@@ -3,6 +3,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "WRCombatLibrary.h"
+#include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPathTypes.h"
 
@@ -146,6 +147,50 @@ bool FWRInventoryRulesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("all slots empty again"), Slots[0].IsEmpty() && Slots[1].IsEmpty() && Slots[2].IsEmpty());
 	FWRInventoryRules::Add(Slots, TEXT("wood"), 10);
 	TestTrue(TEXT("weight = 10 x 0.2"), FMath::IsNearlyEqual(FWRInventoryRules::TotalWeight(Slots), 2.f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRCraftingRulesTest, "Wildreach.Crafting.Rules",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
+{
+	// Hearth tech levels need 0/1/2/4/6 different major boss cores (Crafting tab).
+	TestEqual(TEXT("0 cores = level 1"), FWRCraftingRules::TechLevelForCores(0), 1);
+	TestEqual(TEXT("1 core = level 2"), FWRCraftingRules::TechLevelForCores(1), 2);
+	TestEqual(TEXT("2 cores = level 3"), FWRCraftingRules::TechLevelForCores(2), 3);
+	TestEqual(TEXT("3 cores still level 3"), FWRCraftingRules::TechLevelForCores(3), 3);
+	TestEqual(TEXT("4 cores = level 4"), FWRCraftingRules::TechLevelForCores(4), 4);
+	TestEqual(TEXT("6 cores = level 5"), FWRCraftingRules::TechLevelForCores(6), 5);
+	// Upgrade cap +2 per Hearth level; each step costs one more shard.
+	TestEqual(TEXT("cap at level 1"), FWRCraftingRules::UpgradeCap(1), 2);
+	TestEqual(TEXT("cap at level 3"), FWRCraftingRules::UpgradeCap(3), 6);
+	TestEqual(TEXT("+0 -> +1 costs 1"), FWRCraftingRules::UpgradeCost(0), 1);
+	TestEqual(TEXT("+5 -> +6 costs 6"), FWRCraftingRules::UpgradeCost(5), 6);
+	// Quality odds: low rolls are crude, high rolls masterwork, and better Hearths shift odds up.
+	TestEqual(TEXT("roll 0 = crude"), FWRCraftingRules::RollQuality(0.f, 1, 0), EWRQuality::Crude);
+	TestEqual(TEXT("roll 0.5 = common"), FWRCraftingRules::RollQuality(0.5f, 1, 0), EWRQuality::Common);
+	TestEqual(TEXT("roll 0.999 = masterwork"), FWRCraftingRules::RollQuality(0.999f, 1, 0), EWRQuality::Masterwork);
+	TestTrue(TEXT("a better Hearth makes crude rarer"),
+		FWRCraftingRules::RollQuality(0.2f, 1, 0) == EWRQuality::Crude && FWRCraftingRules::RollQuality(0.2f, 5, 100) != EWRQuality::Crude);
+	// Recipes load and every input/output is a real item.
+	TestNotNull(TEXT("copper sword recipe"), FWRRecipeRegistry::Get().Find(TEXT("copper_sword")));
+	for (const FName Station : { FName(TEXT("forge")), FName(TEXT("armorer")), FName(TEXT("alchemy_table")), FName(TEXT("workbench")) })
+	{
+		for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(Station))
+		{
+			TestNotNull(FString::Printf(TEXT("%s output exists"), *R->Id.ToString()), FWRItemRegistry::Get().Find(R->Output));
+			for (const TPair<FName, int32>& In : R->Inputs)
+			{
+				TestNotNull(FString::Printf(TEXT("%s input %s exists"), *R->Id.ToString(), *In.Key.ToString()), FWRItemRegistry::Get().Find(In.Key));
+			}
+		}
+	}
+	// Equipment never stacks and starts at full durability.
+	TArray<FWRItemStack> Slots;
+	Slots.SetNum(3);
+	TestEqual(TEXT("two swords take two slots"), FWRInventoryRules::Add(Slots, TEXT("copper_sword"), 2), 0);
+	TestTrue(TEXT("separate instances"), Slots[0].Count == 1 && Slots[1].Count == 1);
+	TestEqual(TEXT("full durability"), Slots[0].Durability, 200.f);
 	return true;
 }
 

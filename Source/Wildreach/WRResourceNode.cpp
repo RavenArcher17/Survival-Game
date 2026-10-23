@@ -45,6 +45,10 @@ void AWRResourceNode::OnRep_Look()
 	else if (ItemId == TEXT("copper_ore")) { Color = FLinearColor(0.75f, 0.4f, 0.2f); Scale = FVector(1.5f, 1.5f, 1.2f); }
 	else if (ItemId == TEXT("sulfur_crystal")) { Color = FLinearColor(0.9f, 0.85f, 0.2f); Scale = FVector(0.8f, 0.8f, 1.6f); }
 	else if (ItemId == TEXT("lichen")) { Color = FLinearColor(0.6f, 0.75f, 0.55f); Scale = FVector(1.5f, 1.5f, 0.4f); }
+	else if (ItemId == TEXT("berries")) { Color = FLinearColor(0.45f, 0.1f, 0.25f); Scale = FVector(1.2f, 1.2f, 0.8f); }
+	else if (ItemId == TEXT("fiber")) { Color = FLinearColor(0.55f, 0.6f, 0.25f); Scale = FVector(0.8f, 0.8f, 1.2f); }
+	else if (ItemId == TEXT("tin_ore")) { Color = FLinearColor(0.7f, 0.72f, 0.75f); Scale = FVector(1.5f, 1.5f, 1.2f); }
+	else if (ItemId == TEXT("iron_ore")) { Color = FLinearColor(0.35f, 0.2f, 0.18f); Scale = FVector(1.6f, 1.6f, 1.3f); }
 	SetActorScale3D(Scale);
 	if (UMaterialInstanceDynamic* Mat = Mesh->CreateAndSetMaterialInstanceDynamic(0))
 	{
@@ -71,6 +75,12 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	}
 	const int32 Amount = PerHit * (bHeavy ? 2 : 1);
 	const int32 Left = Inventory->AddItem(ItemId, Amount);
+	// Ore veins sometimes give up a gem (Crafting tab: gems come from mines and caves).
+	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < 0.04f)
+	{
+		static const FName Gems[] = { TEXT("gem_ruby"), TEXT("gem_topaz"), TEXT("gem_onyx") };
+		Inventory->AddItem(Gems[FMath::RandRange(0, 2)], 1);
+	}
 	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s (%d hits left)"), *Gatherer->GetName(), Amount - Left, *ItemId.ToString(), *GetName(), HitsLeft - 1);
 
 	if (--HitsLeft <= 0)

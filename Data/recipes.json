@@ -1,0 +1,32 @@
+{
+  "_comment": "Recipes by station. Station tiers and what each level unlocks follow the Crafting tab (Hearth levels 1-3 for the first playable). Input amounts are placeholders. 'pathMaterial' means one ember or frost essence may be added to infuse the item with that element.",
+  "recipes": [
+    { "id": "copper_ingot", "station": "forge", "level": 1, "inputs": { "copper_ore": 2 }, "output": "copper_ingot", "count": 1, "seconds": 2 },
+    { "id": "bronze_ingot", "station": "forge", "level": 2, "inputs": { "copper_ingot": 2, "tin_ore": 1 }, "output": "bronze_ingot", "count": 1, "seconds": 3 },
+    { "id": "iron_ingot", "station": "forge", "level": 3, "inputs": { "iron_ore": 2 }, "output": "iron_ingot", "count": 1, "seconds": 4 },
+    { "id": "copper_sword", "station": "forge", "level": 1, "inputs": { "copper_ingot": 3, "wood": 2 }, "output": "copper_sword", "count": 1, "seconds": 4, "quality": true },
+    { "id": "bronze_sword", "station": "forge", "level": 2, "inputs": { "bronze_ingot": 3, "wood": 2 }, "output": "bronze_sword", "count": 1, "seconds": 5, "quality": true },
+    { "id": "iron_sword", "station": "forge", "level": 3, "inputs": { "iron_ingot": 3, "wood": 2 }, "output": "iron_sword", "count": 1, "seconds": 6, "quality": true },
+
+    { "id": "hide_armor", "station": "armorer", "level": 1, "inputs": { "hide": 6, "fiber": 4 }, "output": "hide_armor", "count": 1, "seconds": 4, "quality": true },
+    { "id": "copper_armor", "station": "armorer", "level": 1, "inputs": { "copper_ingot": 6, "hide": 2 }, "output": "copper_armor", "count": 1, "seconds": 5, "quality": true },
+    { "id": "bronze_armor", "station": "armorer", "level": 2, "inputs": { "bronze_ingot": 6, "hide": 2 }, "output": "bronze_armor", "count": 1, "seconds": 6, "quality": true },
+    { "id": "iron_armor", "station": "armorer", "level": 3, "inputs": { "iron_ingot": 6, "hide": 3 }, "output": "iron_armor", "count": 1, "seconds": 7, "quality": true },
+
+    { "id": "minor_healing_potion", "station": "alchemy_table", "level": 1, "inputs": { "berries": 3, "fiber": 1 }, "output": "minor_healing_potion", "count": 1, "seconds": 2 },
+    { "id": "healing_potion", "station": "alchemy_table", "level": 2, "inputs": { "minor_healing_potion": 2, "sulfur_crystal": 1, "lichen": 1 }, "output": "healing_potion", "count": 1, "seconds": 3 },
+    { "id": "antidote", "station": "alchemy_table", "level": 2, "inputs": { "berries": 2, "lichen": 2 }, "output": "antidote", "count": 1, "seconds": 2 },
+    { "id": "torpor_dart", "station": "alchemy_table", "level": 1, "inputs": { "berries": 2, "fiber": 2 }, "output": "torpor_dart", "count": 3, "seconds": 2 },
+
+    { "id": "cooked_meat", "station": "workbench", "level": 1, "inputs": { "raw_meat": 1, "wood": 1 }, "output": "cooked_meat", "count": 1, "seconds": 2 },
+    { "id": "waterskin", "station": "workbench", "level": 1, "inputs": { "hide": 1 }, "output": "waterskin", "count": 1, "seconds": 2 }
+  ],
+  "quality": {
+    "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",
+    "baseOdds": [0.25, 0.55, 0.17, 0.03],
+    "perHearthLevel": 0.04,
+    "perSkillLevel": 0.004,
+    "rollSpread": 0.1
+  },
+  "repairCostFraction": 0.3
+}

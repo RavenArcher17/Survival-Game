@@ -4,6 +4,16 @@
 #include "Components/ActorComponent.h"
 #include "WRInventory.generated.h"
 
+class AWRCharacterBase;
+
+UENUM()
+enum class EWREquipSlot : uint8
+{
+	None,
+	Weapon,
+	Armor,
+};
+
 /** One item definition from Data/items.json. */
 struct FWRItemDef
 {
@@ -12,11 +22,22 @@ struct FWRItemDef
 	FName Category;
 	int32 StackSize = 1;
 	float Weight = 0.f;
+	// Consumables
 	float Heal = 0.f;
 	float Hunger = 0.f;
 	float Thirst = 0.f;
 	float UseCooldown = 0.f;
-	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f; }
+	bool bCleanse = false;
+	// Equipment
+	EWREquipSlot Slot = EWREquipSlot::None;
+	FName Metal;
+	float Armor = 0.f;
+	float MaxDurability = 0.f;
+	// Gems / boss parts: stat -> amount
+	TMap<FName, float> GemStats;
+
+	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse; }
+	bool IsEquipment() const { return Slot != EWREquipSlot::None; }
 };
 
 class WILDREACH_API FWRItemRegistry
@@ -32,6 +53,16 @@ private:
 	TArray<TPair<FName, int32>> Kit;
 };
 
+/** Quality tiers (Crafting tab): sockets 0/1/2/3, damage x0.9/1.0/1.1/1.2 (Starting numbers). */
+UENUM()
+enum class EWRQuality : uint8
+{
+	Crude,
+	Common,
+	Fine,
+	Masterwork,
+};
+
 USTRUCT()
 struct FWRItemStack
 {
@@ -39,8 +70,19 @@ struct FWRItemStack
 
 	UPROPERTY() FName ItemId;
 	UPROPERTY() int32 Count = 0;
+	// Per-instance data for equipment (stack size 1).
+	UPROPERTY() EWRQuality Quality = EWRQuality::Common;
+	/** Random stat roll within the quality, ~0.9..1.1. */
+	UPROPERTY() float Roll = 1.f;
+	UPROPERTY() int32 Upgrade = 0;
+	UPROPERTY() float Durability = 0.f;
+	UPROPERTY() TArray<FName> Sockets;
+	/** Path material infused at craft time ("fire"/"frost"), or None. */
+	UPROPERTY() FName Element;
 
 	bool IsEmpty() const { return ItemId.IsNone() || Count <= 0; }
+	static int32 SocketCount(EWRQuality Q) { return static_cast<int32>(Q); }
+	static const TCHAR* QualityName(EWRQuality Q);
 };
 
 /** Pure slot logic (no world) so tests can cover stacking. */
@@ -48,15 +90,19 @@ struct WILDREACH_API FWRInventoryRules
 {
 	/** Adds as much as fits (fills existing stacks first). Returns how many didn't fit. */
 	static int32 Add(TArray<FWRItemStack>& Slots, FName ItemId, int32 Count);
+	/** Adds one prepared equipment instance. False if no free slot. */
+	static bool AddInstance(TArray<FWRItemStack>& Slots, const FWRItemStack& Instance);
 	/** Removes up to Count across stacks. Returns how many were removed. */
 	static int32 Remove(TArray<FWRItemStack>& Slots, FName ItemId, int32 Count);
 	static int32 CountOf(const TArray<FWRItemStack>& Slots, FName ItemId);
 	static float TotalWeight(const TArray<FWRItemStack>& Slots);
+	/** A fresh equipment instance with full durability. */
+	static FWRItemStack MakeInstance(FName ItemId, EWRQuality Quality = EWRQuality::Common, float Roll = 1.f);
 };
 
 /**
- * A survivor's inventory: fixed slots, server-authoritative, replicated to the owner.
- * Lives on the PlayerState (Souls-like death penalty keeps items; other penalties come with M7 settings).
+ * A survivor's inventory + equipment: fixed slots, server-authoritative, replicated to the owner.
+ * Lives on the PlayerState. Equipped weapon/armor stats are pushed onto the pawn.
  */
 UCLASS(ClassGroup=(Inventory))
 class WILDREACH_API UWRInventoryComponent : public UActorComponent
@@ -72,15 +118,28 @@ public:
 
 	// --- Server ---
 	int32 AddItem(FName ItemId, int32 Count);
+	bool AddInstance(const FWRItemStack& Instance);
 	int32 RemoveItem(FName ItemId, int32 Count);
 	/** Use the first usable item of a category ("potion", "food", "drink"). Returns a message. */
 	FString UseCategory(FName Category);
+	/** Use / equip / socket the item in a slot. Returns a message. */
+	FString UseSlot(int32 SlotIndex);
+	FString Unequip(EWREquipSlot Slot);
 	void GiveStartingKit();
+	/** Wear on equipped gear (weapon on hit, armor when hit). Breaks at 0 (stats off until repaired). */
+	void WearEquipped(EWREquipSlot Slot, float Amount);
+	/** Push equipment stats onto the current pawn. */
+	void ApplyEquipment();
+	FWRItemStack* GetEquippedMutable(EWREquipSlot Slot);
 
 	// --- Queries ---
 	const TArray<FWRItemStack>& GetSlots() const { return Slots; }
+	const FWRItemStack& GetEquipped(EWREquipSlot Slot) const { return Slot == EWREquipSlot::Armor ? EquippedArmor : EquippedWeapon; }
 	int32 CountOf(FName ItemId) const { return FWRInventoryRules::CountOf(Slots, ItemId); }
 	float GetPotionCooldownRemaining() const;
+	/** Sum of a gem stat over the equipped weapon's sockets ("damage", "critChance", ...). */
+	float GemStat(FName Stat) const;
+	float GetArmorValue() const;
 
 	static constexpr int32 NumSlots = 30;
 
@@ -89,7 +148,11 @@ public:
 	bool bKitGiven = false;
 
 private:
+	AWRCharacterBase* GetPawnCharacter() const;
+
 	UPROPERTY(Replicated) TArray<FWRItemStack> Slots;
+	UPROPERTY(Replicated) FWRItemStack EquippedWeapon;
+	UPROPERTY(Replicated) FWRItemStack EquippedArmor;
 	/** Server time the potion belt is ready again (replicated so the HUD can show it). */
 	UPROPERTY(Replicated) float PotionReadyAt = 0.f;
 };

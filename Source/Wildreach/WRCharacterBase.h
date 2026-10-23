@@ -78,6 +78,8 @@ public:
 	UPROPERTY(VisibleAnywhere, Category="Combat") TObjectPtr<UWRStatusComponent> Status;
 
 	UPROPERTY(EditAnywhere, Replicated, Category="Combat") FWRWeaponStats Weapon;
+	/** Server: armor from equipped gear; incoming hits are scaled by 100 / (100 + ArmorValue). */
+	float ArmorValue = 0.f;
 
 	/** Max health / stamina / poise to start with (players get these from character level). */
 	UPROPERTY(EditAnywhere, Category="Combat") float BaseHealth = 100.f;

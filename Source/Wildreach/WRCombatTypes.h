@@ -61,4 +61,16 @@ struct FWRWeaponStats
 	UPROPERTY(EditAnywhere) int32 Upgrade = 0;
 	/** Creatures use a flat bite damage instead of the sword table (0 = use the sword table). */
 	UPROPERTY(EditAnywhere) float FlatDamage = 0.f;
+	/** Per-instance stat roll within the quality (~0.9..1.1). */
+	UPROPERTY() float Roll = 1.f;
+	/** Socketed gem bonuses. */
+	UPROPERTY() float GemDamage = 0.f;
+	UPROPERTY() float GemCrit = 0.f;
+	/** Durability hit zero: half damage until repaired. */
+	UPROPERTY() bool bBroken = false;
+	/** Path material infused at craft time ("fire"/"frost"): plain attacks carry that element. */
+	UPROPERTY() FName Element;
+	/** Boss parts: Giant's ember (stagger -> lava shockwave), Wyrm scale (blocks can freeze the attacker). */
+	UPROPERTY() bool bStaggerShockwave = false;
+	UPROPERTY() bool bBlockFreeze = false;
 };

@@ -26,6 +26,8 @@ struct FWRCreatureDef
 	FLinearColor Color = FLinearColor::Gray;
 	FName Element;
 	TArray<FName> Resists;
+	/** Given to whoever lands the killing blow (default: 2 raw meat, 1 hide). */
+	TArray<TPair<FName, int32>> Loot;
 };
 
 class WILDREACH_API FWRCreatureRegistry

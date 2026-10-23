@@ -1,6 +1,7 @@
 #include "WRHUD.h"
 #include "WRAbilities.h"
 #include "WRAltar.h"
+#include "WRCrafting.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
@@ -140,7 +141,7 @@ void AWRHUD::DrawHUD()
 		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
 		DrawText(Line, FLinearColor::White, 24.f, 48.f);
 	}
-	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  V view"),
+	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  V view"),
 		FLinearColor(1.f, 1.f, 1.f, 0.55f), 24.f, 24.f);
 
 	// Quick slots, bottom centre.
@@ -187,6 +188,42 @@ void AWRHUD::DrawHUD()
 	}
 	if (const AWRPlayerController* PC = Cast<AWRPlayerController>(GetOwningPlayerController()))
 	{
+		// Crafting / inventory menu panel.
+		if (PC->GetMenu() != EWRMenu::None)
+		{
+			const TArray<FWRMenuEntry> Entries = PC->BuildMenuEntries();
+			const float PX = 60.f, PY = 90.f, LineH = 20.f, PW = 760.f;
+			const int32 Visible = 22;
+			const int32 First = FMath::Clamp(PC->GetMenuIndex() - Visible / 2, 0, FMath::Max(0, Entries.Num() - Visible));
+			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.72f), PX - 10.f, PY - 30.f, PW, (FMath::Min(Visible, Entries.Num()) + 2) * LineH + 20.f);
+			DrawText(PC->GetMenuTitle(), FLinearColor(1.f, 0.85f, 0.4f), PX, PY - 24.f);
+			for (int32 i = First; i < Entries.Num() && i < First + Visible; ++i)
+			{
+				const bool bSel = i == PC->GetMenuIndex();
+				const float RowY = PY + (i - First) * LineH;
+				if (bSel)
+				{
+					DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.12f), PX - 6.f, RowY - 1.f, PW - 8.f, LineH);
+				}
+				DrawText(FString(bSel ? TEXT("> ") : TEXT("  ")) + Entries[i].Label,
+					Entries[i].bAvailable ? FLinearColor::White : FLinearColor(0.55f, 0.55f, 0.55f), PX, RowY);
+			}
+			if (Entries.Num() == 0)
+			{
+				DrawText(TEXT("(empty)"), FLinearColor(0.6f, 0.6f, 0.6f), PX, PY);
+			}
+		}
+		else if (const AWRStation* Station = PC->FindNearbyStation())
+		{
+			const FString Prompt = FString::Printf(TEXT("E: use %s"), *Station->GetDisplayName());
+			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
+		}
+		else if (const AWRHearth* Hearth = PC->FindNearbyHearth())
+		{
+			const FString Prompt = FString::Printf(TEXT("E: Hearth (tech level %d, %d core%s)%s"), Hearth->GetTechLevel(), Hearth->GetCores().Num(),
+				Hearth->GetCores().Num() == 1 ? TEXT("") : TEXT("s"), Hearth->IsBroken() ? TEXT("  BROKEN") : TEXT(""));
+			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
+		}
 		if (const AWRBossAltar* Altar = PC->FindNearbyAltar())
 		{
 			const FString Prompt = Altar->GetPrompt(PC);

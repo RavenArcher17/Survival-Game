@@ -1,0 +1,263 @@
+// AWRPlayerController: interaction, crafting and inventory menus, and the gameplay commands they send.
+// Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
+
+#include "WRPlayerController.h"
+#include "Wildreach.h"
+#include "WRAltar.h"
+#include "WRCrafting.h"
+#include "WRInventory.h"
+#include "WRPlayerState.h"
+#include "EngineUtils.h"
+
+template <typename T>
+static T* FindNearby(const UWorld* World, const APawn* Pawn, float Range)
+{
+	if (!Pawn)
+	{
+		return nullptr;
+	}
+	T* Best = nullptr;
+	float BestDist = Range;
+	for (TActorIterator<T> It(World); It; ++It)
+	{
+		const float D = FVector::Dist2D(It->GetActorLocation(), Pawn->GetActorLocation());
+		if (D < BestDist)
+		{
+			BestDist = D;
+			Best = *It;
+		}
+	}
+	return Best;
+}
+
+AWRStation* AWRPlayerController::FindNearbyStation() const { return FindNearby<AWRStation>(GetWorld(), GetPawn(), AWRStation::UseRange); }
+AWRHearth* AWRPlayerController::FindNearbyHearth() const { return FindNearby<AWRHearth>(GetWorld(), GetPawn(), AWRStation::UseRange); }
+
+void AWRPlayerController::WRCraft(FName Recipe, FName Element) { ServerCommand(FString::Printf(TEXT("craft %s %s"), *Recipe.ToString(), Element.IsNone() ? TEXT("none") : *Element.ToString())); }
+void AWRPlayerController::WRUseSlot(int32 Slot) { ServerCommand(FString::Printf(TEXT("slot %d"), Slot)); }
+void AWRPlayerController::WRRepair(FName Slot) { ServerCommand(FString::Printf(TEXT("repair %s"), *Slot.ToString())); }
+void AWRPlayerController::WRUpgrade(FName Slot) { ServerCommand(FString::Printf(TEXT("upgrade %s"), *Slot.ToString())); }
+void AWRPlayerController::WRUnequip(FName Slot) { ServerCommand(FString::Printf(TEXT("unequip %s"), *Slot.ToString())); }
+void AWRPlayerController::WREquip(FName Item) { ServerCommand(FString::Printf(TEXT("equip %s"), *Item.ToString())); }
+void AWRPlayerController::WRGoTo(FName What) { ServerCommand(FString::Printf(TEXT("goto %s"), *What.ToString())); }
+
+void AWRPlayerController::WRInteract()
+{
+	if (Menu != EWRMenu::None)
+	{
+		MenuClose();
+		return;
+	}
+	if (AWRStation* Station = FindNearbyStation())
+	{
+		Menu = EWRMenu::Craft;
+		MenuStation = Station;
+		MenuIndex = 0;
+		return;
+	}
+	ServerCommand(TEXT("interact"));
+}
+
+void AWRPlayerController::ToggleInventory()
+{
+	Menu = Menu == EWRMenu::Inventory ? EWRMenu::None : EWRMenu::Inventory;
+	MenuIndex = 0;
+}
+
+void AWRPlayerController::MenuClose()
+{
+	Menu = EWRMenu::None;
+	MenuStation = nullptr;
+}
+
+void AWRPlayerController::MenuUp()
+{
+	if (Menu != EWRMenu::None)
+	{
+		const int32 N = FMath::Max(1, BuildMenuEntries().Num());
+		MenuIndex = (MenuIndex + N - 1) % N;
+	}
+}
+
+void AWRPlayerController::MenuDown()
+{
+	if (Menu != EWRMenu::None)
+	{
+		MenuIndex = (MenuIndex + 1) % FMath::Max(1, BuildMenuEntries().Num());
+	}
+}
+
+void AWRPlayerController::CycleInfuse()
+{
+	if (Menu == EWRMenu::Craft)
+	{
+		MenuElement = MenuElement.IsNone() ? FName(TEXT("fire")) : MenuElement == TEXT("fire") ? FName(TEXT("frost")) : NAME_None;
+	}
+}
+
+void AWRPlayerController::MenuConfirm()
+{
+	const TArray<FWRMenuEntry> Entries = BuildMenuEntries();
+	if (Menu != EWRMenu::None && Entries.IsValidIndex(MenuIndex) && !Entries[MenuIndex].Command.IsEmpty())
+	{
+		ServerCommand(Entries[MenuIndex].Command);
+	}
+}
+
+FString AWRPlayerController::GetMenuTitle() const
+{
+	if (Menu == EWRMenu::Inventory)
+	{
+		return TEXT("Inventory  (Up/Down, Enter = use / equip / socket, I = close)");
+	}
+	if (const AWRStation* Station = MenuStation.Get())
+	{
+		return FString::Printf(TEXT("%s  (Up/Down, Enter = craft, F = infuse: %s, E = close)"), *Station->GetDisplayName(),
+			MenuElement.IsNone() ? TEXT("none") : *MenuElement.ToString());
+	}
+	return FString();
+}
+
+TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
+{
+	TArray<FWRMenuEntry> Out;
+	const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
+	const UWRInventoryComponent* Inv = PS ? PS->GetInventory() : nullptr;
+	if (!Inv)
+	{
+		return Out;
+	}
+
+	const auto GearLabel = [](const FWRItemStack& S)
+	{
+		const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		if (!Def) return FString(TEXT("-"));
+		return FString::Printf(TEXT("%s %s%s  dur %.0f/%.0f%s%s"), FWRItemStack::QualityName(S.Quality), *Def->Name,
+			S.Upgrade > 0 ? *FString::Printf(TEXT(" +%d"), S.Upgrade) : TEXT(""), S.Durability, Def->MaxDurability,
+			S.Element.IsNone() ? TEXT("") : *FString::Printf(TEXT("  [%s]"), *S.Element.ToString()),
+			S.Sockets.Num() > 0 ? *FString::Printf(TEXT("  gems %d/%d"), S.Sockets.Num(), FWRItemStack::SocketCount(S.Quality)) : TEXT(""));
+	};
+
+	if (Menu == EWRMenu::Inventory)
+	{
+		Out.Add({ FString::Printf(TEXT("Weapon: %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Weapon))), TEXT("unequip weapon") });
+		Out.Add({ FString::Printf(TEXT("Armor:  %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Armor))), TEXT("unequip armor") });
+		const TArray<FWRItemStack>& Slots = Inv->GetSlots();
+		for (int32 i = 0; i < Slots.Num(); ++i)
+		{
+			if (Slots[i].IsEmpty())
+			{
+				continue;
+			}
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[i].ItemId);
+			const FString Label = Def && Def->IsEquipment() ? GearLabel(Slots[i])
+				: FString::Printf(TEXT("%s x%d"), Def ? *Def->Name : *Slots[i].ItemId.ToString(), Slots[i].Count);
+			Out.Add({ Label, FString::Printf(TEXT("slot %d"), i) });
+		}
+		return Out;
+	}
+
+	const AWRStation* Station = MenuStation.Get();
+	if (!Station)
+	{
+		return Out;
+	}
+	for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(Station->StationType))
+	{
+		const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(R->Output);
+		FString Needs;
+		bool bHave = R->Level <= Station->GetTier();
+		for (const TPair<FName, int32>& In : R->Inputs)
+		{
+			const FWRItemDef* InDef = FWRItemRegistry::Get().Find(In.Key);
+			const int32 Have = Inv->CountOf(In.Key);
+			bHave &= Have >= In.Value;
+			Needs += FString::Printf(TEXT("%s %d/%d  "), InDef ? *InDef->Name : *In.Key.ToString(), Have, In.Value);
+		}
+		FWRMenuEntry E;
+		E.Label = FString::Printf(TEXT("%s%s  <-  %s%s"), OutDef ? *OutDef->Name : *R->Output.ToString(),
+			R->Count > 1 ? *FString::Printf(TEXT(" x%d"), R->Count) : TEXT(""), *Needs,
+			R->Level > Station->GetTier() ? *FString::Printf(TEXT("(tier %d)"), R->Level) : TEXT(""));
+		E.Command = FString::Printf(TEXT("craft %s %s"), *R->Id.ToString(), MenuElement.IsNone() ? TEXT("none") : *MenuElement.ToString());
+		E.bAvailable = bHave;
+		Out.Add(E);
+	}
+	if (Station->StationType == TEXT("forge"))
+	{
+		Out.Add({ TEXT("Repair weapon"), TEXT("repair weapon") });
+		Out.Add({ TEXT("Upgrade weapon (upgrade shards)"), TEXT("upgrade weapon") });
+	}
+	else if (Station->StationType == TEXT("armorer"))
+	{
+		Out.Add({ TEXT("Repair armor"), TEXT("repair armor") });
+		Out.Add({ TEXT("Upgrade armor (upgrade shards)"), TEXT("upgrade armor") });
+	}
+	return Out;
+}
+
+bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FString& OutResult)
+{
+	AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
+	if (!PS || Args.Num() == 0)
+	{
+		return false;
+	}
+	const FString& Cmd = Args[0];
+	const auto Arg = [&Args](int32 i) { return Args.IsValidIndex(i) ? Args[i] : FString(); };
+	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : EWREquipSlot::Weapon; };
+
+	if (Cmd == TEXT("interact"))
+	{
+		if (AWRHearth* Hearth = FindNearbyHearth())
+		{
+			OutResult = Hearth->DepositCores(this);
+		}
+		else if (AWRBossAltar* Altar = FindNearbyAltar())
+		{
+			OutResult = Altar->Interact(this);
+		}
+		else
+		{
+			OutResult = TEXT("nothing to interact with");
+			return true;
+		}
+	}
+	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade"))
+	{
+		AWRStation* Station = FindNearbyStation();
+		if (!Station)
+		{
+			OutResult = TEXT("no station nearby");
+		}
+		else if (Cmd == TEXT("craft"))
+		{
+			OutResult = Station->Craft(this, FName(*Arg(1)), Arg(2) == TEXT("none") ? NAME_None : FName(*Arg(2)));
+		}
+		else if (Cmd == TEXT("repair"))
+		{
+			OutResult = Station->Repair(this, SlotOf(Arg(1)));
+		}
+		else
+		{
+			OutResult = Station->Upgrade(this, SlotOf(Arg(1)));
+		}
+	}
+	else if (Cmd == TEXT("slot"))
+	{
+		OutResult = PS->GetInventory()->UseSlot(FCString::Atoi(*Arg(1)));
+	}
+	else if (Cmd == TEXT("unequip"))
+	{
+		OutResult = PS->GetInventory()->Unequip(SlotOf(Arg(1)));
+	}
+	else if (Cmd == TEXT("use"))
+	{
+		OutResult = PS->GetInventory()->UseCategory(FName(*Arg(1)));
+	}
+	else
+	{
+		return false;
+	}
+	ClientNotify(OutResult);
+	return true;
+}

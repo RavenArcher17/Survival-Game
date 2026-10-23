@@ -4,6 +4,7 @@
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRGameplayTags.h"
+#include "WRInventory.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -73,6 +74,18 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetArrayField(TEXT("color"), Color) && Color->Num() >= 3)
 		{
 			D.Color = FLinearColor((*Color)[0]->AsNumber(), (*Color)[1]->AsNumber(), (*Color)[2]->AsNumber());
+		}
+		const TSharedPtr<FJsonObject>* Loot = nullptr;
+		if (O->TryGetObjectField(TEXT("loot"), Loot))
+		{
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& L : (*Loot)->Values)
+			{
+				D.Loot.Add({ FName(*L.Key), static_cast<int32>(L.Value->AsNumber()) });
+			}
+		}
+		else if (D.Archetype != TEXT("dummy"))
+		{
+			D.Loot = { { TEXT("raw_meat"), 2 }, { TEXT("hide"), 1 } };
 		}
 		const TArray<TSharedPtr<FJsonValue>>* Resists = nullptr;
 		if (O->TryGetArrayField(TEXT("resists"), Resists))
@@ -195,6 +208,16 @@ FString AWRCreature::GetDisplayLabel() const
 void AWRCreature::OnDeath(AActor* Killer)
 {
 	OnCreatureDied.Broadcast(this);
+	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
+	{
+		if (const FWRCreatureDef* Def = GetDef())
+		{
+			for (const TPair<FName, int32>& L : Def->Loot)
+			{
+				Inv->AddItem(L.Key, L.Value);
+			}
+		}
+	}
 	SetLifeSpan(4.f);
 	if (AController* AI = GetController())
 	{

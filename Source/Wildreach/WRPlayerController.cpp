@@ -1,6 +1,7 @@
 #include "WRPlayerController.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
+#include "WRCrafting.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
@@ -34,6 +35,12 @@ void AWRPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AWRPlayerController::UsePotion);
 	InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AWRPlayerController::UseFood);
 	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &AWRPlayerController::UseDrink);
+	InputComponent->BindKey(EKeys::I, IE_Pressed, this, &AWRPlayerController::ToggleInventory);
+	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
+	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);
+	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
+	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AWRPlayerController::MenuClose);
+	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AWRPlayerController::CycleInfuse);
 }
 
 void AWRPlayerController::UsePotion() { ServerCommand(TEXT("use potion")); }
@@ -81,7 +88,6 @@ void AWRPlayerController::ClientNotify_Implementation(const FString& Message)
 	UE_LOG(LogWildreach, Log, TEXT("NOTICE %s"), *Message);
 }
 
-void AWRPlayerController::WRInteract() { ServerCommand(TEXT("interact")); }
 void AWRPlayerController::WRBotPause(int32 bPause)
 {
 	bBotPaused = bPause != 0;
@@ -203,7 +209,13 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 {
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
-	if (!Command.StartsWith(TEXT("interact")) && !Command.StartsWith(TEXT("use ")))
+	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip ") };
+	bool bAllowed = false;
+	for (const TCHAR* Prefix : GameplayCommands)
+	{
+		bAllowed |= Command.StartsWith(Prefix);
+	}
+	if (!bAllowed)
 	{
 		return;
 	}
@@ -265,19 +277,34 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 100.f);
 	}
 	else if (Cmd == TEXT("killme") && Survivor) { Survivor->Die(nullptr); }
-	else if (Cmd == TEXT("interact"))
+	else if (Cmd == TEXT("goto") && Survivor)
 	{
-		// Interaction is a gameplay action, not a dev command: it stays available in shipping (see ServerCommand).
-		AWRBossAltar* Altar = FindNearbyAltar();
-		Result = Altar ? Altar->Interact(this) : TEXT("nothing to interact with");
-		if (Altar)
+		AActor* Best = nullptr;
+		float BestDist = TNumericLimits<float>::Max();
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
-			ClientNotify(Result);
+			const AWRStation* Station = Cast<AWRStation>(*It);
+			const bool bMatch = (Station && Station->StationType == FName(*Arg(1))) || (Arg(1) == TEXT("hearth") && It->IsA<AWRHearth>());
+			const float D = FVector::Dist(It->GetActorLocation(), Survivor->GetActorLocation());
+			if (bMatch && D < BestDist)
+			{
+				BestDist = D;
+				Best = *It;
+			}
 		}
+		if (Best)
+		{
+			// Stand in front of it (stations sit in a row along X).
+			Survivor->TeleportTo(Best->GetActorLocation() + FVector(0.f, 200.f, 100.f), Survivor->GetActorRotation());
+		}
+		Result = Best ? FString::Printf(TEXT("at %s"), *Best->GetName()) : TEXT("none found");
 	}
-	else if (Cmd == TEXT("use") && PS)
+	else if (RunGameplayCommand(Args, Result)) {}
+	else if (Cmd == TEXT("equip") && PS)
 	{
-		Result = PS->GetInventory()->UseCategory(FName(*Arg(1)));
+		// Testing aid: use the first inventory slot holding this item (equip / socket / consume).
+		const int32 Slot = PS->GetInventory()->GetSlots().IndexOfByPredicate([&Arg](const FWRItemStack& S) { return S.ItemId == FName(*Arg(1)); });
+		Result = Slot == INDEX_NONE ? TEXT("not carried") : PS->GetInventory()->UseSlot(Slot);
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("give") && PS)

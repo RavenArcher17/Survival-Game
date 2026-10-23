@@ -176,6 +176,14 @@ else:
         ps = spawn(unreal.PlayerStart, world(s["x"], s["y"], 200), (0, 0, yaw), f"Spawn_{s['biome']}_{i}")
         ps.set_editor_property("player_start_tag", s["biome"])
 
+    # Starter camps: the four stations at each biome's middle spawn (tier 1 until a player Hearth covers them).
+    station_class = unreal.load_class(None, "/Script/Wildreach.WRStation")
+    for s in [sp for sp in layout["spawns"] if 1000 < sp["y"] < 3000]:
+        inward = 1 if s["biome"] == "volcanic" else -1
+        for k, station in enumerate(["forge", "armorer", "alchemy_table", "workbench"]):
+            st = spawn(station_class, world(s["x"] + inward * 25, s["y"] - 12 + k * 8, 40), label=f"Camp_{s['biome']}_{station}")
+            st.set_editor_property("station_type", station)
+
     # Boss altars at the arena sites (bosses themselves are M6).
     altar_class = unreal.load_class(None, "/Script/Wildreach.WRBossAltar")
     for b, path_id in zip(layout["bosses"], ["fire", "frost"]):
@@ -197,7 +205,8 @@ else:
     node_class = unreal.load_class(None, "/Script/Wildreach.WRResourceNode")
     rng = random.Random(7)
     ridge_x = 2016
-    counts = {"wood": 40, "stone": 40, "copper_ore": 12, "sulfur_crystal": 16, "lichen": 16}
+    counts = {"wood": 40, "stone": 40, "copper_ore": 12, "tin_ore": 8, "iron_ore": 8, "berries": 24, "fiber": 24,
+              "sulfur_crystal": 16, "lichen": 16}
     placed = 0
     for item, count in counts.items():
         n = 0
@@ -211,6 +220,9 @@ else:
             if item == "lichen" and west:
                 continue
             if height_m(x, y) < 3 or slope(x, y) > 0.5 or abs(x - ridge_x) < 450:
+                continue
+            # Better metal sits deeper toward the ridge (midlands/highlands); caves come later.
+            if item in ("tin_ore", "iron_ore") and abs(x - ridge_x) > (1300 if item == "tin_ore" else 900):
                 continue
             node = spawn(node_class, world(x, y, 0), (0, rng.uniform(0, 360), 0), f"Node_{item}_{n}")
             node.set_editor_property("item_id", item)

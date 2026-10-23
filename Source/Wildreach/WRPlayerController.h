@@ -6,6 +6,23 @@
 
 class AWRCharacterBase;
 class AWRCharacter;
+class AWRStation;
+class AWRHearth;
+
+enum class EWRMenu : uint8
+{
+	None,
+	Craft,
+	Inventory,
+};
+
+/** One line of a menu and the server command it runs (or empty for a header line). */
+struct FWRMenuEntry
+{
+	FString Label;
+	FString Command;
+	bool bAvailable = true;
+};
 
 /**
  * Lock-on targeting, developer commands (WR*), and a scripted test bot (-wrbot) used
@@ -26,6 +43,25 @@ public:
 
 	/** Nearest altar in interact range (client-side, for the HUD prompt). */
 	class AWRBossAltar* FindNearbyAltar() const;
+	AWRStation* FindNearbyStation() const;
+	AWRHearth* FindNearbyHearth() const;
+
+	// --- Menus (client-side state; actions go to the server as validated commands) ---
+	EWRMenu GetMenu() const { return Menu; }
+	int32 GetMenuIndex() const { return MenuIndex; }
+	FName GetMenuElement() const { return MenuElement; }
+	FString GetMenuTitle() const;
+	TArray<FWRMenuEntry> BuildMenuEntries() const;
+
+	UFUNCTION(Exec) void WRCraft(FName Recipe, FName Element);
+	UFUNCTION(Exec) void WRUseSlot(int32 Slot);
+	UFUNCTION(Exec) void WRRepair(FName Slot);
+	UFUNCTION(Exec) void WRUpgrade(FName Slot);
+	UFUNCTION(Exec) void WRUnequip(FName Slot);
+	/** Use the first inventory slot holding this item (testing). */
+	UFUNCTION(Exec) void WREquip(FName Item);
+	/** Teleport next to the nearest station of a type, or "hearth" (testing). */
+	UFUNCTION(Exec) void WRGoTo(FName What);
 
 	/** Short message from the server ("Frost is now your subclass."), shown by the HUD for a few seconds. */
 	const FString& GetNotice() const { return Notice; }
@@ -67,6 +103,20 @@ public:
 private:
 	UFUNCTION(Server, Reliable) void ServerCommand(const FString& Command);
 	void RunServerCommand(const FString& Command);
+	/** Handles gameplay commands (crafting, inventory, interaction); false if Cmd isn't one. */
+	bool RunGameplayCommand(const TArray<FString>& Args, FString& OutResult);
+
+	void ToggleInventory();
+	void MenuUp();
+	void MenuDown();
+	void MenuConfirm();
+	void MenuClose();
+	void CycleInfuse();
+
+	EWRMenu Menu = EWRMenu::None;
+	int32 MenuIndex = 0;
+	FName MenuElement;
+	TWeakObjectPtr<AWRStation> MenuStation;
 
 	void ToggleLockOn();
 	void UpdateLockOn(float DeltaTime);

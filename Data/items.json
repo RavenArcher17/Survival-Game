@@ -1,22 +1,59 @@
 {
-  "_comment": "Item definitions. 'use' effects are applied by the server. Weights/values are placeholders until tuned.",
+  "_comment": "Item definitions. Names/tiers follow the design doc (Crafting tab); weights, armor values, durability and the exact recipe inputs (recipes.json) are placeholders to tune.",
   "items": [
-    { "id": "minor_healing_potion", "name": "Minor healing potion", "category": "potion", "stack": 5, "weight": 0.5,
-      "use": { "heal": 45, "cooldown": 6 }, "tier": 1, "station": "alchemy_table" },
-    { "id": "healing_potion", "name": "Healing potion", "category": "potion", "stack": 5, "weight": 0.5,
-      "use": { "heal": 90, "cooldown": 6 }, "tier": 2, "station": "alchemy_table" },
+    { "id": "minor_healing_potion", "name": "Minor healing potion", "category": "potion", "stack": 5, "weight": 0.5, "use": { "heal": 45, "cooldown": 6 } },
+    { "id": "healing_potion", "name": "Healing potion", "category": "potion", "stack": 5, "weight": 0.5, "use": { "heal": 90, "cooldown": 6 } },
+    { "id": "antidote", "name": "Antidote", "category": "potion", "stack": 5, "weight": 0.5, "use": { "cleanse": 1, "cooldown": 6 } },
     { "id": "cooked_meat", "name": "Cooked meat", "category": "food", "stack": 10, "weight": 0.3, "use": { "hunger": 35 } },
+    { "id": "berries", "name": "Berries", "category": "food", "stack": 20, "weight": 0.1, "use": { "hunger": 10 } },
     { "id": "waterskin", "name": "Waterskin", "category": "drink", "stack": 5, "weight": 0.5, "use": { "thirst": 40 } },
+
     { "id": "raw_meat", "name": "Raw meat", "category": "material", "stack": 20, "weight": 0.3 },
+    { "id": "hide", "name": "Hide", "category": "material", "stack": 20, "weight": 0.4 },
+    { "id": "fiber", "name": "Fiber", "category": "material", "stack": 50, "weight": 0.05 },
     { "id": "wood", "name": "Wood", "category": "material", "stack": 100, "weight": 0.2 },
     { "id": "stone", "name": "Stone", "category": "material", "stack": 100, "weight": 0.3 },
     { "id": "copper_ore", "name": "Copper ore", "category": "material", "stack": 50, "weight": 0.6 },
+    { "id": "tin_ore", "name": "Tin ore", "category": "material", "stack": 50, "weight": 0.6 },
+    { "id": "iron_ore", "name": "Iron ore", "category": "material", "stack": 50, "weight": 0.7 },
+    { "id": "copper_ingot", "name": "Copper ingot", "category": "material", "stack": 50, "weight": 0.5 },
+    { "id": "bronze_ingot", "name": "Bronze ingot", "category": "material", "stack": 50, "weight": 0.5 },
+    { "id": "iron_ingot", "name": "Iron ingot", "category": "material", "stack": 50, "weight": 0.6 },
     { "id": "sulfur_crystal", "name": "Sulfur crystal", "category": "material", "stack": 50, "weight": 0.2, "biome": "volcanic" },
-    { "id": "lichen", "name": "Lichen", "category": "material", "stack": 50, "weight": 0.1, "biome": "tundra" }
+    { "id": "lichen", "name": "Lichen", "category": "material", "stack": 50, "weight": 0.1, "biome": "tundra" },
+    { "id": "ember_essence", "name": "Ember essence", "category": "material", "stack": 20, "weight": 0.1, "note": "fire path material" },
+    { "id": "frost_essence", "name": "Frost essence", "category": "material", "stack": 20, "weight": 0.1, "note": "frost path material" },
+    { "id": "seeds", "name": "Seeds", "category": "material", "stack": 50, "weight": 0.02 },
+    { "id": "egg", "name": "Egg", "category": "material", "stack": 10, "weight": 0.2 },
+    { "id": "wool", "name": "Wool", "category": "material", "stack": 50, "weight": 0.1 },
+    { "id": "torpor_dart", "name": "Torpor dart", "category": "material", "stack": 20, "weight": 0.05 },
+
+    { "id": "upgrade_shard", "name": "Upgrade shard", "category": "material", "stack": 50, "weight": 0.1, "note": "mini-boss drop, +1..+10 upgrades" },
+    { "id": "core_vulkarn", "name": "Vulkarn's core", "category": "core", "stack": 5, "weight": 2.0 },
+    { "id": "core_skaldrith", "name": "Skaldrith's core", "category": "core", "stack": 5, "weight": 2.0 },
+
+    { "id": "gem_ruby", "name": "Ruby", "category": "gem", "stack": 10, "weight": 0.05, "gem": { "damage": 0.06 } },
+    { "id": "gem_topaz", "name": "Topaz", "category": "gem", "stack": 10, "weight": 0.05, "gem": { "critChance": 0.05 } },
+    { "id": "gem_onyx", "name": "Onyx", "category": "gem", "stack": 10, "weight": 0.05, "gem": { "poise": 10 } },
+    { "id": "part_giants_ember", "name": "Giant's ember", "category": "gem", "stack": 1, "weight": 0.5, "gem": { "staggerShockwave": 1 }, "note": "Vulkarn boss part" },
+    { "id": "part_wyrm_scale", "name": "Wyrm scale", "category": "gem", "stack": 1, "weight": 0.5, "gem": { "blockFreeze": 1 }, "note": "Skaldrith boss part" },
+    { "id": "trophy_obsidian_heart", "name": "Obsidian heart", "category": "trophy", "stack": 1, "weight": 1.0 },
+    { "id": "trophy_wisp_crown", "name": "Wisp crown", "category": "trophy", "stack": 1, "weight": 0.5 },
+    { "id": "trophy_troll_marrow", "name": "Troll marrow", "category": "trophy", "stack": 1, "weight": 1.0 },
+    { "id": "trophy_stalker_fang", "name": "Stalker fang", "category": "trophy", "stack": 1, "weight": 0.3 },
+
+    { "id": "copper_sword", "name": "Copper sword", "category": "weapon", "stack": 1, "weight": 3.0, "equip": { "slot": "weapon", "metal": "copper", "durability": 200 } },
+    { "id": "bronze_sword", "name": "Bronze sword", "category": "weapon", "stack": 1, "weight": 3.2, "equip": { "slot": "weapon", "metal": "bronze", "durability": 260 } },
+    { "id": "iron_sword", "name": "Iron sword", "category": "weapon", "stack": 1, "weight": 3.6, "equip": { "slot": "weapon", "metal": "iron", "durability": 340 } },
+    { "id": "hide_armor", "name": "Hide armor", "category": "armor", "stack": 1, "weight": 4.0, "equip": { "slot": "armor", "armor": 12, "durability": 160 } },
+    { "id": "copper_armor", "name": "Copper armor", "category": "armor", "stack": 1, "weight": 8.0, "equip": { "slot": "armor", "armor": 22, "durability": 220 } },
+    { "id": "bronze_armor", "name": "Bronze armor", "category": "armor", "stack": 1, "weight": 9.0, "equip": { "slot": "armor", "armor": 34, "durability": 280 } },
+    { "id": "iron_armor", "name": "Iron armor", "category": "armor", "stack": 1, "weight": 11.0, "equip": { "slot": "armor", "armor": 48, "durability": 360 } }
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },
     { "id": "cooked_meat", "count": 2 },
-    { "id": "waterskin", "count": 2 }
+    { "id": "waterskin", "count": 2 },
+    { "id": "copper_sword", "count": 1 }
   ]
 }

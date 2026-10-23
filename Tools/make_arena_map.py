@@ -83,6 +83,17 @@ else:
         node = spawn(node_class, (x, y, 50), (0, 0, 0), label)
         node.set_editor_property("item_id", item)
 
+    # A small camp: the four stations around a Hearth, plus tin/iron/berry/fiber nodes.
+    station_class = unreal.load_class(None, "/Script/Wildreach.WRStation")
+    for station, x, y in [("forge", -600, -1800), ("armorer", -200, -1800), ("alchemy_table", 200, -1800), ("workbench", 600, -1800)]:
+        st = spawn(station_class, (x, y, 50), (0, 0, 0), f"Station_{station}")
+        st.set_editor_property("station_type", station)
+    spawn(unreal.load_class(None, "/Script/Wildreach.WRHearth"), (0, -2400, 60), (0, 0, 0), "Hearth")
+    for label, item, x, y in [("Tin", "tin_ore", -3000, -2500), ("Iron", "iron_ore", 3000, -2500),
+                              ("Berries", "berries", -1000, 2500), ("Fiber", "fiber", 1000, 2500)]:
+        node = spawn(node_class, (x, y, 50), (0, 0, 0), f"Node_{label}")
+        node.set_editor_property("item_id", item)
+
     if not les.save_current_level():
         raise RuntimeError("[Wildreach] save failed")
     unreal.log(f"[Wildreach] created {MAP_PATH}")

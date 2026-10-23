@@ -124,6 +124,7 @@ void AWRCharacter::PossessedBy(AController* NewController)
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 100.f);
 	PS->GetPaths()->ApplyToCharacter(this);
 	PS->GetInventory()->GiveStartingKit();
+	PS->GetInventory()->ApplyEquipment();
 	// Path level can raise max health; respawn at full.
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), Attributes->GetMaxHealth());
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attributes->GetMaxStamina());

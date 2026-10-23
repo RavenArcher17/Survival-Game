@@ -6,7 +6,9 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRPathComponent.h"
+#include "WRInventory.h"
 #include "AbilitySystemComponent.h"
+#include "EngineUtils.h"
 
 const TCHAR* UWRCombatLibrary::ResultName(EWRHitResult Result)
 {
@@ -31,7 +33,7 @@ float UWRCombatLibrary::WeaponDamage(const FWRWeaponStats& Weapon, bool bHeavy)
 	const float Metal = FWRTuning::Get().Num(FString::Printf(TEXT("weapon.metal.%s"), *Weapon.Metal.ToString()), 1.f);
 	const float Quality = FWRTuning::Get().Num(FString::Printf(TEXT("weapon.quality.%s"), *Weapon.Quality.ToString()), 1.f);
 	const float Upgrade = 1.f + Weapon.Upgrade * WRTune(TEXT("weapon.upgradePerLevel"), 0.05f);
-	return Base * Metal * Quality * Upgrade;
+	return Base * Metal * Quality * Upgrade * Weapon.Roll * (1.f + Weapon.GemDamage) * (Weapon.bBroken ? 0.5f : 1.f);
 }
 
 float UWRCombatLibrary::HeatBonus(float Heat, float MaxHeat)
@@ -153,6 +155,12 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking)
 		&& IsInFront(Target, Hit.Origin, WRTune(TEXT("defense.blockAngleDegrees"), 70.f)))
 	{
+		// Wyrm scale: a block can freeze the attacker.
+		if (Attacker && Target->Weapon.bBlockFreeze && FMath::FRand() < WRTune(TEXT("bossParts.wyrmScaleFreezeChance"), 0.25f))
+		{
+			Attacker->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
+			Attacker->GetAbilitySystemComponent()->CancelAllAbilities();
+		}
 		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Parrying) && Attacker)
 		{
 			Attacker->Status->Stagger(WRTune(TEXT("defense.staggerSeconds"), 1.5f));
@@ -205,7 +213,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("vsStaggered"));
 		}
-		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")))
+		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f))
 		{
 			Damage *= 1.5f;
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s"), *Target->GetName());
@@ -239,6 +247,28 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 	}
 
+	// Armor from equipped gear (players).
+	if (!Hit.bDamageOverTime && Target->ArmorValue > 0.f)
+	{
+		Damage *= 100.f / (100.f + Target->ArmorValue);
+	}
+
+	// Gear wears with use.
+	if (Hit.bMelee && Result != EWRHitResult::Dodged)
+	{
+		if (UWRInventoryComponent* AttackerInv = UWRInventoryComponent::FindFor(Attacker))
+		{
+			AttackerInv->WearEquipped(EWREquipSlot::Weapon, 1.f);
+		}
+	}
+	if (!Hit.bDamageOverTime && Damage > 0.f)
+	{
+		if (UWRInventoryComponent* TargetInv = UWRInventoryComponent::FindFor(Target))
+		{
+			TargetInv->WearEquipped(EWREquipSlot::Armor, 1.f);
+		}
+	}
+
 	// --- Apply ---
 	const float NewHealth = TargetAttr->GetHealth() - Damage;
 	TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), NewHealth);
@@ -251,6 +281,24 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (NewPoise <= 0.f)
 		{
 			Target->Status->Stagger(WRTune(TEXT("defense.staggerSeconds"), 1.5f));
+			// Giant's ember: staggering an enemy sends out a small lava shockwave.
+			if (Attacker && Attacker->Weapon.bStaggerShockwave)
+			{
+				for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+				{
+					if (*It != Attacker && *It != Target && Attacker->IsHostileTo(*It) && It->IsAlive()
+						&& FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) < WRTune(TEXT("bossParts.emberShockwaveRadius"), 350.f))
+					{
+						FWRHit Wave;
+						Wave.Instigator = Attacker;
+						Wave.Damage = WRTune(TEXT("bossParts.emberShockwaveDamage"), 20.f);
+						Wave.Element = WRTags::Element_Fire;
+						Wave.BurnBuildup = 30.f;
+						Wave.bDamageOverTime = true;
+						ApplyHit(*It, Wave);
+					}
+				}
+			}
 		}
 	}
 

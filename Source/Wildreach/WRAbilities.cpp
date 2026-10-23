@@ -299,6 +299,13 @@ void UWRGA_Melee::Sweep()
 		Hit.Element = Element;
 		Hit.BurnBuildup = Burn;
 		Hit.FrostBuildup = Frost;
+		// An infused weapon gives plain attacks its element (the path infuses the weapon).
+		if (Element == WRTags::Element_Physical && !Character->Weapon.Element.IsNone())
+		{
+			const float Infused = T.Num(TEXT("weapon.infusedBuildup"), 15.f);
+			if (Character->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Infused; }
+			else if (Character->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Infused; }
+		}
 		Hit.PathId = PathId;
 		Hit.bMelee = true;
 		Hit.bHeavy = bHeavy;
