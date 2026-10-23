@@ -21,14 +21,31 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - `Docs/plan/M1_combat.md` … `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
+## Status (2026-10-22)
+- **M1 combat core: done** on placeholder art. **M2 paths: done** (persistence v1 = JSON per player).
+- Remaining M2 polish: most stat/ability nodes beyond the trunk have no effect yet; no creation screen or skill-tree UI.
+- Next: M3 terrain (layout needs Raven's sign-off first), M4 creatures/taming, M5 inventory/crafting/building.
+- See `CHANGELOG.md` for details and known gaps.
+
+## How things are wired (read before changing combat)
+- All damage goes through `UWRCombatLibrary::ApplyHit` on the server. Don't apply damage anywhere else.
+- Statuses are replicated loose tags (`AddLooseGameplayTag(..., EGameplayTagReplicationState::TagOnly)`), owned by `UWRStatusComponent`.
+- Movement speed changes the client predicts (sprint, attack/block slow) are CMC saved-move flags; server-driven ones (slowed, frozen, staggered) come from tags.
+- New path ability = a `UWRGameplayAbility` subclass + an entry in `UWRAbilityRegistry::ClassForNode`.
+- Numbers go in `Data/tuning.json`, read with `WRTune(TEXT("a.b.c"), fallback)`.
+
 ## Build & test
 ```
 "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" WildreachEditor Win64 Development -Project="C:\Dev\Wildreach\Wildreach.uproject" -WaitMutex
 Tools\play.ps1 local -Clients 2     # dedicated server + 2 windowed clients
-Tools\make_map.ps1                  # regenerate the test map headless
+Tools\make_map.ps1 [arena] [-Force] # regenerate a test map headless
+Tools\test.ps1                      # automation tests, must stay green
+Tools\mptest.ps1                    # server + bots; check hits/statuses/abilities/errors
+Tools\persisttest.ps1               # save/restart/load round trip
+Tools\shots.ps1                     # rendered screenshots (look at them: verify visuals from 2+ angles)
 ```
-Headless multiplayer check: run the editor binary with `-server -nullrhi` and a client with `-game -nullrhi`, then
-grep the server log for `Player joined`. Runtime errors go to the log, not the exit code, so check logs for `Error:`.
+Headless clients must run with `t.MaxFPS 60` or they flood the server with moves. Without an online subsystem,
+use `?WRName=` for a stable player name. Runtime errors go to the log, not the exit code, so check logs for `Error:`.
 Don't close Raven's open editor or game windows; launch new ones alongside.
 
 ## Conventions
