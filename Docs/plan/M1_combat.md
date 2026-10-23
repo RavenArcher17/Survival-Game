@@ -76,6 +76,14 @@ Buildup = attribute per status with decay; implemented as GE stacks so it replic
 - Cinderfang (greybox six-legged hound): StateTree with Idle → Chase → Attack (bite, lunge) → Flank (pack members pick different angles). Reused as the template for every aggressive creature in M4.
 - Debug commands (`UWRCheatManager`): `WR.GrantPath Fire 50`, `WR.Status Frozen`, `WR.God`, `WR.NetStats`.
 
+## 7b. Starting numbers (from the Starting numbers tab)
+- Health 100 (+3/character level, max 250), Stamina 100 (+1/level, max 150).
+- Stamina regen 30/s, starting 0.8 s after the last spend. Costs: light 10, heavy 20, dodge 15, block 10–25 by hit, sprint 5/s.
+- Respawn 10 s.
+- Copper sword: light 12, heavy 22. Metal ×1.0/1.3/1.7/2.2/2.8 (copper→starsteel), quality ×0.9/1.0/1.1/1.2, +5% per upgrade level.
+- Enemies: lowland 70 HP / 12 dmg, midland 120 / 20, highland 200 / 32. Mini-boss 3,000 HP solo. Major boss 12,000 HP solo, +80% per extra player or tame.
+- Scaffold code still has older placeholders; M1 swaps them for these (review #38).
+
 ## 8. Verification
 - Automated: Functional tests in `Source/WildreachTests` (damage pipeline math, parry window, Thaw only on Frozen) run headless with `-ExecCmds="Automation RunTests Wildreach"`.
 - Network: headless server + 2 nullrhi bots running scripted input (bot controller that attacks/dodges on a timer) for 10 min with `PktLag=100 PktLoss=2`; log corrections per minute from `LogNetPlayerMovement`.

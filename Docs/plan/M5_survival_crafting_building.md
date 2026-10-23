@@ -40,15 +40,20 @@ section 4 is the framework only, and its piece list waits for Raven.
 | Queues | Craft queue on the station runs server-side while the player is away (timestamps, not ticking) |
 | Raids | A broken Hearth stops crafting until it's repaired; its cores are safe |
 
-## 4. Building (framework only, pieces TBD by Raven)
+## 4. Building (from the Building tab)
 | System | Detail |
 |---|---|
 | Placement | Client ghost preview → server validates (claim, overlap, support, cost) → spawns piece |
-| Snapping | Piece sockets (foundation edges, wall tops, floor edges, doorframes) with rotation steps; data-driven per piece |
-| Tiers | Wood → stone in First Playable; higher tier = more HP, no elemental resists (from the main doc) |
-| Structural support | Proposal: simple support graph (foundation = grounded; each piece's stability decays with distance from ground); full integrity is Full release |
+| Snapping | Piece sockets (foundation edges, wall tops, floor edges, doorframes) with rotation steps; data-driven per piece. Freeform placement for utility/decor (see review #28). |
+| Materials | Wood at Hearth level 1, stone at level 2 (metal L4 and biome L5 are Full release). Higher tier = more HP, no elemental resists. |
+| Span rule | A piece is supported if it's within N pieces of a foundation or pillar: **wood 4, stone 6** (metal/biome 8). Support recomputes on placement/destruction; unsupported pieces collapse. |
+| Core pieces | Foundations, walls, half walls, floors, roofs, stairs, pillars, doors, windows |
+| Defense | Palisade walls, gates, guard towers, reinforced doors with code locks. No spikes or traps. |
+| Utility | Storage chests, beds, bedrolls, the four crafting stations, the Hearth, torches and braziers, animal pens, crop plots (see review #27) |
+| Decor | Furniture, rugs, banners, boss trophies (comfort buff: review #30) |
 | Doors & code locks | Lock state server-only; code entry by RPC with rate limiting |
-| Land claim totem | Radius claim; only the owner/clan builds inside; upkeep in materials stored in the totem; out of upkeep → claim drops → base decays |
+| Land claim totem | Only your clan builds inside. **30 m radius**, +10 m per totem upgrade up to **60 m**. Unlimited claims per player/clan; each has its own upkeep and can hold one Hearth that levels separately. |
+| Upkeep | Building materials stocked in the totem, scaled by piece count in the claim × the server's upkeep multiplier. Out of upkeep → claim drops → base slowly decays. |
 | Damage | Pieces have HP; tools/explosives later; fire path burns wood (path raiding is Full release) |
 | Replication & persistence | Piece actors use net dormancy (wake on damage/interaction); saved in SQLite as rows {claim, piece def, transform, HP, tier}. Large bases → evaluate ISM batching per claim. |
 
@@ -57,6 +62,11 @@ Mining, Woodcutting, Smithing, Armorcraft, Alchemy, Building, Taming (and Tracki
 1–100 by doing, small per-level boost, a choice of 2 perks at 25/50/75/100. `Data/lifeskills.json` from
 the Life skills tab; perks as GEs/tags. XP curve from Raven's starting numbers.
 
-## Blocked on Raven
-- Building piece list (foundations, walls, roofs, stairs, doors, windows, gates?) and their costs/HP.
-- Starting numbers: weights, durability, upkeep rates, XP curves.
+## Numbers (from the Starting numbers tab)
+- Hunger full → empty in 60 min, thirst in 40 min; at empty, stamina regen halves, then health slowly drains.
+- Life skill level n costs 50 + 5n XP (~30,000 to 100, ~50 h per skill).
+- Taming at skill 1: easy 1 min, medium 5 min, hard 15 min; up to 50% faster at skill 100.
+- Crops: common 20 min, rare 2 h real time.
+
+## Still missing (for tuning, not blocking)
+Piece HP and costs, item weights, durability, per-piece upkeep cost. These get placeholders in `Data/tuning.json`.

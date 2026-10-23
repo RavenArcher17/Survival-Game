@@ -4,9 +4,9 @@ Source of truth for *what* to build: Raven's design docs (still being written):
 - Build plan: https://claude.ai/artifact/RexKaP5rCQmTdw3vmUfzbq
 - Design doc: https://claude.ai/artifact/VQd91XUksbVNsMTZx8EP7k
 
-This file is *how* to build it. As of 2026-10-22 everything in the First Playable is
-designed except **building pieces, server settings and starting numbers**, which Raven is still
-writing. Those parts of the plan are frameworks with placeholders. Re-read the docs before each milestone.
+This file is *how* to build it. As of 2026-10-22 every First Playable topic is designed
+(including the Building, Server settings and Starting numbers tabs). Open inconsistencies are in
+DESIGN_REVIEW.md. Re-read the docs before each milestone.
 
 **First Playable gate:** a group of friends plays a full evening on the server and wants to come back.
 
@@ -94,15 +94,15 @@ Remaining: headless bot clients for load tests; SQLite save skeleton.
 ---
 
 ## Detailed milestone plans
-| Milestone | File | Waiting on Raven |
+| Milestone | File | Review items to settle first |
 |---|---|---|
-| M1 Combat core | [plan/M1_combat.md](plan/M1_combat.md) | starting numbers (placeholders OK) |
-| M2 Paths & progression | [plan/M2_paths.md](plan/M2_paths.md) | XP curve numbers |
-| M3 World | [plan/M3_world.md](plan/M3_world.md) | Map tab landmass refinement |
-| M4 Creatures & taming | [plan/M4_creatures.md](plan/M4_creatures.md) | creature stats |
-| M5 Survival, crafting, building | [plan/M5_survival_crafting_building.md](plan/M5_survival_crafting_building.md) | **building pieces**, numbers |
-| M6 Bosses | [plan/M6_bosses.md](plan/M6_bosses.md) | boss HP/scaling numbers |
-| M7 Server & ship | [plan/M7_server.md](plan/M7_server.md) | **server settings** |
+| M1 Combat core | [plan/M1_combat.md](plan/M1_combat.md) | #1, #2, #5, #6, #7 |
+| M2 Paths & progression | [plan/M2_paths.md](plan/M2_paths.md) | #8, #9, #35, #36 |
+| M3 World | [plan/M3_world.md](plan/M3_world.md) | #12, #15 |
+| M4 Creatures & taming | [plan/M4_creatures.md](plan/M4_creatures.md) | #4/#34, #14, #16 |
+| M5 Survival, crafting, building | [plan/M5_survival_crafting_building.md](plan/M5_survival_crafting_building.md) | #3, #11, #27–#30, #33 |
+| M6 Bosses | [plan/M6_bosses.md](plan/M6_bosses.md) | #10 |
+| M7 Server & ship | [plan/M7_server.md](plan/M7_server.md) | #31, #32 |
 | Data formats | [plan/DATA_SCHEMAS.md](plan/DATA_SCHEMAS.md) | — |
 
 Suggested order: M1 → M2, with M3 terrain work in parallel; then M4 → M5 → M6 → M7.

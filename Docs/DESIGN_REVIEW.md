@@ -27,6 +27,25 @@ Columns: **Where** = which doc tabs disagree · **Needed by** = first milestone 
 | 15 | Map tab: the layout needs more planning into a realistic landmass (coastlines, rivers, mountain range) before building. | Map | M3 | Plan includes a terrain-layout step first |
 | 16 | Neutral creature tames: are they all tamable by every method listed, or only the one in the table? | Creatures | M4 | Only the listed method(s) |
 
+### Added 2026-10-22 after the Building, Server settings and Starting numbers tabs
+
+| # | Issue | Where | Needed by | Proposed default in the plan |
+|---|---|---|---|---|
+| 27 | Farming in the First Playable? Building lists **crop plots and animal pens** and Starting numbers has crop growth times, but the build plan puts all of Farming (crops, husbandry) in Full release. Pumicehog and Snowpuff are farm animals in the First Playable roster. | Building, Starting numbers, Creatures vs Build plan | M5 | Include crop plots and pens in a basic form (plant → grow → harvest; feed → produce) |
+| 28 | Freeform placement: Building says "both snapping and freeform"; the build plan has freeform building in Full release. | Building vs Build plan | M5 | Snap first; freeform for utility/decor pieces only |
+| 29 | Structural integrity: Building has span limits (wood 4, stone 6 pieces); the build plan lists structural integrity as Full release. | Building vs Build plan | M5 | Implement the span rule (it's simple) |
+| 30 | Comfort buff: Building says decor raises it; the build plan has the comfort buff in Full release. | Building vs Build plan | M5 | Build decor pieces; comfort buff later |
+| 31 | Creature raids on bases is a server setting in all three presets, but random creature raids are Full release in the build plan. | Server settings vs Build plan | M7 | Setting exists, feature off until built |
+| 32 | Bounties and infamy is **On** in the PvP preset but is a Full release PvP feature. | Server settings vs Build plan | M7 | Same: setting exists, feature later |
+| 33 | Stone building needs Hearth level 2, so a base can't use stone until someone beats a major boss. Intended? (Matches the Crafting tab's workbench row.) Also still open: build plan "2 station tiers" vs Hearth level 3 (#3). | Building, Crafting | M5 | As written |
+| 34 | Tame limit still has no number. Server settings lets community servers change it but gives no default (#4). | Server settings | M4 | Per player, cap from Taming skill |
+| 35 | Health/stamina growth: "+3 per level, up to 250 at level 50" gives 247 if level 1 starts at 100 (same off-by-one for stamina: 149 vs 150). | Starting numbers | M2 | +3 for each level after 1, capped at 250 |
+| 36 | Character level 1–50 "from all XP earned" has no curve, only the target of reaching 50 over the same time as a second path. | Starting numbers | M2 | Curve fit so level 50 ≈ 80 h of play |
+| 37 | Highland check: iron (1.7×) +6 (+30%) light hit = 26.5 → 200 HP takes 7.5 hits, a bit over the "6–7" target unless fine quality is assumed. Midland check works at bronze +4 (≈ 6.4 hits). | Starting numbers | M1 tuning | Leave as written; tune in playtests |
+| 38 | Starting numbers say empty hunger/thirst halves stamina regen *before* health drains; the plan and current code drain health right away. Code also uses older placeholder values (respawn 5 s vs 10 s, hunger 40 vs 60 min, thirst 25 vs 40 min, stamina regen 12/s vs 30/s, sprint 20/s vs 5/s). | Starting numbers vs scaffold | M1 | Code updates to the doc's numbers in M1 (no question for Raven) |
+
+Resolved by the new tabs: **#21** in part (Building confirms base traps are ruled out; dungeon traps are still a question).
+
 ## Later biomes / Full release
 
 | # | Issue | Where |
@@ -43,6 +62,4 @@ Columns: **Where** = which doc tabs disagree · **Needed by** = first milestone 
 | 26 | Game title is still "Untitled" (repo uses the working title Wildreach). | Main doc |
 
 ## Still being designed (not inconsistencies)
-- Building pieces
-- Server settings
-- Starting numbers
+None as of 2026-10-22: Building, Server settings and Starting numbers tabs are now written.

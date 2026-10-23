@@ -17,13 +17,32 @@ Depends on: everything. Persistence and the bot harness should start earlier (th
 | Backups | Hourly copy of the DB to `Saved/ServerDB/backups/` with rotation |
 | Identity | First Playable: platform-less login via a player-chosen name + generated token in the client's Saved dir. Steam/EOS later (EOS is free). |
 
-## 2. Server settings (framework only, values TBD by Raven)
-`Config/DefaultWildreachServer.ini` → `UWRServerSettings` (UDeveloperSettings), read at startup and replicated to clients where relevant:
-- PvP on/off (PvE-only option), safe-zone rules
-- Death penalty mode (Gentle / Souls-like / Drop inventory / Full loot)
-- Offline raid protection %, upkeep rates, boss respawn timers
-- Max players, clan size limit, tame limits
-- XP/gather/taming rate multipliers
+## 2. Server settings (from the Server settings tab)
+`Config/DefaultWildreachServer.ini` → `UWRServerSettings` (UDeveloperSettings), read at startup and replicated to clients where relevant.
+Official servers run one of three **locked presets**; community servers can change nearly everything.
+
+| Setting | Range | PvP standard | PvE | Casual co-op |
+|---|---|---|---|---|
+| PvP | on/off | On | Off | Off |
+| Death penalty | Gentle / Souls-like / Drop inventory / Full loot | Souls-like | Souls-like | Gentle |
+| Offline base protection | 0–100% less damage | 75% | — | — |
+| PvP inside boss arenas | on/off | On | — | — |
+| Bounties and infamy | on/off | On | Off | Off |
+| Clan size limit | 2–50 or none | 8 | 12 | none |
+| XP and skill gain | 0.5–10× | 1× | 1× | 2× |
+| Gathering and drops | 0.5–10× | 1× | 1× | 2× |
+| Taming and breeding speed | 0.5–10× | 1× | 1× | 3× |
+| Crop and crafting timers | 0.5–10× faster | 1× | 1× | 2× |
+| Boss respawn time | 1–24 h | 4 h | 4 h | 2 h |
+| Base upkeep cost | 0.5–3× | 1× | 1× | 0.5× |
+| Creature raids on bases | off/rare/normal/frequent | normal | normal | rare |
+
+**Fixed on every server** (not exposed in the ini): the 10% boss-loot damage rule, the 150-point / 100-per-path cap,
+artifact weird rules applying only to the wearer.
+
+Implementation: `EWRServerPreset` {PvPStandard, PvE, CasualCoop, Custom}; a preset fills defaults and locks them
+unless the preset is `Custom`. Every gameplay system reads multipliers from `UWRServerSettings` and never hard-codes them.
+Full release adds: portal break timers, artifact modifier limits, invasion frequency, raid group sizes.
 
 ## 3. Social
 - Small clans: create/invite/kick, shared claim and tame access, clan chat. Ranks and alliances are Full release.
