@@ -1,0 +1,103 @@
+{
+  "seed": 7,
+  "sizeMetres": 4032,
+  "previewMetresPerPixel": 4,
+  "landAreaKm2": 9.93,
+  "highestPointMetres": 884,
+  "passes": [
+    {
+      "name": "North pass",
+      "y": 720,
+      "x": 2003
+    },
+    {
+      "name": "South pass",
+      "y": 3310,
+      "x": 2098
+    }
+  ],
+  "walkableRidgeCrossingsY": [
+    700,
+    3300
+  ],
+  "spawns": [
+    {
+      "biome": "volcanic",
+      "x": 1012,
+      "y": 720,
+      "nearestPassMetres": 991,
+      "walkMinutes": 3.7
+    },
+    {
+      "biome": "tundra",
+      "x": 3156,
+      "y": 720,
+      "nearestPassMetres": 1153,
+      "walkMinutes": 4.3
+    },
+    {
+      "biome": "volcanic",
+      "x": 692,
+      "y": 2016,
+      "nearestPassMetres": 1843,
+      "walkMinutes": 6.8
+    },
+    {
+      "biome": "tundra",
+      "x": 3436,
+      "y": 2016,
+      "nearestPassMetres": 1861,
+      "walkMinutes": 6.9
+    },
+    {
+      "biome": "volcanic",
+      "x": 1000,
+      "y": 3310,
+      "nearestPassMetres": 1098,
+      "walkMinutes": 4.1
+    },
+    {
+      "biome": "tundra",
+      "x": 3128,
+      "y": 3310,
+      "nearestPassMetres": 1030,
+      "walkMinutes": 3.8
+    }
+  ],
+  "bosses": [
+    {
+      "name": "Vulkarn (forge cavern)",
+      "x": 1230,
+      "y": 2016,
+      "biome": "volcanic"
+    },
+    {
+      "name": "Skaldrith (mountain bowl)",
+      "x": 2820,
+      "y": 2016,
+      "biome": "tundra"
+    }
+  ],
+  "miniBosses": [
+    {
+      "name": "Obsidian Warden",
+      "x": 950,
+      "y": 1300
+    },
+    {
+      "name": "Ignessa",
+      "x": 980,
+      "y": 2800
+    },
+    {
+      "name": "Grimjaw",
+      "x": 3080,
+      "y": 1250
+    },
+    {
+      "name": "Pale Hunter",
+      "x": 3050,
+      "y": 2850
+    }
+  ]
+}
