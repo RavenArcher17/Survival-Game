@@ -4,9 +4,9 @@ Source of truth for *what* to build: Raven's design docs (still being written):
 - Build plan: https://claude.ai/artifact/RexKaP5rCQmTdw3vmUfzbq
 - Design doc: https://claude.ai/artifact/VQd91XUksbVNsMTZx8EP7k
 
-This file is *how* to build it. It only covers sections that read as settled
-(as of 2026-10-22): the First Playable tier, Fire + Frost trees, the Fire+Frost combo,
-Crafting/Hearth, Bosses, Creatures, Life skills. Re-read the docs before each milestone.
+This file is *how* to build it. As of 2026-10-22 everything in the First Playable is
+designed except **building pieces, server settings and starting numbers**, which Raven is still
+writing. Those parts of the plan are frameworks with placeholders. Re-read the docs before each milestone.
 
 **First Playable gate:** a group of friends plays a full evening on the server and wants to come back.
 
@@ -93,10 +93,21 @@ Remaining: headless bot clients for load tests; SQLite save skeleton.
 
 ---
 
-## Open design questions that affect the build
-Ask Raven before the milestone that needs each answer.
-1. (M1) How many abilities are equipped/usable at once? The docs say "no swappable loadouts" but each tree has many spells.
-2. (M1) Fire overheat: does full Heat hurt you, explode (Overheat node), or both? The fire root passive makes you immune to your own burns.
-3. (M5) Build plan says "2 station tiers"; Crafting tab says Hearth reaches level 3 with two bosses. Which for First Playable?
-4. (M4) Tame limit per player or per tribe?
-5. (later) Healing "crafted potions only" vs heal spells in Tide/Nature/Blood trees, which are not First Playable paths.
+## Detailed milestone plans
+| Milestone | File | Waiting on Raven |
+|---|---|---|
+| M1 Combat core | [plan/M1_combat.md](plan/M1_combat.md) | starting numbers (placeholders OK) |
+| M2 Paths & progression | [plan/M2_paths.md](plan/M2_paths.md) | XP curve numbers |
+| M3 World | [plan/M3_world.md](plan/M3_world.md) | Map tab landmass refinement |
+| M4 Creatures & taming | [plan/M4_creatures.md](plan/M4_creatures.md) | creature stats |
+| M5 Survival, crafting, building | [plan/M5_survival_crafting_building.md](plan/M5_survival_crafting_building.md) | **building pieces**, numbers |
+| M6 Bosses | [plan/M6_bosses.md](plan/M6_bosses.md) | boss HP/scaling numbers |
+| M7 Server & ship | [plan/M7_server.md](plan/M7_server.md) | **server settings** |
+| Data formats | [plan/DATA_SCHEMAS.md](plan/DATA_SCHEMAS.md) | — |
+
+Suggested order: M1 → M2, with M3 terrain work in parallel; then M4 → M5 → M6 → M7.
+Persistence and the bot load-test harness (both in M7) should start during M2 so every later milestone is tested with them.
+
+## Open questions & inconsistencies
+Collected in [DESIGN_REVIEW.md](DESIGN_REVIEW.md), to go through with Raven once the design docs are finished.
+Where a milestone needs an answer first, the plan uses a marked proposed default.
