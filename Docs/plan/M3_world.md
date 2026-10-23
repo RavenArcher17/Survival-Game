@@ -21,6 +21,10 @@ The Map tab notes the layout still needs work into "a realistic landmass, with n
 terrain, rivers and the shape of the mountain range" before building. Step 1 below is that work, and
 **Raven signs off on the refined layout before any terrain is generated or imported.**
 
+**Step 1 done, layout approved 2026-10-23:** `Docs/terrain/LAYOUT_PROPOSAL.md` (island, hard-wall ridge, two
+passes, Vulkarn in the crater, Skaldrith on the glacier bowl, one water + one lava river west, ~10 km² for the
+first playtest; bigger once all biomes are in).
+
 ## Pipeline ($0, scriptable)
 | Step | Tool | Output |
 |---|---|---|

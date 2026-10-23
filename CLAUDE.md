@@ -24,7 +24,7 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 ## Status (2026-10-22)
 - **M1 combat core: done** on placeholder art. **M2 paths: done** (persistence v1 = JSON per player).
 - Stat nodes work (tuning `nodeEffects`); ability nodes past the trunk (Fire wall, Meteor, Ice lance...) aren't built. No creation screen or skill-tree UI yet.
-- M3: landmass proposal in `Docs/terrain/LAYOUT_PROPOSAL.md` is **waiting on Raven's answers**; don't import terrain before that.
+- M3: landmass layout **approved 2026-10-23** (`Docs/terrain/LAYOUT_PROPOSAL.md`); next is the 4033² export + World Partition landscape import.
 - M5 started: inventory + consumables (potions/food/water). Next: gathering, Hearth + stations + recipes, building; M4 taming needs items (food) which now exist.
 - See `CHANGELOG.md` for details and known gaps.
 

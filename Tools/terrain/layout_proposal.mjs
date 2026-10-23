@@ -28,15 +28,21 @@ const ridgeX = y => SIZE / 2 + 170 * fbm(y / 900, 3.1, 3);
 const PASSES = [{ name: 'North pass', y: 720 }, { name: 'South pass', y: 3310 }];
 const VOLCANO = { x: 1230, y: 2016 }, GLACIER = { x: 2820, y: 2016 };
 const COAST_IN = 380;         // land starts this far from the map edge (with noise)
+// Volcanic side: one water river (north) and one lava river (south), decided 2026-10-23. Tundra rivers are icy water.
 const RIVERS = [
-  [[1760, 1250], [1350, 1150], [900, 1320], [450, 1150], [80, 1230]],      // volcanic side
-  [[1700, 2900], [1250, 3050], [700, 2850], [80, 2950]],
-  [[2300, 1300], [2800, 1150], [3300, 1350], [3950, 1250]],                // tundra side
-  [[2330, 2850], [2900, 3000], [3450, 2800], [3950, 2900]],
+  { kind: 'water', pts: [[1760, 1250], [1350, 1150], [900, 1320], [450, 1150], [80, 1230]] },
+  { kind: 'lava', pts: [[1700, 2900], [1250, 3050], [700, 2850], [80, 2950]] },
+  { kind: 'ice', pts: [[2300, 1300], [2800, 1150], [3300, 1350], [3950, 1250]] },
+  { kind: 'ice', pts: [[2330, 2850], [2900, 3000], [3450, 2800], [3950, 2900]] },
 ];
 const SPAWN_X = 520;
+// Middle spawns moved diagonally toward a pass (west toward north, east toward south) so both passes
+// get traffic, while staying in the outer lowlands and clear of the rivers.
 const SPAWNS = [];
-for (const y of [720, 2016, 3310]) { SPAWNS.push({ biome: 'volcanic', x: SPAWN_X, y }); SPAWNS.push({ biome: 'tundra', x: SIZE - SPAWN_X, y }); }
+for (const [wy, ey] of [[720, 720], [1500, 2530], [3310, 3310]]) {
+  SPAWNS.push({ biome: 'volcanic', x: SPAWN_X, y: wy });
+  SPAWNS.push({ biome: 'tundra', x: SIZE - SPAWN_X, y: ey });
+}
 
 function distToPolyline(px, py, pts) {
   let best = 1e9;
@@ -70,11 +76,14 @@ function heightAt(x, y) {
 
   let h = 18 + hills + rise + ridge + (x < rx ? volcano : glacier);
   // Rivers meander: sample the polyline through a warped position.
-  let river = 1e9;
+  let river = 1e9, riverKind = null;
   const wx = x + 110 * fbm(x / 260, y / 260 + 9, 3), wy = y + 110 * fbm(x / 260 + 4, y / 260, 3);
-  for (const pts of RIVERS) river = Math.min(river, distToPolyline(wx, wy, pts));
+  for (const rv of RIVERS) {
+    const d = distToPolyline(wx, wy, rv.pts);
+    if (d < river) { river = d; riverKind = rv.kind; }
+  }
   if (river < 40) h -= 22 * (1 - river / 40) ** 2;
-  return { h: h * land - 12 * (1 - land), land, r, rx, river, dv, dg };
+  return { h: h * land - 12 * (1 - land), land, r, rx, river, riverKind, dv, dg };
 }
 
 // ---------- generate ----------
@@ -123,7 +132,7 @@ for (let j = 0; j < RES; j++) for (let i = 0; i < RES; i++) {
     if (west && s.dv < 150) c = [210, 90, 30];                  // crater / lava
     if (!west && s.dg < 520) c = mix(c, [200, 235, 250], 0.6);  // glacier
     if (slopeAt(i, j) > 0.7) c = mix(c, [120, 116, 112], 0.7);  // cliff / impassable rock
-    if (s.river < 14) c = west ? [180, 70, 30] : [120, 170, 210];
+    if (s.river < 14) c = s.riverKind === 'lava' ? [220, 80, 25] : s.riverKind === 'water' ? [70, 130, 190] : [120, 170, 210];
   }
   // Hillshade (light from the north-west).
   const dzdx = (H[j * RES + Math.min(RES - 1, i + 1)] - H[j * RES + Math.max(0, i - 1)]) / (2 * M);
