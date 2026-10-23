@@ -35,6 +35,12 @@ public:
 
 	UFUNCTION(Exec) void WRInteract();
 	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
+	/** Teleport to world X/Y (cm), dropped onto the ground. */
+	UFUNCTION(Exec) void WRTeleport(float X, float Y);
+	/** Set the camera direction (local). */
+	UFUNCTION(Exec) void WRLook(float Yaw, float Pitch);
+	/** Bot walks straight toward world X/Y (cm) and logs the time it takes, or where it got stuck. */
+	UFUNCTION(Exec) void WRWalkTo(float X, float Y);
 	void UsePotion();
 	void UseFood();
 	void UseDrink();
@@ -83,6 +89,12 @@ private:
 	TArray<FString> BotCmdQueue;
 	float BotCmdResume = 0.f;
 	bool bBotPaused = false;
+	bool bWalking = false;
+	FVector2D WalkTarget = FVector2D::ZeroVector;
+	float WalkStart = 0.f;
+	float WalkLastProgress = 0.f;
+	float WalkBestDist = 0.f;
+	float WalkNextLog = 0.f;
 	float BotClock = 0.f;
 	float BotNextAttack = 0.f;
 	float BotNextDodge = 3.f;

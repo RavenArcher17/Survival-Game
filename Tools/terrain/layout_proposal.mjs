@@ -1,13 +1,18 @@
 // M3 step 1: first-playable landmass proposal for Raven's sign-off (design: Map tab).
 // Generates a 4x4 km heightfield at 4 m/px, renders a shaded, annotated preview PNG and a JSON summary.
 // No terrain is imported into Unreal until the layout is approved.
-//   node Tools/terrain/layout_proposal.mjs [outDir] [seed]
+//   node Tools/terrain/layout_proposal.mjs [outDir] [seed] [--export path/to/height.r16]
+// --export also writes the full-resolution heightmap: 4033 x 4033 samples at 1 m, 16-bit little-endian,
+// value = 32768 + metres * 32 (import with landscape Z scale 400; see Tools/terrain/import_island.py).
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
 const outDir = process.argv[2] ?? 'Docs/terrain';
 const seed = +(process.argv[3] ?? 7);
+const exportIdx = process.argv.indexOf('--export');
+const exportPath = exportIdx > 0 ? process.argv[exportIdx + 1] : null;
+export const HEIGHT_UNITS_PER_METRE = 32;
 const SIZE = 4032;            // metres
 const RES = 1008;             // pixels (4 m/px); final export is 4033^2 at 1 m after sign-off
 const M = SIZE / RES;
@@ -82,7 +87,8 @@ function heightAt(x, y) {
     const d = distToPolyline(wx, wy, rv.pts);
     if (d < river) { river = d; riverKind = rv.kind; }
   }
-  if (river < 40) h -= 22 * (1 - river / 40) ** 2;
+  // Wide, shallow, fordable channel: 6 m deep with ~90 m gentle banks (a deep trench trapped the walk test).
+  if (river < 90) h -= 6 * (1 - river / 90) ** 2;
   return { h: h * land - 12 * (1 - land), land, r, rx, river, riverKind, dv, dg };
 }
 
@@ -185,4 +191,21 @@ const summary = {
   bosses: BOSSES, miniBosses: MINIS,
 };
 fs.writeFileSync(path.join(outDir, 'layout_proposal.json'), JSON.stringify(summary, null, 2) + '\n');
+
+if (exportPath) {
+  // Full resolution: one sample per metre, same height function as the preview.
+  const N = SIZE + 1;
+  const out = Buffer.alloc(N * N * 2);
+  const t0 = Date.now();
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const v = Math.round(32768 + heightAt(i, j).h * HEIGHT_UNITS_PER_METRE);
+      out.writeUInt16LE(Math.max(0, Math.min(65535, v)), (j * N + i) * 2);
+    }
+    if (j % 500 === 0) console.error(`export row ${j}/${N} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
+  }
+  fs.mkdirSync(path.dirname(exportPath), { recursive: true });
+  fs.writeFileSync(exportPath, out);
+  console.error(`wrote ${exportPath} (${N}x${N}) in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+}
 console.log(JSON.stringify({ land: summary.landAreaKm2, highest: summary.highestPointMetres, crossings: summary.walkableRidgeCrossingsY, walk: spawnInfo.map(s => `${s.biome}@${s.y}: ${s.walkMinutes} min`) }, null, 1));

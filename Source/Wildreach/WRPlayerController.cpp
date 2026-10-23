@@ -39,6 +39,18 @@ void AWRPlayerController::SetupInputComponent()
 void AWRPlayerController::UsePotion() { ServerCommand(TEXT("use potion")); }
 void AWRPlayerController::UseFood() { ServerCommand(TEXT("use food")); }
 void AWRPlayerController::UseDrink() { ServerCommand(TEXT("use drink")); }
+void AWRPlayerController::WRTeleport(float X, float Y) { ServerCommand(FString::Printf(TEXT("tp %.0f %.0f"), X, Y)); }
+void AWRPlayerController::WRLook(float Yaw, float Pitch) { SetControlRotation(FRotator(Pitch, Yaw, 0.f)); }
+
+void AWRPlayerController::WRWalkTo(float X, float Y)
+{
+	bWalking = true;
+	WalkTarget = FVector2D(X, Y);
+	WalkStart = WalkLastProgress = WalkNextLog = BotClock;
+	WalkBestDist = TNumericLimits<float>::Max();
+	UE_LOG(LogWildreach, Log, TEXT("WALK start toward (%.0f, %.0f)"), X, Y);
+}
+
 void AWRPlayerController::WRGive(FName Item, int32 Count) { ServerCommand(FString::Printf(TEXT("give %s %d"), *Item.ToString(), FMath::Max(1, Count))); }
 
 AWRBossAltar* AWRPlayerController::FindNearbyAltar() const
@@ -70,7 +82,14 @@ void AWRPlayerController::ClientNotify_Implementation(const FString& Message)
 }
 
 void AWRPlayerController::WRInteract() { ServerCommand(TEXT("interact")); }
-void AWRPlayerController::WRBotPause(int32 bPause) { bBotPaused = bPause != 0; }
+void AWRPlayerController::WRBotPause(int32 bPause)
+{
+	bBotPaused = bPause != 0;
+	if (bBotPaused)
+	{
+		LockTarget = nullptr;  // otherwise lock-on keeps steering the camera
+	}
+}
 
 void AWRPlayerController::WRView(FName Mode)
 {
@@ -266,6 +285,17 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		const int32 Left = PS->GetInventory()->AddItem(FName(*Arg(1)), FMath::Max(1, FCString::Atoi(*Arg(2))));
 		Result = Left > 0 ? FString::Printf(TEXT("%d didn't fit or unknown item"), Left) : TEXT("ok");
 	}
+	else if (Cmd == TEXT("tp") && Survivor)
+	{
+		// Drop onto whatever is below (landscape or floor).
+		const FVector Top(FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2)), 200000.f);
+		FHitResult Ground;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRTeleport), false, Survivor);
+		const bool bHit = GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0.f, 0.f, 400000.f), ECC_WorldStatic, Query);
+		const FVector Dest = bHit ? Ground.ImpactPoint + FVector(0.f, 0.f, 120.f) : FVector(Top.X, Top.Y, 1000.f);
+		Survivor->TeleportTo(Dest, Survivor->GetActorRotation());
+		Result = FString::Printf(TEXT("at %s (ground %s)"), *Dest.ToCompactString(), bHit ? TEXT("found") : TEXT("NOT found"));
+	}
 	else if (Cmd == TEXT("gotoaltar") && Survivor)
 	{
 		for (TActorIterator<AWRBossAltar> It(GetWorld()); It; ++It)
@@ -339,6 +369,38 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			break;
 		}
 		ConsoleCommand(Cmd);
+	}
+	if (bWalking)
+	{
+		const FVector Here = Survivor->GetActorLocation();
+		const FVector2D To = WalkTarget - FVector2D(Here.X, Here.Y);
+		const float Dist = To.Size();
+		if (Dist < WalkBestDist - 100.f)
+		{
+			WalkBestDist = Dist;
+			WalkLastProgress = BotClock;
+		}
+		if (Dist < 400.f)
+		{
+			UE_LOG(LogWildreach, Log, TEXT("WALK arrived after %.0f s (%.1f min)"), BotClock - WalkStart, (BotClock - WalkStart) / 60.f);
+			bWalking = false;
+		}
+		else if (BotClock - WalkLastProgress > 15.f)
+		{
+			UE_LOG(LogWildreach, Log, TEXT("WALK stuck at %s, %.0f m from target after %.0f s"), *Here.ToCompactString(), Dist / 100.f, BotClock - WalkStart);
+			bWalking = false;
+		}
+		else
+		{
+			if (BotClock >= WalkNextLog)
+			{
+				WalkNextLog = BotClock + 30.f;
+				UE_LOG(LogWildreach, Log, TEXT("WALK %.0f s: at %s, %.0f m to go"), BotClock - WalkStart, *Here.ToCompactString(), Dist / 100.f);
+			}
+			SetControlRotation(FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)), 0.f));
+			Survivor->AddMovementInput(FVector(To.GetSafeNormal(), 0.f), 1.f);
+		}
+		return;
 	}
 	if (bBotPaused)
 	{

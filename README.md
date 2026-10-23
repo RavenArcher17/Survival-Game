@@ -19,8 +19,11 @@ Tools\play.ps1 server             # dedicated server only (port 7777)
 Tools\play.ps1 client             # join 127.0.0.1:7777
 ```
 
-Combat testing happens on `/Game/Maps/L_CombatArena` (dummies, a Cinderfang pack west, a Gloomhowl pack east,
-both altars). Join with `?Path=fire` or `?Path=frost` to pick your main path, `?WRName=You` to keep your save.
+The default map is `/Game/Maps/L_Island`, the 4 × 4 km first-playable island. Combat testing happens on
+`L_CombatArena` (`play.ps1 -Map arena`: dummies, both packs, both altars, resource nodes).
+`play.ps1 -Path frost -Name You` picks your main path and keeps your save (`?Path=` / `?WRName=` on the join URL).
+
+Rebuild the island from the layout: `Tools\terrain\build_island.ps1 -Force`. Walk test: `Tools\terrain\walktest.ps1`.
 
 ### Controls
 

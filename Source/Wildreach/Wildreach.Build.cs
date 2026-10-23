@@ -21,7 +21,14 @@ public class Wildreach : ModuleRules
 			"GameplayTasks",
 			"AIModule",
 			"Json",
-			"NetCore"
+			"NetCore",
+			"Landscape"
 		});
+
+		// Editor-only map-building helpers (UWREditorTerrainLibrary).
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
 	}
 }
