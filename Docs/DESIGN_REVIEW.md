@@ -1,8 +1,8 @@
 # Design review list
 
 Inconsistencies and open questions found while reading the design docs, and Raven's decisions.
-Reviewed with Raven on **2026-10-22**. Decisions here override the design docs where they disagree
-(the docs haven't been edited to match yet).
+Reviewed with Raven on **2026-10-22**. The design doc and build plan were edited to match the same day
+(list below); if a doc and this file ever disagree again, this file wins until Raven says otherwise.
 
 ## Decided (First Playable)
 
@@ -35,12 +35,12 @@ Reviewed with Raven on **2026-10-22**. Decisions here override the design docs w
 | 38 | Scaffold placeholder numbers | No decision needed; M1 switches the code to the Starting numbers tab. |
 | 21 | Base traps | Ruled out (Building tab). Dungeon traps: see #21 below. |
 
-### Doc edits these decisions imply (Raven's docs, not edited yet)
-- Main doc: overheating doesn't burn you (#2); "one boss" → 2 major + 4 mini (#10); stations tier 1–5 → Hearth levels (#11).
-- Building + Crafting tabs: stone at Hearth level 1 (#33).
-- Starting numbers: character level = path points ÷ 3 (#36).
-- Creatures tab: Floeback moved to Full release (#14).
-- Build plan: basic farming, span rule, utility/decor freeform moved into First Playable (#27–#29).
+### Doc edits made 2026-10-22 (with Raven's OK)
+- Main doc: full Heat never hurts you (#2); first playable = two biomes, 2 major + 4 mini bosses (#10); stations level through the Hearth (#11); tame limit per player (#4); abilities in 8 quick slots (#1).
+- Building tab: stone at Hearth level 1. Crafting tab: workbench L1 = wood and stone building, L2 no longer lists stone (#33).
+- Starting numbers: character level = path points ÷ 3, level 50 at the 150 cap (#36).
+- Creatures tab: Floeback waits for Full release (#14).
+- Build plan: Crafting = Hearth levels 1–3; Building adds utility/decor freeform + span support; Survival adds basic farming; Full release Building now says freeform *structural* pieces (#3, #27–#29).
 
 ## Open: later biomes / Full release (review when those are designed)
 
