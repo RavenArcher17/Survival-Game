@@ -75,6 +75,10 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	}
 	const int32 Amount = PerHit * (bHeavy ? 2 : 1);
 	const int32 Left = Inventory->AddItem(ItemId, Amount);
+	if (ItemId == TEXT("berries") && FMath::FRand() < 0.35f)
+	{
+		Inventory->AddItem(TEXT("seeds"), 1);
+	}
 	// Ore veins sometimes give up a gem (Crafting tab: gems come from mines and caves).
 	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < 0.04f)
 	{

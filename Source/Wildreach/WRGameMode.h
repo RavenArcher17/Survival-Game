@@ -30,10 +30,16 @@ public:
 	void SaveAllPlayers(bool bOnlyDirty);
 	static FString PlayerSavePath(const FString& PlayerName);
 
+	/** Everything players have built on this map, in Saved/ServerDB/world_<map>.json. */
+	void SaveWorld();
+	void LoadWorld();
+	FString WorldSavePath() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
 	FTimerHandle AutosaveTimer;
+	FTimerHandle WorldSaveTimer;
 };

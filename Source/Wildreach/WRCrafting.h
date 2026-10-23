@@ -75,6 +75,7 @@ public:
 	/** Server: damage from raiders. */
 	void TakeRaidDamage(float Amount);
 	void Repair() { Health = MaxHealth; }
+	void SetCores(const TArray<FName>& InCores) { Cores = InCores; }
 
 	/** Nearest Hearth whose claim covers this point (null = no claim: tier 1). */
 	static AWRHearth* FindCovering(const UWorld* World, const FVector& Location);

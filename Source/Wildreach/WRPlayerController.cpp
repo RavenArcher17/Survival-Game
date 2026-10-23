@@ -2,6 +2,7 @@
 #include "Wildreach.h"
 #include "WRAltar.h"
 #include "WRCrafting.h"
+#include "WRBuilding.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
@@ -41,6 +42,7 @@ void AWRPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
 	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AWRPlayerController::MenuClose);
 	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AWRPlayerController::CycleInfuse);
+	InputComponent->BindKey(EKeys::B, IE_Pressed, this, &AWRPlayerController::ToggleBuildMenu);
 }
 
 void AWRPlayerController::UsePotion() { ServerCommand(TEXT("use potion")); }
@@ -116,6 +118,10 @@ void AWRPlayerController::PlayerTick(float DeltaTime)
 	if (bBot)
 	{
 		TickBot(DeltaTime);
+	}
+	if (IsPlacing())
+	{
+		UpdatePlacement();
 	}
 	UpdateLockOn(DeltaTime);
 }
@@ -209,7 +215,8 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 {
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
-	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip ") };
+	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
+		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take ") };
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{
@@ -300,6 +307,17 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		Result = Best ? FString::Printf(TEXT("at %s"), *Best->GetName()) : TEXT("none found");
 	}
 	else if (RunGameplayCommand(Args, Result)) {}
+	else if (Cmd == TEXT("hitpiece"))
+	{
+		// Testing aid: N copper-sword hits on the nearest building piece.
+		if (AWRBuildPiece* Piece = FindNearbyPiece(450.f))
+		{
+			Piece->TakeBuildDamage(12.f * FMath::Max(1, FCString::Atoi(*Arg(1))), GetPawn());
+			Result = IsValid(Piece) && !Piece->IsActorBeingDestroyed() ? FString::Printf(TEXT("%s hp %.0f"), *Piece->PieceId.ToString(), Piece->Health) : TEXT("destroyed");
+		}
+		else Result = TEXT("no piece nearby");
+		ClientNotify(Result);
+	}
 	else if (Cmd == TEXT("equip") && PS)
 	{
 		// Testing aid: use the first inventory slot holding this item (equip / socket / consume).

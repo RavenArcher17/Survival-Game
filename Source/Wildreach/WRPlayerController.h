@@ -14,7 +14,12 @@ enum class EWRMenu : uint8
 	None,
 	Craft,
 	Inventory,
+	Build,
+	Chest,
+	Claim,
 };
+
+class AWRBuildPiece;
 
 /** One line of a menu and the server command it runs (or empty for a header line). */
 struct FWRMenuEntry
@@ -62,6 +67,24 @@ public:
 	UFUNCTION(Exec) void WREquip(FName Item);
 	/** Teleport next to the nearest station of a type, or "hearth" (testing). */
 	UFUNCTION(Exec) void WRGoTo(FName What);
+
+	// --- Building ---
+	bool IsPlacing() const { return !PlacingPiece.IsNone(); }
+	FName GetPlacingPiece() const { return PlacingPiece; }
+	bool IsPlacementValid() const { return bPlaceValid; }
+	const FString& GetPlacementWhy() const { return PlaceWhy; }
+	void ConfirmPlacement();
+	void RotatePlacement();
+	void CancelPlacement();
+	AWRBuildPiece* FindNearbyPiece(float Range = 350.f) const;
+
+	/** Place a piece at a world spot (testing; normal play uses the build ghost). */
+	UFUNCTION(Exec) void WRPlace(FName Piece, float X, float Y, float Z, float Yaw);
+	UFUNCTION(Exec) void WRSetCode(const FString& Code);
+	UFUNCTION(Exec) void WRCode(const FString& Code);
+	UFUNCTION(Exec) void WRDemolish();
+	/** N sword hits on the nearest building piece (testing raids/collapse). */
+	UFUNCTION(Exec) void WRHitPiece(int32 Hits);
 
 	/** Short message from the server ("Frost is now your subclass."), shown by the HUD for a few seconds. */
 	const FString& GetNotice() const { return Notice; }
@@ -117,6 +140,20 @@ private:
 	int32 MenuIndex = 0;
 	FName MenuElement;
 	TWeakObjectPtr<AWRStation> MenuStation;
+	TWeakObjectPtr<AWRBuildPiece> MenuPiece;
+
+	void ToggleBuildMenu();
+	void StartPlacing(FName Piece);
+	void UpdatePlacement();
+	TArray<FWRMenuEntry> BuildPieceMenu() const;
+	bool RunBuildCommand(const TArray<FString>& Args, FString& OutResult);
+
+	FName PlacingPiece;
+	TWeakObjectPtr<AWRBuildPiece> Ghost;
+	float PlaceYaw = 0.f;
+	FVector PlaceLoc = FVector::ZeroVector;
+	bool bPlaceValid = false;
+	FString PlaceWhy;
 
 	void ToggleLockOn();
 	void UpdateLockOn(float DeltaTime);

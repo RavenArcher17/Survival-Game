@@ -26,6 +26,9 @@ public:
 	/** Basic weapon abilities are granted once per player, not per pawn. */
 	bool bDefaultAbilitiesGranted = false;
 
+	/** Server: bed/bedroll this player respawns at (falls back to a biome spawn). */
+	TWeakObjectPtr<AActor> RespawnPoint;
+
 private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
 	UPROPERTY() TObjectPtr<UWRAttributeSet> Attributes;

@@ -8,6 +8,8 @@
 #include "WRPathComponent.h"
 #include "WRProjectile.h"
 #include "WRResourceNode.h"
+#include "WRBuilding.h"
+#include "GameFramework/PlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
@@ -265,6 +267,23 @@ void UWRGA_Melee::Sweep()
 
 	for (const FHitResult& HitResult : Hits)
 	{
+		// Raiding: weapons damage other people's buildings (stations/Hearths/totems belong to their piece).
+		AWRBuildPiece* Piece = Cast<AWRBuildPiece>(HitResult.GetActor());
+		if (!Piece && HitResult.GetActor())
+		{
+			Piece = Cast<AWRBuildPiece>(HitResult.GetActor()->GetOwner());
+		}
+		if (Piece)
+		{
+			const APlayerState* PS = Character->GetPlayerState();
+			if (!HitThisSwing.Contains(Piece) && PS && !Piece->CanAccess(PS->GetPlayerName()))
+			{
+				HitThisSwing.Add(Piece);
+				Piece->TakeBuildDamage(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f)
+					* T.Num(TEXT("building.raidDamageMultiplier"), 1.f), Character);
+			}
+			continue;
+		}
 		// Weapon swings also gather from resource nodes (once per swing).
 		if (AWRResourceNode* Node = Cast<AWRResourceNode>(HitResult.GetActor()))
 		{

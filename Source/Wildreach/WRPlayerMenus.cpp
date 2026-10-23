@@ -4,6 +4,7 @@
 #include "WRPlayerController.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
+#include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
@@ -47,6 +48,17 @@ void AWRPlayerController::WRInteract()
 	{
 		MenuClose();
 		return;
+	}
+	if (AWRBuildPiece* Piece = FindNearbyPiece())
+	{
+		const FWRPieceDef* Def = Piece->GetDef();
+		if (Def && (Def->Kind == TEXT("chest") || Def->Kind == TEXT("totem")))
+		{
+			Menu = Def->Kind == TEXT("chest") ? EWRMenu::Chest : EWRMenu::Claim;
+			MenuPiece = Piece;
+			MenuIndex = 0;
+			return;
+		}
 	}
 	if (AWRStation* Station = FindNearbyStation())
 	{
@@ -100,7 +112,15 @@ void AWRPlayerController::MenuConfirm()
 	const TArray<FWRMenuEntry> Entries = BuildMenuEntries();
 	if (Menu != EWRMenu::None && Entries.IsValidIndex(MenuIndex) && !Entries[MenuIndex].Command.IsEmpty())
 	{
-		ServerCommand(Entries[MenuIndex].Command);
+		const FString& Command = Entries[MenuIndex].Command;
+		if (Command.StartsWith(TEXT("build ")))
+		{
+			StartPlacing(FName(*Command.RightChop(6)));
+		}
+		else
+		{
+			ServerCommand(Command);
+		}
 	}
 }
 
@@ -109,6 +129,18 @@ FString AWRPlayerController::GetMenuTitle() const
 	if (Menu == EWRMenu::Inventory)
 	{
 		return TEXT("Inventory  (Up/Down, Enter = use / equip / socket, I = close)");
+	}
+	if (Menu == EWRMenu::Build)
+	{
+		return TEXT("Build  (Enter = pick, then LMB place, R rotate, RMB/B cancel)");
+	}
+	if (Menu == EWRMenu::Chest)
+	{
+		return TEXT("Chest  (Enter = take / store, E = close)");
+	}
+	if (Menu == EWRMenu::Claim)
+	{
+		return TEXT("Land claim  (E = close)");
 	}
 	if (const AWRStation* Station = MenuStation.Get())
 	{
@@ -153,6 +185,44 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 			const FString Label = Def && Def->IsEquipment() ? GearLabel(Slots[i])
 				: FString::Printf(TEXT("%s x%d"), Def ? *Def->Name : *Slots[i].ItemId.ToString(), Slots[i].Count);
 			Out.Add({ Label, FString::Printf(TEXT("slot %d"), i) });
+		}
+		return Out;
+	}
+
+	if (Menu == EWRMenu::Build)
+	{
+		return BuildPieceMenu();
+	}
+	if (Menu == EWRMenu::Chest || Menu == EWRMenu::Claim)
+	{
+		const AWRBuildPiece* Piece = MenuPiece.Get();
+		if (!Piece)
+		{
+			return Out;
+		}
+		if (Menu == EWRMenu::Claim)
+		{
+			const AWRClaimTotem* Totem = Cast<AWRClaimTotem>(Piece->GetChild());
+			Out.Add({ Totem ? Totem->Describe() : FString(TEXT("Land claim")), FString() });
+			Out.Add({ TEXT("Stock all your wood and stone for upkeep"), TEXT("claimdeposit") });
+			Out.Add({ TEXT("Upgrade radius +10 m"), TEXT("claimupgrade") });
+			return Out;
+		}
+		Out.Add({ TEXT("-- In the chest --"), FString() });
+		for (int32 i = 0; i < Piece->Storage.Num(); ++i)
+		{
+			const FWRItemStack& S = Piece->Storage[i];
+			if (S.IsEmpty()) continue;
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(S.ItemId);
+			Out.Add({ FString::Printf(TEXT("take  %s x%d"), Def ? *Def->Name : *S.ItemId.ToString(), S.Count), FString::Printf(TEXT("take %d"), i) });
+		}
+		Out.Add({ TEXT("-- Your items --"), FString() });
+		const TArray<FWRItemStack>& Slots = Inv->GetSlots();
+		for (int32 i = 0; i < Slots.Num(); ++i)
+		{
+			if (Slots[i].IsEmpty()) continue;
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[i].ItemId);
+			Out.Add({ FString::Printf(TEXT("store %s x%d"), Def ? *Def->Name : *Slots[i].ItemId.ToString(), Slots[i].Count), FString::Printf(TEXT("store %d"), i) });
 		}
 		return Out;
 	}
@@ -206,9 +276,19 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	const auto Arg = [&Args](int32 i) { return Args.IsValidIndex(i) ? Args[i] : FString(); };
 	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : EWREquipSlot::Weapon; };
 
+	if (RunBuildCommand(Args, OutResult))
+	{
+		return true;
+	}
 	if (Cmd == TEXT("interact"))
 	{
-		if (AWRHearth* Hearth = FindNearbyHearth())
+		AWRBuildPiece* Piece = FindNearbyPiece();
+		const FWRPieceDef* PieceDef = Piece ? Piece->GetDef() : nullptr;
+		if (PieceDef && PieceDef->Kind != TEXT("structure") && PieceDef->Kind != TEXT("decor") && PieceDef->Kind != TEXT("station"))
+		{
+			OutResult = Piece->Interact(this);
+		}
+		else if (AWRHearth* Hearth = FindNearbyHearth())
 		{
 			OutResult = Hearth->DepositCores(this);
 		}

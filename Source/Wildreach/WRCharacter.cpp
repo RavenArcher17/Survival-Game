@@ -7,6 +7,7 @@
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
+#include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
@@ -190,6 +191,14 @@ void AWRCharacter::ToggleView()
 
 void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 {
+	// In build mode the attack buttons place / rotate / cancel instead.
+	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())
+	{
+		if (Input == EWRAbilityInput::Light) PC->ConfirmPlacement();
+		else if (Input == EWRAbilityInput::Heavy) PC->RotatePlacement();
+		else if (Input == EWRAbilityInput::Block) PC->CancelPlacement();
+		return;
+	}
 	if (AbilitySystem)
 	{
 		AbilitySystem->AbilityLocalInputPressed(static_cast<int32>(Input));

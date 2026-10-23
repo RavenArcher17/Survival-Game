@@ -1,0 +1,160 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "WRInventory.h"
+#include "WRBuilding.generated.h"
+
+class AWRPlayerController;
+class UPointLightComponent;
+class UStaticMeshComponent;
+
+/** One buildable from Data/pieces.json. */
+struct FWRPieceDef
+{
+	FName Id;
+	FString Name;
+	FName Category;  // structure / defense / utility / decor
+	FName Kind;      // structure, door, chest, bed, light, crop, pen, decor, station, hearth, totem
+	FName Shape;     // foundation, wall, halfwall, floor, roof, stairs, pillar, door, window, palisade, gate, tower
+	FName Material;  // wood / stone / none
+	FName Station;
+	TArray<TPair<FName, int32>> Cost;
+	float HP = 300.f;
+	bool bLockable = false;
+
+	/** Structure pieces snap to the grid and need support; everything else places freely. */
+	bool Snaps() const { return Kind == TEXT("structure") || Kind == TEXT("door"); }
+};
+
+class WILDREACH_API FWRBuildRegistry
+{
+public:
+	static FWRBuildRegistry& Get();
+	const FWRPieceDef* Find(FName Id) const;
+	const TArray<FWRPieceDef>& All() const { return Pieces; }
+
+	float GridSize = 400.f;
+	TMap<FName, int32> Span;
+	TMap<FName, float> UpkeepPerPiecePerHour;
+	float ClaimRadius = 3000.f;
+	float ClaimRadiusPerUpgrade = 1000.f;
+	float ClaimMaxRadius = 6000.f;
+	TArray<TPair<FName, int32>> ClaimUpgradeCost;
+	float DecayPerHourWhenUnpaid = 0.1f;
+
+private:
+	FWRBuildRegistry();
+	TArray<FWRPieceDef> Pieces;
+};
+
+/** Pure building math (tests). */
+struct WILDREACH_API FWRBuildRules
+{
+	/** Snap a world point to the build grid for a shape; returns the piece location and yaw (0/90). */
+	static FVector SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, float Grid, float& InOutYaw);
+	/** Max support distance (pieces) for a material: wood 4, stone 6. */
+	static int32 SpanFor(FName Material);
+	/** Upkeep per hour for a claim holding these pieces. */
+	static TMap<FName, float> UpkeepPerHour(const TMap<FName, int32>& PiecesByMaterial);
+};
+
+/**
+ * Everything a player builds. Structure pieces carry a support value (0 = grounded); a piece
+ * further than its material's span from the ground collapses. Doors open/close and can carry a
+ * code lock; chests store items; beds set your respawn; crop plots grow food. Stations, the
+ * Hearth and claim totems ride along as child actors so one save path covers them all.
+ */
+UCLASS()
+class WILDREACH_API AWRBuildPiece : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AWRBuildPiece();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UPROPERTY(ReplicatedUsing=OnRep_Piece) FName PieceId;
+	UPROPERTY(Replicated) FString OwnerName;
+	UPROPERTY(Replicated) float Health = 300.f;
+	UPROPERTY(Replicated) float MaxHealth = 300.f;
+	UPROPERTY(ReplicatedUsing=OnRep_Door) bool bOpen = false;
+	UPROPERTY(Replicated) bool bLocked = false;
+	/** Crop plots: server time planting finished growing (0 = empty). */
+	UPROPERTY(Replicated) float CropReadyAt = 0.f;
+	UPROPERTY(Replicated) bool bPlanted = false;
+	/** Chests. */
+	UPROPERTY(Replicated) TArray<FWRItemStack> Storage;
+
+	/** Server bookkeeping. */
+	int32 Support = 0;
+	FString LockCode;
+	TSet<FString> UnlockedFor;
+	/** Ghosts are local previews in build mode: no collision, tinted. */
+	bool bGhost = false;
+
+	const FWRPieceDef* GetDef() const { return FWRBuildRegistry::Get().Find(PieceId); }
+	void SetGhostValid(bool bValid);
+	void ApplyLook();
+
+	// --- Server ---
+	void InitPiece(FName InPieceId, const FString& InOwner);
+	void TakeBuildDamage(float Amount, AActor* DamageSource);
+	FString Interact(AWRPlayerController* Player);
+	bool CanAccess(const FString& PlayerName) const;
+	AActor* GetChild() const { return ChildActor.Get(); }
+
+	TSharedRef<class FJsonObject> ToJson() const;
+	void FromJson(const TSharedPtr<class FJsonObject>& Json);
+
+	/** Server: recompute support for structure pieces around a point; collapse what's unsupported. */
+	static void RecomputeSupport(UWorld* World, const FVector& Around, float Radius);
+	/** Support a new structure piece would have at this spot (INDEX_NONE = unsupported). */
+	static int32 SupportAt(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore = nullptr);
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+
+private:
+	UFUNCTION() void OnRep_Piece();
+	UFUNCTION() void OnRep_Door();
+	void SpawnChild();
+
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Main;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Leaf;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> Light;
+	TWeakObjectPtr<AActor> ChildActor;
+	bool bLookApplied = false;
+};
+
+/** Land claim: only the owner (and their clan) builds inside; pays upkeep from its storage or decays. */
+UCLASS()
+class WILDREACH_API AWRClaimTotem : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AWRClaimTotem();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	UPROPERTY(Replicated) FString OwnerName;
+	UPROPERTY(Replicated) float Radius = 3000.f;
+	UPROPERTY(Replicated) int32 UpgradeLevel = 0;
+	UPROPERTY(Replicated) bool bUnpaid = false;
+	UPROPERTY(Replicated) TArray<FWRItemStack> UpkeepStorage;
+
+	static AWRClaimTotem* FindAt(const UWorld* World, const FVector& Location);
+	/** Can this player build here? (No claim = yes; someone else's claim = no.) */
+	static bool CanBuild(const UWorld* World, const FVector& Location, const FString& PlayerName, FString& OutWhy);
+
+	FString Deposit(AWRPlayerController* Player);
+	FString Upgrade(AWRPlayerController* Player);
+	FString Describe() const;
+	TMap<FName, float> CurrentUpkeepPerHour() const;
+
+private:
+	float MinuteClock = 0.f;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
+};

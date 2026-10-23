@@ -1,0 +1,53 @@
+{
+  "_comment": "Buildable pieces (Building tab). Grid is 4 m. Costs/HP are placeholders. kind: structure pieces snap to the grid and need support (span: wood 4, stone 6); utility/decor place freely (design review #28).",
+  "gridSize": 400,
+  "span": { "wood": 4, "stone": 6 },
+  "upkeepPerPiecePerHour": { "wood": 2, "stone": 2 },
+  "claim": { "radius": 3000, "radiusPerUpgrade": 1000, "maxRadius": 6000, "upgradeCost": { "stone": 50, "wood": 50 } },
+  "decayPerHourWhenUnpaid": 0.1,
+  "pieces": [
+    { "id": "claim_totem", "name": "Land claim totem", "category": "utility", "kind": "totem", "cost": { "wood": 20, "stone": 10 }, "hp": 1500 },
+    { "id": "hearth", "name": "Hearth", "category": "utility", "kind": "hearth", "cost": { "stone": 30, "copper_ingot": 5 }, "hp": 2000 },
+
+    { "id": "wood_foundation", "name": "Wood foundation", "category": "structure", "kind": "structure", "shape": "foundation", "material": "wood", "cost": { "wood": 20 }, "hp": 600 },
+    { "id": "wood_wall", "name": "Wood wall", "category": "structure", "kind": "structure", "shape": "wall", "material": "wood", "cost": { "wood": 12 }, "hp": 400 },
+    { "id": "wood_half_wall", "name": "Wood half wall", "category": "structure", "kind": "structure", "shape": "halfwall", "material": "wood", "cost": { "wood": 6 }, "hp": 250 },
+    { "id": "wood_floor", "name": "Wood floor", "category": "structure", "kind": "structure", "shape": "floor", "material": "wood", "cost": { "wood": 10 }, "hp": 350 },
+    { "id": "wood_roof", "name": "Wood roof", "category": "structure", "kind": "structure", "shape": "roof", "material": "wood", "cost": { "wood": 10 }, "hp": 300 },
+    { "id": "wood_stairs", "name": "Wood stairs", "category": "structure", "kind": "structure", "shape": "stairs", "material": "wood", "cost": { "wood": 14 }, "hp": 300 },
+    { "id": "wood_pillar", "name": "Wood pillar", "category": "structure", "kind": "structure", "shape": "pillar", "material": "wood", "cost": { "wood": 6 }, "hp": 300 },
+    { "id": "wood_door", "name": "Wood doorway + door", "category": "structure", "kind": "door", "shape": "door", "material": "wood", "cost": { "wood": 16 }, "hp": 350 },
+    { "id": "wood_window", "name": "Wood window wall", "category": "structure", "kind": "structure", "shape": "window", "material": "wood", "cost": { "wood": 10 }, "hp": 300 },
+    { "id": "stone_foundation", "name": "Stone foundation", "category": "structure", "kind": "structure", "shape": "foundation", "material": "stone", "cost": { "stone": 30 }, "hp": 1500 },
+    { "id": "stone_wall", "name": "Stone wall", "category": "structure", "kind": "structure", "shape": "wall", "material": "stone", "cost": { "stone": 20 }, "hp": 1000 },
+    { "id": "stone_half_wall", "name": "Stone half wall", "category": "structure", "kind": "structure", "shape": "halfwall", "material": "stone", "cost": { "stone": 10 }, "hp": 600 },
+    { "id": "stone_floor", "name": "Stone floor", "category": "structure", "kind": "structure", "shape": "floor", "material": "stone", "cost": { "stone": 16 }, "hp": 900 },
+    { "id": "stone_roof", "name": "Stone roof", "category": "structure", "kind": "structure", "shape": "roof", "material": "stone", "cost": { "stone": 16 }, "hp": 800 },
+    { "id": "stone_stairs", "name": "Stone stairs", "category": "structure", "kind": "structure", "shape": "stairs", "material": "stone", "cost": { "stone": 22 }, "hp": 800 },
+    { "id": "stone_pillar", "name": "Stone pillar", "category": "structure", "kind": "structure", "shape": "pillar", "material": "stone", "cost": { "stone": 10 }, "hp": 800 },
+    { "id": "stone_window", "name": "Stone window wall", "category": "structure", "kind": "structure", "shape": "window", "material": "stone", "cost": { "stone": 16 }, "hp": 800 },
+
+    { "id": "palisade_wall", "name": "Palisade wall", "category": "defense", "kind": "structure", "shape": "palisade", "material": "wood", "cost": { "wood": 25 }, "hp": 900 },
+    { "id": "palisade_gate", "name": "Palisade gate", "category": "defense", "kind": "door", "shape": "gate", "material": "wood", "cost": { "wood": 40 }, "hp": 900 },
+    { "id": "guard_tower", "name": "Guard tower", "category": "defense", "kind": "structure", "shape": "tower", "material": "wood", "cost": { "wood": 60, "stone": 20 }, "hp": 1200 },
+    { "id": "reinforced_door", "name": "Reinforced door (code lock)", "category": "defense", "kind": "door", "shape": "door", "material": "stone", "cost": { "stone": 20, "copper_ingot": 4 }, "hp": 1400, "lockable": true },
+
+    { "id": "storage_chest", "name": "Storage chest", "category": "utility", "kind": "chest", "cost": { "wood": 15 }, "hp": 300 },
+    { "id": "bed", "name": "Bed", "category": "utility", "kind": "bed", "cost": { "wood": 20, "hide": 4, "fiber": 6 }, "hp": 300 },
+    { "id": "bedroll", "name": "Bedroll", "category": "utility", "kind": "bed", "cost": { "hide": 3, "fiber": 6 }, "hp": 100 },
+    { "id": "forge", "name": "Forge", "category": "utility", "kind": "station", "station": "forge", "cost": { "stone": 40, "copper_ore": 6 }, "hp": 800 },
+    { "id": "armorer", "name": "Armorer", "category": "utility", "kind": "station", "station": "armorer", "cost": { "stone": 20, "wood": 20 }, "hp": 600 },
+    { "id": "alchemy_table", "name": "Alchemy table", "category": "utility", "kind": "station", "station": "alchemy_table", "cost": { "wood": 25, "stone": 10 }, "hp": 400 },
+    { "id": "workbench", "name": "Workbench", "category": "utility", "kind": "station", "station": "workbench", "cost": { "wood": 30 }, "hp": 400 },
+    { "id": "torch", "name": "Torch", "category": "utility", "kind": "light", "cost": { "wood": 2, "fiber": 1 }, "hp": 50 },
+    { "id": "brazier", "name": "Brazier", "category": "utility", "kind": "light", "cost": { "stone": 8, "wood": 4 }, "hp": 200 },
+    { "id": "crop_plot", "name": "Crop plot", "category": "utility", "kind": "crop", "cost": { "wood": 10, "fiber": 4 }, "hp": 200 },
+    { "id": "animal_pen", "name": "Animal pen", "category": "utility", "kind": "pen", "cost": { "wood": 40 }, "hp": 500 },
+
+    { "id": "table", "name": "Table", "category": "decor", "kind": "decor", "cost": { "wood": 8 }, "hp": 100 },
+    { "id": "chair", "name": "Chair", "category": "decor", "kind": "decor", "cost": { "wood": 4 }, "hp": 80 },
+    { "id": "rug", "name": "Rug", "category": "decor", "kind": "decor", "cost": { "hide": 3 }, "hp": 50 },
+    { "id": "banner", "name": "Banner", "category": "decor", "kind": "decor", "cost": { "fiber": 6, "wood": 2 }, "hp": 50 },
+    { "id": "trophy_mount", "name": "Trophy mount", "category": "decor", "kind": "decor", "cost": { "wood": 6 }, "hp": 80 }
+  ]
+}

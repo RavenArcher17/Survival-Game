@@ -1,6 +1,7 @@
 #include "WRHUD.h"
 #include "WRAbilities.h"
 #include "WRAltar.h"
+#include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -212,6 +213,22 @@ void AWRHUD::DrawHUD()
 			{
 				DrawText(TEXT("(empty)"), FLinearColor(0.6f, 0.6f, 0.6f), PX, PY);
 			}
+		}
+		else if (PC->IsPlacing())
+		{
+			const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PC->GetPlacingPiece());
+			const FString Prompt = FString::Printf(TEXT("Placing %s: LMB place, R rotate, RMB cancel%s"), Def ? *Def->Name : TEXT("?"),
+				PC->IsPlacementValid() ? TEXT("") : *FString::Printf(TEXT("  (%s)"), *PC->GetPlacementWhy()));
+			DrawText(Prompt, PC->IsPlacementValid() ? FLinearColor(0.6f, 1.f, 0.6f) : FLinearColor(1.f, 0.5f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.1f);
+		}
+		else if (const AWRBuildPiece* Piece = PC->FindNearbyPiece();
+			Piece && Piece->GetDef() && Piece->GetDef()->Kind != TEXT("structure") && Piece->GetDef()->Kind != TEXT("decor") && Piece->GetDef()->Kind != TEXT("station"))
+		{
+			const FWRPieceDef* Def = Piece->GetDef();
+			FString Prompt = FString::Printf(TEXT("E: %s"), *Def->Name);
+			if (Def->Kind == TEXT("door")) Prompt += Piece->bOpen ? TEXT(" (close)") : Piece->bLocked ? TEXT(" (locked)") : TEXT(" (open)");
+			if (Def->Kind == TEXT("crop") && Piece->bPlanted) Prompt += TEXT(" (growing)");
+			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
 		}
 		else if (const AWRStation* Station = PC->FindNearbyStation())
 		{

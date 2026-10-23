@@ -2,6 +2,7 @@
 #include "Wildreach.h"
 #include "WRCharacter.h"
 #include "WRHUD.h"
+#include "WRBuilding.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
@@ -59,13 +60,79 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 void AWRGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	LoadWorld();
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
+	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);
 }
 
 void AWRGameMode::EndPlay(const EEndPlayReason::Type Reason)
 {
 	SaveAllPlayers(false);
+	SaveWorld();
 	Super::EndPlay(Reason);
+}
+
+FString AWRGameMode::WorldSavePath() const
+{
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), FString::Printf(TEXT("world_%s.json"), *GetWorld()->GetMapName().Replace(TEXT("UEDPIE_0_"), TEXT(""))));
+}
+
+void AWRGameMode::SaveWorld()
+{
+	TArray<TSharedPtr<FJsonValue>> Pieces;
+	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+	{
+		if (!It->bGhost && !It->IsActorBeingDestroyed())
+		{
+			Pieces.Add(MakeShared<FJsonValueObject>(It->ToJson()));
+		}
+	}
+	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetNumberField(TEXT("version"), 1);
+	Root->SetArrayField(TEXT("pieces"), Pieces);
+	FString Text;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
+	FJsonSerializer::Serialize(Root, Writer);
+	if (FFileHelper::SaveStringToFile(Text, *WorldSavePath()))
+	{
+		UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
+	}
+}
+
+void AWRGameMode::LoadWorld()
+{
+	FString Text;
+	if (!FFileHelper::LoadFileToString(Text, *WorldSavePath()))
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> Root;
+	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
+	const TArray<TSharedPtr<FJsonValue>>* Pieces = nullptr;
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid() || !Root->TryGetArrayField(TEXT("pieces"), Pieces))
+	{
+		UE_LOG(LogWildreach, Error, TEXT("WORLD save is corrupt: %s"), *WorldSavePath());
+		return;
+	}
+	int32 Loaded = 0;
+	for (const TSharedPtr<FJsonValue>& V : *Pieces)
+	{
+		const TSharedPtr<FJsonObject> O = V->AsObject();
+		const FName PieceId(*O->GetStringField(TEXT("piece")));
+		if (!FWRBuildRegistry::Get().Find(PieceId))
+		{
+			continue;
+		}
+		const FTransform T(FRotator(0.f, O->GetNumberField(TEXT("yaw")), 0.f),
+			FVector(O->GetNumberField(TEXT("x")), O->GetNumberField(TEXT("y")), O->GetNumberField(TEXT("z"))));
+		AWRBuildPiece* Piece = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		Piece->InitPiece(PieceId, O->GetStringField(TEXT("owner")));
+		Piece->FinishSpawning(T);
+		Piece->FromJson(O);
+		++Loaded;
+	}
+	AWRBuildPiece::RecomputeSupport(GetWorld(), FVector::ZeroVector, 1.0e7f);
+	UE_LOG(LogWildreach, Log, TEXT("WORLD loaded %d pieces"), Loaded);
 }
 
 FString AWRGameMode::PlayerSavePath(const FString& PlayerName)
@@ -168,8 +235,13 @@ void AWRGameMode::Logout(AController* Exiting)
 
 AActor* AWRGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	// Spawn in the main path's biome: player starts are tagged "volcanic" / "tundra".
+	// A bed or bedroll you've set wins; otherwise spawn in the main path's biome
+	// (player starts are tagged "volcanic" / "tundra").
 	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (PS && PS->RespawnPoint.IsValid())
+	{
+		return PS->RespawnPoint.Get();
+	}
 	const FWRPathDef* Def = PS ? FWRPathRegistry::Get().Find(PS->GetPaths()->GetMainPath()) : nullptr;
 	if (Def)
 	{
