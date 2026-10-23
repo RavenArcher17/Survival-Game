@@ -1,0 +1,208 @@
+{
+  "id": "frost",
+  "name": "Frost",
+  "biome": "tundra",
+  "resource": {
+    "id": "chill",
+    "name": "Chill"
+  },
+  "rootPassive": {
+    "id": "permafrost",
+    "name": "Permafrost",
+    "text": "Slowed enemies take extra damage from you."
+  },
+  "trunk": [
+    {
+      "id": "frost_shard",
+      "name": "Frost shard",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic frost spell"
+    },
+    {
+      "id": "chill_capacity",
+      "name": "Chill capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Chill bar"
+    },
+    {
+      "id": "frostbite",
+      "name": "Frostbite",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Higher chance to inflict frostbite"
+    },
+    {
+      "id": "ice_slash",
+      "name": "Ice slash",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic frost weapon art"
+    }
+  ],
+  "branches": [
+    {
+      "id": "shatter",
+      "name": "Shatter",
+      "nodes": [
+        {
+          "id": "deep_freeze",
+          "name": "Deep freeze",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "Faster freeze buildup",
+          "gate": 0
+        },
+        {
+          "id": "brittle",
+          "name": "Brittle",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Frozen enemies take more critical hits",
+          "gate": 5
+        },
+        {
+          "id": "ice_lance",
+          "name": "Ice lance",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a piercing lance of ice",
+          "gate": 9
+        },
+        {
+          "id": "hard_break",
+          "name": "Hard break",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "More shatter damage",
+          "gate": 14
+        },
+        {
+          "id": "cold_return",
+          "name": "Cold return",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Shatters refund some Chill",
+          "gate": 17
+        },
+        {
+          "id": "chain_shatter",
+          "name": "Chain shatter",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "one shatter sets off nearby frozen enemies",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "blizzard",
+      "name": "Blizzard",
+      "nodes": [
+        {
+          "id": "frost_nova",
+          "name": "Frost nova",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a burst of cold around you",
+          "gate": 0
+        },
+        {
+          "id": "biting_cold",
+          "name": "Biting cold",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Stronger slows",
+          "gate": 5
+        },
+        {
+          "id": "wide_storm",
+          "name": "Wide storm",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Larger area effects",
+          "gate": 8
+        },
+        {
+          "id": "ice_wall",
+          "name": "Ice wall",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a wall of ice",
+          "gate": 11
+        },
+        {
+          "id": "whiteout",
+          "name": "Whiteout",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Enemies inside your storms miss more",
+          "gate": 16
+        },
+        {
+          "id": "blizzard",
+          "name": "Blizzard",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "a lasting storm you fight inside",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "ice_blade",
+      "name": "Ice blade",
+      "nodes": [
+        {
+          "id": "keen_edge",
+          "name": "Keen edge",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "Higher critical chance",
+          "gate": 0
+        },
+        {
+          "id": "flurry",
+          "name": "Flurry",
+          "kind": "ability",
+          "cost": 5,
+          "text": "New fast frost weapon art",
+          "gate": 5
+        },
+        {
+          "id": "light_step",
+          "name": "Light step",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Faster dodges",
+          "gate": 10
+        },
+        {
+          "id": "chilling_touch",
+          "name": "Chilling touch",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Hits build Chill",
+          "gate": 13
+        },
+        {
+          "id": "cold_riposte",
+          "name": "Cold riposte",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Ripostes freeze the target",
+          "gate": 16
+        },
+        {
+          "id": "frozen_moment",
+          "name": "Frozen moment",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "a perfect dodge freezes everything close to you",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

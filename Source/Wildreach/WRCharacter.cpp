@@ -1,7 +1,15 @@
 #include "WRCharacter.h"
+#include "Wildreach.h"
+#include "WRAbilities.h"
+#include "WRAttributeSet.h"
 #include "WRCharacterMovementComponent.h"
 #include "WRGameMode.h"
-#include "WRSurvivalComponent.h"
+#include "WRGameplayTags.h"
+#include "WRPathComponent.h"
+#include "WRPlayerState.h"
+#include "WRStatusComponent.h"
+#include "WRTuning.h"
+#include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -13,13 +21,10 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "UObject/ConstructorHelpers.h"
 
 AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer.SetDefaultSubobjectClass<UWRCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
+	: Super(ObjectInitializer)
 {
-	PrimaryActorTick.bCanEverTick = true;
-
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 
 	bUseControllerRotationPitch = false;
@@ -49,41 +54,16 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	FirstPersonCamera->bUsePawnControlRotation = true;
 	FirstPersonCamera->bAutoActivate = false;
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-
-	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
-	BodyMesh->SetupAttachment(RootComponent);
-	BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	BodyMesh->SetRelativeScale3D(FVector(0.84f, 0.84f, 1.92f));
-	if (CylinderMesh.Succeeded())
-	{
-		BodyMesh->SetStaticMesh(CylinderMesh.Object);
-	}
-
-	// Shows which way a placeholder survivor is facing.
-	FaceMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FaceMarker"));
-	FaceMarker->SetupAttachment(RootComponent);
-	FaceMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	FaceMarker->SetRelativeLocation(FVector(40.f, 0.f, 60.f));
-	FaceMarker->SetRelativeScale3D(FVector(0.2f, 0.4f, 0.2f));
-	if (CubeMesh.Succeeded())
-	{
-		FaceMarker->SetStaticMesh(CubeMesh.Object);
-	}
-
-	Survival = CreateDefaultSubobject<UWRSurvivalComponent>(TEXT("Survival"));
+	BaseBodyColor = FLinearColor(0.55f, 0.6f, 0.7f);
+	Status->bSurvivalNeeds = true;
 }
 
 void AWRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
 	ApplyViewMode();
-	if (HasAuthority())
-	{
-		Survival->OnDied.AddDynamic(this, &AWRCharacter::HandleDied);
-	}
+	Cast<UWRCharacterMovementComponent>(GetCharacterMovement())->SprintSpeed = WRTune(TEXT("player.sprintSpeed"), 750.f);
+	GetCharacterMovement()->MaxWalkSpeed = WRTune(TEXT("player.walkSpeed"), 450.f);
 }
 
 void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -92,21 +72,77 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRCharacter, bFirstPerson);
 }
 
-void AWRCharacter::Tick(float DeltaSeconds)
+void AWRCharacter::InitAbilityActorInfo()
 {
-	Super::Tick(DeltaSeconds);
-
-	if (HasAuthority())
+	AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
+	if (!PS)
 	{
-		const UWRCharacterMovementComponent* Move = CastChecked<UWRCharacterMovementComponent>(GetCharacterMovement());
-		Survival->SetStaminaDraining(Move->IsSprinting() && GetVelocity().SizeSquared2D() > FMath::Square(10.f));
+		return;
+	}
+	AbilitySystem = PS->GetAbilitySystemComponent();
+	Attributes = PS->GetAttributes();
+	AbilitySystem->InitAbilityActorInfo(PS, this);
+}
+
+void AWRCharacter::ClearStaleTags()
+{
+	// The ASC lives on the PlayerState, so tags from the previous body would otherwise survive death.
+	static const FGameplayTag Stale[] = {
+		WRTags::State_Dead, WRTags::State_Invulnerable, WRTags::State_Parrying,
+		WRTags::Status_Burn, WRTags::Status_Frostbite, WRTags::Status_Slowed, WRTags::Status_Frozen, WRTags::Status_Staggered };
+	for (const FGameplayTag& Tag : Stale)
+	{
+		AbilitySystem->SetLooseGameplayTagCount(Tag, 0, EGameplayTagReplicationState::TagOnly);
 	}
 }
 
-bool AWRCharacter::CanSprint() const
+void AWRCharacter::PossessedBy(AController* NewController)
 {
-	return Survival && Survival->IsAlive() && Survival->HasStamina();
+	Super::PossessedBy(NewController);
+	InitAbilityActorInfo();
+
+	AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
+	if (!PS || !AbilitySystem)
+	{
+		return;
+	}
+
+	ClearStaleTags();
+	if (!PS->bDefaultAbilitiesGranted)
+	{
+		PS->bDefaultAbilitiesGranted = true;
+		GrantAbility(UWRGA_LightAttack::StaticClass(), EWRAbilityInput::Light);
+		GrantAbility(UWRGA_HeavyAttack::StaticClass(), EWRAbilityInput::Heavy);
+		GrantAbility(UWRGA_Dodge::StaticClass(), EWRAbilityInput::Dodge);
+		GrantAbility(UWRGA_Block::StaticClass(), EWRAbilityInput::Block);
+	}
+
+	InitVitals(WRTune(TEXT("player.health"), 100.f), WRTune(TEXT("player.stamina"), 100.f), WRTune(TEXT("player.poise"), 40.f));
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), 100.f);
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 100.f);
+	PS->GetPaths()->ApplyToCharacter(this);
+	// Path level can raise max health; respawn at full.
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), Attributes->GetMaxHealth());
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attributes->GetMaxStamina());
 }
+
+void AWRCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	InitAbilityActorInfo();
+}
+
+void AWRCharacter::OnDeath(AActor* Killer)
+{
+	if (AWRGameMode* GameMode = GetWorld()->GetAuthGameMode<AWRGameMode>())
+	{
+		GameMode->RequestRespawn(Controller);
+	}
+	DetachFromControllerPendingDestroy();
+	SetLifeSpan(5.f);
+}
+
+// ---------------------------------------------------------------- view
 
 void AWRCharacter::SetFirstPerson(bool bNewFirstPerson)
 {
@@ -141,17 +177,27 @@ void AWRCharacter::ApplyViewMode()
 	GetCharacterMovement()->bOrientRotationToMovement = !bFirstPerson;
 }
 
-void AWRCharacter::HandleDied()
+void AWRCharacter::ToggleView()
 {
-	UE_LOG(LogTemp, Log, TEXT("%s died"), *GetName());
+	SetFirstPerson(!bFirstPerson);
+}
 
-	GetCharacterMovement()->DisableMovement();
-	if (AWRGameMode* GameMode = GetWorld()->GetAuthGameMode<AWRGameMode>())
+// ---------------------------------------------------------------- input
+
+void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
+{
+	if (AbilitySystem)
 	{
-		GameMode->RequestRespawn(Controller);
+		AbilitySystem->AbilityLocalInputPressed(static_cast<int32>(Input));
 	}
-	DetachFromControllerPendingDestroy();
-	SetLifeSpan(5.f);
+}
+
+void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)
+{
+	if (AbilitySystem)
+	{
+		AbilitySystem->AbilityLocalInputReleased(static_cast<int32>(Input));
+	}
 }
 
 void AWRCharacter::BuildInput()
@@ -188,6 +234,23 @@ void AWRCharacter::BuildInput()
 	MappingContext->MapKey(JumpAction, EKeys::SpaceBar);
 	MappingContext->MapKey(SprintAction, EKeys::LeftShift);
 	MappingContext->MapKey(ToggleViewAction, EKeys::V);
+
+	const TPair<EWRAbilityInput, FKey> AbilityKeys[] = {
+		{ EWRAbilityInput::Light, EKeys::LeftMouseButton },
+		{ EWRAbilityInput::Heavy, EKeys::R },
+		{ EWRAbilityInput::Block, EKeys::RightMouseButton },
+		{ EWRAbilityInput::Dodge, EKeys::C },
+		{ EWRAbilityInput::Slot1, EKeys::One }, { EWRAbilityInput::Slot2, EKeys::Two },
+		{ EWRAbilityInput::Slot3, EKeys::Three }, { EWRAbilityInput::Slot4, EKeys::Four },
+		{ EWRAbilityInput::Slot5, EKeys::Five }, { EWRAbilityInput::Slot6, EKeys::Six },
+		{ EWRAbilityInput::Slot7, EKeys::Seven }, { EWRAbilityInput::Slot8, EKeys::Eight },
+	};
+	for (const TPair<EWRAbilityInput, FKey>& Pair : AbilityKeys)
+	{
+		UInputAction* Action = MakeAction(EInputActionValueType::Boolean);
+		MappingContext->MapKey(Action, Pair.Value);
+		AbilityActions.Add(Pair.Key, Action);
+	}
 }
 
 void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -214,6 +277,11 @@ void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AWRCharacter::StartSprint);
 		Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AWRCharacter::StopSprint);
 		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AWRCharacter::ToggleView);
+		for (const TPair<EWRAbilityInput, TObjectPtr<UInputAction>>& Pair : AbilityActions)
+		{
+			Input->BindAction(Pair.Value, ETriggerEvent::Started, this, &AWRCharacter::PressAbilityInput, Pair.Key);
+			Input->BindAction(Pair.Value, ETriggerEvent::Completed, this, &AWRCharacter::ReleaseAbilityInput, Pair.Key);
+		}
 	}
 }
 
@@ -224,7 +292,6 @@ void AWRCharacter::Move(const FInputActionValue& Value)
 	{
 		return;
 	}
-
 	const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
 	const FRotationMatrix YawMatrix(YawRotation);
 	AddMovementInput(YawMatrix.GetUnitAxis(EAxis::X), Axis.Y);
@@ -246,9 +313,4 @@ void AWRCharacter::StartSprint()
 void AWRCharacter::StopSprint()
 {
 	CastChecked<UWRCharacterMovementComponent>(GetCharacterMovement())->bWantsToSprint = false;
-}
-
-void AWRCharacter::ToggleView()
-{
-	SetFirstPerson(!bFirstPerson);
 }

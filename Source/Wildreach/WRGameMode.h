@@ -12,12 +12,11 @@ class WILDREACH_API AWRGameMode : public AGameModeBase
 public:
 	AWRGameMode();
 
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** Restart the given controller's pawn after RespawnDelay seconds. */
+	/** Restart the given controller's pawn after the respawn delay (tuning: player.respawnSeconds). */
 	void RequestRespawn(AController* Controller);
-
-	UPROPERTY(EditDefaultsOnly, Category="Respawn")
-	float RespawnDelay = 5.f;
 };

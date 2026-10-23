@@ -1,55 +1,241 @@
 #include "WRHUD.h"
+#include "WRAbilities.h"
+#include "WRAttributeSet.h"
 #include "WRCharacter.h"
-#include "WRSurvivalComponent.h"
+#include "WRCombatLibrary.h"
+#include "WRGameplayTags.h"
+#include "WRPathComponent.h"
+#include "WRPlayerController.h"
+#include "AbilitySystemComponent.h"
 #include "Engine/Canvas.h"
+#include "EngineUtils.h"
 
 namespace
 {
-	constexpr float BarWidth = 220.f;
 	constexpr float BarHeight = 14.f;
-	constexpr float BarSpacing = 22.f;
+	constexpr float BarSpacing = 20.f;
+}
+
+void AWRHUD::BeginPlay()
+{
+	Super::BeginPlay();
+	HitHandle = AWRCharacterBase::OnHitShown.AddUObject(this, &AWRHUD::OnHitShown);
+}
+
+void AWRHUD::EndPlay(const EEndPlayReason::Type Reason)
+{
+	AWRCharacterBase::OnHitShown.Remove(HitHandle);
+	Super::EndPlay(Reason);
+}
+
+void AWRHUD::OnHitShown(const AActor* Target, float Damage, EWRHitResult Result)
+{
+	if (!Target)
+	{
+		return;
+	}
+	FFloatingText Text;
+	Text.WorldPos = Target->GetActorLocation() + FVector(FMath::FRandRange(-30.f, 30.f), FMath::FRandRange(-30.f, 30.f), 110.f);
+	if (Result == EWRHitResult::Hit)
+	{
+		Text.Text = FString::Printf(TEXT("%.0f"), Damage);
+		Text.Color = Target == GetOwningPawn() ? FLinearColor(1.f, 0.3f, 0.3f) : FLinearColor(1.f, 0.95f, 0.6f);
+	}
+	else
+	{
+		Text.Text = UWRCombatLibrary::ResultName(Result);
+		Text.Color = FLinearColor(0.7f, 0.85f, 1.f);
+	}
+	Floating.Add(Text);
 }
 
 void AWRHUD::DrawHUD()
 {
 	Super::DrawHUD();
-
 	if (!Canvas)
 	{
 		return;
 	}
 
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float DeltaTime = LastDrawTime > 0.0 ? static_cast<float>(Now - LastDrawTime) : 0.f;
+	LastDrawTime = Now;
+
 	const AWRCharacter* Survivor = Cast<AWRCharacter>(GetOwningPawn());
-	if (!Survivor || !Survivor->GetSurvival())
+	DrawDamageNumbers(DeltaTime);
+	if (!Survivor || !Survivor->GetAttributes())
 	{
 		DrawText(TEXT("Respawning..."), FLinearColor::White, Canvas->ClipX * 0.5f - 50.f, Canvas->ClipY * 0.5f);
 		return;
 	}
 
-	const UWRSurvivalComponent* S = Survivor->GetSurvival();
-	const float X = 24.f;
-	float Y = Canvas->ClipY - 4.f * BarSpacing - 24.f;
+	DrawWorldBars(Survivor);
 
-	DrawBar(TEXT("Health"),  S->Health,  S->MaxHealth,  FLinearColor(0.80f, 0.15f, 0.15f), X, Y); Y += BarSpacing;
-	DrawBar(TEXT("Hunger"),  S->Hunger,  S->MaxHunger,  FLinearColor(0.85f, 0.55f, 0.15f), X, Y); Y += BarSpacing;
-	DrawBar(TEXT("Thirst"),  S->Thirst,  S->MaxThirst,  FLinearColor(0.20f, 0.50f, 0.90f), X, Y); Y += BarSpacing;
-	DrawBar(TEXT("Stamina"), S->Stamina, S->MaxStamina, FLinearColor(0.30f, 0.80f, 0.30f), X, Y);
+	const UWRAttributeSet* A = Survivor->GetAttributes();
+	const UWRPathComponent* Paths = UWRPathComponent::FindFor(Survivor);
+	const UAbilitySystemComponent* ASC = Survivor->GetAbilitySystemComponent();
 
-	DrawText(TEXT("WASD move  Mouse look  Space jump  Shift sprint  V toggle view"),
-		FLinearColor(1.f, 1.f, 1.f, 0.6f), 24.f, 24.f);
+	// Vitals, bottom left.
+	float X = 24.f;
+	float Y = Canvas->ClipY - 8.f * BarSpacing - 24.f;
+	DrawBar(TEXT("Health"), A->GetHealth(), A->GetMaxHealth(), FLinearColor(0.8f, 0.15f, 0.15f), X, Y); Y += BarSpacing;
+	DrawBar(TEXT("Stamina"), A->GetStamina(), A->GetMaxStamina(), FLinearColor(0.3f, 0.8f, 0.3f), X, Y); Y += BarSpacing;
+	DrawBar(TEXT("Poise"), A->GetPoise(), A->GetMaxPoise(), FLinearColor(0.75f, 0.75f, 0.75f), X, Y); Y += BarSpacing;
+	if (Paths && Paths->IsActivePath(TEXT("fire")))
+	{
+		DrawBar(TEXT("Heat"), A->GetHeat(), A->GetMaxHeat(), FLinearColor(1.f, 0.45f, 0.1f), X, Y); Y += BarSpacing;
+	}
+	if (Paths && Paths->IsActivePath(TEXT("frost")))
+	{
+		DrawBar(TEXT("Chill"), A->GetChill(), A->GetMaxChill(), FLinearColor(0.55f, 0.85f, 1.f), X, Y); Y += BarSpacing;
+	}
+	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
+	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 
+	// Statuses on yourself.
+	FString StatusLine;
+	const TPair<FGameplayTag, const TCHAR*> StatusNames[] = {
+		{ WRTags::Status_Burn, TEXT("BURNING") }, { WRTags::Status_Frostbite, TEXT("FROSTBITE") },
+		{ WRTags::Status_Slowed, TEXT("SLOWED") }, { WRTags::Status_Frozen, TEXT("FROZEN") },
+		{ WRTags::Status_Staggered, TEXT("STAGGERED") }, { WRTags::State_Blocking, TEXT("blocking") } };
+	for (const auto& Pair : StatusNames)
+	{
+		if (ASC && ASC->HasMatchingGameplayTag(Pair.Key))
+		{
+			StatusLine += FString(Pair.Value) + TEXT("  ");
+		}
+	}
+	if (!StatusLine.IsEmpty())
+	{
+		DrawText(StatusLine, FLinearColor(1.f, 0.85f, 0.4f), X, Y);
+	}
+
+	// Path summary, top left.
+	if (Paths)
+	{
+		FString Line = FString::Printf(TEXT("Lv %d   "), Paths->GetCharacterLevel());
+		for (const FName PathId : { Paths->GetMainPath(), Paths->GetSubPath() })
+		{
+			if (!PathId.IsNone())
+			{
+				Line += FString::Printf(TEXT("%s%s %d/%d pts   "), *PathId.ToString(), PathId == Paths->GetMainPath() ? TEXT(" (main)") : TEXT(""),
+					Paths->GetSpent(PathId), Paths->GetEarned(PathId));
+			}
+		}
+		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Thaw)) Line += TEXT("[Thaw] ");
+		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
+		DrawText(Line, FLinearColor::White, 24.f, 48.f);
+	}
+	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Shift sprint  V view"),
+		FLinearColor(1.f, 1.f, 1.f, 0.55f), 24.f, 24.f);
+
+	// Quick slots, bottom centre.
+	if (Paths && ASC)
+	{
+		const TArray<FName>& Slots = Paths->GetQuickSlots();
+		const float SlotW = 110.f;
+		float SX = Canvas->ClipX * 0.5f - SlotW * Slots.Num() * 0.5f;
+		const float SY = Canvas->ClipY - 54.f;
+		for (int32 i = 0; i < Slots.Num(); ++i, SX += SlotW)
+		{
+			FString Label = TEXT("-");
+			float Cooldown = 0.f;
+			const int32 InputId = static_cast<int32>(EWRAbilityInput::Slot1) + i;
+			for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+			{
+				if (Spec.InputID != InputId)
+				{
+					continue;
+				}
+				if (const UWRGameplayAbility* Instance = Cast<UWRGameplayAbility>(Spec.GetPrimaryInstance()))
+				{
+					Label = Instance->DisplayName;
+					Cooldown = Instance->GetCooldownRemaining();
+				}
+				else if (const UWRGameplayAbility* CDO = Cast<UWRGameplayAbility>(Spec.Ability))
+				{
+					Label = CDO->DisplayName;
+				}
+			}
+			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.5f), SX, SY, SlotW - 6.f, 34.f);
+			DrawText(FString::Printf(TEXT("%d %s"), i + 1, *Label), FLinearColor::White, SX + 4.f, SY + 3.f);
+			if (Cooldown > 0.f)
+			{
+				DrawText(FString::Printf(TEXT("%.1fs"), Cooldown), FLinearColor(1.f, 0.6f, 0.6f), SX + 4.f, SY + 17.f);
+			}
+		}
+	}
+
+	// Crosshair (first person) and lock-on marker.
 	if (Survivor->IsFirstPerson())
 	{
-		const float CX = Canvas->ClipX * 0.5f;
-		const float CY = Canvas->ClipY * 0.5f;
-		DrawRect(FLinearColor::White, CX - 1.f, CY - 1.f, 3.f, 3.f);
+		DrawRect(FLinearColor::White, Canvas->ClipX * 0.5f - 1.f, Canvas->ClipY * 0.5f - 1.f, 3.f, 3.f);
+	}
+	if (const AWRPlayerController* PC = Cast<AWRPlayerController>(GetOwningPlayerController()))
+	{
+		if (const AWRCharacterBase* Lock = PC->GetLockTarget())
+		{
+			const FVector Screen = Project(Lock->GetActorLocation(), true);
+			if (Screen.Z > 0.f)
+			{
+				DrawRect(FLinearColor(1.f, 0.9f, 0.2f), Screen.X - 4.f, Screen.Y - 4.f, 8.f, 8.f);
+			}
+		}
 	}
 }
 
-void AWRHUD::DrawBar(const FString& Label, float Value, float Max, const FLinearColor& Color, float X, float Y)
+void AWRHUD::DrawBar(const FString& Label, float Value, float Max, const FLinearColor& Color, float X, float Y, float Width)
 {
 	const float Fraction = Max > 0.f ? FMath::Clamp(Value / Max, 0.f, 1.f) : 0.f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.5f), X + 70.f, Y, BarWidth, BarHeight);
-	DrawRect(Color, X + 70.f, Y, BarWidth * Fraction, BarHeight);
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.5f), X + 70.f, Y, Width, BarHeight);
+	DrawRect(Color, X + 70.f, Y, Width * Fraction, BarHeight);
 	DrawText(Label, FLinearColor::White, X, Y - 1.f);
+	DrawText(FString::Printf(TEXT("%.0f"), Value), FLinearColor(1.f, 1.f, 1.f, 0.8f), X + 74.f + Width, Y - 1.f);
+}
+
+void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
+{
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+	{
+		const AWRCharacterBase* Other = *It;
+		const UWRAttributeSet* A = Other->GetAttributes();
+		if (Other == Self || !A || FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation()) > 2500.f)
+		{
+			continue;
+		}
+		const FVector Screen = Project(Other->GetActorLocation() + FVector(0.f, 0.f, Other->GetSimpleCollisionHalfHeight() + 30.f), true);
+		if (Screen.Z <= 0.f)
+		{
+			continue;
+		}
+		const float W = 80.f;
+		const float BX = Screen.X - W * 0.5f;
+		DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, Screen.Y - 12.f, W, 6.f);
+		DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f), 6.f);
+		// Buildup meters under the health bar.
+		DrawRect(FLinearColor(1.f, 0.45f, 0.1f), BX, Screen.Y - 5.f, W * FMath::Clamp(A->GetBurnBuildup() / 100.f, 0.f, 1.f), 3.f);
+		DrawRect(FLinearColor(0.55f, 0.85f, 1.f), BX, Screen.Y - 1.f, W * FMath::Clamp(A->GetFrostBuildup() / 100.f, 0.f, 1.f), 3.f);
+	}
+}
+
+void AWRHUD::DrawDamageNumbers(float DeltaTime)
+{
+	for (int32 i = Floating.Num() - 1; i >= 0; --i)
+	{
+		FFloatingText& T = Floating[i];
+		T.Age += DeltaTime;
+		if (T.Age > 1.2f)
+		{
+			Floating.RemoveAt(i);
+			continue;
+		}
+		const FVector Screen = Project(T.WorldPos + FVector(0.f, 0.f, T.Age * 60.f), true);
+		if (Screen.Z > 0.f)
+		{
+			FLinearColor C = T.Color;
+			C.A = 1.f - T.Age / 1.2f;
+			DrawText(T.Text, C, Screen.X, Screen.Y, nullptr, 1.3f);
+		}
+	}
 }

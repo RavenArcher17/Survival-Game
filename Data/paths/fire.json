@@ -1,0 +1,208 @@
+{
+  "id": "fire",
+  "name": "Fire",
+  "biome": "volcanic",
+  "resource": {
+    "id": "heat",
+    "name": "Heat"
+  },
+  "rootPassive": {
+    "id": "burning_blood",
+    "name": "Burning blood",
+    "text": "Immune to your own burns and to lava damage."
+  },
+  "trunk": [
+    {
+      "id": "fire_bolt",
+      "name": "Fire bolt",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic fire spell"
+    },
+    {
+      "id": "heat_capacity",
+      "name": "Heat capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Heat bar"
+    },
+    {
+      "id": "ignite_chance",
+      "name": "Ignite chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Higher chance to set enemies burning"
+    },
+    {
+      "id": "flame_slash",
+      "name": "Flame slash",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic fire weapon art"
+    }
+  ],
+  "branches": [
+    {
+      "id": "inferno",
+      "name": "Inferno",
+      "nodes": [
+        {
+          "id": "spreading_flames",
+          "name": "Spreading flames",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Burns jump to nearby enemies",
+          "gate": 0
+        },
+        {
+          "id": "searing_heat",
+          "name": "Searing heat",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More burn damage",
+          "gate": 3
+        },
+        {
+          "id": "fire_wall",
+          "name": "Fire wall",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a wall of flame",
+          "gate": 8
+        },
+        {
+          "id": "long_burn",
+          "name": "Long burn",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Longer burns",
+          "gate": 13
+        },
+        {
+          "id": "fuel_the_fire",
+          "name": "Fuel the fire",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Burning enemies build your Heat",
+          "gate": 16
+        },
+        {
+          "id": "wildfire",
+          "name": "Wildfire",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "burning enemies erupt into flames when they die",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "eruption",
+      "name": "Eruption",
+      "nodes": [
+        {
+          "id": "explosive_bolt",
+          "name": "Explosive bolt",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Fire bolt explodes on impact",
+          "gate": 0
+        },
+        {
+          "id": "shockwave",
+          "name": "Shockwave",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Bigger blast radius",
+          "gate": 4
+        },
+        {
+          "id": "lava_pool",
+          "name": "Lava pool",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a pool of lava on the ground",
+          "gate": 7
+        },
+        {
+          "id": "crushing_blast",
+          "name": "Crushing blast",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Extra damage to staggered enemies",
+          "gate": 12
+        },
+        {
+          "id": "overheat",
+          "name": "Overheat",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Full Heat releases an explosion",
+          "gate": 15
+        },
+        {
+          "id": "meteor",
+          "name": "Meteor",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "large area meteor spell",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "forge",
+      "name": "Forge",
+      "nodes": [
+        {
+          "id": "heated_blade",
+          "name": "Heated blade",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More weapon art damage",
+          "gate": 0
+        },
+        {
+          "id": "molten_edge",
+          "name": "Molten edge",
+          "kind": "ability",
+          "cost": 5,
+          "text": "New fire weapon art",
+          "gate": 5
+        },
+        {
+          "id": "bellows",
+          "name": "Bellows",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Faster stamina regen at high Heat",
+          "gate": 10
+        },
+        {
+          "id": "tempered",
+          "name": "Tempered",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "More poise",
+          "gate": 13
+        },
+        {
+          "id": "searing_parry",
+          "name": "Searing parry",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Parries set the attacker burning",
+          "gate": 16
+        },
+        {
+          "id": "molten_cleave",
+          "name": "Molten cleave",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "heavy weapon art that leaves lava behind",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

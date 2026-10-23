@@ -5,8 +5,10 @@
 #include "WRCharacterMovementComponent.generated.h"
 
 /**
- * Adds client-predicted sprinting: the sprint flag rides in the saved-move
- * compressed flags, so the server replays it and doesn't rubber-band the client.
+ * Client-predicted movement extras. Sprint and the action slowdowns (attacking, blocking)
+ * ride in the saved-move compressed flags, so the server replays them on exactly the same
+ * moves the client applied them to and nobody rubber-bands.
+ * Server-driven statuses (slowed, frozen, staggered) come from replicated tags instead.
  */
 UCLASS()
 class WILDREACH_API UWRCharacterMovementComponent : public UCharacterMovementComponent
@@ -18,6 +20,10 @@ public:
 	float SprintSpeed = 750.f;
 
 	bool bWantsToSprint = false;
+	/** Set by attack/spell abilities on the predicting machine. */
+	bool bAttackSlow = false;
+	/** Set by the block ability on the predicting machine. */
+	bool bBlockSlow = false;
 
 	bool IsSprinting() const;
 
@@ -32,6 +38,8 @@ public:
 	typedef FSavedMove_Character Super;
 
 	uint8 bSavedWantsToSprint : 1;
+	uint8 bSavedAttackSlow : 1;
+	uint8 bSavedBlockSlow : 1;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;

@@ -1,0 +1,95 @@
+{
+  "_comment": "Every global gameplay number. Source: design doc 'Starting numbers' tab (2026-10-22) unless marked 'placeholder'. All first drafts: tune in playtests.",
+
+  "player": {
+    "health": 100, "healthAtLevel50": 250,
+    "stamina": 100, "staminaAtLevel50": 150,
+    "staminaRegenPerSecond": 30, "staminaRegenDelay": 0.8,
+    "respawnSeconds": 10,
+    "walkSpeed": 450, "sprintSpeed": 750,
+    "poise": 40, "poiseRegenPerSecond": 10, "poiseRegenDelay": 2.0,
+    "_poise": "placeholder"
+  },
+
+  "stamina": { "lightAttack": 10, "heavyAttack": 20, "dodge": 15, "blockMin": 10, "blockMax": 25, "sprintPerSecond": 5, "spell": 12, "weaponArt": 18,
+               "_spell_weaponArt": "placeholder" },
+
+  "survival": { "hungerMinutes": 60, "thirstMinutes": 40, "deprivedStaminaRegenMultiplier": 0.5,
+                "deprivedHealthGraceSeconds": 120, "deprivedDamagePerSecond": 0.5,
+                "_grace_damage": "placeholder: 'then health slowly drains'" },
+
+  "weapon": {
+    "copperSwordLight": 12, "copperSwordHeavy": 22,
+    "metal": { "copper": 1.0, "bronze": 1.3, "iron": 1.7, "steel": 2.2, "starsteel": 2.8 },
+    "quality": { "crude": 0.9, "common": 1.0, "fine": 1.1, "masterwork": 1.2 },
+    "upgradePerLevel": 0.05,
+    "lightPoiseDamage": 10, "heavyPoiseDamage": 25,
+    "lightTiming": { "windup": 0.25, "active": 0.18, "recovery": 0.30 },
+    "heavyTiming": { "windup": 0.55, "active": 0.22, "recovery": 0.45 },
+    "reach": 220, "sweepRadius": 45,
+    "riposteMultiplier": 3.0,
+    "_poise_timing_reach": "placeholder"
+  },
+
+  "defense": {
+    "dodgeDistance": 450, "dodgeDuration": 0.45, "dodgeIFrameStart": 0.05, "dodgeIFrames": 0.30,
+    "parryWindow": 0.20, "blockAngleDegrees": 70, "blockDamageTaken": 0.0, "guardBreakStaggerSeconds": 1.2,
+    "staggerSeconds": 1.5,
+    "_all": "placeholder"
+  },
+
+  "paths": {
+    "pointXpBase": 100, "pointXpPerPoint": 10,
+    "maxPointsTotal": 150, "maxPointsPerPath": 100,
+    "xpPerAbilityUse": 6, "xpPerAbilityHit": 4,
+    "comboThresholds": [25, 50],
+    "_xp_per_use": "placeholder: 60,500 XP per path ~ 80 h at 1x"
+  },
+
+  "resources": {
+    "heatMax": 100, "heatPerHit": 8, "heatDecayPerSecond": 6, "heatDecayDelay": 4, "heatDamageBonusAtFull": 0.30,
+    "heatCapacityPerRank": 15,
+    "chillMax": 100, "chillPerHit": 4, "chillDecayPerSecond": 2, "chillDecayDelay": 8, "chillShatterBonusAtFull": 1.0,
+    "chillCapacityPerRank": 15,
+    "balanceShare": 0.5,
+    "_all": "placeholder: doc defines behaviour only (Heat builds, boosts damage, stops at full; Chill fills slowly, spending it all makes bigger shatters)"
+  },
+
+  "status": {
+    "buildupThreshold": 100, "buildupDecayPerSecond": 8, "buildupDecayDelay": 3,
+    "burnSeconds": 6, "burnDamagePerSecond": 4, "igniteChancePerRank": 0.05,
+    "frostbiteSeconds": 6, "frostbiteDamageTakenBonus": 0.15, "slowMultiplier": 0.6,
+    "frozenSeconds": 2.5,
+    "shatterDamage": 30,
+    "thawDamage": 40,
+    "permafrostBonusVsSlowed": 0.15,
+    "_all": "placeholder"
+  },
+
+  "spells": {
+    "fireBolt": { "damage": 18, "burnBuildup": 35, "speed": 2600, "cooldown": 1.2, "heat": 10 },
+    "frostShard": { "damage": 14, "frostBuildup": 40, "speed": 3000, "cooldown": 1.0, "chill": 6 },
+    "flameSlash": { "multiplier": 1.4, "burnBuildup": 45, "cooldown": 3.0, "heat": 12 },
+    "iceSlash": { "multiplier": 1.3, "frostBuildup": 50, "cooldown": 3.0, "chill": 8 },
+    "_all": "placeholder"
+  },
+
+  "creature": {
+    "biteTiming": { "windup": 0.5, "active": 0.15, "recovery": 0.55 },
+    "leashDistance": 4000, "dummyResetSeconds": 3,
+    "_all": "placeholder"
+  },
+
+  "enemies": {
+    "lowland": { "health": 70, "damage": 12 },
+    "midland": { "health": 120, "damage": 20 },
+    "highland": { "health": 200, "damage": 32 },
+    "miniBossSolo": { "health": 3000 },
+    "majorBossSolo": { "health": 12000 },
+    "bossHealthPerExtraParticipant": 0.8
+  },
+
+  "taming": { "easySeconds": 60, "mediumSeconds": 300, "hardSeconds": 900, "skillSpeedupAt100": 0.5 },
+  "lifeSkills": { "levelXpBase": 50, "levelXpPerLevel": 5 },
+  "crops": { "commonMinutes": 20, "rareMinutes": 120 }
+}
