@@ -6,6 +6,7 @@
 #include "WRCombatTypes.h"
 #include "WRCreature.h"
 #include "WRGameplayTags.h"
+#include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerState.h"
 #include "WRStatusComponent.h"
@@ -27,7 +28,15 @@ void AWRPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AWRPlayerController::ToggleLockOn);
 	InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AWRPlayerController::WRInteract);
+	InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AWRPlayerController::UsePotion);
+	InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AWRPlayerController::UseFood);
+	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &AWRPlayerController::UseDrink);
 }
+
+void AWRPlayerController::UsePotion() { ServerCommand(TEXT("use potion")); }
+void AWRPlayerController::UseFood() { ServerCommand(TEXT("use food")); }
+void AWRPlayerController::UseDrink() { ServerCommand(TEXT("use drink")); }
+void AWRPlayerController::WRGive(FName Item, int32 Count) { ServerCommand(FString::Printf(TEXT("give %s %d"), *Item.ToString(), FMath::Max(1, Count))); }
 
 AWRBossAltar* AWRPlayerController::FindNearbyAltar() const
 {
@@ -172,7 +181,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 {
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
-	if (!Command.StartsWith(TEXT("interact")))
+	if (!Command.StartsWith(TEXT("interact")) && !Command.StartsWith(TEXT("use ")))
 	{
 		return;
 	}
@@ -243,6 +252,16 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		{
 			ClientNotify(Result);
 		}
+	}
+	else if (Cmd == TEXT("use") && PS)
+	{
+		Result = PS->GetInventory()->UseCategory(FName(*Arg(1)));
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("give") && PS)
+	{
+		const int32 Left = PS->GetInventory()->AddItem(FName(*Arg(1)), FMath::Max(1, FCString::Atoi(*Arg(2))));
+		Result = Left > 0 ? FString::Printf(TEXT("%d didn't fit or unknown item"), Left) : TEXT("ok");
 	}
 	else if (Cmd == TEXT("gotoaltar") && Survivor)
 	{
@@ -341,6 +360,16 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			Paths ? Paths->GetEarned(Paths->GetMainPath()) : 0,
 			Paths ? *Paths->GetSubPath().ToString() : TEXT("?"), Paths ? Paths->GetSpent(Paths->GetSubPath()) : 0,
 			*GetNameSafe(Target), Target ? FVector::Dist(Target->GetActorLocation(), Survivor->GetActorLocation()) : -1.f);
+	}
+
+	// Drink a potion when low (the belt cooldown paces it).
+	if (const UWRAttributeSet* A = Survivor->GetAttributes())
+	{
+		if (A->GetHealth() < A->GetMaxHealth() * 0.4f && BotClock >= BotNextPotion)
+		{
+			BotNextPotion = BotClock + 3.f;
+			UsePotion();
+		}
 	}
 
 	if (!Target)

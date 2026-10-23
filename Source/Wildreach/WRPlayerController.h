@@ -34,6 +34,10 @@ public:
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
 
 	UFUNCTION(Exec) void WRInteract();
+	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
+	void UsePotion();
+	void UseFood();
+	void UseDrink();
 	/** First or third person (same as V). */
 	UFUNCTION(Exec) void WRView(FName Mode);
 	/** Stop/start the test bot's own actions (it keeps running queued commands). */
@@ -83,6 +87,7 @@ private:
 	float BotNextSpell = 2.f;
 	float BotNextBlock = 4.f;
 	float BotBlockAt = 0.f;
+	float BotNextPotion = 0.f;
 	float BotNextReport = 5.f;
 	int32 BotSpellSlot = 0;
 	TArray<TPair<int32, float>> BotHeld;

@@ -2,6 +2,7 @@
 #include "Wildreach.h"
 #include "WRCharacter.h"
 #include "WRHUD.h"
+#include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
@@ -87,6 +88,7 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	Root->SetNumberField(TEXT("version"), 1);
 	Root->SetStringField(TEXT("name"), PS->GetPlayerName());
 	Root->SetObjectField(TEXT("paths"), PS->GetPaths()->ToJson());
+	Root->SetObjectField(TEXT("inventory"), PS->GetInventory()->ToJson());
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -117,6 +119,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 		UE_LOG(LogWildreach, Error, TEXT("LOAD %s: save file is corrupt, starting fresh"), *PS->GetPlayerName());
 		return;
 	}
+	const TSharedPtr<FJsonObject>* Inventory = nullptr;
+	if (Root->TryGetObjectField(TEXT("inventory"), Inventory))
+	{
+		PS->GetInventory()->FromJson(*Inventory);
+	}
 	const TSharedPtr<FJsonObject>* Paths = nullptr;
 	if (Root->TryGetObjectField(TEXT("paths"), Paths))
 	{
@@ -136,7 +143,8 @@ void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
 	for (APlayerState* Base : GameState->PlayerArray)
 	{
 		AWRPlayerState* PS = Cast<AWRPlayerState>(Base);
-		if (PS && (!bOnlyDirty || PS->GetPaths()->IsDirty()))
+		// Inventory changes often; saving every player each autosave is cheap at this scale.
+		if (PS && (!bOnlyDirty || PS->GetPaths()->IsDirty() || PS->GetInventory()))
 		{
 			SavePlayer(PS);
 		}

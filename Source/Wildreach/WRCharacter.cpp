@@ -5,6 +5,7 @@
 #include "WRCharacterMovementComponent.h"
 #include "WRGameMode.h"
 #include "WRGameplayTags.h"
+#include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerState.h"
 #include "WRStatusComponent.h"
@@ -122,6 +123,7 @@ void AWRCharacter::PossessedBy(AController* NewController)
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), 100.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 100.f);
 	PS->GetPaths()->ApplyToCharacter(this);
+	PS->GetInventory()->GiveStartingKit();
 	// Path level can raise max health; respawn at full.
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), Attributes->GetMaxHealth());
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attributes->GetMaxStamina());

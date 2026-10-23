@@ -1,0 +1,22 @@
+{
+  "_comment": "Item definitions. 'use' effects are applied by the server. Weights/values are placeholders until tuned.",
+  "items": [
+    { "id": "minor_healing_potion", "name": "Minor healing potion", "category": "potion", "stack": 5, "weight": 0.5,
+      "use": { "heal": 45, "cooldown": 6 }, "tier": 1, "station": "alchemy_table" },
+    { "id": "healing_potion", "name": "Healing potion", "category": "potion", "stack": 5, "weight": 0.5,
+      "use": { "heal": 90, "cooldown": 6 }, "tier": 2, "station": "alchemy_table" },
+    { "id": "cooked_meat", "name": "Cooked meat", "category": "food", "stack": 10, "weight": 0.3, "use": { "hunger": 35 } },
+    { "id": "waterskin", "name": "Waterskin", "category": "drink", "stack": 5, "weight": 0.5, "use": { "thirst": 40 } },
+    { "id": "raw_meat", "name": "Raw meat", "category": "material", "stack": 20, "weight": 0.3 },
+    { "id": "wood", "name": "Wood", "category": "material", "stack": 100, "weight": 0.2 },
+    { "id": "stone", "name": "Stone", "category": "material", "stack": 100, "weight": 0.3 },
+    { "id": "copper_ore", "name": "Copper ore", "category": "material", "stack": 50, "weight": 0.6 },
+    { "id": "sulfur_crystal", "name": "Sulfur crystal", "category": "material", "stack": 50, "weight": 0.2, "biome": "volcanic" },
+    { "id": "lichen", "name": "Lichen", "category": "material", "stack": 50, "weight": 0.1, "biome": "tundra" }
+  ],
+  "startingKit": [
+    { "id": "minor_healing_potion", "count": 3 },
+    { "id": "cooked_meat", "count": 2 },
+    { "id": "waterskin", "count": 2 }
+  ]
+}

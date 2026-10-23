@@ -3,6 +3,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "WRCombatLibrary.h"
+#include "WRInventory.h"
 #include "WRPathTypes.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -125,6 +126,26 @@ bool FWRDamageMathTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("block cost ceiling"), UWRCombatLibrary::BlockStaminaCost(100.f), 25.f);
 	TestTrue(TEXT("full heat bonus"), FMath::IsNearlyEqual(UWRCombatLibrary::HeatBonus(100.f, 100.f), 0.3f));
 	TestEqual(TEXT("no heat bonus"), UWRCombatLibrary::HeatBonus(0.f, 100.f), 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRInventoryRulesTest, "Wildreach.Inventory.Stacking",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRInventoryRulesTest::RunTest(const FString& Parameters)
+{
+	TArray<FWRItemStack> Slots;
+	Slots.SetNum(3);
+	// Potions stack to 5: 12 potions fill three slots (5, 5, 2) with nothing left over.
+	TestEqual(TEXT("12 potions fit in 3 slots"), FWRInventoryRules::Add(Slots, TEXT("minor_healing_potion"), 12), 0);
+	TestEqual(TEXT("count 12"), FWRInventoryRules::CountOf(Slots, TEXT("minor_healing_potion")), 12);
+	TestEqual(TEXT("4 more: 3 fit, 1 left over"), FWRInventoryRules::Add(Slots, TEXT("minor_healing_potion"), 4), 1);
+	TestEqual(TEXT("unknown items never fit"), FWRInventoryRules::Add(Slots, TEXT("not_an_item"), 2), 2);
+	TestEqual(TEXT("remove 7"), FWRInventoryRules::Remove(Slots, TEXT("minor_healing_potion"), 7), 7);
+	TestEqual(TEXT("8 left"), FWRInventoryRules::CountOf(Slots, TEXT("minor_healing_potion")), 8);
+	TestEqual(TEXT("remove more than you have"), FWRInventoryRules::Remove(Slots, TEXT("minor_healing_potion"), 50), 8);
+	TestTrue(TEXT("all slots empty again"), Slots[0].IsEmpty() && Slots[1].IsEmpty() && Slots[2].IsEmpty());
+	FWRInventoryRules::Add(Slots, TEXT("wood"), 10);
+	TestTrue(TEXT("weight = 10 x 0.2"), FMath::IsNearlyEqual(FWRInventoryRules::TotalWeight(Slots), 2.f));
 	return true;
 }
 

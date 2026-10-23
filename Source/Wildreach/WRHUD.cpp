@@ -5,6 +5,7 @@
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
+#include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "AbilitySystemComponent.h"
@@ -93,6 +94,18 @@ void AWRHUD::DrawHUD()
 	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
 	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 
+	// Belt: potions / food / water counts and the potion cooldown.
+	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Survivor))
+	{
+		const float Cooldown = Inv->GetPotionCooldownRemaining();
+		FString Belt = FString::Printf(TEXT("Q potion x%d%s   Z food x%d   X water x%d   (%.1f kg)"),
+			Inv->CountOf(TEXT("minor_healing_potion")) + Inv->CountOf(TEXT("healing_potion")),
+			Cooldown > 0.f ? *FString::Printf(TEXT(" (%.0fs)"), Cooldown) : TEXT(""),
+			Inv->CountOf(TEXT("cooked_meat")), Inv->CountOf(TEXT("waterskin")),
+			FWRInventoryRules::TotalWeight(Inv->GetSlots()));
+		DrawText(Belt, FLinearColor(0.9f, 0.9f, 0.9f), X + 320.f, Canvas->ClipY - 3.f * BarSpacing - 24.f);
+	}
+
 	// Statuses on yourself.
 	FString StatusLine;
 	const TPair<FGameplayTag, const TCHAR*> StatusNames[] = {
@@ -127,7 +140,7 @@ void AWRHUD::DrawHUD()
 		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
 		DrawText(Line, FLinearColor::White, 24.f, 48.f);
 	}
-	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Shift sprint  V view"),
+	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  V view"),
 		FLinearColor(1.f, 1.f, 1.f, 0.55f), 24.f, 24.f);
 
 	// Quick slots, bottom centre.
