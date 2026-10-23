@@ -11,7 +11,8 @@ Depends on: M1 (combat, GAS on creatures), M3 (spawn regions; a test map works u
 **Volcanic:** Magmaw, Cinderfang, Scorchwing (aggressive) · Basaltback, Emberhorn, Kilnmite (neutral) · Ashstrider, Glowmoth, Pumicehog (passive)
 **Tundra:** Rimeclaw, Glacimaw, Gloomhowl (aggressive) · Woolly drudge, Frostantler, Rimeshell (neutral) · Snowpuff, Aurora fox, Floeback (passive)
 
-Floeback (swimming mount) may wait until Full release, as the Creatures tab suggests.
+**Floeback is deferred to Full release** (decided #14), so the tundra launches with 8 creatures.
+Each creature can only be tamed by its listed method(s) (decided #16).
 
 ## Archetypes (one StateTree + C++ task set each; creatures are data on top)
 | Archetype | Creatures | Key behaviours |
@@ -38,7 +39,7 @@ All creatures resist their home biome's hazard (`Resist.Lava` / `Resist.Ice` gra
 | System | Detail |
 |---|---|
 | Ownership | Tame stores owner character ID (and clan ID when clans exist). Server-authoritative orders: follow, stay, guard area, attack target, passive/neutral/aggressive stance. |
-| Tame limit | Proposal: **per player**, active (out in the world) cap from the Taming life skill. Total stored tames higher. Needs Raven's number. |
+| Tame limit (decided #4) | **Per player**: active cap grows with the Taming skill (2 at start, +1 at Bonded, +1 at Beast lord; numbers to tune). Stored tames have a higher cap. Server setting can override. |
 | Mounts | Ground mounts first (Ashstrider fastest, Emberhorn charge, Frostantler fast on ice). Rider attaches to saddle socket; mount uses its own CMC, rider's input drives it; mounted combat is Full release. |
 | Haulers | Basaltback, Woolly drudge carry inventory (carry-weight buff). |
 | Utility | Glowmoth light aura, Kilnmite/Rimeshell ore digging, Aurora fox secret ping. |

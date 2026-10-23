@@ -89,6 +89,8 @@ Buildup = attribute per status with decay; implemented as GE stacks so it replic
 - Network: headless server + 2 nullrhi bots running scripted input (bot controller that attacks/dodges on a timer) for 10 min with `PktLag=100 PktLoss=2`; log corrections per minute from `LogNetPlayerMovement`.
 - Manual: Raven plays `play.ps1 local -Clients 2`.
 
-## Proposed defaults (Raven can override)
-- **Equipped abilities:** 8 quick slots (4 per path) plus light/heavy attack. Slots can be changed anytime out of combat. That's assigning abilities, not saved loadouts, so it fits "no swappable loadouts".
-- **Overheat:** full Heat (Heat can't be spent) applies self-Burn to non-fire-main players; main-path Fire players are immune via Burning blood. The Overheat node turns full Heat into an explosion instead.
+## Decided with Raven (2026-10-22, see DESIGN_REVIEW.md)
+- **Equipped abilities (#1):** 8 quick slots (4 per path) plus light/heavy attack, reassignable anytime out of combat; no saved presets.
+- **Overheat (#2):** no self-damage. Full Heat just stops building; the Overheat node's explosion is the only payoff.
+- **Combos (#5):** Thaw and Balance are free passives. The combo system still supports *active* combos that spend both bars (`kind: "active"` in `combos.json`) for other pairs later.
+- **Statuses (#6):** full list is official; build Burn, Frostbite, Slowed, Frozen, Shatter, Stagger now.

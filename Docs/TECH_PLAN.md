@@ -94,7 +94,7 @@ Remaining: headless bot clients for load tests; SQLite save skeleton.
 ---
 
 ## Detailed milestone plans
-| Milestone | File | Review items to settle first |
+| Milestone | File | Review items it uses (all decided 2026-10-22) |
 |---|---|---|
 | M1 Combat core | [plan/M1_combat.md](plan/M1_combat.md) | #1, #2, #5, #6, #7 |
 | M2 Paths & progression | [plan/M2_paths.md](plan/M2_paths.md) | #8, #9, #35, #36 |
@@ -109,5 +109,5 @@ Suggested order: M1 → M2, with M3 terrain work in parallel; then M4 → M5 →
 Persistence and the bot load-test harness (both in M7) should start during M2 so every later milestone is tested with them.
 
 ## Open questions & inconsistencies
-Collected in [DESIGN_REVIEW.md](DESIGN_REVIEW.md), to go through with Raven once the design docs are finished.
-Where a milestone needs an answer first, the plan uses a marked proposed default.
+[DESIGN_REVIEW.md](DESIGN_REVIEW.md): every First Playable item was decided with Raven on 2026-10-22, and those
+decisions override the design docs where they disagree. Items for later biomes stay open there.

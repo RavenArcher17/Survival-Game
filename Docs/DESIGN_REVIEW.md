@@ -1,65 +1,59 @@
 # Design review list
 
-Inconsistencies and open questions found while reading the design docs (2026-10-22).
-To go through with Raven **after the design docs are finished**. Nothing here blocks the start of M1;
-where the build needs an answer first, the plan uses a proposed default (marked) that's easy to change.
+Inconsistencies and open questions found while reading the design docs, and Raven's decisions.
+Reviewed with Raven on **2026-10-22**. Decisions here override the design docs where they disagree
+(the docs haven't been edited to match yet).
 
-Columns: **Where** = which doc tabs disagree · **Needed by** = first milestone that depends on it.
+## Decided (First Playable)
 
-## Affects the First Playable
+| # | Question | Decision |
+|---|---|---|
+| 1 | How many abilities equipped at once? | **8 quick slots, 4 per path**, plus light/heavy attack. Reassign anytime outside combat; no saved presets. |
+| 2 | Fire overheat | **No self-damage.** Full Heat just stops building. The Overheat node's explosion is the only payoff. (Overrides the main doc's "overheating burns you".) |
+| 5 | Do combos cost resources? | **Some combos are active abilities that spend both bars**; others are free passives. Fire+Frost's **Thaw and Balance stay passive**. Which other pairs are active is decided when those paths are designed. |
+| 6 | Status effects | **The full list is official**; the First Playable builds Burn, Frostbite, Slowed, Frozen, Shatter, Stagger. |
+| 7 | Heat and Chill | **Keep for now**; may be renamed later (they're data, so renaming is cheap). |
+| 8 | Node order inside a branch | **By points spent in the branch** (gates 0/5/10/15/20, capstone last); trunk's 10 first. |
+| 9 | Respec | **Rare item / long quest only** (not in First Playable). Altar swaps keep ranks. |
+| 10 | Boss count | **2 major + 4 mini** (build plan + Bosses tab). The main doc's "one boss" is outdated. |
+| 3, 11 | Crafting tiers | **Crafting tab wins**: Hearth reaches level 3 (iron) with the two major bosses. |
+| 12 | Signature resources | **Sulfur crystals** (volcanic), **lichen** (tundra). |
+| 4, 34 | Tame limit | **Per player**, active cap grows with the Taming skill (e.g. 2 at start, +1 at Bonded, +1 at Beast lord); stored tames have a higher cap. Numbers to tune. |
+| 14 | Floeback | **Deferred to Full release** with the other swimming mounts; tundra launches with 8 creatures. |
+| 15 | Map layout | Refine toward a realistic landmass first; **Raven signs off before terrain is built** (CLAUDE.md). |
+| 16 | Taming methods | **Only the listed method(s)** per creature. |
+| 27 | Farming | **Basic farming is in**: crop plots (plant → grow → harvest) and animal pens (feed → produce). Irrigation, greenhouses, bees, recipe discovery wait. |
+| 28 | Freeform placement | **Utility and decor only**; structure pieces snap. |
+| 29 | Structural support | **Span rule is in** (wood 4, stone 6). |
+| 30 | Comfort buff | **Decor now, buff in Full release.** |
+| 31 | Creature raids | **Setting only**; the feature comes in Full release. |
+| 32 | Bounties and infamy | **Setting only**; the feature comes in Full release. |
+| 33 | Stone building gate | **Stone is available at Hearth level 1** alongside wood. (Overrides the Building tab and the Crafting tab's workbench row.) |
+| 35 | Health/stamina growth | **Cap so level 50 = exactly 250 health / 150 stamina.** |
+| 36 | Character level | **From path points only: level = total path points spent ÷ 3** (150 points → 50). Raven doesn't recall it doing anything else. Health/stamina growth follows it. |
+| 37 | Highland creature HP | **Keep 200, tune in playtests.** |
+| 38 | Scaffold placeholder numbers | No decision needed; M1 switches the code to the Starting numbers tab. |
+| 21 | Base traps | Ruled out (Building tab). Dungeon traps: see #21 below. |
 
-| # | Issue | Where | Needed by | Proposed default in the plan |
-|---|---|---|---|---|
-| 1 | How many abilities can be equipped/used at once? "No swappable loadouts", but each tree has many spells; main doc says "a few path spells". | Main doc vs Skill trees | M1 | 8 quick slots (4 per path) + light/heavy attack, freely reassigned out of combat |
-| 2 | Fire overheat: main doc says "overheating burns you"; the Overheat node makes full Heat an explosion; Burning blood makes main-path fire immune to own burns. What happens for a fire *subclass*? | Main doc vs Skill trees | M1 | Full Heat self-burns non-fire-main players; Overheat node replaces that with an explosion |
-| 3 | Crafting tiers: build plan says "2 station tiers"; Crafting tab says two bosses reach Hearth level 3 (iron). | Build plan vs Crafting | M5 | Hearth level 3 |
-| 4 | Tame limit: per player or per tribe? | Main doc | M4 | Per player, active cap from the Taming skill |
-| 5 | Combos: main doc says combos "spend from both" resource bars; Skill trees says combos are automatic and cost no points. Do combos cost resources? | Main doc vs Skill trees, Combos | M1 | Passive combos (Thaw, Balance) cost nothing; active combo abilities would spend both bars |
-| 6 | Status effects: main doc lists bleed, burn, frostbite, poison, rot. Trees and combos also use freeze/shatter, slow, soak, shock, blind, root, curse, stagger. Need one master list. | Main doc vs Skill trees, Combos | M1 | Fire/Frost set: Burn, Frostbite, Slowed, Frozen, Shatter, Staggered |
-| 7 | Path resources: main doc calls them "suggestions, not decisions yet", but trees use them throughout. Are Heat and Chill final? | Main doc vs Skill trees | M1 | Heat and Chill treated as final |
-| 8 | Skill-tree node prerequisites aren't specified (order inside a branch). | Skill trees | M2 | Nodes unlock by points spent in that branch; trunk (10) before branches |
-| 9 | Respec vs swapping: main doc says respec is costly (rare item or long quest), but swapping paths at altars only means re-beating a boss. Is re-spending points *inside* a tree a respec? | Main doc vs Skill trees | M2 | Altar swap keeps ranks; no in-tree respec in the First Playable |
-| 10 | First playable boss count: main doc's next steps say "one boss"; build plan and Bosses tab say 1 major + 2 minis per biome (2 major total). A subclass needs the other biome's boss altar, so two majors are required. | Main doc vs Build plan, Bosses | M6 | 2 major + 4 mini (build plan) |
-| 11 | Hearth / boss-gated tech levels aren't in the main doc, which says stations go "tier 1 to 5" with no boss gating. | Main doc vs Crafting | M5 | Crafting tab (Hearth) wins |
-| 12 | Signature resource per biome isn't named for volcanic/tundra. Creatures tab implies sulfur crystals and lichen. | Main doc, Creatures | M3 | Sulfur crystals (volcanic), lichen (tundra) |
-| 13 | "Rest" is used by Necro (Deathless) and Void (Corruption) but never defined; survival only has sleep/Rested. | Skill trees vs Main doc | Later (not FP paths) | — |
-| 14 | Floeback is the First Playable's only swimming mount, but swimming mounts are Full release in the build plan. | Creatures vs Build plan | M4 | Defer Floeback |
-| 15 | Map tab: the layout needs more planning into a realistic landmass (coastlines, rivers, mountain range) before building. | Map | M3 | Plan includes a terrain-layout step first |
-| 16 | Neutral creature tames: are they all tamable by every method listed, or only the one in the table? | Creatures | M4 | Only the listed method(s) |
+### Doc edits these decisions imply (Raven's docs, not edited yet)
+- Main doc: overheating doesn't burn you (#2); "one boss" → 2 major + 4 mini (#10); stations tier 1–5 → Hearth levels (#11).
+- Building + Crafting tabs: stone at Hearth level 1 (#33).
+- Starting numbers: character level = path points ÷ 3 (#36).
+- Creatures tab: Floeback moved to Full release (#14).
+- Build plan: basic farming, span rule, utility/decor freeform moved into First Playable (#27–#29).
 
-### Added 2026-10-22 after the Building, Server settings and Starting numbers tabs
-
-| # | Issue | Where | Needed by | Proposed default in the plan |
-|---|---|---|---|---|
-| 27 | Farming in the First Playable? Building lists **crop plots and animal pens** and Starting numbers has crop growth times, but the build plan puts all of Farming (crops, husbandry) in Full release. Pumicehog and Snowpuff are farm animals in the First Playable roster. | Building, Starting numbers, Creatures vs Build plan | M5 | Include crop plots and pens in a basic form (plant → grow → harvest; feed → produce) |
-| 28 | Freeform placement: Building says "both snapping and freeform"; the build plan has freeform building in Full release. | Building vs Build plan | M5 | Snap first; freeform for utility/decor pieces only |
-| 29 | Structural integrity: Building has span limits (wood 4, stone 6 pieces); the build plan lists structural integrity as Full release. | Building vs Build plan | M5 | Implement the span rule (it's simple) |
-| 30 | Comfort buff: Building says decor raises it; the build plan has the comfort buff in Full release. | Building vs Build plan | M5 | Build decor pieces; comfort buff later |
-| 31 | Creature raids on bases is a server setting in all three presets, but random creature raids are Full release in the build plan. | Server settings vs Build plan | M7 | Setting exists, feature off until built |
-| 32 | Bounties and infamy is **On** in the PvP preset but is a Full release PvP feature. | Server settings vs Build plan | M7 | Same: setting exists, feature later |
-| 33 | Stone building needs Hearth level 2, so a base can't use stone until someone beats a major boss. Intended? (Matches the Crafting tab's workbench row.) Also still open: build plan "2 station tiers" vs Hearth level 3 (#3). | Building, Crafting | M5 | As written |
-| 34 | Tame limit still has no number. Server settings lets community servers change it but gives no default (#4). | Server settings | M4 | Per player, cap from Taming skill |
-| 35 | Health/stamina growth: "+3 per level, up to 250 at level 50" gives 247 if level 1 starts at 100 (same off-by-one for stamina: 149 vs 150). | Starting numbers | M2 | +3 for each level after 1, capped at 250 |
-| 36 | Character level 1–50 "from all XP earned" has no curve, only the target of reaching 50 over the same time as a second path. | Starting numbers | M2 | Curve fit so level 50 ≈ 80 h of play |
-| 37 | Highland check: iron (1.7×) +6 (+30%) light hit = 26.5 → 200 HP takes 7.5 hits, a bit over the "6–7" target unless fine quality is assumed. Midland check works at bronze +4 (≈ 6.4 hits). | Starting numbers | M1 tuning | Leave as written; tune in playtests |
-| 38 | Starting numbers say empty hunger/thirst halves stamina regen *before* health drains; the plan and current code drain health right away. Code also uses older placeholder values (respawn 5 s vs 10 s, hunger 40 vs 60 min, thirst 25 vs 40 min, stamina regen 12/s vs 30/s, sprint 20/s vs 5/s). | Starting numbers vs scaffold | M1 | Code updates to the doc's numbers in M1 (no question for Raven) |
-
-Resolved by the new tabs: **#21** in part (Building confirms base traps are ruled out; dungeon traps are still a question).
-
-## Later biomes / Full release
+## Open: later biomes / Full release (review when those are designed)
 
 | # | Issue | Where |
 |---|---|---|
+| 13 | "Rest" is used by Necro (Deathless) and Void (Corruption) but never defined; survival only has sleep/Rested. | Skill trees vs Main doc |
 | 17 | Healing: "crafted potions only", but Tide, Nature, Blood, Necro and Spore trees have heal spells and lifesteal. | Main doc vs Skill trees |
-| 18 | Secret hybrid paths unlock "when two paths reach mastery", but the 150 cap means two paths can't both be 100 at once. Does mastery count saved progress across swaps? The god path ("mastering several paths") has the same question. | Main doc vs Skill trees |
-| 19 | Combo themes: "neighbours are related themes, so combos between them feel natural", yet the flagship combo (fire + frost) is between opposites. The biome wheel order isn't written down anywhere. | Main doc vs Combos |
-| 20 | Portals: "portal timers" and "procedural dungeon layouts" are on the ruled-out list, but portals have real-day break timers (1/3/6/10/18) and shuffled rooms. Also unclear what happens to a cleared portal. | Main doc (internal) |
-| 21 | Traps are ruled out (for bases?) but used in dungeons. | Main doc (internal) |
-| 22 | Raids are for 6–10 players, while "party limits" are ruled out. Tuned for, or capped at? | Main doc (internal) |
-| 23 | "Open questions: none right now" while several TBDs remain (tame limit, mutations "a maybe", resources as suggestions, game title). | Main doc |
-| 24 | Skill trees tab ends "All 66 path pairs … are in the  tab": the tab name is blank (broken mention to Combos). | Skill trees |
-| 25 | Naming overlaps: Necro "Curse of weakness" = Blood "Hex of weakness"; Frost's Blizzard capstone shares its branch name; Blood "Lifesteal" node vs "Bloodthirst" passive; Nature "Regrowth" vs Spore "Regrowth spores". | Skill trees |
+| 18 | Secret hybrid paths unlock "when two paths reach mastery", but the 150 cap means two paths can't both be 100 at once. Does mastery count saved progress across swaps? Same question for the god path. | Main doc vs Skill trees |
+| 19 | "Neighbours are related themes, so combos between them feel natural", yet the flagship combo (fire + frost) is between opposites. The wheel order isn't written down. | Main doc vs Combos |
+| 20 | Portals: "portal timers" and "procedural dungeon layouts" are ruled out, but portals have real-day break timers and shuffled rooms. Unclear what happens to a cleared portal. | Main doc |
+| 21 | Traps in dungeons, given traps are ruled out for bases. | Main doc |
+| 22 | Raids are for 6–10 players while "party limits" are ruled out: tuned for, or capped at? | Main doc |
+| 23 | "Open questions: none right now" in the main doc is stale. | Main doc |
+| 24 | Skill trees tab ends with a broken mention ("… are in the  tab"), which should point to Combos. | Skill trees |
+| 25 | Naming overlaps: Necro "Curse of weakness" = Blood "Hex of weakness"; Frost's Blizzard capstone shares its branch name; Blood "Lifesteal" vs "Bloodthirst"; Nature "Regrowth" vs Spore "Regrowth spores". | Skill trees |
 | 26 | Game title is still "Untitled" (repo uses the working title Wildreach). | Main doc |
-
-## Still being designed (not inconsistencies)
-None as of 2026-10-22: Building, Server settings and Starting numbers tabs are now written.

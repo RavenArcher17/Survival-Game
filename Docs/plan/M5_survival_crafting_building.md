@@ -44,13 +44,14 @@ section 4 is the framework only, and its piece list waits for Raven.
 | System | Detail |
 |---|---|
 | Placement | Client ghost preview → server validates (claim, overlap, support, cost) → spawns piece |
-| Snapping | Piece sockets (foundation edges, wall tops, floor edges, doorframes) with rotation steps; data-driven per piece. Freeform placement for utility/decor (see review #28). |
-| Materials | Wood at Hearth level 1, stone at level 2 (metal L4 and biome L5 are Full release). Higher tier = more HP, no elemental resists. |
+| Snapping | Piece sockets (foundation edges, wall tops, floor edges, doorframes) with rotation steps; data-driven per piece. Freeform placement for utility/decor only (decided #28). |
+| Materials | **Wood and stone both at Hearth level 1** (decided #33; overrides the Building tab). Metal L4 and biome L5 are Full release. Higher tier = more HP, no elemental resists. |
 | Span rule | A piece is supported if it's within N pieces of a foundation or pillar: **wood 4, stone 6** (metal/biome 8). Support recomputes on placement/destruction; unsupported pieces collapse. |
 | Core pieces | Foundations, walls, half walls, floors, roofs, stairs, pillars, doors, windows |
 | Defense | Palisade walls, gates, guard towers, reinforced doors with code locks. No spikes or traps. |
-| Utility | Storage chests, beds, bedrolls, the four crafting stations, the Hearth, torches and braziers, animal pens, crop plots (see review #27) |
-| Decor | Furniture, rugs, banners, boss trophies (comfort buff: review #30) |
+| Utility | Storage chests, beds, bedrolls, the four crafting stations, the Hearth, torches and braziers, animal pens, crop plots |
+| Farming (decided #27) | Basic only: crop plots (plant → grow → harvest; common 20 min, rare 2 h) and animal pens (feed → produce; Pumicehog, Snowpuff). No irrigation, greenhouses, bees or recipe discovery yet. |
+| Decor | Furniture, rugs, banners, boss trophies. Comfort buff is Full release (decided #30). |
 | Doors & code locks | Lock state server-only; code entry by RPC with rate limiting |
 | Land claim totem | Only your clan builds inside. **30 m radius**, +10 m per totem upgrade up to **60 m**. Unlimited claims per player/clan; each has its own upkeep and can hold one Hearth that levels separately. |
 | Upkeep | Building materials stocked in the totem, scaled by piece count in the claim × the server's upkeep multiplier. Out of upkeep → claim drops → base slowly decays. |

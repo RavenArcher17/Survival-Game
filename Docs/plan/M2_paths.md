@@ -31,11 +31,12 @@ Fire+Frost wired to abilities.
 | `UWRPathDefinition` (Primary Data Asset) | Tree layout: nodes, ranks, costs, prerequisite, granted GE/GA |
 | `UWRPathProgressComponent` (on PlayerState) | Replicated (owner-only): `MainPath`, `SubPath`, map PathId → {XP, PointsEarned, NodeRanks}. All edits are server RPCs validated against the caps. |
 | XP award | Hook in `UWRGameplayAbility::CommitAbility`: abilities tagged `Path.X` grant XP to path X, scaled by target difficulty (no XP vs training dummies on live servers). |
-| XP curve | `Data/tuning.json` `pathXpPerPoint` curve. Placeholder: points 1–100 take 100 × 1.04^n XP. **Needs Raven's starting numbers.** |
+| XP curve | Point n costs **100 + 10n** path XP (~60,500 for 100, ~80 h at 1×), times the server XP multiplier. |
 | Node granting | Owning ranks grants the node's GE (stat) or GA (ability). Swapping a path out removes its grants and keeps the saved ranks. |
-| Prerequisites (proposal) | Branch nodes unlock in order by points spent in that branch (e.g. 0/5/10/15/20, capstone at 20). Trunk must be complete (10) before any branch. |
+| Prerequisites (decided #8) | Branch nodes unlock by points spent in that branch (gates 0/5/10/15/20, capstone last). Trunk must be complete (10) before any branch. |
 | Combo service | Watches both paths' spent points; grants/removes the combo GA at 25/25 and 50/50. |
-| Character level | Sum-of-activity level (path XP + life-skill XP). Proposal: gates nothing in First Playable except a display and matchmaking hint. |
+| Character level (decided #36) | **Total path points spent ÷ 3** (150 → level 50). Drives health +3 and stamina +1 per level, capped at exactly 250 / 150 at level 50 (#35). |
+| Respec (decided #9) | No in-tree respec in First Playable (rare item / long quest later). |
 | Altar actor | `AWRBossAltar` in each boss arena: interact → UI to unlock/swap subclass. Unlock condition: that biome's major boss killed by you (or with your damage ≥ 10%) at least once. |
 | Character creation | Name, body, main path (Fire/Frost) → spawn at one of that biome's three spawn points. |
 

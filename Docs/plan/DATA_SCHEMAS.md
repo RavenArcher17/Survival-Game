@@ -38,10 +38,11 @@ them from `Data/tuning.json` defaults and logs a warning so they're easy to find
 ## Combo: `Data/combos.json`
 ```json
 [{ "paths": ["fire", "frost"], "wheel": "opposites",
-   "at25": { "id": "thaw", "name": "Thaw", "text": "Burning a frozen enemy deals a big burst of damage", "grants": ["GA_Combo_Thaw"] },
-   "at50": { "id": "balance", "name": "Balance", "text": "Heat and Chill fill each other as you use them", "grants": ["GA_Combo_Balance"] },
+   "at25": { "id": "thaw", "name": "Thaw", "kind": "passive", "text": "Burning a frozen enemy deals a big burst of damage", "grants": ["GA_Combo_Thaw"] },
+   "at50": { "id": "balance", "name": "Balance", "kind": "passive", "text": "Heat and Chill fill each other as you use them", "grants": ["GA_Combo_Balance"] },
    "requiresAbility": null }]
 ```
+`kind`: `passive` (free, always on) or `active` (an ability that spends both paths' resources, with `cost: { "heat": n, "chill": n }`).
 All 66 pairs are imported for display; `grants` stays empty until a pair is implemented.
 `requiresAbility` covers combos that modify a specific ability ("only works once you have unlocked that ability").
 
