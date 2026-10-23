@@ -9,6 +9,7 @@
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerState.h"
+#include "WRResourceNode.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
@@ -21,6 +22,8 @@ AWRPlayerController::AWRPlayerController()
 	bBot = FParse::Param(FCommandLine::Get(), TEXT("wrbot")) || FParse::Param(FCommandLine::Get(), TEXT("wrbotpvp"));
 	bBotPvP = FParse::Param(FCommandLine::Get(), TEXT("wrbotpvp"));
 	bBotHunt = FParse::Param(FCommandLine::Get(), TEXT("wrbothunt"));
+	bBotGather = FParse::Param(FCommandLine::Get(), TEXT("wrbotgather"));
+	bBot = bBot || bBotGather;
 }
 
 void AWRPlayerController::SetupInputComponent()
@@ -339,6 +342,37 @@ void AWRPlayerController::TickBot(float DeltaTime)
 	}
 	if (bBotPaused)
 	{
+		return;
+	}
+
+	if (bBotGather)
+	{
+		// Walk to the nearest standing resource node and swing at it.
+		AWRResourceNode* Best = nullptr;
+		float BestDist = 1e9f;
+		for (TActorIterator<AWRResourceNode> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation());
+			if (!It->IsDepleted() && D < BestDist)
+			{
+				BestDist = D;
+				Best = *It;
+			}
+		}
+		if (Best)
+		{
+			const FVector To = Best->GetActorLocation() - Survivor->GetActorLocation();
+			SetControlRotation(To.Rotation());
+			if (BestDist > 180.f)
+			{
+				Survivor->AddMovementInput(To.GetSafeNormal2D(), 1.f);
+			}
+			else if (BotClock >= BotNextAttack)
+			{
+				BotNextAttack = BotClock + 0.9f;
+				BotPress(static_cast<int32>(EWRAbilityInput::Light), 0.05f);
+			}
+		}
 		return;
 	}
 

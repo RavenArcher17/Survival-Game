@@ -75,6 +75,14 @@ else:
         altar = spawn(altar_class, (x, 1500, 50), (0, 0, 0), label)
         altar.set_editor_property("path_id", path)
 
+    # Resource nodes: trees and rocks near both spawns, a copper vein, sulfur west, lichen east.
+    node_class = unreal.load_class(None, "/Script/Wildreach.WRResourceNode")
+    for label, item, x, y in [("Tree_W", "wood", -1500, -900), ("Rock_W", "stone", -1500, 900), ("Copper_W", "copper_ore", -2400, -1500),
+                              ("Sulfur_W", "sulfur_crystal", -2400, 1500), ("Tree_E", "wood", 1500, -900), ("Rock_E", "stone", 1500, 900),
+                              ("Copper_E", "copper_ore", 2400, -1500), ("Lichen_E", "lichen", 2400, 1500)]:
+        node = spawn(node_class, (x, y, 50), (0, 0, 0), label)
+        node.set_editor_property("item_id", item)
+
     if not les.save_current_level():
         raise RuntimeError("[Wildreach] save failed")
     unreal.log(f"[Wildreach] created {MAP_PATH}")

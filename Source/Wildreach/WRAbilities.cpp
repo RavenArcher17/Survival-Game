@@ -7,6 +7,7 @@
 #include "WRGameplayTags.h"
 #include "WRPathComponent.h"
 #include "WRProjectile.h"
+#include "WRResourceNode.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
@@ -264,6 +265,16 @@ void UWRGA_Melee::Sweep()
 
 	for (const FHitResult& HitResult : Hits)
 	{
+		// Weapon swings also gather from resource nodes (once per swing).
+		if (AWRResourceNode* Node = Cast<AWRResourceNode>(HitResult.GetActor()))
+		{
+			if (!HitThisSwing.Contains(Node))
+			{
+				HitThisSwing.Add(Node);
+				Node->Harvest(Character, bHeavy);
+			}
+			continue;
+		}
 		AWRCharacterBase* Target = Cast<AWRCharacterBase>(HitResult.GetActor());
 		if (!Target || HitThisSwing.Contains(Target) || !Character->IsHostileTo(Target))
 		{

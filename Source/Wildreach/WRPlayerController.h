@@ -78,6 +78,8 @@ private:
 	/** -wrbothunt: ignore training dummies, go after creature packs. */
 	bool bBotHunt = false;
 	bool bBotSetupDone = false;
+	/** -wrbotgather: harvest resource nodes instead of fighting. */
+	bool bBotGather = false;
 	TArray<FString> BotCmdQueue;
 	float BotCmdResume = 0.f;
 	bool bBotPaused = false;
