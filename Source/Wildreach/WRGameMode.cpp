@@ -7,8 +7,15 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "Dom/JsonObject.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerStart.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
@@ -33,9 +40,107 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 	}
 	if (AWRPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AWRPlayerState>() : nullptr)
 	{
+		// Without an online subsystem the engine names players after the machine plus a random
+		// suffix, which changes every launch. ?WRName= gives a stable name (and save key) until
+		// real account ids arrive (EOS/Steam, M7).
+		const FString WRName = UGameplayStatics::ParseOption(Options, TEXT("WRName"));
+		if (!WRName.IsEmpty())
+		{
+			ChangeName(NewPlayerController, WRName.Left(24), false);
+		}
 		PS->GetPaths()->SetMainPath(FName(*Path));
+		// A returning player's saved paths override the join URL.
+		LoadPlayer(PS);
 	}
 	return Result;
+}
+
+void AWRGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
+}
+
+void AWRGameMode::EndPlay(const EEndPlayReason::Type Reason)
+{
+	SaveAllPlayers(false);
+	Super::EndPlay(Reason);
+}
+
+FString AWRGameMode::PlayerSavePath(const FString& PlayerName)
+{
+	FString Safe;
+	for (const TCHAR C : PlayerName)
+	{
+		Safe.AppendChar(FChar::IsAlnum(C) || C == TEXT('_') || C == TEXT('-') ? C : TEXT('_'));
+	}
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), TEXT("players"), Safe + TEXT(".json"));
+}
+
+void AWRGameMode::SavePlayer(AWRPlayerState* PS)
+{
+	if (!PS || PS->GetPlayerName().IsEmpty())
+	{
+		return;
+	}
+	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetNumberField(TEXT("version"), 1);
+	Root->SetStringField(TEXT("name"), PS->GetPlayerName());
+	Root->SetObjectField(TEXT("paths"), PS->GetPaths()->ToJson());
+
+	FString Text;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
+	FJsonSerializer::Serialize(Root, Writer);
+	const FString Path = PlayerSavePath(PS->GetPlayerName());
+	if (FFileHelper::SaveStringToFile(Text, *Path))
+	{
+		PS->GetPaths()->ClearDirty();
+		UE_LOG(LogWildreach, Log, TEXT("SAVE %s -> %s"), *PS->GetPlayerName(), *Path);
+	}
+	else
+	{
+		UE_LOG(LogWildreach, Error, TEXT("SAVE failed for %s (%s)"), *PS->GetPlayerName(), *Path);
+	}
+}
+
+void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
+{
+	FString Text;
+	if (!PS || !FFileHelper::LoadFileToString(Text, *PlayerSavePath(PS->GetPlayerName())))
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> Root;
+	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	{
+		UE_LOG(LogWildreach, Error, TEXT("LOAD %s: save file is corrupt, starting fresh"), *PS->GetPlayerName());
+		return;
+	}
+	const TSharedPtr<FJsonObject>* Paths = nullptr;
+	if (Root->TryGetObjectField(TEXT("paths"), Paths))
+	{
+		PS->GetPaths()->FromJson(*Paths);
+		UE_LOG(LogWildreach, Log, TEXT("LOAD %s: main=%s(%d) sub=%s(%d)"), *PS->GetPlayerName(),
+			*PS->GetPaths()->GetMainPath().ToString(), PS->GetPaths()->GetSpent(PS->GetPaths()->GetMainPath()),
+			*PS->GetPaths()->GetSubPath().ToString(), PS->GetPaths()->GetSpent(PS->GetPaths()->GetSubPath()));
+	}
+}
+
+void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
+{
+	if (!GameState)
+	{
+		return;
+	}
+	for (APlayerState* Base : GameState->PlayerArray)
+	{
+		AWRPlayerState* PS = Cast<AWRPlayerState>(Base);
+		if (PS && (!bOnlyDirty || PS->GetPaths()->IsDirty()))
+		{
+			SavePlayer(PS);
+		}
+	}
 }
 
 void AWRGameMode::PostLogin(APlayerController* NewPlayer)
@@ -49,6 +154,7 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 void AWRGameMode::Logout(AController* Exiting)
 {
 	UE_LOG(LogWildreach, Log, TEXT("Player left: %s"), *GetNameSafe(Exiting));
+	SavePlayer(Exiting ? Exiting->GetPlayerState<AWRPlayerState>() : nullptr);
 	Super::Logout(Exiting);
 }
 

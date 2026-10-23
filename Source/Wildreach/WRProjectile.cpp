@@ -29,6 +29,11 @@ AWRProjectile::AWRProjectile()
 	{
 		Mesh->SetStaticMesh(SphereMesh.Object);
 	}
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ShapeMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (ShapeMaterial.Succeeded())
+	{
+		Mesh->SetMaterial(0, ShapeMaterial.Object);
+	}
 
 	Movement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Movement"));
 	Movement->ProjectileGravityScale = 0.f;

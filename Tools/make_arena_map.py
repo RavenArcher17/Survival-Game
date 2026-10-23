@@ -2,11 +2,12 @@
 Training dummies in the middle, a Cinderfang pack to the west and a Gloomhowl pack to the
 east, player starts tagged by biome. Re-run with -force to rebuild: Tools/make_map.ps1 arena
 """
-import sys
+import os
 import unreal
 
 MAP_PATH = "/Game/Maps/L_CombatArena"
-FORCE = "-force" in " ".join(sys.argv)
+# make_map.ps1 -Force sets this (the python commandlet doesn't forward script arguments).
+FORCE = os.environ.get("WR_FORCE") == "1"
 
 eal = unreal.EditorAssetLibrary
 if eal.does_asset_exist(MAP_PATH) and FORCE:
@@ -67,6 +68,12 @@ else:
         sp.set_editor_property("count", 3)
         sp.set_editor_property("radius", 400.0)
         sp.set_editor_property("respawn_seconds", 15.0)
+
+    # Boss altars (the real ones sit in the boss arenas; here they're out in the open for testing).
+    altar_class = unreal.load_class(None, "/Script/Wildreach.WRBossAltar")
+    for label, path, x in [("Altar_Fire", "fire", -2000), ("Altar_Frost", "frost", 2000)]:
+        altar = spawn(altar_class, (x, 1500, 50), (0, 0, 0), label)
+        altar.set_editor_property("path_id", path)
 
     if not les.save_current_level():
         raise RuntimeError("[Wildreach] save failed")

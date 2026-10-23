@@ -24,6 +24,23 @@ public:
 
 	AWRCharacterBase* GetLockTarget() const { return LockTarget.Get(); }
 
+	/** Nearest altar in interact range (client-side, for the HUD prompt). */
+	class AWRBossAltar* FindNearbyAltar() const;
+
+	/** Short message from the server ("Frost is now your subclass."), shown by the HUD for a few seconds. */
+	const FString& GetNotice() const { return Notice; }
+	double GetNoticeTime() const { return NoticeTime; }
+
+	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
+
+	UFUNCTION(Exec) void WRInteract();
+	/** First or third person (same as V). */
+	UFUNCTION(Exec) void WRView(FName Mode);
+	/** Stop/start the test bot's own actions (it keeps running queued commands). */
+	UFUNCTION(Exec) void WRBotPause(int32 bPause);
+	/** Teleport next to the altar of a path (testing). */
+	UFUNCTION(Exec) void WRGoToAltar(FName Path);
+
 	// --- Developer commands (console, or -ExecCmds) ---
 	UFUNCTION(Exec) void WRSetMain(FName Path);
 	UFUNCTION(Exec) void WRSetSub(FName Path);
@@ -49,12 +66,17 @@ private:
 	void BotPress(int32 Input, float HoldSeconds);
 
 	TWeakObjectPtr<AWRCharacterBase> LockTarget;
+	FString Notice;
+	double NoticeTime = -100.0;
 
 	bool bBot = false;
 	bool bBotPvP = false;
 	/** -wrbothunt: ignore training dummies, go after creature packs. */
 	bool bBotHunt = false;
 	bool bBotSetupDone = false;
+	TArray<FString> BotCmdQueue;
+	float BotCmdResume = 0.f;
+	bool bBotPaused = false;
 	float BotClock = 0.f;
 	float BotNextAttack = 0.f;
 	float BotNextDodge = 3.f;

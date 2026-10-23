@@ -22,6 +22,8 @@ AWRCharacterBase::AWRCharacterBase(const FObjectInitializer& ObjectInitializer)
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	// The shapes default to a grid material with no colour input; this one has a "Color" parameter.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ShapeMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 
 	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
 	BodyMesh->SetupAttachment(RootComponent);
@@ -38,6 +40,13 @@ AWRCharacterBase::AWRCharacterBase(const FObjectInitializer& ObjectInitializer)
 	WeaponMesh->SetupAttachment(RootComponent);
 	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	if (CubeMesh.Succeeded()) WeaponMesh->SetStaticMesh(CubeMesh.Object);
+
+	if (ShapeMaterial.Succeeded())
+	{
+		BodyMesh->SetMaterial(0, ShapeMaterial.Object);
+		FaceMarker->SetMaterial(0, ShapeMaterial.Object);
+		WeaponMesh->SetMaterial(0, ShapeMaterial.Object);
+	}
 
 	Status = CreateDefaultSubobject<UWRStatusComponent>(TEXT("Status"));
 }

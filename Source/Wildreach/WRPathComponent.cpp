@@ -6,6 +6,7 @@
 #include "WRGameplayTags.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
+#include "Dom/JsonObject.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Misc/CommandLine.h"
@@ -205,6 +206,7 @@ void UWRPathComponent::AwardXP(FName PathId, int32 Amount)
 	FWRPathProgress& P = FindOrAddProgress(PathId);
 	const int32 PointsBefore = FWRPathRules::PointsForXP(P.XP);
 	P.XP += FMath::RoundToInt(Amount * XPMultiplier());
+	bDirty = true;
 	if (FWRPathRules::PointsForXP(P.XP) != PointsBefore)
 	{
 		UE_LOG(LogWildreach, Log, TEXT("PATH %s earned a point (%d earned, xp %d)"), *PathId.ToString(), FWRPathRules::PointsForXP(P.XP), P.XP);
@@ -221,6 +223,7 @@ void UWRPathComponent::GivePoints(FName PathId, int32 Points)
 	FWRPathProgress& P = FindOrAddProgress(PathId);
 	const int32 Have = FWRPathRules::PointsForXP(P.XP);
 	P.XP = FMath::Max(P.XP, FWRPathRules::XPForPoints(Have + Points));
+	bDirty = true;
 }
 
 void UWRPathComponent::RefreshQuickSlots()
@@ -265,8 +268,91 @@ void UWRPathComponent::RefreshQuickSlots()
 	}
 }
 
+TSharedRef<FJsonObject> UWRPathComponent::ToJson() const
+{
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetStringField(TEXT("main"), MainPath.ToString());
+	Root->SetStringField(TEXT("sub"), SubPath.IsNone() ? FString() : SubPath.ToString());
+
+	TArray<TSharedPtr<FJsonValue>> PathArray;
+	for (const FWRPathProgress& P : Progress)
+	{
+		TSharedRef<FJsonObject> PathObj = MakeShared<FJsonObject>();
+		PathObj->SetStringField(TEXT("id"), P.PathId.ToString());
+		PathObj->SetNumberField(TEXT("xp"), P.XP);
+		TSharedRef<FJsonObject> Ranks = MakeShared<FJsonObject>();
+		for (const FWRNodeRank& R : P.Ranks)
+		{
+			if (R.Rank > 0)
+			{
+				Ranks->SetNumberField(R.NodeId.ToString(), R.Rank);
+			}
+		}
+		PathObj->SetObjectField(TEXT("ranks"), Ranks);
+		PathArray.Add(MakeShared<FJsonValueObject>(PathObj));
+	}
+	Root->SetArrayField(TEXT("paths"), PathArray);
+
+	TArray<TSharedPtr<FJsonValue>> SlotArray;
+	for (const FName& Slot : QuickSlots)
+	{
+		SlotArray.Add(MakeShared<FJsonValueString>(Slot.IsNone() ? FString() : Slot.ToString()));
+	}
+	Root->SetArrayField(TEXT("quickSlots"), SlotArray);
+	return Root;
+}
+
+void UWRPathComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
+{
+	if (!Json.IsValid())
+	{
+		return;
+	}
+	Progress.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* PathArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("paths"), PathArray))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *PathArray)
+		{
+			const TSharedPtr<FJsonObject> O = V->AsObject();
+			if (!O.IsValid() || !FWRPathRegistry::Get().Find(FName(*O->GetStringField(TEXT("id")))))
+			{
+				continue;
+			}
+			FWRPathProgress& P = Progress.AddDefaulted_GetRef();
+			P.PathId = FName(*O->GetStringField(TEXT("id")));
+			P.XP = O->GetIntegerField(TEXT("xp"));
+			const TSharedPtr<FJsonObject>* Ranks = nullptr;
+			if (O->TryGetObjectField(TEXT("ranks"), Ranks))
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& R : (*Ranks)->Values)
+				{
+					P.SetRank(FName(*R.Key), static_cast<int32>(R.Value->AsNumber()));
+				}
+			}
+		}
+	}
+	const FString Main = Json->GetStringField(TEXT("main"));
+	const FString Sub = Json->GetStringField(TEXT("sub"));
+	MainPath = FWRPathRegistry::Get().Find(FName(*Main)) ? FName(*Main) : MainPath;
+	SubPath = !Sub.IsEmpty() && FWRPathRegistry::Get().Find(FName(*Sub)) ? FName(*Sub) : NAME_None;
+
+	const TArray<TSharedPtr<FJsonValue>>* SlotArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("quickSlots"), SlotArray))
+	{
+		for (int32 i = 0; i < QuickSlots.Num() && i < SlotArray->Num(); ++i)
+		{
+			const FString S = (*SlotArray)[i]->AsString();
+			QuickSlots[i] = S.IsEmpty() ? NAME_None : FName(*S);
+		}
+	}
+	Changed();
+	bDirty = false;
+}
+
 void UWRPathComponent::Changed()
 {
+	bDirty = true;
 	RefreshQuickSlots();
 	const APlayerState* PS = Cast<APlayerState>(GetOwner());
 	if (AWRCharacter* Character = PS ? Cast<AWRCharacter>(PS->GetPawn()) : nullptr)

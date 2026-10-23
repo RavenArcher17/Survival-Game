@@ -33,7 +33,7 @@ Start-Sleep -Seconds 20
 foreach ($b in $bots) {
 	$log = Join-Path $out "$($b.Name).log"
 	# Headless clients otherwise run at thousands of fps and flood the server with moves.
-	$args = "`"$project`" 127.0.0.1:${Port}?Path=$($b.Path)?Name=$($b.Name) -game -nullrhi -unattended -nosound $($b.Flags) `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($b.Cmds)`" -abslog=`"$log`""
+	$args = "`"$project`" 127.0.0.1:${Port}?Path=$($b.Path)?WRName=$($b.Name) -game -nullrhi -unattended -nosound $($b.Flags) `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($b.Cmds)`" -abslog=`"$log`""
 	$procs += Start-Process $ue -ArgumentList $args -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 2
 }

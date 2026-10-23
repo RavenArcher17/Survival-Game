@@ -40,8 +40,9 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 
 	ThirdPersonBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("ThirdPersonBoom"));
 	ThirdPersonBoom->SetupAttachment(RootComponent);
-	ThirdPersonBoom->TargetArmLength = 350.f;
-	ThirdPersonBoom->SocketOffset = FVector(0.f, 50.f, 60.f);
+	// Over-the-shoulder so your own body doesn't hide what you're aiming at.
+	ThirdPersonBoom->TargetArmLength = 420.f;
+	ThirdPersonBoom->SocketOffset = FVector(0.f, 75.f, 85.f);
 	ThirdPersonBoom->bUsePawnControlRotation = true;
 
 	ThirdPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("ThirdPersonCamera"));

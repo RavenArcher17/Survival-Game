@@ -1,5 +1,6 @@
 #include "WRHUD.h"
 #include "WRAbilities.h"
+#include "WRAltar.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
@@ -173,6 +174,15 @@ void AWRHUD::DrawHUD()
 	}
 	if (const AWRPlayerController* PC = Cast<AWRPlayerController>(GetOwningPlayerController()))
 	{
+		if (const AWRBossAltar* Altar = PC->FindNearbyAltar())
+		{
+			const FString Prompt = Altar->GetPrompt(PC);
+			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
+		}
+		if (!PC->GetNotice().IsEmpty() && GetWorld()->GetTimeSeconds() - PC->GetNoticeTime() < 4.0)
+		{
+			DrawText(PC->GetNotice(), FLinearColor::White, Canvas->ClipX * 0.5f - PC->GetNotice().Len() * 3.5f, Canvas->ClipY * 0.3f, nullptr, 1.3f);
+		}
 		if (const AWRCharacterBase* Lock = PC->GetLockTarget())
 		{
 			const FVector Screen = Project(Lock->GetActorLocation(), true);

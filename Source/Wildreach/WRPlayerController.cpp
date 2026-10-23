@@ -1,5 +1,6 @@
 #include "WRPlayerController.h"
 #include "Wildreach.h"
+#include "WRAltar.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
@@ -25,7 +26,48 @@ void AWRPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 	InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AWRPlayerController::ToggleLockOn);
+	InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AWRPlayerController::WRInteract);
 }
+
+AWRBossAltar* AWRPlayerController::FindNearbyAltar() const
+{
+	const APawn* Self = GetPawn();
+	if (!Self)
+	{
+		return nullptr;
+	}
+	AWRBossAltar* Best = nullptr;
+	float BestDist = AWRBossAltar::InteractRange;
+	for (TActorIterator<AWRBossAltar> It(GetWorld()); It; ++It)
+	{
+		const float Dist = FVector::Dist2D(It->GetActorLocation(), Self->GetActorLocation());
+		if (Dist < BestDist)
+		{
+			BestDist = Dist;
+			Best = *It;
+		}
+	}
+	return Best;
+}
+
+void AWRPlayerController::ClientNotify_Implementation(const FString& Message)
+{
+	Notice = Message;
+	NoticeTime = GetWorld()->GetTimeSeconds();
+	UE_LOG(LogWildreach, Log, TEXT("NOTICE %s"), *Message);
+}
+
+void AWRPlayerController::WRInteract() { ServerCommand(TEXT("interact")); }
+void AWRPlayerController::WRBotPause(int32 bPause) { bBotPaused = bPause != 0; }
+
+void AWRPlayerController::WRView(FName Mode)
+{
+	if (AWRCharacter* Survivor = Cast<AWRCharacter>(GetPawn()))
+	{
+		Survivor->SetFirstPerson(Mode == TEXT("fp"));
+	}
+}
+void AWRPlayerController::WRGoToAltar(FName Path) { ServerCommand(FString::Printf(TEXT("gotoaltar %s"), *Path.ToString())); }
 
 void AWRPlayerController::PlayerTick(float DeltaTime)
 {
@@ -129,10 +171,13 @@ void AWRPlayerController::WRStarve() { ServerCommand(TEXT("starve")); }
 void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 {
 #if UE_BUILD_SHIPPING
-	return;
-#else
-	RunServerCommand(Command);
+	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
+	if (!Command.StartsWith(TEXT("interact")))
+	{
+		return;
+	}
 #endif
+	RunServerCommand(Command);
 }
 
 void AWRPlayerController::RunServerCommand(const FString& Command)
@@ -189,6 +234,27 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 100.f);
 	}
 	else if (Cmd == TEXT("killme") && Survivor) { Survivor->Die(nullptr); }
+	else if (Cmd == TEXT("interact"))
+	{
+		// Interaction is a gameplay action, not a dev command: it stays available in shipping (see ServerCommand).
+		AWRBossAltar* Altar = FindNearbyAltar();
+		Result = Altar ? Altar->Interact(this) : TEXT("nothing to interact with");
+		if (Altar)
+		{
+			ClientNotify(Result);
+		}
+	}
+	else if (Cmd == TEXT("gotoaltar") && Survivor)
+	{
+		for (TActorIterator<AWRBossAltar> It(GetWorld()); It; ++It)
+		{
+			if (It->PathId == FName(*Arg(1)))
+			{
+				Survivor->TeleportTo(It->GetActorLocation() + FVector(150.f, 0.f, 100.f), Survivor->GetActorRotation());
+				break;
+			}
+		}
+	}
 	else if (Cmd == TEXT("starve") && ASC)
 	{
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), 0.f);
@@ -231,20 +297,30 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		return;
 	}
 
-	// Run the setup commands from -wrbotcmds="cmd one|cmd two" once the bot is in the world.
+	// Run the setup commands from -wrbotcmds="cmd one|wait 3|cmd two" once the bot is in the world.
 	if (!bBotSetupDone && BotClock > 1.5f)
 	{
 		bBotSetupDone = true;
 		FString Cmds;
 		if (FParse::Value(FCommandLine::Get(), TEXT("wrbotcmds="), Cmds, false))
 		{
-			TArray<FString> List;
-			Cmds.ParseIntoArray(List, TEXT("|"));
-			for (const FString& Cmd : List)
-			{
-				ConsoleCommand(Cmd.TrimStartAndEnd());
-			}
+			Cmds.ParseIntoArray(BotCmdQueue, TEXT("|"));
 		}
+	}
+	while (BotCmdQueue.Num() > 0 && BotClock >= BotCmdResume)
+	{
+		const FString Cmd = BotCmdQueue[0].TrimStartAndEnd();
+		BotCmdQueue.RemoveAt(0);
+		if (Cmd.StartsWith(TEXT("wait ")))
+		{
+			BotCmdResume = BotClock + FCString::Atof(*Cmd.RightChop(5));
+			break;
+		}
+		ConsoleCommand(Cmd);
+	}
+	if (bBotPaused)
+	{
+		return;
 	}
 
 	if (!LockTarget.IsValid() || !LockTarget->IsAlive())

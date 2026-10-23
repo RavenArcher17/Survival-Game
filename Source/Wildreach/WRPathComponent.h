@@ -56,6 +56,12 @@ public:
 	/** Rate multiplier for path XP (server setting; -xpmult=N on the command line). */
 	static float XPMultiplier();
 
+	// --- Persistence (server) ---
+	TSharedRef<class FJsonObject> ToJson() const;
+	void FromJson(const TSharedPtr<class FJsonObject>& Json);
+	bool IsDirty() const { return bDirty; }
+	void ClearDirty() { bDirty = false; }
+
 	static constexpr int32 NumQuickSlots = 8;
 
 private:
@@ -68,6 +74,8 @@ private:
 	UPROPERTY(Replicated) TArray<FWRPathProgress> Progress;
 	/** "path.node" per slot, None when empty. */
 	UPROPERTY(Replicated) TArray<FName> QuickSlots;
+
+	bool bDirty = false;
 
 	// Server-only bookkeeping of what we granted, so a re-apply removes stale grants.
 	TArray<FGameplayAbilitySpecHandle> GrantedAbilities;
