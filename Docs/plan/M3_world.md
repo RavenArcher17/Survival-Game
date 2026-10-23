@@ -18,7 +18,8 @@ Depends on: M0. Can run in parallel with M1/M2.
 | North + south passes | contested borderland, the only crossing; both biomes' creatures fight here; invasion route; likely PvP hotspot |
 
 The Map tab notes the layout still needs work into "a realistic landmass, with natural coastlines,
-terrain, rivers and the shape of the mountain range" before building. Step 1 below is that work.
+terrain, rivers and the shape of the mountain range" before building. Step 1 below is that work, and
+**Raven signs off on the refined layout before any terrain is generated or imported.**
 
 ## Pipeline ($0, scriptable)
 | Step | Tool | Output |

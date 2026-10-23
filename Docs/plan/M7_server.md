@@ -40,7 +40,12 @@ Official servers run one of three **locked presets**; community servers can chan
 **Fixed on every server** (not exposed in the ini): the 10% boss-loot damage rule, the 150-point / 100-per-path cap,
 artifact weird rules applying only to the wearer.
 
-Implementation: `EWRServerPreset` {PvPStandard, PvE, CasualCoop, Custom}; a preset fills defaults and locks them
+**Playtest preset (internal, not in the design doc):** at 1× a path takes ~80 h and a life skill ~50 h, so playtesters
+would never reach the higher nodes. `Playtest` = Casual co-op values plus XP and skill gain **10×** (the doc's max),
+taming 10×, boss respawn 1 h. Used for every internal playtest from M2 on; debug commands
+(`WR.GrantPath`, `WR.GrantSkill`) cover anything faster.
+
+Implementation: `EWRServerPreset` {PvPStandard, PvE, CasualCoop, Playtest, Custom}; a preset fills defaults and locks them
 unless the preset is `Custom`. Every gameplay system reads multipliers from `UWRServerSettings` and never hard-codes them.
 Full release adds: portal break timers, artifact modifier limits, invasion frequency, raid group sizes.
 
