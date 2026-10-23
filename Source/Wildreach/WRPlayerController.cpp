@@ -380,9 +380,16 @@ void AWRPlayerController::TickBot(float DeltaTime)
 	{
 		// Rotate through the path abilities in the quick slots (spells and weapon arts).
 		// Pairs same-path abilities (shard, slash, shard, slash, bolt, slash...) like a player stacking buildup.
+		// Slots 2 and 4 are weapon arts (melee), so only use those in reach.
 		static const int32 Pattern[] = { 0, 1, 0, 1, 2, 3, 2, 3 };
+		const int32 Slot = Pattern[BotSpellSlot++ % 8];
+		if ((Slot == 1 || Slot == 3) && Dist > 260.f)
+		{
+			BotNextSpell = BotClock + 0.2f;
+			return;
+		}
 		BotNextSpell = BotClock + 1.3f;
-		BotPress(static_cast<int32>(EWRAbilityInput::Slot1) + Pattern[BotSpellSlot++ % 8], 0.05f);
+		BotPress(static_cast<int32>(EWRAbilityInput::Slot1) + Slot, 0.05f);
 		return;
 	}
 	if (Dist <= 260.f && BotClock >= BotNextAttack)

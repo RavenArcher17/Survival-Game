@@ -34,6 +34,67 @@ UWRPathComponent* UWRPathComponent::FindFor(const AActor* Character)
 	return PS ? PS->FindComponentByClass<UWRPathComponent>() : nullptr;
 }
 
+namespace
+{
+	struct FWRNodeEffect
+	{
+		FName PathId;
+		FName NodeId;
+		FName Stat;
+		float PerRank = 0.f;
+	};
+
+	const TArray<FWRNodeEffect>& NodeEffects()
+	{
+		static TArray<FWRNodeEffect> Effects = []()
+		{
+			TArray<FWRNodeEffect> Out;
+			const TSharedPtr<FJsonObject> Root = FWRTuning::LoadDataFile(TEXT("tuning.json"));
+			const TSharedPtr<FJsonObject>* Table = nullptr;
+			if (!Root.IsValid() || !Root->TryGetObjectField(TEXT("nodeEffects"), Table))
+			{
+				return Out;
+			}
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : (*Table)->Values)
+			{
+				FString PathStr, NodeStr;
+				const TSharedPtr<FJsonObject>* Stats = nullptr;
+				if (!Entry.Key.Split(TEXT("."), &PathStr, &NodeStr) || !Entry.Value->TryGetObject(Stats))
+				{
+					continue;
+				}
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& S : (*Stats)->Values)
+				{
+					Out.Add({ FName(*PathStr), FName(*NodeStr), FName(*S.Key), static_cast<float>(S.Value->AsNumber()) });
+				}
+			}
+			return Out;
+		}();
+		return Effects;
+	}
+}
+
+float UWRPathComponent::Stat(const AActor* Character, FName StatName)
+{
+	const UWRPathComponent* Paths = FindFor(Character);
+	if (!Paths)
+	{
+		return 0.f;
+	}
+	float Total = 0.f;
+	for (const FWRNodeEffect& Effect : NodeEffects())
+	{
+		if (Effect.Stat == StatName && Paths->IsActivePath(Effect.PathId))
+		{
+			if (const FWRPathProgress* P = Paths->GetProgress(Effect.PathId))
+			{
+				Total += Effect.PerRank * P->GetRank(Effect.NodeId);
+			}
+		}
+	}
+	return Total;
+}
+
 float UWRPathComponent::XPMultiplier()
 {
 	static float Mult = []()
@@ -428,6 +489,9 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		WRTune(TEXT("resources.heatMax"), 100.f) + WRTune(TEXT("resources.heatCapacityPerRank"), 15.f) * RankIn(TEXT("fire"), TEXT("heat_capacity")));
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChillAttribute(),
 		WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity")));
+
+	// Tempered: more poise.
+	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxPoiseAttribute(), WRTune(TEXT("player.poise"), 40.f) + Stat(Character, TEXT("maxPoise")));
 
 	const int32 Level = GetCharacterLevel();
 	const float HealthRatio = Attr->GetMaxHealth() > 0.f ? Attr->GetHealth() / Attr->GetMaxHealth() : 1.f;

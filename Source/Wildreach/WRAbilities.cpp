@@ -291,6 +291,7 @@ void UWRGA_Melee::Sweep()
 		Hit.PathId = PathId;
 		Hit.bMelee = true;
 		Hit.bHeavy = bHeavy;
+		Hit.bWeaponArt = !ArtKey.IsEmpty();
 		Hit.Origin = Character->GetActorLocation();
 		UWRCombatLibrary::ApplyHit(Target, Hit);
 	}
@@ -390,7 +391,8 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 
 	const FWRTuning& T = FWRTuning::Get();
 	const float Distance = T.Num(TEXT("defense.dodgeDistance"), 450.f);
-	const float Duration = T.Num(TEXT("defense.dodgeDuration"), 0.45f);
+	// Light step: same distance, quicker roll. Progress replicates to the owner, so client and server agree.
+	const float Duration = T.Num(TEXT("defense.dodgeDuration"), 0.45f) / (1.f + UWRPathComponent::Stat(Character, TEXT("dodgeSpeed")));
 	const float IStart = T.Num(TEXT("defense.dodgeIFrameStart"), 0.05f);
 	const float IFrames = T.Num(TEXT("defense.dodgeIFrames"), 0.3f);
 
@@ -546,6 +548,24 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Hit.BurnBuildup = T.Num(SpellKey + TEXT(".burnBuildup"), 0.f);
 		Hit.FrostBuildup = T.Num(SpellKey + TEXT(".frostBuildup"), 0.f);
 		Hit.PathId = PathId;
+
+		// Point blank: a target between the caster and the spawn point would be spawned inside
+		// and never get a hit event, so resolve it directly.
+		FHitResult Near;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSpellMuzzle), false, Caster);
+		const FVector From = Caster->GetActorLocation() + FVector(0.f, 0.f, 40.f);
+		if (Caster->GetWorld()->SweepSingleByChannel(Near, From, SpawnAt, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(14.f), Query))
+		{
+			AWRCharacterBase* Blocker = Cast<AWRCharacterBase>(Near.GetActor());
+			if (Blocker && Caster->IsHostileTo(Blocker))
+			{
+				Hit.Origin = From;
+				UWRCombatLibrary::ApplyHit(Blocker, Hit);
+				UWRCombatLibrary::GainResource(Caster, WRTags::Element_Fire, T.Num(SpellKey + TEXT(".heat"), 0.f));
+				UWRCombatLibrary::GainResource(Caster, WRTags::Element_Frost, T.Num(SpellKey + TEXT(".chill"), 0.f));
+				return;
+			}
+		}
 
 		FActorSpawnParameters Params;
 		Params.Owner = Caster;

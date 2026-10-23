@@ -66,6 +66,23 @@
     "_all": "placeholder"
   },
 
+  "nodeEffects": {
+    "_comment": "Per-rank effect of each stat node (path.node -> stat -> amount per rank). Placeholders; ability nodes are separate abilities.",
+    "fire.ignite_chance":   { "igniteChance": 0.05 },
+    "fire.searing_heat":    { "burnDamage": 0.15 },
+    "fire.long_burn":       { "burnDuration": 1.0 },
+    "fire.crushing_blast":  { "vsStaggered": 0.10 },
+    "fire.heated_blade":    { "weaponArtDamage": 0.06 },
+    "fire.bellows":         { "staminaRegenHighHeat": 0.10 },
+    "fire.tempered":        { "maxPoise": 5 },
+    "frost.frostbite":      { "frostBuildup": 0.10 },
+    "frost.deep_freeze":    { "freezeBuildup": 0.08 },
+    "frost.hard_break":     { "shatterDamage": 0.15 },
+    "frost.keen_edge":      { "critChance": 0.03 },
+    "frost.light_step":     { "dodgeSpeed": 0.05 },
+    "frost.chilling_touch": { "meleeChill": 2 }
+  },
+
   "spells": {
     "fireBolt": { "damage": 18, "burnBuildup": 35, "speed": 2600, "cooldown": 1.2, "heat": 10 },
     "frostShard": { "damage": 14, "frostBuildup": 40, "speed": 3000, "cooldown": 1.0, "chill": 6 },

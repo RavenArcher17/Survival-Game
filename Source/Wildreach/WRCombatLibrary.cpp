@@ -196,6 +196,20 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + WRTune(TEXT("status.permafrostBonusVsSlowed"), 0.15f);
 		}
+		// Stat nodes (Data/tuning.json nodeEffects).
+		if (Hit.bWeaponArt)
+		{
+			Damage *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("weaponArtDamage"));
+		}
+		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
+		{
+			Damage *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("vsStaggered"));
+		}
+		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")))
+		{
+			Damage *= 1.5f;
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s"), *Target->GetName());
+		}
 		if (Hit.bMelee && TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
 		{
 			// Riposte / critical on a staggered target.
@@ -217,7 +231,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			{
 				// Chill: spending it all at once triggers bigger shatters.
 				const float ChillFraction = SpendAllChill(Attacker);
-				Damage += WRTune(TEXT("status.shatterDamage"), 30.f) * (1.f + ChillFraction * WRTune(TEXT("resources.chillShatterBonusAtFull"), 1.f));
+				Damage += WRTune(TEXT("status.shatterDamage"), 30.f) * (1.f + ChillFraction * WRTune(TEXT("resources.chillShatterBonusAtFull"), 1.f))
+					* (1.f + UWRPathComponent::Stat(Attacker, TEXT("shatterDamage")));
 				Target->Status->ClearStatus(WRTags::Status_Frozen);
 				UE_LOG(LogWildreach, Log, TEXT("COMBAT shatter on %s (chill spent %.0f%%)"), *Target->GetName(), ChillFraction * 100.f);
 			}
@@ -241,8 +256,19 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 
 	if (Result == EWRHitResult::Hit)
 	{
-		Target->Status->AddBuildup(WRTags::Element_Fire, Hit.BurnBuildup, Attacker);
-		Target->Status->AddBuildup(WRTags::Element_Frost, Hit.FrostBuildup, Attacker);
+		float Burn = Hit.BurnBuildup;
+		// Ignite chance: any fire hit can set the target burning outright.
+		if (Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("igniteChance")))
+		{
+			Burn += WRTune(TEXT("status.buildupThreshold"), 100.f);
+		}
+		float Frost = Hit.FrostBuildup * (1.f + UWRPathComponent::Stat(Attacker, TEXT("frostBuildup")));
+		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Slowed))
+		{
+			Frost *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("freezeBuildup"));
+		}
+		Target->Status->AddBuildup(WRTags::Element_Fire, Burn, Attacker);
+		Target->Status->AddBuildup(WRTags::Element_Frost, Frost, Attacker);
 	}
 
 	if (!Hit.bDamageOverTime && Attacker && Result != EWRHitResult::Parried)
@@ -254,6 +280,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		else if (Hit.Element == WRTags::Element_Frost)
 		{
 			GainResource(Attacker, Hit.Element, WRTune(TEXT("resources.chillPerHit"), 4.f));
+		}
+		if (Hit.bMelee)
+		{
+			// Chilling touch: every melee hit builds Chill.
+			GainResource(Attacker, WRTags::Element_Frost, UWRPathComponent::Stat(Attacker, TEXT("meleeChill")));
 		}
 		if (!Hit.PathId.IsNone())
 		{

@@ -43,6 +43,8 @@ struct FWRHit
 	UPROPERTY() FName PathId;
 	UPROPERTY() bool bMelee = false;
 	UPROPERTY() bool bHeavy = false;
+	/** Path weapon art (Flame slash, Ice slash...): Heated blade boosts these. */
+	UPROPERTY() bool bWeaponArt = false;
 	/** Status ticks (burn) skip block/parry/riposte/resource gain. */
 	UPROPERTY() bool bDamageOverTime = false;
 	UPROPERTY() FVector Origin = FVector::ZeroVector;

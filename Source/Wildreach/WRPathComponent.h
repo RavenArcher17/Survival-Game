@@ -53,6 +53,13 @@ public:
 	int32 GetCharacterLevel() const;
 	const TArray<FName>& GetQuickSlots() const { return QuickSlots; }
 
+	/**
+	 * Sum of a stat over the character's owned stat nodes in its active paths, from
+	 * tuning "nodeEffects" (e.g. Stat(Attacker, "burnDamage") -> 0.45 with 3 ranks of Searing heat).
+	 * 0 for creatures. Works on the server and the owning client (progress replicates to the owner).
+	 */
+	static float Stat(const AActor* Character, FName StatName);
+
 	/** Rate multiplier for path XP (server setting; -xpmult=N on the command line). */
 	static float XPMultiplier();
 

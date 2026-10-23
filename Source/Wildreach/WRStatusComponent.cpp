@@ -4,6 +4,7 @@
 #include "WRCharacterBase.h"
 #include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
+#include "WRPathComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
 
@@ -112,7 +113,7 @@ void UWRStatusComponent::AddBuildup(const FGameplayTag& Element, float Amount, A
 		{
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetBurnBuildupAttribute(), 0.f);
 			BurnSource = Source;
-			ApplyStatus(WRTags::Status_Burn, WRTune(TEXT("status.burnSeconds"), 6.f));
+			ApplyStatus(WRTags::Status_Burn, WRTune(TEXT("status.burnSeconds"), 6.f) + UWRPathComponent::Stat(Source, TEXT("burnDuration")));
 		}
 		else
 		{
@@ -191,7 +192,7 @@ void UWRStatusComponent::TickStatuses(float DeltaTime)
 			BurnTickAccumulator -= 1.f;
 			FWRHit Tick;
 			Tick.Instigator = BurnSource.Get();
-			Tick.Damage = WRTune(TEXT("status.burnDamagePerSecond"), 4.f);
+			Tick.Damage = WRTune(TEXT("status.burnDamagePerSecond"), 4.f) * (1.f + UWRPathComponent::Stat(BurnSource.Get(), TEXT("burnDamage")));
 			Tick.Element = WRTags::Element_Fire;
 			Tick.bDamageOverTime = true;
 			UWRCombatLibrary::ApplyHit(GetOwnerCharacter(), Tick);
@@ -251,6 +252,11 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		if (bSurvivalNeeds && (Attr->GetHunger() <= 0.f || Attr->GetThirst() <= 0.f))
 		{
 			Regen *= WRTune(TEXT("survival.deprivedStaminaRegenMultiplier"), 0.5f);
+		}
+		if (Attr->GetMaxHeat() > 0.f && Attr->GetHeat() / Attr->GetMaxHeat() >= 0.5f)
+		{
+			// Bellows: faster stamina regen at high Heat.
+			Regen *= 1.f + UWRPathComponent::Stat(Owner, TEXT("staminaRegenHighHeat"));
 		}
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() + Regen * DeltaTime);
 	}
