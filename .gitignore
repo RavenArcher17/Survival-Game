@@ -15,3 +15,18 @@ Build/
 *.VC.opendb
 Plugins/*/Binaries/
 Plugins/*/Intermediate/
+
+# Third-party Fab / marketplace packs: licensed (not redistributable) and too big for git.
+# Back these up separately; the game code and our own content stay in the repo.
+/Content/Attaku/
+/Content/DynamicFalling/
+/Content/Fab/
+/Content/GV_FreeShrubsPack/
+/Content/JayantChakradhariAssets_Free_Stylized_Lava_Rock/
+/Content/LavaMat/
+/Content/QuadrapedCreatures/
+/Content/SimpleRocks/
+/Content/WaterMaterials/
+/Content/WoodMaterialPack2/
+/Content/Collections/
+/Content/Developers/
