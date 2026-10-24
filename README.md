@@ -6,10 +6,14 @@ Frozen tundra) runs on placeholder art. See `CHANGELOG.md` for what's built and 
 ## Play with friends
 
 ```
-Tools\package.ps1     # -> C:\Dev\WildreachBuild\Windows\Wildreach.exe (+ README.txt for players)
+Tools\package.ps1          # -> C:\Dev\WildreachBuild\Windows\Wildreach.exe (+ README.txt for players)
+Tools\make_installer.ps1   # -> C:\Dev\WildreachBuild\Wildreach-Setup.exe (one file to send friends)
 ```
 
-Zip `C:\Dev\WildreachBuild\Windows` and share it. Everyone runs `Wildreach.exe`, types a name and picks
+Send `Wildreach-Setup.exe` with a OneDrive/Drive link (it's ~440 MB). Double-clicking it installs to the player's
+own folder (no admin), adds Desktop and Start Menu shortcuts, installs the VC++ runtime only if it's missing, and
+starts the game; a newer Setup updates in place and keeps saves. It isn't code-signed, so Windows may show "Windows
+protected your PC": More info, then Run anyway. Everyone runs the game, types a name and picks
 Fire or Frost. One person clicks **Host** (their PC is the server; over the internet they forward UDP 7777
 to their PC). Everyone else types the host's IP and clicks **Join**. Saves live on the host
 (`Wildreach\Saved\ServerDB`). F10 goes back to the menu.
