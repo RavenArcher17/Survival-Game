@@ -1,4 +1,6 @@
 #include "WRBuilding.h"
+#include "WRLifeSkills.h"
+#include "WRSocial.h"
 #include "Wildreach.h"
 #include "WRCrafting.h"
 #include "WRPlayerController.h"
@@ -150,8 +152,7 @@ TMap<FName, float> FWRBuildRules::UpkeepPerHour(const TMap<FName, int32>& Pieces
 
 static bool CanPlayersShare(const FString& Owner, const FString& Player)
 {
-	// Clans arrive with server settings; until then, the owner alone has access.
-	return Owner.IsEmpty() || Owner == Player;
+	return FWRSocialRules::CanShare(Owner, Player);
 }
 
 // ---------------------------------------------------------------- piece
@@ -413,6 +414,12 @@ void AWRBuildPiece::TakeBuildDamage(float Amount, AActor* DamageSource)
 	{
 		return;
 	}
+	// Offline base protection: less damage while the owner and their clan are all offline.
+	const float Protection = WRTune(TEXT("server.offlineProtection"), 0.f);
+	if (Protection > 0.f && !FWRSocialRules::IsAnyoneOnline(GetWorld(), OwnerName))
+	{
+		Amount *= 1.f - FMath::Clamp(Protection, 0.f, 1.f);
+	}
 	Health -= Amount;
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
@@ -469,18 +476,25 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 			}
 			PS->GetInventory()->RemoveItem(TEXT("seeds"), 1);
 			bPlanted = true;
-			CropReadyAt = Now + WRTune(TEXT("crops.commonMinutes"), 20.f) * 60.f / FMath::Max(0.1f, WRTune(TEXT("server.cropMultiplier"), 1.f));
+			CropReadyAt = Now + WRTune(TEXT("crops.commonMinutes"), 20.f) * 60.f / FMath::Max(0.1f, WRTune(TEXT("server.cropMultiplier"), 1.f))
+				/ (1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("cropSpeed")));
+			UWRLifeSkillsComponent::Award(PS, TEXT("farming"), TEXT("plant"), 10.f);
 			return FString::Printf(TEXT("Planted. Ready in %.0f min"), (CropReadyAt - Now) / 60.f);
 		}
 		if (Now < CropReadyAt)
 		{
 			return FString::Printf(TEXT("Growing: %.0f min left"), (CropReadyAt - Now) / 60.f);
 		}
-		bPlanted = false;
-		CropReadyAt = 0.f;
-		PS->GetInventory()->AddItem(TEXT("berries"), 6);
-		PS->GetInventory()->AddItem(TEXT("seeds"), 2);
-		return TEXT("Harvested 6 berries, 2 seeds");
+		const int32 Berries = FMath::RoundToInt(6.f * (1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("harvestExtra"))) * WRTune(TEXT("server.gatherMultiplier"), 1.f));
+		const int32 Seeds = 2 + FMath::RoundToInt(UWRLifeSkillsComponent::StatFor(PS, TEXT("seedExtra")));
+		PS->GetInventory()->AddItem(TEXT("berries"), Berries);
+		PS->GetInventory()->AddItem(TEXT("seeds"), Seeds);
+		UWRLifeSkillsComponent::Award(PS, TEXT("farming"), TEXT("harvest"), 20.f);
+		// Endless field: replants itself.
+		bPlanted = UWRLifeSkillsComponent::StatFor(PS, TEXT("autoReplant")) > 0.f;
+		CropReadyAt = bPlanted ? Now + WRTune(TEXT("crops.commonMinutes"), 20.f) * 60.f / FMath::Max(0.1f, WRTune(TEXT("server.cropMultiplier"), 1.f))
+			/ (1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("cropSpeed"))) : 0.f;
+		return FString::Printf(TEXT("Harvested %d berries, %d seeds%s"), Berries, Seeds, bPlanted ? TEXT(" (replanted)") : TEXT(""));
 	}
 	if (K == TEXT("pen"))
 	{
@@ -493,6 +507,7 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 				S = FWRItemStack();
 			}
 		}
+		UWRLifeSkillsComponent::Award(PS, TEXT("husbandry"), TEXT("collect"), 5.f, Collected);
 		return Collected > 0 ? FString::Printf(TEXT("Collected %d animal products"), Collected)
 			: TEXT("Animal pen: keep a tamed Pumicehog or Snowpuff inside and it produces over time");
 	}
@@ -736,6 +751,11 @@ AWRClaimTotem* AWRClaimTotem::FindAt(const UWorld* World, const FVector& Locatio
 
 bool AWRClaimTotem::CanBuild(const UWorld* World, const FVector& Location, const FString& PlayerName, FString& OutWhy)
 {
+	if (FWRSocialRules::IsInSafeZone(World, Location))
+	{
+		OutWhy = TEXT("no building in the safe zone");
+		return false;
+	}
 	const AWRClaimTotem* Claim = FindAt(World, Location);
 	if (Claim && !CanPlayersShare(Claim->OwnerName, PlayerName))
 	{
@@ -758,7 +778,16 @@ TMap<FName, float> AWRClaimTotem::CurrentUpkeepPerHour() const
 		}
 	}
 	TMap<FName, float> PerHour = FWRBuildRules::UpkeepPerHour(ByMaterial);
-	const float Mult = WRTune(TEXT("server.upkeepMultiplier"), 1.f);
+	float Mult = WRTune(TEXT("server.upkeepMultiplier"), 1.f);
+	// Upkeep saver perk (read from the owner while they're on).
+	for (TActorIterator<APawn> It(GetWorld()); It; ++It)
+	{
+		if (It->GetPlayerState() && It->GetPlayerState()->GetPlayerName() == OwnerName)
+		{
+			Mult *= FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(*It, TEXT("upkeepCost")));
+			break;
+		}
+	}
 	for (TPair<FName, float>& P : PerHour) P.Value *= Mult;
 	return PerHour;
 }

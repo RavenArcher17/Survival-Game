@@ -22,6 +22,7 @@ public:
 	UWRAttributeSet* GetAttributes() const { return Attributes; }
 	UWRPathComponent* GetPaths() const { return Paths; }
 	class UWRInventoryComponent* GetInventory() const { return Inventory; }
+	class UWRLifeSkillsComponent* GetLifeSkills() const { return LifeSkills; }
 
 	/** Basic weapon abilities are granted once per player, not per pawn. */
 	bool bDefaultAbilitiesGranted = false;
@@ -37,4 +38,5 @@ private:
 	UPROPERTY() TObjectPtr<UWRAttributeSet> Attributes;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UWRPathComponent> Paths;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRInventoryComponent> Inventory;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRLifeSkillsComponent> LifeSkills;
 };

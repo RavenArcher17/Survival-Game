@@ -9,6 +9,7 @@
 #include "WRCreature.h"
 #include "WRBoss.h"
 #include "WRCombatLibrary.h"
+#include "WRLifeSkills.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
@@ -39,6 +40,7 @@ void AWRPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AWRPlayerController::UseFood);
 	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &AWRPlayerController::UseDrink);
 	InputComponent->BindKey(EKeys::I, IE_Pressed, this, &AWRPlayerController::ToggleInventory);
+	InputComponent->BindKey(EKeys::K, IE_Pressed, this, &AWRPlayerController::ToggleSkills);
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);
 	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
@@ -218,7 +220,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
-		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take "), TEXT("tame "), TEXT("dismount") };
+		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take "), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk ") };
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{
@@ -345,6 +347,34 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 				Boss->Phase, Boss->ShellFraction * 100.f, Boss->bAirborne ? TEXT("airborne ") : TEXT(""), Boss->IsHidden() ? TEXT("hidden") : TEXT(""));
 		}
 		else Result = TEXT("no boss");
+		ClientNotify(Result);
+	}
+	else if ((Cmd == TEXT("skill") || Cmd == TEXT("skillxp")) && PS)
+	{
+		UWRLifeSkillsComponent* Skills = PS->GetLifeSkills();
+		if (Cmd == TEXT("skill")) Skills->DevSetLevel(FName(*Arg(1)), FCString::Atoi(*Arg(2)));
+		else Skills->AwardXP(FName(*Arg(1)), FCString::Atof(*Arg(2)));
+		const FWRSkillProgress* P = Skills->FindProgress(FName(*Arg(1)));
+		Result = P ? FString::Printf(TEXT("%s level %d (%d xp)"), *Arg(1), P->Level, P->XP) : TEXT("unknown skill");
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("hitplayer") && Survivor)
+	{
+		AWRCharacterBase* Victim = nullptr;
+		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+		{
+			if (It->GetPlayerState() && It->GetPlayerState()->GetPlayerName() == Arg(1)) Victim = *It;
+		}
+		FWRHit Hit;
+		Hit.Instigator = Survivor;
+		Hit.Damage = FCString::Atof(*Arg(2));
+		Hit.Origin = Survivor->GetActorLocation();
+		Result = Victim ? FString::Printf(TEXT("hit %s: %s"), *Arg(1), UWRCombatLibrary::ResultName(UWRCombatLibrary::ApplyHit(Victim, Hit))) : TEXT("no such player");
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("skillstat") && PS)
+	{
+		Result = FString::Printf(TEXT("stat %s = %.3f"), *Arg(1), PS->GetLifeSkills()->Stat(FName(*Arg(1))));
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("artifacts") && PS) { PS->bArtifactModifiers = Arg(1) == TEXT("1"); }

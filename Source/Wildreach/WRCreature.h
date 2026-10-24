@@ -110,6 +110,8 @@ public:
 	FString Order(AWRPlayerController* Player, const FString& Command);
 	/** Number of tames a player owns. */
 	static int32 CountTames(const UWorld* World, const FString& PlayerName);
+	/** Tames a player may keep (taming.tameLimit + Bonded / Beast lord perks). */
+	static int32 TameLimitFor(const APlayerState* PS);
 	/** Server: player mounts / dismounts. */
 	FString Ride(AWRCharacter* Rider);
 	void Dismount();
@@ -146,6 +148,8 @@ private:
 	float FedUntil = 0.f;
 	bool bCalm = false;
 	float UtilityClock = 0.f;
+	float ProduceClock = 0.f;
+	float TamerSpeed = 1.f;
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USpringArmComponent> RideBoom;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> RideCamera;

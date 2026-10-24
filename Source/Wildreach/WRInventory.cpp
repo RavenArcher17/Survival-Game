@@ -1,5 +1,6 @@
 #include "WRInventory.h"
 #include "WRCreature.h"
+#include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
@@ -434,7 +435,7 @@ FString UWRInventoryComponent::UseTamingItem(const FWRItemDef& Def)
 		// Hatch: the newborn imprints on you.
 		const APlayerState* PS = Cast<APlayerState>(GetOwner());
 		const FName Species(*Used.ToString().RightChop(4));
-		if (!PS || AWRCreature::CountTames(GetWorld(), PS->GetPlayerName()) >= FMath::RoundToInt(WRTune(TEXT("taming.tameLimit"), 2.f)))
+		if (!PS || AWRCreature::CountTames(GetWorld(), PS->GetPlayerName()) >= AWRCreature::TameLimitFor(PS))
 		{
 			return TEXT("You can't keep any more tames");
 		}
@@ -459,7 +460,7 @@ FString UWRInventoryComponent::UseTamingItem(const FWRItemDef& Def)
 	{
 		if (AWRCharacterBase* Target = Cast<AWRCharacterBase>(Hit.GetActor()))
 		{
-			Target->AddTorpor(WRTune(TEXT("taming.dartTorpor"), 40.f));
+			Target->AddTorpor(WRTune(TEXT("taming.dartTorpor"), 40.f) * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("torporDealt"))));
 			Target->NotifyAttackedBy(Character);
 			return FString::Printf(TEXT("Dart hit %s"), *Target->GetDisplayLabel());
 		}
@@ -497,9 +498,9 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	const UWRAttributeSet* A = Character->GetAttributes();
 	if (Def->Heal > 0.f)
 	{
-		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + Def->Heal);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + Def->Heal * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionPotency"))));
 	}
-	if (Def->bCleanse)
+	if (Def->bCleanse || (Def->Category == TEXT("potion") && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCleanse")) > 0.f))
 	{
 		Character->Status->ClearStatus(WRTags::Status_Burn);
 		Character->Status->ClearStatus(WRTags::Status_Frostbite);
@@ -507,10 +508,12 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	}
 	if (Def->Category == TEXT("potion"))
 	{
-		PotionReadyAt = Now + Def->UseCooldown;
+		PotionReadyAt = Now + Def->UseCooldown * FMath::Max(0.2f, 1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCooldown")));
 	}
-	if (Def->Hunger > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), A->GetHunger() + Def->Hunger);
-	if (Def->Thirst > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), A->GetThirst() + Def->Thirst);
+	const float Food = Def->Hunger * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("foodValue")));
+	const float Drink = Def->Thirst + (Def->Hunger > 0.f && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("mealsQuench")) > 0.f ? Def->Hunger * 0.5f : 0.f);
+	if (Food > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), A->GetHunger() + Food);
+	if (Drink > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), A->GetThirst() + Drink);
 
 	const FName Used = Def->Id;
 	RemoveItem(Used, 1);

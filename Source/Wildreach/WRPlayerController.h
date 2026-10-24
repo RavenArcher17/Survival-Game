@@ -18,6 +18,7 @@ enum class EWRMenu : uint8
 	Chest,
 	Claim,
 	Tame,
+	Skills,
 };
 
 class AWRBuildPiece;
@@ -76,6 +77,14 @@ public:
 	UFUNCTION(Exec) void WRBossDmg(float Amount, FName Element);
 	UFUNCTION(Exec) void WRArtifacts(int32 bOn);
 	UFUNCTION(Exec) void WRBossDmgPct(float Percent, FName Element);
+	/** Clans: WRClan create|invite|join|leave|kick|info [name]. */
+	UFUNCTION(Exec) void WRClan(const FString& Action, const FString& Name);
+	UFUNCTION(Exec) void WRPerk(FName Skill, int32 TierLevel, int32 Option);
+	/** Dev: set a life skill level / award XP. */
+	UFUNCTION(Exec) void WRSkill(FName Skill, int32 Level);
+	UFUNCTION(Exec) void WRSkillXP(FName Skill, int32 XP);
+	UFUNCTION(Exec) void WRSkillStat(FName Stat);
+	UFUNCTION(Exec) void WRHitPlayer(const FString& Name, float Damage);
 
 	// --- Building ---
 	bool IsPlacing() const { return !PlacingPiece.IsNone(); }
@@ -140,6 +149,7 @@ private:
 	bool RunGameplayCommand(const TArray<FString>& Args, FString& OutResult);
 
 	void ToggleInventory();
+	void ToggleSkills();
 	void MenuUp();
 	void MenuDown();
 	void MenuConfirm();

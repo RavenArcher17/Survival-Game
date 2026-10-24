@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
@@ -136,6 +137,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 
 	AWRCharacterBase* Attacker = Cast<AWRCharacterBase>(Hit.Instigator);
 	UAbilitySystemComponent* AttackerASC = Attacker ? Attacker->GetAbilitySystemComponent() : nullptr;
+	if (Attacker && Attacker != Target && Attacker->GetPlayerState() && !Attacker->IsHostileTo(Target))
+	{
+		return EWRHitResult::Ignored;  // PvP off, clanmate, safe zone, or your own tame
+	}
 	if (Attacker && !Hit.bDamageOverTime)
 	{
 		// Path magic: a same-element path hit calms a tamable creature instead of hurting it.
@@ -324,7 +329,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Torpor += Damage * WRTune(TEXT("taming.torporFromFrost"), 0.25f);
 		}
-		Target->AddTorpor(Torpor);
+		Target->AddTorpor(Torpor * (1.f + UWRLifeSkillsComponent::StatFor(Attacker, TEXT("torporDealt"))));
 	}
 
 	if (Result == EWRHitResult::Hit)

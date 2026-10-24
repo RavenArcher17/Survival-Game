@@ -1,5 +1,8 @@
 #include "WRCreature.h"
 #include "WRBoss.h"
+#include "WRLifeSkills.h"
+#include "WRSocial.h"
+#include "GameFramework/GameStateBase.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -146,6 +149,24 @@ void FWRCreatureRegistry::Reload()
 
 // ---------------------------------------------------------------- creature
 
+static APlayerState* FindPlayerByName(const UWorld* World, const FString& Name)
+{
+	const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
+	if (GS)
+	{
+		for (APlayerState* P : GS->PlayerArray)
+		{
+			if (P && P->GetPlayerName() == Name) return P;
+		}
+	}
+	return nullptr;
+}
+
+int32 AWRCreature::TameLimitFor(const APlayerState* PS)
+{
+	return FMath::RoundToInt(WRTune(TEXT("taming.tameLimit"), 2.f) + UWRLifeSkillsComponent::StatFor(PS, TEXT("extraTames")));
+}
+
 AWRCreature::AWRCreature(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -285,9 +306,9 @@ bool AWRCreature::IsHostileTo(const AWRCharacterBase* Other) const
 		// Wild: hostile to survivors and tames, never to other wild creatures.
 		return !Other->IsCreature() || !OtherOwner.IsEmpty();
 	}
-	// Tamed: fights for its owner.
-	if (OtherPS && OtherPS->GetPlayerName() == TamedBy) return false;
-	if (!OtherOwner.IsEmpty() && OtherOwner == TamedBy) return false;
+	// Tamed: fights for its owner (and never against the owner's clan or their tames).
+	if (OtherPS && FWRSocialRules::CanShare(TamedBy, OtherPS->GetPlayerName())) return false;
+	if (!OtherOwner.IsEmpty() && FWRSocialRules::CanShare(TamedBy, OtherOwner)) return false;
 	return true;
 }
 
@@ -377,7 +398,7 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 		if (Def->CanTameBy(TEXT("path_magic"))) return TEXT("Calm it with your path's element");
 		return TEXT("It won't take food from you right now");
 	}
-	if (CountTames(GetWorld(), PS->GetPlayerName()) >= FMath::RoundToInt(WRTune(TEXT("taming.tameLimit"), 2.f)))
+	if (CountTames(GetWorld(), PS->GetPlayerName()) >= TameLimitFor(PS))
 	{
 		return TEXT("You can't keep any more tames");
 	}
@@ -392,6 +413,8 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	}
 	PS->GetInventory()->RemoveItem(FoodUsed, 1);
 	TamerName = PS->GetPlayerName();
+	TamerSpeed = 1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("tamingSpeed"));
+	UWRLifeSkillsComponent::Award(PS, TEXT("taming"), TEXT("feed"), 5.f);
 	bCalm = bOffer || bCalm;
 	FedUntil = GetWorld()->GetTimeSeconds() + WRTune(TEXT("taming.secondsPerFood"), 30.f);
 	return FString::Printf(TEXT("Fed %s: taming %.0f%% (needs %.0f s fed)"), *FoodUsed.ToString(), TameProgress * 100.f, Def->TameSeconds());
@@ -416,6 +439,7 @@ void AWRCreature::CompleteTame(const FString& PlayerName)
 	AggroTarget = nullptr;
 	Status->ClearStatus(WRTags::Status_Unconscious);
 	OnRep_Tamed();
+	UWRLifeSkillsComponent::Award(FindPlayerByName(GetWorld(), PlayerName), TEXT("taming"), TEXT("tame"), 100.f);
 	if (Spawner.IsValid())
 	{
 		// No longer part of the wild pack; the spawner will replace it.
@@ -470,7 +494,7 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 	}
 	PC->UnPossess();
 	PC->Possess(this);
-	GetCharacterMovement()->MaxWalkSpeed = Def->RideSpeed;
+	GetCharacterMovement()->MaxWalkSpeed = Def->RideSpeed * (1.f + UWRLifeSkillsComponent::StatFor(NewRider, TEXT("rideSpeed")));
 	UE_LOG(LogWildreach, Log, TEXT("TAME %s ridden by %s"), *GetName(), *NewRider->GetName());
 	return TEXT("Riding (E to dismount)");
 }
@@ -588,7 +612,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	// Taming progresses while the creature is fed and either knocked out or calm.
 	if (!IsTamed() && Def && !TamerName.IsEmpty() && Now < FedUntil && (IsUnconscious() || bCalm))
 	{
-		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds / FMath::Max(1.f, Def->TameSeconds()));
+		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds * TamerSpeed / FMath::Max(1.f, Def->TameSeconds()));
 		if (TameProgress >= 1.f)
 		{
 			CompleteTame(TamerName);
@@ -614,8 +638,16 @@ void AWRCreature::Tick(float DeltaSeconds)
 				}
 			}
 		}
-		if (Def->Products.Num() > 0)
+	}
+	ProduceClock += DeltaSeconds;
+	if (IsTamed() && Def && Def->Products.Num() > 0)
+	{
+		const APlayerState* OwnerPS = FindPlayerByName(GetWorld(), TamedBy);
+		const float Interval = WRTune(TEXT("husbandry.produceSeconds"), 600.f) / (1.f + UWRLifeSkillsComponent::StatFor(OwnerPS, TEXT("produceRate")));
+		if (ProduceClock >= Interval)
 		{
+			ProduceClock = 0.f;
+			const int32 Extra = FMath::RoundToInt(UWRLifeSkillsComponent::StatFor(OwnerPS, TEXT("produceExtra")));
 			// Farm animals produce into an owned pen they stand in.
 			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
 			{
@@ -623,7 +655,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 				if (Piece && Piece->Kind == TEXT("pen") && It->OwnerName == TamedBy && FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < 450.f)
 				{
 					if (It->Storage.Num() == 0) It->Storage.SetNum(10);
-					for (const TPair<FName, int32>& P : Def->Products) FWRInventoryRules::Add(It->Storage, P.Key, P.Value);
+					for (const TPair<FName, int32>& P : Def->Products) FWRInventoryRules::Add(It->Storage, P.Key, P.Value + Extra);
 					break;
 				}
 			}
@@ -642,10 +674,16 @@ void AWRCreature::OnDeath(AActor* Killer)
 	{
 		if (const FWRCreatureDef* Def = GetDef())
 		{
+			// Gathering multiplier and Field dressing (more meat and hide).
+			const float Mult = WRTune(TEXT("server.gatherMultiplier"), 1.f);
+			const float Dressing = 1.f + UWRLifeSkillsComponent::StatFor(Killer, TEXT("creatureLoot"));
 			for (const TPair<FName, int32>& L : Def->Loot)
 			{
-				Inv->AddItem(L.Key, L.Value);
+				const bool bCarcass = L.Key == TEXT("raw_meat") || L.Key == TEXT("hide");
+				Inv->AddItem(L.Key, FMath::Max(1, FMath::RoundToInt(L.Value * Mult * (bCarcass ? Dressing : 1.f))));
 			}
+			const float TierXP = Def->Tier == TEXT("highland") ? 3.f : Def->Tier == TEXT("midland") ? 2.f : 1.f;
+			UWRLifeSkillsComponent::Award(Killer, TEXT("tracking"), TEXT("kill"), 10.f, TierXP);
 		}
 	}
 	if (IsTamed())
@@ -717,10 +755,21 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 		{
 			continue;
 		}
+		if (FWRSocialRules::IsInSafeZone(GetWorld(), It->GetActorLocation()))
+		{
+			continue;
+		}
 		float Aggro = Def->AggroRadius;
 		// Gloomhowls hunt by sound: sprinting survivors are heard from much further.
 		if (Def->bHearing && It->GetVelocity().Size2D() > 600.f) Aggro *= 1.6f;
+		// Sneaking / Calm presence: you're noticed later.
+		Aggro *= FMath::Max(0.3f, 1.f + UWRLifeSkillsComponent::StatFor(*It, TEXT("aggroRadius")));
 		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
+		if (Dist >= Aggro && Dist < Aggro * 1.5f && It->GetPlayerState() && It->GetVelocity().Size2D() > 50.f && It->GetVelocity().Size2D() < 600.f)
+		{
+			// Sneaking XP: moving close to a predator that hasn't noticed you (checked 4x a second).
+			UWRLifeSkillsComponent::Award(*It, TEXT("sneaking"), TEXT("sneak"), 0.25f);
+		}
 		if (Dist < Aggro && Dist < BestDist)
 		{
 			BestDist = Dist;
@@ -908,11 +957,15 @@ void AWRCreatureSpawner::BeginPlay()
 	{
 		return;
 	}
+	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
+	if (Def && Def->Archetype == TEXT("boss"))
+	{
+		RespawnSeconds = WRTune(TEXT("server.bossRespawnHours"), 4.f) * 3600.f;
+	}
 	for (int32 i = 0; i < Count; ++i)
 	{
 		SpawnOne();
 	}
-	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
 	if (Def && Def->bNest)
 	{
 		FActorSpawnParameters Params;

@@ -135,6 +135,8 @@ public:
 	FWRItemStack* GetEquippedMutable(EWREquipSlot Slot);
 
 	// --- Queries ---
+	/** Server: direct access (death penalty, loot bags). Call ApplyEquipment after changing equipped gear. */
+	TArray<FWRItemStack>& GetSlotsMutable() { return Slots; }
 	const TArray<FWRItemStack>& GetSlots() const { return Slots; }
 	const FWRItemStack& GetEquipped(EWREquipSlot Slot) const { return Slot == EWREquipSlot::Armor ? EquippedArmor : EquippedWeapon; }
 	int32 CountOf(FName ItemId) const { return FWRInventoryRules::CountOf(Slots, ItemId); }

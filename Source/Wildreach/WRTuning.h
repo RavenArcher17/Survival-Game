@@ -22,6 +22,8 @@ public:
 	void Reload();
 	/** Override a number at runtime (server settings presets, tests). */
 	void Set(const FString& Path, float Value) { Overrides.Add(Path, Value); }
+	/** Active server preset (Data/server_presets.json): pvp_standard, pve, casual_coop, playtest or custom. */
+	const FString& GetPreset() const { return Preset; }
 
 	/** Loads any JSON file under the project's Data/ folder. Null on failure. */
 	static TSharedPtr<FJsonObject> LoadDataFile(const FString& RelativePath);
@@ -33,6 +35,9 @@ private:
 	TSharedPtr<FJsonObject> Root;
 	mutable TSet<FString> WarnedKeys;
 	TMap<FString, float> Overrides;
+	TMap<FString, FString> StrOverrides;
+	FString Preset;
+	void ApplyServerPreset();
 };
 
 inline float WRTune(const TCHAR* Path, float Fallback) { return FWRTuning::Get().Num(Path, Fallback); }

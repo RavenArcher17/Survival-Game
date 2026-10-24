@@ -5,6 +5,8 @@
 #include "WRHUD.h"
 #include "WRBuilding.h"
 #include "WRInventory.h"
+#include "WRLifeSkills.h"
+#include "WRSocial.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
@@ -190,6 +192,7 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	Root->SetStringField(TEXT("name"), PS->GetPlayerName());
 	Root->SetObjectField(TEXT("paths"), PS->GetPaths()->ToJson());
 	Root->SetObjectField(TEXT("inventory"), PS->GetInventory()->ToJson());
+	Root->SetObjectField(TEXT("lifeSkills"), PS->GetLifeSkills()->ToJson());
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -224,6 +227,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetObjectField(TEXT("inventory"), Inventory))
 	{
 		PS->GetInventory()->FromJson(*Inventory);
+	}
+	const TSharedPtr<FJsonObject>* Skills = nullptr;
+	if (Root->TryGetObjectField(TEXT("lifeSkills"), Skills))
+	{
+		PS->GetLifeSkills()->FromJson(*Skills);
 	}
 	const TSharedPtr<FJsonObject>* Paths = nullptr;
 	if (Root->TryGetObjectField(TEXT("paths"), Paths))

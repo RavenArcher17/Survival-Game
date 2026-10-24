@@ -176,6 +176,12 @@ else:
         ps = spawn(unreal.PlayerStart, world(s["x"], s["y"], 200), (0, 0, yaw), f"Spawn_{s['biome']}_{i}")
         ps.set_editor_property("player_start_tag", s["biome"])
 
+    # Safe zones around the spawns: no PvP, no building, wild creatures don't follow you in.
+    safe_class = unreal.load_class(None, "/Script/Wildreach.WRSafeZone")
+    for i, s in enumerate(layout["spawns"]):
+        z = spawn(safe_class, world(s["x"], s["y"], 100), label=f"SafeZone_{s['biome']}_{i}")
+        z.set_editor_property("radius", 4000.0)
+
     # Starter camps: the four stations at each biome's middle spawn (tier 1 until a player Hearth covers them).
     station_class = unreal.load_class(None, "/Script/Wildreach.WRStation")
     for s in [sp for sp in layout["spawns"] if 1000 < sp["y"] < 3000]:
@@ -192,15 +198,13 @@ else:
         a.set_editor_property("path_id", path_id)
 
     # Bosses: one spawner each at its arena (the boss builds its own anvils / ice pillars around it).
-    tuning = json.load(open(os.path.join(PROJECT, "Data", "tuning.json")))["bosses"]
     boss_sites = list(zip(layout["bosses"], ["vulkarn", "skaldrith"])) +         list(zip(layout["miniBosses"], ["obsidian_warden", "ignessa", "grimjaw", "pale_hunter"]))
     for site, boss_id in boss_sites:
-        major = boss_id in ("vulkarn", "skaldrith")
         sp = spawn(spawner_class_boss, world(site["x"], site["y"], 150), label=f"Boss_{boss_id}")
         sp.set_editor_property("creature_id", boss_id)
         sp.set_editor_property("count", 1)
         sp.set_editor_property("radius", 0.0)
-        sp.set_editor_property("respawn_seconds", 60.0 * tuning["majorRespawnMinutes" if major else "miniRespawnMinutes"])
+        sp.set_editor_property("respawn_seconds", 3600.0)  # replaced at runtime by server.bossRespawnHours
 
     # Creature packs by zone: lowland packs near the spawns, midland predators toward the ridge.
     spawner_class = unreal.load_class(None, "/Script/Wildreach.WRCreatureSpawner")

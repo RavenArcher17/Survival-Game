@@ -1,4 +1,5 @@
 #include "WRCrafting.h"
+#include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRPlayerController.h"
@@ -302,9 +303,19 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 		{
 			Inv->RemoveItem(Essence, 1);
 		}
-		const EWRQuality Quality = R->bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), GetTier(), 0) : EWRQuality::Common;
+		// Smithing (weapons) / Armorcraft (armor) improve the odds; the Master perks floor it at Fine.
+		const bool bArmor = OutDef->Slot == EWREquipSlot::Armor;
+		const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(Player);
+		const int32 SkillLevel = Skills ? Skills->GetLevel(bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"))) : 0;
+		EWRQuality Quality = R->bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), GetTier(), SkillLevel) : EWRQuality::Common;
+		if (UWRLifeSkillsComponent::StatFor(Player, bArmor ? TEXT("armorMinFine") : TEXT("weaponMinFine")) > 0.f && Quality < EWRQuality::Fine)
+		{
+			Quality = EWRQuality::Fine;
+		}
 		const float Spread = FWRRecipeRegistry::Get().RollSpread;
-		FWRItemStack Item = FWRInventoryRules::MakeInstance(R->Output, Quality, 1.f + FMath::FRandRange(-Spread, Spread));
+		const float RollBonus = bArmor ? 0.f : UWRLifeSkillsComponent::StatFor(Player, TEXT("weaponRoll"));
+		FWRItemStack Item = FWRInventoryRules::MakeInstance(R->Output, Quality, 1.f + FMath::FRandRange(-Spread + RollBonus, Spread));
+		UWRLifeSkillsComponent::Award(Player, bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing")), TEXT("craftGear"), 25.f);
 		Item.Element = Element;
 		if (!Inv->AddInstance(Item))
 		{
@@ -315,8 +326,18 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	}
 	else
 	{
-		const int32 Left = Inv->AddItem(R->Output, R->Count);
-		Result = FString::Printf(TEXT("Crafted %d %s%s"), R->Count - Left, OutDef ? *OutDef->Name : *R->Output.ToString(), Left > 0 ? TEXT(" (inventory full)") : TEXT(""));
+		// Alchemy: double batch. Skill XP by what was made.
+		int32 Count = R->Count;
+		if (StationType == TEXT("alchemy_table") && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Player, TEXT("doubleBrew")))
+		{
+			Count *= 2;
+		}
+		const bool bFood = OutDef && OutDef->Hunger > 0.f;
+		const FName Skill = StationType == TEXT("alchemy_table") ? FName(TEXT("alchemy")) : bFood ? FName(TEXT("cooking"))
+			: StationType == TEXT("armorer") ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
+		UWRLifeSkillsComponent::Award(Player, Skill, bFood ? TEXT("cook") : TEXT("craft"), bFood ? 15.f : 10.f);
+		const int32 Left = Inv->AddItem(R->Output, Count);
+		Result = FString::Printf(TEXT("Crafted %d %s%s"), Count - Left, OutDef ? *OutDef->Name : *R->Output.ToString(), Left > 0 ? TEXT(" (inventory full)") : TEXT(""));
 	}
 	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s at %s: %s"), *GetNameSafe(Player), *StationType.ToString(), *Result);
 	return Result;
@@ -396,5 +417,6 @@ FString AWRStation::Upgrade(AWRPlayerController* Player, EWREquipSlot Slot)
 	Inv->RemoveItem(TEXT("upgrade_shard"), Cost);
 	++Item->Upgrade;
 	Inv->ApplyEquipment();
+	UWRLifeSkillsComponent::Award(Player, Slot == EWREquipSlot::Armor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing")), TEXT("upgrade"), 15.f);
 	return FString::Printf(TEXT("Upgraded to +%d"), Item->Upgrade);
 }

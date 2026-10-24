@@ -1,4 +1,5 @@
 #include "WRPlayerState.h"
+#include "WRLifeSkills.h"
 #include "WRAttributeSet.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
@@ -16,4 +17,5 @@ AWRPlayerState::AWRPlayerState()
 	Attributes = CreateDefaultSubobject<UWRAttributeSet>(TEXT("Attributes"));
 	Paths = CreateDefaultSubobject<UWRPathComponent>(TEXT("Paths"));
 	Inventory = CreateDefaultSubobject<UWRInventoryComponent>(TEXT("Inventory"));
+	LifeSkills = CreateDefaultSubobject<UWRLifeSkillsComponent>(TEXT("LifeSkills"));
 }

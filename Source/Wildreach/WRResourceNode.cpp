@@ -1,4 +1,6 @@
 #include "WRResourceNode.h"
+#include "WRLifeSkills.h"
+#include "WRTuning.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
@@ -73,14 +75,30 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	{
 		return;
 	}
-	const int32 Amount = PerHit * (bHeavy ? 2 : 1);
+	// Gathering multiplier (server) and the gathering life skills.
+	const bool bOre = ItemId.ToString().EndsWith(TEXT("_ore")) || ItemId == TEXT("stone") || ItemId == TEXT("sulfur");
+	const bool bWood = ItemId == TEXT("wood");
+	const FName Skill = bOre ? FName(TEXT("mining")) : bWood ? FName(TEXT("woodcutting")) : NAME_None;
+	float Raw = PerHit * (bHeavy ? 2 : 1) * WRTune(TEXT("server.gatherMultiplier"), 1.f);
+	if (bOre) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("miningYield"));
+	if (bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodYield")) + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodExtra"));
+	if (!bOre && !bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("herbExtra"));
+	int32 Amount = FMath::FloorToInt(Raw) + (FMath::FRand() < FMath::Frac(Raw) ? 1 : 0);
+	if (bOre && ItemId != TEXT("stone") && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("doubleOre")))
+	{
+		Amount *= 2;
+	}
+	if (!Skill.IsNone())
+	{
+		UWRLifeSkillsComponent::Award(Gatherer, Skill, bOre ? TEXT("mine") : TEXT("chop"), 4.f);
+	}
 	const int32 Left = Inventory->AddItem(ItemId, Amount);
 	if (ItemId == TEXT("berries") && FMath::FRand() < 0.35f)
 	{
 		Inventory->AddItem(TEXT("seeds"), 1);
 	}
 	// Ore veins sometimes give up a gem (Crafting tab: gems come from mines and caves).
-	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < 0.04f)
+	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < 0.04f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("gemChance")))
 	{
 		static const FName Gems[] = { TEXT("gem_ruby"), TEXT("gem_topaz"), TEXT("gem_onyx") };
 		Inventory->AddItem(Gems[FMath::RandRange(0, 2)], 1);

@@ -55,6 +55,8 @@ void FWRTuning::Reload()
 	Root = LoadDataFile(TEXT("tuning.json"));
 	WarnedKeys.Reset();
 	Overrides.Reset();
+	StrOverrides.Reset();
+	ApplyServerPreset();
 	FString Cli;
 	if (FParse::Value(FCommandLine::Get(), TEXT("wrtune="), Cli, false))
 	{
@@ -115,8 +117,59 @@ float FWRTuning::Num(const FString& Path, float Fallback) const
 	return Fallback;
 }
 
+void FWRTuning::ApplyServerPreset()
+{
+	// Preset: -wrpreset=<name>, else Saved/ServerDB/server.json {"preset": ..., "settings": {...}}, else the file's default.
+	const TSharedPtr<FJsonObject> Presets = LoadDataFile(TEXT("server_presets.json"));
+	const TSharedPtr<FJsonObject>* List = nullptr;
+	if (!Presets.IsValid() || !Presets->TryGetObjectField(TEXT("presets"), List))
+	{
+		return;
+	}
+	TSharedPtr<FJsonObject> ServerFile;
+	FString Text;
+	if (FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), TEXT("server.json"))))
+	{
+		FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), ServerFile);
+	}
+	Preset = Presets->GetStringField(TEXT("default"));
+	if (ServerFile.IsValid()) ServerFile->TryGetStringField(TEXT("preset"), Preset);
+	FParse::Value(FCommandLine::Get(), TEXT("wrpreset="), Preset);
+
+	const auto ApplyObject = [this](const TSharedPtr<FJsonObject>& Settings)
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : Settings->Values)
+		{
+			const FString Key = TEXT("server.") + KV.Key;
+			if (KV.Value->Type == EJson::String) StrOverrides.Add(Key, KV.Value->AsString());
+			else if (KV.Value->Type == EJson::Boolean) Overrides.Add(Key, KV.Value->AsBool() ? 1.f : 0.f);
+			else if (KV.Value->Type == EJson::Number) Overrides.Add(Key, KV.Value->AsNumber());
+		}
+	};
+	// Custom starts from a base preset and takes the server file's settings; official presets are locked.
+	FString Base = Preset;
+	if (Preset == TEXT("custom") && ServerFile.IsValid()) ServerFile->TryGetStringField(TEXT("base"), Base);
+	const TSharedPtr<FJsonObject>* Values = nullptr;
+	if (!(*List)->TryGetObjectField(Base == TEXT("custom") ? TEXT("pve") : Base, Values))
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("Unknown server preset %s, using defaults"), *Base);
+		return;
+	}
+	ApplyObject(*Values);
+	const TSharedPtr<FJsonObject>* Custom = nullptr;
+	if (Preset == TEXT("custom") && ServerFile.IsValid() && ServerFile->TryGetObjectField(TEXT("settings"), Custom))
+	{
+		ApplyObject(*Custom);
+	}
+	UE_LOG(LogWildreach, Log, TEXT("Server preset: %s"), *Preset);
+}
+
 FString FWRTuning::Str(const FString& Path, const FString& Fallback) const
 {
+	if (const FString* Override = StrOverrides.Find(Path))
+	{
+		return *Override;
+	}
 	if (const TSharedPtr<FJsonObject> Holder = Find(Path))
 	{
 		FString Leaf;

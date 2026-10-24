@@ -4,6 +4,7 @@
 #include "WRPlayerController.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
+#include "WRLifeSkills.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
@@ -259,16 +260,21 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 				if (!It->bGhost && O && O->Shape == Def->Shape && FVector::Dist(It->GetActorLocation(), Loc) < 30.f) OutResult = TEXT("something is already there");
 			}
 		}
+		// Thrifty perk: cheaper building.
+		TMap<FName, int32> Cost;
+		const float CostMult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(this, TEXT("buildCost")));
+		if (Def) for (const TPair<FName, int32>& C : Def->Cost) Cost.Add(C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * CostMult)));
 		if (OutResult.IsEmpty())
 		{
-			for (const TPair<FName, int32>& C : Def->Cost)
+			for (const TPair<FName, int32>& C : Cost)
 			{
 				if (Inv->CountOf(C.Key) < C.Value) { OutResult = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString()); break; }
 			}
 		}
 		if (OutResult.IsEmpty())
 		{
-			for (const TPair<FName, int32>& C : Def->Cost) Inv->RemoveItem(C.Key, C.Value);
+			for (const TPair<FName, int32>& C : Cost) Inv->RemoveItem(C.Key, C.Value);
+			UWRLifeSkillsComponent::Award(this, TEXT("building"), TEXT("place"), 8.f);
 			const FTransform T(FRotator(0.f, Yaw, 0.f), Loc);
 			AWRBuildPiece* Piece = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 			Piece->InitPiece(PieceId, Who);

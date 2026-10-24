@@ -1,0 +1,114 @@
+{
+  "_comment": "Life skills tab. 15 skills, levels 1-100 by doing them; XP to go from level n to n+1 = lifeSkills.levelXpBase + n x levelXpPerLevel (tuning.json). Every level adds everyLevel.perLevel to its stat; at 25/50/75/100 you pick one of two perks. A perk or every-level bonus with no stat isn't wired to a system yet (fishing, engineering and a few others wait for their systems). All first drafts.",
+  "skills": [
+    { "id": "mining", "name": "Mining", "group": "Gathering", "levelsBy": "Mining ore and stone",
+      "everyLevel": { "text": "Faster mining", "stat": "miningYield", "perLevel": 0.006 },
+      "perks": {
+        "25": [ { "id": "prospector", "name": "Prospector", "text": "See nearby ore veins through rock" }, { "id": "strong_back", "name": "Strong back", "text": "Ore weighs less" } ],
+        "50": [ { "id": "gem_eye", "name": "Gem eye", "text": "More gems", "stat": "gemChance", "value": 0.06 }, { "id": "double_strike", "name": "Double strike", "text": "Chance of double ore", "stat": "doubleOre", "value": 0.15 } ],
+        "75": [ { "id": "deep_delver", "name": "Deep delver", "text": "Less damage from cave hazards" }, { "id": "vein_breaker", "name": "Vein breaker", "text": "Small veins break all at once" } ],
+        "100": [ { "id": "rich_veins", "name": "Rich veins", "text": "Rare ore respawns faster for you" }, { "id": "unbreaking", "name": "Unbreaking", "text": "Pickaxes never lose durability" } ] } },
+    { "id": "woodcutting", "name": "Woodcutting", "group": "Gathering", "levelsBy": "Chopping trees",
+      "everyLevel": { "text": "Faster chopping", "stat": "woodYield", "perLevel": 0.006 },
+      "perks": {
+        "25": [ { "id": "lumberjack", "name": "Lumberjack", "text": "More wood", "stat": "woodExtra", "value": 0.25 }, { "id": "light_load", "name": "Light load", "text": "Wood weighs less" } ],
+        "50": [ { "id": "clean_cut", "name": "Clean cut", "text": "A felled tree drops all its wood at once" }, { "id": "bark_harvest", "name": "Bark harvest", "text": "Trees drop resin and bark for alchemy" } ],
+        "75": [ { "id": "timber", "name": "Timber", "text": "Falling trees damage enemies" }, { "id": "seedsaver", "name": "Seedsaver", "text": "Trees drop saplings" } ],
+        "100": [ { "id": "ancient_wood", "name": "Ancient wood", "text": "Harvest biome trees for building sets" }, { "id": "endless_edge", "name": "Endless edge", "text": "Axes never lose durability" } ] } },
+    { "id": "fishing", "name": "Fishing", "group": "Gathering", "levelsBy": "Catching fish (fishing isn't in the first playable yet)",
+      "everyLevel": { "text": "Fish bite sooner" },
+      "perks": {
+        "25": [ { "id": "patient_angler", "name": "Patient angler", "text": "Rarer fish" }, { "id": "net_caster", "name": "Net caster", "text": "Chance to catch two" } ],
+        "50": [ { "id": "deep_line", "name": "Deep line", "text": "Fish deeper waters" }, { "id": "bait_maker", "name": "Bait maker", "text": "Craft bait for specific fish" } ],
+        "75": [ { "id": "treasure_hook", "name": "Treasure hook", "text": "Chance to catch items and treasure" }, { "id": "spear_fisher", "name": "Spear fisher", "text": "Spearfish underwater" } ],
+        "100": [ { "id": "legend_catch", "name": "Legend catch", "text": "Each biome's legendary fish can bite" }, { "id": "monster_line", "name": "Monster line", "text": "Hook sea creatures to tame" } ] } },
+    { "id": "tracking", "name": "Tracking", "group": "Gathering", "levelsBy": "Following and hunting creatures",
+      "everyLevel": { "text": "Tracks stay visible longer" },
+      "perks": {
+        "25": [ { "id": "scent", "name": "Scent", "text": "Search for one kind of creature" }, { "id": "spoor_reader", "name": "Spoor reader", "text": "See a creature's level from its tracks" } ],
+        "50": [ { "id": "hunters_mark", "name": "Hunter's mark", "text": "A marked creature shows on your map" }, { "id": "field_dressing", "name": "Field dressing", "text": "More meat and hide", "stat": "creatureLoot", "value": 0.5 } ],
+        "75": [ { "id": "predator_sense", "name": "Predator sense", "text": "Warning when aggressive creatures are near" }, { "id": "beast_lore", "name": "Beast lore", "text": "See creature weaknesses" } ],
+        "100": [ { "id": "apex_hunter", "name": "Apex hunter", "text": "Track roaming mini-bosses" }, { "id": "rare_finder", "name": "Rare finder", "text": "Creatures with mutations show up more often" } ] } },
+
+    { "id": "smithing", "name": "Smithing", "group": "Making", "levelsBy": "Crafting and upgrading weapons",
+      "everyLevel": { "text": "Better quality odds on weapons", "stat": "weaponQuality", "perLevel": 1 },
+      "perks": {
+        "25": [ { "id": "efficient_smith", "name": "Efficient smith", "text": "Fewer materials" }, { "id": "quick_hands", "name": "Quick hands", "text": "Faster crafting" } ],
+        "50": [ { "id": "fine_edge", "name": "Fine edge", "text": "Better stat rolls", "stat": "weaponRoll", "value": 0.05 }, { "id": "infuser", "name": "Infuser", "text": "Stronger elements from path materials" } ],
+        "75": [ { "id": "reforger", "name": "Reforger", "text": "Reroll one stat on a weapon" }, { "id": "careful_hands", "name": "Careful hands", "text": "50% chance to save an extra when removing it" } ],
+        "100": [ { "id": "master_smith", "name": "Master smith", "text": "Weapons are always fine or better", "stat": "weaponMinFine", "value": 1 }, { "id": "signature", "name": "Signature", "text": "Your weapons carry your name and a small bonus" } ] } },
+    { "id": "armorcraft", "name": "Armorcraft", "group": "Making", "levelsBy": "Crafting armor, shields and creature armor",
+      "everyLevel": { "text": "Better quality odds on armor", "stat": "armorQuality", "perLevel": 1 },
+      "perks": {
+        "25": [ { "id": "efficient_armorer", "name": "Efficient armorer", "text": "Fewer materials" }, { "id": "quick_fit", "name": "Quick fit", "text": "Faster crafting" } ],
+        "50": [ { "id": "reinforced", "name": "Reinforced", "text": "More poise" }, { "id": "light_weave", "name": "Light weave", "text": "Lighter armor" } ],
+        "75": [ { "id": "set_crafter", "name": "Set crafter", "text": "Set bonuses need one fewer piece" }, { "id": "creature_armorer", "name": "Creature armorer", "text": "Stronger tame armor" } ],
+        "100": [ { "id": "master_armorer", "name": "Master armorer", "text": "Armor is always fine or better", "stat": "armorMinFine", "value": 1 }, { "id": "bastion", "name": "Bastion", "text": "Stronger shields" } ] } },
+    { "id": "alchemy", "name": "Alchemy", "group": "Making", "levelsBy": "Brewing potions and brews",
+      "everyLevel": { "text": "Stronger potions", "stat": "potionPotency", "perLevel": 0.005 },
+      "perks": {
+        "25": [ { "id": "double_batch", "name": "Double batch", "text": "Chance to brew two", "stat": "doubleBrew", "value": 0.25 }, { "id": "herbalist", "name": "Herbalist", "text": "More herbs when gathering", "stat": "herbExtra", "value": 0.5 } ],
+        "50": [ { "id": "long_brew", "name": "Long brew", "text": "Longer effects" }, { "id": "quick_drink", "name": "Quick drink", "text": "Shorter potion cooldown", "stat": "potionCooldown", "value": -0.3 } ],
+        "75": [ { "id": "potent", "name": "Potent", "text": "Healing potions also cleanse status effects", "stat": "potionCleanse", "value": 1 }, { "id": "mixologist", "name": "Mixologist", "text": "Combine two brews into one" } ],
+        "100": [ { "id": "philosopher", "name": "Philosopher", "text": "Brew rare elixirs" }, { "id": "deep_belt", "name": "Deep belt", "text": "One extra potion slot" } ] } },
+    { "id": "cooking", "name": "Cooking", "group": "Making", "levelsBy": "Cooking meals",
+      "everyLevel": { "text": "Food keeps hunger away longer", "stat": "foodValue", "perLevel": 0.005 },
+      "perks": {
+        "25": [ { "id": "recipe_sense", "name": "Recipe sense", "text": "Hints for undiscovered recipes" }, { "id": "bulk_cook", "name": "Bulk cook", "text": "Cook several meals at once" } ],
+        "50": [ { "id": "preserver", "name": "Preserver", "text": "Food spoils slower" }, { "id": "shared_meal", "name": "Shared meal", "text": "One meal feeds nearby party members" } ],
+        "75": [ { "id": "camp_chef", "name": "Camp chef", "text": "Cook any recipe at a campfire" }, { "id": "hearty", "name": "Hearty", "text": "Hunger drains slower" } ],
+        "100": [ { "id": "master_chef", "name": "Master chef", "text": "Meals fill hunger and thirst", "stat": "mealsQuench", "value": 1 }, { "id": "banquet", "name": "Banquet", "text": "A big meal holds off hunger for your whole clan" } ] } },
+
+    { "id": "farming", "name": "Farming", "group": "Base and farm", "levelsBy": "Planting and harvesting",
+      "everyLevel": { "text": "Crops grow faster", "stat": "cropSpeed", "perLevel": 0.006 },
+      "perks": {
+        "25": [ { "id": "green_fingers", "name": "Green fingers", "text": "Bigger harvests", "stat": "harvestExtra", "value": 0.5 }, { "id": "seed_keeper", "name": "Seed keeper", "text": "Crops return more seeds", "stat": "seedExtra", "value": 1 } ],
+        "50": [ { "id": "grafting", "name": "Grafting", "text": "Grow off-biome crops without a greenhouse at lower yield" }, { "id": "rare_seeds", "name": "Rare seeds", "text": "Chance of rare seeds" } ],
+        "75": [ { "id": "water_wise", "name": "Water wise", "text": "Irrigated crops grow much faster" }, { "id": "companion_planting", "name": "Companion planting", "text": "Crops planted together boost each other" } ],
+        "100": [ { "id": "golden_crop", "name": "Golden crop", "text": "Chance of rare high-value crops" }, { "id": "endless_field", "name": "Endless field", "text": "Harvested crops replant themselves", "stat": "autoReplant", "value": 1 } ] } },
+    { "id": "husbandry", "name": "Husbandry", "group": "Base and farm", "levelsBy": "Caring for farm animals and bees",
+      "everyLevel": { "text": "Animals produce more often", "stat": "produceRate", "perLevel": 0.006 },
+      "perks": {
+        "25": [ { "id": "gentle_hand", "name": "Gentle hand", "text": "More milk, eggs and wool", "stat": "produceExtra", "value": 1 }, { "id": "large_pens", "name": "Large pens", "text": "More animals per pen" } ],
+        "50": [ { "id": "bee_whisperer", "name": "Bee whisperer", "text": "More honey and wax" }, { "id": "shearer", "name": "Shearer", "text": "More hide and wool" } ],
+        "75": [ { "id": "selective_breeding", "name": "Selective breeding", "text": "Better farm animal stats" }, { "id": "content_herd", "name": "Content herd", "text": "Animals need feeding less often" } ],
+        "100": [ { "id": "prize_stock", "name": "Prize stock", "text": "Rare animal products" }, { "id": "royal_jelly", "name": "Royal jelly", "text": "Rare bee products for alchemy" } ] } },
+    { "id": "building", "name": "Building", "group": "Base and farm", "levelsBy": "Building and repairing",
+      "everyLevel": { "text": "Faster building" },
+      "perks": {
+        "25": [ { "id": "thrifty", "name": "Thrifty", "text": "Cheaper building", "stat": "buildCost", "value": -0.25 }, { "id": "quick_repair", "name": "Quick repair", "text": "Faster repairs" } ],
+        "50": [ { "id": "load_bearing", "name": "Load bearing", "text": "Longer spans before support is needed" }, { "id": "fortifier", "name": "Fortifier", "text": "Stronger walls" } ],
+        "75": [ { "id": "upkeep_saver", "name": "Upkeep saver", "text": "Lower upkeep", "stat": "upkeepCost", "value": -0.3 }, { "id": "decorator", "name": "Decorator", "text": "Bigger comfort buff" } ],
+        "100": [ { "id": "master_builder", "name": "Master builder", "text": "Cheaper biome building sets" }, { "id": "siege_proof", "name": "Siege-proof", "text": "Walls take less explosive damage" } ] } },
+    { "id": "engineering", "name": "Engineering", "group": "Base and farm", "levelsBy": "Building and running machines (machines aren't in the first playable yet)",
+      "everyLevel": { "text": "Machines run faster" },
+      "perks": {
+        "25": [ { "id": "efficient_power", "name": "Efficient power", "text": "Machines use less power" }, { "id": "tinkerer", "name": "Tinkerer", "text": "Cheaper machines" } ],
+        "50": [ { "id": "long_lines", "name": "Long lines", "text": "Conveyors reach farther" }, { "id": "turret_tech", "name": "Turret tech", "text": "Stronger turrets" } ],
+        "75": [ { "id": "overclock", "name": "Overclock", "text": "Machines run much faster at a power cost" }, { "id": "self_repair", "name": "Self-repair", "text": "Machines rarely break" } ],
+        "100": [ { "id": "chief_engineer", "name": "Chief engineer", "text": "Longer production chains" }, { "id": "siege_engineer", "name": "Siege engineer", "text": "Stronger siege weapons" } ] } },
+
+    { "id": "taming", "name": "Taming", "group": "Creatures", "levelsBy": "Taming, riding, breeding and fighting with tames",
+      "everyLevel": { "text": "Faster taming", "stat": "tamingSpeed", "perLevel": 0.005 },
+      "perks": {
+        "25": [ { "id": "calm_presence", "name": "Calm presence", "text": "Wild creatures notice you later", "stat": "aggroRadius", "value": -0.2 }, { "id": "strong_knockout", "name": "Strong knockout", "text": "Creatures go down faster", "stat": "torporDealt", "value": 0.3 } ],
+        "50": [ { "id": "bonded", "name": "Bonded", "text": "One more active tame", "stat": "extraTames", "value": 1 }, { "id": "saddle_master", "name": "Saddle master", "text": "Better saddle stats", "stat": "rideSpeed", "value": 0.15 } ],
+        "75": [ { "id": "breeder", "name": "Breeder", "text": "Better mutation odds" }, { "id": "pack_leader", "name": "Pack leader", "text": "Tames hit harder near you" } ],
+        "100": [ { "id": "beast_lord", "name": "Beast lord", "text": "One more active tame and easier mini-boss taming", "stat": "extraTames", "value": 1 }, { "id": "soulbond", "name": "Soulbond", "text": "One chosen tame can't die permanently" } ] } },
+
+    { "id": "swimming", "name": "Swimming", "group": "Exploration", "levelsBy": "Swimming and diving",
+      "everyLevel": { "text": "Swim faster and hold breath longer" },
+      "perks": {
+        "25": [ { "id": "diver", "name": "Diver", "text": "Much longer breath" }, { "id": "strong_stroke", "name": "Strong stroke", "text": "Swimming uses less stamina" } ],
+        "50": [ { "id": "pressure", "name": "Pressure", "text": "Dive deeper safely" }, { "id": "water_fighter", "name": "Water fighter", "text": "Fight better in water" } ],
+        "75": [ { "id": "current_rider", "name": "Current rider", "text": "Currents speed you up" }, { "id": "salvager", "name": "Salvager", "text": "Find sunken loot" } ],
+        "100": [ { "id": "seaborn", "name": "Seaborn", "text": "Swimming uses no stamina" }, { "id": "abyss_diver", "name": "Abyss diver", "text": "Reach the deepest areas" } ] } },
+    { "id": "sneaking", "name": "Sneaking", "group": "Exploration", "levelsBy": "Moving unseen (walking near aggressive creatures that haven't noticed you)",
+      "everyLevel": { "text": "Quieter movement", "stat": "aggroRadius", "perLevel": -0.003 },
+      "perks": {
+        "25": [ { "id": "soft_step", "name": "Soft step", "text": "Silent footsteps", "stat": "aggroRadius", "value": -0.1 }, { "id": "shadow", "name": "Shadow", "text": "Harder to see in the dark" } ],
+        "50": [ { "id": "backstab", "name": "Backstab", "text": "Bonus damage from behind while unseen" }, { "id": "ambush", "name": "Ambush", "text": "Tames stay hidden until you attack" } ],
+        "75": [ { "id": "silent_charges", "name": "Silent charges", "text": "Explosives make less noise" }, { "id": "vanish", "name": "Vanish", "text": "Briefly break enemy sight after a dodge" } ],
+        "100": [ { "id": "ghost", "name": "Ghost", "text": "Invisible while still in darkness" }, { "id": "assassin", "name": "Assassin", "text": "First hit on an unaware enemy is critical" } ] } }
+  ]
+}

@@ -1,4 +1,5 @@
 #include "WRCharacterBase.h"
+#include "WRSocial.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterMovementComponent.h"
@@ -173,9 +174,18 @@ bool AWRCharacterBase::IsHostileTo(const AWRCharacterBase* Other) const
 	{
 		return false;
 	}
-	// A survivor never fights their own tames.
+	// A survivor never fights their own (or a clanmate's) tames; survivors fight each other only where PvP allows.
 	const APlayerState* PS = GetPlayerState();
-	return !(PS && Other->GetTameOwner() == PS->GetPlayerName());
+	const FString OtherOwner = Other->GetTameOwner();
+	if (PS && !OtherOwner.IsEmpty() && FWRSocialRules::CanShare(OtherOwner, PS->GetPlayerName()))
+	{
+		return false;
+	}
+	if (PS && Other->GetPlayerState())
+	{
+		return FWRSocialRules::PlayersCanFight(this, Other);
+	}
+	return true;
 }
 
 FString AWRCharacterBase::GetDisplayLabel() const

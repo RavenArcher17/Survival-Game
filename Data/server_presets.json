@@ -1,0 +1,26 @@
+{
+  "_comment": "Server settings tab. Official servers run a locked preset; 'custom' takes Saved/ServerDB/server.json {\"preset\": \"custom\", \"base\": \"pve\", \"settings\": {...}}. Pick with -wrpreset=<name> or that file. Read in code as server.<key>. Playtest = Casual co-op + 10x XP/skills, 10x taming, 1 h boss respawn (internal, build plan M7). Fixed on every server (not settable): 10% boss loot rule, 150-point path cap with 100 per path, artifact rules apply only to the wearer.",
+  "default": "playtest",
+  "presets": {
+    "pvp_standard": {
+      "pvp": true, "deathPenalty": "souls", "offlineProtection": 0.75, "pvpInBossArenas": true, "bounties": true,
+      "clanSizeLimit": 8, "xpMultiplier": 1, "gatherMultiplier": 1, "tamingMultiplier": 1, "cropMultiplier": 1, "craftMultiplier": 1,
+      "bossRespawnHours": 4, "upkeepMultiplier": 1, "raids": "normal"
+    },
+    "pve": {
+      "pvp": false, "deathPenalty": "souls", "offlineProtection": 0, "pvpInBossArenas": false, "bounties": false,
+      "clanSizeLimit": 12, "xpMultiplier": 1, "gatherMultiplier": 1, "tamingMultiplier": 1, "cropMultiplier": 1, "craftMultiplier": 1,
+      "bossRespawnHours": 4, "upkeepMultiplier": 1, "raids": "normal"
+    },
+    "casual_coop": {
+      "pvp": false, "deathPenalty": "gentle", "offlineProtection": 0, "pvpInBossArenas": false, "bounties": false,
+      "clanSizeLimit": 0, "xpMultiplier": 2, "gatherMultiplier": 2, "tamingMultiplier": 3, "cropMultiplier": 2, "craftMultiplier": 2,
+      "bossRespawnHours": 2, "upkeepMultiplier": 0.5, "raids": "rare"
+    },
+    "playtest": {
+      "pvp": false, "deathPenalty": "gentle", "offlineProtection": 0, "pvpInBossArenas": false, "bounties": false,
+      "clanSizeLimit": 0, "xpMultiplier": 10, "gatherMultiplier": 2, "tamingMultiplier": 10, "cropMultiplier": 2, "craftMultiplier": 2,
+      "bossRespawnHours": 1, "upkeepMultiplier": 0.5, "raids": "rare"
+    }
+  }
+}

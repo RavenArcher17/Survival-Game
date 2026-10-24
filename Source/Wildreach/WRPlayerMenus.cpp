@@ -7,6 +7,8 @@
 #include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRCreature.h"
+#include "WRLifeSkills.h"
+#include "WRSocial.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
 #include "EngineUtils.h"
@@ -70,6 +72,19 @@ void AWRPlayerController::WRTorpor(float Amount) { ServerCommand(FString::Printf
 void AWRPlayerController::WRTameStat() { ServerCommand(TEXT("tamestat")); }
 void AWRPlayerController::WRBossDmg(float Amount, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.0f %s"), Amount, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
 void AWRPlayerController::WRBossDmgPct(float Percent, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.1f%% %s"), Percent, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
+void AWRPlayerController::WRClan(const FString& Action, const FString& Name) { ServerCommand(FString::Printf(TEXT("clan %s %s"), *Action, *Name)); }
+void AWRPlayerController::WRPerk(FName Skill, int32 TierLevel, int32 Option) { ServerCommand(FString::Printf(TEXT("perk %s %d %d"), *Skill.ToString(), TierLevel, Option)); }
+void AWRPlayerController::WRSkill(FName Skill, int32 Level) { ServerCommand(FString::Printf(TEXT("skill %s %d"), *Skill.ToString(), Level)); }
+void AWRPlayerController::WRSkillXP(FName Skill, int32 XP) { ServerCommand(FString::Printf(TEXT("skillxp %s %d"), *Skill.ToString(), XP)); }
+void AWRPlayerController::WRHitPlayer(const FString& Name, float Damage) { ServerCommand(FString::Printf(TEXT("hitplayer %s %.0f"), *Name, Damage)); }
+void AWRPlayerController::WRSkillStat(FName Stat) { ServerCommand(FString::Printf(TEXT("skillstat %s"), *Stat.ToString())); }
+
+void AWRPlayerController::ToggleSkills()
+{
+	Menu = Menu == EWRMenu::Skills ? EWRMenu::None : EWRMenu::Skills;
+	MenuIndex = 0;
+}
+
 void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
 void AWRPlayerController::WRInteract()
@@ -186,6 +201,10 @@ FString AWRPlayerController::GetMenuTitle() const
 	{
 		return TEXT("Land claim  (E = close)");
 	}
+	if (Menu == EWRMenu::Skills)
+	{
+		return TEXT("Life skills  (Up/Down, Enter = choose a perk when one is waiting, K = close)");
+	}
 	if (Menu == EWRMenu::Tame)
 	{
 		const AWRCreature* Tame = MenuCreature.Get();
@@ -241,6 +260,40 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 	if (Menu == EWRMenu::Build)
 	{
 		return BuildPieceMenu();
+	}
+	if (Menu == EWRMenu::Skills)
+	{
+		const UWRLifeSkillsComponent* Skills = PS ? PS->GetLifeSkills() : nullptr;
+		FString Group;
+		for (const FWRLifeSkillDef& Def : FWRLifeSkillRegistry::Get().All())
+		{
+			if (Def.Group != Group)
+			{
+				Group = Def.Group;
+				Out.Add({ FString::Printf(TEXT("-- %s --"), *Group), FString() });
+			}
+			const FWRSkillProgress* P = Skills ? Skills->FindProgress(Def.Id) : nullptr;
+			const int32 Level = P ? P->Level : 1;
+			Out.Add({ FString::Printf(TEXT("%s  %d   (%d/%d xp)   %s%s"), *Def.Name, Level, P ? P->XP : 0, FWRLifeSkillRules::XPToNext(Level),
+				*Def.EveryLevelText, Def.EveryLevelStat.IsNone() ? TEXT(" [not active yet]") : TEXT("")), FString() });
+			for (int32 T = 0; T < 4; ++T)
+			{
+				const int32 TierLevel = FWRLifeSkillRegistry::TierLevels[T];
+				const int8 Chosen = P && P->Perks.IsValidIndex(T) ? P->Perks[T] : -1;
+				if (Level < TierLevel || !Def.Tiers.IsValidIndex(T)) break;
+				for (int32 O = 0; O < Def.Tiers[T].Num(); ++O)
+				{
+					const FWRPerkDef& Perk = Def.Tiers[T][O];
+					if (Chosen >= 0 && Chosen != O) continue;
+					FWRMenuEntry E;
+					E.Label = FString::Printf(TEXT("    L%d %s %s: %s%s"), TierLevel, Chosen == O ? TEXT("[x]") : TEXT("choose"), *Perk.Name, *Perk.Text,
+						Perk.Stat.IsNone() ? TEXT(" [not active yet]") : TEXT(""));
+					E.Command = Chosen >= 0 ? FString() : FString::Printf(TEXT("perk %s %d %d"), *Def.Id.ToString(), TierLevel, O);
+					Out.Add(E);
+				}
+			}
+		}
+		return Out;
 	}
 	if (Menu == EWRMenu::Tame)
 	{
@@ -349,6 +402,22 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	{
 		return true;
 	}
+	if (Cmd == TEXT("perk"))
+	{
+		OutResult = PS->GetLifeSkills()->ChoosePerk(FName(*Arg(1)), FCString::Atoi(*Arg(2)), FCString::Atoi(*Arg(3)));
+		ClientNotify(OutResult);
+		return true;
+	}
+	if (Cmd == TEXT("clan"))
+	{
+		const FString Who = PS->GetPlayerName();
+		FWRClans& Clans = FWRClans::Get();
+		const FString& A = Arg(1);
+		OutResult = A == TEXT("create") ? Clans.Create(Who, Arg(2)) : A == TEXT("invite") ? Clans.Invite(Who, Arg(2)) : A == TEXT("join") ? Clans.Join(Who, Arg(2))
+			: A == TEXT("leave") ? Clans.Leave(Who) : A == TEXT("kick") ? Clans.Kick(Who, Arg(2)) : Clans.Describe(Who);
+		ClientNotify(OutResult);
+		return true;
+	}
 	if (Cmd == TEXT("dismount"))
 	{
 		if (AWRCreature* Mount = Cast<AWRCreature>(GetPawn()))
@@ -368,9 +437,14 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	{
 		AWRBuildPiece* Piece = FindNearbyPiece();
 		AWRNest* Nest = FindNearby<AWRNest>(GetWorld(), GetPawn(), 350.f);
+		AWRLootBag* Bag = FindNearby<AWRLootBag>(GetWorld(), GetPawn(), 300.f);
 		AWRCreature* Wild = FindNearbyCreature(false, 400.f);
 		const FWRPieceDef* PieceDef = Piece ? Piece->GetDef() : nullptr;
-		if (Nest)
+		if (Bag)
+		{
+			OutResult = Bag->Loot(this);
+		}
+		else if (Nest)
 		{
 			OutResult = Nest->TakeEgg(this);
 		}

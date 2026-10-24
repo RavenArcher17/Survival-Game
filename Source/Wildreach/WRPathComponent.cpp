@@ -99,7 +99,7 @@ float UWRPathComponent::XPMultiplier()
 {
 	static float Mult = []()
 	{
-		float Value = 1.f;
+		float Value = WRTune(TEXT("server.xpMultiplier"), 1.f);
 		FParse::Value(FCommandLine::Get(), TEXT("xpmult="), Value);
 		return FMath::Clamp(Value, 0.5f, 10.f);
 	}();

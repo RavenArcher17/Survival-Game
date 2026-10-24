@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRSocial.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -139,6 +140,7 @@ void AWRCharacter::OnRep_PlayerState()
 
 void AWRCharacter::OnDeath(AActor* Killer)
 {
+	AWRLootBag::ApplyDeathPenalty(this, GetPlayerState<AWRPlayerState>());
 	if (AWRGameMode* GameMode = GetWorld()->GetAuthGameMode<AWRGameMode>())
 	{
 		GameMode->RequestRespawn(Controller);
