@@ -5,6 +5,7 @@
 #include "WRCrafting.h"
 #include "WRCreature.h"
 #include "WRBoss.h"
+#include "WRWorldDressing.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
@@ -88,6 +89,15 @@ void AWRHUD::DrawHUD()
 	}
 
 	DrawWorldBars(Survivor);
+
+	// Biome hazard underfoot without the gear for it.
+	const FName Hazard = FWRBiomeHazards::KindAt(Survivor->GetActorLocation() - FVector(0.f, 0.f, Survivor->GetSimpleCollisionHalfHeight()));
+	if (!Hazard.IsNone() && !FWRBiomeHazards::Resists(Survivor, Hazard))
+	{
+		DrawText(Hazard == TEXT("lava") ? TEXT("LAVA - it burns! (fire path, fire-infused armor or a mount keeps you safe)")
+			: TEXT("Slick ice - hard to stop (frost path or frost-infused armor gives grip)"),
+			Hazard == TEXT("lava") ? FLinearColor(1.f, 0.45f, 0.1f) : FLinearColor(0.6f, 0.85f, 1.f), Canvas->ClipX * 0.5f - 300.f, Canvas->ClipY - 140.f, nullptr, 1.1f);
+	}
 
 	// Boss bar across the top while you're in an engaged boss's fight.
 	for (TActorIterator<AWRBoss> It(GetWorld()); It; ++It)

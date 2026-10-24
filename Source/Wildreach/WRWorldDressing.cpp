@@ -2,18 +2,83 @@
 #include "Wildreach.h"
 #include "WRBoss.h"
 #include "WRCreature.h"
+#include "WRCharacter.h"
+#include "WRCombatLibrary.h"
+#include "WRGameplayTags.h"
+#include "WRInventory.h"
 #include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Dom/JsonObject.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 
 static UMaterialInterface* ShapeMaterial()
 {
 	return LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+}
+
+// ---------------------------------------------------------------- biome hazards
+
+TMap<FIntPoint, float> FWRBiomeHazards::Lava;
+TMap<FIntPoint, float> FWRBiomeHazards::Ice;
+float FWRBiomeHazards::Cell = 600.f;
+
+void FWRBiomeHazards::Load(const TSharedPtr<FJsonObject>& Hazards)
+{
+	Lava.Reset();
+	Ice.Reset();
+	if (!Hazards.IsValid())
+	{
+		return;
+	}
+	double Size = 600.0;
+	Hazards->TryGetNumberField(TEXT("cell"), Size);
+	Cell = Size;
+	for (const TPair<const TCHAR*, TMap<FIntPoint, float>*> Kind : { TPair<const TCHAR*, TMap<FIntPoint, float>*>(TEXT("lava"), &Lava), TPair<const TCHAR*, TMap<FIntPoint, float>*>(TEXT("ice"), &Ice) })
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Hazards->TryGetArrayField(Kind.Key, Arr)) continue;
+		for (int32 i = 0; i + 2 < Arr->Num(); i += 3)
+		{
+			const float X = (*Arr)[i]->AsNumber(), Y = (*Arr)[i + 1]->AsNumber();
+			Kind.Value->Add(FIntPoint(FMath::FloorToInt(X / Cell), FMath::FloorToInt(Y / Cell)), (*Arr)[i + 2]->AsNumber());
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("HAZARDS loaded %d lava and %d ice cells"), Lava.Num(), Ice.Num());
+}
+
+const TMap<FIntPoint, float>& FWRBiomeHazards::Cells(FName Kind)
+{
+	return Kind == TEXT("lava") ? Lava : Ice;
+}
+
+FName FWRBiomeHazards::KindAt(const FVector& Feet)
+{
+	const FIntPoint Key(FMath::FloorToInt(Feet.X / Cell), FMath::FloorToInt(Feet.Y / Cell));
+	if (const float* Z = Lava.Find(Key)) { if (FMath::Abs(Feet.Z - *Z) < 250.f) return TEXT("lava"); }
+	if (const float* Z = Ice.Find(Key)) { if (FMath::Abs(Feet.Z - *Z) < 250.f) return TEXT("ice"); }
+	return NAME_None;
+}
+
+bool FWRBiomeHazards::Resists(const AWRCharacterBase* Who, FName Kind)
+{
+	if (!Who || Who->GetAttachParentActor())
+	{
+		return true;  // riding: the mount takes it
+	}
+	const bool bLava = Kind == TEXT("lava");
+	if (Who->HasTag(bLava ? WRTags::Resist_Lava : WRTags::Resist_Ice))
+	{
+		return true;
+	}
+	// Infused armor: fire-infused resists lava, frost-infused resists ice.
+	const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Who);
+	return Inv && Inv->GetEquipped(EWREquipSlot::Armor).Element == (bLava ? FName(TEXT("fire")) : FName(TEXT("frost")));
 }
 
 // ---------------------------------------------------------------- subsystem
@@ -37,12 +102,15 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const TSharedPtr<FJsonObject>* Hazards = nullptr;
+	FWRBiomeHazards::Load(File->TryGetObjectField(TEXT("hazards"), Hazards) ? *Hazards : nullptr);
 	const TSharedPtr<FJsonObject>* Instances = nullptr;
 	if (File->TryGetObjectField(TEXT("instances"), Instances))
 	{
 		if (AWRDressing* Dressing = InWorld.SpawnActor<AWRDressing>(AWRDressing::StaticClass(), FTransform::Identity, Params))
 		{
 			Dressing->Build(*Instances);
+			Dressing->BuildHazardVisuals();
 		}
 	}
 	// Caves replicate: only the server spawns them.
@@ -71,6 +139,8 @@ AWRDressing::AWRDressing()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	bReplicates = false;
 	RootComponent->SetMobility(EComponentMobility::Static);
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickInterval = 0.5f;
 }
 
 UHierarchicalInstancedStaticMeshComponent* AWRDressing::MakePart(const TCHAR* MeshPath, const FLinearColor& Color, bool bCollision, float CullDistance)
@@ -145,6 +215,64 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		Total += Count;
 	}
 	UE_LOG(LogWildreach, Log, TEXT("DRESSING built %d decorations (%s)"), Total, bServer ? TEXT("collision only") : TEXT("full"));
+}
+
+void AWRDressing::BuildHazardVisuals()
+{
+	if (GetWorld()->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	// Flat tiles a little above the river bed: glowing orange lava, pale blue ice.
+	for (const FName Kind : { FName(TEXT("lava")), FName(TEXT("ice")) })
+	{
+		const bool bLava = Kind == TEXT("lava");
+		const TMap<FIntPoint, float>& Cells = FWRBiomeHazards::Cells(Kind);
+		TArray<FTransform> Tiles;
+		const float S = FWRBiomeHazards::CellSize();
+		for (const TPair<FIntPoint, float>& C : Cells)
+		{
+			// Tilt each tile to the ground's slope, taken from the neighbouring cells (or the cell itself at edges).
+			const auto Z = [&](int32 DX, int32 DY) { const float* N = Cells.Find(C.Key + FIntPoint(DX, DY)); return N ? *N : C.Value; };
+			const FVector Normal = FVector(-(Z(1, 0) - Z(-1, 0)) / (2.f * S), -(Z(0, 1) - Z(0, -1)) / (2.f * S), 1.f).GetSafeNormal();
+			const FRotator Tilt = FRotationMatrix::MakeFromZ(Normal).Rotator();
+			Tiles.Emplace(Tilt, FVector((C.Key.X + 0.5f) * S, (C.Key.Y + 0.5f) * S, C.Value + (bLava ? 25.f : 15.f)), FVector(S / 100.f * 1.12f, S / 100.f * 1.12f, 0.06f));
+		}
+		if (Tiles.Num() > 0)
+		{
+			MakePart(TEXT("/Engine/BasicShapes/Cube.Cube"), bLava ? FLinearColor(0.95f, 0.22f, 0.02f) : FLinearColor(0.4f, 0.68f, 0.95f), false, bLava ? 24000 : 9000)->AddInstances(Tiles, false, true);
+		}
+	}
+}
+
+void AWRDressing::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (GetWorld()->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+	// Server: lava burns anyone standing in it without lava resistance.
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+	{
+		AWRCharacterBase* Who = *It;
+		if (!Who->IsAlive() || !Who->GetCharacterMovement()->IsMovingOnGround())
+		{
+			continue;
+		}
+		const FVector Feet = Who->GetActorLocation() - FVector(0.f, 0.f, Who->GetSimpleCollisionHalfHeight());
+		if (FWRBiomeHazards::KindAt(Feet) != TEXT("lava") || FWRBiomeHazards::Resists(Who, TEXT("lava")))
+		{
+			continue;
+		}
+		FWRHit Hit;
+		Hit.Damage = WRTune(TEXT("hazards.lavaDps"), 12.f) * DeltaSeconds;
+		Hit.Element = WRTags::Element_Fire;
+		Hit.BurnBuildup = WRTune(TEXT("hazards.lavaBurnPerSecond"), 25.f) * DeltaSeconds;
+		Hit.bDamageOverTime = true;
+		Hit.Origin = Feet;
+		UWRCombatLibrary::ApplyHit(Who, Hit);
+	}
 }
 
 // ---------------------------------------------------------------- caves

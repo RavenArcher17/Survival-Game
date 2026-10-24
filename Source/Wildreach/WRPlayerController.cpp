@@ -10,6 +10,8 @@
 #include "WRBoss.h"
 #include "WRCombatLibrary.h"
 #include "WRLifeSkills.h"
+#include "WRWorldDressing.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
@@ -370,6 +372,15 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		Hit.Damage = FCString::Atof(*Arg(2));
 		Hit.Origin = Survivor->GetActorLocation();
 		Result = Victim ? FString::Printf(TEXT("hit %s: %s"), *Arg(1), UWRCombatLibrary::ResultName(UWRCombatLibrary::ApplyHit(Victim, Hit))) : TEXT("no such player");
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("hazard") && Survivor)
+	{
+		const FVector Feet = Survivor->GetActorLocation() - FVector(0.f, 0.f, Survivor->GetSimpleCollisionHalfHeight());
+		const FName Kind = FWRBiomeHazards::KindAt(Feet);
+		Result = FString::Printf(TEXT("hazard %s resist %s onIce %s friction %.1f hp %.0f"), Kind.IsNone() ? TEXT("none") : *Kind.ToString(),
+			FWRBiomeHazards::Resists(Survivor, Kind) ? TEXT("yes") : TEXT("no"), Survivor->IsOnIce() ? TEXT("yes") : TEXT("no"),
+			Survivor->GetCharacterMovement()->GroundFriction, Survivor->GetAttributes()->GetHealth());
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("skillstat") && PS)

@@ -1,5 +1,6 @@
 #include "WRCharacter.h"
 #include "WRSocial.h"
+#include "WRWorldDressing.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -68,6 +69,28 @@ void AWRCharacter::BeginPlay()
 	ApplyViewMode();
 	Cast<UWRCharacterMovementComponent>(GetCharacterMovement())->SprintSpeed = WRTune(TEXT("player.sprintSpeed"), 750.f);
 	GetCharacterMovement()->MaxWalkSpeed = WRTune(TEXT("player.walkSpeed"), 450.f);
+	DefaultFriction = GetCharacterMovement()->GroundFriction;
+	DefaultBraking = GetCharacterMovement()->BrakingDecelerationWalking;
+	DefaultAcceleration = GetCharacterMovement()->MaxAcceleration;
+}
+
+void AWRCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	// Slick ice: the same check runs on the server and the owning client, so movement prediction agrees.
+	if (HasAuthority() || IsLocallyControlled())
+	{
+		const FVector Feet = GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
+		const bool bIce = FWRBiomeHazards::KindAt(Feet) == TEXT("ice") && !FWRBiomeHazards::Resists(this, TEXT("ice"));
+		if (bIce != bOnIce)
+		{
+			bOnIce = bIce;
+			UCharacterMovementComponent* Move = GetCharacterMovement();
+			Move->GroundFriction = bIce ? WRTune(TEXT("hazards.iceFriction"), 0.3f) : DefaultFriction;
+			Move->BrakingDecelerationWalking = bIce ? WRTune(TEXT("hazards.iceBraking"), 100.f) : DefaultBraking;
+			Move->MaxAcceleration = bIce ? WRTune(TEXT("hazards.iceAcceleration"), 600.f) : DefaultAcceleration;
+		}
+	}
 }
 
 void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

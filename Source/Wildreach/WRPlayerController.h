@@ -85,6 +85,8 @@ public:
 	UFUNCTION(Exec) void WRSkillXP(FName Skill, int32 XP);
 	UFUNCTION(Exec) void WRSkillStat(FName Stat);
 	UFUNCTION(Exec) void WRHitPlayer(const FString& Name, float Damage);
+	/** Dev: what biome hazard is underfoot, and does it affect me. */
+	UFUNCTION(Exec) void WRHazard();
 
 	// --- Building ---
 	bool IsPlacing() const { return !PlacingPiece.IsNone(); }

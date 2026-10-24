@@ -106,6 +106,10 @@
     "bossHealthPerExtraParticipant": 0.8
   },
 
+  "hazards": { "_comment": "Biome gear checks: lava river (needs lava resistance), slick ice (needs ice resistance).",
+    "lavaDps": 8, "lavaBurnPerSecond": 12, "iceFriction": 0.3, "iceBraking": 100, "iceAcceleration": 600 },
+  "caves": { "gemChance": 0.12, "gasDps": 6 },
+
   "bosses": {
     "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/... (see WRBoss.cpp for every key).",
     "lootDamageFraction": 0.1, "partChance": 0.25, "weaknessMultiplier": 1.5, "arenaPvpRadius": 3000,

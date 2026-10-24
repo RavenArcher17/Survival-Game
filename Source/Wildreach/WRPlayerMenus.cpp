@@ -77,6 +77,7 @@ void AWRPlayerController::WRPerk(FName Skill, int32 TierLevel, int32 Option) { S
 void AWRPlayerController::WRSkill(FName Skill, int32 Level) { ServerCommand(FString::Printf(TEXT("skill %s %d"), *Skill.ToString(), Level)); }
 void AWRPlayerController::WRSkillXP(FName Skill, int32 XP) { ServerCommand(FString::Printf(TEXT("skillxp %s %d"), *Skill.ToString(), XP)); }
 void AWRPlayerController::WRHitPlayer(const FString& Name, float Damage) { ServerCommand(FString::Printf(TEXT("hitplayer %s %.0f"), *Name, Damage)); }
+void AWRPlayerController::WRHazard() { ServerCommand(TEXT("hazard")); }
 void AWRPlayerController::WRSkillStat(FName Stat) { ServerCommand(FString::Printf(TEXT("skillstat %s"), *Stat.ToString())); }
 
 void AWRPlayerController::ToggleSkills()

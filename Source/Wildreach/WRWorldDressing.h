@@ -10,6 +10,27 @@ class UInstancedStaticMeshComponent;
 class UPointLightComponent;
 
 /**
+ * Biome gear-check hazards (M3 plan, no temperature meter): lava burns unless you resist lava (fire
+ * main path, fire-infused armor, or riding a mount); slick ice drops your grip unless you resist ice
+ * (frost main path or frost-infused armor). Cells come from the dressing file and are known to every
+ * machine, so the ice friction is identical on the server and the owning client (no corrections).
+ */
+struct WILDREACH_API FWRBiomeHazards
+{
+	static void Load(const TSharedPtr<class FJsonObject>& Hazards);
+	/** "lava", "ice" or none, for feet at this location. */
+	static FName KindAt(const FVector& Feet);
+	static bool Resists(const class AWRCharacterBase* Who, FName Kind);
+	static const TMap<FIntPoint, float>& Cells(FName Kind);
+	static float CellSize() { return Cell; }
+
+private:
+	static TMap<FIntPoint, float> Lava;
+	static TMap<FIntPoint, float> Ice;
+	static float Cell;
+};
+
+/**
  * Loads Data/<map>_dressing.json (made by Tools/terrain/dressing.mjs) when a game world starts:
  * every machine builds the decoration locally (no replication, no map rebuild to change it);
  * the server also spawns the caves, which replicate.
@@ -32,8 +53,11 @@ class WILDREACH_API AWRDressing : public AActor
 
 public:
 	AWRDressing();
+	virtual void Tick(float DeltaSeconds) override;
 	/** Build from the "instances" object of a dressing file. */
 	void Build(const TSharedPtr<class FJsonObject>& Instances);
+	/** Lava and ice surfaces (clients only: the server just needs the cells). */
+	void BuildHazardVisuals();
 	int32 GetInstanceCount() const { return Total; }
 
 private:

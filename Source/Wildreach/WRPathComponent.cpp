@@ -469,6 +469,7 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	else if (MainPath == TEXT("frost"))
 	{
 		GrantedTags.AddTag(WRTags::Passive_Permafrost);
+		GrantedTags.AddTag(WRTags::Resist_Ice);
 	}
 	const bool bFireFrost = (MainPath == TEXT("fire") && SubPath == TEXT("frost")) || (MainPath == TEXT("frost") && SubPath == TEXT("fire"));
 	const int32 Low = FMath::Min(GetSpent(MainPath), GetSpent(SubPath));

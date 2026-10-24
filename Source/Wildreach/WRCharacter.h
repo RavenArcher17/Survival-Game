@@ -31,6 +31,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Camera") bool IsFirstPerson() const { return bFirstPerson; }
 	UFUNCTION(BlueprintCallable, Category="Camera") void SetFirstPerson(bool bNewFirstPerson);
 
+	virtual void Tick(float DeltaSeconds) override;
+	/** Standing on slick ice without ice resistance (set on the server and the owning client). */
+	bool IsOnIce() const { return bOnIce; }
+
 	/** Press/release an ability input (used by real input and by the test bot). */
 	void PressAbilityInput(EWRAbilityInput Input);
 	void ReleaseAbilityInput(EWRAbilityInput Input);
@@ -48,6 +52,11 @@ protected:
 private:
 	void InitAbilityActorInfo();
 	void ClearStaleTags();
+
+	bool bOnIce = false;
+	float DefaultFriction = 8.f;
+	float DefaultBraking = 2048.f;
+	float DefaultAcceleration = 2048.f;
 
 	UFUNCTION() void OnRep_FirstPerson();
 	UFUNCTION(Server, Reliable) void ServerSetFirstPerson(bool bNewFirstPerson);

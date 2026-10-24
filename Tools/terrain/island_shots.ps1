@@ -20,7 +20,9 @@ $cmds = @(
 	'WRTeleport -140000 60000', 'WRLook 20 -6', $shot            # west coast, lowlands,
 	'WRTeleport -91800 -90131', 'WRLook 0 -4', $shot,          # outside a volcanic cave entrance (midlands)
 	'WRWalkTo -87900 -90131', 'wait 14', 'WRLook 180 -6', $shot,  # inside the cave chamber, looking out past the ore
-	'WRTeleport 96182 -40000', 'WRLook 90 -10', $shot            # tundra pines near a cave
+	'WRTeleport 96182 -40000', 'WRLook 90 -10', $shot,           # tundra pines near a cave
+	'WRTeleport -40400 79000', 'WRLook 90 -18', $shot,          # the lava river (volcanic south), from its north bank
+	'WRTeleport 48400 -2000', 'WRLook 90 -18', $shot            # slick ice on the glacier plateau
 ) -join '|'
 
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7805 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
