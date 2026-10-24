@@ -13,12 +13,12 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 ## Things that are easy to miss
 - **Everything in the docs is a first draft**: names, perk effects, combos and starting numbers especially. They're meant to be tuned in playtests, not treated as final. Keep them in data files (`Data/*.json`, `Data/tuning.json`) so changing them never needs a code change, and don't over-engineer around a specific value.
 - **The Map tab layout isn't ready to build as-is.** Its note says the layout needs more planning toward a realistic landmass (coastlines, terrain, rivers, mountain range shape) first. M3 starts with that planning step and gets Raven's sign-off before any terrain is built.
-- **Playtests run with XP turned up.** At 1× a path takes ~80 h and a life skill ~50 h, so no one would reach the higher nodes. Playtest servers use the `Playtest` server preset (high XP/skill multipliers, see `Docs/plan/M7_server.md`), and debug commands can grant points directly.
+- **Playtests run with XP turned up.** At 1Ã— a path takes ~80 h and a life skill ~50 h, so no one would reach the higher nodes. Playtest servers use the `Playtest` server preset (high XP/skill multipliers, see `Docs/plan/M7_server.md`), and debug commands can grant points directly.
 - Open inconsistencies between doc tabs are in `Docs/DESIGN_REVIEW.md`. Don't silently pick an answer: use the proposed default listed there and leave the item open for Raven.
 
 ## Plan
 - `Docs/TECH_PLAN.md`: architecture decisions + milestone index
-- `Docs/plan/M1_combat.md` … `M7_server.md`: per-milestone tasks, gates, tests
+- `Docs/plan/M1_combat.md` â€¦ `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
 ## Status (2026-10-22)
@@ -29,10 +29,8 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
   1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
   2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).
   3. Creatures & taming: done (`WRCreature`; `Tools\tametest.ps1`). 4. Bosses: done (`WRBoss`; `Tools\bosstest.ps1`).
-  5. Life skills / server presets / clans / safe zones / PvP / death penalty: built, committed as WIP (`WRLifeSkills`, `WRSocial`,
-     `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks passed except
-     "clanmates can't hit each other": the test's Bravo ran `WRClan join` before Alpha's invite landed. Fix the test timing
-     (Bravo waits longer), rerun, then finish the batch. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
+  5. Life skills / server presets / clans / safe zones / PvP / death penalty: done (`WRLifeSkills`, `WRSocial`,
+     `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks pass. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
   6. Island dressing (caves, foliage), then rebuild the island, full regression, docs, push. Default preset is `playtest`
      (PvP off), so PvP tests need `-wrpreset=pvp_standard`.
 - GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB). Epic source access works (UE source build not started).

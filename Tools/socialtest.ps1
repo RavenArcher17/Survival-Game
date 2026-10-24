@@ -11,14 +11,14 @@ Remove-Item (Join-Path $db 'players\Alpha.json'), (Join-Path $db 'players\Bravo.
 $alpha = @(
 	'WRBotPause 1', 'WRTeleport 1000 1000', 'wait 4',
 	'WRHitPlayer Bravo 10', 'wait 1',
-	'WRClan create Wolves', 'WRClan invite Bravo', 'wait 6',
+	'WRClan create Wolves', 'WRClan invite Bravo', 'wait 8',
 	'WRHitPlayer Bravo 10', 'WRClan info', 'wait 6',
 	'WRTeleport 1000 1000', 'wait 1', 'WRInteract', 'wait 8',
 	'WRSkillXP mining 5000', 'WRSkillStat miningYield', 'WRPerk mining 25 1', 'WRSkill mining 60', 'WRPerk mining 50 1', 'WRPerk mining 50 0',
 	'WRSkillStat doubleOre', 'WRSkill taming 50', 'WRPerk taming 50 0', 'WRSkillStat extraTames', 'WRSkill building 25', 'WRPerk building 25 0', 'WRSkillStat buildCost'
 )
 $bravo = @(
-	'WRBotPause 1', 'WRTeleport 1000 1000', 'wait 6', 'WRClan join Wolves', 'wait 6',
+	'WRBotPause 1', 'WRTeleport 1000 1000', 'wait 9', 'WRClan join Wolves', 'wait 6',
 	'WRGive wood 20', 'WRTeleport 1000 1000', 'wait 1', 'WRKillMe', 'wait 14', 'WRTeleport 1000 1000', 'wait 1', 'WRInteract'
 )
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7813 -wrpreset=pvp_standard -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden

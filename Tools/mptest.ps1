@@ -28,7 +28,7 @@ if ($Scenario -eq 'pve') {
 
 $procs = @()
 $serverLog = Join-Path $out 'server.log'
-$procs += Start-Process $ue -ArgumentList "`"$project`" $Map -server -nullrhi -unattended -nosound -port=$Port `"-ExecCmds=p.NetShowCorrections 1`" `"-LogCmds=LogWildreach Verbose`" -abslog=`"$serverLog`"" -PassThru -WindowStyle Hidden
+$procs += Start-Process $ue -ArgumentList "`"$project`" $Map -server -nullrhi -unattended -nosound -port=$Port -wrpreset=pvp_standard `"-ExecCmds=p.NetShowCorrections 1`" `"-LogCmds=LogWildreach Verbose`" -abslog=`"$serverLog`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 foreach ($b in $bots) {
 	$log = Join-Path $out "$($b.Name).log"
