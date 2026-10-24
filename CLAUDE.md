@@ -21,20 +21,28 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - `Docs/plan/M1_combat.md` â€¦ `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
-## Status (2026-10-22)
-- **M1 combat core: done** on placeholder art. **M2 paths: done** (persistence v1 = JSON per player).
-- Stat nodes work (tuning `nodeEffects`); ability nodes past the trunk (Fire wall, Meteor, Ice lance...) aren't built. No creation screen or skill-tree UI yet.
-- M3: layout approved 2026-10-23; **`L_Island` built** (WP landscape, default map). Rebuild with `Tools/terrain/build_island.ps1 -Force` (runs in the full editor: the landscape's visible textures need the GPU layer update, which commandlets don't do). Next: textured auto-material, PCG dressing, caves.
+## Status (2026-10-24)
+- **First playable is feature-complete on placeholder art** (every First Playable row of the build plan has a
+  working version); what's left is playtesting/tuning, real art, and a packaged dedicated server.
+- **M1 combat core: done.** **M2 paths: done** (persistence v1 = JSON per player). Paths menu (P) learns nodes.
+  Built ability nodes: bolts/shards, weapon arts, Fire wall, Lava pool, Frost nova, Ice lance; other ability nodes
+  (Meteor, Ice wall, Blizzard, Flurry...) show "[not built yet]" in the menu.
+- Front end: `WRMainMenu` (standalone only): name, path, Host (listen server, UDP 7777) / Join by IP; F10 back.
+  `Tools\package.ps1` packages a shareable Windows build (Development) with the launcher engine. A packaged
+  dedicated server needs the source engine: `Tools\build_engine.ps1` (clears `NoDefaultCurrentDirectoryInExePath`,
+  which otherwise breaks Epic's batch files), log `C:\Dev\UE5Source-build.log`.
+- M3: layout approved 2026-10-23; **`L_Island` built** (WP landscape, default map). Rebuild with `Tools/terrain/build_island.ps1 -Force` (runs in the full editor: the landscape's visible textures need the GPU layer update, which commandlets don't do).
+  Dressing/caves/lava+ice cells: `node Tools/terrain/dressing.mjs` -> `Data/island_dressing.json`, built at runtime by
+  `UWRDressingSubsystem` (no map rebuild). Decoration culls at ~250 m (WP loading range). Next: textured auto-material, HLODs.
 - 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):
   1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
   2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).
   3. Creatures & taming: done (`WRCreature`; `Tools\tametest.ps1`). 4. Bosses: done (`WRBoss`; `Tools\bosstest.ps1`).
   5. Life skills / server presets / clans / safe zones / PvP / death penalty: done (`WRLifeSkills`, `WRSocial`,
      `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks pass. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
-  6. Island dressing (caves, foliage), then rebuild the island, full regression, docs, push. Default preset is `playtest`
-     (PvP off), so PvP tests need `-wrpreset=pvp_standard`.
-- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB). Epic source access works (UE source build not started).
-  After all batches: rebuild the island (`Tools\terrain\build_island.ps1 -Force`) so it gets the new nodes/camps.
+  6. Island dressing, caves, biome hazards (`WRWorldDressing`; `Tools\terrain\hazardtest.ps1`): done. Island rebuilt 2026-10-24.
+  Default preset is `playtest` (PvP off), so PvP tests need `-wrpreset=pvp_standard` (mptest and socialtest pass it).
+- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB, ~190 MB used; each island rebuild adds ~80 MB).
 - See `CHANGELOG.md` for details and known gaps.
 
 ## How things are wired (read before changing combat)

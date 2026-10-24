@@ -1,6 +1,25 @@
 # Wildreach (working title)
 
-Multiplayer open-world survival, first + third person, UE 5.8, C++. See `CHANGELOG.md` for what's built.
+Multiplayer open-world survival, first + third person, UE 5.8, C++. The first playable (fire + frost, Volcanic +
+Frozen tundra) runs on placeholder art. See `CHANGELOG.md` for what's built and its known gaps.
+
+## Play with friends
+
+```
+Tools\package.ps1     # -> C:\Dev\WildreachBuild\Windows\Wildreach.exe (+ README.txt for players)
+```
+
+Zip `C:\Dev\WildreachBuild\Windows` and share it. Everyone runs `Wildreach.exe`, types a name and picks
+Fire or Frost. One person clicks **Host** (their PC is the server; over the internet they forward UDP 7777
+to their PC). Everyone else types the host's IP and clicks **Join**. Saves live on the host
+(`Wildreach\Saved\ServerDB`). F10 goes back to the menu.
+
+A packaged **dedicated server** needs Unreal built from source: `Tools\build_engine.ps1` (several hours,
+~200 GB; log `C:\Dev\UE5Source-build.log`). Until then the host plays and hosts at once.
+
+Server settings: the default preset is `playtest` (10x XP, PvP off). Pick another with `-wrpreset=pvp_standard`
+(or `pve`, `casual_coop`), or write `Saved/ServerDB/server.json` with `{"preset": "custom", "base": "pve",
+"settings": {...}}` using the keys in `Data/server_presets.json`.
 
 ## Build
 
@@ -10,7 +29,7 @@ Multiplayer open-world survival, first + third person, UE 5.8, C++. See `CHANGEL
 
 Or double-click `Wildreach.uproject` (it offers to build if binaries are missing).
 
-## Play
+## Play from the editor build
 
 ```
 Tools\play.ps1 local -Clients 2   # dedicated server + 2 windowed clients
@@ -19,11 +38,12 @@ Tools\play.ps1 server             # dedicated server only (port 7777)
 Tools\play.ps1 client             # join 127.0.0.1:7777
 ```
 
-The default map is `/Game/Maps/L_Island`, the 4 × 4 km first-playable island. Combat testing happens on
-`L_CombatArena` (`play.ps1 -Map arena`: dummies, both packs, both altars, resource nodes).
-`play.ps1 -Path frost -Name You` picks your main path and keeps your save (`?Path=` / `?WRName=` on the join URL).
+The default map is `/Game/Maps/L_Island`, the 4 × 4 km island. Combat testing happens on `L_CombatArena`
+(`play.ps1 -Map arena`). `play.ps1 -Path frost -Name You` picks your main path and keeps your save
+(`?Path=` / `?WRName=` on the join URL). The main menu only appears when the game runs on its own (`-nomenu` skips it).
 
-Rebuild the island from the layout: `Tools\terrain\build_island.ps1 -Force`. Walk test: `Tools\terrain\walktest.ps1`.
+Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/rocks/caves/hazards without a rebuild:
+`node Tools/terrain/dressing.mjs` (writes `Data/island_dressing.json`).
 
 ### Controls
 
@@ -34,13 +54,18 @@ Rebuild the island from the layout: `Tools\terrain\build_island.ps1 -Force`. Wal
 | RMB (hold) | block; the first moment of a block is a parry |
 | C | dodge roll (i-frames) |
 | 1–8 | path abilities in your quick slots |
+| Q / Z / X | potion / eat / drink |
 | Tab | lock on |
-| E | interact (boss altars) |
+| E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags |
+| I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu |
 | Shift / Space / V | sprint / jump / first-third person |
+| F10 | back to the main menu |
 
 ### Dev commands (console)
-`WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRSetSub frost`, `WRBuy fire fire_wall`, `WRSpawn cinderfang 3`,
-`WRStatus frozen`, `WRWeapon iron fine 6`, `WRHeal`, `WRGoToAltar frost`, `WR.ReloadTuning` (re-read `Data/tuning.json` live).
+`WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRLearn fire fire_wall`, `WRCast 3`, `WRSpawn cinderfang 3`,
+`WRSpawn vulkarn 1`, `WRBossDmgPct 30 frost`, `WRGive iron_ore 20`, `WREquip copper_sword`, `WRWeapon iron fine 6`,
+`WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
+`WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
 
 ## Test
 
@@ -48,7 +73,13 @@ Rebuild the island from the layout: `Tools\terrain\build_island.ps1 -Force`. Wal
 Tools\test.ps1          # automation tests (rules + deterministic combat scenarios)
 Tools\mptest.ps1        # headless server + bots, PvE (-Scenario pvp for duels)
 Tools\persisttest.ps1   # save -> server restart -> load
-Tools\shots.ps1         # rendered client screenshots -> Saved\Screenshots
+Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets
+Tools\buildtest.ps1     # claims, code locks, raids, collapse, world save
+Tools\tametest.ps1      # offer food, ride, knockout + feed, eggs, orders, tames saved
+Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
+Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
+Tools\spelltest.ps1     # Paths menu learn + the four tree spells
+Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
 ```
 
 ## Layout
@@ -56,18 +87,25 @@ Tools\shots.ps1         # rendered client screenshots -> Saved\Screenshots
 | Path | What |
 |---|---|
 | `Data/tuning.json` | every gameplay number (starting numbers + placeholders) |
-| `Data/paths/*.json` | skill trees (generated from the design doc) |
-| `Data/creatures.json` | creature roster |
+| `Data/server_presets.json` | server settings presets |
+| `Data/paths/*.json`, `lifeskills.json` | skill trees, life skills |
+| `Data/creatures.json`, `items.json`, `recipes.json`, `pieces.json` | roster + bosses, items, recipes, building pieces |
+| `Data/island_dressing.json` | trees, rocks, caves, lava/ice cells (generated) |
 | `Source/Wildreach/WRCombatLibrary` | the damage pipeline (block/parry/statuses/combos) |
-| `Source/Wildreach/WRStatusComponent` | status timers, buildup, regen, hunger/thirst |
 | `Source/Wildreach/WRAbilities` | all GAS abilities |
 | `Source/Wildreach/WRPathTypes`, `WRPathComponent` | trees, rules, progress, grants |
-| `Source/Wildreach/WRCreature` | creatures, dummy, AI, spawner |
+| `Source/Wildreach/WRCreature`, `WRBoss` | creatures, taming, mounts; bosses |
+| `Source/Wildreach/WRCrafting`, `WRInventory`, `WRBuilding` | stations + Hearth, items + equipment, building + claims |
+| `Source/Wildreach/WRLifeSkills`, `WRSocial` | life skills; clans, PvP rules, safe zones, death penalty |
+| `Source/Wildreach/WRWorldDressing` | decoration, caves, biome hazards |
+| `Source/Wildreach/WRMainMenu`, `WRPlayerMenus`, `WRHUD` | front end, in-game menus, HUD |
 | `Source/Wildreach/Tests/` | automation tests |
-| `Docs/` | technical plan, milestone plans, design review |
+| `Docs/` | technical plan, milestone plans, design review, terrain layout |
 
 ## Networking rules
 
 - Server owns gameplay state. Clients send intent (input, RPCs), never results.
 - Health/poise/buildup replicate to all; stamina/hunger/thirst/Heat/Chill owner-only.
-- Anything that changes movement speed for the player goes through the CMC saved-move flags, not RPCs.
+- Anything that changes movement speed for the player goes through the CMC saved-move flags or runs the same
+  deterministic check on the server and the owning client (ice friction).
+- Server settings replicate through `AWRGameState`, so client-side rules (lock-on, PvP) match the host.

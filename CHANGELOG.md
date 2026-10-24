@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-24: playable with friends
+
+- **Main menu** (shown when the game runs on its own): name, Fire or Frost, **Host** (your game becomes a listen
+  server on UDP 7777) or **Join** by IP; remembered between runs. F10 returns to it. `Tools/package.ps1` makes a
+  shareable Windows build with a players' README.
+- **Paths menu (P)**: both trees with ranks, costs, branch gates and points to spend; Enter learns.
+- **Spells**: Fire wall, Lava pool (fire), Frost nova, Ice lance (frost), so each path has three spells plus its
+  weapon art. Nodes whose abilities aren't built yet say so in the menu.
+- **Island dressing**: 26k placeholder trees, rocks and shrubs and six midland caves (rock tunnel + dark chamber
+  with rich ore at 12% gem odds, sulfur gas or slick ice, a Kilnmite or Glacimaw colony), all generated from the
+  heightmap into `Data/island_dressing.json` and built on every machine at runtime.
+- **Biome gear checks**: the lava river burns without lava resistance (fire main path, fire-infused armor, or a
+  mount); slick ice on the tundra rivers and glacier plateau without ice resistance (frost main path, frost-infused
+  armor). HUD warning when you're standing in one.
+- **Fixed**: clients used their own default server preset, so lock-on and PvP disagreed with the host; the host's
+  settings and everyone's clan now replicate. The tame test no longer races a wandering herd animal.
+- Tests: `spelltest.ps1`, `terrain/hazardtest.ps1`; `island_shots.ps1` also covers caves, lava and ice.
+- Known: hazard tiles are flat placeholder slabs; decorations and caves stop drawing at ~250 m (the World
+  Partition loading range; HLODs would fix distant views); a dedicated-server package waits on the source engine build.
+
 ## 2026-10-23/24: the rest of the first playable (batches 1–5)
 
 Everything below is placeholder art (engine shapes, tinted) with numbers in `Data/*.json`, all first drafts to tune in playtests. Each batch has a bot test script in `Tools/`.
@@ -11,7 +31,7 @@ Everything below is placeholder art (engine shapes, tinted) with numbers in `Dat
 - **Life skills, server settings, clans** (`socialtest.ps1`): 15 life skills (levels 1–100, perks at 25/50/75/100; K opens the menu) wired into gathering, crafting, potions, food, crops, pens, building, taming and loot. Server presets `pvp_standard`, `pve`, `casual_coop`, `playtest` (default: 10× XP) and `custom` (`Saved/ServerDB/server.json`), picked with `-wrpreset=`. Clans (`WRClan create/invite/join/leave/kick/info`) share claims, doors, chests and tames, and can't hurt each other. Safe zones at the spawns. PvP and PvP-in-boss-arenas switches, offline base protection, death penalty gentle / Souls-like / drop / full loot with loot bags.
 - **Island rebuilt** with the six boss spawners, spawn safe zones and starter camps; walk test still passes.
 - Tuning overrides for tests: `-wrtune=key:value,key:value`.
-- Known gaps: no caves or foliage yet; fishing, engineering and swimming have no XP source; perks marked "not active yet" wait for their systems; the bounty and creature-raid settings exist but nothing uses them; boss loot goes straight to inventory (no loot bags).
+- Known gaps (caves and foliage arrived 2026-10-24): fishing, engineering and swimming have no XP source; perks marked "not active yet" wait for their systems; the bounty and creature-raid settings exist but nothing uses them; boss loot goes straight to inventory (no loot bags).
 
 ## 2026-10-23: the island (M3 step 2)
 
