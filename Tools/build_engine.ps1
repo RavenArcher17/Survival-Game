@@ -2,6 +2,8 @@
 # servers; keep developing on the launcher engine). Takes several hours and ~200 GB. Safe to rerun:
 # each step skips what's already done. Log: C:\Dev\UE5Source-build.log
 $ErrorActionPreference = 'Continue'
+# Epic's batch files call each other by bare name; this setting (present in some shells) blocks that.
+Remove-Item Env:NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue
 $src = 'C:\Dev\UE5Source'
 $log = 'C:\Dev\UE5Source-build.log'
 function Step($name) { "[$(Get-Date -Format 'HH:mm:ss')] $name" | Tee-Object -FilePath $log -Append }
@@ -16,10 +18,10 @@ if (-not (Test-Path "$src\Setup.bat")) { Step 'FAILED: clone'; exit 1 }
 Set-Location $src
 if (-not (Test-Path "$src\Engine\Binaries\DotNET\UnrealBuildTool")) {
 	Step 'Setup.bat (downloads ~20 GB of dependencies)'
-	cmd /c "Setup.bat --force" 2>&1 | Out-File $log -Append
+	cmd /c "cd /d $src && $src\Setup.bat --force" 2>&1 | Out-File $log -Append
 }
 Step 'GenerateProjectFiles'
-cmd /c "GenerateProjectFiles.bat" 2>&1 | Out-File $log -Append
+cmd /c "cd /d $src && $src\GenerateProjectFiles.bat" 2>&1 | Out-File $log -Append
 
 foreach ($target in 'ShaderCompileWorker', 'UnrealEditor') {
 	Step "building $target"

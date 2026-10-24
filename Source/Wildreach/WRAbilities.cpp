@@ -9,6 +9,7 @@
 #include "WRProjectile.h"
 #include "WRResourceNode.h"
 #include "WRBuilding.h"
+#include "WRBoss.h"
 #include "GameFramework/PlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
@@ -18,6 +19,7 @@
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
+#include "EngineUtils.h"
 
 // ---------------------------------------------------------------- base
 
@@ -643,6 +645,153 @@ UWRGA_FrostShard::UWRGA_FrostShard()
 	Color = FLinearColor(0.5f, 0.85f, 1.f);
 }
 
+// ---------------------------------------------------------------- area spells
+
+void UWRGA_AreaSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	GetCharacter()->PlaySwing(EWRSwingKind::Cast, 0.35f);
+	SetMoveSlow(false, true);
+	After(0.25f, [this]() { if (IsServer()) Execute(); });
+	After(0.45f, [this]() { EndSelf(); });
+}
+
+void UWRGA_AreaSpell::Execute()
+{
+	AWRCharacterBase* Caster = GetCharacter();
+	if (!Caster)
+	{
+		return;
+	}
+	UWorld* World = Caster->GetWorld();
+	const FWRTuning& T = FWRTuning::Get();
+	const auto Num = [&](const TCHAR* Key, float Fallback) { return T.Num(SpellKey + TEXT(".") + Key, Fallback); };
+	const FRotator Aim = Caster->GetBaseAimRotation();
+	const FVector Flat = FRotator(0.f, Aim.Yaw, 0.f).Vector();
+	const FVector Feet = Caster->GetActorLocation() - FVector(0.f, 0.f, Caster->GetSimpleCollisionHalfHeight());
+	const bool bFire = Element == WRTags::Element_Fire;
+	const FLinearColor Color = bFire ? FLinearColor(1.f, 0.35f, 0.05f) : FLinearColor(0.55f, 0.85f, 1.f);
+	const auto Ground = [World, Caster](const FVector& At)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSpellGround), false, Caster);
+		return World->LineTraceSingleByChannel(Hit, At + FVector(0, 0, 500), At - FVector(0, 0, 2000), ECC_WorldStatic, Query) ? Hit.ImpactPoint : At;
+	};
+	const auto Strike = [&](AWRCharacterBase* Target, const FVector& Origin)
+	{
+		FWRHit Hit;
+		Hit.Instigator = Caster;
+		Hit.Damage = Num(TEXT("damage"), 15.f);
+		Hit.PoiseDamage = Num(TEXT("poise"), 12.f);
+		Hit.Element = Element;
+		(bFire ? Hit.BurnBuildup : Hit.FrostBuildup) = Num(bFire ? TEXT("burnBuildup") : TEXT("frostBuildup"), 40.f);
+		Hit.PathId = PathId;
+		Hit.Origin = Origin;
+		UWRCombatLibrary::ApplyHit(Target, Hit);
+	};
+
+	switch (Shape)
+	{
+	case EWRAreaShape::Wall:
+	{
+		// A line of fire across your aim; enemies crossing it burn.
+		const FVector Center = Feet + Flat * Num(TEXT("distance"), 600.f);
+		const FVector Across = FVector::CrossProduct(Flat, FVector::UpVector);
+		const int32 Patches = FMath::RoundToInt(Num(TEXT("patches"), 5.f));
+		const float Width = Num(TEXT("width"), 800.f);
+		for (int32 i = 0; i < Patches; ++i)
+		{
+			const FVector At = Center + Across * (Width * (i / FMath::Max(1.f, Patches - 1.f) - 0.5f));
+			AWRHazard::Spawn(World, Caster, Ground(At), Width / Patches * 0.7f, Num(TEXT("seconds"), 6.f), Num(TEXT("dps"), 10.f), TEXT("fire"));
+		}
+		break;
+	}
+	case EWRAreaShape::Pool:
+	{
+		// Lava where you aim (up to range), on the ground.
+		FHitResult Hit;
+		const FVector Eye = Caster->GetActorLocation() + FVector(0, 0, 60);
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSpellAim), false, Caster);
+		const float Range = Num(TEXT("range"), 1500.f);
+		const FVector At = World->LineTraceSingleByChannel(Hit, Eye, Eye + Aim.Vector() * Range, ECC_WorldStatic, Query) ? Hit.ImpactPoint : Ground(Feet + Flat * Range * 0.7f);
+		AWRHazard::Spawn(World, Caster, At, Num(TEXT("radius"), 300.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 12.f), TEXT("lava"));
+		break;
+	}
+	case EWRAreaShape::Nova:
+	{
+		const float Radius = Num(TEXT("radius"), 500.f);
+		AWRGroundMarker::Spawn(World, Feet + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, Color, 0.5f);
+		for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
+		{
+			if (*It != Caster && It->IsAlive() && Caster->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Caster->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())
+			{
+				Strike(*It, Caster->GetActorLocation());
+			}
+		}
+		break;
+	}
+	case EWRAreaShape::Lance:
+	{
+		// Pierces everything along the aim.
+		const float Range = Num(TEXT("range"), 2000.f);
+		const FVector From = Caster->GetActorLocation() + FVector(0, 0, 40);
+		TArray<FHitResult> Hits;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRIceLance), false, Caster);
+		World->SweepMultiByChannel(Hits, From, From + Aim.Vector() * Range, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(45.f), Query);
+		TSet<AActor*> Done;
+		for (const FHitResult& H : Hits)
+		{
+			AWRCharacterBase* Target = Cast<AWRCharacterBase>(H.GetActor());
+			if (Target && !Done.Contains(Target) && Target->IsAlive() && Caster->IsHostileTo(Target))
+			{
+				Done.Add(Target);
+				Strike(Target, From);
+			}
+		}
+		AWRGroundMarker::Spawn(World, Feet + FVector(0, 0, 3), Aim, FVector2D(Range, 60.f), true, Color, 0.4f);
+		break;
+	}
+	}
+	UWRCombatLibrary::GainResource(Caster, WRTags::Element_Fire, Num(TEXT("heat"), 0.f));
+	UWRCombatLibrary::GainResource(Caster, WRTags::Element_Frost, Num(TEXT("chill"), 0.f));
+	if (UWRPathComponent* Paths = UWRPathComponent::FindFor(Caster))
+	{
+		Paths->AwardXP(PathId, FMath::RoundToInt(WRTune(TEXT("paths.xpPerAbilityUse"), 6.f)));
+	}
+}
+
+UWRGA_FireWall::UWRGA_FireWall()
+{
+	DisplayName = TEXT("Fire wall"); PathId = TEXT("fire"); NodeId = TEXT("fire_wall");
+	SpellKey = TEXT("spells.fireWall"); CooldownKey = TEXT("spells.fireWall.cooldown"); CooldownFallback = 10.f;
+	Shape = EWRAreaShape::Wall; Element = WRTags::Element_Fire;
+}
+
+UWRGA_LavaPool::UWRGA_LavaPool()
+{
+	DisplayName = TEXT("Lava pool"); PathId = TEXT("fire"); NodeId = TEXT("lava_pool");
+	SpellKey = TEXT("spells.lavaPool"); CooldownKey = TEXT("spells.lavaPool.cooldown"); CooldownFallback = 12.f;
+	Shape = EWRAreaShape::Pool; Element = WRTags::Element_Fire;
+}
+
+UWRGA_FrostNova::UWRGA_FrostNova()
+{
+	DisplayName = TEXT("Frost nova"); PathId = TEXT("frost"); NodeId = TEXT("frost_nova");
+	SpellKey = TEXT("spells.frostNova"); CooldownKey = TEXT("spells.frostNova.cooldown"); CooldownFallback = 8.f;
+	Shape = EWRAreaShape::Nova; Element = WRTags::Element_Frost;
+}
+
+UWRGA_IceLance::UWRGA_IceLance()
+{
+	DisplayName = TEXT("Ice lance"); PathId = TEXT("frost"); NodeId = TEXT("ice_lance");
+	SpellKey = TEXT("spells.iceLance"); CooldownKey = TEXT("spells.iceLance.cooldown"); CooldownFallback = 6.f;
+	Shape = EWRAreaShape::Lance; Element = WRTags::Element_Frost;
+}
+
 // ---------------------------------------------------------------- registry
 
 TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FName NodeId)
@@ -651,11 +800,15 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 	{
 		if (NodeId == TEXT("fire_bolt")) return UWRGA_FireBolt::StaticClass();
 		if (NodeId == TEXT("flame_slash")) return UWRGA_FlameSlash::StaticClass();
+		if (NodeId == TEXT("fire_wall")) return UWRGA_FireWall::StaticClass();
+		if (NodeId == TEXT("lava_pool")) return UWRGA_LavaPool::StaticClass();
 	}
 	else if (PathId == TEXT("frost"))
 	{
 		if (NodeId == TEXT("frost_shard")) return UWRGA_FrostShard::StaticClass();
 		if (NodeId == TEXT("ice_slash")) return UWRGA_IceSlash::StaticClass();
+		if (NodeId == TEXT("frost_nova")) return UWRGA_FrostNova::StaticClass();
+		if (NodeId == TEXT("ice_lance")) return UWRGA_IceLance::StaticClass();
 	}
 	return nullptr;
 }

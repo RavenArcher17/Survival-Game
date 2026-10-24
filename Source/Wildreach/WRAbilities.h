@@ -155,6 +155,36 @@ protected:
 UCLASS() class WILDREACH_API UWRGA_FireBolt : public UWRGA_Spell { GENERATED_BODY() public: UWRGA_FireBolt(); };
 UCLASS() class WILDREACH_API UWRGA_FrostShard : public UWRGA_Spell { GENERATED_BODY() public: UWRGA_FrostShard(); };
 
+UENUM()
+enum class EWRAreaShape : uint8
+{
+	Wall,   // a line of fire across your aim
+	Pool,   // a lingering pool where you aim
+	Nova,   // a burst around you
+	Lance,  // a piercing line along your aim
+};
+
+/** Tree spells past the trunk: Fire wall, Lava pool (fire); Frost nova, Ice lance (frost). Numbers: tuning spells.<key>.*. */
+UCLASS()
+class WILDREACH_API UWRGA_AreaSpell : public UWRGameplayAbility
+{
+	GENERATED_BODY()
+
+public:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+protected:
+	void Execute();
+	FString SpellKey;
+	EWRAreaShape Shape = EWRAreaShape::Nova;
+	FGameplayTag Element;
+};
+
+UCLASS() class WILDREACH_API UWRGA_FireWall : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_FireWall(); };
+UCLASS() class WILDREACH_API UWRGA_LavaPool : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_LavaPool(); };
+UCLASS() class WILDREACH_API UWRGA_FrostNova : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_FrostNova(); };
+UCLASS() class WILDREACH_API UWRGA_IceLance : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_IceLance(); };
+
 /** Maps skill-tree nodes to ability classes. Nodes without an entry aren't implemented yet. */
 UCLASS()
 class WILDREACH_API UWRAbilityRegistry : public UObject

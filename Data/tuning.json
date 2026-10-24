@@ -88,6 +88,10 @@
     "frostShard": { "damage": 14, "frostBuildup": 40, "speed": 3000, "cooldown": 1.0, "chill": 6 },
     "flameSlash": { "multiplier": 1.4, "burnBuildup": 45, "cooldown": 3.0, "heat": 12 },
     "iceSlash": { "multiplier": 1.3, "frostBuildup": 50, "cooldown": 3.0, "chill": 8 },
+    "fireWall": { "dps": 10, "seconds": 6, "distance": 600, "width": 800, "patches": 5, "cooldown": 10, "heat": 15 },
+    "lavaPool": { "dps": 12, "seconds": 8, "radius": 300, "range": 1500, "cooldown": 12, "heat": 15 },
+    "frostNova": { "damage": 16, "frostBuildup": 55, "poise": 15, "radius": 500, "cooldown": 8, "chill": 10 },
+    "iceLance": { "damage": 30, "frostBuildup": 45, "poise": 20, "range": 2000, "cooldown": 6, "chill": 10 },
     "_all": "placeholder"
   },
 

@@ -8,6 +8,10 @@
 #include "WRCrafting.h"
 #include "WRCreature.h"
 #include "WRLifeSkills.h"
+#include "WRAbilities.h"
+#include "WRCharacter.h"
+#include "WRPathComponent.h"
+#include "WRPathTypes.h"
 #include "WRSocial.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
@@ -78,7 +82,23 @@ void AWRPlayerController::WRSkill(FName Skill, int32 Level) { ServerCommand(FStr
 void AWRPlayerController::WRSkillXP(FName Skill, int32 XP) { ServerCommand(FString::Printf(TEXT("skillxp %s %d"), *Skill.ToString(), XP)); }
 void AWRPlayerController::WRHitPlayer(const FString& Name, float Damage) { ServerCommand(FString::Printf(TEXT("hitplayer %s %.0f"), *Name, Damage)); }
 void AWRPlayerController::WRHazard() { ServerCommand(TEXT("hazard")); }
+void AWRPlayerController::WRLearn(FName Path, FName Node) { ServerCommand(FString::Printf(TEXT("learn %s %s"), *Path.ToString(), *Node.ToString())); }
+void AWRPlayerController::WRCast(int32 Slot)
+{
+	if (AWRCharacter* Survivor = Cast<AWRCharacter>(GetPawn()))
+	{
+		const EWRAbilityInput Input = static_cast<EWRAbilityInput>(static_cast<int32>(EWRAbilityInput::Slot1) + FMath::Clamp(Slot, 1, 8) - 1);
+		Survivor->PressAbilityInput(Input);
+		Survivor->ReleaseAbilityInput(Input);
+	}
+}
 void AWRPlayerController::WRSkillStat(FName Stat) { ServerCommand(FString::Printf(TEXT("skillstat %s"), *Stat.ToString())); }
+
+void AWRPlayerController::TogglePaths()
+{
+	Menu = Menu == EWRMenu::Paths ? EWRMenu::None : EWRMenu::Paths;
+	MenuIndex = 0;
+}
 
 void AWRPlayerController::ToggleSkills()
 {
@@ -202,6 +222,10 @@ FString AWRPlayerController::GetMenuTitle() const
 	{
 		return TEXT("Land claim  (E = close)");
 	}
+	if (Menu == EWRMenu::Paths)
+	{
+		return TEXT("Paths  (Up/Down, Enter = learn a node, P = close; new abilities fill your 1-8 slots)");
+	}
 	if (Menu == EWRMenu::Skills)
 	{
 		return TEXT("Life skills  (Up/Down, Enter = choose a perk when one is waiting, K = close)");
@@ -261,6 +285,46 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 	if (Menu == EWRMenu::Build)
 	{
 		return BuildPieceMenu();
+	}
+	if (Menu == EWRMenu::Paths)
+	{
+		const UWRPathComponent* Paths = PS ? PS->GetPaths() : nullptr;
+		if (!Paths)
+		{
+			return Out;
+		}
+		Out.Add({ FString::Printf(TEXT("Character level %d"), Paths->GetCharacterLevel()), FString() });
+		for (const FName PathId : { Paths->GetMainPath(), Paths->GetSubPath() })
+		{
+			const FWRPathDef* Def = PathId.IsNone() ? nullptr : FWRPathRegistry::Get().Find(PathId);
+			if (!Def)
+			{
+				continue;
+			}
+			const FWRPathProgress* Progress = Paths->GetProgress(PathId);
+			const int32 Earned = Paths->GetEarned(PathId), Spent = Paths->GetSpent(PathId);
+			Out.Add({ FString::Printf(TEXT("-- %s (%s): %d points to spend (%d earned) --"), *Def->Name, PathId == Paths->GetMainPath() ? TEXT("main") : TEXT("subclass"),
+				Earned - Spent, Earned), FString() });
+			FName Branch = NAME_None;
+			for (const FWRPathNodeDef& Node : Def->Nodes)
+			{
+				if (Node.Branch != Branch)
+				{
+					Branch = Node.Branch;
+					Out.Add({ FString::Printf(TEXT("  %s branch"), *Branch.ToString().Replace(TEXT("_"), TEXT(" "))), FString() });
+				}
+				const int32 Rank = Progress ? Progress->GetRank(Node.Id) : 0;
+				const bool bAbility = Node.Kind == EWRNodeKind::Ability;
+				const bool bBuilt = !bAbility || UWRAbilityRegistry::ClassForNode(PathId, Node.Id) != nullptr;
+				FWRMenuEntry E;
+				E.Label = FString::Printf(TEXT("    [%d/%d] %s  (%d pt%s%s)  %s%s"), Rank, Node.MaxRank, *Node.Name, Node.Cost, Node.Cost == 1 ? TEXT("") : TEXT("s"),
+					Node.Gate > 0 ? *FString::Printf(TEXT(", needs %d in branch"), Node.Gate) : TEXT(""), *Node.Text, bBuilt ? TEXT("") : TEXT("  [not built yet]"));
+				E.Command = Rank < Node.MaxRank ? FString::Printf(TEXT("learn %s %s"), *PathId.ToString(), *Node.Id.ToString()) : FString();
+				E.bAvailable = Rank < Node.MaxRank && Earned - Spent >= Node.Cost;
+				Out.Add(E);
+			}
+		}
+		return Out;
 	}
 	if (Menu == EWRMenu::Skills)
 	{
@@ -401,6 +465,15 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 
 	if (RunBuildCommand(Args, OutResult))
 	{
+		return true;
+	}
+	if (Cmd == TEXT("learn"))
+	{
+		const FString Why = PS->GetPaths()->BuyNode(FName(*Arg(1)), FName(*Arg(2)));
+		const FWRPathDef* Def = FWRPathRegistry::Get().Find(FName(*Arg(1)));
+		const FWRPathNodeDef* Node = Def ? Def->FindNode(FName(*Arg(2))) : nullptr;
+		OutResult = !Why.IsEmpty() ? Why : FString::Printf(TEXT("Learned %s"), Node ? *Node->Name : *Arg(2));
+		ClientNotify(OutResult);
 		return true;
 	}
 	if (Cmd == TEXT("perk"))

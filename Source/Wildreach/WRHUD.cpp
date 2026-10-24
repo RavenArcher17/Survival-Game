@@ -187,7 +187,7 @@ void AWRHUD::DrawHUD()
 		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
 		DrawText(Line, FLinearColor::White, 24.f, 48.f);
 	}
-	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  K skills  B build  V view"),
+	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  P paths  K skills  B build  V view"),
 		FLinearColor(1.f, 1.f, 1.f, 0.55f), 24.f, 24.f);
 
 	// Quick slots, bottom centre.

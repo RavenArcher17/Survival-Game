@@ -19,6 +19,7 @@ enum class EWRMenu : uint8
 	Claim,
 	Tame,
 	Skills,
+	Paths,
 };
 
 class AWRBuildPiece;
@@ -87,6 +88,10 @@ public:
 	UFUNCTION(Exec) void WRHitPlayer(const FString& Name, float Damage);
 	/** Dev: what biome hazard is underfoot, and does it affect me. */
 	UFUNCTION(Exec) void WRHazard();
+	/** Dev/test: press the ability in quick slot 1-8 (as the number keys do). */
+	UFUNCTION(Exec) void WRCast(int32 Slot);
+	/** Dev/test: learn a tree node through the same server command the Paths menu sends. */
+	UFUNCTION(Exec) void WRLearn(FName Path, FName Node);
 
 	// --- Building ---
 	bool IsPlacing() const { return !PlacingPiece.IsNone(); }
@@ -152,6 +157,7 @@ private:
 
 	void ToggleInventory();
 	void ToggleSkills();
+	void TogglePaths();
 	void MenuUp();
 	void MenuDown();
 	void MenuConfirm();
