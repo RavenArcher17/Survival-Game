@@ -14,7 +14,8 @@ Batch flow (what the four-legged set used):
 3. Rig + animations: `blender -b -P rig_quadruped.py -- out\<id>_textured.glb out\<id>.fbx --head +x --preview out\<id>_walk.png`
    (finds the 4 feet, aligns the body, builds the skeleton, auto-weights, bakes Idle/Walk/Run/Attack/Hit/Death).
    Right-facing concepts come out head +X. Three-quarter or left-facing ones land on any axis: check `_walk_0.png`
-   (side view, head should be on the right) and re-run with `--head -x|+y|-y` as needed.
+   (side view, head should be on the right) and re-run with `--head -x|+y|-y` as needed. Those also come out short-bodied:
+   `--stretch 1.3` lengthens just the torso between the legs (Rimeclaw uses it).
 4. Import: `WR_IMPORTS="C:\...\out\a.fbx=A;C:\...\out\b.fbx=B"` then
    `UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script=Tools/import_creature.py`.
    The folder name lower-cased must equal the FBX name (`aurora_fox.fbx=Aurora_fox`). To replace a creature, move its

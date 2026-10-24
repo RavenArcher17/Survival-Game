@@ -1,5 +1,5 @@
 # Blender (headless): rig an image-to-3D quadruped and bake its basic animations, then export FBX for Unreal.
-#   blender -b -P rig_quadruped.py -- <model.glb> <out.fbx> [--head +x|-x|+y|-y] [--preview out.png]
+#   blender -b -P rig_quadruped.py -- <model.glb> <out.fbx> [--head +x|-x|+y|-y] [--gait trot|hop] [--stretch 1.3] [--preview out.png]
 # Legs are found by clustering the lowest part of the mesh; spine/neck/head/tail come from the leg positions.
 # Actions: Idle, Walk, Run, Attack, Hit, Death (30 fps). Unreal gets one skeletal mesh + six animations.
 import bpy, sys, math
@@ -11,6 +11,7 @@ src, out = args[0], args[1]
 head_dir = args[args.index("--head") + 1] if "--head" in args else "+x"
 preview = args[args.index("--preview") + 1] if "--preview" in args else None
 gait_kind = args[args.index("--gait") + 1] if "--gait" in args else "trot"  # trot | hop (front pair, then rear pair)
+stretch = float(args[args.index("--stretch") + 1]) if "--stretch" in args else 1.0  # torso length multiplier
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
@@ -91,6 +92,22 @@ if abs(turn) > math.radians(3):
     L = hi[0] - lo[0]
     centers, cut, sizes = feet_now()
 print("aligned by", round(math.degrees(turn), 1), "deg")
+# Three-quarter concepts come out foreshortened (short bodies): --stretch lengthens only the torso between the inner
+# edges of the rear and front feet, so legs, head and tail keep their shape.
+if stretch != 1.0:
+    xs = np.sort(centers[:, 0])
+    rx0, fx0 = xs[1] + 0.05, xs[2] - 0.05
+    if fx0 > rx0:
+        x = v[:, 0]
+        nx = np.where(x < rx0, x, np.where(x > fx0, x + (fx0 - rx0) * (stretch - 1), rx0 + (x - rx0) * stretch))
+        v = v.copy()
+        v[:, 0] = nx - (nx.min() + nx.max()) / 2
+        body.data.vertices.foreach_set("co", v.ravel())
+        body.data.update()
+        lo, hi = v.min(0), v.max(0)
+        L = hi[0] - lo[0]
+        centers, cut, sizes = feet_now()
+    print("torso stretched", stretch, "between x", round(float(rx0), 2), round(float(fx0), 2))
 lab = np.zeros(1, int)
 print("feet slice", cut, "island sizes", sizes)
 names = ["FL", "FR", "RL", "RR"]  # front/rear, left (+y) / right
