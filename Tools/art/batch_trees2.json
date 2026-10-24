@@ -1,0 +1,9 @@
+{
+  "_comment": "More tree variety: pines without snowy-forest backgrounds (the first batch's 'snow-covered' prompt pulled in winter scenes).",
+  "template": "3d game asset of {p}, one single isolated tree, entire tree visible, centered, studio product shot, isolated on plain white background, no ground, soft even lighting",
+  "negative": "cropped, cut off, forest, multiple trees, other trees, background trees, snowfall, winter landscape, hills, ground, text, watermark, frame, cartoon, blurry",
+  "creatures": [
+    { "id": "pine2", "prompt": "a tall slender spruce tree with dark green needles lightly dusted with white frost, straight trunk" },
+    { "id": "pine3", "prompt": "a wind-bent mountain pine tree with dark green needle clusters and patches of snow on its branches, twisted trunk" }
+  ]
+}

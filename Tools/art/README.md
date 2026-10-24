@@ -19,7 +19,10 @@ Batch flow (what the four-legged set used):
    `--stretch 1.3` lengthens just the torso between the legs (Rimeclaw uses it). `--legs 6` rigs front / middle / rear
    pairs with a tripod gait (insects come out of SDXL with six legs). `--add-mid-legs` turns a four-legged model into a
    six-legged one by copying the front legs halfway back (SDXL never draws six-legged mammals: Cinderfang, Woolly drudge).
-   `--gait hop` gives critters a bounding gait instead of a trot.
+   `--gait hop` gives critters a bounding gait instead of a trot. `--legs 2` rigs birds (alternating steps with a
+   waddle; feet that overlap mid-stride are split front/back).
+   Worms and moths use `rig_special.py -- in.glb out.fbx --body worm|moth [--head ..] [--hover 4]`: a 10-bone spine
+   that slithers and rears to strike, or a flat moth (concept seen from above) with hinged flapping wings that hovers.
 4. Import: `WR_IMPORTS="C:\...\out\a.fbx=A;C:\...\out\b.fbx=B"` then
    `UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script=Tools/import_creature.py`.
    The folder name lower-cased must equal the FBX name (`aurora_fox.fbx=Aurora_fox`). To replace a creature, move its
@@ -27,6 +30,10 @@ Batch flow (what the four-legged set used):
    the old texture and animations).
 5. Wire: `node Tools/art/wire_creatures.mjs id=Folder[:meshYaw] ...` fills `mesh` / `anims` in `Data/creatures.json`.
 6. Check in game: `powershell -File Tools\creatureshots.ps1 id1 id2 ...` (two `WRArtCam` angles per creature, burrowers kept visible).
+
+Pack creatures (Fab, git-ignored): `node Tools/art/wire_pack_creatures.mjs` points Gloomhowl (Barghest), Scorchwing
+and Skaldrith (Mountain Dragon) at the pack meshes and animations, with tinted materials from
+`Tools/art/creature_tints.py` (`M_CreatureTint` + one instance each). Flyers can add `fly` / `hover` animations.
 
 Props (static, no rig), e.g. the island trees:
 

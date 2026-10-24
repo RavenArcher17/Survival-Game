@@ -1,5 +1,5 @@
 # Blender (headless): rig an image-to-3D quadruped and bake its basic animations, then export FBX for Unreal.
-#   blender -b -P rig_quadruped.py -- <model.glb> <out.fbx> [--head +x|-x|+y|-y] [--gait trot|hop] [--legs 4|6] [--add-mid-legs] [--stretch 1.3] [--preview out.png]
+#   blender -b -P rig_quadruped.py -- <model.glb> <out.fbx> [--head +x|-x|+y|-y] [--gait trot|hop] [--legs 2|4|6] [--add-mid-legs] [--stretch 1.3] [--preview out.png]
 # Legs are found by clustering the lowest part of the mesh; spine/neck/head/tail come from the leg positions.
 # Actions: Idle, Walk, Run, Attack, Hit, Death (30 fps). Unreal gets one skeletal mesh + six animations.
 import bpy, sys, math
@@ -75,6 +75,14 @@ def feet_now():
         feet, sizes = find_feet(cut)
         if len(feet) == legs_n and sizes[legs_n - 1] > 20:
             return np.array(feet), cut, sizes
+    if legs_n == 2:
+        # A bird mid-stride has one foot in front of the other and the toes overlap: split the lowest slice along X.
+        low = v[v[:, 2] < 0.06][:, :2]
+        a, b = low[:, 0].min(), low[:, 0].max()
+        for _ in range(12):
+            near_a = np.abs(low[:, 0] - a) < np.abs(low[:, 0] - b)
+            a, b = low[near_a, 0].mean(), low[~near_a, 0].mean()
+        return np.array([low[near_a].mean(0), low[~near_a].mean(0)]), 0.06, [int(near_a.sum()), int((~near_a).sum())]
     return np.array(feet), cut, sizes
 
 # Image-to-3D creatures often stand at an angle (three-quarter concept art): turn the body so the line from the
@@ -170,15 +178,21 @@ print("feet slice", cut, "island sizes", sizes)
 # Pairs from front to back (F, M for six legs, R), each left (+y) then right.
 order = sorted(range(legs_n), key=lambda k: -centers[k][0])
 legs = {}
-for pair, tag in zip(range(0, legs_n, 2), ["F", "M", "R"] if legs_n == 6 else ["F", "R"]):
+for pair, tag in zip(range(0, legs_n, 2), {6: ["F", "M", "R"], 4: ["F", "R"], 2: ["R"]}[legs_n]):
     left, right = sorted(order[pair:pair + 2], key=lambda k: -centers[k][1])
     legs[tag + "L"], legs[tag + "R"] = centers[left], centers[right]
 print("legs", {k: [round(float(c[0]), 3), round(float(c[1]), 3)] for k, c in legs.items()})
 
 # ---- measure the body instead of assuming proportions (tortoises, giraffes and cats all differ)
-fx = (legs["FL"][0] + legs["FR"][0]) / 2
-rx = (legs["RL"][0] + legs["RR"][0]) / 2
-mid = v[(v[:, 0] > rx + 0.15 * (fx - rx)) & (v[:, 0] < fx - 0.15 * (fx - rx)) & (np.abs(v[:, 1]) < 0.12)]
+if legs_n == 2:
+    # Bipeds (birds): hips over the feet, the body runs forward from them; the belly is the gap between the legs.
+    leg_x = (legs["RL"][0] + legs["RR"][0]) / 2
+    fx, rx = leg_x + 0.22 * L, leg_x - 0.02
+    mid = v[(np.abs(v[:, 0] - leg_x) < 0.12 * L) & (np.abs(v[:, 1]) < 0.04)]
+else:
+    fx = (legs["FL"][0] + legs["FR"][0]) / 2
+    rx = (legs["RL"][0] + legs["RR"][0]) / 2
+    mid = v[(v[:, 0] > rx + 0.15 * (fx - rx)) & (v[:, 0] < fx - 0.15 * (fx - rx)) & (np.abs(v[:, 1]) < 0.12)]
 belly = float(np.percentile(mid[:, 2], 3)) if len(mid) else 0.35
 back = float(mid[:, 2].max()) if len(mid) else 0.8
 hip_z = float(np.clip(belly + 0.45 * (back - belly), 0.2, 0.8))
@@ -206,9 +220,8 @@ def bone(name, head, tail, parent=None, roll_to=(0, 0, 1)):
         b.parent = eb[parent]
     return b
 
-front_x = (legs["FL"][0] + legs["FR"][0]) / 2
-rear_x = (legs["RL"][0] + legs["RR"][0]) / 2
-bone("root", (0, 0, 0), (0, 0, 0.2))
+front_x, rear_x = fx, rx
+bone("root", (0, 0, 0), (0, 0, 0.2))  # points up: its local Y is world up, so lift with location.y
 bone("pelvis", (rear_x, 0, hip_z), (rear_x + (front_x - rear_x) * 0.25, 0, hip_z + 0.02), "root")
 spine_pts = [rear_x + (front_x - rear_x) * f for f in (0.25, 0.55, 0.85, 1.05)]
 prev = "pelvis"
@@ -291,6 +304,8 @@ if gait_kind == "hop":
     phase = {"FL": 0.0, "FR": 0.0, "RL": 0.5, "RR": 0.5}  # hop: front pair lands, rear pair pushes off
 if legs_n == 6:
     phase = {"FL": 0.0, "MR": 0.0, "RL": 0.0, "FR": 0.5, "ML": 0.5, "RR": 0.5}  # tripod: three feet always down
+if legs_n == 2:
+    phase = {"RL": 0.0, "RR": 0.5}  # biped: alternate, with a waddle (below)
 
 def gait(t, swing, knee, bob):
     for n, ph in phase.items():
@@ -298,7 +313,9 @@ def gait(t, swing, knee, bob):
         P[f"{n}_upper"].rotation_euler.z = R(swing) * math.sin(a)
         P[f"{n}_lower"].rotation_euler.z = -R(knee) * max(0.0, math.sin(a + 1.2))
         P[f"{n}_foot"].rotation_euler.z = R(knee * 0.5) * max(0.0, math.sin(a + 1.6))
-    P["root"].location.z = bob * abs(math.sin(2 * math.pi * t * 2))
+    P["root"].location.y = bob * abs(math.sin(2 * math.pi * t * 2))
+    if legs_n == 2:
+        P["root"].rotation_euler.x = R(4) * math.sin(2 * math.pi * t)  # waddle onto each planted foot
     P["head"].rotation_euler.x = R(3) * math.sin(4 * math.pi * t)
     P["tail1"].rotation_euler.z = R(10) * math.sin(2 * math.pi * t)
 
@@ -327,7 +344,7 @@ make_action("Hit", 0.3, hit, loop=False)
 def death(t):
     e = min(1.0, t / 0.7) ** 2
     P["root"].rotation_euler.x = R(85) * e
-    P["root"].location.z = -0.05 * e
+    P["root"].location.y = -0.05 * e
     for n in phase:
         P[f"{n}_upper"].rotation_euler.z = R(15) * e * (1 if n[0] == "F" else -1)
     P["neck"].rotation_euler.x = R(-10) * e

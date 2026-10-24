@@ -16,6 +16,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "ProceduralMeshComponent.h"
 
 static UMaterialInterface* ShapeMaterial()
 {
@@ -204,6 +205,9 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("ice_rock"), { { Cube, FLinearColor(0.45f, 0.65f, 0.85f), FVector(200, 170, 160), 50, true, 24000, FVector(12, 0, 18) } } },
 		{ TEXT("ember_shrub"), { { Sphere, FLinearColor(0.6f, 0.12f, 0.02f), FVector(110, 110, 60), 15, false, 12000, FVector::ZeroVector } } },
 		{ TEXT("snow_shrub"), { { Sphere, FLinearColor(0.75f, 0.82f, 0.8f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
+		// Ridge faces: decoration only (no collision), so the ridge stays a wall rather than gaining footholds.
+		{ TEXT("basalt_cliff"), { { Sphere, FLinearColor(0.03f, 0.028f, 0.027f), FVector(500, 440, 400), 60, false, 30000, FVector(12, 0, 0) } } },
+		{ TEXT("ice_cliff"), { { Sphere, FLinearColor(0.45f, 0.55f, 0.65f), FVector(500, 440, 400), 60, false, 30000, FVector(12, 0, 0) } } },
 	};
 	// Real meshes from the art packs / AI props replace the shapes above where we have them.
 	// Size is what each mesh is fitted to (cm, before the instance's own scale): all three axes for rocks, so they keep
@@ -228,9 +232,11 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	const TMap<FString, FArt> Art = {
 		{ TEXT("char_tree"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")) },
 			FVector(0, 0, 720), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
-		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")) }, FVector(0, 0, 1000), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")) }, FVector(0, 0, 1000), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
 		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, {} } },
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
+		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
+		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
 		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 130), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // scorched: dark, dull
 			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) } }, { { TEXT("Color Intensity"), 0.3f }, { TEXT("Sature Max"), 0.6f } } } },
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 120), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // frosted: pale
@@ -331,31 +337,67 @@ void AWRDressing::BuildHazardVisuals()
 	{
 		return;
 	}
-	// Flat tiles a little above the river bed: glowing orange lava, pale blue ice.
+	// One continuous surface per hazard, a little above the river bed: each cell is a quad whose corners are shared
+	// with its neighbours and sit at the average height of the cells around them, so slopes are smooth (no steps).
 	for (const FName Kind : { FName(TEXT("lava")), FName(TEXT("ice")) })
 	{
 		const bool bLava = Kind == TEXT("lava");
 		const TMap<FIntPoint, float>& Cells = FWRBiomeHazards::Cells(Kind);
-		TArray<FTransform> Tiles;
+		if (Cells.Num() == 0)
+		{
+			continue;
+		}
 		const float S = FWRBiomeHazards::CellSize();
-		for (const TPair<FIntPoint, float>& C : Cells)
+		const float Lift = bLava ? 40.f : 20.f;
+		TArray<FVector> Verts;
+		TArray<int32> Tris;
+		TMap<FIntPoint, int32> CornerIndex;
+		const auto Corner = [&](const FIntPoint& P) -> int32
 		{
-			// Tilt each tile to the ground's slope, taken from the neighbouring cells (or the cell itself at edges).
-			const auto Z = [&](int32 DX, int32 DY) { const float* N = Cells.Find(C.Key + FIntPoint(DX, DY)); return N ? *N : C.Value; };
-			const FVector Normal = FVector(-(Z(1, 0) - Z(-1, 0)) / (2.f * S), -(Z(0, 1) - Z(0, -1)) / (2.f * S), 1.f).GetSafeNormal();
-			const FRotator Tilt = FRotationMatrix::MakeFromZ(Normal).Rotator();
-			Tiles.Emplace(Tilt, FVector((C.Key.X + 0.5f) * S, (C.Key.Y + 0.5f) * S, C.Value + (bLava ? 25.f : 15.f)), FVector(S / 100.f * 1.12f, S / 100.f * 1.12f, 0.06f));
-		}
-		if (Tiles.Num() > 0)
-		{
-			UHierarchicalInstancedStaticMeshComponent* Part = MakePart(TEXT("/Engine/BasicShapes/Cube.Cube"), bLava ? FLinearColor(0.95f, 0.22f, 0.02f) : FLinearColor(0.4f, 0.68f, 0.95f), false, bLava ? 24000 : 9000);
-			// Glowing world-aligned lava / glossy ice (Tools/terrain/build_terrain_materials.py), flat colours if missing.
-			if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, bLava ? TEXT("/Game/Terrain/M_Lava.M_Lava") : TEXT("/Game/Terrain/M_Ice.M_Ice")))
+			if (const int32* Found = CornerIndex.Find(P)) return *Found;
+			float Sum = 0.f;
+			int32 N = 0;
+			for (const FIntPoint& Cell : { P, P - FIntPoint(1, 0), P - FIntPoint(0, 1), P - FIntPoint(1, 1) })
 			{
-				Part->SetMaterial(0, Mat);
+				if (const float* Z = Cells.Find(Cell)) { Sum += *Z; ++N; }
 			}
-			Part->AddInstances(Tiles, false, true);
+			return CornerIndex.Add(P, Verts.Add(FVector(P.X * S, P.Y * S, Sum / FMath::Max(1, N) + Lift)));
+		};
+		for (const TPair<FIntPoint, float>& Cell : Cells)
+		{
+			const int32 A = Corner(Cell.Key), B = Corner(Cell.Key + FIntPoint(1, 0)), C2 = Corner(Cell.Key + FIntPoint(1, 1)), D = Corner(Cell.Key + FIntPoint(0, 1));
+			Tris.Append({ A, C2, B, A, D, C2 });  // counter-clockwise from above, so the faces point up
 		}
+		TArray<FVector> Normals;
+		Normals.Init(FVector::ZeroVector, Verts.Num());
+		for (int32 i = 0; i < Tris.Num(); i += 3)
+		{
+			const FVector N = FVector::CrossProduct(Verts[Tris[i + 2]] - Verts[Tris[i]], Verts[Tris[i + 1]] - Verts[Tris[i]]);
+			for (int32 k = 0; k < 3; ++k) Normals[Tris[i + k]] += N;
+		}
+		TArray<FVector2D> UVs;
+		for (int32 i = 0; i < Verts.Num(); ++i)
+		{
+			Normals[i] = Normals[i].GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector);
+			if (Normals[i].Z < 0.f) Normals[i] = -Normals[i];
+			UVs.Add(FVector2D(Verts[i].X, Verts[i].Y) / S);
+		}
+		UProceduralMeshComponent* Surface = NewObject<UProceduralMeshComponent>(this);
+		Surface->SetupAttachment(RootComponent);
+		Surface->RegisterComponent();
+		Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // the hazard itself is cell-based on the server
+		Surface->SetCastShadow(false);
+		Surface->CreateMeshSection(0, Verts, Tris, Normals, UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
+		Surface->SetCullDistance(bLava ? 24000.f : 9000.f);
+		// Glowing world-aligned lava / glossy ice (Tools/terrain/build_terrain_materials.py), flat colours if missing.
+		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, bLava ? TEXT("/Game/Terrain/M_Lava.M_Lava") : TEXT("/Game/Terrain/M_Ice.M_Ice"));
+		if (!Mat)
+		{
+			UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(ShapeMaterial(), this);
+			MID->SetVectorParameterValue(TEXT("Color"), bLava ? FLinearColor(0.95f, 0.22f, 0.02f) : FLinearColor(0.4f, 0.68f, 0.95f));
+			Mat = MID;
+		}
+		Surface->SetMaterial(0, Mat);
 	}
 }
 
@@ -448,6 +490,43 @@ void AWRCave::BuildShell()
 	Block(FVector(1600, -400, 175), FVector(800, 300, 1150));      // tunnel
 	Block(FVector(1600, 400, 175), FVector(800, 300, 1150));
 	Block(FVector(1600, 0, 600), FVector(800, 800, 300));
+
+	// Boulders heaped behind, beside and over the shell so it reads as a rock outcrop rather than a box. Seeded from the
+	// cave's position, so every machine builds the same rocks (and collision). The tunnel mouth (+X) stays clear.
+	TArray<UStaticMesh*> Boulders;
+	for (const TCHAR* N : { TEXT("01A"), TEXT("02A"), TEXT("05A"), TEXT("08A"), TEXT("12A") })
+	{
+		if (UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_%s.SM_SimpleRock_%s"), N, N))) Boulders.Add(M);
+	}
+	if (Boulders.Num() > 0)
+	{
+		TArray<FVector> Spots;
+		for (float Y = -1050.f; Y <= 1060.f; Y += 700.f) Spots.Add(FVector(-1350.f, Y, 150.f));                     // behind
+		for (float X = -1000.f; X <= 1010.f; X += 666.f) { Spots.Add(FVector(X, -1350.f, 150.f)); Spots.Add(FVector(X, 1350.f, 150.f)); }  // sides
+		for (float X = -700.f; X <= 710.f; X += 700.f) for (float Y = -700.f; Y <= 710.f; Y += 700.f) Spots.Add(FVector(X, Y, 1300.f));  // roof
+		for (float X = 1300.f; X <= 1910.f; X += 600.f) { Spots.Add(FVector(X, -950.f, 150.f)); Spots.Add(FVector(X, 950.f, 150.f)); }   // beside the tunnel
+		Spots.Add(FVector(1550.f, 0.f, 900.f));                                                                     // over the tunnel
+		FRandomStream Rand(GetTypeHash(GetActorLocation().GridSnap(100.f)));
+		TArray<UInstancedStaticMeshComponent*> Parts;
+		for (UStaticMesh* M : Boulders)
+		{
+			UInstancedStaticMeshComponent* Part = NewObject<UInstancedStaticMeshComponent>(this);
+			Part->SetStaticMesh(M);
+			Part->SetupAttachment(RootComponent);
+			Part->SetCollisionProfileName(TEXT("BlockAll"));
+			Part->SetMaterial(0, Rock->GetMaterial(0));  // same tinted rock as the walls
+			Part->RegisterComponent();
+			Parts.Add(Part);
+		}
+		for (int32 i = 0; i < Spots.Num(); ++i)
+		{
+			UInstancedStaticMeshComponent* Part = Parts[Rand.RandHelper(Parts.Num())];
+			const float Size = FMath::Max(1.f, Part->GetStaticMesh()->GetBoundingBox().GetSize().GetMax());
+			const FVector Jitter(Rand.FRandRange(-150.f, 150.f), Rand.FRandRange(-150.f, 150.f), Rand.FRandRange(-80.f, 80.f));
+			const FRotator Rot(Rand.FRandRange(-15.f, 15.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-15.f, 15.f));
+			Part->AddInstance(FTransform(Rot, Spots[i] + Jitter, FVector(Rand.FRandRange(700.f, 1000.f) / Size)));
+		}
+	}
 	Glow->SetLightColor(bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
 }
 

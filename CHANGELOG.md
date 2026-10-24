@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-24: real art, part 2 (every wild creature, terrain polish)
+
+- **Every wild creature now has art** (19 of 25 creatures; the four humanoid bosses and the wisp remain):
+  Glowmoth (flat moth that hovers and flaps), Glacimaw (ice worm that slithers and rears to strike) and Snowpuff
+  (fluffy flightless bird) from the AI pipeline, with new rigs (`rig_special.py --body moth|worm`, `--legs 2`);
+  Gloomhowl (pale Barghest), Scorchwing (ember Mountain Dragon) and Skaldrith (ice Mountain Dragon, the boss) from the
+  QuadrapedCreatures pack with tinted materials (`Tools/art/creature_tints.py`, `wire_pack_creatures.mjs`).
+- Creatures can override materials per slot (`materials` in `creatures.json`), and flyers play `fly` / `hover`
+  animations while airborne.
+- **Lava and ice are one continuous surface** each (procedural mesh with shared corners), so slopes are smooth
+  instead of stepped tiles.
+- **Cave entrances** are heaped with big boulders, so they read as rock outcrops rather than boxes.
+- **Ridge cliffs**: 4.7k large boulders on the ridge's steep faces (`basalt_cliff` / `ice_cliff`), hiding the
+  stretched landscape triangles there. Decoration only, so the ridge is still a wall. Existing placements unchanged.
+- **More trees**: two more tundra pine models (spruce, wind-bent mountain pine).
+- Packaging: the pack creatures' meshes and animations are in `DirectoriesToAlwaysCook`.
+
 ## 2026-10-24: real art, part 1 (creatures and terrain)
 
 - **13 creatures made with the local AI pipeline** (`Tools/art/README.md`): Pumicehog, the nine four-legged ones

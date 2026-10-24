@@ -1,0 +1,10 @@
+{
+  "_comment": "Non-quadruped AI creatures. Each gets its own view: the moth from above-front so the wings show, the worm stretched flat, the bird side-on.",
+  "template": "fantasy creature concept art of {p}, full body, entire creature visible, centered, realistic, detailed, isolated on plain white background, soft studio lighting",
+  "negative": "cropped, cut off, multiple creatures, text, watermark, frame, cartoon, blurry, deformed, busy background, scenery, ground, snow drifts",
+  "creatures": [
+    { "id": "glowmoth", "prompt": "a giant fluffy moth with wide spread wings glowing soft blue and amber patterns, furry body, feathery antennae, front three-quarter view from slightly above" },
+    { "id": "glacimaw", "prompt": "a giant ice worm with a round mouth ringed by icy teeth, pale blue segmented armored body with frost crystals, long body lying stretched out straight and flat, side view" },
+    { "id": "snowpuff", "prompt": "a fluffy round flightless snow bird like a giant white ptarmigan crossed with a chicken, thick puffy white feathers, small beak, two sturdy feathered legs, side view facing right" }
+  ]
+}

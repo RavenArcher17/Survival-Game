@@ -110,6 +110,23 @@ for (let y = 100; y < 3930; y += CELL) {
 		if (kind === "lava" || kind === "ice") hazards[kind].push(...world(x, y));
 	}
 }
+// ---- cliff boulders on the ridge's steep faces (hides the stretched landscape triangles there). Its own random
+// stream, so adding it doesn't move any decoration above. Decoration only: no collision, so the wall still holds.
+types.basalt_cliff = [];
+types.ice_cliff = [];
+const cliffRand = rng(layout.seed * 104729 + 7);
+for (let gy = 150; gy < 3880; gy += 13) {
+	for (let gx = RIDGE_X - 230; gx < RIDGE_X + 230; gx += 13) {
+		const x = gx + (cliffRand() - 0.5) * 13, y = gy + (cliffRand() - 0.5) * 13;
+		const s = slope(x, y), keep = cliffRand();
+		if (s < 0.7 || keep > 0.55 || h(x, y) < 3 || !isClear(x, y)) continue;
+		const [wx, wy, wz] = world(x, y);
+		types[x < RIDGE_X ? "basalt_cliff" : "ice_cliff"].push(wx, wy, wz, Math.round(cliffRand() * 360), Math.round((1.2 + cliffRand() * 1.6) * 100) / 100);
+	}
+}
+counts.basalt_cliff = types.basalt_cliff.length / 5;
+counts.ice_cliff = types.ice_cliff.length / 5;
+
 // ---- places of interest for the in-game map list (M)
 const poiAt = (name, kind, x, y) => { const [wx, wy, wz] = world(x, y); return { name, kind, x: wx, y: wy, z: wz }; };
 const pois = [

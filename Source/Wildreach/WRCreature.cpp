@@ -142,6 +142,11 @@ void FWRCreatureRegistry::Reload()
 		{
 			for (const TPair<FString, TSharedPtr<FJsonValue>>& A : (*AnimObj)->Values) D.Anims.Add(FName(*A.Key), A.Value->AsString());
 		}
+		const TArray<TSharedPtr<FJsonValue>>* MatArr = nullptr;
+		if (O->TryGetArrayField(TEXT("materials"), MatArr))
+		{
+			for (const TSharedPtr<FJsonValue>& M : *MatArr) D.Materials.Add(M->AsString());
+		}
 		D.TamingMethods = ParseNames(O, TEXT("taming"));
 		D.Food = ParseNames(O, TEXT("food"));
 		D.Products = ParseCounts(O, TEXT("products"));
@@ -268,6 +273,13 @@ void AWRCreature::ApplyDef()
 	if (ArtMesh && GetNetMode() != NM_DedicatedServer)
 	{
 		Skel->SetSkeletalMesh(ArtMesh);
+		for (int32 Slot = 0; Slot < Def->Materials.Num(); ++Slot)
+		{
+			if (UMaterialInterface* Mat = Def->Materials[Slot].IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Def->Materials[Slot]))
+			{
+				Skel->SetMaterial(Slot, Mat);
+			}
+		}
 		const FBox Box = ArtMesh->GetBounds().GetBox();
 		const float Height = FMath::Max(1.f, Box.Max.Z - Box.Min.Z);
 		const float Scale = Def->HalfHeight * 2.f / Height * Def->MeshScale;
@@ -309,9 +321,14 @@ void AWRCreature::TickCreatureAnim()
 	{
 		return;
 	}
-	// Locomotion by speed (replicated movement on clients).
+	// Locomotion by speed (replicated movement on clients); flyers in the air use fly / hover when they have them.
 	const float Speed = GetVelocity().Size2D();
 	const float Walk = GetCharacterMovement()->MaxWalkSpeed;
+	if (GetCharacterMovement()->IsFlying() && AnimAssets.Contains(TEXT("fly")))
+	{
+		PlayCreatureAnim(Speed < 60.f && AnimAssets.Contains(TEXT("hover")) ? FName(TEXT("hover")) : FName(TEXT("fly")), true);
+		return;
+	}
 	PlayCreatureAnim(Speed > Walk * 0.65f ? FName(TEXT("run")) : Speed > 25.f ? FName(TEXT("walk")) : FName(TEXT("idle")), true);
 }
 

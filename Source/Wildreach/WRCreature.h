@@ -49,7 +49,8 @@ struct FWRCreatureDef
 
 	// Art: a skeletal mesh replaces the placeholder shape when set (scaled to the capsule, feet on the ground).
 	FString Mesh;
-	TMap<FName, FString> Anims;   // idle, walk, run, attack, hit, death
+	TMap<FName, FString> Anims;   // idle, walk, run, attack, hit, death; flyers also fly (moving) / hover (still) in the air
+	TArray<FString> Materials;    // per-slot overrides ("" keeps the mesh's own), e.g. a tinted pack creature
 	float MeshYaw = 0.f;
 	float MeshScale = 1.f;        // multiplier on the auto fit
 

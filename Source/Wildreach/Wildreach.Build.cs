@@ -24,7 +24,7 @@ public class Wildreach : ModuleRules
 			"NetCore",
 			"Landscape"
 		});
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "ProceduralMeshComponent" });  // lava / ice surfaces
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)
