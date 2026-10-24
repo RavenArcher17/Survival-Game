@@ -82,6 +82,8 @@ void AWRPlayerController::WRSkill(FName Skill, int32 Level) { ServerCommand(FStr
 void AWRPlayerController::WRSkillXP(FName Skill, int32 XP) { ServerCommand(FString::Printf(TEXT("skillxp %s %d"), *Skill.ToString(), XP)); }
 void AWRPlayerController::WRHitPlayer(const FString& Name, float Damage) { ServerCommand(FString::Printf(TEXT("hitplayer %s %.0f"), *Name, Damage)); }
 void AWRPlayerController::WRHazard() { ServerCommand(TEXT("hazard")); }
+void AWRPlayerController::WRSay(const FString& Message) { ServerChat(Message); }
+void AWRPlayerController::WRMap() { ToggleMap(); }
 void AWRPlayerController::WRLearn(FName Path, FName Node) { ServerCommand(FString::Printf(TEXT("learn %s %s"), *Path.ToString(), *Node.ToString())); }
 void AWRPlayerController::WRCast(int32 Slot)
 {

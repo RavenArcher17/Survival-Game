@@ -6,6 +6,7 @@
 #include "WRCreature.h"
 #include "WRBoss.h"
 #include "WRWorldDressing.h"
+#include "WRPlayerController.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
@@ -89,6 +90,42 @@ void AWRHUD::DrawHUD()
 	}
 
 	DrawWorldBars(Survivor);
+
+	// Chat (last lines, fade after 25 s) and the map list (M).
+	if (const AWRPlayerController* WPC = Cast<AWRPlayerController>(PlayerOwner))
+	{
+		const double ChatNow = GetWorld()->GetTimeSeconds();
+		float CY = Canvas->ClipY - 300.f;
+		for (int32 i = WPC->GetChat().Num() - 1; i >= 0; --i)
+		{
+			const AWRPlayerController::FChatLine& L = WPC->GetChat()[i];
+			if (ChatNow - L.Time > 25.0) continue;
+			DrawText(L.Text, FLinearColor(0.85f, 0.95f, 1.f), 20.f, CY, nullptr, 1.f);
+			CY -= 20.f;
+		}
+		if (WPC->IsMapShown() && FWRPoi::All.Num() > 0)
+		{
+			const FVector Here = Survivor->GetActorLocation();
+			static const TCHAR* Dirs[] = { TEXT("N"), TEXT("NE"), TEXT("E"), TEXT("SE"), TEXT("S"), TEXT("SW"), TEXT("W"), TEXT("NW") };
+			const auto Compass = [](const FVector& D) { const float Deg = FMath::RadiansToDegrees(FMath::Atan2(D.X, -D.Y)); return Dirs[((FMath::RoundToInt(Deg / 45.f) % 8) + 8) % 8]; };
+			TArray<const FWRPoi*> Sorted;
+			for (const FWRPoi& P : FWRPoi::All) Sorted.Add(&P);
+			Sorted.Sort([&Here](const FWRPoi& A, const FWRPoi& B) { return FVector::Dist2D(A.Location, Here) < FVector::Dist2D(B.Location, Here); });
+			const float MX = Canvas->ClipX - 430.f;
+			float MY = 90.f;
+			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.55f), MX - 10.f, MY - 8.f, 420.f, 34.f + Sorted.Num() * 19.f);
+			DrawText(FString::Printf(TEXT("Map (M)   you face %s"), Compass(Survivor->GetControlRotation().Vector())), FLinearColor(1.f, 0.85f, 0.6f), MX, MY, nullptr, 1.1f);
+			MY += 26.f;
+			for (const FWRPoi* P : Sorted)
+			{
+				const FVector D = P->Location - Here;
+				const float Km = D.Size2D() / 100000.f;
+				DrawText(FString::Printf(TEXT("%-22s %-10s %5s %s"), *P->Name, *P->Kind, *(Km < 1.f ? FString::Printf(TEXT("%.0f m"), Km * 1000.f) : FString::Printf(TEXT("%.1f km"), Km)), Compass(D)),
+					P->Kind == TEXT("boss") ? FLinearColor(1.f, 0.5f, 0.4f) : FLinearColor::White, MX, MY, nullptr, 0.95f);
+				MY += 19.f;
+			}
+		}
+	}
 
 	// Biome hazard underfoot without the gear for it.
 	const FName Hazard = FWRBiomeHazards::KindAt(Survivor->GetActorLocation() - FVector(0.f, 0.f, Survivor->GetSimpleCollisionHalfHeight()));
@@ -187,7 +224,7 @@ void AWRHUD::DrawHUD()
 		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
 		DrawText(Line, FLinearColor::White, 24.f, 48.f);
 	}
-	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  P paths  K skills  B build  V view"),
+	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  P paths  K skills  B build  M map  T chat  V view"),
 		FLinearColor(1.f, 1.f, 1.f, 0.55f), 24.f, 24.f);
 
 	// Quick slots, bottom centre.

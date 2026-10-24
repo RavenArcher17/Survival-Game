@@ -45,6 +45,36 @@ void AWRPlayerController::BeginPlay()
 	}
 }
 
+void AWRPlayerController::OpenChat()
+{
+	SWRChatBox::Open(this);
+}
+
+void AWRPlayerController::ServerChat_Implementation(const FString& Message)
+{
+	const FString Clean = Message.Left(200).TrimStartAndEnd();
+	const FString From = PlayerState ? PlayerState->GetPlayerName() : TEXT("?");
+	if (Clean.IsEmpty())
+	{
+		return;
+	}
+	UE_LOG(LogWildreach, Log, TEXT("CHAT %s: %s"), *From, *Clean);
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get()))
+		{
+			PC->ClientChat(From, Clean);
+		}
+	}
+}
+
+void AWRPlayerController::ClientChat_Implementation(const FString& From, const FString& Message)
+{
+	Chat.Add({ FString::Printf(TEXT("%s: %s"), *From, *Message), GetWorld()->GetTimeSeconds() });
+	if (Chat.Num() > 8) Chat.RemoveAt(0);
+	UE_LOG(LogWildreach, Log, TEXT("NOTICE chat %s: %s"), *From, *Message);
+}
+
 void AWRPlayerController::ReturnToMenu()
 {
 	if (SWRMainMenu::IsOpen())
@@ -71,6 +101,8 @@ void AWRPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::K, IE_Pressed, this, &AWRPlayerController::ToggleSkills);
 	InputComponent->BindKey(EKeys::P, IE_Pressed, this, &AWRPlayerController::TogglePaths);
 	InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AWRPlayerController::ReturnToMenu);
+	InputComponent->BindKey(EKeys::M, IE_Pressed, this, &AWRPlayerController::ToggleMap);
+	InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AWRPlayerController::OpenChat);
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);
 	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
@@ -250,7 +282,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
-		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take "), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn ") };
+		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take "), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn ") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{

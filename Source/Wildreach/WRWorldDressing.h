@@ -30,6 +30,15 @@ private:
 	static float Cell;
 };
 
+/** Places of interest for the map list (bosses, mini-bosses, passes, camps, caves). */
+struct WILDREACH_API FWRPoi
+{
+	FString Name;
+	FString Kind;
+	FVector Location = FVector::ZeroVector;
+	static TArray<FWRPoi> All;
+};
+
 /**
  * Loads Data/<map>_dressing.json (made by Tools/terrain/dressing.mjs) when a game world starts:
  * every machine builds the decoration locally (no replication, no map rebuild to change it);

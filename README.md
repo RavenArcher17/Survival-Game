@@ -59,6 +59,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 | E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags |
 | I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu |
 | Shift / Space / V | sprint / jump / first-third person |
+| M / T | map list (bosses, caves, camps, passes: distance + direction) / chat |
 | F10 | back to the main menu |
 
 ### Dev commands (console)

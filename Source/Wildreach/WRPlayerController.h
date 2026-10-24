@@ -95,6 +95,9 @@ public:
 	UFUNCTION(Exec) void WRCast(int32 Slot);
 	/** Dev/test: learn a tree node through the same server command the Paths menu sends. */
 	UFUNCTION(Exec) void WRLearn(FName Path, FName Node);
+	/** Dev/test: chat a message; toggle the map list. */
+	UFUNCTION(Exec) void WRSay(const FString& Message);
+	UFUNCTION(Exec) void WRMap();
 
 	// --- Building ---
 	bool IsPlacing() const { return !PlacingPiece.IsNone(); }
@@ -161,6 +164,17 @@ private:
 	void ToggleInventory();
 	void ToggleSkills();
 	void TogglePaths();
+public:
+	void ToggleMap() { bShowMap = !bShowMap; }
+	void OpenChat();
+	bool IsMapShown() const { return bShowMap; }
+
+	/** Chat: everyone on the server sees it. */
+	UFUNCTION(Server, Reliable) void ServerChat(const FString& Message);
+	UFUNCTION(Client, Reliable) void ClientChat(const FString& From, const FString& Message);
+	struct FChatLine { FString Text; double Time; };
+	const TArray<FChatLine>& GetChat() const { return Chat; }
+private:
 	void MenuUp();
 	void MenuDown();
 	void MenuConfirm();
@@ -168,6 +182,8 @@ private:
 	void CycleInfuse();
 
 	EWRMenu Menu = EWRMenu::None;
+	bool bShowMap = false;
+	TArray<FChatLine> Chat;
 	int32 MenuIndex = 0;
 	FName MenuElement;
 	TWeakObjectPtr<AWRStation> MenuStation;

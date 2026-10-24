@@ -1,5 +1,7 @@
 #include "WRMainMenu.h"
 #include "Wildreach.h"
+#include "WRPlayerController.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "GameFramework/PlayerController.h"
@@ -14,6 +16,60 @@
 #include "Widgets/Text/STextBlock.h"
 
 TSharedPtr<SWidget> SWRMainMenu::Instance;
+TSharedPtr<SWidget> SWRChatBox::Instance;
+
+void SWRChatBox::Construct(const FArguments& InArgs)
+{
+	Owner = InArgs._Owner;
+	ChildSlot.HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(FMargin(20.f, 0.f, 0.f, 240.f))
+	[
+		SNew(SBox).WidthOverride(520.f)
+		[
+			SAssignNew(Box, SEditableTextBox).HintText(FText::FromString(TEXT("Say something (Enter to send, Esc to cancel)")))
+			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 13)).OnTextCommitted(this, &SWRChatBox::OnCommitted)
+		]
+	];
+}
+
+void SWRChatBox::OnCommitted(const FText& Text, ETextCommit::Type How)
+{
+	if (How == ETextCommit::OnEnter && !Text.IsEmpty())
+	{
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Owner.Get()))
+		{
+			PC->ServerChat(Text.ToString().Left(200));
+		}
+	}
+	Close();
+}
+
+void SWRChatBox::Open(APlayerController* PC)
+{
+	if (!PC || !GEngine || !GEngine->GameViewport || Instance.IsValid() || SWRMainMenu::IsOpen())
+	{
+		return;
+	}
+	TSharedRef<SWRChatBox> Widget = SNew(SWRChatBox).Owner(PC);
+	Instance = Widget;
+	GEngine->GameViewport->AddViewportWidgetContent(Widget, 90);
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(Widget->Box);
+	PC->SetInputMode(Mode);
+	FSlateApplication::Get().SetKeyboardFocus(Widget->Box);
+}
+
+void SWRChatBox::Close()
+{
+	if (Instance.IsValid() && GEngine && GEngine->GameViewport)
+	{
+		GEngine->GameViewport->RemoveViewportWidgetContent(Instance.ToSharedRef());
+		if (APlayerController* PC = GEngine->GameViewport->GetWorld() ? GEngine->GameViewport->GetWorld()->GetFirstPlayerController() : nullptr)
+		{
+			PC->SetInputMode(FInputModeGameOnly());
+		}
+	}
+	Instance.Reset();
+}
 
 static const TCHAR* MenuSection = TEXT("Wildreach.Menu");
 

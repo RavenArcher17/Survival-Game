@@ -24,6 +24,7 @@ static UMaterialInterface* ShapeMaterial()
 
 // ---------------------------------------------------------------- biome hazards
 
+TArray<FWRPoi> FWRPoi::All;
 TMap<FIntPoint, float> FWRBiomeHazards::Lava;
 TMap<FIntPoint, float> FWRBiomeHazards::Ice;
 float FWRBiomeHazards::Cell = 600.f;
@@ -102,6 +103,19 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	FWRPoi::All.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* Pois = nullptr;
+	if (File->TryGetArrayField(TEXT("pois"), Pois))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Pois)
+		{
+			const TSharedPtr<FJsonObject> P = V->AsObject();
+			FWRPoi& Poi = FWRPoi::All.AddDefaulted_GetRef();
+			Poi.Name = P->GetStringField(TEXT("name"));
+			Poi.Kind = P->GetStringField(TEXT("kind"));
+			Poi.Location = FVector(P->GetNumberField(TEXT("x")), P->GetNumberField(TEXT("y")), P->GetNumberField(TEXT("z")));
+		}
+	}
 	const TSharedPtr<FJsonObject>* Hazards = nullptr;
 	FWRBiomeHazards::Load(File->TryGetObjectField(TEXT("hazards"), Hazards) ? *Hazards : nullptr);
 	const TSharedPtr<FJsonObject>* Instances = nullptr;
