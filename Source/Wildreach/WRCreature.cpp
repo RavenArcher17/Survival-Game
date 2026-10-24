@@ -227,7 +227,7 @@ AWRCreature* AWRCreature::SpawnCreature(UWorld* World, FName CreatureId, const F
 	}
 	UClass* Class = Def->Archetype == TEXT("dummy") ? AWRTrainingDummy::StaticClass()
 		: Def->Archetype == TEXT("boss") ? AWRBoss::StaticClass() : AWRCreature::StaticClass();
-	const FTransform Transform(Rotation, Location + FVector(0.f, 0.f, Def->HalfHeight + 5.f));
+	const FTransform Transform(Rotation, Location + FVector(0.f, 0.f, FMath::Max(Def->HalfHeight, Def->Radius) + 5.f));
 	AWRCreature* Creature = World->SpawnActorDeferred<AWRCreature>(Class, Transform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	if (Creature)
 	{
@@ -272,7 +272,8 @@ void AWRCreature::ApplyDef()
 		const float Height = FMath::Max(1.f, Box.Max.Z - Box.Min.Z);
 		const float Scale = Def->HalfHeight * 2.f / Height * Def->MeshScale;
 		Skel->SetRelativeScale3D(FVector(Scale));
-		Skel->SetRelativeLocation(FVector(0.f, 0.f, -Def->HalfHeight - Box.Min.Z * Scale));
+		// The engine grows a capsule whose half-height is under its radius, so stand on its real bottom.
+		Skel->SetRelativeLocation(FVector(0.f, 0.f, -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale));
 		Skel->SetRelativeRotation(FRotator(0.f, Def->MeshYaw, 0.f));
 		Skel->SetVisibility(true);
 		BodyMesh->SetVisibility(false);
@@ -944,7 +945,7 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	// Burrowers stay underground until they have a target.
 	if (Def->Archetype == TEXT("burrower"))
 	{
-		const bool bWantHidden = Target == nullptr;
+		const bool bWantHidden = Target == nullptr && WRTune(TEXT("creature.burrowHide"), 1.f) > 0.f;  // 0 = always visible (art checks)
 		if (Self->IsHidden() != bWantHidden)
 		{
 			Self->SetActorHiddenInGame(bWantHidden);

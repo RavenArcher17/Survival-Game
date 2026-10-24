@@ -139,6 +139,8 @@ public:
 	UFUNCTION(Exec) void WRView(FName Mode);
 	/** Stop/start the test bot's own actions (it keeps running queued commands). */
 	UFUNCTION(Exec) void WRBotPause(int32 bPause);
+	/** Art check: frame the nearest creature of this kind from Yaw degrees off its nose and follow it ("off" = back to the pawn). */
+	UFUNCTION(Exec) void WRArtCam(FName Creature, float Yaw = 60.f);
 	/** Teleport next to the altar of a path (testing). */
 	UFUNCTION(Exec) void WRGoToAltar(FName Path);
 
@@ -208,6 +210,7 @@ private:
 	AWRCharacterBase* FindTarget(float MaxDistance, float MaxAngleDegrees) const;
 
 	void TickBot(float DeltaTime);
+	void UpdateArtCam(float DeltaTime);
 	void BotPress(int32 Input, float HoldSeconds);
 
 	TWeakObjectPtr<AWRCharacterBase> LockTarget;
@@ -224,6 +227,9 @@ private:
 	TArray<FString> BotCmdQueue;
 	float BotCmdResume = 0.f;
 	bool bBotPaused = false;
+	TWeakObjectPtr<AActor> ArtCamTarget;
+	UPROPERTY() TObjectPtr<class ACameraActor> ArtCam;
+	float ArtCamYaw = 60.f;
 	bool bWalking = false;
 	FVector2D WalkTarget = FVector2D::ZeroVector;
 	float WalkStart = 0.f;

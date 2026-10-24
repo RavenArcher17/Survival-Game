@@ -27,8 +27,8 @@ for o in [o for o in bpy.context.scene.objects if o.type != "MESH"]:
 bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
 # Face +X, stand on z=0, 1 unit tall (Unreal fits the scale to the creature's capsule).
 yaw = {"+x": 0, "-x": math.pi, "+y": -math.pi / 2, "-y": math.pi / 2}[head_dir]
-body.rotation_euler = (0, 0, yaw)
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+body.data.transform(Matrix.Rotation(yaw, 4, "Z"))  # the glTF importer leaves objects in quaternion mode, so rotation_euler is ignored
 v = np.array([body.matrix_world @ p.co for p in body.data.vertices])
 lo, hi = v.min(0), v.max(0)
 s = 1.0 / (hi[2] - lo[2])
@@ -97,8 +97,22 @@ names = ["FL", "FR", "RL", "RR"]  # front/rear, left (+y) / right
 order = sorted(range(4), key=lambda k: -centers[k][0])
 front, rear = sorted(order[:2], key=lambda k: -centers[k][1]), sorted(order[2:], key=lambda k: -centers[k][1])
 legs = dict(zip(names, [centers[front[0]], centers[front[1]], centers[rear[0]], centers[rear[1]]]))
-hip_z = 0.55
 print("legs", {k: [round(float(c[0]), 3), round(float(c[1]), 3)] for k, c in legs.items()})
+
+# ---- measure the body instead of assuming proportions (tortoises, giraffes and cats all differ)
+fx = (legs["FL"][0] + legs["FR"][0]) / 2
+rx = (legs["RL"][0] + legs["RR"][0]) / 2
+mid = v[(v[:, 0] > rx + 0.15 * (fx - rx)) & (v[:, 0] < fx - 0.15 * (fx - rx)) & (np.abs(v[:, 1]) < 0.12)]
+belly = float(np.percentile(mid[:, 2], 3)) if len(mid) else 0.35
+back = float(mid[:, 2].max()) if len(mid) else 0.8
+hip_z = float(np.clip(belly + 0.45 * (back - belly), 0.2, 0.8))
+knee_z = max(belly * 0.55, hip_z * 0.4)  # squat critters still get a real knee
+ankle_z = max(0.04, knee_z * 0.3)
+cap_f = v[v[:, 0] > hi[0] - 0.12 * L]
+cap_r = v[v[:, 0] < lo[0] + 0.10 * L]
+head_tip = (float(hi[0]) - 0.01, 0.0, float(cap_f[:, 2].mean()))
+tail_tip = (float(lo[0]) + 0.01, 0.0, float(cap_r[:, 2].mean()))
+print(f"body belly {belly:.2f} back {back:.2f} hip {hip_z:.2f} head z {head_tip[2]:.2f} tail z {tail_tip[2]:.2f}")
 
 # ---- armature
 arm_data = bpy.data.armatures.new("Rig")
@@ -125,17 +139,19 @@ prev = "pelvis"
 for i in range(3):
     bone(f"spine{i + 1}", (spine_pts[i], 0, hip_z + 0.02), (spine_pts[i + 1], 0, hip_z + 0.04), prev)
     prev = f"spine{i + 1}"
-neck_end = (front_x + (hi[0] - front_x) * 0.5, 0, 0.62)
-bone("neck", eb["spine3"].tail, neck_end, "spine3")
-bone("head", neck_end, (hi[0], 0, 0.45), "neck")
-bone("tail1", (rear_x, 0, hip_z), (rear_x - (rear_x - lo[0]) * 0.5, 0, hip_z - 0.05), "pelvis")
-bone("tail2", eb["tail1"].tail, (lo[0], 0, hip_z - 0.15), "tail1")
+neck_start = eb["spine3"].tail
+neck_end = (front_x + (head_tip[0] - front_x) * 0.55, 0, (neck_start.z + head_tip[2]) / 2 + 0.08 * abs(head_tip[2] - neck_start.z))
+bone("neck", neck_start, neck_end, "spine3")
+bone("head", neck_end, head_tip, "neck")
+tail_mid = (rear_x - (rear_x - tail_tip[0]) * 0.5, 0, (hip_z + tail_tip[2]) / 2)
+bone("tail1", (rear_x, 0, hip_z), tail_mid, "pelvis")
+bone("tail2", tail_mid, tail_tip, "tail1")
 for n, (x, y) in legs.items():
     par = "spine3" if n[0] == "F" else "pelvis"
     side = (0, 1, 0)  # leg bones swing about their local Z (= world lateral axis)
-    bone(f"{n}_upper", (x, y, hip_z - 0.02), (x - 0.02, y, 0.3), par, side)
-    bone(f"{n}_lower", (x - 0.02, y, 0.3), (x, y, 0.08), f"{n}_upper", side)
-    bone(f"{n}_foot", (x, y, 0.08), (x + 0.06, y, 0.0), f"{n}_lower", side)
+    bone(f"{n}_upper", (x, y, hip_z - 0.02), (x - 0.02, y, knee_z), par, side)
+    bone(f"{n}_lower", (x - 0.02, y, knee_z), (x, y, ankle_z), f"{n}_upper", side)
+    bone(f"{n}_foot", (x, y, ankle_z), (x + 0.06, y, 0.0), f"{n}_lower", side)
 bpy.ops.object.mode_set(mode="OBJECT")
 
 # ---- skin

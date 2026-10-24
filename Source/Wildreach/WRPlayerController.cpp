@@ -21,6 +21,7 @@
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Camera/CameraActor.h"
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
 #include "WRMainMenu.h"
@@ -165,6 +166,54 @@ void AWRPlayerController::WRBotPause(int32 bPause)
 	}
 }
 
+void AWRPlayerController::WRArtCam(FName Creature, float Yaw)
+{
+	ArtCamTarget = nullptr;
+	const APawn* Self = GetPawn();
+	float BestDist = TNumericLimits<float>::Max();
+	for (TActorIterator<AWRCreature> It(GetWorld()); It && Self; ++It)
+	{
+		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
+		if (It->CreatureId == Creature && It->IsAlive() && Dist < BestDist)
+		{
+			BestDist = Dist;
+			ArtCamTarget = *It;
+		}
+	}
+	if (!ArtCamTarget.IsValid())
+	{
+		if (Self)
+		{
+			SetViewTarget(GetPawn());
+		}
+		return;
+	}
+	if (!ArtCam)
+	{
+		ArtCam = GetWorld()->SpawnActor<ACameraActor>();
+	}
+	ArtCamYaw = Yaw;
+	SetViewTarget(ArtCam);
+	UpdateArtCam(0.f);
+}
+
+void AWRPlayerController::UpdateArtCam(float DeltaTime)
+{
+	const AActor* Target = ArtCamTarget.Get();
+	if (!Target || !ArtCam)
+	{
+		return;
+	}
+	// Far enough to fit the whole creature, a little above it, swinging with its facing so the angle stays put.
+	FVector Origin, Extent;
+	Target->GetActorBounds(true, Origin, Extent);
+	const float Size = FMath::Max3(Extent.X, Extent.Y, Extent.Z);
+	const FVector Dir = FRotator(0.f, Target->GetActorRotation().Yaw + ArtCamYaw, 0.f).Vector();
+	const FVector Goal = Origin + Dir * (Size * 3.2f + 150.f) + FVector(0.f, 0.f, Size * 0.6f);
+	const FVector At = DeltaTime > 0.f ? FMath::VInterpTo(ArtCam->GetActorLocation(), Goal, DeltaTime, 4.f) : Goal;
+	ArtCam->SetActorLocationAndRotation(At, (Origin - At).Rotation());
+}
+
 void AWRPlayerController::WRView(FName Mode)
 {
 	if (AWRCharacter* Survivor = Cast<AWRCharacter>(GetPawn()))
@@ -185,6 +234,7 @@ void AWRPlayerController::PlayerTick(float DeltaTime)
 	{
 		TickBot(DeltaTime);
 	}
+	UpdateArtCam(DeltaTime);
 	if (IsPlacing())
 	{
 		UpdatePlacement();

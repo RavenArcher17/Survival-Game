@@ -103,7 +103,7 @@
 
   "creature": {
     "biteTiming": { "windup": 0.5, "active": 0.15, "recovery": 0.55 },
-    "leashDistance": 4000, "dummyResetSeconds": 3,
+    "leashDistance": 4000, "dummyResetSeconds": 3, "burrowHide": 1,
     "_all": "placeholder"
   },
 

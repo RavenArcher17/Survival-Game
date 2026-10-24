@@ -1,0 +1,41 @@
+{
+  "_comment": "Four-legged creatures for the AI pipeline. Prompts follow the design doc's Creatures and Bosses tabs. Everyone faces right (-> +X in the rig).",
+  "creatures": [
+    {
+      "id": "magmaw",
+      "prompt": "a large lizard-like volcanic predator that swims through lava, low heavy body, dark basalt scales with glowing magma cracks, wide jaws with heat-glowing teeth, thick heavy tail, four sprawling clawed legs"
+    },
+    {
+      "id": "basaltback",
+      "prompt": "a huge tortoise-like beast with a jagged black basalt rock shell topped with volcanic rock columns, thick elephant-like legs, ash-grey leathery skin, small orange glowing eyes"
+    },
+    {
+      "id": "emberhorn",
+      "prompt": "a powerful charging beast like a rhinoceros crossed with a bison, one large glowing ember horn on its snout, charcoal-black hide with smouldering orange markings, muscular shoulders, four hoofed legs"
+    },
+    {
+      "id": "ashstrider",
+      "prompt": "a tall long-legged volcanic grazer like a slender gazelle crossed with a giraffe, very long thin legs, ash-grey hide with dark soot stripes, long neck, small head, built for speed, hooves"
+    },
+    {
+      "id": "rimeclaw",
+      "prompt": "a majestic saber-toothed ice lion standing tall and proud, long saber fangs, thick pale white fur, frost-blue ice crystal mane, long straight muscular legs, long tail"
+    },
+    {
+      "id": "frostantler",
+      "prompt": "an elk-like tundra beast with large branching antlers made of clear blue ice crystals, thick pale grey winter coat dusted with frost, long legs, hooves"
+    },
+    {
+      "id": "rimeshell",
+      "prompt": "a giant armored tundra creature like an armadillo crossed with a tortoise, thick frost-blue plated shell studded with ore crystals, heavy digging claws, low wide body"
+    },
+    {
+      "id": "aurora_fox",
+      "prompt": "a small fox with softly glowing fur in aurora colors of green and teal, very fluffy tail, bright curious eyes, slender legs"
+    },
+    {
+      "id": "pale_hunter",
+      "prompt": "a large pale snow stalker predator, lean and long-legged like a wolf crossed with a snow leopard, shaggy white fur, icy blue glowing eyes, menacing"
+    }
+  ]
+}
