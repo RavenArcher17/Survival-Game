@@ -56,6 +56,14 @@ clear.push(...caves.map(c => ({ x: c.mx, y: c.my, r: 48 })));
 
 // ---- decoration
 const types = { char_tree: [], basalt_rock: [], ember_shrub: [], pine: [], ice_rock: [], snow_shrub: [] };
+// Each piece stands on the lowest ground under its footprint (metres, times its scale), so on a slope the uphill side
+// buries instead of the downhill roots floating. Only heights change: positions and the random stream stay the same.
+const footprint = { char_tree: 3.2, pine: 2.6, basalt_rock: 1.6, ice_rock: 1.6, ember_shrub: 0.8, snow_shrub: 0.8, basalt_cliff: 0, ice_cliff: 0 };  // cliff boulders keep their own height: they cling to near-vertical faces
+const groundUnder = (x, y, r) => {
+	let lo = h(x, y);
+	for (let a = 0; a < 8; a++) lo = Math.min(lo, h(x + Math.cos(a * Math.PI / 4) * r, y + Math.sin(a * Math.PI / 4) * r));
+	return Math.round(lo * 100);
+};
 const STEP = 9;
 for (let gy = 150; gy < 3880; gy += STEP) {
 	for (let gx = 150; gx < 3880; gx += STEP) {
@@ -70,8 +78,8 @@ for (let gy = 150; gy < 3880; gy += STEP) {
 		else if (r < 0.22) type = west ? "basalt_rock" : "ice_rock";
 		else if (r < 0.34) { type = west ? "ember_shrub" : "snow_shrub"; scale = 0.6 + rand() * 0.6; }
 		if (!type) continue;
-		const [wx, wy, wz] = world(x, y);
-		types[type].push(wx, wy, wz, Math.round(rand() * 360), Math.round(scale * 100) / 100);
+		const [wx, wy] = world(x, y);
+		types[type].push(wx, wy, groundUnder(x, y, footprint[type] * scale), Math.round(rand() * 360), Math.round(scale * 100) / 100);
 	}
 }
 const counts = Object.fromEntries(Object.entries(types).map(([k, v]) => [k, v.length / 5]));
@@ -120,8 +128,8 @@ for (let gy = 150; gy < 3880; gy += 13) {
 		const x = gx + (cliffRand() - 0.5) * 13, y = gy + (cliffRand() - 0.5) * 13;
 		const s = slope(x, y), keep = cliffRand();
 		if (s < 0.7 || keep > 0.55 || h(x, y) < 3 || !isClear(x, y)) continue;
-		const [wx, wy, wz] = world(x, y);
-		types[x < RIDGE_X ? "basalt_cliff" : "ice_cliff"].push(wx, wy, wz, Math.round(cliffRand() * 360), Math.round((1.2 + cliffRand() * 1.6) * 100) / 100);
+		const [wx, wy] = world(x, y), yaw = Math.round(cliffRand() * 360), sc = Math.round((1.2 + cliffRand() * 1.6) * 100) / 100;
+		types[x < RIDGE_X ? "basalt_cliff" : "ice_cliff"].push(wx, wy, groundUnder(x, y, footprint.basalt_cliff * sc), yaw, sc);
 	}
 }
 counts.basalt_cliff = types.basalt_cliff.length / 5;

@@ -230,9 +230,11 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	}
 	const auto Prop = [](const TCHAR* Folder, const TCHAR* Name) { return FString::Printf(TEXT("/Game/Props/%s/%s/StaticMeshes/%s.%s"), Folder, Name, Name, Name); };
 	const TMap<FString, FArt> Art = {
-		{ TEXT("char_tree"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")) },
-			FVector(0, 0, 720), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
-		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")) }, FVector(0, 0, 1000), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("char_tree"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")),
+		    Prop(TEXT("CharTreeC"), TEXT("char_tree_c_textured")), Prop(TEXT("CharTreeD"), TEXT("char_tree_d_textured")) },
+			FVector(0, 0, 720), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")),
+		    Prop(TEXT("FirA"), TEXT("fir_a_textured")), Prop(TEXT("BirchA"), TEXT("birch_a_textured")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
 		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, {} } },
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
 		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
@@ -339,6 +341,8 @@ void AWRDressing::BuildHazardVisuals()
 	}
 	// One continuous surface per hazard, a little above the river bed: each cell is a quad whose corners are shared
 	// with its neighbours and sit at the average height of the cells around them, so slopes are smooth (no steps).
+	// Only neighbours within MaxStep of the cell count, so the sheet splits at real drops (a plateau edge) instead of
+	// stretching up into the air between them.
 	for (const FName Kind : { FName(TEXT("lava")), FName(TEXT("ice")) })
 	{
 		const bool bLava = Kind == TEXT("lava");
@@ -351,21 +355,26 @@ void AWRDressing::BuildHazardVisuals()
 		const float Lift = bLava ? 40.f : 20.f;
 		TArray<FVector> Verts;
 		TArray<int32> Tris;
-		TMap<FIntPoint, int32> CornerIndex;
-		const auto Corner = [&](const FIntPoint& P) -> int32
+		const float MaxStep = 700.f;  // joins steep river beds (a 6 m cell rising 7 m), splits plateau edges
+		TMap<FIntVector, int32> CornerIndex;  // corner point + its height (10 cm steps): cells that agree share a vertex
+		const auto Corner = [&](const FIntPoint& P, float CellZ) -> int32
 		{
-			if (const int32* Found = CornerIndex.Find(P)) return *Found;
 			float Sum = 0.f;
 			int32 N = 0;
 			for (const FIntPoint& Cell : { P, P - FIntPoint(1, 0), P - FIntPoint(0, 1), P - FIntPoint(1, 1) })
 			{
-				if (const float* Z = Cells.Find(Cell)) { Sum += *Z; ++N; }
+				const float* Z = Cells.Find(Cell);
+				if (Z && FMath::Abs(*Z - CellZ) <= MaxStep) { Sum += *Z; ++N; }
 			}
-			return CornerIndex.Add(P, Verts.Add(FVector(P.X * S, P.Y * S, Sum / FMath::Max(1, N) + Lift)));
+			const float Height = Sum / FMath::Max(1, N);
+			const FIntVector Key(P.X, P.Y, FMath::RoundToInt(Height / 10.f));
+			if (const int32* Found = CornerIndex.Find(Key)) return *Found;
+			return CornerIndex.Add(Key, Verts.Add(FVector(P.X * S, P.Y * S, Height + Lift)));
 		};
 		for (const TPair<FIntPoint, float>& Cell : Cells)
 		{
-			const int32 A = Corner(Cell.Key), B = Corner(Cell.Key + FIntPoint(1, 0)), C2 = Corner(Cell.Key + FIntPoint(1, 1)), D = Corner(Cell.Key + FIntPoint(0, 1));
+			const FIntPoint K = Cell.Key;
+			const int32 A = Corner(K, Cell.Value), B = Corner(K + FIntPoint(1, 0), Cell.Value), C2 = Corner(K + FIntPoint(1, 1), Cell.Value), D = Corner(K + FIntPoint(0, 1), Cell.Value);
 			Tris.Append({ A, C2, B, A, D, C2 });  // counter-clockwise from above, so the faces point up
 		}
 		TArray<FVector> Normals;
@@ -476,9 +485,27 @@ void AWRCave::BuildShell()
 	{
 		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
 		MID->SetVectorParameterValue(RockMat ? TEXT("Tint") : TEXT("Color"),
-			bFrost ? FLinearColor(0.5f, 0.6f, 0.72f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
+			bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
 		Rock->SetMaterial(0, MID);
 	}
+	Glow->SetLightColor(bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
+
+	// Blender-sculpted cave (Tools/art/cave_gen.py): a rock mound with the chamber and a ragged entrance tunnel carved
+	// out, in the same local layout as the blocks below. Its collision is the mesh itself, and the landscape is the floor.
+	// Three variants, picked by position so every machine agrees; the blocks are the fallback if they're missing.
+	static const TCHAR* Variants[] = { TEXT("/Game/Props/Caves/CaveA/cave_a.cave_a"), TEXT("/Game/Props/Caves/CaveB/cave_b.cave_b"),
+	                                   TEXT("/Game/Props/Caves/CaveC/cave_c.cave_c") };
+	if (UStaticMesh* CaveMesh = LoadObject<UStaticMesh>(nullptr, Variants[GetTypeHash(GetActorLocation().GridSnap(100.f)) % UE_ARRAY_COUNT(Variants)]))
+	{
+		UStaticMeshComponent* Shell = NewObject<UStaticMeshComponent>(this);
+		Shell->SetStaticMesh(CaveMesh);
+		Shell->SetupAttachment(RootComponent);
+		Shell->SetCollisionProfileName(TEXT("BlockAll"));
+		Shell->SetMaterial(0, Rock->GetMaterial(0));  // the biome-tinted rock
+		Shell->RegisterComponent();
+		return;
+	}
+
 	const auto Block = [this](const FVector& Center, const FVector& Size) { Rock->AddInstance(FTransform(FRotator::ZeroRotator, Center, Size / 100.f)); };
 	Block(FVector(-1050, 0, 300), FVector(300, 2400, 1400));       // back wall
 	Block(FVector(0, -1050, 300), FVector(2400, 300, 1400));       // side walls
@@ -500,12 +527,23 @@ void AWRCave::BuildShell()
 	}
 	if (Boulders.Num() > 0)
 	{
-		TArray<FVector> Spots;
-		for (float Y = -1050.f; Y <= 1060.f; Y += 700.f) Spots.Add(FVector(-1350.f, Y, 150.f));                     // behind
-		for (float X = -1000.f; X <= 1010.f; X += 666.f) { Spots.Add(FVector(X, -1350.f, 150.f)); Spots.Add(FVector(X, 1350.f, 150.f)); }  // sides
-		for (float X = -700.f; X <= 710.f; X += 700.f) for (float Y = -700.f; Y <= 710.f; Y += 700.f) Spots.Add(FVector(X, Y, 1300.f));  // roof
-		for (float X = 1300.f; X <= 1910.f; X += 600.f) { Spots.Add(FVector(X, -950.f, 150.f)); Spots.Add(FVector(X, 950.f, 150.f)); }   // beside the tunnel
-		Spots.Add(FVector(1550.f, 0.f, 900.f));                                                                     // over the tunnel
+		// Size range is the boulder's largest dimension (cm); Jitter is how far it may wander from its spot.
+		struct FSpot { FVector At; float MinSize, MaxSize, Jitter; };
+		TArray<FSpot> Spots;
+		const auto Big = [&Spots](float X, float Y, float Z) { Spots.Add({ FVector(X, Y, Z), 700.f, 1000.f, 150.f }); };
+		for (float Y = -1050.f; Y <= 1060.f; Y += 700.f) Big(-1350.f, Y, 150.f);                                  // behind
+		for (float X = -1000.f; X <= 1010.f; X += 666.f) { Big(X, -1350.f, 150.f); Big(X, 1350.f, 150.f); }      // sides
+		for (float X = -700.f; X <= 710.f; X += 700.f) for (float Y = -700.f; Y <= 710.f; Y += 700.f) Big(X, Y, 1300.f);  // roof
+		for (float X = 1300.f; X <= 1910.f; X += 600.f) { Big(X, -950.f, 150.f); Big(X, 950.f, 150.f); }          // beside the tunnel
+		Big(1550.f, 0.f, 900.f);                                                                                  // over the tunnel
+		for (const float Y : { -650.f, 0.f, 650.f }) Big(1300.f, Y, 1050.f);                                       // the wall above the tunnel
+		// A frame of smaller boulders around the tunnel mouth (opening: |y| < 250, up to 450 high). Their inner edges stay
+		// clear of it: half the largest size plus the jitter is under the gap to the opening.
+		Spots.Add({ FVector(2150.f, -600.f, 180.f), 500.f, 600.f, 40.f });
+		Spots.Add({ FVector(2150.f, 600.f, 180.f), 500.f, 600.f, 40.f });
+		Spots.Add({ FVector(2150.f, -600.f, 600.f), 500.f, 600.f, 40.f });
+		Spots.Add({ FVector(2150.f, 600.f, 600.f), 500.f, 600.f, 40.f });
+		Spots.Add({ FVector(2150.f, 0.f, 900.f), 600.f, 700.f, 40.f });                                          // lintel
 		FRandomStream Rand(GetTypeHash(GetActorLocation().GridSnap(100.f)));
 		TArray<UInstancedStaticMeshComponent*> Parts;
 		for (UStaticMesh* M : Boulders)
@@ -518,16 +556,15 @@ void AWRCave::BuildShell()
 			Part->RegisterComponent();
 			Parts.Add(Part);
 		}
-		for (int32 i = 0; i < Spots.Num(); ++i)
+		for (const FSpot& Spot : Spots)
 		{
 			UInstancedStaticMeshComponent* Part = Parts[Rand.RandHelper(Parts.Num())];
 			const float Size = FMath::Max(1.f, Part->GetStaticMesh()->GetBoundingBox().GetSize().GetMax());
-			const FVector Jitter(Rand.FRandRange(-150.f, 150.f), Rand.FRandRange(-150.f, 150.f), Rand.FRandRange(-80.f, 80.f));
+			const FVector Jitter(Rand.FRandRange(-Spot.Jitter, Spot.Jitter), Rand.FRandRange(-Spot.Jitter, Spot.Jitter), Rand.FRandRange(-80.f, 80.f));
 			const FRotator Rot(Rand.FRandRange(-15.f, 15.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-15.f, 15.f));
-			Part->AddInstance(FTransform(Rot, Spots[i] + Jitter, FVector(Rand.FRandRange(700.f, 1000.f) / Size)));
+			Part->AddInstance(FTransform(Rot, Spot.At + Jitter, FVector(Rand.FRandRange(Spot.MinSize, Spot.MaxSize) / Size)));
 		}
 	}
-	Glow->SetLightColor(bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
 }
 
 void AWRCave::SpawnContents()

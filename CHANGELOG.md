@@ -11,11 +11,21 @@
   animations while airborne.
 - **Lava and ice are one continuous surface** each (procedural mesh with shared corners), so slopes are smooth
   instead of stepped tiles.
-- **Cave entrances** are heaped with big boulders, so they read as rock outcrops rather than boxes.
+- **Caves are sculpted in Blender** (`Tools/art/cave_gen.py`, Raven asked for this over the blocky look): a rough rock
+  mound with a domed chamber (~24 m across, ~10 m high) and a ragged, recessed entrance tunnel carved out, three
+  variants picked by position, tinted rock per biome. Collision is the mesh itself (`Tools/import_cave.py`) and the
+  landscape stays the floor. The old block shell (now boulder-covered) is only a fallback.
 - **Ridge cliffs**: 4.7k large boulders on the ridge's steep faces (`basalt_cliff` / `ice_cliff`), hiding the
   stretched landscape triangles there. Decoration only, so the ridge is still a wall. Existing placements unchanged.
-- **More trees**: two more tundra pine models (spruce, wind-bent mountain pine).
+- **More trees**: charred trees come in four models (two new: a split snag and an ember-lit dead tree) and the
+  tundra mixes five (spruce, wind-bent mountain pine, snow-laden fir and a frosted birch are new).
+- **Fixed: trees floated on slopes** (Raven spotted it): every tree, rock and shrub now stands on the lowest ground
+  under its footprint (`dressing.mjs`), so the uphill side buries instead of the downhill roots hanging in the air.
+  Positions are unchanged; trees dropped 0.9 m on average.
+- **Fixed: ice sheets stretched into the sky** at the glacier plateau's edge; surface corners now only join cells
+  within 7 m of each other (steep river beds stay joined, plateau edges split).
 - Packaging: the pack creatures' meshes and animations are in `DirectoriesToAlwaysCook`.
+- Checks: `Tools/terrain/tree_shots.ps1` takes eye-level shots among the trees in both biomes.
 
 ## 2026-10-24: real art, part 1 (creatures and terrain)
 

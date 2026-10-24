@@ -1,0 +1,11 @@
+{
+  "_comment": "More tree variety (Raven asked): two more volcanic, two more tundra.",
+  "template": "3d game asset of {p}, one single isolated tree, entire tree visible from base to top, centered, studio product shot, isolated on plain white background, no ground, soft even lighting",
+  "negative": "cropped, cut off, forest, multiple trees, other trees, background, landscape, hills, ground plane, grass, pot, rock base, text, watermark, frame, cartoon, blurry",
+  "creatures": [
+    { "id": "snag", "prompt": "a tall burnt dead pine snag, straight charred black trunk with short broken stubby branches, cracked bark glowing with faint embers" },
+    { "id": "stump", "prompt": "a short charred dead tree, thick split trunk broken off halfway, a few twisted burnt branches, black and grey ash bark" },
+    { "id": "birch", "prompt": "a slender birch tree with white bark and black marks, bare thin branches dusted with snow and frost" },
+    { "id": "fir", "prompt": "a young dense fir tree heavily laden with snow, dark green needles peeking through thick white snow, conical" }
+  ]
+}
