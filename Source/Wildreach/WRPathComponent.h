@@ -59,6 +59,8 @@ public:
 	 * 0 for creatures. Works on the server and the owning client (progress replicates to the owner).
 	 */
 	static float Stat(const AActor* Character, FName StatName);
+	/** Owns this node (rank > 0) in an active path: passive ability nodes check this. */
+	static bool HasNode(const AActor* Character, FName PathId, FName NodeId);
 
 	/** Rate multiplier for path XP (server setting; -xpmult=N on the command line). */
 	static float XPMultiplier();

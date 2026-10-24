@@ -91,6 +91,12 @@
     "fireWall": { "dps": 10, "seconds": 6, "distance": 600, "width": 800, "patches": 5, "cooldown": 10, "heat": 15 },
     "lavaPool": { "dps": 12, "seconds": 8, "radius": 300, "range": 1500, "cooldown": 12, "heat": 15 },
     "frostNova": { "damage": 16, "frostBuildup": 55, "poise": 15, "radius": 500, "cooldown": 8, "chill": 10 },
+    "moltenEdge": { "multiplier": 1.1, "burnBuildup": 55, "cooldown": 2.0, "heat": 8 },
+    "flurry": { "multiplier": 0.9, "frostBuildup": 35, "cooldown": 1.5, "chill": 6 },
+    "moltenCleave": { "multiplier": 2.0, "burnBuildup": 80, "cooldown": 12, "heat": 20, "lavaRadius": 220, "lavaSeconds": 6, "lavaDps": 10 },
+    "meteor": { "damage": 55, "burnBuildup": 70, "radius": 450, "delay": 1.2, "range": 2500, "cooldown": 30, "heat": 25 },
+    "iceWall": { "pillars": 5, "spacing": 200, "distance": 500, "seconds": 8, "cooldown": 14, "chill": 10 },
+    "blizzard": { "radius": 650, "seconds": 8, "dps": 6, "cooldown": 30, "chill": 20 },
     "iceLance": { "damage": 30, "frostBuildup": 45, "poise": 20, "range": 2000, "cooldown": 6, "chill": 10 },
     "_all": "placeholder"
   },
@@ -110,6 +116,10 @@
     "bossHealthPerExtraParticipant": 0.8
   },
 
+  "passives": { "_comment": "Passive tree nodes (checked with UWRPathComponent::HasNode).",
+    "searingParryBuildup": 100, "frozenMomentCooldown": 6, "frozenMomentRadius": 400, "brittleCrit": 0.25, "fuelTheFireHeat": 4,
+    "coldReturnChill": 15, "chainShatterRadius": 450, "wildfireRadius": 350, "wildfireBuildup": 80, "spreadRadius": 450,
+    "explosiveBoltRadius": 300, "explosiveBoltDamage": 0.5 },
   "hazards": { "_comment": "Biome gear checks: lava river (needs lava resistance), slick ice (needs ice resistance).",
     "lavaDps": 8, "lavaBurnPerSecond": 12, "iceFriction": 0.3, "iceBraking": 100, "iceAcceleration": 600 },
   "caves": { "gemChance": 0.12, "gasDps": 6 },

@@ -315,7 +315,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 				}
 				const int32 Rank = Progress ? Progress->GetRank(Node.Id) : 0;
 				const bool bAbility = Node.Kind == EWRNodeKind::Ability;
-				const bool bBuilt = !bAbility || UWRAbilityRegistry::ClassForNode(PathId, Node.Id) != nullptr;
+				const bool bBuilt = !bAbility || UWRAbilityRegistry::IsBuilt(PathId, Node.Id);
 				FWRMenuEntry E;
 				E.Label = FString::Printf(TEXT("    [%d/%d] %s  (%d pt%s%s)  %s%s"), Rank, Node.MaxRank, *Node.Name, Node.Cost, Node.Cost == 1 ? TEXT("") : TEXT("s"),
 					Node.Gate > 0 ? *FString::Printf(TEXT(", needs %d in branch"), Node.Gate) : TEXT(""), *Node.Text, bBuilt ? TEXT("") : TEXT("  [not built yet]"));

@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "EngineUtils.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
@@ -114,6 +115,26 @@ void UWRStatusComponent::AddBuildup(const FGameplayTag& Element, float Amount, A
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetBurnBuildupAttribute(), 0.f);
 			BurnSource = Source;
 			ApplyStatus(WRTags::Status_Burn, WRTune(TEXT("status.burnSeconds"), 6.f) + UWRPathComponent::Stat(Source, TEXT("burnDuration")));
+			// Spreading flames: the burn jumps to the nearest enemy that isn't already burning.
+			AWRCharacterBase* Self = Cast<AWRCharacterBase>(GetOwner());
+			if (Source && Self && UWRPathComponent::HasNode(Source, TEXT("fire"), TEXT("spreading_flames")))
+			{
+				AWRCharacterBase* Next = nullptr;
+				float Best = WRTune(TEXT("passives.spreadRadius"), 450.f);
+				for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+				{
+					const float D = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
+					if (*It != Self && *It != Source && It->IsAlive() && !It->HasTag(WRTags::Status_Burn) && Source->IsHostileTo(*It) && D < Best)
+					{
+						Best = D;
+						Next = *It;
+					}
+				}
+				if (Next)
+				{
+					Next->Status->AddBuildup(WRTags::Element_Fire, Threshold, Source);
+				}
+			}
 		}
 		else
 		{

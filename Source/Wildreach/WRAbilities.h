@@ -98,6 +98,16 @@ UCLASS() class WILDREACH_API UWRGA_LightAttack : public UWRGA_Melee { GENERATED_
 UCLASS() class WILDREACH_API UWRGA_HeavyAttack : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_HeavyAttack(); };
 UCLASS() class WILDREACH_API UWRGA_FlameSlash : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_FlameSlash(); };
 UCLASS() class WILDREACH_API UWRGA_IceSlash : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_IceSlash(); };
+UCLASS() class WILDREACH_API UWRGA_MoltenEdge : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_MoltenEdge(); };
+UCLASS() class WILDREACH_API UWRGA_Flurry : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_Flurry(); };
+/** Capstone heavy weapon art that leaves lava behind. */
+UCLASS() class WILDREACH_API UWRGA_MoltenCleave : public UWRGA_Melee
+{
+	GENERATED_BODY()
+public:
+	UWRGA_MoltenCleave();
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+};
 
 /** Creature bite: flat damage from the creature's weapon stats, slower telegraphed windup. */
 UCLASS() class WILDREACH_API UWRGA_Bite : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_Bite(); };
@@ -162,6 +172,9 @@ enum class EWRAreaShape : uint8
 	Pool,   // a lingering pool where you aim
 	Nova,   // a burst around you
 	Lance,  // a piercing line along your aim
+	Meteor, // a big delayed strike where you aim
+	IceWall,// blocking ice pillars across your aim
+	Storm,  // a lasting frost storm around you
 };
 
 /** Tree spells past the trunk: Fire wall, Lava pool (fire); Frost nova, Ice lance (frost). Numbers: tuning spells.<key>.*. */
@@ -184,6 +197,9 @@ UCLASS() class WILDREACH_API UWRGA_FireWall : public UWRGA_AreaSpell { GENERATED
 UCLASS() class WILDREACH_API UWRGA_LavaPool : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_LavaPool(); };
 UCLASS() class WILDREACH_API UWRGA_FrostNova : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_FrostNova(); };
 UCLASS() class WILDREACH_API UWRGA_IceLance : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_IceLance(); };
+UCLASS() class WILDREACH_API UWRGA_Meteor : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_Meteor(); };
+UCLASS() class WILDREACH_API UWRGA_IceWall : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_IceWall(); };
+UCLASS() class WILDREACH_API UWRGA_Blizzard : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_Blizzard(); };
 
 /** Maps skill-tree nodes to ability classes. Nodes without an entry aren't implemented yet. */
 UCLASS()
@@ -193,4 +209,6 @@ class WILDREACH_API UWRAbilityRegistry : public UObject
 
 public:
 	static TSubclassOf<UGameplayAbility> ClassForNode(FName PathId, FName NodeId);
+	/** Implemented: an ability class, or a passive the combat code checks with UWRPathComponent::HasNode. */
+	static bool IsBuilt(FName PathId, FName NodeId);
 };

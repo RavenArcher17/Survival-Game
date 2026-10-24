@@ -1,4 +1,8 @@
 #include "WRProjectile.h"
+#include "WRBoss.h"
+#include "WRPathComponent.h"
+#include "WRTuning.h"
+#include "EngineUtils.h"
 #include "WRCharacterBase.h"
 #include "WRCombatLibrary.h"
 #include "Components/SphereComponent.h"
@@ -89,6 +93,23 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	{
 		Hit.Origin = GetActorLocation() - GetVelocity().GetSafeNormal() * 100.f;
 		UWRCombatLibrary::ApplyHit(Target, Hit);
+	}
+	// Explosive bolt: fire bolts burst on impact.
+	if (Caster && Hit.PathId == TEXT("fire") && UWRPathComponent::HasNode(Caster, TEXT("fire"), TEXT("explosive_bolt")))
+	{
+		const float Radius = WRTune(TEXT("passives.explosiveBoltRadius"), 300.f);
+		AWRGroundMarker::Spawn(GetWorld(), GetActorLocation(), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.4f, 0.05f), 0.35f);
+		for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+		{
+			if (*It != Target && *It != Caster && It->IsAlive() && Caster->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < Radius)
+			{
+				FWRHit Splash = Hit;
+				Splash.Damage *= WRTune(TEXT("passives.explosiveBoltDamage"), 0.5f);
+				Splash.BurnBuildup *= 0.5f;
+				Splash.Origin = GetActorLocation();
+				UWRCombatLibrary::ApplyHit(*It, Splash);
+			}
+		}
 	}
 	Destroy();
 }

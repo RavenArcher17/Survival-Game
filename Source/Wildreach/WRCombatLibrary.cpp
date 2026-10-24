@@ -156,6 +156,21 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 
 	if (!Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Invulnerable))
 	{
+		// Frozen moment: a perfect dodge freezes everything close to you (once every few seconds).
+		static TMap<TWeakObjectPtr<AActor>, double> LastFrozenMoment;
+		const double Now = Target->GetWorld()->GetTimeSeconds();
+		if (Attacker && UWRPathComponent::HasNode(Target, TEXT("frost"), TEXT("frozen_moment")) && Now - LastFrozenMoment.FindRef(Target) > WRTune(TEXT("passives.frozenMomentCooldown"), 6.f))
+		{
+			LastFrozenMoment.Add(Target, Now);
+			for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+			{
+				if (*It != Target && It->IsAlive() && Target->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) < WRTune(TEXT("passives.frozenMomentRadius"), 400.f))
+				{
+					It->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
+				}
+			}
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT frozen moment by %s"), *Target->GetName());
+		}
 		Target->ReportHit(0.f, EWRHitResult::Dodged);
 		return EWRHitResult::Dodged;
 	}
@@ -177,6 +192,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Parrying) && Attacker)
 		{
 			Attacker->Status->Stagger(WRTune(TEXT("defense.staggerSeconds"), 1.5f));
+			// Searing parry: parries set the attacker burning.
+			if (UWRPathComponent::HasNode(Target, TEXT("fire"), TEXT("searing_parry")))
+			{
+				Attacker->Status->AddBuildup(WRTags::Element_Fire, WRTune(TEXT("passives.searingParryBuildup"), 100.f), Target);
+			}
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT %s parried %s"), *Target->GetName(), *Attacker->GetName());
 			Target->ReportHit(0.f, EWRHitResult::Parried);
 			return EWRHitResult::Parried;
@@ -226,7 +246,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("vsStaggered"));
 		}
-		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f))
+		// Brittle: frozen enemies take more critical hits. Fuel the fire: hitting burning enemies builds Heat.
+		const float BrittleCrit = TargetASC->HasMatchingGameplayTag(WRTags::Status_Frozen) && UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("brittle"))
+			? WRTune(TEXT("passives.brittleCrit"), 0.25f) : 0.f;
+		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Burn) && UWRPathComponent::HasNode(Attacker, TEXT("fire"), TEXT("fuel_the_fire")))
+		{
+			GainResource(Attacker, WRTags::Element_Fire, WRTune(TEXT("passives.fuelTheFireHeat"), 4.f));
+		}
+		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit)
 		{
 			Damage *= 1.5f;
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s"), *Target->GetName());
@@ -237,6 +264,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			Damage *= WRTune(TEXT("weapon.riposteMultiplier"), 3.f);
 			Target->Status->ClearStatus(WRTags::Status_Staggered);
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT riposte on %s"), *Target->GetName());
+			// Cold riposte: ripostes freeze the target.
+			if (UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("cold_riposte")))
+			{
+				Target->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
+			}
 		}
 
 		// Frozen targets: fire thaws them (Thaw combo), heavy hits shatter them.
@@ -256,6 +288,29 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 					* (1.f + UWRPathComponent::Stat(Attacker, TEXT("shatterDamage")));
 				Target->Status->ClearStatus(WRTags::Status_Frozen);
 				UE_LOG(LogWildreach, Log, TEXT("COMBAT shatter on %s (chill spent %.0f%%)"), *Target->GetName(), ChillFraction * 100.f);
+				// Cold return: shatters refund some Chill.
+				if (UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("cold_return")))
+				{
+					GainResource(Attacker, WRTags::Element_Frost, WRTune(TEXT("passives.coldReturnChill"), 15.f));
+				}
+				// Chain shatter: one shatter sets off nearby frozen enemies.
+				if (Attacker && UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("chain_shatter")))
+				{
+					for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+					{
+						if (*It != Target && *It != Attacker && It->IsAlive() && It->HasTag(WRTags::Status_Frozen) && Attacker->IsHostileTo(*It)
+							&& FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) < WRTune(TEXT("passives.chainShatterRadius"), 450.f))
+						{
+							It->Status->ClearStatus(WRTags::Status_Frozen);
+							FWRHit Chain;
+							Chain.Instigator = Attacker;
+							Chain.Damage = WRTune(TEXT("status.shatterDamage"), 30.f);
+							Chain.Element = WRTags::Element_Frost;
+							Chain.Origin = Target->GetActorLocation();
+							ApplyHit(*It, Chain);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -380,6 +435,19 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	Target->ReportHit(Damage, Result);
 	if (TargetAttr->GetHealth() <= 0.f)
 	{
+		// Wildfire: burning enemies erupt into flames when they die.
+		if (Attacker && TargetASC->HasMatchingGameplayTag(WRTags::Status_Burn) && UWRPathComponent::HasNode(Attacker, TEXT("fire"), TEXT("wildfire")))
+		{
+			for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+			{
+				if (*It != Target && *It != Attacker && It->IsAlive() && Attacker->IsHostileTo(*It)
+					&& FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) < WRTune(TEXT("passives.wildfireRadius"), 350.f))
+				{
+					It->Status->AddBuildup(WRTags::Element_Fire, WRTune(TEXT("passives.wildfireBuildup"), 80.f), Attacker);
+				}
+			}
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT wildfire from %s"), *Target->GetName());
+		}
 		Target->Die(Hit.Instigator);
 	}
 	return Result;

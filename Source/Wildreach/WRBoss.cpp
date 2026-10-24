@@ -115,7 +115,7 @@ AWRHazard* AWRHazard::Spawn(UWorld* World, AActor* InSource, const FVector& Loca
 	H->DamagePerSecond = Dps;
 	H->Kind = InKind;
 	if (Seconds > 0.f) H->SetLifeSpan(Seconds);  // 0 = permanent (cave hazards)
-	const FLinearColor Color = InKind == TEXT("ice") ? FLinearColor(0.7f, 0.9f, 1.f) : InKind == TEXT("gas") ? FLinearColor(0.7f, 0.75f, 0.1f) : FLinearColor(1.f, 0.3f, 0.02f);
+	const FLinearColor Color = InKind == TEXT("ice") || InKind == TEXT("frost") ? FLinearColor(0.7f, 0.9f, 1.f) : InKind == TEXT("gas") ? FLinearColor(0.7f, 0.75f, 0.1f) : FLinearColor(1.f, 0.3f, 0.02f);
 	H->Marker = AWRGroundMarker::Spawn(World, Location + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(InRadius, InRadius), false, Color, Seconds);
 	return H;
 }
@@ -153,11 +153,16 @@ void AWRHazard::Tick(float DeltaSeconds)
 			Who->Status->ApplyStatus(WRTags::Status_Slowed, 0.6f);
 			continue;
 		}
+		const bool bFrost = Kind == TEXT("frost");
+		if (bFrost)
+		{
+			Who->Status->ApplyStatus(WRTags::Status_Slowed, 0.6f);
+		}
 		FWRHit Hit;
 		Hit.Instigator = Source.Get();
 		Hit.Damage = DamagePerSecond * DeltaSeconds * WRTune(TEXT("bosses.damageScale"), 1.f);
-		Hit.Element = WRTags::Element_Fire;
-		Hit.BurnBuildup = 20.f * DeltaSeconds;
+		Hit.Element = bFrost ? WRTags::Element_Frost : WRTags::Element_Fire;
+		(bFrost ? Hit.FrostBuildup : Hit.BurnBuildup) = (bFrost ? 30.f : 20.f) * DeltaSeconds;
 		Hit.bDamageOverTime = true;
 		Hit.Origin = GetActorLocation();
 		UWRCombatLibrary::ApplyHit(Who, Hit);

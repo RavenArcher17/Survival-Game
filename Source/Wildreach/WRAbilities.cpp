@@ -362,6 +362,55 @@ UWRGA_HeavyAttack::UWRGA_HeavyAttack()
 	SetAssetTags(Tags);
 }
 
+UWRGA_MoltenEdge::UWRGA_MoltenEdge()
+{
+	DisplayName = TEXT("Molten edge"); PathId = TEXT("fire"); NodeId = TEXT("molten_edge");
+	StaminaKey = TEXT("stamina.weaponArt"); StaminaFallback = 14.f;
+	CooldownKey = TEXT("spells.moltenEdge.cooldown"); CooldownFallback = 2.f;
+	TimingKey = TEXT("weapon.lightTiming"); SwingKind = EWRSwingKind::WeaponArt;
+	Element = WRTags::Element_Fire; ArtKey = TEXT("spells.moltenEdge");
+}
+
+UWRGA_Flurry::UWRGA_Flurry()
+{
+	DisplayName = TEXT("Flurry"); PathId = TEXT("frost"); NodeId = TEXT("flurry");
+	StaminaKey = TEXT("stamina.weaponArt"); StaminaFallback = 12.f;
+	CooldownKey = TEXT("spells.flurry.cooldown"); CooldownFallback = 1.5f;
+	TimingKey = TEXT("weapon.lightTiming"); SwingKind = EWRSwingKind::WeaponArt;
+	Element = WRTags::Element_Frost; ArtKey = TEXT("spells.flurry");
+}
+
+UWRGA_MoltenCleave::UWRGA_MoltenCleave()
+{
+	DisplayName = TEXT("Molten cleave"); PathId = TEXT("fire"); NodeId = TEXT("molten_cleave");
+	StaminaKey = TEXT("stamina.weaponArt"); StaminaFallback = 25.f;
+	CooldownKey = TEXT("spells.moltenCleave.cooldown"); CooldownFallback = 12.f;
+	TimingKey = TEXT("weapon.heavyTiming"); SwingKind = EWRSwingKind::WeaponArt; bHeavy = true;
+	Element = WRTags::Element_Fire; ArtKey = TEXT("spells.moltenCleave");
+}
+
+void UWRGA_MoltenCleave::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	AWRCharacterBase* Caster = GetCharacter();
+	if (!Caster || !IsServer())
+	{
+		return;
+	}
+	// The cleave leaves a strip of lava where it lands (world timer: outlives the ability).
+	TWeakObjectPtr<AWRCharacterBase> Weak = Caster;
+	FTimerHandle T;
+	Caster->GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateLambda([Weak]()
+	{
+		if (AWRCharacterBase* C = Weak.Get())
+		{
+			const FVector At = C->GetActorLocation() + C->GetActorForwardVector() * 250.f - FVector(0, 0, C->GetSimpleCollisionHalfHeight());
+			AWRHazard::Spawn(C->GetWorld(), C, At, WRTune(TEXT("spells.moltenCleave.lavaRadius"), 220.f), WRTune(TEXT("spells.moltenCleave.lavaSeconds"), 6.f),
+				WRTune(TEXT("spells.moltenCleave.lavaDps"), 10.f), TEXT("lava"));
+		}
+	}), WRTune(TEXT("weapon.heavyTiming.windup"), 0.5f) + 0.05f, false);
+}
+
 UWRGA_FlameSlash::UWRGA_FlameSlash()
 {
 	DisplayName = TEXT("Flame slash");
@@ -734,6 +783,62 @@ void UWRGA_AreaSpell::Execute()
 		}
 		break;
 	}
+	case EWRAreaShape::Meteor:
+	{
+		// A telegraphed strike where you aim: lands after a moment, leaves fire behind.
+		FHitResult Hit;
+		const FVector Eye = Caster->GetActorLocation() + FVector(0, 0, 60);
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRMeteorAim), false, Caster);
+		const float Range = Num(TEXT("range"), 2500.f);
+		const FVector At = World->LineTraceSingleByChannel(Hit, Eye, Eye + Aim.Vector() * Range, ECC_WorldStatic, Query) ? Hit.ImpactPoint : Ground(Feet + Flat * Range * 0.6f);
+		const float Radius = Num(TEXT("radius"), 450.f), Delay = Num(TEXT("delay"), 1.2f);
+		AWRGroundMarker::Spawn(World, At + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.15f, 0.05f), Delay);
+		TWeakObjectPtr<AWRCharacterBase> Weak = Caster;
+		const float Damage = Num(TEXT("damage"), 55.f), Burn = Num(TEXT("burnBuildup"), 70.f);
+		const FName Path = PathId;
+		FTimerHandle Timer;
+		World->GetTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([Weak, At, Radius, Damage, Burn, Path]()
+		{
+			AWRCharacterBase* C = Weak.Get();
+			if (!C) return;
+			for (TActorIterator<AWRCharacterBase> It(C->GetWorld()); It; ++It)
+			{
+				if (*It != C && It->IsAlive() && C->IsHostileTo(*It) && FVector::Dist2D(It->GetActorLocation(), At) < Radius + It->GetSimpleCollisionRadius())
+				{
+					FWRHit H;
+					H.Instigator = C; H.Damage = Damage; H.PoiseDamage = 40.f; H.Element = WRTags::Element_Fire; H.BurnBuildup = Burn; H.PathId = Path; H.bHeavy = true; H.Origin = At;
+					UWRCombatLibrary::ApplyHit(*It, H);
+				}
+			}
+			AWRHazard::Spawn(C->GetWorld(), C, At, Radius * 0.6f, 5.f, 8.f, TEXT("fire"));
+		}), Delay, false);
+		break;
+	}
+	case EWRAreaShape::IceWall:
+	{
+		// Pillars of ice across your aim: they block movement, attacks and breath, then melt.
+		const FVector Center = Feet + Flat * Num(TEXT("distance"), 500.f);
+		const FVector Across = FVector::CrossProduct(Flat, FVector::UpVector);
+		const int32 Count = FMath::RoundToInt(Num(TEXT("pillars"), 5.f));
+		const float Spacing = Num(TEXT("spacing"), 200.f);
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		for (int32 i = 0; i < Count; ++i)
+		{
+			const FVector At = Ground(Center + Across * Spacing * (i - (Count - 1) * 0.5f)) + FVector(0, 0, 200.f);
+			if (AWRBossProp* Pillar = World->SpawnActor<AWRBossProp>(AWRBossProp::StaticClass(), At, FRotator::ZeroRotator, Params))
+			{
+				Pillar->Setup(TEXT("pillar"));
+				Pillar->SetActorScale3D(FVector(0.8f, 0.8f, 0.5f));
+				Pillar->SetLifeSpan(Num(TEXT("seconds"), 8.f));
+			}
+		}
+		break;
+	}
+	case EWRAreaShape::Storm:
+		// A lasting storm around where you cast: frost buildup and slow on enemies inside.
+		AWRHazard::Spawn(World, Caster, Feet, Num(TEXT("radius"), 650.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 6.f), TEXT("frost"));
+		break;
 	case EWRAreaShape::Lance:
 	{
 		// Pierces everything along the aim.
@@ -792,7 +897,36 @@ UWRGA_IceLance::UWRGA_IceLance()
 	Shape = EWRAreaShape::Lance; Element = WRTags::Element_Frost;
 }
 
+UWRGA_Meteor::UWRGA_Meteor()
+{
+	DisplayName = TEXT("Meteor"); PathId = TEXT("fire"); NodeId = TEXT("meteor");
+	SpellKey = TEXT("spells.meteor"); CooldownKey = TEXT("spells.meteor.cooldown"); CooldownFallback = 30.f;
+	Shape = EWRAreaShape::Meteor; Element = WRTags::Element_Fire;
+}
+
+UWRGA_IceWall::UWRGA_IceWall()
+{
+	DisplayName = TEXT("Ice wall"); PathId = TEXT("frost"); NodeId = TEXT("ice_wall");
+	SpellKey = TEXT("spells.iceWall"); CooldownKey = TEXT("spells.iceWall.cooldown"); CooldownFallback = 14.f;
+	Shape = EWRAreaShape::IceWall; Element = WRTags::Element_Frost;
+}
+
+UWRGA_Blizzard::UWRGA_Blizzard()
+{
+	DisplayName = TEXT("Blizzard"); PathId = TEXT("frost"); NodeId = TEXT("blizzard");
+	SpellKey = TEXT("spells.blizzard"); CooldownKey = TEXT("spells.blizzard.cooldown"); CooldownFallback = 30.f;
+	Shape = EWRAreaShape::Storm; Element = WRTags::Element_Frost;
+}
+
 // ---------------------------------------------------------------- registry
+
+bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
+{
+	static const TSet<FName> Passives = {
+		TEXT("spreading_flames"), TEXT("fuel_the_fire"), TEXT("wildfire"), TEXT("explosive_bolt"), TEXT("searing_parry"),
+		TEXT("brittle"), TEXT("cold_return"), TEXT("chain_shatter"), TEXT("cold_riposte"), TEXT("frozen_moment") };
+	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
+}
 
 TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FName NodeId)
 {
@@ -802,6 +936,9 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("flame_slash")) return UWRGA_FlameSlash::StaticClass();
 		if (NodeId == TEXT("fire_wall")) return UWRGA_FireWall::StaticClass();
 		if (NodeId == TEXT("lava_pool")) return UWRGA_LavaPool::StaticClass();
+		if (NodeId == TEXT("molten_edge")) return UWRGA_MoltenEdge::StaticClass();
+		if (NodeId == TEXT("molten_cleave")) return UWRGA_MoltenCleave::StaticClass();
+		if (NodeId == TEXT("meteor")) return UWRGA_Meteor::StaticClass();
 	}
 	else if (PathId == TEXT("frost"))
 	{
@@ -809,6 +946,9 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("ice_slash")) return UWRGA_IceSlash::StaticClass();
 		if (NodeId == TEXT("frost_nova")) return UWRGA_FrostNova::StaticClass();
 		if (NodeId == TEXT("ice_lance")) return UWRGA_IceLance::StaticClass();
+		if (NodeId == TEXT("flurry")) return UWRGA_Flurry::StaticClass();
+		if (NodeId == TEXT("ice_wall")) return UWRGA_IceWall::StaticClass();
+		if (NodeId == TEXT("blizzard")) return UWRGA_Blizzard::StaticClass();
 	}
 	return nullptr;
 }

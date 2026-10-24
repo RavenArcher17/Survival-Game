@@ -106,6 +106,13 @@ float UWRPathComponent::XPMultiplier()
 	return Mult;
 }
 
+bool UWRPathComponent::HasNode(const AActor* Character, FName PathId, FName NodeId)
+{
+	const UWRPathComponent* Paths = FindFor(Character);
+	const FWRPathProgress* P = Paths && Paths->IsActivePath(PathId) ? Paths->GetProgress(PathId) : nullptr;
+	return P && P->GetRank(NodeId) > 0;
+}
+
 const FWRPathProgress* UWRPathComponent::GetProgress(FName PathId) const
 {
 	return Progress.FindByPredicate([PathId](const FWRPathProgress& P) { return P.PathId == PathId; });
