@@ -107,6 +107,9 @@ protected:
 	void InitVitals(float MaxHealth, float MaxStamina, float MaxPoise);
 
 	virtual void OnDeath(AActor* Killer) {}
+	/** Every machine: an attack swing started / this character died (real meshes play animations here). */
+	virtual void OnSwingVisual(EWRSwingKind Kind, float Duration) {}
+	virtual void OnDeathVisual() {}
 
 	/** Owned by creatures; players point this at their PlayerState's ASC. */
 	UPROPERTY() TObjectPtr<UAbilitySystemComponent> AbilitySystem;

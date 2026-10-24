@@ -19,6 +19,9 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Engine/SkeletalMesh.h"
 #include "Dom/JsonObject.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -131,6 +134,14 @@ void FWRCreatureRegistry::Reload()
 			D.Color = FLinearColor((*Color)[0]->AsNumber(), (*Color)[1]->AsNumber(), (*Color)[2]->AsNumber());
 		}
 		D.Resists = ParseNames(O, TEXT("resists"));
+		O->TryGetStringField(TEXT("mesh"), D.Mesh);
+		if (O->TryGetNumberField(TEXT("meshYaw"), Num)) D.MeshYaw = Num;
+		if (O->TryGetNumberField(TEXT("meshScale"), Num)) D.MeshScale = Num;
+		const TSharedPtr<FJsonObject>* AnimObj = nullptr;
+		if (O->TryGetObjectField(TEXT("anims"), AnimObj))
+		{
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& A : (*AnimObj)->Values) D.Anims.Add(FName(*A.Key), A.Value->AsString());
+		}
 		D.TamingMethods = ParseNames(O, TEXT("taming"));
 		D.Food = ParseNames(O, TEXT("food"));
 		D.Products = ParseCounts(O, TEXT("products"));
@@ -192,6 +203,12 @@ AWRCreature::AWRCreature(const FObjectInitializer& ObjectInitializer)
 	RideCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("RideCamera"));
 	RideCamera->SetupAttachment(RideBoom, USpringArmComponent::SocketName);
 
+	Skel = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Skel"));
+	Skel->SetupAttachment(RootComponent);
+	Skel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Skel->SetVisibility(false);
+	Skel->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+
 	GlowLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("GlowLight"));
 	GlowLight->SetupAttachment(RootComponent);
 	GlowLight->SetVisibility(false);
@@ -245,6 +262,75 @@ void AWRCreature::ApplyDef()
 	GetCharacterMovement()->MaxFlySpeed = Def->Speed;
 	BaseBodyColor = Def->Color;
 	SetBodyColor(Def->Color);
+
+	// Real art: swap the placeholder shape for the skeletal mesh, fitted to the capsule with its feet on the ground.
+	USkeletalMesh* ArtMesh = Def->Mesh.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *Def->Mesh);
+	if (ArtMesh && GetNetMode() != NM_DedicatedServer)
+	{
+		Skel->SetSkeletalMesh(ArtMesh);
+		const FBox Box = ArtMesh->GetBounds().GetBox();
+		const float Height = FMath::Max(1.f, Box.Max.Z - Box.Min.Z);
+		const float Scale = Def->HalfHeight * 2.f / Height * Def->MeshScale;
+		Skel->SetRelativeScale3D(FVector(Scale));
+		Skel->SetRelativeLocation(FVector(0.f, 0.f, -Def->HalfHeight - Box.Min.Z * Scale));
+		Skel->SetRelativeRotation(FRotator(0.f, Def->MeshYaw, 0.f));
+		Skel->SetVisibility(true);
+		BodyMesh->SetVisibility(false);
+		FaceMarker->SetVisibility(false);
+		AnimAssets.Reset();
+		for (const TPair<FName, FString>& A : Def->Anims)
+		{
+			if (UAnimSequenceBase* Anim = LoadObject<UAnimSequenceBase>(nullptr, *A.Value)) AnimAssets.Add(A.Key, Anim);
+		}
+		CurrentAnim = NAME_None;
+		PlayCreatureAnim(TEXT("idle"), true);
+	}
+}
+
+void AWRCreature::PlayCreatureAnim(FName Key, bool bLoop)
+{
+	TObjectPtr<UAnimSequenceBase>* Anim = AnimAssets.Find(Key);
+	if (!Anim || !*Anim || (Key == CurrentAnim && bLoop))
+	{
+		return;
+	}
+	CurrentAnim = Key;
+	Skel->PlayAnimation(*Anim, bLoop);
+	if (!bLoop)
+	{
+		OneShotUntil = GetWorld()->GetTimeSeconds() + (*Anim)->GetPlayLength();
+	}
+}
+
+void AWRCreature::TickCreatureAnim()
+{
+	if (!Skel->IsVisible() || AnimAssets.Num() == 0 || !IsAlive() || GetWorld()->GetTimeSeconds() < OneShotUntil)
+	{
+		return;
+	}
+	// Locomotion by speed (replicated movement on clients).
+	const float Speed = GetVelocity().Size2D();
+	const float Walk = GetCharacterMovement()->MaxWalkSpeed;
+	PlayCreatureAnim(Speed > Walk * 0.65f ? FName(TEXT("run")) : Speed > 25.f ? FName(TEXT("walk")) : FName(TEXT("idle")), true);
+}
+
+void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
+{
+	if (Skel->IsVisible())
+	{
+		CurrentAnim = NAME_None;
+		PlayCreatureAnim(TEXT("attack"), false);
+	}
+}
+
+void AWRCreature::OnDeathVisual()
+{
+	if (Skel->IsVisible())
+	{
+		CurrentAnim = NAME_None;
+		PlayCreatureAnim(TEXT("death"), false);
+		OneShotUntil = 1.0e12;  // stay down
+	}
 }
 
 void AWRCreature::OnRep_CreatureId()
@@ -589,6 +675,10 @@ void AWRCreature::RideLook(const FInputActionValue& Value)
 void AWRCreature::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		TickCreatureAnim();
+	}
 	if (!HasAuthority() || !IsAlive())
 	{
 		return;

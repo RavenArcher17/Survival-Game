@@ -47,6 +47,12 @@ struct FWRCreatureDef
 	bool bNest = false;
 	bool bHearing = false;
 
+	// Art: a skeletal mesh replaces the placeholder shape when set (scaled to the capsule, feet on the ground).
+	FString Mesh;
+	TMap<FName, FString> Anims;   // idle, walk, run, attack, hit, death
+	float MeshYaw = 0.f;
+	float MeshScale = 1.f;        // multiplier on the auto fit
+
 	bool CanTameBy(FName Method) const { return TamingMethods.Contains(Method); }
 	float TameSeconds() const;
 };
@@ -95,6 +101,8 @@ public:
 	virtual void AddTorpor(float Amount) override;
 	virtual bool TryPathMagic(const FWRHit& Hit) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void OnSwingVisual(EWRSwingKind Kind, float Duration) override;
+	virtual void OnDeathVisual() override;
 
 	const FWRCreatureDef* GetDef() const { return FWRCreatureRegistry::Get().Find(CreatureId); }
 	AActor* GetAggroTarget() const { return AggroTarget.Get(); }
@@ -154,6 +162,12 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USpringArmComponent> RideBoom;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UCameraComponent> RideCamera;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> GlowLight;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class USkeletalMeshComponent> Skel;
+	UPROPERTY(Transient) TMap<FName, TObjectPtr<class UAnimSequenceBase>> AnimAssets;
+	FName CurrentAnim;
+	double OneShotUntil = 0.0;
+	void PlayCreatureAnim(FName Key, bool bLoop);
+	void TickCreatureAnim();
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> RideMapping;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideMoveAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideLookAction;

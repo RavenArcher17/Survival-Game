@@ -214,6 +214,7 @@ void AWRCharacterBase::MulticastDied_Implementation()
 	BodyMesh->SetRelativeRotation(FRotator(0.f, 0.f, 90.f));
 	SetBodyColor(FLinearColor(0.15f, 0.15f, 0.15f));
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	OnDeathVisual();
 }
 
 void AWRCharacterBase::PlaySwing(EWRSwingKind Kind, float Duration)
@@ -240,6 +241,7 @@ void AWRCharacterBase::StartSwingVisual(EWRSwingKind Kind, float Duration)
 	VisualSwing = Kind;
 	VisualSwingTime = 0.f;
 	VisualSwingDuration = FMath::Max(Duration, 0.05f);
+	OnSwingVisual(Kind, Duration);
 }
 
 void AWRCharacterBase::SetBodyColor(const FLinearColor& Color)

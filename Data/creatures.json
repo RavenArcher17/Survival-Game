@@ -30,7 +30,9 @@
       "taming": ["offer_food"], "difficulty": "easy", "food": ["berries"], "utility": "light", "loot": { "fiber": 2 } },
     { "id": "pumicehog", "name": "Pumicehog", "biome": "volcanic", "tier": "lowland", "behavior": "passive", "archetype": "critter", "role": "farm animal",
       "speed": 350, "poise": 10, "radius": 30, "halfHeight": 25, "color": [0.6, 0.55, 0.5], "element": "fire",
-      "taming": ["offer_food"], "difficulty": "easy", "food": ["berries"], "products": { "raw_meat": 2, "hide": 1 } },
+      "taming": ["offer_food"], "difficulty": "easy", "food": ["berries"], "products": { "raw_meat": 2, "hide": 1 },
+      "mesh": "/Game/Creatures/Pumicehog/pumicehog.pumicehog", "meshYaw": 0,
+      "anims": { "idle": "/Game/Creatures/Pumicehog/pumicehogRig_Idle.pumicehogRig_Idle", "walk": "/Game/Creatures/Pumicehog/pumicehogRig_Walk.pumicehogRig_Walk", "run": "/Game/Creatures/Pumicehog/pumicehogRig_Run.pumicehogRig_Run", "attack": "/Game/Creatures/Pumicehog/pumicehogRig_Attack.pumicehogRig_Attack", "hit": "/Game/Creatures/Pumicehog/pumicehogRig_Hit.pumicehogRig_Hit", "death": "/Game/Creatures/Pumicehog/pumicehogRig_Death.pumicehogRig_Death" } },
 
     { "id": "rimeclaw", "name": "Rimeclaw", "biome": "tundra", "tier": "highland", "behavior": "aggressive", "archetype": "ground_predator", "role": "fighter",
       "speed": 560, "poise": 70, "radius": 55, "halfHeight": 60, "color": [0.55, 0.75, 0.95], "element": "frost", "resists": ["ice"],
