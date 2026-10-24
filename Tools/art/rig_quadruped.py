@@ -1,5 +1,5 @@
 # Blender (headless): rig an image-to-3D quadruped and bake its basic animations, then export FBX for Unreal.
-#   blender -b -P rig_quadruped.py -- <model.glb> <out.fbx> [--head +x|-x|+y|-y] [--gait trot|hop] [--stretch 1.3] [--preview out.png]
+#   blender -b -P rig_quadruped.py -- <model.glb> <out.fbx> [--head +x|-x|+y|-y] [--gait trot|hop] [--legs 4|6] [--add-mid-legs] [--stretch 1.3] [--preview out.png]
 # Legs are found by clustering the lowest part of the mesh; spine/neck/head/tail come from the leg positions.
 # Actions: Idle, Walk, Run, Attack, Hit, Death (30 fps). Unreal gets one skeletal mesh + six animations.
 import bpy, sys, math
@@ -12,6 +12,7 @@ head_dir = args[args.index("--head") + 1] if "--head" in args else "+x"
 preview = args[args.index("--preview") + 1] if "--preview" in args else None
 gait_kind = args[args.index("--gait") + 1] if "--gait" in args else "trot"  # trot | hop (front pair, then rear pair)
 stretch = float(args[args.index("--stretch") + 1]) if "--stretch" in args else 1.0  # torso length multiplier
+legs_n = int(args[args.index("--legs") + 1]) if "--legs" in args else 4  # 4, or 6 (front / middle / rear pairs)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
@@ -67,12 +68,12 @@ def find_feet(cut):
                         stack.append(nb)
         islands.append(members)
     islands.sort(key=len, reverse=True)
-    return [low[m].mean(0) for m in islands[:4]], [len(m) for m in islands[:6]]
+    return [low[m].mean(0) for m in islands[:legs_n]], [len(m) for m in islands[:legs_n + 2]]
 
 def feet_now():
-    for cut in (0.06, 0.1, 0.15, 0.2):  # lowest slice that shows four separate feet
+    for cut in (0.06, 0.1, 0.15, 0.2):  # lowest slice that shows every foot separately
         feet, sizes = find_feet(cut)
-        if len(feet) == 4 and sizes[3] > 20:
+        if len(feet) == legs_n and sizes[legs_n - 1] > 20:
             return np.array(feet), cut, sizes
     return np.array(feet), cut, sizes
 
@@ -80,7 +81,7 @@ def feet_now():
 # rear feet to the front feet runs along +X, then find the feet again.
 centers, cut, sizes = feet_now()
 by_x = centers[np.argsort(-centers[:, 0])]
-fwd = by_x[:2].mean(0) - by_x[2:].mean(0)
+fwd = by_x[:2].mean(0) - by_x[-2:].mean(0)
 turn = -math.atan2(fwd[1], fwd[0])
 if abs(turn) > math.radians(3):
     body.data.transform(Matrix.Rotation(turn, 4, "Z"))
@@ -96,7 +97,7 @@ print("aligned by", round(math.degrees(turn), 1), "deg")
 # edges of the rear and front feet, so legs, head and tail keep their shape.
 if stretch != 1.0:
     xs = np.sort(centers[:, 0])
-    rx0, fx0 = xs[1] + 0.05, xs[2] - 0.05
+    rx0, fx0 = xs[1] + 0.05, xs[-2] - 0.05
     if fx0 > rx0:
         x = v[:, 0]
         nx = np.where(x < rx0, x, np.where(x > fx0, x + (fx0 - rx0) * (stretch - 1), rx0 + (x - rx0) * stretch))
@@ -108,12 +109,70 @@ if stretch != 1.0:
         L = hi[0] - lo[0]
         centers, cut, sizes = feet_now()
     print("torso stretched", stretch, "between x", round(float(rx0), 2), round(float(fx0), 2))
+# Six-legged mammals: image models only draw four legs, so --add-mid-legs copies the front pair (with its UVs) into a
+# middle pair halfway back, lengthened just enough for the tops to tuck into the belly.
+if "--add-mid-legs" in args and legs_n == 4:
+    import bmesh
+    by = centers[np.argsort(-centers[:, 0])]
+    fx_, rx_ = by[:2, 0].mean(), by[2:, 0].mean()
+    mid_x = (fx_ + rx_) / 2
+    band = v[(np.abs(v[:, 0] - mid_x) < 0.05) & (np.abs(v[:, 1]) < 0.1)]
+    belly_mid = float(np.percentile(band[:, 2], 3)) if len(band) else 0.3  # underside halfway between the legs
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0005)  # textured meshes are split at UV seams: weld so a leg is one piece
+    faces = list(bm.faces)
+    fc = np.array([f.calc_center_median()[:] for f in faces])
+    ftop = np.array([max(p.co.z for p in f.verts) for f in faces])
+    index = {f: i for i, f in enumerate(faces)}
+
+    def leg_piece(foot, other, cut):
+        """Faces below `cut` connected to this foot; True if that piece also reaches the other front foot."""
+        below = ftop < cut
+        d = np.where(below, (fc[:, 0] - foot[0]) ** 2 + (fc[:, 1] - foot[1]) ** 2 + fc[:, 2] ** 2, np.inf)
+        start = int(np.argmin(d))
+        seen, stack = {start}, [start]
+        while stack:
+            for e in faces[stack.pop()].edges:
+                for h in e.link_faces:
+                    j = index[h]
+                    if below[j] and j not in seen:
+                        seen.add(j)
+                        stack.append(j)
+        ids = np.fromiter(seen, int)
+        reach = np.any((np.hypot(fc[ids, 0] - other[0], fc[ids, 1] - other[1]) < 0.06) & (fc[ids, 2] < 0.08))
+        return [faces[j] for j in ids], bool(reach)
+
+    for foot, other in ((by[0], by[1]), (by[1], by[0])):
+        cut = belly_mid
+        piece, joined = leg_piece(foot, other, cut)
+        while joined and cut > 0.12:  # a deep chest joins the front legs: cut lower until this one stands alone
+            cut -= 0.02
+            piece, joined = leg_piece(foot, other, cut)
+        near = v[(np.abs(v[:, 0] - mid_x) < 0.04) & (np.abs(v[:, 1] - foot[1]) < 0.08)]
+        under = float(np.percentile(near[:, 2], 3)) if len(near) else belly_mid  # the belly right above the new leg
+        lift = max(1.0, (under + 0.04) / cut)
+        dup = bmesh.ops.duplicate(bm, geom=piece)
+        for p in (g for g in dup["geom"] if isinstance(g, bmesh.types.BMVert)):
+            p.co.x += mid_x - foot[0]
+            p.co.z *= lift
+        print("middle leg from", [round(float(c), 2) for c in foot[:2]], "cut", round(cut, 2), "faces", len(piece), "lift", round(lift, 2))
+    bm.to_mesh(body.data)
+    bm.free()
+    body.data.update()
+    legs_n = 6
+    v = np.array([p.co[:] for p in body.data.vertices])
+    lo, hi = v.min(0), v.max(0)
+    L = hi[0] - lo[0]
+    centers, cut, sizes = feet_now()
 lab = np.zeros(1, int)
 print("feet slice", cut, "island sizes", sizes)
-names = ["FL", "FR", "RL", "RR"]  # front/rear, left (+y) / right
-order = sorted(range(4), key=lambda k: -centers[k][0])
-front, rear = sorted(order[:2], key=lambda k: -centers[k][1]), sorted(order[2:], key=lambda k: -centers[k][1])
-legs = dict(zip(names, [centers[front[0]], centers[front[1]], centers[rear[0]], centers[rear[1]]]))
+# Pairs from front to back (F, M for six legs, R), each left (+y) then right.
+order = sorted(range(legs_n), key=lambda k: -centers[k][0])
+legs = {}
+for pair, tag in zip(range(0, legs_n, 2), ["F", "M", "R"] if legs_n == 6 else ["F", "R"]):
+    left, right = sorted(order[pair:pair + 2], key=lambda k: -centers[k][1])
+    legs[tag + "L"], legs[tag + "R"] = centers[left], centers[right]
 print("legs", {k: [round(float(c[0]), 3), round(float(c[1]), 3)] for k, c in legs.items()})
 
 # ---- measure the body instead of assuming proportions (tortoises, giraffes and cats all differ)
@@ -164,7 +223,7 @@ tail_mid = (rear_x - (rear_x - tail_tip[0]) * 0.5, 0, (hip_z + tail_tip[2]) / 2)
 bone("tail1", (rear_x, 0, hip_z), tail_mid, "pelvis")
 bone("tail2", tail_mid, tail_tip, "tail1")
 for n, (x, y) in legs.items():
-    par = "spine3" if n[0] == "F" else "pelvis"
+    par = {"F": "spine3", "M": "spine1", "R": "pelvis"}[n[0]]
     side = (0, 1, 0)  # leg bones swing about their local Z (= world lateral axis)
     bone(f"{n}_upper", (x, y, hip_z - 0.02), (x - 0.02, y, knee_z), par, side)
     bone(f"{n}_lower", (x - 0.02, y, knee_z), (x, y, ankle_z), f"{n}_upper", side)
@@ -230,6 +289,8 @@ R = math.radians
 phase = {"FL": 0.0, "RR": 0.0, "FR": 0.5, "RL": 0.5}  # trot: diagonal pairs
 if gait_kind == "hop":
     phase = {"FL": 0.0, "FR": 0.0, "RL": 0.5, "RR": 0.5}  # hop: front pair lands, rear pair pushes off
+if legs_n == 6:
+    phase = {"FL": 0.0, "MR": 0.0, "RL": 0.0, "FR": 0.5, "ML": 0.5, "RR": 0.5}  # tripod: three feet always down
 
 def gait(t, swing, knee, bob):
     for n, ph in phase.items():

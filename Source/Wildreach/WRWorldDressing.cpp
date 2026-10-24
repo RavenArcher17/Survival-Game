@@ -159,8 +159,20 @@ AWRDressing::AWRDressing()
 
 UHierarchicalInstancedStaticMeshComponent* AWRDressing::MakePart(const TCHAR* MeshPath, const FLinearColor& Color, bool bCollision, float CullDistance)
 {
+	UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(LoadObject<UStaticMesh>(nullptr, MeshPath), bCollision, CullDistance);
+	if (UMaterialInterface* Mat = ShapeMaterial())
+	{
+		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
+		MID->SetVectorParameterValue(TEXT("Color"), Color);
+		Part->SetMaterial(0, MID);
+	}
+	return Part;
+}
+
+UHierarchicalInstancedStaticMeshComponent* AWRDressing::MakeMeshPart(UStaticMesh* Mesh, bool bCollision, float CullDistance)
+{
 	UHierarchicalInstancedStaticMeshComponent* Part = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
-	Part->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, MeshPath));
+	Part->SetStaticMesh(Mesh);
 	Part->SetupAttachment(RootComponent);
 	Part->SetMobility(EComponentMobility::Static);
 	Part->SetCollisionEnabled(bCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
@@ -169,12 +181,6 @@ UHierarchicalInstancedStaticMeshComponent* AWRDressing::MakePart(const TCHAR* Me
 	Part->bAffectDistanceFieldLighting = false;
 	Part->SetCastShadow(bCollision || CullDistance > 20000.f);
 	Part->RegisterComponent();
-	if (UMaterialInterface* Mat = ShapeMaterial())
-	{
-		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
-		MID->SetVectorParameterValue(TEXT("Color"), Color);
-		Part->SetMaterial(0, MID);
-	}
 	return Part;
 }
 
@@ -199,6 +205,82 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("ember_shrub"), { { Sphere, FLinearColor(0.6f, 0.12f, 0.02f), FVector(110, 110, 60), 15, false, 12000, FVector::ZeroVector } } },
 		{ TEXT("snow_shrub"), { { Sphere, FLinearColor(0.75f, 0.82f, 0.8f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
 	};
+	// Real meshes from the art packs / AI props replace the shapes above where we have them.
+	// Size is what each mesh is fitted to (cm, before the instance's own scale): all three axes for rocks, so they keep
+	// the placeholders' footprint and collision, or just the height for plants. Material (optional) replaces the mesh's
+	// own materials (boulders use the project's world-aligned M_Rock); Params / Scalars tint whichever is used.
+	struct FParam { const TCHAR* Name; FLinearColor Value; };
+	struct FScalar { const TCHAR* Name; float Value; };
+	struct FArt { TArray<FString> Meshes; FVector Size; float Sink; bool bCollision; float Cull; FVector Tilt; bool bHeightOnly;
+	              const TCHAR* Material; TArray<FParam> Params; TArray<FScalar> Scalars;
+	              bool bShapeCollision = false; };  // keep the shapes' colliding parts, hidden (tree trunks)
+	static const TCHAR* RockMat = TEXT("/Game/Terrain/M_Rock.M_Rock");
+	TArray<FString> Rocks, Shrubs;
+	for (const TCHAR* N : { TEXT("01A"), TEXT("02A"), TEXT("03A"), TEXT("05A"), TEXT("08A"), TEXT("12A") })
+	{
+		Rocks.Add(FString::Printf(TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_%s.SM_SimpleRock_%s"), N, N));
+	}
+	for (const TCHAR* N : { TEXT("A"), TEXT("B"), TEXT("D") })
+	{
+		Shrubs.Add(FString::Printf(TEXT("/Game/GV_FreeShrubsPack/Meshes/Shrubs/Wind/Shrub_%s/GV_Vol7_Shrub_%s_full_type1.GV_Vol7_Shrub_%s_full_type1"), N, N, N));
+	}
+	const auto Prop = [](const TCHAR* Folder, const TCHAR* Name) { return FString::Printf(TEXT("/Game/Props/%s/%s/StaticMeshes/%s.%s"), Folder, Name, Name, Name); };
+	const TMap<FString, FArt> Art = {
+		{ TEXT("char_tree"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")) },
+			FVector(0, 0, 720), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")) }, FVector(0, 0, 1000), 10, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, {} } },
+		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
+		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 130), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // scorched: dark, dull
+			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) } }, { { TEXT("Color Intensity"), 0.3f }, { TEXT("Sature Max"), 0.6f } } } },
+		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 120), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // frosted: pale
+			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } }, { { TEXT("Color Intensity"), 1.25f }, { TEXT("Sature Max"), 0.5f } } } },
+	};
+	const auto BuildArt = [&](const FArt& A, const TArray<TSharedPtr<FJsonValue>>& Arr) -> bool
+	{
+		TArray<UStaticMesh*> Meshes;
+		for (const FString& Path : A.Meshes)
+		{
+			if (UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *Path)) Meshes.Add(M);
+		}
+		if (Meshes.Num() == 0)
+		{
+			return false;  // pack not installed: fall back to the shapes
+		}
+		if (bServer && !A.bCollision)
+		{
+			return true;
+		}
+		const int32 Count = Arr.Num() / 5;
+		for (int32 m = 0; m < Meshes.Num(); ++m)
+		{
+			const FBox Box = Meshes[m]->GetBoundingBox();
+			const FVector Ext = Box.GetSize().ComponentMax(FVector(1.f));
+			const FVector Fit = A.bHeightOnly ? FVector(A.Size.Z / Ext.Z) : A.Size / Ext;
+			TArray<FTransform> Transforms;
+			for (int32 i = m; i < Count; i += Meshes.Num())  // instances take turns across the meshes
+			{
+				const float S = Arr[i * 5 + 4]->AsNumber();
+				const float Yaw = Arr[i * 5 + 3]->AsNumber();
+				const FVector Ground(Arr[i * 5]->AsNumber(), Arr[i * 5 + 1]->AsNumber(), Arr[i * 5 + 2]->AsNumber());
+				const FRotator Rot(A.Tilt.X * FMath::Sin(Yaw), Yaw, A.Tilt.Z * FMath::Cos(Yaw * 1.7f));
+				const FVector Scale = Fit * S;
+				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, -Box.Min.Z * Scale.Z - A.Sink * S), Scale);
+			}
+			UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(Meshes[m], A.bCollision, A.Cull);
+			UMaterialInterface* Override = A.Material ? LoadObject<UMaterialInterface>(nullptr, A.Material) : nullptr;
+			for (int32 Slot = 0; Slot < Meshes[m]->GetStaticMaterials().Num() && (Override || A.Params.Num() + A.Scalars.Num() > 0); ++Slot)
+			{
+				UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Override ? Override : Meshes[m]->GetMaterial(Slot), this);
+				for (const FParam& P : A.Params) MID->SetVectorParameterValue(P.Name, P.Value);  // ignored where a material lacks it
+				for (const FScalar& P : A.Scalars) MID->SetScalarParameterValue(P.Name, P.Value);
+				Part->SetMaterial(Slot, MID);
+			}
+			Part->AddInstances(Transforms, false, true);
+		}
+		return true;
+	};
+
 	for (const TPair<FString, TArray<FPart>>& Kind : Kinds)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
@@ -207,8 +289,14 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			continue;
 		}
 		const int32 Count = Arr->Num() / 5;
+		const FArt* A = Art.Find(Kind.Key);
+		const bool bArt = A && BuildArt(*A, *Arr);
 		for (const FPart& Part : Kind.Value)
 		{
+			if (bArt && !(A->bShapeCollision && Part.bCollision))
+			{
+				continue;  // drawn by the art mesh
+			}
 			if (bServer && !Part.bCollision)
 			{
 				continue;  // the server only needs what blocks movement
@@ -224,7 +312,13 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				const FRotator Rot(Part.Tilt.X * FMath::Sin(Yaw), Yaw, Part.Tilt.Z * FMath::Cos(Yaw * 1.7f));
 				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, Part.Lift * S - 20.f), Part.Size / 100.f * S);
 			}
-			MakePart(Part.Mesh, Part.Color, Part.bCollision, Part.Cull)->AddInstances(Transforms, false, true);
+			UHierarchicalInstancedStaticMeshComponent* Shape = MakePart(Part.Mesh, Part.Color, Part.bCollision, Part.Cull);
+			if (bArt)
+			{
+				Shape->SetHiddenInGame(true);  // invisible collision under an art mesh
+				Shape->SetCastShadow(false);
+			}
+			Shape->AddInstances(Transforms, false, true);
 		}
 		Total += Count;
 	}
@@ -254,7 +348,13 @@ void AWRDressing::BuildHazardVisuals()
 		}
 		if (Tiles.Num() > 0)
 		{
-			MakePart(TEXT("/Engine/BasicShapes/Cube.Cube"), bLava ? FLinearColor(0.95f, 0.22f, 0.02f) : FLinearColor(0.4f, 0.68f, 0.95f), false, bLava ? 24000 : 9000)->AddInstances(Tiles, false, true);
+			UHierarchicalInstancedStaticMeshComponent* Part = MakePart(TEXT("/Engine/BasicShapes/Cube.Cube"), bLava ? FLinearColor(0.95f, 0.22f, 0.02f) : FLinearColor(0.4f, 0.68f, 0.95f), false, bLava ? 24000 : 9000);
+			// Glowing world-aligned lava / glossy ice (Tools/terrain/build_terrain_materials.py), flat colours if missing.
+			if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, bLava ? TEXT("/Game/Terrain/M_Lava.M_Lava") : TEXT("/Game/Terrain/M_Ice.M_Ice")))
+			{
+				Part->SetMaterial(0, Mat);
+			}
+			Part->AddInstances(Tiles, false, true);
 		}
 	}
 }
@@ -328,10 +428,13 @@ void AWRCave::BuildShell()
 	// Walls reach 4 m underground so uneven ground never leaves gaps.
 	Rock->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
 	const bool bFrost = Biome == TEXT("tundra");
-	if (UMaterialInterface* Mat = ShapeMaterial())
+	// World-aligned rock (Tools/terrain/build_terrain_materials.py) so the blocks read as stone; flat colour if missing.
+	UMaterialInterface* RockMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Rock.M_Rock"));
+	if (UMaterialInterface* Mat = RockMat ? RockMat : ShapeMaterial())
 	{
 		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
-		MID->SetVectorParameterValue(TEXT("Color"), bFrost ? FLinearColor(0.35f, 0.45f, 0.58f) : FLinearColor(0.04f, 0.035f, 0.03f));
+		MID->SetVectorParameterValue(RockMat ? TEXT("Tint") : TEXT("Color"),
+			bFrost ? FLinearColor(0.5f, 0.6f, 0.72f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
 		Rock->SetMaterial(0, MID);
 	}
 	const auto Block = [this](const FVector& Center, const FVector& Size) { Rock->AddInstance(FTransform(FRotator::ZeroRotator, Center, Size / 100.f)); };

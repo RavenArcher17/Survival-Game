@@ -71,6 +71,8 @@ public:
 
 private:
 	UHierarchicalInstancedStaticMeshComponent* MakePart(const TCHAR* Mesh, const FLinearColor& Color, bool bCollision, float CullDistance);
+	/** An instanced part with the mesh's own materials. */
+	UHierarchicalInstancedStaticMeshComponent* MakeMeshPart(class UStaticMesh* Mesh, bool bCollision, float CullDistance);
 	int32 Total = 0;
 };
 

@@ -1,0 +1,10 @@
+{
+  "_comment": "Six-legged creatures (design doc Creatures tab). SDXL miscounts legs, so generate 8 and pick ones with three clear pairs.",
+  "stance": "standing on six legs",
+  "negative": "cropped, cut off, multiple creatures, text, watermark, frame, cartoon, blurry, deformed, four legs, busy background, scenery, ground clutter, photo of real animal",
+  "creatures": [
+    { "id": "cinderfang", "prompt": "a lean six-legged ember hound, wolf-like predator with three pairs of legs, charcoal black fur with glowing orange ember cracks, smouldering mane, bared fangs" },
+    { "id": "woolly_drudge", "prompt": "a massive shaggy six-legged beast of burden like a woolly mammoth crossed with a yak, three pairs of thick legs, long brown shaggy fur, small curved tusks" },
+    { "id": "kilnmite", "prompt": "a giant burrowing beetle with a copper-brown armored carapace glowing with orange cracks like a kiln, big digging mandibles, six sturdy legs" }
+  ]
+}

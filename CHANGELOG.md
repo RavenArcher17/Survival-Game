@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-24: real art, part 1 (creatures and terrain)
+
+- **13 creatures made with the local AI pipeline** (`Tools/art/README.md`): Pumicehog, the nine four-legged ones
+  (Magmaw, Basaltback, Emberhorn, Ashstrider, Rimeclaw, Frostantler, Rimeshell, Aurora fox, Pale Hunter) and the three
+  six-legged ones (Cinderfang, Woolly drudge, Kilnmite). Each has Idle/Walk/Run/Attack/Hit/Death.
+  The rigger does six legs (tripod gait), adds a middle leg pair to four-legged models (`--add-mid-legs`), and
+  lengthens foreshortened torsos (`--stretch`). `Tools/creatureshots.ps1` + `WRArtCam` screenshot a batch in game.
+- **Terrain textures** (`Tools/terrain/build_terrain_materials.py`): the landscape material uses the MW Landscape
+  Auto Material pack: dark ash with stony patches and black sand in the west, snow and pale sand in the east, basalt /
+  frost rock on steep slopes. New `M_Rock` (boulders, cave walls), `M_Lava` (glowing, flowing) and `M_Ice` (glossy).
+- **Dressing uses real meshes**: AI-made charred trees (two kinds) and snowy pines (`Tools/import_prop.py` ->
+  `/Game/Props`, Nanite, invisible trunk collision as before), SimpleRocks boulders (same footprint and collision as
+  before), GV shrubs, and rock-textured cave walls; falls back to the engine shapes when a pack or prop is missing.
+- **Packaging**: creature art and dressing meshes are loaded by path, so they're now listed in
+  `DirectoriesToAlwaysCook` (a packaged build would otherwise have shipped placeholder shapes).
+- **Fixed**: art creatures whose radius exceeds their half-height floated (the capsule grows to the radius); the
+  rigger ignored `--head`; re-importing a creature kept the old texture and animations (the importer now refuses).
+- Known: lava tiles step visibly on slopes (needs one continuous surface); shrubs stay green in the volcanic west (the
+  pack's leaf colour ignores tints); one pine model for the whole tundra; cave shells are still boxes (now rock-textured);
+  the sawtooth shadow on the steep ridge face remains.
+
 ## 2026-10-24: playable with friends
 
 - **Main menu** (shown when the game runs on its own): name, Fire or Frost, **Host** (your game becomes a listen

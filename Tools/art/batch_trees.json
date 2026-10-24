@@ -1,0 +1,9 @@
+{
+  "_comment": "Static props for the island dressing (no rig): charred trees for the volcanic west, snowy pines for the tundra east.",
+  "template": "game asset concept art of {p}, one single isolated tree, entire tree visible from roots to top, centered, realistic, detailed, isolated on plain white background, soft studio lighting",
+  "negative": "cropped, cut off, forest, multiple trees, text, watermark, frame, cartoon, blurry, ground, grass, scenery, landscape, background",
+  "creatures": [
+    { "id": "char_tree", "prompt": "a dead charred tree burned by volcanic fire, black scorched trunk, a few thick bare twisted branches, glowing embers in the bark cracks" },
+    { "id": "pine", "prompt": "a tall snow-covered pine tree, dense dark green needles under thick snow, straight trunk, conical shape" }
+  ]
+}

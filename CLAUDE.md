@@ -33,7 +33,13 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
   which otherwise breaks Epic's batch files), log `C:\Dev\UE5Source-build.log`.
 - M3: layout approved 2026-10-23; **`L_Island` built** (WP landscape, default map). Rebuild with `Tools/terrain/build_island.ps1 -Force` (runs in the full editor: the landscape's visible textures need the GPU layer update, which commandlets don't do).
   Dressing/caves/lava+ice cells: `node Tools/terrain/dressing.mjs` -> `Data/island_dressing.json`, built at runtime by
-  `UWRDressingSubsystem` (no map rebuild). Decoration culls at ~250 m (WP loading range). Next: textured auto-material, HLODs.
+  `UWRDressingSubsystem` (no map rebuild). Decoration culls at ~250 m (WP loading range). Next: HLODs.
+  Materials (`M_IslandAuto`, `M_Rock`, `M_Lava`, `M_Ice`): `Tools/terrain/build_terrain_materials.py` (commandlet, rebuilds in place).
+  The dressing uses pack meshes (SimpleRocks, GV shrubs, AI trees in `/Game/Props`) and falls back to engine shapes if a pack is missing.
+- Art: creatures and props come from the local AI pipeline (`Tools/art/README.md`; env + models in `C:\Dev\WildreachArt`,
+  not in git). Fab packs live in `Content/<pack>` and are git-ignored; adding a "complete project" pack can overwrite
+  `Config/Default*.ini` and drop a `.uproject` in the root, so check `git diff Config/` after adding one.
+  Anything loaded by path (creature art, dressing meshes) must be under a `DirectoriesToAlwaysCook` entry in `DefaultGame.ini`.
 - 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):
   1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
   2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).
@@ -42,7 +48,7 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
      `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks pass. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
   6. Island dressing, caves, biome hazards (`WRWorldDressing`; `Tools\terrain\hazardtest.ps1`): done. Island rebuilt 2026-10-24.
   Default preset is `playtest` (PvP off), so PvP tests need `-wrpreset=pvp_standard` (mptest and socialtest pass it).
-- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB, ~190 MB used; each island rebuild adds ~80 MB).
+- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB, ~350 MB used 2026-10-24; each island rebuild adds ~80 MB, each AI creature ~11 MB).
 - See `CHANGELOG.md` for details and known gaps.
 
 ## How things are wired (read before changing combat)
