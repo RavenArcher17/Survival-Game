@@ -924,7 +924,7 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 {
 	static const TSet<FName> Passives = {
 		TEXT("spreading_flames"), TEXT("fuel_the_fire"), TEXT("wildfire"), TEXT("explosive_bolt"), TEXT("searing_parry"),
-		TEXT("brittle"), TEXT("cold_return"), TEXT("chain_shatter"), TEXT("cold_riposte"), TEXT("frozen_moment") };
+		TEXT("brittle"), TEXT("cold_return"), TEXT("chain_shatter"), TEXT("cold_riposte"), TEXT("frozen_moment"), TEXT("overheat"), TEXT("whiteout") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 

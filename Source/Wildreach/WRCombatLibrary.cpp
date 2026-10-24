@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRBoss.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -85,6 +86,28 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	{
 		// Heat builds as you attack and simply stops at full (design review #2: no self-damage).
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), Attr->GetHeat() + Amount);
+		// Overheat: reaching full Heat releases an explosion around you (and empties the bar).
+		if (Attr->GetHeat() >= Attr->GetMaxHeat() && Attr->GetMaxHeat() > 0.f && UWRPathComponent::HasNode(Who, TEXT("fire"), TEXT("overheat")))
+		{
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), 0.f);
+			const float Radius = WRTune(TEXT("passives.overheatRadius"), 350.f);
+			AWRGroundMarker::Spawn(Who->GetWorld(), Who->GetActorLocation() - FVector(0, 0, Who->GetSimpleCollisionHalfHeight() - 3.f), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.35f, 0.05f), 0.4f);
+			for (TActorIterator<AWRCharacterBase> It(Who->GetWorld()); It; ++It)
+			{
+				if (*It != Who && It->IsAlive() && Who->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Who->GetActorLocation()) < Radius)
+				{
+					FWRHit Blast;
+					Blast.Instigator = Who;
+					Blast.Damage = WRTune(TEXT("passives.overheatDamage"), 35.f);
+					Blast.PoiseDamage = 25.f;
+					Blast.Element = WRTags::Element_Fire;
+					Blast.BurnBuildup = 60.f;
+					Blast.Origin = Who->GetActorLocation();
+					ApplyHit(*It, Blast);
+				}
+			}
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT overheat by %s"), *Who->GetName());
+		}
 		if (bBalance)
 		{
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), Attr->GetChill() + Amount * Share);
@@ -173,6 +196,21 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 		Target->ReportHit(0.f, EWRHitResult::Dodged);
 		return EWRHitResult::Dodged;
+	}
+
+	// Whiteout: enemies inside a frost storm whose caster has the node miss more often.
+	if (Attacker && !Hit.bDamageOverTime)
+	{
+		for (TActorIterator<AWRHazard> It(Target->GetWorld()); It; ++It)
+		{
+			const AWRCharacterBase* Caster = Cast<AWRCharacterBase>(It->Source.Get());
+			if (It->Kind == TEXT("frost") && Caster && Caster->IsHostileTo(Attacker) && FVector::Dist2D(It->GetActorLocation(), Attacker->GetActorLocation()) < It->Radius
+				&& UWRPathComponent::HasNode(Caster, TEXT("frost"), TEXT("whiteout")) && FMath::FRand() < WRTune(TEXT("passives.whiteoutMissChance"), 0.3f))
+			{
+				Target->ReportHit(0.f, EWRHitResult::Dodged);
+				return EWRHitResult::Dodged;
+			}
+		}
 	}
 
 	float Damage = Hit.Damage;

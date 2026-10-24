@@ -119,7 +119,7 @@
   "passives": { "_comment": "Passive tree nodes (checked with UWRPathComponent::HasNode).",
     "searingParryBuildup": 100, "frozenMomentCooldown": 6, "frozenMomentRadius": 400, "brittleCrit": 0.25, "fuelTheFireHeat": 4,
     "coldReturnChill": 15, "chainShatterRadius": 450, "wildfireRadius": 350, "wildfireBuildup": 80, "spreadRadius": 450,
-    "explosiveBoltRadius": 300, "explosiveBoltDamage": 0.5 },
+    "explosiveBoltRadius": 300, "explosiveBoltDamage": 0.5, "overheatRadius": 350, "overheatDamage": 35, "whiteoutMissChance": 0.3 },
   "hazards": { "_comment": "Biome gear checks: lava river (needs lava resistance), slick ice (needs ice resistance).",
     "lavaDps": 8, "lavaBurnPerSecond": 12, "iceFriction": 0.3, "iceBraking": 100, "iceAcceleration": 600 },
   "caves": { "gemChance": 0.12, "gasDps": 6 },
