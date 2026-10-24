@@ -17,6 +17,7 @@ enum class EWRMenu : uint8
 	Build,
 	Chest,
 	Claim,
+	Tame,
 };
 
 class AWRBuildPiece;
@@ -66,7 +67,11 @@ public:
 	/** Use the first inventory slot holding this item (testing). */
 	UFUNCTION(Exec) void WREquip(FName Item);
 	/** Teleport next to the nearest station of a type, or "hearth" (testing). */
-	UFUNCTION(Exec) void WRGoTo(FName What);
+	UFUNCTION(Exec) void WRGoTo(FName What, FName Extra);
+	UFUNCTION(Exec) void WRTame(FName Order);
+	UFUNCTION(Exec) void WRDismount();
+	UFUNCTION(Exec) void WRTorpor(float Amount);
+	UFUNCTION(Exec) void WRTameStat();
 
 	// --- Building ---
 	bool IsPlacing() const { return !PlacingPiece.IsNone(); }
@@ -77,6 +82,7 @@ public:
 	void RotatePlacement();
 	void CancelPlacement();
 	AWRBuildPiece* FindNearbyPiece(float Range = 350.f) const;
+	class AWRCreature* FindNearbyCreature(bool bOwnTame, float Range = 450.f) const;
 
 	/** Place a piece at a world spot (testing; normal play uses the build ghost). */
 	UFUNCTION(Exec) void WRPlace(FName Piece, float X, float Y, float Z, float Yaw);
@@ -141,6 +147,7 @@ private:
 	FName MenuElement;
 	TWeakObjectPtr<AWRStation> MenuStation;
 	TWeakObjectPtr<AWRBuildPiece> MenuPiece;
+	TWeakObjectPtr<class AWRCreature> MenuCreature;
 
 	void ToggleBuildMenu();
 	void StartPlacing(FName Piece);

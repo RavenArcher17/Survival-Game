@@ -82,18 +82,19 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	{
 		return false;
 	}
-	TestTrue(TEXT("target alive with midland health"), A.Target->IsAlive() && FMath::IsNearlyEqual(A.Health(), WRTune(TEXT("enemies.midland.health"), 120.f)));
+	TestTrue(TEXT("target alive with highland health"), A.Target->IsAlive() && FMath::IsNearlyEqual(A.Health(), WRTune(TEXT("enemies.highland.health"), 200.f)));
+	const float Max = A.Health();
 
 	// 1. Plain hit.
 	TestEqual(TEXT("plain hit result"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(10.f)), EWRHitResult::Hit);
-	TestEqual(TEXT("plain hit damage"), A.Health(), 110.f);
+	TestEqual(TEXT("plain hit damage"), A.Health(), Max - 10.f);
 	A.Heal();
 
 	// 2. Block from the front: no damage, stamina spent.
 	A.Tag(A.Target, WRTags::State_Blocking, true);
 	const float StaminaBefore = A.Target->GetAttributes()->GetStamina();
 	TestEqual(TEXT("block result"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Blocked);
-	TestEqual(TEXT("block takes no damage"), A.Health(), 120.f);
+	TestEqual(TEXT("block takes no damage"), A.Health(), Max);
 	TestTrue(TEXT("block costs stamina"), A.Target->GetAttributes()->GetStamina() < StaminaBefore);
 
 	// 3. Block from behind doesn't count.
@@ -113,7 +114,7 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	// 5. Dodge i-frames.
 	A.Tag(A.Target, WRTags::State_Invulnerable, true);
 	TestEqual(TEXT("i-frames dodge"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Dodged);
-	TestEqual(TEXT("dodge takes no damage"), A.Health(), 120.f);
+	TestEqual(TEXT("dodge takes no damage"), A.Health(), Max);
 	A.Tag(A.Target, WRTags::State_Invulnerable, false);
 
 	// 6. Poise break -> stagger -> riposte for x3.
@@ -123,7 +124,7 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("poise break staggers"), A.Target->HasTag(WRTags::Status_Staggered));
 	A.Heal();
 	UWRCombatLibrary::ApplyHit(A.Target, A.Melee(10.f));
-	TestEqual(TEXT("riposte triples damage"), A.Health(), 120.f - 10.f * WRTune(TEXT("weapon.riposteMultiplier"), 3.f));
+	TestEqual(TEXT("riposte triples damage"), A.Health(), Max - 10.f * WRTune(TEXT("weapon.riposteMultiplier"), 3.f));
 	TestFalse(TEXT("riposte consumes the stagger"), A.Target->HasTag(WRTags::Status_Staggered));
 	A.Heal();
 
@@ -144,7 +145,7 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	Fire.bMelee = false;
 	UWRCombatLibrary::ApplyHit(A.Target, Fire);
 	const float FrostbiteMult = 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);
-	TestTrue(TEXT("thaw adds its burst"), FMath::IsNearlyEqual(A.Health(), 120.f - (10.f * FrostbiteMult + WRTune(TEXT("status.thawDamage"), 40.f)), 0.01f));
+	TestTrue(TEXT("thaw adds its burst"), FMath::IsNearlyEqual(A.Health(), Max - (10.f * FrostbiteMult + WRTune(TEXT("status.thawDamage"), 40.f)), 0.01f));
 	TestFalse(TEXT("thaw ends frozen"), A.Target->HasTag(WRTags::Status_Frozen));
 	A.Tag(A.Attacker, WRTags::Combo_Thaw, false);
 
@@ -154,7 +155,7 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	A.Attacker->GetAbilitySystemComponent()->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), A.Attacker->GetAttributes()->GetMaxChill());
 	UWRCombatLibrary::ApplyHit(A.Target, A.Melee(10.f, true));
 	const float Shatter = WRTune(TEXT("status.shatterDamage"), 30.f) * (1.f + WRTune(TEXT("resources.chillShatterBonusAtFull"), 1.f));
-	TestTrue(TEXT("full-chill shatter"), FMath::IsNearlyEqual(A.Health(), 120.f - (10.f * FrostbiteMult + Shatter), 0.01f));
+	TestTrue(TEXT("full-chill shatter"), FMath::IsNearlyEqual(A.Health(), Max - (10.f * FrostbiteMult + Shatter), 0.01f));
 	TestEqual(TEXT("shatter spends all chill"), A.Attacker->GetAttributes()->GetChill(), 0.f);
 	TestFalse(TEXT("shatter ends frozen"), A.Target->HasTag(WRTags::Status_Frozen));
 

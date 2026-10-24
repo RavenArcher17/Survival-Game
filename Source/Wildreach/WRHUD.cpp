@@ -3,6 +3,7 @@
 #include "WRAltar.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
+#include "WRCreature.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
@@ -67,6 +68,18 @@ void AWRHUD::DrawHUD()
 
 	const AWRCharacter* Survivor = Cast<AWRCharacter>(GetOwningPawn());
 	DrawDamageNumbers(DeltaTime);
+	if (const AWRCreature* Mount = Cast<AWRCreature>(GetOwningPawn()))
+	{
+		// Riding: the mount's own bars, plus the way off.
+		DrawWorldBars(Mount);
+		const UWRAttributeSet* MA = Mount->GetAttributes();
+		DrawText(FString::Printf(TEXT("Riding %s   (WASD, Space jump, E dismount)"), *Mount->GetDisplayLabel()), FLinearColor::White, 20.f, Canvas->ClipY - 80.f);
+		if (MA)
+		{
+			DrawBar(TEXT("Mount"), MA->GetHealth(), MA->GetMaxHealth(), FLinearColor(0.8f, 0.2f, 0.2f), 20.f, Canvas->ClipY - 55.f, 200.f);
+		}
+		return;
+	}
 	if (!Survivor || !Survivor->GetAttributes())
 	{
 		DrawText(TEXT("Respawning..."), FLinearColor::White, Canvas->ClipX * 0.5f - 50.f, Canvas->ClipY * 0.5f);
@@ -293,6 +306,19 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 		// Buildup meters under the health bar.
 		DrawRect(FLinearColor(1.f, 0.45f, 0.1f), BX, Screen.Y - 5.f, W * FMath::Clamp(A->GetBurnBuildup() / 100.f, 0.f, 1.f), 3.f);
 		DrawRect(FLinearColor(0.55f, 0.85f, 1.f), BX, Screen.Y - 1.f, W * FMath::Clamp(A->GetFrostBuildup() / 100.f, 0.f, 1.f), 3.f);
+		if (const AWRCreature* Creature = Cast<AWRCreature>(Other))
+		{
+			// Torpor (purple) and taming progress (green) while you work on a tame.
+			if (!Creature->IsTamed() && (Creature->Torpor > 0.f || Creature->TameProgress > 0.f))
+			{
+				DrawRect(FLinearColor(0.6f, 0.3f, 0.9f), BX, Screen.Y + 3.f, W * FMath::Clamp(Creature->Torpor / FMath::Max(1.f, Creature->MaxTorpor), 0.f, 1.f), 3.f);
+				DrawRect(FLinearColor(0.3f, 0.9f, 0.35f), BX, Screen.Y + 7.f, W * FMath::Clamp(Creature->TameProgress, 0.f, 1.f), 3.f);
+				if (Creature->IsUnconscious())
+				{
+					DrawText(FString::Printf(TEXT("unconscious - E to feed (%.0f%%)"), Creature->TameProgress * 100.f), FLinearColor(0.8f, 0.7f, 1.f), BX, Screen.Y + 12.f, nullptr, 0.8f);
+				}
+			}
+		}
 	}
 }
 

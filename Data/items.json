@@ -26,7 +26,9 @@
     { "id": "seeds", "name": "Seeds", "category": "material", "stack": 50, "weight": 0.02 },
     { "id": "egg", "name": "Egg", "category": "material", "stack": 10, "weight": 0.2 },
     { "id": "wool", "name": "Wool", "category": "material", "stack": 50, "weight": 0.1 },
-    { "id": "torpor_dart", "name": "Torpor dart", "category": "material", "stack": 20, "weight": 0.05 },
+    { "id": "torpor_dart", "name": "Torpor dart", "category": "dart", "stack": 20, "weight": 0.05, "note": "use: adds torpor to the creature you aim at" },
+    { "id": "egg_kilnmite", "name": "Kilnmite egg", "category": "egg", "stack": 5, "weight": 0.5, "note": "use: hatch a tamed Kilnmite" },
+    { "id": "egg_rimeshell", "name": "Rimeshell egg", "category": "egg", "stack": 5, "weight": 0.8, "note": "use: hatch a tamed Rimeshell" },
 
     { "id": "upgrade_shard", "name": "Upgrade shard", "category": "material", "stack": 50, "weight": 0.1, "note": "mini-boss drop, +1..+10 upgrades" },
     { "id": "core_vulkarn", "name": "Vulkarn's core", "category": "core", "stack": 5, "weight": 2.0 },

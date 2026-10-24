@@ -484,7 +484,17 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	}
 	if (K == TEXT("pen"))
 	{
-		return TEXT("Animal pen: keep a tamed Pumicehog or Snowpuff inside and it produces over time");
+		int32 Collected = 0;
+		for (FWRItemStack& S : Storage)
+		{
+			if (!S.IsEmpty() && PS->GetInventory()->AddItem(S.ItemId, S.Count) == 0)
+			{
+				Collected += S.Count;
+				S = FWRItemStack();
+			}
+		}
+		return Collected > 0 ? FString::Printf(TEXT("Collected %d animal products"), Collected)
+			: TEXT("Animal pen: keep a tamed Pumicehog or Snowpuff inside and it produces over time");
 	}
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{

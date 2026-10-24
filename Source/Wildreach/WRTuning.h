@@ -18,8 +18,10 @@ public:
 	float Num(const FString& Path, float Fallback) const;
 	FString Str(const FString& Path, const FString& Fallback) const;
 
-	/** Re-read the file (console: WR.ReloadTuning). */
+	/** Re-read the file (console: WR.ReloadTuning) and the -wrtune=key:value,key:value overrides. */
 	void Reload();
+	/** Override a number at runtime (server settings presets, tests). */
+	void Set(const FString& Path, float Value) { Overrides.Add(Path, Value); }
 
 	/** Loads any JSON file under the project's Data/ folder. Null on failure. */
 	static TSharedPtr<FJsonObject> LoadDataFile(const FString& RelativePath);
@@ -30,6 +32,7 @@ private:
 	TSharedPtr<FJsonObject> Find(const FString& Path) const;
 	TSharedPtr<FJsonObject> Root;
 	mutable TSet<FString> WarnedKeys;
+	TMap<FString, float> Overrides;
 };
 
 inline float WRTune(const TCHAR* Path, float Fallback) { return FWRTuning::Get().Num(Path, Fallback); }

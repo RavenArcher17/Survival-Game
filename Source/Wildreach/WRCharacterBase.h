@@ -46,8 +46,18 @@ public:
 	bool HasTag(const FGameplayTag& Tag) const;
 
 	virtual bool IsCreature() const { return false; }
-	/** Creatures don't hurt each other; survivors can hurt anyone (PvP is a server setting later). */
-	bool IsHostileTo(const AWRCharacterBase* Other) const { return Other && Other != this && !(IsCreature() && Other->IsCreature()); }
+	/** Name of the player who tamed this creature (empty for wild creatures and survivors). */
+	virtual FString GetTameOwner() const { return FString(); }
+	/** Wild creatures don't fight each other; tames fight for their owner; survivors can hurt anyone except their own tames. */
+	virtual bool IsHostileTo(const AWRCharacterBase* Other) const;
+
+	/** Server: taming hooks (creatures implement them). */
+	virtual void AddTorpor(float Amount) {}
+	/** Server: a same-element path hit calms instead of hurting. True if it was consumed. */
+	virtual bool TryPathMagic(const struct FWRHit& Hit) { return false; }
+
+	/** Server: who this character is fighting (tames attack their owner's target). */
+	TWeakObjectPtr<AWRCharacterBase> CombatTarget;
 
 	/** Movement speed multiplier from statuses and actions (read by the movement component on every machine). */
 	float GetSpeedMultiplier() const;

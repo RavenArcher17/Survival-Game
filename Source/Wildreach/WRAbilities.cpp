@@ -30,6 +30,7 @@ UWRGameplayAbility::UWRGameplayAbility()
 	Blocked.AddTag(WRTags::State_Dead);
 	Blocked.AddTag(WRTags::Status_Frozen);
 	Blocked.AddTag(WRTags::Status_Staggered);
+	Blocked.AddTag(WRTags::Status_Unconscious);
 	ActivationBlockedTags = Blocked;
 }
 

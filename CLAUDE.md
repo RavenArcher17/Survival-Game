@@ -25,7 +25,11 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - **M1 combat core: done** on placeholder art. **M2 paths: done** (persistence v1 = JSON per player).
 - Stat nodes work (tuning `nodeEffects`); ability nodes past the trunk (Fire wall, Meteor, Ice lance...) aren't built. No creation screen or skill-tree UI yet.
 - M3: layout approved 2026-10-23; **`L_Island` built** (WP landscape, default map). Rebuild with `Tools/terrain/build_island.ps1 -Force` (runs in the full editor: the landscape's visible textures need the GPU layer update, which commandlets don't do). Next: textured auto-material, PCG dressing, caves.
-- M5 started: inventory + consumables (potions/food/water). Next: gathering, Hearth + stations + recipes, building; M4 taming needs items (food) which now exist.
+- 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):
+  1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
+  2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).
+  3. Creatures & taming, 4. bosses, 5. life skills/server presets/death penalty/clans/safe zones, 6. island dressing: in progress / next.
+  After all batches: rebuild the island (`Tools\terrain\build_island.ps1 -Force`) so it gets the new nodes/camps.
 - See `CHANGELOG.md` for details and known gaps.
 
 ## How things are wired (read before changing combat)

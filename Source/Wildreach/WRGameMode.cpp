@@ -1,6 +1,7 @@
 #include "WRGameMode.h"
 #include "Wildreach.h"
 #include "WRCharacter.h"
+#include "WRCreature.h"
 #include "WRHUD.h"
 #include "WRBuilding.h"
 #include "WRInventory.h"
@@ -90,6 +91,22 @@ void AWRGameMode::SaveWorld()
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("version"), 1);
 	Root->SetArrayField(TEXT("pieces"), Pieces);
+	TArray<TSharedPtr<FJsonValue>> Tames;
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		if (It->IsTamed() && It->IsAlive())
+		{
+			const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetStringField(TEXT("id"), It->CreatureId.ToString());
+			O->SetStringField(TEXT("owner"), It->TamedBy);
+			O->SetBoolField(TEXT("stay"), It->TameOrder == EWRTameOrder::Stay);
+			O->SetBoolField(TEXT("aggressive"), It->bTameAggressive);
+			const FVector L = It->GetActorLocation();
+			O->SetNumberField(TEXT("x"), L.X); O->SetNumberField(TEXT("y"), L.Y); O->SetNumberField(TEXT("z"), L.Z - It->GetSimpleCollisionHalfHeight());
+			Tames.Add(MakeShared<FJsonValueObject>(O));
+		}
+	}
+	Root->SetArrayField(TEXT("tames"), Tames);
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
 	FJsonSerializer::Serialize(Root, Writer);
@@ -132,7 +149,24 @@ void AWRGameMode::LoadWorld()
 		++Loaded;
 	}
 	AWRBuildPiece::RecomputeSupport(GetWorld(), FVector::ZeroVector, 1.0e7f);
-	UE_LOG(LogWildreach, Log, TEXT("WORLD loaded %d pieces"), Loaded);
+	const TArray<TSharedPtr<FJsonValue>>* Tames = nullptr;
+	int32 LoadedTames = 0;
+	if (Root->TryGetArrayField(TEXT("tames"), Tames))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Tames)
+		{
+			const TSharedPtr<FJsonObject> O = V->AsObject();
+			const FVector L(O->GetNumberField(TEXT("x")), O->GetNumberField(TEXT("y")), O->GetNumberField(TEXT("z")));
+			if (AWRCreature* Tame = AWRCreature::SpawnCreature(GetWorld(), FName(*O->GetStringField(TEXT("id"))), L, FRotator::ZeroRotator))
+			{
+				Tame->CompleteTame(O->GetStringField(TEXT("owner")));
+				Tame->TameOrder = O->GetBoolField(TEXT("stay")) ? EWRTameOrder::Stay : EWRTameOrder::Follow;
+				Tame->bTameAggressive = O->GetBoolField(TEXT("aggressive"));
+				++LoadedTames;
+			}
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("WORLD loaded %d pieces, %d tames"), Loaded, LoadedTames);
 }
 
 FString AWRGameMode::PlayerSavePath(const FString& PlayerName)

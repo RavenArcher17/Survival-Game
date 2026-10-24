@@ -14,6 +14,7 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(Status_Slowed, "Status.Slowed");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Frozen, "Status.Frozen");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Staggered, "Status.Staggered");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Unconscious, "Status.Unconscious");
 
 	UE_DEFINE_GAMEPLAY_TAG(Element_Physical, "Element.Physical");
 	UE_DEFINE_GAMEPLAY_TAG(Element_Fire, "Element.Fire");

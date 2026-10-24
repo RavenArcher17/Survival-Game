@@ -68,6 +68,10 @@ else:
         sp.set_editor_property("count", 3)
         sp.set_editor_property("radius", 400.0)
         sp.set_editor_property("respawn_seconds", 15.0)
+    # A Kilnmite colony with an egg nest (steal-egg taming).
+    sp = spawn(spawner_class, (0, -3500, 50), (0, 0, 0), "Spawner_Kilnmite")
+    sp.set_editor_property("creature_id", "kilnmite")
+    sp.set_editor_property("count", 2)
 
     # Boss altars (the real ones sit in the boss arenas; here they're out in the open for testing).
     altar_class = unreal.load_class(None, "/Script/Wildreach.WRBossAltar")

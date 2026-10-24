@@ -216,7 +216,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
-		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take ") };
+		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take "), TEXT("tame "), TEXT("dismount") };
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{
@@ -291,7 +291,11 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			const AWRStation* Station = Cast<AWRStation>(*It);
-			const bool bMatch = (Station && Station->StationType == FName(*Arg(1))) || (Arg(1) == TEXT("hearth") && It->IsA<AWRHearth>());
+			const AWRCreature* Creature = Cast<AWRCreature>(*It);
+			const AWRNest* Nest = Cast<AWRNest>(*It);
+			const bool bMatch = (Station && Station->StationType == FName(*Arg(1))) || (Arg(1) == TEXT("hearth") && It->IsA<AWRHearth>())
+				|| (Creature && Creature->IsAlive() && Creature->CreatureId == FName(*Arg(1)) && (Arg(2) == TEXT("tame")) == Creature->IsTamed())
+				|| (Nest && Arg(1) == TEXT("nest") && Nest->CreatureId == FName(*Arg(2)));
 			const float D = FVector::Dist(It->GetActorLocation(), Survivor->GetActorLocation());
 			if (bMatch && D < BestDist)
 			{
@@ -307,6 +311,22 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		Result = Best ? FString::Printf(TEXT("at %s"), *Best->GetName()) : TEXT("none found");
 	}
 	else if (RunGameplayCommand(Args, Result)) {}
+	else if (Cmd == TEXT("torpor") || Cmd == TEXT("tamestat"))
+	{
+		// Testing aid: knock out / inspect the nearest creature.
+		AWRCreature* Best = nullptr;
+		float BestDist = 1500.f;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It && GetPawn(); ++It)
+		{
+			const float D = FVector::Dist(It->GetActorLocation(), GetPawn()->GetActorLocation());
+			if (It->IsAlive() && !It->IsA<AWRTrainingDummy>() && (Cmd == TEXT("tamestat") || !It->IsTamed()) && D < BestDist) { BestDist = D; Best = *It; }
+		}
+		if (Best && Cmd == TEXT("torpor")) Best->AddTorpor(FCString::Atof(*Arg(1)));
+		Result = Best ? FString::Printf(TEXT("%s torpor %.0f/%.0f tame %.0f%% %s%s rider %s at %s"), *Best->GetDisplayLabel(), Best->Torpor, Best->MaxTorpor, Best->TameProgress * 100.f,
+			Best->IsUnconscious() ? TEXT("unconscious ") : TEXT(""), Best->TameOrder == EWRTameOrder::Stay ? TEXT("stay") : TEXT("follow"),
+			*GetNameSafe(Best->GetRider()), *Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
+		ClientNotify(Result);
+	}
 	else if (Cmd == TEXT("hitpiece"))
 	{
 		// Testing aid: N copper-sword hits on the nearest building piece.
@@ -389,7 +409,8 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			BotHeld.RemoveAt(i);
 		}
 	}
-	if (!Survivor || !Survivor->IsAlive())
+	const bool bRiding = Cast<AWRCreature>(GetPawn()) != nullptr;
+	if (!bRiding && (!Survivor || !Survivor->IsAlive()))
 	{
 		return;
 	}
@@ -414,6 +435,10 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			break;
 		}
 		ConsoleCommand(Cmd);
+	}
+	if (!Survivor)
+	{
+		return;
 	}
 	if (bWalking)
 	{

@@ -122,6 +122,8 @@ public:
 	int32 RemoveItem(FName ItemId, int32 Count);
 	/** Use the first usable item of a category ("potion", "food", "drink"). Returns a message. */
 	FString UseCategory(FName Category);
+	/** Torpor darts and creature eggs. */
+	FString UseTamingItem(const struct FWRItemDef& Def);
 	/** Use / equip / socket the item in a slot. Returns a message. */
 	FString UseSlot(int32 SlotIndex);
 	FString Unequip(EWREquipSlot Slot);

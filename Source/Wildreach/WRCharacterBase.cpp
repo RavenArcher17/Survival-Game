@@ -99,7 +99,7 @@ bool AWRCharacterBase::HasTag(const FGameplayTag& Tag) const
 
 float AWRCharacterBase::GetSpeedMultiplier() const
 {
-	if (!AbilitySystem || HasTag(WRTags::State_Dead) || HasTag(WRTags::Status_Frozen) || HasTag(WRTags::Status_Staggered))
+	if (!AbilitySystem || HasTag(WRTags::State_Dead) || HasTag(WRTags::Status_Frozen) || HasTag(WRTags::Status_Staggered) || HasTag(WRTags::Status_Unconscious))
 	{
 		return 0.f;
 	}
@@ -165,6 +165,17 @@ void AWRCharacterBase::Die(AActor* Killer)
 	UE_LOG(LogWildreach, Log, TEXT("DEATH %s killed by %s"), *GetName(), *GetNameSafe(Killer));
 	MulticastDied();
 	OnDeath(Killer);
+}
+
+bool AWRCharacterBase::IsHostileTo(const AWRCharacterBase* Other) const
+{
+	if (!Other || Other == this)
+	{
+		return false;
+	}
+	// A survivor never fights their own tames.
+	const APlayerState* PS = GetPlayerState();
+	return !(PS && Other->GetTameOwner() == PS->GetPlayerName());
 }
 
 FString AWRCharacterBase::GetDisplayLabel() const

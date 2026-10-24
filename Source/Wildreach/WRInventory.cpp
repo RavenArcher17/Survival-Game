@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRCreature.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
@@ -408,11 +409,62 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		ApplyEquipment();
 		return FString::Printf(TEXT("Socketed %s"), *Name);
 	}
+	if (Def->Category == TEXT("dart") || Def->Category == TEXT("egg"))
+	{
+		return UseTamingItem(*Def);
+	}
 	if (Def->IsUsable())
 	{
 		return UseCategory(Def->Category);
 	}
 	return FString::Printf(TEXT("%s can't be used"), *Def->Name);
+}
+
+FString UWRInventoryComponent::UseTamingItem(const FWRItemDef& Def)
+{
+	AWRCharacterBase* Character = GetPawnCharacter();
+	if (!Character || !Character->IsAlive())
+	{
+		return TEXT("can't use items now");
+	}
+	const FName Used = Def.Id;
+	const FString Name = Def.Name;
+	if (Def.Category == TEXT("egg"))
+	{
+		// Hatch: the newborn imprints on you.
+		const APlayerState* PS = Cast<APlayerState>(GetOwner());
+		const FName Species(*Used.ToString().RightChop(4));
+		if (!PS || AWRCreature::CountTames(GetWorld(), PS->GetPlayerName()) >= FMath::RoundToInt(WRTune(TEXT("taming.tameLimit"), 2.f)))
+		{
+			return TEXT("You can't keep any more tames");
+		}
+		const FVector At = Character->GetActorLocation() + Character->GetActorForwardVector() * 200.f - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
+		AWRCreature* Hatchling = AWRCreature::SpawnCreature(GetWorld(), Species, At, Character->GetActorRotation());
+		if (!Hatchling)
+		{
+			return TEXT("The egg won't hatch");
+		}
+		Hatchling->CompleteTame(PS->GetPlayerName());
+		RemoveItem(Used, 1);
+		return FString::Printf(TEXT("%s hatched and imprinted on you"), *Name);
+	}
+	// Torpor dart: hitscan along the aim, knocks creatures toward unconsciousness.
+	const AController* C = Character->GetController();
+	const FRotator Aim = C ? C->GetControlRotation() : Character->GetActorRotation();
+	const FVector Start = Character->GetActorLocation() + FVector(0.f, 0.f, 60.f);
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(WRDart), false, Character);
+	RemoveItem(Used, 1);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, Start + Aim.Vector() * WRTune(TEXT("taming.dartRange"), 2500.f), ECC_Pawn, Params))
+	{
+		if (AWRCharacterBase* Target = Cast<AWRCharacterBase>(Hit.GetActor()))
+		{
+			Target->AddTorpor(WRTune(TEXT("taming.dartTorpor"), 40.f));
+			Target->NotifyAttackedBy(Character);
+			return FString::Printf(TEXT("Dart hit %s"), *Target->GetDisplayLabel());
+		}
+	}
+	return TEXT("Dart missed");
 }
 
 FString UWRInventoryComponent::UseCategory(FName Category)

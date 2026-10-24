@@ -2,18 +2,40 @@
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
+#include "WRBuilding.h"
 #include "WRCharacter.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
+#include "WRPlayerController.h"
+#include "WRPlayerState.h"
+#include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
+#include "EnhancedInputComponent.h"
+#include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "InputModifiers.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 // ---------------------------------------------------------------- registry
+
+float FWRCreatureDef::TameSeconds() const
+{
+	const FString Key = FString::Printf(TEXT("taming.%sSeconds"), *Difficulty.ToString());
+	return FWRTuning::Get().Num(Key, 300.f) / FMath::Max(0.1f, WRTune(TEXT("server.tamingMultiplier"), 1.f));
+}
 
 FWRCreatureRegistry& FWRCreatureRegistry::Get()
 {
@@ -29,6 +51,28 @@ FWRCreatureRegistry::FWRCreatureRegistry()
 const FWRCreatureDef* FWRCreatureRegistry::Find(FName Id) const
 {
 	return Defs.FindByPredicate([Id](const FWRCreatureDef& D) { return D.Id == Id; });
+}
+
+static TArray<TPair<FName, int32>> ParseCounts(const TSharedPtr<FJsonObject>& O, const TCHAR* Field)
+{
+	TArray<TPair<FName, int32>> Out;
+	const TSharedPtr<FJsonObject>* Obj = nullptr;
+	if (O->TryGetObjectField(Field, Obj))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& L : (*Obj)->Values) Out.Add({ FName(*L.Key), static_cast<int32>(L.Value->AsNumber()) });
+	}
+	return Out;
+}
+
+static TArray<FName> ParseNames(const TSharedPtr<FJsonObject>& O, const TCHAR* Field)
+{
+	TArray<FName> Out;
+	const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+	if (O->TryGetArrayField(Field, Arr))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Arr) Out.Add(FName(*V->AsString()));
+	}
+	return Out;
 }
 
 void FWRCreatureRegistry::Reload()
@@ -55,6 +99,9 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetStringField(TEXT("behavior"), Str)) D.Behavior = FName(*Str);
 		if (O->TryGetStringField(TEXT("archetype"), Str)) D.Archetype = FName(*Str);
 		if (O->TryGetStringField(TEXT("element"), Str)) D.Element = FName(*Str);
+		if (O->TryGetStringField(TEXT("difficulty"), Str)) D.Difficulty = FName(*Str);
+		if (O->TryGetStringField(TEXT("utility"), Str)) D.Utility = FName(*Str);
+		O->TryGetStringField(TEXT("role"), D.Role);
 
 		// Health and damage default to the zone tier's starting numbers.
 		const FString TierKey = FString::Printf(TEXT("enemies.%s"), *D.Tier.ToString());
@@ -69,31 +116,27 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("halfHeight"), Num)) D.HalfHeight = Num;
 		if (O->TryGetNumberField(TEXT("aggroRadius"), Num)) D.AggroRadius = Num;
 		if (O->TryGetNumberField(TEXT("attackRange"), Num)) D.AttackRange = Num;
+		if (O->TryGetNumberField(TEXT("rideSpeed"), Num)) D.RideSpeed = Num;
+		O->TryGetBoolField(TEXT("mount"), D.bMount);
+		O->TryGetBoolField(TEXT("nest"), D.bNest);
+		O->TryGetBoolField(TEXT("hearing"), D.bHearing);
 
 		const TArray<TSharedPtr<FJsonValue>>* Color = nullptr;
 		if (O->TryGetArrayField(TEXT("color"), Color) && Color->Num() >= 3)
 		{
 			D.Color = FLinearColor((*Color)[0]->AsNumber(), (*Color)[1]->AsNumber(), (*Color)[2]->AsNumber());
 		}
-		const TSharedPtr<FJsonObject>* Loot = nullptr;
-		if (O->TryGetObjectField(TEXT("loot"), Loot))
+		D.Resists = ParseNames(O, TEXT("resists"));
+		D.TamingMethods = ParseNames(O, TEXT("taming"));
+		D.Food = ParseNames(O, TEXT("food"));
+		D.Products = ParseCounts(O, TEXT("products"));
+		if (O->HasField(TEXT("loot")))
 		{
-			for (const TPair<FString, TSharedPtr<FJsonValue>>& L : (*Loot)->Values)
-			{
-				D.Loot.Add({ FName(*L.Key), static_cast<int32>(L.Value->AsNumber()) });
-			}
+			D.Loot = ParseCounts(O, TEXT("loot"));
 		}
 		else if (D.Archetype != TEXT("dummy"))
 		{
 			D.Loot = { { TEXT("raw_meat"), 2 }, { TEXT("hide"), 1 } };
-		}
-		const TArray<TSharedPtr<FJsonValue>>* Resists = nullptr;
-		if (O->TryGetArrayField(TEXT("resists"), Resists))
-		{
-			for (const TSharedPtr<FJsonValue>& R : *Resists)
-			{
-				D.Resists.Add(FName(*R->AsString()));
-			}
 		}
 		Defs.Add(D);
 	}
@@ -117,6 +160,22 @@ AWRCreature::AWRCreature(const FObjectInitializer& ObjectInitializer)
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 400.f, 0.f);
 	WeaponMesh->SetVisibility(false);
+
+	// Used only while a player rides this creature.
+	RideBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("RideBoom"));
+	RideBoom->SetupAttachment(RootComponent);
+	RideBoom->TargetArmLength = 600.f;
+	RideBoom->SocketOffset = FVector(0.f, 0.f, 150.f);
+	RideBoom->bUsePawnControlRotation = true;
+	RideCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("RideCamera"));
+	RideCamera->SetupAttachment(RideBoom, USpringArmComponent::SocketName);
+
+	GlowLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("GlowLight"));
+	GlowLight->SetupAttachment(RootComponent);
+	GlowLight->SetVisibility(false);
+	GlowLight->SetIntensity(8000.f);
+	GlowLight->SetAttenuationRadius(1500.f);
+	GlowLight->SetLightColor(FLinearColor(1.f, 0.85f, 0.5f));
 }
 
 AWRCreature* AWRCreature::SpawnCreature(UWorld* World, FName CreatureId, const FVector& Location, const FRotator& Rotation)
@@ -142,6 +201,13 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCreature, CreatureId);
+	DOREPLIFETIME(AWRCreature, TamedBy);
+	DOREPLIFETIME(AWRCreature, TameOrder);
+	DOREPLIFETIME(AWRCreature, bTameAggressive);
+	DOREPLIFETIME(AWRCreature, Torpor);
+	DOREPLIFETIME(AWRCreature, MaxTorpor);
+	DOREPLIFETIME(AWRCreature, TameProgress);
+	DOREPLIFETIME(AWRCreature, Rider);
 }
 
 void AWRCreature::ApplyDef()
@@ -153,6 +219,7 @@ void AWRCreature::ApplyDef()
 	}
 	GetCapsuleComponent()->SetCapsuleSize(Def->Radius, Def->HalfHeight);
 	GetCharacterMovement()->MaxWalkSpeed = Def->Speed;
+	GetCharacterMovement()->MaxFlySpeed = Def->Speed;
 	BaseBodyColor = Def->Color;
 	SetBodyColor(Def->Color);
 }
@@ -162,12 +229,19 @@ void AWRCreature::OnRep_CreatureId()
 	ApplyDef();
 }
 
+void AWRCreature::OnRep_Tamed()
+{
+	const FWRCreatureDef* Def = GetDef();
+	GlowLight->SetVisibility(IsTamed() && Def && Def->Utility == TEXT("light"));
+}
+
 void AWRCreature::BeginPlay()
 {
 	ApplyDef();
 	Super::BeginPlay();
 	Home = GetActorLocation();
 	AbilitySystem->InitAbilityActorInfo(this, this);
+	OnRep_Tamed();
 
 	const FWRCreatureDef* Def = GetDef();
 	if (!HasAuthority() || !Def)
@@ -175,6 +249,7 @@ void AWRCreature::BeginPlay()
 		return;
 	}
 	InitVitals(Def->Health, 100.f, Def->Poise);
+	MaxTorpor = Def->Health * WRTune(TEXT("taming.torporPerHealth"), 1.f);
 	Weapon.FlatDamage = Def->Damage;
 	if (Def->Damage > 0.f)
 	{
@@ -190,24 +265,377 @@ void AWRCreature::BeginPlay()
 	}
 }
 
-void AWRCreature::NotifyAttackedBy(AActor* Attacker)
+bool AWRCreature::IsUnconscious() const
 {
-	// Anything you hit fights back (neutral herds and passives included, for now).
-	if (!AggroTarget.IsValid())
+	return HasTag(WRTags::Status_Unconscious);
+}
+
+bool AWRCreature::IsHostileTo(const AWRCharacterBase* Other) const
+{
+	if (!Other || Other == this)
 	{
-		AggroTarget = Attacker;
+		return false;
 	}
+	const FString OtherOwner = Other->GetTameOwner();
+	const APlayerState* OtherPS = Other->GetPlayerState();
+	if (!IsTamed())
+	{
+		// Wild: hostile to survivors and tames, never to other wild creatures.
+		return !Other->IsCreature() || !OtherOwner.IsEmpty();
+	}
+	// Tamed: fights for its owner.
+	if (OtherPS && OtherPS->GetPlayerName() == TamedBy) return false;
+	if (!OtherOwner.IsEmpty() && OtherOwner == TamedBy) return false;
+	return true;
 }
 
 FString AWRCreature::GetDisplayLabel() const
 {
 	const FWRCreatureDef* Def = GetDef();
-	return Def ? Def->Name : GetName();
+	const FString Name = Def ? Def->Name : GetName();
+	return IsTamed() ? FString::Printf(TEXT("%s's %s"), *TamedBy, *Name) : Name;
+}
+
+void AWRCreature::NotifyAttackedBy(AActor* Attacker)
+{
+	// Anything you hit fights back, unless it's a passive grazer (they run).
+	const FWRCreatureDef* Def = GetDef();
+	if (!IsTamed() && Def && Def->Behavior != TEXT("passive") && !AggroTarget.IsValid())
+	{
+		AggroTarget = Attacker;
+	}
+	if (!IsTamed() && Def && Def->Behavior == TEXT("neutral") && Spawner.IsValid())
+	{
+		// Neutral herds defend each other.
+		Spawner->AlertPack(Attacker);
+	}
+	// Damage interrupts taming.
+	if (TameProgress > 0.f && IsUnconscious())
+	{
+		TameProgress *= WRTune(TEXT("taming.damageKeepsProgress"), 0.5f);
+	}
+	bCalm = false;
+}
+
+void AWRCreature::AddTorpor(float Amount)
+{
+	const FWRCreatureDef* Def = GetDef();
+	if (!HasAuthority() || IsTamed() || !Def || !Def->CanTameBy(TEXT("knockout_feed")) || Amount <= 0.f)
+	{
+		return;
+	}
+	Torpor = FMath::Min(MaxTorpor, Torpor + Amount);
+	if (Torpor >= MaxTorpor && !IsUnconscious())
+	{
+		Status->ApplyStatus(WRTags::Status_Unconscious, 100000.f);
+		AbilitySystem->CancelAllAbilities();
+		AggroTarget = nullptr;
+		GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+		UE_LOG(LogWildreach, Log, TEXT("TAME %s knocked out"), *GetName());
+	}
+}
+
+bool AWRCreature::TryPathMagic(const FWRHit& Hit)
+{
+	const FWRCreatureDef* Def = GetDef();
+	const AWRCharacterBase* Attacker = Cast<AWRCharacterBase>(Hit.Instigator);
+	const APlayerState* PS = Attacker ? Attacker->GetPlayerState() : nullptr;
+	if (!HasAuthority() || IsTamed() || !Def || !PS || !Def->CanTameBy(TEXT("path_magic")) || Hit.PathId.IsNone() || Hit.PathId != Def->Element)
+	{
+		return false;
+	}
+	// Your path's element calms a creature of the same element.
+	TamerName = PS->GetPlayerName();
+	bCalm = true;
+	AggroTarget = nullptr;
+	FedUntil = GetWorld()->GetTimeSeconds() + 15.f;
+	TameProgress = FMath::Min(1.f, TameProgress + WRTune(TEXT("taming.pathMagicPerHit"), 0.08f));
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s calmed by %s's path magic (%.0f%%)"), *GetName(), *TamerName, TameProgress * 100.f);
+	if (TameProgress >= 1.f)
+	{
+		CompleteTame(TamerName);
+	}
+	return true;
+}
+
+FString AWRCreature::Feed(AWRPlayerController* Player)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	const FWRCreatureDef* Def = GetDef();
+	if (!PS || !Def || !HasAuthority() || IsTamed())
+	{
+		return TEXT("can't feed that");
+	}
+	const bool bKnockout = Def->CanTameBy(TEXT("knockout_feed")) && IsUnconscious();
+	const bool bOffer = Def->CanTameBy(TEXT("offer_food")) && !AggroTarget.IsValid();
+	if (!bKnockout && !bOffer)
+	{
+		if (Def->CanTameBy(TEXT("knockout_feed"))) return FString::Printf(TEXT("Knock the %s out first (heavy hits, frost, torpor darts)"), *Def->Name);
+		if (Def->CanTameBy(TEXT("steal_egg"))) return FString::Printf(TEXT("%s are tamed from eggs: steal one from a nest"), *Def->Name);
+		if (Def->CanTameBy(TEXT("path_magic"))) return TEXT("Calm it with your path's element");
+		return TEXT("It won't take food from you right now");
+	}
+	if (CountTames(GetWorld(), PS->GetPlayerName()) >= FMath::RoundToInt(WRTune(TEXT("taming.tameLimit"), 2.f)))
+	{
+		return TEXT("You can't keep any more tames");
+	}
+	FName FoodUsed;
+	for (const FName& Food : Def->Food)
+	{
+		if (PS->GetInventory()->CountOf(Food) > 0) { FoodUsed = Food; break; }
+	}
+	if (FoodUsed.IsNone())
+	{
+		return FString::Printf(TEXT("%s eats %s"), *Def->Name, Def->Food.Num() > 0 ? *Def->Food[0].ToString() : TEXT("nothing you have"));
+	}
+	PS->GetInventory()->RemoveItem(FoodUsed, 1);
+	TamerName = PS->GetPlayerName();
+	bCalm = bOffer || bCalm;
+	FedUntil = GetWorld()->GetTimeSeconds() + WRTune(TEXT("taming.secondsPerFood"), 30.f);
+	return FString::Printf(TEXT("Fed %s: taming %.0f%% (needs %.0f s fed)"), *FoodUsed.ToString(), TameProgress * 100.f, Def->TameSeconds());
+}
+
+int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
+{
+	int32 N = 0;
+	for (TActorIterator<AWRCreature> It(World); It; ++It)
+	{
+		N += It->TamedBy == PlayerName && It->IsAlive() ? 1 : 0;
+	}
+	return N;
+}
+
+void AWRCreature::CompleteTame(const FString& PlayerName)
+{
+	TamedBy = PlayerName;
+	TameOrder = EWRTameOrder::Follow;
+	TameProgress = 1.f;
+	Torpor = 0.f;
+	AggroTarget = nullptr;
+	Status->ClearStatus(WRTags::Status_Unconscious);
+	OnRep_Tamed();
+	if (Spawner.IsValid())
+	{
+		// No longer part of the wild pack; the spawner will replace it.
+		OnCreatureDied.Broadcast(this);
+		Spawner = nullptr;
+	}
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s tamed by %s"), *GetName(), *PlayerName);
+}
+
+FString AWRCreature::Order(AWRPlayerController* Player, const FString& Command)
+{
+	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS || TamedBy != PS->GetPlayerName())
+	{
+		return TEXT("not your tame");
+	}
+	if (Command == TEXT("follow")) { TameOrder = EWRTameOrder::Follow; return TEXT("Following"); }
+	if (Command == TEXT("stay")) { TameOrder = EWRTameOrder::Stay; Home = GetActorLocation(); return TEXT("Staying"); }
+	if (Command == TEXT("aggressive")) { bTameAggressive = true; return TEXT("Will fight your enemies"); }
+	if (Command == TEXT("passive")) { bTameAggressive = false; AggroTarget = nullptr; return TEXT("Won't fight"); }
+	if (Command == TEXT("release"))
+	{
+		TamedBy.Reset();
+		OnRep_Tamed();
+		Home = GetActorLocation();
+		return TEXT("Released into the wild");
+	}
+	if (Command == TEXT("ride"))
+	{
+		return Ride(Cast<AWRCharacter>(Player->GetPawn()));
+	}
+	return TEXT("unknown order");
+}
+
+FString AWRCreature::Ride(AWRCharacter* NewRider)
+{
+	const FWRCreatureDef* Def = GetDef();
+	AController* PC = NewRider ? NewRider->GetController() : nullptr;
+	if (!Def || !Def->bMount || !NewRider || !PC || Rider.IsValid())
+	{
+		return Def && !Def->bMount ? TEXT("can't ride that") : TEXT("can't ride now");
+	}
+	Rider = NewRider;
+	NewRider->SetActorEnableCollision(false);
+	NewRider->GetCharacterMovement()->DisableMovement();
+	NewRider->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	NewRider->SetActorRelativeLocation(FVector(0.f, 0.f, Def->HalfHeight + 60.f));
+	if (AController* AI = GetController())
+	{
+		AI->UnPossess();
+		AI->Destroy();
+	}
+	PC->UnPossess();
+	PC->Possess(this);
+	GetCharacterMovement()->MaxWalkSpeed = Def->RideSpeed;
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s ridden by %s"), *GetName(), *NewRider->GetName());
+	return TEXT("Riding (E to dismount)");
+}
+
+void AWRCreature::ServerDismount_Implementation()
+{
+	Dismount();
+}
+
+void AWRCreature::Dismount()
+{
+	AWRCharacter* Character = Rider.Get();
+	AController* PC = GetController();
+	if (!HasAuthority() || !Character)
+	{
+		return;
+	}
+	Rider = nullptr;
+	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	Character->SetActorLocation(GetActorLocation() + GetActorRightVector() * (GetSimpleCollisionRadius() + 80.f) + FVector(0.f, 0.f, 50.f));
+	Character->SetActorEnableCollision(true);
+	Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	if (PC)
+	{
+		PC->UnPossess();
+		PC->Possess(Character);
+	}
+	if (const FWRCreatureDef* Def = GetDef())
+	{
+		GetCharacterMovement()->MaxWalkSpeed = Def->Speed;
+	}
+	SpawnDefaultController();
+}
+
+void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+	if (!RideMapping)
+	{
+		RideMapping = NewObject<UInputMappingContext>(this);
+		RideMoveAction = NewObject<UInputAction>(this);
+		RideMoveAction->ValueType = EInputActionValueType::Axis2D;
+		RideLookAction = NewObject<UInputAction>(this);
+		RideLookAction->ValueType = EInputActionValueType::Axis2D;
+		RideJumpAction = NewObject<UInputAction>(this);
+		RideDismountAction = NewObject<UInputAction>(this);
+		RideMapping->MapKey(RideMoveAction, EKeys::W).Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
+		FEnhancedActionKeyMapping& Back = RideMapping->MapKey(RideMoveAction, EKeys::S);
+		Back.Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
+		Back.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+		RideMapping->MapKey(RideMoveAction, EKeys::A).Modifiers.Add(NewObject<UInputModifierNegate>(this));
+		RideMapping->MapKey(RideMoveAction, EKeys::D);
+		RideMapping->MapKey(RideLookAction, EKeys::Mouse2D);
+		RideMapping->MapKey(RideJumpAction, EKeys::SpaceBar);
+		RideMapping->MapKey(RideDismountAction, EKeys::E);
+	}
+	if (const APlayerController* PC = Cast<APlayerController>(Controller))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Sub = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			Sub->ClearAllMappings();
+			Sub->AddMappingContext(RideMapping, 0);
+		}
+	}
+	if (UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		Input->BindAction(RideMoveAction, ETriggerEvent::Triggered, this, &AWRCreature::RideMove);
+		Input->BindAction(RideLookAction, ETriggerEvent::Triggered, this, &AWRCreature::RideLook);
+		Input->BindAction(RideJumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		Input->BindAction(RideDismountAction, ETriggerEvent::Started, this, &AWRCreature::ServerDismount);
+	}
+}
+
+void AWRCreature::RideMove(const FInputActionValue& Value)
+{
+	const FVector2D Axis = Value.Get<FVector2D>();
+	if (Controller)
+	{
+		const FRotationMatrix Yaw(FRotator(0.f, Controller->GetControlRotation().Yaw, 0.f));
+		AddMovementInput(Yaw.GetUnitAxis(EAxis::X), Axis.Y);
+		AddMovementInput(Yaw.GetUnitAxis(EAxis::Y), Axis.X);
+	}
+}
+
+void AWRCreature::RideLook(const FInputActionValue& Value)
+{
+	const FVector2D Axis = Value.Get<FVector2D>();
+	AddControllerYawInput(Axis.X);
+	AddControllerPitchInput(-Axis.Y);
+}
+
+void AWRCreature::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority() || !IsAlive())
+	{
+		return;
+	}
+	const FWRCreatureDef* Def = GetDef();
+	const float Now = GetWorld()->GetTimeSeconds();
+
+	// Torpor wears off; an unconscious creature wakes when it reaches zero.
+	if (Torpor > 0.f)
+	{
+		const float Rate = IsUnconscious() ? WRTune(TEXT("taming.unconsciousTorporDecay"), 0.01f) : WRTune(TEXT("taming.torporDecay"), 0.05f);
+		Torpor = FMath::Max(0.f, Torpor - MaxTorpor * Rate * DeltaSeconds);
+		if (Torpor <= 0.f && IsUnconscious())
+		{
+			Status->ClearStatus(WRTags::Status_Unconscious);
+			bCalm = false;
+			UE_LOG(LogWildreach, Log, TEXT("TAME %s woke up (%.0f%% tamed)"), *GetName(), TameProgress * 100.f);
+		}
+	}
+
+	// Taming progresses while the creature is fed and either knocked out or calm.
+	if (!IsTamed() && Def && !TamerName.IsEmpty() && Now < FedUntil && (IsUnconscious() || bCalm))
+	{
+		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds / FMath::Max(1.f, Def->TameSeconds()));
+		if (TameProgress >= 1.f)
+		{
+			CompleteTame(TamerName);
+		}
+	}
+
+	// Tame utilities and farm produce, once a minute.
+	UtilityClock += DeltaSeconds;
+	if (IsTamed() && Def && UtilityClock >= 60.f)
+	{
+		UtilityClock = 0.f;
+		if (Def->Utility == TEXT("mine_ore") && TameOrder == EWRTameOrder::Follow)
+		{
+			for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+			{
+				const APlayerState* PS = It->GetPlayerState();
+				if (PS && PS->GetPlayerName() == TamedBy && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < 2000.f)
+				{
+					if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(*It))
+					{
+						Inv->AddItem(Def->Id == TEXT("rimeshell") ? FName(TEXT("iron_ore")) : FName(TEXT("copper_ore")), 1);
+					}
+				}
+			}
+		}
+		if (Def->Products.Num() > 0)
+		{
+			// Farm animals produce into an owned pen they stand in.
+			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+			{
+				const FWRPieceDef* Piece = It->GetDef();
+				if (Piece && Piece->Kind == TEXT("pen") && It->OwnerName == TamedBy && FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < 450.f)
+				{
+					if (It->Storage.Num() == 0) It->Storage.SetNum(10);
+					for (const TPair<FName, int32>& P : Def->Products) FWRInventoryRules::Add(It->Storage, P.Key, P.Value);
+					break;
+				}
+			}
+		}
+	}
 }
 
 void AWRCreature::OnDeath(AActor* Killer)
 {
 	OnCreatureDied.Broadcast(this);
+	if (Rider.IsValid())
+	{
+		Dismount();
+	}
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
 		if (const FWRCreatureDef* Def = GetDef())
@@ -217,6 +645,10 @@ void AWRCreature::OnDeath(AActor* Killer)
 				Inv->AddItem(L.Key, L.Value);
 			}
 		}
+	}
+	if (IsTamed())
+	{
+		UE_LOG(LogWildreach, Log, TEXT("TAME %s (owned by %s) died for good, killed by %s"), *GetName(), *TamedBy, *GetNameSafe(Killer));
 	}
 	SetLifeSpan(4.f);
 	if (AController* AI = GetController())
@@ -276,15 +708,18 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 		return nullptr;
 	}
 	AActor* Best = nullptr;
-	float BestDist = Def->AggroRadius;
-	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+	float BestDist = TNumericLimits<float>::Max();
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
-		if (!It->IsAlive())
+		if (!It->IsAlive() || !Self->IsHostileTo(*It) || !It->IsHostileTo(Self))
 		{
 			continue;
 		}
+		float Aggro = Def->AggroRadius;
+		// Gloomhowls hunt by sound: sprinting survivors are heard from much further.
+		if (Def->bHearing && It->GetVelocity().Size2D() > 600.f) Aggro *= 1.6f;
 		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
-		if (Dist < BestDist)
+		if (Dist < Aggro && Dist < BestDist)
 		{
 			BestDist = Dist;
 			Best = *It;
@@ -296,12 +731,54 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 void AWRCreatureAI::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
 	AWRCreature* Self = Cast<AWRCreature>(GetPawn());
-	if (!Self || !Self->IsAlive() || !Self->GetDef())
+	if (!Self || !Self->IsAlive() || !Self->GetDef() || Self->IsUnconscious())
 	{
 		return;
 	}
+	if (Self->IsTamed())
+	{
+		TickTame(Self, DeltaSeconds);
+	}
+	else
+	{
+		TickWild(Self, DeltaSeconds);
+	}
+}
+
+void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
+{
+	const FWRCreatureDef* Def = Self->GetDef();
+	const FVector To = Target->GetActorLocation() - Self->GetActorLocation();
+	const float Dist = To.Size2D();
+	const float Range = Def->AttackRange + Target->GetSimpleCollisionRadius();
+	if (Dist > Range)
+	{
+		FVector Dir = To.GetSafeNormal2D();
+		if (Def->Archetype == TEXT("pack_hunter") && Dist > 500.f)
+		{
+			// Pack members swing wide to come at the target from different angles.
+			Dir = Dir.RotateAngleAxis(FlankAngle * FMath::Clamp((Dist - 500.f) / 800.f, 0.f, 1.f), FVector::UpVector);
+		}
+		if (Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered))
+		{
+			// Flyers circle high, then dive when close.
+			const float WantZ = Target->GetActorLocation().Z + (Dist > 700.f ? 450.f : 0.f);
+			Self->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+			Dir.Z = FMath::Clamp((WantZ - Self->GetActorLocation().Z) / 300.f, -1.f, 1.f);
+		}
+		Self->AddMovementInput(Dir, 1.f);
+		return;
+	}
+	SetControlRotation(To.Rotation());
+	if (UAbilitySystemComponent* ASC = Self->GetAbilitySystemComponent())
+	{
+		ASC->TryActivateAbilityByClass(UWRGA_Bite::StaticClass());
+	}
+}
+
+void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
+{
 	const FWRCreatureDef* Def = Self->GetDef();
 
 	ThinkTimer -= DeltaSeconds;
@@ -316,49 +793,104 @@ void AWRCreatureAI::Tick(float DeltaSeconds)
 	}
 
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(Self->GetAggroTarget());
-	const float Leash = WRTune(TEXT("creature.leashDistance"), 4000.f);
-	if (Target && FVector::Dist(Self->GetActorLocation(), Self->GetHome()) > Leash)
+	if (Target && FVector::Dist(Self->GetActorLocation(), Self->GetHome()) > WRTune(TEXT("creature.leashDistance"), 4000.f))
 	{
 		// Gave up the chase: head home.
 		Self->SetAggroTarget(nullptr);
 		Target = nullptr;
 	}
 
-	if (!Target)
+	// Burrowers stay underground until they have a target.
+	if (Def->Archetype == TEXT("burrower"))
 	{
-		const FVector ToHome = Self->GetHome() - Self->GetActorLocation();
-		if (ToHome.Size2D() > 150.f)
+		const bool bWantHidden = Target == nullptr;
+		if (Self->IsHidden() != bWantHidden)
 		{
-			Self->AddMovementInput(ToHome.GetSafeNormal2D(), 0.6f);
+			Self->SetActorHiddenInGame(bWantHidden);
+			Self->SetActorEnableCollision(!bWantHidden);
 		}
+	}
+
+	// Passive creatures flee from nearby survivors (and from anyone who hurt them).
+	if (Def->Behavior == TEXT("passive"))
+	{
+		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+		{
+			const FVector Away = Self->GetActorLocation() - It->GetActorLocation();
+			if (It->IsAlive() && Away.Size2D() < 600.f && It->GetVelocity().Size2D() > 250.f)
+			{
+				Self->AddMovementInput(Away.GetSafeNormal2D(), 1.f);
+				return;
+			}
+		}
+	}
+
+	if (Target)
+	{
+		ChaseAndBite(Self, Target);
 		return;
 	}
 
-	const FVector To = Target->GetActorLocation() - Self->GetActorLocation();
-	const float Dist = To.Size2D();
-	const float Range = Def->AttackRange + Target->GetSimpleCollisionRadius();
-
-	if (Dist > Range)
+	// Idle: drift around home.
+	if (Def->Archetype == TEXT("flyer"))
 	{
-		FVector Dir = To.GetSafeNormal2D();
-		if (Def->Archetype == TEXT("pack_hunter") && Dist > 500.f)
-		{
-			// Pack members swing wide to come at the target from different angles.
-			Dir = Dir.RotateAngleAxis(FlankAngle * FMath::Clamp((Dist - 500.f) / 800.f, 0.f, 1.f), FVector::UpVector);
-		}
-		Self->AddMovementInput(Dir, 1.f);
-		return;
+		Self->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
-
-	// In range: face the target and bite (the ability's own cooldown paces it).
-	SetControlRotation(To.Rotation());
-	if (UAbilitySystemComponent* ASC = Self->GetAbilitySystemComponent())
+	WanderClock -= DeltaSeconds;
+	if (WanderClock <= 0.f)
 	{
-		ASC->TryActivateAbilityByClass(UWRGA_Bite::StaticClass());
+		WanderClock = FMath::FRandRange(4.f, 9.f);
+		WanderGoal = Self->GetHome() + FVector(FMath::RandPointInCircle(Def->Archetype == TEXT("herd") ? 900.f : 400.f), 0.f);
+	}
+	const FVector ToGoal = WanderGoal - Self->GetActorLocation();
+	if (ToGoal.Size2D() > 150.f)
+	{
+		Self->AddMovementInput(ToGoal.GetSafeNormal2D(), 0.4f);
 	}
 }
 
-// ---------------------------------------------------------------- spawner
+void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
+{
+	// Find the owner's body.
+	AWRCharacter* OwnerBody = nullptr;
+	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+	{
+		const APlayerState* PS = It->GetPlayerState();
+		if (PS && PS->GetPlayerName() == Self->TamedBy) { OwnerBody = *It; break; }
+	}
+	if (Self->IsHidden())
+	{
+		Self->SetActorHiddenInGame(false);
+		Self->SetActorEnableCollision(true);
+	}
+
+	// Fight the owner's target (or whatever attacks us) when aggressive.
+	AWRCharacterBase* Target = Cast<AWRCharacterBase>(Self->GetAggroTarget());
+	if (Self->bTameAggressive && OwnerBody && OwnerBody->CombatTarget.IsValid() && OwnerBody->CombatTarget->IsAlive() && Self->IsHostileTo(OwnerBody->CombatTarget.Get()))
+	{
+		Target = OwnerBody->CombatTarget.Get();
+	}
+	if (Target && (!Target->IsAlive() || !Self->bTameAggressive || (OwnerBody && FVector::Dist(Target->GetActorLocation(), OwnerBody->GetActorLocation()) > 2500.f)))
+	{
+		Target = nullptr;
+	}
+	Self->SetAggroTarget(Target);
+	if (Target)
+	{
+		ChaseAndBite(Self, Target);
+		return;
+	}
+
+	const FVector Goal = Self->TameOrder == EWRTameOrder::Follow && OwnerBody ? OwnerBody->GetActorLocation() : Self->GetHome();
+	const FVector To = Goal - Self->GetActorLocation();
+	const float Stop = Self->TameOrder == EWRTameOrder::Follow ? 350.f : 100.f;
+	if (To.Size2D() > Stop)
+	{
+		Self->AddMovementInput(To.GetSafeNormal2D(), To.Size2D() > 1200.f ? 1.f : 0.7f);
+	}
+}
+
+// ---------------------------------------------------------------- spawner & nests
 
 AWRCreatureSpawner::AWRCreatureSpawner()
 {
@@ -370,11 +902,23 @@ AWRCreatureSpawner::AWRCreatureSpawner()
 void AWRCreatureSpawner::BeginPlay()
 {
 	Super::BeginPlay();
-	if (HasAuthority())
+	if (!HasAuthority())
 	{
-		for (int32 i = 0; i < Count; ++i)
+		return;
+	}
+	for (int32 i = 0; i < Count; ++i)
+	{
+		SpawnOne();
+	}
+	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
+	if (Def && Def->bNest)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		if (AWRNest* Nest = GetWorld()->SpawnActor<AWRNest>(AWRNest::StaticClass(), GetActorLocation() + FVector(150.f, 0.f, 0.f), FRotator::ZeroRotator, Params))
 		{
-			SpawnOne();
+			Nest->CreatureId = CreatureId;
+			Nest->Spawner = this;
 		}
 	}
 }
@@ -384,11 +928,23 @@ void AWRCreatureSpawner::SpawnOne()
 	const FVector2D Offset = FMath::RandPointInCircle(Radius);
 	if (AWRCreature* Creature = AWRCreature::SpawnCreature(GetWorld(), CreatureId, GetActorLocation() + FVector(Offset, 0.f), FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
 	{
+		Creature->Spawner = this;
 		Alive.Add(Creature);
 		Creature->OnCreatureDied.AddWeakLambda(this, [this](AWRCreature*)
 		{
 			PendingRespawns.Add(GetWorld()->GetTimeSeconds() + RespawnSeconds);
 		});
+	}
+}
+
+void AWRCreatureSpawner::AlertPack(AActor* Attacker)
+{
+	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+	{
+		if (C.IsValid() && !C->IsTamed() && !C->GetAggroTarget())
+		{
+			C->SetAggroTarget(Attacker);
+		}
 	}
 }
 
@@ -408,5 +964,48 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 			SpawnOne();
 		}
 	}
-	Alive.RemoveAll([](const TWeakObjectPtr<AWRCreature>& C) { return !C.IsValid(); });
+	Alive.RemoveAll([](const TWeakObjectPtr<AWRCreature>& C) { return !C.IsValid() || C->IsTamed(); });
+}
+
+AWRNest::AWRNest()
+{
+	bReplicates = true;
+	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+	RootComponent = Mesh;
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (Sphere.Succeeded()) Mesh->SetStaticMesh(Sphere.Object);
+	Mesh->SetRelativeScale3D(FVector(1.2f, 1.2f, 0.4f));
+}
+
+void AWRNest::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AWRNest, CreatureId);
+	DOREPLIFETIME(AWRNest, bHasEgg);
+}
+
+FString AWRNest::TakeEgg(AWRPlayerController* Player)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS || !HasAuthority())
+	{
+		return FString();
+	}
+	if (!bHasEgg)
+	{
+		return TEXT("The nest is empty (eggs come back in a few minutes)");
+	}
+	const FName Egg(*FString::Printf(TEXT("egg_%s"), *CreatureId.ToString()));
+	if (PS->GetInventory()->AddItem(Egg, 1) > 0)
+	{
+		return TEXT("Inventory full");
+	}
+	bHasEgg = false;
+	GetWorldTimerManager().SetTimer(RegrowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { bHasEgg = true; }), WRTune(TEXT("taming.eggRegrowSeconds"), 300.f), false);
+	// The pack swarms whoever robbed the nest.
+	if (AWRCreatureSpawner* S = Spawner.Get())
+	{
+		S->AlertPack(Player->GetPawn());
+	}
+	return TEXT("Took an egg! Use it to hatch a tame. The nest's guardians are angry...");
 }

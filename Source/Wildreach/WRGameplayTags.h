@@ -18,6 +18,8 @@ namespace WRTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Slowed);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Frozen);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Staggered);
+	/** Knocked out by torpor (taming). */
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Unconscious);
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Physical);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Fire);

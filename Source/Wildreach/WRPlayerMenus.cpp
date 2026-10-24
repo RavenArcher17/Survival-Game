@@ -6,6 +6,7 @@
 #include "WRAltar.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
+#include "WRCreature.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
 #include "EngineUtils.h"
@@ -34,19 +35,55 @@ static T* FindNearby(const UWorld* World, const APawn* Pawn, float Range)
 AWRStation* AWRPlayerController::FindNearbyStation() const { return FindNearby<AWRStation>(GetWorld(), GetPawn(), AWRStation::UseRange); }
 AWRHearth* AWRPlayerController::FindNearbyHearth() const { return FindNearby<AWRHearth>(GetWorld(), GetPawn(), AWRStation::UseRange); }
 
+AWRCreature* AWRPlayerController::FindNearbyCreature(bool bOwnTame, float Range) const
+{
+	const APawn* Me = GetPawn();
+	const FString Who = PlayerState ? PlayerState->GetPlayerName() : FString();
+	AWRCreature* Best = nullptr;
+	float BestDist = Range;
+	for (TActorIterator<AWRCreature> It(GetWorld()); Me && It; ++It)
+	{
+		if (*It == Me || !It->IsAlive() || It->IsA<AWRTrainingDummy>() || (It->TamedBy == Who) != bOwnTame || (!bOwnTame && It->IsTamed()))
+		{
+			continue;
+		}
+		const float D = FVector::Dist2D(It->GetActorLocation(), Me->GetActorLocation()) - It->GetSimpleCollisionRadius();
+		if (D < BestDist)
+		{
+			BestDist = D;
+			Best = *It;
+		}
+	}
+	return Best;
+}
+
 void AWRPlayerController::WRCraft(FName Recipe, FName Element) { ServerCommand(FString::Printf(TEXT("craft %s %s"), *Recipe.ToString(), Element.IsNone() ? TEXT("none") : *Element.ToString())); }
 void AWRPlayerController::WRUseSlot(int32 Slot) { ServerCommand(FString::Printf(TEXT("slot %d"), Slot)); }
 void AWRPlayerController::WRRepair(FName Slot) { ServerCommand(FString::Printf(TEXT("repair %s"), *Slot.ToString())); }
 void AWRPlayerController::WRUpgrade(FName Slot) { ServerCommand(FString::Printf(TEXT("upgrade %s"), *Slot.ToString())); }
 void AWRPlayerController::WRUnequip(FName Slot) { ServerCommand(FString::Printf(TEXT("unequip %s"), *Slot.ToString())); }
 void AWRPlayerController::WREquip(FName Item) { ServerCommand(FString::Printf(TEXT("equip %s"), *Item.ToString())); }
-void AWRPlayerController::WRGoTo(FName What) { ServerCommand(FString::Printf(TEXT("goto %s"), *What.ToString())); }
+void AWRPlayerController::WRGoTo(FName What, FName Extra) { ServerCommand(FString::Printf(TEXT("goto %s %s"), *What.ToString(), Extra.IsNone() ? TEXT("") : *Extra.ToString())); }
+void AWRPlayerController::WRTame(FName Order) { ServerCommand(FString::Printf(TEXT("tame %s"), *Order.ToString())); }
+void AWRPlayerController::WRDismount() { ServerCommand(TEXT("dismount")); }
+void AWRPlayerController::WRTorpor(float Amount) { ServerCommand(FString::Printf(TEXT("torpor %.0f"), Amount)); }
+void AWRPlayerController::WRTameStat() { ServerCommand(TEXT("tamestat")); }
 
 void AWRPlayerController::WRInteract()
 {
 	if (Menu != EWRMenu::None)
 	{
 		MenuClose();
+		return;
+	}
+	AWRCreature* Tame = FindNearbyCreature(true);
+	const AWRCreature* Wild = FindNearbyCreature(false, 400.f);
+	const auto DistTo = [this](const AActor* A) { return FVector::Dist2D(A->GetActorLocation(), GetPawn()->GetActorLocation()); };
+	if (Tame && (!Wild || DistTo(Tame) < DistTo(Wild)))
+	{
+		Menu = EWRMenu::Tame;
+		MenuCreature = Tame;
+		MenuIndex = 0;
 		return;
 	}
 	if (AWRBuildPiece* Piece = FindNearbyPiece())
@@ -120,6 +157,10 @@ void AWRPlayerController::MenuConfirm()
 		else
 		{
 			ServerCommand(Command);
+			if (Menu == EWRMenu::Tame)
+			{
+				MenuClose();
+			}
 		}
 	}
 }
@@ -141,6 +182,11 @@ FString AWRPlayerController::GetMenuTitle() const
 	if (Menu == EWRMenu::Claim)
 	{
 		return TEXT("Land claim  (E = close)");
+	}
+	if (Menu == EWRMenu::Tame)
+	{
+		const AWRCreature* Tame = MenuCreature.Get();
+		return FString::Printf(TEXT("%s  (Enter = order, E = close)"), Tame ? *Tame->GetDisplayLabel() : TEXT("Tame"));
 	}
 	if (const AWRStation* Station = MenuStation.Get())
 	{
@@ -192,6 +238,26 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 	if (Menu == EWRMenu::Build)
 	{
 		return BuildPieceMenu();
+	}
+	if (Menu == EWRMenu::Tame)
+	{
+		const AWRCreature* Tame = MenuCreature.Get();
+		const FWRCreatureDef* CDef = Tame ? Tame->GetDef() : nullptr;
+		if (!CDef)
+		{
+			return Out;
+		}
+		Out.Add({ FString::Printf(TEXT("%s  -  %s%s"), *CDef->Role, Tame->TameOrder == EWRTameOrder::Follow ? TEXT("following") : TEXT("staying"),
+			Tame->bTameAggressive ? TEXT(", aggressive") : TEXT(", passive")), FString() });
+		Out.Add({ TEXT("Follow me"), TEXT("tame follow") });
+		Out.Add({ TEXT("Stay here"), TEXT("tame stay") });
+		Out.Add({ Tame->bTameAggressive ? TEXT("Set passive") : TEXT("Set aggressive"), Tame->bTameAggressive ? TEXT("tame passive") : TEXT("tame aggressive") });
+		if (CDef->bMount)
+		{
+			Out.Add({ TEXT("Ride"), TEXT("tame ride") });
+		}
+		Out.Add({ TEXT("Release into the wild"), TEXT("tame release") });
+		return Out;
 	}
 	if (Menu == EWRMenu::Chest || Menu == EWRMenu::Claim)
 	{
@@ -280,11 +346,36 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	{
 		return true;
 	}
+	if (Cmd == TEXT("dismount"))
+	{
+		if (AWRCreature* Mount = Cast<AWRCreature>(GetPawn()))
+		{
+			Mount->Dismount();
+		}
+		return true;
+	}
+	if (Cmd == TEXT("tame"))
+	{
+		AWRCreature* Tame = FindNearbyCreature(true, 800.f);
+		OutResult = Tame ? Tame->Order(this, Arg(1)) : TEXT("no tame of yours nearby");
+		ClientNotify(OutResult);
+		return true;
+	}
 	if (Cmd == TEXT("interact"))
 	{
 		AWRBuildPiece* Piece = FindNearbyPiece();
+		AWRNest* Nest = FindNearby<AWRNest>(GetWorld(), GetPawn(), 350.f);
+		AWRCreature* Wild = FindNearbyCreature(false, 400.f);
 		const FWRPieceDef* PieceDef = Piece ? Piece->GetDef() : nullptr;
-		if (PieceDef && PieceDef->Kind != TEXT("structure") && PieceDef->Kind != TEXT("decor") && PieceDef->Kind != TEXT("station"))
+		if (Nest)
+		{
+			OutResult = Nest->TakeEgg(this);
+		}
+		else if (Wild)
+		{
+			OutResult = Wild->Feed(this);
+		}
+		else if (PieceDef && PieceDef->Kind != TEXT("structure") && PieceDef->Kind != TEXT("decor") && PieceDef->Kind != TEXT("station"))
 		{
 			OutResult = Piece->Interact(this);
 		}

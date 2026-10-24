@@ -2,7 +2,9 @@
 #include "Wildreach.h"
 #include "Dom/JsonObject.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -52,6 +54,22 @@ void FWRTuning::Reload()
 {
 	Root = LoadDataFile(TEXT("tuning.json"));
 	WarnedKeys.Reset();
+	Overrides.Reset();
+	FString Cli;
+	if (FParse::Value(FCommandLine::Get(), TEXT("wrtune="), Cli, false))
+	{
+		TArray<FString> Pairs;
+		Cli.ParseIntoArray(Pairs, TEXT(","));
+		for (const FString& P : Pairs)
+		{
+			FString Key, Value;
+			if (P.Split(TEXT(":"), &Key, &Value))
+			{
+				Overrides.Add(Key, FCString::Atof(*Value));
+				UE_LOG(LogWildreach, Log, TEXT("Tuning override %s = %s"), *Key, *Value);
+			}
+		}
+	}
 	UE_LOG(LogWildreach, Log, TEXT("Tuning %s"), Root.IsValid() ? TEXT("loaded") : TEXT("NOT loaded, using code fallbacks"));
 }
 
@@ -71,6 +89,10 @@ TSharedPtr<FJsonObject> FWRTuning::Find(const FString& Path) const
 
 float FWRTuning::Num(const FString& Path, float Fallback) const
 {
+	if (const float* Override = Overrides.Find(Path))
+	{
+		return *Override;
+	}
 	if (const TSharedPtr<FJsonObject> Holder = Find(Path))
 	{
 		FString Leaf;

@@ -138,7 +138,15 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	UAbilitySystemComponent* AttackerASC = Attacker ? Attacker->GetAbilitySystemComponent() : nullptr;
 	if (Attacker && !Hit.bDamageOverTime)
 	{
+		// Path magic: a same-element path hit calms a tamable creature instead of hurting it.
+		if (Target->TryPathMagic(Hit))
+		{
+			return EWRHitResult::Ignored;
+		}
 		Target->NotifyAttackedBy(Attacker);
+		// Remember who's fighting whom (tames help their owner).
+		Attacker->CombatTarget = Target;
+		Target->CombatTarget = Attacker;
 	}
 
 	if (!Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Invulnerable))
@@ -300,6 +308,17 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 				}
 			}
 		}
+	}
+
+	// Torpor (knockout taming): heavy hits and frost wear creatures down.
+	if (Result == EWRHitResult::Hit && !Hit.bDamageOverTime && Target->IsCreature())
+	{
+		float Torpor = Hit.bHeavy ? WRTune(TEXT("taming.torporPerHeavyHit"), 15.f) : WRTune(TEXT("taming.torporPerHit"), 3.f);
+		if (Hit.Element == WRTags::Element_Frost)
+		{
+			Torpor += Damage * WRTune(TEXT("taming.torporFromFrost"), 0.25f);
+		}
+		Target->AddTorpor(Torpor);
 	}
 
 	if (Result == EWRHitResult::Hit)
