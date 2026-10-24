@@ -52,7 +52,7 @@ for (const biome of ["volcanic", "tundra"]) {
 		caves.push({ biome, mx: x, my: y, x: wx, y: wy, z: Math.round(lo * 100), yaw });
 	}
 }
-clear.push(...caves.map(c => ({ x: c.mx, y: c.my, r: 30 })));
+clear.push(...caves.map(c => ({ x: c.mx, y: c.my, r: 48 })));
 
 // ---- decoration
 const types = { char_tree: [], basalt_rock: [], ember_shrub: [], pine: [], ice_rock: [], snow_shrub: [] };

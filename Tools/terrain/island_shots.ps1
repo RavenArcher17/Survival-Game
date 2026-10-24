@@ -1,5 +1,5 @@
 # Rendered screenshots around L_Island from several places and angles -> Saved\Screenshots.
-param([int]$Seconds = 75)
+param([int]$Seconds = 160)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\..\Wildreach.uproject')).Path
 $shotDir = Join-Path (Split-Path $project) 'Saved\Screenshots'
@@ -17,7 +17,10 @@ $cmds = @(
 	'WRTeleport -1300 -129600', 'WRLook 90 -10', $shot,          # in the north pass, looking south along the ridge
 	'WRTeleport 30000 -100000', 'WRLook 45 -12', $shot,          # tundra side past the pass
 	'WRTeleport -78600 -20000', 'WRLook 90 -15', $shot,          # volcano flank, looking at the crater
-	'WRTeleport -140000 60000', 'WRLook 20 -6', $shot            # west coast, lowlands
+	'WRTeleport -140000 60000', 'WRLook 20 -6', $shot            # west coast, lowlands,
+	'WRTeleport -91800 -90131', 'WRLook 0 -4', $shot,          # outside a volcanic cave entrance (midlands)
+	'WRWalkTo -87900 -90131', 'wait 14', 'WRLook 180 -6', $shot,  # inside the cave chamber, looking out past the ore
+	'WRTeleport 96182 -40000', 'WRLook 90 -10', $shot            # tundra pines near a cave
 ) -join '|'
 
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7805 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden

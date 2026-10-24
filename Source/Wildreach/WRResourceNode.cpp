@@ -98,7 +98,7 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 		Inventory->AddItem(TEXT("seeds"), 1);
 	}
 	// Ore veins sometimes give up a gem (Crafting tab: gems come from mines and caves).
-	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < 0.04f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("gemChance")))
+	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < GemChance + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("gemChance")))
 	{
 		static const FName Gems[] = { TEXT("gem_ruby"), TEXT("gem_topaz"), TEXT("gem_onyx") };
 		Inventory->AddItem(Gems[FMath::RandRange(0, 2)], 1);

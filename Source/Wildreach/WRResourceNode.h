@@ -25,6 +25,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Resource") int32 Hits = 6;
 	UPROPERTY(EditAnywhere, Category="Resource") int32 PerHit = 2;
 	UPROPERTY(EditAnywhere, Category="Resource") float RespawnSeconds = 60.f;
+	/** Chance per ore hit of a gem (caves are richer). */
+	UPROPERTY(EditAnywhere, Category="Resource") float GemChance = 0.04f;
 
 	/** Server: a melee swing landed on this node. */
 	void Harvest(AWRCharacterBase* Gatherer, bool bHeavy);

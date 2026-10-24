@@ -76,7 +76,7 @@ AWRGroundMarker* AWRGroundMarker::Spawn(UWorld* World, const FVector& Location, 
 		M->bBox = bInBox;
 		M->Color = InColor;
 		M->OnRep_Shape();
-		M->SetLifeSpan(FMath::Max(0.1f, Seconds));
+		if (Seconds > 0.f) M->SetLifeSpan(FMath::Max(0.1f, Seconds));  // 0 = permanent
 	}
 	return M;
 }
@@ -114,8 +114,8 @@ AWRHazard* AWRHazard::Spawn(UWorld* World, AActor* InSource, const FVector& Loca
 	H->Radius = InRadius;
 	H->DamagePerSecond = Dps;
 	H->Kind = InKind;
-	H->SetLifeSpan(Seconds);
-	const FLinearColor Color = InKind == TEXT("ice") ? FLinearColor(0.7f, 0.9f, 1.f) : FLinearColor(1.f, 0.3f, 0.02f);
+	if (Seconds > 0.f) H->SetLifeSpan(Seconds);  // 0 = permanent (cave hazards)
+	const FLinearColor Color = InKind == TEXT("ice") ? FLinearColor(0.7f, 0.9f, 1.f) : InKind == TEXT("gas") ? FLinearColor(0.7f, 0.75f, 0.1f) : FLinearColor(1.f, 0.3f, 0.02f);
 	H->Marker = AWRGroundMarker::Spawn(World, Location + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(InRadius, InRadius), false, Color, Seconds);
 	return H;
 }
