@@ -6,8 +6,12 @@
   server on UDP 7777) or **Join** by IP; remembered between runs. F10 returns to it. `Tools/package.ps1` makes a
   shareable Windows build with a players' README.
 - **Paths menu (P)**: both trees with ranks, costs, branch gates and points to spend; Enter learns.
-- **Spells**: Fire wall, Lava pool (fire), Frost nova, Ice lance (frost), so each path has three spells plus its
-  weapon art. Nodes whose abilities aren't built yet say so in the menu.
+- **Every tree node works**: spells Fire wall, Lava pool, Meteor (fire) and Frost nova, Ice lance, Ice wall,
+  Blizzard (frost); weapon arts Molten edge, Molten cleave (leaves lava), Flurry; passives spreading flames, fuel the
+  fire, wildfire, explosive bolt, overheat, searing parry, brittle, cold return, chain shatter, cold riposte, frozen
+  moment, whiteout. Numbers in `tuning.json` `spells.*` / `passives.*`.
+- **Map list (M)**: bosses, mini-bosses, passes, camps and caves by distance with a compass direction.
+  **Chat (T)**: everyone on the server sees it.
 - **Island dressing**: 26k placeholder trees, rocks and shrubs and six midland caves (rock tunnel + dark chamber
   with rich ore at 12% gem odds, sulfur gas or slick ice, a Kilnmite or Glacimaw colony), all generated from the
   heightmap into `Data/island_dressing.json` and built on every machine at runtime.
