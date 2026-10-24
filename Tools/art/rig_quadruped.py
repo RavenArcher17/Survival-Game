@@ -10,6 +10,7 @@ args = sys.argv[sys.argv.index("--") + 1:]
 src, out = args[0], args[1]
 head_dir = args[args.index("--head") + 1] if "--head" in args else "+x"
 preview = args[args.index("--preview") + 1] if "--preview" in args else None
+gait_kind = args[args.index("--gait") + 1] if "--gait" in args else "trot"  # trot | hop (front pair, then rear pair)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
@@ -142,8 +143,28 @@ bpy.ops.object.select_all(action="DESELECT")
 body.select_set(True)
 rig.select_set(True)
 bpy.context.view_layer.objects.active = rig
+# Textured image-to-3D meshes are split along UV seams, which defeats automatic weights: weld first
+# (UVs live on face corners, so the texture survives), and fall back to envelope weights if it still fails.
+bpy.context.view_layer.objects.active = body
+bpy.ops.object.mode_set(mode="EDIT")
+bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.mesh.remove_doubles(threshold=0.0005)
+bpy.ops.object.mode_set(mode="OBJECT")
+bpy.ops.object.select_all(action="DESELECT")
+body.select_set(True)
+rig.select_set(True)
+bpy.context.view_layer.objects.active = rig
 bpy.ops.object.parent_set(type="ARMATURE_AUTO")
 unweighted = sum(1 for p in body.data.vertices if not p.groups)
+if unweighted > 0.1 * len(body.data.vertices):
+    print("auto weights failed for", unweighted, "verts; using envelopes")
+    for vg in list(body.vertex_groups):
+        body.vertex_groups.remove(vg)
+    for b in arm_data.bones:
+        b.envelope_distance = 0.12
+        b.head_radius = b.tail_radius = 0.06
+    bpy.ops.object.parent_set(type="ARMATURE_ENVELOPE")
+    unweighted = sum(1 for p in body.data.vertices if not p.groups)
 print("unweighted verts", unweighted, "of", len(body.data.vertices))
 
 # ---- animations
@@ -174,6 +195,8 @@ def make_action(name, seconds, fn, loop=True):
 P = rig.pose.bones
 R = math.radians
 phase = {"FL": 0.0, "RR": 0.0, "FR": 0.5, "RL": 0.5}  # trot: diagonal pairs
+if gait_kind == "hop":
+    phase = {"FL": 0.0, "FR": 0.0, "RL": 0.5, "RR": 0.5}  # hop: front pair lands, rear pair pushes off
 
 def gait(t, swing, knee, bob):
     for n, ph in phase.items():
@@ -188,8 +211,8 @@ def gait(t, swing, knee, bob):
 make_action("Idle", 2.0, lambda t: (setattr(P["spine2"].rotation_euler, "x", R(1.5) * math.sin(2 * math.pi * t)),
                                      setattr(P["head"].rotation_euler, "x", R(4) * math.sin(2 * math.pi * t + 1)),
                                      setattr(P["tail1"].rotation_euler, "z", R(8) * math.sin(4 * math.pi * t))))
-make_action("Walk", 1.0, lambda t: gait(t, 22, 25, 0.01))
-make_action("Run", 0.55, lambda t: gait(t, 36, 40, 0.035))
+make_action("Walk", 1.0, lambda t: gait(t, 22, 25, 0.06 if gait_kind == "hop" else 0.01))
+make_action("Run", 0.55, lambda t: gait(t, 36, 40, 0.12 if gait_kind == "hop" else 0.035))
 
 def attack(t):
     k = math.sin(math.pi * min(1.0, t / 0.4)) if t < 0.4 else 0.0     # wind down
@@ -235,7 +258,16 @@ if preview:
         scene.render.filepath = preview.replace(".png", f"_{i}.png")
         bpy.ops.render.render(write_still=True)
 
+# Unreal's importer can't read textures embedded in the FBX: write them next to it as PNGs instead.
+import os
+for img in bpy.data.images:
+    if img.packed_file or not img.filepath:
+        img.filepath_raw = os.path.join(os.path.dirname(os.path.abspath(out)), f"{os.path.splitext(os.path.basename(out))[0]}_{img.name}.png".replace(" ", "_"))
+        img.file_format = "PNG"
+        img.save()
+        if img.packed_file:
+            img.unpack(method="REMOVE")
 bpy.ops.export_scene.fbx(filepath=out, use_selection=False, object_types={"ARMATURE", "MESH"}, add_leaf_bones=False,
                          bake_anim=True, bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False, bake_anim_force_startend_keying=True,
-                         mesh_smooth_type="FACE", path_mode="COPY", embed_textures=True, axis_forward="X", axis_up="Z")
+                         mesh_smooth_type="FACE", path_mode="ABSOLUTE", embed_textures=False, axis_forward="X", axis_up="Z")
 print("exported", out, "actions", [a.name for a in bpy.data.actions])
