@@ -46,6 +46,9 @@ public:
 
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void SetupInputComponent() override;
+	virtual void BeginPlay() override;
+	/** F10: leave the game and go back to the main menu. */
+	void ReturnToMenu();
 
 	AWRCharacterBase* GetLockTarget() const { return LockTarget.Get(); }
 

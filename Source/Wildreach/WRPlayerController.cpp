@@ -23,6 +23,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
+#include "WRMainMenu.h"
+#include "Kismet/GameplayStatics.h"
 
 AWRPlayerController::AWRPlayerController()
 {
@@ -31,6 +33,30 @@ AWRPlayerController::AWRPlayerController()
 	bBotHunt = FParse::Param(FCommandLine::Get(), TEXT("wrbothunt"));
 	bBotGather = FParse::Param(FCommandLine::Get(), TEXT("wrbotgather"));
 	bBot = bBot || bBotGather;
+}
+
+void AWRPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	// The game on its own (not connected to anyone) shows the front end over the island.
+	if (IsLocalController() && GetNetMode() == NM_Standalone && !bBot && !GIsEditor && !FParse::Param(FCommandLine::Get(), TEXT("nomenu")))
+	{
+		SWRMainMenu::Open(this);
+	}
+}
+
+void AWRPlayerController::ReturnToMenu()
+{
+	if (SWRMainMenu::IsOpen())
+	{
+		return;
+	}
+	if (GetNetMode() == NM_Standalone)
+	{
+		SWRMainMenu::Open(this);
+		return;
+	}
+	UGameplayStatics::OpenLevel(this, TEXT("/Game/Maps/L_Island"), true);
 }
 
 void AWRPlayerController::SetupInputComponent()
@@ -44,6 +70,7 @@ void AWRPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::I, IE_Pressed, this, &AWRPlayerController::ToggleInventory);
 	InputComponent->BindKey(EKeys::K, IE_Pressed, this, &AWRPlayerController::ToggleSkills);
 	InputComponent->BindKey(EKeys::P, IE_Pressed, this, &AWRPlayerController::TogglePaths);
+	InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AWRPlayerController::ReturnToMenu);
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);
 	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
