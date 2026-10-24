@@ -29,6 +29,9 @@ public:
 	/** Server: bed/bedroll this player respawns at (falls back to a biome spawn). */
 	TWeakObjectPtr<AActor> RespawnPoint;
 
+	/** Server: artifact modifiers active (Full release feature; unlocks hidden boss phase 3). Dev: WRArtifacts 1. */
+	bool bArtifactModifiers = false;
+
 private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
 	UPROPERTY() TObjectPtr<UWRAttributeSet> Attributes;

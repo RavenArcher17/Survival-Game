@@ -186,9 +186,21 @@ else:
 
     # Boss altars at the arena sites (bosses themselves are M6).
     altar_class = unreal.load_class(None, "/Script/Wildreach.WRBossAltar")
+    spawner_class_boss = unreal.load_class(None, "/Script/Wildreach.WRCreatureSpawner")
     for b, path_id in zip(layout["bosses"], ["fire", "frost"]):
         a = spawn(altar_class, world(b["x"] + 40, b["y"], 50), label=f"Altar_{path_id}")
         a.set_editor_property("path_id", path_id)
+
+    # Bosses: one spawner each at its arena (the boss builds its own anvils / ice pillars around it).
+    tuning = json.load(open(os.path.join(PROJECT, "Data", "tuning.json")))["bosses"]
+    boss_sites = list(zip(layout["bosses"], ["vulkarn", "skaldrith"])) +         list(zip(layout["miniBosses"], ["obsidian_warden", "ignessa", "grimjaw", "pale_hunter"]))
+    for site, boss_id in boss_sites:
+        major = boss_id in ("vulkarn", "skaldrith")
+        sp = spawn(spawner_class_boss, world(site["x"], site["y"], 150), label=f"Boss_{boss_id}")
+        sp.set_editor_property("creature_id", boss_id)
+        sp.set_editor_property("count", 1)
+        sp.set_editor_property("radius", 0.0)
+        sp.set_editor_property("respawn_seconds", 60.0 * tuning["majorRespawnMinutes" if major else "miniRespawnMinutes"])
 
     # Creature packs by zone: lowland packs near the spawns, midland predators toward the ridge.
     spawner_class = unreal.load_class(None, "/Script/Wildreach.WRCreatureSpawner")

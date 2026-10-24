@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRBoss.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -87,7 +88,7 @@ void FWRCreatureRegistry::Reload()
 	for (const TSharedPtr<FJsonValue>& Value : *List)
 	{
 		const TSharedPtr<FJsonObject> O = Value->AsObject();
-		if (!O.IsValid())
+		if (!O.IsValid() || !O->HasField(TEXT("id")))
 		{
 			continue;
 		}
@@ -186,7 +187,8 @@ AWRCreature* AWRCreature::SpawnCreature(UWorld* World, FName CreatureId, const F
 		UE_LOG(LogWildreach, Warning, TEXT("Unknown creature %s"), *CreatureId.ToString());
 		return nullptr;
 	}
-	UClass* Class = Def->Archetype == TEXT("dummy") ? AWRTrainingDummy::StaticClass() : AWRCreature::StaticClass();
+	UClass* Class = Def->Archetype == TEXT("dummy") ? AWRTrainingDummy::StaticClass()
+		: Def->Archetype == TEXT("boss") ? AWRBoss::StaticClass() : AWRCreature::StaticClass();
 	const FTransform Transform(Rotation, Location + FVector(0.f, 0.f, Def->HalfHeight + 5.f));
 	AWRCreature* Creature = World->SpawnActorDeferred<AWRCreature>(Class, Transform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	if (Creature)

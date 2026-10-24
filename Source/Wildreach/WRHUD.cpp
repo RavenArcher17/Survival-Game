@@ -4,6 +4,7 @@
 #include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRCreature.h"
+#include "WRBoss.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
 #include "WRCombatLibrary.h"
@@ -87,6 +88,27 @@ void AWRHUD::DrawHUD()
 	}
 
 	DrawWorldBars(Survivor);
+
+	// Boss bar across the top while you're in an engaged boss's fight.
+	for (TActorIterator<AWRBoss> It(GetWorld()); It; ++It)
+	{
+		const UWRAttributeSet* BA = It->GetAttributes();
+		if (!It->bEngaged || !It->IsAlive() || !BA || FVector::Dist(It->GetActorLocation(), Survivor->GetActorLocation()) > 4500.f)
+		{
+			continue;
+		}
+		const float W = Canvas->ClipX * 0.5f;
+		const float BX = (Canvas->ClipX - W) * 0.5f;
+		DrawText(FString::Printf(TEXT("%s   phase %d%s"), *It->GetDisplayLabel(), It->Phase, It->Participants > 1 ? *FString::Printf(TEXT("   (%d fighters)"), It->Participants) : TEXT("")),
+			FLinearColor(1.f, 0.85f, 0.6f), BX, 18.f, nullptr, 1.2f);
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, 42.f, W, 14.f);
+		DrawRect(FLinearColor(0.75f, 0.1f, 0.08f), BX, 42.f, W * FMath::Clamp(BA->GetHealth() / FMath::Max(1.f, BA->GetMaxHealth()), 0.f, 1.f), 14.f);
+		if (It->ShellFraction > 0.f)
+		{
+			DrawRect(FLinearColor(0.5f, 0.5f, 0.55f), BX, 58.f, W * It->ShellFraction, 5.f);
+		}
+		break;
+	}
 
 	const UWRAttributeSet* A = Survivor->GetAttributes();
 	const UWRPathComponent* Paths = UWRPathComponent::FindFor(Survivor);
@@ -289,7 +311,7 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 	{
 		const AWRCharacterBase* Other = *It;
 		const UWRAttributeSet* A = Other->GetAttributes();
-		if (Other == Self || !A || FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation()) > 2500.f)
+		if (Other == Self || !A || Other->IsHidden() || FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation()) > 2500.f)
 		{
 			continue;
 		}

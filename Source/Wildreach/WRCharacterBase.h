@@ -68,6 +68,11 @@ public:
 	/** Server: tell every machine a hit landed (damage numbers, flash). */
 	void ReportHit(float Damage, EWRHitResult Result);
 
+	/** Server: last chance to change damage before it lands (boss shells, airborne bosses, weaknesses). */
+	virtual float ModifyIncomingDamage(const struct FWRHit& Hit, float Damage) { return Damage; }
+	/** Server: damage actually taken (boss damage ledger). */
+	virtual void OnDamageTaken(const struct FWRHit& Hit, float Damage) {}
+
 	/** Server: someone attacked us (creatures use it for aggro). */
 	virtual void NotifyAttackedBy(AActor* Attacker) {}
 

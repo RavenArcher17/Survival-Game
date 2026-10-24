@@ -68,6 +68,9 @@ void AWRPlayerController::WRTame(FName Order) { ServerCommand(FString::Printf(TE
 void AWRPlayerController::WRDismount() { ServerCommand(TEXT("dismount")); }
 void AWRPlayerController::WRTorpor(float Amount) { ServerCommand(FString::Printf(TEXT("torpor %.0f"), Amount)); }
 void AWRPlayerController::WRTameStat() { ServerCommand(TEXT("tamestat")); }
+void AWRPlayerController::WRBossDmg(float Amount, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.0f %s"), Amount, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
+void AWRPlayerController::WRBossDmgPct(float Percent, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.1f%% %s"), Percent, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
+void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
 void AWRPlayerController::WRInteract()
 {

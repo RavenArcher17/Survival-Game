@@ -55,6 +55,29 @@
       "taming": ["offer_food"], "difficulty": "easy", "food": ["berries"], "products": { "egg": 2, "wool": 1 } },
     { "id": "aurora_fox", "name": "Aurora fox", "biome": "tundra", "tier": "lowland", "behavior": "passive", "archetype": "critter", "role": "utility",
       "speed": 560, "poise": 10, "radius": 30, "halfHeight": 28, "color": [0.5, 0.95, 0.8], "element": "frost",
-      "taming": ["offer_food"], "difficulty": "easy", "food": ["raw_meat"], "utility": "sense_secrets" }
+      "taming": ["offer_food"], "difficulty": "easy", "food": ["raw_meat"], "utility": "sense_secrets" },
+
+    { "id": "wisp", "name": "Wisp", "biome": "volcanic", "tier": "lowland", "health": 25, "damage": 0, "behavior": "aggressive", "archetype": "flyer", "role": "minion",
+      "speed": 480, "poise": 5, "radius": 22, "halfHeight": 22, "color": [1.0, 0.6, 0.15], "element": "fire", "aggroRadius": 3000, "loot": {} },
+
+    { "_bosses": "Bosses tab. Health comes from enemies.majorBossSolo / miniBossSolo (scaled by party size); attacks and counterplay are in WRBoss.cpp, numbers in tuning.json bosses.*. loot = what each player who dealt >= 10% gets." },
+    { "id": "vulkarn", "name": "Vulkarn, the Forge Giant", "biome": "volcanic", "tier": "boss", "damage": 0, "behavior": "aggressive", "archetype": "boss", "role": "major boss",
+      "speed": 380, "poise": 400, "radius": 150, "halfHeight": 260, "color": [0.35, 0.12, 0.06], "element": "fire", "resists": ["lava"], "aggroRadius": 2200,
+      "loot": { "core_vulkarn": 1, "ember_essence": 5 } },
+    { "id": "skaldrith", "name": "Skaldrith, the Frost Wyrm", "biome": "tundra", "tier": "boss", "damage": 0, "behavior": "aggressive", "archetype": "boss", "role": "major boss",
+      "speed": 600, "poise": 400, "radius": 170, "halfHeight": 180, "color": [0.55, 0.75, 0.95], "element": "frost", "resists": ["ice"], "aggroRadius": 2500,
+      "loot": { "core_skaldrith": 1, "frost_essence": 5 } },
+    { "id": "obsidian_warden", "name": "The Obsidian Warden", "biome": "volcanic", "tier": "boss", "damage": 0, "behavior": "aggressive", "archetype": "boss", "role": "mini-boss",
+      "speed": 300, "poise": 250, "radius": 110, "halfHeight": 170, "color": [0.08, 0.07, 0.1], "element": "fire", "resists": ["lava"], "aggroRadius": 1500,
+      "loot": { "upgrade_shard": 4, "trophy_obsidian_heart": 1 } },
+    { "id": "ignessa", "name": "Ignessa, Queen of Wisps", "biome": "volcanic", "tier": "boss", "damage": 0, "behavior": "aggressive", "archetype": "boss", "role": "mini-boss",
+      "speed": 450, "poise": 120, "radius": 60, "halfHeight": 110, "color": [1.0, 0.45, 0.1], "element": "fire", "resists": ["lava"], "aggroRadius": 1800,
+      "loot": { "upgrade_shard": 4, "trophy_wisp_crown": 1 } },
+    { "id": "grimjaw", "name": "Grimjaw", "biome": "tundra", "tier": "boss", "damage": 0, "behavior": "aggressive", "archetype": "boss", "role": "mini-boss",
+      "speed": 400, "poise": 200, "radius": 100, "halfHeight": 160, "color": [0.45, 0.6, 0.7], "element": "frost", "resists": ["ice"], "aggroRadius": 1500,
+      "loot": { "upgrade_shard": 4, "trophy_troll_marrow": 1 } },
+    { "id": "pale_hunter", "name": "The Pale Hunter", "biome": "tundra", "tier": "boss", "damage": 0, "behavior": "aggressive", "archetype": "boss", "role": "mini-boss",
+      "speed": 620, "poise": 120, "radius": 50, "halfHeight": 90, "color": [0.92, 0.94, 0.98], "element": "frost", "resists": ["ice"], "aggroRadius": 1600,
+      "loot": { "upgrade_shard": 4, "trophy_stalker_fang": 1 } }
   ]
 }

@@ -277,9 +277,15 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 	}
 
+	Damage = Target->ModifyIncomingDamage(Hit, Damage);
+
 	// --- Apply ---
 	const float NewHealth = TargetAttr->GetHealth() - Damage;
 	TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), NewHealth);
+	if (Damage > 0.f)
+	{
+		Target->OnDamageTaken(Hit, Damage);
+	}
 
 	if (PoiseDamage > 0.f && !TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
 	{

@@ -72,6 +72,10 @@ public:
 	UFUNCTION(Exec) void WRDismount();
 	UFUNCTION(Exec) void WRTorpor(float Amount);
 	UFUNCTION(Exec) void WRTameStat();
+	/** Dev: deal damage (optionally fire/frost) to the nearest boss as this player. */
+	UFUNCTION(Exec) void WRBossDmg(float Amount, FName Element);
+	UFUNCTION(Exec) void WRArtifacts(int32 bOn);
+	UFUNCTION(Exec) void WRBossDmgPct(float Percent, FName Element);
 
 	// --- Building ---
 	bool IsPlacing() const { return !PlacingPiece.IsNone(); }

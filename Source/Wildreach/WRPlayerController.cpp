@@ -7,6 +7,8 @@
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
 #include "WRCreature.h"
+#include "WRBoss.h"
+#include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
@@ -327,6 +329,25 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			*GetNameSafe(Best->GetRider()), *Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
 		ClientNotify(Result);
 	}
+	else if (Cmd == TEXT("bossdmg") && Survivor)
+	{
+		AWRBoss* Boss = nullptr;
+		for (TActorIterator<AWRBoss> It(GetWorld()); It; ++It) if (It->IsAlive()) { Boss = *It; break; }
+		if (Boss)
+		{
+			FWRHit Hit;
+			Hit.Instigator = Survivor;
+			Hit.Damage = FCString::Atof(*Arg(1)) * (Arg(1).EndsWith(TEXT("%")) ? Boss->GetAttributes()->GetMaxHealth() / 100.f : 1.f);
+			Hit.Element = Arg(2) == TEXT("fire") ? WRTags::Element_Fire : Arg(2) == TEXT("frost") ? WRTags::Element_Frost : WRTags::Element_Physical;
+			Hit.Origin = Boss->GetActorLocation();
+			UWRCombatLibrary::ApplyHit(Boss, Hit);
+			Result = FString::Printf(TEXT("%s hp %.0f/%.0f phase %d shell %.0f%% %s%s"), *Boss->GetDisplayLabel(), Boss->GetAttributes()->GetHealth(), Boss->GetAttributes()->GetMaxHealth(),
+				Boss->Phase, Boss->ShellFraction * 100.f, Boss->bAirborne ? TEXT("airborne ") : TEXT(""), Boss->IsHidden() ? TEXT("hidden") : TEXT(""));
+		}
+		else Result = TEXT("no boss");
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("artifacts") && PS) { PS->bArtifactModifiers = Arg(1) == TEXT("1"); }
 	else if (Cmd == TEXT("hitpiece"))
 	{
 		// Testing aid: N copper-sword hits on the nearest building piece.

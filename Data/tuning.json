@@ -106,6 +106,18 @@
     "bossHealthPerExtraParticipant": 0.8
   },
 
+  "bosses": {
+    "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/... (see WRBoss.cpp for every key).",
+    "lootDamageFraction": 0.1, "partChance": 0.25, "weaknessMultiplier": 1.5, "majorRespawnMinutes": 30, "miniRespawnMinutes": 15,
+    "forcePhase3": 0,
+    "vulkarn": { "floodSeconds": 4, "floodDps": 30, "phase2FloodSeconds": 22, "auraDps": 6, "plungeSeconds": 3, "phase3DamageScale": 1.4 },
+    "skaldrith": { "wingHitsToGround": 6, "groundedSeconds": 8, "airSeconds": 14, "landedSeconds": 10, "hoverHeight": 650 },
+    "obsidian_warden": { "shellFraction": 0.4, "shellDamageTaken": 0.15, "chilledShellMultiplier": 2.5 },
+    "ignessa": { "wisps": 4, "wispDamage": 25, "landedSeconds": 8, "airborneDamageTaken": 0.25, "hoverHeight": 550 },
+    "grimjaw": { "regenPerSecond": 0.015 },
+    "pale_hunter": { "blizzardSeconds": 14, "clearSeconds": 10, "ambushMultiplier": 2, "revealSeconds": 6 }
+  },
+
   "taming": { "easySeconds": 60, "mediumSeconds": 300, "hardSeconds": 900, "skillSpeedupAt100": 0.5 },
   "lifeSkills": { "levelXpBase": 50, "levelXpPerLevel": 5 },
   "crops": { "commonMinutes": 20, "rareMinutes": 120 }
