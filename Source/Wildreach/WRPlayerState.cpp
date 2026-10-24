@@ -4,6 +4,7 @@
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "AbilitySystemComponent.h"
+#include "Net/UnrealNetwork.h"
 
 AWRPlayerState::AWRPlayerState()
 {
@@ -18,4 +19,10 @@ AWRPlayerState::AWRPlayerState()
 	Paths = CreateDefaultSubobject<UWRPathComponent>(TEXT("Paths"));
 	Inventory = CreateDefaultSubobject<UWRInventoryComponent>(TEXT("Inventory"));
 	LifeSkills = CreateDefaultSubobject<UWRLifeSkillsComponent>(TEXT("LifeSkills"));
+}
+
+void AWRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AWRPlayerState, ClanName);
 }

@@ -24,6 +24,9 @@ public:
 	void Set(const FString& Path, float Value) { Overrides.Add(Path, Value); }
 	/** Active server preset (Data/server_presets.json): pvp_standard, pve, casual_coop, playtest or custom. */
 	const FString& GetPreset() const { return Preset; }
+	/** Server -> clients: every server.* value as "key=number" or "key=s:text". */
+	TArray<FString> ExportServerSettings() const;
+	void ImportServerSettings(const FString& InPreset, const TArray<FString>& Pairs);
 
 	/** Loads any JSON file under the project's Data/ folder. Null on failure. */
 	static TSharedPtr<FJsonObject> LoadDataFile(const FString& RelativePath);

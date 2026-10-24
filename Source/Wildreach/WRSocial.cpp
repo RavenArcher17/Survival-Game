@@ -71,6 +71,16 @@ void FWRClans::Save() const
 	FFileHelper::SaveStringToFile(Text, *ClansPath());
 }
 
+void FWRClans::RefreshPlayerStates(const UWorld* World) const
+{
+	const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
+	if (!GS) return;
+	for (APlayerState* P : GS->PlayerArray)
+	{
+		if (AWRPlayerState* WPS = Cast<AWRPlayerState>(P)) WPS->ClanName = ClanOf(WPS->GetPlayerName());
+	}
+}
+
 FString FWRClans::ClanOf(const FString& Player) const
 {
 	for (const TPair<FString, FClan>& KV : Clans)
@@ -196,7 +206,9 @@ bool FWRSocialRules::PlayersCanFight(const AWRCharacterBase* A, const AWRCharact
 	{
 		return true;
 	}
-	if (FWRClans::Get().SameClan(PA->GetPlayerName(), PB->GetPlayerName()))
+	const AWRPlayerState* WA = Cast<AWRPlayerState>(PA);
+	const AWRPlayerState* WB = Cast<AWRPlayerState>(PB);
+	if (WA && WB && !WA->ClanName.IsEmpty() && WA->ClanName == WB->ClanName)
 	{
 		return false;
 	}

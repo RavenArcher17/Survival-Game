@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRGameState.h"
 #include "Wildreach.h"
 #include "WRCharacter.h"
 #include "WRCreature.h"
@@ -30,6 +31,7 @@ AWRGameMode::AWRGameMode()
 	HUDClass = AWRHUD::StaticClass();
 	PlayerStateClass = AWRPlayerState::StaticClass();
 	PlayerControllerClass = AWRPlayerController::StaticClass();
+	GameStateClass = AWRGameState::StaticClass();
 }
 
 FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
@@ -263,6 +265,7 @@ void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
 void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
+	FWRClans::Get().RefreshPlayerStates(GetWorld());
 	const AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
 	UE_LOG(LogWildreach, Log, TEXT("Player joined: %s main=%s (%d connected)"),
 		PS ? *PS->GetPlayerName() : TEXT("?"), PS ? *PS->GetPaths()->GetMainPath().ToString() : TEXT("?"), GetNumPlayers());

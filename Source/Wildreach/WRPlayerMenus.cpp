@@ -415,6 +415,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		const FString& A = Arg(1);
 		OutResult = A == TEXT("create") ? Clans.Create(Who, Arg(2)) : A == TEXT("invite") ? Clans.Invite(Who, Arg(2)) : A == TEXT("join") ? Clans.Join(Who, Arg(2))
 			: A == TEXT("leave") ? Clans.Leave(Who) : A == TEXT("kick") ? Clans.Kick(Who, Arg(2)) : Clans.Describe(Who);
+		Clans.RefreshPlayerStates(GetWorld());
 		ClientNotify(OutResult);
 		return true;
 	}

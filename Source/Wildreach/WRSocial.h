@@ -32,6 +32,8 @@ public:
 
 	void Load();
 	void Save() const;
+	/** Server: copy everyone's clan onto their PlayerState (replicated to clients). */
+	void RefreshPlayerStates(const UWorld* World) const;
 
 private:
 	FWRClans() { Load(); }

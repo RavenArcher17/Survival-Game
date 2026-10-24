@@ -33,6 +33,11 @@ public:
 	/** Server: artifact modifiers active (Full release feature; unlocks hidden boss phase 3). Dev: WRArtifacts 1. */
 	bool bArtifactModifiers = false;
 
+	/** Replicated so clients apply clan rules too (lock-on, PvP). Server keeps it in sync with FWRClans. */
+	UPROPERTY(Replicated) FString ClanName;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UAbilitySystemComponent> AbilitySystem;
 	UPROPERTY() TObjectPtr<UWRAttributeSet> Attributes;

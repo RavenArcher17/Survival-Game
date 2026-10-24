@@ -11,7 +11,7 @@ $tune = '-wrtune=taming.easySeconds:4,taming.mediumSeconds:6,taming.hardSeconds:
 
 $cmds = @(
 	'WRBotPause 1', 'WRGive raw_meat 5', 'WRGive berries 5',
-	'WRTeleport 1500 -2200', 'wait 1', 'WRSpawn ashstrider 1', 'wait 1', 'WRGoTo ashstrider', 'wait 1', 'WRInteract', 'wait 7', 'WRTameStat',
+	'WRTeleport 1500 -2200', 'wait 1', 'WRSpawn ashstrider 1', 'wait 1', 'WRGoTo ashstrider', 'WRInteract', 'wait 7', 'WRTameStat',
 	'WRTame ride', 'wait 2', 'WRTameStat', 'WRDismount', 'wait 1', 'WRTameStat', 'wait 1', 'WRTame stay', 'wait 1',
 	'WRTeleport -1500 -5000', 'wait 1', 'WRSpawn cinderfang 1', 'wait 1', 'WRGoTo cinderfang', 'WRTorpor 1000', 'wait 1', 'WRTameStat', 'WRInteract', 'wait 9', 'WRTameStat',
 	'WRGoTo nest kilnmite', 'wait 1', 'WRInteract', 'wait 1', 'WREquip egg_kilnmite', 'wait 2', 'WRTameStat', 'WRTeleport 900 -3300', 'wait 5', 'WRTameStat', 'WRTame aggressive'

@@ -117,6 +117,32 @@ float FWRTuning::Num(const FString& Path, float Fallback) const
 	return Fallback;
 }
 
+TArray<FString> FWRTuning::ExportServerSettings() const
+{
+	TArray<FString> Out;
+	for (const TPair<FString, float>& KV : Overrides)
+	{
+		if (KV.Key.StartsWith(TEXT("server."))) Out.Add(FString::Printf(TEXT("%s=%g"), *KV.Key, KV.Value));
+	}
+	for (const TPair<FString, FString>& KV : StrOverrides)
+	{
+		if (KV.Key.StartsWith(TEXT("server."))) Out.Add(FString::Printf(TEXT("%s=s:%s"), *KV.Key, *KV.Value));
+	}
+	return Out;
+}
+
+void FWRTuning::ImportServerSettings(const FString& InPreset, const TArray<FString>& Pairs)
+{
+	Preset = InPreset;
+	for (const FString& P : Pairs)
+	{
+		FString Key, Value;
+		if (!P.Split(TEXT("="), &Key, &Value)) continue;
+		if (Value.StartsWith(TEXT("s:"))) StrOverrides.Add(Key, Value.RightChop(2));
+		else Overrides.Add(Key, FCString::Atof(*Value));
+	}
+}
+
 void FWRTuning::ApplyServerPreset()
 {
 	// Preset: -wrpreset=<name>, else Saved/ServerDB/server.json {"preset": ..., "settings": {...}}, else the file's default.
