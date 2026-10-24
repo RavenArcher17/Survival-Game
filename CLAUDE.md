@@ -28,7 +28,14 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):
   1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
   2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).
-  3. Creatures & taming, 4. bosses, 5. life skills/server presets/death penalty/clans/safe zones, 6. island dressing: in progress / next.
+  3. Creatures & taming: done (`WRCreature`; `Tools\tametest.ps1`). 4. Bosses: done (`WRBoss`; `Tools\bosstest.ps1`).
+  5. Life skills / server presets / clans / safe zones / PvP / death penalty: built, committed as WIP (`WRLifeSkills`, `WRSocial`,
+     `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks passed except
+     "clanmates can't hit each other": the test's Bravo ran `WRClan join` before Alpha's invite landed. Fix the test timing
+     (Bravo waits longer), rerun, then finish the batch. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
+  6. Island dressing (caves, foliage), then rebuild the island, full regression, docs, push. Default preset is `playtest`
+     (PvP off), so PvP tests need `-wrpreset=pvp_standard`.
+- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB). Epic source access works (UE source build not started).
   After all batches: rebuild the island (`Tools\terrain\build_island.ps1 -Force`) so it gets the new nodes/camps.
 - See `CHANGELOG.md` for details and known gaps.
 
