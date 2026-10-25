@@ -75,6 +75,8 @@ public:
 	/** Teleport next to the nearest station of a type, or "hearth" (testing). */
 	UFUNCTION(Exec) void WRGoTo(FName What, FName Extra);
 	UFUNCTION(Exec) void WRTame(FName Order);
+	/** Every tame of yours within 30 m takes the order (follow, stay, aggressive, passive). */
+	UFUNCTION(Exec) void WRTameAll(FName Order);
 	UFUNCTION(Exec) void WRDismount();
 	UFUNCTION(Exec) void WRTorpor(float Amount);
 	UFUNCTION(Exec) void WRTameStat();

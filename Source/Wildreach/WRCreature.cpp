@@ -1512,11 +1512,11 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 		}
 		else if (Special == TEXT("stomp"))
 		{
-			// Everything hostile in the ring takes it.
+			// Everything hostile in the ring takes it (not a knocked-out creature: someone may be taming it).
 			const float Radius = AttackNum(Special, TEXT("radius"), 320.f);
 			for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 			{
-				if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && FVector::Dist2D(It->GetActorLocation(), Self->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())
+				if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && (!It->HasTag(WRTags::Status_Unconscious) || *It == SpecialTarget.Get()) && FVector::Dist2D(It->GetActorLocation(), Self->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())
 				{
 					CreatureHit(Self, *It, Special);
 				}
@@ -1529,7 +1529,7 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 		}
 		return;
 	}
-	// Under way: a charge runs its line; both it and a lunge hit the first hostile they reach.
+	// Under way: a charge runs its line; both it and a lunge hit the first hostile they reach (passing over knocked-out ones).
 	if (Special == TEXT("charge"))
 	{
 		Self->AddMovementInput(SpecialDir, 1.f);
@@ -1539,7 +1539,7 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 		for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 		{
 			const float Reach = Self->GetSimpleCollisionRadius() + It->GetSimpleCollisionRadius() + AttackNum(Special, TEXT("reach"), 60.f);
-			if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Self->GetActorLocation()) < Reach)
+			if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && (!It->HasTag(WRTags::Status_Unconscious) || *It == SpecialTarget.Get()) && FVector::Dist(It->GetActorLocation(), Self->GetActorLocation()) < Reach)
 			{
 				bSpecialHit = true;
 				CreatureHit(Self, *It, Special);

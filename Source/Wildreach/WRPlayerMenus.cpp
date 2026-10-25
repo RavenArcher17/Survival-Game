@@ -72,6 +72,7 @@ void AWRPlayerController::WRUnequip(FName Slot) { ServerCommand(FString::Printf(
 void AWRPlayerController::WREquip(FName Item) { ServerCommand(FString::Printf(TEXT("equip %s"), *Item.ToString())); }
 void AWRPlayerController::WRGoTo(FName What, FName Extra) { ServerCommand(FString::Printf(TEXT("goto %s %s"), *What.ToString(), Extra.IsNone() ? TEXT("") : *Extra.ToString())); }
 void AWRPlayerController::WRTame(FName Order) { ServerCommand(FString::Printf(TEXT("tame %s"), *Order.ToString())); }
+void AWRPlayerController::WRTameAll(FName Order) { ServerCommand(FString::Printf(TEXT("tameall %s"), *Order.ToString())); }
 void AWRPlayerController::WRDismount() { ServerCommand(TEXT("dismount")); }
 void AWRPlayerController::WRTorpor(float Amount) { ServerCommand(FString::Printf(TEXT("torpor %.0f"), Amount)); }
 void AWRPlayerController::WRTameStat() { ServerCommand(TEXT("tamestat")); }
@@ -595,6 +596,22 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	{
 		AWRCreature* Tame = FindNearbyCreature(true, 800.f);
 		OutResult = Tame ? Tame->Order(this, Arg(1)) : TEXT("no tame of yours nearby");
+		ClientNotify(OutResult);
+		return true;
+	}
+	if (Cmd == TEXT("tameall") && PS && GetPawn())
+	{
+		// A whistle: every tame of yours within 30 m takes the order.
+		int32 Count = 0;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			if (It->IsAlive() && It->TamedBy == PS->GetPlayerName() && FVector::Dist(It->GetActorLocation(), GetPawn()->GetActorLocation()) < 3000.f)
+			{
+				It->Order(this, Arg(1));
+				++Count;
+			}
+		}
+		OutResult = FString::Printf(TEXT("%d tames: %s"), Count, *Arg(1));
 		ClientNotify(OutResult);
 		return true;
 	}

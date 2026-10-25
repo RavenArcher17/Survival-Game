@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-25: one command runs every test
+
+- **`Tools\alltests.ps1`** builds, then runs the automation tests and every bot test in turn and prints a PASS / FAIL
+  table (`-SkipBuild`, `-Only ranged,tame`; each test's full output is kept in the run folder). Every bot test now ends
+  with its checks (`PASS` / `FAIL` lines, "N checks, M failed") and exits 1 on a failure.
+- New automation tests: `Ranged.Items` (ammo kinds, picking ammo and the wheel, stacking gear, quality, recipes),
+  `Taming.Food` (food values, kibble, tame times, every tameable creature eats something), `Creatures.Behaviour`
+  (diets, who hunts whom, every hunter has prey, attacks and activity are known), `World.Clock` (night and daylight by
+  hour). The rules they check were pulled out into plain functions (`FWRInventoryRules::FindAmmo/NextAmmo`,
+  `FWRCreatureDef::FoodValue/CanHunt`, `AWRGameState::IsNightAt/DaylightAt`).
+- **`-wrworld=<name>`** gives a server its own world save (`Saved/ServerDB/world_<name>.json`); the arena tests use it,
+  so tests running side by side no longer load each other's tames and pieces.
+- Fixed: E next to a wild creature and a station opened the station's menu instead of feeding the creature; the nearer
+  one wins now.
+- Fixed: a creature's lunge, charge or stomp hit any hostile it touched, so a tame's lunge could hit a creature you'd
+  knocked out (costing effectiveness); special attacks pass over knocked-out creatures unless that was the target.
+- `WRTameAll <order>`: every tame of yours within 30 m takes the order (a whistle: all stay, all follow...).
+- The full suite passes: 13 automation tests and 197 checks over 15 bot tests (`Tools\alltests.ps1`, about 40
+  minutes). The taming test ran three times in a row clean after its scenario was made deterministic (tames parked,
+  the Rimeclaw rooted before it wakes).
+
 ## 2026-10-25: test pass
 
 - The older bot tests now check what they test and end like the rest (a PASS/FAIL line per check, "N checks, M

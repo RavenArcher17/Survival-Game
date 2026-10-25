@@ -22,16 +22,18 @@ $cmds = @(
 	# Knockout taming: tranq arrows put it down, a stone arrow while it's out costs effectiveness, a narcotic keeps it
 	# under, kibble in its stash tames it.
 	'WRGive hunting_bow 1', 'WRGive tranq_arrow 4', 'WRGive narcotic 2', 'WRGive kibble 3',
-	'WRTeleport -1500 -5000', 'wait 1', 'WRSpawn cinderfang 1', 'wait 0.5', 'WRHold 30', 'wait 0.5',
+	'WRTeleport -1500 -5000', 'wait 1', 'WRSpawn cinderfang 1', 'WRHold 30', 'wait 1',   # rooted as it lands (a fresh one lunges at you)
 	'WREquip hunting_bow', 'wait 1', 'WRRanged 1', 'wait 1', 'WRAim 1', 'wait 1',
 	$aim, 'WRFire', 'wait 1.3', $aim, 'WRFire', 'wait 1.3', 'WRTameStat',
 	'WRGive stone_arrow 1', 'WRAmmo 1', 'wait 0.5', $aim, 'WRFire', 'wait 1', 'WRAim 0', 'WRRanged 0', 'WRTameStat',
 	'WRGoTo cinderfang', 'wait 0.5', 'WRNarcotic', 'wait 0.5', 'WRInteract', 'wait 1', $shot, 'WRInteract', 'wait 0.5',
 	'WRTameGive kibble', 'wait 1', $shot, 'WRTameStat', 'wait 7', 'WRTameStat',
-	'WRGoTo nest kilnmite', 'wait 1', 'WRInteract', 'wait 1', 'WREquip egg_kilnmite', 'wait 2', 'WRTameStat', 'WRTeleport 900 -3300', 'wait 5', 'WRTameStat', 'WRTame aggressive', 'WRTame stay', 'wait 0.5',
+	'WRGoTo nest kilnmite', 'wait 1', 'WRInteract', 'wait 1', 'WREquip egg_kilnmite', 'wait 2', 'WRTameStat', 'WRTeleport 900 -3300', 'wait 5', 'WRTameStat', 'WRTame aggressive',
+	# Park every tame well away from the nest's angry guardians and the Rimeclaw (tames walk after you; give them time).
+	'WRTeleport 2500 -1000', 'wait 6', 'WRTameAll stay', 'wait 0.5',
 	# Left to wake up: a Rimeclaw (hard: 600 s of food, 60 s on the playtest preset) part-tamed on raw meat loses its progress when it wakes.
-	'WRTeleport -1500 -5000', 'wait 1', 'WRSpawn rimeclaw 1', 'wait 0.5', 'WRGoTo rimeclaw', 'WRTorpor 1000', 'wait 0.5',
-	'WRTameGive raw_meat', 'wait 8', 'WRTameStat', 'wait 12.5', 'WRTameStat', 'WRClearCreatures'   # cleared as it wakes, before it bites the tames
+	'WRTeleport -1500 -5000', 'wait 1', 'WRSpawn rimeclaw 1', 'wait 0.5', 'WRGoTo rimeclaw', 'WRTorpor 1000', 'WRHold 90', 'wait 0.5',   # rooted: awake, it stays put
+	'WRTameGive raw_meat', 'wait 8', 'WRTameStat', 'WRTeleport 2500 3800', 'wait 12'   # away: it wakes alone
 ) -join '|'
 
 function Start-Server($log) {
@@ -46,7 +48,7 @@ foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force 
 
 # Restart: the tames should come back.
 $s2 = Start-Server "$out\server2.log"
-Start-Sleep -Seconds 20
+Start-Sleep -Seconds 30
 if (-not $s2.HasExited) { Stop-Process -Id $s2.Id -Force }
 
 $results = @()
