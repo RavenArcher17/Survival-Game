@@ -20,14 +20,17 @@ if ($LASTEXITCODE -ne 0) { "[$(Get-Date -Format 'HH:mm:ss')] FAILED (exit $LASTE
 $game = Join-Path $Out 'Windows\Wildreach'
 Copy-Item (Join-Path $root 'Data') $game -Recurse -Force
 @"
-WILDREACH - first playable (placeholder art)
+WILDREACH - first playable
 
-1. Run Wildreach.exe. Type a name, pick Fire (volcanic) or Frost (tundra).
+1. Run Wildreach.exe. Type a name, pick Male or Female, and Fire (volcanic) or Frost (tundra).
 2. One person clicks Host. Everyone else types the host's IP and clicks Join.
    - On the same Wi-Fi: the host's local IP (run ipconfig, "IPv4 Address").
    - Over the internet: the host forwards UDP port 7777 on their router to their PC
      and shares their public IP (search "what is my ip").
-3. Controls are listed at the top of the screen. F10 returns to the menu.
+3. Controls are listed at the top of the screen. A few to start with:
+   LMB / R attack, RMB block, C dodge, E interact (and tame a knocked-out creature),
+   B build and craft, I inventory, G swap to a bow or other ranged weapon (RMB aims).
+   F10 returns to the menu.
 
 Your character is saved on the host's PC under your name (Wildreach\Saved\ServerDB).
 "@ | Set-Content -Encoding ascii (Join-Path $Out 'Windows\README.txt')
