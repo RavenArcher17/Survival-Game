@@ -44,6 +44,11 @@ Props (static, no rig), e.g. the island trees:
 3. `WR_IMPORTS="C:\...\out\pine_a_cropped.glb=PineA"` then `UnrealEditor-Cmd ... -script=Tools/import_prop.py`
    -> `/Game/Props/PineA` (Nanite on, no collision), and add the mesh to the `Art` table in `WRWorldDressing.cpp`.
 
+Humanoids (player survivors, humanoid bosses): `python concept_batch.py batch_humanoids.json --count 6` (front view,
+A-pose, empty hands; pick single-figure images, not the multi-view sheets), build3d as usual, then
+`blender -b -P prep_mixamo.py -- out\survivor_m_a_textured.glb mixamo\survivor_m.fbx 1.8` makes a Mixamo-ready FBX
+(feet at the origin, real height, texture embedded) for auto-rigging and animations on mixamo.com (needs an Adobe login).
+
 Caves (procedural, no AI): `blender -b -P cave_gen.py -- C:\...\out\cave_a.fbx --seed 1 --preview C:\...\out\cave_a.png`
 sculpts a noisy rock mound and carves the chamber, tunnel and a recessed entrance out of it (AWRCave's local layout,
 open bottom). Import with `WR_IMPORTS="C:\...\cave_a.fbx=CaveA"` and `Tools/import_cave.py` (mesh collision, no Nanite).

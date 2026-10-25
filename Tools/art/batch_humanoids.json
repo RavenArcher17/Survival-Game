@@ -1,0 +1,13 @@
+{
+  "_comment": "Humanoids for auto-rigging (Mixamo or a Blender humanoid rig): front view, A-pose, empty hands, plain background.",
+  "template": "full body character concept art of {p}, front view, standing in A-pose with arms held out at 45 degrees, legs slightly apart, empty hands, symmetrical, entire body visible from head to feet, centered, realistic, detailed, isolated on plain white background, soft studio lighting",
+  "negative": "cropped, cut off, multiple people, side view, sitting, holding weapon, sword, staff, cape covering arms, text, watermark, frame, cartoon, anime, blurry, deformed hands, extra limbs",
+  "creatures": [
+    { "id": "survivor_m", "prompt": "a rugged male island survivor in practical layered survival gear, fur-lined leather jacket, cloth wraps, sturdy boots, short beard" },
+    { "id": "survivor_f", "prompt": "a rugged female island survivor in practical layered survival gear, fur-lined leather jacket, cloth wraps, sturdy boots, braided hair" },
+    { "id": "vulkarn", "prompt": "Vulkarn the forge giant, a huge molten blacksmith giant with cracked obsidian skin glowing with lava, leather apron, massive arms" },
+    { "id": "grimjaw", "prompt": "Grimjaw the frost troll, a hulking hunched troll with pale blue skin, icicle beard, tusks, fur loincloth, long arms" },
+    { "id": "obsidian_warden", "prompt": "the Obsidian Warden, a massive armored golem made of black obsidian slabs with a glowing orange core in its chest" },
+    { "id": "ignessa", "prompt": "Ignessa queen of wisps, a slender fiery fae queen with flame hair, a crown of glowing wisps, ember-patterned gown, glowing eyes" }
+  ]
+}
