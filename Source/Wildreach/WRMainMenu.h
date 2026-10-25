@@ -49,6 +49,7 @@ private:
 	FReply OnJoin();
 	FReply OnQuit();
 	FReply OnPickPath(FName Path);
+	FReply OnPickBody(FName InBody);
 	FString Options() const;
 	void Remember() const;
 
@@ -56,6 +57,7 @@ private:
 	TSharedPtr<SEditableTextBox> NameBox;
 	TSharedPtr<SEditableTextBox> AddressBox;
 	FName Path = TEXT("fire");
+	FName Body;  // None = the default (male) body, "f" = the female body (Data/player_art.json "bodies")
 	FText Status;
 	static TSharedPtr<SWidget> Instance;
 };

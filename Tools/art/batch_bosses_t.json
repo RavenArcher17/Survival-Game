@@ -1,0 +1,11 @@
+{
+  "_comment": "Humanoid bosses in a T-pose for Mixamo (arms must stand clear of the body). Ignessa gets legs under a short gown so the auto-rigger has them.",
+  "template": "full body character of {p}, front view, standing in a T-pose with both arms stretched straight out horizontally to the sides, legs apart, symmetrical, entire body visible from head to feet, centered, realistic, detailed, isolated on plain white background, soft studio lighting",
+  "negative": "cropped, cut off, multiple characters, character sheet, turnaround, side view, arms down, arms at sides, holding anything, weapon, text, watermark, frame, cartoon, anime, blurry, extra limbs, background scenery",
+  "creatures": [
+    { "id": "vulkarn_t", "prompt": "Vulkarn the forge giant, a huge molten blacksmith giant with cracked black obsidian skin glowing with lava, leather apron, massive arms" },
+    { "id": "grimjaw_t", "prompt": "Grimjaw the frost troll, a hulking troll with pale blue skin, icicle beard, tusks, fur loincloth, long arms" },
+    { "id": "obsidian_warden_t", "prompt": "the Obsidian Warden, a massive armored golem made of black obsidian slabs with a glowing orange core in its chest" },
+    { "id": "ignessa_t", "prompt": "Ignessa queen of wisps, a slender fiery fae queen with flame hair, a crown of glowing wisps, short ember-patterned gown, bare legs, glowing eyes" }
+  ]
+}

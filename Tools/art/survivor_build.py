@@ -1,9 +1,10 @@
 # Blender (headless): build the game-ready player character from Mixamo output.
-#   blender -b -P survivor_build.py -- <rigged_lowpoly.fbx> <fullres.fbx> <anim_dir> [<anim_dir> ...] --out <out.fbx> [--preview out.png]
+#   blender -b -P survivor_build.py -- <rigged_lowpoly.fbx> <fullres.fbx> <anim_dir> [<anim_dir> ...] --out <out.fbx> [--preview out.png] [--cut-stretch 2.5]
 # 1. The Mixamo rig was made on a decimated, untextured copy (Mixamo's page can't take our full file): copy its skin
 #    weights onto the full-detail textured mesh (same shape, same place) and bind that mesh to the Mixamo skeleton.
 # 2. Load every animation FBX (Mixamo "without skin" downloads for this character) onto the same skeleton, named after
-#    its file (e.g. "SwordAndShieldSlash2"), with the hips' horizontal travel removed so they play in place.
+#    its file (e.g. "SwordAndShieldSlash2"), with the hips' horizontal travel removed so they play in place (and the
+#    vertical travel too for jumps).
 # 3. Export mesh + skeleton + all animations as one FBX, textures as PNGs next to it (what Unreal's importer reads).
 import bpy, sys, os, re, glob
 from mathutils import Vector
@@ -69,6 +70,27 @@ arm_mod.object = rig
 bpy.data.objects.remove(low)
 print(f"weights: {len(full.vertex_groups)} groups on {len(full.data.vertices)} verts, unweighted {unweighted}, parent {full.parent.name if full.parent else None}")
 
+
+def edge_lengths(co):
+    """Length of every mesh edge for vertex positions co (n x 3)."""
+    import numpy as np
+    e = np.empty(len(full.data.edges) * 2, dtype=np.int64)
+    full.data.edges.foreach_get("vertices", e)
+    e = e.reshape(-1, 2)
+    return np.linalg.norm(co[e[:, 0]] - co[e[:, 1]], axis=1)
+
+
+def mesh_co(mesh):
+    import numpy as np
+    co = np.empty(len(mesh.vertices) * 3)
+    mesh.vertices.foreach_get("co", co)
+    return co.reshape(-1, 3)
+
+
+# Edge lengths in the model's own pose: the yardstick for --cut-stretch (the move to the T-pose below already stretches
+# any fused hand-to-thigh bridge).
+orig_len = edge_lengths(mesh_co(full.data)) if "--cut-stretch" in args else None
+
 # ---- rest pose: Mixamo's animation files are relative to its T-pose skeleton, but the rig was downloaded in the mesh's
 # own pose (arms out and down). Pose the rig into the animations' rest skeleton, bake that into the mesh, and make it
 # the new rest pose, so every animation plays as intended.
@@ -116,8 +138,10 @@ for d in anim_dirs:
             act.use_fake_user = True
             # In place: freeze the hips' sideways (local X) and forward (local Z) travel at their first value;
             # keep local Y, the up-and-down (jumps, crouches, bob).
+            # Jumps also lose their vertical travel: the game lifts the capsule itself, so the clip's own hop doubled it.
+            frozen = (0, 1, 2) if "Jump" in name else (0, 2)
             for fc in action_curves(act):
-                if fc.data_path == 'pose.bones["mixamorig:Hips"].location' and fc.array_index in (0, 2):
+                if fc.data_path == 'pose.bones["mixamorig:Hips"].location' and fc.array_index in frozen:
                     first = fc.keyframe_points[0].co[1]
                     for k in fc.keyframe_points:
                         k.co[1] = first
@@ -127,6 +151,63 @@ for d in anim_dirs:
         for o in objs:
             bpy.data.objects.remove(o)
 print("animations", len(names), names)
+
+# ---- optional: cut faces that tear when animated. Image-to-3D bodies sometimes fuse a hand to a thigh (hands hanging
+# at the sides); skinned, those bridges stretch into long planks whenever the arm moves. Play every clip, measure each
+# edge against its rest length, and delete the faces on any edge that ever stretches past the given ratio.
+if "--cut-stretch" in args:
+    import numpy as np
+    import bmesh
+    limit = float(args[args.index("--cut-stretch") + 1])
+    deps = bpy.context.evaluated_depsgraph_get()
+    edges = np.empty(len(full.data.edges) * 2, dtype=np.int64)
+    full.data.edges.foreach_get("vertices", edges)
+    edges = edges.reshape(-1, 2)
+    rest_len = np.maximum(orig_len, 1e-6)
+    worst = np.maximum(1.0, edge_lengths(mesh_co(full.data)) / rest_len)  # the T-pose itself counts
+    for name in names:
+        act = bpy.data.actions[name]
+        rig.animation_data.action = act
+        if hasattr(rig.animation_data, "action_suitable_slots") and rig.animation_data.action_suitable_slots:
+            rig.animation_data.action_slot = rig.animation_data.action_suitable_slots[0]
+        lo, hi = act.frame_range
+        for f in np.linspace(lo, hi, 8):
+            bpy.context.scene.frame_set(int(round(f)))
+            ev = full.evaluated_get(deps)
+            co = mesh_co(ev.to_mesh())
+            ev.to_mesh_clear()
+            worst = np.maximum(worst, edge_lengths(co) / rest_len)
+    rig.animation_data.action = None
+    bpy.context.scene.frame_set(0)
+    bad = {tuple(sorted(e)) for e in edges[worst > limit].tolist()}
+    bm = bmesh.new()
+    bm.from_mesh(full.data)
+    doomed = [f for f in bm.faces if any(tuple(sorted((e.verts[0].index, e.verts[1].index))) in bad for e in f.edges)]
+    bmesh.ops.delete(bm, geom=doomed, context="FACES")
+    # The cut leaves scraps of the bridges floating: drop pieces under half a percent of the faces.
+    bm.faces.ensure_lookup_table()
+    seen, scraps = set(), []
+    for start in bm.faces:
+        if start.index in seen:
+            continue
+        island, stack = [], [start]
+        seen.add(start.index)
+        while stack:
+            f = stack.pop()
+            island.append(f)
+            for e in f.edges:
+                for g in e.link_faces:
+                    if g.index not in seen:
+                        seen.add(g.index)
+                        stack.append(g)
+        if len(island) < 0.005 * len(bm.faces):
+            scraps += island
+    bmesh.ops.delete(bm, geom=scraps, context="FACES")
+    doomed += scraps
+    bm.to_mesh(full.data)
+    bm.free()
+    full.data.update()
+    print(f"cut-stretch: {len(bad)} edges stretched past {limit}x, {len(doomed)} faces removed of {len(full.data.polygons) + len(doomed)}")
 
 # ---- preview: the full mesh posed by an attack, to check the weights move it cleanly
 if preview and names:
@@ -152,7 +233,7 @@ if preview and names:
     rig.animation_data.action = None
 
 # ---- 3. export (textures next to the FBX, as Unreal's importer can't read embedded ones)
-for img in bpy.data.images:
+for img in [i for i in bpy.data.images if i.type == "IMAGE"]:  # not the preview's Render Result
     if img.packed_file or not img.filepath or not os.path.exists(bpy.path.abspath(img.filepath)):
         img.filepath_raw = os.path.join(os.path.dirname(os.path.abspath(out)), f"{os.path.splitext(os.path.basename(out))[0]}_{img.name}.png".replace(" ", "_"))
         img.file_format = "PNG"

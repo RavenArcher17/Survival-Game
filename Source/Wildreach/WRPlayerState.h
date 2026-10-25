@@ -33,6 +33,9 @@ public:
 	/** Server: artifact modifiers active (Full release feature; unlocks hidden boss phase 3). Dev: WRArtifacts 1. */
 	bool bArtifactModifiers = false;
 
+	/** Server: body picked in the menu (?Body= on the join URL); each new pawn takes it (AWRCharacter::BodyStyle). */
+	FName BodyStyle;
+
 	/** Replicated so clients apply clan rules too (lock-on, PvP). Server keeps it in sync with FWRClans. */
 	UPROPERTY(Replicated) FString ClanName;
 

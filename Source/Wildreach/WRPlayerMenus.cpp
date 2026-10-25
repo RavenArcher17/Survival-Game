@@ -517,6 +517,10 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		AWRLootBag* Bag = FindNearby<AWRLootBag>(GetWorld(), GetPawn(), 300.f);
 		AWRCreature* Wild = FindNearbyCreature(false, 400.f);
 		const FWRPieceDef* PieceDef = Piece ? Piece->GetDef() : nullptr;
+		if ((Bag || Nest || Wild) && Cast<AWRCharacter>(GetPawn()))
+		{
+			Cast<AWRCharacter>(GetPawn())->MulticastBodyOneShot(TEXT("pickup"));
+		}
 		if (Bag)
 		{
 			OutResult = Bag->Loot(this);

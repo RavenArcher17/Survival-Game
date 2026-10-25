@@ -55,15 +55,26 @@ Humanoids (player survivors, humanoid bosses), rigged and animated on mixamo.com
    in through the page itself: `blender -b -P pack_for_page.py -- mixamo\x.fbx out\x_page.b64 2400`, then decode it in
    the page into an OBJ `File` and set it on the upload input. That only works if the upload dialog was opened with a real
    click, and `window.scrollTo(0, 0)` first (the page scrolls behind the dialog and throws the marker drags off).
-   Keep every marker on the mesh (elbows especially).
+   Keep every marker on the mesh (elbows especially). Turn "Use Symmetry" off when the body sits off the centre line
+   (a jacket flap or a longer arm shifts it). A character wider than it is tall (a hulking boss) gets cropped by the
+   marker view: add a tiny triangle at 1.45x its height above the feet when building the OBJ, so the camera frames
+   the whole body (the triangle is in the throwaway rig copy only).
 3. Download the rigged character (Original Pose) and the animations ("Without Skin" / packs: "No Character", In Place for
-   locomotion), then `blender -b -P survivor_build.py -- rigged.fbx mixamo\x.fbx anims\pack anims\singles --out
+   locomotion). A pack downloaded with "Original Pose" instead brings the rigged character too, as `<name>.fbx` in the
+   zip next to the clips. Then `blender -b -P survivor_build.py -- rigged.fbx mixamo\x.fbx anims\pack anims\singles --out
    mixamo\game\x.fbx --preview out\x_rig.png`: copies the rig's weights onto the full-detail mesh, moves the rest pose to
    the animations' T-pose, loads every animation (named after its file, hips' horizontal travel removed), exports one
    FBX. Check with `blender -b -P check_actions.py -- mixamo\game\x.fbx out\x_act.png Idle Run Slash`.
 4. `WR_DEST_ROOT=/Game/Characters WR_IMPORTS="...\x.fbx=Survivor"` + `Tools/import_creature.py`, then point
    `Data/player_art.json` at it (Unreal drops the `mixamorig:` bone prefix: the hand is `RightHand`).
-   Check with `powershell -File Tools\playershots.ps1` (`WRArtCam me`).
+   Check with `powershell -File Tools\playershots.ps1` (`WRArtCam me`; `-Body f` for the female body). More bodies go
+   under `"bodies"` in `player_art.json` (the main menu's Male / Female buttons send `?Body=f` on the join URL).
+
+Held gear (the player's sword and shield): concepts from `batch_gear.json`, build3d, then
+`blender -b -P normalize_gear.py -- sword out\sword_a_textured.glb out\sword_game.glb 95` (grip at the origin, blade along
+its longest axis, 95 cm) or `-- shield ... 70` (face along +Z, 70 cm across, stray struts off the back cut away), and
+`Tools/import_prop.py`. `player_art.json` `weaponMesh` / `shieldMesh` / `shieldSocket` attach them: the game works out the
+blade and face directions from the mesh bounds and the skeleton's T-pose.
 
 Caves (procedural, no AI): `blender -b -P cave_gen.py -- C:\...\out\cave_a.fbx --seed 1 --preview C:\...\out\cave_a.png`
 sculpts a noisy rock mound and carves the chamber, tunnel and a recessed entrance out of it (AWRCave's local layout,

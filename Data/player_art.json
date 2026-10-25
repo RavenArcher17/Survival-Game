@@ -4,6 +4,9 @@
   "meshYaw": -90,
   "meshScale": 1.0,
   "weaponSocket": "RightHand",
+  "weaponMesh": "/Game/Props/Sword/sword_game/StaticMeshes/sword_game.sword_game",
+  "shieldMesh": "/Game/Props/Shield/shield_game/StaticMeshes/shield_game.shield_game",
+  "shieldSocket": "LeftForeArm",
   "speeds": { "walk": 150, "run": 420 },
   "anims": {
     "idle": ["SwordAndShieldIdle"],
@@ -23,5 +26,9 @@
     "chop": ["StandingMeleeAttackDownward"],
     "pickup": ["PickingUpObject"]
   },
-  "animPrefix": "/Game/Characters/Survivor/survivor_mArmature_"
+  "animPrefix": "/Game/Characters/Survivor/survivor_mArmature_",
+  "_bodies": "Body variants picked in the main menu (?Body= on the join URL). Each overrides any top-level field it lists.",
+  "bodies": {
+    "f": { "mesh": "/Game/Characters/SurvivorF/survivor_f.survivor_f", "animPrefix": "/Game/Characters/SurvivorF/survivor_fArmature_" }
+  }
 }

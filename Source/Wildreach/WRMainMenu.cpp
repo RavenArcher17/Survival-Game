@@ -81,6 +81,9 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 	GConfig->GetString(MenuSection, TEXT("Address"), Address, GGameUserSettingsIni);
 	GConfig->GetString(MenuSection, TEXT("Path"), SavedPath, GGameUserSettingsIni);
 	Path = FName(*SavedPath);
+	FString SavedBody;
+	GConfig->GetString(MenuSection, TEXT("Body"), SavedBody, GGameUserSettingsIni);
+	Body = SavedBody.IsEmpty() ? NAME_None : FName(*SavedBody);
 
 	const auto Label = [](const FString& Text, int32 Size = 14)
 	{
@@ -103,6 +106,23 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 18)[Label(TEXT("WILDREACH"), 34)]
 				+ SVerticalBox::Slot().AutoHeight()[Label(TEXT("Your name (your character and progress are saved under it)"), 11)]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 4, 0, 14)[SAssignNew(NameBox, SEditableTextBox).Text(FText::FromString(Name)).Font(FCoreStyle::GetDefaultFontStyle("Regular", 15))]
+				+ SVerticalBox::Slot().AutoHeight()[Label(TEXT("Body"), 11)]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 4, 0, 14)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1).Padding(0, 0, 6, 0)
+					[
+						SNew(SButton).OnClicked(this, &SWRMainMenu::OnPickBody, FName()).HAlign(HAlign_Center).ContentPadding(FMargin(10.f, 8.f))
+						.ButtonColorAndOpacity_Lambda([this]() { return Body.IsNone() ? FLinearColor(0.85f, 0.7f, 0.45f) : FLinearColor(0.3f, 0.3f, 0.3f); })
+						[SNew(STextBlock).Text(FText::FromString(TEXT("Male"))).Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1).Padding(6, 0, 0, 0)
+					[
+						SNew(SButton).OnClicked(this, &SWRMainMenu::OnPickBody, FName(TEXT("f"))).HAlign(HAlign_Center).ContentPadding(FMargin(10.f, 8.f))
+						.ButtonColorAndOpacity_Lambda([this]() { return Body == TEXT("f") ? FLinearColor(0.85f, 0.7f, 0.45f) : FLinearColor(0.3f, 0.3f, 0.3f); })
+						[SNew(STextBlock).Text(FText::FromString(TEXT("Female"))).Font(FCoreStyle::GetDefaultFontStyle("Bold", 14))]
+					]
+				]
 				+ SVerticalBox::Slot().AutoHeight()[Label(TEXT("Main path (sets where you spawn; the other is a subclass from a boss altar)"), 11)]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0, 4, 0, 14)
 				[
@@ -138,13 +158,19 @@ FReply SWRMainMenu::OnPickPath(FName InPath)
 	return FReply::Handled();
 }
 
+FReply SWRMainMenu::OnPickBody(FName InBody)
+{
+	Body = InBody;
+	return FReply::Handled();
+}
+
 FString SWRMainMenu::Options() const
 {
 	FString Name = NameBox->GetText().ToString().TrimStartAndEnd();
 	// Keep names to what the server's file names and chat can handle.
 	Name = Name.Replace(TEXT("?"), TEXT("")).Replace(TEXT("="), TEXT("")).Replace(TEXT(" "), TEXT("_")).Left(20);
 	if (Name.IsEmpty()) Name = TEXT("Survivor");
-	return FString::Printf(TEXT("?WRName=%s?Path=%s"), *Name, *Path.ToString());
+	return FString::Printf(TEXT("?WRName=%s?Path=%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()));
 }
 
 void SWRMainMenu::Remember() const
@@ -152,6 +178,7 @@ void SWRMainMenu::Remember() const
 	GConfig->SetString(MenuSection, TEXT("Name"), *NameBox->GetText().ToString(), GGameUserSettingsIni);
 	GConfig->SetString(MenuSection, TEXT("Address"), *AddressBox->GetText().ToString(), GGameUserSettingsIni);
 	GConfig->SetString(MenuSection, TEXT("Path"), *Path.ToString(), GGameUserSettingsIni);
+	GConfig->SetString(MenuSection, TEXT("Body"), Body.IsNone() ? TEXT("") : *Body.ToString(), GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }
 

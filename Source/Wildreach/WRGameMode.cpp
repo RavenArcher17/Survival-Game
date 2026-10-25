@@ -56,6 +56,8 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 			ChangeName(NewPlayerController, WRName.Left(24), false);
 		}
 		PS->GetPaths()->SetMainPath(FName(*Path));
+		const FString Body = UGameplayStatics::ParseOption(Options, TEXT("Body")).ToLower().Left(8);
+		PS->BodyStyle = Body.IsEmpty() ? NAME_None : FName(*Body);
 		// A returning player's saved paths override the join URL.
 		LoadPlayer(PS);
 	}

@@ -3,7 +3,8 @@
 #   WR_IMPORTS="C:\path\a_textured.glb=Name;C:\path\b_textured.glb=Other"   (empty: just re-fix existing props' materials)
 # Nanite on (AI meshes are ~40k triangles and the dressing places thousands); no collision (the dressing adds its own).
 # The glTF importer's materials derive from an engine material without the Nanite / instancing usage flags (the game would
-# draw the default material), so each prop material is re-parented to /Game/Props/M_Prop, keeping its texture.
+# draw the default material), so each prop material is re-parented to /Game/Props/M_Prop, keeping its texture. Only the
+# folders it imports get that fix (an empty WR_IMPORTS fixes every prop but the caves, whose rock materials are their own).
 # Like import_creature.py, an existing folder is skipped: move it out of Content first to replace a prop.
 import os
 import unreal
@@ -51,6 +52,7 @@ def fix_materials(folder):
         print(f"[Wildreach] {mi.get_name()} -> M_Prop (texture {texture.get_name() if texture else 'none'})")
 
 
+fixed = []
 for item in os.environ.get("WR_IMPORTS", "").split(";"):
     if not item.strip():
         continue
@@ -76,5 +78,10 @@ for item in os.environ.get("WR_IMPORTS", "").split(";"):
             unreal.EditorStaticMeshLibrary.remove_collisions(asset)
             meshes.append(f"{a.asset_name} ({asset.get_num_triangles(0)} tris)")
     eal.save_directory(dest)
+    fixed.append(dest)
     print(f"[Wildreach] imported {name}: meshes {meshes}")
-fix_materials("/Game/Props")
+if not os.environ.get("WR_IMPORTS", "").strip():
+    fixed = sorted({str(a.package_path) for a in reg.get_assets_by_path("/Game/Props", recursive=True)} - {"/Game/Props"})
+    fixed = [p for p in fixed if not p.startswith("/Game/Props/Caves")]
+for folder in fixed:
+    fix_materials(folder)

@@ -39,6 +39,9 @@ public:
 	void PressAbilityInput(EWRAbilityInput Input);
 	void ReleaseAbilityInput(EWRAbilityInput Input);
 
+	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
+	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnDeath(AActor* Killer) override;
@@ -48,6 +51,11 @@ protected:
 
 	/** Animated survivor body (Data/player_art.json); the placeholder shapes are hidden once it loads. */
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<class USkeletalMeshComponent> Body;
+	/** Shield strapped to the body's left forearm (player_art.json "shieldMesh"). */
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> ShieldMesh;
+	/** Body picked in the menu (?Body= on the join URL, kept on the PlayerState): a variant under "bodies" in
+	 *  Data/player_art.json. None = the default body. */
+	UPROPERTY(ReplicatedUsing=OnRep_BodyStyle) FName BodyStyle;
 
 	UPROPERTY(VisibleAnywhere, Category="Camera") TObjectPtr<USpringArmComponent> ThirdPersonBoom;
 	UPROPERTY(VisibleAnywhere, Category="Camera") TObjectPtr<UCameraComponent> ThirdPersonCamera;
@@ -70,7 +78,11 @@ private:
 	double BodyOneShotUntil = 0.0;
 	float WalkClipSpeed = 150.f;
 	float RunClipSpeed = 420.f;
+	FName LoadedBodyStyle;
+	bool bBodyLoaded = false;
+	/** Load (or swap to) the body for BodyStyle; does nothing if that body is already on. */
 	void LoadBodyArt();
+	UFUNCTION() void OnRep_BodyStyle();
 	void TickBodyAnim();
 	/** Play a clip from a set; bLoop for locomotion. Duration > 0 stretches a one-shot to fit it. Returns the clip length. */
 	float PlayBodyAnim(FName Key, bool bLoop, float PlayRate = 1.f, float Duration = 0.f);

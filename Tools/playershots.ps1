@@ -1,6 +1,8 @@
 # Art check for the player body: the art camera (WRArtCam me) frames the test bot's survivor while it idles (front and
 # side), walks, and fights the arena's training dummies. Shots land in Saved\Screenshots (paths printed at the end).
-param([int]$Seconds = 70)
+# -Gather: the bot harvests resource nodes instead of fighting (checks the chop / gather clips).
+# -Body f: the female body (any key under "bodies" in Data/player_art.json).
+param([int]$Seconds = 70, [switch]$Gather, [string]$Body = '')
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $shotDir = Join-Path (Split-Path $project) 'Saved\Screenshots'
@@ -18,7 +20,8 @@ $cmds = @(
 ) -join '|'
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7792 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7792?Path=fire?WRName=ArtBot -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru
+$mode = if ($Gather) { '-wrbotgather' } else { '' }
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7792?Path=fire?WRName=ArtBot$(if ($Body) { "?Body=$Body" }) -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot $mode `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru
 Start-Sleep -Seconds $Seconds
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Get-ChildItem $shotDir -Recurse -Filter *.png -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $before } | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }

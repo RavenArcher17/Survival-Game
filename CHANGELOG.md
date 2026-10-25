@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-24: a second body, a real sword and shield
+
+- **Female survivor**: the second AI survivor is rigged on Mixamo with the same 55 animations
+  (`/Game/Characters/SurvivorF`). The main menu has a **Male / Female** choice, sent as `?Body=f` on the join URL,
+  kept on the PlayerState and replicated with each pawn, so everyone sees the body you picked. Bodies are variants
+  under `"bodies"` in `Data/player_art.json`; each overrides any top-level field.
+- **Real sword and shield**: an AI-made one-handed sword in the right hand and a round iron-rimmed shield strapped to
+  the left forearm, replacing the cube blade. `Tools/art/normalize_gear.py` puts the grip at the origin and trims
+  stray struts off the shield's back. The game works out the blade and shield-face directions from the mesh bounds and
+  the T-pose skeleton (`weaponMesh`, `shieldMesh`, `shieldSocket`). First person hides the shield; the sword stays.
+- **Gathering clips play**: swinging at a resource node right in front does an overhead chop for wood, stone and ore,
+  or a crouching gather for plants; looting a bag, taking an egg or feeding a wild creature plays a pick-up for
+  everyone.
+- **Jump fixed**: the jump clip no longer adds its own hop on top of the real jump, and the fall starts airborne.
+- `Tools/art/survivor_build.py --cut-stretch 2.5` removes faces that tear when animated (image-to-3D bodies sometimes
+  fuse a hand to a thigh), measured against the model's own pose, plus the scraps it leaves.
+- Fixed: `Tools/import_prop.py` re-parented every prop material under `/Game/Props` (the caves' tinted rock
+  included) to the plain prop material. It now fixes only what it imports.
+- `Tools/playershots.ps1 -Body f` frames the female body.
+
 ## 2026-10-24: the player has a body
 
 - **Custom survivor** (Raven's pick over the UE mannequin): an AI-made male survivor (T-pose concept, so Mixamo can rig

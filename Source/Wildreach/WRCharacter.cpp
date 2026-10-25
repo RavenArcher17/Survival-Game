@@ -11,6 +11,7 @@
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRResourceNode.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
@@ -20,7 +21,9 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
 #include "AnimationRuntime.h"
+#include "EngineUtils.h"
 #include "Dom/JsonObject.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -72,6 +75,11 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Body->SetVisibility(false);
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+
+	ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
+	ShieldMesh->SetupAttachment(Body);
+	ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShieldMesh->SetVisibility(false);
 }
 
 void AWRCharacter::BeginPlay()
@@ -113,6 +121,7 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCharacter, bFirstPerson);
+	DOREPLIFETIME(AWRCharacter, BodyStyle);
 }
 
 void AWRCharacter::InitAbilityActorInfo()
@@ -149,6 +158,8 @@ void AWRCharacter::PossessedBy(AController* NewController)
 	{
 		return;
 	}
+	BodyStyle = PS->BodyStyle;  // replicates; a listen server or standalone game swaps its own copy now
+	LoadBodyArt();
 
 	ClearStaleTags();
 	if (!PS->bDefaultAbilitiesGranted)
@@ -169,6 +180,14 @@ void AWRCharacter::PossessedBy(AController* NewController)
 	// Path level can raise max health; respawn at full.
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), Attributes->GetMaxHealth());
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attributes->GetMaxStamina());
+}
+
+void AWRCharacter::OnRep_BodyStyle()
+{
+	if (HasActorBegunPlay())
+	{
+		LoadBodyArt();  // otherwise BeginPlay loads it
+	}
 }
 
 void AWRCharacter::OnRep_PlayerState()
@@ -218,6 +237,7 @@ void AWRCharacter::ApplyViewMode()
 	BodyMesh->SetOwnerNoSee(bFirstPerson);
 	FaceMarker->SetOwnerNoSee(bFirstPerson);
 	Body->SetOwnerNoSee(bFirstPerson);
+	ShieldMesh->SetOwnerNoSee(bFirstPerson);  // it would fill the first-person view; the sword stays
 
 	// First person: body yaw follows the camera. Third person: body turns toward movement.
 	bUseControllerRotationYaw = bFirstPerson;
@@ -228,13 +248,26 @@ void AWRCharacter::ApplyViewMode()
 
 void AWRCharacter::LoadBodyArt()
 {
-	if (GetNetMode() == NM_DedicatedServer)
+	if (GetNetMode() == NM_DedicatedServer || (bBodyLoaded && LoadedBodyStyle == BodyStyle))
 	{
 		return;  // the server never draws bodies
 	}
 	const TSharedPtr<FJsonObject> Art = FWRTuning::LoadDataFile(TEXT("player_art.json"));
-	FString MeshPath, Prefix, Socket;
-	if (!Art.IsValid() || !Art->TryGetStringField(TEXT("mesh"), MeshPath))
+	if (!Art.IsValid())
+	{
+		return;
+	}
+	// A body variant ("bodies": {"f": {...}}) overrides any top-level field it has.
+	TSharedPtr<FJsonObject> Variant;
+	const TSharedPtr<FJsonObject>* Bodies = nullptr;
+	const TSharedPtr<FJsonObject>* Found = nullptr;
+	if (!BodyStyle.IsNone() && Art->TryGetObjectField(TEXT("bodies"), Bodies) && (*Bodies)->TryGetObjectField(BodyStyle.ToString(), Found))
+	{
+		Variant = *Found;
+	}
+	const auto Pick = [&Art, &Variant](const TCHAR* Field) { return Variant.IsValid() && Variant->HasField(Field) ? Variant : Art; };
+	FString MeshPath, Prefix, Socket, WeaponPath, ShieldPath, ShieldSocket;
+	if (!Pick(TEXT("mesh"))->TryGetStringField(TEXT("mesh"), MeshPath))
 	{
 		return;
 	}
@@ -244,12 +277,21 @@ void AWRCharacter::LoadBodyArt()
 		UE_LOG(LogWildreach, Warning, TEXT("Player art: mesh %s not found, keeping the placeholder"), *MeshPath);
 		return;
 	}
-	Art->TryGetStringField(TEXT("animPrefix"), Prefix);
-	Art->TryGetStringField(TEXT("weaponSocket"), Socket);
-	const double Yaw = Art->HasField(TEXT("meshYaw")) ? Art->GetNumberField(TEXT("meshYaw")) : 0.0;
-	const double Scale = Art->HasField(TEXT("meshScale")) ? Art->GetNumberField(TEXT("meshScale")) : 1.0;
+	LoadedBodyStyle = BodyStyle;
+	bBodyLoaded = true;
+	BodyAnims.Reset();
+	BodyAnimRefs.Reset();
+	BodyAnim = NAME_None;
+	BodyOneShotUntil = 0.0;
+	Pick(TEXT("animPrefix"))->TryGetStringField(TEXT("animPrefix"), Prefix);
+	Pick(TEXT("weaponSocket"))->TryGetStringField(TEXT("weaponSocket"), Socket);
+	Pick(TEXT("weaponMesh"))->TryGetStringField(TEXT("weaponMesh"), WeaponPath);
+	Pick(TEXT("shieldMesh"))->TryGetStringField(TEXT("shieldMesh"), ShieldPath);
+	Pick(TEXT("shieldSocket"))->TryGetStringField(TEXT("shieldSocket"), ShieldSocket);
+	const double Yaw = Pick(TEXT("meshYaw"))->HasField(TEXT("meshYaw")) ? Pick(TEXT("meshYaw"))->GetNumberField(TEXT("meshYaw")) : 0.0;
+	const double Scale = Pick(TEXT("meshScale"))->HasField(TEXT("meshScale")) ? Pick(TEXT("meshScale"))->GetNumberField(TEXT("meshScale")) : 1.0;
 	const TSharedPtr<FJsonObject>* Speeds = nullptr;
-	if (Art->TryGetObjectField(TEXT("speeds"), Speeds))
+	if (Pick(TEXT("speeds"))->TryGetObjectField(TEXT("speeds"), Speeds))
 	{
 		(*Speeds)->TryGetNumberField(TEXT("walk"), WalkClipSpeed);
 		(*Speeds)->TryGetNumberField(TEXT("run"), RunClipSpeed);
@@ -280,14 +322,69 @@ void AWRCharacter::LoadBodyArt()
 		const FVector Blade = HandCS.InverseTransformVectorNoScale(BodyForward).GetSafeNormal();
 		const FVector Grip = HandCS.InverseTransformPositionNoScale(FMath::Lerp(HandCS.GetLocation(), FingerCS, 0.6f));
 		WeaponMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(*Socket));
-		WeaponMesh->SetRelativeRotation(FRotationMatrix::MakeFromY(Blade).Rotator());  // the cube's long axis is its Y
-		WeaponMesh->SetRelativeLocation(Grip + Blade * 40.f);                               // centre: blade ahead, short grip behind
-		WeaponMesh->SetRelativeScale3D(FVector(0.05f, 0.95f, 0.1f));
+		UStaticMesh* Sword = WeaponPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *WeaponPath);
+		if (Sword)
+		{
+			// A modelled sword (Tools/art/normalize_gear.py: grip at the origin, blade along the longest axis, crossguard
+			// along the next). A palm-down fist holds it flat: blade forward, crossguard along the fingers.
+			const FBox SwordBox = Sword->GetBoundingBox();
+			const FVector Size = SwordBox.GetSize();
+			const int32 Long = Size.X >= Size.Y && Size.X >= Size.Z ? 0 : (Size.Y >= Size.Z ? 1 : 2);
+			const int32 Guard = Size[(Long + 1) % 3] >= Size[(Long + 2) % 3] ? (Long + 1) % 3 : (Long + 2) % 3;
+			FVector LocalBlade = FVector::ZeroVector, LocalGuard = FVector::ZeroVector;
+			LocalBlade[Long] = SwordBox.Max[Long] >= -SwordBox.Min[Long] ? 1.f : -1.f;  // the blade is the long side of the grip
+			LocalGuard[Guard] = 1.f;
+			const FVector Fingers = HandCS.InverseTransformPositionNoScale(FingerCS);
+			const FQuat Rot = FQuat(FRotationMatrix::MakeFromXY(Blade, Fingers)) * FQuat(FRotationMatrix::MakeFromXY(LocalBlade, LocalGuard)).Inverse();
+			WeaponMesh->SetStaticMesh(Sword);
+			WeaponMesh->EmptyOverrideMaterials();
+			WeaponMesh->SetRelativeRotation(Rot.Rotator());
+			WeaponMesh->SetRelativeLocation(Grip);
+			WeaponMesh->SetRelativeScale3D(FVector::OneVector);
+		}
+		else
+		{
+			WeaponMesh->SetRelativeRotation(FRotationMatrix::MakeFromY(Blade).Rotator());  // the cube's long axis is its Y
+			WeaponMesh->SetRelativeLocation(Grip + Blade * 40.f);                               // centre: blade ahead, short grip behind
+			WeaponMesh->SetRelativeScale3D(FVector(0.05f, 0.95f, 0.1f));
+		}
 		bArtWeapon = true;
 	}
 
+	// Shield on the outside of the forearm, face out: in the T-pose (palms down) that is straight up, centred a little
+	// past the middle of the forearm, its back resting on the arm.
+	UStaticMesh* Shield = ShieldPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ShieldPath);
+	const int32 ArmBone = Shield ? Ref.FindBoneIndex(FName(*ShieldSocket)) : INDEX_NONE;
+	ShieldMesh->SetVisibility(ArmBone != INDEX_NONE);
+	if (ArmBone != INDEX_NONE)
+	{
+		const FTransform ArmCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, ArmBone);
+		FVector WristCS = ArmCS.GetLocation();
+		for (int32 Bone = 0; Bone < Ref.GetNum(); ++Bone)
+		{
+			if (Ref.GetParentIndex(Bone) == ArmBone)
+			{
+				WristCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Bone).GetLocation();
+				break;
+			}
+		}
+		const FVector Out = ArmCS.InverseTransformVectorNoScale(FVector::UpVector);
+		const FVector Along = ArmCS.InverseTransformVectorNoScale(WristCS - ArmCS.GetLocation());
+		const FVector Size = Shield->GetBoundingBox().GetSize();
+		const int32 Thin = Size.X <= Size.Y && Size.X <= Size.Z ? 0 : (Size.Y <= Size.Z ? 1 : 2);
+		FVector LocalFace = FVector::ZeroVector;
+		LocalFace[Thin] = 1.f;  // normalize_gear.py faces the front along +Z (Unreal's glTF import keeps it)
+		const FVector LocalUp = Thin == 2 ? FVector::YAxisVector : FVector::ZAxisVector;
+		const FQuat Rot = FQuat(FRotationMatrix::MakeFromXY(Out, Along)) * FQuat(FRotationMatrix::MakeFromXY(LocalFace, LocalUp)).Inverse();
+		const FVector Centre = ArmCS.InverseTransformPositionNoScale(FMath::Lerp(ArmCS.GetLocation(), WristCS, WRTune(TEXT("player.shieldAlongArm"), 0.55f)));
+		ShieldMesh->SetStaticMesh(Shield);
+		ShieldMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(*ShieldSocket));
+		ShieldMesh->SetRelativeRotation(Rot.Rotator());
+		ShieldMesh->SetRelativeLocation(Centre + Out.GetSafeNormal() * (Size[Thin] * 0.5f + WRTune(TEXT("player.shieldOffArm"), 4.f)));
+	}
+
 	const TSharedPtr<FJsonObject>* Anims = nullptr;
-	if (Art->TryGetObjectField(TEXT("anims"), Anims))
+	if (Pick(TEXT("anims"))->TryGetObjectField(TEXT("anims"), Anims))
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& Set : (*Anims)->Values)
 		{
@@ -350,7 +447,11 @@ void AWRCharacter::TickBodyAnim()
 	}
 	else if (Move->IsFalling())
 	{
-		if (BodyAnim != TEXT("fall")) PlayBodyAnim(TEXT("fall"), false);  // plays once and holds the airborne pose
+		if (BodyAnim != TEXT("fall"))
+		{
+			const float Length = PlayBodyAnim(TEXT("fall"), false);  // plays once and holds the airborne pose
+			Body->SetPosition(Length * WRTune(TEXT("player.fallClipStart"), 0.35f));  // skip the crouch and take-off
+		}
 	}
 	else if (HasTag(WRTags::State_Blocking))
 	{
@@ -376,11 +477,38 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 	{
 		return;
 	}
-	const FName Key = Kind == EWRSwingKind::Cast ? FName(TEXT("cast"))
+	FName Key = Kind == EWRSwingKind::Cast ? FName(TEXT("cast"))
 		: (Kind == EWRSwingKind::Heavy || Kind == EWRSwingKind::WeaponArt) ? FName(TEXT("heavy")) : FName(TEXT("light"));
+	// A plain swing at a resource node right in front gathers instead: an overhead chop for wood, stone and ore, a crouch
+	// for plants. Purely visual (the swing's own hit does the harvesting), so every machine decides from what it sees.
+	if (Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy)
+	{
+		const FVector Here = GetActorLocation(), Forward = GetActorForwardVector();
+		for (TActorIterator<AWRResourceNode> It(GetWorld()); It; ++It)
+		{
+			const FVector To = It->GetActorLocation() - Here;
+			if (!It->IsDepleted() && To.Size2D() < 280.f && FVector::DotProduct(To.GetSafeNormal2D(), Forward) > 0.5f)
+			{
+				const FString Item = It->ItemId.ToString();
+				const bool bHard = Item == TEXT("wood") || Item == TEXT("stone") || Item.EndsWith(TEXT("_ore")) || Item.StartsWith(TEXT("sulfur"));
+				Key = bHard ? FName(TEXT("chop")) : FName(TEXT("gather"));
+				break;
+			}
+		}
+	}
 	BodyAnim = NAME_None;  // restart even if the same set just played
 	PlayBodyAnim(Key, false, 1.f, Duration);
 	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + Duration;
+}
+
+void AWRCharacter::MulticastBodyOneShot_Implementation(FName Key)
+{
+	if (GetNetMode() == NM_DedicatedServer || !Body->IsVisible() || GetWorld()->GetTimeSeconds() < BodyOneShotUntil)
+	{
+		return;
+	}
+	BodyAnim = NAME_None;
+	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(Key, false, 1.f, WRTune(TEXT("player.pickupVisualSeconds"), 1.2f));
 }
 
 void AWRCharacter::OnHitVisual(EWRHitResult Result)

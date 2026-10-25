@@ -1,0 +1,9 @@
+{
+  "_comment": "Held gear for the player (static props, no rig): one item, laid flat, plain background.",
+  "template": "3d game asset of {p}, single object, entire object visible, centered, laid flat horizontally, studio product shot, isolated on plain white background, soft even lighting",
+  "negative": "hand, person, character, multiple objects, cropped, cut off, text, watermark, frame, cartoon, blurry, background scenery, stand, display rack",
+  "creatures": [
+    { "id": "sword", "prompt": "a sturdy survival one-handed sword with a straight steel blade, simple crossguard and a leather-wrapped grip, slightly worn" },
+    { "id": "shield", "prompt": "a round wooden survival shield with an iron rim and an iron boss in the centre, front view, worn painted wood" }
+  ]
+}
