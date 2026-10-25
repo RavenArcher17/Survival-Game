@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-25: test pass
+
+- The older bot tests now check what they test and end like the rest (a PASS/FAIL line per check, "N checks, M
+  failed", exit 1 on a failure, no errors in the logs): `bosstest` (16 checks), `buildtest` (16), `mptest` (9),
+  `persisttest` (7), `socialtest` (14), `spelltest` (19), `terrain/walktest` (5) and `terrain/hazardtest` (6). Each has
+  its own fresh world save (`-wrworld=<test>`) and stops once its bots are done. On the way: buildtest's crop plot was
+  placed out of reach and never built, and spelltest learned a branch node before its trunk.
+
 ## 2026-10-25: creatures that hunt, flee, sleep and fight differently
 
 - **Attack variety** (`attacks` in `creatures.json`, numbers in `tuning.json` `creatureAI`), each telegraphed: a
