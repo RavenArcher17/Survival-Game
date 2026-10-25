@@ -107,7 +107,10 @@ public:
 	void ConfirmPlacement();
 	void RotatePlacement();
 	void CancelPlacement();
-	AWRBuildPiece* FindNearbyPiece(float Range = 350.f) const;
+	/** Nearest built piece in range; bUsableOnly skips walls, floors, decor and stations (what E can't use on the piece itself). */
+	AWRBuildPiece* FindNearbyPiece(float Range = 350.f, bool bUsableOnly = false) const;
+	/** What E uses (and the prompt shows): the nearer of the nearest usable piece (door, chest, bed, crop, claim) and station. */
+	AActor* FindUseTarget() const;
 	class AWRCreature* FindNearbyCreature(bool bOwnTame, float Range = 450.f) const;
 
 	/** Place a piece at a world spot (testing; normal play uses the build ghost). */
@@ -148,6 +151,8 @@ public:
 	UFUNCTION(Exec) void WRView(FName Mode);
 	/** Stop/start the test bot's own actions (it keeps running queued commands). */
 	UFUNCTION(Exec) void WRBotPause(int32 bPause);
+	/** Bot: walk to the nearest tree / rock / shrub (the island's), node (resource nodes) or any, and gather with light attacks; off stops. */
+	UFUNCTION(Exec) void WRGather(const FString& What);
 	/** Art check: frame the nearest creature of this kind ("me" = your own body) from Yaw degrees off its nose and follow it ("off" = back to the pawn). */
 	UFUNCTION(Exec) void WRArtCam(FName Creature, float Yaw = 60.f);
 	/** Teleport next to the altar of a path (testing). */
@@ -233,6 +238,8 @@ private:
 	bool bBotSetupDone = false;
 	/** -wrbotgather: harvest resource nodes instead of fighting. */
 	bool bBotGather = false;
+	/** What the gathering bot goes for (WRGather): node, tree, rock, shrub or any. */
+	FString BotGatherGroup = TEXT("node");
 	TArray<FString> BotCmdQueue;
 	float BotCmdResume = 0.f;
 	bool bBotPaused = false;

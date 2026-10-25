@@ -549,6 +549,7 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 	if (Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy)
 	{
 		const FVector Here = GetActorLocation(), Forward = GetActorForwardVector();
+		bool bGathering = false;
 		for (TActorIterator<AWRResourceNode> It(GetWorld()); It; ++It)
 		{
 			const FVector To = It->GetActorLocation() - Here;
@@ -557,8 +558,20 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 				const FString Item = It->ItemId.ToString();
 				const bool bHard = Item == TEXT("wood") || Item == TEXT("stone") || Item.EndsWith(TEXT("_ore")) || Item.StartsWith(TEXT("sulfur"));
 				Key = bHard ? FName(TEXT("chop")) : FName(TEXT("gather"));
+				bGathering = true;
 				break;
 			}
+		}
+		// The island's trees and rocks (chop) and shrubs (gather) are instanced decoration, not actors.
+		const AWRDressing* Dressing = bGathering ? nullptr : UWRDressingSubsystem::FindDressing(GetWorld());
+		FVector Ground;
+		if (Dressing && Dressing->FindNearest(Here + Forward * 150.f, TEXT("shrub"), 150.f, Ground))
+		{
+			Key = TEXT("gather");
+		}
+		else if (Dressing && Dressing->FindNearest(Here + Forward * 150.f, FString(), 200.f, Ground))
+		{
+			Key = TEXT("chop");
 		}
 	}
 	BodyAnim = NAME_None;  // restart even if the same set just played

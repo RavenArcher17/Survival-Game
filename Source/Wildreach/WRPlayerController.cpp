@@ -209,6 +209,13 @@ void AWRPlayerController::WRBotPause(int32 bPause)
 	}
 }
 
+void AWRPlayerController::WRGather(const FString& What)
+{
+	bBotGather = What != TEXT("off");
+	BotGatherGroup = bBotGather ? What.ToLower() : FString(TEXT("node"));
+	LockTarget = nullptr;
+}
+
 void AWRPlayerController::WRArtCam(FName Creature, float Yaw)
 {
 	ArtCamTarget = nullptr;
@@ -723,23 +730,33 @@ void AWRPlayerController::TickBot(float DeltaTime)
 
 	if (bBotGather)
 	{
-		// Walk to the nearest standing resource node and swing at it.
-		AWRResourceNode* Best = nullptr;
+		// Walk to the nearest standing resource node (or island tree / rock / shrub, WRGather) and swing at it.
+		const FVector Here = Survivor->GetActorLocation();
+		FVector Best = FVector::ZeroVector;
 		float BestDist = 1e9f;
-		for (TActorIterator<AWRResourceNode> It(GetWorld()); It; ++It)
+		float Reach = 180.f;
+		for (TActorIterator<AWRResourceNode> It(GetWorld()); It && (BotGatherGroup == TEXT("node") || BotGatherGroup == TEXT("any")); ++It)
 		{
-			const float D = FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation());
+			const float D = FVector::Dist2D(It->GetActorLocation(), Here);
 			if (!It->IsDepleted() && D < BestDist)
 			{
 				BestDist = D;
-				Best = *It;
+				Best = It->GetActorLocation();
 			}
 		}
-		if (Best)
+		const AWRDressing* Dressing = BotGatherGroup == TEXT("node") ? nullptr : UWRDressingSubsystem::FindDressing(GetWorld());
+		FVector Ground;
+		if (Dressing && Dressing->FindNearest(Here, BotGatherGroup == TEXT("any") ? FString() : BotGatherGroup, FMath::Min(BestDist, 6000.f), Ground))
 		{
-			const FVector To = Best->GetActorLocation() - Survivor->GetActorLocation();
+			BestDist = FVector::Dist2D(Ground, Here);
+			Best = Ground;
+			Reach = 220.f;  // rocks are wide: stop outside them
+		}
+		if (BestDist < 1e9f)
+		{
+			const FVector To = Best - Here;
 			SetControlRotation(To.Rotation());
-			if (BestDist > 180.f)
+			if (BestDist > Reach)
 			{
 				Survivor->AddMovementInput(To.GetSafeNormal2D(), 1.f);
 			}

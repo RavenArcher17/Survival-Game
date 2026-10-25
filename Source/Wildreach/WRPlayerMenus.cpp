@@ -127,7 +127,10 @@ void AWRPlayerController::WRInteract()
 		MenuIndex = 0;
 		return;
 	}
-	if (AWRBuildPiece* Piece = FindNearbyPiece())
+	// The nearer of a door / chest / bed / crop / claim and a station, like the prompt (a workbench in a small hut
+	// mustn't steal the door).
+	AActor* Use = FindUseTarget();
+	if (AWRBuildPiece* Piece = Cast<AWRBuildPiece>(Use))
 	{
 		const FWRPieceDef* Def = Piece->GetDef();
 		if (Def && (Def->Kind == TEXT("chest") || Def->Kind == TEXT("totem")))
@@ -138,7 +141,7 @@ void AWRPlayerController::WRInteract()
 			return;
 		}
 	}
-	if (AWRStation* Station = FindNearbyStation())
+	else if (AWRStation* Station = Cast<AWRStation>(Use))
 	{
 		Menu = EWRMenu::Craft;
 		MenuStation = Station;
@@ -146,6 +149,19 @@ void AWRPlayerController::WRInteract()
 		return;
 	}
 	ServerCommand(TEXT("interact"));
+}
+
+AActor* AWRPlayerController::FindUseTarget() const
+{
+	const APawn* Me = GetPawn();
+	AWRBuildPiece* Piece = FindNearbyPiece(350.f, true);
+	AWRStation* Station = FindNearbyStation();
+	if (!Me || !Piece || !Station)
+	{
+		return Piece ? static_cast<AActor*>(Piece) : static_cast<AActor*>(Station);
+	}
+	const float ToPiece = FVector::Dist2D(Piece->GetActorLocation(), Me->GetActorLocation());
+	return ToPiece <= FVector::Dist2D(Station->GetActorLocation(), Me->GetActorLocation()) ? static_cast<AActor*>(Piece) : static_cast<AActor*>(Station);
 }
 
 void AWRPlayerController::ToggleInventory()
@@ -214,7 +230,7 @@ FString AWRPlayerController::GetMenuTitle() const
 	}
 	if (Menu == EWRMenu::Build)
 	{
-		return TEXT("Build  (Enter = pick, then LMB place, R rotate, RMB/B cancel)");
+		return TEXT("Build & craft  (Enter = craft a tool / pick a piece, then LMB place, R rotate, RMB/B cancel)");
 	}
 	if (Menu == EWRMenu::Chest)
 	{
@@ -513,7 +529,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	}
 	if (Cmd == TEXT("interact"))
 	{
-		AWRBuildPiece* Piece = FindNearbyPiece();
+		AWRBuildPiece* Piece = FindNearbyPiece(350.f, true);  // the door, not the wall beside it
 		AWRNest* Nest = FindNearby<AWRNest>(GetWorld(), GetPawn(), 350.f);
 		AWRLootBag* Bag = FindNearby<AWRLootBag>(GetWorld(), GetPawn(), 300.f);
 		AWRCreature* Wild = FindNearbyCreature(false, 400.f);

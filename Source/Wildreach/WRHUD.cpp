@@ -321,8 +321,7 @@ void AWRHUD::DrawHUD()
 				PC->IsPlacementValid() ? TEXT("") : *FString::Printf(TEXT("  (%s)"), *PC->GetPlacementWhy()));
 			DrawText(Prompt, PC->IsPlacementValid() ? FLinearColor(0.6f, 1.f, 0.6f) : FLinearColor(1.f, 0.5f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.1f);
 		}
-		else if (const AWRBuildPiece* Piece = PC->FindNearbyPiece();
-			Piece && Piece->GetDef() && Piece->GetDef()->Kind != TEXT("structure") && Piece->GetDef()->Kind != TEXT("decor") && Piece->GetDef()->Kind != TEXT("station"))
+		else if (const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(PC->FindUseTarget()); Piece && Piece->GetDef())
 		{
 			const FWRPieceDef* Def = Piece->GetDef();
 			FString Prompt = FString::Printf(TEXT("E: %s"), *Def->Name);
@@ -330,7 +329,7 @@ void AWRHUD::DrawHUD()
 			if (Def->Kind == TEXT("crop") && Piece->bPlanted) Prompt += TEXT(" (growing)");
 			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
 		}
-		else if (const AWRStation* Station = PC->FindNearbyStation())
+		else if (const AWRStation* Station = Cast<AWRStation>(PC->FindUseTarget()))
 		{
 			const FString Prompt = FString::Printf(TEXT("E: use %s"), *Station->GetDisplayName());
 			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);

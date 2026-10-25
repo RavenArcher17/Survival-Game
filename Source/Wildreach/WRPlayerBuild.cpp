@@ -21,7 +21,7 @@ void AWRPlayerController::WRCode(const FString& Code) { ServerCommand(FString::P
 void AWRPlayerController::WRDemolish() { ServerCommand(TEXT("demolish")); }
 void AWRPlayerController::WRHitPiece(int32 Hits) { ServerCommand(FString::Printf(TEXT("hitpiece %d"), Hits)); }
 
-AWRBuildPiece* AWRPlayerController::FindNearbyPiece(float Range) const
+AWRBuildPiece* AWRPlayerController::FindNearbyPiece(float Range, bool bUsableOnly) const
 {
 	const APawn* Self = GetPawn();
 	if (!Self)
@@ -33,7 +33,7 @@ AWRBuildPiece* AWRPlayerController::FindNearbyPiece(float Range) const
 	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
 	{
 		const FWRPieceDef* Def = It->GetDef();
-		if (It->bGhost || !Def)
+		if (It->bGhost || !Def || (bUsableOnly && (Def->Kind == TEXT("structure") || Def->Kind == TEXT("decor") || Def->Kind == TEXT("station"))))
 		{
 			continue;
 		}

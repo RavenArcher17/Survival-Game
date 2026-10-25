@@ -55,14 +55,17 @@ Now a fresh survivor can do it all, and `Tools\survivaltest.ps1` plays it end to
   the server spawns).
 - **Doors swing on their hinge** instead of turning in the middle of the doorway.
 - Sulfur now counts as mining (pick, mining XP), as the chop clip already assumed.
-- `Tools\survivaltest.ps1` (22 checks): a fresh fire survivor on the island gathers bare-handed, crafts the crude
+- **E uses the nearer** of a door / chest / bed / crop / claim and a station, which is what the prompt already showed:
+  a workbench inside a small hut no longer opens its menu when you go to close the door, and the server's interact
+  picks the door rather than the wall beside it. The build menu is titled "Build & craft".
+- The **chop clip** plays at island trees and rocks too, and the gather crouch at shrubs.
+- `WRGather tree|rock|shrub|node|any|off`: the test bot walks to the nearest one and gathers with light attacks.
+- `Tools\survivaltest.ps1` (23 checks): a fresh fire survivor on the island gathers bare-handed, crafts the crude
   tools, gathers more with them, builds a hut (foundation, three walls, a door, a roof) and a workbench out of what it
-  gathered, opens the door and walks in, crafts the stone tools at the bench and gathers more again. `-Shots` adds
-  screenshots (a tree before and after felling, the hut from three sides and through the door). It backs up the
-  island's world save and puts it back.
-- Known: bots swing with the Flame slash weapon art (bot commands can't press LMB; it's the same melee sweep); the chop
-  clip only plays at the old resource nodes, not at island trees; with a workbench inside a small hut, E at the door
-  can open the bench menu instead of the door. Tools don't wear out yet.
+  gathered, opens the door and walks in, crafts the stone tools at the bench, closes the door from inside and gathers
+  more again. `-Shots` adds screenshots (a tree before and after felling, the hut from three sides and through the
+  door, a chop). It backs up the island's world save and puts it back.
+- Known: tools don't wear out yet (durability is only saved for equipment).
 
 ## 2026-10-25: the humanoid bosses have bodies
 

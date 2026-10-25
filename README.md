@@ -73,6 +73,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 `WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRLearn fire fire_wall`, `WRCast 3`, `WRSpawn cinderfang 3`,
 `WRSpawn vulkarn 1`, `WRBossDmgPct 30 frost`, `WRGive iron_ore 20`, `WREquip copper_sword`, `WRWeapon iron fine 6`,
 `WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
+`WRGather tree` (bot gathers: tree / rock / shrub / node / any / off),
 `WRGive hunting_bow 1`, `WRGive tranq_arrow 20`, `WRRanged 1`, `WRHold 30` (root nearby creatures), `WRClearCreatures`,
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
 

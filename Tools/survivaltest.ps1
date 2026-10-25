@@ -1,7 +1,8 @@
 # Fresh-player survival loop on L_Island, end to end: spawn with the starting kit, gather wood / stone / fiber from the
 # island's trees, rocks and shrubs bare-handed, craft the crude hatchet + pick by hand, check they gather more, build a
 # hut (foundation, three walls, a door, a roof), place a workbench inside, walk in through the door, craft the stone
-# tools at the bench and check they gather more again. Everything the hut and tools cost is gathered, nothing given.
+# tools at the bench and check they gather more again. Everything the hut and tools cost is gathered, nothing given;
+# the bot gathers with light attacks (WRGather), like a player clicking at a tree.
 #   survivaltest.ps1          headless
 #   survivaltest.ps1 -Shots   rendered client: screenshots of a tree before/after felling and the hut from 3 angles + inside
 # The island's world save is backed up and put back afterwards, so the test hut never stays in your world.
@@ -20,27 +21,25 @@ $worldSave = Join-Path $db 'world_L_Island.json'
 Remove-Item $playerSave -ErrorAction SilentlyContinue
 if (Test-Path $worldSave) { Copy-Item $worldSave "$out\world_backup.json" }
 
-# Swings: the Flame slash weapon art runs the same melee sweep as a light attack (bot commands can't press LMB).
-$cast = 'WRCast 1|wait 3.3'
-function Swings([int]$n) { (@($cast) * $n) -join '|' }
+# Gathering: the bot walks to the nearest tree / rock / shrub and swings light attacks at it (WRGather), from a spot
+# next to a known one; what it gets shows up as "+N Wood (tool)" notices.
+function Gather([string]$at, [string]$group, [double]$secs) { "WRTeleport $at|wait 2|WRGather $group|WRBotPause 0|wait $secs|WRBotPause 1|WRGather off" }
 function Shot([string]$at, [string]$look) { if ($Shots) { "WRTeleport $at|wait 3|WRLook $look|wait 2|HighResShot 1600x900|wait 1" } else { $null } }
 # Hut site 49 m south of the middle volcanic spawn (outside its safe zone): a flat 4 m cell, ground ~4794.
 $X = -132000; $Y = -56400; $Z = 4734   # foundation sunk 60 cm (building.foundationSink): its floor is a 40 cm step
 $T = $Z + 100
 
 $cmds = @(
-	'WRBotPause 1', 'wait 2', 'WRGivePoints fire 5', 'WRLearn fire flame_slash', 'wait 1',
+	'WRBotPause 1', 'wait 2',
 	'WRCraft crude_hatchet none',                                                         # nothing to make it from yet
 	(Shot '-131246 -59750' '0 -5'),                                                         # tree 2020 before
-	'WRTeleport -130596 -59750', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 8),          # tree 2020, bare hands
+	(Gather '-130596 -59750' 'tree' 14),                                                    # tree 2020, bare hands
 	(Shot '-131246 -59750' '0 -5'),                                                         # ...and felled
-	'WRTeleport -134077 -58676', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 2),          # rock 1004, bare hands
+	(Gather '-134077 -58676' 'rock' 6),                                                     # rock 1004, bare hands
 	'WRCraft crude_hatchet none', 'WRCraft crude_pick none', 'wait 1',                     # by hand, no station
-	'WRTeleport -129046 -58811', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 8),          # tree 2037, crude hatchet
-	'WRTeleport -131858 -59449', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 3),          # rock 998, crude pick
-	'WRTeleport -132959 -59639', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 2),          # shrub 1462 (fiber)
-	'WRTeleport -130621 -59015', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 2),          # shrub 1477
-	'WRTeleport -134683 -59631', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 4),          # tree 2019, crude hatchet
+	(Gather '-129046 -58811' 'tree' 35),                                                    # tree 2037 and on, crude hatchet
+	(Gather '-131858 -59449' 'rock' 6),                                                     # rock 998, crude pick
+	(Gather '-132959 -59639' 'shrub' 8),                                                    # shrub 1462 and on (fiber)
 	# The hut: everything placed from 6 m east of it.
 	"WRTeleport $($X + 600) $Y", 'wait 2',
 	"WRPlace wood_foundation $X $Y $Z 0",
@@ -52,7 +51,10 @@ $cmds = @(
 	# i.e. inside; a shut door leaves it stuck outside), craft at the bench.
 	"WRTeleport $($X + 400) $Y", 'wait 2', 'WRInteract', 'wait 1', "WRWalkTo $($X - 500) $Y", 'wait 6',
 	'WRCraft stone_hatchet none', 'WRCraft stone_pick none', 'wait 1',
-	'WRTeleport -135802 -59658', 'wait 2', 'WRLook 0 -10', 'wait 0.5', (Swings 3),          # tree 2018, stone hatchet
+	# E just inside the door, with the bench in reach too, closes the door (the nearer one wins).
+	"WRWalkTo $($X + 500) $Y", 'wait 3', 'WRInteract', 'wait 1',
+	$(if ($Shots) { "WRTeleport -135802 -59658|wait 3|WRGather tree|WRBotPause 0|wait 1.7|HighResShot 1600x900|wait 6|WRBotPause 1|WRGather off" }  # mid-chop
+	  else { Gather '-135802 -59658' 'tree' 8 }),                                           # tree 2018, stone hatchet
 	(Shot "$($X + 1000) $($Y + 400)" '202 -8'),                                             # hut from the door side
 	(Shot "$($X - 900) $($Y + 900)" '315 -8'),                                              # from the northwest
 	(Shot "$($X - 300) $($Y - 1100)" '75 -8'),                                              # from the south
@@ -103,6 +105,7 @@ foreach ($piece in 'Wood foundation', 'Wood doorway + door', 'Wood roof', 'Workb
 Check 'built three wood walls' (@($notices | Where-Object { $_ -eq 'Built Wood wall' }).Count -eq 3)
 Check 'nothing refused while building' (-not ($notices | Where-Object { $_ -match '^(no support|need |too far|something is already|no building|not inside)' -and $_ -ne 'need 3 Wood' })) (($notices | Where-Object { $_ -match '^(no support|need |too far|something is already|no building)' -and $_ -ne 'need 3 Wood' }) -join '; ')
 Check 'the door opens' ($notices -contains 'Opened')
+Check 'E inside closes the door (not the bench menu)' ($notices -contains 'Closed')
 Check 'walked in through the door' (Select-String -Path "$out\client.log" -Pattern 'WALK arrived' -Quiet)
 Check 'stone hatchet crafted at the workbench' ($notices -contains 'Crafted 1 Stone hatchet')
 Check 'stone pickaxe crafted at the workbench' ($notices -contains 'Crafted 1 Stone pickaxe')
