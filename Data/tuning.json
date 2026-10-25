@@ -156,5 +156,7 @@
   "building": { "foundationSink": 60, "_foundationSink": "cm a new foundation sits into the ground at its centre, so its floor (100 up) is a walkable step. placeholder" },
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },
-  "crops": { "commonMinutes": 20, "rareMinutes": 120 }
+  "crops": { "commonMinutes": 20, "rareMinutes": 120 },
+  "clock": { "_comment": "World clock: real minutes per in-game day, the hour a new server starts at, night from duskHour to dawnHour, twilightHours of fade either side. placeholder",
+    "dayMinutes": 60, "startHour": 8, "dawnHour": 6, "duskHour": 20, "twilightHours": 1 }
 }

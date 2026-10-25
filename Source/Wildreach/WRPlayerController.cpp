@@ -13,6 +13,7 @@
 #include "WRWorldDressing.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "WRGameplayTags.h"
+#include "WRGameState.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerState.h"
@@ -133,6 +134,7 @@ void AWRPlayerController::WRFire() { if (AWRCharacter* C = Cast<AWRCharacter>(Ge
 void AWRPlayerController::WRAmmo(int32 Dir) { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn())) C->CycleAmmo(Dir); }
 void AWRPlayerController::WRHold(float Seconds) { ServerCommand(FString::Printf(TEXT("hold %.1f"), Seconds)); }
 void AWRPlayerController::WRClearCreatures() { ServerCommand(TEXT("clearcreatures")); }
+void AWRPlayerController::WRHour(float Hour) { ServerCommand(FString::Printf(TEXT("hour %.2f"), Hour)); }
 
 void AWRPlayerController::WRAimAt(FName Creature)
 {
@@ -499,6 +501,14 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			*GetNameSafe(Best->GetRider()), Best->TameBonus * 100.f, Best->GetAttributes() ? Best->GetAttributes()->GetMaxHealth() : 0.f,
 			*Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
 		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("hour"))
+	{
+		if (AWRGameState* State = GetWorld()->GetGameState<AWRGameState>())
+		{
+			State->SetHour(FCString::Atof(*Arg(1)));
+			Result = FString::Printf(TEXT("day %d %05.2f%s"), State->GetDay(), State->GetHour(), State->IsNight() ? TEXT(" (night)") : TEXT(""));
+		}
 	}
 	else if ((Cmd == TEXT("hold") || Cmd == TEXT("clearcreatures")) && Survivor)
 	{

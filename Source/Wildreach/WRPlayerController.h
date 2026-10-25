@@ -146,6 +146,8 @@ public:
 	/** Testing aid: root the wild creatures within 30 m for some seconds / remove them and the training dummies. */
 	UFUNCTION(Exec) void WRHold(float Seconds);
 	UFUNCTION(Exec) void WRClearCreatures();
+	/** Set the world clock to an hour (0-24; jumps forward to the next time it's that hour). */
+	UFUNCTION(Exec) void WRHour(float Hour);
 	/** Teleport to world X/Y (cm), dropped onto the ground. */
 	UFUNCTION(Exec) void WRTeleport(float X, float Y);
 	/** Set the camera direction (local). */
