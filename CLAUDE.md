@@ -21,9 +21,12 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - `Docs/plan/M1_combat.md` â€¦ `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
-## Status (2026-10-24)
-- **First playable is feature-complete on placeholder art** (every First Playable row of the build plan has a
-  working version); what's left is playtesting/tuning, real art, and a packaged dedicated server.
+## Status (2026-10-25)
+- **First playable is feature-complete**; art pass 2026-10-24/25: every creature but the training dummy has art (AI
+  pipeline; the 3 humanoid bosses rigged on Mixamo, Ignessa a winged fae rig, the wisp a glowing orb), the player is a
+  Mixamo-rigged male or female survivor (menu choice, `Data/player_art.json`) with an AI sword and shield.
+- Every First Playable row of the build plan has a working version; what's left is playtesting/tuning, a packaged
+  dedicated server and HLODs.
 - **M1 combat core: done.** **M2 paths: done** (persistence v1 = JSON per player). Paths menu (P) learns nodes.
   Built ability nodes: bolts/shards, weapon arts, Fire wall, Lava pool, Frost nova, Ice lance; other ability nodes
   (Meteor, Ice wall, Blizzard, Flurry...) show "[not built yet]" in the menu.
@@ -40,6 +43,8 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
   not in git). Fab packs live in `Content/<pack>` and are git-ignored; adding a "complete project" pack can overwrite
   `Config/Default*.ini` and drop a `.uproject` in the root, so check `git diff Config/` after adding one.
   Anything loaded by path (creature art, dressing meshes) must be under a `DirectoriesToAlwaysCook` entry in `DefaultGame.ini`.
+  Cooking crashes (`Assertion failed: !Hash.IsZero()`) on any skeleton-less clip in a cooked folder: the Barghest pack's
+  MANE/TAIL clips and meshes are moved out to `C:\Dev\WildreachArt\replaced\barghest_parts`; re-adding the pack brings them back.
 - 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):
   1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
   2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).
@@ -48,7 +53,7 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
      `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks pass. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
   6. Island dressing, caves, biome hazards (`WRWorldDressing`; `Tools\terrain\hazardtest.ps1`): done. Island rebuilt 2026-10-24.
   Default preset is `playtest` (PvP off), so PvP tests need `-wrpreset=pvp_standard` (mptest and socialtest pass it).
-- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB, ~350 MB used 2026-10-24; each island rebuild adds ~80 MB, each AI creature ~11 MB).
+- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB, ~770 MB used 2026-10-25 (each Mixamo character ~30-40 MB); each island rebuild adds ~80 MB, each AI creature ~11 MB).
 - See `CHANGELOG.md` for details and known gaps.
 
 ## How things are wired (read before changing combat)

@@ -211,6 +211,19 @@ if "--cut-stretch" in args:
             scraps += island
     bmesh.ops.delete(bm, geom=scraps, context="FACES")
     doomed += scraps
+    # Close the holes the cut leaves, each loop on its own (a cut hand-to-thigh bridge closes the hand and the thigh
+    # separately). The patches take texture coordinates from the faces around each corner.
+    made = bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)["faces"]
+    made_set = set(made)
+    uv = bm.loops.layers.uv.active
+    if uv:
+        for f in made:
+            for loop in f.loops:
+                around = [l[uv].uv.copy() for l in loop.vert.link_loops if l.face not in made_set]
+                if around:
+                    loop[uv].uv = sum(around, Vector((0.0, 0.0))) / len(around)
+    patches = len(bmesh.ops.triangulate(bm, faces=made)["faces"]) if made else 0
+    print(f"cut-stretch: {len(made)} holes closed ({patches} patch faces)")
     bm.to_mesh(full.data)
     bm.free()
     full.data.update()

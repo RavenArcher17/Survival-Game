@@ -3,18 +3,24 @@
 ## 2026-10-25: the humanoid bosses have bodies
 
 - **Vulkarn, Grimjaw and the Obsidian Warden** are AI-made, rigged on Mixamo and animated with its Creature Pack
-  (breathing idle, walking, run, swiping or punch attacks, dying; roaring, jump attack and flexing are imported for
-  later). Vulkarn swipes, Grimjaw and the Warden punch.
+  (breathing idle, walking, run, swipe / punch / jump-attack attacks, roaring, dying). Creatures with several attack
+  clips (`attack`, `attack2`, `attack3` in `creatures.json`) take them in turn, and every creature attack clip is now
+  fitted to the swing's length, so the hit lands with the telegraph. Bosses **roar** when they enter a new phase
+  (`roar` clip; `Phase` replicates with a notify).
 - **Ignessa** is a winged fire fae: `rig_special.py --body fae` gives her a body, a head and two hinged wings that fan
   while she floats; her fly / hover clips map to Run / Idle.
 - Every creature now has art except the training dummy. The **wisp** (Ignessa's summons) is a glowing orb: creatures with a `glow` value and no mesh get an emissive sphere in their colour (`/Game/Creatures/M_Glow`, made by `Tools/make_glow_material.py`) and a point light that bright.
 - Image-to-3D brutes often fuse a hand to a thigh: `survivor_build.py --cut-stretch 4` drops faces that stretch past
-  4x their length during any clip (only the clips count; the T-pose bind itself is ignored) and the scraps left over.
+  4x their length during any clip (only the clips count; the T-pose bind itself is ignored) and the scraps left over,
+  then closes each hole it leaves with a patch textured from the faces around it.
 - Fixed: the shield could lie flat like a tray. The skeleton's reference pose in Unreal isn't always the T-pose (it
   can be a clip's first frame, arms hanging), so the shield's face now comes from the arm itself: away from it,
   between up and out from the body.
 - Mixamo without Raven at the keyboard: the decimated copy goes into the page as text; wide bodies get a tiny
   framing triangle so the marker view shows them whole (`Tools/art/README.md`).
+- Fixed: packaging crashed cooking the Barghest pack's mane and tail clips (`Assertion failed: !Hash.IsZero()`: they
+  have no skeleton in the pack). The game never used them; they and their meshes moved out of `Content` (kept in
+  `C:\Dev\WildreachArt\replaced\barghest_parts`). The pack is git-ignored, so re-adding it from Fab brings them back.
 
 ## 2026-10-24: a second body, a real sword and shield
 

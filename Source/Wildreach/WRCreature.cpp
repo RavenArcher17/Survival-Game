@@ -320,7 +320,7 @@ void AWRCreature::ApplyDef()
 	}
 }
 
-void AWRCreature::PlayCreatureAnim(FName Key, bool bLoop)
+void AWRCreature::PlayCreatureAnim(FName Key, bool bLoop, float Duration)
 {
 	TObjectPtr<UAnimSequenceBase>* Anim = AnimAssets.Find(Key);
 	if (!Anim || !*Anim || (Key == CurrentAnim && bLoop))
@@ -329,9 +329,21 @@ void AWRCreature::PlayCreatureAnim(FName Key, bool bLoop)
 	}
 	CurrentAnim = Key;
 	Skel->PlayAnimation(*Anim, bLoop);
+	const float Length = (*Anim)->GetPlayLength();
+	const float Rate = !bLoop && Duration > 0.f ? FMath::Clamp(Length / Duration, 0.6f, 1.8f) : 1.f;
+	Skel->SetPlayRate(Rate);
 	if (!bLoop)
 	{
-		OneShotUntil = GetWorld()->GetTimeSeconds() + (*Anim)->GetPlayLength();
+		OneShotUntil = GetWorld()->GetTimeSeconds() + Length / Rate;
+	}
+}
+
+void AWRCreature::PlayCreatureOneShot(FName Key)
+{
+	if (Skel->IsVisible() && IsAlive() && AnimAssets.Contains(Key))
+	{
+		CurrentAnim = NAME_None;
+		PlayCreatureAnim(Key, false);
 	}
 }
 
@@ -356,8 +368,12 @@ void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
 {
 	if (Skel->IsVisible())
 	{
+		// Creatures with several attack clips (attack, attack2, attack3) take them in turn, each fitted to the swing.
+		static const FName Keys[] = { TEXT("attack"), TEXT("attack2"), TEXT("attack3") };
+		int32 Count = 0;
+		while (Count < 3 && AnimAssets.Contains(Keys[Count])) ++Count;
 		CurrentAnim = NAME_None;
-		PlayCreatureAnim(TEXT("attack"), false);
+		PlayCreatureAnim(Keys[Count > 0 ? AttackVariant++ % Count : 0], false, Duration);
 	}
 }
 

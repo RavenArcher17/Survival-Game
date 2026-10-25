@@ -509,6 +509,14 @@ void AWRBoss::ResetFight()
 	SpawnArena();
 }
 
+void AWRBoss::OnRep_Phase()
+{
+	if (Phase > 1)
+	{
+		PlayCreatureOneShot(TEXT("roar"));
+	}
+}
+
 void AWRBoss::SetPhase(int32 NewPhase)
 {
 	if (NewPhase == Phase)
@@ -517,6 +525,10 @@ void AWRBoss::SetPhase(int32 NewPhase)
 	}
 	Phase = NewPhase;
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s enters phase %d"), *GetDisplayLabel(), Phase);
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		OnRep_Phase();  // a listen server or standalone game sees its own boss roar
+	}
 	if (Phase == 2 && CreatureId == TEXT("vulkarn"))
 	{
 		SetBodyColor(FLinearColor(1.f, 0.95f, 0.8f));  // white-hot armor

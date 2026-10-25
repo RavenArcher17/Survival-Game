@@ -125,7 +125,7 @@ public:
 
 	bool IsMajor() const { return bMajor; }
 
-	UPROPERTY(Replicated) int32 Phase = 1;
+	UPROPERTY(ReplicatedUsing=OnRep_Phase) int32 Phase = 1;
 	UPROPERTY(Replicated) bool bEngaged = false;
 	UPROPERTY(Replicated) bool bAirborne = false;
 	UPROPERTY(Replicated) int32 Participants = 1;
@@ -141,6 +141,8 @@ protected:
 	virtual void OnDeath(AActor* Killer) override;
 
 private:
+	/** Everyone: a new phase gets a roar, if the boss has the clip. */
+	UFUNCTION() void OnRep_Phase();
 	void BuildAttacks();
 	FWRBossAttack MakeAttack(FName AttackId, EWRBossShape Shape, float Range, float Size, float Windup, float Damage, float Cooldown) const;
 	void SpawnArena();

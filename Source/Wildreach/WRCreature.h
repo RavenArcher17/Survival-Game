@@ -144,6 +144,8 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void OnDeath(AActor* Killer) override;
 	void ApplyDef();
+	/** Visual only: play a one-shot clip from the creature's anims (e.g. a boss's "roar"), if it has one. */
+	void PlayCreatureOneShot(FName Key);
 
 private:
 	UFUNCTION() void OnRep_CreatureId();
@@ -168,7 +170,9 @@ private:
 	UPROPERTY(Transient) TMap<FName, TObjectPtr<class UAnimSequenceBase>> AnimAssets;
 	FName CurrentAnim;
 	double OneShotUntil = 0.0;
-	void PlayCreatureAnim(FName Key, bool bLoop);
+	int32 AttackVariant = 0;  // attack, attack2, attack3 take turns
+	/** Duration > 0 fits a one-shot to that many seconds (within limits), e.g. an attack to its telegraph. */
+	void PlayCreatureAnim(FName Key, bool bLoop, float Duration = 0.f);
 	void TickCreatureAnim();
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> RideMapping;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideMoveAction;
