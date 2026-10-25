@@ -13,8 +13,8 @@ Tools\make_installer.ps1   # -> C:\Dev\WildreachBuild\Wildreach-Setup.exe (one f
 Send `Wildreach-Setup.exe` with a OneDrive/Drive link (it's ~440 MB). Double-clicking it installs to the player's
 own folder (no admin), adds Desktop and Start Menu shortcuts, installs the VC++ runtime only if it's missing, and
 starts the game; a newer Setup updates in place and keeps saves. It isn't code-signed, so Windows may show "Windows
-protected your PC": More info, then Run anyway. Everyone runs the game, types a name and picks
-Fire or Frost. One person clicks **Host** (their PC is the server; over the internet they forward UDP 7777
+protected your PC": More info, then Run anyway. Everyone runs the game, types a name, picks a
+Male or Female body and Fire or Frost. One person clicks **Host** (their PC is the server; over the internet they forward UDP 7777
 to their PC). Everyone else types the host's IP and clicks **Join**. Saves live on the host
 (`Wildreach\Saved\ServerDB`). F10 goes back to the menu.
 
@@ -44,7 +44,7 @@ Tools\play.ps1 client             # join 127.0.0.1:7777
 
 The default map is `/Game/Maps/L_Island`, the 4 × 4 km island. Combat testing happens on `L_CombatArena`
 (`play.ps1 -Map arena`). `play.ps1 -Path frost -Name You` picks your main path and keeps your save
-(`?Path=` / `?WRName=` on the join URL). The main menu only appears when the game runs on its own (`-nomenu` skips it).
+(`?Path=` / `?WRName=` / `?Body=f` on the join URL). The main menu only appears when the game runs on its own (`-nomenu` skips it).
 
 Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/rocks/caves/hazards without a rebuild:
 `node Tools/terrain/dressing.mjs` (writes `Data/island_dressing.json`).
