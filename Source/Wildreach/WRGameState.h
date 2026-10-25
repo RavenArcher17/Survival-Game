@@ -30,6 +30,9 @@ public:
 	bool IsNight() const;
 	/** 0 at night, 1 in full day, easing through dawn and dusk (lighting, creatures that come out at dusk). */
 	float GetDaylight() const;
+	/** The same, for any hour (clock tuning). */
+	static bool IsNightAt(float Hour);
+	static float DaylightAt(float Hour);
 	/** Server: jump the clock to an hour (later the same day, or the next day if it's already past). */
 	void SetHour(float Hour);
 	/** Server: restore a saved clock exactly (total hours since day 1, 00:00). */

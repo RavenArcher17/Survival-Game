@@ -8,7 +8,7 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-ai-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Ranger.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Ranger.json'), (Join-Path (Split-Path $project) 'Saved\ServerDB\world_aitest.json') -ErrorAction SilentlyContinue
 $before = Get-Date
 $tune = '-wrtune=creatureAI.huntIntervalMinutes:0'
 $shot = if ($Shots) { 'HighResShot 1600x900' } else { 'wait 0.1' }
@@ -32,19 +32,31 @@ $cmds = @(
 	'WRSpawn magmaw 1', 'WRArtCam magmaw 100', 'wait 0.4', $shot, (Hold 8), 'WRArtCam none', 'WRClearCreatures'
 ) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7797 $tune `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7797 -wrworld=aitest $tune `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $view = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7797?Path=fire?WRName=Ranger -game $view -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 Start-Sleep -Seconds 140
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
+$results = @()
+function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
+function Count($path, $pattern) { @(Select-String -Path $path -Pattern $pattern).Count }
 $log = "$out\server.log"
-Select-String -Path $log -Pattern 'AI |DEATH|CMD .*(spawnat|creaturehp|hour)|COMBAT WRCreature.* -> WR(Character|Creature)' | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ','') }
-$count = { param($p) (Select-String -Path $log -Pattern $p | Measure-Object).Count }
-"hunts: $(& $count 'AI .* hunts ')  prey killed and eaten: $(& $count 'AI .* eats the ')  fled: $(& $count 'AI .* flees from ')  slept: $(& $count 'AI .* falls asleep')"
-"attacks used - lunge: $(& $count 'AI .* uses lunge')  charge: $(& $count 'AI .* uses charge')  spit: $(& $count 'AI .* uses spit')  stomp: $(& $count 'AI .* uses stomp')   special hits: $(& $count 'AI .* (lunge|charge|stomp) hits ')"
-"server errors: $(& $count 'Error:|Ensure condition failed|Accessed None')  client errors: $((Select-String -Path "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' | Measure-Object).Count)"
-if ($Shots) {
-	Get-ChildItem (Join-Path (Split-Path $project) 'Saved\Screenshots') -Recurse -Filter *.png -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $before } | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }
-}
-Write-Output "logs: $out"
+Check 'hungry carnivores hunt' ((Count $log 'AI .* hunts WRCreature') -ge 1)
+Check 'hunted prey runs' ((Count $log 'flees from .* \(hunted') -ge 1)
+Check 'the pack kills its prey and shares it' ((Count $log 'DEATH WRCreature.* killed by WRCreature') -ge 1 -and (Count $log 'AI .* eats the ') -ge 2) "$(Count $log 'AI .* eats the ') ate"
+Check 'night hunters sleep by day' ((Count $log 'AI .* falls asleep') -ge 1)
+Check 'and wake to hunt at night' ((Count $log 'AI .* wakes up') -ge 1 -and (Count $log 'CMD .*hour 22.*\(night\)') -eq 1)
+Check 'a badly hurt creature runs' ((Count $log 'flees from .* \(badly hurt') -ge 1)
+Check 'an Emberhorn charges' ((Count $log 'AI .* uses charge') -ge 1)
+Check 'a Basaltback stomps' ((Count $log 'AI .* uses stomp') -ge 1)
+Check 'a Magmaw spits and lunges' ((Count $log 'AI .* uses spit') -ge 1 -and (Count $log 'AI .* uses lunge') -ge 1)
+Check 'special attacks land' ((Count $log 'AI .* (lunge|charge|stomp) hits ') -ge 3) "$(Count $log 'AI .* (lunge|charge|stomp) hits ') hits"
+$errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
+
+foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }
+if ($Shots) { Select-String -Path "$out\client.log" -Pattern 'screenshot saved as (.*\.png)' | ForEach-Object { $_.Matches[0].Groups[1].Value } }
+$failed = @($results | Where-Object { -not $_.ok }).Count
+"{0} checks, {1} failed (logs: {2})" -f $results.Count, $failed, $out
+if ($failed -gt 0) { exit 1 }

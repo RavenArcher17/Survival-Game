@@ -119,6 +119,10 @@ struct WILDREACH_API FWRInventoryRules
 	/** Removes up to Count across stacks. Returns how many were removed. */
 	static int32 Remove(TArray<FWRItemStack>& Slots, FName ItemId, int32 Count);
 	static int32 CountOf(const TArray<FWRItemStack>& Slots, FName ItemId);
+	/** Ammo of a kind (arrow, bolt, dart) to fire: the preferred one while it lasts, else the first in the bag. */
+	static FName FindAmmo(const TArray<FWRItemStack>& Slots, FName Kind, FName Preferred);
+	/** The next / previous kind of that ammo in the bag after Current (the mouse wheel). */
+	static FName NextAmmo(const TArray<FWRItemStack>& Slots, FName Kind, FName Current, int32 Dir);
 	static float TotalWeight(const TArray<FWRItemStack>& Slots);
 	/** A fresh equipment instance with full durability. */
 	static FWRItemStack MakeInstance(FName ItemId, EWRQuality Quality = EWRQuality::Common, float Roll = 1.f);

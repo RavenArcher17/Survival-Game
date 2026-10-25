@@ -41,6 +41,30 @@
 
 // ---------------------------------------------------------------- registry
 
+float FWRCreatureDef::FoodValue(FName Item) const
+{
+	if (Item.IsNone())
+	{
+		return 0.f;
+	}
+	if (Item == TEXT("kibble"))
+	{
+		return WRTune(TEXT("taming.kibbleValue"), 2.f);
+	}
+	return Food.Contains(Item) ? 1.f : 0.f;
+}
+
+bool FWRCreatureDef::CanHunt(const FWRCreatureDef& Hunter, const FWRCreatureDef& Prey)
+{
+	if (Hunter.Diet != TEXT("carnivore") || Prey.Diet == TEXT("carnivore") || Prey.Archetype == TEXT("boss") || Prey.Archetype == TEXT("dummy")
+		|| Prey.Role == TEXT("minion") || &Hunter == &Prey)
+	{
+		return false;
+	}
+	const float Ratio = Hunter.Archetype == TEXT("pack_hunter") ? WRTune(TEXT("creatureAI.packPreySizeRatio"), 2.f) : WRTune(TEXT("creatureAI.preySizeRatio"), 1.3f);
+	return Prey.Radius <= Hunter.Radius * Ratio;
+}
+
 float FWRCreatureDef::TameSeconds() const
 {
 	const FString Key = FString::Printf(TEXT("taming.%sSeconds"), *Difficulty.ToString());
@@ -701,15 +725,7 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 float AWRCreature::FoodValue(FName Item) const
 {
 	const FWRCreatureDef* Def = GetDef();
-	if (!Def || Item.IsNone())
-	{
-		return 0.f;
-	}
-	if (Item == TEXT("kibble"))
-	{
-		return WRTune(TEXT("taming.kibbleValue"), 2.f);
-	}
-	return Def->Food.Contains(Item) ? 1.f : 0.f;
+	return Def ? Def->FoodValue(Item) : 0.f;
 }
 
 FString AWRCreature::GiveTameFood(AWRPlayerController* Player, FName Item)
@@ -1332,16 +1348,12 @@ AWRCreature* AWRCreatureAI::PickPrey(AWRCreature* Self) const
 	{
 		return nullptr;
 	}
-	const float MaxSize = Self->GetSimpleCollisionRadius() * (Def->Archetype == TEXT("pack_hunter")
-		? WRTune(TEXT("creatureAI.packPreySizeRatio"), 2.f) : WRTune(TEXT("creatureAI.preySizeRatio"), 1.3f));
 	AWRCreature* Best = nullptr;
 	float BestDist = Def->AggroRadius;
 	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
 	{
 		const FWRCreatureDef* PreyDef = It->GetDef();
-		if (*It == Self || !PreyDef || !It->IsAlive() || It->IsTamed() || It->IsUnconscious() || It->IsHidden() || PreyDef->Diet == TEXT("carnivore")
-			|| PreyDef->Archetype == TEXT("boss") || PreyDef->Archetype == TEXT("dummy") || PreyDef->Role == TEXT("minion")
-			|| It->GetSimpleCollisionRadius() > MaxSize)
+		if (*It == Self || !PreyDef || !It->IsAlive() || It->IsTamed() || It->IsUnconscious() || It->IsHidden() || !FWRCreatureDef::CanHunt(*Def, *PreyDef))
 		{
 			continue;
 		}

@@ -397,9 +397,19 @@ void UWRInventoryComponent::ApplyEquipment()
 
 FName UWRInventoryComponent::FindAmmo(FName Kind, FName Preferred) const
 {
+	return FWRInventoryRules::FindAmmo(Slots, Kind, Preferred);
+}
+
+FName UWRInventoryComponent::NextAmmo(FName Kind, FName Current, int32 Dir) const
+{
+	return FWRInventoryRules::NextAmmo(Slots, Kind, Current, Dir);
+}
+
+FName FWRInventoryRules::FindAmmo(const TArray<FWRItemStack>& Slots, FName Kind, FName Preferred)
+{
 	const FWRItemRegistry& Items = FWRItemRegistry::Get();
 	const FWRItemDef* Pref = Preferred.IsNone() ? nullptr : Items.Find(Preferred);
-	if (Pref && Pref->AmmoOf == Kind && CountOf(Preferred) > 0)
+	if (Pref && Pref->AmmoOf == Kind && CountOf(Slots, Preferred) > 0)
 	{
 		return Preferred;
 	}
@@ -414,7 +424,7 @@ FName UWRInventoryComponent::FindAmmo(FName Kind, FName Preferred) const
 	return NAME_None;
 }
 
-FName UWRInventoryComponent::NextAmmo(FName Kind, FName Current, int32 Dir) const
+FName FWRInventoryRules::NextAmmo(const TArray<FWRItemStack>& Slots, FName Kind, FName Current, int32 Dir)
 {
 	TArray<FName> Kinds;
 	for (const FWRItemStack& S : Slots)

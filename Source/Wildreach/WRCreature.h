@@ -61,6 +61,11 @@ struct FWRCreatureDef
 
 	bool CanTameBy(FName Method) const { return TamingMethods.Contains(Method); }
 	float TameSeconds() const;
+	/** Taming value of a food: kibble x taming.kibbleValue, what it eats x1, anything else 0. */
+	float FoodValue(FName Item) const;
+	/** Whether a hungry hunter goes after this prey: a carnivore, prey not a carnivore / boss / minion / dummy, and no
+	 *  bigger than creatureAI.preySizeRatio x the hunter (packPreySizeRatio for pack hunters). */
+	static bool CanHunt(const FWRCreatureDef& Hunter, const FWRCreatureDef& Prey);
 };
 
 class WILDREACH_API FWRCreatureRegistry

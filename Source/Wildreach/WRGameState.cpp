@@ -53,14 +53,22 @@ int32 AWRGameState::GetDay() const
 
 bool AWRGameState::IsNight() const
 {
-	const float Hour = GetHour();
+	return IsNightAt(GetHour());
+}
+
+bool AWRGameState::IsNightAt(float Hour)
+{
 	return Hour >= WRTune(TEXT("clock.duskHour"), 20.f) || Hour < WRTune(TEXT("clock.dawnHour"), 6.f);
 }
 
 float AWRGameState::GetDaylight() const
 {
+	return DaylightAt(GetHour());
+}
+
+float AWRGameState::DaylightAt(float Hour)
+{
 	// Full day an hour (clock.twilightHours) after dawn until that long before dusk, dark from dusk to dawn.
-	const float Hour = GetHour();
 	const float Dawn = WRTune(TEXT("clock.dawnHour"), 6.f);
 	const float Dusk = WRTune(TEXT("clock.duskHour"), 20.f);
 	const float Ramp = FMath::Max(0.1f, WRTune(TEXT("clock.twilightHours"), 1.f));

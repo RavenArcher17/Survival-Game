@@ -8,7 +8,7 @@ $shotDir = Join-Path (Split-Path $project) 'Saved\Screenshots'
 $before = Get-Date
 $out = Join-Path $env:TEMP ("wildreach-ranged-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Archer.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Archer.json'), (Join-Path (Split-Path $project) 'Saved\ServerDB\world_rangedtest.json') -ErrorAction SilentlyContinue
 $shot = 'HighResShot 1600x900|wait 1'
 $aim = 'WRAimAt cinderfang|WRHeal|wait 0.1'   # after the aim zoom settles, and a frame for the camera to swing round
 # A fresh Cinderfang (70 hp, 70 torpor) for each weapon, rooted so it can't reach the archer: a bite staggers, and a
@@ -29,15 +29,31 @@ $cmds = @(
 	'WREquip bola', 'wait 1.5', 'WRAim 1', 'wait 1', $aim, 'WRFire', 'wait 1.5', 'WRTameStat', 'WRAim 0', # same target as the spear
 	'WRRanged 0', 'wait 1.5', $shot                                                                    # back to sword and shield
 ) -join '|'
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7795 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7795 -wrworld=rangedtest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $bodyOpt = if ($Body) { "?Body=$Body" } else { '' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7795?Path=fire?WRName=Archer$bodyOpt -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru
 Start-Sleep -Seconds $Seconds
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
-Select-String -Path "$out\server.log" -Pattern 'RANGED |TAME |-> WRCreature|CMD .*(held|removed)' | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ','') }
-Select-String -Path "$out\client.log" -Pattern 'NOTICE ' | ForEach-Object { ($_.Line -replace '^.*NOTICE ','') }
-"shots: $((Select-String -Path "$out\server.log" -Pattern 'RANGED .* fires' | Measure-Object).Count)  hits: $((Select-String -Path "$out\server.log" -Pattern 'COMBAT WRCharacter.* -> WRCreature' | Measure-Object).Count)"
-"server errors: $((Select-String -Path "$out\server.log" -Pattern 'Error:|Ensure condition failed|Accessed None' | Measure-Object).Count)  client errors: $((Select-String -Path "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' | Measure-Object).Count)"
-Get-ChildItem $shotDir -Recurse -Filter *.png -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $before } | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }
-Write-Output "logs: $out"
+$results = @()
+function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
+function Count($path, $pattern) { @(Select-String -Path $path -Pattern $pattern).Count }
+$log = "$out\server.log"
+$shots = Count $log 'RANGED .* fires'
+$hits = Count $log 'COMBAT WRCharacter.* -> WRCreature'
+Check 'every weapon fires (10 shots)' ($shots -ge 10) "$shots shots"
+Check 'the shots land' ($hits -ge 9) "$hits hits of $shots"
+Check 'stone arrows hit (bow 14 + arrow 6)' ((Count $log 'COMBAT WRCharacter.* -> WRCreature.* dmg=20\.0') -ge 2)
+Check 'crossbow bolts hit hard (30 + 10)' ((Count $log 'COMBAT WRCharacter.* -> WRCreature.* dmg=40\.0') -ge 1)
+Check 'tranq arrows and torpor darts knock Cinderfangs out' ((Count $log 'TAME .* knocked out') -ge 2) "$(Count $log 'TAME .* knocked out') knockouts"
+Check 'arrows stick in what they hit' ((Count $log 'RANGED (bow|crossbow|blowgun) hit WRCreature') -ge 4)
+Check 'a thrown spear is left to pick up' ((Count $log 'throwing_spear landed; left to pick up') -ge 1)
+Check 'the bola roots a Cinderfang' ((Count $log 'RANGED bola roots') -ge 1)
+$errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
+
+foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }
+Select-String -Path "$out\client.log" -Pattern 'screenshot saved as (.*\.png)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+$failed = @($results | Where-Object { -not $_.ok }).Count
+"{0} checks, {1} failed (logs: {2})" -f $results.Count, $failed, $out
+if ($failed -gt 0) { exit 1 }

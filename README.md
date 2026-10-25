@@ -80,8 +80,13 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 
 ## Test
 
+`Tools\alltests.ps1` builds and runs everything below in turn (about 40 minutes) and prints a PASS / FAIL table
+(`-SkipBuild`, `-Only ranged,tame`). Each bot test ends with its checks (`PASS` / `FAIL` lines) and exits 1 on a failure.
+Arena tests give their server `-wrworld=<name>`, so each keeps its own world save (`Saved/ServerDB/world_<name>.json`)
+and they can run side by side.
+
 ```
-Tools\test.ps1          # automation tests (rules + deterministic combat scenarios)
+Tools\test.ps1          # automation tests (rules, combat scenarios, ranged items, taming food, creature behaviour, clock)
 Tools\mptest.ps1        # headless server + bots, PvE (-Scenario pvp for duels)
 Tools\persisttest.ps1   # save -> server restart -> load
 Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets, every ranged weapon + ammo, bow wear + repair

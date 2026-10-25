@@ -141,6 +141,10 @@ void AWRPlayerController::WRInteract()
 	// The nearer of a door / chest / bed / crop / claim and a station, like the prompt (a workbench in a small hut
 	// mustn't steal the door).
 	AActor* Use = FindUseTarget();
+	if (Wild && Use && DistTo(Wild) < DistTo(Use))
+	{
+		Use = nullptr;  // the creature in front of you (feed it), not the bench behind it
+	}
 	if (AWRBuildPiece* Piece = Cast<AWRBuildPiece>(Use))
 	{
 		const FWRPieceDef* Def = Piece->GetDef();

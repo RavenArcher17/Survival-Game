@@ -9,7 +9,7 @@ $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-tame-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $db = Join-Path (Split-Path $project) 'Saved\ServerDB'
-Remove-Item (Join-Path $db 'players\Tamer.json'), (Join-Path $db 'world_L_CombatArena.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $db 'players\Tamer.json'), (Join-Path $db 'world_tametest.json') -ErrorAction SilentlyContinue
 $tune = '-wrtune=taming.easySeconds:4,taming.mediumSeconds:6,taming.hardSeconds:600,taming.tameLimit:5,taming.unconsciousTorporDecay:0.05'
 $before = Get-Date
 $shot = if ($Shots) { 'HighResShot 1600x900|wait 1' } else { 'wait 0.1' }
@@ -17,7 +17,7 @@ $aim = 'WRAimAt cinderfang|wait 0.1'   # a frame for the camera to swing round b
 
 $cmds = @(
 	'WRBotPause 1', 'WRGive raw_meat 5', 'WRGive berries 5',
-	'WRTeleport 1500 -2200', 'wait 1', 'WRSpawn ashstrider 1', 'wait 1', 'WRGoTo ashstrider', 'WRInteract', 'wait 7', 'WRTameStat',
+	'WRTeleport 2500 3000', 'wait 1', 'WRSpawn ashstrider 1', 'wait 1', 'WRGoTo ashstrider', 'WRInteract', 'wait 7', 'WRTameStat',
 	'WRTame ride', 'wait 2', 'WRTameStat', 'WRDismount', 'wait 1', 'WRTameStat', 'wait 1', 'WRTame stay', 'wait 1',
 	# Knockout taming: tranq arrows put it down, a stone arrow while it's out costs effectiveness, a narcotic keeps it
 	# under, kibble in its stash tames it.
@@ -35,7 +35,7 @@ $cmds = @(
 ) -join '|'
 
 function Start-Server($log) {
-	Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7811 $tune -abslog=`"$log`"" -PassThru -WindowStyle Hidden
+	Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7811 -wrworld=tametest $tune -abslog=`"$log`"" -PassThru -WindowStyle Hidden
 }
 $s = Start-Server "$out\server.log"
 Start-Sleep -Seconds 20
@@ -43,15 +43,32 @@ $view = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7811?Path=fire?WRName=Tamer -game $view -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 Start-Sleep -Seconds 130   # past the 60 s and 120 s world autosaves
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
-Select-String -Path "$out\client.log" -Pattern 'NOTICE ' | ForEach-Object { ($_.Line -replace '^.*NOTICE ','') }
-Select-String -Path "$out\server.log" -Pattern 'TAME |WORLD saved|RANGED .*(fires|hit)' | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ','') }
-"server errors: $((Select-String -Path "$out\server.log" -Pattern 'Error:|Ensure condition failed|Accessed None' | Measure-Object).Count)"
 
 # Restart: the tames should come back.
 $s2 = Start-Server "$out\server2.log"
 Start-Sleep -Seconds 20
 if (-not $s2.HasExited) { Stop-Process -Id $s2.Id -Force }
-Select-String -Path "$out\server2.log" -Pattern 'WORLD loaded' | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ','') }
-if ($Shots) {
-	Get-ChildItem (Join-Path (Split-Path $project) 'Saved\Screenshots') -Recurse -Filter *.png -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $before } | Sort-Object LastWriteTime | ForEach-Object { $_.FullName }
-}
+
+$results = @()
+function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
+function Count($path, $pattern) { @(Select-String -Path $path -Pattern $pattern).Count }
+$log = "$out\server.log"
+$notices = @(Select-String -Path "$out\client.log" -Pattern 'NOTICE (.*)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
+function Said($pattern) { @($notices | Where-Object { $_ -match $pattern }).Count }
+Check 'an Ashstrider tames on offered food' ((Said "^Tamer's Ashstrider torpor .* tame 100%") -ge 1)
+Check 'ride it and get off' ((Said '^Riding \(E to dismount\)') -ge 1 -and (Said "^Tamer's Ashstrider .* rider WRCharacter") -ge 1)
+Check 'two tranq arrows knock a Cinderfang out' ((Count $log 'fires hunting_bow \(tranq_arrow\)') -eq 2 -and (Said '^Cinderfang torpor .* unconscious') -ge 1)
+Check 'a hit while it is out costs effectiveness' ((Said '^Cinderfang torpor .* eff 9\d% .*unconscious') -ge 1)
+Check 'a narcotic tops its torpor up' ((Said '^Narcotic: torpor') -eq 1)
+Check 'kibble tames it with a bonus (from 94%)' ((Count $log 'tamed by Tamer \(effectiveness 9\d%: \+4\d% health') -ge 1)
+Check 'a stolen egg hatches a tame' ((Said 'Kilnmite egg hatched') -eq 1)
+Check 'waking up loses the progress' ((Count $log 'woke up \([1-9]\d*% tamed, 0% kept\)') -ge 1)
+Check 'the tames survive a restart' ((Count "$out\server2.log" 'WORLD loaded .* 3 tames') -eq 1) ((Select-String -Path "$out\server2.log" -Pattern 'WORLD loaded.*' | Select-Object -First 1).Matches.Value)
+$errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
+
+foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }
+if ($Shots) { Select-String -Path "$out\client.log" -Pattern 'screenshot saved as (.*\.png)' | ForEach-Object { $_.Matches[0].Groups[1].Value } }
+$failed = @($results | Where-Object { -not $_.ok }).Count
+"{0} checks, {1} failed (logs: {2})" -f $results.Count, $failed, $out
+if ($failed -gt 0) { exit 1 }

@@ -81,7 +81,13 @@ void AWRGameMode::EndPlay(const EEndPlayReason::Type Reason)
 
 FString AWRGameMode::WorldSavePath() const
 {
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), FString::Printf(TEXT("world_%s.json"), *GetWorld()->GetMapName().Replace(TEXT("UEDPIE_0_"), TEXT(""))));
+	// -wrworld=<name> gives a server its own save (tests running side by side on one map don't share one).
+	FString Name;
+	if (!FParse::Value(FCommandLine::Get(), TEXT("-wrworld="), Name) || Name.IsEmpty())
+	{
+		Name = GetWorld()->GetMapName().Replace(TEXT("UEDPIE_0_"), TEXT(""));
+	}
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), FString::Printf(TEXT("world_%s.json"), *Name));
 }
 
 void AWRGameMode::SaveWorld()
