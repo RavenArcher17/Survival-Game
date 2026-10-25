@@ -7,6 +7,9 @@
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
 #include "WRBuilding.h"
+#include "WRCombatLibrary.h"
+#include "WRGameState.h"
+#include "WRProjectile.h"
 #include "WRCharacter.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
@@ -151,6 +154,12 @@ void FWRCreatureRegistry::Reload()
 		D.TamingMethods = ParseNames(O, TEXT("taming"));
 		D.Food = ParseNames(O, TEXT("food"));
 		D.Products = ParseCounts(O, TEXT("products"));
+		D.Attacks = ParseNames(O, TEXT("attacks"));
+		D.Diet = O->TryGetStringField(TEXT("diet"), Str) ? FName(*Str)
+			: D.Food.Contains(TEXT("raw_meat")) ? FName(TEXT("carnivore"))
+			: D.Food.ContainsByPredicate([](const FName& F) { return F.ToString().EndsWith(TEXT("_ore")); }) ? FName(TEXT("lithovore"))
+			: D.Food.Num() > 0 ? FName(TEXT("herbivore")) : NAME_None;
+		D.Activity = O->TryGetStringField(TEXT("activity"), Str) ? FName(*Str) : FName(TEXT("any"));
 		if (O->HasField(TEXT("loot")))
 		{
 			D.Loot = ParseCounts(O, TEXT("loot"));
@@ -261,6 +270,7 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRCreature, TameFoodNeeded);
 	DOREPLIFETIME(AWRCreature, MealLeft);
 	DOREPLIFETIME(AWRCreature, WakeIn);
+	DOREPLIFETIME(AWRCreature, bAsleep);
 	DOREPLIFETIME(AWRCreature, Rider);
 }
 
@@ -421,6 +431,7 @@ void AWRCreature::BeginPlay()
 	}
 	InitVitals(Def->Health, 100.f, Def->Poise);
 	MaxTorpor = Def->Health * WRTune(TEXT("taming.torporPerHealth"), 1.f);
+	HungryAt = GetWorld()->GetTimeSeconds() + FMath::FRand() * WRTune(TEXT("creatureAI.huntIntervalMinutes"), 5.f) * 60.f;
 	Weapon.FlatDamage = Def->Damage;
 	if (Def->Damage > 0.f)
 	{
@@ -451,8 +462,13 @@ bool AWRCreature::IsHostileTo(const AWRCharacterBase* Other) const
 	const APlayerState* OtherPS = Other->GetPlayerState();
 	if (!IsTamed())
 	{
-		// Wild: hostile to survivors and tames, never to other wild creatures.
-		return !Other->IsCreature() || !OtherOwner.IsEmpty();
+		// Wild: hostile to survivors and tames; other wild creatures only in a hunt (predator and prey fight each other).
+		if (Other->IsCreature() && OtherOwner.IsEmpty())
+		{
+			const AWRCreature* OtherCreature = Cast<AWRCreature>(Other);
+			return OtherCreature && (HuntTarget.Get() == OtherCreature || OtherCreature->HuntTarget.Get() == this);
+		}
+		return true;
 	}
 	// Tamed: fights for its owner (and never against the owner's clan or their tames).
 	if (OtherPS && FWRSocialRules::CanShare(TamedBy, OtherPS->GetPlayerName())) return false;
@@ -464,11 +480,17 @@ FString AWRCreature::GetDisplayLabel() const
 {
 	const FWRCreatureDef* Def = GetDef();
 	const FString Name = Def ? Def->Name : GetName();
-	return IsTamed() ? FString::Printf(TEXT("%s's %s"), *TamedBy, *Name) : Name;
+	return IsTamed() ? FString::Printf(TEXT("%s's %s"), *TamedBy, *Name) : bAsleep ? Name + TEXT(" (asleep)") : Name;
 }
 
 void AWRCreature::NotifyAttackedBy(AActor* Attacker)
 {
+	LastHitAt = GetWorld()->GetTimeSeconds();
+	if (bAsleep || !IsTamed())
+	{
+		WokenUntil = LastHitAt + WRTune(TEXT("creatureAI.wokenSeconds"), 30.f);
+		SetAsleep(false);
+	}
 	// Anything you hit fights back, unless it's a passive grazer (they run).
 	const FWRCreatureDef* Def = GetDef();
 	if (!IsTamed() && Def && Def->Behavior != TEXT("passive") && !AggroTarget.IsValid())
@@ -480,12 +502,107 @@ void AWRCreature::NotifyAttackedBy(AActor* Attacker)
 		// Neutral herds defend each other.
 		Spawner->AlertPack(Attacker);
 	}
+	// Grazers bolt from whatever hurt them (wild ones; the hunt they were part of is over).
+	if (!IsTamed() && Def && Def->Behavior == TEXT("passive") && !IsUnconscious())
+	{
+		StartFleeing(Attacker, TEXT("attacked"));
+	}
 	// Hitting a knocked-out creature (even with tranq ammo) costs taming effectiveness: feed it narcotics instead.
 	if (IsUnconscious() && !IsTamed())
 	{
 		TameEffectiveness = FMath::Max(0.f, TameEffectiveness - WRTune(TEXT("taming.effectivenessPerHit"), 0.06f));
 	}
 	bCalm = false;
+}
+
+bool AWRCreature::IsHungry() const
+{
+	return GetWorld()->GetTimeSeconds() >= HungryAt && GetWorld()->GetTimeSeconds() >= EatingUntil;
+}
+
+bool AWRCreature::IsEating() const
+{
+	return GetWorld()->GetTimeSeconds() < EatingUntil;
+}
+
+bool AWRCreature::IsFleeing() const
+{
+	return GetWorld()->GetTimeSeconds() < FleeUntil;
+}
+
+bool AWRCreature::CanBoltAgain() const
+{
+	return GetWorld()->GetTimeSeconds() > FleeUntil + WRTune(TEXT("creatureAI.preyRestSeconds"), 4.f);
+}
+
+bool AWRCreature::RecentPackLoss() const
+{
+	return GetWorld()->GetTimeSeconds() - PackLossAt < WRTune(TEXT("creatureAI.packLossSeconds"), 15.f);
+}
+
+float AWRCreature::SinceHit() const
+{
+	return static_cast<float>(GetWorld()->GetTimeSeconds() - LastHitAt);
+}
+
+bool AWRCreature::WasWokenRecently() const
+{
+	return GetWorld()->GetTimeSeconds() < WokenUntil;
+}
+
+void AWRCreature::StartFleeing(AActor* From, const TCHAR* Why)
+{
+	const FWRCreatureDef* Def = GetDef();
+	if (!HasAuthority() || !Def || IsTamed() || Def->Archetype == TEXT("boss") || Def->Archetype == TEXT("dummy") || Def->Role == TEXT("minion"))
+	{
+		return;
+	}
+	const bool bWas = IsFleeing();
+	FleeUntil = GetWorld()->GetTimeSeconds() + WRTune(TEXT("creatureAI.fleeSeconds"), 8.f);
+	FleeFrom = From;
+	AggroTarget = nullptr;
+	HuntTarget = nullptr;
+	SetAsleep(false);
+	if (!bWas)
+	{
+		const UWRAttributeSet* A = GetAttributes();
+		UE_LOG(LogWildreach, Log, TEXT("AI %s flees from %s (%s, %.0f%% health)"), *GetName(), *GetNameSafe(From), Why,
+			A ? 100.f * A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 0.f);
+	}
+}
+
+void AWRCreature::NotePackLoss()
+{
+	PackLossAt = GetWorld()->GetTimeSeconds();
+}
+
+void AWRCreature::Ate(AWRCreature* Prey)
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	EatingUntil = Now + WRTune(TEXT("creatureAI.eatSeconds"), 8.f);
+	HungryAt = EatingUntil + WRTune(TEXT("creatureAI.huntIntervalMinutes"), 5.f) * 60.f * FMath::FRandRange(0.75f, 1.25f);
+	HuntTarget = nullptr;
+	AggroTarget = nullptr;
+	UE_LOG(LogWildreach, Log, TEXT("AI %s eats the %s it killed"), *GetName(), *GetNameSafe(Prey));
+}
+
+void AWRCreature::HuntFailed()
+{
+	if (HuntTarget.IsValid())
+	{
+		UE_LOG(LogWildreach, Log, TEXT("AI %s gives up on %s"), *GetName(), *GetNameSafe(HuntTarget.Get()));
+	}
+	HuntTarget = nullptr;
+	HungryAt = GetWorld()->GetTimeSeconds() + WRTune(TEXT("creatureAI.huntRetrySeconds"), 45.f);
+}
+
+void AWRCreature::SetAsleep(bool bSleep)
+{
+	if (bAsleep != bSleep && HasAuthority())
+	{
+		bAsleep = bSleep;
+		UE_LOG(LogWildreach, Log, TEXT("AI %s %s"), *GetName(), bSleep ? TEXT("falls asleep") : TEXT("wakes up"));
+	}
 }
 
 void AWRCreature::AddTorpor(float Amount)
@@ -997,6 +1114,23 @@ void AWRCreature::Tick(float DeltaSeconds)
 
 void AWRCreature::OnDeath(AActor* Killer)
 {
+	// A kill feeds every hunter that was on it (the pack shares).
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		if (It->HuntTarget.Get() == this && It->IsAlive() && (*It == Killer || FVector::Dist(It->GetActorLocation(), GetActorLocation()) < WRTune(TEXT("creatureAI.shareKillRadius"), 1200.f)))
+		{
+			It->Ate(this);
+		}
+		else if (It->HuntTarget.Get() == this)
+		{
+			It->HuntTarget = nullptr;
+			It->SetAggroTarget(nullptr);
+		}
+	}
+	if (Spawner.IsValid() && !IsTamed())
+	{
+		Spawner->NotifyPackLoss(this);
+	}
 	OnCreatureDied.Broadcast(this);
 	if (Rider.IsValid())
 	{
@@ -1083,7 +1217,8 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 	float BestDist = TNumericLimits<float>::Max();
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
-		if (!It->IsAlive() || !Self->IsHostileTo(*It) || !It->IsHostileTo(Self))
+		// Survivors and tames (wild creatures are prey, picked separately).
+		if (!It->IsAlive() || (It->IsCreature() && It->GetTameOwner().IsEmpty()) || !Self->IsHostileTo(*It) || !It->IsHostileTo(Self))
 		{
 			continue;
 		}
@@ -1092,6 +1227,9 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 			continue;
 		}
 		float Aggro = Def->AggroRadius;
+		// Asleep it notices you late; a night hunter at night notices you early.
+		if (Self->IsAsleep()) Aggro *= WRTune(TEXT("creatureAI.sleepAggroMult"), 0.35f);
+		else if (Def->Activity == TEXT("nocturnal") && AWRGameState::IsNightIn(Self)) Aggro *= WRTune(TEXT("creatureAI.nightAggroMult"), 1.4f);
 		// Gloomhowls hunt by sound: sprinting survivors are heard from much further.
 		if (Def->bHearing && It->GetVelocity().Size2D() > 600.f) Aggro *= 1.6f;
 		// Sneaking / Calm presence: you're noticed later.
@@ -1117,6 +1255,10 @@ void AWRCreatureAI::Tick(float DeltaSeconds)
 	AWRCreature* Self = Cast<AWRCreature>(GetPawn());
 	if (!Self || !Self->IsAlive() || !Self->GetDef() || Self->IsUnconscious())
 	{
+		if (Self && SpecialPhase != 0)
+		{
+			EndSpecial(Self);
+		}
 		return;
 	}
 	if (Self->IsTamed())
@@ -1129,18 +1271,27 @@ void AWRCreatureAI::Tick(float DeltaSeconds)
 	}
 }
 
+namespace
+{
+	void CreatureHit(AWRCreature* Self, AWRCharacterBase* Victim, FName Kind);
+}
+
 void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
 {
 	const FWRCreatureDef* Def = Self->GetDef();
 	const FVector To = Target->GetActorLocation() - Self->GetActorLocation();
 	const float Dist = To.Size2D();
 	const float Range = Def->AttackRange + Target->GetSimpleCollisionRadius();
+	if (SpecialPhase != 0 || TryStartSpecial(Self, Target, Dist))
+	{
+		return;  // TickSpecial runs it
+	}
 	if (Dist > Range)
 	{
 		FVector Dir = To.GetSafeNormal2D();
-		if (Def->Archetype == TEXT("pack_hunter") && Dist > 500.f)
+		if (Def->Archetype == TEXT("pack_hunter") && Dist > 500.f && Self->HuntTarget.Get() != Target)
 		{
-			// Pack members swing wide to come at the target from different angles.
+			// Pack members swing wide to come at the target from different angles (not at running prey: they'd never catch it).
 			Dir = Dir.RotateAngleAxis(FlankAngle * FMath::Clamp((Dist - 500.f) / 800.f, 0.f, 1.f), FVector::UpVector);
 		}
 		if (Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered))
@@ -1154,33 +1305,346 @@ void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
 		return;
 	}
 	SetControlRotation(To.Rotation());
+	if (Self->HuntTarget.Get() == Target)
+	{
+		// Prey can't block or dodge: a quick snap in reach (a swept bite would miss something running), keeping pace.
+		const double Now = GetWorld()->GetTimeSeconds();
+		if (Now >= NextSnapAt)
+		{
+			NextSnapAt = Now + FWRTuning::Get().Num(TEXT("creatureAI.bite.cooldown"), 1.2f);
+			Self->SetActorRotation(To.GetSafeNormal2D().Rotation());
+			Self->PlaySwing(EWRSwingKind::Bite, 0.4f);
+			CreatureHit(Self, Target, TEXT("bite"));
+		}
+		Self->AddMovementInput(To.GetSafeNormal2D(), 1.f);
+		return;
+	}
 	if (UAbilitySystemComponent* ASC = Self->GetAbilitySystemComponent())
 	{
 		ASC->TryActivateAbilityByClass(UWRGA_Bite::StaticClass());
 	}
 }
 
+AWRCreature* AWRCreatureAI::PickPrey(AWRCreature* Self) const
+{
+	const FWRCreatureDef* Def = Self->GetDef();
+	if (!Def || Def->Diet != TEXT("carnivore"))
+	{
+		return nullptr;
+	}
+	const float MaxSize = Self->GetSimpleCollisionRadius() * (Def->Archetype == TEXT("pack_hunter")
+		? WRTune(TEXT("creatureAI.packPreySizeRatio"), 2.f) : WRTune(TEXT("creatureAI.preySizeRatio"), 1.3f));
+	AWRCreature* Best = nullptr;
+	float BestDist = Def->AggroRadius;
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		const FWRCreatureDef* PreyDef = It->GetDef();
+		if (*It == Self || !PreyDef || !It->IsAlive() || It->IsTamed() || It->IsUnconscious() || It->IsHidden() || PreyDef->Diet == TEXT("carnivore")
+			|| PreyDef->Archetype == TEXT("boss") || PreyDef->Archetype == TEXT("dummy") || PreyDef->Role == TEXT("minion")
+			|| It->GetSimpleCollisionRadius() > MaxSize)
+		{
+			continue;
+		}
+		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
+		if (Dist < BestDist)
+		{
+			BestDist = Dist;
+			Best = *It;
+		}
+	}
+	return Best;
+}
+
+void AWRCreatureAI::UpdateSleep(AWRCreature* Self)
+{
+	const FWRCreatureDef* Def = Self->GetDef();
+	const bool bNight = AWRGameState::IsNightIn(Self);
+	const bool bBedtime = (Def->Activity == TEXT("diurnal") && bNight) || (Def->Activity == TEXT("nocturnal") && !bNight);
+	const bool bBusy = Self->GetAggroTarget() || Self->IsFleeing() || Self->IsEating() || Self->HuntTarget.IsValid() || Self->WasWokenRecently();
+	Self->SetAsleep(bBedtime && !bBusy);
+}
+
+namespace
+{
+	FString AttackKey(FName Kind, const TCHAR* Field) { return FString::Printf(TEXT("creatureAI.%s.%s"), *Kind.ToString(), Field); }
+	float AttackNum(FName Kind, const TCHAR* Field, float Fallback) { return FWRTuning::Get().Num(AttackKey(Kind, Field), Fallback); }
+
+	void CreatureHit(AWRCreature* Self, AWRCharacterBase* Victim, FName Kind)
+	{
+		FWRHit Hit;
+		Hit.Instigator = Self;
+		Hit.Damage = Self->Weapon.FlatDamage * AttackNum(Kind, TEXT("damageMult"), 1.3f);
+		Hit.PoiseDamage = AttackNum(Kind, TEXT("poise"), 25.f);
+		Hit.Element = WRTags::Element_Physical;
+		Hit.Origin = Self->GetActorLocation();
+		Hit.bMelee = true;
+		Hit.bHeavy = true;
+		const EWRHitResult Result = UWRCombatLibrary::ApplyHit(Victim, Hit);
+		UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *Kind.ToString(), *Victim->GetName());
+		const float Knockback = AttackNum(Kind, TEXT("knockback"), 0.f);
+		if (Knockback > 0.f && Result != EWRHitResult::Dodged && Result != EWRHitResult::Parried)
+		{
+			const FVector Push = (Victim->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D() * Knockback + FVector(0.f, 0.f, Knockback * 0.35f);
+			Victim->LaunchCharacter(Push, true, true);
+		}
+	}
+}
+
+bool AWRCreatureAI::TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target, float Dist)
+{
+	const FWRCreatureDef* Def = Self->GetDef();
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (!Def || Def->Attacks.Num() == 0 || Self->HasTag(WRTags::Status_Staggered) || Self->GetCharacterMovement()->IsFalling())
+	{
+		return false;
+	}
+	for (const FName& Kind : Def->Attacks)
+	{
+		if (Now < SpecialReadyAt.FindRef(Kind) || ((Kind == TEXT("lunge") || Kind == TEXT("charge")) && Self->GetSpeedMultiplier() <= 0.f))
+		{
+			continue;  // cooling down, or rooted / frozen: no leaping or charging (it can still spit or stomp)
+		}
+		const float Min = Kind == TEXT("stomp") ? 0.f : AttackNum(Kind, TEXT("min"), 300.f);
+		const float Max = Kind == TEXT("stomp") ? AttackNum(Kind, TEXT("radius"), 320.f) + Target->GetSimpleCollisionRadius() - 20.f : AttackNum(Kind, TEXT("max"), 800.f);
+		if (Dist < Min || Dist > Max)
+		{
+			continue;
+		}
+		const float Windup = AttackNum(Kind, TEXT("windup"), 0.5f);
+		Special = Kind;
+		SpecialPhase = 1;
+		SpecialClock = Windup;
+		SpecialTarget = Target;
+		bSpecialHit = false;
+		SpecialDir = (Target->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D();
+		SpecialReadyAt.Add(Kind, Now + Windup + AttackNum(Kind, TEXT("cooldown"), 6.f));
+		Self->PlaySwing(EWRSwingKind::Bite, Windup);  // its attack clip, fitted to the telegraph
+		// Telegraphs: where the charge will run, the ring a stomp hits.
+		const FVector Floor = Self->GetActorLocation() - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight() - 3.f);
+		if (Kind == TEXT("charge"))
+		{
+			const float Length = Self->GetCharacterMovement()->GetMaxSpeed() * AttackNum(Kind, TEXT("speedMult"), 2.f) * AttackNum(Kind, TEXT("seconds"), 1.2f);
+			AWRGroundMarker::Spawn(GetWorld(), Floor, SpecialDir.Rotation(), FVector2D(Length, Self->GetSimpleCollisionRadius()), true, FLinearColor(1.f, 0.35f, 0.1f), Windup);
+		}
+		else if (Kind == TEXT("stomp"))
+		{
+			const float Radius = AttackNum(Kind, TEXT("radius"), 320.f);
+			AWRGroundMarker::Spawn(GetWorld(), Floor, FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.2f, 0.05f), Windup);
+		}
+		UE_LOG(LogWildreach, Log, TEXT("AI %s winds up %s at %s"), *Self->GetName(), *Kind.ToString(), *Target->GetName());
+		return true;
+	}
+	return false;
+}
+
+void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
+{
+	AWRCharacterBase* Target = SpecialTarget.Get();
+	SpecialClock -= DeltaSeconds;
+	if (SpecialPhase == 1)
+	{
+		// Windup: it keeps facing the target (a charge commits to its line when it starts).
+		if (Target && Special != TEXT("charge"))
+		{
+			SpecialDir = (Target->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D();
+		}
+		if (!SpecialDir.IsNearlyZero())
+		{
+			Self->SetActorRotation(SpecialDir.Rotation());
+		}
+		if (SpecialClock > 0.f)
+		{
+			return;
+		}
+		SpecialPhase = 2;
+		UE_LOG(LogWildreach, Log, TEXT("AI %s uses %s"), *Self->GetName(), *Special.ToString());
+		if (Special == TEXT("lunge"))
+		{
+			// A leap at where the target will be when it lands (running prey included).
+			const float Flight = 0.45f;
+			const FVector Aim = Target ? Target->GetActorLocation() + Target->GetVelocity() * FVector(1.f, 1.f, 0.f) * Flight : Self->GetActorLocation() + SpecialDir * 400.f;
+			const FVector Leap = (Aim - Self->GetActorLocation()) * FVector(1.f, 1.f, 0.f);
+			const float Speed = AttackNum(Special, TEXT("speed"), 1100.f);
+			SpecialDir = Leap.GetSafeNormal();
+			Self->SetActorRotation(SpecialDir.Rotation());
+			Self->LaunchCharacter(SpecialDir * FMath::Min(Speed, Leap.Size() / Flight) + FVector(0.f, 0.f, AttackNum(Special, TEXT("lift"), 380.f)), true, true);
+			SpecialClock = 0.9f;
+		}
+		else if (Special == TEXT("charge"))
+		{
+			Self->SpeedBoost = AttackNum(Special, TEXT("speedMult"), 2.f);
+			SpecialClock = AttackNum(Special, TEXT("seconds"), 1.2f);
+		}
+		else if (Special == TEXT("spit"))
+		{
+			// A glob of its element (fire / frost) at the target.
+			const FWRCreatureDef* Def = Self->GetDef();
+			const bool bFrost = Def && Def->Element == TEXT("frost");
+			const FVector From = Self->GetActorLocation() + FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight() * 0.5f) + SpecialDir * Self->GetSimpleCollisionRadius();
+			const FVector Aim = Target ? (Target->GetActorLocation() - From).GetSafeNormal() : SpecialDir;
+			FActorSpawnParameters Params;
+			Params.Owner = Self;
+			Params.Instigator = Self;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (AWRProjectile* Glob = GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), From, Aim.Rotation(), Params))
+			{
+				FWRHit Hit;
+				Hit.Instigator = Self;
+				Hit.Damage = Self->Weapon.FlatDamage * AttackNum(Special, TEXT("damageMult"), 0.8f);
+				Hit.PoiseDamage = AttackNum(Special, TEXT("poise"), 10.f);
+				Hit.Element = bFrost ? WRTags::Element_Frost : WRTags::Element_Fire;
+				(bFrost ? Hit.FrostBuildup : Hit.BurnBuildup) = AttackNum(Special, TEXT("buildup"), 25.f);
+				Glob->Init(Hit, AttackNum(Special, TEXT("speed"), 1800.f), bFrost ? FLinearColor(0.5f, 0.85f, 1.f) : FLinearColor(1.f, 0.45f, 0.05f));
+			}
+			EndSpecial(Self);
+		}
+		else if (Special == TEXT("stomp"))
+		{
+			// Everything hostile in the ring takes it.
+			const float Radius = AttackNum(Special, TEXT("radius"), 320.f);
+			for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+			{
+				if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && FVector::Dist2D(It->GetActorLocation(), Self->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())
+				{
+					CreatureHit(Self, *It, Special);
+				}
+			}
+			EndSpecial(Self);
+		}
+		else
+		{
+			EndSpecial(Self);
+		}
+		return;
+	}
+	// Under way: a charge runs its line; both it and a lunge hit the first hostile they reach.
+	if (Special == TEXT("charge"))
+	{
+		Self->AddMovementInput(SpecialDir, 1.f);
+	}
+	if (!bSpecialHit)
+	{
+		for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+		{
+			const float Reach = Self->GetSimpleCollisionRadius() + It->GetSimpleCollisionRadius() + AttackNum(Special, TEXT("reach"), 60.f);
+			if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Self->GetActorLocation()) < Reach)
+			{
+				bSpecialHit = true;
+				CreatureHit(Self, *It, Special);
+				break;
+			}
+		}
+	}
+	const bool bLanded = Special == TEXT("lunge") && SpecialClock < 0.6f && !Self->GetCharacterMovement()->IsFalling();
+	if (SpecialClock <= 0.f || bLanded || (Special == TEXT("charge") && bSpecialHit))
+	{
+		EndSpecial(Self);
+	}
+}
+
+void AWRCreatureAI::EndSpecial(AWRCreature* Self)
+{
+	Self->SpeedBoost = 1.f;
+	SpecialPhase = 0;
+	Special = NAME_None;
+	SpecialTarget = nullptr;
+}
+
 void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 {
 	const FWRCreatureDef* Def = Self->GetDef();
+	if (SpecialPhase != 0)
+	{
+		TickSpecial(Self, DeltaSeconds);
+		return;
+	}
 
 	ThinkTimer -= DeltaSeconds;
 	if (ThinkTimer <= 0.f)
 	{
 		ThinkTimer = 0.25f;
-		const AWRCharacterBase* Current = Cast<AWRCharacterBase>(Self->GetAggroTarget());
-		if (!Current || !Current->IsAlive())
+		UpdateSleep(Self);
+		// Morale: badly hurt, or hurt with the pack falling around it, it runs (bosses and minions never do).
+		const UWRAttributeSet* A = Self->GetAttributes();
+		const float Health = A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 1.f;
+		if (!Self->IsFleeing() && Self->SinceHit() < 10.f && Def->Behavior != TEXT("passive"))
 		{
-			Self->SetAggroTarget(PickTarget(Self));
+			AActor* Threat = Self->GetAggroTarget() ? Self->GetAggroTarget() : Self->GetFleeFrom();
+			if (Health < WRTune(TEXT("creatureAI.fleeHealth"), 0.25f))
+			{
+				Self->StartFleeing(Threat, TEXT("badly hurt"));
+			}
+			else if (Self->RecentPackLoss() && Health < WRTune(TEXT("creatureAI.packFleeHealth"), 0.5f))
+			{
+				Self->StartFleeing(Threat, TEXT("the pack is breaking"));
+			}
+		}
+		const AWRCharacterBase* Current = Cast<AWRCharacterBase>(Self->GetAggroTarget());
+		if (Self->IsFleeing() || Self->IsEating())
+		{
+			// Running or feeding: no new fights.
+		}
+		else if (!Current || !Current->IsAlive() || (Current->IsCreature() && Current->GetTameOwner().IsEmpty()))
+		{
+			// A survivor or a tame in range comes first (a hunter drops its prey for one); then, if hungry, prey.
+			AActor* Picked = PickTarget(Self);
+			if (Picked)
+			{
+				Self->HuntTarget = nullptr;
+				Self->SetAggroTarget(Picked);
+			}
+			else if (!Current || !Current->IsAlive())
+			{
+				AWRCreature* Prey = Self->IsHungry() && !Self->IsAsleep() ? PickPrey(Self) : nullptr;
+				if (Prey)
+				{
+					UE_LOG(LogWildreach, Log, TEXT("AI %s hunts %s"), *Self->GetName(), *Prey->GetName());
+				}
+				Self->HuntTarget = Prey;
+				Self->SetAggroTarget(Prey);
+			}
 		}
 	}
 
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(Self->GetAggroTarget());
-	if (Target && FVector::Dist(Self->GetActorLocation(), Self->GetHome()) > WRTune(TEXT("creature.leashDistance"), 4000.f))
+	if (Target && !Target->IsAlive())
 	{
-		// Gave up the chase: head home.
 		Self->SetAggroTarget(nullptr);
 		Target = nullptr;
+	}
+	const bool bOnHunt = Target && Self->HuntTarget.Get() == Target;
+	const float Leash = bOnHunt ? WRTune(TEXT("creatureAI.huntLeash"), 8000.f) : WRTune(TEXT("creature.leashDistance"), 4000.f);
+	if (Target && FVector::Dist(Self->GetActorLocation(), Self->GetHome()) > Leash)
+	{
+		// Gave up the chase (a hunt runs further): head home.
+		if (Self->HuntTarget.IsValid())
+		{
+			Self->HuntFailed();
+		}
+		Self->SetAggroTarget(nullptr);
+		Target = nullptr;
+	}
+
+	if (Self->HuntTarget.IsValid() && GetWorld()->GetTimeSeconds() >= NextChaseLogAt)
+	{
+		NextChaseLogAt = GetWorld()->GetTimeSeconds() + 3.0;
+		UE_LOG(LogWildreach, Verbose, TEXT("AI %s chasing %s at %.0f cm (%.0f from home)"), *Self->GetName(), *GetNameSafe(Self->HuntTarget.Get()),
+			FVector::Dist2D(Self->HuntTarget->GetActorLocation(), Self->GetActorLocation()), FVector::Dist2D(Self->GetActorLocation(), Self->GetHome()));
+	}
+	// Running for its life: away from the threat, a little faster than usual.
+	if (Self->IsFleeing())
+	{
+		Self->SpeedBoost = WRTune(TEXT("creatureAI.fleeSpeedMult"), 1.2f);
+		const AActor* From = Self->GetFleeFrom();
+		const FVector Away = From ? Self->GetActorLocation() - From->GetActorLocation() : Self->GetActorLocation() - Self->GetHome();
+		Self->AddMovementInput(Away.IsNearlyZero() ? Self->GetActorForwardVector() : Away.GetSafeNormal2D(), 1.f);
+		return;
+	}
+	// In pursuit of prey it runs flat out (slow prey gets caught, fast prey can still get away).
+	Self->SpeedBoost = Self->HuntTarget.IsValid() && Target == Self->HuntTarget.Get() ? WRTune(TEXT("creatureAI.huntSpeedMult"), 1.3f) : 1.f;
+	if (Self->IsEating())
+	{
+		return;  // over its kill
 	}
 
 	// Burrowers stay underground until they have a target.
@@ -1194,7 +1658,7 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		}
 	}
 
-	// Passive creatures flee from nearby survivors (and from anyone who hurt them).
+	// Passive creatures flee from nearby survivors (and from anyone who hurt them), and from a predator hunting them.
 	if (Def->Behavior == TEXT("passive"))
 	{
 		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
@@ -1206,6 +1670,16 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 				return;
 			}
 		}
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			// It bolts in bursts: after a run it needs creatureAI.preyRestSeconds before it can bolt again (a bite still sends it).
+			if (It->HuntTarget.Get() == Self && It->IsAlive() && Self->CanBoltAgain()
+				&& FVector::Dist(It->GetActorLocation(), Self->GetActorLocation()) < WRTune(TEXT("creatureAI.preyNoticeRadius"), 1500.f))
+			{
+				Self->StartFleeing(*It, TEXT("hunted"));
+				return;
+			}
+		}
 	}
 
 	if (Target)
@@ -1214,10 +1688,14 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 
-	// Idle: drift around home.
+	// Idle: drift around home (or lie still, asleep).
 	if (Def->Archetype == TEXT("flyer"))
 	{
 		Self->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	}
+	if (Self->IsAsleep())
+	{
+		return;
 	}
 	WanderClock -= DeltaSeconds;
 	if (WanderClock <= 0.f)
@@ -1234,6 +1712,13 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 
 void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 {
+	Self->SpeedBoost = 1.f;
+	Self->SetAsleep(false);
+	if (SpecialPhase != 0)
+	{
+		TickSpecial(Self, DeltaSeconds);
+		return;
+	}
 	// Find the owner's body.
 	AWRCharacter* OwnerBody = nullptr;
 	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
@@ -1334,6 +1819,17 @@ void AWRCreatureSpawner::AlertPack(AActor* Attacker)
 		if (C.IsValid() && !C->IsTamed() && !C->GetAggroTarget())
 		{
 			C->SetAggroTarget(Attacker);
+		}
+	}
+}
+
+void AWRCreatureSpawner::NotifyPackLoss(const AWRCreature* Dead)
+{
+	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+	{
+		if (C.IsValid() && C.Get() != Dead && C->IsAlive() && !C->IsTamed())
+		{
+			C->NotePackLoss();
 		}
 	}
 }

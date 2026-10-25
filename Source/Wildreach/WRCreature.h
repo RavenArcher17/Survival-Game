@@ -46,6 +46,10 @@ struct FWRCreatureDef
 	TArray<TPair<FName, int32>> Products;
 	bool bNest = false;
 	bool bHearing = false;
+	// Wild life
+	TArray<FName> Attacks;        // besides the bite: lunge, charge, spit, stomp (numbers in tuning.json creatureAI.<attack>)
+	FName Diet;                   // carnivore (hunts), herbivore, lithovore; from its food when not given
+	FName Activity;               // diurnal (sleeps at night), nocturnal (sleeps by day), any
 
 	// Art: a skeletal mesh replaces the placeholder shape when set (scaled to the capsule, feet on the ground).
 	FString Mesh;
@@ -130,6 +134,31 @@ public:
 	static int32 CountTames(const UWorld* World, const FString& PlayerName);
 	/** Tames a player may keep (taming.tameLimit + Bonded / Beast lord perks). */
 	static int32 TameLimitFor(const APlayerState* PS);
+	// --- Wild life (server) ---
+	/** The prey it's hunting. A predator and its prey fight each other; wild creatures otherwise never do. */
+	TWeakObjectPtr<AWRCreature> HuntTarget;
+	bool IsHungry() const;
+	bool IsEating() const;
+	bool IsFleeing() const;
+	/** Prey bolt in bursts: rested enough since its last run to bolt from a hunter again. */
+	bool CanBoltAgain() const;
+	AActor* GetFleeFrom() const { return FleeFrom.Get(); }
+	/** Run from a threat for creatureAI.fleeSeconds (bosses, minions and dummies never do). */
+	void StartFleeing(AActor* From, const TCHAR* Why);
+	/** A packmate just died: a hurt creature breaks and runs sooner. */
+	void NotePackLoss();
+	bool RecentPackLoss() const;
+	/** Seconds since something last hurt it. */
+	float SinceHit() const;
+	/** It killed its prey: eats for a while, then isn't hungry for creatureAI.huntIntervalMinutes. */
+	void Ate(AWRCreature* Prey);
+	/** Gave up a hunt (prey got away): tries again a little later. */
+	void HuntFailed();
+	bool IsAsleep() const { return bAsleep; }
+	void SetAsleep(bool bSleep);
+	bool WasWokenRecently() const;
+	UPROPERTY(Replicated) bool bAsleep = false;
+
 	/** Server: player mounts / dismounts. */
 	FString Ride(AWRCharacter* Rider);
 	void Dismount();
@@ -177,6 +206,13 @@ private:
 	float MealValue = 1.f;           // taming value of the meal being digested
 	TMap<FName, int32> TameStash;    // knockout taming: food given, eaten a meal at a time
 	bool bCalm = false;
+	double HungryAt = 0.0;
+	double EatingUntil = 0.0;
+	double FleeUntil = 0.0;
+	TWeakObjectPtr<AActor> FleeFrom;
+	double PackLossAt = -1000.0;
+	double LastHitAt = -1000.0;
+	double WokenUntil = 0.0;
 	void UpdateTameForecast();
 	float UtilityClock = 0.f;
 	float ProduceClock = 0.f;
@@ -228,9 +264,26 @@ public:
 
 private:
 	AActor* PickTarget(AWRCreature* Self) const;
+	/** A hungry carnivore's prey: the nearest wild non-carnivore small enough to take (pack hunters take bigger). */
+	AWRCreature* PickPrey(AWRCreature* Self) const;
 	void TickTame(AWRCreature* Self, float DeltaSeconds);
 	void TickWild(AWRCreature* Self, float DeltaSeconds);
 	void ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target);
+	/** Day animals sleep at night, night hunters by day (unless something's going on). */
+	void UpdateSleep(AWRCreature* Self);
+	// Special attacks (creatureAI.<kind> in tuning.json): a telegraphed windup, then the move.
+	bool TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target, float Dist);
+	void TickSpecial(AWRCreature* Self, float DeltaSeconds);
+	void EndSpecial(AWRCreature* Self);
+	FName Special;
+	int32 SpecialPhase = 0;  // 0 none, 1 windup, 2 under way
+	float SpecialClock = 0.f;
+	FVector SpecialDir = FVector::ForwardVector;
+	bool bSpecialHit = false;
+	TWeakObjectPtr<AWRCharacterBase> SpecialTarget;
+	TMap<FName, double> SpecialReadyAt;
+	double NextSnapAt = 0.0;      // its next bite at running prey
+	double NextChaseLogAt = 0.0;  // verbose log while hunting
 	float ThinkTimer = 0.f;
 	float FlankAngle = 0.f;
 	FVector WanderGoal = FVector::ZeroVector;
@@ -254,6 +307,8 @@ public:
 
 	/** Everyone in this spawner's pack turns on an attacker (herds defend; nests swarm). */
 	void AlertPack(AActor* Attacker);
+	/** One of the pack died: the rest lose heart (see AWRCreature::NotePackLoss). */
+	void NotifyPackLoss(const AWRCreature* Dead);
 
 protected:
 	virtual void BeginPlay() override;

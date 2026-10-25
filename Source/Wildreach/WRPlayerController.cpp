@@ -136,6 +136,8 @@ void AWRPlayerController::WRAmmo(int32 Dir) { if (AWRCharacter* C = Cast<AWRChar
 void AWRPlayerController::WRHold(float Seconds) { ServerCommand(FString::Printf(TEXT("hold %.1f"), Seconds)); }
 void AWRPlayerController::WRClearCreatures() { ServerCommand(TEXT("clearcreatures")); }
 void AWRPlayerController::WRHour(float Hour) { ServerCommand(FString::Printf(TEXT("hour %.2f"), Hour)); }
+void AWRPlayerController::WRSpawnAt(FName Creature, float X, float Y) { ServerCommand(FString::Printf(TEXT("spawnat %s %.0f %.0f"), *Creature.ToString(), X, Y)); }
+void AWRPlayerController::WRCreatureHP(FName Creature, float Fraction) { ServerCommand(FString::Printf(TEXT("creaturehp %s %.3f"), *Creature.ToString(), Fraction)); }
 void AWRPlayerController::WRSky()
 {
 	const UWRSkySubsystem* Sub = GetWorld()->GetSubsystem<UWRSkySubsystem>();
@@ -508,6 +510,33 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			*GetNameSafe(Best->GetRider()), Best->TameBonus * 100.f, Best->GetAttributes() ? Best->GetAttributes()->GetMaxHealth() : 0.f,
 			*Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
 		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("spawnat"))
+	{
+		FVector At(FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)), 5000.f);
+		FHitResult Ground;
+		if (GetWorld()->LineTraceSingleByChannel(Ground, At, At - FVector(0.f, 0.f, 10000.f), ECC_WorldStatic))
+		{
+			At = Ground.ImpactPoint + FVector(0.f, 0.f, 100.f);
+		}
+		AWRCreature* Spawned = AWRCreature::SpawnCreature(GetWorld(), FName(*Arg(1)), At, FRotator::ZeroRotator);
+		Result = Spawned ? FString::Printf(TEXT("%s at %s"), *Spawned->GetName(), *At.ToCompactString()) : TEXT("couldn't spawn");
+	}
+	else if (Cmd == TEXT("creaturehp") && Survivor)
+	{
+		AWRCreature* Best = nullptr;
+		float BestDist = TNumericLimits<float>::Max();
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist(It->GetActorLocation(), Survivor->GetActorLocation());
+			if (It->IsAlive() && !It->IsTamed() && It->CreatureId == FName(*Arg(1)) && D < BestDist) { BestDist = D; Best = *It; }
+		}
+		UAbilitySystemComponent* CreatureASC = Best ? Best->GetAbilitySystemComponent() : nullptr;
+		if (CreatureASC && Best->GetAttributes())
+		{
+			CreatureASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), Best->GetAttributes()->GetMaxHealth() * FMath::Clamp(FCString::Atof(*Arg(2)), 0.01f, 1.f));
+		}
+		Result = Best ? FString::Printf(TEXT("%s health %.0f"), *Best->GetName(), Best->GetAttributes()->GetHealth()) : TEXT("none found");
 	}
 	else if (Cmd == TEXT("hour"))
 	{

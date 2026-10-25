@@ -106,7 +106,7 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 		return 0.f;
 	}
 	// Attack/block slowdowns are predicted flags on the movement component, not tags.
-	return HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) : 1.f;
+	return (HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) : 1.f) * SpeedBoost;
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)

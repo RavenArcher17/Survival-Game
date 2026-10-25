@@ -74,7 +74,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 `WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRLearn fire fire_wall`, `WRCast 3`, `WRSpawn cinderfang 3`,
 `WRSpawn vulkarn 1`, `WRBossDmgPct 30 frost`, `WRGive iron_ore 20`, `WREquip copper_sword`, `WRWeapon iron fine 6`,
 `WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRTameGive kibble`, `WRNarcotic`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
-`WRGather tree` (bot gathers: tree / rock / shrub / node / any / off), `WRHour 21` (jump the clock), `WRSky` (log the sky),
+`WRGather tree` (bot gathers: tree / rock / shrub / node / any / off), `WRHour 21` (jump the clock), `WRSpawnAt cinderfang X Y`, `WRCreatureHP rimeclaw 0.3`, `WRSky` (log the sky),
 `WRGive hunting_bow 1`, `WRGive tranq_arrow 20`, `WRRanged 1`, `WRHold 30` (root nearby creatures), `WRClearCreatures`,
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
 
@@ -90,6 +90,7 @@ Tools\housetest.ps1     # a two-room, two-storey house through the build ghost: 
 Tools\survivaltest.ps1  # fresh player on the island: gather bare-handed, crude tools, hut + workbench, stone tools
 Tools\skytest.ps1       # day and night: sun, moon and exposure at noon / sunset / midnight, clock rate, time kept over a restart (-Shots, -Arena)
 Tools\tametest.ps1      # offer food, ride, tranq knockout + effectiveness + narcotic + kibble, eggs, orders, waking loses progress, tames saved (-Shots)
+Tools\aitest.ps1        # creature AI: a pack hunt, sleep by day / hunt at night, a hurt creature fleeing, charge / stomp / spit / lunge (-Shots)
 Tools\rangedtest.ps1    # every ranged weapon at a rooted Cinderfang: hits, tranq knockout, bola, spear pickup (-Body f)
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks

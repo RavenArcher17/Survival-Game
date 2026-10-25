@@ -13,7 +13,7 @@ $shot = 'HighResShot 1600x900|wait 1'
 $aim = 'WRAimAt cinderfang|WRHeal|wait 0.1'   # after the aim zoom settles, and a frame for the camera to swing round
 # A fresh Cinderfang (70 hp, 70 torpor) for each weapon, rooted so it can't reach the archer: a bite staggers, and a
 # staggered survivor can't shoot.
-$target = 'WRClearCreatures|WRSpawn cinderfang 1|wait 0.5|WRHold 40|wait 0.5'
+$target = 'WRClearCreatures|WRSpawn cinderfang 1|WRHold 40|wait 1'   # rooted as it lands (it would lunge at you)
 $cmds = @(
 	'WRBotPause 1', 'wait 2',
 	'WRGive hunting_bow 1', 'WRGive stone_arrow 10', 'WRGive tranq_arrow 10', 'WRGive crossbow 1', 'WRGive crossbow_bolt 5',

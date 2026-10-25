@@ -61,6 +61,8 @@ public:
 
 	/** Movement speed multiplier from statuses and actions (read by the movement component on every machine). */
 	float GetSpeedMultiplier() const;
+	/** Server-driven extra speed (creature AI: a charge, running for its life). */
+	float SpeedBoost = 1.f;
 
 	/** Server: health hit zero. */
 	virtual void Die(AActor* Killer);

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-25: creatures that hunt, flee, sleep and fight differently
+
+- **Attack variety** (`attacks` in `creatures.json`, numbers in `tuning.json` `creatureAI`), each telegraphed: a
+  **lunge** that leaps where its target will be (Cinderfang, Gloomhowl, Rimeclaw, Magmaw), a **charge** down a marked
+  strip that knocks you back (Emberhorn, Frostantler), a **stomp** that hits everything in a marked ring (Basaltback,
+  Woolly drudge), and **spit**, a glob of fire or frost from range (Magmaw spits first then leaps, Scorchwing,
+  Glacimaw). Bites are unchanged; tames use their specials too. A rooted or frozen creature can't leap or charge.
+- **Food chain**: carnivores get hungry every few minutes and hunt the nearest wild non-carnivore they can take (up
+  to 1.3x their size, pack hunters 2x), run it down (pursuit speed, no flanking on running prey, a longer leash on a
+  hunt), and the pack shares the kill and eats. Prey that's hunted bolts in bursts (fast ones like the Ashstrider can
+  get away); neutral prey fights back. Basaltbacks and Woolly drudges are too big to hunt. Wild creatures otherwise
+  still never fight each other.
+- **Morale**: a creature below 25% health runs from what's hurting it, or below 50% when a packmate just died;
+  passive animals bolt when hit. Bosses and their minions never run.
+- **Day and night** (`activity`): day animals sleep at night and night hunters (Gloomhowl, Glowmoth, Aurora fox) by
+  day. Asleep, a creature lies still and notices you at a third of the distance ("(asleep)" on its label), and a hit
+  wakes it; night hunters notice you from 40% further at night.
+- Dev and test commands: `WRSpawnAt <creature> X Y`, `WRCreatureHP <creature> <fraction>`; `Tools/aitest.ps1
+  [-Shots]` stages a Cinderfang pack hunt (Pumicehog killed and shared, Ashstrider ignored once they're fed), the
+  Gloomhowls asleep by day and hunting at night, a hurt Rimeclaw running, and a charge, stomp, spit and lunges. The
+  ranged test now roots its target as it spawns (fresh Cinderfangs lunge at you).
+
 ## 2026-10-25: day and night
 
 The world clock (`AWRGameState`, `clock` in tuning.json) now shows on every client, on the island and the arena.

@@ -148,6 +148,9 @@ public:
 	UFUNCTION(Exec) void WRClearCreatures();
 	/** Set the world clock to an hour (0-24; jumps forward to the next time it's that hour). */
 	UFUNCTION(Exec) void WRHour(float Hour);
+	/** Testing aid: spawn a creature at world X/Y (on the ground) / set the nearest wild one of an id to a fraction of its health. */
+	UFUNCTION(Exec) void WRSpawnAt(FName Creature, float X, float Y);
+	UFUNCTION(Exec) void WRCreatureHP(FName Creature, float Fraction);
 	/** Log what this machine's sky shows: hour, sun and moon height and light, exposure (SKY ...). */
 	UFUNCTION(Exec) void WRSky();
 	/** Teleport to world X/Y (cm), dropped onto the ground. */
