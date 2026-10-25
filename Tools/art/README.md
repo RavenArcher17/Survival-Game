@@ -83,6 +83,21 @@ Winged figures (Ignessa): `blender -b -P rig_special.py -- out\ignessa_tb_textur
 a body, a head and a hinged wing per side behind the shoulders (wings found as whatever spreads out to the sides above
 the waist), with floating, swaying and wing-fanning clips; `meshYaw` 0 and `fly` / `hover` mapped to Run / Idle.
 
+Adding clips to the survivors later (the ranged batch: bow, rifle and throw clips): download them on Mixamo's stock
+**Y Bot** (same Mixamo skeleton, ~1.8 m, no upload needed) as "Without Skin" / packs "No Character", then build
+animation-only FBXs for each survivor with that survivor's own first clip as the rest pose:
+`blender -b -P survivor_build.py -- rigged.fbx mixamo\survivor_m.fbx anims\ranged --out mixamo\ranged_m\survivor_m.fbx
+--rest-from "anims\sword_shield\sheath sword 1.fbx"` (finger tracks the rig lacks are stripped; otherwise the FBX
+exporter drops the whole clip). Copy it to `survivor_m_clips.fbx` (a file named like the mesh re-imports the mesh)
+and run `Tools/import_anims.py` with `WR_ANIMS="...\survivor_m_clips.fbx=/Game/Characters/Survivor/survivor_m_Skeleton=survivor_mArmature_"`:
+Interchange with an animations-only pipeline onto the existing skeleton, clips renamed to the survivor's prefix. The meshes
+are not touched, so Git LFS only grows by the clips.
+
+Ranged gear: `batch_ranged.json` concepts; `normalize_gear.py -- bow ... 120` (limbs along +Y, the arrow's flight
+along +X, riser at the origin), `-- pole ... --front wide|narrow --grip 0.35` (crossbow, blowgun, spear, arrow: tip along
++Y, grip a fraction from the back), `-- ball ... 45` (bola). Blender's +Y comes into Unreal as -Y, so `items.json` says
+`"meshAlong": "-Y"`. `ranged.socket / along / face / rot / offset` place each weapon in the hand.
+
 Held gear (the player's sword and shield): concepts from `batch_gear.json`, build3d, then
 `blender -b -P normalize_gear.py -- sword out\sword_a_textured.glb out\sword_game.glb 95` (grip at the origin, blade along
 its longest axis, 95 cm) or `-- shield ... 70` (face along +Z, 70 cm across, stray struts off the back cut away), and

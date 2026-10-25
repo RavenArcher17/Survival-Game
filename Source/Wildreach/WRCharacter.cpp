@@ -80,6 +80,11 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	ShieldMesh->SetupAttachment(Body);
 	ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ShieldMesh->SetVisibility(false);
+
+	RangedMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RangedMesh"));
+	RangedMesh->SetupAttachment(Body);
+	RangedMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RangedMesh->SetVisibility(false);
 }
 
 void AWRCharacter::BeginPlay()
@@ -100,6 +105,16 @@ void AWRCharacter::Tick(float DeltaSeconds)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		TickBodyAnim();
+		if (IsLocallyControlled())
+		{
+			TickAimCamera(DeltaSeconds);
+		}
+		const float Turn = FMath::FInterpTo(BodyAimTurn, IsAimingRanged() ? RangedAimYaw : 0.f, DeltaSeconds, 10.f);
+		if (bBodyLoaded && !FMath::IsNearlyEqual(Turn, BodyAimTurn, 0.01f))
+		{
+			Body->SetRelativeRotation(FRotator(0.f, BodyYaw + Turn, 0.f));
+		}
+		BodyAimTurn = Turn;
 	}
 	// Slick ice: the same check runs on the server and the owning client, so movement prediction agrees.
 	if (HasAuthority() || IsLocallyControlled())
@@ -122,6 +137,10 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCharacter, bFirstPerson);
 	DOREPLIFETIME(AWRCharacter, BodyStyle);
+	DOREPLIFETIME(AWRCharacter, RangedItem);
+	DOREPLIFETIME(AWRCharacter, bRangedMode);
+	DOREPLIFETIME(AWRCharacter, bAiming);
+	DOREPLIFETIME(AWRCharacter, SelectedAmmo);
 }
 
 void AWRCharacter::InitAbilityActorInfo()
@@ -302,6 +321,8 @@ void AWRCharacter::LoadBodyArt()
 	const FBox Box = BodyAsset->GetBounds().GetBox();
 	Body->SetRelativeScale3D(FVector(Scale));
 	Body->SetRelativeLocation(FVector(0.f, 0.f, -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale));
+	BodyYaw = Yaw;
+	BodyAimTurn = 0.f;
 	Body->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));
 	Body->SetVisibility(true);
 	BodyMesh->SetVisibility(false);
@@ -357,7 +378,8 @@ void AWRCharacter::LoadBodyArt()
 	// (palms down) that's straight up; with the arms hanging (palms in) it's out to the side. Both are the back of the arm.
 	UStaticMesh* Shield = ShieldPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ShieldPath);
 	const int32 ArmBone = Shield ? Ref.FindBoneIndex(FName(*ShieldSocket)) : INDEX_NONE;
-	ShieldMesh->SetVisibility(ArmBone != INDEX_NONE);
+	bShieldShown = ArmBone != INDEX_NONE;
+	ShieldMesh->SetVisibility(bShieldShown);
 	if (ArmBone != INDEX_NONE)
 	{
 		const FTransform ArmCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, ArmBone);
@@ -406,6 +428,7 @@ void AWRCharacter::LoadBodyArt()
 		}
 	}
 	UE_LOG(LogWildreach, Log, TEXT("Player art: %s with %d clips"), *BodyAsset->GetName(), BodyAnimRefs.Num());
+	UpdateWeaponLook();  // a ranged weapon may already be out
 }
 
 float AWRCharacter::PlayBodyAnim(FName Key, bool bLoop, float PlayRate, float Duration)
@@ -446,6 +469,18 @@ void AWRCharacter::TickBodyAnim()
 		BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(TEXT("dodge"), false, 1.f, WRTune(TEXT("player.dodgeVisualSeconds"), 0.7f));
 		return;
 	}
+	if (!QueuedOneShot.IsNone())
+	{
+		// The second half of a shot: nock the next arrow / reload the crossbow.
+		const FName Key = QueuedOneShot;
+		QueuedOneShot = NAME_None;
+		if (BodyAnims.Contains(Key) && !Move->IsFalling() && !Move->IsSwimming())
+		{
+			BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(Key, false, 1.f, QueuedOneShotSeconds);
+			return;
+		}
+	}
+	const auto Pick = [this](const TCHAR* Want, const TCHAR* Fallback) { return BodyAnims.Contains(Want) ? FName(Want) : FName(Fallback); };
 	if (Move->IsSwimming())
 	{
 		PlayBodyAnim(Speed > 40.f ? FName(TEXT("swim")) : FName(TEXT("tread")), true);
@@ -456,6 +491,31 @@ void AWRCharacter::TickBodyAnim()
 		{
 			const float Length = PlayBodyAnim(TEXT("fall"), false);  // plays once and holds the airborne pose
 			Body->SetPosition(Length * WRTune(TEXT("player.fallClipStart"), 0.35f));  // skip the crouch and take-off
+		}
+	}
+	else if (IsRangedOut())
+	{
+		// Ranged weapon out: its own stance, and the aim pose while aiming (bow: drawn; crossbow / blowgun: shouldered).
+		const FName Group = RangedAnimGroup();
+		if (bAiming && Group == TEXT("bow"))
+		{
+			PlayBodyAnim(Speed > 25.f ? Pick(TEXT("bow_aimwalk"), TEXT("bow_aim")) : FName(TEXT("bow_aim")), true);
+		}
+		else if (bAiming && Group == TEXT("rifle"))
+		{
+			PlayBodyAnim(TEXT("rifle_aim"), true);
+		}
+		else if (Speed > 280.f)
+		{
+			PlayBodyAnim(Pick(TEXT("ranged_run"), TEXT("run")), true, FMath::Clamp(Speed / RunClipSpeed, 0.7f, 1.8f));
+		}
+		else if (Speed > 25.f)
+		{
+			PlayBodyAnim(Pick(TEXT("ranged_walk"), TEXT("walk")), true, FMath::Clamp(Speed / WalkClipSpeed, 0.6f, 1.8f));
+		}
+		else
+		{
+			PlayBodyAnim(Pick(TEXT("ranged_idle"), TEXT("idle")), true);
 		}
 	}
 	else if (HasTag(WRTags::State_Blocking))
@@ -553,6 +613,13 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 		else if (Input == EWRAbilityInput::Block) PC->CancelPlacement();
 		return;
 	}
+	// Ranged weapon out: right mouse aims, left mouse fires (heavy has nothing to do).
+	if (IsRangedOut() && (Input == EWRAbilityInput::Block || Input == EWRAbilityInput::Light || Input == EWRAbilityInput::Heavy))
+	{
+		if (Input == EWRAbilityInput::Block) SetAiming(true);
+		else if (Input == EWRAbilityInput::Light) FireRanged();
+		return;
+	}
 	if (AbilitySystem)
 	{
 		AbilitySystem->AbilityLocalInputPressed(static_cast<int32>(Input));
@@ -561,6 +628,11 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 
 void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)
 {
+	if (Input == EWRAbilityInput::Block && bAiming)
+	{
+		SetAiming(false);
+		return;
+	}
 	if (AbilitySystem)
 	{
 		AbilitySystem->AbilityLocalInputReleased(static_cast<int32>(Input));
@@ -601,6 +673,12 @@ void AWRCharacter::BuildInput()
 	MappingContext->MapKey(JumpAction, EKeys::SpaceBar);
 	MappingContext->MapKey(SprintAction, EKeys::LeftShift);
 	MappingContext->MapKey(ToggleViewAction, EKeys::V);
+	SwapWeaponAction = NewObject<UInputAction>(this);
+	MappingContext->MapKey(SwapWeaponAction, EKeys::G);
+	AmmoNextAction = NewObject<UInputAction>(this);
+	MappingContext->MapKey(AmmoNextAction, EKeys::MouseScrollUp);
+	AmmoPrevAction = NewObject<UInputAction>(this);
+	MappingContext->MapKey(AmmoPrevAction, EKeys::MouseScrollDown);
 
 	const TPair<EWRAbilityInput, FKey> AbilityKeys[] = {
 		{ EWRAbilityInput::Light, EKeys::LeftMouseButton },
@@ -644,6 +722,9 @@ void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AWRCharacter::StartSprint);
 		Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AWRCharacter::StopSprint);
 		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AWRCharacter::ToggleView);
+		Input->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &AWRCharacter::ToggleWeaponSet);
+		Input->BindAction(AmmoNextAction, ETriggerEvent::Started, this, &AWRCharacter::AmmoNext);
+		Input->BindAction(AmmoPrevAction, ETriggerEvent::Started, this, &AWRCharacter::AmmoPrev);
 		for (const TPair<EWRAbilityInput, TObjectPtr<UInputAction>>& Pair : AbilityActions)
 		{
 			Input->BindAction(Pair.Value, ETriggerEvent::Started, this, &AWRCharacter::PressAbilityInput, Pair.Key);

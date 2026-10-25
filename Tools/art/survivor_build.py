@@ -100,7 +100,9 @@ orig_len = edge_lengths(mesh_co(full.data)) if "--cut-stretch" in args else None
 # ---- rest pose: Mixamo's animation files are relative to its T-pose skeleton, but the rig was downloaded in the mesh's
 # own pose (arms out and down). Pose the rig into the animations' rest skeleton, bake that into the mesh, and make it
 # the new rest pose, so every animation plays as intended.
-first_anim = next(p for d in anim_dirs for p in sorted(glob.glob(os.path.join(d, "*.fbx"))))
+# --rest-from: the clip whose skeleton sets the rest pose (default the first clip). Pass the character's own first clip
+# when adding clips downloaded on another Mixamo character (Y Bot), so the rest pose stays the one already in game.
+first_anim = args[args.index("--rest-from") + 1] if "--rest-from" in args else next(p for d in anim_dirs for p in sorted(glob.glob(os.path.join(d, "*.fbx"))))
 objs = imported(lambda: bpy.ops.import_scene.fbx(filepath=first_anim, automatic_bone_orientation=False))
 ref = next(o for o in objs if o.type == "ARMATURE")
 target = {b.name: b.matrix_local.copy() for b in ref.data.bones}
@@ -142,6 +144,13 @@ for d in anim_dirs:
         else:
             act.name = name
             act.use_fake_user = True
+            # Clips made on another Mixamo character (Y Bot) carry finger bones this rig may not have; the FBX exporter
+            # drops a whole clip if any of its tracks points at a missing bone, so strip those tracks.
+            bags = [bag for layer in getattr(act, "layers", []) for strip in layer.strips for bag in strip.channelbags]
+            for bag in bags:
+                for fc in [fc for fc in bag.fcurves if fc.data_path.startswith('pose.bones["')
+                           and fc.data_path.split('"')[1] not in rig.pose.bones]:
+                    bag.fcurves.remove(fc)
             # In place: freeze the hips' sideways (local X) and forward (local Z) travel at their first value;
             # keep local Y, the up-and-down (jumps, crouches, bob).
             # Jumps also lose their vertical travel: the game lifts the capsule itself, so the clip's own hop doubled it.

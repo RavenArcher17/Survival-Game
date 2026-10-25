@@ -47,6 +47,8 @@ struct FWRHit
 	UPROPERTY() bool bWeaponArt = false;
 	/** Status ticks (burn) skip block/parry/riposte/resource gain. */
 	UPROPERTY() bool bDamageOverTime = false;
+	/** Extra knockout torpor (tranq arrows, bolts, darts). */
+	UPROPERTY() float Torpor = 0.f;
 	UPROPERTY() FVector Origin = FVector::ZeroVector;
 };
 

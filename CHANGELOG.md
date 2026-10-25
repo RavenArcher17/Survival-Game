@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-10-25: ranged weapons
+
+- **A ranged slot** next to the sword and shield: a hunting bow (stone and tranq arrows), a crossbow (bolts and tranq
+  bolts), a blowgun (torpor darts), throwing spears (stack of 5) and bolas (stack of 10). **G** swaps between the
+  sword and shield and the ranged weapon, **right mouse** aims (the camera pulls in over the shoulder, the view
+  narrows, you walk at half speed and face where you look), **left mouse** fires or throws at the crosshair, and the
+  **mouse wheel** picks the ammo. The HUD shows the weapon and what it's loaded with; firing from the hip spreads 4°.
+  A bite that staggers you also stops you shooting.
+- Shots are real projectiles with drop. Arrows, bolts, darts and spears **stick** where they land, tip first (and ride
+  along on a creature they hit); a thrown spear is left on the ground to pick up again. A **bola** roots small
+  creatures (new `Rooted` status, no movement) and slows big ones. Tranq ammo adds **torpor** on the hit, the start of
+  taming: two tranq arrows or two torpor darts knock a Cinderfang out.
+- Art: AI-made bow, crossbow, blowgun, spear, bola and arrow (`batch_ranged.json`; `normalize_gear.py` bow / pole /
+  ball modes). Pole mode now turns an item onto its principal axes first: image-to-3D left the blowgun, spear and
+  arrow lying on a slant, so they were held and flew crooked. 13 new Mixamo clips on both bodies: bow idle / walk /
+  run / draw / aim / aim-walk / release / equip / put away, rifle aim / fire / reload (crossbow and blowgun), and a
+  throw. Each shot plays its fire clip and then its reload.
+- Holding them: `ranged.socket / along / face` in `items.json`, worked out from the skeleton. `"pose"` measures those
+  directions in a body clip instead of the reference pose (arms hanging), and `"along": "hands"` runs the weapon level
+  from the trigger hand toward the other hand: the crossbow and blowgun sit at the cheek in the rifle-aim pose, and the
+  spear is carried level, blade forward. Mixamo's rifle aim holds the gun ~25° left of where the body faces, so the
+  body turns that much while aiming one.
+- Adding clips to a survivor without touching its mesh: `Tools/import_anims.py` imports animations only onto the
+  existing skeleton (Interchange, through a pipeline stack override: a bare pipeline in the import task is ignored
+  and the default one imports a new mesh and skeleton). `survivor_build.py --rest-from` builds the clip FBX on the
+  survivor's own rest pose and strips tracks for bones the survivor lacks (the FBX exporter drops any clip that has one).
+- The crosshair and `WRAimAt` use the survivor's own camera, so the art camera can watch a bot shoot.
+- Bot and test commands: `WRRanged 0|1`, `WRAim 0|1`, `WRFire`, `WRAmmo 1|-1`, `WRAimAt <creature>` (holds over for
+  drop), `WRHold <seconds>` (roots the wild creatures within 30 m), `WRClearCreatures` (removes them and the training
+  dummies). `Tools/rangedtest.ps1 [-Body f]` fires every weapon at a fresh, rooted Cinderfang on the arena with
+  screenshots: 9/10 hits on the male body (the spear fell short), 10/10 on the female, no errors.
+
 ## 2026-10-25: the survival loop works from a fresh spawn
 
 A playthrough as a fresh bot on `L_Island` showed the basic loop didn't hold together: the island's trees, rocks and

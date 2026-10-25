@@ -126,6 +126,15 @@ public:
 
 	UFUNCTION(Exec) void WRInteract();
 	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
+	/** Ranged weapon (bots): out (1) / away (0), aim, fire, cycle ammo, face the nearest creature of an id. */
+	UFUNCTION(Exec) void WRRanged(int32 bOn);
+	UFUNCTION(Exec) void WRAim(int32 bOn);
+	UFUNCTION(Exec) void WRFire();
+	UFUNCTION(Exec) void WRAmmo(int32 Dir);
+	UFUNCTION(Exec) void WRAimAt(FName Creature);
+	/** Testing aid: root the wild creatures within 30 m for some seconds / remove them and the training dummies. */
+	UFUNCTION(Exec) void WRHold(float Seconds);
+	UFUNCTION(Exec) void WRClearCreatures();
 	/** Teleport to world X/Y (cm), dropped onto the ground. */
 	UFUNCTION(Exec) void WRTeleport(float X, float Y);
 	/** Set the camera direction (local). */

@@ -12,6 +12,7 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(Status_Burn, "Status.Burn");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Frostbite, "Status.Frostbite");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Slowed, "Status.Slowed");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Rooted, "Status.Rooted");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Frozen, "Status.Frozen");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Staggered, "Status.Staggered");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Unconscious, "Status.Unconscious");

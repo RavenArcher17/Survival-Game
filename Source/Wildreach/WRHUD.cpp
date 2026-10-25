@@ -188,6 +188,15 @@ void AWRHUD::DrawHUD()
 			Inv->CountOf(TEXT("cooked_meat")), Inv->CountOf(TEXT("waterskin")),
 			FWRInventoryRules::TotalWeight(Inv->GetSlots()));
 		DrawText(Belt, FLinearColor(0.9f, 0.9f, 0.9f), X + 320.f, Canvas->ClipY - 3.f * BarSpacing - 24.f);
+		// Ranged slot: what it is and what it's loaded with.
+		if (const FWRItemDef* Ranged = FWRItemRegistry::Get().Find(Survivor->GetRangedItem()))
+		{
+			const FWRItemDef* Ammo = FWRItemRegistry::Get().Find(Survivor->GetSelectedAmmo());
+			const FString Loaded = Ranged->IsThrowable() ? FString::Printf(TEXT("%s x%d"), *Ranged->Name, Inv->GetEquipped(EWREquipSlot::Ranged).Count)
+				: FString::Printf(TEXT("%s: %s x%d"), *Ranged->Name, Ammo ? *Ammo->Name : TEXT("no ammo"), Ammo ? Inv->CountOf(Ammo->Id) : 0);
+			DrawText(FString::Printf(TEXT("%s   (G: %s, RMB aim, wheel: ammo)"), *Loaded, Survivor->IsRangedOut() ? TEXT("put away") : TEXT("draw")),
+				Survivor->IsRangedOut() ? FLinearColor(1.f, 0.85f, 0.45f) : FLinearColor(0.7f, 0.7f, 0.7f), X + 320.f, Canvas->ClipY - 3.f * BarSpacing - 44.f);
+		}
 	}
 
 	// Statuses on yourself.
@@ -224,7 +233,7 @@ void AWRHUD::DrawHUD()
 		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
 		DrawText(Line, FLinearColor::White, 24.f, 48.f);
 	}
-	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  P paths  K skills  B build  M map  T chat  V view"),
+	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  P paths  K skills  B build  M map  T chat  V view  G ranged weapon"),
 		FLinearColor(1.f, 1.f, 1.f, 0.55f), 24.f, 24.f);
 
 	// Quick slots, bottom centre.
@@ -265,7 +274,16 @@ void AWRHUD::DrawHUD()
 	}
 
 	// Crosshair (first person) and lock-on marker.
-	if (Survivor->IsFirstPerson())
+	if (Survivor->IsAimingRanged())
+	{
+		// Aiming: a small cross where the shot goes.
+		const float CX = Canvas->ClipX * 0.5f, CY = Canvas->ClipY * 0.5f;
+		DrawRect(FLinearColor::White, CX - 9.f, CY - 1.f, 6.f, 2.f);
+		DrawRect(FLinearColor::White, CX + 3.f, CY - 1.f, 6.f, 2.f);
+		DrawRect(FLinearColor::White, CX - 1.f, CY - 9.f, 2.f, 6.f);
+		DrawRect(FLinearColor::White, CX - 1.f, CY + 3.f, 2.f, 6.f);
+	}
+	else if (Survivor->IsFirstPerson())
 	{
 		DrawRect(FLinearColor::White, Canvas->ClipX * 0.5f - 1.f, Canvas->ClipY * 0.5f - 1.f, 3.f, 3.f);
 	}

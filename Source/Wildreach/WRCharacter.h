@@ -42,6 +42,27 @@ public:
 	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
 
+	// Ranged weapons (WRRanged.cpp).
+	/** Server (from the inventory): the weapon in the ranged slot, None if empty. */
+	void SetRangedItem(FName ItemId);
+	/** Owner: swap between sword-and-shield and the ranged weapon (G). */
+	void ToggleWeaponSet();
+	void SetRangedMode(bool bOn);
+	/** Owner: aim the ranged weapon (right mouse while it's out). */
+	void SetAiming(bool bOn);
+	/** Owner: fire or throw at the crosshair (left mouse while it's out). */
+	void FireRanged();
+	/** Where the crosshair looks from: the survivor's camera and control rotation. */
+	void GetAimView(FVector& OutLoc, FRotator& OutRot) const;
+	/** The control rotation that puts the crosshair on a world point (WRAimAt). */
+	FRotator AimRotationAt(const FVector& Target) const;
+	/** Owner: next / previous ammo type (mouse wheel). */
+	void CycleAmmo(int32 Dir);
+	bool IsRangedOut() const { return bRangedMode && !RangedItem.IsNone(); }
+	bool IsAimingRanged() const { return bAiming && IsRangedOut(); }
+	FName GetRangedItem() const { return RangedItem; }
+	FName GetSelectedAmmo() const { return SelectedAmmo; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnDeath(AActor* Killer) override;
@@ -53,6 +74,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<class USkeletalMeshComponent> Body;
 	/** Shield strapped to the body's left forearm (player_art.json "shieldMesh"). */
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> ShieldMesh;
+	/** The ranged weapon in hand while it's out. */
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> RangedMesh;
+	bool bShieldShown = false;
 	/** Body picked in the menu (?Body= on the join URL, kept on the PlayerState): a variant under "bodies" in
 	 *  Data/player_art.json. None = the default body. */
 	UPROPERTY(ReplicatedUsing=OnRep_BodyStyle) FName BodyStyle;
@@ -83,6 +107,32 @@ private:
 	/** Load (or swap to) the body for BodyStyle; does nothing if that body is already on. */
 	void LoadBodyArt();
 	UFUNCTION() void OnRep_BodyStyle();
+	FName QueuedOneShot;          // played when the current one-shot ends (a bow's nock, a crossbow's reload)
+	float QueuedOneShotSeconds = 0.f;
+
+	UPROPERTY(ReplicatedUsing=OnRep_RangedLook) FName RangedItem;
+	UPROPERTY(ReplicatedUsing=OnRep_RangedLook) bool bRangedMode = false;
+	UPROPERTY(Replicated) bool bAiming = false;
+	UPROPERTY(Replicated) FName SelectedAmmo;
+	double NextShotAt = 0.0;       // server: the weapon is ready again
+	double LocalNextShotAt = 0.0;  // owner: don't flood the server
+	float AimBlend = 0.f;          // owner camera, 0 = normal, 1 = aiming
+	float BodyYaw = 0.f;           // the body art's meshYaw
+	float RangedAimYaw = 0.f;      // extra body turn while aiming, so a weapon held across the body points ahead
+	float BodyAimTurn = 0.f;       // that turn, eased in and out
+	FTimerHandle ThrowTimer;
+	UFUNCTION() void OnRep_RangedLook();
+	void UpdateWeaponLook();
+	void AttachHeld(UStaticMeshComponent* Comp, class UStaticMesh* Model, const struct FWRItemDef& Def);
+	void ApplyAimRotation();
+	void TickAimCamera(float DeltaSeconds);
+	FName RangedAnimGroup() const;  // bow / rifle (crossbow, blowgun) / throw
+	void LaunchProjectile(const struct FWRItemDef& Launcher, FName AmmoId, const FVector& Dir);
+	UFUNCTION(Server, Reliable) void ServerSetRangedMode(bool bOn);
+	UFUNCTION(Server, Reliable) void ServerSetAiming(bool bOn);
+	UFUNCTION(Server, Reliable) void ServerFireRanged(FVector_NetQuantize AimPoint);
+	UFUNCTION(Server, Reliable) void ServerCycleAmmo(int32 Dir);
+	UFUNCTION(NetMulticast, Unreliable) void MulticastRangedShot(FName FireKey, FName ReloadKey, float Reload);
 	void TickBodyAnim();
 	/** Play a clip from a set; bLoop for locomotion. Duration > 0 stretches a one-shot to fit it. Returns the clip length. */
 	float PlayBodyAnim(FName Key, bool bLoop, float PlayRate = 1.f, float Duration = 0.f);
@@ -107,5 +157,10 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> JumpAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> SprintAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> ToggleViewAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> SwapWeaponAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> AmmoNextAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> AmmoPrevAction;
+	void AmmoNext() { CycleAmmo(1); }
+	void AmmoPrev() { CycleAmmo(-1); }
 	UPROPERTY(Transient) TMap<EWRAbilityInput, TObjectPtr<UInputAction>> AbilityActions;
 };

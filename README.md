@@ -63,6 +63,8 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 | E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags |
 | I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu (also crafting by hand) |
 | LMB at a tree / rock / shrub | gather wood / stone / fiber (a hatchet or pick in your bag gathers more) |
+| G | swap sword-and-shield for the ranged weapon (bow, crossbow, blowgun, spears, bolas) and back |
+| with it out: RMB (hold) / LMB / wheel | aim over the shoulder / fire or throw at the crosshair / next ammo (stone, tranq) |
 | Shift / Space / V | sprint / jump / first-third person |
 | M / T | map list (bosses, caves, camps, passes: distance + direction) / chat |
 | F10 | back to the main menu |
@@ -71,6 +73,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 `WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRLearn fire fire_wall`, `WRCast 3`, `WRSpawn cinderfang 3`,
 `WRSpawn vulkarn 1`, `WRBossDmgPct 30 frost`, `WRGive iron_ore 20`, `WREquip copper_sword`, `WRWeapon iron fine 6`,
 `WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
+`WRGive hunting_bow 1`, `WRGive tranq_arrow 20`, `WRRanged 1`, `WRHold 30` (root nearby creatures), `WRClearCreatures`,
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
 
 ## Test
@@ -83,6 +86,7 @@ Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets
 Tools\buildtest.ps1     # claims, code locks, raids, collapse, world save
 Tools\survivaltest.ps1  # fresh player on the island: gather bare-handed, crude tools, hut + workbench, stone tools
 Tools\tametest.ps1      # offer food, ride, knockout + feed, eggs, orders, tames saved
+Tools\rangedtest.ps1    # every ranged weapon at a rooted Cinderfang: hits, tranq knockout, bola, spear pickup (-Body f)
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells

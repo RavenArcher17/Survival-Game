@@ -1,6 +1,8 @@
 #include "WRCharacterMovementComponent.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
+#include "WRCharacter.h"
+#include "WRTuning.h"
 #include "WRGameplayTags.h"
 
 bool UWRCharacterMovementComponent::IsSprinting() const
@@ -22,6 +24,10 @@ float UWRCharacterMovementComponent::GetMaxSpeed() const
 	}
 	if (bAttackSlow) Speed *= 0.35f;
 	if (bBlockSlow) Speed *= 0.5f;
+	if (const AWRCharacter* Survivor = Cast<AWRCharacter>(CharacterOwner); Survivor && Survivor->IsAimingRanged())
+	{
+		Speed *= WRTune(TEXT("ranged.aimSpeedMultiplier"), 0.5f);
+	}
 	const AWRCharacterBase* WRChar = Cast<AWRCharacterBase>(CharacterOwner);
 	return WRChar ? Speed * WRChar->GetSpeedMultiplier() : Speed;
 }

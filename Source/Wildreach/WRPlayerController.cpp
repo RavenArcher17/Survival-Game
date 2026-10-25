@@ -127,6 +127,49 @@ void AWRPlayerController::WRWalkTo(float X, float Y)
 	UE_LOG(LogWildreach, Log, TEXT("WALK start toward (%.0f, %.0f)"), X, Y);
 }
 
+void AWRPlayerController::WRRanged(int32 bOn) { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn())) C->SetRangedMode(bOn != 0); }
+void AWRPlayerController::WRAim(int32 bOn) { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn())) C->SetAiming(bOn != 0); }
+void AWRPlayerController::WRFire() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn())) C->FireRanged(); }
+void AWRPlayerController::WRAmmo(int32 Dir) { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn())) C->CycleAmmo(Dir); }
+void AWRPlayerController::WRHold(float Seconds) { ServerCommand(FString::Printf(TEXT("hold %.1f"), Seconds)); }
+void AWRPlayerController::WRClearCreatures() { ServerCommand(TEXT("clearcreatures")); }
+
+void AWRPlayerController::WRAimAt(FName Creature)
+{
+	APawn* Me = GetPawn();
+	if (!Me)
+	{
+		return;
+	}
+	AActor* Best = nullptr;
+	float BestDist = TNumericLimits<float>::Max();
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		const float Dist = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
+		if (It->IsAlive() && (Creature.IsNone() || It->CreatureId == Creature) && Dist < BestDist)
+		{
+			BestDist = Dist;
+			Best = *It;
+		}
+	}
+	if (Best)
+	{
+		FVector ViewLoc;
+		FRotator ViewRot;
+		GetPlayerViewPoint(ViewLoc, ViewRot);
+		const AWRCharacter* Survivor = Cast<AWRCharacter>(Me);
+		FVector At = Best->GetActorLocation();
+		if (const FWRItemDef* Gun = Survivor && Survivor->IsRangedOut() ? FWRItemRegistry::Get().Find(Survivor->GetRangedItem()) : nullptr)
+		{
+			// Hold over for the shot's drop, as a player would.
+			const float Flight = FVector::Dist(At, Me->GetActorLocation() + FVector(0.f, 0.f, 55.f)) / FMath::Max(100.f, Gun->ProjectileSpeed);
+			At.Z += 0.5f * FMath::Abs(GetWorld()->GetGravityZ()) * Gun->ProjectileGravity * Flight * Flight;
+		}
+		// The survivor's crosshair camera, even while the art camera is the view.
+		SetControlRotation(Survivor ? Survivor->AimRotationAt(At) : (At - ViewLoc).Rotation());
+	}
+}
+
 void AWRPlayerController::WRGive(FName Item, int32 Count) { ServerCommand(FString::Printf(TEXT("give %s %d"), *Item.ToString(), FMath::Max(1, Count))); }
 
 AWRBossAltar* AWRPlayerController::FindNearbyAltar() const
@@ -447,6 +490,30 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			Best->IsUnconscious() ? TEXT("unconscious ") : TEXT(""), Best->TameOrder == EWRTameOrder::Stay ? TEXT("stay") : TEXT("follow"),
 			*GetNameSafe(Best->GetRider()), *Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
 		ClientNotify(Result);
+	}
+	else if ((Cmd == TEXT("hold") || Cmd == TEXT("clearcreatures")) && Survivor)
+	{
+		// Testing aid: a target that stays put (rooted) / a clean slate for the next one (training dummies too: a clear
+		// line of fire).
+		int32 Count = 0;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			if ((Cmd == TEXT("hold") && It->IsA<AWRTrainingDummy>()) || It->IsTamed() || FVector::Dist(It->GetActorLocation(), Survivor->GetActorLocation()) > 3000.f)
+			{
+				continue;
+			}
+			if (Cmd == TEXT("clearcreatures"))
+			{
+				It->Destroy();
+				++Count;
+			}
+			else if (It->IsAlive() && It->Status)
+			{
+				It->Status->ApplyStatus(WRTags::Status_Rooted, FMath::Max(1.f, FCString::Atof(*Arg(1))));
+				++Count;
+			}
+		}
+		Result = FString::Printf(TEXT("%s %d creatures"), Cmd == TEXT("hold") ? TEXT("held") : TEXT("removed"), Count);
 	}
 	else if (Cmd == TEXT("bossdmg") && Survivor)
 	{

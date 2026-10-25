@@ -1,0 +1,13 @@
+{
+  "_comment": "Ranged gear for the player (static props, no rig): one item, laid flat, plain background.",
+  "template": "3d game asset of {p}, single object, entire object visible, centered, laid flat horizontally, side view, studio product shot, isolated on plain white background, soft even lighting",
+  "negative": "hand, person, character, multiple objects, cropped, cut off, text, watermark, frame, cartoon, blurry, background scenery, stand, display rack, quiver, many arrows",
+  "creatures": [
+    { "id": "bow", "prompt": "a wooden recurve hunting bow with a leather-wrapped grip and a taut bowstring, no arrow" },
+    { "id": "crossbow", "prompt": "a medieval crossbow with a dark wooden stock, an iron bow prod and a string, no bolt" },
+    { "id": "blowgun", "prompt": "a long thin bamboo blowgun tube with leather wrappings and a carved mouthpiece" },
+    { "id": "spear", "prompt": "a primitive throwing spear with a long straight wooden shaft and a knapped stone spearhead bound with sinew" },
+    { "id": "bola", "prompt": "a hunting bola made of three round leather-wrapped stones joined by braided cords to a central knot" },
+    { "id": "arrow", "prompt": "a single wooden arrow with grey feather fletching and a sharp stone arrowhead" }
+  ]
+}

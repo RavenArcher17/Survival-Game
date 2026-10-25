@@ -269,6 +269,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 	{
 		Out.Add({ FString::Printf(TEXT("Weapon: %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Weapon))), TEXT("unequip weapon") });
 		Out.Add({ FString::Printf(TEXT("Armor:  %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Armor))), TEXT("unequip armor") });
+		Out.Add({ FString::Printf(TEXT("Ranged: %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Ranged))), TEXT("unequip ranged") });
 		const TArray<FWRItemStack>& Slots = Inv->GetSlots();
 		for (int32 i = 0; i < Slots.Num(); ++i)
 		{
@@ -463,7 +464,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	}
 	const FString& Cmd = Args[0];
 	const auto Arg = [&Args](int32 i) { return Args.IsValidIndex(i) ? Args[i] : FString(); };
-	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : EWREquipSlot::Weapon; };
+	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : S == TEXT("ranged") ? EWREquipSlot::Ranged : EWREquipSlot::Weapon; };
 
 	if (RunBuildCommand(Args, OutResult))
 	{

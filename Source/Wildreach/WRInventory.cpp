@@ -4,6 +4,7 @@
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
+#include "WRCharacter.h"
 #include "WRGameplayTags.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
@@ -31,6 +32,10 @@ FWRItemRegistry::FWRItemRegistry()
 		for (const TSharedPtr<FJsonValue>& V : *Items)
 		{
 			const TSharedPtr<FJsonObject> O = V->AsObject();
+			if (!O.IsValid() || !O->HasField(TEXT("id")))
+			{
+				continue;  // comment entries ("_ranged": ...)
+			}
 			FWRItemDef D;
 			D.Id = FName(*O->GetStringField(TEXT("id")));
 			D.Name = O->GetStringField(TEXT("name"));
@@ -51,11 +56,45 @@ FWRItemRegistry::FWRItemRegistry()
 			if (O->TryGetObjectField(TEXT("equip"), Equip))
 			{
 				const FString Slot = (*Equip)->GetStringField(TEXT("slot"));
-				D.Slot = Slot == TEXT("weapon") ? EWREquipSlot::Weapon : Slot == TEXT("armor") ? EWREquipSlot::Armor : EWREquipSlot::None;
+				D.Slot = Slot == TEXT("weapon") ? EWREquipSlot::Weapon : Slot == TEXT("armor") ? EWREquipSlot::Armor
+					: Slot == TEXT("ranged") ? EWREquipSlot::Ranged : EWREquipSlot::None;
 				FString Metal;
 				if ((*Equip)->TryGetStringField(TEXT("metal"), Metal)) D.Metal = FName(*Metal);
 				(*Equip)->TryGetNumberField(TEXT("armor"), D.Armor);
 				(*Equip)->TryGetNumberField(TEXT("durability"), D.MaxDurability);
+			}
+			const TSharedPtr<FJsonObject>* Ranged = nullptr;
+			if (O->TryGetObjectField(TEXT("ranged"), Ranged))
+			{
+				const TSharedPtr<FJsonObject>& R = *Ranged;
+				FString Str;
+				if (R->TryGetStringField(TEXT("kind"), Str)) D.RangedKind = FName(*Str);
+				if (R->TryGetStringField(TEXT("ammo"), Str)) D.AmmoKind = FName(*Str);
+				R->TryGetNumberField(TEXT("damage"), D.RangedDamage);
+				R->TryGetNumberField(TEXT("speed"), D.ProjectileSpeed);
+				R->TryGetNumberField(TEXT("gravity"), D.ProjectileGravity);
+				R->TryGetNumberField(TEXT("reload"), D.Reload);
+				R->TryGetNumberField(TEXT("torpor"), D.TorporMult);
+				R->TryGetStringField(TEXT("mesh"), D.HeldMesh);
+				if (R->TryGetStringField(TEXT("socket"), Str)) D.HeldSocket = FName(*Str);
+				if (R->TryGetStringField(TEXT("along"), Str)) D.HeldAlong = FName(*Str);
+				if (R->TryGetStringField(TEXT("face"), Str)) D.HeldFace = FName(*Str);
+				if (R->TryGetStringField(TEXT("pose"), Str)) D.HeldPose = FName(*Str);
+				R->TryGetStringField(TEXT("meshAlong"), D.MeshAlong);
+				R->TryGetStringField(TEXT("meshFace"), D.MeshFace);
+				const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+				if (R->TryGetArrayField(TEXT("rot"), Arr) && Arr->Num() == 3) D.HeldRot = FRotator((*Arr)[0]->AsNumber(), (*Arr)[1]->AsNumber(), (*Arr)[2]->AsNumber());
+				if (R->TryGetArrayField(TEXT("offset"), Arr) && Arr->Num() == 3) D.HeldOffset = FVector((*Arr)[0]->AsNumber(), (*Arr)[1]->AsNumber(), (*Arr)[2]->AsNumber());
+			}
+			const TSharedPtr<FJsonObject>* AmmoObj = nullptr;
+			if (O->TryGetObjectField(TEXT("ammo"), AmmoObj))
+			{
+				FString Str;
+				if ((*AmmoObj)->TryGetStringField(TEXT("kind"), Str)) D.AmmoOf = FName(*Str);
+				(*AmmoObj)->TryGetNumberField(TEXT("damage"), D.AmmoDamage);
+				(*AmmoObj)->TryGetNumberField(TEXT("torpor"), D.AmmoTorpor);
+				(*AmmoObj)->TryGetStringField(TEXT("mesh"), D.ProjectileMesh);
+				(*AmmoObj)->TryGetStringField(TEXT("meshAlong"), D.MeshAlong);
 			}
 			const TSharedPtr<FJsonObject>* Gem = nullptr;
 			if (O->TryGetObjectField(TEXT("gem"), Gem))
@@ -118,9 +157,9 @@ int32 FWRInventoryRules::Add(TArray<FWRItemStack>& Slots, FName ItemId, int32 Co
 	{
 		return Count;
 	}
-	if (Def->IsEquipment())
+	if (Def->IsEquipment() && Def->StackSize <= 1)
 	{
-		// Equipment never stacks; each one is its own instance.
+		// Equipment never stacks (thrown spears and bolas do); each one is its own instance.
 		while (Count > 0 && AddInstance(Slots, MakeInstance(ItemId)))
 		{
 			--Count;
@@ -220,6 +259,7 @@ void UWRInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, Slots, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedWeapon, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedArmor, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedRanged, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, PotionReadyAt, COND_OwnerOnly);
 }
 
@@ -281,7 +321,7 @@ float UWRInventoryComponent::GetPotionCooldownRemaining() const
 
 FWRItemStack* UWRInventoryComponent::GetEquippedMutable(EWREquipSlot Slot)
 {
-	return Slot == EWREquipSlot::Armor ? &EquippedArmor : Slot == EWREquipSlot::Weapon ? &EquippedWeapon : nullptr;
+	return Slot == EWREquipSlot::Armor ? &EquippedArmor : Slot == EWREquipSlot::Weapon ? &EquippedWeapon : Slot == EWREquipSlot::Ranged ? &EquippedRanged : nullptr;
 }
 
 float UWRInventoryComponent::GemStat(FName Stat) const
@@ -337,6 +377,72 @@ void UWRInventoryComponent::ApplyEquipment()
 	}
 	Character->Weapon = Stats;
 	Character->ArmorValue = GetArmorValue();
+	if (AWRCharacter* Survivor = Cast<AWRCharacter>(Character))
+	{
+		Survivor->SetRangedItem(EquippedRanged.IsEmpty() ? NAME_None : EquippedRanged.ItemId);
+	}
+}
+
+FName UWRInventoryComponent::FindAmmo(FName Kind, FName Preferred) const
+{
+	const FWRItemRegistry& Items = FWRItemRegistry::Get();
+	const FWRItemDef* Pref = Preferred.IsNone() ? nullptr : Items.Find(Preferred);
+	if (Pref && Pref->AmmoOf == Kind && CountOf(Preferred) > 0)
+	{
+		return Preferred;
+	}
+	for (const FWRItemStack& S : Slots)
+	{
+		const FWRItemDef* Def = S.IsEmpty() ? nullptr : Items.Find(S.ItemId);
+		if (Def && Def->AmmoOf == Kind)
+		{
+			return S.ItemId;
+		}
+	}
+	return NAME_None;
+}
+
+FName UWRInventoryComponent::NextAmmo(FName Kind, FName Current, int32 Dir) const
+{
+	TArray<FName> Kinds;
+	for (const FWRItemStack& S : Slots)
+	{
+		const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		if (Def && Def->AmmoOf == Kind)
+		{
+			Kinds.AddUnique(S.ItemId);
+		}
+	}
+	if (Kinds.Num() == 0)
+	{
+		return NAME_None;
+	}
+	const int32 At = Kinds.IndexOfByKey(Current);
+	return Kinds[At == INDEX_NONE ? 0 : (At + Dir + Kinds.Num()) % Kinds.Num()];
+}
+
+void UWRInventoryComponent::SpendThrowable()
+{
+	if (EquippedRanged.IsEmpty())
+	{
+		return;
+	}
+	const FName Id = EquippedRanged.ItemId;
+	if (--EquippedRanged.Count > 0)
+	{
+		return;
+	}
+	EquippedRanged = FWRItemStack();
+	for (FWRItemStack& S : Slots)
+	{
+		if (S.ItemId == Id && !S.IsEmpty())
+		{
+			EquippedRanged = S;
+			S = FWRItemStack();
+			break;
+		}
+	}
+	ApplyEquipment();
 }
 
 void UWRInventoryComponent::WearEquipped(EWREquipSlot Slot, float Amount)
@@ -579,6 +685,7 @@ TSharedRef<FJsonObject> UWRInventoryComponent::ToJson() const
 	Root->SetArrayField(TEXT("slots"), Array);
 	Root->SetObjectField(TEXT("weapon"), StackToJson(EquippedWeapon));
 	Root->SetObjectField(TEXT("armor"), StackToJson(EquippedArmor));
+	Root->SetObjectField(TEXT("ranged"), StackToJson(EquippedRanged));
 	Root->SetBoolField(TEXT("kitGiven"), bKitGiven);
 	return Root;
 }
@@ -600,5 +707,7 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	if (Json->TryGetObjectField(TEXT("weapon"), Weapon)) EquippedWeapon = StackFromJson(*Weapon);
 	const TSharedPtr<FJsonObject>* Armor = nullptr;
 	if (Json->TryGetObjectField(TEXT("armor"), Armor)) EquippedArmor = StackFromJson(*Armor);
+	const TSharedPtr<FJsonObject>* RangedJson = nullptr;
+	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = StackFromJson(*RangedJson);
 	Json->TryGetBoolField(TEXT("kitGiven"), bKitGiven);
 }

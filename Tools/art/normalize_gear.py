@@ -1,6 +1,8 @@
 # Blender (headless): make an image-to-3D held item ready to attach to a hand bone.
 #   blender -b -P normalize_gear.py -- sword <in.glb> <out.glb> <length cm>
 #   blender -b -P normalize_gear.py -- shield <in.glb> <out.glb> <diameter cm>
+#   blender -b -P normalize_gear.py -- pole <in.glb> <out.glb> <length cm> [--front wide|narrow] [--grip 0.4]
+#   blender -b -P normalize_gear.py -- bow <in.glb> <out.glb> <length cm>    /    -- ball <in.glb> <out.glb> <size cm>
 # sword:  blade along +Y, the middle of the grip (between the crossguard and the pommel end) at the origin, crossguard
 #         width along X.
 # shield: face along +Z (front, the side with the boss), centre of the disc at the origin. Anything sticking out of the
@@ -38,7 +40,78 @@ def basis(x, y, z):
     return Matrix((Vector(x), Vector(y), Vector(z))).to_4x4()
 
 
-if kind == "sword":
+opt = sys.argv[sys.argv.index("--") + 1:][4:]
+
+
+def arg(name, default):
+    return opt[opt.index(name) + 1] if name in opt else default
+
+
+if kind == "pole":
+    # A long item (crossbow, blowgun, spear, arrow): its front along +Y, the next widest axis along X, and the grip
+    # (a fraction of the way from the back end) at the origin. --front wide|narrow: which end is the front (a spear's
+    # head and a crossbow's prod are the wide end; an arrow's fletching is its wide end, so its front is narrow).
+    # Image-to-3D often leaves the item lying on a slant (the concept was drawn diagonally), so it is first turned onto
+    # its principal axes: longest along Y, next along X, thinnest along Z.
+    c = v.mean(axis=0)
+    _, _, vt = np.linalg.svd(v - c, full_matrices=False)
+    obj.data.transform(basis(vt[1], vt[0], np.cross(vt[1], vt[0])) @ Matrix.Translation(-Vector(c)))
+    v = np.array([vert.co[:] for vert in obj.data.vertices])
+    long_ax = 1
+    others = [a for a in range(3) if a != long_ax]
+    t = v[:, long_ax]
+    t0, t1 = t.min(), t.max()
+
+    def end_width(a, b):
+        sl = v[(t >= a) & (t <= b)][:, others]
+        return (sl.max(axis=0) - sl.min(axis=0)).max() if len(sl) else 0.0
+
+    span = t1 - t0
+    low_w, high_w = end_width(t0, t0 + 0.15 * span), end_width(t1 - 0.15 * span, t1)
+    wide_high = high_w >= low_w
+    front_high = wide_high if arg("--front", "wide") == "wide" else not wide_high
+    sign = 1.0 if front_high else -1.0
+    back = t0 if front_high else t1
+    grip = back + sign * span * float(arg("--grip", "0.4"))
+    widths = v[:, others].max(axis=0) - v[:, others].min(axis=0)
+    side_ax = others[int(np.argmax(widths))]
+    centre = (v.min(axis=0) + v.max(axis=0)) / 2
+    centre[long_ax] = grip
+    obj.data.transform(Matrix.Translation(-Vector(centre)))
+    ax = np.eye(3)
+    y = ax[long_ax] * sign
+    x = ax[side_ax]
+    obj.data.transform(basis(x, y, np.cross(x, y)))
+    obj.data.transform(Matrix.Scale(size / span, 4))
+    print(f"GEAR pole: long axis {long_ax}, ends {low_w:.3f}/{high_w:.3f} wide, front {'high' if front_high else 'low'}, grip {grip:.3f}, length {span:.3f} -> {size} m")
+elif kind == "bow":
+    # Limbs along +Y, the arrow's flight (string to riser) along +X, the riser's grip at the origin.
+    long_ax = int(np.argmax(ext))
+    others = sorted([a for a in range(3) if a != long_ax], key=lambda a: -ext[a])
+    arrow_ax, thin_ax = others
+    t = v[:, long_ax]
+    mid = (t.min() + t.max()) / 2
+    sl = v[np.abs(t - mid) < 0.08 * (t.max() - t.min())][:, arrow_ax]
+    med = float(np.median(sl))
+    string_side = sl.max() if abs(sl.max() - med) > abs(sl.min() - med) else sl.min()
+    flight = 1.0 if med > string_side else -1.0  # from the string toward the riser
+    centre = (v.min(axis=0) + v.max(axis=0)) / 2
+    centre[long_ax] = mid
+    centre[arrow_ax] = med
+    obj.data.transform(Matrix.Translation(-Vector(centre)))
+    ax = np.eye(3)
+    x = ax[arrow_ax] * flight
+    y = ax[long_ax]
+    obj.data.transform(basis(x, y, np.cross(x, y)))
+    obj.data.transform(Matrix.Scale(size / (t.max() - t.min()), 4))
+    print(f"GEAR bow: limbs axis {long_ax}, arrow axis {arrow_ax} (flight {flight:+.0f}), riser at {med:.3f}")
+elif kind == "ball":
+    # Something held by its middle (a bola): centred, scaled to its widest extent.
+    centre = (v.min(axis=0) + v.max(axis=0)) / 2
+    obj.data.transform(Matrix.Translation(-Vector(centre)))
+    obj.data.transform(Matrix.Scale(size / float(ext.max()), 4))
+    print(f"GEAR ball: {float(ext.max()):.3f} across -> {size} m")
+elif kind == "sword":
     long_ax = int(np.argmax(ext))
     others = [a for a in range(3) if a != long_ax]
     t = v[:, long_ax]

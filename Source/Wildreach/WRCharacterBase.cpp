@@ -100,7 +100,8 @@ bool AWRCharacterBase::HasTag(const FGameplayTag& Tag) const
 
 float AWRCharacterBase::GetSpeedMultiplier() const
 {
-	if (!AbilitySystem || HasTag(WRTags::State_Dead) || HasTag(WRTags::Status_Frozen) || HasTag(WRTags::Status_Staggered) || HasTag(WRTags::Status_Unconscious))
+	if (!AbilitySystem || HasTag(WRTags::State_Dead) || HasTag(WRTags::Status_Frozen) || HasTag(WRTags::Status_Staggered) || HasTag(WRTags::Status_Unconscious)
+		|| HasTag(WRTags::Status_Rooted))  // bola: can't move, can still bite
 	{
 		return 0.f;
 	}

@@ -417,7 +417,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// Torpor (knockout taming): heavy hits and frost wear creatures down.
 	if (Result == EWRHitResult::Hit && !Hit.bDamageOverTime && Target->IsCreature())
 	{
-		float Torpor = Hit.bHeavy ? WRTune(TEXT("taming.torporPerHeavyHit"), 15.f) : WRTune(TEXT("taming.torporPerHit"), 3.f);
+		float Torpor = (Hit.bHeavy ? WRTune(TEXT("taming.torporPerHeavyHit"), 15.f) : WRTune(TEXT("taming.torporPerHit"), 3.f)) + Hit.Torpor;
 		if (Hit.Element == WRTags::Element_Frost)
 		{
 			Torpor += Damage * WRTune(TEXT("taming.torporFromFrost"), 0.25f);
