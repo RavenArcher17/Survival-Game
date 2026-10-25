@@ -21,6 +21,8 @@ public:
 private:
 	void DrawBar(const FString& Label, float Value, float Max, const FLinearColor& Color, float X, float Y, float Width = 220.f);
 	void DrawWorldBars(const AWRCharacterBase* Self);
+	/** The nearest knocked-out wild creature: torpor (and when it wakes), progress, effectiveness, food, what it needs. */
+	void DrawTamingPanel(const AWRCharacterBase* Self);
 	void DrawDamageNumbers(float DeltaTime);
 	void OnHitShown(const AActor* Target, float Damage, EWRHitResult Result);
 

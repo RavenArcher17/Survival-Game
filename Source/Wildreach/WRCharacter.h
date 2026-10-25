@@ -130,7 +130,7 @@ private:
 	void LaunchProjectile(const struct FWRItemDef& Launcher, FName AmmoId, const FVector& Dir, float LauncherMult = 1.f);
 	UFUNCTION(Server, Reliable) void ServerSetRangedMode(bool bOn);
 	UFUNCTION(Server, Reliable) void ServerSetAiming(bool bOn);
-	UFUNCTION(Server, Reliable) void ServerFireRanged(FVector_NetQuantize AimPoint);
+	UFUNCTION(Server, Reliable) void ServerFireRanged(FVector_NetQuantize AimPoint, FVector_NetQuantizeNormal ViewDir);
 	UFUNCTION(Server, Reliable) void ServerCycleAmmo(int32 Dir);
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRangedShot(FName FireKey, FName ReloadKey, float Reload);
 	void TickBodyAnim();

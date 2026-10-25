@@ -33,6 +33,7 @@
     { "id": "stone_pick", "station": "workbench", "level": 1, "inputs": { "wood": 6, "stone": 8, "fiber": 4 }, "output": "stone_pick", "count": 1, "seconds": 3 },
     { "id": "hunting_bow", "station": "workbench", "level": 1, "inputs": { "wood": 10, "fiber": 12, "hide": 2 }, "output": "hunting_bow", "count": 1, "seconds": 4, "quality": true },
     { "id": "blowgun", "station": "workbench", "level": 1, "inputs": { "wood": 6, "fiber": 4, "hide": 1 }, "output": "blowgun", "count": 1, "seconds": 3, "quality": true },
+    { "id": "kibble", "station": "workbench", "level": 1, "inputs": { "cooked_meat": 1, "berries": 3, "egg": 1 }, "output": "kibble", "count": 2, "seconds": 2 },
     { "id": "cooked_meat", "station": "workbench", "level": 1, "inputs": { "raw_meat": 1, "wood": 1 }, "output": "cooked_meat", "count": 1, "seconds": 2 },
     { "id": "waterskin", "station": "workbench", "level": 1, "inputs": { "hide": 1 }, "output": "waterskin", "count": 1, "seconds": 2 }
   ],

@@ -107,6 +107,7 @@ void AWRGameMode::SaveWorld()
 			O->SetStringField(TEXT("owner"), It->TamedBy);
 			O->SetBoolField(TEXT("stay"), It->TameOrder == EWRTameOrder::Stay);
 			O->SetBoolField(TEXT("aggressive"), It->bTameAggressive);
+			O->SetNumberField(TEXT("bonus"), It->TameBonus);
 			const FVector L = It->GetActorLocation();
 			O->SetNumberField(TEXT("x"), L.X); O->SetNumberField(TEXT("y"), L.Y); O->SetNumberField(TEXT("z"), L.Z - It->GetSimpleCollisionHalfHeight());
 			Tames.Add(MakeShared<FJsonValueObject>(O));
@@ -168,6 +169,7 @@ void AWRGameMode::LoadWorld()
 				Tame->CompleteTame(O->GetStringField(TEXT("owner")));
 				Tame->TameOrder = O->GetBoolField(TEXT("stay")) ? EWRTameOrder::Stay : EWRTameOrder::Follow;
 				Tame->bTameAggressive = O->GetBoolField(TEXT("aggressive"));
+				Tame->ApplyTameBonus(O->HasField(TEXT("bonus")) ? O->GetNumberField(TEXT("bonus")) : 0.f);  // older saves: none
 				++LoadedTames;
 			}
 		}

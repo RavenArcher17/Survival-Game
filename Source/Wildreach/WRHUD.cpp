@@ -90,6 +90,7 @@ void AWRHUD::DrawHUD()
 	}
 
 	DrawWorldBars(Survivor);
+	DrawTamingPanel(Survivor);
 
 	// Chat (last lines, fade after 25 s) and the map list (M).
 	if (const AWRPlayerController* WPC = Cast<AWRPlayerController>(PlayerOwner))
@@ -402,11 +403,70 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 				DrawRect(FLinearColor(0.3f, 0.9f, 0.35f), BX, Screen.Y + 7.f, W * FMath::Clamp(Creature->TameProgress, 0.f, 1.f), 3.f);
 				if (Creature->IsUnconscious())
 				{
-					DrawText(FString::Printf(TEXT("unconscious - E to feed (%.0f%%)"), Creature->TameProgress * 100.f), FLinearColor(0.8f, 0.7f, 1.f), BX, Screen.Y + 12.f, nullptr, 0.8f);
+					DrawText(FString::Printf(TEXT("knocked out - E to tame (%.0f%%)"), Creature->TameProgress * 100.f), FLinearColor(0.8f, 0.7f, 1.f), BX, Screen.Y + 12.f, nullptr, 0.8f);
 				}
 			}
 		}
 	}
+}
+
+void AWRHUD::DrawTamingPanel(const AWRCharacterBase* Self)
+{
+	const AWRCreature* Best = nullptr;
+	float BestDist = 1500.f;
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		const float D = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
+		if (It->IsAlive() && !It->IsTamed() && It->IsUnconscious() && D < BestDist)
+		{
+			BestDist = D;
+			Best = *It;
+		}
+	}
+	if (!Best)
+	{
+		return;
+	}
+	const float X = Canvas->ClipX - 460.f;
+	float Y = 150.f;
+	const float W = 240.f;
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.45f), X - 10.f, Y - 8.f, 450.f, 136.f);
+	DrawText(FString::Printf(TEXT("Taming %s"), *Best->GetDisplayLabel()), FLinearColor::White, X, Y, nullptr, 1.1f);
+	Y += 28.f;
+	const float WakesIn = Best->WakeIn;
+	DrawBar(TEXT("Torpor"), Best->Torpor, Best->MaxTorpor, FLinearColor(0.6f, 0.3f, 0.9f), X, Y, W);
+	DrawText(FString::Printf(TEXT("wakes in %d:%02d"), FMath::FloorToInt(WakesIn / 60.f), FMath::FloorToInt(WakesIn) % 60),
+		WakesIn < 30.f ? FLinearColor(1.f, 0.45f, 0.35f) : FLinearColor(0.8f, 0.8f, 0.8f), X + W + 110.f, Y - 1.f, nullptr, 0.85f);
+	Y += 24.f;
+	DrawBar(TEXT("Tamed"), Best->TameProgress * 100.f, 100.f, FLinearColor(0.3f, 0.9f, 0.35f), X, Y, W);
+	Y += 26.f;
+	const FWRItemDef* Food = FWRItemRegistry::Get().Find(Best->TameFoodItem);
+	const FString FoodName = Food ? Food->Name : FString(TEXT("food"));
+	DrawText(FString::Printf(TEXT("Effectiveness %.0f%%    Stash: %d%s"), Best->TameEffectiveness * 100.f, Best->TameFoodCount,
+		Best->TameFoodCount > 0 ? *FString::Printf(TEXT(" (next: %s)"), *FoodName) : TEXT("")), FLinearColor(0.85f, 0.85f, 0.85f), X, Y, nullptr, 0.95f);
+	Y += 24.f;
+	FString Advice;
+	FLinearColor Tint(0.6f, 1.f, 0.6f);
+	if (Best->TameFoodCount == 0 && Best->MealLeft <= 0.f)
+	{
+		Advice = FString::Printf(TEXT("Hungry: E to give it %s or kibble"), *FoodName);
+		Tint = FLinearColor(1.f, 0.6f, 0.3f);
+	}
+	else if (Best->TameEta < 0.f)
+	{
+		Advice = FString::Printf(TEXT("Needs %d more %s"), Best->TameFoodNeeded, *FoodName);
+		Tint = FLinearColor(1.f, 0.85f, 0.4f);
+	}
+	else if (Best->TameEta > WakesIn)
+	{
+		Advice = FString::Printf(TEXT("Tamed in ~%.0f s, but it wakes first: give it narcotics"), Best->TameEta);
+		Tint = FLinearColor(1.f, 0.6f, 0.3f);
+	}
+	else
+	{
+		Advice = FString::Printf(TEXT("Tamed in ~%.0f s"), Best->TameEta);
+	}
+	DrawText(Advice, Tint, X, Y, nullptr, 1.f);
 }
 
 void AWRHUD::DrawDamageNumbers(float DeltaTime)

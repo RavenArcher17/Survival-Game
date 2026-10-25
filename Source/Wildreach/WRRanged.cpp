@@ -349,12 +349,19 @@ void AWRCharacter::FireRanged()
 	const FVector End = ViewLoc + ViewDir * 20000.f;
 	FHitResult Hit;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRRangedAim), false, this);
-	const FVector Point = GetWorld()->LineTraceSingleByChannel(Hit, ViewLoc + ViewDir * 60.f, End, ECC_Visibility, Query) ? Hit.ImpactPoint : End;
+	// Creatures count too (their capsules don't block the visibility channel): a crosshair on a low creature must not
+	// aim at the ground behind it.
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	Objects.AddObjectTypesToQuery(ECC_Pawn);
+	Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+	const FVector Point = GetWorld()->LineTraceSingleByObjectType(Hit, ViewLoc + ViewDir * 60.f, End, Objects, Query) ? Hit.ImpactPoint : End;
 	LocalNextShotAt = Now + 0.15;
-	ServerFireRanged(Point);
+	ServerFireRanged(Point, ViewDir);
 }
 
-void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint)
+void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint, FVector_NetQuantizeNormal ViewDir)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
 	UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(this);
@@ -377,12 +384,14 @@ void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint)
 		SelectedAmmo = Ammo;
 		Inv->RemoveItem(Ammo, 1);
 	}
-	// Toward the crosshair's point; a point behind or right on top of us falls back to the view direction.
+	// Toward the crosshair's point; a point behind or right on top of us falls back to the view direction. The view
+	// direction comes with the shot: the server's copy of the control rotation can be a frame behind a quick flick.
 	const FVector Muzzle = GetActorLocation() + FVector(0.f, 0.f, 55.f) + GetActorForwardVector() * 35.f;
+	const FVector View = FVector(ViewDir).IsNearlyZero() ? GetControlRotation().Vector() : FVector(ViewDir).GetSafeNormal();
 	FVector Dir = (FVector(AimPoint) - Muzzle).GetSafeNormal();
-	if (Dir.IsNearlyZero() || FVector::DotProduct(Dir, GetControlRotation().Vector()) < 0.3f)
+	if (Dir.IsNearlyZero() || FVector::DistSquared(AimPoint, Muzzle) < FMath::Square(100.f) || FVector::DotProduct(Dir, View) < 0.3f)
 	{
-		Dir = GetControlRotation().Vector();
+		Dir = View;
 	}
 	if (!bAiming)
 	{

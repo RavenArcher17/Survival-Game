@@ -114,9 +114,17 @@ public:
 	bool IsUnconscious() const;
 
 	// --- Taming (server) ---
-	/** Feed (knockout taming) or offer food (calm creatures). Returns a message. */
+	/** E: offer food (calm creatures), or put the best food you have in a knocked-out one's stash. Returns a message. */
 	FString Feed(AWRPlayerController* Player);
+	/** Knockout taming, ARK-style: all of one food (kibble or what it eats) into its stash; it eats a meal at a time. */
+	FString GiveTameFood(AWRPlayerController* Player, FName Item);
+	/** Knockout taming: a narcotic keeps it under (+torpor). */
+	FString GiveNarcotic(AWRPlayerController* Player);
+	/** Taming value of a food for this creature: kibble x2, what it eats x1, anything else 0. */
+	float FoodValue(FName Item) const;
 	void CompleteTame(const FString& PlayerName);
+	/** Tames come out stronger the better they were tamed: health and bite x (1 + bonus). */
+	void ApplyTameBonus(float Bonus);
 	FString Order(AWRPlayerController* Player, const FString& Command);
 	/** Number of tames a player owns. */
 	static int32 CountTames(const UWorld* World, const FString& PlayerName);
@@ -134,6 +142,14 @@ public:
 	UPROPERTY(Replicated) float Torpor = 0.f;
 	UPROPERTY(Replicated) float MaxTorpor = 100.f;
 	UPROPERTY(Replicated) float TameProgress = 0.f;
+	UPROPERTY(Replicated) float TameEffectiveness = 1.f;  // hits while it's out and plain food lower it
+	UPROPERTY(Replicated) float TameBonus = 0.f;          // a tame's health / bite bonus (from effectiveness)
+	UPROPERTY(Replicated) int32 TameFoodCount = 0;        // food left in its stash
+	UPROPERTY(Replicated) FName TameFoodItem;             // what it eats next
+	UPROPERTY(Replicated) float TameEta = -1.f;           // seconds to tamed if the food lasts, -1 = it won't
+	UPROPERTY(Replicated) int32 TameFoodNeeded = 0;       // more of that food it needs to finish
+	UPROPERTY(Replicated) float MealLeft = 0.f;           // seconds left on the meal it's digesting
+	UPROPERTY(Replicated) float WakeIn = 0.f;             // seconds until a knocked-out creature wakes (the server's drain)
 	UPROPERTY(Replicated) TWeakObjectPtr<AWRCharacter> Rider;
 
 	FWROnCreatureDied OnCreatureDied;
@@ -158,7 +174,10 @@ private:
 	FVector Home = FVector::ZeroVector;
 	FString TamerName;
 	float FedUntil = 0.f;
+	float MealValue = 1.f;           // taming value of the meal being digested
+	TMap<FName, int32> TameStash;    // knockout taming: food given, eaten a meal at a time
 	bool bCalm = false;
+	void UpdateTameForecast();
 	float UtilityClock = 0.f;
 	float ProduceClock = 0.f;
 	float TamerSpeed = 1.f;

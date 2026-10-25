@@ -60,7 +60,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 | 1–8 | path abilities in your quick slots |
 | Q / Z / X | potion / eat / drink |
 | Tab | lock on |
-| E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags |
+| E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags; on a knocked-out creature, the Taming menu (food, kibble, narcotics) |
 | I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu (also crafting by hand) |
 | building (B, pick a piece) | aim where it goes: LMB place, R rotate (stairs, roofs; flips a gable), RMB cancel; the ghost is red with the reason when it won't go. Demolish (top of the menu): aim at your piece, LMB removes it for half back |
 | LMB at a tree / rock / shrub | gather wood / stone / fiber (a hatchet or pick in your bag gathers more) |
@@ -73,7 +73,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 ### Dev commands (console)
 `WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRLearn fire fire_wall`, `WRCast 3`, `WRSpawn cinderfang 3`,
 `WRSpawn vulkarn 1`, `WRBossDmgPct 30 frost`, `WRGive iron_ore 20`, `WREquip copper_sword`, `WRWeapon iron fine 6`,
-`WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
+`WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRTameGive kibble`, `WRNarcotic`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
 `WRGather tree` (bot gathers: tree / rock / shrub / node / any / off),
 `WRGive hunting_bow 1`, `WRGive tranq_arrow 20`, `WRRanged 1`, `WRHold 30` (root nearby creatures), `WRClearCreatures`,
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
@@ -88,7 +88,7 @@ Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets, 
 Tools\buildtest.ps1     # claims, code locks, raids, collapse, world save
 Tools\housetest.ps1     # a two-room, two-storey house through the build ghost: snapping, refusals, stairs, doors, roof
 Tools\survivaltest.ps1  # fresh player on the island: gather bare-handed, crude tools, hut + workbench, stone tools
-Tools\tametest.ps1      # offer food, ride, knockout + feed, eggs, orders, tames saved
+Tools\tametest.ps1      # offer food, ride, tranq knockout + effectiveness + narcotic + kibble, eggs, orders, waking loses progress, tames saved (-Shots)
 Tools\rangedtest.ps1    # every ranged weapon at a rooted Cinderfang: hits, tranq knockout, bola, spear pickup (-Body f)
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks

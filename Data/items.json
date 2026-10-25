@@ -26,6 +26,7 @@
     { "id": "seeds", "name": "Seeds", "category": "material", "stack": 50, "weight": 0.02 },
     { "id": "egg", "name": "Egg", "category": "material", "stack": 10, "weight": 0.2 },
     { "id": "wool", "name": "Wool", "category": "material", "stack": 50, "weight": 0.1 },
+    { "id": "kibble", "name": "Kibble", "category": "tame_food", "stack": 50, "weight": 0.1, "note": "the best taming food: every tameable creature eats it, it tames twice as fast and costs no effectiveness" },
     { "id": "narcotic", "name": "Narcotic", "category": "material", "stack": 50, "weight": 0.05, "note": "alchemy table: berries steeped with raw meat. Makes tranq arrows and bolts (by hand) and torpor darts" },
     { "id": "torpor_dart", "name": "Torpor dart", "category": "dart", "stack": 20, "weight": 0.05, "note": "blowgun ammo (or use from the menu: adds torpor to the creature you aim at); alchemy table: narcotic + fiber",
       "ammo": { "kind": "dart", "damage": 0, "torpor": 40, "mesh": "/Game/Props/Arrow/arrow_game/StaticMeshes/arrow_game.arrow_game", "meshAlong": "-Y" } },

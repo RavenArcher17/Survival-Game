@@ -493,9 +493,11 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			if (It->IsAlive() && !It->IsA<AWRTrainingDummy>() && (Cmd == TEXT("tamestat") || !It->IsTamed()) && D < BestDist) { BestDist = D; Best = *It; }
 		}
 		if (Best && Cmd == TEXT("torpor")) Best->AddTorpor(FCString::Atof(*Arg(1)));
-		Result = Best ? FString::Printf(TEXT("%s torpor %.0f/%.0f tame %.0f%% %s%s rider %s at %s"), *Best->GetDisplayLabel(), Best->Torpor, Best->MaxTorpor, Best->TameProgress * 100.f,
+		Result = Best ? FString::Printf(TEXT("%s torpor %.0f/%.0f tame %.0f%% eff %.0f%% stash %d %s%s rider %s bonus +%.0f%% hp %.0f at %s"), *Best->GetDisplayLabel(),
+			Best->Torpor, Best->MaxTorpor, Best->TameProgress * 100.f, Best->TameEffectiveness * 100.f, Best->TameFoodCount,
 			Best->IsUnconscious() ? TEXT("unconscious ") : TEXT(""), Best->TameOrder == EWRTameOrder::Stay ? TEXT("stay") : TEXT("follow"),
-			*GetNameSafe(Best->GetRider()), *Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
+			*GetNameSafe(Best->GetRider()), Best->TameBonus * 100.f, Best->GetAttributes() ? Best->GetAttributes()->GetMaxHealth() : 0.f,
+			*Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
 		ClientNotify(Result);
 	}
 	else if ((Cmd == TEXT("hold") || Cmd == TEXT("clearcreatures")) && Survivor)

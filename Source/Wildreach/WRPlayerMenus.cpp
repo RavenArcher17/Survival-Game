@@ -15,6 +15,7 @@
 #include "WRSocial.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
+#include "WRTuning.h"
 #include "EngineUtils.h"
 
 template <typename T>
@@ -74,6 +75,8 @@ void AWRPlayerController::WRTame(FName Order) { ServerCommand(FString::Printf(TE
 void AWRPlayerController::WRDismount() { ServerCommand(TEXT("dismount")); }
 void AWRPlayerController::WRTorpor(float Amount) { ServerCommand(FString::Printf(TEXT("torpor %.0f"), Amount)); }
 void AWRPlayerController::WRTameStat() { ServerCommand(TEXT("tamestat")); }
+void AWRPlayerController::WRTameGive(FName Item) { ServerCommand(FString::Printf(TEXT("tamegive %s"), *Item.ToString())); }
+void AWRPlayerController::WRNarcotic() { ServerCommand(TEXT("tamenarcotic")); }
 void AWRPlayerController::WRBossDmg(float Amount, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.0f %s"), Amount, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
 void AWRPlayerController::WRBossDmgPct(float Percent, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.1f%% %s"), Percent, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
 void AWRPlayerController::WRClan(const FString& Action, const FString& Name) { ServerCommand(FString::Printf(TEXT("clan %s %s"), *Action, *Name)); }
@@ -118,12 +121,20 @@ void AWRPlayerController::WRInteract()
 		return;
 	}
 	AWRCreature* Tame = FindNearbyCreature(true);
-	const AWRCreature* Wild = FindNearbyCreature(false, 400.f);
+	AWRCreature* Wild = FindNearbyCreature(false, 400.f);
 	const auto DistTo = [this](const AActor* A) { return FVector::Dist2D(A->GetActorLocation(), GetPawn()->GetActorLocation()); };
 	if (Tame && (!Wild || DistTo(Tame) < DistTo(Wild)))
 	{
 		Menu = EWRMenu::Tame;
 		MenuCreature = Tame;
+		MenuIndex = 0;
+		return;
+	}
+	const FWRCreatureDef* WildDef = Wild ? Wild->GetDef() : nullptr;
+	if (WildDef && Wild->IsUnconscious() && WildDef->CanTameBy(TEXT("knockout_feed")))
+	{
+		Menu = EWRMenu::Taming;
+		MenuCreature = Wild;
 		MenuIndex = 0;
 		return;
 	}
@@ -252,6 +263,11 @@ FString AWRPlayerController::GetMenuTitle() const
 	{
 		const AWRCreature* Tame = MenuCreature.Get();
 		return FString::Printf(TEXT("%s  (Enter = order, E = close)"), Tame ? *Tame->GetDisplayLabel() : TEXT("Tame"));
+	}
+	if (Menu == EWRMenu::Taming)
+	{
+		const AWRCreature* Wild = MenuCreature.Get();
+		return FString::Printf(TEXT("Taming %s  (Enter = give, E = close)"), Wild ? *Wild->GetDisplayLabel() : TEXT(""));
 	}
 	if (const AWRStation* Station = MenuStation.Get())
 	{
@@ -399,6 +415,41 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 		Out.Add({ TEXT("Release into the wild"), TEXT("tame release") });
 		return Out;
 	}
+	if (Menu == EWRMenu::Taming)
+	{
+		const AWRCreature* Wild = MenuCreature.Get();
+		const FWRCreatureDef* CDef = Wild ? Wild->GetDef() : nullptr;
+		if (!CDef || Wild->IsTamed() || !Wild->IsUnconscious())
+		{
+			Out.Add({ Wild && Wild->IsTamed() ? TEXT("Tamed!") : TEXT("It's awake"), FString() });
+			return Out;
+		}
+		const FWRItemDef* Next = FWRItemRegistry::Get().Find(Wild->TameFoodItem);
+		Out.Add({ FString::Printf(TEXT("Torpor %.0f/%.0f   tamed %.0f%%   effectiveness %.0f%%   stash: %d food"), Wild->Torpor, Wild->MaxTorpor,
+			Wild->TameProgress * 100.f, Wild->TameEffectiveness * 100.f, Wild->TameFoodCount), FString() });
+		Out.Add({ Wild->TameEta >= 0.f ? FString::Printf(TEXT("Tamed in ~%.0f s if it stays under"), Wild->TameEta)
+			: FString::Printf(TEXT("Needs %d more %s"), Wild->TameFoodNeeded, Next ? *Next->Name : TEXT("food")), FString() });
+		// Kibble first (twice as fast, no effectiveness cost), then what it eats.
+		TArray<FName> Foods = { FName(TEXT("kibble")) };
+		Foods.Append(CDef->Food);
+		for (const FName& Food : Foods)
+		{
+			const FWRItemDef* FDef = FWRItemRegistry::Get().Find(Food);
+			const int32 Have = Inv->CountOf(Food);
+			FWRMenuEntry E;
+			E.Label = FString::Printf(TEXT("Give all %s (you have %d)%s"), FDef ? *FDef->Name : *Food.ToString(), Have,
+				Food == TEXT("kibble") ? TEXT("  - tames x2, keeps effectiveness") : TEXT(""));
+			E.Command = FString::Printf(TEXT("tamegive %s"), *Food.ToString());
+			E.bAvailable = Have > 0;
+			Out.Add(E);
+		}
+		FWRMenuEntry Narcotic;
+		Narcotic.Label = FString::Printf(TEXT("Give a narcotic: +%.0f%% torpor (you have %d)"), WRTune(TEXT("taming.narcoticTorpor"), 0.3f) * 100.f, Inv->CountOf(TEXT("narcotic")));
+		Narcotic.Command = TEXT("tamenarcotic");
+		Narcotic.bAvailable = Inv->CountOf(TEXT("narcotic")) > 0;
+		Out.Add(Narcotic);
+		return Out;
+	}
 	if (Menu == EWRMenu::Chest || Menu == EWRMenu::Claim)
 	{
 		const AWRBuildPiece* Piece = MenuPiece.Get();
@@ -526,6 +577,14 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		{
 			Mount->Dismount();
 		}
+		return true;
+	}
+	if (Cmd == TEXT("tamegive") || Cmd == TEXT("tamenarcotic"))
+	{
+		AWRCreature* Wild = FindNearbyCreature(false, 500.f);
+		OutResult = !Wild ? FString(TEXT("no knocked-out creature nearby"))
+			: Cmd == TEXT("tamenarcotic") ? Wild->GiveNarcotic(this) : Wild->GiveTameFood(this, FName(*Arg(1)));
+		ClientNotify(OutResult);
 		return true;
 	}
 	if (Cmd == TEXT("tame"))

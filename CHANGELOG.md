@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-10-25: ARK-style taming
+
+- **Knock it out, then feed it.** E on a knocked-out creature opens the **Taming menu**: give it all of a food at once
+  (kibble or what it eats) and it eats from that stash on its own, one item every 30 s; taming moves while a meal is
+  digesting and stalls when the stash runs dry. The taming times (60 / 300 / 900 s by difficulty) are seconds of eating
+  plain food. A creature that **wakes up loses its progress** (the food it hasn't eaten stays in its stash).
+- **Kibble** (workbench: cooked meat, 3 berries, an egg, makes 2): every tameable creature eats it, it counts double and
+  costs no effectiveness. Eggs come from tamed Snowpuffs, so kibble is a second-tame thing, like ARK.
+- **Narcotics keep it under**: each one adds 30% torpor, without the hit that a dart or arrow is. Knocked-out creatures
+  drain torpor slower now (250 s from full), so a medium tame fits in one knockout on kibble and a hard one needs
+  narcotics.
+- **Taming effectiveness** starts at 100%, drops 6% per hit while it's out (tranq ammo too: give narcotics instead) and
+  1% per plain-food meal. The tame gets **+health and +bite of up to 50%** from it (`taming.bonusAtFull`); eggs and
+  hand-fed calm creatures come out at the full bonus. The bonus is saved with the tame.
+- A **taming panel** on the HUD for the nearest knocked-out creature: torpor and when it wakes (from the server's own
+  drain, red under 30 s), progress, effectiveness, stash, and "tamed in ~N s", "needs N more raw meat", "it wakes first:
+  give it narcotics" or "hungry". `WRTameStat` shows effectiveness, stash, bonus and max health.
+- Fixed: your own tames attacked a creature you'd knocked out (they took it as your combat target) and could kill it; tames
+  leave knocked-out creatures alone now, and a tame told to stay only fights within 15 m of its post (it crossed the map).
+- Fixed: a quick shot could fly the wrong way: the server checked the aim point against its copy of your view, which can
+  be a frame behind a flick. The shot now carries the view direction, and the crosshair trace sees creatures (low ones
+  sent the shot at the ground behind them).
+- Every taming number is in `tuning.json` (`taming`), and the Taming menu / HUD lines are `WRTameGive <food>` and
+  `WRNarcotic` for bots. `Tools/tametest.ps1` knocks a Cinderfang out with two tranq arrows, costs it effectiveness with
+  a stone arrow, keeps it under with a narcotic and tames it on kibble (+47%), lets a part-tamed Rimeclaw wake up (back to
+  0%), and checks the tames and their bonus survive a restart; `-Shots` takes the panel and menu screenshots.
+
 ## 2026-10-25: building a house
 
 A two-room, two-storey house with stairs and a gable roof now goes up the way a player expects, and

@@ -253,6 +253,14 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRCreature, Torpor);
 	DOREPLIFETIME(AWRCreature, MaxTorpor);
 	DOREPLIFETIME(AWRCreature, TameProgress);
+	DOREPLIFETIME(AWRCreature, TameEffectiveness);
+	DOREPLIFETIME(AWRCreature, TameBonus);
+	DOREPLIFETIME(AWRCreature, TameFoodCount);
+	DOREPLIFETIME(AWRCreature, TameFoodItem);
+	DOREPLIFETIME(AWRCreature, TameEta);
+	DOREPLIFETIME(AWRCreature, TameFoodNeeded);
+	DOREPLIFETIME(AWRCreature, MealLeft);
+	DOREPLIFETIME(AWRCreature, WakeIn);
 	DOREPLIFETIME(AWRCreature, Rider);
 }
 
@@ -472,10 +480,10 @@ void AWRCreature::NotifyAttackedBy(AActor* Attacker)
 		// Neutral herds defend each other.
 		Spawner->AlertPack(Attacker);
 	}
-	// Damage interrupts taming.
-	if (TameProgress > 0.f && IsUnconscious())
+	// Hitting a knocked-out creature (even with tranq ammo) costs taming effectiveness: feed it narcotics instead.
+	if (IsUnconscious() && !IsTamed())
 	{
-		TameProgress *= WRTune(TEXT("taming.damageKeepsProgress"), 0.5f);
+		TameEffectiveness = FMath::Max(0.f, TameEffectiveness - WRTune(TEXT("taming.effectivenessPerHit"), 0.06f));
 	}
 	bCalm = false;
 }
@@ -490,6 +498,10 @@ void AWRCreature::AddTorpor(float Amount)
 	Torpor = FMath::Min(MaxTorpor, Torpor + Amount);
 	if (Torpor >= MaxTorpor && !IsUnconscious())
 	{
+		if (TameProgress <= 0.f)
+		{
+			TameEffectiveness = 1.f;  // a fresh knockout starts a fresh tame
+		}
 		Status->ApplyStatus(WRTags::Status_Unconscious, 100000.f);
 		AbilitySystem->CancelAllAbilities();
 		AggroTarget = nullptr;
@@ -542,22 +554,150 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	{
 		return TEXT("You can't keep any more tames");
 	}
+	// The best food you carry: kibble, then what it eats.
+	TArray<FName> Foods = { FName(TEXT("kibble")) };
+	Foods.Append(Def->Food);
 	FName FoodUsed;
-	for (const FName& Food : Def->Food)
+	for (const FName& Food : Foods)
 	{
-		if (PS->GetInventory()->CountOf(Food) > 0) { FoodUsed = Food; break; }
+		if (FoodValue(Food) > 0.f && PS->GetInventory()->CountOf(Food) > 0) { FoodUsed = Food; break; }
 	}
 	if (FoodUsed.IsNone())
 	{
-		return FString::Printf(TEXT("%s eats %s"), *Def->Name, Def->Food.Num() > 0 ? *Def->Food[0].ToString() : TEXT("nothing you have"));
+		return FString::Printf(TEXT("%s eats %s (or kibble)"), *Def->Name, Def->Food.Num() > 0 ? *Def->Food[0].ToString() : TEXT("nothing you have"));
 	}
+	if (bKnockout)
+	{
+		return GiveTameFood(Player, FoodUsed);
+	}
+	// A calm creature takes it from your hand and keeps taming while it eats; kibble lasts twice as long.
 	PS->GetInventory()->RemoveItem(FoodUsed, 1);
 	TamerName = PS->GetPlayerName();
 	TamerSpeed = 1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("tamingSpeed"));
 	UWRLifeSkillsComponent::Award(PS, TEXT("taming"), TEXT("feed"), 5.f);
-	bCalm = bOffer || bCalm;
-	FedUntil = GetWorld()->GetTimeSeconds() + WRTune(TEXT("taming.secondsPerFood"), 30.f);
+	bCalm = true;
+	MealValue = 1.f;
+	FedUntil = GetWorld()->GetTimeSeconds() + WRTune(TEXT("taming.secondsPerFood"), 30.f) * FoodValue(FoodUsed);
 	return FString::Printf(TEXT("Fed %s: taming %.0f%% (needs %.0f s fed)"), *FoodUsed.ToString(), TameProgress * 100.f, Def->TameSeconds());
+}
+
+float AWRCreature::FoodValue(FName Item) const
+{
+	const FWRCreatureDef* Def = GetDef();
+	if (!Def || Item.IsNone())
+	{
+		return 0.f;
+	}
+	if (Item == TEXT("kibble"))
+	{
+		return WRTune(TEXT("taming.kibbleValue"), 2.f);
+	}
+	return Def->Food.Contains(Item) ? 1.f : 0.f;
+}
+
+FString AWRCreature::GiveTameFood(AWRPlayerController* Player, FName Item)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	const FWRCreatureDef* Def = GetDef();
+	if (!PS || !Def || !HasAuthority() || IsTamed() || !Def->CanTameBy(TEXT("knockout_feed")) || !IsUnconscious())
+	{
+		return TEXT("Knock it out first");
+	}
+	if (CountTames(GetWorld(), PS->GetPlayerName()) >= TameLimitFor(PS))
+	{
+		return TEXT("You can't keep any more tames");
+	}
+	const FWRItemDef* Food = FWRItemRegistry::Get().Find(Item);
+	const FString FoodName = Food ? Food->Name : Item.ToString();
+	if (FoodValue(Item) <= 0.f)
+	{
+		return FString::Printf(TEXT("%s won't eat %s"), *Def->Name, *FoodName);
+	}
+	int32 Stashed = 0;
+	for (const TPair<FName, int32>& Kept : TameStash)
+	{
+		Stashed += Kept.Value;
+	}
+	const int32 Room = FMath::RoundToInt(WRTune(TEXT("taming.stashMax"), 50.f)) - Stashed;
+	const int32 Count = FMath::Min(PS->GetInventory()->CountOf(Item), Room);
+	if (Count <= 0)
+	{
+		return Room <= 0 ? TEXT("Its food stash is full") : FString::Printf(TEXT("You have no %s"), *FoodName);
+	}
+	PS->GetInventory()->RemoveItem(Item, Count);
+	TameStash.FindOrAdd(Item) += Count;
+	TamerName = PS->GetPlayerName();
+	TamerSpeed = 1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("tamingSpeed"));
+	UWRLifeSkillsComponent::Award(PS, TEXT("taming"), TEXT("feed"), 5.f);
+	UpdateTameForecast();
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s given %d %s by %s (%d in its stash)"), *GetName(), Count, *Item.ToString(), *TamerName, TameFoodCount);
+	return FString::Printf(TEXT("Gave %d %s: %d food in its stash, taming %.0f%%, %s"), Count, *FoodName, TameFoodCount, TameProgress * 100.f,
+		TameEta >= 0.f ? *FString::Printf(TEXT("tamed in ~%.0f s if it stays under"), TameEta) : *FString::Printf(TEXT("needs %d more"), TameFoodNeeded));
+}
+
+FString AWRCreature::GiveNarcotic(AWRPlayerController* Player)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS || !HasAuthority() || IsTamed() || !IsUnconscious())
+	{
+		return TEXT("Only a knocked-out creature takes narcotics");
+	}
+	if (PS->GetInventory()->CountOf(TEXT("narcotic")) < 1)
+	{
+		return TEXT("You have no narcotic (alchemy table: berries + raw meat)");
+	}
+	PS->GetInventory()->RemoveItem(TEXT("narcotic"), 1);
+	Torpor = FMath::Min(MaxTorpor, Torpor + MaxTorpor * WRTune(TEXT("taming.narcoticTorpor"), 0.3f));
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s given a narcotic: torpor %.0f/%.0f"), *GetName(), Torpor, MaxTorpor);
+	return FString::Printf(TEXT("Narcotic: torpor %.0f/%.0f"), Torpor, MaxTorpor);
+}
+
+void AWRCreature::UpdateTameForecast()
+{
+	const FWRCreatureDef* Def = GetDef();
+	const float Seconds = Def ? FMath::Max(1.f, Def->TameSeconds()) : 1.f;
+	const float PerFood = WRTune(TEXT("taming.secondsPerFood"), 30.f);
+	const float Now = GetWorld()->GetTimeSeconds();
+	MealLeft = FMath::Max(0.f, FedUntil - Now);
+	const float Drain = MaxTorpor * WRTune(TEXT("taming.unconsciousTorporDecay"), 0.004f);
+	WakeIn = Drain > 0.f ? Torpor / Drain : 0.f;
+	// Meals still to come, best first (that's the order it eats them).
+	TArray<TPair<float, int32>> Meals;
+	TameFoodCount = 0;
+	TameFoodItem = NAME_None;
+	float BestValue = 0.f;
+	for (const TPair<FName, int32>& Kept : TameStash)
+	{
+		const float Value = FoodValue(Kept.Key);
+		Meals.Add({ Value, Kept.Value });
+		TameFoodCount += Kept.Value;
+		if (Value > BestValue)
+		{
+			BestValue = Value;
+			TameFoodItem = Kept.Key;
+		}
+	}
+	Meals.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key > B.Key; });
+	const float Rate = TamerSpeed / Seconds;  // progress per second per unit of food value
+	float Left = 1.f - TameProgress - MealLeft * MealValue * Rate;
+	float Eta = Left <= 0.f ? (1.f - TameProgress) / FMath::Max(KINDA_SMALL_NUMBER, MealValue * Rate) : MealLeft;
+	for (const TPair<float, int32>& Meal : Meals)
+	{
+		for (int32 i = 0; i < Meal.Value && Left > 0.f; ++i)
+		{
+			const float Gain = Meal.Key * PerFood * Rate;
+			Eta += Left >= Gain ? PerFood : PerFood * Left / Gain;
+			Left -= Gain;
+		}
+	}
+	TameEta = Left <= 0.f ? Eta : -1.f;
+	const FName Next = !TameFoodItem.IsNone() ? TameFoodItem : (Def && Def->Food.Num() > 0 ? Def->Food[0] : NAME_None);
+	const float NextGain = FoodValue(Next) * PerFood * Rate;
+	TameFoodNeeded = Left > 0.f && NextGain > 0.f ? FMath::CeilToInt(Left / NextGain) : 0;
+	if (TameFoodItem.IsNone())
+	{
+		TameFoodItem = Next;  // what to bring
+	}
 }
 
 int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
@@ -578,6 +718,10 @@ void AWRCreature::CompleteTame(const FString& PlayerName)
 	Torpor = 0.f;
 	AggroTarget = nullptr;
 	Status->ClearStatus(WRTags::Status_Unconscious);
+	ApplyTameBonus(TameEffectiveness * WRTune(TEXT("taming.bonusAtFull"), 0.5f));
+	TameStash.Reset();
+	TameFoodCount = 0;
+	TameEta = -1.f;
 	OnRep_Tamed();
 	UWRLifeSkillsComponent::Award(FindPlayerByName(GetWorld(), PlayerName), TEXT("taming"), TEXT("tame"), 100.f);
 	if (Spawner.IsValid())
@@ -586,7 +730,19 @@ void AWRCreature::CompleteTame(const FString& PlayerName)
 		OnCreatureDied.Broadcast(this);
 		Spawner = nullptr;
 	}
-	UE_LOG(LogWildreach, Log, TEXT("TAME %s tamed by %s"), *GetName(), *PlayerName);
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s tamed by %s (effectiveness %.0f%%: +%.0f%% health and bite)"), *GetName(), *PlayerName, TameEffectiveness * 100.f, TameBonus * 100.f);
+}
+
+void AWRCreature::ApplyTameBonus(float Bonus)
+{
+	const FWRCreatureDef* Def = GetDef();
+	if (!HasAuthority() || !Def)
+	{
+		return;
+	}
+	TameBonus = FMath::Max(0.f, Bonus);
+	InitVitals(Def->Health * (1.f + TameBonus), 100.f, Def->Poise);
+	Weapon.FlatDamage = Def->Damage * (1.f + TameBonus);
 }
 
 FString AWRCreature::Order(AWRPlayerController* Player, const FString& Command)
@@ -743,24 +899,56 @@ void AWRCreature::Tick(float DeltaSeconds)
 	// Torpor wears off; an unconscious creature wakes when it reaches zero.
 	if (Torpor > 0.f)
 	{
-		const float Rate = IsUnconscious() ? WRTune(TEXT("taming.unconsciousTorporDecay"), 0.01f) : WRTune(TEXT("taming.torporDecay"), 0.05f);
+		const float Rate = IsUnconscious() ? WRTune(TEXT("taming.unconsciousTorporDecay"), 0.004f) : WRTune(TEXT("taming.torporDecay"), 0.05f);
 		Torpor = FMath::Max(0.f, Torpor - MaxTorpor * Rate * DeltaSeconds);
 		if (Torpor <= 0.f && IsUnconscious())
 		{
+			// Awake before it was tamed: the tame starts over (the food it hasn't eaten stays in its stash).
 			Status->ClearStatus(WRTags::Status_Unconscious);
 			bCalm = false;
-			UE_LOG(LogWildreach, Log, TEXT("TAME %s woke up (%.0f%% tamed)"), *GetName(), TameProgress * 100.f);
+			FedUntil = 0.f;
+			const float Was = TameProgress;
+			TameProgress *= WRTune(TEXT("taming.wakeKeepsProgress"), 0.f);
+			UE_LOG(LogWildreach, Log, TEXT("TAME %s woke up (%.0f%% tamed, %.0f%% kept)"), *GetName(), Was * 100.f, TameProgress * 100.f);
 		}
+	}
+
+	// Knockout taming: it eats from its stash a meal at a time, best food first; plain food costs a little effectiveness.
+	if (!IsTamed() && Def && IsUnconscious() && Now >= FedUntil && TameStash.Num() > 0)
+	{
+		FName Meal;
+		for (const TPair<FName, int32>& Kept : TameStash)
+		{
+			if (Meal.IsNone() || FoodValue(Kept.Key) > FoodValue(Meal))
+			{
+				Meal = Kept.Key;
+			}
+		}
+		if (--TameStash[Meal] <= 0)
+		{
+			TameStash.Remove(Meal);
+		}
+		MealValue = FoodValue(Meal);
+		FedUntil = Now + WRTune(TEXT("taming.secondsPerFood"), 30.f);
+		if (Meal != TEXT("kibble"))
+		{
+			TameEffectiveness = FMath::Max(0.f, TameEffectiveness - WRTune(TEXT("taming.effectivenessPerPlainMeal"), 0.01f));
+		}
+		UE_LOG(LogWildreach, Log, TEXT("TAME %s eats %s (effectiveness %.0f%%)"), *GetName(), *Meal.ToString(), TameEffectiveness * 100.f);
 	}
 
 	// Taming progresses while the creature is fed and either knocked out or calm.
 	if (!IsTamed() && Def && !TamerName.IsEmpty() && Now < FedUntil && (IsUnconscious() || bCalm))
 	{
-		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds * TamerSpeed / FMath::Max(1.f, Def->TameSeconds()));
+		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds * TamerSpeed * MealValue / FMath::Max(1.f, Def->TameSeconds()));
 		if (TameProgress >= 1.f)
 		{
 			CompleteTame(TamerName);
 		}
+	}
+	if (!IsTamed() && IsUnconscious())
+	{
+		UpdateTameForecast();
 	}
 
 	// Tame utilities and farm produce, once a minute.
@@ -1065,7 +1253,10 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	{
 		Target = OwnerBody->CombatTarget.Get();
 	}
-	if (Target && (!Target->IsAlive() || !Self->bTameAggressive || (OwnerBody && FVector::Dist(Target->GetActorLocation(), OwnerBody->GetActorLocation()) > 2500.f)))
+	// Not a knocked-out creature (no threat, and likely the owner's next tame), and a tame told to stay guards its post.
+	if (Target && (!Target->IsAlive() || !Self->bTameAggressive || Target->HasTag(WRTags::Status_Unconscious)
+		|| (OwnerBody && FVector::Dist(Target->GetActorLocation(), OwnerBody->GetActorLocation()) > 2500.f)
+		|| (Self->TameOrder == EWRTameOrder::Stay && FVector::Dist(Target->GetActorLocation(), Self->GetHome()) > WRTune(TEXT("taming.stayGuardRadius"), 1500.f))))
 	{
 		Target = nullptr;
 	}

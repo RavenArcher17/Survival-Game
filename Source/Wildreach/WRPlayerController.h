@@ -18,6 +18,7 @@ enum class EWRMenu : uint8
 	Chest,
 	Claim,
 	Tame,
+	Taming,    // a knocked-out wild creature: give food, kibble, narcotics
 	Skills,
 	Paths,
 };
@@ -77,6 +78,9 @@ public:
 	UFUNCTION(Exec) void WRDismount();
 	UFUNCTION(Exec) void WRTorpor(float Amount);
 	UFUNCTION(Exec) void WRTameStat();
+	/** Knockout taming (the Taming menu's lines): all of a food into the nearest knocked-out creature's stash / a narcotic. */
+	UFUNCTION(Exec) void WRTameGive(FName Item);
+	UFUNCTION(Exec) void WRNarcotic();
 	/** Dev: deal damage (optionally fire/frost) to the nearest boss as this player. */
 	UFUNCTION(Exec) void WRBossDmg(float Amount, FName Element);
 	UFUNCTION(Exec) void WRArtifacts(int32 bOn);
