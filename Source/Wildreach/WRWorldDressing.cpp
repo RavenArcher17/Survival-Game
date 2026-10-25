@@ -122,10 +122,20 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	const TSharedPtr<FJsonObject>* Instances = nullptr;
 	if (File->TryGetObjectField(TEXT("instances"), Instances))
 	{
-		if (AWRDressing* Dressing = InWorld.SpawnActor<AWRDressing>(AWRDressing::StaticClass(), FTransform::Identity, Params))
+		if (AWRDressing* Built = InWorld.SpawnActor<AWRDressing>(AWRDressing::StaticClass(), FTransform::Identity, Params))
 		{
-			Dressing->Build(*Instances);
-			Dressing->BuildHazardVisuals();
+			Built->Build(*Instances);
+			Built->BuildHazardVisuals();
+			Dressing = Built;
+			// What's been gathered away replicates through the ledger (the server's; a client may already have it).
+			if (InWorld.GetNetMode() != NM_Client)
+			{
+				Ledger = InWorld.SpawnActor<AWRHarvestLedger>(AWRHarvestLedger::StaticClass(), FTransform::Identity, Params);
+			}
+			if (AWRHarvestLedger* L = Ledger.Get())
+			{
+				Built->SyncGone(L->GetGone());
+			}
 		}
 	}
 	// Caves replicate: only the server spawns them.
@@ -147,7 +157,22 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 }
 
+AWRDressing* UWRDressingSubsystem::FindDressing(const UWorld* World)
+{
+	const UWRDressingSubsystem* Sub = World ? World->GetSubsystem<UWRDressingSubsystem>() : nullptr;
+	return Sub ? Sub->GetDressing() : nullptr;
+}
+
 // ---------------------------------------------------------------- decoration
+
+// Decorations a swing gathers from: kind in the dressing file, tuning group (gathering.<group>.*), item, and the
+// trunk / footprint radius (cm, times the instance's scale) measured to from the swinging character.
+struct FWRHarvestSpec { const TCHAR* Kind; const TCHAR* Group; const TCHAR* Item; float Radius; };
+static const FWRHarvestSpec HarvestSpecs[] = {
+	{ TEXT("char_tree"), TEXT("tree"), TEXT("wood"), 30.f }, { TEXT("pine"), TEXT("tree"), TEXT("wood"), 30.f },
+	{ TEXT("basalt_rock"), TEXT("rock"), TEXT("stone"), 110.f }, { TEXT("ice_rock"), TEXT("rock"), TEXT("stone"), 90.f },
+	{ TEXT("ember_shrub"), TEXT("shrub"), TEXT("fiber"), 55.f }, { TEXT("snow_shrub"), TEXT("shrub"), TEXT("fiber"), 60.f },
+};
 
 AWRDressing::AWRDressing()
 {
@@ -244,7 +269,35 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 120), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // frosted: pale
 			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } }, { { TEXT("Color Intensity"), 1.25f }, { TEXT("Sature Max"), 0.5f } } } },
 	};
-	const auto BuildArt = [&](const FArt& A, const TArray<TSharedPtr<FJsonValue>>& Arr) -> bool
+	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
+	// machine in the same order, so a ledger key means the same decoration everywhere.
+	Harvestables.Reset();
+	for (const FWRHarvestSpec& Spec : HarvestSpecs)
+	{
+		FHarvestKind& HK = Harvestables.AddDefaulted_GetRef();
+		HK.Kind = Spec.Kind;
+		HK.Group = Spec.Group;
+		HK.Item = FName(Spec.Item);
+		HK.Radius = Spec.Radius;
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Instances->TryGetArrayField(Spec.Kind, Arr))
+		{
+			continue;
+		}
+		for (int32 i = 0; i + 4 < Arr->Num(); i += 5)
+		{
+			const FVector Ground((*Arr)[i]->AsNumber(), (*Arr)[i + 1]->AsNumber(), (*Arr)[i + 2]->AsNumber());
+			HK.Cells.FindOrAdd(FIntPoint(FMath::FloorToInt(Ground.X / HarvestCell), FMath::FloorToInt(Ground.Y / HarvestCell))).Add(HK.Ground.Num());
+			HK.Ground.Add(Ground);
+			HK.Scale.Add((*Arr)[i + 4]->AsNumber());
+		}
+	}
+	const auto HarvestKind = [this](const FString& Kind) -> FHarvestKind*
+	{
+		return Harvestables.FindByPredicate([&Kind](const FHarvestKind& HK) { return HK.Kind == Kind; });
+	};
+
+	const auto BuildArt = [&](const FArt& A, const TArray<TSharedPtr<FJsonValue>>& Arr, FHarvestKind* HK) -> bool
 	{
 		TArray<UStaticMesh*> Meshes;
 		for (const FString& Path : A.Meshes)
@@ -285,6 +338,10 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				Part->SetMaterial(Slot, MID);
 			}
 			Part->AddInstances(Transforms, false, true);
+			if (HK)
+			{
+				HK->Parts.Add({ Part, Meshes.Num(), m });
+			}
 		}
 		return true;
 	};
@@ -298,7 +355,8 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		}
 		const int32 Count = Arr->Num() / 5;
 		const FArt* A = Art.Find(Kind.Key);
-		const bool bArt = A && BuildArt(*A, *Arr);
+		FHarvestKind* HK = HarvestKind(Kind.Key);
+		const bool bArt = A && BuildArt(*A, *Arr, HK);
 		for (const FPart& Part : Kind.Value)
 		{
 			if (bArt && !(A->bShapeCollision && Part.bCollision))
@@ -327,6 +385,10 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				Shape->SetCastShadow(false);
 			}
 			Shape->AddInstances(Transforms, false, true);
+			if (HK)
+			{
+				HK->Parts.Add({ Shape, 1, 0 });
+			}
 		}
 		Total += Count;
 	}
@@ -438,6 +500,246 @@ void AWRDressing::Tick(float DeltaSeconds)
 		Hit.Origin = Feet;
 		UWRCombatLibrary::ApplyHit(Who, Hit);
 	}
+}
+
+// ---------------------------------------------------------------- gathering from the decoration
+
+bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy)
+{
+	UWRInventoryComponent* Inventory = Who ? UWRInventoryComponent::FindFor(Who) : nullptr;
+	if (!Inventory || GetWorld()->GetNetMode() == NM_Client)
+	{
+		return false;  // only survivors gather (a creature's bite near a tree doesn't fell it)
+	}
+	const FVector Here = Who->GetActorLocation();
+	const float FeetZ = Here.Z - Who->GetSimpleCollisionHalfHeight();
+	const FVector Forward = Who->GetActorForwardVector().GetSafeNormal2D();
+	const FIntPoint Cell(FMath::FloorToInt(Here.X / HarvestCell), FMath::FloorToInt(Here.Y / HarvestCell));
+	int32 BestKind = INDEX_NONE, BestIndex = INDEX_NONE;
+	float BestGap = Reach;
+	for (int32 k = 0; k < Harvestables.Num(); ++k)
+	{
+		const FHarvestKind& HK = Harvestables[k];
+		for (int32 dx = -1; dx <= 1; ++dx)
+		{
+			for (int32 dy = -1; dy <= 1; ++dy)
+			{
+				const TArray<int32>* InCell = HK.Cells.Find(Cell + FIntPoint(dx, dy));
+				if (!InCell)
+				{
+					continue;
+				}
+				for (int32 i : *InCell)
+				{
+					const FVector To = HK.Ground[i] - Here;
+					const float Gap = To.Size2D() - HK.Radius * HK.Scale[i];
+					// In reach, roughly at your feet (slopes), and in front unless you're standing in it.
+					if (Gap > BestGap || HK.Ground[i].Z < FeetZ - 200.f || HK.Ground[i].Z > FeetZ + 250.f
+						|| (Gap > 0.f && FVector::DotProduct(To.GetSafeNormal2D(), Forward) < 0.4f) || Hidden.Contains((k << KeyShift) | i))
+					{
+						continue;
+					}
+					BestGap = Gap;
+					BestKind = k;
+					BestIndex = i;
+				}
+			}
+		}
+	}
+	if (BestKind == INDEX_NONE)
+	{
+		return false;
+	}
+	const FHarvestKind& HK = Harvestables[BestKind];
+	const FString Tune = TEXT("gathering.") + HK.Group;
+	const int32 Key = (BestKind << KeyShift) | BestIndex;
+	FWRGathering::Gather(Who, HK.Item, FWRTuning::Get().Num(Tune + TEXT(".perHit"), 2.f), bHeavy, FString::Printf(TEXT("%s %d"), *HK.Kind, BestIndex));
+	if (HK.Group == TEXT("shrub") && FMath::FRand() < FWRTuning::Get().Num(Tune + TEXT(".berryChance"), 0.3f))
+	{
+		Inventory->AddItem(TEXT("berries"), 1);
+	}
+	int32& Taken = HitsTaken.FindOrAdd(Key);
+	if (++Taken >= FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(Tune + TEXT(".hits"), 6.f))))
+	{
+		HitsTaken.Remove(Key);
+		const UWRDressingSubsystem* Sub = GetWorld()->GetSubsystem<UWRDressingSubsystem>();
+		if (AWRHarvestLedger* Ledger = Sub ? Sub->GetLedger() : nullptr)
+		{
+			Ledger->Fell(Key, FWRTuning::Get().Num(Tune + TEXT(".respawnMinutes"), 15.f) * 60.f);
+		}
+		UE_LOG(LogWildreach, Log, TEXT("HARVEST %s used up %s %d at %s"), *Who->GetName(), *HK.Kind, BestIndex, *HK.Ground[BestIndex].ToCompactString());
+	}
+	return true;
+}
+
+bool AWRDressing::FindNearest(const FVector& From, const FString& Group, float Range, FVector& OutGround) const
+{
+	float Best = Range;
+	const FIntPoint Cell(FMath::FloorToInt(From.X / HarvestCell), FMath::FloorToInt(From.Y / HarvestCell));
+	const int32 Span = FMath::CeilToInt(Range / HarvestCell);
+	for (int32 k = 0; k < Harvestables.Num(); ++k)
+	{
+		const FHarvestKind& HK = Harvestables[k];
+		if (!Group.IsEmpty() && HK.Group != Group)
+		{
+			continue;
+		}
+		for (int32 dx = -Span; dx <= Span; ++dx)
+		{
+			for (int32 dy = -Span; dy <= Span; ++dy)
+			{
+				const TArray<int32>* InCell = HK.Cells.Find(Cell + FIntPoint(dx, dy));
+				if (!InCell)
+				{
+					continue;
+				}
+				for (int32 i : *InCell)
+				{
+					const float D = FVector::Dist2D(HK.Ground[i], From);
+					if (D < Best && FMath::Abs(HK.Ground[i].Z - From.Z) < 600.f && !Hidden.Contains((k << KeyShift) | i))
+					{
+						Best = D;
+						OutGround = HK.Ground[i];
+					}
+				}
+			}
+		}
+	}
+	return Best < Range;
+}
+
+void AWRDressing::SyncGone(const TArray<int32>& Gone)
+{
+	const TSet<int32> Want(Gone);
+	TArray<int32> Back;
+	for (const TPair<int32, TArray<FTransform>>& H : Hidden)
+	{
+		if (!Want.Contains(H.Key)) Back.Add(H.Key);
+	}
+	for (int32 Key : Back)
+	{
+		SetGone(Key, false);
+	}
+	for (int32 Key : Gone)
+	{
+		SetGone(Key, true);
+	}
+}
+
+void AWRDressing::SetGone(int32 Key, bool bGone)
+{
+	const int32 k = Key >> KeyShift, i = Key & ((1 << KeyShift) - 1);
+	if (!Harvestables.IsValidIndex(k) || !Harvestables[k].Ground.IsValidIndex(i) || bGone == Hidden.Contains(Key))
+	{
+		return;
+	}
+	// Gone = its instances (the art mesh and any hidden collider) moved far below the island; back = put where they were.
+	TArray<FTransform> Saved;
+	const TArray<FTransform>* Restore = bGone ? nullptr : Hidden.Find(Key);
+	int32 n = 0;
+	for (const FPartRef& Ref : Harvestables[k].Parts)
+	{
+		UHierarchicalInstancedStaticMeshComponent* Part = Ref.Part.Get();
+		if (!Part || i % Ref.Stride != Ref.Phase)
+		{
+			continue;
+		}
+		const int32 Index = (i - Ref.Phase) / Ref.Stride;
+		if (bGone)
+		{
+			FTransform T = FTransform::Identity;
+			Part->GetInstanceTransform(Index, T, true);
+			Saved.Add(T);
+			T.AddToTranslation(FVector(0.f, 0.f, -100000.f));
+			Part->UpdateInstanceTransform(Index, T, true, true, true);
+		}
+		else if (Restore && Restore->IsValidIndex(n))
+		{
+			Part->UpdateInstanceTransform(Index, (*Restore)[n], true, true, true);
+		}
+		++n;
+	}
+	if (bGone)
+	{
+		Hidden.Add(Key, MoveTemp(Saved));
+	}
+	else
+	{
+		Hidden.Remove(Key);
+	}
+}
+
+AWRHarvestLedger::AWRHarvestLedger()
+{
+	bReplicates = true;
+	bAlwaysRelevant = true;
+	SetNetUpdateFrequency(4.f);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickInterval = 1.f;
+}
+
+void AWRHarvestLedger::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AWRHarvestLedger, Gone);
+}
+
+void AWRHarvestLedger::BeginPlay()
+{
+	Super::BeginPlay();
+	if (UWRDressingSubsystem* Sub = GetWorld()->GetSubsystem<UWRDressingSubsystem>())
+	{
+		Sub->SetLedger(this);
+	}
+	OnRep_Gone();
+}
+
+void AWRHarvestLedger::OnRep_Gone()
+{
+	if (AWRDressing* Dressing = UWRDressingSubsystem::FindDressing(GetWorld()))
+	{
+		Dressing->SyncGone(Gone);
+	}
+	UE_LOG(LogWildreach, Log, TEXT("HARVEST ledger: %d decorations gathered away"), Gone.Num());
+}
+
+void AWRHarvestLedger::Fell(int32 Key, float Seconds)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	Gone.AddUnique(Key);
+	GrowBackAt.Add(Key, GetWorld()->GetTimeSeconds() + Seconds);
+	OnRep_Gone();
+}
+
+void AWRHarvestLedger::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority() || GrowBackAt.Num() == 0)
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	TArray<int32> Ready;
+	for (const TPair<int32, double>& P : GrowBackAt)
+	{
+		if (P.Value <= Now) Ready.Add(P.Key);
+	}
+	if (Ready.Num() == 0)
+	{
+		return;
+	}
+	AWRDressing* Dressing = UWRDressingSubsystem::FindDressing(GetWorld());
+	for (int32 Key : Ready)
+	{
+		GrowBackAt.Remove(Key);
+		Gone.RemoveSwap(Key);
+		if (Dressing) Dressing->GrewBack(Key);
+	}
+	OnRep_Gone();
 }
 
 // ---------------------------------------------------------------- caves

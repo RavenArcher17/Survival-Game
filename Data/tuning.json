@@ -140,6 +140,11 @@
   "lifeSkills": { "levelXpBase": 50, "levelXpPerLevel": 5,
     "xp": { "mine": 4, "chop": 4, "plant": 10, "harvest": 20, "collect": 5, "craftGear": 25, "craft": 10, "cook": 15, "upgrade": 15,
             "place": 8, "feed": 5, "tame": 100, "kill": 10, "sneak": 1 } },
+  "gathering": { "_comment": "The island's trees, rocks and shrubs (Data/island_dressing.json). perHit is before the tool's yield, the server gatherMultiplier and life skills (heavy hits x2); hits until it's used up; minutes until it grows back. placeholder",
+    "tree": { "perHit": 2, "hits": 8, "respawnMinutes": 20 },
+    "rock": { "perHit": 2, "hits": 6, "respawnMinutes": 20 },
+    "shrub": { "perHit": 2, "hits": 2, "respawnMinutes": 6, "berryChance": 0.3 } },
+  "building": { "foundationSink": 60, "_foundationSink": "cm a new foundation sits into the ground at its centre, so its floor (100 up) is a walkable step. placeholder" },
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },
   "crops": { "commonMinutes": 20, "rareMinutes": 120 }

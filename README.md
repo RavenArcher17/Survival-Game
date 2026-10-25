@@ -61,7 +61,8 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 | Q / Z / X | potion / eat / drink |
 | Tab | lock on |
 | E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags |
-| I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu |
+| I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu (also crafting by hand) |
+| LMB at a tree / rock / shrub | gather wood / stone / fiber (a hatchet or pick in your bag gathers more) |
 | Shift / Space / V | sprint / jump / first-third person |
 | M / T | map list (bosses, caves, camps, passes: distance + direction) / chat |
 | F10 | back to the main menu |
@@ -80,6 +81,7 @@ Tools\mptest.ps1        # headless server + bots, PvE (-Scenario pvp for duels)
 Tools\persisttest.ps1   # save -> server restart -> load
 Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets
 Tools\buildtest.ps1     # claims, code locks, raids, collapse, world save
+Tools\survivaltest.ps1  # fresh player on the island: gather bare-handed, crude tools, hut + workbench, stone tools
 Tools\tametest.ps1      # offer food, ride, knockout + feed, eggs, orders, tames saved
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks

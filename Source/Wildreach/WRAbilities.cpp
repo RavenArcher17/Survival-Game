@@ -8,6 +8,7 @@
 #include "WRPathComponent.h"
 #include "WRProjectile.h"
 #include "WRResourceNode.h"
+#include "WRWorldDressing.h"
 #include "WRBuilding.h"
 #include "WRBoss.h"
 #include "GameFramework/PlayerState.h"
@@ -267,6 +268,7 @@ void UWRGA_Melee::Sweep()
 	TArray<FHitResult> Hits;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(WRMelee), false, Character);
 	Character->GetWorld()->SweepMultiByChannel(Hits, Start, End, FQuat::Identity, ECC_Pawn, FCollisionShape::MakeSphere(Radius), Params);
+	AWRDressing* Dressing = UWRDressingSubsystem::FindDressing(Character->GetWorld());
 
 	for (const FHitResult& HitResult : Hits)
 	{
@@ -293,6 +295,7 @@ void UWRGA_Melee::Sweep()
 			if (!HitThisSwing.Contains(Node))
 			{
 				HitThisSwing.Add(Node);
+				if (Dressing) HitThisSwing.Add(Dressing);  // one gather per swing
 				Node->Harvest(Character, bHeavy);
 			}
 			continue;
@@ -334,6 +337,11 @@ void UWRGA_Melee::Sweep()
 		Hit.bWeaponArt = !ArtKey.IsEmpty();
 		Hit.Origin = Character->GetActorLocation();
 		UWRCombatLibrary::ApplyHit(Target, Hit);
+	}
+	// The island's trees, rocks and shrubs are instanced decoration, not actors: the swing gathers from the nearest one in reach.
+	if (Dressing && !HitThisSwing.Contains(Dressing) && Dressing->HarvestInFront(Character, Reach + Radius, bHeavy))
+	{
+		HitThisSwing.Add(Dressing);
 	}
 }
 

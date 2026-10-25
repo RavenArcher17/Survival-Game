@@ -45,6 +45,10 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
   Anything loaded by path (creature art, dressing meshes) must be under a `DirectoriesToAlwaysCook` entry in `DefaultGame.ini`.
   Cooking crashes (`Assertion failed: !Hash.IsZero()`) on any skeleton-less clip in a cooked folder: the Barghest pack's
   MANE/TAIL clips and meshes are moved out to `C:\Dev\WildreachArt\replaced\barghest_parts`; re-adding the pack brings them back.
+- 2026-10-25 survival loop pass: the island's trees / rocks / shrubs are the gathering (`AWRDressing::HarvestInFront`,
+  used-up ones replicate via `AWRHarvestLedger`), tools work from the bag (`FWRGathering`, `"tool"` in items.json),
+  crude tools are made by hand (recipes with station `hand`, top of the B menu), stone tools at the workbench.
+  `Tools\survivaltest.ps1` plays the fresh-player loop on L_Island (backs up and restores the island world save).
 - 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):
   1. Crafting & equipment: done (`WRCrafting`, `WRInventory`, menus in `WRPlayerMenus.cpp`; `Tools\crafttest.ps1`).
   2. Building: done (`WRBuilding`, build mode in `WRPlayerBuild.cpp`, world save in `WRGameMode`; `Tools\buildtest.ps1`).

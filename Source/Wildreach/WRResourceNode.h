@@ -7,6 +7,29 @@
 class AWRCharacterBase;
 class UStaticMeshComponent;
 
+/** A gathering tool from Data/items.json ("tool": {"kind": "hatchet" | "pick", "yield": 1.5}). */
+struct FWRToolDef
+{
+	FName ItemId;
+	FName Kind;
+	float Yield = 1.f;
+};
+
+/**
+ * Everything that gives materials when hit (resource nodes, the island's trees, rocks and shrubs) yields through here.
+ * Tools work from the bag: the best hatchet you carry chops wood, the best pick breaks stone and ore.
+ */
+struct WILDREACH_API FWRGathering
+{
+	static const TArray<FWRToolDef>& Tools();
+	/** The tool kind that speeds up gathering an item (hatchet for wood, pick for stone/ore/sulfur), or None. */
+	static FName ToolKindFor(FName ItemId);
+	/** Best tool of a kind among carried item ids (null = bare hands). Pure, for tests. */
+	static const FWRToolDef* BestTool(FName Kind, const TArray<FName>& Carried);
+	/** Server: one hit's worth of ItemId into the gatherer's bag (tool, server multiplier, life skills). Returns how many went in. */
+	static int32 Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHit, bool bHeavy, const FString& Source);
+};
+
 /**
  * Gatherable node (tree, rock, ore vein, crystal, lichen patch). Melee hits give its item to the
  * hitter's inventory; heavy hits give more. Depletes after a number of hits, then respawns.

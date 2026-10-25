@@ -4,11 +4,116 @@
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
+#include "WRPlayerController.h"
 #include "Components/StaticMeshComponent.h"
+#include "Dom/JsonObject.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+
+// ---------------------------------------------------------------- gathering
+
+const TArray<FWRToolDef>& FWRGathering::Tools()
+{
+	static TArray<FWRToolDef> List = []()
+	{
+		TArray<FWRToolDef> Out;
+		const TSharedPtr<FJsonObject> Root = FWRTuning::LoadDataFile(TEXT("items.json"));
+		const TArray<TSharedPtr<FJsonValue>>* Items = nullptr;
+		if (Root.IsValid() && Root->TryGetArrayField(TEXT("items"), Items))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Items)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				const TSharedPtr<FJsonObject>* Tool = nullptr;
+				if (O.IsValid() && O->TryGetObjectField(TEXT("tool"), Tool))
+				{
+					FWRToolDef& T = Out.AddDefaulted_GetRef();
+					T.ItemId = FName(*O->GetStringField(TEXT("id")));
+					T.Kind = FName(*(*Tool)->GetStringField(TEXT("kind")));
+					double Yield = 1.0;
+					(*Tool)->TryGetNumberField(TEXT("yield"), Yield);
+					T.Yield = Yield;
+				}
+			}
+		}
+		return Out;
+	}();
+	return List;
+}
+
+FName FWRGathering::ToolKindFor(FName ItemId)
+{
+	const FString Id = ItemId.ToString();
+	if (ItemId == TEXT("wood")) return TEXT("hatchet");
+	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur"))) return TEXT("pick");
+	return NAME_None;
+}
+
+const FWRToolDef* FWRGathering::BestTool(FName Kind, const TArray<FName>& Carried)
+{
+	const FWRToolDef* Best = nullptr;
+	for (const FWRToolDef& T : Tools())
+	{
+		if (!Kind.IsNone() && T.Kind == Kind && Carried.Contains(T.ItemId) && (!Best || T.Yield > Best->Yield))
+		{
+			Best = &T;
+		}
+	}
+	return Best;
+}
+
+int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHit, bool bHeavy, const FString& Source)
+{
+	UWRInventoryComponent* Inventory = Gatherer && Gatherer->HasAuthority() ? UWRInventoryComponent::FindFor(Gatherer) : nullptr;
+	if (!Inventory)
+	{
+		return 0;
+	}
+	TArray<FName> Carried;
+	for (const FWRItemStack& S : Inventory->GetSlots())
+	{
+		if (!S.IsEmpty()) Carried.AddUnique(S.ItemId);
+	}
+	const FWRToolDef* Tool = BestTool(ToolKindFor(ItemId), Carried);
+
+	// Tool, gathering multiplier (server) and the gathering life skills.
+	const bool bOre = ToolKindFor(ItemId) == TEXT("pick");
+	const bool bWood = ItemId == TEXT("wood");
+	const FName Skill = bOre ? FName(TEXT("mining")) : bWood ? FName(TEXT("woodcutting")) : NAME_None;
+	float Raw = PerHit * (bHeavy ? 2 : 1) * WRTune(TEXT("server.gatherMultiplier"), 1.f) * (Tool ? Tool->Yield : 1.f);
+	if (bOre) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("miningYield"));
+	if (bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodYield")) + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodExtra"));
+	if (!bOre && !bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("herbExtra"));
+	int32 Amount = FMath::FloorToInt(Raw) + (FMath::FRand() < FMath::Frac(Raw) ? 1 : 0);
+	if (bOre && ItemId != TEXT("stone") && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("doubleOre")))
+	{
+		Amount *= 2;
+	}
+	if (!Skill.IsNone())
+	{
+		UWRLifeSkillsComponent::Award(Gatherer, Skill, bOre ? TEXT("mine") : TEXT("chop"), 4.f);
+	}
+	const int32 Left = Inventory->AddItem(ItemId, Amount);
+	if (ItemId == TEXT("berries") && FMath::FRand() < 0.35f)
+	{
+		Inventory->AddItem(TEXT("seeds"), 1);
+	}
+	const int32 Got = Amount - Left;
+	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Gatherer->GetController()))
+	{
+		const FWRItemDef* Def = FWRItemRegistry::Get().Find(ItemId);
+		const FWRItemDef* ToolDef = Tool ? FWRItemRegistry::Get().Find(Tool->ItemId) : nullptr;
+		PC->ClientNotify(Got <= 0 ? TEXT("Your bag is full")
+			: FString::Printf(TEXT("+%d %s%s"), Got, Def ? *Def->Name : *ItemId.ToString(), ToolDef ? *FString::Printf(TEXT("  (%s)"), *ToolDef->Name) : TEXT("")));
+	}
+	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s, tool %s"), *Gatherer->GetName(), Got, *ItemId.ToString(), *Source,
+		Tool ? *Tool->ItemId.ToString() : TEXT("none"));
+	return Got;
+}
+
+// ---------------------------------------------------------------- resource node
 
 AWRResourceNode::AWRResourceNode()
 {
@@ -75,35 +180,13 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	{
 		return;
 	}
-	// Gathering multiplier (server) and the gathering life skills.
-	const bool bOre = ItemId.ToString().EndsWith(TEXT("_ore")) || ItemId == TEXT("stone") || ItemId == TEXT("sulfur");
-	const bool bWood = ItemId == TEXT("wood");
-	const FName Skill = bOre ? FName(TEXT("mining")) : bWood ? FName(TEXT("woodcutting")) : NAME_None;
-	float Raw = PerHit * (bHeavy ? 2 : 1) * WRTune(TEXT("server.gatherMultiplier"), 1.f);
-	if (bOre) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("miningYield"));
-	if (bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodYield")) + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodExtra"));
-	if (!bOre && !bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("herbExtra"));
-	int32 Amount = FMath::FloorToInt(Raw) + (FMath::FRand() < FMath::Frac(Raw) ? 1 : 0);
-	if (bOre && ItemId != TEXT("stone") && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("doubleOre")))
-	{
-		Amount *= 2;
-	}
-	if (!Skill.IsNone())
-	{
-		UWRLifeSkillsComponent::Award(Gatherer, Skill, bOre ? TEXT("mine") : TEXT("chop"), 4.f);
-	}
-	const int32 Left = Inventory->AddItem(ItemId, Amount);
-	if (ItemId == TEXT("berries") && FMath::FRand() < 0.35f)
-	{
-		Inventory->AddItem(TEXT("seeds"), 1);
-	}
+	FWRGathering::Gather(Gatherer, ItemId, PerHit, bHeavy, FString::Printf(TEXT("%s (%d hits left)"), *GetName(), HitsLeft - 1));
 	// Ore veins sometimes give up a gem (Crafting tab: gems come from mines and caves).
 	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < GemChance + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("gemChance")))
 	{
 		static const FName Gems[] = { TEXT("gem_ruby"), TEXT("gem_topaz"), TEXT("gem_onyx") };
 		Inventory->AddItem(Gems[FMath::RandRange(0, 2)], 1);
 	}
-	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s (%d hits left)"), *Gatherer->GetName(), Amount - Left, *ItemId.ToString(), *GetName(), HitsLeft - 1);
 
 	if (--HitsLeft <= 0)
 	{

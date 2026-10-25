@@ -6,6 +6,7 @@
 #include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPathTypes.h"
+#include "WRResourceNode.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -174,7 +175,7 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 		FWRCraftingRules::RollQuality(0.2f, 1, 0) == EWRQuality::Crude && FWRCraftingRules::RollQuality(0.2f, 5, 100) != EWRQuality::Crude);
 	// Recipes load and every input/output is a real item.
 	TestNotNull(TEXT("copper sword recipe"), FWRRecipeRegistry::Get().Find(TEXT("copper_sword")));
-	for (const FName Station : { FName(TEXT("forge")), FName(TEXT("armorer")), FName(TEXT("alchemy_table")), FName(TEXT("workbench")) })
+	for (const FName Station : { FName(TEXT("forge")), FName(TEXT("armorer")), FName(TEXT("alchemy_table")), FName(TEXT("workbench")), FName(TEXT("hand")) })
 	{
 		for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(Station))
 		{
@@ -191,6 +192,26 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("two swords take two slots"), FWRInventoryRules::Add(Slots, TEXT("copper_sword"), 2), 0);
 	TestTrue(TEXT("separate instances"), Slots[0].Count == 1 && Slots[1].Count == 1);
 	TestEqual(TEXT("full durability"), Slots[0].Durability, 200.f);
+	// A fresh survivor can make the crude tools by hand from what the island gives bare-handed (wood, stone).
+	for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(TEXT("hand")))
+	{
+		for (const TPair<FName, int32>& In : R->Inputs)
+		{
+			TestTrue(FString::Printf(TEXT("%s needs only wood and stone"), *R->Id.ToString()), In.Key == TEXT("wood") || In.Key == TEXT("stone"));
+		}
+	}
+	TestTrue(TEXT("hatchet and pick made by hand"), FWRRecipeRegistry::Get().ForStation(TEXT("hand")).Num() >= 2);
+	// Tools work from the bag: the best of the right kind counts, nothing for other materials.
+	TestEqual(TEXT("wood wants a hatchet"), FWRGathering::ToolKindFor(TEXT("wood")), FName(TEXT("hatchet")));
+	TestEqual(TEXT("ore wants a pick"), FWRGathering::ToolKindFor(TEXT("copper_ore")), FName(TEXT("pick")));
+	TestEqual(TEXT("sulfur wants a pick"), FWRGathering::ToolKindFor(TEXT("sulfur_crystal")), FName(TEXT("pick")));
+	TestEqual(TEXT("fiber has no tool"), FWRGathering::ToolKindFor(TEXT("fiber")), FName());
+	TestNull(TEXT("bare hands"), FWRGathering::BestTool(TEXT("hatchet"), { TEXT("copper_sword"), TEXT("wood") }));
+	const FWRToolDef* Crude = FWRGathering::BestTool(TEXT("hatchet"), { TEXT("crude_hatchet"), TEXT("crude_pick") });
+	TestTrue(TEXT("crude hatchet beats bare hands"), Crude && Crude->ItemId == TEXT("crude_hatchet") && Crude->Yield > 1.f);
+	const FWRToolDef* Best = FWRGathering::BestTool(TEXT("hatchet"), { TEXT("crude_hatchet"), TEXT("stone_hatchet") });
+	TestTrue(TEXT("the stone hatchet is the better one"), Best && Crude && Best->ItemId == TEXT("stone_hatchet") && Best->Yield > Crude->Yield);
+	TestNull(TEXT("a pick doesn't chop"), FWRGathering::BestTool(TEXT("hatchet"), { TEXT("stone_pick") }));
 	return true;
 }
 

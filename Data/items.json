@@ -35,6 +35,11 @@
     { "id": "core_skaldrith", "name": "Skaldrith's core", "category": "core", "stack": 5, "weight": 2.0 },
 
     { "id": "gem_ruby", "name": "Ruby", "category": "gem", "stack": 10, "weight": 0.05, "gem": { "damage": 0.06 } },
+    { "id": "crude_hatchet", "name": "Crude hatchet", "category": "tool", "stack": 1, "weight": 1.0, "tool": { "kind": "hatchet", "yield": 1.5 }, "note": "made by hand (B menu); tools work from the bag: wood per chop x yield" },
+    { "id": "crude_pick", "name": "Crude pick", "category": "tool", "stack": 1, "weight": 1.2, "tool": { "kind": "pick", "yield": 1.5 }, "note": "made by hand; stone, ore and sulfur" },
+    { "id": "stone_hatchet", "name": "Stone hatchet", "category": "tool", "stack": 1, "weight": 1.4, "tool": { "kind": "hatchet", "yield": 2.0 }, "note": "workbench" },
+    { "id": "stone_pick", "name": "Stone pickaxe", "category": "tool", "stack": 1, "weight": 1.6, "tool": { "kind": "pick", "yield": 2.0 }, "note": "workbench" },
+
     { "id": "gem_topaz", "name": "Topaz", "category": "gem", "stack": 10, "weight": 0.05, "gem": { "critChance": 0.05 } },
     { "id": "gem_onyx", "name": "Onyx", "category": "gem", "stack": 10, "weight": 0.05, "gem": { "poise": 10 } },
     { "id": "part_giants_ember", "name": "Giant's ember", "category": "gem", "stack": 1, "weight": 0.5, "gem": { "staggerShockwave": 1 }, "note": "Vulkarn boss part" },

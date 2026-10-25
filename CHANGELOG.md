@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-10-25: the survival loop works from a fresh spawn
+
+A playthrough as a fresh bot on `L_Island` showed the basic loop didn't hold together: the island's trees, rocks and
+shrubs were decoration (swinging at them gave nothing; the only gatherables were ~190 placeholder cones over 16 km²),
+there were no tools, nothing could be made without a station, and the workbench only cooked meat and made waterskins.
+Now a fresh survivor can do it all, and `Tools\survivaltest.ps1` plays it end to end.
+
+- **Gather from the island itself**: a melee swing chops the tree, breaks the rock or picks the shrub in front of you
+  (trees -> wood, rocks -> stone, shrubs -> fiber and sometimes berries). Each takes a number of hits, then vanishes
+  for everyone and grows back later (`gathering` in `tuning.json`: per hit, hits, minutes). The used-up ones replicate
+  through a small `AWRHarvestLedger`; the decoration itself stays local. Every gather shows a notice ("+12 Wood
+  (Crude hatchet)").
+- **Tools**: a crude hatchet and a crude pick, made **by hand** from wood and stone (they're at the top of the build
+  menu, B), and a stone hatchet and stone pickaxe at the **workbench** (wood, stone, fiber). Tools work from your bag:
+  the best hatchet you carry chops, the best pick breaks stone, ore and sulfur. Bare hands 1x, crude 1.5x, stone 2x
+  (`"tool": {"kind", "yield"}` in `items.json`). Recipes with station `hand` are made anywhere.
+- **Foundations sit into the ground** (`building.foundationSink`, 60 cm) so the floor is a walkable step instead of a
+  waist-high ledge, and the slab runs deep, so slopes don't show a gap under it. A new foundation next to one you built
+  levels with it; otherwise it sits on the ground at its cell's centre, wherever you aim.
+- **Placing a workbench, forge, Hearth or totem shows a preview**: the ghost was invisible (those are child actors only
+  the server spawns).
+- **Doors swing on their hinge** instead of turning in the middle of the doorway.
+- Sulfur now counts as mining (pick, mining XP), as the chop clip already assumed.
+- `Tools\survivaltest.ps1` (22 checks): a fresh fire survivor on the island gathers bare-handed, crafts the crude
+  tools, gathers more with them, builds a hut (foundation, three walls, a door, a roof) and a workbench out of what it
+  gathered, opens the door and walks in, crafts the stone tools at the bench and gathers more again. `-Shots` adds
+  screenshots (a tree before and after felling, the hut from three sides and through the door). It backs up the
+  island's world save and puts it back.
+- Known: bots swing with the Flame slash weapon art (bot commands can't press LMB; it's the same melee sweep); the chop
+  clip only plays at the old resource nodes, not at island trees; with a workbench inside a small hut, E at the door
+  can open the bench menu instead of the door. Tools don't wear out yet.
+
 ## 2026-10-25: the humanoid bosses have bodies
 
 - **Vulkarn, Grimjaw and the Obsidian Warden** are AI-made, rigged on Mixamo and animated with its Creature Pack

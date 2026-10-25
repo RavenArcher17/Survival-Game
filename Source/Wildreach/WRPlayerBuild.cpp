@@ -8,6 +8,7 @@
 #include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
+#include "WRTuning.h"
 #include "Camera/PlayerCameraManager.h"
 #include "EngineUtils.h"
 
@@ -149,6 +150,36 @@ void AWRPlayerController::UpdatePlacement()
 				BaseZ = Top + Level * 300.f;
 			}
 		}
+		else if (Def->Shape == TEXT("foundation"))
+		{
+			// Level with a foundation next to this cell (so floors and walls line up); else on the ground at the cell's
+			// centre, sunk in so the floor is a step up instead of a waist-high ledge.
+			const float Grid = FWRBuildRegistry::Get().GridSize;
+			float CellYaw = 0.f;
+			const FVector Cell = FWRBuildRules::SnapToGrid(Def->Shape, Point, Point.Z, Grid, CellYaw);
+			const AWRBuildPiece* Next = nullptr;
+			float NextDist = Grid * 1.05f;
+			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+			{
+				const FWRPieceDef* O = It->GetDef();
+				const float D = FVector::Dist2D(It->GetActorLocation(), Cell);
+				if (!It->bGhost && O && O->Shape == TEXT("foundation") && D > 10.f && D < NextDist && FMath::Abs(It->GetActorLocation().Z - Point.Z) < 300.f)
+				{
+					NextDist = D;
+					Next = *It;
+				}
+			}
+			FHitResult Ground;
+			if (Next)
+			{
+				BaseZ = Next->GetActorLocation().Z;
+			}
+			else if (GetWorld()->LineTraceSingleByChannel(Ground, FVector(Cell.X, Cell.Y, Point.Z + 300.f), FVector(Cell.X, Cell.Y, Point.Z - 600.f), ECC_WorldStatic, Query)
+				&& !Cast<AWRBuildPiece>(Ground.GetActor()))
+			{
+				BaseZ = Ground.ImpactPoint.Z - WRTune(TEXT("building.foundationSink"), 60.f);
+			}
+		}
 		float Yaw = PlaceYaw;
 		PlaceLoc = FWRBuildRules::SnapToGrid(Def->Shape, Point, BaseZ, FWRBuildRegistry::Get().GridSize, Yaw);
 		G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, Yaw, 0.f));
@@ -198,6 +229,25 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
 	TArray<FWRMenuEntry> Out;
 	const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
 	const UWRInventoryComponent* Inv = PS ? PS->GetInventory() : nullptr;
+	// Things made by hand (no station) come first: the crude tools a fresh survivor starts with.
+	Out.Add({ TEXT("-- Craft by hand (tools work from your bag) --"), FString() });
+	for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(TEXT("hand")))
+	{
+		const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(R->Output);
+		FString Needs;
+		bool bHave = true;
+		for (const TPair<FName, int32>& In : R->Inputs)
+		{
+			const FWRItemDef* InDef = FWRItemRegistry::Get().Find(In.Key);
+			const int32 Have = Inv ? Inv->CountOf(In.Key) : 0;
+			bHave &= Have >= In.Value;
+			Needs += FString::Printf(TEXT("%s %d/%d  "), InDef ? *InDef->Name : *In.Key.ToString(), Have, In.Value);
+		}
+		const int32 Carried = Inv ? Inv->CountOf(R->Output) : 0;
+		Out.Add({ FString::Printf(TEXT("%s%s  <-  %s"), OutDef ? *OutDef->Name : *R->Output.ToString(), Carried > 0 ? TEXT(" (have one)") : TEXT(""), *Needs),
+			FString::Printf(TEXT("craft %s none"), *R->Id.ToString()), bHave });
+	}
+	Out.Add({ TEXT("-- Build --"), FString() });
 	for (const FWRPieceDef& Def : FWRBuildRegistry::Get().All())
 	{
 		FString Cost;
@@ -316,6 +366,11 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			AWRBuildPiece::RecomputeSupport(GetWorld(), Where, 3000.f);
 			OutResult = FString::Printf(TEXT("Demolished %s (half refunded)"), *Def->Name);
 		}
+	}
+	else if (Cmd == TEXT("craft") && FWRRecipeRegistry::Get().Find(FName(*Arg(1))) && FWRRecipeRegistry::Get().Find(FName(*Arg(1)))->Station == TEXT("hand"))
+	{
+		// Crafting by hand from this menu (station recipes go on to the station in front of you).
+		OutResult = FWRCrafting::CraftByHand(this, FName(*Arg(1)));
 	}
 	else if (Cmd == TEXT("claimdeposit") || Cmd == TEXT("claimupgrade"))
 	{

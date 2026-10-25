@@ -227,8 +227,10 @@ void AWRBuildPiece::OnRep_Piece()
 
 void AWRBuildPiece::OnRep_Door()
 {
-	// The leaf swings 90 degrees about its hinge edge.
-	Leaf->SetRelativeRotation(FRotator(0.f, bOpen ? 90.f : 0.f, 0.f));
+	// The leaf swings 90 degrees about its hinge edge (the opening's -X side), clear of the doorway.
+	const FVector Size = Leaf->GetRelativeScale3D() * 100.f;
+	Leaf->SetRelativeLocationAndRotation(bOpen ? FVector(-Size.X * 0.5f, Size.X * 0.5f, Size.Z * 0.5f) : FVector(0.f, 0.f, Size.Z * 0.5f),
+		FRotator(0.f, bOpen ? 90.f : 0.f, 0.f));
 	Leaf->SetCollisionEnabled(bOpen || bGhost ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
 }
 
@@ -289,7 +291,8 @@ void AWRBuildPiece::ApplyLook()
 	FVector LeafSize = FVector::ZeroVector;
 	const FName S = Def->Shape;
 	const FName K = Def->Kind;
-	if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 100), FVector(0, 0, 50) });
+	// A deep slab: the top is the floor (100 above the piece), the rest sinks into the ground so slopes don't show a gap.
+	if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 250), FVector(0, 0, -25) });
 	else if (S == TEXT("wall")) Parts.Add({ FVector(400, 20, 300), FVector(0, 0, 150) });
 	else if (S == TEXT("halfwall")) Parts.Add({ FVector(400, 20, 150), FVector(0, 0, 75) });
 	else if (S == TEXT("floor") || S == TEXT("roof")) Parts.Add({ FVector(400, 400, 20), FVector(0, 0, 10) });
@@ -329,6 +332,10 @@ void AWRBuildPiece::ApplyLook()
 		Parts.Add({ FVector(20, 800, 120), FVector(-400, 0, 60) });
 		Parts.Add({ FVector(20, 800, 120), FVector(400, 0, 60) });
 	}
+	// Stations, the Hearth and the totem are child actors only the server spawns: the build-mode ghost previews their size.
+	else if (bGhost && K == TEXT("station")) Parts.Add({ FVector(120, 80, 90), FVector(0, 0, 50) });
+	else if (bGhost && K == TEXT("hearth")) Parts.Add({ FVector(150, 150, 120), FVector(0, 0, 50) });
+	else if (bGhost && K == TEXT("totem")) Parts.Add({ FVector(40, 40, 250), FVector(0, 0, 50) });
 	else if (Def->Id == TEXT("table")) Parts.Add({ FVector(150, 90, 80), FVector(0, 0, 40) });
 	else if (Def->Id == TEXT("chair")) Parts.Add({ FVector(50, 50, 90), FVector(0, 0, 45) });
 	else if (Def->Id == TEXT("rug")) Parts.Add({ FVector(200, 150, 2), FVector(0, 0, 1) });
@@ -534,15 +541,18 @@ int32 AWRBuildPiece::SupportAt(UWorld* World, FName PieceId, const FVector& Loca
 	for (const FName& G : GroundShapes) bGroundShape |= Def->Shape == G;
 	if (bGroundShape)
 	{
-		// Grounded if the terrain (not another piece) is right below.
-		TArray<FHitResult> Hits;
-		World->LineTraceMultiByChannel(Hits, Location + FVector(0, 0, 60), Location - FVector(0, 0, 160), ECC_WorldStatic);
-		for (const FHitResult& H : Hits)
+		// Grounded if the terrain (not another piece) is right below. Foundations sit sunk into the ground
+		// (building.foundationSink), so look from above that, past any pieces in the way (this one's own slab too).
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSupport), false, Ignore);
+		const FVector Top = Location + FVector(0, 0, 60 + WRTune(TEXT("building.foundationSink"), 60.f));
+		FHitResult H;
+		for (int32 Try = 0; Try < 4 && World->LineTraceSingleByChannel(H, Top, Location - FVector(0, 0, 160), ECC_WorldStatic, Query); ++Try)
 		{
 			if (H.GetActor() && !H.GetActor()->IsA<AWRBuildPiece>())
 			{
 				return 0;
 			}
+			Query.AddIgnoredActor(H.GetActor());
 		}
 	}
 	const float Grid = FWRBuildRegistry::Get().GridSize;

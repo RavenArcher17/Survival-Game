@@ -40,6 +40,15 @@ private:
 	TArray<FWRRecipe> Recipes;
 };
 
+/** Server: making a recipe's output (shared by stations and crafting by hand). */
+struct WILDREACH_API FWRCrafting
+{
+	/** Checks and takes the inputs, then makes the output (quality roll for gear). Returns the message for the player. */
+	static FString Make(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element);
+	/** Recipes with station "hand": anywhere, no station needed (the crude tools). */
+	static FString CraftByHand(AWRPlayerController* Player, FName RecipeId);
+};
+
 /** Pure crafting math (tests). */
 struct WILDREACH_API FWRCraftingRules
 {

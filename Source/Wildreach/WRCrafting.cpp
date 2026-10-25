@@ -276,7 +276,32 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	{
 		return FString::Printf(TEXT("needs a tier %d station (feed the Hearth boss cores)"), R->Level);
 	}
-	UWRInventoryComponent* Inv = Player->GetPlayerState<AWRPlayerState>()->GetInventory();
+	return FWRCrafting::Make(Player, *R, StationType, GetTier(), Element);
+}
+
+FString FWRCrafting::CraftByHand(AWRPlayerController* Player, FName RecipeId)
+{
+	const FWRRecipe* R = FWRRecipeRegistry::Get().Find(RecipeId);
+	if (!R || R->Station != TEXT("hand"))
+	{
+		return TEXT("that needs a station");
+	}
+	if (!Player || !Player->HasAuthority() || !Player->GetPawn())
+	{
+		return FString();
+	}
+	return Make(Player, *R, TEXT("hand"), 1, NAME_None);
+}
+
+FString FWRCrafting::Make(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element)
+{
+	const FWRRecipe* R = &Recipe;
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS)
+	{
+		return FString();
+	}
+	UWRInventoryComponent* Inv = PS->GetInventory();
 	for (const TPair<FName, int32>& In : R->Inputs)
 	{
 		if (Inv->CountOf(In.Key) < In.Value)
@@ -307,7 +332,7 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 		const bool bArmor = OutDef->Slot == EWREquipSlot::Armor;
 		const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(Player);
 		const int32 SkillLevel = Skills ? Skills->GetLevel(bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"))) : 0;
-		EWRQuality Quality = R->bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), GetTier(), SkillLevel) : EWRQuality::Common;
+		EWRQuality Quality = R->bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), Tier, SkillLevel) : EWRQuality::Common;
 		if (UWRLifeSkillsComponent::StatFor(Player, bArmor ? TEXT("armorMinFine") : TEXT("weaponMinFine")) > 0.f && Quality < EWRQuality::Fine)
 		{
 			Quality = EWRQuality::Fine;
