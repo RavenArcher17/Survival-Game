@@ -351,8 +351,10 @@ void AWRCharacter::LoadBodyArt()
 		bArtWeapon = true;
 	}
 
-	// Shield on the outside of the forearm, face out: in the T-pose (palms down) that is straight up, centred a little
-	// past the middle of the forearm, its back resting on the arm.
+	// Shield on the outside of the forearm (the back of the arm), centred a little past its middle, its back resting on
+	// the arm. The skeleton's reference pose isn't always the T-pose (Unreal can take a clip's first frame), so the face
+	// is worked out from the arm itself: away from the arm, between up and out from the body's centre line. In a T-pose
+	// (palms down) that's straight up; with the arms hanging (palms in) it's out to the side. Both are the back of the arm.
 	UStaticMesh* Shield = ShieldPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ShieldPath);
 	const int32 ArmBone = Shield ? Ref.FindBoneIndex(FName(*ShieldSocket)) : INDEX_NONE;
 	ShieldMesh->SetVisibility(ArmBone != INDEX_NONE);
@@ -368,7 +370,10 @@ void AWRCharacter::LoadBodyArt()
 				break;
 			}
 		}
-		const FVector Out = ArmCS.InverseTransformVectorNoScale(FVector::UpVector);
+		const FVector ArmDir = (WristCS - ArmCS.GetLocation()).GetSafeNormal();
+		const FVector Side = FVector(ArmCS.GetLocation().X, ArmCS.GetLocation().Y, 0.f).GetSafeNormal();  // the mesh origin is on the centre line
+		const FVector Away = FVector::VectorPlaneProject(FVector::UpVector + Side, ArmDir).GetSafeNormal();
+		const FVector Out = ArmCS.InverseTransformVectorNoScale(Away);
 		const FVector Along = ArmCS.InverseTransformVectorNoScale(WristCS - ArmCS.GetLocation());
 		const FVector Size = Shield->GetBoundingBox().GetSize();
 		const int32 Thin = Size.X <= Size.Y && Size.X <= Size.Z ? 0 : (Size.Y <= Size.Z ? 1 : 2);

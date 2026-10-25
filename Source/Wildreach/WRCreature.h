@@ -53,6 +53,7 @@ struct FWRCreatureDef
 	TArray<FString> Materials;    // per-slot overrides ("" keeps the mesh's own), e.g. a tinted pack creature
 	float MeshYaw = 0.f;
 	float MeshScale = 1.f;        // multiplier on the auto fit
+	float Glow = 0.f;             // > 0, no mesh: a glowing orb (emissive sphere in its colour + a light this bright)
 
 	bool CanTameBy(FName Method) const { return TamingMethods.Contains(Method); }
 	float TameSeconds() const;

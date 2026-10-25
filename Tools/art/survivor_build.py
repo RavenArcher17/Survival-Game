@@ -62,6 +62,12 @@ dt.layers_vgroup_select_src = "ALL"
 dt.layers_vgroup_select_dst = "NAME"
 bpy.context.view_layer.objects.active = full
 bpy.ops.object.modifier_apply(modifier="weights")
+if "--smooth-weights" in args:
+    # Spiky or furry image-to-3D bodies pick up blotchy weights from the decimated copy; blur them over the surface
+    # so spikes and cuffs bend with their neighbours instead of tearing.
+    bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=int(args[args.index("--smooth-weights") + 1]))
+    bpy.ops.object.mode_set(mode="OBJECT")
 bpy.ops.object.vertex_group_limit_total(limit=4)
 bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 unweighted = sum(1 for v in full.data.vertices if not any(g.weight > 0 for g in v.groups))
@@ -164,7 +170,8 @@ if "--cut-stretch" in args:
     full.data.edges.foreach_get("vertices", edges)
     edges = edges.reshape(-1, 2)
     rest_len = np.maximum(orig_len, 1e-6)
-    worst = np.maximum(1.0, edge_lengths(mesh_co(full.data)) / rest_len)  # the T-pose itself counts
+    # Only what the clips do counts: the T-pose bind itself tears shoulders it never shows in play.
+    worst = np.ones(len(edges))
     for name in names:
         act = bpy.data.actions[name]
         rig.animation_data.action = act

@@ -1,8 +1,10 @@
 # Blender (headless): rig image-to-3D creatures that aren't legged walkers, bake their animations, export FBX for Unreal.
-#   blender -b -P rig_special.py -- <model.glb> <out.fbx> --body worm|moth [--head +x|-x|+y|-y] [--hover 1.2] [--preview out.png]
+#   blender -b -P rig_special.py -- <model.glb> <out.fbx> --body worm|moth|fae [--head +x|-x|+y|-y] [--hover 1.2] [--preview out.png]
 #   worm  a 10-bone spine along the body's centreline: slithers with a travelling wave, rears up to strike.
 #   moth  the concept is seen from above, so the model stands on its tail: it's laid flat (head forward, back up),
 #         then gets a body, a head and one hinged wing per side; it hovers off the ground and flaps.
+#   fae   an upright winged figure seen from the front (Ignessa): faced the camera, so it's turned to face +X; a body,
+#         a head and a hinged wing per side behind the shoulders. It floats, sways and fans its wings (the game flies it).
 # Actions: Idle, Walk, Run, Attack, Hit, Death (30 fps), same names as rig_quadruped.py so the game wires them alike.
 import bpy, sys, math, os
 import numpy as np
@@ -29,6 +31,8 @@ for o in [o for o in bpy.context.scene.objects if o.type != "MESH"]:
     bpy.data.objects.remove(o)
 bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+if kind == "fae":
+    body.data.transform(Matrix.Rotation(math.pi / 2, 4, "Z"))  # faced the camera (-Y): now faces +X
 if kind == "moth":
     # Image top (+Z) becomes forward (+X); the side that faced the camera (-Y) becomes the back (+Z).
     body.data.transform(Matrix(((0, 0, 1, 0), (-1, 0, 0, 0), (0, -1, 0, 0), (0, 0, 0, 1))))
@@ -75,6 +79,16 @@ if kind == "worm":
         bone(f"spine{i + 1}", joints[i], joints[i + 1], prev)
         prev = f"spine{i + 1}"
     print("centreline", [[round(c, 2) for c in j] for j in joints])
+elif kind == "fae":
+    # Wings: whatever spreads well out to the sides above the waist; hinge them behind the shoulders, at their height.
+    wing = v[(np.abs(v[:, 1]) > 0.28 * W) & (v[:, 2] > 0.35)]
+    wx = float(np.median(wing[:, 0])) if len(wing) else lo[0] * 0.5
+    wz = float(np.median(wing[:, 2])) if len(wing) else 0.7
+    bone("body", (0, 0, 0.05), (0, 0, 0.8), "root")
+    bone("head", (0, 0, 0.8), (0, 0, 0.99), "body")
+    bone("wing_L", (wx, 0.06 * W, wz), (wx, 0.46 * W, wz + 0.05), "body")
+    bone("wing_R", (wx, -0.06 * W, wz), (wx, -0.46 * W, wz + 0.05), "body")
+    print(f"fae wings hinge at x {wx:.2f} z {wz:.2f} ({len(wing)} wing verts)")
 else:
     core = v[np.abs(v[:, 1]) < 0.06 * W]
     zc = float(np.median(core[:, 2])) if len(core) else 0.5
@@ -158,6 +172,36 @@ if kind == "worm":
         for i in range(SEGS):
             P[f"spine{i + 1}"].rotation_euler.z = R(14) * e  # curls up
         P["root"].location.y = -0.1 * e
+    make_action("Death", 1.2, death)
+elif kind == "fae":
+    LIFT = 0.04  # the game flies her; just a little float of her own
+
+    def fan(t, cycles, amp, bob, sway=0.0, pitch=0.0):
+        a = R(amp) * math.sin(2 * math.pi * cycles * t)
+        P["wing_L"].rotation_euler.z = a   # the wings fan forward and back about the vertical
+        P["wing_R"].rotation_euler.z = -a
+        P["root"].location.y = LIFT + bob * math.sin(2 * math.pi * cycles * t + 1.6)
+        P["body"].rotation_euler.y = R(sway) * math.sin(2 * math.pi * t)
+        P["body"].rotation_euler.x = R(pitch)
+        P["head"].rotation_euler.y = -R(sway) * 0.5 * math.sin(2 * math.pi * t)
+    make_action("Idle", 2.0, lambda t: fan(t, 2, 18, 0.02, sway=3))
+    make_action("Walk", 1.0, lambda t: fan(t, 2, 26, 0.03, sway=4, pitch=6))
+    make_action("Run", 0.8, lambda t: fan(t, 3, 32, 0.03, sway=3, pitch=12))
+
+    def attack(t):
+        fan(t, 3, 35, 0.02)
+        lunge = math.sin(math.pi * t)
+        P["body"].rotation_euler.x = R(22) * lunge   # leans into the strike
+        P["root"].location.x = 0.25 * lunge
+    make_action("Attack", 0.9, attack)
+    make_action("Hit", 0.35, lambda t: (fan(t, 1, 30, 0.0), setattr(P["body"].rotation_euler, "x", -R(14) * math.sin(math.pi * t))))
+
+    def death(t):
+        e = min(1.0, t / 0.8) ** 2
+        P["root"].location.y = LIFT * (1 - e)
+        P["body"].rotation_euler.x = -R(70) * e   # falls back
+        P["wing_L"].rotation_euler.x = -R(30) * e
+        P["wing_R"].rotation_euler.x = R(30) * e
     make_action("Death", 1.2, death)
 else:
     HOVER = hover

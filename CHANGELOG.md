@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-25: the humanoid bosses have bodies
+
+- **Vulkarn, Grimjaw and the Obsidian Warden** are AI-made, rigged on Mixamo and animated with its Creature Pack
+  (breathing idle, walking, run, swiping or punch attacks, dying; roaring, jump attack and flexing are imported for
+  later). Vulkarn swipes, Grimjaw and the Warden punch.
+- **Ignessa** is a winged fire fae: `rig_special.py --body fae` gives her a body, a head and two hinged wings that fan
+  while she floats; her fly / hover clips map to Run / Idle.
+- Every creature now has art except the training dummy. The **wisp** (Ignessa's summons) is a glowing orb: creatures with a `glow` value and no mesh get an emissive sphere in their colour (`/Game/Creatures/M_Glow`, made by `Tools/make_glow_material.py`) and a point light that bright.
+- Image-to-3D brutes often fuse a hand to a thigh: `survivor_build.py --cut-stretch 4` drops faces that stretch past
+  4x their length during any clip (only the clips count; the T-pose bind itself is ignored) and the scraps left over.
+- Fixed: the shield could lie flat like a tray. The skeleton's reference pose in Unreal isn't always the T-pose (it
+  can be a clip's first frame, arms hanging), so the shield's face now comes from the arm itself: away from it,
+  between up and out from the body.
+- Mixamo without Raven at the keyboard: the decimated copy goes into the page as text; wide bodies get a tiny
+  framing triangle so the marker view shows them whole (`Tools/art/README.md`).
+
 ## 2026-10-24: a second body, a real sword and shield
 
 - **Female survivor**: the second AI survivor is rigged on Mixamo with the same 55 animations

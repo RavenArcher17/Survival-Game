@@ -70,6 +70,19 @@ Humanoids (player survivors, humanoid bosses), rigged and animated on mixamo.com
    Check with `powershell -File Tools\playershots.ps1` (`WRArtCam me`; `-Body f` for the female body). More bodies go
    under `"bodies"` in `player_art.json` (the main menu's Male / Female buttons send `?Body=f` on the join URL).
 
+Humanoid bosses (Vulkarn, Grimjaw, the Obsidian Warden) go through the same Mixamo steps with `batch_bosses_t.json`
+(the concepts came out in an A-pose, which rigs as long as the arms stand clear) and Mixamo's **Creature Pack**
+downloaded with "Original Pose" (idle, breathing idle, walking, run, swiping, punch, jump attack, roaring, dying,
+flexing). Build with `survivor_build.py ... --cut-stretch 4`: image-to-3D brutes often have a hand fused to a thigh, and
+those faces stretch into long planks in every clip; the cut drops faces whose edges stretch past 4x their length in the
+model's own pose during any clip, plus the scraps left floating. Import into `/Game/Creatures/<Name>` and wire
+`creatures.json` like the other creatures (`meshYaw` -90 for anything built from a Mixamo rig). "Unknown error while
+generating motion" usually clears by nudging the elbow markers up to the bend and the chin down to the jaw line.
+
+Winged figures (Ignessa): `blender -b -P rig_special.py -- out\ignessa_tb_textured.glb out\ignessa.fbx --body fae` gives
+a body, a head and a hinged wing per side behind the shoulders (wings found as whatever spreads out to the sides above
+the waist), with floating, swaying and wing-fanning clips; `meshYaw` 0 and `fly` / `hover` mapped to Run / Idle.
+
 Held gear (the player's sword and shield): concepts from `batch_gear.json`, build3d, then
 `blender -b -P normalize_gear.py -- sword out\sword_a_textured.glb out\sword_game.glb 95` (grip at the origin, blade along
 its longest axis, 95 cm) or `-- shield ... 70` (face along +Z, 70 cm across, stray struts off the back cut away), and

@@ -137,6 +137,7 @@ void FWRCreatureRegistry::Reload()
 		O->TryGetStringField(TEXT("mesh"), D.Mesh);
 		if (O->TryGetNumberField(TEXT("meshYaw"), Num)) D.MeshYaw = Num;
 		if (O->TryGetNumberField(TEXT("meshScale"), Num)) D.MeshScale = Num;
+		if (O->TryGetNumberField(TEXT("glow"), Num)) D.Glow = Num;
 		const TSharedPtr<FJsonObject>* AnimObj = nullptr;
 		if (O->TryGetObjectField(TEXT("anims"), AnimObj))
 		{
@@ -268,6 +269,25 @@ void AWRCreature::ApplyDef()
 	BaseBodyColor = Def->Color;
 	SetBodyColor(Def->Color);
 
+	// Glowing creatures without art (the wisp): an emissive sphere in their colour that lights its surroundings.
+	if (Def->Glow > 0.f && Def->Mesh.IsEmpty() && GetNetMode() != NM_DedicatedServer)
+	{
+		UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		UMaterialInterface* GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Creatures/M_Glow.M_Glow"));
+		if (Sphere && GlowMat)
+		{
+			BodyMesh->SetStaticMesh(Sphere);
+			BodyMaterial = BodyMesh->CreateDynamicMaterialInstance(0, GlowMat);
+			BodyMaterial->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("creatures.glowEmissive"), 2.f));  // brighter washes out to white
+			SetBodyColor(Def->Color);
+			FaceMarker->SetVisibility(false);
+		}
+		GlowLight->SetLightColor(Def->Color);
+		GlowLight->SetIntensity(Def->Glow);
+		GlowLight->SetAttenuationRadius(WRTune(TEXT("creatures.glowRadius"), 700.f));
+		GlowLight->SetVisibility(true);
+	}
+
 	// Real art: swap the placeholder shape for the skeletal mesh, fitted to the capsule with its feet on the ground.
 	USkeletalMesh* ArtMesh = Def->Mesh.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *Def->Mesh);
 	if (ArtMesh && GetNetMode() != NM_DedicatedServer)
@@ -359,7 +379,7 @@ void AWRCreature::OnRep_CreatureId()
 void AWRCreature::OnRep_Tamed()
 {
 	const FWRCreatureDef* Def = GetDef();
-	GlowLight->SetVisibility(IsTamed() && Def && Def->Utility == TEXT("light"));
+	GlowLight->SetVisibility(Def && ((IsTamed() && Def->Utility == TEXT("light")) || (Def->Glow > 0.f && Def->Mesh.IsEmpty())));
 }
 
 void AWRCreature::BeginPlay()
