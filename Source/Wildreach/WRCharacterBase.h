@@ -110,6 +110,8 @@ protected:
 	/** Every machine: an attack swing started / this character died (real meshes play animations here). */
 	virtual void OnSwingVisual(EWRSwingKind Kind, float Duration) {}
 	virtual void OnDeathVisual() {}
+	/** Clients: a hit landed on us (after the hit flash starts). */
+	virtual void OnHitVisual(EWRHitResult Result) {}
 
 	/** Owned by creatures; players point this at their PlayerState's ASC. */
 	UPROPERTY() TObjectPtr<UAbilitySystemComponent> AbilitySystem;
@@ -118,6 +120,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> BodyMesh;
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> FaceMarker;
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> WeaponMesh;
+	/** The weapon is held by an animated body: don't swing the placeholder pivot. */
+	bool bArtWeapon = false;
 
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> BodyMaterial;
 	FLinearColor BaseBodyColor = FLinearColor(0.6f, 0.6f, 0.65f);

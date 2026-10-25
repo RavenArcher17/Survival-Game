@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-24: the player has a body
+
+- **Custom survivor** (Raven's pick over the UE mannequin): an AI-made male survivor (T-pose concept, so Mixamo can rig
+  it), rigged on Mixamo and animated with the Sword And Shield pack (49 moves) plus a dodge roll, an overhead chop,
+  gathering, picking up, swimming and treading water. 55 clips in `/Game/Characters/Survivor`.
+- `Data/player_art.json` drives it: mesh, facing, and which clips play for idle / walk / run (play rate matched to the
+  real speed), falling, blocking, dodging, swimming, light and heavy swings (fitted to the swing's length), spell casts,
+  hit flinches and death. The placeholder blade is now a sword held in the right hand, its grip worked out from the
+  skeleton. First person hides the body.
+- `Tools/art/survivor_build.py` copies Mixamo's rig from the decimated copy it was made on onto the full textured mesh,
+  moves the rest pose to the animations' T-pose and makes the clips play in place; see `Tools/art/README.md` for the
+  Mixamo steps (and the page's quirks). `Tools/playershots.ps1` frames the player with `WRArtCam me`.
+- Known: the female survivor and the four humanoid bosses are built and Mixamo-ready but not rigged yet (the bosses'
+  arms-down poses will need T-pose versions); gathering, chopping and pick-up clips are loaded but not yet triggered by
+  the game; the jump clip's own hop adds to the real jump; the sword is still the placeholder cube.
+
 ## 2026-10-24: real art, part 2 (every wild creature, terrain polish)
 
 - **Every wild creature now has art** (19 of 25 creatures; the four humanoid bosses and the wisp remain):

@@ -171,7 +171,12 @@ void AWRPlayerController::WRArtCam(FName Creature, float Yaw)
 	ArtCamTarget = nullptr;
 	const APawn* Self = GetPawn();
 	float BestDist = TNumericLimits<float>::Max();
-	for (TActorIterator<AWRCreature> It(GetWorld()); It && Self; ++It)
+	if (Creature == TEXT("me"))
+	{
+		ArtCamTarget = GetPawn();  // the player's own body (art checks)
+		BestDist = 0.f;
+	}
+	for (TActorIterator<AWRCreature> It(GetWorld()); It && Self && BestDist > 0.f; ++It)
 	{
 		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
 		if (It->CreatureId == Creature && It->IsAlive() && Dist < BestDist)

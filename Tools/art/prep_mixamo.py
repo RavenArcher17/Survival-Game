@@ -22,6 +22,19 @@ for o in [o for o in bpy.context.scene.objects if o.type != "MESH"]:
     bpy.data.objects.remove(o)
 bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+# Image-to-3D texturing splits the mesh along UV seams (hundreds of loose pieces, open edges everywhere), which makes
+# Mixamo's auto-rigger fail with "Unknown error while generating motion". Weld it back into one closed body; UVs live
+# on face corners, so the texture survives.
+import bmesh
+bm = bmesh.new()
+bm.from_mesh(body.data)
+before = len(bm.verts)
+bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0005)
+open_edges = sum(1 for e in bm.edges if not e.is_manifold)
+bm.to_mesh(body.data)
+bm.free()
+body.data.update()
+print(f"welded {before} -> {len(body.data.vertices)} verts, open edges left {open_edges}")
 v = [p.co.copy() for p in body.data.vertices]
 lo = Vector((min(c.x for c in v), min(c.y for c in v), min(c.z for c in v)))
 hi = Vector((max(c.x for c in v), max(c.y for c in v), max(c.z for c in v)))

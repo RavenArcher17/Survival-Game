@@ -17,6 +17,11 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimSequenceBase.h"
+#include "Engine/SkeletalMesh.h"
+#include "AnimationRuntime.h"
+#include "Dom/JsonObject.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
@@ -61,11 +66,18 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 
 	BaseBodyColor = FLinearColor(0.55f, 0.6f, 0.7f);
 	Status->bSurvivalNeeds = true;
+
+	Body = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Body"));
+	Body->SetupAttachment(RootComponent);
+	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Body->SetVisibility(false);
+	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 }
 
 void AWRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	LoadBodyArt();
 	ApplyViewMode();
 	Cast<UWRCharacterMovementComponent>(GetCharacterMovement())->SprintSpeed = WRTune(TEXT("player.sprintSpeed"), 750.f);
 	GetCharacterMovement()->MaxWalkSpeed = WRTune(TEXT("player.walkSpeed"), 450.f);
@@ -77,6 +89,10 @@ void AWRCharacter::BeginPlay()
 void AWRCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		TickBodyAnim();
+	}
 	// Slick ice: the same check runs on the server and the owning client, so movement prediction agrees.
 	if (HasAuthority() || IsLocallyControlled())
 	{
@@ -201,10 +217,190 @@ void AWRCharacter::ApplyViewMode()
 	ThirdPersonCamera->SetActive(!bFirstPerson);
 	BodyMesh->SetOwnerNoSee(bFirstPerson);
 	FaceMarker->SetOwnerNoSee(bFirstPerson);
+	Body->SetOwnerNoSee(bFirstPerson);
 
 	// First person: body yaw follows the camera. Third person: body turns toward movement.
 	bUseControllerRotationYaw = bFirstPerson;
 	GetCharacterMovement()->bOrientRotationToMovement = !bFirstPerson;
+}
+
+// ---------------------------------------------------------------- body art
+
+void AWRCharacter::LoadBodyArt()
+{
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;  // the server never draws bodies
+	}
+	const TSharedPtr<FJsonObject> Art = FWRTuning::LoadDataFile(TEXT("player_art.json"));
+	FString MeshPath, Prefix, Socket;
+	if (!Art.IsValid() || !Art->TryGetStringField(TEXT("mesh"), MeshPath))
+	{
+		return;
+	}
+	USkeletalMesh* BodyAsset = LoadObject<USkeletalMesh>(nullptr, *MeshPath);
+	if (!BodyAsset)
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("Player art: mesh %s not found, keeping the placeholder"), *MeshPath);
+		return;
+	}
+	Art->TryGetStringField(TEXT("animPrefix"), Prefix);
+	Art->TryGetStringField(TEXT("weaponSocket"), Socket);
+	const double Yaw = Art->HasField(TEXT("meshYaw")) ? Art->GetNumberField(TEXT("meshYaw")) : 0.0;
+	const double Scale = Art->HasField(TEXT("meshScale")) ? Art->GetNumberField(TEXT("meshScale")) : 1.0;
+	const TSharedPtr<FJsonObject>* Speeds = nullptr;
+	if (Art->TryGetObjectField(TEXT("speeds"), Speeds))
+	{
+		(*Speeds)->TryGetNumberField(TEXT("walk"), WalkClipSpeed);
+		(*Speeds)->TryGetNumberField(TEXT("run"), RunClipSpeed);
+	}
+
+	// Feet on the capsule's bottom, facing the actor's forward.
+	Body->SetSkeletalMesh(BodyAsset);
+	const FBox Box = BodyAsset->GetBounds().GetBox();
+	Body->SetRelativeScale3D(FVector(Scale));
+	Body->SetRelativeLocation(FVector(0.f, 0.f, -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale));
+	Body->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));
+	Body->SetVisibility(true);
+	BodyMesh->SetVisibility(false);
+	FaceMarker->SetVisibility(false);
+
+	// The placeholder blade becomes a sword held in the right hand. Mixamo's rest pose is a T-pose with the palms down,
+	// so a held blade points along the body's forward there: work that out in the hand bone's space from the reference
+	// skeleton, gripped in the palm (partway from the wrist to the index finger), ~95 cm long.
+	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
+	const int32 HandBone = Socket.IsEmpty() ? INDEX_NONE : Ref.FindBoneIndex(FName(*Socket));
+	if (HandBone != INDEX_NONE)
+	{
+		const FTransform HandCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, HandBone);
+		const int32 FingerBone = Ref.FindBoneIndex(FName(*(Socket + TEXT("Index1"))));
+		const FVector FingerCS = FingerBone != INDEX_NONE ? FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, FingerBone).GetLocation()
+		                                                  : HandCS.GetLocation();
+		const FVector BodyForward = FRotator(0.f, Yaw, 0.f).UnrotateVector(FVector::ForwardVector);  // in mesh space
+		const FVector Blade = HandCS.InverseTransformVectorNoScale(BodyForward).GetSafeNormal();
+		const FVector Grip = HandCS.InverseTransformPositionNoScale(FMath::Lerp(HandCS.GetLocation(), FingerCS, 0.6f));
+		WeaponMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(*Socket));
+		WeaponMesh->SetRelativeRotation(FRotationMatrix::MakeFromY(Blade).Rotator());  // the cube's long axis is its Y
+		WeaponMesh->SetRelativeLocation(Grip + Blade * 40.f);                               // centre: blade ahead, short grip behind
+		WeaponMesh->SetRelativeScale3D(FVector(0.05f, 0.95f, 0.1f));
+		bArtWeapon = true;
+	}
+
+	const TSharedPtr<FJsonObject>* Anims = nullptr;
+	if (Art->TryGetObjectField(TEXT("anims"), Anims))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Set : (*Anims)->Values)
+		{
+			FBodyAnimSet& Out = BodyAnims.Add(FName(*Set.Key));
+			for (const TSharedPtr<FJsonValue>& Name : Set.Value->AsArray())
+			{
+				const FString Clip = Prefix + Name->AsString();
+				if (UAnimSequenceBase* Anim = LoadObject<UAnimSequenceBase>(nullptr, *FString::Printf(TEXT("%s.%s"), *Clip, *FPaths::GetBaseFilename(Clip))))
+				{
+					Out.Clips.Add(Anim);
+					BodyAnimRefs.Add(Anim);
+				}
+			}
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("Player art: %s with %d clips"), *BodyAsset->GetName(), BodyAnimRefs.Num());
+}
+
+float AWRCharacter::PlayBodyAnim(FName Key, bool bLoop, float PlayRate, float Duration)
+{
+	FBodyAnimSet* Set = BodyAnims.Find(Key);
+	if (!Set || Set->Clips.Num() == 0)
+	{
+		return 0.f;
+	}
+	if (bLoop && BodyAnim == Key)
+	{
+		Body->SetPlayRate(PlayRate);  // already playing: just keep its pace matched to the speed
+		return 0.f;
+	}
+	UAnimSequenceBase* Clip = Set->Clips[Set->Next % Set->Clips.Num()];
+	Set->Next++;
+	const float Length = Clip->GetPlayLength();
+	if (Duration > 0.f)
+	{
+		PlayRate = FMath::Clamp(Length / Duration, 0.5f, 3.f);
+	}
+	Body->PlayAnimation(Clip, bLoop);
+	Body->SetPlayRate(PlayRate);
+	BodyAnim = Key;
+	return Length / PlayRate;
+}
+
+void AWRCharacter::TickBodyAnim()
+{
+	if (!Body->IsVisible() || BodyAnims.Num() == 0 || HasTag(WRTags::State_Dead) || GetWorld()->GetTimeSeconds() < BodyOneShotUntil)
+	{
+		return;
+	}
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	const float Speed = GetVelocity().Size2D();
+	if (HasTag(WRTags::State_Dodging) && BodyAnim != TEXT("dodge"))
+	{
+		BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(TEXT("dodge"), false, 1.f, WRTune(TEXT("player.dodgeVisualSeconds"), 0.7f));
+		return;
+	}
+	if (Move->IsSwimming())
+	{
+		PlayBodyAnim(Speed > 40.f ? FName(TEXT("swim")) : FName(TEXT("tread")), true);
+	}
+	else if (Move->IsFalling())
+	{
+		if (BodyAnim != TEXT("fall")) PlayBodyAnim(TEXT("fall"), false);  // plays once and holds the airborne pose
+	}
+	else if (HasTag(WRTags::State_Blocking))
+	{
+		PlayBodyAnim(TEXT("block"), true);
+	}
+	else if (Speed > 280.f)
+	{
+		PlayBodyAnim(TEXT("run"), true, FMath::Clamp(Speed / RunClipSpeed, 0.7f, 1.8f));
+	}
+	else if (Speed > 25.f)
+	{
+		PlayBodyAnim(TEXT("walk"), true, FMath::Clamp(Speed / WalkClipSpeed, 0.6f, 1.8f));
+	}
+	else
+	{
+		PlayBodyAnim(TEXT("idle"), true);
+	}
+}
+
+void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
+{
+	if (!Body->IsVisible())
+	{
+		return;
+	}
+	const FName Key = Kind == EWRSwingKind::Cast ? FName(TEXT("cast"))
+		: (Kind == EWRSwingKind::Heavy || Kind == EWRSwingKind::WeaponArt) ? FName(TEXT("heavy")) : FName(TEXT("light"));
+	BodyAnim = NAME_None;  // restart even if the same set just played
+	PlayBodyAnim(Key, false, 1.f, Duration);
+	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + Duration;
+}
+
+void AWRCharacter::OnHitVisual(EWRHitResult Result)
+{
+	if (!Body->IsVisible() || Result != EWRHitResult::Hit || GetWorld()->GetTimeSeconds() < BodyOneShotUntil)
+	{
+		return;  // a swing in progress isn't interrupted by the flinch
+	}
+	BodyAnim = NAME_None;
+	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(TEXT("hit"), false, 1.f, 0.45f);
+}
+
+void AWRCharacter::OnDeathVisual()
+{
+	if (Body->IsVisible())
+	{
+		BodyAnim = NAME_None;
+		PlayBodyAnim(TEXT("death"), false);
+		BodyOneShotUntil = 1.0e12;  // stay down
+	}
 }
 
 void AWRCharacter::ToggleView()

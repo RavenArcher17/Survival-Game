@@ -139,7 +139,7 @@ public:
 	UFUNCTION(Exec) void WRView(FName Mode);
 	/** Stop/start the test bot's own actions (it keeps running queued commands). */
 	UFUNCTION(Exec) void WRBotPause(int32 bPause);
-	/** Art check: frame the nearest creature of this kind from Yaw degrees off its nose and follow it ("off" = back to the pawn). */
+	/** Art check: frame the nearest creature of this kind ("me" = your own body) from Yaw degrees off its nose and follow it ("off" = back to the pawn). */
 	UFUNCTION(Exec) void WRArtCam(FName Creature, float Yaw = 60.f);
 	/** Teleport next to the altar of a path (testing). */
 	UFUNCTION(Exec) void WRGoToAltar(FName Path);

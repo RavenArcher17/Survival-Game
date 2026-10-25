@@ -1,0 +1,9 @@
+{
+  "_comment": "T-pose versions for Mixamo: its auto-rigger fails ('Unknown error while generating motion') when the arms touch the body, as in the A-pose batch. Check picks with check_arms.py (3 shapes at chest height).",
+  "template": "full body character of {p}, front view, standing in a T-pose with both arms stretched straight out horizontally to the sides, palms down, fingers together, legs slightly apart, symmetrical, entire body visible from head to feet, centered, realistic, detailed, isolated on plain white background, soft studio lighting",
+  "negative": "cropped, cut off, multiple people, character sheet, turnaround, side view, arms down, arms at sides, hands on hips, holding anything, weapon, text, watermark, frame, cartoon, anime, blurry, deformed hands, extra limbs",
+  "creatures": [
+    { "id": "survivor_m_t", "prompt": "a rugged male island survivor in practical survival gear, short fur-collared leather jacket, cloth wraps, sturdy boots, short beard" },
+    { "id": "survivor_f_t", "prompt": "a rugged female island survivor in practical survival gear, short fur-collared leather jacket, cloth wraps, sturdy boots, braided hair" }
+  ]
+}

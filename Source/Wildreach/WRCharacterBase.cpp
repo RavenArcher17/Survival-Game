@@ -205,6 +205,7 @@ void AWRCharacterBase::ReportHit(float Damage, EWRHitResult Result)
 void AWRCharacterBase::MulticastHit_Implementation(float Damage, EWRHitResult Result)
 {
 	HitFlash = Result == EWRHitResult::Hit ? 0.15f : 0.f;
+	OnHitVisual(Result);
 	OnHitShown.Broadcast(this, Damage, Result);
 }
 
@@ -286,7 +287,10 @@ void AWRCharacterBase::UpdateVisuals(float DeltaSeconds)
 			VisualSwing = EWRSwingKind::None;
 		}
 	}
-	WeaponMesh->SetRelativeRotation(FRotator(Pitch, Yaw, 0.f));
+	if (!bArtWeapon)
+	{
+		WeaponMesh->SetRelativeRotation(FRotator(Pitch, Yaw, 0.f));
+	}
 
 	// Status tint so placeholder bodies read at a glance.
 	FLinearColor Color = BaseBodyColor;

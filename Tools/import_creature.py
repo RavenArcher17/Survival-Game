@@ -15,12 +15,13 @@ else:
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 reg = unreal.AssetRegistryHelpers.get_asset_registry()
+root = os.environ.get("WR_DEST_ROOT", "/Game/Creatures")  # e.g. /Game/Characters for the player
 for fbx, name in pairs:
-    dest = f"/Game/Creatures/{name}"
+    dest = f"{root}/{name}"
     # Re-importing over an existing folder only refreshes the mesh: the old texture and animations (with the old
     # skeleton's bone positions) stay. Make the caller move the old folder out of Content first.
     if reg.get_assets_by_path(dest, recursive=True):
-        print(f"[Wildreach] SKIPPED {name}: {dest} already exists - move Content/Creatures/{name} out of the project, then import again")
+        print(f"[Wildreach] SKIPPED {name}: {dest} already exists - move that folder out of Content, then import again")
         continue
     task = unreal.AssetImportTask()
     task.filename = fbx

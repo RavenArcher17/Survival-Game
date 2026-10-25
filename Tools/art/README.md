@@ -44,10 +44,26 @@ Props (static, no rig), e.g. the island trees:
 3. `WR_IMPORTS="C:\...\out\pine_a_cropped.glb=PineA"` then `UnrealEditor-Cmd ... -script=Tools/import_prop.py`
    -> `/Game/Props/PineA` (Nanite on, no collision), and add the mesh to the `Art` table in `WRWorldDressing.cpp`.
 
-Humanoids (player survivors, humanoid bosses): `python concept_batch.py batch_humanoids.json --count 6` (front view,
-A-pose, empty hands; pick single-figure images, not the multi-view sheets), build3d as usual, then
-`blender -b -P prep_mixamo.py -- out\survivor_m_a_textured.glb mixamo\survivor_m.fbx 1.8` makes a Mixamo-ready FBX
-(feet at the origin, real height, texture embedded) for auto-rigging and animations on mixamo.com (needs an Adobe login).
+Humanoids (player survivors, humanoid bosses), rigged and animated on mixamo.com (Raven's Adobe login):
+
+1. Concepts in a T-pose: `python concept_batch.py batch_humanoids_t.json --count 8`. Mixamo fails ("Unknown error while
+   generating motion") when the arms touch the body, so arms-down concepts (`batch_humanoids.json`) won't rig.
+   Build3d as usual, then `blender -b -P prep_mixamo.py -- out\x_textured.glb mixamo\x.fbx 1.8` (welds the texture-seam
+   pieces into one closed mesh, feet at the origin, real height) and `blender -b -P check_arms.py -- mixamo\x.fbx`
+   (slices at chest height should show 3 shapes: arms clear of the body).
+2. Mixamo's page blocks fetching local files, so either Raven picks the file in the upload box, or a decimated copy goes
+   in through the page itself: `blender -b -P pack_for_page.py -- mixamo\x.fbx out\x_page.b64 2400`, then decode it in
+   the page into an OBJ `File` and set it on the upload input. That only works if the upload dialog was opened with a real
+   click, and `window.scrollTo(0, 0)` first (the page scrolls behind the dialog and throws the marker drags off).
+   Keep every marker on the mesh (elbows especially).
+3. Download the rigged character (Original Pose) and the animations ("Without Skin" / packs: "No Character", In Place for
+   locomotion), then `blender -b -P survivor_build.py -- rigged.fbx mixamo\x.fbx anims\pack anims\singles --out
+   mixamo\game\x.fbx --preview out\x_rig.png`: copies the rig's weights onto the full-detail mesh, moves the rest pose to
+   the animations' T-pose, loads every animation (named after its file, hips' horizontal travel removed), exports one
+   FBX. Check with `blender -b -P check_actions.py -- mixamo\game\x.fbx out\x_act.png Idle Run Slash`.
+4. `WR_DEST_ROOT=/Game/Characters WR_IMPORTS="...\x.fbx=Survivor"` + `Tools/import_creature.py`, then point
+   `Data/player_art.json` at it (Unreal drops the `mixamorig:` bone prefix: the hand is `RightHand`).
+   Check with `powershell -File Tools\playershots.ps1` (`WRArtCam me`).
 
 Caves (procedural, no AI): `blender -b -P cave_gen.py -- C:\...\out\cave_a.fbx --seed 1 --preview C:\...\out\cave_a.png`
 sculpts a noisy rock mound and carves the chamber, tunnel and a recessed entrance out of it (AWRCave's local layout,

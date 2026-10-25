@@ -1,0 +1,27 @@
+{
+  "_comment": "Player body art (Mixamo-rigged AI survivor, Tools/art/README.md). Each anim key lists one or more AnimSequences; one-shots pick variants in turn. speeds = each locomotion clip's natural pace in cm/s, used to scale its play rate to the real speed so feet don't slide.",
+  "mesh": "/Game/Characters/Survivor/survivor_m.survivor_m",
+  "meshYaw": -90,
+  "meshScale": 1.0,
+  "weaponSocket": "RightHand",
+  "speeds": { "walk": 150, "run": 420 },
+  "anims": {
+    "idle": ["SwordAndShieldIdle"],
+    "walk": ["SwordAndShieldWalk"],
+    "run": ["SwordAndShieldRun"],
+    "fall": ["SwordAndShieldJump"],
+    "block": ["SwordAndShieldBlockIdle"],
+    "dodge": ["StandToRoll"],
+    "swim": ["Swimming"],
+    "tread": ["TreadingWater"],
+    "light": ["SwordAndShieldSlash", "SwordAndShieldSlash2", "SwordAndShieldSlash3"],
+    "heavy": ["SwordAndShieldAttack", "SwordAndShieldAttack2", "SwordAndShieldAttack3"],
+    "cast": ["SwordAndShieldCasting", "SwordAndShieldCasting2"],
+    "hit": ["SwordAndShieldImpact", "SwordAndShieldImpact2", "SwordAndShieldImpact3"],
+    "death": ["SwordAndShieldDeath", "SwordAndShieldDeath2"],
+    "gather": ["GatheringObjects"],
+    "chop": ["StandingMeleeAttackDownward"],
+    "pickup": ["PickingUpObject"]
+  },
+  "animPrefix": "/Game/Characters/Survivor/survivor_mArmature_"
+}
