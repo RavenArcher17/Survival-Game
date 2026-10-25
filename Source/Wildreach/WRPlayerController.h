@@ -117,7 +117,11 @@ public:
 	UFUNCTION(Exec) void WRPlace(FName Piece, float X, float Y, float Z, float Yaw);
 	UFUNCTION(Exec) void WRSetCode(const FString& Code);
 	UFUNCTION(Exec) void WRCode(const FString& Code);
-	UFUNCTION(Exec) void WRDemolish();
+	/** Remove your piece standing at X Y Z (no arguments: the nearest one); half the cost back. */
+	UFUNCTION(Exec) void WRDemolish(float X = 0.f, float Y = 0.f, float Z = 0.f);
+	/** Bots: the build ghost as a player gets it (B menu pick): WRGhost <piece>, aim with WRLook, then WRGhostPlace logs where it snapped and places it. */
+	UFUNCTION(Exec) void WRGhost(FName Piece);
+	UFUNCTION(Exec) void WRGhostPlace();
 	/** N sword hits on the nearest building piece (testing raids/collapse). */
 	UFUNCTION(Exec) void WRHitPiece(int32 Hits);
 

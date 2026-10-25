@@ -51,8 +51,23 @@ private:
 /** Pure building math (tests). */
 struct WILDREACH_API FWRBuildRules
 {
-	/** Snap a world point to the build grid for a shape; returns the piece location and yaw (0/90). */
+	/** Storey height (cm): walls are this tall, floors / roofs sit this far above the storey below. */
+	static constexpr float Storey = 300.f;
+
+	/**
+	 * Snap a world point to the build grid for a shape; returns the piece location and yaw. Edge pieces get 0/90 from
+	 * the nearest cell edge (a gable keeps a 180 flip from InOutYaw: which end is high); stairs and roofs keep InOutYaw
+	 * rounded to 90 (which way they rise); everything else 0.
+	 */
 	static FVector SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, float Grid, float& InOutYaw);
+	/** Which slot a shape fills, so two pieces can't share one: "edge" (walls, doorways, windows, gables...), "cell" (foundations, floors, roofs), "corner" (pillars), "stairs". */
+	static FName SlotOf(FName Shape);
+	/** Pieces that carry what's stacked straight on top of them at no span cost (walls, pillars, foundations...). */
+	static bool IsBearing(FName Shape);
+	/** Span a piece at To costs when resting on one at From: INDEX_NONE = not touching, 0 = straight on top of a bearing piece, 1 = beside it. */
+	static int32 SupportCost(const FVector& From, FName FromShape, const FVector& To, float Grid);
+	/** Storey to build in when aiming at PointZ, from the foundation floor at Top: what you look into (a floor's surface counts as its storey). Floors, roofs and gables go on top of it. */
+	static int32 LevelFor(FName Shape, float PointZ, float Top);
 	/** Max support distance (pieces) for a material: wood 4, stone 6. */
 	static int32 SpanFor(FName Material);
 	/** Upkeep per hour for a claim holding these pieces. */
@@ -86,8 +101,9 @@ public:
 	/** Chests. */
 	UPROPERTY(Replicated) TArray<FWRItemStack> Storage;
 
+	/** Steps to the ground (0 = grounded); replicated so the build ghost can tell you before you place. */
+	UPROPERTY(Replicated) int32 Support = 0;
 	/** Server bookkeeping. */
-	int32 Support = 0;
 	FString LockCode;
 	TSet<FString> UnlockedFor;
 	/** Ghosts are local previews in build mode: no collision, tinted. */
@@ -111,6 +127,8 @@ public:
 	static void RecomputeSupport(UWorld* World, const FVector& Around, float Radius);
 	/** Support a new structure piece would have at this spot (INDEX_NONE = unsupported). */
 	static int32 SupportAt(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore = nullptr);
+	/** Why a piece can't go here because of what's already built (its slot is taken, or stairs need the opening above them); empty = free. */
+	static FString Blocked(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore = nullptr);
 
 protected:
 	virtual void BeginPlay() override;

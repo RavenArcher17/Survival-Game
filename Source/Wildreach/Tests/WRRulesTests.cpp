@@ -2,6 +2,7 @@
 //   Tools\test.ps1   (UnrealEditor-Cmd ... -ExecCmds="Automation RunTests Wildreach;Quit")
 
 #include "Misc/AutomationTest.h"
+#include "WRBuilding.h"
 #include "WRCombatLibrary.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
@@ -228,6 +229,54 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 	const FWRToolDef* Best = FWRGathering::BestTool(TEXT("hatchet"), { TEXT("crude_hatchet"), TEXT("stone_hatchet") });
 	TestTrue(TEXT("the stone hatchet is the better one"), Best && Crude && Best->ItemId == TEXT("stone_hatchet") && Best->Yield > Crude->Yield);
 	TestNull(TEXT("a pick doesn't chop"), FWRGathering::BestTool(TEXT("hatchet"), { TEXT("stone_pick") }));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRBuildRulesTest, "Wildreach.Building.Rules",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRBuildRulesTest::RunTest(const FString& Parameters)
+{
+	const float Grid = 400.f;
+	// Edge pieces snap to the nearest cell edge; a gable keeps its flip, stairs and roofs the way they rise.
+	float Yaw = 33.f;
+	TestEqual(TEXT("wall on the east edge"), FWRBuildRules::SnapToGrid(TEXT("wall"), FVector(170, 20, 0), 50.f, Grid, Yaw), FVector(200, 0, 50));
+	TestEqual(TEXT("...running along Y"), Yaw, 90.f);
+	Yaw = 180.f;
+	FWRBuildRules::SnapToGrid(TEXT("gable"), FVector(20, -150, 0), 0.f, Grid, Yaw);
+	TestEqual(TEXT("a gable turned round stays turned"), Yaw, 180.f);
+	Yaw = 268.f;
+	FWRBuildRules::SnapToGrid(TEXT("roof"), FVector(10, 10, 0), 0.f, Grid, Yaw);
+	TestEqual(TEXT("a roof rises the way R turned it"), Yaw, 270.f);
+	Yaw = 45.f;
+	FWRBuildRules::SnapToGrid(TEXT("floor"), FVector(10, 10, 0), 0.f, Grid, Yaw);
+	TestEqual(TEXT("floors sit square"), Yaw, 0.f);
+	// One piece per slot.
+	TestEqual(TEXT("a door takes a wall's slot"), FWRBuildRules::SlotOf(TEXT("door")), FWRBuildRules::SlotOf(TEXT("wall")));
+	TestEqual(TEXT("a doorway too"), FWRBuildRules::SlotOf(TEXT("doorway")), FName(TEXT("edge")));
+	TestEqual(TEXT("a roof takes a floor's slot"), FWRBuildRules::SlotOf(TEXT("roof")), FWRBuildRules::SlotOf(TEXT("floor")));
+	TestNotEqual(TEXT("pillars have their own"), FWRBuildRules::SlotOf(TEXT("pillar")), FWRBuildRules::SlotOf(TEXT("wall")));
+	// Support: straight on top of a wall costs nothing, beside it one step, out of reach not at all.
+	TestEqual(TEXT("wall on a wall"), FWRBuildRules::SupportCost(FVector(200, 0, 100), TEXT("wall"), FVector(200, 0, 400), Grid), 0);
+	TestEqual(TEXT("floor on walls"), FWRBuildRules::SupportCost(FVector(200, 0, 100), TEXT("wall"), FVector(0, 0, 400), Grid), 1);
+	TestEqual(TEXT("floor beside a floor"), FWRBuildRules::SupportCost(FVector(0, 0, 400), TEXT("floor"), FVector(400, 0, 400), Grid), 1);
+	TestEqual(TEXT("a floor doesn't carry what's on it for free"), FWRBuildRules::SupportCost(FVector(0, 0, 400), TEXT("floor"), FVector(0, 0, 700), Grid), 1);
+	TestEqual(TEXT("two storeys apart don't touch"), FWRBuildRules::SupportCost(FVector(0, 0, 100), TEXT("wall"), FVector(0, 0, 700), Grid), INDEX_NONE);
+	TestEqual(TEXT("two cells apart don't touch"), FWRBuildRules::SupportCost(FVector(0, 0, 100), TEXT("foundation"), FVector(800, 0, 100), Grid), INDEX_NONE);
+	// The storey you aim into: ground floor (from the foundation top up a wall), the first floor's surface, a ceiling above.
+	TestEqual(TEXT("wall aimed at the ground outside"), FWRBuildRules::LevelFor(TEXT("wall"), 940.f, 1000.f), 0);
+	TestEqual(TEXT("wall aimed high on a ground-floor wall"), FWRBuildRules::LevelFor(TEXT("wall"), 1290.f, 1000.f), 0);
+	TestEqual(TEXT("wall aimed at the first floor"), FWRBuildRules::LevelFor(TEXT("wall"), 1320.f, 1000.f), 1);
+	TestEqual(TEXT("ceiling aimed at the ground floor"), FWRBuildRules::LevelFor(TEXT("floor"), 1000.f, 1000.f), 1);
+	TestEqual(TEXT("roof aimed at the first floor"), FWRBuildRules::LevelFor(TEXT("roof"), 1320.f, 1000.f), 2);
+	// Every piece's costs are real items, and every structure has a known shape.
+	for (const FWRPieceDef& Def : FWRBuildRegistry::Get().All())
+	{
+		for (const TPair<FName, int32>& C : Def.Cost)
+		{
+			TestNotNull(FString::Printf(TEXT("%s cost %s exists"), *Def.Id.ToString(), *C.Key.ToString()), FWRItemRegistry::Get().Find(C.Key));
+		}
+		TestTrue(FString::Printf(TEXT("%s has a slot"), *Def.Id.ToString()), !Def.Snaps() || !FWRBuildRules::SlotOf(Def.Shape).IsNone());
+	}
 	return true;
 }
 

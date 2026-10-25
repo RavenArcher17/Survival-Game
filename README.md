@@ -62,6 +62,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 | Tab | lock on |
 | E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags |
 | I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu (also crafting by hand) |
+| building (B, pick a piece) | aim where it goes: LMB place, R rotate (stairs, roofs; flips a gable), RMB cancel; the ghost is red with the reason when it won't go. Demolish (top of the menu): aim at your piece, LMB removes it for half back |
 | LMB at a tree / rock / shrub | gather wood / stone / fiber (a hatchet or pick in your bag gathers more) |
 | G | swap sword-and-shield for the ranged weapon (bow, crossbow, blowgun, spears, bolas) and back |
 | with it out: RMB (hold) / LMB / wheel | aim over the shoulder / fire or throw at the crosshair / next ammo (stone, tranq) |
@@ -85,6 +86,7 @@ Tools\mptest.ps1        # headless server + bots, PvE (-Scenario pvp for duels)
 Tools\persisttest.ps1   # save -> server restart -> load
 Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets, every ranged weapon + ammo, bow wear + repair
 Tools\buildtest.ps1     # claims, code locks, raids, collapse, world save
+Tools\housetest.ps1     # a two-room, two-storey house through the build ghost: snapping, refusals, stairs, doors, roof
 Tools\survivaltest.ps1  # fresh player on the island: gather bare-handed, crude tools, hut + workbench, stone tools
 Tools\tametest.ps1      # offer food, ride, knockout + feed, eggs, orders, tames saved
 Tools\rangedtest.ps1    # every ranged weapon at a rooted Cinderfang: hits, tranq knockout, bola, spear pickup (-Body f)

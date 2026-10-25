@@ -11,8 +11,6 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
 $db = Join-Path $root 'Saved\ServerDB'
-$shotDir = Join-Path $root 'Saved\Screenshots'
-$before = Get-Date
 $out = Join-Path $env:TEMP ("wildreach-survival-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $name = 'Survivor'
@@ -45,7 +43,7 @@ $cmds = @(
 	"WRPlace wood_foundation $X $Y $Z 0",
 	"WRPlace wood_wall $X $($Y + 200) $T 0", "WRPlace wood_wall $X $($Y - 200) $T 0", "WRPlace wood_wall $($X - 200) $Y $T 90",
 	"WRPlace wood_door $($X + 200) $Y $T 90",
-	"WRPlace wood_roof $X $Y $($T + 300) 0",
+	"WRPlace wood_roof $X $Y $($T + 300) 0", "WRPlace wood_gable $X $($Y + 200) $($T + 300) 0", "WRPlace wood_gable $X $($Y - 200) $($T + 300) 0",  # a sloped roof rising east, gables closing its sides
 	"WRPlace workbench $($X - 120) $($Y + 100) $T 90", 'wait 1',
 	# In through the door: open it, walk in (the walk counts as arrived 4 m short of its goal past the back wall,
 	# i.e. inside; a shut door leaves it stuck outside), craft at the bench.
@@ -60,8 +58,9 @@ $cmds = @(
 	(Shot "$($X - 300) $($Y - 1100)" '75 -8'),                                              # from the south
 	$(if ($Shots) { "WRTeleport $($X + 330) $Y|wait 3|WRView fp|WRLook 180 -12|wait 2|HighResShot 1600x900|wait 1|WRView tp" }),  # in at the door
 	'wait 3'
-) | Where-Object { $_ }
-$cmds = $cmds -join '|'
+)
+# (a foreach, not Where-Object: piping drops the entries after an empty $(if ...) one)
+$cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7833 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
@@ -101,7 +100,8 @@ Check 'crude hatchet crafted by hand' ($notices -contains 'Crafted 1 Crude hatch
 Check 'crude pick crafted by hand' ($notices -contains 'Crafted 1 Crude pick')
 Check 'crude hatchet chops more than bare hands' ($crudeWood.Count -ge 4 -and (Avg $crudeWood) -gt (Avg $bareWood)) ("avg {0:N1} vs {1:N1}" -f (Avg $crudeWood), (Avg $bareWood))
 Check 'crude pick breaks more stone than bare hands' ($crudeStone.Count -ge 1 -and (Avg $crudeStone) -gt (Avg $bareStone)) ("avg {0:N1} vs {1:N1}" -f (Avg $crudeStone), (Avg $bareStone))
-foreach ($piece in 'Wood foundation', 'Wood doorway + door', 'Wood roof', 'Workbench') { Check "built $piece" ($notices -contains "Built $piece") }
+foreach ($piece in 'Wood foundation', 'Wood doorway + door', 'Wood roof (sloped)', 'Workbench') { Check "built $piece" ($notices -contains "Built $piece") }
+Check 'built two gables' (@($notices | Where-Object { $_ -eq 'Built Wood gable (roof side)' }).Count -eq 2)
 Check 'built three wood walls' (@($notices | Where-Object { $_ -eq 'Built Wood wall' }).Count -eq 3)
 Check 'nothing refused while building' (-not ($notices | Where-Object { $_ -match '^(no support|need |too far|something is already|no building|not inside)' -and $_ -ne 'need 3 Wood' })) (($notices | Where-Object { $_ -match '^(no support|need |too far|something is already|no building)' -and $_ -ne 'need 3 Wood' }) -join '; ')
 Check 'the door opens' ($notices -contains 'Opened')
@@ -117,7 +117,8 @@ $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'E
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }
-if ($Shots) { Get-ChildItem $shotDir -Recurse -Filter *.png -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $before } | Sort-Object LastWriteTime | ForEach-Object { $_.FullName } }
+# This run's own screenshots (other sessions may be saving theirs into the same folder).
+if ($Shots) { Select-String -Path "$out\client.log" -Pattern 'screenshot saved as (.*\.png)' | ForEach-Object { $_.Matches[0].Groups[1].Value } }
 $failed = @($results | Where-Object { -not $_.ok }).Count
 "{0} checks, {1} failed (logs: {2})" -f $results.Count, $failed, $out
 if ($failed -gt 0) { exit 1 }

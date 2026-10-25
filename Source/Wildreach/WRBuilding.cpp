@@ -14,6 +14,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 // ---------------------------------------------------------------- registry
@@ -107,21 +108,19 @@ FVector FWRBuildRules::SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, 
 {
 	const float Cx = FMath::RoundToFloat(Hit.X / Grid) * Grid;
 	const float Cy = FMath::RoundToFloat(Hit.Y / Grid) * Grid;
-	static const FName EdgeShapes[] = { TEXT("wall"), TEXT("halfwall"), TEXT("door"), TEXT("window"), TEXT("palisade"), TEXT("gate") };
-	for (const FName& Edge : EdgeShapes)
+	const int32 Quarter = ((FMath::RoundToInt(InOutYaw / 90.f) % 4) + 4) % 4;
+	if (SlotOf(Shape) == TEXT("edge"))
 	{
-		if (Shape == Edge)
+		// Nearest cell edge: walls run along it. A gable also keeps which end is high (R turns it round).
+		const float Flip = Shape == TEXT("gable") && Quarter >= 2 ? 180.f : 0.f;
+		const float Dx = Hit.X - Cx, Dy = Hit.Y - Cy;
+		if (FMath::Abs(Dx) > FMath::Abs(Dy))
 		{
-			// Nearest cell edge: walls run along it.
-			const float Dx = Hit.X - Cx, Dy = Hit.Y - Cy;
-			if (FMath::Abs(Dx) > FMath::Abs(Dy))
-			{
-				InOutYaw = 90.f;
-				return FVector(Cx + FMath::Sign(Dx) * Grid * 0.5f, Cy, BaseZ);
-			}
-			InOutYaw = 0.f;
-			return FVector(Cx, Cy + FMath::Sign(Dy == 0.f ? 1.f : Dy) * Grid * 0.5f, BaseZ);
+			InOutYaw = 90.f + Flip;
+			return FVector(Cx + FMath::Sign(Dx) * Grid * 0.5f, Cy, BaseZ);
 		}
+		InOutYaw = Flip;
+		return FVector(Cx, Cy + FMath::Sign(Dy == 0.f ? 1.f : Dy) * Grid * 0.5f, BaseZ);
 	}
 	if (Shape == TEXT("pillar"))
 	{
@@ -129,15 +128,44 @@ FVector FWRBuildRules::SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, 
 		return FVector(FMath::RoundToFloat((Hit.X - Grid * 0.5f) / Grid) * Grid + Grid * 0.5f,
 			FMath::RoundToFloat((Hit.Y - Grid * 0.5f) / Grid) * Grid + Grid * 0.5f, BaseZ);
 	}
-	if (Shape != TEXT("stairs"))
-	{
-		InOutYaw = 0.f;
-	}
-	else
-	{
-		InOutYaw = FMath::RoundToFloat(InOutYaw / 90.f) * 90.f;
-	}
+	// Stairs and roofs keep which way they rise; everything else in a cell sits square.
+	InOutYaw = Shape == TEXT("stairs") || Shape == TEXT("roof") ? Quarter * 90.f : 0.f;
 	return FVector(Cx, Cy, BaseZ);
+}
+
+FName FWRBuildRules::SlotOf(FName Shape)
+{
+	static const FName Edges[] = { TEXT("wall"), TEXT("halfwall"), TEXT("door"), TEXT("doorway"), TEXT("window"), TEXT("palisade"), TEXT("gate"), TEXT("gable") };
+	for (const FName& E : Edges)
+	{
+		if (Shape == E) return TEXT("edge");
+	}
+	if (Shape == TEXT("pillar")) return TEXT("corner");
+	if (Shape == TEXT("stairs")) return TEXT("stairs");
+	return Shape.IsNone() ? NAME_None : FName(TEXT("cell"));
+}
+
+bool FWRBuildRules::IsBearing(FName Shape)
+{
+	return SlotOf(Shape) == TEXT("edge") || SlotOf(Shape) == TEXT("corner") || Shape == TEXT("foundation") || Shape == TEXT("tower");
+}
+
+int32 FWRBuildRules::SupportCost(const FVector& From, FName FromShape, const FVector& To, float Grid)
+{
+	const FVector D = To - From;
+	if (D.Size2D() > Grid * 1.05f || FMath::Abs(D.Z) > Storey + 20.f)
+	{
+		return INDEX_NONE;
+	}
+	// Stacked straight on a wall / pillar (a storey up) costs nothing; beside something, one step of the material's span.
+	return IsBearing(FromShape) && D.Size2D() < 30.f && D.Z > 0.f ? 0 : 1;
+}
+
+int32 FWRBuildRules::LevelFor(FName Shape, float PointZ, float Top)
+{
+	// A floor's surface is 20 above its storey's base, so aiming at it (or anywhere up a wall) picks that storey.
+	const int32 Into = FMath::Max(0, FMath::FloorToInt((PointZ - Top + 5.f) / Storey));
+	return Shape == TEXT("floor") || Shape == TEXT("roof") || Shape == TEXT("gable") ? Into + 1 : Into;
 }
 
 TMap<FName, float> FWRBuildRules::UpkeepPerHour(const TMap<FName, int32>& PiecesByMaterial)
@@ -185,6 +213,7 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, CropReadyAt);
 	DOREPLIFETIME(AWRBuildPiece, bPlanted);
 	DOREPLIFETIME(AWRBuildPiece, Storage);
+	DOREPLIFETIME(AWRBuildPiece, Support);
 }
 
 void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
@@ -276,6 +305,18 @@ static UMaterialInterface* ShapeMat()
 	return Mat;
 }
 
+/** Planks for wood (and most furniture), blocks for stone and the brazier; null = keep the flat tint (crops, cloth). */
+static UMaterialInterface* SurfaceFor(const FWRPieceDef& Def)
+{
+	if (Def.Kind == TEXT("crop") || Def.Id == TEXT("rug") || Def.Id == TEXT("banner"))
+	{
+		return nullptr;
+	}
+	static UMaterialInterface* Wood = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
+	static UMaterialInterface* Stone = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
+	return Def.Material == TEXT("stone") || Def.Id == TEXT("brazier") ? Stone : Wood;
+}
+
 void AWRBuildPiece::ApplyLook()
 {
 	const FWRPieceDef* Def = GetDef();
@@ -285,37 +326,65 @@ void AWRBuildPiece::ApplyLook()
 	}
 	bLookApplied = true;
 
-	// Parts: (size cm, centre offset cm) of cube blocks; a door/gate also gets a hinged leaf.
-	struct FPart { FVector Size; FVector Offset; FRotator Rot = FRotator::ZeroRotator; };
+	// Parts: (size cm, centre offset cm) of cube blocks; a door/gate also gets a hinged leaf. Edge pieces run on past the
+	// cell edge by half their thickness at each end, so two walls meeting at a corner close it.
+	struct FPart { FVector Size; FVector Offset; FRotator Rot = FRotator::ZeroRotator; bool bCollide = true; bool bVisible = true; };
 	TArray<FPart> Parts;
 	FVector LeafSize = FVector::ZeroVector;
 	const FName S = Def->Shape;
 	const FName K = Def->Kind;
+	const float Len = S == TEXT("palisade") || S == TEXT("gate") ? 440.f : 420.f;
 	// A deep slab: the top is the floor (100 above the piece), the rest sinks into the ground so slopes don't show a gap.
 	if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 250), FVector(0, 0, -25) });
-	else if (S == TEXT("wall")) Parts.Add({ FVector(400, 20, 300), FVector(0, 0, 150) });
-	else if (S == TEXT("halfwall")) Parts.Add({ FVector(400, 20, 150), FVector(0, 0, 75) });
-	else if (S == TEXT("floor") || S == TEXT("roof")) Parts.Add({ FVector(400, 400, 20), FVector(0, 0, 10) });
+	else if (S == TEXT("wall")) Parts.Add({ FVector(Len, 20, 300), FVector(0, 0, 150) });
+	else if (S == TEXT("halfwall")) Parts.Add({ FVector(Len, 20, 150), FVector(0, 0, 75) });
+	else if (S == TEXT("floor")) Parts.Add({ FVector(400, 400, 20), FVector(0, 0, 10) });
+	else if (S == TEXT("roof"))
+	{
+		// Rises 200 across the cell toward +X (yaw turns it), resting on the walls at the low edge with 40 of eaves past
+		// it, and runs a little past the high edge so two roofs meeting at a ridge close it. Gables close the open sides.
+		const float Slope = FMath::Atan2(200.f, 400.f);
+		const float MidX = -15.f;  // the slab runs -240 .. 210 along X
+		const float UnderZ = 0.5f * (MidX + 200.f);
+		Parts.Add({ FVector(450.f / FMath::Cos(Slope), Len, 15), FVector(MidX - 7.5f * FMath::Sin(Slope), 0, UnderZ + 7.5f * FMath::Cos(Slope)),
+			FRotator(FMath::RadiansToDegrees(Slope), 0, 0) });
+	}
 	else if (S == TEXT("pillar")) Parts.Add({ FVector(40, 40, 300), FVector(0, 0, 150) });
-	else if (S == TEXT("stairs")) Parts.Add({ FVector(500, 200, 20), FVector(0, 0, 150), FRotator(36.87f, 0, 0) });
+	else if (S == TEXT("stairs"))
+	{
+		// Eight treads rising a storey across the cell toward +X (yaw turns it) between two stringers. You walk on a
+		// hidden ramp through the treads' middles that ends level with the floor above.
+		const float Pitch = FMath::RadiansToDegrees(FMath::Atan2(300.f, 400.f));
+		Parts.Add({ FVector(500, 200, 10), FVector(3, 0, 164.75f), FRotator(Pitch, 0, 0), true, false });
+		for (int32 k = 1; k <= 8; ++k)
+		{
+			Parts.Add({ FVector(52, 200, 10), FVector(-225 + 50 * k, 0, 37.5f * k - 5), FRotator::ZeroRotator, false });
+		}
+		Parts.Add({ FVector(500, 8, 30), FVector(0, -104, 135), FRotator(Pitch, 0, 0), false });
+		Parts.Add({ FVector(500, 8, 30), FVector(0, 104, 135), FRotator(Pitch, 0, 0), false });
+	}
 	else if (S == TEXT("window"))
 	{
-		Parts.Add({ FVector(400, 20, 100), FVector(0, 0, 50) });
-		Parts.Add({ FVector(400, 20, 80), FVector(0, 0, 260) });
-		Parts.Add({ FVector(120, 20, 120), FVector(-140, 0, 160) });
-		Parts.Add({ FVector(120, 20, 120), FVector(140, 0, 160) });
+		Parts.Add({ FVector(Len, 20, 100), FVector(0, 0, 50) });
+		Parts.Add({ FVector(Len, 20, 80), FVector(0, 0, 260) });
+		Parts.Add({ FVector(130, 20, 120), FVector(-145, 0, 160) });
+		Parts.Add({ FVector(130, 20, 120), FVector(145, 0, 160) });
 	}
-	else if (S == TEXT("door") || S == TEXT("gate"))
+	else if (S == TEXT("door") || S == TEXT("gate") || S == TEXT("doorway"))
 	{
+		// A doorway is the frame without the leaf (between rooms).
 		const float Opening = S == TEXT("gate") ? 300.f : 140.f;
-		const float Side = (400.f - Opening) * 0.5f;
+		const float Side = (Len - Opening) * 0.5f;
 		const float Height = S == TEXT("gate") ? 400.f : 300.f;
-		Parts.Add({ FVector(Side, 20, Height), FVector(-200 + Side * 0.5f, 0, Height * 0.5f) });
-		Parts.Add({ FVector(Side, 20, Height), FVector(200 - Side * 0.5f, 0, Height * 0.5f) });
+		Parts.Add({ FVector(Side, 20, Height), FVector(-Len * 0.5f + Side * 0.5f, 0, Height * 0.5f) });
+		Parts.Add({ FVector(Side, 20, Height), FVector(Len * 0.5f - Side * 0.5f, 0, Height * 0.5f) });
 		Parts.Add({ FVector(Opening, 20, Height - 240), FVector(0, 0, 240 + (Height - 240) * 0.5f) });
-		LeafSize = FVector(Opening, 10, 240);
+		if (S != TEXT("doorway"))
+		{
+			LeafSize = FVector(Opening, 10, 240);
+		}
 	}
-	else if (S == TEXT("palisade")) Parts.Add({ FVector(400, 40, 400), FVector(0, 0, 200) });
+	else if (S == TEXT("palisade")) Parts.Add({ FVector(Len, 40, 400), FVector(0, 0, 200) });
 	else if (S == TEXT("tower"))
 	{
 		Parts.Add({ FVector(200, 200, 500), FVector(0, 0, 250) });
@@ -345,30 +414,39 @@ void AWRBuildPiece::ApplyLook()
 	FLinearColor Color = Def->Material == TEXT("stone") ? FLinearColor(0.45f, 0.45f, 0.47f) : FLinearColor(0.42f, 0.27f, 0.13f);
 	if (K == TEXT("crop")) Color = FLinearColor(0.25f, 0.16f, 0.08f);
 	if (Def->Id == TEXT("rug") || Def->Id == TEXT("banner")) Color = FLinearColor(0.5f, 0.1f, 0.1f);
-
-	const auto Configure = [this, Color](UStaticMeshComponent* C, const FVector& Size, const FVector& Offset, const FRotator& Rot)
+	// Built pieces wear world-aligned planks or stone blocks (Tools/make_build_materials.py); ghosts stay a flat tint.
+	UMaterialInterface* Surface = bGhost ? nullptr : SurfaceFor(*Def);
+	const auto Paint = [this, Color, Surface](UMeshComponent* C)
+	{
+		if (Surface)
+		{
+			C->SetMaterial(0, Surface);
+			return;
+		}
+		UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(ShapeMat(), this);
+		M->SetVectorParameterValue(TEXT("Color"), Color);
+		C->SetMaterial(0, M);
+	};
+	const auto Configure = [this, &Paint](UStaticMeshComponent* C, const FPart& P)
 	{
 		C->SetStaticMesh(CubeMesh());
-		C->SetMaterial(0, ShapeMat());
-		C->SetRelativeLocation(Offset);
-		C->SetRelativeRotation(Rot);
-		C->SetRelativeScale3D(Size / 100.f);
-		C->SetCollisionProfileName(bGhost ? TEXT("NoCollision") : TEXT("BlockAll"));
-		if (UMaterialInstanceDynamic* M = C->CreateAndSetMaterialInstanceDynamic(0))
-		{
-			M->SetVectorParameterValue(TEXT("Color"), Color);
-		}
+		C->SetRelativeLocation(P.Offset);
+		C->SetRelativeRotation(P.Rot);
+		C->SetRelativeScale3D(P.Size / 100.f);
+		C->SetCollisionProfileName(bGhost || !P.bCollide ? TEXT("NoCollision") : TEXT("BlockAll"));
+		C->SetVisibility(P.bVisible);  // the stairs' walking ramp is collision only
+		Paint(C);
 	};
 
 	if (Parts.Num() > 0)
 	{
-		Configure(Main, Parts[0].Size, Parts[0].Offset, Parts[0].Rot);
+		Configure(Main, Parts[0]);
 		for (int32 i = 1; i < Parts.Num(); ++i)
 		{
 			UStaticMeshComponent* Extra = NewObject<UStaticMeshComponent>(this);
 			Extra->SetupAttachment(RootComponent);
 			Extra->RegisterComponent();
-			Configure(Extra, Parts[i].Size, Parts[i].Offset, Parts[i].Rot);
+			Configure(Extra, Parts[i]);
 		}
 	}
 	else
@@ -377,10 +455,42 @@ void AWRBuildPiece::ApplyLook()
 		Main->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
+	if (S == TEXT("gable"))
+	{
+		// A right-angled triangle on top of a wall, low at -X and 210 up at +X (yaw 180 flips it): under a roof that rises
+		// the same way it closes the open side, poking a little into the roof slab so no light shows through.
+		UProceduralMeshComponent* Tri = NewObject<UProceduralMeshComponent>(this);
+		Tri->SetupAttachment(RootComponent);
+		Tri->RegisterComponent();
+		const float H = Len * 0.5f;
+		const FVector A(-H, 0, 0), B(H, 0, 0), C(H, 0, H), T(0, 10, 0);
+		TArray<FVector> Verts, Normals;
+		TArray<int32> Tris;
+		const auto Face = [&Verts, &Normals, &Tris](const TArray<FVector>& Pts, const FVector& Normal)
+		{
+			// Unreal draws a triangle's front where its (P1 - P0) x (P2 - P0) points away from the viewer.
+			const int32 First = Verts.Num();
+			for (const FVector& P : Pts) { Verts.Add(P); Normals.Add(Normal); }
+			for (int32 i = 1; i + 1 < Pts.Num(); ++i)
+			{
+				const bool bFlip = FVector::DotProduct(FVector::CrossProduct(Pts[i] - Pts[0], Pts[i + 1] - Pts[0]), Normal) > 0.f;
+				Tris.Append({ First, First + (bFlip ? i + 1 : i), First + (bFlip ? i : i + 1) });
+			}
+		};
+		Face({ A + T, B + T, C + T }, FVector(0, 1, 0));
+		Face({ A - T, B - T, C - T }, FVector(0, -1, 0));
+		Face({ A - T, B - T, B + T, A + T }, FVector(0, 0, -1));
+		Face({ B - T, C - T, C + T, B + T }, FVector(1, 0, 0));
+		Face({ A - T, C - T, C + T, A + T }, FVector(-0.5f, 0, 1).GetSafeNormal());
+		Tri->CreateMeshSection(0, Verts, Tris, Normals, TArray<FVector2D>(), TArray<FColor>(), TArray<FProcMeshTangent>(), !bGhost);
+		Tri->SetCollisionProfileName(bGhost ? TEXT("NoCollision") : TEXT("BlockAll"));
+		Paint(Tri);
+	}
+
 	if (!LeafSize.IsZero())
 	{
-		// Placeholder door: a leaf in the opening that turns edge-on (and stops blocking) when open.
-		Configure(Leaf, LeafSize, FVector(0.f, 0.f, LeafSize.Z * 0.5f), FRotator::ZeroRotator);
+		// The door leaf (swings open on its hinge, see OnRep_Door).
+		Configure(Leaf, { LeafSize, FVector(0.f, 0.f, LeafSize.Z * 0.5f) });
 		OnRep_Door();
 	}
 	else
@@ -399,9 +509,9 @@ void AWRBuildPiece::ApplyLook()
 void AWRBuildPiece::SetGhostValid(bool bValid)
 {
 	const FLinearColor Color = bValid ? FLinearColor(0.2f, 0.9f, 0.3f) : FLinearColor(0.9f, 0.2f, 0.2f);
-	TArray<UStaticMeshComponent*> Comps;
+	TArray<UMeshComponent*> Comps;
 	GetComponents(Comps);
-	for (UStaticMeshComponent* C : Comps)
+	for (UMeshComponent* C : Comps)
 	{
 		if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0)))
 		{
@@ -564,13 +674,46 @@ int32 AWRBuildPiece::SupportAt(UWorld* World, FName PieceId, const FVector& Loca
 		{
 			continue;
 		}
-		const FVector D = It->GetActorLocation() - Location;
-		if (D.Size2D() <= Grid * 1.05f && FMath::Abs(D.Z) <= 320.f && It->Support < TNumericLimits<int32>::Max())
+		const int32 Cost = FWRBuildRules::SupportCost(It->GetActorLocation(), Other->Shape, Location, Grid);
+		if (Cost != INDEX_NONE && It->Support < TNumericLimits<int32>::Max())
 		{
-			Best = FMath::Min(Best, It->Support + 1);
+			Best = FMath::Min(Best, It->Support + Cost);
 		}
 	}
 	return Best <= FWRBuildRules::SpanFor(Def->Material) ? Best : INDEX_NONE;
+}
+
+FString AWRBuildPiece::Blocked(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore)
+{
+	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PieceId);
+	if (!Def || !Def->Snaps())
+	{
+		return FString();
+	}
+	const FName Slot = FWRBuildRules::SlotOf(Def->Shape);
+	const bool bFlat = Def->Shape == TEXT("floor") || Def->Shape == TEXT("roof");
+	for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
+	{
+		const FWRPieceDef* Other = It->GetDef();
+		if (*It == Ignore || It->bGhost || !Other || !Other->Snaps() || It->IsActorBeingDestroyed())
+		{
+			continue;
+		}
+		// One piece per slot: a door doesn't go on top of a wall (demolish the wall first), a floor not into a floor.
+		const FVector D = It->GetActorLocation() - Location;
+		if (FWRBuildRules::SlotOf(Other->Shape) == Slot && D.Size() < 30.f)
+		{
+			return FString::Printf(TEXT("something is already there (%s)"), *Other->Name);
+		}
+		// Stairs need the opening above them.
+		const bool bOtherFlat = Other->Shape == TEXT("floor") || Other->Shape == TEXT("roof");
+		if (D.Size2D() < 30.f && ((bFlat && Other->Shape == TEXT("stairs") && FMath::IsNearlyEqual(-D.Z, FWRBuildRules::Storey, 40.f))
+			|| (Def->Shape == TEXT("stairs") && bOtherFlat && FMath::IsNearlyEqual(D.Z, FWRBuildRules::Storey, 40.f))))
+		{
+			return TEXT("the stairs need this opening");
+		}
+	}
+	return FString();
 }
 
 void AWRBuildPiece::RecomputeSupport(UWorld* World, const FVector& Around, float Radius)
@@ -600,10 +743,10 @@ void AWRBuildPiece::RecomputeSupport(UWorld* World, const FVector& Around, float
 			const float Grid = FWRBuildRegistry::Get().GridSize;
 			for (AWRBuildPiece* N : Pieces)
 			{
-				const FVector D = N->GetActorLocation() - P->GetActorLocation();
-				if (N != P && N->Support < TNumericLimits<int32>::Max() && D.Size2D() <= Grid * 1.05f && FMath::Abs(D.Z) <= 320.f && N->Support + 1 < P->Support)
+				const int32 Cost = N == P ? INDEX_NONE : FWRBuildRules::SupportCost(N->GetActorLocation(), N->GetDef()->Shape, P->GetActorLocation(), Grid);
+				if (Cost != INDEX_NONE && N->Support < TNumericLimits<int32>::Max() && N->Support + Cost < P->Support)
 				{
-					P->Support = N->Support + 1;
+					P->Support = N->Support + Cost;
 					bChanged = true;
 				}
 			}

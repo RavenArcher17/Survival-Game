@@ -317,8 +317,9 @@ void AWRHUD::DrawHUD()
 		else if (PC->IsPlacing())
 		{
 			const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PC->GetPlacingPiece());
-			const FString Prompt = FString::Printf(TEXT("Placing %s: LMB place, R rotate, RMB cancel%s"), Def ? *Def->Name : TEXT("?"),
-				PC->IsPlacementValid() ? TEXT("") : *FString::Printf(TEXT("  (%s)"), *PC->GetPlacementWhy()));
+			const FString Why = PC->IsPlacementValid() ? FString() : FString::Printf(TEXT("  (%s)"), *PC->GetPlacementWhy());
+			const FString Prompt = Def ? FString::Printf(TEXT("Placing %s: LMB place, R rotate, RMB cancel%s"), *Def->Name, *Why)
+				: FString::Printf(TEXT("Demolish: aim at a piece of yours, LMB remove (half back), RMB stop%s"), *Why);
 			DrawText(Prompt, PC->IsPlacementValid() ? FLinearColor(0.6f, 1.f, 0.6f) : FLinearColor(1.f, 0.5f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.1f);
 		}
 		else if (const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(PC->FindUseTarget()); Piece && Piece->GetDef())

@@ -18,7 +18,18 @@ void AWRPlayerController::WRPlace(FName Piece, float X, float Y, float Z, float 
 }
 void AWRPlayerController::WRSetCode(const FString& Code) { ServerCommand(FString::Printf(TEXT("setcode %s"), *Code)); }
 void AWRPlayerController::WRCode(const FString& Code) { ServerCommand(FString::Printf(TEXT("code %s"), *Code)); }
-void AWRPlayerController::WRDemolish() { ServerCommand(TEXT("demolish")); }
+void AWRPlayerController::WRDemolish(float X, float Y, float Z)
+{
+	ServerCommand(X == 0.f && Y == 0.f && Z == 0.f ? FString(TEXT("demolish")) : FString::Printf(TEXT("demolish %.0f %.0f %.0f"), X, Y, Z));
+}
+void AWRPlayerController::WRGhost(FName Piece) { StartPlacing(Piece); }
+void AWRPlayerController::WRGhostPlace()
+{
+	UE_LOG(LogWildreach, Log, TEXT("GHOST %s at %s yaw %.0f %s %s"), *PlacingPiece.ToString(), *PlaceLoc.ToCompactString(), PlaceYaw,
+		bPlaceValid ? TEXT("valid") : TEXT("invalid"), *PlaceWhy);
+	ConfirmPlacement();
+	CancelPlacement();
+}
 void AWRPlayerController::WRHitPiece(int32 Hits) { ServerCommand(FString::Printf(TEXT("hitpiece %d"), Hits)); }
 
 AWRBuildPiece* AWRPlayerController::FindNearbyPiece(float Range, bool bUsableOnly) const
@@ -59,15 +70,10 @@ void AWRPlayerController::ToggleBuildMenu()
 	MenuIndex = 0;
 }
 
-void AWRPlayerController::StartPlacing(FName Piece)
+/** A local, collision-free preview of a piece. */
+static AWRBuildPiece* SpawnGhost(UWorld* World, FName Piece)
 {
-	CancelPlacement();
-	MenuClose();
-	PlacingPiece = Piece;
-	PlaceYaw = GetControlRotation().Yaw;
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AWRBuildPiece* G = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), FTransform::Identity, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	AWRBuildPiece* G = World->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), FTransform::Identity, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (G)
 	{
 		G->bGhost = true;
@@ -75,8 +81,17 @@ void AWRPlayerController::StartPlacing(FName Piece)
 		G->PieceId = Piece;
 		G->FinishSpawning(FTransform::Identity);
 		G->SetActorEnableCollision(false);
-		Ghost = G;
 	}
+	return G;
+}
+
+void AWRPlayerController::StartPlacing(FName Piece)
+{
+	CancelPlacement();
+	MenuClose();
+	PlacingPiece = Piece;
+	PlaceYaw = GetControlRotation().Yaw;
+	Ghost = SpawnGhost(GetWorld(), Piece);  // "demolish": a red copy of whatever you aim at, made in UpdatePlacement
 }
 
 void AWRPlayerController::CancelPlacement()
@@ -96,7 +111,14 @@ void AWRPlayerController::RotatePlacement()
 
 void AWRPlayerController::ConfirmPlacement()
 {
-	if (IsPlacing())
+	if (PlacingPiece == TEXT("demolish"))
+	{
+		if (bPlaceValid)
+		{
+			ServerCommand(FString::Printf(TEXT("demolish %.0f %.0f %.0f"), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z));
+		}
+	}
+	else if (IsPlacing())
 	{
 		ServerCommand(FString::Printf(TEXT("place %s %.0f %.0f %.0f %.0f"), *PlacingPiece.ToString(), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z, PlaceYaw));
 	}
@@ -107,7 +129,7 @@ void AWRPlayerController::UpdatePlacement()
 	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
 	AWRBuildPiece* G = Ghost.Get();
 	const APawn* Self = GetPawn();
-	if (!Def || !G || !Self || !PlayerCameraManager)
+	if ((!Def && PlacingPiece != TEXT("demolish")) || !G || !Self || !PlayerCameraManager)
 	{
 		return;
 	}
@@ -122,6 +144,31 @@ void AWRPlayerController::UpdatePlacement()
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query))
 	{
 		Point = Hit.ImpactPoint;
+	}
+
+	if (!Def)
+	{
+		// Demolish: the piece under the crosshair (or the station / totem on it) gets a red copy over it; LMB removes it.
+		AActor* HitActor = Hit.GetActor();
+		AWRBuildPiece* Target = Cast<AWRBuildPiece>(HitActor);
+		Target = Target ? Target : HitActor ? Cast<AWRBuildPiece>(HitActor->GetOwner()) : nullptr;
+		const FName Aimed = Target ? Target->PieceId : FName(TEXT("demolish"));
+		if (G->PieceId != Aimed)
+		{
+			G->Destroy();
+			G = SpawnGhost(GetWorld(), Aimed);
+			Ghost = G;
+		}
+		const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
+		bPlaceValid = Target && PS && Target->OwnerName == PS->GetPlayerName() && FVector::Dist(Target->GetActorLocation(), Self->GetActorLocation()) < 1100.f;
+		PlaceWhy = !Target ? TEXT("aim at a piece you built") : bPlaceValid ? TEXT("") : Target->OwnerName != (PS ? PS->GetPlayerName() : FString()) ? TEXT("not yours") : TEXT("too far");
+		PlaceLoc = Target ? Target->GetActorLocation() : FVector::ZeroVector;
+		if (G && Target)
+		{
+			G->SetActorTransform(FTransform(Target->GetActorRotation(), PlaceLoc, FVector(1.02f)));  // a hair bigger, so it shows over the piece
+			G->SetGhostValid(false);
+		}
+		return;
 	}
 
 	if (Def->Snaps())
@@ -145,9 +192,9 @@ void AWRPlayerController::UpdatePlacement()
 			}
 			if (Foundation)
 			{
+				// The storey you're looking into; floors, roofs and gables go on top of it.
 				const float Top = Foundation->GetActorLocation().Z + 100.f;
-				const int32 Level = FMath::Max(Def->Shape == TEXT("floor") || Def->Shape == TEXT("roof") ? 1 : 0, FMath::RoundToInt((Point.Z - Top) / 300.f));
-				BaseZ = Top + Level * 300.f;
+				BaseZ = Top + FWRBuildRules::LevelFor(Def->Shape, Point.Z, Top) * FWRBuildRules::Storey;
 			}
 		}
 		else if (Def->Shape == TEXT("foundation"))
@@ -183,12 +230,7 @@ void AWRPlayerController::UpdatePlacement()
 		float Yaw = PlaceYaw;
 		PlaceLoc = FWRBuildRules::SnapToGrid(Def->Shape, Point, BaseZ, FWRBuildRegistry::Get().GridSize, Yaw);
 		G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, Yaw, 0.f));
-		PlaceYaw = Def->Shape == TEXT("stairs") ? Yaw : PlaceYaw;
-		if (Def->Shape != TEXT("stairs"))
-		{
-			// The server snaps the same way; send the snapped yaw.
-			PlaceYaw = Yaw;
-		}
+		PlaceYaw = Yaw;  // send the snapped yaw (stairs, roofs and gables keep the way R turned them)
 	}
 	else
 	{
@@ -208,6 +250,17 @@ void AWRPlayerController::UpdatePlacement()
 	else if (!AWRClaimTotem::CanBuild(GetWorld(), PlaceLoc, PS ? PS->GetPlayerName() : FString(), PlaceWhy))
 	{
 		bPlaceValid = false;
+	}
+	else if (Def->Snaps() && AWRBuildPiece::SupportAt(GetWorld(), PlacingPiece, PlaceLoc) == INDEX_NONE)
+	{
+		// Same rules as the server (support values replicate), so red means it really won't go there.
+		bPlaceValid = false;
+		PlaceWhy = FString::Printf(TEXT("no support (%s spans %d)"), *Def->Material.ToString(), FWRBuildRules::SpanFor(Def->Material));
+	}
+	else if (const FString Blocked = AWRBuildPiece::Blocked(GetWorld(), PlacingPiece, PlaceLoc); !Blocked.IsEmpty())
+	{
+		bPlaceValid = false;
+		PlaceWhy = Blocked;
 	}
 	else if (PS)
 	{
@@ -247,9 +300,19 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
 		Out.Add({ FString::Printf(TEXT("%s%s  <-  %s"), OutDef ? *OutDef->Name : *R->Output.ToString(), Carried > 0 ? TEXT(" (have one)") : TEXT(""), *Needs),
 			FString::Printf(TEXT("craft %s none"), *R->Id.ToString()), bHave });
 	}
-	Out.Add({ TEXT("-- Build --"), FString() });
+	Out.Add({ TEXT("Demolish: aim at a piece of yours, LMB removes it (half back)"), TEXT("build demolish") });
+	// Pieces in pieces.json order, under a heading per group (wood / stone building, then by category).
+	FString Group;
 	for (const FWRPieceDef& Def : FWRBuildRegistry::Get().All())
 	{
+		const FString ThisGroup = Def.Category == TEXT("structure") ? Def.Material.ToString() : Def.Category.ToString();
+		if (ThisGroup != Group)
+		{
+			Group = ThisGroup;
+			const FString Heading = Group == TEXT("wood") ? TEXT("Wood building") : Group == TEXT("stone") ? TEXT("Stone building")
+				: Group == TEXT("utility") ? TEXT("Crafting, storage, beds, light, farming") : Group == TEXT("claim") ? TEXT("Land claim") : Group.Left(1).ToUpper() + Group.Mid(1);
+			Out.Add({ FString::Printf(TEXT("-- %s --"), *Heading), FString() });
+		}
 		FString Cost;
 		bool bHave = true;
 		for (const TPair<FName, int32>& C : Def.Cost)
@@ -258,7 +321,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
 			bHave &= Have >= C.Value;
 			Cost += FString::Printf(TEXT("%s %d/%d  "), *C.Key.ToString(), Have, C.Value);
 		}
-		Out.Add({ FString::Printf(TEXT("[%s] %s  <-  %s"), *Def.Category.ToString(), *Def.Name, *Cost), FString::Printf(TEXT("build %s"), *Def.Id.ToString()), bHave });
+		Out.Add({ FString::Printf(TEXT("%s  <-  %s"), *Def.Name, *Cost), FString::Printf(TEXT("build %s"), *Def.Id.ToString()), bHave });
 	}
 	return Out;
 }
@@ -304,11 +367,7 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		{
 			Support = AWRBuildPiece::SupportAt(GetWorld(), PieceId, Loc);
 			if (Support == INDEX_NONE) OutResult = FString::Printf(TEXT("no support (%s spans %d)"), *Def->Material.ToString(), FWRBuildRules::SpanFor(Def->Material));
-			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It && OutResult.IsEmpty(); ++It)
-			{
-				const FWRPieceDef* O = It->GetDef();
-				if (!It->bGhost && O && O->Shape == Def->Shape && FVector::Dist(It->GetActorLocation(), Loc) < 30.f) OutResult = TEXT("something is already there");
-			}
+			else OutResult = AWRBuildPiece::Blocked(GetWorld(), PieceId, Loc);
 		}
 		// Thrifty perk: cheaper building.
 		TMap<FName, int32> Cost;
@@ -354,7 +413,13 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 	}
 	else if (Cmd == TEXT("demolish"))
 	{
-		AWRBuildPiece* Piece = FindNearbyPiece(450.f);
+		// demolish X Y Z: the piece standing there (demolish mode sends what you aimed at); bare: the nearest one.
+		AWRBuildPiece* Piece = Args.Num() >= 4 ? nullptr : FindNearbyPiece(450.f);
+		const FVector At(FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)));
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It && Args.Num() >= 4 && Self && !Piece; ++It)
+		{
+			if (!It->bGhost && FVector::Dist(It->GetActorLocation(), At) < 50.f && FVector::Dist(At, Self->GetActorLocation()) < 1300.f) Piece = *It;
+		}
 		const FWRPieceDef* Def = Piece ? Piece->GetDef() : nullptr;
 		if (!Def) OutResult = TEXT("nothing to demolish");
 		else if (Piece->OwnerName != Who) OutResult = TEXT("not yours");

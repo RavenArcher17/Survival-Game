@@ -703,7 +703,7 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		}
 		if (Dist < 400.f)
 		{
-			UE_LOG(LogWildreach, Log, TEXT("WALK arrived after %.0f s (%.1f min)"), BotClock - WalkStart, (BotClock - WalkStart) / 60.f);
+			UE_LOG(LogWildreach, Log, TEXT("WALK arrived after %.0f s (%.1f min) at %s"), BotClock - WalkStart, (BotClock - WalkStart) / 60.f, *Here.ToCompactString());
 			bWalking = false;
 		}
 		else if (BotClock - WalkLastProgress > 15.f)

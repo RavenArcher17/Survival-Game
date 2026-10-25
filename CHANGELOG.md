@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-10-25: building a house
+
+A two-room, two-storey house with stairs and a gable roof now goes up the way a player expects, and
+`Tools\housetest.ps1` builds one. Before, only a one-room box worked: pieces could be stacked into the same spot, the
+ghost showed green for things the server then refused, outer corners had holes, the "roof" was a second flat floor,
+the stairs a single plank, a wooden building past two storeys collapsed, and nothing could be removed in game.
+
+- **Ceilings sit on walls, a second floor you walk on**: the build ghost picks the storey you're looking into (a floor's
+  surface counts as its storey, so aiming at the upper part of a wall no longer jumps to the next one); floors / ceilings,
+  roofs and gables go on top of it. Walls stacked straight on walls, pillars or foundations cost no span (they carry
+  the weight down), so a wooden building can go up storey after storey; reaching sideways still uses wood's 4 / stone's 6.
+- **One piece per spot**: a door, doorway, window, wall or gable can't go on an edge that already has one, a floor or
+  roof not into a cell that has one, and stairs keep the opening above them clear. The ghost turns red with the reason
+  (no support, something is already there, the stairs need this opening) before you click: support values replicate,
+  so the client checks the same rules as the server.
+- **New pieces**: a **doorway** without a door (between rooms), a **sloped roof** (rises 2 m across a cell, with eaves;
+  R turns which way, two facing ones meet at a ridge) and a **gable** (the triangle that closes a roof's side; R flips
+  it). **Stairs** are eight treads between stringers with a hidden ramp you walk up, ending level with the floor above.
+  Walls, windows and doorways run 10 cm past each end so corners close.
+- **Planks and stone blocks**: built pieces wear world-aligned materials (`Tools/make_build_materials.py`,
+  `/Game/Building`): 20 cm boards with staggered joints and grain for wood, 45 x 90 cm blocks in running bond for stone.
+  The ghost keeps its green / red tint.
+- **Demolish mode**: the top of the build menu; aim at a piece of yours (it turns red), LMB removes it for half its
+  cost. `WRDemolish x y z` does the same from the console.
+- **Build menu** in groups with headings (wood building, stone building, crafting/storage/beds, land claim, defense,
+  decor); names say what pieces are for ("Wood floor / ceiling", "Wood stairs (one storey)").
+- `Tools\housetest.ps1` (25 checks): foundations, a wall, a ceiling and an upstairs wall go through the ghost exactly as a
+  player aims them (and land where expected); the expected refusals happen; the bot demolishes a pillar, climbs the
+  stairs to the first floor, and walks in through the front door and the inner doorway; a server restart loads all 34
+  pieces back. `-Shots` adds screenshots. The survival test's hut now gets a sloped roof and two gables.
+  Bots: `WRGhost <piece>` + `WRLook` + `WRGhostPlace` place through the ghost. `Wildreach.Building.Rules` covers the
+  snapping, slots, support and storey rules.
+
 ## 2026-10-25: ranged weapons are crafted
 
 - **By hand** (B menu): throwing spear (4 wood, 2 stone, 2 fiber), bola (6 fiber, 3 stone), 3 stone arrows
