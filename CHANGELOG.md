@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-25: ranged weapons are crafted
+
+- **By hand** (B menu): throwing spear (4 wood, 2 stone, 2 fiber), bola (6 fiber, 3 stone), 3 stone arrows
+  (wood, stone, fiber), tranq arrow (stone arrow + narcotic), tranq bolt (crossbow bolt + narcotic).
+- **Workbench**: hunting bow (10 wood, 12 fiber, 2 hide), blowgun (6 wood, 4 fiber, 1 hide).
+  **Forge**: 6 crossbow bolts (copper ingot, 2 wood); the crossbow at Hearth tier 2 (3 bronze ingots, 8 wood, 6 fiber).
+  **Alchemy table**: the new **narcotic** (3 berries steeped with a raw meat, makes 2), and torpor darts now take
+  narcotic + fiber (was 2 berries, 2 fiber), so every knockout goes through it.
+- Bows, crossbows and blowguns roll **quality** like swords: quality x roll scales the weapon's own damage and torpor
+  (the ammo's share is fixed), each shot wears it by 1 (`ranged.wearPerShot`), and worn out it hits at half.
+  It's repaired where it's made: the station menu shows "Repair Hunting bow (x/250)" at the workbench, and the forge
+  says where to go. Spears and bolas stack, so they're crafted in stacks like ammo, not one rolled item each.
+- `tuning.json` has a `ranged` section with every ranged number the code was defaulting (aiming camera, spread, throw
+  release, projectile size and lifetime, bola limits, wear).
+- The rules test still checks the crude tools need only wood and stone; every other hand recipe now has to take
+  things gathered bare-handed (wood, stone, fiber, berries) or made by another recipe, and every ranged weapon and
+  ammo has to have a recipe. `Tools/crafttest.ps1` crafts all of them at the arena's stations, then wears a bow by
+  shooting and repairs it at the workbench (the forge refuses).
+
 ## 2026-10-25: ranged weapons
 
 - **A ranged slot** next to the sword and shield: a hunting bow (stone and tranq arrows), a crossbow (bolts and tranq

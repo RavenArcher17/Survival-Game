@@ -174,6 +174,8 @@ public:
 	/** Sum of a gem stat over the equipped weapon's sockets ("damage", "critChance", ...). */
 	float GemStat(FName Stat) const;
 	float GetArmorValue() const;
+	/** The equipped bow / crossbow / blowgun's quality x roll (x0.5 worn out): scales its own damage and torpor. */
+	float GetRangedMultiplier() const;
 
 	static constexpr int32 NumSlots = 30;
 

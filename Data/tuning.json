@@ -136,6 +136,10 @@
     "pale_hunter": { "blizzardSeconds": 14, "clearSeconds": 10, "ambushMultiplier": 2, "revealSeconds": 6 }
   },
 
+  "ranged": { "_comment": "Bows, crossbows, blowguns, spears, bolas (weapon numbers are in items.json). Aiming camera arm cm / fov / walk speed x; hip-fire spread; throw release s; projectile radius cm, flight s, stuck s, stick depth cm; bola roots creatures up to this radius cm, else slows; poise per damage; grip cm from the wrist; durability per shot. placeholder",
+    "aimArmLength": 170, "aimFov": 60, "aimSpeedMultiplier": 0.5, "hipSpreadDegrees": 4, "throwDelay": 0.45,
+    "projectileRadius": 6, "flightSeconds": 8, "stuckSeconds": 12, "stickDepth": 6,
+    "bolaRootMaxRadius": 90, "bolaRootSeconds": 4, "bolaSlowSeconds": 4, "poisePerDamage": 0.4, "gripFromWrist": 5, "wearPerShot": 1 },
   "taming": { "easySeconds": 60, "mediumSeconds": 300, "hardSeconds": 900, "skillSpeedupAt100": 0.5 },
   "lifeSkills": { "levelXpBase": 50, "levelXpPerLevel": 5,
     "xp": { "mine": 4, "chop": 4, "plant": 10, "harvest": 20, "collect": 5, "craftGear": 25, "craft": 10, "cook": 15, "upgrade": 15,

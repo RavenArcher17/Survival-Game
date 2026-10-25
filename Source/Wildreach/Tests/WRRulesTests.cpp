@@ -192,15 +192,31 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("two swords take two slots"), FWRInventoryRules::Add(Slots, TEXT("copper_sword"), 2), 0);
 	TestTrue(TEXT("separate instances"), Slots[0].Count == 1 && Slots[1].Count == 1);
 	TestEqual(TEXT("full durability"), Slots[0].Durability, 200.f);
-	// A fresh survivor can make the crude tools by hand from what the island gives bare-handed (wood, stone).
+	// A fresh survivor can make the crude tools by hand from what the island gives bare-handed (wood, stone); everything
+	// else made by hand takes things gathered bare-handed (shrubs give fiber and berries) or made by another recipe.
+	for (const FName Tool : { FName(TEXT("crude_hatchet")), FName(TEXT("crude_pick")) })
+	{
+		const FWRRecipe* R = FWRRecipeRegistry::Get().Find(Tool);
+		TestTrue(FString::Printf(TEXT("%s made by hand"), *Tool.ToString()), R && R->Station == TEXT("hand"));
+		for (const TPair<FName, int32>& In : R ? R->Inputs : TArray<TPair<FName, int32>>())
+		{
+			TestTrue(FString::Printf(TEXT("%s needs only wood and stone"), *Tool.ToString()), In.Key == TEXT("wood") || In.Key == TEXT("stone"));
+		}
+	}
 	for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(TEXT("hand")))
 	{
 		for (const TPair<FName, int32>& In : R->Inputs)
 		{
-			TestTrue(FString::Printf(TEXT("%s needs only wood and stone"), *R->Id.ToString()), In.Key == TEXT("wood") || In.Key == TEXT("stone"));
+			const bool bBareHanded = In.Key == TEXT("wood") || In.Key == TEXT("stone") || In.Key == TEXT("fiber") || In.Key == TEXT("berries");
+			TestTrue(FString::Printf(TEXT("%s input %s can be had"), *R->Id.ToString(), *In.Key.ToString()), bBareHanded || FWRRecipeRegistry::Get().ForOutput(In.Key) != nullptr);
 		}
 	}
-	TestTrue(TEXT("hatchet and pick made by hand"), FWRRecipeRegistry::Get().ForStation(TEXT("hand")).Num() >= 2);
+	// Every ranged weapon and its ammo can be made.
+	for (const FName Id : { FName(TEXT("hunting_bow")), FName(TEXT("crossbow")), FName(TEXT("blowgun")), FName(TEXT("throwing_spear")), FName(TEXT("bola")),
+		FName(TEXT("stone_arrow")), FName(TEXT("tranq_arrow")), FName(TEXT("crossbow_bolt")), FName(TEXT("tranq_bolt")), FName(TEXT("torpor_dart")) })
+	{
+		TestNotNull(FString::Printf(TEXT("%s has a recipe"), *Id.ToString()), FWRRecipeRegistry::Get().ForOutput(Id));
+	}
 	// Tools work from the bag: the best of the right kind counts, nothing for other materials.
 	TestEqual(TEXT("wood wants a hatchet"), FWRGathering::ToolKindFor(TEXT("wood")), FName(TEXT("hatchet")));
 	TestEqual(TEXT("ore wants a pick"), FWRGathering::ToolKindFor(TEXT("copper_ore")), FName(TEXT("pick")));

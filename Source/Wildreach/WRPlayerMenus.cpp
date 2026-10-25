@@ -468,6 +468,14 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 		Out.Add({ TEXT("Repair armor"), TEXT("repair armor") });
 		Out.Add({ TEXT("Upgrade armor (upgrade shards)"), TEXT("upgrade armor") });
 	}
+	// The equipped bow / crossbow / blowgun is mended where it's made.
+	const FWRItemStack& Ranged = Inv->GetEquipped(EWREquipSlot::Ranged);
+	const FWRItemDef* RangedDef = Ranged.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Ranged.ItemId);
+	const FWRRecipe* RangedRecipe = RangedDef ? FWRRecipeRegistry::Get().ForOutput(RangedDef->Id) : nullptr;
+	if (RangedRecipe && RangedDef->MaxDurability > 0.f && RangedRecipe->Station == Station->StationType)
+	{
+		Out.Add({ FString::Printf(TEXT("Repair %s (%.0f/%.0f)"), *RangedDef->Name, Ranged.Durability, RangedDef->MaxDurability), TEXT("repair ranged") });
+	}
 	return Out;
 }
 

@@ -83,7 +83,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 Tools\test.ps1          # automation tests (rules + deterministic combat scenarios)
 Tools\mptest.ps1        # headless server + bots, PvE (-Scenario pvp for duels)
 Tools\persisttest.ps1   # save -> server restart -> load
-Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets
+Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets, every ranged weapon + ammo, bow wear + repair
 Tools\buildtest.ps1     # claims, code locks, raids, collapse, world save
 Tools\survivaltest.ps1  # fresh player on the island: gather bare-handed, crude tools, hut + workbench, stone tools
 Tools\tametest.ps1      # offer food, ride, knockout + feed, eggs, orders, tames saved

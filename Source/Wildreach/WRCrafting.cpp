@@ -322,7 +322,7 @@ FString FWRCrafting::Make(AWRPlayerController* Player, const FWRRecipe& Recipe, 
 	}
 	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(R->Output);
 	FString Result;
-	if (OutDef && OutDef->IsEquipment())
+	if (OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1)  // spears and bolas stack: made like ammo, below
 	{
 		if (!Essence.IsNone())
 		{
@@ -392,6 +392,10 @@ FString AWRStation::Repair(AWRPlayerController* Player, EWREquipSlot Slot)
 		return TEXT("already in perfect condition");
 	}
 	const FWRRecipe* R = FWRRecipeRegistry::Get().ForOutput(Def->Id);
+	if (Slot == EWREquipSlot::Ranged && R && R->Station != StationType)
+	{
+		return FString::Printf(TEXT("the %s is repaired where it's made (%s)"), *Def->Name, *R->Station.ToString().Replace(TEXT("_"), TEXT(" ")));
+	}
 	const float Fraction = FWRRecipeRegistry::Get().RepairCostFraction;
 	if (R)
 	{

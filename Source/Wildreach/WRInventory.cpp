@@ -348,6 +348,18 @@ float UWRInventoryComponent::GetArmorValue() const
 	return Def->Armor * QualityMult * EquippedArmor.Roll * (1.f + EquippedArmor.Upgrade * WRTune(TEXT("weapon.upgradePerLevel"), 0.05f));
 }
 
+float UWRInventoryComponent::GetRangedMultiplier() const
+{
+	const FWRItemDef* Def = EquippedRanged.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedRanged.ItemId);
+	if (!Def || Def->IsThrowable())
+	{
+		return 1.f;
+	}
+	const float QualityMult = FWRTuning::Get().Num(FString::Printf(TEXT("weapon.quality.%s"), *FString(FWRItemStack::QualityName(EquippedRanged.Quality)).ToLower()), 1.f);
+	const bool bBroken = Def->MaxDurability > 0.f && EquippedRanged.Durability <= 0.f;
+	return QualityMult * EquippedRanged.Roll * (bBroken ? 0.5f : 1.f);
+}
+
 void UWRInventoryComponent::ApplyEquipment()
 {
 	AWRCharacterBase* Character = GetPawnCharacter();

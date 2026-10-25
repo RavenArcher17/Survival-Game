@@ -3,6 +3,11 @@
   "recipes": [
     { "id": "crude_hatchet", "station": "hand", "level": 1, "inputs": { "wood": 3, "stone": 2 }, "output": "crude_hatchet", "count": 1, "seconds": 2 },
     { "id": "crude_pick", "station": "hand", "level": 1, "inputs": { "wood": 3, "stone": 3 }, "output": "crude_pick", "count": 1, "seconds": 2 },
+    { "id": "throwing_spear", "station": "hand", "level": 1, "inputs": { "wood": 4, "stone": 2, "fiber": 2 }, "output": "throwing_spear", "count": 1, "seconds": 2 },
+    { "id": "bola", "station": "hand", "level": 1, "inputs": { "fiber": 6, "stone": 3 }, "output": "bola", "count": 1, "seconds": 2 },
+    { "id": "stone_arrow", "station": "hand", "level": 1, "inputs": { "wood": 1, "stone": 1, "fiber": 1 }, "output": "stone_arrow", "count": 3, "seconds": 1 },
+    { "id": "tranq_arrow", "station": "hand", "level": 1, "inputs": { "stone_arrow": 1, "narcotic": 1 }, "output": "tranq_arrow", "count": 1, "seconds": 1 },
+    { "id": "tranq_bolt", "station": "hand", "level": 1, "inputs": { "crossbow_bolt": 1, "narcotic": 1 }, "output": "tranq_bolt", "count": 1, "seconds": 1 },
 
     { "id": "copper_ingot", "station": "forge", "level": 1, "inputs": { "copper_ore": 2 }, "output": "copper_ingot", "count": 1, "seconds": 2 },
     { "id": "bronze_ingot", "station": "forge", "level": 2, "inputs": { "copper_ingot": 2, "tin_ore": 1 }, "output": "bronze_ingot", "count": 1, "seconds": 3 },
@@ -10,6 +15,8 @@
     { "id": "copper_sword", "station": "forge", "level": 1, "inputs": { "copper_ingot": 3, "wood": 2 }, "output": "copper_sword", "count": 1, "seconds": 4, "quality": true },
     { "id": "bronze_sword", "station": "forge", "level": 2, "inputs": { "bronze_ingot": 3, "wood": 2 }, "output": "bronze_sword", "count": 1, "seconds": 5, "quality": true },
     { "id": "iron_sword", "station": "forge", "level": 3, "inputs": { "iron_ingot": 3, "wood": 2 }, "output": "iron_sword", "count": 1, "seconds": 6, "quality": true },
+    { "id": "crossbow", "station": "forge", "level": 2, "inputs": { "bronze_ingot": 3, "wood": 8, "fiber": 6 }, "output": "crossbow", "count": 1, "seconds": 5, "quality": true },
+    { "id": "crossbow_bolt", "station": "forge", "level": 1, "inputs": { "copper_ingot": 1, "wood": 2 }, "output": "crossbow_bolt", "count": 6, "seconds": 2 },
 
     { "id": "hide_armor", "station": "armorer", "level": 1, "inputs": { "hide": 6, "fiber": 4 }, "output": "hide_armor", "count": 1, "seconds": 4, "quality": true },
     { "id": "copper_armor", "station": "armorer", "level": 1, "inputs": { "copper_ingot": 6, "hide": 2 }, "output": "copper_armor", "count": 1, "seconds": 5, "quality": true },
@@ -19,10 +26,13 @@
     { "id": "minor_healing_potion", "station": "alchemy_table", "level": 1, "inputs": { "berries": 3, "fiber": 1 }, "output": "minor_healing_potion", "count": 1, "seconds": 2 },
     { "id": "healing_potion", "station": "alchemy_table", "level": 2, "inputs": { "minor_healing_potion": 2, "sulfur_crystal": 1, "lichen": 1 }, "output": "healing_potion", "count": 1, "seconds": 3 },
     { "id": "antidote", "station": "alchemy_table", "level": 2, "inputs": { "berries": 2, "lichen": 2 }, "output": "antidote", "count": 1, "seconds": 2 },
-    { "id": "torpor_dart", "station": "alchemy_table", "level": 1, "inputs": { "berries": 2, "fiber": 2 }, "output": "torpor_dart", "count": 3, "seconds": 2 },
+    { "id": "narcotic", "station": "alchemy_table", "level": 1, "inputs": { "berries": 3, "raw_meat": 1 }, "output": "narcotic", "count": 2, "seconds": 2 },
+    { "id": "torpor_dart", "station": "alchemy_table", "level": 1, "inputs": { "narcotic": 1, "fiber": 1 }, "output": "torpor_dart", "count": 3, "seconds": 2 },
 
     { "id": "stone_hatchet", "station": "workbench", "level": 1, "inputs": { "wood": 6, "stone": 6, "fiber": 4 }, "output": "stone_hatchet", "count": 1, "seconds": 3 },
     { "id": "stone_pick", "station": "workbench", "level": 1, "inputs": { "wood": 6, "stone": 8, "fiber": 4 }, "output": "stone_pick", "count": 1, "seconds": 3 },
+    { "id": "hunting_bow", "station": "workbench", "level": 1, "inputs": { "wood": 10, "fiber": 12, "hide": 2 }, "output": "hunting_bow", "count": 1, "seconds": 4, "quality": true },
+    { "id": "blowgun", "station": "workbench", "level": 1, "inputs": { "wood": 6, "fiber": 4, "hide": 1 }, "output": "blowgun", "count": 1, "seconds": 3, "quality": true },
     { "id": "cooked_meat", "station": "workbench", "level": 1, "inputs": { "raw_meat": 1, "wood": 1 }, "output": "cooked_meat", "count": 1, "seconds": 2 },
     { "id": "waterskin", "station": "workbench", "level": 1, "inputs": { "hide": 1 }, "output": "waterskin", "count": 1, "seconds": 2 }
   ],

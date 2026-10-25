@@ -408,11 +408,13 @@ void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint)
 	}
 	else
 	{
-		LaunchProjectile(*Gun, Ammo, Dir);
+		// A crafted launcher's quality scales its shots; each shot wears it a little.
+		LaunchProjectile(*Gun, Ammo, Dir, Inv->GetRangedMultiplier());
+		Inv->WearEquipped(EWREquipSlot::Ranged, WRTune(TEXT("ranged.wearPerShot"), 1.f));
 	}
 }
 
-void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, const FVector& Dir)
+void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, const FVector& Dir, float LauncherMult)
 {
 	if (!IsAlive())
 	{
@@ -421,10 +423,10 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	const FWRItemDef* Ammo = ItemDef(AmmoId);
 	FWRHit Hit;
 	Hit.Instigator = this;
-	Hit.Damage = Launcher.RangedDamage + (Ammo ? Ammo->AmmoDamage : 0.f);
+	Hit.Damage = Launcher.RangedDamage * LauncherMult + (Ammo ? Ammo->AmmoDamage : 0.f);
 	Hit.PoiseDamage = Hit.Damage * WRTune(TEXT("ranged.poisePerDamage"), 0.4f);
 	Hit.Element = WRTags::Element_Physical;
-	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult;
+	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult * LauncherMult;
 	const FVector Chest = GetActorLocation() + FVector(0.f, 0.f, 55.f);
 	const FVector Muzzle = Chest + Dir * 45.f;
 

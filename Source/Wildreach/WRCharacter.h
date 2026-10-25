@@ -127,7 +127,7 @@ private:
 	void ApplyAimRotation();
 	void TickAimCamera(float DeltaSeconds);
 	FName RangedAnimGroup() const;  // bow / rifle (crossbow, blowgun) / throw
-	void LaunchProjectile(const struct FWRItemDef& Launcher, FName AmmoId, const FVector& Dir);
+	void LaunchProjectile(const struct FWRItemDef& Launcher, FName AmmoId, const FVector& Dir, float LauncherMult = 1.f);
 	UFUNCTION(Server, Reliable) void ServerSetRangedMode(bool bOn);
 	UFUNCTION(Server, Reliable) void ServerSetAiming(bool bOn);
 	UFUNCTION(Server, Reliable) void ServerFireRanged(FVector_NetQuantize AimPoint);
