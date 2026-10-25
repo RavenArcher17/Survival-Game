@@ -48,4 +48,6 @@ private:
 	/** Clock anchor: total hours (since day 1, 00:00) at server world time ClockAnchorTime. */
 	UPROPERTY(Replicated) double ClockAnchorHours = 8.0;
 	UPROPERTY(Replicated) double ClockAnchorTime = 0.0;
+	/** Server: set before BeginPlay (the world save's time may load first), so the start hour doesn't replace it. */
+	bool bClockSet = false;
 };

@@ -123,6 +123,8 @@
   "hazards": { "_comment": "Biome gear checks: lava river (needs lava resistance), slick ice (needs ice resistance).",
     "lavaDps": 8, "lavaBurnPerSecond": 12, "iceFriction": 0.3, "iceBraking": 100, "iceAcceleration": 600 },
   "caves": { "gemChance": 0.12, "gasDps": 6 },
+  "sky": { "_comment": "How the clock looks (WRSky): sun height at noon and depth at midnight (degrees), the moon's light (lux; the map's sun is ~10) and how far above the opposite of the sun it rides, the sky light at night (x the map's), and the dimmest auto-exposure may go (EV100: higher = darker nights). placeholder",
+    "noonElevation": 65, "midnightDepth": 50, "moonLux": 0.5, "moonLift": 0.3, "nightSkyLight": 3, "nightMinEV100": 0.5, "dayMinEV100": -10 },
 
   "bosses": {
     "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/... (see WRBoss.cpp for every key).",

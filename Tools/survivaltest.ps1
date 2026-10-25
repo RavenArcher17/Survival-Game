@@ -43,7 +43,7 @@ $cmds = @(
 	"WRPlace wood_foundation $X $Y $Z 0",
 	"WRPlace wood_wall $X $($Y + 200) $T 0", "WRPlace wood_wall $X $($Y - 200) $T 0", "WRPlace wood_wall $($X - 200) $Y $T 90",
 	"WRPlace wood_door $($X + 200) $Y $T 90",
-	"WRPlace wood_roof $X $Y $($T + 300) 0", "WRPlace wood_gable $X $($Y + 200) $($T + 300) 0", "WRPlace wood_gable $X $($Y - 200) $($T + 300) 0",  # a sloped roof rising east, gables closing its sides
+	"WRPlace wood_roof $X $Y $($T + 300) 0", "WRPlace wood_gable $X $($Y + 200) $($T + 300) 0", "WRPlace wood_gable $X $($Y - 200) $($T + 300) 0", "WRPlace wood_upper_wall $($X + 200) $Y $($T + 300) 90",  # a sloped roof rising east: gables close its sides, an upper wall its high end
 	"WRPlace workbench $($X - 120) $($Y + 100) $T 90", 'wait 1',
 	# In through the door: open it, walk in (the walk counts as arrived 4 m short of its goal past the back wall,
 	# i.e. inside; a shut door leaves it stuck outside), craft at the bench.
@@ -100,7 +100,7 @@ Check 'crude hatchet crafted by hand' ($notices -contains 'Crafted 1 Crude hatch
 Check 'crude pick crafted by hand' ($notices -contains 'Crafted 1 Crude pick')
 Check 'crude hatchet chops more than bare hands' ($crudeWood.Count -ge 4 -and (Avg $crudeWood) -gt (Avg $bareWood)) ("avg {0:N1} vs {1:N1}" -f (Avg $crudeWood), (Avg $bareWood))
 Check 'crude pick breaks more stone than bare hands' ($crudeStone.Count -ge 1 -and (Avg $crudeStone) -gt (Avg $bareStone)) ("avg {0:N1} vs {1:N1}" -f (Avg $crudeStone), (Avg $bareStone))
-foreach ($piece in 'Wood foundation', 'Wood doorway + door', 'Wood roof (sloped)', 'Workbench') { Check "built $piece" ($notices -contains "Built $piece") }
+foreach ($piece in 'Wood foundation', 'Wood doorway + door', 'Wood roof (sloped)', 'Wood upper wall (under a roof''s high side)', 'Workbench') { Check "built $piece" ($notices -contains "Built $piece") }
 Check 'built two gables' (@($notices | Where-Object { $_ -eq 'Built Wood gable (roof side)' }).Count -eq 2)
 Check 'built three wood walls' (@($notices | Where-Object { $_ -eq 'Built Wood wall' }).Count -eq 3)
 Check 'nothing refused while building' (-not ($notices | Where-Object { $_ -match '^(no support|need |too far|something is already|no building|not inside)' -and $_ -ne 'need 3 Wood' })) (($notices | Where-Object { $_ -match '^(no support|need |too far|something is already|no building)' -and $_ -ne 'need 3 Wood' }) -join '; ')

@@ -66,7 +66,7 @@ struct WILDREACH_API FWRBuildRules
 	static bool IsBearing(FName Shape);
 	/** Span a piece at To costs when resting on one at From: INDEX_NONE = not touching, 0 = straight on top of a bearing piece, 1 = beside it. */
 	static int32 SupportCost(const FVector& From, FName FromShape, const FVector& To, float Grid);
-	/** Storey to build in when aiming at PointZ, from the foundation floor at Top: what you look into (a floor's surface counts as its storey). Floors, roofs and gables go on top of it. */
+	/** Storey to build in when aiming at PointZ, from the foundation floor at Top: what you look into (a floor's surface counts as its storey). Floors, roofs, gables and upper walls go on top of it. */
 	static int32 LevelFor(FName Shape, float PointZ, float Top);
 	/** Max support distance (pieces) for a material: wood 4, stone 6. */
 	static int32 SpanFor(FName Material);

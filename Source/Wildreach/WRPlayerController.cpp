@@ -18,6 +18,7 @@
 #include "WRPathComponent.h"
 #include "WRPlayerState.h"
 #include "WRResourceNode.h"
+#include "WRSky.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
@@ -135,6 +136,12 @@ void AWRPlayerController::WRAmmo(int32 Dir) { if (AWRCharacter* C = Cast<AWRChar
 void AWRPlayerController::WRHold(float Seconds) { ServerCommand(FString::Printf(TEXT("hold %.1f"), Seconds)); }
 void AWRPlayerController::WRClearCreatures() { ServerCommand(TEXT("clearcreatures")); }
 void AWRPlayerController::WRHour(float Hour) { ServerCommand(FString::Printf(TEXT("hour %.2f"), Hour)); }
+void AWRPlayerController::WRSky()
+{
+	const UWRSkySubsystem* Sub = GetWorld()->GetSubsystem<UWRSkySubsystem>();
+	const AWRSky* Sky = Sub ? Sub->GetSky() : nullptr;
+	UE_LOG(LogWildreach, Log, TEXT("SKY %s"), Sky ? *Sky->Describe() : TEXT("none (no sky in this world)"));
+}
 
 void AWRPlayerController::WRAimAt(FName Creature)
 {

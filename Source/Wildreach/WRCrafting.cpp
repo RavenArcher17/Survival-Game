@@ -5,6 +5,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
@@ -135,6 +136,20 @@ static void Tint(UStaticMeshComponent* Mesh, const FLinearColor& Color)
 	}
 }
 
+/** A fire's warm light (the Hearth, a forge): no shadows, and the scaled shape doesn't stretch it. */
+static UPointLightComponent* MakeGlow(AActor* Owner, USceneComponent* Parent, float Height, float Intensity, float Radius)
+{
+	UPointLightComponent* Light = Owner->CreateDefaultSubobject<UPointLightComponent>(TEXT("Glow"));
+	Light->SetupAttachment(Parent);
+	Light->SetUsingAbsoluteScale(true);
+	Light->SetRelativeLocation(FVector(0.f, 0.f, Height));
+	Light->SetLightColor(FLinearColor(1.f, 0.5f, 0.2f));
+	Light->SetIntensity(Intensity);
+	Light->SetAttenuationRadius(Radius);
+	Light->SetCastShadows(false);
+	return Light;
+}
+
 // ---------------------------------------------------------------- Hearth
 
 AWRHearth::AWRHearth()
@@ -143,6 +158,7 @@ AWRHearth::AWRHearth()
 	Mesh = MakeShape(this, TEXT("Mesh"), TEXT("/Engine/BasicShapes/Cone.Cone"));
 	RootComponent = Mesh;
 	Mesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 1.2f));
+	Glow = MakeGlow(this, Mesh, 90.f, 9000.f, 1800.f);
 }
 
 void AWRHearth::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -207,6 +223,8 @@ AWRStation::AWRStation()
 	Mesh = MakeShape(this, TEXT("Mesh"), TEXT("/Engine/BasicShapes/Cube.Cube"));
 	RootComponent = Mesh;
 	Mesh->SetRelativeScale3D(FVector(1.2f, 0.8f, 0.9f));
+	Glow = MakeGlow(this, Mesh, 70.f, 7000.f, 1200.f);
+	Glow->SetVisibility(false);
 }
 
 void AWRStation::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -228,6 +246,7 @@ void AWRStation::OnRep_Type()
 	else if (StationType == TEXT("armorer")) C = FLinearColor(0.4f, 0.4f, 0.45f);
 	else if (StationType == TEXT("alchemy_table")) C = FLinearColor(0.3f, 0.15f, 0.4f);
 	Tint(Mesh, C);
+	Glow->SetVisibility(StationType == TEXT("forge"));
 }
 
 int32 AWRStation::GetTier() const

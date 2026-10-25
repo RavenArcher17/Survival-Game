@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-25: day and night
+
+The world clock (`AWRGameState`, `clock` in tuning.json) now shows on every client, on the island and the arena.
+
+- **Sun and moon**: `AWRSky` (spawned on every machine that renders) turns the map's sun with the hour: it rises in the
+  east at dawn (6:00), crosses the south at 65 degrees and sets in the west at dusk (20:00), and the atmosphere reddens
+  it on the way down. A moon rides opposite it as a second atmosphere light: a disc in the sky, moonlit clouds and fog.
+- **Darker but playable nights**: the sky light is lifted at night so shapes still read, the fog goes deep blue, and
+  auto-exposure may only brighten so far (otherwise moonlight looks like day). Numbers in tuning.json `sky`.
+- **Lights at night**: the Hearth and the forge have a fire's warm glow (torches and braziers already had theirs).
+- **HUD clock**: "Day 3   21:40" top right, pale blue at night.
+- **The time carries over a restart**: the world save keeps the clock (`clockHours`); a new world starts at
+  `clock.startHour`.
+- Building: an **upper wall** (2 m, wood or stone) closes the gap a one-cell sloped roof leaves above its high side.
+- `Tools\skytest.ps1` (10 checks): a bot builds a hut with a torch, a brazier, a claim and a Hearth, jumps the clock to
+  noon, sunset and midnight and reads the client's sky (`WRSky`) at each, checks the clock runs at clock.dayMinutes and
+  that a restart keeps the time. `-Shots` takes the hut and the moon at each time of day; `-Arena` runs it on the arena.
+
 ## 2026-10-25: ARK-style taming
 
 - **Knock it out, then feed it.** E on a knocked-out creature opens the **Taming menu**: give it all of a food at once

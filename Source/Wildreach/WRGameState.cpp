@@ -11,7 +11,10 @@ void AWRGameState::BeginPlay()
 	{
 		Preset = FWRTuning::Get().GetPreset();
 		ServerSettings = FWRTuning::Get().ExportServerSettings();
-		SetTotalHours(WRTune(TEXT("clock.startHour"), 8.f));
+		if (!bClockSet)
+		{
+			SetTotalHours(WRTune(TEXT("clock.startHour"), 8.f));
+		}
 	}
 }
 
@@ -89,6 +92,7 @@ void AWRGameState::SetTotalHours(double Hours)
 	}
 	ClockAnchorHours = FMath::Max(0.0, Hours);
 	ClockAnchorTime = GetServerWorldTimeSeconds();
+	bClockSet = true;
 	UE_LOG(LogWildreach, Log, TEXT("CLOCK day %d %05.2f"), GetDay(), GetHour());
 }
 

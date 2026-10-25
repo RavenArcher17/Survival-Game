@@ -94,6 +94,8 @@ public:
 
 private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
+	/** Its fire: a warm light, what a base looks like from afar at night. */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UPointLightComponent> Glow;
 	UPROPERTY(Replicated) TArray<FName> Cores;
 	UPROPERTY(Replicated) float Health = 2000.f;
 };
@@ -127,4 +129,6 @@ private:
 	bool CanUse(AWRPlayerController* Player, FString& OutWhy) const;
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
+	/** A forge's fire (other stations stay dark). */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UPointLightComponent> Glow;
 };

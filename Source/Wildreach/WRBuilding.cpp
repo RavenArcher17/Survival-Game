@@ -135,7 +135,7 @@ FVector FWRBuildRules::SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, 
 
 FName FWRBuildRules::SlotOf(FName Shape)
 {
-	static const FName Edges[] = { TEXT("wall"), TEXT("halfwall"), TEXT("door"), TEXT("doorway"), TEXT("window"), TEXT("palisade"), TEXT("gate"), TEXT("gable") };
+	static const FName Edges[] = { TEXT("wall"), TEXT("halfwall"), TEXT("door"), TEXT("doorway"), TEXT("window"), TEXT("palisade"), TEXT("gate"), TEXT("gable"), TEXT("upperwall") };
 	for (const FName& E : Edges)
 	{
 		if (Shape == E) return TEXT("edge");
@@ -165,7 +165,7 @@ int32 FWRBuildRules::LevelFor(FName Shape, float PointZ, float Top)
 {
 	// A floor's surface is 20 above its storey's base, so aiming at it (or anywhere up a wall) picks that storey.
 	const int32 Into = FMath::Max(0, FMath::FloorToInt((PointZ - Top + 5.f) / Storey));
-	return Shape == TEXT("floor") || Shape == TEXT("roof") || Shape == TEXT("gable") ? Into + 1 : Into;
+	return Shape == TEXT("floor") || Shape == TEXT("roof") || Shape == TEXT("gable") || Shape == TEXT("upperwall") ? Into + 1 : Into;
 }
 
 TMap<FName, float> FWRBuildRules::UpkeepPerHour(const TMap<FName, int32>& PiecesByMaterial)
@@ -338,6 +338,7 @@ void AWRBuildPiece::ApplyLook()
 	if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 250), FVector(0, 0, -25) });
 	else if (S == TEXT("wall")) Parts.Add({ FVector(Len, 20, 300), FVector(0, 0, 150) });
 	else if (S == TEXT("halfwall")) Parts.Add({ FVector(Len, 20, 150), FVector(0, 0, 75) });
+	else if (S == TEXT("upperwall")) Parts.Add({ FVector(Len, 20, 210), FVector(0, 0, 105) });  // up into the roof slab, no gap
 	else if (S == TEXT("floor")) Parts.Add({ FVector(400, 400, 20), FVector(0, 0, 10) });
 	else if (S == TEXT("roof"))
 	{

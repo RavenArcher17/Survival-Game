@@ -114,6 +114,10 @@ void AWRGameMode::SaveWorld()
 		}
 	}
 	Root->SetArrayField(TEXT("tames"), Tames);
+	if (const AWRGameState* State = GetGameState<AWRGameState>())
+	{
+		Root->SetNumberField(TEXT("clockHours"), State->GetTotalHours());  // the day and time carry over a restart
+	}
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
 	FJsonSerializer::Serialize(Root, Writer);
@@ -174,7 +178,13 @@ void AWRGameMode::LoadWorld()
 			}
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("WORLD loaded %d pieces, %d tames"), Loaded, LoadedTames);
+	double ClockHours = 0.0;
+	AWRGameState* State = GetGameState<AWRGameState>();
+	if (State && Root->TryGetNumberField(TEXT("clockHours"), ClockHours))
+	{
+		State->SetTotalHours(ClockHours);
+	}
+	UE_LOG(LogWildreach, Log, TEXT("WORLD loaded %d pieces, %d tames, day %d %05.2f"), Loaded, LoadedTames, State ? State->GetDay() : 0, State ? State->GetHour() : -1.f);
 }
 
 FString AWRGameMode::PlayerSavePath(const FString& PlayerName)

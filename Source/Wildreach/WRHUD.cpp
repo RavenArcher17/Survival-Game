@@ -14,6 +14,7 @@
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
+#include "WRGameState.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
@@ -83,6 +84,14 @@ void AWRHUD::DrawHUD()
 		}
 		return;
 	}
+	// The clock, top right: day and time, pale blue at night.
+	if (const AWRGameState* State = AWRGameState::Get(this))
+	{
+		const float Hour = State->GetHour();
+		const FString Clock = FString::Printf(TEXT("Day %d   %02d:%02d"), State->GetDay(), FMath::FloorToInt(Hour), FMath::FloorToInt(Hour * 60.f) % 60);
+		DrawText(Clock, State->IsNight() ? FLinearColor(0.6f, 0.75f, 1.f) : FLinearColor(1.f, 0.92f, 0.7f), Canvas->ClipX - 190.f, 50.f, nullptr, 1.3f);
+	}
+
 	if (!Survivor || !Survivor->GetAttributes())
 	{
 		DrawText(TEXT("Respawning..."), FLinearColor::White, Canvas->ClipX * 0.5f - 50.f, Canvas->ClipY * 0.5f);

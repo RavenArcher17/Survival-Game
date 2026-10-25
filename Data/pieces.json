@@ -1,5 +1,5 @@
 {
-  "_comment": "Buildable pieces (Building tab), in build-menu order (B; a heading per group). Grid is 4 m, a storey 3 m. Costs/HP are placeholders. kind: structure pieces snap to the grid and need support (span: wood 4, stone 6 pieces away from the ground; stacking straight on a wall or pillar costs nothing); utility/decor place freely (design review #28). Shapes: foundation / floor (also a ceiling) / roof (sloped, R turns which way it rises) / stairs (one storey) fill a cell; wall / halfwall / door / doorway / window / gable (the triangle that closes a roof's side; R flips it) / palisade / gate sit on a cell edge; pillar on a corner.",
+  "_comment": "Buildable pieces (Building tab), in build-menu order (B; a heading per group). Grid is 4 m, a storey 3 m. Costs/HP are placeholders. kind: structure pieces snap to the grid and need support (span: wood 4, stone 6 pieces away from the ground; stacking straight on a wall or pillar costs nothing); utility/decor place freely (design review #28). Shapes: foundation / floor (also a ceiling) / roof (sloped, R turns which way it rises) / stairs (one storey) fill a cell; wall / halfwall / door / doorway / window / gable (the triangle that closes a roof's side; R flips it) / upperwall (2 m, under a roof's high edge, where a one-cell roof leaves a gap) / palisade / gate sit on a cell edge; pillar on a corner.",
   "gridSize": 400,
   "span": { "wood": 4, "stone": 6 },
   "upkeepPerPiecePerHour": { "wood": 2, "stone": 2 },
@@ -16,6 +16,7 @@
     { "id": "wood_stairs", "name": "Wood stairs (one storey)", "category": "structure", "kind": "structure", "shape": "stairs", "material": "wood", "cost": { "wood": 14 }, "hp": 300 },
     { "id": "wood_roof", "name": "Wood roof (sloped)", "category": "structure", "kind": "structure", "shape": "roof", "material": "wood", "cost": { "wood": 10 }, "hp": 300 },
     { "id": "wood_gable", "name": "Wood gable (roof side)", "category": "structure", "kind": "structure", "shape": "gable", "material": "wood", "cost": { "wood": 6 }, "hp": 250 },
+    { "id": "wood_upper_wall", "name": "Wood upper wall (under a roof's high side)", "category": "structure", "kind": "structure", "shape": "upperwall", "material": "wood", "cost": { "wood": 8 }, "hp": 300 },
     { "id": "wood_pillar", "name": "Wood pillar", "category": "structure", "kind": "structure", "shape": "pillar", "material": "wood", "cost": { "wood": 6 }, "hp": 300 },
 
     { "id": "stone_foundation", "name": "Stone foundation", "category": "structure", "kind": "structure", "shape": "foundation", "material": "stone", "cost": { "stone": 30 }, "hp": 1500 },
@@ -27,6 +28,7 @@
     { "id": "stone_stairs", "name": "Stone stairs (one storey)", "category": "structure", "kind": "structure", "shape": "stairs", "material": "stone", "cost": { "stone": 22 }, "hp": 800 },
     { "id": "stone_roof", "name": "Stone roof (sloped)", "category": "structure", "kind": "structure", "shape": "roof", "material": "stone", "cost": { "stone": 16 }, "hp": 800 },
     { "id": "stone_gable", "name": "Stone gable (roof side)", "category": "structure", "kind": "structure", "shape": "gable", "material": "stone", "cost": { "stone": 10 }, "hp": 700 },
+    { "id": "stone_upper_wall", "name": "Stone upper wall (under a roof's high side)", "category": "structure", "kind": "structure", "shape": "upperwall", "material": "stone", "cost": { "stone": 14 }, "hp": 800 },
     { "id": "stone_pillar", "name": "Stone pillar", "category": "structure", "kind": "structure", "shape": "pillar", "material": "stone", "cost": { "stone": 10 }, "hp": 800 },
 
     { "id": "workbench", "name": "Workbench", "category": "utility", "kind": "station", "station": "workbench", "cost": { "wood": 30 }, "hp": 400 },
