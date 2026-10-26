@@ -18,7 +18,7 @@ $cmds = @(
 	'WRCraft bronze_ingot none', 'wait 1',
 	'WRGoTo armorer', 'wait 2', 'WRCraft hide_armor none', 'wait 1', 'WREquip hide_armor',
 	'WRGoTo alchemy_table', 'wait 2', 'WRCraft minor_healing_potion none',
-	'WRGoTo hearth', 'wait 2', 'WRInteract', 'wait 1',
+	'WRGoTo hearth', 'wait 2', 'WRCmd hearthfeed', 'wait 1',   # E on the Hearth opens its screen; feeding is that screen's button
 	'WRGoTo forge', 'wait 2', 'WRCraft copper_ingot none', 'WRCraft copper_ingot none', 'wait 1', 'WRCraft bronze_ingot none', 'WRUpgrade weapon', 'wait 1',
 	'WREquip gem_ruby', 'wait 2',
 	# Ranged weapons and ammo: spears, bolas, arrows and tranq arrows by hand, bow and blowgun at the workbench,

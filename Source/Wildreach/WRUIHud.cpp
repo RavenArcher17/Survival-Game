@@ -220,7 +220,10 @@ private:
 	const UWRAttributeSet* Attr() const { const AWRCharacterBase* B = Body(); return B ? B->GetAttributes() : nullptr; }
 	FWRPlayerUI* UI() const { return PC.IsValid() ? PC->GetUI() : nullptr; }
 	EVisibility IfSurvivor() const { return Survivor() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; }
-	bool Hidden() const { const FWRPlayerUI* X = UI(); return !X || X->IsScreenOpen(); }
+	// The taming screen is a side panel over the game: vitals, hotbar and pickups stay up beside it (Hidden), while
+	// what it would overlap or repeat (prompt, crosshair, the right-hand cards) goes for any screen (Covered).
+	bool Hidden() const { const FWRPlayerUI* X = UI(); return !X || (X->IsScreenOpen() && X->GetScreen() != TEXT("taming")); }
+	bool Covered() const { const FWRPlayerUI* X = UI(); return !X || X->IsScreenOpen(); }
 
 	// ---------------------------------------------------------------- top left: level, path, statuses
 	TSharedRef<SWidget> LevelPlate()
@@ -404,7 +407,7 @@ private:
 
 	TSharedRef<SWidget> TamingPanel()
 	{
-		return SNew(SBox).WidthOverride(330.f * U).Visibility_Lambda([this]() { return !Hidden() && KnockedOut() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SBox).WidthOverride(330.f * U).Visibility_Lambda([this]() { return !Covered() && KnockedOut() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Glass).Rivets(true).Padding(FMargin(16.f * U, 12.f * U))
 			[
@@ -480,7 +483,7 @@ private:
 		return SNew(SBox).WidthOverride(18.f).HeightOverride(18.f).Visibility_Lambda([this]()
 		{
 			const AWRCharacter* S = Survivor();
-			return S && !Hidden() && (S->IsAimingRanged() || S->IsFirstPerson()) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			return S && !Covered() && (S->IsAimingRanged() || S->IsFirstPerson()) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 		})
 		[
 			SNew(SOverlay)
@@ -538,7 +541,7 @@ private:
 
 	TSharedRef<SWidget> Prompt()
 	{
-		return SNew(SBox).Visibility_Lambda([this]() { FString T; return !Hidden() && !PromptText(T).IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SBox).Visibility_Lambda([this]() { FString T; return !Covered() && !PromptText(T).IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(12.f * U, 8.f * U))
 			[
@@ -773,7 +776,7 @@ private:
 
 	TSharedRef<SWidget> AbilityPlate()
 	{
-		return SNew(SBox).Visibility_Lambda([this]() { return Survivor() && !Hidden() && FWRKeyBindings::Get().GetCastMode() != EWRCastMode::Keys ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SBox).Visibility_Lambda([this]() { return Survivor() && !Covered() && FWRKeyBindings::Get().GetCastMode() != EWRCastMode::Keys ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).Padding(FMargin(16.f * U, 12.f * U))
 			[
@@ -812,7 +815,7 @@ private:
 
 	TSharedRef<SWidget> TameCard()
 	{
-		return SNew(SBox).WidthOverride(240.f * U).Visibility_Lambda([this]() { return NearTame() && !Hidden() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SBox).WidthOverride(240.f * U).Visibility_Lambda([this]() { return NearTame() && !Covered() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(12.f * U, 9.f * U))
 			[

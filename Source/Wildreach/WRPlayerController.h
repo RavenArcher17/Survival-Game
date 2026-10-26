@@ -103,6 +103,8 @@ public:
 	/** Knockout taming (the Taming menu's lines): all of a food into the nearest knocked-out creature's stash / a narcotic. */
 	UFUNCTION(Exec) void WRTameGive(FName Item);
 	UFUNCTION(Exec) void WRNarcotic();
+	/** Dev/test: send a gameplay command to the server as a screen's button does ("WRCmd hearthfeed", "WRCmd claimdeposit"). */
+	UFUNCTION(Exec) void WRCmd(const FString& Command);
 	/** Dev: deal damage (optionally fire/frost) to the nearest boss as this player. */
 	UFUNCTION(Exec) void WRBossDmg(float Amount, FName Element);
 	UFUNCTION(Exec) void WRArtifacts(int32 bOn);

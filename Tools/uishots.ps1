@@ -6,7 +6,9 @@ param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845)
 # One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
-$ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
+# Unreal otherwise stalls at startup (UBT -Mode=ValidatePlatforms) while another worktree compiles.
+$env:UE_SKIP_UBT_SDK_SETUP = '1'
+$ue ='C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
 $logs = Join-Path $env:TEMP ("wildreach-uishots-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -32,8 +34,18 @@ $screens = [ordered]@{
 	'skills'       = 'WRMenu skills 0|wait 1'
 	'map'          = 'WRMenu none 0|WRMenu map 0|wait 1'
 	'build'        = 'WRMenu map 0|WRMenu build 0|wait 1'
-	'taming'       = 'WRMenu none 0|WRMenu build 0|WRMenu none 0|WRSpawn cinderfang 1|WRHold 60|wait 1|WRGoTo cinderfang|WRTorpor 1000|wait 1.5|WRInteract|wait 1'
+	# The Ashstrider tame stays behind (E would pick it over the knocked-out Cinderfang); the Taming screen, fed meat.
+	'taming'       = 'WRMenu none 0|WRMenu build 0|WRMenu none 0|WRTameAll stay|WRTeleport -51623 57155|wait 3|WRLook 270 -8|WRSpawn cinderfang 1|WRHold 60|wait 1|WRGoTo cinderfang|WRTorpor 1000|wait 1.5|WRInteract|wait 1|WRTameGive raw_meat|wait 3'
 	'taming_hud'   = 'WRInteract|wait 1'
+	# A base by the survival test's hut site (as skytest builds it): a hut of wood and stone, four stations, a claim
+	# stocked from the bag, and a Hearth fed Vulkarn's core; then E on the totem, and E on the Hearth.
+	'claim'        = 'WRMenu none 0|WRTeleport -131300 -56400|wait 4|WRGive wood 300|WRGive stone 200|WRGive copper_ingot 5|WRGive copper_ore 6|WRGive core_vulkarn 1|' +
+	                 'WRPlace wood_foundation -132000 -56400 4734 0|WRPlace wood_wall -132000 -56200 4834 0|WRPlace wood_wall -132000 -56600 4834 0|WRPlace stone_wall -132200 -56400 4834 90|' +
+	                 'WRPlace wood_door -131800 -56400 4834 90|WRPlace wood_roof -132000 -56400 5134 0|WRPlace stone_gable -132000 -56200 5134 0|WRPlace stone_gable -132000 -56600 5134 0|' +
+	                 'WRPlace wood_upper_wall -131800 -56400 5134 90|WRPlace workbench -132060 -56290 4834 0|WRPlace forge -132060 -56510 4834 0|WRPlace armorer -131670 -56250 4803 0|' +
+	                 'WRPlace alchemy_table -131670 -56550 4806 0|WRPlace claim_totem -131100 -56000 4847 0|wait 1|WRPlace hearth -131300 -56800 4838 0|wait 1|' +
+	                 'WRCmd claimdeposit|WRGive wood 80|WRGive stone 50|WRGoTo hearth|wait 1|WRCmd hearthfeed|wait 1|WRTeleport -131100 -55800|wait 3|WRInteract|wait 1'
+	'hearth'       = 'WRMenu none 0|WRGoTo hearth|wait 1|WRInteract|wait 1'
 }
 if ($Only.Count -gt 0) { $Only = $Only | ForEach-Object { $_ -split ',' } }
 $cmds = @('WRBotPause 1', 'wait 3',
@@ -51,7 +63,8 @@ $tune = '-wrtune=taming.easySeconds:4'
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=uishots $tune -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
-$deadline = (Get-Date).AddSeconds(120 + 12 * $labels.Count)
+# Every screen's commands run (even with -Only), so the time allowed grows with the whole list.
+$deadline = (Get-Date).AddSeconds(120 + 12 * $screens.Count)
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 	Start-Sleep -Seconds 5
 	$n = @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $started }).Count

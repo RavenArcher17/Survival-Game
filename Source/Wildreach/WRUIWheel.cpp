@@ -58,9 +58,10 @@ public:
 			];
 		}
 
+		SetVisibility(TAttribute<EVisibility>::CreateLambda([this]() { const FWRPlayerUI* X = UI(); return X && Mode() == 2 && X->IsTameWheelSticky() ? EVisibility::Visible : EVisibility::HitTestInvisible; }));
 		ChildSlot
 		[
-			SNew(SOverlay).Visibility_Lambda([this]() { return Mode() == 0 ? EVisibility::Collapsed : EVisibility::Visible; })
+			SNew(SOverlay).Visibility_Lambda([this]() { return Mode() == 0 ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 			+ SOverlay::Slot()[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.35f))]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
