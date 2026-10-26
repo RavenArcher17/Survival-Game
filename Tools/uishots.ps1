@@ -6,6 +6,8 @@ param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845)
 # One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
+# Unreal otherwise starts with UnrealBuildTool's platform check, which waits for any build running on the machine.
+$env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -27,11 +29,12 @@ $screens = [ordered]@{
 	'tame_wheel'   = 'WRWheel -1 0|WRSpawn ashstrider 1|wait 1|WRGoTo ashstrider|WRInteract|wait 6|WRWheel 2 0'
 	'help'         = 'WRWheel -1 0|wait 0.5|WRHelp'
 	'inventory'    = 'WRHelp|WRMenu inventory 0|wait 1'
-	'crafting'     = 'WRMenu none 0|WRMenu crafting 0|wait 1'
+	'crafting'     = 'WRMenu none 0|WRTeleport -51623 54155|wait 3|WRGive wood 30|WRGive ember_essence 1|WRLook 270 -35|WRGhost workbench|wait 1|WRGhostPlace|wait 1.5|WRGoTo workbench|wait 1.5|WRMenu crafting 0|wait 1.5'
 	'paths'        = 'WRMenu paths 0|wait 1'
 	'skills'       = 'WRMenu skills 0|wait 1'
 	'map'          = 'WRMenu none 0|WRMenu map 0|wait 1'
-	'build'        = 'WRMenu map 0|WRMenu build 0|wait 1'
+	'build'        = 'WRMenu map 0|WRTeleport -131300 -56400|wait 4|WRLook 180 -18|WRMenu build 0|wait 1'
+	'build_placing' = 'WRLook 180 -18|WRGhost wood_foundation|wait 1.5'
 	'taming'       = 'WRMenu none 0|WRMenu build 0|WRMenu none 0|WRSpawn cinderfang 1|WRHold 60|wait 1|WRGoTo cinderfang|WRTorpor 1000|wait 1.5|WRInteract|wait 1'
 	'taming_hud'   = 'WRInteract|wait 1'
 }

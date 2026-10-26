@@ -11,6 +11,9 @@
  */
 namespace WRUI
 {
+	/** Mockup px -> 1080p Slate units (the mockups are 1600x900). One definition, so unity builds can join UI files. */
+	inline constexpr float U = 1.2f;
+
 	// Colours (linear), named as in the mockups' tokens.
 	extern const FLinearColor Ink;        // main text
 	extern const FLinearColor Ink2;       // secondary text

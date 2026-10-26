@@ -219,8 +219,10 @@ private:
 	AWRCharacterBase* Body() const { return PC.IsValid() ? Cast<AWRCharacterBase>(PC->GetPawn()) : nullptr; }
 	const UWRAttributeSet* Attr() const { const AWRCharacterBase* B = Body(); return B ? B->GetAttributes() : nullptr; }
 	FWRPlayerUI* UI() const { return PC.IsValid() ? PC->GetUI() : nullptr; }
-	EVisibility IfSurvivor() const { return Survivor() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; }
+	EVisibility IfSurvivor() const { return Survivor() && !BuildMode() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; }
 	bool Hidden() const { const FWRPlayerUI* X = UI(); return !X || X->IsScreenOpen(); }
+	/** The build bar is up: the HUD comes down to the vitals (mockup "Building"); the bar has its own banner and claim line. */
+	bool BuildMode() const { const FWRPlayerUI* X = UI(); return X && X->GetScreen() == TEXT("build"); }
 
 	// ---------------------------------------------------------------- top left: level, path, statuses
 	TSharedRef<SWidget> LevelPlate()
@@ -293,7 +295,7 @@ private:
 	// ---------------------------------------------------------------- top centre: compass, boss bar
 	TSharedRef<SWidget> CompassAndBoss()
 	{
-		return SNew(SVerticalBox).Visibility_Lambda([this]() { return Survivor() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SVerticalBox).Visibility_Lambda([this]() { return Survivor() && !BuildMode() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
 				SNew(SOverlay)
@@ -649,7 +651,7 @@ private:
 	TSharedRef<SWidget> Vitals()
 	{
 		const auto A = [this]() { return Attr(); };
-		return SNew(SBox).WidthOverride(360.f * U).Visibility_Lambda([this]() { return Body() && !Hidden() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SBox).WidthOverride(360.f * U).Visibility_Lambda([this]() { return Body() && (!Hidden() || BuildMode()) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Leather).Rivets(true).Padding(FMargin(18.f * U, 14.f * U))
 			[
