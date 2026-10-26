@@ -30,6 +30,8 @@
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
+#include "WRKeyBindings.h"
+#include "WRPlayerUI.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -672,43 +674,77 @@ void AWRCharacter::BuildInput()
 	SprintAction = MakeAction(EInputActionValueType::Boolean);
 	ToggleViewAction = MakeAction(EInputActionValueType::Boolean);
 
-	MappingContext = NewObject<UInputMappingContext>(this);
-
-	// WASD -> Axis2D (X = right, Y = forward).
-	MappingContext->MapKey(MoveAction, EKeys::W).Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
-	FEnhancedActionKeyMapping& Back = MappingContext->MapKey(MoveAction, EKeys::S);
-	Back.Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
-	Back.Modifiers.Add(NewObject<UInputModifierNegate>(this));
-	MappingContext->MapKey(MoveAction, EKeys::A).Modifiers.Add(NewObject<UInputModifierNegate>(this));
-	MappingContext->MapKey(MoveAction, EKeys::D);
-
-	MappingContext->MapKey(LookAction, EKeys::Mouse2D);
-	MappingContext->MapKey(JumpAction, EKeys::SpaceBar);
-	MappingContext->MapKey(SprintAction, EKeys::LeftShift);
-	MappingContext->MapKey(ToggleViewAction, EKeys::V);
 	SwapWeaponAction = NewObject<UInputAction>(this);
-	MappingContext->MapKey(SwapWeaponAction, EKeys::G);
 	AmmoNextAction = NewObject<UInputAction>(this);
-	MappingContext->MapKey(AmmoNextAction, EKeys::MouseScrollUp);
 	AmmoPrevAction = NewObject<UInputAction>(this);
-	MappingContext->MapKey(AmmoPrevAction, EKeys::MouseScrollDown);
-
-	const TPair<EWRAbilityInput, FKey> AbilityKeys[] = {
-		{ EWRAbilityInput::Light, EKeys::LeftMouseButton },
-		{ EWRAbilityInput::Heavy, EKeys::R },
-		{ EWRAbilityInput::Block, EKeys::RightMouseButton },
-		{ EWRAbilityInput::Dodge, EKeys::C },
-		{ EWRAbilityInput::Slot1, EKeys::One }, { EWRAbilityInput::Slot2, EKeys::Two },
-		{ EWRAbilityInput::Slot3, EKeys::Three }, { EWRAbilityInput::Slot4, EKeys::Four },
-		{ EWRAbilityInput::Slot5, EKeys::Five }, { EWRAbilityInput::Slot6, EKeys::Six },
-		{ EWRAbilityInput::Slot7, EKeys::Seven }, { EWRAbilityInput::Slot8, EKeys::Eight },
-	};
-	for (const TPair<EWRAbilityInput, FKey>& Pair : AbilityKeys)
+	// The path abilities (quick slots 1-8) are cast through the ability wheels or their own keys (FWRPlayerUI);
+	// the number keys belong to the item hotbar.
+	for (const EWRAbilityInput Input : { EWRAbilityInput::Light, EWRAbilityInput::Heavy, EWRAbilityInput::Block, EWRAbilityInput::Dodge })
 	{
-		UInputAction* Action = MakeAction(EInputActionValueType::Boolean);
-		MappingContext->MapKey(Action, Pair.Value);
-		AbilityActions.Add(Pair.Key, Action);
+		AbilityActions.Add(Input, MakeAction(EInputActionValueType::Boolean));
 	}
+	MapKeys();
+}
+
+void AWRCharacter::MapKeys()
+{
+	// Keys from FWRKeyBindings (rebindable in Settings); rebuilt when they change.
+	if (!MappingContext)
+	{
+		MappingContext = NewObject<UInputMappingContext>(this);
+	}
+	MappingContext->UnmapAll();
+	const auto Map = [this](UInputAction* Action, FName Id) -> FEnhancedActionKeyMapping*
+	{
+		const FKey Key = FWRKeyBindings::Get().Key(Id);
+		return Key.IsValid() ? &MappingContext->MapKey(Action, Key) : nullptr;
+	};
+	// Forward/back/left/right -> Axis2D (X = right, Y = forward).
+	if (FEnhancedActionKeyMapping* M = Map(MoveAction, TEXT("Forward"))) M->Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
+	if (FEnhancedActionKeyMapping* M = Map(MoveAction, TEXT("Back"))) { M->Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this)); M->Modifiers.Add(NewObject<UInputModifierNegate>(this)); }
+	if (FEnhancedActionKeyMapping* M = Map(MoveAction, TEXT("Left"))) M->Modifiers.Add(NewObject<UInputModifierNegate>(this));
+	Map(MoveAction, TEXT("Right"));
+	MappingContext->MapKey(LookAction, EKeys::Mouse2D);
+	Map(JumpAction, TEXT("Jump"));
+	Map(SprintAction, TEXT("Sprint"));
+	Map(ToggleViewAction, TEXT("View"));
+	Map(SwapWeaponAction, TEXT("SwapRanged"));
+	Map(AmmoNextAction, TEXT("HotbarNext"));
+	Map(AmmoPrevAction, TEXT("HotbarPrev"));
+	const TPair<EWRAbilityInput, const TCHAR*> AbilityKeys[] = {
+		{ EWRAbilityInput::Light, TEXT("Light") }, { EWRAbilityInput::Heavy, TEXT("Heavy") },
+		{ EWRAbilityInput::Block, TEXT("Block") }, { EWRAbilityInput::Dodge, TEXT("Dodge") },
+	};
+	for (const TPair<EWRAbilityInput, const TCHAR*>& Pair : AbilityKeys)
+	{
+		if (const TObjectPtr<UInputAction>* Action = AbilityActions.Find(Pair.Key)) Map(*Action, Pair.Value);
+	}
+	if (const APlayerController* PC = Cast<APlayerController>(Controller))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = PC->GetLocalPlayer() ? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()) : nullptr)
+		{
+			Subsystem->RequestRebuildControlMappings();
+		}
+	}
+}
+
+void AWRCharacter::WheelStep(int32 Dir)
+{
+	// The mouse wheel: ammo while aiming a ranged weapon, otherwise the hotbar.
+	if (IsAimingRanged())
+	{
+		CycleAmmo(Dir);
+		return;
+	}
+	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller))
+	{
+		if (FWRPlayerUI* UI = PC->GetUI())
+		{
+			UI->CycleHotbar(Dir);
+			return;
+		}
+	}
+	CycleAmmo(Dir);
 }
 
 void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -716,6 +752,10 @@ void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	BuildInput();
+	if (!KeysChangedHandle.IsValid())
+	{
+		KeysChangedHandle = FWRKeyBindings::Get().OnChanged.AddWeakLambda(this, [this]() { MapKeys(); });
+	}
 
 	if (const APlayerController* PC = Cast<APlayerController>(Controller))
 	{

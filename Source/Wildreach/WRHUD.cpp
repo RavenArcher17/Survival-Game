@@ -15,6 +15,7 @@
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "WRGameState.h"
+#include "WRPlayerUI.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
@@ -72,6 +73,20 @@ void AWRHUD::DrawHUD()
 
 	const AWRCharacter* Survivor = Cast<AWRCharacter>(GetOwningPawn());
 	DrawDamageNumbers(DeltaTime);
+	if (const AWRPlayerController* NewUIPC = Cast<AWRPlayerController>(PlayerOwner); NewUIPC && NewUIPC->GetUI())
+	{
+		// The stone-and-leather UI (Slate) draws the HUD and menus; this canvas keeps the nameplates over creatures
+		// and players, the damage numbers, and the old text panel for a menu that has no new screen yet.
+		if (const AWRCharacterBase* Self = Cast<AWRCharacterBase>(GetOwningPawn()))
+		{
+			DrawWorldBars(Self);
+		}
+		if (NewUIPC->GetMenu() != EWRMenu::None && NewUIPC->GetMenu() != EWRMenu::Tame && !NewUIPC->GetUI()->IsScreenOpen())
+		{
+			DrawMenuPanel(NewUIPC);
+		}
+		return;
+	}
 	if (const AWRCreature* Mount = Cast<AWRCreature>(GetOwningPawn()))
 	{
 		// Riding: the mount's own bars, plus the way off.
@@ -302,27 +317,7 @@ void AWRHUD::DrawHUD()
 		// Crafting / inventory menu panel.
 		if (PC->GetMenu() != EWRMenu::None)
 		{
-			const TArray<FWRMenuEntry> Entries = PC->BuildMenuEntries();
-			const float PX = 60.f, PY = 90.f, LineH = 20.f, PW = 760.f;
-			const int32 Visible = 22;
-			const int32 First = FMath::Clamp(PC->GetMenuIndex() - Visible / 2, 0, FMath::Max(0, Entries.Num() - Visible));
-			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.72f), PX - 10.f, PY - 30.f, PW, (FMath::Min(Visible, Entries.Num()) + 2) * LineH + 20.f);
-			DrawText(PC->GetMenuTitle(), FLinearColor(1.f, 0.85f, 0.4f), PX, PY - 24.f);
-			for (int32 i = First; i < Entries.Num() && i < First + Visible; ++i)
-			{
-				const bool bSel = i == PC->GetMenuIndex();
-				const float RowY = PY + (i - First) * LineH;
-				if (bSel)
-				{
-					DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.12f), PX - 6.f, RowY - 1.f, PW - 8.f, LineH);
-				}
-				DrawText(FString(bSel ? TEXT("> ") : TEXT("  ")) + Entries[i].Label,
-					Entries[i].bAvailable ? FLinearColor::White : FLinearColor(0.55f, 0.55f, 0.55f), PX, RowY);
-			}
-			if (Entries.Num() == 0)
-			{
-				DrawText(TEXT("(empty)"), FLinearColor(0.6f, 0.6f, 0.6f), PX, PY);
-			}
+			DrawMenuPanel(PC);
 		}
 		else if (PC->IsPlacing())
 		{
@@ -496,5 +491,30 @@ void AWRHUD::DrawDamageNumbers(float DeltaTime)
 			C.A = 1.f - T.Age / 1.2f;
 			DrawText(T.Text, C, Screen.X, Screen.Y, nullptr, 1.3f);
 		}
+	}
+}
+
+void AWRHUD::DrawMenuPanel(const AWRPlayerController* PC)
+{
+	const TArray<FWRMenuEntry> Entries = PC->BuildMenuEntries();
+	const float PX = 60.f, PY = 90.f, LineH = 20.f, PW = 760.f;
+	const int32 Visible = 22;
+	const int32 First = FMath::Clamp(PC->GetMenuIndex() - Visible / 2, 0, FMath::Max(0, Entries.Num() - Visible));
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.72f), PX - 10.f, PY - 30.f, PW, (FMath::Min(Visible, Entries.Num()) + 2) * LineH + 20.f);
+	DrawText(PC->GetMenuTitle(), FLinearColor(1.f, 0.85f, 0.4f), PX, PY - 24.f);
+	for (int32 i = First; i < Entries.Num() && i < First + Visible; ++i)
+	{
+		const bool bSel = i == PC->GetMenuIndex();
+		const float RowY = PY + (i - First) * LineH;
+		if (bSel)
+		{
+			DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.12f), PX - 6.f, RowY - 1.f, PW - 8.f, LineH);
+		}
+		DrawText(FString(bSel ? TEXT("> ") : TEXT("  ")) + Entries[i].Label,
+			Entries[i].bAvailable ? FLinearColor::White : FLinearColor(0.55f, 0.55f, 0.55f), PX, RowY);
+	}
+	if (Entries.Num() == 0)
+	{
+		DrawText(TEXT("(empty)"), FLinearColor(0.6f, 0.6f, 0.6f), PX, PY);
 	}
 }

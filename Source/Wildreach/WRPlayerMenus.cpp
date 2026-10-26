@@ -16,6 +16,7 @@
 #include "WRInventory.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "WRPlayerUI.h"
 #include "EngineUtils.h"
 
 template <typename T>
@@ -88,6 +89,17 @@ void AWRPlayerController::WRHitPlayer(const FString& Name, float Damage) { Serve
 void AWRPlayerController::WRHazard() { ServerCommand(TEXT("hazard")); }
 void AWRPlayerController::WRSay(const FString& Message) { ServerChat(Message); }
 void AWRPlayerController::WRMap() { ToggleMap(); }
+
+void AWRPlayerController::ToggleMap()
+{
+	// The new UI's journal has a map tab; the old HUD draws a list of places.
+	if (UI && FWRScreens::Find(TEXT("journal")))
+	{
+		OpenJournal(EWRMenu::Map);
+		return;
+	}
+	bShowMap = !bShowMap;
+}
 void AWRPlayerController::WRLearn(FName Path, FName Node) { ServerCommand(FString::Printf(TEXT("learn %s %s"), *Path.ToString(), *Node.ToString())); }
 void AWRPlayerController::WRCast(int32 Slot)
 {
@@ -131,6 +143,9 @@ void AWRPlayerController::WRMenu(FName Which, int32 Select)
 	else if (Which == TEXT("build")) ToggleBuildMenu();
 	else if (Which == TEXT("skills")) ToggleSkills();
 	else if (Which == TEXT("paths")) TogglePaths();
+	else if (Which == TEXT("crafting")) OpenJournal(EWRMenu::Craft);
+	else if (Which == TEXT("settings")) OpenJournal(EWRMenu::Settings);
+	else if (Which == TEXT("hearth")) OpenJournal(EWRMenu::Hearth);
 	MenuIndex = FMath::Clamp(Select, 0, FMath::Max(0, BuildMenuEntries().Num() - 1));
 }
 
@@ -181,6 +196,13 @@ void AWRPlayerController::WRInteract()
 	{
 		Menu = EWRMenu::Craft;
 		MenuStation = Station;
+		MenuIndex = 0;
+		return;
+	}
+	// The Hearth has its own screen in the new UI (feeding it cores is a button there).
+	if (UI && FWRScreens::Find(TEXT("hearth")) && FindNearbyHearth() && !FindNearbyPiece(350.f, true))
+	{
+		Menu = EWRMenu::Hearth;
 		MenuIndex = 0;
 		return;
 	}
@@ -696,6 +718,74 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 			OutResult = Station->Upgrade(this, SlotOf(Arg(1)));
 		}
 	}
+	else if (Cmd == TEXT("move") || Cmd == TEXT("split") || Cmd == TEXT("drop"))
+	{
+		// The inventory screen's drag and drop: move / swap / merge two bag slots, split a stack into the first
+		// empty slot, drop (part of) a stack on the ground in a bag anyone can pick up.
+		TArray<FWRItemStack>& Slots = PS->GetInventory()->GetSlotsMutable();
+		const int32 A = FCString::Atoi(*Arg(1));
+		if (!Slots.IsValidIndex(A) || Slots[A].IsEmpty())
+		{
+			OutResult = TEXT("empty slot");
+		}
+		else if (Cmd == TEXT("move"))
+		{
+			const int32 B = FCString::Atoi(*Arg(2));
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[A].ItemId);
+			if (!Slots.IsValidIndex(B) || A == B) OutResult = TEXT("");
+			else if (Def && !Slots[B].IsEmpty() && Slots[B].ItemId == Slots[A].ItemId && Def->StackSize > 1 && !Def->IsEquipment())
+			{
+				const int32 Moved = FMath::Min(Slots[A].Count, Def->StackSize - Slots[B].Count);
+				Slots[B].Count += Moved;
+				Slots[A].Count -= Moved;
+				if (Slots[A].Count <= 0) Slots[A] = FWRItemStack();
+			}
+			else
+			{
+				Swap(Slots[A], Slots[B]);
+			}
+			return true;   // silent: the screen shows the result
+		}
+		else if (Cmd == TEXT("split"))
+		{
+			const int32 N = FMath::Clamp(FCString::Atoi(*Arg(2)), 1, Slots[A].Count - 1);
+			const int32 Free = Slots.IndexOfByPredicate([](const FWRItemStack& S) { return S.IsEmpty(); });
+			if (Slots[A].Count < 2) OutResult = TEXT("nothing to split");
+			else if (Free == INDEX_NONE) OutResult = TEXT("no empty slot");
+			else
+			{
+				Slots[Free] = Slots[A];
+				Slots[Free].Count = N;
+				Slots[A].Count -= N;
+				return true;
+			}
+		}
+		else
+		{
+			APawn* Me = GetPawn();
+			const int32 N = Arg(2).IsEmpty() ? Slots[A].Count : FMath::Clamp(FCString::Atoi(*Arg(2)), 1, Slots[A].Count);
+			if (!Me) OutResult = TEXT("no body");
+			else
+			{
+				FWRItemStack Dropped = Slots[A];
+				Dropped.Count = N;
+				Slots[A].Count -= N;
+				if (Slots[A].Count <= 0) Slots[A] = FWRItemStack();
+				FActorSpawnParameters Params;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				const FVector At = Me->GetActorLocation() + Me->GetActorForwardVector() * 80.f - FVector(0.f, 0.f, Me->GetSimpleCollisionHalfHeight() - 25.f);
+				if (AWRLootBag* Bag = GetWorld()->SpawnActor<AWRLootBag>(AWRLootBag::StaticClass(), At, FRotator::ZeroRotator, Params))
+				{
+					Bag->OwnerName = PS->GetPlayerName();
+					Bag->bOwnerOnly = false;
+					Bag->Items = { Dropped };
+					Bag->SetLifeSpan(WRTune(TEXT("inventory.dropMinutes"), 10.f) * 60.f);
+				}
+				const FWRItemDef* Def = FWRItemRegistry::Get().Find(Dropped.ItemId);
+				OutResult = FString::Printf(TEXT("Dropped %s x%d"), Def ? *Def->Name : *Dropped.ItemId.ToString(), N);
+			}
+		}
+	}
 	else if (Cmd == TEXT("slot"))
 	{
 		OutResult = PS->GetInventory()->UseSlot(FCString::Atoi(*Arg(1)));
@@ -714,4 +804,32 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	}
 	ClientNotify(OutResult);
 	return true;
+}
+
+void AWRPlayerController::WRWheel(int32 Which, int32 Hover)
+{
+	if (UI) UI->DebugWheel(Which, Hover);
+}
+
+void AWRPlayerController::WRHelp()
+{
+	if (UI) UI->ToggleHelp();
+}
+
+void AWRPlayerController::EscapePressed()
+{
+	if (IsPlacing())
+	{
+		CancelPlacement();
+		return;
+	}
+	if (Menu != EWRMenu::None)
+	{
+		MenuClose();
+		return;
+	}
+	if (UI && FWRScreens::Find(TEXT("settings")))
+	{
+		OpenJournal(EWRMenu::Settings);
+	}
 }

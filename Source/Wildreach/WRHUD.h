@@ -23,6 +23,8 @@ private:
 	void DrawWorldBars(const AWRCharacterBase* Self);
 	/** The nearest knocked-out wild creature: torpor (and when it wakes), progress, effectiveness, food, what it needs. */
 	void DrawTamingPanel(const AWRCharacterBase* Self);
+	/** The old text list for the open menu (with -oldui, or a menu the new UI has no screen for yet). */
+	void DrawMenuPanel(const class AWRPlayerController* PC);
 	void DrawDamageNumbers(float DeltaTime);
 	void OnHitShown(const AActor* Target, float Damage, EWRHitResult Result);
 

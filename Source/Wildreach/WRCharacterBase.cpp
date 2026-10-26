@@ -6,6 +6,7 @@
 #include "WRGameplayTags.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRInventory.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -106,7 +107,13 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 		return 0.f;
 	}
 	// Attack/block slowdowns are predicted flags on the movement component, not tags.
-	return (HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) : 1.f) * SpeedBoost;
+	// Carrying more than inventory.carryKg slows you (the bag replicates to the owner, so both sides agree).
+	float Load = 1.f;
+	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(this))
+	{
+		if (Inv->GetCarryWeight() > WRTune(TEXT("inventory.carryKg"), 80.f)) Load = WRTune(TEXT("inventory.overweightSpeed"), 0.7f);
+	}
+	return (HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) : 1.f) * SpeedBoost * Load;
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)

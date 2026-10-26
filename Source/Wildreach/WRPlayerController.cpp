@@ -27,6 +27,8 @@
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
 #include "WRMainMenu.h"
+#include "WRKeyBindings.h"
+#include "WRPlayerUI.h"
 #include "Kismet/GameplayStatics.h"
 
 AWRPlayerController::AWRPlayerController()
@@ -41,6 +43,11 @@ AWRPlayerController::AWRPlayerController()
 void AWRPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	// The stone-and-leather UI for the player at this screen (-oldui keeps the text menus for comparison).
+	if (IsLocalController() && GetNetMode() != NM_DedicatedServer && !FParse::Param(FCommandLine::Get(), TEXT("oldui")) && GEngine && GEngine->GameViewport)
+	{
+		UI = MakeShared<FWRPlayerUI>(this);
+	}
 	// The game on its own (not connected to anyone) shows the front end over the island.
 	if (IsLocalController() && GetNetMode() == NM_Standalone && !bBot && !GIsEditor && !FParse::Param(FCommandLine::Get(), TEXT("nomenu")))
 	{
@@ -95,23 +102,144 @@ void AWRPlayerController::ReturnToMenu()
 void AWRPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &AWRPlayerController::ToggleLockOn);
-	InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AWRPlayerController::WRInteract);
-	InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AWRPlayerController::UsePotion);
-	InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AWRPlayerController::UseFood);
-	InputComponent->BindKey(EKeys::X, IE_Pressed, this, &AWRPlayerController::UseDrink);
-	InputComponent->BindKey(EKeys::I, IE_Pressed, this, &AWRPlayerController::ToggleInventory);
-	InputComponent->BindKey(EKeys::K, IE_Pressed, this, &AWRPlayerController::ToggleSkills);
-	InputComponent->BindKey(EKeys::P, IE_Pressed, this, &AWRPlayerController::TogglePaths);
-	InputComponent->BindKey(EKeys::F10, IE_Pressed, this, &AWRPlayerController::ReturnToMenu);
-	InputComponent->BindKey(EKeys::M, IE_Pressed, this, &AWRPlayerController::ToggleMap);
-	InputComponent->BindKey(EKeys::T, IE_Pressed, this, &AWRPlayerController::OpenChat);
+	BindKeys();
+	if (!KeysChangedHandle.IsValid())
+	{
+		KeysChangedHandle = FWRKeyBindings::Get().OnChanged.AddWeakLambda(this, [this]() { BindKeys(); });
+	}
+}
+
+void AWRPlayerController::BindKeys()
+{
+	if (!InputComponent)
+	{
+		return;
+	}
+	InputComponent->KeyBindings.Reset();
+	const FWRKeyBindings& Keys = FWRKeyBindings::Get();
+	const auto Bind = [this, &Keys](const TCHAR* Action, EInputEvent Event, auto Func)
+	{
+		const FKey Key = Keys.Key(FName(Action));
+		if (Key.IsValid()) InputComponent->BindKey(Key, Event, this, Func);
+	};
+	Bind(TEXT("LockOn"), IE_Pressed, &AWRPlayerController::ToggleLockOn);
+	Bind(TEXT("Interact"), IE_Pressed, &AWRPlayerController::InteractPressed);
+	Bind(TEXT("Interact"), IE_Released, &AWRPlayerController::InteractReleased);
+	Bind(TEXT("Inventory"), IE_Pressed, &AWRPlayerController::ToggleInventory);
+	Bind(TEXT("Skills"), IE_Pressed, &AWRPlayerController::ToggleSkills);
+	Bind(TEXT("Paths"), IE_Pressed, &AWRPlayerController::TogglePaths);
+	Bind(TEXT("BackToMenu"), IE_Pressed, &AWRPlayerController::ReturnToMenu);
+	Bind(TEXT("Map"), IE_Pressed, &AWRPlayerController::ToggleMap);
+	Bind(TEXT("Chat"), IE_Pressed, &AWRPlayerController::OpenChat);
+	Bind(TEXT("Build"), IE_Pressed, &AWRPlayerController::ToggleBuildMenu);
+	Bind(TEXT("Snap"), IE_Pressed, &AWRPlayerController::ToggleSnap);
+	// The old text menus' keys (bots and -oldui still use them); Esc always closes what's open.
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);
 	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
-	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AWRPlayerController::MenuClose);
-	InputComponent->BindKey(EKeys::F, IE_Pressed, this, &AWRPlayerController::CycleInfuse);
-	InputComponent->BindKey(EKeys::B, IE_Pressed, this, &AWRPlayerController::ToggleBuildMenu);
+	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AWRPlayerController::EscapePressed);
+	// Keys that pass a value: lambdas through FInputKeyBinding.
+	const auto BindLambda = [this](const FKey& Key, EInputEvent Event, TFunction<void()> Fn)
+	{
+		if (!Key.IsValid()) return;
+		FInputKeyBinding KB(FInputChord(Key), Event);
+		KB.KeyDelegate.GetDelegateForManualSet().BindWeakLambda(this, MoveTemp(Fn));
+		InputComponent->KeyBindings.Add(KB);
+	};
+	BindLambda(Keys.Key(TEXT("Crafting")), IE_Pressed, [this]() { OpenJournal(EWRMenu::Craft); });
+	BindLambda(Keys.Key(TEXT("Help")), IE_Pressed, [this]() { if (UI) UI->ToggleHelp(); });
+	for (int32 i = 0; i < 8; ++i)
+	{
+		BindLambda(Keys.Key(FName(*FString::Printf(TEXT("Hotbar%d"), i + 1))), IE_Pressed, [this, i]()
+		{
+			if (UI) UI->UseHotbar(i);
+			else if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn())) { C->PressAbilityInput(static_cast<EWRAbilityInput>(static_cast<int32>(EWRAbilityInput::Slot1) + i)); C->ReleaseAbilityInput(static_cast<EWRAbilityInput>(static_cast<int32>(EWRAbilityInput::Slot1) + i)); }
+		});
+	}
+	for (int32 W = 0; W < 2; ++W)
+	{
+		const FKey WheelKey = Keys.Key(W == 0 ? TEXT("Wheel1") : TEXT("Wheel2"));
+		BindLambda(WheelKey, IE_Pressed, [this, W]() { if (UI) UI->WheelKey(W, true); });
+		BindLambda(WheelKey, IE_Released, [this, W]() { if (UI) UI->WheelKey(W, false); });
+	}
+	// Abilities with their own keys (Settings > Controls, "Own keys" or "Both").
+	if (Keys.GetCastMode() != EWRCastMode::Wheel)
+	{
+		for (const FWRActionKey& A : Keys.Actions())
+		{
+			if (A.Group != TEXT("Abilities") || !A.Key.IsValid()) continue;
+			const FName Node(*A.Id.ToString().RightChop(8));   // "Ability." + path.node
+			BindLambda(A.Key, IE_Pressed, [this, Node]() { if (UI) UI->CastAbility(Node); });
+		}
+	}
+}
+
+void AWRPlayerController::InteractPressed()
+{
+	if (UI && Menu == EWRMenu::None)
+	{
+		// Your own tame in front of you: hold for the order wheel, tap for the usual (see FWRPlayerUI::TameKey).
+		AWRCreature* Tame = FindNearbyCreature(true);
+		AWRCreature* Wild = FindNearbyCreature(false, 400.f);
+		const APawn* Me = GetPawn();
+		if (Tame && Me && (!Wild || FVector::Dist2D(Tame->GetActorLocation(), Me->GetActorLocation()) < FVector::Dist2D(Wild->GetActorLocation(), Me->GetActorLocation())))
+		{
+			UI->TameKey(true);
+			return;
+		}
+	}
+	WRInteract();
+}
+
+void AWRPlayerController::InteractReleased()
+{
+	if (UI) UI->TameKey(false);
+}
+
+void AWRPlayerController::OpenJournal(EWRMenu Tab)
+{
+	if (!UI)
+	{
+		if (Tab == EWRMenu::Craft) ToggleBuildMenu();   // the old Build & craft list
+		return;
+	}
+	if (Menu == Tab)
+	{
+		MenuClose();
+		return;
+	}
+	// Crafting opens at the station you stand by (or by hand).
+	if (Tab == EWRMenu::Craft && Menu != EWRMenu::Craft) MenuStation = FindNearbyStation();
+	Menu = Tab;
+	MenuIndex = 0;
+}
+
+void AWRPlayerController::SetMenu(EWRMenu NewMenu)
+{
+	if (NewMenu == EWRMenu::None)
+	{
+		MenuClose();
+		return;
+	}
+	OpenJournal(NewMenu);
+}
+
+void AWRPlayerController::ShowLocalNotice(const FString& Message)
+{
+	Notice = Message;
+	NoticeTime = GetWorld()->GetTimeSeconds();
+	if (UI) UI->NoteNotice(Message);
+}
+
+void AWRPlayerController::EndPlay(const EEndPlayReason::Type Reason)
+{
+	if (KeysChangedHandle.IsValid())
+	{
+		FWRKeyBindings::Get().OnChanged.Remove(KeysChangedHandle);
+		KeysChangedHandle.Reset();
+	}
+	UI.Reset();
+	Super::EndPlay(Reason);
 }
 
 void AWRPlayerController::UsePotion() { ServerCommand(TEXT("use potion")); }
@@ -209,6 +337,10 @@ void AWRPlayerController::ClientNotify_Implementation(const FString& Message)
 {
 	Notice = Message;
 	NoticeTime = GetWorld()->GetTimeSeconds();
+	if (UI)
+	{
+		UI->NoteNotice(Message);
+	}
 	UE_LOG(LogWildreach, Log, TEXT("NOTICE %s"), *Message);
 }
 
@@ -307,6 +439,10 @@ void AWRPlayerController::PlayerTick(float DeltaTime)
 		UpdatePlacement();
 	}
 	UpdateLockOn(DeltaTime);
+	if (UI)
+	{
+		UI->Tick(DeltaTime);
+	}
 }
 
 // ---------------------------------------------------------------- lock-on
@@ -399,7 +535,8 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
-		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store "), TEXT("take "), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn ") };  // chat is its own RPC
+		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
+		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall ") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{

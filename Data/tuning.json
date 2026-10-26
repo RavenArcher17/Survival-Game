@@ -159,6 +159,8 @@
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },
   "crops": { "commonMinutes": 20, "rareMinutes": 120 },
+  "inventory": { "_comment": "The bag: carrying more than carryKg (bag + worn + held) slows you to overweightSpeed; dropped items lie in a bag for dropMinutes. placeholder",
+    "carryKg": 80, "overweightSpeed": 0.7, "dropMinutes": 10 },
   "wildlife": { "_comment": "Island wildlife sites (Data/island_spawns.json, from Tools/terrain/spawns.mjs): a pack comes out when a player is within activationRadius cm of its site and fades away after despawnSeconds with nobody within activationRadius x leaveRadiusMult (tamed and knocked-out creatures stay). enabled 0 turns the sites off. placeholder",
     "enabled": 1, "activationRadius": 25000, "leaveRadiusMult": 1.2, "despawnSeconds": 90 },
   "clock": { "_comment": "World clock: real minutes per in-game day, the hour a new server starts at, night from duskHour to dawnHour, twilightHours of fade either side. placeholder",

@@ -160,7 +160,12 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> SwapWeaponAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> AmmoNextAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> AmmoPrevAction;
-	void AmmoNext() { CycleAmmo(1); }
-	void AmmoPrev() { CycleAmmo(-1); }
+	void AmmoNext() { WheelStep(1); }
+	void AmmoPrev() { WheelStep(-1); }
+	/** The mouse wheel: ammo while aiming, the hotbar otherwise. */
+	void WheelStep(int32 Dir);
+	/** (Re)map every key from FWRKeyBindings. */
+	void MapKeys();
+	FDelegateHandle KeysChangedHandle;
 	UPROPERTY(Transient) TMap<EWRAbilityInput, TObjectPtr<UInputAction>> AbilityActions;
 };

@@ -733,3 +733,14 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = StackFromJson(*RangedJson);
 	Json->TryGetBoolField(TEXT("kitGiven"), bKitGiven);
 }
+
+float UWRInventoryComponent::GetCarryWeight() const
+{
+	float Kg = FWRInventoryRules::TotalWeight(Slots);
+	for (const FWRItemStack* Worn : { &EquippedWeapon, &EquippedArmor, &EquippedRanged })
+	{
+		const FWRItemDef* Def = Worn->IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Worn->ItemId);
+		if (Def) Kg += Def->Weight * FMath::Max(1, Worn->Count);
+	}
+	return Kg;
+}

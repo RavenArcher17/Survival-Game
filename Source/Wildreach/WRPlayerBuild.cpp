@@ -444,38 +444,62 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		else if (Cmd == TEXT("claimdeposit")) OutResult = Totem->OwnerName == Who ? Totem->Deposit(this) : TEXT("not your claim");
 		else OutResult = Totem->Upgrade(this);
 	}
-	else if (Cmd == TEXT("store") || Cmd == TEXT("take"))
+	else if (Cmd == TEXT("store") || Cmd == TEXT("take") || Cmd == TEXT("storeall") || Cmd == TEXT("takeall"))
 	{
+		// store / take <slot> [count]: a stack (or part of one) between your bag and the chest you stand at;
+		// storeall: every resource in your bag; takeall: everything that fits.
 		AWRBuildPiece* Chest = FindNearbyPiece(450.f);
 		const FWRPieceDef* Def = Chest ? Chest->GetDef() : nullptr;
 		const int32 Index = FCString::Atoi(*Arg(1));
+		// Move up to N from one stack into a slot list; returns how many moved.
+		const auto MoveStack = [](FWRItemStack& From, TArray<FWRItemStack>& To, int32 N) -> int32
+		{
+			const FWRItemDef* ItemDef = FWRItemRegistry::Get().Find(From.ItemId);
+			if (ItemDef && ItemDef->IsEquipment() && ItemDef->StackSize <= 1)
+			{
+				if (!FWRInventoryRules::AddInstance(To, From)) return 0;
+				From = FWRItemStack();
+				return 1;
+			}
+			N = FMath::Clamp(N, 1, From.Count);
+			const int32 Moved = N - FWRInventoryRules::Add(To, From.ItemId, N);
+			From.Count -= Moved;
+			if (From.Count <= 0) From = FWRItemStack();
+			return Moved;
+		};
 		if (!Def || Def->Kind != TEXT("chest")) OutResult = TEXT("no chest nearby");
 		else if (!Chest->CanAccess(Who)) OutResult = TEXT("not your chest");
-		else if (Cmd == TEXT("store"))
+		else if (Cmd == TEXT("storeall") || Cmd == TEXT("takeall"))
 		{
-			const TArray<FWRItemStack>& Slots = Inv->GetSlots();
-			if (!Slots.IsValidIndex(Index) || Slots[Index].IsEmpty()) OutResult = TEXT("empty slot");
+			int32 Stacks = 0;
+			if (Cmd == TEXT("storeall"))
+			{
+				for (FWRItemStack& S : Inv->GetSlotsMutable())
+				{
+					const FWRItemDef* ItemDef = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+					if (ItemDef && ItemDef->Category == TEXT("material") && MoveStack(S, Chest->Storage, S.Count) > 0) ++Stacks;
+				}
+			}
 			else
 			{
-				const FWRItemStack Stack = Slots[Index];
-				const FWRItemDef* ItemDef = FWRItemRegistry::Get().Find(Stack.ItemId);
-				const bool bOk = ItemDef && ItemDef->IsEquipment() ? FWRInventoryRules::AddInstance(Chest->Storage, Stack)
-					: FWRInventoryRules::Add(Chest->Storage, Stack.ItemId, Stack.Count) == 0;
-				if (bOk) { Inv->RemoveItem(Stack.ItemId, Stack.Count); OutResult = TEXT("Stored"); }
-				else OutResult = TEXT("chest full");
+				for (FWRItemStack& S : Chest->Storage)
+				{
+					if (!S.IsEmpty() && MoveStack(S, Inv->GetSlotsMutable(), S.Count) > 0) ++Stacks;
+				}
 			}
+			OutResult = Stacks > 0 ? FString::Printf(TEXT("%s %d stack%s"), Cmd == TEXT("storeall") ? TEXT("Stored") : TEXT("Took"), Stacks, Stacks == 1 ? TEXT("") : TEXT("s"))
+				: Cmd == TEXT("storeall") ? TEXT("no resources to store") : TEXT("nothing taken (bag full?)");
+		}
+		else if (Cmd == TEXT("store"))
+		{
+			TArray<FWRItemStack>& Slots = Inv->GetSlotsMutable();
+			if (!Slots.IsValidIndex(Index) || Slots[Index].IsEmpty()) OutResult = TEXT("empty slot");
+			else OutResult = MoveStack(Slots[Index], Chest->Storage, Arg(2).IsEmpty() ? Slots[Index].Count : FCString::Atoi(*Arg(2))) > 0 ? TEXT("Stored") : TEXT("chest full");
 		}
 		else
 		{
 			if (!Chest->Storage.IsValidIndex(Index) || Chest->Storage[Index].IsEmpty()) OutResult = TEXT("empty slot");
-			else
-			{
-				const FWRItemStack Stack = Chest->Storage[Index];
-				const FWRItemDef* ItemDef = FWRItemRegistry::Get().Find(Stack.ItemId);
-				const bool bOk = ItemDef && ItemDef->IsEquipment() ? Inv->AddInstance(Stack) : Inv->AddItem(Stack.ItemId, Stack.Count) == 0;
-				if (bOk) { Chest->Storage[Index] = FWRItemStack(); OutResult = TEXT("Taken"); }
-				else OutResult = TEXT("inventory full");
-			}
+			else OutResult = MoveStack(Chest->Storage[Index], Inv->GetSlotsMutable(), Arg(2).IsEmpty() ? Chest->Storage[Index].Count : FCString::Atoi(*Arg(2))) > 0 ? TEXT("Taken") : TEXT("inventory full");
 		}
 	}
 	else

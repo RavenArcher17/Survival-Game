@@ -21,6 +21,9 @@ enum class EWRMenu : uint8
 	Taming,    // a knocked-out wild creature: give food, kibble, narcotics
 	Skills,
 	Paths,
+	Map,       // the journal's map tab
+	Hearth,    // the Hearth: tech level, cores, unlocks
+	Settings,  // settings: controls (key bindings) and more
 };
 
 class AWRBuildPiece;
@@ -48,6 +51,23 @@ public:
 	virtual void PlayerTick(float DeltaTime) override;
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+
+	/** The stone-and-leather UI (local players; null on servers and with -oldui). */
+	class FWRPlayerUI* GetUI() const { return UI.Get(); }
+	/** Open a menu / journal tab (None closes it). */
+	void SetMenu(EWRMenu NewMenu);
+	/** Send a gameplay command to the server ("slot 3", "craft hunting_bow none", "store 4 20"...). */
+	void SendCommand(const FString& Command) { ServerCommand(Command); }
+	/** A notice shown like the server's, without a round trip. */
+	void ShowLocalNotice(const FString& Message);
+	/** What E does right now (the same as a tap of it). */
+	void InteractNow() { WRInteract(); }
+	AWRStation* GetMenuStation() const { return MenuStation.Get(); }
+	AWRBuildPiece* GetMenuPiece() const { return MenuPiece.Get(); }
+	class AWRCreature* GetMenuCreature() const { return MenuCreature.Get(); }
+	/** Building: snap pieces to each other (F). */
+	bool IsSnapOn() const { return bSnap; }
 	/** F10: leave the game and go back to the main menu. */
 	void ReturnToMenu();
 
@@ -141,6 +161,9 @@ public:
 	/** Testing / screenshot aid: open a menu (inventory, build, skills, paths) on line Select, toggle the map (map),
 	 *  press Enter on the selected line (confirm) or close it (none). Tools\menushots.ps1 uses it. */
 	UFUNCTION(Exec) void WRMenu(FName Which, int32 Select);
+	/** Testing / screenshot aid: hold a wheel open with a wedge lit (0, 1 ability wheels, 2 tame orders; -1 closes); toggle the controls help. */
+	UFUNCTION(Exec) void WRWheel(int32 Which, int32 Hover);
+	UFUNCTION(Exec) void WRHelp();
 	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
 	/** Ranged weapon (bots): out (1) / away (0), aim, fire, cycle ammo, face the nearest creature of an id. */
 	UFUNCTION(Exec) void WRRanged(int32 bOn);
@@ -203,7 +226,7 @@ private:
 	void ToggleSkills();
 	void TogglePaths();
 public:
-	void ToggleMap() { bShowMap = !bShowMap; }
+	void ToggleMap();
 	void OpenChat();
 	bool IsMapShown() const { return bShowMap; }
 
@@ -218,6 +241,18 @@ private:
 	void MenuConfirm();
 	void MenuClose();
 	void CycleInfuse();
+
+	/** (Re)bind every key from FWRKeyBindings (called again when a binding changes). */
+	void BindKeys();
+	void InteractPressed();
+	void InteractReleased();
+	void OpenJournal(EWRMenu Tab);
+	/** Esc: close what's open (a wheel, a menu, the build ghost); with nothing open, the game menu (settings). */
+	void EscapePressed();
+	void ToggleSnap() { bSnap = !bSnap; }
+	TSharedPtr<class FWRPlayerUI> UI;
+	FDelegateHandle KeysChangedHandle;
+	bool bSnap = true;
 
 	EWRMenu Menu = EWRMenu::None;
 	bool bShowMap = false;
