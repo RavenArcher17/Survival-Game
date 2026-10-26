@@ -29,8 +29,8 @@ struct FWRScreenAutoRegister
 {
 	FWRScreenAutoRegister(FName Name, FWRScreenFactory Factory, bool bTab) { bTab ? FWRScreens::RegisterTab(Name, MoveTemp(Factory)) : FWRScreens::Register(Name, MoveTemp(Factory)); }
 };
-#define WR_REGISTER_SCREEN(Name, Factory) static FWRScreenAutoRegister PREPROCESSOR_JOIN(GWRScreen_, __LINE__)(FName(TEXT(Name)), Factory, false)
-#define WR_REGISTER_JOURNAL_TAB(Name, Factory) static FWRScreenAutoRegister PREPROCESSOR_JOIN(GWRTab_, __LINE__)(FName(TEXT(Name)), Factory, true)
+#define WR_REGISTER_SCREEN(Name, Factory) static FWRScreenAutoRegister UE_JOIN(GWRScreen_, __COUNTER__)(FName(TEXT(Name)), Factory, false)
+#define WR_REGISTER_JOURNAL_TAB(Name, Factory) static FWRScreenAutoRegister UE_JOIN(GWRTab_, __COUNTER__)(FName(TEXT(Name)), Factory, true)
 
 /** A castable path ability as the wheel and the HUD show it. */
 struct FWRCastable

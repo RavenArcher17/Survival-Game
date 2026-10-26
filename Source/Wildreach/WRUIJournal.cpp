@@ -18,7 +18,7 @@
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
-namespace { constexpr float U = 1.2f; }
+using WRUI::U;
 
 class SWRJournal : public SCompoundWidget
 {
