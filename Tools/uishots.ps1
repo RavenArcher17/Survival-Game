@@ -29,7 +29,8 @@ $screens = [ordered]@{
 	'wheel2'       = 'WRWheel 0 2'
 	'tame_wheel'   = 'WRWheel -1 0|WRSpawn ashstrider 1|wait 1|WRGoTo ashstrider|WRInteract|wait 6|WRWheel 2 0'
 	'help'         = 'WRWheel -1 0|wait 0.5|WRHelp'
-	'inventory'    = 'WRHelp|WRMenu inventory 0|wait 1'
+	'inventory'    = 'WRHelp|WRGive gem_ruby 1|WREquip gem_ruby|wait 0.5|WRMenu inventory 0|wait 1|WRUISelect ranged'
+	'inventory_split' = 'WRUIInvPicker split stone'
 	'crafting'     = 'WRMenu none 0|WRMenu crafting 0|wait 1'
 	'paths'        = 'WRGivePoints fire 8|WRAutoSpend fire 5|wait 1.5|WRMenu paths 0|wait 1.5'
 	'skills'       = 'WRSkill woodcutting 25|WRSkill mining 18|WRSkill smithing 12|WRSkill cooking 4|WRSkill taming 9|WRSkill sneaking 6|WRSkill tracking 3|WRSkillXP woodcutting 1|WRSkillXP mining 8|WRSkillXP smithing 4|WRSkillXP cooking 5|WRSkillXP taming 5|WRSkillXP sneaking 4|wait 1.5|WRMenu skills 0|wait 1.5'
@@ -52,6 +53,10 @@ $screens = [ordered]@{
 	'settings_conflict' = 'WRSettings key G|wait 0.5'
 	'settings_keys' = 'WRSettings cancel|WRSettings scroll 2000|wait 0.5'
 	'settings_video' = 'WRSettings video|wait 1'
+	# A chest on flat ground far from the tame (E would pick your tame over the chest), wild creatures cleared; the
+	# resources stored, some taken back; then the "how many?" picker.
+	'storage'      = 'WRMenu none 0|WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 270 -8|WRGive copper_ingot 12|WRPlace storage_chest -124800 -51800 6525 0|wait 2|WRInteract|wait 1|WRUICmd storeall|wait 1|WRUICmd take 1 20|WRUICmd take 0 30|wait 1.5'
+	'storage_picker' = 'WRUIStoragePicker store wood'
 }
 # The front end (-MainMenu). The bot only runs the commands: WRMainMenu opens the menu as F10 does on your own.
 $menuScreens = [ordered]@{
