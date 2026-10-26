@@ -1,8 +1,9 @@
 # Screenshots of the stone-and-leather UI (Slate, so "shot showui": HighResShot leaves the UI out). A rendered client
 # on L_Island with a stocked bag, learned abilities and a tame opens each screen, saving one numbered picture per
-# screen into -Out. Add screens to $screens as they're built.
-#   uishots.ps1 [-Out <folder>] [-Only hud,wheel]
-param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845)
+# screen into -Out. Add screens to $screens as they're built. -MainMenu shoots the front end instead ($menuScreens):
+# what the game shows on its own, so a standalone client and no server.
+#   uishots.ps1 [-Out <folder>] [-Only hud,wheel] [-MainMenu]
+param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845, [switch]$MainMenu)
 # One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
@@ -46,13 +47,24 @@ $screens = [ordered]@{
 	                 'WRPlace alchemy_table -131670 -56550 4806 0|WRPlace claim_totem -131100 -56000 4847 0|wait 1|WRPlace hearth -131300 -56800 4838 0|wait 1|' +
 	                 'WRCmd claimdeposit|WRGive wood 80|WRGive stone 50|WRGoTo hearth|wait 1|WRCmd hearthfeed|wait 1|WRTeleport -131100 -55800|wait 3|WRInteract|wait 1'
 	'hearth'       = 'WRMenu none 0|WRGoTo hearth|wait 1|WRInteract|wait 1'
+	'settings'     = 'WRMenu none 0|WRMenu settings 0|wait 1.5'
+	'settings_listen' = 'WRSettings listen|wait 0.5'
+	'settings_conflict' = 'WRSettings key G|wait 0.5'
+	'settings_keys' = 'WRSettings cancel|WRSettings scroll 2000|wait 0.5'
+	'settings_video' = 'WRSettings video|wait 1'
 }
+# The front end (-MainMenu). The bot only runs the commands: WRMainMenu opens the menu as F10 does on your own.
+$menuScreens = [ordered]@{
+	'mainmenu'          = 'WRMainMenu|wait 4'
+	'mainmenu_settings' = 'WRMainMenu settings|wait 1.5'
+}
+if ($MainMenu) { $screens = $menuScreens }
 if ($Only.Count -gt 0) { $Only = $Only | ForEach-Object { $_ -split ',' } }
-$cmds = @('WRBotPause 1', 'wait 3',
+$cmds = if ($MainMenu) { @('WRBotPause 1', 'wait 3') } else { @('WRBotPause 1', 'wait 3',
 	'WRGive wood 80', 'WRGive stone 50', 'WRGive fiber 30', 'WRGive hide 8', 'WRGive raw_meat 6', 'WRGive berries 8',
 	'WRGive copper_ore 12', 'WRGive tin_ore 4', 'WRGive kibble 3', 'WRGive narcotic 2', 'WRGive cooked_meat 2',
 	'WRGive hunting_bow 1', 'WRGive stone_arrow 20', 'WRGive tranq_arrow 10', 'WRGive stone_hatchet 1', 'WRGive stone_pick 1',
-	'WRGive hide_armor 1', 'WREquip hide_armor', 'WRGivePoints fire 10', 'WRAutoSpend fire 10', 'wait 2')
+	'WRGive hide_armor 1', 'WREquip hide_armor', 'WRGivePoints fire 10', 'WRAutoSpend fire 10', 'wait 2') }
 $labels = @()
 foreach ($s in $screens.GetEnumerator()) {
 	$cmds += $s.Value
@@ -60,11 +72,22 @@ foreach ($s in $screens.GetEnumerator()) {
 }
 $cmds += 'wait 2'
 $tune = '-wrtune=taming.easySeconds:4'
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=uishots $tune -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
-Start-Sleep -Seconds 30
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
+if ($MainMenu) {
+	# No server: the island on its own, as the game starts. A local stand-in for GitHub says the next version is out,
+	# so the update banner shows too.
+	$version = ((Get-Content (Join-Path $root 'Config\DefaultGame.ini') | Where-Object { $_ -match '^ProjectVersion=' } | Select-Object -First 1) -replace '^ProjectVersion=', '').Trim()
+	$parts = @($version -split '\.'); $parts[-1] = [string]([int]$parts[-1] + 1)
+	$feedPort = $Port + 1000
+	[System.IO.File]::WriteAllText("$logs\feed.mjs", "import http from 'http'; http.createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify({ tag_name: 'v$($parts -join '.')' })); }).listen($feedPort, '127.0.0.1');")
+	$s = Start-Process node -ArgumentList "`"$logs\feed.mjs`"" -PassThru -WindowStyle Hidden
+	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot -wrworld=uishotsmenu -wrupdatefeed=http://127.0.0.1:$feedPort/latest `"-ini:GameUserSettings:[Wildreach.Menu]:Name=$name,[Wildreach.Menu]:Body=f,[Wildreach.Menu]:Path=fire`" `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
+} else {
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=uishots $tune -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
+	Start-Sleep -Seconds 30
+	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
+}
 # Every screen's commands run (even with -Only), so the time allowed grows with the whole list.
-$deadline = (Get-Date).AddSeconds(120 + 12 * $screens.Count)
+$deadline = (Get-Date).AddSeconds(240 + 12 * $screens.Count)
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 	Start-Sleep -Seconds 5
 	$n = @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $started }).Count
@@ -72,7 +95,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_uishots.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\ServerDB\world_uishots.json'), (Join-Path $root 'Saved\ServerDB\world_uishotsmenu.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
 $files = @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' | Where-Object { $_.LastWriteTime -gt $started } | Sort-Object LastWriteTime)
 for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 	$dest = Join-Path $Out ('{0:D2}_{1}.png' -f ($i + 1), $labels[$i])
