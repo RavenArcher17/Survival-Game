@@ -221,6 +221,8 @@ private:
 	FWRPlayerUI* UI() const { return PC.IsValid() ? PC->GetUI() : nullptr; }
 	EVisibility IfSurvivor() const { return Survivor() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; }
 	bool Hidden() const { const FWRPlayerUI* X = UI(); return !X || X->IsScreenOpen(); }
+	/** An ability or tame wheel covers the centre: text that sits behind it steps aside. */
+	bool WheelOpen() const { const FWRPlayerUI* X = UI(); return X && (X->GetOpenWheel() >= 0 || X->IsTameWheelOpen()); }
 
 	// ---------------------------------------------------------------- top left: level, path, statuses
 	TSharedRef<SWidget> LevelPlate()
@@ -538,7 +540,7 @@ private:
 
 	TSharedRef<SWidget> Prompt()
 	{
-		return SNew(SBox).Visibility_Lambda([this]() { FString T; return !Hidden() && !PromptText(T).IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		return SNew(SBox).Visibility_Lambda([this]() { FString T; return !Hidden() && !WheelOpen() && !PromptText(T).IsEmpty() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(12.f * U, 8.f * U))
 			[
@@ -692,7 +694,7 @@ private:
 		return SNew(SVerticalBox).Visibility_Lambda([this]() { return Survivor() && !Hidden() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 0.f, 0.f, 8.f * U)
 			[
-				SNew(SBox).Visibility_Lambda([this]() { return SelectedItemName().IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+				SNew(SBox).Visibility_Lambda([this]() { return SelectedItemName().IsEmpty() || WheelOpen() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 				[
 					SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(14.f * U, 3.f * U))
 					[

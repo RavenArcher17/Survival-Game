@@ -38,7 +38,8 @@ public:
 			const FVector2D Box(150.f * U, 90.f * U);
 			Labels->AddSlot().Position(Centre - Box * 0.5f).Size(Box)
 			[
-				SNew(SVerticalBox)
+				// The tame wheel has six orders for eight wedges: its two spare wedges stay blank.
+				SNew(SVerticalBox).Visibility_Lambda([this, i]() { return Mode() == 2 && Empty(i) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 				[
 					SNew(SBox).WidthOverride(44.f * U).HeightOverride(44.f * U)
@@ -185,7 +186,14 @@ private:
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 6.f * U, 0.f, 0.f)
 			[
-				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return CentreTitle(); }), WRUI::Title(20), WRUI::Ink, true)
+				// Tame names ("Snapper's Ashstrider") run long: shrink them to fit the disc rather than clip.
+				SNew(SBox).MaxDesiredWidth(WheelSize * 0.38f)
+				[
+					SNew(STextBlock).Text_Lambda([this]() { return CentreTitle(); })
+					.Font_Lambda([this]() { const int32 Len = CentreTitle().ToString().Len(); return WRUI::Title(Len > 20 ? 13 : Len > 14 ? 16 : 20); })
+					.ColorAndOpacity(WRUI::Ink).ShadowOffset(FVector2D(1.f, 1.f)).ShadowColorAndOpacity(WRUI::Shadow)
+					.AutoWrapText(true).Justification(ETextJustify::Center)
+				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 4.f * U, 0.f, 0.f)
 			[
