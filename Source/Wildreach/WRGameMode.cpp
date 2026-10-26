@@ -68,6 +68,7 @@ void AWRGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	LoadWorld();
+	AWRCreatureSpawner::SpawnSitesFromData(GetWorld());
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
 	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);
 }

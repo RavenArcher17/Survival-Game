@@ -1,4 +1,5 @@
-// Automation tests for the ranged weapons, taming, creature AI and clock rules (no world needed). Run headless:
+// Automation tests for the ranged weapons, taming, creature AI, clock, island wildlife and version rules (no world
+// needed). Run headless:
 //   Tools\test.ps1 Ranged / Taming / Creatures / World   (or all of Wildreach)
 
 #include "Misc/AutomationTest.h"
@@ -6,7 +7,13 @@
 #include "WRCreature.h"
 #include "WRGameState.h"
 #include "WRInventory.h"
+#include "WRMainMenu.h"
 #include "WRTuning.h"
+#include "Dom/JsonObject.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -167,6 +174,94 @@ bool FWRClockRulesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("it brightens through dawn"), Morning > 0.f && Morning < 1.f && AWRGameState::DaylightAt(Dawn + 0.25f) < Morning);
 	TestTrue(TEXT("and dims through dusk"), Evening > 0.f && Evening < 1.f && AWRGameState::DaylightAt(Dusk - 0.25f) < Evening);
 	TestTrue(TEXT("a day lasts some real minutes"), FWRTuning::Get().Num(TEXT("clock.dayMinutes"), 0.f) >= 1.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRWildlifeSitesTest, "Wildreach.World.Wildlife",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRWildlifeSitesTest::RunTest(const FString& Parameters)
+{
+	const TSharedPtr<FJsonObject> Spawns = FWRTuning::LoadDataFile(TEXT("island_spawns.json"));
+	const TSharedPtr<FJsonObject> Roster = FWRTuning::LoadDataFile(TEXT("creatures.json"));
+	TSharedPtr<FJsonObject> Layout;
+	FString LayoutText;
+	if (FFileHelper::LoadFileToString(LayoutText, *FPaths::Combine(FPaths::ProjectDir(), TEXT("Docs/terrain/layout_proposal.json"))))
+	{
+		FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(LayoutText), Layout);
+	}
+	if (!TestTrue(TEXT("island_spawns.json, creatures.json and the layout load"), Spawns.IsValid() && Roster.IsValid() && Layout.IsValid()))
+	{
+		return false;
+	}
+	TestEqual(TEXT("sites are for the island"), Spawns->GetStringField(TEXT("map")), FString(TEXT("L_Island")));
+	// Every wild species (not bosses, their minions or the dummy) by biome.
+	TMap<FString, FString> Biome;
+	for (const TSharedPtr<FJsonValue>& V : Roster->GetArrayField(TEXT("creatures")))
+	{
+		const TSharedPtr<FJsonObject> C = V->AsObject();
+		FString Id, Home, Archetype, Role;
+		if (C && C->TryGetStringField(TEXT("id"), Id) && C->TryGetStringField(TEXT("biome"), Home) && C->TryGetStringField(TEXT("archetype"), Archetype)
+			&& Archetype != TEXT("boss") && !(C->TryGetStringField(TEXT("role"), Role) && Role == TEXT("minion")))
+		{
+			Biome.Add(Id, Home);
+		}
+	}
+	// Map metres -> world cm, as the island import does (4,033 m square, centred).
+	const double Half = (4033 - 1) * 100.0 / 2.0;
+	TArray<FVector2D> Camps;
+	for (const TSharedPtr<FJsonValue>& V : Layout->GetArrayField(TEXT("spawns")))
+	{
+		Camps.Add(FVector2D(V->AsObject()->GetNumberField(TEXT("x")) * 100.0 - Half, V->AsObject()->GetNumberField(TEXT("y")) * 100.0 - Half));
+	}
+	TMap<FString, int32> Count;
+	int32 Total = 0;
+	for (const TSharedPtr<FJsonValue>& V : Spawns->GetArrayField(TEXT("sites")))
+	{
+		const TSharedPtr<FJsonObject> S = V->AsObject();
+		const FString Id = S->GetStringField(TEXT("creature"));
+		const FVector2D At(S->GetNumberField(TEXT("x")), S->GetNumberField(TEXT("y")));
+		const FString* Home = Biome.Find(Id);
+		if (!TestNotNull(FString::Printf(TEXT("%s is a wild creature"), *Id), Home))
+		{
+			continue;
+		}
+		// The ridge runs down the middle (x = 0): volcanic to the west, tundra to the east.
+		TestTrue(FString::Printf(TEXT("%s at %.0f %.0f is in its %s half"), *Id, At.X, At.Y, **Home), (*Home == TEXT("volcanic")) == (At.X < 0.0));
+		TestTrue(FString::Printf(TEXT("%s at %.0f %.0f is on the island"), *Id, At.X, At.Y), FMath::Abs(At.X) < Half && FMath::Abs(At.Y) < Half && S->GetNumberField(TEXT("z")) > 0.0);
+		for (const FVector2D& Camp : Camps)
+		{
+			TestTrue(FString::Printf(TEXT("%s at %.0f %.0f is well clear of a player camp's safe zone"), *Id, At.X, At.Y), FVector2D::Distance(Camp, At) > 8000.0);
+		}
+		TestTrue(FString::Printf(TEXT("%s site has a pack, a range and a respawn"), *Id), S->GetIntegerField(TEXT("count")) >= 1 && S->GetNumberField(TEXT("radius")) > 0.0 && S->GetNumberField(TEXT("respawn")) > 0.0);
+		Count.FindOrAdd(Id) += S->GetIntegerField(TEXT("count"));
+		Total += S->GetIntegerField(TEXT("count"));
+	}
+	for (const TPair<FString, FString>& Wild : Biome)
+	{
+		TestTrue(FString::Printf(TEXT("%s lives somewhere on the island"), *Wild.Key), Count.FindRef(Wild.Key) > 0);
+	}
+	TestTrue(FString::Printf(TEXT("the island is busy (%d creatures)"), Total), Total >= 120);
+	TestTrue(TEXT("packs come out near players"), FWRTuning::Get().Num(TEXT("wildlife.activationRadius"), 0.f) >= 10000.f
+		&& FWRTuning::Get().Num(TEXT("wildlife.leaveRadiusMult"), 0.f) >= 1.f && FWRTuning::Get().Num(TEXT("wildlife.despawnSeconds"), 0.f) > 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRVersionRulesTest, "Wildreach.World.Version",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRVersionRulesTest::RunTest(const FString& Parameters)
+{
+	// The menu's update offer (the updater, Tools/installer/WildreachUpdater.cs, compares the same way).
+	TestTrue(TEXT("v0.2.1 is newer than 0.2.0"), SWRMainMenu::IsNewerVersion(TEXT("v0.2.1"), TEXT("0.2.0")));
+	TestTrue(TEXT("v0.10.0 is newer than 0.9.9 (numbers, not text)"), SWRMainMenu::IsNewerVersion(TEXT("v0.10.0"), TEXT("0.9.9")));
+	TestTrue(TEXT("v1.0 is newer than 0.9.9"), SWRMainMenu::IsNewerVersion(TEXT("v1.0"), TEXT("0.9.9")));
+	TestFalse(TEXT("the same version isn't"), SWRMainMenu::IsNewerVersion(TEXT("v0.2.0"), TEXT("0.2.0")));
+	TestFalse(TEXT("0.2 is 0.2.0"), SWRMainMenu::IsNewerVersion(TEXT("0.2"), TEXT("0.2.0")));
+	TestFalse(TEXT("an older one isn't"), SWRMainMenu::IsNewerVersion(TEXT("v0.1.9"), TEXT("0.2.0")));
+	TestFalse(TEXT("the first playtest's tag isn't a version"), SWRMainMenu::IsNewerVersion(TEXT("playtest-2026-10-25"), TEXT("0.2.0")));
+	TestFalse(TEXT("nor a pre-release suffix"), SWRMainMenu::IsNewerVersion(TEXT("v0.3.0-beta"), TEXT("0.2.0")));
+	TestFalse(TEXT("no tag (offline) is no update"), SWRMainMenu::IsNewerVersion(TEXT(""), TEXT("0.2.0")));
+	const FString Mine = SWRMainMenu::GameVersion();
+	TestTrue(FString::Printf(TEXT("this build has a version (%s)"), *Mine), SWRMainMenu::IsNewerVersion(TEXT("v") + Mine + TEXT(".1"), Mine) && !SWRMainMenu::IsNewerVersion(Mine, Mine));
 	return true;
 }
 

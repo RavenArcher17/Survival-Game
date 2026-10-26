@@ -34,6 +34,7 @@
 #include "InputAction.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
+#include "LandscapeProxy.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
@@ -1794,15 +1795,15 @@ void AWRCreatureSpawner::BeginPlay()
 	{
 		RespawnSeconds = WRTune(TEXT("server.bossRespawnHours"), 4.f) * 3600.f;
 	}
-	for (int32 i = 0; i < Count; ++i)
+	if (ActivationRadius <= 0.f)
 	{
-		SpawnOne();
+		Activate();
 	}
 	if (Def && Def->bNest)
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		if (AWRNest* Nest = GetWorld()->SpawnActor<AWRNest>(AWRNest::StaticClass(), GetActorLocation() + FVector(150.f, 0.f, 0.f), FRotator::ZeroRotator, Params))
+		if (AWRNest* Nest = GetWorld()->SpawnActor<AWRNest>(AWRNest::StaticClass(), GroundAt(GetActorLocation() + FVector(150.f, 0.f, 0.f)), FRotator::ZeroRotator, Params))
 		{
 			Nest->CreatureId = CreatureId;
 			Nest->Spawner = this;
@@ -1810,10 +1811,144 @@ void AWRCreatureSpawner::BeginPlay()
 	}
 }
 
+int32 AWRCreatureSpawner::SpawnSitesFromData(UWorld* World)
+{
+	if (!World || World->GetNetMode() == NM_Client || WRTune(TEXT("wildlife.enabled"), 1.f) <= 0.f)
+	{
+		return 0;
+	}
+	const TSharedPtr<FJsonObject> Root = FWRTuning::LoadDataFile(TEXT("island_spawns.json"));
+	const TArray<TSharedPtr<FJsonValue>>* Sites = nullptr;
+	FString Map;
+	if (!Root || !Root->TryGetStringField(TEXT("map"), Map) || Map != UWorld::RemovePIEPrefix(World->GetMapName()) || !Root->TryGetArrayField(TEXT("sites"), Sites))
+	{
+		return 0;
+	}
+	const float Activation = WRTune(TEXT("wildlife.activationRadius"), 25000.f);
+	int32 Spawned = 0, Creatures = 0;
+	for (const TSharedPtr<FJsonValue>& Value : *Sites)
+	{
+		const TSharedPtr<FJsonObject> Site = Value.IsValid() ? Value->AsObject() : nullptr;
+		const FName Id = Site ? FName(*Site->GetStringField(TEXT("creature"))) : NAME_None;
+		if (!FWRCreatureRegistry::Get().Find(Id))
+		{
+			UE_LOG(LogWildreach, Warning, TEXT("WILDLIFE site for unknown creature %s"), *Id.ToString());
+			continue;
+		}
+		const FTransform At(FVector(Site->GetNumberField(TEXT("x")), Site->GetNumberField(TEXT("y")), Site->GetNumberField(TEXT("z")) + 100.f));
+		if (AWRCreatureSpawner* Spawner = World->SpawnActorDeferred<AWRCreatureSpawner>(StaticClass(), At, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+		{
+			Spawner->CreatureId = Id;
+			Spawner->Count = FMath::Max(1, Site->GetIntegerField(TEXT("count")));
+			Spawner->Radius = Site->GetNumberField(TEXT("radius"));
+			Spawner->RespawnSeconds = Site->GetNumberField(TEXT("respawn"));
+			Spawner->ActivationRadius = Activation;
+			Spawner->bTraceGround = true;
+			Spawner->FinishSpawning(At);
+			++Spawned;
+			Creatures += Spawner->Count;
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %d sites, %d creatures (Data/island_spawns.json); a pack comes out when a player is within %.0f m"), Spawned, Creatures, Activation / 100.f);
+	return Spawned;
+}
+
+int32 AWRCreatureSpawner::NumAlive() const
+{
+	int32 N = 0;
+	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+	{
+		N += C.IsValid() && C->IsAlive() && !C->IsTamed();
+	}
+	return N;
+}
+
+void AWRCreatureSpawner::Activate()
+{
+	bActive = true;
+	AloneSince = -1.0;
+	// Top the pack up; a death still waiting out its respawn keeps its place.
+	const double Now = GetWorld()->GetTimeSeconds();
+	PendingRespawns.RemoveAll([Now](double At) { return At <= Now; });
+	for (int32 i = NumAlive() + PendingRespawns.Num(); i < Count; ++i)
+	{
+		SpawnOne();
+	}
+	if (ActivationRadius > 0.f)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %s out at %s (%d)"), *CreatureId.ToString(), *GetActorLocation().ToCompactString(), NumAlive());
+	}
+}
+
+void AWRCreatureSpawner::Deactivate()
+{
+	bActive = false;
+	AloneSince = -1.0;
+	int32 Gone = 0;
+	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+	{
+		// One knocked out mid-tame stays where its tamer left it.
+		if (C.IsValid() && C->IsAlive() && !C->IsTamed() && !C->IsUnconscious())
+		{
+			C->Destroy();
+			++Gone;
+		}
+	}
+	Alive.RemoveAll([](const TWeakObjectPtr<AWRCreature>& C) { return !C.IsValid(); });
+	UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %s at %s went quiet (%d gone)"), *CreatureId.ToString(), *GetActorLocation().ToCompactString(), Gone);
+}
+
+bool AWRCreatureSpawner::PlayerNear(float Range) const
+{
+	// Near the site or near any of the pack (a hunt can carry it a long way from home).
+	const float RangeSq = FMath::Square(Range);
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APawn* Pawn = It->Get() ? It->Get()->GetPawn() : nullptr;
+		if (!Pawn)
+		{
+			continue;
+		}
+		const FVector At = Pawn->GetActorLocation();
+		if (FVector::DistSquared2D(At, GetActorLocation()) < RangeSq)
+		{
+			return true;
+		}
+		for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+		{
+			if (C.IsValid() && FVector::DistSquared2D(At, C->GetActorLocation()) < RangeSq)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+FVector AWRCreatureSpawner::GroundAt(const FVector& Point) const
+{
+	if (!bTraceGround)
+	{
+		return Point;
+	}
+	// The terrain under the point, not a tree crown or a roof over it.
+	TArray<FHitResult> Hits;
+	GetWorld()->LineTraceMultiByObjectType(Hits, Point + FVector(0.f, 0.f, 3000.f), Point - FVector(0.f, 0.f, 6000.f),
+		FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(WRSpawnGround), false, this));
+	for (const FHitResult& Hit : Hits)
+	{
+		if (Hit.GetActor() && Hit.GetActor()->IsA<ALandscapeProxy>())
+		{
+			return Hit.ImpactPoint;
+		}
+	}
+	return Hits.Num() > 0 ? Hits.Last().ImpactPoint : Point;
+}
+
 void AWRCreatureSpawner::SpawnOne()
 {
 	const FVector2D Offset = FMath::RandPointInCircle(Radius);
-	if (AWRCreature* Creature = AWRCreature::SpawnCreature(GetWorld(), CreatureId, GetActorLocation() + FVector(Offset, 0.f), FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
+	if (AWRCreature* Creature = AWRCreature::SpawnCreature(GetWorld(), CreatureId, GroundAt(GetActorLocation() + FVector(Offset, 0.f)), FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
 	{
 		Creature->Spawner = this;
 		Alive.Add(Creature);
@@ -1853,7 +1988,34 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 	{
 		return;
 	}
+	Alive.RemoveAll([](const TWeakObjectPtr<AWRCreature>& C) { return !C.IsValid() || C->IsTamed(); });
 	const double Now = GetWorld()->GetTimeSeconds();
+	if (ActivationRadius > 0.f)
+	{
+		// A little further to leave than to arrive, so a player on the edge doesn't flicker the pack in and out.
+		const bool bNear = PlayerNear(bActive ? ActivationRadius * WRTune(TEXT("wildlife.leaveRadiusMult"), 1.2f) : ActivationRadius);
+		if (!bActive)
+		{
+			if (bNear)
+			{
+				Activate();
+			}
+			return;
+		}
+		if (bNear)
+		{
+			AloneSince = -1.0;
+		}
+		else if (AloneSince < 0.0)
+		{
+			AloneSince = Now;
+		}
+		else if (Now - AloneSince >= WRTune(TEXT("wildlife.despawnSeconds"), 90.f))
+		{
+			Deactivate();
+			return;
+		}
+	}
 	for (int32 i = PendingRespawns.Num() - 1; i >= 0; --i)
 	{
 		if (PendingRespawns[i] <= Now)
@@ -1862,7 +2024,6 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 			SpawnOne();
 		}
 	}
-	Alive.RemoveAll([](const TWeakObjectPtr<AWRCreature>& C) { return !C.IsValid() || C->IsTamed(); });
 }
 
 AWRNest::AWRNest()

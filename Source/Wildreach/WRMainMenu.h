@@ -44,10 +44,22 @@ public:
 	static void Close();
 	static bool IsOpen();
 
+	/** This build's version (ProjectVersion in DefaultGame.ini; releases are tagged v<version>). */
+	static FString GameVersion();
+	/** "v0.2.1" is newer than "0.2.0"; a tag that isn't a version number never is. */
+	static bool IsNewerVersion(const FString& Tag, const FString& Than);
+	/** Remember why a join or game ended badly (a different version than the host's...) to show when the menu comes back. */
+	static void WatchNetworkFailures();
+
 private:
 	FReply OnHost();
 	FReply OnJoin();
 	FReply OnQuit();
+	FReply OnUpdate();
+	/** Once per run (packaged game, or -wrupdatefeed=<url>): ask GitHub for the newest release (sets LatestVersion). */
+	static void CheckForUpdate();
+	static FString LatestVersion;
+	static FString LastFailure;
 	FReply OnPickPath(FName Path);
 	FReply OnPickBody(FName InBody);
 	FString Options() const;

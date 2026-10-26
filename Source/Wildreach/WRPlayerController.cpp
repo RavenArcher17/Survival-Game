@@ -136,6 +136,7 @@ void AWRPlayerController::WRAmmo(int32 Dir) { if (AWRCharacter* C = Cast<AWRChar
 void AWRPlayerController::WRHold(float Seconds) { ServerCommand(FString::Printf(TEXT("hold %.1f"), Seconds)); }
 void AWRPlayerController::WRClearCreatures() { ServerCommand(TEXT("clearcreatures")); }
 void AWRPlayerController::WRHour(float Hour) { ServerCommand(FString::Printf(TEXT("hour %.2f"), Hour)); }
+void AWRPlayerController::WRWildlife() { ServerCommand(TEXT("wildlife")); }
 void AWRPlayerController::WRSpawnAt(FName Creature, float X, float Y) { ServerCommand(FString::Printf(TEXT("spawnat %s %.0f %.0f"), *Creature.ToString(), X, Y)); }
 void AWRPlayerController::WRCreatureHP(FName Creature, float Fraction) { ServerCommand(FString::Printf(TEXT("creaturehp %s %.3f"), *Creature.ToString(), Fraction)); }
 void AWRPlayerController::WRSky()
@@ -521,6 +522,45 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		}
 		AWRCreature* Spawned = AWRCreature::SpawnCreature(GetWorld(), FName(*Arg(1)), At, FRotator::ZeroRotator);
 		Result = Spawned ? FString::Printf(TEXT("%s at %s"), *Spawned->GetName(), *At.ToCompactString()) : TEXT("couldn't spawn");
+	}
+	else if (Cmd == TEXT("wildlife") && Survivor)
+	{
+		// The island's wildlife sites: how many are out, what's around you, the nearest one still quiet.
+		int32 Sites = 0, Active = 0, Out = 0;
+		TMap<FName, int32> Near;
+		const AWRCreatureSpawner* Quiet = nullptr;
+		float QuietDist = TNumericLimits<float>::Max();
+		for (TActorIterator<AWRCreatureSpawner> It(GetWorld()); It; ++It)
+		{
+			if (It->ActivationRadius <= 0.f)
+			{
+				continue;
+			}
+			++Sites;
+			const float D = FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation());
+			if (It->IsActive())
+			{
+				++Active;
+				Out += It->NumAlive();
+			}
+			else if (D < QuietDist)
+			{
+				QuietDist = D;
+				Quiet = *It;
+			}
+		}
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			if (It->IsAlive() && !It->IsTamed() && !It->IsA<AWRTrainingDummy>() && FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation()) < 30000.f)
+			{
+				Near.FindOrAdd(It->CreatureId)++;
+			}
+		}
+		FString NearText;
+		for (const TPair<FName, int32>& N : Near) NearText += FString::Printf(TEXT("%s%s %d"), NearText.IsEmpty() ? TEXT("") : TEXT(", "), *N.Key.ToString(), N.Value);
+		Result = FString::Printf(TEXT("sites %d, active %d, out %d; within 300 m: %s; nearest quiet site %s"), Sites, Active, Out, NearText.IsEmpty() ? TEXT("none") : *NearText,
+			Quiet ? *FString::Printf(TEXT("%s %.0f m at %.0f %.0f"), *Quiet->CreatureId.ToString(), QuietDist / 100.f, Quiet->GetActorLocation().X, Quiet->GetActorLocation().Y) : TEXT("none"));
+		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("creaturehp") && Survivor)
 	{

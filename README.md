@@ -10,9 +10,12 @@ Tools\package.ps1          # -> C:\Dev\WildreachBuild\Windows\Wildreach.exe (+ R
 Tools\make_installer.ps1   # -> C:\Dev\WildreachBuild\Wildreach-Setup.exe (one file to send friends)
 ```
 
-Send `Wildreach-Setup.exe` with a OneDrive/Drive link (it's ~440 MB). Double-clicking it installs to the player's
-own folder (no admin), adds Desktop and Start Menu shortcuts, installs the VC++ runtime only if it's missing, and
-starts the game; a newer Setup updates in place and keeps saves. It isn't code-signed, so Windows may show "Windows
+Players download `Wildreach-Setup.exe` from the latest GitHub release
+(https://github.com/RavenArcher17/Survival-Game/releases/latest/download/Wildreach-Setup.exe, ~1.6 GB). Double-clicking
+it installs to the player's own folder (no admin), adds Desktop and Start Menu shortcuts, installs the VC++ runtime only
+if it's missing, and starts the game; a newer Setup updates in place and keeps saves. The shortcuts start
+`WildreachUpdater.exe`, which installs any newer GitHub release by itself before starting the game (the main menu
+offers **Update now** too), so players only download Setup once. It isn't code-signed, so Windows may show "Windows
 protected your PC": More info, then Run anyway. Everyone runs the game, types a name, picks a
 Male or Female body and Fire or Frost. One person clicks **Host** (their PC is the server; over the internet they forward UDP 7777
 to their PC). Everyone else types the host's IP and clicks **Join**. Saves live on the host
@@ -20,6 +23,11 @@ to their PC). Everyone else types the host's IP and clicks **Join**. Saves live 
 
 A packaged **dedicated server** needs Unreal built from source: `Tools\build_engine.ps1` (several hours,
 ~200 GB; log `C:\Dev\UE5Source-build.log`). Until then the host plays and hosts at once.
+
+**Releasing an update:** bump `ProjectVersion` in `Config/DefaultGame.ini` (e.g. 0.2.1), run `Tools\package.ps1` and
+`Tools\make_installer.ps1`, then publish a GitHub release tagged `v0.2.1` with `Wildreach-Setup.exe` attached
+(`gh release create v0.2.1 C:\Dev\WildreachBuild\Wildreach-Setup.exe --target master --latest`). Installed copies
+update on their next start. Clients and hosts must be on the same version to play together.
 
 Server settings: the default preset is `playtest` (10x XP, PvP off). Pick another with `-wrpreset=pvp_standard`
 (or `pve`, `casual_coop`), or write `Saved/ServerDB/server.json` with `{"preset": "custom", "base": "pve",
@@ -47,7 +55,9 @@ The default map is `/Game/Maps/L_Island`, the 4 × 4 km island. Combat testing h
 (`?Path=` / `?WRName=` / `?Body=f` on the join URL). The main menu only appears when the game runs on its own (`-nomenu` skips it).
 
 Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/rocks/caves/hazards without a rebuild:
-`node Tools/terrain/dressing.mjs` (writes `Data/island_dressing.json`).
+`node Tools/terrain/dressing.mjs` (writes `Data/island_dressing.json`). Move or re-balance the wildlife without a rebuild:
+`node Tools/terrain/spawns.mjs` (writes `Data/island_spawns.json`: 81 packs, every wild species in its biome; a pack
+comes out when a player is within 250 m, `wildlife` in `tuning.json`).
 
 ### Controls
 
@@ -74,7 +84,7 @@ Rebuild the island: `Tools\terrain\build_island.ps1 -Force`. Change the trees/ro
 `WRGivePoints fire 30`, `WRAutoSpend fire 30`, `WRLearn fire fire_wall`, `WRCast 3`, `WRSpawn cinderfang 3`,
 `WRSpawn vulkarn 1`, `WRBossDmgPct 30 frost`, `WRGive iron_ore 20`, `WREquip copper_sword`, `WRWeapon iron fine 6`,
 `WRSkill mining 50`, `WRTameStat`, `WRTorpor 100`, `WRTameGive kibble`, `WRNarcotic`, `WRClan create Name`, `WRHazard`, `WRHeal`, `WRTeleport x y`,
-`WRGather tree` (bot gathers: tree / rock / shrub / node / any / off), `WRHour 21` (jump the clock), `WRSpawnAt cinderfang X Y`, `WRCreatureHP rimeclaw 0.3`, `WRTameAll stay`, `WRSky` (log the sky),
+`WRGather tree` (bot gathers: tree / rock / shrub / node / any / off), `WRHour 21` (jump the clock), `WRSpawnAt cinderfang X Y`, `WRCreatureHP rimeclaw 0.3`, `WRTameAll stay`, `WRSky` (log the sky), `WRWildlife` (packs out, what's near),
 `WRGive hunting_bow 1`, `WRGive tranq_arrow 20`, `WRRanged 1`, `WRHold 30` (root nearby creatures), `WRClearCreatures`,
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
 
@@ -86,7 +96,7 @@ Arena tests give their server `-wrworld=<name>`, so each keeps its own world sav
 and they can run side by side.
 
 ```
-Tools\test.ps1          # automation tests (rules, combat scenarios, ranged items, taming food, creature behaviour, clock)
+Tools\test.ps1          # automation tests (rules, combat scenarios, ranged items, taming food, creature behaviour, clock, wildlife sites, versions)
 Tools\mptest.ps1        # headless server + bots, PvE (-Scenario pvp for duels)
 Tools\persisttest.ps1   # save -> server restart -> load
 Tools\crafttest.ps1     # smelt, craft, infuse, upgrade, Hearth tiers, sockets, every ranged weapon + ammo, bow wear + repair
@@ -97,6 +107,9 @@ Tools\skytest.ps1       # day and night: sun, moon and exposure at noon / sunset
 Tools\tametest.ps1      # offer food, ride, tranq knockout + effectiveness + narcotic + kibble, eggs, orders, waking loses progress, tames saved (-Shots)
 Tools\aitest.ps1        # creature AI: a pack hunt, sleep by day / hunt at night, a hurt creature fleeing, charge / stomp / spit / lunge (-Shots)
 Tools\rangedtest.ps1    # every ranged weapon at a rooted Cinderfang: hits, tranq knockout, bola, spear pickup (-Body f)
+Tools\wildlifetest.ps1  # island wildlife: a herd comes out when a player arrives (each side), goes quiet, comes back (-Shots)
+Tools\updatertest.ps1   # auto-update end to end with fake releases and a local GitHub stand-in (no Unreal needed)
+Tools\versiontest.ps1   # another version can't join and the menu says why; the menu offers a newer release (local feed)
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
@@ -112,6 +125,8 @@ Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traver
 | `Data/paths/*.json`, `lifeskills.json` | skill trees, life skills |
 | `Data/creatures.json`, `items.json`, `recipes.json`, `pieces.json` | roster + bosses, items, recipes, building pieces |
 | `Data/island_dressing.json` | trees, rocks, caves, lava/ice cells (generated) |
+| `Data/island_spawns.json` | wildlife sites: creature, place, pack size, respawn (generated) |
+| `Tools/installer/` | `WildreachSetup.cs` (the one-file installer), `WildreachUpdater.cs` (the shortcut: auto-update) |
 | `Source/Wildreach/WRCombatLibrary` | the damage pipeline (block/parry/statuses/combos) |
 | `Source/Wildreach/WRAbilities` | all GAS abilities |
 | `Source/Wildreach/WRPathTypes`, `WRPathComponent` | trees, rules, progress, grants |

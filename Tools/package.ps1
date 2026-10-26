@@ -19,10 +19,13 @@ if ($LASTEXITCODE -ne 0) { "[$(Get-Date -Format 'HH:mm:ss')] FAILED (exit $LASTE
 # The game reads its numbers from Data\*.json next to the project folder (tuning, items, creatures, ...).
 $game = Join-Path $Out 'Windows\Wildreach'
 Copy-Item (Join-Path $root 'Data') $game -Recurse -Force
+$version = ((Get-Content (Join-Path $root 'Config\DefaultGame.ini') | Where-Object { $_ -match '^ProjectVersion=' } | Select-Object -First 1) -replace '^ProjectVersion=', '').Trim()
 @"
-WILDREACH - first playable
+WILDREACH $version
 
-1. Run Wildreach.exe. Type a name, pick Male or Female, and Fire (volcanic) or Frost (tundra).
+1. Start Wildreach from its shortcut (or WildreachUpdater.exe): it installs a new version by itself
+   when there is one (your saves are kept); everyone in a game needs the same version.
+   Type a name, pick Male or Female, and Fire (volcanic) or Frost (tundra).
 2. One person clicks Host. Everyone else types the host's IP and clicks Join.
    - On the same Wi-Fi: the host's local IP (run ipconfig, "IPv4 Address").
    - Over the internet: the host forwards UDP port 7777 on their router to their PC

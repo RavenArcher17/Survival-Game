@@ -4,13 +4,13 @@
 #   alltests.ps1                     build, then everything (about 40 minutes)
 #   alltests.ps1 -SkipBuild          use the current build
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
-#                                    sky, tame, boss, social, spell, ranged, ai, walk, hazard)
+#                                    sky, tame, boss, social, spell, ranged, ai, wildlife, version, updater, walk, hazard)
 param([switch]$SkipBuild, [string[]]$Only = @())
 $root = Split-Path $PSScriptRoot
 $run = Join-Path $env:TEMP ("wildreach-alltests-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $run | Out-Null
 $tests = @(
-	@{ name = 'unit'; script = 'test.ps1'; what = 'automation tests: rules, combat scenarios, ranged, taming, creatures, clock' },
+	@{ name = 'unit'; script = 'test.ps1'; what = 'automation tests: rules, combat scenarios, ranged, taming, creatures, clock, wildlife sites, versions' },
 	@{ name = 'mp'; script = 'mptest.ps1'; what = 'server + bots, PvE' },
 	@{ name = 'persist'; script = 'persisttest.ps1'; what = 'save, restart, load' },
 	@{ name = 'craft'; script = 'crafttest.ps1'; what = 'stations, Hearth tiers, sockets, every ranged weapon and ammo, bow wear and repair' },
@@ -24,6 +24,9 @@ $tests = @(
 	@{ name = 'spell'; script = 'spelltest.ps1'; what = 'the Paths menu and tree spells' },
 	@{ name = 'ranged'; script = 'rangedtest.ps1'; what = 'every ranged weapon at a Cinderfang' },
 	@{ name = 'ai'; script = 'aitest.ps1'; what = 'hunting, sleeping, fleeing, special attacks' },
+	@{ name = 'wildlife'; script = 'wildlifetest.ps1'; what = 'island wildlife: packs come out near players, go quiet, come back' },
+	@{ name = 'version'; script = 'versiontest.ps1'; what = 'another version can''t join and is told why; the menu offers a newer release' },
+	@{ name = 'updater'; script = 'updatertest.ps1'; what = 'auto-update end to end with fake releases (no Unreal)' },
 	@{ name = 'walk'; script = 'terrain\walktest.ps1'; what = 'island traversal' },
 	@{ name = 'hazard'; script = 'terrain\hazardtest.ps1'; what = 'lava and ice gear checks' }
 )

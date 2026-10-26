@@ -309,19 +309,35 @@ public:
 	UPROPERTY(EditAnywhere, Category="Spawner") int32 Count = 3;
 	UPROPERTY(EditAnywhere, Category="Spawner") float Radius = 400.f;
 	UPROPERTY(EditAnywhere, Category="Spawner") float RespawnSeconds = 20.f;
+	/** 0: the pack is always out. Otherwise it only comes out while a player is within this range (cm) and fades away
+	 *  after wildlife.despawnSeconds with nobody near (the island's wildlife sites). */
+	UPROPERTY(EditAnywhere, Category="Spawner") float ActivationRadius = 0.f;
+	/** Set each creature (and the nest) on the ground under its spawn point: sites on open terrain. */
+	UPROPERTY(EditAnywhere, Category="Spawner") bool bTraceGround = false;
 
 	/** Everyone in this spawner's pack turns on an attacker (herds defend; nests swarm). */
 	void AlertPack(AActor* Attacker);
 	/** One of the pack died: the rest lose heart (see AWRCreature::NotePackLoss). */
 	void NotifyPackLoss(const AWRCreature* Dead);
+	bool IsActive() const { return bActive; }
+	int32 NumAlive() const;
+
+	/** Server start: a spawner for every wildlife site in Data/island_spawns.json made for this map. Returns the count. */
+	static int32 SpawnSitesFromData(UWorld* World);
 
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	void SpawnOne();
+	void Activate();
+	void Deactivate();
+	bool PlayerNear(float Range) const;
+	FVector GroundAt(const FVector& Point) const;
 	TArray<TWeakObjectPtr<AWRCreature>> Alive;
 	TArray<double> PendingRespawns;
+	bool bActive = false;
+	double AloneSince = -1.0;
 };
 
 /** Egg nest for nesting species (Kilnmite, Rimeshell). Taking the egg angers the pack. */
