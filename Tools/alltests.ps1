@@ -6,6 +6,8 @@
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
 #                                    sky, tame, boss, social, spell, ranged, ai, wildlife, version, updater, walk, hazard)
 param([switch]$SkipBuild, [string[]]$Only = @())
+# Every Unreal start otherwise runs UnrealBuildTool's platform check, which waits for any build running on the machine.
+$env:UE_SKIP_UBT_SDK_SETUP = '1'
 $root = Split-Path $PSScriptRoot
 $run = Join-Path $env:TEMP ("wildreach-alltests-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $run | Out-Null

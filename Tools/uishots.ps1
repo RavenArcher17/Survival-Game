@@ -6,6 +6,8 @@ param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845)
 # One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
+# Unreal otherwise starts with UnrealBuildTool's platform check, which waits for any build running on the machine.
+$env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
