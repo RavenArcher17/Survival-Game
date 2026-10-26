@@ -114,6 +114,26 @@ void AWRPlayerController::ToggleSkills()
 
 void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
+void AWRPlayerController::WRMenu(FName Which, int32 Select)
+{
+	if (Which == TEXT("confirm"))
+	{
+		MenuConfirm();
+		return;
+	}
+	if (Which == TEXT("map"))
+	{
+		ToggleMap();
+		return;
+	}
+	MenuClose();
+	if (Which == TEXT("inventory")) ToggleInventory();
+	else if (Which == TEXT("build")) ToggleBuildMenu();
+	else if (Which == TEXT("skills")) ToggleSkills();
+	else if (Which == TEXT("paths")) TogglePaths();
+	MenuIndex = FMath::Clamp(Select, 0, FMath::Max(0, BuildMenuEntries().Num() - 1));
+}
+
 void AWRPlayerController::WRInteract()
 {
 	if (Menu != EWRMenu::None)

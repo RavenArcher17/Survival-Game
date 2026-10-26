@@ -138,6 +138,9 @@ public:
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
 
 	UFUNCTION(Exec) void WRInteract();
+	/** Testing / screenshot aid: open a menu (inventory, build, skills, paths) on line Select, toggle the map (map),
+	 *  press Enter on the selected line (confirm) or close it (none). Tools\menushots.ps1 uses it. */
+	UFUNCTION(Exec) void WRMenu(FName Which, int32 Select);
 	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
 	/** Ranged weapon (bots): out (1) / away (0), aim, fire, cycle ammo, face the nearest creature of an id. */
 	UFUNCTION(Exec) void WRRanged(int32 bOn);
