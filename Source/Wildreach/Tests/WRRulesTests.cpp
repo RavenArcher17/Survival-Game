@@ -268,6 +268,31 @@ bool FWRBuildRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("wall aimed at the first floor"), FWRBuildRules::LevelFor(TEXT("wall"), 1320.f, 1000.f), 1);
 	TestEqual(TEXT("ceiling aimed at the ground floor"), FWRBuildRules::LevelFor(TEXT("floor"), 1000.f, 1000.f), 1);
 	TestEqual(TEXT("roof aimed at the first floor"), FWRBuildRules::LevelFor(TEXT("roof"), 1320.f, 1000.f), 2);
+	// Claim upkeep: an hour at 6 wood/h costs 6 wood (it once took the hour's share rounded up every minute: 60).
+	{
+		TArray<FWRItemStack> Stock;
+		Stock.SetNum(6);
+		FWRInventoryRules::Add(Stock, TEXT("wood"), 100);
+		FWRInventoryRules::Add(Stock, TEXT("stone"), 2);
+		TMap<FName, float> Owed;
+		const TMap<FName, float> Rate = { { FName(TEXT("wood")), 6.f }, { FName(TEXT("stone")), 0.5f } };
+		bool bAllPaid = true;
+		for (int32 Minute = 0; Minute < 60; ++Minute) bAllPaid &= FWRBuildRules::PayUpkeepMinute(Stock, Owed, Rate);
+		TestTrue(TEXT("a stocked claim pays every minute of an hour"), bAllPaid);
+		TestEqual(TEXT("an hour at 6 wood/h costs 6 wood"), FWRInventoryRules::CountOf(Stock, TEXT("wood")), 94);
+		TestEqual(TEXT("half a stone an hour: none taken in the first hour"), FWRInventoryRules::CountOf(Stock, TEXT("stone")), 2);
+		for (int32 Minute = 0; Minute < 60; ++Minute) FWRBuildRules::PayUpkeepMinute(Stock, Owed, Rate);
+		TestEqual(TEXT("...and one stone by the end of the second"), FWRInventoryRules::CountOf(Stock, TEXT("stone")), 1);
+		TArray<FWRItemStack> Empty;
+		Empty.SetNum(6);
+		TMap<FName, float> Owed2;
+		TestFalse(TEXT("an empty claim is unpaid straight away"), FWRBuildRules::PayUpkeepMinute(Empty, Owed2, Rate));
+		for (int32 Minute = 0; Minute < 30; ++Minute) FWRBuildRules::PayUpkeepMinute(Empty, Owed2, Rate);
+		FWRInventoryRules::Add(Empty, TEXT("wood"), 10);
+		FWRInventoryRules::Add(Empty, TEXT("stone"), 10);
+		FWRBuildRules::PayUpkeepMinute(Empty, Owed2, Rate);
+		TestTrue(TEXT("restocking doesn't charge back pay for the unpaid half hour"), FWRInventoryRules::CountOf(Empty, TEXT("wood")) >= 9);
+	}
 	// Every piece's costs are real items, and every structure has a known shape.
 	for (const FWRPieceDef& Def : FWRBuildRegistry::Get().All())
 	{

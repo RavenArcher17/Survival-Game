@@ -72,6 +72,12 @@ struct WILDREACH_API FWRBuildRules
 	static int32 SpanFor(FName Material);
 	/** Upkeep per hour for a claim holding these pieces. */
 	static TMap<FName, float> UpkeepPerHour(const TMap<FName, int32>& PiecesByMaterial);
+	/**
+	 * One minute of a claim's upkeep: adds each rate's sixtieth to Owed and takes whole items from Storage as they fall
+	 * due, so 6 wood an hour costs 6 an hour. False when the claim can't pay (its pieces decay): a share it couldn't
+	 * cover (dropped, not run up as back pay), or a material it needs run out.
+	 */
+	static bool PayUpkeepMinute(TArray<FWRItemStack>& Storage, TMap<FName, float>& Owed, const TMap<FName, float>& PerHour);
 };
 
 /**
@@ -174,5 +180,7 @@ public:
 
 private:
 	float MinuteClock = 0.f;
+	/** Upkeep due but not yet a whole item, per material (paid as it adds up to one). */
+	TMap<FName, float> UpkeepOwed;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
 };

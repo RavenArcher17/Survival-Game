@@ -178,6 +178,27 @@ TMap<FName, float> FWRBuildRules::UpkeepPerHour(const TMap<FName, int32>& Pieces
 	return Out;
 }
 
+bool FWRBuildRules::PayUpkeepMinute(TArray<FWRItemStack>& Storage, TMap<FName, float>& Owed, const TMap<FName, float>& PerHour)
+{
+	bool bPaid = true;
+	for (const TPair<FName, float>& Cost : PerHour)
+	{
+		if (Cost.Value <= 0.f) continue;
+		float& Due = Owed.FindOrAdd(Cost.Key);
+		Due += Cost.Value / 60.f;
+		const int32 Need = FMath::FloorToInt(Due + KINDA_SMALL_NUMBER);
+		if (Need > 0)
+		{
+			if (FWRInventoryRules::CountOf(Storage, Cost.Key) >= Need) FWRInventoryRules::Remove(Storage, Cost.Key, Need);
+			else bPaid = false;
+			Due -= Need;
+		}
+		// Nothing left of a material the claim needs: unpaid from now, not only on the minutes a whole item falls due.
+		if (FWRInventoryRules::CountOf(Storage, Cost.Key) <= 0) bPaid = false;
+	}
+	return bPaid;
+}
+
 static bool CanPlayersShare(const FString& Owner, const FString& Player)
 {
 	return FWRSocialRules::CanShare(Owner, Player);
@@ -961,14 +982,7 @@ void AWRClaimTotem::Tick(float DeltaSeconds)
 	MinuteClock = 0.f;
 
 	// Pay one minute of upkeep from storage, or mark the claim unpaid (its pieces decay).
-	bool bPaid = true;
-	for (const TPair<FName, float>& Cost : CurrentUpkeepPerHour())
-	{
-		const int32 Need = FMath::CeilToInt(Cost.Value / 60.f);
-		if (FWRInventoryRules::CountOf(UpkeepStorage, Cost.Key) >= Need) FWRInventoryRules::Remove(UpkeepStorage, Cost.Key, Need);
-		else bPaid = false;
-	}
-	bUnpaid = !bPaid;
+	bUnpaid = !FWRBuildRules::PayUpkeepMinute(UpkeepStorage, UpkeepOwed, CurrentUpkeepPerHour());
 	if (bUnpaid)
 	{
 		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)

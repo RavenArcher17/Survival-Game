@@ -49,9 +49,9 @@ namespace WRUIClaimScreen
 		int32 Pieces = 0;     // your pieces of this material inside the circle
 		float PerPiece = 0.f; // pieces.json
 		float PerHour = 0.f;  // after the server's multiplier and perks
-		int32 PerMinute = 0;  // what the totem takes each minute: the hour's share, rounded up
 		int32 Stock = 0;
-		float Hours() const { return PerMinute > 0 ? Stock / (PerMinute * 60.f) : TNumericLimits<float>::Max(); }
+		bool Pays() const { return PerHour > 0.f; }
+		float Hours() const { return Pays() ? Stock / PerHour : TNumericLimits<float>::Max(); }
 	};
 
 	void DrawTextAt(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FText& Text, const FSlateFontInfo& Font, const FVector2D& Pos, const FLinearColor& Color)
@@ -315,7 +315,6 @@ namespace WRUIClaimScreen
 				U2.Mat = Mat;
 				U2.PerPiece = FWRBuildRegistry::Get().UpkeepPerPiecePerHour.FindRef(Mat);
 				U2.PerHour = PerHour.FindRef(Mat);
-				U2.PerMinute = U2.PerHour > 0.f ? FMath::CeilToInt(U2.PerHour / 60.f) : 0;
 				U2.Stock = FWRInventoryRules::CountOf(T->UpkeepStorage, Mat);
 				for (TActorIterator<AWRBuildPiece> It(T->GetWorld()); It; ++It)
 				{
@@ -333,7 +332,7 @@ namespace WRUIClaimScreen
 			float Best = TNumericLimits<float>::Max();
 			for (const FUpkeep& X : Of)
 			{
-				if (X.PerMinute > 0 && X.Hours() < Best) { Best = X.Hours(); if (OutFirst) *OutFirst = X.Mat; }
+				if (X.Pays() && X.Hours() < Best) { Best = X.Hours(); if (OutFirst) *OutFirst = X.Mat; }
 			}
 			return Best;
 		}
@@ -621,11 +620,11 @@ namespace WRUIClaimScreen
 						{
 							if (!Upkeep.IsValidIndex(Index)) return FText::GetEmpty();
 							const FUpkeep& X = Upkeep[Index];
-							if (X.PerMinute == 0) return FText::FromString(FString::Printf(TEXT("Not needed: no %s pieces"), *X.Mat.ToString()));
-							return X.Stock < X.PerMinute ? LOCTEXT("StockOut", "Run out") : FText::FromString(TEXT("Lasts ") + Duration(X.Hours()));
+							if (!X.Pays()) return FText::FromString(FString::Printf(TEXT("Not needed: no %s pieces"), *X.Mat.ToString()));
+							return X.Stock <= 0 ? LOCTEXT("StockOut", "Run out") : FText::FromString(TEXT("Lasts ") + Duration(X.Hours()));
 						}), WRUI::Body(13, 500), TAttribute<FSlateColor>::CreateLambda([this, Index]()
 						{
-							const bool bOut = Upkeep.IsValidIndex(Index) && Upkeep[Index].PerMinute > 0 && Upkeep[Index].Stock < Upkeep[Index].PerMinute;
+							const bool bOut = Upkeep.IsValidIndex(Index) && Upkeep[Index].Pays() && Upkeep[Index].Stock <= 0;
 							return FSlateColor(bOut ? WRUI::Bad : IsFirstOut(Index) ? WRUI::Warn : WRUI::Ink2);
 						}))
 					]
@@ -637,7 +636,7 @@ namespace WRUIClaimScreen
 			FName First;
 			const float H = HoursLeft(Upkeep, &First);
 			int32 Paying = 0;
-			for (const FUpkeep& X : Upkeep) Paying += X.PerMinute > 0 ? 1 : 0;
+			for (const FUpkeep& X : Upkeep) Paying += X.Pays() ? 1 : 0;
 			return Paying > 1 && H < TNumericLimits<float>::Max() && Upkeep.IsValidIndex(Index) && Upkeep[Index].Mat == First;
 		}
 
@@ -680,10 +679,10 @@ namespace WRUIClaimScreen
 					[
 						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 						{
-							// The totem pays each minute, a whole number of each: the hour's share, rounded up.
-							TArray<FString> Parts;
-							for (const FUpkeep& X : Upkeep) if (X.PerMinute > 0) Parts.Add(FString::Printf(TEXT("%d %s"), X.PerMinute, *X.Mat.ToString()));
-							return Parts.Num() == 0 ? LOCTEXT("UpkeepFree", "None of your wood or stone pieces are inside") : FText::FromString(FString::Printf(TEXT("Taken from the totem's stock: %s a minute"), *FString::Join(Parts, TEXT(" + "))));
+							// The totem takes whole items as each hour's share comes due (a wood every 10 minutes at 6 an hour).
+							bool bAny = false;
+							for (const FUpkeep& X : Upkeep) bAny |= X.Pays();
+							return bAny ? LOCTEXT("UpkeepDue", "Taken from the totem's stock a little at a time, as it comes due") : LOCTEXT("UpkeepFree", "None of your wood or stone pieces are inside");
 						}), WRUI::Body(13, 500), WRUI::Ink3)
 					]
 				]
@@ -715,7 +714,7 @@ namespace WRUIClaimScreen
 							FName First;
 							HoursLeft(Upkeep, &First);
 							int32 Paying = 0;
-							for (const FUpkeep& X : Upkeep) Paying += X.PerMinute > 0 ? 1 : 0;
+							for (const FUpkeep& X : Upkeep) Paying += X.Pays() ? 1 : 0;
 							return Paying > 1 && !First.IsNone() ? FText::FromString(FString::Printf(TEXT("%s runs out first"), *(First.ToString().Left(1).ToUpper() + First.ToString().Mid(1)))) : FText::GetEmpty();
 						}), WRUI::Body(13, 500), WRUI::Ink2)
 					]
