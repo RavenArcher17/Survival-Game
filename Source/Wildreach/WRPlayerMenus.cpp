@@ -263,6 +263,17 @@ void AWRPlayerController::CycleInfuse()
 	}
 }
 
+void AWRPlayerController::MenuConfirmKey()
+{
+	// With Crafting open, Enter also ran the hidden text menu's line under it and crafted the station's first recipe.
+	// Bots confirm through WRMenu confirm, which still goes straight to MenuConfirm.
+	if (UI.IsValid() && UI->IsScreenOpen())
+	{
+		return;
+	}
+	MenuConfirm();
+}
+
 void AWRPlayerController::MenuConfirm()
 {
 	const TArray<FWRMenuEntry> Entries = BuildMenuEntries();

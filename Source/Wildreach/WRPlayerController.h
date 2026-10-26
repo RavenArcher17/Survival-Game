@@ -241,6 +241,8 @@ private:
 	void MenuUp();
 	void MenuDown();
 	void MenuConfirm();
+	/** Enter: the old text menu's confirm, unless a stone-and-leather screen (with its own buttons) is open. */
+	void MenuConfirmKey();
 	void MenuClose();
 	void CycleInfuse();
 

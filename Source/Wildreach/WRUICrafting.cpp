@@ -562,11 +562,12 @@ private:
 
 	const FEntry* Selected() const { return Entries.FindByPredicate([this](const FEntry& E) { return E.Key == SelectedKey; }); }
 
-	/** Gear that takes an essence: a quality recipe making one piece of equipment (FWRCrafting::Make's rule). */
+	/** Gear that takes an essence: a quality recipe making one piece of melee gear or armor (FWRCrafting::Make's rule;
+	 *  ranged hits are physical, so the server refuses to infuse bows and blowguns). */
 	bool CanInfuse(const FEntry& E) const
 	{
 		const FWRItemDef* Out = E.Recipe ? FWRItemRegistry::Get().Find(E.Recipe->Output) : nullptr;
-		return E.Kind == FEntry::EKind::Recipe && E.Recipe->bQuality && E.Recipe->Station != Hand && Out && Out->IsEquipment() && Out->StackSize <= 1;
+		return E.Kind == FEntry::EKind::Recipe && E.Recipe->bQuality && E.Recipe->Station != Hand && Out && Out->IsEquipment() && Out->StackSize <= 1 && !Out->IsRanged();
 	}
 	static FName EssenceFor(FName El) { return El == TEXT("fire") ? FName(TEXT("ember_essence")) : El == TEXT("frost") ? FName(TEXT("frost_essence")) : NAME_None; }
 

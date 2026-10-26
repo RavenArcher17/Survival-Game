@@ -136,7 +136,7 @@ void AWRPlayerController::BindKeys()
 	// The old text menus' keys (bots and -oldui still use them); Esc always closes what's open.
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);
-	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirm);
+	InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AWRPlayerController::MenuConfirmKey);
 	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AWRPlayerController::EscapePressed);
 	// Keys that pass a value: lambdas through FInputKeyBinding.
 	const auto BindLambda = [this](const FKey& Key, EInputEvent Event, TFunction<void()> Fn)

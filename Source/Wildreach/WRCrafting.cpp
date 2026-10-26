@@ -334,6 +334,12 @@ FString FWRCrafting::Make(AWRPlayerController* Player, const FWRRecipe& Recipe, 
 	{
 		return R->bQuality ? FString::Printf(TEXT("need 1 %s to infuse"), *Essence.ToString()) : TEXT("only gear can be infused");
 	}
+	// Ranged hits are physical (WRRanged): an infused bow would only use up the essence.
+	const FWRItemDef* InfuseDef = FWRItemRegistry::Get().Find(R->Output);
+	if (!Essence.IsNone() && InfuseDef && InfuseDef->IsRanged())
+	{
+		return TEXT("ranged weapons can't carry an infusion yet");
+	}
 
 	for (const TPair<FName, int32>& In : R->Inputs)
 	{
