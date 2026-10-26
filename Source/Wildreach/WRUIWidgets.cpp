@@ -129,12 +129,13 @@ void SWRSlot::Construct(const FArguments& InArgs)
 		SNew(SBox).WidthOverride(Size).HeightOverride(Size)
 		[
 			SNew(SOverlay)
-			+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(FLinearColor(0.07f, 0.075f, 0.085f, 0.92f), 4.f, FLinearColor(0.02f, 0.02f, 0.025f), 1.f))]
+			// Mockup colours are sRGB (#2E3238 to #141619 with a near-black edge): FColor, not linear values, or slots wash out grey.
+			+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(FLinearColor(FColor(10, 11, 13, 235)), 4.f, FLinearColor(FColor(4, 4, 5)), 1.f))]
 			+ SOverlay::Slot().Padding(1.f)[SNew(SImage).Image_Lambda([this]()
 			{
 				const FWRSlotView V = View.Get();
 				const FLinearColor Rim = bDropHover ? WRUI::Brass : V.bSelected ? WRUI::Brass : V.Quality == 2 ? FLinearColor(0.25f, 0.43f, 0.66f) : V.Quality == 1 ? FLinearColor(0.31f, 0.5f, 0.24f) : WRUI::Rim;
-				return WRUI::Box(FLinearColor(0.13f, 0.14f, 0.16f, V.ItemId.IsNone() ? 0.6f : 0.85f), 3.f, Rim, V.bSelected || bDropHover ? 2.f : 1.f);
+				return WRUI::Box(FLinearColor(FColor(33, 36, 41, V.ItemId.IsNone() ? 165 : 215)), 3.f, Rim, V.bSelected || bDropHover ? 2.f : 1.f);
 			})]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
