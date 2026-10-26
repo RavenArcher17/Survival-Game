@@ -536,7 +536,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
-		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall ") };  // chat is its own RPC
+		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("hearthfeed") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{

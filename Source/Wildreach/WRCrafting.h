@@ -77,6 +77,7 @@ public:
 
 	int32 GetTechLevel() const { return FWRCraftingRules::TechLevelForCores(Cores.Num()); }
 	bool IsBroken() const { return Health <= 0.f; }
+	float GetHealth() const { return Health; }
 	const TArray<FName>& GetCores() const { return Cores; }
 
 	/** Server: deposit every boss core the player carries. */

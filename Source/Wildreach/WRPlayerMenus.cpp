@@ -79,6 +79,7 @@ void AWRPlayerController::WRTorpor(float Amount) { ServerCommand(FString::Printf
 void AWRPlayerController::WRTameStat() { ServerCommand(TEXT("tamestat")); }
 void AWRPlayerController::WRTameGive(FName Item) { ServerCommand(FString::Printf(TEXT("tamegive %s"), *Item.ToString())); }
 void AWRPlayerController::WRNarcotic() { ServerCommand(TEXT("tamenarcotic")); }
+void AWRPlayerController::WRCmd(const FString& Command) { ServerCommand(Command); }
 void AWRPlayerController::WRBossDmg(float Amount, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.0f %s"), Amount, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
 void AWRPlayerController::WRBossDmgPct(float Percent, FName Element) { ServerCommand(FString::Printf(TEXT("bossdmg %.1f%% %s"), Percent, Element.IsNone() ? TEXT("none") : *Element.ToString())); }
 void AWRPlayerController::WRClan(const FString& Action, const FString& Name) { ServerCommand(FString::Printf(TEXT("clan %s %s"), *Action, *Name)); }
@@ -199,8 +200,11 @@ void AWRPlayerController::WRInteract()
 		MenuIndex = 0;
 		return;
 	}
-	// The Hearth has its own screen in the new UI (feeding it cores is a button there).
-	if (UI && FWRScreens::Find(TEXT("hearth")) && FindNearbyHearth() && !FindNearbyPiece(350.f, true))
+	// The Hearth has its own screen in the new UI (feeding it cores is a button there). Its own piece is the usable
+	// piece nearest to it, so only another one (a door, a chest) closer than that keeps E on that one.
+	const AWRBuildPiece* NearPiece = FindNearbyPiece(350.f, true);
+	const FWRPieceDef* NearDef = NearPiece ? NearPiece->GetDef() : nullptr;
+	if (UI && FWRScreens::Find(TEXT("hearth")) && FindNearbyHearth() && (!NearPiece || (NearDef && NearDef->Kind == TEXT("hearth"))))
 	{
 		Menu = EWRMenu::Hearth;
 		MenuIndex = 0;
@@ -631,6 +635,14 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		AWRCreature* Wild = FindNearbyCreature(false, 500.f);
 		OutResult = !Wild ? FString(TEXT("no knocked-out creature nearby"))
 			: Cmd == TEXT("tamenarcotic") ? Wild->GiveNarcotic(this) : Wild->GiveTameFood(this, FName(*Arg(1)));
+		ClientNotify(OutResult);
+		return true;
+	}
+	if (Cmd == TEXT("hearthfeed"))
+	{
+		// The Hearth screen's "Feed a core": E on the Hearth opens that screen instead of sending "interact".
+		AWRHearth* Hearth = FindNearbyHearth();
+		OutResult = Hearth ? Hearth->DepositCores(this) : TEXT("no Hearth nearby");
 		ClientNotify(OutResult);
 		return true;
 	}
