@@ -9,8 +9,116 @@
 #include "WRInventory.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "WRPlayerUI.h"
 #include "Camera/PlayerCameraManager.h"
 #include "EngineUtils.h"
+
+// ---------------------------------------------------------------- free placement (snap off)
+// With snap off (F) a structure piece goes where you aim instead of onto the grid. The grid's own rules (one piece per
+// slot) can't see a piece that's off the grid, so a free piece is also checked box against box: it mustn't sink into
+// another structure piece. Two pieces on the grid keep the slot rules alone (walls meeting at a corner overlap by
+// design). Client and server run the same checks; the server also treats any off-grid location as free.
+namespace WRFreeBuild
+{
+	/** The solid box of a structure piece around its location (cm, before yaw): AWRBuildPiece::ApplyLook's blocks. */
+	static FBox PieceBox(const FWRPieceDef& Def)
+	{
+		const FName S = Def.Shape;
+		if (S == TEXT("foundation")) return FBox(FVector(-200, -200, -150), FVector(200, 200, 100));
+		if (S == TEXT("floor")) return FBox(FVector(-200, -200, 0), FVector(200, 200, 20));
+		if (S == TEXT("roof")) return FBox(FVector(-240, -210, 0), FVector(210, 210, 215));
+		if (S == TEXT("pillar")) return FBox(FVector(-20, -20, 0), FVector(20, 20, 300));
+		if (S == TEXT("stairs")) return FBox(FVector(-250, -104, 0), FVector(250, 104, 300));
+		if (S == TEXT("halfwall")) return FBox(FVector(-210, -10, 0), FVector(210, 10, 150));
+		if (S == TEXT("upperwall") || S == TEXT("gable")) return FBox(FVector(-210, -10, 0), FVector(210, 10, 210));
+		if (S == TEXT("palisade")) return FBox(FVector(-220, -20, 0), FVector(220, 20, 400));
+		if (S == TEXT("gate")) return FBox(FVector(-220, -10, 0), FVector(220, 10, 400));
+		if (S == TEXT("tower")) return FBox(FVector(-100, -100, 0), FVector(100, 100, 520));
+		return FBox(FVector(-210, -10, 0), FVector(210, 10, 300));   // wall, door, doorway, window
+	}
+
+	/** On the build grid: where snapping would have put it, square to the grid. */
+	static bool IsOnGrid(const FWRPieceDef& Def, const FVector& Loc, float Yaw)
+	{
+		float SnapYaw = Yaw;
+		const FVector Snapped = FWRBuildRules::SnapToGrid(Def.Shape, Loc, Loc.Z, FWRBuildRegistry::Get().GridSize, SnapYaw);
+		const float Turn = FMath::Fmod(FMath::Abs(Yaw), 90.f);
+		return FVector::Dist2D(Snapped, Loc) < 2.f && FMath::Min(Turn, 90.f - Turn) < 1.f;
+	}
+
+	/** Two yawed boxes interpenetrate (by more than Slack: touching faces and float noise don't count). */
+	static bool Overlap(const FBox& A, const FVector& LocA, float YawA, const FBox& B, const FVector& LocB, float YawB, float Slack = 5.f)
+	{
+		const auto Shrink = [Slack](float Min, float Max, float& OutMin, float& OutMax)
+		{
+			const float Mid = (Min + Max) * 0.5f, Half = FMath::Max(1.f, (Max - Min) * 0.5f - Slack);
+			OutMin = Mid - Half;
+			OutMax = Mid + Half;
+		};
+		float AZ0, AZ1, BZ0, BZ1;
+		Shrink(LocA.Z + A.Min.Z, LocA.Z + A.Max.Z, AZ0, AZ1);
+		Shrink(LocB.Z + B.Min.Z, LocB.Z + B.Max.Z, BZ0, BZ1);
+		if (AZ1 <= BZ0 || BZ1 <= AZ0) return false;
+		// Separating axes in plan: each box's own two axes.
+		struct FRect { FVector2D C, X, Y; float HX = 0.f, HY = 0.f; };
+		const auto Rect = [&Shrink](const FBox& Box, const FVector& Loc, float Yaw)
+		{
+			FRect R;
+			float X0, X1, Y0, Y1;
+			Shrink(Box.Min.X, Box.Max.X, X0, X1);
+			Shrink(Box.Min.Y, Box.Max.Y, Y0, Y1);
+			const float Rad = FMath::DegreesToRadians(Yaw);
+			R.X = FVector2D(FMath::Cos(Rad), FMath::Sin(Rad));
+			R.Y = FVector2D(-R.X.Y, R.X.X);
+			R.C = FVector2D(Loc.X, Loc.Y) + R.X * ((X0 + X1) * 0.5f) + R.Y * ((Y0 + Y1) * 0.5f);
+			R.HX = (X1 - X0) * 0.5f;
+			R.HY = (Y1 - Y0) * 0.5f;
+			return R;
+		};
+		const FRect RA = Rect(A, LocA, YawA), RB = Rect(B, LocB, YawB);
+		const FVector2D D = RB.C - RA.C;
+		for (const FVector2D& Axis : { RA.X, RA.Y, RB.X, RB.Y })
+		{
+			const float PA = RA.HX * FMath::Abs(FVector2D::DotProduct(RA.X, Axis)) + RA.HY * FMath::Abs(FVector2D::DotProduct(RA.Y, Axis));
+			const float PB = RB.HX * FMath::Abs(FVector2D::DotProduct(RB.X, Axis)) + RB.HY * FMath::Abs(FVector2D::DotProduct(RB.Y, Axis));
+			if (FMath::Abs(FVector2D::DotProduct(D, Axis)) >= PA + PB) return false;
+		}
+		return true;
+	}
+
+	/** Why a structure piece can't go here because it would sink into another one; empty = it fits. */
+	static FString OverlapWhy(UWorld* World, const FWRPieceDef& Def, const FVector& Loc, float Yaw, bool bFree)
+	{
+		const FBox Mine = PieceBox(Def);
+		for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
+		{
+			const FWRPieceDef* Other = It->GetDef();
+			if (It->bGhost || !Other || !Other->Snaps() || It->IsActorBeingDestroyed())
+			{
+				continue;
+			}
+			const float OtherYaw = It->GetActorRotation().Yaw;
+			if (!bFree && IsOnGrid(*Other, It->GetActorLocation(), OtherYaw))
+			{
+				continue;
+			}
+			if (Overlap(Mine, Loc, Yaw, PieceBox(*Other), It->GetActorLocation(), OtherYaw))
+			{
+				return FString::Printf(TEXT("overlaps the %s"), *Other->Name.ToLower());
+			}
+		}
+		return FString();
+	}
+
+	/** A piece's cost for this player (the Thrifty perk makes building cheaper). */
+	static TArray<TPair<FName, int32>> CostFor(const AActor* Player, const FWRPieceDef& Def)
+	{
+		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("buildCost")));
+		TArray<TPair<FName, int32>> Out;
+		for (const TPair<FName, int32>& C : Def.Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Mult)) });
+		return Out;
+	}
+}
 
 void AWRPlayerController::WRPlace(FName Piece, float X, float Y, float Z, float Yaw)
 {
@@ -63,7 +171,9 @@ void AWRPlayerController::ToggleBuildMenu()
 {
 	if (IsPlacing())
 	{
+		// The new UI keeps its build bar up while you place: B leaves build mode altogether.
 		CancelPlacement();
+		if (Menu == EWRMenu::Build) MenuClose();
 		return;
 	}
 	Menu = Menu == EWRMenu::Build ? EWRMenu::None : EWRMenu::Build;
@@ -88,7 +198,11 @@ static AWRBuildPiece* SpawnGhost(UWorld* World, FName Piece)
 void AWRPlayerController::StartPlacing(FName Piece)
 {
 	CancelPlacement();
-	MenuClose();
+	// The new UI's build bar stays up while you place (it shows the piece and the keys); the old text menu closes.
+	if (!(UI && Menu == EWRMenu::Build && FWRScreens::Find(TEXT("build"))))
+	{
+		MenuClose();
+	}
 	PlacingPiece = Piece;
 	PlaceYaw = GetControlRotation().Yaw;
 	Ghost = SpawnGhost(GetWorld(), Piece);  // "demolish": a red copy of whatever you aim at, made in UpdatePlacement
@@ -106,7 +220,9 @@ void AWRPlayerController::CancelPlacement()
 
 void AWRPlayerController::RotatePlacement()
 {
-	PlaceYaw += 90.f;
+	// On the grid a quarter turn; placed freely (snap off, or a piece that never snaps) an eighth.
+	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
+	PlaceYaw += Def && Def->Snaps() && bSnap ? 90.f : 45.f;
 }
 
 void AWRPlayerController::ConfirmPlacement()
@@ -120,7 +236,10 @@ void AWRPlayerController::ConfirmPlacement()
 	}
 	else if (IsPlacing())
 	{
-		ServerCommand(FString::Printf(TEXT("place %s %.0f %.0f %.0f %.0f"), *PlacingPiece.ToString(), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z, PlaceYaw));
+		// A structure piece placed with snap off says so: the server checks it box against box, not by grid slot.
+		const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
+		ServerCommand(FString::Printf(TEXT("place %s %.0f %.0f %.0f %.0f%s"), *PlacingPiece.ToString(), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z, PlaceYaw,
+			Def && Def->Snaps() && !bSnap ? TEXT(" free") : TEXT("")));
 	}
 }
 
@@ -141,7 +260,8 @@ void AWRPlayerController::UpdatePlacement()
 	Query.AddIgnoredActor(G);
 	FHitResult Hit;
 	FVector Point = Eye + Dir * 1000.f;
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query))
+	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query);
+	if (bHit)
 	{
 		Point = Hit.ImpactPoint;
 	}
@@ -171,7 +291,8 @@ void AWRPlayerController::UpdatePlacement()
 		return;
 	}
 
-	if (Def->Snaps())
+	const bool bFreeStructure = Def->Snaps() && !bSnap;
+	if (Def->Snaps() && bSnap)
 	{
 		// Storey heights come from the nearest foundation's top surface.
 		float BaseZ = Point.Z;
@@ -235,6 +356,17 @@ void AWRPlayerController::UpdatePlacement()
 	else
 	{
 		PlaceLoc = Point;
+		if (bFreeStructure)
+		{
+			// Snap off: where you aim, a foundation sunk into the ground as on the grid. Whole centimetres and degrees,
+			// as the place command carries them, so the server checks exactly the spot you see.
+			if (Def->Shape == TEXT("foundation") && bHit && !Cast<AWRBuildPiece>(Hit.GetActor()))
+			{
+				PlaceLoc.Z -= WRTune(TEXT("building.foundationSink"), 60.f);
+			}
+			PlaceLoc = FVector(FMath::RoundToFloat(PlaceLoc.X), FMath::RoundToFloat(PlaceLoc.Y), FMath::RoundToFloat(PlaceLoc.Z));
+			PlaceYaw = FMath::RoundToFloat(FRotator::NormalizeAxis(PlaceYaw));
+		}
 		G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, PlaceYaw, 0.f));
 	}
 
@@ -242,7 +374,12 @@ void AWRPlayerController::UpdatePlacement()
 	bPlaceValid = true;
 	PlaceWhy.Reset();
 	const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
-	if (FVector::Dist(PlaceLoc, Self->GetActorLocation()) > 1100.f)
+	if (bFreeStructure && !bHit)
+	{
+		bPlaceValid = false;
+		PlaceWhy = TEXT("aim at the ground or a piece");
+	}
+	else if (FVector::Dist(PlaceLoc, Self->GetActorLocation()) > 1100.f)
 	{
 		bPlaceValid = false;
 		PlaceWhy = TEXT("too far");
@@ -262,9 +399,14 @@ void AWRPlayerController::UpdatePlacement()
 		bPlaceValid = false;
 		PlaceWhy = Blocked;
 	}
+	else if (const FString Overlaps = Def->Snaps() ? WRFreeBuild::OverlapWhy(GetWorld(), *Def, PlaceLoc, PlaceYaw, bFreeStructure) : FString(); !Overlaps.IsEmpty())
+	{
+		bPlaceValid = false;
+		PlaceWhy = Overlaps;
+	}
 	else if (PS)
 	{
-		for (const TPair<FName, int32>& C : Def->Cost)
+		for (const TPair<FName, int32>& C : WRFreeBuild::CostFor(this, *Def))
 		{
 			if (PS->GetInventory()->CountOf(C.Key) < C.Value)
 			{
@@ -345,6 +487,8 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PieceId);
 		const FVector Loc(FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)), FCString::Atof(*Arg(4)));
 		const float Yaw = FCString::Atof(*Arg(5));
+		// Snap off (the client says "free"), or anything off the grid: checked box against box, not only by grid slot.
+		const bool bFree = Def && Def->Snaps() && (Arg(6) == TEXT("free") || !WRFreeBuild::IsOnGrid(*Def, Loc, Yaw));
 		OutResult.Reset();
 		if (!Def || !Self) OutResult = TEXT("unknown piece");
 		else if (FVector::Dist(Loc, Self->GetActorLocation()) > 1300.f) OutResult = TEXT("too far away");
@@ -368,11 +512,11 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			Support = AWRBuildPiece::SupportAt(GetWorld(), PieceId, Loc);
 			if (Support == INDEX_NONE) OutResult = FString::Printf(TEXT("no support (%s spans %d)"), *Def->Material.ToString(), FWRBuildRules::SpanFor(Def->Material));
 			else OutResult = AWRBuildPiece::Blocked(GetWorld(), PieceId, Loc);
+			if (OutResult.IsEmpty()) OutResult = WRFreeBuild::OverlapWhy(GetWorld(), *Def, Loc, Yaw, bFree);
 		}
 		// Thrifty perk: cheaper building.
 		TMap<FName, int32> Cost;
-		const float CostMult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(this, TEXT("buildCost")));
-		if (Def) for (const TPair<FName, int32>& C : Def->Cost) Cost.Add(C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * CostMult)));
+		if (Def) for (const TPair<FName, int32>& C : WRFreeBuild::CostFor(this, *Def)) Cost.Add(C.Key, C.Value);
 		if (OutResult.IsEmpty())
 		{
 			for (const TPair<FName, int32>& C : Cost)
