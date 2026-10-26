@@ -448,7 +448,14 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 	{
 		// store / take <slot> [count]: a stack (or part of one) between your bag and the chest you stand at;
 		// storeall: every resource in your bag; takeall: everything that fits.
-		AWRBuildPiece* Chest = FindNearbyPiece(450.f);
+		// The nearest chest (what E opened): the nearest piece of any kind would be the floor or wall you stand by.
+		AWRBuildPiece* Chest = nullptr;
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It && Self; ++It)
+		{
+			const FWRPieceDef* ItDef = It->GetDef();
+			const float Dist = FVector::Dist(It->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation());
+			if (!It->bGhost && ItDef && ItDef->Kind == TEXT("chest") && Dist < 450.f && (!Chest || Dist < FVector::Dist(Chest->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation()))) Chest = *It;
+		}
 		const FWRPieceDef* Def = Chest ? Chest->GetDef() : nullptr;
 		const int32 Index = FCString::Atoi(*Arg(1));
 		// Move up to N from one stack into a slot list; returns how many moved.

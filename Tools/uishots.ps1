@@ -6,6 +6,8 @@ param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845)
 # One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
+# Unreal otherwise starts with UnrealBuildTool's platform check, which waits for any build running on the machine.
+$env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -26,7 +28,8 @@ $screens = [ordered]@{
 	'wheel2'       = 'WRWheel 0 2'
 	'tame_wheel'   = 'WRWheel -1 0|WRSpawn ashstrider 1|wait 1|WRGoTo ashstrider|WRInteract|wait 6|WRWheel 2 0'
 	'help'         = 'WRWheel -1 0|wait 0.5|WRHelp'
-	'inventory'    = 'WRHelp|WRMenu inventory 0|wait 1'
+	'inventory'    = 'WRHelp|WRGive gem_ruby 1|WREquip gem_ruby|wait 0.5|WRMenu inventory 0|wait 1|WRUISelect ranged'
+	'inventory_split' = 'WRUIInvPicker split stone'
 	'crafting'     = 'WRMenu none 0|WRMenu crafting 0|wait 1'
 	'paths'        = 'WRMenu paths 0|wait 1'
 	'skills'       = 'WRMenu skills 0|wait 1'
@@ -34,6 +37,10 @@ $screens = [ordered]@{
 	'build'        = 'WRMenu map 0|WRMenu build 0|wait 1'
 	'taming'       = 'WRMenu none 0|WRMenu build 0|WRMenu none 0|WRSpawn cinderfang 1|WRHold 60|wait 1|WRGoTo cinderfang|WRTorpor 1000|wait 1.5|WRInteract|wait 1'
 	'taming_hud'   = 'WRInteract|wait 1'
+	# A chest on flat ground far from the tame (E would pick your tame over the chest), wild creatures cleared; the
+	# resources stored, some taken back; then the "how many?" picker.
+	'storage'      = 'WRMenu none 0|WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 270 -8|WRGive copper_ingot 12|WRPlace storage_chest -124800 -51800 6525 0|wait 2|WRInteract|wait 1|WRUICmd storeall|wait 1|WRUICmd take 1 20|WRUICmd take 0 30|wait 1.5'
+	'storage_picker' = 'WRUIStoragePicker store wood'
 }
 if ($Only.Count -gt 0) { $Only = $Only | ForEach-Object { $_ -split ',' } }
 $cmds = @('WRBotPause 1', 'wait 3',
