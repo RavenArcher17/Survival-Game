@@ -32,7 +32,7 @@
 // Named (not anonymous): unity builds put several UI files in one translation unit.
 namespace WRPathsTab
 {
-	constexpr float U = 1.2f;
+	using WRUI::U;
 
 	FLinearColor Hex(const TCHAR* H) { return FLinearColor(FColor::FromHex(H)); }
 	const FSlateBrush* Glyph(const FString& Name) { return WRUI::Image(FName(*(TEXT("Glyphs/") + Name))); }
@@ -340,8 +340,9 @@ public:
 					]
 					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 					[
-						SNew(SBox).WidthOverride(74.f * U).HeightOverride(74.f * U).Visibility_Lambda([this]() { return Selected.Get() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-						[SNew(SImage).Image(WRUI::Box(WRUI::Alpha(WRUI::Brass, 0.18f), 37.f * U, WRUI::Brass, 3.f))]
+						// The node you point at gets a fainter one, so it's clear what the details panel is showing.
+						SNew(SBox).WidthOverride(74.f * U).HeightOverride(74.f * U).Visibility_Lambda([this]() { return Selected.Get() || IsHovered() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						[SNew(SImage).Image(WRUI::Box(WRUI::Alpha(WRUI::Brass, 0.18f), 37.f * U, WRUI::Brass, 3.f)).ColorAndOpacity_Lambda([this]() { return FLinearColor(1.f, 1.f, 1.f, Selected.Get() ? 1.f : 0.5f); })]
 					]
 					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 					[
@@ -1130,7 +1131,7 @@ private:
 			}
 			else
 			{
-				Line->AddSlot()[WRUI::Text(LOCTEXT("BranchReq", "· first of its branch: needs the trunk"), WRUI::Body(14, 500), WRUI::Ink2)];
+				Line->AddSlot()[WRUI::Text(LOCTEXT("BranchReq", "· opens once the trunk is done"), WRUI::Body(14, 500), WRUI::Ink2)];
 			}
 			// The bar: ranks for a stat, the branch gate for a gated node, trunk progress for the first of a branch.
 			float Frac = 1.f;

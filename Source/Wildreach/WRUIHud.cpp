@@ -39,7 +39,7 @@
 
 namespace
 {
-	constexpr float U = 1.2f;   // mockup px -> 1080p units
+	using WRUI::U;
 
 	FVector2D Measure(const FText& Text, const FSlateFontInfo& Font)
 	{

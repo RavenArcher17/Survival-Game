@@ -18,7 +18,7 @@
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
-namespace { constexpr float U = 1.2f; constexpr float WheelSize = 560.f * U; }
+namespace { using WRUI::U; constexpr float WheelSize = 560.f * U; }
 
 class SWRWheel : public SCompoundWidget
 {
@@ -58,7 +58,13 @@ public:
 			];
 		}
 
-		SetVisibility(TAttribute<EVisibility>::CreateLambda([this]() { const FWRPlayerUI* X = UI(); return X && Mode() == 2 && X->IsTameWheelSticky() ? EVisibility::Visible : EVisibility::HitTestInvisible; }));
+		// This layer covers the whole screen: only a sticky tame wheel (waiting for a click) takes the mouse, otherwise
+		// clicks and drags go through to the screens below.
+		SetVisibility(TAttribute<EVisibility>::CreateLambda([this]()
+		{
+			const FWRPlayerUI* X = UI();
+			return X && Mode() == 2 && X->IsTameWheelSticky() ? EVisibility::Visible : EVisibility::HitTestInvisible;
+		}));
 		ChildSlot
 		[
 			SNew(SOverlay).Visibility_Lambda([this]() { return Mode() == 0 ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })

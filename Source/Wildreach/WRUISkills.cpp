@@ -22,7 +22,7 @@
 // Named (not anonymous): unity builds put several UI files in one translation unit.
 namespace WRSkillsTab
 {
-	constexpr float U = 1.2f;
+	using WRUI::U;
 	constexpr float CardW = 240.f, ColGap = 14.f;
 
 	FLinearColor Hex(const TCHAR* H) { return FLinearColor(FColor::FromHex(H)); }

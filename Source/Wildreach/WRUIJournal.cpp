@@ -18,11 +18,10 @@
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
+using WRUI::U;
+
 class SWRJournal : public SCompoundWidget
 {
-	// A class constant, not an anonymous-namespace one: unity builds can put this file next to WRUIHud.cpp's U.
-	static constexpr float U = 1.2f;
-
 public:
 	SLATE_BEGIN_ARGS(SWRJournal) {}
 		SLATE_ARGUMENT(TWeakObjectPtr<AWRPlayerController>, PC)

@@ -38,7 +38,7 @@
 // Named (not anonymous): unity builds put several UI files in one translation unit.
 namespace WRMapTab
 {
-	constexpr float U = 1.2f;
+	using WRUI::U;
 	constexpr float MapMin = -201800.f;   // world cm at the picture's left / top edge
 	constexpr float MapSize = 403600.f;   // world cm across the picture
 	constexpr float MaxZoom = 8.f;
