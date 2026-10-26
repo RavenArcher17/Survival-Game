@@ -314,15 +314,27 @@ void AWRBuildPiece::SpawnChild()
 	ChildActor = Child;
 }
 
+/**
+ * Loaded once and rooted. A static raw pointer isn't a GC reference: once no piece is near (they leave a client's
+ * relevancy as you walk away from your base) the asset was collected, and the next piece to arrive read freed memory.
+ */
+template <typename T>
+static T* LoadRooted(const TCHAR* Path)
+{
+	T* Obj = LoadObject<T>(nullptr, Path);
+	if (Obj) Obj->AddToRoot();
+	return Obj;
+}
+
 static UStaticMesh* CubeMesh()
 {
-	static UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	static UStaticMesh* Mesh = LoadRooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	return Mesh;
 }
 
 static UMaterialInterface* ShapeMat()
 {
-	static UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static UMaterialInterface* Mat = LoadRooted<UMaterialInterface>(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	return Mat;
 }
 
@@ -333,8 +345,8 @@ static UMaterialInterface* SurfaceFor(const FWRPieceDef& Def)
 	{
 		return nullptr;
 	}
-	static UMaterialInterface* Wood = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
-	static UMaterialInterface* Stone = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
+	static UMaterialInterface* Wood = LoadRooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
+	static UMaterialInterface* Stone = LoadRooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
 	return Def.Material == TEXT("stone") || Def.Id == TEXT("brazier") ? Stone : Wood;
 }
 
