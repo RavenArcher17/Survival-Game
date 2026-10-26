@@ -280,7 +280,7 @@ void SWRButton::Construct(const FArguments& InArgs)
 			SNew(SBox).MinDesiredHeight(InArgs._MinHeight)
 			[
 				SNew(SOverlay)
-				+ SOverlay::Slot()[SNew(SImage).Image(bGhost ? WRUI::White() : WRUI::Image(TEXT("leather"))).ColorAndOpacity(bGhost ? FLinearColor(0.f, 0.f, 0.f, 0.32f) : FLinearColor::White)]
+				+ SOverlay::Slot()[SNew(SImage).Image(bGhost ? WRUI::White() : WRUI::Image(TEXT("leather"))).DesiredSizeOverride(FVector2D(1.f, 1.f)).ColorAndOpacity(bGhost ? FLinearColor(0.f, 0.f, 0.f, 0.32f) : FLinearColor::White)]
 				+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, bPrimary]()
 				{
 					const bool bHover = IsHovered();

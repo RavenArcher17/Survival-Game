@@ -11,6 +11,7 @@
  */
 namespace WRUI
 {
+	inline constexpr float U = 1.2f;
 	// Colours (linear), named as in the mockups' tokens.
 	extern const FLinearColor Ink;        // main text
 	extern const FLinearColor Ink2;       // secondary text
