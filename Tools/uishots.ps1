@@ -3,6 +3,9 @@
 # screen into -Out. Add screens to $screens as they're built.
 #   uishots.ps1 [-Out <folder>] [-Only hud,wheel]
 param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845)
+# One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
+$lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
+try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -66,3 +69,4 @@ for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 $errors = @(Select-String -Path "$logs\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue | Select-Object -First 5)
 if ($errors) { "client errors:"; $errors | ForEach-Object { '  ' + $_.Line.Trim() } }
 "{0} of {1} screens captured (logs: {2})" -f [Math]::Min($files.Count, $labels.Count), $labels.Count, $logs
+$lock.ReleaseMutex()
