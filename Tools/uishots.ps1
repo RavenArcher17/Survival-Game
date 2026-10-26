@@ -38,7 +38,7 @@ $screens = [ordered]@{
 	'build'        = 'WRMenu map 0|WRTeleport -131300 -56400|wait 4|WRLook 180 -18|WRMenu build 0|wait 1'
 	'build_placing' = 'WRLook 180 -18|WRGhost wood_foundation|wait 1.5'
 	# The Ashstrider tame stays behind (E would pick it over the knocked-out Cinderfang); the Taming screen, fed meat.
-	'taming'       = 'WRMenu none 0|WRMenu build 0|WRMenu none 0|WRTameAll stay|WRTeleport -51623 57155|wait 3|WRLook 270 -8|WRSpawn cinderfang 1|WRHold 60|wait 1|WRGoTo cinderfang|WRTorpor 1000|wait 1.5|WRInteract|wait 1|WRTameGive raw_meat|wait 3'
+	'taming'       = 'WRMenu none 0|WRMenu build 0|WRMenu none 0|WRTameAll stay|WRTeleport -51623 57155|wait 9|WRLook 270 -8|WRSpawn cinderfang 1|WRHold 60|wait 1|WRGoTo cinderfang|WRTorpor 1000|wait 1.5|WRInteract|wait 1|WRTameGive raw_meat|wait 3'
 	'taming_hud'   = 'WRInteract|wait 1'
 	# A base by the survival test's hut site (as skytest builds it): a hut of wood and stone, four stations, a claim
 	# stocked from the bag, and a Hearth fed Vulkarn's core; then E on the totem, and E on the Hearth.

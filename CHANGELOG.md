@@ -1,5 +1,68 @@
 # Changelog
 
+## 2026-10-26: the stone-and-leather UI
+
+The whole UI is rebuilt from the mockups Raven approved (dark stone and leather, Cinzel and Alegreya Sans), in Slate
+C++ owned per local player by `FWRPlayerUI`. Screens register themselves by name and follow the controller's menu
+state, so gameplay still goes through the same server commands (and the bots still drive every menu). Fonts, textures,
+item icons, creature portraits and line glyphs load at runtime from `Data/UI` (no editor import). `-oldui` keeps
+the old text HUD.
+
+- **Every key is rebindable** (Esc → Controls; saved in `GameUserSettings.ini` `[Wildreach.Keys]`, only what differs
+  from the defaults). Click a key and press the new one (keyboard, mouse buttons, wheel); a key already in use asks
+  "Replace it?" and the action that loses it shows "Not set". Right-click clears, Reset to defaults. Defaults no longer
+  clash: dodge C, crafting J. H shows the current keys in game.
+- **Item hotbar (1–8)**: each key holds an item from your bag (drag items onto it in the inventory, right-click or drag
+  off to clear; new tools, weapons, food and potions take a free key unless you took them off). Pressing a key equips or
+  uses it; the mouse wheel steps along it (it still cycles ammo while aiming). Q/Z/X no longer take a potion, eat or
+  drink: the hotbar does that.
+- **Ability wheels**: hold Q (or Z for the second wheel) to open a wheel of 8 abilities, pick with the mouse, release to
+  keep it; a tap casts the picked one. Or give each ability its own key (cast mode Wheel / Own keys / Both, and
+  cast-on-release, in Controls). Fill the wheels from the Paths tab (drag a learned ability onto a slot).
+- **Tame orders**: hold E on your tame for an order wheel (follow, stay, ride, release, passive, aggressive); a tap
+  opens it to click an order.
+- **HUD**: level and path XP, compass with points of interest and the nearest camp or boss, boss bar, clock, vitals with
+  food/water/Heat rings, hotbar, ability plate with cooldowns, tame card, taming card, pickups, chat, interaction prompt.
+- **The journal** (I / J / P / K / M):
+  - Inventory: equipment with a body figure, the 8×5 bag with drag and drop (move, equip, unequip, swap), filters, sort,
+    item details (stats, durability, sockets, where it's repaired/made/used), split and drop with a "how many?" picker,
+    carry weight, the hotbar strip.
+  - Crafting: the station you're at (or by hand) and the others' distance, categories, search, "ready to craft",
+    ingredients have/need, quality odds, infusion (melee gear and armor), quantity, repair and upgrade.
+  - Paths: the fire/frost tree with learned / available / locked states, node details with real numbers, Learn, and the
+    two-wheel loadout.
+  - Skills: life-skill cards with level and XP, perk tiers and choices.
+  - Map: the island with camps, caves, bosses, passes, your Hearth, claims and tames; zoom, pan, legend toggles, marker
+    details (boss loot).
+- **Build bar** (B): categories and piece cards with costs, a placing chip with the reason a piece won't go, keys, claim
+  status, demolish. **Snap (F) now works**: with it off, pieces go at the aim point (45° turns), checked box against box
+  so they can't overlap; client and server check the same spot.
+- **Storage** (a chest beside your bag: drag, shift-click a stack, ctrl-click one, "how many?", Store all resources,
+  Take all), **Hearth** (tech levels, boss cores, what each level unlocks, stations in the claim, feed a core),
+  **Claim** (top-down map of the claim, upkeep per material with time left, stock, radius upgrade), **Taming** (a side
+  panel: torpor, taming, effectiveness, foods from your bag to click).
+- **Game menu** (Esc): Resume, Controls, Video (window mode, resolution, 3D resolution, frame cap, vsync, quality
+  levels, auto-detect), main menu, quit. **Main menu** restyled, with a Settings button and tips that use your keys.
+- Gameplay that came with it: the bag has 40 slots; carrying over 80 kg slows you to 70% (`inventory` in
+  `tuning.json`); new server commands `move`, `split`, `drop` (a loot bag anyone can open, 10 min), `store`/`take` with
+  counts, `storeall`, `takeall`, `hearthfeed`; store/take use the nearest chest (inside a house they found the floor).
+- Fixes found on the way:
+  - **Claim upkeep cost ten times its rate**: the totem paid each hourly rate rounded up *every minute* (6 wood/h burned
+    60). It now pays as it falls due (`FWRBuildRules::PayUpkeepMinute`, tested in `Wildreach.Building.Rules`).
+  - **A client crash coming back to a base**: the build pieces' cube mesh and wood/stone materials were held in static
+    raw pointers, so after every piece left your client's range they were garbage-collected and the next piece crashed.
+  - With Crafting open, Enter also crafted the station's first recipe (the hidden text menu); infusing a bow used up the
+    essence for nothing (ranged hits are physical), so the server refuses it.
+- Tools: `Tools\uishots.ps1` shoots every new screen (`-MainMenu`: the front end); it and `alltests.ps1` set
+  `UE_SKIP_UBT_SDK_SETUP=1`, because every Unreal start otherwise waits on UnrealBuildTool's platform check while any
+  build runs. `node Tools/ui_glyphs.mjs` redraws the line glyphs. `menushots.ps1` keeps the old menus (`-oldui`).
+- What the mockups showed that the game can't do yet (built the game's way instead): Hearth repair, taking stock back
+  from a claim, named chests, map waypoints, audio and mouse settings, the taming stash's contents. Your Hearth and
+  claims show on the map only once seen (their locations don't replicate from further than ~150 m).
+- Built by five agents in parallel git worktrees (one per screen group) on the shared foundation, then merged. The
+  full suite passes on the merged build: 15 automation tests and 222 checks over 18 bot tests; `uishots.ps1` captures
+  all 25 in-game screens and the front end with no client errors.
+
 ## 2026-10-25: version 0.2.0, the game updates itself
 
 - **Auto-update.** The Wildreach shortcuts now start `WildreachUpdater.exe` (beside `Wildreach.exe`): it asks GitHub

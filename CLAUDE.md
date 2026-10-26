@@ -21,7 +21,18 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - `Docs/plan/M1_combat.md` â€¦ `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
-## Status (2026-10-25)
+## Status (2026-10-26)
+- **UI: the stone-and-leather Slate UI** (2026-10-26, from Raven's approved mockups): `FWRPlayerUI` per local player
+  (`WRPlayerUI`), style + widget kit (`WRUIStyle`, `WRUIWidgets`, `WRUIWindowKit.h`), every key in `FWRKeyBindings`
+  (Esc → Controls). Screens and journal tabs live in their own `WRUI*.cpp` and register with
+  `WR_REGISTER_SCREEN` / `WR_REGISTER_JOURNAL_TAB`; they show while the controller's `EWRMenu` matches and send the same
+  server commands. `-oldui` keeps the old text HUD (`WRHUD::DrawMenuPanel`), which still draws menus with no screen.
+  `Tools\uishots.ps1` screenshots them all. Slate gotchas: images/fonts load from `Data/UI` at runtime (PNG through
+  `IImageWrapper` into `FSlateDynamicImageBrush`; an `FSlateImageBrush` file path renders white); mockup colours are
+  sRGB, so build them with `FColor` (linear literals wash out); `FSlateDrawElement::MakeBox` ignores the brush tint
+  (`WRUI::DrawBox`); a tiled `SImage` needs `DesiredSizeOverride(1,1)` or it sizes to the texture;
+  `SetIgnoreLook/MoveInput` are counters (reset, then set once); unity builds join UI files, so share `WRUI::U` and keep
+  helpers in named namespaces; screenshots of Slate need `shot showui` (HighResShot leaves UI out).
 - **First playable is feature-complete**; art pass 2026-10-24/25: every creature but the training dummy has art (AI
   pipeline; the 3 humanoid bosses rigged on Mixamo, Ignessa a winged fae rig, the wisp a glowing orb), the player is a
   Mixamo-rigged male or female survivor (menu choice, `Data/player_art.json`) with an AI sword and shield.

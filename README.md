@@ -61,23 +61,27 @@ comes out when a player is within 250 m, `wildlife` in `tuning.json`).
 
 ### Controls
 
+Every key below is a default: **Esc → Controls** rebinds any of them (saved in `GameUserSettings.ini`,
+`[Wildreach.Keys]`), and **H** shows the current ones in game.
+
 | Key | Action |
 |---|---|
 | WASD / mouse | move / look |
 | LMB / R | light / heavy attack |
 | RMB (hold) | block; the first moment of a block is a parry |
 | C | dodge roll (i-frames) |
-| 1–8 | path abilities in your quick slots |
-| Q / Z / X | potion / eat / drink |
+| 1–8 / mouse wheel | item hotbar: equip or use what's on the key (drag items onto it in the inventory); the wheel steps along it |
+| Q / Z (hold) | ability wheel 1 / 2: pick an ability with the mouse, release to keep it; a tap casts the picked one. Esc → Controls can give each ability its own key instead (or both) |
 | Tab | lock on |
-| E | interact: stations, chests, doors, beds, crops, pens, Hearth, feed or order creatures, nests, loot bags; on a knocked-out creature, the Taming menu (food, kibble, narcotics) |
-| I / P / K / B | inventory / paths (learn nodes) / life skills (perks) / build menu (also crafting by hand) |
-| building (B, pick a piece) | aim where it goes: LMB place, R rotate (stairs, roofs; flips a gable), RMB cancel; the ghost is red with the reason when it won't go. Demolish (top of the menu): aim at your piece, LMB removes it for half back |
+| E | interact: stations, chests, doors, beds, crops, pens, Hearth, claim totem, loot bags; on a knocked-out creature, the Taming panel; hold E on your tame for its order wheel |
+| I / J / P / K / M | the journal: inventory / crafting / paths (learn nodes, fill the wheels) / life skills (perks) / map |
+| B | build bar: click a piece, then LMB place, R rotate (45° with snap off), F snap on/off, RMB cancel, B leave; the ghost is red with the reason when it won't go. Demolish from the bar: aim at your piece, LMB removes it for half back |
 | LMB at a tree / rock / shrub | gather wood / stone / fiber (a hatchet or pick in your bag gathers more) |
 | G | swap sword-and-shield for the ranged weapon (bow, crossbow, blowgun, spears, bolas) and back |
 | with it out: RMB (hold) / LMB / wheel | aim over the shoulder / fire or throw at the crosshair / next ammo (stone, tranq) |
 | Shift / Space / V | sprint / jump / first-third person |
-| M / T | map list (bosses, caves, camps, passes: distance + direction) / chat |
+| T | chat |
+| Esc | close what's open; with nothing open, the game menu (Controls, Video, main menu, quit) |
 | F10 | back to the main menu |
 
 ### Dev commands (console)
@@ -87,6 +91,10 @@ comes out when a player is within 250 m, `wildlife` in `tuning.json`).
 `WRGather tree` (bot gathers: tree / rock / shrub / node / any / off), `WRHour 21` (jump the clock), `WRSpawnAt cinderfang X Y`, `WRCreatureHP rimeclaw 0.3`, `WRTameAll stay`, `WRSky` (log the sky), `WRWildlife` (packs out, what's near),
 `WRGive hunting_bow 1`, `WRGive tranq_arrow 20`, `WRRanged 1`, `WRHold 30` (root nearby creatures), `WRClearCreatures`, `WRMenu inventory 3` (open a menu on a line: inventory / build / skills / paths / map / confirm / none),
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
+UI (screenshots and tests): `WRWheel 0 2` (hold a wheel open on a wedge; 2 = tame orders, -1 closes), `WRHelp`,
+`WRMenu crafting|settings|hearth 0`, `WRSettings video|controls|listen|key G|cancel`, `WRMainMenu [settings]`,
+`WRUISelect ranged`, `WRUIMouse click|rclick|drag ...` (real Slate input), `WRCmd <server command>`. `-oldui` keeps the
+old text HUD.
 
 ## Test
 
@@ -114,7 +122,8 @@ Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
-Tools\menushots.ps1     # a screenshot of every menu and HUD screen (inventory, build, stations, chest, claim, taming...) for UI review
+Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings; -MainMenu: the front end)
+Tools\menushots.ps1     # the same for the old text menus (-oldui)
 ```
 
 ## Layout
@@ -135,7 +144,8 @@ Tools\menushots.ps1     # a screenshot of every menu and HUD screen (inventory, 
 | `Source/Wildreach/WRCrafting`, `WRInventory`, `WRBuilding` | stations + Hearth, items + equipment, building + claims |
 | `Source/Wildreach/WRLifeSkills`, `WRSocial` | life skills; clans, PvP rules, safe zones, death penalty |
 | `Source/Wildreach/WRWorldDressing` | decoration, caves, biome hazards |
-| `Source/Wildreach/WRMainMenu`, `WRPlayerMenus`, `WRHUD` | front end, in-game menus, HUD |
+| `Source/Wildreach/WRMainMenu`, `WRPlayerMenus`, `WRHUD` | front end, in-game menu commands, world-space bars and damage numbers |
+| `Source/Wildreach/WRPlayerUI`, `WRUI*` | the stone-and-leather Slate UI: style + widget kit (`WRUIStyle`, `WRUIWidgets`), key bindings (`WRKeyBindings`), HUD, wheels, journal tabs, screens (each registers itself by name) |
 | `Source/Wildreach/Tests/` | automation tests |
 | `Docs/` | technical plan, milestone plans, design review, terrain layout |
 

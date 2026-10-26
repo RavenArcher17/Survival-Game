@@ -1,7 +1,7 @@
 # Screenshots of every menu and HUD screen, for reviewing the UI: a rendered client on L_CombatArena with a stocked
 # bag opens each menu (WRMenu), walks up to each crafting station, a chest and a land claim, a tame and a knocked-out
 # creature, and saves one picture per screen, named in order, to -Out (default: a new folder in %TEMP%).
-#   menushots.ps1 [-Out <folder>] [-Body f]
+#   menushots.ps1 [-Out <folder>] [-Body f]   (the old text menus: the client runs with -oldui; Tools\uishots.ps1 shoots the new UI)
 # The main menu and the chat box are Slate widgets, which in-game screenshots don't include.
 param([string]$Out = '', [string]$Body = '')
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -52,7 +52,7 @@ $tune = '-wrtune=taming.easySeconds:4'
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7839 -wrworld=menushots $tune -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 25
 $bodyOpt = if ($Body) { "?Body=$Body" } else { '' }
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7839?Path=fire?WRName=$name$bodyOpt -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmdline`" -abslog=`"$logs\client.log`"" -PassThru
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7839?Path=fire?WRName=$name$bodyOpt -game -oldui -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmdline`" -abslog=`"$logs\client.log`"" -PassThru
 $deadline = (Get-Date).AddSeconds(300)
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 	Start-Sleep -Seconds 5
