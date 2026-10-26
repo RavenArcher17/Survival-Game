@@ -377,7 +377,8 @@ FWRSlotView FWRPlayerUI::HotbarView(int32 Index) const
 		const bool bWorn = !Worn.IsEmpty() && Worn.ItemId == V.ItemId;
 		const FWRItemStack* Inst = bWorn ? &Worn : Inv->GetSlots().FindByPredicate([&V](const FWRItemStack& S) { return !S.IsEmpty() && S.ItemId == V.ItemId; });
 		if (Inst && Def->MaxDurability > 0.f) V.Durability = Inst->Durability / Def->MaxDurability;
-		if (Inst) V.Quality = static_cast<int32>(Inst->Quality);
+		// The slot's rim only marks the better grades (crude and common look plain), as the inventory shows them.
+		if (Inst && Def->IsEquipment()) V.Quality = Inst->Quality == EWRQuality::Masterwork ? 2 : Inst->Quality == EWRQuality::Fine ? 1 : 0;
 		const AWRCharacter* Survivor = Cast<AWRCharacter>(PC->GetPawn());
 		V.bSelected = bWorn && (Def->Slot == EWREquipSlot::Ranged ? (Survivor && Survivor->IsRangedOut()) : (Def->Slot == EWREquipSlot::Weapon && !(Survivor && Survivor->IsRangedOut())));
 		if (Def->IsThrowable()) { V.Count = (bWorn ? Worn.Count : 0) + Inv->CountOf(V.ItemId); V.bShowCount = true; }
