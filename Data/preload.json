@@ -1,0 +1,9 @@
+{
+  "_comment": "Art the game loads by path the first time something appears, preloaded in the background at map start so that moment doesn't stall a frame (UWRPreloadSubsystem, Docs/PERFORMANCE.md). Every /Game/ path in the 'scan' files is preloaded (creatures' meshes, clips and materials, player bodies and held weapons), plus 'assets' (the caves, loaded when one comes within 250 m).",
+  "scan": ["creatures.json", "player_art.json", "items.json"],
+  "assets": [
+    "/Game/Props/Caves/CaveA/cave_a.cave_a",
+    "/Game/Props/Caves/CaveB/cave_b.cave_b",
+    "/Game/Props/Caves/CaveC/cave_c.cave_c"
+  ]
+}
