@@ -331,7 +331,7 @@ public:
 		if (Sig != SideSig)
 		{
 			SideSig = Sig;
-			SideBox->SetContent(Side());
+			WRUI::SetContentMeasured(*SideBox, Side(), Geo.Scale);
 		}
 	}
 

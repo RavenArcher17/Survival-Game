@@ -4,12 +4,15 @@
 // and skip all of that, which is how menus that wouldn't take clicks went unnoticed. Tools\menutest.ps1 uses these.
 
 #include "Wildreach.h"
+#include "WRCharacter.h"
 #include "WRPlayerController.h"
 #include "WRUIFlow.h"
+#include "Containers/Ticker.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
 #include "GameFramework/GameUserSettings.h"
 #include "HAL/IConsoleManager.h"
 #include "Layout/WidgetPath.h"
@@ -208,6 +211,57 @@ namespace WRUIDrive
 			UE_LOG(LogWildreach, Log, TEXT("KEY %s"), *Key.ToString());
 		}));
 
+	// WRMouseClick [x y] [rmb]: press the mouse at a point of the game window (fractions of its size; by default the
+	// middle, where the crosshair is), for clicks in the world: placing and demolishing in build mode. The mouse doesn't
+	// travel there first (with the cursor hidden, a move turns the camera and spoils the aim).
+	FAutoConsoleCommandWithWorldAndArgs MouseClickCommand(TEXT("WRMouseClick"),
+		TEXT("Testing: click the mouse in the game window as a player would (WRMouseClick [x y] [rmb]; fractions, default the middle)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
+		{
+			const TSharedPtr<SWindow> Window = GameWindow();
+			if (!Window.IsValid() || !FSlateApplication::IsInitialized()) return;
+			const FKey Button = Args.Contains(TEXT("rmb")) ? EKeys::RightMouseButton : EKeys::LeftMouseButton;
+			const float FX = Args.Num() >= 2 && Args[0].IsNumeric() ? FCString::Atof(*Args[0]) : 0.5f;
+			const float FY = Args.Num() >= 2 && Args[1].IsNumeric() ? FCString::Atof(*Args[1]) : 0.5f;
+			const FSlateRect R = Window->GetClientRectInScreen();
+			const FVector2D Pos(FMath::Lerp(R.Left, R.Right, FX), FMath::Lerp(R.Top, R.Bottom, FY));
+			FSlateApplication& App = FSlateApplication::Get();
+			const uint32 User = FSlateApplication::CursorUserIndex, Pointer = FSlateApplication::CursorPointerIndex;
+			const FWidgetPath Hit = App.LocateWindowUnderMouse(Pos, { Window.ToSharedRef() });
+			const FString Under = Hit.IsValid() ? Hit.Widgets.Last().Widget->GetTypeAsString() : FString(TEXT("nothing"));
+			// As WRClick: take the click even when another window is in front (see Click). The button comes up a tenth of
+			// a second later, as a finger's does: game input reads keys once a frame, so a press and release in the same
+			// frame might never be seen as a press.
+			const bool bWasAllowed = App.GetHandleDeviceInputWhenApplicationNotActive();
+			App.SetHandleDeviceInputWhenApplicationNotActive(true);
+			App.ProcessMouseButtonDownEvent(nullptr, FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>({ Button }), Button, 0.f, FModifierKeysState()));
+			UE_LOG(LogWildreach, Log, TEXT("MOUSECLICK %s at %.0f,%.0f (under %s, captor %s)"), *Button.ToString(), Pos.X, Pos.Y, *Under,
+				App.GetCursorUser().IsValid() && App.GetCursorUser()->GetCursorCaptor().IsValid() ? *App.GetCursorUser()->GetCursorCaptor()->GetTypeAsString() : TEXT("none"));
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Pos, Button, User, Pointer, bWasAllowed](float)
+			{
+				if (FSlateApplication::IsInitialized())
+				{
+					FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>(), Button, 0.f, FModifierKeysState()));
+					FSlateApplication::Get().SetHandleDeviceInputWhenApplicationNotActive(bWasAllowed);
+				}
+				return false;
+			}), 0.1f);
+		}));
+
+	// WRLookAt X Y Z: turn the camera so the crosshair sits on a world point, as a player aims the build ghost (or the
+	// demolish highlight) at a spot before clicking.
+	FAutoConsoleCommandWithWorldAndArgs LookAtCommand(TEXT("WRLookAt"),
+		TEXT("Testing: aim the crosshair at a world point (WRLookAt X Y Z, cm)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			AWRPlayerController* PC = World ? Cast<AWRPlayerController>(World->GetFirstPlayerController()) : nullptr;
+			const AWRCharacter* Survivor = PC ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr;
+			if (!Survivor || Args.Num() < 3) return;
+			const FVector At(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]), FCString::Atof(*Args[2]));
+			PC->SetControlRotation(Survivor->AimRotationAt(At));
+			UE_LOG(LogWildreach, Log, TEXT("LOOKAT %s"), *At.ToCompactString());
+		}));
+
 	// WRType <text>: type characters into whatever has keyboard focus (a text box after WRClick on it).
 	FAutoConsoleCommandWithWorldAndArgs TypeCommand(TEXT("WRType"),
 		TEXT("Testing: type text into the focused text box as the keyboard would"),
@@ -226,7 +280,7 @@ namespace WRUIDrive
 		}));
 
 	// WRUIState: what a player would notice. The open menu, the cursor, whether game input and the mouse are free, where
-	// keyboard focus sits, and the settings the menu test changes.
+	// keyboard focus sits, the settings the menu test changes, and what build mode holds (a piece, "demolish", none).
 	FAutoConsoleCommandWithWorld StateCommand(TEXT("WRUIState"),
 		TEXT("Testing: log the open menu, cursor, input mode, keyboard focus and a few settings"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
@@ -236,10 +290,10 @@ namespace WRUIDrive
 			FSlateApplication& App = FSlateApplication::Get();
 			const TSharedPtr<SWidget> Focus = App.GetKeyboardFocusedWidget();
 			const UGameUserSettings* S = GEngine ? GEngine->GetGameUserSettings() : nullptr;
-			UE_LOG(LogWildreach, Log, TEXT("UISTATE menu=%s cursor=%d ignoreinput=%d capturemode=%d mousecaptor=%d focus=%s ignoremove=%d ignorelook=%d hints=%d vsync=%d"),
+			UE_LOG(LogWildreach, Log, TEXT("UISTATE menu=%s cursor=%d ignoreinput=%d capturemode=%d mousecaptor=%d focus=%s ignoremove=%d ignorelook=%d hints=%d vsync=%d placing=%s"),
 				PC ? MenuName(PC->GetMenu()) : TEXT("?"), PC ? PC->bShowMouseCursor : -1, VC ? VC->IgnoreInput() : -1,
 				VC ? static_cast<int32>(VC->GetMouseCaptureMode()) : -1, App.HasAnyMouseCaptor() ? 1 : 0,
 				Focus.IsValid() ? *Focus->GetTypeAsString() : TEXT("none"), PC ? PC->IsMoveInputIgnored() : -1, PC ? PC->IsLookInputIgnored() : -1,
-				FWRFlow::HintsEnabled() ? 1 : 0, S && S->IsVSyncEnabled() ? 1 : 0);
+				FWRFlow::HintsEnabled() ? 1 : 0, S && S->IsVSyncEnabled() ? 1 : 0, PC && PC->IsPlacing() ? *PC->GetPlacingPiece().ToString() : TEXT("none"));
 		}));
 }

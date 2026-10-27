@@ -173,4 +173,11 @@ namespace WRUI
 	TSharedRef<SWidget> Divider();
 	/** MakeBox with the brush's own colour (custom-painted widgets). */
 	void DrawBox(class FSlateWindowElementList& Out, int32 Layer, const struct FPaintGeometry& Geometry, const FSlateBrush* Brush);
+	/** Measure a widget (and everything in it) now. Call it after rebuilding widgets in a Tick: Slate ticks widgets
+	 *  inside its paint, after the frame's measuring pass, so new widgets otherwise draw one frame with every size zero,
+	 *  piled up at the top of their box. The Map tab did that twice a second ("the bottom right is flashing another
+	 *  panel on top of it"). LayoutScale: the ticking widget's Geometry.Scale. */
+	void MeasureNow(SWidget& Widget, float LayoutScale);
+	/** SetContent from a Tick, measured at once (see MeasureNow). */
+	void SetContentMeasured(class SBox& Box, const TSharedRef<SWidget>& Content, float LayoutScale);
 }

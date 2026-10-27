@@ -3,6 +3,9 @@
 // placing it the way the old B menu did (the controller's ghost); while a piece is out, the bar stays up and the keys
 // to place, rotate, cancel and toggle snap sit above it, a chip over the ghost says whether it will go (and why not),
 // and the claim you stand in shows top right. The screen keeps movement; the UI hides the cursor while you place.
+// Demolish mode (the Demolish button at the end of the tab strip, or its key, X by default): the piece under the
+// crosshair turns red, the chip says what comes back (or why it can't come down), a click takes it down; the key
+// again, Esc or right mouse stop.
 
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
@@ -411,6 +414,7 @@ public:
 			LastHash = Hash;
 			bDirty = false;
 			Rebuild();
+			WRUI::MeasureNow(*this, Geo.Scale);   // (this is inside Slate's paint: see MeasureNow)
 		}
 	}
 
@@ -423,6 +427,7 @@ private:
 	TSharedPtr<SScrollBox> Cards;
 	TSharedPtr<SBox> Details;
 	TSharedPtr<SWidget> Chip;
+	TSharedPtr<SButton> DemolishBtn;
 	FVector2D LocalSize = FVector2D(1920.f, 1080.f);
 	bool bDirty = false;
 	uint32 LastHash = 0;
@@ -439,7 +444,7 @@ private:
 
 	uint32 BagHash() const
 	{
-		uint32 H = GetTypeHash(PC.IsValid() && PC->IsPlacing());
+		uint32 H = HashCombine(GetTypeHash(PC.IsValid() && PC->IsPlacing()), GetTypeHash(PC.IsValid() ? PC->GetPlacingPiece() : FName()));
 		if (const UWRInventoryComponent* I = Inv())
 		{
 			for (const FWRItemStack& S : I->GetSlots()) H = HashCombine(H, HashCombine(GetTypeHash(S.ItemId), GetTypeHash(S.Count)));
@@ -573,19 +578,39 @@ private:
 		];
 	}
 
+	bool Demolishing() const { return PC.IsValid() && PC->IsDemolishing(); }
+
+	/** Into demolish mode and out: a red-rimmed button with the hammer, "Demolish" and its key, lit while it's on. (0.4.1
+	 *  had only red words at the end of the tab strip, which read as one more tab: Raven found no demolish button.) */
 	TSharedRef<SWidget> DemolishButton()
 	{
-		return SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
-			.ToolTipText(LOCTEXT("DemolishTip", "Aim at a piece you built and click: it comes down and half its cost comes back"))
-			.OnClicked_Lambda([this]() { if (PC.IsValid()) PC->WRGhost(TEXT("demolish")); return FReply::Handled(); })
+		return SNew(SBox).VAlign(VAlign_Center).Padding(FMargin(6.f * U, 0.f, 0.f, 0.f))
 			[
-				SNew(SBox).Padding(FMargin(12.f * U, 0.f, 8.f * U, 0.f)).VAlign(VAlign_Center)
+				SNew(SBox).HeightOverride(32.f * U)
 				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 7.f * U, 0.f)[SNew(SMark).Kind(SMark::EKind::HammerRed).Size(16.f * U)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					SAssignNew(DemolishBtn, SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
+					.ToolTipText(LOCTEXT("DemolishTip", "Take down a piece you built: aim at it and click. Half its cost comes back."))
+					.OnClicked_Lambda([this]() { if (PC.IsValid()) PC->ToggleDemolish(); return FReply::Handled(); })
 					[
-						WRUI::Text(LOCTEXT("Demolish", "Demolish"), WRUI::Title(12), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(PC.IsValid() && PC->GetPlacingPiece() == TEXT("demolish") ? WRUI::Ember : WRUI::Bad); }), true)
+						SNew(SBorder).VAlign(VAlign_Center).Padding(FMargin(10.f * U, 0.f, 6.f * U, 0.f))
+						.BorderImage_Lambda([this]()
+						{
+							const bool bHover = DemolishBtn.IsValid() && DemolishBtn->IsHovered();
+							return Demolishing() ? WRUI::Box(FLinearColor(FColor(0x6A, 0x22, 0x14)), 4.f, WRUI::Ember, 1.5f)
+								: WRUI::Box(bHover ? FLinearColor(FColor(0x42, 0x19, 0x12)) : FLinearColor(FColor(0x2A, 0x14, 0x10)), 4.f, WRUI::Alpha(WRUI::Bad, bHover ? 1.f : 0.75f), 1.f);
+						})
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 7.f * U, 0.f)[SNew(SMark).Kind(SMark::EKind::HammerRed).Size(17.f * U)]
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+							[
+								WRUI::Text(LOCTEXT("Demolish", "Demolish"), WRUI::Title(12), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Demolishing() ? FLinearColor::White : WRUI::Ink); }), true)
+							]
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+							[
+								SNew(SWRKeyCap).FontSize(11).Text_Lambda([this]() { return WRUI::KeyName(KeyOf(TEXT("Demolish"))); })
+							]
+						]
 					]
 				]
 			];
@@ -684,8 +709,64 @@ private:
 			})];
 	}
 
+	/** The piece the demolish ghost covers (what a click would take down), or null. */
+	const FWRPieceDef* DemolishTarget() const
+	{
+		const AWRBuildPiece* G = Demolishing() ? Ghost() : nullptr;
+		return G ? G->GetDef() : nullptr;
+	}
+
+	/** Half of each of a piece's costs: what demolishing it gives back (the server's refund). */
+	static FString RefundOf(const FWRPieceDef& D)
+	{
+		TArray<FString> Bits;
+		for (const TPair<FName, int32>& C : D.Cost) if (C.Value / 2 > 0) Bits.Add(FString::Printf(TEXT("%d %s"), C.Value / 2, *ItemName(C.Key)));
+		return Bits.Num() > 0 ? FString::Join(Bits, TEXT(", ")) : FString(TEXT("nothing"));
+	}
+
+	TSharedRef<SWidget> DemolishDetails()
+	{
+		const auto Stat = [](const FText& Label, const TSharedRef<SWidget>& Value)
+		{
+			return SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(Label, WRUI::Caps(11), WRUI::Ink2)]
+				+ SVerticalBox::Slot().AutoHeight()[Value];
+		};
+		return SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[WRUI::Text(LOCTEXT("DemolishTitle", "Demolish"), WRUI::Title(17), WRUI::Ink, true)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SWRChip).Text(LOCTEXT("Demolishing", "Demolishing")).Color(WRUI::Bad).FontSize(11)]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)
+			[
+				WRUI::Text(FText::Format(LOCTEXT("DemolishAbout", "Aim at a piece you built and click: it comes down and half its cost goes back in your bag. Only whoever built a piece can take it down. {0}, Esc or right mouse stop."),
+					WRUI::KeyName(KeyOf(TEXT("Demolish")))), WRUI::Body(12, 500), WRUI::Ink2, false, true)
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 9.f * U, 0.f, 0.f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 22.f * U, 0.f)
+				[
+					Stat(LOCTEXT("AimingAt", "Aiming at"), WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const FWRPieceDef* T = DemolishTarget(); return T ? FText::FromString(T->Name) : LOCTEXT("AimNothing", "Nothing yet"); }), WRUI::Body(13, 700),
+						TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(DemolishTarget() ? WRUI::Ink : WRUI::Ink3); })))
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					Stat(LOCTEXT("YouGetBack", "You get back"), WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+					{
+						const FWRPieceDef* T = DemolishTarget();
+						if (!T) return FText::FromString(TEXT("-"));
+						return PC.IsValid() && PC->IsPlacementValid() ? FText::FromString(RefundOf(*T)) : FText::FromString(PC.IsValid() ? PC->GetPlacementWhy() : FString());
+					}), WRUI::Body(13, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(DemolishTarget() && PC.IsValid() && !PC->IsPlacementValid() ? WRUI::Bad : WRUI::Ink); })))
+				]
+			];
+	}
+
 	TSharedRef<SWidget> BuildDetails()
 	{
+		if (Demolishing()) return DemolishDetails();
 		const FWRPieceDef* D = Shown();
 		if (!D) return SNullWidget::NullWidget;
 		const TArray<TPair<FName, int32>> Cost = CostOf(*D);
@@ -775,8 +856,12 @@ private:
 		return SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(16.f * U, 8.f * U))
 		[
 			SNew(SHorizontalBox)
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)[SNew(SMark).Kind(SMark::EKind::Hammer).Size(20.f * U)]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)[WRUI::Text(LOCTEXT("BuildMode", "Build mode"), WRUI::Title(14), WRUI::Ink, true)]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)[SNew(SMark).Kind_Lambda([this]() { return Demolishing() ? SMark::EKind::HammerRed : SMark::EKind::Hammer; }).Size(20.f * U)]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
+			[
+				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Demolishing() ? LOCTEXT("DemolishMode", "Demolish mode") : LOCTEXT("BuildMode", "Build mode"); }), WRUI::Title(14),
+					TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Demolishing() ? FLinearColor(FColor(0xFF, 0x9A, 0x80)) : WRUI::Ink); }), true)
+			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)[SNew(SBox).WidthOverride(1.f).HeightOverride(20.f * U)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Brass2)]]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRKeyCap).FontSize(12).Text_Lambda([this]() { return WRUI::KeyName(KeyOf(TEXT("Build"))); })]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("Leave", "Leave"), WRUI::Body(12, 500), WRUI::Ink2)]
@@ -870,7 +955,7 @@ private:
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 9.f * U, 0.f)
 					[
-						SNew(SMark).Size(22.f * U).Kind_Lambda([this]() { return PC.IsValid() && PC->IsPlacementValid() ? SMark::EKind::Yes : SMark::EKind::No; })
+						SNew(SMark).Size(22.f * U).Kind_Lambda([this]() { return PC.IsValid() && PC->IsPlacementValid() ? (Demolishing() ? SMark::EKind::HammerRed : SMark::EKind::Yes) : SMark::EKind::No; })
 					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 					[
@@ -899,6 +984,12 @@ private:
 	{
 		const AWRBuildPiece* G = Ghost();
 		if (!G) return false;
+		if (Demolishing() && !G->GetDef())
+		{
+			// Aiming at nothing: the chip sits over the crosshair and says what to do.
+			Out = FVector2D(LocalSize.X * 0.5f, LocalSize.Y * 0.5f - 24.f * U);
+			return true;
+		}
 		FVector Origin, Extent;
 		G->GetActorBounds(false, Origin, Extent);
 		if (Extent.IsNearlyZero()) { Origin = G->GetActorLocation(); Extent = FVector(0.f, 0.f, 100.f); }
@@ -958,7 +1049,7 @@ private:
 		[
 			WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Mode() == 1 ? LOCTEXT("KPlacing", "Placing") : Mode() == 2 ? LOCTEXT("KDemolish", "Demolishing") : LOCTEXT("KBuilding", "Building"); }), WRUI::Caps(12), WRUI::Ink2)
 		];
-		for (int32 Row = 0; Row < 5; ++Row)
+		for (int32 Row = 0; Row < 6; ++Row)
 		{
 			Rows->AddSlot().AutoHeight().Padding(0.f, 5.f * U, 0.f, 0.f)
 			[
@@ -992,7 +1083,7 @@ private:
 	}
 
 	/** 0 browsing the bar, 1 placing a piece, 2 demolishing. */
-	int32 Mode() const { return !PC.IsValid() || !PC->IsPlacing() ? 0 : PC->GetPlacingPiece() == TEXT("demolish") ? 2 : 1; }
+	int32 Mode() const { return !PC.IsValid() || !PC->IsPlacing() ? 0 : PC->IsDemolishing() ? 2 : 1; }
 
 	/** One line of the keys panel: its key and what it does (false: no line there in this mode). */
 	bool KeyRow(int32 Row, FText& OutKey, FText& OutLabel, bool& bOutSnap) const
@@ -1000,31 +1091,33 @@ private:
 		const int32 M = Mode();
 		const FWRPieceDef* D = PC.IsValid() ? FWRBuildRegistry::Get().Find(PC->GetPlacingPiece()) : nullptr;
 		const bool bGrid = D && D->Snaps() && PC->IsSnapOn();
-		struct FLine { const TCHAR* Action; FText Label; bool bSnap; };
+		struct FLine { FText Key; FText Label; bool bSnap; };
+		const auto K = [this](const TCHAR* Action) { return WRUI::KeyName(KeyOf(Action)); };
 		TArray<FLine> Lines;
 		if (M == 1)
 		{
-			Lines.Add({ TEXT("Light"), LOCTEXT("KPlace", "Place"), false });
-			Lines.Add({ TEXT("Heavy"), bGrid ? LOCTEXT("KRotate90", "Rotate 90°") : LOCTEXT("KRotate45", "Rotate 45°"), false });
-			Lines.Add({ TEXT("Block"), LOCTEXT("KCancel", "Cancel"), false });
-			Lines.Add({ TEXT("Snap"), LOCTEXT("KSnap", "Snap"), true });
-			Lines.Add({ TEXT("Build"), LOCTEXT("KLeave", "Leave build mode"), false });
+			Lines.Add({ K(TEXT("Light")), LOCTEXT("KPlace", "Place"), false });
+			Lines.Add({ K(TEXT("Heavy")), bGrid ? LOCTEXT("KRotate90", "Rotate 90°") : LOCTEXT("KRotate45", "Rotate 45°"), false });
+			Lines.Add({ K(TEXT("Block")), LOCTEXT("KCancel", "Cancel"), false });
+			Lines.Add({ K(TEXT("Snap")), LOCTEXT("KSnap", "Snap"), true });
+			Lines.Add({ K(TEXT("Demolish")), LOCTEXT("KDemolishInstead", "Demolish instead"), false });
+			Lines.Add({ K(TEXT("Build")), LOCTEXT("KLeave", "Leave build mode"), false });
 		}
 		else if (M == 2)
 		{
-			Lines.Add({ TEXT("Light"), LOCTEXT("KRemove", "Remove (half back)"), false });
-			Lines.Add({ TEXT("Block"), LOCTEXT("KStop", "Stop demolishing"), false });
-			Lines.Add({ TEXT("Build"), LOCTEXT("KLeave", "Leave build mode"), false });
+			Lines.Add({ K(TEXT("Light")), LOCTEXT("KRemove", "Take it down (half back)"), false });
+			Lines.Add({ FText::Format(LOCTEXT("KeyOrEsc", "{0} / Esc"), K(TEXT("Demolish"))), LOCTEXT("KStop", "Stop demolishing"), false });
+			Lines.Add({ K(TEXT("Build")), LOCTEXT("KLeave", "Leave build mode"), false });
 		}
 		else
 		{
-			Lines.Add({ TEXT("Light"), LOCTEXT("KPick", "Pick a piece below"), false });
-			Lines.Add({ nullptr, LOCTEXT("KDemolishHint", "Take down a piece"), false });
-			Lines.Add({ TEXT("Snap"), LOCTEXT("KSnap", "Snap"), true });
-			Lines.Add({ TEXT("Build"), LOCTEXT("KLeave", "Leave build mode"), false });
+			Lines.Add({ K(TEXT("Light")), LOCTEXT("KPick", "Pick a piece below"), false });
+			Lines.Add({ K(TEXT("Demolish")), LOCTEXT("KDemolishMode", "Demolish mode"), false });
+			Lines.Add({ K(TEXT("Snap")), LOCTEXT("KSnap", "Snap"), true });
+			Lines.Add({ K(TEXT("Build")), LOCTEXT("KLeave", "Leave build mode"), false });
 		}
 		if (!Lines.IsValidIndex(Row)) return false;
-		OutKey = Lines[Row].Action ? WRUI::KeyName(KeyOf(Lines[Row].Action)) : LOCTEXT("KDemolishKey", "Demolish");
+		OutKey = Lines[Row].Key;
 		OutLabel = Lines[Row].Label;
 		bOutSnap = Lines[Row].bSnap;
 		return true;

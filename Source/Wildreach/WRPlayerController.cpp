@@ -144,6 +144,7 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("Chat"), IE_Pressed, &AWRPlayerController::OpenChat);
 	Bind(TEXT("Build"), IE_Pressed, &AWRPlayerController::ToggleBuildMenu);
 	Bind(TEXT("Snap"), IE_Pressed, &AWRPlayerController::ToggleSnap);
+	Bind(TEXT("Demolish"), IE_Pressed, &AWRPlayerController::ToggleDemolish);
 	// The old text menus' keys (bots and -oldui still use them); Esc always closes what's open.
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AWRPlayerController::MenuUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AWRPlayerController::MenuDown);

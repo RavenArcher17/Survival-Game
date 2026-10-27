@@ -44,6 +44,7 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Chat"), TEXT("Chat"), Menus, EKeys::T);
 	Add(TEXT("Help"), TEXT("Controls help"), Menus, EKeys::H);
 	Add(TEXT("Snap"), TEXT("Building: snap on / off"), Menus, EKeys::F);
+	Add(TEXT("Demolish"), TEXT("Building: demolish mode"), Menus, EKeys::X);
 	Add(TEXT("BackToMenu"), TEXT("Leave to the main menu"), Menus, EKeys::F10);
 	Load();
 }

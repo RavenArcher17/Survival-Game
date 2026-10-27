@@ -48,7 +48,7 @@ public:
 			Strip->AddSlot().AutoWidth().Padding(0.f, 0.f, 6.f * U, 0.f)
 			[
 				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").Cursor(EMouseCursor::Hand)
-				.OnClicked_Lambda([this, Menu]() { if (PC.IsValid()) PC->SetMenu(Menu); return FReply::Handled(); })
+				.OnClicked_Lambda([this, Menu]() { if (PC.IsValid() && !IsOn(Menu)) PC->SetMenu(Menu); return FReply::Handled(); })   // (the open tab's key closes the journal; clicking it doesn't)
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight().Padding(14.f * U, 8.f * U, 14.f * U, 6.f * U)
@@ -124,7 +124,11 @@ public:
 	virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
 	{
 		SCompoundWidget::Tick(Geo, Time, Delta);
-		if (PC.IsValid() && PC->GetMenu() != Shown) ShowTab();
+		if (PC.IsValid() && PC->GetMenu() != Shown)
+		{
+			ShowTab();
+			WRUI::MeasureNow(*Content, Geo.Scale);   // (this is inside Slate's paint: see MeasureNow)
+		}
 	}
 
 private:
