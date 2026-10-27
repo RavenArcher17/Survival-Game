@@ -30,8 +30,9 @@ click, for the host or anyone who joined.
   in the menu, and whether they play with a controller.
 - The full suite passes: 21 of 21, 22 automation tests and 246 checks over 20 bot tests. `ProjectVersion=0.4.1`;
   packaged (`C:\Dev\WildreachBuild2`) and smoke-tested by clicking (the packaged game opens Crafting, crafts a crude
-  hatchet, opens Settings > Video and resumes); installer `Wildreach-Setup.exe` built (1.7 GB). Release notes:
-  `Docs/release-notes/v0.4.1.md`.
+  hatchet, opens Settings > Video and resumes). **Released 2026-10-27 as
+  [v0.4.1](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.4.1)** (Latest, `Wildreach-Setup.exe` 1.7 GB,
+  notes `Docs/release-notes/v0.4.1.md`): installed 0.4.0 and 0.3.0 copies update themselves on their next start.
 
 ## 2026-10-27: version 0.4.0, the polish pass
 
