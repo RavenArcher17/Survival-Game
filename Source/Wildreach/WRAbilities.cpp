@@ -512,7 +512,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	if (IsServer())
 	{
 		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
-		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), 1.f, TEXT("dodge"));
+		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), 1.f);  // (the dodge sound is the audio director's)
 	}
 
 	UAbilityTask_ApplyRootMotionConstantForce* Task = UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(
