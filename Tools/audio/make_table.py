@@ -43,6 +43,8 @@ ev("swing.heavy", files("combat/swing_heavy_*"), 0.6, 22, pitch=(0.8, 0.92), gap
 ev("hit.flesh", files("combat/hit_flesh_*"), 0.8, 30, pitch=(0.9, 1.08), gap=0.03, voices=8)
 ev("hit.armor", files("combat/hit_armor_*"), 0.75, 30, pitch=(0.92, 1.08), gap=0.03, voices=8)
 ev("hit.block", files("combat/hit_block_*"), 0.85, 30, pitch=(0.9, 1.05), gap=0.05)
+ev("hit.dust", files("world/gather_stone_*"), 0.7, 30, pitch=(0.75, 0.9), gap=0.03, voices=8)  # stone, dry or soft bodies (WRFx impacts)
+ev("stomp", files("world/build_demolish_*"), 1.0, 60, pitch=(0.55, 0.7), gap=0.25)  # a boss or a big creature slams the ground
 ev("parry", files("combat/parry_*"), 0.9, 35, pitch=(0.95, 1.08), gap=0.1)
 ev("dodge", files("combat/dodge_*"), 0.5, 15, pitch=(0.9, 1.1), gap=0.3)
 ev("jump", files("combat/jump_*"), 0.35, 12, pitch=(0.95, 1.1), gap=0.3)

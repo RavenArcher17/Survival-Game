@@ -158,7 +158,8 @@ normal = lerp(lerp(lerp(lerp(dirt_n, stones_n, stone_a), sand_n, shore_a), lerp(
 finish(base, normal, lerp(None, None, biome, const_a=0.93, const_b=0.7))  # snow is a little glossier
 
 # ================================================================ M_Rock (boulders)
-begin("/Game/Terrain/M_Rock", ISM)
+# Nanite too: the cave boulders are Nanite meshes, and without the flag cooked builds draw them in the default material.
+begin("/Game/Terrain/M_Rock", ISM + (unreal.MaterialUsage.MATUSAGE_NANITE,))
 wp, uv_top, uv_side = world_uvs(300.0)
 up = sat(mul(mask(expr(unreal.MaterialExpressionVertexNormalWS), "b"), k=1.5))
 top_c, side_c = sample("Ground/TEX_MWAM_Rock_col", uv_top), sample("Ground/TEX_MWAM_Rock_col", uv_side)

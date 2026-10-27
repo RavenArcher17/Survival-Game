@@ -95,6 +95,8 @@
 		"hearth.feed": {"files": ["world/hearth_feed_1"], "volume": 0.75, "pitch": [0.95, 1.05], "radius": 2500, "category": "effects", "minGap": 0.5},
 		"hit.armor": {"files": ["combat/hit_armor_1", "combat/hit_armor_2", "combat/hit_armor_3", "combat/hit_armor_4", "combat/hit_armor_5"], "volume": 1.15, "pitch": [0.92, 1.08], "radius": 3000, "category": "effects", "minGap": 0.03, "maxVoices": 8},
 		"hit.block": {"files": ["combat/hit_block_1", "combat/hit_block_2", "combat/hit_block_3", "combat/hit_block_4"], "volume": 1.32, "pitch": [0.9, 1.05], "radius": 3000, "category": "effects", "minGap": 0.05},
+		"hit.dust": {"files":["world/gather_stone_1","world/gather_stone_2","world/gather_stone_3","world/gather_stone_4","world/gather_stone_5"],"volume":0.81,"pitch":[0.75,0.9],"radius":3000,"category":"effects","minGap":0.03,"maxVoices":8},
+		"stomp": {"files":["world/build_demolish_1","world/build_demolish_2","world/build_demolish_3","world/build_demolish_4"],"volume":1.15,"pitch":[0.55,0.7],"radius":6000,"category":"effects","minGap":0.25},
 		"hit.flesh": {
 			"files": ["combat/hit_flesh_1", "combat/hit_flesh_2", "combat/hit_flesh_3", "combat/hit_flesh_4", "combat/hit_flesh_5", "combat/hit_flesh_6", "combat/hit_flesh_7"],
 			"volume": 0.88,
