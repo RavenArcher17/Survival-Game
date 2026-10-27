@@ -89,6 +89,10 @@ first: `WRSound` and `WRFx` name the moment ("hit.flesh", "gather.wood", "levelu
 - Still known: the volcanic shrubs are bright green; creature feet still slide about half their speed (the procedural
   rigs never fully plant a foot); running strafes show only while aiming or in first person, because third person faces
   where you run.
+- `ProjectVersion=0.4.0`. Packaged (`C:\Dev\WildreachBuild2`) and smoke-tested (118 sound events loaded, exposure floor
+  -2.0 by day). **Released 2026-10-27 as
+  [v0.4.0](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.4.0)** (Latest, `Wildreach-Setup.exe` 1.7 GB):
+  installed 0.3.0 copies update themselves on their next start.
 
 ## 2026-10-26: version 0.3.0, the stone-and-leather UI
 
