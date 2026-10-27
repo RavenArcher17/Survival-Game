@@ -5,6 +5,8 @@
 #include "WRCharacter.h"
 #include "WRSound.h"
 #include "Wildreach.h"
+#include "WRCameraBoom.h"
+#include "WRCharacterMovementComponent.h"
 #include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
@@ -286,7 +288,14 @@ void AWRCharacter::TickAimCamera(float DeltaSeconds)
 	AimBlend = FMath::FInterpTo(AimBlend, IsAimingRanged() ? 1.f : 0.f, DeltaSeconds, 10.f);
 	ThirdPersonBoom->TargetArmLength = FMath::Lerp(420.f, WRTune(TEXT("ranged.aimArmLength"), 170.f), AimBlend);
 	ThirdPersonBoom->SocketOffset = FMath::Lerp(FVector(0.f, 75.f, 85.f), FVector(0.f, 60.f, 70.f), AimBlend);
-	const float Fov = FMath::Lerp(90.f, WRTune(TEXT("ranged.aimFov"), 60.f), AimBlend);
+	float Fov = FMath::Lerp(90.f, WRTune(TEXT("ranged.aimFov"), 60.f), AimBlend);
+	// Sprinting widens the view a little (eased in and out; not while aiming).
+	if (UWRCameraBoom* Boom = Cast<UWRCameraBoom>(ThirdPersonBoom.Get()))
+	{
+		const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
+		const bool bSprinting = Move && Move->IsSprinting() && GetVelocity().Size2D() > Move->MaxWalkSpeed * 1.1f;
+		Fov += Boom->TickSprintWiden(bSprinting, DeltaSeconds) * (1.f - AimBlend);
+	}
 	ThirdPersonCamera->SetFieldOfView(Fov);
 	FirstPersonCamera->SetFieldOfView(Fov);
 }

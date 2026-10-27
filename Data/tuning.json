@@ -124,7 +124,27 @@
     "lavaDps": 8, "lavaBurnPerSecond": 12, "iceFriction": 0.3, "iceBraking": 100, "iceAcceleration": 600 },
   "caves": { "gemChance": 0.12, "gasDps": 6 },
   "sky": { "_comment": "How the clock looks (WRSky): sun height at noon and depth at midnight (degrees), the moon's light (lux; the map's sun is ~10) and how far above the opposite of the sun it rides, the sky light at night (x the map's), and the dimmest auto-exposure may go (EV100: higher = darker nights). placeholder",
-    "noonElevation": 65, "midnightDepth": 50, "moonLux": 0.5, "moonLift": 0.3, "nightSkyLight": 3, "nightMinEV100": 0.5, "dayMinEV100": -10 },
+    "noonElevation": 65, "midnightDepth": 50, "moonLux": 0.5, "moonLift": 0.3, "nightSkyLight": 3, "nightMinEV100": 0.5, "dayMinEV100": -10,
+    "_air": "The air by biome (polish pass): the camera's side of the ridge (X; blend biomeWidth cm wide around biomeCentre) picks haze colour (sRGB) and density, the grade (white balance K: higher = warmer, saturation, gain r,g,b) and blends across. nightFogColor is linear. A low sun (below goldenHourBelow degrees) adds light shafts (bloom, threshold, occlusion darkness, tint) and a warm glow in the fog toward it. The valley mist is a local fog volume in each hollow of Data/valley_fog.json (node Tools/terrain/valleys.mjs), lifted mistLift cm, radius x mistRadiusScale: density mistDensity x (mistDay..mistNight by daylight, + mistDawn / mistDusk around dawn and dusk), height falloff (engine units: higher = thinner layer) and offset, albedo by side (sRGB). shadowLift (linear, x nightShadowLift at night) keeps blacks from crushing. volumetricFog 1 turns on volumetric fog (costs GPU).",
+    "biomeCentre": 0, "biomeWidth": 60000,
+    "volcanicFogColor": "176,146,120", "tundraFogColor": "160,190,228", "nightFogColor": "0.01,0.015,0.035", "fogBrightness": 1,
+    "volcanicFogDensity": 0.027, "tundraFogDensity": 0.022,
+    "goldenHourBelow": 18, "sunGlowColor": "255,150,80", "sunGlow": 0.6, "sunGlowExponent": 6,
+    "shaftBloom": 0.4, "shaftThreshold": 2, "shaftDarkness": 0.6, "shaftTint": "255,210,160",
+    "mistDensity": 1.2, "mistDawn": 1, "mistDawnHours": 1.8, "mistDusk": 0.45, "mistDay": 0.12, "mistNight": 0.04, "mistFalloff": 1000, "mistHeightOffset": 0, "mistLift": 300, "mistRadiusScale": 1, "volcanicMistColor": "232,220,206", "tundraMistColor": "214,226,240",
+    "volcanicWhiteTemp": 7000, "tundraWhiteTemp": 5900, "volcanicSaturation": 0.94, "tundraSaturation": 0.97, "contrast": 1.04,
+    "volcanicGain": "1.03,1.0,0.95", "tundraGain": "0.96,0.99,1.04", "shadowLift": "0.004,0.005,0.008", "nightShadowLift": 2, "vignette": 0.3,
+    "volumetricFog": 0 },
+
+  "sea": { "_comment": "The sea (WRSea, polish pass): the WaterMaterials ocean at level cm over the open sea of Data/sea_mask.json (node Tools/terrain/sea_mask.mjs), in squares one mask cell (4 m) wide at the shore growing to distance / falloff (bigger falloff = finer far out) up to maxSquare cm, out to extent cm across, split into tile cm meshes near the island (8x that further out); uvScale cm per texture repeat. dim: material parameters with their daytime values that dim to nightDim x at night (glow, foam glow, painted highlights, sky reflection). scalars / colours (sRGB) set any of the material's parameters by name.",
+    "material": "/Game/Sea/MI_Ocean.MI_Ocean", "level": -20, "falloff": 6, "maxSquare": 409600, "extent": 6553600, "tile": 102400, "uvScale": 1500,
+    "nightDim": 0.06,
+    "dim": { "Emissive": 1.2, "EdgeFoam_Emissive": 1.0, "SeaFoam_Emissive": 0.5, "CubeMap_Intensity": 0.1, "FakeSpec_Intensity": 0.5 },
+    "scalars": { "Opacity": 0.75 },
+    "colours": { "Colour": "28,88,104", "ColourDeep": "8,30,52", "ColourVariation": "20,64,80" } },
+
+  "camera": { "_comment": "Third-person camera (WRCameraBoom, polish pass): the wall / tree probe radius cm; how fast the camera eases back out after something pulled it in (it always pulls in at once); degrees the view widens while sprinting and how fast; lock-on turns start at lockOnStartSpeed and firm up to lockOnSpeed over lockOnEaseSeconds.",
+    "probeSize": 16, "returnSpeed": 3.5, "sprintFov": 6, "sprintFovSpeed": 3, "lockOnStartSpeed": 2.5, "lockOnSpeed": 7, "lockOnEaseSeconds": 0.5 },
 
   "bosses": {
     "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/... (see WRBoss.cpp for every key).",

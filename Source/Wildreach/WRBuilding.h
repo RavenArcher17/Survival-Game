@@ -22,6 +22,10 @@ struct FWRPieceDef
 	TArray<TPair<FName, int32>> Cost;
 	float HP = 300.f;
 	bool bLockable = false;
+	/** A prop mesh that replaces the plain shape (stations, the Hearth, the totem, the chest): path, turn, fit box (cm). */
+	FString Mesh;
+	float MeshYaw = 0.f;
+	FVector MeshFit = FVector::ZeroVector;
 
 	/** Structure pieces snap to the grid and need support; everything else places freely. */
 	bool Snaps() const { return Kind == TEXT("structure") || Kind == TEXT("door"); }
@@ -144,6 +148,8 @@ private:
 	UFUNCTION() void OnRep_Piece();
 	UFUNCTION() void OnRep_Door();
 	void SpawnChild();
+	/** The real shape over the plain blocks (WRBuildLook), which stay as the collision. */
+	void ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize);
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Main;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Leaf;
@@ -177,6 +183,10 @@ public:
 	FString Upgrade(AWRPlayerController* Player);
 	FString Describe() const;
 	TMap<FName, float> CurrentUpkeepPerHour() const;
+
+protected:
+	/** Where it's drawn: the carved post (pieces.json "mesh") over the plain cylinder, which stays as the collision. */
+	virtual void BeginPlay() override;
 
 private:
 	float MinuteClock = 0.f;

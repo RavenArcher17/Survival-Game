@@ -1,5 +1,6 @@
 #include "WRCharacter.h"
 #include "WRAnimInstance.h"
+#include "WRCameraBoom.h"
 #include "WRSocial.h"
 #include "WRWorldDressing.h"
 #include "Wildreach.h"
@@ -53,7 +54,7 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	Move->JumpZVelocity = 500.f;
 	Move->AirControl = 0.35f;
 
-	ThirdPersonBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("ThirdPersonBoom"));
+	ThirdPersonBoom = CreateDefaultSubobject<UWRCameraBoom>(TEXT("ThirdPersonBoom"));  // eases back out after a wall or trunk
 	ThirdPersonBoom->SetupAttachment(RootComponent);
 	// Over-the-shoulder so your own body doesn't hide what you're aiming at.
 	ThirdPersonBoom->TargetArmLength = 420.f;

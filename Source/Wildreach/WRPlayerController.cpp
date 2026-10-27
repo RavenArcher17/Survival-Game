@@ -501,6 +501,7 @@ AWRCharacterBase* AWRPlayerController::FindTarget(float MaxDistance, float MaxAn
 void AWRPlayerController::ToggleLockOn()
 {
 	LockTarget = LockTarget.IsValid() ? nullptr : FindTarget(2500.f, 40.f);
+	LockAge = 0.f;
 }
 
 void AWRPlayerController::UpdateLockOn(float DeltaTime)
@@ -518,7 +519,11 @@ void AWRPlayerController::UpdateLockOn(float DeltaTime)
 	}
 	const FVector Eye = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : Self->GetActorLocation();
 	const FRotator Desired = (Target->GetActorLocation() + FVector(0.f, 0.f, 30.f) - Eye).Rotation();
-	SetControlRotation(FMath::RInterpTo(GetControlRotation(), Desired, DeltaTime, bBot ? 30.f : 10.f));
+	// Soft lock: the turn toward a new target starts gently and firms up over camera.lockOnEaseSeconds (bots snap).
+	LockAge += DeltaTime;
+	const float Ease = FMath::SmoothStep(0.f, FMath::Max(0.01f, WRTune(TEXT("camera.lockOnEaseSeconds"), 0.5f)), LockAge);
+	const float Speed = bBot ? 30.f : FMath::Lerp(WRTune(TEXT("camera.lockOnStartSpeed"), 2.5f), WRTune(TEXT("camera.lockOnSpeed"), 7.f), Ease);
+	SetControlRotation(FMath::RInterpTo(GetControlRotation(), Desired, DeltaTime, Speed));
 }
 
 // ---------------------------------------------------------------- developer commands

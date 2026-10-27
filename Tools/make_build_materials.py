@@ -7,6 +7,11 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="Tools/make_b
 Both project from the world, picked by the face's normal: walls get horizontal courses along their length, floors and
 roofs run along X. So pieces line up with their neighbours and need no UVs (the gable is a procedural mesh).
 Only engine content is used (no Fab pack), so a fresh clone builds them.
+
+Per-block mode (the polish pass's detail blocks, WRBuildLook): an instanced block carries custom data 0 = its shade
+(0..1), 1 = the world axis its grain runs along (0 X, 1 Y, 2 Z), 2 = a brightness factor (dark backing, iron). Then the
+painted seams / mortar lines go (the blocks' real gaps show instead) and the whole face is one plank or stone in that
+shade. Without custom data (plain components) the default -1 shade keeps the world-aligned pattern above.
 """
 import unreal
 
@@ -33,6 +38,8 @@ def begin(path):
 def finish(base, rough):
     mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
     mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    # Detail blocks are instanced static meshes: without the usage flag a cooked game draws the default material.
+    mel.set_base_material_usage(mat, unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)
     mel.recompile_material(mat)
     eal.save_loaded_asset(mat)
     unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")
@@ -156,6 +163,22 @@ def courses():
     return u, v
 
 
+def custom(index, default):
+    return expr(unreal.MaterialExpressionPerInstanceCustomData, data_index=index, const_default_value=default)
+
+
+def block_mode():
+    """(shade, axis, brightness, use): use is 1 for a detail block (its shade >= 0), 0 for a plain component."""
+    shade, axis, dim = custom(0, -1.0), custom(1, 0.0), custom(2, 1.0)
+    use = sat(mul(add(shade, k=0.5), k=1000.0))
+    return shade, axis, dim, use
+
+
+def world_xyz():
+    wp = expr(unreal.MaterialExpressionWorldPosition)
+    return mask(wp, "r"), mask(wp, "g"), mask(wp, "b")
+
+
 # ================================================================ M_BuildWood
 begin("/Game/Building/M_BuildWood")
 u, v = courses()
@@ -167,8 +190,19 @@ plank = hash1(add(mul(row, k=7.13), mul(floor(pu), k=3.71)))
 seams = mul(edge(frac(pv), 0.03), edge(frac(pu), 0.004))
 grain = noise(op(unreal.MaterialExpressionAppendVector, add(mul(u, k=1.0 / 150.0), plank), mul(v, k=1.0 / 5.0)))
 tone = sat(add(add(mul(plank, k=0.45), mul(grain, k=0.35)), k=0.2))
+# per-block mode: the block's own shade, grain along its axis, no painted seams
+shade, axis, dim, use = block_mode()
+wx, wy, wz = world_xyz()
+a1 = sat(axis)
+a2 = sat(add(axis, k=-1.0))
+ui = lerp(lerp(wx, wy, a1), wz, a2)
+vi = sub(add(add(wx, wy), wz), ui)
+grain_i = noise(op(unreal.MaterialExpressionAppendVector, add(mul(ui, k=1.0 / 150.0), mul(shade, k=7.0)), mul(vi, k=1.0 / 5.0)))
+tone_i = sat(add(add(mul(shade, k=0.45), mul(grain_i, k=0.35)), k=0.2))
+tone = lerp(tone, tone_i, use)
+seams = lerp(seams, const(1.0), use)
 wood = lerp(const3((0.075, 0.042, 0.022)), const3((0.28, 0.17, 0.085)), tone)
-base = mul(wood, lerp(const(0.35), const(1.0), seams))
+base = mul(mul(wood, lerp(const(0.35), const(1.0), seams)), dim)
 finish(base, lerp(const(0.95), const(0.75), seams))
 
 # ================================================================ M_BuildStone
@@ -182,6 +216,10 @@ block = hash1(add(mul(row, k=12.9898), mul(floor(pu), k=78.233)))
 mortar = mul(edge(frac(pv), 0.05), edge(frac(pu), 0.025))
 mottle = noise(op(unreal.MaterialExpressionAppendVector, mul(u, k=1.0 / 70.0), mul(v, k=1.0 / 70.0)))
 tone = sat(add(add(mul(block, k=0.45), mul(mottle, k=0.4)), k=0.1))
+# per-block mode: the block's own shade, no painted mortar
+shade, axis, dim, use = block_mode()
+tone = lerp(tone, sat(add(add(mul(shade, k=0.45), mul(mottle, k=0.4)), k=0.1)), use)
+mortar = lerp(mortar, const(1.0), use)
 stone = lerp(const3((0.09, 0.085, 0.08)), const3((0.30, 0.28, 0.25)), tone)
-base = lerp(const3((0.045, 0.04, 0.035)), stone, mortar)
+base = mul(lerp(const3((0.045, 0.04, 0.035)), stone, mortar), dim)
 finish(base, const(0.9))

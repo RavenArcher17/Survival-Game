@@ -115,4 +115,12 @@ Caves (procedural, no AI): `blender -b -P cave_gen.py -- C:\...\out\cave_a.fbx -
 sculpts a noisy rock mound and carves the chamber, tunnel and a recessed entrance out of it (AWRCave's local layout,
 open bottom). Import with `WR_IMPORTS="C:\...\cave_a.fbx=CaveA"` and `Tools/import_cave.py` (mesh collision, no Nanite).
 
+Base props (the stations, the Hearth's fire ring, the claim totem, the storage chest; polish pass 2026-10): concepts from
+`batch_stations.json` / `batch_stations2.json` (a three-quarter studio shot of one object), build3d, then
+`blender -b -P normalize_prop.py -- out\x_textured.glb out\x_game.glb --faces 14000 --tex 1024 [--yaw 90] [--crop 0.05]`
+(decimates, shrinks the texture to 1k, centres it with its bottom at zero: ~1.5 MB in Git LFS instead of ~5 MB) and
+`Tools/import_prop.py`. A concept with several objects can be cropped to one first (the totem was). `pieces.json` `mesh`
+/ `meshYaw` / `meshFit` show it: the game scales it to fit inside meshFit (cm) and keeps the plain box as the collision
+(`FWRBuildLook::AttachProp`); turn it with meshYaw so its working side faces -X (the side toward whoever placed it).
+
 Single-item tools: `concept.py`, `shape.py`, `texture.py`; preview any model with `blender -b -P render_preview.py -- model.glb out.png`.

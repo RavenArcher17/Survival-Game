@@ -93,6 +93,9 @@ public:
 	UPROPERTY(EditAnywhere, Category="Hearth") float CoverRadius = 3000.f;
 	UPROPERTY(EditAnywhere, Category="Hearth") float MaxHealth = 2000.f;
 
+protected:
+	virtual void BeginPlay() override;
+
 private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
 	/** Its fire: a warm light, what a base looks like from afar at night. */
@@ -132,4 +135,7 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
 	/** A forge's fire (other stations stay dark). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UPointLightComponent> Glow;
+	/** Its modelled prop where it's drawn (the box above stays as the collision), and the type it shows. */
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Visual;
+	FName LookType;
 };

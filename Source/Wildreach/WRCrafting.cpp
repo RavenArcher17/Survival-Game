@@ -1,5 +1,6 @@
 #include "WRCrafting.h"
 #include "WRSound.h"
+#include "WRBuildLook.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
@@ -162,6 +163,17 @@ AWRHearth::AWRHearth()
 	Glow = MakeGlow(this, Mesh, 90.f, 9000.f, 1800.f);
 }
 
+void AWRHearth::BeginPlay()
+{
+	Super::BeginPlay();
+	// The stone fire ring (pieces.json "mesh") over the plain cone, which stays as the collision.
+	const FWRPieceDef* Def = FWRBuildLook::KindDef(TEXT("hearth"));
+	if (Def && FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift))
+	{
+		Mesh->SetVisibility(false);
+	}
+}
+
 void AWRHearth::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -252,6 +264,20 @@ void AWRStation::OnRep_Type()
 	else if (StationType == TEXT("alchemy_table")) C = FLinearColor(0.3f, 0.15f, 0.4f);
 	Tint(Mesh, C);
 	Glow->SetVisibility(StationType == TEXT("forge"));
+	// The station's modelled prop (pieces.json "mesh") over the tinted box, which stays as the collision.
+	if (Visual && Visual->GetStaticMesh() && LookType == StationType)
+	{
+		return;
+	}
+	if (Visual)
+	{
+		Visual->DestroyComponent();
+		Visual = nullptr;
+	}
+	LookType = StationType;
+	const FWRPieceDef* Def = FWRBuildLook::StationDef(StationType);
+	Visual = Def ? FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift) : nullptr;
+	Mesh->SetVisibility(Visual == nullptr);
 }
 
 int32 AWRStation::GetTier() const

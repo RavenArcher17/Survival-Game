@@ -1,5 +1,6 @@
 #include "WRBuilding.h"
 #include "WRSound.h"
+#include "WRBuildLook.h"
 #include "WRLifeSkills.h"
 #include "WRSocial.h"
 #include "Wildreach.h"
@@ -87,6 +88,13 @@ FWRBuildRegistry::FWRBuildRegistry()
 			O->TryGetNumberField(TEXT("hp"), D.HP);
 			O->TryGetBoolField(TEXT("lockable"), D.bLockable);
 			D.Cost = ParseCost(O, TEXT("cost"));
+			O->TryGetStringField(TEXT("mesh"), D.Mesh);
+			O->TryGetNumberField(TEXT("meshYaw"), D.MeshYaw);
+			const TArray<TSharedPtr<FJsonValue>>* Fit = nullptr;
+			if (O->TryGetArrayField(TEXT("meshFit"), Fit) && Fit->Num() == 3)
+			{
+				D.MeshFit = FVector((*Fit)[0]->AsNumber(), (*Fit)[1]->AsNumber(), (*Fit)[2]->AsNumber());
+			}
 			Pieces.Add(D);
 		}
 	}
@@ -306,7 +314,7 @@ void AWRBuildPiece::SpawnChild()
 	FActorSpawnParameters Params;
 	Params.Owner = this;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AActor* Child = GetWorld()->SpawnActor<AActor>(Class, GetActorLocation() + FVector(0.f, 0.f, 50.f), GetActorRotation(), Params);
+	AActor* Child = GetWorld()->SpawnActor<AActor>(Class, GetActorLocation() + FVector(0.f, 0.f, FWRBuildLook::ChildLift), GetActorRotation(), Params);
 	if (AWRStation* Station = Cast<AWRStation>(Child))
 	{
 		Station->StationType = Def->Station;
@@ -542,6 +550,38 @@ void AWRBuildPiece::ApplyLook()
 	{
 		Light->SetVisibility(!bGhost);
 		Light->SetRelativeLocation(FVector(0.f, 0.f, Def->Id == TEXT("brazier") ? 100.f : 160.f));
+	}
+
+	// Built pieces, where they're drawn, get their real shape; ghosts stay plain tinted blocks.
+	if (!bGhost && GetNetMode() != NM_DedicatedServer)
+	{
+		ApplyDetail(*Def, LeafSize);
+	}
+}
+
+void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
+{
+	// A prop mesh (the chest) or detail blocks (WRBuildLook: planks, coursed stone, shingles, frames). Either way the
+	// plain blocks made above stay as the piece's collision, hidden, so placing, snapping and support don't change.
+	UStaticMeshComponent* Prop = FWRBuildLook::AttachProp(this, RootComponent, Def, 0.f);
+	const TArray<FWRLookBlock> Blocks = Prop ? TArray<FWRLookBlock>() : FWRBuildLook::Blocks(Def, GetActorTransform());
+	if (!Prop && Blocks.Num() == 0)
+	{
+		return;  // rugs, banners: their flat block is the look
+	}
+	TArray<UMeshComponent*> Plain;
+	GetComponents(Plain);
+	for (UMeshComponent* C : Plain)
+	{
+		if (C != Prop)
+		{
+			C->SetVisibility(false);  // not propagated: the door leaf's own detail stays visible
+		}
+	}
+	FWRBuildLook::Spawn(this, RootComponent, Blocks, FWRBuildLook::ClothColor(Def), false);
+	if (!LeafSize.IsZero())
+	{
+		FWRBuildLook::Spawn(this, Leaf, FWRBuildLook::LeafBlocks(Def, LeafSize, GetActorTransform()), FWRBuildLook::ClothColor(Def), true);
 	}
 }
 
@@ -917,6 +957,17 @@ AWRClaimTotem::AWRClaimTotem()
 	if (Mat.Succeeded()) Mesh->SetMaterial(0, Mat.Object);
 	Mesh->SetRelativeScale3D(FVector(0.4f, 0.4f, 2.5f));
 	UpkeepStorage.SetNum(6);
+}
+
+void AWRClaimTotem::BeginPlay()
+{
+	Super::BeginPlay();
+	// Its piece puts it 50 cm up (SpawnChild), half its cylinder in the ground: the post stands on the ground.
+	const FWRPieceDef* Def = FWRBuildLook::KindDef(TEXT("totem"));
+	if (Def && FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift))
+	{
+		Mesh->SetVisibility(false);
+	}
 }
 
 void AWRClaimTotem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
