@@ -347,7 +347,7 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		const float Dawn = T.Num(TEXT("clock.dawnHour"), 6.f), Dusk = T.Num(TEXT("clock.duskHour"), 20.f);
 		const float DawnPeak = FMath::Exp(-FMath::Square((Hour - Dawn - 0.5f) / T.Num(TEXT("sky.mistDawnHours"), 1.8f)));
 		const float DuskPeak = FMath::Exp(-FMath::Square((Hour - Dusk - 0.5f) / 1.5f));
-		const float Amount = FMath::Lerp(T.Num(TEXT("sky.mistNight"), 0.1f), T.Num(TEXT("sky.mistDay"), 0.12f), Daylight)
+		const float Amount = FMath::Lerp(T.Num(TEXT("sky.mistNight"), 0.04f), T.Num(TEXT("sky.mistDay"), 0.12f), Daylight)
 			+ DawnPeak * T.Num(TEXT("sky.mistDawn"), 1.f) + DuskPeak * T.Num(TEXT("sky.mistDusk"), 0.45f);
 		const float Density = Amount * T.Num(TEXT("sky.mistDensity"), 1.2f) * WRSkyDetail::MistScale;
 		if (!FMath::IsNearlyEqual(Density, MistDensity, 0.005f))

@@ -3,7 +3,9 @@
 # each by day and at night, plus "stat unit" frame times in three fixed spots. A rendered client on L_Island driven
 # by bot commands (as uishots.ps1); one picture per shot into -Out, numbered and named.
 #   worldshots.ps1 [-Out <folder>] [-Only coast,base] [-Port 7865] [-Baseline]
-# Sections: base (builds the showcase base; later sections use it), perf, coast, biomes, stations, camera, foliage.
+# Sections: base (builds the showcase base; later sections use it), perf, coast, biomes, stations, camera, foliage,
+# popin (distant decoration at 1x and 3x draw distance), and checks (A/B: mist off, sea waves / highlights off; only
+# when asked for with -Only checks).
 # -Baseline leaves out what needs this pass's own commands (the free camera wr.Cam, wr.FrameStats), so the same
 # script also shoots the unchanged game for before / after.
 param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7865, [switch]$Baseline)

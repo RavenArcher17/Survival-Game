@@ -265,11 +265,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
 		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
 		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 130), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // scorched: dark, dull
-			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) },
-			  // the leaves' own tints (the bark's "Color" doesn't reach them): dry olive-brown, not spring green in the ash
-			  { TEXT("Color Tint"), FLinearColor(0.42f, 0.3f, 0.16f) }, { TEXT("Color Tint B"), FLinearColor(0.32f, 0.2f, 0.1f) },
-			  { TEXT("SSS Color Tint"), FLinearColor(0.12f, 0.07f, 0.03f) } },
-			{ { TEXT("Color Intensity"), 0.3f }, { TEXT("Sature Max"), 0.6f } } } },
+			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) } }, { { TEXT("Color Intensity"), 0.3f }, { TEXT("Sature Max"), 0.6f } } } },
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 120), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // frosted: pale
 			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } }, { { TEXT("Color Intensity"), 1.25f }, { TEXT("Sature Max"), 0.5f } } } },
 	};

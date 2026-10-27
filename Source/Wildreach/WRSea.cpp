@@ -349,7 +349,7 @@ bool AWRSea::BuildMesh()
 	const TSet<FWRSeaLeaf> Set(Leaves);
 	const float Level = T.Num(TEXT("sea.level"), -20.f);
 	const float UVScale = T.Num(TEXT("sea.uvScale"), 1500.f);
-	const int32 TileCells = FMath::Max(8, FMath::RoundToInt(T.Num(TEXT("sea.tile"), 51200.f) / Mask.Cell));
+	const int32 TileCells = FMath::Max(8, FMath::RoundToInt(T.Num(TEXT("sea.tile"), 102400.f) / Mask.Cell));
 
 	// One mesh per tile (TileCells square; squares bigger than a tile share one far-out mesh), so the engine can skip
 	// the tiles that are off screen. Corners are shared within a tile; where a neighbour is half the size the side gets
@@ -360,8 +360,12 @@ bool AWRSea::BuildMesh()
 	int32 Triangles = 0;
 	for (const FWRSeaLeaf& L : Leaves)
 	{
-		const FIntPoint Key = L.Size > TileCells ? FarKey
-			: FIntPoint(FMath::FloorToInt((L.X - Start) / static_cast<float>(TileCells)), FMath::FloorToInt((L.Y - Start) / static_cast<float>(TileCells)));
+		// Near the island, tiles TileCells wide; the open sea around it in tiles eight times that (few triangles each,
+		// so a few big meshes rather than hundreds of draws).
+		const bool bNear = L.Size <= TileCells && L.X < Mask.Width + TileCells && L.Y < Mask.Height + TileCells && L.X + L.Size > -TileCells && L.Y + L.Size > -TileCells;
+		const int32 Block = bNear ? TileCells : TileCells * 8;
+		const FIntPoint Key = L.Size > Block ? FarKey
+			: FIntPoint(FMath::FloorToInt((L.X - Start) / static_cast<float>(Block)) + (bNear ? 0 : 1000000), FMath::FloorToInt((L.Y - Start) / static_cast<float>(Block)));
 		FTile& Tile = Built.FindOrAdd(Key);
 		// Vertices on a half-cell lattice (the centre of a one-cell square is half a cell in).
 		const auto Vert = [&Tile, &Mask, Level](int32 HX, int32 HY)
