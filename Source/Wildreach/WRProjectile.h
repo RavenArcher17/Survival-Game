@@ -30,11 +30,13 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
 	UFUNCTION() void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& HitResult);
 	UFUNCTION() void OnRep_Color();
 	UFUNCTION() void OnRep_Model();
+	UFUNCTION() void OnRep_Fx();
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USphereComponent> Collision;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
@@ -43,6 +45,9 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_Color) FLinearColor TintColor = FLinearColor::White;
 	UPROPERTY(ReplicatedUsing=OnRep_Model) FString ModelPath;
 	UPROPERTY(ReplicatedUsing=OnRep_Model) FString ModelAlong;
+	/** A spell's look in flight (WRFx: fire.bolt, frost.shard), picked from its element; the grey sphere hides under it. */
+	UPROPERTY(ReplicatedUsing=OnRep_Fx) FName TrailFx;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> Trail;
 	FName Kind;
 	FName PickupItem;
 

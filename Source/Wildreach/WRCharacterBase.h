@@ -70,8 +70,9 @@ public:
 	/** Server: health hit zero. */
 	virtual void Die(AActor* Killer);
 
-	/** Server: tell every machine a hit landed (damage numbers, flash). */
-	void ReportHit(float Damage, EWRHitResult Result);
+	/** Server: tell every machine a hit landed (damage numbers, flash, impact effects). FxFlags are WRFx::EHitFlags;
+	 *  Source and Origin (where the blow came from) place the impact and pick who feels the hit-stop and shake. */
+	void ReportHit(float Damage, EWRHitResult Result, uint16 FxFlags = 0, AActor* Source = nullptr, const FVector& Origin = FVector::ZeroVector);
 
 	/** Server: last chance to change damage before it lands (boss shells, airborne bosses, weaknesses). */
 	virtual float ModifyIncomingDamage(const struct FWRHit& Hit, float Damage) { return Damage; }
@@ -135,7 +136,7 @@ protected:
 	FLinearColor BaseBodyColor = FLinearColor(0.6f, 0.6f, 0.65f);
 
 private:
-	UFUNCTION(NetMulticast, Unreliable) void MulticastHit(float Damage, EWRHitResult Result);
+	UFUNCTION(NetMulticast, Unreliable) void MulticastHit(float Damage, EWRHitResult Result, uint16 FxFlags, AActor* Source, FVector_NetQuantize Origin);
 	UFUNCTION(NetMulticast, Reliable) void MulticastDied();
 
 	UPROPERTY(ReplicatedUsing=OnRep_Swing) uint8 SwingSeq = 0;

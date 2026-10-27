@@ -9,6 +9,7 @@
 #include "WRInventory.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "WRPlayerUI.h"
 #include "Camera/PlayerCameraManager.h"
 #include "EngineUtils.h"
@@ -533,6 +534,15 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			Piece->InitPiece(PieceId, Who);
 			Piece->Support = Support;
 			Piece->FinishSpawning(T);
+			{
+				// A puff of dust where it settles, sized to the piece; at the piece's own height (a foundation's bounds reach
+				// down into the slope, so their bottom would bury the puff).
+				FVector Origin, Extent;
+				Piece->GetActorBounds(false, Origin, Extent);
+				if (Extent.IsNearlyZero()) { Origin = Loc; Extent = FVector(50.f); }
+				WRFx::Broadcast(this, TEXT("build.place"), FVector(Origin.X, Origin.Y, Piece->GetActorLocation().Z), FRotator(0.f, Yaw, 0.f),
+					FMath::Clamp(FVector2D(Extent.X, Extent.Y).Size() / 120.f, 0.4f, 3.f), TEXT("build.place"));
+			}
 			OutResult = FString::Printf(TEXT("Built %s"), *Def->Name);
 			UE_LOG(LogWildreach, Log, TEXT("BUILD %s placed %s at %s (support %d)"), *Who, *PieceId.ToString(), *Loc.ToCompactString(), Support);
 		}

@@ -1,6 +1,7 @@
 #include "WRResourceNode.h"
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
@@ -181,6 +182,16 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 		return;
 	}
 	FWRGathering::Gather(Gatherer, ItemId, PerHit, bHeavy, FString::Printf(TEXT("%s (%d hits left)"), *GetName(), HitsLeft - 1));
+	{
+		// Wood chips, stone (and ore) chips with dust, or plant bits, toward the gatherer.
+		const FName Kind = FWRGathering::ToolKindFor(ItemId);
+		const FName Effect = Kind == TEXT("hatchet") ? TEXT("gather.wood") : Kind == TEXT("pick") ? TEXT("gather.stone") : TEXT("gather.fiber");
+		const FVector Toward = (Gatherer->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+		FVector Origin, Extent;
+		GetActorBounds(false, Origin, Extent);
+		const FVector At = Origin + Toward * FMath::Min(Extent.X, Extent.Y) * 0.8f;
+		WRFx::Broadcast(this, Effect, At, Toward.Rotation(), HitsLeft <= 1 ? 1.8f : (bHeavy ? 1.3f : 1.f), Effect);
+	}
 	// Ore veins sometimes give up a gem (Crafting tab: gems come from mines and caves).
 	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < GemChance + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("gemChance")))
 	{

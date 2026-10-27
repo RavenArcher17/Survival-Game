@@ -30,6 +30,7 @@ public class Wildreach : ModuleRules
 		PrivateIncludePathModuleNames.Add("TargetPlatform");
 		PrivateDependencyModuleNames.Add("AnimationCore");  // two-bone IK: the survivor's feet planted on slopes (WRAnimInstance)
 		PrivateDependencyModuleNames.Add("MoviePlayer");  // the loading screen during map loads (WRUIFlow)
+		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "RHI" });  // effects: WRFx draws its sprites with its own scene proxy
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)

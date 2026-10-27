@@ -39,8 +39,9 @@ public:
 	AWRHazard();
 	virtual void Tick(float DeltaSeconds) override;
 
-	/** Server. A flood hurts everyone on the ground in the radius except those standing on a boss prop (anvils). */
-	static AWRHazard* Spawn(UWorld* World, AActor* Source, const FVector& Location, float Radius, float Seconds, float DamagePerSecond, FName Kind);
+	/** Server. A flood hurts everyone on the ground in the radius except those standing on a boss prop (anvils).
+	 *  bMarker = false: no flat disc (the caller shows the area with an effect instead, as the player's spells do). */
+	static AWRHazard* Spawn(UWorld* World, AActor* Source, const FVector& Location, float Radius, float Seconds, float DamagePerSecond, FName Kind, bool bMarker = true);
 
 	TWeakObjectPtr<AActor> Source;
 	float Radius = 250.f;
