@@ -133,6 +133,10 @@ Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traver
 Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)
 Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings, then the moments between play: death, loading, banners, hints; -MainMenu: the front end; -Flow: just the moments)
 Tools\menushots.ps1     # the same for the old text menus (-oldui)
+Tools\animshots.ps1     # frame sequences from two angles: blocking, strafing, walking back, attacks and casts on the move, turns, creatures (contact sheets)
+Tools\fxshots.ps1       # the effects by day and night: hits, parries, spells, gathering, building, Hearth, lava embers, snow and ash
+Tools\worldshots.ps1    # the sea, both biomes at noon / dusk / dawn / night, a base of every piece, the stations, the camera (-Only <section>; all ~35 min)
+Tools\benchmark.ps1     # frame time on a fixed walk at Epic and Medium + server load with all wildlife out; appends to Docs\PERFORMANCE.md
 ```
 
 ## Layout

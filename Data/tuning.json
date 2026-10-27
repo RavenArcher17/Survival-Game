@@ -148,7 +148,7 @@
     "volcanicFogDensity": 0.027, "tundraFogDensity": 0.022,
     "goldenHourBelow": 18, "sunGlowColor": "255,150,80", "sunGlow": 0.6, "sunGlowExponent": 6,
     "shaftBloom": 0.4, "shaftThreshold": 2, "shaftDarkness": 0.6, "shaftTint": "255,210,160",
-    "mistDensity": 1.2, "mistDawn": 1, "mistDawnHours": 1.8, "mistDusk": 0.45, "mistDay": 0.12, "mistNight": 0.04, "mistFalloff": 1000, "mistHeightOffset": 0, "mistLift": 300, "mistRadiusScale": 1, "volcanicMistColor": "232,220,206", "tundraMistColor": "214,226,240",
+    "mistDensity": 1.2, "mistDawn": 0.55, "mistDawnHours": 1.1, "mistDusk": 0.45, "mistDay": 0.12, "mistNight": 0.04, "mistFalloff": 1000, "mistHeightOffset": 0, "mistLift": 300, "mistRadiusScale": 1, "volcanicMistColor": "232,220,206", "tundraMistColor": "214,226,240",
     "volcanicWhiteTemp": 7000, "tundraWhiteTemp": 5900, "volcanicSaturation": 0.94, "tundraSaturation": 0.97, "contrast": 1.04,
     "volcanicGain": "1.03,1.0,0.95", "tundraGain": "0.96,0.99,1.04", "shadowLift": "0.004,0.005,0.008", "nightShadowLift": 2, "vignette": 0.3,
     "volumetricFog": 0 },

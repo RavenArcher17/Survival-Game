@@ -19,6 +19,8 @@ if ($LASTEXITCODE -ne 0) { "[$(Get-Date -Format 'HH:mm:ss')] FAILED (exit $LASTE
 # The game reads its numbers from Data\*.json next to the project folder (tuning, items, creatures, ...).
 $game = Join-Path $Out 'Windows\Wildreach'
 Copy-Item (Join-Path $root 'Data') $game -Recurse -Force
+# Third-party credits ship with the game (some sounds are CC-BY, which asks for attribution where the work is used).
+Copy-Item (Join-Path $root 'Docs\CREDITS.md') (Join-Path $Out 'Windows\CREDITS.md') -Force
 $version = ((Get-Content (Join-Path $root 'Config\DefaultGame.ini') | Where-Object { $_ -match '^ProjectVersion=' } | Select-Object -First 1) -replace '^ProjectVersion=', '').Trim()
 @"
 WILDREACH $version
@@ -30,11 +32,13 @@ WILDREACH $version
    - On the same Wi-Fi: the host's local IP (run ipconfig, "IPv4 Address").
    - Over the internet: the host forwards UDP port 7777 on their router to their PC
      and shares their public IP (search "what is my ip").
-3. Controls are listed at the top of the screen. A few to start with:
-   LMB / R attack, RMB block, C dodge, E interact (and tame a knocked-out creature),
-   B build and craft, I inventory, G swap to a bow or other ranged weapon (RMB aims).
-   F10 returns to the menu.
+3. Every key can be changed in Esc > Controls, and H shows them in game. To start with:
+   LMB / R attack, RMB block, C dodge, E interact (hold E on your tame for its orders),
+   1-8 your items, hold Q for your abilities, I J P K M the journal (inventory, crafting,
+   paths, skills, map), B build, G a bow or other ranged weapon (RMB aims), Esc the menu,
+   F10 back to the main menu.
 
 Your character is saved on the host's PC under your name (Wildreach\Saved\ServerDB).
+Sound, music and other outside files are credited in CREDITS.md.
 "@ | Set-Content -Encoding ascii (Join-Path $Out 'Windows\README.txt')
 "[$(Get-Date -Format 'HH:mm:ss')] DONE: $Out\Windows\Wildreach.exe" | Tee-Object -FilePath $log -Append

@@ -50,11 +50,15 @@ AWRGroundMarker::AWRGroundMarker()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	Disc = MakeShapeMesh(this, TEXT("Disc"), TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	Box = MakeShapeMesh(this, TEXT("Box"), TEXT("/Engine/BasicShapes/Cube.Cube"));
+	// A glowing, pulsing, see-through telegraph (Tools/fx/make_telegraph_material.py): the lit shape material tinted
+	// orange blew out to a flat white or yellow patch in strong sun.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Telegraph(TEXT("/Game/FX/M_Telegraph.M_Telegraph"));
 	for (UStaticMeshComponent* M : { Disc.Get(), Box.Get() })
 	{
 		M->SetupAttachment(RootComponent);
 		M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		M->SetCastShadow(false);
+		if (Telegraph.Succeeded()) M->SetMaterial(0, Telegraph.Object);
 	}
 }
 
@@ -181,6 +185,9 @@ AWRBossProp::AWRBossProp()
 	Mesh = MakeShapeMesh(this, TEXT("Mesh"), TEXT("/Engine/BasicShapes/Cube.Cube"));
 	RootComponent = Mesh;
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
+	// Stone from the start (anvils), so no prop ever shows the engine's plain white shape material.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Stone(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
+	if (Stone.Succeeded()) Mesh->SetMaterial(0, Stone.Object);
 }
 
 void AWRBossProp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -205,14 +212,16 @@ void AWRBossProp::OnRep_Kind()
 		}
 		Radius = WRTune(TEXT("bosses.pillarRadius"), 120.f);
 		Mesh->SetRelativeScale3D(FVector(Radius / 50.f, Radius / 50.f, 8.f));
-		TintMesh(Mesh, FLinearColor(0.65f, 0.85f, 1.f));
+		// The island's ice (the frozen-ground material); the old pale tint on the shape material read as plain white.
+		if (UMaterialInterface* Ice = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Ice.M_Ice"))) Mesh->SetMaterial(0, Ice);
+		else TintMesh(Mesh, FLinearColor(0.65f, 0.85f, 1.f));
 	}
 	else
 	{
-		// Anvil: a raised stone block to stand on when the floor floods.
+		// Anvil: a raised stone block to stand on when the floor floods (coursed building stone, set in the constructor).
 		Radius = WRTune(TEXT("bosses.anvilHalfSize"), 160.f);
 		Mesh->SetRelativeScale3D(FVector(Radius / 50.f, Radius / 50.f, 1.5f));
-		TintMesh(Mesh, FLinearColor(0.18f, 0.16f, 0.15f));
+		if (!LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildStone.M_BuildStone"))) TintMesh(Mesh, FLinearColor(0.18f, 0.16f, 0.15f));
 	}
 }
 

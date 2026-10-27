@@ -21,7 +21,18 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
 - `Docs/plan/M1_combat.md` â€¦ `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
-## Status (2026-10-26)
+## Status (2026-10-27)
+- **Polish pass (0.4.0)**: sound and effects are named events (`WRSound::PlayAt/PlayOn/Voice/Broadcast`,
+  `WRFx::SpawnAt/Broadcast/ShowHit`); what plays is data (`Data/Audio/sounds.json` + OGG files loaded at runtime,
+  `Data/fx.json` recipes drawn by the C++ sprite system in `WRFx*`), so new moments need a table row, not code.
+  Animation is `UWRAnimInstance` (C++ layered blending, no animation blueprint; clips from `player_art.json` /
+  `creatures.json`, numbers in tuning `anim`). Ambient beds and music: `UWRAudioDirector`. World look: `WRSea`,
+  `WRSky` (biome air, valley mist), `WRBuildLook` (build-piece detail over the unchanged collision blocks),
+  `WRCameraBoom`. Death/loading/moments/hints: `WRUIFlow`, `WRFlowDeath`, `WRUIMotion`. Far creatures tick in slices
+  (`UWRSignificanceSubsystem`); art preloads (`UWRPreloadSubsystem`, `Data/preload.json`). Measure with
+  `Tools\benchmark.ps1` (results in `Docs/PERFORMANCE.md`); verify with `Tools\uishots.ps1`, `animshots.ps1`,
+  `fxshots.ps1`, `worldshots.ps1`, `audiotest.ps1`, `flowtest.ps1`. Third-party files and licences:
+  `Docs/CREDITS.md` (shipped beside the game).
 - **UI: the stone-and-leather Slate UI** (2026-10-26, from Raven's approved mockups): `FWRPlayerUI` per local player
   (`WRPlayerUI`), style + widget kit (`WRUIStyle`, `WRUIWidgets`, `WRUIWindowKit.h`), every key in `FWRKeyBindings`
   (Esc → Controls). Screens and journal tabs live in their own `WRUI*.cpp` and register with

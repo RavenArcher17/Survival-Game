@@ -1,6 +1,76 @@
 # Changelog
 
-## 2026-10-26: version 0.3.0, the stone-and-leather UI
+## 2026-10-27: version 0.4.0, the polish pass
+
+Raven asked for the playtest to feel and look like a real game by polishing what's there, with no new content (plan:
+https://claude.ai/artifact/LuauEtwseW8GwRVXie1iM4). Six agents worked side by side in their own git worktrees (animation,
+flow and UI, sound, effects and combat feel, world look, performance), on two shared event interfaces that landed
+first: `WRSound` and `WRFx` name the moment ("hit.flesh", "gather.wood", "levelup") and data decides what plays.
+
+- **Animation** (`UWRAnimInstance`, C++, no animation blueprint). The player and every creature played one clip at a
+  time, so blocking, attacking or casting while moving slid. Now the legs run locomotion (idle / walk / run blended by
+  speed and by direction: forward, back, strafes, diagonals) while an upper-body layer from the spine carries block,
+  attacks, casts, aiming, reloads and hit reactions; dodge, death, falls, swimming and gathering stay full body. Every
+  change crossfades (about 0.2 s), standing turns step the feet round past 70 degrees, feet plant on slopes (two-bone
+  IK). Clip paces are measured from the clips' own feet, so steps match the ground speed. Blocking now turns off
+  orient-to-movement, as aiming does (the facing used to wobble). 22 new clips (3.7 MB): ranged strafes and back-walks
+  built from packs already in the project; the sword-and-shield strafes were already imported.
+  - Creatures crossfade, play their loops at their real ground speed, turn at 160 / 260 degrees a second (was 400)
+    and arc instead of spinning, bite from the neck up while running, and time each attack's strike to the damage;
+    lunge, charge, stomp and spit each move at their own pace. Every creature from `rig_quadruped.py` had its walk and
+    run playing backward (moonwalking); the game now plays those loops reversed (the rig script is the real fix).
+  - Footsteps fire at each foot plant.
+- **Sound** (`WRSound`, `Data/Audio/sounds.json`, `UWRAudioDirector`). The game had none. 118 events from 352 OGG
+  files (18 MB, loaded at runtime from `Data/Audio` and decoded with the engine's Vorbis decoder): footsteps by surface,
+  swings, hits, blocks, parries, voices for both bodies, creature calls by species and family, gathering, building,
+  doors, crafting, spells, ranged weapons, UI, and the moments. Ambient beds crossfade by side of the ridge, time of day,
+  coast, caves, lava and altitude; music plays the menu theme, exploring and night tunes now and then, combat while
+  something hunts you and the boss track in a boss fight, ducking under big moments. Settings has an Audio page
+  (master, music, effects, ambience, interface). All sources are CC0 except two CC-BY 3.0 ones, credited in
+  `Docs/CREDITS.md` and the game folder's `CREDITS.md`: "Lava loop" (Blender Foundation) and "Crossbow sounds"
+  (HolgiB).
+- **Effects and combat feel** (`WRFx`, `Data/fx.json`, a small C++ sprite particle system: Niagara can't be authored
+  headless here). Fire and frost bolts with cores, trails and light; Fire wall, Lava pool, Frost nova, Ice lance and the
+  rest of the spells; impacts (blood, dust, ice or magic by creature, sparks on blocks); hit-stop (60 ms, 90 on
+  parries, animation only), camera shake, a parry flare and screen-edge flash, a crosshair hit marker; damage numbers
+  moved to the Slate HUD (gold Cinzel crits, "weak" on boss weaknesses, red for damage you take); wood chips, stone
+  dust and plant bits when gathering; dust when building, debris when pieces break; flames on Hearths, torches and
+  braziers; embers over lava; snow on the tundra and ash on the volcanic side. Server-only moments reach clients through
+  a reliable relay (`AWRFxRelay`).
+- **World**: the flat sea is moving water (waves, turquoise shallows, deep water, shore foam; dark at night), meshed
+  over the open sea only (`Data/sea_mask.json`). The volcanic side gets a warm ash haze and the tundra a cold blue,
+  blended by where the camera is; light shafts at dawn and dusk; mist in 45 valleys; a lifted grade so nights read.
+  Build pieces get real shape from code (`WRBuildLook`): plank walls with posts, coursed stone, floorboards and flags,
+  shingles and slates on rafters, cut gables, framed doors and windows, palisade points; collision and placement are
+  unchanged. The workbench, forge, armorer, alchemy table, Hearth, claim totem and storage chest are modelled props from
+  the local AI pipeline (Hunyuan3D 2.0: not licensed in the EU, UK or South Korea). The camera eases back out after a
+  wall, widens slightly when sprinting and eases into lock-on.
+- **Flow and UI**: dying fades to a carved "You died" card naming what killed you, where your belongings wait and for
+  how long, and where you'll wake, then holds "Loading the island…" until the ground around you has streamed in; a
+  compass marker leads back to your bag. A loading screen with tips shows when you host, join or travel. Screens fade
+  and rise in, buttons and slots warm and dip, pickups stack ("+40 Wood"), notices queue. Banners for level-ups, new
+  recipes, first visits to camps, caves, passes and boss lairs, boss title cards and tames. Six one-time hints with the
+  real keys ("Show hints" on the Video page). A fixed scenic view behind the main menu.
+- **Performance** (`Tools/benchmark.ps1`, results in `Docs/PERFORMANCE.md`): creatures more than 200 m from every
+  player think in quarter-second slices (`UWRSignificanceSubsystem`): with all 169 out, server work per frame went from
+  14.6 to 6.8 ms. The creature, body and item art preloads in the background at start (`UWRPreloadSubsystem`), which
+  removed the two hitches on the walk route (frames over 50 ms: 2-6 per run before, none after).
+- Fixes found on the way:
+  - **Beds never set where you respawn**: the engine reused the controller's first start spot. They work now (and you
+    wake standing on the bed, not inside the floor).
+  - `M_Rock` lacked the Nanite usage flag, so cooked builds drew the cave boulders in the default material.
+  - The sound table had no `hit.dust` or `stomp`, which the effects call.
+  - Boss telegraphs and hazard markers were the engine's lit shape material tinted orange, which strong sun blew out
+    to flat white or yellow patches; they're now a glowing, see-through, pulsing material (`M_Telegraph`,
+    `Tools/fx/make_telegraph_material.py`).
+  - New players spawn at 08:00, the peak of the dawn valley mist, so their first look at the island was washed out;
+    the dawn mist is about half as strong and clears sooner.
+- The full suite passes on the merged build: 22 automation tests and 234 checks over 19 bot tests (`flow` is new);
+  `uishots.ps1` captures all 39 screens with no client errors.
+- Known gaps: distant terrain isn't drawn past about 256 m (needs HLODs, still on the roadmap); the volcanic shrubs
+  are bright green; your first spawn ignores your path (a fire player can start at a tundra camp); creature feet still
+  slide about half their speed (the procedural rigs never fully plant a foot); running strafes show only while aiming or
+  in first person, because third person faces where you run.
 
 The whole UI is rebuilt from the mockups Raven approved (dark stone and leather, Cinzel and Alegreya Sans), in Slate
 C++ owned per local player by `FWRPlayerUI`. Screens register themselves by name and follow the controller's menu
