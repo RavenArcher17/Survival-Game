@@ -4,6 +4,7 @@
 #include "WRCharacterBase.h"
 #include "WRCharacterMovementComponent.h"
 #include "WRCombatLibrary.h"
+#include "WRFx.h"
 #include "WRGameplayTags.h"
 #include "WRPathComponent.h"
 #include "WRProjectile.h"
@@ -284,6 +285,13 @@ void UWRGA_Melee::Sweep()
 			if (!HitThisSwing.Contains(Piece) && PS && !Piece->CanAccess(PS->GetPlayerName()))
 			{
 				HitThisSwing.Add(Piece);
+				{
+					// Splinters off a wooden wall, grit off a stone one.
+					const FWRPieceDef* PieceDef = Piece->GetDef();
+					const bool bWood = PieceDef && PieceDef->Material == TEXT("wood");
+					const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : Piece->GetActorLocation();
+					WRFx::Broadcast(Character, bWood ? TEXT("gather.wood") : TEXT("hit.dust"), At, (Start - At).GetSafeNormal().Rotation(), bHeavy ? 1.3f : 1.f, bWood ? TEXT("gather.wood") : TEXT("hit.block"));
+				}
 				Piece->TakeBuildDamage(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f)
 					* T.Num(TEXT("building.raidDamageMultiplier"), 1.f), Character);
 			}
@@ -414,7 +422,8 @@ void UWRGA_MoltenCleave::ActivateAbility(const FGameplayAbilitySpecHandle Handle
 		{
 			const FVector At = C->GetActorLocation() + C->GetActorForwardVector() * 250.f - FVector(0, 0, C->GetSimpleCollisionHalfHeight());
 			AWRHazard::Spawn(C->GetWorld(), C, At, WRTune(TEXT("spells.moltenCleave.lavaRadius"), 220.f), WRTune(TEXT("spells.moltenCleave.lavaSeconds"), 6.f),
-				WRTune(TEXT("spells.moltenCleave.lavaDps"), 10.f), TEXT("lava"));
+				WRTune(TEXT("spells.moltenCleave.lavaDps"), 10.f), TEXT("lava"), false);
+			WRFx::Broadcast(C, TEXT("lavapool"), At, FRotator::ZeroRotator, WRTune(TEXT("spells.moltenCleave.lavaRadius"), 220.f) / 100.f, TEXT("lavapool"), WRTune(TEXT("spells.moltenCleave.lavaSeconds"), 6.f));
 		}
 	}), WRTune(TEXT("weapon.heavyTiming.windup"), 0.5f) + 0.05f, false);
 }
@@ -498,6 +507,12 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	if (Dir.IsNearlyZero())
 	{
 		Dir = -Character->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	if (IsServer())
+	{
+		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
+		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), 1.f, TEXT("dodge"));
 	}
 
 	UAbilityTask_ApplyRootMotionConstantForce* Task = UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(
@@ -624,6 +639,11 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	AWRCharacterBase* Character = GetCharacter();
 	Character->PlaySwing(EWRSwingKind::Cast, 0.25f);
 	SetMoveSlow(false, true);
+	if (IsServer())
+	{
+		const bool bFire = Element == WRTags::Element_Fire;
+		WRFx::BroadcastOn(Character, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), TEXT("hand"), 1.f, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), 0.4f);
+	}
 
 	After(0.15f, [this]()
 	{
@@ -713,6 +733,11 @@ void UWRGA_AreaSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	}
 	GetCharacter()->PlaySwing(EWRSwingKind::Cast, 0.35f);
 	SetMoveSlow(false, true);
+	if (IsServer())
+	{
+		const bool bFire = Element == WRTags::Element_Fire;
+		WRFx::BroadcastOn(GetCharacter(), bFire ? TEXT("cast.fire") : TEXT("cast.frost"), TEXT("hand"), 1.4f, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), 0.5f);
+	}
 	After(0.25f, [this]() { if (IsServer()) Execute(); });
 	After(0.45f, [this]() { EndSelf(); });
 }
@@ -731,7 +756,6 @@ void UWRGA_AreaSpell::Execute()
 	const FVector Flat = FRotator(0.f, Aim.Yaw, 0.f).Vector();
 	const FVector Feet = Caster->GetActorLocation() - FVector(0.f, 0.f, Caster->GetSimpleCollisionHalfHeight());
 	const bool bFire = Element == WRTags::Element_Fire;
-	const FLinearColor Color = bFire ? FLinearColor(1.f, 0.35f, 0.05f) : FLinearColor(0.55f, 0.85f, 1.f);
 	const auto Ground = [World, Caster](const FVector& At)
 	{
 		FHitResult Hit;
@@ -763,7 +787,8 @@ void UWRGA_AreaSpell::Execute()
 		for (int32 i = 0; i < Patches; ++i)
 		{
 			const FVector At = Center + Across * (Width * (i / FMath::Max(1.f, Patches - 1.f) - 0.5f));
-			AWRHazard::Spawn(World, Caster, Ground(At), Width / Patches * 0.7f, Num(TEXT("seconds"), 6.f), Num(TEXT("dps"), 10.f), TEXT("fire"));
+			AWRHazard::Spawn(World, Caster, Ground(At), Width / Patches * 0.7f, Num(TEXT("seconds"), 6.f), Num(TEXT("dps"), 10.f), TEXT("fire"), false);
+			WRFx::Broadcast(Caster, TEXT("firewall"), Ground(At), FRotator(0.f, Aim.Yaw, 0.f), Width / Patches * 0.7f / 100.f, i == Patches / 2 ? FName(TEXT("firewall")) : NAME_None, Num(TEXT("seconds"), 6.f));
 		}
 		break;
 	}
@@ -775,13 +800,15 @@ void UWRGA_AreaSpell::Execute()
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSpellAim), false, Caster);
 		const float Range = Num(TEXT("range"), 1500.f);
 		const FVector At = World->LineTraceSingleByChannel(Hit, Eye, Eye + Aim.Vector() * Range, ECC_WorldStatic, Query) ? Hit.ImpactPoint : Ground(Feet + Flat * Range * 0.7f);
-		AWRHazard::Spawn(World, Caster, At, Num(TEXT("radius"), 300.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 12.f), TEXT("lava"));
+		AWRHazard::Spawn(World, Caster, At, Num(TEXT("radius"), 300.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 12.f), TEXT("lava"), false);
+		WRFx::Broadcast(Caster, TEXT("lavapool"), At, FRotator::ZeroRotator, Num(TEXT("radius"), 300.f) / 100.f, TEXT("lavapool"), Num(TEXT("seconds"), 8.f));
 		break;
 	}
 	case EWRAreaShape::Nova:
 	{
 		const float Radius = Num(TEXT("radius"), 500.f);
-		AWRGroundMarker::Spawn(World, Feet + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, Color, 0.5f);
+		// (The frost nova effect shows the ring it reaches; no flat marker disc.)
+		WRFx::Broadcast(Caster, TEXT("frostnova"), Feet, FRotator::ZeroRotator, Radius / 100.f, TEXT("frostnova"));
 		for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
 		{
 			if (*It != Caster && It->IsAlive() && Caster->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Caster->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())
@@ -818,7 +845,9 @@ void UWRGA_AreaSpell::Execute()
 					UWRCombatLibrary::ApplyHit(*It, H);
 				}
 			}
-			AWRHazard::Spawn(C->GetWorld(), C, At, Radius * 0.6f, 5.f, 8.f, TEXT("fire"));
+			AWRHazard::Spawn(C->GetWorld(), C, At, Radius * 0.6f, 5.f, 8.f, TEXT("fire"), false);
+			WRFx::Broadcast(C, TEXT("fire.impact"), At, FRotator(90.f, 0.f, 0.f), 3.f, TEXT("fire.impact"));
+			WRFx::Broadcast(C, TEXT("firewall"), At, FRotator::ZeroRotator, Radius * 0.6f / 100.f, NAME_None, 5.f);
 		}), Delay, false);
 		break;
 	}
@@ -840,12 +869,14 @@ void UWRGA_AreaSpell::Execute()
 				Pillar->SetActorScale3D(FVector(0.8f, 0.8f, 0.5f));
 				Pillar->SetLifeSpan(Num(TEXT("seconds"), 8.f));
 			}
+			WRFx::Broadcast(Caster, TEXT("frost.impact"), At - FVector(0, 0, 180.f), FRotator(90.f, 0.f, 0.f), 1.5f, i == 0 ? FName(TEXT("frost.impact")) : NAME_None);
 		}
 		break;
 	}
 	case EWRAreaShape::Storm:
 		// A lasting storm around where you cast: frost buildup and slow on enemies inside.
-		AWRHazard::Spawn(World, Caster, Feet, Num(TEXT("radius"), 650.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 6.f), TEXT("frost"));
+		AWRHazard::Spawn(World, Caster, Feet, Num(TEXT("radius"), 650.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 6.f), TEXT("frost"), false);
+		WRFx::Broadcast(Caster, TEXT("blizzard"), Feet, FRotator::ZeroRotator, Num(TEXT("radius"), 650.f) / 100.f, TEXT("frostnova"), Num(TEXT("seconds"), 8.f));
 		break;
 	case EWRAreaShape::Lance:
 	{
@@ -865,7 +896,7 @@ void UWRGA_AreaSpell::Execute()
 				Strike(Target, From);
 			}
 		}
-		AWRGroundMarker::Spawn(World, Feet + FVector(0, 0, 3), Aim, FVector2D(Range, 60.f), true, Color, 0.4f);
+		WRFx::Broadcast(Caster, TEXT("icelance"), From, Aim, Range / 100.f, TEXT("icelance"));
 		break;
 	}
 	}

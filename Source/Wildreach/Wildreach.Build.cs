@@ -25,6 +25,7 @@ public class Wildreach : ModuleRules
 			"Landscape"
 		});
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "ProceduralMeshComponent", "HTTP", "ImageWrapper" });  // lava / ice surfaces; the main menu's update check
+		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "RHI" });  // effects: WRFx draws its sprites with its own scene proxy
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)

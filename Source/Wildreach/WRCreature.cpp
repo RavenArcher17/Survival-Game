@@ -17,6 +17,7 @@
 #include "WRPlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -1515,6 +1516,7 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 		{
 			// Everything hostile in the ring takes it (not a knocked-out creature: someone may be taming it).
 			const float Radius = AttackNum(Special, TEXT("radius"), 320.f);
+			WRFx::Broadcast(Self, TEXT("stomp"), Self->GetActorLocation() - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, Radius / 100.f, TEXT("stomp"));
 			for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 			{
 				if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && (!It->HasTag(WRTags::Status_Unconscious) || *It == SpecialTarget.Get()) && FVector::Dist2D(It->GetActorLocation(), Self->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())

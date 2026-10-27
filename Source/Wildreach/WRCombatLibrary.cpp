@@ -9,6 +9,7 @@
 #include "WRTuning.h"
 #include "WRPathComponent.h"
 #include "WRInventory.h"
+#include "WRFx.h"
 #include "AbilitySystemComponent.h"
 #include "EngineUtils.h"
 
@@ -91,7 +92,7 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 		{
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), 0.f);
 			const float Radius = WRTune(TEXT("passives.overheatRadius"), 350.f);
-			AWRGroundMarker::Spawn(Who->GetWorld(), Who->GetActorLocation() - FVector(0, 0, Who->GetSimpleCollisionHalfHeight() - 3.f), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.35f, 0.05f), 0.4f);
+			WRFx::Broadcast(Who, TEXT("fire.impact"), Who->GetActorLocation() - FVector(0, 0, Who->GetSimpleCollisionHalfHeight() - 20.f), FRotator(90.f, 0.f, 0.f), Radius / 120.f, TEXT("fire.impact"));
 			for (TActorIterator<AWRCharacterBase> It(Who->GetWorld()); It; ++It)
 			{
 				if (*It != Who && It->IsAlive() && Who->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Who->GetActorLocation()) < Radius)
@@ -194,7 +195,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			}
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT frozen moment by %s"), *Target->GetName());
 		}
-		Target->ReportHit(0.f, EWRHitResult::Dodged);
+		Target->ReportHit(0.f, EWRHitResult::Dodged, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
 		return EWRHitResult::Dodged;
 	}
 
@@ -207,7 +208,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			if (It->Kind == TEXT("frost") && Caster && Caster->IsHostileTo(Attacker) && FVector::Dist2D(It->GetActorLocation(), Attacker->GetActorLocation()) < It->Radius
 				&& UWRPathComponent::HasNode(Caster, TEXT("frost"), TEXT("whiteout")) && FMath::FRand() < WRTune(TEXT("passives.whiteoutMissChance"), 0.3f))
 			{
-				Target->ReportHit(0.f, EWRHitResult::Dodged);
+				Target->ReportHit(0.f, EWRHitResult::Dodged, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
 				return EWRHitResult::Dodged;
 			}
 		}
@@ -216,6 +217,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	float Damage = Hit.Damage;
 	float PoiseDamage = Hit.PoiseDamage;
 	EWRHitResult Result = EWRHitResult::Hit;
+	// What kind of hit it was, for the effects and damage numbers on every machine.
+	bool bCrit = false, bRiposte = false, bShatter = false;
 
 	// --- Block and parry (melee only, from the front) ---
 	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking)
@@ -236,7 +239,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 				Attacker->Status->AddBuildup(WRTags::Element_Fire, WRTune(TEXT("passives.searingParryBuildup"), 100.f), Target);
 			}
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT %s parried %s"), *Target->GetName(), *Attacker->GetName());
-			Target->ReportHit(0.f, EWRHitResult::Parried);
+			Target->ReportHit(0.f, EWRHitResult::Parried, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
 			return EWRHitResult::Parried;
 		}
 
@@ -294,12 +297,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit)
 		{
 			Damage *= 1.5f;
+			bCrit = true;
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s"), *Target->GetName());
 		}
 		if (Hit.bMelee && TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
 		{
 			// Riposte / critical on a staggered target.
 			Damage *= WRTune(TEXT("weapon.riposteMultiplier"), 3.f);
+			bRiposte = true;
 			Target->Status->ClearStatus(WRTags::Status_Staggered);
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT riposte on %s"), *Target->GetName());
 			// Cold riposte: ripostes freeze the target.
@@ -322,6 +327,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			{
 				// Chill: spending it all at once triggers bigger shatters.
 				const float ChillFraction = SpendAllChill(Attacker);
+				bShatter = true;
 				Damage += WRTune(TEXT("status.shatterDamage"), 30.f) * (1.f + ChillFraction * WRTune(TEXT("resources.chillShatterBonusAtFull"), 1.f))
 					* (1.f + UWRPathComponent::Stat(Attacker, TEXT("shatterDamage")));
 				Target->Status->ClearStatus(WRTags::Status_Frozen);
@@ -375,7 +381,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 	}
 
+	const float BeforeModify = Damage;
 	Damage = Target->ModifyIncomingDamage(Hit, Damage);
+	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
+	const bool bWeak = BeforeModify > 0.f && Damage > BeforeModify * 1.05f;
 
 	// --- Apply ---
 	const float NewHealth = TargetAttr->GetHealth() - Damage;
@@ -470,7 +479,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		*GetNameSafe(Hit.Instigator), *Target->GetName(), Damage, PoiseDamage,
 		Hit.Element.IsValid() ? *Hit.Element.ToString() : TEXT("none"), ResultName(Result), TargetAttr->GetHealth());
 
-	Target->ReportHit(Damage, Result);
+	Target->ReportHit(Damage, Result, WRFx::HitFlagsFor(Hit, bCrit, bRiposte, bWeak, bShatter, Target->ArmorValue > 0.f), Hit.Instigator, Hit.Origin);
 	if (TargetAttr->GetHealth() <= 0.f)
 	{
 		// Wildfire: burning enemies erupt into flames when they die.

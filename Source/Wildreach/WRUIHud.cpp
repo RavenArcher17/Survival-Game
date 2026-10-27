@@ -22,6 +22,7 @@
 #include "WRPlayerState.h"
 #include "WRWorldDressing.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "AbilitySystemComponent.h"
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
@@ -194,6 +195,7 @@ public:
 		ChildSlot
 		[
 			SNew(SOverlay)
+			+ SOverlay::Slot()[WRFx::MakeHudOverlay(PC)]   // damage numbers, hit marker, parry flash (under the panels)
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[LevelPlate()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 18.f * U)[CompassAndBoss()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[ClockPlate()]

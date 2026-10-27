@@ -7,6 +7,8 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRInventory.h"
+#include "WRFx.h"
+#include "WRSound.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -202,19 +204,21 @@ FString AWRCharacterBase::GetDisplayLabel() const
 	return PS ? PS->GetPlayerName() : GetName();
 }
 
-void AWRCharacterBase::ReportHit(float Damage, EWRHitResult Result)
+void AWRCharacterBase::ReportHit(float Damage, EWRHitResult Result, uint16 FxFlags, AActor* Source, const FVector& Origin)
 {
 	if (HasAuthority())
 	{
-		MulticastHit(Damage, Result);
+		MulticastHit(Damage, Result, FxFlags, Source, Origin);
 	}
 }
 
-void AWRCharacterBase::MulticastHit_Implementation(float Damage, EWRHitResult Result)
+void AWRCharacterBase::MulticastHit_Implementation(float Damage, EWRHitResult Result, uint16 FxFlags, AActor* Source, FVector_NetQuantize Origin)
 {
 	HitFlash = Result == EWRHitResult::Hit ? 0.15f : 0.f;
 	OnHitVisual(Result);
 	OnHitShown.Broadcast(this, Damage, Result);
+	// Impact, hit sound, hit-stop, shake, hit marker and damage number (nothing on a dedicated server).
+	WRFx::ShowHit(this, Source, Damage, Result, FxFlags, Origin);
 }
 
 void AWRCharacterBase::MulticastDied_Implementation()
@@ -251,6 +255,11 @@ void AWRCharacterBase::StartSwingVisual(EWRSwingKind Kind, float Duration)
 	VisualSwingTime = 0.f;
 	VisualSwingDuration = FMath::Max(Duration, 0.05f);
 	OnSwingVisual(Kind, Duration);
+	// The blade's whoosh (creatures' bites have their own attack calls).
+	if (!IsCreature() && (Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy || Kind == EWRSwingKind::WeaponArt))
+	{
+		WRSound::PlayOn(this, Kind == EWRSwingKind::Light ? TEXT("swing.light") : TEXT("swing.heavy"));
+	}
 }
 
 void AWRCharacterBase::SetBodyColor(const FLinearColor& Color)

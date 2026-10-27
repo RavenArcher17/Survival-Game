@@ -9,6 +9,7 @@
 #include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
+#include "WRFx.h"
 #include "WRSocial.h"
 #include "WRStatusComponent.h"
 #include "Engine/StaticMesh.h"
@@ -59,6 +60,7 @@ void AWRProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRProjectile, TintColor);
 	DOREPLIFETIME(AWRProjectile, ModelPath);
 	DOREPLIFETIME(AWRProjectile, ModelAlong);
+	DOREPLIFETIME(AWRProjectile, TrailFx);
 }
 
 void AWRProjectile::BeginPlay()
@@ -70,6 +72,32 @@ void AWRProjectile::BeginPlay()
 	}
 	Collision->OnComponentHit.AddDynamic(this, &AWRProjectile::OnHit);
 	OnRep_Color();
+	OnRep_Fx();
+}
+
+void AWRProjectile::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// The trail stops; what it left behind fades on its own (the impact came from the server, see OnHit).
+	if (Trail)
+	{
+		WRFx::Stop(Trail);
+		Trail = nullptr;
+	}
+	Super::EndPlay(Reason);
+}
+
+void AWRProjectile::OnRep_Fx()
+{
+	// Before BeginPlay (initial replication) BeginPlay calls this again; during it, IsActorBeginningPlay.
+	if (Trail || TrailFx.IsNone() || !ModelPath.IsEmpty() || GetNetMode() == NM_DedicatedServer || IsActorBeingDestroyed() || !(HasActorBegunPlay() || IsActorBeginningPlay()))
+	{
+		return;
+	}
+	Trail = WRFx::Attach(Collision, TrailFx);
+	if (Trail)
+	{
+		Mesh->SetVisibility(false);  // the glowing core and its trail are the bolt now
+	}
 }
 
 void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& Color)
@@ -77,7 +105,9 @@ void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& C
 	Hit = InHit;
 	TintColor = Color;
 	Movement->Velocity = GetActorForwardVector() * Speed;
+	TrailFx = InHit.Element == WRTags::Element_Fire ? FName(TEXT("fire.bolt")) : InHit.Element == WRTags::Element_Frost ? FName(TEXT("frost.shard")) : NAME_None;
 	OnRep_Color();
+	OnRep_Fx();
 }
 
 void AWRProjectile::InitPhysical(const FWRHit& InHit, const FVector& Velocity, float Gravity, const FString& MeshPath, const FString& MeshAlong, FName InKind, FName InPickupItem)
@@ -171,6 +201,20 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	if (!ModelPath.IsEmpty())
 	{
 		UE_LOG(LogWildreach, Log, TEXT("RANGED %s hit %s"), *Kind.ToString(), *GetNameSafe(OtherActor));
+		if (!Target)
+		{
+			// An arrow into the ground or a wall kicks up a little dust (a body shows its own hit).
+			WRFx::Broadcast(this, TEXT("hit.dust"), HitResult.ImpactPoint, HitResult.ImpactNormal.Rotation(), 0.45f, TEXT("arrow.hit"));
+		}
+	}
+	else
+	{
+		// A spell bursts where it struck; an explosive bolt bursts bigger.
+		const bool bFire = Hit.Element == WRTags::Element_Fire;
+		const bool bExplosive = Caster && Hit.PathId == TEXT("fire") && UWRPathComponent::HasNode(Caster, TEXT("fire"), TEXT("explosive_bolt"));
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		const FVector Normal = HitResult.bBlockingHit ? FVector(HitResult.ImpactNormal) : -GetVelocity().GetSafeNormal();
+		WRFx::Broadcast(this, bFire ? TEXT("fire.impact") : TEXT("frost.impact"), At, Normal.Rotation(), bExplosive ? 2.f : 1.f, bFire ? TEXT("fire.impact") : TEXT("frost.impact"));
 	}
 	if (!ModelPath.IsEmpty() && Kind != TEXT("bola"))
 	{
@@ -207,7 +251,7 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	if (Caster && Hit.PathId == TEXT("fire") && UWRPathComponent::HasNode(Caster, TEXT("fire"), TEXT("explosive_bolt")))
 	{
 		const float Radius = WRTune(TEXT("passives.explosiveBoltRadius"), 300.f);
-		AWRGroundMarker::Spawn(GetWorld(), GetActorLocation(), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.4f, 0.05f), 0.35f);
+		// (The burst is the impact effect at twice the size, sent above; no flat marker disc.)
 		for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 		{
 			if (*It != Target && *It != Caster && It->IsAlive() && Caster->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < Radius)

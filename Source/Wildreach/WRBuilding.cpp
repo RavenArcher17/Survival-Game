@@ -6,6 +6,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -263,6 +264,17 @@ void AWRBuildPiece::BeginPlay()
 
 void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 {
+	// Demolished, smashed or collapsed: debris of its material and dust for everyone (not when the world closes).
+	const UWorld* World = GetWorld();
+	const FWRPieceDef* Def = GetDef();
+	if (Reason == EEndPlayReason::Destroyed && HasAuthority() && !bGhost && Def && World && !World->bIsTearingDown)
+	{
+		FVector Origin, Extent;
+		GetActorBounds(false, Origin, Extent);
+		if (Extent.IsNearlyZero()) { Origin = GetActorLocation(); Extent = FVector(60.f); }
+		const FName Effect = Def->Material == TEXT("wood") ? TEXT("build.break.wood") : Def->Material == TEXT("stone") ? TEXT("build.break.stone") : TEXT("build.break");
+		WRFx::Broadcast(this, Effect, Origin, GetActorRotation(), FMath::Clamp(Extent.Size() / 150.f, 0.4f, 3.f), TEXT("build.demolish"));
+	}
 	if (AActor* Child = ChildActor.Get())
 	{
 		Child->Destroy();

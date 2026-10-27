@@ -8,6 +8,7 @@
 #include "WRInventory.h"
 #include "WRResourceNode.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Dom/JsonObject.h"
@@ -559,6 +560,16 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 		Inventory->AddItem(TEXT("berries"), 1);
 	}
 	int32& Taken = HitsTaken.FindOrAdd(Key);
+	const bool bUsedUp = Taken + 1 >= FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(Tune + TEXT(".hits"), 6.f)));
+	{
+		// Chips fly back at the gatherer from the side of the trunk / rock / shrub they hit; the last blow throws more.
+		const FVector Ground = HK.Ground[BestIndex];
+		const FVector Toward = (Here - Ground).GetSafeNormal2D();
+		const bool bTree = HK.Group == TEXT("tree"), bRock = HK.Group == TEXT("rock");
+		const FName Effect = bTree ? TEXT("gather.wood") : bRock ? TEXT("gather.stone") : TEXT("gather.fiber");
+		const FVector At = Ground + Toward * HK.Radius * HK.Scale[BestIndex] * 0.8f + FVector(0.f, 0.f, bTree ? 100.f : 45.f);
+		WRFx::Broadcast(this, Effect, At, Toward.Rotation(), bUsedUp ? 1.8f : (bHeavy ? 1.3f : 1.f), Effect);
+	}
 	if (++Taken >= FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(Tune + TEXT(".hits"), 6.f))))
 	{
 		HitsTaken.Remove(Key);

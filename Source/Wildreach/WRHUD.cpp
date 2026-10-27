@@ -72,9 +72,10 @@ void AWRHUD::DrawHUD()
 	LastDrawTime = Now;
 
 	const AWRCharacter* Survivor = Cast<AWRCharacter>(GetOwningPawn());
-	DrawDamageNumbers(DeltaTime);
 	if (const AWRPlayerController* NewUIPC = Cast<AWRPlayerController>(PlayerOwner); NewUIPC && NewUIPC->GetUI())
 	{
+		// (The new UI draws the damage numbers itself, styled: WRFx::MakeHudOverlay.)
+		Floating.Reset();
 		// The stone-and-leather UI (Slate) draws the HUD and menus; this canvas keeps the nameplates over creatures
 		// and players, the damage numbers, and the old text panel for a menu that has no new screen yet.
 		if (const AWRCharacterBase* Self = Cast<AWRCharacterBase>(GetOwningPawn()))
@@ -87,6 +88,7 @@ void AWRHUD::DrawHUD()
 		}
 		return;
 	}
+	DrawDamageNumbers(DeltaTime);
 	if (const AWRCreature* Mount = Cast<AWRCreature>(GetOwningPawn()))
 	{
 		// Riding: the mount's own bars, plus the way off.

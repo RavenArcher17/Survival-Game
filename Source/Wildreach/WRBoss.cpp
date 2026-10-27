@@ -9,6 +9,7 @@
 #include "WRPlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRFx.h"
 #include "AIController.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -101,7 +102,7 @@ AWRHazard::AWRHazard()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 }
 
-AWRHazard* AWRHazard::Spawn(UWorld* World, AActor* InSource, const FVector& Location, float InRadius, float Seconds, float Dps, FName InKind)
+AWRHazard* AWRHazard::Spawn(UWorld* World, AActor* InSource, const FVector& Location, float InRadius, float Seconds, float Dps, FName InKind, bool bMarker)
 {
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -115,8 +116,11 @@ AWRHazard* AWRHazard::Spawn(UWorld* World, AActor* InSource, const FVector& Loca
 	H->DamagePerSecond = Dps;
 	H->Kind = InKind;
 	if (Seconds > 0.f) H->SetLifeSpan(Seconds);  // 0 = permanent (cave hazards)
-	const FLinearColor Color = InKind == TEXT("ice") || InKind == TEXT("frost") ? FLinearColor(0.7f, 0.9f, 1.f) : InKind == TEXT("gas") ? FLinearColor(0.7f, 0.75f, 0.1f) : FLinearColor(1.f, 0.3f, 0.02f);
-	H->Marker = AWRGroundMarker::Spawn(World, Location + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(InRadius, InRadius), false, Color, Seconds);
+	if (bMarker)
+	{
+		const FLinearColor Color = InKind == TEXT("ice") || InKind == TEXT("frost") ? FLinearColor(0.7f, 0.9f, 1.f) : InKind == TEXT("gas") ? FLinearColor(0.7f, 0.75f, 0.1f) : FLinearColor(1.f, 0.3f, 0.02f);
+		H->Marker = AWRGroundMarker::Spawn(World, Location + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(InRadius, InRadius), false, Color, Seconds);
+	}
 	return H;
 }
 
@@ -839,6 +843,24 @@ void AWRBoss::ResolveAttack()
 
 	// Aftermath.
 	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
+	{
+		// The blow lands for everyone to see: dust and rubble where a slam hits the ground (it shakes nearby cameras),
+		// a burst where thrown fire or ice strikes.
+		const FString Id = Attack.Id.ToString();
+		const FVector Centre = Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : Floor;
+		if (Id.Contains(TEXT("slam")) || Id == TEXT("ground_pound") || Id == TEXT("stomp") || Id == TEXT("dive") || Id == TEXT("boulder") || Id == TEXT("tail_sweep"))
+		{
+			WRFx::Broadcast(this, TEXT("stomp"), Centre, FRotator::ZeroRotator, Attack.Size / 100.f, TEXT("stomp"));
+		}
+		else if (Id == TEXT("slag_throw") || Id == TEXT("fire_bolt"))
+		{
+			WRFx::Broadcast(this, TEXT("fire.impact"), Centre, FRotator(90.f, 0.f, 0.f), 2.f, TEXT("fire.impact"));
+		}
+		else if (Id == TEXT("ice_spikes") || Id == TEXT("air_breath"))
+		{
+			WRFx::Broadcast(this, TEXT("frostnova"), Centre, FRotator::ZeroRotator, Attack.Size / 100.f, TEXT("frostnova"));
+		}
+	}
 	if (Attack.Id == TEXT("overhead_slam") || Attack.Id == TEXT("slag_throw"))
 	{
 		AWRHazard::Spawn(GetWorld(), this, AttackPoint, Attack.Id == TEXT("slag_throw") ? 160.f : 250.f, Tune(TEXT("crackSeconds"), 12.f), Tune(TEXT("crackDps"), 10.f), TEXT("lava"));

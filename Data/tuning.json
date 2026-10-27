@@ -101,6 +101,23 @@
     "_all": "placeholder"
   },
 
+  "fx": {
+    "_comment": "Combat feel and effect budgets (WRFx; the effects themselves are recipes in Data/fx.json). Client-side only. hitStop: how long both fighters' animation freezes on heavy blows (heavy swings, weapon arts, crits, ripostes, shatters, guard breaks) and parries, seconds. shake.<moment>: camera trauma 0..1 added (radius > 0: fades with distance from the camera, for slams and spells), scale = master (0 turns shaking off), maxAngle degrees / maxOffset cm at full trauma, decay per second, frequency of the wobble. impact.heavyScale = how much bigger a heavy blow's sparks/blood are, elementScale = the fire/frost burst on an infused or path melee hit. hud: hit marker and parry flash (seconds, alpha). Budgets: sprites per batch, pooled lights, distances (cm) for one-shots, drawing and lights. ambient/lava/weather: fires on Hearths and torches, statuses, lava embers, snow and ash (ridge distances from x = 0, cm).",
+    "hitStop": { "seconds": 0.06, "parrySeconds": 0.09 },
+    "shake": {
+      "scale": 1, "maxAngle": 2.5, "maxOffset": 6, "decay": 1.6, "frequency": 22,
+      "heavyDealt": { "strength": 0.3 }, "heavyTaken": { "strength": 0.5 }, "lightTaken": { "strength": 0.15 },
+      "block": { "strength": 0.15 }, "guardBreak": { "strength": 0.45 }, "parry": { "strength": 0.3 },
+      "stomp": { "strength": 0.6, "radius": 2500 }, "spellImpact": { "strength": 0.2, "radius": 900 }, "nova": { "strength": 0.35, "radius": 1500 }
+    },
+    "impact": { "heavyScale": 1.6, "elementScale": 0.45 },
+    "hud": { "markerSeconds": 0.28, "parryFlashSeconds": 0.18, "parryFlashAlpha": 0.22 },
+    "maxParticles": 8000, "maxLights": 12, "cullDistance": 15000, "drawDistance": 25000, "lightDistance": 6000,
+    "ambient": { "distance": 6000, "statusDistance": 4000, "flicker": 0.18 },
+    "lava": { "distance": 4500, "burstsPerCell": 0.5 },
+    "weather": { "enabled": 1, "ridgeStart": 5000, "ridgeFull": 25000, "snow": 1, "ash": 1 }
+  },
+
   "creature": {
     "biteTiming": { "windup": 0.5, "active": 0.15, "recovery": 0.55 },
     "leashDistance": 4000, "dummyResetSeconds": 3, "burrowHide": 1,
