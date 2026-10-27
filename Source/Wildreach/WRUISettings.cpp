@@ -1,7 +1,7 @@
 // The settings window (mockup "Settings: controls"): Esc in game (EWRMenu::Settings, which makes it the game menu:
 // Resume, the settings pages, Back to main menu, Quit) and the main menu's Settings button. Pages exist only for what
-// the game really has: Controls (every FWRKeyBindings action, how abilities are cast) and Video (the engine's
-// UGameUserSettings). There is no audio page (the game has no sound yet) and no mouse sensitivity setting.
+// the game really has: Controls (every FWRKeyBindings action, how abilities are cast), Audio (the volumes WRSound keeps
+// in GameUserSettings.ini) and Video (the engine's UGameUserSettings). There is no mouse sensitivity setting.
 // Key changes save as they're made (FWRKeyBindings saves on every change), so there is no Apply step.
 
 #include "WRUISettings.h"
@@ -14,6 +14,7 @@
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
+#include "WRSound.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -216,6 +217,11 @@ int32 SWRLineIcon::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const F
 		Line({ V(5.f, 5.f), V(19.f, 19.f) }, C, 2.4f);
 		Line({ V(19.f, 5.f), V(5.f, 19.f) }, C, 2.4f);
 		break;
+	case EWRIcon::Speaker:
+		Fill({ V(3.f, 9.f), V(7.5f, 9.f), V(13.f, 4.5f), V(13.f, 19.5f), V(7.5f, 15.f), V(3.f, 15.f) }, C);
+		Arc(13.f, 12.f, 4.5f, -48.f, 48.f, C, 1.8f);
+		Arc(13.f, 12.f, 8.5f, -48.f, 48.f, C, 1.8f);
+		break;
 	}
 	return Layer;
 }
@@ -376,6 +382,7 @@ namespace WRSettingsUI
 			if (!HasMouseCapture()) return FReply::Unhandled();
 			if (Geo.IsUnderLocation(E.GetScreenSpacePosition()) && IsEnabled())
 			{
+				WRSound::PlayUI(nullptr, TEXT("ui.click"));
 				if (E.GetEffectingButton() == EKeys::LeftMouseButton && OnLeft) OnLeft();
 				else if (E.GetEffectingButton() == EKeys::RightMouseButton && OnRight) OnRight();
 			}
@@ -1304,6 +1311,108 @@ namespace WRSettingsUI
 		return WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.45f), 4.f, bHover ? WRUI::Brass2 : FLinearColor::Black, 1.f);
 	}
 
+	// ------------------------------------------------------------ audio page
+
+	/** A volume slider: click or drag along it; a soft click plays at the new level when you let go. */
+	class SWRVolumeBar : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRVolumeBar) {}
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs, FName InCategory) { Category = InCategory; }
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(320.f * U, 30.f * U); }
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override
+		{
+			const FVector2D Size = Geo.GetLocalSize();
+			const float Knob = 18.f * U, TrackH = 8.f * U;
+			const float Track = FMath::Max(1.f, static_cast<float>(Size.X) - Knob);
+			const float Y = (Size.Y - TrackH) * 0.5f;
+			const float F = WRSound::GetVolume(Category);
+			const bool bHot = IsHovered() || HasMouseCapture();
+			WRUI::DrawBox(Out, Layer, Geo.ToPaintGeometry(FVector2D(Size.X, TrackH), FSlateLayoutTransform(FVector2D(0.f, Y))), WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.5f), 4.f, FLinearColor::Black, 1.f));
+			if (F > 0.f)
+			{
+				WRUI::DrawBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(Knob * 0.5f + Track * F, TrackH - 2.f), FSlateLayoutTransform(FVector2D(1.f, Y + 1.f))), WRUI::Box(Hex(TEXT("6A3A1C")), 3.f, WRUI::Brass2, 1.f));
+			}
+			WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(FVector2D(Knob, Knob), FSlateLayoutTransform(FVector2D(Track * F, (Size.Y - Knob) * 0.5f))),
+				WRUI::Box(bHot ? Hex(TEXT("F0D49B")) : WRUI::Brass, Knob * 0.5f, FLinearColor::Black, 1.f));
+			return Layer + 2;
+		}
+		virtual FReply OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& E) override
+		{
+			if (E.GetEffectingButton() != EKeys::LeftMouseButton) return FReply::Unhandled();
+			SetFrom(Geo, E, false);
+			return FReply::Handled().CaptureMouse(SharedThis(this));
+		}
+		virtual FReply OnMouseMove(const FGeometry& Geo, const FPointerEvent& E) override
+		{
+			if (!HasMouseCapture()) return FReply::Unhandled();
+			SetFrom(Geo, E, false);
+			return FReply::Handled();
+		}
+		virtual FReply OnMouseButtonUp(const FGeometry& Geo, const FPointerEvent& E) override
+		{
+			if (!HasMouseCapture()) return FReply::Unhandled();
+			SetFrom(Geo, E, true);
+			WRSound::PlayUI(nullptr, TEXT("ui.click"));   // hear the new level
+			return FReply::Handled().ReleaseMouseCapture();
+		}
+		virtual FCursorReply OnCursorQuery(const FGeometry& Geo, const FPointerEvent& E) const override { return FCursorReply::Cursor(EMouseCursor::Hand); }
+
+	private:
+		void SetFrom(const FGeometry& Geo, const FPointerEvent& E, bool bSave)
+		{
+			const float Knob = 18.f * U;
+			const float X = Geo.AbsoluteToLocal(E.GetScreenSpacePosition()).X - Knob * 0.5f;
+			const float F = FMath::Clamp(X / FMath::Max(1.f, static_cast<float>(Geo.GetLocalSize().X) - Knob), 0.f, 1.f);
+			WRSound::SetVolume(Category, FMath::RoundToFloat(F * 100.f) / 100.f, bSave);
+		}
+		FName Category;
+	};
+
+	class SWRAudioPage : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRAudioPage) {}
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			struct FRow { const TCHAR* Category; FText Name; FText Sub; };
+			const FRow Rows[] = {
+				{ TEXT("master"), LOCTEXT("MasterVolume", "Master volume"), LOCTEXT("MasterVolumeSub", "Everything at once") },
+				{ TEXT("music"), LOCTEXT("MusicVolume", "Music"), LOCTEXT("MusicVolumeSub", "The menu theme, a tune now and then while you explore, fights and bosses") },
+				{ TEXT("effects"), LOCTEXT("EffectsVolume", "Effects"), LOCTEXT("EffectsVolumeSub", "Footsteps, combat, creatures, spells, gathering and building") },
+				{ TEXT("ambient"), LOCTEXT("AmbientVolume", "Ambience"), LOCTEXT("AmbientVolumeSub", "Wind, surf, birds and insects, caves and lava") },
+				{ TEXT("ui"), LOCTEXT("UIVolume", "Interface"), LOCTEXT("UIVolumeSub", "Menus, buttons and the bag") },
+			};
+			TSharedRef<SVerticalBox> List = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("Volume", "Volume"))];
+			for (const FRow& Row : Rows)
+			{
+				const FName Category(Row.Category);
+				List->AddSlot().AutoHeight().Padding(0.f, Category == TEXT("master") ? 10.f * U : 6.f * U, 0.f, 0.f)
+				[
+					SettingRow(Row.Name, Row.Sub,
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SWRVolumeBar, Category)]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f * U, 0.f, 6.f * U, 0.f)
+						[
+							SNew(SBox).WidthOverride(46.f * U).HAlign(HAlign_Right)
+							[
+								WRUI::Text(TAttribute<FText>::CreateLambda([Category]() { return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(WRSound::GetVolume(Category) * 100.f))); }),
+									WRUI::Body(13, 700), WRUI::Ink)
+							]
+						], Category == TEXT("master") ? 56.f : 52.f)
+				];
+			}
+			List->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
+			[
+				Muted(LOCTEXT("AudioHint", "Changes apply straight away and are kept for next time. Music stays quiet most of the time while you explore."), 12, true)
+			];
+			ChildSlot[List];
+		}
+	};
+
 	// ------------------------------------------------------------ video page
 
 	class SWRVideoPage : public SCompoundWidget
@@ -1519,6 +1628,7 @@ namespace WRSettingsUI
 				Nav->AddSlot().AutoHeight().Padding(10.f * U, 8.f * U, 10.f * U, 4.f * U)[HLine(WRUI::Alpha(WRUI::Brass2, 0.5f))];
 			}
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("controls"); }, [this]() { ShowPage(TEXT("controls")); }).Icon(EWRIcon::Keyboard).Text(LOCTEXT("Controls", "Controls")), bInGame ? 4.f : 0.f);
+			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("audio"); }, [this]() { ShowPage(TEXT("audio")); }).Icon(EWRIcon::Speaker).Text(LOCTEXT("Audio", "Audio")));
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("video"); }, [this]() { ShowPage(TEXT("video")); }).Icon(EWRIcon::Monitor).Text(LOCTEXT("Video", "Video")));
 			if (bInGame)
 			{
@@ -1594,6 +1704,11 @@ namespace WRSettingsUI
 				Controls.Reset();
 				Content->SetContent(SNew(SWRVideoPage));
 			}
+			else if (Page == TEXT("audio"))
+			{
+				Controls.Reset();
+				Content->SetContent(SNew(SWRAudioPage));
+			}
 			else
 			{
 				Page = TEXT("controls");
@@ -1648,7 +1763,7 @@ namespace WRSettingsUI
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f * U, 0.f)[WRUI::Text(FText::FromString(TEXT("›")), WRUI::Body(20, 500), WRUI::Ink3)]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 				[
-					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("video") ? LOCTEXT("Video", "Video") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[Muted(LOCTEXT("Close", "Close"), 12)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f * U, 0.f)[SNew(SWRKeyCap).FontSize(11).Text(LOCTEXT("EscKey", "Esc"))]
@@ -1701,6 +1816,10 @@ namespace WRSettingsUI
 										S->ApplyHardwareBenchmarkResults();
 									}
 								}
+								else if (Page == TEXT("audio"))
+								{
+									WRSound::ResetVolumes();
+								}
 								else if (Controls.IsValid())
 								{
 									Controls->ResetAll();
@@ -1726,12 +1845,12 @@ namespace WRSettingsUI
 #if !UE_BUILD_SHIPPING
 	// Testing and screenshots (the bot runs console commands): WRSettings video | controls | listen [action] | key <key> | cancel | scroll <offset>.
 	static FAutoConsoleCommand GSettingsCommand(TEXT("WRSettings"),
-		TEXT("Testing: drive the open settings window. WRSettings video|controls, WRSettings listen [action] (default: the last ability), WRSettings key <key name>, WRSettings cancel, WRSettings scroll <offset>"),
+		TEXT("Testing: drive the open settings window. WRSettings video|audio|controls, WRSettings listen [action] (default: the last ability), WRSettings key <key name>, WRSettings cancel, WRSettings scroll <offset>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
 		{
 			const TSharedPtr<SWRSettings> W = GLiveSettings.Pin();
 			if (!W.IsValid() || Args.Num() == 0) return;
-			if (Args[0] == TEXT("video") || Args[0] == TEXT("controls"))
+			if (Args[0] == TEXT("video") || Args[0] == TEXT("controls") || Args[0] == TEXT("audio"))
 			{
 				W->ShowPage(FName(*Args[0]));
 				return;

@@ -1,4 +1,5 @@
 #include "WRCrafting.h"
+#include "WRSound.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
@@ -203,6 +204,10 @@ FString AWRHearth::DepositCores(AWRPlayerController* Player)
 		}
 	}
 	UE_LOG(LogWildreach, Log, TEXT("HEARTH %s: %d cores added, tech level %d"), *GetName(), Added, GetTechLevel());
+	if (Added > 0)
+	{
+		WRSound::Broadcast(Player->GetPawn(), TEXT("hearth.feed"));
+	}
 	return Added > 0 ? FString::Printf(TEXT("The Hearth burns brighter: tech level %d"), GetTechLevel())
 		: FString::Printf(TEXT("Hearth tech level %d (feed it cores from different major bosses)"), GetTechLevel());
 }
@@ -390,6 +395,7 @@ FString FWRCrafting::Make(AWRPlayerController* Player, const FWRRecipe& Recipe, 
 		Result = FString::Printf(TEXT("Crafted %d %s%s"), Count - Left, OutDef ? *OutDef->Name : *R->Output.ToString(), Left > 0 ? TEXT(" (inventory full)") : TEXT(""));
 	}
 	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s at %s: %s"), *GetNameSafe(Player), *StationType.ToString(), *Result);
+	WRSound::Broadcast(Player->GetPawn(), TEXT("craft.done"));
 	return Result;
 }
 

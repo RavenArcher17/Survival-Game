@@ -163,6 +163,9 @@ public:
 	void SetAsleep(bool bSleep);
 	bool WasWokenRecently() const;
 	UPROPERTY(Replicated) bool bAsleep = false;
+	/** Who it's after, for every machine (the server's AggroTarget, copied as it changes): aggro calls, combat music. */
+	AActor* GetAggroRep() const { return AggroRep; }
+	UPROPERTY(Replicated) TObjectPtr<AActor> AggroRep;
 
 	/** Server: player mounts / dismounts. */
 	FString Ride(AWRCharacter* Rider);

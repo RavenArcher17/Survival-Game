@@ -25,6 +25,9 @@ public class Wildreach : ModuleRules
 			"Landscape"
 		});
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "ProceduralMeshComponent", "HTTP", "ImageWrapper" });  // lava / ice surfaces; the main menu's update check
+		// Sound: OGG files from Data/Audio decoded with the engine's Vorbis decoder (WRSound); its quality-info struct lives in TargetPlatform.
+		PrivateDependencyModuleNames.AddRange(new string[] { "VorbisAudioDecoder", "AudioExtensions", "AudioMixer" });  // AudioExtensions: the procedural wave subclass (UWRPcmSound); AudioMixer: WRSoundRecord
+		PrivateIncludePathModuleNames.Add("TargetPlatform");
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)

@@ -1,5 +1,6 @@
 #include "WRUIWidgets.h"
 #include "WRUIStyle.h"
+#include "WRSound.h"
 #include "Rendering/DrawElements.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
@@ -184,8 +185,16 @@ FReply SWRSlot::OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Eve
 
 FReply SWRSlot::OnMouseButtonUp(const FGeometry& Geo, const FPointerEvent& Event)
 {
+	if (OnClicked.IsBound()) WRSound::PlayUI(nullptr, TEXT("ui.click"));
 	OnClicked.ExecuteIfBound(Event);
 	return FReply::Handled();
+}
+
+void SWRSlot::OnMouseEnter(const FGeometry& Geo, const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseEnter(Geo, Event);
+	// Only slots with something in them tick: sweeping the cursor over an empty bag stays quiet.
+	if (!View.Get().ItemId.IsNone() && !Event.IsMouseButtonDown(EKeys::LeftMouseButton)) WRSound::PlayUI(nullptr, TEXT("ui.hover"));
 }
 
 FReply SWRSlot::OnDragDetected(const FGeometry& Geo, const FPointerEvent& Event)
@@ -195,6 +204,7 @@ FReply SWRSlot::OnDragDetected(const FGeometry& Geo, const FPointerEvent& Event)
 	{
 		return FReply::Unhandled();
 	}
+	WRSound::PlayUI(nullptr, TEXT("ui.drag"));
 	return FReply::Handled().BeginDragDrop(FWRItemDragDrop::New(Kind, Index, V.ItemId, V.Count));
 }
 
@@ -216,6 +226,7 @@ FReply SWRSlot::OnDrop(const FGeometry& Geo, const FDragDropEvent& Event)
 	{
 		return FReply::Unhandled();
 	}
+	WRSound::PlayUI(nullptr, TEXT("ui.drop"));
 	OnDropped.Execute(Op->From, Op->Index);
 	return FReply::Handled();
 }
@@ -269,13 +280,15 @@ void SWRButton::Construct(const FArguments& InArgs)
 {
 	const bool bPrimary = InArgs._Primary;
 	const bool bGhost = InArgs._Ghost;
+	const FOnClicked Clicked = InArgs._OnClicked;
 	TSharedPtr<SButton> Button;
 	ChildSlot
 	[
 		SAssignNew(Button, SButton)
 		.ButtonStyle(FCoreStyle::Get(), "NoBorder")
 		.ContentPadding(0.f)
-		.OnClicked(InArgs._OnClicked)
+		.OnClicked_Lambda([Clicked]() { WRSound::PlayUI(nullptr, TEXT("ui.click")); return Clicked.IsBound() ? Clicked.Execute() : FReply::Handled(); })
+		.OnHovered_Lambda([this]() { if (IsEnabled()) WRSound::PlayUI(nullptr, TEXT("ui.hover")); })
 		.Cursor(EMouseCursor::Hand)
 		[
 			SNew(SBox).MinDesiredHeight(InArgs._MinHeight)

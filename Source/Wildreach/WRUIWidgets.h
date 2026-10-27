@@ -80,6 +80,7 @@ public:
 
 	virtual FReply OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Event) override;
 	virtual FReply OnMouseButtonUp(const FGeometry& Geo, const FPointerEvent& Event) override;
+	virtual void OnMouseEnter(const FGeometry& Geo, const FPointerEvent& Event) override;
 	virtual FReply OnDragDetected(const FGeometry& Geo, const FPointerEvent& Event) override;
 	virtual void OnDragEnter(const FGeometry& Geo, const FDragDropEvent& Event) override;
 	virtual void OnDragLeave(const FDragDropEvent& Event) override;

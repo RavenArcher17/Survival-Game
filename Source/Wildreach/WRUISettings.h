@@ -10,7 +10,7 @@ class APlayerController;
 enum class EWRIcon : uint8
 {
 	Gear, Flag, FlagFilled, Keyboard, Monitor, Play, Exit, Power, Join, Chevron, Info, Clock, Download, Bulb,
-	Flame, Snowflake, Warning, Lock, Close,
+	Flame, Snowflake, Warning, Lock, Close, Speaker,
 };
 
 class WILDREACH_API SWRLineIcon : public SLeafWidget
@@ -59,8 +59,8 @@ private:
 namespace WRUI
 {
 	/**
-	 * The settings window (mockup "Settings: controls"): Controls (every rebindable key, how abilities are cast) and
-	 * Video (the engine's game-user settings). In game (Esc) it is also the game menu: Resume, Back to main menu, Quit.
+	 * The settings window (mockup "Settings: controls"): Controls (every rebindable key, how abilities are cast),
+	 * Audio (volumes, WRSound) and Video (the engine's game-user settings). In game (Esc) it is also the game menu: Resume, Back to main menu, Quit.
 	 * The main menu shows the same window from its Settings button. OnClose runs on Close, Esc and Done / Resume.
 	 */
 	WILDREACH_API TSharedRef<SWidget> MakeSettings(APlayerController* PC, bool bInGame, FSimpleDelegate OnClose);
