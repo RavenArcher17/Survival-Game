@@ -134,12 +134,18 @@ void SWRSlot::Construct(const FArguments& InArgs)
 			+ SOverlay::Slot().Padding(1.f)[SNew(SImage).Image_Lambda([this]()
 			{
 				const FWRSlotView V = View.Get();
-				const FLinearColor Rim = bDropHover ? WRUI::Brass : V.bSelected ? WRUI::Brass : V.Quality == 2 ? FLinearColor(0.25f, 0.43f, 0.66f) : V.Quality == 1 ? FLinearColor(0.31f, 0.5f, 0.24f) : WRUI::Rim;
-				return WRUI::Box(FLinearColor(FColor(33, 36, 41, V.ItemId.IsNone() ? 165 : 215)), 3.f, Rim, V.bSelected || bDropHover ? 2.f : 1.f);
+				FLinearColor Rim = bDropHover ? WRUI::Brass : V.bSelected ? WRUI::Brass : V.Quality == 2 ? FLinearColor(0.25f, 0.43f, 0.66f) : V.Quality == 1 ? FLinearColor(0.31f, 0.5f, 0.24f) : WRUI::Rim;
+				// Hover warms the rim toward brass and lifts the face a little (eased, not a snap).
+				const float H = Kind == EWRSlotKind::Other && V.ItemId.IsNone() ? 0.f : Hover.Get();
+				if (!V.bSelected && !bDropHover) Rim = FMath::Lerp(Rim, WRUI::Brass2, H * 0.85f);
+				const FColor Face(33 + FMath::RoundToInt(10.f * H), 36 + FMath::RoundToInt(9.f * H), 41 + FMath::RoundToInt(6.f * H), V.ItemId.IsNone() ? 165 : 215);
+				return WRUI::Box(FLinearColor(Face), 3.f, Rim, V.bSelected || bDropHover ? 2.f : 1.f);
 			})]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 			[
 				SNew(SBox).WidthOverride(Size * 0.76f).HeightOverride(Size * 0.76f)
+				.RenderTransformPivot(FVector2D(0.5f, 0.5f))
+				.RenderTransform_Lambda([this]() { return bPressed ? TOptional<FSlateRenderTransform>(FSlateRenderTransform(FScale2D(0.9f))) : TOptional<FSlateRenderTransform>(); })
 				[
 					SNew(SImage)
 					.Image_Lambda([this]() { const FWRSlotView V = View.Get(); return V.ItemId.IsNone() ? WRUI::White() : WRUI::Icon(V.ItemId); })
@@ -175,6 +181,7 @@ void SWRSlot::Construct(const FArguments& InArgs)
 
 FReply SWRSlot::OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Event)
 {
+	bPressed = true;
 	if (Event.GetEffectingButton() == EKeys::LeftMouseButton && !View.Get().ItemId.IsNone() && Kind != EWRSlotKind::Other)
 	{
 		return FReply::Handled().DetectDrag(SharedThis(this), EKeys::LeftMouseButton);
@@ -184,12 +191,27 @@ FReply SWRSlot::OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Eve
 
 FReply SWRSlot::OnMouseButtonUp(const FGeometry& Geo, const FPointerEvent& Event)
 {
+	bPressed = false;
 	OnClicked.ExecuteIfBound(Event);
 	return FReply::Handled();
 }
 
+void SWRSlot::OnMouseEnter(const FGeometry& Geo, const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseEnter(Geo, Event);
+	Hover.Set(true);
+}
+
+void SWRSlot::OnMouseLeave(const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseLeave(Event);
+	Hover.Set(false);
+	bPressed = false;
+}
+
 FReply SWRSlot::OnDragDetected(const FGeometry& Geo, const FPointerEvent& Event)
 {
+	bPressed = false;
 	const FWRSlotView V = View.Get();
 	if (V.ItemId.IsNone())
 	{
@@ -269,7 +291,6 @@ void SWRButton::Construct(const FArguments& InArgs)
 {
 	const bool bPrimary = InArgs._Primary;
 	const bool bGhost = InArgs._Ghost;
-	TSharedPtr<SButton> Button;
 	ChildSlot
 	[
 		SAssignNew(Button, SButton)
@@ -279,13 +300,19 @@ void SWRButton::Construct(const FArguments& InArgs)
 		.Cursor(EMouseCursor::Hand)
 		[
 			SNew(SBox).MinDesiredHeight(InArgs._MinHeight)
+			// Pressed: the face dips a little.
+			.RenderTransformPivot(FVector2D(0.5f, 0.5f))
+			.RenderTransform_Lambda([this]() { return Button.IsValid() && Button->IsPressed() ? TOptional<FSlateRenderTransform>(FSlateRenderTransform(FScale2D(0.97f))) : TOptional<FSlateRenderTransform>(); })
 			[
 				SNew(SOverlay)
 				+ SOverlay::Slot()[SNew(SImage).Image(bGhost ? WRUI::White() : WRUI::Image(TEXT("leather"))).ColorAndOpacity(bGhost ? FLinearColor(0.f, 0.f, 0.f, 0.32f) : FLinearColor::White).DesiredSizeOverride(FVector2D(1.f, 1.f))]
 				+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, bPrimary]()
 				{
-					const bool bHover = IsHovered();
-					return WRUI::Box(bHover ? FLinearColor(1.f, 0.85f, 0.6f, 0.08f) : FLinearColor::Transparent, 4.f, bPrimary || bHover ? WRUI::Brass : WRUI::Brass2, bPrimary ? 1.5f : 1.f);
+					// The trim warms to brass and the leather brightens as the mouse comes over (eased); darker while held.
+					const float H = Hover.Get();
+					const bool bDown = Button.IsValid() && Button->IsPressed();
+					const FLinearColor Fill = bDown ? FLinearColor(0.f, 0.f, 0.f, 0.18f) : FLinearColor(1.f, 0.85f, 0.6f, 0.08f * H);
+					return WRUI::Box(Fill, 4.f, bPrimary ? WRUI::Brass : FMath::Lerp(WRUI::Brass2, WRUI::Brass, H), bPrimary ? 1.5f : 1.f);
 				})]
 				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(FMargin(18.f, 6.f))
 				[
@@ -294,6 +321,18 @@ void SWRButton::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+}
+
+void SWRButton::OnMouseEnter(const FGeometry& Geo, const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseEnter(Geo, Event);
+	Hover.Set(true);
+}
+
+void SWRButton::OnMouseLeave(const FPointerEvent& Event)
+{
+	SCompoundWidget::OnMouseLeave(Event);
+	Hover.Set(false);
 }
 
 void SWRChip::Construct(const FArguments& InArgs)

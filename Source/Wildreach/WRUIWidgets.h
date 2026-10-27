@@ -5,6 +5,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Input/DragAndDrop.h"
 #include "InputCoreTypes.h"
+#include "WRUIMotion.h"
 
 /** Building blocks of the stone-and-leather UI (WRUIStyle has the look). */
 
@@ -84,6 +85,8 @@ public:
 	virtual void OnDragEnter(const FGeometry& Geo, const FDragDropEvent& Event) override;
 	virtual void OnDragLeave(const FDragDropEvent& Event) override;
 	virtual FReply OnDrop(const FGeometry& Geo, const FDragDropEvent& Event) override;
+	virtual void OnMouseEnter(const FGeometry& Geo, const FPointerEvent& Event) override;
+	virtual void OnMouseLeave(const FPointerEvent& Event) override;
 
 private:
 	TAttribute<FWRSlotView> View;
@@ -92,6 +95,9 @@ private:
 	FOnWRSlotClicked OnClicked;
 	FOnWRSlotDropped OnDropped;
 	bool bDropHover = false;
+	// Motion: the rim warms on hover, the icon dips while pressed.
+	FWRHoverFade Hover;
+	bool bPressed = false;
 };
 
 /** A filled bar (health, stamina, torpor...). */
@@ -136,6 +142,13 @@ public:
 		SLATE_EVENT(FOnClicked, OnClicked)
 	SLATE_END_ARGS()
 	void Construct(const FArguments& InArgs);
+	virtual void OnMouseEnter(const FGeometry& Geo, const FPointerEvent& Event) override;
+	virtual void OnMouseLeave(const FPointerEvent& Event) override;
+
+private:
+	// Motion: the trim warms on hover (eased), the face dips while pressed.
+	TSharedPtr<class SButton> Button;
+	FWRHoverFade Hover;
 };
 
 /** A pill-shaped tag ("Fine", "Following", "Locked"). */

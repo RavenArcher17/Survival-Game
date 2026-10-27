@@ -3,8 +3,14 @@
 #include "WRPlayerController.h"
 #include "WRKeyBindings.h"
 #include "WRUISettings.h"
+#include "WRUIMotion.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
+#include "WRTuning.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -34,6 +40,7 @@
 #include "Serialization/JsonSerializer.h"
 
 TSharedPtr<SWidget> SWRMainMenu::Instance;
+TWeakObjectPtr<ACameraActor> SWRMainMenu::Backdrop;
 TSharedPtr<SWidget> SWRChatBox::Instance;
 FString SWRMainMenu::LatestVersion;
 FString SWRMainMenu::LastFailure;
@@ -175,9 +182,12 @@ namespace WRMenuUI
 			}
 			ChildSlot
 			[
-				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).OnClicked(InArgs._OnClicked)
+				SAssignNew(Button, SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).OnClicked(InArgs._OnClicked)
 				[
 					SNew(SBox).HeightOverride(InArgs._Height * U)
+					// Pressed: the leather dips a little (UI motion).
+					.RenderTransformPivot(FVector2D(0.5f, 0.5f))
+					.RenderTransform_Lambda([this]() { return Button.IsValid() && Button->IsPressed() ? TOptional<FSlateRenderTransform>(FSlateRenderTransform(FScale2D(0.98f))) : TOptional<FSlateRenderTransform>(); })
 					[
 						SNew(SOverlay)
 						+ SOverlay::Slot()[SNew(SImage).Image(InArgs._Ghost ? WRUI::White() : WRUI::Image(TEXT("leather"))).DesiredSizeOverride(FVector2D(1.f, 1.f))
@@ -193,6 +203,8 @@ namespace WRMenuUI
 				]
 			];
 		}
+	private:
+		TSharedPtr<SButton> Button;
 	};
 
 	/** One side of a two-way choice: Male / Female, Fire / Frost. Kind 0 plain, 1 fire, 2 frost. */
@@ -262,7 +274,6 @@ namespace WRMenuUI
 		return SNew(SBox).WidthOverride(48.f * U)[WRUI::Text(Text, Spaced(WRUI::Caps(12), 80), WRUI::Ink2)];
 	}
 
-	struct FTip { FText Before; const TCHAR* Action; FText After; };
 	const TArray<FTip>& Tips()
 	{
 		static const TArray<FTip> List = {
@@ -314,7 +325,7 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 	];
 }
 
-TSharedRef<SWidget> SWRMainMenu::MakeTitle() const
+TSharedRef<SWidget> SWRMainMenu::MakeTitle()
 {
 	using namespace WRMenuUI;
 	// Carved gold: a dark copy below for depth, then bands of lighter gold clipped to the top of the letters.
@@ -538,6 +549,15 @@ TSharedRef<SWidget> SWRMainMenu::MakeUpdate()
 void SWRMainMenu::Tick(const FGeometry& Geo, const double Time, const float Delta)
 {
 	SCompoundWidget::Tick(Geo, Time, Delta);
+	// The body is possessed after the menu opens (and takes the view): keep the backdrop camera and the body still.
+	if (APlayerController* PC = Owner.Get())
+	{
+		const ACharacter* Survivor = Cast<ACharacter>(PC->GetPawn());
+		if (!Backdrop.IsValid() || PC->GetViewTarget() != Backdrop.Get() || (Survivor && Survivor->HasAuthority() && Survivor->GetCharacterMovement()->MovementMode != MOVE_None))
+		{
+			ShowBackdrop(PC, true);
+		}
+	}
 	// A new tip now and then.
 	if (NextTip == 0.0)
 	{
@@ -559,7 +579,10 @@ void SWRMainMenu::ShowSettings(bool bShow)
 	}
 	if (bShow)
 	{
-		Menu->SettingsHost->SetContent(WRUI::MakeSettings(Menu->Owner.Get(), false, FSimpleDelegate::CreateLambda([]() { ShowSettings(false); })));
+		Menu->SettingsHost->SetContent(SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, WRTune(TEXT("flow.screenRise"), 14.f)))
+		[
+			WRUI::MakeSettings(Menu->Owner.Get(), false, FSimpleDelegate::CreateLambda([]() { ShowSettings(false); }))
+		]);
 	}
 	else
 	{
@@ -786,6 +809,7 @@ void SWRMainMenu::Open(APlayerController* PC)
 	Mode.SetWidgetToFocus(Instance);
 	PC->SetInputMode(Mode);
 	PC->bShowMouseCursor = true;
+	ShowBackdrop(PC, true);
 }
 
 void SWRMainMenu::Close()
@@ -801,8 +825,59 @@ void SWRMainMenu::Close()
 		{
 			PC->SetInputMode(FInputModeGameOnly());
 			PC->bShowMouseCursor = false;
+			ShowBackdrop(PC, false);
 		}
 	}
+}
+
+void SWRMainMenu::ShowBackdrop(APlayerController* PC, bool bShow)
+{
+	UWorld* World = PC ? PC->GetWorld() : nullptr;
+	if (!World)
+	{
+		return;
+	}
+	ACharacter* Survivor = Cast<ACharacter>(PC->GetPawn());
+	if (!bShow)
+	{
+		if (ACameraActor* Cam = Backdrop.Get())
+		{
+			if (Survivor)
+			{
+				PC->SetViewTarget(Survivor);
+				Survivor->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+			}
+			Cam->Destroy();
+		}
+		Backdrop.Reset();
+		return;
+	}
+	// A fixed view of the island for the menu (the tundra forest by the sea at Tundra camp 2) rather than wherever you
+	// spawned. World Partition streams around the camera, so the body waits without moving (the ground under it may unload).
+	const FVector At(WRTune(TEXT("flow.menuCamera.x"), 114000.f), WRTune(TEXT("flow.menuCamera.y"), -125000.f), WRTune(TEXT("flow.menuCamera.z"), 12500.f));
+	const FRotator Look(WRTune(TEXT("flow.menuCamera.pitch"), -6.f), WRTune(TEXT("flow.menuCamera.yaw"), 205.f), 0.f);
+	ACameraActor* Cam = Backdrop.Get();
+	if (!Cam)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Params.ObjectFlags |= RF_Transient;
+		Cam = World->SpawnActor<ACameraActor>(At, Look, Params);
+		Backdrop = Cam;
+	}
+	if (!Cam)
+	{
+		return;
+	}
+	Cam->SetActorLocationAndRotation(At, Look);
+	Cam->GetCameraComponent()->SetConstraintAspectRatio(false);
+	Cam->GetCameraComponent()->SetFieldOfView(WRTune(TEXT("flow.menuCamera.fov"), 75.f));
+	PC->SetViewTarget(Cam);
+	if (Survivor && Survivor->HasAuthority())
+	{
+		Survivor->GetCharacterMovement()->DisableMovement();
+	}
+	UE_LOG(LogWildreach, Log, TEXT("MENU backdrop camera at %s looking %s"), *At.ToCompactString(), *Look.ToCompactString());
 }
 
 bool SWRMainMenu::IsOpen()

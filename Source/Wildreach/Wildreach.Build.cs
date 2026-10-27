@@ -25,6 +25,7 @@ public class Wildreach : ModuleRules
 			"Landscape"
 		});
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "ProceduralMeshComponent", "HTTP", "ImageWrapper" });  // lava / ice surfaces; the main menu's update check
+		PrivateDependencyModuleNames.Add("MoviePlayer");  // the loading screen during map loads (WRUIFlow)
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)

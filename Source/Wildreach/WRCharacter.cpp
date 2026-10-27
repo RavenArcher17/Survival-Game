@@ -220,6 +220,7 @@ void AWRCharacter::OnRep_PlayerState()
 void AWRCharacter::OnDeath(AActor* Killer)
 {
 	AWRLootBag::ApplyDeathPenalty(this, GetPlayerState<AWRPlayerState>());
+	WRFlow::SendDeathNote(this, Killer);  // the death screen: killer, bag, where you'll respawn
 	if (AWRGameMode* GameMode = GetWorld()->GetAuthGameMode<AWRGameMode>())
 	{
 		GameMode->RequestRespawn(Controller);

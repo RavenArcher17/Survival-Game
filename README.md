@@ -93,7 +93,10 @@ Every key below is a default: **Esc → Controls** rebinds any of them (saved in
 `WR.ReloadTuning` (re-read `Data/tuning.json` live). Tests can override numbers: `-wrtune=key:value,key:value`.
 UI (screenshots and tests): `WRWheel 0 2` (hold a wheel open on a wedge; 2 = tame orders, -1 closes), `WRHelp`,
 `WRMenu crafting|settings|hearth 0`, `WRSettings video|controls|listen|key G|cancel`, `WRMainMenu [settings]`,
-`WRUISelect ranged`, `WRUIMouse click|rclick|drag ...` (real Slate input), `WRCmd <server command>`. `-oldui` keeps the
+`WRUISelect ranged`, `WRUIMouse click|rclick|drag ...` (real Slate input), `WRCmd <server command>`,
+`WRFlow preview death|loading|island|levelup|point|recipe|discover <place>|boss <id>|tame <id>|hint <id>` (the moments between play),
+`WRFlow forget` / `hints on|off` / `quiet on|off` (this player's discoveries and hints; moments off for other screenshots), `WRFlow shotondeath 3`,
+`WRFlow near tree`, `WRFlow cam X Y Z Yaw Pitch` (try a view, e.g. for the menu backdrop). `-oldui` keeps the
 old text HUD.
 
 ## Test
@@ -120,9 +123,10 @@ Tools\updatertest.ps1   # auto-update end to end with fake releases and a local 
 Tools\versiontest.ps1   # another version can't join and the menu says why; the menu offers a newer release (local feed)
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
+Tools\flowtest.ps1      # death by creatures: death note, death screen, back after the countdown at your camp; a bed respawn; a hint remembered
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
-Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings; -MainMenu: the front end)
+Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings, then the moments between play: death, loading, banners, hints; -MainMenu: the front end; -Flow: just the moments)
 Tools\menushots.ps1     # the same for the old text menus (-oldui)
 ```
 
@@ -145,6 +149,7 @@ Tools\menushots.ps1     # the same for the old text menus (-oldui)
 | `Source/Wildreach/WRLifeSkills`, `WRSocial` | life skills; clans, PvP rules, safe zones, death penalty |
 | `Source/Wildreach/WRWorldDressing` | decoration, caves, biome hazards |
 | `Source/Wildreach/WRMainMenu`, `WRPlayerMenus`, `WRHUD` | front end, in-game menu commands, world-space bars and damage numbers |
+| `Source/Wildreach/WRUIFlow`, `WRFlowDeath`, `WRUIMotion` | the moments between play: death screen + fades, loading screens, banners, toasts, hints; UI motion |
 | `Source/Wildreach/WRPlayerUI`, `WRUI*` | the stone-and-leather Slate UI: style + widget kit (`WRUIStyle`, `WRUIWidgets`), key bindings (`WRKeyBindings`), HUD, wheels, journal tabs, screens (each registers itself by name) |
 | `Source/Wildreach/Tests/` | automation tests |
 | `Docs/` | technical plan, milestone plans, design review, terrain layout |

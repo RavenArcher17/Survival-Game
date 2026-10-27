@@ -56,6 +56,8 @@ public:
 	static bool IsNewerVersion(const FString& Tag, const FString& Than);
 	/** Remember why a join or game ended badly (a different version than the host's...) to show when the menu comes back. */
 	static void WatchNetworkFailures();
+	/** The carved WILDREACH title and its tagline (the menu and the loading screen show it). */
+	static TSharedRef<SWidget> MakeTitle();
 
 private:
 	FReply OnHost();
@@ -70,7 +72,6 @@ private:
 	FReply OnPickBody(FName InBody);
 	FString Options() const;
 	void Remember() const;
-	TSharedRef<SWidget> MakeTitle() const;
 	TSharedRef<SWidget> MakePanel();
 	TSharedRef<SWidget> MakeTip();
 	TSharedRef<SWidget> MakeUpdate();
@@ -85,4 +86,14 @@ private:
 	int32 Tip = 0;
 	double NextTip = 0.0;
 	static TSharedPtr<SWidget> Instance;
+	/** The backdrop: a fixed scenic camera over the island (flow.menuCamera in tuning.json) instead of the spawn. */
+	static TWeakObjectPtr<class ACameraActor> Backdrop;
+	static void ShowBackdrop(APlayerController* PC, bool bShow);
 };
+
+namespace WRMenuUI
+{
+	/** A tip with a real key in it: "Tip: hold [Q] to open your ability wheel" (the menu and the loading screen). */
+	struct FTip { FText Before; const TCHAR* Action; FText After; };
+	WILDREACH_API const TArray<FTip>& Tips();
+}

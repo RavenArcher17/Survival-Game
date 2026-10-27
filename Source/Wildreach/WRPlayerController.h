@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "WRFlowTypes.h"
 #include "WRPlayerController.generated.h"
 
 class AWRCharacterBase;
@@ -158,6 +159,8 @@ public:
 	double GetNoticeTime() const { return NoticeTime; }
 
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
+	/** You died: the death screen's killer, bag and respawn (WRFlowDeath.cpp sends it, WRUIFlow shows it). */
+	UFUNCTION(Client, Reliable) void ClientDeathNote(const FWRDeathNote& Note);
 
 	UFUNCTION(Exec) void WRInteract();
 	/** Testing / screenshot aid: open a menu (inventory, build, skills, paths) on line Select, toggle the map (map),
