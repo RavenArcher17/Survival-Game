@@ -5,6 +5,7 @@
 #include "WRSignificance.generated.h"
 
 class AWRCreature;
+class UCameraComponent;
 class USpringArmComponent;
 
 /** Pure rules (tests). */
@@ -24,8 +25,9 @@ struct WILDREACH_API FWRSignificanceRules
  * reach it) ticks its body, its movement and its brain significance.farTickInterval apart instead of every frame, with
  * the same behaviour in coarser steps; near any player nothing changes. Bosses and ridden creatures always run at full
  * rate; far ones are also looked at by replication a few times a second instead of every frame (nobody they could be
- * sent to is near). The authority (dedicated or listen server, or a game on its own) does this; on every machine a creature's ride
- * camera arm only ticks while a player rides it (an idle arm still sweeps for collision every frame).
+ * sent to is near). Creatures are checked a slice per frame, which also spreads their slow ticks over different frames.
+ * The authority (dedicated or listen server, or a game on its own) does this; on every machine a creature's ride camera
+ * arm and camera only tick while a player rides it (an idle arm still sweeps for collision every frame).
  * Numbers in Data/tuning.json "significance"; -wrtune=significance.enabled:0 turns it off for comparisons.
  */
 UCLASS()
@@ -48,6 +50,7 @@ private:
 	{
 		TWeakObjectPtr<AWRCreature> Creature;
 		TWeakObjectPtr<USpringArmComponent> Arm;
+		TWeakObjectPtr<UCameraComponent> Camera;
 		bool bFar = false;
 	};
 	void Update();

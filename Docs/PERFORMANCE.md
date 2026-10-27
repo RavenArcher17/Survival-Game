@@ -66,6 +66,89 @@ mesh pipeline (python, up to 58% of the GPU) did to the numbers, not the game.
   ... Falling`), and the server's 169-spawn burst. Raising the iteration limit would only hide it and do more work in
   an already slow frame, so the fix is fewer slow frames.
 
+## The perf pass (branch polish/perf): what changed and why
+
+Gameplay is the same: no numbers, rules or behaviour near players changed.
+
+1. **Wildlife cost by distance** (`UWRSignificanceSubsystem`, `Source/Wildreach/WRSignificance.*`, numbers in
+   `Data/tuning.json` "significance"). On the authority (dedicated server, listen-server host, or a game on its own) a
+   creature further than 200 m from every remote player (350 m from a player on the server's own machine, who has the
+   whole island loaded and can see further) ticks its body, its movement and its brain every 0.25 s instead of every
+   frame, moves in steps of up to 0.1 s (so a quarter-second tick stays inside the engine's 8 steps), and replication
+   looks at it 4 times a second. Inside 180 m it's back to every frame. Why those radii: clients are only sent creatures
+   within 150 m (the default net cull distance), so a far creature can't be seen or reached by anyone; it keeps doing
+   the same things (wandering, hunting other creatures, sleeping, taming progress) in coarser steps. Bosses and ridden
+   creatures always run every frame. Creatures are looked at a slice per frame (each once every 8 frames), which also
+   spreads their slow ticks over different frames: the first version switched them all in one frame and they then all
+   ticked together, average 5.7 ms but p95 16.7 ms (rows "first version"). On a dedicated server their unused skeletal
+   meshes tick at the same slow rate. Results, same build and session, all 169 creatures out: off 14.6 ms average /
+   p95 23.6 / p99 30.3 / worst 60 / 6 `Max iterations` warnings, on 6.8 / 10.5 / 12.1 / 50 / none (the base measured
+   10.4-13.6 average, p99 14.7-28.5). With the usual wildlife (most packs out are near the player; the always-on packs
+   and cave colonies elsewhere are what goes far) 3.2 -> 3.0 ms. Players host games themselves (listen server), so on
+   the host this work comes out of the frame they're playing in. `-wrtune=significance.enabled:0` turns it off.
+2. **Ride cameras only tick while ridden** (same subsystem, every machine): each creature's ride-camera arm swept for
+   collision every frame even with nobody on it, 199 sweeps a frame on the all-out server; now only a creature a player
+   controls ticks its arm and camera (checked every frame, so mounting gets its camera at once).
+3. **Background preload** (`UWRPreloadSubsystem`, `Source/Wildreach/WRPreload.*`, `Data/preload.json`, tuning
+   `preload.enabled`). At map start (behind the main menu or the join) every "/Game/..." path in creatures.json,
+   player_art.json and items.json, plus the three cave meshes, is requested as one background load and kept for the
+   life of the world: 178 assets, loaded in about 6 s. When a creature, a cave, another player's body or a held weapon
+   first shows up, its art is already in memory, so the synchronous loads that stalled the walk are gone. Cost: that art stays in memory for the session (about 220 MB of source assets in the editor; less
+   cooked, and textures still stream by mip).
+
+**Result on the client** (rows "perf pass", a quiet machine: GPU used by others 0-1%): no frame over 50 ms in any of
+the four runs, and no `FlushAsyncLoading` on the walk any more. Epic 7.7 ms (130 fps) both runs, p99 9.3-9.8, worst
+frame 23-28 ms; Medium 5.0-5.3 ms (188-201 fps), p99 6.1-7.5, worst 24-37 ms. The base had 2-6 frames over 50 ms on
+every run, at the same two spots on the walk (78 ms on its best Epic run, 43 ms on its quietest Medium run, 150-260 ms
+when the machine was busy). The steady frame rate is the same as the base on a quiet machine (none of this is
+rendering): the base's best Epic run was 8.45 ms with 23% of the GPU used by others; its Medium 5.0 ms quiet.
+
+**Config settings changed: none.** Each candidate below was checked and left at the engine default because the numbers
+didn't call for it or it couldn't be verified in this pass.
+
+## Checked, not changed
+
+- **`Max iterations` warnings**: explained above (slow frames). Fewer slow frames is the fix: the preload removes the
+  walk's load stalls, and the significance pass took the all-out server from 4-11 warnings per run to none. The one
+  412 ms server frame when all 81 sites come out at once only happens in the stress test (in play a player brings a few
+  sites out at a time); spreading spawns over frames would mean changing the spawner in WRCreature.cpp, so it's left.
+- **Garbage collection**: incremental reachability (`gc.AllowIncrementalReachability`) is off by default and still
+  experimental in 5.8 (it needs every object reference to be tracked; a missed one is a crash), and the measured pauses
+  (11-20 ms once a minute) don't justify that risk. Not changed. Note for packaged builds: a packaged *Development*
+  build (what `Tools\package.ps1` makes) also runs `gc.VerifyAssumptions` on every pass, which the editor binary in this
+  benchmark doesn't; a Shipping build or `gc.VerifyAssumptions=0` drops that cost.
+- **World Partition streaming**: L_Island uses the 5.8 default runtime hash (one grid, 128 m cells, loading range
+  256 m). In every run the new cells were in within 0.1-0.25 s after the 2.5 km jump, with no frame over ~36 ms on a
+  quiet machine, so there was nothing to tune here (`wp.Runtime.MaxLoadingStreamingCells`, the level-streaming time
+  slices) without a measurement that shows a problem; raising them blindly trades a later pop-in for bigger frame
+  spikes. What does look late after a long move: art loaded on the spot (now preloaded), and in packaged builds PSO
+  precaching (below), which holds a mesh back until its shaders are compiled the first time. Beyond 256 m clients draw
+  no terrain at all until HLODs are built (an open item already).
+- **Shader pipeline (PSO) cache for packaged builds**: UE 5.8 already precaches PSOs on D3D12 and holds a mesh back
+  until its PSOs are ready (`r.PSOPrecache.ProxyCreationStrategy=1`), so a first-time compile shows as an object
+  appearing a moment late rather than a stutter. A bundled cache would cover the rest, but it has to be recorded from
+  play and re-recorded whenever materials or effects change, which five agents are doing right now: a cache recorded on
+  the base would be stale at merge. Recommended once at release time, after everything is merged:
+  1. `Config/DefaultEngine.ini`: `[DevOptions.Shaders]` `NeedsShaderStableKeys=true` (the cook then writes stable
+     shader keys, `*.shk`, under `Saved/Cooked/Windows/Wildreach/Metadata/PipelineCaches`), and optionally
+     `[ConsoleVariables]` `r.ShaderPipelineCacheTools.IncludeComputePSODuringCook=1` (bundles every compute PSO from
+     those keys with no recording; the default 2 bundles only Niagara's).
+  2. `Tools\package.ps1`, then play the packaged game with `-logPSO` around the island (camps, the walk, caves, a fight, the menus); it
+     writes `Saved/CollectedPSOs/*.rec.upipelinecache`.
+  3. `UnrealEditor-Cmd.exe Wildreach.uproject -run=ShaderPipelineCacheTools expand <rec files> <shk files>
+     Build/Windows/PipelineCaches/Wildreach_PCD3D_SM6.spc` (and `_SM5`), commit the `.spc` (small), package again: the
+     cook builds the bundled cache from it automatically.
+  Not set up in this pass because it changes the cook and I couldn't verify a package from this worktree under the
+  other agents' load.
+- **Cheaper animation for far creatures on clients** (update-rate optimisation): animation is 0.1 ms of the client's
+  game thread (clients only have creatures within 150 m), so there's nothing to gain, and it would touch WRCreature,
+  which the anim agent is rewriting. Skipped; no WRCreature edit.
+- **Client render thread**: the client is render-thread bound and a third of that thread is `EventWait/Visibility`
+  (2-3 ms, waiting for the culling / dynamic-mesh tasks). Not changed here (it's the world's content); worth checking
+  when the world detail lands: non-Nanite instanced meshes are culled per view on the CPU, Nanite ones on the GPU.
+- Seen in the client logs, not mine to fix: `Material /Game/Terrain/M_Rock missing usage flag Nanite! Default Material
+  will be used in game` (the cave boulders), and the Slate UI is about 1 ms of the client's game thread.
+
 ## Client runs
 
 | Date | Build | Level | Run | avg ms (fps) | p95 | p99 | game | draw | GPU | hitches >50 / >100 | worst ms | GC worst ms (frames) | memory | phases avg/p99 ms | Max-iter | load |
@@ -78,6 +161,10 @@ mesh pipeline (python, up to 58% of the GPU) did to the numbers, not the game.
 | 2026-10-27 03:44 | baseline 9c707cb, quiet re-run | medium | 1 | 6.16 (162 fps) | 11.6 | 13.5 | 2.9 | 6.2 | 4.7 | 5 / 1 | 258 | 13.8 (7) | 3659 MB | camp 5.0/6.2, walk 6.0/13.6, move 8.5/13.8 (streaming done 0.1 s) | 0 | CPU others 23%, GPU others 15% (UnrealEditor 9, pid 25636 5) (this run 59%); other: 2 UE, 1 game, 0 SCW, 0 build, 0 py |
 | 2026-10-27 03:44 | baseline 9c707cb, quiet re-run | epic | 2 | 13.85 (72 fps) | 17.1 | 22.2 | 3.1 | 13.8 | 12.5 | 5 / 0 | 91 | 18.1 (7) | 3776 MB | camp 10.8/22.4, walk 14.9/22.4, move 13.5/18.0 (streaming done 0.2 s) | 0 | CPU others 27%, GPU others 24% (UnrealEditor 22) (this run 47%); other: 2 UE, 1 game, 0 SCW, 0 build, 0 py |
 | 2026-10-27 03:44 | baseline 9c707cb, quiet re-run | medium | 2 | 5.02 (199 fps) | 5.7 | 6.2 | 2.8 | 5.0 | 3.9 | 0 / 0 | 43 | 10.8 (6) | 3591 MB | camp 4.9/6.1, walk 5.1/6.3, move 4.9/6.0 (streaming done 0.1 s) | 0 | CPU others 16%, GPU others 0% (this run 67%); other: 0 UE, 1 game, 0 SCW, 0 build, 0 py |
+| 2026-10-27 08:40 | perf pass | epic | 1 | 7.71 (130 fps) | 8.8 | 9.8 | 3.1 | 7.7 | 7.0 | 0 / 0 | 28 | 11.9 (6) | 4135 MB | camp 7.5/9.2, walk 7.9/10.0, move 7.3/9.0 (streaming done 0.1 s) | 0 | CPU others 21%, GPU others 0% (this run 73%); other: 1 UE, 1 game, 0 SCW, 1 build, 0 py |
+| 2026-10-27 08:40 | perf pass | medium | 1 | 4.97 (201 fps) | 5.7 | 6.1 | 2.8 | 5.0 | 3.9 | 0 / 0 | 24 | 11.8 (6) | 3923 MB | camp 4.9/6.0, walk 5.0/6.2, move 4.9/6.0 (streaming done 0.1 s) | 0 | CPU others 14%, GPU others 0% (this run 64%); other: 0 UE, 1 game, 0 SCW, 0 build, 0 py |
+| 2026-10-27 08:40 | perf pass | epic | 2 | 7.68 (130 fps) | 8.6 | 9.3 | 2.9 | 7.7 | 7.0 | 0 / 0 | 23 | 11.2 (6) | 4085 MB | camp 7.6/9.1, walk 7.8/9.4, move 7.3/8.7 (streaming done 0.1 s) | 0 | CPU others 21%, GPU others 1% (this run 70%); other: 0 UE, 1 game, 0 SCW, 0 build, 0 py |
+| 2026-10-27 08:40 | perf pass | medium | 2 | 5.32 (188 fps) | 6.5 | 7.5 | 3.0 | 5.3 | 3.9 | 0 / 0 | 37 | 19.1 (5) | 4043 MB | camp 5.2/7.4, walk 5.4/7.7, move 5.2/6.7 (streaming done 0.1 s) | 0 | CPU others 25%, GPU others 0% (this run 64%); other: 0 UE, 1 game, 0 SCW, 0 build, 0 py |
 <!-- client rows -->
 
 ## Server runs

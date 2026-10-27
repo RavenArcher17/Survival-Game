@@ -3,6 +3,7 @@
 #include "WRBoss.h"
 #include "WRCreature.h"
 #include "WRTuning.h"
+#include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -34,18 +35,22 @@ void UWRSignificanceSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	Update();
-	// Ride camera arms, every frame so mounting gets its camera at once: only a creature a player controls needs one.
+	// Ride cameras, every frame so mounting gets its camera at once: only a creature a player controls needs its arm
+	// (which otherwise sweeps for collision every tick) and camera ticking.
 	for (const FTracked& T : Tracked)
 	{
 		AWRCreature* Creature = T.Creature.Get();
-		USpringArmComponent* Arm = T.Arm.Get();
-		if (Creature && Arm)
+		if (!Creature)
 		{
-			const AController* C = Creature->GetController();
-			const bool bRidden = C && C->IsPlayerController();
-			if (Arm->IsComponentTickEnabled() != bRidden)
+			continue;
+		}
+		const AController* C = Creature->GetController();
+		const bool bRidden = C && C->IsPlayerController();
+		for (UActorComponent* Part : { static_cast<UActorComponent*>(T.Arm.Get()), static_cast<UActorComponent*>(T.Camera.Get()) })
+		{
+			if (Part && Part->IsComponentTickEnabled() != bRidden)
 			{
-				Arm->SetComponentTickEnabled(bRidden);
+				Part->SetComponentTickEnabled(bRidden);
 			}
 		}
 	}
@@ -135,6 +140,7 @@ void UWRSignificanceSubsystem::Update()
 				FTracked T;
 				T.Creature = *It;
 				T.Arm = It->FindComponentByClass<USpringArmComponent>();
+				T.Camera = It->FindComponentByClass<UCameraComponent>();
 				Next.Add(T);
 			}
 		}
