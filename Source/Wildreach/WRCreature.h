@@ -58,6 +58,11 @@ struct FWRCreatureDef
 	float MeshYaw = 0.f;
 	float MeshScale = 1.f;        // multiplier on the auto fit
 	float Glow = 0.f;             // > 0, no mesh: a glowing orb (emissive sphere in its colour + a light this bright)
+	// Animation overrides (0 / None: measured from the clips, see UWRAnimInstance).
+	float WalkPace = 0.f;         // cm/s the walk clip covers at play rate 1
+	float RunPace = 0.f;
+	float StrikeAt = 0.f;         // where in the attack clip (0..1) the bite lands
+	FName AnimUpper;              // bone the attack / hit layer starts from (its subtree), so running legs keep running
 
 	bool CanTameBy(FName Method) const { return TamingMethods.Contains(Method); }
 	float TameSeconds() const;
@@ -114,6 +119,10 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void OnSwingVisual(EWRSwingKind Kind, float Duration) override;
 	virtual void OnDeathVisual() override;
+	virtual void OnHitVisual(EWRHitResult Result) override;
+	/** AI movement curves round instead of sliding sideways: the way it walks leads its facing by at most
+	 *  anim.creatureLeadDegrees; nearly stopped and facing well away, it turns on the spot first. */
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.f, bool bForce = false) override;
 
 	const FWRCreatureDef* GetDef() const { return FWRCreatureRegistry::Get().Find(CreatureId); }
 	AActor* GetAggroTarget() const { return AggroTarget.Get(); }
@@ -231,12 +240,14 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UPointLightComponent> GlowLight;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class USkeletalMeshComponent> Skel;
 	UPROPERTY(Transient) TMap<FName, TObjectPtr<class UAnimSequenceBase>> AnimAssets;
-	FName CurrentAnim;
 	double OneShotUntil = 0.0;
 	int32 AttackVariant = 0;  // attack, attack2, attack3 take turns
-	/** Duration > 0 fits a one-shot to that many seconds (within limits), e.g. an attack to its telegraph. */
-	void PlayCreatureAnim(FName Key, bool bLoop, float Duration = 0.f);
-	void TickCreatureAnim();
+	float LastYaw = 0.f;      // for its turn rate (feet step while it turns on the spot)
+	float EarshotClock = 0.f;
+	class UWRAnimInstance* CreatureAnim() const;
+	/** The layered animation instance: locomotion paced to the ground speed, attacks / hits over it, crossfades. */
+	void SetupCreatureAnim(const FWRCreatureDef& Def);
+	void TickCreatureAnim(float DeltaSeconds);
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> RideMapping;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideMoveAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideLookAction;

@@ -95,15 +95,19 @@ private:
 
 	bool bOnIce = false;
 
-	// Body animation: one AnimSequence at a time, looping by movement state; one-shots (swings, hits, dodge) hold
-	// the body until they finish.
+	// Body animation (UWRAnimInstance): locomotion blended by speed and direction, block / swings / casts / shots on
+	// the upper body, dodge / falls / swimming / gathering over the whole body. One-shots keep the gameplay's timing:
+	// BodyOneShotUntil is when the current one ends (nothing new starts before then, as before).
 	struct FBodyAnimSet { TArray<TObjectPtr<class UAnimSequenceBase>> Clips; int32 Next = 0; };
 	TMap<FName, FBodyAnimSet> BodyAnims;
 	UPROPERTY(Transient) TArray<TObjectPtr<class UAnimSequenceBase>> BodyAnimRefs;  // keeps the clips loaded
-	FName BodyAnim;
+	TSet<FName> FullBodyKeys;  // one-shots over the whole body (player_art.json "fullBody"); the rest are upper body
+	FName BodyAnim;            // the one-shot playing (None once it's done)
 	double BodyOneShotUntil = 0.0;
-	float WalkClipSpeed = 150.f;
-	float RunClipSpeed = 420.f;
+	class UWRAnimInstance* BodyAnimInstance() const;
+	/** Locomotion sets, turn clips and the upper body for the animation instance, from the loaded clips. */
+	void SetupBodyAnim(const TSharedPtr<class FJsonObject>& Art, const TSharedPtr<class FJsonObject>& Variant);
+	class UAnimSequenceBase* BodyClip(FName Key) const;
 	FName LoadedBodyStyle;
 	bool bBodyLoaded = false;
 	/** Load (or swap to) the body for BodyStyle; does nothing if that body is already on. */
@@ -120,8 +124,8 @@ private:
 	double LocalNextShotAt = 0.0;  // owner: don't flood the server
 	float AimBlend = 0.f;          // owner camera, 0 = normal, 1 = aiming
 	float BodyYaw = 0.f;           // the body art's meshYaw
-	float RangedAimYaw = 0.f;      // extra body turn while aiming, so a weapon held across the body points ahead
-	float BodyAimTurn = 0.f;       // that turn, eased in and out
+	float RangedAimYaw = 0.f;      // extra upper-body turn while aiming, so a weapon held across the body points ahead
+	float BodyAimTurn = 0.f;       // that turn, eased in and out (a spine twist, so walking legs keep their line)
 	FTimerHandle ThrowTimer;
 	UFUNCTION() void OnRep_RangedLook();
 	void UpdateWeaponLook();
@@ -136,7 +140,8 @@ private:
 	UFUNCTION(Server, Reliable) void ServerCycleAmmo(int32 Dir);
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRangedShot(FName FireKey, FName ReloadKey, float Reload);
 	void TickBodyAnim();
-	/** Play a clip from a set; bLoop for locomotion. Duration > 0 stretches a one-shot to fit it. Returns the clip length. */
+	/** Play a one-shot clip from a set (its next variant), on the upper body or, for "fullBody" keys, the whole body.
+	 *  Duration > 0 stretches it to fit. Returns its play time. bLoop is unused: loops follow the body's state. */
 	float PlayBodyAnim(FName Key, bool bLoop, float PlayRate = 1.f, float Duration = 0.f);
 	float DefaultFriction = 8.f;
 	float DefaultBraking = 2048.f;

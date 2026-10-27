@@ -407,6 +407,11 @@ void AWRPlayerController::UpdateArtCam(float DeltaTime)
 	FVector Origin, Extent;
 	Target->GetActorBounds(true, Origin, Extent);
 	const float Size = FMath::Max3(Extent.X, Extent.Y, Extent.Z);
+	if (bArtCamFixed && DeltaTime > 0.f)
+	{
+		ArtCam->SetActorRotation((Origin - ArtCam->GetActorLocation()).Rotation());  // held in place, just watching
+		return;
+	}
 	const FVector Dir = FRotator(0.f, Target->GetActorRotation().Yaw + ArtCamYaw, 0.f).Vector();
 	const FVector Goal = Origin + Dir * (Size * 3.2f + 150.f) + FVector(0.f, 0.f, Size * 0.6f);
 	const FVector At = DeltaTime > 0.f ? FMath::VInterpTo(ArtCam->GetActorLocation(), Goal, DeltaTime, 4.f) : Goal;
@@ -860,6 +865,35 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 
 // ---------------------------------------------------------------- test bot
 
+void AWRPlayerController::WRArtCamFix(int32 bFix)
+{
+	bArtCamFixed = bFix != 0;
+}
+
+void AWRPlayerController::WRShotSeq(const FString& Prefix, int32 Count, float Every)
+{
+	ShotSeqPrefix = Prefix;
+	ShotSeqTaken = 0;
+	ShotSeqCount = FMath::Max(0, Count);
+	ShotSeqEvery = FMath::Max(0.02f, Every);
+	ShotSeqNext = BotClock;
+}
+
+void AWRPlayerController::WRAnimDrive(float Angle, float Seconds, float Scale, float TurnRate)
+{
+	DriveAngle = Angle;
+	DriveUntil = BotClock + Seconds;
+	DriveScale = Scale;
+	DriveTurn = TurnRate;
+}
+
+void AWRPlayerController::WRPress(FName Input, float Seconds)
+{
+	const EWRAbilityInput Which = Input == TEXT("heavy") ? EWRAbilityInput::Heavy : Input == TEXT("block") ? EWRAbilityInput::Block
+		: Input == TEXT("dodge") ? EWRAbilityInput::Dodge : EWRAbilityInput::Light;
+	BotPress(static_cast<int32>(Which), Seconds);
+}
+
 void AWRPlayerController::BotPress(int32 Input, float HoldSeconds)
 {
 	if (AWRCharacter* Survivor = Cast<AWRCharacter>(GetPawn()))
@@ -901,7 +935,7 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			Cmds.ParseIntoArray(BotCmdQueue, TEXT("|"));
 		}
 	}
-	while (BotCmdQueue.Num() > 0 && BotClock >= BotCmdResume)
+	while (BotCmdQueue.Num() > 0 && BotClock >= BotCmdResume && ShotSeqTaken >= ShotSeqCount)  // a shot sequence finishes first
 	{
 		const FString Cmd = BotCmdQueue[0].TrimStartAndEnd();
 		BotCmdQueue.RemoveAt(0);
@@ -915,6 +949,20 @@ void AWRPlayerController::TickBot(float DeltaTime)
 	if (!Survivor)
 	{
 		return;
+	}
+	if (ShotSeqTaken < ShotSeqCount && BotClock >= ShotSeqNext)
+	{
+		ConsoleCommand(FString::Printf(TEXT("HighResShot 1280x720 filename=%s%02d"), *ShotSeqPrefix, ShotSeqTaken++));
+		ShotSeqNext += ShotSeqEvery;
+	}
+	if (BotClock < DriveUntil)
+	{
+		// WRAnimDrive: strafe / back off / circle relative to the camera (animation captures).
+		SetControlRotation(GetControlRotation() + FRotator(0.f, DriveTurn * DeltaTime, 0.f));
+		if (DriveScale > 0.f)
+		{
+			Survivor->AddMovementInput(FRotator(0.f, GetControlRotation().Yaw + DriveAngle, 0.f).Vector(), DriveScale);
+		}
 	}
 	if (bWalking)
 	{

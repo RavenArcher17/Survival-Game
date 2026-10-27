@@ -28,6 +28,7 @@ public class Wildreach : ModuleRules
 		// Sound: OGG files from Data/Audio decoded with the engine's Vorbis decoder (WRSound); its quality-info struct lives in TargetPlatform.
 		PrivateDependencyModuleNames.AddRange(new string[] { "VorbisAudioDecoder", "AudioExtensions", "AudioMixer" });  // AudioExtensions: the procedural wave subclass (UWRPcmSound); AudioMixer: WRSoundRecord
 		PrivateIncludePathModuleNames.Add("TargetPlatform");
+		PrivateDependencyModuleNames.Add("AnimationCore");  // two-bone IK: the survivor's feet planted on slopes (WRAnimInstance)
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)
