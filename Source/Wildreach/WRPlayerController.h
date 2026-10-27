@@ -202,6 +202,15 @@ public:
 	UFUNCTION(Exec) void WRGather(const FString& What);
 	/** Art check: frame the nearest creature of this kind ("me" = your own body) from Yaw degrees off its nose and follow it ("off" = back to the pawn). */
 	UFUNCTION(Exec) void WRArtCam(FName Creature, float Yaw = 60.f);
+	/** Animation captures (Tools\animshots.ps1): move Angle degrees off the camera's heading (0 ahead, 90 right, 180
+	 *  back) at Scale x full input for Seconds, turning the camera TurnRate degrees a second (Scale 0: turn on the spot). */
+	UFUNCTION(Exec) void WRAnimDrive(float Angle, float Seconds, float Scale = 1.f, float TurnRate = 0.f);
+	/** Hold an attack input (light, heavy, block, dodge) for Seconds, as the bot does. */
+	UFUNCTION(Exec) void WRPress(FName Input, float Seconds = 0.05f);
+	/** Hold the art camera where it is (it keeps watching its subject but stops swinging round with its facing). */
+	UFUNCTION(Exec) void WRArtCamFix(int32 bFix);
+	/** Take Count screenshots (1280x720) Every seconds apart, named <Prefix>00, <Prefix>01, ... (animation captures). */
+	UFUNCTION(Exec) void WRShotSeq(const FString& Prefix, int32 Count, float Every);
 	/** Teleport next to the altar of a path (testing). */
 	UFUNCTION(Exec) void WRGoToAltar(FName Path);
 
@@ -323,4 +332,9 @@ private:
 	float BotNextReport = 5.f;
 	int32 BotSpellSlot = 0;
 	TArray<TPair<int32, float>> BotHeld;
+	float DriveAngle = 0.f, DriveUntil = 0.f, DriveScale = 1.f, DriveTurn = 0.f;  // WRAnimDrive
+	bool bArtCamFixed = false;
+	FString ShotSeqPrefix;  // WRShotSeq
+	int32 ShotSeqTaken = 0, ShotSeqCount = 0;
+	float ShotSeqEvery = 0.125f, ShotSeqNext = 0.f;
 };

@@ -91,7 +91,14 @@ animation-only FBXs for each survivor with that survivor's own first clip as the
 exporter drops the whole clip). Copy it to `survivor_m_clips.fbx` (a file named like the mesh re-imports the mesh)
 and run `Tools/import_anims.py` with `WR_ANIMS="...\survivor_m_clips.fbx=/Game/Characters/Survivor/survivor_m_Skeleton=survivor_mArmature_"`:
 Interchange with an animations-only pipeline onto the existing skeleton, clips renamed to the survivor's prefix. The meshes
-are not touched, so Git LFS only grows by the clips.
+are not touched, so Git LFS only grows by the clips. The ranged stance's strafes, steps back and turns (0.4.0) came the
+same way from `anims\ranged_move`: copies of the Longbow pack's `standing walk / run / aim walk back|left|right` and
+`standing turn 90 left|right`, renamed `bow walk back.fbx` etc. (-> `BowWalkBack`), built with `--out mixamo\ranged_move_m\...`
+and `ranged_move_f` (the female's rest pose from `f\sword_shield\sheath sword 1.fbx`), ~170 KB per clip in LFS.
+The Sword And Shield pack already held the melee stance's strafes (`Strafe2` left / `Strafe` right walking, `Strafe3`
+left / `Strafe4` right running), walking / running back (`Walk2`, `Run2`) and turns (`Turn2` left, `Turn` right).
+`player_art.json` wires them by direction; `UWRAnimInstance` measures each clip's pace and which way its feet go, and
+warns if a clip is filed under the wrong direction. Check with `Tools\animshots.ps1` (frame sequences from two angles).
 
 Ranged gear: `batch_ranged.json` concepts; `normalize_gear.py -- bow ... 120` (limbs along +Y, the arrow's flight
 along +X, riser at the origin), `-- pole ... --front wide|narrow --grip 0.35` (crossbow, blowgun, spear, arrow: tip along

@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRAnimInstance.h"
 #include "WRSocial.h"
 #include "WRWorldDressing.h"
 #include "Wildreach.h"
@@ -76,7 +77,9 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	Body->SetupAttachment(RootComponent);
 	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Body->SetVisibility(false);
-	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+	// The pose always updates (bones only refresh when seen): footsteps of a survivor behind you, or your own in first
+	// person (where your body is hidden from you), come from the animation's foot phase.
+	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
 
 	ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
 	ShieldMesh->SetupAttachment(Body);
@@ -92,6 +95,7 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 void AWRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	Body->PrimaryComponentTick.AddPrerequisite(this, PrimaryActorTick);  // animate from this frame's movement
 	LoadBodyArt();
 	ApplyViewMode();
 	Cast<UWRCharacterMovementComponent>(GetCharacterMovement())->SprintSpeed = WRTune(TEXT("player.sprintSpeed"), 750.f);
@@ -104,19 +108,18 @@ void AWRCharacter::BeginPlay()
 void AWRCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// Blocking keeps you facing where you aim (WRCharacterBase): the movement mustn't also turn the body toward a
+	// strafe or a step back, or the two fight every frame and the body wobbles (worse on a long frame). Same rule as
+	// aiming and first person; set on every machine so prediction agrees.
+	GetCharacterMovement()->bOrientRotationToMovement = !(bFirstPerson || bAiming || HasTag(WRTags::State_Blocking));
 	if (GetNetMode() != NM_DedicatedServer)
 	{
-		TickBodyAnim();
 		if (IsLocallyControlled())
 		{
 			TickAimCamera(DeltaSeconds);
 		}
-		const float Turn = FMath::FInterpTo(BodyAimTurn, IsAimingRanged() ? RangedAimYaw : 0.f, DeltaSeconds, 10.f);
-		if (bBodyLoaded && !FMath::IsNearlyEqual(Turn, BodyAimTurn, 0.01f))
-		{
-			Body->SetRelativeRotation(FRotator(0.f, BodyYaw + Turn, 0.f));
-		}
-		BodyAimTurn = Turn;
+		BodyAimTurn = FMath::FInterpTo(BodyAimTurn, IsAimingRanged() ? RangedAimYaw : 0.f, DeltaSeconds, 10.f);
+		TickBodyAnim();
 	}
 	// Slick ice: the same check runs on the server and the owning client, so movement prediction agrees.
 	if (HasAuthority() || IsLocallyControlled())
@@ -311,12 +314,6 @@ void AWRCharacter::LoadBodyArt()
 	Pick(TEXT("shieldSocket"))->TryGetStringField(TEXT("shieldSocket"), ShieldSocket);
 	const double Yaw = Pick(TEXT("meshYaw"))->HasField(TEXT("meshYaw")) ? Pick(TEXT("meshYaw"))->GetNumberField(TEXT("meshYaw")) : 0.0;
 	const double Scale = Pick(TEXT("meshScale"))->HasField(TEXT("meshScale")) ? Pick(TEXT("meshScale"))->GetNumberField(TEXT("meshScale")) : 1.0;
-	const TSharedPtr<FJsonObject>* Speeds = nullptr;
-	if (Pick(TEXT("speeds"))->TryGetObjectField(TEXT("speeds"), Speeds))
-	{
-		(*Speeds)->TryGetNumberField(TEXT("walk"), WalkClipSpeed);
-		(*Speeds)->TryGetNumberField(TEXT("run"), RunClipSpeed);
-	}
 
 	// Feet on the capsule's bottom, facing the actor's forward.
 	Body->SetSkeletalMesh(BodyAsset);
@@ -430,19 +427,117 @@ void AWRCharacter::LoadBodyArt()
 		}
 	}
 	UE_LOG(LogWildreach, Log, TEXT("Player art: %s with %d clips"), *BodyAsset->GetName(), BodyAnimRefs.Num());
+	// The layered animation instance (no animation blueprint), set up after the mesh so it measures at its scale.
+	Body->SetAnimInstanceClass(UWRAnimInstance::StaticClass());
+	SetupBodyAnim(Art, Variant);
 	UpdateWeaponLook();  // a ranged weapon may already be out
+}
+
+UWRAnimInstance* AWRCharacter::BodyAnimInstance() const
+{
+	return Cast<UWRAnimInstance>(Body->GetAnimInstance());
+}
+
+UAnimSequenceBase* AWRCharacter::BodyClip(FName Key) const
+{
+	const FBodyAnimSet* Set = BodyAnims.Find(Key);
+	return Set && Set->Clips.Num() > 0 ? Set->Clips[0].Get() : nullptr;
+}
+
+void AWRCharacter::SetupBodyAnim(const TSharedPtr<FJsonObject>& Art, const TSharedPtr<FJsonObject>& Variant)
+{
+	UWRAnimInstance* Anim = BodyAnimInstance();
+	if (!Anim)
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("Player art: no animation instance on the body"));
+		return;
+	}
+	Anim->ResetSetup();
+	const auto Pick = [&Art, &Variant](const TCHAR* Field) { return Variant.IsValid() && Variant->HasField(Field) ? Variant : Art; };
+	// Paces from "speeds" (cm/s at play rate 1) where given; the rest are measured from the clips' feet.
+	const TSharedPtr<FJsonObject>* Speeds = nullptr;
+	Pick(TEXT("speeds"))->TryGetObjectField(TEXT("speeds"), Speeds);
+	const auto Pace = [Speeds](const FString& Key)
+	{
+		double Value = 0.0;
+		if (Speeds) (*Speeds)->TryGetNumberField(Key, Value);
+		return float(Value);
+	};
+	// A set: an idle and walk / run clips forward, back, left and right (<walk>, <walk>_back, <walk>_left, ...).
+	const auto AddSet = [&](FName Name, const FString& Idle, const FString& Walk, const FString& Run)
+	{
+		TArray<FWRLocoClipDesc> Clips;
+		const TPair<const TCHAR*, float> Dirs[] = { { TEXT(""), 0.f }, { TEXT("_back"), 180.f }, { TEXT("_left"), -90.f }, { TEXT("_right"), 90.f } };
+		for (int32 Gait = 0; Gait < 2; ++Gait)
+		{
+			const FString& Base = Gait == 0 ? Walk : Run;
+			for (const TPair<const TCHAR*, float>& Dir : Dirs)
+			{
+				const FString Key = Base + Dir.Key;
+				if (UAnimSequenceBase* Clip = Base.IsEmpty() ? nullptr : BodyClip(FName(*Key)))
+				{
+					Clips.Add({ Clip, Dir.Value, Gait, Pace(Key) });
+				}
+			}
+		}
+		Anim->AddLocoSet(Name, BodyClip(FName(*Idle)), Clips);
+	};
+	const auto Have = [this](const TCHAR* Key, const TCHAR* Fallback) { return FString(BodyAnims.Contains(Key) ? Key : Fallback); };
+	AddSet(TEXT("melee"), TEXT("idle"), TEXT("walk"), TEXT("run"));
+	AddSet(TEXT("ranged"), Have(TEXT("ranged_idle"), TEXT("idle")), Have(TEXT("ranged_walk"), TEXT("walk")), Have(TEXT("ranged_run"), TEXT("run")));
+	if (BodyAnims.Contains(TEXT("bow_aimwalk")))
+	{
+		AddSet(TEXT("bow_aim"), TEXT("bow_aim"), TEXT("bow_aimwalk"), FString());  // aiming walks only (half speed)
+	}
+	Anim->SetTurnClips(TEXT("melee"), BodyClip(TEXT("turn_left")), BodyClip(TEXT("turn_right")));
+	const FName RangedTurn[] = { BodyAnims.Contains(TEXT("ranged_turn_left")) ? FName(TEXT("ranged_turn_left")) : FName(TEXT("turn_left")),
+	                             BodyAnims.Contains(TEXT("ranged_turn_right")) ? FName(TEXT("ranged_turn_right")) : FName(TEXT("turn_right")) };
+	Anim->SetTurnClips(TEXT("ranged"), BodyClip(RangedTurn[0]), BodyClip(RangedTurn[1]));
+	Anim->SetTurnClips(TEXT("bow_aim"), BodyClip(RangedTurn[0]), BodyClip(RangedTurn[1]));
+
+	// The upper body (block, swings, casts, shots) from this bone up; the spine bones share the twist that keeps the
+	// chest facing the camera while the legs stand.
+	FString Upper = TEXT("Spine");
+	Pick(TEXT("upperBody"))->TryGetStringField(TEXT("upperBody"), Upper);
+	TArray<FName> Spine;
+	const TArray<TSharedPtr<FJsonValue>>* SpineList = nullptr;
+	if (Pick(TEXT("spineBones"))->TryGetArrayField(TEXT("spineBones"), SpineList))
+	{
+		for (const TSharedPtr<FJsonValue>& Bone : *SpineList) Spine.Add(FName(*Bone->AsString()));
+	}
+	else
+	{
+		Spine = { TEXT("Spine"), TEXT("Spine1"), TEXT("Spine2") };
+	}
+	Anim->SetUpperBody(FName(*Upper), Spine);
+	TArray<FName> Legs;
+	const TArray<TSharedPtr<FJsonValue>>* LegList = nullptr;
+	if (Pick(TEXT("legBones"))->TryGetArrayField(TEXT("legBones"), LegList))
+	{
+		for (const TSharedPtr<FJsonValue>& Bone : *LegList) Legs.Add(FName(*Bone->AsString()));
+	}
+	Anim->SetLegs(Legs);  // feet planted on slopes while standing
+	FullBodyKeys.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* Full = nullptr;
+	if (Pick(TEXT("fullBody"))->TryGetArrayField(TEXT("fullBody"), Full))
+	{
+		for (const TSharedPtr<FJsonValue>& Key : *Full) FullBodyKeys.Add(FName(*Key->AsString()));
+	}
+	else
+	{
+		FullBodyKeys = { TEXT("dodge"), TEXT("death"), TEXT("fall"), TEXT("swim"), TEXT("tread"), TEXT("gather"), TEXT("chop"), TEXT("pickup") };
+	}
+	UE_LOG(LogWildreach, Log, TEXT("Player anim: walk %.0f back %.0f left %.0f right %.0f | run %.0f back %.0f left %.0f right %.0f cm/s"),
+		Anim->LocoSpeed(TEXT("melee"), 0, 0.f), Anim->LocoSpeed(TEXT("melee"), 0, 180.f), Anim->LocoSpeed(TEXT("melee"), 0, -90.f), Anim->LocoSpeed(TEXT("melee"), 0, 90.f),
+		Anim->LocoSpeed(TEXT("melee"), 1, 0.f), Anim->LocoSpeed(TEXT("melee"), 1, 180.f), Anim->LocoSpeed(TEXT("melee"), 1, -90.f), Anim->LocoSpeed(TEXT("melee"), 1, 90.f));
 }
 
 float AWRCharacter::PlayBodyAnim(FName Key, bool bLoop, float PlayRate, float Duration)
 {
 	FBodyAnimSet* Set = BodyAnims.Find(Key);
-	if (!Set || Set->Clips.Num() == 0)
+	UWRAnimInstance* Anim = BodyAnimInstance();
+	if (!Set || Set->Clips.Num() == 0 || !Anim)
 	{
-		return 0.f;
-	}
-	if (bLoop && BodyAnim == Key)
-	{
-		Body->SetPlayRate(PlayRate);  // already playing: just keep its pace matched to the speed
 		return 0.f;
 	}
 	UAnimSequenceBase* Clip = Set->Clips[Set->Next % Set->Clips.Num()];
@@ -452,23 +547,98 @@ float AWRCharacter::PlayBodyAnim(FName Key, bool bLoop, float PlayRate, float Du
 	{
 		PlayRate = FMath::Clamp(Length / Duration, 0.5f, 3.f);
 	}
-	Body->PlayAnimation(Clip, bLoop);
-	Body->SetPlayRate(PlayRate);
+	PlayRate = PlayRate > KINDA_SMALL_NUMBER ? PlayRate : 1.f;
+	const bool bHold = Key == TEXT("death");  // stay down
+	Anim->PlayOneShot(Clip, FullBodyKeys.Contains(Key) ? EWRAnimLayer::Full : EWRAnimLayer::Upper, PlayRate, 0.f, 0.f, bHold);
 	BodyAnim = Key;
 	return Length / PlayRate;
 }
 
 void AWRCharacter::TickBodyAnim()
 {
-	if (!Body->IsVisible() || BodyAnims.Num() == 0 || HasTag(WRTags::State_Dead) || GetWorld()->GetTimeSeconds() < BodyOneShotUntil)
+	UWRAnimInstance* Anim = BodyAnimInstance();
+	if (!Body->IsVisible() || BodyAnims.Num() == 0 || !Anim)
 	{
 		return;
 	}
 	const UCharacterMovementComponent* Move = GetCharacterMovement();
-	const float Speed = GetVelocity().Size2D();
-	if (HasTag(WRTags::State_Dodging) && BodyAnim != TEXT("dodge"))
+	const double Now = GetWorld()->GetTimeSeconds();
+	const FVector Velocity = GetVelocity();
+	const float Speed = Velocity.Size2D();
+	const bool bDead = HasTag(WRTags::State_Dead);
+	const bool bBusy = Now < BodyOneShotUntil;
+	const FName Group = IsRangedOut() ? RangedAnimGroup() : NAME_None;
+
+	// What the body is doing this frame (the instance blends between states).
+	FWRAnimInput& In = Anim->Input;
+	In.Speed = bDead ? 0.f : Speed;
+	In.ActorYaw = GetActorRotation().Yaw;
+	In.Angle = Speed > 1.f ? FRotator::NormalizeAxis(Velocity.Rotation().Yaw - In.ActorYaw) : 0.f;  // strafes, walking back
+	In.bGrounded = Move->IsMovingOnGround();
+	In.Set = !IsRangedOut() ? FName(TEXT("melee")) : bAiming && Group == TEXT("bow") && BodyAnims.Contains(TEXT("bow_aimwalk")) ? FName(TEXT("bow_aim")) : FName(TEXT("ranged"));
+	In.UpperLoop = nullptr;
+	In.FullLoop = nullptr;
+	In.bFullLoopHold = false;
+	In.FullLoopStart = 0.f;
+	In.ExtraTwist = BodyAimTurn;
+	if (!bDead)
 	{
-		BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(TEXT("dodge"), false, 1.f, WRTune(TEXT("player.dodgeVisualSeconds"), 0.7f));
+		if (Move->IsSwimming())
+		{
+			In.FullLoop = BodyClip(Speed > 40.f ? FName(TEXT("swim")) : FName(TEXT("tread")));
+		}
+		else if (Move->IsFalling())
+		{
+			// Plays once and holds the airborne pose, skipping the crouch and take-off.
+			In.FullLoop = BodyClip(TEXT("fall"));
+			In.bFullLoopHold = true;
+			In.FullLoopStart = In.FullLoop ? In.FullLoop->GetPlayLength() * WRTune(TEXT("player.fallClipStart"), 0.35f) : 0.f;
+		}
+		if (bAiming && Group == TEXT("rifle"))
+		{
+			In.UpperLoop = BodyClip(TEXT("rifle_aim"));  // shouldered crossbow / blowgun over the walking legs
+		}
+		else if (bAiming && Group == TEXT("bow") && !BodyAnims.Contains(TEXT("bow_aimwalk")))
+		{
+			In.UpperLoop = BodyClip(TEXT("bow_aim"));
+		}
+		else if (!IsRangedOut() && HasTag(WRTags::State_Blocking))
+		{
+			In.UpperLoop = BodyClip(TEXT("block"));  // shield up, legs walking, strafing or backing off
+		}
+	}
+	In.bTurnInPlace = !bDead && !bBusy && In.bGrounded && !In.FullLoop;
+	// Standing on a slope: where the ground is under each foot, against the capsule's bottom (the instance sinks the
+	// hips to the lower one and bends the other leg up to its own).
+	const float Dt = GetWorld()->GetDeltaSeconds();
+	const FVector Bottom = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	for (int32 Side = 0; Side < 2; ++Side)
+	{
+		float Want = 0.f;
+		const FName Foot = Anim->FootBone(Side);
+		if (!Foot.IsNone() && !bDead && In.bGrounded && !In.FullLoop && Speed < 30.f && Body->WasRecentlyRendered(0.2f))
+		{
+			const FVector At = Body->GetSocketLocation(Foot);
+			const float Reach = WRTune(TEXT("anim.footMaxRaise"), 45.f);
+			FHitResult Ground;
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(WRFootPlant), false, this);
+			FCollisionObjectQueryParams Floors(ECC_WorldStatic);
+			Floors.AddObjectTypesToQuery(ECC_WorldDynamic);
+			if (GetWorld()->LineTraceSingleByObjectType(Ground, FVector(At.X, At.Y, Bottom.Z + Reach), FVector(At.X, At.Y, Bottom.Z - Reach), Floors, Query))
+			{
+				Want = FMath::Clamp(float(Ground.ImpactPoint.Z - Bottom.Z), -Reach, Reach);
+			}
+		}
+		In.FootLift[Side] = FMath::FInterpTo(In.FootLift[Side], Want, Dt, 12.f);
+	}
+	if (bDead || bBusy)
+	{
+		return;  // a one-shot is on: nothing new starts until it's done (the gameplay's timing)
+	}
+	BodyAnim = NAME_None;
+	if (HasTag(WRTags::State_Dodging))
+	{
+		BodyOneShotUntil = Now + PlayBodyAnim(TEXT("dodge"), false, 1.f, WRTune(TEXT("player.dodgeVisualSeconds"), 0.7f));
 		return;
 	}
 	if (!QueuedOneShot.IsNone())
@@ -478,63 +648,8 @@ void AWRCharacter::TickBodyAnim()
 		QueuedOneShot = NAME_None;
 		if (BodyAnims.Contains(Key) && !Move->IsFalling() && !Move->IsSwimming())
 		{
-			BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(Key, false, 1.f, QueuedOneShotSeconds);
-			return;
+			BodyOneShotUntil = Now + PlayBodyAnim(Key, false, 1.f, QueuedOneShotSeconds);
 		}
-	}
-	const auto Pick = [this](const TCHAR* Want, const TCHAR* Fallback) { return BodyAnims.Contains(Want) ? FName(Want) : FName(Fallback); };
-	if (Move->IsSwimming())
-	{
-		PlayBodyAnim(Speed > 40.f ? FName(TEXT("swim")) : FName(TEXT("tread")), true);
-	}
-	else if (Move->IsFalling())
-	{
-		if (BodyAnim != TEXT("fall"))
-		{
-			const float Length = PlayBodyAnim(TEXT("fall"), false);  // plays once and holds the airborne pose
-			Body->SetPosition(Length * WRTune(TEXT("player.fallClipStart"), 0.35f));  // skip the crouch and take-off
-		}
-	}
-	else if (IsRangedOut())
-	{
-		// Ranged weapon out: its own stance, and the aim pose while aiming (bow: drawn; crossbow / blowgun: shouldered).
-		const FName Group = RangedAnimGroup();
-		if (bAiming && Group == TEXT("bow"))
-		{
-			PlayBodyAnim(Speed > 25.f ? Pick(TEXT("bow_aimwalk"), TEXT("bow_aim")) : FName(TEXT("bow_aim")), true);
-		}
-		else if (bAiming && Group == TEXT("rifle"))
-		{
-			PlayBodyAnim(TEXT("rifle_aim"), true);
-		}
-		else if (Speed > 280.f)
-		{
-			PlayBodyAnim(Pick(TEXT("ranged_run"), TEXT("run")), true, FMath::Clamp(Speed / RunClipSpeed, 0.7f, 1.8f));
-		}
-		else if (Speed > 25.f)
-		{
-			PlayBodyAnim(Pick(TEXT("ranged_walk"), TEXT("walk")), true, FMath::Clamp(Speed / WalkClipSpeed, 0.6f, 1.8f));
-		}
-		else
-		{
-			PlayBodyAnim(Pick(TEXT("ranged_idle"), TEXT("idle")), true);
-		}
-	}
-	else if (HasTag(WRTags::State_Blocking))
-	{
-		PlayBodyAnim(TEXT("block"), true);
-	}
-	else if (Speed > 280.f)
-	{
-		PlayBodyAnim(TEXT("run"), true, FMath::Clamp(Speed / RunClipSpeed, 0.7f, 1.8f));
-	}
-	else if (Speed > 25.f)
-	{
-		PlayBodyAnim(TEXT("walk"), true, FMath::Clamp(Speed / WalkClipSpeed, 0.6f, 1.8f));
-	}
-	else
-	{
-		PlayBodyAnim(TEXT("idle"), true);
 	}
 }
 

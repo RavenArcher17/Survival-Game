@@ -1,5 +1,5 @@
 {
-  "_comment": "Player body art (Mixamo-rigged AI survivor, Tools/art/README.md). Each anim key lists one or more AnimSequences; one-shots pick variants in turn. speeds = each locomotion clip's natural pace in cm/s, used to scale its play rate to the real speed so feet don't slide.",
+  "_comment": "Player body art (Mixamo-rigged AI survivor, Tools/art/README.md). Each anim key lists one or more AnimSequences; one-shots pick variants in turn. speeds (optional) = a locomotion clip's natural pace in cm/s by anim key, overriding the pace measured from its feet; the play rate is the real speed over it, so feet don't slide. The old 150 / 420 guesses were ~20% over the measured 125 / 350, so feet skated forward.",
   "mesh": "/Game/Characters/Survivor/survivor_m.survivor_m",
   "meshYaw": -90,
   "meshScale": 1.0,
@@ -7,7 +7,7 @@
   "weaponMesh": "/Game/Props/Sword/sword_game/StaticMeshes/sword_game.sword_game",
   "shieldMesh": "/Game/Props/Shield/shield_game/StaticMeshes/shield_game.shield_game",
   "shieldSocket": "LeftForeArm",
-  "speeds": { "walk": 150, "run": 420 },
+  "speeds": {},
   "anims": {
     "idle": ["SwordAndShieldIdle"],
     "walk": ["SwordAndShieldWalk"],
@@ -36,8 +36,20 @@
     "rifle_aim": ["RifleAim"],
     "rifle_fire": ["RifleFire"],
     "rifle_reload": ["RifleReload"],
-    "throw": ["Throw"]
+    "throw": ["Throw"],
+    "walk_back": ["SwordAndShieldWalk2"], "walk_left": ["SwordAndShieldStrafe2"], "walk_right": ["SwordAndShieldStrafe"],
+    "run_back": ["SwordAndShieldRun2"], "run_left": ["SwordAndShieldStrafe3"], "run_right": ["SwordAndShieldStrafe4"],
+    "turn_left": ["SwordAndShieldTurn2"], "turn_right": ["SwordAndShieldTurn"],
+    "ranged_walk_back": ["BowWalkBack"], "ranged_walk_left": ["BowWalkLeft"], "ranged_walk_right": ["BowWalkRight"],
+    "ranged_run_back": ["BowRunBack"], "ranged_run_left": ["BowRunLeft"], "ranged_run_right": ["BowRunRight"],
+    "bow_aimwalk_back": ["BowAimWalkBack"], "bow_aimwalk_left": ["BowAimWalkLeft"], "bow_aimwalk_right": ["BowAimWalkRight"],
+    "ranged_turn_left": ["BowTurnLeft"], "ranged_turn_right": ["BowTurnRight"]
   },
+  "_layers": "Animation layers (UWRAnimInstance): a locomotion set is an idle plus walk / run clips with _back / _left / _right variants, blended by the direction of travel against the facing; paces come from 'speeds' where given, otherwise they're measured from the clips' feet. One-shots play from upperBody up (the legs keep walking) unless listed in fullBody. spineBones share the twist that keeps the chest facing the camera while the legs stand; turn_left / turn_right step the legs round.",
+  "upperBody": "Spine",
+  "spineBones": ["Spine", "Spine1", "Spine2"],
+  "legBones": ["LeftUpLeg", "LeftLeg", "LeftFoot", "RightUpLeg", "RightLeg", "RightFoot"],
+  "fullBody": ["dodge", "death", "fall", "swim", "tread", "gather", "chop", "pickup"],
   "animPrefix": "/Game/Characters/Survivor/survivor_mArmature_",
   "_bodies": "Body variants picked in the main menu (?Body= on the join URL). Each overrides any top-level field it lists.",
   "bodies": {

@@ -1,5 +1,7 @@
 #include "WRCreature.h"
+#include "WRAnimInstance.h"
 #include "WRBoss.h"
+#include "Camera/PlayerCameraManager.h"
 #include "WRLifeSkills.h"
 #include "WRSocial.h"
 #include "GameFramework/GameStateBase.h"
@@ -166,6 +168,16 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("meshYaw"), Num)) D.MeshYaw = Num;
 		if (O->TryGetNumberField(TEXT("meshScale"), Num)) D.MeshScale = Num;
 		if (O->TryGetNumberField(TEXT("glow"), Num)) D.Glow = Num;
+		// Optional animation overrides (normally measured from the clips): paces in cm/s at play rate 1, where the
+		// attack clip's strike lands (0..1), the bone the attack layer starts from.
+		const TSharedPtr<FJsonObject>* PaceObj = nullptr;
+		if (O->TryGetObjectField(TEXT("pace"), PaceObj))
+		{
+			if ((*PaceObj)->TryGetNumberField(TEXT("walk"), Num)) D.WalkPace = Num;
+			if ((*PaceObj)->TryGetNumberField(TEXT("run"), Num)) D.RunPace = Num;
+		}
+		if (O->TryGetNumberField(TEXT("strikeAt"), Num)) D.StrikeAt = Num;
+		if (O->TryGetStringField(TEXT("animUpper"), Str)) D.AnimUpper = FName(*Str);
 		const TSharedPtr<FJsonObject>* AnimObj = nullptr;
 		if (O->TryGetObjectField(TEXT("anims"), AnimObj))
 		{
@@ -358,76 +370,215 @@ void AWRCreature::ApplyDef()
 		{
 			if (UAnimSequenceBase* Anim = LoadObject<UAnimSequenceBase>(nullptr, *A.Value)) AnimAssets.Add(A.Key, Anim);
 		}
-		CurrentAnim = NAME_None;
-		PlayCreatureAnim(TEXT("idle"), true);
+		// The layered animation instance (no animation blueprint), set up after the scale so it paces in cm.
+		Skel->SetAnimInstanceClass(UWRAnimInstance::StaticClass());
+		SetupCreatureAnim(*Def);
 	}
 }
 
-void AWRCreature::PlayCreatureAnim(FName Key, bool bLoop, float Duration)
+namespace WRCreatureAnimDetail
 {
-	TObjectPtr<UAnimSequenceBase>* Anim = AnimAssets.Find(Key);
-	if (!Anim || !*Anim || (Key == CurrentAnim && bLoop))
+	UAnimSequenceBase* Clip(const TMap<FName, TObjectPtr<UAnimSequenceBase>>& Assets, FName Key)
+	{
+		const TObjectPtr<UAnimSequenceBase>* Found = Assets.Find(Key);
+		return Found ? Found->Get() : nullptr;
+	}
+
+	/** Within this many cm of a local player's view (its footsteps are worth hearing). */
+	bool NearLocalView(const AActor* Actor, float Range)
+	{
+		for (FConstPlayerControllerIterator It = Actor->GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			if (PC && PC->IsLocalController() && PC->PlayerCameraManager
+				&& FVector::DistSquared(PC->PlayerCameraManager->GetCameraLocation(), Actor->GetActorLocation()) < FMath::Square(Range))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+UWRAnimInstance* AWRCreature::CreatureAnim() const
+{
+	return Cast<UWRAnimInstance>(Skel->GetAnimInstance());
+}
+
+void AWRCreature::SetupCreatureAnim(const FWRCreatureDef& Def)
+{
+	UWRAnimInstance* Anim = CreatureAnim();
+	if (!Anim)
 	{
 		return;
 	}
-	CurrentAnim = Key;
-	Skel->PlayAnimation(*Anim, bLoop);
-	const float Length = (*Anim)->GetPlayLength();
-	const float Rate = !bLoop && Duration > 0.f ? FMath::Clamp(Length / Duration, 0.6f, 1.8f) : 1.f;
-	Skel->SetPlayRate(Rate);
-	if (!bLoop)
+	using WRCreatureAnimDetail::Clip;
+	Anim->ResetSetup();
+	// Walk and run paced to the ground (measured from their feet unless creatures.json gives a pace), over the idle.
+	TArray<FWRLocoClipDesc> Ground;
+	UAnimSequenceBase* Walk = Clip(AnimAssets, TEXT("walk"));
+	UAnimSequenceBase* Run = Clip(AnimAssets, TEXT("run"));
+	if (Walk) Ground.Add({ Walk, 0.f, 0, Def.WalkPace });
+	if (Run && Run != Walk) Ground.Add({ Run, 0.f, 1, Def.RunPace });
+	Anim->AddLocoSet(TEXT("ground"), Clip(AnimAssets, TEXT("idle")), Ground);
+	// Flyers in the air: a wing beat at its own rate (no feet to pace it by), hovering when slow.
+	if (UAnimSequenceBase* Fly = Clip(AnimAssets, TEXT("fly")))
 	{
-		OneShotUntil = GetWorld()->GetTimeSeconds() + Length / Rate;
+		UAnimSequenceBase* Hover = Clip(AnimAssets, TEXT("hover"));
+		Anim->AddLocoSet(TEXT("fly"), Hover ? Hover : Clip(AnimAssets, TEXT("idle")), { { Fly, 0.f, 0, -1.f } });
 	}
+	Anim->SetMeshForward(FRotator(0.f, -Def.MeshYaw, 0.f).RotateVector(FVector::ForwardVector));
+	// Attacks and flinches play from the neck up (a humanoid's spine), so one biting on the run keeps running.
+	FName Upper = Def.AnimUpper;
+	if (Upper.IsNone() && Skel->GetSkeletalMeshAsset())
+	{
+		const FReferenceSkeleton& Ref = Skel->GetSkeletalMeshAsset()->GetRefSkeleton();
+		if (Ref.FindBoneIndex(TEXT("Spine")) != INDEX_NONE && Ref.FindBoneIndex(TEXT("LeftUpLeg")) != INDEX_NONE)
+		{
+			Upper = TEXT("Spine");  // a Mixamo humanoid
+		}
+		for (int32 Bone = 0; Bone < Ref.GetNum() && Upper.IsNone(); ++Bone)
+		{
+			if (Ref.GetBoneName(Bone).ToString().ToLower().Contains(TEXT("neck")))
+			{
+				Upper = Ref.GetBoneName(Bone);
+			}
+		}
+	}
+	Anim->SetUpperBody(Upper, {});
+	OneShotUntil = 0.0;
+	LastYaw = GetActorRotation().Yaw;
+	UE_LOG(LogWildreach, Verbose, TEXT("Creature anim %s: walk %.0f run %.0f cm/s (moves at %.0f), attacks from %s"), *Def.Id.ToString(),
+		Anim->LocoSpeed(TEXT("ground"), 0, 0.f), Anim->LocoSpeed(TEXT("ground"), 1, 0.f), Def.Speed, *Upper.ToString());
 }
 
 void AWRCreature::PlayCreatureOneShot(FName Key)
 {
-	if (Skel->IsVisible() && IsAlive() && AnimAssets.Contains(Key))
+	UWRAnimInstance* Anim = CreatureAnim();
+	UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, Key);
+	if (Anim && Clip && Skel->IsVisible() && IsAlive())
 	{
-		CurrentAnim = NAME_None;
-		PlayCreatureAnim(Key, false);
+		OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, 1.f);
 	}
 }
 
-void AWRCreature::TickCreatureAnim()
+void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 {
-	if (!Skel->IsVisible() || AnimAssets.Num() == 0 || !IsAlive() || GetWorld()->GetTimeSeconds() < OneShotUntil)
+	UWRAnimInstance* Anim = CreatureAnim();
+	if (!Anim || !Skel->IsVisible())
 	{
 		return;
 	}
-	// Locomotion by speed (replicated movement on clients); flyers in the air use fly / hover when they have them.
-	const float Speed = GetVelocity().Size2D();
-	const float Walk = GetCharacterMovement()->MaxWalkSpeed;
-	if (GetCharacterMovement()->IsFlying() && AnimAssets.Contains(TEXT("fly")))
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	const float Yaw = GetActorRotation().Yaw;
+	const float YawRate = DeltaSeconds > 0.f ? FMath::Abs(FMath::FindDeltaAngleDegrees(LastYaw, Yaw)) / DeltaSeconds : 0.f;
+	LastYaw = Yaw;
+	const bool bAlive = IsAlive();
+	FWRAnimInput& In = Anim->Input;
+	In.Speed = bAlive ? GetVelocity().Size2D() : 0.f;
+	In.Angle = 0.f;  // forward clips only: it faces where it goes
+	In.ActorYaw = Yaw;
+	In.bTurnInPlace = false;
+	In.bGrounded = Move->IsMovingOnGround();
+	In.Set = Move->IsFlying() && AnimAssets.Contains(TEXT("fly")) ? FName(TEXT("fly")) : FName(TEXT("ground"));
+	// Turning on the spot, the feet step round (its turn rate x its radius) instead of spinning on still feet.
+	const float Step = bAlive && In.Speed < 60.f ? FMath::DegreesToRadians(FMath::Min(YawRate, 360.f)) * GetSimpleCollisionRadius() * WRTune(TEXT("anim.creatureTurnStep"), 1.f) : 0.f;
+	In.TurnStepSpeed = FMath::FInterpTo(In.TurnStepSpeed, Step, DeltaSeconds, 8.f);  // replicated turns arrive in steps
+	In.IdleRate = bAsleep ? WRTune(TEXT("anim.sleepIdleRate"), 0.45f) : 1.f;  // slow breathing asleep
+	// Within earshot the pose updates even unseen (its footsteps come from the foot phase); further off only when seen.
+	EarshotClock -= DeltaSeconds;
+	if (EarshotClock <= 0.f)
 	{
-		PlayCreatureAnim(Speed < 60.f && AnimAssets.Contains(TEXT("hover")) ? FName(TEXT("hover")) : FName(TEXT("fly")), true);
-		return;
+		EarshotClock = 0.5f;
+		Skel->VisibilityBasedAnimTickOption = WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.footstepRange"), 3000.f))
+			? EVisibilityBasedAnimTickOption::AlwaysTickPose : EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 	}
-	PlayCreatureAnim(Speed > Walk * 0.65f ? FName(TEXT("run")) : Speed > 25.f ? FName(TEXT("walk")) : FName(TEXT("idle")), true);
 }
 
 void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
 {
-	if (Skel->IsVisible())
+	UWRAnimInstance* Anim = CreatureAnim();
+	if (!Skel->IsVisible() || !Anim)
 	{
-		// Creatures with several attack clips (attack, attack2, attack3) take them in turn, each fitted to the swing.
-		static const FName Keys[] = { TEXT("attack"), TEXT("attack2"), TEXT("attack3") };
-		int32 Count = 0;
-		while (Count < 3 && AnimAssets.Contains(Keys[Count])) ++Count;
-		CurrentAnim = NAME_None;
-		PlayCreatureAnim(Keys[Count > 0 ? AttackVariant++ % Count : 0], false, Duration);
+		return;
+	}
+	// Creatures with several attack clips (attack, attack2, attack3) take them in turn.
+	static const FName Keys[] = { TEXT("attack"), TEXT("attack2"), TEXT("attack3") };
+	int32 Count = 0;
+	while (Count < 3 && AnimAssets.Contains(Keys[Count])) ++Count;
+	UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, Keys[Count > 0 ? AttackVariant++ % Count : 0]);
+	if (!Clip)
+	{
+		return;
+	}
+	// When the damage lands, in seconds from the swing's start (the server's timing for each move).
+	const TCHAR* Move = TEXT("heavy");
+	float Hit = Duration - 0.2f;  // a boss's attack resolves 0.2 s before its swing ends
+	switch (Kind)
+	{
+	case EWRSwingKind::Bite:   Move = TEXT("bite");   Hit = Duration - WRTune(TEXT("creature.biteTiming.active"), 0.15f); break;  // sweeps after its windup
+	case EWRSwingKind::Snap:   Move = TEXT("snap");   Hit = WRTune(TEXT("anim.creatureAttack.snap.hit"), 0.12f); break;     // at running prey: at once
+	case EWRSwingKind::Lunge:  Move = TEXT("lunge");  Hit = Duration + WRTune(TEXT("anim.creatureAttack.lunge.hit"), 0.25f); break;   // mid-leap
+	case EWRSwingKind::Charge: Move = TEXT("charge"); Hit = Duration + WRTune(TEXT("anim.creatureAttack.charge.hit"), 0.5f); break;  // into the run
+	case EWRSwingKind::Stomp:  Move = TEXT("stomp");  Hit = Duration; break;
+	case EWRSwingKind::Spit:   Move = TEXT("spit");   Hit = Duration; break;
+	default: break;
+	}
+	Hit = FMath::Max(Hit, 0.05f);
+	const FWRCreatureDef* Def = GetDef();
+	const float Strike = Clip->GetPlayLength() * (Def && Def->StrikeAt > 0.f ? Def->StrikeAt : Anim->StrikeFraction(Clip));
+	// Each move can have its own pace (a slow heavy stomp, a quick spit); otherwise the clip is fitted so its strike
+	// lands with the damage. Too slow to get there in time, it starts partway in; too quick, it holds its first frame.
+	float Rate = FWRTuning::Get().Num(FString::Printf(TEXT("anim.creatureAttack.%s.rate"), Move), 0.f);
+	Rate = FMath::Clamp(Rate > 0.f ? Rate : Strike / Hit, WRTune(TEXT("anim.creatureAttackMinRate"), 0.4f), WRTune(TEXT("anim.creatureAttackMaxRate"), 2.5f));
+	const float Start = FMath::Max(0.f, Strike - Rate * Hit);
+	const float Delay = FMath::Max(0.f, Hit - (Strike - Start) / Rate);
+	OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, Rate, Start, Delay);
+}
+
+void AWRCreature::OnHitVisual(EWRHitResult Result)
+{
+	// A flinch, unless it's mid-attack (or dying: the death takes over).
+	UWRAnimInstance* Anim = CreatureAnim();
+	UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, TEXT("hit"));
+	if (Anim && Clip && Skel->IsVisible() && Result == EWRHitResult::Hit && IsAlive() && GetWorld()->GetTimeSeconds() >= OneShotUntil)
+	{
+		OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, 1.f);
 	}
 }
 
 void AWRCreature::OnDeathVisual()
 {
-	if (Skel->IsVisible())
+	UWRAnimInstance* Anim = CreatureAnim();
+	if (Skel->IsVisible() && Anim)
 	{
-		CurrentAnim = NAME_None;
-		PlayCreatureAnim(TEXT("death"), false);
+		Anim->PlayOneShot(WRCreatureAnimDetail::Clip(AnimAssets, TEXT("death")), EWRAnimLayer::Full, 1.f, 0.f, 0.f, true);
 		OneShotUntil = 1.0e12;  // stay down
 	}
+}
+
+void AWRCreature::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	const FWRCreatureDef* Def = GetDef();
+	if (HasAuthority() && !Rider.IsValid() && Def && Def->Archetype != TEXT("boss") && !GetCharacterMovement()->IsFlying()
+		&& WRTune(TEXT("anim.creatureArcTurns"), 1.f) > 0.f && !WorldDirection.IsNearlyZero())
+	{
+		// The way it walks may lead its facing by only so much, so a change of direction becomes a curve (its facing
+		// turns at RotationRate) rather than a slide sideways while the body spins.
+		const FVector Facing = GetActorForwardVector().GetSafeNormal2D();
+		const FVector Want = WorldDirection.GetSafeNormal2D();
+		const float Turn = FMath::RadiansToDegrees(FMath::Atan2(FVector::CrossProduct(Facing, Want).Z, FVector::DotProduct(Facing, Want)));
+		const float Lead = WRTune(TEXT("anim.creatureLeadDegrees"), 60.f);
+		if (!Facing.IsNearlyZero() && FMath::Abs(Turn) > Lead)
+		{
+			WorldDirection = Facing.RotateAngleAxis(FMath::Sign(Turn) * Lead, FVector::UpVector) * WorldDirection.Size();
+			if (FMath::Abs(Turn) > WRTune(TEXT("anim.creatureSpinAngle"), 110.f) && GetVelocity().Size2D() < Def->Speed * 0.3f)
+			{
+				ScaleValue *= WRTune(TEXT("anim.creatureSpinCreep"), 0.15f);  // nearly stopped, facing well away: turn on the spot first
+			}
+		}
+	}
+	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
 void AWRCreature::OnRep_CreatureId()
@@ -443,6 +594,7 @@ void AWRCreature::OnRep_Tamed()
 
 void AWRCreature::BeginPlay()
 {
+	Skel->PrimaryComponentTick.AddPrerequisite(this, PrimaryActorTick);  // animate from this frame's movement
 	ApplyDef();
 	Super::BeginPlay();
 	Home = GetActorLocation();
@@ -1021,7 +1173,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (GetNetMode() != NM_DedicatedServer)
 	{
-		TickCreatureAnim();
+		TickCreatureAnim(DeltaSeconds);
 	}
 	if (!HasAuthority() || !IsAlive())
 	{
@@ -1029,6 +1181,17 @@ void AWRCreature::Tick(float DeltaSeconds)
 	}
 	const FWRCreatureDef* Def = GetDef();
 	const float Now = GetWorld()->GetTimeSeconds();
+	// Turning: slower on the spot (no whipping round), quicker on the move so its facing keeps up with its curve.
+	// Ridden creatures keep the rider's quick turns; bosses keep their own rate.
+	if (Def && !Rider.IsValid() && Def->Archetype != TEXT("boss"))
+	{
+		const float Moving = FMath::Clamp(GetVelocity().Size2D() / FMath::Max(1.f, Def->Speed * 0.5f), 0.f, 1.f);
+		GetCharacterMovement()->RotationRate.Yaw = FMath::Lerp(WRTune(TEXT("anim.creatureSpinRate"), 160.f), WRTune(TEXT("anim.creatureTurnRate"), 260.f), Moving);
+	}
+	else if (Def && Rider.IsValid())
+	{
+		GetCharacterMovement()->RotationRate.Yaw = 400.f;
+	}
 
 	// Torpor wears off; an unconscious creature wakes when it reaches zero.
 	if (Torpor > 0.f)
@@ -1330,7 +1493,7 @@ void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
 		{
 			NextSnapAt = Now + FWRTuning::Get().Num(TEXT("creatureAI.bite.cooldown"), 1.2f);
 			Self->SetActorRotation(To.GetSafeNormal2D().Rotation());
-			Self->PlaySwing(EWRSwingKind::Bite, 0.4f);
+			Self->PlaySwing(EWRSwingKind::Snap, 0.4f);
 			CreatureHit(Self, Target, TEXT("bite"));
 		}
 		Self->AddMovementInput(To.GetSafeNormal2D(), 1.f);
@@ -1431,7 +1594,10 @@ bool AWRCreatureAI::TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target,
 		bSpecialHit = false;
 		SpecialDir = (Target->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D();
 		SpecialReadyAt.Add(Kind, Now + Windup + AttackNum(Kind, TEXT("cooldown"), 6.f));
-		Self->PlaySwing(EWRSwingKind::Bite, Windup);  // its attack clip, fitted to the telegraph
+		// Its attack clip, timed so the strike lands with the move (and paced to read differently for each).
+		const EWRSwingKind Swing = Kind == TEXT("lunge") ? EWRSwingKind::Lunge : Kind == TEXT("charge") ? EWRSwingKind::Charge
+			: Kind == TEXT("stomp") ? EWRSwingKind::Stomp : Kind == TEXT("spit") ? EWRSwingKind::Spit : EWRSwingKind::Bite;
+		Self->PlaySwing(Swing, Windup);
 		// Telegraphs: where the charge will run, the ring a stomp hits.
 		const FVector Floor = Self->GetActorLocation() - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight() - 3.f);
 		if (Kind == TEXT("charge"))

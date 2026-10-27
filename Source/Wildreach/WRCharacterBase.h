@@ -21,7 +21,10 @@ DECLARE_MULTICAST_DELEGATE_ThreeParams(FWROnHitShown, const AActor* /*Target*/, 
 UENUM()
 enum class EWRSwingKind : uint8
 {
-	None, Light, Heavy, WeaponArt, Cast, Bite
+	None, Light, Heavy, WeaponArt, Cast, Bite,
+	// Creature moves, so the attack clip can be timed to each (the strike lands when the damage does): a snap at
+	// running prey, and the special attacks (creatureAI.<kind> in tuning.json).
+	Snap, Lunge, Charge, Stomp, Spit
 };
 
 /**
