@@ -16,7 +16,7 @@ class UObject;
  *   world    gather.wood, gather.stone, gather.fiber, build.place, build.demolish, build.invalid, door.open, door.close,
  *            craft.done, hearth.feed
  *   moments  levelup, recipe.unlock, discover, boss.intro, tame.success, respawn
- *   creature creature.<id>.idle | aggro | attack | hurt | death (falls back to creature.<size>.<kind>), stomp (a slam on the ground)
+ *   creature creature.<id>.idle | aggro | attack | hurt | death (falls back to creature.<size>.<kind>)
  *   ui       ui.hover, ui.click, ui.open, ui.close, ui.error, ui.drag, ui.drop
  */
 namespace WRSound

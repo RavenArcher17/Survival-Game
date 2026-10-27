@@ -74,10 +74,9 @@ void AWRHUD::DrawHUD()
 	const AWRCharacter* Survivor = Cast<AWRCharacter>(GetOwningPawn());
 	if (const AWRPlayerController* NewUIPC = Cast<AWRPlayerController>(PlayerOwner); NewUIPC && NewUIPC->GetUI())
 	{
-		// (The new UI draws the damage numbers itself, styled: WRFx::MakeHudOverlay.)
+		// The stone-and-leather UI (Slate) draws the HUD, menus and damage numbers (WRFx::MakeHudOverlay); this canvas
+		// keeps the nameplates over creatures and players and the old text panel for a menu that has no new screen yet.
 		Floating.Reset();
-		// The stone-and-leather UI (Slate) draws the HUD and menus; this canvas keeps the nameplates over creatures
-		// and players, the damage numbers, and the old text panel for a menu that has no new screen yet.
 		if (const AWRCharacterBase* Self = Cast<AWRCharacterBase>(GetOwningPawn()))
 		{
 			DrawWorldBars(Self);

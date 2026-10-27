@@ -1112,8 +1112,9 @@ namespace WRFxDetail
 			UE_LOG(LogWildreach, Log, TEXT("FX stress: %d sprites, %d emitters"), Fx->NumParticles(), Fx->NumEmitters());
 		}));
 
-	// WR.Fx <effect> [scale] [metres ahead] [seconds]: an effect in front of the camera, on the ground.
-	static FAutoConsoleCommandWithWorldAndArgs SpawnCmd(TEXT("WR.Fx"), TEXT("WR.Fx <effect> [scale] [metres ahead] [seconds]: show an effect in front of you"),
+	// WR.Fx <effect> [scale] [metres ahead] [seconds] [yaw]: an effect in front of the camera, on the ground, facing back at you
+	// (yaw 180, as impacts do) or another way (yaw 0: away, as an ice lance runs).
+	static FAutoConsoleCommandWithWorldAndArgs SpawnCmd(TEXT("WR.Fx"), TEXT("WR.Fx <effect> [scale] [metres ahead] [seconds] [yaw]: show an effect in front of you"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
 			UWRFxSubsystem* Fx = World ? World->GetSubsystem<UWRFxSubsystem>() : nullptr;
@@ -1122,12 +1123,13 @@ namespace WRFxDetail
 			const float Scale = Args.Num() > 1 ? FCString::Atof(*Args[1]) : 1.f;
 			const float Ahead = (Args.Num() > 2 ? FCString::Atof(*Args[2]) : 4.f) * 100.f;
 			const float Seconds = Args.Num() > 3 ? FCString::Atof(*Args[3]) : 0.f;
+			const float Yaw = Args.Num() > 4 ? FCString::Atof(*Args[4]) : 180.f;
 			const FRotator View = PC->PlayerCameraManager->GetCameraRotation();
 			const FVector Flat = FRotator(0.f, View.Yaw, 0.f).Vector();
 			FVector At = (PC->GetPawn() ? PC->GetPawn()->GetActorLocation() : PC->PlayerCameraManager->GetCameraLocation()) + Flat * Ahead;
 			FHitResult Hit;
 			FCollisionQueryParams Query(SCENE_QUERY_STAT(WRFxCmd), false, PC->GetPawn());
 			if (World->LineTraceSingleByChannel(Hit, At + FVector(0, 0, 500), At - FVector(0, 0, 3000), ECC_WorldStatic, Query)) At = Hit.ImpactPoint;
-			Fx->Start(FName(*Args[0]), FTransform(FRotator(0.f, View.Yaw + 180.f, 0.f), At), Scale, Seconds);
+			Fx->Start(FName(*Args[0]), FTransform(FRotator(0.f, View.Yaw + Yaw, 0.f), At), Scale, Seconds);
 		}));
 }

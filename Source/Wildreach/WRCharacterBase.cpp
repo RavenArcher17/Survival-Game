@@ -8,7 +8,6 @@
 #include "WRTuning.h"
 #include "WRInventory.h"
 #include "WRFx.h"
-#include "WRSound.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -255,11 +254,6 @@ void AWRCharacterBase::StartSwingVisual(EWRSwingKind Kind, float Duration)
 	VisualSwingTime = 0.f;
 	VisualSwingDuration = FMath::Max(Duration, 0.05f);
 	OnSwingVisual(Kind, Duration);
-	// The blade's whoosh (creatures' bites have their own attack calls).
-	if (!IsCreature() && (Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy || Kind == EWRSwingKind::WeaponArt))
-	{
-		WRSound::PlayOn(this, Kind == EWRSwingKind::Light ? TEXT("swing.light") : TEXT("swing.heavy"));
-	}
 }
 
 void AWRCharacterBase::SetBodyColor(const FLinearColor& Color)

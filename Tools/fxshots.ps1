@@ -23,31 +23,34 @@ $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 $started = Get-Date
 
 # In a scene's commands, "SHOT <label>" takes a picture; "BURST <label> <n> <gap>" takes n pictures gap seconds apart.
-# Flat open ground by volcanic camp 3: a creature spawned in front and rooted, you beside it (melee: WRGoTo stands you
+# Flat open ground by volcanic camp 3: a creature (a passive one for melee, so it can't kill you mid-run) spawned in front and rooted, you beside it (melee: WRGoTo stands you
 # 2 m on its +Y side, so yaw 270 faces it) or 7 m off (spells).
-$arena = 'WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 0 0|wait 0.5|WRSpawn {0} 1|wait 0.4|WRHold 120|wait 1|WRGoTo {0}|wait 1|WRLook 270 -8|wait 1'
+$arena = 'WRHeal|WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 0 0|wait 0.5|WRSpawn {0} 1|wait 0.4|WRHold 120|wait 1|WRGoTo {0}|wait 1|WRLook 270 -8|wait 1'
 $far = 'WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 0 0|wait 0.5|WRSpawn {0} 1|wait 0.4|WRHold 120|wait 1|WRAimAt {0}|wait 1'
 $scenes = [ordered]@{}
 if ($Pass -eq 'combat') {
-	$scenes['heavy_day'] = 'WRHour 12|wait 2|' + ($arena -f 'emberhorn') + '|WR.FxPress heavy|wait 0.5|BURST heavy_day 6 0.05|wait 1.5|WR.FxPress heavy|wait 0.58|SHOT heavy_day_b|wait 1.5'
-	$scenes['heavy_side'] = 'WRCreatureHP emberhorn 1|wait 0.5|WRArtCam emberhorn 100|wait 1.5|WR.FxPress heavy|wait 0.55|BURST heavy_side 4 0.06|wait 1|WR.FxHit crit 61|wait 0.15|SHOT crit_side|wait 1.2|WR.FxHit weak 38|wait 0.15|SHOT weak_side|wait 1.2|WRArtCam off|wait 1'
-	$scenes['parry'] = 'WRCreatureHP emberhorn 1|wait 0.5|WR.FxHit parry|wait 0.03|BURST parry 4 0.05|wait 1|WRArtCam emberhorn 100|wait 1.2|WR.FxHit parry|wait 0.03|BURST parry_side 3 0.05|WRArtCam off|wait 1'
+	$scenes['heavy_day'] = 'WRHour 12|wait 2|' + ($arena -f 'ashstrider') + '|WR.FxPress heavy|wait 0.5|BURST heavy_day 6 0.05|wait 1.5|WR.FxPress heavy|wait 0.58|SHOT heavy_day_b|wait 1.5'
+	$scenes['heavy_side'] = 'WRCreatureHP ashstrider 1|wait 0.5|WRArtCam ashstrider 100|wait 1.5|WR.FxPress heavy|wait 0.55|BURST heavy_side 4 0.06|wait 1|WR.FxHit crit 61|wait 0.15|SHOT crit_side|wait 1.2|WR.FxHit weak 38|wait 0.15|SHOT weak_side|wait 1.2|WRArtCam off|wait 1'
+	$scenes['parry'] = 'WRCreatureHP ashstrider 1|wait 0.5|WR.FxHit parry|wait 0.03|BURST parry 4 0.05|wait 1|WRArtCam ashstrider 100|wait 1.2|WR.FxHit parry|wait 0.03|BURST parry_side 3 0.05|WRArtCam off|wait 1'
 	$scenes['block'] = 'WR.FxHit block|wait 0.03|SHOT block|wait 1'
 	$scenes['bolt_day'] = ($far -f 'ashstrider') + '|WRCast 1|wait 0.22|BURST bolt_day 6 0.07|wait 1.5|WRArtCam ashstrider 90|wait 1.5|WRCast 1|wait 0.25|BURST bolt_side 5 0.07|WRArtCam off|wait 1.5'
 	$scenes['firewall_day'] = 'WRTeleport -124800 -51600|wait 3|WRClearCreatures|WRLook 0 -15|wait 1|WRCast 3|wait 0.6|SHOT spell3_day|wait 1.5|SHOT spell3_day_b|wait 3|WRLook 40 -25|wait 0.5|SHOT spell3_day_c|wait 4'
 	$scenes['lavapool_day'] = 'WRLook 0 -20|wait 1|WRCast 4|wait 0.7|SHOT spell4_day|wait 1.5|SHOT spell4_day_b|wait 2|WRLook -40 -25|wait 0.5|SHOT spell4_day_c|wait 7'
-	$scenes['heavy_night'] = 'WRHour 23|wait 3|' + ($arena -f 'emberhorn') + '|WR.FxPress heavy|wait 0.55|BURST heavy_night 4 0.05|wait 1.5|WR.FxHit parry|wait 0.03|SHOT parry_night|wait 1'
+	$scenes['heavy_night'] = 'WRHour 23|wait 3|' + ($arena -f 'ashstrider') + '|WR.FxPress heavy|wait 0.55|BURST heavy_night 4 0.05|wait 1.5|WR.FxHit parry|wait 0.03|SHOT parry_night|wait 1'
 	$scenes['bolt_night'] = ($far -f 'ashstrider') + '|WRCast 1|wait 0.22|BURST bolt_night 5 0.07|wait 2'
 	$scenes['firewall_night'] = 'WRClearCreatures|WRLook 0 -15|wait 1|WRCast 3|wait 0.8|SHOT spell3_night|wait 2.5|WRLook 0 -20|WRCast 4|wait 1|SHOT spell4_night|wait 2'
+	# Close looks at effects the camera rarely catches mid-game (chips flying off a struck tree), spawned in front of you with
+	# WR.Fx: the same recipes gameplay plays (the run's 'FX started' line shows the gameplay ones arrived).
+	$scenes['looks'] = 'WRHour 12|wait 2|WRTeleport -124800 -51600|wait 4|WRClearCreatures|WRLook 0 -20|wait 1|WR.Fx gather.wood 1.3 2.5|wait 0.12|BURST look_wood 2 0.15|wait 1.5|WR.Fx gather.stone 1.3 2.5|wait 0.15|SHOT look_stone|wait 1.5|WR.Fx gather.fiber 1.3 2.5|wait 0.25|SHOT look_fiber|wait 1.5|WR.Fx build.break.wood 1.5 4|wait 0.2|SHOT look_break|wait 2|WR.Fx stomp 4 6|wait 0.2|SHOT look_stomp|wait 2|WR.Fx frostnova 5 7|wait 0.25|SHOT look_nova|wait 2|WR.Fx icelance 20 1.5 0 0|wait 0.2|SHOT look_lance|wait 2'
 	# Frame time with stat unit, then with a heavy load of effects around you (WR.FxStress), and the effects' own cost.
 	$scenes['perf'] = 'WRHour 12|wait 2|WRTeleport -124800 -51600|wait 4|WRClearCreatures|stat unit|wait 4|WR.FxStats|wait 2|SHOT perf_before|WR.FxStats|WR.FxStress|wait 2|SHOT perf_stress|WR.FxStats|WR.FxStress|wait 2|SHOT perf_stress_b|WR.FxStats|stat unit|wait 1'
 } elseif ($Pass -eq 'frost') {
 	$scenes['shard_day'] = 'WRHour 12|wait 2|' + ($far -f 'frostantler') + '|WRCast 1|wait 0.22|BURST shard_day 6 0.07|wait 1.5|WRArtCam frostantler 90|wait 1.5|WRCast 1|wait 0.25|BURST shard_side 5 0.07|WRArtCam off|wait 1.5'
 	$scenes['spell3_day'] = 'WRLook 0 -6|wait 1|WRCast 3|wait 0.15|BURST spell3_day 5 0.08|wait 2|WRArtCam frostantler 90|wait 1.5|WRCast 3|wait 0.15|BURST spell3_side 4 0.08|WRArtCam off|wait 2'
-	$scenes['spell4_day'] = ($arena -f 'emberhorn') + '|WRLook 0 -25|wait 1|WRCast 4|wait 0.3|BURST spell4_day 5 0.08|wait 2|WRArtCam me 120|wait 1.5|WRCast 4|wait 0.3|BURST spell4_side 4 0.08|WRArtCam off|wait 2'
+	$scenes['spell4_day'] = ($arena -f 'ashstrider') + '|WRLook 0 -25|wait 1|WRCast 4|wait 0.3|BURST spell4_day 5 0.08|wait 2|WRArtCam me 120|wait 1.5|WRCast 4|wait 0.3|BURST spell4_side 4 0.08|WRArtCam off|wait 2'
 	$scenes['status'] = 'WRStatus burn|wait 1.5|WRArtCam me 60|wait 1.5|SHOT burn_me|wait 0.5|WRStatus frozen|wait 1|SHOT frozen_me|WRArtCam off|wait 1'
 	$scenes['shard_night'] = 'WRHour 23|wait 3|' + ($far -f 'frostantler') + '|WRCast 1|wait 0.22|BURST shard_night 5 0.07|wait 2|WRLook 0 -6|WRCast 3|wait 0.15|BURST spell3_night 4 0.08|wait 2'
-	$scenes['spell4_night'] = ($arena -f 'emberhorn') + '|WRLook 0 -25|wait 1|WRCast 4|wait 0.3|BURST spell4_night 4 0.08|wait 2'
+	$scenes['spell4_night'] = ($arena -f 'ashstrider') + '|WRLook 0 -25|wait 1|WRCast 4|wait 0.3|BURST spell4_night 4 0.08|wait 2'
 } else {
 	# The survival test's hut site on the volcanic side (falling ash there), a lava field further east, a tundra camp.
 	$build = 'WRGive wood 300|WRGive stone 200|WRGive fiber 50|WRGive copper_ingot 10|WRGive core_vulkarn 1'
