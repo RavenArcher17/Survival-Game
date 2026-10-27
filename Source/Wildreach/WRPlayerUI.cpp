@@ -10,6 +10,7 @@
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRSound.h"
 #include "WRUIStyle.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/Engine.h"
@@ -149,6 +150,7 @@ void FWRPlayerUI::SyncScreen()
 	}
 	if (Want != ScreenName)
 	{
+		WRSound::PlayUI(P, Want.IsNone() ? FName(TEXT("ui.close")) : FName(TEXT("ui.open")));
 		CloseScreen();
 		if (!Want.IsNone()) ShowScreen(Want);
 	}

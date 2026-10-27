@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRSound.h"
 #include "WRLifeSkills.h"
 #include "WRSocial.h"
 #include "Wildreach.h"
@@ -282,6 +283,10 @@ void AWRBuildPiece::OnRep_Door()
 	Leaf->SetRelativeLocationAndRotation(bOpen ? FVector(-Size.X * 0.5f, Size.X * 0.5f, Size.Z * 0.5f) : FVector(0.f, 0.f, Size.Z * 0.5f),
 		FRotator(0.f, bOpen ? 90.f : 0.f, 0.f));
 	Leaf->SetCollisionEnabled(bOpen || bGhost ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	if (HasActorBegunPlay() && !bGhost && GetWorld() && GetWorld()->GetTimeSeconds() - CreationTime > 1.0)
+	{
+		WRSound::PlayAt(this, bOpen ? FName(TEXT("door.open")) : FName(TEXT("door.close")), Leaf->GetComponentLocation());
+	}
 }
 
 void AWRBuildPiece::SpawnChild()

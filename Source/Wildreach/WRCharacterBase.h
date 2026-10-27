@@ -84,6 +84,9 @@ public:
 	/** Play a swing locally and, on the server, replicate it to everyone else. */
 	void PlaySwing(EWRSwingKind Kind, float Duration);
 
+	/** Server: a sound event on this character for everyone nearby (WRSound::Broadcast: eating, equipping...). */
+	UFUNCTION(NetMulticast, Unreliable) void MulticastSound(FName Event);
+
 	/** Grant an ability on the server; returns its spec handle. */
 	FGameplayAbilitySpecHandle GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass, EWRAbilityInput Input = EWRAbilityInput::None, int32 Level = 1);
 

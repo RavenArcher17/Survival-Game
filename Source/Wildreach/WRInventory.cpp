@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRSound.h"
 #include "WRCreature.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
@@ -495,6 +496,7 @@ FString UWRInventoryComponent::Unequip(EWREquipSlot Slot)
 	}
 	*Item = FWRItemStack();
 	ApplyEquipment();
+	WRSound::Broadcast(GetPawnCharacter(), TEXT("equip"));
 	return TEXT("unequipped");
 }
 
@@ -519,6 +521,7 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		*Equipped = Stack;
 		Stack = Previous;
 		ApplyEquipment();
+		WRSound::Broadcast(GetPawnCharacter(), TEXT("equip"));
 		return FString::Printf(TEXT("Equipped %s %s"), FWRItemStack::QualityName(Equipped->Quality), *Def->Name);
 	}
 	if (Def->Category == TEXT("gem"))
@@ -644,6 +647,7 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	if (Drink > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), A->GetThirst() + Drink);
 
 	const FName Used = Def->Id;
+	WRSound::Broadcast(Character, Def->Category == TEXT("potion") ? FName(TEXT("potion")) : Def->Thirst > Def->Hunger ? FName(TEXT("drink")) : FName(TEXT("eat")));
 	RemoveItem(Used, 1);
 	UE_LOG(LogWildreach, Log, TEXT("ITEM %s used %s (%d left)"), *Character->GetName(), *Used.ToString(), CountOf(Used));
 	return FString::Printf(TEXT("Used %s"), *Def->Name);

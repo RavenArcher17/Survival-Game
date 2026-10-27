@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRPlayerController.h"
+#include "WRSound.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
 #include "WRBuilding.h"
@@ -690,6 +691,10 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		if ((Bag || Nest || Wild) && Cast<AWRCharacter>(GetPawn()))
 		{
 			Cast<AWRCharacter>(GetPawn())->MulticastBodyOneShot(TEXT("pickup"));
+		}
+		if (Bag || Nest)
+		{
+			WRSound::Broadcast(GetPawn(), TEXT("pickup"));
 		}
 		if (Bag)
 		{

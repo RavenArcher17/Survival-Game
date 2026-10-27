@@ -41,6 +41,8 @@ public:
 
 	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
+	/** The body picked in the menu (None = the default body); the sound pass picks the voice by it. */
+	FName GetBodyStyle() const { return BodyStyle; }
 
 	// Ranged weapons (WRRanged.cpp).
 	/** Server (from the inventory): the weapon in the ranged slot, None if empty. */

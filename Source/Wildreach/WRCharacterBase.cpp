@@ -7,6 +7,7 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRInventory.h"
+#include "WRSound.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -224,6 +225,7 @@ void AWRCharacterBase::MulticastDied_Implementation()
 	SetBodyColor(FLinearColor(0.15f, 0.15f, 0.15f));
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	OnDeathVisual();
+	WRSound::Voice(this, TEXT("death"));   // here, not by watching health: a boss is gone soon after
 }
 
 void AWRCharacterBase::PlaySwing(EWRSwingKind Kind, float Duration)
@@ -251,6 +253,15 @@ void AWRCharacterBase::StartSwingVisual(EWRSwingKind Kind, float Duration)
 	VisualSwingTime = 0.f;
 	VisualSwingDuration = FMath::Max(Duration, 0.05f);
 	OnSwingVisual(Kind, Duration);
+	// The swing's whoosh (survivors) or the attack call (creatures); casts sound at the spell itself.
+	if (IsCreature() && Kind != EWRSwingKind::Cast) WRSound::Voice(this, TEXT("attack"));
+	else if (Kind == EWRSwingKind::Light) WRSound::PlayOn(this, TEXT("swing.light"));
+	else if (Kind == EWRSwingKind::Heavy || Kind == EWRSwingKind::WeaponArt) WRSound::PlayOn(this, TEXT("swing.heavy"));
+}
+
+void AWRCharacterBase::MulticastSound_Implementation(FName Event)
+{
+	WRSound::PlayOn(this, Event);
 }
 
 void AWRCharacterBase::SetBodyColor(const FLinearColor& Color)

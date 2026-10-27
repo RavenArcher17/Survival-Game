@@ -296,6 +296,7 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRCreature, MealLeft);
 	DOREPLIFETIME(AWRCreature, WakeIn);
 	DOREPLIFETIME(AWRCreature, bAsleep);
+	DOREPLIFETIME(AWRCreature, AggroRep);
 	DOREPLIFETIME(AWRCreature, Rider);
 }
 
@@ -1022,6 +1023,10 @@ void AWRCreature::Tick(float DeltaSeconds)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		TickCreatureAnim();
+	}
+	if (HasAuthority() && AggroRep != AggroTarget.Get())
+	{
+		AggroRep = AggroTarget.Get();   // sound only (WRAudioDirector): the AI keeps using AggroTarget
 	}
 	if (!HasAuthority() || !IsAlive())
 	{

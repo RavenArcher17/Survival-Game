@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRSound.h"
 #include "Wildreach.h"
 #include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
@@ -249,6 +250,10 @@ void AWRCharacter::SetAiming(bool bOn)
 	}
 	bAiming = bOn;
 	ApplyAimRotation();
+	if (bOn && RangedAnimGroup() == TEXT("bow"))
+	{
+		WRSound::PlayOn(this, TEXT("bow.draw"));
+	}
 	if (!HasAuthority())
 	{
 		ServerSetAiming(bOn);
@@ -403,6 +408,8 @@ void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint,
 	MulticastRangedShot(Group == TEXT("throw") ? FName(TEXT("throw")) : FName(*(Group.ToString() + TEXT("_fire"))),
 		Group == TEXT("throw") ? NAME_None : FName(*(Group.ToString() + TEXT("_reload"))), Gun->Reload);
 	UE_LOG(LogWildreach, Log, TEXT("RANGED %s fires %s (%s)%s"), *GetName(), *Gun->Id.ToString(), bThrow ? TEXT("thrown") : *Ammo.ToString(), bAiming ? TEXT(" aimed") : TEXT(""));
+	WRSound::Broadcast(this, bThrow ? FName(TEXT("throw")) : Gun->RangedKind == TEXT("bow") ? FName(TEXT("bow.release"))
+		: Gun->RangedKind == TEXT("blowgun") ? FName(TEXT("blowgun.fire")) : FName(TEXT("crossbow.fire")));
 	if (bThrow)
 	{
 		const FName Thrown = Gun->Id;

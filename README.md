@@ -95,6 +95,10 @@ UI (screenshots and tests): `WRWheel 0 2` (hold a wheel open on a wedge; 2 = tam
 `WRMenu crafting|settings|hearth 0`, `WRSettings video|controls|listen|key G|cancel`, `WRMainMenu [settings]`,
 `WRUISelect ranged`, `WRUIMouse click|rclick|drag ...` (real Slate input), `WRCmd <server command>`. `-oldui` keeps the
 old text HUD.
+Sound (`Data/Audio/sounds.json`, WRSound.h): `wr.SoundLog 1` or `-wrsoundlog` (log every sound: event, file, volume,
+where; 2 also logs what the minimum gap held back), `WRSoundPlay <event> [2d] [times]`, `WRSoundFootstep` (logs the
+surface), `WRSoundStats [reset]` (plays per event + the mixer's state), `WRMusic menu|explore|combat|boss|auto`,
+`WRVolume music 0.5`, `WRSoundRecord start|stop <name>` (the mixed output to `Saved/BouncedWavFiles`), `WRSettings audio`.
 
 ## Test
 
@@ -122,6 +126,7 @@ Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
+Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)
 Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings; -MainMenu: the front end)
 Tools\menushots.ps1     # the same for the old text menus (-oldui)
 ```

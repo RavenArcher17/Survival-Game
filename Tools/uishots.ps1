@@ -54,6 +54,7 @@ $screens = [ordered]@{
 	'settings_conflict' = 'WRSettings key G|wait 0.5'
 	'settings_keys' = 'WRSettings cancel|WRSettings scroll 2000|wait 0.5'
 	'settings_video' = 'WRSettings video|wait 1'
+	'settings_audio' = 'WRSettings audio|wait 1'
 	# A chest on flat ground far from the tame (E would pick your tame over the chest), wild creatures cleared; the
 	# resources stored, some taken back; then the "how many?" picker.
 	'storage'      = 'WRMenu none 0|WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 270 -8|WRGive copper_ingot 12|WRPlace storage_chest -124800 -51800 6525 0|wait 2|WRInteract|wait 1|WRUICmd storeall|wait 1|WRUICmd take 1 20|WRUICmd take 0 30|wait 1.5'
