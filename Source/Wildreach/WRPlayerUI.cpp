@@ -124,6 +124,7 @@ void FWRPlayerUI::Tick(float DeltaTime)
 	{
 		NextAbilityKeyCheck = Now + 1.0;
 		for (const FWRCastable& C : GetCastables()) FWRKeyBindings::Get().EnsureAbility(C.NodeId, C.Name);
+		PlaceStarterSpell();
 	}
 }
 
@@ -604,6 +605,64 @@ void FWRPlayerUI::SetWheelPicked(int32 Wheel, int32 Pos)
 {
 	WheelPicked[FMath::Clamp(Wheel, 0, 1)] = FMath::Clamp(Pos, 0, 7);
 	SaveWheels();
+}
+
+void FWRPlayerUI::PlaceStarterSpell()
+{
+	// The main path's starter spell goes on wheel 1, on the picked wedge, so a tap of the wheel key (Q) casts it from
+	// the first minute. Placed once per spell on this machine: moved or taken off later, it stays where the player put it.
+	const AWRCharacter* Survivor = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr;
+	const UWRPathComponent* Paths = Survivor ? UWRPathComponent::FindFor(Survivor) : nullptr;
+	const FWRPathDef* Def = Paths ? FWRPathRegistry::Get().Find(Paths->GetMainPath()) : nullptr;
+	if (!Def || Def->Starter.IsNone())
+	{
+		return;
+	}
+	const FName Starter(*FString::Printf(TEXT("%s.%s"), *Def->Id.ToString(), *Def->Starter.ToString()));
+	const TArray<FWRCastable> All = GetCastables();
+	if (!FindCastable(Starter, All))
+	{
+		return;  // not granted to this client yet
+	}
+	int32 StarterPos = INDEX_NONE;
+	bool bOnWheel = false;
+	for (int32 W = 0; W < 2; ++W) for (int32 i = 0; i < 8; ++i)
+	{
+		if (Wheels[W][i] == Starter)
+		{
+			bOnWheel = true;
+			StarterPos = W == 0 ? i : StarterPos;
+		}
+	}
+	FString Done;
+	GConfig->GetString(UISection, TEXT("StarterWheeled"), Done, GGameUserSettingsIni);
+	TArray<FString> DoneList;
+	Done.ParseIntoArray(DoneList, TEXT(","));
+	if (!bOnWheel && !DoneList.Contains(Starter.ToString()))
+	{
+		// The picked wedge, unless the player put another ability there: then the first empty wedge.
+		const int32 Picked = WheelPicked[0];
+		const bool bPickedTaken = !Wheels[0][Picked].IsNone() && FindCastable(Wheels[0][Picked], All);
+		StarterPos = bPickedTaken ? INDEX_NONE : Picked;
+		for (int32 i = 0; i < 8 && StarterPos == INDEX_NONE; ++i)
+		{
+			if (Wheels[0][i].IsNone()) StarterPos = i;
+		}
+		if (StarterPos != INDEX_NONE)
+		{
+			SetWheelAbility(0, StarterPos, Starter);
+			DoneList.AddUnique(Starter.ToString());
+			GConfig->SetString(UISection, TEXT("StarterWheeled"), *FString::Join(DoneList, TEXT(",")), GGameUserSettingsIni);
+			GConfig->Flush(false, GGameUserSettingsIni);
+			UE_LOG(LogWildreach, Log, TEXT("UI starter %s on wheel 1 wedge %d (picked %d)"), *Starter.ToString(), StarterPos, WheelPicked[0]);
+		}
+	}
+	// A tap of Q never lands on nothing while the starter is on wheel 1 (the picked wedge may hold another path's spell).
+	if (StarterPos != INDEX_NONE && !FindCastable(GetWheelAbility(0, WheelPicked[0]), All))
+	{
+		SetWheelPicked(0, StarterPos);
+		UE_LOG(LogWildreach, Log, TEXT("UI wheel 1 picks the starter %s (wedge %d)"), *Starter.ToString(), StarterPos);
+	}
 }
 
 void FWRPlayerUI::CastAbility(FName NodeId)

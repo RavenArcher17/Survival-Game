@@ -3,7 +3,7 @@
 # steal and hatch a Kilnmite egg, give orders; a Rimeclaw left to wake up loses its progress; then restart the server
 # and check tames were saved (with their bonus). Taming times and the unconscious torpor drain are shortened with
 # -wrtune. -Shots runs a windowed client and takes screenshots of the taming panel and the Taming menu.
-param([switch]$Shots)
+param([switch]$Shots, [int]$Port = 7811)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-tame-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -37,12 +37,12 @@ $cmds = @(
 ) -join '|'
 
 function Start-Server($log) {
-	Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7811 -wrworld=tametest $tune -abslog=`"$log`"" -PassThru -WindowStyle Hidden
+	Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=tametest $tune -abslog=`"$log`"" -PassThru -WindowStyle Hidden
 }
 $s = Start-Server "$out\server.log"
 Start-Sleep -Seconds 20
 $view = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7811?Path=fire?WRName=Tamer -game $view -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=fire?WRName=Tamer -game $view -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 Start-Sleep -Seconds 130   # past the 60 s and 120 s world autosaves
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 

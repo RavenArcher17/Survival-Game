@@ -220,8 +220,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// What kind of hit it was, for the effects and damage numbers on every machine.
 	bool bCrit = false, bRiposte = false, bShatter = false;
 
-	// --- Block and parry (melee only, from the front) ---
+	// --- Block and parry (melee only, from the front; not while the blocker is swinging or casting out of the guard) ---
 	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking)
+		&& !TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking)
 		&& IsInFront(Target, Hit.Origin, WRTune(TEXT("defense.blockAngleDegrees"), 70.f)))
 	{
 		// Wyrm scale: a block can freeze the attacker.

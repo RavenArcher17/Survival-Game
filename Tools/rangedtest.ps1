@@ -1,7 +1,7 @@
 # Ranged weapons test on the arena: a bot fires the bow (stone then tranq arrows), crossbow, blowgun, a thrown spear
 # and a bola at a Cinderfang, with screenshots of each weapon in hand (art camera on the bot). Checks shots, hits,
 # torpor, the bola's root and the spear left to pick up. -Body f for the female body.
-param([int]$Seconds = 125, [string]$Body = '')
+param([int]$Seconds = 125, [string]$Body = '', [int]$Port = 7795)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $shotDir = Join-Path (Split-Path $project) 'Saved\Screenshots'
@@ -29,10 +29,10 @@ $cmds = @(
 	'WREquip bola', 'wait 1.5', 'WRAim 1', 'wait 1', $aim, 'WRFire', 'wait 1.5', 'WRTameStat', 'WRAim 0', # same target as the spear
 	'WRRanged 0', 'wait 1.5', $shot                                                                    # back to sword and shield
 ) -join '|'
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7795 -wrworld=rangedtest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=rangedtest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $bodyOpt = if ($Body) { "?Body=$Body" } else { '' }
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7795?Path=fire?WRName=Archer$bodyOpt -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=fire?WRName=Archer$bodyOpt -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru
 Start-Sleep -Seconds $Seconds
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 $results = @()

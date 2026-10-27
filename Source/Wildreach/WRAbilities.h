@@ -92,6 +92,7 @@ private:
 	TSet<TWeakObjectPtr<AActor>> HitThisSwing;
 	FTimerHandle SweepTimer;
 	double ActiveEnd = 0.0;
+	bool bFromGuard = false;  // this swing came out of a held block (server, for the log)
 };
 
 UCLASS() class WILDREACH_API UWRGA_LightAttack : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_LightAttack(); };

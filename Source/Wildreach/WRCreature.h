@@ -242,6 +242,20 @@ private:
 	UPROPERTY(Transient) TMap<FName, TObjectPtr<class UAnimSequenceBase>> AnimAssets;
 	double OneShotUntil = 0.0;
 	int32 AttackVariant = 0;  // attack, attack2, attack3 take turns
+	// Attack wind-up telegraph (look only, on every machine that draws): from a swing's start until its move lands the
+	// creature rears back, glows (M_WindupGlow over its own materials) and gives a warning call (creature.windup).
+	// Numbers in tuning.json telegraph.*; the wind-up lengths are the attacks' own (creature.biteTiming, creatureAI.<kind>).
+	void StartTelegraph(EWRSwingKind Kind, float Duration);
+	void TickTelegraph();
+	void EndTelegraph();
+	double TelegraphStart = -1.0;
+	double TelegraphStrike = -1.0;
+	FName TelegraphMove;
+	bool bTelegraphPosed = false;
+	FVector SkelBaseLocation = FVector::ZeroVector;   // the fitted mesh transform the rear-back offsets
+	FRotator SkelBaseRotation = FRotator::ZeroRotator;
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> TelegraphGlow;
+	UPROPERTY(Transient) TObjectPtr<class UMeshComponent> TelegraphMesh;
 	float LastYaw = 0.f;      // for its turn rate (feet step while it turns on the spot)
 	float EarshotClock = 0.f;
 	class UWRAnimInstance* CreatureAnim() const;
@@ -301,6 +315,7 @@ private:
 	bool bSpecialHit = false;
 	TWeakObjectPtr<AWRCharacterBase> SpecialTarget;
 	TMap<FName, double> SpecialReadyAt;
+	double BiteTrackUntil = 0.0;  // a bite's wind-up turns toward the target until then, then commits
 	double NextSnapAt = 0.0;      // its next bite at running prey
 	double NextChaseLogAt = 0.0;  // verbose log while hunting
 	float ThinkTimer = 0.f;

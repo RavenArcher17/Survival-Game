@@ -6,6 +6,7 @@
 #include "WRCombatLibrary.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
+#include "WRAbilities.h"
 #include "WRPathTypes.h"
 #include "WRResourceNode.h"
 
@@ -84,26 +85,54 @@ bool FWRBuyRulesTest::RunTest(const FString& Parameters)
 
 	FWRPathProgress P;
 	P.PathId = TEXT("fire");
-	TestEqual(TEXT("no points, can't buy"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("fire_bolt")), FString(TEXT("not enough points")));
+	TestEqual(TEXT("no points, can't buy"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("heat_capacity")), FString(TEXT("not enough points")));
+	TestTrue(TEXT("the starter needs no points"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("fire_bolt")).IsEmpty());
 
 	P.XP = FWRPathRules::XPForPoints(100);
 	TestTrue(TEXT("trunk node buyable"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("fire_bolt")).IsEmpty());
 	TestEqual(TEXT("branch before trunk"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("spreading_flames")), FString(TEXT("finish the trunk first")));
 	TestEqual(TEXT("unknown node"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("nope")), FString(TEXT("no such node")));
 
-	// Finish the trunk (fire_bolt 3, heat_capacity 3 ranks, ignite_chance 2 ranks, flame_slash 2).
+	// Finish the trunk (fire_bolt 3 but the starter is free, heat_capacity 3 ranks, ignite_chance 2 ranks, flame_slash 2).
 	P.SetRank(TEXT("fire_bolt"), 1);
 	P.SetRank(TEXT("heat_capacity"), 3);
 	P.SetRank(TEXT("ignite_chance"), 2);
 	P.SetRank(TEXT("flame_slash"), 1);
-	TestEqual(TEXT("trunk spent = 10"), FWRPathRules::Spent(*Fire, P), 10);
+	TestEqual(TEXT("trunk spent = 7 (the starter came free)"), FWRPathRules::Spent(*Fire, P), 7);
 	TestTrue(TEXT("trunk complete"), FWRPathRules::TrunkComplete(*Fire, P));
 	TestEqual(TEXT("maxed node"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("fire_bolt")), FString(TEXT("already maxed")));
 	TestTrue(TEXT("first branch node now buyable"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("spreading_flames")).IsEmpty());
 	TestFalse(TEXT("capstone gated"), FWRPathRules::CanBuy(*Fire, P, 0, TEXT("wildfire")).IsEmpty());
 
-	// 150 total cap: with 140 in the other path, a 3-point node on 10 spent here would make 153.
-	TestEqual(TEXT("total cap"), FWRPathRules::CanBuy(*Fire, P, 140, TEXT("spreading_flames")), FString(TEXT("total cap (150)")));
+	// 150 total cap: with 141 in the other path, a 3-point node on 7 spent here would make 151.
+	TestEqual(TEXT("total cap"), FWRPathRules::CanBuy(*Fire, P, 141, TEXT("spreading_flames")), FString(TEXT("total cap (150)")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRStarterSpellTest, "Wildreach.Paths.StarterSpell",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRStarterSpellTest::RunTest(const FString& Parameters)
+{
+	// Every path comes with its first spell at level 1, free, so it has something to earn path XP with.
+	const TPair<const TCHAR*, const TCHAR*> Expected[] = { { TEXT("fire"), TEXT("fire_bolt") }, { TEXT("frost"), TEXT("frost_shard") } };
+	for (const TPair<const TCHAR*, const TCHAR*>& E : Expected)
+	{
+		const FWRPathDef* Def = FWRPathRegistry::Get().Find(E.Key);
+		if (!TestNotNull(FString::Printf(TEXT("%s loaded"), E.Key), Def))
+		{
+			continue;
+		}
+		TestEqual(FString::Printf(TEXT("%s starter"), E.Key), Def->Starter, FName(E.Value));
+		TestNotNull(FString::Printf(TEXT("%s starter is a spell"), E.Key), UWRAbilityRegistry::ClassForNode(Def->Id, Def->Starter).Get());
+		FWRPathProgress P;
+		P.PathId = Def->Id;
+		TestTrue(FString::Printf(TEXT("%s starter given"), E.Key), FWRPathRules::GrantStarter(*Def, P));
+		TestFalse(FString::Printf(TEXT("%s starter given once"), E.Key), FWRPathRules::GrantStarter(*Def, P));
+		TestEqual(FString::Printf(TEXT("%s starter owned"), E.Key), P.GetRank(Def->Starter), 1);
+		TestEqual(FString::Printf(TEXT("%s starter costs nothing"), E.Key), FWRPathRules::Spent(*Def, P), 0);
+		TestEqual(FString::Printf(TEXT("%s still level 1"), E.Key), FWRPathRules::CharacterLevel(FWRPathRules::Spent(*Def, P)), 1);
+		TestEqual(FString::Printf(TEXT("%s starter maxed"), E.Key), FWRPathRules::CanBuy(*Def, P, 0, Def->Starter), FString(TEXT("already maxed")));
+	}
 	return true;
 }
 

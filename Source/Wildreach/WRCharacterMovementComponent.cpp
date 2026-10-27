@@ -23,7 +23,7 @@ float UWRCharacterMovementComponent::GetMaxSpeed() const
 		return Speed;
 	}
 	if (bAttackSlow) Speed *= 0.35f;
-	if (bBlockSlow) Speed *= 0.5f;
+	else if (bBlockSlow) Speed *= 0.5f;  // a swing out of a held block moves like any swing (the slows don't stack)
 	if (const AWRCharacter* Survivor = Cast<AWRCharacter>(CharacterOwner); Survivor && Survivor->IsAimingRanged())
 	{
 		Speed *= WRTune(TEXT("ranged.aimSpeedMultiplier"), 0.5f);

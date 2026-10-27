@@ -46,6 +46,9 @@ ev("hit.block", files("combat/hit_block_*"), 0.85, 30, pitch=(0.9, 1.05), gap=0.
 ev("hit.dust", files("world/gather_stone_*"), 0.7, 30, pitch=(0.75, 0.9), gap=0.03, voices=8)  # stone, dry or soft bodies (WRFx impacts)
 ev("stomp", files("world/build_demolish_*"), 1.0, 60, pitch=(0.55, 0.7), gap=0.25)  # a boss or a big creature slams the ground
 ev("parry", files("combat/parry_*"), 0.9, 35, pitch=(0.95, 1.08), gap=0.1)
+# A creature winding up an attack (its telegraph, WRCreature.cpp): the heavy swish slowed to a deep whoomph, the same for
+# every creature so the cue is learned once.
+ev("creature.windup", files("combat/swing_heavy_*"), 0.7, 30, pitch=(0.5, 0.58), gap=0.25, voices=4)
 ev("dodge", files("combat/dodge_*"), 0.5, 15, pitch=(0.9, 1.1), gap=0.3)
 ev("jump", files("combat/jump_*"), 0.35, 12, pitch=(0.95, 1.1), gap=0.3)
 ev("land", files("combat/land_*"), 0.5, 18, pitch=(0.85, 1.0), gap=0.3)

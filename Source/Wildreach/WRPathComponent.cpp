@@ -414,13 +414,34 @@ void UWRPathComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 			QuickSlots[i] = S.IsEmpty() ? NAME_None : FName(*S);
 		}
 	}
+	// A save from before starter spells gets them now (and is written back with them).
+	const bool bGranted = GrantStarters();
 	Changed();
-	bDirty = false;
+	bDirty = bGranted;
+}
+
+bool UWRPathComponent::GrantStarters()
+{
+	// Every path you take up comes with its starter spell (Data/paths "starter": Fire bolt, Frost shard), free, so it
+	// has something to earn path XP with from level 1. The quick slots then put it first.
+	bool bGranted = false;
+	for (const FName PathId : { MainPath, SubPath })
+	{
+		const FWRPathDef* Def = FWRPathRegistry::Get().Find(PathId);
+		if (Def && FWRPathRules::GrantStarter(*Def, FindOrAddProgress(PathId)))
+		{
+			bGranted = true;
+			const APlayerState* PS = Cast<APlayerState>(GetOwner());
+			UE_LOG(LogWildreach, Log, TEXT("PATH starter %s.%s for %s"), *PathId.ToString(), *Def->Starter.ToString(), PS ? *PS->GetPlayerName() : TEXT("?"));
+		}
+	}
+	return bGranted;
 }
 
 void UWRPathComponent::Changed()
 {
 	bDirty = true;
+	GrantStarters();
 	RefreshQuickSlots();
 	const APlayerState* PS = Cast<APlayerState>(GetOwner());
 	if (AWRCharacter* Character = PS ? Cast<AWRCharacter>(PS->GetPawn()) : nullptr)

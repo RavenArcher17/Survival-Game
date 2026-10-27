@@ -25,6 +25,9 @@ struct FWRPathNodeDef
 	/** None = trunk. */
 	FName Branch;
 	FString Text;
+	/** The path's starter spell: every survivor owns it from level 1 in each path they take up, free (its cost isn't
+	 *  counted as spent), so a new path has something to earn XP with. */
+	bool bStarter = false;
 };
 
 struct FWRPathDef
@@ -35,6 +38,8 @@ struct FWRPathDef
 	FName ResourceId;
 	FString RootPassiveName;
 	TArray<FWRPathNodeDef> Nodes;
+	/** The starter node ("starter" in the JSON; else the trunk's first ability). */
+	FName Starter;
 
 	const FWRPathNodeDef* FindNode(FName NodeId) const;
 	bool IsValid() const { return !Id.IsNone(); }
@@ -96,6 +101,10 @@ struct WILDREACH_API FWRPathRules
 
 	/** Empty string when the node can be bought; otherwise the reason it can't. */
 	static FString CanBuy(const FWRPathDef& Def, const FWRPathProgress& Progress, int32 OtherPathSpent, FName NodeId);
+	/** Points a node's next rank costs (the starter's first rank is free). */
+	static int32 NextRankCost(const FWRPathNodeDef& Node, const FWRPathProgress& Progress);
+	/** Gives the path's starter node if it isn't owned yet; true if it was given. */
+	static bool GrantStarter(const FWRPathDef& Def, FWRPathProgress& Progress);
 
 	/** Character level = total path points spent / 3, 1..50 (design review #36). */
 	static int32 CharacterLevel(int32 TotalSpent);
