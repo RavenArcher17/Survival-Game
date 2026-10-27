@@ -1,0 +1,14 @@
+{
+  "_comment": "Base props (polish pass): the crafting stations, the Hearth, the claim totem and the storage chest. Static props, no rig; each is fitted to its gameplay box in game (WRCrafting / WRBuilding), so keep the footprints compact.",
+  "template": "3d game asset of {p}, single object, entire object visible, centered, three-quarter view from slightly above, studio product shot, isolated on plain white background, soft even lighting, realistic, detailed",
+  "negative": "person, character, hands, multiple objects, room, interior, floor, ground plane, scenery, cropped, cut off, text, watermark, frame, cartoon, anime, blurry, low poly",
+  "creatures": [
+    { "id": "workbench", "prompt": "a rustic wooden survival workbench, thick worn plank top on four sturdy square legs, a wooden vise on one end, a saw and a hammer on top, a lower shelf with planks" },
+    { "id": "forge", "prompt": "a primitive blacksmith forge built of rough stacked stones, waist high, a bed of glowing coals in the top, a small iron anvil on a wooden stump beside it" },
+    { "id": "armorer", "prompt": "a medieval armorer's station, a sturdy wooden table with a riveted iron breastplate, tongs, hammers and leather straps, a small anvil on one end" },
+    { "id": "alchemy_table", "prompt": "a rustic wooden alchemy table with glass flasks and bottles of coloured liquid, a stone mortar and pestle, a small brass burner and old books" },
+    { "id": "hearth", "prompt": "a round fire pit ring made of large rough fieldstones stacked two high, charred split logs inside, unlit, no flames" },
+    { "id": "claim_totem", "prompt": "a tall carved wooden totem post, weathered dark wood carved with stacked animal faces, a carved bird with spread wings on top, set on a small stone base" },
+    { "id": "storage_chest", "prompt": "a sturdy wooden storage chest with dark iron corner bands, iron straps and a heavy iron latch, closed lid, worn planks" }
+  ]
+}

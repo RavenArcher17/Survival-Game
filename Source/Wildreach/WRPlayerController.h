@@ -289,6 +289,8 @@ private:
 	void BotPress(int32 Input, float HoldSeconds);
 
 	TWeakObjectPtr<AWRCharacterBase> LockTarget;
+	/** Seconds since the lock-on target last changed (the camera eases into the turn). */
+	float LockAge = 0.f;
 	FString Notice;
 	double NoticeTime = -100.0;
 

@@ -1,0 +1,11 @@
+{
+  "_comment": "Second round for the base props whose first concepts were groups or flat tops (polish pass): one single object each.",
+  "template": "3d game asset of {p}, one single object only, entire object visible, centered, three-quarter view from slightly above, studio product shot, isolated on plain white background, soft even lighting, realistic, detailed",
+  "negative": "person, character, hands, multiple objects, several, group, collection, set, lineup, room, interior, floor, ground plane, scenery, cropped, cut off, text, watermark, frame, cartoon, anime, blurry, low poly",
+  "creatures": [
+    { "id": "forge2", "prompt": "a medieval blacksmith forge, a solid waist-high rectangular block of rough stacked stone masonry, a bed of glowing coals sunk into its top, a short stone chimney hood at the back" },
+    { "id": "armorer2", "prompt": "an iron blacksmith anvil standing on a thick wooden tree stump, a leather cuirass hanging on a wooden armor stand right beside it, touching, tongs leaning on the stump" },
+    { "id": "alchemy_table2", "prompt": "a small rustic wooden table on four turned legs, glass flasks and bottles of coloured liquids, a stone mortar and pestle and a brass burner on its top" },
+    { "id": "claim_totem2", "prompt": "one tall carved wooden totem pole, weathered dark wood, three stacked carved animal faces, a carved eagle with spread wings on the very top, standing upright" }
+  ]
+}
