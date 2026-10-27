@@ -69,14 +69,28 @@ first: `WRSound` and `WRFx` name the moment ("hit.flesh", "gather.wood", "levelu
     the dawn mist is about half as strong and clears sooner.
 - The full suite passes on the merged build: 22 automation tests and 234 checks over 19 bot tests (`flow` is new);
   `uishots.ps1` captures all 39 screens with no client errors.
-- Known gaps: distant terrain isn't drawn past about 256 m (needs HLODs, still on the roadmap); the volcanic shrubs
-  are bright green; your first spawn ignores your path (a fire player can start at a tundra camp); creature feet still
-  slide about half their speed (the procedural rigs never fully plant a foot); running strafes show only while aiming or
-  in first person, because third person faces where you run. Two older visual faults the screenshots show, still open:
-  in Vulkarn's arena the near-black basalt floor makes the camera over-brighten, so the boss and his anvils look washed
-  out (needs an exposure pass); and one spot about 1.9 km from Volcanic camp 1 (around X -51600, Y 57200) draws a
-  flat blue surface instead of the ground, though the ground's collision is there (seen since 0.3.0; needs a look in the
-  editor).
+- The open items from the first 0.4.0 build, fixed before release:
+  - **Falling through the island.** A character that arrived before the ground's collision was there (after a
+    teleport, a respawn far away, or a pack spawning) dropped through the terrain onto the map's sea plane 140 m below,
+    where the island can't be seen from underneath: the "flat blue ground" in screenshots since 0.3.0. The server now
+    checks once a second and puts anyone under the ground back on top (`AWRGameMode::RescueUnderground`; a probe,
+    `WRProbe`, logs what's under you). In one test run it caught the player and two creatures.
+  - **Distant terrain is drawn.** The ground streamed in only 256 m around you, so from any hill the distance was a
+    flat pale void with scalloped edges. Each player now streams four times as far (`world.streamingRangeScale`), and
+    trees, rocks and cliffs draw 2.5 times further (`world.decorationDistanceScale`). The benchmark barely moved (Epic
+    8.21 ms, Medium 5.74 ms; about 150 MB more memory; streaming after a long jump done in 0.6 s instead of 0.2 s).
+  - **Your first spawn follows your path.** The engine chose the start spot before your path was set, so a frost
+    player could start (and keep respawning) at a volcanic camp; it's chosen again once your path and save are loaded.
+  - **No more washed-out boss arena.** The daytime exposure floor was written in the wrong units (an "EV" of -10 in a
+    setting this project reads as luminance), so by day the camera had no floor and brightened dark ground until
+    everything on it blew out. It's converted properly now: by day the camera brightens only to an ordinary scene's
+    level, under cover (caves, roofs, canopy) it may go further, and nights are unchanged. Daytime valley mist is
+    lighter too, so it doesn't read as white blobs from high ground.
+- Still known: the volcanic shrubs are bright green; creature feet still slide about half their speed (the procedural
+  rigs never fully plant a foot); running strafes show only while aiming or in first person, because third person faces
+  where you run.
+
+## 2026-10-26: version 0.3.0, the stone-and-leather UI
 
 The whole UI is rebuilt from the mockups Raven approved (dark stone and leather, Cinzel and Alegreya Sans), in Slate
 C++ owned per local player by `FWRPlayerUI`. Screens register themselves by name and follow the controller's menu

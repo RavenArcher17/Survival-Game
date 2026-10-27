@@ -240,8 +240,43 @@ void AWRSky::Tick(float DeltaSeconds)
 	if (const AWRGameState* State = AWRGameState::Get(this))
 	{
 		ApplyAtmosphere(DeltaSeconds, State->GetDaylight());
+		UpdateExposure(DeltaSeconds, State->GetDaylight());
 	}
 	TickFrameStats(DeltaSeconds);
+}
+
+void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
+{
+	// With no floor by day, auto-exposure brightened dark ground (Vulkarn's basalt arena) until everything lighter on it
+	// blew out to white. By day it may now only brighten to about an ordinary scene's level; under cover (a cave, a roof,
+	// a canopy) it may go further, so interiors still read; at night the floor that keeps a moonlit night dark.
+	const FWRTuning& T = FWRTuning::Get();
+	ShelterClock -= DeltaSeconds;
+	if (ShelterClock <= 0.f)
+	{
+		ShelterClock = 0.25f;
+		FVector View;
+		bSheltered = false;
+		if (GetViewLocation(View))
+		{
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSkyShelter), false);
+			if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			{
+				Query.AddIgnoredActor(PC->GetPawn());
+			}
+			FHitResult Hit;
+			bSheltered = GetWorld()->LineTraceSingleByChannel(Hit, View, View + FVector(0.f, 0.f, T.Num(TEXT("sky.shelterHeight"), 2500.f)), ECC_Visibility, Query);
+		}
+	}
+	const float DayEV = bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : T.Num(TEXT("sky.dayMinEV100"), -2.f);
+	const float Target = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), DayEV, Daylight);
+	// Eased, so stepping under a branch or through a doorway doesn't pump the exposure.
+	FloorEV = FloorEV < -50.f || DeltaSeconds <= 0.f ? Target : FMath::FInterpTo(FloorEV, Target, DeltaSeconds, 1.5f);
+	// The setting is EV100 only with the extended luminance range on; this project leaves it off, where the same
+	// setting is a luminance (cd/m2, EV100 = log2(L * 8)), and a negative "EV" there meant no floor at all.
+	static const IConsoleVariable* Extended = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange"));
+	const bool bEV = Extended && Extended->GetInt() != 0;
+	Exposure->Settings.AutoExposureMinBrightness = bEV ? FloorEV : 0.125f * FMath::Pow(2.f, FloorEV);
 }
 
 void AWRSky::Apply(bool bForce)
@@ -288,7 +323,10 @@ void AWRSky::Apply(bool bForce)
 	{
 		Sky->SetIntensity(SkyIntensity * FMath::Lerp(T.Num(TEXT("sky.nightSkyLight"), 3.f), 1.f, Daylight));
 	}
-	Exposure->Settings.AutoExposureMinBrightness = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 0.5f), T.Num(TEXT("sky.dayMinEV100"), -10.f), Daylight);
+	if (bForce)
+	{
+		UpdateExposure(0.f, Daylight);
+	}
 
 	if (bForce || bJumped || FMath::FloorToInt(Hour) != FMath::FloorToInt(LastLoggedHour))
 	{
@@ -435,10 +473,10 @@ FString AWRSky::Describe() const
 {
 	const AWRGameState* State = AWRGameState::Get(this);
 	const UDirectionalLightComponent* S = Sun.Get();
-	return FString::Printf(TEXT("day %d hour %.2f daylight %.2f sun %.1f deg %.2f lux, moon %.1f deg %.2f lux, min EV100 %.1f"),
+	return FString::Printf(TEXT("day %d hour %.2f daylight %.2f sun %.1f deg %.2f lux, moon %.1f deg %.2f lux, exposure floor EV100 %.1f%s"),
 		State ? State->GetDay() : 0, State ? State->GetHour() : -1.f, State ? State->GetDaylight() : -1.f,
 		SunElevation, S && S->IsVisible() ? S->Intensity : 0.f, MoonElevation, Moon->IsVisible() ? Moon->Intensity : 0.f,
-		Exposure->Settings.AutoExposureMinBrightness);
+		FloorEV, bSheltered ? TEXT(" (sheltered)") : TEXT(""));
 }
 
 // ---------------------------------------------------------------- subsystem

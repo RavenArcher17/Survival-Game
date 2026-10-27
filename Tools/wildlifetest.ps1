@@ -66,6 +66,8 @@ if ($reports.Count -ge 5) {
 	Check 'and came back out when the player returned' (((Near $reports[4] 'emberhorn') -ge $fire.count) -and $fireOut.Count -ge 2) ("{0} | out events {1}" -f $reports[4], $fireOut.Count)
 }
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

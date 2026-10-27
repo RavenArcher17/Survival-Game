@@ -40,6 +40,10 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 private:
+	/** Puts anyone who fell through the island back on top of it (checked once a second). */
+	void RescueUnderground();
+
 	FTimerHandle AutosaveTimer;
 	FTimerHandle WorldSaveTimer;
+	FTimerHandle UndergroundTimer;
 };

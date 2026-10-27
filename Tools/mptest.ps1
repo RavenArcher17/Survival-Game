@@ -81,6 +81,8 @@ Check "path abilities are granted" ($n.applies -ge 2) "$($n.applies) applies"
 Check "movement stays in sync (no saved-move overflow, few corrections)" ($n.overflow -eq 0 -and $n.corrections -le $Seconds) "$($n.corrections) corrections, $($n.overflow) overflows"
 $logs = @($serverLog) + @($bots | ForEach-Object { Join-Path $out "$($_.Name).log" })
 $errors = @(Select-String -Path $logs -Pattern 'Error:|Ensure condition failed|Accessed None|Fatal error' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check "no errors in the logs" ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

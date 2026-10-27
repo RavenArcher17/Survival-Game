@@ -42,6 +42,8 @@ $c = Last 'WalkC_RidgeWall'
 Check 'the ridge wall stops WalkC well short of the far side' (@(Walk 'WalkC_RidgeWall' | Where-Object { $_ -match '^WALK arrived ' }).Count -eq 0 -and $c -match ', (\d+) m from target' -and [int]$Matches[1] -ge 500) $c
 $logs = @("$out\server.log") + @($walkers | ForEach-Object { "$out\$($_.Name).log" } | Where-Object { Test-Path $_ })
 $errors = @(Select-String -Path $logs -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

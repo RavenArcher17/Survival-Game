@@ -93,6 +93,8 @@ $loaded = Lines "$out\server2.log" 'WORLD loaded' | Select-Object -First 1
 Check 'a restarted server loads every piece, and nothing collapses' ($loaded -match '^WORLD loaded 7 pieces' -and (Lines "$out\server2.log" 'collapsed').Count -eq 0) $loaded
 $logs = @("$out\server1.log", "$out\server2.log", "$out\builder.log", "$out\raider.log" | Where-Object { Test-Path $_ })
 $errors = @(Select-String -Path $logs -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($x in $results) { "{0,-5} {1}{2}" -f $(if ($x.ok) { 'PASS' } else { 'FAIL' }), $x.what, $(if ($x.detail) { "  ($($x.detail))" } else { '' }) }

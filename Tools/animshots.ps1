@@ -115,6 +115,8 @@ foreach ($label in $labels) {
 	}
 }
 $errors = @(Select-String -Path "$logs\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None|LogAnimation: Warning' -ErrorAction SilentlyContinue | Select-Object -First 8)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 if ($errors) { "client errors / animation warnings:"; $errors | ForEach-Object { '  ' + $_.Line.Trim() } }
 # How far planted feet slid over the ground while moving (wr.AnimFootSlide): near 0 = the feet keep up with the ground.
 Select-String -Path "$logs\client.log" -Pattern 'FOOTSLIDE (.*)' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value } | Set-Content "$Out\footslide.txt"

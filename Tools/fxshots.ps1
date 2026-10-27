@@ -98,6 +98,8 @@ for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 	$dest
 }
 $errors = @(Select-String -Path "$logs\client.log", "$logs\server.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue | Select-Object -First 8)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 if ($errors) { "errors:"; $errors | ForEach-Object { '  ' + $_.Line.Trim() } }
 Select-String -Path "$logs\client.log" -Pattern 'FX (ready|stats|started|stress|unknown)' -ErrorAction SilentlyContinue | ForEach-Object { '  ' + ($_.Line -replace '^.*LogWildreach: ', '') }
 "{0} of {1} shots (logs: {2})" -f [Math]::Min($files.Count, $labels.Count), $labels.Count, $logs

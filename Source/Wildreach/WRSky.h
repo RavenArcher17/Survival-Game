@@ -69,6 +69,8 @@ private:
 	/** The camera's location on this machine (the first local player's view), or false (no view yet). */
 	bool GetViewLocation(FVector& Out) const;
 	void TickFrameStats(float DeltaSeconds);
+	/** Auto-exposure's floor: how far the camera may brighten, by daylight and by whether it's under cover. */
+	void UpdateExposure(float DeltaSeconds, float Daylight);
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UDirectionalLightComponent> Moon;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UPostProcessComponent> Exposure;
@@ -90,6 +92,11 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<class ULocalFogVolumeComponent>> Mist;
 	float MistDensity = -1.f;
 	float MistClock = 0.f;
+	/** Under something (a cave, a roof, a canopy) as of the last check; checked a few times a second. */
+	bool bSheltered = false;
+	float ShelterClock = 0.f;
+	/** The exposure floor in EV100, eased toward its target (unset below -50). */
+	float FloorEV = -100.f;
 	bool bShaftsOn = false;
 	/** wr.FrameStats accumulators. */
 	float StatsLeft = 0.f;

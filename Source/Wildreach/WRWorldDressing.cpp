@@ -204,7 +204,8 @@ UHierarchicalInstancedStaticMeshComponent* AWRDressing::MakeMeshPart(UStaticMesh
 	Part->SetMobility(EComponentMobility::Static);
 	Part->SetCollisionEnabled(bCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	if (bCollision) Part->SetCollisionProfileName(TEXT("BlockAll"));
-	Part->SetCullDistances(0, CullDistance);
+	// Trees, rocks and cliffs drew only out to 120-300 m, so hills further off stood bare; about 0.3 ms at 3x.
+	Part->SetCullDistances(0, CullDistance * WRTune(TEXT("world.decorationDistanceScale"), 2.5f));
 	Part->bAffectDistanceFieldLighting = false;
 	Part->SetCastShadow(bCollision || CullDistance > 20000.f);
 	Part->RegisterComponent();

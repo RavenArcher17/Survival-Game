@@ -30,6 +30,7 @@
 #include "WRKeyBindings.h"
 #include "WRPlayerUI.h"
 #include "Kismet/GameplayStatics.h"
+#include "WorldPartition/WorldPartitionStreamingSource.h"
 
 AWRPlayerController::AWRPlayerController()
 {
@@ -43,6 +44,16 @@ AWRPlayerController::AWRPlayerController()
 void AWRPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	// The island's ground streams in around each player. At the map's 256 m loading range the terrain past that wasn't
+	// drawn at all (empty distance from any hill); the landscape's own LODs keep the far ground cheap.
+	const float RangeScale = WRTune(TEXT("world.streamingRangeScale"), 4.f);
+	if (RangeScale > 1.f)
+	{
+		FStreamingSourceShape Shape;
+		Shape.bUseGridLoadingRange = true;
+		Shape.LoadingRangeScale = RangeScale;
+		StreamingSourceShapes = { Shape };
+	}
 	// The stone-and-leather UI for the player at this screen (-oldui keeps the text menus for comparison).
 	if (IsLocalController() && GetNetMode() != NM_DedicatedServer && !FParse::Param(FCommandLine::Get(), TEXT("oldui")) && GEngine && GEngine->GameViewport)
 	{

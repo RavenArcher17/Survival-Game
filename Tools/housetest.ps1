@@ -154,6 +154,8 @@ $reload = @(Select-String -Path "$out\server2.log" -Pattern 'WORLD loaded (\d+) 
 $reloadCollapsed = @(Select-String -Path "$out\server2.log" -Pattern 'collapsed' -ErrorAction SilentlyContinue).Count
 Check 'a server restart loads the whole house back (34 pieces, nothing collapses)' ($reload.Count -eq 1 -and $reload[0] -eq 34 -and $reloadCollapsed -eq 0) $(if ($reload.Count) { "$($reload[0]) pieces, $reloadCollapsed collapsed" } else { 'not loaded' })
 $errors = @(Select-String -Path "$out\server.log", "$out\server2.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

@@ -57,6 +57,8 @@ Check 'the Obsidian Warden''s shell breaks' (Has '^The Obsidian Warden shell bro
 Check 'Ignessa sends wisps, then lands when they''re gone' ((Has 'sends \d+ wisps') -and (Has 'out of wisps and lands'))
 Check 'the Pale Hunter vanishes into the blizzard and shows again' ((Has 'Pale Hunter vanishes into the blizzard') -and (Has 'Pale Hunter is visible'))
 $errors = @(Select-String -Path "$out\server.log", "$out\hero.log", "$out\helper.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

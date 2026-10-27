@@ -259,6 +259,8 @@ for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 Select-String -Path "$logs\server.log" -Pattern 'BUILD |refused|no support|already there|overlaps|too far|need \d' | ForEach-Object { $_.Line -replace '^.*LogWildreach: ', '' } | Set-Content "$logs\build.txt"
 Select-String -Path "$logs\client.log" -Pattern 'LogWildreach: (FRAMESTATS|GHOST |SEA |CMD .*-> (need|no|some|over|too))' | ForEach-Object { $_.Line -replace '^.*LogWildreach: ', '' }
 $errors = @(Select-String -Path "$logs\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue | Select-Object -First 8)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 if ($errors) { "client errors:"; $errors | ForEach-Object { '  ' + $_.Line.Trim() } }
 "{0} of {1} shots (logs: {2}, out: {3})" -f [Math]::Min($files.Count, $labels.Count), $labels.Count, $logs, $Out
 $lock.ReleaseMutex()

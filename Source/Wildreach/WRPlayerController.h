@@ -169,6 +169,9 @@ public:
 	/** Testing / screenshot aid: hold a wheel open with a wedge lit (0, 1 ability wheels, 2 tame orders; -1 closes); toggle the controls help. */
 	UFUNCTION(Exec) void WRWheel(int32 Which, int32 Hover);
 	UFUNCTION(Exec) void WRHelp();
+	/** Dev: log what's under the player and at the middle of the view (actor, component, material), and any big flat
+	 *  surface over this spot: for rendering faults such as ground that draws as something else. */
+	UFUNCTION(Exec) void WRProbe();
 	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
 	/** Ranged weapon (bots): out (1) / away (0), aim, fire, cycle ammo, face the nearest creature of an id. */
 	UFUNCTION(Exec) void WRRanged(int32 bOn);

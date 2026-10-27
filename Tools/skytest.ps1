@@ -73,16 +73,16 @@ Start-Sleep -Seconds 2
 if (Test-Path "$out\world_backup.json") { Copy-Item "$out\world_backup.json" $worldSave -Force } else { Remove-Item $worldSave -ErrorAction SilentlyContinue }
 
 # ---- results
-$skies = @(Select-String -Path "$out\client.log" -Pattern 'SKY day (\d+) hour ([-\d.]+) daylight ([-\d.]+) sun ([-\d.]+) deg ([-\d.]+) lux, moon ([-\d.]+) deg ([-\d.]+) lux, min EV100 ([-\d.]+)' | ForEach-Object {
+$skies = @(Select-String -Path "$out\client.log" -Pattern 'SKY day (\d+) hour ([-\d.]+) daylight ([-\d.]+) sun ([-\d.]+) deg ([-\d.]+) lux, moon ([-\d.]+) deg ([-\d.]+) lux, exposure floor EV100 ([-\d.]+)' | ForEach-Object {
 	$m = $_.Matches[0].Groups; [pscustomobject]@{ day = [int]$m[1].Value; hour = [double]$m[2].Value; daylight = [double]$m[3].Value; sun = [double]$m[4].Value; sunLux = [double]$m[5].Value; moon = [double]$m[6].Value; moonLux = [double]$m[7].Value; ev = [double]$m[8].Value } })
 $results = @()
 function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
 function Near([double]$hour) { $skies | Where-Object { [math]::Abs($_.hour - $hour) -lt 0.08 } | Select-Object -First 1 }
-function Show($s) { if ($s) { "hour {0:N2}: sun {1:N1} deg {2:N2} lux, moon {3:N1} deg {4:N2} lux, min EV100 {5:N1}" -f $s.hour, $s.sun, $s.sunLux, $s.moon, $s.moonLux, $s.ev } else { 'no reading' } }
+function Show($s) { if ($s) { "hour {0:N2}: sun {1:N1} deg {2:N2} lux, moon {3:N1} deg {4:N2} lux, exposure floor EV100 {5:N1}" -f $s.hour, $s.sun, $s.sunLux, $s.moon, $s.moonLux, $s.ev } else { 'no reading' } }
 $start = $skies | Select-Object -First 1
 Check 'a new world starts at clock.startHour (8:00, day 1; the bot joins a few game minutes in)' ($start -and $start.day -eq 1 -and $start.hour -ge 8 -and $start.hour -lt 8.6) (Show $start)
 $noon = Near 12; $dusk = Near 19.7; $night = Near 0
-Check 'noon: the sun is high and bright, no moon' ($noon -and $noon.sun -gt 55 -and $noon.sunLux -gt 5 -and $noon.moonLux -eq 0 -and $noon.ev -lt -5) (Show $noon)
+Check 'noon: the sun is high and bright, no moon' ($noon -and $noon.sun -gt 55 -and $noon.sunLux -gt 5 -and $noon.moonLux -eq 0 -and $noon.ev -lt 0) (Show $noon)  # by day the camera may brighten further than at night (floor sky.dayMinEV100, -2)
 Check 'sunset: the sun is low in the west and still up' ($dusk -and $dusk.sun -gt 0 -and $dusk.sun -lt 12 -and $dusk.sunLux -gt 0) (Show $dusk)
 Check 'midnight: the sun is down and off, the moon is up and lights the island' ($night -and $night.sun -lt -40 -and $night.sunLux -eq 0 -and $night.moon -gt 40 -and $night.moonLux -gt 0.2) (Show $night)
 Check 'midnight: exposure keeps the night dark (min EV100 at sky.nightMinEV100)' ($night -and $night.ev -gt 0) (Show $night)
@@ -96,6 +96,8 @@ if (-not $Arena) {
 }
 Check 'the client found the map''s sun' (Select-String -Path "$out\client.log" -Pattern 'SKY sun found' -Quiet)
 $errors = @(Select-String -Path "$out\server.log", "$out\server2.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

@@ -114,6 +114,8 @@ $save = if (Test-Path $playerSave) { Get-Content $playerSave -Raw | ConvertFrom-
 $carried = if ($save) { @($save.inventory.slots | Where-Object { $_.id } | ForEach-Object { $_.id }) } else { @() }
 Check 'the save holds all four tools and the starting kit' ((@('crude_hatchet', 'crude_pick', 'stone_hatchet', 'stone_pick', 'minor_healing_potion', 'waterskin') | Where-Object { $carried -notcontains $_ }).Count -eq 0) ($carried -join ', ')
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

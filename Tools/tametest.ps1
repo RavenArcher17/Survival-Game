@@ -67,6 +67,8 @@ Check 'a stolen egg hatches a tame' ((Said 'Kilnmite egg hatched') -eq 1)
 Check 'waking up loses the progress' ((Count $log 'woke up \([1-9]\d*% tamed, 0% kept\)') -ge 1)
 Check 'the tames survive a restart' ((Count "$out\server2.log" 'WORLD loaded .* 3 tames') -eq 1) ((Select-String -Path "$out\server2.log" -Pattern 'WORLD loaded.*' | Select-Object -First 1).Matches.Value)
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

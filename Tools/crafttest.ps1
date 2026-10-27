@@ -65,6 +65,8 @@ Check 'a new bow needs no repair' ((Said 'already in perfect condition') -ge 2)
 Check 'shooting wears the bow, the forge sends you to the workbench' ((Count "$out\server.log" 'RANGED .* fires hunting_bow') -eq 3 -and (Said "repaired where it's made \(workbench\)") -eq 1)
 Check 'the workbench repairs it' ((Said '^Repaired Hunting bow') -eq 1)
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

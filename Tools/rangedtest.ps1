@@ -50,6 +50,8 @@ Check 'arrows stick in what they hit' ((Count $log 'RANGED (bow|crossbow|blowgun
 Check 'a thrown spear is left to pick up' ((Count $log 'throwing_spear landed; left to pick up') -ge 1)
 Check 'the bola roots a Cinderfang' ((Count $log 'RANGED bola roots') -ge 1)
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

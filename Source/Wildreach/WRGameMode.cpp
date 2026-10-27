@@ -24,6 +24,9 @@
 #include "Serialization/JsonWriter.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "LandscapeHeightfieldCollisionComponent.h"
 
 AWRGameMode::AWRGameMode()
 {
@@ -60,6 +63,12 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		PS->BodyStyle = Body.IsEmpty() ? NAME_None : FName(*Body);
 		// A returning player's saved paths override the join URL.
 		LoadPlayer(PS);
+		// The engine picked the start spot inside Super::InitNewPlayer, before the main path was known, so the first
+		// spawn landed at any camp. Pick again now: the path's biome (or a saved bed).
+		// (FindPlayerStart hands back an existing StartSpot, so it's cleared first.)
+		NewPlayerController->StartSpot = nullptr;
+		FString StartError;
+		UpdatePlayerStartSpot(NewPlayerController, Portal, StartError);
 	}
 	return Result;
 }
@@ -71,6 +80,39 @@ void AWRGameMode::BeginPlay()
 	AWRCreatureSpawner::SpawnSitesFromData(GetWorld());
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
 	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);
+	GetWorldTimerManager().SetTimer(UndergroundTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { RescueUnderground(); }), 1.f, true);
+}
+
+void AWRGameMode::RescueUnderground()
+{
+	// Someone who arrives before the ground's collision is there (a teleport or a respawn far from everyone) falls
+	// through the island and lands on the map's sea plane, 140 m under the terrain, where the island can't be seen from
+	// below. The landscape is a heightfield, so ground above you always means you're under it: put them back on top.
+	const float Margin = WRTune(TEXT("world.undergroundMargin"), 300.f);
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+	{
+		AWRCharacterBase* C = *It;
+		if (!C->IsAlive())
+		{
+			continue;
+		}
+		const FVector L = C->GetActorLocation();
+		TArray<FHitResult> Hits;
+		const FCollisionQueryParams Query(SCENE_QUERY_STAT(WRUnderground), false, C);
+		GetWorld()->LineTraceMultiByObjectType(Hits, FVector(L.X, L.Y, L.Z + 80000.f), L, FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+		for (const FHitResult& Hit : Hits)
+		{
+			if (Cast<ULandscapeHeightfieldCollisionComponent>(Hit.GetComponent()) && Hit.ImpactPoint.Z > L.Z + Margin)
+			{
+				const float Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+				C->TeleportTo(FVector(L.X, L.Y, Hit.ImpactPoint.Z + Half + 30.f), C->GetActorRotation(), false, true);
+				C->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+				UE_LOG(LogWildreach, Warning, TEXT("RESCUE %s was %.0f m under the ground at %s: put back on top"),
+					*C->GetName(), (Hit.ImpactPoint.Z - L.Z) / 100.f, *L.ToString());
+				break;
+			}
+		}
+	}
 }
 
 void AWRGameMode::EndPlay(const EEndPlayReason::Type Reason)

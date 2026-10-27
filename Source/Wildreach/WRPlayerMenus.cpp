@@ -844,6 +844,54 @@ void AWRPlayerController::WRHelp()
 	if (UI) UI->ToggleHelp();
 }
 
+void AWRPlayerController::WRProbe()
+{
+	APawn* P = GetPawn();
+	if (!P)
+	{
+		return;
+	}
+	FCollisionQueryParams Query(TEXT("WRProbe"), true, P);
+	const auto Report = [this, &Query](const TCHAR* What, const FVector& A, const FVector& B)
+	{
+		FHitResult Hit;
+		if (!GetWorld()->LineTraceSingleByChannel(Hit, A, B, ECC_Visibility, Query))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("PROBE %s: nothing"), What);
+			return;
+		}
+		UPrimitiveComponent* C = Hit.GetComponent();
+		UE_LOG(LogWildreach, Log, TEXT("PROBE %s: %s (%s) component %s (%s) material %s at %s visible %d hidden-in-game %d"), What,
+			*GetNameSafe(Hit.GetActor()), Hit.GetActor() ? *Hit.GetActor()->GetClass()->GetName() : TEXT("-"), *GetNameSafe(C),
+			C ? *C->GetClass()->GetName() : TEXT("-"), C ? *GetNameSafe(C->GetMaterial(0)) : TEXT("-"), *Hit.ImpactPoint.ToString(),
+			C ? C->IsVisible() : 0, C ? C->bHiddenInGame : 0);
+	};
+	const FVector Here = P->GetActorLocation();
+	Report(TEXT("down"), Here, Here - FVector(0.f, 0.f, 5000.f));
+	FVector CamLoc;
+	FRotator CamRot;
+	GetPlayerViewPoint(CamLoc, CamRot);
+	Report(TEXT("view"), CamLoc, CamLoc + CamRot.Vector() * 20000.f);
+	// Anything big and flat over this spot (a plane, a water or fog volume, a sea tile), drawn or not.
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		for (UActorComponent* AC : It->GetComponents())
+		{
+			const UPrimitiveComponent* C = Cast<UPrimitiveComponent>(AC);
+			if (!C || !C->IsRegistered())
+			{
+				continue;
+			}
+			const FBox B = C->Bounds.GetBox();
+			if (B.GetSize().X > 4000.f && B.GetSize().Y > 4000.f && B.Min.X <= Here.X && B.Max.X >= Here.X && B.Min.Y <= Here.Y && B.Max.Y >= Here.Y)
+			{
+				UE_LOG(LogWildreach, Log, TEXT("PROBE over: %s (%s) component %s (%s) material %s z %.0f..%.0f visible %d"), *It->GetName(), *It->GetClass()->GetName(),
+					*C->GetName(), *C->GetClass()->GetName(), *GetNameSafe(C->GetMaterial(0)), B.Min.Z, B.Max.Z, C->IsVisible());
+			}
+		}
+	}
+}
+
 void AWRPlayerController::EscapePressed()
 {
 	if (IsPlacing())

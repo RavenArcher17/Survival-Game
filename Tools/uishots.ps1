@@ -139,6 +139,8 @@ for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 	$dest
 }
 $errors = @(Select-String -Path "$logs\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue | Select-Object -First 5)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 if ($errors) { "client errors:"; $errors | ForEach-Object { '  ' + $_.Line.Trim() } }
 "{0} of {1} screens captured (logs: {2})" -f [Math]::Min($files.Count, $labels.Count), $labels.Count, $logs
 $lock.ReleaseMutex()

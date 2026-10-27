@@ -71,6 +71,8 @@ Check 'a first-session hint names the real key' ($hints.Count -eq 1 -and $hints[
 $ini = Join-Path $root 'Saved\Config\WindowsEditor\GameUserSettings.ini'
 Check 'the hint is remembered for the player' ((Test-Path $ini) -and (Select-String -Path $ini -Pattern '^Hints_Flowbot=.*ability' -Quiet))
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

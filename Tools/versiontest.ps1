@@ -42,6 +42,8 @@ Check 'the menu says why' ($shows -match ('different version of Wildreach \(you 
 Check 'the menu offers the newer release' ($check -match ('this is ' + [regex]::Escape($version) + ', the latest release is v9\.9\.9: offering the update')) $check
 Check 'a client on the same version joins' (Has "$out\server.log" 'Join succeeded: Same')
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

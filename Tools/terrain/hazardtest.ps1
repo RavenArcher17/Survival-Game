@@ -38,6 +38,8 @@ Check 'a fire main walks through lava unhurt (Burning blood)' ($fire.Count -ge 2
 Check 'a fire main slips on the glacier ice' ($fire.Count -ge 3 -and $fire[2].kind -eq 'ice' -and -not $fire[2].resist -and $fire[2].onIce -and $fire[2].friction -lt 1) (Show $fire[2])
 Check 'a frost main keeps its grip on ice (Permafrost)' ($frost.Count -ge 3 -and $frost[2].kind -eq 'ice' -and $frost[2].resist -and -not $frost[2].onIce -and $frost[2].friction -ge 4) (Show $frost[2])
 $errors = @(Select-String -Path "$out\server.log", "$out\Frosty.log", "$out\Blaze.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

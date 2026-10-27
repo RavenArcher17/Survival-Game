@@ -61,6 +61,8 @@ Check 'perks change their stats' ((Stat 'doubleOre') -gt 0 -and (Stat 'extraTame
 $skills = Saved
 Check 'life skills and perks are saved with the player' ($skills -and $skills.mining.level -eq 60 -and $skills.mining.perks[1] -eq 1 -and $skills.taming.perks[1] -eq 0 -and $skills.building.perks[0] -eq 0) $(if ($skills) { $skills | ConvertTo-Json -Compress } else { 'no save' })
 $errors = @(Select-String -Path "$out\server.log", "$out\alpha.log", "$out\bravo.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

@@ -50,6 +50,8 @@ $bot = Lines $p2.Client 'BOT .* main=' | Select-Object -Last 1
 Check 'the player plays on with the same spent points' ($bot -match 'main=frost\(30/\d+\) sub=fire\(25\)') ($bot -replace '^BOT \S+ ', '')
 $logs = @($p1.Server, $p1.Client, $p2.Server, $p2.Client | Where-Object { Test-Path $_ })
 $errors = @(Select-String -Path $logs -Pattern 'Error:|Ensure condition failed|Accessed None')
+# The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
+$errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }
