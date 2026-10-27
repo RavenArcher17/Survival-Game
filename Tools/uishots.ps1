@@ -2,8 +2,10 @@
 # on L_Island with a stocked bag, learned abilities and a tame opens each screen, saving one numbered picture per
 # screen into -Out. Add screens to $screens as they're built. -MainMenu shoots the front end instead ($menuScreens):
 # what the game shows on its own, so a standalone client and no server.
-#   uishots.ps1 [-Out <folder>] [-Only hud,wheel] [-MainMenu]
-param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845, [switch]$MainMenu)
+# -Flow shoots only the moments between play ($flowScreens: death and respawn, loading, banners, toasts, hints) on a
+# souls-penalty server, so the death screen shows a belongings bag; the full run ends with them too.
+#   uishots.ps1 [-Out <folder>] [-Only hud,wheel] [-MainMenu] [-Flow]
+param([string]$Out = '', [string[]]$Only = @(), [int]$Port = 7845, [switch]$MainMenu, [switch]$Flow)
 # One run at a time on this machine: each starts a server and a rendered client, and worktrees can run it side by side.
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
@@ -60,14 +62,37 @@ $screens = [ordered]@{
 	'storage'      = 'WRMenu none 0|WRTeleport -124800 -51600|wait 5|WRClearCreatures|WRLook 270 -8|WRGive copper_ingot 12|WRPlace storage_chest -124800 -51800 6525 0|wait 2|WRInteract|wait 1|WRUICmd storeall|wait 1|WRUICmd take 1 20|WRUICmd take 0 30|wait 1.5'
 	'storage_picker' = 'WRUIStoragePicker store wood'
 }
+# The moments between play (WRUIFlow). The rest of the run keeps them quiet (WRFlow quiet on) so they don't land in
+# other screens; here they come back on, with this player's discoveries and hints forgotten so each fires again.
+# flow_death and flow_respawn take their own pictures (the bot pauses while dead): 3.5 s into the death screen, and
+# just after the new body arrives (the island loading behind the card).
+$flowScreens = [ordered]@{
+	'flow_hint'      = 'WRMenu none 0|WRFlow quiet off|WRFlow hints on|WRFlow forget|WRTeleport -51623 54155|wait 8'
+	'flow_levelup'   = 'WRGivePoints fire 4|WRAutoSpend fire 3|wait 1.5'
+	'flow_gather'    = 'WRFlow near tree|wait 3|WRBotPause 0|WRGather tree|wait 4.5'
+	'flow_discover'  = 'WRGather off|WRBotPause 1|WRTeleport -1300 -126600|wait 2.5'
+	'flow_boss'      = 'WRTeleport -40000 -60000|wait 6|WRHeal|WRSpawn vulkarn 1|wait 1.2'
+	'flow_tame'      = 'WRTeleport -51623 59155|wait 7|WRHeal|WRClearCreatures|WRSpawn ashstrider 1|wait 1|WRGoTo ashstrider|WRInteract|wait 6'
+	'flow_recipe'    = 'WRTameAll stay|WRTeleport -124800 -51600|wait 6|WRClearCreatures|WRGive copper_ingot 5|WRGive core_vulkarn 1|WRLook 0 -35|WRGhost claim_totem|wait 1|WRGhostPlace|wait 1.5|WRLook 180 -35|WRGhost hearth|wait 1|WRGhostPlace|wait 1.5|WRGoTo hearth|wait 1|WRCmd hearthfeed|wait 1.5'
+	'flow_island'    = 'WRFlow preview island 4|wait 0.6'
+	'flow_loading'   = 'WRFlow preview loading 4|wait 0.6'
+	# Killed by Magmaws: a hard knock first, so they finish it quickly (tames nearby would otherwise fight them off).
+	'flow_death'     = 'wait 4|WRTeleport -51623 64155|wait 6|WRClearCreatures|WRHeal|WRHitPlayer Snapper 105|WRFlow shotondeath 3.5|WRFlow shotonback 0.15|WRSpawn magmaw 2|wait 45'
+	'flow_respawn'   = 'wait 0.1'
+	'flow_after'     = 'wait 2'
+	'flow_settings'  = 'WRMenu none 0|WRMenu settings 0|wait 1.5|WRSettings video|wait 1'
+}
+$selfShots = @('flow_death', 'flow_respawn')
 # The front end (-MainMenu). The bot only runs the commands: WRMainMenu opens the menu as F10 does on your own.
 $menuScreens = [ordered]@{
 	'mainmenu'          = 'WRMainMenu|wait 4'
 	'mainmenu_settings' = 'WRMainMenu settings|wait 1.5'
 }
 if ($MainMenu) { $screens = $menuScreens }
+elseif ($Flow) { $screens = $flowScreens }
+else { foreach ($f in $flowScreens.GetEnumerator()) { $screens[$f.Key] = $f.Value } }
 if ($Only.Count -gt 0) { $Only = $Only | ForEach-Object { $_ -split ',' } }
-$cmds = if ($MainMenu) { @('WRBotPause 1', 'wait 3') } else { @('WRBotPause 1', 'wait 3',
+$cmds = if ($MainMenu) { @('WRBotPause 1', 'wait 3') } else { @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 3',
 	'WRGive wood 80', 'WRGive stone 50', 'WRGive fiber 30', 'WRGive hide 8', 'WRGive raw_meat 6', 'WRGive berries 8',
 	'WRGive copper_ore 12', 'WRGive tin_ore 4', 'WRGive kibble 3', 'WRGive narcotic 2', 'WRGive cooked_meat 2',
 	'WRGive hunting_bow 1', 'WRGive stone_arrow 20', 'WRGive tranq_arrow 10', 'WRGive stone_hatchet 1', 'WRGive stone_pick 1',
@@ -75,10 +100,14 @@ $cmds = if ($MainMenu) { @('WRBotPause 1', 'wait 3') } else { @('WRBotPause 1', 
 $labels = @()
 foreach ($s in $screens.GetEnumerator()) {
 	$cmds += $s.Value
-	if ($Only.Count -eq 0 -or $Only -contains $s.Key) { $cmds += $shot; $labels += $s.Key }
+	if ($Only.Count -eq 0 -or $Only -contains $s.Key -or $selfShots -contains $s.Key) {
+		if ($selfShots -notcontains $s.Key) { $cmds += $shot }
+		$labels += $s.Key
+	}
 }
 $cmds += 'wait 2'
 $tune = '-wrtune=taming.easySeconds:4'
+if ($Flow) { $tune += ' -wrpreset=pve' }
 if ($MainMenu) {
 	# No server: the island on its own, as the game starts. A local stand-in for GitHub says the next version is out,
 	# so the update banner shows too.
@@ -94,7 +123,7 @@ if ($MainMenu) {
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 }
 # Every screen's commands run (even with -Only), so the time allowed grows with the whole list.
-$deadline = (Get-Date).AddSeconds(240 + 12 * $screens.Count)
+$deadline = (Get-Date).AddSeconds(240 + 12 * $screens.Count + $(if ($screens.Contains('flow_death')) { 120 } else { 0 }))
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 	Start-Sleep -Seconds 5
 	$n = @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $started }).Count

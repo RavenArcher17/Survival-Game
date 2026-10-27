@@ -11,6 +11,9 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRSound.h"
+#include "WRTuning.h"
+#include "WRUIFlow.h"
+#include "WRUIMotion.h"
 #include "WRUIStyle.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/Engine.h"
@@ -50,15 +53,19 @@ FWRPlayerUI::FWRPlayerUI(AWRPlayerController* InPC) : PC(InPC)
 			GEngine->GameViewport->AddViewportWidgetContent(WheelWidget.ToSharedRef(), 40);
 		}
 	}
+	Flow = MakeShared<FWRFlow>(InPC);
 }
 
 FWRPlayerUI::~FWRPlayerUI()
 {
+	Flow.Reset();
 	if (GEngine && GEngine->GameViewport)
 	{
-		for (TSharedPtr<SWidget>* W : { &HudWidget, &ScreenWidget, &WheelWidget })
+		TArray<TSharedPtr<SWidget>> All = { HudWidget, ScreenHost, WheelWidget };
+		for (const TSharedPtr<SWRAppear>& W : LeavingScreens) All.Add(W);
+		for (const TSharedPtr<SWidget>& W : All)
 		{
-			if (W->IsValid()) GEngine->GameViewport->RemoveViewportWidgetContent(W->ToSharedRef());
+			if (W.IsValid()) GEngine->GameViewport->RemoveViewportWidgetContent(W.ToSharedRef());
 		}
 	}
 }
@@ -99,7 +106,19 @@ void FWRPlayerUI::Tick(float DeltaTime)
 		CentreMouse();
 	}
 	if (bTameWheel && !bDebugWheel) UpdateWheelHover(TameHover, 8);
-	Pickups.RemoveAll([Now](const FPickup& X) { return Now - X.Time > 3.5; });
+	const double UINow = WRUIMotion::Now();
+	Pickups.RemoveAll([UINow](const FPickup& X) { return UINow - X.Time > 3.5; });
+	UpdateNotices();
+	// Closed screens fade out on their own; drop them once they're gone (or if they stopped ticking).
+	for (int32 i = LeavingScreens.Num() - 1; i >= 0; --i)
+	{
+		if (!LeavingScreens[i].IsValid() || LeavingScreens[i]->IsGone())
+		{
+			if (LeavingScreens[i].IsValid() && GEngine && GEngine->GameViewport) GEngine->GameViewport->RemoveViewportWidgetContent(LeavingScreens[i].ToSharedRef());
+			LeavingScreens.RemoveAt(i);
+		}
+	}
+	if (Flow) Flow->Tick(DeltaTime);
 	// Abilities can have their own keys (Settings): make sure each learned one has an entry.
 	if (Now > NextAbilityKeyCheck)
 	{
@@ -164,16 +183,22 @@ void FWRPlayerUI::ShowScreen(FName Name)
 	if (!Factory || !GEngine || !GEngine->GameViewport) return;
 	ScreenWidget = (*Factory)(P);
 	ScreenName = Name;
-	GEngine->GameViewport->AddViewportWidgetContent(ScreenWidget.ToSharedRef(), 20);
+	// Screens ease in (a short fade and rise); the build bar is a strip, so it only fades.
+	const bool bBar = Name == TEXT("build");
+	ScreenHost = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, bBar ? 0.f : WRTune(TEXT("flow.screenRise"), 14.f)))[ScreenWidget.ToSharedRef()];
+	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), 20);
 	UE_LOG(LogWildreach, Log, TEXT("UI screen %s"), *Name.ToString());
 }
 
 void FWRPlayerUI::CloseScreen()
 {
-	if (ScreenWidget.IsValid() && GEngine && GEngine->GameViewport)
+	if (ScreenHost.IsValid())
 	{
-		GEngine->GameViewport->RemoveViewportWidgetContent(ScreenWidget.ToSharedRef());
+		// It fades out where it is and takes no more clicks; Tick removes it when it's gone.
+		ScreenHost->PlayOut(WRTune(TEXT("flow.screenOutSeconds"), 0.12f));
+		LeavingScreens.Add(ScreenHost);
 	}
+	ScreenHost.Reset();
 	ScreenWidget.Reset();
 	ScreenName = NAME_None;
 }
@@ -214,12 +239,77 @@ void FWRPlayerUI::UpdateInputMode()
 
 void FWRPlayerUI::NoteNotice(const FString& Text)
 {
+	const double Now = WRUIMotion::Now();
 	// "+3 Wood" style pickups stack above the hotbar; everything else is a centre notice (the HUD reads it).
 	if (Text.StartsWith(TEXT("+")))
 	{
-		Pickups.Add({ Text, FPlatformTime::Seconds() });
+		// "+3 Wood  (Stone hatchet)": more wood while its line is up adds to it ("+5 Wood") instead of a new line.
+		FPickup New;
+		New.Text = Text;
+		New.Time = Now;
+		FString Rest = Text.Mid(1);
+		int32 Space = INDEX_NONE;
+		if (Rest.FindChar(TEXT(' '), Space) && Rest.Left(Space).IsNumeric())
+		{
+			New.Count = FCString::Atoi(*Rest.Left(Space));
+			Rest = Rest.Mid(Space + 1);
+			const int32 Paren = Rest.Find(TEXT("  ("));
+			New.Item = Paren == INDEX_NONE ? Rest : Rest.Left(Paren);
+			New.Tail = Paren == INDEX_NONE ? FString() : Rest.Mid(Paren);
+		}
+		if (FPickup* Same = New.Item.IsEmpty() ? nullptr : Pickups.FindByPredicate([&New](const FPickup& P) { return P.Item == New.Item; }))
+		{
+			Same->Count += New.Count;
+			Same->Tail = New.Tail;
+			Same->Text = FString::Printf(TEXT("+%d %s%s"), Same->Count, *Same->Item, *Same->Tail);
+			Same->Time = Now;
+			Same->Bumped = Now;
+			return;
+		}
+		Pickups.Add(New);
+		PickupAddedAt = Now;
 		if (Pickups.Num() > 5) Pickups.RemoveAt(0);
+		return;
 	}
+	if (Text.IsEmpty()) return;
+	// Notices take turns: the same one again just stays up longer; a new one cuts the current one short (after a
+	// minimum, so each can be read) instead of replacing it at once.
+	const float Hold = WRTune(TEXT("flow.noticeSeconds"), 4.f);
+	if (Text == CurNotice && Now < CurNoticeEnd)
+	{
+		CurNoticeEnd = FMath::Max(CurNoticeEnd, Now + Hold);
+		return;
+	}
+	if (NoticeQueue.Contains(Text)) return;
+	NoticeQueue.Add(Text);
+	if (NoticeQueue.Num() > 5) NoticeQueue.RemoveAt(0);
+	if (!CurNotice.IsEmpty())
+	{
+		CurNoticeEnd = FMath::Min(CurNoticeEnd, FMath::Max(CurNoticeAt + WRTune(TEXT("flow.noticeMinSeconds"), 1.6f), Now + 0.25));
+	}
+}
+
+void FWRPlayerUI::UpdateNotices()
+{
+	const double Now = WRUIMotion::Now();
+	if (!CurNotice.IsEmpty() && Now >= CurNoticeEnd)
+	{
+		CurNotice.Empty();
+	}
+	if (CurNotice.IsEmpty() && NoticeQueue.Num() > 0)
+	{
+		CurNotice = NoticeQueue[0];
+		NoticeQueue.RemoveAt(0);
+		CurNoticeAt = Now;
+		CurNoticeEnd = Now + (NoticeQueue.Num() > 0 ? WRTune(TEXT("flow.noticeMinSeconds"), 1.6f) : WRTune(TEXT("flow.noticeSeconds"), 4.f));
+	}
+}
+
+const FString& FWRPlayerUI::GetCentreNotice(float& OutAlpha) const
+{
+	const double Now = WRUIMotion::Now();
+	OutAlpha = CurNotice.IsEmpty() ? 0.f : FMath::Min(WRUIMotion::EaseOut(float(Now - CurNoticeAt) / 0.15f), FMath::Clamp(float(CurNoticeEnd - Now) / 0.25f, 0.f, 1.f));
+	return CurNotice;
 }
 
 // ---------------------------------------------------------------- hotbar

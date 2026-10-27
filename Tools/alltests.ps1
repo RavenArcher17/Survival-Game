@@ -4,7 +4,7 @@
 #   alltests.ps1                     build, then everything (about 40 minutes)
 #   alltests.ps1 -SkipBuild          use the current build
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
-#                                    sky, tame, boss, social, spell, ranged, ai, wildlife, version, updater, walk, hazard)
+#                                    sky, tame, boss, social, flow, spell, ranged, ai, wildlife, version, updater, walk, hazard)
 param([switch]$SkipBuild, [string[]]$Only = @())
 # Every Unreal start otherwise runs UnrealBuildTool's platform check, which waits for any build running on the machine.
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -23,6 +23,7 @@ $tests = @(
 	@{ name = 'tame'; script = 'tametest.ps1'; what = 'food, riding, tranq knockout, narcotic, kibble, eggs, waking, saved tames' },
 	@{ name = 'boss'; script = 'bosstest.ps1'; what = 'the six bosses' },
 	@{ name = 'social'; script = 'socialtest.ps1'; what = 'PvP preset, clans, death bags, life skills' },
+	@{ name = 'flow'; script = 'flowtest.ps1'; what = 'death screen and respawn: killer, bag, back at the camp; a bed respawn; a hint remembered' },
 	@{ name = 'spell'; script = 'spelltest.ps1'; what = 'the Paths menu and tree spells' },
 	@{ name = 'ranged'; script = 'rangedtest.ps1'; what = 'every ranged weapon at a Cinderfang' },
 	@{ name = 'ai'; script = 'aitest.ps1'; what = 'hunting, sleeping, fleeing, special attacks' },

@@ -88,10 +88,24 @@ public:
 	void PickTameOrder(int32 Pos);
 	static const TArray<TPair<FName, FText>>& TameOrders();
 
-	/** Short-lived "+3 Wood" lines (from the server's notices). */
-	struct FPickup { FString Text; double Time; };
+	/** Short-lived "+3 Wood" lines (from the server's notices); more of the same item stacks onto its line. */
+	struct FPickup
+	{
+		FString Text;
+		double Time = 0.0;      // last added to (WRUIMotion::Now)
+		FString Item;           // "Wood" (empty: a line that doesn't stack)
+		int32 Count = 0;
+		FString Tail;           // "  (Stone hatchet)"
+		double Bumped = -100.0; // when it last stacked (a little pulse)
+	};
 	const TArray<FPickup>& GetPickups() const { return Pickups; }
+	/** When the newest line came in (the stack eases up to make room). */
+	double GetPickupAddedAt() const { return PickupAddedAt; }
 	void NoteNotice(const FString& Text);
+	/** The centre notice showing now and its fade (0..1); empty when none. Notices queue, so none is lost. */
+	const FString& GetCentreNotice(float& OutAlpha) const;
+	/** The moments between play: death and loading covers, banners, hints (WRUIFlow). */
+	class FWRFlow* GetFlow() const { return Flow.Get(); }
 
 	/** Testing / screenshots: hold a wheel open (0, 1 = ability wheels, 2 = tame orders) with a wedge lit; -1 closes. */
 	void DebugWheel(int32 Which, int32 Hover);
@@ -114,7 +128,11 @@ private:
 	TWeakObjectPtr<AWRPlayerController> PC;
 	TSharedPtr<SWidget> HudWidget;
 	TSharedPtr<SWidget> ScreenWidget;
+	/** The screen's motion wrapper (what the viewport holds), and closed screens still fading out. */
+	TSharedPtr<class SWRAppear> ScreenHost;
+	TArray<TSharedPtr<class SWRAppear>> LeavingScreens;
 	TSharedPtr<SWidget> WheelWidget;
+	TSharedPtr<class FWRFlow> Flow;
 	FName ScreenName;
 	bool bScreenWantsCursor = false;
 	bool bScreenStopsMove = false;
@@ -140,6 +158,12 @@ private:
 	int32 TameHover = -1;
 
 	TArray<FPickup> Pickups;
+	double PickupAddedAt = -100.0;
+	void UpdateNotices();
+	TArray<FString> NoticeQueue;
+	FString CurNotice;
+	double CurNoticeAt = -100.0;
+	double CurNoticeEnd = -100.0;
 	bool bHelp = false;
 	bool bDebugWheel = false;
 	void LoadWheels();

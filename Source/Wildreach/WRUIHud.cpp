@@ -22,12 +22,15 @@
 #include "WRPlayerState.h"
 #include "WRWorldDressing.h"
 #include "WRTuning.h"
+#include "WRUIFlow.h"
+#include "WRUIMotion.h"
 #include "AbilitySystemComponent.h"
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/SBoxPanel.h"
@@ -133,6 +136,28 @@ public:
 				const FVector2D Pos(X - S.X * 0.5f, Size.Y + 6.f);
 				WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(S + FVector2D(16.f, 4.f), FSlateLayoutTransform(Pos - FVector2D(8.f, 2.f))), WRUI::Box(FLinearColor(0.05f, 0.04f, 0.035f, 0.72f), 9.f, WRUI::Alpha(C, 0.5f), 1.f));
 				DrawTextAt(Out, Layer + 3, Geo, T, Font, Pos, C.Desaturate(0.3f) * 1.1f, false);
+			}
+		}
+		// Your belongings (the death screen's bag) while they wait: a warm marker with its distance.
+		FVector Bag = FVector::ZeroVector;
+		const FWRPlayerUI* UI = P->GetUI();
+		const FWRFlow* Flow = UI ? UI->GetFlow() : nullptr;
+		if (Flow && Flow->GetBagMarker(Bag))
+		{
+			const FVector D = Bag - Pawn->GetActorLocation();
+			bool bVis = false;
+			const float X = XFor(FMath::RadiansToDegrees(FMath::Atan2(D.X, -D.Y)), bVis);
+			if (bVis)
+			{
+				const float R = 6.f;
+				FSlateDrawElement::MakeRotatedBox(Out, Layer + 3, Geo.ToPaintGeometry(FVector2D(R * 2.f, R * 2.f), FSlateLayoutTransform(FVector2D(X - R, 4.f))), WRUI::Box(WRUI::Warn, 1.f, FLinearColor::Black, 1.f),
+					ESlateDrawEffect::None, FMath::DegreesToRadians(45.f), TOptional<FVector2f>(), FSlateDrawElement::RelativeToElement, WRUI::Warn);
+				const FText T = FText::FromString(FString::Printf(TEXT("Your belongings · %s"), D.Size2D() < 100000.f ? *FString::Printf(TEXT("%.0f m"), D.Size2D() / 100.f) : *FString::Printf(TEXT("%.1f km"), D.Size2D() / 100000.f)));
+				const FSlateFontInfo Font = WRUI::Body(12, 700);
+				const FVector2D S = Measure(T, Font);
+				const FVector2D Pos(X - S.X * 0.5f, Size.Y + 30.f);
+				WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(S + FVector2D(16.f, 4.f), FSlateLayoutTransform(Pos - FVector2D(8.f, 2.f))), WRUI::Box(FLinearColor(0.05f, 0.04f, 0.035f, 0.72f), 9.f, WRUI::Alpha(WRUI::Warn, 0.5f), 1.f));
+				DrawTextAt(Out, Layer + 3, Geo, T, Font, Pos, WRUI::Warn, false);
 			}
 		}
 		FSlateDrawElement::MakeBox(Out, Layer + 4, Geo.ToPaintGeometry(FVector2D(2.f, 10.f), FSlateLayoutTransform(FVector2D(Size.X * 0.5f - 1.f, Size.Y - 10.f))), WRUI::White(), ESlateDrawEffect::None, WRUI::Brass);
@@ -499,17 +524,30 @@ private:
 
 	TSharedRef<SWidget> CentreNotice()
 	{
-		return SNew(SBox).Visibility_Lambda([this]()
-		{
-			const AWRPlayerController* P = PC.Get();
-			return P && !P->GetNotice().IsEmpty() && !P->GetNotice().StartsWith(TEXT("+")) && P->GetWorld()->GetTimeSeconds() - P->GetNoticeTime() < 4.0 ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
-		})
-		[
-			SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(18.f * U, 7.f * U))
+		// Notices queue in the UI (each gets its turn) and ease in and out rather than snapping.
+		const auto Alpha = [this]() { float A = 0.f; if (const FWRPlayerUI* X = UI()) X->GetCentreNotice(A); return A; };
+		TSharedRef<SBox> Box = SNew(SBox).Visibility_Lambda([Alpha]() { return Alpha() > 0.f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			.RenderTransform_Lambda([Alpha]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, (1.f - Alpha()) * -8.f))); })
 			[
-				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return PC.IsValid() ? FText::FromString(PC->GetNotice()) : FText::GetEmpty(); }), WRUI::Body(16, 700), WRUI::Ink)
-			]
-		];
+				SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(18.f * U, 7.f * U))
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { float A = 0.f; const FWRPlayerUI* X = UI(); return X ? FText::FromString(X->GetCentreNotice(A)) : FText::GetEmpty(); }), WRUI::Body(16, 700), WRUI::Ink)
+				]
+			];
+		NoticeBox = Box;
+		return Box;
+	}
+	TSharedPtr<SBox> NoticeBox;
+
+	virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
+	{
+		SCompoundWidget::Tick(Geo, Time, Delta);
+		if (NoticeBox.IsValid())
+		{
+			float A = 0.f;
+			if (const FWRPlayerUI* X = UI()) X->GetCentreNotice(A);
+			NoticeBox->SetRenderOpacity(A);
+		}
 	}
 
 	FString PromptText(FString& OutTarget) const
@@ -563,27 +601,55 @@ private:
 
 	TSharedRef<SWidget> Pickups()
 	{
-		TSharedRef<SVerticalBox> Box = SNew(SVerticalBox).Visibility_Lambda([this]() { return Hidden() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; });
+		// The newest line slides up into the bottom row and the stack eases up to make room; a line that stacks
+		// more of its item ("+3 Wood" -> "+5 Wood") gives a little pulse; old lines fade.
+		const float RowH = 23.f * U;
+		const auto Entry = [this](int32 i) -> const FWRPlayerUI::FPickup*
+		{
+			const FWRPlayerUI* X = UI();
+			if (!X) return nullptr;
+			const TArray<FWRPlayerUI::FPickup>& P = X->GetPickups();
+			const int32 Idx = P.Num() - 5 + i;
+			return P.IsValidIndex(Idx) ? &P[Idx] : nullptr;
+		};
+		TSharedRef<SVerticalBox> Box = SNew(SVerticalBox).Visibility_Lambda([this]() { return Hidden() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+			.RenderTransform_Lambda([this, RowH]()
+			{
+				const FWRPlayerUI* X = UI();
+				const float T = X ? WRUIMotion::EaseOut(float(WRUIMotion::Now() - X->GetPickupAddedAt()) / 0.18f) : 1.f;
+				return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, (1.f - T) * RowH)));
+			});
 		for (int32 i = 0; i < 5; ++i)
 		{
 			Box->AddSlot().AutoHeight().HAlign(HAlign_Center)
 			[
-				WRUI::Text(TAttribute<FText>::CreateLambda([this, i]()
+				SNew(SBox).HeightOverride(RowH).VAlign(VAlign_Center)
+				.RenderTransformPivot(FVector2D(0.5f, 0.5f))
+				.RenderTransform_Lambda([Entry, i]()
 				{
-					const FWRPlayerUI* X = UI();
-					if (!X) return FText::GetEmpty();
-					const TArray<FWRPlayerUI::FPickup>& P = X->GetPickups();
-					const int32 Idx = P.Num() - 5 + i;
-					return P.IsValidIndex(Idx) ? FText::FromString(P[Idx].Text) : FText::GetEmpty();
-				}), WRUI::Body(15, 800), TAttribute<FSlateColor>::CreateLambda([this, i]()
-				{
-					const FWRPlayerUI* X = UI();
-					if (!X) return FSlateColor(WRUI::Ink);
-					const TArray<FWRPlayerUI::FPickup>& P = X->GetPickups();
-					const int32 Idx = P.Num() - 5 + i;
-					const float Age = P.IsValidIndex(Idx) ? float(FPlatformTime::Seconds() - P[Idx].Time) : 99.f;
-					return FSlateColor(WRUI::Alpha(WRUI::Ink, FMath::Clamp(1.f - (Age - 2.f) / 1.5f, 0.f, 1.f)));
-				}), true)
+					const FWRPlayerUI::FPickup* P = Entry(i);
+					const float Pulse = P ? 1.f - WRUIMotion::EaseOut(float(WRUIMotion::Now() - P->Bumped) / 0.22f) : 0.f;
+					return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FScale2D(1.f + 0.14f * Pulse)));
+				})
+				[
+					// A soft dark pill behind each line keeps it readable on snow and sand; line and pill fade together.
+					SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.42f), 10.f * U)).Padding(FMargin(12.f * U, 1.f * U))
+					.Visibility_Lambda([Entry, i]() { return Entry(i) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+					.ColorAndOpacity_Lambda([Entry, i]()
+					{
+						const FWRPlayerUI::FPickup* P = Entry(i);
+						const float Age = P ? float(WRUIMotion::Now() - P->Time) : 99.f;
+						const float In = i == 4 ? WRUIMotion::EaseOut(Age / 0.18f) : 1.f;
+						return FLinearColor(1.f, 1.f, 1.f, FMath::Min(In, FMath::Clamp(1.f - (Age - 2.f) / 1.5f, 0.f, 1.f)));
+					})
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([Entry, i]()
+						{
+							const FWRPlayerUI::FPickup* P = Entry(i);
+							return P ? FText::FromString(P->Text) : FText::GetEmpty();
+						}), WRUI::Body(15, 800), WRUI::Ink, true)
+					]
+				]
 			];
 		}
 		return Box;

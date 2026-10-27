@@ -29,6 +29,7 @@ public class Wildreach : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { "VorbisAudioDecoder", "AudioExtensions", "AudioMixer" });  // AudioExtensions: the procedural wave subclass (UWRPcmSound); AudioMixer: WRSoundRecord
 		PrivateIncludePathModuleNames.Add("TargetPlatform");
 		PrivateDependencyModuleNames.Add("AnimationCore");  // two-bone IK: the survivor's feet planted on slopes (WRAnimInstance)
+		PrivateDependencyModuleNames.Add("MoviePlayer");  // the loading screen during map loads (WRUIFlow)
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)

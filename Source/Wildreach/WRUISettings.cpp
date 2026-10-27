@@ -15,6 +15,7 @@
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
 #include "WRSound.h"
+#include "WRUIFlow.h"   // the Game section's "Show hints"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -1520,6 +1521,13 @@ namespace WRSettingsUI
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 				[
 					Muted(LOCTEXT("VideoHint", "Changes apply straight away and are kept for next time. Auto-detect picks quality levels for this computer."), 12, true)
+				]
+				// ---- Game: first-session hints (WRUIFlow keeps which ones each player has seen). Added by the polish pass.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 26.f * U, 0.f, 0.f)[Heading(LOCTEXT("GameHeading", "Game"))]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+				[
+					SettingRow(LOCTEXT("ShowHints", "Show hints"), LOCTEXT("ShowHintsSub", "One-time tips with your keys, the first time you meet something"),
+						SNew(SWRSwitch, []() { return FWRFlow::HintsEnabled(); }, []() { FWRFlow::SetHintsEnabled(!FWRFlow::HintsEnabled()); }), 52.f)
 				];
 
 			ChildSlot

@@ -9,6 +9,8 @@
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRTuning.h"
+#include "WRUIMotion.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBackgroundBlur.h"
@@ -148,15 +150,17 @@ private:
 		const TCHAR* Tab = Shown == EWRMenu::Inventory ? TEXT("inventory") : Shown == EWRMenu::Craft ? TEXT("crafting") : Shown == EWRMenu::Paths ? TEXT("paths")
 			: Shown == EWRMenu::Skills ? TEXT("skills") : Shown == EWRMenu::Map ? TEXT("map") : nullptr;
 		const FWRScreenFactory* Factory = Tab ? FWRScreens::FindTab(Tab) : nullptr;
-		if (Factory)
+		TSharedRef<SWidget> Page = Factory ? (*Factory)(PC.Get())
+			: StaticCastSharedRef<SWidget>(SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("TabSoon", "This page is on its way."), WRUI::Title(18), WRUI::Ink3)]);
+		// A new tab eases in (the window itself already does when it opens, so not the first one).
+		if (bShownOnce)
 		{
-			Content->SetContent((*Factory)(PC.Get()));
+			Page = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.tabInSeconds"), 0.15f)).Offset(FVector2D(0.f, 10.f))[Page];
 		}
-		else
-		{
-			Content->SetContent(SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("TabSoon", "This page is on its way."), WRUI::Title(18), WRUI::Ink3)]);
-		}
+		bShownOnce = true;
+		Content->SetContent(Page);
 	}
+	bool bShownOnce = false;
 };
 
 WR_REGISTER_SCREEN("journal", [](AWRPlayerController* PC) -> TSharedRef<SWidget> { return SNew(SWRJournal).PC(PC); });
