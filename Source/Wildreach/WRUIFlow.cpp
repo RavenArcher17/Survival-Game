@@ -265,6 +265,9 @@ public:
 		const auto ArtAlpha = [W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F && F->ShowsLoadingArt() ? F->GetBlack() : 0.f; };
 		const auto LineAlpha = [W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F && F->GetCover() == FWRFlow::ECover::Loading && !F->ShowsLoadingArt() && F->IsWaitingForIsland() ? F->GetBlack() : 0.f; };
 		const auto CardAlpha = [W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F ? F->GetDeathCardAlpha() : 0.f; };
+		// The cover fills the screen over the menus (layer 60 to their 20): left Visible, the empty cover took every
+		// click meant for a menu, so none could be clicked. Its parts say for themselves what they let through.
+		SetVisibility(EVisibility::SelfHitTestInvisible);
 		ChildSlot
 		[
 			SNew(SOverlay).Visibility_Lambda([Black]() { return Black() > 0.002f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
@@ -462,6 +465,8 @@ public:
 		{
 			ToastColumn->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)[ToastSlot(i)];
 		}
+		// Over the menus too (layer 30): never in the way of a click (see SWRFlowCover).
+		SetVisibility(EVisibility::SelfHitTestInvisible);
 		ChildSlot
 		[
 			SNew(SOverlay).Visibility_Lambda([this]()

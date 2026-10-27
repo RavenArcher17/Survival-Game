@@ -941,7 +941,9 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		return;
 	}
 
-	// Run the setup commands from -wrbotcmds="cmd one|wait 3|cmd two" once the bot is in the world.
+	// Run the setup commands from -wrbotcmds="cmd one|wait 3|cmd two" once the bot is in the world. They start over in
+	// each world, so a run that goes through the main menu marks commands "solo:" (only on your own, before joining) or
+	// "net:" (only once connected to a game).
 	if (!bBotSetupDone && BotClock > 1.5f)
 	{
 		bBotSetupDone = true;
@@ -953,8 +955,14 @@ void AWRPlayerController::TickBot(float DeltaTime)
 	}
 	while (BotCmdQueue.Num() > 0 && BotClock >= BotCmdResume && ShotSeqTaken >= ShotSeqCount)  // a shot sequence finishes first
 	{
-		const FString Cmd = BotCmdQueue[0].TrimStartAndEnd();
+		FString Cmd = BotCmdQueue[0].TrimStartAndEnd();
 		BotCmdQueue.RemoveAt(0);
+		const bool bSolo = GetNetMode() == NM_Standalone;
+		if (Cmd.StartsWith(TEXT("solo:")) || Cmd.StartsWith(TEXT("net:")))
+		{
+			if (Cmd.StartsWith(TEXT("solo:")) != bSolo) continue;
+			Cmd = Cmd.RightChop(Cmd.Find(TEXT(":")) + 1).TrimStart();
+		}
 		if (Cmd.StartsWith(TEXT("wait ")))
 		{
 			BotCmdResume = BotClock + FCString::Atof(*Cmd.RightChop(5));

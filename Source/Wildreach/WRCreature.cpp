@@ -1841,6 +1841,9 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		{
 			Self->SetActorHiddenInGame(bWantHidden);
 			Self->SetActorEnableCollision(!bWantHidden);
+			// Without collision nothing holds it up: buried, it waits where it is instead of falling out of the world.
+			if (bWantHidden) Self->GetCharacterMovement()->DisableMovement();
+			else Self->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 		}
 	}
 

@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-10-27: menus take clicks again, cave burrowers stay put
+
+Raven's friend reported they couldn't move around the menus, change settings or craft, though they could gather. A new
+test plays the menus with a mouse and keyboard the way players do, and it found that in 0.4.0 no menu took a single
+click, for the host or anyone who joined.
+
+- **Menus take clicks again.** The polish pass's loading and death cover (`SWRFlowCover`, drawn over the menus) and the
+  banner and hint layer (`SWRFlowMoments`) were full-screen widgets left at the default visibility, so even when empty
+  they caught every click meant for a menu: tabs, recipes, the Craft button, every setting. Keys still worked (I, J, Esc,
+  B open and close them), which is why gathering and opening menus looked fine. Both now let clicks through
+  (`SelfHitTestInvisible`); their parts already did.
+- **A menu left open under the chat box or the main menu keeps its cursor.** Closing either set game-only input, so a
+  menu still open had no cursor and the camera swung with the mouse until it was closed and opened again
+  (`FWRPlayerUI::ReapplyInputMode`).
+- **Cave burrowers stay put.** A Glacimaw or Kilnmite waiting underground has no collision, so it fell out of the world
+  (cave colonies have been empty since they were added); since 0.4.0 the fall-through rescue caught it every second and
+  logged it, about 280 times a session. A buried burrower now holds still (`DisableMovement`) and comes out walking, and
+  the rescue leaves characters without collision alone.
+- `Tools\menutest.ps1` (in `alltests.ps1` as `menus`): a host and a friend who joins from the main menu each open the
+  journal with I, click through its tabs, craft a crude hatchet by clicking the recipe and its button, open Settings with
+  Esc, flip Vertical sync off and back, click Resume, and open and close the build bar (12 checks). The clicks go through
+  Slate as real ones do (`WRClick`, `WRKey`, `WRType`, `WRUIText`, `WRUIState` in `WRUIDrive.cpp`), unlike `WRMenu` and
+  `WRSettings`, which call the menus' code directly: that is how a layer eating every click went unnoticed. Bot command
+  lists can mark steps `solo:` (on your own, before joining) or `net:` (once in a game), since the list starts over in
+  each world.
+- Not reproduced: what blocked the friend before 0.4.0, which had neither layer (closing chat over an open menu, fixed
+  above, is the one way found). If it happens again, it helps to know whether they host or join, whether a cursor shows
+  in the menu, and whether they play with a controller.
+
 ## 2026-10-27: version 0.4.0, the polish pass
 
 Raven asked for the playtest to feel and look like a real game by polishing what's there, with no new content (plan:

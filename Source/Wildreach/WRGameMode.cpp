@@ -92,7 +92,8 @@ void AWRGameMode::RescueUnderground()
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
 		AWRCharacterBase* C = *It;
-		if (!C->IsAlive())
+		// A burrower lying in wait has no collision on purpose (AWRCreature hides it underground).
+		if (!C->IsAlive() || !C->GetActorEnableCollision())
 		{
 			continue;
 		}

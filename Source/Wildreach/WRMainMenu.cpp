@@ -1,6 +1,7 @@
 #include "WRMainMenu.h"
 #include "Wildreach.h"
 #include "WRPlayerController.h"
+#include "WRPlayerUI.h"
 #include "WRKeyBindings.h"
 #include "WRUISettings.h"
 #include "WRUIMotion.h"
@@ -104,6 +105,8 @@ void SWRChatBox::Close()
 		if (APlayerController* PC = GEngine->GameViewport->GetWorld() ? GEngine->GameViewport->GetWorld()->GetFirstPlayerController() : nullptr)
 		{
 			PC->SetInputMode(FInputModeGameOnly());
+			// A menu that was open under the chat box gets its cursor back.
+			if (const AWRPlayerController* WPC = Cast<AWRPlayerController>(PC)) { if (FWRPlayerUI* UI = WPC->GetUI()) UI->ReapplyInputMode(); }
 		}
 	}
 	Instance.Reset();
@@ -826,6 +829,7 @@ void SWRMainMenu::Close()
 			PC->SetInputMode(FInputModeGameOnly());
 			PC->bShowMouseCursor = false;
 			ShowBackdrop(PC, false);
+			if (const AWRPlayerController* WPC = Cast<AWRPlayerController>(PC)) { if (FWRPlayerUI* UI = WPC->GetUI()) UI->ReapplyInputMode(); }
 		}
 	}
 }

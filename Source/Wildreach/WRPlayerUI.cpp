@@ -235,6 +235,13 @@ void FWRPlayerUI::UpdateInputMode()
 	}
 }
 
+void FWRPlayerUI::ReapplyInputMode()
+{
+	// UpdateInputMode only acts on a change, so make what it last set look different.
+	bScreenWantsCursor = !bScreenWantsCursor;
+	UpdateInputMode();
+}
+
 // ---------------------------------------------------------------- notices
 
 void FWRPlayerUI::NoteNotice(const FString& Text)

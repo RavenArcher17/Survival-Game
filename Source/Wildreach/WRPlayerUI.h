@@ -110,6 +110,10 @@ public:
 	/** Testing / screenshots: hold a wheel open (0, 1 = ability wheels, 2 = tame orders) with a wedge lit; -1 closes. */
 	void DebugWheel(int32 Which, int32 Hover);
 
+	/** Something else set the input mode (the chat box or the main menu closing sets game-only): put back what the
+	 *  open screen needs, or a menu left open has no cursor and the camera swings with the mouse. */
+	void ReapplyInputMode();
+
 	/** Help overlay (H). */
 	bool IsHelpShown() const { return bHelp; }
 	void ToggleHelp() { bHelp = !bHelp; }
