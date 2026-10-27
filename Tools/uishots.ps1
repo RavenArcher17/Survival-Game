@@ -71,13 +71,12 @@ $flowScreens = [ordered]@{
 	'flow_gather'    = 'WRFlow near tree|wait 3|WRBotPause 0|WRGather tree|wait 4.5'
 	'flow_discover'  = 'WRGather off|WRBotPause 1|WRTeleport -1300 -126600|wait 2.5'
 	'flow_boss'      = 'WRTeleport -40000 -60000|wait 6|WRHeal|WRSpawn vulkarn 1|wait 1.2'
-	# (Vulkarn is put down straight after his title card: he'd follow and kill the player.)
-	'flow_tame'      = 'WRBossDmg 99999999 none|WRTeleport -51623 59155|wait 7|WRHeal|WRClearCreatures|WRSpawn ashstrider 1|wait 1|WRGoTo ashstrider|WRInteract|wait 6'
+	'flow_tame'      = 'WRTeleport -51623 59155|wait 7|WRHeal|WRClearCreatures|WRSpawn ashstrider 1|wait 1|WRGoTo ashstrider|WRInteract|wait 6'
 	'flow_recipe'    = 'WRTameAll stay|WRTeleport -124800 -51600|wait 6|WRClearCreatures|WRGive copper_ingot 5|WRGive core_vulkarn 1|WRLook 0 -35|WRGhost claim_totem|wait 1|WRGhostPlace|wait 1.5|WRLook 180 -35|WRGhost hearth|wait 1|WRGhostPlace|wait 1.5|WRGoTo hearth|wait 1|WRCmd hearthfeed|wait 1.5'
 	'flow_island'    = 'WRFlow preview island 4|wait 0.6'
 	'flow_loading'   = 'WRFlow preview loading 4|wait 0.6'
-	# Killed by Magmaws away from the tames (which would fight them off).
-	'flow_death'     = 'wait 4|WRTeleport -118000 -40000|wait 6|WRClearCreatures|WRFlow shotondeath 3.5|WRFlow shotonback 0.15|WRSpawn magmaw 3|wait 45'
+	# Killed by Magmaws: a hard knock first, so they finish it quickly (tames nearby would otherwise fight them off).
+	'flow_death'     = 'wait 4|WRTeleport -51623 64155|wait 6|WRClearCreatures|WRHeal|WRHitPlayer Snapper 105|WRFlow shotondeath 3.5|WRFlow shotonback 0.15|WRSpawn magmaw 2|wait 45'
 	'flow_respawn'   = 'wait 0.1'
 	'flow_after'     = 'wait 2'
 	'flow_settings'  = 'WRMenu none 0|WRMenu settings 0|wait 1.5|WRSettings video|wait 1'
