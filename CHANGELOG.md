@@ -54,7 +54,9 @@ first: `WRSound` and `WRFx` name the moment ("hit.flesh", "gather.wood", "levelu
 - **Performance** (`Tools/benchmark.ps1`, results in `Docs/PERFORMANCE.md`): creatures more than 200 m from every
   player think in quarter-second slices (`UWRSignificanceSubsystem`): with all 169 out, server work per frame went from
   14.6 to 6.8 ms. The creature, body and item art preloads in the background at start (`UWRPreloadSubsystem`), which
-  removed the two hitches on the walk route (frames over 50 ms: 2-6 per run before, none after).
+  removed the two hitches on the walk route (frames over 50 ms: 2-6 per run before, none after). The whole merged pass
+  on this PC (RTX 4070 Ti, 1080p): Epic 8.25 ms a frame (121 fps), Medium 5.66 ms (177 fps), p99 9.9 / 7.0 ms, no frame
+  over 50 ms; the server 2.0 ms a frame with the usual wildlife and 4.2 ms with all 169 creatures out.
 - Fixes found on the way:
   - **Beds never set where you respawn**: the engine reused the controller's first start spot. They work now (and you
     wake standing on the bed, not inside the floor).
@@ -70,7 +72,11 @@ first: `WRSound` and `WRFx` name the moment ("hit.flesh", "gather.wood", "levelu
 - Known gaps: distant terrain isn't drawn past about 256 m (needs HLODs, still on the roadmap); the volcanic shrubs
   are bright green; your first spawn ignores your path (a fire player can start at a tundra camp); creature feet still
   slide about half their speed (the procedural rigs never fully plant a foot); running strafes show only while aiming or
-  in first person, because third person faces where you run.
+  in first person, because third person faces where you run. Two older visual faults the screenshots show, still open:
+  in Vulkarn's arena the near-black basalt floor makes the camera over-brighten, so the boss and his anvils look washed
+  out (needs an exposure pass); and one spot about 1.9 km from Volcanic camp 1 (around X -51600, Y 57200) draws a
+  flat blue surface instead of the ground, though the ground's collision is there (seen since 0.3.0; needs a look in the
+  editor).
 
 The whole UI is rebuilt from the mockups Raven approved (dark stone and leather, Cinzel and Alegreya Sans), in Slate
 C++ owned per local player by `FWRPlayerUI`. Screens register themselves by name and follow the controller's menu
