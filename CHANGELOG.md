@@ -28,7 +28,7 @@ click, for the host or anyone who joined.
 - Not reproduced: what blocked the friend before 0.4.0, which had neither layer (closing chat over an open menu, fixed
   above, is the one way found). If it happens again, it helps to know whether they host or join, whether a cursor shows
   in the menu, and whether they play with a controller.
-- The full suite passes: 21 of 21, 22 automation tests and 256 checks over 20 bot tests. `ProjectVersion=0.4.1`;
+- The full suite passes: 21 of 21, 22 automation tests and 246 checks over 20 bot tests. `ProjectVersion=0.4.1`;
   packaged (`C:\Dev\WildreachBuild2`) and smoke-tested by clicking (the packaged game opens Crafting, crafts a crude
   hatchet, opens Settings > Video and resumes); installer `Wildreach-Setup.exe` built (1.7 GB). Release notes:
   `Docs/release-notes/v0.4.1.md`.
