@@ -63,8 +63,9 @@ the old text HUD.
   full suite passes on the merged build: 15 automation tests and 222 checks over 18 bot tests; `uishots.ps1` captures
   all 25 in-game screens and the front end with no client errors.
 - `ProjectVersion=0.3.0`. Packaged (`C:\Dev\WildreachBuild2`) and smoke-tested: the packaged game loads the UI from its
-  `Data/UI` folder (fonts, icons, glyphs) and the menu shows 0.3.0; `Wildreach-Setup.exe` (1.6 GB) is built. Not yet
-  published as a GitHub release, so installed copies stay on 0.2.0 until it is.
+  `Data/UI` folder (fonts, icons, glyphs) and the menu shows 0.3.0. **Released 2026-10-26 as
+  [v0.3.0](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.3.0)** (Latest, `Wildreach-Setup.exe` 1.6 GB):
+  installed 0.2.0 copies update themselves on their next start.
 
 ## 2026-10-25: version 0.2.0, the game updates itself
 
