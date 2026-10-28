@@ -114,7 +114,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("lichen")) Body = FVector2D(150.f, 90.f);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (!Cylinder || !Sphere)
+	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
 	{
 		Placeholder(Node, Collider);
 		return;
@@ -253,7 +253,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		{
 			const float A = (k + Rand.FRandRange(-0.35f, 0.35f)) * 2.f * PI / N;
 			const float Lean = k == 0 ? 0.f : Rand.FRandRange(12.f, 38.f);
-			const float Len = k == 0 ? 165.f : Rand.FRandRange(75.f, 140.f);
+			// Sized against the rock mesh's bounds, which run well past the rock itself (so are the shards').
+			const float Len = k == 0 ? 280.f : Rand.FRandRange(150.f, 240.f);
 			const float W = Len * Rand.FRandRange(0.18f, 0.26f);
 			const FVector Foot(FMath::Cos(A) * (k == 0 ? 0.f : 30.f), FMath::Sin(A) * (k == 0 ? 0.f : 26.f), 22.f);
 			// Tip away from the middle: pitch the shard's long (Z) axis outward along A.
@@ -280,7 +281,10 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("berries"))
 	{
 		// A leafy bush hung with red berries (the dressing's shrubs give fibre; this one is the berry bush).
-		Place(Fit(Main, FVector(0.f, 0.f, 125.f), 8.f));
+		// GV shrub bounds are about twice their leafy part: 260 cm of bounds is a bush about a metre high.
+		const float BushH = 260.f, LeafH = BushH * 0.45f;
+		Place(Fit(Main, FVector(0.f, 0.f, BushH), 8.f));
+		Look->SetCastShadow(false);  // like the island's shrubs: wind-blown leaf cards in the shadow maps cost far more than they show
 		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
 		{
 			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
@@ -295,29 +299,29 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		// The rock material can draw instanced (the engine's shape material can't): a deep red over its dark texture.
 		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(2.2f, 0.06f, 0.12f)));
 		const FBox Box = Main->GetBoundingBox();
-		const float Width = FMath::Max(Box.GetSize().X, Box.GetSize().Y) * (125.f / FMath::Max(1.f, Box.GetSize().Z));
+		const float Width = FMath::Max(Box.GetSize().X, Box.GetSize().Y) * (BushH / FMath::Max(1.f, Box.GetSize().Z)) * 0.45f;  // the leafy part
 		for (int32 k = 0; k < 18; ++k)
 		{
-			const float A = Rand.FRandRange(0.f, 2.f * PI), H = Rand.FRandRange(0.35f, 0.9f);
-			const float R = Width * 0.5f * FMath::Lerp(0.85f, 0.45f, H) * Rand.FRandRange(0.75f, 1.f);
-			const float S = Rand.FRandRange(8.f, 12.f);
-			Bit(FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, 125.f * H - 8.f), FRotator::ZeroRotator, FVector(S));
+			const float A = Rand.FRandRange(0.f, 2.f * PI), H = Rand.FRandRange(0.3f, 0.95f);
+			const float R = Width * 0.5f * FMath::Lerp(0.9f, 0.5f, H) * Rand.FRandRange(0.8f, 1.05f);
+			const float S = Rand.FRandRange(10.f, 14.f);
+			Bit(FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, LeafH * H - 8.f), FRotator::ZeroRotator, FVector(S));
 		}
 	}
 	else if (Item == TEXT("fiber"))
 	{
 		// A tall, dry, olive-straw fibrous plant: the GV leaves' green is their texture's saturation (Sature Min..Max).
-		Place(Fit(Main, FVector(0.f, 0.f, 160.f), 8.f));
+		Place(Fit(Main, FVector(0.f, 0.f, 300.f), 8.f));  // bounds: about 1.4 m of plant
+		Look->SetCastShadow(false);
 		Bits->SetStaticMesh(nullptr);
 		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
 		{
 			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
 			{
 				MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.2f, 0.15f, 0.08f));
-				// The GV leaves take their colour from a "snow" coat (Snow Color over Amount Min..Max); a straw coat all over.
+				// The GV leaves take their colour from a "snow" coat (Snow Color over a random share of the plant): straw.
 				MID->SetVectorParameterValue(TEXT("Snow Color"), FLinearColor(0.3f, 0.24f, 0.1f));
-				MID->SetScalarParameterValue(TEXT("Amount Min"), 1.f);
-				MID->SetScalarParameterValue(TEXT("Amount Max"), 1.f);
+
 				Look->SetMaterial(Slot, MID);
 			}
 		}
