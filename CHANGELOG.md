@@ -65,6 +65,10 @@ the lead merged them; Raven approved the defaults below.
 - Tests: the suite gains `combat`, `water`, `gather`, `demolish`, `flicker` and `cave`; several bot tests take `-Port`.
   On the merged build 26 of 27 passed (25 automation tests, 335 checks over 26 bot tests); `mp` was the server crash above, and on the
   fix it passed 3 runs of 9/9, with the ten combat-related suites rerun and passing.
+- `ProjectVersion=0.5.0`; packaged and smoke-tested by real input (the starter spell on wheel 1, crafting by click,
+  demolish mode on B then X). **Released 2026-10-28 as
+  [v0.5.0](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.5.0)** (Latest, `Wildreach-Setup.exe` 1.7 GB,
+  notes `Docs/release-notes/v0.5.0.md`): installed copies update themselves on their next start.
 - Known: the volcanic shrubs are still yellow-green (their leaves only recolour through a coat; worth retrying now the
   hangs are understood); ice still uses the old 6 m sheet.
 
