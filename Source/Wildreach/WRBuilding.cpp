@@ -599,7 +599,11 @@ void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
 
 void AWRBuildPiece::SetGhostValid(bool bValid)
 {
-	const FLinearColor Color = bValid ? FLinearColor(0.2f, 0.9f, 0.3f) : FLinearColor(0.9f, 0.2f, 0.2f);
+	SetGhostColor(bValid ? FLinearColor(0.2f, 0.9f, 0.3f) : FLinearColor(0.9f, 0.2f, 0.2f));
+}
+
+void AWRBuildPiece::SetGhostColor(const FLinearColor& Color)
+{
 	TArray<UMeshComponent*> Comps;
 	GetComponents(Comps);
 	for (UMeshComponent* C : Comps)
@@ -608,6 +612,31 @@ void AWRBuildPiece::SetGhostValid(bool bValid)
 		{
 			M->SetVectorParameterValue(TEXT("Color"), Color);
 		}
+	}
+}
+
+void AWRBuildPiece::SetGhostGlow(const FLinearColor& Color, float Glow)
+{
+	// The creatures' unlit glow material (same "Color" parameter as the ghost's flat tint).
+	static UMaterialInterface* GlowMat = LoadRooted<UMaterialInterface>(TEXT("/Game/Creatures/M_Glow.M_Glow"));
+	if (!GlowMat)
+	{
+		SetGhostColor(Color);
+		return;
+	}
+	TArray<UMeshComponent*> Comps;
+	GetComponents(Comps);
+	for (UMeshComponent* C : Comps)
+	{
+		UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0));
+		if (!M) continue;
+		if (M->Parent != GlowMat)
+		{
+			M = UMaterialInstanceDynamic::Create(GlowMat, this);
+			C->SetMaterial(0, M);
+		}
+		M->SetVectorParameterValue(TEXT("Color"), Color);
+		M->SetScalarParameterValue(TEXT("Glow"), Glow);
 	}
 }
 

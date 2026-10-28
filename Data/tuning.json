@@ -195,6 +195,7 @@
     "rock": { "perHit": 2, "hits": 6, "respawnMinutes": 20 },
     "shrub": { "perHit": 2, "hits": 2, "respawnMinutes": 6, "berryChance": 0.3 } },
   "building": { "foundationSink": 60, "_foundationSink": "cm a new foundation sits into the ground at its centre, so its floor (100 up) is a walkable step. placeholder" },
+  "ui": { "_comment": "Build bar demolish mode: the piece under the crosshair glows (unlit, x demolishGlow; brighter washes out) red when a click takes it down, grey when it can't; the crosshair finds pieces out to demolishReach cm from the camera (beyond 11 m from you they say too far). placeholder", "demolishGlow": 0.35, "demolishReach": 1600 },
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },
   "flow": { "_comment": "The moments between play (WRUIFlow): the death screen and its fades; the Loading the island cover, held until World Partition has streamed streamRadius cm around you (at most streamMaxSeconds), shown after a jump of teleportCm or more; screens ease in over screenInSeconds; notices queue (each up noticeSeconds, at least noticeMinSeconds when others wait); banners, toasts and hints; discovery radii by place kind (cm); menuCamera is the main menu backdrop (cm, degrees). placeholder",

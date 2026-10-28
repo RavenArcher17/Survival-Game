@@ -11,6 +11,8 @@
 #include "WRTuning.h"
 #include "WRFx.h"
 #include "WRPlayerUI.h"
+#include "WRKeyBindings.h"
+#include "WRSound.h"
 #include "Camera/PlayerCameraManager.h"
 #include "EngineUtils.h"
 
@@ -209,6 +211,22 @@ void AWRPlayerController::StartPlacing(FName Piece)
 	Ghost = SpawnGhost(GetWorld(), Piece);  // "demolish": a red copy of whatever you aim at, made in UpdatePlacement
 }
 
+void AWRPlayerController::ToggleDemolish()
+{
+	if (IsDemolishing())
+	{
+		CancelPlacement();   // back to browsing the build bar
+		return;
+	}
+	// From anywhere, as the Build key opens build mode: the bar comes up, already demolishing.
+	if (UI && FWRScreens::Find(TEXT("build")))
+	{
+		Menu = EWRMenu::Build;
+		MenuIndex = 0;
+	}
+	StartPlacing(TEXT("demolish"));
+}
+
 void AWRPlayerController::CancelPlacement()
 {
 	PlacingPiece = NAME_None;
@@ -233,6 +251,13 @@ void AWRPlayerController::ConfirmPlacement()
 		if (bPlaceValid)
 		{
 			ServerCommand(FString::Printf(TEXT("demolish %.0f %.0f %.0f"), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z));
+		}
+		else
+		{
+			// Say why the click did nothing (the server would refuse it too).
+			ShowLocalNotice(TEXT("Can't demolish: ") + PlaceWhy);
+			WRSound::PlayUI(this, TEXT("build.invalid"));
+			UE_LOG(LogWildreach, Log, TEXT("DEMOLISH refused here: %s"), *PlaceWhy);
 		}
 	}
 	else if (IsPlacing())
@@ -260,7 +285,9 @@ void AWRPlayerController::UpdatePlacement()
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRBuildAim), false, Self);
 	Query.AddIgnoredActor(G);
 	FHitResult Hit;
-	FVector Point = Eye + Dir * 1000.f;
+	// Demolish reaches further than the 10 m a piece is placed within, so a piece out of reach says "too far" instead of
+	// "aim at a piece".
+	FVector Point = Eye + Dir * (Def ? 1000.f : WRTune(TEXT("ui.demolishReach"), 1600.f));
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query);
 	if (bHit)
 	{
@@ -282,12 +309,15 @@ void AWRPlayerController::UpdatePlacement()
 		}
 		const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
 		bPlaceValid = Target && PS && Target->OwnerName == PS->GetPlayerName() && FVector::Dist(Target->GetActorLocation(), Self->GetActorLocation()) < 1100.f;
-		PlaceWhy = !Target ? TEXT("aim at a piece you built") : bPlaceValid ? TEXT("") : Target->OwnerName != (PS ? PS->GetPlayerName() : FString()) ? TEXT("not yours") : TEXT("too far");
+		PlaceWhy = !Target ? FString(TEXT("aim at a piece you built")) : bPlaceValid ? FString()
+			: Target->OwnerName != (PS ? PS->GetPlayerName() : FString()) ? FString::Printf(TEXT("not yours: %s built it"), Target->OwnerName.IsEmpty() ? TEXT("someone else") : *Target->OwnerName)
+			: FString(TEXT("too far: get closer"));
 		PlaceLoc = Target ? Target->GetActorLocation() : FVector::ZeroVector;
 		if (G && Target)
 		{
 			G->SetActorTransform(FTransform(Target->GetActorRotation(), PlaceLoc, FVector(1.02f)));  // a hair bigger, so it shows over the piece
-			G->SetGhostValid(false);
+			// Glowing red: a click takes it down. Someone else's (or out of reach): dull grey, and the chip says why.
+			G->SetGhostGlow(bPlaceValid ? FLinearColor(1.f, 0.015f, 0.008f) : FLinearColor(0.5f, 0.5f, 0.53f), WRTune(TEXT("ui.demolishGlow"), 0.35f));
 		}
 		return;
 	}
@@ -443,7 +473,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
 		Out.Add({ FString::Printf(TEXT("%s%s  <-  %s"), OutDef ? *OutDef->Name : *R->Output.ToString(), Carried > 0 ? TEXT(" (have one)") : TEXT(""), *Needs),
 			FString::Printf(TEXT("craft %s none"), *R->Id.ToString()), bHave });
 	}
-	Out.Add({ TEXT("Demolish: aim at a piece of yours, LMB removes it (half back)"), TEXT("build demolish") });
+	Out.Add({ FString::Printf(TEXT("Demolish (%s): aim at a piece of yours, LMB removes it (half back)"), *FWRKeyBindings::Get().Key(TEXT("Demolish")).GetDisplayName().ToString()), TEXT("build demolish") });
 	// Pieces in pieces.json order, under a heading per group (wood / stone building, then by category).
 	FString Group;
 	for (const FWRPieceDef& Def : FWRBuildRegistry::Get().All())
@@ -576,7 +606,7 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		}
 		const FWRPieceDef* Def = Piece ? Piece->GetDef() : nullptr;
 		if (!Def) OutResult = TEXT("nothing to demolish");
-		else if (Piece->OwnerName != Who) OutResult = TEXT("not yours");
+		else if (Piece->OwnerName != Who) OutResult = FString::Printf(TEXT("not yours: %s built it"), Piece->OwnerName.IsEmpty() ? TEXT("someone else") : *Piece->OwnerName);
 		else
 		{
 			for (const TPair<FName, int32>& C : Def->Cost) Inv->AddItem(C.Key, C.Value / 2);

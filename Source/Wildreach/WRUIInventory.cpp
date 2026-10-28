@@ -739,7 +739,7 @@ namespace WRInvTab
 			{
 				DetailsHash = Hash;
 				bDetailsBuilt = true;
-				DetailsBox->SetContent(BuildDetails());
+				WRUI::SetContentMeasured(*DetailsBox, BuildDetails(), Geo.Scale);
 				// The stack being split or dropped changed under the picker: close it.
 				if (PickMode != EPick::None && (!I->GetSlots().IsValidIndex(PickSlot) || I->GetSlots()[PickSlot].ItemId != PickItem || I->GetSlots()[PickSlot].Count < PickMin)) ClosePicker();
 			}

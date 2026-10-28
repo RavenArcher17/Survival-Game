@@ -70,7 +70,7 @@ namespace WRStorageUI
 			{
 				Capacity = ChestCapacity();
 				ClosePicker();
-				WindowBox->SetContent(Window());
+				WRUI::SetContentMeasured(*WindowBox, Window(), Geo.Scale);
 			}
 			// The stack being moved changed under the picker: close it.
 			if (PickSide != EWRSlotKind::Other)

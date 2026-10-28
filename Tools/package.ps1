@@ -37,6 +37,21 @@ WILDREACH $version
    1-8 your items, hold Q for your abilities, I J P K M the journal (inventory, crafting,
    paths, skills, map), B build, G a bow or other ranged weapon (RMB aims), Esc the menu,
    F10 back to the main menu.
+   In build mode, X (or the Demolish button on the bar) takes down pieces you built: aim at
+   one, it turns red and shows what you get back (half its cost), click. X or Esc stops.
+
+CONSOLE (playtest builds)
+The `` key (left of 1, under Esc) opens the console; type a command and press Enter, Tab completes.
+In this playtest build ANYONE in the game can use these (they act on the host's world), so
+play with people you trust. A few handy ones:
+   WRGive <item> <count>        e.g. WRGive wood 100, WRGive copper_ingot 10 (ids: Wildreach\Data\items.json)
+   WRTeleport <x> <y>           centimetres, e.g. WRTeleport -131200 -51600 (Volcanic camp 3)
+   WRHour <0-24>                set the time of day, e.g. WRHour 22 for night
+   WRSpawn <creature> <count>   spawn creatures near you, e.g. WRSpawn ashstrider 1
+                                (ids: Wildreach\Data\creatures.json)
+   WRHeal                       full health, stamina, food and water
+   WRGivePoints <path> <n>      points for a path tree (fire or frost), e.g. WRGivePoints fire 5
+   WRClearCreatures             remove the wild creatures within 30 m of you
 
 Your character is saved on the host's PC under your name (Wildreach\Saved\ServerDB).
 Sound, music and other outside files are credited in CREDITS.md.

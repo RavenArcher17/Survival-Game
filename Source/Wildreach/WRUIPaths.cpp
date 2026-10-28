@@ -699,7 +699,7 @@ public:
 		if (Sig != ShownSig)
 		{
 			ShownSig = Sig;
-			DetailsBox->SetContent(Details());
+			WRUI::SetContentMeasured(*DetailsBox, Details(), Geo.Scale);
 		}
 	}
 

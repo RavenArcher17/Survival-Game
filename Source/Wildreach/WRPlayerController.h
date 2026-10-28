@@ -136,6 +136,9 @@ public:
 	void ConfirmPlacement();
 	void RotatePlacement();
 	void CancelPlacement();
+	/** Demolish mode (the build bar's button, the Demolish key): on, bringing the build bar up, or back off to the bar. */
+	void ToggleDemolish();
+	bool IsDemolishing() const { return PlacingPiece == TEXT("demolish"); }
 	/** Nearest built piece in range; bUsableOnly skips walls, floors, decor and stations (what E can't use on the piece itself). */
 	AWRBuildPiece* FindNearbyPiece(float Range = 350.f, bool bUsableOnly = false) const;
 	/** What E uses (and the prompt shows): the nearer of the nearest usable piece (door, chest, bed, crop, claim) and station. */

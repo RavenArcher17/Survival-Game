@@ -56,6 +56,18 @@ TSharedRef<SWidget> WRUI::Divider()
 	return SNew(SBox).HeightOverride(1.f)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Alpha(WRUI::Brass2, 0.8f))];
 }
 
+void WRUI::MeasureNow(SWidget& Widget, float LayoutScale)
+{
+	// This frame's measuring pass has already run: measure again now, before the new widgets are painted.
+	Widget.SlatePrepass(FMath::Max(0.01f, LayoutScale));
+}
+
+void WRUI::SetContentMeasured(SBox& Box, const TSharedRef<SWidget>& Content, float LayoutScale)
+{
+	Box.SetContent(Content);
+	MeasureNow(Box, LayoutScale);
+}
+
 // ---------------------------------------------------------------- panel
 
 void SWRPanel::Construct(const FArguments& InArgs)

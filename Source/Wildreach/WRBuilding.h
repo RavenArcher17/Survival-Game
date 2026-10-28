@@ -121,6 +121,10 @@ public:
 
 	const FWRPieceDef* GetDef() const { return FWRBuildRegistry::Get().Find(PieceId); }
 	void SetGhostValid(bool bValid);
+	/** Tint a ghost. */
+	void SetGhostColor(const FLinearColor& Color);
+	/** Make a ghost glow, unlit, so it reads the same by day and by night (demolish mode marks what a click takes down). */
+	void SetGhostGlow(const FLinearColor& Color, float Glow);
 	void ApplyLook();
 
 	// --- Server ---

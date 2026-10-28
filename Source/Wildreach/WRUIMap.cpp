@@ -522,12 +522,22 @@ namespace WRMapTab
 		virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
 		{
 			SCompoundWidget::Tick(Geo, Time, Delta);
-			// Rebuild the details when the pick changes, and now and then for distances and moving tames.
+			// Look the picked marker up again now and then (tames move, a Hearth gains cores): the panel's distance and
+			// state lines read it live. The panel itself is rebuilt only when it shows something else (another pick, or
+			// the marker came or went). 0.4.1 rebuilt it twice a second, here inside Slate's paint, so each rebuild drew
+			// one frame unmeasured: the flash Raven saw at the bottom right of the map.
 			if (State().Selected != ShownKey || Time > NextRefresh)
 			{
-				ShownKey = State().Selected;
 				NextRefresh = Time + 0.5;
-				PickedBox->SetContent(Picked());
+				const TArray<FMarker> All = Gather(PC.Get());
+				const FMarker* M = All.FindByPredicate([](const FMarker& X) { return X.Key == State().Selected; });
+				if (M) Live = *M;
+				if (State().Selected != ShownKey || (M != nullptr) != bLive)
+				{
+					ShownKey = State().Selected;
+					bLive = M != nullptr;
+					WRUI::SetContentMeasured(*PickedBox, Picked(), Geo.Scale);
+				}
 			}
 		}
 
@@ -537,6 +547,9 @@ namespace WRMapTab
 		TSharedPtr<SBox> PickedBox;
 		FString ShownKey = TEXT("-");
 		double NextRefresh = 0.0;
+		/** The picked marker as last looked up (bLive: it's there). */
+		FMarker Live;
+		bool bLive = false;
 
 		FVector Here() const { const APawn* P = PC.IsValid() ? PC->GetPawn() : nullptr; return P ? P->GetActorLocation() : FVector::ZeroVector; }
 
@@ -687,22 +700,46 @@ namespace WRMapTab
 
 		// ---------------------------------------------------------------- the picked marker
 
+		/** What the game says about a marker; a Hearth's cores and a tame's orders change, so the panel reads it live. */
+		static FText About(const FMarker& M)
+		{
+			const bool bWest = M.World.X < 0.f;
+			switch (M.Cat)
+			{
+			case ECat::Camp: return LOCTEXT("AboutCamp", "Where new survivors of this side wake up. Wild creatures don't nest close by.");
+			case ECat::Cave: return bWest ? LOCTEXT("AboutCaveV", "A dark chamber of rich ore (better gem odds), sulfur gas and a burrower colony.") : LOCTEXT("AboutCaveT", "A dark chamber of rich ore (better gem odds), ice underfoot and a burrower colony.");
+			case ECat::Pass: return LOCTEXT("AboutPass", "A way over the ridge between the volcanic west and the tundra east.");
+			case ECat::Base:
+			{
+				const AWRHearth* H = Cast<AWRHearth>(M.Actor.Get());
+				return H ? FText::Format(LOCTEXT("AboutHearth", "Tech level {0}, {1} {1}|plural(one=core,other=cores) fed{2}."), H->GetTechLevel(), H->GetCores().Num(), H->IsBroken() ? LOCTEXT("Broken", ", broken: repair it to craft") : FText::GetEmpty()) : FText::GetEmpty();
+			}
+			case ECat::Tame:
+			{
+				const AWRCreature* T = Cast<AWRCreature>(M.Actor.Get());
+				return T ? FText::Format(LOCTEXT("AboutTame", "{0}, {1}."), T->TameOrder == EWRTameOrder::Follow ? LOCTEXT("Following", "Following you") : LOCTEXT("Staying", "Staying put"), T->bTameAggressive ? LOCTEXT("Aggressive", "aggressive") : LOCTEXT("Passive", "passive")) : FText::GetEmpty();
+			}
+			case ECat::Claim: return FText::Format(LOCTEXT("AboutClaim", "Only its owner and their clan build within {0}."), FText::FromString(Distance(M.Radius)));
+			case ECat::Player: return LOCTEXT("AboutPlayer", "Another survivor near enough for you to know of.");
+			default: return FText::GetEmpty();
+			}
+		}
+
+		/** The details of the picked marker (Live). Its distance, height and state lines follow Live as Tick refreshes it. */
 		TSharedRef<SWidget> Picked()
 		{
-			const TArray<FMarker> All = Gather(PC.Get());
-			const FMarker* M = All.FindByPredicate([](const FMarker& X) { return X.Key == State().Selected; });
+			const FMarker* M = bLive ? &Live : nullptr;
 			if (!M)
 			{
 				return SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("PickMarker", "Click a marker on the map to read about it."), WRUI::Body(14, 500), WRUI::Ink3)];
 			}
 			const FCatLook Lk = LookFor(*M);
-			const float Dist = FVector::Dist2D(M->World, Here());
 			const bool bWest = M->World.X < 0.f;
 			const FWRCreatureDef* Creature = M->CreatureId.IsNone() ? nullptr : FWRCreatureRegistry::Get().Find(M->CreatureId);
 			const FSlateBrush* Portrait = M->CreatureId.IsNone() ? nullptr : WRUI::Portrait(M->CreatureId);
 
-			// The kind chip and what the game says about it.
-			FText Chip, About;
+			// The kind chip.
+			FText Chip;
 			FLinearColor ChipColor = Lk.Ring;
 			switch (M->Cat)
 			{
@@ -711,26 +748,13 @@ namespace WRMapTab
 					FText::FromString(Creature && !Creature->Element.IsNone() ? Creature->Element.ToString() : FString(bWest ? TEXT("fire") : TEXT("frost"))));
 				ChipColor = M->Kind == TEXT("boss") ? WRUI::Ember : WRUI::Warn;
 				break;
-			case ECat::Camp: Chip = LOCTEXT("ChipCamp", "Camp"); About = LOCTEXT("AboutCamp", "Where new survivors of this side wake up. Wild creatures don't nest close by."); break;
-			case ECat::Cave: Chip = LOCTEXT("ChipCave", "Cave"); About = bWest ? LOCTEXT("AboutCaveV", "A dark chamber of rich ore (better gem odds), sulfur gas and a burrower colony.") : LOCTEXT("AboutCaveT", "A dark chamber of rich ore (better gem odds), ice underfoot and a burrower colony."); break;
-			case ECat::Pass: Chip = LOCTEXT("ChipPass", "Pass"); About = LOCTEXT("AboutPass", "A way over the ridge between the volcanic west and the tundra east."); break;
-			case ECat::Base:
-			{
-				const AWRHearth* H = Cast<AWRHearth>(M->Actor.Get());
-				Chip = LOCTEXT("ChipBase", "Your base");
-				About = H ? FText::Format(LOCTEXT("AboutHearth", "Tech level {0}, {1} {1}|plural(one=core,other=cores) fed{2}."), H->GetTechLevel(), H->GetCores().Num(), H->IsBroken() ? LOCTEXT("Broken", ", broken: repair it to craft") : FText::GetEmpty()) : FText::GetEmpty();
-				break;
-			}
-			case ECat::Tame:
-			{
-				const AWRCreature* T = Cast<AWRCreature>(M->Actor.Get());
-				Chip = LOCTEXT("ChipTame", "Your tame");
-				About = T ? FText::Format(LOCTEXT("AboutTame", "{0}, {1}."), T->TameOrder == EWRTameOrder::Follow ? LOCTEXT("Following", "Following you") : LOCTEXT("Staying", "Staying put"), T->bTameAggressive ? LOCTEXT("Aggressive", "aggressive") : LOCTEXT("Passive", "passive")) : FText::GetEmpty();
-				break;
-			}
-			case ECat::Claim: Chip = M->bMine ? LOCTEXT("ChipClaimMine", "Your claim") : LOCTEXT("ChipClaim", "Land claim");
-				About = FText::Format(LOCTEXT("AboutClaim", "Only its owner and their clan build within {0}."), FText::FromString(Distance(M->Radius))); break;
-			default: Chip = LOCTEXT("ChipPlayer", "Survivor"); About = LOCTEXT("AboutPlayer", "Another survivor near enough for you to know of."); break;
+			case ECat::Camp: Chip = LOCTEXT("ChipCamp", "Camp"); break;
+			case ECat::Cave: Chip = LOCTEXT("ChipCave", "Cave"); break;
+			case ECat::Pass: Chip = LOCTEXT("ChipPass", "Pass"); break;
+			case ECat::Base: Chip = LOCTEXT("ChipBase", "Your base"); break;
+			case ECat::Tame: Chip = LOCTEXT("ChipTame", "Your tame"); break;
+			case ECat::Claim: Chip = M->bMine ? LOCTEXT("ChipClaimMine", "Your claim") : LOCTEXT("ChipClaim", "Land claim"); break;
+			default: Chip = LOCTEXT("ChipPlayer", "Survivor"); break;
 			}
 
 			TSharedRef<SVerticalBox> Box = SNew(SVerticalBox)
@@ -738,7 +762,7 @@ namespace WRMapTab
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("SelectedMarker", "Selected marker"), WRUI::Caps(13), WRUI::Ink2)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::Format(LOCTEXT("FromYou", "{0} from you"), FText::FromString(Distance(Dist))), WRUI::Body(12, 500), WRUI::Ink2)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::Format(LOCTEXT("FromYou", "{0} from you"), FText::FromString(Distance(FVector::Dist2D(Live.World, Here())))); }), WRUI::Body(12, 500), WRUI::Ink2)]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 				[
@@ -764,7 +788,10 @@ namespace WRMapTab
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[SNew(SBox).WidthOverride(14.f * U).HeightOverride(14.f * U)[SNew(SImage).Image(Glyph(TEXT("mountain"))).ColorAndOpacity(WRUI::Ink3)]]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								WRUI::Text(FText::Format(LOCTEXT("Side", "{0} side · {1} m up"), bWest ? LOCTEXT("SideWest", "Volcanic, west") : LOCTEXT("SideEast", "Tundra, east"), FMath::Max(0, FMath::RoundToInt(M->World.Z / 100.f))), WRUI::Body(13, 500), WRUI::Ink2)
+								WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+								{
+									return FText::Format(LOCTEXT("Side", "{0} side · {1} m up"), Live.World.X < 0.f ? LOCTEXT("SideWest", "Volcanic, west") : LOCTEXT("SideEast", "Tundra, east"), FMath::Max(0, FMath::RoundToInt(Live.World.Z / 100.f)));
+								}), WRUI::Body(13, 500), WRUI::Ink2)
 							]
 						]
 					]
@@ -802,10 +829,9 @@ namespace WRMapTab
 			}
 			else
 			{
-				Box->AddSlot().AutoHeight()[SNew(STextBlock).Text(About).Font(WRUI::Body(14, 500)).ColorAndOpacity(WRUI::Ink2).AutoWrapText(true)];
+				Box->AddSlot().AutoHeight()[SNew(STextBlock).Text_Lambda([this]() { return About(Live); }).Font(WRUI::Body(14, 500)).ColorAndOpacity(WRUI::Ink2).AutoWrapText(true)];
 			}
 
-			const FVector At = M->World;
 			Box->AddSlot().FillHeight(1.f)[SNullWidget::NullWidget];
 			// SWRButton's leather tile would size it to 256 units in an auto-height slot: give it its height.
 			Box->AddSlot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
@@ -816,7 +842,7 @@ namespace WRMapTab
 					+ SHorizontalBox::Slot().FillWidth(1.5f)
 					[
 						SNew(SWRButton).Text(LOCTEXT("ShowOnMapBtn", "Show on map")).Primary(true).FontSize(14)
-						.OnClicked_Lambda([At]() { State().Centre = FVector2D(At.X, At.Y); State().Zoom = FMath::Max(State().Zoom, 3.f); SWRMapView::Clamp(); return FReply::Handled(); })
+						.OnClicked_Lambda([this]() { State().Centre = FVector2D(Live.World.X, Live.World.Y); State().Zoom = FMath::Max(State().Zoom, 3.f); SWRMapView::Clamp(); return FReply::Handled(); })
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(10.f * U, 0.f, 0.f, 0.f)
 					[

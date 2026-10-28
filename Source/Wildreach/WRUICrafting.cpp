@@ -402,6 +402,7 @@ public:
 			LastHash = Hash;
 			bDirty = false;
 			RebuildAll();
+			WRUI::MeasureNow(*this, Geo.Scale);   // (this is inside Slate's paint: see MeasureNow)
 		}
 	}
 
