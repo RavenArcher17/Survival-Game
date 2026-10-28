@@ -233,8 +233,8 @@
     "stomp": { "radius": 320, "windup": 1.0, "cooldown": 8, "damageMult": 1.5, "poise": 40 },
     "bite": { "cooldown": 1.2, "damageMult": 1.0, "poise": 10, "_bite": "its snap at running prey (prey can't block or dodge; at survivors it swings its bite ability)" } },
   "telegraph": { "_comment": "Creature attack wind-ups, the look (WRCreature.cpp; how long each lasts is the attack's own windup: creature.biteTiming, creatureAI.<kind>). From the swing's start to its move the creature glows (M_WindupGlow over its materials: a flash for flashSeconds, then startGlow building to full; glow x opacity, wash = how much of the body fills in besides the rim; color sRGB, one for every creature) and rears back, reaching the pose by poseBy of the wind-up: pitch degrees (+ nose up on the hind feet, - head down on the front), back x its radius, sink x its half height. After the move it springs forward over releaseSeconds. Bosses glow but keep their own clips. enabled 0 turns it off. placeholder",
-    "enabled": 1, "glow": 3.0, "opacity": 0.6, "wash": 0.3, "startGlow": 0.45, "flashSeconds": 0.12, "poseBy": 0.6, "releaseSeconds": 0.2,
+    "enabled": 1, "glow": 5.0, "opacity": 0.75, "wash": 0.35, "startGlow": 0.7, "flashSeconds": 0.12, "poseBy": 0.6, "releaseSeconds": 0.2,
     "color": { "r": 255, "g": 60, "b": 20 },
-    "bite": { "pitch": 7, "back": 0.3, "sink": 0 }, "lunge": { "pitch": -6, "back": 0.35, "sink": 0.15 }, "charge": { "pitch": -10, "back": 0.15, "sink": 0 },
+    "bite": { "pitch": 10, "back": 0.4, "sink": 0 }, "lunge": { "pitch": -6, "back": 0.35, "sink": 0.15 }, "charge": { "pitch": -10, "back": 0.15, "sink": 0 },
     "stomp": { "pitch": 16, "back": 0.15, "sink": 0 }, "spit": { "pitch": 12, "back": 0.2, "sink": 0 }, "heavy": { "pitch": 0, "back": 0, "sink": 0 } }
 }

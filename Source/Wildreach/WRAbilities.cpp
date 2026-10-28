@@ -258,17 +258,20 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 			After(i * Active / Steps, [this]() { Sweep(); });
 		}
 	});
-	After(Windup + Active + Recovery, [this]()
+	After(Windup + Active + Recovery, [this]() { EndSelf(); });
+}
+
+void UWRGA_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// (Here, not in the swing's last timer: on a server the owning client's end of the swing usually arrives first.)
+	const AWRCharacterBase* Self = GetCharacter();
+	if (bFromGuard && Self && IsActive())
 	{
-		AWRCharacterBase* Self = GetCharacter();
-		if (bFromGuard && Self)
-		{
-			UE_LOG(LogWildreach, Log, TEXT("BLOCK %s swing done: %s"), *Self->GetName(),
-				Self->HasTag(WRTags::State_Blocking) ? TEXT("block still held, guard back up") : TEXT("block let go"));
-		}
-		bFromGuard = false;
-		EndSelf();
-	});
+		UE_LOG(LogWildreach, Log, TEXT("BLOCK %s swing done: %s"), *Self->GetName(),
+			Self->HasTag(WRTags::State_Blocking) ? TEXT("block still held, guard back up") : TEXT("block let go"));
+	}
+	bFromGuard = false;
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UWRGA_Melee::Sweep()

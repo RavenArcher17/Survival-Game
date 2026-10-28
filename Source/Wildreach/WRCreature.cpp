@@ -601,7 +601,7 @@ void AWRCreature::StartTelegraph(EWRSwingKind Kind, float Duration)
 		// One warning colour for every creature (sRGB in tuning), so the cue is learned once.
 		const FColor C(uint8(WRTune(TEXT("telegraph.color.r"), 255.f)), uint8(WRTune(TEXT("telegraph.color.g"), 60.f)), uint8(WRTune(TEXT("telegraph.color.b"), 20.f)));
 		TelegraphGlow->SetVectorParameterValue(TEXT("Color"), FLinearColor(C));
-		TelegraphGlow->SetScalarParameterValue(TEXT("Wash"), WRTune(TEXT("telegraph.wash"), 0.3f));
+		TelegraphGlow->SetScalarParameterValue(TEXT("Wash"), WRTune(TEXT("telegraph.wash"), 0.35f));
 		GlowOn->SetOverlayMaterial(TelegraphGlow);
 		TelegraphMesh = GlowOn;
 	}
@@ -640,7 +640,7 @@ void AWRCreature::TickTelegraph()
 		const float A = float(Now - TelegraphStart) / Windup;
 		// A flash as it starts (catches the eye), then building to its brightest just before the move.
 		const float Flash = FMath::Max(0.f, 1.f - float(Now - TelegraphStart) / T.Num(TEXT("telegraph.flashSeconds"), 0.12f));
-		Glow = FMath::Max(FMath::Lerp(T.Num(TEXT("telegraph.startGlow"), 0.45f), 1.f, A * A), Flash);
+		Glow = FMath::Max(FMath::Lerp(T.Num(TEXT("telegraph.startGlow"), 0.7f), 1.f, A * A), Flash);
 		// Reared back by telegraph.poseBy of the wind-up (eased), then held, coiled, until the move.
 		Pose = 1.f - FMath::Square(1.f - FMath::Min(1.f, A / FMath::Max(0.1f, T.Num(TEXT("telegraph.poseBy"), 0.6f))));
 	}
@@ -653,8 +653,8 @@ void AWRCreature::TickTelegraph()
 	}
 	if (TelegraphGlow)
 	{
-		TelegraphGlow->SetScalarParameterValue(TEXT("Glow"), Glow * T.Num(TEXT("telegraph.glow"), 3.f));
-		TelegraphGlow->SetScalarParameterValue(TEXT("Opacity"), Glow * T.Num(TEXT("telegraph.opacity"), 0.6f));
+		TelegraphGlow->SetScalarParameterValue(TEXT("Glow"), Glow * T.Num(TEXT("telegraph.glow"), 5.f));
+		TelegraphGlow->SetScalarParameterValue(TEXT("Opacity"), Glow * T.Num(TEXT("telegraph.opacity"), 0.75f));
 	}
 	if (bTelegraphPosed)
 	{

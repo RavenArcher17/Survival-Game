@@ -26,17 +26,17 @@ $cmds = @(
 	'WRClearCreatures', 'wait 0.5'
 )
 if ($Shots) {
-	# Two sides of each wind-up: frames every 0.1 s while it attacks you (you stand still, healed).
+	# Each wind-up from its side and from your own camera (or its other side): frames every 0.1 s while it attacks you.
 	foreach ($hour in 12, 22) {
 		$cmds += @("WRHour $hour", 'wait 2',
 			'WRSpawn cinderfang 1', 'wait 0.3', 'WRArtCam cinderfang 90', 'wait 1', "WRShotSeq telegraph_cinder_${hour}_side_ 30 0.1", (Hold 4),
-			'WRArtCam cinderfang 25', "WRShotSeq telegraph_cinder_${hour}_front_ 30 0.1", (Hold 4), 'WRArtCam none', 'WRClearCreatures', 'wait 0.5')
+			'WRArtCam none', "WRShotSeq telegraph_cinder_${hour}_player_ 30 0.1", (Face 4), 'WRHeal', 'WRClearCreatures', 'wait 0.5')
 	}
 	# Big ones, provoked by an arrow: a Basaltback stomps (ring), an Emberhorn charges (line).
 	$cmds += @('WRHour 12', 'wait 1', 'WRGive hunting_bow 1', 'WRGive stone_arrow 20', 'WREquip hunting_bow', 'wait 0.5')
 	foreach ($beast in 'basaltback', 'emberhorn') {
 		$cmds += @("WRSpawn $beast 1", 'wait 0.3', 'WRRanged 1', 'wait 0.5', 'WRAim 1', 'wait 0.5', "WRAimAt $beast", 'wait 0.1', 'WRFire', 'wait 0.3', 'WRAim 0', 'WRRanged 0',
-			"WRArtCam $beast 90", "WRShotSeq telegraph_${beast}_side_ 40 0.1", (Hold 4), "WRArtCam $beast 30", "WRShotSeq telegraph_${beast}_front_ 40 0.1", (Hold 4),
+			"WRArtCam $beast 90", "WRShotSeq telegraph_${beast}_side_ 40 0.1", (Hold 4), "WRArtCam $beast -70", "WRShotSeq telegraph_${beast}_other_ 40 0.1", (Hold 4),
 			'WRArtCam none', 'WRClearCreatures', 'wait 0.5')
 	}
 }
