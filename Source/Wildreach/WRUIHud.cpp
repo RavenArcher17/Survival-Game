@@ -25,6 +25,7 @@
 #include "WRUIFlow.h"
 #include "WRUIMotion.h"
 #include "WRFx.h"
+#include "WRWater.h"
 #include "AbilitySystemComponent.h"
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
@@ -580,6 +581,8 @@ private:
 			}
 		}
 		if (const AWRHearth* Hearth = P->FindNearbyHearth()) { OutTarget = FString::Printf(TEXT("Hearth · tech level %d"), Hearth->GetTechLevel()); return TEXT("Hearth"); }
+		// In the water or at its edge (WRWater), as the server decides it: E drinks.
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(P); Water && Water->CanDrink(S)) { OutTarget = TEXT("Sea water"); return TEXT("Drink"); }
 		return FString();
 	}
 

@@ -21,6 +21,7 @@
 #include "WRSky.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRWater.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Camera/CameraActor.h"
@@ -874,6 +875,7 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), 0.f);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 0.f);
 	}
+	else if (Cmd == TEXT("water") && UWRWaterSubsystem::Get(this)) { Result = UWRWaterSubsystem::Get(this)->DevCommand(this, Args); }  // swim / drink checks
 	else { Result = TEXT("unknown command or no pawn"); }
 
 	UE_LOG(LogWildreach, Log, TEXT("CMD %s: %s -> %s"), *GetNameSafe(PS), *Command, Result.IsEmpty() ? TEXT("ok") : *Result);

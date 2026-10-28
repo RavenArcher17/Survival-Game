@@ -1,7 +1,8 @@
 // Where the sea is: a 4 m grid over the island's heightmap, "sea" where the open ocean reaches (flood-filled in from the
 // edge through ground below landAbove), everything else land. The sea (AWRSea) is drawn only over sea cells, so it never
 // shows through the middle of the island where the far terrain isn't streamed in. Writes Data/sea_mask.json, rows of
-// run lengths (sea, land, sea, ...). Re-run after the terrain changes:  node Tools/terrain/sea_mask.mjs
+// run lengths (sea, land, sea, ...). The water you swim in (UWRWaterSubsystem) is built on the same cells, on the map named
+// here. Re-run after the terrain changes:  node Tools/terrain/sea_mask.mjs
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -57,7 +58,7 @@ for (let j = 0; j < N; j++) {
 const half = (SIZE - 1) * 100 / 2;
 const out = `{
   "_comment": "The open sea on a ${CELL} m grid (Tools/terrain/sea_mask.mjs, generated: edit the script, not this file). Each row (south to north, -Y first) is run lengths west to east (-X first), alternating sea, land, sea... starting with sea. Outside the grid is all sea.",
-  "cell": ${CELL * 100}, "originX": ${-half}, "originY": ${-half}, "width": ${N}, "height": ${N},
+  "map": "L_Island", "cell": ${CELL * 100}, "originX": ${-half}, "originY": ${-half}, "width": ${N}, "height": ${N},
   "rows": [
 ${rows.map(r => '    "' + r + '"').join(',\n')}
   ]

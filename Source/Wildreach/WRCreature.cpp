@@ -20,6 +20,7 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRFx.h"
+#include "WRWater.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -578,6 +579,14 @@ void AWRCreature::AddMovementInput(FVector WorldDirection, float ScaleValue, boo
 			{
 				ScaleValue *= WRTune(TEXT("anim.creatureSpinCreep"), 0.15f);  // nearly stopped, facing well away: turn on the spot first
 			}
+		}
+	}
+	// Wades in the shallows but never walks off into the sea (on the server, and a rider's client so it predicts the same).
+	if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying())
+	{
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
+		{
+			WorldDirection = Water->KeepOutOfDeepWater(this, WorldDirection);
 		}
 	}
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);

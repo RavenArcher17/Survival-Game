@@ -18,6 +18,7 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRPlayerUI.h"
+#include "WRWater.h"
 #include "EngineUtils.h"
 
 template <typename T>
@@ -722,8 +723,14 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		}
 		else
 		{
-			OutResult = TEXT("nothing to interact with");
-			return true;
+			// In the water or at its edge: a drink (WRWater validates it).
+			UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this);
+			OutResult = Water ? Water->Drink(this) : FString();
+			if (OutResult.IsEmpty())
+			{
+				OutResult = TEXT("nothing to interact with");
+				return true;
+			}
 		}
 	}
 	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade"))
