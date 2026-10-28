@@ -172,4 +172,6 @@ private:
 	bool bDebugWheel = false;
 	void LoadWheels();
 	void SaveWheels() const;
+	/** Put the main path's starter spell on wheel 1 (once) so a tap of the wheel key casts it. */
+	void PlaceStarterSpell();
 };

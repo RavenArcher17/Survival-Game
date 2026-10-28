@@ -121,6 +121,8 @@
   "creature": {
     "biteTiming": { "windup": 0.5, "active": 0.15, "recovery": 0.55 },
     "leashDistance": 4000, "dummyResetSeconds": 3, "burrowHide": 1,
+    "_biteTrack": "during a bite's wind-up the creature stands still and turns toward its target at biteTrackRate deg/s for the first biteTrackFraction of the wind-up, then commits (a late step aside makes it miss)",
+    "biteTrackRate": 180, "biteTrackFraction": 0.5,
     "_all": "placeholder"
   },
 
@@ -225,9 +227,14 @@
     "huntIntervalMinutes": 5, "eatSeconds": 8, "huntRetrySeconds": 45, "preySizeRatio": 1.3, "packPreySizeRatio": 2.0, "preyNoticeRadius": 1500, "huntSpeedMult": 1.3, "preyRestSeconds": 4, "huntLeash": 8000, "shareKillRadius": 1200,
     "fleeHealth": 0.25, "packFleeHealth": 0.5, "packLossSeconds": 15, "fleeSeconds": 8, "fleeSpeedMult": 1.2,
     "sleepAggroMult": 0.35, "nightAggroMult": 1.4, "wokenSeconds": 30,
-    "lunge": { "min": 300, "max": 650, "windup": 0.45, "cooldown": 6, "damageMult": 1.4, "poise": 30, "speed": 1100, "lift": 380, "reach": 60 },
-    "charge": { "min": 400, "max": 1400, "windup": 0.7, "cooldown": 9, "damageMult": 1.6, "poise": 45, "speedMult": 2.0, "seconds": 1.2, "knockback": 900, "reach": 50 },
-    "spit": { "min": 450, "max": 1600, "windup": 0.5, "cooldown": 5, "damageMult": 0.8, "poise": 10, "speed": 1800, "buildup": 25 },
-    "stomp": { "radius": 320, "windup": 0.8, "cooldown": 8, "damageMult": 1.5, "poise": 40 },
-    "bite": { "cooldown": 1.2, "damageMult": 1.0, "poise": 10, "_bite": "its snap at running prey (prey can't block or dodge; at survivors it swings its bite ability)" } }
+    "lunge": { "min": 300, "max": 650, "windup": 0.6, "cooldown": 6, "damageMult": 1.4, "poise": 30, "speed": 1100, "lift": 380, "reach": 60 },
+    "charge": { "min": 400, "max": 1400, "windup": 0.9, "cooldown": 9, "damageMult": 1.6, "poise": 45, "speedMult": 2.0, "seconds": 1.2, "knockback": 900, "reach": 50 },
+    "spit": { "min": 450, "max": 1600, "windup": 0.75, "cooldown": 5, "damageMult": 0.8, "poise": 10, "speed": 1800, "buildup": 25 },
+    "stomp": { "radius": 320, "windup": 1.0, "cooldown": 8, "damageMult": 1.5, "poise": 40 },
+    "bite": { "cooldown": 1.2, "damageMult": 1.0, "poise": 10, "_bite": "its snap at running prey (prey can't block or dodge; at survivors it swings its bite ability)" } },
+  "telegraph": { "_comment": "Creature attack wind-ups, the look (WRCreature.cpp; how long each lasts is the attack's own windup: creature.biteTiming, creatureAI.<kind>). From the swing's start to its move the creature glows (M_WindupGlow over its materials: a flash for flashSeconds, then startGlow building to full; glow x opacity, wash = how much of the body fills in besides the rim; color sRGB, one for every creature) and rears back, reaching the pose by poseBy of the wind-up: pitch degrees (+ nose up on the hind feet, - head down on the front), back x its radius, sink x its half height. After the move it springs forward over releaseSeconds. Bosses glow but keep their own clips. enabled 0 turns it off. placeholder",
+    "enabled": 1, "glow": 5.0, "opacity": 0.75, "wash": 0.35, "startGlow": 0.7, "flashSeconds": 0.12, "poseBy": 0.6, "releaseSeconds": 0.2,
+    "color": { "r": 255, "g": 60, "b": 20 },
+    "bite": { "pitch": 10, "back": 0.4, "sink": 0 }, "lunge": { "pitch": -6, "back": 0.35, "sink": 0.15 }, "charge": { "pitch": -10, "back": 0.15, "sink": 0 },
+    "stomp": { "pitch": 16, "back": 0.15, "sink": 0 }, "spit": { "pitch": 12, "back": 0.2, "sink": 0 }, "heavy": { "pitch": 0, "back": 0, "sink": 0 } }
 }

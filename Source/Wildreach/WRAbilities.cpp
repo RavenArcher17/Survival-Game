@@ -195,7 +195,8 @@ UWRGA_Melee::UWRGA_Melee()
 	FGameplayTagContainer Blocked = ActivationBlockedTags;
 	Blocked.AddTag(WRTags::State_Attacking);
 	Blocked.AddTag(WRTags::State_Dodging);
-	Blocked.AddTag(WRTags::State_Blocking);
+	// Not State_Blocking: a swing comes straight out of a held block. The guard drops while you swing (a block only
+	// counts when you aren't attacking, WRCombatLibrary) and is back up once the swing ends if block is still held.
 	ActivationBlockedTags = Blocked;
 	Element = WRTags::Element_Physical;
 }
@@ -228,6 +229,13 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	Character->PlaySwing(SwingKind, Windup + Active);
 	SetMoveSlow(false, true);
 
+	// Swinging out of a held block (survivors): log the guard dropping and coming back, for the bot tests.
+	bFromGuard = IsServer() && !Character->IsCreature() && Character->HasTag(WRTags::State_Blocking);
+	if (bFromGuard)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("BLOCK %s swings from the guard (%s): the guard is down for %.2f s"), *Character->GetName(), *GetClass()->GetName(), Windup + Active + Recovery);
+	}
+
 	if (IsServer() && !ArtKey.IsEmpty())
 	{
 		UWRCombatLibrary::GainResource(Character, WRTags::Element_Fire, T.Num(ArtKey + TEXT(".heat"), 0.f));
@@ -251,6 +259,19 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		}
 	});
 	After(Windup + Active + Recovery, [this]() { EndSelf(); });
+}
+
+void UWRGA_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// (Here, not in the swing's last timer: on a server the owning client's end of the swing usually arrives first.)
+	const AWRCharacterBase* Self = GetCharacter();
+	if (bFromGuard && Self && IsActive())
+	{
+		UE_LOG(LogWildreach, Log, TEXT("BLOCK %s swing done: %s"), *Self->GetName(),
+			Self->HasTag(WRTags::State_Blocking) ? TEXT("block still held, guard back up") : TEXT("block let go"));
+	}
+	bFromGuard = false;
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UWRGA_Melee::Sweep()
@@ -561,7 +582,8 @@ UWRGA_Block::UWRGA_Block()
 	CooldownFallback = 0.35f;
 	ActivationOwnedTags.AddTag(WRTags::State_Blocking);
 	FGameplayTagContainer Blocked = ActivationBlockedTags;
-	Blocked.AddTag(WRTags::State_Attacking);
+	// Not State_Attacking: block pressed during a swing is held ready and the guard goes up when the swing ends (it
+	// doesn't count while attacking). Its parry window starts at the press, so it mostly runs out during the swing.
 	Blocked.AddTag(WRTags::State_Dodging);
 	ActivationBlockedTags = Blocked;
 	FGameplayTagContainer Tags;
@@ -579,6 +601,11 @@ void UWRGA_Block::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	SetParrying(true);
 	SetMoveSlow(true, true);
 	After(WRTune(TEXT("defense.parryWindow"), 0.2f), [this]() { SetParrying(false); });
+	if (IsServer())
+	{
+		UE_LOG(LogWildreach, Verbose, TEXT("BLOCK %s raises the guard%s"), *GetNameSafe(GetAvatarActorFromActorInfo()),
+			GetCharacter() && GetCharacter()->HasTag(WRTags::State_Attacking) ? TEXT(" (mid-swing: up when it ends)") : TEXT(""));
+	}
 
 	if (UAbilityTask_WaitInputRelease* Wait = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true))
 	{
@@ -612,6 +639,10 @@ void UWRGA_Block::SetParrying(bool bOn)
 
 void UWRGA_Block::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (IsServer() && IsActive())
+	{
+		UE_LOG(LogWildreach, Verbose, TEXT("BLOCK %s lowers the guard"), *GetNameSafe(GetAvatarActorFromActorInfo()));
+	}
 	SetParrying(false);
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

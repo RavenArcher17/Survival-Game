@@ -73,6 +73,7 @@ class WILDREACH_API UWRGA_Melee : public UWRGameplayAbility
 public:
 	UWRGA_Melee();
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
 	bool bHeavy = false;
@@ -92,6 +93,7 @@ private:
 	TSet<TWeakObjectPtr<AActor>> HitThisSwing;
 	FTimerHandle SweepTimer;
 	double ActiveEnd = 0.0;
+	bool bFromGuard = false;  // this swing came out of a held block (server, for the log)
 };
 
 UCLASS() class WILDREACH_API UWRGA_LightAttack : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_LightAttack(); };

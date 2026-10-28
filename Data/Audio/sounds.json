@@ -15,6 +15,7 @@
 		"cast.fire": {"files": ["spell/cast_fire_1", "spell/cast_fire_2", "spell/cast_fire_3"], "volume": 0.71, "pitch": [0.95, 1.05], "radius": 3500, "category": "effects", "minGap": 0.1},
 		"cast.frost": {"files": ["spell/cast_frost_1", "spell/cast_frost_2"], "volume": 1.03, "pitch": [0.95, 1.05], "radius": 3500, "category": "effects", "minGap": 0.1},
 		"craft.done": {"files": ["world/craft_done_1", "world/craft_done_2"], "volume": 0.65, "pitch": [0.97, 1.05], "radius": 2000, "category": "effects", "minGap": 0.3},
+		"creature.windup": {"files": ["combat/swing_heavy_1", "combat/swing_heavy_2", "combat/swing_heavy_3", "combat/swing_heavy_4"], "volume": 0.8, "pitch": [0.5, 0.58], "radius": 3000, "category": "effects", "minGap": 0.25, "maxVoices": 4},
 		"creature.beast.aggro": {"files": ["creature/beast_aggro_1", "creature/beast_aggro_2", "creature/beast_aggro_3", "creature/beast_aggro_4", "creature/beast_aggro_5"], "volume": 0.85, "pitch": [0.94, 1.06], "radius": 4500, "category": "effects", "minGap": 5.0, "maxVoices": 4},
 		"creature.beast.attack": {"files": ["creature/beast_attack_1", "creature/beast_attack_2", "creature/beast_attack_3", "creature/beast_attack_4", "creature/beast_attack_5"], "volume": 0.76, "pitch": [0.94, 1.06], "radius": 3000, "category": "effects", "minGap": 0.25, "maxVoices": 4},
 		"creature.beast.death": {"files": ["creature/beast_death_1", "creature/beast_death_2", "creature/beast_death_3"], "volume": 0.85, "pitch": [0.94, 1.06], "radius": 4000, "category": "effects", "minGap": 1.0, "maxVoices": 4},

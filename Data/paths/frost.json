@@ -2,6 +2,7 @@
   "id": "frost",
   "name": "Frost",
   "biome": "tundra",
+  "starter": "frost_shard",
   "resource": {
     "id": "chill",
     "name": "Chill"

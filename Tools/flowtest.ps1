@@ -2,6 +2,7 @@
 # killed by creatures -> the server's death note names them and the bag, the client's death screen comes up, and the
 # player is back after the countdown at the camp they started at; then a bed is set and a second death brings them
 # back at the bed; a first-session hint fires once and is remembered for the player in GameUserSettings.
+param([int]$Port = 7881)
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
@@ -10,7 +11,6 @@ $out = Join-Path $env:TEMP ("wildreach-flow-" + (Get-Date -Format 'yyyyMMdd-HHmm
 New-Item -ItemType Directory -Force $out | Out-Null
 $db = Join-Path $root 'Saved\ServerDB'
 Remove-Item (Join-Path $db 'players\Flowbot.json'), (Join-Path $db 'world_flowtest.json') -ErrorAction SilentlyContinue
-$port = 7881
 
 $bot = @(
 	'WRBotPause 1', 'WRFlow quiet off', 'WRFlow hints on', 'WRFlow forget', 'wait 2',

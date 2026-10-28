@@ -3,7 +3,7 @@
 # Gloomhowl pack sleeps by day (doesn't notice you at 13 m) and hunts at night. Morale: a badly hurt Rimeclaw runs when
 # shot. Attacks: an Emberhorn charges, a Magmaw spits and lunges, a Basaltback stomps. -Shots: a windowed client and
 # screenshots (the hunt, the sleeping pack, each telegraph).
-param([switch]$Shots)
+param([switch]$Shots, [int]$Port = 7797)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-ai-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -32,10 +32,10 @@ $cmds = @(
 	'WRSpawn magmaw 1', 'WRArtCam magmaw 100', 'wait 0.4', $shot, (Hold 8), 'WRArtCam none', 'WRClearCreatures'
 ) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7797 -wrworld=aitest $tune `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=aitest $tune `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $view = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7797?Path=fire?WRName=Ranger -game $view -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=fire?WRName=Ranger -game $view -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 Start-Sleep -Seconds 140
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 $results = @()

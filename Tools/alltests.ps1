@@ -4,7 +4,7 @@
 #   alltests.ps1                     build, then everything (about 40 minutes)
 #   alltests.ps1 -SkipBuild          use the current build
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
-#                                    sky, tame, boss, social, menus, flow, spell, ranged, ai, wildlife, version, updater, walk, hazard)
+#                                    sky, tame, boss, social, menus, flow, spell, ranged, ai, combat, wildlife, version, updater, walk, hazard)
 param([switch]$SkipBuild, [string[]]$Only = @())
 # Every Unreal start otherwise runs UnrealBuildTool's platform check, which waits for any build running on the machine.
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -28,6 +28,7 @@ $tests = @(
 	@{ name = 'spell'; script = 'spelltest.ps1'; what = 'the Paths menu and tree spells' },
 	@{ name = 'ranged'; script = 'rangedtest.ps1'; what = 'every ranged weapon at a Cinderfang' },
 	@{ name = 'ai'; script = 'aitest.ps1'; what = 'hunting, sleeping, fleeing, special attacks' },
+	@{ name = 'combat'; script = 'combattest.ps1'; what = 'attacking out of a held block, creature attack wind-ups, the starter spell on wheel 1' },
 	@{ name = 'wildlife'; script = 'wildlifetest.ps1'; what = 'island wildlife: packs come out near players, go quiet, come back' },
 	@{ name = 'version'; script = 'versiontest.ps1'; what = 'another version can''t join and is told why; the menu offers a newer release' },
 	@{ name = 'updater'; script = 'updatertest.ps1'; what = 'auto-update end to end with fake releases (no Unreal)' },

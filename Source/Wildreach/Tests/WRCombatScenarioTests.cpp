@@ -103,6 +103,13 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("block from behind is a hit"), UWRCombatLibrary::ApplyHit(A.Target, FromBehind), EWRHitResult::Hit);
 	A.Heal();
 
+	// 3b. Swinging out of a held block: the guard is down until the swing ends, then back.
+	A.Tag(A.Target, WRTags::State_Attacking, true);
+	TestEqual(TEXT("no guard mid-swing"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Hit);
+	A.Tag(A.Target, WRTags::State_Attacking, false);
+	TestEqual(TEXT("guard back after the swing"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Blocked);
+	A.Heal();
+
 	// 4. Parry staggers the attacker.
 	A.Tag(A.Target, WRTags::State_Parrying, true);
 	TestEqual(TEXT("parry result"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Parried);

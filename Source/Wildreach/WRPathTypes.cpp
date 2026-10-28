@@ -104,6 +104,23 @@ bool FWRPathRegistry::ParsePath(const FString& JsonText, FWRPathDef& Out)
 			}
 		}
 	}
+	// The starter spell: named in the JSON, else the trunk's first ability.
+	FString StarterStr;
+	if (Root->TryGetStringField(TEXT("starter"), StarterStr) && !Out.FindNode(FName(*StarterStr)))
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("Path %s: starter %s is not a node, using the trunk's first ability"), *Out.Id.ToString(), *StarterStr);
+		StarterStr.Reset();
+	}
+	if (StarterStr.IsEmpty())
+	{
+		const FWRPathNodeDef* First = Out.Nodes.FindByPredicate([](const FWRPathNodeDef& N) { return N.Branch.IsNone() && N.Kind == EWRNodeKind::Ability; });
+		StarterStr = First ? First->Id.ToString() : FString();
+	}
+	Out.Starter = StarterStr.IsEmpty() ? NAME_None : FName(*StarterStr);
+	for (FWRPathNodeDef& Node : Out.Nodes)
+	{
+		Node.bStarter = Node.Id == Out.Starter;
+	}
 	return Out.IsValid();
 }
 
@@ -184,7 +201,8 @@ int32 FWRPathRules::Spent(const FWRPathDef& Def, const FWRPathProgress& Progress
 	int32 Total = 0;
 	for (const FWRPathNodeDef& Node : Def.Nodes)
 	{
-		Total += Progress.GetRank(Node.Id) * Node.Cost;
+		// The starter came free.
+		Total += FMath::Max(0, Progress.GetRank(Node.Id) - (Node.bStarter ? 1 : 0)) * Node.Cost;
 	}
 	return Total;
 }
@@ -196,7 +214,7 @@ int32 FWRPathRules::SpentInBranch(const FWRPathDef& Def, const FWRPathProgress& 
 	{
 		if (Node.Branch == Branch)
 		{
-			Total += Progress.GetRank(Node.Id) * Node.Cost;
+			Total += FMath::Max(0, Progress.GetRank(Node.Id) - (Node.bStarter ? 1 : 0)) * Node.Cost;
 		}
 	}
 	return Total;
@@ -226,15 +244,16 @@ FString FWRPathRules::CanBuy(const FWRPathDef& Def, const FWRPathProgress& Progr
 		return TEXT("already maxed");
 	}
 	const int32 Spent = FWRPathRules::Spent(Def, Progress);
-	if (PointsForXP(Progress.XP) - Spent < Node->Cost)
+	const int32 Cost = NextRankCost(*Node, Progress);
+	if (PointsForXP(Progress.XP) - Spent < Cost)
 	{
 		return TEXT("not enough points");
 	}
-	if (Spent + Node->Cost > FMath::RoundToInt(WRTune(TEXT("paths.maxPointsPerPath"), 100.f)))
+	if (Spent + Cost > FMath::RoundToInt(WRTune(TEXT("paths.maxPointsPerPath"), 100.f)))
 	{
 		return TEXT("path cap (100)");
 	}
-	if (Spent + OtherPathSpent + Node->Cost > FMath::RoundToInt(WRTune(TEXT("paths.maxPointsTotal"), 150.f)))
+	if (Spent + OtherPathSpent + Cost > FMath::RoundToInt(WRTune(TEXT("paths.maxPointsTotal"), 150.f)))
 	{
 		return TEXT("total cap (150)");
 	}
@@ -250,6 +269,21 @@ FString FWRPathRules::CanBuy(const FWRPathDef& Def, const FWRPathProgress& Progr
 		}
 	}
 	return FString();
+}
+
+int32 FWRPathRules::NextRankCost(const FWRPathNodeDef& Node, const FWRPathProgress& Progress)
+{
+	return Node.bStarter && Progress.GetRank(Node.Id) == 0 ? 0 : Node.Cost;
+}
+
+bool FWRPathRules::GrantStarter(const FWRPathDef& Def, FWRPathProgress& Progress)
+{
+	if (Def.Starter.IsNone() || Progress.GetRank(Def.Starter) > 0)
+	{
+		return false;
+	}
+	Progress.SetRank(Def.Starter, 1);
+	return true;
 }
 
 int32 FWRPathRules::CharacterLevel(int32 TotalSpent)

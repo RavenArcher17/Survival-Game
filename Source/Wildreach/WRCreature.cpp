@@ -20,6 +20,7 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRFx.h"
+#include "WRSound.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -499,6 +500,7 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 
 void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
 {
+	StartTelegraph(Kind, Duration);  // art or placeholder body alike
 	UWRAnimInstance* Anim = CreatureAnim();
 	if (!Skel->IsVisible() || !Anim)
 	{
@@ -536,6 +538,152 @@ void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
 	const float Start = FMath::Max(0.f, Strike - Rate * Hit);
 	const float Delay = FMath::Max(0.f, Hit - (Strike - Start) / Rate);
 	OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, Rate, Start, Delay);
+}
+
+namespace WRTelegraphDetail
+{
+	/** Seconds from a swing's start to the moment its move lands (its wind-up), by kind; 0 = nothing to telegraph. */
+	float WindupOf(EWRSwingKind Kind, float Duration)
+	{
+		switch (Kind)
+		{
+		case EWRSwingKind::Bite: return Duration - WRTune(TEXT("creature.biteTiming.active"), 0.15f);  // it sweeps after its wind-up
+		case EWRSwingKind::Lunge:
+		case EWRSwingKind::Charge:
+		case EWRSwingKind::Stomp:
+		case EWRSwingKind::Spit: return Duration;  // the move starts as its wind-up ends
+		case EWRSwingKind::Heavy:
+		case EWRSwingKind::WeaponArt: return Duration - 0.2f;  // a boss's attack resolves 0.2 s before its swing ends
+		default: return 0.f;  // a snap at running prey lands at once (prey can't block or dodge)
+		}
+	}
+
+	const TCHAR* MoveOf(EWRSwingKind Kind)
+	{
+		switch (Kind)
+		{
+		case EWRSwingKind::Bite: return TEXT("bite");
+		case EWRSwingKind::Lunge: return TEXT("lunge");
+		case EWRSwingKind::Charge: return TEXT("charge");
+		case EWRSwingKind::Stomp: return TEXT("stomp");
+		case EWRSwingKind::Spit: return TEXT("spit");
+		default: return TEXT("heavy");
+		}
+	}
+}
+
+void AWRCreature::StartTelegraph(EWRSwingKind Kind, float Duration)
+{
+	const float Windup = WRTelegraphDetail::WindupOf(Kind, Duration);
+	// A creature just arriving on this machine replays its last swing: that's not a new attack.
+	if (GetNetMode() == NM_DedicatedServer || Windup < 0.05f || !IsAlive() || GetGameTimeSinceCreation() < 0.5f
+		|| WRTune(TEXT("telegraph.enabled"), 1.f) <= 0.f)
+	{
+		return;
+	}
+	EndTelegraph();  // a new swing takes over from one still fading
+	const double Now = GetWorld()->GetTimeSeconds();
+	TelegraphStart = Now;
+	TelegraphStrike = Now + Windup;
+	TelegraphMove = FName(WRTelegraphDetail::MoveOf(Kind));
+
+	// The glow: an overlay drawn over its own materials (the art, or the placeholder shape).
+	UMeshComponent* GlowOn = Skel->IsVisible() ? static_cast<UMeshComponent*>(Skel.Get()) : static_cast<UMeshComponent*>(BodyMesh.Get());
+	if (!TelegraphGlow)
+	{
+		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FX/M_WindupGlow.M_WindupGlow")))
+		{
+			TelegraphGlow = UMaterialInstanceDynamic::Create(Base, this);
+		}
+	}
+	if (TelegraphGlow && GlowOn && GlowOn->IsVisible())
+	{
+		// One warning colour for every creature (sRGB in tuning), so the cue is learned once.
+		const FColor C(uint8(WRTune(TEXT("telegraph.color.r"), 255.f)), uint8(WRTune(TEXT("telegraph.color.g"), 60.f)), uint8(WRTune(TEXT("telegraph.color.b"), 20.f)));
+		TelegraphGlow->SetVectorParameterValue(TEXT("Color"), FLinearColor(C));
+		TelegraphGlow->SetScalarParameterValue(TEXT("Wash"), WRTune(TEXT("telegraph.wash"), 0.35f));
+		GlowOn->SetOverlayMaterial(TelegraphGlow);
+		TelegraphMesh = GlowOn;
+	}
+	// The rear-back moves the fitted art (bosses keep to their own big clips).
+	const FWRCreatureDef* Def = GetDef();
+	if (Skel->IsVisible() && Def && Def->Archetype != TEXT("boss"))
+	{
+		SkelBaseLocation = Skel->GetRelativeLocation();
+		SkelBaseRotation = Skel->GetRelativeRotation();
+		bTelegraphPosed = true;
+	}
+	WRSound::PlayOn(this, TEXT("creature.windup"));
+	TickTelegraph();
+	UE_LOG(LogWildreach, Verbose, TEXT("TELEGRAPH %s %s wind-up %.2f s"), *GetName(), *TelegraphMove.ToString(), Windup);
+}
+
+void AWRCreature::TickTelegraph()
+{
+	if (TelegraphStart < 0.0)
+	{
+		return;
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float Windup = FMath::Max(0.05f, float(TelegraphStrike - TelegraphStart));
+	const float Release = FMath::Max(0.05f, T.Num(TEXT("telegraph.releaseSeconds"), 0.2f));
+	// Over once the move has landed, or if it's cut short (staggered by a parry, frozen, knocked out, dead).
+	if (Now > TelegraphStrike + Release || !IsAlive() || HasTag(WRTags::Status_Staggered) || HasTag(WRTags::Status_Frozen) || HasTag(WRTags::Status_Unconscious))
+	{
+		EndTelegraph();
+		return;
+	}
+	float Glow = 0.f, Pose = 0.f;
+	if (Now <= TelegraphStrike)
+	{
+		const float A = float(Now - TelegraphStart) / Windup;
+		// A flash as it starts (catches the eye), then building to its brightest just before the move.
+		const float Flash = FMath::Max(0.f, 1.f - float(Now - TelegraphStart) / T.Num(TEXT("telegraph.flashSeconds"), 0.12f));
+		Glow = FMath::Max(FMath::Lerp(T.Num(TEXT("telegraph.startGlow"), 0.7f), 1.f, A * A), Flash);
+		// Reared back by telegraph.poseBy of the wind-up (eased), then held, coiled, until the move.
+		Pose = 1.f - FMath::Square(1.f - FMath::Min(1.f, A / FMath::Max(0.1f, T.Num(TEXT("telegraph.poseBy"), 0.6f))));
+	}
+	else
+	{
+		// The move: the glow goes out and the body springs forward past rest, then settles.
+		const float U = float(Now - TelegraphStrike) / Release;
+		Glow = FMath::Square(1.f - U);
+		Pose = (1.f - U) * (1.f - 2.2f * U);
+	}
+	if (TelegraphGlow)
+	{
+		TelegraphGlow->SetScalarParameterValue(TEXT("Glow"), Glow * T.Num(TEXT("telegraph.glow"), 5.f));
+		TelegraphGlow->SetScalarParameterValue(TEXT("Opacity"), Glow * T.Num(TEXT("telegraph.opacity"), 0.75f));
+	}
+	if (bTelegraphPosed)
+	{
+		// Nose up pivots on the hind feet (rearing), head down on the front ones (a charge lowering its horns); back and
+		// sink shift the weight (fractions of its radius / half height).
+		const FString Key = FString::Printf(TEXT("telegraph.%s."), *TelegraphMove.ToString());
+		const float R = GetCapsuleComponent()->GetScaledCapsuleRadius();
+		const float HH = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		const float Pitch = T.Num(Key + TEXT("pitch"), 0.f) * Pose;
+		const FVector Pivot(Pitch >= 0.f ? -R : R, 0.f, -HH);
+		const FQuat Q(FRotator(Pitch, 0.f, 0.f));
+		const FVector Shift(-T.Num(Key + TEXT("back"), 0.f) * R, 0.f, -T.Num(Key + TEXT("sink"), 0.f) * HH);
+		Skel->SetRelativeLocationAndRotation(Pivot + Q.RotateVector(SkelBaseLocation - Pivot) + Shift * Pose, Q * FQuat(SkelBaseRotation));
+	}
+}
+
+void AWRCreature::EndTelegraph()
+{
+	if (TelegraphMesh)
+	{
+		TelegraphMesh->SetOverlayMaterial(nullptr);
+		TelegraphMesh = nullptr;
+	}
+	if (bTelegraphPosed)
+	{
+		Skel->SetRelativeLocationAndRotation(SkelBaseLocation, SkelBaseRotation);
+		bTelegraphPosed = false;
+	}
+	TelegraphStart = TelegraphStrike = -1.0;
 }
 
 void AWRCreature::OnHitVisual(EWRHitResult Result)
@@ -1176,6 +1324,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		TickCreatureAnim(DeltaSeconds);
+		TickTelegraph();
 	}
 	if (HasAuthority() && AggroRep != AggroTarget.Get())
 	{
@@ -1468,6 +1617,17 @@ void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
 	const FVector To = Target->GetActorLocation() - Self->GetActorLocation();
 	const float Dist = To.Size2D();
 	const float Range = Def->AttackRange + Target->GetSimpleCollisionRadius();
+	if (Self->HasTag(WRTags::State_Attacking))
+	{
+		// Mid-bite: feet planted for the wind-up (its telegraph), turning toward the target only through the first part
+		// of it, so a late step aside or back still makes it miss. Nothing else starts until the bite is done.
+		if (GetWorld()->GetTimeSeconds() < BiteTrackUntil && !To.IsNearlyZero())
+		{
+			Self->SetActorRotation(FMath::RInterpConstantTo(Self->GetActorRotation(), FRotator(0.f, To.Rotation().Yaw, 0.f),
+				GetWorld()->GetDeltaSeconds(), WRTune(TEXT("creature.biteTrackRate"), 180.f)));
+		}
+		return;
+	}
 	if (SpecialPhase != 0 || TryStartSpecial(Self, Target, Dist))
 	{
 		return;  // TickSpecial runs it
@@ -1505,9 +1665,11 @@ void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
 		Self->AddMovementInput(To.GetSafeNormal2D(), 1.f);
 		return;
 	}
-	if (UAbilitySystemComponent* ASC = Self->GetAbilitySystemComponent())
+	if (UAbilitySystemComponent* ASC = Self->GetAbilitySystemComponent(); ASC && ASC->TryActivateAbilityByClass(UWRGA_Bite::StaticClass()))
 	{
-		ASC->TryActivateAbilityByClass(UWRGA_Bite::StaticClass());
+		const float Windup = WRTune(TEXT("creature.biteTiming.windup"), 0.5f);
+		BiteTrackUntil = GetWorld()->GetTimeSeconds() + Windup * WRTune(TEXT("creature.biteTrackFraction"), 0.5f);
+		UE_LOG(LogWildreach, Verbose, TEXT("AI %s winds up bite at %s (%.2f s)"), *Self->GetName(), *Target->GetName(), Windup);
 	}
 }
 

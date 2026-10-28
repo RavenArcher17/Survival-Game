@@ -220,8 +220,19 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// What kind of hit it was, for the effects and damage numbers on every machine.
 	bool bCrit = false, bRiposte = false, bShatter = false;
 
-	// --- Block and parry (melee only, from the front) ---
+	// --- Block and parry (melee only, from the front; not while the blocker is swinging or casting out of the guard) ---
+	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) && UE_LOG_ACTIVE(LogWildreach, Verbose))
+	{
+		const FVector To = (Hit.Origin - Target->GetActorLocation()).GetSafeNormal2D();
+		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Target->GetActorForwardVector().GetSafeNormal2D(), To), -1.f, 1.f)));
+		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) || Off > WRTune(TEXT("defense.blockAngleDegrees"), 70.f))
+		{
+			UE_LOG(LogWildreach, Verbose, TEXT("COMBAT %s's guard misses %s: %s (%.0f deg off its facing)"), *Target->GetName(), *GetNameSafe(Hit.Instigator),
+				TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) ? TEXT("swinging") : TEXT("not in front"), Off);
+		}
+	}
 	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking)
+		&& !TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking)
 		&& IsInFront(Target, Hit.Origin, WRTune(TEXT("defense.blockAngleDegrees"), 70.f)))
 	{
 		// Wyrm scale: a block can freeze the attacker.

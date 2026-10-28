@@ -200,11 +200,12 @@ struct FWRPathsModel
 	FString Meta(const FWRPathNodeDef& N) const
 	{
 		const bool bRanked = N.Kind == EWRNodeKind::Stat;
-		const FString Cost = bRanked ? FString(TEXT("1 pt/rank")) : FString::Printf(TEXT("%d pts"), N.Cost);
+		// The starter spell comes free with the path (WRPathTypes).
+		const FString Cost = N.bStarter ? FString(TEXT("starter · free")) : bRanked ? FString(TEXT("1 pt/rank")) : FString::Printf(TEXT("%d pts"), N.Cost);
 		const int32 Rk = Rank(N.Id);
 		switch (State(N))
 		{
-		case ENodeState::Learned: return bRanked ? FString::Printf(TEXT("%d/%d · %s"), Rk, N.MaxRank, *Cost) : FString(TEXT("Learned"));
+		case ENodeState::Learned: return bRanked ? FString::Printf(TEXT("%d/%d · %s"), Rk, N.MaxRank, *Cost) : FString(N.bStarter ? TEXT("Starter") : TEXT("Learned"));
 		case ENodeState::Available: return bRanked ? FString::Printf(TEXT("%d/%d · %s"), Rk, N.MaxRank, *Cost) : Cost;
 		default: return N.Gate > 0 ? FString::Printf(TEXT("needs %d · %s"), N.Gate, *Cost) : Cost;
 		}
@@ -1117,7 +1118,8 @@ private:
 		// What it takes: cost, the branch gate and how far along you are.
 		{
 			const int32 Have = N->Branch.IsNone() ? 0 : Model->BranchSpent(N->Branch);
-			const FString CostText = bRanked ? FString::Printf(TEXT("%d point%s per rank"), N->Cost, N->Cost == 1 ? TEXT("") : TEXT("s")) : FString::Printf(TEXT("%d points"), N->Cost);
+			const FString CostText = N->bStarter ? FString(TEXT("Free: the path's starter spell"))
+				: bRanked ? FString::Printf(TEXT("%d point%s per rank"), N->Cost, N->Cost == 1 ? TEXT("") : TEXT("s")) : FString::Printf(TEXT("%d points"), N->Cost);
 			TSharedRef<SWrapBox> Line = SNew(SWrapBox).UseAllottedSize(true);
 			Line->AddSlot().Padding(0.f, 0.f, 5.f * U, 0.f)[WRUI::Text(FText::FromString(CostText), WRUI::Body(14, 800), WRUI::Ink)];
 			if (!N->Branch.IsNone() && N->Gate > 0)

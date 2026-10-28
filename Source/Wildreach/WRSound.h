@@ -19,7 +19,8 @@ class UObject;
  *   moments  levelup, recipe.unlock, discover, boss.intro, tame.success, respawn
  *   creature creature.<id>.idle | aggro | attack | hurt | death; falls back to creature.<size>.<family>.<kind>, then
  *            creature.<family>.<kind>, then creature.<size>.<kind> (size small / medium / large from the capsule,
- *            family from the archetype: canine, beast, flyer, bug, herd, critter, boss, wisp)
+ *            family from the archetype: canine, beast, flyer, bug, herd, critter, boss, wisp); creature.windup (any
+ *            creature winding up an attack: its telegraph)
  *   ui       ui.hover, ui.click, ui.open, ui.close, ui.error, ui.drag, ui.drop
  * Ambient beds (by biome, time of day, coast, caves) and music (menu, exploring, combat, boss) run on their own from
  * the same table (UWRAudioDirector). Dev: `wr.SoundLog 1` (or -wrsoundlog) logs every play with its file and volume,

@@ -2,6 +2,7 @@
   "id": "fire",
   "name": "Fire",
   "biome": "volcanic",
+  "starter": "fire_bolt",
   "resource": {
     "id": "heat",
     "name": "Heat"

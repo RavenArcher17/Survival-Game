@@ -77,6 +77,8 @@ private:
 	FWRPathProgress& FindOrAddProgress(FName PathId);
 	void RefreshQuickSlots();
 	void Changed();
+	/** The starter spell of the main path and the subclass, if not owned yet; true if any was given. */
+	bool GrantStarters();
 
 	UPROPERTY(Replicated) FName MainPath;
 	UPROPERTY(Replicated) FName SubPath;
