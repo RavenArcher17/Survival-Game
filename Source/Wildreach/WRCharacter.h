@@ -131,6 +131,8 @@ private:
 	float BodyYaw = 0.f;           // the body art's meshYaw
 	float RangedAimYaw = 0.f;      // extra upper-body turn while aiming, so a weapon held across the body points ahead
 	float BodyAimTurn = 0.f;       // that turn, eased in and out (a spine twist, so walking legs keep their line)
+	float BodyBaseZ = 0.f;         // the body art's height on the capsule (feet on its bottom)
+	float SwimLift = 0.f;          // how much higher the body rides while swimming (WRWater), eased
 	FTimerHandle ThrowTimer;
 	UFUNCTION() void OnRep_RangedLook();
 	void UpdateWeaponLook();

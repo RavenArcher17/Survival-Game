@@ -13,6 +13,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "WRWater.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
@@ -86,9 +87,17 @@ void AWRGameMode::BeginPlay()
 void AWRGameMode::RescueUnderground()
 {
 	// Someone who arrives before the ground's collision is there (a teleport or a respawn far from everyone) falls
-	// through the island and lands on the map's sea plane, 140 m under the terrain, where the island can't be seen from
-	// below. The landscape is a heightfield, so ground above you always means you're under it: put them back on top.
+	// through the island, where it can't be seen from below. The landscape is a heightfield, so ground above you always
+	// means you're under it: put them back on top.
 	const float Margin = WRTune(TEXT("world.undergroundMargin"), 300.f);
+	// In the water (WRWater) any ground overhead will do: open water has nothing over it, so a swimmer under the
+	// landscape fell through the sea floor into the water below it, and would float up against the ground's underside.
+	const float SwimMargin = WRTune(TEXT("water.rescueMargin"), 0.f);
+	// Traced from over the island's highest ground however deep the fall, and held at voidZ (nothing is ground below
+	// the sea floor) until the ground under them streams in: the map's old flat plane under the middle of the island
+	// used to catch some of them, and is gone now.
+	const float TopZ = WRTune(TEXT("water.rescueTraceTop"), 150000.f);
+	const float VoidZ = WRTune(TEXT("water.voidZ"), -5000.f);
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
 		AWRCharacterBase* C = *It;
@@ -98,20 +107,29 @@ void AWRGameMode::RescueUnderground()
 			continue;
 		}
 		const FVector L = C->GetActorLocation();
+		const float Need = UWRWaterSubsystem::IsInWater(C) ? SwimMargin : Margin;
 		TArray<FHitResult> Hits;
 		const FCollisionQueryParams Query(SCENE_QUERY_STAT(WRUnderground), false, C);
-		GetWorld()->LineTraceMultiByObjectType(Hits, FVector(L.X, L.Y, L.Z + 80000.f), L, FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+		GetWorld()->LineTraceMultiByObjectType(Hits, FVector(L.X, L.Y, FMath::Max(L.Z + 80000.f, TopZ)), L, FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+		bool bRescued = false;
 		for (const FHitResult& Hit : Hits)
 		{
-			if (Cast<ULandscapeHeightfieldCollisionComponent>(Hit.GetComponent()) && Hit.ImpactPoint.Z > L.Z + Margin)
+			if (Cast<ULandscapeHeightfieldCollisionComponent>(Hit.GetComponent()) && Hit.ImpactPoint.Z > L.Z + Need)
 			{
 				const float Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 				C->TeleportTo(FVector(L.X, L.Y, Hit.ImpactPoint.Z + Half + 30.f), C->GetActorRotation(), false, true);
 				C->GetCharacterMovement()->Velocity = FVector::ZeroVector;
-				UE_LOG(LogWildreach, Warning, TEXT("RESCUE %s was %.0f m under the ground at %s: put back on top"),
-					*C->GetName(), (Hit.ImpactPoint.Z - L.Z) / 100.f, *L.ToString());
+				UE_LOG(LogWildreach, Warning, TEXT("RESCUE %s was %.0f m under the ground at %s%s: put back on top"),
+					*C->GetName(), (Hit.ImpactPoint.Z - L.Z) / 100.f, *L.ToString(), Need < Margin ? TEXT(" (in the water)") : TEXT(""));
+				bRescued = true;
 				break;
 			}
+		}
+		if (!bRescued && L.Z < VoidZ)
+		{
+			C->TeleportTo(FVector(L.X, L.Y, VoidZ), C->GetActorRotation(), false, true);
+			C->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+			UE_LOG(LogWildreach, Warning, TEXT("RESCUE %s fell under the world at %s with no ground over it yet: held at z %.0f"), *C->GetName(), *L.ToString(), VoidZ);
 		}
 	}
 }

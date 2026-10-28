@@ -16,6 +16,7 @@
 #include "WRPlayerController.h"
 #include "WRGameState.h"
 #include "WRPlayerUI.h"
+#include "WRWater.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
@@ -345,6 +346,11 @@ void AWRHUD::DrawHUD()
 		{
 			const FString Prompt = FString::Printf(TEXT("E: Hearth (tech level %d, %d core%s)%s"), Hearth->GetTechLevel(), Hearth->GetCores().Num(),
 				Hearth->GetCores().Num() == 1 ? TEXT("") : TEXT("s"), Hearth->IsBroken() ? TEXT("  BROKEN") : TEXT(""));
+			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
+		}
+		else if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(PC); Water && Water->CanDrink(Cast<ACharacter>(PC->GetPawn())))
+		{
+			const FString Prompt = TEXT("E: drink (sea water)");
 			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
 		}
 		if (const AWRBossAltar* Altar = PC->FindNearbyAltar())

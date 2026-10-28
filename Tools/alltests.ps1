@@ -4,7 +4,7 @@
 #   alltests.ps1                     build, then everything (about 40 minutes)
 #   alltests.ps1 -SkipBuild          use the current build
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
-#                                    sky, tame, boss, social, menus, flow, spell, ranged, ai, combat, wildlife, version, updater, walk, hazard)
+#                                    sky, tame, boss, social, menus, flow, spell, ranged, ai, combat, wildlife, version, updater, walk, hazard, water)
 param([switch]$SkipBuild, [string[]]$Only = @())
 # Every Unreal start otherwise runs UnrealBuildTool's platform check, which waits for any build running on the machine.
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -33,7 +33,8 @@ $tests = @(
 	@{ name = 'version'; script = 'versiontest.ps1'; what = 'another version can''t join and is told why; the menu offers a newer release' },
 	@{ name = 'updater'; script = 'updatertest.ps1'; what = 'auto-update end to end with fake releases (no Unreal)' },
 	@{ name = 'walk'; script = 'terrain\walktest.ps1'; what = 'island traversal' },
-	@{ name = 'hazard'; script = 'terrain\hazardtest.ps1'; what = 'lava and ice gear checks' }
+	@{ name = 'hazard'; script = 'terrain\hazardtest.ps1'; what = 'lava and ice gear checks' },
+	@{ name = 'water'; script = 'watertest.ps1'; what = 'swim in the sea and walk back up the beach, drink in it and at its edge, the fall-through rescue, wildlife stays out of deep water' }
 )
 if ($Only.Count -gt 0) { $Only = $Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ }; $tests = $tests | Where-Object { $Only -contains $_.name } }
 

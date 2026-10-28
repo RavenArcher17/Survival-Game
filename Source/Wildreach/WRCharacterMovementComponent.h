@@ -27,6 +27,7 @@ public:
 
 	bool IsSprinting() const;
 
+	virtual void BeginPlay() override;
 	virtual float GetMaxSpeed() const override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;

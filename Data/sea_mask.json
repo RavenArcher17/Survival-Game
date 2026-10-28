@@ -1,6 +1,6 @@
 {
   "_comment": "The open sea on a 4 m grid (Tools/terrain/sea_mask.mjs, generated: edit the script, not this file). Each row (south to north, -Y first) is run lengths west to east (-X first), alternating sea, land, sea... starting with sea. Outside the grid is all sea.",
-  "cell": 400, "originX": -201600, "originY": -201600, "width": 1008, "height": 1008,
+  "map": "L_Island", "cell": 400, "originX": -201600, "originY": -201600, "width": 1008, "height": 1008,
   "rows": [
     "1008",
     "1008",

@@ -21,6 +21,7 @@
 #include "WRTuning.h"
 #include "WRFx.h"
 #include "WRSound.h"
+#include "WRWater.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -730,6 +731,14 @@ void AWRCreature::AddMovementInput(FVector WorldDirection, float ScaleValue, boo
 			}
 		}
 	}
+	// Wades in the shallows but never walks off into the sea (on the server, and a rider's client so it predicts the same).
+	if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying())
+	{
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
+		{
+			WorldDirection = Water->KeepOutOfDeepWater(this, WorldDirection);
+		}
+	}
 	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
@@ -1348,6 +1357,14 @@ void AWRCreature::Tick(float DeltaSeconds)
 	else if (Def && Rider.IsValid())
 	{
 		GetCharacterMovement()->RotationRate.Yaw = 400.f;
+	}
+	// Out of its depth in the sea (WRWater): it swims for the shallows, whatever its brain wants.
+	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming())
+	{
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
+		{
+			AddMovementInput(Water->ShoreDirection(this), 1.f);
+		}
 	}
 
 	// Torpor wears off; an unconscious creature wakes when it reaches zero.
