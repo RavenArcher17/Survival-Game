@@ -617,7 +617,7 @@ void AWRCharacter::TickBodyAnim()
 	const float Dt = GetWorld()->GetDeltaSeconds();
 	// Swimming (WRWater): one float height for the capsule, but the stroke lies along the surface (the body rides higher
 	// on the capsule) while treading water stands in it (head and shoulders out: a little lower).
-	const float LiftGoal = !bDead && Move->IsSwimming() ? WRTune(Speed > 40.f ? TEXT("water.swimLift") : TEXT("water.treadLift"), Speed > 40.f ? 70.f : -5.f) : 0.f;
+	const float LiftGoal = !bDead && Move->IsSwimming() ? WRTune(Speed > 40.f ? TEXT("water.swimLift") : TEXT("water.treadLift"), Speed > 40.f ? 60.f : -5.f) : 0.f;
 	if (!FMath::IsNearlyEqual(SwimLift, LiftGoal, 0.05f))
 	{
 		SwimLift = FMath::FInterpTo(SwimLift, LiftGoal, Dt, 4.f);
