@@ -321,7 +321,9 @@ void AWRCharacter::LoadBodyArt()
 	Body->SetSkeletalMesh(BodyAsset);
 	const FBox Box = BodyAsset->GetBounds().GetBox();
 	Body->SetRelativeScale3D(FVector(Scale));
-	Body->SetRelativeLocation(FVector(0.f, 0.f, -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale));
+	BodyBaseZ = -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale;
+	SwimLift = 0.f;
+	Body->SetRelativeLocation(FVector(0.f, 0.f, BodyBaseZ));
 	BodyYaw = Yaw;
 	BodyAimTurn = 0.f;
 	Body->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));
@@ -613,6 +615,14 @@ void AWRCharacter::TickBodyAnim()
 	// Standing on a slope: where the ground is under each foot, against the capsule's bottom (the instance sinks the
 	// hips to the lower one and bends the other leg up to its own).
 	const float Dt = GetWorld()->GetDeltaSeconds();
+	// Swimming (WRWater): one float height for the capsule, but the stroke lies along the surface (the body rides higher
+	// on the capsule) while treading water stands in it (head and shoulders out: a little lower).
+	const float LiftGoal = !bDead && Move->IsSwimming() ? WRTune(Speed > 40.f ? TEXT("water.swimLift") : TEXT("water.treadLift"), Speed > 40.f ? 70.f : -5.f) : 0.f;
+	if (!FMath::IsNearlyEqual(SwimLift, LiftGoal, 0.05f))
+	{
+		SwimLift = FMath::FInterpTo(SwimLift, LiftGoal, Dt, 4.f);
+		Body->SetRelativeLocation(FVector(0.f, 0.f, BodyBaseZ + SwimLift));
+	}
 	const FVector Bottom = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	for (int32 Side = 0; Side < 2; ++Side)
 	{

@@ -1207,6 +1207,14 @@ void AWRCreature::Tick(float DeltaSeconds)
 	{
 		GetCharacterMovement()->RotationRate.Yaw = 400.f;
 	}
+	// Out of its depth in the sea (WRWater): it swims for the shallows, whatever its brain wants.
+	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming())
+	{
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
+		{
+			AddMovementInput(Water->ShoreDirection(this), 1.f);
+		}
+	}
 
 	// Torpor wears off; an unconscious creature wakes when it reaches zero.
 	if (Torpor > 0.f)

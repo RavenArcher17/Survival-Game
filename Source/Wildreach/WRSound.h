@@ -15,7 +15,7 @@ class UObject;
  *   ranged   bow.draw, bow.release, crossbow.fire, blowgun.fire, throw, arrow.hit
  *   spells   cast.fire, cast.frost, fire.impact, frost.impact, firewall, lavapool, frostnova, icelance
  *   world    gather.wood, gather.stone, gather.fiber, build.place, build.demolish, build.invalid, door.open, door.close,
- *            craft.done, hearth.feed
+ *            craft.done, hearth.feed, water.splash (into the sea), water.stroke (swimming), water.scoop (drinking at it)
  *   moments  levelup, recipe.unlock, discover, boss.intro, tame.success, respawn
  *   creature creature.<id>.idle | aggro | attack | hurt | death; falls back to creature.<size>.<family>.<kind>, then
  *            creature.<family>.<kind>, then creature.<size>.<kind> (size small / medium / large from the capsule,

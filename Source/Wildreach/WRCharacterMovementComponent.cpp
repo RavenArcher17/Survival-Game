@@ -21,7 +21,7 @@ void UWRCharacterMovementComponent::BeginPlay()
 	// Swimming in the sea (WRWater): how high a body floats (1 = just under, more = higher) and how fast it swims; the
 	// water's drag stops it (any braking would also stop a body under the surface from floating up, since the engine
 	// zeroes slow speeds under braking). Same numbers on every machine, so prediction agrees.
-	Buoyancy = WRTune(TEXT("water.buoyancy"), 1.3f);
+	Buoyancy = WRTune(TEXT("water.buoyancy"), 1.6f);
 	MaxSwimSpeed = WRTune(TEXT("water.swimSpeed"), 300.f);
 	BrakingDecelerationSwimming = WRTune(TEXT("water.braking"), 0.f);
 }

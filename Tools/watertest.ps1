@@ -28,9 +28,9 @@ Remove-Item (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 $started = Get-Date
 
-# The volcanic beach west of the hut site: ground ~3 m up, the waterline 63 m west, 4.6 m deep 98 m out, a gentle
-# 1:20 slope all the way (Tools/terrain heightmap).
-$beach = '-153700 78300'; $sea = '-163500 78300'; $edge = '-160000 78300'; $near = '-161500 78300'
+# The volcanic beach west of the hut site: ground ~3 m up, the drawn waterline 50 m west (water.surfaceOffset), 5 m deep
+# 98 m out, a gentle 1:20 slope all the way (Tools/terrain heightmap).
+$beach = '-153700 78300'; $sea = '-163500 78300'; $edge = '-158700 78300'; $near = '-160800 78300'
 $labels = @()
 function Shot([string]$label, [string]$prep) { if ($Shots) { $script:labels += $label; "$prep|wait 0.8|HighResShot 1600x900|wait 1.5" } }
 function UIShot([string]$label, [string]$prep) { if ($Shots) { $script:labels += $label; "$prep|wait 0.8|shot showui|wait 1.5" } }
@@ -53,7 +53,7 @@ $cmds = @(
 	$(if ($Shots) { 'wait 2.5|WRHour 12|wait 4' }),
 	# Back up the gentle bank: it swims to the shallows and walks out.
 	"WRWalkTo $beach", 'wait 34', 'wr.Water out', 'WRCmd water stat out',
-	# At the water's edge (feet a centimetre over the surface, water a metre and a half away): E drinks too.
+	# At the water's edge (feet a few centimetres over the surface, the water a metre and a half away): E drinks too.
 	"WRTeleport $edge", 'wait 3', 'WRLook 180 -20', 'WRCmd water thirst 40', 'wait 1', 'wr.Water edge', 'WRInteract', 'wait 1.5', 'WRCmd water stat edgedrank',
 	(UIShot 'day_prompt_edge' 'WRLook 180 -20|wait 1'),
 	(Shot 'day_edge_kneel' 'WRCmd water thirst 50|wait 1|WRInteract|wait 0.6'),
@@ -63,9 +63,9 @@ $cmds = @(
 	"WRTeleport $sea", 'wait 4', 'WRCmd water sink 700', 'WRCmd water stat sunk', 'wait 5', 'WRCmd water stat afterseafloor',
 	# Dropped 300 m through the beach (far under the island, below where the old sea plane was): back on top.
 	"WRTeleport $beach", 'wait 4', 'WRCmd water sink 30000', 'WRCmd water stat deep', 'wait 4', 'WRCmd water stat afterisland',
-	# Two Cinderfangs at the waterline see the swimmer 17 m out (1.7 m deep) and chase it: they wade in up to the belly
-	# (36 cm for them) and stop there.
-	"WRTeleport $near", 'wait 4', 'WRSpawnAt cinderfang -159800 78600', 'WRSpawnAt cinderfang -159800 78000', 'wait 20', 'WRCmd water creatures',
+	# Two Cinderfangs in the shallows see the swimmer 15 m out (1.6 m deep) and chase it: they wade in up to the belly
+	# (36 cm for them) and stop there. A Pumicehog dropped in water over its head swims back to the shallows.
+	"WRTeleport $near", 'wait 4', 'WRSpawnAt cinderfang -159300 78000', 'WRSpawnAt cinderfang -159300 77700', 'WRSpawnAt pumicehog -160400 78300', 'wait 20', 'WRCmd water creatures',
 	(Shot 'day_creature_shore' 'WRLook 0 -8|wait 1'),
 	'wait 1', 'WRProbe', 'wait 2'
 )
@@ -126,7 +126,7 @@ Check 'dropped 300 m through the island: put back on top' ($deep -and $afterIsla
 $fangs = @($server | Where-Object { $_ -like 'WATER creature *' })
 $fangBad = @($fangs | Where-Object { $_ -match 'mode (\w+) inwater \d depth (-?[\d.]+) .* half (\d+)' -and ($Matches[1] -eq 'Swimming' -or [double]$Matches[2] -gt 0.8 * [double]$Matches[3] + 20) })
 $fangWet = @($fangs | Where-Object { $_ -match 'depth (-?[\d.]+)' -and [double]$Matches[1] -gt 0 })
-Check 'Cinderfangs chase to the shore but stay out of deep water' ($fangs.Count -ge 2 -and $fangBad.Count -eq 0) ("{0} seen, {1} wading, {2} too deep: {3}" -f $fangs.Count, $fangWet.Count, $fangBad.Count, (($fangs | ForEach-Object { $_ -replace '^WATER creature (\S+) at V\(X=(-?\d+)\.\d+, Y=(-?\d+)\.\d+, Z=(-?\d+)\.\d+\) mode (\w+) .*depth (-?\d+).*', '$1 x $2 z $4 $5 depth $6' }) -join '; '))
+Check 'creatures stay out of deep water (Cinderfangs chasing stop where it''s too deep, a Pumicehog swims back)' ($fangs.Count -ge 3 -and $fangBad.Count -eq 0) ("{0} seen, {1} wading, {2} too deep: {3}" -f $fangs.Count, $fangWet.Count, $fangBad.Count, (($fangs | ForEach-Object { $_ -replace '^WATER creature (\S+) at V\(X=(-?\d+)\.\d+, Y=(-?\d+)\.\d+, Z=(-?\d+)\.\d+\) mode (\w+) .*depth (-?\d+).*', '$1 x $2 z $4 $5 depth $6' }) -join '; '))
 $errors = @(Select-String -Path "$logs\server.log", "$logs\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
 # The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
 $errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
@@ -134,7 +134,7 @@ Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -F
 
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }
 if ($Shots -and -not $Recheck) {
-	$files = @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $started } | Sort-Object LastWriteTime)
+	$files = @(Get-ChildItem $shotDir -Filter '*Screenshot*.png' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $started } | Sort-Object LastWriteTime)
 	for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 		$dest = Join-Path $Out ('{0:D2}_{1}.png' -f ($i + 1), $labels[$i])
 		Copy-Item $files[$i].FullName $dest -Force

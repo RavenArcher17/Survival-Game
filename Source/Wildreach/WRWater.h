@@ -11,7 +11,8 @@ class AWRPlayerController;
 
 /**
  * The sea you can swim in: a water physics volume over the open sea of Data/sea_mask.json, from below the sea floor
- * (tuning water.floor) up to the surface the sea is drawn at (sea.level). Its shape is boxes merged from the mask's
+ * (tuning water.floor) up to the surface the sea is drawn at (sea.level plus water.surfaceOffset: the sea's material
+ * draws its surface that much above its mesh). Its shape is boxes merged from the mask's
  * cells, so ground below sea level that the sea doesn't reach stays dry. Every machine builds the same one from the
  * data (it isn't replicated), so the server and the predicting client agree on who swims. CharacterMovement swims
  * while the capsule's centre is inside it. It only overlaps pawns: traces, the camera and building never see it.
@@ -71,6 +72,9 @@ public:
 	/** A creature's step (server and a rider's client): Direction, or zero when it would take it into water deeper
 	 *  than it wades. A creature already that deep may still head for shallower water. */
 	FVector KeepOutOfDeepWater(const ACharacter* Creature, const FVector& Direction) const;
+	/** The way to the shallowest water within a step or two of it (zero if it is already in the shallowest): a
+	 *  creature out of its depth swims that way (AWRCreature::Tick). */
+	FVector ShoreDirection(const ACharacter* Creature) const;
 	/** Dev (server command "water"): "stat" logs where the player is and how it moves; "thirst <0..100>"; "sink <cm>"
 	 *  drops you through the ground (the rescue's test); "creatures" logs every creature within 80 m. */
 	FString DevCommand(AWRPlayerController* Player, const TArray<FString>& Args);

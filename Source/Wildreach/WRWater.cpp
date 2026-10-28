@@ -7,6 +7,7 @@
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
 #include "Components/BrushComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -16,6 +17,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/WorldSettings.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "PhysicsEngine/BodySetup.h"
 
@@ -125,7 +127,21 @@ namespace WRWaterDetail
 	{
 		const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(World);
 		const ACharacter* Me = Cast<ACharacter>(LocalPawn(World));
-		UE_LOG(LogWildreach, Log, TEXT("WATER client [%s] %s"), Args.Num() > 0 ? *Args[0] : TEXT("-"), Water && Me ? *Water->Describe(Me) : TEXT("no water or no body"));
+		const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+		const FVector Cam = PC && PC->PlayerCameraManager ? PC->PlayerCameraManager->GetCameraLocation() : FVector::ZeroVector;
+		// The body art's head and chest (how high the swimmer shows against the surface).
+		float HeadZ = 0.f, ChestZ = 0.f;
+		TArray<USkeletalMeshComponent*> Meshes;
+		if (Me) Me->GetComponents(Meshes);
+		for (const USkeletalMeshComponent* S : Meshes)
+		{
+			if (S->GetFName() == TEXT("Body") && S->GetSkeletalMeshAsset())
+			{
+				HeadZ = S->GetBoneLocation(TEXT("Head")).Z;
+				ChestZ = S->GetBoneLocation(TEXT("Spine2")).Z;
+			}
+		}
+		UE_LOG(LogWildreach, Log, TEXT("WATER client [%s] %s camera z %.0f head z %.0f chest z %.0f"), Args.Num() > 0 ? *Args[0] : TEXT("-"), Water && Me ? *Water->Describe(Me) : TEXT("no water or no body"), Cam.Z, HeadZ, ChestZ);
 	}
 	static FAutoConsoleCommandWithWorldAndArgs WaterConsole(TEXT("wr.Water"),
 		TEXT("wr.Water [tag]: log the local survivor's water state (position, movement mode, in water, depth, Water, can drink)."),
@@ -169,7 +185,9 @@ void UWRWaterSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 	const FWRTuning& T = FWRTuning::Get();
-	SurfaceZ = T.Num(TEXT("sea.level"), -20.f);
+	// Where the drawn water is: the sea mesh lies at sea.level, but its material lifts the surface it draws (the
+	// waterline on the beaches sits about 80 cm higher), and swimming has to match what you see.
+	SurfaceZ = T.Num(TEXT("sea.level"), -20.f) + T.Num(TEXT("water.surfaceOffset"), 80.f);
 	const float FloorZ = T.Num(TEXT("water.floor"), -1500.f);
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -285,7 +303,7 @@ bool UWRWaterSubsystem::CanDrink(const ACharacter* Character) const
 		bCacheResult = true;
 		return true;
 	}
-	// At the edge: feet no higher above the surface than you can reach down, and open water at your feet or in front.
+	// At the edge: feet no higher above the surface than you can reach down, and open water within arm's reach.
 	const FVector Here = Character->GetActorLocation();
 	const float Feet = Here.Z - Character->GetSimpleCollisionHalfHeight();
 	if (Feet > SurfaceZ + WRTune(TEXT("water.drinkReach"), 80.f))
@@ -358,12 +376,43 @@ FVector UWRWaterSubsystem::KeepOutOfDeepWater(const ACharacter* Creature, const 
 	// Wading is fine (up to about the belly); deeper than that it turns back, so it never walks the sea floor.
 	const float Wade = Half * WRTune(TEXT("water.creatureWade"), 0.8f);
 	const FVector Step = Direction.GetSafeNormal2D();
-	const float There = DepthAt(Here + Step * (Creature->GetSimpleCollisionRadius() + WRTune(TEXT("water.creatureLookAhead"), 150.f)));
-	if (There <= Wade || There < DepthAt(Here))
+	const float Ahead = Creature->GetSimpleCollisionRadius() + WRTune(TEXT("water.creatureLookAhead"), 150.f);
+	const float There = DepthAt(Here + Step * Ahead);
+	const float Depth = DepthAt(Here);
+	if (There <= Wade || There < Depth)
 	{
 		return Direction;
 	}
-	return FVector::ZeroVector;
+	if (Depth <= Wade)
+	{
+		return FVector::ZeroVector;   // at the edge of what it wades: it waits there
+	}
+	// Already out of its depth (knocked in, or it arrived there) with nowhere it wants to go but deeper: it makes for
+	// the shallows instead, so it never floats out there.
+	return ShoreDirection(Creature) * Direction.Size();
+}
+
+FVector UWRWaterSubsystem::ShoreDirection(const ACharacter* Creature) const
+{
+	if (!bActive || !Creature)
+	{
+		return FVector::ZeroVector;
+	}
+	const FVector Here = Creature->GetActorLocation();
+	const float Ahead = Creature->GetSimpleCollisionRadius() + WRTune(TEXT("water.creatureLookAhead"), 150.f);
+	FVector Best = FVector::ZeroVector;
+	float BestDepth = DepthAt(Here);
+	for (int32 Dir = 0; Dir < 8; ++Dir)
+	{
+		const FVector Way = FRotator(0.f, Dir * 45.f, 0.f).Vector();
+		const float D = DepthAt(Here + Way * Ahead);
+		if (D < BestDepth)
+		{
+			BestDepth = D;
+			Best = Way;
+		}
+	}
+	return Best;
 }
 
 FString UWRWaterSubsystem::Describe(const ACharacter* Character) const
@@ -462,3 +511,4 @@ void UWRWaterSubsystem::Tick(float DeltaTime)
 		if (!It.Key().IsValid()) It.RemoveCurrent();
 	}
 }
+
