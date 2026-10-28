@@ -365,15 +365,14 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// Fitted heights are the meshes' bounds, about twice their leafy part: 260 cm makes a bush of a metre or so.
 		// Ash-dusted and frosted. The GV leaves are green whatever their tint and saturation settings (the "volcanic shrubs
 		// green" note, more visible now there are many more); what recolours them is their "snow" coat, Snow Color laid
-		// over Amount Min..Max of each plant (0..1 by default: each plant gets a random share). Dark ash in the volcanic west,
-		// white in the tundra. Don't raise Amount Min: with the coat over every shrub (min 0.85) the GPU hung
-		// (DXGI_ERROR_DEVICE_HUNG in the Nanite shadow pass) on the benchmark route, with or without its displacement.
+		// over Amount Min..Max of each plant (0..1 by default, so many stayed green). Ash over nearly all of every volcanic
+		// shrub, frost over most of each tundra one (tuning world.ashCoatMin / frostCoatMin).
 		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 260), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) }, { TEXT("Snow Color"), FLinearColor(0.06f, 0.05f, 0.045f) } },
-			{ { TEXT("Amount Min"), WRTune(TEXT("world.ashCoatMin"), 0.f) }, { TEXT("Amount Max"), WRTune(TEXT("world.ashCoatMax"), 1.f) } } } },
+			{ { TEXT("Amount Min"), WRTune(TEXT("world.ashCoatMin"), 0.85f) }, { TEXT("Amount Max"), WRTune(TEXT("world.ashCoatMax"), 1.f) } } } },
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 240), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } },
-			{ { TEXT("Amount Min"), WRTune(TEXT("world.frostCoatMin"), 0.f) }, { TEXT("Amount Max"), 1.f } } } },
+			{ { TEXT("Amount Min"), WRTune(TEXT("world.frostCoatMin"), 0.6f) }, { TEXT("Amount Max"), 1.f } } } },
 	};
 	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
 	// machine in the same order, so a ledger key means the same decoration everywhere.
