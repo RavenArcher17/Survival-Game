@@ -200,4 +200,7 @@ private:
 	void SpawnContents();
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Rock;
 	UPROPERTY() TObjectPtr<UPointLightComponent> Glow;
+	/** Server: waits for the landscape under the cave before placing the ore on it. */
+	int32 ContentTries = 0;
+	FTimerHandle ContentTimer;
 };

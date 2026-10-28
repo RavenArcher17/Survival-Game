@@ -18,6 +18,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "ProceduralMeshComponent.h"
+#include "LandscapeHeightfieldCollisionComponent.h"
+#include "TimerManager.h"
 
 static UMaterialInterface* ShapeMaterial()
 {
@@ -619,14 +621,14 @@ void AWRDressing::BuildLavaFlow()
 		}
 		const FVector2f V = Flow.Points.FindChecked(P);
 		const float Z = V.X + Flow.Lift(V.Y);
-		float L = Z, R = Z, D = Z, U = Z;  // a missing neighbour counts as level
-		SurfaceZ(P - FIntPoint(1, 0), L);
-		SurfaceZ(P + FIntPoint(1, 0), R);
-		SurfaceZ(P - FIntPoint(0, 1), D);
-		SurfaceZ(P + FIntPoint(0, 1), U);
+		float ZWest = Z, ZEast = Z, ZSouth = Z, ZNorth = Z;  // a missing neighbour counts as level
+		SurfaceZ(P - FIntPoint(1, 0), ZWest);
+		SurfaceZ(P + FIntPoint(1, 0), ZEast);
+		SurfaceZ(P - FIntPoint(0, 1), ZSouth);
+		SurfaceZ(P + FIntPoint(0, 1), ZNorth);
 		const FVector At(P.X * S - Flow.Half, P.Y * S - Flow.Half, Z);
 		const int32 I = Into.Verts.Add(At);
-		Into.Normals.Add(FVector((L - R) / (2.f * S), (D - U) / (2.f * S), 1.f).GetSafeNormal());
+		Into.Normals.Add(FVector((ZWest - ZEast) / (2.f * S), (ZSouth - ZNorth) / (2.f * S), 1.f).GetSafeNormal());
 		Into.UVs.Add(FVector2D(At.X, At.Y) / 400.f);
 		// R = heat (crust at the rim, molten toward the middle), G = 0 where the sheet dips under the ground.
 		Into.Colors.Add(FLinearColor(FMath::SmoothStep(0.6f, 5.f, V.Y), FMath::SmoothStep(-0.4f, 1.6f, V.Y), 0.f, 1.f));
@@ -1145,6 +1147,21 @@ void AWRCave::BuildShell()
 
 void AWRCave::SpawnContents()
 {
+	// The landscape under a cave may not have streamed in when the server starts the caves: the floor traces then missed
+	// and the ore went in at the cave's origin height, under the ground where it rises inside (two tundra caves had no
+	// ore a survivor could reach). Wait for the ground (a second at a time, up to a minute).
+	{
+		const FVector Top = GetActorTransform().TransformPosition(FVector(-300.f, 0.f, 650.f));
+		FHitResult Ground;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCave), false, this);
+		const bool bGround = GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0, 0, 2000), ECC_WorldStatic, Query)
+			&& Cast<ULandscapeHeightfieldCollisionComponent>(Ground.GetComponent());
+		if (!bGround && ++ContentTries < 60)
+		{
+			GetWorldTimerManager().SetTimer(ContentTimer, this, &AWRCave::SpawnContents, 1.f, false);
+			return;
+		}
+	}
 	const bool bFrost = Biome == TEXT("tundra");
 	const auto Floor = [this](const FVector& Local)
 	{
@@ -1166,6 +1183,7 @@ void AWRCave::SpawnContents()
 			Node->ItemId = Ore.Key;
 			Node->GemChance = WRTune(TEXT("caves.gemChance"), 0.12f);
 			Node->FinishSpawning(T);
+			UE_LOG(LogWildreach, Verbose, TEXT("CAVE %s: %s at %s (%.0f cm over the cave's origin)"), *GetName(), *Ore.Key.ToString(), *T.GetLocation().ToCompactString(), T.GetLocation().Z - GetActorLocation().Z);
 		}
 	}
 	// Cave hazard: burning sulfur gas (volcanic) or slick ice (tundra). Permanent.
@@ -1181,6 +1199,6 @@ void AWRCave::SpawnContents()
 		Spawner->RespawnSeconds = 300.f;
 		Spawner->FinishSpawning(SpawnAt);
 	}
-	UE_LOG(LogWildreach, Log, TEXT("CAVE %s (%s) at %s yaw %.0f, variant %d, size x%.2f: %d ore nodes"), *GetName(), *Biome.ToString(),
-		*GetActorLocation().ToCompactString(), GetActorRotation().Yaw, Variant, GetActorScale3D().X, Ores.Num());
+	UE_LOG(LogWildreach, Log, TEXT("CAVE %s (%s) at %s yaw %.0f, variant %d, size x%.2f: %d ore nodes (ground found after %d s)"), *GetName(), *Biome.ToString(),
+		*GetActorLocation().ToCompactString(), GetActorRotation().Yaw, Variant, GetActorScale3D().X, Ores.Num(), ContentTries);
 }

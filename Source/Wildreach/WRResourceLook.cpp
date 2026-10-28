@@ -106,12 +106,14 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 
 	// Collider: the node's engine mesh, now a hidden cylinder about the look's footprint (cm: width, height).
 	const bool bOre = Id.EndsWith(TEXT("_ore"));
-	FVector2D Body(110.f, 120.f);
+	// The cylinder is centred on the node's ground point, so half of it stands above the ground: at least 1.1 m, the height
+	// a swing sweeps at (a 45 cm lichen collider sat under the swing on uneven cave floors and never got hit).
+	FVector2D Body(110.f, 240.f);
 	if (Item == TEXT("wood")) Body = FVector2D(90.f, 420.f);
-	else if (Item == TEXT("stone")) Body = FVector2D(200.f, 140.f);
-	else if (bOre) Body = FVector2D(190.f, 150.f);
-	else if (Item == TEXT("sulfur_crystal")) Body = FVector2D(110.f, 150.f);
-	else if (Item == TEXT("lichen")) Body = FVector2D(150.f, 90.f);
+	else if (Item == TEXT("stone")) Body = FVector2D(200.f, 260.f);
+	else if (bOre) Body = FVector2D(190.f, 260.f);
+	else if (Item == TEXT("sulfur_crystal")) Body = FVector2D(110.f, 280.f);
+	else if (Item == TEXT("lichen")) Body = FVector2D(150.f, 240.f);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)

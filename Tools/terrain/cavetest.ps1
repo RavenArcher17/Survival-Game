@@ -1,8 +1,8 @@
 # Caves on L_Island: a headless player walks into every cave in Data/island_dressing.json on foot (from 30 m outside
 # the mouth to the back of the chamber), then mines the nearest ore in there. Each cave must be reached (WALK arrived
 # inside the chamber, not stuck in the mouth) and give ore; the walk's end point is logged for each.
-#   cavetest.ps1 [-Port 7837]
-param([int]$Port = 7837)
+#   cavetest.ps1 [-Port 7837] [-Path fire|frost] [-Only 3,4]   (-Only: cave numbers, in the file's order)
+param([int]$Port = 7837, [string]$Path = 'fire', [int[]]$Only = @())
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\..\Wildreach.uproject')).Path
@@ -14,6 +14,8 @@ Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction S
 Remove-Item (Join-Path $root 'Saved\ServerDB\world_cavetest.json') -ErrorAction SilentlyContinue
 
 $caves = @((Get-Content -Raw (Join-Path $root 'Data\island_dressing.json') | ConvertFrom-Json).caves)
+$spawned = $caves.Count
+if ($Only.Count -gt 0) { $caves = @(for ($k = 0; $k -lt $caves.Count; $k++) { if ($Only -contains $k) { $caves[$k] } }) }
 # Cave local space (AWRCave): the chamber is centred on the cave's origin and the entrance opens toward local +X.
 function At($cave, [double]$along) {
 	$a = $cave.yaw * [math]::PI / 180
@@ -34,7 +36,7 @@ $cmds = $cmds -join '|'
 
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=cavetest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=$Path?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(60 + 45 * $caves.Count)
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 	Start-Sleep -Seconds 5
@@ -59,7 +61,7 @@ foreach ($l in $server) {
 }
 $results = @()
 function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
-Check "the server spawned $($caves.Count) caves" (@($server | Where-Object { $_ -match "^DRESSING spawned $($caves.Count) caves" }).Count -eq 1)
+Check "the server spawned $spawned caves" (@($server | Where-Object { $_ -match "^DRESSING spawned $spawned caves" }).Count -eq 1)
 for ($k = 0; $k -lt $caves.Count; $k++) {
 	$cv = $caves[$k]
 	$end = if ($k -lt $walks.Count) { $walks[$k] } else { 'no walk result' }
