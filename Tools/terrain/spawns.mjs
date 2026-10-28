@@ -46,11 +46,14 @@ const inTrench = (x, y) => (h(x + 40, y) + h(x - 40, y) + h(x, y + 40) + h(x, y 
 // Elevation bands by distance from the ridge (the coast is ~1,700 m out): lowlands by the camps, highlands by the ridge.
 const BANDS = { lowland: [900, 1900], midland: [450, 1050], highland: [140, 620] };
 // Sites per species and pack size. Critters and herds by the camps, hunters spread wider, flyers and giants fewer.
+// Doubled for 0.5.0 (Raven: "still feels very sparse on the creatures"): about 160 sites, so walking anywhere you come
+// within a pack's wake-up range (wildlife.activationRadius, 250 m) about once a minute. Predators grew a little less
+// than grazers and critters, so the island fills with life rather than with fights.
 const PLAN = {
-	pumicehog: [8, 2], glowmoth: [6, 2], ashstrider: [6, 3], cinderfang: [5, 3], kilnmite: [3, 2],
-	emberhorn: [5, 3], basaltback: [4, 2], scorchwing: [4, 1], magmaw: [3, 1],
-	snowpuff: [8, 2], aurora_fox: [6, 1], gloomhowl: [5, 3], frostantler: [5, 3], woolly_drudge: [4, 2],
-	rimeshell: [3, 2], glacimaw: [3, 1], rimeclaw: [3, 1],
+	pumicehog: [16, 2], glowmoth: [12, 2], ashstrider: [12, 3], cinderfang: [9, 3], kilnmite: [6, 2],
+	emberhorn: [10, 3], basaltback: [8, 2], scorchwing: [7, 1], magmaw: [5, 1],
+	snowpuff: [16, 2], aurora_fox: [12, 1], gloomhowl: [9, 3], frostantler: [10, 3], woolly_drudge: [8, 2],
+	rimeshell: [6, 2], glacimaw: [5, 1], rimeclaw: [5, 1],
 };
 const RADIUS = { critter: 300, herd: 650, pack_hunter: 500, ground_predator: 350, flyer: 450, burrower: 300 };
 const RESPAWN = { passive: 120, neutral: 180, aggressive: 240 };
@@ -73,8 +76,8 @@ for (const [id, [want, count]] of Object.entries(PLAN)) {
 		if (z < 3 || slope(x, y) > (c.archetype === "flyer" ? 0.7 : 0.45) || inTrench(x, y) || nearHazard(x, y)) continue;
 		if (keepOut.some(k => Math.hypot(k.x - x, k.y - y) < k.r)) continue;
 		if (camps.some(k => Math.hypot(k.x - x, k.y - y) < CAMP_GAP[c.behavior])) continue;
-		// Spread out: 140 m from any site, 320 m from one of the same kind.
-		if (sites.concat(mapPacks).some(s => Math.hypot(s.mx - x, s.my - y) < (s.creature === id ? 320 : 140))) continue;
+		// Spread out: 95 m from any site, 210 m from one of the same kind.
+		if (sites.concat(mapPacks).some(s => Math.hypot(s.mx - x, s.my - y) < (s.creature === id ? 210 : 95))) continue;
 		sites.push({ creature: id, mx: x, my: y, x: Math.round(x * 100 - HALF), y: Math.round(y * 100 - HALF), z: Math.round(z * 100),
 			count, radius: RADIUS[c.archetype] || 400, respawn: RESPAWN[c.behavior] || 180 });
 		placed++;
