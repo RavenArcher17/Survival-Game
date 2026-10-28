@@ -21,12 +21,33 @@ struct WILDREACH_API FWRBiomeHazards
 	/** "lava", "ice" or none, for feet at this location. */
 	static FName KindAt(const FVector& Feet);
 	static bool Resists(const class AWRCharacterBase* Who, FName Kind);
+	/** Coarse cells (CellSize apart) with lava / ice in them, at the surface height: where the hazard roughly is. */
 	static const TMap<FIntPoint, float>& Cells(FName Kind);
 	static float CellSize() { return Cell; }
+
+	/**
+	 * The lava flow as drawn (hazards.lavaGrid in the dressing file, from Tools/terrain/dressing.mjs): grid points every
+	 * Spacing cm with the ground height and how far inside the flow's edge each is. The lava's surface is the ground
+	 * plus Lift(cover): under the ground outside the edge, a thin skin over the middle. Where Lift > 0 is lava, on every
+	 * machine, so the burning matches the picture.
+	 */
+	struct FLavaGrid
+	{
+		float Spacing = 200.f;
+		float Half = 0.f;
+		float CoverLow = -1.2f, Sink = -45.f, CoverHigh = 2.6f, Top = 22.f;
+		/** Grid point (i, j) -> (ground cm, cover m). World = i * Spacing - Half. */
+		TMap<FIntPoint, FVector2f> Points;
+		float Lift(float Cover) const;
+		/** Ground and lava lift (cm) at a world spot, between the grid points around it; false where there's no flow. */
+		bool SurfaceAt(const FVector2D& At, float& OutGround, float& OutLift) const;
+	};
+	static const FLavaGrid& Flow() { return LavaFlow; }
 
 private:
 	static TMap<FIntPoint, float> Lava;
 	static TMap<FIntPoint, float> Ice;
+	static FLavaGrid LavaFlow;
 	static float Cell;
 };
 
@@ -81,6 +102,8 @@ public:
 	void Build(const TSharedPtr<class FJsonObject>& Instances);
 	/** Lava and ice surfaces (clients only: the server just needs the cells). */
 	void BuildHazardVisuals();
+	/** The lava flow's surface: a sheet over the landscape from FWRBiomeHazards::Flow(), in chunks (each culls alone). */
+	void BuildLavaFlow();
 	int32 GetInstanceCount() const { return Total; }
 
 	/** Server: a swing from Who reached this far (cm from its centre). Gathers from the nearest harvestable decoration in front. */
@@ -163,6 +186,8 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(Replicated) FName Biome = TEXT("volcanic");
+	/** Which sculpted cave (CaveA..C); the dressing file picks the one that fits the ground (-1: by position). */
+	UPROPERTY(Replicated) int32 Variant = -1;
 
 protected:
 	virtual void BeginPlay() override;

@@ -1,4 +1,5 @@
 #include "WRResourceNode.h"
+#include "WRResourceLook.h"
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
 #include "WRFx.h"
@@ -145,23 +146,9 @@ void AWRResourceNode::BeginPlay()
 
 void AWRResourceNode::OnRep_Look()
 {
-	// Placeholder look per resource: tall green cone = tree, grey = rock, orange = copper, yellow = sulfur, pale = lichen.
-	FLinearColor Color(0.5f, 0.5f, 0.5f);
-	FVector Scale(1.f, 1.f, 1.f);
-	if (ItemId == TEXT("wood")) { Color = FLinearColor(0.15f, 0.4f, 0.15f); Scale = FVector(1.2f, 1.2f, 4.f); }
-	else if (ItemId == TEXT("stone")) { Color = FLinearColor(0.45f, 0.45f, 0.45f); Scale = FVector(2.f, 2.f, 1.f); }
-	else if (ItemId == TEXT("copper_ore")) { Color = FLinearColor(0.75f, 0.4f, 0.2f); Scale = FVector(1.5f, 1.5f, 1.2f); }
-	else if (ItemId == TEXT("sulfur_crystal")) { Color = FLinearColor(0.9f, 0.85f, 0.2f); Scale = FVector(0.8f, 0.8f, 1.6f); }
-	else if (ItemId == TEXT("lichen")) { Color = FLinearColor(0.6f, 0.75f, 0.55f); Scale = FVector(1.5f, 1.5f, 0.4f); }
-	else if (ItemId == TEXT("berries")) { Color = FLinearColor(0.45f, 0.1f, 0.25f); Scale = FVector(1.2f, 1.2f, 0.8f); }
-	else if (ItemId == TEXT("fiber")) { Color = FLinearColor(0.55f, 0.6f, 0.25f); Scale = FVector(0.8f, 0.8f, 1.2f); }
-	else if (ItemId == TEXT("tin_ore")) { Color = FLinearColor(0.7f, 0.72f, 0.75f); Scale = FVector(1.5f, 1.5f, 1.2f); }
-	else if (ItemId == TEXT("iron_ore")) { Color = FLinearColor(0.35f, 0.2f, 0.18f); Scale = FVector(1.6f, 1.6f, 1.3f); }
-	SetActorScale3D(Scale);
-	if (UMaterialInstanceDynamic* Mat = Mesh->CreateAndSetMaterialInstanceDynamic(0))
-	{
-		Mat->SetVectorParameterValue(TEXT("Color"), Color);
-	}
+	// Each item's look (a tree, a boulder, an ore boulder, sulfur crystals, a lichen rock, a berry bush, a fibre plant)
+	// over the node's mesh, which becomes its hidden collider (WRResourceLook.cpp).
+	WRResourceLook::Apply(this, Mesh);
 }
 
 void AWRResourceNode::OnRep_Depleted()

@@ -4,7 +4,9 @@
 # quiet meanwhile: wildlife.despawnSeconds is shortened to 10 for the test), then the Emberhorns again.
 #   wildlifetest.ps1          headless
 #   wildlifetest.ps1 -Shots   rendered client: a screenshot of each herd
-param([switch]$Shots)
+#   wildlifetest.ps1 -Port 7871   another port (tests side by side)
+param([switch]$Shots, [int]$Port = 7835)
+$env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -31,10 +33,10 @@ $cmds = @(
 )
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7835 -wrworld=wildlife -wrtune=wildlife.despawnSeconds:10 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=wildlife -wrtune=wildlife.despawnSeconds:10 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7835?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 $deadline = (Get-Date).AddSeconds(150)
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 	Start-Sleep -Seconds 5

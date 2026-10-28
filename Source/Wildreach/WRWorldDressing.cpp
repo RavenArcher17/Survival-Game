@@ -29,15 +29,91 @@ static UMaterialInterface* ShapeMaterial()
 TArray<FWRPoi> FWRPoi::All;
 TMap<FIntPoint, float> FWRBiomeHazards::Lava;
 TMap<FIntPoint, float> FWRBiomeHazards::Ice;
+FWRBiomeHazards::FLavaGrid FWRBiomeHazards::LavaFlow;
 float FWRBiomeHazards::Cell = 600.f;
+
+float FWRBiomeHazards::FLavaGrid::Lift(float Cover) const
+{
+	return Sink + (Top - Sink) * FMath::SmoothStep(CoverLow, CoverHigh, Cover);
+}
+
+bool FWRBiomeHazards::FLavaGrid::SurfaceAt(const FVector2D& At, float& OutGround, float& OutLift) const
+{
+	if (Points.Num() == 0 || Spacing <= 0.f)
+	{
+		return false;
+	}
+	const double GX = (At.X + Half) / Spacing, GY = (At.Y + Half) / Spacing;
+	const int32 I = FMath::FloorToInt(GX), J = FMath::FloorToInt(GY);
+	const float FX = GX - I, FY = GY - J;
+	// Corners outside the flow count as well outside its edge; with no corner in the flow there's no lava here.
+	float Ground[4], Lifted[4];
+	int32 Found = 0;
+	float GroundSum = 0.f;
+	const FIntPoint Corners[4] = { FIntPoint(I, J), FIntPoint(I + 1, J), FIntPoint(I, J + 1), FIntPoint(I + 1, J + 1) };
+	for (int32 k = 0; k < 4; ++k)
+	{
+		if (const FVector2f* P = Points.Find(Corners[k]))
+		{
+			Ground[k] = P->X;
+			Lifted[k] = Lift(P->Y);
+			GroundSum += P->X;
+			++Found;
+		}
+		else
+		{
+			Ground[k] = TNumericLimits<float>::Max();
+			Lifted[k] = Sink;
+		}
+	}
+	if (Found == 0)
+	{
+		return false;
+	}
+	for (int32 k = 0; k < 4; ++k)
+	{
+		if (Ground[k] == TNumericLimits<float>::Max()) Ground[k] = GroundSum / Found;
+	}
+	const auto Bilerp = [FX, FY](const float V[4]) { return FMath::Lerp(FMath::Lerp(V[0], V[1], FX), FMath::Lerp(V[2], V[3], FX), FY); };
+	OutGround = Bilerp(Ground);
+	OutLift = Bilerp(Lifted);
+	return true;
+}
 
 void FWRBiomeHazards::Load(const TSharedPtr<FJsonObject>& Hazards)
 {
 	Lava.Reset();
 	Ice.Reset();
+	LavaFlow.Points.Reset();
 	if (!Hazards.IsValid())
 	{
 		return;
+	}
+	const TSharedPtr<FJsonObject>* Grid = nullptr;
+	if (Hazards->TryGetObjectField(TEXT("lavaGrid"), Grid))
+	{
+		FLavaGrid& F = LavaFlow;
+		F.Spacing = (*Grid)->GetNumberField(TEXT("spacing"));
+		F.Half = (*Grid)->GetNumberField(TEXT("half"));
+		F.CoverLow = (*Grid)->GetNumberField(TEXT("coverLow"));
+		F.Sink = (*Grid)->GetNumberField(TEXT("sink"));
+		F.CoverHigh = (*Grid)->GetNumberField(TEXT("coverHigh"));
+		F.Top = (*Grid)->GetNumberField(TEXT("top"));
+		const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+		if ((*Grid)->TryGetArrayField(TEXT("rows"), Rows))
+		{
+			// [row j, first column i, count n, then n pairs (ground cm, cover dm)]
+			for (const TSharedPtr<FJsonValue>& RowValue : *Rows)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& Row = RowValue->AsArray();
+				if (Row.Num() < 3) continue;
+				const int32 J = Row[0]->AsNumber(), I0 = Row[1]->AsNumber(), N = Row[2]->AsNumber();
+				for (int32 k = 0; k < N && 4 + k * 2 < Row.Num(); ++k)
+				{
+					F.Points.Add(FIntPoint(I0 + k, J), FVector2f(Row[3 + k * 2]->AsNumber(), Row[4 + k * 2]->AsNumber() / 10.f));
+				}
+			}
+		}
 	}
 	double Size = 600.0;
 	Hazards->TryGetNumberField(TEXT("cell"), Size);
@@ -52,7 +128,7 @@ void FWRBiomeHazards::Load(const TSharedPtr<FJsonObject>& Hazards)
 			Kind.Value->Add(FIntPoint(FMath::FloorToInt(X / Cell), FMath::FloorToInt(Y / Cell)), (*Arr)[i + 2]->AsNumber());
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("HAZARDS loaded %d lava and %d ice cells"), Lava.Num(), Ice.Num());
+	UE_LOG(LogWildreach, Log, TEXT("HAZARDS loaded %d lava and %d ice cells (lava flow: %d grid points)"), Lava.Num(), Ice.Num(), LavaFlow.Points.Num());
 }
 
 const TMap<FIntPoint, float>& FWRBiomeHazards::Cells(FName Kind)
@@ -63,7 +139,20 @@ const TMap<FIntPoint, float>& FWRBiomeHazards::Cells(FName Kind)
 FName FWRBiomeHazards::KindAt(const FVector& Feet)
 {
 	const FIntPoint Key(FMath::FloorToInt(Feet.X / Cell), FMath::FloorToInt(Feet.Y / Cell));
-	if (const float* Z = Lava.Find(Key)) { if (FMath::Abs(Feet.Z - *Z) < 250.f) return TEXT("lava"); }
+	if (const float* Z = Lava.Find(Key))
+	{
+		float Ground = 0.f, Lift = 0.f;
+		if (LavaFlow.Points.Num() == 0)
+		{
+			if (FMath::Abs(Feet.Z - *Z) < 250.f) return TEXT("lava");  // an older dressing file: whole cells
+		}
+		// Standing in the drawn lava: where its surface is over the ground, and on that ground (not on a bridge over it).
+		else if (LavaFlow.SurfaceAt(FVector2D(Feet), Ground, Lift) && Lift > WRTune(TEXT("hazards.lavaMinDepth"), 3.f)
+			&& Feet.Z < Ground + Lift + 80.f && Feet.Z > Ground - 150.f)
+		{
+			return TEXT("lava");
+		}
+	}
 	if (const float* Z = Ice.Find(Key)) { if (FMath::Abs(Feet.Z - *Z) < 250.f) return TEXT("ice"); }
 	return NAME_None;
 }
@@ -147,10 +236,15 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			const TSharedPtr<FJsonObject> C = V->AsObject();
 			const FVector At(C->GetNumberField(TEXT("x")), C->GetNumberField(TEXT("y")), C->GetNumberField(TEXT("z")));
-			const FTransform T(FRotator(0.f, C->GetNumberField(TEXT("yaw")), 0.f), At);
+			// The generator fits each cave to its ground (variant, turn, size, height) so its tunnel clears the landscape.
+			double Scale = 1.0, Variant = -1.0;
+			C->TryGetNumberField(TEXT("scale"), Scale);
+			C->TryGetNumberField(TEXT("variant"), Variant);
+			const FTransform T(FRotator(0.f, C->GetNumberField(TEXT("yaw")), 0.f), At, FVector(FMath::Clamp(Scale, 0.5, 3.0)));
 			if (AWRCave* Cave = InWorld.SpawnActorDeferred<AWRCave>(AWRCave::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 			{
 				Cave->Biome = FName(*C->GetStringField(TEXT("biome")));
+				Cave->Variant = FMath::RoundToInt(Variant);
 				Cave->FinishSpawning(T);
 			}
 		}
@@ -266,8 +360,14 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
 		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
 		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
-		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 130), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // scorched: dark, dull
-			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) } }, { { TEXT("Color Intensity"), 0.3f }, { TEXT("Sature Max"), 0.6f } } } },
+		// Scorched: dark bark, dry rust-brown leaves. The leaves' own colour is "Color Tint" / "Color Tint B" and their
+		// back-lit glow "SSS Color Tint": setting only "Color" (the bark) left them bright green, more so now there are
+		// many more of them.
+		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 130), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) }, { TEXT("Color Tint"), FLinearColor(0.11f, 0.06f, 0.03f) },
+			  { TEXT("Color Tint B"), FLinearColor(0.16f, 0.07f, 0.025f) }, { TEXT("SSS Color Tint"), FLinearColor(0.14f, 0.045f, 0.01f) },
+			  { TEXT("SSS Color Tint B"), FLinearColor(0.12f, 0.04f, 0.01f) } },
+			{ { TEXT("Color Intensity"), 0.55f }, { TEXT("Sature Max"), 0.65f }, { TEXT("SSS Color Intensity"), 0.35f } } } },
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 120), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // frosted: pale
 			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } }, { { TEXT("Color Intensity"), 1.25f }, { TEXT("Sature Max"), 0.5f } } } },
 	};
@@ -407,9 +507,18 @@ void AWRDressing::BuildHazardVisuals()
 	// with its neighbours and sit at the average height of the cells around them, so slopes are smooth (no steps).
 	// Only neighbours within MaxStep of the cell count, so the sheet splits at real drops (a plateau edge) instead of
 	// stretching up into the air between them.
+	const bool bLavaFlow = FWRBiomeHazards::Flow().Points.Num() > 0;
+	if (bLavaFlow)
+	{
+		BuildLavaFlow();
+	}
 	for (const FName Kind : { FName(TEXT("lava")), FName(TEXT("ice")) })
 	{
 		const bool bLava = Kind == TEXT("lava");
+		if (bLava && bLavaFlow)
+		{
+			continue;  // drawn from the flow's own grid instead of the coarse cells
+		}
 		const TMap<FIntPoint, float>& Cells = FWRBiomeHazards::Cells(Kind);
 		if (Cells.Num() == 0)
 		{
@@ -472,6 +581,103 @@ void AWRDressing::BuildHazardVisuals()
 		}
 		Surface->SetMaterial(0, Mat);
 	}
+}
+
+void AWRDressing::BuildLavaFlow()
+{
+	// The lava flow: a sheet whose points sit on landscape vertices (every other one) at the ground plus the lava's lift,
+	// so it lies along the terrain on any slope instead of flat squares that float over it, and its rim, sunk under the
+	// ground, ends wherever the terrain cuts it (a ragged shore, no straight edges). Its own material glows from the
+	// vertex colours: molten in the middle, cooling to crust toward the rim. Chunks so the far ones cull.
+	const FWRBiomeHazards::FLavaGrid& Flow = FWRBiomeHazards::Flow();
+	const float S = Flow.Spacing;
+	const int32 ChunkPoints = FMath::Max(4, FMath::RoundToInt(WRTune(TEXT("lava.chunkPoints"), 32.f)));
+	const auto SurfaceZ = [&Flow](const FIntPoint& P, float& Out) -> bool
+	{
+		const FVector2f* V = Flow.Points.Find(P);
+		if (V) Out = V->X + Flow.Lift(V->Y);
+		return V != nullptr;
+	};
+	struct FChunk
+	{
+		TArray<FVector> Verts;
+		TArray<int32> Tris;
+		TArray<FVector> Normals;
+		TArray<FVector2D> UVs;
+		TArray<FLinearColor> Colors;
+		TMap<FIntPoint, int32> Index;
+	};
+	TMap<FIntPoint, FChunk> Chunks;
+	const auto Vertex = [&](FChunk& Into, const FIntPoint& P) -> int32
+	{
+		if (const int32* Found = Into.Index.Find(P))
+		{
+			return *Found;
+		}
+		const FVector2f V = Flow.Points.FindChecked(P);
+		const float Z = V.X + Flow.Lift(V.Y);
+		float L = Z, R = Z, D = Z, U = Z;  // a missing neighbour counts as level
+		SurfaceZ(P - FIntPoint(1, 0), L);
+		SurfaceZ(P + FIntPoint(1, 0), R);
+		SurfaceZ(P - FIntPoint(0, 1), D);
+		SurfaceZ(P + FIntPoint(0, 1), U);
+		const FVector At(P.X * S - Flow.Half, P.Y * S - Flow.Half, Z);
+		const int32 I = Into.Verts.Add(At);
+		Into.Normals.Add(FVector((L - R) / (2.f * S), (D - U) / (2.f * S), 1.f).GetSafeNormal());
+		Into.UVs.Add(FVector2D(At.X, At.Y) / 400.f);
+		// R = heat (crust at the rim, molten toward the middle), G = 0 where the sheet dips under the ground.
+		Into.Colors.Add(FLinearColor(FMath::SmoothStep(0.6f, 5.f, V.Y), FMath::SmoothStep(-0.4f, 1.6f, V.Y), 0.f, 1.f));
+		Into.Index.Add(P, I);
+		return I;
+	};
+	int32 Squares = 0;
+	for (const TPair<FIntPoint, FVector2f>& It : Flow.Points)
+	{
+		const FIntPoint P = It.Key, P1 = P + FIntPoint(1, 0), P2 = P + FIntPoint(1, 1), P3 = P + FIntPoint(0, 1);
+		const FVector2f* V1 = Flow.Points.Find(P1);
+		const FVector2f* V2 = Flow.Points.Find(P2);
+		const FVector2f* V3 = Flow.Points.Find(P3);
+		if (!V1 || !V2 || !V3)
+		{
+			continue;
+		}
+		if (FMath::Max(FMath::Max(Flow.Lift(It.Value.Y), Flow.Lift(V1->Y)), FMath::Max(Flow.Lift(V2->Y), Flow.Lift(V3->Y))) <= 0.f)
+		{
+			continue;  // wholly under the ground
+		}
+		FChunk& Into = Chunks.FindOrAdd(FIntPoint(FMath::FloorToInt(P.X / float(ChunkPoints)), FMath::FloorToInt(P.Y / float(ChunkPoints))));
+		const int32 A = Vertex(Into, P), B = Vertex(Into, P1), C = Vertex(Into, P2), D = Vertex(Into, P3);
+		Into.Tris.Append({ A, C, B, A, D, C });  // counter-clockwise from above, so the faces point up
+		++Squares;
+	}
+	// Glowing lava (Tools/terrain/build_terrain_materials.py), flat orange if it's missing.
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Lava.M_Lava"));
+	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base ? Base : ShapeMaterial(), this);
+	if (Base)
+	{
+		Mat->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("lava.glow"), 1.f));
+		Mat->SetScalarParameterValue(TEXT("FarLift"), WRTune(TEXT("lava.farLiftPer100m"), 45.f));
+	}
+	else
+	{
+		Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.95f, 0.22f, 0.02f));
+	}
+	const float Cull = WRTune(TEXT("lava.cullDistance"), 30000.f);
+	for (TPair<FIntPoint, FChunk>& It : Chunks)
+	{
+		FChunk& C = It.Value;
+		UProceduralMeshComponent* Surface = NewObject<UProceduralMeshComponent>(this);
+		Surface->SetupAttachment(RootComponent);
+		Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // the hazard is decided from the same grid, not by touch
+		Surface->SetCastShadow(false);
+		Surface->bAffectDistanceFieldLighting = false;
+		Surface->SetBoundsScale(1.2f);  // the material lifts far lava over the coarser far landscape
+		Surface->RegisterComponent();
+		Surface->CreateMeshSection_LinearColor(0, C.Verts, C.Tris, C.Normals, C.UVs, C.Colors, TArray<FProcMeshTangent>(), false);
+		Surface->SetCullDistance(Cull);
+		Surface->SetMaterial(0, Mat);
+	}
+	UE_LOG(LogWildreach, Log, TEXT("LAVA flow drawn: %d squares in %d chunks"), Squares, Chunks.Num());
 }
 
 void AWRDressing::Tick(float DeltaSeconds)
@@ -775,6 +981,7 @@ void AWRCave::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCave, Biome);
+	DOREPLIFETIME(AWRCave, Variant);
 }
 
 void AWRCave::BeginPlay()
@@ -806,10 +1013,12 @@ void AWRCave::BuildShell()
 
 	// Blender-sculpted cave (Tools/art/cave_gen.py): a rock mound with the chamber and a ragged entrance tunnel carved
 	// out, in the same local layout as the blocks below. Its collision is the mesh itself, and the landscape is the floor.
-	// Three variants, picked by position so every machine agrees; the blocks are the fallback if they're missing.
+	// Three variants: the one the dressing file chose (replicated), else picked by position so every machine agrees; the
+	// blocks are the fallback if they're missing.
 	static const TCHAR* Variants[] = { TEXT("/Game/Props/Caves/CaveA/cave_a.cave_a"), TEXT("/Game/Props/Caves/CaveB/cave_b.cave_b"),
 	                                   TEXT("/Game/Props/Caves/CaveC/cave_c.cave_c") };
-	if (UStaticMesh* CaveMesh = LoadObject<UStaticMesh>(nullptr, Variants[GetTypeHash(GetActorLocation().GridSnap(100.f)) % UE_ARRAY_COUNT(Variants)]))
+	const int32 Pick = Variant >= 0 ? Variant % UE_ARRAY_COUNT(Variants) : GetTypeHash(GetActorLocation().GridSnap(100.f)) % UE_ARRAY_COUNT(Variants);
+	if (UStaticMesh* CaveMesh = LoadObject<UStaticMesh>(nullptr, Variants[Pick]))
 	{
 		UStaticMeshComponent* Shell = NewObject<UStaticMeshComponent>(this);
 		Shell->SetStaticMesh(CaveMesh);
@@ -919,5 +1128,6 @@ void AWRCave::SpawnContents()
 		Spawner->RespawnSeconds = 300.f;
 		Spawner->FinishSpawning(SpawnAt);
 	}
-	UE_LOG(LogWildreach, Log, TEXT("CAVE %s (%s) at %s: %d ore nodes"), *GetName(), *Biome.ToString(), *GetActorLocation().ToCompactString(), Ores.Num());
+	UE_LOG(LogWildreach, Log, TEXT("CAVE %s (%s) at %s yaw %.0f, variant %d, size x%.2f: %d ore nodes"), *GetName(), *Biome.ToString(),
+		*GetActorLocation().ToCompactString(), GetActorRotation().Yaw, Variant, GetActorScale3D().X, Ores.Num());
 }
