@@ -758,7 +758,8 @@ private:
 					{
 						const FWRPieceDef* T = DemolishTarget();
 						if (!T) return FText::FromString(TEXT("-"));
-						return PC.IsValid() && PC->IsPlacementValid() ? FText::FromString(RefundOf(*T)) : FText::FromString(PC.IsValid() ? PC->GetPlacementWhy() : FString());
+						return PC.IsValid() && PC->IsPlacementValid() ? FText::FromString(RefundOf(*T))
+							: FText::Format(LOCTEXT("NothingBecause", "Nothing ({0})"), FText::FromString(PC.IsValid() ? PC->GetPlacementWhy() : FString()));
 					}), WRUI::Body(13, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(DemolishTarget() && PC.IsValid() && !PC->IsPlacementValid() ? WRUI::Bad : WRUI::Ink); })))
 				]
 			];
@@ -1105,7 +1106,7 @@ private:
 		}
 		else if (M == 2)
 		{
-			Lines.Add({ K(TEXT("Light")), LOCTEXT("KRemove", "Take it down (half back)"), false });
+			Lines.Add({ K(TEXT("Light")), LOCTEXT("KRemove", "Take it down"), false });
 			Lines.Add({ FText::Format(LOCTEXT("KeyOrEsc", "{0} / Esc"), K(TEXT("Demolish"))), LOCTEXT("KStop", "Stop demolishing"), false });
 			Lines.Add({ K(TEXT("Build")), LOCTEXT("KLeave", "Leave build mode"), false });
 		}

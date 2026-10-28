@@ -214,6 +214,18 @@ namespace WRUIDrive
 	// WRMouseClick [x y] [rmb]: press the mouse at a point of the game window (fractions of its size; by default the
 	// middle, where the crosshair is), for clicks in the world: placing and demolishing in build mode. The mouse doesn't
 	// travel there first (with the cursor hidden, a move turns the camera and spoils the aim).
+	bool HasCaptor()
+	{
+		const TSharedPtr<FSlateUser> User = FSlateApplication::Get().GetCursorUser();
+		return User.IsValid() && User->GetCursorCaptor().IsValid();
+	}
+
+	FString CaptorName()
+	{
+		const TSharedPtr<FSlateUser> User = FSlateApplication::Get().GetCursorUser();
+		return User.IsValid() && User->GetCursorCaptor().IsValid() ? User->GetCursorCaptor()->GetTypeAsString() : FString(TEXT("none"));
+	}
+
 	FAutoConsoleCommandWithWorldAndArgs MouseClickCommand(TEXT("WRMouseClick"),
 		TEXT("Testing: click the mouse in the game window as a player would (WRMouseClick [x y] [rmb]; fractions, default the middle)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
@@ -229,23 +241,38 @@ namespace WRUIDrive
 			const uint32 User = FSlateApplication::CursorUserIndex, Pointer = FSlateApplication::CursorPointerIndex;
 			const FWidgetPath Hit = App.LocateWindowUnderMouse(Pos, { Window.ToSharedRef() });
 			const FString Under = Hit.IsValid() ? Hit.Widgets.Last().Widget->GetTypeAsString() : FString(TEXT("nothing"));
-			// As WRClick: take the click even when another window is in front (see Click). The button comes up a tenth of
-			// a second later, as a finger's does: game input reads keys once a frame, so a press and release in the same
-			// frame might never be seen as a press.
+			const auto Down = [Pos, Button, User, Pointer]() { FSlateApplication::Get().ProcessMouseButtonDownEvent(nullptr, FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>({ Button }), Button, 0.f, FModifierKeysState())); };
+			const auto Up = [Pos, Button, User, Pointer]() { FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>(), Button, 0.f, FModifierKeysState())); };
+			// As WRClick: take the click even when another window is in front (see Click).
 			const bool bWasAllowed = App.GetHandleDeviceInputWhenApplicationNotActive();
 			App.SetHandleDeviceInputWhenApplicationNotActive(true);
-			App.ProcessMouseButtonDownEvent(nullptr, FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>({ Button }), Button, 0.f, FModifierKeysState()));
-			UE_LOG(LogWildreach, Log, TEXT("MOUSECLICK %s at %.0f,%.0f (under %s, captor %s)"), *Button.ToString(), Pos.X, Pos.Y, *Under,
-				App.GetCursorUser().IsValid() && App.GetCursorUser()->GetCursorCaptor().IsValid() ? *App.GetCursorUser()->GetCursorCaptor()->GetTypeAsString() : TEXT("none"));
-			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Pos, Button, User, Pointer, bWasAllowed](float)
+			// A game window that isn't in front hasn't got the mouse: a player's first click there only takes it back (the
+			// game swallows the click that captures the mouse), so click once more, as they would.
+			const bool bTakeBack = !HasCaptor();
+			if (bTakeBack)
 			{
-				if (FSlateApplication::IsInitialized())
+				Down();
+				Up();
+				UE_LOG(LogWildreach, Log, TEXT("MOUSECLICK %s at %.0f,%.0f takes the mouse back first (under %s, captor now %s)"), *Button.ToString(), Pos.X, Pos.Y, *Under, *CaptorName());
+			}
+			// The button comes up a tenth of a second after it goes down, as a finger's does: game input reads keys once
+			// a frame, so a press and release in the same frame might never be seen as a press.
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Pos, Button, Under, Down, Up, bWasAllowed](float)
+			{
+				if (!FSlateApplication::IsInitialized()) return false;
+				Down();
+				UE_LOG(LogWildreach, Log, TEXT("MOUSECLICK %s at %.0f,%.0f (under %s, captor %s)"), *Button.ToString(), Pos.X, Pos.Y, *Under, *CaptorName());
+				FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Up, bWasAllowed](float)
 				{
-					FSlateApplication::Get().ProcessMouseButtonUpEvent(FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>(), Button, 0.f, FModifierKeysState()));
-					FSlateApplication::Get().SetHandleDeviceInputWhenApplicationNotActive(bWasAllowed);
-				}
+					if (FSlateApplication::IsInitialized())
+					{
+						Up();
+						FSlateApplication::Get().SetHandleDeviceInputWhenApplicationNotActive(bWasAllowed);
+					}
+					return false;
+				}), 0.1f);
 				return false;
-			}), 0.1f);
+			}), bTakeBack ? 0.15f : 0.f);
 		}));
 
 	// WRLookAt X Y Z: turn the camera so the crosshair sits on a world point, as a player aims the build ghost (or the

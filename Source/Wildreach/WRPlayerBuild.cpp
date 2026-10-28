@@ -285,7 +285,9 @@ void AWRPlayerController::UpdatePlacement()
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRBuildAim), false, Self);
 	Query.AddIgnoredActor(G);
 	FHitResult Hit;
-	FVector Point = Eye + Dir * 1000.f;
+	// Demolish reaches further than the 10 m a piece is placed within, so a piece out of reach says "too far" instead of
+	// "aim at a piece".
+	FVector Point = Eye + Dir * (Def ? 1000.f : WRTune(TEXT("ui.demolishReach"), 1600.f));
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query);
 	if (bHit)
 	{
@@ -314,7 +316,8 @@ void AWRPlayerController::UpdatePlacement()
 		if (G && Target)
 		{
 			G->SetActorTransform(FTransform(Target->GetActorRotation(), PlaceLoc, FVector(1.02f)));  // a hair bigger, so it shows over the piece
-			G->SetGhostValid(false);
+			// Glowing red: a click takes it down. Someone else's (or out of reach): dull grey, and the chip says why.
+			G->SetGhostGlow(bPlaceValid ? FLinearColor(1.f, 0.015f, 0.008f) : FLinearColor(0.5f, 0.5f, 0.53f), WRTune(TEXT("ui.demolishGlow"), 0.35f));
 		}
 		return;
 	}
