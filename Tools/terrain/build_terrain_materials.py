@@ -201,18 +201,23 @@ if want("lava"):
     link(mul(uv_top, k=0.37), flow2, "Coordinate")
     t1 = sample("/Game/LavaMat/Textures/T_LavaMat1_Emissive", flow)
     t2 = sample("/Game/LavaMat/Textures/T_LavaMat1_Emissive", flow2)
-    veins = mul(mask(t1, "g"), mask(t1, "g"))                     # its bright streaks only, squared: cracks in a dark crust
+    scalar_p = lambda name, v: expr(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=v)
+    # Its bright streaks only, raised to CrackPower: thin cracks in a dark crust.
+    veins = expr(unreal.MaterialExpressionPower)
+    link(mask(t1, "g"), veins, "Base")
+    if not any(mel.connect_material_expressions(scalar_p("CrackPower", 3.0), "", veins, n) for n in ("Exp", "Exponent")):
+        unreal.log_error("[Wildreach] lava: Power exponent not connected")
     plates = mask(t2, "r")
-    # e: 0 = cold crust, 1 = molten. Cracks everywhere (dimmer at the rim), the middle of the flow molten all over.
-    e = sat(op(unreal.MaterialExpressionAdd, mul(veins, lerp(None, None, heat, const_a=0.45, const_b=1.25)),
-               mul(mul(heat, heat), lerp(None, None, plates, const_a=0.15, const_b=0.75))))
-    colour = lerp(lerp(const3((0.85, 0.05, 0.006)), const3((1.0, 0.30, 0.025)), sat(mul(e, k=1.6))),
-                  const3((1.0, 0.62, 0.16)), sat(mul(op(unreal.MaterialExpressionSubtract, e, const_b=0.6), k=2.5)))
-    glow_p = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Glow", default_value=1.0)
-    # On-screen brightness: ~0.06 for cold crust up to ~3 for the hottest; the rim (sunk under the ground) fades out.
-    level = mul(mul(lerp(None, None, e, const_a=0.06, const_b=3.0), sat(mul(edge, k=1.5))), glow_p)
+    # e: 0 = cold crust, 1 = molten. Cracks everywhere (dimmer at the rim), the middle of the flow molten in patches.
+    e = sat(op(unreal.MaterialExpressionAdd, mul(veins, lerp(None, None, heat, const_a=0.5, const_b=1.3)),
+               mul(mul(mul(heat, heat), lerp(None, None, plates, const_a=0.1, const_b=0.9)), scalar_p("MoltenCore", 0.6))))
+    colour = lerp(lerp(const3((0.6, 0.02, 0.003)), const3((1.0, 0.18, 0.01)), sat(mul(e, k=1.8))),
+                  const3((1.0, 0.45, 0.06)), sat(mul(op(unreal.MaterialExpressionSubtract, e, const_b=0.7), k=3.0)))
+    glow_p = scalar_p("Glow", 1.0)
+    # On-screen brightness from CrustLevel (cold crust) to HotLevel (molten); the rim (sunk under the ground) fades out.
+    level = mul(mul(lerp(scalar_p("CrustLevel", 0.0), scalar_p("HotLevel", 5.0), mul(e, e)), sat(mul(edge, k=1.5))), glow_p)
     steady = expr(unreal.MaterialExpressionEyeAdaptationInverse)
-    alpha = expr(unreal.MaterialExpressionConstant, r=0.85)  # mostly steady: a touch brighter at night still
+    alpha = scalar_p("Steady", 0.85)  # 1 = the same brightness on screen whatever the exposure; less: brighter at night
     ok_l = any(mel.connect_material_expressions(level, "", steady, n) for n in ("LightValue", "Light Value", "LightValueInput"))
     ok_a = any(mel.connect_material_expressions(alpha, "", steady, n) for n in ("Alpha", "AlphaInput"))
     if not (ok_l and ok_a):
@@ -224,7 +229,8 @@ if want("lava"):
     farlift_p = expr(unreal.MaterialExpressionScalarParameter, parameter_name="FarLift", default_value=45.0)
     lift = mul(mul(far, farlift_p), k=1.0 / 10000.0)
     wpo = op(unreal.MaterialExpressionAppendVector, expr(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), lift)
-    crust = mul(const3((0.03, 0.026, 0.024)), lerp(None, None, plates, const_a=0.7, const_b=1.2))
+    crust_p = expr(unreal.MaterialExpressionVectorParameter, parameter_name="CrustColor", default_value=unreal.LinearColor(0.012, 0.01, 0.009, 1))
+    crust = mul(crust_p, lerp(None, None, plates, const_a=0.7, const_b=1.3))  # near-black: by day the sun lit it pale
     finish(crust, sample("/Game/LavaMat/Textures/T_LavaMat1_normal", flow), expr(unreal.MaterialExpressionConstant, r=0.92),
            emissive, wpo, expr(unreal.MaterialExpressionConstant, r=0.15))
 

@@ -360,16 +360,16 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
 		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
 		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
-		// Scorched: dark bark, dry rust-brown leaves. The leaves' own colour is "Color Tint" / "Color Tint B" and their
-		// back-lit glow "SSS Color Tint": setting only "Color" (the bark) left them bright green, more so now there are
-		// many more of them.
-		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 130), 5, false, 12000, FVector::ZeroVector, true, nullptr,
-			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) }, { TEXT("Color Tint"), FLinearColor(0.11f, 0.06f, 0.03f) },
-			  { TEXT("Color Tint B"), FLinearColor(0.16f, 0.07f, 0.025f) }, { TEXT("SSS Color Tint"), FLinearColor(0.14f, 0.045f, 0.01f) },
-			  { TEXT("SSS Color Tint B"), FLinearColor(0.12f, 0.04f, 0.01f) } },
-			{ { TEXT("Color Intensity"), 0.55f }, { TEXT("Sature Max"), 0.65f }, { TEXT("SSS Color Intensity"), 0.35f } } } },
-		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 120), 5, false, 12000, FVector::ZeroVector, true, nullptr,  // frosted: pale
-			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } }, { { TEXT("Color Intensity"), 1.25f }, { TEXT("Sature Max"), 0.5f } } } },
+		// Ash-dusted and frosted. The GV leaves are green whatever their tint and saturation settings (the "volcanic shrubs
+		// green" note, more visible now there are many more); what recolours them is their "snow" coat, Snow Color laid
+		// over Amount Min..Max of each plant (0..1 by default, so only some got any). Ash grey all over in the volcanic
+		// west, mostly white in the tundra.
+		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 150), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) }, { TEXT("Snow Color"), FLinearColor(0.06f, 0.05f, 0.045f) } },
+			{ { TEXT("Amount Min"), 0.85f }, { TEXT("Amount Max"), 1.f } } } },
+		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 140), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } },
+			{ { TEXT("Amount Min"), 0.6f }, { TEXT("Amount Max"), 1.f } } } },
 	};
 	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
 	// machine in the same order, so a ledger key means the same decoration everywhere.
@@ -399,7 +399,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		return Harvestables.FindByPredicate([&Kind](const FHarvestKind& HK) { return HK.Kind == Kind; });
 	};
 
-	const auto BuildArt = [&](const FArt& A, const TArray<TSharedPtr<FJsonValue>>& Arr, FHarvestKind* HK) -> bool
+	const auto BuildArt = [&](const FString& KindName, const FArt& A, const TArray<TSharedPtr<FJsonValue>>& Arr, FHarvestKind* HK) -> bool
 	{
 		TArray<UStaticMesh*> Meshes;
 		for (const FString& Path : A.Meshes)
@@ -438,6 +438,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				for (const FParam& P : A.Params) MID->SetVectorParameterValue(P.Name, P.Value);  // ignored where a material lacks it
 				for (const FScalar& P : A.Scalars) MID->SetScalarParameterValue(P.Name, P.Value);
 				Part->SetMaterial(Slot, MID);
+				KindMaterials.FindOrAdd(KindName).Add(MID);
 			}
 			Part->AddInstances(Transforms, false, true);
 			if (HK)
@@ -458,7 +459,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		const int32 Count = Arr->Num() / 5;
 		const FArt* A = Art.Find(Kind.Key);
 		FHarvestKind* HK = HarvestKind(Kind.Key);
-		const bool bArt = A && BuildArt(*A, *Arr, HK);
+		const bool bArt = A && BuildArt(Kind.Key, *A, *Arr, HK);
 		for (const FPart& Part : Kind.Value)
 		{
 			if (bArt && !(A->bShapeCollision && Part.bCollision))
@@ -653,10 +654,16 @@ void AWRDressing::BuildLavaFlow()
 	// Glowing lava (Tools/terrain/build_terrain_materials.py), flat orange if it's missing.
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Lava.M_Lava"));
 	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base ? Base : ShapeMaterial(), this);
+	KindMaterials.FindOrAdd(TEXT("lava")).Add(Mat);
 	if (Base)
 	{
 		Mat->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("lava.glow"), 1.f));
 		Mat->SetScalarParameterValue(TEXT("FarLift"), WRTune(TEXT("lava.farLiftPer100m"), 45.f));
+		Mat->SetScalarParameterValue(TEXT("HotLevel"), WRTune(TEXT("lava.hotLevel"), 6.f));
+		Mat->SetScalarParameterValue(TEXT("CrustLevel"), WRTune(TEXT("lava.crustLevel"), 0.f));
+		Mat->SetScalarParameterValue(TEXT("CrackPower"), WRTune(TEXT("lava.crackPower"), 2.5f));
+		Mat->SetScalarParameterValue(TEXT("MoltenCore"), WRTune(TEXT("lava.moltenCore"), 0.9f));
+		Mat->SetScalarParameterValue(TEXT("Steady"), WRTune(TEXT("lava.steady"), 0.85f));
 	}
 	else
 	{
@@ -678,6 +685,47 @@ void AWRDressing::BuildLavaFlow()
 		Surface->SetMaterial(0, Mat);
 	}
 	UE_LOG(LogWildreach, Log, TEXT("LAVA flow drawn: %d squares in %d chunks"), Squares, Chunks.Num());
+}
+
+int32 AWRDressing::SetLookParam(const FString& Kind, FName Param, const TArray<float>& Values)
+{
+	int32 Set = 0;
+	if (const TArray<TWeakObjectPtr<UMaterialInstanceDynamic>>* Mats = KindMaterials.Find(Kind))
+	{
+		for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Weak : *Mats)
+		{
+			if (UMaterialInstanceDynamic* MID = Weak.Get())
+			{
+				if (Values.Num() >= 3) MID->SetVectorParameterValue(Param, FLinearColor(Values[0], Values[1], Values[2], Values.Num() > 3 ? Values[3] : 1.f));
+				else if (Values.Num() == 1) MID->SetScalarParameterValue(Param, Values[0]);
+				++Set;
+			}
+		}
+	}
+	return Set;
+}
+
+namespace WRDressingDev
+{
+	// Looks tuned live while the game runs (screenshots of a few settings in one go), as wr.SeaParam does for the sea.
+	void SetParam(UWorld* World, const FString& Kind, const TArray<FString>& Args, int32 First)
+	{
+		AWRDressing* Dressing = UWRDressingSubsystem::FindDressing(World);
+		if (!Dressing || Args.Num() < First + 2)
+		{
+			UE_LOG(LogWildreach, Warning, TEXT("LOOK usage: wr.LavaParam <param> <value | r g b> / wr.DressParam <kind> <param> <value | r g b>"));
+			return;
+		}
+		TArray<float> Values;
+		for (int32 i = First + 1; i < Args.Num(); ++i) Values.Add(FCString::Atof(*Args[i]));
+		// Underscores stand for spaces ("Sature_Min"): console arguments split on spaces.
+		const int32 Set = Dressing->SetLookParam(Kind, FName(*Args[First].Replace(TEXT("_"), TEXT(" "))), Values);
+		UE_LOG(LogWildreach, Log, TEXT("LOOK %s %s = %s on %d materials"), *Kind, *Args[First], *FString::JoinBy(Values, TEXT(" "), [](float V) { return FString::SanitizeFloat(V); }), Set);
+	}
+	static FAutoConsoleCommandWithWorldAndArgs LavaParam(TEXT("wr.LavaParam"), TEXT("wr.LavaParam <param> <value | r g b>: set a parameter on the lava flow's material (Glow, HotLevel, CrustLevel, CrackPower, MoltenCore, Steady, FarLift)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World) { SetParam(World, TEXT("lava"), Args, 0); }));
+	static FAutoConsoleCommandWithWorldAndArgs DressParam(TEXT("wr.DressParam"), TEXT("wr.DressParam <kind> <param> <value | r g b>: set a material parameter on every decoration of a kind (ember_shrub, snow_shrub, ...)"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World) { if (Args.Num() > 0) SetParam(World, Args[0], Args, 1); }));
 }
 
 void AWRDressing::Tick(float DeltaSeconds)
@@ -1010,6 +1058,9 @@ void AWRCave::BuildShell()
 		Rock->SetMaterial(0, MID);
 	}
 	Glow->SetLightColor(bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
+	// Enough light in the chamber to find the ore by (it was black inside: 1200 over a 16 m reach).
+	Glow->SetIntensity(WRTune(TEXT("caves.glowIntensity"), 8000.f));
+	Glow->SetAttenuationRadius(WRTune(TEXT("caves.glowRadius"), 2400.f) * GetActorScale3D().X);
 
 	// Blender-sculpted cave (Tools/art/cave_gen.py): a rock mound with the chamber and a ragged entrance tunnel carved
 	// out, in the same local layout as the blocks below. Its collision is the mesh itself, and the landscape is the floor.

@@ -27,18 +27,6 @@ namespace WRResourceLookParts
 		return MID;
 	}
 
-	UMaterialInterface* ShapeColour(UObject* Outer, const FLinearColor& Color)
-	{
-		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-		if (!Base)
-		{
-			return nullptr;
-		}
-		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Base, Outer);
-		MID->SetVectorParameterValue(TEXT("Color"), Color);
-		return MID;
-	}
-
 	/** One of the node's look components (made once, cleared on a rebuild: the look can be applied more than once). */
 	template <typename T>
 	T* Part(AWRResourceNode* Node, USceneComponent* Parent, FName Tag)
@@ -53,7 +41,10 @@ namespace WRResourceLookParts
 		T* Made = NewObject<T>(Node);
 		Made->ComponentTags.Add(Tag);
 		Made->SetupAttachment(Parent);
-		Made->SetUsingAbsoluteScale(true);  // the node's own scale sizes its collider, not the look
+		// The node's own scale sizes its collider, not the look: the look is placed in world units at the node (relative
+		// locations under the scaled collider came out sunk by about the look's own height).
+		Made->SetUsingAbsoluteScale(true);
+		Made->SetUsingAbsoluteLocation(true);
 		Made->SetCollisionEnabled(ECollisionEnabled::NoCollision);  // the hidden collider is what swings and feet hit
 		Made->bAffectDistanceFieldLighting = false;
 		Made->RegisterComponent();
@@ -143,7 +134,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	}
 	else if (Item == TEXT("berries") || Item == TEXT("fiber"))
 	{
-		Main = LoadMesh(Shrub(Item == TEXT("berries") ? (Seed % 2 ? TEXT("B") : TEXT("D")) : (Seed % 2 ? TEXT("E") : TEXT("C"))));
+		// Leafy A / B for berries, the taller, twiggier C / D for fibre (E and F carry a suffix in their names).
+		Main = LoadMesh(Shrub(Item == TEXT("berries") ? (Seed % 2 ? TEXT("B") : TEXT("A")) : (Seed % 2 ? TEXT("D") : TEXT("C"))));
 	}
 	else
 	{
@@ -169,14 +161,12 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	Bits->ClearInstances();
 	Look->SetStaticMesh(Main);
 	Look->SetWorldScale3D(FVector::OneVector);
-	Look->SetRelativeLocation(FVector::ZeroVector);
+	Look->SetWorldLocation(At);
 	Look->SetRelativeRotation(FRotator::ZeroRotator);
 	for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot) Look->SetMaterial(Slot, nullptr);  // the mesh's own, unless set below
-	// The look's transform is worked out in world units at the node, then expressed under the scaled collider.
-	const FVector ParentScale = Node->GetActorScale3D().ComponentMax(FVector(0.01f));
 	const auto Place = [&](const FTransform& T)
 	{
-		Look->SetRelativeLocation(T.GetLocation() / ParentScale);
+		Look->SetWorldLocation(At + Node->GetActorRotation().RotateVector(T.GetLocation()));
 		Look->SetRelativeRotation(T.GetRotation());
 		Look->SetWorldScale3D(T.GetScale3D());
 	};
@@ -193,6 +183,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	};
 	// Instances are in cm around the node (the bits keep a unit world scale, so a tilted shard isn't sheared).
 	Bits->SetWorldScale3D(FVector::OneVector);
+	Bits->SetWorldLocation(At);
 
 	if (Item == TEXT("wood"))
 	{
@@ -207,10 +198,10 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		{
 			// An ore boulder: darker rock with lumps of the metal breaking its surface (copper's green-stained lumps,
 			// silvery tin, rusty iron), so it reads as ore from a distance and not as one more grey stone.
-			FLinearColor RockTint(0.12f, 0.1f, 0.09f), Lump(0.5f, 0.5f, 0.5f), Lump2 = Lump;
-			if (Item == TEXT("copper_ore")) { RockTint = FLinearColor(0.15f, 0.11f, 0.09f); Lump = FLinearColor(0.62f, 0.3f, 0.12f); Lump2 = FLinearColor(0.12f, 0.42f, 0.3f); }
-			else if (Item == TEXT("tin_ore")) { RockTint = FLinearColor(0.16f, 0.16f, 0.17f); Lump = FLinearColor(0.72f, 0.74f, 0.78f); Lump2 = FLinearColor(0.5f, 0.52f, 0.56f); }
-			else if (Item == TEXT("iron_ore")) { RockTint = FLinearColor(0.13f, 0.085f, 0.07f); Lump = FLinearColor(0.5f, 0.2f, 0.08f); Lump2 = FLinearColor(0.32f, 0.13f, 0.07f); }
+			FLinearColor RockTint(0.3f, 0.27f, 0.25f), Lump(1.f, 1.f, 1.f), Lump2 = Lump;  // over 1: the rock texture is dark
+			if (Item == TEXT("copper_ore")) { RockTint = FLinearColor(0.3f, 0.24f, 0.2f); Lump = FLinearColor(1.9f, 0.75f, 0.25f); Lump2 = FLinearColor(0.3f, 1.3f, 0.85f); }
+			else if (Item == TEXT("tin_ore")) { RockTint = FLinearColor(0.42f, 0.43f, 0.46f); Lump = FLinearColor(2.4f, 2.45f, 2.6f); Lump2 = Lump; }
+			else if (Item == TEXT("iron_ore")) { RockTint = FLinearColor(0.26f, 0.19f, 0.17f); Lump = FLinearColor(1.5f, 0.55f, 0.2f); Lump2 = Lump; }
 			Tint(RockMaterial(Node, RockTint));
 			Bits->SetStaticMesh(Shard);
 			Bits->SetMaterial(0, RockMaterial(Node, Lump));
@@ -231,6 +222,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 				UInstancedStaticMeshComponent* Stain = Part<UInstancedStaticMeshComponent>(Node, Collider, TEXT("WRLookBits2"));
 				Stain->ClearInstances();
 				Stain->SetWorldScale3D(FVector::OneVector);
+				Stain->SetWorldLocation(At);
 				Stain->SetStaticMesh(Shard);
 				Stain->SetMaterial(0, RockMaterial(Node, Lump2));
 				for (int32 k = 0; k < 3; ++k)
@@ -252,18 +244,18 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("sulfur_crystal"))
 	{
 		// A cluster of yellow sulfur crystals growing out of a low dark rock: stretched rock shards leaning outward.
-		Place(Fit(Main, FVector(130.f, 115.f, 55.f), 15.f));
+		Place(Fit(Main, FVector(115.f, 100.f, 42.f), 12.f));
 		Tint(RockMaterial(Node, BasaltTint));
 		Bits->SetStaticMesh(Shard);
-		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(0.85f, 0.66f, 0.04f)));
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(2.6f, 2.0f, 0.12f)));  // bright sulfur yellow over the dark rock texture
 		const int32 N = 9;
 		for (int32 k = 0; k < N; ++k)
 		{
 			const float A = (k + Rand.FRandRange(-0.35f, 0.35f)) * 2.f * PI / N;
 			const float Lean = k == 0 ? 0.f : Rand.FRandRange(12.f, 38.f);
-			const float Len = k == 0 ? 150.f : Rand.FRandRange(60.f, 125.f);
+			const float Len = k == 0 ? 165.f : Rand.FRandRange(75.f, 140.f);
 			const float W = Len * Rand.FRandRange(0.18f, 0.26f);
-			const FVector Foot(FMath::Cos(A) * (k == 0 ? 0.f : 26.f), FMath::Sin(A) * (k == 0 ? 0.f : 22.f), 20.f);
+			const FVector Foot(FMath::Cos(A) * (k == 0 ? 0.f : 30.f), FMath::Sin(A) * (k == 0 ? 0.f : 26.f), 22.f);
 			// Tip away from the middle: pitch the shard's long (Z) axis outward along A.
 			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
 			const FVector Centre = Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f));
@@ -274,9 +266,9 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	{
 		// A frosted rock crusted with pale green lichen: flat pads over its top and spreading on the snow at its foot.
 		Place(Fit(Main, FVector(160.f, 140.f, 85.f), 20.f));
-		Tint(RockMaterial(Node, FLinearColor(0.42f, 0.46f, 0.5f)));
+		Tint(RockMaterial(Node, FLinearColor(0.75f, 0.8f, 0.86f)));
 		Bits->SetStaticMesh(Shard);
-		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(0.36f, 0.48f, 0.22f)));
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(1.1f, 1.45f, 0.6f)));  // pale sage green
 		Bit(FVector(0.f, 0.f, 60.f), FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(95.f, 80.f, 16.f));
 		for (int32 k = 0; k < 6; ++k)
 		{
@@ -289,8 +281,19 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	{
 		// A leafy bush hung with red berries (the dressing's shrubs give fibre; this one is the berry bush).
 		Place(Fit(Main, FVector(0.f, 0.f, 125.f), 8.f));
+		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
+		{
+			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
+			{
+				// No "snow" coat: a fresh green bush, the one green thing among the ashen shrubs, hung with berries.
+				MID->SetScalarParameterValue(TEXT("Amount Min"), 0.f);
+				MID->SetScalarParameterValue(TEXT("Amount Max"), 0.f);
+				Look->SetMaterial(Slot, MID);
+			}
+		}
 		Bits->SetStaticMesh(Sphere);
-		Bits->SetMaterial(0, ShapeColour(Node, FLinearColor(0.42f, 0.015f, 0.04f)));
+		// The rock material can draw instanced (the engine's shape material can't): a deep red over its dark texture.
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(2.2f, 0.06f, 0.12f)));
 		const FBox Box = Main->GetBoundingBox();
 		const float Width = FMath::Max(Box.GetSize().X, Box.GetSize().Y) * (125.f / FMath::Max(1.f, Box.GetSize().Z));
 		for (int32 k = 0; k < 18; ++k)
@@ -303,19 +306,18 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	}
 	else if (Item == TEXT("fiber"))
 	{
-		// A tall, straw-coloured fibrous plant.
-		Place(Fit(Main, FVector(0.f, 0.f, 150.f), 8.f));
+		// A tall, dry, olive-straw fibrous plant: the GV leaves' green is their texture's saturation (Sature Min..Max).
+		Place(Fit(Main, FVector(0.f, 0.f, 160.f), 8.f));
 		Bits->SetStaticMesh(nullptr);
 		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
 		{
 			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
 			{
-				// GV shrub parameters: "Color" is the bark, "Color Tint (B)" the leaves, "SSS Color Tint" their back-lit glow.
 				MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.2f, 0.15f, 0.08f));
-				MID->SetVectorParameterValue(TEXT("Color Tint"), FLinearColor(0.42f, 0.34f, 0.12f));
-				MID->SetVectorParameterValue(TEXT("Color Tint B"), FLinearColor(0.5f, 0.4f, 0.16f));
-				MID->SetVectorParameterValue(TEXT("SSS Color Tint"), FLinearColor(0.4f, 0.3f, 0.08f));
-				MID->SetVectorParameterValue(TEXT("SSS Color Tint B"), FLinearColor(0.4f, 0.3f, 0.08f));
+				// The GV leaves take their colour from a "snow" coat (Snow Color over Amount Min..Max); a straw coat all over.
+				MID->SetVectorParameterValue(TEXT("Snow Color"), FLinearColor(0.3f, 0.24f, 0.1f));
+				MID->SetScalarParameterValue(TEXT("Amount Min"), 1.f);
+				MID->SetScalarParameterValue(TEXT("Amount Max"), 1.f);
 				Look->SetMaterial(Slot, MID);
 			}
 		}
@@ -329,5 +331,15 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	for (UActorComponent* C : Node->GetComponents())
 	{
 		if (UPrimitiveComponent* P = Cast<UPrimitiveComponent>(C); P && P != Collider) P->SetCullDistance(WRTune(TEXT("world.nodeCullDistance"), 30000.f));
+	}
+	// One line per item kind (the first node of each): what the look came out as, for checking it from a log.
+	static TSet<FName> Logged;
+	if (!Logged.Contains(Item))
+	{
+		Logged.Add(Item);
+		const FBox Box = Look->Bounds.GetBox();
+		UE_LOG(LogTemp, Log, TEXT("NODELOOK %s at %s: %s, look %s (scale %s, %.0f cm tall, base %.0f cm from the node), %d bits"), *Id, *At.ToCompactString(),
+			*GetNameSafe(Main), *GetNameSafe(Look->GetStaticMesh()), *Look->GetComponentScale().ToCompactString(), Box.GetSize().Z, Box.Min.Z - At.Z,
+			Bits->GetInstanceCount());
 	}
 }

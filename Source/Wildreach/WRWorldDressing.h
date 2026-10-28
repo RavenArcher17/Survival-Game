@@ -105,6 +105,8 @@ public:
 	/** The lava flow's surface: a sheet over the landscape from FWRBiomeHazards::Flow(), in chunks (each culls alone). */
 	void BuildLavaFlow();
 	int32 GetInstanceCount() const { return Total; }
+	/** Dev look tuning (wr.DressParam / wr.LavaParam): a material parameter on every decoration of a kind ("lava": the flow). */
+	int32 SetLookParam(const FString& Kind, FName Param, const TArray<float>& Values);
 
 	/** Server: a swing from Who reached this far (cm from its centre). Gathers from the nearest harvestable decoration in front. */
 	bool HarvestInFront(class AWRCharacterBase* Who, float Reach, bool bHeavy);
@@ -121,6 +123,7 @@ private:
 	UHierarchicalInstancedStaticMeshComponent* MakeMeshPart(class UStaticMesh* Mesh, bool bCollision, float CullDistance);
 	void SetGone(int32 Key, bool bGone);
 	int32 Total = 0;
+	TMap<FString, TArray<TWeakObjectPtr<class UMaterialInstanceDynamic>>> KindMaterials;
 
 	/** Instanced parts that draw / collide one kind: decoration i is instance (i - Phase) / Stride of a part when i % Stride == Phase. */
 	struct FPartRef { TWeakObjectPtr<UHierarchicalInstancedStaticMeshComponent> Part; int32 Stride = 1; int32 Phase = 0; };

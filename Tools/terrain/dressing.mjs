@@ -224,11 +224,11 @@ let undergrowth = 0;
 for (let gy = 150; gy < 3880; gy += SHRUB_STEP) {
 	for (let gx = 150; gx < 3880; gx += SHRUB_STEP) {
 		const x = gx + (shrubRand() - 0.5) * SHRUB_STEP, y = gy + (shrubRand() - 0.5) * SHRUB_STEP;
-		const keep = shrubRand(), scale = 0.45 + shrubRand() * 0.7, yaw = Math.round(shrubRand() * 360);
+		const keep = shrubRand(), scale = 0.55 + shrubRand() * 0.75, yaw = Math.round(shrubRand() * 360);
 		const z = h(x, y), s = slope(x, y);
 		if (z < 2.5 || s > 0.6 || Math.abs(x - RIDGE_X) < 160 || inHollow(x, y) || !isClear(x, y)) continue;
 		const clump = 0.5 + 0.5 * fbm(x / 35 + 3, y / 35 - 7, 3);
-		const chance = (z > 520 || s > 0.45 ? 0.012 : 0.05) * (0.25 + 1.75 * clump * clump);
+		const chance = (z > 520 || s > 0.45 ? 0.018 : 0.075) * (0.25 + 1.75 * clump * clump);
 		if (keep > chance) continue;
 		const west = x < RIDGE_X;
 		if (west && inLava(x, y, 2)) continue;
