@@ -1,12 +1,13 @@
 # Fresh-player survival loop on L_Island, end to end: spawn with the starting kit, gather wood / stone / fiber from the
-# island's trees, rocks and shrubs bare-handed, craft the crude hatchet + pick by hand, check they gather more, build a
-# hut (foundation, three walls, a door, a roof), place a workbench inside, walk in through the door, craft the stone
-# tools at the bench and check they gather more again. Everything the hut and tools cost is gathered, nothing given;
-# the bot gathers with light attacks (WRGather), like a player clicking at a tree.
-#   survivaltest.ps1          headless
-#   survivaltest.ps1 -Shots   rendered client: screenshots of a tree before/after felling and the hut from 3 angles + inside
+# island's trees, rocks and shrubs with no tool (the starting sword), craft the crude hatchet + pick by hand, take each
+# in hand and check it gathers more, build a hut (foundation, three walls, a door, a roof), place a workbench inside,
+# walk in through the door, craft the stone tools at the bench and check the stone hatchet, held, gathers more again.
+# Tools work only in the hand (since 0.5): the bot equips each before it gathers with it. Everything the hut and
+# tools cost is gathered, nothing given; the bot gathers with light attacks (WRGather), like a player clicking at a tree.
+#   survivaltest.ps1 [-Port 7833]   headless
+#   survivaltest.ps1 -Shots         rendered client: screenshots of a tree before/after felling and the hut from 3 angles + inside
 # The island's world save is backed up and put back afterwards, so the test hut never stays in your world.
-param([switch]$Shots)
+param([switch]$Shots, [int]$Port = 7833)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -35,7 +36,9 @@ $cmds = @(
 	(Shot '-131246 -59750' '0 -5'),                                                         # ...and felled
 	(Gather '-134077 -58676' 'rock' 6),                                                     # rock 1004, bare hands
 	'WRCraft crude_hatchet none', 'WRCraft crude_pick none', 'wait 1',                     # by hand, no station
+	'WREquip crude_hatchet', 'wait 1',                                                      # tools work in the hand
 	(Gather '-129046 -58811' 'tree' 35),                                                    # tree 2037 and on, crude hatchet
+	'WREquip crude_pick', 'wait 1',
 	(Gather '-131858 -59449' 'rock' 6),                                                     # rock 998, crude pick
 	(Gather '-132959 -59639' 'shrub' 8),                                                    # shrub 1462 and on (fiber)
 	# The hut: everything placed from 6 m east of it.
@@ -48,7 +51,7 @@ $cmds = @(
 	# In through the door: open it, walk in (the walk counts as arrived 4 m short of its goal past the back wall,
 	# i.e. inside; a shut door leaves it stuck outside), craft at the bench.
 	"WRTeleport $($X + 400) $Y", 'wait 2', 'WRInteract', 'wait 1', "WRWalkTo $($X - 500) $Y", 'wait 6',
-	'WRCraft stone_hatchet none', 'WRCraft stone_pick none', 'wait 1',
+	'WRCraft stone_hatchet none', 'WRCraft stone_pick none', 'wait 1', 'WREquip stone_hatchet', 'wait 1',
 	# E just inside the door, with the bench in reach too, closes the door (the nearer one wins).
 	"WRWalkTo $($X + 500) $Y", 'wait 3', 'WRInteract', 'wait 1',
 	$(if ($Shots) { "WRTeleport -135802 -59658|wait 3|WRGather tree|WRBotPause 0|wait 1.7|HighResShot 1600x900|wait 6|WRBotPause 1|WRGather off" }  # mid-chop
@@ -62,10 +65,10 @@ $cmds = @(
 # (a foreach, not Where-Object: piping drops the entries after an empty $(if ...) one)
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7833 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7833?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 # Wait for the bot to run its list (the last command is a wait), then let the 10 s player autosave catch up.
 $deadline = (Get-Date).AddSeconds($(if ($Shots) { 420 } else { 330 }))
 while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
@@ -92,9 +95,9 @@ function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results
 $bareWood = Yields 'Wood' ''; $crudeWood = Yields 'Wood' 'Crude hatchet'; $stoneWood = Yields 'Wood' 'Stone hatchet'
 $bareStone = Yields 'Stone' ''; $crudeStone = Yields 'Stone' 'Crude pick'; $fiber = Yields 'Fiber' ''
 Check 'no crude tools for free (needs wood first)' ($notices -contains 'need 3 Wood')
-Check 'trees give wood bare-handed' ($bareWood.Count -ge 6) ("{0} chops, avg {1:N1}" -f $bareWood.Count, (Avg $bareWood))
+Check 'trees give wood without a tool' ($bareWood.Count -ge 6) ("{0} chops, avg {1:N1}" -f $bareWood.Count, (Avg $bareWood))
 Check 'a tree is used up and vanishes for the client' ((@($server | Where-Object { $_ -match 'used up char_tree' }).Count -ge 1) -and (Select-String -Path "$out\client.log" -Pattern 'HARVEST ledger: [1-9]' -Quiet))
-Check 'rocks give stone bare-handed' ($bareStone.Count -ge 1) ("{0} hits, avg {1:N1}" -f $bareStone.Count, (Avg $bareStone))
+Check 'rocks give stone without a tool' ($bareStone.Count -ge 1) ("{0} hits, avg {1:N1}" -f $bareStone.Count, (Avg $bareStone))
 Check 'shrubs give fiber' (($fiber | Measure-Object -Sum).Sum -ge 8) ("{0} fiber" -f ($fiber | Measure-Object -Sum).Sum)
 Check 'crude hatchet crafted by hand' ($notices -contains 'Crafted 1 Crude hatchet')
 Check 'crude pick crafted by hand' ($notices -contains 'Crafted 1 Crude pick')
@@ -111,7 +114,8 @@ Check 'stone hatchet crafted at the workbench' ($notices -contains 'Crafted 1 St
 Check 'stone pickaxe crafted at the workbench' ($notices -contains 'Crafted 1 Stone pickaxe')
 Check 'stone hatchet chops more than the crude one' ($stoneWood.Count -ge 2 -and (Avg $stoneWood) -gt (Avg $crudeWood)) ("avg {0:N1} vs {1:N1}" -f (Avg $stoneWood), (Avg $crudeWood))
 $save = if (Test-Path $playerSave) { Get-Content $playerSave -Raw | ConvertFrom-Json } else { $null }
-$carried = if ($save) { @($save.inventory.slots | Where-Object { $_.id } | ForEach-Object { $_.id }) } else { @() }
+# (the one in hand is in the weapon slot)
+$carried = if ($save) { @(@($save.inventory.slots) + @($save.inventory.weapon) | Where-Object { $_.id } | ForEach-Object { $_.id }) } else { @() }
 Check 'the save holds all four tools and the starting kit' ((@('crude_hatchet', 'crude_pick', 'stone_hatchet', 'stone_pick', 'minor_healing_potion', 'waterskin') | Where-Object { $carried -notcontains $_ }).Count -eq 0) ($carried -join ', ')
 $errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
 # The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.

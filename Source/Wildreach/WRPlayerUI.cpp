@@ -427,11 +427,7 @@ void FWRPlayerUI::UseHotbar(int32 Index)
 			return;
 		}
 	}
-	if (Def->Category == TEXT("tool"))
-	{
-		P->ShowLocalNotice(TEXT("Tools work from your bag: gather and the best one is used"));
-		return;
-	}
+	// A tool is weapon-hand equipment: picking it puts it in the right hand in place of the sword (and back).
 	const TArray<FWRItemStack>& Slots = Inv->GetSlots();
 	for (int32 i = 0; i < Slots.Num(); ++i)
 	{

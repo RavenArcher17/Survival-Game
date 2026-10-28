@@ -44,6 +44,11 @@ public:
 	/** The body picked in the menu (None = the default body); the sound pass picks the voice by it. */
 	FName GetBodyStyle() const { return BodyStyle; }
 
+	// Held tools (WRHeldTool.cpp).
+	/** Server (from the inventory): what's in the weapon hand, None for bare hands. A tool there shows in the hand. */
+	void SetMeleeItem(FName ItemId);
+	FName GetMeleeItem() const { return MeleeItem; }
+
 	// Ranged weapons (WRRanged.cpp).
 	/** Server (from the inventory): the weapon in the ranged slot, None if empty. */
 	void SetRangedItem(FName ItemId);
@@ -139,6 +144,11 @@ private:
 	UFUNCTION(Server, Reliable) void ServerFireRanged(FVector_NetQuantize AimPoint, FVector_NetQuantizeNormal ViewDir);
 	UFUNCTION(Server, Reliable) void ServerCycleAmmo(int32 Dir);
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRangedShot(FName FireKey, FName ReloadKey, float Reload);
+	/** The weapon hand's item (WRHeldTool.cpp): a tool there is built from engine shapes in place of the sword. */
+	UPROPERTY(ReplicatedUsing=OnRep_RangedLook) FName MeleeItem;
+	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> ToolParts;
+	FName ToolPartsFor;            // the tool ToolParts were built for
+	void UpdateToolLook(bool bShow);
 	void TickBodyAnim();
 	/** Play a one-shot clip from a set (its next variant), on the upper body or, for "fullBody" keys, the whole body.
 	 *  Duration > 0 stretches it to fit. Returns its play time. bLoop is unused: loops follow the body's state. */

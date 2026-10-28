@@ -1403,7 +1403,7 @@ void FWRFlow::CheckHints(const FVector& At)
 		}
 		if (bNear)
 		{
-			ShowHint(TEXT("gather"), TEXT("Light"), LOCTEXT("HintGather", "Swing at a tree or rock to gather wood and stone. The best tool in your bag is used."));
+			ShowHint(TEXT("gather"), TEXT("Light"), LOCTEXT("HintGather", "Swing at a tree or rock to gather wood and stone. Hold a hatchet or a pick to gather more."));
 			return;
 		}
 	}
@@ -1414,6 +1414,40 @@ void FWRFlow::CheckHints(const FVector& At)
 			if (!It->IsTamed() && It->IsAlive() && It->IsUnconscious() && FVector::Dist(It->GetActorLocation(), At) < WRFlowUI::Tune(TEXT("hintTameRange"), 700.f))
 			{
 				ShowHint(TEXT("tame"), TEXT("Interact"), FText::Format(LOCTEXT("HintTame", "This {0} is knocked out. Feed it to tame it before it wakes."), FText::FromString(It->GetDef() ? It->GetDef()->Name : It->GetDisplayLabel())));
+				return;
+			}
+		}
+	}
+	if (!WasSeen(TEXT("body")))
+	{
+		for (TActorIterator<AWRCreature> It(P->GetWorld()); It; ++It)
+		{
+			if (It->IsHarvestableBody() && FVector::Dist(It->GetActorLocation(), At) < WRTune(TEXT("gather.body.hintRange"), 700.f))
+			{
+				ShowHint(TEXT("body"), TEXT("Light"), LOCTEXT("HintBody", "Hit the body to harvest it: meat, hide and the rest. A blade in hand (hatchet or sword) gets more than bare hands."));
+				return;
+			}
+		}
+	}
+	if (!WasSeen(TEXT("tool")) && X)
+	{
+		// Carrying the right tool for a tree or rock in reach but not holding it: tools only work in the hand.
+		const AWRPlayerState* ToolPS = P->GetPlayerState<AWRPlayerState>();
+		const UWRInventoryComponent* ToolInv = ToolPS ? ToolPS->GetInventory() : nullptr;
+		const float Reach = WRFlowUI::Tune(TEXT("hintGatherRange"), 400.f);
+		const AWRDressing* Dressing = UWRDressingSubsystem::FindDressing(P->GetWorld());
+		FVector Ground = FVector::ZeroVector;
+		const FName Kind = !Dressing ? NAME_None : Dressing->FindNearest(At, TEXT("tree"), Reach, Ground) ? FName(TEXT("hatchet"))
+			: Dressing->FindNearest(At, TEXT("rock"), Reach, Ground) ? FName(TEXT("pick")) : NAME_None;
+		const FWRToolDef* InHand = ToolInv ? FWRGathering::FindTool(ToolInv->GetEquipped(EWREquipSlot::Weapon).ItemId) : nullptr;
+		for (int32 i = 0; i < 8 && ToolInv && !Kind.IsNone() && !(InHand && InHand->Kind == Kind); ++i)
+		{
+			const FWRToolDef* Tool = FWRGathering::FindTool(X->GetHotbarItem(i));
+			if (Tool && Tool->Kind == Kind && ToolInv->CountOf(Tool->ItemId) > 0)
+			{
+				ShowHint(TEXT("tool"), FName(*FString::Printf(TEXT("Hotbar%d"), i + 1)), Kind == TEXT("hatchet")
+					? LOCTEXT("HintToolHatchet", "Tools work in your hand: take out your hatchet to chop more wood. Your sword's key puts it back.")
+					: LOCTEXT("HintToolPick", "Tools work in your hand: take out your pick to break more stone and ore. Your sword's key puts it back."));
 				return;
 			}
 		}
@@ -1624,7 +1658,9 @@ void FWRFlow::Preview(const TArray<FString>& Args)
 		const FName Id(*(Arg1.IsEmpty() ? TEXT("gather") : Arg1));
 		Seen.Remove(Id);
 		Hints.Reset();
-		if (Id == TEXT("gather")) ShowHint(Id, TEXT("Light"), LOCTEXT("HintGather", "Swing at a tree or rock to gather wood and stone. The best tool in your bag is used."));
+		if (Id == TEXT("gather")) ShowHint(Id, TEXT("Light"), LOCTEXT("HintGather", "Swing at a tree or rock to gather wood and stone. Hold a hatchet or a pick to gather more."));
+		else if (Id == TEXT("body")) ShowHint(Id, TEXT("Light"), LOCTEXT("HintBody", "Hit the body to harvest it: meat, hide and the rest. A blade in hand (hatchet or sword) gets more than bare hands."));
+		else if (Id == TEXT("tool")) ShowHint(Id, TEXT("Hotbar2"), LOCTEXT("HintToolHatchet", "Tools work in your hand: take out your hatchet to chop more wood. Your sword's key puts it back."));
 		else if (Id == TEXT("night")) ShowHint(Id, NAME_None, LOCTEXT("HintNight", "Night has fallen. Creatures that live by day sleep now, and the night hunters wake."));
 		else if (Id == TEXT("station")) ShowHint(Id, TEXT("Crafting"), LOCTEXT("HintStation", "Open crafting here to make this station's recipes."));
 		else ShowHint(Id, TEXT("Wheel1"), FText::Format(LOCTEXT("HintAbility", "Hold for your ability wheel; tap to cast {0}."), LOCTEXT("FireBolt", "Fire bolt")));

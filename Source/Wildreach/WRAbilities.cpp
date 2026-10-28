@@ -308,6 +308,18 @@ void UWRGA_Melee::Sweep()
 			}
 			continue;
 		}
+		// ...and butcher a kill's body (WRCarcass.cpp), once per swing like a node.
+		AWRCreature* Body = Cast<AWRCreature>(HitResult.GetActor());
+		if (Body && Body->IsHarvestableBody())
+		{
+			if (!HitThisSwing.Contains(Body))
+			{
+				HitThisSwing.Add(Body);
+				if (Dressing) HitThisSwing.Add(Dressing);
+				Body->HarvestBody(Character, bHeavy);
+			}
+			continue;
+		}
 		AWRCharacterBase* Target = Cast<AWRCharacterBase>(HitResult.GetActor());
 		if (!Target || HitThisSwing.Contains(Target) || !Character->IsHostileTo(Target))
 		{

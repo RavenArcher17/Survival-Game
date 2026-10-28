@@ -311,6 +311,7 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRCreature, bAsleep);
 	DOREPLIFETIME(AWRCreature, AggroRep);
 	DOREPLIFETIME(AWRCreature, Rider);
+	DOREPLIFETIME(AWRCreature, BodyHitsLeft);
 }
 
 void AWRCreature::ApplyDef()
@@ -554,6 +555,7 @@ void AWRCreature::OnDeathVisual()
 	UWRAnimInstance* Anim = CreatureAnim();
 	if (Skel->IsVisible() && Anim)
 	{
+		bDeathShown = true;  // a body that comes into view later shows it from OnRep_Body (WRCarcass.cpp)
 		Anim->PlayOneShot(WRCreatureAnimDetail::Clip(AnimAssets, TEXT("death")), EWRAnimLayer::Full, 1.f, 0.f, 0.f, true);
 		OneShotUntil = 1.0e12;  // stay down
 	}
@@ -1322,6 +1324,8 @@ void AWRCreature::OnDeath(AActor* Killer)
 	{
 		Dismount();
 	}
+	// A wild kill stays down to be butchered (its loot comes off the body, hit by hit); tames still go the old way.
+	const bool bBody = BecomeBody(Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
 		if (const FWRCreatureDef* Def = GetDef())
@@ -1332,7 +1336,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 			for (const TPair<FName, int32>& L : Def->Loot)
 			{
 				const bool bCarcass = L.Key == TEXT("raw_meat") || L.Key == TEXT("hide");
-				Inv->AddItem(L.Key, FMath::Max(1, FMath::RoundToInt(L.Value * Mult * (bCarcass ? Dressing : 1.f))));
+				if (!bBody) Inv->AddItem(L.Key, FMath::Max(1, FMath::RoundToInt(L.Value * Mult * (bCarcass ? Dressing : 1.f))));
 			}
 			const float TierXP = Def->Tier == TEXT("highland") ? 3.f : Def->Tier == TEXT("midland") ? 2.f : 1.f;
 			UWRLifeSkillsComponent::Award(Killer, TEXT("tracking"), TEXT("kill"), 10.f, TierXP);
@@ -1342,7 +1346,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	{
 		UE_LOG(LogWildreach, Log, TEXT("TAME %s (owned by %s) died for good, killed by %s"), *GetName(), *TamedBy, *GetNameSafe(Killer));
 	}
-	SetLifeSpan(4.f);
+	SetLifeSpan(bBody ? WRTune(TEXT("gather.body.lifetimeSeconds"), 180.f) : 4.f);
 	if (AController* AI = GetController())
 	{
 		AI->UnPossess();

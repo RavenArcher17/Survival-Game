@@ -384,7 +384,7 @@ void AWRPlayerController::WRArtCam(FName Creature, float Yaw)
 	for (TActorIterator<AWRCreature> It(GetWorld()); It && Self && BestDist > 0.f; ++It)
 	{
 		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
-		if (It->CreatureId == Creature && It->IsAlive() && Dist < BestDist)
+		if (It->CreatureId == Creature && (It->IsAlive() || It->IsHarvestableBody()) && Dist < BestDist)  // a body too (art checks)
 		{
 			BestDist = Dist;
 			ArtCamTarget = *It;
@@ -635,7 +635,7 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			const AWRCreature* Creature = Cast<AWRCreature>(*It);
 			const AWRNest* Nest = Cast<AWRNest>(*It);
 			const bool bMatch = (Station && Station->StationType == FName(*Arg(1))) || (Arg(1) == TEXT("hearth") && It->IsA<AWRHearth>())
-				|| (Creature && Creature->IsAlive() && Creature->CreatureId == FName(*Arg(1)) && (Arg(2) == TEXT("tame")) == Creature->IsTamed())
+				|| (Creature && (Creature->IsAlive() || Creature->IsHarvestableBody()) && Creature->CreatureId == FName(*Arg(1)) && (Arg(2) == TEXT("tame")) == Creature->IsTamed())
 				|| (Nest && Arg(1) == TEXT("nest") && Nest->CreatureId == FName(*Arg(2)));
 			const float D = FVector::Dist(It->GetActorLocation(), Survivor->GetActorLocation());
 			if (bMatch && D < BestDist)
@@ -840,6 +840,14 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		// Testing aid: use the first inventory slot holding this item (equip / socket / consume).
 		const int32 Slot = PS->GetInventory()->GetSlots().IndexOfByPredicate([&Arg](const FWRItemStack& S) { return S.ItemId == FName(*Arg(1)); });
 		Result = Slot == INDEX_NONE ? TEXT("not carried") : PS->GetInventory()->UseSlot(Slot);
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("wear") && PS)
+	{
+		// Testing aid (WRCmd wear N): wear the item in the weapon hand down by N (tool durability, breaking).
+		PS->GetInventory()->WearEquipped(EWREquipSlot::Weapon, FCString::Atof(*Arg(1)));
+		const FWRItemStack& Held = PS->GetInventory()->GetEquipped(EWREquipSlot::Weapon);
+		Result = Held.IsEmpty() ? FString(TEXT("nothing held")) : FString::Printf(TEXT("%s durability %.0f"), *Held.ItemId.ToString(), Held.Durability);
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("give") && PS)

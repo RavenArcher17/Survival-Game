@@ -426,7 +426,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
 	const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
 	const UWRInventoryComponent* Inv = PS ? PS->GetInventory() : nullptr;
 	// Things made by hand (no station) come first: the crude tools a fresh survivor starts with.
-	Out.Add({ TEXT("-- Craft by hand (tools work from your bag) --"), FString() });
+	Out.Add({ TEXT("-- Craft by hand (hold a tool to use it) --"), FString() });
 	for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(TEXT("hand")))
 	{
 		const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(R->Output);

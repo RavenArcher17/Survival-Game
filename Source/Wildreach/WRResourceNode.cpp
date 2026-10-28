@@ -2,6 +2,7 @@
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
 #include "WRFx.h"
+#include "WRSound.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
@@ -33,15 +34,25 @@ const TArray<FWRToolDef>& FWRGathering::Tools()
 					FWRToolDef& T = Out.AddDefaulted_GetRef();
 					T.ItemId = FName(*O->GetStringField(TEXT("id")));
 					T.Kind = FName(*(*Tool)->GetStringField(TEXT("kind")));
-					double Yield = 1.0;
-					(*Tool)->TryGetNumberField(TEXT("yield"), Yield);
-					T.Yield = Yield;
+					double Num = 1.0;
+					if ((*Tool)->TryGetNumberField(TEXT("yield"), Num)) T.Yield = Num;
+					if ((*Tool)->TryGetNumberField(TEXT("damage"), Num)) T.Damage = Num;
+					const TArray<TSharedPtr<FJsonValue>>* Head = nullptr;
+					if ((*Tool)->TryGetArrayField(TEXT("head"), Head) && Head->Num() == 3)
+					{
+						T.Head = FLinearColor((*Head)[0]->AsNumber(), (*Head)[1]->AsNumber(), (*Head)[2]->AsNumber());
+					}
 				}
 			}
 		}
 		return Out;
 	}();
 	return List;
+}
+
+const FWRToolDef* FWRGathering::FindTool(FName ItemId)
+{
+	return ItemId.IsNone() ? nullptr : Tools().FindByPredicate([ItemId](const FWRToolDef& T) { return T.ItemId == ItemId; });
 }
 
 FName FWRGathering::ToolKindFor(FName ItemId)
@@ -52,17 +63,49 @@ FName FWRGathering::ToolKindFor(FName ItemId)
 	return NAME_None;
 }
 
-const FWRToolDef* FWRGathering::BestTool(FName Kind, const TArray<FName>& Carried)
+const FWRToolDef* FWRGathering::HeldTool(FName Kind, FName HeldItem, float Durability)
 {
-	const FWRToolDef* Best = nullptr;
-	for (const FWRToolDef& T : Tools())
+	// A broken tool stops giving its bonus until it's repaired (it isn't lost), as broken weapons and armor do.
+	const FWRToolDef* Tool = FindTool(HeldItem);
+	return Tool && !Kind.IsNone() && Tool->Kind == Kind && Durability > 0.f ? Tool : nullptr;
+}
+
+bool FWRGathering::IsSharp(const FWRItemStack& Held)
+{
+	if (Held.IsEmpty() || Held.Durability <= 0.f)
 	{
-		if (!Kind.IsNone() && T.Kind == Kind && Carried.Contains(T.ItemId) && (!Best || T.Yield > Best->Yield))
-		{
-			Best = &T;
-		}
+		return false;
 	}
-	return Best;
+	if (const FWRToolDef* Tool = FindTool(Held.ItemId))
+	{
+		return Tool->Kind == TEXT("hatchet");
+	}
+	const FWRItemDef* Def = FWRItemRegistry::Get().Find(Held.ItemId);
+	return Def && Def->Slot == EWREquipSlot::Weapon;  // a sword
+}
+
+bool FWRGathering::WearHeld(AWRCharacterBase* Gatherer, bool bRightTool)
+{
+	UWRInventoryComponent* Inventory = Gatherer && Gatherer->HasAuthority() ? UWRInventoryComponent::FindFor(Gatherer) : nullptr;
+	FWRItemStack* Held = Inventory ? Inventory->GetEquippedMutable(EWREquipSlot::Weapon) : nullptr;
+	if (!Held || Held->IsEmpty() || Held->Durability <= 0.f)
+	{
+		return false;
+	}
+	Inventory->WearEquipped(EWREquipSlot::Weapon, bRightTool ? WRTune(TEXT("gather.tools.wearPerHit"), 1.f) : WRTune(TEXT("gather.tools.wearOther"), 1.f));
+	if (Held->Durability > 0.f)
+	{
+		return false;
+	}
+	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Gatherer->GetController()))
+	{
+		const FWRItemDef* Def = FWRItemRegistry::Get().Find(Held->ItemId);
+		const FString Name = Def ? Def->Name : Held->ItemId.ToString();
+		PC->ClientNotify(FindTool(Held->ItemId) ? FString::Printf(TEXT("Your %s broke: repair it at a workbench"), *Name.ToLower())
+			: FString::Printf(TEXT("Your %s broke: repair it at a forge"), *Name.ToLower()));
+	}
+	WRSound::Broadcast(Gatherer, TEXT("hit.block"));
+	return true;
 }
 
 int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHit, bool bHeavy, const FString& Source)
@@ -72,12 +115,11 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 	{
 		return 0;
 	}
-	TArray<FName> Carried;
-	for (const FWRItemStack& S : Inventory->GetSlots())
-	{
-		if (!S.IsEmpty()) Carried.AddUnique(S.ItemId);
-	}
-	const FWRToolDef* Tool = BestTool(ToolKindFor(ItemId), Carried);
+	// What's in the weapon hand decides: the right tool gives its yield, anything else the base rate.
+	const FWRItemStack& Held = Inventory->GetEquipped(EWREquipSlot::Weapon);
+	const FWRToolDef* Tool = HeldTool(ToolKindFor(ItemId), Held.ItemId, Held.Durability);
+	const FWRToolDef* HeldDef = FindTool(Held.ItemId);
+	const bool bBrokenTool = HeldDef && !ToolKindFor(ItemId).IsNone() && HeldDef->Kind == ToolKindFor(ItemId) && Held.Durability <= 0.f;
 
 	// Tool, gathering multiplier (server) and the gathering life skills.
 	const bool bOre = ToolKindFor(ItemId) == TEXT("pick");
@@ -102,15 +144,24 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 		Inventory->AddItem(TEXT("seeds"), 1);
 	}
 	const int32 Got = Amount - Left;
+	const FName HeldId = Held.ItemId;
+	const float HeldBefore = Held.Durability;
 	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Gatherer->GetController()))
 	{
 		const FWRItemDef* Def = FWRItemRegistry::Get().Find(ItemId);
 		const FWRItemDef* ToolDef = Tool ? FWRItemRegistry::Get().Find(Tool->ItemId) : nullptr;
-		PC->ClientNotify(Got <= 0 ? TEXT("Your bag is full")
-			: FString::Printf(TEXT("+%d %s%s"), Got, Def ? *Def->Name : *ItemId.ToString(), ToolDef ? *FString::Printf(TEXT("  (%s)"), *ToolDef->Name) : TEXT("")));
+		const FWRItemDef* BrokenDef = bBrokenTool ? FWRItemRegistry::Get().Find(HeldId) : nullptr;
+		const FString Why = ToolDef ? FString::Printf(TEXT("  (%s)"), *ToolDef->Name)
+			: BrokenDef ? FString::Printf(TEXT("  (%s broken: repair it)"), *BrokenDef->Name) : FString();
+		PC->ClientNotify(Got <= 0 ? FString(TEXT("Your bag is full")) : FString::Printf(TEXT("+%d %s%s"), Got, Def ? *Def->Name : *ItemId.ToString(), *Why));
 	}
-	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s, tool %s"), *Gatherer->GetName(), Got, *ItemId.ToString(), *Source,
-		Tool ? *Tool->ItemId.ToString() : TEXT("none"));
+	// The swing wears what's in hand (after the notice, so "it broke" comes second).
+	if (Got > 0)
+	{
+		WearHeld(Gatherer, Tool != nullptr);
+	}
+	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s, tool %s, held %s %.0f"), *Gatherer->GetName(), Got, *ItemId.ToString(), *Source,
+		Tool ? *Tool->ItemId.ToString() : TEXT("none"), HeldId.IsNone() ? TEXT("nothing") : *HeldId.ToString(), HeldBefore);
 	return Got;
 }
 
