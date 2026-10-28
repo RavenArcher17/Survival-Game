@@ -62,7 +62,7 @@ $cmds = @(
 	'WRGoTo workbench', 'wait 1', 'WRCmd repair weapon', 'wait 1',
 	(Gather '-135802 -59658' 'tree' 5),                       # and on, mended
 	# Bodies: a Pumicehog hit with the hatchet (a modest blow), killed, and butchered with the sword...
-	(Put 'pumicehog'), 'WRPress light', 'wait 1.5', (Finish 'pumicehog'),
+	(Put 'pumicehog'), 'WRPress light', 'wait 1.5', (Finish 'pumicehog'), 'WRCmd wear 0', 'wait 0.5',   # (reports what the blows left)
 	'WREquip copper_sword', 'wait 1',
 	(Shot 'body_a' 'WRArtCam pumicehog 50|wait 2'),
 	(Shot 'body_b' 'WRArtCam pumicehog 200|wait 2'),
@@ -156,6 +156,10 @@ Check 'a body does not block the way' ($walk.Count -eq 1 -and $off -lt 40 -and @
 $blow = @($server | Where-Object { $_ -match '^COMBAT WRCharacter\S* -> WRCreature\S* dmg=([\d.]+) .*result=hit' } | Select-Object -First 1)
 $dmg = if ($blow.Count -gt 0 -and $blow[0] -match 'dmg=([\d.]+)') { [double]$Matches[1] } else { 0 }
 Check 'a hatchet swung at a creature hits it (modest damage)' ($dmg -gt 0 -and $dmg -lt 12) ("{0} damage (a copper sword: 12)" -f $dmg)
+# Used as a weapon it wears too: one a blow (the two on the Pumicehog), after the last chop's one.
+$lastChop = if ($mended.Count) { [int]($mended[-1] -replace '^.* (\d+)$', '$1') } else { -1 }
+$afterBlows = @($notices | Where-Object { $_ -match '^crude_hatchet durability (\d+)$' } | ForEach-Object { [int]$Matches[1] } | Select-Object -Last 1)
+Check 'a hatchet wears when it hits a creature' ($lastChop -gt 0 -and $afterBlows.Count -eq 1 -and $afterBlows[0] -eq $lastChop - 3) ("{0} after the last chop at {1}" -f $(if ($afterBlows.Count) { $afterBlows[0] } else { '?' }), $lastChop)
 $errors = @(Select-String -Path "$logs\server.log", "$logs\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None')
 $errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')

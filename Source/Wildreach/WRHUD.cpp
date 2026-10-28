@@ -393,6 +393,18 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 		}
 		const float W = 80.f;
 		const float BX = Screen.X - W * 0.5f;
+		if (const AWRCreature* Body = Cast<AWRCreature>(Other); Body && Body->IsHarvestableBody())
+		{
+			// A kill's body (WRCarcass.cpp): what's left to cut, not an empty health bar, just over where it lies (its capsule
+			// still stands upright).
+			const FVector Low = Project(Other->GetActorLocation() + FVector(0.f, 0.f, 40.f), true);
+			if (Low.Z > 0.f)
+			{
+				DrawText(FString::Printf(TEXT("%s (body)"), *Other->GetDisplayLabel()), FLinearColor(0.9f, 0.82f, 0.68f), Low.X - W * 0.5f, Low.Y - 30.f, nullptr, 0.9f);
+				DrawText(FString::Printf(TEXT("hit to harvest: %d left"), Body->GetBodyHitsLeft()), FLinearColor(0.75f, 0.7f, 0.62f), Low.X - W * 0.5f, Low.Y - 13.f, nullptr, 0.75f);
+			}
+			continue;
+		}
 		DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, Screen.Y - 12.f, W, 6.f);
 		DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f), 6.f);
