@@ -160,7 +160,7 @@ namespace WRCraftUI
 		else if (Def->IsRanged()) Bits.Add(FString::Printf(TEXT("Shoots %ss: %.0f damage, %.1f s between shots"), *Def->AmmoKind.ToString(), Def->RangedDamage, Def->Reload));
 		else if (!Def->AmmoOf.IsNone()) Bits.Add(FString::Printf(TEXT("%.0f damage%s"), Def->AmmoDamage, Def->AmmoTorpor > 0.f ? *FString::Printf(TEXT(", %.0f torpor"), Def->AmmoTorpor) : TEXT("")));
 		if (Def->Armor > 0.f) Bits.Add(FString::Printf(TEXT("%.0f armor"), Def->Armor));
-		if (X && X->Yield > 0.f) Bits.Add(FString::Printf(TEXT("Gathers %s x%.1f; works from your bag"), X->ToolKind == TEXT("hatchet") ? TEXT("wood") : X->ToolKind == TEXT("pick") ? TEXT("stone and ore") : *X->ToolKind, X->Yield));
+		if (X && X->Yield > 0.f) Bits.Add(FString::Printf(TEXT("Gathers %s x%.1f while held"), X->ToolKind == TEXT("hatchet") ? TEXT("wood") : X->ToolKind == TEXT("pick") ? TEXT("stone and ore") : *X->ToolKind, X->Yield));
 		if (Def->Heal > 0.f) Bits.Add(FString::Printf(TEXT("Heals %.0f"), Def->Heal));
 		if (Def->Hunger > 0.f) Bits.Add(FString::Printf(TEXT("+%.0f food"), Def->Hunger));
 		if (Def->Thirst > 0.f) Bits.Add(FString::Printf(TEXT("+%.0f water"), Def->Thirst));
@@ -503,7 +503,8 @@ private:
 			if (!Def || Def->MaxDurability <= 0.f) continue;
 			const FWRRecipe* R = FWRRecipeRegistry::Get().ForOutput(Def->Id);
 			const TCHAR* SlotName = Slot == EWREquipSlot::Armor ? TEXT("armor") : Slot == EWREquipSlot::Ranged ? TEXT("ranged") : TEXT("weapon");
-			const FName At = Slot == EWREquipSlot::Weapon ? FName(TEXT("forge")) : Slot == EWREquipSlot::Armor ? FName(TEXT("armorer")) : R ? R->Station : NAME_None;
+			const bool bTool = Slot == EWREquipSlot::Weapon && Def->Category == TEXT("tool");  // the tool in hand: at a workbench
+			const FName At = bTool ? FName(TEXT("workbench")) : Slot == EWREquipSlot::Weapon ? FName(TEXT("forge")) : Slot == EWREquipSlot::Armor ? FName(TEXT("armorer")) : R ? R->Station : NAME_None;
 			if (At.IsNone() || At == Hand) continue;
 
 			FEntry Fix;
@@ -524,7 +525,7 @@ private:
 			Fix.CanMake = FMath::Min(1, MaxTimes(Fix.Cost));
 			Entries.Add(MoveTemp(Fix));
 
-			if (Slot == EWREquipSlot::Ranged) continue;
+			if (Slot == EWREquipSlot::Ranged || bTool) continue;  // tools aren't upgraded
 			FEntry Up;
 			Up.Kind = FEntry::EKind::Upgrade;
 			Up.Key = FString::Printf(TEXT("upgrade %s"), SlotName);

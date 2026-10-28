@@ -2,6 +2,7 @@
 #include "WRSound.h"
 #include "WRCreature.h"
 #include "WRLifeSkills.h"
+#include "WRResourceNode.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
@@ -381,6 +382,11 @@ void UWRInventoryComponent::ApplyEquipment()
 		Stats.Element = EquippedWeapon.Element;
 		Stats.bStaggerShockwave = GemStat(TEXT("staggerShockwave")) > 0.f;
 		Stats.bBlockFreeze = GemStat(TEXT("blockFreeze")) > 0.f;
+		if (const FWRToolDef* Tool = FWRGathering::FindTool(EquippedWeapon.ItemId))
+		{
+			// A held tool swings as a modest weapon: its own flat damage (less when broken), not the sword table.
+			Stats.FlatDamage = Tool->Damage * (Stats.bBroken ? WRTune(TEXT("gather.tools.brokenDamage"), 0.5f) : 1.f);
+		}
 	}
 	else
 	{
@@ -393,6 +399,7 @@ void UWRInventoryComponent::ApplyEquipment()
 	if (AWRCharacter* Survivor = Cast<AWRCharacter>(Character))
 	{
 		Survivor->SetRangedItem(EquippedRanged.IsEmpty() ? NAME_None : EquippedRanged.ItemId);
+		Survivor->SetMeleeItem(EquippedWeapon.IsEmpty() ? NAME_None : EquippedWeapon.ItemId);
 	}
 }
 
@@ -527,7 +534,7 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	if (Def->Category == TEXT("gem"))
 	{
 		// Socket into the equipped weapon if it has a free socket (quality sets the count).
-		if (EquippedWeapon.IsEmpty())
+		if (EquippedWeapon.IsEmpty() || FWRGathering::FindTool(EquippedWeapon.ItemId))
 		{
 			return TEXT("equip a weapon to socket gems");
 		}
@@ -690,6 +697,7 @@ static FWRItemStack StackFromJson(const TSharedPtr<FJsonObject>& O)
 	if (O->TryGetNumberField(TEXT("roll"), Num)) S.Roll = Num;
 	if (O->TryGetNumberField(TEXT("upgrade"), Num)) S.Upgrade = static_cast<int32>(Num);
 	if (O->TryGetNumberField(TEXT("durability"), Num)) S.Durability = Num;
+	else if (const FWRItemDef* Def = FWRItemRegistry::Get().Find(S.ItemId)) S.Durability = Def->MaxDurability;  // saved before it had any (0.4 tools)
 	FString Element;
 	if (O->TryGetStringField(TEXT("element"), Element) && !Element.IsEmpty()) S.Element = FName(*Element);
 	const TArray<TSharedPtr<FJsonValue>>* Sockets = nullptr;

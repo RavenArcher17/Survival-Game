@@ -11,6 +11,7 @@
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
 #include "WRProjectile.h"
+#include "WRResourceNode.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "AnimationRuntime.h"
@@ -139,7 +140,10 @@ void AWRCharacter::UpdateWeaponLook()
 	const bool bRanged = IsRangedOut();
 	const FWRItemDef* Def = bRanged ? ItemDef(RangedItem) : nullptr;
 	UStaticMesh* Model = Def && !Def->HeldMesh.IsEmpty() ? LoadObject<UStaticMesh>(nullptr, *Def->HeldMesh) : nullptr;
-	WeaponMesh->SetVisibility(!bRanged);
+	// The weapon hand shows what it holds: the sword, a tool built from shapes (WRHeldTool.cpp), or nothing.
+	const bool bTool = !bRanged && Body->IsVisible() && FWRGathering::FindTool(MeleeItem) != nullptr;
+	WeaponMesh->SetVisibility(!bRanged && !bTool && !MeleeItem.IsNone());
+	UpdateToolLook(bTool);
 	ShieldMesh->SetVisibility(!bRanged && bShieldShown);
 	RangedMesh->SetVisibility(Model != nullptr && Body->IsVisible());
 	if (Model && Body->IsVisible())

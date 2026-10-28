@@ -7,6 +7,7 @@
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterMovementComponent.h"
+#include "WRCreature.h"
 #include "WRGameMode.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
@@ -147,6 +148,7 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRCharacter, bRangedMode);
 	DOREPLIFETIME(AWRCharacter, bAiming);
 	DOREPLIFETIME(AWRCharacter, SelectedAmmo);
+	DOREPLIFETIME(AWRCharacter, MeleeItem);
 }
 
 void AWRCharacter::InitAbilityActorInfo()
@@ -679,6 +681,16 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 				Key = bHard ? FName(TEXT("chop")) : FName(TEXT("gather"));
 				bGathering = true;
 				break;
+			}
+		}
+		// A kill's body on the ground (WRCarcass.cpp): an overhead chop butchers it.
+		for (TActorIterator<AWRCreature> It(GetWorld()); It && !bGathering; ++It)
+		{
+			const FVector To = It->GetActorLocation() - Here;
+			if (It->IsHarvestableBody() && To.Size2D() < 200.f + It->GetSimpleCollisionRadius() && FVector::DotProduct(To.GetSafeNormal2D(), Forward) > 0.5f)
+			{
+				Key = TEXT("chop");
+				bGathering = true;
 			}
 		}
 		// The island's trees and rocks (chop) and shrubs (gather) are instanced decoration, not actors.

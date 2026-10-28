@@ -176,6 +176,13 @@ public:
 	AActor* GetAggroRep() const { return AggroRep; }
 	UPROPERTY(Replicated) TObjectPtr<AActor> AggroRep;
 
+	// --- The body (WRCarcass.cpp): a wild creature's kill stays down, to be butchered by hitting it ---
+	/** Server: a melee hit on the body: a share of its loot into the hitter's bag (more with a blade in hand). */
+	void HarvestBody(AWRCharacterBase* Harvester, bool bHeavy);
+	/** A body with something left to take (every machine). */
+	bool IsHarvestableBody() const { return BodyHitsLeft > 0; }
+	int32 GetBodyHitsLeft() const { return BodyHitsLeft; }
+
 	/** Server: player mounts / dismounts. */
 	FString Ride(AWRCharacter* Rider);
 	void Dismount();
@@ -215,6 +222,18 @@ private:
 	UFUNCTION(Server, Reliable) void ServerDismount();
 	void RideMove(const FInputActionValue& Value);
 	void RideLook(const FInputActionValue& Value);
+
+	// The body (WRCarcass.cpp).
+	/** Server, at death: a wild creature with loot becomes a body to butcher. False: the old way (loot to the killer). */
+	bool BecomeBody(AActor* Killer);
+	UFUNCTION() void OnRep_Body();
+	UPROPERTY(ReplicatedUsing=OnRep_Body) uint8 BodyHitsLeft = 0;
+	struct FBodyLoot { FName Item; int32 Left = 0; int32 Total = 0; };
+	TArray<FBodyLoot> BodyLoot;
+	FString BodyClaim;             // the killer (or the killing tame's owner) has it first
+	double BodyClaimUntil = 0.0;
+	float BodyCarry = 0.f;         // bare hands keep part of a unit: the rest of it carries to the next hit
+	bool bDeathShown = false;      // this machine has shown the death (the clip holds its last pose)
 
 	TWeakObjectPtr<AActor> AggroTarget;
 	FVector Home = FVector::ZeroVector;

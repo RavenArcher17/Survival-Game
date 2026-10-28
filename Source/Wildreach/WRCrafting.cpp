@@ -6,6 +6,7 @@
 #include "WRCharacterBase.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -378,7 +379,8 @@ FString FWRCrafting::Make(AWRPlayerController* Player, const FWRRecipe& Recipe, 
 	}
 	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(R->Output);
 	FString Result;
-	if (OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1)  // spears and bolas stack: made like ammo, below
+	// Spears and bolas stack: made like ammo, below. So are tools: no quality roll, just a new one at full durability.
+	if (OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1 && OutDef->Category != TEXT("tool"))
 	{
 		if (!Essence.IsNone())
 		{
@@ -432,14 +434,19 @@ FString AWRStation::Repair(AWRPlayerController* Player, EWREquipSlot Slot)
 	{
 		return Why;
 	}
-	// Repairs happen at the matching station.
-	if ((Slot == EWREquipSlot::Weapon && StationType != TEXT("forge")) || (Slot == EWREquipSlot::Armor && StationType != TEXT("armorer")))
-	{
-		return Slot == EWREquipSlot::Weapon ? TEXT("weapons are repaired at a forge") : TEXT("armor is repaired at an armorer");
-	}
 	UWRInventoryComponent* Inv = Player->GetPlayerState<AWRPlayerState>()->GetInventory();
 	FWRItemStack* Item = Inv->GetEquippedMutable(Slot);
 	const FWRItemDef* Def = Item && !Item->IsEmpty() ? FWRItemRegistry::Get().Find(Item->ItemId) : nullptr;
+	// Repairs happen at the matching station: the tool in your hand at a workbench, weapons at a forge.
+	const bool bTool = Slot == EWREquipSlot::Weapon && Def && Def->Category == TEXT("tool");
+	if (bTool && StationType != TEXT("workbench"))
+	{
+		return TEXT("tools are repaired at a workbench");
+	}
+	if ((Slot == EWREquipSlot::Weapon && !bTool && StationType != TEXT("forge")) || (Slot == EWREquipSlot::Armor && StationType != TEXT("armorer")))
+	{
+		return Slot == EWREquipSlot::Weapon ? TEXT("weapons are repaired at a forge") : TEXT("armor is repaired at an armorer");
+	}
 	if (!Def)
 	{
 		return TEXT("nothing equipped");
@@ -470,6 +477,7 @@ FString AWRStation::Repair(AWRPlayerController* Player, EWREquipSlot Slot)
 	}
 	Item->Durability = Def->MaxDurability;
 	Inv->ApplyEquipment();
+	UE_LOG(LogWildreach, Log, TEXT("REPAIR %s: %s at %s"), *GetNameSafe(Player), *Def->Id.ToString(), *StationType.ToString());
 	return FString::Printf(TEXT("Repaired %s"), *Def->Name);
 }
 
@@ -489,6 +497,10 @@ FString AWRStation::Upgrade(AWRPlayerController* Player, EWREquipSlot Slot)
 	if (!Item || Item->IsEmpty())
 	{
 		return TEXT("nothing equipped");
+	}
+	if (Slot == EWREquipSlot::Weapon && FWRGathering::FindTool(Item->ItemId))
+	{
+		return TEXT("tools can't be upgraded (a better tool gathers more)");
 	}
 	const int32 Cap = FWRCraftingRules::UpgradeCap(GetTier());
 	if (Item->Upgrade >= FMath::Min(10, Cap))

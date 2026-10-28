@@ -15,6 +15,7 @@
 #include "WRKeyBindings.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
 #include "Engine/Engine.h"
@@ -505,6 +506,10 @@ namespace WRInvTab
 		Stats.Roll = S->Roll;
 		Stats.GemDamage = GemSum(*S, TEXT("damage"));
 		Stats.bBroken = S->Durability <= 0.f;
+		if (const FWRToolDef* Tool = FWRGathering::FindTool(S->ItemId))
+		{
+			Stats.FlatDamage = Tool->Damage * (Stats.bBroken ? WRTune(TEXT("gather.tools.brokenDamage"), 0.5f) : 1.f);  // as ApplyEquipment
+		}
 		return Stats;
 	}
 
@@ -530,9 +535,9 @@ namespace WRInvTab
 		const FName C = D.Category;
 		if (D.IsThrowable()) return TEXT("Thrown weapon · held in the ranged slot");
 		if (D.IsRanged()) return FString::Printf(TEXT("Ranged weapon · shoots %s"), *AmmoWord(D.AmmoKind, true));
+		if (C == TEXT("tool")) return TEXT("Tool · held in the weapon hand");
 		if (D.Slot == EWREquipSlot::Weapon) return D.Metal.IsNone() ? FString(TEXT("Melee weapon")) : FString::Printf(TEXT("Melee weapon · %s"), *D.Metal.ToString());
 		if (D.Slot == EWREquipSlot::Armor) return TEXT("Armor · worn on the body");
-		if (C == TEXT("tool")) return TEXT("Tool · works from your bag");
 		if (C == TEXT("ammo")) return FString::Printf(TEXT("Ammo · for %s"), *LauncherOf(D.AmmoOf));
 		if (C == TEXT("dart")) return TEXT("Dart · blowgun ammo, or use it by hand");
 		if (C == TEXT("potion")) return TEXT("Potion · drink it");
@@ -580,7 +585,7 @@ namespace WRInvTab
 		if (C == TEXT("egg")) { bTaming = true; return TEXT("Right-click to hatch it: the newborn imprints on you."); }
 		if (C == TEXT("tame_food")) { bTaming = true; return TEXT("Every tameable creature eats it; it tames twice as fast."); }
 		if (D.Id == TEXT("narcotic")) { bTaming = true; return TEXT("Feed it to a knocked-out creature to keep it under."); }
-		if (C == TEXT("tool")) return TEXT("Tools work from your bag: gather and the best one is used.");
+		if (C == TEXT("tool")) return TEXT("Hold it (its hotbar key) to gather more: a hatchet for wood, a pick for stone and ore. It wears with every hit; repair it at a workbench.");
 		if (C == TEXT("potion")) return TEXT("Potions share a belt: one, then a cooldown.");
 		if (C == TEXT("core")) return TEXT("Bring it to your Hearth to raise its tech level.");
 		if (D.Slot == EWREquipSlot::Weapon) return TEXT("Gems socket into it; upgrade shards raise its damage.");
@@ -1368,7 +1373,14 @@ namespace WRInvTab
 				const FWRWeaponStats WS = WeaponStats(S, D);
 				AddRow(StatRow(TEXT("Damage"), FString::Printf(TEXT("%.0f"), UWRCombatLibrary::WeaponDamage(WS, false))));
 				AddRow(StatRow(TEXT("Heavy attack"), FString::Printf(TEXT("%.0f"), UWRCombatLibrary::WeaponDamage(WS, true))));
-				const int32 Sockets = FWRItemStack::SocketCount(S->Quality);
+				const FWRToolDef* Tool = FWRGathering::FindTool(D->Id);
+				if (Tool)
+				{
+					const bool bBrokenTool = S->Durability <= 0.f;
+					AddRow(StatRow(TEXT("Gathers"), bBrokenTool ? FString(TEXT("broken: base rate until repaired"))
+						: FString::Printf(TEXT("%s x%.1f while held"), Tool->Kind == TEXT("hatchet") ? TEXT("wood") : TEXT("stone and ore"), Tool->Yield), bBrokenTool ? WRUI::Bad : WRUI::Ink));
+				}
+				const int32 Sockets = Tool ? 0 : FWRItemStack::SocketCount(S->Quality);  // tools take no gems
 				if (Sockets > 0 || S->Sockets.Num() > 0)
 				{
 					TArray<FString> Gems;
@@ -1476,7 +1488,12 @@ namespace WRInvTab
 			TArray<TPair<FString, FString>> WhereRows;
 			const FWRRecipe* Recipe = FWRRecipeRegistry::Get().ForOutput(D->Id);
 			const int32 Shards = I ? I->CountOf(TEXT("upgrade_shard")) : 0;
-			if (D->Slot == EWREquipSlot::Weapon || D->Slot == EWREquipSlot::Armor)
+			if (D->Category == TEXT("tool"))
+			{
+				WhereRows.Add({ TEXT("Repair at"), StationName(TEXT("workbench")) });  // tools aren't upgraded
+				if (Recipe) WhereRows.Add({ TEXT("Made at"), StationName(Recipe->Station) });
+			}
+			else if (D->Slot == EWREquipSlot::Weapon || D->Slot == EWREquipSlot::Armor)
 			{
 				const FString Station = D->Slot == EWREquipSlot::Weapon ? TEXT("Forge") : TEXT("Armorer");
 				WhereRows.Add({ TEXT("Repair at"), Station });

@@ -590,6 +590,13 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 	{
 		Out.Add({ FString::Printf(TEXT("Repair %s (%.0f/%.0f)"), *RangedDef->Name, Ranged.Durability, RangedDef->MaxDurability), TEXT("repair ranged") });
 	}
+	// The tool in your hand is mended at a workbench.
+	const FWRItemStack& Held = Inv->GetEquipped(EWREquipSlot::Weapon);
+	const FWRItemDef* HeldDef = Held.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Held.ItemId);
+	if (HeldDef && HeldDef->Category == TEXT("tool") && HeldDef->MaxDurability > 0.f && Station->StationType == TEXT("workbench"))
+	{
+		Out.Add({ FString::Printf(TEXT("Repair %s (%.0f/%.0f)"), *HeldDef->Name, Held.Durability, HeldDef->MaxDurability), TEXT("repair weapon") });
+	}
 	return Out;
 }
 

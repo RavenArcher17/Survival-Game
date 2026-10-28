@@ -9,6 +9,7 @@
 #include "WRAbilities.h"
 #include "WRPathTypes.h"
 #include "WRResourceNode.h"
+#include "WRTuning.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -247,17 +248,37 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 	{
 		TestNotNull(FString::Printf(TEXT("%s has a recipe"), *Id.ToString()), FWRRecipeRegistry::Get().ForOutput(Id));
 	}
-	// Tools work from the bag: the best of the right kind counts, nothing for other materials.
+	// Tools work in the hand: the held one counts if it's the right kind and not broken; nothing for other materials.
 	TestEqual(TEXT("wood wants a hatchet"), FWRGathering::ToolKindFor(TEXT("wood")), FName(TEXT("hatchet")));
 	TestEqual(TEXT("ore wants a pick"), FWRGathering::ToolKindFor(TEXT("copper_ore")), FName(TEXT("pick")));
 	TestEqual(TEXT("sulfur wants a pick"), FWRGathering::ToolKindFor(TEXT("sulfur_crystal")), FName(TEXT("pick")));
 	TestEqual(TEXT("fiber has no tool"), FWRGathering::ToolKindFor(TEXT("fiber")), FName());
-	TestNull(TEXT("bare hands"), FWRGathering::BestTool(TEXT("hatchet"), { TEXT("copper_sword"), TEXT("wood") }));
-	const FWRToolDef* Crude = FWRGathering::BestTool(TEXT("hatchet"), { TEXT("crude_hatchet"), TEXT("crude_pick") });
-	TestTrue(TEXT("crude hatchet beats bare hands"), Crude && Crude->ItemId == TEXT("crude_hatchet") && Crude->Yield > 1.f);
-	const FWRToolDef* Best = FWRGathering::BestTool(TEXT("hatchet"), { TEXT("crude_hatchet"), TEXT("stone_hatchet") });
-	TestTrue(TEXT("the stone hatchet is the better one"), Best && Crude && Best->ItemId == TEXT("stone_hatchet") && Best->Yield > Crude->Yield);
-	TestNull(TEXT("a pick doesn't chop"), FWRGathering::BestTool(TEXT("hatchet"), { TEXT("stone_pick") }));
+	TestNull(TEXT("a held sword chops at the base rate"), FWRGathering::HeldTool(TEXT("hatchet"), TEXT("copper_sword"), 200.f));
+	TestNull(TEXT("bare hands chop at the base rate"), FWRGathering::HeldTool(TEXT("hatchet"), NAME_None, 0.f));
+	const FWRToolDef* Crude = FWRGathering::HeldTool(TEXT("hatchet"), TEXT("crude_hatchet"), 50.f);
+	TestTrue(TEXT("a held crude hatchet beats bare hands"), Crude && Crude->ItemId == TEXT("crude_hatchet") && Crude->Yield > 1.f);
+	const FWRToolDef* Stone = FWRGathering::HeldTool(TEXT("hatchet"), TEXT("stone_hatchet"), 50.f);
+	TestTrue(TEXT("the stone hatchet is the better one"), Stone && Crude && Stone->Yield > Crude->Yield);
+	TestNull(TEXT("a held pick doesn't chop"), FWRGathering::HeldTool(TEXT("hatchet"), TEXT("stone_pick"), 50.f));
+	TestNull(TEXT("a held hatchet doesn't mine"), FWRGathering::HeldTool(TEXT("pick"), TEXT("stone_hatchet"), 50.f));
+	TestNull(TEXT("a broken hatchet gives no bonus"), FWRGathering::HeldTool(TEXT("hatchet"), TEXT("crude_hatchet"), 0.f));
+	for (const FName Id : { FName(TEXT("crude_hatchet")), FName(TEXT("crude_pick")), FName(TEXT("stone_hatchet")), FName(TEXT("stone_pick")) })
+	{
+		const FWRItemDef* Def = FWRItemRegistry::Get().Find(Id);
+		const FWRToolDef* Tool = FWRGathering::FindTool(Id);
+		TestTrue(FString::Printf(TEXT("%s is held in the weapon hand and wears"), *Id.ToString()), Def && Def->Slot == EWREquipSlot::Weapon && Def->MaxDurability > 0.f);
+		TestTrue(FString::Printf(TEXT("%s hits softer than a copper sword"), *Id.ToString()), Tool && Tool->Damage > 0.f && Tool->Damage < WRTune(TEXT("weapon.copperSwordLight"), 12.f));
+		FWRItemStack Made = FWRInventoryRules::MakeInstance(Id);
+		TestTrue(FString::Printf(TEXT("a new %s is at full durability"), *Id.ToString()), Def && Made.Durability == Def->MaxDurability);
+	}
+	// Bodies: a blade keeps the whole share, bare hands and picks don't.
+	FWRItemStack Blade = FWRInventoryRules::MakeInstance(TEXT("crude_hatchet"));
+	TestTrue(TEXT("a hatchet is a blade"), FWRGathering::IsSharp(Blade));
+	TestTrue(TEXT("a sword is a blade"), FWRGathering::IsSharp(FWRInventoryRules::MakeInstance(TEXT("copper_sword"))));
+	TestFalse(TEXT("a pick isn't"), FWRGathering::IsSharp(FWRInventoryRules::MakeInstance(TEXT("stone_pick"))));
+	TestFalse(TEXT("bare hands aren't"), FWRGathering::IsSharp(FWRItemStack()));
+	Blade.Durability = 0.f;
+	TestFalse(TEXT("a broken hatchet isn't"), FWRGathering::IsSharp(Blade));
 	return true;
 }
 
