@@ -15,7 +15,7 @@ $db = Join-Path (Split-Path $project) 'Saved\ServerDB'
 Remove-Item (Join-Path $db 'players\Vanguard.json'), (Join-Path $db 'world_combattest.json') -ErrorAction SilentlyContinue
 
 function Hold($seconds) { (1..[math]::Ceiling($seconds) | ForEach-Object { 'wait 1|WRHeal' }) -join '|' }   # wait, staying alive
-function Face($seconds) { (1..[math]::Ceiling($seconds * 2) | ForEach-Object { 'WRAimAt cinderfang|wait 0.5' }) -join '|' }  # keep the guard toward it
+function Face($seconds, $id = 'cinderfang') { (1..[math]::Ceiling($seconds * 2) | ForEach-Object { "WRAimAt $id|wait 0.5" }) -join '|' }  # keep the guard (and your camera) toward it
 $cmds = @(
 	'WRBotPause 1', 'wait 3', 'WRClearCreatures', 'WRLook 0 0', 'wait 1',
 	# The starter spell: a tap of the wheel key casts what wheel 1 has picked.
@@ -26,17 +26,17 @@ $cmds = @(
 	'WRClearCreatures', 'wait 0.5'
 )
 if ($Shots) {
-	# Each wind-up from its side and from your own camera (or its other side): frames every 0.1 s while it attacks you.
+	# Each wind-up from its side and from your own camera: frames every 0.1 s while it comes at you (the first frames catch its lunge).
 	foreach ($hour in 12, 22) {
 		$cmds += @("WRHour $hour", 'wait 2',
-			'WRSpawn cinderfang 1', 'wait 0.3', 'WRArtCam cinderfang 90', 'wait 1', "WRShotSeq telegraph_cinder_${hour}_side_ 30 0.1", (Hold 4),
+			'WRSpawn cinderfang 1', 'wait 0.3', 'WRArtCam cinderfang 90', "WRShotSeq telegraph_cinder_${hour}_side_ 40 0.1", (Hold 5),
 			'WRArtCam none', "WRShotSeq telegraph_cinder_${hour}_player_ 30 0.1", (Face 4), 'WRHeal', 'WRClearCreatures', 'wait 0.5')
 	}
 	# Big ones, provoked by an arrow: a Basaltback stomps (ring), an Emberhorn charges (line).
 	$cmds += @('WRHour 12', 'wait 1', 'WRGive hunting_bow 1', 'WRGive stone_arrow 20', 'WREquip hunting_bow', 'wait 0.5')
 	foreach ($beast in 'basaltback', 'emberhorn') {
 		$cmds += @("WRSpawn $beast 1", 'wait 0.3', 'WRRanged 1', 'wait 0.5', 'WRAim 1', 'wait 0.5', "WRAimAt $beast", 'wait 0.1', 'WRFire', 'wait 0.3', 'WRAim 0', 'WRRanged 0',
-			"WRArtCam $beast 90", "WRShotSeq telegraph_${beast}_side_ 40 0.1", (Hold 4), "WRArtCam $beast -70", "WRShotSeq telegraph_${beast}_other_ 40 0.1", (Hold 4),
+			"WRArtCam $beast 90", "WRShotSeq telegraph_${beast}_side_ 40 0.1", (Hold 4), 'WRArtCam none', "WRShotSeq telegraph_${beast}_player_ 40 0.1", (Face 4 $beast),
 			'WRArtCam none', 'WRClearCreatures', 'wait 0.5')
 	}
 }
