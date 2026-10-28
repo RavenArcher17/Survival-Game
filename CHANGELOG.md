@@ -1,5 +1,73 @@
 # Changelog
 
+## 2026-10-28: version 0.5.0, the feedback pass
+
+Raven played 0.4.1 and sent a list. Five agents took it in their own worktrees (world, water, gather, combat, ui) and
+the lead merged them; Raven approved the defaults below.
+
+- **Lava** (world). The "lava squares" were scattered 6 m cells drawn as flat quads (edges floating on slopes) in a
+  glossy emissive the day exposure washed to pale pink. `Tools/terrain/dressing.mjs` now traces the river's real channel
+  into a 2 m grid (`hazards.lavaGrid`: ground height and depth inside the edge), and `AWRDressing::BuildLavaFlow` lays a
+  sheet on the landscape's own vertices whose rim sinks under the ground (38 chunks). `M_Lava` is rebuilt: dark crust,
+  glowing cracks, a molten middle drifting downstream (`lava.*`, live with `wr.LavaParam`). A spot burns only where the
+  drawn surface stands over the ground (`FWRBiomeHazards::FLavaGrid::SurfaceAt`); trees and rocks stay out of it.
+- **The green and yellow cones** (world) were the 188 placeholder resource nodes. `WRResourceLook.cpp` gives each item a
+  look from packs already in use: charred trees and pines for wood, boulders, ore boulders with coloured lumps, a sulfur
+  crystal cluster, lichen pads, berry bushes, fibre plants; the node's own mesh is a hidden collider (`world.nodeLooks 0`
+  shows the cones).
+- **Caves you can walk into** (world). The landscape filled the tunnels (each cave sat at the lowest ground under it, so
+  the floor rose 2-3 m up the tunnel). The meshes were measured in Blender (`Tools/art/cave_measure.py` ->
+  `Tools/terrain/cave_hollows.json`) and `dressing.mjs` fits each cave's height, variant, turn and size for at least
+  3.6 m of headroom from outside to the back of the chamber; chambers are lit brighter and their ore can be swung at on
+  uneven floors. `Tools/terrain/cavetest.ps1`: a bot walks into all six and mines.
+- **Denser island** (world): shrubs 8,383 -> 24,435 (clumped, 1.7x bigger; the fibre and berry shrubs with them);
+  wildlife 81 sites / 169 creatures -> 156 / 328 (a minute's walk now passes a pack 67-81% of the time).
+- **Water** (water). There was no water at all: players walked on the sea floor, and the old MI_Sea plane's collision
+  (a 1.2 km square under the island, where fallers landed) is now off. `UWRWaterSubsystem` (`WRWater.cpp`) builds a water
+  volume from `Data/sea_mask.json` on the server and every client, at the drawn waterline (80 cm over the mesh,
+  `water.surfaceOffset`): swim at 300, tread water with your head out, walk back up the beach. E drinks in the water or
+  at its edge (20 Water a gulp; sea water counts, `water.seaDrinkable`). Creatures wade to belly depth and turn back;
+  the fall-through rescue now catches swimmers under the island and holds deep fallers until the ground loads.
+  Footsteps and the surf start at the drawn waterline (`audio.seaLevel` 60). `Tools/watertest.ps1`.
+- **Tools are held** (gather). The hatchet or pick on the hotbar goes in the weapon hand (a model built from engine
+  shapes, `WRHeldTool.cpp`) and decides the yield: hatchet on trees, pick on stone and ore, anything else the base rate.
+  Every gathering hit costs the held item 1 durability (crude tools 80, stone 160; shown like the sword's); at 0 a tool
+  gives no bonus and hits for half until repaired at a workbench (30% of its recipe). As a weapon: 7 / 9 light damage.
+- **Bodies to harvest** (gather). A wild creature's kill stays down 180 s (`WRCarcass.cpp`) and nothing goes straight
+  into the bag: each hit cuts a share of its loot (a blade keeps all of it, hands or a pick half); the killer and their
+  clan have it alone for 30 s. Bosses, tames and wisps die as before. `Tools/gathertest.ps1`.
+- **Attack out of a held block** (combat): light or heavy swings at once from the guard, which comes back when the
+  swing ends if block is still held (parry still needs a fresh press). Casting while blocking now drops the guard too.
+- **Creature wind-ups** (combat): every attack plants, rears back (bite up, stomp on hind legs, charge head down, spit
+  head back, lunge crouched), glows red-orange (`/Game/FX/M_WindupGlow`) and makes a deep whoomph (`creature.windup`)
+  before it lands; lengths and looks in `telegraph` (bite 0.5 s up to stomp 1.0 s). `Tools/combattest.ps1`.
+- **Starter spells** (combat): each path names one (`"starter"`: Fire bolt, Frost shard), granted free at level 1 (and
+  when a subclass is taken up), put on wheel 1 so Q casts it; saves without it get it on login, and characters who had
+  bought it get the 3 points back.
+- **The panel flashing over the map** (ui) was the marker details rebuilding every 0.5 s inside Tick, so new widgets
+  drew one frame unmeasured; `WRUI::MeasureNow` / `SetContentMeasured` fix it there and in the other screens that
+  rebuild (journal tabs, inventory, paths, skills, storage, crafting, build bar). `Tools/uiflickertest.ps1`. Clicking
+  the journal tab that's open no longer closes it.
+- **Demolish mode** (ui): a Demolish button in the build bar and a rebindable key (X); the piece under the crosshair
+  glows red with its refund ("Demolish Wood wall · 6 wood back"), grey and "Not yours" when it isn't; X, Esc or right
+  mouse leave it. `Tools/demolishtest.ps1`.
+- **Console** (ui): README.txt now explains the ` key and a few commands (playtest builds: anyone in the game can use
+  them).
+- **GPU hangs fixed.** The agents' runs hit `DXGI_ERROR_DEVICE_HUNG` now and then, and the merged build hung in 2 of 3
+  Epic benchmark runs on a quiet machine, always in the virtual shadow maps' Nanite `PatchSplit` pass: Nanite's runtime
+  tessellation, on by default in 5.8. `r.Nanite.Tessellation=0` (DefaultEngine.ini `[SystemSettings]`): 4 of 4 runs
+  clean, 8.34 ms (120 fps) on Epic. 0.4.x most likely carried the same risk.
+- **A server crash in melee fixed.** The suite's mp run crashed the server in `UWRGameplayAbility::After` called from a
+  swing's wind-up step, just after a parry: the step set its re-sweep timers (and the hit could start more), a new timer
+  grew the timer manager's storage, and the running closure, `this` included, moved under it. Latent since the combat
+  core (2026-10-22); more creatures made it likelier. `After` now keeps each step on the heap and runs it from a local
+  reference.
+- Tests: the suite gains `combat`, `water`, `gather`, `demolish`, `flicker` and `cave`; several bot tests take `-Port`.
+  On the merged build 26 of 27 passed (25 automation tests, 344 checks); `mp` was the server crash above, and on the
+  fix it passed 3 runs of 9/9, with the ten combat-related suites rerun and passing.
+- Known: the volcanic shrubs are still yellow-green (their leaves only recolour through a coat; worth retrying now the
+  hangs are understood); ice still uses the old 6 m sheet.
+
 ## 2026-10-27: version 0.4.1, menus take clicks again, cave burrowers stay put
 
 Raven's friend reported they couldn't move around the menus, change settings or craft, though they could gather. A new

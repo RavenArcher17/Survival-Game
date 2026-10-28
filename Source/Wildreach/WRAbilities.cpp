@@ -133,8 +133,16 @@ void UWRGameplayAbility::After(float Delay, TFunction<void()> Fn)
 		Fn();
 		return;
 	}
+	// A step can set more timers (a swing's re-sweeps) or start things that do (a hit, a riposte), and a new timer can
+	// grow the timer manager's storage, moving the delegate that's running and the captures in it: the server crashed
+	// reading `this` from a moved closure. So the step lives on the heap and runs from a local reference.
+	const TSharedRef<TFunction<void()>> Step = MakeShared<TFunction<void()>>(MoveTemp(Fn));
 	FTimerHandle& Handle = Timers.AddDefaulted_GetRef();
-	World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, MoveTemp(Fn)), Delay, false);
+	World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [Step]()
+	{
+		const TSharedRef<TFunction<void()>> Run = Step;
+		(*Run)();
+	}), Delay, false);
 }
 
 void UWRGameplayAbility::EndSelf(bool bCancelled)
