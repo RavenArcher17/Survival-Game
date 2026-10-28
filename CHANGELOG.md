@@ -63,7 +63,7 @@ the lead merged them; Raven approved the defaults below.
   core (2026-10-22); more creatures made it likelier. `After` now keeps each step on the heap and runs it from a local
   reference.
 - Tests: the suite gains `combat`, `water`, `gather`, `demolish`, `flicker` and `cave`; several bot tests take `-Port`.
-  On the merged build 26 of 27 passed (25 automation tests, 344 checks); `mp` was the server crash above, and on the
+  On the merged build 26 of 27 passed (25 automation tests, 335 checks over 26 bot tests); `mp` was the server crash above, and on the
   fix it passed 3 runs of 9/9, with the ten combat-related suites rerun and passing.
 - Known: the volcanic shrubs are still yellow-green (their leaves only recolour through a coat; worth retrying now the
   hangs are understood); ice still uses the old 6 m sheet.
