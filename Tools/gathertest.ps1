@@ -39,7 +39,9 @@ function Butcher([int]$n) { (@(1..$n) | ForEach-Object { 'WRPress light|wait 1.3
 $cmds = @(
 	'WRBotPause 1', 'WRFlow hints off', 'wait 2', 'WRHour 11', 'WRGive crude_hatchet 1', 'WRGive stone_pick 1', 'wait 1',
 	(Gather '-130596 -59750' 'tree' 9),                       # tree 2020, the starting sword in hand: the base rate
-	'WREquip crude_hatchet', 'wait 1',
+	# Rendered, the hatchet comes out by its hotbar key as a player's would (the bar fills sword, food, drink,
+	# potion, then the tools given here: key 5); headless has no hotbar, so the server command.
+	$(if ($Shots) { 'WRKey Five|wait 1|WRUIState' } else { 'WREquip crude_hatchet' }), 'wait 1',
 	(UIShot 'hud_hatchet' 'WRLook 0 -5'),                     # the hatchet selected, its durability over the hotbar
 	(Shot 'hatchet_hand_a' 'WRArtCam me 60|wait 2'),          # the hatchet in the hand, two angles
 	(Shot 'hatchet_hand_b' 'WRArtCam me 230|wait 2'),

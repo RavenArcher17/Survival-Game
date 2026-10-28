@@ -68,7 +68,9 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
   Cooking crashes (`Assertion failed: !Hash.IsZero()`) on any skeleton-less clip in a cooked folder: the Barghest pack's
   MANE/TAIL clips and meshes are moved out to `C:\Dev\WildreachArt\replaced\barghest_parts`; re-adding the pack brings them back.
 - 2026-10-25 survival loop pass: the island's trees / rocks / shrubs are the gathering (`AWRDressing::HarvestInFront`,
-  used-up ones replicate via `AWRHarvestLedger`), tools work from the bag (`FWRGathering`, `"tool"` in items.json),
+  used-up ones replicate via `AWRHarvestLedger`), tools work in the hand since 0.5 (weapon-slot equipment: the held one
+  sets the yield and wears, `FWRGathering`, drawn from engine shapes in `WRHeldTool.cpp`; wild kills stay down as bodies
+  butchered hit by hit, `WRCarcass.cpp`; numbers in tuning `gather`, `Tools\gathertest.ps1`),
   crude tools are made by hand (recipes with station `hand`, top of the B menu), stone tools at the workbench.
   `Tools\survivaltest.ps1` plays the fresh-player loop on L_Island (backs up and restores the island world save).
 - 2026-10-23 "build the rest of the first playable" run, in batches (each tested + committed):

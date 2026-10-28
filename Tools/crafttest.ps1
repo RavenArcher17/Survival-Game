@@ -1,6 +1,8 @@
 # End-to-end crafting test on the arena: gather-free (materials given), then smelt, craft, infuse,
 # equip, socket, upgrade to the Hearth cap, feed the Hearth a core, craft a tier-2 recipe; then every ranged weapon
 # and its ammo, and a bow worn by shooting repaired at the workbench.
+#   crafttest.ps1 [-Port 7810]
+param([int]$Port = 7810)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-craft-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -40,9 +42,9 @@ $cmds = @(
 	'WRGoTo workbench', 'wait 2', 'WRRepair ranged', 'wait 1'
 ) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7810 -wrworld=crafttest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=crafttest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
-$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7810?Path=fire?WRName=Crafter -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Crafter -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 80
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 $results = @()
