@@ -26,7 +26,11 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Camera/CameraActor.h"
 #include "EngineUtils.h"
+#include "GameFramework/HUD.h"
+#include "Misc/App.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "WRMainMenu.h"
 #include "WRKeyBindings.h"
 #include "WRPlayerUI.h"
@@ -280,6 +284,28 @@ void AWRPlayerController::WRHour(float Hour) { ServerCommand(FString::Printf(TEX
 void AWRPlayerController::WRWildlife() { ServerCommand(TEXT("wildlife")); }
 void AWRPlayerController::WRSpawnAt(FName Creature, float X, float Y) { ServerCommand(FString::Printf(TEXT("spawnat %s %.0f %.0f"), *Creature.ToString(), X, Y)); }
 void AWRPlayerController::WRCreatureHP(FName Creature, float Fraction) { ServerCommand(FString::Printf(TEXT("creaturehp %s %.3f"), *Creature.ToString(), Fraction)); }
+void AWRPlayerController::WRCreatureDrive(FName Creature, float Yaw, float Seconds, float Scale)
+{
+	ServerCommand(FString::Printf(TEXT("creaturedrive %s %.2f %.3f %.3f"), *Creature.ToString(), Yaw, Seconds, Scale));
+}
+void AWRPlayerController::WRCreatureFace(FName Creature, float Yaw) { ServerCommand(FString::Printf(TEXT("creatureface %s %.2f"), *Creature.ToString(), Yaw)); }
+void AWRPlayerController::WRCreatureAttack(FName Creature) { ServerCommand(FString::Printf(TEXT("creatureattack %s"), *Creature.ToString())); }
+void AWRPlayerController::WRCreatureFlinch(FName Creature) { ServerCommand(FString::Printf(TEXT("creatureflinch %s"), *Creature.ToString())); }
+void AWRPlayerController::WRCreatureFree(FName Creature) { ServerCommand(FString::Printf(TEXT("creaturefree %s"), *Creature.ToString())); }
+
+void AWRPlayerController::WRHideMe(int32 bHide)
+{
+	if (APawn* Me = GetPawn())
+	{
+		Me->SetActorHiddenInGame(bHide != 0);
+		TArray<AActor*> Held;
+		Me->GetAttachedActors(Held, true, true);
+		for (AActor* Actor : Held)
+		{
+			Actor->SetActorHiddenInGame(bHide != 0);
+		}
+	}
+}
 void AWRPlayerController::WRSky()
 {
 	const UWRSkySubsystem* Sub = GetWorld()->GetSubsystem<UWRSkySubsystem>();
@@ -425,9 +451,24 @@ void AWRPlayerController::UpdateArtCam(float DeltaTime)
 		ArtCam->SetActorRotation((Origin - ArtCam->GetActorLocation()).Rotation());  // held in place, just watching
 		return;
 	}
-	const FVector Dir = FRotator(0.f, Target->GetActorRotation().Yaw + ArtCamYaw, 0.f).Vector();
-	const FVector Goal = Origin + Dir * (Size * 3.2f + 150.f) + FVector(0.f, 0.f, Size * 0.6f);
-	const FVector At = DeltaTime > 0.f ? FMath::VInterpTo(ArtCam->GetActorLocation(), Goal, DeltaTime, 4.f) : Goal;
+	// Locked to where the subject is (it stays in frame however fast it runs); only the angle it looks from eases round
+	// when the subject turns.
+	const float WantAngle = Target->GetActorRotation().Yaw + ArtCamYaw;
+	ArtCamAngle = DeltaTime > 0.f ? ArtCamAngle + FMath::FInterpTo(0.f, FMath::FindDeltaAngleDegrees(ArtCamAngle, WantAngle), DeltaTime, 4.f) : WantAngle;
+	const FVector Dir = FRotator(0.f, ArtCamAngle, 0.f).Vector();
+	FVector Goal = Origin + Dir * (Size * 3.2f + 150.f) + FVector(0.f, 0.f, Size * 0.6f);
+	// Never in the ground: on a slope the side it looks from can be higher than the creature stands.
+	FHitResult Ground;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRArtCam), false, Target);
+	if (GetWorld()->LineTraceSingleByObjectType(Ground, FVector(Goal.X, Goal.Y, Origin.Z + Size * 2.f + 100.f), Goal - FVector(0.f, 0.f, 300.f), FCollisionObjectQueryParams(ECC_WorldStatic), Query))
+	{
+		Goal.Z = FMath::Max(Goal.Z, Ground.ImpactPoint.Z + 30.f);
+	}
+	FVector At = Goal;
+	if (DeltaTime > 0.f)
+	{
+		At.Z = FMath::FInterpTo(ArtCam->GetActorLocation().Z, Goal.Z, DeltaTime, 6.f);  // over a ledge or a ramp's foot, glides
+	}
 	ArtCam->SetActorLocationAndRotation(At, (Origin - At).Rotation());
 }
 
@@ -452,6 +493,7 @@ void AWRPlayerController::PlayerTick(float DeltaTime)
 		TickBot(DeltaTime);
 	}
 	UpdateArtCam(DeltaTime);
+	TickRecord();
 	if (IsPlacing())
 	{
 		UpdatePlacement();
@@ -732,11 +774,38 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			if (It->IsAlive() && !It->IsTamed() && It->CreatureId == FName(*Arg(1)) && D < BestDist) { BestDist = D; Best = *It; }
 		}
 		UAbilitySystemComponent* CreatureASC = Best ? Best->GetAbilitySystemComponent() : nullptr;
-		if (CreatureASC && Best->GetAttributes())
+		if (CreatureASC && Best->GetAttributes() && FCString::Atof(*Arg(2)) <= 0.f)
+		{
+			Best->Die(Survivor);  // 0: dead, down where it stands (a wild one stays down as a body)
+			Result = FString::Printf(TEXT("%s killed"), *Best->GetName());
+		}
+		else if (CreatureASC && Best->GetAttributes())
 		{
 			CreatureASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), Best->GetAttributes()->GetMaxHealth() * FMath::Clamp(FCString::Atof(*Arg(2)), 0.01f, 1.f));
+			Result = FString::Printf(TEXT("%s health %.0f"), *Best->GetName(), Best->GetAttributes()->GetHealth());
 		}
-		Result = Best ? FString::Printf(TEXT("%s health %.0f"), *Best->GetName(), Best->GetAttributes()->GetHealth()) : TEXT("none found");
+		else
+		{
+			Result = TEXT("none found");
+		}
+	}
+	else if ((Cmd == TEXT("creaturedrive") || Cmd == TEXT("creatureface") || Cmd == TEXT("creatureattack") || Cmd == TEXT("creatureflinch") || Cmd == TEXT("creaturefree")) && GetPawn())
+	{
+		// Testing aid (animation captures): the nearest living creature of an id does as it's told, its brain off.
+		AWRCreature* Best = nullptr;
+		float BestDist = TNumericLimits<float>::Max();
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist(It->GetActorLocation(), GetPawn()->GetActorLocation());
+			if (It->IsAlive() && It->CreatureId == FName(*Arg(1)) && D < BestDist) { BestDist = D; Best = *It; }
+		}
+		if (!Best) Result = TEXT("none found");
+		else if (Cmd == TEXT("creaturedrive")) Best->TestDrive(FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)), Args.IsValidIndex(4) ? FCString::Atof(*Arg(4)) : 0.4f);
+		else if (Cmd == TEXT("creatureface")) Best->TestFace(FCString::Atof(*Arg(2)));
+		else if (Cmd == TEXT("creatureattack")) Result = Best->TestAttack() ? TEXT("biting") : TEXT("can't bite now");
+		else if (Cmd == TEXT("creatureflinch")) Best->TestFlinch();
+		else Best->TestRelease();
+		if (Best) Result = FString::Printf(TEXT("%s at %s yaw %.0f: %s"), *Best->GetName(), *Best->GetActorLocation().ToCompactString(), Best->GetActorRotation().Yaw, *Result);
 	}
 	else if (Cmd == TEXT("hour"))
 	{
@@ -904,6 +973,66 @@ void AWRPlayerController::WRShotSeq(const FString& Prefix, int32 Count, float Ev
 	ShotSeqCount = FMath::Max(0, Count);
 	ShotSeqEvery = FMath::Max(0.02f, Every);
 	ShotSeqNext = BotClock;
+}
+
+void AWRPlayerController::WRRecord(const FString& Prefix, int32 Frames, int32 Width, int32 Height)
+{
+	RecordPrefix = Prefix.IsEmpty() ? FString(TEXT("rec_")) : Prefix;
+	RecordFrame = 0;
+	RecordFrames = FMath::Max(0, Frames);
+	RecordSize = FIntPoint(FMath::Clamp(Width, 64, 7680), FMath::Clamp(Height, 64, 4320));
+	RecordTimes.Reset();
+	RecordTimes.Add(TEXT("frame,world_seconds,world_delta,engine_delta,real_seconds"));
+	RecordRealStart = FPlatformTime::Seconds();
+	if (MyHUD && RecordFrames > 0)
+	{
+		bRecordHUDWas = MyHUD->bShowHUD;
+		MyHUD->bShowHUD = false;  // nameplates and text panels stay out of the frames
+	}
+	UE_LOG(LogWildreach, Log, TEXT("RECORD start %s: %d frames at %dx%d, fixed time step %s (%.4f s)"), *RecordPrefix, RecordFrames, RecordSize.X, RecordSize.Y,
+		FApp::UseFixedTimeStep() ? TEXT("on") : TEXT("OFF"), FApp::GetFixedDeltaTime());
+}
+
+void AWRPlayerController::TickRecord()
+{
+	if (RecordFrame >= RecordFrames)
+	{
+		return;
+	}
+	// This frame's picture: the request is taken when this frame is drawn (after every tick), so the frames follow the
+	// game frame for frame however long each takes to render and save.
+	const double Now = GetWorld()->GetTimeSeconds();
+	const double Delta = RecordFrame > 0 ? Now - RecordLastTime : double(GetWorld()->GetDeltaSeconds());
+	if (RecordFrame == 0)
+	{
+		RecordWorldStart = Now;
+	}
+	ConsoleCommand(FString::Printf(TEXT("HighResShot %dx%d filename=%s%04d"), RecordSize.X, RecordSize.Y, *RecordPrefix, RecordFrame));
+	RecordTimes.Add(FString::Printf(TEXT("%d,%.6f,%.6f,%.6f,%.3f"), RecordFrame, Now, Delta, FApp::GetDeltaTime(), FPlatformTime::Seconds() - RecordRealStart));
+	UE_LOG(LogWildreach, Log, TEXT("RECORD frame %d world %.4f dt %.5f"), RecordFrame, Now, Delta);
+	RecordLastTime = Now;
+	if (++RecordFrame < RecordFrames)
+	{
+		return;
+	}
+	// Done: the timing beside the frames, and a summary for the script.
+	double MinDt = TNumericLimits<double>::Max(), MaxDt = 0.0;
+	for (int32 i = 2; i < RecordTimes.Num(); ++i)  // (the first frame's delta is the frame before it started)
+	{
+		TArray<FString> Cols;
+		RecordTimes[i].ParseIntoArray(Cols, TEXT(","));
+		const double Dt = Cols.Num() > 2 ? FCString::Atod(*Cols[2]) : 0.0;
+		MinDt = FMath::Min(MinDt, Dt);
+		MaxDt = FMath::Max(MaxDt, Dt);
+	}
+	const FString Csv = RecordPrefix.Contains(TEXT("/")) ? RecordPrefix + TEXT("timing.csv") : FPaths::ScreenShotDir() / RecordPrefix + TEXT("timing.csv");
+	FFileHelper::SaveStringToFile(FString::Join(RecordTimes, TEXT("\n")) + TEXT("\n"), *Csv);
+	UE_LOG(LogWildreach, Log, TEXT("RECORD done %s: %d frames over %.3f s of world time, frame step %.5f..%.5f s, %.1f s real (timing: %s)"), *RecordPrefix, RecordFrames,
+		Now - RecordWorldStart, RecordFrames > 2 ? MinDt : 0.0, MaxDt, FPlatformTime::Seconds() - RecordRealStart, *Csv);
+	if (MyHUD)
+	{
+		MyHUD->bShowHUD = bRecordHUDWas;
+	}
 }
 
 void AWRPlayerController::WRAnimDrive(float Angle, float Seconds, float Scale, float TurnRate)

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased (branch creature-runtime): creature feet on uneven ground, frame-exact creature videos
+
+- **Feet on slopes and bumps** for the generated creatures (`Tools/art/rig_quadruped.py` skeletons: `<leg>_upper /
+  _lower / _foot`, 4 or 6 legs; pack creatures and the Mixamo bosses are left alone). Near a local view the game thread
+  traces the ground under every foot each frame (`AWRCreature::TickCreatureFeet`, eased); the animation proxy
+  (`FWRAnimProxy::PlaceCreatureFeet`) tilts the body to the plane through those points (pitch front to back, roll side to
+  side, clamped 30 / 15 degrees) about a point over the feet at hip height, sits it at the ground's height and sinks it
+  so the lowest foot reaches, then two-bone IK puts each foot at the clip's own position plus its ground height (a
+  stepping foot keeps its lift; the knee bends as the clip bends it; the foot lies to its ground). Off in the air, in the
+  water and out of range (fades); once dead the legs let go and the body stays lying to the slope. The survivor's
+  standing foot plant now shares the leg solver (`WRAnimDetail::SolveLeg`), unchanged. Numbers: tuning
+  `anim.creatureFeet`; `wr.CreatureFeetLog 1` logs each ankle's height over its ground.
+- **Packs out of step**: every creature starts its idle and stride at its own point (seeded by its spawn spot, so the
+  same spawn replays the same; `anim.creatureRandomPhase`). Before this they all started at 0.
+- **Creature videos** (`Tools\creaturevideo.ps1 -Creature <id>`): a standalone game on the new `L_CreatureStage`
+  (`Tools\make_map.ps1 stage`: a 1 m checker floor beside a 20 degree ramp) with a fixed time step
+  (`-UseFixedTimeStep -FPS=30 -FixedSeed`) records a scripted performance frame by frame: idle, walk, run, two bites,
+  a turn, a walk up the ramp, two flinches, death (25.2 s, 756 frames), identical for every creature and run, plus a
+  contact sheet and the world time of every frame. New dev commands: `WRRecord <prefix> <frames> [w h]` (a screenshot of
+  every frame), `WRCreatureDrive / Face / Attack / Flinch / Free <id>` (a creature does as it's told, its brain off),
+  `WRCreatureHP <id> 0` kills, `WRHideMe 1`; the art camera keeps out of the ground.
+
 ## 2026-10-28: version 0.5.0, the feedback pass
 
 Raven played 0.4.1 and sent a list. Five agents took it in their own worktrees (world, water, gather, combat, ui) and

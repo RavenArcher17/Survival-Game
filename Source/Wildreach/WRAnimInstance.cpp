@@ -284,6 +284,67 @@ namespace WRAnimDetail
 	{
 		return Seconds > KINDA_SMALL_NUMBER ? 1.f / Seconds : 1000.f;
 	}
+
+	/** A bone's component-space transform in a pose (walks up its parents). */
+	static FTransform PoseCS(const FCompactPose& Pose, FCompactPoseBoneIndex Bone)
+	{
+		const FBoneContainer& Bones = Pose.GetBoneContainer();
+		FTransform Out = Pose[Bone];
+		for (FCompactPoseBoneIndex P = Bones.GetParentBoneIndex(Bone); P.GetInt() != INDEX_NONE; P = Bones.GetParentBoneIndex(P))
+		{
+			Out = Out * Pose[P];
+		}
+		return Out;
+	}
+
+	static FCompactPoseBoneIndex CompactBone(const FBoneContainer& Bones, FName Name)
+	{
+		const int32 Mesh = Name.IsNone() ? INDEX_NONE : Bones.GetPoseBoneIndexForBoneName(Name);
+		return Mesh == INDEX_NONE ? FCompactPoseBoneIndex(INDEX_NONE) : Bones.MakeCompactPoseIndex(FMeshPoseBoneIndex(Mesh));
+	}
+
+	/** One leg's two-bone IK (thigh - knee - foot, in the pose as it stands): the foot goes to Target (component space;
+	 *  bRaise: Target is added to where the foot is) and the knee bends the way the pose already bends it (the pole runs
+	 *  out through the pose's own knee, PoleDistance from the hip-foot line). The foot keeps its component-space
+	 *  rotation, or takes FootRotation if given. Alpha blends the result over the pose. FallbackBend (thigh space): which
+	 *  way the knee bends when the pose has the leg straight (zero: no fallback). Shared by the survivor's planted feet
+	 *  and the creatures'. */
+	static void SolveLeg(FCompactPose& Pose, FCompactPoseBoneIndex Thigh, FCompactPoseBoneIndex Knee, FCompactPoseBoneIndex Foot, const FVector& Target, bool bRaise,
+		double PoleDistance, const FQuat* FootRotation = nullptr, float Alpha = 1.f, const FVector& FallbackBend = FVector::ZeroVector)
+	{
+		const FBoneContainer& Bones = Pose.GetBoneContainer();
+		const FTransform ThighParent = PoseCS(Pose, Bones.GetParentBoneIndex(Thigh));
+		FTransform A = Pose[Thigh] * ThighParent;
+		FTransform B = Pose[Knee] * A;
+		FTransform C = Pose[Foot] * B;
+		const FVector Mid = (A.GetLocation() + C.GetLocation()) * 0.5f;
+		FVector Bend = B.GetLocation() - Mid;
+		if (!FallbackBend.IsZero() && Bend.Size() < 0.02 * PoleDistance)
+		{
+			Bend = A.GetRotation().RotateVector(FallbackBend);  // the leg is straight: bend it the way its rest pose does
+		}
+		const FVector Pole = B.GetLocation() + Bend.GetSafeNormal() * PoleDistance;
+		AnimationCore::SolveTwoBoneIK(A, B, C, Pole, bRaise ? C.GetLocation() + Target : Target, false, 1.0, 1.0);
+		if (FootRotation)
+		{
+			C.SetRotation(*FootRotation);
+		}
+		FTransform NewThigh = A.GetRelativeTransform(ThighParent);
+		FTransform NewKnee = B.GetRelativeTransform(A);
+		FTransform NewFoot = C.GetRelativeTransform(B);
+		if (Alpha < 1.f)
+		{
+			FTransform Old = Pose[Thigh]; Old.BlendWith(NewThigh, Alpha); NewThigh = Old;
+			Old = Pose[Knee]; Old.BlendWith(NewKnee, Alpha); NewKnee = Old;
+			Old = Pose[Foot]; Old.BlendWith(NewFoot, Alpha); NewFoot = Old;
+		}
+		Pose[Thigh] = NewThigh;
+		Pose[Knee] = NewKnee;
+		Pose[Foot] = NewFoot;
+		Pose[Thigh].NormalizeRotation();
+		Pose[Knee].NormalizeRotation();
+		Pose[Foot].NormalizeRotation();
+	}
 }
 
 // ---------------------------------------------------------------- proxy (animation thread)
@@ -447,6 +508,7 @@ bool FWRAnimProxy::Evaluate(FPoseContext& Output)
 		}
 	}
 	PlantFeet(Output.Pose);
+	PlaceCreatureFeet(Output.Pose);
 	return true;
 }
 
@@ -473,15 +535,6 @@ void FWRAnimProxy::PlantFeet(FCompactPose& Pose) const
 	const float Drop = FMath::Max(FMath::Min3(0.f, Frame.FootLift[0], Frame.FootLift[1]), -WRTune(TEXT("anim.footMaxDrop"), 35.f));
 	const FCompactPoseBoneIndex Root(0);
 	Pose[Root].AddToTranslation(FVector(0.f, 0.f, Drop));
-	const auto CS = [&Pose, &Bones](FCompactPoseBoneIndex Bone)
-	{
-		FTransform Out = Pose[Bone];
-		for (FCompactPoseBoneIndex P = Bones.GetParentBoneIndex(Bone); P.GetInt() != INDEX_NONE; P = Bones.GetParentBoneIndex(P))
-		{
-			Out = Out * Pose[P];
-		}
-		return Out;
-	};
 	for (int32 Side = 0; Side < 2; ++Side)
 	{
 		const float Raise = FMath::Min(Frame.FootLift[Side] - Drop, WRTune(TEXT("anim.footMaxRaise"), 45.f));
@@ -489,20 +542,121 @@ void FWRAnimProxy::PlantFeet(FCompactPose& Pose) const
 		{
 			continue;
 		}
-		const FCompactPoseBoneIndex Thigh = Leg[Side * 3], Knee = Leg[Side * 3 + 1], Foot = Leg[Side * 3 + 2];
-		const FTransform ThighParent = CS(Bones.GetParentBoneIndex(Thigh));
-		FTransform A = Pose[Thigh] * ThighParent;
-		FTransform B = Pose[Knee] * A;
-		FTransform C = Pose[Foot] * B;
-		const FVector Mid = (A.GetLocation() + C.GetLocation()) * 0.5f;
-		const FVector Pole = B.GetLocation() + (B.GetLocation() - Mid).GetSafeNormal() * 60.f;
-		AnimationCore::SolveTwoBoneIK(A, B, C, Pole, C.GetLocation() + FVector(0.f, 0.f, Raise), false, 1.0, 1.0);
-		Pose[Thigh] = A.GetRelativeTransform(ThighParent);
-		Pose[Knee] = B.GetRelativeTransform(A);
-		Pose[Foot] = C.GetRelativeTransform(B);
-		Pose[Thigh].NormalizeRotation();
-		Pose[Knee].NormalizeRotation();
-		Pose[Foot].NormalizeRotation();
+		WRAnimDetail::SolveLeg(Pose, Leg[Side * 3], Leg[Side * 3 + 1], Leg[Side * 3 + 2], FVector(0.f, 0.f, Raise), true, 60.0);
+	}
+}
+
+void FWRAnimProxy::PlaceCreatureFeet(FCompactPose& Pose) const
+{
+	// A creature on uneven ground (the generated skeletons, 4 or 6 legs). Feet.Ground is where the ground is under each
+	// foot (mesh space; the clip's ground is z = 0). The body tilts to the plane through those points (pitch front to
+	// back, roll side to side, clamped), turning about a point over the feet's middle at hip height so the legs stay
+	// under it; it sits at the plane's height there and sinks further if a foot can't reach its ground; then each leg
+	// reaches its own ground with two-bone IK: the foot goes where the clip puts it plus that foot's ground height (a
+	// stepping foot's lift is kept), the knee bends the way the clip bends it, the foot lies to its ground as it lies to
+	// flat ground in the clip.
+	const FWRCreatureFeet& F = Frame.Feet;
+	const FWRCreatureFeetTune& T = Frame.FeetTune;
+	const int32 N = FMath::Min(Frame.CreatureLegs.Num(), FWRCreatureFeet::MaxLegs);
+	if (N < 4 || (F.BodyAlpha <= 0.001f && F.LegAlpha <= 0.001f))
+	{
+		return;
+	}
+	const FBoneContainer& Bones = Pose.GetBoneContainer();
+	FCompactPoseBoneIndex Upper[FWRCreatureFeet::MaxLegs], Lower[FWRCreatureFeet::MaxLegs], Foot[FWRCreatureFeet::MaxLegs];
+	for (int32 i = 0; i < N; ++i)
+	{
+		Upper[i] = WRAnimDetail::CompactBone(Bones, Frame.CreatureLegs[i].Upper);
+		Lower[i] = WRAnimDetail::CompactBone(Bones, Frame.CreatureLegs[i].Lower);
+		Foot[i] = WRAnimDetail::CompactBone(Bones, Frame.CreatureLegs[i].Foot);
+		if (Upper[i].GetInt() == INDEX_NONE || Lower[i].GetInt() == INDEX_NONE || Foot[i].GetInt() == INDEX_NONE)
+		{
+			return;  // a lower LOD without the legs
+		}
+	}
+	// The pose as the clips have it (before any of this): feet, hips, leg length.
+	FTransform AnimFoot[FWRCreatureFeet::MaxLegs];
+	float HipZ = 0.f, LegLength = 0.f;
+	for (int32 i = 0; i < N; ++i)
+	{
+		AnimFoot[i] = WRAnimDetail::PoseCS(Pose, Foot[i]);
+		const FVector Hip = WRAnimDetail::PoseCS(Pose, Upper[i]).GetLocation();
+		const FVector Knee = WRAnimDetail::PoseCS(Pose, Lower[i]).GetLocation();
+		HipZ += float(Hip.Z) / N;
+		LegLength += float(FVector::Dist(Hip, Knee) + FVector::Dist(Knee, AnimFoot[i].GetLocation())) / N;
+	}
+	LegLength = FMath::Max(LegLength, 1.f);
+
+	// The ground plane through the sampled points, z = G + b x + c y about their middle (least squares).
+	float Cx = 0.f, Cy = 0.f, G = 0.f;
+	for (int32 i = 0; i < N; ++i)
+	{
+		Cx += F.At[i].X / N;
+		Cy += F.At[i].Y / N;
+		G += F.Ground[i] / N;
+	}
+	double Sxx = 0.0, Sxy = 0.0, Syy = 0.0, Sxg = 0.0, Syg = 0.0;
+	for (int32 i = 0; i < N; ++i)
+	{
+		const double X = F.At[i].X - Cx, Y = F.At[i].Y - Cy, Gi = F.Ground[i] - G;
+		Sxx += X * X; Sxy += X * Y; Syy += Y * Y; Sxg += X * Gi; Syg += Y * Gi;
+	}
+	const double Ridge = 1e-3 * (Sxx + Syy) + 1e-6;
+	Sxx += Ridge; Syy += Ridge;
+	const double Det = Sxx * Syy - Sxy * Sxy;
+	const double SlopeX = Det > 1e-9 ? (Sxg * Syy - Syg * Sxy) / Det : 0.0;
+	const double SlopeY = Det > 1e-9 ? (Syg * Sxx - Sxg * Sxy) / Det : 0.0;
+	// Pitch along the body's forward (turned with the legs when they lag a turn in place), roll across it.
+	const FVector Fwd = Frame.MeshForward.RotateAngleAxis(Frame.RootYaw, FVector::UpVector).GetSafeNormal2D();
+	const FVector Right(-Fwd.Y, Fwd.X, 0.f);
+	const float Pitch = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan(float(SlopeX * Fwd.X + SlopeY * Fwd.Y))) * T.TiltScale, -T.MaxPitch, T.MaxPitch);
+	const float Roll = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan(float(SlopeX * Right.X + SlopeY * Right.Y))) * T.TiltScale, -T.MaxRoll, T.MaxRoll);
+	const FVector Normal = (FVector::UpVector - Fwd * FMath::Tan(FMath::DegreesToRadians(Pitch)) - Right * FMath::Tan(FMath::DegreesToRadians(Roll))).GetSafeNormal();
+	const FQuat Tilt = FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(FVector::UpVector, Normal), F.BodyAlpha);
+	const float Height = FMath::Clamp(G, -T.MaxDrop * LegLength, T.MaxRaise * LegLength) * F.BodyAlpha;
+	const FVector Pivot(Cx, Cy, HipZ * FMath::Clamp(T.Pivot, 0.f, 1.f));
+	const FTransform Body = FTransform(-Pivot) * FTransform(Tilt) * FTransform(Pivot + FVector(0.f, 0.f, Height));
+
+	// Sink so the lowest foot can reach its ground (the others bend to theirs).
+	FVector Want[FWRCreatureFeet::MaxLegs];
+	float Drop = 0.f;
+	for (int32 i = 0; i < N; ++i)
+	{
+		Want[i] = AnimFoot[i].GetLocation() + FVector(0.f, 0.f, F.Ground[i]);
+		Drop = FMath::Min(Drop, float(Want[i].Z - Body.TransformPosition(AnimFoot[i].GetLocation()).Z));
+	}
+	Drop = FMath::Max(Drop, -T.MaxDrop * LegLength) * F.LegAlpha;
+	const FCompactPoseBoneIndex Root(0);
+	Pose[Root] = Pose[Root] * Body * FTransform(FVector(0.f, 0.f, Drop));
+	Pose[Root].NormalizeRotation();
+	if (F.LegAlpha <= 0.001f)
+	{
+		return;
+	}
+	const float MaxFootTilt = FMath::DegreesToRadians(T.FootMaxTilt);
+	for (int32 i = 0; i < N; ++i)
+	{
+		// No higher than a leg can lift a foot over where the tilted body put it.
+		const FVector Now = WRAnimDetail::PoseCS(Pose, Foot[i]).GetLocation();
+		FVector Target = Want[i];
+		Target.Z = FMath::Min(Target.Z, Now.Z + T.MaxRaise * LegLength);
+		// The foot lies over to its own ground (no further than FootMaxTilt).
+		FVector Up = F.Normal[i].GetSafeNormal();
+		const float Lean = FMath::Acos(FMath::Clamp(float(Up.Z), -1.f, 1.f));
+		if (Up.IsZero() || Up.Z <= 0.f)
+		{
+			Up = FVector::UpVector;
+		}
+		else if (Lean > MaxFootTilt)
+		{
+			Up = FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(FVector::UpVector, Up), MaxFootTilt / Lean).RotateVector(FVector::UpVector);
+		}
+		const FQuat FootRot = (FQuat::FindBetweenNormals(FVector::UpVector, Up) * AnimFoot[i].GetRotation()).GetNormalized();
+		// The knee's rest bend (thigh space), for a clip that holds the leg straight.
+		const FTransform RefKnee = Bones.GetRefPoseTransform(Lower[i]);
+		const FVector RefAnkle = RefKnee.TransformPosition(Bones.GetRefPoseTransform(Foot[i]).GetTranslation());
+		const FVector RestBend = RefKnee.GetTranslation() - RefAnkle * 0.5f;
+		WRAnimDetail::SolveLeg(Pose, Upper[i], Lower[i], Foot[i], Target, false, LegLength, &FootRot, F.LegAlpha, RestBend);
 	}
 }
 
@@ -638,6 +792,7 @@ void UWRAnimInstance::ResetSetup()
 	UpperRoot = NAME_None;
 	SpineBones.Reset();
 	LegBones.Reset();
+	CreatureLegs.Reset();
 	YawOffset = 0.f;
 	bHaveYaw = false;
 	bTurning = false;
@@ -754,6 +909,35 @@ void UWRAnimInstance::SetUpperBody(FName Root, const TArray<FName>& Spine)
 {
 	UpperRoot = Root;
 	SpineBones = Spine;
+}
+
+void UWRAnimInstance::SetCreatureLegs(const TArray<FWRCreatureLeg>& Legs)
+{
+	CreatureLegs = Legs.Num() >= 4 && Legs.Num() <= FWRCreatureFeet::MaxLegs ? Legs : TArray<FWRCreatureLeg>();
+	Input.Feet = FWRCreatureFeet();
+}
+
+TArray<FWRCreatureLeg> UWRAnimInstance::FindCreatureLegs(const FReferenceSkeleton& Ref)
+{
+	// Tools/art/rig_quadruped.py: front legs hang off spine3, middle off spine1, rear off pelvis; each is
+	// <leg>_upper -> _lower -> _foot.
+	TArray<FWRCreatureLeg> Legs;
+	for (const TCHAR* Leg : { TEXT("FL"), TEXT("FR"), TEXT("ML"), TEXT("MR"), TEXT("RL"), TEXT("RR") })
+	{
+		const FWRCreatureLeg L{ FName(FString::Printf(TEXT("%s_upper"), Leg)), FName(FString::Printf(TEXT("%s_lower"), Leg)), FName(FString::Printf(TEXT("%s_foot"), Leg)) };
+		const int32 U = Ref.FindBoneIndex(L.Upper), K = Ref.FindBoneIndex(L.Lower), F = Ref.FindBoneIndex(L.Foot);
+		if (U != INDEX_NONE && K != INDEX_NONE && F != INDEX_NONE && Ref.GetParentIndex(K) == U && Ref.GetParentIndex(F) == K)
+		{
+			Legs.Add(L);
+		}
+	}
+	return Legs.Num() >= 4 ? Legs : TArray<FWRCreatureLeg>();
+}
+
+void UWRAnimInstance::SetStartPhase(float LocoPhase, float IdleSeconds)
+{
+	Phase = FMath::Fmod(FMath::Max(0.f, LocoPhase), 1.f);
+	IdleTime = FMath::Max(0.f, IdleSeconds);
 }
 
 const UWRAnimInstance::FTurnCurve& UWRAnimInstance::TurnCurve(UAnimSequenceBase* Clip)
@@ -1104,6 +1288,21 @@ void UWRAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Frame.LegBones = LegBones;
 	Frame.FootLift[0] = Input.FootLift[0];
 	Frame.FootLift[1] = Input.FootLift[1];
+	Frame.CreatureLegs = CreatureLegs;
+	Frame.Feet = Input.Feet;
+	Frame.MeshForward = MeshForward;
+	if (CreatureLegs.Num() > 0)
+	{
+		const FWRTuning& T = FWRTuning::Get();
+		FWRCreatureFeetTune& Tune = Frame.FeetTune;
+		Tune.MaxPitch = T.Num(TEXT("anim.creatureFeet.maxPitch"), 30.f);
+		Tune.MaxRoll = T.Num(TEXT("anim.creatureFeet.maxRoll"), 15.f);
+		Tune.TiltScale = T.Num(TEXT("anim.creatureFeet.tiltScale"), 1.f);
+		Tune.Pivot = T.Num(TEXT("anim.creatureFeet.pivot"), 1.f);
+		Tune.MaxDrop = T.Num(TEXT("anim.creatureFeet.maxDrop"), 0.35f);
+		Tune.MaxRaise = T.Num(TEXT("anim.creatureFeet.maxRaise"), 0.5f);
+		Tune.FootMaxTilt = T.Num(TEXT("anim.creatureFeet.footMaxTilt"), 35.f);
+	}
 	MeasureSlide(DeltaSeconds);
 }
 

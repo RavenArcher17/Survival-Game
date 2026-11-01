@@ -183,6 +183,22 @@ public:
 	bool IsHarvestableBody() const { return BodyHitsLeft > 0; }
 	int32 GetBodyHitsLeft() const { return BodyHitsLeft; }
 
+	// --- Test control (server; dev commands WRCreatureDrive / Face / Attack / Flinch / Free, Tools\creaturevideo.ps1) ---
+	// While any is set its brain is off (AWRCreatureAI::Tick runs TickTestControl instead) and it does only this.
+	/** Walk / run toward world Yaw at SpeedScale x its speed (0.4 its wander walk, 1 its run) for Seconds, then stand. */
+	void TestDrive(float Yaw, float Seconds, float SpeedScale);
+	/** Stand still, turning on the spot (at its own turn rate) to face world Yaw. */
+	void TestFace(float Yaw);
+	/** Its basic bite as a real one looks (wind-up glow, call, clip, through its bite ability), standing where it is,
+	 *  no target needed. False if it can't bite now. */
+	bool TestAttack();
+	/** A hit reaction, no damage. */
+	void TestFlinch();
+	/** Back under its brain. */
+	void TestRelease() { TestMode = 0; }
+	bool IsTestControlled() const { return TestMode != 0; }
+	void TickTestControl(float DeltaSeconds);
+
 	/** Server: player mounts / dismounts. */
 	FString Ride(AWRCharacter* Rider);
 	void Dismount();
@@ -281,6 +297,18 @@ private:
 	/** The layered animation instance: locomotion paced to the ground speed, attacks / hits over it, crossfades. */
 	void SetupCreatureAnim(const FWRCreatureDef& Def);
 	void TickCreatureAnim(float DeltaSeconds);
+	/** Generated skeletons on uneven ground: the ground under each foot for the animation instance (traced only near a
+	 *  local view and while its pose updates; smoothed), and how much the body tilts / the legs reach (off in the air,
+	 *  in the water, far away; the legs let go once it's dead). Numbers in tuning anim.creatureFeet. */
+	void TickCreatureFeet(float DeltaSeconds);
+	float FeetLegCm = 0.f;      // leg length (hip to ankle) in cm at the mesh's scale
+	bool bFeetInRange = false;  // within anim.creatureFeet.range of a local view (checked with the earshot clock)
+	float FeetLogClock = 0.f;   // wr.CreatureFeetLog
+	// Test control (above).
+	uint8 TestMode = 0;  // 0 off, 1 stand facing TestYaw, 2 drive
+	float TestYaw = 0.f, TestScale = 0.4f;
+	double TestDriveUntil = 0.0;
+	UFUNCTION(NetMulticast, Unreliable) void MulticastTestFlinch();
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> RideMapping;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideMoveAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideLookAction;

@@ -383,6 +383,9 @@ void AWRCreature::ApplyDef()
 
 namespace WRCreatureAnimDetail
 {
+	static TAutoConsoleVariable<int32> CVarFeetLog(TEXT("wr.CreatureFeetLog"), 0,
+		TEXT("Testing: every half second, log how high each creature foot (ankle) stands over the ground traced under it (cm)"));
+
 	UAnimSequenceBase* Clip(const TMap<FName, TObjectPtr<UAnimSequenceBase>>& Assets, FName Key)
 	{
 		const TObjectPtr<UAnimSequenceBase>* Found = Assets.Find(Key);
@@ -451,6 +454,38 @@ void AWRCreature::SetupCreatureAnim(const FWRCreatureDef& Def)
 		}
 	}
 	Anim->SetUpperBody(Upper, {});
+	// Generated skeletons (Tools/art/rig_quadruped.py, 4 or 6 legs): feet on uneven ground (TickCreatureFeet).
+	FeetLegCm = 0.f;
+	const USkeletalMesh* MeshAsset = Skel->GetSkeletalMeshAsset();
+	if (MeshAsset && WRTune(TEXT("anim.creatureFeet.enabled"), 1.f) > 0.f)
+	{
+		const FReferenceSkeleton& Ref = MeshAsset->GetRefSkeleton();
+		const TArray<FWRCreatureLeg> Legs = UWRAnimInstance::FindCreatureLegs(Ref);
+		Anim->SetCreatureLegs(Legs);
+		const auto RefCS = [&Ref](int32 Bone)
+		{
+			FTransform Out = FTransform::Identity;
+			for (int32 B = Bone; B != INDEX_NONE; B = Ref.GetParentIndex(B)) Out = Out * Ref.GetRefBonePose()[B];
+			return Out.GetLocation();
+		};
+		for (const FWRCreatureLeg& Leg : Legs)
+		{
+			const FVector Hip = RefCS(Ref.FindBoneIndex(Leg.Upper)), Knee = RefCS(Ref.FindBoneIndex(Leg.Lower)), Ankle = RefCS(Ref.FindBoneIndex(Leg.Foot));
+			FeetLegCm += float(FVector::Dist(Hip, Knee) + FVector::Dist(Knee, Ankle)) * float(Skel->GetRelativeScale3D().Z) / Legs.Num();
+		}
+	}
+	// Each one starts its idle and its stride somewhere else, so a pack doesn't breathe and step in unison. Seeded by
+	// where it came into the world: the same spawn gives the same start (side-by-side captures), packmates differ.
+	if (WRTune(TEXT("anim.creatureRandomPhase"), 1.f) > 0.f)
+	{
+		// (The id by its text: an FName's own hash changes from run to run.)
+		const FVector At = GetActorLocation();
+		const FIntVector Spot(FMath::RoundToInt(At.X / 10.f), FMath::RoundToInt(At.Y / 10.f), FMath::RoundToInt(At.Z / 10.f));
+		FRandomStream Random(int32(HashCombine(GetTypeHash(Spot), FCrc::StrCrc32(*Def.Id.ToString()))));
+		const UAnimSequenceBase* Idle = Clip(AnimAssets, TEXT("idle"));
+		const float LocoPhase = Random.FRand();
+		Anim->SetStartPhase(LocoPhase, Random.FRand() * (Idle ? Idle->GetPlayLength() : 1.f));
+	}
 	OneShotUntil = 0.0;
 	LastYaw = GetActorRotation().Yaw;
 	UE_LOG(LogWildreach, Verbose, TEXT("Creature anim %s: walk %.0f run %.0f cm/s (moves at %.0f), attacks from %s"), *Def.Id.ToString(),
@@ -497,6 +532,80 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 		EarshotClock = 0.5f;
 		Skel->VisibilityBasedAnimTickOption = WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.footstepRange"), 3000.f))
 			? EVisibilityBasedAnimTickOption::AlwaysTickPose : EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		bFeetInRange = Anim->GetCreatureLegs().Num() > 0 && WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.creatureFeet.range"), 6000.f));
+	}
+	TickCreatureFeet(DeltaSeconds);
+}
+
+void AWRCreature::TickCreatureFeet(float DeltaSeconds)
+{
+	UWRAnimInstance* Anim = CreatureAnim();
+	if (!Anim || Anim->GetCreatureLegs().Num() == 0)
+	{
+		return;
+	}
+	const TArray<FWRCreatureLeg>& Legs = Anim->GetCreatureLegs();
+	const FWRTuning& T = FWRTuning::Get();
+	FWRCreatureFeet& Feet = Anim->Input.Feet;
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	const bool bAlive = IsAlive();
+	// On: standing or walking on the ground near a local view. Dead: the body stays lying to the ground it fell on (the
+	// samples stop), the legs let go of it so the death pose plays as made.
+	const float BodyWas = Feet.BodyAlpha;
+	const bool bOn = bAlive && bFeetInRange && Move->IsMovingOnGround();
+	const float Rate = 1.f / FMath::Max(0.02f, T.Num(TEXT("anim.creatureFeet.fadeSeconds"), 0.25f));
+	const auto Toward = [DeltaSeconds, Rate](float Value, float Goal)
+	{
+		return Value < Goal ? FMath::Min(Goal, Value + Rate * DeltaSeconds) : FMath::Max(Goal, Value - Rate * DeltaSeconds);
+	};
+	Feet.BodyAlpha = bAlive ? Toward(Feet.BodyAlpha, bOn ? 1.f : 0.f) : Feet.BodyAlpha;
+	Feet.LegAlpha = Toward(Feet.LegAlpha, bOn ? 1.f : 0.f);
+	// Sampled only while its pose updates (seen, or within earshot), in range, alive.
+	if (!bOn || (!Skel->WasRecentlyRendered(0.2f) && Skel->VisibilityBasedAnimTickOption != EVisibilityBasedAnimTickOption::AlwaysTickPose))
+	{
+		return;
+	}
+	// Mesh space as fitted (a wind-up's rear-back moves the mesh: the ground stays where it is).
+	const FTransform Fitted = bTelegraphPosed ? FTransform(SkelBaseRotation, SkelBaseLocation, Skel->GetRelativeScale3D()) : Skel->GetRelativeTransform();
+	const FTransform Base = Fitted * GetActorTransform();
+	const FVector Bottom = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	const float Steep = FMath::Tan(FMath::DegreesToRadians(T.Num(TEXT("anim.creatureFeet.maxPitch"), 30.f) + 10.f));
+	const float Leg = FMath::Max(FeetLegCm, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	// Eased toward each new sample (a step onto a ledge doesn't snap), at once when it was off before.
+	const float Ease = BodyWas <= 0.f ? 1.f : 1.f - FMath::Exp(-T.Num(TEXT("anim.creatureFeet.smoothing"), 18.f) * DeltaSeconds);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCreatureFeet), false, this);
+	FCollisionObjectQueryParams Floors(ECC_WorldStatic);
+	Floors.AddObjectTypesToQuery(ECC_WorldDynamic);
+	// wr.CreatureFeetLog 1 (testing): each ankle's height over its ground / that ground against the capsule's bottom.
+	FeetLogClock -= DeltaSeconds;
+	const bool bLog = WRCreatureAnimDetail::CVarFeetLog.GetValueOnGameThread() > 0 && FeetLogClock <= 0.f;
+	FString Over;
+	for (int32 i = 0; i < Legs.Num() && i < FWRCreatureFeet::MaxLegs; ++i)
+	{
+		const FVector At = Skel->GetSocketLocation(Legs[i].Foot);
+		// Deep enough for the steepest slope it tilts to, out as far as this foot is from its middle.
+		const float Span = Leg + float(FVector::Dist2D(At, GetActorLocation())) * Steep;
+		FVector Ground(At.X, At.Y, Bottom.Z), Normal = FVector::UpVector;
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByObjectType(Hit, FVector(At.X, At.Y, Bottom.Z + Span), FVector(At.X, At.Y, Bottom.Z - Span), Floors, Query))
+		{
+			Ground = Hit.ImpactPoint;
+			Normal = Hit.ImpactNormal;
+		}
+		const FVector LocalGround = Base.InverseTransformPosition(Ground);
+		const FVector LocalNormal = Base.InverseTransformVectorNoScale(Normal).GetSafeNormal();
+		Feet.Ground[i] = FMath::Lerp(Feet.Ground[i], float(LocalGround.Z), Ease);
+		Feet.Normal[i] = FMath::Lerp(Feet.Normal[i], LocalNormal, Ease).GetSafeNormal();
+		Feet.At[i] = FVector2D(Base.InverseTransformPosition(At));
+		if (bLog)
+		{
+			Over += FString::Printf(TEXT(" %s %+.1f/%+.0f"), *Legs[i].Foot.ToString().Left(2), At.Z - Ground.Z, Ground.Z - Bottom.Z);
+		}
+	}
+	if (bLog)
+	{
+		FeetLogClock = 0.5f;
+		UE_LOG(LogWildreach, Log, TEXT("FEET %s speed %.0f body %.2f legs %.2f, ankle over ground / ground cm:%s"), *GetName(), GetVelocity().Size2D(), Feet.BodyAlpha, Feet.LegAlpha, *Over);
 	}
 }
 
@@ -707,6 +816,72 @@ void AWRCreature::OnDeathVisual()
 		bDeathShown = true;  // a body that comes into view later shows it from OnRep_Body (WRCarcass.cpp)
 		Anim->PlayOneShot(WRCreatureAnimDetail::Clip(AnimAssets, TEXT("death")), EWRAnimLayer::Full, 1.f, 0.f, 0.f, true);
 		OneShotUntil = 1.0e12;  // stay down
+	}
+}
+
+// ---------------------------------------------------------------- test control (dev commands, Tools\creaturevideo.ps1)
+
+void AWRCreature::TestDrive(float Yaw, float Seconds, float SpeedScale)
+{
+	TestFace(Yaw);
+	TestMode = 2;
+	TestScale = FMath::Clamp(SpeedScale, 0.f, 1.f);
+	TestDriveUntil = GetWorld()->GetTimeSeconds() + FMath::Max(0.f, Seconds);
+}
+
+void AWRCreature::TestFace(float Yaw)
+{
+	TestMode = 1;
+	TestYaw = FRotator::NormalizeAxis(Yaw);
+	SetAsleep(false);
+	SetAggroTarget(nullptr);
+	HuntTarget = nullptr;
+	SpeedBoost = 1.f;
+}
+
+bool AWRCreature::TestAttack()
+{
+	if (!IsAlive() || !AbilitySystem)
+	{
+		return false;
+	}
+	// Standing where it is, facing the way it faces (the bite commits to its controller's aim as it starts).
+	TestFace(GetActorRotation().Yaw);
+	if (AController* Brain = GetController())
+	{
+		Brain->SetControlRotation(FRotator(0.f, TestYaw, 0.f));
+	}
+	return AbilitySystem->TryActivateAbilityByClass(UWRGA_Bite::StaticClass());
+}
+
+void AWRCreature::TestFlinch()
+{
+	if (IsAlive())
+	{
+		MulticastTestFlinch();
+	}
+}
+
+void AWRCreature::MulticastTestFlinch_Implementation()
+{
+	OnHitVisual(EWRHitResult::Hit);
+	WRSound::Voice(this, TEXT("hurt"));
+}
+
+void AWRCreature::TickTestControl(float DeltaSeconds)
+{
+	SpeedBoost = 1.f;
+	if (TestMode == 2 && GetWorld()->GetTimeSeconds() < TestDriveUntil)
+	{
+		AddMovementInput(FRotator(0.f, TestYaw, 0.f).Vector(), TestScale);
+		return;
+	}
+	// Driven far enough, or told to stand: it stops and turns on the spot (its legs step round) to face TestYaw. Mid-bite
+	// the ability holds its facing.
+	TestMode = 1;
+	if (!HasTag(WRTags::State_Attacking) && FMath::Abs(FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, TestYaw)) > 0.05f)
+	{
+		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, TestYaw, 0.f), DeltaSeconds, GetCharacterMovement()->RotationRate.Yaw));
 	}
 }
 
@@ -1615,6 +1790,16 @@ void AWRCreatureAI::Tick(float DeltaSeconds)
 		{
 			EndSpecial(Self);
 		}
+		return;
+	}
+	if (Self->IsTestControlled())
+	{
+		// A dev command has it (WRCreatureDrive and the rest): no thinking of its own until it's let go.
+		if (SpecialPhase != 0)
+		{
+			EndSpecial(Self);
+		}
+		Self->TickTestControl(DeltaSeconds);
 		return;
 	}
 	if (Self->IsTamed())

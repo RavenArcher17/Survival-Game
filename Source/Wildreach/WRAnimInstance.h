@@ -20,6 +20,10 @@ class UAnimSequenceBase;
  *   full        loops (fall, swim) and one-shots (dodge, death, gathering) over the whole body.
  * Every change crossfades (anim.* in tuning.json). Standing still, the legs stay put while the facing swings (the
  * upper body twists to follow) until a turn-in-place clip steps them round.
+ * On uneven ground, last: the survivor standing on a slope sinks its hips to the lower foot and bends the other leg up
+ * (SetLegs, Input.FootLift); a creature with the generated four- or six-legged skeleton (SetCreatureLegs, Input.Feet)
+ * tilts its body to the ground under its feet, sinks so the lowest can reach, and every leg reaches its own ground,
+ * standing or walking (two-bone IK; the knees bend as the clips bend them, a stepping foot keeps its lift).
  *
  * Game thread: the owner fills Input every tick and calls PlayOneShot; NativeUpdateAnimation steps the state and hands
  * the proxy a list of weighted clip samples, which it blends on the animation thread.
@@ -52,6 +56,35 @@ struct FWRClipGait
 	TArray<float> PlantsBackward;
 };
 
+/** A creature leg (the generated quadruped / hexapod skeleton: <leg>_upper, _lower, _foot; the foot runs ankle to toe). */
+struct FWRCreatureLeg
+{
+	FName Upper, Lower, Foot;
+};
+
+/** Up to six legs of a creature on uneven ground, filled by the owner (game thread traces under each foot). Mesh space:
+ *  lengths in mesh units, the clip's ground is z = 0. */
+struct FWRCreatureFeet
+{
+	static constexpr int32 MaxLegs = 6;
+	float Ground[MaxLegs] = { 0.f };                  // height of the ground under each foot
+	FVector Normal[MaxLegs];                          // the ground's normal there
+	FVector2D At[MaxLegs];                            // where it was sampled (the foot's position)
+	float BodyAlpha = 0.f;                            // 0..1: the body tilts to the ground (and sits on it)
+	float LegAlpha = 0.f;                             // 0..1: each foot reaches its own ground (off while dead)
+	FWRCreatureFeet() { for (int32 i = 0; i < MaxLegs; ++i) { Normal[i] = FVector::UpVector; At[i] = FVector2D::ZeroVector; } }
+};
+
+/** Numbers for the creature feet, read on the game thread (tuning anim.creatureFeet) and handed to the proxy. */
+struct FWRCreatureFeetTune
+{
+	float MaxPitch = 30.f, MaxRoll = 15.f;   // degrees the body may tilt to the ground
+	float TiltScale = 1.f;                   // share of the ground's slope the body takes
+	float Pivot = 1.f;                       // the tilt turns about the feet (0) .. the hips (1)
+	float MaxDrop = 0.35f, MaxRaise = 0.5f;  // x leg length: the body may sink / a foot may rise this far
+	float FootMaxTilt = 35.f;                // degrees a foot may lie over to its ground
+};
+
 /** Per-tick input from the owner. */
 struct FWRAnimInput
 {
@@ -69,6 +102,7 @@ struct FWRAnimInput
 	bool bFullLoopHold = false;        // play FullLoop once and hold its last frame (falling)
 	float ExtraTwist = 0.f;            // degrees of upper-body turn on top of turn in place (a crossbow held across the body)
 	float FootLift[2] = { 0.f, 0.f };  // cm the ground under the left / right foot sits above the capsule's bottom (slopes)
+	FWRCreatureFeet Feet;              // creatures with SetCreatureLegs: the ground under every foot
 };
 
 /** A clip sample for the animation thread. */
@@ -93,6 +127,11 @@ struct FWRAnimFrame
 	TArray<FName> SpineBones;
 	float FootLift[2] = { 0.f, 0.f };
 	TArray<FName> LegBones;   // left thigh, knee, foot, then right: feet planted on slopes (pelvis down, two-bone IK)
+	// Creatures: the body tilts to the ground under its feet, sinks so the lowest can reach, each leg reaches its own.
+	TArray<FWRCreatureLeg> CreatureLegs;
+	FWRCreatureFeet Feet;
+	FWRCreatureFeetTune FeetTune;
+	FVector MeshForward = FVector::ForwardVector;
 };
 
 struct FWRAnimProxy : public FAnimInstanceProxy
@@ -109,6 +148,7 @@ private:
 	bool SampleBlend(const TArray<FWRAnimSample>& Samples, FPoseContext& Out) const;
 	void RefreshMasks(const FBoneContainer& Bones);
 	void PlantFeet(FCompactPose& Pose) const;
+	void PlaceCreatureFeet(FCompactPose& Pose) const;
 	TArray<uint8> UpperMask;  // per compact bone: 1 from the upper-body root up
 	uint16 MaskSerial = 0;
 	FName MaskRoot;
@@ -135,6 +175,15 @@ public:
 	void SetLegs(const TArray<FName>& Bones) { LegBones = Bones.Num() == 6 ? Bones : TArray<FName>(); }
 	bool HasLegs() const { return LegBones.Num() == 6; }
 	FName FootBone(int32 Side) const { return HasLegs() ? LegBones[Side == 0 ? 2 : 5] : NAME_None; }
+	/** Creature legs for uneven ground (4 or 6; anything else turns it off): the owner fills Input.Feet each tick. */
+	void SetCreatureLegs(const TArray<FWRCreatureLeg>& Legs);
+	const TArray<FWRCreatureLeg>& GetCreatureLegs() const { return CreatureLegs; }
+	/** The generated quadruped / hexapod skeleton's legs (<FL|FR|ML|MR|RL|RR>_upper / _lower / _foot), front first; empty
+	 *  if the skeleton has fewer than four of them (pack creatures, humanoids). */
+	static TArray<FWRCreatureLeg> FindCreatureLegs(const FReferenceSkeleton& Ref);
+	/** Where the cycles start: the foot phase (0..1 of a stride) and seconds into the idle, so a pack doesn't breathe and
+	 *  step in unison. */
+	void SetStartPhase(float LocoPhase, float IdleSeconds);
 	/** The body's forward in mesh space (for finding an attack clip's strike). */
 	void SetMeshForward(const FVector& Forward) { MeshForward = Forward; }
 
@@ -231,6 +280,7 @@ private:
 	FName UpperRoot;
 	TArray<FName> SpineBones;
 	TArray<FName> LegBones;
+	TArray<FWRCreatureLeg> CreatureLegs;
 	FVector MeshForward = FVector::ForwardVector;
 
 	// Turn in place

@@ -31,7 +31,8 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
   `WRCameraBoom`. Death/loading/moments/hints: `WRUIFlow`, `WRFlowDeath`, `WRUIMotion`. Far creatures tick in slices
   (`UWRSignificanceSubsystem`); art preloads (`UWRPreloadSubsystem`, `Data/preload.json`). Measure with
   `Tools\benchmark.ps1` (results in `Docs/PERFORMANCE.md`); verify with `Tools\uishots.ps1`, `animshots.ps1`,
-  `fxshots.ps1`, `worldshots.ps1`, `audiotest.ps1`, `flowtest.ps1`. Third-party files and licences:
+  `fxshots.ps1`, `worldshots.ps1`, `audiotest.ps1`, `flowtest.ps1`, `creaturevideo.ps1` (a creature's scripted
+  performance, every frame at a fixed 1/30 s, on `L_CreatureStage`). Third-party files and licences:
   `Docs/CREDITS.md` (shipped beside the game).
 - **UI: the stone-and-leather Slate UI** (2026-10-26, from Raven's approved mockups): `FWRPlayerUI` per local player
   (`WRPlayerUI`), style + widget kit (`WRUIStyle`, `WRUIWidgets`, `WRUIWindowKit.h`), every key in `FWRKeyBindings`

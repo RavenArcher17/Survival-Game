@@ -220,6 +220,22 @@ public:
 	UFUNCTION(Exec) void WRArtCamFix(int32 bFix);
 	/** Take Count screenshots (1280x720) Every seconds apart, named <Prefix>00, <Prefix>01, ... (animation captures). */
 	UFUNCTION(Exec) void WRShotSeq(const FString& Prefix, int32 Count, float Every);
+	/** Video captures (Tools\creaturevideo.ps1): a screenshot of every rendered frame for Frames frames, Width x Height,
+	 *  named <Prefix>0000, <Prefix>0001, ... (in Saved\Screenshots, or a path with forward slashes and no spaces), the
+	 *  HUD off meanwhile; each frame's world time goes to the log (RECORD ...) and to <Prefix>timing.csv. Doesn't hold
+	 *  up the bot's commands. Run the game with -UseFixedTimeStep -FPS=30 for every frame to be 1/30 s. */
+	UFUNCTION(Exec) void WRRecord(const FString& Prefix, int32 Frames, int32 Width = 1280, int32 Height = 720);
+	/** Hide your own body (and what it holds) from view, e.g. out of a capture. */
+	UFUNCTION(Exec) void WRHideMe(int32 bHide);
+	/** Testing aid, the nearest creature of an id: walk / run toward world Yaw at Scale x its speed (0.4 its wander walk,
+	 *  1 its run) for Seconds, then stand / stand still turning to face world Yaw / bite as it would at you (wind-up,
+	 *  glow, call, clip) / flinch as if hit (no damage) / back under its own brain. Its brain is off from the first of
+	 *  these until WRCreatureFree. (WRCreatureHP <id> 0 kills it.) */
+	UFUNCTION(Exec) void WRCreatureDrive(FName Creature, float Yaw, float Seconds, float Scale = 0.4f);
+	UFUNCTION(Exec) void WRCreatureFace(FName Creature, float Yaw);
+	UFUNCTION(Exec) void WRCreatureAttack(FName Creature);
+	UFUNCTION(Exec) void WRCreatureFlinch(FName Creature);
+	UFUNCTION(Exec) void WRCreatureFree(FName Creature);
 	/** Teleport next to the altar of a path (testing). */
 	UFUNCTION(Exec) void WRGoToAltar(FName Path);
 
@@ -327,6 +343,7 @@ private:
 	TWeakObjectPtr<AActor> ArtCamTarget;
 	UPROPERTY() TObjectPtr<class ACameraActor> ArtCam;
 	float ArtCamYaw = 60.f;
+	float ArtCamAngle = 0.f;  // the world yaw it looks from, eased toward the subject's facing + ArtCamYaw
 	bool bWalking = false;
 	FVector2D WalkTarget = FVector2D::ZeroVector;
 	float WalkStart = 0.f;
@@ -348,4 +365,11 @@ private:
 	FString ShotSeqPrefix;  // WRShotSeq
 	int32 ShotSeqTaken = 0, ShotSeqCount = 0;
 	float ShotSeqEvery = 0.125f, ShotSeqNext = 0.f;
+	void TickRecord();      // WRRecord
+	FString RecordPrefix;
+	int32 RecordFrame = 0, RecordFrames = 0;
+	FIntPoint RecordSize = FIntPoint(1280, 720);
+	double RecordLastTime = 0.0, RecordWorldStart = 0.0, RecordRealStart = 0.0;
+	TArray<FString> RecordTimes;
+	bool bRecordHUDWas = true;
 };
