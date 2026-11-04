@@ -23,7 +23,8 @@ class UAnimSequenceBase;
  * On uneven ground, last: the survivor standing on a slope sinks its hips to the lower foot and bends the other leg up
  * (SetLegs, Input.FootLift); a creature with the generated four- or six-legged skeleton (SetCreatureLegs, Input.Feet)
  * tilts its body to the ground under its feet, sinks so the lowest can reach, and every leg reaches its own ground,
- * standing or walking (two-bone IK; the knees bend as the clips bend them, a stepping foot keeps its lift).
+ * standing or walking (two-bone IK; the knees bend as the clips bend them, a stepping foot keeps its lift). A legless
+ * creature with a spine chain (SetCreatureSpine, Input.Spine: Glacimaw) lies along the ground under every joint.
  *
  * Game thread: the owner fills Input every tick and calls PlayOneShot; NativeUpdateAnimation steps the state and hands
  * the proxy a list of weighted clip samples, which it blends on the animation thread.
@@ -85,6 +86,15 @@ struct FWRCreatureFeetTune
 	float FootMaxTilt = 35.f;                // degrees a foot may lie over to its ground
 };
 
+/** A legless creature's body on uneven ground (Tools/art/rig_special.py's worm: spine1 .. spineN, then its head),
+ *  filled by the owner: the ground under each joint, tail end first, in mesh space (the clip's ground is z = 0). */
+struct FWRCreatureSpine
+{
+	static constexpr int32 MaxJoints = 16;
+	float Ground[MaxJoints] = { 0.f };
+	float Alpha = 0.f;                 // 0..1: the body lies along that ground
+};
+
 /** Per-tick input from the owner. */
 struct FWRAnimInput
 {
@@ -103,6 +113,7 @@ struct FWRAnimInput
 	float ExtraTwist = 0.f;            // degrees of upper-body turn on top of turn in place (a crossbow held across the body)
 	float FootLift[2] = { 0.f, 0.f };  // cm the ground under the left / right foot sits above the capsule's bottom (slopes)
 	FWRCreatureFeet Feet;              // creatures with SetCreatureLegs: the ground under every foot
+	FWRCreatureSpine Spine;            // creatures with SetCreatureSpine: the ground under every joint
 };
 
 /** A clip sample for the animation thread. */
@@ -131,7 +142,12 @@ struct FWRAnimFrame
 	TArray<FWRCreatureLeg> CreatureLegs;
 	FWRCreatureFeet Feet;
 	FWRCreatureFeetTune FeetTune;
+	// Legless creatures: each spine bone turns so the joints lie along the ground under them.
+	TArray<FName> CreatureSpine;
+	FWRCreatureSpine Spine;
+	float SpineMaxBend = 35.f;  // degrees a bone may turn to follow the ground
 	FVector MeshForward = FVector::ForwardVector;
+	TArray<TPair<FName, float>> PoseLift;  // bones turned nose-up (degrees, about the body's side axis) over every clip
 };
 
 struct FWRAnimProxy : public FAnimInstanceProxy
@@ -149,6 +165,7 @@ private:
 	void RefreshMasks(const FBoneContainer& Bones);
 	void PlantFeet(FCompactPose& Pose) const;
 	void PlaceCreatureFeet(FCompactPose& Pose) const;
+	void PlaceCreatureSpine(FCompactPose& Pose) const;
 	TArray<uint8> UpperMask;  // per compact bone: 1 from the upper-body root up
 	uint16 MaskSerial = 0;
 	FName MaskRoot;
@@ -181,11 +198,20 @@ public:
 	/** The generated quadruped / hexapod skeleton's legs (<FL|FR|ML|MR|RL|RR>_upper / _lower / _foot), front first; empty
 	 *  if the skeleton has fewer than four of them (pack creatures, humanoids). */
 	static TArray<FWRCreatureLeg> FindCreatureLegs(const FReferenceSkeleton& Ref);
+	/** A legless creature's joints for uneven ground (3 to FWRCreatureSpine::MaxJoints; anything else turns it off): the
+	 *  owner fills Input.Spine each tick. */
+	void SetCreatureSpine(const TArray<FName>& Joints);
+	const TArray<FName>& GetCreatureSpine() const { return CreatureSpine; }
+	/** rig_special.py's worm: spine1, spine2 ... each the child of the one before, then that chain's first child (the
+	 *  head); empty for anything with legs or fewer than three spine bones. */
+	static TArray<FName> FindCreatureSpine(const FReferenceSkeleton& Ref);
 	/** Where the cycles start: the foot phase (0..1 of a stride) and seconds into the idle, so a pack doesn't breathe and
 	 *  step in unison. */
 	void SetStartPhase(float LocoPhase, float IdleSeconds);
 	/** The body's forward in mesh space (for finding an attack clip's strike). */
 	void SetMeshForward(const FVector& Forward) { MeshForward = Forward; }
+	/** Bones turned nose-up by these degrees on top of every clip, e.g. a bought mesh whose clips hang its head low. */
+	void SetPoseLift(const TArray<TPair<FName, float>>& Lift) { PoseLift = Lift; }
 
 	/** Play a clip once. Rate 0 keeps 1. Start skips into it, Delay holds its first frame first, bHold keeps the last
 	 *  frame until the layer gets something else. Returns its play time in seconds (Delay included). */
@@ -281,7 +307,9 @@ private:
 	TArray<FName> SpineBones;
 	TArray<FName> LegBones;
 	TArray<FWRCreatureLeg> CreatureLegs;
+	TArray<FName> CreatureSpine;
 	FVector MeshForward = FVector::ForwardVector;
+	TArray<TPair<FName, float>> PoseLift;
 
 	// Turn in place
 	float YawOffset = 0.f;      // degrees the legs are behind the actor's facing

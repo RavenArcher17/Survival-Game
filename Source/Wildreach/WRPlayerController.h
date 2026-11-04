@@ -218,13 +218,18 @@ public:
 	UFUNCTION(Exec) void WRPress(FName Input, float Seconds = 0.05f);
 	/** Hold the art camera where it is (it keeps watching its subject but stops swinging round with its facing). */
 	UFUNCTION(Exec) void WRArtCamFix(int32 bFix);
+	/** Art checks: set a tuning number on this machine only, e.g. WRTuneSet artCam.sizes 4 (frame one big subject wider). */
+	UFUNCTION(Exec) void WRTuneSet(const FString& Path, float Value);
 	/** Take Count screenshots (1280x720) Every seconds apart, named <Prefix>00, <Prefix>01, ... (animation captures). */
 	UFUNCTION(Exec) void WRShotSeq(const FString& Prefix, int32 Count, float Every);
 	/** Video captures (Tools\creaturevideo.ps1): a screenshot of every rendered frame for Frames frames, Width x Height,
 	 *  named <Prefix>0000, <Prefix>0001, ... (in Saved\Screenshots, or a path with forward slashes and no spaces), the
 	 *  HUD off meanwhile; each frame's world time goes to the log (RECORD ...) and to <Prefix>timing.csv. Doesn't hold
-	 *  up the bot's commands. Run the game with -UseFixedTimeStep -FPS=30 for every frame to be 1/30 s. */
-	UFUNCTION(Exec) void WRRecord(const FString& Prefix, int32 Frames, int32 Width = 1280, int32 Height = 720);
+	 *  up the bot's commands. Run the game with -UseFixedTimeStep -FPS=30 for every frame to be 1/30 s. Keep: which frames
+	 *  are saved, as windows "first-last/step,..." (e.g. "0-89/30,120-167/2": every 30th of the first 90, every 2nd of
+	 *  120-167, none of the rest); empty saves every frame. Saved frames keep their own numbers, and every frame's time
+	 *  is still logged (with a "saved" column), so a frame number is always its time. */
+	UFUNCTION(Exec) void WRRecord(const FString& Prefix, int32 Frames, int32 Width = 1280, int32 Height = 720, const FString& Keep = TEXT(""));
 	/** Hide your own body (and what it holds) from view, e.g. out of a capture. */
 	UFUNCTION(Exec) void WRHideMe(int32 bHide);
 	/** Testing aid, the nearest creature of an id: walk / run toward world Yaw at Scale x its speed (0.4 its wander walk,
@@ -367,7 +372,8 @@ private:
 	float ShotSeqEvery = 0.125f, ShotSeqNext = 0.f;
 	void TickRecord();      // WRRecord
 	FString RecordPrefix;
-	int32 RecordFrame = 0, RecordFrames = 0;
+	int32 RecordFrame = 0, RecordFrames = 0, RecordSaved = 0;
+	TArray<FIntVector> RecordKeep;  // (first, last, step) windows of frames to save; none = all
 	FIntPoint RecordSize = FIntPoint(1280, 720);
 	double RecordLastTime = 0.0, RecordWorldStart = 0.0, RecordRealStart = 0.0;
 	TArray<FString> RecordTimes;

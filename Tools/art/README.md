@@ -21,8 +21,63 @@ Batch flow (what the four-legged set used):
    six-legged one by copying the front legs halfway back (SDXL never draws six-legged mammals: Cinderfang, Woolly drudge).
    `--gait hop` gives critters a bounding gait instead of a trot. `--legs 2` rigs birds (alternating steps with a
    waddle; feet that overlap mid-stride are split front/back).
-   Worms and moths use `rig_special.py -- in.glb out.fbx --body worm|moth [--head ..] [--hover 4]`: a 10-bone spine
-   that slithers and rears to strike, or a flat moth (concept seen from above) with hinged flapping wings that hovers.
+   Worms and moths use `rig_special.py -- in.glb out.fbx --body worm|moth [--head ..] [--hover 4] [--stretch 1.4]`: a
+   10-bone spine that slithers and rears to strike, or a flat moth (concept seen from above) with hinged wings that beat
+   up and down together and hovers. `--stretch` makes a worm longer but stretches everything on it too (it smeared
+   Glacimaw's spikes into low fins); for a longer worm, rebuild its body instead, as Glacimaw's `gl_build.py`
+   (WildreachArt\out\glacimaw_v2) does: the image model's head kept, a new ringed body grown from the neck's edge with
+   crystal spikes and a pointed tail, painted into the right half of a texture twice as wide. Loose pieces automatic
+   weights skip take their nearest skin's weights. A worm lies flat and slithers like a snake (waves running back down
+   the body, head steady); `gl_build.py --flat` lays the body straight on the ground (the rig's clips make the curves).
+   `--head-info <npz>` (gl_build writes `<out>_head.npz`: the neck, and the lower jaw's weights, hinge and chin in the
+   model's own units) adds a rigid head bone and a jaw bone, so its bite lifts the front half, gapes, strikes and
+   snaps shut. Its clips' paces belong in creatures.json (`pace`): the script prints the wavelength.
+   Better clips onto that same skeleton (no new mesh, so LFS only grows by the clips):
+   `blender -b -P anim_creature.py -- out\<id>.fbx out\<id>_clips.fbx --id <id> [--build light|heavy] [--attack bite|ram]
+   [--hind-bend back|forward] [--preview <dir>] [--debug Walk:1,5,9]`. Feet stay planted while they bear weight (IK),
+   the body rises, rolls and sways with its legs, the head holds steady, the tail trails on springs, and attacks wind up,
+   strike in about a tenth of a second and recover. Gaits come from the creature's size and speeds in `creatures.json`
+   (walk / trot or amble / gallop by Froude number), strides from the legs' reach, so the clips play near rate 1 in game.
+   `--gait hop`: a hopper (Pumicehog) bounds at every speed instead, front paws landing together, then the hind feet.
+   `--lift 0.6` lowers the paws' clearance in the swing (Rimeclaw: at full lift its forearms swung up level).
+   `--motion barghest:<dir>` retargets the QuadrapedCreatures Barghest clips instead (exported to FBX from Unreal; the
+   pack has no trot, so at our wander speeds its walk runs fast). Import with `Tools/import_anims.py`
+   (`WR_ANIMS="...\<id>_clips.fbx=/Game/Creatures/<Name>/<id>_Skeleton=<id>V2_"`). Check the rig first: auto-weights on
+   a bad leg layout (three-quarter concepts; Cinderfang's rig took its tail tip for a foot) stretch the mesh whatever
+   the animation.
+   Front legs stand as straight columns under the shoulders and fold at the wrist, low on the leg (`rig_quadruped.py`
+   puts the front knee there; a fold halfway down the forearm reads as an extra joint); hind legs stand angled at the
+   hock and the back stays near level. A long-legged model can still fold above its real wrist: `--front-wrist 0.11`
+   puts the front knee at the top of the paw. But a long forearm on a short pastern then folds the paw right back up
+   in every swing (the leg can only shorten there): `--front-elbow` puts the joint at the elbow under the chest, apex
+   back, and `anim_creature.py` (it spots an elbow by its height) swings the forearm and paw as one straight piece,
+   the paw flat again to touch down (Cinderfang). Look at each side alone to see the legs and tail clearly
+   (`halves.py` in WildreachArt\out\cinderfang_v3 renders the y > 0 and y < 0 halves).
+   Fixing a model's shape while rigging (all on the mesh, before the bones go in):
+   `--mirror-leg x,y` replaces the leg standing at x,y with a mirror copy of the one opposite (Cinderfang's front right
+   was what was left of a sixth leg, rooted behind the shoulder); `--straighten-front` stands crooked front legs up as
+   columns (it moves the feet, so check the hips it then traces); `--legs-longer 1.2` / `--legs-thicker 1.15` (the body
+   rides up, so a deep chest stops meeting the front legs: Woolly drudge; raise its `halfHeight` by the same share to keep
+   its size); `--head-forward 0.09` brings a head jammed against the body out on a longer neck (Basaltback);
+   `--widen 1.3` for a body too narrow side to side (or `meshWiden` in `creatures.json`, no re-rig: Rimeshell).
+   To re-rig a model whose legs were fixed in an earlier rig, export that rig's mesh back to a GLB first
+   (`fbx_to_glb.py -- out\<id>.fbx out\<id>_4leg.glb`): an old `--drop-leg` spot stops matching once the foot finder
+   changes.
+   Detail the image models don't have: `blender -b -P bake_detail.py -- out\<id>.fbx out\<id>_detail --kind
+   scales|feathers|fur [--size 0.03] [--depth 1.5] [--aurora]` bakes a normal map and a groove-shaded colour texture on the
+   model's own UVs (Magmaw's scales, Snowpuff's feathers, the Aurora fox's fur; `--aurora` turns its hard green patches
+   back to pale fur under a soft teal-to-violet aurora). `Tools/art/creature_glow.py` imports them as
+   `<Name>_DetailColor / _DetailNormal` and builds the creature's material from them (`MI_<Name>Glow`, or
+   `MI_<Name>Skin` with no glow).
+   Hair the image models make as a lump of the body (a mane, a ruff): `blender -b -P hair_locks.py -- out\<id>.fbx
+   <mask.png> out\<id>_hair.fbx --face x,y,z [--count 1800] [--length 0.13] [--width 0.02] [--droop 0.7]
+   [--glb <preview.glb>]` grows locks over the rig where a mask on the model's UVs is white (a fix script writes it:
+   Rimeclaw's `rc_fix.py` saves its mane), combed out from the face and back, drooping at the tips; each takes the
+   colour and skin weights under its root, so make the clips from its output. Rimeclaw: 2200 locks, `--width 0.016
+   --length 0.14 --droop 1.1 --lift 0.08`, about 60k triangles on top of its 39k (wider, scattered locks came out like
+   ice shards). A tail: `--along "x,z x,z ..."` (its middle line in the rig's frame, root first: x from the box's
+   middle, z from the feet, in heights) combs each lock the way the line runs nearest it. Aurora fox: 3200 locks,
+   `--width 0.011 --length 0.09 --lift 0.12 --droop 0.35` (mask from its `af_tail.py`; 0.016 wide came out leafy).
 4. Import: `WR_IMPORTS="C:\...\out\a.fbx=A;C:\...\out\b.fbx=B"` then
    `UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script=Tools/import_creature.py`.
    The folder name lower-cased must equal the FBX name (`aurora_fox.fbx=Aurora_fox`). To replace a creature, move its
@@ -33,7 +88,14 @@ Batch flow (what the four-legged set used):
 
 Pack creatures (Fab, git-ignored): `node Tools/art/wire_pack_creatures.mjs` points Gloomhowl (Barghest), Scorchwing
 and Skaldrith (Mountain Dragon) at the pack meshes and animations, with tinted materials from
-`Tools/art/creature_tints.py` (`M_CreatureTint` + one instance each). Flyers can add `fly` / `hover` animations.
+`Tools/art/creature_tints.py` (`M_CreatureTint` + one instance each; `TwoTone` > 0 puts `TintLight` on the
+texture's lighter parts, from luminance `LightFrom` up: Skaldrith's frost white over glacier blue). Flyers can add
+`fly` / `hover` animations.
+`"nightGlow": N` in `creatures.json` raises the materials' `GlowStrength` to N as the daylight goes (Gloomhowl's eyes:
+its instance keeps `GlowStrength` 0, so it is dark by day).
+`"legs": [[upper, lower, foot], ...]` (4 or 6, front first, left then right; each bone the parent of the next) gives a
+pack skeleton the generated rigs' feet on slopes: the body tilts to the ground and each foot reaches its own (Skaldrith:
+`UpperArm / Forearm / Hand` in front, `Calf / HorseLink / Foot` behind, so the hock does the reaching).
 
 Props (static, no rig), e.g. the island trees:
 
@@ -52,7 +114,8 @@ Humanoids (player survivors, humanoid bosses), rigged and animated on mixamo.com
    pieces into one closed mesh, feet at the origin, real height) and `blender -b -P check_arms.py -- mixamo\x.fbx`
    (slices at chest height should show 3 shapes: arms clear of the body).
 2. Mixamo's page blocks fetching local files, so either Raven picks the file in the upload box, or a decimated copy goes
-   in through the page itself: `blender -b -P pack_for_page.py -- mixamo\x.fbx out\x_page.b64 2400`, then decode it in
+   in through the page itself: `blender -b -P pack_for_page.py -- mixamo\x.fbx out\x_page.b64 2400 <height>` (the same height given to
+   prep_mixamo: the rig comes back at the packed height and the full mesh is laid over it as is), then decode it in
    the page into an OBJ `File` and set it on the upload input. That only works if the upload dialog was opened with a real
    click, and `window.scrollTo(0, 0)` first (the page scrolls behind the dialog and throws the marker drags off).
    Keep every marker on the mesh (elbows especially). Turn "Use Symmetry" off when the body sits off the centre line

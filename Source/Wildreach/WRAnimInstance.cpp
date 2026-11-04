@@ -507,8 +507,26 @@ bool FWRAnimProxy::Evaluate(FPoseContext& Output)
 			Output.Pose[Bone].SetRotation((Parent.Inverse() * Step * Parent * Local).GetNormalized());
 		}
 	}
+	// Pose lifts: each bone turned nose-up about the body's side axis (in component space), its children following.
+	const FVector Side = FVector::CrossProduct(Frame.MeshForward, FVector::UpVector).GetSafeNormal();
+	for (const TPair<FName, float>& Lift : Frame.PoseLift)
+	{
+		const FCompactPoseBoneIndex Bone = WRAnimDetail::CompactBone(Bones, Lift.Key);
+		if (Bone.GetInt() == INDEX_NONE || Side.IsNearlyZero())
+		{
+			continue;
+		}
+		FQuat Parent = FQuat::Identity;
+		for (FCompactPoseBoneIndex P = Bones.GetParentBoneIndex(Bone); P.GetInt() != INDEX_NONE; P = Bones.GetParentBoneIndex(P))
+		{
+			Parent = Output.Pose[P].GetRotation() * Parent;
+		}
+		const FQuat Turn(Side, FMath::DegreesToRadians(Lift.Value));
+		Output.Pose[Bone].SetRotation((Parent.Inverse() * Turn * Parent * Output.Pose[Bone].GetRotation()).GetNormalized());
+	}
 	PlantFeet(Output.Pose);
 	PlaceCreatureFeet(Output.Pose);
+	PlaceCreatureSpine(Output.Pose);
 	return true;
 }
 
@@ -660,6 +678,56 @@ void FWRAnimProxy::PlaceCreatureFeet(FCompactPose& Pose) const
 	}
 }
 
+void FWRAnimProxy::PlaceCreatureSpine(FCompactPose& Pose) const
+{
+	// A legless creature on uneven ground (rig_special.py's worm). Spine.Ground is where the ground is under each joint
+	// (mesh space; the clip's ground is z = 0). The tail-end joint moves up or down to its ground, then each spine bone in
+	// turn swings (up to SpineMaxBend) so the joint at its far end sits as far over its own ground as the clip has it
+	// over flat ground: the body lies along a slope or over a crest, and whatever the clip lifts (a rearing strike) rises
+	// from the ground under it. The head comes with the last spine bone.
+	const FWRCreatureSpine& S = Frame.Spine;
+	const int32 N = FMath::Min(Frame.CreatureSpine.Num(), FWRCreatureSpine::MaxJoints);
+	if (N < 3 || S.Alpha <= 0.001f)
+	{
+		return;
+	}
+	const FBoneContainer& Bones = Pose.GetBoneContainer();
+	FCompactPoseBoneIndex Joint[FWRCreatureSpine::MaxJoints];
+	FVector Clip[FWRCreatureSpine::MaxJoints];
+	for (int32 i = 0; i < N; ++i)
+	{
+		Joint[i] = WRAnimDetail::CompactBone(Bones, Frame.CreatureSpine[i]);
+		if (Joint[i].GetInt() == INDEX_NONE)
+		{
+			return;  // a lower LOD without them
+		}
+		Clip[i] = WRAnimDetail::PoseCS(Pose, Joint[i]).GetLocation();
+	}
+	const FCompactPoseBoneIndex Above = Bones.GetParentBoneIndex(Joint[0]);
+	FTransform ParentCS = Above.GetInt() == INDEX_NONE ? FTransform::Identity : WRAnimDetail::PoseCS(Pose, Above);
+	FTransform CS = Pose[Joint[0]] * ParentCS;
+	CS.AddToTranslation(FVector(0.f, 0.f, S.Ground[0] * S.Alpha));
+	const float MaxBend = FMath::DegreesToRadians(Frame.SpineMaxBend);
+	for (int32 i = 0; i + 1 < N; ++i)
+	{
+		const FVector Start = CS.GetLocation();
+		const FVector From = (Pose[Joint[i + 1]] * CS).GetLocation() - Start;
+		const FVector To = Clip[i + 1] + FVector(0.f, 0.f, S.Ground[i + 1] * S.Alpha) - Start;
+		FQuat Turn = FQuat::FindBetweenVectors(From, To);
+		FVector Axis;
+		float Angle = 0.f;
+		Turn.ToAxisAndAngle(Axis, Angle);
+		if (Angle > MaxBend)
+		{
+			Turn = FQuat(Axis, MaxBend);
+		}
+		CS.SetRotation((Turn * CS.GetRotation()).GetNormalized());
+		Pose[Joint[i]] = CS.GetRelativeTransform(ParentCS);
+		ParentCS = CS;
+		CS = Pose[Joint[i + 1]] * ParentCS;
+	}
+}
+
 // ---------------------------------------------------------------- channels
 
 void UWRAnimInstance::FChannel::Play(UAnimSequenceBase* Clip, float Rate, bool bLoop, bool bHold, float Start, float Delay, bool bInstant)
@@ -793,6 +861,8 @@ void UWRAnimInstance::ResetSetup()
 	SpineBones.Reset();
 	LegBones.Reset();
 	CreatureLegs.Reset();
+	CreatureSpine.Reset();
+	PoseLift.Reset();
 	YawOffset = 0.f;
 	bHaveYaw = false;
 	bTurning = false;
@@ -915,6 +985,41 @@ void UWRAnimInstance::SetCreatureLegs(const TArray<FWRCreatureLeg>& Legs)
 {
 	CreatureLegs = Legs.Num() >= 4 && Legs.Num() <= FWRCreatureFeet::MaxLegs ? Legs : TArray<FWRCreatureLeg>();
 	Input.Feet = FWRCreatureFeet();
+}
+
+void UWRAnimInstance::SetCreatureSpine(const TArray<FName>& Joints)
+{
+	CreatureSpine = Joints.Num() >= 3 && Joints.Num() <= FWRCreatureSpine::MaxJoints ? Joints : TArray<FName>();
+	Input.Spine = FWRCreatureSpine();
+}
+
+TArray<FName> UWRAnimInstance::FindCreatureSpine(const FReferenceSkeleton& Ref)
+{
+	TArray<FName> Joints;
+	int32 Prev = INDEX_NONE;
+	for (int32 i = 1; i < FWRCreatureSpine::MaxJoints; ++i)
+	{
+		const int32 Bone = Ref.FindBoneIndex(FName(*FString::Printf(TEXT("spine%d"), i)));
+		if (Bone == INDEX_NONE || (Prev != INDEX_NONE && Ref.GetParentIndex(Bone) != Prev))
+		{
+			break;
+		}
+		Joints.Add(Ref.GetBoneName(Bone));
+		Prev = Bone;
+	}
+	if (Joints.Num() < 3 || FindCreatureLegs(Ref).Num() > 0)
+	{
+		return {};
+	}
+	for (int32 Bone = Prev + 1; Bone < Ref.GetNum(); ++Bone)
+	{
+		if (Ref.GetParentIndex(Bone) == Prev)
+		{
+			Joints.Add(Ref.GetBoneName(Bone));  // the head: the last spine bone's far end
+			break;
+		}
+	}
+	return Joints;
 }
 
 TArray<FWRCreatureLeg> UWRAnimInstance::FindCreatureLegs(const FReferenceSkeleton& Ref)
@@ -1290,7 +1395,11 @@ void UWRAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Frame.FootLift[1] = Input.FootLift[1];
 	Frame.CreatureLegs = CreatureLegs;
 	Frame.Feet = Input.Feet;
+	Frame.CreatureSpine = CreatureSpine;
+	Frame.Spine = Input.Spine;
+	Frame.SpineMaxBend = WRTune(TEXT("anim.creatureSpine.maxBend"), 35.f);
 	Frame.MeshForward = MeshForward;
+	Frame.PoseLift = PoseLift;
 	if (CreatureLegs.Num() > 0)
 	{
 		const FWRTuning& T = FWRTuning::Get();

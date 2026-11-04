@@ -2,18 +2,25 @@
 # (old and new clips, two creatures) can be laid side by side. A standalone game (no server) on L_CreatureStage (a flat
 # floor beside a 20 degree ramp: Tools\make_map.ps1 stage), daytime, nothing else around. The game runs on a fixed time
 # step (-UseFixedTimeStep -FPS=30 -FixedSeed): each frame is exactly 1/30 s of game time however long it takes to draw
-# and save, and every frame is saved (WRRecord). The creature's brain is off (WRCreatureDrive and the rest); the camera
-# frames it by its size (WRArtCam):
+# and save (WRRecord). The creature's brain is off (WRCreatureDrive and the rest); the camera frames it by its size
+# (WRArtCam):
 #    0.0 s  idle, side-on                            10.8  bite, 12.4 bite (standing)
 #    3.0    walk +X 4 s (0.4 x its speed)             14.0  turns on the spot to face up the ramp (camera held)
 #    7.0    run +X 3 s (its full speed)               15.2  walks up the ramp 4 s, camera from behind its right (110)
 #   10.0    stops                                     19.8  flinch, 20.8 flinch, 22.0 dies, held to the end (25.2)
-# Frames land in -Out as f0000.png ... with timing.csv (world time of every frame) and sheet.png (every -SheetEvery-th
-# frame, labelled). Prints the frame count, where they are, and whether every frame step was 1/30 s.
-#   creaturevideo.ps1 -Creature woolly_drudge [-Out <dir>] [-Res 1280x720] [-SheetEvery 30] [-MotionBlur]
+# Only some frames are saved (-Keep, windows "first-last/step" of frame numbers; a frame number is always its time x 30):
+# by default the idle every second, the walk and run every half second with a steady stretch of each at every 2nd frame
+# (f126-161 walking, f234-257 running), the bites every 4th, and the turn, ramp, flinches and death every 20th: about
+# 90 frames of the 756 played (every frame was ~1 GB and most of it a held pose). -Keep all saves every frame.
+# Frames land in -Out as f0000.png ... with timing.csv (world time of every frame played, and whether it was saved) and
+# sheet.png (a frame from every -SheetEvery frames, labelled). Prints the frame count, where they are, and whether every
+# frame step was 1/30 s.
+#   creaturevideo.ps1 -Creature woolly_drudge [-Out <dir>] [-Res 1280x720] [-SheetEvery 30] [-MotionBlur] [-Keep all]
 #                     [-Tune anim.creatureFeet.enabled:0]   (tuning overrides for the run, e.g. feet IK off to compare)
+#                     [-RampCam 90]   (the angle it is filmed from going up the ramp: 110 behind its right, 90 side-on)
 param([Parameter(Mandatory = $true)][string]$Creature, [string]$Out = '', [string]$Res = '1280x720', [int]$SheetEvery = 30,
-	[string]$Map = '/Game/Maps/L_CreatureStage', [switch]$MotionBlur, [string]$Tune = '', [int]$TimeoutSeconds = 0)
+	[string]$Map = '/Game/Maps/L_CreatureStage', [switch]$MotionBlur, [string]$Tune = '', [int]$TimeoutSeconds = 0, [double]$RampCam = 110,
+	[string]$Keep = '0-89/30,90-209/15,126-161/2,210-299/15,234-257/2,300-323/12,324-419/4,420-755/20')
 $ErrorActionPreference = 'Stop'
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -42,7 +49,7 @@ $steps = @(
 	@(@("WRCreatureAttack $c"), 1.6),                                             # bite
 	@(@("WRCreatureAttack $c"), 1.6),                                             # bite
 	@(@('WRArtCamFix 1', "WRCreatureFace $c -90"), 1.2),                          # turn to the ramp (camera held)
-	@(@('WRArtCamFix 0', "WRArtCam $c 110", "WRCreatureDrive $c -90 4 0.4"), 4.0),  # up the ramp, three-quarter from behind its right side
+	@(@('WRArtCamFix 0', "WRArtCam $c $RampCam", "WRCreatureDrive $c -90 4 0.4"), 4.0),  # up the ramp, three-quarter from behind its right side
 	@(@(), 0.6),                                                                  # stop on the slope
 	@(@("WRCreatureFlinch $c"), 1.0),                                             # flinch
 	@(@("WRCreatureFlinch $c"), 1.2),                                             # flinch
@@ -50,10 +57,22 @@ $steps = @(
 )
 $seconds = ($steps | ForEach-Object { $_[1] } | Measure-Object -Sum).Sum
 $frames = [int][Math]::Ceiling($seconds * $fps)
+# The frames that are saved (WRRecord's rule): in any window, on its step.
+if ($Keep -eq 'all') { $Keep = '' }
+$windows = @(foreach ($win in ($Keep -split ',' | Where-Object { $_ })) {
+	$range, $step = $win -split '/'
+	$first, $last = $range -split '-'
+	if (-not $last) { $last = $first }
+	, @([int]$first, [int]$last, [Math]::Max(1, [int]$(if ($step) { $step } else { 1 })))
+})
+$kept = @(for ($i = 0; $i -lt $frames; $i++) {
+	if (-not $windows.Count -or @($windows | Where-Object { $i -ge $_[0] -and $i -le $_[1] -and ($i - $_[0]) % $_[2] -eq 0 }).Count) { $i }
+})
+$record = "WRRecord $prefix $frames $w $h" + $(if ($Keep) { " $Keep" } else { '' })
 # Setup: the filmer out of sight, a clean stage, mid-morning sun from behind the cameras; the creature in, its brain off,
 # settled on the floor (and its feet on it) before the first frame.
 $cmds = @('WRBotPause 1', 'wr.CreatureFeetLog 1', 'wait 1', 'WRHideMe 1', 'WRTeleport -2500 2500', 'wait 1', 'WRClearCreatures', 'WRHour 10', 'wait 3',
-	"WRSpawnAt $c 0 0", "WRCreatureFace $c 0", 'wait 3', "WRArtCam $c 90", 'wait 2', "WRRecord $prefix $frames $w $h")
+	"WRSpawnAt $c 0 0", "WRCreatureFace $c 0", 'wait 3', "WRArtCam $c 90", 'wait 2', $record)
 foreach ($s in $steps) { $cmds += $s[0]; $cmds += "wait $($s[1])" }
 $cmds += 'wait 2'
 
@@ -63,14 +82,14 @@ if ($Tune) { $exec += " -wrtune=$Tune" }
 $gameArgs = "`"$project`" ${Map}?WRName=${name} -game -windowed -ResX=$w -ResY=$h -unattended -nosound -nosplash -wrbot -wrworld=creaturevideo " +
 	"-UseFixedTimeStep -FPS=$fps -FixedSeed $exec `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\game.log`""
 $game = Start-Process $ue -ArgumentList $gameArgs -PassThru
-"recording $Creature ($frames frames, ${w}x$h) - game pid $($game.Id), log $logs\game.log"
+"recording $Creature ($frames frames, $($kept.Count) saved, ${w}x$h) - game pid $($game.Id), log $logs\game.log"
 $pattern = "$prefix*.png"
-$deadline = (Get-Date).AddSeconds($(if ($TimeoutSeconds -gt 0) { $TimeoutSeconds } else { 240 + $frames * 1.5 }))
+$deadline = (Get-Date).AddSeconds($(if ($TimeoutSeconds -gt 0) { $TimeoutSeconds } else { 240 + $frames * 0.2 + $kept.Count * 1.5 }))
 $done = $false
 while ((Get-Date) -lt $deadline -and -not $game.HasExited) {
 	Start-Sleep -Seconds 3
 	$have = @(Get-ChildItem $shotDir -Filter $pattern -ErrorAction SilentlyContinue).Count
-	if ($have -ge $frames -and (Test-Path (Join-Path $shotDir "${prefix}timing.csv"))) { Start-Sleep -Seconds 3; $done = $true; break }
+	if ($have -ge $kept.Count -and (Test-Path (Join-Path $shotDir "${prefix}timing.csv"))) { Start-Sleep -Seconds 3; $done = $true; break }
 }
 if (-not $game.HasExited) { Stop-Process -Id $game.Id -Force }
 Start-Sleep -Seconds 2
@@ -99,10 +118,12 @@ if (Test-Path (Join-Path $Out 'timing.csv')) {
 		([double]$rows[-1].world_seconds - [double]$rows[0].world_seconds), $real
 }
 
-# Contact sheet: every SheetEvery-th frame, labelled with its number and time.
+# Contact sheet: the first saved frame of every SheetEvery frames, labelled with its number and time.
 if ($moved -gt 0 -and $SheetEvery -gt 0) {
 	Add-Type -AssemblyName System.Drawing
-	$picks = @(for ($i = 0; $i -lt $frames; $i += $SheetEvery) { $i }) | Where-Object { Test-Path (Join-Path $Out ('f{0:D4}.png' -f $_)) }
+	$picks = @(for ($i = 0; $i -lt $frames; $i += $SheetEvery) {
+		$kept | Where-Object { $_ -ge $i -and $_ -lt $i + $SheetEvery -and (Test-Path (Join-Path $Out ('f{0:D4}.png' -f $_))) } | Select-Object -First 1
+	})
 	$tw = 384; $th = [int]($tw * $h / $w); $cols = 6; $rowsN = [Math]::Ceiling($picks.Count / $cols)
 	$sheet = New-Object System.Drawing.Bitmap ($tw * $cols), ($th * $rowsN)
 	$g = [System.Drawing.Graphics]::FromImage($sheet)
@@ -125,7 +146,7 @@ $errors = @(Select-String -Path "$logs\game.log" -Pattern 'Error:|Ensure conditi
 if ($errors) { "game errors:"; $errors | ForEach-Object { '  ' + $_.Line.Trim() } }
 $said = @(Select-String -Path "$logs\game.log" -Pattern 'CMD .*creature(attack|hp) .*|RECORD (start|done).*' -ErrorAction SilentlyContinue | ForEach-Object { '  ' + ($_.Line -replace '^.*?(CMD|RECORD)', '$1') })
 $said
-"{0} of {1} frames in {2} (f0000.png ...; sheet.png every {3}th; timing.csv)" -f $moved, $frames, $Out, $SheetEvery
+"{0} of {1} saved frames ({2} played) in {3} (f0000.png ...; sheet.png every {4}th; timing.csv)" -f $moved, $kept.Count, $frames, $Out, $SheetEvery
 $timing
 "log: $logs\game.log"
-if ($moved -lt $frames) { exit 1 }
+if ($moved -lt $kept.Count) { exit 1 }

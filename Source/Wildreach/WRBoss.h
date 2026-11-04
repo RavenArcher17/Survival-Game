@@ -123,6 +123,8 @@ public:
 	virtual void OnDamageTaken(const FWRHit& Hit, float Damage) override;
 	virtual void NotifyAttackedBy(AActor* Attacker) override;
 	virtual FString GetDisplayLabel() const override;
+	/** Test control (WRCreatureAttack, Tools\creaturevideo.ps1): its next attack clip where it stands; no telegraph, no hit. */
+	virtual bool TestAttack() override;
 
 	bool IsMajor() const { return bMajor; }
 

@@ -290,7 +290,12 @@ void UWRGA_Melee::Sweep()
 		return;
 	}
 	const FWRTuning& T = FWRTuning::Get();
-	const float Reach = T.Num(TEXT("weapon.reach"), 220.f);
+	float Reach = T.Num(TEXT("weapon.reach"), 220.f);
+	// A creature bites from as far as it starts biting (its attackRange): a big one's jaws are well past a weapon's reach.
+	if (const AWRCreature* Creature = Cast<AWRCreature>(Character); Creature && Creature->GetDef())
+	{
+		Reach = FMath::Max(Reach, Creature->GetDef()->AttackRange);
+	}
 	const float Radius = T.Num(TEXT("weapon.sweepRadius"), 45.f);
 	const FVector Start = Character->GetActorLocation();
 	const FVector End = Start + Character->GetActorForwardVector() * Reach;

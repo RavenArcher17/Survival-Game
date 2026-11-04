@@ -445,6 +445,35 @@ void AWRPlayerController::UpdateArtCam(float DeltaTime)
 	// Far enough to fit the whole creature, a little above it, swinging with its facing so the angle stays put.
 	FVector Origin, Extent;
 	Target->GetActorBounds(true, Origin, Extent);
+	// A creature's art, not its capsule: a moth's wings or a boss's arms reach well past it.
+	// (The visible one with a model: a creature also carries the character's own empty mesh.)
+	const USkeletalMeshComponent* Art = nullptr;
+	if (Target->IsA<AWRCreature>())
+	{
+		TInlineComponentArray<USkeletalMeshComponent*> Meshes(Target);
+		for (const USkeletalMeshComponent* M : Meshes)
+		{
+			Art = !Art && M->IsVisible() && M->GetSkeletalMeshAsset() ? M : Art;
+		}
+	}
+	if (Art)
+	{
+		// The model's own size (the physics bodies can be far smaller, a moth's wings have none), carried along as far as
+		// the animation moves its bones off their rest places (a moth hovers well above where its model rests).
+		const FBoxSphereBounds Model = Art->GetSkeletalMeshAsset()->GetImportedBounds().TransformBy(Art->GetComponentTransform());
+		const FReferenceSkeleton& Ref = Art->GetSkeletalMeshAsset()->GetRefSkeleton();
+		TArray<FTransform> RefCS;
+		RefCS.SetNum(Ref.GetNum());
+		FVector Moved = FVector::ZeroVector;
+		for (int32 Bone = 0; Bone < Ref.GetNum(); ++Bone)
+		{
+			const int32 Parent = Ref.GetParentIndex(Bone);
+			RefCS[Bone] = Parent == INDEX_NONE ? Ref.GetRefBonePose()[Bone] : Ref.GetRefBonePose()[Bone] * RefCS[Parent];
+			Moved += Art->GetBoneLocation(Ref.GetBoneName(Bone)) - Art->GetComponentTransform().TransformPosition(RefCS[Bone].GetLocation());
+		}
+		Origin = Model.Origin + Moved / FMath::Max(1, Ref.GetNum());
+		Extent = Model.BoxExtent;
+	}
 	const float Size = FMath::Max3(Extent.X, Extent.Y, Extent.Z);
 	if (bArtCamFixed && DeltaTime > 0.f)
 	{
@@ -456,7 +485,8 @@ void AWRPlayerController::UpdateArtCam(float DeltaTime)
 	const float WantAngle = Target->GetActorRotation().Yaw + ArtCamYaw;
 	ArtCamAngle = DeltaTime > 0.f ? ArtCamAngle + FMath::FInterpTo(0.f, FMath::FindDeltaAngleDegrees(ArtCamAngle, WantAngle), DeltaTime, 4.f) : WantAngle;
 	const FVector Dir = FRotator(0.f, ArtCamAngle, 0.f).Vector();
-	FVector Goal = Origin + Dir * (Size * 3.2f + 150.f) + FVector(0.f, 0.f, Size * 0.6f);
+	const float Back = Size * WRTune(TEXT("artCam.sizes"), 3.2f) + WRTune(TEXT("artCam.extra"), 150.f);  // videos frame tighter
+	FVector Goal = Origin + Dir * Back + FVector(0.f, 0.f, Size * 0.6f);
 	// Never in the ground: on a slope the side it looks from can be higher than the creature stands.
 	FHitResult Ground;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRArtCam), false, Target);
@@ -966,6 +996,11 @@ void AWRPlayerController::WRArtCamFix(int32 bFix)
 	bArtCamFixed = bFix != 0;
 }
 
+void AWRPlayerController::WRTuneSet(const FString& Path, float Value)
+{
+	FWRTuning::Get().Set(Path, Value);
+}
+
 void AWRPlayerController::WRShotSeq(const FString& Prefix, int32 Count, float Every)
 {
 	ShotSeqPrefix = Prefix;
@@ -975,14 +1010,33 @@ void AWRPlayerController::WRShotSeq(const FString& Prefix, int32 Count, float Ev
 	ShotSeqNext = BotClock;
 }
 
-void AWRPlayerController::WRRecord(const FString& Prefix, int32 Frames, int32 Width, int32 Height)
+void AWRPlayerController::WRRecord(const FString& Prefix, int32 Frames, int32 Width, int32 Height, const FString& Keep)
 {
 	RecordPrefix = Prefix.IsEmpty() ? FString(TEXT("rec_")) : Prefix;
 	RecordFrame = 0;
+	RecordSaved = 0;
 	RecordFrames = FMath::Max(0, Frames);
 	RecordSize = FIntPoint(FMath::Clamp(Width, 64, 7680), FMath::Clamp(Height, 64, 4320));
+	// "first-last/step,...": the windows of frames that are saved (most of a performance is a still pose)
+	RecordKeep.Reset();
+	TArray<FString> Windows;
+	Keep.ParseIntoArray(Windows, TEXT(","));
+	for (const FString& W : Windows)
+	{
+		FString Range, Step, First, Last;
+		if (!W.Split(TEXT("/"), &Range, &Step))
+		{
+			Range = W;
+			Step = TEXT("1");
+		}
+		if (!Range.Split(TEXT("-"), &First, &Last))
+		{
+			First = Last = Range;
+		}
+		RecordKeep.Add(FIntVector(FCString::Atoi(*First), FCString::Atoi(*Last), FMath::Max(1, FCString::Atoi(*Step))));
+	}
 	RecordTimes.Reset();
-	RecordTimes.Add(TEXT("frame,world_seconds,world_delta,engine_delta,real_seconds"));
+	RecordTimes.Add(TEXT("frame,world_seconds,world_delta,engine_delta,real_seconds,saved"));
 	RecordRealStart = FPlatformTime::Seconds();
 	if (MyHUD && RecordFrames > 0)
 	{
@@ -1007,9 +1061,18 @@ void AWRPlayerController::TickRecord()
 	{
 		RecordWorldStart = Now;
 	}
-	ConsoleCommand(FString::Printf(TEXT("HighResShot %dx%d filename=%s%04d"), RecordSize.X, RecordSize.Y, *RecordPrefix, RecordFrame));
-	RecordTimes.Add(FString::Printf(TEXT("%d,%.6f,%.6f,%.6f,%.3f"), RecordFrame, Now, Delta, FApp::GetDeltaTime(), FPlatformTime::Seconds() - RecordRealStart));
-	UE_LOG(LogWildreach, Log, TEXT("RECORD frame %d world %.4f dt %.5f"), RecordFrame, Now, Delta);
+	bool bSave = RecordKeep.IsEmpty();
+	for (const FIntVector& W : RecordKeep)
+	{
+		bSave |= RecordFrame >= W.X && RecordFrame <= W.Y && (RecordFrame - W.X) % W.Z == 0;
+	}
+	if (bSave)
+	{
+		ConsoleCommand(FString::Printf(TEXT("HighResShot %dx%d filename=%s%04d"), RecordSize.X, RecordSize.Y, *RecordPrefix, RecordFrame));
+		++RecordSaved;
+	}
+	RecordTimes.Add(FString::Printf(TEXT("%d,%.6f,%.6f,%.6f,%.3f,%d"), RecordFrame, Now, Delta, FApp::GetDeltaTime(), FPlatformTime::Seconds() - RecordRealStart, bSave ? 1 : 0));
+	UE_LOG(LogWildreach, Log, TEXT("RECORD frame %d world %.4f dt %.5f%s"), RecordFrame, Now, Delta, bSave ? TEXT(" saved") : TEXT(""));
 	RecordLastTime = Now;
 	if (++RecordFrame < RecordFrames)
 	{
@@ -1027,8 +1090,8 @@ void AWRPlayerController::TickRecord()
 	}
 	const FString Csv = RecordPrefix.Contains(TEXT("/")) ? RecordPrefix + TEXT("timing.csv") : FPaths::ScreenShotDir() / RecordPrefix + TEXT("timing.csv");
 	FFileHelper::SaveStringToFile(FString::Join(RecordTimes, TEXT("\n")) + TEXT("\n"), *Csv);
-	UE_LOG(LogWildreach, Log, TEXT("RECORD done %s: %d frames over %.3f s of world time, frame step %.5f..%.5f s, %.1f s real (timing: %s)"), *RecordPrefix, RecordFrames,
-		Now - RecordWorldStart, RecordFrames > 2 ? MinDt : 0.0, MaxDt, FPlatformTime::Seconds() - RecordRealStart, *Csv);
+	UE_LOG(LogWildreach, Log, TEXT("RECORD done %s: %d frames (%d saved) over %.3f s of world time, frame step %.5f..%.5f s, %.1f s real (timing: %s)"), *RecordPrefix,
+		RecordFrames, RecordSaved, Now - RecordWorldStart, RecordFrames > 2 ? MinDt : 0.0, MaxDt, FPlatformTime::Seconds() - RecordRealStart, *Csv);
 	if (MyHUD)
 	{
 		MyHUD->bShowHUD = bRecordHUDWas;

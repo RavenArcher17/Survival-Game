@@ -2,9 +2,9 @@
 Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="Tools/art/creature_tints.py"
 
   /Game/Creatures/M_CreatureTint   master: pack textures, desaturated, tinted, brightened; glow from the illum map.
-  MI_Gloomhowl   Barghest, pale grey and eyeless (no glow).
+  MI_Gloomhowl   Barghest, grey; its red irises glow at night (GlowStrength 0 here: creatures.json nightGlow raises it).
   MI_Scorchwing  Mountain Dragon, ember red with glowing markings.
-  MI_Skaldrith   Mountain Dragon, ice blue with a cold glow.
+  MI_Skaldrith   Mountain Dragon, glacier blue scales, frost white on the lighter parts, cyan glowing markings.
 """
 import unreal
 
@@ -58,9 +58,23 @@ def build_master():
     link(base_t, desat, "A")
     link(lum, desat, "B")
     link(scalar("Desaturation", 1.0), desat, "Alpha")
+    # Two tones: Tint on the texture's darker parts, TintLight on its lighter ones (luminance from LightFrom up, over
+    # 1 / TwoTone); TwoTone 0 (the default) is one tint.
+    tone = expr(unreal.MaterialExpressionSubtract)
+    link(lum, tone, "A")
+    link(scalar("LightFrom", 0.0), tone, "B")
+    tone_k = expr(unreal.MaterialExpressionMultiply)
+    link(tone, tone_k, "A")
+    link(scalar("TwoTone", 0.0), tone_k, "B")
+    tone_s = expr(unreal.MaterialExpressionSaturate)
+    link(tone_k, tone_s)
+    mix = expr(unreal.MaterialExpressionLinearInterpolate)
+    link(vector("Tint", (1, 1, 1)), mix, "A")
+    link(vector("TintLight", (1, 1, 1)), mix, "B")
+    link(tone_s, mix, "Alpha")
     tinted = expr(unreal.MaterialExpressionMultiply)
     link(desat, tinted, "A")
-    link(vector("Tint", (1, 1, 1)), tinted, "B")
+    link(mix, tinted, "B")
     bright = expr(unreal.MaterialExpressionMultiply)
     link(tinted, bright, "A")
     link(scalar("Brightness", 1.0), bright, "B")
@@ -100,10 +114,11 @@ dragon = {"BaseColorTex": Q + "MountainDragon/Textures/T_MOUNTAIN_DRAGON_ALBEDO"
 instance("/Game/Creatures/Gloomhowl/MI_Gloomhowl",
          {"BaseColorTex": Q + "Barghest/Textures/BARGHEST_BaseColor", "NormalTex": Q + "Barghest/Textures/BARGHEST_NRM_2_Yinv",
           "GlowTex": Q + "Barghest/Textures/BARGHEST_ILLUM"},
-         {"Desaturation": 1.0, "Brightness": 3.2, "GlowStrength": 0.0, "Roughness": 0.75}, {"Tint": (0.86, 0.88, 0.9)})
+         {"Desaturation": 1.0, "Brightness": 3.2, "GlowStrength": 0.0, "Roughness": 0.75}, {"Tint": (0.86, 0.88, 0.9), "GlowColor": (1, 1, 1)})
 instance("/Game/Creatures/Scorchwing/MI_Scorchwing", dragon,
          {"Desaturation": 0.75, "Brightness": 1.1, "GlowStrength": 1.5, "Roughness": 0.6},
          {"Tint": (1.0, 0.32, 0.12), "GlowColor": (1.0, 0.4, 0.05)})
+# (a faint single blue washed out grey in the game sun: glacier blue scales, frost-white on the lighter parts)
 instance("/Game/Creatures/Skaldrith/MI_Skaldrith", dragon,
-         {"Desaturation": 1.0, "Brightness": 1.9, "GlowStrength": 1.0, "Roughness": 0.45},
-         {"Tint": (0.72, 0.86, 1.0), "GlowColor": (0.35, 0.7, 1.0)})
+         {"Desaturation": 1.0, "Brightness": 2.1, "GlowStrength": 3.0, "Roughness": 0.55, "LightFrom": 0.18, "TwoTone": 3.5},
+         {"Tint": (0.38, 0.62, 1.0), "TintLight": (0.88, 0.96, 1.0), "GlowColor": (0.3, 0.8, 1.0)})

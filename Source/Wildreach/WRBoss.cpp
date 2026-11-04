@@ -918,8 +918,26 @@ void AWRBoss::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (HasAuthority() && IsAlive())
 	{
+		// A boss's brain is a plain AI controller (not AWRCreatureAI, which runs test control for creatures): the dev
+		// commands (WRCreatureDrive and the rest, creature films) are run here, and it doesn't fight meanwhile.
+		if (IsTestControlled())
+		{
+			TickTestControl(DeltaSeconds);
+			return;
+		}
 		TickCombat(DeltaSeconds);
 	}
+}
+
+bool AWRBoss::TestAttack()
+{
+	if (!IsAlive())
+	{
+		return false;
+	}
+	TestFace(GetActorRotation().Yaw);
+	PlaySwing(EWRSwingKind::Heavy, 1.2f);  // its attack clips in turn (attack, attack2, attack3)
+	return true;
 }
 
 void AWRBoss::TickCombat(float DeltaSeconds)

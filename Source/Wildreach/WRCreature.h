@@ -57,12 +57,17 @@ struct FWRCreatureDef
 	TArray<FString> Materials;    // per-slot overrides ("" keeps the mesh's own), e.g. a tinted pack creature
 	float MeshYaw = 0.f;
 	float MeshScale = 1.f;        // multiplier on the auto fit
+	float MeshWiden = 1.f;        // extra scale side to side only
 	float Glow = 0.f;             // > 0, no mesh: a glowing orb (emissive sphere in its colour + a light this bright)
+	float NightGlow = 0.f;        // > 0: its materials' GlowStrength rises to this as the daylight goes (a night hunter's eyes)
+	TArray<FName> LegBones;       // a pack skeleton's legs for uneven ground: upper, lower, foot of each (front first, left then right)
 	// Animation overrides (0 / None: measured from the clips, see UWRAnimInstance).
 	float WalkPace = 0.f;         // cm/s the walk clip covers at play rate 1
 	float RunPace = 0.f;
 	float StrikeAt = 0.f;         // where in the attack clip (0..1) the bite lands
-	FName AnimUpper;              // bone the attack / hit layer starts from (its subtree), so running legs keep running
+	bool bOwnWindup = false;      // its attack clip rears up on its own (Glacimaw lifts its front half): no telegraph rear-back
+	FName AnimUpper;             // bone the attack / hit layer starts from (its subtree), so running legs keep running
+	TArray<TPair<FName, float>> PoseLift;  // bones turned nose-up by these degrees over every clip (a head held low)
 
 	bool CanTameBy(FName Method) const { return TamingMethods.Contains(Method); }
 	float TameSeconds() const;
@@ -125,6 +130,9 @@ public:
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.f, bool bForce = false) override;
 
 	const FWRCreatureDef* GetDef() const { return FWRCreatureRegistry::Get().Find(CreatureId); }
+	/** Where a spit leaves it: its art's head bone if it has one (a long worm's head is metres ahead of its middle),
+	 *  else the front of its capsule, halfway up. */
+	FVector MouthLocation() const;
 	AActor* GetAggroTarget() const { return AggroTarget.Get(); }
 	void SetAggroTarget(AActor* Target) { AggroTarget = Target; }
 	FVector GetHome() const { return Home; }
@@ -190,8 +198,8 @@ public:
 	/** Stand still, turning on the spot (at its own turn rate) to face world Yaw. */
 	void TestFace(float Yaw);
 	/** Its basic bite as a real one looks (wind-up glow, call, clip, through its bite ability), standing where it is,
-	 *  no target needed. False if it can't bite now. */
-	bool TestAttack();
+	 *  no target needed. False if it can't bite now. (A boss swings its next attack clip instead.) */
+	virtual bool TestAttack();
 	/** A hit reaction, no damage. */
 	void TestFlinch();
 	/** Back under its brain. */
@@ -291,6 +299,10 @@ private:
 	FRotator SkelBaseRotation = FRotator::ZeroRotator;
 	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> TelegraphGlow;
 	UPROPERTY(Transient) TObjectPtr<class UMeshComponent> TelegraphMesh;
+	/** nightGlow: its override materials as dynamic instances, their GlowStrength following the dark (0 by day and dead). */
+	void TickNightGlow();
+	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> NightGlowMats;
+	float NightGlowNow = -1.f;
 	float LastYaw = 0.f;      // for its turn rate (feet step while it turns on the spot)
 	float EarshotClock = 0.f;
 	class UWRAnimInstance* CreatureAnim() const;

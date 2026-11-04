@@ -1,8 +1,10 @@
 # Art check: spawn each creature in its own corner of the combat arena and screenshot it with WRArtCam
 # (front three-quarter, then side-on profile while it moves).
-#   powershell -File Tools\creatureshots.ps1 magmaw basaltback ...
+#   powershell -File Tools\creatureshots.ps1 magmaw basaltback ... [-Hour 21] [-Still]
+# -Hour sets the clock first (night shows glowing parts); -Still holds each creature still with its AI off (no attacks
+# or wind-up tint in the shots) and hides the survivor taking them.
 # Shots land in Saved\Screenshots\ in creature order (two per creature); the paths are printed at the end.
-param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Ids)
+param([double]$Hour = -1, [switch]$Still, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Ids)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $shotDir = Join-Path (Split-Path $project) 'Saved\Screenshots'
@@ -13,10 +15,13 @@ New-Item -ItemType Directory -Force $out | Out-Null
 # 3x3 grid, 4500 apart: farther than any aggro radius, so earlier spawns stay out of later shots.
 $spots = foreach ($y in -4500, 0, 4500) { foreach ($x in -4500, 0, 4500) { "$x $y" } }
 $cmds = @('WRBotPause 1', 'wait 2')
+if ($Hour -ge 0) { $cmds += "WRHour $Hour", 'wait 2' }
+if ($Still) { $cmds += 'WRHideMe 1' }
 for ($i = 0; $i -lt $Ids.Count; $i++) {
 	$id = $Ids[$i]
+	$hold = if ($Still) { "WRCreatureFace $id 0" } else { 'wait 0' }
 	# HighResShot captures on the next rendered frame, so wait before changing the camera again.
-	$cmds += "WRTeleport $($spots[$i % 9])", 'wait 1', 'WRHeal', "WRSpawn $id 1", 'wait 1', "WRArtCam $id 60", 'wait 1', 'HighResShot 1600x900', 'wait 1',
+	$cmds += "WRTeleport $($spots[$i % 9])", 'wait 1', 'WRHeal', "WRSpawn $id 1", 'wait 1', $hold, "WRArtCam $id 60", 'wait 1', 'HighResShot 1600x900', 'wait 1',
 		'WRHeal', "WRArtCam $id -90", 'wait 2', 'HighResShot 1600x900', 'wait 1', 'WRArtCam off'
 }
 $cmds = $cmds -join '|'

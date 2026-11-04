@@ -170,7 +170,20 @@ void FWRCreatureRegistry::Reload()
 		O->TryGetStringField(TEXT("mesh"), D.Mesh);
 		if (O->TryGetNumberField(TEXT("meshYaw"), Num)) D.MeshYaw = Num;
 		if (O->TryGetNumberField(TEXT("meshScale"), Num)) D.MeshScale = Num;
+		if (O->TryGetNumberField(TEXT("meshWiden"), Num)) D.MeshWiden = Num;
 		if (O->TryGetNumberField(TEXT("glow"), Num)) D.Glow = Num;
+		if (O->TryGetNumberField(TEXT("nightGlow"), Num)) D.NightGlow = Num;
+		const TArray<TSharedPtr<FJsonValue>>* LegList = nullptr;
+		if (O->TryGetArrayField(TEXT("legs"), LegList))
+		{
+			for (const TSharedPtr<FJsonValue>& Leg : *LegList)
+			{
+				for (const TSharedPtr<FJsonValue>& Bone : Leg->AsArray())
+				{
+					D.LegBones.Add(FName(*Bone->AsString()));
+				}
+			}
+		}
 		// Optional animation overrides (normally measured from the clips): paces in cm/s at play rate 1, where the
 		// attack clip's strike lands (0..1), the bone the attack layer starts from.
 		const TSharedPtr<FJsonObject>* PaceObj = nullptr;
@@ -180,7 +193,13 @@ void FWRCreatureRegistry::Reload()
 			if ((*PaceObj)->TryGetNumberField(TEXT("run"), Num)) D.RunPace = Num;
 		}
 		if (O->TryGetNumberField(TEXT("strikeAt"), Num)) D.StrikeAt = Num;
+		O->TryGetBoolField(TEXT("ownWindup"), D.bOwnWindup);
 		if (O->TryGetStringField(TEXT("animUpper"), Str)) D.AnimUpper = FName(*Str);
+		const TSharedPtr<FJsonObject>* LiftObj = nullptr;
+		if (O->TryGetObjectField(TEXT("poseLift"), LiftObj))
+		{
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& L : (*LiftObj)->Values) D.PoseLift.Add({ FName(*L.Key), float(L.Value->AsNumber()) });
+		}
 		const TSharedPtr<FJsonObject>* AnimObj = nullptr;
 		if (O->TryGetObjectField(TEXT("anims"), AnimObj))
 		{
@@ -360,10 +379,23 @@ void AWRCreature::ApplyDef()
 				Skel->SetMaterial(Slot, Mat);
 			}
 		}
+		NightGlowMats.Reset();
+		NightGlowNow = -1.f;
+		for (int32 Slot = 0; Def->NightGlow > 0.f && Slot < Def->Materials.Num(); ++Slot)
+		{
+			if (UMaterialInstanceDynamic* M = Def->Materials[Slot].IsEmpty() ? nullptr : Skel->CreateDynamicMaterialInstance(Slot))
+			{
+				NightGlowMats.Add(M);
+			}
+		}
 		const FBox Box = ArtMesh->GetBounds().GetBox();
 		const float Height = FMath::Max(1.f, Box.Max.Z - Box.Min.Z);
 		const float Scale = Def->HalfHeight * 2.f / Height * Def->MeshScale;
-		Skel->SetRelativeScale3D(FVector(Scale));
+		// meshWiden stretches it side to side (a body the image model made too narrow), along the mesh's own side axis.
+		const FVector MeshFwd = FRotator(0.f, -Def->MeshYaw, 0.f).RotateVector(FVector::ForwardVector);
+		FVector Scale3D(Scale);
+		(FMath::Abs(MeshFwd.X) >= FMath::Abs(MeshFwd.Y) ? Scale3D.Y : Scale3D.X) *= Def->MeshWiden;
+		Skel->SetRelativeScale3D(Scale3D);
 		// The engine grows a capsule whose half-height is under its radius, so stand on its real bottom.
 		Skel->SetRelativeLocation(FVector(0.f, 0.f, -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale));
 		Skel->SetRelativeRotation(FRotator(0.f, Def->MeshYaw, 0.f));
@@ -436,6 +468,7 @@ void AWRCreature::SetupCreatureAnim(const FWRCreatureDef& Def)
 		Anim->AddLocoSet(TEXT("fly"), Hover ? Hover : Clip(AnimAssets, TEXT("idle")), { { Fly, 0.f, 0, -1.f } });
 	}
 	Anim->SetMeshForward(FRotator(0.f, -Def.MeshYaw, 0.f).RotateVector(FVector::ForwardVector));
+	Anim->SetPoseLift(Def.PoseLift);
 	// Attacks and flinches play from the neck up (a humanoid's spine), so one biting on the run keeps running.
 	FName Upper = Def.AnimUpper;
 	if (Upper.IsNone() && Skel->GetSkeletalMeshAsset())
@@ -454,14 +487,32 @@ void AWRCreature::SetupCreatureAnim(const FWRCreatureDef& Def)
 		}
 	}
 	Anim->SetUpperBody(Upper, {});
-	// Generated skeletons (Tools/art/rig_quadruped.py, 4 or 6 legs): feet on uneven ground (TickCreatureFeet).
+	// Generated skeletons (Tools/art/rig_quadruped.py, 4 or 6 legs), or a pack skeleton whose legs creatures.json names:
+	// feet on uneven ground (TickCreatureFeet).
 	FeetLegCm = 0.f;
 	const USkeletalMesh* MeshAsset = Skel->GetSkeletalMeshAsset();
 	if (MeshAsset && WRTune(TEXT("anim.creatureFeet.enabled"), 1.f) > 0.f)
 	{
 		const FReferenceSkeleton& Ref = MeshAsset->GetRefSkeleton();
-		const TArray<FWRCreatureLeg> Legs = UWRAnimInstance::FindCreatureLegs(Ref);
+		TArray<FWRCreatureLeg> Legs = UWRAnimInstance::FindCreatureLegs(Ref);
+		if (Legs.Num() == 0 && Def.LegBones.Num() >= 12 && Def.LegBones.Num() % 3 == 0)
+		{
+			for (int32 i = 0; i + 2 < Def.LegBones.Num(); i += 3)
+			{
+				const FWRCreatureLeg L{ Def.LegBones[i], Def.LegBones[i + 1], Def.LegBones[i + 2] };
+				const int32 U = Ref.FindBoneIndex(L.Upper), K = Ref.FindBoneIndex(L.Lower), F = Ref.FindBoneIndex(L.Foot);
+				if (U == INDEX_NONE || K == INDEX_NONE || F == INDEX_NONE || Ref.GetParentIndex(K) != U || Ref.GetParentIndex(F) != K)
+				{
+					UE_LOG(LogWildreach, Warning, TEXT("Creature %s: legs %s / %s / %s aren't a chain on its skeleton: no feet on slopes"), *Def.Id.ToString(),
+						*L.Upper.ToString(), *L.Lower.ToString(), *L.Foot.ToString());
+					Legs.Reset();
+					break;
+				}
+				Legs.Add(L);
+			}
+		}
 		Anim->SetCreatureLegs(Legs);
+		Anim->SetCreatureSpine(UWRAnimInstance::FindCreatureSpine(Ref));  // legless (a worm): its body lies on the ground
 		const auto RefCS = [&Ref](int32 Bone)
 		{
 			FTransform Out = FTransform::Identity;
@@ -532,7 +583,7 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 		EarshotClock = 0.5f;
 		Skel->VisibilityBasedAnimTickOption = WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.footstepRange"), 3000.f))
 			? EVisibilityBasedAnimTickOption::AlwaysTickPose : EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
-		bFeetInRange = Anim->GetCreatureLegs().Num() > 0 && WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.creatureFeet.range"), 6000.f));
+		bFeetInRange = (Anim->GetCreatureLegs().Num() > 0 || Anim->GetCreatureSpine().Num() > 0) && WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.creatureFeet.range"), 6000.f));
 	}
 	TickCreatureFeet(DeltaSeconds);
 }
@@ -540,18 +591,20 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 void AWRCreature::TickCreatureFeet(float DeltaSeconds)
 {
 	UWRAnimInstance* Anim = CreatureAnim();
-	if (!Anim || Anim->GetCreatureLegs().Num() == 0)
+	if (!Anim || (Anim->GetCreatureLegs().Num() == 0 && Anim->GetCreatureSpine().Num() == 0))
 	{
 		return;
 	}
 	const TArray<FWRCreatureLeg>& Legs = Anim->GetCreatureLegs();
+	const TArray<FName>& Joints = Anim->GetCreatureSpine();  // a legless body: the ground under each joint
 	const FWRTuning& T = FWRTuning::Get();
 	FWRCreatureFeet& Feet = Anim->Input.Feet;
+	FWRCreatureSpine& Spine = Anim->Input.Spine;
 	const UCharacterMovementComponent* Move = GetCharacterMovement();
 	const bool bAlive = IsAlive();
 	// On: standing or walking on the ground near a local view. Dead: the body stays lying to the ground it fell on (the
 	// samples stop), the legs let go of it so the death pose plays as made.
-	const float BodyWas = Feet.BodyAlpha;
+	const float BodyWas = Legs.Num() > 0 ? Feet.BodyAlpha : Spine.Alpha;
 	const bool bOn = bAlive && bFeetInRange && Move->IsMovingOnGround();
 	const float Rate = 1.f / FMath::Max(0.02f, T.Num(TEXT("anim.creatureFeet.fadeSeconds"), 0.25f));
 	const auto Toward = [DeltaSeconds, Rate](float Value, float Goal)
@@ -560,6 +613,7 @@ void AWRCreature::TickCreatureFeet(float DeltaSeconds)
 	};
 	Feet.BodyAlpha = bAlive ? Toward(Feet.BodyAlpha, bOn ? 1.f : 0.f) : Feet.BodyAlpha;
 	Feet.LegAlpha = Toward(Feet.LegAlpha, bOn ? 1.f : 0.f);
+	Spine.Alpha = bAlive ? Toward(Spine.Alpha, bOn ? 1.f : 0.f) : Spine.Alpha;
 	// Sampled only while its pose updates (seen, or within earshot), in range, alive.
 	if (!bOn || (!Skel->WasRecentlyRendered(0.2f) && Skel->VisibilityBasedAnimTickOption != EVisibilityBasedAnimTickOption::AlwaysTickPose))
 	{
@@ -602,11 +656,44 @@ void AWRCreature::TickCreatureFeet(float DeltaSeconds)
 			Over += FString::Printf(TEXT(" %s %+.1f/%+.0f"), *Legs[i].Foot.ToString().Left(2), At.Z - Ground.Z, Ground.Z - Bottom.Z);
 		}
 	}
+	for (int32 i = 0; i < Joints.Num() && i < FWRCreatureSpine::MaxJoints; ++i)
+	{
+		const FVector At = Skel->GetSocketLocation(Joints[i]);
+		const float Span = Leg + float(FVector::Dist2D(At, GetActorLocation())) * Steep;
+		FVector Ground(At.X, At.Y, Bottom.Z);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByObjectType(Hit, FVector(At.X, At.Y, Bottom.Z + Span), FVector(At.X, At.Y, Bottom.Z - Span), Floors, Query))
+		{
+			Ground = Hit.ImpactPoint;
+		}
+		Spine.Ground[i] = FMath::Lerp(Spine.Ground[i], float(Base.InverseTransformPosition(Ground).Z), Ease);
+		if (bLog)
+		{
+			Over += FString::Printf(TEXT(" %s %+.0f"), *Joints[i].ToString(), Ground.Z - Bottom.Z);
+		}
+	}
 	if (bLog)
 	{
 		FeetLogClock = 0.5f;
-		UE_LOG(LogWildreach, Log, TEXT("FEET %s speed %.0f body %.2f legs %.2f, ankle over ground / ground cm:%s"), *GetName(), GetVelocity().Size2D(), Feet.BodyAlpha, Feet.LegAlpha, *Over);
+		UE_LOG(LogWildreach, Log, TEXT("FEET %s speed %.0f body %.2f legs %.2f, ankle over ground / ground cm:%s"), *GetName(), GetVelocity().Size2D(),
+			Legs.Num() > 0 ? Feet.BodyAlpha : Spine.Alpha, Feet.LegAlpha, *Over);
 	}
+}
+
+FVector AWRCreature::MouthLocation() const
+{
+	// The jaw's hinge is the back of the mouth; without a jaw, the head's joint.
+	if (Skel && Skel->IsVisible() && Skel->GetSkeletalMeshAsset())
+	{
+		for (const TCHAR* Bone : { TEXT("jaw"), TEXT("head") })
+		{
+			if (Skel->GetBoneIndex(Bone) != INDEX_NONE)
+			{
+				return Skel->GetBoneLocation(Bone);
+			}
+		}
+	}
+	return GetActorLocation() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() * 0.5f) + GetActorForwardVector() * GetSimpleCollisionRadius();
 }
 
 void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
@@ -707,7 +794,7 @@ void AWRCreature::StartTelegraph(EWRSwingKind Kind, float Duration)
 			TelegraphGlow = UMaterialInstanceDynamic::Create(Base, this);
 		}
 	}
-	if (TelegraphGlow && GlowOn && GlowOn->IsVisible())
+	if (TelegraphGlow && GlowOn && GlowOn->IsVisible() && WRTune(TEXT("telegraph.glow"), 5.f) > 0.f)  // glow 0: the pose and growl warn alone
 	{
 		// One warning colour for every creature (sRGB in tuning), so the cue is learned once.
 		const FColor C(uint8(WRTune(TEXT("telegraph.color.r"), 255.f)), uint8(WRTune(TEXT("telegraph.color.g"), 60.f)), uint8(WRTune(TEXT("telegraph.color.b"), 20.f)));
@@ -716,9 +803,10 @@ void AWRCreature::StartTelegraph(EWRSwingKind Kind, float Duration)
 		GlowOn->SetOverlayMaterial(TelegraphGlow);
 		TelegraphMesh = GlowOn;
 	}
-	// The rear-back moves the fitted art (bosses keep to their own big clips).
+	// The rear-back moves the fitted art (bosses keep to their own big clips, and so does a creature whose clip rears
+	// on its own: tipping a long worm back would sink its tail into the ground).
 	const FWRCreatureDef* Def = GetDef();
-	if (Skel->IsVisible() && Def && Def->Archetype != TEXT("boss"))
+	if (Skel->IsVisible() && Def && Def->Archetype != TEXT("boss") && !Def->bOwnWindup)
 	{
 		SkelBaseLocation = Skel->GetRelativeLocation();
 		SkelBaseRotation = Skel->GetRelativeRotation();
@@ -795,6 +883,27 @@ void AWRCreature::EndTelegraph()
 		bTelegraphPosed = false;
 	}
 	TelegraphStart = TelegraphStrike = -1.0;
+}
+
+void AWRCreature::TickNightGlow()
+{
+	const FWRCreatureDef* Def = GetDef();
+	if (NightGlowMats.Num() == 0 || !Def)
+	{
+		return;
+	}
+	// Lit as the daylight goes and out again at dawn; the eyes go dark when it dies.
+	const AWRGameState* State = AWRGameState::Get(this);
+	const float Target = IsAlive() ? Def->NightGlow * (1.f - (State ? State->GetDaylight() : 1.f)) : 0.f;
+	if (FMath::Abs(Target - NightGlowNow) < 0.02f)
+	{
+		return;
+	}
+	NightGlowNow = Target;
+	for (UMaterialInstanceDynamic* M : NightGlowMats)
+	{
+		M->SetScalarParameterValue(TEXT("GlowStrength"), Target);
+	}
 }
 
 void AWRCreature::OnHitVisual(EWRHitResult Result)
@@ -1511,6 +1620,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	{
 		TickCreatureAnim(DeltaSeconds);
 		TickTelegraph();
+		TickNightGlow();
 	}
 	if (HasAuthority() && AggroRep != AggroTarget.Get())
 	{
@@ -1919,6 +2029,13 @@ namespace
 	FString AttackKey(FName Kind, const TCHAR* Field) { return FString::Printf(TEXT("creatureAI.%s.%s"), *Kind.ToString(), Field); }
 	float AttackNum(FName Kind, const TCHAR* Field, float Fallback) { return FWRTuning::Get().Num(AttackKey(Kind, Field), Fallback); }
 
+	// A stomp's ring is set for a body of bodyRadius (a Woolly drudge's); a bigger body stomps a ring as much wider (a
+	// Basaltback bites from further out than the drudge's ring would reach).
+	float StompRadius(const AWRCreature* Self)
+	{
+		return AttackNum(TEXT("stomp"), TEXT("radius"), 320.f) * FMath::Max(1.f, Self->GetSimpleCollisionRadius() / AttackNum(TEXT("stomp"), TEXT("bodyRadius"), 90.f));
+	}
+
 	void CreatureHit(AWRCreature* Self, AWRCharacterBase* Victim, FName Kind)
 	{
 		FWRHit Hit;
@@ -1955,7 +2072,7 @@ bool AWRCreatureAI::TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target,
 			continue;  // cooling down, or rooted / frozen: no leaping or charging (it can still spit or stomp)
 		}
 		const float Min = Kind == TEXT("stomp") ? 0.f : AttackNum(Kind, TEXT("min"), 300.f);
-		const float Max = Kind == TEXT("stomp") ? AttackNum(Kind, TEXT("radius"), 320.f) + Target->GetSimpleCollisionRadius() - 20.f : AttackNum(Kind, TEXT("max"), 800.f);
+		const float Max = Kind == TEXT("stomp") ? StompRadius(Self) + Target->GetSimpleCollisionRadius() - 20.f : AttackNum(Kind, TEXT("max"), 800.f);
 		if (Dist < Min || Dist > Max)
 		{
 			continue;
@@ -1981,7 +2098,7 @@ bool AWRCreatureAI::TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target,
 		}
 		else if (Kind == TEXT("stomp"))
 		{
-			const float Radius = AttackNum(Kind, TEXT("radius"), 320.f);
+			const float Radius = StompRadius(Self);
 			AWRGroundMarker::Spawn(GetWorld(), Floor, FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.2f, 0.05f), Windup);
 		}
 		UE_LOG(LogWildreach, Log, TEXT("AI %s winds up %s at %s"), *Self->GetName(), *Kind.ToString(), *Target->GetName());
@@ -2033,7 +2150,7 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 			// A glob of its element (fire / frost) at the target.
 			const FWRCreatureDef* Def = Self->GetDef();
 			const bool bFrost = Def && Def->Element == TEXT("frost");
-			const FVector From = Self->GetActorLocation() + FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight() * 0.5f) + SpecialDir * Self->GetSimpleCollisionRadius();
+			const FVector From = Self->MouthLocation();
 			const FVector Aim = Target ? (Target->GetActorLocation() - From).GetSafeNormal() : SpecialDir;
 			FActorSpawnParameters Params;
 			Params.Owner = Self;
@@ -2054,7 +2171,7 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 		else if (Special == TEXT("stomp"))
 		{
 			// Everything hostile in the ring takes it (not a knocked-out creature: someone may be taming it).
-			const float Radius = AttackNum(Special, TEXT("radius"), 320.f);
+			const float Radius = StompRadius(Self);
 			WRFx::Broadcast(Self, TEXT("stomp"), Self->GetActorLocation() - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, Radius / 100.f, TEXT("stomp"));
 			for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 			{

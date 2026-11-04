@@ -1,5 +1,348 @@
 # Changelog
 
+## Unreleased: better-looking creatures (0.6, creatures first)
+
+Raven asked for better, more realistic creature movement and looks, keeping the design doc's fantasy, and reviewed
+every creature from front and side pictures; this is the work so far (round 2 of their notes).
+
+- **New creature animation** (`Tools/art/anim_creature.py`): feet planted while they bear weight (two-bone IK), the body
+  rising, rolling and swaying with its legs, a steady head, a tail on springs, attacks that wind up and strike in a tenth
+  of a second; gaits picked by size and speed (walk, trot or amble, gallop). On Cinderfang, Woolly drudge, Ashstrider,
+  Frostantler, Aurora fox, Emberhorn, Basaltback and Rimeclaw. Front legs stand as straight columns under the shoulders
+  and fold at the wrist (Raven: "an extra joint" on Cinderfang's and Ashstrider's front legs, Frostantler's "bend towards
+  the back feet"); the back stays near level.
+- **Four legs** unless the real animal has more: Woolly drudge and Cinderfang lost their middle pair (the Kilnmite keeps
+  six). Cinderfang's front right leg, what was left of the sixth, is now a mirror of the front left.
+- **Shapes** (`rig_quadruped.py`: `--mirror-leg`, `--straighten-front`, `--legs-longer/--legs-thicker`,
+  `--head-forward`, `--widen`): Woolly drudge on longer, thicker legs (its chest no longer meets them); Basaltback's head
+  out from under its shell; Glacimaw 40% longer (`rig_special.py --stretch`) and far bigger (`halfHeight` 95, reach 380);
+  Rimeshell wider (`meshWiden` 1.3, new in `creatures.json`).
+- **Surface detail** (`Tools/art/bake_detail.py`, a normal map and shaded colour baked on each model's UVs): scales all
+  over Magmaw, feathers on Snowpuff, fur on the Aurora fox, whose hard green patches are now pale fur under a soft
+  teal-to-violet aurora. `M_CreatureGlow` takes a normal map (`MI_<Name>Skin` for creatures with no glow).
+- **Ember glow** that really glows (`M_CreatureGlow`) on Magmaw, Cinderfang, Basaltback and Emberhorn; the red attack
+  wind-up glow is off (`telegraph.glow` 0: the pose and growl warn).
+- **Gloomhowl looks ahead** instead of at the ground: `poseLift` in `creatures.json` turns named bones nose-up over every
+  clip (its pack clips hang the head low).
+- **Gloomhowl's eyes glow at night** (Raven's pick): its red irises (the Barghest's own glow map) light up as the
+  daylight goes, out again at dawn and when it dies. New `nightGlow` in `creatures.json`: the creature's materials'
+  `GlowStrength` rises to it with the dark (`1 - daylight`); `MI_Gloomhowl` keeps the iris's own colour.
+- **Woolly drudge walks on pillars**: its front shoulders sat 15 cm behind its feet, so each step reached far ahead on a
+  slant and the hoof curled under in the swing. Re-rigged with the shoulder over the foot and the front joint up inside
+  the body (`rig_quadruped --front-elbow 0.42 --front-hip-x 0.12`, clips `--swing-foot level`); the narrow neck every
+  leg had above its hoof (a wine-glass stem once the leg stood upright) filled out to the hoof's width.
+- **Woolly drudge is a giant** (Raven: 3x): 5.2 m to the hump (`halfHeight` 258, `radius` 270), reach 420 (its face is
+  ~2.6 m ahead of its middle); its stomp ring grows with it (9.6 m). The pale and grey fur tips round its ankles and the
+  tip of its beard now take the brown of the fur around them (tusks and horns stay ivory).
+- `creatureportraits.ps1 -Frame <sizes>`: a wider camera for giants (the frame's fixed margin shrinks beside them).
+- **Frostantler's antlers end in tines** (Raven): each main beam ended in a fat club with a holed knob (a melted blob,
+  an S-shaped lump from the side); both are now tall pointed tines, and the dark flecks in the antlers are ice. It is
+  **twice the size** too: 3 m to the antler tips (`halfHeight` 150, `radius` 110), reach 300. The pale cyan stripe down
+  each flank fades into its body, and the nubs hanging under its belly (a stray piece in the game) are gone.
+- **Rimeshell loses its side fin**: the image model gave it a broad flat fin sticking out of its left side under the
+  shell (not in its concept), which also put its body ~13 cm off-centre in the game. The fin now folds into a lip under
+  the rim (mirrored from the clean side), the body sits in the middle, and the front shoulders sit over the feet
+  (`rig_quadruped --front-hip-x 0.34`: its steps reached ahead on a slant).
+- **Snowpuff's toes are bird-sized**: the image model gave its feet toes about twice as long as its legs are tall, which
+  scissored along the ground like dark planks as it walked. They are now about as long as its shins, so it steps like a
+  fowl.
+- **Aurora fox stands and trots, with a real fox's brush**: its tail was a ball as wide as its hips resting on the
+  ground, so the old rig took it for a foot and mixed up its legs: it crouched with its rump down and crawled. The tail
+  is remade as a long brush that leaves the rump nearly level and droops in an arc, bushiest past the middle and closing
+  to a point (its old surface and colours swept onto the new shape; where it had grown into the backs of the thighs
+  it is cut free), and covered in 3200 fur locks combed toward the tip. Re-rigged on its four real legs with the
+  shoulders over the paws, on the new animation (`anim_creature --build light --attack bite`).
+- **`hair_locks.py --along`**: locks lie along a line in the side view instead of one way (a tail's fur combed toward
+  its tip round the curve).
+- **Creature films save a tenth of the frames** (Raven: "do you need to take hundreds of screenshots of the same
+  frame?"): `WRRecord` takes windows of frames to keep (`first-last/step,...`; every frame's time is still logged), and
+  `creaturevideo.ps1` keeps 88 of the 756 by default (`-Keep all` for every frame): the idle once a second, the walk
+  and run every half second with a steady stretch of each at every 2nd frame (f126-161, f234-257), the bites every 4th,
+  the ramp, flinches and death every 20th. A film is ~90 MB instead of ~1 GB and records in 30 s instead of ~170 s.
+- **Vulkarn's right side is whole again**: the boss build cut out the faces where its right arm had been fused to its
+  body, which left a hole down its flank under the armpit (the floor showed through it in every swing), and the skin
+  round it, partly weighted to the arm, tore into strips that hung off its back. The hole is closed on the shape of its
+  left flank (mirrored), in its skin colour, and the skin round it takes the left side's weights, mirrored
+  (`WildreachArt/mixamo/bosses_r2/vulkarn/vk_fix.py` on the game model; rig and clips unchanged). And he's bigger
+  (Raven): 6.5 m instead of 5.2 (halfHeight 325, radius 188; his attacks reach from his body's edge, so they grow too).
+  His two small holes (a hand, a thigh) are really closed now: `bmesh.ops.holes_fill` had made nothing on them, so a
+  face is built from each hole's corners in order. The hand's patch faced inward (the sky still showed through it from
+  outside), so both small patches have a back side too.
+- **The Obsidian Warden's holes closed, and it's 20% bigger** (Raven): the same boss build left holes under its left
+  armpit and on the front of its left shoulder (where the image model's left arm met its body), and a few round its
+  neck; the sky showed through its shoulder in some swings. Each is filled with one patch in the skin's colour, with a
+  back side (`WildreachArt/mixamo/bosses_r2/obsidian_warden/ow_fix.py` on the game model; rig and clips unchanged).
+  Nothing round them tears in any clip, and its walk, run, swings and death play clean. A check that looks through the
+  model from 26 directions in four clips (`WildreachArt/mixamo/bosses_r2/seethru.py`) finds nothing see-through on
+  Vulkarn and only two pinhead specks on the Warden in one idle; the light patch in its shadow is the sun through the
+  gap between its bent arm and its body. halfHeight 204, radius 132 (was 170, 110).
+- **Ignessa: a face, real hair, wings on her back, arms and legs that move** (Raven: hair "like actual hair", wings
+  joined "by her shoulder blades", "her face looks messed up"). Her face was a blur of the concept's (dark rings for
+  eyes, the mouth a round open O): the concept's face is now laid onto it from the front, lined up on the eyes and mouth
+  and blended into her own skin. Her hair is 4500 thin locks over the old lump (`Tools/art/hair_locks.py`, which can
+  now keep to one material: the built wings share its UV space). Her wings hung off the back of her hair at neck
+  height; they now grow out of her back opposite her breasts (Raven: at the shoulders they still looked joined at her
+  head), where her chest stands farthest forward (`--wing-z` to set it). She was one rigid piece (a body bone, a head, wings):
+  `rig_special.py --body fae --wing` now gives her thighs, shins, feet, upper arms, forearms and hands: legs hang soft
+  with pointed toes and trail behind her in flight, both hands draw back and thrust at the target in her attack, arms
+  fling out as she falls. Her upright body bone had no roll, so every lean (the lunge, the flight, the fall) tipped her
+  sideways: it leans forward and back now. Her flame trousers were flat boards (16 x 11 cm, hip to ankle): deepened to
+  round legs, and the concept's white background flecks on her legs and hands painted out
+  (`WildreachArt/out/ignessa_v3/ig_fix.py`). Then her head "looked like a mess" (Raven): locks grew out of her crown
+  and hung over her forehead, and the crown (a fan standing up from her hairline) was painted with hair streaks and
+  white blobs. The crown is one fiery piece now, ember red to flame-yellow tips, and hair grows only behind it, at her
+  temples and down her back. Then the crown was "just a flat piece on her head" (Raven): the image model stood it up as
+  a flat fan in front of her head (2 cm thick). It is bent round her head into a circlet now, from her brow back to her
+  temples, its outer spikes at her sides; the hair on top grows from just behind its ring. And its colours match her
+  wings so it stands out of her red hair (Raven): the wing picture's orange at its foot through gold to pale cream at
+  the tips, with dark vein lines up its lower half. Size unchanged (halfHeight 110: 2.2 m to the crown).
+- **Grimjaw's holes closed**: the same boss build left seven holes (both shoulders, under the left arm, one at his
+  hip strap); the floor showed through his shoulder in every step of his walk, and the see-through check found 110 to
+  160 spots per clip. Each is filled with a patch and a back side (`ow_fix.py --around 3`: his holes' edges are darker
+  than his skin, so the patch takes the skin a few edges out from the hole; with the edge's own colour they came out
+  as dark blue blotches). The check finds nothing see-through on him now. The dark shape that crosses his back in his
+  swipe is his own raised arm's shadow. Walk, run, swipes, jump attack and death play clean.
+- **Grimjaw 30% bigger, and his back cleaned up** (Raven: "his rags/back area is weird"): halfHeight 208, radius 130
+  (was 160, 100). The image model made his seat and the back of his fur loincloth one boxy block, its top edge a ledge
+  jutting 25 cm past his lower back: it is drawn in to a rounded rump that tapers to his thighs, and its lower half
+  partly follows his thighs so it swings with his legs. What looked like dark metal plates on his flanks and shoulder
+  were faces left by the boss build's cut with their UVs stretched across a strip of the texture; every face stretched
+  like that (245) takes its neighbour's colour. The pale, whitish tatters at the loincloth's hem take the fur's brown
+  (the concept's fur is dark to its tips). `WildreachArt/mixamo/bosses_r2/grimjaw/gj_fix.py` on the hole-filled
+  model; rig and clips unchanged, nothing see-through.
+- **Grimjaw's fur is real fur, his skin one blue, the dark patch on his back mostly gone** (Raven: "the dark patch on
+  his back looks off and his rags still don't look right"). His fur pieces (loincloth, forearm cuffs, shin wraps)
+  were faceted brown lumps with fur painted on: 6000 brown locks grow on them now (`hair_locks.py --mixamo`, which
+  exports the way the Mixamo bosses are built). His skin came in two blues, pale over his shoulders and upper back and
+  dark below with a torn edge between (a ragged vest): both are moved to their middle, each keeping its own detail.
+  The dark oval on his back while he punched or swiped was a shadow (it goes with shadows off) from a ridge his
+  shoulder skin bunched into. The cause: the rig gave his HEAD bone the skin of his trapezius and upper back (up to 94%,
+  64 cm out from his head), so every move of his head dragged his back and shoulders into creases and puckers. Outside
+  his head's own outline that hold now goes to his shoulders, neck and upper spine, the shoulder weights are smoothed,
+  and his upper back and shoulders are smoothed in shape and paint (Raven circled them: "can we smooth this section
+  out"). The oval is gone and his back reads as smooth muscle. His hole patches are now domed on the skin round them
+  (`ow_fix.py --dome`) instead of one flat face each, and the shadow painted in his armpits is gone.
+- **Vulkarn and the Obsidian Warden checked for Grimjaw's faults** (Raven): neither rig ties back or shoulder skin to
+  the head (Vulkarn's head bone holds no skin; the Warden's only its head). Both had faces with their UVs stretched
+  across a strip of the texture: 127 on Vulkarn, 509 on the Warden (on its shoulder plates, chest and back), which
+  showed as faint smears and amber flecks on its dark armour. Each takes its neighbour's texel
+  (`WildreachArt/mixamo/bosses_r2/stretch_fix.py`); rig, shape and clips unchanged, both re-filmed clean.
+- **The Pale Hunter: whiskers off, re-rigged, a real bite**: its whiskers were a spray of thin wire loops off its
+  muzzle (grey plates either side of its mouth in the game): cut out and the roots closed
+  (`WildreachArt/out/pale_hunter_v2/ph_fix.py`; small flat stubs are left at the mouth corners). It ran on its October
+  rig, whose bite was a slight dip of the head and whose new walk folded the front paws up: re-rigged with the front
+  joint high inside the body and the shoulders over the paws (`rig_quadruped.py --head +x --front-elbow 0.4
+  --front-hip-x 0.32`), clips from `anim_creature.py --build light --attack bite` (a trot, a gallop, a head strike).
+  `anim_creature.py` could not find a boss (the `_bosses` divider in creatures.json has no id): fixed. What looked like a
+  see-through sheet under its belly is the pale blue paint of a fold of its skin, so the shape is kept. Size unchanged
+  (halfHeight 90).
+- **Leftovers tidied** (Raven): the Pale Hunter's flat whisker stubs at the mouth corners and the tufts over its eyes
+  are smoothed back into its face (`pale_hunter_v2/ph_smooth.py`; cutting them harder opened dark holes); the notch at
+  the back of Grimjaw's neck is smoothed with his back (his nape is in the smoothing, his beard and throat kept); the
+  Obsidian Warden's orange cracks glow at night (`MI_Obsidian_wardenGlow`, fire glow 7: they were only painted); the
+  stray lock that stood out at each of Ignessa's temples is gone. The Aurora fox's tail was already remade as a brush
+  on Nov 3 and is left as it is.
+- **The food chain at the new sizes** (Raven: keep the size rule; a hand-drawn web of who-eats-whom was too
+  confusing): checked once every creature's size was set. Nothing hunts the two herd giants (Basaltback, Woolly
+  drudge), every hunter has prey on its own side, and packs still take an Emberhorn. One pairing was wrong: the small
+  Scorchwing could take a 2 m Ashstrider (exactly at its limit). A lone hunter's prey limit is now 1.25 times its own
+  width (was 1.3; `creatureAI.preySizeRatio`), which removes that pairing and changes nothing else; packs keep 2.
+- **Skaldrith, twice the size, on its feet on slopes, in frost colours** (Raven): halfHeight 360, radius 340 (its back
+  about twice the survivor's height). Its body stayed level on a slope with its feet in the air or in the ground (the
+  pack dragon's skeleton wasn't one the feet system knew): `creatures.json` can now name a pack skeleton's legs
+  (`"legs"`), and Skaldrith's body tilts to the ground with each foot planted on it. Its faint blue tint showed as plain
+  grey in the game sun: now ice blue with frost white on its lighter parts (`M_CreatureTint` takes a second, lighter
+  tint). Scorchwing, the same pack dragon, names the same legs (Raven): its body tilts on slopes too.
+- **Bosses can be filmed**: a boss's brain is a plain AI controller, so the film commands never reached it (Vulkarn stood
+  still and "couldn't bite"). Bosses now run the test controls themselves (walk, turn, stand; no fighting meanwhile),
+  and `WRCreatureAttack` swings a boss's next attack clip where it stands (no telegraph, no hit).
+- **Glowmoth's wings beat up and down together** (they beat in opposition: a mirrored-bone sign).
+- **Four rebuilt from new concepts** (Raven's picks): **Rimeclaw** (concept 3 with concept 0's curled tail; the face
+  clear of the mane, on the new animation); **Ignessa** with her arms and legs apart (her body cut out of concept 3)
+  and wings built as separate pieces from one wing picture (`rig_special.py --wing`), hinged behind the shoulders and
+  moving only with the wing bones; **Vulkarn** (concepts 1 and 3: lava cracks, beard, hood) and **Grimjaw** (concept
+  1, no horns, hands clear of the legs), both re-rigged on Mixamo with fresh Creature Pack clips.
+- **Boss rigs at the right height**: the Mixamo copy was always packed as a 1.8 m figure while the bosses' full models
+  are 2 m, so every joint sat 10% low (shoulders sunk into the chest, Raven's "mixed up near the shoulders").
+  `pack_for_page.py` takes the model's height now.
+- **Cinderfang rebuilt from concept 1** (Raven's pick: flame-lit face and horns, mane, raised tail). The old model came
+  from a six-legged concept and had five paws, front legs patched from a leftover leg. Five shapes from different
+  generator seeds, paws counted on each (all four clean); seed 42 kept for its horns and straight front legs. Torso
+  stretched 1.2 (three-quarter concept), `meshScale` 1.08 so the raised tail doesn't shrink it (the game fits the whole
+  height to the capsule). Then, on Raven's notes ("tail not attached to its rear correctly", "front legs still messed
+  up", "his leg is disconnected"), `cf_fix.py` (in WildreachArt) on the rigged mesh: the tail had come out as a flat
+  sheet down the outside of the left thigh, so it is cut off and a new one grown from the top of the rump (a tapering
+  core under 130 flat locks like the mane's, arcing up and back to a curled tip); the right front leg reached forward
+  and zig-zagged when stood up, so the body is made symmetric from its left side (upright leg, one connected surface;
+  a mirrored copy had shown its seam at the shoulder) and both front legs lean in under the chest. Then ("its front
+  legs have an extra joint"): the rig had folded them at 0.16, partway up the forearm above the real wrist, so it is
+  re-rigged with `--front-wrist 0.11` (the top of the paw), and a knob halfway down the back of each leg is smoothed
+  away; they stand and trot as straight columns, folding only at the paw. Then (Raven circled the paw hooking back
+  in the swing: "have it be straight with the lower leg"): a long forearm on a short pastern can only shorten by
+  folding the paw right back, so the front joint is now the elbow under the chest (`rig_quadruped.py --front-elbow`,
+  apex back) and the forearm and paw swing forward as one straight piece, flat again to touch down.
+- **Magmaw walks on two legs** (Raven's pick). Its model is built like a two-legged dinosaur (six new generator seeds
+  from concept 2 came out the same): hind legs under the middle of the body, arms hanging just above the ground right in
+  front of them, so four-legged walking crouched it (the old picture) and stretched-arm walking crowded the legs.
+  `mg_fix.py --fold 55` (in WildreachArt) swings the arms up in front of the chest; rigged with `--legs 2 --hip-z 0.52`
+  (its sail had read as the back), new planted-feet clips (it still had the first rig's), same texture and baked scales.
+- **Scorchwing kept as it is** (Raven: small, and the pack's Mountain Dragon model, the Skaldrith boss's, tinted).
+- **Basaltback cleaned up** (`bb_fix.py` in WildreachArt\out\basaltback_v2): its face (trunk, tusks) had come out turned
+  0.1 to one side and is slid back onto the centre line; the side the concept doesn't show (a flat sheet for an ear, a
+  loose flap on a front leg) is replaced by making the body symmetric from the good side; the head, painted pale
+  blue-grey at 2.5x the legs' brightness, is recoloured to the legs' dark tone (the tusks warmed to ivory, the concept's
+  glowing marks on the forehead kept, the shell untouched). Re-rigged with the front elbow, new heavy clips with a ram.
+  Then **a giant walking tortoise** (Raven): 2x (halfHeight 70 -> 140, radius 140, reach 400: 280 cm to the shell top),
+  legs 1.45x longer (`--legs-longer`), the head and ears moved forward as one piece on a longer neck (`bb_fix.py
+  --neck 0.10`; the rig's `--head-forward` had dragged the shell's front along), the flaps hanging off the front legs'
+  tops and the tusk that curved back toward the legs cut off. `rig_quadruped.py --belly-z` (that tusk had read as the
+  belly). A 2x2 foundation platform on its back is parked: the 4 m grid needs an 8 x 8 m flat back.
+  **Then rebuilt from a new concept** (Raven: "its ears now stretch back to its shell", "still looks like the ears are
+  messed up": stretching that model into a neck came out boxy, its head was tucked under the shell). New concepts
+  (`batch_r2_basalt.json`: an elephant-head set and a tortoise-head set); Raven picked elephant-head 1: an elephant on
+  tall legs under a broad tortoise shell with three lava patches a side. Five generator seeds, seed 7 kept (four clean
+  feet, roundest shell), the shell's top flattened a little (`flatten_top.py 0.4`), rigged with the front elbow, heavy
+  clips with a ram; halfHeight 150, radius 150, reach 430 (300 cm tall). Sources in WildreachArt\out\basaltback_v3.
+  **Building on its back** is to be its own feature later (Raven). Then ("make its tusks longer", "the front legs move
+  weird just like Cinderfang's"): tusks 3x as long with the tips curving forward (`tusks.py`: the ivory texels, each tusk
+  stretched along its own axis from the face), and the front joint moved up inside the body (`rig_quadruped.py
+  --front-elbow 0.42`; at the belly it had bent the elephant legs backwards mid-leg): each front leg swings as one pillar.
+- **Emberhorn cleaned up** (`eh_fix.py` in WildreachArt\out\emberhorn_v2): its left front leg had come out mid-step
+  (lifted, bent back), so the body is made symmetric from the right side; the hide, painted mid-grey and rendering pale
+  blue-grey, darkened to the concept's charcoal (orange markings and glowing horns kept); the front legs, slanting back
+  from the shoulder to the hooves, sheared upright. Rigged with the front joint inside the chest (`--front-elbow 0.43`)
+  and the shoulder set by hand (`rig_quadruped.py --front-hip-x 0.20`: fur hanging off the legs stopped the trace low and
+  put the shoulders behind the hooves), so each front leg swings as one straight piece; `anim_creature.py
+  --swing-foot level` keeps hooves hanging through the swing (following the leg they pointed straight ahead). It was
+  still on its first rig's clips; new heavy clips with a charge.
+- **Kilnmite repainted to its concept** (`km_fix.py` in WildreachArt\out\kilnmite_v2): the image model's paint had
+  navy-purple legs and belly and a gold shell with baked highlights (it rendered as polished gold), and none of the
+  concept's kiln cracks. Legs and belly are now a warm dark brown, the shell dark copper, and a crack network glows
+  orange across the shell plates (the edges of 3D Voronoi cells at each texel's position, warped jagged and faded out in
+  places, so cracks run on across texture seams and break into separate fissures); `MI_KilnmiteGlow` lights the cracks
+  alone. Re-rigged on six legs with the current `rig_quadruped.py` (the old rig's weights were poor). `anim_creature.py`:
+  six legs never gallop (they scurry in tripods at every speed; Kilnmite bounded like a dog) and step at most 1.2 leg
+  lengths (long strides reached the front legs out like arms).
+- **Ashstrider fixed to its concept** (`as_fix.py` in WildreachArt\out\ashstrider_v2): the image model had turned its
+  head 28 degrees to its right (every walk carried it crooked), painted the face white with big black goggles round the
+  eyes and a black ball of a nose (it read as a skull), and the body near-black between bright white lines. The head
+  turns back straight about the top of the neck, the face is mid-grey with dark almond eyes and a dark grey nose, and the
+  body's cells are mid-grey between pale lines like the concept's. Re-rigged with the current `rig_quadruped.py`
+  (`--belly-z 0.44`: its legs stand mid-stride, so one crossed the centre line and read as the belly at 5% height;
+  `--front-elbow 0.5`); new light clips (a trot, a gallop, a horn ram) with hooves hanging in the swing. Raven: "slightly
+  bigger than Cinderfang", so 1.15x (halfHeight 85 -> 98, radius 45 -> 52): 196 cm to the horns, back at 145 cm against
+  Cinderfang's 130, as long as Cinderfang with its tail.
+- **Glowmoth fixed to its concept, and it glows** (`gm_fix.py` in WildreachArt\out\glowmoth_v2): the image model's
+  antennae lay flat, straight out in front at mid-body height and as thick as fingers (from the side, two long sticks);
+  they're thinner now and rise 35 degrees from the head. Its abdomen was striped black and yellow like a wasp's (the
+  concept's is bronze plates over dark slate) and is now bronze and slate. The design's wings "glow soft blue": the
+  dull blue eyespots are a clear cyan now and `MI_GlowmothGlow` lights them (a new MOTH glow in `creature_glow.py`,
+  bluer and brighter than FROST asks so the pale blue fur stays dark), which shows best at night. The raised antennae
+  are now its tallest point, so `meshScale` 0.35 -> 0.54 and `rig_special.py --hover` 2.5 -> 1.6 keep its 1.6 m
+  wingspan and flying height. `creatureportraits.ps1` parks the hidden survivor past the 25 m nameplate range (a small
+  creature's nameplate sat across it in the picture).
+- **Pumicehog fixed to its concept** (`ph_fix.py` in WildreachArt\out\pumicehog_v2; the grey pumice rodent of
+  `pumicehop_0.png`): the image model's head was turned 27 degrees to its right (from the three-quarter concept) and
+  turns back straight, through a temporary armature heat-weighted to the mesh so the cheeks blend into the shoulders.
+  Its front paws' claws touched in the middle (the rigger read them as one foot) and now stand a little apart, and a
+  thin white spike above its right eye is gone. Its grey read white and its back yellow in the game's sun: the grey is
+  darker and cooler with pumice pores, the back a deeper orange, and the design's "warm orange glow in the cracks" is
+  cracks through the orange that `MI_PumicehogGlow` lights (FIRE 4). Re-rigged (`--front-elbow 0.3`: folding at a low
+  wrist hooked the paws back) with new light clips; `anim_creature.py --gait hop` (new) makes it hop at a walk and bound
+  at a run, as the design's hopping critter (its old clips hopped too).
+- **Rimeclaw fixed to its concept** (`rc_fix.py` in WildreachArt\out\rimeclaw_v3; concept 3, the white ice lion): its
+  whiskers were thin wire loops standing off the muzzle, which the game drew as flat grey plates either side of the mouth;
+  they are cut out (thin both ways, at mouth height, so the mane's flakes stay) and their roots closed. The whole mane
+  had come out blue: its front half is the concept's white ruff round the face now, with the blue kept along the crest,
+  the back of the mane and the chest. Its dark slit eyes are the concept's glowing ice blue, the same size and set
+  evenly (one had come out bigger and lower), with round pupils like a big cat's, lit by `MI_RimeclawGlow` through a
+  new `EYES` glow kind in `creature_glow.py` (bluer than any fur, so the blue mane stays dark). Its dark navy lower legs
+  (baked shading) are lifted toward the body's white. Re-rigged with an elbow under the chest (`--belly-z 0.40
+  --front-elbow 0.36`: the rigger read the belly at 0.20) and new light clips. `rig_quadruped.py` now gives both hips of
+  a pair the same place along the body (a leg modelled mid-stride put Rimeclaw's hind hips 14 cm apart), and
+  `anim_creature.py --lift` (new) scales paw clearance in the swing: Rimeclaw walks at 0.6, since at the light build's
+  full lift its forearms swung up level like a show horse's.
+- **Rimeclaw's mane is hair now, and Rimeclaw is Emberhorn-sized** (Raven: the mane looked like part of the body, not
+  hair; about as big as Emberhorn, a tad smaller). New `Tools/art/hair_locks.py` grows 2200 locks over the rigged mane
+  (`rc_fix.py` now also saves the mane as a mask): tapered, flattened, combed out from the face and back, the crest
+  back over the neck and the chest hair down, each drooping at the tip, each taking the colour (white ruff, blue crest,
+  back and chest) and skin weights under its root, like the concept's. Locks rooted in the texture's dark creases are
+  skipped. Rig and clips from WildreachArt\out\rimeclaw_v4. Size: halfHeight 60 -> 95 (190 cm to the top of the mane,
+  about 2.5 m long; Emberhorn stands 210 cm and 2.7 m), radius 88, lunge reach 300; at that size its walk is a trot.
+- **Glacimaw rebuilt behind the head** (Raven: the body should be longer, the spikes should look like spikes, the tail
+  end looked like a blob). The old `--stretch 1.4` had stretched the whole model along its length, smearing the spikes
+  into low fins, and the image model's tail curled under into a lump. `gl_build.py` (WildreachArt\out\glacimaw_v2)
+  keeps the image model's head (jaws, teeth, horns; the yellow-brown teeth now ice white, rusty spots in the mouth
+  gone) and grows a new body out of the neck's edge, after concept a: about 5.6 m of overlapping pale ice-blue plates
+  (was 3.9 m), arching up behind the head, then lying along the ground and tapering to a point; a crystal spike on every
+  plate down the back, raked back and tallest mid-body, and a fringe of smaller crystals along the lower flanks, all
+  pale to white at the tips. The body is painted into the right half of a texture twice as wide. Glossy skin
+  (`MI_GlacimawSkin`: `creature_glow.py` entries take a third, optional set of material scalars now).
+  `rig_special.py` gives loose pieces automatic weights skip their nearest skin's weights. Then Raven doubled it:
+  halfHeight 95 -> 198 (the crest stands about 4 m, its jaws about the survivor's height), about 11 m long, radius
+  90 -> 180, spit range 380 -> 940 (its head sits about 5.6 m in front of its middle). A cave Glacimaw still fits the
+  tunnels (5 m wide, 4.5 m high), but its tail reaches into the cave walls.
+- **Glacimaw lies flat and moves like a snake** (Raven: no hunch at rest, slither like a snake, and bite by picking up
+  its front half and chomping). `gl_build.py --flat` (output in WildreachArt\out\glacimaw_v3) lays the body straight
+  along the ground from the neck, which eases down from the head's height; no arch. It also finds the lower jaw (the
+  mouth is modelled a little open, the upper teeth hanging past the lower lip, so by distance over the surface from the
+  chin versus the upper gums) and saves it for the rig. `rig_special.py --body worm --head-info` gives it a rigid head
+  bone and a jaw bone hinged at the corner of the mouth, and new clips: it slithers in waves that run back down the body
+  (the neck sways a third as much, the head keeps looking ahead), lies still at rest with a slow sway, a flicking tail
+  tip and the jaw breathing, and bites by lifting its front half about 4 m up, jaw gaping, coiling back, then striking
+  forward and down as the jaw snaps shut, with a shake, before lowering flat again; its spit uses the same strike.
+  About 11 m long still (halfHeight 198 -> 120: lying flat it stands 2.4 m to its horns and spikes), bite range
+  940 -> 640 (where its jaws land at the strike), walk and run paced to the waves (`pace` 315 / 480 cm/s), `strikeAt`
+  0.53. New creatures.json `ownWindup`: an attack clip that rears on its own skips the telegraph's rear-back (tipping
+  the whole worm back sank its tail into the ground).
+- **Glacimaw lies along slopes** (Raven: tilt to follow slopes; on the ramp its 11 m body had stayed level, the tail
+  floating and the head in the slope). Legless creatures with a spine chain (`rig_special.py` worms) now trace the ground
+  under every joint, like the creature feet (same range, smoothing and fade), and each spine bone turns (up to
+  `anim.creatureSpine.maxBend`, 35 degrees) so the body lies along the ground: up a slope, over a crest or bent at a
+  slope's foot, whatever it is doing (a rearing bite rises from the ground under it). `creaturevideo.ps1 -RampCam 90`
+  films the ramp climb side-on (default 110, from behind its right).
+- **Glacimaw's body takes its head's colours** (Raven: the new body and the head didn't match or mix). The body had been a pale
+  ice blue a quarter brighter than the head's steel blue, and smooth beside the head's mottling; in the game its gloss took
+  the sky and it read nearly white. `gl_build.py` now paints the body from the head's own skin (its mean colour, with more
+  colour: the head's grey horns and bare patches pull the mean grey), lighter on the back and darker underneath, with
+  darker blotches across the plates like the head's, softer plate-edge highlights, and crystals that go from the body's
+  blue at the root to a bluer pale ice at the tips (were near white). A softer sheen too (`MI_GlacimawSkin` roughness
+  0.45 -> 0.6, specular 0.45 -> 0.35). The head piece's neck takes the same colours, so the join blends.
+- **Big creatures' bites reach.** A creature's bite swept only the weapon reach (220 cm) from its middle, whatever its
+  size, while the AI stops to bite at its `attackRange`: anything over about 2.6 m (Glacimaw, Basaltback, Emberhorn,
+  Magmaw, Cinderfang, Rimeclaw) bit at the air. The sweep now reaches the creature's `attackRange` when that's longer.
+  A spit leaves from the creature's jaw (or head) bone when its art has one, not the front of its capsule (a long
+  Glacimaw spat from the middle of its body).
+- **Sizes against the survivor (180 cm)**, Raven's picks from side-by-side shots: **Magmaw doubled** (halfHeight 55 ->
+  110, radius 90, bite reach 340: 220 cm to the sail tip, head level with the survivor's) and **Cinderfang 1.75x**,
+  horse-sized (halfHeight 45 -> 79, radius 66, reach 320: head at the survivor's shoulder, about 1.9 m long), and
+  **Emberhorn 1.75x**, a mount bigger than its rider (halfHeight and radius 60 -> 105, charge reach 240 -> 360: 210 cm to
+  the hump), all re-animated at the new size (slower, longer strides; at the same 480 cm/s an Emberhorn's run is now
+  a heavy amble, not a gallop). `anim_creature.py` now counts `meshScale` in a creature's size
+  (Cinderfang's strides had been planned 8% short). Between those and the giant Basaltback, Cinderfang packs and Magmaw
+  counted as big enough to hunt a Basaltback (prey up to 2x / 1.3x the hunter's radius) and `Wildreach.Creatures.Behaviour`
+  "nothing hunts a Basaltback" failed; at radius 150 it is out of reach of both again. Raven will settle the food chain
+  once every creature's size is set.
+- **A stomp's ring grows with the body** (`creatureAI.stomp.bodyRadius` 90: the 320 ring is a Woolly drudge's, a bigger
+  body stomps one as much wider; the giant Basaltback's is 5.3 m). At 3.2 m the Basaltback bit from further out than
+  its stomp reached and never stomped (`Tools\aitest.ps1` "a Basaltback stomps" failed).
+- **Rig fixes** (`rig_quadruped.py`): a hip traced across the middle takes its partner's, mirrored (Cinderfang's left
+  front shoulder had landed on the right of its chest); the belly is measured on the centre line (front legs standing
+  close together had read as belly and dropped the hips); automatic weights go on the biggest piece alone and loose
+  pieces (fur strands, a separate tail) take their two nearest bones (130 strands had made the weights fail outright,
+  leaving the whole body on rough envelopes); a shoulder or hip carries on along the slant of the leg's middle, not
+  its top few points (they swing toward the chest the leg merges into: Cinderfang's shoulders had landed in front of
+  its legs, tilting them forward when standing); `--front-wrist` sets the front fold's height; `--front-elbow` makes
+  it an elbow; `--hip-z` sets the hip height (a sail or crest reads as the back). `anim_creature.py`: a front joint
+  above half the shoulder's height is an elbow (bends back, no paw flick, the paw keeps its angle to the forearm through
+  the swing); two-legged creatures work (body measured to the chest, legs step in turn at every speed, the body comes
+  down level where a foot can't reach and the bite lunges half as far: Magmaw's first bite reared it upright). The
+  front-leg middle-slant hip rule applies to front legs only (Magmaw's zig-zag hind legs put their hips in front).
+- **Art camera** frames the creature's own model where its animation has it (it had been framing the empty character
+  mesh, so a hovering moth sat off the top of the picture); `WRTuneSet <path> <value>` sets a tuning number locally.
+  `Tools\creatureportraits.ps1 [ids]`: one picture per creature, front over side, on the 1 m checker stage. Bosses get
+  a wider frame and the hidden survivor parks outside their aggro radius (they had been fighting it mid-shot).
+
 ## Unreleased (branch creature-runtime): creature feet on uneven ground, frame-exact creature videos
 
 - **Feet on slopes and bumps** for the generated creatures (`Tools/art/rig_quadruped.py` skeletons: `<leg>_upper /
