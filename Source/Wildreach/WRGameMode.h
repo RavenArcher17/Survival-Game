@@ -17,8 +17,13 @@ public:
 	virtual void Logout(AController* Exiting) override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** Restart the given controller's pawn after the respawn delay (tuning: player.respawnSeconds). */
+	/**
+	 * A player died: they wake when they press Wake on the death screen's map, once player.respawnSeconds have passed
+	 * (player.autoWakeSeconds > 0 wakes them at their pick after that long anyway).
+	 */
 	void RequestRespawn(AController* Controller);
+	/** Bring a dead player back at the place they picked; false if they aren't waiting to wake or it's too soon. */
+	bool Wake(AController* Controller);
 
 	/**
 	 * Persistence v1: one JSON file per player under Saved/ServerDB/players/, keyed by player name.

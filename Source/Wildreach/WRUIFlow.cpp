@@ -4,12 +4,15 @@
 
 #include "WRUIFlow.h"
 #include "Wildreach.h"
+#include "WRBeds.h"
+#include "WRUIMap.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
 #include "WRCharacter.h"
 #include "WRCrafting.h"
 #include "WRCreature.h"
 #include "WRFx.h"
+#include "WRGameMode.h"
 #include "WRGameState.h"
 #include "WRInventory.h"
 #include "WRKeyBindings.h"
@@ -94,10 +97,10 @@ namespace WRFlowUI
 	FText KeyText(FName Action) { return WRUI::KeyName(FWRKeyBindings::Get().Key(Action)); }
 
 	/** Content that fades (and drifts in from Drift) with an alpha; collapsed at zero, never takes clicks. */
-	TSharedRef<SWidget> Fade(TFunction<float()> Alpha, TSharedRef<SWidget> Content, FVector2D Drift = FVector2D::ZeroVector)
+	TSharedRef<SWidget> Fade(TFunction<float()> Alpha, TSharedRef<SWidget> Content, FVector2D Drift = FVector2D::ZeroVector, bool bClickable = false)
 	{
 		return SNew(SBorder).BorderImage(FStyleDefaults::GetNoBrush()).Padding(0.f)
-			.Visibility_Lambda([Alpha]() { return Alpha() > 0.002f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			.Visibility_Lambda([Alpha, bClickable]() { return Alpha() > 0.002f ? (bClickable ? EVisibility::SelfHitTestInvisible : EVisibility::HitTestInvisible) : EVisibility::Collapsed; })
 			.ColorAndOpacity_Lambda([Alpha]() { return FLinearColor(1.f, 1.f, 1.f, FMath::Clamp(Alpha(), 0.f, 1.f)); })
 			.RenderTransform_Lambda([Alpha, Drift]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(Drift * (1.f - FMath::Clamp(Alpha(), 0.f, 1.f)))); })
 			[
@@ -270,16 +273,31 @@ public:
 		SetVisibility(EVisibility::SelfHitTestInvisible);
 		ChildSlot
 		[
-			SNew(SOverlay).Visibility_Lambda([Black]() { return Black() > 0.002f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-			+ SOverlay::Slot()[SNew(SImage).Image(WRUI::White()).ColorAndOpacity_Lambda([Black]() { return FSlateColor(FLinearColor(0.f, 0.f, 0.f, Black())); })]
+			// (Only the death card's places to wake take clicks.)
+			SNew(SOverlay).Visibility_Lambda([Black]() { return Black() > 0.002f ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+			+ SOverlay::Slot()[SNew(SImage).Visibility(EVisibility::HitTestInvisible).Image(WRUI::White()).ColorAndOpacity_Lambda([Black]() { return FSlateColor(FLinearColor(0.f, 0.f, 0.f, Black())); })]
 			+ SOverlay::Slot()[Fade(ArtAlpha, WRUIFlow::MakeLoadingScreen(LOCTEXT("LoadingIsland", "Loading the island…"), true))]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Fade(LineAlpha, StatusLine(LOCTEXT("LoadingIsland", "Loading the island…"), 18))]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Fade(CardAlpha, DeathCard(), FVector2D(0.f, 18.f * U))]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Fade(CardAlpha, DeathCard(), FVector2D(0.f, 18.f * U), true)]
 		];
+	}
+
+	virtual void Tick(const FGeometry& Geometry, const double Time, const float Dt) override
+	{
+		SCompoundWidget::Tick(Geometry, Time, Dt);
+		// A new death brings a new list of places to wake.
+		const TSharedPtr<FWRFlow> F = Flow.Pin();
+		if (F && WakeBox.IsValid() && F->GetDeathCount() != WakeBuiltFor)
+		{
+			WakeBuiltFor = F->GetDeathCount();
+			RebuildWake();
+		}
 	}
 
 private:
 	TWeakPtr<FWRFlow> Flow;
+	TSharedPtr<SVerticalBox> WakeBox;
+	int32 WakeBuiltFor = -1;
 
 	const FWRDeathNote* Note() const { const TSharedPtr<FWRFlow> F = Flow.Pin(); return F ? &F->GetDeathNote() : nullptr; }
 
@@ -327,29 +345,20 @@ private:
 		return FText::FromString(FString::Printf(TEXT("%s, %s. Anyone can take them; they last %d minutes."), *Stacks, *Where, Minutes));
 	}
 
-	FText WakeTitle() const
-	{
-		const FWRDeathNote* N = Note();
-		if (!N || N->RespawnName.IsEmpty()) return LOCTEXT("WakeCamp", "You'll wake at your camp");
-		return FText::Format(LOCTEXT("WakeAt", "You'll wake at {0}"), FText::FromString(N->RespawnName));
-	}
-
-	FText WakeLine() const
-	{
-		const FWRDeathNote* N = Note();
-		if (!N || N->RespawnAt.IsZero()) return FText::GetEmpty();
-		const FVector D = N->RespawnAt - N->DeathAt;
-		if (D.Size2D() < 3000.f) return LOCTEXT("WakeNear", "Close to where you fell.");
-		return FText::FromString(FString::Printf(TEXT("%s %s of where you fell."), *WRUIWindowKit::Distance(D.Size2D()), WRUIWindowKit::CompassName(D)));
-	}
-
-	FText Countdown() const
+	/** The Wake button: where it takes you, or why not yet. */
+	FText WakeButton() const
 	{
 		const TSharedPtr<FWRFlow> F = Flow.Pin();
-		if (!F) return FText::GetEmpty();
+		const FWRDeathNote* N = Note();
+		if (!F || !N) return FText::GetEmpty();
 		if (F->IsBack()) return LOCTEXT("WakeLoading", "Loading the island…");
+		if (F->IsWaking()) return LOCTEXT("Waking", "Waking…");
 		const float Left = F->GetRespawnLeft();
-		return Left > 0.05f ? FText::Format(LOCTEXT("WakeIn", "Waking in {0}"), FText::AsNumber(FMath::CeilToInt(Left))) : LOCTEXT("Waking", "Waking…");
+		if (Left > 0.f) return FText::Format(LOCTEXT("WakeIn", "Wake in {0}"), FText::AsNumber(FMath::CeilToInt(Left)));
+		const float Rest = F->GetWakeRestLeft(N->WakePick);
+		if (Rest > 0.f) return FText::Format(LOCTEXT("WakeRestingBtn", "Resting, {0} s"), FText::AsNumber(FMath::CeilToInt(Rest)));
+		if (N->RespawnName.IsEmpty()) return LOCTEXT("WakeCamp", "Wake at your camp");
+		return FText::Format(LOCTEXT("WakeAt", "Wake at {0}"), FText::FromString(N->RespawnName));
 	}
 
 	TSharedRef<SWidget> Row(FName Glyph, TAttribute<FLinearColor> GlyphColor, TAttribute<FText> Title, TAttribute<FText> Line)
@@ -373,20 +382,94 @@ private:
 			];
 	}
 
+	/** The places to wake beside the map (your beds, your clan's, your path's camps), the same picks as its markers. */
+	void RebuildWake()
+	{
+		using WRUI::U;
+		WakeBox->ClearChildren();
+		const FWRDeathNote* N = Note();
+		WakeBox->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)
+		[
+			WRUI::Text(LOCTEXT("WakeChoose", "CHOOSE WHERE TO WAKE"), WRFlowUI::Spaced(WRUI::Body(12, 800), 60), WRUI::Ink3)
+		];
+		for (int32 i = 0; N && i < FMath::Min(N->Wake.Num(), 8); ++i)
+		{
+			WakeBox->AddSlot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[WakeChoice(i)];
+		}
+	}
+
+	TSharedRef<SWidget> WakeChoice(int32 i)
+	{
+		using WRUI::U;
+		const TWeakPtr<FWRFlow> W = Flow;
+		const FWRWakeOption O = Note()->Wake[i];
+		const auto Picked = [this, i]() { const FWRDeathNote* N = Note(); return N && N->WakePick == i; };
+		const auto Resting = [W, i]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F && F->GetWakeRestLeft(i) > 0.f; };
+		const auto Detail = [this, W, i, O]()
+		{
+			const TSharedPtr<FWRFlow> F = W.Pin();
+			const FWRDeathNote* N = Note();
+			if (!F || !N) return FText::GetEmpty();
+			const float Rest = F->GetWakeRestLeft(i);
+			if (Rest > 0.f) return FText::Format(LOCTEXT("WakeResting", "resting, {0} s"), FText::AsNumber(FMath::CeilToInt(Rest)));
+			const FVector D = O.At - N->DeathAt;
+			if (D.Size2D() < 500.f) return LOCTEXT("WakeChoiceNear", "where you fell");
+			return FText::FromString(FString::Printf(TEXT("%s %s"), *WRUIWindowKit::Distance(D.Size2D()), WRUIWindowKit::CompassName(D)));
+		};
+		const FName Glyph = O.Kind == TEXT("camp") ? FName(TEXT("camp")) : FName(TEXT("bed"));
+		return SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
+			.IsEnabled_Lambda([Resting]() { return !Resting(); })
+			.OnClicked_Lambda([W, i]() { if (const TSharedPtr<FWRFlow> F = W.Pin()) F->ChooseWake(i); return FReply::Handled(); })
+			[
+				SNew(SBorder).Padding(FMargin(10.f * U, 6.f * U))
+				.BorderImage_Lambda([Picked]() { return Picked() ? WRUI::Box(WRUI::Alpha(WRUI::Brass, 0.14f), 4.f, WRUI::Brass, 1.f) : WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.3f), 4.f, FLinearColor(0.f, 0.f, 0.f, 0.6f), 1.f); })
+				.ColorAndOpacity_Lambda([Resting]() { return FLinearColor(1.f, 1.f, 1.f, Resting() ? 0.5f : 1.f); })
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)
+					[
+						SNew(SBox).WidthOverride(16.f * U).HeightOverride(16.f * U)
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()[SNew(SImage).Image(WRUIWindowKit::Circle(FLinearColor(0.f, 0.f, 0.f, 0.4f), WRUI::Brass2, 1.5f))]
+							+ SOverlay::Slot().Padding(4.f * U)[SNew(SImage).Image(WRUIWindowKit::Circle(WRUI::Brass)).Visibility_Lambda([Picked]() { return Picked() ? EVisibility::HitTestInvisible : EVisibility::Hidden; })]
+						]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+					[
+						SNew(SBox).WidthOverride(20.f * U).HeightOverride(20.f * U)[SNew(SImage).Image(WRFlowUI::Glyph(Glyph)).ColorAndOpacity(O.bClan ? WRUI::Frost : WRUI::Brass)]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(O.Name), WRUI::Body(15, 700), WRUI::Ink)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.f * U, 0.f, 0.f, 0.f)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda(Detail), WRUI::Body(13, 500), WRUI::Ink2)
+					]
+				]
+			];
+	}
+
 	TSharedRef<SWidget> DeathCard()
 	{
 		using namespace WRFlowUI;
 		const FLinearColor Blood(FColor(176, 44, 34));
 		const float BarW = 360.f * U;
-		return SNew(SBox).WidthOverride(700.f * U)
+		const TWeakPtr<FWRFlow> W = Flow;
+		// You look at the island and pick where to wake: a bed of yours, a clanmate's, or one of your path's camps.
+		WRUIMap::FWakeMapArgs MapArgs;
+		MapArgs.Note = [W]() -> const FWRDeathNote* { const TSharedPtr<FWRFlow> F = W.Pin(); return F ? &F->GetDeathNote() : nullptr; };
+		MapArgs.Version = [W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F ? F->GetDeathCount() : 0; };
+		MapArgs.Resting = [W](int32 i) { const TSharedPtr<FWRFlow> F = W.Pin(); return F && F->GetWakeRestLeft(i) > 0.f; };
+		MapArgs.Pick = [W](int32 i) { if (const TSharedPtr<FWRFlow> F = W.Pin()) F->ChooseWake(i); };
+		const auto Waiting = [W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F && !F->IsBack() && F->GetRespawnLeft() > 0.f; };
+		return SNew(SBox).WidthOverride(1480.f * U)
 		[
 			SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				Carved(LOCTEXT("YouDied", "YOU DIED"), Spaced(WRUI::Title(64), 160), Blood, FLinearColor(FColor(205, 70, 52)), FLinearColor(FColor(232, 120, 92)))
+				Carved(LOCTEXT("YouDied", "YOU DIED"), Spaced(WRUI::Title(52), 160), Blood, FLinearColor(FColor(205, 70, 52)), FLinearColor(FColor(232, 120, 92)))
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 2.f * U, 0.f, 0.f)[Rule(150.f * U, WRUI::Brass)]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 16.f * U, 0.f, 0.f)
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 12.f * U, 0.f, 0.f)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
@@ -400,45 +483,67 @@ private:
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return KilledBy(); }), WRUI::Title(22, 600), WRUI::Ink, true)]
 			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 22.f * U, 0.f, 0.f)
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 20.f * U, 0.f, 0.f)
 			[
-				SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).BrassTrim(true).Padding(FMargin(26.f * U, 20.f * U))
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()
+				[
+					SNew(SBox).WidthOverride(880.f * U).HeightOverride(640.f * U)[WRUIMap::MakeWakeMap(MapArgs)]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(22.f * U, 0.f, 0.f, 0.f)
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()
 					[
-						Row(TEXT("map_pin"), TAttribute<FLinearColor>::CreateLambda([this]() { const FWRDeathNote* N = Note(); return N && N->bBag ? WRUI::Warn : WRUI::Good; }),
-							TAttribute<FText>::CreateLambda([this]() { return BagTitle(); }), TAttribute<FText>::CreateLambda([this]() { return BagLine(); }))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(56.f * U, 14.f * U, 0.f, 14.f * U)[WRUI::Divider()]
-					+ SVerticalBox::Slot().AutoHeight()
-					[
-						Row(TEXT("camp"), WRUI::Brass, TAttribute<FText>::CreateLambda([this]() { return WakeTitle(); }), TAttribute<FText>::CreateLambda([this]() { return WakeLine(); }))
-					]
-				]
-			]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 26.f * U, 0.f, 0.f)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
-				[
-					SNew(SBox).Visibility_Lambda([this]() { const TSharedPtr<FWRFlow> F = Flow.Pin(); return F && F->IsBack() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })[SNew(SWRSpinner).Size(24.f * U)]
-				]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Countdown(); }), Spaced(WRUI::Title(22, 600), 80), WRUI::Ink, true)]
-			]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 10.f * U, 0.f, 0.f)
-			[
-				SNew(SBox).WidthOverride(BarW).HeightOverride(6.f * U)
-				[
-					SNew(SOverlay)
-					+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(WRUI::Alpha(WRUI::Brass2, 0.3f), 3.f))]
-					+ SOverlay::Slot().HAlign(HAlign_Left).Padding(1.f)
-					[
-						SNew(SBox).WidthOverride_Lambda([this, BarW]() { const TSharedPtr<FWRFlow> F = Flow.Pin(); return FOptionalSize(FMath::Max(2.f, (BarW - 2.f) * (F ? F->GetRespawnFraction() : 0.f))); })
+						SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).BrassTrim(true).Padding(FMargin(24.f * U, 20.f * U))
 						[
-							SNew(SImage).Image(WRUI::Box(WRUI::Brass, 2.f))
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								Row(TEXT("map_pin"), TAttribute<FLinearColor>::CreateLambda([this]() { const FWRDeathNote* N = Note(); return N && N->bBag ? WRUI::Warn : WRUI::Good; }),
+									TAttribute<FText>::CreateLambda([this]() { return BagTitle(); }), TAttribute<FText>::CreateLambda([this]() { return BagLine(); }))
+							]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 16.f * U)[WRUI::Divider()]
+							+ SVerticalBox::Slot().AutoHeight()[SAssignNew(WakeBox, SVerticalBox)]
 						]
 					]
+					// Wake: greyed with the seconds left while you wait, then where it takes you.
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)
+					[
+						SNew(SBox).HeightOverride(58.f * U)
+						[
+							SNew(SBorder).BorderImage(FStyleDefaults::GetNoBrush()).Padding(0.f)
+							.ColorAndOpacity_Lambda([W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return FLinearColor(1.f, 1.f, 1.f, F && F->CanWake() ? 1.f : 0.75f); })
+							[
+								SNew(SWRButton).Primary(true).FontSize(18)
+								.Text_Lambda([this]() { return WakeButton(); })
+								.IsEnabled_Lambda([W]() { const TSharedPtr<FWRFlow> F = W.Pin(); return F && F->CanWake(); })
+								.OnClicked_Lambda([W]() { if (const TSharedPtr<FWRFlow> F = W.Pin()) F->Wake(); return FReply::Handled(); })
+							]
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 12.f * U, 0.f, 0.f)
+					[
+						SNew(SBox).WidthOverride(BarW).HeightOverride(6.f * U).Visibility_Lambda([Waiting]() { return Waiting() ? EVisibility::HitTestInvisible : EVisibility::Hidden; })
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(WRUI::Alpha(WRUI::Brass2, 0.3f), 3.f))]
+							+ SOverlay::Slot().HAlign(HAlign_Left).Padding(1.f)
+							[
+								SNew(SBox).WidthOverride_Lambda([this, BarW]() { const TSharedPtr<FWRFlow> F = Flow.Pin(); return FOptionalSize(FMath::Max(2.f, (BarW - 2.f) * (F ? F->GetRespawnFraction() : 0.f))); })
+								[
+									SNew(SImage).Image(WRUI::Box(WRUI::Brass, 2.f))
+								]
+							]
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 10.f * U, 0.f, 0.f)
+					[
+						SNew(SHorizontalBox).Visibility_Lambda([this]() { const TSharedPtr<FWRFlow> F = Flow.Pin(); return F && F->IsBack() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRSpinner).Size(20.f * U)]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("WakeLoadingLine", "Loading the island…"), Spaced(WRUI::Title(16, 600), 60), WRUI::Ink, true)]
+					]
+					+ SVerticalBox::Slot().FillHeight(1.f)[SNullWidget::NullWidget]
 				]
 			]
 		];
@@ -685,6 +790,8 @@ void FWRFlow::OnDeathNote(const FWRDeathNote& Note)
 	const double Now = WRUIMotion::Now();
 	Death = Note;
 	DeathAt = Now;
+	++DeathCount;
+	WakeSentAt = -1.0;
 	Cover = ECover::Dying;
 	bBack = false;
 	bStreaming = false;
@@ -726,6 +833,61 @@ float FWRFlow::GetRespawnLeft() const
 float FWRFlow::GetRespawnFraction() const
 {
 	return bBack ? 1.f : FMath::Clamp(1.f - GetRespawnLeft() / FMath::Max(0.1f, Death.Seconds), 0.f, 1.f);
+}
+
+bool FWRFlow::WantsCursor() const
+{
+	return Cover == ECover::Dying && !bBack && !bReleasing && CardShownAt >= 0.0 && !IsWaking();
+}
+
+float FWRFlow::GetWakeRestLeft(int32 Index) const
+{
+	return Death.Wake.IsValidIndex(Index) ? FMath::Max(0.f, Death.Wake[Index].RestSeconds - float(WRUIMotion::Now() - DeathAt)) : 0.f;
+}
+
+bool FWRFlow::ChooseWake(int32 Index)
+{
+	AWRPlayerController* P = GetPC();
+	if (!P || !Death.Wake.IsValidIndex(Index) || bBack || IsWaking() || GetWakeRestLeft(Index) > 0.f) return false;
+	const FWRWakeOption& O = Death.Wake[Index];
+	Death.WakePick = Index;
+	Death.RespawnName = WRBeds::InSentence(O.Name);
+	Death.RespawnAt = O.At;
+	Death.bRespawnBed = O.Kind != TEXT("camp");
+	if (!bPreviewHold) P->ServerChooseWake(Index);
+	WRSound::PlayUI(P, TEXT("ui.click"));
+	UE_LOG(LogWildreach, Log, TEXT("FLOW chose to wake at '%s' (%d of %d)"), *O.Name, Index + 1, Death.Wake.Num());
+	return true;
+}
+
+bool FWRFlow::IsWaking() const
+{
+	// No answer for a few seconds (pressed a moment early by the server's clock, or the place went): press again.
+	return WakeSentAt >= 0.0 && WRUIMotion::Now() - WakeSentAt < 2.0;
+}
+
+bool FWRFlow::CanWake() const
+{
+	return Cover == ECover::Dying && CardShownAt >= 0.0 && !bBack && !bReleasing && !IsWaking() && GetRespawnLeft() <= 0.f
+		&& (Death.Wake.Num() == 0 || GetWakeRestLeft(Death.WakePick) <= 0.f);
+}
+
+bool FWRFlow::Wake()
+{
+	AWRPlayerController* P = GetPC();
+	if (!P || !CanWake()) return false;
+	WakeSentAt = WRUIMotion::Now();
+	if (bPreviewHold)
+	{
+		PreviewUntil = WakeSentAt;   // the preview's made-up note: just close it
+	}
+	else
+	{
+		P->ServerWake(Death.WakePick);
+	}
+	WRSound::PlayUI(P, TEXT("ui.click"));
+	UE_LOG(LogWildreach, Log, TEXT("FLOW wake at '%s'"), Death.Wake.IsValidIndex(Death.WakePick) ? *Death.Wake[Death.WakePick].Name : TEXT("(camp)"));
+	return true;
 }
 
 bool FWRFlow::GetBagMarker(FVector& OutLocation) const
@@ -1563,7 +1725,16 @@ void FWRFlow::Preview(const TArray<FString>& Args)
 		for (const FWRPoi& Poi : FWRPoi::All) if (Poi.Kind == TEXT("camp") && (!Camp || FVector::Dist2D(Poi.Location, At) < FVector::Dist2D(Camp->Location, At))) Camp = &Poi;
 		N.RespawnName = Camp ? Camp->Name : TEXT("Volcanic camp 3");
 		N.RespawnAt = Camp ? Camp->Location : At + FVector(80000.f, 0.f, 0.f);
-		N.Seconds = 30.f;
+		// Places to wake on the map: a made-up bed of yours (picked) and a clanmate's, then this side's camps.
+		const auto AddWake = [&N](const FString& Name, FName Kind, const FVector& Where, bool bClan) { FWRWakeOption& O = N.Wake.AddDefaulted_GetRef(); O.Name = Name; O.Kind = Kind; O.At = Where; O.bClan = bClan; };
+		AddWake(TEXT("Your bed"), TEXT("bed"), At + FVector(-9000.f, 6000.f, 0.f), false);
+		AddWake(TEXT("Mira's bed"), TEXT("bed"), At + FVector(14000.f, -11000.f, 0.f), true);
+		for (const FWRPoi& Poi : FWRPoi::All)
+		{
+			if (Poi.Kind == TEXT("camp") && (Poi.Location.X < 0.f) == (At.X < 0.f)) AddWake(Poi.Name, TEXT("camp"), Poi.Location, false);
+		}
+		N.RespawnName = WRBeds::InSentence(N.Wake[0].Name);
+		N.Seconds = 5.f;
 		OnDeathNote(N);
 		bPreviewHold = true;
 		PreviewUntil = Now + 30.0;
@@ -1679,6 +1850,27 @@ void AWRPlayerController::ClientDeathNote_Implementation(const FWRDeathNote& Not
 		{
 			F->OnDeathNote(Note);
 		}
+	}
+}
+
+void AWRPlayerController::ServerChooseWake_Implementation(int32 Index)
+{
+	// Only while dead: a living player has nowhere to wake.
+	if (const AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAlive()) return;
+	WRBeds::Choose(this, GetPlayerState<AWRPlayerState>(), Index);
+}
+
+void AWRPlayerController::ServerWake_Implementation(int32 Index)
+{
+	if (const AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAlive()) return;
+	AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
+	AWRGameMode* GM = GetWorld()->GetAuthGameMode<AWRGameMode>();
+	if (!PS || !GM || PS->WakeReadyAt < 0.0) return;
+	// A place other than the one already picked (resting or gone: stay on the death screen and pick again).
+	if (Index != PS->WakePick && !WRBeds::Choose(this, PS, Index)) return;
+	if (!GM->Wake(this))
+	{
+		UE_LOG(LogWildreach, Log, TEXT("BEDS %s pressed Wake %.1f s early"), *PS->GetPlayerName(), PS->WakeReadyAt - GetWorld()->GetTimeSeconds());
 	}
 }
 

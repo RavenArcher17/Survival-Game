@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRBeds.h"
 #include "WRGameState.h"
 #include "Wildreach.h"
 #include "WRCharacter.h"
@@ -277,6 +278,10 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	Root->SetObjectField(TEXT("paths"), PS->GetPaths()->ToJson());
 	Root->SetObjectField(TEXT("inventory"), PS->GetInventory()->ToJson());
 	Root->SetObjectField(TEXT("lifeSkills"), PS->GetLifeSkills()->ToJson());
+	if (const TSharedPtr<FJsonObject> Bed = WRBeds::SaveDefault(PS))
+	{
+		Root->SetObjectField(TEXT("bed"), Bed);
+	}
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -325,6 +330,12 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 			*PS->GetPaths()->GetMainPath().ToString(), PS->GetPaths()->GetSpent(PS->GetPaths()->GetMainPath()),
 			*PS->GetPaths()->GetSubPath().ToString(), PS->GetPaths()->GetSpent(PS->GetPaths()->GetSubPath()));
 	}
+	// The bed you wake at by default: the world's beds remember who set them, so it's found again among them.
+	const TSharedPtr<FJsonObject>* Bed = nullptr;
+	if (Root->TryGetObjectField(TEXT("bed"), Bed))
+	{
+		WRBeds::LoadDefault(PS, *Bed);
+	}
 }
 
 void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
@@ -348,7 +359,8 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 	FWRClans::Get().RefreshPlayerStates(GetWorld());
-	const AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
+	AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
+	WRBeds::Refresh(PS);
 	UE_LOG(LogWildreach, Log, TEXT("Player joined: %s main=%s (%d connected)"),
 		PS ? *PS->GetPlayerName() : TEXT("?"), PS ? *PS->GetPaths()->GetMainPath().ToString() : TEXT("?"), GetNumPlayers());
 }
@@ -362,11 +374,17 @@ void AWRGameMode::Logout(AController* Exiting)
 
 AActor* AWRGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	// A bed or bedroll you've set wins; otherwise spawn in the main path's biome
-	// (player starts are tagged "volcanic" / "tundra").
+	// A bed or bedroll you've set wins (on top of it: its origin is on the floor); otherwise spawn in the main path's
+	// biome (player starts are tagged "volcanic" / "tundra").
 	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
 	if (PS && PS->RespawnPoint.IsValid())
 	{
+		const ACharacter* Body = DefaultPawnClass ? Cast<ACharacter>(DefaultPawnClass->GetDefaultObject()) : nullptr;
+		const float HalfHeight = Body && Body->GetCapsuleComponent() ? Body->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f;
+		if (AActor* Spot = WRBeds::SpotAbove(PS->RespawnPoint.Get(), HalfHeight, 30.f))
+		{
+			return Spot;
+		}
 		return PS->RespawnPoint.Get();
 	}
 	const FWRPathDef* Def = PS ? FWRPathRegistry::Get().Find(PS->GetPaths()->GetMainPath()) : nullptr;
@@ -394,13 +412,42 @@ void AWRGameMode::RequestRespawn(AController* Controller)
 	{
 		return;
 	}
-
-	FTimerHandle Handle;
-	GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [this, WeakController = TWeakObjectPtr<AController>(Controller)]()
+	const float Wait = WRTune(TEXT("player.respawnSeconds"), 10.f);
+	AWRPlayerState* PS = Controller->GetPlayerState<AWRPlayerState>();
+	if (PS)
 	{
-		if (AController* C = WeakController.Get())
+		PS->WakeReadyAt = GetWorld()->GetTimeSeconds() + Wait;
+	}
+	// Without a player state of ours there's no death screen to press Wake on: back after the wait.
+	const float Auto = PS ? WRTune(TEXT("player.autoWakeSeconds"), 0.f) : Wait;
+	if (Auto > 0.f)
+	{
+		FTimerHandle Handle;
+		GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [this, WeakController = TWeakObjectPtr<AController>(Controller)]()
 		{
-			RestartPlayer(C);
-		}
-	}), WRTune(TEXT("player.respawnSeconds"), 10.f), false);
+			if (AController* C = WeakController.Get()) Wake(C);
+		}), FMath::Max(Auto, Wait), false);
+	}
+}
+
+bool AWRGameMode::Wake(AController* Controller)
+{
+	if (!Controller)
+	{
+		return false;
+	}
+	AWRPlayerState* PS = Controller->GetPlayerState<AWRPlayerState>();
+	if (PS)
+	{
+		// A second's grace: the death screen counts on the client's clock, and the world's time runs a little behind
+		// real time whenever the server hitches (a long frame is clamped), so a press right at zero came in "early".
+		if (PS->WakeReadyAt < 0.0 || GetWorld()->GetTimeSeconds() < PS->WakeReadyAt - 1.0) return false;
+		PS->WakeReadyAt = -1.0;
+		// Stand on the pick afresh: the spot above it lives only a while, and the death screen can be open longer.
+		if (PS->WakeActors.IsValidIndex(PS->WakePick)) WRBeds::Choose(Controller, PS, PS->WakePick);
+	}
+	RestartPlayer(Controller);
+	// The bed they woke at rests a while; a bedroll is used up.
+	WRBeds::OnWoke(PS);
+	return true;
 }

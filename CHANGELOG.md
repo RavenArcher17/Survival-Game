@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: beds and respawn (0.6)
+
+From Raven's Oct 31 review: a bed should be where you wake, and still be there after a restart.
+
+- **Beds are saved** with the world (`sleepers` on each bed in `world_<name>.json`), and your chosen bed with you
+  (`bed` in your player save), so a restart keeps both.
+- **Placing a bed or bedroll sets it** ("Built bed. You'll wake here"); using one sets it again.
+- **Choose where to wake on the map** (Raven: "you die and then you're looking at the map"): the death screen is the
+  island map with every place you can wake on it (your beds, your clan's beds, your path's camps) and a red pin where
+  you fell, framed around them; click one to pick it (a brass halo), or pick from the list beside it, which gives each
+  one's distance and direction. Then press **Wake** ("Wake at your bed"): it works once the 10 s wait is over and you
+  wake there, standing on top of the bed. No timer wakes you any more (`player.autoWakeSeconds` > 0 brings that back).
+  The default pick is the bed you last set (or another of yours that's ready, else your camp). Names on the map step
+  aside for each other; the map zooms up to 12x for beds close together. `WRFlow preview death` shows it with made-up
+  beds and that side's camps.
+- **Beds rest, bedrolls wear out**: a bed can't be woken at again for 60 s after you use it ("resting, N s" in the list);
+  a bedroll is used up when you wake on it ("Your bedroll is worn out"). Both are in `Data/tuning.json` (`beds`).
+- **Beds on the map**: a new legend row, "Beds · where you can wake", with your beds in brass and your clan's in frost.
+- New `WRBeds.h/.cpp` holds it all; a bed that's destroyed drops out of everyone's list.
+- `Tools/flowtest.ps1` has a second phase: restart the server, check the bed was saved, place a bedroll, die, click
+  "Your bed" on the death screen's map, check nobody wakes until Wake is clicked, wake on the bed, then die again: the
+  bed is resting, so you wake on the bedroll, which wears out (22 checks).
+  Test bots can act while dead with a `dead:` prefix (`dead:WRClickMap Your bed`, `dead:WRClick Wake at`); otherwise a
+  dead bot presses Wake as soon as it can. New `WRClickMap <name>` clicks a named place on whichever map is up.
+- The server gives Wake a second's grace: its world clock runs a little behind the death screen's countdown.
+
 ## Unreleased: better-looking creatures (0.6, creatures first)
 
 Raven asked for better, more realistic creature movement and looks, keeping the design doc's fantasy, and reviewed

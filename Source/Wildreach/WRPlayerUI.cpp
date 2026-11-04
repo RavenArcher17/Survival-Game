@@ -118,7 +118,11 @@ void FWRPlayerUI::Tick(float DeltaTime)
 			LeavingScreens.RemoveAt(i);
 		}
 	}
-	if (Flow) Flow->Tick(DeltaTime);
+	if (Flow)
+	{
+		Flow->Tick(DeltaTime);
+		UpdateInputMode();  // (acts only on a change: the death screen's choices come and go)
+	}
 	// Abilities can have their own keys (Settings): make sure each learned one has an entry.
 	if (Now > NextAbilityKeyCheck)
 	{
@@ -210,7 +214,9 @@ void FWRPlayerUI::UpdateInputMode()
 	// Menus want the cursor and stop the camera; the build bar only while no piece is being placed.
 	const bool bMenu = ScreenWidget.IsValid() && !(ScreenName == TEXT("build") && P->IsPlacing());
 	const bool bWheel = OpenWheel >= 0 || bTameWheel;
-	const bool bWant = bMenu || bWheel;
+	// The death screen while it offers places to wake.
+	const bool bDeath = Flow && Flow->WantsCursor();
+	const bool bWant = bMenu || bWheel || bDeath;
 	const bool bStill = bMenu && ScreenName != TEXT("build");
 	if (bWant != bScreenWantsCursor || bStill != bScreenStopsMove)
 	{

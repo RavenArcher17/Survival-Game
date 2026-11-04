@@ -7,6 +7,7 @@
 #include "WRCharacter.h"
 #include "WRPlayerController.h"
 #include "WRUIFlow.h"
+#include "WRUIMap.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
@@ -195,6 +196,25 @@ namespace WRUIDrive
 			const bool bReaches = Reaches(F.Centre, F.Widget, Under);
 			Click(F.Centre, Button, ButtonOf(F.Widget), Took);
 			UE_LOG(LogWildreach, Log, TEXT("CLICK \"%s\" at %.0f,%.0f reaches=%d (%s; under %s)"), *F.Text, F.Centre.X, F.Centre.Y, bReaches ? 1 : 0, *Took, *Under);
+		}));
+
+	// WRClickMap <name>: click a place on the map that's up (the death screen's places to wake, or the journal map's
+	// markers), as the mouse would: a move there, a press and a release.
+	FAutoConsoleCommandWithWorldAndArgs ClickMapCommand(TEXT("WRClickMap"),
+		TEXT("Testing: click a named place on the map that is up, as the mouse would. WRClickMap <name>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
+		{
+			const FString Name = FString::Join(Args, TEXT(" ")).TrimStartAndEnd();
+			FVector2D Pos;
+			if (!FSlateApplication::IsInitialized() || !WRUIMap::FindMarkerOnScreen(Name, Pos))
+			{
+				UE_LOG(LogWildreach, Warning, TEXT("CLICKMAP \"%s\" is on no map that's up"), *Name);
+				return;
+			}
+			FString Under, Took;
+			Reaches(Pos, nullptr, Under);
+			Click(Pos, EKeys::LeftMouseButton, nullptr, Took);
+			UE_LOG(LogWildreach, Log, TEXT("CLICKMAP \"%s\" at %.0f,%.0f (under %s)"), *Name, Pos.X, Pos.Y, *Under);
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs KeyCommand(TEXT("WRKey"),

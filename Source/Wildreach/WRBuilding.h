@@ -116,6 +116,8 @@ public:
 	/** Server bookkeeping. */
 	FString LockCode;
 	TSet<FString> UnlockedFor;
+	/** Beds: the players who've set it to wake at (WRBeds; saved with the world). */
+	TArray<FString> Sleepers;
 	/** Ghosts are local previews in build mode: no collision, tinted. */
 	bool bGhost = false;
 

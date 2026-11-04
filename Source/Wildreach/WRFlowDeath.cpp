@@ -2,6 +2,7 @@
 // just left, pins where they'll come back, and sends it all to them as one death note.
 
 #include "WRFlowTypes.h"
+#include "WRBeds.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBuilding.h"
@@ -108,47 +109,23 @@ void WRFlow::SendDeathNote(AWRCharacter* Died, AActor* Killer)
 		Note.BagMinutes = WRTune(TEXT("death.bagMinutes"), 30.f);
 	}
 
-	// Where they come back. The engine respawns a player at their controller's start spot, so a bed has to be pinned
-	// there to count (ChoosePlayerStart alone is only asked when there is no start spot). Without a bed they keep the
-	// camp they started at, as before.
-	AActor* Start = PS->RespawnPoint.Get();
-	Note.bRespawnBed = Start != nullptr;
-	if (!Start)
+	// Where they come back (WRBeds): the bed they set last (on top of it), else their camp, pinned as the controller's
+	// start spot (the engine respawns a player there); the death screen offers their other beds and camps.
+	WRBeds::FillWakeChoices(Controller, PS, Note, Died->GetSimpleCollisionHalfHeight());
+	if (Note.Wake.Num() == 0)
 	{
-		Start = Controller->StartSpot.Get();
-	}
-	if (!Start)
-	{
-		if (AWRGameMode* GM = Died->GetWorld()->GetAuthGameMode<AWRGameMode>())
+		AActor* Start = Controller->StartSpot.Get();
+		if (!Start)
 		{
-			Start = GM->ChoosePlayerStart(Controller);
-		}
-	}
-	if (Start)
-	{
-		Controller->StartSpot = Start;
-		Note.RespawnAt = Start->GetActorLocation();
-		if (Note.bRespawnBed)
-		{
-			const AWRBuildPiece* Bed = Cast<AWRBuildPiece>(Start);
-			const FWRPieceDef* Def = Bed ? Bed->GetDef() : nullptr;
-			Note.RespawnName = FString::Printf(TEXT("your %s"), Def ? *Def->Name.ToLower() : TEXT("bed"));
-			// The bed's origin is on the floor: a body spawned there sinks into it. Wake on top of the bed instead, at a
-			// short-lived marker (gone after this respawn, so a bed broken later isn't remembered).
-			FVector Origin, Extent;
-			Start->GetActorBounds(true, Origin, Extent);
-			const FVector Above(Note.RespawnAt.X, Note.RespawnAt.Y, Origin.Z + Extent.Z + Died->GetSimpleCollisionHalfHeight() + 5.f);
-			FActorSpawnParameters Params;
-			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			if (ATargetPoint* Spot = Died->GetWorld()->SpawnActor<ATargetPoint>(Above, FRotator(0.f, Start->GetActorRotation().Yaw, 0.f), Params))
+			if (AWRGameMode* GM = Died->GetWorld()->GetAuthGameMode<AWRGameMode>())
 			{
-				Spot->SetLifeSpan(Note.Seconds + 30.f);
-				Controller->StartSpot = Spot;
-				Note.RespawnAt = Above;
+				Start = GM->ChoosePlayerStart(Controller);
 			}
 		}
-		else
+		if (Start)
 		{
+			Controller->StartSpot = Start;
+			Note.RespawnAt = Start->GetActorLocation();
 			Note.RespawnName = WRFlowDeath::CampAt(Note.RespawnAt);
 		}
 	}

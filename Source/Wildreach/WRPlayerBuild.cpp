@@ -574,6 +574,12 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 					FMath::Clamp(FVector2D(Extent.X, Extent.Y).Size() / 120.f, 0.4f, 3.f), TEXT("build.place"));
 			}
 			OutResult = FString::Printf(TEXT("Built %s"), *Def->Name);
+			// A bed you place is where you'll wake (you can still set another with E).
+			if (WRBeds::IsBed(Piece))
+			{
+				WRBeds::Set(PS, Piece);
+				OutResult = FString::Printf(TEXT("Built %s. You'll wake here"), *Def->Name);
+			}
 			UE_LOG(LogWildreach, Log, TEXT("BUILD %s placed %s at %s (support %d)"), *Who, *PieceId.ToString(), *Loc.ToCompactString(), Support);
 		}
 	}

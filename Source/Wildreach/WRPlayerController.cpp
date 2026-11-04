@@ -34,6 +34,7 @@
 #include "WRMainMenu.h"
 #include "WRKeyBindings.h"
 #include "WRPlayerUI.h"
+#include "WRUIFlow.h"
 #include "Kismet/GameplayStatics.h"
 #include "WorldPartition/WorldPartitionStreamingSource.h"
 
@@ -1141,6 +1142,25 @@ void AWRPlayerController::TickBot(float DeltaTime)
 	const bool bRiding = Cast<AWRCreature>(GetPawn()) != nullptr;
 	if (!bRiding && (!Survivor || !Survivor->IsAlive()))
 	{
+		// Dead: the rest wait for the next body, except commands marked "dead:" (clicks on the death screen), each with
+		// the wait after it.
+		while (bBotSetupDone && BotCmdQueue.Num() > 0 && BotClock >= BotCmdResume && BotCmdQueue[0].TrimStart().StartsWith(TEXT("dead:")))
+		{
+			const FString Cmd = BotCmdQueue[0].TrimStartAndEnd().RightChop(5).TrimStart();
+			BotCmdQueue.RemoveAt(0);
+			ConsoleCommand(Cmd);
+			if (BotCmdQueue.Num() > 0 && BotCmdQueue[0].TrimStart().StartsWith(TEXT("wait ")))
+			{
+				BotCmdResume = BotClock + FCString::Atof(*BotCmdQueue[0].TrimStart().RightChop(5));
+				BotCmdQueue.RemoveAt(0);
+			}
+		}
+		// Then it presses Wake as soon as it can (at the place picked), unless its next command is for the death screen.
+		FWRFlow* Flow = UI.IsValid() ? UI->GetFlow() : nullptr;
+		if (Flow && (BotCmdQueue.Num() == 0 || !BotCmdQueue[0].TrimStart().StartsWith(TEXT("dead:"))))
+		{
+			Flow->Wake();
+		}
 		return;
 	}
 

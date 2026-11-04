@@ -5,11 +5,15 @@
     "health": 100, "healthAtLevel50": 250,
     "stamina": 100, "staminaAtLevel50": 150,
     "staminaRegenPerSecond": 30, "staminaRegenDelay": 0.8,
-    "respawnSeconds": 10,
+    "respawnSeconds": 10, "autoWakeSeconds": 0,
+    "_wake": "respawnSeconds: the wait before the death screen's Wake button works. autoWakeSeconds > 0: wake at your pick after that long without pressing it (0: wait for you).",
     "walkSpeed": 450, "sprintSpeed": 750,
     "poise": 40, "poiseRegenPerSecond": 10, "poiseRegenDelay": 2.0,
     "_poise": "placeholder"
   },
+
+  "beds": { "_comment": "Beds and bedrolls (WRBeds): a bed you just woke at rests restSeconds before you can wake there again; a bedroll is used up when you wake on it (bedrollSingleUse 1). placeholder",
+    "restSeconds": 60, "bedrollSingleUse": 1 },
 
   "stamina": { "lightAttack": 10, "heavyAttack": 20, "dodge": 15, "blockMin": 10, "blockMax": 25, "sprintPerSecond": 5, "spell": 12, "weaponArt": 18,
                "_spell_weaponArt": "placeholder" },

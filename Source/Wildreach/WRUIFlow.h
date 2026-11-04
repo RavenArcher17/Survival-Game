@@ -12,8 +12,9 @@ class SWidget;
 
 /**
  * The moments between play, for one local player (FWRPlayerUI owns it). All client-side, reading replicated state:
- *  - the cover: a fade to black on death, the death screen (what killed you, your bag, where you'll wake, the
- *    countdown) and a fade back in once the island has streamed in around you; the same "Loading the island" cover
+ *  - the cover: a fade to black on death, the death screen (what killed you, your bag, the map of where you can
+ *    wake and a Wake button once the wait is over) and a fade back in once the island has streamed in around you;
+ *    the same "Loading the island" cover
  *    after joining or a long teleport, so you never stand on unloaded ground;
  *  - moments: banners (level up, a place discovered, a boss's title card, a tame), toasts (new recipes, a path point)
  *    and one-time hints that name your real keys. Discoveries and seen hints are kept per player name in
@@ -44,6 +45,20 @@ public:
 	float GetRespawnFraction() const;
 	/** Back in a body and waiting for the island to stream in. */
 	bool IsBack() const { return bBack; }
+	/** Deaths so far this session (the death card rebuilds its list of places when it changes). */
+	int32 GetDeathCount() const { return DeathCount; }
+	/** The death screen is up and you haven't woken yet: show the cursor (the map, the list, Wake). */
+	bool WantsCursor() const;
+	/** Seconds a bed on the list still rests (counting down since the note came). */
+	float GetWakeRestLeft(int32 Index) const;
+	/** Pick where to wake (the server is told); false if it's resting or you're already waking. */
+	bool ChooseWake(int32 Index);
+	/** The wait is over and the pick is free: Wake would work. */
+	bool CanWake() const;
+	/** Wake at the pick (the server brings you back); false if you can't yet. */
+	bool Wake();
+	/** Wake was pressed and the server hasn't brought you back yet. */
+	bool IsWaking() const;
 	/** The full loading layout (title, tip) rather than just a status line. */
 	bool ShowsLoadingArt() const { return Cover == ECover::Loading && bLoadingArt; }
 	bool IsWaitingForIsland() const { return bStreaming; }
@@ -133,6 +148,9 @@ private:
 	double CardShownAt = -1.0;
 	FWRDeathNote Death;
 	double DeathAt = -100.0;
+	int32 DeathCount = 0;
+	/** When Wake was pressed (< 0: not yet). */
+	double WakeSentAt = -1.0;
 	bool bBack = false;
 	TWeakObjectPtr<APawn> DeadBody;
 	bool bStreaming = false;

@@ -164,6 +164,10 @@ public:
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
 	/** You died: the death screen's killer, bag and respawn (WRFlowDeath.cpp sends it, WRUIFlow shows it). */
 	UFUNCTION(Client, Reliable) void ClientDeathNote(const FWRDeathNote& Note);
+	/** The death screen's pick of where to wake (an index into the note's Wake list). */
+	UFUNCTION(Server, Reliable) void ServerChooseWake(int32 Index);
+	/** The death screen's Wake button: wake at this place (an index into the note's Wake list). */
+	UFUNCTION(Server, Reliable) void ServerWake(int32 Index);
 
 	UFUNCTION(Exec) void WRInteract();
 	/** Testing / screenshot aid: open a menu (inventory, build, skills, paths) on line Select, toggle the map (map),

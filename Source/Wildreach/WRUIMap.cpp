@@ -2,12 +2,15 @@
 // island's places (camps, caves, bosses, passes from the dressing file, as the HUD compass uses), your Hearth, your
 // tames, land claims and, when shown, other players this client knows about. A legend filters them; the wheel zooms
 // about the cursor, a drag pans, a click picks a marker for the details panel. Sizes are mockup px x U.
+// The death screen shows the same map with only the places you can wake (WRUIMap::MakeWakeMap, WRUIMap.h).
 //
 // World to map: map.png is Art/Terrain/island_height.r16 (4033 x 4033 samples, 1 m apart) sampled every 4 m into
 // 1009 px, pixel (px, py) = sample (4 px, 4 py) (mock/gen_assets.mjs). The landscape is centred on the origin with
 // 1 m per sample (Tools/terrain/import_island.py: world = sample x 100 cm - 201600), north (-Y) up, east (+X) right.
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
+#include "WRUIMap.h"
+#include "WRFlowTypes.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -22,6 +25,7 @@
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Layout/WidgetPath.h"
 #include "GameFramework/PlayerState.h"
 #include "Rendering/DrawElements.h"
 #include "Widgets/Images/SImage.h"
@@ -58,7 +62,7 @@ namespace WRMapTab
 	}
 
 	/** Legend categories (the order of the legend). */
-	enum class ECat : uint8 { Camp, Cave, Boss, Pass, Base, Tame, Claim, Player, Count };
+	enum class ECat : uint8 { Camp, Cave, Boss, Pass, Base, Bed, Tame, Claim, Player, Count };
 
 	struct FMarker
 	{
@@ -70,6 +74,7 @@ namespace WRMapTab
 		FName CreatureId;        // bosses and tames: portrait / drops
 		float Radius = 0.f;      // claims
 		bool bMine = false;
+		float Alpha = 1.f;       // a resting bed on the death screen's map is dimmed
 		TWeakObjectPtr<AActor> Actor;
 	};
 
@@ -77,8 +82,9 @@ namespace WRMapTab
 	struct FMapState
 	{
 		float Zoom = 1.f;
+		float ZoomLimit = MaxZoom;
 		FVector2D Centre = FVector2D::ZeroVector;   // world cm at the middle of the view
-		bool bShow[static_cast<int32>(ECat::Count)] = { true, true, true, true, true, true, true, false };
+		bool bShow[static_cast<int32>(ECat::Count)] = { true, true, true, true, true, true, true, true, false };
 		FString Selected;
 		bool bPicked = false;
 		/** Your Hearths and claims as last seen: they stop replicating once you walk out of range, but they're still there. */
@@ -97,6 +103,7 @@ namespace WRMapTab
 			: FCatLook{ Hex(TEXT("EAB95A")), FLinearColor(0.025f, 0.012f, 0.002f, 0.94f), Hex(TEXT("EAB95A")), TEXT("skull"), 24.f, false };
 		case ECat::Pass: return { WRUI::Ink3, FLinearColor(0.01f, 0.01f, 0.012f, 0.9f), WRUI::Ink2, TEXT("mountain"), 22.f, false };
 		case ECat::Base: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("house"), 24.f, false };
+		case ECat::Bed: return { M.bMine ? WRUI::Brass : WRUI::Frost, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), M.bMine ? WRUI::Brass : WRUI::Frost, TEXT("bed"), 20.f, false };
 		case ECat::Tame: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("paw"), 22.f, false };
 		case ECat::Claim: return { M.bMine ? WRUI::Brass : WRUI::Bad, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), M.bMine ? WRUI::Brass : WRUI::Bad, TEXT("flag"), 20.f, false };
 		default: return { WRUI::Frost, Hex(TEXT("0C141B")), WRUI::Frost, TEXT("person"), 22.f, false };
@@ -133,6 +140,20 @@ namespace WRMapTab
 			M.World = It->GetActorLocation();
 			M.bMine = true;
 			M.Actor = *It;
+		}
+		// Your beds and your clan's (the server sends their list: they don't replicate from across the island).
+		if (const AWRPlayerState* WPS = Cast<AWRPlayerState>(PS))
+		{
+			for (const FWRBedSpot& B : WPS->Beds)
+			{
+				FMarker& M = Out.AddDefaulted_GetRef();
+				M.Key = FString::Printf(TEXT("bed:%d,%d"), FMath::RoundToInt(B.At.X / 100.f), FMath::RoundToInt(B.At.Y / 100.f));
+				M.Cat = ECat::Bed;
+				M.Name = B.Name;
+				M.Kind = B.bBedroll ? TEXT("bedroll") : TEXT("bed");
+				M.World = B.At;
+				M.bMine = !B.bClan;
+			}
 		}
 		for (TActorIterator<AWRCreature> It(World); It; ++It)
 		{
@@ -188,7 +209,7 @@ namespace WRMapTab
 
 	FString CatName(ECat C)
 	{
-		static const TCHAR* Names[] = { TEXT("Camps"), TEXT("Caves"), TEXT("Bosses"), TEXT("Passes"), TEXT("Your base"), TEXT("Tames"), TEXT("Land claims"), TEXT("Other players") };
+		static const TCHAR* Names[] = { TEXT("Camps"), TEXT("Caves"), TEXT("Bosses"), TEXT("Passes"), TEXT("Your base"), TEXT("Beds"), TEXT("Tames"), TEXT("Land claims"), TEXT("Other players") };
 		return Names[static_cast<int32>(C)];
 	}
 
@@ -198,38 +219,79 @@ namespace WRMapTab
 	public:
 		SLATE_BEGIN_ARGS(SWRMapView) {}
 			SLATE_ARGUMENT(TWeakObjectPtr<AWRPlayerController>, PC)
+			/** Its own view (zoom, centre, filters) instead of the journal map's. */
+			SLATE_ARGUMENT(TSharedPtr<FMapState>, ViewState)
+			/** Only these markers, every one named, and no "you" (the death screen: the places to wake). */
+			SLATE_ARGUMENT(TFunction<TArray<FMarker>()>, Markers)
+			/** A click on a marker calls this instead of picking it for the details panel. */
+			SLATE_ARGUMENT(TFunction<void(const FString&)>, OnPick)
+			/** The marker drawn as chosen. */
+			SLATE_ARGUMENT(TFunction<FString()>, Chosen)
+			/** Where you fell, drawn as a pin (unset: none). */
+			SLATE_ARGUMENT(TFunction<FVector()>, Fell)
+			/** When it changes, frame every marker (and where you fell) again. */
+			SLATE_ARGUMENT(TFunction<int32()>, FitVersion)
 		SLATE_END_ARGS()
 
 		void Construct(const FArguments& InArgs)
 		{
 			PC = InArgs._PC;
+			OwnedState = InArgs._ViewState;
+			ViewState = OwnedState.IsValid() ? OwnedState.Get() : &State();
+			MarkersFn = InArgs._Markers;
+			OnPick = InArgs._OnPick;
+			Chosen = InArgs._Chosen;
+			Fell = InArgs._Fell;
+			FitVersion = InArgs._FitVersion;
 			SetClipping(EWidgetClipping::ClipToBounds);
 		}
 		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(862.f, 678.f) * U; }
+
+		FMapState& View() const { return *ViewState; }
+		TArray<FMarker> Markers() const { return MarkersFn ? MarkersFn() : Gather(PC.Get()); }
 
 		// --- view maths
 		static float Frac(float W) { return (W - MapMin) / MapSize; }
 		FVector2D ToLocal(const FVector& W, const FVector2D& Size) const
 		{
-			const FMapState& S = State();
+			const FMapState& S = View();
 			const float Img = Size.Y * S.Zoom;
 			return FVector2D((Frac(W.X) - Frac(S.Centre.X)) * Img, (Frac(W.Y) - Frac(S.Centre.Y)) * Img) + Size * 0.5f;
 		}
 		FVector2D ToWorld(const FVector2D& L, const FVector2D& Size) const
 		{
-			const FMapState& S = State();
+			const FMapState& S = View();
 			const float Img = Size.Y * S.Zoom;
 			const FVector2D F = (L - Size * 0.5f) / Img + FVector2D(Frac(S.Centre.X), Frac(S.Centre.Y));
 			return F * MapSize + FVector2D(MapMin, MapMin);
 		}
-		static void Clamp()
+		static void Clamp(FMapState& S)
 		{
-			FMapState& S = State();
-			S.Zoom = FMath::Clamp(S.Zoom, 1.f, MaxZoom);
+			S.Zoom = FMath::Clamp(S.Zoom, 1.f, S.ZoomLimit);
 			S.Centre.X = FMath::Clamp(S.Centre.X, MapMin, MapMin + MapSize);
 			S.Centre.Y = FMath::Clamp(S.Centre.Y, MapMin, MapMin + MapSize);
 		}
-		static void ZoomBy(float Factor) { State().Zoom *= Factor; Clamp(); }
+		static void ZoomBy(FMapState& S, float Factor) { S.Zoom *= Factor; Clamp(S); }
+
+		/** Frame the markers (and where you fell) once per FitVersion: centred on them, as close as they all fit. */
+		virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
+		{
+			if (!FitVersion) return;
+			const int32 Version = FitVersion();
+			const FVector2D Size = Geo.GetLocalSize();
+			if (Version == FittedFor || Size.X < 10.f || Size.Y < 10.f) return;
+			FittedFor = Version;
+			FBox2D Box(ForceInit);
+			for (const FMarker& M : Markers()) Box += FVector2D(M.World.X, M.World.Y);
+			if (Fell) { const FVector F = Fell(); Box += FVector2D(F.X, F.Y); }
+			if (!Box.bIsValid) return;
+			// At least 150 m across, so a bed beside where you fell isn't blown up past the map's detail.
+			const FVector2D Extent = FVector2D::Max(Box.GetSize(), FVector2D(15000.f, 15000.f));
+			FMapState& S = View();
+			S.Centre = Box.GetCenter();
+			S.Zoom = FMath::Min(0.8f * Size.X * MapSize / (Extent.X * Size.Y), 0.72f * MapSize / Extent.Y);
+			Clamp(S);
+		}
 
 		virtual FReply OnMouseWheel(const FGeometry& Geo, const FPointerEvent& Event) override
 		{
@@ -237,11 +299,11 @@ namespace WRMapTab
 			const FVector2D Size = Geo.GetLocalSize();
 			const FVector2D L = Geo.AbsoluteToLocal(Event.GetScreenSpacePosition());
 			const FVector2D Before = ToWorld(L, Size);
-			State().Zoom *= Event.GetWheelDelta() > 0.f ? 1.25f : 0.8f;
-			Clamp();
+			View().Zoom *= Event.GetWheelDelta() > 0.f ? 1.25f : 0.8f;
+			Clamp(View());
 			const FVector2D After = ToWorld(L, Size);
-			State().Centre += Before - After;
-			Clamp();
+			View().Centre += Before - After;
+			Clamp(View());
 			return FReply::Handled();
 		}
 		virtual FReply OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Event) override
@@ -262,8 +324,8 @@ namespace WRMapTab
 				if (bDragged)
 				{
 					const FVector2D DL = Geo.AbsoluteToLocal(Event.GetScreenSpacePosition()) - Geo.AbsoluteToLocal(LastAt);
-					State().Centre -= DL / (Size.Y * State().Zoom) * MapSize;
-					Clamp();
+					View().Centre -= DL / (Size.Y * View().Zoom) * MapSize;
+					Clamp(View());
 				}
 				LastAt = Event.GetScreenSpacePosition();
 				return FReply::Handled();
@@ -277,7 +339,8 @@ namespace WRMapTab
 			if (!bDragged)
 			{
 				const FString Hit = MarkerAt(Geo.AbsoluteToLocal(Event.GetScreenSpacePosition()), Geo.GetLocalSize());
-				if (!Hit.IsEmpty()) { State().Selected = Hit; State().bPicked = true; }
+				if (!Hit.IsEmpty() && OnPick) OnPick(Hit);
+				else if (!Hit.IsEmpty()) { View().Selected = Hit; View().bPicked = true; }
 			}
 			return FReply::Handled().ReleaseMouseCapture();
 		}
@@ -290,7 +353,10 @@ namespace WRMapTab
 		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override
 		{
 			const FVector2D Size = Geo.GetLocalSize();
-			const FMapState& S = State();
+			const FMapState& S = View();
+			// Tests find the markers of the map drawn last on the screen (WRUIMap::FindMarkerOnScreen).
+			LastPaintFrame = GFrameCounter;
+			LastPainted() = SharedThis(this);
 			const auto Box = [&](int32 L, const FVector2D& Pos, const FVector2D& Sz, const FSlateBrush* B, const FLinearColor& Tint = FLinearColor::White)
 			{
 				FSlateDrawElement::MakeBox(Out, L, Geo.ToPaintGeometry(Sz, FSlateLayoutTransform(Pos)), B, ESlateDrawEffect::None, B && Tint == FLinearColor::White ? B->TintColor.GetSpecifiedColor() : Tint);
@@ -324,7 +390,7 @@ namespace WRMapTab
 				}
 			}
 			// Region names, carved into the picture.
-			const FSlateFontInfo RegionFont = WRUI::Title(FMath::RoundToInt(14.f + 2.f * (S.Zoom - 1.f)));
+			const FSlateFontInfo RegionFont = WRUI::Title(FMath::Min(30, FMath::RoundToInt(14.f + 2.f * (S.Zoom - 1.f))));
 			const auto Region = [&](const TCHAR* Name, const FVector& At, const FLinearColor& C)
 			{
 				const FText T = FText::FromString(Name);
@@ -334,11 +400,60 @@ namespace WRMapTab
 			Region(TEXT("V  O  L  C  A  N  I  C"), FVector(-56600.f, 113400.f, 0.f), FLinearColor(1.f, 0.82f, 0.6f, 0.55f));
 			Region(TEXT("T  U  N  D  R  A"), FVector(78400.f, -101600.f, 0.f), FLinearColor(0.02f, 0.05f, 0.1f, 0.55f));
 
-			const TArray<FMarker> Markers = Gather(PC.Get());
+			const TArray<FMarker> All = Markers();
 			const FString Hover = MarkerAt(MouseLocal, Size);
+			const FString Pick = Chosen ? Chosen() : FString();
 			int32 L = Layer + 6;
+			// On the death screen every place is named: names go where nothing else is (markers, names already placed).
+			TArray<FSlateRect> Taken;
+			const auto IsFree = [&Taken](const FSlateRect& R) { return !Taken.ContainsByPredicate([&R](const FSlateRect& O) { return FSlateRect::DoRectanglesIntersect(R, O); }); };
+			// The first spot round a marker (centre C, size D) where a name of size TS is clear of what's there: below or
+			// above first, then the sides and corners, then the same a little farther out. That spot is taken then.
+			const auto PlaceName = [&Taken, &IsFree](const FVector2D& C, float D, const FVector2D& TS, const FVector2D& Pad, bool bBelowFirst)
+			{
+				TArray<FVector2D> Tries;
+				for (const float Extra : { 0.f, 14.f })
+				{
+					const float R = D * 0.5f + 4.f + Extra, K = R * 0.7f;
+					const FVector2D Below = C + FVector2D(-TS.X * 0.5f, R), Above = C + FVector2D(-TS.X * 0.5f, -R - TS.Y);
+					const FVector2D Right = C + FVector2D(R + 4.f, -TS.Y * 0.5f), Left = C + FVector2D(-R - 4.f - TS.X, -TS.Y * 0.5f);
+					const FVector2D BR = C + FVector2D(K, K), BL = C + FVector2D(-K - TS.X, K), AR = C + FVector2D(K, -K - TS.Y), AL = C + FVector2D(-K - TS.X, -K - TS.Y);
+					Tries.Append(bBelowFirst ? TArray<FVector2D>{ Below, Above, Right, Left, BR, BL, AR, AL } : TArray<FVector2D>{ Above, Below, Left, Right, AL, AR, BL, BR });
+				}
+				FVector2D Pos = Tries[0];
+				for (const FVector2D& Try : Tries)
+				{
+					if (IsFree(FSlateRect(Try - Pad, Try + TS + Pad))) { Pos = Try; break; }
+				}
+				Taken.Add(FSlateRect(Pos - Pad, Pos + TS + Pad));
+				return Pos;
+			};
+			if (MarkersFn)
+			{
+				for (const FMarker& M : All)
+				{
+					const FVector2D C = ToLocal(M.World, Size);
+					const bool bChosen = !Pick.IsEmpty() && M.Key == Pick;
+					const float R = LookFor(M).Size * U * (bChosen ? 0.65f : 0.5f) + (bChosen ? 12.f : 0.f);
+					Taken.Add(FSlateRect(C - FVector2D(R), C + FVector2D(R)));
+				}
+			}
+			// Where you fell: a red pin under the places to wake.
+			if (Fell)
+			{
+				const FVector2D C = ToLocal(Fell(), Size);
+				const float D = 20.f * U;
+				Box(L, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor::Black, D * 0.5f + 1.f));
+				Box(L + 1, C - FVector2D(D * 0.5f), FVector2D(D), WRUI::Box(FLinearColor(0.06f, 0.012f, 0.008f, 0.94f), D * 0.5f, WRUI::Ember, 1.5f));
+				Box(L + 2, C - FVector2D(D * 0.3f), FVector2D(D * 0.6f), Glyph(TEXT("map_pin")), WRUI::Ember);
+				const FSlateFontInfo F = WRUI::Body(11, 700);
+				const FText T = LOCTEXT("WhereYouFell", "Where you fell");
+				const FVector2D TS = Measure(T, F);
+				Taken.Add(FSlateRect(C - FVector2D(D * 0.5f), C + FVector2D(D * 0.5f)));
+				Text(L + 3, T, F, PlaceName(C, D, TS, FVector2D(2.f), false), Hex(TEXT("F2A48C")), true);
+			}
 			// Claims: their reach as a ring.
-			for (const FMarker& M : Markers)
+			for (const FMarker& M : All)
 			{
 				if (M.Cat != ECat::Claim || !S.bShow[static_cast<int32>(ECat::Claim)]) continue;
 				const FVector2D C = ToLocal(M.World, Size);
@@ -348,26 +463,32 @@ namespace WRMapTab
 				FSlateDrawElement::MakeLines(Out, L, Geo.ToPaintGeometry(), Ring, ESlateDrawEffect::None, WRUI::Alpha(M.bMine ? WRUI::Brass : WRUI::Bad, 0.75f), true, 2.f);
 			}
 			// Markers, small things first so bosses sit on top.
-			const ECat Order[] = { ECat::Cave, ECat::Pass, ECat::Claim, ECat::Camp, ECat::Boss, ECat::Base, ECat::Tame, ECat::Player };
+			const ECat Order[] = { ECat::Cave, ECat::Pass, ECat::Claim, ECat::Camp, ECat::Boss, ECat::Base, ECat::Bed, ECat::Tame, ECat::Player };
 			for (const ECat Cat : Order)
 			{
 				if (!S.bShow[static_cast<int32>(Cat)]) continue;
-				for (const FMarker& M : Markers)
+				for (const FMarker& M : All)
 				{
 					if (M.Cat != Cat) continue;
-					const FCatLook Lk = LookFor(M);
+					FCatLook Lk = LookFor(M);
+					Lk.Ring.A *= M.Alpha;
+					Lk.Fill.A *= M.Alpha;
+					Lk.Icon.A *= M.Alpha;
 					const FVector2D C = ToLocal(M.World, Size);
-					const float D = Lk.Size * U;
+					const bool bChosen = !Pick.IsEmpty() && M.Key == Pick;
+					// The chosen place to wake stands out: bigger, in a brass halo.
+					const float D = Lk.Size * U * (bChosen ? 1.3f : 1.f);
 					const bool bMajor = M.Kind == TEXT("boss");
-					const bool bHot = M.Key == Hover || M.Key == S.Selected;
+					const bool bHot = M.Key == Hover || M.Key == S.Selected || bChosen;
 					if (bMajor) Box(L, C - FVector2D(D * 0.75f), FVector2D(D * 1.5f), WRUI::Box(WRUI::Alpha(Lk.Ring, 0.22f), D * 0.75f));
-					if (bHot) Box(L, C - FVector2D(D * 0.5f + 5.f), FVector2D(D + 10.f), WRUI::Box(FLinearColor::Transparent, Lk.bSquare ? 8.f : D * 0.5f + 5.f, WRUI::Brass, 2.f));
-					Box(L + 1, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor::Black, Lk.bSquare ? 6.f : D * 0.5f + 1.f));
+					if (bChosen) Box(L, C - FVector2D(D * 0.5f + 12.f), FVector2D(D + 24.f), WRUI::Box(WRUI::Alpha(WRUI::Brass, 0.2f), D * 0.5f + 12.f));
+					if (bHot) Box(L, C - FVector2D(D * 0.5f + 5.f), FVector2D(D + 10.f), WRUI::Box(FLinearColor::Transparent, Lk.bSquare ? 8.f : D * 0.5f + 5.f, WRUI::Brass, bChosen ? 2.5f : 2.f));
+					Box(L + 1, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor(0.f, 0.f, 0.f, M.Alpha), Lk.bSquare ? 6.f : D * 0.5f + 1.f));
 					Box(L + 2, C - FVector2D(D * 0.5f), FVector2D(D), WRUI::Box(Lk.Fill, Lk.bSquare ? 5.f : D * 0.5f, Lk.Ring, bMajor ? 2.f : 1.5f));
 					const float G = D * (bMajor ? 0.64f : 0.6f);
 					Box(L + 3, C - FVector2D(G * 0.5f), FVector2D(G), Glyph(Lk.Glyph), Lk.Icon);
-					// Names: camps and bosses always, the rest when you point at them.
-					const bool bLabel = Cat == ECat::Camp || Cat == ECat::Boss || Cat == ECat::Tame || Cat == ECat::Player || bHot;
+					// Names: camps and bosses always, the rest when you point at them (on the death screen, all of them).
+					const bool bLabel = MarkersFn || Cat == ECat::Camp || Cat == ECat::Boss || Cat == ECat::Tame || Cat == ECat::Player || bHot;
 					if (!bLabel) continue;
 					const FSlateFontInfo F = bMajor ? WRUI::Title(13) : WRUI::Body(11, 800);
 					const FText T = FText::FromString(bMajor ? M.Name.ToUpper() : M.Name);
@@ -375,8 +496,10 @@ namespace WRMapTab
 					const bool bSide = Cat == ECat::Tame || Cat == ECat::Player;
 					// Side names go seaward (left in the west half, right in the east), away from the bosses on the ridge.
 					const float SideX = M.World.X < 0.f ? -D * 0.5f - 5.f - TS.X : D * 0.5f + 5.f;
-					const FVector2D Pos = bSide ? C + FVector2D(SideX, -TS.Y * 0.5f) : C + FVector2D(-TS.X * 0.5f, D * 0.5f + 3.f);
-					const FLinearColor TextC = bMajor ? Hex(TEXT("FFB7A0")) : Cat == ECat::Camp ? Hex(TEXT("E2F2D2")) : M.Kind == TEXT("mini-boss") ? Hex(TEXT("F4D99C")) : Cat == ECat::Tame || Cat == ECat::Base ? Hex(TEXT("F0D49B")) : WRUI::Ink;
+					FVector2D Pos = bSide ? C + FVector2D(SideX, -TS.Y * 0.5f) : C + FVector2D(-TS.X * 0.5f, D * 0.5f + 3.f);
+					if (MarkersFn) Pos = PlaceName(C, D, TS, FVector2D(6.f, 1.f), true);
+					FLinearColor TextC = bChosen ? Hex(TEXT("F0D49B")) : bMajor ? Hex(TEXT("FFB7A0")) : Cat == ECat::Camp ? Hex(TEXT("E2F2D2")) : M.Kind == TEXT("mini-boss") ? Hex(TEXT("F4D99C")) : Cat == ECat::Tame || Cat == ECat::Base ? Hex(TEXT("F0D49B")) : WRUI::Ink;
+					TextC.A *= M.Alpha;
 					if (!bSide)
 					{
 						Box(L + 4, Pos - FVector2D(6.f, 1.f), TS + FVector2D(12.f, 2.f), bMajor ? WRUI::Box(FLinearColor(0.09f, 0.025f, 0.01f, 0.8f), 3.f, WRUI::Alpha(Hex(TEXT("EC6A48")), 0.45f), 1.f) : WRUI::Box(FLinearColor(0.03f, 0.035f, 0.03f, 0.65f), 3.f));
@@ -384,8 +507,8 @@ namespace WRMapTab
 					Text(L + 5, T, F, Pos, TextC, true);
 				}
 			}
-			// You: a soft halo and the arrow turned to where you look.
-			if (const APawn* Pawn = PC.IsValid() ? PC->GetPawn() : nullptr)
+			// You: a soft halo and the arrow turned to where you look (not on the death screen: that body is gone).
+			if (const APawn* Pawn = PC.IsValid() && !MarkersFn ? PC->GetPawn() : nullptr)
 			{
 				const FVector2D C = ToLocal(Pawn->GetActorLocation(), Size);
 				const float H = 38.f * U, A = 28.f * U;
@@ -427,10 +550,10 @@ namespace WRMapTab
 		/** The marker under a local point (within its disc, a little forgiving), or empty. */
 		FString MarkerAt(const FVector2D& Local, const FVector2D& Size) const
 		{
-			const FMapState& S = State();
+			const FMapState& S = View();
 			FString Best;
 			float BestD = 16.f * U;
-			for (const FMarker& M : Gather(PC.Get()))
+			for (const FMarker& M : Markers())
 			{
 				if (!S.bShow[static_cast<int32>(M.Cat)]) continue;
 				const float D = FVector2D::Distance(ToLocal(M.World, Size), Local) - (M.Kind == TEXT("boss") ? 6.f * U : 0.f);
@@ -439,14 +562,78 @@ namespace WRMapTab
 			return Best;
 		}
 
+		/**
+		 * Where the marker named Name sits on the screen (false: no such marker, or the map isn't drawn now). From the
+		 * widget's path, as clicks see it: the paint geometry of a widget over the game viewport is in the window's space.
+		 */
+		bool ScreenPosOf(const FString& Name, FVector2D& Out) const
+		{
+			FWidgetPath Path;
+			if (GFrameCounter - LastPaintFrame > 5 || !FSlateApplication::Get().FindPathToWidget(ConstCastSharedRef<SWidget>(AsShared()), Path) || !Path.IsValid()) return false;
+			const FGeometry& G = Path.Widgets.Last().Geometry;
+			for (const FMarker& M : Markers())
+			{
+				if (!M.Name.Equals(Name, ESearchCase::IgnoreCase)) continue;
+				Out = FVector2D(G.LocalToAbsolute(ToLocal(M.World, G.GetLocalSize())));
+				return true;
+			}
+			return false;
+		}
+
+		static TWeakPtr<const SWRMapView>& LastPainted() { static TWeakPtr<const SWRMapView> P; return P; }
+
 	private:
 		TWeakObjectPtr<AWRPlayerController> PC;
+		TSharedPtr<FMapState> OwnedState;
+		FMapState* ViewState = nullptr;
+		TFunction<TArray<FMarker>()> MarkersFn;
+		TFunction<void(const FString&)> OnPick;
+		TFunction<FString()> Chosen;
+		TFunction<FVector()> Fell;
+		TFunction<int32()> FitVersion;
+		int32 FittedFor = INDEX_NONE;
+		mutable uint64 LastPaintFrame = 0;
 		bool bDown = false;
 		bool bDragged = false;
 		FVector2D DownAt = FVector2D::ZeroVector;
 		FVector2D LastAt = FVector2D::ZeroVector;
 		FVector2D MouseLocal = FVector2D(-1e6f, -1e6f);
 	};
+
+	/** The compass rose in the map's top left corner. */
+	TSharedRef<SWidget> Compass()
+	{
+		return SNew(SBox).WidthOverride(92.f * U).HeightOverride(92.f * U).Visibility(EVisibility::HitTestInvisible)
+			[
+				SNew(SOverlay)
+				+ SOverlay::Slot()[SNew(SImage).Image(Glyph(TEXT("map_compass")))]
+				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, -2.f * U, 0.f, 0.f)[WRUI::Text(FText::FromString(TEXT("N")), WRUI::Title(12), Hex(TEXT("F0C878")), true)]
+				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, -4.f * U)[WRUI::Text(FText::FromString(TEXT("S")), WRUI::Title(9), WRUI::Ink2, true)]
+				+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(TEXT("E")), WRUI::Title(9), WRUI::Ink2, true)]
+				+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(TEXT("W")), WRUI::Title(9), WRUI::Ink2, true)]
+			];
+	}
+
+	/** A small square button over the map (zoom in, zoom out, centre). */
+	TSharedRef<SWidget> MapButton(const FString& Icon, const FText& Tip, TFunction<void()> OnClick)
+	{
+		return SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).ToolTipText(Tip)
+			.OnClicked_Lambda([OnClick]() { OnClick(); return FReply::Handled(); })
+			[
+				SNew(SBox).WidthOverride(34.f * U).HeightOverride(34.f * U)
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(FLinearColor(0.055f, 0.06f, 0.067f, 0.88f), 4.f, WRUI::Brass2, 1.f))]
+					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+					[
+						SNew(SBox).WidthOverride(16.f * U).HeightOverride(Icon == TEXT("minus") ? 3.f * U : 16.f * U)
+						[
+							Icon == TEXT("minus") ? SNew(SImage).Image(WRUI::Box(WRUI::Ink, 1.5f * U)) : SNew(SImage).Image(Glyph(Icon)).ColorAndOpacity(Icon == TEXT("target") ? WRUI::Brass : WRUI::Ink)
+						]
+					]
+				]
+			];
+	}
 
 	class SWRMapTabWidget : public SCompoundWidget
 	{
@@ -472,23 +659,12 @@ namespace WRMapTab
 						[
 							SNew(SOverlay)
 							+ SOverlay::Slot()[SAssignNew(View, SWRMapView).PC(PC)]
-							+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(14.f * U)
-							[
-								SNew(SBox).WidthOverride(92.f * U).HeightOverride(92.f * U).Visibility(EVisibility::HitTestInvisible)
-								[
-									SNew(SOverlay)
-									+ SOverlay::Slot()[SNew(SImage).Image(Glyph(TEXT("map_compass")))]
-									+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, -2.f * U, 0.f, 0.f)[WRUI::Text(FText::FromString(TEXT("N")), WRUI::Title(12), Hex(TEXT("F0C878")), true)]
-									+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, -4.f * U)[WRUI::Text(FText::FromString(TEXT("S")), WRUI::Title(9), WRUI::Ink2, true)]
-									+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(TEXT("E")), WRUI::Title(9), WRUI::Ink2, true)]
-									+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(TEXT("W")), WRUI::Title(9), WRUI::Ink2, true)]
-								]
-							]
+							+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(14.f * U)[Compass()]
 							+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(14.f * U)
 							[
 								SNew(SVerticalBox)
-								+ SVerticalBox::Slot().AutoHeight()[MapButton(TEXT("plus"), LOCTEXT("ZoomIn", "Zoom in"), []() { SWRMapView::ZoomBy(1.4f); })]
-								+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[MapButton(TEXT("minus"), LOCTEXT("ZoomOut", "Zoom out"), []() { SWRMapView::ZoomBy(1.f / 1.4f); })]
+								+ SVerticalBox::Slot().AutoHeight()[MapButton(TEXT("plus"), LOCTEXT("ZoomIn", "Zoom in"), []() { SWRMapView::ZoomBy(State(), 1.4f); })]
+								+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[MapButton(TEXT("minus"), LOCTEXT("ZoomOut", "Zoom out"), []() { SWRMapView::ZoomBy(State(), 1.f / 1.4f); })]
 								+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[MapButton(TEXT("target"), LOCTEXT("CentreYou", "Centre on you"), [this]() { CentreOnYou(); })]
 							]
 						]
@@ -571,33 +747,13 @@ namespace WRMapTab
 			const FVector H = Here();
 			State().Centre = FVector2D(H.X, H.Y);
 			State().Zoom = FMath::Max(State().Zoom, 2.5f);
-			SWRMapView::Clamp();
+			SWRMapView::Clamp(State());
 		}
 
 		FText WhereLine() const
 		{
 			// The ridge runs down the middle (x = 0): volcanic to the west, tundra to the east.
 			return FText::Format(LOCTEXT("Where", "4 × 4 km · you are on the {0} side"), Here().X < 0.f ? LOCTEXT("Volcanic", "volcanic") : LOCTEXT("Tundra", "tundra"));
-		}
-
-		TSharedRef<SWidget> MapButton(const FString& Icon, const FText& Tip, TFunction<void()> OnClick)
-		{
-			return SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).ToolTipText(Tip)
-				.OnClicked_Lambda([OnClick]() { OnClick(); return FReply::Handled(); })
-				[
-					SNew(SBox).WidthOverride(34.f * U).HeightOverride(34.f * U)
-					[
-						SNew(SOverlay)
-						+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(FLinearColor(0.055f, 0.06f, 0.067f, 0.88f), 4.f, WRUI::Brass2, 1.f))]
-						+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
-						[
-							SNew(SBox).WidthOverride(16.f * U).HeightOverride(Icon == TEXT("minus") ? 3.f * U : 16.f * U)
-							[
-								Icon == TEXT("minus") ? SNew(SImage).Image(WRUI::Box(WRUI::Ink, 1.5f * U)) : SNew(SImage).Image(Glyph(Icon)).ColorAndOpacity(Icon == TEXT("target") ? WRUI::Brass : WRUI::Ink)
-							]
-						]
-					]
-				];
 		}
 
 		// ---------------------------------------------------------------- legend
@@ -622,6 +778,7 @@ namespace WRMapTab
 			case ECat::Camp: return LOCTEXT("SubCamp", "· where survivors wake");
 			case ECat::Boss: { int32 Major = 0; const int32 N = CountOf(C, &Major); return FText::Format(LOCTEXT("SubBoss", "· {0} major, {1} mini"), Major, N - Major); }
 			case ECat::Pass: return LOCTEXT("SubPass", "· over the ridge");
+			case ECat::Bed: return LOCTEXT("SubBed", "· where you can wake");
 			case ECat::Player: return State().bShow[static_cast<int32>(ECat::Player)] ? LOCTEXT("SubPlayersOn", "· those near you") : LOCTEXT("SubPlayersOff", "· hidden");
 			default: return FText::GetEmpty();
 			}
@@ -719,6 +876,7 @@ namespace WRMapTab
 				const AWRCreature* T = Cast<AWRCreature>(M.Actor.Get());
 				return T ? FText::Format(LOCTEXT("AboutTame", "{0}, {1}."), T->TameOrder == EWRTameOrder::Follow ? LOCTEXT("Following", "Following you") : LOCTEXT("Staying", "Staying put"), T->bTameAggressive ? LOCTEXT("Aggressive", "aggressive") : LOCTEXT("Passive", "passive")) : FText::GetEmpty();
 			}
+			case ECat::Bed: return M.bMine ? LOCTEXT("AboutBedMine", "You can wake here after you die (pick it on the death screen).") : LOCTEXT("AboutBedClan", "A clanmate's: you can wake here after you die too.");
 			case ECat::Claim: return FText::Format(LOCTEXT("AboutClaim", "Only its owner and their clan build within {0}."), FText::FromString(Distance(M.Radius)));
 			case ECat::Player: return LOCTEXT("AboutPlayer", "Another survivor near enough for you to know of.");
 			default: return FText::GetEmpty();
@@ -752,6 +910,7 @@ namespace WRMapTab
 			case ECat::Cave: Chip = LOCTEXT("ChipCave", "Cave"); break;
 			case ECat::Pass: Chip = LOCTEXT("ChipPass", "Pass"); break;
 			case ECat::Base: Chip = LOCTEXT("ChipBase", "Your base"); break;
+			case ECat::Bed: Chip = M->Kind == TEXT("bedroll") ? LOCTEXT("ChipBedroll", "Bedroll") : LOCTEXT("ChipBed", "Bed"); break;
 			case ECat::Tame: Chip = LOCTEXT("ChipTame", "Your tame"); break;
 			case ECat::Claim: Chip = M->bMine ? LOCTEXT("ChipClaimMine", "Your claim") : LOCTEXT("ChipClaim", "Land claim"); break;
 			default: Chip = LOCTEXT("ChipPlayer", "Survivor"); break;
@@ -842,7 +1001,7 @@ namespace WRMapTab
 					+ SHorizontalBox::Slot().FillWidth(1.5f)
 					[
 						SNew(SWRButton).Text(LOCTEXT("ShowOnMapBtn", "Show on map")).Primary(true).FontSize(14)
-						.OnClicked_Lambda([this]() { State().Centre = FVector2D(Live.World.X, Live.World.Y); State().Zoom = FMath::Max(State().Zoom, 3.f); SWRMapView::Clamp(); return FReply::Handled(); })
+						.OnClicked_Lambda([this]() { State().Centre = FVector2D(Live.World.X, Live.World.Y); State().Zoom = FMath::Max(State().Zoom, 3.f); SWRMapView::Clamp(State()); return FReply::Handled(); })
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(10.f * U, 0.f, 0.f, 0.f)
 					[
@@ -872,6 +1031,68 @@ namespace WRMapTab
 		}
 	};
 } // namespace WRMapTab
+
+TSharedRef<SWidget> WRUIMap::MakeWakeMap(const FWakeMapArgs& Args)
+{
+	using namespace WRMapTab;
+	// Its own view, apart from the journal map's: framed afresh each death, every place shown, closer zoom allowed (a
+	// bed is often a few metres from where you fell; past 12x the picture's 4 m pixels blur).
+	const TSharedRef<FMapState> ViewState = MakeShared<FMapState>();
+	ViewState->ZoomLimit = 12.f;
+	const TFunction<const FWRDeathNote*()> Note = Args.Note;
+	const TFunction<bool(int32)> Resting = Args.Resting;
+	const TFunction<void(int32)> Pick = Args.Pick;
+	const TSharedRef<SWidget> View = SNew(SWRMapView)
+		.ViewState(ViewState)
+		.Markers([Note, Resting]()
+		{
+			TArray<FMarker> Out;
+			const FWRDeathNote* N = Note ? Note() : nullptr;
+			for (int32 i = 0; N && i < N->Wake.Num(); ++i)
+			{
+				const FWRWakeOption& O = N->Wake[i];
+				FMarker& M = Out.AddDefaulted_GetRef();
+				M.Key = FString::Printf(TEXT("wake:%d"), i);
+				M.Cat = O.Kind == TEXT("camp") ? ECat::Camp : ECat::Bed;
+				M.Name = O.Name;
+				M.Kind = O.Kind.ToString();
+				M.World = O.At;
+				M.bMine = !O.bClan;
+				M.Alpha = Resting && Resting(i) ? 0.45f : 1.f;
+			}
+			return Out;
+		})
+		.OnPick([Pick](const FString& Key) { if (Pick && Key.StartsWith(TEXT("wake:"))) Pick(FCString::Atoi(*Key.RightChop(5))); })
+		.Chosen([Note]() { const FWRDeathNote* N = Note ? Note() : nullptr; return N ? FString::Printf(TEXT("wake:%d"), N->WakePick) : FString(); })
+		.Fell([Note]() { const FWRDeathNote* N = Note ? Note() : nullptr; return N ? N->DeathAt : FVector::ZeroVector; })
+		.FitVersion(Args.Version);
+	return SNew(SWRPanel).Kind(EWRPanel::Leather).Padding(FMargin(9.f * U))
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot()[View]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(14.f * U)[Compass()]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(14.f * U)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[MapButton(TEXT("plus"), LOCTEXT("ZoomIn", "Zoom in"), [ViewState]() { SWRMapView::ZoomBy(*ViewState, 1.4f); })]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[MapButton(TEXT("minus"), LOCTEXT("ZoomOut", "Zoom out"), [ViewState]() { SWRMapView::ZoomBy(*ViewState, 1.f / 1.4f); })]
+			]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 16.f * U, 0.f, 0.f)
+			[
+				SNew(SBorder).Visibility(EVisibility::HitTestInvisible).BorderImage(WRUI::Box(FLinearColor(0.02f, 0.02f, 0.025f, 0.82f), 14.f * U, WRUI::Brass2, 1.f))
+				.Padding(FMargin(16.f * U, 6.f * U))
+				[
+					WRUI::Text(LOCTEXT("WakeMapHint", "Click a bed or camp to wake there"), WRUI::Body(13, 600), WRUI::Ink2)
+				]
+			]
+		];
+}
+
+bool WRUIMap::FindMarkerOnScreen(const FString& Name, FVector2D& OutScreen)
+{
+	const TSharedPtr<const WRMapTab::SWRMapView> View = WRMapTab::SWRMapView::LastPainted().Pin();
+	return View.IsValid() && View->ScreenPosOf(Name, OutScreen);
+}
 
 WR_REGISTER_JOURNAL_TAB("map", [](AWRPlayerController* PC) -> TSharedRef<SWidget> { return SNew(WRMapTab::SWRMapTabWidget).PC(PC); });
 

@@ -79,6 +79,8 @@ void FWRClans::RefreshPlayerStates(const UWorld* World) const
 	{
 		if (AWRPlayerState* WPS = Cast<AWRPlayerState>(P)) WPS->ClanName = ClanOf(WPS->GetPlayerName());
 	}
+	// Clanmates' beds are offered too: a clan change changes whose beds each player has.
+	WRBeds::RefreshAll(const_cast<UWorld*>(World));
 }
 
 FString FWRClans::ClanOf(const FString& Player) const

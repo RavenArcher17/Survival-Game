@@ -6,6 +6,22 @@
 class AActor;
 class AWRCharacter;
 
+/** A place the death screen offers to wake at (WRBeds): one of your beds, a clanmate's, or a camp. */
+USTRUCT()
+struct FWRWakeOption
+{
+	GENERATED_BODY()
+
+	/** "Your bed", "Mira's bedroll", "Volcanic camp 3". */
+	UPROPERTY() FString Name;
+	/** bed, bedroll or camp. */
+	UPROPERTY() FName Kind;
+	UPROPERTY() FVector At = FVector::ZeroVector;
+	/** Seconds this bed still rests after you last woke at it (0: ready). */
+	UPROPERTY() float RestSeconds = 0.f;
+	UPROPERTY() bool bClan = false;
+};
+
 /**
  * What the server tells a player who just died, for the death screen (WRUIFlow): who or what killed them, where their
  * belongings wait (the server's death penalty), and where and when they come back.
@@ -33,6 +49,9 @@ struct FWRDeathNote
 	UPROPERTY() FVector RespawnAt = FVector::ZeroVector;
 	/** Until the server brings you back (player.respawnSeconds). */
 	UPROPERTY() float Seconds = 10.f;
+	/** Where you can wake, the default first (WRBeds); the screen lets you pick another before the countdown ends. */
+	UPROPERTY() TArray<FWRWakeOption> Wake;
+	UPROPERTY() int32 WakePick = 0;
 };
 
 namespace WRFlow

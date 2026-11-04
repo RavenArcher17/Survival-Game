@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRBeds.h"
 #include "WRSound.h"
 #include "WRBuildLook.h"
 #include "WRLifeSkills.h"
@@ -283,6 +284,10 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 		if (Extent.IsNearlyZero()) { Origin = GetActorLocation(); Extent = FVector(60.f); }
 		const FName Effect = Def->Material == TEXT("wood") ? TEXT("build.break.wood") : Def->Material == TEXT("stone") ? TEXT("build.break.stone") : TEXT("build.break");
 		WRFx::Broadcast(this, Effect, Origin, GetActorRotation(), FMath::Clamp(Extent.Size() / 150.f, 0.4f, 3.f), TEXT("build.demolish"));
+		if (WRBeds::IsBed(this))
+		{
+			WRBeds::OnGone(this);
+		}
 	}
 	if (AActor* Child = ChildActor.Get())
 	{
@@ -699,7 +704,7 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 		{
 			return TEXT("Not your bed");
 		}
-		PS->RespawnPoint = this;
+		WRBeds::Set(PS, this);
 		return TEXT("Respawn point set");
 	}
 	if (K == TEXT("crop"))
@@ -926,6 +931,12 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 		}
 		O->SetArrayField(TEXT("upkeep"), Upkeep);
 	}
+	if (Sleepers.Num() > 0)
+	{
+		TArray<TSharedPtr<FJsonValue>> Names;
+		for (const FString& S : Sleepers) Names.Add(MakeShared<FJsonValueString>(S));
+		O->SetArrayField(TEXT("sleepers"), Names);
+	}
 	return O;
 }
 
@@ -961,6 +972,11 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 		CropReadyAt = GetWorld()->GetTimeSeconds() + Left;
 	}
 	ReadStacks(O, TEXT("storage"), Storage);
+	const TArray<TSharedPtr<FJsonValue>>* SleeperNames = nullptr;
+	if (O->TryGetArrayField(TEXT("sleepers"), SleeperNames))
+	{
+		for (const TSharedPtr<FJsonValue>& N : *SleeperNames) Sleepers.AddUnique(N->AsString());
+	}
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Cores = nullptr;

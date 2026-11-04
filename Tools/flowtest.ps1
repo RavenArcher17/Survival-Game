@@ -1,7 +1,11 @@
 # Death and respawn (WRUIFlow) on the arena with the souls death penalty, one scripted player:
 # killed by creatures -> the server's death note names them and the bag, the client's death screen comes up, and the
-# player is back after the countdown at the camp they started at; then a bed is set and a second death brings them
+# bot presses Wake when the wait is over and is back at the camp they started at; then a bed is set and a second death brings them
 # back at the bed; a first-session hint fires once and is remembered for the player in GameUserSettings.
+# Then the server restarts (WRBeds): the bed is still theirs; a bedroll placed after it is the default, but the death
+# screen's map offers both: a click on "Your bed" on the map (a real window: WRClickMap) picks it, nobody wakes until
+# the Wake button is clicked (WRClick), and then they wake there; dying again, the bed is resting, so they wake on the
+# bedroll, which is used up.
 param([int]$Port = 7881)
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
@@ -25,10 +29,32 @@ $bot = @(
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrpreset=pve -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${port}?Path=fire?WRName=Flowbot -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
+$worldFile = Join-Path $db 'world_flowtest.json'
+# Done once the bot is, and the world's autosave (every 60 s) holds the bed with Flowbot as its sleeper.
+function BedSaved { (Test-Path $worldFile) -and ((Get-Content $worldFile -Raw) -match '"sleepers":\s*\[\s*"Flowbot"') }
+$deadline = (Get-Date).AddSeconds(230)
+while ((Get-Date) -lt $deadline) {
+	Start-Sleep -Seconds 3
+	if ((Select-String -Path "$out\server.log" -Pattern 'CHAT .*flowtest-done' -Quiet) -and (BedSaved)) { Start-Sleep -Seconds 2; break }
+}
+foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
+Start-Sleep -Seconds 2
+$bedSavedBeforeRestart = BedSaved
+
+# ---- phase 2: the server restarts; the client has a real window so the death screen can be clicked.
+$bot2 = @(
+	'WRBotPause 1', 'WRFlow quiet off', 'wait 3',
+	'WRGive hide 6', 'WRGive fiber 12', 'WRTeleport 600 -700', 'wait 2', 'WRPlace bedroll 600 -500 0 0', 'wait 1',
+	'WRKillMe', 'wait 4', 'dead:WRClickMap Your bed', 'wait 9', 'dead:WRClick Wake at', 'wait 12',
+	'WRKillMe', 'wait 16', 'WRSay flowtest2-done'
+)
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrpreset=pve -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
+Start-Sleep -Seconds 20
+$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${port}?Path=fire?WRName=Flowbot -game -windowed -ResX=1280 -ResY=720 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($bot2 -join '|')`" -abslog=`"$out\client2.log`"" -PassThru
 $deadline = (Get-Date).AddSeconds(150)
 while ((Get-Date) -lt $deadline) {
 	Start-Sleep -Seconds 3
-	if (Select-String -Path "$out\server.log" -Pattern 'CHAT .*flowtest-done' -Quiet) { Start-Sleep -Seconds 2; break }
+	if (Select-String -Path "$out\server2.log" -Pattern 'CHAT .*flowtest2-done' -Quiet) { Start-Sleep -Seconds 2; break }
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 1
@@ -56,7 +82,7 @@ $screens = @($client | Where-Object { $_ -match '^FLOW death screen' })
 Check 'the client shows the death screen' ($screens.Count -ge 1 -and $screens[0] -match "'Magmaw' \(magmaw\), penalty souls, bag \d+ stacks") $(if ($screens.Count) { $screens[0] })
 $backs = @($client | Where-Object { $_ -match '^FLOW back from the dead at' })
 $wait = if ($backs.Count -ge 1 -and $backs[0] -match '\(([\d.]+) s after dying\)') { [double]$Matches[1] } else { -1 }
-Check 'the player is back after the countdown' ($wait -ge 9 -and $wait -le 14) "$wait s"
+Check 'the bot presses Wake once the wait is over and is back' ($wait -ge 9 -and $wait -le 14) "$wait s"
 $respawnAt = if ($notes.Count -ge 1 -and $notes[0] -match "back at '[^']*' (V\([^)]*\))") { Vec $Matches[1] } else { $null }
 Check 'they come back where the note said (their start)' ((Dist2D $respawnAt (Vec $backs[0])) -lt 400) "note $respawnAt, back at $(Vec $backs[0])"
 Check 'the island is waited for, then the screen fades in' (@($client | Where-Object { $_ -match '^FLOW island streamed in' }).Count -ge 1)
@@ -70,7 +96,29 @@ $hints = @($client | Where-Object { $_ -match '^FLOW hint ability' })
 Check 'a first-session hint names the real key' ($hints.Count -eq 1 -and $hints[0] -match '\[Q\]') ($hints -join '; ')
 $ini = Join-Path $root 'Saved\Config\WindowsEditor\GameUserSettings.ini'
 Check 'the hint is remembered for the player' ((Test-Path $ini) -and (Select-String -Path $ini -Pattern '^Hints_Flowbot=.*ability' -Quiet))
-$errors = @(Select-String -Path "$out\server.log", "$out\client.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
+
+# ---- phase 2 (after the restart)
+Check 'the world save keeps who set the bed' $bedSavedBeforeRestart
+$server2 = Lines "$out\server2.log"
+$client2 = Lines "$out\client2.log"
+$restored = @($server2 | Where-Object { $_ -match '^BEDS Flowbot will wake at their bed at' })
+Check 'after a restart the bed is still theirs' ($restored.Count -ge 1) $(if ($restored.Count) { $restored[0] })
+Check 'placing a bedroll sets it' (@($server2 | Where-Object { $_ -match '^BEDS Flowbot set their bedroll' }).Count -ge 1)
+$offers = @($server2 | Where-Object { $_ -match '^BEDS Flowbot can wake at: ' })
+Check 'the death screen offers the bedroll first, then the bed and a camp' ($offers.Count -ge 1 -and $offers[0] -match 'can wake at: Your bedroll, Your bed, \S') $(if ($offers.Count) { $offers[0] })
+Check 'the map shows the places to wake, and a click on "Your bed" there picks it' ((@($client2 | Where-Object { $_ -match '^CLICKMAP "Your bed" at' }).Count -ge 1) -and (@($client2 | Where-Object { $_ -match "^FLOW chose to wake at 'Your bed'" }).Count -ge 1) -and (@($server2 | Where-Object { $_ -match '^BEDS Flowbot chose to wake at Your bed' }).Count -ge 1)) `
+	(($client2 | Where-Object { $_ -match '^FLOW chose' } | Select-Object -First 1) + ' / ' + ($server2 | Where-Object { $_ -match '^BEDS Flowbot chose|can.t wake' } | Select-Object -First 1))
+$backs2 = @($client2 | Where-Object { $_ -match '^FLOW back from the dead at' })
+# Wake is clicked 13 s after dying, 3 s after the wait is over: nothing brings them back before that.
+$wait2 = if ($backs2.Count -ge 1 -and $backs2[0] -match '\(([\d.]+) s after dying\)') { [double]$Matches[1] } else { -1 }
+Check 'nobody wakes until Wake is clicked' ($wait2 -ge 12.5 -and (@($client2 | Where-Object { $_ -match "^CLICK ""Wake at your bed""" }).Count -ge 1) -and (@($client2 | Where-Object { $_ -match "^FLOW wake at 'Your bed'" }).Count -ge 1)) "back $wait2 s after dying"
+$back1 = if ($backs2.Count -ge 1) { Vec $backs2[0] } else { $null }
+Check 'they wake at the bed they picked' ($back1 -and (Dist2D $back1 @(-500, 900, 0)) -lt 400) $(if ($backs2.Count) { $backs2[0] })
+Check 'dying again, the bed is resting' ($offers.Count -ge 2 -and $offers[1] -match 'Your bed \(resting \d+ s\)') $(if ($offers.Count -ge 2) { $offers[1] })
+$back2 = if ($backs2.Count -ge 2) { Vec $backs2[1] } else { $null }
+Check 'so they wake on the bedroll' ($back2 -and (Dist2D $back2 @(600, -500, 0)) -lt 400) $(if ($backs2.Count -ge 2) { $backs2[1] })
+Check 'and the bedroll is used up' (@($server2 | Where-Object { $_ -match '^BEDS Flowbot woke on their bedroll at .*used up' }).Count -ge 1)
+$errors = @(Select-String -Path "$out\server.log", "$out\client.log", "$out\server2.log", "$out\client2.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
 # The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.
 $errors = @($errors | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the logs' ($errors.Count -eq 0) (($errors | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() }) -join ' | ')

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/PlayerState.h"
+#include "WRBeds.h"
 #include "WRPlayerState.generated.h"
 
 class UAbilitySystemComponent;
@@ -27,8 +28,18 @@ public:
 	/** Basic weapon abilities are granted once per player, not per pawn. */
 	bool bDefaultAbilitiesGranted = false;
 
-	/** Server: bed/bedroll this player respawns at (falls back to a biome spawn). */
+	/** Server: the bed/bedroll this player wakes at by default (WRBeds; falls back to a camp). */
 	TWeakObjectPtr<AActor> RespawnPoint;
+	/** The beds you've set and your clan's, for your map and death screen (only your own client gets them). */
+	UPROPERTY(Replicated) TArray<FWRBedSpot> Beds;
+	/** Server: where the death screen offered to wake (in its order), what's picked, and the body's half height. */
+	TArray<TWeakObjectPtr<AActor>> WakeActors;
+	int32 WakePick = INDEX_NONE;
+	float WakeHalfHeight = 90.f;
+	/** Server: dead and waiting to wake; from this world time Wake is allowed (< 0: not waiting). */
+	double WakeReadyAt = -1.0;
+	/** Server: beds resting after you woke at them, until this world time. */
+	TMap<TWeakObjectPtr<AActor>, double> BedRestUntil;
 
 	/** Server: artifact modifiers active (Full release feature; unlocks hidden boss phase 3). Dev: WRArtifacts 1. */
 	bool bArtifactModifiers = false;
