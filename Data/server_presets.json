@@ -1,5 +1,5 @@
 {
-  "_comment": "Server settings tab. Official servers run a locked preset; 'custom' takes Saved/ServerDB/server.json {\"preset\": \"custom\", \"base\": \"pve\", \"settings\": {...}}. Pick with -wrpreset=<name> or that file. Read in code as server.<key>. Playtest = Casual co-op + 10x XP/skills, 10x taming, 1 h boss respawn (internal, build plan M7). Fixed on every server (not settable): 10% boss loot rule, 150-point path cap with 100 per path, artifact rules apply only to the wearer.",
+  "_comment": "Server settings tab. Official servers run a locked preset; 'custom' takes the world's Saved/Worlds/<world>/settings.json {\"preset\": \"custom\", \"base\": \"pve\", \"settings\": {...}}. Pick with -wrpreset=<name> or that file (the menu writes it for a new world). Read in code as server.<key>. Playtest = Casual co-op + 10x XP/skills, 10x taming, 1 h boss respawn (internal, build plan M7). Fixed on every server (not settable): 10% boss loot rule, 150-point path cap with 100 per path, artifact rules apply only to the wearer.",
   "default": "playtest",
   "presets": {
     "pvp_standard": {

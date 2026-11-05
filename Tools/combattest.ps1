@@ -11,8 +11,8 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-combat-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path (Split-Path $project) 'Saved\ServerDB'
-Remove-Item (Join-Path $db 'players\Vanguard.json'), (Join-Path $db 'world_combattest.json') -ErrorAction SilentlyContinue
+$db = Join-Path (Split-Path $project) 'Saved\Worlds\combattest'
+Remove-Item (Join-Path $db 'players\Vanguard.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
 function Hold($seconds) { (1..[math]::Ceiling($seconds) | ForEach-Object { 'wait 1|WRHeal' }) -join '|' }   # wait, staying alive
 function Face($seconds, $id = 'cinderfang') { (1..[math]::Ceiling($seconds * 2) | ForEach-Object { "WRAimAt $id|wait 0.5" }) -join '|' }  # keep the guard (and your camera) toward it

@@ -6,9 +6,9 @@ $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
 $out = Join-Path $env:TEMP ("wildreach-build-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$world = Join-Path $root 'Saved\ServerDB\world_buildtest.json'
+$world = Join-Path $root 'Saved\Worlds\buildtest\world.json'
 Remove-Item $world -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $root 'Saved\ServerDB\players\Builder.json'), (Join-Path $root 'Saved\ServerDB\players\Raider.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\buildtest\players\Builder.json'), (Join-Path $root 'Saved\Worlds\buildtest\players\Raider.json') -ErrorAction SilentlyContinue
 
 $builder = @(
 	'WRBotPause 1', 'WRTeleport 2400 3000', 'wait 1',

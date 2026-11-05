@@ -7,7 +7,7 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-craft-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Crafter.json'), (Join-Path (Split-Path $project) 'Saved\ServerDB\world_crafttest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\crafttest\players\Crafter.json'), (Join-Path (Split-Path $project) 'Saved\Worlds\crafttest\world.json') -ErrorAction SilentlyContinue
 
 $cmds = @(
 	'WRBotPause 1',

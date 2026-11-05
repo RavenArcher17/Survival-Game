@@ -64,13 +64,13 @@ if (-not $Log) {
 	$logs = Join-Path $env:TEMP ("wildreach-demolish-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 	if (-not $Out) { $Out = Join-Path $logs 'shots' }
 	New-Item -ItemType Directory -Force $logs | Out-Null
-	$db = Join-Path $root 'Saved\ServerDB'
+	$db = Join-Path $root 'Saved\Worlds\demolishtest'
 	New-Item -ItemType Directory -Force (Join-Path $db 'players') | Out-Null
 	Remove-Item (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 	# Stranger's foundation and wall at the hut site (the world save format: AWRBuildPiece::ToJson).
 	$piece = { param($id, $x, $y, $z, $hp) "{`"piece`":`"$id`",`"owner`":`"Stranger`",`"x`":$x,`"y`":$y,`"z`":$z,`"yaw`":0,`"hp`":$hp,`"code`":`"`",`"locked`":false,`"planted`":false,`"cropSecondsLeft`":0,`"storage`":[]}" }
 	$world = "{`"version`":1,`"pieces`":[$(& $piece 'wood_foundation' -132000 -56400 4734 600),$(& $piece 'wood_wall' -132000 -56600 4834 400)],`"tames`":[]}"
-	[System.IO.File]::WriteAllText((Join-Path $db 'world_demolishtest.json'), $world)
+	[System.IO.File]::WriteAllText((Join-Path $db 'world.json'), $world)
 	$shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 	$started = Get-Date
 	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=demolishtest -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
@@ -84,7 +84,7 @@ if (-not $Log) {
 	}
 	foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 	Start-Sleep -Seconds 2
-	Remove-Item (Join-Path $db 'world_demolishtest.json'), (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
+	Remove-Item (Join-Path $db 'world.json'), (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 	$lock.ReleaseMutex()
 	if ($Shots) {
 		New-Item -ItemType Directory -Force $Out | Out-Null

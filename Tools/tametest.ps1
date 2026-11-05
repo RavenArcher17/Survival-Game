@@ -8,8 +8,8 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-tame-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path (Split-Path $project) 'Saved\ServerDB'
-Remove-Item (Join-Path $db 'players\Tamer.json'), (Join-Path $db 'world_tametest.json') -ErrorAction SilentlyContinue
+$db = Join-Path (Split-Path $project) 'Saved\Worlds\tametest'
+Remove-Item (Join-Path $db 'players\Tamer.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 $tune = '-wrtune=taming.easySeconds:4,taming.mediumSeconds:6,taming.hardSeconds:600,taming.tameLimit:5,taming.unconsciousTorporDecay:0.05'
 $before = Get-Date
 $shot = if ($Shots) { 'HighResShot 1600x900|wait 1' } else { 'wait 0.1' }

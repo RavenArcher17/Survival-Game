@@ -8,7 +8,7 @@ $shotDir = Join-Path (Split-Path $project) 'Saved\Screenshots'
 $before = Get-Date
 $out = Join-Path $env:TEMP ("wildreach-ranged-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Archer.json'), (Join-Path (Split-Path $project) 'Saved\ServerDB\world_rangedtest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\rangedtest\players\Archer.json'), (Join-Path (Split-Path $project) 'Saved\Worlds\rangedtest\world.json') -ErrorAction SilentlyContinue
 $shot = 'HighResShot 1600x900|wait 1'
 $aim = 'WRAimAt cinderfang|WRHeal|wait 0.1'   # after the aim zoom settles, and a frame for the camera to swing round
 # A fresh Cinderfang (70 hp, 70 torpor) for each weapon, rooted so it can't reach the archer: a bite staggers, and a

@@ -10,12 +10,12 @@ param([switch]$Shots, [switch]$Arena)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
-$db = Join-Path $root 'Saved\ServerDB'
+$db = Join-Path $root 'Saved\Worlds\skytest'
 $out = Join-Path $env:TEMP ("wildreach-sky-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $name = 'SkyBot'
 $map = if ($Arena) { 'L_CombatArena' } else { 'L_Island' }
-$worldSave = Join-Path $db "world_$map.json"
+$worldSave = Join-Path $db 'world.json'
 Remove-Item (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 if (Test-Path $worldSave) { Copy-Item $worldSave "$out\world_backup.json" }
 Remove-Item $worldSave -ErrorAction SilentlyContinue   # a fresh world: the clock starts at clock.startHour
@@ -49,7 +49,7 @@ $cmds = @(
 )
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/$map -server -nullrhi -unattended -nosound -port=7837 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/$map -server -nullrhi -wrworld=skytest -unattended -nosound -port=7837 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds $(if ($Arena) { 20 } else { 30 })
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7837?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
@@ -62,7 +62,7 @@ if (-not $c.HasExited) { Stop-Process -Id $c.Id -Force }
 $deadline = (Get-Date).AddSeconds(70)
 while ((Get-Date) -lt $deadline -and @(Select-String -Path "$out\server.log" -Pattern 'WORLD saved').Count -lt 2) { Start-Sleep -Seconds 3 }
 if (-not $s.HasExited) { Stop-Process -Id $s.Id -Force }
-$s2 = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/$map -server -nullrhi -unattended -nosound -port=7837 -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
+$s2 = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/$map -server -nullrhi -wrworld=skytest -unattended -nosound -port=7837 -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(90)
 while ((Get-Date) -lt $deadline) {
 	Start-Sleep -Seconds 3

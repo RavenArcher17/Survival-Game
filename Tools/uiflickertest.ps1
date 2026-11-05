@@ -29,7 +29,7 @@ if (-not $Log) {
 	$logs = Join-Path $env:TEMP ("wildreach-flicker-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 	New-Item -ItemType Directory -Force $logs | Out-Null
 	$name = 'Steady'
-	Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+	Remove-Item (Join-Path $root "Saved\Worlds\flicker\players\$name.json") -ErrorAction SilentlyContinue
 	$shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 	$started = Get-Date
 	# Each section: its commands, a WRUIState naming it in the log, then one WRUIText per frame.
@@ -49,7 +49,7 @@ if (-not $Log) {
 	}
 	foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 	Start-Sleep -Seconds 2
-	Remove-Item (Join-Path $root 'Saved\ServerDB\world_flicker.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+	Remove-Item (Join-Path $root 'Saved\Worlds\flicker\world.json'), (Join-Path $root "Saved\Worlds\flicker\players\$name.json") -ErrorAction SilentlyContinue
 	$lock.ReleaseMutex()
 	if ($Shots) {
 		$out = Join-Path $logs 'shots'
@@ -61,25 +61,26 @@ if (-not $Log) {
 	$Log = "$logs\client.log"
 }
 
-# Each section's text, frame by frame (the [frame] counter on each log line), as "text#n" -> "x,y".
+# Each section's text, look by look (UIFRAME starts each: a long burst can cross the log's own [frame] counter), as
+# "text#n" -> "x,y".
 $results = @()
 function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
 $data = @{}
 $shown = @{}
 $sec = -1
-$rx = [regex]'^\[[^\]]+\]\[\s*(\d+)\]LogWildreach: (UISTATE|UITEXT)\s*(-?\d+)?,?\s*(-?\d+)? ?(.*)$'
+$fr = $null
+$rx = [regex]'^\[[^\]]+\]\[\s*\d+\]LogWildreach: (UISTATE|UIFRAME|UITEXT)\s*(-?\d+)?,?\s*(-?\d+)? ?(.*)$'
 foreach ($line in [System.IO.File]::ReadLines($Log)) {
 	$m = $rx.Match($line)
 	if (-not $m.Success) { continue }
-	if ($m.Groups[2].Value -eq 'UISTATE') { $sec++; $data[$sec] = [ordered]@{}; $shown[$sec] = if ($line -match 'menu=(\w+)') { $Matches[1] } else { '?' }; continue }
+	if ($m.Groups[1].Value -eq 'UISTATE') { $sec++; $data[$sec] = [ordered]@{}; $shown[$sec] = if ($line -match 'menu=(\w+)') { $Matches[1] } else { '?' }; $fr = $null; continue }
 	if ($sec -lt 0 -or $sec -ge $names.Count) { continue }
-	$fk = 'f' + $m.Groups[1].Value
-	if (-not $data[$sec].Contains($fk)) { $data[$sec][$fk] = [ordered]@{} }
-	$fr = $data[$sec][$fk]
-	$k = $m.Groups[5].Value
+	if ($m.Groups[1].Value -eq 'UIFRAME') { $fr = [ordered]@{}; $data[$sec]['f' + $m.Groups[2].Value] = $fr; continue }
+	if ($null -eq $fr) { continue }
+	$k = $m.Groups[4].Value
 	$n = 0
 	while ($fr.Contains("$k#$n")) { $n++ }
-	$fr["$k#$n"] = "$($m.Groups[3].Value),$($m.Groups[4].Value)"
+	$fr["$k#$n"] = "$($m.Groups[2].Value),$($m.Groups[3].Value)"
 }
 for ($i = 0; $i -lt $names.Count; $i++) {
 	$f = if ($data.ContainsKey($i)) { $data[$i] } else { [ordered]@{} }

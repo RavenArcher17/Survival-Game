@@ -5,6 +5,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
+#include "WRWorlds.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
@@ -22,7 +23,8 @@
 
 static FString ClansPath()
 {
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), TEXT("clans.json"));
+	const FString Dir = WRWorlds::CurrentDir();
+	return Dir.IsEmpty() ? FString() : FPaths::Combine(Dir, TEXT("clans.json"));  // "": the menu's island keeps none
 }
 
 FWRClans& FWRClans::Get()
@@ -68,7 +70,7 @@ void FWRClans::Save() const
 	}
 	FString Text;
 	FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Text));
-	FFileHelper::SaveStringToFile(Text, *ClansPath());
+	if (!ClansPath().IsEmpty()) FFileHelper::SaveStringToFile(Text, *ClansPath());
 }
 
 void FWRClans::RefreshPlayerStates(const UWorld* World) const

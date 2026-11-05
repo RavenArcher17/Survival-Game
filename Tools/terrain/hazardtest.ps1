@@ -9,7 +9,7 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-hazard-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\world_hazardtest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\hazardtest\world.json') -ErrorAction SilentlyContinue
 # Lava spots: grid points 3 m or more inside the flow's edge whose neighbours are within 40 cm (level ground), 60 m apart.
 $grid = (Get-Content -Raw (Join-Path (Split-Path $project) 'Data/island_dressing.json') | ConvertFrom-Json).hazards.lavaGrid
 $spots = @()

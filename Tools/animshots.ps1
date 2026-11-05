@@ -15,7 +15,7 @@ if (-not $Out) { $Out = Join-Path $logs 'shots' }
 New-Item -ItemType Directory -Force $logs, $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
 $name = 'Animator'
-Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root "Saved\Worlds\animshots\players\$name.json") -ErrorAction SilentlyContinue
 
 # Each sequence: what to set up, the action (started just before the frames), how long to wait into it, the angles
 # (degrees off the subject's nose: 90 = its right side, 35 = three-quarter front), who to frame, and fix = hold the
@@ -85,7 +85,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_animshots.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\animshots\world.json'), (Join-Path $root "Saved\Worlds\animshots\players\$name.json") -ErrorAction SilentlyContinue
 foreach ($f in $frameNames) {
 	$src = Join-Path $shotDir ($f[0] + '.png')
 	if (Test-Path $src) { Move-Item $src (Join-Path $Out $f[1]) -Force }

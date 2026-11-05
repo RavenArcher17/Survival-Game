@@ -342,6 +342,8 @@ private:
 	/** -wrbothunt: ignore training dummies, go after creature packs. */
 	bool bBotHunt = false;
 	bool bBotSetupDone = false;
+	/** Which world of this run the bot is in (1 = the first): "@2:" commands are for that one only. */
+	int32 BotWorld = 0;
 	/** -wrbotgather: harvest resource nodes instead of fighting. */
 	bool bBotGather = false;
 	/** What the gathering bot goes for (WRGather): node, tree, rock, shrub or any. */

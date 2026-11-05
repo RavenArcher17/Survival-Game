@@ -12,7 +12,7 @@ $root = Split-Path $project
 if (-not $Out) { $Out = Join-Path $env:TEMP ("wildreach-audiotest-" + (Get-Date -Format 'yyyyMMdd-HHmmss')) }
 New-Item -ItemType Directory -Force $Out | Out-Null
 $name = 'Earwig'
-Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root "Saved\Worlds\audiotest\players\$name.json") -ErrorAction SilentlyContinue
 $bounce = Join-Path $root 'Saved\BouncedWavFiles'
 Remove-Item (Join-Path $bounce 'audiotest*.wav') -ErrorAction SilentlyContinue
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
@@ -87,7 +87,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in @($c, $s)) { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_audiotest.json'), (Join-Path $root 'Saved\ServerDB\world_audiotestmenu.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\audiotest\world.json'), (Join-Path $root 'Saved\Worlds\audiotestmenu\world.json'), (Join-Path $root "Saved\Worlds\audiotest\players\$name.json") -ErrorAction SilentlyContinue
 foreach ($f in @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -gt $started })) { Copy-Item $f.FullName (Join-Path $Out ('audio_page_' + $f.Name)) }
 foreach ($f in @(Get-ChildItem $bounce -Filter 'audiotest*.wav' -ErrorAction SilentlyContinue)) { Move-Item $f.FullName (Join-Path $Out $f.Name) -Force }
 "logs and recording: $Out"

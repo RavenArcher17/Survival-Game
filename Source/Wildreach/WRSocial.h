@@ -10,7 +10,7 @@ class AWRPlayerController;
 class UStaticMeshComponent;
 
 /**
- * Small clans (server only, saved to Saved/ServerDB/clans.json). Clanmates share claims, doors,
+ * Small clans (server only, saved in the world's folder: Saved/Worlds/<world>/clans.json). Clanmates share claims, doors,
  * chests and tames, and can't hurt each other. Size limit comes from server.clanSizeLimit (0 = none).
  */
 class WILDREACH_API FWRClans
@@ -30,6 +30,7 @@ public:
 	FString Kick(const FString& Player, const FString& Target);
 	FString Describe(const FString& Player) const;
 
+	/** The current world's clans (the game mode loads them again for each world it starts). */
 	void Load();
 	void Save() const;
 	/** Server: copy everyone's clan onto their PlayerState (replicated to clients). */

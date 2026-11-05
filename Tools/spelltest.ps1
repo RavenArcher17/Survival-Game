@@ -9,8 +9,8 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-spell-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path (Split-Path $project) 'Saved\ServerDB'
-Remove-Item (Join-Path $db 'players\Pyro.json'), (Join-Path $db 'players\Cryo.json'), (Join-Path $db 'world_spelltest.json') -ErrorAction SilentlyContinue
+$db = Join-Path (Split-Path $project) 'Saved\Worlds\spelltest'
+Remove-Item (Join-Path $db 'players\Pyro.json'), (Join-Path $db 'players\Cryo.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
 $pyro = @('WRBotPause 1', 'wait 1', 'WRCast 1', 'wait 1.6', 'WRCast 1', 'wait 1', 'WRGivePoints fire 120', 'WRLearn fire spreading_flames', 'WRLearn fire heat_capacity', 'WRAutoSpend fire 100', 'wait 2',
 	'WRTeleport -400 -500', 'wait 2', 'WRLook 0 -20', 'WRCast 3', 'wait 3', 'WRCast 4', 'wait 3', 'WRCast 5', 'wait 3', 'WRLook 0 0', 'WRCast 6', 'wait 2', 'WRCast 7', 'wait 4',

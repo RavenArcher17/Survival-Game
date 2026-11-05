@@ -1,5 +1,6 @@
 #include "WRTuning.h"
 #include "Wildreach.h"
+#include "WRWorlds.h"
 #include "Dom/JsonObject.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
@@ -145,7 +146,7 @@ void FWRTuning::ImportServerSettings(const FString& InPreset, const TArray<FStri
 
 void FWRTuning::ApplyServerPreset()
 {
-	// Preset: -wrpreset=<name>, else Saved/ServerDB/server.json {"preset": ..., "settings": {...}}, else the file's default.
+	// Preset: -wrpreset=<name>, else the world's settings.json {"preset": ..., "settings": {...}}, else the file's default.
 	const TSharedPtr<FJsonObject> Presets = LoadDataFile(TEXT("server_presets.json"));
 	const TSharedPtr<FJsonObject>* List = nullptr;
 	if (!Presets.IsValid() || !Presets->TryGetObjectField(TEXT("presets"), List))
@@ -154,7 +155,8 @@ void FWRTuning::ApplyServerPreset()
 	}
 	TSharedPtr<FJsonObject> ServerFile;
 	FString Text;
-	if (FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), TEXT("server.json"))))
+	const FString WorldDir = WRWorlds::CurrentDir();
+	if (!WorldDir.IsEmpty() && FFileHelper::LoadFileToString(Text, *FPaths::Combine(WorldDir, TEXT("settings.json"))))
 	{
 		FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), ServerFile);
 	}

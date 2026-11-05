@@ -65,7 +65,7 @@ while ((Get-Date) -lt $deadline -and -not $game.HasExited -and -not (Test-Path $
 Start-Sleep -Seconds 3
 if (-not $game.HasExited) { Stop-Process -Id $game.Id -Force }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_portraits.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\portraits\world.json'), (Join-Path $root "Saved\Worlds\portraits\players\$name.json") -ErrorAction SilentlyContinue
 
 # One picture per creature: its name, the front view, then the side view.
 Add-Type -AssemblyName System.Drawing

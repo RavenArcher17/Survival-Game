@@ -29,7 +29,7 @@ $deadline = (Get-Date).AddSeconds(90)
 while ((Get-Date) -lt $deadline -and -not (Has "$out\server.log" 'Join succeeded: Same')) { Start-Sleep -Seconds 3 }
 foreach ($p in $c2, $s, $node) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\world_versiontest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\versiontest\world.json') -ErrorAction SilentlyContinue
 
 $client = @(if (Test-Path "$out\client.log") { Select-String -Path "$out\client.log" -Pattern 'LogWildreach: ' | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ','') } })
 $results = @()

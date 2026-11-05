@@ -1165,11 +1165,13 @@ void AWRPlayerController::TickBot(float DeltaTime)
 	}
 
 	// Run the setup commands from -wrbotcmds="cmd one|wait 3|cmd two" once the bot is in the world. They start over in
-	// each world, so a run that goes through the main menu marks commands "solo:" (only on your own, before joining) or
-	// "net:" (only once connected to a game).
+	// each world, so a run that goes through the main menu marks commands "solo:" (only on your own, before joining),
+	// "net:" (only once connected to a game) or "@2:" (only in the second world this run enters: menu, game, menu...).
 	if (!bBotSetupDone && BotClock > 1.5f)
 	{
 		bBotSetupDone = true;
+		static int32 BotWorldsEntered = 0;
+		BotWorld = ++BotWorldsEntered;
 		FString Cmds;
 		if (FParse::Value(FCommandLine::Get(), TEXT("wrbotcmds="), Cmds, false))
 		{
@@ -1181,6 +1183,12 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		FString Cmd = BotCmdQueue[0].TrimStartAndEnd();
 		BotCmdQueue.RemoveAt(0);
 		const bool bSolo = GetNetMode() == NM_Standalone;
+		if (Cmd.StartsWith(TEXT("@")))
+		{
+			const int32 Colon = Cmd.Find(TEXT(":"));
+			if (Colon < 0 || FCString::Atoi(*Cmd.Mid(1, Colon - 1)) != BotWorld) continue;
+			Cmd = Cmd.RightChop(Colon + 1).TrimStart();
+		}
 		if (Cmd.StartsWith(TEXT("solo:")) || Cmd.StartsWith(TEXT("net:")))
 		{
 			if (Cmd.StartsWith(TEXT("solo:")) != bSolo) continue;

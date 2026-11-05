@@ -6,7 +6,7 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-walk-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\world_walktest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\walktest\world.json') -ErrorAction SilentlyContinue
 
 $walkers = @(
 	@{ Name = 'WalkA_NorthPass'; Cmds = 'WRBotPause 1|WRTeleport -100400 -129600|wait 3|WRWalkTo 60000 -129600' },

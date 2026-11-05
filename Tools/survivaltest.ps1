@@ -11,12 +11,12 @@ param([switch]$Shots, [int]$Port = 7833)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
-$db = Join-Path $root 'Saved\ServerDB'
+$db = Join-Path $root 'Saved\Worlds\survivaltest'
 $out = Join-Path $env:TEMP ("wildreach-survival-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $name = 'Survivor'
 $playerSave = Join-Path $db "players\$name.json"
-$worldSave = Join-Path $db 'world_L_Island.json'
+$worldSave = Join-Path $db 'world.json'
 Remove-Item $playerSave -ErrorAction SilentlyContinue
 if (Test-Path $worldSave) { Copy-Item $worldSave "$out\world_backup.json" }
 
@@ -65,7 +65,7 @@ $cmds = @(
 # (a foreach, not Where-Object: piping drops the entries after an empty $(if ...) one)
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=survivaltest -unattended -nosound -port=$Port -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })

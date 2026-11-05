@@ -37,7 +37,7 @@ $fps = 30
 $name = 'Filmer'
 $prefix = "cv$($stamp -replace '-', '')_"
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
-Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root "Saved\Worlds\creaturevideo\players\$name.json") -ErrorAction SilentlyContinue
 
 # The performance: each step's commands, then how long it lasts (game seconds). Same for every creature.
 $c = $Creature
@@ -93,7 +93,7 @@ while ((Get-Date) -lt $deadline -and -not $game.HasExited) {
 }
 if (-not $game.HasExited) { Stop-Process -Id $game.Id -Force }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_creaturevideo.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\creaturevideo\world.json'), (Join-Path $root "Saved\Worlds\creaturevideo\players\$name.json") -ErrorAction SilentlyContinue
 
 # Frames into -Out as f0000.png ..., the timing beside them.
 Remove-Item (Join-Path $Out 'f[0-9][0-9][0-9][0-9].png') -ErrorAction SilentlyContinue

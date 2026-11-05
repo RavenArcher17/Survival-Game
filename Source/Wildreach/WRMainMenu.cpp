@@ -4,6 +4,7 @@
 #include "WRPlayerUI.h"
 #include "WRKeyBindings.h"
 #include "WRUISettings.h"
+#include "WRUIWorlds.h"
 #include "WRUIMotion.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -431,7 +432,7 @@ TSharedRef<SWidget> SWRMainMenu::MakePanel()
 			[
 				SNew(SWRMenuButton).Primary(true).Height(68.f).FontSize(18).Chevron(true)
 				.Icon(EWRIcon::FlagFilled).IconSize(28.f).IconColor(WRUI::Brass).IconAccent(WRUI::Ember)
-				.Text(NSLOCTEXT("WRUI", "Host", "Host a game")).Sub(NSLOCTEXT("WRUI", "HostSub", "Friends join your IP · UDP 7777"))
+				.Text(NSLOCTEXT("WRUI", "Host", "Host a game")).Sub(NSLOCTEXT("WRUI", "HostSub", "Choose a world · friends join your IP"))
 				.OnClicked(this, &SWRMainMenu::OnHost)
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
@@ -625,17 +626,33 @@ void SWRMainMenu::Remember() const
 
 FReply SWRMainMenu::OnHost()
 {
+	// Choose a world first; it covers the menu as the settings window does (they share the slot).
+	FString LastWorld;
+	GConfig->GetString(MenuSection, TEXT("World"), LastWorld, GGameUserSettingsIni);
+	const TWeakPtr<SWRMainMenu> Weak = SharedThis(this);
+	SettingsHost->SetContent(SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, WRTune(TEXT("flow.screenRise"), 14.f)))
+	[
+		WRUI::MakeWorldChooser(LastWorld,
+			[Weak](const FString& Id) { if (const TSharedPtr<SWRMainMenu> Menu = Weak.Pin()) Menu->HostWorld(Id); },
+			FSimpleDelegate::CreateLambda([Weak]() { if (const TSharedPtr<SWRMainMenu> Menu = Weak.Pin()) Menu->SettingsHost->SetContent(SNullWidget::NullWidget); }))
+	]);
+	return FReply::Handled();
+}
+
+void SWRMainMenu::HostWorld(const FString& WorldId)
+{
 	APlayerController* PC = Owner.Get();
 	if (!PC)
 	{
-		return FReply::Handled();
+		return;
 	}
 	Remember();
-	const FString Opts = TEXT("listen") + Options();
+	GConfig->SetString(MenuSection, TEXT("World"), *WorldId, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+	const FString Opts = FString::Printf(TEXT("listen%s?World=%s"), *Options(), *WorldId);
 	UE_LOG(LogWildreach, Log, TEXT("MENU host: L_Island?%s"), *Opts);
 	Close();
 	UGameplayStatics::OpenLevel(PC, TEXT("/Game/Maps/L_Island"), true, Opts);
-	return FReply::Handled();
 }
 
 FReply SWRMainMenu::OnJoin()

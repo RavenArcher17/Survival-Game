@@ -5,9 +5,9 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-social-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path (Split-Path $project) 'Saved\ServerDB'
+$db = Join-Path (Split-Path $project) 'Saved\Worlds\socialtest'
 $save = Join-Path $db 'players\Alpha.json'
-Remove-Item $save, (Join-Path $db 'players\Bravo.json'), (Join-Path $db 'clans.json'), (Join-Path $db 'world_socialtest.json') -ErrorAction SilentlyContinue
+Remove-Item $save, (Join-Path $db 'players\Bravo.json'), (Join-Path $db 'clans.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
 $alpha = @(
 	'WRBotPause 1', 'WRTeleport 1000 1000', 'wait 4',

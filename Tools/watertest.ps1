@@ -23,7 +23,7 @@ if (-not $Out) { $Out = Join-Path $logs 'shots' }
 New-Item -ItemType Directory -Force $logs | Out-Null
 if ($Shots) { New-Item -ItemType Directory -Force $Out | Out-Null }
 $name = 'Swimmer'
-$db = Join-Path $root 'Saved\ServerDB'
+$db = Join-Path $root 'Saved\Worlds\watertest'
 Remove-Item (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 $started = Get-Date
@@ -84,7 +84,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $db 'world_watertest.json'), (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $db 'world.json'), (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 }
 
 # ---- results

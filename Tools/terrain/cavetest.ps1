@@ -10,8 +10,8 @@ $root = Split-Path $project
 $out = Join-Path $env:TEMP ("wildreach-caves-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $name = 'Spelunker'
-Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_cavetest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root "Saved\Worlds\cavetest\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\cavetest\world.json') -ErrorAction SilentlyContinue
 
 $caves = @((Get-Content -Raw (Join-Path $root 'Data\island_dressing.json') | ConvertFrom-Json).caves)
 $spawned = $caves.Count
@@ -44,7 +44,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_cavetest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\cavetest\world.json') -ErrorAction SilentlyContinue
 
 # ---- results: split the logs per cave on the walk starts (client) and the "caveN done" lines (server)
 $client = @(Select-String -Path "$out\client.log" -Pattern 'LogWildreach: (WALK .*)$' -ErrorAction SilentlyContinue | ForEach-Object { $_.Matches[0].Groups[1].Value })

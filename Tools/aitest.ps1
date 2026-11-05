@@ -8,7 +8,7 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-ai-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-Remove-Item (Join-Path (Split-Path $project) 'Saved\ServerDB\players\Ranger.json'), (Join-Path (Split-Path $project) 'Saved\ServerDB\world_aitest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\aitest\players\Ranger.json'), (Join-Path (Split-Path $project) 'Saved\Worlds\aitest\world.json') -ErrorAction SilentlyContinue
 $before = Get-Date
 $tune = '-wrtune=creatureAI.huntIntervalMinutes:0'
 $shot = if ($Shots) { 'HighResShot 1600x900' } else { 'wait 0.1' }

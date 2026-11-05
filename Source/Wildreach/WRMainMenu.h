@@ -27,9 +27,9 @@ private:
 
 /**
  * Front end shown when the game runs on its own (not connected to a server): pick a name and a main
- * path (fire / frost sets your spawn biome), then Host (your game becomes the server on UDP 7777)
- * or Join a friend by IP. Choices are remembered in GameUserSettings.ini. Settings opens the same
- * settings window as Esc in game (WRUISettings).
+ * path (fire / frost sets your spawn biome), then Host (choose a world, WRUIWorlds, and your game becomes
+ * its server on UDP 7777) or Join a friend by IP. Choices are remembered in GameUserSettings.ini. Settings
+ * opens the same settings window as Esc in game (WRUISettings).
  */
 class WILDREACH_API SWRMainMenu : public SCompoundWidget
 {
@@ -61,6 +61,8 @@ public:
 
 private:
 	FReply OnHost();
+	/** Host this world (Choose a world's Play). */
+	void HostWorld(const FString& WorldId);
 	FReply OnJoin();
 	FReply OnQuit();
 	FReply OnUpdate();

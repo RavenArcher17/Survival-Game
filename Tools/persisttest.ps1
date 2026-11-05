@@ -5,9 +5,9 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-persist-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path (Split-Path $project) 'Saved\ServerDB'
+$db = Join-Path (Split-Path $project) 'Saved\Worlds\persisttest'
 $save = Join-Path $db 'players\PersistBot.json'
-Remove-Item $save, (Join-Path $db 'world_persisttest.json') -ErrorAction SilentlyContinue
+Remove-Item $save, (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
 function Saved { if (Test-Path $save) { try { Get-Content $save -Raw | ConvertFrom-Json } catch { $null } } }
 function Seen($file, $pattern) { (Test-Path $file) -and (Select-String -Path $file -Pattern $pattern -Quiet) }

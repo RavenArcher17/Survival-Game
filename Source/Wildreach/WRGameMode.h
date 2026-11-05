@@ -12,6 +12,8 @@ class WILDREACH_API AWRGameMode : public AGameModeBase
 public:
 	AWRGameMode();
 
+	/** Picks the world this game is (WRWorlds), then loads its settings and clans. */
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
@@ -26,16 +28,17 @@ public:
 	bool Wake(AController* Controller);
 
 	/**
-	 * Persistence v1: one JSON file per player under Saved/ServerDB/players/, keyed by player name.
-	 * Autosaves dirty players every 10 s, and on logout and server shutdown. SQLite + real
-	 * account ids replace this in M7.
+	 * Persistence v1: one JSON file per character in the world's folder (Saved/Worlds/<world>/players/), keyed by
+	 * player name. Autosaves dirty players every 10 s, and on logout and server shutdown. SQLite + real account ids
+	 * replace this in M7.
 	 */
 	void SavePlayer(class AWRPlayerState* PS);
 	void LoadPlayer(class AWRPlayerState* PS);
 	void SaveAllPlayers(bool bOnlyDirty);
+	/** "" when this game runs no world (the menu's island). */
 	static FString PlayerSavePath(const FString& PlayerName);
 
-	/** Everything players have built on this map, in Saved/ServerDB/world_<map>.json. */
+	/** Everything players have built in this world, in Saved/Worlds/<world>/world.json (also counts its play time). */
 	void SaveWorld();
 	void LoadWorld();
 	FString WorldSavePath() const;
@@ -51,4 +54,9 @@ private:
 	FTimerHandle AutosaveTimer;
 	FTimerHandle WorldSaveTimer;
 	FTimerHandle UndergroundTimer;
+	/** Adds to the world's play time (WRWorlds::Touch). Leaving: a player on their way out, who doesn't count from now on. */
+	void CountPlayTime(const AController* Leaving = nullptr);
+	/** When the world's play time was last counted (FPlatformTime), and whether anyone has been here since. */
+	double PlayCountedAt = 0.0;
+	bool bPlayersHere = false;
 };

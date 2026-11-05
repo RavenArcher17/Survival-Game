@@ -145,7 +145,7 @@ function Analyse([string]$csv, [string]$extra)
 }
 function StartServer([string]$world, [string]$extra)
 {
-	Remove-Item (Join-Path $root "Saved\ServerDB\world_$world.json") -ErrorAction SilentlyContinue
+	Remove-Item -Recurse -Force (Join-Path $root "Saved\Worlds\$world") -ErrorAction SilentlyContinue
 	$log = "$out\$world-server.log"
 	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=$world $extra -abslog=`"$log`"" -PassThru -WindowStyle Hidden
 	if (-not (WaitFor $log 'LoadMap\(/Game/Maps/L_Island\)' 180 $s)) { Write-Warning "server $world did not come up (log: $log)" }
@@ -173,7 +173,6 @@ foreach ($o in $order)
 	$tag = "$($o.Level)$($o.Run)"
 	try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
 	$name = 'Bench'
-	Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
 	$csvName = "bench_${tag}_$(Get-Date -Format 'HHmmss').csv"
 	$before = OtherProcs @()
 	$s = StartServer 'bench' $(if ($Tune) { "-wrtune=$Tune" } else { '' })
@@ -226,7 +225,6 @@ if (-not $NoServer)
 foreach ($sc in $scenarios)
 {
 	$name = 'BenchServer'
-	Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
 	$csvName = "bench_server_$($sc.Name)_$(Get-Date -Format 'HHmmss').csv"
 	# A dedicated server can't be told "csvprofile stop" from outside, so it captures a fixed number of frames (it runs
 	# at 30 Hz) from boot and the window the player was on the route is cut out of that by the log's timestamps.

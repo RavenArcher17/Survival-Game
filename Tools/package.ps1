@@ -53,7 +53,7 @@ play with people you trust. A few handy ones:
    WRGivePoints <path> <n>      points for a path tree (fire or frost), e.g. WRGivePoints fire 5
    WRClearCreatures             remove the wild creatures within 30 m of you
 
-Your character is saved on the host's PC under your name (Wildreach\Saved\ServerDB).
+Each world is a folder on the host's PC (Wildreach\Saved\Worlds), with a character for you in each one, under your name.
 Sound, music and other outside files are credited in CREDITS.md.
 "@ | Set-Content -Encoding ascii (Join-Path $Out 'Windows\README.txt')
 "[$(Get-Date -Format 'HH:mm:ss')] DONE: $Out\Windows\Wildreach.exe" | Tee-Object -FilePath $log -Append

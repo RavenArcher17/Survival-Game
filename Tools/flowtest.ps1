@@ -13,8 +13,8 @@ $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
 $out = Join-Path $env:TEMP ("wildreach-flow-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path $root 'Saved\ServerDB'
-Remove-Item (Join-Path $db 'players\Flowbot.json'), (Join-Path $db 'world_flowtest.json') -ErrorAction SilentlyContinue
+$db = Join-Path $root 'Saved\Worlds\flowtest'
+Remove-Item (Join-Path $db 'players\Flowbot.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
 $bot = @(
 	'WRBotPause 1', 'WRFlow quiet off', 'WRFlow hints on', 'WRFlow forget', 'wait 2',
@@ -29,7 +29,7 @@ $bot = @(
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrpreset=pve -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${port}?Path=fire?WRName=Flowbot -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
-$worldFile = Join-Path $db 'world_flowtest.json'
+$worldFile = Join-Path $db 'world.json'
 # Done once the bot is, and the world's autosave (every 60 s) holds the bed with Flowbot as its sleeper.
 function BedSaved { (Test-Path $worldFile) -and ((Get-Content $worldFile -Raw) -match '"sleepers":\s*\[\s*"Flowbot"') }
 $deadline = (Get-Date).AddSeconds(230)

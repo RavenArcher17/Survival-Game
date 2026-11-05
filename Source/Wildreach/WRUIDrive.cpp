@@ -323,6 +323,9 @@ namespace WRUIDrive
 		TEXT("Testing: log every piece of text on screen with its position"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld*)
 		{
+			// UIFRAME starts each look: a long burst can cross the log's own frame counter, so it can't tell them apart.
+			static int32 Looks = 0;
+			UE_LOG(LogWildreach, Log, TEXT("UIFRAME %d"), ++Looks);
 			for (const FFound& F : VisibleText()) UE_LOG(LogWildreach, Log, TEXT("UITEXT %4.0f,%4.0f %s"), F.Centre.X, F.Centre.Y, *F.Text.Left(60));
 		}));
 

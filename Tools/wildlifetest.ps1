@@ -13,7 +13,7 @@ $root = Split-Path $project
 $out = Join-Path $env:TEMP ("wildreach-wildlife-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $name = 'Ranger'
-Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root "Saved\Worlds\wildlife\players\$name.json") -ErrorAction SilentlyContinue
 
 $data = Get-Content -Raw (Join-Path $root 'Data\island_spawns.json') | ConvertFrom-Json
 $fire = $data.sites | Where-Object { $_.creature -eq 'emberhorn' } | Select-Object -First 1
@@ -44,7 +44,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_wildlife.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\wildlife\world.json') -ErrorAction SilentlyContinue
 
 # ---- results
 $server = @(Select-String -Path "$out\server.log" -Pattern 'LogWildreach: ' | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ','') })

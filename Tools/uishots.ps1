@@ -18,7 +18,7 @@ $logs = Join-Path $env:TEMP ("wildreach-uishots-" + (Get-Date -Format 'yyyyMMdd-
 if (-not $Out) { $Out = Join-Path $logs 'shots' }
 New-Item -ItemType Directory -Force $logs, $Out | Out-Null
 $name = 'Snapper'
-Remove-Item (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root "Saved\Worlds\uishots\players\$name.json") -ErrorAction SilentlyContinue
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 $started = Get-Date
 
@@ -131,7 +131,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 }
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_uishots.json'), (Join-Path $root 'Saved\ServerDB\world_uishotsmenu.json'), (Join-Path $root "Saved\ServerDB\players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $root 'Saved\Worlds\uishots\world.json'), (Join-Path $root 'Saved\Worlds\uishotsmenu\world.json'), (Join-Path $root "Saved\Worlds\uishots\players\$name.json") -ErrorAction SilentlyContinue
 $files = @(Get-ChildItem $shotDir -Filter 'ScreenShot*.png' | Where-Object { $_.LastWriteTime -gt $started } | Sort-Object LastWriteTime)
 for ($i = 0; $i -lt $files.Count -and $i -lt $labels.Count; $i++) {
 	$dest = Join-Path $Out ('{0:D2}_{1}.png' -f ($i + 1), $labels[$i])

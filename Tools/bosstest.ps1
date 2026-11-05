@@ -7,8 +7,8 @@ $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $out = Join-Path $env:TEMP ("wildreach-boss-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
-$db = Join-Path (Split-Path $project) 'Saved\ServerDB'
-Remove-Item (Join-Path $db 'players\Hero.json'), (Join-Path $db 'players\Helper.json'), (Join-Path $db 'world_bosstest.json') -ErrorAction SilentlyContinue
+$db = Join-Path (Split-Path $project) 'Saved\Worlds\bosstest'
+Remove-Item (Join-Path $db 'players\Hero.json'), (Join-Path $db 'players\Helper.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 $tune = '-wrtune=bosses.damageScale:0.05,bosses.partChance:1'
 
 $fight = { param($id, $extra) @("WRSpawn $id 1", 'wait 7', 'WRHeal', 'WRBossDmgPct 30 none', 'wait 3', 'WRBossDmgPct 25 none', 'wait 6') + $extra + @('WRHeal', 'WRBossDmg 9999999 none', 'wait 8') }

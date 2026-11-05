@@ -15,7 +15,9 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRWater.h"
+#include "WRWorlds.h"
 #include "Dom/JsonObject.h"
+#include "Misc/PackageName.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerStart.h"
@@ -37,6 +39,30 @@ AWRGameMode::AWRGameMode()
 	PlayerStateClass = AWRPlayerState::StaticClass();
 	PlayerControllerClass = AWRPlayerController::StaticClass();
 	GameStateClass = AWRGameState::StaticClass();
+}
+
+void AWRGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+	// Which world this is: the menu's Host names it (?World=), tests and dedicated servers pass -wrworld=, and any other
+	// server plays the map's own (L_Island: "Island", where 0.5's save moved). The menu's island on its own (not
+	// hosting: no ?listen yet at this point, which comes after InitGame) is no world and saves nothing.
+	FString Id = UGameplayStatics::ParseOption(Options, TEXT("World"));
+	if (Id.IsEmpty()) FParse::Value(FCommandLine::Get(), TEXT("-wrworld="), Id);
+	if (Id.IsEmpty() && (IsRunningDedicatedServer() || UGameplayStatics::HasOption(Options, TEXT("listen"))))
+	{
+		Id = UWorld::RemovePIEPrefix(FPackageName::GetShortName(MapName));
+		Id.RemoveFromStart(TEXT("L_"));
+	}
+	Id = WRWorlds::SafeId(Id);
+	if (Id == TEXT("Island"))
+	{
+		WRWorlds::MigrateOldSave();
+	}
+	WRWorlds::SetCurrent(Id);
+	FWRTuning::Get().Reload();   // the world's settings.json
+	FWRClans::Get().Load();
+	UE_LOG(LogWildreach, Log, TEXT("WORLD %s"), Id.IsEmpty() ? TEXT("none (the menu's island: nothing is loaded or saved)") : *FString::Printf(TEXT("'%s' (Saved/Worlds/%s), preset %s"), *Id, *Id, *FWRTuning::Get().GetPreset()));
 }
 
 FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
@@ -144,17 +170,17 @@ void AWRGameMode::EndPlay(const EEndPlayReason::Type Reason)
 
 FString AWRGameMode::WorldSavePath() const
 {
-	// -wrworld=<name> gives a server its own save (tests running side by side on one map don't share one).
-	FString Name;
-	if (!FParse::Value(FCommandLine::Get(), TEXT("-wrworld="), Name) || Name.IsEmpty())
-	{
-		Name = GetWorld()->GetMapName().Replace(TEXT("UEDPIE_0_"), TEXT(""));
-	}
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), FString::Printf(TEXT("world_%s.json"), *Name));
+	const FString Dir = WRWorlds::CurrentDir();
+	return Dir.IsEmpty() ? FString() : FPaths::Combine(Dir, TEXT("world.json"));
 }
 
 void AWRGameMode::SaveWorld()
 {
+	if (WorldSavePath().IsEmpty())
+	{
+		return;
+	}
+	CountPlayTime();
 	TArray<TSharedPtr<FJsonValue>> Pieces;
 	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
 	{
@@ -196,10 +222,28 @@ void AWRGameMode::SaveWorld()
 	}
 }
 
+void AWRGameMode::CountPlayTime(const AController* Leaving)
+{
+	// The time since last counted, if anyone was here for it: asked each save, and as players come and go (by the save
+	// at the end of a game the host may have logged out already).
+	const double Now = FPlatformTime::Seconds();
+	if (bPlayersHere)
+	{
+		WRWorlds::Touch(Now - PlayCountedAt);
+	}
+	PlayCountedAt = Now;
+	bPlayersHere = false;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		bPlayersHere |= PC && PC != Leaving && PC->PlayerState;
+	}
+}
+
 void AWRGameMode::LoadWorld()
 {
 	FString Text;
-	if (!FFileHelper::LoadFileToString(Text, *WorldSavePath()))
+	if (WorldSavePath().IsEmpty() || !FFileHelper::LoadFileToString(Text, *WorldSavePath()))
 	{
 		return;
 	}
@@ -258,17 +302,22 @@ void AWRGameMode::LoadWorld()
 
 FString AWRGameMode::PlayerSavePath(const FString& PlayerName)
 {
+	const FString Dir = WRWorlds::CurrentDir();
+	if (Dir.IsEmpty())
+	{
+		return FString();
+	}
 	FString Safe;
 	for (const TCHAR C : PlayerName)
 	{
 		Safe.AppendChar(FChar::IsAlnum(C) || C == TEXT('_') || C == TEXT('-') ? C : TEXT('_'));
 	}
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("ServerDB"), TEXT("players"), Safe + TEXT(".json"));
+	return FPaths::Combine(Dir, TEXT("players"), Safe + TEXT(".json"));
 }
 
 void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 {
-	if (!PS || PS->GetPlayerName().IsEmpty())
+	if (!PS || PS->GetPlayerName().IsEmpty() || WRWorlds::CurrentDir().IsEmpty())
 	{
 		return;
 	}
@@ -301,7 +350,7 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 {
 	FString Text;
-	if (!PS || !FFileHelper::LoadFileToString(Text, *PlayerSavePath(PS->GetPlayerName())))
+	if (!PS || PlayerSavePath(PS->GetPlayerName()).IsEmpty() || !FFileHelper::LoadFileToString(Text, *PlayerSavePath(PS->GetPlayerName())))
 	{
 		return;
 	}
@@ -358,6 +407,7 @@ void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
 void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
+	CountPlayTime();
 	FWRClans::Get().RefreshPlayerStates(GetWorld());
 	AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
 	WRBeds::Refresh(PS);
@@ -370,6 +420,7 @@ void AWRGameMode::Logout(AController* Exiting)
 	UE_LOG(LogWildreach, Log, TEXT("Player left: %s"), *GetNameSafe(Exiting));
 	SavePlayer(Exiting ? Exiting->GetPlayerState<AWRPlayerState>() : nullptr);
 	Super::Logout(Exiting);
+	CountPlayTime(Exiting);
 }
 
 AActor* AWRGameMode::ChoosePlayerStart_Implementation(AController* Player)

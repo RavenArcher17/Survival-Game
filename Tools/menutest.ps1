@@ -12,8 +12,8 @@ $root = Split-Path $project
 $logs = Join-Path $env:TEMP ("wildreach-menutest-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $logs | Out-Null
 $players = @('Hosty', 'Friendo')
-foreach ($n in $players) { Remove-Item (Join-Path $root "Saved\ServerDB\players\$n.json") -ErrorAction SilentlyContinue }
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_menutest.json') -ErrorAction SilentlyContinue
+foreach ($n in $players) { Remove-Item (Join-Path $root "Saved\Worlds\menutest\players\$n.json") -ErrorAction SilentlyContinue }
+Remove-Item (Join-Path $root 'Saved\Worlds\menutest\world.json') -ErrorAction SilentlyContinue
 
 # What each player does once in the game, and the menu (and cursor) each WRUIState should then show.
 $play = @(
@@ -39,7 +39,9 @@ $expect = @(
 	@('none', 0), @('settings', 1), @('settings', 1), @('settings', 1), @('none', 0), @('build', 1), @('none', 0)
 )
 function Cmds([string]$menuClick) {
-	$front = if ($menuClick) { @('solo:wait 3', 'solo:WRMainMenu', 'solo:wait 3', 'solo:WRUIState', "solo:WRClick $menuClick", 'solo:wait 600') } else { @() }
+	# (Clicks split by ; go one after another: Host a game, then the buttons of Choose a world.)
+	$clicks = @($menuClick -split ';' | Where-Object { $_ } | ForEach-Object { "solo:WRClick $_"; 'solo:wait 2' })
+	$front = if ($menuClick) { @('solo:wait 3', 'solo:WRMainMenu', 'solo:wait 3', 'solo:WRUIState') + $clicks + @('solo:wait 600') } else { @() }
 	@('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off') + $front + $play
 }
 # The host opens the island hosting straight away (what "Host a game" does: L_Island?listen with the menu's name and
@@ -55,7 +57,8 @@ function Start-Player([string]$name, [string]$menuClick, [string]$extraIni, [str
 
 $procs = @()
 $started = Get-Date
-if ($MenuHost) { $procs += Start-Player 'Hosty' 'Host a game' '' }
+$worldsBefore = @(Get-ChildItem (Join-Path $root 'Saved\Worlds') -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
+if ($MenuHost) { $procs += Start-Player 'Hosty' 'Host a game;New world;Create and play' '' }
 else { $procs += Start-Player 'Hosty' '' '' '/Game/Maps/L_Island?listen?WRName=Hosty?Path=fire?Body=m' }
 $hostLog = Join-Path $logs 'Hosty.log'
 # The friend starts once the host's game is up (its first UISTATE in the hosted world).
@@ -74,8 +77,10 @@ while ((Get-Date) -lt $deadline) {
 }
 foreach ($p in $procs) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
-foreach ($n in $players) { Remove-Item (Join-Path $root "Saved\ServerDB\players\$n.json") -ErrorAction SilentlyContinue }
-Remove-Item (Join-Path $root 'Saved\ServerDB\world_menutest.json') -ErrorAction SilentlyContinue
+# The world -MenuHost made comes off the list again.
+if ($MenuHost) { Get-ChildItem (Join-Path $root 'Saved\Worlds') -Directory | Where-Object { ($worldsBefore -notcontains $_.Name) -and ($_.Name -ne 'menutest') } | Remove-Item -Recurse -Force }
+foreach ($n in $players) { Remove-Item (Join-Path $root "Saved\Worlds\menutest\players\$n.json") -ErrorAction SilentlyContinue }
+Remove-Item (Join-Path $root 'Saved\Worlds\menutest\world.json') -ErrorAction SilentlyContinue
 
 $results = @()
 function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }

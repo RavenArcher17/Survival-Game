@@ -17,9 +17,10 @@ if it's missing, and starts the game; a newer Setup updates in place and keeps s
 `WildreachUpdater.exe`, which installs any newer GitHub release by itself before starting the game (the main menu
 offers **Update now** too), so players only download Setup once. It isn't code-signed, so Windows may show "Windows
 protected your PC": More info, then Run anyway. Everyone runs the game, types a name, picks a
-Male or Female body and Fire or Frost. One person clicks **Host** (their PC is the server; over the internet they forward UDP 7777
-to their PC). Everyone else types the host's IP and clicks **Join**. Saves live on the host
-(`Wildreach\Saved\ServerDB`). F10 goes back to the menu.
+Male or Female body and Fire or Frost. One person clicks **Host** and chooses a world or makes a new one (their PC is the
+server; over the internet they forward UDP 7777 to their PC). Everyone else types the host's IP and clicks **Join**. Saves
+live on the host, a folder per world (`Wildreach\Saved\Worlds\<world>`: its buildings, characters, clans and settings;
+0.5's `Saved\ServerDB` is copied into a world called Island once and kept as the backup). F10 goes back to the menu.
 
 A packaged **dedicated server** needs Unreal built from source: `Tools\build_engine.ps1` (several hours,
 ~200 GB; log `C:\Dev\UE5Source-build.log`). Until then the host plays and hosts at once.
@@ -29,9 +30,10 @@ A packaged **dedicated server** needs Unreal built from source: `Tools\build_eng
 (`gh release create v0.2.1 C:\Dev\WildreachBuild\Wildreach-Setup.exe --target master --latest`). Installed copies
 update on their next start. Clients and hosts must be on the same version to play together.
 
-Server settings: the default preset is `playtest` (10x XP, PvP off). Pick another with `-wrpreset=pvp_standard`
-(or `pve`, `casual_coop`), or write `Saved/ServerDB/server.json` with `{"preset": "custom", "base": "pve",
-"settings": {...}}` using the keys in `Data/server_presets.json`.
+Server settings: a world made on the menu keeps the preset picked for it in `Saved/Worlds/<world>/settings.json`, which can
+also hold `{"preset": "custom", "base": "pve", "settings": {...}}` with the keys in `Data/server_presets.json`. A server
+with no settings file plays `playtest` (10x XP, PvP off). `-wrpreset=pvp_standard` (or `pve`, `casual_coop`) overrides
+either, and `-wrworld=<name>` picks a dedicated server's world (without it: the map's, so `Island` on L_Island).
 
 ## Build
 
@@ -107,8 +109,8 @@ surface), `WRSoundStats [reset]` (plays per event + the mixer's state), `WRMusic
 
 `Tools\alltests.ps1` builds and runs everything below in turn (about 40 minutes) and prints a PASS / FAIL table
 (`-SkipBuild`, `-Only ranged,tame`). Each bot test ends with its checks (`PASS` / `FAIL` lines) and exits 1 on a failure.
-Arena tests give their server `-wrworld=<name>`, so each keeps its own world save (`Saved/ServerDB/world_<name>.json`)
-and they can run side by side.
+Tests give their server `-wrworld=<name>`, so each keeps its own world folder (`Saved/Worlds/<name>`, off the menu's list
+as it has no `info.json`) and they can run side by side.
 
 ```
 Tools\test.ps1          # automation tests (rules, combat scenarios, ranged items, taming food, creature behaviour, clock, wildlife sites, versions)
@@ -128,6 +130,7 @@ Tools\versiontest.ps1   # another version can't join and the menu says why; the 
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\flowtest.ps1      # death by creatures: death note, death screen, back after the countdown at your camp; a bed respawn; a hint remembered
+Tools\worldstest.ps1    # worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
 Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)

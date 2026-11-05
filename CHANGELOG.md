@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased: worlds (0.6)
+
+From Raven's Oct 31 review: only one world save, and characters, clans and settings shared by everything.
+
+- **Each world is a folder**, `Saved/Worlds/<world>/` (`WRWorlds`): `info.json` (name, created, last played, play time,
+  version), `settings.json` (what `ServerDB/server.json` was), `world.json` (buildings, tames, clock), `clans.json` and
+  `players/`. Characters are per world: everyone starts fresh in a new one.
+- **Host a game opens Choose a world** (`WRUIWorlds`): the worlds on this PC, last played first, each with its preset and
+  when and how long it was played. **Play** (or a double click), **Rename**, **Delete** (asks first: Keep it / Yes, delete
+  it) and **New world**: a name and a preset (PvE first, PvP, Casual co-op, Playtest), then **Create and play**. The last
+  world played is picked next time. Joining is unchanged. The full settings screen comes next.
+- **The old save moves over by itself:** the first time the list opens, `Saved/ServerDB` (`world_L_Island.json`, every
+  character, clans, `server.json`) is copied into a world called **Island**, with its preset kept, and left in place as
+  the backup (`Saved/Worlds/moved_from_ServerDB.txt` records it). Hosting without a world named does the same for L_Island.
+- **The game picks its world at the start of each game** (`AWRGameMode::InitGame`): `?World=<id>` from the menu,
+  `-wrworld=<id>` for tests and dedicated servers, else the map's name without `L_`. It reloads the settings and clans
+  then, so a second world hosted in the same run gets its own.
+- **The menu's island is no world any more:** it used to load and save `world_L_Island.json` behind the menu, and left a
+  character file for every machine-named player. Now it loads and saves nothing (unless a test gives it `-wrworld`).
+- **Worlds a server was only pointed at stay off the list** (no `info.json`): a dedicated server's, and all the tests'.
+- **Tests:** `Tools/worldstest.ps1` (in `alltests`): one game window, by real clicks, through two worlds and back:
+  separate buildings, characters and presets, rename, delete, play time, and the old save copied into Island. Every test
+  script now keeps its own world folder; `survivaltest`, `housetest` and `skytest` get their own instead of sharing
+  L_Island's. Bot commands take `@2:` (only in the second world this run enters), for runs that pass through the menu.
+- **`uiflickertest` no longer sees flashes that aren't there:** it split its frames by the log's own frame counter, which
+  can change part-way through a burst of lines, so one look at the Skills tab (136 lines) came out as two jumbled ones and
+  failed. `WRUIText` now starts each look with a `UIFRAME` line.
+
 ## Unreleased: beds and respawn (0.6)
 
 From Raven's Oct 31 review: a bed should be where you wake, and still be there after a restart.

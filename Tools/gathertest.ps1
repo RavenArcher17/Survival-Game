@@ -10,7 +10,7 @@ $env:UE_SKIP_UBT_SDK_SETUP = '1'
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
-$db = Join-Path $root 'Saved\ServerDB'
+$db = Join-Path $root 'Saved\Worlds\gathertest'
 $logs = Join-Path $env:TEMP ("wildreach-gathertest-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 if (-not $Out) { $Out = Join-Path $logs 'shots' }
 New-Item -ItemType Directory -Force $logs, $Out | Out-Null
@@ -20,7 +20,7 @@ if ($Shots) {
 	try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
 }
 $name = 'Gatherer'
-Remove-Item (Join-Path $db "players\$name.json"), (Join-Path $db 'world_gathertest.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $db "players\$name.json"), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 $started = Get-Date
 
@@ -98,7 +98,7 @@ while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 Start-Sleep -Seconds 2
 Copy-Item (Join-Path $db "players\$name.json") "$logs\player.json" -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $db 'world_gathertest.json'), (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $db 'world.json'), (Join-Path $db "players\$name.json") -ErrorAction SilentlyContinue
 
 # ---- results
 $notices = @(Select-String -Path "$logs\client.log" -Pattern 'NOTICE ' | ForEach-Object { ($_.Line -replace '^.*NOTICE ','').Trim() })
