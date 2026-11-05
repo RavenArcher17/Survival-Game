@@ -4,7 +4,7 @@
 #   alltests.ps1                     build, then everything (about 40 minutes)
 #   alltests.ps1 -SkipBuild          use the current build
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
-#                                    sky, tame, boss, social, menus, flow, worlds, spell, ranged, ai, combat, wildlife, version, updater, walk, hazard, water,
+#                                    sky, tame, boss, social, menus, flow, worlds, rules, spell, ranged, ai, combat, wildlife, version, updater, walk, hazard, water,
 #                                    gather, demolish, flicker, cave)
 param([switch]$SkipBuild, [string[]]$Only = @())
 # Every Unreal start otherwise runs UnrealBuildTool's platform check, which waits for any build running on the machine.
@@ -26,7 +26,8 @@ $tests = @(
 	@{ name = 'social'; script = 'socialtest.ps1'; what = 'PvP preset, clans, death bags, life skills' },
 	@{ name = 'menus'; script = 'menutest.ps1'; what = 'the menus by mouse and keyboard, host and a friend who joins: tabs, crafting, settings, build bar' },
 	@{ name = 'flow'; script = 'flowtest.ps1'; what = 'death screen and respawn: killer, bag, back at the camp; a bed respawn; a hint remembered' },
-	@{ name = 'worlds'; script = 'worldstest.ps1'; what = 'worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island' },
+	@{ name = 'worlds'; script = 'worldstest.ps1'; what = 'worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island; the settings screens' },
+	@{ name = 'rules'; script = 'rulestest.ps1'; what = 'a world''s settings change the game: clock, hunger and thirst, creature numbers and difficulty' },
 	@{ name = 'spell'; script = 'spelltest.ps1'; what = 'the Paths menu and tree spells' },
 	@{ name = 'ranged'; script = 'rangedtest.ps1'; what = 'every ranged weapon at a Cinderfang' },
 	@{ name = 'ai'; script = 'aitest.ps1'; what = 'hunting, sleeping, fleeing, special attacks' },

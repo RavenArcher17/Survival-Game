@@ -1051,10 +1051,12 @@ void AWRCreature::BeginPlay()
 	{
 		return;
 	}
-	InitVitals(Def->Health, 100.f, Def->Poise);
+	// The world's creature difficulty: wild ones (a tame goes back to its own numbers, ApplyTameBonus). Bosses: AWRBoss.
+	const float Difficulty = FMath::Max(0.1f, WRTune(TEXT("server.creatureDifficulty"), 1.f));
+	InitVitals(Def->Health * Difficulty, 100.f, Def->Poise);
 	MaxTorpor = Def->Health * WRTune(TEXT("taming.torporPerHealth"), 1.f);
 	HungryAt = GetWorld()->GetTimeSeconds() + FMath::FRand() * WRTune(TEXT("creatureAI.huntIntervalMinutes"), 5.f) * 60.f;
-	Weapon.FlatDamage = Def->Damage;
+	Weapon.FlatDamage = Def->Damage * Difficulty;
 	if (Def->Damage > 0.f)
 	{
 		GrantAbility(UWRGA_Bite::StaticClass());
@@ -2452,10 +2454,6 @@ void AWRCreatureSpawner::BeginPlay()
 		return;
 	}
 	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
-	if (Def && Def->Archetype == TEXT("boss"))
-	{
-		RespawnSeconds = WRTune(TEXT("server.bossRespawnHours"), 4.f) * 3600.f;
-	}
 	if (ActivationRadius <= 0.f)
 	{
 		Activate();
@@ -2486,6 +2484,9 @@ int32 AWRCreatureSpawner::SpawnSitesFromData(UWorld* World)
 		return 0;
 	}
 	const float Activation = WRTune(TEXT("wildlife.activationRadius"), 25000.f);
+	// The world's creature numbers: under 1, that share of the sites (spread evenly over the list); over 1, bigger packs.
+	const float Numbers = FMath::Max(0.1f, WRTune(TEXT("server.creatureNumbers"), 1.f));
+	float SitesOwed = 0.f;
 	int32 Spawned = 0, Creatures = 0;
 	for (const TSharedPtr<FJsonValue>& Value : *Sites)
 	{
@@ -2496,11 +2497,17 @@ int32 AWRCreatureSpawner::SpawnSitesFromData(UWorld* World)
 			UE_LOG(LogWildreach, Warning, TEXT("WILDLIFE site for unknown creature %s"), *Id.ToString());
 			continue;
 		}
+		SitesOwed += FMath::Min(Numbers, 1.f);
+		if (SitesOwed < 1.f - KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+		SitesOwed -= 1.f;
 		const FTransform At(FVector(Site->GetNumberField(TEXT("x")), Site->GetNumberField(TEXT("y")), Site->GetNumberField(TEXT("z")) + 100.f));
 		if (AWRCreatureSpawner* Spawner = World->SpawnActorDeferred<AWRCreatureSpawner>(StaticClass(), At, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 		{
 			Spawner->CreatureId = Id;
-			Spawner->Count = FMath::Max(1, Site->GetIntegerField(TEXT("count")));
+			Spawner->Count = FMath::Max(1, FMath::RoundToInt(Site->GetIntegerField(TEXT("count")) * FMath::Max(Numbers, 1.f)));
 			Spawner->Radius = Site->GetNumberField(TEXT("radius"));
 			Spawner->RespawnSeconds = Site->GetNumberField(TEXT("respawn"));
 			Spawner->ActivationRadius = Activation;
@@ -2615,7 +2622,10 @@ void AWRCreatureSpawner::SpawnOne()
 		Alive.Add(Creature);
 		Creature->OnCreatureDied.AddWeakLambda(this, [this](AWRCreature*)
 		{
-			PendingRespawns.Add(GetWorld()->GetTimeSeconds() + RespawnSeconds);
+			// A boss: as the world says now (its settings can change while the game runs).
+			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
+			const float Wait = Def && Def->Archetype == TEXT("boss") ? WRTune(TEXT("server.bossRespawnHours"), 4.f) * 3600.f : RespawnSeconds;
+			PendingRespawns.Add(GetWorld()->GetTimeSeconds() + Wait);
 		});
 	}
 }

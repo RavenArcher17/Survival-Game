@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased: world settings (0.6)
+
+From Raven's Oct 31 review: four presets existed, but only a command-line switch could pick one.
+
+- **The New world form has the rules:** pick a preset on the left and tweak it on the right. Players (PvP, PvP in boss
+  arenas, what happens to what you carry when you die, offline raid protection, clan size), Speeds (XP, gathering, taming,
+  crops) and The world (day length, hunger and thirst, creature numbers, creature difficulty, building upkeep, boss
+  respawn). Sliders with - and + for one step. Picking a preset sets them all to its values.
+- **The host can change them while playing:** Esc > World (`SWRWorldPage`, only on the host's menu): the preset, the same
+  rows, and Back to the preset. Changes are saved and in force a moment after the last one, go to everyone in the game, and
+  other players get a notice when the host is done.
+- **Saved with the world:** `settings.json` holds just the preset, or `"custom"` with the base and only what differs from
+  it. A changed world shows **Custom** on the list. `FWRWorldSettings`, `WRWorlds::PresetSettings / ReadSettings /
+  WriteSettings`; `AWRGameMode::ChangeWorldSettings`.
+- **Four new settings reach the game:** `server.dayMinutes` (the clock keeps its time when it changes),
+  `server.hungerMultiplier`, `server.creatureNumbers` (under 1x, that share of the wildlife sites; over 1x, bigger packs;
+  from the next start of the world, until roaming wildlife replaces sites) and `server.creatureDifficulty` (health and
+  damage of wild creatures and bosses as they appear; tames keep their own numbers).
+- **Boss respawn** is read when a boss dies, so changing it in game counts from its next defeat.
+- **Not on the screen, because nothing is behind them:** crafting speed (crafting is instant), bounties and raids (no such
+  systems yet). Their preset values are still in `Data/server_presets.json`. The preset descriptions on the form no longer
+  promise them.
+- **A client now takes the host's settings whole** (`ImportServerSettings` clears its `server.*` first), so a setting put
+  back to its default doesn't linger.
+- **Tests:** `Tools/rulestest.ps1` (in `alltests`) plays the island three times with different `settings.json` and compares
+  the clock, hunger and thirst, sites and creatures, creature and boss numbers. `worldstest` now also clicks the form's and
+  Esc > World's steps, with a friend in the game who gets the new rules and a notice, and whose Esc menu has no World
+  page (28 checks). New commands: `WRWheel` (the mouse wheel over a piece of text), `WRVitals`; `WRSpawn` logs what it made.
+
 ## Unreleased: worlds (0.6)
 
 From Raven's Oct 31 review: only one world save, and characters, clans and settings shared by everything.

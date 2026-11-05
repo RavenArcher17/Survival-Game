@@ -222,6 +222,36 @@ void AWRGameMode::SaveWorld()
 	}
 }
 
+void AWRGameMode::ChangeWorldSettings(const FWRWorldSettings& Settings)
+{
+	if (WRWorlds::Current().IsEmpty() || !WRWorlds::WriteSettings(WRWorlds::Current(), Settings))
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("WORLD settings weren't saved (world '%s')"), *WRWorlds::Current());
+		return;
+	}
+	AWRGameState* State = GetGameState<AWRGameState>();
+	const double Hours = State ? State->GetTotalHours() : 0.0;   // at the old day length
+	FWRTuning::Get().Reload();
+	if (State)
+	{
+		State->RefreshServerSettings();
+		State->SetTotalHours(Hours);
+	}
+	UE_LOG(LogWildreach, Log, TEXT("WORLD settings changed: preset %s (%s)"), *FWRTuning::Get().GetPreset(), *FString::Join(FWRTuning::Get().ExportServerSettings(), TEXT(", ")));
+}
+
+void AWRGameMode::AnnounceWorldSettings()
+{
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
+		if (PC && !PC->IsLocalController())
+		{
+			PC->ClientNotify(TEXT("The host changed the world's settings"));
+		}
+	}
+}
+
 void AWRGameMode::CountPlayTime(const AController* Leaving)
 {
 	// The time since last counted, if anyone was here for it: asked each save, and as players come and go (by the save

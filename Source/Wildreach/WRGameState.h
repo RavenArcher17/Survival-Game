@@ -35,6 +35,8 @@ public:
 	static float DaylightAt(float Hour);
 	/** Server: jump the clock to an hour (later the same day, or the next day if it's already past). */
 	void SetHour(float Hour);
+	/** Server: send the settings in force to everyone (at the start, and when the host changes them). */
+	void RefreshServerSettings();
 	/** Server: restore a saved clock exactly (total hours since day 1, 00:00). */
 	void SetTotalHours(double Hours);
 	double GetTotalHours() const;

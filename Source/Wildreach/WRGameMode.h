@@ -43,6 +43,11 @@ public:
 	void LoadWorld();
 	FString WorldSavePath() const;
 
+	/** The host changed this world's settings: saved, in force at once and sent to everyone. The clock keeps its time. */
+	void ChangeWorldSettings(const struct FWRWorldSettings& Settings);
+	/** Tells the other players (when the host is done, not at each change). */
+	void AnnounceWorldSettings();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;

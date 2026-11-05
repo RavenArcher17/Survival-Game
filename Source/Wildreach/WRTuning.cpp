@@ -135,6 +135,9 @@ TArray<FString> FWRTuning::ExportServerSettings() const
 void FWRTuning::ImportServerSettings(const FString& InPreset, const TArray<FString>& Pairs)
 {
 	Preset = InPreset;
+	// The host's list is the whole of it (a setting it has since put back to its default isn't on the list any more).
+	for (auto It = Overrides.CreateIterator(); It; ++It) if (It.Key().StartsWith(TEXT("server."))) It.RemoveCurrent();
+	for (auto It = StrOverrides.CreateIterator(); It; ++It) if (It.Key().StartsWith(TEXT("server."))) It.RemoveCurrent();
 	for (const FString& P : Pairs)
 	{
 		FString Key, Value;

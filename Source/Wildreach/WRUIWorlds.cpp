@@ -1,6 +1,6 @@
 // The main menu's Host a game window, in the settings window's look: the worlds on this PC, last played first, with
-// New world (a name and a preset), Play, Rename and Delete (which asks first). WRWorlds keeps the folders; the menu
-// hosts the world Play picks (L_Island?listen?World=<id>).
+// New world (a name, a preset and its rules: WRUI::MakeWorldRules), Play, Rename and Delete (which asks first). WRWorlds
+// keeps the folders; the menu hosts the world Play picks (L_Island?listen?World=<id>).
 
 #include "WRUIWorlds.h"
 #include "Wildreach.h"
@@ -81,15 +81,16 @@ namespace WRWorldsUI
 		if (Preset == TEXT("pvp_standard")) return WRUI::Bad;
 		if (Preset == TEXT("casual_coop")) return WRUI::Frost;
 		if (Preset == TEXT("playtest")) return WRUI::Warn;
+		if (Preset == TEXT("custom")) return WRUI::Brass;
 		return WRUI::Good;
 	}
 
 	FText PresetBlurb(const FString& Preset)
 	{
-		if (Preset == TEXT("pvp_standard")) return LOCTEXT("BlurbPvP", "Players can fight and raid each other. Bases take less damage while their owners are away. Bounties.");
-		if (Preset == TEXT("casual_coop")) return LOCTEXT("BlurbCasual", "No fighting other players, you keep your things when you die, twice the XP and gathering, rare raids.");
+		if (Preset == TEXT("pvp_standard")) return LOCTEXT("BlurbPvP", "Players can fight and raid each other. Bases are safer while their owners are away.");
+		if (Preset == TEXT("casual_coop")) return LOCTEXT("BlurbCasual", "No fighting other players, you keep your things when you die, and twice the XP and gathering.");
 		if (Preset == TEXT("playtest")) return LOCTEXT("BlurbPlaytest", "Casual co-op with ten times the XP and taming, for trying things out.");
-		return LOCTEXT("BlurbPvE", "No fighting other players. Creatures and raids as usual; you leave a bag behind when you die.");
+		return LOCTEXT("BlurbPvE", "No fighting other players. You leave a bag behind when you die, and go back for it.");
 	}
 
 	/** "today at 17:32", "yesterday at 9:05", "3 days ago", "12 Oct". Times are kept in UTC. */
@@ -220,9 +221,9 @@ namespace WRWorldsUI
 			const FString Preset = InArgs._Preset;
 			ChildSlot
 			[
-				SNew(SBox).HeightOverride(168.f * U)
+				SNew(SBox).HeightOverride(92.f * U)
 				[
-					SNew(SBorder).Padding(FMargin(16.f * U, 14.f * U)).VAlign(VAlign_Top)
+					SNew(SBorder).Padding(FMargin(14.f * U, 10.f * U)).VAlign(VAlign_Top)
 					.BorderImage_Lambda([this]()
 					{
 						if (Selected()) return WRUI::Box(Hex(TEXT("3A2B17")), 5.f, WRUI::Brass, 1.5f);
@@ -239,10 +240,10 @@ namespace WRWorldsUI
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								WRUI::Text(WRWorlds::PresetName(Preset), Spaced(WRUI::Title(16), 40), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Selected() ? WRUI::Ink : WRUI::Ink2); }))
+								WRUI::Text(WRWorlds::PresetName(Preset), Spaced(WRUI::Title(15), 40), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Selected() ? WRUI::Ink : WRUI::Ink2); }))
 							]
 						]
-						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)[WRUI::Text(PresetBlurb(Preset), WRUI::Body(13, 500), WRUI::Ink2, false, true)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)[WRUI::Text(PresetBlurb(Preset), WRUI::Body(13, 500), WRUI::Ink2, false, true)]
 					]
 				]
 			];
@@ -345,7 +346,8 @@ namespace WRWorldsUI
 		FSimpleDelegate OnClose;
 		TArray<FWRWorldInfo> Worlds;
 		FString SelectedId;
-		FString NewPreset = TEXT("pve");
+		TSharedPtr<FWRWorldSettings> NewValues;
+		bool bNewChanged = false;
 		FText Status;
 		bool bFocused = false;
 		TSharedPtr<SWidget> FocusNext;
@@ -569,41 +571,61 @@ namespace WRWorldsUI
 		{
 			Mode = EMode::New;
 			Status = FText::GetEmpty();
-			NewPreset = TEXT("pve");
+			NewValues = MakeShared<FWRWorldSettings>(WRWorlds::PresetSettings(TEXT("pve")));
+			bNewChanged = false;
 			SAssignNew(NameBox, SEditableTextBox).Style(&FieldStyle()).Font(WRUI::Body(17, 700)).Text(FText::FromString(DefaultName()))
 				.SelectAllTextWhenFocused(true).HintText(LOCTEXT("WorldNameHint", "The world's name")).OnKeyDownHandler(this, &SWRWorldChooser::OnTextBoxKey)
 				.OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type How) { if (How == ETextCommit::OnEnter) CreateAndPlay(); });
 			FocusNext = NameBox;
-			TSharedRef<SHorizontalBox> Tiles = SNew(SHorizontalBox);
+			TSharedRef<SVerticalBox> Tiles = SNew(SVerticalBox);
 			for (const FString& P : WRWorlds::Presets())
 			{
-				Tiles->AddSlot().FillWidth(1.f).Padding(Tiles->NumSlots() > 0 ? 10.f * U : 0.f, 0.f, 0.f, 0.f)
+				Tiles->AddSlot().AutoHeight().Padding(0.f, Tiles->NumSlots() > 0 ? 8.f * U : 0.f, 0.f, 0.f)
 				[
-					SNew(SWRPresetTile, [this, P]() { return NewPreset == P; }, [this, P]() { NewPreset = P; }).Preset(P)
+					SNew(SWRPresetTile, [this, P]() { return NewValues->Base == P; }, [this, P]() { *NewValues = WRWorlds::PresetSettings(P); bNewChanged = false; }).Preset(P)
 				];
 			}
 			Body->SetContent(
-				SNew(SBorder).BorderImage(InsetBrush()).Padding(FMargin(28.f * U, 24.f * U))
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()
+				[
+					SNew(SBox).WidthOverride(400.f * U)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[Label(LOCTEXT("WorldName", "Name"))]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[SNew(SBox).HeightOverride(46.f * U)[NameBox.ToSharedRef()]]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Label(LOCTEXT("WorldKind", "Kind of world"))]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[Tiles]
+					]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(22.f * U, 0.f, 0.f, 0.f)
 				[
 					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()[Label(LOCTEXT("WorldName", "Name"))]
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(0.f, 8.f * U, 0.f, 0.f)[SNew(SBox).WidthOverride(520.f * U).HeightOverride(46.f * U)[NameBox.ToSharedRef()]]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 28.f * U, 0.f, 0.f)[Label(LOCTEXT("WorldKind", "Kind of world"))]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[Tiles]
-					+ SVerticalBox::Slot().FillHeight(1.f)[SNullWidget::NullWidget]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
 						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRLineIcon).Icon(EWRIcon::Info).Size(15.f * U).Color(WRUI::Brass)]
-						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Label(LOCTEXT("WorldRules", "Its rules"))]
+						+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)
 						[
-							Muted(LOCTEXT("NewWorldInfo", "A world keeps its own buildings, tames, clans and characters: everyone starts fresh in a new one."), 13, true)
+							Muted(TAttribute<FText>::CreateLambda([this]() { return bNewChanged ? LOCTEXT("WorldChangedNew", "Changed from the preset") : LOCTEXT("WorldRulesLater", "The host can change these later"); }), 12)
+						]
+					]
+					+ SVerticalBox::Slot().FillHeight(1.f).Padding(0.f, 8.f * U, 0.f, 0.f)
+					[
+						SNew(SBorder).BorderImage(InsetBrush()).Padding(FMargin(12.f * U, 12.f * U, 6.f * U, 6.f * U))
+						[
+							SNew(SScrollBox).ScrollBarThickness(FVector2D(5.f, 5.f))
+							+ SScrollBox::Slot().Padding(FMargin(0.f, 0.f, 8.f * U, 0.f))
+							[
+								WRUI::MakeWorldRules(NewValues.ToSharedRef(), [this]() { bNewChanged = WRWorlds::IsCustom(*NewValues); })
+							]
 						]
 					]
 				]);
 			SetFooter(
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).MinDesiredWidth(110.f * U)[SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U).Text(LOCTEXT("Back", "Back")).OnClicked_Lambda([this]() { ShowList(); return FReply::Handled(); })]]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(16.f * U, 0.f, 0.f, 0.f)[Muted(LOCTEXT("NewWorldInfo", "Everyone starts fresh in a new world"), 13)]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[StatusLine()],
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("CreatePlay", "Create and play"), true, [this]() { CreateAndPlay(); }, nullptr, 190.f)]);
@@ -614,7 +636,7 @@ namespace WRWorldsUI
 			if (Mode != EMode::New || !NameBox.IsValid()) return;
 			FString Name = NameBox->GetText().ToString().TrimStartAndEnd();
 			if (Name.IsEmpty()) Name = DefaultName();
-			const FString Id = WRWorlds::Create(Name, NewPreset);
+			const FString Id = WRWorlds::Create(Name, *NewValues);
 			if (Id.IsEmpty())
 			{
 				Status = LOCTEXT("CreateFailed", "Couldn't make the world's folder in Saved/Worlds");

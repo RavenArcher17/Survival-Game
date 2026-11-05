@@ -217,6 +217,30 @@ namespace WRUIDrive
 			UE_LOG(LogWildreach, Log, TEXT("CLICKMAP \"%s\" at %.0f,%.0f (under %s)"), *Name, Pos.X, Pos.Y, *Under);
 		}));
 
+	// WRWheel <notches> <text>: turn the mouse wheel over a piece of text, as over a list to scroll it (negative goes down).
+	FAutoConsoleCommandWithWorldAndArgs WheelCommand(TEXT("WRWheel"),
+		TEXT("Testing: turn the mouse wheel over on-screen text. WRWheel <notches> <text>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
+		{
+			if (Args.Num() < 2) return;
+			const FString Label = FString::Join(TArray<FString>(Args.GetData() + 1, Args.Num() - 1), TEXT(" "));
+			const TArray<FFound> Hits = Matching(VisibleText(), Label);
+			if (Hits.Num() == 0)
+			{
+				UE_LOG(LogWildreach, Warning, TEXT("WHEEL \"%s\" not on screen"), *Label);
+				return;
+			}
+			const FVector2D Pos = Hits[0].Centre;
+			FSlateApplication& App = FSlateApplication::Get();
+			const uint32 User = FSlateApplication::CursorUserIndex, Pointer = FSlateApplication::CursorPointerIndex;
+			const bool bWasAllowed = App.GetHandleDeviceInputWhenApplicationNotActive();
+			App.SetHandleDeviceInputWhenApplicationNotActive(true);
+			App.ProcessMouseMoveEvent(FPointerEvent(User, Pointer, Pos, App.GetCursorPos(), TSet<FKey>(), EKeys::Invalid, 0.f, FModifierKeysState()));
+			App.ProcessMouseWheelOrGestureEvent(FPointerEvent(User, Pointer, Pos, Pos, TSet<FKey>(), EKeys::Invalid, FCString::Atof(*Args[0]), FModifierKeysState()), nullptr);
+			App.SetHandleDeviceInputWhenApplicationNotActive(bWasAllowed);
+			UE_LOG(LogWildreach, Log, TEXT("WHEEL %s over \"%s\""), *Args[0], *Hits[0].Text);
+		}));
+
 	FAutoConsoleCommandWithWorldAndArgs KeyCommand(TEXT("WRKey"),
 		TEXT("Testing: press and release a key as the keyboard would (WRKey I, WRKey Escape, WRKey Enter)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)

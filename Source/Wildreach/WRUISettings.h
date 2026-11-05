@@ -5,6 +5,7 @@
 #include "Widgets/DeclarativeSyntaxSupport.h"
 
 class APlayerController;
+struct FWRWorldSettings;
 
 /** Small line icons drawn in code on the mockups' 24-unit grid (their SVGs), so they need no image files. */
 enum class EWRIcon : uint8
@@ -64,4 +65,11 @@ namespace WRUI
 	 * The main menu shows the same window from its Settings button. OnClose runs on Close, Esc and Done / Resume.
 	 */
 	WILDREACH_API TSharedRef<SWidget> MakeSettings(APlayerController* PC, bool bInGame, FSimpleDelegate OnClose);
+
+	/**
+	 * A world's rules as rows of switches and sliders: a new world's form (WRUIWorlds), and the settings window's World
+	 * page for the host. Values is edited in place, and can be replaced (a preset picked): the rows follow it. Changed
+	 * runs after each edit.
+	 */
+	WILDREACH_API TSharedRef<SWidget> MakeWorldRules(TSharedRef<FWRWorldSettings> Values, TFunction<void()> Changed);
 }

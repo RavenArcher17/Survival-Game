@@ -21,6 +21,12 @@
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 
+/** Boss damage: the file's scale times the world's creature difficulty. */
+static float BossDamageScale()
+{
+	return WRTune(TEXT("bosses.damageScale"), 1.f) * FMath::Max(0.1f, WRTune(TEXT("server.creatureDifficulty"), 1.f));
+}
+
 static UStaticMeshComponent* MakeShapeMesh(AActor* Owner, const TCHAR* Name, const TCHAR* MeshPath)
 {
 	UStaticMeshComponent* Mesh = Owner->CreateDefaultSubobject<UStaticMeshComponent>(Name);
@@ -168,7 +174,7 @@ void AWRHazard::Tick(float DeltaSeconds)
 		}
 		FWRHit Hit;
 		Hit.Instigator = Source.Get();
-		Hit.Damage = DamagePerSecond * DeltaSeconds * WRTune(TEXT("bosses.damageScale"), 1.f);
+		Hit.Damage = DamagePerSecond * DeltaSeconds * BossDamageScale();
 		Hit.Element = bFrost ? WRTags::Element_Frost : WRTags::Element_Fire;
 		(bFrost ? Hit.FrostBuildup : Hit.BurnBuildup) = (bFrost ? 30.f : 20.f) * DeltaSeconds;
 		Hit.bDamageOverTime = true;
@@ -346,7 +352,8 @@ void AWRBoss::BeginPlay()
 	{
 		return;
 	}
-	SoloHealth = Tune(TEXT("health"), WRTune(bMajor ? TEXT("enemies.majorBossSolo.health") : TEXT("enemies.miniBossSolo.health"), bMajor ? 12000.f : 3000.f));
+	SoloHealth = Tune(TEXT("health"), WRTune(bMajor ? TEXT("enemies.majorBossSolo.health") : TEXT("enemies.miniBossSolo.health"), bMajor ? 12000.f : 3000.f))
+		* FMath::Max(0.1f, WRTune(TEXT("server.creatureDifficulty"), 1.f));
 	ArenaRadius = Tune(TEXT("arenaRadius"), bMajor ? 3000.f : 2200.f);
 	InitVitals(SoloHealth, 100.f, Tune(TEXT("poise"), bMajor ? 400.f : 200.f));
 	BuildAttacks();
@@ -788,7 +795,7 @@ void AWRBoss::ResolveAttack()
 	FWRBossAttack& Attack = Attacks[Current];
 	const double Now = GetWorld()->GetTimeSeconds();
 	const bool bHiddenStrike = IsHidden() && Now > RevealedUntil;
-	float Scale = (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f) * WRTune(TEXT("bosses.damageScale"), 1.f);
+	float Scale = (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f) * BossDamageScale();
 	if (bHiddenStrike && CreatureId == TEXT("pale_hunter"))
 	{
 		Scale *= Tune(TEXT("ambushMultiplier"), 2.f);  // ambush from cover
@@ -997,7 +1004,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 				{
 					FWRHit Aura;
 					Aura.Instigator = this;
-					Aura.Damage = Tune(TEXT("auraDps"), 6.f) * DeltaSeconds * WRTune(TEXT("bosses.damageScale"), 1.f);
+					Aura.Damage = Tune(TEXT("auraDps"), 6.f) * DeltaSeconds * BossDamageScale();
 					Aura.Element = WRTags::Element_Fire;
 					Aura.bDamageOverTime = true;
 					UWRCombatLibrary::ApplyHit(*It, Aura);
@@ -1039,7 +1046,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 				{
 					FWRHit Blast;
 					Blast.Instigator = this;
-					Blast.Damage = Tune(TEXT("wispDamage"), 25.f) * WRTune(TEXT("bosses.damageScale"), 1.f);
+					Blast.Damage = Tune(TEXT("wispDamage"), 25.f) * BossDamageScale();
 					Blast.Element = WRTags::Element_Fire;
 					Blast.BurnBuildup = 35.f;
 					Blast.Origin = W->GetActorLocation();

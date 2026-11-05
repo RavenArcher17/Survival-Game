@@ -256,6 +256,8 @@ public:
 	UFUNCTION(Exec) void WRBuy(FName Path, FName Node);
 	UFUNCTION(Exec) void WRWeapon(FName Metal, FName Quality, int32 Upgrade);
 	UFUNCTION(Exec) void WRSpawn(FName Creature, int32 Count);
+	/** Server log: hunger, thirst and the clock, for tests that measure how fast they go. */
+	UFUNCTION(Exec) void WRVitals();
 	UFUNCTION(Exec) void WRStatus(FName Status);
 	UFUNCTION(Exec) void WRHeal();
 	UFUNCTION(Exec) void WRKillMe();

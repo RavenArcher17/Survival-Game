@@ -305,8 +305,9 @@ void UWRStatusComponent::TickSurvival(float DeltaTime)
 	UWRAttributeSet* Attr = Owner->GetAttributes();
 
 	// Meters are 0..100; full to empty in hungerMinutes / thirstMinutes of play.
-	const float HungerRate = 100.f / (WRTune(TEXT("survival.hungerMinutes"), 60.f) * 60.f);
-	const float ThirstRate = 100.f / (WRTune(TEXT("survival.thirstMinutes"), 40.f) * 60.f);
+	const float WorldRate = FMath::Max(0.f, WRTune(TEXT("server.hungerMultiplier"), 1.f));
+	const float HungerRate = WorldRate * 100.f / (WRTune(TEXT("survival.hungerMinutes"), 60.f) * 60.f);
+	const float ThirstRate = WorldRate * 100.f / (WRTune(TEXT("survival.thirstMinutes"), 40.f) * 60.f);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), Attr->GetHunger() - HungerRate * DeltaTime);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), Attr->GetThirst() - ThirstRate * DeltaTime);
 

@@ -48,11 +48,32 @@ namespace WRWorldsFiles
 		return WriteJson(FPaths::Combine(WRWorlds::Dir(I.Id), TEXT("info.json")), O);
 	}
 
-	bool WriteSettings(const FString& Dir, const FString& Preset)
+	bool WritePreset(const FString& Dir, const FString& Preset)
 	{
 		const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 		O->SetStringField(TEXT("preset"), Preset);
 		return WriteJson(FPaths::Combine(Dir, TEXT("settings.json")), O);
+	}
+
+	/** Every number the settings screen has. Not bounties, raids or craftMultiplier: nothing in the game reads them yet. */
+	const TCHAR* const RuleKeys[] = {
+		TEXT("pvp"), TEXT("pvpInBossArenas"), TEXT("offlineProtection"), TEXT("clanSizeLimit"),
+		TEXT("xpMultiplier"), TEXT("gatherMultiplier"), TEXT("tamingMultiplier"), TEXT("cropMultiplier"),
+		TEXT("dayMinutes"), TEXT("hungerMultiplier"), TEXT("creatureNumbers"), TEXT("creatureDifficulty"),
+		TEXT("upkeepMultiplier"), TEXT("bossRespawnHours"),
+	};
+
+	/** Reads what an object sets over S: a preset's values, or a custom world's changes. */
+	void ReadRules(const TSharedPtr<FJsonObject>& O, FWRWorldSettings& S)
+	{
+		for (const TCHAR* Key : RuleKeys)
+		{
+			double Number = 0.0;
+			bool bSwitch = false;
+			if (O->TryGetNumberField(Key, Number)) S.Numbers.Add(Key, static_cast<float>(Number));
+			else if (O->TryGetBoolField(Key, bSwitch)) S.Numbers.Add(Key, bSwitch ? 1.f : 0.f);
+		}
+		O->TryGetStringField(TEXT("deathPenalty"), S.DeathPenalty);
 	}
 
 	/** The preset a server plays with no settings of its own (server_presets.json "default"). */
@@ -154,7 +175,7 @@ void WRWorlds::MigrateOldSave()
 		// The old server.json (a custom preset) becomes the world's settings; without one it played the file's default.
 		const FString OldSettings = FPaths::Combine(Old, TEXT("server.json"));
 		if (FM.FileExists(*OldSettings)) Copy(OldSettings, FPaths::Combine(To, TEXT("settings.json")));
-		else bOk &= WriteSettings(To, DefaultPreset());
+		else bOk &= WritePreset(To, DefaultPreset());
 		FWRWorldInfo Info;
 		Info.Id = Info.Name = TEXT("Island");
 		// Played after it was made, however few files it has: the list says when, and "not played yet" would be wrong.
@@ -206,7 +227,78 @@ bool WRWorlds::Read(const FString& Id, FWRWorldInfo& Out)
 	return true;
 }
 
-FString WRWorlds::Create(const FString& Name, const FString& Preset)
+FWRWorldSettings WRWorlds::PresetSettings(const FString& Preset)
+{
+	FWRWorldSettings S;
+	S.Base = Preset;
+	// The presets all play these the same way, so they don't list them.
+	S.Numbers.Add(TEXT("dayMinutes"), WRTune(TEXT("clock.dayMinutes"), 60.f));
+	S.Numbers.Add(TEXT("hungerMultiplier"), 1.f);
+	S.Numbers.Add(TEXT("creatureNumbers"), 1.f);
+	S.Numbers.Add(TEXT("creatureDifficulty"), 1.f);
+	const TSharedPtr<FJsonObject> Presets = FWRTuning::LoadDataFile(TEXT("server_presets.json"));
+	const TSharedPtr<FJsonObject>* List = nullptr;
+	const TSharedPtr<FJsonObject>* Values = nullptr;
+	if (Presets.IsValid() && Presets->TryGetObjectField(TEXT("presets"), List) && (*List)->TryGetObjectField(Preset, Values))
+	{
+		WRWorldsFiles::ReadRules(*Values, S);
+	}
+	return S;
+}
+
+FWRWorldSettings WRWorlds::ReadSettings(const FString& Id)
+{
+	const TSharedPtr<FJsonObject> File = WRWorldsFiles::ReadJson(FPaths::Combine(Dir(Id), TEXT("settings.json")));
+	FString Preset = WRWorldsFiles::DefaultPreset();
+	if (File.IsValid()) File->TryGetStringField(TEXT("preset"), Preset);
+	if (Preset != TEXT("custom"))
+	{
+		return PresetSettings(Preset);
+	}
+	FString Base = TEXT("pve");
+	File->TryGetStringField(TEXT("base"), Base);
+	FWRWorldSettings S = PresetSettings(Base);
+	const TSharedPtr<FJsonObject>* Changes = nullptr;
+	if (File->TryGetObjectField(TEXT("settings"), Changes))
+	{
+		WRWorldsFiles::ReadRules(*Changes, S);
+	}
+	return S;
+}
+
+bool WRWorlds::WriteSettings(const FString& Id, const FWRWorldSettings& Settings)
+{
+	const FWRWorldSettings Preset = PresetSettings(Settings.Base);
+	const TSharedRef<FJsonObject> Changes = MakeShared<FJsonObject>();
+	for (const TPair<FString, float>& KV : Settings.Numbers)
+	{
+		const float* Was = Preset.Numbers.Find(KV.Key);
+		if (!Was || !FMath::IsNearlyEqual(*Was, KV.Value, 0.001f)) Changes->SetNumberField(KV.Key, KV.Value);
+	}
+	if (Settings.DeathPenalty != Preset.DeathPenalty) Changes->SetStringField(TEXT("deathPenalty"), Settings.DeathPenalty);
+	if (Changes->Values.Num() == 0)
+	{
+		return WRWorldsFiles::WritePreset(Dir(Id), Settings.Base);
+	}
+	const TSharedRef<FJsonObject> File = MakeShared<FJsonObject>();
+	File->SetStringField(TEXT("preset"), TEXT("custom"));
+	File->SetStringField(TEXT("base"), Settings.Base);
+	File->SetObjectField(TEXT("settings"), Changes);
+	return WRWorldsFiles::WriteJson(FPaths::Combine(Dir(Id), TEXT("settings.json")), File);
+}
+
+bool WRWorlds::IsCustom(const FWRWorldSettings& Settings)
+{
+	const FWRWorldSettings Preset = PresetSettings(Settings.Base);
+	for (const TPair<FString, float>& KV : Settings.Numbers)
+	{
+		const float* Was = Preset.Numbers.Find(KV.Key);
+		if (!Was || !FMath::IsNearlyEqual(*Was, KV.Value, 0.001f)) return true;
+	}
+	return Settings.DeathPenalty != Preset.DeathPenalty;
+}
+
+FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings)
 {
 	using namespace WRWorldsFiles;
 	const FString Shown = Name.TrimStartAndEnd().Left(32);
@@ -223,12 +315,12 @@ FString WRWorlds::Create(const FString& Name, const FString& Preset)
 	Info.Name = Shown.IsEmpty() ? Id : Shown;
 	Info.Created = Info.LastPlayed = FDateTime::UtcNow();
 	Info.Version = SWRMainMenu::GameVersion();
-	if (!WriteSettings(Dir(Id), Preset) || !WriteInfo(Info))
+	if (!WriteSettings(Id, Settings) || !WriteInfo(Info))
 	{
 		UE_LOG(LogWildreach, Warning, TEXT("WORLDS couldn't make the world '%s' in %s"), *Info.Name, *Dir(Id));
 		return FString();
 	}
-	UE_LOG(LogWildreach, Log, TEXT("WORLDS made '%s' (%s) in Saved/Worlds/%s"), *Info.Name, *Preset, *Id);
+	UE_LOG(LogWildreach, Log, TEXT("WORLDS made '%s' (%s%s) in Saved/Worlds/%s"), *Info.Name, *Settings.Base, IsCustom(Settings) ? TEXT(", changed") : TEXT(""), *Id);
 	return Id;
 }
 

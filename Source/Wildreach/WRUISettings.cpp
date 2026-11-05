@@ -16,6 +16,8 @@
 #include "WRPlayerController.h"
 #include "WRSound.h"
 #include "WRUIFlow.h"   // the Game section's "Show hints"
+#include "WRGameMode.h"
+#include "WRWorlds.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -1610,6 +1612,305 @@ namespace WRSettingsUI
 		bool IsOn() const { return Selected && Selected(); }
 	};
 
+	// ------------------------------------------------------------ a world's rules
+
+	/** A value's slider, in the volume bars' look: Get reads 0..1, Set takes 0..1 and keeps to the value's steps. */
+	class SWRRuleBar : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRRuleBar) {}
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs, TFunction<float()> InGet, TFunction<void(float)> InSet)
+		{
+			Get = MoveTemp(InGet);
+			Set = MoveTemp(InSet);
+		}
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(170.f * U, 30.f * U); }
+		virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override
+		{
+			const FVector2D Size = Geo.GetLocalSize();
+			const float Knob = 18.f * U, TrackH = 8.f * U;
+			const float Track = FMath::Max(1.f, static_cast<float>(Size.X) - Knob);
+			const float Y = (Size.Y - TrackH) * 0.5f;
+			const float F = FMath::Clamp(Get(), 0.f, 1.f);
+			const bool bHot = IsHovered() || HasMouseCapture();
+			WRUI::DrawBox(Out, Layer, Geo.ToPaintGeometry(FVector2D(Size.X, TrackH), FSlateLayoutTransform(FVector2D(0.f, Y))), WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.5f), 4.f, FLinearColor::Black, 1.f));
+			if (F > 0.f)
+			{
+				WRUI::DrawBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(Knob * 0.5f + Track * F, TrackH - 2.f), FSlateLayoutTransform(FVector2D(1.f, Y + 1.f))), WRUI::Box(Hex(TEXT("6A3A1C")), 3.f, WRUI::Brass2, 1.f));
+			}
+			WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(FVector2D(Knob, Knob), FSlateLayoutTransform(FVector2D(Track * F, (Size.Y - Knob) * 0.5f))),
+				WRUI::Box(bHot ? Hex(TEXT("F0D49B")) : WRUI::Brass, Knob * 0.5f, FLinearColor::Black, 1.f));
+			return Layer + 2;
+		}
+		virtual FReply OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& E) override
+		{
+			if (E.GetEffectingButton() != EKeys::LeftMouseButton) return FReply::Unhandled();
+			SetFrom(Geo, E);
+			return FReply::Handled().CaptureMouse(SharedThis(this));
+		}
+		virtual FReply OnMouseMove(const FGeometry& Geo, const FPointerEvent& E) override
+		{
+			if (!HasMouseCapture()) return FReply::Unhandled();
+			SetFrom(Geo, E);
+			return FReply::Handled();
+		}
+		virtual FReply OnMouseButtonUp(const FGeometry& Geo, const FPointerEvent& E) override
+		{
+			if (!HasMouseCapture()) return FReply::Unhandled();
+			SetFrom(Geo, E);
+			WRSound::PlayUI(nullptr, TEXT("ui.click"));
+			return FReply::Handled().ReleaseMouseCapture();
+		}
+		virtual FCursorReply OnCursorQuery(const FGeometry& Geo, const FPointerEvent& E) const override { return FCursorReply::Cursor(EMouseCursor::Hand); }
+
+	private:
+		void SetFrom(const FGeometry& Geo, const FPointerEvent& E)
+		{
+			const float Knob = 18.f * U;
+			const float X = Geo.AbsoluteToLocal(E.GetScreenSpacePosition()).X - Knob * 0.5f;
+			Set(FMath::Clamp(X / FMath::Max(1.f, static_cast<float>(Geo.GetLocalSize().X) - Knob), 0.f, 1.f));
+		}
+		TFunction<float()> Get;
+		TFunction<void(float)> Set;
+	};
+
+	/** The - and + beside a slider, for one step at a time. */
+	class SWRRuleStep : public SWRClickBase
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRRuleStep) {}
+			SLATE_ARGUMENT(FText, Text)
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs, TFunction<void()> InClick)
+		{
+			OnLeft = MoveTemp(InClick);
+			ChildSlot
+			[
+				SNew(SBox).WidthOverride(26.f * U).HeightOverride(26.f * U)
+				[
+					SNew(SBorder).BorderImage_Lambda([this]() { return WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.45f), 4.f, IsHovered() ? WRUI::Brass : FLinearColor::Black, 1.f); })
+					.HAlign(HAlign_Center).VAlign(VAlign_Center)
+					[
+						WRUI::Text(InArgs._Text, WRUI::Body(16, 800), WRUI::Ink2)
+					]
+				]
+			];
+		}
+	};
+
+	class SWRWorldRules : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRWorldRules) {}
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs, TSharedRef<FWRWorldSettings> InValues, TFunction<void()> InChanged)
+		{
+			Values = InValues;
+			Changed = MoveTemp(InChanged);
+			const TFunction<FText(float)> Times = [](float V) { return FText::FromString(FString::Printf(TEXT("%gx"), V)); };
+			const TFunction<FText(float)> Percent = [](float V) { return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(V * 100.f))); };
+			const TFunction<FText(float)> Minutes = [](float V) { return FText::Format(LOCTEXT("RuleMinutes", "{0} min"), FMath::RoundToInt(V)); };
+			const TFunction<FText(float)> Hours = [](float V) { return FText::Format(LOCTEXT("RuleHours", "{0} h"), FMath::RoundToInt(V)); };
+			const TFunction<FText(float)> Members = [](float V) { return V < 0.5f ? LOCTEXT("RuleNoLimit", "No limit") : FText::AsNumber(FMath::RoundToInt(V)); };
+			List = SNew(SVerticalBox);
+
+			Group(LOCTEXT("RulesPlayers", "Players"), true);
+			Add(LOCTEXT("RulePvP", "Players can fight each other"), LOCTEXT("RulePvPSub", "Off: nobody can hurt another player"), Switch(TEXT("pvp")));
+			Add(LOCTEXT("RuleArenaPvP", "In boss arenas too"), LOCTEXT("RuleArenaPvPSub", "Off: a boss arena is safe from other players"),
+				SNew(SBorder).BorderImage(WRUI::Box(FLinearColor::Transparent)).Padding(0.f)
+				.IsEnabled_Lambda([this]() { return Number(TEXT("pvp")) > 0.5f; })
+				.ColorAndOpacity_Lambda([this]() { return FLinearColor(1.f, 1.f, 1.f, Number(TEXT("pvp")) > 0.5f ? 1.f : 0.35f); })
+				[
+					Switch(TEXT("pvpInBossArenas"))
+				]);
+			Add(LOCTEXT("RuleDeath", "When you die"), LOCTEXT("RuleDeathSub", "What happens to what you were carrying"),
+				Segmented({ LOCTEXT("RuleDeathKeep", "You keep it"), LOCTEXT("RuleDeathBag", "A bag you go back for") },
+					[this]() { return Values->DeathPenalty == TEXT("gentle") ? 0 : 1; },
+					[this](int32 i) { Values->DeathPenalty = i == 0 ? TEXT("gentle") : TEXT("souls"); Changed(); }));
+			Range(LOCTEXT("RuleOffline", "Offline raid protection"), LOCTEXT("RuleOfflineSub", "Less damage to bases while their owners are away"), TEXT("offlineProtection"), 0.f, 1.f, 0.05f, Percent);
+			Range(LOCTEXT("RuleClan", "Clan size limit"), LOCTEXT("RuleClanSub", "How many can share a clan"), TEXT("clanSizeLimit"), 0.f, 20.f, 1.f, Members);
+
+			Group(LOCTEXT("RulesSpeeds", "Speeds"), false);
+			Range(LOCTEXT("RuleXP", "XP"), LOCTEXT("RuleXPSub", "How fast paths and life skills level up"), TEXT("xpMultiplier"), 0.5f, 10.f, 0.5f, Times);
+			Range(LOCTEXT("RuleGather", "Gathering"), LOCTEXT("RuleGatherSub", "How much each hit, harvest and body gives"), TEXT("gatherMultiplier"), 0.5f, 10.f, 0.5f, Times);
+			Range(LOCTEXT("RuleTaming", "Taming"), LOCTEXT("RuleTamingSub", "How fast creatures tame"), TEXT("tamingMultiplier"), 0.5f, 10.f, 0.5f, Times);
+			Range(LOCTEXT("RuleCrops", "Crops"), LOCTEXT("RuleCropsSub", "How fast crops grow"), TEXT("cropMultiplier"), 0.5f, 10.f, 0.5f, Times);
+
+			Group(LOCTEXT("RulesWorld", "The world"), false);
+			Range(LOCTEXT("RuleDay", "Day length"), LOCTEXT("RuleDaySub", "Real minutes in one game day"), TEXT("dayMinutes"), 20.f, 120.f, 5.f, Minutes);
+			Range(LOCTEXT("RuleHunger", "Hunger and thirst"), LOCTEXT("RuleHungerSub", "How fast they drop"), TEXT("hungerMultiplier"), 0.5f, 2.f, 0.1f, Times);
+			Range(LOCTEXT("RuleNumbers", "Creature numbers"), LOCTEXT("RuleNumbersSub", "How many live on the island, from the next start"), TEXT("creatureNumbers"), 0.5f, 2.f, 0.1f, Times);
+			Range(LOCTEXT("RuleDifficulty", "Creature difficulty"), LOCTEXT("RuleDifficultySub", "Health and damage of new creatures and bosses"), TEXT("creatureDifficulty"), 0.5f, 2.f, 0.1f, Times);
+			Range(LOCTEXT("RuleUpkeep", "Building upkeep"), LOCTEXT("RuleUpkeepSub", "What a land claim costs to keep up"), TEXT("upkeepMultiplier"), 0.f, 2.f, 0.1f, Times);
+			Range(LOCTEXT("RuleBoss", "Boss respawn"), LOCTEXT("RuleBossSub", "How long before a beaten boss comes back"), TEXT("bossRespawnHours"), 1.f, 24.f, 1.f, Hours);
+
+			ChildSlot[List.ToSharedRef()];
+		}
+
+	private:
+		TSharedPtr<FWRWorldSettings> Values;
+		TFunction<void()> Changed;
+		TSharedPtr<SVerticalBox> List;
+
+		float Number(const TCHAR* Key) const
+		{
+			const float* V = Values->Numbers.Find(Key);
+			return V ? *V : 0.f;
+		}
+
+		void Group(const FText& Name, bool bFirst)
+		{
+			List->AddSlot().AutoHeight().Padding(0.f, bFirst ? 0.f : 18.f * U, 0.f, 2.f * U)[Heading(Name, 15)];
+		}
+
+		void Add(const FText& Name, const FText& Sub, TSharedRef<SWidget> Control)
+		{
+			List->AddSlot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)[SettingRow(Name, Sub, Control, 50.f)];
+		}
+
+		TSharedRef<SWidget> Switch(const TCHAR* Key)
+		{
+			const FString K = Key;
+			return SNew(SWRSwitch, [this, K]() { return Number(*K) > 0.5f; }, [this, K]() { Values->Numbers.Add(K, Number(*K) > 0.5f ? 0.f : 1.f); Changed(); });
+		}
+
+		void Range(const FText& Name, const FText& Sub, const TCHAR* Key, float Min, float Max, float Step, TFunction<FText(float)> Show)
+		{
+			const FString K = Key;
+			const auto Put = [this, K, Min, Max, Step](float V)
+			{
+				V = FMath::Clamp(Min + FMath::RoundToFloat((V - Min) / Step) * Step, Min, Max);
+				if (!FMath::IsNearlyEqual(V, Number(*K), 0.001f))
+				{
+					Values->Numbers.Add(K, V);
+					Changed();
+				}
+			};
+			Add(Name, Sub,
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SWRRuleStep, [this, K, Put, Step]() { Put(Number(*K) - Step); }).Text(FText::FromString(TEXT("-")))]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.f * U, 0.f)
+				[
+					SNew(SWRRuleBar, [this, K, Min, Max]() { return (Number(*K) - Min) / (Max - Min); }, [Put, Min, Max](float F) { Put(Min + F * (Max - Min)); })
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SWRRuleStep, [this, K, Put, Step]() { Put(Number(*K) + Step); }).Text(FText::FromString(TEXT("+")))]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 6.f * U, 0.f)
+				[
+					SNew(SBox).WidthOverride(62.f * U).HAlign(HAlign_Right)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this, K, Show]() { return Show(Number(*K)); }), WRUI::Body(13, 700), WRUI::Ink)
+					]
+				]);
+		}
+	};
+
+	/** The host's World page: the preset, the rules. Changes are saved and in force a moment after the last one. */
+	class SWRWorldPage : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRWorldPage) {}
+			SLATE_ARGUMENT(TWeakObjectPtr<APlayerController>, PC)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			PC = InArgs._PC;
+			Values = MakeShared<FWRWorldSettings>(WRWorlds::ReadSettings(WRWorlds::Current()));
+			bCustom = WRWorlds::IsCustom(*Values);
+			TArray<FText> Names;
+			for (const FString& P : WRWorlds::Presets()) Names.Add(WRWorlds::PresetName(P));
+			ChildSlot
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 12.f * U)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f * U, 0.f)[Heading(LOCTEXT("WorldPreset", "Preset"), 15)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						Segmented(Names,
+							[this]() { return WRWorlds::Presets().IndexOfByKey(Values->Base); },
+							[this](int32 i) { *Values = WRWorlds::PresetSettings(WRWorlds::Presets()[i]); Touched(); })
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)
+					[
+						Muted(TAttribute<FText>::CreateLambda([this]() { return bCustom ? LOCTEXT("WorldChanged", "Changed from the preset") : FText::GetEmpty(); }), 12)
+					]
+				]
+				+ SVerticalBox::Slot().FillHeight(1.f)
+				[
+					SNew(SScrollBox).ScrollBarStyle(&ScrollStyle()).ScrollBarThickness(FVector2D(5.f, 5.f))
+					+ SScrollBox::Slot().Padding(FMargin(0.f, 0.f, 10.f * U, 0.f))
+					[
+						SNew(SWRWorldRules, Values.ToSharedRef(), [this]() { Touched(); })
+					]
+				]
+			];
+		}
+
+		virtual ~SWRWorldPage() override
+		{
+			Commit();
+			if (bAnyChange)
+			{
+				if (AWRGameMode* Mode = PC.IsValid() ? PC->GetWorld()->GetAuthGameMode<AWRGameMode>() : nullptr)
+				{
+					Mode->AnnounceWorldSettings();
+				}
+			}
+		}
+
+		virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
+		{
+			SCompoundWidget::Tick(Geo, Time, Delta);
+			Now = Time;
+			if (bDirty && Time >= CommitAt)
+			{
+				Commit();
+			}
+		}
+
+		/** Footer's button: back to the preset this world is on. */
+		void ResetToPreset()
+		{
+			*Values = WRWorlds::PresetSettings(Values->Base);
+			Touched();
+		}
+
+	private:
+		TWeakObjectPtr<APlayerController> PC;
+		TSharedPtr<FWRWorldSettings> Values;
+		bool bCustom = false;
+		bool bDirty = false;
+		bool bAnyChange = false;
+		double Now = 0.0;
+		double CommitAt = 0.0;
+
+		void Touched()
+		{
+			bCustom = WRWorlds::IsCustom(*Values);
+			bDirty = true;
+			bAnyChange = true;
+			CommitAt = Now + 0.4;   // a slider being dragged changes many times a second
+		}
+
+		void Commit()
+		{
+			if (!bDirty) return;
+			bDirty = false;
+			if (AWRGameMode* Mode = PC.IsValid() ? PC->GetWorld()->GetAuthGameMode<AWRGameMode>() : nullptr)
+			{
+				Mode->ChangeWorldSettings(*Values);
+			}
+			else
+			{
+				WRWorlds::WriteSettings(WRWorlds::Current(), *Values);   // the game ended with it open
+			}
+		}
+	};
+
 	class SWRSettings;
 	TWeakPtr<SWRSettings> GLiveSettings;
 
@@ -1638,6 +1939,11 @@ namespace WRSettingsUI
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("controls"); }, [this]() { ShowPage(TEXT("controls")); }).Icon(EWRIcon::Keyboard).Text(LOCTEXT("Controls", "Controls")), bInGame ? 4.f : 0.f);
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("audio"); }, [this]() { ShowPage(TEXT("audio")); }).Icon(EWRIcon::Speaker).Text(LOCTEXT("Audio", "Audio")));
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("video"); }, [this]() { ShowPage(TEXT("video")); }).Icon(EWRIcon::Monitor).Text(LOCTEXT("Video", "Video")));
+			// The host's: this game is the server, and it's running a world.
+			if (bInGame && PC.IsValid() && PC->GetNetMode() != NM_Client && !WRWorlds::Current().IsEmpty())
+			{
+				Add(SNew(SWRNavItem, [this]() { return Page == TEXT("world"); }, [this]() { ShowPage(TEXT("world")); }).Icon(EWRIcon::FlagFilled).Accent(WRUI::Ember).Text(LOCTEXT("WorldPage", "World")));
+			}
 			if (bInGame)
 			{
 				Nav->AddSlot().AutoHeight().Padding(10.f * U, 8.f * U, 10.f * U, 4.f * U)[HLine(WRUI::Alpha(WRUI::Brass2, 0.5f))];
@@ -1707,7 +2013,13 @@ namespace WRSettingsUI
 		void ShowPage(FName NewPage)
 		{
 			Page = NewPage;
-			if (Page == TEXT("video"))
+			World.Reset();
+			if (Page == TEXT("world"))
+			{
+				Controls.Reset();
+				Content->SetContent(SAssignNew(World, SWRWorldPage).PC(PC));
+			}
+			else if (Page == TEXT("video"))
 			{
 				Controls.Reset();
 				Content->SetContent(SNew(SWRVideoPage));
@@ -1734,6 +2046,7 @@ namespace WRSettingsUI
 		FName Page;
 		TSharedPtr<SBox> Content;
 		TSharedPtr<SWRControlsPage> Controls;
+		TSharedPtr<SWRWorldPage> World;
 
 		void Close()
 		{
@@ -1771,7 +2084,7 @@ namespace WRSettingsUI
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f * U, 0.f)[WRUI::Text(FText::FromString(TEXT("›")), WRUI::Body(20, 500), WRUI::Ink3)]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 				[
-					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("world") ? LOCTEXT("WorldPageTitle", "This world") : Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[Muted(LOCTEXT("Close", "Close"), 12)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f * U, 0.f)[SNew(SWRKeyCap).FontSize(11).Text(LOCTEXT("EscKey", "Esc"))]
@@ -1813,10 +2126,14 @@ namespace WRSettingsUI
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
 							SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U)
-							.Text_Lambda([this]() { return Page == TEXT("video") ? LOCTEXT("AutoDetect", "Auto-detect quality") : LOCTEXT("ResetDefaults", "Reset to defaults"); })
+							.Text_Lambda([this]() { return Page == TEXT("world") ? LOCTEXT("WorldReset", "Back to the preset") : Page == TEXT("video") ? LOCTEXT("AutoDetect", "Auto-detect quality") : LOCTEXT("ResetDefaults", "Reset to defaults"); })
 							.OnClicked_Lambda([this]()
 							{
-								if (Page == TEXT("video"))
+								if (Page == TEXT("world"))
+								{
+									if (World.IsValid()) World->ResetToPreset();
+								}
+								else if (Page == TEXT("video"))
 								{
 									if (UGameUserSettings* S = VideoSettings())
 									{
@@ -1900,6 +2217,11 @@ namespace WRSettingsUI
 TSharedRef<SWidget> WRUI::MakeSettings(APlayerController* PC, bool bInGame, FSimpleDelegate OnClose)
 {
 	return WRSettingsUI::Make(PC, bInGame, OnClose);
+}
+
+TSharedRef<SWidget> WRUI::MakeWorldRules(TSharedRef<FWRWorldSettings> Values, TFunction<void()> Changed)
+{
+	return SNew(WRSettingsUI::SWRWorldRules, Values, MoveTemp(Changed));
 }
 
 namespace WRSettingsUI

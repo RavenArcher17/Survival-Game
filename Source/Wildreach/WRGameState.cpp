@@ -9,8 +9,7 @@ void AWRGameState::BeginPlay()
 	Super::BeginPlay();
 	if (HasAuthority())
 	{
-		Preset = FWRTuning::Get().GetPreset();
-		ServerSettings = FWRTuning::Get().ExportServerSettings();
+		RefreshServerSettings();
 		if (!bClockSet)
 		{
 			SetTotalHours(WRTune(TEXT("clock.startHour"), 8.f));
@@ -30,14 +29,21 @@ void AWRGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 void AWRGameState::OnRep_ServerSettings()
 {
 	FWRTuning::Get().ImportServerSettings(Preset, ServerSettings);
-	UE_LOG(LogWildreach, Log, TEXT("Server settings from host: %s (%d values)"), *Preset, ServerSettings.Num());
+	UE_LOG(LogWildreach, Log, TEXT("Server settings from host: %s (%s)"), *Preset, *FString::Join(ServerSettings, TEXT(", ")));
+}
+
+void AWRGameState::RefreshServerSettings()
+{
+	Preset = FWRTuning::Get().GetPreset();
+	ServerSettings = FWRTuning::Get().ExportServerSettings();
 }
 
 // ---------------------------------------------------------------- world clock
 
 double AWRGameState::GetTotalHours() const
 {
-	const double DaySeconds = FMath::Max(1.0, static_cast<double>(WRTune(TEXT("clock.dayMinutes"), 60.f)) * 60.0);
+	// The world's day length, else the file's.
+	const double DaySeconds = FMath::Max(1.0, static_cast<double>(WRTune(TEXT("server.dayMinutes"), WRTune(TEXT("clock.dayMinutes"), 60.f))) * 60.0);
 	return ClockAnchorHours + (GetServerWorldTimeSeconds() - ClockAnchorTime) * 24.0 / DaySeconds;
 }
 

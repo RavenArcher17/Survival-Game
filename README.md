@@ -30,10 +30,12 @@ A packaged **dedicated server** needs Unreal built from source: `Tools\build_eng
 (`gh release create v0.2.1 C:\Dev\WildreachBuild\Wildreach-Setup.exe --target master --latest`). Installed copies
 update on their next start. Clients and hosts must be on the same version to play together.
 
-Server settings: a world made on the menu keeps the preset picked for it in `Saved/Worlds/<world>/settings.json`, which can
-also hold `{"preset": "custom", "base": "pve", "settings": {...}}` with the keys in `Data/server_presets.json`. A server
-with no settings file plays `playtest` (10x XP, PvP off). `-wrpreset=pvp_standard` (or `pve`, `casual_coop`) overrides
-either, and `-wrworld=<name>` picks a dedicated server's world (without it: the map's, so `Island` on L_Island).
+Server settings: a world's preset and rules are set on the New world form, and by the host in game (Esc > World). They live
+in `Saved/Worlds/<world>/settings.json`: the preset alone, or `{"preset": "custom", "base": "pve", "settings": {...}}` with
+what differs from it (the keys in `Data/server_presets.json`, plus `dayMinutes`, `hungerMultiplier`, `creatureNumbers` and
+`creatureDifficulty`). A server with no settings file plays `playtest` (10x XP, PvP off). `-wrpreset=pvp_standard` (or
+`pve`, `casual_coop`) overrides either, and `-wrworld=<name>` picks a dedicated server's world (without it: the map's, so
+`Island` on L_Island).
 
 ## Build
 
@@ -130,7 +132,8 @@ Tools\versiontest.ps1   # another version can't join and the menu says why; the 
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\flowtest.ps1      # death by creatures: death note, death screen, back after the countdown at your camp; a bed respawn; a hint remembered
-Tools\worldstest.ps1    # worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island
+Tools\worldstest.ps1    # worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island; the settings screens
+Tools\rulestest.ps1     # a world's settings change the game: clock, hunger and thirst, creature numbers and difficulty
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
 Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)

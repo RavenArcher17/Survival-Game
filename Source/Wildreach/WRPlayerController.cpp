@@ -621,6 +621,7 @@ void AWRPlayerController::WRAutoSpend(FName Path, int32 Points) { ServerCommand(
 void AWRPlayerController::WRBuy(FName Path, FName Node) { ServerCommand(FString::Printf(TEXT("buy %s %s"), *Path.ToString(), *Node.ToString())); }
 void AWRPlayerController::WRWeapon(FName Metal, FName Quality, int32 Upgrade) { ServerCommand(FString::Printf(TEXT("weapon %s %s %d"), *Metal.ToString(), *Quality.ToString(), Upgrade)); }
 void AWRPlayerController::WRSpawn(FName Creature, int32 Count) { ServerCommand(FString::Printf(TEXT("spawn %s %d"), *Creature.ToString(), FMath::Max(1, Count))); }
+void AWRPlayerController::WRVitals() { ServerCommand(TEXT("vitals")); }
 void AWRPlayerController::WRStatus(FName Status) { ServerCommand(FString::Printf(TEXT("status %s"), *Status.ToString())); }
 void AWRPlayerController::WRHeal() { ServerCommand(TEXT("heal")); }
 void AWRPlayerController::WRKillMe() { ServerCommand(TEXT("killme")); }
@@ -679,8 +680,17 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		for (int32 i = 0; i < Count; ++i)
 		{
 			const FVector At = Survivor->GetActorLocation() + Survivor->GetActorForwardVector() * 700.f + FVector(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), 0.f);
-			AWRCreature::SpawnCreature(GetWorld(), FName(*Arg(1)), At, FRotator(0.f, Survivor->GetActorRotation().Yaw + 180.f, 0.f));
+			if (AWRCreature* Spawned = AWRCreature::SpawnCreature(GetWorld(), FName(*Arg(1)), At, FRotator(0.f, Survivor->GetActorRotation().Yaw + 180.f, 0.f)))
+			{
+				UE_LOG(LogWildreach, Log, TEXT("SPAWN %s: %.0f hp, %.0f damage"), *Arg(1), Spawned->GetAttributes()->GetMaxHealth(), Spawned->Weapon.FlatDamage);
+			}
 		}
+	}
+	else if (Cmd == TEXT("vitals") && Survivor)
+	{
+		const UWRAttributeSet* A = Survivor->GetAttributes();
+		const AWRGameState* State = GetWorld()->GetGameState<AWRGameState>();
+		UE_LOG(LogWildreach, Log, TEXT("VITALS hunger %.3f thirst %.3f, clock %.3f h, at %.1f s"), A->GetHunger(), A->GetThirst(), State ? State->GetTotalHours() : 0.0, GetWorld()->GetTimeSeconds());
 	}
 	else if (Cmd == TEXT("status") && Survivor)
 	{
