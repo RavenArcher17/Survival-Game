@@ -134,6 +134,7 @@ Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills 
 Tools\flowtest.ps1      # death by creatures: death note, death screen, back after the countdown at your camp; a bed respawn; a hint remembered
 Tools\worldstest.ps1    # worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island; the settings screens
 Tools\rulestest.ps1     # a world's settings change the game: clock, hunger and thirst, creature numbers and difficulty
+Tools\roamtest.ps1      # wildlife roams: travels, rests, hunts out of sight, numbers come back; wounds and numbers kept through a restart
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
 Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)

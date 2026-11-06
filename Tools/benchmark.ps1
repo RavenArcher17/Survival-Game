@@ -220,7 +220,7 @@ $scenarios = @()
 if (-not $NoServer)
 {
 	$scenarios += [pscustomobject]@{ Name = 'usual'; What = 'usual wildlife (packs within 250 m)'; Tune = $Tune }
-	$scenarios += [pscustomobject]@{ Name = 'all'; What = 'every pack out (169 creatures)'; Tune = (@('wildlife.activationRadius:10000000', $Tune) | Where-Object { $_ }) -join ',' }
+	$scenarios += [pscustomobject]@{ Name = 'all'; What = 'every pack out'; Tune = (@('wildlife.activationRadius:10000000', $Tune) | Where-Object { $_ }) -join ',' }
 }
 foreach ($sc in $scenarios)
 {

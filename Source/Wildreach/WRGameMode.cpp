@@ -15,6 +15,7 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRWater.h"
+#include "WRWildlife.h"
 #include "WRWorlds.h"
 #include "Dom/JsonObject.h"
 #include "Misc/PackageName.h"
@@ -105,7 +106,13 @@ void AWRGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	LoadWorld();
-	AWRCreatureSpawner::SpawnSitesFromData(GetWorld());
+	WRWildlife::Start(GetWorld());
+	// (The menu's own island is no world: its packs stay put, and it saves nothing.)
+	if (!WRWorlds::Current().IsEmpty())
+	{
+		const float Every = FMath::Max(0.1f, WRTune(TEXT("wildlife.stepSeconds"), 20.f));
+		GetWorldTimerManager().SetTimer(WildlifeTimer, FTimerDelegate::CreateWeakLambda(this, [this, Every]() { WRWildlife::Step(GetWorld(), Every); }), Every, true);
+	}
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
 	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);
 	GetWorldTimerManager().SetTimer(UndergroundTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { RescueUnderground(); }), 1.f, true);
@@ -220,6 +227,7 @@ void AWRGameMode::SaveWorld()
 	{
 		UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
 	}
+	WRWildlife::Save(GetWorld());
 }
 
 void AWRGameMode::ChangeWorldSettings(const FWRWorldSettings& Settings)

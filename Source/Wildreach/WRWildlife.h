@@ -1,0 +1,39 @@
+#pragma once
+
+#include "CoreMinimal.h"
+
+class AWRCreatureSpawner;
+class UWorld;
+enum class EWRPackDoing : uint8;
+
+/**
+ * The island's wildlife keeps living when nobody is near. Each pack is a roaming AWRCreatureSpawner: where it is, what
+ * it's doing, how many are left and how hurt they are. A few times a minute (wildlife.stepSeconds) this moves them over a
+ * coarse map of where animals can walk (Data/island_walk.json, Tools/terrain/walkmap.mjs), inside the elevation band and
+ * the side of the island their kind belongs to, and clear of the camps:
+ *   grazers drift between feeding grounds and travel while awake; predators keep a territory, go after prey when hungry
+ *   (off screen a hunt is settled by odds) and rest when they've eaten; a few (creatures.json wanderChance) travel far;
+ *   burrowers stay home.
+ * A player coming within wildlife.activationRadius brings the pack out where it has got to, doing what it was doing; when
+ * everyone has gone it's a record again, with its numbers and wounds. Numbers come back slowly, by breeding and by new
+ * packs wandering in, towards each kind's share of the island (its sites x its usual pack x the world's creature numbers).
+ * Saved in the world's folder (wildlife.json). Tames aren't part of any of this.
+ */
+namespace WRWildlife
+{
+	/** Server, at the start of a game: the world's packs from its wildlife.json, or new ones at the sites in Data/island_spawns.json. */
+	WILDREACH_API int32 Start(UWorld* World);
+	/** Server: moves every pack on by this many seconds (times wildlife.timeScale, for tests). */
+	WILDREACH_API void Step(UWorld* World, float Seconds);
+	/** Server: writes wildlife.json in the world's folder. */
+	WILDREACH_API void Save(UWorld* World);
+
+	/** Can this kind stand here? (Its side of the island, its band, off the sea and steep ground, clear of the camps.) */
+	WILDREACH_API bool CanStand(FName CreatureId, const FVector2D& At);
+	/** A way from one spot to another that only uses ground this kind can stand on (false: there is none). */
+	WILDREACH_API bool FindPath(FName CreatureId, const FVector2D& From, const FVector2D& To, TArray<FVector2D>& OutPath);
+	/** How many of the kind the island should have just now. */
+	WILDREACH_API int32 TargetOf(FName CreatureId);
+
+	WILDREACH_API const TCHAR* DoingName(EWRPackDoing Doing);
+}

@@ -1,7 +1,7 @@
 # A world's settings really change the game (the screen for them is in worldstest): the island is played twice with a
 # headless server and a scripted player, once on PvE as it comes and once with a settings.json that changes the new
-# rules, and the two are compared: the clock, how fast hunger and thirst drop, how many wildlife sites and creatures
-# there are, a creature's and a boss's health and damage. Over 1x on creature numbers the packs grow: a third run checks.
+# rules, and the two are compared: the clock, how fast hunger and thirst drop, how many wildlife packs
+# there are, a creature's and a boss's health and damage. A third run has more creature numbers than usual.
 #   rulestest.ps1 [-Port 7887]
 param([int]$Port = 7887)
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -38,9 +38,9 @@ function Play([string]$tag, [string]$settings) {
 	Start-Sleep -Seconds 2
 	$lines = @(Select-String -Path $slog -Pattern 'LogWildreach: ' -ErrorAction SilentlyContinue | ForEach-Object { ($_.Line -replace '^.*LogWildreach: (Warning: )?', '').Trim() })
 	$v = @($lines | Where-Object { $_ -match '^VITALS' } | ForEach-Object { if ($_ -match 'hunger ([\d.]+) thirst ([\d.]+), clock ([\d.]+) h, at ([\d.]+) s') { [pscustomobject]@{ Hunger = [double]$Matches[1]; Thirst = [double]$Matches[2]; Clock = [double]$Matches[3]; At = [double]$Matches[4] } } })
-	$r = [ordered]@{ Sites = 0; Creatures = 0; HungerPerS = 0.0; ThirstPerS = 0.0; ClockPerS = 0.0; CreatureHp = 0.0; CreatureDamage = 0.0; BossHp = 0.0; Client = '' }
+	$r = [ordered]@{ Packs = 0; Animals = 0; Share = 0; HungerPerS = 0.0; ThirstPerS = 0.0; ClockPerS = 0.0; CreatureHp = 0.0; CreatureDamage = 0.0; BossHp = 0.0; Client = '' }
 	foreach ($l in $lines) {
-		if ($l -match '^WILDLIFE (\d+) sites, (\d+) creatures') { $r.Sites = [int]$Matches[1]; $r.Creatures = [int]$Matches[2] }
+		if ($l -match "^WILDLIFE (\d+) packs, (\d+) animals, new; the island's share is (\d+)") { $r.Packs = [int]$Matches[1]; $r.Animals = [int]$Matches[2]; $r.Share = [int]$Matches[3] }
 		if ($l -match '^SPAWN cinderfang: ([\d.]+) hp, ([\d.]+) damage') { $r.CreatureHp = [double]$Matches[1]; $r.CreatureDamage = [double]$Matches[2] }
 		if ($l -match '^BOSS Ignessa, Queen of Wisps ready \(mini, ([\d.]+) hp solo\)') { $r.BossHp = [double]$Matches[1] }
 	}
@@ -68,8 +68,8 @@ function Near([double]$a, [double]$b, [double]$slack = 0.1) { $b -ne 0 -and [Mat
 $p = $script:runs['plain']; $c = $script:runs['changed']; $m = $script:runs['more']
 Check 'a third of the day length makes the clock three times as fast' (Near $c.ClockPerS (3 * $p.ClockPerS)) ("{0:N5} vs {1:N5} h/s" -f $c.ClockPerS, $p.ClockPerS)
 Check 'twice the hunger and thirst drop twice as fast' ((Near $c.HungerPerS (2 * $p.HungerPerS)) -and (Near $c.ThirstPerS (2 * $p.ThirstPerS))) ("hunger {0:N4} vs {1:N4} /s" -f $c.HungerPerS, $p.HungerPerS)
-Check 'half the creature numbers: half the sites' (Near $c.Sites ($p.Sites / 2) 0.02) "$($c.Sites) of $($p.Sites)"
-Check 'twice the creature numbers: the same sites, twice the creatures' (($m.Sites -eq $p.Sites) -and (Near $m.Creatures (2 * $p.Creatures) 0.02)) "$($m.Creatures) creatures at $($m.Sites) sites, from $($p.Creatures)"
+Check 'half the creature numbers: half the packs and half the share of animals' ((Near $c.Packs ($p.Packs / 2) 0.02) -and (Near $c.Share ($p.Share / 2) 0.02)) "$($c.Packs) packs of $($p.Packs), share $($c.Share) of $($p.Share)"
+Check 'twice the creature numbers: twice the packs and twice the share' ((Near $m.Packs (2 * $p.Packs) 0.02) -and (Near $m.Share (2 * $p.Share) 0.02)) "$($m.Packs) packs, share $($m.Share), from $($p.Packs), $($p.Share)"
 Check 'twice the difficulty: a creature has twice the health and damage' ((Near $c.CreatureHp (2 * $p.CreatureHp) 0.01) -and (Near $c.CreatureDamage (2 * $p.CreatureDamage) 0.01)) "$($c.CreatureHp) hp, $($c.CreatureDamage) damage, from $($p.CreatureHp), $($p.CreatureDamage)"
 Check 'and a boss has twice the health' (Near $c.BossHp (2 * $p.BossHp) 0.01) "$($c.BossHp) from $($p.BossHp)"
 Check 'the player is told the world''s settings' ($c.Client -match 'custom \(' -and $c.Client -match 'server\.dayMinutes=20' -and $c.Client -match 'server\.creatureDifficulty=2')

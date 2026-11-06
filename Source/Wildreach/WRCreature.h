@@ -50,6 +50,10 @@ struct FWRCreatureDef
 	TArray<FName> Attacks;        // besides the bite: lunge, charge, spit, stomp (numbers in tuning.json creatureAI.<attack>)
 	FName Diet;                   // carnivore (hunts), herbivore, lithovore; from its food when not given
 	FName Activity;               // diurnal (sleeps at night), nocturnal (sleeps by day), any
+	FName Biome;                  // volcanic / tundra: the side of the island it lives on
+	int32 PackMin = 1;            // how big its packs on the island are (WRWildlife)
+	int32 PackMax = 1;
+	float WanderChance = 0.f;     // the share of its packs that travel far instead of keeping to one area
 
 	// Art: a skeletal mesh replaces the placeholder shape when set (scaled to the capsule, feet on the ground).
 	FString Mesh;
@@ -136,6 +140,13 @@ public:
 	AActor* GetAggroTarget() const { return AggroTarget.Get(); }
 	void SetAggroTarget(AActor* Target) { AggroTarget = Target; }
 	FVector GetHome() const { return Home; }
+	/** Its pack has moved on (WRWildlife): home goes with it. Heading: the way the pack is walking (zero: it's staying here). */
+	void FollowPack(const FVector2D& PackAt, const FVector2D& Heading);
+	FVector2D GetPackHeading() const { return PackHeading; }
+	float GetHealthFraction() const;
+	void SetHealthFraction(float Fraction);
+	/** Comes into view wanting a meal: its pack was on a hunt. */
+	void MakeHungry() { HungryAt = 0.0; }
 	bool IsTamed() const { return !TamedBy.IsEmpty(); }
 	bool IsUnconscious() const;
 
@@ -261,6 +272,7 @@ private:
 
 	TWeakObjectPtr<AActor> AggroTarget;
 	FVector Home = FVector::ZeroVector;
+	FVector2D PackHeading = FVector2D::ZeroVector;
 	FString TamerName;
 	float FedUntil = 0.f;
 	float MealValue = 1.f;           // taming value of the meal being digested
@@ -383,7 +395,14 @@ private:
 	float WanderClock = 0.f;
 };
 
-/** Keeps a number of creatures alive around itself; nesting species get an egg nest. */
+/** What a roaming pack is up to, in view or not (WRWildlife). */
+enum class EWRPackDoing : uint8 { Grazing, Travelling, Hunting, Resting };
+
+/**
+ * Keeps a number of creatures alive around itself; nesting species get an egg nest. A map-placed one holds its place and
+ * replaces its dead. On the island most are roaming packs (bRoams, WRWildlife): this actor is then the pack's record,
+ * wherever it has got to, and a death is a death: Count is how many are left.
+ */
 UCLASS()
 class WILDREACH_API AWRCreatureSpawner : public AActor
 {
@@ -392,6 +411,26 @@ class WILDREACH_API AWRCreatureSpawner : public AActor
 public:
 	AWRCreatureSpawner();
 	virtual void Tick(float DeltaSeconds) override;
+
+	bool bRoams = false;
+	EWRPackDoing Doing = EWRPackDoing::Grazing;
+	/** The middle of where a predator prowls. */
+	FVector2D Territory = FVector2D::ZeroVector;
+	/** Travels far instead of keeping to one area. */
+	bool bWanderer = false;
+	/** How hurt they were when last in view, 0..1 (mends with time). */
+	float PackHealth = 1.f;
+	double NextThinkAt = 0.0;
+	double FedUntil = 0.0;
+	/** Where it's walking, next point first. */
+	TArray<FVector2D> Path;
+	TWeakObjectPtr<AWRCreatureSpawner> Quarry;
+	FVector2D QuarryWas = FVector2D::ZeroVector;
+	/** Walks on along its path; when the pack is in view, its creatures follow. */
+	void Advance(float Seconds);
+	/** In view and caught up in something (a fight, a hunt, running away, a meal): it waits for them. */
+	bool IsBusy() const;
+	float AverageHealth() const;
 
 	UPROPERTY(EditAnywhere, Category="Spawner") FName CreatureId = TEXT("cinderfang");
 	UPROPERTY(EditAnywhere, Category="Spawner") int32 Count = 3;
@@ -410,9 +449,6 @@ public:
 	bool IsActive() const { return bActive; }
 	int32 NumAlive() const;
 
-	/** Server start: a spawner for every wildlife site in Data/island_spawns.json made for this map. Returns the count. */
-	static int32 SpawnSitesFromData(UWorld* World);
-
 protected:
 	virtual void BeginPlay() override;
 
@@ -421,11 +457,15 @@ private:
 	void Activate();
 	void Deactivate();
 	bool PlayerNear(float Range) const;
-	FVector GroundAt(const FVector& Point) const;
+	/** The ground under a point. bFound false: the ground isn't there yet (it hasn't streamed in). */
+	FVector GroundAt(const FVector& Point, bool& bFound) const;
 	TArray<TWeakObjectPtr<AWRCreature>> Alive;
 	TArray<double> PendingRespawns;
 	bool bActive = false;
 	double AloneSince = -1.0;
+	/** A roaming pack can come into view before its ground has streamed in: these wait a few seconds for it. */
+	int32 SpawnsWaiting = 0;
+	int32 GroundWaits = 0;
 };
 
 /** Egg nest for nesting species (Kilnmite, Rimeshell). Taking the egg angers the pack. */

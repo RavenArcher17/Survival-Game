@@ -22,6 +22,7 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRWater.h"
+#include "WRWildlife.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Camera/CameraActor.h"
@@ -622,6 +623,37 @@ void AWRPlayerController::WRBuy(FName Path, FName Node) { ServerCommand(FString:
 void AWRPlayerController::WRWeapon(FName Metal, FName Quality, int32 Upgrade) { ServerCommand(FString::Printf(TEXT("weapon %s %s %d"), *Metal.ToString(), *Quality.ToString(), Upgrade)); }
 void AWRPlayerController::WRSpawn(FName Creature, int32 Count) { ServerCommand(FString::Printf(TEXT("spawn %s %d"), *Creature.ToString(), FMath::Max(1, Count))); }
 void AWRPlayerController::WRVitals() { ServerCommand(TEXT("vitals")); }
+void AWRPlayerController::WRPacks() { ServerCommand(TEXT("packs")); }
+void AWRPlayerController::WRFaceHerd(FName Creature, float Distance, float Bearing)
+{
+	const AWRCharacter* Survivor = Cast<AWRCharacter>(GetPawn());
+	FVector Sum = FVector::ZeroVector;
+	int32 N = 0;
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		if (It->CreatureId == Creature && It->IsAlive())
+		{
+			Sum += It->GetActorLocation();
+			++N;
+		}
+	}
+	if (!Survivor || N == 0)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("FACEHERD no %s in view"), *Creature.ToString());
+		return;
+	}
+	const FVector Middle = Sum / N;
+	if (Distance > 0.f)
+	{
+		const float Rad = FMath::DegreesToRadians(Bearing);
+		WRTeleport(Middle.X + FMath::Cos(Rad) * Distance, Middle.Y + FMath::Sin(Rad) * Distance);
+	}
+	else
+	{
+		SetControlRotation(Survivor->AimRotationAt(Middle));
+	}
+}
+void AWRPlayerController::WRHurtPack(FName Creature, int32 Kills, float Share) { ServerCommand(FString::Printf(TEXT("hurtpack %s %d %.2f"), *Creature.ToString(), Kills, Share)); }
 void AWRPlayerController::WRStatus(FName Status) { ServerCommand(FString::Printf(TEXT("status %s"), *Status.ToString())); }
 void AWRPlayerController::WRHeal() { ServerCommand(TEXT("heal")); }
 void AWRPlayerController::WRKillMe() { ServerCommand(TEXT("killme")); }
@@ -768,8 +800,8 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 	}
 	else if (Cmd == TEXT("wildlife") && Survivor)
 	{
-		// The island's wildlife sites: how many are out, what's around you, the nearest one still quiet.
-		int32 Sites = 0, Active = 0, Out = 0;
+		// The island's packs: how many are out, what's around you, the nearest one still quiet.
+		int32 Sites = 0, Animals = 0, Active = 0, Out = 0;
 		TMap<FName, int32> Near;
 		const AWRCreatureSpawner* Quiet = nullptr;
 		float QuietDist = TNumericLimits<float>::Max();
@@ -780,6 +812,7 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 				continue;
 			}
 			++Sites;
+			Animals += It->Count;
 			const float D = FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation());
 			if (It->IsActive())
 			{
@@ -801,8 +834,56 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		}
 		FString NearText;
 		for (const TPair<FName, int32>& N : Near) NearText += FString::Printf(TEXT("%s%s %d"), NearText.IsEmpty() ? TEXT("") : TEXT(", "), *N.Key.ToString(), N.Value);
-		Result = FString::Printf(TEXT("sites %d, active %d, out %d; within 300 m: %s; nearest quiet site %s"), Sites, Active, Out, NearText.IsEmpty() ? TEXT("none") : *NearText,
-			Quiet ? *FString::Printf(TEXT("%s %.0f m at %.0f %.0f"), *Quiet->CreatureId.ToString(), QuietDist / 100.f, Quiet->GetActorLocation().X, Quiet->GetActorLocation().Y) : TEXT("none"));
+		Result = FString::Printf(TEXT("packs %d, animals %d, active %d, out %d; within 300 m: %s; nearest quiet pack %s"), Sites, Animals, Active, Out, NearText.IsEmpty() ? TEXT("none") : *NearText,
+			Quiet ? *FString::Printf(TEXT("%s x%d %s %.0f m at %.0f %.0f"), *Quiet->CreatureId.ToString(), Quiet->Count, WRWildlife::DoingName(Quiet->Doing), QuietDist / 100.f, Quiet->GetActorLocation().X, Quiet->GetActorLocation().Y) : TEXT("none"));
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("packs") && Survivor)
+	{
+		// Testing: every roaming pack in view, and how close its creatures keep to it.
+		for (TActorIterator<AWRCreatureSpawner> It(GetWorld()); It; ++It)
+		{
+			if (!It->bRoams || !It->IsActive())
+			{
+				continue;
+			}
+			float Sum = 0.f, Far = 0.f, Health = 0.f;
+			int32 N = 0;
+			for (TActorIterator<AWRCreature> C(GetWorld()); C; ++C)
+			{
+				if (C->Spawner.Get() == *It && C->IsAlive() && !C->IsTamed())
+				{
+					const float D = FVector::Dist2D(C->GetActorLocation(), It->GetActorLocation());
+					Sum += D;
+					Far = FMath::Max(Far, D);
+					Health += C->GetHealthFraction();
+					++N;
+				}
+			}
+			UE_LOG(LogWildreach, Log, TEXT("PACK %s x%d %s at %.0f %.0f; %d bodies, %.0f m away on average, %.0f at most, health %.2f; %.0f m from you"), *It->CreatureId.ToString(), It->Count, WRWildlife::DoingName(It->Doing),
+				It->GetActorLocation().X, It->GetActorLocation().Y, N, N > 0 ? Sum / N / 100.f : 0.f, Far / 100.f, N > 0 ? Health / N : 0.f, FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation()) / 100.f);
+		}
+	}
+	else if (Cmd == TEXT("hurtpack") && Survivor)
+	{
+		// Testing: of the nearest roaming pack in view, kill this many and leave the rest at this share of their health.
+		AWRCreatureSpawner* Pack = nullptr;
+		float Best = TNumericLimits<float>::Max();
+		for (TActorIterator<AWRCreatureSpawner> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist2D(It->GetActorLocation(), Survivor->GetActorLocation());
+			if (It->bRoams && It->IsActive() && It->NumAlive() > 0 && (Arg(1).IsEmpty() || Arg(1) == TEXT("any") || It->CreatureId == FName(*Arg(1))) && D < Best) { Best = D; Pack = *It; }
+		}
+		int32 Kills = FCString::Atoi(*Arg(2));
+		const float Share = Arg(3).IsEmpty() ? 1.f : FCString::Atof(*Arg(3));
+		int32 Left = 0;
+		for (TActorIterator<AWRCreature> It(GetWorld()); Pack && It; ++It)
+		{
+			if (It->Spawner.Get() != Pack || !It->IsAlive() || It->IsTamed()) continue;
+			if (Kills > 0) { --Kills; It->Die(Survivor); }
+			else { It->SetHealthFraction(Share); ++Left; }
+		}
+		Result = Pack ? FString::Printf(TEXT("%s at %.0f %.0f: %d left, Count %d"), *Pack->CreatureId.ToString(), Pack->GetActorLocation().X, Pack->GetActorLocation().Y, Left, Pack->Count) : FString(TEXT("no pack in view"));
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("creaturehp") && Survivor)

@@ -1741,7 +1741,7 @@ namespace WRSettingsUI
 			Group(LOCTEXT("RulesWorld", "The world"), false);
 			Range(LOCTEXT("RuleDay", "Day length"), LOCTEXT("RuleDaySub", "Real minutes in one game day"), TEXT("dayMinutes"), 20.f, 120.f, 5.f, Minutes);
 			Range(LOCTEXT("RuleHunger", "Hunger and thirst"), LOCTEXT("RuleHungerSub", "How fast they drop"), TEXT("hungerMultiplier"), 0.5f, 2.f, 0.1f, Times);
-			Range(LOCTEXT("RuleNumbers", "Creature numbers"), LOCTEXT("RuleNumbersSub", "How many live on the island, from the next start"), TEXT("creatureNumbers"), 0.5f, 2.f, 0.1f, Times);
+			Range(LOCTEXT("RuleNumbers", "Creature numbers"), LOCTEXT("RuleNumbersSub", "How many live on the island; a change comes on slowly"), TEXT("creatureNumbers"), 0.5f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleDifficulty", "Creature difficulty"), LOCTEXT("RuleDifficultySub", "Health and damage of new creatures and bosses"), TEXT("creatureDifficulty"), 0.5f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleUpkeep", "Building upkeep"), LOCTEXT("RuleUpkeepSub", "What a land claim costs to keep up"), TEXT("upkeepMultiplier"), 0.f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleBoss", "Boss respawn"), LOCTEXT("RuleBossSub", "How long before a beaten boss comes back"), TEXT("bossRespawnHours"), 1.f, 24.f, 1.f, Hours);

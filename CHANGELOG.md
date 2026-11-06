@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased: wildlife that roams (0.6)
+
+From Raven's Oct 31 review: always a small pack standing still.
+
+- **Packs live on when nobody is near** (`WRWildlife`). Each is a record that keeps its place, what it's doing, how many
+  are left and how hurt they are. The server moves them every 20 s over a coarse map of where animals can walk
+  (`Data/island_walk.json`, from `Tools/terrain/walkmap.mjs`: 32 m cells, the sea, steep ground, lava, arenas and caves).
+- **You meet them where they've got to.** A player within 250 m brings a pack out at its record's position, doing what it
+  was doing; when everyone has gone it's a record again. A pack in view keeps walking at its own pace with its creatures
+  following it, and waits for any caught up in a fight, a hunt, a meal or running away.
+- **By kind:** grazers drift between feeding grounds and rest when they sleep; predators keep a territory and go after the
+  nearest prey they can reach when hungry, faster, by night unless they sleep through it; a few packs travel far
+  (`wanderChance` in `creatures.json`: Basaltbacks, Woolly drudges, Aurora foxes, Scorchwings, some Emberhorns and
+  Frostantlers); burrowers and colonies stay home. Everyone keeps to their side of the island and their elevation band,
+  and clear of the camps, as the sites always did, so the strong ones don't walk into the starting areas.
+- **Hunts nobody sees are settled by odds** (`huntChance`, on the size rule the creatures already hunt by): caught or
+  missed, the prey runs. Tames are never touched.
+- **Pack sizes vary**, from a lone animal or a pair to herds of 12 (`pack` in `creatures.json`), mostly small. About 470
+  animals on the island, up from 328.
+- **A death is a death:** a pack no longer replaces its dead a couple of minutes later. Numbers and wounds stay with the
+  pack, wounds mend slowly, and numbers come back slowly (10% of a kind's share an hour) by breeding and by new packs
+  wandering in out of sight, towards its share: its sites x its usual pack x the world's creature numbers.
+- **Creature numbers** now means how many packs: more or fewer at the start of a new world, and a change later comes on
+  slowly.
+- **Saved with the world** (`wildlife.json`, each minute with the buildings). Without a `world.json` a world starts over,
+  and so does its wildlife. A world from before this starts new packs at the sites.
+- **A pack never comes out inside a land claim:** it comes out at the edge of it, and doesn't pick a goal inside one.
+- **Map-placed packs and bosses** hold their place and replace their dead as before.
+- **Tests:** `Tools/roamtest.ps1` (in `alltests`): a player stands still through two fast island days while packs travel,
+  rest, hunt and breed around them, then a herd is watched walking at normal speed, a pack is thinned and hurt and stays
+  so through a server restart, and one inside a claim comes out at its edge. `Wildreach.World.WalkMap`. Moving them all
+  costs about 2 ms each step. New commands: `WRPacks`, `WRHurtPack`, `WRFaceHerd`.
+
 ## Unreleased: world settings (0.6)
 
 From Raven's Oct 31 review: four presets existed, but only a command-line switch could pick one.

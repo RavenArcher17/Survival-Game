@@ -22,6 +22,7 @@
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRWater.h"
+#include "WRWildlife.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -219,6 +220,14 @@ void FWRCreatureRegistry::Reload()
 			: D.Food.ContainsByPredicate([](const FName& F) { return F.ToString().EndsWith(TEXT("_ore")); }) ? FName(TEXT("lithovore"))
 			: D.Food.Num() > 0 ? FName(TEXT("herbivore")) : NAME_None;
 		D.Activity = O->TryGetStringField(TEXT("activity"), Str) ? FName(*Str) : FName(TEXT("any"));
+		if (O->TryGetStringField(TEXT("biome"), Str)) D.Biome = FName(*Str);
+		const TArray<TSharedPtr<FJsonValue>>* PackSizes = nullptr;
+		if (O->TryGetArrayField(TEXT("pack"), PackSizes) && PackSizes->Num() == 2)
+		{
+			D.PackMin = FMath::Max(1, static_cast<int32>((*PackSizes)[0]->AsNumber()));
+			D.PackMax = FMath::Max(D.PackMin, static_cast<int32>((*PackSizes)[1]->AsNumber()));
+		}
+		if (O->TryGetNumberField(TEXT("wanderChance"), Num)) D.WanderChance = Num;
 		if (O->HasField(TEXT("loot")))
 		{
 			D.Loot = ParseCounts(O, TEXT("loot"));
@@ -1068,6 +1077,26 @@ void AWRCreature::BeginPlay()
 		{
 			AbilitySystem->AddLooseGameplayTag(Tag, 1, EGameplayTagReplicationState::TagOnly);
 		}
+	}
+}
+
+void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
+{
+	Home = FVector(PackAt.X, PackAt.Y, GetActorLocation().Z);
+	PackHeading = Heading;
+}
+
+float AWRCreature::GetHealthFraction() const
+{
+	const UWRAttributeSet* A = GetAttributes();
+	return A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 1.f;
+}
+
+void AWRCreature::SetHealthFraction(float Fraction)
+{
+	if (const UWRAttributeSet* A = GetAttributes())
+	{
+		AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetMaxHealth() * FMath::Clamp(Fraction, 0.01f, 1.f));
 	}
 }
 
@@ -2377,12 +2406,16 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	if (WanderClock <= 0.f)
 	{
 		WanderClock = FMath::FRandRange(4.f, 9.f);
-		WanderGoal = Self->GetHome() + FVector(FMath::RandPointInCircle(Def->Archetype == TEXT("herd") ? 900.f : 400.f), 0.f);
+		WanderGoal = FVector(FMath::RandPointInCircle(Def->Archetype == TEXT("herd") ? 900.f : 400.f), 0.f);
 	}
-	const FVector ToGoal = WanderGoal - Self->GetActorLocation();
+	// A spot near home, and home may be on the move (a pack travelling): then a little ahead of it, at a walk, and one
+	// that has fallen behind hurries to catch up.
+	const FVector2D Heading = Self->GetPackHeading();
+	const bool bTravelling = !Heading.IsNearlyZero();
+	const FVector ToGoal = Self->GetHome() + WanderGoal + FVector(Heading * WRTune(TEXT("wildlife.leadDistance"), 400.f), 0.f) - Self->GetActorLocation();
 	if (ToGoal.Size2D() > 150.f)
 	{
-		Self->AddMovementInput(ToGoal.GetSafeNormal2D(), 0.4f);
+		Self->AddMovementInput(ToGoal.GetSafeNormal2D(), !bTravelling ? 0.4f : ToGoal.Size2D() > WRTune(TEXT("wildlife.catchUpDistance"), 2500.f) ? 0.95f : WRTune(TEXT("wildlife.travelInput"), 0.55f));
 	}
 }
 
@@ -2462,63 +2495,13 @@ void AWRCreatureSpawner::BeginPlay()
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		if (AWRNest* Nest = GetWorld()->SpawnActor<AWRNest>(AWRNest::StaticClass(), GroundAt(GetActorLocation() + FVector(150.f, 0.f, 0.f)), FRotator::ZeroRotator, Params))
+		bool bGround = false;
+		if (AWRNest* Nest = GetWorld()->SpawnActor<AWRNest>(AWRNest::StaticClass(), GroundAt(GetActorLocation() + FVector(150.f, 0.f, 0.f), bGround), FRotator::ZeroRotator, Params))
 		{
 			Nest->CreatureId = CreatureId;
 			Nest->Spawner = this;
 		}
 	}
-}
-
-int32 AWRCreatureSpawner::SpawnSitesFromData(UWorld* World)
-{
-	if (!World || World->GetNetMode() == NM_Client || WRTune(TEXT("wildlife.enabled"), 1.f) <= 0.f)
-	{
-		return 0;
-	}
-	const TSharedPtr<FJsonObject> Root = FWRTuning::LoadDataFile(TEXT("island_spawns.json"));
-	const TArray<TSharedPtr<FJsonValue>>* Sites = nullptr;
-	FString Map;
-	if (!Root || !Root->TryGetStringField(TEXT("map"), Map) || Map != UWorld::RemovePIEPrefix(World->GetMapName()) || !Root->TryGetArrayField(TEXT("sites"), Sites))
-	{
-		return 0;
-	}
-	const float Activation = WRTune(TEXT("wildlife.activationRadius"), 25000.f);
-	// The world's creature numbers: under 1, that share of the sites (spread evenly over the list); over 1, bigger packs.
-	const float Numbers = FMath::Max(0.1f, WRTune(TEXT("server.creatureNumbers"), 1.f));
-	float SitesOwed = 0.f;
-	int32 Spawned = 0, Creatures = 0;
-	for (const TSharedPtr<FJsonValue>& Value : *Sites)
-	{
-		const TSharedPtr<FJsonObject> Site = Value.IsValid() ? Value->AsObject() : nullptr;
-		const FName Id = Site ? FName(*Site->GetStringField(TEXT("creature"))) : NAME_None;
-		if (!FWRCreatureRegistry::Get().Find(Id))
-		{
-			UE_LOG(LogWildreach, Warning, TEXT("WILDLIFE site for unknown creature %s"), *Id.ToString());
-			continue;
-		}
-		SitesOwed += FMath::Min(Numbers, 1.f);
-		if (SitesOwed < 1.f - KINDA_SMALL_NUMBER)
-		{
-			continue;
-		}
-		SitesOwed -= 1.f;
-		const FTransform At(FVector(Site->GetNumberField(TEXT("x")), Site->GetNumberField(TEXT("y")), Site->GetNumberField(TEXT("z")) + 100.f));
-		if (AWRCreatureSpawner* Spawner = World->SpawnActorDeferred<AWRCreatureSpawner>(StaticClass(), At, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
-		{
-			Spawner->CreatureId = Id;
-			Spawner->Count = FMath::Max(1, FMath::RoundToInt(Site->GetIntegerField(TEXT("count")) * FMath::Max(Numbers, 1.f)));
-			Spawner->Radius = Site->GetNumberField(TEXT("radius"));
-			Spawner->RespawnSeconds = Site->GetNumberField(TEXT("respawn"));
-			Spawner->ActivationRadius = Activation;
-			Spawner->bTraceGround = true;
-			Spawner->FinishSpawning(At);
-			++Spawned;
-			Creatures += Spawner->Count;
-		}
-	}
-	UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %d sites, %d creatures (Data/island_spawns.json); a pack comes out when a player is within %.0f m"), Spawned, Creatures, Activation / 100.f);
-	return Spawned;
 }
 
 int32 AWRCreatureSpawner::NumAlive() const
@@ -2535,6 +2518,19 @@ void AWRCreatureSpawner::Activate()
 {
 	bActive = true;
 	AloneSince = -1.0;
+	GroundWaits = 0;
+	SpawnsWaiting = 0;
+	// A pack doesn't come out inside someone's land claim: it has come to the edge of it.
+	if (bRoams)
+	{
+		if (const AWRClaimTotem* Claim = AWRClaimTotem::FindAt(GetWorld(), GetActorLocation()))
+		{
+			const FVector2D Out = FVector2D(GetActorLocation() - Claim->GetActorLocation()).GetSafeNormal();
+			const FVector2D Edge = FVector2D(Claim->GetActorLocation()) + (Out.IsNearlyZero() ? FVector2D(1.0, 0.0) : Out) * (Claim->Radius + Radius + 500.f);
+			SetActorLocation(FVector(Edge.X, Edge.Y, GetActorLocation().Z));
+			Path.Reset();
+		}
+	}
 	// Top the pack up; a death still waiting out its respawn keeps its place.
 	const double Now = GetWorld()->GetTimeSeconds();
 	PendingRespawns.RemoveAll([Now](double At) { return At <= Now; });
@@ -2544,7 +2540,7 @@ void AWRCreatureSpawner::Activate()
 	}
 	if (ActivationRadius > 0.f)
 	{
-		UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %s out at %s (%d)"), *CreatureId.ToString(), *GetActorLocation().ToCompactString(), NumAlive());
+		UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %s out at %s (%d%s)"), *CreatureId.ToString(), *GetActorLocation().ToCompactString(), NumAlive(), bRoams ? *FString::Printf(TEXT(", %s"), WRWildlife::DoingName(Doing)) : TEXT(""));
 	}
 }
 
@@ -2552,6 +2548,29 @@ void AWRCreatureSpawner::Deactivate()
 {
 	bActive = false;
 	AloneSince = -1.0;
+	// It's a record again: where they got to, how many are left, how hurt they are.
+	if (bRoams)
+	{
+		FVector2D Sum = FVector2D::ZeroVector;
+		const int32 Left = NumAlive();
+		for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+		{
+			if (C.IsValid() && C->IsAlive() && !C->IsTamed()) Sum += FVector2D(C->GetActorLocation());
+		}
+		if (Left > 0)
+		{
+			PackHealth = AverageHealth();
+			const FVector2D Middle = Sum / Left;
+			// (A colony stays by its home, wherever a fight took its creatures.)
+			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
+			if (Def && Def->Archetype != TEXT("burrower") && WRWildlife::CanStand(CreatureId, Middle))
+			{
+				SetActorLocation(FVector(Middle.X, Middle.Y, GetActorLocation().Z));
+			}
+		}
+		Count = Left + SpawnsWaiting;
+		SpawnsWaiting = 0;
+	}
 	int32 Gone = 0;
 	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
 	{
@@ -2564,6 +2583,68 @@ void AWRCreatureSpawner::Deactivate()
 	}
 	Alive.RemoveAll([](const TWeakObjectPtr<AWRCreature>& C) { return !C.IsValid(); });
 	UE_LOG(LogWildreach, Log, TEXT("WILDLIFE %s at %s went quiet (%d gone)"), *CreatureId.ToString(), *GetActorLocation().ToCompactString(), Gone);
+}
+
+void AWRCreatureSpawner::Advance(float Seconds)
+{
+	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
+	FVector2D At(GetActorLocation());
+	const FVector2D Was = At;
+	if (Def && Path.Num() > 0)
+	{
+		float Walk = Def->Speed * WRTune(TEXT("wildlife.travelSpeed"), 0.3f) * (Doing == EWRPackDoing::Hunting ? WRTune(TEXT("wildlife.huntSpeed"), 1.5f) : 1.f) * Seconds;
+		while (Walk > 0.f && Path.Num() > 0)
+		{
+			const float ToNext = FVector2D::Distance(At, Path[0]);
+			if (ToNext <= Walk)
+			{
+				At = Path[0];
+				Walk -= ToNext;
+				Path.RemoveAt(0, EAllowShrinking::No);
+			}
+			else
+			{
+				At += (Path[0] - At) / ToNext * Walk;
+				Walk = 0.f;
+			}
+		}
+		SetActorLocation(FVector(At.X, At.Y, GetActorLocation().Z));
+	}
+	if (bActive)
+	{
+		const FVector2D Heading = Path.Num() > 0 ? (At - Was).GetSafeNormal() : FVector2D::ZeroVector;
+		for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+		{
+			if (C.IsValid() && !C->IsTamed()) C->FollowPack(At, Heading);
+		}
+	}
+}
+
+bool AWRCreatureSpawner::IsBusy() const
+{
+	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+	{
+		if (C.IsValid() && C->IsAlive() && !C->IsTamed() && (C->GetAggroTarget() || C->HuntTarget.IsValid() || C->IsFleeing() || C->IsEating()))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+float AWRCreatureSpawner::AverageHealth() const
+{
+	float Sum = 0.f;
+	int32 N = 0;
+	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+	{
+		if (C.IsValid() && C->IsAlive() && !C->IsTamed())
+		{
+			Sum += C->GetHealthFraction();
+			++N;
+		}
+	}
+	return N > 0 ? Sum / N : PackHealth;
 }
 
 bool AWRCreatureSpawner::PlayerNear(float Range) const
@@ -2593,16 +2674,19 @@ bool AWRCreatureSpawner::PlayerNear(float Range) const
 	return false;
 }
 
-FVector AWRCreatureSpawner::GroundAt(const FVector& Point) const
+FVector AWRCreatureSpawner::GroundAt(const FVector& Point, bool& bFound) const
 {
+	bFound = true;
 	if (!bTraceGround)
 	{
 		return Point;
 	}
-	// The terrain under the point, not a tree crown or a roof over it.
+	// The terrain under the point, not a tree crown or a roof over it. (From over the island's highest ground: a roaming
+	// pack's height isn't kept up to date as it walks.)
 	TArray<FHitResult> Hits;
-	GetWorld()->LineTraceMultiByObjectType(Hits, Point + FVector(0.f, 0.f, 3000.f), Point - FVector(0.f, 0.f, 6000.f),
-		FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(WRSpawnGround), false, this));
+	const FVector Top(Point.X, Point.Y, WRTune(TEXT("water.rescueTraceTop"), 150000.f));
+	const FVector Bottom(Point.X, Point.Y, WRTune(TEXT("water.voidZ"), -5000.f));
+	GetWorld()->LineTraceMultiByObjectType(Hits, Top, Bottom, FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(WRSpawnGround), false, this));
 	for (const FHitResult& Hit : Hits)
 	{
 		if (Hit.GetActor() && Hit.GetActor()->IsA<ALandscapeProxy>())
@@ -2610,18 +2694,40 @@ FVector AWRCreatureSpawner::GroundAt(const FVector& Point) const
 			return Hit.ImpactPoint;
 		}
 	}
+	bFound = false;
 	return Hits.Num() > 0 ? Hits.Last().ImpactPoint : Point;
 }
 
 void AWRCreatureSpawner::SpawnOne()
 {
-	const FVector2D Offset = FMath::RandPointInCircle(Radius);
-	if (AWRCreature* Creature = AWRCreature::SpawnCreature(GetWorld(), CreatureId, GroundAt(GetActorLocation() + FVector(Offset, 0.f)), FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
+	// A big herd spreads wider.
+	const float Spread = bRoams ? Radius * FMath::Sqrt(FMath::Max(Count, 3) / 3.f) : Radius;
+	const FVector2D Offset = FMath::RandPointInCircle(Spread);
+	bool bGround = false;
+	const FVector Ground = GroundAt(GetActorLocation() + FVector(Offset, 0.f), bGround);
+	if (!bGround && bRoams && GroundWaits < 10)
+	{
+		++SpawnsWaiting;  // Tick tries again; after a few seconds it comes out regardless
+		return;
+	}
+	if (AWRCreature* Creature = AWRCreature::SpawnCreature(GetWorld(), CreatureId, Ground, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
 	{
 		Creature->Spawner = this;
 		Alive.Add(Creature);
+		if (bRoams)
+		{
+			Creature->FollowPack(FVector2D(GetActorLocation()), FVector2D::ZeroVector);
+			if (PackHealth < 0.999f) Creature->SetHealthFraction(PackHealth);
+			if (Doing == EWRPackDoing::Hunting) Creature->MakeHungry();
+		}
 		Creature->OnCreatureDied.AddWeakLambda(this, [this](AWRCreature*)
 		{
+			// A roaming pack is that much smaller from now on (it fills again slowly: WRWildlife).
+			if (bRoams)
+			{
+				Count = FMath::Max(0, Count - 1);
+				return;
+			}
 			// A boss: as the world says now (its settings can change while the game runs).
 			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
 			const float Wait = Def && Def->Archetype == TEXT("boss") ? WRTune(TEXT("server.bossRespawnHours"), 4.f) * 3600.f : RespawnSeconds;
@@ -2667,7 +2773,7 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 		const bool bNear = PlayerNear(bActive ? ActivationRadius * WRTune(TEXT("wildlife.leaveRadiusMult"), 1.2f) : ActivationRadius);
 		if (!bActive)
 		{
-			if (bNear)
+			if (bNear && (!bRoams || Count > 0))
 			{
 				Activate();
 			}
@@ -2685,6 +2791,28 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 		{
 			Deactivate();
 			return;
+		}
+	}
+	if (bRoams)
+	{
+		if (SpawnsWaiting > 0)
+		{
+			++GroundWaits;
+			const int32 Waiting = SpawnsWaiting;
+			SpawnsWaiting = 0;
+			for (int32 i = 0; i < Waiting; ++i) SpawnOne();
+		}
+		// In view it walks at its own pace, and waits for any caught up in something.
+		if (IsBusy())
+		{
+			for (const TWeakObjectPtr<AWRCreature>& C : Alive)
+			{
+				if (C.IsValid() && !C->IsTamed()) C->FollowPack(FVector2D(GetActorLocation()), FVector2D::ZeroVector);
+			}
+		}
+		else
+		{
+			Advance(DeltaSeconds);
 		}
 	}
 	for (int32 i = PendingRespawns.Num() - 1; i >= 0; --i)

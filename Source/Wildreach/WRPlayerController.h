@@ -258,6 +258,12 @@ public:
 	UFUNCTION(Exec) void WRSpawn(FName Creature, int32 Count);
 	/** Server log: hunger, thirst and the clock, for tests that measure how fast they go. */
 	UFUNCTION(Exec) void WRVitals();
+	/** Server log: every roaming pack in view, and how close its creatures keep to it. */
+	UFUNCTION(Exec) void WRPacks();
+	/** For pictures: stand this far from the middle of the creatures of a kind in view, at this bearing (degrees); Distance 0: aim at them. */
+	UFUNCTION(Exec) void WRFaceHerd(FName Creature, float Distance, float Bearing);
+	/** Of the nearest roaming pack in view (a kind, or "any"): kill this many, leave the rest at this share of their health. */
+	UFUNCTION(Exec) void WRHurtPack(FName Creature, int32 Kills, float Share);
 	UFUNCTION(Exec) void WRStatus(FName Status);
 	UFUNCTION(Exec) void WRHeal();
 	UFUNCTION(Exec) void WRKillMe();

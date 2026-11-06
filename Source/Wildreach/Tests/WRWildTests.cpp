@@ -9,6 +9,7 @@
 #include "WRInventory.h"
 #include "WRMainMenu.h"
 #include "WRTuning.h"
+#include "WRWildlife.h"
 #include "Dom/JsonObject.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -243,6 +244,63 @@ bool FWRWildlifeSitesTest::RunTest(const FString& Parameters)
 	TestTrue(FString::Printf(TEXT("the island is busy (%d creatures)"), Total), Total >= 120);
 	TestTrue(TEXT("packs come out near players"), FWRTuning::Get().Num(TEXT("wildlife.activationRadius"), 0.f) >= 10000.f
 		&& FWRTuning::Get().Num(TEXT("wildlife.leaveRadiusMult"), 0.f) >= 1.f && FWRTuning::Get().Num(TEXT("wildlife.despawnSeconds"), 0.f) > 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRWalkMapTest, "Wildreach.World.WalkMap",
+	EAutomationTestFlags::ProductFilter | EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ServerContext)
+
+bool FWRWalkMapTest::RunTest(const FString& Parameters)
+{
+	const TSharedPtr<FJsonObject> Spawns = FWRTuning::LoadDataFile(TEXT("island_spawns.json"));
+	if (!TestTrue(TEXT("sites load"), Spawns.IsValid()))
+	{
+		return false;
+	}
+	TMap<FName, TArray<FVector2D>> SitesOf;
+	for (const TSharedPtr<FJsonValue>& V : Spawns->GetArrayField(TEXT("sites")))
+	{
+		const TSharedPtr<FJsonObject> S = V->AsObject();
+		const FName Id(*S->GetStringField(TEXT("creature")));
+		const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Id);
+		if (!TestNotNull(*FString::Printf(TEXT("%s is a creature"), *Id.ToString()), Def))
+		{
+			continue;
+		}
+		TestTrue(*FString::Printf(TEXT("%s has a pack size (%d to %d)"), *Id.ToString(), Def->PackMin, Def->PackMax), Def->PackMin >= 1 && Def->PackMax >= Def->PackMin);
+		SitesOf.FindOrAdd(Id).Add(FVector2D(S->GetNumberField(TEXT("x")), S->GetNumberField(TEXT("y"))));
+	}
+	TestTrue(TEXT("herds can be big"), FWRCreatureRegistry::Get().Find(TEXT("ashstrider")) && FWRCreatureRegistry::Get().Find(TEXT("ashstrider"))->PackMax >= 6);
+	TestTrue(TEXT("hunters can be alone"), FWRCreatureRegistry::Get().Find(TEXT("magmaw")) && FWRCreatureRegistry::Get().Find(TEXT("magmaw"))->PackMin == 1);
+
+	// Ground of its own for each kind, and from most of its sites a way across that ground to another of them. (Not from
+	// all: the lava river and the ridge cut the bands into pieces, and a kind can have a site on each. Burrowers stay home.)
+	for (const TPair<FName, TArray<FVector2D>>& KV : SitesOf)
+	{
+		int32 Connected = 0;
+		for (int32 i = 0; i < KV.Value.Num(); ++i)
+		{
+			bool bOut = false;
+			for (int32 j = 0; j < KV.Value.Num() && !bOut; ++j)
+			{
+				TArray<FVector2D> Way;
+				if (i != j && WRWildlife::FindPath(KV.Key, KV.Value[i], KV.Value[j], Way) && Way.Num() > 0)
+				{
+					bOut = true;
+					for (const FVector2D& Point : Way)
+					{
+						TestTrue(*FString::Printf(TEXT("%s's way is all ground it can stand on"), *KV.Key.ToString()), WRWildlife::CanStand(KV.Key, Point));
+					}
+				}
+			}
+			Connected += bOut;
+		}
+		TestTrue(*FString::Printf(TEXT("%s can walk between most of its sites (%d of %d)"), *KV.Key.ToString(), Connected, KV.Value.Num()), Connected * 2 >= KV.Value.Num());
+	}
+	TestFalse(TEXT("nobody stands in the deep sea"), WRWildlife::CanStand(TEXT("ashstrider"), FVector2D(-199000.0, -199000.0)));
+	TestFalse(TEXT("nor on the other side of the island"), WRWildlife::CanStand(TEXT("ashstrider"), FVector2D(130000.0, 0.0)));
+	TArray<FVector2D> Way;
+	TestFalse(TEXT("there's no way out to sea"), WRWildlife::FindPath(TEXT("ashstrider"), SitesOf.FindRef(TEXT("ashstrider"))[0], FVector2D(-199000.0, -199000.0), Way));
 	return true;
 }
 
