@@ -52,9 +52,9 @@ namespace
 		TSet<FString> Seen;
 		for (AActor* A : Pick)
 		{
-			bool bNew = false;
-			Seen.Add(CampName(A->GetActorLocation()), &bNew);
-			if (bNew) Out.Add(A);
+			bool bAlreadySeen = false;
+			Seen.Add(CampName(A->GetActorLocation()), &bAlreadySeen);
+			if (!bAlreadySeen) Out.Add(A);
 		}
 		return Out;
 	}

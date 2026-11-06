@@ -47,7 +47,10 @@ $bot = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off') +
 	(At 6 (@('wait 50', 'WRKey Escape', 'wait 1.5', 'WRClick World', 'wait 1.5') + $shot + @('WRClick + @ Taming', 'wait 2', 'WRClick On/Off @ Players can fight each other', 'wait 2', 'WRWheel -30 XP', 'wait 1', 'WRClick + @ Day length', 'wait 2') + $shot + @('WRClick Video', 'wait 3', 'WRClick Main menu'))) +
 	# (Esc: one press from a new world's name box back to the list, one more out to the menu. Each click after it only lands if it worked.)
 	(At 7 ($menu + @('WRClick New world', 'wait 2', 'WRKey Escape', 'wait 1', 'WRClick Rename', 'wait 1.5', 'WRKey Escape', 'wait 1', 'WRKey Escape', 'wait 1', 'WRClick Host a game', 'wait 2', 'WRClick Island', 'wait 1', 'WRClick Play'))) +
-	(At 8 @('wait 10', 'WRSay worlds-done'))
+	# On the real island, as the host: die, click a camp on the death screen's map, press Wake. (The arena's starts all have
+	# the one name, which hid a death screen with no places here. "dead:" commands only run while dead: not in other worlds.)
+	(At 8 @('wait 10', 'WRKillMe', 'wait 4')) + @('dead:WRClickMap Tundra camp 3', 'wait 9', 'dead:WRClick Wake at', 'wait 14') +
+	(At 8 @('wait 2', 'WRSay worlds-done'))
 
 try {
 	Remove-TestWorlds
@@ -97,6 +100,16 @@ try {
 	Check 'and the old save stays as the backup' ((Test-Path $seed) -and (Test-Path $marker))
 	$islandStretch = Stretch 'Island'
 	Check 'hosting Island loads the old character' (@($islandStretch | Where-Object { $_ -match "LOAD ${name}: main=frost" }).Count -ge 1) ($islandStretch | Select-Object -First 1)
+
+	# Dying on the real island as the host.
+	$wakes = @($islandStretch | Where-Object { $_ -like "BEDS $name can wake at:*" } | Select-Object -First 1)
+	$places = if ($wakes.Count) { @(($wakes[0] -replace '^.*can wake at:\s*', '') -split ', ' | Where-Object { $_ }) } else { @() }
+	Check 'dying on the island offers the camps of your side' ($places.Count -ge 3 -and @($places | Where-Object { $_ -notlike 'Tundra camp*' }).Count -eq 0) ($places -join ', ')
+	Check 'a click on one on the map picks it' (@($islandStretch | Where-Object { $_ -like "FLOW chose to wake at 'Tundra camp 3'*" }).Count -ge 1 -and @($islandStretch | Where-Object { $_ -match '^CLICKMAP "Tundra camp 3"' }).Count -ge 1)
+	$backLine = @($islandStretch | Where-Object { $_ -match '^FLOW back from the dead at V\(X=(-?[\d.]+), Y=(-?[\d.]+)' } | Select-Object -Last 1)
+	$backOk = $false
+	if ($backLine.Count -and $backLine[0] -match '^FLOW back from the dead at V\(X=(-?[\d.]+), Y=(-?[\d.]+)') { $backOk = [Math]::Abs([double]$Matches[1] - 111200) -lt 5000 -and [Math]::Abs([double]$Matches[2] - 129400) -lt 5000 }
+	Check 'and Wake brings you back there' $backOk (($backLine | Select-Object -First 1))
 
 	# The menu's own island.
 	Check "the menu's island is no world" ((@($lines | Where-Object { $_ -like 'WORLD none*' }).Count -ge 4) -and -not (Test-Path (Join-Path $worlds 'L_Island')))

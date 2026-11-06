@@ -11,6 +11,9 @@ $work = Join-Path $Build 'installer'
 $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $fx = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
 if (-not (Test-Path (Join-Path $game 'Wildreach.exe'))) { throw "No packaged game in $game - run Tools\package.ps1 first" }
+# Everything in the folder goes in the installer: a build that's been run has saves, logs and settings in Wildreach\Saved,
+# which would land on every player's PC. Make the installer before running the build, or run a copy of it.
+if (Test-Path (Join-Path $game 'Wildreach\Saved')) { throw "$game\Wildreach\Saved exists (this build has been run): package again, or remove it first" }
 if (-not $Version) {
 	$line = Get-Content (Join-Path $PSScriptRoot '..\Config\DefaultGame.ini') | Where-Object { $_ -match '^ProjectVersion=' } | Select-Object -First 1
 	if (-not $line) { throw 'No ProjectVersion in Config\DefaultGame.ini' }

@@ -1866,8 +1866,9 @@ void AWRPlayerController::ServerWake_Implementation(int32 Index)
 	AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
 	AWRGameMode* GM = GetWorld()->GetAuthGameMode<AWRGameMode>();
 	if (!PS || !GM || PS->WakeReadyAt < 0.0) return;
-	// A place other than the one already picked (resting or gone: stay on the death screen and pick again).
-	if (Index != PS->WakePick && !WRBeds::Choose(this, PS, Index)) return;
+	// A place other than the one already picked (resting or gone: stay on the death screen and pick again). With no places
+	// to choose from at all there's nothing to pick: they come back at their start, never stuck dead.
+	if (PS->WakeActors.Num() > 0 && Index != PS->WakePick && !WRBeds::Choose(this, PS, Index)) return;
 	if (!GM->Wake(this))
 	{
 		UE_LOG(LogWildreach, Log, TEXT("BEDS %s pressed Wake %.1f s early"), *PS->GetPlayerName(), PS->WakeReadyAt - GetWorld()->GetTimeSeconds());
