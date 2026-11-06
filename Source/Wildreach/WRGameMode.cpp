@@ -107,7 +107,6 @@ void AWRGameMode::BeginPlay()
 	Super::BeginPlay();
 	LoadWorld();
 	WRWildlife::Start(GetWorld());
-	// (The menu's own island is no world: its packs stay put, and it saves nothing.)
 	if (!WRWorlds::Current().IsEmpty())
 	{
 		const float Every = FMath::Max(0.1f, WRTune(TEXT("wildlife.stepSeconds"), 20.f));

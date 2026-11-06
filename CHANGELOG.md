@@ -1,6 +1,38 @@
 # Changelog
 
-## Unreleased: wildlife that roams (0.6)
+## 2026-11-06: version 0.6.0, a living island
+
+Everything from Raven's Oct 31 review ships together: the creature pass, beds and waking on the map, worlds, world
+settings and roaming wildlife (their sections follow). These are the release checks and what they turned up.
+
+- **Death on the real island offered nowhere to wake, and Wake did nothing.** Found by playing the packaged game on a copy
+  of Raven's save: the bot stayed dead for over 80 s. `WRBeds::CampsFor` misread `TSet::Add`'s second argument (it says
+  whether the name was already there), so it dropped every camp on the island. Fixed, and Wake now brings you back at
+  your start when there are no places at all, so nobody can be stuck dead. Every test had passed because the arena's
+  starts share one name and the island preview used made-up places; `Tools/worldstest.ps1` now dies on the real island.
+- **The menu's island has no roaming packs.** It's no world and saves nothing, so `WRWildlife::Start` leaves it alone. The
+  map's own always-out pack still falls behind the menu until a game starts (`RESCUE` lines in the log, none in play).
+  Older than 0.6 and nobody can see it, so it stays for now.
+- **An old engine warning, not new.** One `Ensure condition failed ... bPSOPrecacheCalled` from `ULandscapeComponent` in
+  the log on the frame you click Play, in the menu's world, which is thrown away the next frame. It costs about 0.25 s
+  there and shows nothing. 0.5.0 does the same after the same wait at the menu.
+- **The old save carries over** (run on a copy, the real one untouched): the first Host copied it into Island, listed as
+  Played 28 Oct, with Raven's level 12 character on the Fire path and all 9 pieces. Their real bed could be set, was
+  offered on the death map with three camps, and woke them 13 s after dying. Back at the list it read "Played today, 1
+  min played". A new world from the same list started a fresh character.
+- **Full suite on the final code:** 28 of 30, and the other two passed when run again alone. `mp` counted 98 movement
+  corrections where it allows 90, as the first test while other work was running on the machine, and 69 alone (about
+  what it has always been). `walk` now has no roaming packs: it checks the ground, and a Magmaw had caught the unarmed
+  walker 1 km out and sent it back to a camp. That's the game working, but it failed the test by chance.
+- **Installer:** `make_installer.ps1` now refuses a build that has been run, since it zips the whole folder and saves and
+  logs would ship. Run tests from a copy. `package.ps1 -SkipEditorBuild` cooks with the editor as built, because
+  UnrealBuildTool won't build the editor while another project's editor or `-game` run holds a Live Coding session.
+- **Benchmark, quiet machine:** Epic 8.38 / 8.35 ms (119-120 fps; 0.5.0 was 8.34), Medium 5.44 / 5.56 ms, one 141 ms hitch
+  in one Medium run. Server 2.37 ms as usual (29 animals in 8 packs; was 2.16), 8.35 ms with every pack out (432 in 156;
+  was 6.46 with 328). With packs brought out at 600 m as a stress test: 10.9 ms (92 fps), 188 animals, the worst hitch
+  1,073 ms at the start while they all load. No tuning changes.
+
+## 0.6.0: wildlife that roams
 
 From Raven's Oct 31 review: always a small pack standing still.
 
@@ -33,7 +65,7 @@ From Raven's Oct 31 review: always a small pack standing still.
   so through a server restart, and one inside a claim comes out at its edge. `Wildreach.World.WalkMap`. Moving them all
   costs about 2 ms each step. New commands: `WRPacks`, `WRHurtPack`, `WRFaceHerd`.
 
-## Unreleased: world settings (0.6)
+## 0.6.0: world settings
 
 From Raven's Oct 31 review: four presets existed, but only a command-line switch could pick one.
 
@@ -62,7 +94,7 @@ From Raven's Oct 31 review: four presets existed, but only a command-line switch
   Esc > World's steps, with a friend in the game who gets the new rules and a notice, and whose Esc menu has no World
   page (28 checks). New commands: `WRWheel` (the mouse wheel over a piece of text), `WRVitals`; `WRSpawn` logs what it made.
 
-## Unreleased: worlds (0.6)
+## 0.6.0: worlds
 
 From Raven's Oct 31 review: only one world save, and characters, clans and settings shared by everything.
 
@@ -90,7 +122,7 @@ From Raven's Oct 31 review: only one world save, and characters, clans and setti
   can change part-way through a burst of lines, so one look at the Skills tab (136 lines) came out as two jumbled ones and
   failed. `WRUIText` now starts each look with a `UIFRAME` line.
 
-## Unreleased: beds and respawn (0.6)
+## 0.6.0: beds and respawn
 
 From Raven's Oct 31 review: a bed should be where you wake, and still be there after a restart.
 
@@ -116,7 +148,7 @@ From Raven's Oct 31 review: a bed should be where you wake, and still be there a
   dead bot presses Wake as soon as it can. New `WRClickMap <name>` clicks a named place on whichever map is up.
 - The server gives Wake a second's grace: its world clock runs a little behind the death screen's countdown.
 
-## Unreleased: better-looking creatures (0.6, creatures first)
+## 0.6.0: better-looking creatures
 
 Raven asked for better, more realistic creature movement and looks, keeping the design doc's fantasy, and reviewed
 every creature from front and side pictures; this is the work so far (round 2 of their notes).
@@ -459,7 +491,7 @@ every creature from front and side pictures; this is the work so far (round 2 of
   `Tools\creatureportraits.ps1 [ids]`: one picture per creature, front over side, on the 1 m checker stage. Bosses get
   a wider frame and the hidden survivor parks outside their aggro radius (they had been fighting it mid-shot).
 
-## Unreleased (branch creature-runtime): creature feet on uneven ground, frame-exact creature videos
+## 0.6.0: creature feet on uneven ground, frame-exact creature videos
 
 - **Feet on slopes and bumps** for the generated creatures (`Tools/art/rig_quadruped.py` skeletons: `<leg>_upper /
   _lower / _foot`, 4 or 6 legs; pack creatures and the Mixamo bosses are left alone). Near a local view the game thread

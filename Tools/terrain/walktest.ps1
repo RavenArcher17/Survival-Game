@@ -1,6 +1,7 @@
 # Walk test on L_Island: real character movement from spawns to the passes, and into the ridge wall.
 # WalkA (north spawn) and WalkB (middle spawn) must reach their pass; WalkC walks east into the ridge
 # wall, which must stop it. Ends early once every walker has arrived or got stuck.
+# No roaming packs: this tests the ground, and a hunter that happens to catch a walker sends it back to a camp.
 param([int]$Seconds = 420)
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\..\Wildreach.uproject')).Path
@@ -14,7 +15,7 @@ $walkers = @(
 	@{ Name = 'WalkC_RidgeWall'; Cmds = 'WRBotPause 1|WRTeleport -60000 0|wait 3|WRWalkTo 60000 0' }
 )
 $procs = @()
-$procs += Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7800 -wrworld=walktest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$procs += Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7800 -wrworld=walktest -wrtune=wildlife.enabled:0 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 foreach ($w in $walkers) {
 	$procs += Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7800?Path=fire?WRName=$($w.Name) -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($w.Cmds)`" -abslog=`"$out\$($w.Name).log`"" -PassThru -WindowStyle Hidden

@@ -3,7 +3,9 @@
 # A packaged dedicated server needs the source engine (Tools\build_engine.ps1); see the README.
 #   package.ps1                    -> C:\Dev\WildreachBuild\Windows (Development: dev console stays on for playtests)
 #   package.ps1 -Config Shipping
-param([ValidateSet('Development', 'Shipping')] [string]$Config = 'Development', [string]$Out = 'C:\Dev\WildreachBuild')
+#   package.ps1 -SkipEditorBuild   the editor is already built: cook with it as it is. (Another project's editor or -game run
+#                                  on this engine has a Live Coding session, and UnrealBuildTool won't build the editor then.)
+param([ValidateSet('Development', 'Shipping')] [string]$Config = 'Development', [string]$Out = 'C:\Dev\WildreachBuild', [switch]$SkipEditorBuild)
 $uat = 'C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\RunUAT.bat'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -12,7 +14,8 @@ New-Item -ItemType Directory -Force $Out | Out-Null
 Remove-Item Env:NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue
 
 "[$(Get-Date -Format 'HH:mm:ss')] BuildCookRun ($Config) -> $Out" | Tee-Object -FilePath $log
-& $uat BuildCookRun "-project=$project" -noP4 -platform=Win64 "-clientconfig=$Config" -build -cook "-map=/Game/Maps/L_Island" `
+$extra = @(if ($SkipEditorBuild) { '-nocompileeditor' })
+& $uat BuildCookRun "-project=$project" -noP4 -platform=Win64 "-clientconfig=$Config" -build -cook "-map=/Game/Maps/L_Island" @extra `
 	-stage -pak -archive "-archivedirectory=$Out" -utf8output -unattended 2>&1 | Tee-Object -FilePath $log -Append | Select-String -Pattern 'BUILD SUCCESSFUL|BUILD FAILED|ERROR|Error:' | Select-Object -Last 20
 if ($LASTEXITCODE -ne 0) { "[$(Get-Date -Format 'HH:mm:ss')] FAILED (exit $LASTEXITCODE), see $log"; exit 1 }
 

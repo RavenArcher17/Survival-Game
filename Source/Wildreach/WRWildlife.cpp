@@ -710,7 +710,9 @@ int32 WRWildlife::Start(UWorld* World)
 {
 	using namespace WRWildlifeImpl;
 	G = FState();
-	if (!World || World->GetNetMode() == NM_Client || WRTune(TEXT("wildlife.enabled"), 1.f) <= 0.f)
+	// (Not behind the main menu: that island is no world, and nothing streams in around the idle body it holds, so a pack
+	// that came out near it would fall through the ground and be fished out over and over.)
+	if (!World || World->GetNetMode() == NM_Client || WRTune(TEXT("wildlife.enabled"), 1.f) <= 0.f || WRWorlds::Current().IsEmpty())
 	{
 		return 0;
 	}
