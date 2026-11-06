@@ -3,7 +3,10 @@
 ## 2026-11-06: version 0.6.0, a living island
 
 Everything from Raven's Oct 31 review ships together: the creature pass, beds and waking on the map, worlds, world
-settings and roaming wildlife (their sections follow). These are the release checks and what they turned up.
+settings and roaming wildlife (their sections follow). **Released 2026-11-06 as
+[v0.6.0](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.6.0)** (Latest, `Wildreach-Setup.exe` 1.7 GB, notes
+`Docs/release-notes/v0.6.0.md`): installed copies update themselves on their next start. These are the release checks and
+what they turned up.
 
 - **Death on the real island offered nowhere to wake, and Wake did nothing.** Found by playing the packaged game on a copy
   of Raven's save: the bot stayed dead for over 80 s. `WRBeds::CampsFor` misread `TSet::Add`'s second argument (it says
