@@ -24,6 +24,12 @@ settings and roaming wildlife (their sections follow). These are the release che
   corrections where it allows 90, as the first test while other work was running on the machine, and 69 alone (about
   what it has always been). `walk` now has no roaming packs: it checks the ground, and a Magmaw had caught the unarmed
   walker 1 km out and sent it back to a camp. That's the game working, but it failed the test by chance.
+- **Real Windows mouse and keyboard** on the packaged build with no test flags, on a copy of the save. All of these worked,
+  with nothing wrong in the log: hover and clicks on the menus and world list; the New world form (typing, preset tiles, a
+  toggle, `+`, a dragged slider); walking, the camera, an attack, the ability wheel and the hotbar keys; items dragged in
+  the bag and onto the hotbar; the journal's tabs; Esc > World with a dragged slider and Back to the preset; the build bar;
+  the console; setting a bed with E; waking at a camp clicked on the map and at the bed clicked on the list; Main menu; a
+  new world; Quit. Block on the right button was pressed but not confirmed, as no picture or log line shows it.
 - **Installer:** `make_installer.ps1` now refuses a build that has been run, since it zips the whole folder and saves and
   logs would ship. Run tests from a copy. `package.ps1 -SkipEditorBuild` cooks with the editor as built, because
   UnrealBuildTool won't build the editor while another project's editor or `-game` run holds a Live Coding session.
