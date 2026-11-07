@@ -1,8 +1,53 @@
 # Changelog
 
+## After 0.6.1: wildlife spawns by region (not released)
+
+Raven asked for spawning that works like ARK's ("define regions, give each a weighted creature list plus a population
+target, and run a periodic check that refills missing slots away from players and structures"), and small packs: "small
+packs like 3-4 feel normal for pack animals".
+
+- **Regions** (`Data/spawn_regions.json`, new): the island's two sides, each in its three bands (lowland, midland, highland),
+  so six. Each has a population target and its creatures, each with a weight (the chance a new pack is of that kind). The
+  weights are the old site counts, so the mix is as before; the targets are those sites times the new pack sizes: volcanic
+  133 / 57 / 7 and tundra 74 / 66 / 7 (low / mid / high), 344 animals in about the same 156 packs. A region can also be cut
+  down to a box (`area`), for a valley of its own later. `server.creatureNumbers` still scales every target.
+- **A new world fills every region** to its target, each pack's kind rolled by weight, somewhere that kind can live (its
+  ground on the walk map, clear of the camps).
+- **The periodic check** replaces breeding and wandering in: every `wildlife.spawnCheckSeconds` (60) a region short of its
+  target gets up to `wildlife.spawnPacksPerCheck` (2) new packs, never within `wildlife.spawnAwayFromPlayers` (300 m) of a
+  player, `wildlife.spawnAwayFromBuildings` (100 m) of anything built, or in a land claim. Each one is logged
+  (`WILDLIFE spawned ashstrider x3 in volcanic_lowland at ...; 412 m from a player, nothing built`), and the step log has
+  each region's count against its target. A region over target (creature numbers turned down) still thins out of sight.
+- **A pack belongs to its region** wherever it roams (saved as `region` in `wildlife.json`), so a herd that's wiped out is
+  made up for by a new pack somewhere else in that region, not by the survivors breeding back. A pack that's down to none
+  is gone, burrowers too.
+- **Small packs** (`creatures.json` `pack`): Cinderfang, Gloomhowl, Ashstrider, Emberhorn and Frostantler 3-4 (they were up
+  to 6, 7, 12, 8 and 8); Basaltback, Woolly Drudge, Glowmoth, Pumicehog and Snowpuff 1-3; Kilnmite and Rimeshell 2-3;
+  Magmaw, Rimeclaw, Scorchwing and Aurora Fox 1-2; Glacimaw alone. Nothing wild comes in more than 4.
+- **Old worlds:** a pack saved bigger than its kind allows now is cut down to the most it can be, and a pack with no region
+  joins the one for its kind where it stands. The regions then make up any shortfall with new small packs.
+- `wildlife.refillPerHour` and `wildlife.arriveDistance` are gone. `Data/island_spawns.json` stays as reference ground (the
+  walk map and the tests stand on its sites).
+- **Tests:** `Wildreach.World.SpawnRegions` (every region on its side and band, every wild kind in one, targets);
+  `Wildreach.World.WalkMap` now wants packs of 4 or fewer. `Tools/roamtest.ps1` checks a new world against each region's
+  target, pack sizes, kinds by region, an emptied region refilling (a player and a building in it), at most 2 packs a
+  check, and the distances. `Tools/wildlifetest.ps1` seeds its two herds in a saved world; `Tools/rulestest.ps1` compares the
+  share and the animals (the pack count is now only about in proportion).
+- **Results:** unit 28/28, roam 25/25, wildlife 11/11, rules 8/8, water 13/13, gather 19/19, survival 25/25, ai 11/11,
+  tame 10/10. A new world: 148 to 157 packs, 347 to 353 animals for a target of 344; packs x1 42-52, x2 35-41, x3 49-51,
+  x4 16-21. Volcanic lowland emptied with a player in it refilled 0 to 133 in 33 checks, at most 2 packs a check, the
+  nearest new pack 309 m from the player and 605 m from a building (600 m asked for the test). A copy of Raven's 0.6.0
+  world (154 packs, 467 animals, 31 packs over 4) loaded as 368 animals, every pack in a region, no errors.
+
 ## 0.6.1: much smaller updates
 
 Raven asked why an update is another 1.7 GB when the game updates itself. It was downloading the whole Setup every time.
+**Released 2026-11-07 as [v0.6.1](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.6.1)** (Latest, the
+same 1.7 GB `Wildreach-Setup.exe` for everyone this once, notes `Docs/release-notes/v0.6.1.md`; GitHub's digest matches the
+build). Then the real thing, off GitHub: a copy of 0.6.0 with the new updater fetched **234 MB** (11 of 666 files changed)
+and came out matching a clean 0.6.1 install file for file. It took 22 minutes: GitHub served this machine about 140 KB/s a
+connection (another site, 2.2 MB/s), and four connections at once each got the same, so fetching in parallel would be about
+four times quicker.
 
 - **What actually changes between builds** (0.6.0 against 0.6.1, compared block by block): the content file, 1,383 MB, came
   out byte for byte the same. Nearly all of a code update is `Wildreach.exe` and `Wildreach.pdb`: one change shifts addresses

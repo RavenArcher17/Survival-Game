@@ -401,7 +401,7 @@ enum class EWRPackDoing : uint8 { Grazing, Travelling, Hunting, Resting };
 /**
  * Keeps a number of creatures alive around itself; nesting species get an egg nest. A map-placed one holds its place and
  * replaces its dead. On the island most are roaming packs (bRoams, WRWildlife): this actor is then the pack's record,
- * wherever it has got to, and a death is a death: Count is how many are left.
+ * wherever it has got to, and Count is how many are left (a pack doesn't grow back: its region spawns new packs instead).
  */
 UCLASS()
 class WILDREACH_API AWRCreatureSpawner : public AActor
@@ -413,6 +413,8 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	bool bRoams = false;
+	/** The spawn region it belongs to (Data/spawn_regions.json): it counts toward that region's population wherever it roams. */
+	FName Region;
 	EWRPackDoing Doing = EWRPackDoing::Grazing;
 	/** The middle of where a predator prowls. */
 	FVector2D Territory = FVector2D::ZeroVector;

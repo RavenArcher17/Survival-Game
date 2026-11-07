@@ -68,8 +68,10 @@ function Near([double]$a, [double]$b, [double]$slack = 0.1) { $b -ne 0 -and [Mat
 $p = $script:runs['plain']; $c = $script:runs['changed']; $m = $script:runs['more']
 Check 'a third of the day length makes the clock three times as fast' (Near $c.ClockPerS (3 * $p.ClockPerS)) ("{0:N5} vs {1:N5} h/s" -f $c.ClockPerS, $p.ClockPerS)
 Check 'twice the hunger and thirst drop twice as fast' ((Near $c.HungerPerS (2 * $p.HungerPerS)) -and (Near $c.ThirstPerS (2 * $p.ThirstPerS))) ("hunger {0:N4} vs {1:N4} /s" -f $c.HungerPerS, $p.HungerPerS)
-Check 'half the creature numbers: half the packs and half the share of animals' ((Near $c.Packs ($p.Packs / 2) 0.02) -and (Near $c.Share ($p.Share / 2) 0.02)) "$($c.Packs) packs of $($p.Packs), share $($c.Share) of $($p.Share)"
-Check 'twice the creature numbers: twice the packs and twice the share' ((Near $m.Packs (2 * $p.Packs) 0.02) -and (Near $m.Share (2 * $p.Share) 0.02)) "$($m.Packs) packs, share $($m.Share), from $($p.Packs), $($p.Share)"
+# (A new world fills each region's target with packs rolled one at a time: the animals come out at the target, the number
+# of packs about in proportion.)
+Check 'half the creature numbers: half the share of animals, and about half the packs' ((Near $c.Share ($p.Share / 2) 0.02) -and (Near $c.Animals $c.Share 0.1) -and (Near $c.Packs ($p.Packs / 2) 0.2)) "$($c.Animals) animals in $($c.Packs) packs, share $($c.Share); from $($p.Animals) in $($p.Packs), $($p.Share)"
+Check 'twice the creature numbers: twice the share, and about twice the packs' ((Near $m.Share (2 * $p.Share) 0.02) -and (Near $m.Animals $m.Share 0.1) -and (Near $m.Packs (2 * $p.Packs) 0.2)) "$($m.Animals) animals in $($m.Packs) packs, share $($m.Share); from $($p.Animals) in $($p.Packs), $($p.Share)"
 Check 'twice the difficulty: a creature has twice the health and damage' ((Near $c.CreatureHp (2 * $p.CreatureHp) 0.01) -and (Near $c.CreatureDamage (2 * $p.CreatureDamage) 0.01)) "$($c.CreatureHp) hp, $($c.CreatureDamage) damage, from $($p.CreatureHp), $($p.CreatureDamage)"
 Check 'and a boss has twice the health' (Near $c.BossHp (2 * $p.BossHp) 0.01) "$($c.BossHp) from $($p.BossHp)"
 Check 'the player is told the world''s settings' ($c.Client -match 'custom \(' -and $c.Client -match 'server\.dayMinutes=20' -and $c.Client -match 'server\.creatureDifficulty=2')

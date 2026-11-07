@@ -13,7 +13,7 @@ $root = Split-Path $PSScriptRoot
 $run = Join-Path $env:TEMP ("wildreach-alltests-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $run | Out-Null
 $tests = @(
-	@{ name = 'unit'; script = 'test.ps1'; what = 'automation tests: rules, combat scenarios, ranged, taming, creatures, clock, wildlife sites, versions' },
+	@{ name = 'unit'; script = 'test.ps1'; what = 'automation tests: rules, combat scenarios, ranged, taming, creatures, clock, wildlife regions, versions' },
 	@{ name = 'mp'; script = 'mptest.ps1'; what = 'server + bots, PvE' },
 	@{ name = 'persist'; script = 'persisttest.ps1'; what = 'save, restart, load' },
 	@{ name = 'craft'; script = 'crafttest.ps1'; what = 'stations, Hearth tiers, sockets, every ranged weapon and ammo, bow wear and repair' },
@@ -35,7 +35,7 @@ $tests = @(
 	@{ name = 'ai'; script = 'aitest.ps1'; what = 'hunting, sleeping, fleeing, special attacks' },
 	@{ name = 'combat'; script = 'combattest.ps1'; what = 'attacking out of a held block, creature attack wind-ups, the starter spell on wheel 1' },
 	@{ name = 'wildlife'; script = 'wildlifetest.ps1'; what = 'island wildlife: packs come out near players, go quiet, come back' },
-	@{ name = 'roam'; script = 'roamtest.ps1'; what = 'wildlife roams: travels, rests, hunts out of sight, numbers come back; wounds and numbers kept through a restart' },
+	@{ name = 'roam'; script = 'roamtest.ps1'; what = 'wildlife regions fill a new world with small packs; packs roam, rest, hunt out of sight; an emptied region refills away from players and buildings; wounds and numbers kept through a restart' },
 	@{ name = 'version'; script = 'versiontest.ps1'; what = 'another version can''t join and is told why; the menu offers a newer release' },
 	@{ name = 'updater'; script = 'updatertest.ps1'; what = 'auto-update end to end with fake releases (no Unreal): only what changed, every fallback, interrupted, a file in use, the updater from 0.6.0' },
 	@{ name = 'walk'; script = 'terrain\walktest.ps1'; what = 'island traversal' },

@@ -247,6 +247,57 @@ bool FWRWildlifeSitesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRSpawnRegionsTest, "Wildreach.World.SpawnRegions",
+	EAutomationTestFlags::ProductFilter | EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ServerContext)
+
+bool FWRSpawnRegionsTest::RunTest(const FString& Parameters)
+{
+	const TSharedPtr<FJsonObject> Root = FWRTuning::LoadDataFile(TEXT("spawn_regions.json"));
+	const TArray<TSharedPtr<FJsonValue>>* Regions = nullptr;
+	if (!TestTrue(TEXT("spawn_regions.json loads, with its regions"), Root.IsValid() && Root->TryGetArrayField(TEXT("regions"), Regions) && Regions->Num() > 0))
+	{
+		return false;
+	}
+	TSet<FName> Placed;
+	double Total = 0.0;
+	for (const TSharedPtr<FJsonValue>& V : *Regions)
+	{
+		const TSharedPtr<FJsonObject> R = V->AsObject();
+		const FString Id = R->GetStringField(TEXT("id")), Side = R->GetStringField(TEXT("side")), Band = R->GetStringField(TEXT("band"));
+		TestTrue(*FString::Printf(TEXT("%s is on a side of the island and in a band"), *Id), (Side == TEXT("volcanic") || Side == TEXT("tundra"))
+			&& (Band == TEXT("lowland") || Band == TEXT("midland") || Band == TEXT("highland")));
+		TestTrue(*FString::Printf(TEXT("%s has a population target"), *Id), R->GetNumberField(TEXT("target")) >= 1.0);
+		Total += R->GetNumberField(TEXT("target"));
+		const TSharedPtr<FJsonObject>* Kinds = nullptr;
+		if (!TestTrue(*FString::Printf(TEXT("%s has its creatures"), *Id), R->TryGetObjectField(TEXT("creatures"), Kinds) && (*Kinds)->Values.Num() > 0))
+		{
+			continue;
+		}
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Kinds)->Values)
+		{
+			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(FName(*KV.Key));
+			if (!TestNotNull(*FString::Printf(TEXT("%s in %s is a creature"), *KV.Key, *Id), Def))
+			{
+				continue;
+			}
+			TestTrue(*FString::Printf(TEXT("%s has a weight in %s"), *KV.Key, *Id), KV.Value->AsNumber() > 0.0);
+			// It only starts on ground it can stand on: its side and band have to be the region's.
+			TestTrue(*FString::Printf(TEXT("%s lives where %s is (%s %s)"), *KV.Key, *Id, *Def->Biome.ToString(), *Def->Tier.ToString()), Def->Biome.ToString() == Side && Def->Tier.ToString() == Band);
+			Placed.Add(Def->Id);
+		}
+	}
+	// Every wild species has a region (not bosses, their minions or the dummy).
+	for (const FWRCreatureDef& Def : FWRCreatureRegistry::Get().All())
+	{
+		const bool bWild = Def.Archetype != TEXT("boss") && Def.Role != TEXT("minion") && !Def.Biome.IsNone() && Def.Tier != TEXT("boss");
+		if (bWild) TestTrue(*FString::Printf(TEXT("%s has a region to live in"), *Def.Id.ToString()), Placed.Contains(Def.Id));
+	}
+	TestTrue(*FString::Printf(TEXT("the island is busy (%.0f animals)"), Total), Total >= 200.0);
+	TestTrue(TEXT("new packs start out of a player's sight"), FWRTuning::Get().Num(TEXT("wildlife.spawnAwayFromPlayers"), 0.f) > FWRTuning::Get().Num(TEXT("wildlife.activationRadius"), 0.f)
+		&& FWRTuning::Get().Num(TEXT("wildlife.spawnAwayFromBuildings"), 0.f) > 0.f && FWRTuning::Get().Num(TEXT("wildlife.spawnCheckSeconds"), 0.f) > 0.f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRWalkMapTest, "Wildreach.World.WalkMap",
 	EAutomationTestFlags::ProductFilter | EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ServerContext)
 
@@ -270,7 +321,16 @@ bool FWRWalkMapTest::RunTest(const FString& Parameters)
 		TestTrue(*FString::Printf(TEXT("%s has a pack size (%d to %d)"), *Id.ToString(), Def->PackMin, Def->PackMax), Def->PackMin >= 1 && Def->PackMax >= Def->PackMin);
 		SitesOf.FindOrAdd(Id).Add(FVector2D(S->GetNumberField(TEXT("x")), S->GetNumberField(TEXT("y"))));
 	}
-	TestTrue(TEXT("herds can be big"), FWRCreatureRegistry::Get().Find(TEXT("ashstrider")) && FWRCreatureRegistry::Get().Find(TEXT("ashstrider"))->PackMax >= 6);
+	// Packs are small: 3 or 4 for the pack animals (Raven: big herds didn't feel right), lone hunters alone or in pairs.
+	for (const TCHAR* Pack : { TEXT("ashstrider"), TEXT("emberhorn"), TEXT("frostantler"), TEXT("cinderfang"), TEXT("gloomhowl") })
+	{
+		const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Pack);
+		TestTrue(*FString::Printf(TEXT("%s goes about in threes and fours"), Pack), Def && Def->PackMin == 3 && Def->PackMax == 4);
+	}
+	for (const FWRCreatureDef& Def : FWRCreatureRegistry::Get().All())
+	{
+		if (Def.Archetype != TEXT("boss")) TestTrue(*FString::Printf(TEXT("no pack of %s is over 4"), *Def.Id.ToString()), Def.PackMax <= 4);
+	}
 	TestTrue(TEXT("hunters can be alone"), FWRCreatureRegistry::Get().Find(TEXT("magmaw")) && FWRCreatureRegistry::Get().Find(TEXT("magmaw"))->PackMin == 1);
 
 	// Ground of its own for each kind, and from most of its sites a way across that ground to another of them. (Not from

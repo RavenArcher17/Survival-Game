@@ -1,6 +1,7 @@
-# Island wildlife on L_Island: the server starts a pack at every site in Data/island_spawns.json, a pack comes out when a
-# player arrives (on the ground, all of it, none dying on the way in), goes quiet once nobody's near and comes back on a
-# return. (roamtest.ps1 has them roaming: in the couple of minutes this takes they don't get far from their sites.)
+# Island wildlife on L_Island: a pack comes out when a player arrives (on the ground, all of it, none dying on the way
+# in), goes quiet once nobody's near and comes back on a return. The world is seeded with two herds (its wildlife.json),
+# so the regions (Data/spawn_regions.json) are short and fill up meanwhile, out of the player's sight. (roamtest.ps1 has
+# them roaming and the new world filled: in the couple of minutes this takes a herd doesn't get far.)
 # The bot visits an Emberhorn herd on the volcanic side, a Frostantler herd on the tundra side (the Emberhorns go
 # quiet meanwhile: wildlife.despawnSeconds is shortened to 10 for the test), then the Emberhorns again.
 #   wildlifetest.ps1          headless
@@ -14,11 +15,17 @@ $root = Split-Path $project
 $out = Join-Path $env:TEMP ("wildreach-wildlife-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Force $out | Out-Null
 $name = 'Ranger'
-Remove-Item -Recurse -Force (Join-Path $root 'Saved\Worlds\wildlife') -ErrorAction SilentlyContinue
+$db = Join-Path $root 'Saved\Worlds\wildlife'
+Remove-Item -Recurse -Force $db -ErrorAction SilentlyContinue
 
+# Two herds, at old spawn sites (open ground of their kind).
 $data = Get-Content -Raw (Join-Path $root 'Data\island_spawns.json') | ConvertFrom-Json
 $fire = $data.sites | Where-Object { $_.creature -eq 'emberhorn' } | Select-Object -First 1
 $frost = $data.sites | Where-Object { $_.creature -eq 'frostantler' } | Select-Object -First 1
+function Herd($site, $region) { [pscustomobject]@{ id = $site.creature; region = $region; x = [int]$site.x; y = [int]$site.y; z = [int]$site.z + 100; n = 4; r = 650; hp = 1; doing = 'grazing'; tx = [int]$site.x; ty = [int]$site.y; wander = $false; next = 1e9; fed = 0 } }
+New-Item -ItemType Directory -Force $db | Out-Null
+[IO.File]::WriteAllText((Join-Path $db 'world.json'), '{"version":1,"pieces":[],"tames":[],"clockHours":10}')
+[IO.File]::WriteAllText((Join-Path $db 'wildlife.json'), (@{ clock = 0; packs = @((Herd $fire 'volcanic_midland'), (Herd $frost 'tundra_midland')) } | ConvertTo-Json -Depth 4 -Compress))
 # Stand 20 m south of a site, looking north at it.
 function Visit($site) { "WRTeleport $([int]$site.x) $([int]$site.y + 2000)|wait 8|WRLook 270 -10|WRWildlife|wait 1" }
 function Shot { if ($Shots) { 'wait 2|HighResShot 1600x900|wait 1' } else { $null } }
@@ -56,7 +63,9 @@ function Active([string]$report) { if ($report -match 'active (\d+), out (\d+)')
 $at = { param($site) '{0:N0} {1:N0}' -f $site.x, $site.y }
 $fireOut = @($server | Where-Object { $_ -match '^WILDLIFE emberhorn out at V\(X=(-?[\d.]+), Y=(-?[\d.]+)' -and [Math]::Abs([double]$Matches[1] - $fire.x) -lt 30000 -and [Math]::Abs([double]$Matches[2] - $fire.y) -lt 30000 })
 
-Check "the server starts a pack at every site ($($data.sites.Count))" (@($server | Where-Object { $_ -match "^WILDLIFE $($data.sites.Count) packs, \d+ animals, new" }).Count -eq 1)
+Check 'the server starts with the world''s two herds' (@($server | Where-Object { $_ -match '^WILDLIFE 2 packs, 8 animals, as the world left them' }).Count -eq 1)
+$born = @($server | Where-Object { $_ -match '^WILDLIFE spawned \w+ x\d+ in \w+ at .*; (\d+) m from a player' } | ForEach-Object { if ($_ -match '; (\d+) m from a player') { [int]$Matches[1] } })
+Check 'and the regions fill up with new packs, none near the player' ($born.Count -ge 6 -and @($born | Where-Object { $_ -lt 300 }).Count -eq 0) ("{0} new packs, the nearest {1} m from the player" -f $born.Count, (($born | Measure-Object -Minimum).Minimum))
 Check 'five wildlife reports' ($reports.Count -ge 5) ("{0}" -f $reports.Count)
 if ($reports.Count -ge 5) {
 	Check 'nothing out far from the player at the start (only sites near the camp)' ((Active $reports[0]) -ge 0 -and (Active $reports[0]) -le 6) $reports[0]

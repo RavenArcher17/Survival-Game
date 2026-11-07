@@ -15,13 +15,18 @@ enum class EWRPackDoing : uint8;
  *   (off screen a hunt is settled by odds) and rest when they've eaten; a few (creatures.json wanderChance) travel far;
  *   burrowers stay home.
  * A player coming within wildlife.activationRadius brings the pack out where it has got to, doing what it was doing; when
- * everyone has gone it's a record again, with its numbers and wounds. Numbers come back slowly, by breeding and by new
- * packs wandering in, towards each kind's share of the island (its sites x its usual pack x the world's creature numbers).
+ * everyone has gone it's a record again, with its numbers and wounds.
+ * Where they come from (Data/spawn_regions.json): the island is cut into regions, each with a weighted list of creatures
+ * and a population target (times the world's creature numbers). A new world fills every region; after that, every
+ * wildlife.spawnCheckSeconds a region short of its target gets a few new packs (wildlife.spawnPacksPerCheck), each kind
+ * rolled by weight, somewhere it can live that's wildlife.spawnAwayFromPlayers from every player and
+ * wildlife.spawnAwayFromBuildings from anything built, outside the land claims. A pack keeps counting for its region
+ * wherever it roams; a pack that's wiped out is gone.
  * Saved in the world's folder (wildlife.json). Tames aren't part of any of this.
  */
 namespace WRWildlife
 {
-	/** Server, at the start of a game: the world's packs from its wildlife.json, or new ones at the sites in Data/island_spawns.json. */
+	/** Server, at the start of a game: the world's packs from its wildlife.json, or every region filled for a new world. */
 	WILDREACH_API int32 Start(UWorld* World);
 	/** Server: moves every pack on by this many seconds (times wildlife.timeScale, for tests). */
 	WILDREACH_API void Step(UWorld* World, float Seconds);
