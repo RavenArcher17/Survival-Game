@@ -68,11 +68,17 @@ public:
 	AWRBuildPiece* GetMenuPiece() const { return MenuPiece.Get(); }
 	class AWRCreature* GetMenuCreature() const { return MenuCreature.Get(); }
 	/** Building: snap pieces to each other (F). */
-	bool IsSnapOn() const { return bSnap; }
+	bool IsSnapOn() const { return SnapMode != 0; }
+	/** 0 off (placed freely, any angle), 1 the grid, 2 the fine grid: F goes round them. */
+	int32 GetSnapMode() const { return SnapMode; }
+	/** Building: how far the rotate key turns the piece right now; 0 = it's free, facing the way you look. */
+	float GetPlaceStep() const { return PlaceStep; }
 	/** F10: leave the game and go back to the main menu. */
 	void ReturnToMenu();
 
 	AWRCharacterBase* GetLockTarget() const { return LockTarget.Get(); }
+	/** Server: what this player has locked on to (spells lead and curve toward it). */
+	AWRCharacterBase* GetServerLock() const { return ServerLock.Get(); }
 
 	/** Nearest altar in interact range (client-side, for the HUD prompt). */
 	class AWRBossAltar* FindNearbyAltar() const;
@@ -134,7 +140,11 @@ public:
 	bool IsPlacementValid() const { return bPlaceValid; }
 	const FString& GetPlacementWhy() const { return PlaceWhy; }
 	void ConfirmPlacement();
+	/** The rotate key went down: one step on a grid; free, a small turn, and held it keeps turning. */
 	void RotatePlacement();
+	void RotatePlacementEnd();
+	/** The mouse wheel while placing: a step on a grid, free a fine turn. */
+	void WheelPlacement(int32 Dir);
 	void CancelPlacement();
 	/** Demolish mode (the build bar's button, the Demolish key): on, bringing the build bar up, or back off to the bar. */
 	void ToggleDemolish();
@@ -154,6 +164,14 @@ public:
 	/** Bots: the build ghost as a player gets it (B menu pick): WRGhost <piece>, aim with WRLook, then WRGhostPlace logs where it snapped and places it. */
 	UFUNCTION(Exec) void WRGhost(FName Piece);
 	UFUNCTION(Exec) void WRGhostPlace();
+	/** Testing: where the build ghost is now and how it looks, without placing it. */
+	UFUNCTION(Exec) void WRGhostInfo();
+	/** Testing: press the rotate key (WRGhostTurn), or wheel Dir notches (WRGhostTurn 1 / -1). */
+	UFUNCTION(Exec) void WRGhostTurn(int32 WheelDir = 0);
+	/** Testing: WRSnap off | grid | fine. */
+	UFUNCTION(Exec) void WRSnap(FName Mode);
+	/** Testing: press the lock-on key. */
+	UFUNCTION(Exec) void WRLockOn();
 	/** N sword hits on the nearest building piece (testing raids/collapse). */
 	UFUNCTION(Exec) void WRHitPiece(int32 Hits);
 
@@ -304,10 +322,10 @@ private:
 	void OpenJournal(EWRMenu Tab);
 	/** Esc: close what's open (a wheel, a menu, the build ghost); with nothing open, the game menu (settings). */
 	void EscapePressed();
-	void ToggleSnap() { bSnap = !bSnap; }
+	void ToggleSnap() { SnapMode = SnapMode == 1 ? 2 : SnapMode == 2 ? 0 : 1; }
 	TSharedPtr<class FWRPlayerUI> UI;
 	FDelegateHandle KeysChangedHandle;
-	bool bSnap = true;
+	int32 SnapMode = 1;
 
 	EWRMenu Menu = EWRMenu::None;
 	bool bShowMap = false;
@@ -327,21 +345,43 @@ private:
 	FName PlacingPiece;
 	TWeakObjectPtr<AWRBuildPiece> Ghost;
 	float PlaceYaw = 0.f;
+	/** How far you've turned the piece from the way you're looking: it follows you, this on top. */
+	float PlaceTurn = 0.f;
+	/** Degrees a turn is right now (a grid's square steps); 0 = free. Worked out by UpdatePlacement. */
+	float PlaceStep = 0.f;
+	bool bPlaceSpin = false;
+	double PlaceSpinAt = 0.0;
 	FVector PlaceLoc = FVector::ZeroVector;
 	bool bPlaceValid = false;
 	FString PlaceWhy;
+	/** The little marks on a foundation showing where a piece will snap (this machine only). */
+	void ShowSnapDots(const AWRBuildPiece* On, float Step);
+	TWeakObjectPtr<AActor> SnapDots;
+	TWeakObjectPtr<const AActor> SnapDotsOn;
+	float SnapDotsStep = 0.f;
 
 	void ToggleLockOn();
 	void UpdateLockOn(float DeltaTime);
 	AWRCharacterBase* FindTarget(float MaxDistance, float MaxAngleDegrees) const;
+	/** What the lock-on key locks on to: visible, in the open, nearest the crosshair. */
+	AWRCharacterBase* FindLockTarget() const;
+	/** Is there a clear line to it, from the camera or the survivor (walls, rock and the ground block it)? */
+	bool CanSeeTarget(const AWRCharacterBase* Target) const;
+	/** Change the lock-on target, telling the server (spells aim with it). */
+	void SetLockTarget(AWRCharacterBase* Target);
+	UFUNCTION(Server, Reliable) void ServerSetLock(AWRCharacterBase* Target);
 
 	void TickBot(float DeltaTime);
 	void UpdateArtCam(float DeltaTime);
 	void BotPress(int32 Input, float HoldSeconds);
 
 	TWeakObjectPtr<AWRCharacterBase> LockTarget;
+	/** The server's copy of it. */
+	TWeakObjectPtr<AWRCharacterBase> ServerLock;
 	/** Seconds since the lock-on target last changed (the camera eases into the turn). */
 	float LockAge = 0.f;
+	/** Seconds the lock-on target has been out of sight: too long and the lock lets go. */
+	float LockUnseen = 0.f;
 	FString Notice;
 	double NoticeTime = -100.0;
 

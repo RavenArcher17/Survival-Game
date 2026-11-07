@@ -782,6 +782,13 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 
 void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)
 {
+	if (Input == EWRAbilityInput::Heavy)
+	{
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())
+		{
+			PC->RotatePlacementEnd();
+		}
+	}
 	if (Input == EWRAbilityInput::Block && bAiming)
 	{
 		SetAiming(false);
@@ -869,7 +876,12 @@ void AWRCharacter::MapKeys()
 
 void AWRCharacter::WheelStep(int32 Dir)
 {
-	// The mouse wheel: ammo while aiming a ranged weapon, otherwise the hotbar.
+	// The mouse wheel: turns what you're placing; ammo while aiming a ranged weapon; otherwise the hotbar.
+	if (AWRPlayerController* Placing = Cast<AWRPlayerController>(Controller); Placing && Placing->IsPlacing() && !Placing->IsDemolishing())
+	{
+		Placing->WheelPlacement(Dir);
+		return;
+	}
 	if (IsAimingRanged())
 	{
 		CycleAmmo(Dir);

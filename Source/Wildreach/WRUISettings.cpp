@@ -869,6 +869,11 @@ namespace WRSettingsUI
 					SettingRow(LOCTEXT("CastRelease", "Cast on release (skip the tap)"), LOCTEXT("CastReleaseSub", "Letting go of the wheel on an ability casts it right away."),
 						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().CastOnRelease(); }, []() { FWRKeyBindings::Get().SetCastOnRelease(!FWRKeyBindings::Get().CastOnRelease()); }))
 				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+				[
+					SettingRow(LOCTEXT("CrosshairRow", "Crosshair"), LOCTEXT("CrosshairRowSub", "Where spells and shots go. Off: only while aiming, placing or in first person."),
+						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().ShowCrosshair(); }, []() { FWRKeyBindings::Get().SetShowCrosshair(!FWRKeyBindings::Get().ShowCrosshair()); }))
+				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
 				[
 					SNew(SHorizontalBox).Visibility_Lambda(NotWheel(true))

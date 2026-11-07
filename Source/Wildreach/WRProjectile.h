@@ -19,6 +19,8 @@ public:
 	AWRProjectile();
 
 	void Init(const FWRHit& InHit, float Speed, const FLinearColor& Color);
+	/** Server: curve toward a locked-on target as it flies (Acceleration cm/s/s; 0 = straight on). */
+	void HomeOn(AActor* Target, float Acceleration);
 	/** A thrown or shot weapon: flies with drop as a model (MeshAlong = the model's tip axis, empty = from its bounds).
 	 *  Kind "bola" tangles what it hits; arrows, bolts, darts and spears stick where they land, and PickupItem (a thrown
 	 *  spear) is left on the ground there to pick up again. */
@@ -37,6 +39,7 @@ private:
 	UFUNCTION() void OnRep_Color();
 	UFUNCTION() void OnRep_Model();
 	UFUNCTION() void OnRep_Fx();
+	UFUNCTION() void OnRep_Homing();
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USphereComponent> Collision;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
@@ -47,6 +50,9 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_Model) FString ModelAlong;
 	/** A spell's look in flight (WRFx: fire.bolt, frost.shard), picked from its element; the grey sphere hides under it. */
 	UPROPERTY(ReplicatedUsing=OnRep_Fx) FName TrailFx;
+	/** Replicated so clients fly the same curve between the server's corrections. */
+	UPROPERTY(ReplicatedUsing=OnRep_Homing) TObjectPtr<AActor> HomingOn;
+	UPROPERTY(ReplicatedUsing=OnRep_Homing) float HomingAcceleration = 0.f;
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> Trail;
 	FName Kind;
 	FName PickupItem;

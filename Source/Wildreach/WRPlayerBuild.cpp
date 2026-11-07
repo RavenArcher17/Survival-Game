@@ -4,6 +4,7 @@
 #include "WRPlayerController.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
+#include "WRBuildLook.h"
 #include "WRLifeSkills.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
@@ -40,13 +41,33 @@ namespace WRFreeBuild
 		return FBox(FVector(-210, -10, 0), FVector(210, 10, 300));   // wall, door, doorway, window
 	}
 
-	/** On the build grid: where snapping would have put it, square to the grid. */
-	static bool IsOnGrid(const FWRPieceDef& Def, const FVector& Loc, float Yaw)
+	/** A piece that goes where you aim, aimed at nothing. */
+	static const TCHAR* const NoAimWhy = TEXT("aim at the ground or a piece");
+
+	/** The fine grid's lines: walls across a cell, pillars at their crossings. */
+	static float FineStep() { return WRTune(TEXT("building.fineStep"), 100.f); }
+
+	/** How far from a foundation a snap still lines up with its grid. */
+	static float FrameReach() { return FWRBuildRegistry::Get().GridSize * 2.5f; }
+
+	/** On a build grid: the world's, or that of a foundation it's beside (one placed at an angle has its own), square to it. */
+	static bool IsOnGrid(UWorld* World, const FWRPieceDef& Def, const FVector& Loc, float Yaw)
 	{
-		float SnapYaw = Yaw;
-		const FVector Snapped = FWRBuildRules::SnapToGrid(Def.Shape, Loc, Loc.Z, FWRBuildRegistry::Get().GridSize, SnapYaw);
-		const float Turn = FMath::Fmod(FMath::Abs(Yaw), 90.f);
-		return FVector::Dist2D(Snapped, Loc) < 2.f && FMath::Min(Turn, 90.f - Turn) < 1.f;
+		const float Grid = FWRBuildRegistry::Get().GridSize;
+		if (FWRBuildRules::IsSnappedIn(Def.Shape, Loc, Yaw, Grid, FineStep(), FVector::ZeroVector, 0.f))
+		{
+			return true;
+		}
+		for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
+		{
+			const FWRPieceDef* Other = It->GetDef();
+			if (!It->bGhost && Other && Other->Shape == TEXT("foundation") && FVector::Dist2D(It->GetActorLocation(), Loc) <= FrameReach()
+				&& FWRBuildRules::IsSnappedIn(Def.Shape, Loc, Yaw, Grid, FineStep(), It->GetActorLocation(), It->GetActorRotation().Yaw))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Two yawed boxes interpenetrate (by more than Slack: touching faces and float noise don't count). */
@@ -100,12 +121,9 @@ namespace WRFreeBuild
 			{
 				continue;
 			}
+			// (The cheap test first: this runs every frame while you place, and few pieces touch.)
 			const float OtherYaw = It->GetActorRotation().Yaw;
-			if (!bFree && IsOnGrid(*Other, It->GetActorLocation(), OtherYaw))
-			{
-				continue;
-			}
-			if (Overlap(Mine, Loc, Yaw, PieceBox(*Other), It->GetActorLocation(), OtherYaw))
+			if (Overlap(Mine, Loc, Yaw, PieceBox(*Other), It->GetActorLocation(), OtherYaw) && (bFree || !IsOnGrid(World, *Other, It->GetActorLocation(), OtherYaw)))
 			{
 				return FString::Printf(TEXT("overlaps the %s"), *Other->Name.ToLower());
 			}
@@ -136,10 +154,31 @@ void AWRPlayerController::WRDemolish(float X, float Y, float Z)
 void AWRPlayerController::WRGhost(FName Piece) { StartPlacing(Piece); }
 void AWRPlayerController::WRGhostPlace()
 {
-	UE_LOG(LogWildreach, Log, TEXT("GHOST %s at %s yaw %.0f %s %s"), *PlacingPiece.ToString(), *PlaceLoc.ToCompactString(), PlaceYaw,
-		bPlaceValid ? TEXT("valid") : TEXT("invalid"), *PlaceWhy);
+	WRGhostInfo();
 	ConfirmPlacement();
 	CancelPlacement();
+}
+void AWRPlayerController::WRGhostInfo()
+{
+	const AWRBuildPiece* G = Ghost.Get();
+	UE_LOG(LogWildreach, Log, TEXT("GHOST %s at %s yaw %.0f %s %s| snap %d step %.0f look %s"), *PlacingPiece.ToString(), *PlaceLoc.ToCompactString(), PlaceYaw,
+		bPlaceValid ? TEXT("valid") : TEXT("invalid"), *PlaceWhy, SnapMode, PlaceStep, G ? *G->GhostLook() : TEXT("none"));
+}
+void AWRPlayerController::WRGhostTurn(int32 WheelDir)
+{
+	if (WheelDir != 0)
+	{
+		WheelPlacement(WheelDir);
+	}
+	else
+	{
+		RotatePlacement();
+		RotatePlacementEnd();
+	}
+}
+void AWRPlayerController::WRSnap(FName Mode)
+{
+	SnapMode = Mode == TEXT("off") ? 0 : Mode == TEXT("fine") ? 2 : 1;
 }
 void AWRPlayerController::WRHitPiece(int32 Hits) { ServerCommand(FString::Printf(TEXT("hitpiece %d"), Hits)); }
 
@@ -184,12 +223,13 @@ void AWRPlayerController::ToggleBuildMenu()
 }
 
 /** A local, collision-free preview of a piece. */
-static AWRBuildPiece* SpawnGhost(UWorld* World, FName Piece)
+static AWRBuildPiece* SpawnGhost(UWorld* World, FName Piece, bool bPlain = false)
 {
 	AWRBuildPiece* G = World->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), FTransform::Identity, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (G)
 	{
 		G->bGhost = true;
+		G->bPlainGhost = bPlain;
 		G->SetReplicates(false);
 		G->PieceId = Piece;
 		G->FinishSpawning(FTransform::Identity);
@@ -208,6 +248,8 @@ void AWRPlayerController::StartPlacing(FName Piece)
 	}
 	PlacingPiece = Piece;
 	PlaceYaw = GetControlRotation().Yaw;
+	PlaceTurn = 0.f;
+	PlaceStep = 0.f;
 	Ghost = SpawnGhost(GetWorld(), Piece);  // "demolish": a red copy of whatever you aim at, made in UpdatePlacement
 }
 
@@ -235,13 +277,79 @@ void AWRPlayerController::CancelPlacement()
 		G->Destroy();
 	}
 	Ghost = nullptr;
+	bPlaceSpin = false;
+	ShowSnapDots(nullptr, 0.f);
 }
 
 void AWRPlayerController::RotatePlacement()
 {
-	// On the grid a quarter turn; placed freely (snap off, or a piece that never snaps) an eighth.
-	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
-	PlaceYaw += Def && Def->Snaps() && bSnap ? 90.f : 45.f;
+	// On a grid, its square steps. Free, a small turn at once, and held it keeps turning (UpdatePlacement).
+	if (PlaceStep > 0.f)
+	{
+		PlaceTurn += PlaceStep;
+		return;
+	}
+	PlaceTurn += WRTune(TEXT("building.turnStep"), 15.f);
+	bPlaceSpin = true;
+	PlaceSpinAt = GetWorld()->GetTimeSeconds() + WRTune(TEXT("building.spinDelay"), 0.25f);
+}
+
+void AWRPlayerController::RotatePlacementEnd()
+{
+	bPlaceSpin = false;
+}
+
+void AWRPlayerController::WheelPlacement(int32 Dir)
+{
+	PlaceTurn -= Dir * (PlaceStep > 0.f ? PlaceStep : WRTune(TEXT("building.wheelStep"), 5.f));
+}
+
+void AWRPlayerController::ShowSnapDots(const AWRBuildPiece* On, float Step)
+{
+	if (SnapDotsOn.Get() == On && SnapDotsStep == Step)
+	{
+		return;
+	}
+	if (AActor* Old = SnapDots.Get())
+	{
+		Old->Destroy();
+	}
+	SnapDots = nullptr;
+	SnapDotsOn = On;
+	SnapDotsStep = Step;
+	const FWRPieceDef* Def = On ? On->GetDef() : nullptr;
+	if (!Def || Step <= 0.f)
+	{
+		return;
+	}
+	// On the surface you'd stand on: a foundation's top is 100 above it, a floor's 20.
+	const float Top = Def->Shape == TEXT("foundation") ? 100.f : 20.f;
+	const float Half = FWRBuildRegistry::Get().GridSize * 0.5f;
+	const int32 N = FMath::RoundToInt(Half / Step);
+	const float Size = WRTune(TEXT("building.snapDotSize"), 11.f);
+	TArray<FWRLookBlock> Dots;
+	for (int32 i = -N; i <= N; ++i)
+	{
+		for (int32 j = -N; j <= N; ++j)
+		{
+			FWRLookBlock Dot;
+			Dot.Size = FVector(Size, Size, 1.f);
+			Dot.Centre = FVector(i * Step, j * Step, Top + 1.5f);
+			Dot.Mat = EWRLookMat::Cloth;
+			Dots.Add(Dot);
+		}
+	}
+	AActor* Marks = GetWorld()->SpawnActor<AActor>(AActor::StaticClass());
+	if (!Marks)
+	{
+		return;
+	}
+	USceneComponent* Root = NewObject<USceneComponent>(Marks);
+	Marks->SetRootComponent(Root);
+	Root->RegisterComponent();
+	Root->SetWorldTransform(On->GetActorTransform());
+	FWRBuildLook::Spawn(Marks, Root, Dots, FLinearColor(0.f, 0.22f, 0.9f), false);   // blue: plain on pale planks and grey stone alike
+	SnapDots = Marks;
 }
 
 void AWRPlayerController::ConfirmPlacement()
@@ -262,10 +370,17 @@ void AWRPlayerController::ConfirmPlacement()
 	}
 	else if (IsPlacing())
 	{
+		// With no ground to aim at there's no spot to send, and nothing on the server would stop a chest hanging in the air.
+		if (PlaceWhy == WRFreeBuild::NoAimWhy)
+		{
+			ShowLocalNotice(PlaceWhy);
+			WRSound::PlayUI(this, TEXT("build.invalid"));
+			return;
+		}
 		// A structure piece placed with snap off says so: the server checks it box against box, not by grid slot.
 		const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
 		ServerCommand(FString::Printf(TEXT("place %s %.0f %.0f %.0f %.0f%s"), *PlacingPiece.ToString(), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z, PlaceYaw,
-			Def && Def->Snaps() && !bSnap ? TEXT(" free") : TEXT("")));
+			Def && Def->Snaps() && !IsSnapOn() ? TEXT(" free") : TEXT("")));
 	}
 }
 
@@ -286,12 +401,25 @@ void AWRPlayerController::UpdatePlacement()
 	Query.AddIgnoredActor(G);
 	FHitResult Hit;
 	// Demolish reaches further than the 10 m a piece is placed within, so a piece out of reach says "too far" instead of
-	// "aim at a piece".
-	FVector Point = Eye + Dir * (Def ? 1000.f : WRTune(TEXT("ui.demolishReach"), 1600.f));
-	const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query);
+	// "aim at a piece". The 10 m count from you, not from the camera behind your shoulder.
+	const float Behind = FMath::Max(0.f, static_cast<float>(FVector::DotProduct(Self->GetActorLocation() - Eye, Dir)));
+	FVector Point = Eye + Dir * (Def ? Behind + 1000.f : WRTune(TEXT("ui.demolishReach"), 1600.f));
+	bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Point, ECC_Visibility, Query);
 	if (bHit)
 	{
 		Point = Hit.ImpactPoint;
+	}
+	else if (Def && (!Def->Snaps() || !IsSnapOn()))
+	{
+		// Looking past your reach: what goes where you aim comes down onto the ground at the end of it, and keeps following
+		// your look, instead of hanging in the air. Only with no ground under it (out over a drop) is there nowhere to put it.
+		FHitResult Below;
+		if (GetWorld()->LineTraceSingleByChannel(Below, Point, Point - FVector(0.f, 0.f, WRTune(TEXT("building.dropReach"), 1500.f)), ECC_Visibility, Query))
+		{
+			Hit = Below;
+			bHit = true;
+			Point = Below.ImpactPoint;
+		}
 	}
 
 	if (!Def)
@@ -304,7 +432,7 @@ void AWRPlayerController::UpdatePlacement()
 		if (G->PieceId != Aimed)
 		{
 			G->Destroy();
-			G = SpawnGhost(GetWorld(), Aimed);
+			G = SpawnGhost(GetWorld(), Aimed, true);
 			Ghost = G;
 		}
 		const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
@@ -322,26 +450,44 @@ void AWRPlayerController::UpdatePlacement()
 		return;
 	}
 
-	const bool bFreeStructure = Def->Snaps() && !bSnap;
-	if (Def->Snaps() && bSnap)
+	// The way it wants to face: the way you're looking, plus however far you've turned it, so it follows your body and the
+	// camera. A snap below squares that up. (A held rotate key keeps turning a free piece.)
+	if (bPlaceSpin && PlaceStep <= 0.f && GetWorld()->GetTimeSeconds() >= PlaceSpinAt)
 	{
-		// Storey heights come from the nearest foundation's top surface.
+		PlaceTurn += GetWorld()->GetDeltaSeconds() * WRTune(TEXT("building.spinSpeed"), 90.f);
+	}
+	const float Wanted = GetControlRotation().Yaw + PlaceTurn;
+	const float Grid = FWRBuildRegistry::Get().GridSize;
+	const AWRBuildPiece* DotsOn = nullptr;
+	float DotsEvery = 0.f;
+	PlaceStep = 0.f;
+
+	const bool bFreeStructure = Def->Snaps() && !IsSnapOn();
+	if (Def->Snaps() && IsSnapOn())
+	{
+		// The nearest foundation: its top sets the storey heights, and close by its grid is the grid (one placed at an angle
+		// takes what's built beside it to that angle too).
+		const AWRBuildPiece* Foundation = nullptr;
+		float Best = 2500.f;
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+		{
+			const FWRPieceDef* O = It->GetDef();
+			const float D = FVector::Dist2D(It->GetActorLocation(), Point);
+			if (!It->bGhost && O && O->Shape == TEXT("foundation") && D < Best)
+			{
+				Best = D;
+				Foundation = *It;
+			}
+		}
+		const bool bFrame = Foundation && Best <= WRFreeBuild::FrameReach();
+		const FVector Origin = bFrame ? Foundation->GetActorLocation() : FVector::ZeroVector;
+		const float FrameYaw = bFrame ? Foundation->GetActorRotation().Yaw : 0.f;
+		const float LineStep = SnapMode == 2 ? WRFreeBuild::FineStep() : Grid;
+
 		float BaseZ = Point.Z;
 		const bool bGroundShape = Def->Shape == TEXT("foundation") || Def->Shape == TEXT("palisade") || Def->Shape == TEXT("tower") || Def->Shape == TEXT("gate");
 		if (!bGroundShape)
 		{
-			const AWRBuildPiece* Foundation = nullptr;
-			float Best = 2500.f;
-			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
-			{
-				const FWRPieceDef* O = It->GetDef();
-				const float D = FVector::Dist2D(It->GetActorLocation(), Point);
-				if (!It->bGhost && O && O->Shape == TEXT("foundation") && D < Best)
-				{
-					Best = D;
-					Foundation = *It;
-				}
-			}
 			if (Foundation)
 			{
 				// The storey you're looking into; floors, roofs and gables go on top of it.
@@ -353,9 +499,8 @@ void AWRPlayerController::UpdatePlacement()
 		{
 			// Level with a foundation next to this cell (so floors and walls line up); else on the ground at the cell's
 			// centre, sunk in so the floor is a step up instead of a waist-high ledge.
-			const float Grid = FWRBuildRegistry::Get().GridSize;
 			float CellYaw = 0.f;
-			const FVector Cell = FWRBuildRules::SnapToGrid(Def->Shape, Point, Point.Z, Grid, CellYaw);
+			const FVector Cell = FWRBuildRules::SnapInFrame(Def->Shape, Point, Point.Z, Grid, Grid, Origin, FrameYaw, CellYaw);
 			const AWRBuildPiece* Next = nullptr;
 			float NextDist = Grid * 1.05f;
 			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
@@ -379,36 +524,59 @@ void AWRPlayerController::UpdatePlacement()
 				BaseZ = Ground.ImpactPoint.Z - WRTune(TEXT("building.foundationSink"), 60.f);
 			}
 		}
-		float Yaw = PlaceYaw;
-		PlaceLoc = FWRBuildRules::SnapToGrid(Def->Shape, Point, BaseZ, FWRBuildRegistry::Get().GridSize, Yaw);
-		G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, Yaw, 0.f));
-		PlaceYaw = Yaw;  // send the snapped yaw (stairs, roofs and gables keep the way R turned them)
+		// Stairs and roofs rise away from you until you turn them; which end of a gable is high is the rotate key's alone
+		// (it mustn't flip because you looked round at the wall from the other side).
+		const bool bGable = Def->Shape == TEXT("gable");
+		float Yaw = bGable ? PlaceTurn + FrameYaw : Wanted;
+		PlaceLoc = FWRBuildRules::SnapInFrame(Def->Shape, Point, BaseZ, Grid, LineStep, Origin, FrameYaw, Yaw);
+		PlaceYaw = Yaw;
+		PlaceStep = bGable ? 180.f : 90.f;
+		if (SnapMode == 2 && bFrame)
+		{
+			DotsOn = Foundation;
+			DotsEvery = LineStep;
+		}
 	}
 	else
 	{
 		PlaceLoc = Point;
-		if (bFreeStructure)
+		PlaceYaw = Wanted;
+		// Furniture on a foundation or a floor: that piece's own subdivided grid, square to it (the fine grid, finer).
+		const AWRBuildPiece* Under = !Def->Snaps() && IsSnapOn() && bHit && Hit.ImpactNormal.Z > 0.7f ? Cast<AWRBuildPiece>(Hit.GetActor()) : nullptr;
+		const FWRPieceDef* UnderDef = Under ? Under->GetDef() : nullptr;
+		if (UnderDef && (UnderDef->Shape == TEXT("foundation") || UnderDef->Shape == TEXT("floor")))
 		{
-			// Snap off: where you aim, a foundation sunk into the ground as on the grid. Whole centimetres and degrees,
-			// as the place command carries them, so the server checks exactly the spot you see.
-			if (Def->Shape == TEXT("foundation") && bHit && !Cast<AWRBuildPiece>(Hit.GetActor()))
-			{
-				PlaceLoc.Z -= WRTune(TEXT("building.foundationSink"), 60.f);
-			}
-			PlaceLoc = FVector(FMath::RoundToFloat(PlaceLoc.X), FMath::RoundToFloat(PlaceLoc.Y), FMath::RoundToFloat(PlaceLoc.Z));
-			PlaceYaw = FMath::RoundToFloat(FRotator::NormalizeAxis(PlaceYaw));
+			const float Step = SnapMode == 2 ? WRTune(TEXT("building.furnitureFineStep"), 50.f) : WRTune(TEXT("building.furnitureStep"), 100.f);
+			PlaceStep = SnapMode == 2 ? 45.f : 90.f;
+			const float FrameYaw = Under->GetActorRotation().Yaw;
+			const FRotator Frame(0.f, FrameYaw, 0.f);
+			const FVector Local = Frame.UnrotateVector(Point - Under->GetActorLocation());
+			const FVector OnGrid = Under->GetActorLocation() + Frame.RotateVector(FVector(FMath::RoundToFloat(Local.X / Step) * Step, FMath::RoundToFloat(Local.Y / Step) * Step, 0.f));
+			PlaceLoc = FVector(OnGrid.X, OnGrid.Y, Point.Z);
+			PlaceYaw = FrameYaw + FMath::RoundToFloat((Wanted - FrameYaw) / PlaceStep) * PlaceStep;
+			DotsOn = Under;
+			DotsEvery = Step;
 		}
-		G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, PlaceYaw, 0.f));
+		else if (bFreeStructure && Def->Shape == TEXT("foundation") && bHit && !Cast<AWRBuildPiece>(Hit.GetActor()))
+		{
+			// Snap off: where you aim, a foundation sunk into the ground as on the grid.
+			PlaceLoc.Z -= WRTune(TEXT("building.foundationSink"), 60.f);
+		}
 	}
+	// Whole centimetres and degrees, as the place command carries them, so the server checks exactly the spot you see.
+	PlaceLoc = FVector(FMath::RoundToFloat(PlaceLoc.X), FMath::RoundToFloat(PlaceLoc.Y), FMath::RoundToFloat(PlaceLoc.Z));
+	PlaceYaw = FMath::RoundToFloat(FRotator::NormalizeAxis(PlaceYaw));
+	G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, PlaceYaw, 0.f));
+	ShowSnapDots(DotsOn, DotsEvery);
 
 	// Quick client-side checks (the server re-checks everything).
 	bPlaceValid = true;
 	PlaceWhy.Reset();
 	const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>();
-	if (bFreeStructure && !bHit)
+	if ((bFreeStructure || !Def->Snaps()) && !bHit)
 	{
 		bPlaceValid = false;
-		PlaceWhy = TEXT("aim at the ground or a piece");
+		PlaceWhy = WRFreeBuild::NoAimWhy;
 	}
 	else if (FVector::Dist(PlaceLoc, Self->GetActorLocation()) > 1100.f)
 	{
@@ -519,7 +687,7 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		const FVector Loc(FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)), FCString::Atof(*Arg(4)));
 		const float Yaw = FCString::Atof(*Arg(5));
 		// Snap off (the client says "free"), or anything off the grid: checked box against box, not only by grid slot.
-		const bool bFree = Def && Def->Snaps() && (Arg(6) == TEXT("free") || !WRFreeBuild::IsOnGrid(*Def, Loc, Yaw));
+		const bool bFree = Def && Def->Snaps() && (Arg(6) == TEXT("free") || !WRFreeBuild::IsOnGrid(GetWorld(), *Def, Loc, Yaw));
 		OutResult.Reset();
 		if (!Def || !Self) OutResult = TEXT("unknown piece");
 		else if (FVector::Dist(Loc, Self->GetActorLocation()) > 1300.f) OutResult = TEXT("too far away");

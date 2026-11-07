@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.6.1: much smaller updates
+
+Raven asked why an update is another 1.7 GB when the game updates itself. It was downloading the whole Setup every time.
+
+- **What actually changes between builds** (0.6.0 against 0.6.1, compared block by block): the content file, 1,383 MB, came
+  out byte for byte the same. Nearly all of a code update is `Wildreach.exe` and `Wildreach.pdb`: one change shifts addresses
+  all through them, so they're effectively new each time (120 MB and 112 MB compressed). Everything else is small.
+- **The Setup is now its own patch source** (`Tools/installer/WildreachPack.cs`). Its game is no longer a zip: every file is
+  cut into blocks of about 256 KB at places chosen by the bytes (content-defined chunking, so a change only disturbs the
+  blocks around it, even when everything after it moves), each compressed and stored once, with an index and a footer on
+  the end of the program. A release is still one file, with nothing else to upload, and a new player's install is the same
+  as before. `Tools/installer/WildreachPackTool.cs` makes it, in under a minute.
+- **The updater fetches only what's missing**, with exact-range requests to that same file. (GitHub's store serves those,
+  through the redirect, but not "the last N bytes", so it asks the length first.) It cuts its own files the same way,
+  downloads the blocks it hasn't got, builds each new file beside the old one and checks its hash, then swaps them in with
+  `version.txt` last, so a copy that stops part way still says it's the old version and the next start finishes the job.
+  Fetched blocks survive an interruption. Files a player made are never touched: only what's on the last version's
+  `installed-files.txt` can be removed, and an index that names anything under a `Saved` folder is refused outright.
+- **If the small way can't be done** (no partial downloads, a damaged block, an old-style Setup, or over 80% changed) it logs
+  why and downloads the whole Setup as before. A file in use puts everything back and says so, without that download.
+- **Measured on the real builds, each ending with all 666 files matching a clean install:** a code update (0.6.0 to 0.6.1)
+  **235 MB** of 1,681 MB, 13 s here; a settings-only patch (one number in `tuning.json`) **295 KB**, of which 28 KB is the
+  change and the rest the index. The real jump from 0.5.0 to 0.6.0, every creature rebuilt, would have been about 316 MB.
+- **0.6.1 itself is still the full download,** because the updater every player has is the old one. That old updater was
+  tested taking the new Setup, on the real build. Small updates start with the next release.
+- **Old Setups no longer pile up.** Every full update left its 1.7 GB Setup in `%TEMP%\Wildreach-Update`: deleting it straight
+  after it ran failed silently, most likely because a virus scanner was still reading it. The updater now clears that folder
+  when it starts, so leftovers from 0.6.0 and earlier go too.
+- `Tools/updatertest.ps1` now covers all of it: the small update, each fallback, a dropped connection, the updater killed part
+  way, half swapped, a file in use, the updater and Setup from 0.6.0.
+
+## 0.6.1: aiming and building feel
+
+From Raven's first feedback after 0.6.0.
+
+- **A crosshair**, always up: a dot and four short ticks at the middle of the screen, red over something hostile. Settings >
+  Controls can turn it off (it still shows while aiming, placing or in first person). `ui.crosshairFoeRange`.
+- **Spells go where it points.** Bolts flew parallel to the camera from the chest, so with the camera behind the shoulder
+  they passed beside what you aimed at. They now leave the chest through the point under the crosshair
+  (`AWRCharacter::CrosshairPoint`, which works on the server); Lava pool and Meteor land on it. 6 hits from 6 at 15 m.
+- **Locked on, spells hit what's moving.** The lock lived only on the client, so the server just fired along a lagging
+  camera. Now it knows (`ServerSetLock`): bolts aim ahead of where the target's going (`UWRCombatLibrary::LeadPoint`) and
+  curve toward it (`AWRProjectile::HomeOn`; `spells.lockHoming`, less for other players so they can dodge). Lava pool lands
+  under the target, Meteor where it'll be when it lands. At a player always running across at 15 m, turning back at each end
+  of a 24 m lane: 7 to 10 bolts from 10 and 3 to 4 Meteors from 4; with the lead and the curve turned off
+  (`aimtest.ps1 -NoAssist`) 1 bolt from 10 and 1 Meteor from 4.
+- **Lock-on took things you couldn't see.** It never checked for buried burrowers, nor for anything in the way. Every
+  volcanic cave has a buried Kilnmite colony (2 right in front of the camera in the cave tested), so it could turn the view
+  to a bare patch of cave or the lava beside it. Only a host had this: a buried creature is hidden with no collision, so it's
+  never sent to a client who joins. It now
+  takes what's visible with a clear line (`CanSeeTarget`), nearest the crosshair rather than nearest you, and lets go if the
+  target goes underground or stays out of sight (`camera.lockOn*`). What's locked gets four gold corners on screen: the new
+  UI had no marker at all.
+- **Pieces follow you.** The angle was set once, when you picked the piece. It now faces the way you look, plus however
+  far you've turned it. Free (no grid under it), any angle: the rotate key turns it 15 degrees, held it spins, the wheel
+  turns it 5 (`building.turnStep`, `spinSpeed`, `wheelStep`).
+- **Snap has three settings.** F goes Grid, Fine, Off. Furniture on a foundation or floor now snaps to that piece's marks
+  and sits square to it: 100 cm and quarter turns on the grid, 50 cm and eighths on the fine grid. The fine grid also takes
+  walls on inner lines 100 cm apart and pillars on their crossings. Marks show on the piece you're aiming at.
+- **A foundation placed at an angle has its own grid** (`FWRBuildRules::SnapInFrame`): walls, floors, furniture and
+  neighbouring foundations line up with it, and the server accepts them (`IsSnappedIn`) with the same corner rules.
+- **Ghosts have real shapes.** Stations, the Hearth, the totem and the chest show their real models and structure pieces
+  their real planks, in the tint. Demolish's red copy of a station is its real shape too, not a box.
+- **Reach counts from you, not the camera.** Looking past it, or up, a piece that goes where you aim comes down on the
+  ground at the end of your reach and keeps following your look. With no ground under it (out over a drop) it's refused:
+  a chest could be placed hanging in the air.
+- **Tests:** `Tools/aimtest.ps1`, `Tools/buildaimtest.ps1` (in `alltests`), `Wildreach.Combat.LeadPoint`, more in
+  `Wildreach.Building.Rules`. New commands: `WRLockOn`, `WRSnap`, `WRGhostInfo`, `WRGhostTurn`.
+
 ## 2026-11-06: version 0.6.0, a living island
 
 Everything from Raven's Oct 31 review ships together: the creature pass, beds and waking on the map, worlds, world

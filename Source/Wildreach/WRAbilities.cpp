@@ -12,6 +12,8 @@
 #include "WRWorldDressing.h"
 #include "WRBuilding.h"
 #include "WRBoss.h"
+#include "WRCharacter.h"
+#include "WRPlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
@@ -22,6 +24,42 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
+
+// ---------------------------------------------------------------- where a spell goes
+namespace WRSpellAim
+{
+	/** What the caster has locked on to, if a spell can still go for it (the client tells the server when it locks on). */
+	static AWRCharacterBase* Locked(const AWRCharacterBase* Caster)
+	{
+		const AWRPlayerController* PC = Caster ? Cast<AWRPlayerController>(Caster->GetController()) : nullptr;
+		AWRCharacterBase* Target = PC ? PC->GetServerLock() : nullptr;
+		return Target && Target->IsAlive() && !Target->IsHidden() && Caster->IsHostileTo(Target)
+			&& FVector::Dist(Target->GetActorLocation(), Caster->GetActorLocation()) <= WRTune(TEXT("spells.lockRange"), 4000.f) ? Target : nullptr;
+	}
+
+	/** From the caster's chest toward where the target will be when a bolt of this speed gets there. */
+	static FVector Leading(const FVector& From, const AWRCharacterBase* Target, float Speed)
+	{
+		const FVector Velocity = WRTune(TEXT("spells.lockLead"), 1.f) > 0.f ? Target->GetVelocity() : FVector::ZeroVector;
+		return (UWRCombatLibrary::LeadPoint(From, Target->GetActorLocation(), Velocity, Speed) - From).GetSafeNormal();
+	}
+
+	/** From the caster's chest through the point under the crosshair (it isn't the chest's line: the camera sits behind the shoulder). */
+	static FVector ThroughCrosshair(const AWRCharacterBase* Caster, const FVector& From)
+	{
+		const FVector View = Caster->GetBaseAimRotation().Vector();
+		const AWRCharacter* Survivor = Cast<AWRCharacter>(Caster);
+		FVector Point;
+		if (!Survivor || !Survivor->GetController())
+		{
+			return View;
+		}
+		Survivor->CrosshairPoint(20000.f, true, Point);
+		const FVector Dir = (Point - From).GetSafeNormal();
+		// Something right in your face, or a point off behind you: straight down your look instead.
+		return Dir.IsNearlyZero() || FVector::DistSquared(Point, From) < FMath::Square(100.f) || FVector::DotProduct(Dir, View) < 0.3f ? View : Dir;
+	}
+}
 
 // ---------------------------------------------------------------- base
 
@@ -709,9 +747,13 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 			return;
 		}
 		const FWRTuning& T = FWRTuning::Get();
-		const FRotator Aim = Caster->GetBaseAimRotation();
-		const FVector Dir = Aim.Vector();
-		const FVector SpawnAt = Caster->GetActorLocation() + FVector(0.f, 0.f, 40.f) + Dir * 70.f;
+		const float Speed = T.Num(SpellKey + TEXT(".speed"), 2600.f);
+		// At what you've locked on to, ahead of where it's going; otherwise through the crosshair.
+		AWRCharacterBase* Lock = WRSpellAim::Locked(Caster);
+		const FVector Chest = Caster->GetActorLocation() + FVector(0.f, 0.f, 40.f);
+		const FVector Dir = Lock ? WRSpellAim::Leading(Chest, Lock, Speed) : WRSpellAim::ThroughCrosshair(Caster, Chest);
+		const FRotator Aim = Dir.Rotation();
+		const FVector SpawnAt = Chest + Dir * 70.f;
 
 		FWRHit Hit;
 		Hit.Instigator = Caster;
@@ -746,7 +788,12 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (AWRProjectile* Projectile = Caster->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), SpawnAt, Aim, Params))
 		{
-			Projectile->Init(Hit, T.Num(SpellKey + TEXT(".speed"), 2600.f), Color);
+			Projectile->Init(Hit, Speed, Color);
+			if (Lock)
+			{
+				// A gentle curve for what the lead can't know: it turned. Other players get less of it, so they can still dodge.
+				Projectile->HomeOn(Lock, Lock->IsCreature() ? T.Num(TEXT("spells.lockHoming"), 6000.f) : T.Num(TEXT("spells.lockHomingPlayers"), 2000.f));
+			}
 		}
 		UWRCombatLibrary::GainResource(Caster, WRTags::Element_Fire, T.Num(SpellKey + TEXT(".heat"), 0.f));
 		UWRCombatLibrary::GainResource(Caster, WRTags::Element_Frost, T.Num(SpellKey + TEXT(".chill"), 0.f));
@@ -818,6 +865,20 @@ void UWRGA_AreaSpell::Execute()
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSpellGround), false, Caster);
 		return World->LineTraceSingleByChannel(Hit, At + FVector(0, 0, 500), At - FVector(0, 0, 2000), ECC_WorldStatic, Query) ? Hit.ImpactPoint : At;
 	};
+	// Where a spell that lands on the ground goes: under what you've locked on to (Lead seconds ahead of it, for one that
+	// takes that long to land), else where the crosshair meets the ground, else out in front.
+	const auto Aimed = [&](float Range, float Lead, float MissShare) -> FVector
+	{
+		if (const AWRCharacterBase* Lock = WRSpellAim::Locked(Caster))
+		{
+			const FVector Next = Lock->GetActorLocation() + (WRTune(TEXT("spells.lockLead"), 1.f) > 0.f ? Lock->GetVelocity() * Lead : FVector::ZeroVector);
+			const FVector Off = Next - Feet;
+			return Ground(FVector(Feet.X, Feet.Y, Next.Z) + FVector(Off.X, Off.Y, 0.f).GetClampedToMaxSize(Range));
+		}
+		const AWRCharacter* Survivor = Cast<AWRCharacter>(Caster);
+		FVector Point;
+		return Survivor && Survivor->CrosshairPoint(Range, false, Point) ? Point : Ground(Feet + Flat * Range * MissShare);
+	};
 	const auto Strike = [&](AWRCharacterBase* Target, const FVector& Origin)
 	{
 		FWRHit Hit;
@@ -851,11 +912,7 @@ void UWRGA_AreaSpell::Execute()
 	case EWRAreaShape::Pool:
 	{
 		// Lava where you aim (up to range), on the ground.
-		FHitResult Hit;
-		const FVector Eye = Caster->GetActorLocation() + FVector(0, 0, 60);
-		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSpellAim), false, Caster);
-		const float Range = Num(TEXT("range"), 1500.f);
-		const FVector At = World->LineTraceSingleByChannel(Hit, Eye, Eye + Aim.Vector() * Range, ECC_WorldStatic, Query) ? Hit.ImpactPoint : Ground(Feet + Flat * Range * 0.7f);
+		const FVector At = Aimed(Num(TEXT("range"), 1500.f), 0.f, 0.7f);
 		AWRHazard::Spawn(World, Caster, At, Num(TEXT("radius"), 300.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 12.f), TEXT("lava"), false);
 		WRFx::Broadcast(Caster, TEXT("lavapool"), At, FRotator::ZeroRotator, Num(TEXT("radius"), 300.f) / 100.f, TEXT("lavapool"), Num(TEXT("seconds"), 8.f));
 		break;
@@ -877,12 +934,8 @@ void UWRGA_AreaSpell::Execute()
 	case EWRAreaShape::Meteor:
 	{
 		// A telegraphed strike where you aim: lands after a moment, leaves fire behind.
-		FHitResult Hit;
-		const FVector Eye = Caster->GetActorLocation() + FVector(0, 0, 60);
-		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRMeteorAim), false, Caster);
-		const float Range = Num(TEXT("range"), 2500.f);
-		const FVector At = World->LineTraceSingleByChannel(Hit, Eye, Eye + Aim.Vector() * Range, ECC_WorldStatic, Query) ? Hit.ImpactPoint : Ground(Feet + Flat * Range * 0.6f);
 		const float Radius = Num(TEXT("radius"), 450.f), Delay = Num(TEXT("delay"), 1.2f);
+		const FVector At = Aimed(Num(TEXT("range"), 2500.f), Delay, 0.6f);
 		AWRGroundMarker::Spawn(World, At + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(Radius, Radius), false, FLinearColor(1.f, 0.15f, 0.05f), Delay);
 		TWeakObjectPtr<AWRCharacterBase> Weak = Caster;
 		const float Damage = Num(TEXT("damage"), 55.f), Burn = Num(TEXT("burnBuildup"), 70.f);

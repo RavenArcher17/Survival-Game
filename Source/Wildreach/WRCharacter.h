@@ -63,6 +63,12 @@ public:
 	void GetAimView(FVector& OutLoc, FRotator& OutRot) const;
 	/** The control rotation that puts the crosshair on a world point (WRAimAt). */
 	FRotator AimRotationAt(const FVector& Target) const;
+	/**
+	 * Where the crosshair's ray lands, out to Range past the survivor (the camera's own place behind them doesn't count, so
+	 * a rock at their back can't stop it). Works on the server too: the camera's place comes from the control rotation.
+	 * bPawns: creatures and players count, not just the ground and what's built. False: it met nothing that far.
+	 */
+	bool CrosshairPoint(float Range, bool bPawns, FVector& OutPoint) const;
 	/** Owner: next / previous ammo type (mouse wheel). */
 	void CycleAmmo(int32 Dir);
 	bool IsRangedOut() const { return bRangedMode && !RangedItem.IsNone(); }

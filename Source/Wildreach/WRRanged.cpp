@@ -352,6 +352,39 @@ FRotator AWRCharacter::AimRotationAt(const FVector& Target) const
 	return Rot;
 }
 
+bool AWRCharacter::CrosshairPoint(float Range, bool bPawns, FVector& OutPoint) const
+{
+	const FRotator Rot = GetControlRotation();
+	const FVector Dir = Rot.Vector();
+	FVector Cam;
+	if (bFirstPerson || !ThirdPersonBoom)
+	{
+		Cam = FirstPersonCamera ? FirstPersonCamera->GetComponentLocation() : GetPawnViewLocation();
+	}
+	else
+	{
+		// As AimRotationAt places it: the server has no view of its own to ask, and pull-in only moves it along the ray.
+		Cam = ThirdPersonBoom->GetComponentLocation() + ThirdPersonBoom->TargetOffset - Dir * ThirdPersonBoom->TargetArmLength
+			+ FRotationMatrix(Rot).TransformVector(ThirdPersonBoom->SocketOffset);
+	}
+	const float Along = FMath::Max(60.f, static_cast<float>(FVector::DotProduct(GetActorLocation() - Cam, Dir)));
+	const FVector Start = Cam + Dir * Along;
+	const FVector End = Start + Dir * Range;
+	FHitResult Hit;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCrosshairPoint), false, this);
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	if (bPawns)
+	{
+		Objects.AddObjectTypesToQuery(ECC_Pawn);
+		Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
+	}
+	const bool bHit = GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, Objects, Query);
+	OutPoint = bHit ? FVector(Hit.ImpactPoint) : End;
+	return bHit;
+}
+
 void AWRCharacter::FireRanged()
 {
 	const double Now = GetWorld()->GetTimeSeconds();

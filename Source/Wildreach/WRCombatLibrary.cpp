@@ -26,6 +26,33 @@ const TCHAR* UWRCombatLibrary::ResultName(EWRHitResult Result)
 	}
 }
 
+FVector UWRCombatLibrary::LeadPoint(const FVector& From, const FVector& Target, const FVector& Velocity, float Speed)
+{
+	// |Target + Velocity t - From| = Speed t: a quadratic in t, and the first time from now on is when they meet.
+	const FVector D = Target - From;
+	const double A = FVector::DotProduct(Velocity, Velocity) - double(Speed) * Speed;
+	const double B = 2.0 * FVector::DotProduct(D, Velocity);
+	const double C = FVector::DotProduct(D, D);
+	double T = Speed > 0.f ? D.Size() / Speed : 0.0;   // no meeting: where it'll be when a shot reaches where it is now
+	if (FMath::Abs(A) < 1.0)
+	{
+		// Exactly as fast as the shot: the equation loses its square.
+		if (B < 0.0) T = -C / B;
+	}
+	else
+	{
+		const double Disc = B * B - 4.0 * A * C;
+		if (Disc >= 0.0)
+		{
+			const double Root = FMath::Sqrt(Disc);
+			const double T1 = (-B - Root) / (2.0 * A), T2 = (-B + Root) / (2.0 * A);
+			const double Soonest = T1 >= 0.0 && (T1 < T2 || T2 < 0.0) ? T1 : T2;
+			if (Soonest >= 0.0) T = Soonest;
+		}
+	}
+	return Target + Velocity * T;
+}
+
 float UWRCombatLibrary::WeaponDamage(const FWRWeaponStats& Weapon, bool bHeavy)
 {
 	if (Weapon.FlatDamage > 0.f)

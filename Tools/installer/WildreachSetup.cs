@@ -1,8 +1,9 @@
 // One-file installer for friends: double-click -> unpacks Wildreach into your user folder (no admin), adds
 // Desktop + Start Menu shortcuts, installs Microsoft's VC++ runtime only if it's missing, then starts the game.
 // Running a newer Setup updates in place and keeps saves. The shortcuts start WildreachUpdater.exe, which fetches and
-// runs the next release's Setup by itself (--silent --update). Built by Tools\make_installer.ps1 with the C# compiler
-// that ships with Windows; the packaged game is embedded as the "game.zip" resource.
+// usually fetches just what changed, from this same file (WildreachPack.cs), or runs the whole Setup (--silent --update).
+// Built by Tools\make_installer.ps1 with the C# compiler that ships with Windows; the packaged game is on the end of this
+// program, in blocks, with an index and a footer after them.
 //   Wildreach-Setup.exe                         normal install
 //   Wildreach-Setup.exe --silent --dir <path> --nolaunch [--noshortcuts]   (used by the tests)
 //   Wildreach-Setup.exe --silent --update --dir <path> --nolaunch          (used by the updater: shortcuts left as they are)
@@ -10,11 +11,11 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
+using WildreachPack;
 
 static class WildreachSetup
 {
@@ -59,20 +60,23 @@ static class WildreachSetup
 	static void Install(string dir, Action<double> progress, Action<string> status, bool launch, bool shortcuts)
 	{
 		Directory.CreateDirectory(dir);
-		using (Stream zipStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("game.zip"))
-		using (var zip = new ZipArchive(zipStream, ZipArchiveMode.Read))
+		Index index;
+		using (var self = new FileStream(Assembly.GetExecutingAssembly().Location, FileMode.Open, FileAccess.Read, FileShare.Read))
 		{
-			int done = 0, total = zip.Entries.Count;
+			index = ReadIndex(self);
+			long done = 0, total = Math.Max(1L, index.Files.Sum(f => f.Size));
 			string root = Path.GetFullPath(dir) + Path.DirectorySeparatorChar;
-			foreach (ZipArchiveEntry entry in zip.Entries)
+			foreach (PackedFile file in index.Files)
 			{
-				string target = Path.GetFullPath(Path.Combine(dir, entry.FullName));
+				string target = Path.GetFullPath(Path.Combine(dir, file.Path));
 				if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue;  // never write outside the folder
-				if (entry.FullName.EndsWith("/") || entry.FullName.EndsWith("\\")) { Directory.CreateDirectory(target); }
-				else { Directory.CreateDirectory(Path.GetDirectoryName(target)); Extract(entry, target); }
-				if (progress != null) progress(++done / (double)total);
+				Directory.CreateDirectory(Path.GetDirectoryName(target));
+				Extract(self, file, target);
+				done += file.Size;
+				if (progress != null) progress(done / (double)total);
 			}
 		}
+		index.RemoveStaleAndRecord(dir);
 
 		// Microsoft's C++ runtime: most gaming PCs have it; install it only when it's missing (this one asks for admin).
 		string sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
@@ -103,17 +107,52 @@ static class WildreachSetup
 		if (launch) Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = dir, UseShellExecute = true });
 	}
 
+	static Index ReadIndex(FileStream self)
+	{
+		var footer = new byte[Index.FooterSize];
+		self.Seek(-Index.FooterSize, SeekOrigin.End);
+		ReadAll(self, footer, footer.Length);
+		long at, length;
+		if (!Index.ReadFooter(footer, out at, out length)) throw new InvalidDataException("this Setup is damaged: its index is missing");
+		var stored = new byte[length];
+		self.Seek(at, SeekOrigin.Begin);
+		ReadAll(self, stored, stored.Length);
+		return Index.Load(stored);
+	}
+
+	static void ReadAll(Stream from, byte[] buffer, int count)
+	{
+		int got = 0, read;
+		while (got < count && (read = from.Read(buffer, got, count - got)) > 0) got += read;
+		if (got != count) throw new EndOfStreamException("this Setup is damaged: it ends early");
+	}
+
 	/** A file in use (the updater that started this Setup) can't be overwritten but can be renamed: set it aside as
 	 *  .old (the updater deletes those on its next start) and write the new one in its place. */
-	static void Extract(ZipArchiveEntry entry, string target)
+	static void Extract(FileStream self, PackedFile file, string target)
 	{
-		try { entry.ExtractToFile(target, true); }
+		FileStream output;
+		try { output = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16); }
 		catch (IOException)
 		{
 			string old = target + ".old";
 			if (File.Exists(old)) File.Delete(old);
 			File.Move(target, old);
-			entry.ExtractToFile(target, true);
+			output = new FileStream(target, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16);
+		}
+		using (output)
+		using (var whole = new WholeHash())
+		{
+			var stored = new byte[Blocks.MaxSize];
+			foreach (BlockRef block in file.Blocks)
+			{
+				self.Seek(block.At, SeekOrigin.Begin);
+				ReadAll(self, stored, block.Packed);
+				byte[] bytes = Blocks.Unpack(stored, 0, block.Packed, block.Size);
+				whole.Add(bytes, 0, bytes.Length);
+				output.Write(bytes, 0, bytes.Length);
+			}
+			if (whole.Finish() != file.Sha) throw new InvalidDataException("this Setup is damaged: " + file.Path + " came out wrong");
 		}
 	}
 

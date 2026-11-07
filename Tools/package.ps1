@@ -40,8 +40,11 @@ WILDREACH $version
    1-8 your items, hold Q for your abilities, I J P K M the journal (inventory, crafting,
    paths, skills, map), B build, G a bow or other ranged weapon (RMB aims), Esc the menu,
    F10 back to the main menu.
-   In build mode, X (or the Demolish button on the bar) takes down pieces you built: aim at
-   one, it turns red and shows what you get back (half its cost), click. X or Esc stops.
+   In build mode a piece faces the way you look. R turns it (hold to spin), the wheel turns it
+   finely, and F changes the snap: Grid, Fine (smaller steps on a foundation), Off (anywhere).
+   X (or the Demolish button on the bar) takes down pieces you built: aim at one, it turns red
+   and shows what you get back (half its cost), click. X or Esc stops.
+   Tab locks on to what's nearest the crosshair: your spells lead it and curve toward it.
 
 CONSOLE (playtest builds)
 The `` key (left of 1, under Esc) opens the console; type a command and press Enter, Tab completes.

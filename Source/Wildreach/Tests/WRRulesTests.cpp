@@ -282,6 +282,27 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRLeadTest, "Wildreach.Combat.LeadPoint",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRLeadTest::RunTest(const FString& Parameters)
+{
+	const FVector From = FVector::ZeroVector;
+	const float Speed = 2600.f;
+	TestEqual(TEXT("a target standing still: where it is"), UWRCombatLibrary::LeadPoint(From, FVector(1500, 0, 0), FVector::ZeroVector, Speed), FVector(1500, 0, 0));
+	// Running sideways: the shot and the target must reach the point at the same moment.
+	const FVector Target(1500, 0, 0), Run(0, 500, 0);
+	const FVector Point = UWRCombatLibrary::LeadPoint(From, Target, Run, Speed);
+	TestTrue(TEXT("ahead of it"), Point.Y > 100.f);
+	TestTrue(TEXT("shot and target arrive together"), FMath::IsNearlyEqual(Point.Size() / Speed, (Point - Target).Size() / Run.Size(), 0.001f));
+	// Running straight at you: met sooner, closer than it is now.
+	const FVector Coming = UWRCombatLibrary::LeadPoint(From, Target, FVector(-500, 0, 0), Speed);
+	TestTrue(TEXT("a charge is met short of it"), Coming.X < Target.X && Coming.X > 0.f);
+	// Faster than the shot, running away: no meeting, so a sensible point ahead of it instead of nonsense.
+	const FVector Away = UWRCombatLibrary::LeadPoint(From, Target, FVector(4000, 0, 0), Speed);
+	TestTrue(TEXT("what can't be caught gets a point ahead of it"), Away.X > Target.X && Away.X < Target.X + 4000.f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRBuildRulesTest, "Wildreach.Building.Rules",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWRBuildRulesTest::RunTest(const FString& Parameters)
@@ -300,6 +321,41 @@ bool FWRBuildRulesTest::RunTest(const FString& Parameters)
 	Yaw = 45.f;
 	FWRBuildRules::SnapToGrid(TEXT("floor"), FVector(10, 10, 0), 0.f, Grid, Yaw);
 	TestEqual(TEXT("floors sit square"), Yaw, 0.f);
+	// In a foundation's frame: the same grid, turned and moved with it.
+	{
+		const float Fine = 100.f;
+		float W = 33.f;
+		const FVector Same = FWRBuildRules::SnapInFrame(TEXT("wall"), FVector(170, 20, 0), 50.f, Grid, Grid, FVector::ZeroVector, 0.f, W);
+		TestEqual(TEXT("the world's frame is the old grid"), Same, FVector(200, 0, 50));
+		TestEqual(TEXT("...running along Y"), W, 90.f);
+		W = 0.f;
+		const FVector Turned = FWRBuildRules::SnapInFrame(TEXT("wall"), FVector(1170, 500, 0), 50.f, Grid, Grid, FVector(1000, 500, 0), 90.f, W);
+		TestTrue(TEXT("a turned frame's edge: its local +X is the world's +Y, so this hit is on its local -Y edge"), Turned.Equals(FVector(1200, 500, 50), 0.01f));
+		TestTrue(TEXT("...and the wall runs along that edge"), FMath::IsNearlyEqual(FRotator::NormalizeAxis(W), 90.f, 0.01f));
+		W = 40.f;
+		const FVector AtAngle = FWRBuildRules::SnapInFrame(TEXT("floor"), FVector(10, 10, 0), 0.f, Grid, Grid, FVector::ZeroVector, 30.f, W);
+		TestTrue(TEXT("a floor in a frame turned 30 stays on it"), AtAngle.Equals(FVector::ZeroVector, 0.01f));
+		TestTrue(TEXT("...square to it"), FMath::IsNearlyEqual(FRotator::NormalizeAxis(W), 30.f, 0.01f));
+		// Fine lines: every 100 inside a cell, walls on the nearest of them, pillars at their crossings.
+		W = 0.f;
+		TestEqual(TEXT("a fine wall on an inner line"), FWRBuildRules::SnapInFrame(TEXT("wall"), FVector(40, 95, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f, W), FVector(0, 100, 0));
+		TestEqual(TEXT("...running along X"), W, 0.f);
+		W = 0.f;
+		TestEqual(TEXT("a fine wall on the middle line, across"), FWRBuildRules::SnapInFrame(TEXT("wall"), FVector(5, 150, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f, W), FVector(0, 0, 0));
+		TestEqual(TEXT("...running along Y"), W, 90.f);
+		W = 0.f;
+		TestEqual(TEXT("a fine pillar on a crossing"), FWRBuildRules::SnapInFrame(TEXT("pillar"), FVector(140, 60, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f, W), FVector(100, 100, 0));
+		W = 0.f;
+		TestEqual(TEXT("whole-cell pieces stay on whole cells"), FWRBuildRules::SnapInFrame(TEXT("floor"), FVector(140, 60, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f, W), FVector(0, 0, 0));
+		// What's on a grid stays on it, whichever line; what isn't, isn't.
+		TestTrue(TEXT("an edge wall is on the grid"), FWRBuildRules::IsSnappedIn(TEXT("wall"), FVector(0, -200, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f));
+		TestTrue(TEXT("a wall the other way too, at 270"), FWRBuildRules::IsSnappedIn(TEXT("wall"), FVector(600, 0, 0), 270.f, Grid, Fine, FVector::ZeroVector, 0.f));
+		TestTrue(TEXT("an inner line counts"), FWRBuildRules::IsSnappedIn(TEXT("wall"), FVector(0, 100, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f));
+		TestFalse(TEXT("between lines doesn't"), FWRBuildRules::IsSnappedIn(TEXT("wall"), FVector(0, 130, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f));
+		TestFalse(TEXT("nor crooked"), FWRBuildRules::IsSnappedIn(TEXT("wall"), FVector(0, 100, 0), 20.f, Grid, Fine, FVector::ZeroVector, 0.f));
+		TestTrue(TEXT("crooked is square in a frame turned the same"), FWRBuildRules::IsSnappedIn(TEXT("floor"), FVector::ZeroVector, 20.f, Grid, Fine, FVector::ZeroVector, 20.f));
+		TestFalse(TEXT("a floor half a cell off isn't"), FWRBuildRules::IsSnappedIn(TEXT("floor"), FVector(200, 0, 0), 0.f, Grid, Fine, FVector::ZeroVector, 0.f));
+	}
 	// One piece per slot.
 	TestEqual(TEXT("a door takes a wall's slot"), FWRBuildRules::SlotOf(TEXT("door")), FWRBuildRules::SlotOf(TEXT("wall")));
 	TestEqual(TEXT("a doorway too"), FWRBuildRules::SlotOf(TEXT("doorway")), FName(TEXT("edge")));

@@ -64,6 +64,15 @@ struct WILDREACH_API FWRBuildRules
 	 * rounded to 90 (which way they rise); everything else 0.
 	 */
 	static FVector SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, float Grid, float& InOutYaw);
+	/**
+	 * The same, on a grid laid out from Origin and turned FrameYaw: a foundation's own, so what's built beside a foundation
+	 * that was placed at an angle lines up with it. InOutYaw is the world's both ways. LineStep under Grid is the fine grid:
+	 * edge pieces go on any line that far apart across a cell (the edges among them) and pillars on any crossing of them;
+	 * LineStep = Grid is the plain grid. Cell pieces stay on whole cells either way.
+	 */
+	static FVector SnapInFrame(FName Shape, const FVector& Hit, float BaseZ, float Grid, float LineStep, const FVector& Origin, float FrameYaw, float& InOutYaw);
+	/** A piece is where SnapInFrame with this frame could have put it: on its lines, square to it (2 cm, 1 degree of slack). */
+	static bool IsSnappedIn(FName Shape, const FVector& Location, float Yaw, float Grid, float LineStep, const FVector& Origin, float FrameYaw);
 	/** Which slot a shape fills, so two pieces can't share one: "edge" (walls, doorways, windows, gables...), "cell" (foundations, floors, roofs), "corner" (pillars), "stairs". */
 	static FName SlotOf(FName Shape);
 	/** Pieces that carry what's stacked straight on top of them at no span cost (walls, pillars, foundations...). */
@@ -118,8 +127,10 @@ public:
 	TSet<FString> UnlockedFor;
 	/** Beds: the players who've set it to wake at (WRBeds; saved with the world). */
 	TArray<FString> Sleepers;
-	/** Ghosts are local previews in build mode: no collision, tinted. */
+	/** Ghosts are local previews in build mode: no collision, tinted, in the piece's real shape. */
 	bool bGhost = false;
+	/** A ghost without the detail blocks (demolish's glowing copy of what you aim at: its glow isn't made for instanced blocks). */
+	bool bPlainGhost = false;
 
 	const FWRPieceDef* GetDef() const { return FWRBuildRegistry::Get().Find(PieceId); }
 	void SetGhostValid(bool bValid);
@@ -128,6 +139,8 @@ public:
 	/** Make a ghost glow, unlit, so it reads the same by day and by night (demolish mode marks what a click takes down). */
 	void SetGhostGlow(const FLinearColor& Color, float Glow);
 	void ApplyLook();
+	/** What a ghost is showing, for tests: the prop mesh's name, or how many blocks it's made of. */
+	FString GhostLook() const;
 
 	// --- Server ---
 	void InitPiece(FName InPieceId, const FString& InOwner);

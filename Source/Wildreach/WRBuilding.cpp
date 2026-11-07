@@ -10,6 +10,7 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRFx.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -142,6 +143,77 @@ FVector FWRBuildRules::SnapToGrid(FName Shape, const FVector& Hit, float BaseZ, 
 	// Stairs and roofs keep which way they rise; everything else in a cell sits square.
 	InOutYaw = Shape == TEXT("stairs") || Shape == TEXT("roof") ? Quarter * 90.f : 0.f;
 	return FVector(Cx, Cy, BaseZ);
+}
+
+FVector FWRBuildRules::SnapInFrame(FName Shape, const FVector& Hit, float BaseZ, float Grid, float LineStep, const FVector& Origin, float FrameYaw, float& InOutYaw)
+{
+	const FRotator Frame(0.f, FrameYaw, 0.f);
+	const FVector Local = Frame.UnrotateVector(FVector(Hit.X - Origin.X, Hit.Y - Origin.Y, 0.f));
+	float Yaw = InOutYaw - FrameYaw;
+	FVector Snapped;
+	const FName Slot = SlotOf(Shape);
+	if (LineStep > 1.f && LineStep < Grid && (Slot == TEXT("edge") || Slot == TEXT("corner")))
+	{
+		// The lines run through the cell edges, LineStep apart.
+		const float Edge = Grid * 0.5f;
+		const auto Line = [Edge, LineStep](float V) { return FMath::RoundToFloat((V - Edge) / LineStep) * LineStep + Edge; };
+		const float LX = Line(Local.X), LY = Line(Local.Y);
+		if (Slot == TEXT("corner"))
+		{
+			Yaw = 0.f;
+			Snapped = FVector(LX, LY, 0.f);
+		}
+		else
+		{
+			// Along the nearest line, in the cell it's aimed at. A gable keeps which end is high.
+			const int32 Quarter = ((FMath::RoundToInt(Yaw / 90.f) % 4) + 4) % 4;
+			const float Flip = Shape == TEXT("gable") && Quarter >= 2 ? 180.f : 0.f;
+			if (FMath::Abs(Local.X - LX) < FMath::Abs(Local.Y - LY))
+			{
+				Yaw = 90.f + Flip;
+				Snapped = FVector(LX, FMath::RoundToFloat(Local.Y / Grid) * Grid, 0.f);
+			}
+			else
+			{
+				Yaw = Flip;
+				Snapped = FVector(FMath::RoundToFloat(Local.X / Grid) * Grid, LY, 0.f);
+			}
+		}
+	}
+	else
+	{
+		Snapped = SnapToGrid(Shape, Local, 0.f, Grid, Yaw);
+	}
+	const FVector World = Origin + Frame.RotateVector(FVector(Snapped.X, Snapped.Y, 0.f));
+	InOutYaw = Yaw + FrameYaw;
+	return FVector(World.X, World.Y, BaseZ);
+}
+
+bool FWRBuildRules::IsSnappedIn(FName Shape, const FVector& Location, float Yaw, float Grid, float LineStep, const FVector& Origin, float FrameYaw)
+{
+	const float Turn = FMath::Abs(FRotator::NormalizeAxis(Yaw - FrameYaw));
+	const int32 Quarters = FMath::RoundToInt(Turn / 90.f);
+	if (FMath::Abs(Turn - Quarters * 90.f) > 1.f)
+	{
+		return false;
+	}
+	const FVector Local = FRotator(0.f, FrameYaw, 0.f).UnrotateVector(FVector(Location.X - Origin.X, Location.Y - Origin.Y, 0.f));
+	const auto On = [](float V, float Step, float Start)
+	{
+		const float K = (V - Start) / Step;
+		return FMath::Abs(K - FMath::RoundToFloat(K)) * Step < 2.f;
+	};
+	const float Edge = Grid * 0.5f;
+	const FName Slot = SlotOf(Shape);
+	if (Slot == TEXT("edge"))
+	{
+		return Quarters % 2 == 1 ? On(Local.X, LineStep, Edge) && On(Local.Y, Grid, 0.f) : On(Local.Y, LineStep, Edge) && On(Local.X, Grid, 0.f);
+	}
+	if (Slot == TEXT("corner"))
+	{
+		return On(Local.X, LineStep, Edge) && On(Local.Y, LineStep, Edge);
+	}
+	return On(Local.X, Grid, 0.f) && On(Local.Y, Grid, 0.f);
 }
 
 FName FWRBuildRules::SlotOf(FName Shape)
@@ -569,11 +641,53 @@ void AWRBuildPiece::ApplyLook()
 		Light->SetRelativeLocation(FVector(0.f, 0.f, Def->Id == TEXT("brazier") ? 100.f : 160.f));
 	}
 
-	// Built pieces, where they're drawn, get their real shape; ghosts stay plain tinted blocks.
-	if (!bGhost && GetNetMode() != NM_DedicatedServer)
+	// Built pieces, where they're drawn, get their real shape. So does a ghost, all in its tint: you see what you're placing.
+	if (GetNetMode() != NM_DedicatedServer)
 	{
 		ApplyDetail(*Def, LeafSize);
+		if (bGhost)
+		{
+			UMaterialInstanceDynamic* Tint = UMaterialInstanceDynamic::Create(ShapeMat(), this);
+			Tint->SetVectorParameterValue(TEXT("Color"), Color);
+			TArray<UMeshComponent*> All;
+			GetComponents(All);
+			for (UMeshComponent* C : All)
+			{
+				for (int32 Slot = 0; Slot < C->GetNumMaterials(); ++Slot)
+				{
+					C->SetMaterial(Slot, Tint);
+				}
+			}
+		}
 	}
+}
+
+FString AWRBuildPiece::GhostLook() const
+{
+	int32 Blocks = 0;
+	FString Prop;
+	TArray<UStaticMeshComponent*> All;
+	GetComponents(All);
+	for (const UStaticMeshComponent* C : All)
+	{
+		if (!C->IsVisible() || !C->GetStaticMesh())
+		{
+			continue;
+		}
+		if (const UInstancedStaticMeshComponent* Many = Cast<UInstancedStaticMeshComponent>(C))
+		{
+			Blocks += Many->GetInstanceCount();
+		}
+		else if (C != Main.Get() && C != Leaf.Get())
+		{
+			Prop = C->GetStaticMesh()->GetName();
+		}
+		else
+		{
+			++Blocks;
+		}
+	}
+	return Prop.IsEmpty() ? FString::Printf(TEXT("%d blocks"), Blocks) : Prop;
 }
 
 void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
@@ -581,10 +695,15 @@ void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
 	// A prop mesh (the chest) or detail blocks (WRBuildLook: planks, coursed stone, shingles, frames). Either way the
 	// plain blocks made above stay as the piece's collision, hidden, so placing, snapping and support don't change.
 	UStaticMeshComponent* Prop = FWRBuildLook::AttachProp(this, RootComponent, Def, 0.f);
-	const TArray<FWRLookBlock> Blocks = Prop ? TArray<FWRLookBlock>() : FWRBuildLook::Blocks(Def, GetActorTransform());
+	const TArray<FWRLookBlock> Blocks = Prop || bPlainGhost ? TArray<FWRLookBlock>() : FWRBuildLook::Blocks(Def, GetActorTransform());
 	if (!Prop && Blocks.Num() == 0)
 	{
 		return;  // rugs, banners: their flat block is the look
+	}
+	if (Prop && bGhost)
+	{
+		// Scales with the ghost, so demolish's copy (a hair bigger) sits over the real thing instead of flickering through it.
+		Prop->SetUsingAbsoluteScale(false);
 	}
 	TArray<UMeshComponent*> Plain;
 	GetComponents(Plain);
@@ -633,15 +752,18 @@ void AWRBuildPiece::SetGhostGlow(const FLinearColor& Color, float Glow)
 	GetComponents(Comps);
 	for (UMeshComponent* C : Comps)
 	{
-		UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0));
-		if (!M) continue;
-		if (M->Parent != GlowMat)
+		for (int32 Slot = 0; Slot < C->GetNumMaterials(); ++Slot)
 		{
-			M = UMaterialInstanceDynamic::Create(GlowMat, this);
-			C->SetMaterial(0, M);
+			UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(Slot));
+			if (!M) continue;
+			if (M->Parent != GlowMat)
+			{
+				M = UMaterialInstanceDynamic::Create(GlowMat, this);
+				C->SetMaterial(Slot, M);
+			}
+			M->SetVectorParameterValue(TEXT("Color"), Color);
+			M->SetScalarParameterValue(TEXT("Glow"), Glow);
 		}
-		M->SetVectorParameterValue(TEXT("Color"), Color);
-		M->SetScalarParameterValue(TEXT("Glow"), Glow);
 	}
 }
 

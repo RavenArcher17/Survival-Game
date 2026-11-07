@@ -1050,7 +1050,7 @@ private:
 		[
 			WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Mode() == 1 ? LOCTEXT("KPlacing", "Placing") : Mode() == 2 ? LOCTEXT("KDemolish", "Demolishing") : LOCTEXT("KBuilding", "Building"); }), WRUI::Caps(12), WRUI::Ink2)
 		];
-		for (int32 Row = 0; Row < 6; ++Row)
+		for (int32 Row = 0; Row < 7; ++Row)
 		{
 			Rows->AddSlot().AutoHeight().Padding(0.f, 5.f * U, 0.f, 0.f)
 			[
@@ -1071,7 +1071,7 @@ private:
 					SNew(SBox).Visibility_Lambda([this, Row]() { FText K, L; bool bSnap = false; KeyRow(Row, K, L, bSnap); return bSnap ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 					[
 						SNew(SWRChip).FontSize(11)
-						.Text_Lambda([this]() { return PC.IsValid() && PC->IsSnapOn() ? LOCTEXT("On", "On") : LOCTEXT("Off", "Off"); })
+						.Text_Lambda([this]() { const int32 S = PC.IsValid() ? PC->GetSnapMode() : 0; return S == 2 ? LOCTEXT("SnapFine", "Fine") : S == 1 ? LOCTEXT("SnapGrid", "Grid") : LOCTEXT("Off", "Off"); })
 						.Color_Lambda([this]() { return PC.IsValid() && PC->IsSnapOn() ? WRUI::Good : WRUI::Warn; })
 					]
 				]
@@ -1090,15 +1090,15 @@ private:
 	bool KeyRow(int32 Row, FText& OutKey, FText& OutLabel, bool& bOutSnap) const
 	{
 		const int32 M = Mode();
-		const FWRPieceDef* D = PC.IsValid() ? FWRBuildRegistry::Get().Find(PC->GetPlacingPiece()) : nullptr;
-		const bool bGrid = D && D->Snaps() && PC->IsSnapOn();
+		const float Step = PC.IsValid() ? PC->GetPlaceStep() : 0.f;
 		struct FLine { FText Key; FText Label; bool bSnap; };
 		const auto K = [this](const TCHAR* Action) { return WRUI::KeyName(KeyOf(Action)); };
 		TArray<FLine> Lines;
 		if (M == 1)
 		{
 			Lines.Add({ K(TEXT("Light")), LOCTEXT("KPlace", "Place"), false });
-			Lines.Add({ K(TEXT("Heavy")), bGrid ? LOCTEXT("KRotate90", "Rotate 90°") : LOCTEXT("KRotate45", "Rotate 45°"), false });
+			Lines.Add({ K(TEXT("Heavy")), Step >= 180.f ? LOCTEXT("KFlip", "Flip it") : Step >= 90.f ? LOCTEXT("KRotate90", "Rotate 90°") : Step > 0.f ? LOCTEXT("KRotate45", "Rotate 45°") : LOCTEXT("KTurnHold", "Turn, hold to spin"), false });
+			Lines.Add({ LOCTEXT("KWheel", "Wheel"), Step > 0.f ? LOCTEXT("KWheelStep", "Rotate either way") : LOCTEXT("KWheelFine", "Fine turn"), false });
 			Lines.Add({ K(TEXT("Block")), LOCTEXT("KCancel", "Cancel"), false });
 			Lines.Add({ K(TEXT("Snap")), LOCTEXT("KSnap", "Snap"), true });
 			Lines.Add({ K(TEXT("Demolish")), LOCTEXT("KDemolishInstead", "Demolish instead"), false });

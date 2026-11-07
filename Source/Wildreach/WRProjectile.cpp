@@ -61,6 +61,8 @@ void AWRProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRProjectile, ModelPath);
 	DOREPLIFETIME(AWRProjectile, ModelAlong);
 	DOREPLIFETIME(AWRProjectile, TrailFx);
+	DOREPLIFETIME(AWRProjectile, HomingOn);
+	DOREPLIFETIME(AWRProjectile, HomingAcceleration);
 }
 
 void AWRProjectile::BeginPlay()
@@ -108,6 +110,21 @@ void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& C
 	TrailFx = InHit.Element == WRTags::Element_Fire ? FName(TEXT("fire.bolt")) : InHit.Element == WRTags::Element_Frost ? FName(TEXT("frost.shard")) : NAME_None;
 	OnRep_Color();
 	OnRep_Fx();
+}
+
+void AWRProjectile::HomeOn(AActor* Target, float Acceleration)
+{
+	HomingOn = Target;
+	HomingAcceleration = Acceleration;
+	OnRep_Homing();
+}
+
+void AWRProjectile::OnRep_Homing()
+{
+	USceneComponent* At = HomingOn ? HomingOn->GetRootComponent() : nullptr;
+	Movement->HomingTargetComponent = At;
+	Movement->HomingAccelerationMagnitude = HomingAcceleration;
+	Movement->bIsHomingProjectile = At != nullptr && HomingAcceleration > 0.f;
 }
 
 void AWRProjectile::InitPhysical(const FWRHit& InHit, const FVector& Velocity, float Gravity, const FString& MeshPath, const FString& MeshAlong, FName InKind, FName InPickupItem)

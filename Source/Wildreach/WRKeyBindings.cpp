@@ -105,6 +105,7 @@ void FWRKeyBindings::ResetAll()
 	for (FWRActionKey& A : List) A.Key = A.Default;
 	CastMode = EWRCastMode::Both;
 	bCastOnRelease = false;
+	bShowCrosshair = true;
 	Save();
 	OnChanged.Broadcast();
 }
@@ -135,6 +136,13 @@ void FWRKeyBindings::SetCastOnRelease(bool b)
 	OnChanged.Broadcast();
 }
 
+void FWRKeyBindings::SetShowCrosshair(bool b)
+{
+	bShowCrosshair = b;
+	Save();
+	OnChanged.Broadcast();
+}
+
 void FWRKeyBindings::Load()
 {
 	for (FWRActionKey& A : List)
@@ -149,6 +157,7 @@ void FWRKeyBindings::Load()
 	GConfig->GetInt(KeySection, TEXT("CastMode"), Mode, GGameUserSettingsIni);
 	CastMode = static_cast<EWRCastMode>(FMath::Clamp(Mode, 0, 2));
 	GConfig->GetBool(KeySection, TEXT("CastOnRelease"), bCastOnRelease, GGameUserSettingsIni);
+	GConfig->GetBool(KeySection, TEXT("ShowCrosshair"), bShowCrosshair, GGameUserSettingsIni);
 }
 
 void FWRKeyBindings::Save() const
@@ -167,5 +176,6 @@ void FWRKeyBindings::Save() const
 	}
 	GConfig->SetInt(KeySection, TEXT("CastMode"), static_cast<int32>(CastMode), GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("CastOnRelease"), bCastOnRelease, GGameUserSettingsIni);
+	GConfig->SetBool(KeySection, TEXT("ShowCrosshair"), bShowCrosshair, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }

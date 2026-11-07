@@ -3,6 +3,7 @@
 // reads what WRFx::ShowHit recorded on this machine.
 
 #include "WRFx.h"
+#include "WRCharacterBase.h"
 #include "WRFxSystem.h"
 #include "WRPlayerController.h"
 #include "WRPlayerUI.h"
@@ -172,6 +173,28 @@ public:
 				const FVector2D TagSize = Measure->Measure(S.Tag, TagFont);
 				FSlateDrawElement::MakeText(Out, Layer + 1, Geo.ToPaintGeometry(TagSize, FSlateLayoutTransform(FVector2D(Pos.X - TagSize.X * 0.5f, At.Y + TextSize.Y - 4.f))),
 					S.Tag, TagFont, ESlateDrawEffect::None, WRUI::Alpha(S.Color, Alpha * 0.9f));
+			}
+		}
+
+		// What you've locked on to: four gold corners around it, sized to it.
+		if (const AWRCharacterBase* Lock = P->GetLockTarget())
+		{
+			const FVector At = Lock->GetActorLocation();
+			FVector2D Middle, Top;
+			if (P->ProjectWorldLocationToScreen(At, Middle, true) && P->ProjectWorldLocationToScreen(At + FVector(0.f, 0.f, Lock->GetSimpleCollisionHalfHeight()), Top, true))
+			{
+				const FVector2D C(Middle.X * Size.X / VX, Middle.Y * Size.Y / VY);
+				const float R = FMath::Clamp(static_cast<float>(FMath::Abs(Middle.Y - Top.Y)) * Size.Y / VY * 1.25f, 18.f, 150.f);
+				const float L = FMath::Max(7.f, R * 0.35f);
+				for (int32 k = 0; k < 4; ++k)
+				{
+					const FVector2D S2(k == 0 || k == 3 ? -1.f : 1.f, k < 2 ? -1.f : 1.f);
+					const TArray<FVector2D> Corner = { C + FVector2D(S2.X * R, S2.Y * (R - L)), C + FVector2D(S2.X * R, S2.Y * R), C + FVector2D(S2.X * (R - L), S2.Y * R) };
+					TArray<FVector2D> Under;
+					for (const FVector2D& V : Corner) Under.Add(V + FVector2D(1.f, 1.f));
+					FSlateDrawElement::MakeLines(Out, Layer + 2, Geo.ToPaintGeometry(), Under, ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.f, 0.6f), true, 3.f);
+					FSlateDrawElement::MakeLines(Out, Layer + 3, Geo.ToPaintGeometry(), Corner, ESlateDrawEffect::None, FLinearColor(1.f, 0.78f, 0.25f, 0.95f), true, 2.f);
+				}
 			}
 		}
 

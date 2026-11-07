@@ -43,6 +43,9 @@ public:
 	void SetCastMode(EWRCastMode Mode);
 	bool CastOnRelease() const { return bCastOnRelease; }
 	void SetCastOnRelease(bool b);
+	/** The crosshair stays up all the time (off: only while aiming, placing or in first person). */
+	bool ShowCrosshair() const { return bShowCrosshair; }
+	void SetShowCrosshair(bool b);
 
 	void Save() const;
 	FSimpleMulticastDelegate OnChanged;
@@ -54,4 +57,5 @@ private:
 	TArray<FWRActionKey> List;
 	EWRCastMode CastMode = EWRCastMode::Both;
 	bool bCastOnRelease = false;
+	bool bShowCrosshair = true;
 };

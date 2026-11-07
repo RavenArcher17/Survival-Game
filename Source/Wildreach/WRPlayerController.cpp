@@ -390,7 +390,7 @@ void AWRPlayerController::WRBotPause(int32 bPause)
 	bBotPaused = bPause != 0;
 	if (bBotPaused)
 	{
-		LockTarget = nullptr;  // otherwise lock-on keeps steering the camera
+		SetLockTarget(nullptr);  // otherwise lock-on keeps steering the camera
 	}
 }
 
@@ -398,7 +398,7 @@ void AWRPlayerController::WRGather(const FString& What)
 {
 	bBotGather = What != TEXT("off");
 	BotGatherGroup = bBotGather ? What.ToLower() : FString(TEXT("node"));
-	LockTarget = nullptr;
+	SetLockTarget(nullptr);
 }
 
 void AWRPlayerController::WRArtCam(FName Creature, float Yaw)
@@ -585,10 +585,105 @@ AWRCharacterBase* AWRPlayerController::FindTarget(float MaxDistance, float MaxAn
 	return Best;
 }
 
+bool AWRPlayerController::CanSeeTarget(const AWRCharacterBase* Target) const
+{
+	const APawn* Self = GetPawn();
+	if (!Target || !Self)
+	{
+		return false;
+	}
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRLockSight), false, Self);
+	Query.AddIgnoredActor(Target);
+	const FVector Middle = Target->GetActorLocation();
+	const FVector Top = Middle + FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight() * 0.8f);
+	const FVector Camera = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : Self->GetActorLocation();
+	const FVector Head = Self->GetActorLocation() + FVector(0.f, 0.f, 60.f);
+	const UWorld* World = GetWorld();
+	return !World->LineTraceTestByChannel(Camera, Middle, ECC_Visibility, Query) || !World->LineTraceTestByChannel(Camera, Top, ECC_Visibility, Query)
+		|| !World->LineTraceTestByChannel(Head, Middle, ECC_Visibility, Query) || !World->LineTraceTestByChannel(Head, Top, ECC_Visibility, Query);
+}
+
+AWRCharacterBase* AWRPlayerController::FindLockTarget() const
+{
+	const AWRCharacterBase* Self = Cast<AWRCharacterBase>(GetPawn());
+	if (!Self || !PlayerCameraManager)
+	{
+		return nullptr;
+	}
+	const FVector Eye = PlayerCameraManager->GetCameraLocation();
+	const FVector Forward = PlayerCameraManager->GetCameraRotation().Vector();
+	const float Range = WRTune(TEXT("camera.lockOnRange"), 2500.f);
+	const float MinCos = FMath::Cos(FMath::DegreesToRadians(WRTune(TEXT("camera.lockOnAngle"), 40.f)));
+	const float DistanceWeight = WRTune(TEXT("camera.lockOnDistanceWeight"), 15.f);
+	AWRCharacterBase* Best = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	int32 Hidden = 0, OutOfSight = 0;
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+	{
+		AWRCharacterBase* Other = *It;
+		if (Other == Self || !Other->IsAlive() || !Self->IsHostileTo(Other))
+		{
+			continue;
+		}
+		const float Dist = FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation());
+		const float Cos = FVector::DotProduct((Other->GetActorLocation() - Eye).GetSafeNormal(), Forward);
+		if (Dist > Range || Cos < MinCos)
+		{
+			continue;
+		}
+		// A buried burrower is there, but you can't see it: nothing to lock on to (it once turned the camera to a bare patch
+		// of a cave, or the lava beside it).
+		if (Other->IsHidden())
+		{
+			++Hidden;
+			continue;
+		}
+		// Whatever's nearest the crosshair, the nearer of two about as close to it.
+		const float Score = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Cos, -1.f, 1.f))) + Dist / Range * DistanceWeight;
+		if (Score >= BestScore)
+		{
+			continue;
+		}
+		if (!CanSeeTarget(Other))
+		{
+			++OutOfSight;
+			continue;
+		}
+		BestScore = Score;
+		Best = Other;
+	}
+	UE_LOG(LogWildreach, Log, TEXT("LOCK %s (%d buried, %d out of sight)"), Best ? *FString::Printf(TEXT("on %s %.0f cm away"), *Best->GetName(), FVector::Dist(Best->GetActorLocation(), Self->GetActorLocation())) : TEXT("nothing to lock on to"), Hidden, OutOfSight);
+	return Best;
+}
+
+void AWRPlayerController::SetLockTarget(AWRCharacterBase* Target)
+{
+	if (LockTarget.Get() == Target)
+	{
+		return;
+	}
+	LockTarget = Target;
+	LockAge = 0.f;
+	LockUnseen = 0.f;
+	if (IsLocalController())
+	{
+		ServerSetLock(Target);
+	}
+}
+
+void AWRPlayerController::ServerSetLock_Implementation(AWRCharacterBase* Target)
+{
+	ServerLock = Target;
+}
+
 void AWRPlayerController::ToggleLockOn()
 {
-	LockTarget = LockTarget.IsValid() ? nullptr : FindTarget(2500.f, 40.f);
-	LockAge = 0.f;
+	SetLockTarget(LockTarget.IsValid() ? nullptr : FindLockTarget());
+}
+
+void AWRPlayerController::WRLockOn()
+{
+	ToggleLockOn();
 }
 
 void AWRPlayerController::UpdateLockOn(float DeltaTime)
@@ -599,10 +694,27 @@ void AWRPlayerController::UpdateLockOn(float DeltaTime)
 	{
 		return;
 	}
-	if (!Target->IsAlive() || FVector::Dist(Target->GetActorLocation(), Self->GetActorLocation()) > 3500.f)
+	const AWRCharacterBase* Me = Cast<AWRCharacterBase>(Self);
+	const FString Lost = !Target->IsAlive() ? FString(TEXT("it died"))
+		: Me && !Me->IsAlive() ? FString(TEXT("you died"))
+		: Target->IsHidden() ? FString(TEXT("it went underground"))
+		: FVector::Dist(Target->GetActorLocation(), Self->GetActorLocation()) > WRTune(TEXT("camera.lockOnKeepRange"), 3500.f) ? FString(TEXT("too far")) : FString();
+	if (!Lost.IsEmpty())
 	{
-		LockTarget = nullptr;
+		UE_LOG(LogWildreach, Log, TEXT("LOCK lost: %s"), *Lost);
+		SetLockTarget(nullptr);
 		return;
+	}
+	// Behind a wall or a hill for a moment is fine; gone for good, the camera stops staring at the rock (hunting bots don't look).
+	if (!bBot || bBotPaused)
+	{
+		LockUnseen = CanSeeTarget(Target) ? 0.f : LockUnseen + DeltaTime;
+		if (LockUnseen > WRTune(TEXT("camera.lockOnLostSeconds"), 2.5f))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("LOCK lost: out of sight"));
+			SetLockTarget(nullptr);
+			return;
+		}
 	}
 	const FVector Eye = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : Self->GetActorLocation();
 	const FRotator Desired = (Target->GetActorLocation() + FVector(0.f, 0.f, 30.f) - Eye).Rotation();
@@ -1390,7 +1502,7 @@ void AWRPlayerController::TickBot(float DeltaTime)
 
 	if (!LockTarget.IsValid() || !LockTarget->IsAlive())
 	{
-		LockTarget = FindTarget(8000.f, 180.f);
+		SetLockTarget(FindTarget(8000.f, 180.f));
 	}
 	AWRCharacterBase* Target = LockTarget.Get();
 

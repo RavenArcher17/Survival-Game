@@ -21,6 +21,12 @@ public:
 	/** Server: resolve a hit on Target. Returns what happened. */
 	static EWRHitResult ApplyHit(AWRCharacterBase* Target, const FWRHit& Hit);
 
+	/**
+	 * Where to aim so a shot leaving From at Speed meets a target moving at Velocity. A target that can't be caught gets
+	 * the point it'll have reached by the time a shot gets to where it is now.
+	 */
+	static FVector LeadPoint(const FVector& From, const FVector& Target, const FVector& Velocity, float Speed);
+
 	/** Weapon damage from the sword table: base x metal x quality x (1 + upgrade * per-level). */
 	static float WeaponDamage(const FWRWeaponStats& Weapon, bool bHeavy);
 

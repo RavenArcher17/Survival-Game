@@ -512,17 +512,72 @@ private:
 	// ---------------------------------------------------------------- centre: crosshair, notice, prompt, pickups, hazards
 	TSharedRef<SWidget> Crosshair()
 	{
-		return SNew(SBox).WidthOverride(18.f).HeightOverride(18.f).Visibility_Lambda([this]()
+		// A dot and four short ticks at the screen's middle, where spells, shots and the build ghost go. A thin dark edge keeps
+		// them readable on snow and sky alike; red over something hostile.
+		TSharedRef<SOverlay> Marks = SNew(SOverlay);
+		const auto Stroke = [this, &Marks](float Width, float Height, float X, float Y)
+		{
+			Marks->AddSlot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(Width + 2.f).HeightOverride(Height + 2.f)
+				.RenderTransform(TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(X, Y))))
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.45f))]
+					+ SOverlay::Slot().Padding(1.f)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity_Lambda([this]() { return CrosshairColor(); })]
+				]
+			];
+		};
+		Stroke(2.f, 2.f, 0.f, 0.f);
+		Stroke(2.f, 6.f, 0.f, -9.f);
+		Stroke(2.f, 6.f, 0.f, 9.f);
+		Stroke(6.f, 2.f, -9.f, 0.f);
+		Stroke(6.f, 2.f, 9.f, 0.f);
+		return SNew(SBox).WidthOverride(36.f).HeightOverride(36.f).Visibility_Lambda([this]()
 		{
 			const AWRCharacter* S = Survivor();
-			return S && !Covered() && (S->IsAimingRanged() || S->IsFirstPerson()) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			const AWRPlayerController* P = PC.Get();
+			const bool bPlacing = P && P->IsPlacing();
+			const bool bWanted = FWRKeyBindings::Get().ShowCrosshair() || (S && (S->IsAimingRanged() || S->IsFirstPerson())) || bPlacing;
+			return S && (!Covered() || bPlacing) && !WheelOpen() && bWanted ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 		})
 		[
-			SNew(SOverlay)
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[SNew(SBox).WidthOverride(16.f).HeightOverride(2.f)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity_Lambda([this]() { const AWRCharacter* S = Survivor(); return S && S->IsAimingRanged() ? FLinearColor(1, 1, 1, 0.9f) : FLinearColor::Transparent; })]]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[SNew(SBox).WidthOverride(2.f).HeightOverride(16.f)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity_Lambda([this]() { const AWRCharacter* S = Survivor(); return S && S->IsAimingRanged() ? FLinearColor(1, 1, 1, 0.9f) : FLinearColor::Transparent; })]]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[SNew(SBox).WidthOverride(4.f).HeightOverride(4.f)[SNew(SImage).Image(WRUI::Box(FLinearColor::White, 2.f, FLinearColor::Black, 1.f))]]
+			Marks
 		];
+	}
+
+	FSlateColor CrosshairColor() const
+	{
+		const AWRPlayerController* P = PC.Get();
+		const bool bRed = bAimOnFoe || (P && P->IsDemolishing() && P->IsPlacementValid());
+		return bRed ? FLinearColor(1.f, 0.28f, 0.16f, 1.f) : FLinearColor(1.f, 1.f, 1.f, 0.9f);
+	}
+	bool bAimOnFoe = false;
+
+	/** Is something hostile right under the crosshair? */
+	void UpdateCrosshair()
+	{
+		bAimOnFoe = false;
+		const AWRPlayerController* P = PC.Get();
+		const AWRCharacter* S = Survivor();
+		if (!P || !S || !P->PlayerCameraManager || Covered())
+		{
+			return;
+		}
+		const FVector Eye = P->PlayerCameraManager->GetCameraLocation();
+		const FVector Dir = P->PlayerCameraManager->GetCameraRotation().Vector();
+		const float Along = FMath::Max(0.f, static_cast<float>(FVector::DotProduct(S->GetActorLocation() - Eye, Dir)));
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCrosshair), false, S);
+		FCollisionObjectQueryParams Objects;
+		Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+		Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+		Objects.AddObjectTypesToQuery(ECC_Pawn);
+		FHitResult Hit;
+		if (S->GetWorld()->LineTraceSingleByObjectType(Hit, Eye + Dir * Along, Eye + Dir * (Along + WRTune(TEXT("ui.crosshairFoeRange"), 4000.f)), Objects, Query))
+		{
+			const AWRCharacterBase* Who = Cast<AWRCharacterBase>(Hit.GetActor());
+			bAimOnFoe = Who && Who->IsAlive() && !Who->IsHidden() && S->IsHostileTo(Who);
+		}
 	}
 
 	TSharedRef<SWidget> CentreNotice()
@@ -545,6 +600,7 @@ private:
 	virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
 	{
 		SCompoundWidget::Tick(Geo, Time, Delta);
+		UpdateCrosshair();
 		if (NoticeBox.IsValid())
 		{
 			float A = 0.f;

@@ -2,7 +2,8 @@
 # double-click: C:\Dev\WildreachBuild\Wildreach-Setup.exe. Uses the C# compiler that ships with Windows.
 # The game folder gets version.txt (the game's version, ProjectVersion in Config\DefaultGame.ini) and
 # WildreachUpdater.exe, which the shortcuts start: it installs newer releases from GitHub by itself. Publish a
-# release tagged v<version> (e.g. v0.2.0) with Wildreach-Setup.exe attached and every installed copy picks it up.
+# release tagged v<version> (e.g. v0.2.0) with Wildreach-Setup.exe attached and every installed copy picks it up,
+# fetching only the parts of that Setup it doesn't already have (installer\WildreachPack.cs).
 #   make_installer.ps1 [-Build C:\Dev\WildreachBuild] [-Version 0.2.0] [-Out <setup.exe>]
 param([string]$Build = 'C:\Dev\WildreachBuild', [string]$Version = '', [string]$Out = '')
 $ErrorActionPreference = 'Stop'
@@ -27,21 +28,23 @@ Copy-Item 'C:\Program Files\Epic Games\UE_5.8\Engine\Extras\Redist\en-us\vc_redi
 # The updater and the version it compares against (no BOM: it's read as plain text).
 [System.IO.File]::WriteAllText((Join-Path $game 'version.txt'), $Version)
 Remove-Item (Join-Path $game 'updater.log') -ErrorAction SilentlyContinue
-& $csc /nologo /target:winexe /optimize "/out:$(Join-Path $game 'WildreachUpdater.exe')" `
-	"/r:$fx\System.Windows.Forms.dll" "/r:$fx\System.Drawing.dll" (Join-Path $PSScriptRoot 'installer\WildreachUpdater.cs')
+$pack = Join-Path $PSScriptRoot 'installer\WildreachPack.cs'
+& $csc /nologo /target:winexe /optimize /platform:x64 "/out:$(Join-Path $game 'WildreachUpdater.exe')" `
+	"/r:$fx\System.Windows.Forms.dll" "/r:$fx\System.Drawing.dll" (Join-Path $PSScriptRoot 'installer\WildreachUpdater.cs') $pack
 if ($LASTEXITCODE -ne 0) { throw "csc (updater) failed ($LASTEXITCODE)" }
 
-$zip = Join-Path $work 'game.zip'
-Remove-Item $zip -ErrorAction SilentlyContinue
-Write-Host "Zipping the game, version $Version (a few minutes)..."
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory($game, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+# The installer program, and the tool that puts the game on the end of it.
+$stub = Join-Path $work 'stub.exe'
+$tool = Join-Path $work 'WildreachPackTool.exe'
+& $csc /nologo /target:winexe /platform:x64 /optimize "/out:$stub" "/r:$fx\System.Windows.Forms.dll" "/r:$fx\System.Drawing.dll" `
+	"/r:$fx\Microsoft.CSharp.dll" (Join-Path $PSScriptRoot 'installer\WildreachSetup.cs') $pack
+if ($LASTEXITCODE -ne 0) { throw "csc (installer) failed ($LASTEXITCODE)" }
+& $csc /nologo /target:exe /platform:x64 /optimize "/out:$tool" (Join-Path $PSScriptRoot 'installer\WildreachPackTool.cs') $pack
+if ($LASTEXITCODE -ne 0) { throw "csc (pack tool) failed ($LASTEXITCODE)" }
 
 if (-not $Out) { $Out = Join-Path $Build 'Wildreach-Setup.exe' }
-Write-Host "Compiling $Out..."
-& $csc /nologo /target:winexe /platform:x64 /optimize "/out:$Out" "/resource:$zip,game.zip" `
-	"/r:$fx\System.IO.Compression.dll" "/r:$fx\System.IO.Compression.FileSystem.dll" "/r:$fx\System.Windows.Forms.dll" `
-	"/r:$fx\System.Drawing.dll" "/r:$fx\Microsoft.CSharp.dll" (Join-Path $PSScriptRoot 'installer\WildreachSetup.cs')
-if ($LASTEXITCODE -ne 0) { throw "csc failed ($LASTEXITCODE)" }
-Remove-Item $zip
+Write-Host "Packing the game, version $Version (a few minutes)..."
+& $tool $game $stub $Out $Version
+if ($LASTEXITCODE -ne 0) { throw "the pack tool failed ($LASTEXITCODE)" }
+Remove-Item $stub, $tool
 "{0} ({1:N0} MB), version {2}" -f $Out, ((Get-Item $Out).Length / 1MB), $Version

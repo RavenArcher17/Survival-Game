@@ -88,6 +88,8 @@
   },
 
   "spells": {
+    "lockLead": 1, "lockHoming": 6000, "lockHomingPlayers": 2000, "lockRange": 4000,
+    "_lock": "With a target locked on, bolts aim ahead of where it's going (lockLead 0 = at where it is), then curve toward it: cm/s/s, less against other players so they can dodge. A target past lockRange cm isn't aimed at.",
     "fireBolt": { "damage": 18, "burnBuildup": 35, "speed": 2600, "cooldown": 1.2, "heat": 10 },
     "frostShard": { "damage": 14, "frostBuildup": 40, "speed": 3000, "cooldown": 1.0, "chill": 6 },
     "flameSlash": { "multiplier": 1.4, "burnBuildup": 45, "cooldown": 3.0, "heat": 12 },
@@ -175,8 +177,9 @@
     "creatureWade": 0.8, "creatureLookAhead": 150, "soundRange": 3500, "strokeSeconds": 0.85,
     "rescueMargin": 0, "rescueTraceTop": 150000, "voidZ": -5000 },
 
-  "camera": { "_comment": "Third-person camera (WRCameraBoom, polish pass): the wall / tree probe radius cm; how fast the camera eases back out after something pulled it in (it always pulls in at once); degrees the view widens while sprinting and how fast; lock-on turns start at lockOnStartSpeed and firm up to lockOnSpeed over lockOnEaseSeconds.",
-    "probeSize": 16, "returnSpeed": 3.5, "sprintFov": 6, "sprintFovSpeed": 3, "lockOnStartSpeed": 2.5, "lockOnSpeed": 7, "lockOnEaseSeconds": 0.5 },
+  "camera": { "_comment": "Third-person camera (WRCameraBoom, polish pass): the wall / tree probe radius cm; how fast the camera eases back out after something pulled it in (it always pulls in at once); degrees the view widens while sprinting and how fast; lock-on turns start at lockOnStartSpeed and firm up to lockOnSpeed over lockOnEaseSeconds. Lock-on takes what's visible within lockOnRange cm and lockOnAngle degrees of the crosshair, nearest it (lockOnDistanceWeight degrees is what being at the far end of the range counts for); it lets go past lockOnKeepRange cm or after lockOnLostSeconds out of sight.",
+    "probeSize": 16, "returnSpeed": 3.5, "sprintFov": 6, "sprintFovSpeed": 3, "lockOnStartSpeed": 2.5, "lockOnSpeed": 7, "lockOnEaseSeconds": 0.5,
+    "lockOnRange": 2500, "lockOnAngle": 40, "lockOnDistanceWeight": 15, "lockOnKeepRange": 3500, "lockOnLostSeconds": 2.5 },
 
   "bosses": {
     "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/... (see WRBoss.cpp for every key).",
@@ -211,7 +214,9 @@
     "tools": { "wearPerHit": 1, "wearOther": 1, "brokenDamage": 0.5 },
     "toolLook": { "hatchetLength": 52, "pickLength": 62, "gripBack": 8, "handleThickness": 3.4, "headScale": 1 },
     "body": { "lifetimeSeconds": 180, "claimSeconds": 30, "unitsPerHit": 2, "minHits": 2, "maxHits": 8, "bareShare": 0.5, "hintRange": 700 } },
-  "building": { "foundationSink": 60, "_foundationSink": "cm a new foundation sits into the ground at its centre, so its floor (100 up) is a walkable step. placeholder" },
+  "building": { "foundationSink": 60, "_foundationSink": "cm a new foundation sits into the ground at its centre, so its floor (100 up) is a walkable step. placeholder",
+    "fineStep": 100, "furnitureStep": 100, "furnitureFineStep": 50, "snapDotSize": 11, "dropReach": 1500, "_steps": "cm: the fine grid's lines for walls and pillars; furniture's marks on a foundation or floor, on the grid and on the fine grid; the marks' size; how far down a piece aimed past your reach looks for the ground.",
+    "turnStep": 15, "wheelStep": 5, "spinDelay": 0.25, "spinSpeed": 90, "_turning": "A free piece: degrees a tap of the rotate key turns it, a wheel notch, seconds before a held key starts to spin it, degrees a second it spins." },
   "ui": { "_comment": "Build bar demolish mode: the piece under the crosshair glows (unlit, x demolishGlow; brighter washes out) red when a click takes it down, grey when it can't; the crosshair finds pieces out to demolishReach cm from the camera (beyond 11 m from you they say too far). placeholder", "demolishGlow": 0.35, "demolishReach": 1600 },
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },
