@@ -15,7 +15,8 @@ Players download `Wildreach-Setup.exe` from the latest GitHub release
 it installs to the player's own folder (no admin), adds Desktop and Start Menu shortcuts, installs the VC++ runtime only
 if it's missing, and starts the game; a newer Setup updates in place and keeps saves. The shortcuts start
 `WildreachUpdater.exe`, which installs any newer GitHub release by itself before starting the game (the main menu
-offers **Update now** too), so players only download Setup once. It isn't code-signed, so Windows may show "Windows
+offers **Update now** too), so players only download Setup once. It fetches only the blocks that changed, from the
+release's Setup, over 4 connections at once. It isn't code-signed, so Windows may show "Windows
 protected your PC": More info, then Run anyway. Everyone runs the game, types a name, picks a
 Male or Female body and Fire or Frost. One person clicks **Host** and chooses a world or makes a new one (their PC is the
 server; over the internet they forward UDP 7777 to their PC). Everyone else types the host's IP and clicks **Join**. Saves

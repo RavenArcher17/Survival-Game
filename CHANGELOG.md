@@ -1,6 +1,21 @@
 # Changelog
 
-## After 0.6.1: updates download over four connections (not released)
+## 0.6.2: updates download over four connections
+
+**Not released yet** (built in `C:\Dev\WildreachBuild5`, notes `Docs/release-notes/v0.6.2.md`). The first release players
+on 0.6.1 get as a small update. Checked on the real build, against a local stand-in for GitHub serving its Setup (1,681
+MB, 667 files; the new one is `Data/spawn_regions.json`):
+- a clean install from it matches the build in all 667 files;
+- **0.6.1 with its own updater** (what players have): **230 MB** (12 of 667 files changed), 13 s here, all 667 files right,
+  the save kept, no working files left, and the new updater in place;
+- **0.6.0 with its updater** (Raven's install): the whole Setup, as that updater always does, all 667 files right;
+- the packaged game on a copy of Raven's "playtest 0.6.0" world (saved by 0.6.0: 154 packs, 467 animals, packs up to 11)
+  loaded as 368 animals, every pack in a region; over a couple of minutes a periodic check added a Magmaw to the volcanic
+  highland (6 of 7) and the regions over target thinned; saved as 149 packs, 363 animals, none over 4. Island (never
+  played with wildlife) and a new world each filled every region (348 and 351 animals). The only error in the logs is the
+  engine's known PSO-precache ensure on the frame Play is clicked. Raven's real worlds untouched.
+- the full suite (`Tools/alltests.ps1`) on this build: 30 of 32 passed; the two that failed in the loaded run both passed
+  run alone (`worlds` 31 checks, `updater` 44 checks), so every test passes.
 
 GitHub gave this machine about 140 KB/s a connection when 0.6.1 came down this morning (22 minutes for 234 MB), and four
 connections at once each got the same.
@@ -20,7 +35,7 @@ connections at once each got the same.
 - `Tools/updatertest.ps1` (44 checks, all pass): the small update stays at 4 connections or fewer, the whole Setup in parts
   (with a dropped connection in the middle), and every connection held back.
 
-## After 0.6.1: wildlife spawns by region (not released)
+## 0.6.2: wildlife spawns by region
 
 Raven asked for spawning that works like ARK's ("define regions, give each a weighted creature list plus a population
 target, and run a periodic check that refills missing slots away from players and structures"), and small packs: "small
