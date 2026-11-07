@@ -1,6 +1,7 @@
 // The Wildreach shortcut: checks GitHub for a newer release, and if there is one brings this folder up to it (saves are
 // kept) and starts the game; otherwise (or offline) starts the game right away. It fetches only what changed, from the
 // release's Wildreach-Setup.exe (WildreachPack.cs); if that can't be done it downloads the whole Setup and runs it.
+// Either way it downloads over a few connections at once: GitHub gives each one about the same speed.
 // Installed next to Wildreach.exe by Wildreach-Setup.exe; built by Tools\make_installer.ps1. The installed version is
 // in version.txt beside it, a release's version is its tag ("v0.2.1").
 //   WildreachUpdater.exe [game args]          the shortcut: check, update if needed, play
@@ -23,7 +24,13 @@ using WildreachPack;
 static class WildreachUpdater
 {
 	const string Repo = "https://github.com/RavenArcher17/Survival-Game";
+	/**
+	 * Downloads at once. GitHub gives each connection about the same speed (from 140 KB/s at a busy time to 5 MB/s), so four
+	 * are three to four times as quick as one; eight were slower than four (measured 2026-11-07).
+	 */
+	const int Connections = 4;
 	static string dir, feed;
+	static readonly object logLock = new object();
 	static bool noLaunch, quiet;
 	static List<string> gameArgs = new List<string>();
 
@@ -59,6 +66,8 @@ static class WildreachUpdater
 		}
 		catch { }
 		ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+		// .NET allows a program two connections to a host unless told otherwise.
+		ServicePointManager.DefaultConnectionLimit = Math.Max(ServicePointManager.DefaultConnectionLimit, Connections * 2);
 
 		string installed = Installed();
 		string latest = LatestTag(fromGame ? 15000 : 5000);
@@ -132,7 +141,10 @@ static class WildreachUpdater
 
 	static void Log(string line)
 	{
-		try { File.AppendAllText(Path.Combine(dir, "updater.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") + line + "\r\n"); } catch { }
+		lock (logLock)
+		{
+			try { File.AppendAllText(Path.Combine(dir, "updater.log"), DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") + line + "\r\n"); } catch { }
+		}
 	}
 
 	/** Progress window: fetch what changed (or the whole Setup and run it silently over this folder), then play. */
@@ -173,7 +185,9 @@ static class WildreachUpdater
 			string setup = Path.Combine(temp, "Wildreach-Setup-" + latest + ".exe");
 			try
 			{
-				// Just what changed, if it can be done. Whatever goes wrong with that, the whole Setup is still there.
+				// Just what changed, if it can be done. Whatever goes wrong with that, the whole Setup is still there: in parts
+				// if the small way only wasn't worth it, in one go if parts of it didn't come down right.
+				bool inParts = false;
 				try
 				{
 					if (SmallUpdate())
@@ -181,13 +195,14 @@ static class WildreachUpdater
 						Ui(() => { Close(); Launch(); });
 						return;
 					}
+					inParts = setupSize > 0;
 				}
 				catch (CantUpdate) { throw; }
 				catch (Exception e) { Log("small update didn't work (" + e.Message + "): downloading the whole game instead"); }
 				if (cancelled) return;
 				Ui(() => { skip.Enabled = true; bar.Style = ProgressBarStyle.Blocks; bar.Value = 0; label.Text = "Wildreach " + latest.TrimStart('v') + " is out (you have " + installed + "). Downloading it..."; });
 				Directory.CreateDirectory(temp);
-				Download(SetupUrl, setup);
+				Download(SetupUrl, setup, inParts ? setupSize : 0);
 				if (cancelled) return;
 				Ui(() => { label.Text = "Installing Wildreach " + latest.TrimStart('v') + "..."; bar.Style = ProgressBarStyle.Marquee; skip.Enabled = false; });
 				using (Process p = Process.Start(new ProcessStartInfo(setup, "--silent --update --nolaunch --dir \"" + dir + "\"") { UseShellExecute = false, CreateNoWindow = true }))
@@ -220,6 +235,12 @@ static class WildreachUpdater
 		const long JoinGap = 256 * 1024;
 		/** Past this share of the Setup, the whole Setup is as quick and simpler. */
 		const double WorthItShare = 0.8;
+		/** No request longer than this, so a long run of changed blocks (the game's exe) is shared out between the connections. */
+		const long MaxRequest = 8L << 20;
+		/** The Setup's length, once the small way has asked (0: it didn't get that far). */
+		long setupSize;
+		/** Bytes down so far, from every connection. */
+		long received;
 
 		class Have { public string Path; public long At; public int Size; }
 
@@ -230,6 +251,7 @@ static class WildreachUpdater
 			// The index, from the end of the Setup. (GitHub won't serve "the last N bytes", so first ask how long the file is.)
 			long total;
 			Range(SetupUrl, 0, 1, out total);
+			setupSize = total;
 			long unused, indexAt, indexLength;
 			if (!Index.ReadFooter(Range(SetupUrl, total - Index.FooterSize, Index.FooterSize, out unused), out indexAt, out indexLength))
 			{
@@ -378,70 +400,114 @@ static class WildreachUpdater
 		/** Each missing block into its own file, as stored. What's already there from an interrupted try isn't fetched again. */
 		void Fetch(Dictionary<string, BlockRef> missing, string folder, long total)
 		{
-			long done = 0;
-			var pending = new List<BlockRef>();
+			received = 0;
+			// Runs of blocks close together, each one request, none longer than MaxRequest.
+			var runs = new List<List<BlockRef>>();
+			List<BlockRef> run = null;
 			foreach (BlockRef block in missing.Values.OrderBy(b => b.At))
 			{
 				string file = Path.Combine(folder, block.Name);
-				if (File.Exists(file) && new FileInfo(file).Length == block.Packed) done += block.Packed;
-				else pending.Add(block);
-			}
-			Say("Downloading what's changed...", done, total);
-			int next = 0, failures = 0;
-			while (next < pending.Count && !cancelled)
-			{
-				// A run of blocks close together: one request.
-				int last = next;
-				while (last + 1 < pending.Count && pending[last + 1].At - (pending[last].At + pending[last].Packed) <= JoinGap) last++;
-				long from = pending[next].At, length = pending[last].At + pending[last].Packed - from;
-				int before = next;
-				try
+				if (File.Exists(file) && new FileInfo(file).Length == block.Packed) { received += block.Packed; continue; }
+				BlockRef first = run == null ? null : run[0], previous = run == null ? null : run[run.Count - 1];
+				if (run == null || block.At - (previous.At + previous.Packed) > JoinGap || block.At + block.Packed - first.At > MaxRequest)
 				{
-					using (var response = (HttpWebResponse)RangeRequest(SetupUrl, from, length).GetResponse())
-					using (Stream stream = response.GetResponseStream())
+					run = new List<BlockRef>();
+					runs.Add(run);
+				}
+				run.Add(block);
+			}
+			Log(string.Format("fetching {0} parts over {1} connections", runs.Count, Math.Min(Connections, runs.Count)));
+			AllAtOnce(runs, r => FetchRun(r, folder), "Downloading what's changed...", total);
+		}
+
+		/** One run of blocks in one request. A dropped connection picks up at the block it was on, as long as it keeps getting somewhere. */
+		void FetchRun(List<BlockRef> run, string folder)
+		{
+			int next = 0, failures = 0;
+			var buffer = new byte[Blocks.MaxSize];
+			using (SHA256 hasher = new SHA256Cng())
+			{
+				while (next < run.Count && !cancelled)
+				{
+					BlockRef last = run[run.Count - 1];
+					long from = run[next].At, length = last.At + last.Packed - from;
+					int before = next;
+					try
 					{
-						CheckRange(response, from);
-						var clock = Stopwatch.StartNew();
-						long position = from;
-						var buffer = new byte[Blocks.MaxSize];
-						for (; next <= last && !cancelled; next++)
+						using (var response = (HttpWebResponse)RangeRequest(SetupUrl, from, length).GetResponse())
+						using (Stream stream = response.GetResponseStream())
 						{
-							BlockRef block = pending[next];
-							for (long skip_ = block.At - position; skip_ > 0;)
+							CheckRange(response, from);
+							long position = from;
+							for (; next < run.Count && !cancelled; next++)
 							{
-								int read = stream.Read(buffer, 0, (int)Math.Min(skip_, buffer.Length));
-								if (read <= 0) throw new IOException("a part of the Setup stopped early");
-								skip_ -= read;
-							}
-							int got = 0;
-							while (got < block.Packed)
-							{
-								int read = stream.Read(buffer, got, block.Packed - got);
-								if (read <= 0) throw new IOException("a part of the Setup stopped early");
-								got += read;
-							}
-							// Checked as it arrives, so a bad byte can't reach the game. (A bad block isn't worth retrying: the whole Setup can't be right either way.)
-							using (SHA256 hasher = new SHA256Cng())
-							{
+								BlockRef block = run[next];
+								for (long skip_ = block.At - position; skip_ > 0;)
+								{
+									int read = stream.Read(buffer, 0, (int)Math.Min(skip_, buffer.Length));
+									if (read <= 0) throw new IOException("a part of the Setup stopped early");
+									skip_ -= read;
+								}
+								int got = 0;
+								while (got < block.Packed)
+								{
+									int read = stream.Read(buffer, got, block.Packed - got);
+									if (read <= 0) throw new IOException("a part of the Setup stopped early");
+									got += read;
+								}
+								// Checked as it arrives, so a bad byte can't reach the game. (A bad block isn't worth retrying: the whole Setup can't be right either way.)
 								byte[] bytes = Blocks.Unpack(buffer, 0, block.Packed, block.Size);
 								if (Blocks.Name(hasher, bytes, 0, bytes.Length) != block.Name) throw new InvalidDataException("a block came down wrong");
-							}
-							using (var to = new FileStream(Path.Combine(folder, block.Name), FileMode.Create, FileAccess.Write)) to.Write(buffer, 0, block.Packed);
-							position = block.At + block.Packed;
-							done += block.Packed;
-							if (clock.ElapsedMilliseconds > 200)
-							{
-								clock.Restart();
-								long d = done;
-								Say("Downloading what's changed...", d, total);
-								Ui(() => bar.Value = (int)Math.Min(1000, d * 1000 / Math.Max(1L, total)));
+								using (var to = new FileStream(Path.Combine(folder, block.Name), FileMode.Create, FileAccess.Write)) to.Write(buffer, 0, block.Packed);
+								position = block.At + block.Packed;
+								Interlocked.Add(ref received, block.Packed);
 							}
 						}
 					}
+					catch (IOException e) { if (!TryAgain(e, next > before, ref failures)) throw; }
+					catch (WebException e) { if (!TryAgain(e, next > before, ref failures)) throw; }
 				}
-				catch (IOException e) { if (!TryAgain(e, next > before, ref failures)) throw; }
-				catch (WebException e) { if (!TryAgain(e, next > before, ref failures)) throw; }
 			}
+		}
+
+		/**
+		 * Each job on one of Connections threads, the bar showing what's been received meanwhile. The first job that fails stops
+		 * the others (each at the end of what it's on) and is thrown here.
+		 */
+		void AllAtOnce<T>(List<T> jobs, Action<T> job, string text, long total)
+		{
+			int next = -1;
+			Exception failed = null;
+			var threads = new List<Thread>();
+			for (int i = 0; i < Math.Min(Connections, jobs.Count); i++)
+			{
+				var thread = new Thread(() =>
+				{
+					try
+					{
+						while (!cancelled && Volatile.Read(ref failed) == null)
+						{
+							int j = Interlocked.Increment(ref next);
+							if (j >= jobs.Count) break;
+							job(jobs[j]);
+						}
+					}
+					catch (Exception e) { Interlocked.CompareExchange(ref failed, e, null); }
+				}) { IsBackground = true };
+				threads.Add(thread);
+				thread.Start();
+			}
+			foreach (Thread thread in threads)
+				while (!thread.Join(200)) Received(text, total);
+			Received(text, total);
+			if (failed != null) throw failed;
+		}
+
+		void Received(string text, long total)
+		{
+			long d = Interlocked.Read(ref received);
+			Say(text, d, total);
+			Ui(() => bar.Value = (int)Math.Min(1000, d * 1000 / Math.Max(1L, total)));
 		}
 
 		/** A dropped connection picks up at the block it was on, as long as it keeps getting somewhere. */
@@ -543,9 +609,63 @@ static class WildreachUpdater
 
 		// ---------------------------------------------------------------- the whole Setup
 
-		void Download(string url, string path)
+		/** The whole Setup: in parts over several connections when its length is known (the server does partial downloads), else in one go. */
+		void Download(string url, string path, long length)
 		{
 			string part = path + ".part";
+			if (length > 0) DownloadInParts(url, part, length);
+			else DownloadInOne(url, part);
+			if (cancelled) return;
+			if (File.Exists(path)) File.Delete(path);
+			File.Move(part, path);
+		}
+
+		void DownloadInParts(string url, string part, long total)
+		{
+			using (var file = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) file.SetLength(total);
+			var parts = new List<long>();
+			for (long at = 0; at < total; at += MaxRequest) parts.Add(at);
+			received = 0;
+			Log(string.Format("downloading the whole Setup in {0} parts over {1} connections", parts.Count, Math.Min(Connections, parts.Count)));
+			AllAtOnce(parts, at => DownloadPart(url, part, at, Math.Min(MaxRequest, total - at)), "Downloading it...", total);
+		}
+
+		/** One part of the whole Setup into its place in the file. A dropped connection picks up where it got to. (The Setup checks itself when it runs.) */
+		void DownloadPart(string url, string part, long from, long length)
+		{
+			long got = 0;
+			int failures = 0;
+			var buffer = new byte[1 << 16];
+			using (var to = new FileStream(part, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+			{
+				while (got < length && !cancelled)
+				{
+					long before = got;
+					try
+					{
+						using (var response = (HttpWebResponse)RangeRequest(url, from + got, length - got).GetResponse())
+						using (Stream stream = response.GetResponseStream())
+						{
+							CheckRange(response, from + got);
+							to.Seek(from + got, SeekOrigin.Begin);
+							int read;
+							while (got < length && !cancelled && (read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, length - got))) > 0)
+							{
+								to.Write(buffer, 0, read);
+								got += read;
+								Interlocked.Add(ref received, read);
+							}
+							if (got < length && !cancelled) throw new IOException("a part of the Setup stopped early");
+						}
+					}
+					catch (IOException e) { if (!TryAgain(e, got > before, ref failures)) throw; }
+					catch (WebException e) { if (!TryAgain(e, got > before, ref failures)) throw; }
+				}
+			}
+		}
+
+		void DownloadInOne(string url, string part)
+		{
 			var request = (HttpWebRequest)WebRequest.Create(url);
 			request.UserAgent = "WildreachUpdater";
 			request.Timeout = 30000;
@@ -576,8 +696,6 @@ static class WildreachUpdater
 				if (cancelled) return;
 				if (total > 0 && done != total) throw new Exception("the download stopped early");
 			}
-			if (File.Exists(path)) File.Delete(path);
-			File.Move(part, path);
 		}
 	}
 }

@@ -3,7 +3,8 @@
 # counts every byte, and 0.2.0 installed fresh to a scratch folder for each case.
 #   The small update: fetches only what changed, the folder ends up exactly as a fresh install, saves and stray files alone.
 #   When it can't be done (no partial downloads, a damaged block, an index it can't read, an old-style Setup, too much
-#   changed): the whole Setup, and the same result.
+#   changed): the whole Setup, and the same result. Both download over no more than 4 connections at once; the whole Setup
+#   comes in parts when the server does partial downloads and the parts so far came down right, else in one go.
 #   Interrupted: a dropped connection picks up; a killed updater leaves the game as it was and finishes next time.
 #   A file in use: everything put back, the game still starts, and next time it works.
 #   The updater from 0.6.0 (the one every player has now) still installs a new Setup. Up to date, a tag that isn't a
@@ -97,7 +98,7 @@ $server = Join-Path $out 'feed.mjs'
 [System.IO.File]::WriteAllText($server, @"
 import http from 'http'; import fs from 'fs';
 const dir = process.argv[2], size = fs.statSync(dir + '/setup-0.2.1.exe').size;
-let dropped = false;
+let dropped = false, lastMode = '', open = 0, t0 = 0, sent = 0, best = 0;
 function count(n) { let t = 0; try { t = +fs.readFileSync(dir + '/served.txt', 'utf8'); } catch {} fs.writeFileSync(dir + '/served.txt', String(t + n)); }
 http.createServer((req, res) => {
   const mode = fs.readFileSync(dir + '/mode.txt', 'utf8').trim();
@@ -107,7 +108,12 @@ http.createServer((req, res) => {
     res.writeHead(302, { Location: 'http://127.0.0.1:$port/store/setup.exe' }); return res.end();
   }
   if (req.url !== '/store/setup.exe') { res.writeHead(404); return res.end(); }
-  const file = dir + '/setup-' + (mode === 'oldstyle' ? 'oldstyle' : '0.2.1') + '.exe';
+  if (mode !== lastMode) { dropped = false; lastMode = mode; t0 = Date.now(); sent = 0; best = 0; }
+  // How many parts are on their way at once, most at a time (most.txt).
+  open++; res.on('close', () => open--);
+  let most = 0; try { most = +fs.readFileSync(dir + '/most.txt', 'utf8'); } catch {}
+  if (open > most) fs.writeFileSync(dir + '/most.txt', String(open));
+  const file = dir + '/setup-' + (mode.includes('oldstyle') ? 'oldstyle' : '0.2.1') + '.exe';
   const whole = fs.statSync(file).size;
   const m = /^bytes=(\d+)-(\d+)$/.exec(req.headers.range || '');
   fs.appendFileSync(dir + '/requests.log', (req.headers.range || 'whole') + '\n');
@@ -118,7 +124,7 @@ http.createServer((req, res) => {
   }
   const from = +m[1], to = Math.min(+m[2], whole - 1), n = to - from + 1;
   const big = n > 100000;
-  if (mode === 'drop' && big && !dropped) {
+  if (mode.includes('drop') && big && !dropped) {
     // Half of this part, then the connection goes: once.
     dropped = true;
     res.writeHead(206, { 'Content-Range': 'bytes ' + from + '-' + to + '/' + whole, 'Content-Length': n });
@@ -133,6 +139,18 @@ http.createServer((req, res) => {
     const buffer = Buffer.alloc(n), fd = fs.openSync(file, 'r'); fs.readSync(fd, buffer, 0, n, from); fs.closeSync(fd);
     buffer[Math.floor(n / 2)] ^= 0x55;
     return res.end(buffer);
+  }
+  if (mode.includes('throttle')) {
+    // Each connection held to about 2 MB/s, as GitHub's store does at a busy time (140 KB/s each there, however many).
+    // rate.txt: bytes a second over everything since this mode began, and the best one connection did on its own.
+    const s = fs.createReadStream(file, { start: from, end: to, highWaterMark: 64 * 1024 }), began = Date.now();
+    s.on('data', d => { s.pause(); res.write(d); sent += d.length; setTimeout(() => s.resume(), 32); });
+    s.on('end', () => {
+      res.end();
+      if (n > 1000000) best = Math.max(best, n / ((Date.now() - began) / 1000));
+      fs.writeFileSync(dir + '/rate.txt', Math.round(sent / ((Date.now() - t0) / 1000)) + ' ' + Math.round(best));
+    });
+    return;
   }
   if (mode === 'slow') {
     // A trickle, so the test can pull the plug part way.
@@ -158,8 +176,10 @@ Start-Sleep -Seconds 2
 
 $install = Join-Path $out 'install'
 $feed = "http://127.0.0.1:$port"
-function Mode([string]$m) { [System.IO.File]::WriteAllText($modeFile, $m); Remove-Item "$out\served.txt", "$out\requests.log" -ErrorAction SilentlyContinue }
+function Mode([string]$m) { [System.IO.File]::WriteAllText($modeFile, $m); Remove-Item "$out\served.txt", "$out\requests.log", "$out\most.txt", "$out\rate.txt" -ErrorAction SilentlyContinue }
 function Served { if (Test-Path "$out\served.txt") { [long](Get-Content "$out\served.txt") } else { 0L } }
+function MostAtOnce { if (Test-Path "$out\most.txt") { [int](Get-Content "$out\most.txt") } else { 0 } }
+function Parts { if ((LogText) -match '(fetching|in) (\d+) parts over (\d+) connections') { $Matches[0] } else { 'no parts line' } }
 function WholeDownloads { @(Get-Content "$out\requests.log" -ErrorAction SilentlyContinue | Where-Object { $_ -eq 'whole' }).Count }
 function Updater([string]$extra, [string]$feedUrl = $feed, [string]$exe = 'WildreachUpdater.exe') {
 	$p = Start-Process (Join-Path $install $exe) -ArgumentList "--feed $feedUrl --quiet $extra" -PassThru
@@ -219,6 +239,7 @@ try {
 	$smallSize = $served
 	Check 'it fetched a small part of the Setup' ($served -lt $setupSize * 0.1 -and $served -gt 0) ("{0:N0} KB of {1:N0} KB" -f ($served / 1KB), ($setupSize / 1KB))
 	Check 'without ever asking for the whole file' ((WholeDownloads) -eq 0) ((LogText).Trim())
+	Check 'on no more than 4 connections at once' ((MostAtOnce) -ge 1 -and (MostAtOnce) -le 4) ("most at once {0}; {1}" -f (MostAtOnce), (Parts))
 	Check 'saves and a player''s own files are untouched' (Kept)
 	Check 'it set its running self aside to be replaced' (Test-Path "$install\WildreachUpdater.exe.old")
 	Check 'it left no working files behind' (-not (Test-Path "$install\.update"))
@@ -235,7 +256,17 @@ try {
 	# ---- when the small way can't be done: the whole Setup, the same result
 	FreshInstall; Mode 'oldstyle'
 	$ok = Updater ''
-	Check 'a Setup with no index: the whole Setup instead' ($ok -and (Get-Content "$install\version.txt") -eq '0.2.1' -and (Get-Content "$install\release.txt") -eq 'this is 0.2.1' -and (WholeDownloads) -eq 1 -and (Kept) -and @(Launches).Count -eq 1) ((LogText).Trim())
+	$oldSize = (Get-Item "$out\setup-oldstyle.exe").Length
+	Check 'a Setup with no index: the whole Setup instead' ($ok -and (Get-Content "$install\version.txt") -eq '0.2.1' -and (Get-Content "$install\release.txt") -eq 'this is 0.2.1' -and (Served) -ge $oldSize -and (Kept) -and @(Launches).Count -eq 1) ((LogText).Trim())
+	Check '...in parts, several at once (no more than 4)' ((WholeDownloads) -eq 0 -and (MostAtOnce) -ge 2 -and (MostAtOnce) -le 4) ("most at once {0}; {1}; {2} whole downloads" -f (MostAtOnce), (Parts), (WholeDownloads))
+	FreshInstall; Mode 'oldstyle drop'
+	$ok = Updater ''
+	Check '...and a dropped connection there picks up too' ($ok -and (Get-Content "$install\version.txt") -eq '0.2.1' -and (Get-Content "$install\release.txt") -eq 'this is 0.2.1' -and (WholeDownloads) -eq 0 -and (LogText) -match 'download interrupted') ((LogText).Trim())
+	# Each connection held back, as GitHub is at a busy time: all of them together must be well over what one gets.
+	FreshInstall; Mode 'oldstyle throttle'
+	$ok = Updater ''
+	$rate = if (Test-Path "$out\rate.txt") { (Get-Content "$out\rate.txt").Split(' ') | ForEach-Object { [double]$_ } } else { 0, 1 }
+	Check 'each connection held back: together over 2.5 times as fast as one' ($ok -and (Get-Content "$install\version.txt") -eq '0.2.1' -and $rate[0] -ge 2.5 * $rate[1]) ("{0:N0} KB/s in all, one connection at most {1:N0} KB/s" -f ($rate[0] / 1KB), ($rate[1] / 1KB))
 	foreach ($case in @(
 		@{ mode = 'norange'; what = 'a server without partial downloads' },
 		@{ mode = 'damage'; what = 'a block that comes down damaged' })) {

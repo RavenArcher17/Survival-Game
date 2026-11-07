@@ -1,5 +1,25 @@
 # Changelog
 
+## After 0.6.1: updates download over four connections (not released)
+
+GitHub gave this machine about 140 KB/s a connection when 0.6.1 came down this morning (22 minutes for 234 MB), and four
+connections at once each got the same.
+
+- **The updater now downloads over 4 connections at once** (`Tools/installer/WildreachUpdater.cs`, `Connections`). The
+  changed blocks go in runs of no more than 8 MB, so one big changed file (the game's exe) is shared out too, and four
+  threads take the next run as they finish. A dropped connection still picks up at the block it was on.
+- **The whole Setup comes down in parts as well** (8 MB each, written into place) whenever the small way only wasn't worth
+  it (no index, or over 80% changed). If parts of the Setup came down wrong or the server won't do partial downloads, it
+  still asks for the whole file in one go. The Setup checks itself when it runs, as before.
+- .NET's default of two connections to a server is raised to eight.
+- **Measured:** GitHub at 1, 4 and 8 connections this afternoon: 5.5, 16.9 and 11.6 MB/s in all, so four, not eight. The
+  real update off GitHub (a copy of 0.6.0 to v0.6.1, 35 parts) came out matching the 0.6.1 build in all 666 files. This
+  afternoon GitHub was quick enough that the line was the limit: the old updater and the new one both took 27 s. With
+  every connection held back, as GitHub does at a busy time (the offline test, each about 1.4 MB/s), the four together
+  went 3.3 times as fast as one: 4,789 KB/s.
+- `Tools/updatertest.ps1` (44 checks, all pass): the small update stays at 4 connections or fewer, the whole Setup in parts
+  (with a dropped connection in the middle), and every connection held back.
+
 ## After 0.6.1: wildlife spawns by region (not released)
 
 Raven asked for spawning that works like ARK's ("define regions, give each a weighted creature list plus a population
