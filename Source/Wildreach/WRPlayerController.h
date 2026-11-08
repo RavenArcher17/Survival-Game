@@ -183,6 +183,11 @@ public:
 	/** A creature raid on your claim (WRRaids): the notice, and for the warning (Stage 0) a banner with the raiders'
 	 *  portrait and Title ("Cinderfangs"). Stage 1: they're here; 2: it's over. */
 	UFUNCTION(Client, Reliable) void ClientRaid(FName Portrait, const FString& Title, const FString& Message, uint8 Stage);
+	/** The raid on your claim as the HUD's tracker shows it, sent each raid step: Stage 0 coming (Seconds until they do,
+	 *  from Way), 1 on (Left of Total still alive, Seconds until the rest give up). It goes when the updates stop. */
+	UFUNCTION(Client, Unreliable) void ClientRaidTrack(uint8 Stage, uint8 Left, uint8 Total, float Seconds, const FString& Way);
+	/** The tracker's line now; false when no raid is on your claim. */
+	bool GetRaidTrack(uint8& OutStage, int32& OutLeft, int32& OutTotal, float& OutSeconds, FString& OutWay) const;
 	/** You died: the death screen's killer, bag and respawn (WRFlowDeath.cpp sends it, WRUIFlow shows it). */
 	UFUNCTION(Client, Reliable) void ClientDeathNote(const FWRDeathNote& Note);
 	/** The death screen's pick of where to wake (an index into the note's Wake list). */
@@ -389,6 +394,12 @@ private:
 	float LockUnseen = 0.f;
 	FString Notice;
 	double NoticeTime = -100.0;
+	/** Every chat line a bot has heard (its "waitchat <text>" waits for one). */
+	TArray<FString> BotHeard;
+	uint8 RaidTrackStage = 0, RaidTrackLeft = 0, RaidTrackTotal = 0;
+	float RaidTrackSeconds = 0.f;
+	FString RaidTrackWay;
+	double RaidTrackAt = -100.0;
 
 	bool bBot = false;
 	bool bBotPvP = false;

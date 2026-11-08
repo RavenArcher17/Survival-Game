@@ -182,8 +182,9 @@
     "lockOnRange": 2500, "lockOnAngle": 40, "lockOnDistanceWeight": 15, "lockOnKeepRange": 3500, "lockOnLostSeconds": 2.5 },
 
   "bosses": {
-    "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/... (see WRBoss.cpp for every key).",
+    "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/chaseRadius/... (see WRBoss.cpp for every key). arenaRadius (30 m major, 22 m mini) is the floor its floods and props cover; it chases, and counts as fighting, anyone within chaseRadiusMajor / Mini cm of its home. With nobody there for resetSeconds (8) it resets and walks home; one that isn't home after returnStuckSeconds is put back.",
     "lootDamageFraction": 0.1, "partChance": 0.25, "weaknessMultiplier": 1.5, "arenaPvpRadius": 3000,
+    "chaseRadiusMajor": 9000, "chaseRadiusMini": 6500, "returnStuckSeconds": 25,
     "forcePhase3": 0,
     "vulkarn": { "floodSeconds": 4, "floodDps": 30, "phase2FloodSeconds": 22, "auraDps": 6, "plungeSeconds": 3, "phase3DamageScale": 1.4 },
     "skaldrith": { "wingHitsToGround": 6, "groundedSeconds": 8, "airSeconds": 14, "landedSeconds": 10, "hoverHeight": 650 },

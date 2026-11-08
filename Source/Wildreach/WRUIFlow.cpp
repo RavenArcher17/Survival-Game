@@ -582,7 +582,18 @@ public:
 			})
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 128.f * U, 0.f, 0.f)[Banner(false)]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 186.f * U, 0.f, 0.f)[Banner(true)]
-			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 128.f * U, 0.f, 0.f)[ToastColumn]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 128.f * U, 0.f, 0.f)
+			[
+				// (Down under the HUD's raid tracker while a raid is on: it sits under the level plate too.)
+				SNew(SBox).RenderTransform_Lambda([this]()
+				{
+					uint8 S; int32 L, T; float Sec; FString W;
+					return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, PC.IsValid() && PC->GetRaidTrack(S, L, T, Sec, W) ? 64.f * U : 0.f)));
+				})
+				[
+					ToastColumn
+				]
+			]
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Center).Padding(24.f * U, 0.f, 0.f, 40.f * U)[HintCard()]
 		];
 	}

@@ -8,8 +8,10 @@
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
+#include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
+#include "GameFramework/GameStateBase.h"
 #include "WRKeyBindings.h"
 #include "WRLifeSkills.h"
 #include "WRPlayerController.h"
@@ -398,6 +400,15 @@ public:
 			Station = PC->GetMenuStation();
 			bDirty = true;
 		}
+		// Three cards a row, or two when that would make them too narrow for their names (4:3, 5:4: "Bronze" ran under
+		// the card's lock).
+		const float ListWidth = List.IsValid() ? List->GetTickSpaceGeometry().GetLocalSize().X : 0.f;
+		const int32 WantColumns = ListWidth > 0.f && (ListWidth - 24.f * U) / 3.f < 200.f * U ? 2 : 3;
+		if (WantColumns != Columns)
+		{
+			Columns = WantColumns;
+			bDirty = true;
+		}
 		const uint32 Hash = StateHash();
 		if (bDirty || Hash != LastHash)
 		{
@@ -423,6 +434,7 @@ private:
 	int32 Quantity = 1;
 	bool bDirty = false;
 	uint32 LastHash = 0;
+	int32 Columns = 3;           // cards a row (Tick: 2 on narrow screens)
 
 	// ---------------------------------------------------------------- state
 
@@ -439,6 +451,22 @@ private:
 	int32 Have(FName Item) const { const UWRInventoryComponent* I = Inv(); return I ? I->CountOf(Item) : 0; }
 	FName StationType() const { return Station.IsValid() ? Station->StationType : Hand; }
 	int32 Tier() const { return Station.IsValid() ? Station->GetTier() : 1; }
+	/** The station is Me's or their clan's (or nobody's), as the server's AWRStation::CanManage sees it from here: a clan
+	 *  is known from the owner's replicated player state, so while the owner is offline only the owner counts. */
+	bool CanManageHere(const FString& Me) const
+	{
+		const AWRBuildPiece* Piece = Station.IsValid() ? Cast<AWRBuildPiece>(Station->GetOwner()) : nullptr;
+		if (!Piece || Piece->OwnerName.IsEmpty() || Piece->OwnerName == Me) return true;
+		const AWRPlayerState* Mine = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+		const AGameStateBase* GS = PC.IsValid() && PC->GetWorld() ? PC->GetWorld()->GetGameState() : nullptr;
+		if (!Mine || Mine->ClanName.IsEmpty() || !GS) return false;
+		for (const APlayerState* P : GS->PlayerArray)
+		{
+			const AWRPlayerState* W = Cast<AWRPlayerState>(P);
+			if (W && W->GetPlayerName() == Piece->OwnerName) return W->ClanName == Mine->ClanName;
+		}
+		return false;
+	}
 
 	/** Everything the cards show that can change while the tab is open. */
 	uint32 StateHash() const
@@ -670,9 +698,12 @@ private:
 			return SNullWidget::NullWidget;
 		}
 		TSharedRef<SHorizontalBox> Orders = SNew(SHorizontalBox);
+		const FString Me = PC.IsValid() && PC->PlayerState ? PC->PlayerState->GetPlayerName() : FString();
+		const bool bManage = CanManageHere(Me);
 		for (int32 i = 0; i < St->Queue.Num(); ++i)
 		{
 			const FWRCraftJob& J = St->Queue[i];
+			const bool bMine = J.Owner == Me;
 			const FWRRecipe* R = FWRRecipeRegistry::Get().Find(J.Recipe);
 			FWRSlotView View;
 			View.ItemId = R ? R->Output : NAME_None;
@@ -688,6 +719,11 @@ private:
 			TSharedRef<SVerticalBox> Words = SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(FText::FromString(R ? ItemName(R->Output) : J.Recipe.ToString()), WRUI::Body(12, 800), WRUI::Ink, true)]
 				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(State, WRUI::Body(11, 500), StateColor)];
+			if (!bMine)
+			{
+				// Someone else's order at a shared station: whose (theirs to collect from the tray, or to cancel).
+				Words->AddSlot().AutoHeight()[WRUI::Text(FText::FromString(FString::Printf(TEXT("%s's order"), *J.Owner)), WRUI::Body(10, 600), WRUI::Ink3, true)];
+			}
 			if (i == 0)
 			{
 				Words->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
@@ -705,7 +741,8 @@ private:
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(112.f * U)[Words]]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.f * U, 0.f, 0.f, 0.f)
 					[
-						SNew(SBox).HeightOverride(28.f * U)
+						// Yours, or anyone's here when the station is yours or your clan's (the server's AWRStation::CancelJob).
+						SNew(SBox).HeightOverride(28.f * U).Visibility(bMine || bManage ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed)
 						[
 							SNew(SWRButton).Ghost(true).FontSize(11).MinHeight(28.f * U).Text(LOCTEXT("QueueCancel", "Cancel"))
 							.OnClicked_Lambda([this, Index]() { if (PC.IsValid()) PC->SendCommand(FString::Printf(TEXT("craftcancel %d"), Index)); return FReply::Handled(); })
@@ -1066,7 +1103,7 @@ private:
 	void BuildList()
 	{
 		List->ClearChildren();
-		// Sections of three or more cards get full rows; smaller ones share a row side by side (as the mockup's
+		// Sections of a row's worth (Columns) or more get full rows; smaller ones share a row side by side (as the mockup's
 		// Food · Taming · Repair line), each under its own heading.
 		TArray<TPair<FName, TArray<const FEntry*>>> Small;
 		int32 SmallCards = 0;
@@ -1097,7 +1134,7 @@ private:
 					+ SVerticalBox::Slot().AutoHeight()[Cards]
 				];
 			}
-			if (SmallCards < 3) Row->AddSlot().FillWidth(3 - SmallCards).Padding(12.f * U, 0.f, 0.f, 0.f)[SNullWidget::NullWidget];
+			if (SmallCards < Columns) Row->AddSlot().FillWidth(Columns - SmallCards).Padding(12.f * U, 0.f, 0.f, 0.f)[SNullWidget::NullWidget];
 			List->AddSlot().Padding(0.f, bFirst ? 0.f : 18.f * U, 0.f, 0.f)[Row];
 			bFirst = false;
 			Small.Reset();
@@ -1107,9 +1144,9 @@ private:
 		{
 			const TArray<const FEntry*> Items = InSection(Cat);
 			if (Items.Num() == 0) continue;
-			if (Items.Num() < 3)
+			if (Items.Num() < Columns)
 			{
-				if (SmallCards + Items.Num() > 3) FlushSmall();
+				if (SmallCards + Items.Num() > Columns) FlushSmall();
 				Small.Add({ Cat, Items });
 				SmallCards += Items.Num();
 				continue;
@@ -1117,10 +1154,10 @@ private:
 			FlushSmall();
 			List->AddSlot().Padding(0.f, bFirst ? 0.f : 18.f * U, 0.f, 8.f * U)[Heading(Cat, Items)];
 			bFirst = false;
-			for (int32 i = 0; i < Items.Num(); i += 3)
+			for (int32 i = 0; i < Items.Num(); i += Columns)
 			{
 				TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
-				for (int32 c = 0; c < 3; ++c)
+				for (int32 c = 0; c < Columns; ++c)
 				{
 					Row->AddSlot().FillWidth(1.f).Padding(c == 0 ? 0.f : 12.f * U, 0.f, 0.f, 0.f)[Items.IsValidIndex(i + c) ? Card(*Items[i + c]) : SNullWidget::NullWidget];
 				}

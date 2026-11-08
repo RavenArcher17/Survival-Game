@@ -176,6 +176,27 @@ namespace WRRaidsImpl
 		}
 	}
 
+	/** The HUD tracker of everyone of the claim who's on: coming (how long until they do) or on (how many still alive). */
+	void Track(UWorld* World, const FRaid& R)
+	{
+		if (R.Stage == EStage::Leaving) return;
+		const double Now = World->GetTimeSeconds();
+		int32 Alive = 0;
+		for (const TWeakObjectPtr<AWRCreature>& C : R.Raiders) if (C.IsValid() && C->IsAlive()) ++Alive;
+		const bool bOn = R.Stage == EStage::On;
+		const float Seconds = static_cast<float>(FMath::Max(0.0, (bOn ? R.EndAt : R.ComeAt) - Now));
+		const AWRClaimTotem* Claim = R.Claim.Get();
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
+			const FString Name = PC && PC->PlayerState ? PC->PlayerState->GetPlayerName() : FString();
+			if (PC && !Name.IsEmpty() && FWRSocialRules::CanShare(Claim ? Claim->OwnerName : R.Owner, Name))
+			{
+				PC->ClientRaidTrack(bOn ? 1 : 0, static_cast<uint8>(FMath::Min(Alive, 255)), static_cast<uint8>(FMath::Min(bOn ? R.Raiders.Num() : Total(R), 255)), Seconds, R.Way);
+			}
+		}
+	}
+
 	void ScheduleNext(UWorld* World, AWRClaimTotem* Claim)
 	{
 		const double Every = WRRaids::IntervalHours();
@@ -235,7 +256,7 @@ namespace WRRaidsImpl
 		UE_LOG(LogWildreach, Log, TEXT("RAID warning for %s's claim (region %s, Hearth level %d, %d points): %s from the %s at %.0f %.0f, in %.0f s"),
 			*R.Owner, *R.Region.ToString(), R.HearthLevel, R.Points, *Who(R), *R.Way, R.From.X, R.From.Y, WarnSeconds);
 		Tell(World, R, 0, Message);
-		G.Raids.Add(MoveTemp(R));
+		Track(World, G.Raids.Add_GetRef(MoveTemp(R)));
 		return Message;
 	}
 
@@ -409,6 +430,7 @@ void WRRaids::Step(UWorld* World)
 	for (int32 i = G.Raids.Num() - 1; i >= 0; --i)
 	{
 		if (Advance(World, G.Raids[i])) G.Raids.RemoveAt(i);
+		else Track(World, G.Raids[i]);
 	}
 	const double Every = IntervalHours();
 	if (Every <= 0.0)

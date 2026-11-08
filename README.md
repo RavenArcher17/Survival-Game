@@ -134,6 +134,7 @@ Tools\wildlifetest.ps1  # island wildlife: a herd comes out when a player arrive
 Tools\updatertest.ps1   # auto-update end to end with fake releases and a local GitHub stand-in (no Unreal needed)
 Tools\versiontest.ps1   # another version can't join and the menu says why; the menu offers a newer release (local feed)
 Tools\bosstest.ps1      # all six bosses: phases, counterplay, party scaling, 10% loot rule
+Tools\bosschasetest.ps1 # a boss chases you well past its arena floor, then resets and walks home when you leave
 Tools\socialtest.ps1    # PvP preset, clans, Souls-like death bags, life skills + perks
 Tools\flowtest.ps1      # death by creatures: death note, death screen, back after the countdown at your camp; a bed respawn; a hint remembered
 Tools\worldstest.ps1    # worlds by clicks on the main menu: two stay separate, rename, delete, back again; the old save copied into Island; the settings screens
@@ -143,6 +144,7 @@ Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\basetest.ps1      # a base by real input at 16:10: build bar pages and the Claim tab, the Hearth hint, a broken Hearth repaired, a chest renamed, a map waypoint (-Shots)
 Tools\raidtest.ps1      # creature raids: the warning, region hunters by Hearth level bite the base and fight, held or timed out, a due raid waits for someone home (-Shots)
 Tools\crafttimetest.ps1 # crafting time by clicks at a forge: an order of five one at a time, walked off into the tray and taken, cancelled, saved (-Shots)
+Tools\cooptest.ps1      # two players at one base (the friend at 4:3): a shared forge queue, then a raid with its card and tracker (-Shots); bots keep in step with "waitchat <text>"
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
 Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)
 Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings, then the moments between play: death, loading, banners, hints; -MainMenu: the front end; -Flow: just the moments)

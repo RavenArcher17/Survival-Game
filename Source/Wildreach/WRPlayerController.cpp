@@ -104,6 +104,7 @@ void AWRPlayerController::ClientChat_Implementation(const FString& From, const F
 {
 	Chat.Add({ FString::Printf(TEXT("%s: %s"), *From, *Message), GetWorld()->GetTimeSeconds() });
 	if (Chat.Num() > 8) Chat.RemoveAt(0);
+	if (bBot) BotHeard.Add(Chat.Last().Text);   // (waitchat)
 	UE_LOG(LogWildreach, Log, TEXT("NOTICE chat %s: %s"), *From, *Message);
 }
 
@@ -409,11 +410,44 @@ void AWRPlayerController::ClientNotify_Implementation(const FString& Message)
 
 void AWRPlayerController::ClientRaid_Implementation(FName Portrait, const FString& Title, const FString& Message, uint8 Stage)
 {
-	ClientNotify_Implementation(Message);
 	if (Stage == 0 && UI && UI->GetFlow())
 	{
+		// The card says it all: no centre notice as well (it sat under the card and showed through it).
+		Notice = Message;
+		NoticeTime = GetWorld()->GetTimeSeconds();
+		UE_LOG(LogWildreach, Log, TEXT("NOTICE %s"), *Message);
 		UI->GetFlow()->ShowRaid(Portrait, Title, Message);
+		return;
 	}
+	if (Stage == 2) RaidTrackAt = -100.0;   // over: the tracker goes at once
+	ClientNotify_Implementation(Message);
+}
+
+void AWRPlayerController::ClientRaidTrack_Implementation(uint8 Stage, uint8 Left, uint8 Total, float Seconds, const FString& Way)
+{
+	if (RaidTrackAt < 0.0 || RaidTrackStage != Stage || RaidTrackLeft != Left)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("RAIDTRACK stage %d, %d of %d left, %.0f s, from the %s"), Stage, Left, Total, Seconds, *Way);
+	}
+	RaidTrackStage = Stage;
+	RaidTrackLeft = Left;
+	RaidTrackTotal = Total;
+	RaidTrackSeconds = Seconds;
+	RaidTrackWay = Way;
+	RaidTrackAt = GetWorld()->GetTimeSeconds();
+}
+
+bool AWRPlayerController::GetRaidTrack(uint8& OutStage, int32& OutLeft, int32& OutTotal, float& OutSeconds, FString& OutWay) const
+{
+	const double Since = GetWorld()->GetTimeSeconds() - RaidTrackAt;
+	// Sent every raid step (raid.stepSeconds): a few missed means it's over, or you left the claim's people.
+	if (RaidTrackAt < 0.0 || Since > FMath::Max(6.f, WRTune(TEXT("raid.stepSeconds"), 2.f) * 3.f)) return false;
+	OutStage = RaidTrackStage;
+	OutLeft = RaidTrackLeft;
+	OutTotal = RaidTrackTotal;
+	OutSeconds = FMath::Max(0.f, RaidTrackSeconds - static_cast<float>(Since));
+	OutWay = RaidTrackWay;
+	return true;
 }
 
 void AWRPlayerController::WRBotPause(int32 bPause)
@@ -860,6 +894,23 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			{
 				UE_LOG(LogWildreach, Log, TEXT("SPAWN %s: %.0f hp, %.0f damage"), *Arg(1), Spawned->GetAttributes()->GetMaxHealth(), Spawned->Weapon.FlatDamage);
 			}
+		}
+	}
+	else if (Cmd == TEXT("bossinfo"))
+	{
+		// Each boss: how far it is from its home and from the nearest player, and what it's doing (bosschasetest).
+		for (TActorIterator<AWRBoss> It(GetWorld()); It; ++It)
+		{
+			float Nearest = -1.f;
+			for (TActorIterator<AWRCharacter> P(GetWorld()); P; ++P)
+			{
+				const float D = FVector::Dist2D(P->GetActorLocation(), It->GetActorLocation());
+				if (P->IsAlive() && (Nearest < 0.f || D < Nearest)) Nearest = D;
+			}
+			const UWRAttributeSet* BA = It->GetAttributes();
+			UE_LOG(LogWildreach, Log, TEXT("BOSSINFO %s: %.0f m from home, nearest player %.0f m, %s, %.0f/%.0f hp (chases within %.0f m)"), *It->GetDisplayLabel(),
+				FVector::Dist2D(It->GetActorLocation(), It->GetHome()) / 100.f, Nearest / 100.f,
+				It->bEngaged ? TEXT("fighting") : It->IsReturning() ? TEXT("walking home") : TEXT("idle"), BA ? BA->GetHealth() : 0.f, BA ? BA->GetMaxHealth() : 0.f, It->GetChaseRadius() / 100.f);
 		}
 	}
 	else if (Cmd == TEXT("vitals") && Survivor)
@@ -1445,6 +1496,18 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		{
 			BotCmdResume = BotClock + FCString::Atof(*Cmd.RightChop(5));
 			break;
+		}
+		if (Cmd.StartsWith(TEXT("waitchat ")))
+		{
+			// Two bots in step: wait until a chat line with this in it has come (anyone's, since this bot began).
+			const FString Want = Cmd.RightChop(9).TrimStartAndEnd();
+			if (!BotHeard.ContainsByPredicate([&Want](const FString& Line) { return Line.Contains(Want); }))
+			{
+				BotCmdQueue.Insert(Cmd, 0);
+				BotCmdResume = BotClock + 0.25f;
+				break;
+			}
+			continue;
 		}
 		ConsoleCommand(Cmd);
 	}

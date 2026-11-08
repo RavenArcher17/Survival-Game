@@ -127,6 +127,8 @@ public:
 	virtual bool TestAttack() override;
 
 	bool IsMajor() const { return bMajor; }
+	bool IsReturning() const { return bReturning; }
+	float GetChaseRadius() const { return ChaseRadius; }
 
 	UPROPERTY(ReplicatedUsing=OnRep_Phase) int32 Phase = 1;
 	UPROPERTY(Replicated) bool bEngaged = false;
@@ -168,7 +170,13 @@ private:
 
 	bool bMajor = false;
 	float SoloHealth = 3000.f;
+	/** The floor its floods and props cover (bosses.<id>.arenaRadius). */
 	float ArenaRadius = 3000.f;
+	/** How far from home it fights: who it chases and who's in the fight (bosses.chaseRadiusMajor / Mini). */
+	float ChaseRadius = 9000.f;
+	/** Reset with nobody left to fight: walking back home (TickCombat); put back only if it can't get there. */
+	bool bReturning = false;
+	double ReturnStarted = 0.0;
 	TArray<FWRBossAttack> Attacks;
 	TArray<TWeakObjectPtr<AWRBossProp>> Props;
 	TArray<TWeakObjectPtr<AWRCreature>> Wisps;

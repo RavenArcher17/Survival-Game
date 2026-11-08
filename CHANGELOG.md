@@ -1,10 +1,37 @@
 # Changelog
 
-## 0.7.0 (in progress): creature raids
+## 0.7.0: creature raids, crafting time, far views
 
-**Not released.** The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views,
-ash-grey volcanic shrubs, ice rebuilt like the lava. Raids, crafting time, far views and the ice are done. The ash-grey
-shrubs were retried and still hang the GPU, so they stay off (below).
+**Not released yet** (notes `Docs/release-notes/v0.7.0.md`; it carries 0.6.3's base fixes too, which never went out on
+their own). The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views, ash-grey
+volcanic shrubs, ice rebuilt like the lava. All done but the shrubs, which still hang the GPU and stay green (Raven:
+"leave the shrubs green if it's a problem"). Then a polish pass, and boss fights from Raven's play.
+
+- **Bosses chase you, and walk home instead of jumping there** (`AWRBoss::ChaseRadius`, tuning.json `bosses`). Raven:
+  "the radius is too small and it's very hard to fight a boss because it can't walk far and it glitches back or doesn't
+  pursue". A boss only fought within its arena's floor (`arenaRadius`, 30 m for a major boss, 22 m for a mini one):
+  past it, it stopped coming after you, and 8 s with nobody inside it teleported home at full health. Now it chases and
+  counts fighters within `chaseRadiusMajor` 90 m / `chaseRadiusMini` 65 m of home (flat distance; the floor stays for
+  floods and props). With nobody there for `resetSeconds` it still resets, but walks (or flies) home; only one that
+  isn't home after `returnStuckSeconds` (25) is put back. On its way home it only wakes for someone it may fight.
+  New `Tools/bosschasetest.ps1` (alltests `bosschase`, 5 checks): Grimjaw follows the player 35 m from home and keeps
+  fighting, then resets with them 200 m off and walks home, full health, no teleport. Dev command `bossinfo`.
+- **The raid tracker** (`AWRPlayerController::ClientRaidTrack`, `WRUIHud` under the level plate): while a raid is on
+  your claim, "Raid on your base" with a clock: "5 coming from the east" until they come, then "4 of 5 raiders left"
+  with a bar, until it's over. Sent each raid step to everyone of the claim; it goes when the updates stop.
+- **The raid card no longer has a notice showing through it.** The warning came as a notice and a card in the same
+  place; the card carries it alone now. And any notice that comes while a card or banner is up (a boss's, a level-up)
+  steps down under it instead of sitting behind it ("Your 8 Copper ingot are done" did, in the friend's test).
+  The flow screen's toasts move down under the raid tracker while it's up.
+- **Shared stations: whose order is whose.** In the forge's strip someone else's order says "Mason's order", and its
+  **Cancel** shows only when you may cancel it (yours, or any at your own or your clan's station: the server's rule).
+- **The Crafting tab at 4:3 and 5:4:** cards go two a row when three would be too narrow for their names ("Bronze ingot"
+  ran under its lock).
+- **Two-player testing**: bots keep in step by chat (`waitchat <text>` waits for a chat line). New
+  `Tools/cooptest.ps1` (alltests `coop`, 12 checks, all pass): Mason hosts (no window) and builds a base, Bravo joins in
+  a 1024x768 window and plays by clicks: Bravo's 8 ingots and Mason's 2 swords on one forge (Bravo sees Mason's order
+  without Cancel, then with it once in Mason's clan; each one's things to their own bag or the tray), then a raid with
+  Bravo getting the card, the tracker coming and counting, and "Raid over" when Mason kills them.
 
 - **Ash-grey volcanic shrubs: retried, still off.** The plan was to try `world.ashCoatMin` 0.85 again, since the hang
   it gave in 0.4 (4 of 4 benchmark runs) looked like the Nanite tessellation one fixed in 0.5.0. It isn't: with it, 2 of
@@ -93,7 +120,8 @@ shrubs were retried and still hang the GPU, so they stay off (below).
 
 ## 0.6.3: your base (the Hearth found, repaired; chest names, waypoints)
 
-**Not released yet** (notes `Docs/release-notes/v0.6.3.md`). From Raven's play of 0.6.2: "there was nowhere I saw to
+**Not released on its own: it goes out in 0.7.0** (its notes, `Docs/release-notes/v0.6.3.md`, are folded into 0.7.0's).
+From Raven's play of 0.6.2: "there was nowhere I saw to
 build the Hearth or upgrade it". The build bar's card row was a horizontal scroll box exactly three cards wide with a
 4 px scroll bar; the Stations tab had eight cards and the Hearth was the eighth (the claim totem the seventh), so neither
 was ever on screen. Most tabs overflowed the same way (stone walls, floors, roofs). No test caught it: every test placed

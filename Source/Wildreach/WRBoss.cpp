@@ -355,6 +355,8 @@ void AWRBoss::BeginPlay()
 	SoloHealth = Tune(TEXT("health"), WRTune(bMajor ? TEXT("enemies.majorBossSolo.health") : TEXT("enemies.miniBossSolo.health"), bMajor ? 12000.f : 3000.f))
 		* FMath::Max(0.1f, WRTune(TEXT("server.creatureDifficulty"), 1.f));
 	ArenaRadius = Tune(TEXT("arenaRadius"), bMajor ? 3000.f : 2200.f);
+	// It chases and counts fighters well past its floor: 22-30 m held it on a leash it kept snapping back from.
+	ChaseRadius = FMath::Max(ArenaRadius, Tune(TEXT("chaseRadius"), WRTune(bMajor ? TEXT("bosses.chaseRadiusMajor") : TEXT("bosses.chaseRadiusMini"), bMajor ? 9000.f : 6500.f)));
 	InitVitals(SoloHealth, 100.f, Tune(TEXT("poise"), bMajor ? 400.f : 200.f));
 	BuildAttacks();
 	if (CreatureId == TEXT("obsidian_warden"))
@@ -426,7 +428,7 @@ bool AWRBoss::AnyArtifactModifiers() const
 	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
 	{
 		const AWRPlayerState* PS = It->GetPlayerState<AWRPlayerState>();
-		if (PS && PS->bArtifactModifiers && FVector::Dist(It->GetActorLocation(), GetHome()) < ArenaRadius)
+		if (PS && PS->bArtifactModifiers && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
 		{
 			return true;
 		}
@@ -445,6 +447,7 @@ void AWRBoss::NotifyAttackedBy(AActor* Attacker)
 void AWRBoss::Engage()
 {
 	bEngaged = true;
+	bReturning = false;
 	EmptySince = -1.0;
 	UpdateParticipants();
 	NextFloodAt = GetWorld()->GetTimeSeconds() + Tune(TEXT("firstFloodSeconds"), 15.f);
@@ -463,7 +466,7 @@ void AWRBoss::UpdateParticipants()
 	{
 		const APlayerState* PS = It->GetPlayerState();
 		const bool bRiding = It->GetAttachParentActor() != nullptr;
-		if (PS && (It->IsAlive() || bRiding) && FVector::Dist(It->GetActorLocation(), GetHome()) < ArenaRadius)
+		if (PS && (It->IsAlive() || bRiding) && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
 		{
 			Players.Add(PS->GetPlayerName());
 			++Count;
@@ -472,7 +475,7 @@ void AWRBoss::UpdateParticipants()
 	// Each tame counts as an extra player.
 	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
 	{
-		if (It->IsTamed() && It->IsAlive() && Players.Contains(It->TamedBy) && FVector::Dist(It->GetActorLocation(), GetHome()) < ArenaRadius)
+		if (It->IsTamed() && It->IsAlive() && Players.Contains(It->TamedBy) && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
 		{
 			++Count;
 		}
@@ -506,8 +509,11 @@ void AWRBoss::UpdateParticipants()
 
 void AWRBoss::ResetFight()
 {
-	UE_LOG(LogWildreach, Log, TEXT("BOSS %s reset (arena empty)"), *GetDisplayLabel());
 	bEngaged = false;
+	// It walks back (TickCombat) instead of jumping there; one that can't get home is put back after a while.
+	bReturning = FVector::Dist2D(GetActorLocation(), GetHome()) > 300.f;
+	ReturnStarted = GetWorld()->GetTimeSeconds();
+	UE_LOG(LogWildreach, Log, TEXT("BOSS %s reset (nobody within %.0f m)%s"), *GetDisplayLabel(), ChaseRadius / 100.f, bReturning ? TEXT(": walks home") : TEXT(""));
 	Participants = 1;
 	Ledger.Reset();
 	Current = INDEX_NONE;
@@ -525,7 +531,6 @@ void AWRBoss::ResetFight()
 	bWispsOut = false;
 	SetActorHiddenInGame(false);
 	SetAirborne(CreatureId == TEXT("ignessa"));
-	TeleportTo(GetHome(), GetActorRotation());
 	SpawnArena();
 }
 
@@ -617,10 +622,10 @@ void AWRBoss::Flood()
 AWRCharacterBase* AWRBoss::PickBossTarget() const
 {
 	AWRCharacterBase* Best = nullptr;
-	float BestDist = ArenaRadius;
+	float BestDist = TNumericLimits<float>::Max();
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
-		if (*It == this || !It->IsAlive() || !IsHostileTo(*It) || It->GetAttachParentActor() || FVector::Dist(It->GetActorLocation(), GetHome()) > ArenaRadius)
+		if (*It == this || !It->IsAlive() || !IsHostileTo(*It) || It->GetAttachParentActor() || FVector::Dist2D(It->GetActorLocation(), GetHome()) > ChaseRadius)
 		{
 			continue;
 		}
@@ -958,10 +963,37 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 
 	if (!bEngaged)
 	{
-		// Wake when someone walks into the arena.
+		if (bReturning)
+		{
+			// Back home after a reset, on foot (or on the wing).
+			const FVector ToHome = GetHome() - GetActorLocation();
+			if (ToHome.Size2D() < 300.f)
+			{
+				bReturning = false;
+				UE_LOG(LogWildreach, Log, TEXT("BOSS %s is home"), *GetDisplayLabel());
+			}
+			else if (Now - ReturnStarted > Tune(TEXT("returnStuckSeconds"), WRTune(TEXT("bosses.returnStuckSeconds"), 25.f)))
+			{
+				bReturning = false;
+				TeleportTo(GetHome(), GetActorRotation());
+				UE_LOG(LogWildreach, Log, TEXT("BOSS %s couldn't walk home (%.0f m off): put back"), *GetDisplayLabel(), ToHome.Size2D() / 100.f);
+			}
+			else if (bAirborne)
+			{
+				SetActorLocation(FMath::VInterpConstantTo(GetActorLocation(), GetHome(), DeltaSeconds, Def->Speed));
+				SetActorRotation(FRotator(0.f, ToHome.Rotation().Yaw, 0.f));
+			}
+			else
+			{
+				AddMovementInput(ToHome.GetSafeNormal2D(), 1.f);
+			}
+		}
+		// Wake when someone walks into the arena (or comes at it on its way home).
 		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
 		{
-			if (It->IsAlive() && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < Def->AggroRadius)
+			// (Only someone it may fight: past its chase range they'd just stand it there until it reset again.)
+			if (It->IsAlive() && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < Def->AggroRadius
+				&& FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
 			{
 				Engage();
 				break;

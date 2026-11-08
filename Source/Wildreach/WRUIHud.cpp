@@ -247,6 +247,7 @@ public:
 			SNew(SOverlay)
 			+ SOverlay::Slot()[WRFx::MakeHudOverlay(PC)]   // damage numbers, hit marker, parry flash (under the panels)
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[LevelPlate()]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 104.f * U)[RaidTracker()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 18.f * U)[CompassAndBoss()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[ClockPlate()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 150.f * U)[TamingPanel()]
@@ -318,6 +319,47 @@ private:
 					[
 						WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::FromString(StatusLine()); }), WRUI::Body(11, 700), WRUI::Warn, true)
 					]
+				]
+			]
+		];
+	}
+
+	// ---------------------------------------------------------------- under it: a raid on your claim (WRRaids)
+	struct FRaidLine { uint8 Stage = 0; int32 Left = 0, Total = 0; float Seconds = 0.f; FString Way; };
+	bool RaidLine(FRaidLine& L) const { return PC.IsValid() && PC->GetRaidTrack(L.Stage, L.Left, L.Total, L.Seconds, L.Way); }
+	TSharedRef<SWidget> RaidTracker()
+	{
+		return SNew(SBox).WidthOverride(300.f * U).Visibility_Lambda([this]()
+			{
+				FRaidLine L;
+				return Survivor() && !BuildMode() && !Hidden() && RaidLine(L) ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+			})
+		[
+			SNew(SWRPanel).Kind(EWRPanel::Glass).Rivets(true).Padding(FMargin(14.f * U, 9.f * U))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("RaidHead", "Raid on your base"), WRUI::Caps(12), WRUI::Bad)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this]() { FRaidLine L; return RaidLine(L) ? FText::FromString(Clock(L.Seconds)) : FText::GetEmpty(); }), WRUI::Title(15), WRUI::Ink)
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f * U, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+					{
+						FRaidLine L;
+						if (!RaidLine(L)) return FText::GetEmpty();
+						if (L.Stage == 0) return FText::FromString(FString::Printf(TEXT("%d coming from the %s"), L.Total, *L.Way));
+						return FText::FromString(FString::Printf(TEXT("%d of %d raiders left"), L.Left, L.Total));
+					}), WRUI::Body(13, 700), WRUI::Ink, true)
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f * U, 0.f, 0.f)
+				[
+					SNew(SWRBar).Height(5.f * U).Color(WRUI::Bad).Fraction_Lambda([this]() { FRaidLine L; return RaidLine(L) && L.Stage == 1 && L.Total > 0 ? float(L.Left) / float(L.Total) : 1.f; })
 				]
 			]
 		];
@@ -608,8 +650,11 @@ private:
 	{
 		// Notices queue in the UI (each gets its turn) and ease in and out rather than snapping.
 		const auto Alpha = [this]() { float A = 0.f; if (const FWRPlayerUI* X = UI()) X->GetCentreNotice(A); return A; };
+		// A banner (level up, a boss's or a raid's card) sits where the notice does: the notice steps down under it
+		// meanwhile, or the one showed through the other.
+		const auto Under = [this]() { float A = 0.f; const FWRPlayerUI* X = UI(); const FWRFlow* F = X ? X->GetFlow() : nullptr; return F && F->GetBanner(A) ? A * 150.f * U : 0.f; };
 		TSharedRef<SBox> Box = SNew(SBox).Visibility_Lambda([Alpha]() { return Alpha() > 0.f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-			.RenderTransform_Lambda([Alpha]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, (1.f - Alpha()) * -8.f))); })
+			.RenderTransform_Lambda([Alpha, Under]() { return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(0.f, (1.f - Alpha()) * -8.f + Under()))); })
 			[
 				SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(18.f * U, 7.f * U))
 				[
