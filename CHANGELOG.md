@@ -1,6 +1,14 @@
 # Changelog
 
-## Not released yet: door keypads, the Clan tab
+## 0.7.1: door keypads, the Clan tab
+
+**Not released yet** (notes `Docs/release-notes/v0.7.1.md`). Raven: "finish what you were doing, push and publish".
+Checked before release: alltests 38 of 39 at once, the 39th (updater's dropped-connection step, timing under load) passing
+alone, 44 of 44; packaged into `C:\Dev\WildreachBuild8` (Setup 1,682 MB); from the Setup a clean install matches all 667
+files; through the local stand-in for GitHub, 0.7.0 and 0.6.2 each update with their own updater over four connections,
+231 MB and 236 MB of 1,682 MB, every file matching and the save kept; in the updated copy, crafttimetest's steps by
+clicks (10 of 10) and a copy of Raven's playtest world from the main menu with its Claim tab and the new Clan tab on O
+(Raven's own worlds untouched, 0 of 11 files changed).
 
 - **The Clan tab** (journal, **O**; new `WRUIClan.cpp`, `EWRMenu::Clan`). Raven: "how do clans work and are they in yet?",
   then "yes please, is there any other feature that's console only that needs a screen?". Clans worked but only by
