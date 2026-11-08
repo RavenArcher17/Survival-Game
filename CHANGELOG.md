@@ -3,7 +3,22 @@
 ## 0.7.0 (in progress): creature raids
 
 **Not released.** The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views,
-ash-grey volcanic shrubs, ice rebuilt like the lava. Raids and crafting time are done; the rest is to come.
+ash-grey volcanic shrubs, ice rebuilt like the lava. Raids, crafting time and far views are done; the rest is to come.
+
+- **Far views: a friend who joins sees the whole island, as the host does.** A server loads every cell of the map
+  (server streaming is off), so the host always had the whole island; a player who joined loaded the ground within
+  `world.streamingRangeScale` x 256 m, 1 km at x4. Standing 1.3 km west of the middle, a friend had 59 of the 257
+  landscape pieces and the far peaks were missing from their view (the host, at the same spot, had them all). x24 (6 km,
+  the whole island from anywhere: 5.7 km corner to corner) is the default now. Benchmarked on Epic, a joined client:
+  8.33 ms / p99 10.7 / 4,361 MB at x4, 8.38 ms / p99 10.7 / 4,654 MB at x24, and nothing left to stream in after the
+  2.5 km move (Docs/PERFORMANCE.md). HLODs aren't needed for it. New `WRStreaming` logs what this machine has loaded;
+  worldstest checks the friend has all 257 pieces.
+- **A crash when the host changes the world's settings, fixed.** The animation workers read two tuning numbers
+  (`anim.footMaxDrop` / `footMaxRaise`, not in tuning.json, so the fallbacks) through `FWRTuning::Num`, which adds a
+  missing key to its warn-once set: two threads adding at once, or the host's settings change reloading the tuning at
+  that moment, corrupted it (`Assertion failed: Index>=0 && Index<NumBits` in a TSet, the worlds test's host, a friend
+  in the game). They're read on the game thread now (`FWRAnimFrame::FootMaxDrop / FootMaxRaise`), and `Num` only keeps
+  that set on the game thread. An old race, not new in 0.7.
 
 - **Crafting time with a queue at each station** (`AWRStation::Queue` / `Output`, tuning.json `craft`). A station's
   recipe now takes its time (recipes.json `seconds`, 2-7 s, there since the first drafts but read by nothing) over the

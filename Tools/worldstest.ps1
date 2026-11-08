@@ -72,7 +72,8 @@ try {
 		# A friend joins when the host is back in WT Alpha: they're told its rules, and told again when the host changes them.
 		if (-not $friend -and @(Select-String -Path $log -Pattern "LogWildreach: WORLD 'WT_Alpha'" -ErrorAction SilentlyContinue).Count -ge 2) {
 			# (A real window: it opens Esc and reads what's there, and the World page shouldn't be.)
-			$pal = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 12', 'WRKey Escape', 'wait 1.5', 'WRUIText', 'WRKey Escape')
+			# (WRStreaming: the friend has the whole island's ground, as the host does: 0.7's far views.)
+			$pal = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 12', 'WRStreaming', 'WRKey Escape', 'wait 1.5', 'WRUIText', 'WRKey Escape')
 			$friend = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Palbot -game -windowed -ResX=960 -ResY=540 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 30`" `"-wrbotcmds=$($pal -join '|')`" -abslog=`"$friendLog`"" -PassThru
 		}
 	}
@@ -162,6 +163,8 @@ try {
 	$palSettings = @($palSaw | Where-Object { $_ -match 'UITEXT\s+-?\d+,\s*-?\d+ Video$' }).Count -ge 1
 	$palWorld = @($palSaw | Where-Object { $_ -cmatch 'UITEXT\s+-?\d+,\s*-?\d+ World$' }).Count
 	Check 'a friend''s Esc menu has no World page' ($palSettings -and $palWorld -eq 0) "settings window up: $palSettings, World shown: $palWorld"
+	$palGround = @(Select-String -Path $friendLog -Pattern 'STREAMING client: (\d+) landscape pieces' -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+	Check 'a friend has the whole island''s ground loaded, as the host does' ($palGround -eq 257) "$palGround of 257 landscape pieces"
 	$alphaInfo = Json (Join-Path $worlds 'WT_Alpha\info.json')
 	Check 'the list knows when it was played and for how long' ($alphaInfo -and $alphaInfo.playSeconds -ge 5 -and $alphaInfo.version) $(if ($alphaInfo) { "$($alphaInfo.playSeconds) s, version $($alphaInfo.version)" })
 

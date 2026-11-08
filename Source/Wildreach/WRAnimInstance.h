@@ -137,6 +137,9 @@ struct FWRAnimFrame
 	FName UpperRoot;
 	TArray<FName> SpineBones;
 	float FootLift[2] = { 0.f, 0.f };
+	// How far the pelvis may drop / a foot rise on a slope (cm): read on the game thread (tuning isn't safe to read from
+	// the animation workers while the host changes the world's settings).
+	float FootMaxDrop = 35.f, FootMaxRaise = 45.f;
 	TArray<FName> LegBones;   // left thigh, knee, foot, then right: feet planted on slopes (pelvis down, two-bone IK)
 	// Creatures: the body tilts to the ground under its feet, sinks so the lowest can reach, each leg reaches its own.
 	TArray<FWRCreatureLeg> CreatureLegs;

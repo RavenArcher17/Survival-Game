@@ -214,6 +214,8 @@ public:
 	UFUNCTION(Exec) void WRHour(float Hour);
 	/** Log the island wildlife: sites, how many packs are out, what lives within 300 m, the nearest quiet site. */
 	UFUNCTION(Exec) void WRWildlife();
+	/** Testing aid: what of the island this machine has loaded (landscape pieces, the area they cover, the range). */
+	UFUNCTION(Exec) void WRStreaming();
 	/** Testing aid: spawn a creature at world X/Y (on the ground) / set the nearest wild one of an id to a fraction of its health. */
 	UFUNCTION(Exec) void WRSpawnAt(FName Creature, float X, float Y);
 	UFUNCTION(Exec) void WRCreatureHP(FName Creature, float Fraction);

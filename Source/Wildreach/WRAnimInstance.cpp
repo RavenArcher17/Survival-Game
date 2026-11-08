@@ -550,12 +550,12 @@ void FWRAnimProxy::PlantFeet(FCompactPose& Pose) const
 			return;
 		}
 	}
-	const float Drop = FMath::Max(FMath::Min3(0.f, Frame.FootLift[0], Frame.FootLift[1]), -WRTune(TEXT("anim.footMaxDrop"), 35.f));
+	const float Drop = FMath::Max(FMath::Min3(0.f, Frame.FootLift[0], Frame.FootLift[1]), -Frame.FootMaxDrop);
 	const FCompactPoseBoneIndex Root(0);
 	Pose[Root].AddToTranslation(FVector(0.f, 0.f, Drop));
 	for (int32 Side = 0; Side < 2; ++Side)
 	{
-		const float Raise = FMath::Min(Frame.FootLift[Side] - Drop, WRTune(TEXT("anim.footMaxRaise"), 45.f));
+		const float Raise = FMath::Min(Frame.FootLift[Side] - Drop, Frame.FootMaxRaise);
 		if (Raise < 0.5f)
 		{
 			continue;
@@ -1393,6 +1393,8 @@ void UWRAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Frame.LegBones = LegBones;
 	Frame.FootLift[0] = Input.FootLift[0];
 	Frame.FootLift[1] = Input.FootLift[1];
+	Frame.FootMaxDrop = WRTune(TEXT("anim.footMaxDrop"), 35.f);
+	Frame.FootMaxRaise = WRTune(TEXT("anim.footMaxRaise"), 45.f);
 	Frame.CreatureLegs = CreatureLegs;
 	Frame.Feet = Input.Feet;
 	Frame.CreatureSpine = CreatureSpine;

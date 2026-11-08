@@ -110,7 +110,9 @@ float FWRTuning::Num(const FString& Path, float Fallback) const
 			return static_cast<float>(Value);
 		}
 	}
-	if (!WarnedKeys.Contains(Path))
+	// (The once-only warning's set is the game thread's: two threads adding to it at once corrupted it, the 0.7 crash in
+	// the animation workers. Off the game thread a missing key just takes its fallback.)
+	if (IsInGameThread() && !WarnedKeys.Contains(Path))
 	{
 		WarnedKeys.Add(Path);
 		UE_LOG(LogWildreach, Verbose, TEXT("Tuning key %s missing, using %.3f"), *Path, Fallback);

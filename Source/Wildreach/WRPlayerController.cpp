@@ -27,6 +27,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Camera/CameraActor.h"
 #include "EngineUtils.h"
+#include "LandscapeProxy.h"
 #include "GameFramework/HUD.h"
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
@@ -53,9 +54,10 @@ AWRPlayerController::AWRPlayerController()
 void AWRPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-	// The island's ground streams in around each player. At the map's 256 m loading range the terrain past that wasn't
-	// drawn at all (empty distance from any hill); the landscape's own LODs keep the far ground cheap.
-	const float RangeScale = WRTune(TEXT("world.streamingRangeScale"), 4.f);
+	// The island's ground streams in around each player who joins (a server, the host's game too, loads all of it). At
+	// the map's 256 m loading range the terrain past that wasn't drawn at all (empty distance from any hill); since 0.7
+	// it's x24, the whole island from anywhere, as the host sees it: the landscape's own LODs keep the far ground cheap.
+	const float RangeScale = WRTune(TEXT("world.streamingRangeScale"), 24.f);
 	if (RangeScale > 1.f)
 	{
 		FStreamingSourceShape Shape;
@@ -286,6 +288,24 @@ void AWRPlayerController::WRHold(float Seconds) { ServerCommand(FString::Printf(
 void AWRPlayerController::WRClearCreatures() { ServerCommand(TEXT("clearcreatures")); }
 void AWRPlayerController::WRHour(float Hour) { ServerCommand(FString::Printf(TEXT("hour %.2f"), Hour)); }
 void AWRPlayerController::WRWildlife() { ServerCommand(TEXT("wildlife")); }
+void AWRPlayerController::WRStreaming()
+{
+	// This machine's own view (not the server's): the landscape pieces loaded here and the box they cover.
+	int32 Pieces = 0, Components = 0;
+	FBox Area(ForceInit);
+	for (TActorIterator<ALandscapeProxy> It(GetWorld()); It; ++It)
+	{
+		++Pieces;
+		Components += It->LandscapeComponents.Num();
+		Area += It->GetComponentsBoundingBox(true);
+	}
+	int32 Actors = 0;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It) ++Actors;
+	const TCHAR* Mode = GetNetMode() == NM_Client ? TEXT("client") : GetNetMode() == NM_ListenServer ? TEXT("listen host") : GetNetMode() == NM_DedicatedServer ? TEXT("server") : TEXT("standalone");
+	UE_LOG(LogWildreach, Log, TEXT("STREAMING %s: %d landscape pieces (%d components) loaded, covering X %.0f..%.0f m, Y %.0f..%.0f m; %d actors; range x%.1f"),
+		Mode, Pieces, Components, Area.IsValid ? Area.Min.X / 100.f : 0.f, Area.IsValid ? Area.Max.X / 100.f : 0.f, Area.IsValid ? Area.Min.Y / 100.f : 0.f, Area.IsValid ? Area.Max.Y / 100.f : 0.f,
+		Actors, WRTune(TEXT("world.streamingRangeScale"), 24.f));
+}
 void AWRPlayerController::WRSpawnAt(FName Creature, float X, float Y) { ServerCommand(FString::Printf(TEXT("spawnat %s %.0f %.0f"), *Creature.ToString(), X, Y)); }
 void AWRPlayerController::WRCreatureHP(FName Creature, float Fraction) { ServerCommand(FString::Printf(TEXT("creaturehp %s %.3f"), *Creature.ToString(), Fraction)); }
 void AWRPlayerController::WRCreatureDrive(FName Creature, float Yaw, float Seconds, float Scale)
