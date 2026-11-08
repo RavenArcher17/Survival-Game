@@ -375,8 +375,9 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// green" note, more visible now there are many more); what recolours them is their "snow" coat, Snow Color laid
 		// over a random share of each plant, between Amount Min and Max (0..1 by default). Dark ash in the volcanic west, white
 		// in the tundra. Raising the least share (tuning world.ashCoatMin 0.85 greys nearly every volcanic shrub) looks
-		// better, but every benchmark run with it hung the GPU (DXGI_ERROR_DEVICE_HUNG in the Nanite shadow pass, 4 of 4)
-		// while the GPU was also hanging on and off without it, even on master: left at the pack's 0 until that's settled.
+		// better, but it hangs the GPU (DXGI_ERROR_DEVICE_HUNG in the virtual shadow maps' Nanite NodeAndClusterCull): 4 of 4
+		// benchmark runs in 0.4, and again in 0.7 after the 0.5.0 tessellation fix 2 of 3, while the same day's 5 runs
+		// without it were all clean. Left at the pack's 0: greying them needs another way than this coat.
 		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 260), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) }, { TEXT("Snow Color"), FLinearColor(0.06f, 0.05f, 0.045f) } },
 			{ { TEXT("Amount Min"), WRTune(TEXT("world.ashCoatMin"), 0.f) }, { TEXT("Amount Max"), WRTune(TEXT("world.ashCoatMax"), 1.f) } } } },

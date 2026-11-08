@@ -130,6 +130,13 @@ didn't call for it or it couldn't be verified in this pass.
   quiet machine, Epic, a joined client (the rows "far views" below): x4 8.33 ms / p99 10.7 / 4,361 MB against x24
   (6 km: the whole island from anywhere) 8.38 ms / p99 10.7 / 4,654 MB, and nothing left to stream in after the 2.5 km
   move. So x24 is the default: the whole island for everyone for about 0.3 GB, and HLODs aren't needed for it.
+- **The ice sheet (0.7)** costs nothing measurable: three Epic runs with it at 8.35-8.42 ms (rows "hang check without
+  the ash coat") against 8.38 before it, with the tundra camp in the route's "move" part unchanged (7.6 ms).
+- **Ash-grey shrubs still hang the GPU (0.7)**: `world.ashCoatMin` 0.85 hung 2 of 3 Epic runs (rows "ash-grey shrubs
+  hang check", `DXGI_ERROR_DEVICE_HUNG`, the virtual shadow maps' Nanite `NodeAndClusterCull`), as it hung 4 of 4 in
+  0.4; the 5 runs without it that day were all clean. It stays at 0. The same hang turns up now and then elsewhere
+  (the menus test's host with two game windows on the GPU, the creature-video and portrait tools), always in that step
+  and with the GPU heavily loaded: not looked into yet.
 - **Shader pipeline (PSO) cache for packaged builds**: UE 5.8 already precaches PSOs on D3D12 and holds a mesh back
   until its PSOs are ready (`r.PSOPrecache.ProxyCreationStrategy=1`), so a first-time compile shows as an object
   appearing a moment late rather than a stutter. A bundled cache would cover the rest, but it has to be recorded from
@@ -191,6 +198,12 @@ didn't call for it or it couldn't be verified in this pass.
 | 2026-11-06 10:13 | 0.6 stress: packs out within 600 m (wildlife.activationRadius:60000) | epic | 1 | 10.90 (92 fps) | 10.3 | 15.9 | 3.8 | 10.9 | 9.8 | 88 / 76 | 1,073 | 20.1 (13) | 4361 MB | camp 13.1/145.3, walk 11.9/19.0, move 8.1/11.0 (streaming done 7.8 s) | 0 | CPU others 22%, GPU others 22% (pid 20840 8, pid 7424 7, UnrealEditor 7) (this run 50%); other: 1 UE, 0 game, 0 SCW, 0 build, 0 py |
 | 2026-11-07 23:18 | far views: before, ground to 1 km (x4) | epic | 1 | 8.33 (120 fps) | 9.7 | 10.7 | 3.7 | 8.3 | 7.6 | 0 / 0 | 39 | 11.0 (13) | 4361 MB | camp 8.1/9.6, walk 8.6/10.9, move 7.6/9.9 (streaming done 0.6 s) | 0 | CPU others 7%, GPU others 0% (this run 70%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
 | 2026-11-07 23:21 | far views: whole island (x24) (world.streamingRangeScale:24) | epic | 1 | 8.38 (119 fps) | 9.7 | 10.7 | 3.7 | 8.4 | 7.7 | 0 / 0 | 24 | 12.9 (3) | 4654 MB | camp 8.2/9.8, walk 8.7/10.8, move 7.7/9.4 (streaming done 0.0 s) | 0 | CPU others 6%, GPU others 1% (this run 71%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
+| 2026-11-08 00:16 | ash-grey shrubs hang check (with the new ice) (world.ashCoatMin:0.85) | epic | 1 | 8.35 (120 fps) | 9.7 | 10.6 | 3.9 | 8.3 | 7.6 | 0 / 0 | 24 | 13.0 (4) | 4697 MB | camp 8.1/9.6, walk 8.7/10.8, move 7.6/9.5 (streaming done 0.0 s) | 0 | CPU others 6%, GPU others 0% (this run 72%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
+| 2026-11-08 00:16 | ash-grey shrubs hang check (with the new ice) (world.ashCoatMin:0.85) | epic | 2 | 0.37 (2,673 fps) | 0.0 | 8.3 | 4.6 | 5.9 | 11.2 | 0 / 0 | 12 | 0.0 (0) | 18809 MB | camp 0.4/8.3, walk -/-, move -/- (streaming done - s) | 0 | CPU others 8%, GPU others 0% (this run 56%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
+| 2026-11-08 00:16 | ash-grey shrubs hang check (with the new ice) (world.ashCoatMin:0.85) | epic | 3 | - (- fps) | - | - | - | - | - |  /  | - | - () |  MB | camp -/-, walk -/-, move -/- (streaming done - s) | 0 | CPU others 6%, GPU others 1% (this run 60%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
+| 2026-11-08 00:25 | hang check without the ash coat (the new ice in) | epic | 1 | 8.40 (119 fps) | 9.7 | 10.7 | 3.8 | 8.4 | 7.7 | 0 / 0 | 26 | 12.7 (4) | 4566 MB | camp 8.2/9.7, walk 8.7/10.8, move 7.6/9.4 (streaming done 0.0 s) | 0 | CPU others 5%, GPU others 0% (this run 71%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
+| 2026-11-08 00:25 | hang check without the ash coat (the new ice in) | epic | 2 | 8.42 (119 fps) | 9.8 | 10.7 | 4.0 | 8.4 | 7.7 | 0 / 0 | 23 | 12.2 (5) | 4814 MB | camp 8.2/9.8, walk 8.7/11.0, move 7.7/9.4 (streaming done 0.0 s) | 0 | CPU others 7%, GPU others 0% (this run 68%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
+| 2026-11-08 00:25 | hang check without the ash coat (the new ice in) | epic | 3 | 8.35 (120 fps) | 9.7 | 10.6 | 3.8 | 8.3 | 7.6 | 0 / 0 | 23 | 12.2 (5) | 4751 MB | camp 8.1/10.0, walk 8.6/10.8, move 7.6/9.5 (streaming done 0.0 s) | 0 | CPU others 6%, GPU others 0% (this run 69%); other: 0 UE, 0 game, 0 SCW, 0 build, 0 py |
 <!-- client rows -->
 
 ## Server runs

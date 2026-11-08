@@ -3,8 +3,14 @@
 ## 0.7.0 (in progress): creature raids
 
 **Not released.** The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views,
-ash-grey volcanic shrubs, ice rebuilt like the lava. Raids, crafting time, far views and the ice are done; the shrubs
-are to come.
+ash-grey volcanic shrubs, ice rebuilt like the lava. Raids, crafting time, far views and the ice are done. The ash-grey
+shrubs were retried and still hang the GPU, so they stay off (below).
+
+- **Ash-grey volcanic shrubs: retried, still off.** The plan was to try `world.ashCoatMin` 0.85 again, since the hang
+  it gave in 0.4 (4 of 4 benchmark runs) looked like the Nanite tessellation one fixed in 0.5.0. It isn't: with it, 2 of
+  3 Epic runs hung (`DXGI_ERROR_DEVICE_HUNG` in the virtual shadow maps' Nanite `NodeAndClusterCull`), and the 5 runs
+  without it the same day were clean (Docs/PERFORMANCE.md). It stays at 0; greying them needs another way than the
+  pack's snow coat (the note in `WRWorldDressing.cpp`).
 
 - **The ice, rebuilt like the lava.** It was flat 6 m squares (the hazard cells, 13,576 of them) floating 20 cm over the
   ground. Now it's a sheet on its own 2 m grid (`hazards.iceGrid` in `Data/island_dressing.json`, made by
