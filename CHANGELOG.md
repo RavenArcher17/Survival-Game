@@ -2,8 +2,9 @@
 
 ## 0.7.1: door keypads, the Clan tab
 
-**Not released yet** (notes `Docs/release-notes/v0.7.1.md`). Raven: "finish what you were doing, push and publish".
-Checked before release: alltests 38 of 39 at once, the 39th (updater's dropped-connection step, timing under load) passing
+**Released 2026-11-08** as [v0.7.1](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.7.1) (Latest; commit
+a1a542a, `C:\Dev\WildreachBuild8`, the Setup's SHA-256 on GitHub the same as the local file's; notes
+`Docs/release-notes/v0.7.1.md`). Raven: "finish what you were doing, push and publish". Checked before release: alltests 38 of 39 at once, the 39th (updater's dropped-connection step, timing under load) passing
 alone, 44 of 44; packaged into `C:\Dev\WildreachBuild8` (Setup 1,682 MB); from the Setup a clean install matches all 667
 files; through the local stand-in for GitHub, 0.7.0 and 0.6.2 each update with their own updater over four connections,
 231 MB and 236 MB of 1,682 MB, every file matching and the save kept; in the updated copy, crafttimetest's steps by
