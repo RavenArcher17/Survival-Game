@@ -79,7 +79,21 @@ void FWRClans::RefreshPlayerStates(const UWorld* World) const
 	if (!GS) return;
 	for (APlayerState* P : GS->PlayerArray)
 	{
-		if (AWRPlayerState* WPS = Cast<AWRPlayerState>(P)) WPS->ClanName = ClanOf(WPS->GetPlayerName());
+		AWRPlayerState* WPS = Cast<AWRPlayerState>(P);
+		if (!WPS) continue;
+		const FString Name = WPS->GetPlayerName();
+		WPS->ClanName = ClanOf(Name);
+		// The Clan tab's: your clan as it stands, and who has invited you.
+		const FClan* Mine = Clans.Find(WPS->ClanName);
+		WPS->ClanLeader = Mine ? Mine->Leader : FString();
+		WPS->ClanMembers = Mine ? Mine->Members : TArray<FString>();
+		WPS->ClanInvited = Mine ? Mine->Invites : TArray<FString>();
+		WPS->ClanInvitesToMe.Reset();
+		WPS->ClanInviteFrom.Reset();
+		for (const TPair<FString, FClan>& KV : Clans)
+		{
+			if (KV.Value.Invites.Contains(Name)) { WPS->ClanInvitesToMe.Add(KV.Key); WPS->ClanInviteFrom.Add(KV.Value.Leader); }
+		}
 	}
 	// Clanmates' beds are offered too: a clan change changes whose beds each player has.
 	WRBeds::RefreshAll(const_cast<UWorld*>(World));
@@ -129,7 +143,7 @@ FString FWRClans::Invite(const FString& Player, const FString& Target)
 	if (Limit > 0 && C->Members.Num() >= Limit) return FString::Printf(TEXT("Clan is full (%d)"), Limit);
 	C->Invites.AddUnique(Target);
 	Save();
-	return FString::Printf(TEXT("Invited %s (they type WRClan join %s)"), *Target, *ClanOf(Player));
+	return FString::Printf(TEXT("Invited %s to clan %s"), *Target, *ClanOf(Player));
 }
 
 FString FWRClans::Join(const FString& Player, const FString& Clan)
@@ -173,11 +187,34 @@ FString FWRClans::Kick(const FString& Player, const FString& Target)
 	return FString::Printf(TEXT("Kicked %s"), *Target);
 }
 
+FString FWRClans::Decline(const FString& Player, const FString& Clan)
+{
+	FClan* C = Clans.Find(Clan);
+	if (!C || !C->Invites.Remove(Player)) return TEXT("No invite from that clan");
+	Save();
+	return FString::Printf(TEXT("Turned down clan %s"), *Clan);
+}
+
+FString FWRClans::Uninvite(const FString& Player, const FString& Target)
+{
+	FClan* C = Clans.Find(ClanOf(Player));
+	if (!C || C->Leader != Player) return TEXT("Only the clan leader can take back an invite");
+	if (!C->Invites.Remove(Target)) return TEXT("No invite out to them");
+	Save();
+	return FString::Printf(TEXT("Took back the invite to %s"), *Target);
+}
+
+FString FWRClans::LeaderOf(const FString& Clan) const
+{
+	const FClan* C = Clans.Find(Clan);
+	return C ? C->Leader : FString();
+}
+
 FString FWRClans::Describe(const FString& Player) const
 {
 	const FString Name = ClanOf(Player);
 	const FClan* C = Clans.Find(Name);
-	if (!C) return TEXT("No clan. WRClan create <name>, or WRClan join <name> once invited.");
+	if (!C) return TEXT("No clan: found one, or accept an invite, in the Clan tab (O)");
 	return FString::Printf(TEXT("Clan %s (leader %s): %s"), *Name, *C->Leader, *FString::Join(C->Members, TEXT(", ")));
 }
 

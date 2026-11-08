@@ -25,5 +25,10 @@ void AWRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRPlayerState, ClanName);
+	DOREPLIFETIME_CONDITION(AWRPlayerState, ClanLeader, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWRPlayerState, ClanMembers, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWRPlayerState, ClanInvited, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWRPlayerState, ClanInvitesToMe, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AWRPlayerState, ClanInviteFrom, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AWRPlayerState, Beds, COND_OwnerOnly);
 }

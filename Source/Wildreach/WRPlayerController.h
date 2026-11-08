@@ -26,6 +26,7 @@ enum class EWRMenu : uint8
 	Hearth,    // the Hearth: tech level, cores, unlocks
 	Settings,  // settings: controls (key bindings) and more
 	Door,      // a code-lock door's keypad (MenuPiece)
+	Clan,      // the journal's Clan tab
 };
 
 class AWRBuildPiece;
@@ -308,6 +309,7 @@ private:
 
 	void ToggleInventory();
 	void ToggleSkills();
+	void ToggleClan();
 	void TogglePaths();
 public:
 	void ToggleMap();

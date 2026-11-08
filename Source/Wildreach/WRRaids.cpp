@@ -44,7 +44,7 @@ namespace WRRaidsImpl
 		TWeakObjectPtr<UWorld> World;
 		TArray<FRaid> Raids;
 		TSet<TWeakObjectPtr<AWRClaimTotem>> Waiting;   // due, nobody of it home yet (logged once)
-	} G;
+	} RaidState;
 
 	double NowHours(const UWorld* World)
 	{
@@ -208,7 +208,7 @@ namespace WRRaidsImpl
 
 	bool RaidOn(const AWRClaimTotem* Claim)
 	{
-		return G.Raids.ContainsByPredicate([Claim](const FRaid& R) { return R.Claim.Get() == Claim; });
+		return RaidState.Raids.ContainsByPredicate([Claim](const FRaid& R) { return R.Claim.Get() == Claim; });
 	}
 
 	/** The warning goes out; they come WarnSeconds later (from Bearing, compass degrees, when it's 0 or more: tests).
@@ -256,7 +256,7 @@ namespace WRRaidsImpl
 		UE_LOG(LogWildreach, Log, TEXT("RAID warning for %s's claim (region %s, Hearth level %d, %d points): %s from the %s at %.0f %.0f, in %.0f s"),
 			*R.Owner, *R.Region.ToString(), R.HearthLevel, R.Points, *Who(R), *R.Way, R.From.X, R.From.Y, WarnSeconds);
 		Tell(World, R, 0, Message);
-		Track(World, G.Raids.Add_GetRef(MoveTemp(R)));
+		Track(World, RaidState.Raids.Add_GetRef(MoveTemp(R)));
 		return Message;
 	}
 
@@ -407,14 +407,14 @@ TArray<TPair<FName, int32>> WRRaids::Plan(const TArray<TPair<FName, float>>& Kin
 
 void WRRaids::Start(UWorld* World)
 {
-	for (FRaid& R : G.Raids)
+	for (FRaid& R : RaidState.Raids)
 	{
 		for (const TWeakObjectPtr<AWRCreature>& C : R.Raiders) if (C.IsValid() && C->IsAlive()) C->Destroy();
 	}
-	G = FState();
+	RaidState = FState();
 	if (World && World->GetNetMode() != NM_Client && !WRWorlds::Current().IsEmpty())
 	{
-		G.World = World;
+		RaidState.World = World;
 		const double Every = IntervalHours();
 		UE_LOG(LogWildreach, Log, TEXT("RAID setting %s: %s"), *FWRSocialRules::Setting(TEXT("raids"), TEXT("normal")),
 			Every > 0.0 ? *FString::Printf(TEXT("a claim's raid every %.0f game hours or so, while someone of it is home"), Every) : TEXT("no raids"));
@@ -423,14 +423,14 @@ void WRRaids::Start(UWorld* World)
 
 void WRRaids::Step(UWorld* World)
 {
-	if (!World || G.World.Get() != World)
+	if (!World || RaidState.World.Get() != World)
 	{
 		return;
 	}
-	for (int32 i = G.Raids.Num() - 1; i >= 0; --i)
+	for (int32 i = RaidState.Raids.Num() - 1; i >= 0; --i)
 	{
-		if (Advance(World, G.Raids[i])) G.Raids.RemoveAt(i);
-		else Track(World, G.Raids[i]);
+		if (Advance(World, RaidState.Raids[i])) RaidState.Raids.RemoveAt(i);
+		else Track(World, RaidState.Raids[i]);
 	}
 	const double Every = IntervalHours();
 	if (Every <= 0.0)
@@ -458,14 +458,14 @@ void WRRaids::Step(UWorld* World)
 		}
 		if (!MemberHome(World, Claim))
 		{
-			if (!G.Waiting.Contains(Claim))
+			if (!RaidState.Waiting.Contains(Claim))
 			{
-				G.Waiting.Add(Claim);
+				RaidState.Waiting.Add(Claim);
 				UE_LOG(LogWildreach, Log, TEXT("RAID due on %s's claim: waiting for someone of it to be home"), *Claim->OwnerName);
 			}
 			continue;
 		}
-		G.Waiting.Remove(Claim);
+		RaidState.Waiting.Remove(Claim);
 		Begin(World, Claim, WRTune(TEXT("raid.warnSeconds"), 60.f));
 	}
 }
@@ -474,7 +474,7 @@ FString WRRaids::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 {
 	UWorld* World = PC ? PC->GetWorld() : nullptr;
 	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
-	if (!World || G.World.Get() != World)
+	if (!World || RaidState.World.Get() != World)
 	{
 		return TEXT("No raids in this game (no world)");
 	}
@@ -504,7 +504,7 @@ FString WRRaids::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	}
 	if (Sub == TEXT("end"))
 	{
-		for (FRaid& R : G.Raids) if (R.Stage != EStage::Leaving) Leave(World, R, TEXT("ended by command"));
+		for (FRaid& R : RaidState.Raids) if (R.Stage != EStage::Leaving) Leave(World, R, TEXT("ended by command"));
 		return TEXT("Raids ended");
 	}
 	if (Sub == TEXT("plan"))
@@ -531,7 +531,7 @@ FString WRRaids::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	TArray<FString> Lines;
 	for (TActorIterator<AWRClaimTotem> It(World); It; ++It)
 	{
-		const FRaid* On = G.Raids.FindByPredicate([&It](const FRaid& R) { return R.Claim.Get() == *It; });
+		const FRaid* On = RaidState.Raids.FindByPredicate([&It](const FRaid& R) { return R.Claim.Get() == *It; });
 		Lines.Add(FString::Printf(TEXT("%s's claim: %s"), *It->OwnerName,
 			On ? (On->Stage == EStage::Warned ? TEXT("warned") : On->Stage == EStage::On ? TEXT("raid on") : TEXT("raiders leaving"))
 			: It->NextRaidHours < 0.0 ? TEXT("not scheduled yet") : *FString::Printf(TEXT("next in %.1f h"), It->NextRaidHours - Hours)));

@@ -28,7 +28,12 @@ public:
 	FString Join(const FString& Player, const FString& Clan);
 	FString Leave(const FString& Player);
 	FString Kick(const FString& Player, const FString& Target);
+	/** Turn down a clan's invite (the invited player), or take one back (the leader). */
+	FString Decline(const FString& Player, const FString& Clan);
+	FString Uninvite(const FString& Player, const FString& Target);
 	FString Describe(const FString& Player) const;
+	/** The clan's leader ("" = no such clan). */
+	FString LeaderOf(const FString& Clan) const;
 
 	/** The current world's clans (the game mode loads them again for each world it starts). */
 	void Load();

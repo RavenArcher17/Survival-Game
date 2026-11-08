@@ -153,6 +153,7 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("Paths"), IE_Pressed, &AWRPlayerController::TogglePaths);
 	Bind(TEXT("BackToMenu"), IE_Pressed, &AWRPlayerController::ReturnToMenu);
 	Bind(TEXT("Map"), IE_Pressed, &AWRPlayerController::ToggleMap);
+	Bind(TEXT("Clan"), IE_Pressed, &AWRPlayerController::ToggleClan);
 	Bind(TEXT("Chat"), IE_Pressed, &AWRPlayerController::OpenChat);
 	Bind(TEXT("Build"), IE_Pressed, &AWRPlayerController::ToggleBuildMenu);
 	Bind(TEXT("Snap"), IE_Pressed, &AWRPlayerController::ToggleSnap);

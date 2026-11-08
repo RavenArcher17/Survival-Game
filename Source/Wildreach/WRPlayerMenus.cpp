@@ -127,6 +127,12 @@ void AWRPlayerController::ToggleSkills()
 	MenuIndex = 0;
 }
 
+void AWRPlayerController::ToggleClan()
+{
+	if (!UI) { ServerCommand(TEXT("clan info")); return; }   // the old HUD: what your clan is, as a notice
+	OpenJournal(EWRMenu::Clan);
+}
+
 void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
 void AWRPlayerController::WRMenu(FName Which, int32 Select)
@@ -149,6 +155,7 @@ void AWRPlayerController::WRMenu(FName Which, int32 Select)
 	else if (Which == TEXT("crafting")) OpenJournal(EWRMenu::Craft);
 	else if (Which == TEXT("settings")) OpenJournal(EWRMenu::Settings);
 	else if (Which == TEXT("hearth")) OpenJournal(EWRMenu::Hearth);
+	else if (Which == TEXT("clan")) OpenJournal(EWRMenu::Clan);
 	MenuIndex = FMath::Clamp(Select, 0, FMath::Max(0, BuildMenuEntries().Num() - 1));
 }
 
@@ -642,10 +649,31 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		const FString Who = PS->GetPlayerName();
 		FWRClans& Clans = FWRClans::Get();
 		const FString& A = Arg(1);
-		OutResult = A == TEXT("create") ? Clans.Create(Who, Arg(2)) : A == TEXT("invite") ? Clans.Invite(Who, Arg(2)) : A == TEXT("join") ? Clans.Join(Who, Arg(2))
-			: A == TEXT("leave") ? Clans.Leave(Who) : A == TEXT("kick") ? Clans.Kick(Who, Arg(2)) : Clans.Describe(Who);
+		// (A clan's name may have spaces: everything after the action. A player's name is one word.)
+		TArray<FString> Rest;
+		for (int32 i = 2; i < Args.Num(); ++i) Rest.Add(Args[i]);
+		const FString Name = FString::Join(Rest, TEXT(" ")).TrimStartAndEnd();
+		const FString Before = Clans.ClanOf(Who);
+		OutResult = A == TEXT("create") ? Clans.Create(Who, Name) : A == TEXT("invite") ? Clans.Invite(Who, Arg(2)) : A == TEXT("join") ? Clans.Join(Who, Name)
+			: A == TEXT("leave") ? Clans.Leave(Who) : A == TEXT("kick") ? Clans.Kick(Who, Arg(2)) : A == TEXT("decline") ? Clans.Decline(Who, Name)
+			: A == TEXT("uninvite") ? Clans.Uninvite(Who, Arg(2)) : Clans.Describe(Who);
 		Clans.RefreshPlayerStates(GetWorld());
 		ClientNotify(OutResult);
+		// Tell the others it touches who are on: the one invited or kicked, the clan someone joined or left.
+		const auto Tell = [this](const FString& Target, const FString& Message)
+		{
+			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			{
+				AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
+				if (Other && Other != this && Other->PlayerState && Other->PlayerState->GetPlayerName() == Target) Other->ClientNotify(Message);
+			}
+		};
+		const auto TellClan = [&Clans, &Tell, &Who](const FString& Clan, const FString& Message) { for (const FString& M : Clans.Members(Clan)) if (M != Who) Tell(M, Message); };
+		if (A == TEXT("invite") && OutResult.StartsWith(TEXT("Invited"))) Tell(Arg(2), FString::Printf(TEXT("%s invited you to clan %s: accept it in the Clan tab (O)"), *Who, *Clans.ClanOf(Who)));
+		else if (A == TEXT("join") && OutResult.StartsWith(TEXT("Joined"))) TellClan(Name, FString::Printf(TEXT("%s joined the clan"), *Who));
+		else if (A == TEXT("leave") && OutResult.StartsWith(TEXT("Left"))) TellClan(Before, FString::Printf(TEXT("%s left the clan"), *Who));
+		else if (A == TEXT("kick") && OutResult.StartsWith(TEXT("Kicked"))) { Tell(Arg(2), FString::Printf(TEXT("%s removed you from clan %s"), *Who, *Before)); TellClan(Before, FString::Printf(TEXT("%s removed %s from the clan"), *Who, *Arg(2))); }
+		UE_LOG(LogWildreach, Log, TEXT("CLAN %s: %s -> %s"), *Who, *FString::Join(Args, TEXT(" ")), *OutResult);
 		return true;
 	}
 	if (Cmd == TEXT("dismount"))

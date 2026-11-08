@@ -144,6 +144,7 @@ Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\basetest.ps1      # a base by real input at 16:10: build bar pages and the Claim tab, the Hearth hint, a broken Hearth repaired, a chest renamed, a map waypoint (-Shots)
 Tools\raidtest.ps1      # creature raids: the warning, region hunters by Hearth level bite the base and fight, held or timed out, a due raid waits for someone home (-Shots)
 Tools\crafttimetest.ps1 # crafting time by clicks at a forge: an order of five one at a time, walked off into the tray and taken, cancelled, saved (-Shots)
+Tools\clantest.ps1      # clans by the journal's Clan tab (O), a host and a friend: found, invite (from the players here, by name), remove, take back, leave; an invite turned down, then accepted (-Shots)
 Tools\doortest.ps1      # code-lock doors by their keypad, a host and a friend: a code entered (wrong, then right), your own door's code set by holding E, kept out, removed (-Shots); WRKey E hold 0.6 holds a key
 Tools\cooptest.ps1      # two players at one base (the friend at 4:3): a shared forge queue, then a raid with its card and tracker (-Shots); bots keep in step with "waitchat <text>"
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots

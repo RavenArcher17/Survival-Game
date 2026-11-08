@@ -154,7 +154,7 @@ void FWRPlayerUI::SyncScreen()
 	FName Want;
 	switch (P->GetMenu())
 	{
-	case EWRMenu::Inventory: case EWRMenu::Craft: case EWRMenu::Skills: case EWRMenu::Paths: case EWRMenu::Map: Want = TEXT("journal"); break;
+	case EWRMenu::Inventory: case EWRMenu::Craft: case EWRMenu::Skills: case EWRMenu::Paths: case EWRMenu::Map: case EWRMenu::Clan: Want = TEXT("journal"); break;
 	case EWRMenu::Build: Want = TEXT("build"); break;
 	case EWRMenu::Chest: Want = TEXT("storage"); break;
 	case EWRMenu::Claim: Want = TEXT("claim"); break;

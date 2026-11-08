@@ -147,7 +147,7 @@ namespace WRUIDrive
 	const TCHAR* MenuName(EWRMenu M)
 	{
 		static const TCHAR* Names[] = { TEXT("none"), TEXT("crafting"), TEXT("inventory"), TEXT("build"), TEXT("chest"), TEXT("claim"), TEXT("tame"),
-			TEXT("taming"), TEXT("skills"), TEXT("paths"), TEXT("map"), TEXT("hearth"), TEXT("settings"), TEXT("door") };
+			TEXT("taming"), TEXT("skills"), TEXT("paths"), TEXT("map"), TEXT("hearth"), TEXT("settings"), TEXT("door"), TEXT("clan") };
 		const int32 i = static_cast<int32>(M);
 		return i >= 0 && i < UE_ARRAY_COUNT(Names) ? Names[i] : TEXT("?");
 	}

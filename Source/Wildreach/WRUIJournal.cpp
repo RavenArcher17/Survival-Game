@@ -1,6 +1,6 @@
 // The journal (mockups "Inventory", "Crafting", "Paths", "Life skills", "Map"): one stone window with a leather tab
 // strip; each tab's content is a factory registered by name with WR_REGISTER_JOURNAL_TAB ("inventory", "crafting",
-// "paths", "skills", "map"). The window follows the controller's menu state, so I / J / P / K / M switch tabs.
+// "paths", "skills", "map", "clan"). The window follows the controller's menu state, so I / J / P / K / M / O switch tabs.
 
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
@@ -39,6 +39,7 @@ public:
 			{ EWRMenu::Paths, LOCTEXT("TabPaths", "Paths"), TEXT("Paths") },
 			{ EWRMenu::Skills, LOCTEXT("TabSkills", "Skills"), TEXT("Skills") },
 			{ EWRMenu::Map, LOCTEXT("TabMap", "Map"), TEXT("Map") },
+			{ EWRMenu::Clan, LOCTEXT("TabClan", "Clan"), TEXT("Clan") },
 		};
 		TSharedRef<SHorizontalBox> Strip = SNew(SHorizontalBox);
 		for (const FTab& T : Tabs)
@@ -152,7 +153,7 @@ private:
 		if (!PC.IsValid() || !Content.IsValid()) return;
 		Shown = PC->GetMenu();
 		const TCHAR* Tab = Shown == EWRMenu::Inventory ? TEXT("inventory") : Shown == EWRMenu::Craft ? TEXT("crafting") : Shown == EWRMenu::Paths ? TEXT("paths")
-			: Shown == EWRMenu::Skills ? TEXT("skills") : Shown == EWRMenu::Map ? TEXT("map") : nullptr;
+			: Shown == EWRMenu::Skills ? TEXT("skills") : Shown == EWRMenu::Map ? TEXT("map") : Shown == EWRMenu::Clan ? TEXT("clan") : nullptr;
 		const FWRScreenFactory* Factory = Tab ? FWRScreens::FindTab(Tab) : nullptr;
 		TSharedRef<SWidget> Page = Factory ? (*Factory)(PC.Get())
 			: StaticCastSharedRef<SWidget>(SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("TabSoon", "This page is on its way."), WRUI::Title(18), WRUI::Ink3)]);

@@ -49,6 +49,14 @@ public:
 
 	/** Replicated so clients apply clan rules too (lock-on, PvP). Server keeps it in sync with FWRClans. */
 	UPROPERTY(Replicated) FString ClanName;
+	/** Your own clan for the Clan tab (only your own client gets them; FWRClans::RefreshPlayerStates fills them): its
+	 *  leader and members, the players it has invited, and the clans that have invited you. */
+	UPROPERTY(Replicated) FString ClanLeader;
+	UPROPERTY(Replicated) TArray<FString> ClanMembers;
+	UPROPERTY(Replicated) TArray<FString> ClanInvited;
+	UPROPERTY(Replicated) TArray<FString> ClanInvitesToMe;
+	/** Each of those clans' leader (the same order). */
+	UPROPERTY(Replicated) TArray<FString> ClanInviteFrom;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

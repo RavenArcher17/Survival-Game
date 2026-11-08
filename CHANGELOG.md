@@ -1,6 +1,28 @@
 # Changelog
 
-## Not released yet: door keypads
+## Not released yet: door keypads, the Clan tab
+
+- **The Clan tab** (journal, **O**; new `WRUIClan.cpp`, `EWRMenu::Clan`). Raven: "how do clans work and are they in yet?",
+  then "yes please, is there any other feature that's console only that needs a screen?". Clans worked but only by
+  `WRClan` in the console, and an invite even told the other player to type a command.
+  - With no clan: **Found a clan** (a name box that takes the keyboard, as the chest's Rename: 1-24 characters, spaces
+    allowed) and the invites you've had, each "from <leader>" with **Accept** / **Turn down**.
+  - In one: its name, "You lead it" or "Leader: X", "N members" (or "N of L" with the world's size limit), the members
+    (on or away, Leader, You) with **Remove** for the leader, the invites it has out with **Take back**, and **Leave
+    clan**, which asks first ("Leave X? Y leads it after you." / "It ends with you.").
+  - Right side: the players in this game with their clan and, for a leader, **Invite** on each; **Invite by name** for
+    someone who isn't on; and what clanmates share (bases, beds, no fighting, raids).
+  - Server: new `clan decline <clan>` and `clan uninvite <player>`; clan names may have spaces; the player invited or
+    removed, and the clan someone joins or leaves, are told ("Mason invited you to clan Ash: accept it in the Clan tab
+    (O)"). Each player's state carries their own clan's leader, members, invites out and invites to them
+    (`AWRPlayerState::ClanLeader` etc., owner only), refreshed with every clan change and on joining.
+  - New `Tools/clantest.ps1` (alltests `clan`, 14 checks, all pass): a host with no window and a friend at 1440x900
+    by real keys and clicks through all of the above, and clans.json saved.
+- **What else was console-only** (every player command checked against the screens that send it): only the tame
+  "whistle" (`WRTameAll <order>`: every tame of yours within 30 m takes the order); the tame wheel orders one tame.
+  The main path is picked on the main menu and the subclass at a boss altar; the rest all have screens or keys.
+- Fixed on the way: a new file moved WRRaids.cpp into another unity file, where its `using namespace` put its state
+  `G` beside other files' locals named `G` (C4459): it's `RaidState` now.
 
 From checking the build plan's first playable against the game (Raven: "is the first playable done ... with building?"):
 everything in its Building row was in but "doors and code locks", whose codes only the console set or entered

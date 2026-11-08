@@ -47,6 +47,7 @@ $tests = @(
 	@{ name = 'base'; script = 'basetest.ps1'; what = 'a base by real input at 16:10: build bar pages and the Claim tab, the Hearth hint, a broken Hearth repaired, a chest renamed, a map waypoint' },
 	@{ name = 'raid'; script = 'raidtest.ps1'; what = 'creature raids: the warning, region hunters by Hearth level bite the base and fight, held or timed out, a due raid waits for someone home' },
 	@{ name = 'crafttime'; script = 'crafttimetest.ps1'; what = 'crafting time by clicks at a forge: an order of five one at a time, walked off into the tray and taken, cancelled, saved' },
+	@{ name = 'clan'; script = 'clantest.ps1'; what = 'clans by the Clan tab: found, invite from the players here and by name, remove, take back, leave; turn down and accept' },
 	@{ name = 'door'; script = 'doortest.ps1'; what = 'code-lock doors by their keypad: a code entered (wrong, then right), your own set, kept out, removed' },
 	@{ name = 'coop'; script = 'cooptest.ps1'; what = 'two players at one base, the friend at 4:3: a shared forge queue, then a raid with its card and tracker' },
 	@{ name = 'flicker'; script = 'uiflickertest.ps1'; what = 'no panel jumps or flashes frame to frame in any journal tab or the build bar' },

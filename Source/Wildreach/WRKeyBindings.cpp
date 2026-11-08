@@ -41,6 +41,7 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Paths"), TEXT("Paths"), Menus, EKeys::P);
 	Add(TEXT("Skills"), TEXT("Life skills"), Menus, EKeys::K);
 	Add(TEXT("Map"), TEXT("Map"), Menus, EKeys::M);
+	Add(TEXT("Clan"), TEXT("Clan"), Menus, EKeys::O);
 	Add(TEXT("Chat"), TEXT("Chat"), Menus, EKeys::T);
 	Add(TEXT("Help"), TEXT("Controls help"), Menus, EKeys::H);
 	Add(TEXT("Snap"), TEXT("Building: snap on / off"), Menus, EKeys::F);
