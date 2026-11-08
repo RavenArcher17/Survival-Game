@@ -1,10 +1,64 @@
 # Changelog
 
+## 0.6.3: your base (the Hearth found, repaired; chest names, waypoints)
+
+**Not released yet** (notes `Docs/release-notes/v0.6.3.md`). From Raven's play of 0.6.2: "there was nowhere I saw to
+build the Hearth or upgrade it". The build bar's card row was a horizontal scroll box exactly three cards wide with a
+4 px scroll bar; the Stations tab had eight cards and the Hearth was the eighth (the claim totem the seventh), so neither
+was ever on screen. Most tabs overflowed the same way (stone walls, floors, roofs). No test caught it: every test placed
+the Hearth by command (`WRGhost hearth`), never through the bar.
+
+- **Build bar** (`WRUIBuild.cpp`): a **Claim** tab holds the claim totem and the Hearth. The cards go a page of three at
+  a time (`PerPage`): round ‹ › arrows on the row's ends, level with the pictures (shown only when there's a page that
+  way), the mouse wheel over the cards (`SWheelArea`), and a "4–6 of 6" tag on the row's top edge. Placing a piece turns
+  the row to its page. The tab strip shrinks to fit on narrow screens (`SFitWidth`; at 16:10 the eleven tabs ran into the
+  Demolish button, and SScaleBox's ScaleToFitX only clipped them: it sizes from the last frame's paint geometry and
+  never scaled down here). The Hearth's card says "E on it: feed it major bosses' cores".
+- **First-claim hint** (`FWRFlow::CheckHints`, id `hearth`): standing in your own claim with no Hearth covering it, "Your
+  claim is up. Build a Hearth in it (build menu, Claim tab), then E on it: boss cores raise every station's tier."
+- **A broken Hearth stays and can be repaired.** The Hearth's build piece took the damage and was destroyed the moment
+  it reached 0, cores and all; the Hearth actor's own "broken" state was never seen, and `AWRHearth::Repair` was never
+  called (the map even said "repair it to craft"). Now the piece stops at 0 and the Hearth's health follows the piece's
+  (`SetHealthFraction`; loaded from the saved `hp` too), so a broken Hearth stands, stops its stations and keeps its
+  cores. The Hearth screen has **Repair** under its health while it's damaged: `hearthrepair` → `AWRHearth::RepairFor`,
+  half the piece's build cost scaled by the damage (`hearth.repairShare` 0.5; 15 stone + 3 copper ingots when broken),
+  owner and clan only.
+- **Chest names**: `AWRBuildPiece::CustomName` (replicated, saved as `"name"`), `chestname <words>` (24 characters,
+  owner and clan), the chest screen's **Rename** opens a name box over the screen that takes the keyboard (UI only, as
+  chat does; focus a frame after it opens, or the Rename button takes it back), Enter / Save / Esc / Cancel.
+- **Map waypoints**: right-click the journal map (`WRUIMap::SetWaypoint`; right-click it again clears it); a brass pin
+  with its distance on the map and on the HUD compass, waiting at the compass's end with an arrow when it's behind you.
+  This client's own, for the world it was set in (not saved). The map's controls row lists it.
+- **Your base on the map from anywhere**: claim totems and Hearths (and their build pieces) are `bAlwaysRelevant`, so a
+  friend's own Hearth and claim reach them across the island (they replicated only within 150 m and dropped off the
+  map). The map shows someone else's claim only within 150 m, as before.
+- Testing: `WRMouseClick ... once` (no take-back click first: a second click would undo a toggle like the waypoint).
+  New `Tools/basetest.ps1` (alltests `base`, 12 checks) does all of the above by real keys and clicks as the host at
+  1440x900, 16:10: 12 of 12 pass.
+
+Checked on the packaged build (`C:\Dev\WildreachBuild6`, Setup 1,681 MB, 667 files, 9 changed from 0.6.2) against a local
+stand-in for GitHub serving its Setup:
+- a clean install from it matches the build in all 667 files;
+- **0.6.2 with its updater** (four connections): 9 of 667 files changed, **231 MB**, all 667 files right, the save kept,
+  no working files left, the new updater in place; **0.6.1 with its updater**: 12 files changed, the same 231 MB, all right;
+- the packaged game, updated from 0.6.1, passes basetest's 12 checks on its own client log (the same steps by keys and
+  clicks), and loads a copy of Raven's "playtest 0.6.0" world from the main menu (14 pieces, 154 packs, the Claim tab
+  showing the totem and the Hearth). The only error is the engine's known PSO-precache ensure on the frame Play is
+  clicked. Raven's real worlds untouched;
+- the full suite on this code: 30 of 33 passed; the three that failed in the loaded run all passed run alone (`menus` 12
+  checks, `flow` 22, `roam` 25), so every test passes. The `menus` host's GPU hung (`DXGI_ERROR_DEVICE_HUNG`) 5 s after
+  the friend joined, with two game windows on the GPU: not the 0.5.0 hang (Nanite tessellation's `PatchSplit`) but the
+  virtual shadow maps' Nanite `NodeAndClusterCull`, the same place as all 7 earlier hangs since 0.5.0 (`menus` on 11-04,
+  the creature-video, size-check and portrait tools), every time with the GPU heavily loaded. Not new in 0.6.3; not
+  looked into yet.
+
 ## 0.6.2: updates download over four connections
 
-**Not released yet** (built in `C:\Dev\WildreachBuild5`, notes `Docs/release-notes/v0.6.2.md`). The first release players
-on 0.6.1 get as a small update. Checked on the real build, against a local stand-in for GitHub serving its Setup (1,681
-MB, 667 files; the new one is `Data/spawn_regions.json`):
+**Released 2026-11-07** as [v0.6.2](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.6.2) (Latest; commit
+16984a9, `C:\Dev\WildreachBuild5`). A copy of 0.6.1 updated itself from the real release in 32 s (235 MB, 12 of 667
+files, all 667 right, the save kept, nothing left over). The first release players on 0.6.1 get as a small update.
+Before release, checked on the real build against a local stand-in for GitHub serving its Setup (1,681 MB, 667 files;
+the new one is `Data/spawn_regions.json`):
 - a clean install from it matches the build in all 667 files;
 - **0.6.1 with its own updater** (what players have): **230 MB** (12 of 667 files changed), 13 s here, all 667 files right,
   the save kept, no working files left, and the new updater in place;

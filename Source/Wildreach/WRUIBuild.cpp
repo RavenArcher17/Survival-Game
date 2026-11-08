@@ -26,7 +26,7 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/Layout/SScrollBox.h"
+#include "Layout/ArrangedChildren.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SLeafWidget.h"
 #include "Widgets/SOverlay.h"
@@ -40,6 +40,43 @@ namespace WRBuildUI
 	/** The bar starts right of the HUD's vitals panel (24 + 360 + a gap, in mockup px). */
 	constexpr float BarLeft = 398.f;
 	constexpr float BarHeight = 240.f;
+	/** Cards the row shows at once; more go on further pages (arrows, the mouse wheel, "4–6 of 8"). */
+	constexpr int32 PerPage = 3;
+
+	/** Shrinks its content to the width it's given (never grows it), centred up and down; asks for no width of its own,
+	 *  so a wide content never pushes its neighbours. (SScaleBox's ScaleToFitX only clipped the tab strip here.) */
+	class SFitWidth : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SFitWidth) {}
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs) { ChildSlot[InArgs._Content.Widget]; }
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(0.f, ChildSlot.GetWidget()->GetDesiredSize().Y); }
+		virtual void OnArrangeChildren(const FGeometry& Geo, FArrangedChildren& Out) const override
+		{
+			const TSharedRef<SWidget> Child = ChildSlot.GetWidget();
+			if (!Out.Accepts(Child->GetVisibility())) return;
+			const FVector2D Want = Child->GetDesiredSize(), Have = Geo.GetLocalSize();
+			const float Scale = Want.X > Have.X && Want.X > 0.f ? Have.X / Want.X : 1.f;
+			Out.AddWidget(Geo.MakeChild(Child, Want, FSlateLayoutTransform(Scale, FVector2D(0.f, (Have.Y - Want.Y * Scale) * 0.5f))));
+		}
+	};
+
+	/** Hands the mouse wheel over its content to OnWheel (the card row pages with it). */
+	class SWheelArea : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWheelArea) {}
+			SLATE_DEFAULT_SLOT(FArguments, Content)
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs) { ChildSlot[InArgs._Content.Widget]; }
+		TFunction<bool(float)> OnWheel;
+		virtual FReply OnMouseWheel(const FGeometry& Geo, const FPointerEvent& Event) override
+		{
+			return OnWheel && OnWheel(Event.GetWheelDelta()) ? FReply::Handled() : FReply::Unhandled();
+		}
+	};
 
 	struct FTab { FName Id; FText Name; };
 	const TArray<FTab>& Tabs()
@@ -51,6 +88,7 @@ namespace WRBuildUI
 			{ TEXT("doors"), LOCTEXT("TabDoors", "Doors & windows") },
 			{ TEXT("stairs"), LOCTEXT("TabStairs", "Stairs") },
 			{ TEXT("stations"), LOCTEXT("TabStations", "Stations") },
+			{ TEXT("claim"), LOCTEXT("TabClaim", "Claim") },
 			{ TEXT("storage"), LOCTEXT("TabStorage", "Storage & beds") },
 			{ TEXT("defense"), LOCTEXT("TabDefense", "Defense") },
 			{ TEXT("light"), LOCTEXT("TabLight", "Light") },
@@ -68,7 +106,10 @@ namespace WRBuildUI
 		if (S == TEXT("floor") || S == TEXT("roof") || S == TEXT("gable")) return TEXT("floors");
 		if (S == TEXT("door") || S == TEXT("doorway") || S == TEXT("window")) return TEXT("doors");
 		if (S == TEXT("stairs")) return TEXT("stairs");
-		if (K == TEXT("station") || K == TEXT("hearth") || K == TEXT("totem") || K == TEXT("crop") || K == TEXT("pen")) return TEXT("stations");
+		// The claim totem and the Hearth have a tab of their own: as the last two of eight stations they sat past the
+		// card row's edge, and players never found the Hearth (0.6.2).
+		if (K == TEXT("totem") || K == TEXT("hearth")) return TEXT("claim");
+		if (K == TEXT("station") || K == TEXT("crop") || K == TEXT("pen")) return TEXT("stations");
 		if (K == TEXT("chest") || K == TEXT("bed")) return TEXT("storage");
 		if (K == TEXT("light")) return TEXT("light");
 		return TEXT("decor");
@@ -102,7 +143,7 @@ namespace WRBuildUI
 		if (S == TEXT("gate")) return TEXT("A wide gate for a palisade: E opens it.");
 		if (S == TEXT("tower")) return TEXT("A guard tower with a lookout platform on top.");
 		if (K == TEXT("station")) return FString::Printf(TEXT("A crafting station (%s recipes). Its tier follows the Hearth in your claim."), *D.Name.ToLower());
-		if (K == TEXT("hearth")) return TEXT("Goes inside your own land claim, one per claim. Feed it boss cores to raise every station's tier.");
+		if (K == TEXT("hearth")) return TEXT("Goes inside your own land claim, one per claim. E on it: feed it major bosses' cores to raise every station's tier.");
 		if (K == TEXT("totem")) return TEXT("Claims the land around it: only you and your clan build there. Stock it with wood and stone for upkeep.");
 		if (K == TEXT("chest")) return TEXT("Stores what doesn't fit in your bag. Only you and your clan can open it.");
 		if (K == TEXT("bed")) return TEXT("Where you wake up after you die.");
@@ -383,6 +424,7 @@ public:
 		{
 			Tab = TabOf(*D);
 			Picked = D->Id;
+			ShowPicked();
 		}
 		ChildSlot
 		[
@@ -406,6 +448,7 @@ public:
 		{
 			Picked = D->Id;
 			Tab = TabOf(*D);
+			ShowPicked();
 			bDirty = true;
 		}
 		const uint32 Hash = BagHash();
@@ -423,8 +466,10 @@ private:
 	FName Tab = TEXT("foundations");
 	FName Picked;
 	FName Hovered;
+	/** The card row's page in the open tab (PerPage cards each). */
+	int32 Page = 0;
 	TSharedPtr<SHorizontalBox> TabStrip;
-	TSharedPtr<SScrollBox> Cards;
+	TSharedPtr<SHorizontalBox> Cards;
 	TSharedPtr<SBox> Details;
 	TSharedPtr<SWidget> Chip;
 	TSharedPtr<SButton> DemolishBtn;
@@ -474,6 +519,23 @@ private:
 		Algo::StableSortBy(Out, [&Shapes](const FWRPieceDef* D) { return Shapes.IndexOfByKey(D->Shape.IsNone() ? D->Id : D->Shape); });
 		return Out;
 	}
+	int32 Pages() const { return FMath::Max(1, FMath::DivideAndRoundUp(InTab().Num(), PerPage)); }
+	/** Turn the card row to the page holding the picked piece. */
+	void ShowPicked()
+	{
+		const int32 i = InTab().IndexOfByPredicate([this](const FWRPieceDef* D) { return D->Id == Picked; });
+		if (i != INDEX_NONE) Page = i / PerPage;
+	}
+	/** Another page of cards (Delta -1 back, +1 on); false when there's none that way. */
+	bool TurnPage(int32 Delta)
+	{
+		const int32 To = FMath::Clamp(Page + Delta, 0, Pages() - 1);
+		if (To == Page) return false;
+		Page = To;
+		Hovered = NAME_None;
+		bDirty = true;
+		return true;
+	}
 	int32 Affordable(const FWRPieceDef& D) const
 	{
 		int32 N = 999;
@@ -520,21 +582,26 @@ private:
 			TabStrip->AddSlot().AutoWidth().VAlign(VAlign_Fill)
 			[
 				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
-				.OnClicked_Lambda([this, Id]() { Tab = Id; Hovered = NAME_None; bDirty = true; return FReply::Handled(); })
+				.OnClicked_Lambda([this, Id]() { if (Tab != Id) Page = 0; Tab = Id; Hovered = NAME_None; bDirty = true; return FReply::Handled(); })
 				[
-					SNew(SOverlay)
-					+ SOverlay::Slot().VAlign(VAlign_Center).Padding(FMargin(8.f * U, 0.f))[WRUI::Text(T.Name, WRUI::Title(12), bOn ? WRUI::Ink : WRUI::Ink3, bOn)]
-					+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(FMargin(8.f * U, 0.f, 8.f * U, 4.f * U))
+					SNew(SBox).HeightOverride(44.f * U)   // the strip's height (the scale box sizes the strip by what it holds)
 					[
-						SNew(SBox).HeightOverride(2.f).Visibility(bOn ? EVisibility::HitTestInvisible : EVisibility::Collapsed)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Brass)]
+						SNew(SOverlay)
+						+ SOverlay::Slot().VAlign(VAlign_Center).Padding(FMargin(8.f * U, 0.f))[WRUI::Text(T.Name, WRUI::Title(12), bOn ? WRUI::Ink : WRUI::Ink3, bOn)]
+						+ SOverlay::Slot().VAlign(VAlign_Bottom).Padding(FMargin(8.f * U, 0.f, 8.f * U, 4.f * U))
+						[
+							SNew(SBox).HeightOverride(2.f).Visibility(bOn ? EVisibility::HitTestInvisible : EVisibility::Collapsed)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Brass)]
+						]
 					]
 				]
 			];
 		}
 		Cards->ClearChildren();
-		for (const FWRPieceDef* D : InTab())
+		const TArray<const FWRPieceDef*> Pieces = InTab();
+		Page = FMath::Clamp(Page, 0, Pages() - 1);
+		for (int32 i = Page * PerPage; i < FMath::Min(Pieces.Num(), (Page + 1) * PerPage); ++i)
 		{
-			Cards->AddSlot().Padding(Cards->GetChildren()->Num() == 0 ? 0.f : 12.f * U, 0.f, 0.f, 0.f)[Card(*D)];
+			Cards->AddSlot().AutoWidth().Padding(Cards->GetChildren()->Num() == 0 ? 0.f : 12.f * U, 0.f, 0.f, 0.f)[Card(*Pieces[i])];
 		}
 		Details->SetContent(BuildDetails());
 	}
@@ -553,7 +620,11 @@ private:
 						SNew(SWRPanel).Kind(EWRPanel::Inset).Padding(FMargin(8.f * U, 0.f))
 						[
 							SNew(SHorizontalBox)
-							+ SHorizontalBox::Slot().FillWidth(1.f)[SAssignNew(TabStrip, SHorizontalBox)]
+							// Shrinks to fit (never grows): eleven tabs are wider than the strip on a 16:10 screen.
+							+ SHorizontalBox::Slot().FillWidth(1.f)
+							[
+								SNew(SFitWidth)[SAssignNew(TabStrip, SHorizontalBox)]
+							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4.f * U, 0.f)[SNew(SBox).WidthOverride(1.f).HeightOverride(24.f * U)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Brass2)]]
 							+ SHorizontalBox::Slot().AutoWidth()[DemolishButton()]
 						]
@@ -564,9 +635,9 @@ private:
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
-						SNew(SBox).WidthOverride((3.f * 200.f + 2.f * 12.f) * U)
+						SNew(SBox).WidthOverride((PerPage * 200.f + (PerPage - 1) * 12.f) * U)
 						[
-							SAssignNew(Cards, SScrollBox).Orientation(Orient_Horizontal).ScrollBarThickness(FVector2D(4.f, 4.f))
+							CardRow()
 						]
 					]
 					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(12.f * U, 0.f, 0.f, 0.f)
@@ -576,6 +647,61 @@ private:
 				]
 			]
 		];
+	}
+
+	/** The cards, a page at a time: round arrow buttons on the row's ends when there's a page that way (the wheel turns
+	 *  pages too) and a "4–6 of 8" tag on its top edge. 0.6.2 had a scroll box with a 4 px bar under it: nobody saw that
+	 *  most tabs went on past the third card. */
+	TSharedRef<SWidget> CardRow()
+	{
+		TSharedRef<SWheelArea> Area = SNew(SWheelArea)
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot()[SAssignNew(Cards, SHorizontalBox)]
+			// Level with the cards' pictures, clear of their names and costs.
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(-14.f * U, 24.f * U, 0.f, 0.f)[Arrow(-1)]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 24.f * U, -14.f * U, 0.f)[Arrow(1)]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, -10.f * U, 22.f * U, 0.f)
+			[
+				SNew(SBorder).Visibility_Lambda([this]() { return InTab().Num() > PerPage ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				.BorderImage(WRUI::Box(FLinearColor(FColor(0x16, 0x18, 0x1B)), 8.f, WRUI::Brass2, 1.f)).Padding(FMargin(8.f * U, 1.f * U))
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+					{
+						const int32 N = InTab().Num(), From = Page * PerPage + 1, To = FMath::Min(N, (Page + 1) * PerPage);
+						return FText::FromString(From == To ? FString::Printf(TEXT("%d of %d"), From, N) : FString::Printf(TEXT("%d–%d of %d"), From, To, N));
+					}), WRUI::Body(11, 800), WRUI::Ink2)
+				]
+			]
+		];
+		Area->OnWheel = [this](float Delta) { return TurnPage(Delta < 0.f ? 1 : -1); };
+		return Area;
+	}
+
+	/** A round arrow on the card row's end: Dir -1 the page before, +1 the next. Shown only when there is one. */
+	TSharedRef<SWidget> Arrow(int32 Dir)
+	{
+		TSharedPtr<SButton> Btn;
+		SAssignNew(Btn, SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
+			.ToolTipText(Dir < 0 ? LOCTEXT("PageBack", "The pieces before these (mouse wheel up)") : LOCTEXT("PageOn", "More pieces in this tab (mouse wheel down)"))
+			.Visibility_Lambda([this, Dir]() { return (Dir < 0 ? Page > 0 : Page < Pages() - 1) ? EVisibility::Visible : EVisibility::Collapsed; })
+			.OnClicked_Lambda([this, Dir]() { TurnPage(Dir); return FReply::Handled(); });
+		TWeakPtr<SButton> Weak = Btn;
+		Btn->SetContent(
+			SNew(SBox).WidthOverride(34.f * U).HeightOverride(34.f * U)
+			[
+				SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(FMargin(0.f, 0.f, 0.f, 3.f * U))
+				.BorderImage_Lambda([Weak]()
+				{
+					const TSharedPtr<SButton> B = Weak.Pin();
+					const bool bHover = B && B->IsHovered();
+					return WRUI::Box(bHover ? FLinearColor(FColor(0x3A, 0x31, 0x24)) : FLinearColor(FColor(0x1C, 0x1E, 0x22)), 17.f, bHover ? WRUI::Brass : WRUI::Brass2, 1.5f);
+				})
+				[
+					WRUI::Text(FText::FromString(Dir < 0 ? TEXT("‹") : TEXT("›")), WRUI::Body(24, 800), WRUI::Ink)
+				]
+			]);
+		return Btn.ToSharedRef();
 	}
 
 	bool Demolishing() const { return PC.IsValid() && PC->IsDemolishing(); }

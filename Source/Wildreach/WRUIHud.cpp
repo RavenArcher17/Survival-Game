@@ -5,6 +5,7 @@
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
+#include "WRUIMap.h"
 #include "WRAltar.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
@@ -161,6 +162,29 @@ public:
 				WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(S + FVector2D(16.f, 4.f), FSlateLayoutTransform(Pos - FVector2D(8.f, 2.f))), WRUI::Box(FLinearColor(0.05f, 0.04f, 0.035f, 0.72f), 9.f, WRUI::Alpha(WRUI::Warn, 0.5f), 1.f));
 				DrawTextAt(Out, Layer + 3, Geo, T, Font, Pos, WRUI::Warn, false);
 			}
+		}
+		// Your waypoint (right-click on the map): a brass pin and its distance; behind you it waits at the strip's nearer
+		// end with an arrow, so you know which way to turn.
+		FVector Way;
+		if (WRUIMap::GetWaypoint(P->GetWorld(), Way))
+		{
+			const FVector D = Way - Pawn->GetActorLocation();
+			const float Deg = FMath::RadiansToDegrees(FMath::Atan2(D.X, -D.Y));
+			bool bVis = false;
+			float X = XFor(Deg, bVis);
+			const bool bLeft = FMath::UnwindDegrees(Deg - Heading) < 0.f;
+			if (!bVis) X = bLeft ? 22.f : Size.X - 22.f;
+			const float R = 7.f;
+			WRUI::DrawBox(Out, Layer + 3, Geo.ToPaintGeometry(FVector2D(R * 2.f, R * 2.f), FSlateLayoutTransform(FVector2D(X - R, 3.f))), WRUI::Box(WRUI::Brass, R, FLinearColor::Black, 1.5f));
+			const float M = D.Size2D() / 100.f;
+			const FString Far = M < 1000.f ? FString::Printf(TEXT("%.0f m"), M) : FString::Printf(TEXT("%.1f km"), M / 1000.f);
+			const FText T = FText::FromString(bVis ? FString::Printf(TEXT("Waypoint · %s"), *Far) : bLeft ? FString::Printf(TEXT("‹ Waypoint · %s"), *Far) : FString::Printf(TEXT("Waypoint · %s ›"), *Far));
+			const FSlateFontInfo Font = WRUI::Body(12, 700);
+			const FVector2D S = Measure(T, Font);
+			const float Row = Size.Y + (Flow && Flow->GetBagMarker(Bag) ? 54.f : 30.f);
+			const FVector2D Pos(FMath::Clamp(X - S.X * 0.5f, 0.f, Size.X - S.X), Row);
+			WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(S + FVector2D(16.f, 4.f), FSlateLayoutTransform(Pos - FVector2D(8.f, 2.f))), WRUI::Box(FLinearColor(0.05f, 0.04f, 0.035f, 0.72f), 9.f, WRUI::Alpha(WRUI::Brass, 0.55f), 1.f));
+			DrawTextAt(Out, Layer + 3, Geo, T, Font, Pos, FLinearColor(FColor(0xF0, 0xD4, 0x9B)), false);
 		}
 		FSlateDrawElement::MakeBox(Out, Layer + 4, Geo.ToPaintGeometry(FVector2D(2.f, 10.f), FSlateLayoutTransform(FVector2D(Size.X * 0.5f - 1.f, Size.Y - 10.f))), WRUI::White(), ESlateDrawEffect::None, WRUI::Brass);
 		return Layer + 5;

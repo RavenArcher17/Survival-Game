@@ -80,8 +80,8 @@ Every key below is a default: **Esc → Controls** rebinds any of them (saved in
 | Q / Z (hold) | ability wheel 1 / 2: pick an ability with the mouse, release to keep it; a tap casts the picked one. Esc → Controls can give each ability its own key instead (or both) |
 | Tab | lock on |
 | E | interact: stations, chests, doors, beds, crops, pens, Hearth, claim totem, loot bags; on a knocked-out creature, the Taming panel; hold E on your tame for its order wheel |
-| I / J / P / K / M | the journal: inventory / crafting / paths (learn nodes, fill the wheels) / life skills (perks) / map |
-| B | build bar: click a piece, then LMB place, R rotate (45° with snap off), F snap on/off, RMB cancel, B leave; the ghost is red with the reason when it won't go. Demolish from the bar: aim at your piece, LMB removes it for half back |
+| I / J / P / K / M | the journal: inventory / crafting / paths (learn nodes, fill the wheels) / life skills (perks) / map (right-click sets a waypoint, shown on the compass; right-click it again clears it) |
+| B | build bar: click a piece, then LMB place, R rotate (45° with snap off), F snap on/off, RMB cancel, B leave; the ghost is red with the reason when it won't go. A tab's cards go three at a time (the ‹ › arrows or the wheel); the claim totem and the Hearth are on the Claim tab. Demolish from the bar: aim at your piece, LMB removes it for half back |
 | LMB at a tree / rock / shrub | gather wood / stone / fiber (a hatchet or pick in your bag gathers more) |
 | G | swap sword-and-shield for the ranged weapon (bow, crossbow, blowgun, spears, bolas) and back |
 | with it out: RMB (hold) / LMB / wheel | aim over the shoulder / fire or throw at the crosshair / next ammo (stone, tranq) |

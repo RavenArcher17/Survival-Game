@@ -467,7 +467,49 @@ namespace WRUIHearthScreen
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
 				[
 					SNew(SWRBar).Height(16.f * U).Color(WRUI::Hp).Fraction_Lambda([this]() { const AWRHearth* H = Hearth.Get(); return H && H->MaxHealth > 0.f ? H->GetHealth() / H->MaxHealth : 0.f; })
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[RepairRow()];
+		}
+
+		/** Repair, while it's below full: what it takes (half its build cost, scaled by the damage) against your bag. */
+		TSharedRef<SWidget> RepairRow()
+		{
+			return SNew(SHorizontalBox).Visibility_Lambda([this]() { const AWRHearth* H = Hearth.Get(); return H && H->RepairCost().Num() > 0 ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(SWRButton).Primary(true).FontSize(14).MinHeight(36.f * U).Text(LOCTEXT("RepairHearth", "Repair"))
+					.IsEnabled_Lambda([this]() { return CanRepair(); })
+					.OnClicked_Lambda([this]() { if (PC.IsValid()) PC->SendCommand(TEXT("hearthrepair")); return FReply::Handled(); })
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(12.f * U, 0.f, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return RepairNote(); }), WRUI::Body(13, 600),
+						TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(CanRepair() ? WRUI::Ink2 : WRUI::Bad); }), false, true)
 				];
+		}
+
+		bool CanRepair() const
+		{
+			const AWRHearth* H = Hearth.Get();
+			if (!H || !PC.IsValid() || PC->FindNearbyHearth() != H) return false;
+			const TArray<TPair<FName, int32>> Cost = H->RepairCost();
+			if (Cost.Num() == 0) return false;
+			for (const TPair<FName, int32>& C : Cost) if (Carried(C.Key) < C.Value) return false;
+			return true;
+		}
+
+		FText RepairNote() const
+		{
+			const AWRHearth* H = Hearth.Get();
+			if (!H) return FText::GetEmpty();
+			if (!PC.IsValid() || PC->FindNearbyHearth() != H) return LOCTEXT("RepairGoThere", "Stand at the Hearth to repair it");
+			TArray<FString> Bits;
+			for (const TPair<FName, int32>& C : H->RepairCost())
+			{
+				const FWRItemDef* Def = FWRItemRegistry::Get().Find(C.Key);
+				Bits.Add(FString::Printf(TEXT("%d %s (you have %d)"), C.Value, Def ? *Def->Name.ToLower() : *C.Key.ToString(), Carried(C.Key)));
+			}
+			return FText::FromString(FString::Printf(TEXT("%s: %s"), H->IsBroken() ? TEXT("Mend it so its stations work again") : TEXT("Takes"), *FString::Join(Bits, TEXT(", "))));
 		}
 
 		TSharedRef<SWidget> FeedBlock()

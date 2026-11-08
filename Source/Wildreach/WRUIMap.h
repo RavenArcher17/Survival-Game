@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 
 class SWidget;
+class UWorld;
 struct FWRDeathNote;
 
 /** The island map outside the journal's Map tab (WRUIMap.cpp). */
@@ -27,4 +28,12 @@ namespace WRUIMap
 
 	/** Tests: where a place named on the map drawn last sits on the screen (false: no map is up, or no such place). */
 	WILDREACH_API bool FindMarkerOnScreen(const FString& Name, FVector2D& OutScreen);
+
+	/**
+	 * Your waypoint: one spot you set on the journal map (right-click; right-click it again to clear it), shown there and
+	 * on the HUD compass with its distance. This client's own, for the world it was set in (another world drops it).
+	 */
+	WILDREACH_API bool GetWaypoint(const UWorld* World, FVector& OutWhere);
+	WILDREACH_API void SetWaypoint(const UWorld* World, const FVector& Where);
+	WILDREACH_API void ClearWaypoint();
 }

@@ -802,6 +802,29 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		else if (Cmd == TEXT("claimdeposit")) OutResult = Totem->OwnerName == Who ? Totem->Deposit(this) : TEXT("not your claim");
 		else OutResult = Totem->Upgrade(this);
 	}
+	else if (Cmd == TEXT("chestname"))
+	{
+		// chestname <words>: name the chest you stand at (its screen's Rename); nothing after it = its own name again.
+		AWRBuildPiece* Chest = nullptr;
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It && Self; ++It)
+		{
+			const FWRPieceDef* ItDef = It->GetDef();
+			const float Dist = FVector::Dist(It->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation());
+			if (!It->bGhost && ItDef && ItDef->Kind == TEXT("chest") && Dist < 450.f && (!Chest || Dist < FVector::Dist(Chest->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation()))) Chest = *It;
+		}
+		TArray<FString> Words(Args);
+		Words.RemoveAt(0);
+		FString Name = FString::Join(Words, TEXT(" ")).TrimStartAndEnd().Left(FMath::RoundToInt(WRTune(TEXT("building.chestNameLength"), 24.f)));
+		Name.ReplaceInline(TEXT("|"), TEXT(""));
+		if (!Chest) OutResult = TEXT("no chest nearby");
+		else if (!Chest->CanAccess(Who)) OutResult = TEXT("not your chest");
+		else
+		{
+			Chest->CustomName = Name;
+			OutResult = Name.IsEmpty() ? TEXT("The chest has its own name again") : FString::Printf(TEXT("Chest named \"%s\""), *Name);
+			UE_LOG(LogWildreach, Log, TEXT("CHEST %s named \"%s\" by %s"), *Chest->GetName(), *Name, *Who);
+		}
+	}
 	else if (Cmd == TEXT("store") || Cmd == TEXT("take") || Cmd == TEXT("storeall") || Cmd == TEXT("takeall"))
 	{
 		// store / take <slot> [count]: a stack (or part of one) between your bag and the chest you stand at;

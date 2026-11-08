@@ -9,6 +9,7 @@
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
 #include "WRCharacter.h"
+#include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRCreature.h"
 #include "WRFx.h"
@@ -1612,6 +1613,17 @@ void FWRFlow::CheckHints(const FVector& At)
 					: LOCTEXT("HintToolPick", "Tools work in your hand: take out your pick to break more stone and ore. Your sword's key puts it back."));
 				return;
 			}
+		}
+	}
+	if (!WasSeen(TEXT("hearth")))
+	{
+		// In your own claim with no Hearth yet: say where it is and what it's for (players never found it in 0.6.2).
+		const AWRClaimTotem* Totem = AWRClaimTotem::FindAt(P->GetWorld(), At);
+		const AWRPlayerState* Me = P->GetPlayerState<AWRPlayerState>();
+		if (Totem && Me && Totem->OwnerName == Me->GetPlayerName() && !AWRHearth::FindCovering(P->GetWorld(), At))
+		{
+			ShowHint(TEXT("hearth"), TEXT("Build"), LOCTEXT("HintHearth", "Your claim is up. Build a Hearth in it (build menu, Claim tab), then E on it: boss cores raise every station's tier."));
+			return;
 		}
 	}
 	if (!WasSeen(TEXT("station")) && P->FindNearbyStation())

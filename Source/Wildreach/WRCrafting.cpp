@@ -1,6 +1,8 @@
 #include "WRCrafting.h"
 #include "WRSound.h"
 #include "WRBuildLook.h"
+#include "WRBuilding.h"
+#include "WRInventory.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
@@ -158,6 +160,7 @@ static UPointLightComponent* MakeGlow(AActor* Owner, USceneComponent* Parent, fl
 AWRHearth::AWRHearth()
 {
 	bReplicates = true;
+	bAlwaysRelevant = true;   // "Your Hearth" on your map from anywhere (its build piece is too: AWRBuildPiece::InitPiece)
 	Mesh = MakeShape(this, TEXT("Mesh"), TEXT("/Engine/BasicShapes/Cone.Cone"));
 	RootComponent = Mesh;
 	Mesh->SetRelativeScale3D(FVector(1.5f, 1.5f, 1.2f));
@@ -231,6 +234,44 @@ void AWRHearth::TakeRaidDamage(float Amount)
 	{
 		Health = FMath::Max(0.f, Health - Amount);
 	}
+}
+
+TArray<TPair<FName, int32>> AWRHearth::RepairCost() const
+{
+	TArray<TPair<FName, int32>> Out;
+	const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
+	const FWRPieceDef* Def = Piece ? Piece->GetDef() : nullptr;
+	const float Missing = MaxHealth > 0.f ? FMath::Clamp(1.f - Health / MaxHealth, 0.f, 1.f) : 0.f;
+	if (!Def || Missing <= KINDA_SMALL_NUMBER) return Out;
+	const float Share = WRTune(TEXT("hearth.repairShare"), 0.5f) * Missing;
+	for (const TPair<FName, int32>& C : Def->Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Share)) });
+	return Out;
+}
+
+FString AWRHearth::RepairFor(AWRPlayerController* Player)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
+	if (!PS || !Piece || !HasAuthority()) return TEXT("no Hearth here");
+	if (!Piece->CanAccess(PS->GetPlayerName())) return TEXT("Only its owner and their clan can repair this Hearth");
+	const TArray<TPair<FName, int32>> Cost = RepairCost();
+	if (Cost.Num() == 0) return TEXT("The Hearth is already at full health");
+	UWRInventoryComponent* Inv = PS->GetInventory();
+	for (const TPair<FName, int32>& C : Cost)
+	{
+		if (Inv->CountOf(C.Key) < C.Value)
+		{
+			const FWRItemDef* Item = FWRItemRegistry::Get().Find(C.Key);
+			return FString::Printf(TEXT("Repairing it takes %d %s: you have %d"), C.Value, Item ? *Item->Name.ToLower() : *C.Key.ToString(), Inv->CountOf(C.Key));
+		}
+	}
+	for (const TPair<FName, int32>& C : Cost) Inv->RemoveItem(C.Key, C.Value);
+	const bool bWasBroken = IsBroken();
+	Piece->Health = Piece->MaxHealth;
+	Repair();
+	UE_LOG(LogWildreach, Log, TEXT("HEARTH %s repaired by %s (was %s)"), *GetName(), *PS->GetPlayerName(), bWasBroken ? TEXT("broken") : TEXT("damaged"));
+	WRSound::Broadcast(Player->GetPawn(), TEXT("hearth.feed"));
+	return bWasBroken ? TEXT("The Hearth is mended and burning: its stations work again") : TEXT("The Hearth is back to full health");
 }
 
 // ---------------------------------------------------------------- stations

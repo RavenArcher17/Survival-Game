@@ -271,7 +271,7 @@ namespace WRUIDrive
 	}
 
 	FAutoConsoleCommandWithWorldAndArgs MouseClickCommand(TEXT("WRMouseClick"),
-		TEXT("Testing: click the mouse in the game window as a player would (WRMouseClick [x y] [rmb]; fractions, default the middle)"),
+		TEXT("Testing: click the mouse in the game window as a player would (WRMouseClick [x y] [rmb] [once]; fractions, default the middle)"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
 		{
 			const TSharedPtr<SWindow> Window = GameWindow();
@@ -292,7 +292,8 @@ namespace WRUIDrive
 			App.SetHandleDeviceInputWhenApplicationNotActive(true);
 			// A game window that isn't in front hasn't got the mouse: a player's first click there only takes it back (the
 			// game swallows the click that captures the mouse), so click once more, as they would.
-			const bool bTakeBack = !HasCaptor();
+			// "once": a menu with the cursor up takes the click as it is (a second click would undo a toggle: the map's waypoint).
+			const bool bTakeBack = !HasCaptor() && !Args.Contains(TEXT("once"));
 			if (bTakeBack)
 			{
 				Down();

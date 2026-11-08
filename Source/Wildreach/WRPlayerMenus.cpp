@@ -666,6 +666,14 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		ClientNotify(OutResult);
 		return true;
 	}
+	if (Cmd == TEXT("hearthrepair"))
+	{
+		// The Hearth screen's Repair (a broken Hearth stops its claim's stations until then).
+		AWRHearth* Hearth = FindNearbyHearth();
+		OutResult = Hearth ? Hearth->RepairFor(this) : TEXT("no Hearth nearby");
+		ClientNotify(OutResult);
+		return true;
+	}
 	if (Cmd == TEXT("tame"))
 	{
 		AWRCreature* Tame = FindNearbyCreature(true, 800.f);

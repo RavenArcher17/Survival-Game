@@ -85,6 +85,15 @@ public:
 	/** Server: damage from raiders. */
 	void TakeRaidDamage(float Amount);
 	void Repair() { Health = MaxHealth; }
+	/** Server: health as a share of full (the Hearth's build piece carries the real number and calls this). */
+	void SetHealthFraction(float Fraction) { Health = MaxHealth * FMath::Clamp(Fraction, 0.f, 1.f); }
+	/**
+	 * Server: the Hearth screen's Repair. Back to full, the Hearth and its build piece both, for half the piece's build
+	 * cost scaled by how much is missing (a broken one costs the whole half). Only its owner and their clan.
+	 */
+	FString RepairFor(AWRPlayerController* Player);
+	/** What RepairFor would take now (empty when it's at full health). */
+	TArray<TPair<FName, int32>> RepairCost() const;
 	void SetCores(const TArray<FName>& InCores) { Cores = InCores; }
 
 	/** Nearest Hearth whose claim covers this point (null = no claim: tier 1). */

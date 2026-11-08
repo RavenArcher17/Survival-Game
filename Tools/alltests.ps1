@@ -5,7 +5,7 @@
 #   alltests.ps1 -SkipBuild          use the current build
 #   alltests.ps1 -Only ranged,tame   just those (names as in the table: unit, mp, persist, craft, build, survival, house,
 #                                    sky, tame, boss, social, menus, flow, worlds, rules, spell, ranged, ai, combat, wildlife, roam, version, updater, walk, hazard, water,
-#                                    gather, demolish, flicker, cave)
+#                                    gather, demolish, base, flicker, cave)
 param([switch]$SkipBuild, [string[]]$Only = @())
 # Every Unreal start otherwise runs UnrealBuildTool's platform check, which waits for any build running on the machine.
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -43,6 +43,7 @@ $tests = @(
 	@{ name = 'water'; script = 'watertest.ps1'; what = 'swim in the sea and walk back up the beach, drink in it and at its edge, the fall-through rescue, wildlife stays out of deep water' },
 	@{ name = 'gather'; script = 'gathertest.ps1'; what = 'tools held to gather (yield by tool, durability, break and repair), harvestable creature bodies' },
 	@{ name = 'demolish'; script = 'demolishtest.ps1'; what = 'demolish mode by real input: build, aim, demolish with a refund, refused on another builder''s piece' },
+	@{ name = 'base'; script = 'basetest.ps1'; what = 'a base by real input at 16:10: build bar pages and the Claim tab, the Hearth hint, a broken Hearth repaired, a chest renamed, a map waypoint' },
 	@{ name = 'flicker'; script = 'uiflickertest.ps1'; what = 'no panel jumps or flashes frame to frame in any journal tab or the build bar' },
 	@{ name = 'cave'; script = 'terrain\cavetest.ps1'; what = 'walk into all six caves and mine inside' }
 )

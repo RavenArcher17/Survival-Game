@@ -119,6 +119,8 @@ public:
 	UPROPERTY(Replicated) bool bPlanted = false;
 	/** Chests. */
 	UPROPERTY(Replicated) TArray<FWRItemStack> Storage;
+	/** A name its owner gave it (chests: "chestname"; empty = the piece's own name). Saved with the world. */
+	UPROPERTY(Replicated) FString CustomName;
 
 	/** Steps to the ground (0 = grounded); replicated so the build ghost can tell you before you place. */
 	UPROPERTY(Replicated) int32 Support = 0;

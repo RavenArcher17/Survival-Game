@@ -318,6 +318,7 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, bPlanted);
 	DOREPLIFETIME(AWRBuildPiece, Storage);
 	DOREPLIFETIME(AWRBuildPiece, Support);
+	DOREPLIFETIME(AWRBuildPiece, CustomName);
 }
 
 void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
@@ -330,6 +331,12 @@ void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
 		if (Def->Kind == TEXT("chest"))
 		{
 			Storage.SetNum(20);
+		}
+		// Claim totems and Hearths reach every player wherever they are (a few actors a base), so your base stays on
+		// your map from across the island; the map shows other people's claims only near them, as before.
+		if (Def->Kind == TEXT("totem") || Def->Kind == TEXT("hearth"))
+		{
+			bAlwaysRelevant = true;
 		}
 	}
 }
@@ -787,7 +794,16 @@ void AWRBuildPiece::TakeBuildDamage(float Amount, AActor* DamageSource)
 	Health -= Amount;
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
-		Hearth->TakeRaidDamage(Amount);
+		// A Hearth breaks and stays: its stations stop until it's repaired (E on it, Repair), and its cores are never
+		// lost. Until 0.6.3 the piece was destroyed the moment the Hearth broke, cores and all.
+		const bool bWasBroken = Hearth->IsBroken();
+		Health = FMath::Max(0.f, Health);
+		Hearth->SetHealthFraction(MaxHealth > 0.f ? Health / MaxHealth : 0.f);
+		if (Hearth->IsBroken() && !bWasBroken)
+		{
+			UE_LOG(LogWildreach, Log, TEXT("BUILD %s (hearth) broken by %s"), *GetName(), *GetNameSafe(DamageSource));
+		}
+		return;
 	}
 	if (Health <= 0.f)
 	{
@@ -1021,6 +1037,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	O->SetNumberField(TEXT("yaw"), GetActorRotation().Yaw);
 	O->SetNumberField(TEXT("hp"), Health);
 	O->SetStringField(TEXT("code"), LockCode);
+	if (!CustomName.IsEmpty()) O->SetStringField(TEXT("name"), CustomName);
 	O->SetBoolField(TEXT("locked"), bLocked);
 	O->SetBoolField(TEXT("planted"), bPlanted);
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
@@ -1086,6 +1103,7 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 {
 	Health = O->GetNumberField(TEXT("hp"));
 	LockCode = O->GetStringField(TEXT("code"));
+	O->TryGetStringField(TEXT("name"), CustomName);
 	O->TryGetBoolField(TEXT("locked"), bLocked);
 	O->TryGetBoolField(TEXT("planted"), bPlanted);
 	double Left = 0.0;
@@ -1108,6 +1126,8 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 			for (const TSharedPtr<FJsonValue>& C : *Cores) Names.Add(FName(*C->AsString()));
 			Hearth->SetCores(Names);
 		}
+		// Its health is the piece's (a broken one is saved broken).
+		Hearth->SetHealthFraction(MaxHealth > 0.f ? FMath::Max(0.f, Health) / MaxHealth : 1.f);
 	}
 	if (AWRClaimTotem* Totem = Cast<AWRClaimTotem>(ChildActor.Get()))
 	{
@@ -1126,6 +1146,7 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 AWRClaimTotem::AWRClaimTotem()
 {
 	bReplicates = true;
+	bAlwaysRelevant = true;   // on every player's map (its build piece is too: AWRBuildPiece::InitPiece)
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 1.f;
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));

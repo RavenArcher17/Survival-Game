@@ -10,6 +10,7 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
+#include "Wildreach.h"
 #include "WRFlowTypes.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
@@ -92,6 +93,10 @@ namespace WRMapTab
 	};
 	FMapState& State() { static FMapState S; return S; }
 
+	/** The waypoint (WRUIMap::GetWaypoint): where, and the world it belongs to. */
+	struct FWaypoint { TWeakObjectPtr<const UWorld> World; FVector Where = FVector::ZeroVector; bool bSet = false; };
+	FWaypoint& Waypoint() { static FWaypoint W; return W; }
+
 	struct FCatLook { FLinearColor Ring, Fill, Icon; const TCHAR* Glyph; float Size; bool bSquare; };
 	FCatLook LookFor(const FMarker& M)
 	{
@@ -167,8 +172,12 @@ namespace WRMapTab
 			M.bMine = true;
 			M.Actor = *It;
 		}
+		const APawn* Viewer = PC->GetPawn();
 		for (TActorIterator<AWRClaimTotem> It(World); It; ++It)
 		{
+			// Every claim reaches every player now (for your own base's sake); someone else's shows only once you're
+			// near it, as when they replicated only within 150 m: the map doesn't give away bases across the island.
+			if (It->OwnerName != Me && (!Viewer || FVector::Dist2D(Viewer->GetActorLocation(), It->GetActorLocation()) > 15000.f)) continue;
 			FMarker& M = Out.AddDefaulted_GetRef();
 			M.Key = FString::Printf(TEXT("claim:%d,%d"), FMath::RoundToInt(It->GetActorLocation().X / 100.f), FMath::RoundToInt(It->GetActorLocation().Y / 100.f));
 			M.Cat = ECat::Claim;
@@ -308,6 +317,15 @@ namespace WRMapTab
 		}
 		virtual FReply OnMouseButtonDown(const FGeometry& Geo, const FPointerEvent& Event) override
 		{
+			// Right-click on the journal map: your waypoint there (or, on the one you have, off). Not on the death screen.
+			if (Event.GetEffectingButton() == EKeys::RightMouseButton && !MarkersFn && PC.IsValid())
+			{
+				const FVector2D L = Geo.AbsoluteToLocal(Event.GetScreenSpacePosition());
+				FVector Have;
+				if (WRUIMap::GetWaypoint(PC->GetWorld(), Have) && FVector2D::Distance(ToLocal(Have, Geo.GetLocalSize()), L) < 16.f * U) WRUIMap::ClearWaypoint();
+				else { const FVector2D W = ToWorld(L, Geo.GetLocalSize()); WRUIMap::SetWaypoint(PC->GetWorld(), FVector(W.X, W.Y, 0.f)); }
+				return FReply::Handled();
+			}
 			if (Event.GetEffectingButton() != EKeys::LeftMouseButton) return FReply::Unhandled();
 			bDown = true;
 			bDragged = false;
@@ -506,6 +524,23 @@ namespace WRMapTab
 					}
 					Text(L + 5, T, F, Pos, TextC, true);
 				}
+			}
+			// Your waypoint: a brass pin and how far it is.
+			FVector Way;
+			if (!MarkersFn && PC.IsValid() && WRUIMap::GetWaypoint(PC->GetWorld(), Way))
+			{
+				const FVector2D C = ToLocal(Way, Size);
+				const float D = 24.f * U;
+				Box(L + 6, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor::Black, D * 0.5f + 1.f));
+				Box(L + 6, C - FVector2D(D * 0.5f), FVector2D(D), WRUI::Box(FLinearColor(0.07f, 0.045f, 0.012f, 0.95f), D * 0.5f, WRUI::Brass, 2.f));
+				Box(L + 7, C - FVector2D(D * 0.32f), FVector2D(D * 0.64f), Glyph(TEXT("map_pin")), WRUI::Brass);
+				const APawn* Me = PC->GetPawn();
+				const FSlateFontInfo F = WRUI::Body(11, 800);
+				const FText T = FText::FromString(Me ? FString::Printf(TEXT("Waypoint · %s"), *Distance(FVector::Dist2D(Me->GetActorLocation(), Way))) : FString(TEXT("Waypoint")));
+				const FVector2D TS = Measure(T, F);
+				const FVector2D Pos = C + FVector2D(-TS.X * 0.5f, D * 0.5f + 3.f);
+				Box(L + 7, Pos - FVector2D(6.f, 1.f), TS + FVector2D(12.f, 2.f), WRUI::Box(FLinearColor(0.03f, 0.035f, 0.03f, 0.75f), 3.f, WRUI::Alpha(WRUI::Brass, 0.5f), 1.f));
+				Text(L + 7, T, F, Pos, Hex(TEXT("F0D49B")), true);
 			}
 			// You: a soft halo and the arrow turned to where you look (not on the death screen: that body is gone).
 			if (const APawn* Pawn = PC.IsValid() && !MarkersFn ? PC->GetPawn() : nullptr)
@@ -1024,13 +1059,40 @@ namespace WRMapTab
 			return SNew(SWRPanel).Kind(EWRPanel::Inset).Padding(FMargin(14.f * U, 10.f * U))
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Left)[Hint(TEXT("mouse_left"), LOCTEXT("DragPan", "Drag to pan"))]
-					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Center)[Hint(TEXT("mouse_wheel"), LOCTEXT("WheelZoom", "Wheel to zoom"))]
-					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right)[Hint(TEXT("mouse_left"), LOCTEXT("ClickMarker", "Click a marker: details"))]
+					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_left"), LOCTEXT("DragPan", "Drag: pan"))]
+					+ SHorizontalBox::Slot().FillWidth(1.f)
+					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_wheel"), LOCTEXT("WheelZoom", "Wheel: zoom"))]
+					+ SHorizontalBox::Slot().FillWidth(1.f)
+					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_left"), LOCTEXT("ClickMarker", "Click: details"))]
+					+ SHorizontalBox::Slot().FillWidth(1.f)
+					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_right"), LOCTEXT("RightClickWaypoint", "Right-click: waypoint"))]
 				];
 		}
 	};
 } // namespace WRMapTab
+
+bool WRUIMap::GetWaypoint(const UWorld* World, FVector& OutWhere)
+{
+	const WRMapTab::FWaypoint& W = WRMapTab::Waypoint();
+	if (!W.bSet || !World || W.World.Get() != World) return false;
+	OutWhere = W.Where;
+	return true;
+}
+
+void WRUIMap::SetWaypoint(const UWorld* World, const FVector& Where)
+{
+	WRMapTab::FWaypoint& W = WRMapTab::Waypoint();
+	W.World = World;
+	W.Where = Where;
+	W.bSet = World != nullptr;
+	UE_LOG(LogWildreach, Log, TEXT("WAYPOINT set at %.0f %.0f"), Where.X, Where.Y);
+}
+
+void WRUIMap::ClearWaypoint()
+{
+	if (WRMapTab::Waypoint().bSet) UE_LOG(LogWildreach, Log, TEXT("WAYPOINT cleared"));
+	WRMapTab::Waypoint() = WRMapTab::FWaypoint();
+}
 
 TSharedRef<SWidget> WRUIMap::MakeWakeMap(const FWakeMapArgs& Args)
 {

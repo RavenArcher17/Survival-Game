@@ -17,8 +17,13 @@
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/GameStateBase.h"
 #include "HAL/IConsoleManager.h"
+#include "Wildreach.h"
+#include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBackgroundBlur.h"
+#include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
@@ -34,6 +39,115 @@ using WRUI::U;
 namespace WRStorageUI
 {
 	constexpr float BagW = 610.f, MiddleW = 230.f, Gap = 20.f, Pad = 24.f, PickerW = 356.f;
+
+	/** The chest's Rename: a name box over the screen that takes the keyboard (UI only, as chat does), so typing doesn't
+	 *  walk you away or close the chest. Enter stores it ("chestname"), Esc or a click away cancels. */
+	class SWRChestNameBox : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRChestNameBox) {}
+			SLATE_ARGUMENT(TWeakObjectPtr<AWRPlayerController>, PC)
+			SLATE_ARGUMENT(FString, Name)
+		SLATE_END_ARGS()
+
+		static TWeakPtr<SWRChestNameBox> Instance;
+
+		void Construct(const FArguments& InArgs)
+		{
+			PC = InArgs._PC;
+			static const FEditableTextBoxStyle Field = []()
+			{
+				FEditableTextBoxStyle S = FCoreStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");
+				const FSlateBrush* Normal = WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.55f), 5.f, WRUI::Brass, 1.f);
+				S.SetBackgroundImageNormal(*Normal).SetBackgroundImageHovered(*Normal).SetBackgroundImageFocused(*Normal).SetBackgroundImageReadOnly(*Normal);
+				S.SetForegroundColor(FSlateColor(WRUI::Ink)).SetFocusedForegroundColor(FSlateColor(WRUI::Ink)).SetBackgroundColor(FSlateColor(FLinearColor::White));
+				S.SetPadding(FMargin(12.f * U, 8.f * U));
+				return S;
+			}();
+			ChildSlot.HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 120.f * U, 0.f, 0.f)
+			[
+				SNew(SBox).WidthOverride(460.f * U)
+				[
+					SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).BrassTrim(true).Padding(FMargin(18.f * U, 14.f * U))
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[WRUI::Text(LOCTEXT("NameChest", "Name this chest"), WRUI::Title(15), WRUI::Ink, true)]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							SAssignNew(Box, SEditableTextBox).Style(&Field).Font(WRUI::Body(16, 700)).Text(FText::FromString(InArgs._Name))
+							.HintText(LOCTEXT("NameChestHint", "Ore, food, spare tools..."))
+							.SelectAllTextWhenFocused(true)
+							// Enter saves, Esc cancels; losing focus (a click elsewhere) leaves it open for Save / Cancel.
+							.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type How)
+							{
+								if (How == ETextCommit::OnEnter) Save();
+								else if (How == ETextCommit::OnCleared) Close();
+							})
+						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+							[
+								WRUI::Text(LOCTEXT("NameChestKeys", "Empty: its own name back"), WRUI::Body(12, 500), WRUI::Ink3)
+							]
+							+ SHorizontalBox::Slot().AutoWidth().Padding(8.f * U, 0.f, 0.f, 0.f)
+							[
+								SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(32.f * U).Text(LOCTEXT("NameChestCancel", "Cancel")).OnClicked_Lambda([this]() { Close(); return FReply::Handled(); })
+							]
+							+ SHorizontalBox::Slot().AutoWidth().Padding(8.f * U, 0.f, 0.f, 0.f)
+							[
+								SNew(SWRButton).Primary(true).FontSize(13).MinHeight(32.f * U).Text(LOCTEXT("NameChestSave", "Save")).OnClicked_Lambda([this]() { Save(); return FReply::Handled(); })
+							]
+						]
+					]
+				]
+			];
+		}
+
+		static void Open(AWRPlayerController* InPC, const FString& Name)
+		{
+			if (!InPC || !GEngine || !GEngine->GameViewport || Instance.IsValid()) return;
+			TSharedRef<SWRChestNameBox> Widget = SNew(SWRChestNameBox).PC(InPC).Name(Name);
+			Instance = Widget;
+			GEngine->GameViewport->AddViewportWidgetContent(Widget, 90);
+			FInputModeUIOnly Mode;
+			Mode.SetWidgetToFocus(Widget->Box);
+			InPC->SetInputMode(Mode);
+			UE_LOG(LogWildreach, Log, TEXT("CHEST name box open"));
+		}
+
+		/** Focus goes to the box a frame after it opens: the Rename button's own click takes focus back after its handler. */
+		virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
+		{
+			SCompoundWidget::Tick(Geo, Time, Delta);
+			if (Frames++ < 2 && Box.IsValid()) FSlateApplication::Get().SetKeyboardFocus(Box, EFocusCause::SetDirectly);
+		}
+
+		void Save()
+		{
+			if (PC.IsValid() && Box.IsValid()) PC->SendCommand(TEXT("chestname ") + Box->GetText().ToString().Replace(TEXT("|"), TEXT("")).Left(24));
+			Close();
+		}
+
+		void Close()
+		{
+			if (bClosed) return;
+			bClosed = true;
+			const TSharedRef<SWRChestNameBox> KeepAlive = SharedThis(this);   // the viewport held the last other reference
+			if (GEngine && GEngine->GameViewport) GEngine->GameViewport->RemoveViewportWidgetContent(KeepAlive);
+			// The chest screen under it gets its cursor and input mode back.
+			if (PC.IsValid()) { if (FWRPlayerUI* UI = PC->GetUI()) UI->ReapplyInputMode(); }
+			Instance.Reset();
+		}
+
+	private:
+		TWeakObjectPtr<AWRPlayerController> PC;
+		TSharedPtr<SEditableTextBox> Box;
+		bool bClosed = false;
+		int32 Frames = 0;
+	};
+	TWeakPtr<SWRChestNameBox> SWRChestNameBox::Instance;
 
 	class SWRStorageScreen : public SCompoundWidget
 	{
@@ -131,6 +245,7 @@ namespace WRStorageUI
 		FString ChestName() const
 		{
 			const AWRBuildPiece* P = Piece();
+			if (P && !P->CustomName.IsEmpty()) return P->CustomName;
 			const FWRPieceDef* Def = P ? P->GetDef() : nullptr;
 			return Def ? Def->Name : FString(TEXT("Storage chest"));
 		}
@@ -352,7 +467,14 @@ namespace WRStorageUI
 				+ SVerticalBox::Slot().AutoHeight().Padding(4.f * U, 4.f * U, 4.f * U, 0.f)
 				[
 					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Bottom)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::FromString(ChestName()); }), WRUI::Title(18), WRUI::Ink)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::FromString(ChestName()); }), WRUI::Title(18), WRUI::Ink)]
+					// Rename: a box over the screen takes the name (as chat does), "chestname" stores it on the server.
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(10.f * U, 0.f, 0.f, 0.f)
+					[
+						SNew(SWRButton).Ghost(true).FontSize(12).MinHeight(26.f * U).Text(LOCTEXT("RenameChest", "Rename"))
+						.OnClicked_Lambda([this]() { SWRChestNameBox::Open(PC.Get(), Piece() ? Piece()->CustomName : FString()); return FReply::Handled(); })
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f)[SNew(SSpacer)]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(10.f * U, 0.f, 0.f, 0.f)[Count(EWRSlotKind::Chest, Capacity)]
 				]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Left).Padding(4.f * U, 12.f * U, 4.f * U, 0.f)
