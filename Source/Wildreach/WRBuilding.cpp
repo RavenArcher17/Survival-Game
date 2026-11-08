@@ -319,6 +319,7 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, Storage);
 	DOREPLIFETIME(AWRBuildPiece, Support);
 	DOREPLIFETIME(AWRBuildPiece, CustomName);
+	DOREPLIFETIME(AWRBuildPiece, UnlockedFor);
 }
 
 void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
@@ -784,6 +785,27 @@ bool AWRBuildPiece::CanAccess(const FString& PlayerName) const
 	return CanPlayersShare(OwnerName, PlayerName);
 }
 
+bool AWRBuildPiece::SeemsShared(const AController* Player) const
+{
+	const AWRPlayerState* Me = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!Me) return false;
+	if (HasAuthority()) return CanAccess(Me->GetPlayerName());
+	if (OwnerName.IsEmpty() || OwnerName == Me->GetPlayerName()) return true;
+	const AGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState() : nullptr;
+	for (const APlayerState* P : GS && !Me->ClanName.IsEmpty() ? GS->PlayerArray : TArray<TObjectPtr<APlayerState>>())
+	{
+		const AWRPlayerState* W = Cast<AWRPlayerState>(P);
+		if (W && W->GetPlayerName() == OwnerName) return W->ClanName == Me->ClanName;
+	}
+	return false;
+}
+
+bool AWRBuildPiece::SeemsOpenable(const AController* Player) const
+{
+	const APlayerState* Me = Player ? Player->PlayerState : nullptr;
+	return !bLocked || SeemsShared(Player) || (Me && UnlockedFor.Contains(Me->GetPlayerName()));
+}
+
 void AWRBuildPiece::TakeBuildDamage(float Amount, AActor* DamageSource)
 {
 	if (!HasAuthority() || Amount <= 0.f || IsActorBeingDestroyed())
@@ -835,7 +857,7 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	{
 		if (bLocked && !CanAccess(Who) && !UnlockedFor.Contains(Who))
 		{
-			return TEXT("Locked. Type WRCode <code> to unlock.");
+			return TEXT("Locked. Enter its code on the keypad (E)");
 		}
 		bOpen = !bOpen;
 		OnRep_Door();

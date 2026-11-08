@@ -211,13 +211,35 @@ void AWRPlayerController::InteractPressed()
 			UI->TameKey(true);
 			return;
 		}
+		// Your own (or your clan's) code-lock door: hold for its keypad, tap to open or shut it (FWRPlayerUI::DoorKey).
+		AWRBuildPiece* Door = Cast<AWRBuildPiece>(FindUseTarget());
+		const FWRPieceDef* DoorDef = Door ? Door->GetDef() : nullptr;
+		if (DoorDef && DoorDef->bLockable && !(Wild && Me && FVector::Dist2D(Wild->GetActorLocation(), Me->GetActorLocation()) < FVector::Dist2D(Door->GetActorLocation(), Me->GetActorLocation()))
+			&& Door->SeemsShared(this))
+		{
+			UI->DoorKey(true, Door);
+			return;
+		}
 	}
 	WRInteract();
 }
 
 void AWRPlayerController::InteractReleased()
 {
-	if (UI) UI->TameKey(false);
+	if (UI)
+	{
+		UI->TameKey(false);
+		UI->DoorKey(false, nullptr);
+	}
+}
+
+void AWRPlayerController::OpenDoorKeypad(AWRBuildPiece* Door)
+{
+	if (!Door || Menu != EWRMenu::None) return;
+	Menu = EWRMenu::Door;
+	MenuPiece = Door;
+	MenuIndex = 0;
+	UE_LOG(LogWildreach, Log, TEXT("DOOR keypad for %s's door (%s)"), *Door->OwnerName, Door->SeemsShared(this) ? TEXT("theirs: set or remove the code") : TEXT("enter the code"));
 }
 
 void AWRPlayerController::OpenJournal(EWRMenu Tab)
@@ -843,7 +865,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
 		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("hearthfeed"), TEXT("hearthrepair"),
-		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname ") };  // chat is its own RPC
+		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{

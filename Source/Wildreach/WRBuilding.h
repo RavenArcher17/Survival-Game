@@ -124,9 +124,11 @@ public:
 
 	/** Steps to the ground (0 = grounded); replicated so the build ghost can tell you before you place. */
 	UPROPERTY(Replicated) int32 Support = 0;
+	/** Code-locked doors: who has entered its code since it was set (replicated so the prompt and E know who may open it:
+	 *  the keypad only comes up for someone who can't). Not saved: after a restart, the code again. */
+	UPROPERTY(Replicated) TArray<FString> UnlockedFor;
 	/** Server bookkeeping. */
 	FString LockCode;
-	TSet<FString> UnlockedFor;
 	/** Beds: the players who've set it to wake at (WRBeds; saved with the world). */
 	TArray<FString> Sleepers;
 	/** Ghosts are local previews in build mode: no collision, tinted, in the piece's real shape. */
@@ -149,6 +151,13 @@ public:
 	void TakeBuildDamage(float Amount, AActor* DamageSource);
 	FString Interact(AWRPlayerController* Player);
 	bool CanAccess(const FString& PlayerName) const;
+	/** As any machine can tell (clans from the replicated player states, so an offline owner's clan isn't known): the
+	 *  piece is Player's or their clan's (CanAccess's rule), and may Player open this door (no lock, theirs, or they've
+	 *  entered its code)? The prompt and E use these; the server decides with CanAccess / UnlockedFor. */
+	bool SeemsShared(const AController* Player) const;
+	bool SeemsOpenable(const AController* Player) const;
+	/** Doors: open or shut it (the right code on its keypad opens it). */
+	void SetOpen(bool bNewOpen) { bOpen = bNewOpen; OnRep_Door(); }
 	AActor* GetChild() const { return ChildActor.Get(); }
 
 	TSharedRef<class FJsonObject> ToJson() const;

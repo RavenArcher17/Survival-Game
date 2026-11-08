@@ -25,6 +25,7 @@ enum class EWRMenu : uint8
 	Map,       // the journal's map tab
 	Hearth,    // the Hearth: tech level, cores, unlocks
 	Settings,  // settings: controls (key bindings) and more
+	Door,      // a code-lock door's keypad (MenuPiece)
 };
 
 class AWRBuildPiece;
@@ -64,6 +65,8 @@ public:
 	void ShowLocalNotice(const FString& Message);
 	/** What E does right now (the same as a tap of it). */
 	void InteractNow() { WRInteract(); }
+	/** The keypad of a code-lock door (EWRMenu::Door): to enter its code, or, yours, to set or remove it. */
+	void OpenDoorKeypad(AWRBuildPiece* Door);
 	AWRStation* GetMenuStation() const { return MenuStation.Get(); }
 	AWRBuildPiece* GetMenuPiece() const { return MenuPiece.Get(); }
 	class AWRCreature* GetMenuCreature() const { return MenuCreature.Get(); }

@@ -1,5 +1,29 @@
 # Changelog
 
+## Not released yet: door keypads
+
+From checking the build plan's first playable against the game (Raven: "is the first playable done ... with building?"):
+everything in its Building row was in but "doors and code locks", whose codes only the console set or entered
+(`WRSetCode` / `WRCode`), so a player couldn't lock a door at all. The dedicated server, the other gap, is on hold
+(Raven).
+
+- **A keypad on code-lock doors** (the reinforced door; new screen `WRUIDoor.cpp`, `EWRMenu::Door`). E on a locked door
+  that isn't yours brings it up: the prompt says "Enter code". Four digits by click or by the number keys (number row or
+  pad), Back / Backspace, Clear / Delete, **Unlock** or Enter. A wrong code shakes the digits ("Wrong code"); the right one
+  opens the door and closes the keypad, and the door is yours to open (and shut) from then on, until its code changes.
+- **Your own door: hold E** (0.35 s, `ui.doorHoldSeconds`) for its keypad; a tap still opens or shuts it. The prompt
+  says "Open · Hold: code lock". Type four digits and **Set code and lock**; **Remove lock** takes it off ("anyone can
+  open it"). The same for your clan's doors. Owner and clan are known from the replicated player states, so the hold
+  and the prompt work on a friend's machine too; the server decides as before.
+- Server: `setcode` / `code` / new `clearcode` take the door's spot (`code 4821 X Y Z`: the keypad's own door, not just
+  the nearest piece), the right code opens the door, and `AWRBuildPiece::UnlockedFor` (who has entered it) replicates
+  so the prompt and E know who may open it. Every attempt is logged (`DOOR <who> <cmd> at <spot>: <result>`).
+- Testing: `WRKey <key> hold <seconds>` holds a key down. New `Tools/doortest.ps1` (alltests `door`, 14 checks, all
+  pass): a host with no window and a friend at 1440x900 by real keys and clicks: the host's door, a wrong code by keys
+  and the right one by clicks; the friend's own door locked by a held E and keys, the host kept out (his E brings up its
+  keypad), a tap still opening it for its owner, the lock removed. buildtest's raider now sends `WRCmd interact` for
+  the server's door rules (its E brings up the keypad now). unit, build, survival, house, menus, base and flicker pass.
+
 ## 0.7.0: creature raids, crafting time, far views
 
 **Released 2026-11-08** as [v0.7.0](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.7.0) (Latest; commit

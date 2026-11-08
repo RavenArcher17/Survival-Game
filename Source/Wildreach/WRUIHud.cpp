@@ -697,7 +697,13 @@ private:
 				const FWRPieceDef* Def = Piece->GetDef();
 				if (!Def) return FString();
 				OutTarget = Def->Name;
-				if (Def->Kind == TEXT("door")) return Piece->bOpen ? TEXT("Close") : Piece->bLocked ? TEXT("Locked") : TEXT("Open");
+				if (Def->Kind == TEXT("door"))
+				{
+					// A code-lock door: its keypad when it's locked to you; your own one also has its keypad on a hold.
+					if (Def->bLockable && !Piece->SeemsOpenable(P)) return TEXT("Enter code");
+					const TCHAR* Act = Piece->bOpen ? TEXT("Close") : TEXT("Open");
+					return Def->bLockable && Piece->SeemsShared(P) ? FString::Printf(TEXT("%s  ·  Hold: code lock"), Act) : FString(Act);
+				}
 				if (Def->Kind == TEXT("chest")) return TEXT("Open");
 				if (Def->Kind == TEXT("totem")) return TEXT("Land claim");
 				if (Def->Kind == TEXT("crop")) return Piece->bPlanted ? TEXT("Growing") : TEXT("Plant");

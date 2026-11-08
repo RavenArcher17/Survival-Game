@@ -187,6 +187,12 @@ void AWRPlayerController::WRInteract()
 	if (AWRBuildPiece* Piece = Cast<AWRBuildPiece>(Use))
 	{
 		const FWRPieceDef* Def = Piece->GetDef();
+		if (UI && Def && Def->bLockable && !Piece->SeemsOpenable(this))
+		{
+			// Locked, and not to you: its keypad, to enter the code (the right one opens it).
+			OpenDoorKeypad(Piece);
+			return;
+		}
 		if (Def && (Def->Kind == TEXT("chest") || Def->Kind == TEXT("totem")))
 		{
 			Menu = Def->Kind == TEXT("chest") ? EWRMenu::Chest : EWRMenu::Claim;

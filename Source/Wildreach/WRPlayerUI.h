@@ -88,6 +88,9 @@ public:
 	void PickTameOrder(int32 Pos);
 	static const TArray<TPair<FName, FText>>& TameOrders();
 
+	// --- Your own code-lock door: hold E for its keypad (set or remove the code), tap to open or shut it.
+	void DoorKey(bool bDown, class AWRBuildPiece* Door);
+
 	/** Short-lived "+3 Wood" lines (from the server's notices); more of the same item stacks onto its line. */
 	struct FPickup
 	{
@@ -160,6 +163,9 @@ private:
 	bool bTameKeyDown = false;
 	double TameDownAt = 0.0;
 	int32 TameHover = -1;
+	bool bDoorKeyDown = false;
+	double DoorDownAt = 0.0;
+	TWeakObjectPtr<class AWRBuildPiece> DoorKeyPiece;
 
 	TArray<FPickup> Pickups;
 	double PickupAddedAt = -100.0;

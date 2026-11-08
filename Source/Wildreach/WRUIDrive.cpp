@@ -147,7 +147,7 @@ namespace WRUIDrive
 	const TCHAR* MenuName(EWRMenu M)
 	{
 		static const TCHAR* Names[] = { TEXT("none"), TEXT("crafting"), TEXT("inventory"), TEXT("build"), TEXT("chest"), TEXT("claim"), TEXT("tame"),
-			TEXT("taming"), TEXT("skills"), TEXT("paths"), TEXT("map"), TEXT("hearth"), TEXT("settings") };
+			TEXT("taming"), TEXT("skills"), TEXT("paths"), TEXT("map"), TEXT("hearth"), TEXT("settings"), TEXT("door") };
 		const int32 i = static_cast<int32>(M);
 		return i >= 0 && i < UE_ARRAY_COUNT(Names) ? Names[i] : TEXT("?");
 	}
@@ -242,13 +242,33 @@ namespace WRUIDrive
 		}));
 
 	FAutoConsoleCommandWithWorldAndArgs KeyCommand(TEXT("WRKey"),
-		TEXT("Testing: press and release a key as the keyboard would (WRKey I, WRKey Escape, WRKey Enter)"),
+		TEXT("Testing: press and release a key as the keyboard would (WRKey I, WRKey Escape, WRKey Enter); WRKey E hold 0.6 keeps it down that long"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld*)
 		{
 			const FKey Key(Args.Num() > 0 ? FName(*Args[0]) : NAME_None);
 			if (!Key.IsValid())
 			{
 				UE_LOG(LogWildreach, Warning, TEXT("KEY %s is not a key"), Args.Num() > 0 ? *Args[0] : TEXT("(none)"));
+				return;
+			}
+			if (Args.Num() >= 3 && Args[1] == TEXT("hold"))
+			{
+				// Down now, up after a while (a held key: E on your own door or tame).
+				const float Seconds = FMath::Max(0.05f, FCString::Atof(*Args[2]));
+				FSlateApplication& App = FSlateApplication::Get();
+				const uint32* KeyCodePtr = nullptr;
+				const uint32* CharCodePtr = nullptr;
+				FInputKeyManager::Get().GetCodesFromKey(Key, KeyCodePtr, CharCodePtr);
+				const uint32 KeyCode = KeyCodePtr ? *KeyCodePtr : 0, CharCode = CharCodePtr ? *CharCodePtr : 0;
+				const uint32 User = FSlateApplication::CursorUserIndex;
+				App.ProcessKeyDownEvent(FKeyEvent(Key, FModifierKeysState(), User, false, CharCode, KeyCode));
+				FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Key, User, CharCode, KeyCode](float)
+				{
+					if (FSlateApplication::IsInitialized()) FSlateApplication::Get().ProcessKeyUpEvent(FKeyEvent(Key, FModifierKeysState(), User, false, CharCode, KeyCode));
+					UE_LOG(LogWildreach, Log, TEXT("KEY %s up"), *Key.ToString());
+					return false;
+				}), Seconds);
+				UE_LOG(LogWildreach, Log, TEXT("KEY %s held %.2f s"), *Key.ToString(), Seconds);
 				return;
 			}
 			Press(Key);

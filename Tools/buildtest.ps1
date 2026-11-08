@@ -30,7 +30,8 @@ $builder = @(
 $raider = @(
 	'WRBotPause 1', 'wait 14', 'WRTeleport 3200 3000', 'wait 1', 'WRGive wood 50',
 	'WRPlace wood_foundation 3200 3600 0 0',
-	'WRTeleport 2800 3150', 'wait 1', 'WRInteract', 'WRCode 0000', 'WRCode 1234', 'WRInteract',
+	# (The server's rules by command: E itself brings up the door's keypad on a locked door, which doortest plays.)
+	'WRTeleport 2800 3150', 'wait 1', 'WRCmd interact', 'WRCode 0000', 'WRCode 1234', 'WRCmd interact',
 	'WRTeleport 2400 3200', 'wait 1', 'WRHitPiece 20', 'WRHitPiece 20', 'wait 1',
 	'WRTeleport 2400 3700', 'wait 1', 'WRHitPiece 60', 'wait 2', 'WRSay buildtest-done'
 ) -join '|'

@@ -751,23 +751,44 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			UE_LOG(LogWildreach, Log, TEXT("BUILD %s placed %s at %s (support %d)"), *Who, *PieceId.ToString(), *Loc.ToCompactString(), Support);
 		}
 	}
-	else if (Cmd == TEXT("setcode") || Cmd == TEXT("code"))
+	else if (Cmd == TEXT("setcode") || Cmd == TEXT("code") || Cmd == TEXT("clearcode"))
 	{
-		AWRBuildPiece* Door = FindNearbyPiece(450.f);
-		const FWRPieceDef* Def = Door ? Door->GetDef() : nullptr;
+		// setcode / code <4 digits> [X Y Z], clearcode [X Y Z]: the code-lock door standing there (the keypad sends the one
+		// it's for), else the nearest one within reach.
+		const int32 At = Cmd == TEXT("clearcode") ? 1 : 2;
+		const bool bAt = Args.Num() >= At + 3;
+		const FVector Spot(FCString::Atof(*Arg(At)), FCString::Atof(*Arg(At + 1)), FCString::Atof(*Arg(At + 2)));
+		AWRBuildPiece* Door = nullptr;
+		float Best = 450.f;
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It && Self; ++It)
+		{
+			const FWRPieceDef* D = It->GetDef();
+			if (It->bGhost || !D || !D->bLockable || (bAt && FVector::Dist(It->GetActorLocation(), Spot) > 50.f)) continue;
+			const float Dist = FVector::Dist(It->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation());
+			if (Dist < Best) { Best = Dist; Door = *It; }
+		}
 		const FString Code = Arg(1);
-		if (!Def || !Def->bLockable) OutResult = TEXT("no lockable door nearby");
-		else if (Code.Len() != 4 || !Code.IsNumeric()) OutResult = TEXT("codes are 4 digits");
+		if (!Door) OutResult = TEXT("no code-lock door nearby");
+		else if (Cmd == TEXT("clearcode"))
+		{
+			if (!Door->CanAccess(Who)) OutResult = TEXT("Not your door");
+			else { Door->LockCode.Reset(); Door->bLocked = false; Door->UnlockedFor.Reset(); OutResult = TEXT("Lock removed: anyone can open it"); }
+		}
+		else if (Code.Len() != 4 || !Code.IsNumeric()) OutResult = TEXT("Codes are 4 digits");
 		else if (Cmd == TEXT("setcode"))
 		{
-			if (!Door->CanAccess(Who)) OutResult = TEXT("not your door");
+			if (!Door->CanAccess(Who)) OutResult = TEXT("Not your door");
 			else { Door->LockCode = Code; Door->bLocked = true; Door->UnlockedFor.Reset(); OutResult = TEXT("Code set; door locked"); }
 		}
-		else
+		else if (Door->LockCode == Code)
 		{
-			if (Door->LockCode == Code) { Door->UnlockedFor.Add(Who); OutResult = TEXT("Code accepted"); }
-			else OutResult = TEXT("Wrong code");
+			// Right: it opens, and stays theirs to open until the code changes.
+			Door->UnlockedFor.AddUnique(Who);
+			if (!Door->bOpen) Door->SetOpen(true);
+			OutResult = TEXT("Code accepted");
 		}
+		else OutResult = TEXT("Wrong code");
+		UE_LOG(LogWildreach, Log, TEXT("DOOR %s %s at %s: %s"), *Who, *Cmd, Door ? *Door->GetActorLocation().ToCompactString() : TEXT("-"), *OutResult);
 	}
 	else if (Cmd == TEXT("demolish"))
 	{

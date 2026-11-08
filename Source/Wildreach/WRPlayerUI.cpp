@@ -1,6 +1,7 @@
 #include "WRPlayerUI.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
+#include "WRBuilding.h"
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
 #include "WRInventory.h"
@@ -106,6 +107,12 @@ void FWRPlayerUI::Tick(float DeltaTime)
 		CentreMouse();
 	}
 	if (bTameWheel && !bDebugWheel) UpdateWheelHover(TameHover, 8);
+	if (bDoorKeyDown && Now - DoorDownAt > WRTune(TEXT("ui.doorHoldSeconds"), 0.35f))
+	{
+		// Held on your own code-lock door: its keypad, to set or remove the code.
+		bDoorKeyDown = false;
+		if (DoorKeyPiece.IsValid()) P->OpenDoorKeypad(DoorKeyPiece.Get());
+	}
 	const double UINow = WRUIMotion::Now();
 	Pickups.RemoveAll([UINow](const FPickup& X) { return UINow - X.Time > 3.5; });
 	UpdateNotices();
@@ -154,6 +161,7 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::Hearth: Want = TEXT("hearth"); break;
 	case EWRMenu::Taming: Want = TEXT("taming"); break;
 	case EWRMenu::Settings: Want = TEXT("settings"); break;
+	case EWRMenu::Door: Want = TEXT("door"); break;
 	default: break;
 	}
 	if (!Want.IsNone() && !FWRScreens::Find(Want))
@@ -773,6 +781,20 @@ void FWRPlayerUI::TameKey(bool bDown)
 		return;
 	}
 	if (!bTameSticky) PickTameOrder(TameHover);
+}
+
+void FWRPlayerUI::DoorKey(bool bDown, AWRBuildPiece* Door)
+{
+	if (bDown)
+	{
+		bDoorKeyDown = true;
+		DoorDownAt = FPlatformTime::Seconds();
+		DoorKeyPiece = Door;
+		return;
+	}
+	if (!bDoorKeyDown) return;   // the hold already opened the keypad
+	bDoorKeyDown = false;
+	if (AWRPlayerController* P = PC.Get()) P->InteractNow();   // a tap: open or shut it
 }
 
 void FWRPlayerUI::PickTameOrder(int32 Pos)
