@@ -33,6 +33,17 @@ volcanic shrubs, ice rebuilt like the lava. All done but the shrubs, which still
   without Cancel, then with it once in Mason's clan; each one's things to their own bag or the tray), then a raid with
   Bravo getting the card, the tracker coming and counting, and "Raid over" when Mason kills them.
 
+Checked before release, on commit e6c4fe2:
+- the full suite: 36 of 37 passed; `menus`' host hit the known GPU hang (`DXGI_ERROR_DEVICE_HUNG`, VSM Nanite
+  `NodeAndClusterCull`, two game windows on the GPU) and passed run alone, so all 37 pass;
+- the packaged build (`C:\Dev\WildreachBuild7`, Setup 1,682 MB, 667 files, 16 changed from 0.6.2): a clean install
+  from it matches the build in every file; **0.6.2 with its updater** (four connections) and **0.6.1 with its updater**
+  each fetched only what changed, 236 MB, all 667 files right, the save kept, nothing left over, the new updater in
+  place (a local stand-in for GitHub serving the Setup);
+- the packaged game, updated from 0.6.2: crafttimetest's steps by clicks (10 of 10 on its own log) and raidtest's (14
+  of 14); a copy of Raven's "playtest 0.6.0" world loads from the main menu (14 pieces, 368 animals, raids "rare", all
+  257 landscape pieces, the Claim tab showing the totem and the Hearth), no errors. Raven's real worlds untouched.
+
 - **Ash-grey volcanic shrubs: retried, still off.** The plan was to try `world.ashCoatMin` 0.85 again, since the hang
   it gave in 0.4 (4 of 4 benchmark runs) looked like the Nanite tessellation one fixed in 0.5.0. It isn't: with it, 2 of
   3 Epic runs hung (`DXGI_ERROR_DEVICE_HUNG` in the virtual shadow maps' Nanite `NodeAndClusterCull`), and the 5 runs
