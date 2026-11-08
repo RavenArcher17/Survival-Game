@@ -81,6 +81,8 @@ public:
 
 	/** Server: run the death penalty for a player who just died here. */
 	static void ApplyDeathPenalty(AWRCharacterBase* Died, class AWRPlayerState* PS);
+	/** Server: what a broken chest held, in a bag where it stood that anyone can take, for building.spillMinutes. */
+	static AWRLootBag* Spill(UWorld* World, const FVector& At, const FString& Owner, const TArray<FWRItemStack>& Items);
 	/** Server: take everything. */
 	FString Loot(AWRPlayerController* Player);
 

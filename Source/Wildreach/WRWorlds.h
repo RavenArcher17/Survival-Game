@@ -20,6 +20,7 @@ struct FWRWorldSettings
 	FString Base;                    // a Data/server_presets.json key
 	TMap<FString, float> Numbers;    // switches are 0 or 1
 	FString DeathPenalty;
+	FString Raids;                   // off / rare / normal / frequent (WRRaids)
 };
 
 /**

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.7.0 (in progress): creature raids
+
+**Not released.** The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views,
+ash-grey volcanic shrubs, ice rebuilt like the lava. Raids are done; the rest is to come.
+
+- **Creature raids** (new `WRRaids.cpp/.h`, numbers in tuning.json `raid`). The world setting "Creature raids" (Off /
+  Rare / Normal / Frequent; `server.raids`, already in every preset but read by nothing until now) is on the world
+  settings screens (new world and Esc > World): a claim's raid comes every 72 / 24 / 12 game hours or so (give or take
+  a quarter), counted per claim from when it's first seen (`AWRClaimTotem::NextRaidHours`, saved with the totem as
+  `nextRaid`; claims from older saves get their first one interval after this update loads them).
+  - Only while someone of the claim (its owner or their clan) is home: a due raid waits until one of them is within
+    250 m of the totem (`raid.homeRange`), since creatures only exist near players. Nobody's base is raided while
+    they're away, and a raid ends (the rest leave) if everyone of the claim goes offline.
+  - A minute's warning (`raid.warnSeconds`) to everyone of the claim who's on, wherever they are: a card like a boss's
+    with the raiders' portrait ("RAID / CINDERFANGS / 5 Cinderfangs are coming for your base from the east, in 60 s")
+    and a notice. Then they come from 30 m outside the claim's edge, on dry ground.
+  - Who: the claim's region's hunters (`Data/spawn_regions.json` new `raiders`: Cinderfangs in the volcanic lowland,
+    Cinderfangs and Scorchwings in the midland, Magmaws and Cinderfangs in the highland; Gloomhowls, Glacimaws, Rimeclaws
+    on the tundra side), rolled by weight. How many: 3 points plus 2 per Hearth level (no Hearth: 3; a new Hearth at
+    level 1: 5; level 3: 9), a lowland hunter costing 1, midland 2, highland 3 (`WRRaids::Plan`).
+  - What they do (`AWRCreatureAI::TickRaid`): each goes for the nearest piece of the claim (foundations and the totem
+    count as further off, so walls, doors, chests and stations go first; a broken Hearth is left alone) and bites it:
+    its bite x 1.5 every 1.6 s (a Cinderfang: 18), with the bite's wind-up and its dust or splinters. Anyone who comes
+    near is attacked as any hunter would. They never sleep or go after prey, and their leash runs from the base.
+  - The end: all killed ("Raid over: you held them off, 2 pieces lost"), or after 6 minutes the rest walk off and are
+    taken away out of sight. The claim's next raid is then one interval away. A raid in progress isn't saved.
+  - Testing: `WRCmd raid now [warn s] [from bearing] | due | status | plan | end`.
+- **A broken chest leaves what it held in a bag** (`AWRLootBag::Spill`, `building.spillMinutes` 30, anyone's to take).
+  A chest smashed, demolished or decayed used to take everything in it with it.
+- Tests: `Tools/raidtest.ps1` (alltests `raid`, 14 checks, all pass): the setting read, the first raid an interval
+  away, the plan by Hearth level, a raid from the east (the card and notice, 5 Cinderfangs for the level 1 Hearth, 24
+  bites, the chest broken first and its things in a bag, the player bitten on walking in, killed: held, next scheduled),
+  a due raid waiting while the player is 400 m off and coming when they're back, timing out and the rest taken away, and
+  the next raid saved with the claim. Automation `Wildreach.Raids.Plan` / `.Regions`. worldstest clicks "Frequent" on
+  a new world's form and finds `"raids": "frequent"` in its settings.json.
+
 ## 0.6.3: your base (the Hearth found, repaired; chest names, waypoints)
 
 **Not released yet** (notes `Docs/release-notes/v0.6.3.md`). From Raven's play of 0.6.2: "there was nowhere I saw to

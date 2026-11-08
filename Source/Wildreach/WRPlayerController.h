@@ -180,6 +180,9 @@ public:
 	double GetNoticeTime() const { return NoticeTime; }
 
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
+	/** A creature raid on your claim (WRRaids): the notice, and for the warning (Stage 0) a banner with the raiders'
+	 *  portrait and Title ("Cinderfangs"). Stage 1: they're here; 2: it's over. */
+	UFUNCTION(Client, Reliable) void ClientRaid(FName Portrait, const FString& Title, const FString& Message, uint8 Stage);
 	/** You died: the death screen's killer, bag and respawn (WRFlowDeath.cpp sends it, WRUIFlow shows it). */
 	UFUNCTION(Client, Reliable) void ClientDeathNote(const FWRDeathNote& Note);
 	/** The death screen's pick of where to wake (an index into the note's Wake list). */

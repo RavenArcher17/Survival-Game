@@ -36,7 +36,7 @@ function At([int]$world, [object[]]$cmds) { $cmds | ForEach-Object { "@${world}:
 $bot = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off') +
 	# (The form's rules: one step up on XP, then scrolled down, on Day length; a preset picked and back resets them first.)
 	(At 1 ($menu + $shot + @('WRClick New world', 'wait 2', 'WRType WT Alpha', 'wait 1', 'WRClick PvP', 'wait 1', 'WRClick PvE', 'wait 1', 'WRClick + @ XP', 'wait 1') + $shot +
-		@('WRWheel -30 XP', 'wait 1', 'WRClick + @ Day length', 'wait 1') + $shot + @('WRClick Create and play'))) +
+		@('WRWheel -30 XP', 'wait 1', 'WRClick + @ Day length', 'wait 1', 'WRClick Frequent @ Creature raids', 'wait 1') + $shot + @('WRClick Create and play'))) +
 	(At 2 (@('wait 10', 'WRTeleport -131650 -56400', 'wait 5', 'WRClearCreatures', 'WRGive wood 120', 'wait 1',
 		'WRGhost wood_foundation', 'WRLookAt -131200 -56400 4800', 'wait 1.5', 'WRGhostPlace', 'wait 2') + $leave)) +
 	(At 3 ($menu + @('WRClick New world', 'wait 2', 'WRType WT Beta', 'wait 1', 'WRClick PvP', 'wait 1') + $shot + @('WRClick Create and play'))) +
@@ -120,7 +120,7 @@ try {
 	# (What it was made with: the first "changed" log line comes later. The file now has the in-game changes on top.)
 	$alphaSettings = Json (Join-Path $worlds 'WT_Alpha\settings.json')
 	$alphaRules = if ($alphaSettings) { $alphaSettings.settings } else { $null }
-	Check 'the form''s steps are in its settings.json' ($alphaSettings -and $alphaSettings.preset -eq 'custom' -and $alphaSettings.base -eq 'pve' -and $alphaRules.xpMultiplier -eq 1.5) "$($alphaSettings | ConvertTo-Json -Compress)"
+	Check 'the form''s steps are in its settings.json (raids: Frequent)' ($alphaSettings -and $alphaSettings.preset -eq 'custom' -and $alphaSettings.base -eq 'pve' -and $alphaRules.xpMultiplier -eq 1.5 -and $alphaRules.raids -eq 'frequent') "$($alphaSettings | ConvertTo-Json -Compress)"
 	$alphaWorld = Json (Join-Path $worlds 'WT_Alpha\world.json')
 	$pieces = if ($alphaWorld) { @($alphaWorld.pieces | Where-Object { $_.piece -eq 'wood_foundation' }).Count } else { 0 }
 	Check 'what is built there is saved in its folder' ($pieces -eq 1) "$pieces foundations"

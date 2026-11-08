@@ -39,6 +39,12 @@ namespace WRWildlife
 	WILDREACH_API bool FindPath(FName CreatureId, const FVector2D& From, const FVector2D& To, TArray<FVector2D>& OutPath);
 	/** How many of the kind the island should have just now. */
 	WILDREACH_API int32 TargetOf(FName CreatureId);
+	/**
+	 * Raids (WRRaids): the region a spot is in, or failing that the one on its side of the island whose band is nearest
+	 * (a beach below the lowland), and that region's raiders with their weights (spawn_regions.json "raiders"; without
+	 * them, its aggressive kinds). Read from the file, so it works whether or not the wildlife is running. None: no region.
+	 */
+	WILDREACH_API FName RaidersAt(const FVector2D& At, TArray<TPair<FName, float>>& OutRaiders);
 
 	WILDREACH_API const TCHAR* DoingName(EWRPackDoing Doing);
 }

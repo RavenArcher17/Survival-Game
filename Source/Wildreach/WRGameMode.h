@@ -60,6 +60,7 @@ private:
 	FTimerHandle WorldSaveTimer;
 	FTimerHandle UndergroundTimer;
 	FTimerHandle WildlifeTimer;
+	FTimerHandle RaidTimer;
 	/** Adds to the world's play time (WRWorlds::Touch). Leaving: a player on their way out, who doesn't count from now on. */
 	void CountPlayTime(const AController* Leaving = nullptr);
 	/** When the world's play time was last counted (FPlatformTime), and whether anyone has been here since. */

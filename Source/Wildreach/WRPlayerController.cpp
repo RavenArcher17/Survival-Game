@@ -35,6 +35,7 @@
 #include "WRMainMenu.h"
 #include "WRKeyBindings.h"
 #include "WRPlayerUI.h"
+#include "WRRaids.h"
 #include "WRUIFlow.h"
 #include "Kismet/GameplayStatics.h"
 #include "WorldPartition/WorldPartitionStreamingSource.h"
@@ -383,6 +384,15 @@ void AWRPlayerController::ClientNotify_Implementation(const FString& Message)
 		UI->NoteNotice(Message);
 	}
 	UE_LOG(LogWildreach, Log, TEXT("NOTICE %s"), *Message);
+}
+
+void AWRPlayerController::ClientRaid_Implementation(FName Portrait, const FString& Title, const FString& Message, uint8 Stage)
+{
+	ClientNotify_Implementation(Message);
+	if (Stage == 0 && UI && UI->GetFlow())
+	{
+		UI->GetFlow()->ShowRaid(Portrait, Title, Message);
+	}
 }
 
 void AWRPlayerController::WRBotPause(int32 bPause)
@@ -1129,6 +1139,12 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("artifacts") && PS) { PS->bArtifactModifiers = Arg(1) == TEXT("1"); }
+	else if (Cmd == TEXT("raid"))
+	{
+		// Testing aid (WRCmd raid now [warn s] | due | status | plan | end): creature raids on the nearest claim.
+		Result = WRRaids::Command(this, Args);
+		ClientNotify(Result);
+	}
 	else if (Cmd == TEXT("hitpiece"))
 	{
 		// Testing aid: N copper-sword hits on the nearest building piece.

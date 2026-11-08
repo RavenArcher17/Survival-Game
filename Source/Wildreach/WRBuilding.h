@@ -195,6 +195,8 @@ public:
 	UPROPERTY(Replicated) int32 UpgradeLevel = 0;
 	UPROPERTY(Replicated) bool bUnpaid = false;
 	UPROPERTY(Replicated) TArray<FWRItemStack> UpkeepStorage;
+	/** Server: the game hour (AWRGameState::GetTotalHours) its next creature raid is due (WRRaids); < 0: not set yet. Saved. */
+	double NextRaidHours = -1.0;
 
 	static AWRClaimTotem* FindAt(const UWorld* World, const FVector& Location);
 	/** Can this player build here? (No claim = yes; someone else's claim = no.) */

@@ -55,7 +55,7 @@ namespace WRWorldsFiles
 		return WriteJson(FPaths::Combine(Dir, TEXT("settings.json")), O);
 	}
 
-	/** Every number the settings screen has. Not bounties, raids or craftMultiplier: nothing in the game reads them yet. */
+	/** Every number the settings screen has. Not bounties or craftMultiplier: nothing in the game reads them yet. */
 	const TCHAR* const RuleKeys[] = {
 		TEXT("pvp"), TEXT("pvpInBossArenas"), TEXT("offlineProtection"), TEXT("clanSizeLimit"),
 		TEXT("xpMultiplier"), TEXT("gatherMultiplier"), TEXT("tamingMultiplier"), TEXT("cropMultiplier"),
@@ -74,6 +74,7 @@ namespace WRWorldsFiles
 			else if (O->TryGetBoolField(Key, bSwitch)) S.Numbers.Add(Key, bSwitch ? 1.f : 0.f);
 		}
 		O->TryGetStringField(TEXT("deathPenalty"), S.DeathPenalty);
+		O->TryGetStringField(TEXT("raids"), S.Raids);
 	}
 
 	/** The preset a server plays with no settings of its own (server_presets.json "default"). */
@@ -276,6 +277,7 @@ bool WRWorlds::WriteSettings(const FString& Id, const FWRWorldSettings& Settings
 		if (!Was || !FMath::IsNearlyEqual(*Was, KV.Value, 0.001f)) Changes->SetNumberField(KV.Key, KV.Value);
 	}
 	if (Settings.DeathPenalty != Preset.DeathPenalty) Changes->SetStringField(TEXT("deathPenalty"), Settings.DeathPenalty);
+	if (Settings.Raids != Preset.Raids) Changes->SetStringField(TEXT("raids"), Settings.Raids);
 	if (Changes->Values.Num() == 0)
 	{
 		return WRWorldsFiles::WritePreset(Dir(Id), Settings.Base);
@@ -295,7 +297,7 @@ bool WRWorlds::IsCustom(const FWRWorldSettings& Settings)
 		const float* Was = Preset.Numbers.Find(KV.Key);
 		if (!Was || !FMath::IsNearlyEqual(*Was, KV.Value, 0.001f)) return true;
 	}
-	return Settings.DeathPenalty != Preset.DeathPenalty;
+	return Settings.DeathPenalty != Preset.DeathPenalty || Settings.Raids != Preset.Raids;
 }
 
 FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings)

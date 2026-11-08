@@ -10,6 +10,7 @@
 #include "WRAttributeSet.h"
 #include "WRBuilding.h"
 #include "WRCombatLibrary.h"
+#include "WRCrafting.h"
 #include "WRGameState.h"
 #include "WRProjectile.h"
 #include "WRCharacter.h"
@@ -2049,6 +2050,11 @@ AWRCreature* AWRCreatureAI::PickPrey(AWRCreature* Self) const
 void AWRCreatureAI::UpdateSleep(AWRCreature* Self)
 {
 	const FWRCreatureDef* Def = Self->GetDef();
+	if (Self->bRaider)
+	{
+		Self->SetAsleep(false);   // it came for a base: no rest until it leaves
+		return;
+	}
 	const bool bNight = AWRGameState::IsNightIn(Self);
 	const bool bBedtime = (Def->Activity == TEXT("diurnal") && bNight) || (Def->Activity == TEXT("nocturnal") && !bNight);
 	const bool bBusy = Self->GetAggroTarget() || Self->IsFleeing() || Self->IsEating() || Self->HuntTarget.IsValid() || Self->WasWokenRecently();
@@ -2260,6 +2266,21 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		TickSpecial(Self, DeltaSeconds);
 		return;
 	}
+	if (Self->bRaidLeaving)
+	{
+		// The raid is over: away from the base at a trot, fighting no one (WRRaids takes it away out of sight).
+		Self->SetAggroTarget(nullptr);
+		Self->SpeedBoost = 1.f;
+		if (Def->Archetype == TEXT("burrower") && Self->IsHidden())
+		{
+			Self->SetActorHiddenInGame(false);
+			Self->SetActorEnableCollision(true);
+			Self->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+		}
+		const FVector Away = Self->GetActorLocation() - Self->RaidBase;
+		Self->AddMovementInput(Away.IsNearlyZero() ? Self->GetActorForwardVector() : Away.GetSafeNormal2D(), 0.8f);
+		return;
+	}
 
 	ThinkTimer -= DeltaSeconds;
 	if (ThinkTimer <= 0.f)
@@ -2297,7 +2318,7 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 			}
 			else if (!Current || !Current->IsAlive())
 			{
-				AWRCreature* Prey = Self->IsHungry() && !Self->IsAsleep() ? PickPrey(Self) : nullptr;
+				AWRCreature* Prey = Self->IsHungry() && !Self->IsAsleep() && !Self->bRaider ? PickPrey(Self) : nullptr;
 				if (Prey)
 				{
 					UE_LOG(LogWildreach, Log, TEXT("AI %s hunts %s"), *Self->GetName(), *Prey->GetName());
@@ -2315,7 +2336,8 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		Target = nullptr;
 	}
 	const bool bOnHunt = Target && Self->HuntTarget.Get() == Target;
-	const float Leash = bOnHunt ? WRTune(TEXT("creatureAI.huntLeash"), 8000.f) : WRTune(TEXT("creature.leashDistance"), 4000.f);
+	// (A raider's home is the base it came for, and it chases further from it.)
+	const float Leash = bOnHunt ? WRTune(TEXT("creatureAI.huntLeash"), 8000.f) : Self->bRaider ? WRTune(TEXT("raid.leash"), 9000.f) : WRTune(TEXT("creature.leashDistance"), 4000.f);
 	if (Target && FVector::Dist(Self->GetActorLocation(), Self->GetHome()) > Leash)
 	{
 		// Gave up the chase (a hunt runs further): head home.
@@ -2352,7 +2374,8 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	// Burrowers stay underground until they have a target.
 	if (Def->Archetype == TEXT("burrower"))
 	{
-		const bool bWantHidden = Target == nullptr && WRTune(TEXT("creature.burrowHide"), 1.f) > 0.f;  // 0 = always visible (art checks)
+		// (A raider stays up: it's at the base's walls.)
+		const bool bWantHidden = Target == nullptr && !Self->bRaider && WRTune(TEXT("creature.burrowHide"), 1.f) > 0.f;  // 0 = always visible (art checks)
 		if (Self->IsHidden() != bWantHidden)
 		{
 			Self->SetActorHiddenInGame(bWantHidden);
@@ -2392,6 +2415,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		ChaseAndBite(Self, Target);
 		return;
 	}
+	if (Self->bRaider)
+	{
+		TickRaid(Self, DeltaSeconds);
+		return;
+	}
 
 	// Idle: drift around home (or lie still, asleep).
 	if (Def->Archetype == TEXT("flyer"))
@@ -2416,6 +2444,128 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	if (ToGoal.Size2D() > 150.f)
 	{
 		Self->AddMovementInput(ToGoal.GetSafeNormal2D(), !bTravelling ? 0.4f : ToGoal.Size2D() > WRTune(TEXT("wildlife.catchUpDistance"), 2500.f) ? 0.95f : WRTune(TEXT("wildlife.travelInput"), 0.55f));
+	}
+}
+
+namespace
+{
+	/** A piece's extent to bite at: its own colliding parts and its prop (a Hearth, a station), or a metre round it. */
+	FBox RaidPieceBox(const AWRBuildPiece* Piece)
+	{
+		FBox Box = Piece->GetComponentsBoundingBox(false);
+		if (const AActor* Child = Piece->GetChild())
+		{
+			const FBox ChildBox = Child->GetComponentsBoundingBox(false);
+			if (ChildBox.IsValid) Box += ChildBox;
+		}
+		return Box.IsValid ? Box : FBox::BuildAABB(Piece->GetActorLocation(), FVector(100.f));
+	}
+
+	/** How far a raider's mouth is from a piece across the ground (0: standing over or against it). */
+	float RaidGap(const AWRCreature* Self, const AWRBuildPiece* Piece)
+	{
+		const FVector At = Self->GetActorLocation();
+		return FMath::Max(0.f, static_cast<float>(FVector::Dist2D(RaidPieceBox(Piece).GetClosestPointTo(At), At)) - Self->GetSimpleCollisionRadius());
+	}
+}
+
+AWRBuildPiece* AWRCreatureAI::PickRaidPiece(AWRCreature* Self) const
+{
+	// The nearest piece of the claim, so the wall in its way is the one it breaks; foundations (they carry the rest) and
+	// the claim totem count as further off, so walls, doors and what's inside go first.
+	AWRBuildPiece* Best = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	const float Reach = Self->RaidRadius + 1500.f;
+	const float FoundationPenalty = WRTune(TEXT("raid.foundationPenalty"), 400.f);
+	const float TotemPenalty = WRTune(TEXT("raid.totemPenalty"), 900.f);
+	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+	{
+		AWRBuildPiece* Piece = *It;
+		if (Piece->bGhost || Piece->IsActorBeingDestroyed() || !FWRSocialRules::CanShare(Piece->OwnerName, Self->RaidOwner)
+			|| FVector::Dist2D(Piece->GetActorLocation(), Self->RaidBase) > Reach)
+		{
+			continue;
+		}
+		const FWRPieceDef* PieceDef = Piece->GetDef();
+		// (A broken Hearth is done with: it stays, broken, until it's repaired.)
+		if (const AWRHearth* Hearth = Cast<AWRHearth>(Piece->GetChild()); Hearth && Hearth->IsBroken())
+		{
+			continue;
+		}
+		float Score = RaidGap(Self, Piece);
+		if (Piece->PieceId.ToString().Contains(TEXT("foundation"))) Score += FoundationPenalty;
+		if (PieceDef && PieceDef->Kind == TEXT("totem")) Score += TotemPenalty;
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			Best = Piece;
+		}
+	}
+	return Best;
+}
+
+void AWRCreatureAI::TickRaid(AWRCreature* Self, float DeltaSeconds)
+{
+	const FWRCreatureDef* Def = Self->GetDef();
+	const double Now = GetWorld()->GetTimeSeconds();
+	Self->SpeedBoost = 1.f;
+	if (Def->Archetype == TEXT("flyer"))
+	{
+		Self->GetCharacterMovement()->SetMovementMode(MOVE_Walking);   // down on the ground to bite at walls
+	}
+	// A bite under way lands when its wind-up is over (as a bite at a survivor would).
+	if (RaidBiteLandsAt >= 0.0 && Now >= RaidBiteLandsAt)
+	{
+		RaidBiteLandsAt = -1.0;
+		AWRBuildPiece* Bitten = RaidBitePiece.Get();
+		if (Bitten && !Bitten->IsActorBeingDestroyed() && RaidGap(Self, Bitten) <= Def->AttackRange)
+		{
+			const FWRPieceDef* PieceDef = Bitten->GetDef();
+			const bool bWood = PieceDef && PieceDef->Material == TEXT("wood");
+			const FVector At = RaidPieceBox(Bitten).GetClosestPointTo(Self->MouthLocation());
+			WRFx::Broadcast(Self, bWood ? TEXT("gather.wood") : TEXT("hit.dust"), At, (Self->GetActorLocation() - At).GetSafeNormal().Rotation(), 1.f, bWood ? TEXT("gather.wood") : TEXT("hit.block"));
+			const float Difficulty = FMath::Max(0.1f, WRTune(TEXT("server.creatureDifficulty"), 1.f));
+			const float Damage = Def->Damage * Difficulty * WRTune(TEXT("raid.pieceDamageMult"), 1.5f);
+			const FString Name = Bitten->GetName(), Kind = Bitten->PieceId.ToString();
+			Bitten->TakeBuildDamage(Damage, Self);
+			UE_LOG(LogWildreach, Log, TEXT("RAID %s bit %s (%s) for %.0f: %s"), *Self->GetName(), *Name, *Kind, Damage,
+				IsValid(Bitten) && !Bitten->IsActorBeingDestroyed() ? *FString::Printf(TEXT("%.0f left"), Bitten->Health) : TEXT("broken"));
+		}
+		RaidBitePiece = nullptr;
+	}
+	if (Self->HasTag(WRTags::State_Attacking) || RaidBiteLandsAt >= 0.0)
+	{
+		return;   // mid-bite
+	}
+	RaidPickClock -= DeltaSeconds;
+	if (RaidPickClock <= 0.f || !RaidPiece.IsValid() || RaidPiece->IsActorBeingDestroyed())
+	{
+		RaidPickClock = 1.f;
+		RaidPiece = PickRaidPiece(Self);
+	}
+	AWRBuildPiece* Piece = RaidPiece.Get();
+	if (!Piece)
+	{
+		// Nothing of the claim's left to break: it prowls the middle of it for anyone who comes back.
+		const FVector ToBase = Self->RaidBase - Self->GetActorLocation();
+		if (ToBase.Size2D() > 400.f) Self->AddMovementInput(ToBase.GetSafeNormal2D(), 0.5f);
+		return;
+	}
+	const FVector At = RaidPieceBox(Piece).GetClosestPointTo(Self->GetActorLocation());
+	const FVector To = At - Self->GetActorLocation();
+	if (RaidGap(Self, Piece) > Def->AttackRange * 0.6f)
+	{
+		Self->AddMovementInput(To.GetSafeNormal2D(), 1.f);
+		return;
+	}
+	if (!To.IsNearlyZero()) Self->SetActorRotation(FRotator(0.f, To.Rotation().Yaw, 0.f));
+	if (Now >= NextRaidBiteAt)
+	{
+		const float Windup = WRTune(TEXT("creature.biteTiming.windup"), 0.5f);
+		NextRaidBiteAt = Now + WRTune(TEXT("raid.biteSeconds"), 1.6f);
+		RaidBiteLandsAt = Now + Windup;
+		RaidBitePiece = Piece;
+		Self->PlaySwing(EWRSwingKind::Bite, Windup + WRTune(TEXT("creature.biteTiming.active"), 0.15f));
 	}
 }
 

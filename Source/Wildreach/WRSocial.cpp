@@ -344,6 +344,31 @@ void AWRLootBag::ApplyDeathPenalty(AWRCharacterBase* Died, AWRPlayerState* PS)
 	}
 }
 
+AWRLootBag* AWRLootBag::Spill(UWorld* World, const FVector& At, const FString& Owner, const TArray<FWRItemStack>& Items)
+{
+	TArray<FWRItemStack> Held = Items.FilterByPredicate([](const FWRItemStack& S) { return !S.IsEmpty(); });
+	if (!World || Held.Num() == 0)
+	{
+		return nullptr;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AWRLootBag* Bag = World->SpawnActor<AWRLootBag>(AWRLootBag::StaticClass(), At, FRotator::ZeroRotator, Params);
+	if (!Bag)
+	{
+		return nullptr;
+	}
+	Bag->OwnerName = Owner;
+	Bag->bOwnerOnly = false;
+	Bag->Items = MoveTemp(Held);
+	Bag->SetLifeSpan(WRTune(TEXT("building.spillMinutes"), 30.f) * 60.f);
+	if (UMaterialInstanceDynamic* MID = Bag->Mesh->CreateAndSetMaterialInstanceDynamic(0))
+	{
+		MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.6f, 0.4f, 0.2f));
+	}
+	return Bag;
+}
+
 FString AWRLootBag::Loot(AWRPlayerController* Player)
 {
 	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;

@@ -31,6 +31,8 @@ public:
 	void OnDeathNote(const FWRDeathNote& Note);
 	/** A non-shipping test or screenshot command (WRFlow ...). */
 	void Command(const TArray<FString>& Args);
+	/** A creature raid is coming for your claim (AWRPlayerController::ClientRaid): its card cuts in, as a boss's does. */
+	void ShowRaid(FName Portrait, const FString& Title, const FString& Message);
 
 	// --- the cover (what its widget reads)
 	enum class ECover : uint8 { None, Dying, Loading };

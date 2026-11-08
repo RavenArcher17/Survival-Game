@@ -13,6 +13,7 @@
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRRaids.h"
 #include "WRTuning.h"
 #include "WRWater.h"
 #include "WRWildlife.h"
@@ -107,10 +108,13 @@ void AWRGameMode::BeginPlay()
 	Super::BeginPlay();
 	LoadWorld();
 	WRWildlife::Start(GetWorld());
+	WRRaids::Start(GetWorld());
 	if (!WRWorlds::Current().IsEmpty())
 	{
 		const float Every = FMath::Max(0.1f, WRTune(TEXT("wildlife.stepSeconds"), 20.f));
 		GetWorldTimerManager().SetTimer(WildlifeTimer, FTimerDelegate::CreateWeakLambda(this, [this, Every]() { WRWildlife::Step(GetWorld(), Every); }), Every, true);
+		GetWorldTimerManager().SetTimer(RaidTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { WRRaids::Step(GetWorld()); }),
+			FMath::Max(0.25f, WRTune(TEXT("raid.stepSeconds"), 2.f)), true);
 	}
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
 	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);

@@ -1441,6 +1441,26 @@ void FWRFlow::CheckBosses(const FVector& At)
 	}
 }
 
+void FWRFlow::ShowRaid(FName Portrait, const FString& Title, const FString& Message)
+{
+	AWRPlayerController* P = GetPC();
+	if (!P) return;
+	FBanner B;
+	B.Kind = FBanner::EKind::Boss;
+	B.Over = LOCTEXT("RaidOver", "Raid");
+	B.Title = FText::FromString(Title.ToUpper());
+	// "Raid: 3 Cinderfangs are coming for your base from the north, in 60 s" -> what follows "Raid: ".
+	FString Sub = Message;
+	Sub.RemoveFromStart(TEXT("Raid: "));
+	B.Sub = FText::FromString(Sub);
+	B.Portrait = Portrait;
+	B.Accent = WRUI::Bad;
+	B.Seconds = WRFlowUI::Tune(TEXT("raidCardSeconds"), 5.f);
+	ShowBanner(B, true);
+	WRSound::PlayUI(P, TEXT("boss.intro"));
+	UE_LOG(LogWildreach, Log, TEXT("FLOW raid card: %s / %s"), *Title, *Sub);
+}
+
 void FWRFlow::CheckTames(const FVector& At)
 {
 	AWRPlayerController* P = GetPC();

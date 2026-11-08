@@ -195,6 +195,18 @@ public:
 	AActor* GetAggroRep() const { return AggroRep; }
 	UPROPERTY(Replicated) TObjectPtr<AActor> AggroRep;
 
+	// --- Raids (server; WRRaids) ---
+	// A raider makes for the nearest piece of the claim it came for and bites it, and turns on anyone who comes near as
+	// any hunter does. It never sleeps and never goes after prey; told to leave, it walks away from the base.
+	bool bRaider = false;
+	bool bRaidLeaving = false;
+	FVector RaidBase = FVector::ZeroVector;
+	/** The claim's radius: the pieces it breaks are the claim's owner's and their clan's within it. */
+	float RaidRadius = 3000.f;
+	FString RaidOwner;
+	/** Its home becomes the base (its leash runs from there). */
+	void SetHome(const FVector& At) { Home = At; }
+
 	// --- The body (WRCarcass.cpp): a wild creature's kill stays down, to be butchered by hitting it ---
 	/** Server: a melee hit on the body: a share of its loot into the hitter's bag (more with a blade in hand). */
 	void HarvestBody(AWRCharacterBase* Harvester, bool bHeavy);
@@ -379,6 +391,14 @@ private:
 	bool TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target, float Dist);
 	void TickSpecial(AWRCreature* Self, float DeltaSeconds);
 	void EndSpecial(AWRCreature* Self);
+	/** A raider with nobody to fight (WRRaids): to the nearest piece of the claim it came for, and bites it. */
+	void TickRaid(AWRCreature* Self, float DeltaSeconds);
+	class AWRBuildPiece* PickRaidPiece(AWRCreature* Self) const;
+	TWeakObjectPtr<class AWRBuildPiece> RaidPiece;
+	TWeakObjectPtr<class AWRBuildPiece> RaidBitePiece;
+	float RaidPickClock = 0.f;
+	double NextRaidBiteAt = 0.0;
+	double RaidBiteLandsAt = -1.0;
 	FName Special;
 	int32 SpecialPhase = 0;  // 0 none, 1 windup, 2 under way
 	float SpecialClock = 0.f;

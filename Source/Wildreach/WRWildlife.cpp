@@ -870,6 +870,64 @@ int32 WRWildlife::TargetOf(FName CreatureId)
 	return Def ? FMath::RoundToInt(WRWildlifeImpl::TargetFor(*Def)) : 0;
 }
 
+FName WRWildlife::RaidersAt(const FVector2D& At, TArray<TPair<FName, float>>& OutRaiders)
+{
+	using namespace WRWildlifeImpl;
+	OutRaiders.Reset();
+	const TSharedPtr<FJsonObject> Root = FWRTuning::LoadDataFile(TEXT("spawn_regions.json"));
+	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+	if (!Root.IsValid() || !Root->TryGetArrayField(TEXT("regions"), List))
+	{
+		return NAME_None;
+	}
+	// The region it's in has no gap; otherwise the nearest band on its side (a region's box counts as far off).
+	const FWalkMap& M = Map();
+	const double Across = FMath::Abs(At.X);
+	TSharedPtr<FJsonObject> Best;
+	double BestGap = TNumericLimits<double>::Max();
+	for (const TSharedPtr<FJsonValue>& V : *List)
+	{
+		const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
+		if (!O.IsValid() || (O->GetStringField(TEXT("side")) != TEXT("tundra")) != (At.X < 0.0))
+		{
+			continue;
+		}
+		const FVector2D* Band = M.Bands.Find(FName(*O->GetStringField(TEXT("band"))));
+		double Gap = !Band ? 0.0 : Across < Band->X ? Band->X - Across : Across > Band->Y ? Across - Band->Y : 0.0;
+		const TArray<TSharedPtr<FJsonValue>>* Box = nullptr;
+		if (O->TryGetArrayField(TEXT("area"), Box) && Box->Num() == 4
+			&& !FBox2D(FVector2D((*Box)[0]->AsNumber() * 100.0, (*Box)[1]->AsNumber() * 100.0), FVector2D((*Box)[2]->AsNumber() * 100.0, (*Box)[3]->AsNumber() * 100.0)).IsInside(At))
+		{
+			Gap += 1.0e7;
+		}
+		if (Gap < BestGap)
+		{
+			BestGap = Gap;
+			Best = O;
+		}
+	}
+	if (!Best.IsValid())
+	{
+		return NAME_None;
+	}
+	const TSharedPtr<FJsonObject>* Weights = nullptr;
+	const bool bListed = Best->TryGetObjectField(TEXT("raiders"), Weights);
+	if (!bListed) Best->TryGetObjectField(TEXT("creatures"), Weights);
+	if (Weights)
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Weights)->Values)
+		{
+			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(FName(*KV.Key));
+			const float Weight = static_cast<float>(KV.Value->AsNumber());
+			if (Def && Weight > 0.f && (bListed || (Def->Behavior == TEXT("aggressive") && Def->Tier != TEXT("boss"))))
+			{
+				OutRaiders.Add({ Def->Id, Weight });
+			}
+		}
+	}
+	return FName(*Best->GetStringField(TEXT("id")));
+}
+
 int32 WRWildlife::Start(UWorld* World)
 {
 	using namespace WRWildlifeImpl;

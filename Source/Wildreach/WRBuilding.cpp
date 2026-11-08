@@ -363,6 +363,11 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 		if (Extent.IsNearlyZero()) { Origin = GetActorLocation(); Extent = FVector(60.f); }
 		const FName Effect = Def->Material == TEXT("wood") ? TEXT("build.break.wood") : Def->Material == TEXT("stone") ? TEXT("build.break.stone") : TEXT("build.break");
 		WRFx::Broadcast(this, Effect, Origin, GetActorRotation(), FMath::Clamp(Extent.Size() / 150.f, 0.4f, 3.f), TEXT("build.demolish"));
+		// A chest broken open (by raiders, or upkeep running out) leaves what it held in a bag where it stood.
+		if (const AWRLootBag* Bag = AWRLootBag::Spill(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 25.f), OwnerName, Storage))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("BUILD %s (%s) spilled %d stacks"), *GetName(), *PieceId.ToString(), Bag->Items.Num());
+		}
 		if (WRBeds::IsBed(this))
 		{
 			WRBeds::OnGone(this);
@@ -1060,6 +1065,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	if (const AWRClaimTotem* Totem = Cast<AWRClaimTotem>(ChildActor.Get()))
 	{
 		O->SetNumberField(TEXT("claimUpgrade"), Totem->UpgradeLevel);
+		if (Totem->NextRaidHours >= 0.0) O->SetNumberField(TEXT("nextRaid"), Totem->NextRaidHours);
 		TArray<TSharedPtr<FJsonValue>> Upkeep;
 		for (const FWRItemStack& S : Totem->UpkeepStorage)
 		{
@@ -1138,6 +1144,7 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 			Totem->Radius = FMath::Min(FWRBuildRegistry::Get().ClaimMaxRadius, FWRBuildRegistry::Get().ClaimRadius + Totem->UpgradeLevel * FWRBuildRegistry::Get().ClaimRadiusPerUpgrade);
 		}
 		ReadStacks(O, TEXT("upkeep"), Totem->UpkeepStorage);
+		O->TryGetNumberField(TEXT("nextRaid"), Totem->NextRaidHours);
 	}
 }
 
