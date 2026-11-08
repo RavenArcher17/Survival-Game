@@ -1,5 +1,26 @@
 # Changelog
 
+## Since 0.7.1: set up for a second developer
+
+Raven: "make a handoff and a readme making sure his Claude knows it needs the art packs and Visual Studio and the other
+things" (Raven's brother, on his own PC with his own Claude account, pulling this repo). Docs and a check script only;
+the game is unchanged.
+
+- **`Tools/check_setup.ps1`**: PASS / FAIL for what a PC needs, each FAIL saying how to fix it: Unreal 5.8 in the
+  launcher's default folder, Visual Studio with "Game development with C++", a Windows SDK, Git LFS with the art
+  downloaded, the six Fab packs the game uses (of the 13 pack folders on Raven's PC, only GV_FreeShrubsPack, LavaMat,
+  QuadrapedCreatures, SimpleRocks, WaterMaterials and MWLandscapeAutoMaterial are referenced), the four Barghest files
+  that crash packaging, and a pack overwriting `Config\`. Passes on Raven's PC; in a fresh clone without art or packs
+  it fails the seven things missing.
+- **README "Working on the game on a new PC"**: what to install, the packs with their Fab listings and folders, the
+  steps from clone to a passing test.
+- **`Docs/HANDOFF.md`**: who decides what, where the game stands, two people on one repo, testing, releasing step by
+  step, the known traps, art.
+- **`Docs/design/`**: the build plan and every design doc tab exported from Raven's Claude docs (2026-11-08), since
+  another Claude account can't open them.
+- **CLAUDE.md**: check the setup first and stop if a pack is missing, pull first, design docs from `Docs/design/`,
+  status brought to 0.7.1, two garbled lines fixed. README: the full suite takes about 90 minutes, not 40.
+
 ## 0.7.1: door keypads, the Clan tab
 
 **Released 2026-11-08** as [v0.7.1](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.7.1) (Latest; commit

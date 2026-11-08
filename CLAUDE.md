@@ -2,26 +2,45 @@
 
 Multiplayer open-world survival, UE 5.8, C++. Read this before working on the project.
 
+## First, on any PC
+1. **Check the setup before anything else**: `powershell -ExecutionPolicy Bypass -File Tools\check_setup.ps1`. It checks
+   Unreal Engine 5.8 (default folder), Visual Studio with "Game development with C++", a Windows SDK, Git LFS with the
+   art downloaded, the **six Fab art packs** in `Content\` (not in git), the Barghest files that crash packaging, and
+   that no pack overwrote `Config\`. If anything FAILs, stop and tell the user exactly what to install or add (the FAIL
+   line says how; `README.md` "Working on the game on a new PC" has the details). Don't open or resave assets, build
+   or run tests with a pack missing: a saved asset loses its link to the pack for everyone.
+2. **`git pull` before starting, and before pushing.** Two people work on this repo (Raven, and Raven's brother on his
+   own PC with his own Claude). Read `Docs/HANDOFF.md`: sharing the repo, releasing, the known traps.
+3. Ask Raven (or the user) before anything big, and **never publish a release without Raven's OK.**
+
 ## Design sources (two separate docs)
-- **Build plan** (scope and order): https://claude.ai/artifact/RexKaP5rCQmTdw3vmUfzbq
-- **Design doc** (what each system is): https://claude.ai/artifact/VQd91XUksbVNsMTZx8EP7k
+- **Build plan** (scope and order): `Docs/design/build-plan.md`
+- **Design doc** (what each system is): `Docs/design/design-doc.md` plus one file per tab in `Docs/design/`
+
+Those are copies from 2026-11-08 of Raven's Claude docs (build plan https://claude.ai/artifact/RexKaP5rCQmTdw3vmUfzbq,
+design doc https://claude.ai/artifact/VQd91XUksbVNsMTZx8EP7k), which only Raven's account can open. On Raven's account,
+read the live ones through the Claude Docs connector; elsewhere use the copies and ask for a fresh export before a big
+piece of work, since Raven keeps editing them.
 
 They're separate docs. **Scope = the build plan's First Playable tier: Fire and Frost only** (Volcanic + Frozen tundra).
 Don't build anything from the other 10 biomes/paths, or from the Full release / Dream list tiers, unless Raven asks.
-Read both through the Claude Docs connector; re-read before each milestone, since Raven keeps editing them.
 
 ## Things that are easy to miss
 - **Everything in the docs is a first draft**: names, perk effects, combos and starting numbers especially. They're meant to be tuned in playtests, not treated as final. Keep them in data files (`Data/*.json`, `Data/tuning.json`) so changing them never needs a code change, and don't over-engineer around a specific value.
 - **The Map tab layout isn't ready to build as-is.** Its note says the layout needs more planning toward a realistic landmass (coastlines, terrain, rivers, mountain range shape) first. M3 starts with that planning step and gets Raven's sign-off before any terrain is built.
-- **Playtests run with XP turned up.** At 1Ã— a path takes ~80 h and a life skill ~50 h, so no one would reach the higher nodes. Playtest servers use the `Playtest` server preset (high XP/skill multipliers, see `Docs/plan/M7_server.md`), and debug commands can grant points directly.
+- **Playtests run with XP turned up.** At 1x a path takes ~80 h and a life skill ~50 h, so no one would reach the higher nodes. Playtest servers use the `Playtest` server preset (high XP/skill multipliers, see `Docs/plan/M7_server.md`), and debug commands can grant points directly.
 - Open inconsistencies between doc tabs are in `Docs/DESIGN_REVIEW.md`. Don't silently pick an answer: use the proposed default listed there and leave the item open for Raven.
 
 ## Plan
 - `Docs/TECH_PLAN.md`: architecture decisions + milestone index
-- `Docs/plan/M1_combat.md` â€¦ `M7_server.md`: per-milestone tasks, gates, tests
+- `Docs/plan/M1_combat.md` ... `M7_server.md`: per-milestone tasks, gates, tests
 - `Docs/plan/DATA_SCHEMAS.md`: JSON formats for design content
 
-## Status (2026-10-27)
+## Status (2026-11-08, v0.7.1)
+Every First Playable system is built and tested; released versions and what each changed are in `CHANGELOG.md`
+(newest first), what's still open is in `Docs/HANDOFF.md` ("Where the game stands"). The notes below are how the main
+systems are put together (written up to 0.4/0.5; the CHANGELOG has everything since).
+
 - **Polish pass (0.4.0)**: sound and effects are named events (`WRSound::PlayAt/PlayOn/Voice/Broadcast`,
   `WRFx::SpawnAt/Broadcast/ShowHit`); what plays is data (`Data/Audio/sounds.json` + OGG files loaded at runtime,
   `Data/fx.json` recipes drawn by the C++ sprite system in `WRFx*`), so new moments need a table row, not code.
@@ -82,7 +101,10 @@ Read both through the Claude Docs connector; re-read before each milestone, sinc
      `Data/lifeskills.json`, `Data/server_presets.json`, `-wrpreset=`; `Tools\socialtest.ps1`). All checks pass. Fishing/engineering/swimming have no XP source yet; bounties/raids settings unused.
   6. Island dressing, caves, biome hazards (`WRWorldDressing`; `Tools\terrain\hazardtest.ps1`): done. Island rebuilt 2026-10-24.
   Default preset is `playtest` (PvP off), so PvP tests need `-wrpreset=pvp_standard` (mptest and socialtest pass it).
-- GitHub backup: origin = https://github.com/RavenArcher17/Survival-Game (Git LFS for assets; free LFS quota 1 GB, ~770 MB used 2026-10-25 (each Mixamo character ~30-40 MB); each island rebuild adds ~80 MB, each AI creature ~11 MB).
+- GitHub: origin = https://github.com/RavenArcher17/Survival-Game (public; Git LFS for assets on Raven's account, so
+  every clone and pull counts against its allowance; ~755 MB of LFS files in the current tree; each Mixamo character
+  ~30-40 MB, each island rebuild ~80 MB, each AI creature ~11 MB: say before adding a lot). Releases (the installer
+  players download and auto-update from) are published there too.
 - See `CHANGELOG.md` for details and known gaps.
 
 ## How things are wired (read before changing combat)
@@ -109,4 +131,8 @@ Don't close Raven's open editor or game windows; launch new ones alongside.
 ## Conventions
 - Server-authoritative everything; clients send intent, never results.
 - Gameplay logic in C++ and data, not Blueprint-only assets, so it can be built and reviewed without the editor UI.
-- Class prefix `WR`. Commit to `master` (no feature branches). Large binaries go through Git LFS (`.gitattributes`).
+- Class prefix `WR`. Commit to `master` (no feature branches): pull first, commit your own files by name (never
+  `git add -A`: Raven's `Config/DefaultEditor.ini` and the Fab packs stay out), push once it builds and its tests pass.
+  Maps and `.uasset` files can't be merged, so say before changing one someone else may be working on.
+  Large binaries go through Git LFS (`.gitattributes`).
+- Keep `CHANGELOG.md` (each change, why, how it was tested) and `Docs/HANDOFF.md` current in the same commit.

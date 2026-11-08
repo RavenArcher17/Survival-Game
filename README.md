@@ -3,6 +3,56 @@
 Multiplayer open-world survival, first + third person, UE 5.8, C++. The first playable (fire + frost, Volcanic +
 Frozen tundra) runs on placeholder art. See `CHANGELOG.md` for what's built and its known gaps.
 
+## Working on the game on a new PC
+
+This is for building and changing the game. To just play it, download the installer (next section).
+
+**What the PC needs**
+
+| What | Notes |
+|---|---|
+| Windows 10 or 11, 64-bit, a DirectX 12 gaming GPU | the island uses Nanite and virtual shadow maps |
+| About 100 GB free | engine ~30 GB, the project with its build files ~20 GB, shader cache and packaged builds the rest |
+| **Unreal Engine 5.8.4** | Epic Games Launcher > Unreal Engine > Library > +. Leave it in its default folder, `C:\Program Files\Epic Games\UE_5.8`: the scripts in `Tools\` look for it there |
+| **Visual Studio 2022 Community** (17.8 or later; VS 2026 works too) | in the Visual Studio Installer tick the workloads **Game development with C++**, **Desktop development with C++** and **.NET desktop development**, plus a **Windows 11 SDK** (10.0.22621 is the one Unreal 5.8 prefers) |
+| **Git for Windows** (includes **Git LFS**) | run `git lfs install` once, before cloning |
+| **The six Fab art packs below** | not in git (their licence doesn't allow sharing them publicly) |
+| GitHub CLI (`gh`), optional | only to publish a release: `gh auth login` as an account with write access to the repo |
+| Node.js, optional | only for the island scripts in `Tools\terrain` |
+| Claude Code, optional | on this PC (desktop app or terminal), not a cloud session: Unreal has to run here |
+
+**The art packs.** Each must end up in `Content\` under exactly this folder name, because the game loads them by path.
+Add each from Fab to the project (Fab > the listing > Add to My Library, then in the Epic Games Launcher: Unreal Engine >
+Library > Fab Library > the pack > Add to project > Wildreach), or copy the folders from Raven's PC if the pack's licence
+allows sharing it with someone on your project. The other pack folders in Raven's `Content` aren't used.
+
+| Folder in `Content\` | Fab listing (seller) | Size | Used for |
+|---|---|---|---|
+| `GV_FreeShrubsPack` | Free Shrubs Pack (Ultra Realistic Wind) (Greenleaf Vision) | 1.4 GB | the island's shrubs |
+| `LavaMat` | Lava Material (Stone Material): the one whose folder is `LavaMat` | 1.7 GB | the lava |
+| `QuadrapedCreatures` | Quadruped Fantasy Creatures (PROTOFACTOR INC) | 0.6 GB | Gloomhowl, Scorchwing, Skaldrith |
+| `SimpleRocks` | Simple Rocks (Orangujanusz Store) | 0.3 GB | rocks, boulders, ore nodes |
+| `WaterMaterials` | Water Materials (tharlevfx) | 0.1 GB | the sea |
+| `MWLandscapeAutoMaterial` | MW Landscape Auto Material (MAWI United) | 0.7 GB | ground, cliff and ice textures |
+
+After adding **Quadruped Fantasy Creatures**, move its four mane and tail files out of `Content` (packaging crashes on
+them; `check_setup.ps1` names them). Without a pack the game still builds, but the terrain, sea or creatures lose their
+look, and an asset saved in that state loses its link to the pack for everyone, so add all six before the first
+editor start.
+
+**Steps**
+
+1. Clone outside OneDrive: `git clone https://github.com/RavenArcher17/Survival-Game.git C:\Dev\Wildreach` (about
+   0.75 GB of art comes down through Git LFS).
+2. Add the six packs, then run `powershell -ExecutionPolicy Bypass -File Tools\check_setup.ps1` until everything passes.
+3. Build (the command under **Build** below), or double-click `Wildreach.uproject` and let it build. The first editor
+   start compiles shaders for a long time (can be an hour).
+4. Check it: `Tools\alltests.ps1 -SkipBuild -Only unit,survival` should pass. Then `Tools\play.ps1 listen` to play.
+5. To push your changes, Raven adds your GitHub account under the repo's Settings > Collaborators.
+
+Before changing anything, read `Docs/HANDOFF.md`: how two people share this repo, how a release goes out, and the
+known traps. The design docs are in `Docs/design/`. Claude Code reads `CLAUDE.md` by itself, which points to both.
+
 ## Play with friends
 
 ```
@@ -29,7 +79,8 @@ A packaged **dedicated server** needs Unreal built from source: `Tools\build_eng
 **Releasing an update:** bump `ProjectVersion` in `Config/DefaultGame.ini` (e.g. 0.2.1), run `Tools\package.ps1` and
 `Tools\make_installer.ps1`, then publish a GitHub release tagged `v0.2.1` with `Wildreach-Setup.exe` attached
 (`gh release create v0.2.1 C:\Dev\WildreachBuild\Wildreach-Setup.exe --target master --latest`). Installed copies
-update on their next start. Clients and hosts must be on the same version to play together.
+update on their next start. Clients and hosts must be on the same version to play together. The full steps, with the
+checks before and after publishing, are in `Docs/HANDOFF.md` ("Releasing an update").
 
 Server settings: a world's preset and rules are set on the New world form, and by the host in game (Esc > World). They live
 in `Saved/Worlds/<world>/settings.json`: the preset alone, or `{"preset": "custom", "base": "pve", "settings": {...}}` with
@@ -113,7 +164,7 @@ surface), `WRSoundStats [reset]` (plays per event + the mixer's state), `WRMusic
 
 ## Test
 
-`Tools\alltests.ps1` builds and runs everything below in turn (about 40 minutes) and prints a PASS / FAIL table
+`Tools\alltests.ps1` builds and runs everything below in turn (about 90 minutes) and prints a PASS / FAIL table
 (`-SkipBuild`, `-Only ranged,tame`). Each bot test ends with its checks (`PASS` / `FAIL` lines) and exits 1 on a failure.
 Tests give their server `-wrworld=<name>`, so each keeps its own world folder (`Saved/Worlds/<name>`, off the menu's list
 as it has no `info.json`) and they can run side by side.
