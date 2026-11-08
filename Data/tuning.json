@@ -229,6 +229,8 @@
     "discoverRadius": { "camp": 4000, "cave": 2500, "pass": 4000, "boss": 4500, "miniboss": 3500 },
     "menuCamera": { "x": 114000, "y": -125000, "z": 12500, "yaw": 205, "pitch": -6, "fov": 75 } },
   "crops": { "commonMinutes": 20, "rareMinutes": 120 },
+  "craft": { "_comment": "Crafting time at stations (AWRStation::Queue, 0.7): each of a recipe takes its recipes.json seconds x timeScale / the world's craftMultiplier (timeScale 0: at once, as before; tests of what's made use it). An order is up to maxPerOrder of one recipe, its inputs taken when it's ordered; a station holds queueOrders orders and makes them one after another, with nobody at it. Each one made goes into its maker's bag while they're within deliverRange cm of the station, else into its tray of traySlots slots; with neither room, it waits. Hand recipes stay instant. placeholder",
+    "timeScale": 1, "maxPerOrder": 50, "queueOrders": 6, "deliverRange": 2000, "traySlots": 8 },
   "inventory": { "_comment": "The bag: carrying more than carryKg (bag + worn + held) slows you to overweightSpeed; dropped items lie in a bag for dropMinutes. placeholder",
     "carryKg": 80, "overweightSpeed": 0.7, "dropMinutes": 10 },
   "wildlife": { "_comment": "Island wildlife (WRWildlife): packs live on when nobody is near, on the walk map (Data/island_walk.json, from Tools/terrain/walkmap.mjs), and comes from the regions in Data/spawn_regions.json. A pack comes out when a player is within activationRadius cm of it and fades away after despawnSeconds with nobody within activationRadius x leaveRadiusMult (tamed and knocked-out creatures stay). enabled 0: no packs. placeholder",

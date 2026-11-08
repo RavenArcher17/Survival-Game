@@ -3,7 +3,29 @@
 ## 0.7.0 (in progress): creature raids
 
 **Not released.** The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views,
-ash-grey volcanic shrubs, ice rebuilt like the lava. Raids are done; the rest is to come.
+ash-grey volcanic shrubs, ice rebuilt like the lava. Raids and crafting time are done; the rest is to come.
+
+- **Crafting time with a queue at each station** (`AWRStation::Queue` / `Output`, tuning.json `craft`). A station's
+  recipe now takes its time (recipes.json `seconds`, 2-7 s, there since the first drafts but read by nothing) over the
+  world's crafting speed (`server.craftMultiplier`, also read by nothing until now: 2x in Casual co-op and Playtest, so
+  1-3.5 s). Craft with a quantity is one order: its inputs are taken when it's ordered, and the station makes them one
+  after another. It keeps going with nobody at it; each one goes into its maker's bag while they're within 20 m, else
+  into the station's tray (8 slots). With no room for it, it waits. Up to 6 orders a station, 50 of one recipe an
+  order; a broken Hearth stops them where they are. Hand recipes stay instant.
+  - The Crafting tab: the details say how long ("Takes 1 s each: 5 s for 5. It keeps going if you walk off."); under the
+    cards, a strip with the station's orders (the first with its bar, "4 of 5"), each with **Cancel**, and what's
+    **Ready** in the tray with **Take all**. A notice when an order you walked off from is done.
+  - Cancel gives back what wasn't made (the one under way too), to its maker or the base's owner and clan; what doesn't
+    fit lands in a bag at the station. A station smashed or demolished leaves its tray and its orders' materials in a bag.
+  - The quality roll, perks and double brews use the maker's skill when they ordered it, so a queue finishes the same
+    after they've walked off or logged out (skill XP comes as each one is made, while they're on). Saved with the
+    station (`queue`, `tray` in its piece in world.json); the one under way keeps the time it had left.
+  - `FWRCrafting::Make` is split into `Shortfall` / `TakeInputs` / `HandOf` / `MakeOne`, shared by the queue and the
+    instant path (`craft.timeScale` 0: crafttest and survivaltest run that way, as they test what's made). New
+    commands `craft <id> <element> <times>`, `craftcancel <n>`, `crafttake`, and `saveworld` (tests).
+  - `Tools/crafttimetest.ps1` (alltests `crafttime`, 10 checks, all pass): by clicks at a forge, five ingots one at a
+    time about a second apart into the bag, ten more walked off from going into the tray with the notice, Take all,
+    two swords cancelled with their materials back, and an order under way saved with its forge.
 
 - **Creature raids** (new `WRRaids.cpp/.h`, numbers in tuning.json `raid`). The world setting "Creature raids" (Off /
   Rare / Normal / Frequent; `server.raids`, already in every preset but read by nothing until now) is on the world

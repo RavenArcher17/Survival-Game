@@ -100,7 +100,8 @@ Every key below is a default: **Esc → Controls** rebinds any of them (saved in
 UI (screenshots and tests): `WRWheel 0 2` (hold a wheel open on a wedge; 2 = tame orders, -1 closes), `WRHelp`,
 `WRMenu crafting|settings|hearth 0`, `WRSettings video|controls|listen|key G|cancel`, `WRMainMenu [settings]`,
 `WRUISelect ranged`, `WRUIMouse click|rclick|drag ...` (real Slate input), `WRCmd <server command>`,
-`WRCmd raid now [warn s] [from bearing]|due|status|plan|end` (creature raids on the nearest claim),
+`WRCmd raid now [warn s] [from bearing]|due|status|plan|end` (creature raids on the nearest claim), `WRCmd craft <recipe> none <times>` (an order at
+the station you're at), `WRCmd craftcancel <n>`, `WRCmd crafttake`, `WRCmd saveworld`; `-wrtune=craft.timeScale:0` makes stations instant,
 `WRFlow preview death|loading|island|levelup|point|recipe|discover <place>|boss <id>|tame <id>|hint <id>` (the moments between play),
 `WRFlow forget` / `hints on|off` / `quiet on|off` (this player's discoveries and hints; moments off for other screenshots), `WRFlow shotondeath 3`,
 `WRFlow near tree`, `WRFlow cam X Y Z Yaw Pitch` (try a view, e.g. for the menu backdrop). `-oldui` keeps the
@@ -141,6 +142,7 @@ Tools\roamtest.ps1      # wildlife regions fill a new world; packs roam, rest, h
 Tools\spelltest.ps1     # Paths menu learn + the four tree spells
 Tools\basetest.ps1      # a base by real input at 16:10: build bar pages and the Claim tab, the Hearth hint, a broken Hearth repaired, a chest renamed, a map waypoint (-Shots)
 Tools\raidtest.ps1      # creature raids: the warning, region hunters by Hearth level bite the base and fight, held or timed out, a due raid waits for someone home (-Shots)
+Tools\crafttimetest.ps1 # crafting time by clicks at a forge: an order of five one at a time, walked off into the tray and taken, cancelled, saved (-Shots)
 Tools\terrain\walktest.ps1 / hazardtest.ps1 / island_shots.ps1   # island traversal, lava + ice, screenshots
 Tools\audiotest.ps1     # the sound pass played through with sound on: every event logged and checked, beds + music by place / time / fight, the output recorded (-MainMenu)
 Tools\uishots.ps1       # a screenshot of every stone-and-leather screen (HUD, wheels, journal tabs, build, storage, Hearth, claim, taming, settings, then the moments between play: death, loading, banners, hints; -MainMenu: the front end; -Flow: just the moments)

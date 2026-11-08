@@ -34,6 +34,7 @@
 #include "Misc/Paths.h"
 #include "WRMainMenu.h"
 #include "WRKeyBindings.h"
+#include "WRGameMode.h"
 #include "WRPlayerUI.h"
 #include "WRRaids.h"
 #include "WRUIFlow.h"
@@ -787,7 +788,8 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
-		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("hearthfeed") };  // chat is its own RPC
+		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("hearthfeed"), TEXT("hearthrepair"),
+		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname ") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{
@@ -1139,6 +1141,12 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("artifacts") && PS) { PS->bArtifactModifiers = Arg(1) == TEXT("1"); }
+	else if (Cmd == TEXT("saveworld"))
+	{
+		// Testing aid: write the world's save now (it's every minute otherwise).
+		if (AWRGameMode* Mode = GetWorld()->GetAuthGameMode<AWRGameMode>()) Mode->SaveWorld();
+		Result = TEXT("world saved");
+	}
 	else if (Cmd == TEXT("raid"))
 	{
 		// Testing aid (WRCmd raid now [warn s] | due | status | plan | end): creature raids on the nearest claim.

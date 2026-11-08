@@ -1062,6 +1062,10 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 		for (const FName& C : Hearth->GetCores()) Cores.Add(MakeShared<FJsonValueString>(C.ToString()));
 		O->SetArrayField(TEXT("cores"), Cores);
 	}
+	if (const AWRStation* Station = Cast<AWRStation>(ChildActor.Get()))
+	{
+		Station->QueueToJson(O);   // its orders and its tray
+	}
 	if (const AWRClaimTotem* Totem = Cast<AWRClaimTotem>(ChildActor.Get()))
 	{
 		O->SetNumberField(TEXT("claimUpgrade"), Totem->UpgradeLevel);
@@ -1134,6 +1138,10 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 		}
 		// Its health is the piece's (a broken one is saved broken).
 		Hearth->SetHealthFraction(MaxHealth > 0.f ? FMath::Max(0.f, Health) / MaxHealth : 1.f);
+	}
+	if (AWRStation* Station = Cast<AWRStation>(ChildActor.Get()))
+	{
+		Station->QueueFromJson(O);
 	}
 	if (AWRClaimTotem* Totem = Cast<AWRClaimTotem>(ChildActor.Get()))
 	{

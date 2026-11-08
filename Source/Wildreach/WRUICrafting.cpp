@@ -369,6 +369,8 @@ public:
 					[
 						SAssignNew(List, SScrollBox).ScrollBarThickness(FVector2D(5.f, 5.f))
 					]
+					// The station's orders and its tray (crafting time): only while it has some.
+					+ SVerticalBox::Slot().AutoHeight()[SAssignNew(QueueBox, SBox)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)[FooterHints()]
 				]
 				// Right: the picked recipe.
@@ -409,7 +411,7 @@ public:
 private:
 	TWeakObjectPtr<AWRPlayerController> PC;
 	TWeakObjectPtr<AWRStation> Station;
-	TSharedPtr<SBox> TopRow, NavFoot, Details;
+	TSharedPtr<SBox> TopRow, NavFoot, Details, QueueBox;
 	TSharedPtr<SVerticalBox> Nav;
 	TSharedPtr<SScrollBox> List;
 	TArray<FEntry> Entries;
@@ -455,6 +457,12 @@ private:
 		if (const UWRLifeSkillsComponent* S = Skills())
 		{
 			for (const FWRSkillProgress& P : S->GetSkills()) H = HashCombine(H, HashCombine(GetTypeHash(P.Level), GetTypeHash(P.XP)));
+		}
+		// The station's orders and tray (not how far along the one under way is: its bar follows that by itself).
+		if (const AWRStation* St = Station.Get())
+		{
+			for (const FWRCraftJob& J : St->Queue) H = HashCombine(H, HashCombine(GetTypeHash(J.Recipe), HashCombine(GetTypeHash(J.Left), GetTypeHash(J.Waiting))));
+			for (const FWRItemStack& S : St->Output) H = HashCombine(H, HashCombine(GetTypeHash(S.ItemId), GetTypeHash(S.Count)));
 		}
 		return H;
 	}
@@ -649,6 +657,121 @@ private:
 		NavFoot->SetContent(BuildNavFoot());
 		BuildList();
 		Details->SetContent(BuildDetails());
+		QueueBox->SetContent(BuildQueue());
+	}
+
+	/** The station's orders, first under way with its bar, each with Cancel; then its tray and Take all. */
+	TSharedRef<SWidget> BuildQueue()
+	{
+		const AWRStation* St = Station.Get();
+		const bool bTray = St && St->Output.ContainsByPredicate([](const FWRItemStack& S) { return !S.IsEmpty(); });
+		if (!St || (St->Queue.Num() == 0 && !bTray))
+		{
+			return SNullWidget::NullWidget;
+		}
+		TSharedRef<SHorizontalBox> Orders = SNew(SHorizontalBox);
+		for (int32 i = 0; i < St->Queue.Num(); ++i)
+		{
+			const FWRCraftJob& J = St->Queue[i];
+			const FWRRecipe* R = FWRRecipeRegistry::Get().Find(J.Recipe);
+			FWRSlotView View;
+			View.ItemId = R ? R->Output : NAME_None;
+			View.Count = J.Left;
+			View.bShowCount = true;
+			FText State;
+			FLinearColor StateColor = WRUI::Ink2;
+			if (i > 0) State = LOCTEXT("QueueNext", "next");
+			else if (J.Waiting == 1) { State = LOCTEXT("QueueFull", "the tray is full"); StateColor = WRUI::Warn; }
+			else if (J.Waiting == 2) { State = LOCTEXT("QueueBroken", "the Hearth is broken"); StateColor = WRUI::Bad; }
+			else State = FText::Format(LOCTEXT("QueueOf", "{0} of {1}"), J.Made + 1, J.Made + J.Left);
+			const int32 Index = i;
+			TSharedRef<SVerticalBox> Words = SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(FText::FromString(R ? ItemName(R->Output) : J.Recipe.ToString()), WRUI::Body(12, 800), WRUI::Ink, true)]
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(State, WRUI::Body(11, 500), StateColor)];
+			if (i == 0)
+			{
+				Words->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
+				[
+					SNew(SWRBar).Height(5.f * U).Color(WRUI::Brass).Fraction_Lambda([this]() { return Station.IsValid() ? Station->JobProgress() : 0.f; })
+				];
+			}
+			Orders->AddSlot().AutoWidth().Padding(0.f, 0.f, 8.f * U, 0.f)
+			[
+				SNew(SBorder).BorderImage(WRUI::Box(i == 0 ? WRUI::Alpha(WRUI::Brass, 0.1f) : FLinearColor(0.f, 0.f, 0.f, 0.3f), 5.f, i == 0 ? WRUI::Brass2 : WRUI::Alpha(WRUI::Rim, 0.7f), 1.f))
+				.Padding(FMargin(4.f * U, 4.f * U, 6.f * U, 4.f * U))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRSlot).Size(36.f * U).View(View)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(112.f * U)[Words]]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.f * U, 0.f, 0.f, 0.f)
+					[
+						SNew(SBox).HeightOverride(28.f * U)
+						[
+							SNew(SWRButton).Ghost(true).FontSize(11).MinHeight(28.f * U).Text(LOCTEXT("QueueCancel", "Cancel"))
+							.OnClicked_Lambda([this, Index]() { if (PC.IsValid()) PC->SendCommand(FString::Printf(TEXT("craftcancel %d"), Index)); return FReply::Handled(); })
+						]
+					]
+				]
+			];
+		}
+		TSharedRef<SHorizontalBox> Tray = SNew(SHorizontalBox);
+		int32 Shown = 0;
+		for (const FWRItemStack& S : St->Output)
+		{
+			if (S.IsEmpty() || Shown >= 4) continue;
+			FWRSlotView View;
+			View.ItemId = S.ItemId;
+			View.Count = S.Count;
+			View.Quality = S.Quality >= EWRQuality::Masterwork ? 2 : S.Quality >= EWRQuality::Fine ? 1 : 0;
+			Tray->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 5.f * U, 0.f)[SNew(SWRSlot).Size(36.f * U).View(View)];
+			++Shown;
+		}
+		return SNew(SBox).Padding(FMargin(0.f, 10.f * U, 0.f, 0.f))
+			[
+				SNew(SWRPanel).Kind(EWRPanel::Inset).Padding(FMargin(12.f * U, 8.f * U))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
+					[
+						WRUI::Text(St->Queue.Num() > 0 ? LOCTEXT("QueueHead", "Making") : LOCTEXT("QueueIdle", "Done"), WRUI::Caps(12), WRUI::Ink2)
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(SScrollBox).Orientation(Orient_Horizontal).ScrollBarThickness(FVector2D(3.f, 3.f))
+						+ SScrollBox::Slot()[Orders]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
+					[
+						SNew(SHorizontalBox).Visibility(bTray ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[WRUI::Text(LOCTEXT("TrayHead", "Ready"), WRUI::Caps(12), WRUI::Good)]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Tray]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4.f * U, 0.f, 0.f, 0.f)
+						[
+							SNew(SBox).HeightOverride(32.f * U)
+							[
+								SNew(SWRButton).FontSize(12).MinHeight(32.f * U).Text(LOCTEXT("TrayTake", "Take all"))
+								.OnClicked_Lambda([this]() { if (PC.IsValid()) PC->SendCommand(TEXT("crafttake")); return FReply::Handled(); })
+							]
+						]
+					]
+				]
+			];
+	}
+
+	/** "Takes 2 s each: 10 s for 5" for a station's recipe (crafting time); empty by hand or when it's at once. */
+	FString TimeText(const FEntry& E) const
+	{
+		if (E.Kind != FEntry::EKind::Recipe || !E.Recipe || E.Recipe->Station == Hand) return FString();
+		const float Each = AWRStation::SecondsFor(*E.Recipe);
+		if (Each <= 0.f) return FString();
+		const int32 N = FMath::Clamp(Quantity, 1, FMath::Max(1, MaxQuantity(E)));
+		const auto Time = [](float S)
+		{
+			const int32 Whole = FMath::Max(1, FMath::CeilToInt(S));
+			return Whole < 60 ? FString::Printf(TEXT("%d s"), Whole) : Whole % 60 == 0 || Whole >= 600 ? FString::Printf(TEXT("%d min"), FMath::RoundToInt(Whole / 60.f)) : FString::Printf(TEXT("%d min %d s"), Whole / 60, Whole % 60);
+		};
+		return N > 1 ? FString::Printf(TEXT("Takes %s each: %s for %d. It keeps going if you walk off."), *Time(Each), *Time(Each * N), N)
+			: FString::Printf(TEXT("Takes %s. It keeps going if you walk off."), *Time(Each));
 	}
 
 	/** The cards that pass the category, search and ready filters, in the order the list shows them. */
@@ -1254,6 +1377,14 @@ private:
 			[
 				SNew(SBox).Visibility(bRecipe && !E->Locked() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed)[QuantityRow(Key)]
 			]
+			// How long it takes at a station (crafting time).
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+			[
+				SNew(SBox).Visibility(TimeText(*E).IsEmpty() || E->Locked() ? EVisibility::Collapsed : EVisibility::HitTestInvisible)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this, Key]() { const FEntry* X = Find(Key); return X ? FText::FromString(TimeText(*X)) : FText::GetEmpty(); }), WRUI::Body(12, 500), WRUI::Ink2, false, true)
+				]
+			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
 			[
 				// A fixed height: the button's leather tile would otherwise ask for its texture's 256.
@@ -1403,10 +1534,11 @@ private:
 			PC->SendCommand(E->Command);
 			return;
 		}
-		// No repeat count on the server: N crafts are N commands, each checked there on its own.
+		// At a station, one order of N (its queue makes them one after another); by hand, N crafts, each checked on its own.
 		const FString Infuse = CanInfuse(*E) && !Element.IsNone() ? Element.ToString() : TEXT("none");
 		const int32 N = FMath::Clamp(Quantity, 1, MaxQuantity(*E));
-		for (int32 i = 0; i < N; ++i) PC->SendCommand(FString::Printf(TEXT("%s %s"), *E->Command, *Infuse));
+		if (E->Station != Hand) PC->SendCommand(FString::Printf(TEXT("%s %s %d"), *E->Command, *Infuse, N));
+		else for (int32 i = 0; i < N; ++i) PC->SendCommand(FString::Printf(TEXT("%s %s"), *E->Command, *Infuse));
 		Quantity = 1;
 	}
 
@@ -1420,7 +1552,8 @@ private:
 	FLinearColor NoticeColor() const
 	{
 		const FString N = NoticeText();
-		return N.StartsWith(TEXT("Crafted")) || N.StartsWith(TEXT("Repaired")) || N.StartsWith(TEXT("Upgraded")) ? WRUI::Good : WRUI::Warn;
+		return N.StartsWith(TEXT("Crafted")) || N.StartsWith(TEXT("Repaired")) || N.StartsWith(TEXT("Upgraded")) || N.StartsWith(TEXT("Queued")) || N.StartsWith(TEXT("Took"))
+			|| N.StartsWith(TEXT("Cancelled")) || N.StartsWith(TEXT("Your ")) ? WRUI::Good : WRUI::Warn;
 	}
 };
 

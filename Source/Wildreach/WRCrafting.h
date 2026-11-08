@@ -18,6 +18,8 @@ struct FWRRecipe
 	FName Output;
 	int32 Count = 1;
 	bool bQuality = false;
+	/** How long one takes at a station (recipes.json "seconds"), before the world's crafting speed. */
+	float Seconds = 2.f;
 };
 
 class WILDREACH_API FWRRecipeRegistry
@@ -40,6 +42,27 @@ private:
 	TArray<FWRRecipe> Recipes;
 };
 
+/** What the crafter brings to a recipe (their skill and perks), taken when it's ordered: a station's queue goes on
+ *  making it after they've walked off or logged out. */
+struct FWRCrafterHand
+{
+	int32 SkillLevel = 0;     // smithing or armorcraft, for gear's quality
+	bool bMinFine = false;    // a Master perk: gear is Fine or better
+	float RollBonus = 0.f;    // weapons' stat roll
+	float DoubleBrew = 0.f;   // alchemy's chance of a double batch
+};
+
+/** One made: the item (a piece of gear, or a stack), the skill it trains, and the "Crafted ..." line. */
+struct FWRCraftedOne
+{
+	FWRItemStack Item;
+	bool bGear = false;
+	FName Skill;
+	const TCHAR* XPKey = TEXT("craft");   // lifeskills.json's XP for it (XP: the number when it has none)
+	float XP = 0.f;
+	FString Text;
+};
+
 /** Server: making a recipe's output (shared by stations and crafting by hand). */
 struct WILDREACH_API FWRCrafting
 {
@@ -47,6 +70,39 @@ struct WILDREACH_API FWRCrafting
 	static FString Make(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element);
 	/** Recipes with station "hand": anywhere, no station needed (the crude tools). */
 	static FString CraftByHand(AWRPlayerController* Player, FName RecipeId);
+	/** Why this recipe can't be made Times over with this infusion from what the player carries (empty: it can). */
+	static FString Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times);
+	/** Takes the inputs (and the essence) for Times. Check Shortfall first. */
+	static void TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times);
+	/** What the inputs (and essence) for Times are: a cancelled order's refund. */
+	static TArray<TPair<FName, int32>> InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times);
+	static FWRCrafterHand HandOf(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType);
+	/** Makes one (its inputs already taken): the quality roll for gear, alchemy's double batch. */
+	static FWRCraftedOne MakeOne(const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element, const FWRCrafterHand& Hand);
+	/** Gear: one per craft; the rest come as a stack. */
+	static bool IsGear(const FWRRecipe& Recipe);
+};
+
+/** One order in a station's queue (AWRStation::Queue): a recipe to make Left more times, one after another. */
+USTRUCT()
+struct FWRCraftJob
+{
+	GENERATED_BODY()
+
+	UPROPERTY() FName Recipe;
+	UPROPERTY() FName Element;
+	UPROPERTY() FString Owner;
+	UPROPERTY() int32 Left = 0;
+	UPROPERTY() int32 Made = 0;
+	/** Seconds each takes (the recipe's over the world's crafting speed, when it was ordered). */
+	UPROPERTY() float ItemSeconds = 1.f;
+	/** The one under way is done at this server time; 0 while it waits (ItemLeft then has the seconds still to go). */
+	UPROPERTY() double DoneAt = 0.0;
+	UPROPERTY() float ItemLeft = 0.f;
+	/** Why it waits: 0 it doesn't, 1 nowhere to put what it makes (its maker isn't near and the tray is full), 2 the
+	 *  Hearth is broken. */
+	UPROPERTY() uint8 Waiting = 0;
+	FWRCrafterHand Hand;   // server only
 };
 
 /** Pure crafting math (tests). */
@@ -130,9 +186,33 @@ public:
 	static constexpr float UseRange = 350.f;
 
 	// --- Server actions (validated) ---
-	FString Craft(AWRPlayerController* Player, FName RecipeId, FName Element);
+	/**
+	 * Orders Times of a recipe: the inputs are taken now and it joins the queue, made one after another
+	 * (craft.timeScale 0: made at once, as before 0.7).
+	 */
+	FString Craft(AWRPlayerController* Player, FName RecipeId, FName Element, int32 Times = 1);
+	/** Calls off an order (its maker, or the base's owner and clan): what wasn't made yet comes back. */
+	FString CancelJob(AWRPlayerController* Player, int32 Index);
+	/** Everything in the tray that fits into the player's bag. */
+	FString TakeOutput(AWRPlayerController* Player);
 	FString Repair(AWRPlayerController* Player, EWREquipSlot Slot);
 	FString Upgrade(AWRPlayerController* Player, EWREquipSlot Slot);
+
+	/**
+	 * Crafting time (0.7): what it's making, first under way. It keeps going with nobody at it; each one goes into its
+	 * maker's bag when they're within craft.deliverRange, else into the tray (Output) to be taken. Saved with its piece.
+	 */
+	UPROPERTY(Replicated) TArray<FWRCraftJob> Queue;
+	UPROPERTY(Replicated) TArray<FWRItemStack> Output;
+	/** How far the first order is through the one it's making, 0..1 (any machine: from the server's clock). */
+	float JobProgress() const;
+	/** Seconds one of a recipe takes here and now (the recipe's, over the world's crafting speed; 0: at once). */
+	static float SecondsFor(const FWRRecipe& Recipe);
+	/** Save / load (its build piece's JSON). */
+	void QueueToJson(TSharedRef<class FJsonObject> O) const;
+	void QueueFromJson(const TSharedPtr<class FJsonObject>& O);
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -140,6 +220,10 @@ protected:
 private:
 	UFUNCTION() void OnRep_Type();
 	bool CanUse(AWRPlayerController* Player, FString& OutWhy) const;
+	/** The base's owner and clan (the piece it stands on), or anyone at a station that isn't a building's. */
+	bool CanManage(const FString& Player) const;
+	/** Server: makes the first order's next one if it's due, and starts the next. */
+	void AdvanceQueue();
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
 	/** A forge's fire (other stations stay dark). */

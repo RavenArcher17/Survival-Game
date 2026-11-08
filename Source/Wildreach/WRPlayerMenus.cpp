@@ -748,7 +748,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 			}
 		}
 	}
-	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade"))
+	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade") || Cmd == TEXT("craftcancel") || Cmd == TEXT("crafttake"))
 	{
 		AWRStation* Station = FindNearbyStation();
 		if (!Station)
@@ -757,7 +757,16 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		}
 		else if (Cmd == TEXT("craft"))
 		{
-			OutResult = Station->Craft(this, FName(*Arg(1)), Arg(2) == TEXT("none") ? NAME_None : FName(*Arg(2)));
+			// craft <recipe> <none|fire|frost> [times]: an order of that many (one after another, crafting time).
+			OutResult = Station->Craft(this, FName(*Arg(1)), Arg(2) == TEXT("none") || Arg(2).IsEmpty() ? NAME_None : FName(*Arg(2)), FMath::Max(1, FCString::Atoi(*Arg(3))));
+		}
+		else if (Cmd == TEXT("craftcancel"))
+		{
+			OutResult = Station->CancelJob(this, FCString::Atoi(*Arg(1)));
+		}
+		else if (Cmd == TEXT("crafttake"))
+		{
+			OutResult = Station->TakeOutput(this);
 		}
 		else if (Cmd == TEXT("repair"))
 		{

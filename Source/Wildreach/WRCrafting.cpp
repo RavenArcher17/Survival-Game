@@ -9,14 +9,34 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRResourceNode.h"
+#include "WRSocial.h"
 #include "WRTuning.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameStateBase.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
+
+// (Named, not anonymous: unity builds put several files in one translation unit.)
+namespace WRCraftDetail
+{
+	/** "8 s", "1 min 20 s", "12 min". */
+	FString Duration(float Seconds)
+	{
+		const int32 S = FMath::Max(1, FMath::CeilToInt(Seconds));
+		if (S < 60) return FString::Printf(TEXT("%d s"), S);
+		return S % 60 == 0 || S >= 600 ? FString::Printf(TEXT("%d min"), FMath::RoundToInt(S / 60.f)) : FString::Printf(TEXT("%d min %d s"), S / 60, S % 60);
+	}
+
+	/** "forge", "alchemy table". */
+	FString PlainName(FName Type)
+	{
+		return Type.ToString().Replace(TEXT("_"), TEXT(" "));
+	}
+}
 
 // ---------------------------------------------------------------- recipes
 
@@ -47,6 +67,8 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 			R.Output = FName(*O->GetStringField(TEXT("output")));
 			R.Count = FMath::Max(1, static_cast<int32>(O->GetNumberField(TEXT("count"))));
 			O->TryGetBoolField(TEXT("quality"), R.bQuality);
+			double Seconds = 0.0;
+			if (O->TryGetNumberField(TEXT("seconds"), Seconds)) R.Seconds = static_cast<float>(Seconds);
 			const TSharedPtr<FJsonObject>* Inputs = nullptr;
 			if (O->TryGetObjectField(TEXT("inputs"), Inputs))
 			{
@@ -279,6 +301,10 @@ FString AWRHearth::RepairFor(AWRPlayerController* Player)
 AWRStation::AWRStation()
 {
 	bReplicates = true;
+	// Its queue runs on the server a few times a second, and only while there's one.
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	PrimaryActorTick.TickInterval = 0.2f;
 	Mesh = MakeShape(this, TEXT("Mesh"), TEXT("/Engine/BasicShapes/Cube.Cube"));
 	RootComponent = Mesh;
 	Mesh->SetRelativeScale3D(FVector(1.2f, 0.8f, 0.9f));
@@ -290,6 +316,8 @@ void AWRStation::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRStation, StationType);
+	DOREPLIFETIME(AWRStation, Queue);
+	DOREPLIFETIME(AWRStation, Output);
 }
 
 void AWRStation::BeginPlay()
@@ -352,7 +380,7 @@ bool AWRStation::CanUse(AWRPlayerController* Player, FString& OutWhy) const
 	return true;
 }
 
-FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Element)
+FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Element, int32 Times)
 {
 	FString Why;
 	if (!HasAuthority() || !CanUse(Player, Why))
@@ -368,7 +396,359 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	{
 		return FString::Printf(TEXT("needs a tier %d station (feed the Hearth boss cores)"), R->Level);
 	}
-	return FWRCrafting::Make(Player, *R, StationType, GetTier(), Element);
+	Times = FMath::Clamp(Times, 1, FMath::RoundToInt(WRTune(TEXT("craft.maxPerOrder"), 50.f)));
+	const float Seconds = SecondsFor(*R);
+	if (Seconds <= 0.f)
+	{
+		// At once, one after another (craft.timeScale 0).
+		FString Result;
+		for (int32 i = 0; i < Times; ++i) Result = FWRCrafting::Make(Player, *R, StationType, GetTier(), Element);
+		return Result;
+	}
+	const FString Short = FWRCrafting::Shortfall(Player, *R, Element, Times);
+	if (!Short.IsEmpty())
+	{
+		return Short;
+	}
+	const AWRPlayerState* PS = Player->GetPlayerState<AWRPlayerState>();
+	const FString Who = PS ? PS->GetPlayerName() : FString();
+	// The same again from the same maker goes on the end of their last order.
+	FWRCraftJob* Last = Queue.Num() > 0 ? &Queue.Last() : nullptr;
+	const bool bJoin = Last && Last->Recipe == R->Id && Last->Element == Element && Last->Owner == Who && Last->Left + Times <= 99;
+	if (!bJoin && Queue.Num() >= FMath::RoundToInt(WRTune(TEXT("craft.queueOrders"), 6.f)))
+	{
+		return FString::Printf(TEXT("The %s's queue is full: wait for an order to finish, or cancel one"), *WRCraftDetail::PlainName(StationType));
+	}
+	FWRCrafting::TakeInputs(Player, *R, Element, Times);
+	if (bJoin)
+	{
+		Last->Left += Times;
+	}
+	else
+	{
+		FWRCraftJob& Job = Queue.AddDefaulted_GetRef();
+		Job.Recipe = R->Id;
+		Job.Element = Element;
+		Job.Owner = Who;
+		Job.Left = Times;
+		Job.ItemSeconds = Seconds;
+		Job.ItemLeft = Seconds;
+		Job.Hand = FWRCrafting::HandOf(Player, *R, StationType);
+	}
+	SetActorTickEnabled(true);
+	AdvanceQueue();
+	const FWRItemDef* Out = FWRItemRegistry::Get().Find(R->Output);
+	const FString Name = Out ? Out->Name : R->Output.ToString();
+	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s queued %d x %s at %s (%.1f s each; %d orders)"), *Who, Times, *R->Id.ToString(), *StationType.ToString(), Seconds, Queue.Num());
+	return FString::Printf(TEXT("Queued %d %s: %s"), Times, *Name, *WRCraftDetail::Duration(Seconds * Times));
+}
+
+float AWRStation::SecondsFor(const FWRRecipe& Recipe)
+{
+	const float Speed = FMath::Max(0.1f, WRTune(TEXT("server.craftMultiplier"), 1.f));
+	return FMath::Max(0.f, Recipe.Seconds * WRTune(TEXT("craft.timeScale"), 1.f) / Speed);
+}
+
+bool AWRStation::CanManage(const FString& Player) const
+{
+	const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
+	return !Piece || Piece->CanAccess(Player);
+}
+
+FString AWRStation::CancelJob(AWRPlayerController* Player, int32 Index)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	FString Why;
+	if (!HasAuthority() || !PS || !CanUse(Player, Why) && Why != TEXT("the Hearth is broken; repair it to craft"))
+	{
+		return Why;
+	}
+	if (!Queue.IsValidIndex(Index))
+	{
+		return TEXT("No such order");
+	}
+	const FString Who = PS->GetPlayerName();
+	FWRCraftJob Job = Queue[Index];
+	if (Job.Owner != Who && !CanManage(Who))
+	{
+		return FString::Printf(TEXT("That's %s's order"), *Job.Owner);
+	}
+	const FWRRecipe* R = FWRRecipeRegistry::Get().Find(Job.Recipe);
+	Queue.RemoveAt(Index);
+	int32 Spilled = 0;
+	if (R)
+	{
+		// What wasn't made yet comes back (the one under way too); what doesn't fit goes in a bag at the station.
+		TArray<FWRItemStack> Over;
+		for (const TPair<FName, int32>& In : FWRCrafting::InputsFor(*R, Job.Element, Job.Left))
+		{
+			const int32 Left = PS->GetInventory()->AddItem(In.Key, In.Value);
+			if (Left > 0) { FWRItemStack& S = Over.AddDefaulted_GetRef(); S.ItemId = In.Key; S.Count = Left; Spilled += Left; }
+		}
+		AWRLootBag::Spill(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 40.f), Who, Over);
+	}
+	if (Index == 0) AdvanceQueue();
+	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s cancelled %s's order of %d %s at %s"), *Who, *Job.Owner, Job.Left, *Job.Recipe.ToString(), *StationType.ToString());
+	const FWRItemDef* Out = R ? FWRItemRegistry::Get().Find(R->Output) : nullptr;
+	return FString::Printf(TEXT("Cancelled %d %s: its materials are back%s"), Job.Left, Out ? *Out->Name : *Job.Recipe.ToString(), Spilled > 0 ? TEXT(" (what didn't fit is in a bag here)") : TEXT(""));
+}
+
+FString AWRStation::TakeOutput(AWRPlayerController* Player)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	const APawn* Pawn = Player ? Player->GetPawn() : nullptr;
+	if (!HasAuthority() || !PS || !Pawn || FVector::Dist(Pawn->GetActorLocation(), GetActorLocation()) > UseRange + 100.f)
+	{
+		return TEXT("too far from the station");
+	}
+	if (!CanManage(PS->GetPlayerName()) && !Queue.ContainsByPredicate([&PS](const FWRCraftJob& J) { return J.Owner == PS->GetPlayerName(); })
+		&& Cast<AWRBuildPiece>(GetOwner()))
+	{
+		return TEXT("Only the base's people can take from it");
+	}
+	int32 Taken = 0, Kept = 0;
+	for (FWRItemStack& S : Output)
+	{
+		if (S.IsEmpty()) continue;
+		const FWRItemDef* Def = FWRItemRegistry::Get().Find(S.ItemId);
+		if (Def && Def->IsEquipment() && Def->StackSize <= 1)
+		{
+			if (PS->GetInventory()->AddInstance(S)) { Taken += S.Count; S = FWRItemStack(); }
+			else Kept += S.Count;
+		}
+		else
+		{
+			const int32 Left = PS->GetInventory()->AddItem(S.ItemId, S.Count);
+			Taken += S.Count - Left;
+			Kept += Left;
+			S.Count = Left;
+			if (Left <= 0) S = FWRItemStack();
+		}
+	}
+	Output.RemoveAll([](const FWRItemStack& S) { return S.IsEmpty(); });
+	if (Taken > 0) AdvanceQueue();   // a full tray had it waiting
+	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s took %d from the %s's tray (%d left)"), *PS->GetPlayerName(), Taken, *StationType.ToString(), Kept);
+	return Taken == 0 ? (Kept > 0 ? TEXT("Your bag is full") : TEXT("Nothing to take")) : Kept > 0 ? FString::Printf(TEXT("Took %d: your bag is full"), Taken) : FString::Printf(TEXT("Took %d"), Taken);
+}
+
+float AWRStation::JobProgress() const
+{
+	if (Queue.Num() == 0) return 0.f;
+	const FWRCraftJob& J = Queue[0];
+	const UWorld* World = GetWorld();
+	const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
+	const double Now = GS ? GS->GetServerWorldTimeSeconds() : World ? World->GetTimeSeconds() : 0.0;
+	const float Left = J.DoneAt > 0.0 ? static_cast<float>(J.DoneAt - Now) : J.ItemLeft;
+	return FMath::Clamp(1.f - Left / FMath::Max(0.01f, J.ItemSeconds), 0.f, 1.f);
+}
+
+void AWRStation::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority())
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+	AdvanceQueue();
+	if (Queue.Num() == 0) SetActorTickEnabled(false);
+}
+
+void AWRStation::AdvanceQueue()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	const double Now = World->GetTimeSeconds();
+	for (int32 Guard = 0; Queue.Num() > 0 && Guard < 100; ++Guard)
+	{
+		FWRCraftJob& Job = Queue[0];
+		const FWRRecipe* R = FWRRecipeRegistry::Get().Find(Job.Recipe);
+		if (!R || Job.Left <= 0)
+		{
+			Queue.RemoveAt(0);
+			continue;
+		}
+		// A broken Hearth stops its stations: the one under way holds where it got to.
+		const AWRHearth* Hearth = AWRHearth::FindCovering(World, GetActorLocation());
+		const uint8 Wait = Hearth && Hearth->IsBroken() ? 2 : 0;
+		if (Wait != 0)
+		{
+			if (Job.DoneAt > 0.0) { Job.ItemLeft = FMath::Max(0.f, static_cast<float>(Job.DoneAt - Now)); Job.DoneAt = 0.0; }
+			Job.Waiting = Wait;
+			return;
+		}
+		if (Job.DoneAt <= 0.0)
+		{
+			Job.DoneAt = Now + FMath::Max(0.f, Job.ItemLeft);
+			Job.Waiting = 0;
+		}
+		if (Now < Job.DoneAt)
+		{
+			return;
+		}
+		// Due. Into its maker's bag when they're near, else the tray; neither has room: it waits for some.
+		AWRPlayerController* Maker = nullptr;
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
+			if (PC && PC->PlayerState && PC->PlayerState->GetPlayerName() == Job.Owner) { Maker = PC; break; }
+		}
+		const APawn* MakerPawn = Maker ? Maker->GetPawn() : nullptr;
+		AWRPlayerState* MakerPS = Maker ? Maker->GetPlayerState<AWRPlayerState>() : nullptr;
+		const bool bNear = MakerPawn && MakerPS && FVector::Dist(MakerPawn->GetActorLocation(), GetActorLocation()) <= WRTune(TEXT("craft.deliverRange"), 2000.f);
+		const FWRCraftedOne One = FWRCrafting::MakeOne(*R, StationType, GetTier(), Job.Element, Job.Hand);
+		const auto Fits = [&One](TArray<FWRItemStack> Slots) { return One.bGear ? FWRInventoryRules::AddInstance(Slots, One.Item) : FWRInventoryRules::Add(Slots, One.Item.ItemId, One.Item.Count) == 0; };
+		bool bToBag = bNear && Fits(MakerPS->GetInventory()->GetSlots());
+		TArray<FWRItemStack> Tray = Output;
+		Tray.SetNum(FMath::Max(Tray.Num(), FMath::RoundToInt(WRTune(TEXT("craft.traySlots"), 8.f))));
+		if (!bToBag && !Fits(Tray))
+		{
+			Job.Waiting = 1;
+			Job.ItemLeft = 0.f;
+			return;
+		}
+		if (bToBag)
+		{
+			if (One.bGear) MakerPS->GetInventory()->AddInstance(One.Item);
+			else MakerPS->GetInventory()->AddItem(One.Item.ItemId, One.Item.Count);
+		}
+		else
+		{
+			if (One.bGear) FWRInventoryRules::AddInstance(Tray, One.Item);
+			else FWRInventoryRules::Add(Tray, One.Item.ItemId, One.Item.Count);
+			Tray.RemoveAll([](const FWRItemStack& S) { return S.IsEmpty(); });
+			Output = Tray;
+		}
+		if (Maker)
+		{
+			UWRLifeSkillsComponent::Award(Maker, One.Skill, One.XPKey, One.XP);
+			if (bToBag) Maker->ClientNotify(One.Text);
+		}
+		WRSound::Broadcast(this, TEXT("craft.done"));
+		UE_LOG(LogWildreach, Log, TEXT("CRAFT %s's %s at %s: %s, into %s (%d to go)"), *Job.Owner, *Job.Recipe.ToString(), *StationType.ToString(), *One.Text,
+			bToBag ? TEXT("their bag") : TEXT("the tray"), Job.Left - 1);
+		Job.Made += 1;
+		Job.Left -= 1;
+		Job.Waiting = 0;
+		Job.ItemLeft = Job.ItemSeconds;
+		Job.DoneAt = 0.0;
+		if (Job.Left <= 0)
+		{
+			const FWRItemDef* Out = FWRItemRegistry::Get().Find(R->Output);
+			if (Maker && !bToBag) Maker->ClientNotify(FString::Printf(TEXT("Your %d %s are done: take them from the %s"), Job.Made, Out ? *Out->Name : *R->Output.ToString(), *WRCraftDetail::PlainName(StationType)));
+			Queue.RemoveAt(0);
+		}
+		// (Loops on: a station that was left waiting catches up at once.)
+	}
+}
+
+void AWRStation::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// Smashed or demolished: the tray and what the orders still had in them are left in a bag where it stood.
+	const UWorld* World = GetWorld();
+	if (Reason == EEndPlayReason::Destroyed && HasAuthority() && World && !World->bIsTearingDown)
+	{
+		TArray<FWRItemStack> Left = Output;
+		for (const FWRCraftJob& Job : Queue)
+		{
+			if (const FWRRecipe* R = FWRRecipeRegistry::Get().Find(Job.Recipe))
+			{
+				for (const TPair<FName, int32>& In : FWRCrafting::InputsFor(*R, Job.Element, Job.Left)) FWRInventoryRules::Add(Left, In.Key, In.Value);
+			}
+		}
+		const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
+		if (AWRLootBag::Spill(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 40.f), Piece ? Piece->OwnerName : FString(), Left))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("CRAFT the %s's tray and orders spilled (%d orders)"), *StationType.ToString(), Queue.Num());
+		}
+	}
+	Super::EndPlay(Reason);
+}
+
+void AWRStation::QueueToJson(TSharedRef<FJsonObject> O) const
+{
+	TArray<TSharedPtr<FJsonValue>> Jobs;
+	for (const FWRCraftJob& J : Queue)
+	{
+		const TSharedRef<FJsonObject> Q = MakeShared<FJsonObject>();
+		Q->SetStringField(TEXT("recipe"), J.Recipe.ToString());
+		if (!J.Element.IsNone()) Q->SetStringField(TEXT("element"), J.Element.ToString());
+		Q->SetStringField(TEXT("owner"), J.Owner);
+		Q->SetNumberField(TEXT("left"), J.Left);
+		Q->SetNumberField(TEXT("made"), J.Made);
+		Q->SetNumberField(TEXT("each"), J.ItemSeconds);
+		// The one under way: how long it still has (the server's clock starts again with the next game).
+		Q->SetNumberField(TEXT("itemLeft"), J.DoneAt > 0.0 ? FMath::Max(0.0, J.DoneAt - GetWorld()->GetTimeSeconds()) : J.ItemLeft);
+		Q->SetNumberField(TEXT("skill"), J.Hand.SkillLevel);
+		Q->SetBoolField(TEXT("minFine"), J.Hand.bMinFine);
+		Q->SetNumberField(TEXT("rollBonus"), J.Hand.RollBonus);
+		Q->SetNumberField(TEXT("doubleBrew"), J.Hand.DoubleBrew);
+		Jobs.Add(MakeShared<FJsonValueObject>(Q));
+	}
+	if (Jobs.Num()) O->SetArrayField(TEXT("queue"), Jobs);
+	TArray<TSharedPtr<FJsonValue>> Tray;
+	for (const FWRItemStack& S : Output)
+	{
+		if (S.IsEmpty()) continue;
+		const TSharedRef<FJsonObject> I = MakeShared<FJsonObject>();
+		I->SetStringField(TEXT("id"), S.ItemId.ToString());
+		I->SetNumberField(TEXT("count"), S.Count);
+		I->SetNumberField(TEXT("quality"), static_cast<int32>(S.Quality));
+		I->SetNumberField(TEXT("roll"), S.Roll);
+		I->SetNumberField(TEXT("durability"), S.Durability);
+		if (!S.Element.IsNone()) I->SetStringField(TEXT("element"), S.Element.ToString());
+		Tray.Add(MakeShared<FJsonValueObject>(I));
+	}
+	if (Tray.Num()) O->SetArrayField(TEXT("tray"), Tray);
+}
+
+void AWRStation::QueueFromJson(const TSharedPtr<FJsonObject>& O)
+{
+	Queue.Reset();
+	Output.Reset();
+	const TArray<TSharedPtr<FJsonValue>>* Jobs = nullptr;
+	if (O->TryGetArrayField(TEXT("queue"), Jobs))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Jobs)
+		{
+			const TSharedPtr<FJsonObject> Q = V->AsObject();
+			if (!Q.IsValid() || !FWRRecipeRegistry::Get().Find(FName(*Q->GetStringField(TEXT("recipe"))))) continue;
+			FWRCraftJob& J = Queue.AddDefaulted_GetRef();
+			J.Recipe = FName(*Q->GetStringField(TEXT("recipe")));
+			FString Element;
+			if (Q->TryGetStringField(TEXT("element"), Element)) J.Element = FName(*Element);
+			J.Owner = Q->GetStringField(TEXT("owner"));
+			J.Left = Q->GetIntegerField(TEXT("left"));
+			J.Made = Q->GetIntegerField(TEXT("made"));
+			J.ItemSeconds = Q->GetNumberField(TEXT("each"));
+			J.ItemLeft = Q->GetNumberField(TEXT("itemLeft"));
+			J.Hand.SkillLevel = Q->GetIntegerField(TEXT("skill"));
+			J.Hand.bMinFine = Q->GetBoolField(TEXT("minFine"));
+			J.Hand.RollBonus = Q->GetNumberField(TEXT("rollBonus"));
+			J.Hand.DoubleBrew = Q->GetNumberField(TEXT("doubleBrew"));
+		}
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Tray = nullptr;
+	if (O->TryGetArrayField(TEXT("tray"), Tray))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Tray)
+		{
+			const TSharedPtr<FJsonObject> I = V->AsObject();
+			if (!I.IsValid()) continue;
+			FWRItemStack& S = Output.AddDefaulted_GetRef();
+			S.ItemId = FName(*I->GetStringField(TEXT("id")));
+			S.Count = I->GetIntegerField(TEXT("count"));
+			S.Quality = static_cast<EWRQuality>(I->GetIntegerField(TEXT("quality")));
+			S.Roll = I->GetNumberField(TEXT("roll"));
+			S.Durability = I->GetNumberField(TEXT("durability"));
+			FString Element;
+			if (I->TryGetStringField(TEXT("element"), Element)) S.Element = FName(*Element);
+		}
+	}
+	if (Queue.Num() > 0 && HasAuthority()) SetActorTickEnabled(true);
 }
 
 FString FWRCrafting::CraftByHand(AWRPlayerController* Player, FName RecipeId)
@@ -385,83 +765,150 @@ FString FWRCrafting::CraftByHand(AWRPlayerController* Player, FName RecipeId)
 	return Make(Player, *R, TEXT("hand"), 1, NAME_None);
 }
 
+namespace WRCraftDetail
+{
+	FName EssenceFor(FName Element)
+	{
+		return Element == TEXT("fire") ? FName(TEXT("ember_essence")) : Element == TEXT("frost") ? FName(TEXT("frost_essence")) : NAME_None;
+	}
+}
+
+bool FWRCrafting::IsGear(const FWRRecipe& Recipe)
+{
+	// Spears and bolas stack: made like ammo. So are tools: no quality roll, just a new one at full durability.
+	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
+	return OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1 && OutDef->Category != TEXT("tool");
+}
+
+FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times)
+{
+	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS)
+	{
+		return TEXT("no one to craft");
+	}
+	const UWRInventoryComponent* Inv = PS->GetInventory();
+	for (const TPair<FName, int32>& In : Recipe.Inputs)
+	{
+		if (Inv->CountOf(In.Key) < In.Value * Times)
+		{
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(In.Key);
+			return FString::Printf(TEXT("need %d %s"), In.Value * Times, Def ? *Def->Name : *In.Key.ToString());
+		}
+	}
+	const FName Essence = WRCraftDetail::EssenceFor(Element);
+	if (!Essence.IsNone() && (!Recipe.bQuality || Inv->CountOf(Essence) < Times))
+	{
+		return Recipe.bQuality ? FString::Printf(TEXT("need %d %s to infuse"), Times, *Essence.ToString()) : TEXT("only gear can be infused");
+	}
+	// Ranged hits are physical (WRRanged): an infused bow would only use up the essence.
+	const FWRItemDef* InfuseDef = FWRItemRegistry::Get().Find(Recipe.Output);
+	if (!Essence.IsNone() && InfuseDef && InfuseDef->IsRanged())
+	{
+		return TEXT("ranged weapons can't carry an infusion yet");
+	}
+	return FString();
+}
+
+TArray<TPair<FName, int32>> FWRCrafting::InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times)
+{
+	TArray<TPair<FName, int32>> Out;
+	for (const TPair<FName, int32>& In : Recipe.Inputs) Out.Add({ In.Key, In.Value * Times });
+	const FName Essence = WRCraftDetail::EssenceFor(Element);
+	if (!Essence.IsNone() && IsGear(Recipe)) Out.Add({ Essence, Times });
+	return Out;
+}
+
+void FWRCrafting::TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times)
+{
+	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS) return;
+	for (const TPair<FName, int32>& In : InputsFor(Recipe, Element, Times)) PS->GetInventory()->RemoveItem(In.Key, In.Value);
+}
+
+FWRCrafterHand FWRCrafting::HandOf(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType)
+{
+	// Smithing (weapons) / Armorcraft (armor) improve gear's odds; the Master perks floor it at Fine.
+	FWRCrafterHand Hand;
+	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
+	const bool bArmor = OutDef && OutDef->Slot == EWREquipSlot::Armor;
+	const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(Player);
+	Hand.SkillLevel = Skills ? Skills->GetLevel(bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"))) : 0;
+	Hand.bMinFine = UWRLifeSkillsComponent::StatFor(Player, bArmor ? TEXT("armorMinFine") : TEXT("weaponMinFine")) > 0.f;
+	Hand.RollBonus = bArmor ? 0.f : UWRLifeSkillsComponent::StatFor(Player, TEXT("weaponRoll"));
+	Hand.DoubleBrew = StationType == TEXT("alchemy_table") ? UWRLifeSkillsComponent::StatFor(Player, TEXT("doubleBrew")) : 0.f;
+	return Hand;
+}
+
+FWRCraftedOne FWRCrafting::MakeOne(const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element, const FWRCrafterHand& Hand)
+{
+	FWRCraftedOne One;
+	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
+	One.bGear = IsGear(Recipe);
+	if (One.bGear)
+	{
+		const bool bArmor = OutDef->Slot == EWREquipSlot::Armor;
+		EWRQuality Quality = Recipe.bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), Tier, Hand.SkillLevel) : EWRQuality::Common;
+		if (Hand.bMinFine && Quality < EWRQuality::Fine)
+		{
+			Quality = EWRQuality::Fine;
+		}
+		const float Spread = FWRRecipeRegistry::Get().RollSpread;
+		One.Item = FWRInventoryRules::MakeInstance(Recipe.Output, Quality, 1.f + FMath::FRandRange(-Spread + Hand.RollBonus, Spread));
+		One.Item.Element = Element;
+		One.Skill = bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
+		One.XPKey = TEXT("craftGear");
+		One.XP = 25.f;
+		One.Text = FString::Printf(TEXT("Crafted %s %s%s (roll %.0f%%)"), FWRItemStack::QualityName(Quality), *OutDef->Name,
+			Element.IsNone() ? TEXT("") : *FString::Printf(TEXT(", %s-infused"), *Element.ToString()), One.Item.Roll * 100.f);
+		return One;
+	}
+	// Alchemy: a double batch now and then. Skill XP by what was made.
+	int32 Count = Recipe.Count;
+	if (StationType == TEXT("alchemy_table") && FMath::FRand() < Hand.DoubleBrew)
+	{
+		Count *= 2;
+	}
+	const bool bFood = OutDef && OutDef->Hunger > 0.f;
+	One.Skill = StationType == TEXT("alchemy_table") ? FName(TEXT("alchemy")) : bFood ? FName(TEXT("cooking"))
+		: StationType == TEXT("armorer") ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
+	One.XPKey = bFood ? TEXT("cook") : TEXT("craft");
+	One.XP = bFood ? 15.f : 10.f;
+	One.Item.ItemId = Recipe.Output;
+	One.Item.Count = Count;
+	One.Text = FString::Printf(TEXT("Crafted %d %s"), Count, OutDef ? *OutDef->Name : *Recipe.Output.ToString());
+	return One;
+}
+
 FString FWRCrafting::Make(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element)
 {
-	const FWRRecipe* R = &Recipe;
 	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
 	if (!PS)
 	{
 		return FString();
 	}
+	const FString Short = Shortfall(Player, Recipe, Element, 1);
+	if (!Short.IsEmpty())
+	{
+		return Short;
+	}
+	TakeInputs(Player, Recipe, Element, 1);
 	UWRInventoryComponent* Inv = PS->GetInventory();
-	for (const TPair<FName, int32>& In : R->Inputs)
+	const FWRCraftedOne One = MakeOne(Recipe, StationType, Tier, Element, HandOf(Player, Recipe, StationType));
+	UWRLifeSkillsComponent::Award(Player, One.Skill, One.XPKey, One.XP);
+	FString Result = One.Text;
+	if (One.bGear)
 	{
-		if (Inv->CountOf(In.Key) < In.Value)
-		{
-			const FWRItemDef* Def = FWRItemRegistry::Get().Find(In.Key);
-			return FString::Printf(TEXT("need %d %s"), In.Value, Def ? *Def->Name : *In.Key.ToString());
-		}
-	}
-	const FName Essence = Element == TEXT("fire") ? FName(TEXT("ember_essence")) : Element == TEXT("frost") ? FName(TEXT("frost_essence")) : NAME_None;
-	if (!Essence.IsNone() && (!R->bQuality || Inv->CountOf(Essence) < 1))
-	{
-		return R->bQuality ? FString::Printf(TEXT("need 1 %s to infuse"), *Essence.ToString()) : TEXT("only gear can be infused");
-	}
-	// Ranged hits are physical (WRRanged): an infused bow would only use up the essence.
-	const FWRItemDef* InfuseDef = FWRItemRegistry::Get().Find(R->Output);
-	if (!Essence.IsNone() && InfuseDef && InfuseDef->IsRanged())
-	{
-		return TEXT("ranged weapons can't carry an infusion yet");
-	}
-
-	for (const TPair<FName, int32>& In : R->Inputs)
-	{
-		Inv->RemoveItem(In.Key, In.Value);
-	}
-	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(R->Output);
-	FString Result;
-	// Spears and bolas stack: made like ammo, below. So are tools: no quality roll, just a new one at full durability.
-	if (OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1 && OutDef->Category != TEXT("tool"))
-	{
-		if (!Essence.IsNone())
-		{
-			Inv->RemoveItem(Essence, 1);
-		}
-		// Smithing (weapons) / Armorcraft (armor) improve the odds; the Master perks floor it at Fine.
-		const bool bArmor = OutDef->Slot == EWREquipSlot::Armor;
-		const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(Player);
-		const int32 SkillLevel = Skills ? Skills->GetLevel(bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"))) : 0;
-		EWRQuality Quality = R->bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), Tier, SkillLevel) : EWRQuality::Common;
-		if (UWRLifeSkillsComponent::StatFor(Player, bArmor ? TEXT("armorMinFine") : TEXT("weaponMinFine")) > 0.f && Quality < EWRQuality::Fine)
-		{
-			Quality = EWRQuality::Fine;
-		}
-		const float Spread = FWRRecipeRegistry::Get().RollSpread;
-		const float RollBonus = bArmor ? 0.f : UWRLifeSkillsComponent::StatFor(Player, TEXT("weaponRoll"));
-		FWRItemStack Item = FWRInventoryRules::MakeInstance(R->Output, Quality, 1.f + FMath::FRandRange(-Spread + RollBonus, Spread));
-		UWRLifeSkillsComponent::Award(Player, bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing")), TEXT("craftGear"), 25.f);
-		Item.Element = Element;
-		if (!Inv->AddInstance(Item))
+		if (!Inv->AddInstance(One.Item))
 		{
 			return TEXT("inventory full");
 		}
-		Result = FString::Printf(TEXT("Crafted %s %s%s (roll %.0f%%)"), FWRItemStack::QualityName(Quality), *OutDef->Name,
-			Element.IsNone() ? TEXT("") : *FString::Printf(TEXT(", %s-infused"), *Element.ToString()), Item.Roll * 100.f);
 	}
 	else
 	{
-		// Alchemy: double batch. Skill XP by what was made.
-		int32 Count = R->Count;
-		if (StationType == TEXT("alchemy_table") && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Player, TEXT("doubleBrew")))
-		{
-			Count *= 2;
-		}
-		const bool bFood = OutDef && OutDef->Hunger > 0.f;
-		const FName Skill = StationType == TEXT("alchemy_table") ? FName(TEXT("alchemy")) : bFood ? FName(TEXT("cooking"))
-			: StationType == TEXT("armorer") ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
-		UWRLifeSkillsComponent::Award(Player, Skill, bFood ? TEXT("cook") : TEXT("craft"), bFood ? 15.f : 10.f);
-		const int32 Left = Inv->AddItem(R->Output, Count);
-		Result = FString::Printf(TEXT("Crafted %d %s%s"), Count - Left, OutDef ? *OutDef->Name : *R->Output.ToString(), Left > 0 ? TEXT(" (inventory full)") : TEXT(""));
+		const int32 Left = Inv->AddItem(One.Item.ItemId, One.Item.Count);
+		const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
+		Result = FString::Printf(TEXT("Crafted %d %s%s"), One.Item.Count - Left, OutDef ? *OutDef->Name : *Recipe.Output.ToString(), Left > 0 ? TEXT(" (inventory full)") : TEXT(""));
 	}
 	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s at %s: %s"), *GetNameSafe(Player), *StationType.ToString(), *Result);
 	WRSound::Broadcast(Player->GetPawn(), TEXT("craft.done"));
