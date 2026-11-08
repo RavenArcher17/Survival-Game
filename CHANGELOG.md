@@ -3,7 +3,19 @@
 ## 0.7.0 (in progress): creature raids
 
 **Not released.** The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views,
-ash-grey volcanic shrubs, ice rebuilt like the lava. Raids, crafting time and far views are done; the rest is to come.
+ash-grey volcanic shrubs, ice rebuilt like the lava. Raids, crafting time, far views and the ice are done; the shrubs
+are to come.
+
+- **The ice, rebuilt like the lava.** It was flat 6 m squares (the hazard cells, 13,576 of them) floating 20 cm over the
+  ground. Now it's a sheet on its own 2 m grid (`hazards.iceGrid` in `Data/island_dressing.json`, made by
+  `Tools/terrain/dressing.mjs` from the same cells: a distance pass gives how far inside the edge each point is, with a
+  ragged, noisy rim; 134,424 points), a thin skin over the ground that sinks under it at the rim, drawn in 454 chunks
+  that each cull alone (`AWRDressing::BuildIceSheet`, sharing the lava's `BuildGridSheet`). `M_Ice` (rebuilt by
+  `build_terrain_materials.py`, `WR_MATERIALS=ice`) is glassier: deep teal-blue and clear where it's thick, frosted at the
+  rim, a mirror-smooth top (roughness 0.03, specular 0.8) with faint frozen ripples, a cool sheen at grazing angles, and
+  the lava's far lift. What's slippery is still the 6 m cells, so play is as before. Checked in pictures from above, the
+  side and low, by day, dusk and night, on a river and the glacier ring. Everything else in the dressing file is
+  byte-for-byte what it was.
 
 - **Far views: a friend who joins sees the whole island, as the host does.** A server loads every cell of the map
   (server streaming is off), so the host always had the whole island; a player who joined loaded the ground within

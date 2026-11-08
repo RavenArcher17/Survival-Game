@@ -32,6 +32,7 @@ TArray<FWRPoi> FWRPoi::All;
 TMap<FIntPoint, float> FWRBiomeHazards::Lava;
 TMap<FIntPoint, float> FWRBiomeHazards::Ice;
 FWRBiomeHazards::FLavaGrid FWRBiomeHazards::LavaFlow;
+FWRBiomeHazards::FLavaGrid FWRBiomeHazards::IceGrid;
 float FWRBiomeHazards::Cell = 600.f;
 
 float FWRBiomeHazards::FLavaGrid::Lift(float Cover) const
@@ -87,36 +88,13 @@ void FWRBiomeHazards::Load(const TSharedPtr<FJsonObject>& Hazards)
 	Lava.Reset();
 	Ice.Reset();
 	LavaFlow.Points.Reset();
+	IceGrid.Points.Reset();
 	if (!Hazards.IsValid())
 	{
 		return;
 	}
-	const TSharedPtr<FJsonObject>* Grid = nullptr;
-	if (Hazards->TryGetObjectField(TEXT("lavaGrid"), Grid))
-	{
-		FLavaGrid& F = LavaFlow;
-		F.Spacing = (*Grid)->GetNumberField(TEXT("spacing"));
-		F.Half = (*Grid)->GetNumberField(TEXT("half"));
-		F.CoverLow = (*Grid)->GetNumberField(TEXT("coverLow"));
-		F.Sink = (*Grid)->GetNumberField(TEXT("sink"));
-		F.CoverHigh = (*Grid)->GetNumberField(TEXT("coverHigh"));
-		F.Top = (*Grid)->GetNumberField(TEXT("top"));
-		const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
-		if ((*Grid)->TryGetArrayField(TEXT("rows"), Rows))
-		{
-			// [row j, first column i, count n, then n pairs (ground cm, cover dm)]
-			for (const TSharedPtr<FJsonValue>& RowValue : *Rows)
-			{
-				const TArray<TSharedPtr<FJsonValue>>& Row = RowValue->AsArray();
-				if (Row.Num() < 3) continue;
-				const int32 J = Row[0]->AsNumber(), I0 = Row[1]->AsNumber(), N = Row[2]->AsNumber();
-				for (int32 k = 0; k < N && 4 + k * 2 < Row.Num(); ++k)
-				{
-					F.Points.Add(FIntPoint(I0 + k, J), FVector2f(Row[3 + k * 2]->AsNumber(), Row[4 + k * 2]->AsNumber() / 10.f));
-				}
-			}
-		}
-	}
+	ReadGrid(Hazards, TEXT("lavaGrid"), LavaFlow);
+	ReadGrid(Hazards, TEXT("iceGrid"), IceGrid);
 	double Size = 600.0;
 	Hazards->TryGetNumberField(TEXT("cell"), Size);
 	Cell = Size;
@@ -130,7 +108,37 @@ void FWRBiomeHazards::Load(const TSharedPtr<FJsonObject>& Hazards)
 			Kind.Value->Add(FIntPoint(FMath::FloorToInt(X / Cell), FMath::FloorToInt(Y / Cell)), (*Arr)[i + 2]->AsNumber());
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("HAZARDS loaded %d lava and %d ice cells (lava flow: %d grid points)"), Lava.Num(), Ice.Num(), LavaFlow.Points.Num());
+	UE_LOG(LogWildreach, Log, TEXT("HAZARDS loaded %d lava and %d ice cells (lava flow: %d grid points, ice sheet: %d)"), Lava.Num(), Ice.Num(), LavaFlow.Points.Num(), IceGrid.Points.Num());
+}
+
+void FWRBiomeHazards::ReadGrid(const TSharedPtr<FJsonObject>& Hazards, const TCHAR* Field, FLavaGrid& F)
+{
+	const TSharedPtr<FJsonObject>* Grid = nullptr;
+	if (!Hazards->TryGetObjectField(Field, Grid))
+	{
+		return;
+	}
+	F.Spacing = (*Grid)->GetNumberField(TEXT("spacing"));
+	F.Half = (*Grid)->GetNumberField(TEXT("half"));
+	F.CoverLow = (*Grid)->GetNumberField(TEXT("coverLow"));
+	F.Sink = (*Grid)->GetNumberField(TEXT("sink"));
+	F.CoverHigh = (*Grid)->GetNumberField(TEXT("coverHigh"));
+	F.Top = (*Grid)->GetNumberField(TEXT("top"));
+	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+	if ((*Grid)->TryGetArrayField(TEXT("rows"), Rows))
+	{
+		// [row j, first column i, count n, then n pairs (ground cm, cover dm)]
+		for (const TSharedPtr<FJsonValue>& RowValue : *Rows)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& Row = RowValue->AsArray();
+			if (Row.Num() < 3) continue;
+			const int32 J = Row[0]->AsNumber(), I0 = Row[1]->AsNumber(), N = Row[2]->AsNumber();
+			for (int32 k = 0; k < N && 4 + k * 2 < Row.Num(); ++k)
+			{
+				F.Points.Add(FIntPoint(I0 + k, J), FVector2f(Row[3 + k * 2]->AsNumber(), Row[4 + k * 2]->AsNumber() / 10.f));
+			}
+		}
+	}
 }
 
 const TMap<FIntPoint, float>& FWRBiomeHazards::Cells(FName Kind)
@@ -514,16 +522,21 @@ void AWRDressing::BuildHazardVisuals()
 	// Only neighbours within MaxStep of the cell count, so the sheet splits at real drops (a plateau edge) instead of
 	// stretching up into the air between them.
 	const bool bLavaFlow = FWRBiomeHazards::Flow().Points.Num() > 0;
+	const bool bIceSheet = FWRBiomeHazards::IceSheet().Points.Num() > 0;
 	if (bLavaFlow)
 	{
 		BuildLavaFlow();
 	}
+	if (bIceSheet)
+	{
+		BuildIceSheet();
+	}
 	for (const FName Kind : { FName(TEXT("lava")), FName(TEXT("ice")) })
 	{
 		const bool bLava = Kind == TEXT("lava");
-		if (bLava && bLavaFlow)
+		if (bLava ? bLavaFlow : bIceSheet)
 		{
-			continue;  // drawn from the flow's own grid instead of the coarse cells
+			continue;  // drawn from its own fine grid instead of the coarse cells
 		}
 		const TMap<FIntPoint, float>& Cells = FWRBiomeHazards::Cells(Kind);
 		if (Cells.Num() == 0)
@@ -594,8 +607,52 @@ void AWRDressing::BuildLavaFlow()
 	// The lava flow: a sheet whose points sit on landscape vertices (every other one) at the ground plus the lava's lift,
 	// so it lies along the terrain on any slope instead of flat squares that float over it, and its rim, sunk under the
 	// ground, ends wherever the terrain cuts it (a ragged shore, no straight edges). Its own material glows from the
-	// vertex colours: molten in the middle, cooling to crust toward the rim. Chunks so the far ones cull.
-	const FWRBiomeHazards::FLavaGrid& Flow = FWRBiomeHazards::Flow();
+	// vertex colours: molten in the middle, cooling to crust toward the rim. Chunks so the far ones cull (BuildGridSheet,
+	// which the ice sheet shares). Glowing lava (Tools/terrain/build_terrain_materials.py), flat orange if it's missing.
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Lava.M_Lava"));
+	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base ? Base : ShapeMaterial(), this);
+	KindMaterials.FindOrAdd(TEXT("lava")).Add(Mat);
+	if (Base)
+	{
+		Mat->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("lava.glow"), 1.f));
+		Mat->SetScalarParameterValue(TEXT("FarLift"), WRTune(TEXT("lava.farLiftPer100m"), 45.f));
+		Mat->SetScalarParameterValue(TEXT("HotLevel"), WRTune(TEXT("lava.hotLevel"), 6.f));
+		Mat->SetScalarParameterValue(TEXT("CrustLevel"), WRTune(TEXT("lava.crustLevel"), 0.f));
+		Mat->SetScalarParameterValue(TEXT("CrackPower"), WRTune(TEXT("lava.crackPower"), 2.5f));
+		Mat->SetScalarParameterValue(TEXT("MoltenCore"), WRTune(TEXT("lava.moltenCore"), 0.9f));
+		Mat->SetScalarParameterValue(TEXT("Steady"), WRTune(TEXT("lava.steady"), 0.85f));
+	}
+	else
+	{
+		Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.95f, 0.22f, 0.02f));
+	}
+	// R = heat (crust at the rim, molten toward the middle), G = 0 where the sheet dips under the ground.
+	int32 Chunks = 0;
+	const int32 Squares = BuildGridSheet(FWRBiomeHazards::Flow(), Mat, WRTune(TEXT("lava.cullDistance"), 30000.f),
+		[](float Cover) { return FLinearColor(FMath::SmoothStep(0.6f, 5.f, Cover), FMath::SmoothStep(-0.4f, 1.6f, Cover), 0.f, 1.f); }, Chunks);
+	UE_LOG(LogWildreach, Log, TEXT("LAVA flow drawn: %d squares in %d chunks"), Squares, Chunks);
+}
+
+void AWRDressing::BuildIceSheet()
+{
+	// Glassy ice (Tools/terrain/build_terrain_materials.py M_Ice: clear and dark-blue where it's thick, paler and
+	// frosted toward the rim, a mirror-smooth top), pale blue if it's missing. It follows the ground like the lava does.
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Ice.M_Ice"));
+	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base ? Base : ShapeMaterial(), this);
+	KindMaterials.FindOrAdd(TEXT("ice")).Add(Mat);
+	if (!Base)
+	{
+		Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.4f, 0.68f, 0.95f));
+	}
+	// R = thickness (0 at the rim, 1 a few metres in), G = 0 where the sheet dips under the ground.
+	int32 Chunks = 0;
+	const int32 Squares = BuildGridSheet(FWRBiomeHazards::IceSheet(), Mat, WRTune(TEXT("ice.cullDistance"), 30000.f),
+		[](float Cover) { return FLinearColor(FMath::SmoothStep(0.2f, 6.f, Cover), FMath::SmoothStep(-0.3f, 1.2f, Cover), 0.f, 1.f); }, Chunks);
+	UE_LOG(LogWildreach, Log, TEXT("ICE sheet drawn: %d squares in %d chunks"), Squares, Chunks);
+}
+
+int32 AWRDressing::BuildGridSheet(const FWRBiomeHazards::FLavaGrid& Flow, UMaterialInterface* Mat, float Cull, TFunctionRef<FLinearColor(float)> Colour, int32& OutChunks)
+{
 	const float S = Flow.Spacing;
 	const int32 ChunkPoints = FMath::Max(4, FMath::RoundToInt(WRTune(TEXT("lava.chunkPoints"), 32.f)));
 	const auto SurfaceZ = [&Flow](const FIntPoint& P, float& Out) -> bool
@@ -631,8 +688,7 @@ void AWRDressing::BuildLavaFlow()
 		const int32 I = Into.Verts.Add(At);
 		Into.Normals.Add(FVector((ZWest - ZEast) / (2.f * S), (ZSouth - ZNorth) / (2.f * S), 1.f).GetSafeNormal());
 		Into.UVs.Add(FVector2D(At.X, At.Y) / 400.f);
-		// R = heat (crust at the rim, molten toward the middle), G = 0 where the sheet dips under the ground.
-		Into.Colors.Add(FLinearColor(FMath::SmoothStep(0.6f, 5.f, V.Y), FMath::SmoothStep(-0.4f, 1.6f, V.Y), 0.f, 1.f));
+		Into.Colors.Add(Colour(V.Y));
 		Into.Index.Add(P, I);
 		return I;
 	};
@@ -656,25 +712,6 @@ void AWRDressing::BuildLavaFlow()
 		Into.Tris.Append({ A, C, B, A, D, C });  // counter-clockwise from above, so the faces point up
 		++Squares;
 	}
-	// Glowing lava (Tools/terrain/build_terrain_materials.py), flat orange if it's missing.
-	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Lava.M_Lava"));
-	UMaterialInstanceDynamic* Mat = UMaterialInstanceDynamic::Create(Base ? Base : ShapeMaterial(), this);
-	KindMaterials.FindOrAdd(TEXT("lava")).Add(Mat);
-	if (Base)
-	{
-		Mat->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("lava.glow"), 1.f));
-		Mat->SetScalarParameterValue(TEXT("FarLift"), WRTune(TEXT("lava.farLiftPer100m"), 45.f));
-		Mat->SetScalarParameterValue(TEXT("HotLevel"), WRTune(TEXT("lava.hotLevel"), 6.f));
-		Mat->SetScalarParameterValue(TEXT("CrustLevel"), WRTune(TEXT("lava.crustLevel"), 0.f));
-		Mat->SetScalarParameterValue(TEXT("CrackPower"), WRTune(TEXT("lava.crackPower"), 2.5f));
-		Mat->SetScalarParameterValue(TEXT("MoltenCore"), WRTune(TEXT("lava.moltenCore"), 0.9f));
-		Mat->SetScalarParameterValue(TEXT("Steady"), WRTune(TEXT("lava.steady"), 0.85f));
-	}
-	else
-	{
-		Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.95f, 0.22f, 0.02f));
-	}
-	const float Cull = WRTune(TEXT("lava.cullDistance"), 30000.f);
 	for (TPair<FIntPoint, FChunk>& It : Chunks)
 	{
 		FChunk& C = It.Value;
@@ -689,7 +726,8 @@ void AWRDressing::BuildLavaFlow()
 		Surface->SetCullDistance(Cull);
 		Surface->SetMaterial(0, Mat);
 	}
-	UE_LOG(LogWildreach, Log, TEXT("LAVA flow drawn: %d squares in %d chunks"), Squares, Chunks.Num());
+	OutChunks = Chunks.Num();
+	return Squares;
 }
 
 int32 AWRDressing::SetLookParam(const FString& Kind, FName Param, const TArray<float>& Values)

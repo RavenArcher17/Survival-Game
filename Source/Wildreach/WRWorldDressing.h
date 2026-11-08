@@ -43,11 +43,15 @@ struct WILDREACH_API FWRBiomeHazards
 		bool SurfaceAt(const FVector2D& At, float& OutGround, float& OutLift) const;
 	};
 	static const FLavaGrid& Flow() { return LavaFlow; }
+	/** The ice sheet as drawn (hazards.iceGrid, 0.7), on the same kind of grid. Drawn only: slippery is the ice cells. */
+	static const FLavaGrid& IceSheet() { return IceGrid; }
 
 private:
+	static void ReadGrid(const TSharedPtr<class FJsonObject>& Hazards, const TCHAR* Field, FLavaGrid& Out);
 	static TMap<FIntPoint, float> Lava;
 	static TMap<FIntPoint, float> Ice;
 	static FLavaGrid LavaFlow;
+	static FLavaGrid IceGrid;
 	static float Cell;
 };
 
@@ -104,6 +108,10 @@ public:
 	void BuildHazardVisuals();
 	/** The lava flow's surface: a sheet over the landscape from FWRBiomeHazards::Flow(), in chunks (each culls alone). */
 	void BuildLavaFlow();
+	/** The ice's: the same over FWRBiomeHazards::IceSheet(), glassy (M_Ice), thicker-looking toward the middle. */
+	void BuildIceSheet();
+	/** A sheet of chunks over a grid: Colour gives each point's vertex colour from its cover (m). */
+	int32 BuildGridSheet(const FWRBiomeHazards::FLavaGrid& Grid, class UMaterialInterface* Material, float CullDistance, TFunctionRef<FLinearColor(float)> Colour, int32& OutChunks);
 	int32 GetInstanceCount() const { return Total; }
 	/** Dev look tuning (wr.DressParam / wr.LavaParam): a material parameter on every decoration of a kind ("lava": the flow). */
 	int32 SetLookParam(const FString& Kind, FName Param, const TArray<float>& Values);

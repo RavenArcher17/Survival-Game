@@ -10,7 +10,8 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="Tools/terrai
                 colour R = heat, G = 0 at the sunk rim), drifting downstream (west); its glow is held at a steady
                 on-screen brightness whatever the exposure, and far lava is lifted over the coarser far landscape.
                 Parameters Glow, FarLift (cm per 100 m) are set from tuning (lava.*).
-  M_Ice         ice cells: glossy pale blue with ripples.
+  M_Ice         the ice sheet: deep and clear where it's thick, frosted at the rim, a mirror-smooth top with a cool
+                sheen at grazing angles (vertex colour R = thickness, G = 0 at the sunk rim); FarLift as the lava's.
 """
 import os
 import unreal
@@ -234,10 +235,40 @@ if want("lava"):
     finish(crust, sample("/Game/LavaMat/Textures/T_LavaMat1_normal", flow), expr(unreal.MaterialExpressionConstant, r=0.92),
            emissive, wpo, expr(unreal.MaterialExpressionConstant, r=0.15))
 
-# ================================================================ M_Ice (ice cells)
+# ================================================================ M_Ice (the ice sheet)
+# 0.7: Raven's note was the ice should be "glassier", drawn like the lava (a sheet on its own 2 m grid that follows the
+# ground, AWRDressing::BuildIceSheet). Vertex colour R = thickness (0 at the rim, 1 a few metres in), G = 0 where the
+# sheet dips under the ground. Thick ice looks clear and deep (dark teal-blue, with the ground's tone showing through as
+# cloudy streaks), the rim frosted white; a mirror-smooth top (roughness ~0.03, strong specular) with faint ripples and
+# cracks in its normal, and a cool fresnel sheen at grazing angles so it reads as glass from afar. Opaque: translucent
+# sheets this big would sort badly against the snow and cost far more. FarLift as the lava's (the far landscape is coarser).
 if want("ice"):
     begin("/Game/Terrain/M_Ice", ISM)
     wp, uv_top, _ = world_uvs(900.0)
+    vc = expr(unreal.MaterialExpressionVertexColor)
+    thick, edge = mask(vc, "r"), mask(vc, "g")
+    scalar_p = lambda name, v: expr(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=v)
     var = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(uv_top, k=0.2)), "r")
-    base = mul(const3((0.55, 0.74, 0.9)), lerp(None, None, var, const_a=0.75, const_b=1.05))
-    finish(base, sample("FX/TEX_MW_WaterA_nrm", uv_top), expr(unreal.MaterialExpressionConstant, r=0.08))
+    cloud = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(uv_top, k=1.7)), "r")
+    deep = expr(unreal.MaterialExpressionVectorParameter, parameter_name="DeepColor", default_value=unreal.LinearColor(0.03, 0.12, 0.2, 1))
+    clear = expr(unreal.MaterialExpressionVectorParameter, parameter_name="ClearColor", default_value=unreal.LinearColor(0.2, 0.42, 0.55, 1))
+    frost = expr(unreal.MaterialExpressionVectorParameter, parameter_name="FrostColor", default_value=unreal.LinearColor(0.78, 0.86, 0.92, 1))
+    # Thick: deep with clearer streaks; thin: frost. Frost again in a fringe a little way in from the rim.
+    body = lerp(clear, deep, sat(op(unreal.MaterialExpressionAdd, mul(thick, k=1.2), mul(cloud, k=-0.35))))
+    rim = sat(mul(op(unreal.MaterialExpressionSubtract, None, thick, const_a=1.0), k=1.0))
+    base = lerp(body, frost, sat(op(unreal.MaterialExpressionAdd, mul(mul(rim, rim), k=1.1), mul(var, k=-0.25))))
+    base = mul(base, lerp(None, None, var, const_a=0.85, const_b=1.1))
+    # Grazing angles: a pale sheen, as glass shows the sky.
+    fres = expr(unreal.MaterialExpressionFresnel, exponent=4.0, base_reflect_fraction=0.04)
+    sheen = mul(mul(fres, scalar_p("Sheen", 0.35)), const3((0.7, 0.85, 1.0)))
+    emissive = mul(sheen, sat(mul(edge, k=1.5)))
+    # Mirror-smooth where it's thick, rougher frost at the rim.
+    rough = lerp(scalar_p("Smooth", 0.03), scalar_p("FrostRough", 0.45), sat(mul(mul(rim, rim), k=1.2)))
+    # The water normal, broad and mostly flattened (full strength it read as a rippling lake): faint frozen ripples.
+    flat = scalar_p("Flatness", 0.78)
+    normal = lerp(sample("FX/TEX_MW_WaterA_nrm", mul(uv_top, k=0.35)), expr(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(0, 0, 1, 1)), flat)
+    far = op(unreal.MaterialExpressionMax, op(unreal.MaterialExpressionSubtract,
+             op(unreal.MaterialExpressionDistance, expr(unreal.MaterialExpressionCameraPositionWS), wp), const_b=2000.0), const_b=0.0)
+    lift = mul(mul(far, scalar_p("FarLift", 30.0)), k=1.0 / 10000.0)
+    wpo = op(unreal.MaterialExpressionAppendVector, expr(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), lift)
+    finish(base, normal, rough, emissive, wpo, scalar_p("Specular", 0.8))

@@ -298,6 +298,65 @@ hazards.lavaGrid = {
 	_comment: "The lava flow: rows of grid points [row j, first column i, count n, then n pairs (ground cm, cover dm)]; a point is world (i * spacing - half, j * spacing - half). Lava surface = ground + lift(cover), lift = sink..top over cover coverLow..coverHigh (smoothstep, cover in m); lava is where lift > 0.",
 	spacing: LAVA_GRID * 100, half: HALF, ...LIFT, rows: lavaRows,
 };
+// ---- the ice sheet (0.7: drawn like the lava, from its own 2 m grid on the landscape, instead of flat 6 m squares).
+// Where it is stays the 6 m cells above (what's slippery is decided from those, so play is as before). Cover (m): how
+// far inside the cells' edge a point is (a distance pass over the cells), with a ragged, noisy edge; the sheet is a
+// thin skin over the ground in the middle and sinks under it at the rim, so it meets the terrain wherever it ends.
+const ICE_LIFT = { coverLow: -0.8, sink: -30, coverHigh: 1.8, top: 7 };
+const iceLift = c => ICE_LIFT.sink + (ICE_LIFT.top - ICE_LIFT.sink) * sstep(ICE_LIFT.coverLow, ICE_LIFT.coverHigh, c);
+const iceRows = [];
+let iceShown = 0;
+{
+	// Cells in map metres: cell (cx, cy) covers [cx * CELL, (cx + 1) * CELL). Distance to the nearest cell that isn't ice
+	// (8-way passes, in cells), so the middle of a wide river or the glacier ring is "deep".
+	const iceCells = new Set();
+	for (let k = 0; k < hazards.ice.length; k += 3) {
+		const mx = (hazards.ice[k] + HALF) / 100, my = (hazards.ice[k + 1] + HALF) / 100;
+		iceCells.add(`${Math.floor(mx / CELL)},${Math.floor(my / CELL)}`);
+	}
+	const N = Math.ceil(SIZE / CELL) + 2;
+	const depth = new Float32Array(N * N).fill(0);
+	for (const key of iceCells) { const [cx, cy] = key.split(",").map(Number); if (cx >= 0 && cy >= 0 && cx < N && cy < N) depth[cy * N + cx] = 1e6; }
+	const D = Math.SQRT2;
+	for (let cy = 1; cy < N - 1; cy++) for (let cx = 1; cx < N - 1; cx++) {
+		const i = cy * N + cx; if (depth[i] === 0) continue;
+		depth[i] = Math.min(depth[i], depth[i - 1] + 1, depth[i - N] + 1, depth[i - N - 1] + D, depth[i - N + 1] + D);
+	}
+	for (let cy = N - 2; cy >= 1; cy--) for (let cx = N - 2; cx >= 1; cx--) {
+		const i = cy * N + cx; if (depth[i] === 0) continue;
+		depth[i] = Math.min(depth[i], depth[i + 1] + 1, depth[i + N] + 1, depth[i + N + 1] + D, depth[i + N - 1] + D);
+	}
+	// At a point: the depth of the cells around it, between their centres, in metres from the edge (half a cell in).
+	const cellDepth = (cx, cy) => (cx < 0 || cy < 0 || cx >= N || cy >= N) ? 0 : depth[cy * N + cx];
+	const iceCover = (x, y) => {
+		const fx = x / CELL - 0.5, fy = y / CELL - 0.5, cx = Math.floor(fx), cy = Math.floor(fy), tx = fx - cx, ty = fy - cy;
+		const d = (cellDepth(cx, cy) * (1 - tx) + cellDepth(cx + 1, cy) * tx) * (1 - ty) + (cellDepth(cx, cy + 1) * (1 - tx) + cellDepth(cx + 1, cy + 1) * tx) * ty;
+		return d * CELL - CELL * 0.5 + 1.4 * fbm(x / 11 + 31, y / 11 + 17, 2) + 0.6 * fbm(x / 3 + 5, y / 3 + 9, 2);
+	};
+	const ICE_GRID = 2;
+	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	for (const key of iceCells) { const [cx, cy] = key.split(",").map(Number); minX = Math.min(minX, cx); minY = Math.min(minY, cy); maxX = Math.max(maxX, cx); maxY = Math.max(maxY, cy); }
+	for (let j = Math.floor((minY - 1) * CELL / ICE_GRID); j <= Math.ceil((maxY + 2) * CELL / ICE_GRID); j++) {
+		let run = null;
+		for (let i = Math.floor((minX - 1) * CELL / ICE_GRID); i <= Math.ceil((maxX + 2) * CELL / ICE_GRID); i++) {
+			const x = i * ICE_GRID, y = j * ICE_GRID;
+			const near = iceCells.has(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || iceCells.has(`${Math.floor((x + 3) / CELL)},${Math.floor(y / CELL)}`)
+				|| iceCells.has(`${Math.floor((x - 3) / CELL)},${Math.floor(y / CELL)}`) || iceCells.has(`${Math.floor(x / CELL)},${Math.floor((y + 3) / CELL)}`) || iceCells.has(`${Math.floor(x / CELL)},${Math.floor((y - 3) / CELL)}`);
+			const c = near ? iceCover(x, y) : -9;
+			if (c > ICE_LIFT.coverLow - 0.6) {
+				if (!run) { run = [j, i, 0]; iceRows.push(run); }
+				run.push(Math.round(sample(x, y) * 100), Math.max(-16, Math.min(99, Math.round(c * 10))));
+				run[2]++;
+				if (iceLift(c) > 0) iceShown++;
+			} else run = null;
+		}
+	}
+}
+hazards.iceGrid = {
+	_comment: "The ice sheet, drawn like the lava flow: rows of grid points [row j, first column i, count n, then n pairs (ground cm, cover dm)]; a point is world (i * spacing - half, j * spacing - half); surface = ground + lift(cover), lift = sink..top over cover coverLow..coverHigh. Drawn only: what's slippery is the 6 m ice cells.",
+	spacing: 200, half: HALF, ...ICE_LIFT, rows: iceRows,
+};
+console.log("ice grid points", iceRows.reduce((n, r) => n + r[2], 0), "shown", iceShown, "rows", iceRows.length);
 // ---- cliff boulders on the ridge's steep faces (hides the stretched landscape triangles there). Its own random
 // stream, so adding it doesn't move any decoration above. Decoration only: no collision, so the wall still holds.
 types.basalt_cliff = [];
