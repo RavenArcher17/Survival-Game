@@ -2,8 +2,9 @@
 
 ## 0.7.0: creature raids, crafting time, far views
 
-**Not released yet** (notes `Docs/release-notes/v0.7.0.md`; it carries 0.6.3's base fixes too, which never went out on
-their own). The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views, ash-grey
+**Released 2026-11-08** as [v0.7.0](https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.7.0) (Latest; commit
+6ac25f3, `C:\Dev\WildreachBuild7`, the Setup's SHA-256 on GitHub the same as the local file's; notes
+`Docs/release-notes/v0.7.0.md`). It carries 0.6.3's base fixes too, which never went out on their own. The plan Raven approved after 0.6.3: creature raids, crafting time with station queues, far views, ash-grey
 volcanic shrubs, ice rebuilt like the lava. All done but the shrubs, which still hang the GPU and stay green (Raven:
 "leave the shrubs green if it's a problem"). Then a polish pass, and boss fights from Raven's play.
 
