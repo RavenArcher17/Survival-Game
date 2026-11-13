@@ -5,6 +5,7 @@
 // The HUD's small taming card (WRUIHud.cpp) shows the same numbers and the same advice while this is closed.
 
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRCreature.h"
@@ -167,7 +168,7 @@ namespace WRUITamingScreen
 		{
 			const AWRCreature* C = Creature();
 			if (!C || !C->IsAlive()) return LOCTEXT("TameGone", "It's gone.");
-			if (C->IsTamed()) return FText::Format(LOCTEXT("TameDone", "Tamed! {0} is yours: hold {1} on it for orders."), FText::FromString(Def() ? Def()->Name : C->GetDisplayLabel()), WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Interact"))));
+			if (C->IsTamed()) return FText::Format(LOCTEXT("TameDone", "Tamed! {0} is yours: hold {1} on it for orders."), FText::FromString(Def() ? Def()->Name : C->GetDisplayLabel()), WRInput::ActionKey(TEXT("Interact")));
 			return LOCTEXT("TameAwake", "It woke up. Knock it out again to go on taming: its progress is lost.");
 		}
 
@@ -509,7 +510,7 @@ namespace WRUITamingScreen
 								SNew(SHorizontalBox)
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
 								[
-									SNew(SWRKeyCap).FontSize(12).Text_Lambda([]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Interact"))); })
+									SNew(SWRKeyCap).FontSize(12).Text_Lambda([]() { return WRInput::ActionKey(TEXT("Interact")); })
 								]
 								+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("TameClose", "Close"), WRUI::Title(15), WRUI::Ink, true)]
 							]

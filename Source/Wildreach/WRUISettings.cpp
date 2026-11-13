@@ -1,7 +1,8 @@
 // The settings window (mockup "Settings: controls"): Esc in game (EWRMenu::Settings, which makes it the game menu:
 // Resume, the settings pages, Back to main menu, Quit) and the main menu's Settings button. Pages exist only for what
 // the game really has: Controls (every FWRKeyBindings action, how abilities are cast), Audio (the volumes WRSound keeps
-// in GameUserSettings.ini) and Video (the engine's UGameUserSettings). There is no mouse sensitivity setting.
+// in GameUserSettings.ini), Look and controller (mouse and stick sensitivity, invert, button names, vibration: also
+// FWRKeyBindings) and Video (the engine's UGameUserSettings).
 // Key changes save as they're made (FWRKeyBindings saves on every change), so there is no Apply step.
 
 #include "WRUISettings.h"
@@ -10,6 +11,7 @@
 #include "WRUIWidgets.h"
 #include "WRAbilities.h"
 #include "WRKeyBindings.h"
+#include "WRPadInput.h"
 #include "WRMainMenu.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
@@ -662,6 +664,7 @@ namespace WRSettingsUI
 			Listening = Id;
 			Pending = FPending();
 			Bar = EBar::Listening;
+			WRInput::SetKeyCapture(true);   // F1 / F8 can be bound too: they come here, not to their pages
 			// The wheel is a key too: scroll boxes mustn't eat it while we listen.
 			for (const TSharedPtr<SScrollBox>& S : Scrolls) if (S.IsValid()) S->SetConsumeMouseWheel(EConsumeMouseWheel::Never);
 			FSlateApplication::Get().SetKeyboardFocus(SharedThis(this), EFocusCause::SetDirectly);
@@ -782,6 +785,7 @@ namespace WRSettingsUI
 		void StopListening()
 		{
 			Listening = NAME_None;
+			WRInput::SetKeyCapture(false);
 			for (const TSharedPtr<SScrollBox>& S : Scrolls) if (S.IsValid()) S->SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
 		}
 
@@ -1423,6 +1427,82 @@ namespace WRSettingsUI
 
 	// ------------------------------------------------------------ video page
 
+	// ------------------------------------------------------------ look and controller page
+
+	/** Mouse and controller look (sensitivity, invert), the pad's button names and rumble, and the controls page. */
+	class SWRLookPage : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRLookPage) {}
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			const auto Sens = [](float V) { return FText::FromString(FString::Printf(TEXT("%.1f"), V)); };
+			const auto Step = [](float V, int32 Dir) { return FMath::Clamp(FMath::RoundToFloat((V + Dir * 0.1f) * 10.f) / 10.f, 0.1f, 4.f); };
+			ChildSlot
+			[
+				SNew(SScrollBox)
+				+ SScrollBox::Slot()
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("MouseHead", "Mouse"))]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+					[
+						SettingRow(LOCTEXT("MouseSens", "Mouse sensitivity"), LOCTEXT("MouseSensSub", "How far the view turns for a move of the mouse (1.0 is the standard)"),
+							Stepper([Sens]() { return Sens(FWRKeyBindings::Get().MouseSensitivity()); }, [Step](int32 Dir) { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetMouseSensitivity(Step(K.MouseSensitivity(), Dir)); }, 90.f))
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						SettingRow(LOCTEXT("InvertMouse", "Invert mouse"), LOCTEXT("InvertMouseSub", "Mouse forward looks down"),
+							SNew(SWRSwitch, []() { return FWRKeyBindings::Get().InvertMouse(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetInvertMouse(!K.InvertMouse()); }))
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Heading(LOCTEXT("PadHead", "Controller"))]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+					[
+						SettingRow(LOCTEXT("PadSens", "Look speed"), LOCTEXT("PadSensSub", "How fast the right stick turns the view (1.0 is the standard)"),
+							Stepper([Sens]() { return Sens(FWRKeyBindings::Get().PadSensitivity()); }, [Step](int32 Dir) { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetPadSensitivity(Step(K.PadSensitivity(), Dir)); }, 90.f))
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						SettingRow(LOCTEXT("InvertPad", "Invert look"), LOCTEXT("InvertPadSub", "Right stick up looks down"),
+							SNew(SWRSwitch, []() { return FWRKeyBindings::Get().InvertPad(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetInvertPad(!K.InvertPad()); }))
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						SettingRow(LOCTEXT("PadNames", "Button names"), LOCTEXT("PadNamesSub", "How prompts and the controls page name the buttons"),
+							Segmented({ LOCTEXT("Xbox", "Xbox (A, B, LB)"), LOCTEXT("PlayStation", "PlayStation (Cross, L1)") },
+								[]() { return FWRKeyBindings::Get().PadLabels(); }, [](int32 i) { FWRKeyBindings::Get().SetPadLabels(i); }))
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						SettingRow(LOCTEXT("Rumble", "Vibration"), LOCTEXT("RumbleSub", "The controller shakes when you land or take a blow"),
+							SNew(SWRSwitch, []() { return FWRKeyBindings::Get().PadRumble(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetPadRumble(!K.PadRumble()); }))
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							SNew(SBox).WidthOverride(260.f * U)
+							[
+								SNew(SWRButton).Text(LOCTEXT("ShowControls", "Show all the controls")).OnClicked_Lambda([]() { WRControlsPage::Toggle(); return FReply::Handled(); })
+							]
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(14.f * U, 0.f, 0.f, 0.f)
+						[
+							Muted(TAttribute<FText>::CreateLambda([]()
+							{
+								return FText::Format(LOCTEXT("ControlsWhere", "Every key and button. {0} opens it anywhere; on a controller, {1} in any menu."),
+									WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Help"))), WRInput::PadButton(TEXT("MenuControls")));
+							}), 12, true)
+						]
+					]
+				]
+			];
+		}
+	};
+
 	class SWRVideoPage : public SCompoundWidget
 	{
 	public:
@@ -1950,6 +2030,7 @@ namespace WRSettingsUI
 				Nav->AddSlot().AutoHeight().Padding(10.f * U, 8.f * U, 10.f * U, 4.f * U)[HLine(WRUI::Alpha(WRUI::Brass2, 0.5f))];
 			}
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("controls"); }, [this]() { ShowPage(TEXT("controls")); }).Icon(EWRIcon::Keyboard).Text(LOCTEXT("Controls", "Controls")), bInGame ? 4.f : 0.f);
+			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("look"); }, [this]() { ShowPage(TEXT("look")); }).Icon(EWRIcon::Join).Text(LOCTEXT("LookNav", "Look and controller")));
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("audio"); }, [this]() { ShowPage(TEXT("audio")); }).Icon(EWRIcon::Speaker).Text(LOCTEXT("Audio", "Audio")));
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("video"); }, [this]() { ShowPage(TEXT("video")); }).Icon(EWRIcon::Monitor).Text(LOCTEXT("Video", "Video")));
 			// The host's: this game is the server, and it's running a world.
@@ -2042,6 +2123,11 @@ namespace WRSettingsUI
 				Controls.Reset();
 				Content->SetContent(SNew(SWRAudioPage));
 			}
+			else if (Page == TEXT("look"))
+			{
+				Controls.Reset();
+				Content->SetContent(SNew(SWRLookPage));
+			}
 			else
 			{
 				Page = TEXT("controls");
@@ -2097,7 +2183,7 @@ namespace WRSettingsUI
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f * U, 0.f)[WRUI::Text(FText::FromString(TEXT("›")), WRUI::Body(20, 500), WRUI::Ink3)]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 				[
-					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("world") ? LOCTEXT("WorldPageTitle", "This world") : Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("world") ? LOCTEXT("WorldPageTitle", "This world") : Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : Page == TEXT("look") ? LOCTEXT("LookNav", "Look and controller") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[Muted(LOCTEXT("Close", "Close"), 12)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f * U, 0.f)[SNew(SWRKeyCap).FontSize(11).Text(LOCTEXT("EscKey", "Esc"))]

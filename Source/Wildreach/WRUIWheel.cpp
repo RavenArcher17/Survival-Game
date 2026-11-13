@@ -3,6 +3,7 @@
 // a release or click picks; this widget only draws it (and turns a click into a pick for the tame wheel).
 
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRAttributeSet.h"
@@ -162,7 +163,7 @@ private:
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)
 			[
-				SNew(SWRKeyCap).FontSize(13).Text_Lambda([this]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(Mode() == 2 ? TEXT("Interact") : Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1"))); })
+				SNew(SWRKeyCap).FontSize(13).Text_Lambda([this]() { return WRInput::ActionKey(Mode() == 2 ? TEXT("Interact") : Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1")); })
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
@@ -256,7 +257,7 @@ private:
 					const FWRPlayerUI* X = UI();
 					return X && X->IsTameWheelSticky() ? LOCTEXT("TameClick", "Click an order  ·  Esc to close") : LOCTEXT("TameRelease", "Release on an order");
 				}
-				const FText K = WRUI::KeyName(FWRKeyBindings::Get().Key(Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1")));
+				const FText K = WRInput::ActionKey(Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1"));
 				return FWRKeyBindings::Get().CastOnRelease() ? FText::Format(LOCTEXT("CastRelease", "Release {0} to cast"), K) : FText::Format(LOCTEXT("KeepTap", "Release {0} to keep  ·  Tap {0} to cast"), K);
 			}), WRUI::Body(13, 700), WRUI::Ink2)
 		];

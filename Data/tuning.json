@@ -277,5 +277,34 @@
     "enabled": 1, "glow": 0, "opacity": 0.75, "wash": 0.35, "startGlow": 0.7, "flashSeconds": 0.12, "poseBy": 0.6, "releaseSeconds": 0.2,
     "color": { "r": 255, "g": 60, "b": 20 },
     "bite": { "pitch": 10, "back": 0.4, "sink": 0 }, "lunge": { "pitch": -6, "back": 0.35, "sink": 0.15 }, "charge": { "pitch": -10, "back": 0.15, "sink": 0 },
-    "stomp": { "pitch": 16, "back": 0.15, "sink": 0 }, "spit": { "pitch": 12, "back": 0.2, "sink": 0 }, "heavy": { "pitch": 0, "back": 0, "sink": 0 } }
+    "stomp": { "pitch": 16, "back": 0.15, "sink": 0 }, "spit": { "pitch": 12, "back": 0.2, "sink": 0 }, "heavy": { "pitch": 0, "back": 0, "sink": 0 } },
+
+  "look": {
+    "_comment": "Camera look from the mouse and the pad's right stick, and held-input isolation. Settings > Look and controller multiplies the speeds (sensitivity 0.1-4) and can invert up/down; neither is inverted by default (COMBAT-AND-LESSONS 1.15).",
+    "mouseScale": 1.0,
+    "padYawDegrees": 230, "padPitchDegrees": 150, "padDeadZone": 0.15, "padCurve": 1.8, "moveDeadZone": 0.2,
+    "_pad": "pad*: degrees a second at full tilt and sensitivity 1; curve > 1 makes small tilts finer.",
+    "flickThreshold": 0.6, "flickRearm": 0.3, "flickCrossWeight": 1.5,
+    "_flick": "Locked on, the right stick past flickThreshold moves the lock to the nearest target that way on screen; it has to fall under flickRearm before the next flick.",
+    "isolationSeconds": 0.14,
+    "_isolation": "After leaving a menu, wheel, page, build placing or a mount, gameplay presses wait this long (COMBAT-AND-LESSONS L8)."
+  },
+
+  "pad": {
+    "_comment": "The pad in menus (WRPadInput): the left stick moves the cursor, the D-pad jumps it to the next button, the right stick scrolls.",
+    "cursorSpeed": 1300, "cursorCurve": 2.0, "cursorDeadZone": 0.18, "cursorOverTarget": 0.5,
+    "_cursor": "cursorSpeed: pixels a second at full tilt on a 1080-high screen (scaled with the screen); cursorOverTarget: the speed over something clickable.",
+    "wheelRadius": 0.2, "navCrossWeight": 2.2, "repeatDelay": 0.35, "repeatSeconds": 0.11,
+    "scrollNotches": 12, "scrollDeadZone": 0.25, "deviceThreshold": 0.35,
+    "rumble": {
+      "light": { "strength": 0.3, "seconds": 0.1 }, "heavy": { "strength": 0.6, "seconds": 0.18 }, "taken": { "strength": 0.7, "seconds": 0.22 }
+    }
+  },
+
+  "report": {
+    "_comment": "Report a problem (F8 / View on a pad): where reports go, the picture's size, retries and the trip from a client to the host.",
+    "endpoint": "https://freedom35studios.pages.dev/api/feedback", "game": "wildreach",
+    "shotMaxWidth": 1280, "shotMaxBytes": 330000, "contextMaxChars": 3900, "retrySeconds": 30,
+    "forwardChunkBytes": 8192, "forwardBytesPerTick": 8192, "hostMinSeconds": 10
+  }
 }

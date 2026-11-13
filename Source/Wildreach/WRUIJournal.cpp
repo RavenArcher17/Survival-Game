@@ -3,6 +3,7 @@
 // "paths", "skills", "map", "clan"). The window follows the controller's menu state, so I / J / P / K / M / O switch tabs.
 
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRKeyBindings.h"
@@ -42,6 +43,13 @@ public:
 			{ EWRMenu::Clan, LOCTEXT("TabClan", "Clan"), TEXT("Clan") },
 		};
 		TSharedRef<SHorizontalBox> Strip = SNew(SHorizontalBox);
+		// On a pad, LB / RB walk the pages (WRPlayerUI::PadTab): their buttons sit at the strip's ends.
+		const auto PadCap = [](const TCHAR* Verb)
+		{
+			const FName V(Verb);
+			return SNew(SWRKeyCap).FontSize(11).Text_Lambda([V]() { return WRInput::UsingPad() ? WRInput::PadButton(V) : FText::GetEmpty(); });
+		};
+		Strip->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[PadCap(TEXT("TabPrev"))];
 		for (const FTab& T : Tabs)
 		{
 			const EWRMenu Menu = T.Menu;
@@ -61,7 +69,7 @@ public:
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.f * U, 0.f, 0.f, 0.f)
 						[
-							SNew(SWRKeyCap).FontSize(10).Text_Lambda([Action]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(Action)); })
+							SNew(SWRKeyCap).FontSize(10).Text_Lambda([Action]() { return WRInput::ActionKey(Action); })
 						]
 					]
 					+ SVerticalBox::Slot().AutoHeight()
@@ -71,6 +79,8 @@ public:
 				]
 			];
 		}
+
+		Strip->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(4.f * U, 0.f, 0.f, 0.f)[PadCap(TEXT("TabNext"))];
 
 		ChildSlot
 		[

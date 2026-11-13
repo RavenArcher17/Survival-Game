@@ -33,12 +33,21 @@ bosses, enemies and wildlife regions, taming, survival, crafting (with time and 
 claims, raids and door keypads), clans, PvP rules, worlds and world settings, the stone-and-leather UI, sound, the
 installer and auto-updater. `CHANGELOG.md` has every version, newest first, with what changed and why.
 
+Since 0.7.1 (unreleased): **F8 reports** (testers' reports land in the studio inbox, in `Saved/Reports` on their PC
+and, from a client, in the host's `Saved/Reports`), **full controller support** (`Data/gamepad.json`; menus driven by
+one input processor in `WRPadInput.cpp`, so a new screen needs nothing for the pad as long as its clickable pieces
+show the hand cursor or are buttons / slots), the **F1 controls page**, and **look sensitivity / invert**. New prompt
+rule: show a key with `WRInput::ActionKey(<action>)`, not `WRUI::KeyName(...Key(...))`, so pads see their buttons.
+
 Open, as of 0.7.1:
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
   at `C:\Dev\UE5Source` on Raven's PC (`Tools\build_engine.ps1`), needed only for that.
 - **The gate playtest** (a group of friends plays a full evening and wants to come back) hasn't been run.
 - **Volcanic shrubs stay green**: the ash-grey coat hung the GPU (VSM Nanite), so `ashCoatMin` stays 0.
 - **The tame whistle** (`WRTameAll <order>`, every tame of yours within 30 m) is the one player feature with no screen.
+- **F8 pictures from the game don't reach the web inbox yet**: the feedback endpoint keeps screenshots (and context over
+  4000 characters) for signed-in players only, and the game isn't signed in. The full report and picture are in
+  `Saved/Reports` on the tester's PC (and the host's). Text fields (chat, names, the report note) need a keyboard.
 
 ## Two people, one repo
 

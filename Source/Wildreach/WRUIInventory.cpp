@@ -3,6 +3,7 @@
 // commands: slot (use / equip), unequip, move, split, drop. Also the pieces the storage screen shares (WRUIInventory.h).
 
 #include "WRUIInventory.h"
+#include "WRPadInput.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -1596,6 +1597,10 @@ namespace WRInvTab
 		// ------------------------------------------------------------ hotbar strip
 		FText KeysLine() const
 		{
+			if (WRInput::UsingPad())
+			{
+				return FText::FromString(FString::Printf(TEXT("In play, %s chooses a belt item and %s uses it"), *WRInput::PadButton(TEXT("BeltNext")).ToString(), *WRInput::PadButton(TEXT("UseBelt")).ToString()));
+			}
 			const FWRKeyBindings& K = FWRKeyBindings::Get();
 			const FString First = WRUI::KeyName(K.Key(TEXT("Hotbar1"))).ToString(), Last = WRUI::KeyName(K.Key(TEXT("Hotbar8"))).ToString();
 			const FKey Next = K.Key(TEXT("HotbarNext")), Prev = K.Key(TEXT("HotbarPrev"));
@@ -1678,7 +1683,7 @@ namespace WRInvTab
 										[
 											SNew(SBox).Visibility_Lambda([this]() { bool bKey; DragLine(bKey); return bKey ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 											[
-												SNew(SWRKeyCap).FontSize(11).Text_Lambda([this]() { const int32 K = HoveredKey(); return K == INDEX_NONE ? FText::GetEmpty() : WRUI::KeyName(FWRKeyBindings::Get().Key(FName(*FString::Printf(TEXT("Hotbar%d"), K + 1)))); })
+												SNew(SWRKeyCap).FontSize(11).Text_Lambda([this]() { const int32 K = HoveredKey(); return K == INDEX_NONE ? FText::GetEmpty() : WRInput::ActionKey(FName(*FString::Printf(TEXT("Hotbar%d"), K + 1))); })
 											]
 										]
 									]

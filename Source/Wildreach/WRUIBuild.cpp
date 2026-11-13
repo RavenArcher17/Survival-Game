@@ -8,6 +8,7 @@
 // again, Esc or right mouse stop.
 
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRBuilding.h"
@@ -734,7 +735,7 @@ private:
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								SNew(SWRKeyCap).FontSize(11).Text_Lambda([this]() { return WRUI::KeyName(KeyOf(TEXT("Demolish"))); })
+								SNew(SWRKeyCap).FontSize(11).Text_Lambda([this]() { return WRInput::ActionKey(FName(TEXT("Demolish"))); })
 							]
 						]
 					]
@@ -868,7 +869,7 @@ private:
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)
 			[
 				WRUI::Text(FText::Format(LOCTEXT("DemolishAbout", "Aim at a piece you built and click: it comes down and half its cost goes back in your bag. Only whoever built a piece can take it down. {0}, Esc or right mouse stop."),
-					WRUI::KeyName(KeyOf(TEXT("Demolish")))), WRUI::Body(12, 500), WRUI::Ink2, false, true)
+					WRInput::ActionKey(FName(TEXT("Demolish")))), WRUI::Body(12, 500), WRUI::Ink2, false, true)
 			]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 9.f * U, 0.f, 0.f)
 			[
@@ -990,7 +991,7 @@ private:
 					TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Demolishing() ? FLinearColor(FColor(0xFF, 0x9A, 0x80)) : WRUI::Ink); }), true)
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)[SNew(SBox).WidthOverride(1.f).HeightOverride(20.f * U)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Brass2)]]
-			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRKeyCap).FontSize(12).Text_Lambda([this]() { return WRUI::KeyName(KeyOf(TEXT("Build"))); })]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRKeyCap).FontSize(12).Text_Lambda([this]() { return WRInput::ActionKey(FName(TEXT("Build"))); })]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("Leave", "Leave"), WRUI::Body(12, 500), WRUI::Ink2)]
 		];
 	}
@@ -1218,13 +1219,13 @@ private:
 		const int32 M = Mode();
 		const float Step = PC.IsValid() ? PC->GetPlaceStep() : 0.f;
 		struct FLine { FText Key; FText Label; bool bSnap; };
-		const auto K = [this](const TCHAR* Action) { return WRUI::KeyName(KeyOf(Action)); };
+		const auto K = [this](const TCHAR* Action) { return WRInput::ActionKey(FName(Action)); };
 		TArray<FLine> Lines;
 		if (M == 1)
 		{
 			Lines.Add({ K(TEXT("Light")), LOCTEXT("KPlace", "Place"), false });
 			Lines.Add({ K(TEXT("Heavy")), Step >= 180.f ? LOCTEXT("KFlip", "Flip it") : Step >= 90.f ? LOCTEXT("KRotate90", "Rotate 90°") : Step > 0.f ? LOCTEXT("KRotate45", "Rotate 45°") : LOCTEXT("KTurnHold", "Turn, hold to spin"), false });
-			Lines.Add({ LOCTEXT("KWheel", "Wheel"), Step > 0.f ? LOCTEXT("KWheelStep", "Rotate either way") : LOCTEXT("KWheelFine", "Fine turn"), false });
+			if (!WRInput::UsingPad()) Lines.Add({ LOCTEXT("KWheel", "Wheel"), Step > 0.f ? LOCTEXT("KWheelStep", "Rotate either way") : LOCTEXT("KWheelFine", "Fine turn"), false });
 			Lines.Add({ K(TEXT("Block")), LOCTEXT("KCancel", "Cancel"), false });
 			Lines.Add({ K(TEXT("Snap")), LOCTEXT("KSnap", "Snap"), true });
 			Lines.Add({ K(TEXT("Demolish")), LOCTEXT("KDemolishInstead", "Demolish instead"), false });
@@ -1233,7 +1234,7 @@ private:
 		else if (M == 2)
 		{
 			Lines.Add({ K(TEXT("Light")), LOCTEXT("KRemove", "Take it down"), false });
-			Lines.Add({ FText::Format(LOCTEXT("KeyOrEsc", "{0} / Esc"), K(TEXT("Demolish"))), LOCTEXT("KStop", "Stop demolishing"), false });
+			Lines.Add({ WRInput::UsingPad() ? K(TEXT("Demolish")) : FText::Format(LOCTEXT("KeyOrEsc", "{0} / Esc"), K(TEXT("Demolish"))), LOCTEXT("KStop", "Stop demolishing"), false });
 			Lines.Add({ K(TEXT("Build")), LOCTEXT("KLeave", "Leave build mode"), false });
 		}
 		else

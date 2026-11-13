@@ -1,4 +1,5 @@
 #include "WRMainMenu.h"
+#include "WRPadInput.h"
 #include "Wildreach.h"
 #include "WRPlayerController.h"
 #include "WRPlayerUI.h"
@@ -489,7 +490,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeTip()
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Tips()[Tip].Before; }), WRUI::Body(14, 500), WRUI::Ink2)]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)
 		[
-			SNew(SWRKeyCap).FontSize(12).Text_Lambda([this]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(Tips()[Tip].Action)); })
+			SNew(SWRKeyCap).FontSize(12).Text_Lambda([this]() { return WRInput::ActionKey(Tips()[Tip].Action); })
 		]
 		+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Tips()[Tip].After; }), WRUI::Body(14, 500), WRUI::Ink2)]
 	];

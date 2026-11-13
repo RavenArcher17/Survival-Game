@@ -3,6 +3,7 @@
 // tuning.json "fx" so they can be tuned without a build; all of it is client-side presentation.
 
 #include "WRFx.h"
+#include "WRPadInput.h"
 #include "WRFxSystem.h"
 #include "WRCombatTypes.h"
 #include "WRGameplayTags.h"
@@ -76,6 +77,13 @@ void WRFx::ShowHit(AActor* Target, AActor* Source, float Damage, EWRHitResult Re
 	// Impacts spray out of the struck side, back toward the blow (where the camera usually is).
 	const FRotator Back = (Toward + FVector(0.f, 0.f, 0.25f)).Rotation();
 	const float StopSeconds = T.Num(TEXT("fx.hitStop.seconds"), 0.06f);
+	// The pad's rumble: a blow you land or take (heavier ones harder), never the ticks of a burn.
+	if ((bMine || bOnMe) && !bDot)
+	{
+		const TCHAR* Kind = bOnMe ? TEXT("taken") : bHeavy ? TEXT("heavy") : TEXT("light");
+		WRInput::Rumble(Target->GetWorld(), T.Num(FString::Printf(TEXT("pad.rumble.%s.strength"), Kind), bOnMe ? 0.7f : bHeavy ? 0.6f : 0.3f),
+			T.Num(FString::Printf(TEXT("pad.rumble.%s.seconds"), Kind), bOnMe ? 0.22f : bHeavy ? 0.18f : 0.1f));
+	}
 
 	switch (Result)
 	{

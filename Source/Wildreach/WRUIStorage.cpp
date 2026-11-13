@@ -4,6 +4,7 @@
 // AWRBuildPiece::Storage, which replicates to every client, so the screen reads them straight off the piece.
 
 #include "WRUIInventory.h"
+#include "WRPadInput.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -543,7 +544,7 @@ namespace WRStorageUI
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(5.f * U, 0.f, 0.f, 0.f)[WRUI::Text(Rest, WRUI::Body(13, 500), WRUI::Ink3)];
 			};
 			return SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()[Item(SNew(SWRKeyCap).FontSize(12).Text_Lambda([]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Interact"))); }), LOCTEXT("FootClose", "Close"), FText::GetEmpty())]
+				+ SHorizontalBox::Slot().AutoWidth()[Item(SNew(SWRKeyCap).FontSize(12).Text_Lambda([]() { return WRInput::ActionKey(TEXT("Interact")); }), LOCTEXT("FootClose", "Close"), FText::GetEmpty())]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(36.f * U, 0.f, 0.f, 0.f)[Item(SNew(SWRKeyCap).FontSize(12).Text(LOCTEXT("KShift", "Shift")), LOCTEXT("FootClick", "+ click"), LOCTEXT("FootStack", "· move the stack"))]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(36.f * U, 0.f, 0.f, 0.f)[Item(SNew(SWRKeyCap).FontSize(12).Text(LOCTEXT("KCtrl", "Ctrl")), LOCTEXT("FootClick2", "+ click"), LOCTEXT("FootOne", "· move one"))]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(36.f * U, 0.f, 0.f, 0.f)[Item(SNew(SWRInvLineIcon).Icon(WRInv::Icons::Drag()).Size(18.f * U).Thickness(1.6f).Color(WRUI::Ink2), LOCTEXT("FootDrag", "Drag"), LOCTEXT("FootHowMany", "· choose how many"))];

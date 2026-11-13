@@ -117,9 +117,26 @@ public:
 	 *  open screen needs, or a menu left open has no cursor and the camera swings with the mouse. */
 	void ReapplyInputMode();
 
-	/** Help overlay (H). */
-	bool IsHelpShown() const { return bHelp; }
-	void ToggleHelp() { bHelp = !bHelp; }
+	/** The controls page (F1; it replaced the old H overlay). */
+	void ToggleHelp();
+
+	// --- Controller (WRPadInput).
+	/** The cursor is up for a screen, a wheel or the death screen. */
+	bool WantsCursor() const { return bScreenWantsCursor; }
+	/** A screen (or the death screen's choices), not just a wheel, wants the cursor. */
+	bool WantsScreenCursor() const { return bScreenCursor; }
+	bool IsWheelOpen() const { return OpenWheel >= 0 || bTameWheel; }
+	/** Menu on the pad: the journal at the page last used. */
+	void PadOpenMenus();
+	/** LB / RB in a menu: the previous / next of Inventory, Crafting, Build, Paths, Skills, Map, Clan, Settings. */
+	void PadTab(int32 Dir);
+	/** D-pad left / right: the previous / next ability on the two wheels (the quick slot); D-pad up casts it. */
+	void PadQuickStep(int32 Dir);
+	void PadQuickFire();
+	/** D-pad down: the next item on the belt (the hotbar); Y uses it (a drink, food, a potion; a weapon or tool goes in hand). */
+	void PadBeltStep(int32 Dir);
+	void PadBeltUse();
+	int32 GetPadBelt() const { return PadBelt; }
 
 private:
 	void SyncScreen();
@@ -142,6 +159,13 @@ private:
 	TSharedPtr<class FWRFlow> Flow;
 	FName ScreenName;
 	bool bScreenWantsCursor = false;
+	bool bScreenCursor = false;
+	/** Held-input isolation: the modes last seen (a screen / page up, a wheel, build placing, the pawn). */
+	void UpdateIsolation();
+	bool bWasBusy = false, bWasWheel = false, bWasPlacing = false;
+	TWeakObjectPtr<APawn> LastPawn;
+	uint8 PadLastTab = 0;   // an EWRMenu (0: Inventory)
+	int32 PadBelt = 0;
 	bool bScreenStopsMove = false;
 	double NextAbilityKeyCheck = 0.0;
 
@@ -174,7 +198,6 @@ private:
 	FString CurNotice;
 	double CurNoticeAt = -100.0;
 	double CurNoticeEnd = -100.0;
-	bool bHelp = false;
 	bool bDebugWheel = false;
 	void LoadWheels();
 	void SaveWheels() const;

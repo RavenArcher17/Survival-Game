@@ -43,7 +43,8 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Map"), TEXT("Map"), Menus, EKeys::M);
 	Add(TEXT("Clan"), TEXT("Clan"), Menus, EKeys::O);
 	Add(TEXT("Chat"), TEXT("Chat"), Menus, EKeys::T);
-	Add(TEXT("Help"), TEXT("Controls help"), Menus, EKeys::H);
+	Add(TEXT("Help"), TEXT("Controls page"), Menus, EKeys::F1);
+	Add(TEXT("Report"), TEXT("Report a problem"), Menus, EKeys::F8);
 	Add(TEXT("Snap"), TEXT("Building: snap on / off"), Menus, EKeys::F);
 	Add(TEXT("Demolish"), TEXT("Building: demolish mode"), Menus, EKeys::X);
 	Add(TEXT("BackToMenu"), TEXT("Leave to the main menu"), Menus, EKeys::F10);
@@ -107,6 +108,10 @@ void FWRKeyBindings::ResetAll()
 	CastMode = EWRCastMode::Both;
 	bCastOnRelease = false;
 	bShowCrosshair = true;
+	MouseSens = PadSens = 1.f;
+	bInvertMouse = bInvertPad = false;
+	PadLabelSet = 0;
+	bPadRumble = true;
 	Save();
 	OnChanged.Broadcast();
 }
@@ -144,6 +149,13 @@ void FWRKeyBindings::SetShowCrosshair(bool b)
 	OnChanged.Broadcast();
 }
 
+void FWRKeyBindings::SetMouseSensitivity(float V) { MouseSens = FMath::Clamp(V, 0.1f, 4.f); Save(); OnChanged.Broadcast(); }
+void FWRKeyBindings::SetPadSensitivity(float V) { PadSens = FMath::Clamp(V, 0.1f, 4.f); Save(); OnChanged.Broadcast(); }
+void FWRKeyBindings::SetInvertMouse(bool b) { bInvertMouse = b; Save(); OnChanged.Broadcast(); }
+void FWRKeyBindings::SetInvertPad(bool b) { bInvertPad = b; Save(); OnChanged.Broadcast(); }
+void FWRKeyBindings::SetPadLabels(int32 Set) { PadLabelSet = FMath::Clamp(Set, 0, 1); Save(); OnChanged.Broadcast(); }
+void FWRKeyBindings::SetPadRumble(bool b) { bPadRumble = b; Save(); OnChanged.Broadcast(); }
+
 void FWRKeyBindings::Load()
 {
 	for (FWRActionKey& A : List)
@@ -159,6 +171,15 @@ void FWRKeyBindings::Load()
 	CastMode = static_cast<EWRCastMode>(FMath::Clamp(Mode, 0, 2));
 	GConfig->GetBool(KeySection, TEXT("CastOnRelease"), bCastOnRelease, GGameUserSettingsIni);
 	GConfig->GetBool(KeySection, TEXT("ShowCrosshair"), bShowCrosshair, GGameUserSettingsIni);
+	GConfig->GetFloat(KeySection, TEXT("MouseSensitivity"), MouseSens, GGameUserSettingsIni);
+	GConfig->GetFloat(KeySection, TEXT("PadSensitivity"), PadSens, GGameUserSettingsIni);
+	GConfig->GetBool(KeySection, TEXT("InvertMouse"), bInvertMouse, GGameUserSettingsIni);
+	GConfig->GetBool(KeySection, TEXT("InvertPad"), bInvertPad, GGameUserSettingsIni);
+	GConfig->GetInt(KeySection, TEXT("PadLabels"), PadLabelSet, GGameUserSettingsIni);
+	GConfig->GetBool(KeySection, TEXT("PadRumble"), bPadRumble, GGameUserSettingsIni);
+	MouseSens = FMath::Clamp(MouseSens, 0.1f, 4.f);
+	PadSens = FMath::Clamp(PadSens, 0.1f, 4.f);
+	PadLabelSet = FMath::Clamp(PadLabelSet, 0, 1);
 }
 
 void FWRKeyBindings::Save() const
@@ -178,5 +199,11 @@ void FWRKeyBindings::Save() const
 	GConfig->SetInt(KeySection, TEXT("CastMode"), static_cast<int32>(CastMode), GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("CastOnRelease"), bCastOnRelease, GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("ShowCrosshair"), bShowCrosshair, GGameUserSettingsIni);
+	GConfig->SetFloat(KeySection, TEXT("MouseSensitivity"), MouseSens, GGameUserSettingsIni);
+	GConfig->SetFloat(KeySection, TEXT("PadSensitivity"), PadSens, GGameUserSettingsIni);
+	GConfig->SetBool(KeySection, TEXT("InvertMouse"), bInvertMouse, GGameUserSettingsIni);
+	GConfig->SetBool(KeySection, TEXT("InvertPad"), bInvertPad, GGameUserSettingsIni);
+	GConfig->SetInt(KeySection, TEXT("PadLabels"), PadLabelSet, GGameUserSettingsIni);
+	GConfig->SetBool(KeySection, TEXT("PadRumble"), bPadRumble, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 }

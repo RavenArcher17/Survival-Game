@@ -290,6 +290,9 @@ int32 SWRBar::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlate
 
 void SWRKeyCap::Construct(const FArguments& InArgs)
 {
+	// No key (an action the pad has no button for, while a pad is in use): no cap at all, never an empty box.
+	const TAttribute<FText> Text = InArgs._Text;
+	SetVisibility(TAttribute<EVisibility>::CreateLambda([Text]() { return Text.Get().IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; }));
 	ChildSlot
 	[
 		SNew(SBorder)

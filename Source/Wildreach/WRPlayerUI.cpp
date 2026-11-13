@@ -7,6 +7,8 @@
 #include "WRInventory.h"
 #include "WRKeyBindings.h"
 #include "WRMainMenu.h"
+#include "WRPadInput.h"
+#include "WRReport.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
@@ -55,6 +57,8 @@ FWRPlayerUI::FWRPlayerUI(AWRPlayerController* InPC) : PC(InPC)
 		}
 	}
 	Flow = MakeShared<FWRFlow>(InPC);
+	// Controller support, F8 and F1 (one input processor for the whole game).
+	WRInput::Install();
 }
 
 FWRPlayerUI::~FWRPlayerUI()
@@ -130,6 +134,7 @@ void FWRPlayerUI::Tick(float DeltaTime)
 		Flow->Tick(DeltaTime);
 		UpdateInputMode();  // (acts only on a change: the death screen's choices come and go)
 	}
+	UpdateIsolation();
 	// Abilities can have their own keys (Settings): make sure each learned one has an entry.
 	if (Now > NextAbilityKeyCheck)
 	{
@@ -200,13 +205,17 @@ void FWRPlayerUI::ShowScreen(FName Name)
 	const bool bBar = Name == TEXT("build");
 	ScreenHost = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, bBar ? 0.f : WRTune(TEXT("flow.screenRise"), 14.f)))[ScreenWidget.ToSharedRef()];
 	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), 20);
+	WRInput::AddNavRoot(ScreenHost.ToSharedRef(), 20);
 	UE_LOG(LogWildreach, Log, TEXT("UI screen %s"), *Name.ToString());
+	WRReport::Event(TEXT("screen"), Name.ToString());
 }
 
 void FWRPlayerUI::CloseScreen()
 {
 	if (ScreenHost.IsValid())
 	{
+		WRInput::RemoveNavRoot(ScreenHost);
+		WRReport::Event(TEXT("screen"), TEXT("closed ") + ScreenName.ToString());
 		// It fades out where it is and takes no more clicks; Tick removes it when it's gone.
 		ScreenHost->PlayOut(WRTune(TEXT("flow.screenOutSeconds"), 0.12f));
 		LeavingScreens.Add(ScreenHost);
@@ -226,6 +235,7 @@ void FWRPlayerUI::UpdateInputMode()
 	const bool bDeath = Flow && Flow->WantsCursor();
 	const bool bWant = bMenu || bWheel || bDeath;
 	const bool bStill = bMenu && ScreenName != TEXT("build");
+	bScreenCursor = bMenu || bDeath;
 	if (bWant != bScreenWantsCursor || bStill != bScreenStopsMove)
 	{
 		bScreenWantsCursor = bWant;
@@ -248,6 +258,135 @@ void FWRPlayerUI::UpdateInputMode()
 			P->SetInputMode(FInputModeGameOnly());
 		}
 	}
+}
+
+void FWRPlayerUI::UpdateIsolation()
+{
+	// Held-input isolation (WRInput::Transition): entering a mode that takes the buttons drops what's held; leaving it,
+	// gameplay presses wait a moment. Screens and pages also flush the keys, so a stick or key held into a menu doesn't
+	// keep the survivor walking under it.
+	AWRPlayerController* P = PC.Get();
+	const bool bBusy = bScreenCursor || WRReport::IsOpen() || WRControlsPage::IsOpen() || SWRChatBox::IsOpen() || SWRMainMenu::IsOpen();
+	const bool bWheel = OpenWheel >= 0 || bTameWheel;
+	const bool bPlacing = P->IsPlacing();
+	APawn* Pawn = P->GetPawn();
+	if (bBusy != bWasBusy)
+	{
+		if (bBusy)
+		{
+			if (AWRCharacter* C = Cast<AWRCharacter>(Pawn)) C->DropHeldInputs();
+			P->FlushPressedKeys();
+		}
+		else WRInput::Transition(P, TEXT("left a menu"));
+		bWasBusy = bBusy;
+	}
+	if (bWheel != bWasWheel)
+	{
+		if (bWheel) { if (AWRCharacter* C = Cast<AWRCharacter>(Pawn)) C->DropHeldInputs(); }
+		else WRInput::Transition(P, TEXT("closed a wheel"));
+		bWasWheel = bWheel;
+	}
+	if (bPlacing != bWasPlacing)
+	{
+		WRInput::Transition(P, bPlacing ? TEXT("build placing") : TEXT("stopped placing"));
+		bWasPlacing = bPlacing;
+	}
+	if (Pawn != LastPawn.Get())
+	{
+		// Mounting, dismounting, a new body after death.
+		if (LastPawn.IsValid() || Pawn) WRInput::Transition(P, Pawn ? *(TEXT("now controlling ") + Pawn->GetName()) : TEXT("no body"));
+		LastPawn = Pawn;
+	}
+}
+
+void FWRPlayerUI::ToggleHelp()
+{
+	WRControlsPage::Toggle();
+}
+
+void FWRPlayerUI::PadOpenMenus()
+{
+	AWRPlayerController* P = PC.Get();
+	if (!P) return;
+	// A piece being placed is put away first (the build bar's ghost never stays out under another page).
+	if (P->IsPlacing()) P->CancelPlacement();
+	const EWRMenu Want = PadLastTab == 0 ? EWRMenu::Inventory : static_cast<EWRMenu>(PadLastTab);
+	P->SetMenu(Want);
+}
+
+void FWRPlayerUI::PadTab(int32 Dir)
+{
+	AWRPlayerController* P = PC.Get();
+	if (!P) return;
+	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Clan, EWRMenu::Settings };
+	const int32 N = UE_ARRAY_COUNT(Order);
+	int32 At = INDEX_NONE;
+	for (int32 i = 0; i < N; ++i) if (Order[i] == P->GetMenu()) At = i;
+	if (At == INDEX_NONE || P->IsPlacing()) return;   // a station's screen, a chest, a keypad: LB / RB have no pages there
+	const EWRMenu Next = Order[((At + Dir) % N + N) % N];
+	// A crafting station's page stays that station's; the journal's Crafting page is crafting by hand or at the nearest.
+	P->SetMenu(Next);
+	PadLastTab = static_cast<uint8>(Next == EWRMenu::Settings || Next == EWRMenu::Build ? EWRMenu::Inventory : Next);
+	WRSound::PlayUI(P, TEXT("ui.click"));
+}
+
+void FWRPlayerUI::PadQuickStep(int32 Dir)
+{
+	// Both wheels as one ring of 16 quick slots, skipping empty ones and abilities not learned.
+	const TArray<FWRCastable> All = GetCastables();
+	const int32 Wheel = WRInput::PadQuickWheel();
+	const int32 From = Wheel * 8 + WheelPicked[Wheel];
+	for (int32 Step = 1; Step <= 16; ++Step)
+	{
+		const int32 i = ((From + Dir * Step) % 16 + 16) % 16;
+		const FWRCastable* C = FindCastable(GetWheelAbility(i / 8, i % 8), All);
+		if (!C || !C->bLearned) continue;
+		WRInput::SetPadQuickWheel(i / 8);
+		SetWheelPicked(i / 8, i % 8);
+		if (AWRPlayerController* P = PC.Get())
+		{
+			WRSound::PlayUI(P, TEXT("ui.click"));
+			P->ShowLocalNotice(C->Name.ToString());
+		}
+		return;
+	}
+	if (AWRPlayerController* P = PC.Get()) P->ShowLocalNotice(TEXT("No abilities on your wheels: learn them in Paths"));
+}
+
+void FWRPlayerUI::PadQuickFire()
+{
+	const int32 Wheel = WRInput::PadQuickWheel();
+	if (!FindCastable(GetWheelAbility(Wheel, WheelPicked[Wheel]), GetCastables()))
+	{
+		// The slot the pad was on emptied (or was never filled): the first one there is.
+		PadQuickStep(1);
+	}
+	const int32 Now = WRInput::PadQuickWheel();
+	CastAbility(GetWheelAbility(Now, WheelPicked[Now]));
+}
+
+void FWRPlayerUI::PadBeltStep(int32 Dir)
+{
+	for (int32 Step = 1; Step <= 8; ++Step)
+	{
+		const int32 i = ((PadBelt + Dir * Step) % 8 + 8) % 8;
+		const FWRItemDef* Def = Hotbar[i].IsNone() ? nullptr : FWRItemRegistry::Get().Find(Hotbar[i]);
+		if (!Def) continue;
+		PadBelt = i;
+		if (AWRPlayerController* P = PC.Get())
+		{
+			WRSound::PlayUI(P, TEXT("ui.click"));
+			P->ShowLocalNotice(Def->Name);
+		}
+		return;
+	}
+	if (AWRPlayerController* P = PC.Get()) P->ShowLocalNotice(TEXT("Your belt is empty: put items on the hotbar in the Inventory"));
+}
+
+void FWRPlayerUI::PadBeltUse()
+{
+	if (GetHotbarItem(PadBelt).IsNone()) PadBeltStep(1);
+	if (!GetHotbarItem(PadBelt).IsNone()) UseHotbar(PadBelt);
 }
 
 void FWRPlayerUI::ReapplyInputMode()
@@ -474,7 +613,9 @@ void FWRPlayerUI::CycleHotbar(int32 Dir)
 FWRSlotView FWRPlayerUI::HotbarView(int32 Index) const
 {
 	FWRSlotView V;
-	V.Key = WRUI::KeyName(FWRKeyBindings::Get().Key(FName(*FString::Printf(TEXT("Hotbar%d"), Index + 1))));
+	// On a pad the belt's chosen slot shows the button that uses it (Y), the others nothing.
+	V.Key = WRInput::UsingPad() ? (Index == PadBelt ? WRInput::PadButton(TEXT("UseBelt")) : FText::GetEmpty())
+		: WRUI::KeyName(FWRKeyBindings::Get().Key(FName(*FString::Printf(TEXT("Hotbar%d"), Index + 1))));
 	V.ItemId = GetHotbarItem(Index);
 	const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
 	const UWRInventoryComponent* Inv = PS ? PS->GetInventory() : nullptr;

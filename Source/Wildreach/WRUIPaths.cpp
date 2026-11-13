@@ -5,6 +5,7 @@
 // Sizes are mockup px x U (1080p units). Node glyphs: Data/UI/Glyphs (Tools/ui_glyphs.mjs).
 
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRAbilities.h"
@@ -641,7 +642,7 @@ private:
 	FText Tip() const
 	{
 		const FName Id = Ability();
-		const FText Key = WRUI::KeyName(FWRKeyBindings::Get().Key(Wheel == 0 ? TEXT("Wheel1") : TEXT("Wheel2")));
+		const FText Key = WRInput::ActionKey(Wheel == 0 ? TEXT("Wheel1") : TEXT("Wheel2"));
 		if (Id.IsNone()) return FText::Format(LOCTEXT("SlotEmptyTip", "Wheel {0}, slot {1}: empty. Drag a learned ability here."), Wheel + 1, Pos + 1);
 		FString P, N;
 		Id.ToString().Split(TEXT("."), &P, &N);
@@ -1276,7 +1277,7 @@ private:
 		[
 			SNew(SBox).WidthOverride(26.f * U).HAlign(HAlign_Center)
 			[
-				SNew(SWRKeyCap).FontSize(11).Text_Lambda([Wheel]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(Wheel == 0 ? TEXT("Wheel1") : TEXT("Wheel2"))); })
+				SNew(SWRKeyCap).FontSize(11).Text_Lambda([Wheel]() { return WRInput::ActionKey(Wheel == 0 ? TEXT("Wheel1") : TEXT("Wheel2")); })
 			]
 		];
 		for (int32 i = 0; i < 8; ++i)
@@ -1337,7 +1338,7 @@ private:
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[WRUI::Text(LOCTEXT("OwnKey", "Own key:"), WRUI::Body(12, 700), WRUI::Ink)]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[
-							SNew(SWRKeyCap).FontSize(10).Text_Lambda([this]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(FWRKeyBindings::AbilityAction(Model->WheelId(Shown())))); })
+							SNew(SWRKeyCap).FontSize(10).Text_Lambda([this]() { return WRInput::ActionKey(FWRKeyBindings::AbilityAction(Model->WheelId(Shown()))); })
 						]
 					]
 				]
@@ -1353,7 +1354,7 @@ private:
 		for (int32 W = 0; W < 2; ++W)
 		{
 			const FWRCastable* C = UI->FindCastable(UI->GetWheelAbility(W, UI->GetWheelPicked(W)), All);
-			const FString Key = WRUI::KeyName(FWRKeyBindings::Get().Key(W == 0 ? TEXT("Wheel1") : TEXT("Wheel2"))).ToString();
+			const FString Key = WRInput::ActionKey(W == 0 ? TEXT("Wheel1") : TEXT("Wheel2")).ToString();
 			if (!Line.IsEmpty()) Line += TEXT("  ·  ");
 			Line += FString::Printf(TEXT("Tap %s: %s"), *Key, C ? *C->Name.ToString() : TEXT("nothing"));
 		}

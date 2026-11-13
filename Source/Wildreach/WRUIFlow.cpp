@@ -3,6 +3,7 @@
 // Sizes are 1080p units (the mockups' px x 1.2), as in the rest of the stone-and-leather UI.
 
 #include "WRUIFlow.h"
+#include "WRPadInput.h"
 #include "Wildreach.h"
 #include "WRBeds.h"
 #include "WRUIMap.h"
@@ -95,7 +96,7 @@ namespace WRFlowUI
 		return FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text, Font);
 	}
 
-	FText KeyText(FName Action) { return WRUI::KeyName(FWRKeyBindings::Get().Key(Action)); }
+	FText KeyText(FName Action) { return WRInput::ActionKey(Action); }
 
 	/** Content that fades (and drifts in from Drift) with an alpha; collapsed at zero, never takes clicks. */
 	TSharedRef<SWidget> Fade(TFunction<float()> Alpha, TSharedRef<SWidget> Content, FVector2D Drift = FVector2D::ZeroVector, bool bClickable = false)

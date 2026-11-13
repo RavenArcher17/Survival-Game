@@ -38,6 +38,9 @@ public:
 	/** Press/release an ability input (used by real input and by the test bot). */
 	void PressAbilityInput(EWRAbilityInput Input);
 	void ReleaseAbilityInput(EWRAbilityInput Input);
+	/** Let go of every held gameplay input (block, a charging heavy, sprint, jump): a menu, wheel, build placing, a mount
+	 *  or the death screen took the buttons (WRInput::Transition). */
+	void DropHeldInputs();
 
 	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
@@ -172,6 +175,16 @@ private:
 	void BuildInput();
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
+	/** The pad's right stick (turn rates, curve and sensitivity in WRInput::PadLook); flicks switch the lock-on target. */
+	void PadLook(const FInputActionValue& Value);
+	/** Button presses from the input mapping, through the held-input gate (WRInput::AllowPress). */
+	void InputPressed(EWRAbilityInput Input);
+	void InputReleased(EWRAbilityInput Input);
+	void InputJump();
+	void InputSprint();
+	void InputView();
+	TSet<EWRAbilityInput> HeldInputs;
+	bool bPadFlickReady = true;
 	void StartSprint();
 	void StopSprint();
 	void ToggleView();
@@ -179,6 +192,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> MappingContext;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> MoveAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> LookAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> PadLookAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> JumpAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> SprintAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> ToggleViewAction;

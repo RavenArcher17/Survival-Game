@@ -269,6 +269,7 @@ private:
 	UFUNCTION(Server, Reliable) void ServerDismount();
 	void RideMove(const FInputActionValue& Value);
 	void RideLook(const FInputActionValue& Value);
+	void RidePadLook(const FInputActionValue& Value);
 
 	// The body (WRCarcass.cpp).
 	/** Server, at death: a wild creature with loot becomes a body to butcher. False: the old way (loot to the killer). */
@@ -348,6 +349,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UInputMappingContext> RideMapping;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideMoveAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideLookAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> RidePadLookAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideJumpAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideDismountAction;
 };

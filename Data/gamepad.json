@@ -1,0 +1,118 @@
+{
+  "_comment": "The controller (WRPadInput). verbs: the button of each thing the pad does (Unreal key names), one verb per button in play (COMBAT-AND-LESSONS L4) and one per button in menus. Build* are the buttons while placing a piece (B, Y and D-pad down change meaning only then). prompts: which verb shows for each rebindable action in on-screen prompts while a pad is in use (actions not listed show nothing on a pad). names: what each button is called, per button set (Settings > Look and controller). page: the controller side of the F1 controls page.",
+
+  "verbs": {
+    "Move": "Gamepad_Left2D",
+    "Look": "Gamepad_Right2D",
+    "Light": "Gamepad_RightShoulder",
+    "Heavy": "Gamepad_RightTrigger",
+    "Block": "Gamepad_LeftShoulder",
+    "Sprint": "Gamepad_LeftTrigger",
+    "Jump": "Gamepad_FaceButton_Bottom",
+    "Dodge": "Gamepad_FaceButton_Right",
+    "Interact": "Gamepad_FaceButton_Left",
+    "UseBelt": "Gamepad_FaceButton_Top",
+    "QuickFire": "Gamepad_DPad_Up",
+    "QuickPrev": "Gamepad_DPad_Left",
+    "QuickNext": "Gamepad_DPad_Right",
+    "BeltNext": "Gamepad_DPad_Down",
+    "LockOn": "Gamepad_RightThumbstick",
+    "View": "Gamepad_LeftThumbstick",
+    "Journal": "Gamepad_Special_Right",
+    "Report": "Gamepad_Special_Left",
+
+    "BuildCancel": "Gamepad_FaceButton_Right",
+    "BuildDemolish": "Gamepad_FaceButton_Top",
+    "BuildSnap": "Gamepad_DPad_Down",
+
+    "MenuClick": "Gamepad_FaceButton_Bottom",
+    "MenuSecond": "Gamepad_FaceButton_Left",
+    "MenuBack": "Gamepad_FaceButton_Right",
+    "MenuControls": "Gamepad_FaceButton_Top",
+    "MenuClose": "Gamepad_Special_Right",
+    "TabPrev": "Gamepad_LeftShoulder",
+    "TabNext": "Gamepad_RightShoulder"
+  },
+
+  "prompts": {
+    "Light": "Light",
+    "Heavy": "Heavy",
+    "Block": "Block",
+    "Sprint": "Sprint",
+    "Jump": "Jump",
+    "Dodge": "Dodge",
+    "Interact": "Interact",
+    "LockOn": "LockOn",
+    "View": "View",
+    "HotbarNext": "BeltNext",
+    "HotbarPrev": "BeltNext",
+    "Snap": "BuildSnap",
+    "Demolish": "BuildDemolish",
+    "Build": "BuildCancel",
+    "Report": "Report"
+  },
+
+  "names": {
+    "xbox": {
+      "Gamepad_FaceButton_Bottom": "A", "Gamepad_FaceButton_Right": "B", "Gamepad_FaceButton_Left": "X", "Gamepad_FaceButton_Top": "Y",
+      "Gamepad_LeftShoulder": "LB", "Gamepad_RightShoulder": "RB", "Gamepad_LeftTrigger": "LT", "Gamepad_RightTrigger": "RT",
+      "Gamepad_LeftThumbstick": "LS", "Gamepad_RightThumbstick": "RS",
+      "Gamepad_DPad_Up": "D-pad up", "Gamepad_DPad_Down": "D-pad down", "Gamepad_DPad_Left": "D-pad left", "Gamepad_DPad_Right": "D-pad right",
+      "Gamepad_Special_Left": "View", "Gamepad_Special_Right": "Menu",
+      "Gamepad_Left2D": "Left stick", "Gamepad_Right2D": "Right stick"
+    },
+    "playstation": {
+      "Gamepad_FaceButton_Bottom": "Cross", "Gamepad_FaceButton_Right": "Circle", "Gamepad_FaceButton_Left": "Square", "Gamepad_FaceButton_Top": "Triangle",
+      "Gamepad_LeftShoulder": "L1", "Gamepad_RightShoulder": "R1", "Gamepad_LeftTrigger": "L2", "Gamepad_RightTrigger": "R2",
+      "Gamepad_LeftThumbstick": "L3", "Gamepad_RightThumbstick": "R3",
+      "Gamepad_DPad_Up": "D-pad up", "Gamepad_DPad_Down": "D-pad down", "Gamepad_DPad_Left": "D-pad left", "Gamepad_DPad_Right": "D-pad right",
+      "Gamepad_Special_Left": "Create", "Gamepad_Special_Right": "Options",
+      "Gamepad_Left2D": "Left stick", "Gamepad_Right2D": "Right stick"
+    }
+  },
+
+  "page": [
+    { "title": "Moving", "rows": [
+      { "verb": "Move", "does": "Move" },
+      { "verb": "Look", "does": "Look around (locked on: flick to the next target)" },
+      { "verb": "Sprint", "does": "Sprint (hold)" },
+      { "verb": "Jump", "does": "Jump" },
+      { "verb": "Dodge", "does": "Dodge roll" },
+      { "verb": "LockOn", "does": "Lock on / let go" },
+      { "verb": "View", "does": "First / third person" }
+    ] },
+    { "title": "Fighting", "rows": [
+      { "verb": "Light", "does": "Light attack; fire a ranged weapon" },
+      { "verb": "Heavy", "does": "Heavy attack" },
+      { "verb": "Block", "does": "Block (hold); aim a ranged weapon" },
+      { "verb": "QuickFire", "does": "Use the chosen ability" },
+      { "verb": "QuickNext", "does": "Next ability (ammo while aiming)" },
+      { "verb": "QuickPrev", "does": "Previous ability (ammo while aiming)" }
+    ] },
+    { "title": "Items and the world", "rows": [
+      { "verb": "Interact", "does": "Use, gather, open, talk to your tame (hold: orders, a door's keypad)" },
+      { "verb": "UseBelt", "does": "Use the chosen belt item (drink, eat, a potion; a weapon or tool goes in hand)" },
+      { "verb": "BeltNext", "does": "Choose the next belt item" },
+      { "verb": "Journal", "does": "Menus: inventory, crafting, build, paths, skills, map, clan, settings" },
+      { "verb": "Report", "does": "Report a problem (screenshot and note)" }
+    ] },
+    { "title": "Building (placing a piece)", "rows": [
+      { "verb": "Light", "does": "Place it" },
+      { "verb": "Heavy", "does": "Turn it (hold to spin)" },
+      { "verb": "BuildSnap", "does": "Snap: grid, fine grid, free" },
+      { "verb": "BuildDemolish", "does": "Demolish instead / stop demolishing" },
+      { "verb": "BuildCancel", "does": "Put the piece away" }
+    ] },
+    { "title": "In menus", "rows": [
+      { "button": "Left stick", "does": "Move the pointer (slower over buttons)" },
+      { "button": "D-pad", "does": "Jump to the next button that way" },
+      { "verb": "MenuClick", "does": "Click; hold and move to drag" },
+      { "verb": "MenuSecond", "does": "Second click (use, unequip, split)" },
+      { "verb": "MenuBack", "does": "Back / close" },
+      { "verb": "TabPrev", "does": "Previous page" },
+      { "verb": "TabNext", "does": "Next page" },
+      { "button": "Right stick", "does": "Scroll; zoom the map" },
+      { "verb": "MenuControls", "does": "This page" }
+    ] }
+  ]
+}

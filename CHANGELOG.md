@@ -1,5 +1,56 @@
 # Changelog
 
+## Unreleased: F8 bug reports, the controller, the F1 controls page, look settings
+
+Aaron: build the in-game bug report first so testers can report (COMBAT-AND-LESSONS L10, C1), with the controls page,
+full controller support (L4 one verb per button, L8 held-input isolation) and mouse sensitivity / invert (quality
+plan row 9). Built to compile; not played here (Aaron and the testers test, and report with F8).
+
+- **Report a problem: F8, or View on a pad** (new `WRReport.cpp`, panel `WRUIReport.cpp`). The frame on screen is
+  frozen with the interface (the engine's screenshot with UI, JPEG at most 1280 wide), and the report gathers version
+  (and the package's `build.json` if one sits beside the game), map, net mode, world, preset, players, position and
+  facing, health, stamina, hunger, thirst, path and level, the open menu or screen, placing, lock-on, device and pad,
+  sensitivity, frame rate, viewport, quality, OS, CPU, GPU, RAM, time played and the **last 60 s**: the game's log lines
+  (notices, screens, locks, deaths...), any warnings and errors, and events (screen opened / closed, mode changes,
+  device changes). The panel: the frozen picture, the **8 kinds** (Bug, Stuck, Controls, Camera, Music-Audio, Visual,
+  Balance, Idea, as Waveraider's), a note, Send / Cancel (Ctrl+Enter / Esc; on a pad LB / RB the kind, Y send, B
+  cancel). Alone, the world pauses while you write.
+  - **Send** posts to `https://freedom35studios.pages.dev/api/feedback` with `game: "wildreach"`, the body, category,
+    label and context exactly as Waveraider's `report.ts` (context trimmed to the inbox's 4000 characters for a player
+    who isn't signed in, oldest log lines first). Offline or refused, it waits in `Saved/Reports/Outbox` and is sent
+    again every 30 s and at the next start; a picture too big goes again without it.
+  - It's also saved in full to `Saved/Reports/<time>_<player>_<kind>.json` + `.jpg`.
+  - **A client's report goes to the host too** (`ServerReportPart`, 8 KB a frame), which saves it as
+    `<time>_<player>_from-client.json` + `.jpg` and tells the host's player. A player can send one every 10 s, each
+    under 2 MB.
+  - Numbers in tuning `report`.
+- **The controller** (new `WRPadInput.cpp`, layout in new `Data/gamepad.json`). In play, one verb per button (L4): RB
+  light, RT heavy, LB block, LT sprint, A jump, B roll, X use (hold: tame orders, a door's keypad), Y use the chosen
+  belt item, D-pad up the chosen ability, D-pad left / right the previous / next ability (ammo while aiming), D-pad down
+  the next belt item, RS lock on (a flick of the right stick moves the lock to the next target that way), LS first /
+  third person, Menu the menus, View the report. Placing a piece: RB place, RT turn, B put it away, Y demolish, D-pad
+  down the snap. Riding: left stick, right stick, A jump, X get off.
+  - **Every screen works on a pad without each knowing it**: one Slate input processor, while the cursor is up, moves
+    it with the left stick (slower over anything clickable), jumps it with the D-pad to the nearest button that way on
+    the top screen (with none, the list scrolls), clicks with A (hold and move to drag), second-clicks with X (use,
+    unequip, split), scrolls with the right stick, goes back with B (whatever Esc does there), Y opens the controls
+    page, LB / RB walk Inventory, Crafting, Build, Paths, Skills, Map, Clan, Settings; wheels point with the stick. The
+    main menu, the settings window and the death screen work the same way.
+  - **Prompts follow the device last used** (`WRInput::ActionKey`): every key cap in the HUD, journal, build bar,
+    hints, taming, storage, paths and wheels shows the pad's button on a pad, and nothing where the pad has none (an
+    empty key cap now hides itself). The hotbar shows Y on the chosen belt slot.
+  - **Held-input isolation** (L8): opening a menu, page or wheel, starting or stopping placing, mounting and dying let
+    go of held block, charge, sprint and jump; screens also flush held keys and sticks; leaving any of them, gameplay
+    presses wait 0.14 s, so the press that closed a menu never also swings.
+  - Vibration on blows landed and taken (tuning `pad.rumble`).
+- **The controls page: F1** anywhere (and Y in any menu on a pad; it replaces the old H overlay, and Help now
+  defaults to F1): every action with its key or button, opening on the device in use and switching with it;
+  Keyboard and mouse / Controller tabs (LB / RB).
+- **Settings > Look and controller**: mouse sensitivity and invert, controller look speed and invert, button names
+  (Xbox or PlayStation), vibration, and a button for the controls page. Look speeds and curves are tuning `look`;
+  neither device is inverted by default.
+- Rebindable: Report (F8) joins the keys; the settings window's key listening takes F1 / F8 when you bind them.
+
 ## Since 0.7.1: set up for a second developer
 
 Raven: "make a handoff and a readme making sure his Claude knows it needs the art packs and Visual Studio and the other

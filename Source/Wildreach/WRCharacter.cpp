@@ -29,6 +29,7 @@
 #include "EngineUtils.h"
 #include "Dom/JsonObject.h"
 #include "EnhancedInputComponent.h"
+#include "WRPadInput.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
@@ -816,6 +817,7 @@ void AWRCharacter::BuildInput()
 
 	MoveAction = MakeAction(EInputActionValueType::Axis2D);
 	LookAction = MakeAction(EInputActionValueType::Axis2D);
+	PadLookAction = MakeAction(EInputActionValueType::Axis2D);
 	JumpAction = MakeAction(EInputActionValueType::Boolean);
 	SprintAction = MakeAction(EInputActionValueType::Boolean);
 	ToggleViewAction = MakeAction(EInputActionValueType::Boolean);
@@ -864,6 +866,32 @@ void AWRCharacter::MapKeys()
 	for (const TPair<EWRAbilityInput, const TCHAR*>& Pair : AbilityKeys)
 	{
 		if (const TObjectPtr<UInputAction>* Action = AbilityActions.Find(Pair.Key)) Map(*Action, Pair.Value);
+	}
+	// The pad (Data/gamepad.json): the same actions, one verb per button. The move stick gets a radial dead zone.
+	const FWRPadLayout& Pad = FWRPadLayout::Get();
+	const auto MapPad = [this, &Pad](UInputAction* Action, const TCHAR* Verb) -> FEnhancedActionKeyMapping*
+	{
+		const FKey Key = Pad.Key(FName(Verb));
+		return Action && Key.IsValid() ? &MappingContext->MapKey(Action, Key) : nullptr;
+	};
+	if (FEnhancedActionKeyMapping* M = MapPad(MoveAction, TEXT("Move")))
+	{
+		UInputModifierDeadZone* Dead = NewObject<UInputModifierDeadZone>(this);
+		Dead->Type = EDeadZoneType::Radial;
+		Dead->LowerThreshold = WRTune(TEXT("look.moveDeadZone"), 0.2f);
+		M->Modifiers.Add(Dead);
+	}
+	MapPad(PadLookAction, TEXT("Look"));
+	MapPad(JumpAction, TEXT("Jump"));
+	MapPad(SprintAction, TEXT("Sprint"));
+	MapPad(ToggleViewAction, TEXT("View"));
+	const TPair<EWRAbilityInput, const TCHAR*> PadAbilityKeys[] = {
+		{ EWRAbilityInput::Light, TEXT("Light") }, { EWRAbilityInput::Heavy, TEXT("Heavy") },
+		{ EWRAbilityInput::Block, TEXT("Block") }, { EWRAbilityInput::Dodge, TEXT("Dodge") },
+	};
+	for (const TPair<EWRAbilityInput, const TCHAR*>& Pair : PadAbilityKeys)
+	{
+		if (const TObjectPtr<UInputAction>* Action = AbilityActions.Find(Pair.Key)) MapPad(*Action, Pair.Value);
 	}
 	if (const APlayerController* PC = Cast<APlayerController>(Controller))
 	{
@@ -921,18 +949,20 @@ void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	{
 		Input->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AWRCharacter::Move);
 		Input->BindAction(LookAction, ETriggerEvent::Triggered, this, &AWRCharacter::Look);
-		Input->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		Input->BindAction(PadLookAction, ETriggerEvent::Triggered, this, &AWRCharacter::PadLook);
+		Input->BindAction(PadLookAction, ETriggerEvent::Completed, this, &AWRCharacter::PadLook);
+		Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AWRCharacter::InputJump);
 		Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-		Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AWRCharacter::StartSprint);
+		Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AWRCharacter::InputSprint);
 		Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AWRCharacter::StopSprint);
-		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AWRCharacter::ToggleView);
+		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AWRCharacter::InputView);
 		Input->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &AWRCharacter::ToggleWeaponSet);
 		Input->BindAction(AmmoNextAction, ETriggerEvent::Started, this, &AWRCharacter::AmmoNext);
 		Input->BindAction(AmmoPrevAction, ETriggerEvent::Started, this, &AWRCharacter::AmmoPrev);
 		for (const TPair<EWRAbilityInput, TObjectPtr<UInputAction>>& Pair : AbilityActions)
 		{
-			Input->BindAction(Pair.Value, ETriggerEvent::Started, this, &AWRCharacter::PressAbilityInput, Pair.Key);
-			Input->BindAction(Pair.Value, ETriggerEvent::Completed, this, &AWRCharacter::ReleaseAbilityInput, Pair.Key);
+			Input->BindAction(Pair.Value, ETriggerEvent::Started, this, &AWRCharacter::InputPressed, Pair.Key);
+			Input->BindAction(Pair.Value, ETriggerEvent::Completed, this, &AWRCharacter::InputReleased, Pair.Key);
 		}
 	}
 }
@@ -952,9 +982,65 @@ void AWRCharacter::Move(const FInputActionValue& Value)
 
 void AWRCharacter::Look(const FInputActionValue& Value)
 {
-	const FVector2D Axis = Value.Get<FVector2D>();
-	AddControllerYawInput(Axis.X);
-	AddControllerPitchInput(-Axis.Y);
+	WRInput::MouseLook(this, Value.Get<FVector2D>());
+}
+
+void AWRCharacter::PadLook(const FInputActionValue& Value)
+{
+	const FVector2D Stick = Value.Get<FVector2D>();
+	AWRPlayerController* PC = Cast<AWRPlayerController>(Controller);
+	if (PC && PC->GetLockTarget())
+	{
+		// Locked on, the camera follows the target: a flick of the right stick moves the lock to the next one that way.
+		const float Mag = Stick.Size();
+		if (Mag < WRTune(TEXT("look.flickRearm"), 0.3f)) bPadFlickReady = true;
+		else if (bPadFlickReady && Mag > WRTune(TEXT("look.flickThreshold"), 0.6f))
+		{
+			bPadFlickReady = false;
+			PC->FlickLock(Stick);
+		}
+		return;
+	}
+	bPadFlickReady = true;
+	WRInput::PadLook(this, Stick, GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f);
+}
+
+void AWRCharacter::InputPressed(EWRAbilityInput Input)
+{
+	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
+	HeldInputs.Add(Input);
+	PressAbilityInput(Input);
+}
+
+void AWRCharacter::InputReleased(EWRAbilityInput Input)
+{
+	// Only a press this body took is let go (one dropped by a menu already was; one the gate stopped never began).
+	if (HeldInputs.Remove(Input) == 0) return;
+	ReleaseAbilityInput(Input);
+}
+
+void AWRCharacter::InputJump()
+{
+	if (WRInput::AllowPress(Cast<APlayerController>(Controller))) Jump();
+}
+
+void AWRCharacter::InputSprint()
+{
+	if (WRInput::AllowPress(Cast<APlayerController>(Controller))) StartSprint();
+}
+
+void AWRCharacter::InputView()
+{
+	if (WRInput::AllowPress(Cast<APlayerController>(Controller))) ToggleView();
+}
+
+void AWRCharacter::DropHeldInputs()
+{
+	const TArray<EWRAbilityInput> Held = HeldInputs.Array();
+	HeldInputs.Reset();
+	for (const EWRAbilityInput Input : Held) ReleaseAbilityInput(Input);
+	StopSprint();
+	StopJumping();
 }
 
 void AWRCharacter::StartSprint()

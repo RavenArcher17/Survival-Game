@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRUIMap.h"
@@ -261,7 +262,6 @@ public:
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 24.f * U)[HotbarArea()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 24.f * U, 24.f * U)[AbilityPlate()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 24.f * U, 140.f * U)[TameCard()]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[HelpOverlay()]
 		];
 	}
 
@@ -480,8 +480,9 @@ private:
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 8.f * U, 2.f * U, 0.f)
 			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()[SNew(SWRKeyCap).Text_Lambda([]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Help"))); }).FontSize(11)]
+				// (F1 on the keyboard; a pad opens the page with Y from any menu, so the hint is the keyboard's only)
+				SNew(SHorizontalBox).Visibility_Lambda([]() { return WRInput::UsingPad() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+				+ SHorizontalBox::Slot().AutoWidth()[SNew(SWRKeyCap).Text_Lambda([]() { return WRInput::ActionKey(TEXT("Help")); }).FontSize(11)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.f, 0.f, 0.f, 0.f)[WRUI::Text(LOCTEXT("Controls", "Controls"), WRUI::Body(12, 700), WRUI::Ink2, true)]
 			];
 	}
@@ -555,7 +556,7 @@ private:
 		if (!C) return FString();
 		const FWRItemDef* Food = FWRItemRegistry::Get().Find(C->TameFoodItem);
 		const FString FoodName = Food ? Food->Name : FString(TEXT("food"));
-		const FString Key = WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Interact"))).ToString();
+		const FString Key = WRInput::ActionKey(TEXT("Interact")).ToString();
 		if (C->TameFoodCount == 0 && C->MealLeft <= 0.f) return FString::Printf(TEXT("Hungry: %s to feed it %s or kibble"), *Key, *FoodName);
 		if (C->TameEta < 0.f) return FString::Printf(TEXT("Needs %d more %s"), C->TameFoodNeeded, *FoodName);
 		if (C->TameEta > C->WakeIn) return FString::Printf(TEXT("Tamed in about %.0f s, but it wakes first: give it a narcotic"), C->TameEta);
@@ -724,7 +725,7 @@ private:
 			SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(12.f * U, 8.f * U))
 			[
 				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRKeyCap).FontSize(14).Text_Lambda([]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Interact"))); })]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRKeyCap).FontSize(14).Text_Lambda([]() { return WRInput::ActionKey(TEXT("Interact")); })]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
 					SNew(SVerticalBox)
@@ -865,7 +866,7 @@ private:
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)
 				[
-					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* M = PC.IsValid() ? Cast<AWRCreature>(PC->GetPawn()) : nullptr; return M ? FText::Format(LOCTEXT("Riding", "Riding {0}  ·  {1} to dismount"), FText::FromString(M->GetDisplayLabel()), WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Interact")))) : FText::GetEmpty(); }), WRUI::Body(13, 700), WRUI::Brass)
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* M = PC.IsValid() ? Cast<AWRCreature>(PC->GetPawn()) : nullptr; return M ? FText::Format(LOCTEXT("Riding", "Riding {0}  ·  {1} to dismount"), FText::FromString(M->GetDisplayLabel()), WRInput::ActionKey(TEXT("Interact"))) : FText::GetEmpty(); }), WRUI::Body(13, 700), WRUI::Brass)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Stamina", "Stamina"), WRUI::Stamina, 14.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetStamina() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxStamina() : 1.f; })]
@@ -952,7 +953,7 @@ private:
 					]
 					+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(-6.f, 0.f, 0.f, -4.f)
 					[
-						SNew(SWRKeyCap).FontSize(11).Text_Lambda([Wheel]() { return WRUI::KeyName(FWRKeyBindings::Get().Key(Wheel == 0 ? TEXT("Wheel1") : TEXT("Wheel2"))); })
+						SNew(SWRKeyCap).FontSize(11).Text_Lambda([Wheel]() { return WRInput::ActionKey(Wheel == 0 ? TEXT("Wheel1") : TEXT("Wheel2")); })
 					]
 				]
 			]
@@ -995,7 +996,7 @@ private:
 					[
 						WRUI::Text(TAttribute<FText>::CreateLambda([]()
 						{
-							const FText K = WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Wheel1")));
+							const FText K = WRInput::ActionKey(TEXT("Wheel1"));
 							return FText::Format(LOCTEXT("WheelHint", "Hold {0} for the wheel\nTap {0} to cast"), K);
 						}), WRUI::Body(12, 500), WRUI::Ink3, false, true)
 					]
@@ -1041,44 +1042,6 @@ private:
 					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* T = NearTame(); return T ? FText::FromString(T->GetDisplayLabel()) : FText::GetEmpty(); }), WRUI::Body(14, 800), WRUI::Ink)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 3.f * U)[SNew(SWRBar).Height(5.f * U).Color(WRUI::Hp).Fraction_Lambda([this]() { const AWRCreature* T = NearTame(); const UWRAttributeSet* A = T ? T->GetAttributes() : nullptr; return A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 0.f; })]
 					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* T = NearTame(); return T && T->bTameAggressive ? LOCTEXT("FollowAggro", "Following · aggressive") : LOCTEXT("Follow", "Following · passive"); }), WRUI::Body(12, 700), WRUI::Good)]
-				]
-			]
-		];
-	}
-
-	// ---------------------------------------------------------------- help (H)
-	TSharedRef<SWidget> HelpOverlay()
-	{
-		TSharedRef<SVerticalBox> Col1 = SNew(SVerticalBox), Col2 = SNew(SVerticalBox);
-		int32 n = 0;
-		for (const FWRActionKey& A : FWRKeyBindings::Get().Actions())
-		{
-			if (A.Group == TEXT("Abilities") || (A.Id.ToString().StartsWith(TEXT("Hotbar")) && A.Id != TEXT("Hotbar1"))) continue;
-			const FName Id = A.Id;
-			TSharedRef<SVerticalBox> Col = (n++ % 2 == 0) ? Col1 : Col2;
-			Col->AddSlot().AutoHeight().Padding(0.f, 3.f * U)
-			[
-				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(96.f * U)[SNew(SWRKeyCap).FontSize(11).Text_Lambda([Id]() { return Id == TEXT("Hotbar1") ? FText::FromString(TEXT("1 - 8")) : WRUI::KeyName(FWRKeyBindings::Get().Key(Id)); })]]
-				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(Id == TEXT("Hotbar1") ? LOCTEXT("HotbarAll", "Hotbar slots") : A.Label, WRUI::Body(13, 500), WRUI::Ink)]
-			];
-		}
-		return SNew(SBox).WidthOverride(760.f * U).Visibility_Lambda([this]() { const FWRPlayerUI* X = UI(); return X && X->IsHelpShown() && !X->IsScreenOpen() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-		[
-			SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).BrassTrim(true).Padding(FMargin(26.f * U, 20.f * U))
-			[
-				SNew(SVerticalBox)
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 12.f * U)
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f)[WRUI::Text(LOCTEXT("ControlsTitle", "Controls"), WRUI::Title(20), WRUI::Ink)]
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("ControlsHint", "Change any key in Settings > Controls"), WRUI::Body(12, 500), WRUI::Ink3)]
-				]
-				+ SVerticalBox::Slot().AutoHeight()
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 20.f * U, 0.f)[Col1]
-					+ SHorizontalBox::Slot().FillWidth(1.f)[Col2]
 				]
 			]
 		];

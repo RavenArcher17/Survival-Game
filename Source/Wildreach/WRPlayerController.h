@@ -81,6 +81,13 @@ public:
 	void ReturnToMenu();
 
 	AWRCharacterBase* GetLockTarget() const { return LockTarget.Get(); }
+	/** The pad's right stick flicked while locked on: the lock moves to the nearest target that way on screen. */
+	void FlickLock(FVector2D Stick);
+	/** Building: snap off / grid / fine grid in turn (the Snap key; D-pad down while placing on a pad). */
+	void CycleSnap() { ToggleSnap(); }
+
+	/** Report a problem: a client's report travels to the host in pieces (WRReport), Kind 0 the JSON, 1 the picture. */
+	UFUNCTION(Server, Reliable) void ServerReportPart(int32 Id, int32 Part, int32 Parts, uint8 Kind, const TArray<uint8>& Bytes);
 	/** Server: what this player has locked on to (spells lead and curve toward it). */
 	AWRCharacterBase* GetServerLock() const { return ServerLock.Get(); }
 
@@ -376,6 +383,7 @@ private:
 	float SnapDotsStep = 0.f;
 
 	void ToggleLockOn();
+	void LockOnPressed();
 	void UpdateLockOn(float DeltaTime);
 	AWRCharacterBase* FindTarget(float MaxDistance, float MaxAngleDegrees) const;
 	/** What the lock-on key locks on to: visible, in the open, nearest the crosshair. */

@@ -37,6 +37,8 @@
 #include "WRKeyBindings.h"
 #include "WRGameMode.h"
 #include "WRPlayerUI.h"
+#include "WRPadInput.h"
+#include "WRReport.h"
 #include "WRRaids.h"
 #include "WRUIFlow.h"
 #include "Kismet/GameplayStatics.h"
@@ -145,7 +147,7 @@ void AWRPlayerController::BindKeys()
 		const FKey Key = Keys.Key(FName(Action));
 		if (Key.IsValid()) InputComponent->BindKey(Key, Event, this, Func);
 	};
-	Bind(TEXT("LockOn"), IE_Pressed, &AWRPlayerController::ToggleLockOn);
+	Bind(TEXT("LockOn"), IE_Pressed, &AWRPlayerController::LockOnPressed);
 	Bind(TEXT("Interact"), IE_Pressed, &AWRPlayerController::InteractPressed);
 	Bind(TEXT("Interact"), IE_Released, &AWRPlayerController::InteractReleased);
 	Bind(TEXT("Inventory"), IE_Pressed, &AWRPlayerController::ToggleInventory);
@@ -172,7 +174,21 @@ void AWRPlayerController::BindKeys()
 		InputComponent->KeyBindings.Add(KB);
 	};
 	BindLambda(Keys.Key(TEXT("Crafting")), IE_Pressed, [this]() { OpenJournal(EWRMenu::Craft); });
-	BindLambda(Keys.Key(TEXT("Help")), IE_Pressed, [this]() { if (UI) UI->ToggleHelp(); });
+	// (F1, the controls page, and F8, the report, are caught by the pad's input processor so they work in every menu.)
+	// The pad's gameplay buttons (Data/gamepad.json) that aren't the character's: one verb each (COMBAT-AND-LESSONS L4).
+	const FWRPadLayout& Pad = FWRPadLayout::Get();
+	const auto PadPress = [this, &BindLambda, &Pad](const TCHAR* Verb, TFunction<void()> Fn)
+	{
+		BindLambda(Pad.Key(FName(Verb)), IE_Pressed, [this, Fn]() { if (WRInput::AllowPress(this)) Fn(); });
+	};
+	BindLambda(Pad.Key(TEXT("Interact")), IE_Pressed, [this]() { InteractPressed(); });
+	BindLambda(Pad.Key(TEXT("Interact")), IE_Released, [this]() { InteractReleased(); });
+	PadPress(TEXT("LockOn"), [this]() { ToggleLockOn(); });
+	PadPress(TEXT("QuickFire"), [this]() { if (UI) UI->PadQuickFire(); });
+	PadPress(TEXT("QuickPrev"), [this]() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAimingRanged()) C->CycleAmmo(-1); else if (UI) UI->PadQuickStep(-1); });
+	PadPress(TEXT("QuickNext"), [this]() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAimingRanged()) C->CycleAmmo(1); else if (UI) UI->PadQuickStep(1); });
+	PadPress(TEXT("BeltNext"), [this]() { if (UI) UI->PadBeltStep(1); });
+	PadPress(TEXT("UseBelt"), [this]() { if (UI) UI->PadBeltUse(); });
 	for (int32 i = 0; i < 8; ++i)
 	{
 		BindLambda(Keys.Key(FName(*FString::Printf(TEXT("Hotbar%d"), i + 1))), IE_Pressed, [this, i]()
@@ -201,6 +217,8 @@ void AWRPlayerController::BindKeys()
 
 void AWRPlayerController::InteractPressed()
 {
+	// (Menus keep E: it closes a chest or a station's screen.) Just after leaving a mode, the press that left it doesn't act.
+	if (Menu == EWRMenu::None && !WRInput::AllowPress(this)) return;
 	if (UI && Menu == EWRMenu::None)
 	{
 		// Your own tame in front of you: hold for the order wheel, tap for the usual (see FWRPlayerUI::TameKey).
@@ -762,6 +780,51 @@ void AWRPlayerController::SetLockTarget(AWRCharacterBase* Target)
 void AWRPlayerController::ServerSetLock_Implementation(AWRCharacterBase* Target)
 {
 	ServerLock = Target;
+}
+
+void AWRPlayerController::LockOnPressed()
+{
+	if (WRInput::AllowPress(this)) ToggleLockOn();
+}
+
+void AWRPlayerController::FlickLock(FVector2D Stick)
+{
+	AWRCharacterBase* Current = LockTarget.Get();
+	const AWRCharacterBase* Self = Cast<AWRCharacterBase>(GetPawn());
+	if (!Current || !Self) return;
+	FVector2D From;
+	if (!ProjectWorldLocationToScreen(Current->GetActorLocation(), From, true)) return;
+	// Screen y grows downward; the stick's up is +y.
+	const FVector2D Dir = FVector2D(Stick.X, -Stick.Y).GetSafeNormal();
+	const float Range = WRTune(TEXT("camera.lockOnRange"), 2500.f);
+	const float Cross = WRTune(TEXT("look.flickCrossWeight"), 1.5f);
+	AWRCharacterBase* Best = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+	{
+		AWRCharacterBase* Other = *It;
+		if (Other == Self || Other == Current || !Other->IsAlive() || Other->IsHidden() || !Self->IsHostileTo(Other)) continue;
+		if (FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation()) > Range) continue;
+		FVector2D At;
+		if (!ProjectWorldLocationToScreen(Other->GetActorLocation(), At, true)) continue;
+		const FVector2D D = At - From;
+		const float Along = FVector2D::DotProduct(D, Dir);
+		if (Along <= 1.f) continue;
+		const float Score = Along + FMath::Abs(FVector2D::CrossProduct(D, Dir)) * Cross;
+		if (Score >= BestScore || !CanSeeTarget(Other)) continue;
+		BestScore = Score;
+		Best = Other;
+	}
+	if (Best)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("LOCK flick to %s"), *Best->GetName());
+		SetLockTarget(Best);
+	}
+}
+
+void AWRPlayerController::ServerReportPart_Implementation(int32 Id, int32 Part, int32 Parts, uint8 Kind, const TArray<uint8>& Bytes)
+{
+	WRReport::HostReceive(this, Id, Part, Parts, Kind, Bytes);
 }
 
 void AWRPlayerController::ToggleLockOn()

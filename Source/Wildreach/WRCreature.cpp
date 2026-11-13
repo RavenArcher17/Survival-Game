@@ -34,6 +34,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Dom/JsonObject.h"
 #include "EnhancedInputComponent.h"
+#include "WRPadInput.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -1609,6 +1610,20 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		RideMapping->MapKey(RideLookAction, EKeys::Mouse2D);
 		RideMapping->MapKey(RideJumpAction, EKeys::SpaceBar);
 		RideMapping->MapKey(RideDismountAction, EKeys::E);
+		// The pad: left stick rides, right stick looks, A jumps, X (use) gets off, as on foot.
+		RidePadLookAction = NewObject<UInputAction>(this);
+		RidePadLookAction->ValueType = EInputActionValueType::Axis2D;
+		const FWRPadLayout& Pad = FWRPadLayout::Get();
+		if (Pad.Key(TEXT("Move")).IsValid())
+		{
+			UInputModifierDeadZone* Dead = NewObject<UInputModifierDeadZone>(this);
+			Dead->Type = EDeadZoneType::Radial;
+			Dead->LowerThreshold = WRTune(TEXT("look.moveDeadZone"), 0.2f);
+			RideMapping->MapKey(RideMoveAction, Pad.Key(TEXT("Move"))).Modifiers.Add(Dead);
+		}
+		if (Pad.Key(TEXT("Look")).IsValid()) RideMapping->MapKey(RidePadLookAction, Pad.Key(TEXT("Look")));
+		if (Pad.Key(TEXT("Jump")).IsValid()) RideMapping->MapKey(RideJumpAction, Pad.Key(TEXT("Jump")));
+		if (Pad.Key(TEXT("Interact")).IsValid()) RideMapping->MapKey(RideDismountAction, Pad.Key(TEXT("Interact")));
 	}
 	if (const APlayerController* PC = Cast<APlayerController>(Controller))
 	{
@@ -1622,6 +1637,7 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	{
 		Input->BindAction(RideMoveAction, ETriggerEvent::Triggered, this, &AWRCreature::RideMove);
 		Input->BindAction(RideLookAction, ETriggerEvent::Triggered, this, &AWRCreature::RideLook);
+		Input->BindAction(RidePadLookAction, ETriggerEvent::Triggered, this, &AWRCreature::RidePadLook);
 		Input->BindAction(RideJumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		Input->BindAction(RideDismountAction, ETriggerEvent::Started, this, &AWRCreature::ServerDismount);
 	}
@@ -1640,9 +1656,12 @@ void AWRCreature::RideMove(const FInputActionValue& Value)
 
 void AWRCreature::RideLook(const FInputActionValue& Value)
 {
-	const FVector2D Axis = Value.Get<FVector2D>();
-	AddControllerYawInput(Axis.X);
-	AddControllerPitchInput(-Axis.Y);
+	WRInput::MouseLook(this, Value.Get<FVector2D>());
+}
+
+void AWRCreature::RidePadLook(const FInputActionValue& Value)
+{
+	WRInput::PadLook(this, Value.Get<FVector2D>(), GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f);
 }
 
 void AWRCreature::Tick(float DeltaSeconds)
