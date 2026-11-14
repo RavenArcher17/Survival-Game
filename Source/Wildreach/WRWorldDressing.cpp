@@ -1,4 +1,6 @@
 #include "WRWorldDressing.h"
+#include "WRFarm.h"
+#include "WRSurvival.h"
 #include "Algo/Sort.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
@@ -882,6 +884,16 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 	if (HK.Group == TEXT("shrub") && FMath::FRand() < FWRTuning::Get().Num(Tune + TEXT(".berryChance"), 0.3f))
 	{
 		Inventory->AddItem(TEXT("berries"), 1);
+	}
+	// The biome's crops grow wild among its shrubs (cooks/build-farming.md 2.2): their seeds come with the fibre.
+	if (HK.Group == TEXT("shrub"))
+	{
+		FWRFarm::WildSeeds(Inventory, WRBiome::At(this, HK.Ground[BestIndex]));
+	}
+	// Ice rocks give ice blocks for ice boxes (cooks/build-farming.md 2.9).
+	if (HK.Kind == TEXT("ice_rock") && FMath::FRand() < FWRTuning::Get().Num(TEXT("food.iceBlockChance"), 0.35f))
+	{
+		Inventory->AddItem(TEXT("ice_block"), 1);
 	}
 	const bool bUsedUp = Taken + 1 >= HitsTotal;
 	{

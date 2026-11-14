@@ -36,11 +36,20 @@ public:
 	const FWRFishDef* Pick(FName Biome, FName Water, bool bNight, float RareBoost, bool bLegend, float Random01) const;
 	/** "Lost things" a Treasure hook brings up (fishing.treasure in fish.json): an item and how many. */
 	TPair<FName, int32> Treasure(float Random01) const;
+	/** Each biome's bait (fish.json lures: Bait maker's lure for it) and every lure there is. */
+	FName LureFor(FName Biome) const { const FName* L = Lures.Find(Biome); return L ? *L : NAME_None; }
+	bool IsLure(FName Item) const { for (const TPair<FName, FName>& L : Lures) if (L.Value == Item) return true; return false; }
+	/** Fishing XP for a catch of this rarity (fish.json xp; a legend's first catch has its own). */
+	float XpFor(FName Rarity, bool bFirstLegend) const;
+	/** A legend's trophy item (trophy_<fish id>), given on its first catch. */
+	static FName TrophyItem(FName Fish) { return FName(*(TEXT("trophy_") + Fish.ToString())); }
 
 private:
 	FWRFishRegistry();
 	TArray<FWRFishDef> Fish;
 	TArray<TTuple<FName, int32, int32, float>> TreasureTable;   // item, min, max, weight
+	TMap<FName, FName> Lures;
+	TMap<FName, float> Xp;
 };
 
 UENUM()

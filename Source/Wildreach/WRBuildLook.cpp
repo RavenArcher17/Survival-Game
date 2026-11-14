@@ -532,6 +532,340 @@ float FWRBuildLook::Hash01(const FVector& WorldPoint, int32 Salt)
 	return (H & 0xFFFFFF) / static_cast<float>(0xFFFFFF);
 }
 
+// ---------------------------------------------------------------- farm and kitchen pieces (cooks/build-farming.md)
+
+namespace WRBuildLookDetail
+{
+	/** The farm's and the kitchen's pieces, each built as the real thing (the plan's 2.8 table and 1.2 references). */
+	static bool FarmBlocks(FBuilder& B, const FWRPieceDef& Def)
+	{
+		const FName Id = Def.Id;
+		const FName K = Def.Kind;
+		// A ring of fire stones with charcoal in it (the campfire's, the pot's).
+		const auto FireRing = [&B](float R, int32 N)
+		{
+			for (int32 i = 0; i < N; ++i)
+			{
+				const float A = i * 360.f / N;
+				const FVector C(FMath::Cos(FMath::DegreesToRadians(A)) * R, FMath::Sin(FMath::DegreesToRadians(A)) * R, 6.f);
+				B.Add(EWRLookMat::Stone, FVector(20.f + 6.f * B.Rand(C, 3), 15.f, 12.f + 4.f * B.Rand(C, 5)), C, FRotator(4.f * B.Jit(C, 7), A + 90.f, 6.f * B.Jit(C, 9)));
+			}
+			B.Add(EWRLookMat::Stone, FVector(R * 1.6f, R * 1.6f, 3.f), FVector(0.f, 0.f, 2.f), FRotator::ZeroRotator, 0.12f, EWRLookMesh::Cylinder);   // charcoal bed
+		};
+		if (Id == TEXT("campfire"))
+		{
+			// Nine fire stones, five split logs leaning in a cone over the coals, a spit across two forked sticks.
+			FireRing(45.f, 9);
+			for (int32 i = 0; i < 5; ++i)
+			{
+				const float A = i * 72.f + 15.f;
+				const FVector Dir(FMath::Cos(FMath::DegreesToRadians(A)), FMath::Sin(FMath::DegreesToRadians(A)), 0.f);
+				// Leaning in over the coals: the foot out on the ring, the top over the middle.
+				FWRLookBlock& Log = B.Add(EWRLookMat::Wood, FVector(10.f, 10.f, 62.f), Dir * 14.f + FVector(0.f, 0.f, 24.f), FRotator::ZeroRotator, 0.85f, EWRLookMesh::Cylinder);
+				Log.Rot = FRotationMatrix::MakeFromZX(-Dir * 0.55f + FVector(0.f, 0.f, 0.85f), Dir).Rotator();
+			}
+			for (const float X : { -62.f, 62.f })
+			{
+				B.Post(EWRLookMat::Wood, X, 0.f, 0.f, 72.f, 5.f);
+				B.Add(EWRLookMat::Wood, FVector(4.f, 4.f, 16.f), FVector(X - 4.f, 0.f, 78.f), FRotator(0.f, 0.f, 25.f));
+				B.Add(EWRLookMat::Wood, FVector(4.f, 4.f, 16.f), FVector(X + 4.f, 0.f, 78.f), FRotator(0.f, 0.f, -25.f));
+			}
+			B.Add(EWRLookMat::Wood, FVector(3.5f, 3.5f, 150.f), FVector(0.f, 0.f, 74.f), FRotator(90.f, 0.f, 0.f), 1.1f, EWRLookMesh::Cylinder);   // the spit
+			return true;
+		}
+		if (Id == TEXT("cooking_pot"))
+		{
+			// Its own fire ring, an iron tripod whose three legs meet over it, a chain, a round copper pot and its lid.
+			FireRing(42.f, 8);
+			for (int32 i = 0; i < 3; ++i)
+			{
+				const float A = i * 120.f;
+				const FVector Foot(FMath::Cos(FMath::DegreesToRadians(A)) * 60.f, FMath::Sin(FMath::DegreesToRadians(A)) * 60.f, 0.f);
+				const FVector Apex(0.f, 0.f, 128.f);
+				const FVector Leg = Apex - Foot;
+				FWRLookBlock& L = B.Add(EWRLookMat::Stone, FVector(4.f, 4.f, Leg.Size()), (Foot + Apex) * 0.5f, FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);
+				L.Rot = FRotationMatrix::MakeFromZ(Leg.GetSafeNormal()).Rotator();
+			}
+			B.Add(EWRLookMat::Stone, FVector(8.f, 8.f, 6.f), FVector(0.f, 0.f, 128.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);   // the ring at the apex
+			for (int32 c = 0; c < 6; ++c) B.Add(EWRLookMat::Stone, FVector(2.f, c % 2 ? 4.f : 2.f, 7.f), FVector(0.f, 0.f, 122.f - c * 7.f), FRotator(0.f, c % 2 ? 90.f : 0.f, 0.f), Iron);
+			B.Add(EWRLookMat::Cloth, FVector(46.f, 46.f, 24.f), FVector(0.f, 0.f, 70.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);       // the pot
+			B.Add(EWRLookMat::Cloth, FVector(50.f, 50.f, 3.f), FVector(0.f, 0.f, 82.f), FRotator::ZeroRotator, 0.8f, EWRLookMesh::Cylinder);       // its rim
+			B.Add(EWRLookMat::Cloth, FVector(42.f, 42.f, 4.f), FVector(0.f, 0.f, 85.f), FRotator::ZeroRotator, 0.7f, EWRLookMesh::Cylinder);       // the lid
+			B.Add(EWRLookMat::Stone, FVector(5.f, 5.f, 4.f), FVector(0.f, 0.f, 89.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);        // its knob
+			B.Add(EWRLookMat::Stone, FVector(52.f, 2.f, 2.f), FVector(0.f, 0.f, 92.f), FRotator::ZeroRotator, Iron);                               // the bail
+			return true;
+		}
+		if (Id == TEXT("oven"))
+		{
+			// A square plinth with a wood store under the hearth, a dome of coursed stone, an arched mouth, a chimney.
+			B.Box(EWRLookMat::Stone, FVector(-70.f, -60.f, 0.f), FVector(70.f, -45.f, 60.f));
+			B.Box(EWRLookMat::Stone, FVector(-70.f, 45.f, 0.f), FVector(70.f, 60.f, 60.f));
+			B.Box(EWRLookMat::Stone, FVector(-70.f, -45.f, 0.f), FVector(-55.f, 45.f, 60.f));
+			B.Box(EWRLookMat::Stone, FVector(-70.f, -62.f, 52.f), FVector(72.f, 62.f, 64.f), 1.1f);   // the hearth slab
+			for (int32 l = 0; l < 6; ++l) B.Add(EWRLookMat::Wood, FVector(9.f, 9.f, 95.f), FVector(10.f, -30.f + (l % 3) * 18.f, 10.f + (l / 3) * 17.f), FRotator(90.f, 0.f, 0.f), 0.9f, EWRLookMesh::Cylinder);
+			for (int32 c = 0; c < 6; ++c)
+			{
+				const float R = 58.f * FMath::Cos(c / 6.f * HALF_PI);
+				B.Add(EWRLookMat::Stone, FVector(R * 2.f, R * 2.f, 12.f), FVector(-5.f, 0.f, 70.f + c * 11.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);
+			}
+			B.Box(EWRLookMat::Stone, FVector(48.f, -24.f, 64.f), FVector(58.f, 24.f, 104.f), 0.08f);     // the mouth, dark inside
+			B.Box(EWRLookMat::Stone, FVector(50.f, -30.f, 104.f), FVector(62.f, 30.f, 112.f), 1.15f);   // the lintel stone
+			B.Box(EWRLookMat::Stone, FVector(-50.f, -16.f, 110.f), FVector(-22.f, 16.f, 190.f));        // the chimney
+			B.Box(EWRLookMat::Stone, FVector(-53.f, -19.f, 186.f), FVector(-19.f, 19.f, 194.f), 1.1f);
+			return true;
+		}
+		if (Id == TEXT("smokehouse"))
+		{
+			// A 2 x 2 m plank shed on sill beams: a door on the front, a gable roof of shingles with a vent at the ridge,
+			// a stone fire pit inside (the smoke goes up past the racks of meat and fish).
+			for (int32 s = 0; s < 4; ++s)
+			{
+				B.Frame = FTransform(FRotator(0.f, 90.f * s, 0.f), FRotator(0.f, 90.f * s, 0.f).RotateVector(FVector(0.f, -96.f, 0.f)));
+				B.Planks(-92.f, 92.f, 10.f, 200.f, 6.f, 24.f, 2.f, s != 0);
+				B.Box(EWRLookMat::Wood, FVector(-100.f, -6.f, 0.f), FVector(100.f, 6.f, 12.f), 0.8f);
+			}
+			B.Frame = FTransform::Identity;
+			for (const float X : { -96.f, 96.f }) for (const float Y : { -96.f, 96.f }) B.Post(EWRLookMat::Wood, X, Y, 0.f, 205.f, 12.f);
+			B.Box(EWRLookMat::Wood, FVector(-30.f, -101.f, 12.f), FVector(30.f, -97.f, 180.f), 0.7f);                 // the door
+			B.Box(EWRLookMat::Stone, FVector(18.f, -104.f, 95.f), FVector(22.f, -101.f, 105.f), Iron);              // its latch
+			for (const float Side : { -1.f, 1.f })
+			{
+				B.Add(EWRLookMat::Wood, FVector(240.f, 140.f, 8.f), FVector(0.f, Side * 52.f, 238.f), FRotator(0.f, 0.f, Side * 32.f), 0.9f);
+			}
+			B.Box(EWRLookMat::Wood, FVector(-110.f, -14.f, 268.f), FVector(110.f, 14.f, 276.f), 0.6f);              // the ridge vent cap
+			B.Add(EWRLookMat::Stone, FVector(70.f, 70.f, 14.f), FVector(0.f, 0.f, 12.f), FRotator::ZeroRotator, 0.9f, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (Id == TEXT("salting_barrel"))
+		{
+			// An oak cask with three iron hoops on a low stand, its lid held down by a river stone.
+			B.Box(EWRLookMat::Wood, FVector(-38.f, -38.f, 0.f), FVector(38.f, 38.f, 10.f), 0.8f);
+			for (int32 s = 0; s < 16; ++s)
+			{
+				const float A = s * 22.5f;
+				const FVector C(FMath::Cos(FMath::DegreesToRadians(A)) * 31.f, FMath::Sin(FMath::DegreesToRadians(A)) * 31.f, 52.f);
+				B.Add(EWRLookMat::Wood, FVector(5.f, 12.5f, 84.f), C, FRotator(0.f, A, 0.f));   // staves
+			}
+			for (const float Z : { 22.f, 52.f, 82.f }) B.Add(EWRLookMat::Stone, FVector(70.f, 70.f, 4.f), FVector(0.f, 0.f, Z), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);
+			B.Add(EWRLookMat::Wood, FVector(62.f, 62.f, 4.f), FVector(0.f, 0.f, 93.f), FRotator::ZeroRotator, 0.9f, EWRLookMesh::Cylinder);
+			B.Add(EWRLookMat::Stone, FVector(26.f, 20.f, 12.f), FVector(4.f, -3.f, 101.f), FRotator(0.f, 20.f, 0.f), 1.f, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (Id == TEXT("drying_rack"))
+		{
+			// Two A-frames of poles lashed at the top, three cross poles hung with strips of meat and fish.
+			for (const float X : { -90.f, 90.f })
+			{
+				for (const float Lean : { -1.f, 1.f }) B.Add(EWRLookMat::Wood, FVector(6.f, 6.f, 175.f), FVector(X, Lean * 22.f, 84.f), FRotator(0.f, 0.f, Lean * 15.f), 0.95f, EWRLookMesh::Cylinder);
+				B.Add(EWRLookMat::Trim, FVector(9.f, 9.f, 8.f), FVector(X, 0.f, 165.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);   // the lashing
+			}
+			const float Heights[] = { 162.f, 125.f, 95.f };
+			const float Offs[] = { 0.f, 10.f, 18.f };
+			for (int32 p = 0; p < 3; ++p)
+			{
+				B.Add(EWRLookMat::Wood, FVector(4.f, 4.f, 200.f), FVector(0.f, (p == 0 ? 0.f : (p == 1 ? -Offs[1] : Offs[2])), Heights[p]), FRotator(90.f, 0.f, 0.f), 1.1f, EWRLookMesh::Cylinder);
+				for (int32 s = 0; s < 7; ++s)
+				{
+					const float X = -66.f + s * 22.f;
+					const FVector C(X, (p == 0 ? 0.f : (p == 1 ? -Offs[1] : Offs[2])), Heights[p] - 20.f - 6.f * B.Rand(FVector(X, p, 0.f), 4));
+					B.Add(EWRLookMat::Cloth, FVector(7.f, 1.5f, 36.f + 10.f * B.Rand(C, 6)), C, FRotator(0.f, 0.f, 4.f * B.Jit(C, 8)));
+				}
+			}
+			return true;
+		}
+		if (Id == TEXT("compost_bin"))
+		{
+			// A slatted box (air between the boards), corner posts, dark compost heaped inside.
+			for (const float X : { -60.f, 60.f }) for (const float Y : { -50.f, 50.f }) B.Post(EWRLookMat::Wood, X, Y, 0.f, 88.f, 9.f);
+			for (int32 r = 0; r < 5; ++r)
+			{
+				const float Z0 = 6.f + r * 16.f, Z1 = Z0 + 11.f;
+				B.Box(EWRLookMat::Wood, FVector(-56.f, -52.f, Z0), FVector(56.f, -48.f, Z1));
+				B.Box(EWRLookMat::Wood, FVector(-56.f, 48.f, Z0), FVector(56.f, 52.f, Z1));
+				B.Box(EWRLookMat::Wood, FVector(-62.f, -46.f, Z0), FVector(-58.f, 46.f, Z1));
+				B.Box(EWRLookMat::Wood, FVector(58.f, -46.f, Z0), FVector(62.f, 46.f, Z1));
+			}
+			B.Box(EWRLookMat::Cloth, FVector(-56.f, -46.f, 0.f), FVector(56.f, 46.f, 58.f));
+			B.Add(EWRLookMat::Cloth, FVector(90.f, 75.f, 20.f), FVector(0.f, 0.f, 60.f), FRotator::ZeroRotator, 0.9f, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (Id == TEXT("ice_box"))
+		{
+			// A stone chest lined with straw, two iron bands, a heavy stone lid with an iron ring to lift it.
+			B.Box(EWRLookMat::Stone, FVector(-60.f, -36.f, 0.f), FVector(60.f, 36.f, 58.f));
+			B.Box(EWRLookMat::Trim, FVector(-56.f, -32.f, 58.f), FVector(56.f, 32.f, 61.f));          // straw at the seam
+			B.Box(EWRLookMat::Stone, FVector(-62.f, -38.f, 61.f), FVector(62.f, 38.f, 72.f), 1.15f);  // the lid
+			for (const float X : { -38.f, 38.f })
+			{
+				B.Box(EWRLookMat::Stone, FVector(X - 4.f, -39.f, 0.f), FVector(X + 4.f, 39.f, 73.f), Iron);
+			}
+			B.Add(EWRLookMat::Stone, FVector(10.f, 2.f, 10.f), FVector(0.f, -40.f, 62.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (Id == TEXT("salt_pan"))
+		{
+			// A shallow bed on the upper beach: a stone rim, a clay floor under the brine, a wooden rake.
+			B.Box(EWRLookMat::Stone, FVector(-150.f, -100.f, 0.f), FVector(150.f, -88.f, 14.f));
+			B.Box(EWRLookMat::Stone, FVector(-150.f, 88.f, 0.f), FVector(150.f, 100.f, 14.f));
+			B.Box(EWRLookMat::Stone, FVector(-150.f, -88.f, 0.f), FVector(-138.f, 88.f, 14.f));
+			B.Box(EWRLookMat::Stone, FVector(138.f, -88.f, 0.f), FVector(150.f, 88.f, 14.f));
+			B.Box(EWRLookMat::Cloth, FVector(-138.f, -88.f, 0.f), FVector(138.f, 88.f, 8.f));
+			B.Add(EWRLookMat::Wood, FVector(3.f, 3.f, 170.f), FVector(60.f, 112.f, 4.f), FRotator(90.f, 10.f, 0.f), 1.f, EWRLookMesh::Cylinder);
+			B.Add(EWRLookMat::Wood, FVector(6.f, 45.f, 4.f), FVector(-24.f, 97.f, 4.f), FRotator(0.f, 10.f, 0.f));
+			return true;
+		}
+		if (Id == TEXT("well"))
+		{
+			// A round stone curb (two courses, offset), two posts, the windlass drum and crank, a rope and bucket.
+			for (int32 c = 0; c < 2; ++c)
+			{
+				for (int32 i = 0; i < 12; ++i)
+				{
+					const float A = i * 30.f + c * 15.f;
+					const FVector C(FMath::Cos(FMath::DegreesToRadians(A)) * 54.f, FMath::Sin(FMath::DegreesToRadians(A)) * 54.f, 18.f + c * 34.f);
+					B.Add(EWRLookMat::Stone, FVector(26.f, 24.f, 33.f), C, FRotator(0.f, A, 0.f));
+				}
+			}
+			for (const float Y : { -72.f, 72.f }) B.Post(EWRLookMat::Wood, 0.f, Y, 0.f, 185.f, 11.f);
+			B.Add(EWRLookMat::Wood, FVector(18.f, 18.f, 130.f), FVector(0.f, 0.f, 160.f), FRotator(0.f, 0.f, 90.f), 0.9f, EWRLookMesh::Cylinder);    // the drum
+			B.Add(EWRLookMat::Stone, FVector(4.f, 4.f, 26.f), FVector(0.f, 90.f, 160.f), FRotator(0.f, 0.f, 90.f), Iron, EWRLookMesh::Cylinder);     // its axle out to the crank
+			B.Add(EWRLookMat::Stone, FVector(4.f, 4.f, 26.f), FVector(0.f, 103.f, 148.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);       // the crank arm
+			B.Add(EWRLookMat::Wood, FVector(4.f, 16.f, 4.f), FVector(0.f, 111.f, 136.f), FRotator::ZeroRotator, 1.f);                                 // its handle
+			B.Add(EWRLookMat::Trim, FVector(2.f, 2.f, 50.f), FVector(0.f, 0.f, 128.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);           // the rope
+			B.Add(EWRLookMat::Wood, FVector(24.f, 24.f, 24.f), FVector(0.f, 0.f, 92.f), FRotator::ZeroRotator, 0.85f, EWRLookMesh::Cylinder);        // the bucket
+			B.Add(EWRLookMat::Stone, FVector(26.f, 26.f, 2.f), FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);
+			B.Add(EWRLookMat::Stone, FVector(28.f, 2.f, 2.f), FVector(0.f, 0.f, 106.f), FRotator::ZeroRotator, Iron);
+			B.Box(EWRLookMat::Wood, FVector(-12.f, -90.f, 185.f), FVector(12.f, 90.f, 193.f), 0.8f);                                                // the beam over it
+			return true;
+		}
+		if (Id == TEXT("irrigation_channel"))
+		{
+			// A 4 m stone-lined trough: a base slab, two side walls, flat coping stones; the water runs in it when fed.
+			B.Box(EWRLookMat::Stone, FVector(-200.f, -35.f, 0.f), FVector(200.f, 35.f, 10.f), 0.85f);
+			for (const float Side : { -1.f, 1.f })
+			{
+				for (int32 s = 0; s < 5; ++s)
+				{
+					const float X0 = -200.f + s * 80.f;
+					B.Box(EWRLookMat::Stone, FVector(X0 + 0.5f, Side > 0.f ? 23.f : -35.f, 10.f), FVector(X0 + 79.5f, Side > 0.f ? 35.f : -23.f, 30.f));
+					B.Box(EWRLookMat::Stone, FVector(X0 + 1.f, Side > 0.f ? 21.f : -39.f, 30.f), FVector(X0 + 79.f, Side > 0.f ? 39.f : -21.f, 35.f), 1.15f);
+				}
+			}
+			return true;
+		}
+		if (Def.bGlass && Def.Shape == TEXT("wall"))
+		{
+			// Glazing over a stone knee wall: posts at the ends, timber mullions every 50 cm, rails; the panes are
+			// drawn in glass by WRFarmLook.
+			B.Box(EWRLookMat::Stone, FVector(-210.f, -12.f, 0.f), FVector(210.f, 12.f, 60.f));
+			B.Box(EWRLookMat::Stone, FVector(-210.f, -15.f, 58.f), FVector(210.f, 15.f, 64.f), 1.15f);
+			for (int32 m = 0; m <= 8; ++m) B.Box(EWRLookMat::Wood, FVector(-204.f + m * 51.f - 3.f, -5.f, 64.f), FVector(-204.f + m * 51.f + 3.f, 5.f, 300.f));
+			for (const float Z : { 64.f, 180.f, 294.f }) B.Box(EWRLookMat::Wood, FVector(-210.f, -6.f, Z), FVector(210.f, 6.f, Z + 6.f));
+			return true;
+		}
+		if (Def.bGlass && Def.Shape == TEXT("roof"))
+		{
+			// Rafters down the slope every 50 cm (the panes between them in glass by WRFarmLook).
+			const float Pitch = FMath::RadiansToDegrees(FMath::Atan2(200.f, 400.f));
+			for (int32 r = 0; r <= 8; ++r)
+			{
+				B.Add(EWRLookMat::Wood, FVector(500.f, 6.f, 10.f), FVector(-15.f, -204.f + r * 51.f, 108.f), FRotator(Pitch, 0.f, 0.f));
+			}
+			return true;
+		}
+		if (K == TEXT("crop") && Def.Plot == TEXT("ashpit"))
+		{
+			// La Geria: a round bed of black picÃ³n ash ringed with basalt, a crescent of stacked stone on its windward side.
+			for (int32 i = 0; i < 26; ++i)
+			{
+				const float A = i * 360.f / 26.f;
+				const FVector C(FMath::Cos(FMath::DegreesToRadians(A)) * 172.f, FMath::Sin(FMath::DegreesToRadians(A)) * 172.f, 10.f);
+				B.Add(EWRLookMat::Stone, FVector(40.f + 8.f * B.Rand(C, 1), 26.f, 20.f + 6.f * B.Rand(C, 2)), C, FRotator(3.f * B.Jit(C, 3), A + 90.f, 4.f * B.Jit(C, 4)), 0.55f);
+			}
+			for (int32 c = 0; c < 4; ++c)
+			{
+				for (int32 i = 0; i < 9; ++i)
+				{
+					const float A = 140.f + i * 10.f + (c % 2) * 5.f;   // the crescent behind the bed (-X)
+					const FVector C(FMath::Cos(FMath::DegreesToRadians(A)) * 196.f, FMath::Sin(FMath::DegreesToRadians(A)) * 196.f, 14.f + c * 24.f);
+					B.Add(EWRLookMat::Stone, FVector(38.f, 34.f - c * 3.f, 24.f), C, FRotator(4.f * B.Jit(C, 5), A + 90.f, 0.f), 0.5f);
+				}
+			}
+			B.Add(EWRLookMat::Cloth, FVector(330.f, 330.f, 6.f), FVector(0.f, 0.f, 1.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (K == TEXT("crop") && Def.Plot == TEXT("paddy"))
+		{
+			// An earth bund round a flooded bed.
+			for (const float S : { -1.f, 1.f })
+			{
+				B.Box(EWRLookMat::Cloth, FVector(-200.f, S > 0.f ? 180.f : -200.f, -10.f), FVector(200.f, S > 0.f ? 200.f : -180.f, 25.f), 1.4f);
+				B.Box(EWRLookMat::Cloth, FVector(S > 0.f ? 180.f : -200.f, -180.f, -10.f), FVector(S > 0.f ? 200.f : -180.f, 180.f, 25.f), 1.4f);
+			}
+			return true;
+		}
+		if (K == TEXT("crop") && Def.Plot == TEXT("kelp"))
+		{
+			// Two floats and the line the kelp is seeded on.
+			for (const float X : { -200.f, 200.f }) B.Add(EWRLookMat::Wood, FVector(40.f, 40.f, 30.f), FVector(X, 0.f, 15.f), FRotator::ZeroRotator, 0.7f, EWRLookMesh::Cylinder);
+			B.Add(EWRLookMat::Trim, FVector(2.f, 2.f, 400.f), FVector(0.f, 0.f, 20.f), FRotator(90.f, 0.f, 0.f), 1.f, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (K == TEXT("crop") && Def.Plot == TEXT("log"))
+		{
+			// Three hardwood logs, drilled and plugged with spawn.
+			for (int32 l = 0; l < 3; ++l) B.Add(EWRLookMat::Wood, FVector(36.f, 36.f, 380.f), FVector(0.f, -120.f + l * 120.f, 18.f), FRotator(90.f, 0.f, 0.f), 0.8f, EWRLookMesh::Cylinder);
+			return true;
+		}
+		if (K == TEXT("hive"))
+		{
+			// A coiled straw skep on a plank stand under a shingled hood on two posts; the entrance at its foot.
+			for (const float X : { -35.f, 35.f }) for (const float Y : { -30.f, 30.f }) B.Post(EWRLookMat::Wood, X, Y, 0.f, 60.f, 7.f);
+			B.Box(EWRLookMat::Wood, FVector(-45.f, -40.f, 56.f), FVector(45.f, 40.f, 62.f));
+			for (int32 c = 0; c < 7; ++c)
+			{
+				const float R = 30.f * FMath::Cos(c / 7.f * HALF_PI * 1.1f) + 2.f;
+				B.Add(EWRLookMat::Trim, FVector(R * 2.f, R * 2.f, 8.f), FVector(0.f, 0.f, 66.f + c * 7.5f), FRotator::ZeroRotator, 0.9f + 0.05f * (c % 2), EWRLookMesh::Cylinder);
+			}
+			B.Box(EWRLookMat::Stone, FVector(26.f, -6.f, 62.f), FVector(32.f, 6.f, 68.f), 0.05f);   // the entrance
+			for (const float X : { -48.f, 48.f }) B.Post(EWRLookMat::Wood, X, -42.f, 0.f, 150.f, 6.f);
+			for (const float Side : { -1.f, 1.f }) B.Add(EWRLookMat::Wood, FVector(120.f, 60.f, 4.f), FVector(0.f, Side * 24.f, 150.f), FRotator(0.f, 0.f, Side * 22.f), 0.85f);
+			return true;
+		}
+		if (K == TEXT("trap"))
+		{
+			// A willow funnel basket on a driven stake: three hoops, staves along it, the throat at the mouth.
+			B.Post(EWRLookMat::Wood, -50.f, 0.f, -60.f, 110.f, 7.f);
+			// Three hoops of bent willow (each a ring of short lengths), the basket narrowing to its end.
+			const float Hoops[] = { 26.f, 22.f, 15.f };
+			for (int32 h = 0; h < 3; ++h)
+			{
+				for (int32 g = 0; g < 12; ++g)
+				{
+					const float A = g * 30.f;
+					const FVector C(-30.f + h * 28.f, FMath::Cos(FMath::DegreesToRadians(A)) * Hoops[h], 26.f + FMath::Sin(FMath::DegreesToRadians(A)) * Hoops[h]);
+					B.Add(EWRLookMat::Trim, FVector(2.5f, Hoops[h] * 0.55f, 2.5f), C, FRotator(0.f, 0.f, A + 90.f), 0.75f);
+				}
+			}
+			for (int32 s = 0; s < 10; ++s)
+			{
+				const float A = s * 36.f;
+				const FVector C(-2.f, FMath::Cos(FMath::DegreesToRadians(A)) * 22.f, 26.f + FMath::Sin(FMath::DegreesToRadians(A)) * 22.f);
+				B.Add(EWRLookMat::Trim, FVector(66.f, 1.5f, 1.5f), C, FRotator(0.f, 0.f, A), 0.7f);
+			}
+			return true;
+		}
+		if (!Def.Trophy.IsNone())
+		{
+			// An oak board of three planks with two iron pins the fish hangs on (the fish is WRFarmLook's).
+			for (int32 i = 0; i < 3; ++i) B.Box(EWRLookMat::Wood, FVector(-72.f, -10.f, 120.f + i * 20.f + 0.5f), FVector(72.f, -4.f, 120.f + (i + 1) * 20.f - 0.5f));
+			for (const float X : { -24.f, 24.f }) B.Add(EWRLookMat::Stone, FVector(2.5f, 2.5f, 12.f), FVector(X, 0.f, 150.f), FRotator(0.f, 0.f, 90.f), Iron, EWRLookMesh::Cylinder);
+			return true;
+		}
+		return false;
+	}
+}
+
 TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransform& PieceToWorld)
 {
 	using namespace WRBuildLookDetail;
@@ -541,7 +875,8 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 	const FName K = Def.Kind;
 	const bool bStone = Def.Material == TEXT("stone");
 	const float Len = S == TEXT("palisade") || S == TEXT("gate") ? 440.f : 420.f;
-	if (S == TEXT("foundation")) bStone ? B.StoneFoundation() : B.WoodFoundation();
+	if (FarmBlocks(B, Def)) {}
+	else if (S == TEXT("foundation")) bStone ? B.StoneFoundation() : B.WoodFoundation();
 	else if (S == TEXT("wall")) bStone ? B.StoneWall(300.f) : B.WoodWall(300.f);
 	else if (S == TEXT("halfwall")) bStone ? B.StoneWall(150.f) : B.WoodWall(150.f);
 	else if (S == TEXT("upperwall")) bStone ? B.StoneWall(210.f) : B.WoodWall(210.f);
@@ -673,6 +1008,17 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 			B.Box(EWRLookMat::Wood, FVector(-405.f, -400.f, Z), FVector(-398.f, 400.f, Z + 12.f));
 			B.Box(EWRLookMat::Wood, FVector(398.f, -400.f, Z), FVector(405.f, 400.f, Z + 12.f));
 		}
+		// The feed trough along the -X fence: a hollowed log on two trestles (WRFarmLook heaps the fodder in it).
+		for (const float X : { -320.f, -200.f })
+		{
+			B.Add(EWRLookMat::Wood, FVector(5.f, 5.f, 48.f), FVector(X, -165.f, 22.f), FRotator(0.f, 0.f, 18.f), 1.f, EWRLookMesh::Cylinder);
+			B.Add(EWRLookMat::Wood, FVector(5.f, 5.f, 48.f), FVector(X, -135.f, 22.f), FRotator(0.f, 0.f, -18.f), 1.f, EWRLookMesh::Cylinder);
+		}
+		B.Add(EWRLookMat::Wood, FVector(40.f, 40.f, 170.f), FVector(-260.f, -150.f, 52.f), FRotator(90.f, 0.f, 0.f), 0.8f, EWRLookMesh::Cylinder);
+		B.Add(EWRLookMat::Stone, FVector(30.f, 30.f, 160.f), FVector(-260.f, -150.f, 58.f), FRotator(90.f, 0.f, 0.f), 0.1f, EWRLookMesh::Cylinder);   // its hollow
+		// The shelf by the +X fence's middle, where the products wait: a plank on two posts (the nest box sits on it).
+		for (const float Y : { 226.f, 294.f }) B.Post(EWRLookMat::Wood, 330.f, Y, 0.f, 80.f, 8.f);
+		B.Box(EWRLookMat::Wood, FVector(270.f, 222.f, 74.f), FVector(390.f, 298.f, 80.f));
 	}
 	return Out;
 }
@@ -708,6 +1054,12 @@ TArray<FWRLookBlock> FWRBuildLook::LeafBlocks(const FWRPieceDef& Def, const FVec
 
 FLinearColor FWRBuildLook::ClothColor(const FWRPieceDef& Def)
 {
+	if (Def.Plot == TEXT("ashpit")) return FLinearColor(0.022f, 0.021f, 0.02f);          // black picon ash
+	if (Def.Plot == TEXT("paddy")) return FLinearColor(0.06f, 0.045f, 0.03f);            // wet mud
+	if (Def.Id == TEXT("cooking_pot")) return FLinearColor(0.45f, 0.17f, 0.07f);         // beaten copper
+	if (Def.Id == TEXT("drying_rack")) return FLinearColor(0.25f, 0.06f, 0.04f);         // strips of meat and fish
+	if (Def.Id == TEXT("compost_bin")) return FLinearColor(0.04f, 0.025f, 0.015f);       // compost
+	if (Def.Id == TEXT("salt_pan")) return FLinearColor(0.18f, 0.22f, 0.24f);            // brine over clay
 	if (Def.Kind == TEXT("crop")) return FLinearColor(0.07f, 0.045f, 0.025f);           // tilled soil
 	if (Def.Id == TEXT("torch")) return FLinearColor(0.05f, 0.035f, 0.025f);            // pitch-soaked wrapping
 	if (Def.Id == TEXT("brazier")) return FLinearColor(0.12f, 0.03f, 0.01f);            // banked coals

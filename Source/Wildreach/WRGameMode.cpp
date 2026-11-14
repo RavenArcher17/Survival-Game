@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRFarm.h"
 #include "WRBeds.h"
 #include "WRSurvival.h"
 #include "WRGameState.h"
@@ -437,6 +438,7 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	Root->SetObjectField(TEXT("inventory"), PS->GetInventory()->ToJson());
 	Root->SetObjectField(TEXT("lifeSkills"), PS->GetLifeSkills()->ToJson());
 	Root->SetObjectField(TEXT("survival"), PS->GetSurvival()->ToJson());
+	Root->SetObjectField(TEXT("food"), PS->GetFood()->ToJson());
 	if (const TSharedPtr<FJsonObject> Bed = WRBeds::SaveDefault(PS))
 	{
 		Root->SetObjectField(TEXT("bed"), Bed);
@@ -480,6 +482,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetObjectField(TEXT("survival"), Survival))
 	{
 		PS->GetSurvival()->FromJson(*Survival);
+	}
+	const TSharedPtr<FJsonObject>* FoodJson = nullptr;
+	if (Root->TryGetObjectField(TEXT("food"), FoodJson))
+	{
+		PS->GetFood()->FromJson(*FoodJson);
 	}
 	const TSharedPtr<FJsonObject>* Inventory = nullptr;
 	if (Root->TryGetObjectField(TEXT("inventory"), Inventory))

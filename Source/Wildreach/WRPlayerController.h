@@ -27,6 +27,7 @@ enum class EWRMenu : uint8
 	Settings,  // settings: controls (key bindings) and more
 	Door,      // a code-lock door's keypad (MenuPiece)
 	Clan,      // the journal's Clan tab
+	Cook,      // a cooking pot or oven's Cook screen (MenuStation): discovery cooking (WRUICook)
 };
 
 class AWRBuildPiece;

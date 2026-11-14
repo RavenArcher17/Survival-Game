@@ -38,7 +38,8 @@ namespace WRCraftUI
 	using WRUI::U;   // mockup px -> 1080p units
 
 	const FName Hand(TEXT("hand"));
-	const FName Stations[] = { TEXT("hand"), TEXT("workbench"), TEXT("forge"), TEXT("armorer"), TEXT("alchemy_table") };
+	const FName Stations[] = { TEXT("hand"), TEXT("workbench"), TEXT("forge"), TEXT("armorer"), TEXT("alchemy_table"),
+		TEXT("campfire"), TEXT("smokehouse"), TEXT("salting_barrel"), TEXT("drying_rack"), TEXT("compost_bin") };
 
 	FText StationName(FName Type)
 	{
@@ -46,6 +47,13 @@ namespace WRCraftUI
 		if (Type == TEXT("forge")) return LOCTEXT("StForge", "Forge");
 		if (Type == TEXT("armorer")) return LOCTEXT("StArmorer", "Armorer");
 		if (Type == TEXT("alchemy_table")) return LOCTEXT("StAlchemy", "Alchemy table");
+		if (Type == TEXT("campfire")) return LOCTEXT("StCampfire", "Campfire");
+		if (Type == TEXT("cooking_pot")) return LOCTEXT("StPot", "Cooking pot");
+		if (Type == TEXT("oven")) return LOCTEXT("StOven", "Oven");
+		if (Type == TEXT("smokehouse")) return LOCTEXT("StSmokehouse", "Smokehouse");
+		if (Type == TEXT("salting_barrel")) return LOCTEXT("StSalting", "Salting barrel");
+		if (Type == TEXT("drying_rack")) return LOCTEXT("StDrying", "Drying rack");
+		if (Type == TEXT("compost_bin")) return LOCTEXT("StCompost", "Compost bin");
 		return LOCTEXT("StHand", "By hand");
 	}
 
@@ -56,6 +64,11 @@ namespace WRCraftUI
 		if (Type == TEXT("forge")) return TEXT("copper_ingot");
 		if (Type == TEXT("armorer")) return TEXT("hide_armor");
 		if (Type == TEXT("alchemy_table")) return TEXT("minor_healing_potion");
+		if (Type == TEXT("campfire")) return TEXT("cooked_meat");
+		if (Type == TEXT("smokehouse")) return TEXT("smoked_meat");
+		if (Type == TEXT("salting_barrel")) return TEXT("salted_meat");
+		if (Type == TEXT("drying_rack")) return TEXT("jerky");
+		if (Type == TEXT("compost_bin")) return TEXT("compost");
 		return TEXT("crude_hatchet");
 	}
 
@@ -899,6 +912,9 @@ private:
 				if (D >= 0.f) { State = FText::Format(LOCTEXT("MAway", "{0} m away"), FMath::Max(1, FMath::RoundToInt(D / 100.f))); StateColor = WRUI::Ink2; bNear = true; }
 				else State = LOCTEXT("NotNearby", "not nearby");
 			}
+			// The kitchen's stations only show when you have one near (the row stays the width of the screen).
+			const bool bKitchen = St == TEXT("campfire") || St == TEXT("smokehouse") || St == TEXT("salting_barrel") || St == TEXT("drying_rack") || St == TEXT("compost_bin");
+			if (bKitchen && !bNear) continue;
 			Chips->AddSlot().AutoWidth().Padding(4.f * U, 0.f, 0.f, 0.f)
 			[
 				SNew(SBorder)

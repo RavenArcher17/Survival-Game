@@ -23,6 +23,10 @@ struct FWRRecipe
 	/** A life-skill stat the maker needs (recipes.json "needsPerk": Bait maker's lures); none = anyone. Hidden without it. */
 	FName NeedsStat;
 	FString NeedsText;
+	/** A dish of the discovery kitchen (Data/cooking.json): cooked from the Cook screen's pattern, not ordered here. */
+	bool bDish = false;
+	/** The land its ingredients come from (recipes.json "biome"): not listed until that land is in the game. */
+	FName Biome;
 };
 
 class WILDREACH_API FWRRecipeRegistry
@@ -119,6 +123,8 @@ struct FWRCraftJob
 	 *  (one per item, taken when ordered, the unmade ones' back on a cancel). */
 	UPROPERTY() float Discount = 0.f;
 	UPROPERTY() bool bOverclocked = false;
+	/** A dish's worth (a golden crop in it: 1.5): what each one made is worth when eaten. */
+	UPROPERTY() float Worth = 1.f;
 	FWRCrafterHand Hand;   // server only
 };
 
@@ -209,6 +215,14 @@ public:
 	 * (craft.timeScale 0: made at once, as before 0.7).
 	 */
 	FString Craft(AWRPlayerController* Player, FName RecipeId, FName Element, int32 Times = 1);
+	/**
+	 * The kitchen (WRFarm::Cook): a dish (or Grey mush) cooked once, its ingredients already taken by the caller, on
+	 * this station's queue like any order (Count made, Seconds long, Worth carried to the food). Starts with "!" when
+	 * it can't (the queue is full), else the queued line.
+	 */
+	FString CookOrder(AWRPlayerController* Player, FName Dish, int32 Count, float Seconds, float Worth);
+	/** Is it burning (a campfire, a pot's fire, the oven, the smokehouse at work)? Every machine. */
+	bool IsWorking() const { return Queue.Num() > 0; }
 	/** Calls off an order (its maker, or the base's owner and clan): what wasn't made yet comes back. */
 	FString CancelJob(AWRPlayerController* Player, int32 Index);
 	/** Everything in the tray that fits into the player's bag. */

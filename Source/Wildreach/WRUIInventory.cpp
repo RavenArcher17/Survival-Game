@@ -256,6 +256,8 @@ FWRSlotView WRInv::StackView(const FWRItemStack& Stack)
 	V.Count = Stack.Count;
 	const FWRItemDef* Def = FWRItemRegistry::Get().Find(Stack.ItemId);
 	if (Def && Def->MaxDurability > 0.f) V.Durability = FMath::Clamp(Stack.Durability / Def->MaxDurability, 0.f, 1.f);
+	// Food: its freshness in the same thin bar (green, then amber at half, red at a quarter: half its worth).
+	if (Def && Def->Perishes()) V.Durability = FWRSpoil::FreshOf(Stack, FWRSpoil::DisplayNow);
 	// Slot rims: green for fine, blue for masterwork (crude and common have none).
 	if (Def && Def->IsEquipment()) V.Quality = Stack.Quality == EWRQuality::Masterwork ? 2 : Stack.Quality == EWRQuality::Fine ? 1 : 0;
 	return V;
@@ -1573,6 +1575,28 @@ namespace WRInvTab
 			TArray<TPair<FString, FString>> WhereRows;
 			const FWRRecipe* Recipe = FWRRecipeRegistry::Get().ForOutput(D->Id);
 			const int32 Shards = I ? I->CountOf(TEXT("upgrade_shard")) : 0;
+			// Food: how fresh, how long it keeps, what it fills (cooks/build-farming.md 2.8, 2.9).
+			if (D->Hunger > 0.f || D->Thirst > 0.f || D->Perishes())
+			{
+				if (D->Perishes())
+				{
+					const double Left = FWRSpoil::SecondsLeft(*S, FWRSpoil::DisplayNow);
+					const int32 Pct = FMath::RoundToInt(FWRSpoil::FreshOf(*S, FWRSpoil::DisplayNow) * 100.f);
+					const FString When = Left < 0.0 ? FString(TEXT("")) : Left >= 7200.0 ? FString::Printf(TEXT(" · spoils in %d h"), FMath::RoundToInt(Left / 3600.0))
+						: FString::Printf(TEXT(" · spoils in %d min"), FMath::Max(1, FMath::RoundToInt(Left / 60.0)));
+					WhereRows.Add({ TEXT("Fresh"), FString::Printf(TEXT("%d%%%s%s"), Pct, *When, Pct <= 25 ? TEXT(" (stale: half its worth)") : TEXT("")) });
+				}
+				else if (D->Hunger > 0.f)
+				{
+					WhereRows.Add({ TEXT("Keeps"), TEXT("Never spoils") });
+				}
+				TArray<FString> Fills;
+				const float Worth = FMath::Max(0.1f, S->Roll);
+				if (D->Hunger > 0.f) Fills.Add(FString::Printf(TEXT("hunger %d"), FMath::RoundToInt(D->Hunger * Worth)));
+				if (D->Thirst > 0.f) Fills.Add(FString::Printf(TEXT("thirst %d"), FMath::RoundToInt(D->Thirst * Worth)));
+				if (D->SatedMinutes > 0.f) Fills.Add(FString::Printf(TEXT("sated %d min"), FMath::RoundToInt(D->SatedMinutes * Worth)));
+				if (Fills.Num() > 0) WhereRows.Add({ TEXT("Fills"), FString::Join(Fills, TEXT(" · ")) + (Worth > 1.01f ? TEXT(" (golden)") : TEXT("")) });
+			}
 			if (D->Category == TEXT("tool"))
 			{
 				WhereRows.Add({ TEXT("Repair at"), StationName(TEXT("workbench")) });  // tools aren't upgraded

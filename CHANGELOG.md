@@ -1,5 +1,81 @@
 # Changelog
 
+## Unreleased: farming and food (biome crops, water, greenhouses, pens, hives, fishing in every land, the kitchen, spoilage)
+
+Aaron (lane build-farming: FULL-GAME 6.2; research, requirement ledger and plan in showcase-notes cooks/build-farming.md,
+following cooks/survival-crafting.md 2.7-2.11 and 2.23). Built to compile (editor); not played here (Aaron and the
+testers test, F8).
+
+- **Biome crops** (`Data/farming.json`): 24 crops, a common (20 min) and a rare (2 h) for each of the 12 lands, plus the
+  old berry plot. A crop grows in its own land only (the plot says "wrong ground: grows in the frozen tundra"), in the
+  plot types it takes, and by its needs: daylight (open sky or a glass roof), dark (a cave, or a roofed room with no
+  windows: Yorkshire's forcing sheds), wind (300 m up or the storm peaks), withered ground. On the island today: **Fire
+  pepper** and **Ember grape** (volcanic), **Snow turnip** and **Roseroot** (tundra); the rest come alive with their
+  land (`tuning world.liveBiomes`). A plot takes **9 seeds** and grows **9 plants**, modelled in code per crop form
+  (chilli bush, vine on a chestnut stake, root rosette, grain tufts, flowering herb, cactus pads, young palm, orchard
+  sapling, low berry, melon runner, forced stalks, mushrooms, kelp ribbons) through **four stages**: seed leaves, leaf,
+  flower, fruit colouring in from green and glossy when ripe. E harvests all nine: yield and seeds back from the data,
+  +50 XP the first time you harvest each crop. Seeds come from the land's shrubs (fire pepper 30% / ember grape 6% a
+  blow on volcanic shrubs; snow turnip / roseroot on tundra ones).
+- **Ash pit** (volcanic slopes only; stone 20): La Geria's vine pit: a round bed of black ash ringed in basalt behind a
+  crescent of stacked stone. Ember grapes grow only here. Paddies, kelp lines and log beds are built for the swamp, the
+  reefs and the fungal caverns and stay hidden until those lands exist.
+- **Water** (no watering can): a plot within 8 m of the sea, a **well** (Hearth 2: a round stone curb, windlass, rope and
+  bucket, water in the shaft) or a running **irrigation channel** (Hearth 3: 4 m stone troughs laid end to end from the
+  sea's edge or a well; water shows in them when fed and never runs uphill) grows in x0.67 the time; rain on an open plot
+  counts while it falls (`weather.json watersCrops`). Wet soil darkens. Ashfall still stops outdoor plots (moved here).
+- **Greenhouses** (Hearth 4: glass walls on a stone knee wall with timber mullions, glass roofs on rafters): a plot under
+  a glass roof walled in on 80% of its sides grows any land's crop at full speed. Shown with "Needs a Hearth of level 4"
+  until steel lands.
+- **Fertiliser**: E on a growing plot with compost uses one (+25% at harvest, +3 XP); a mulch ring shows.
+- **Farming perks all live**: Green fingers +25%, Seed keeper +50%, Grafting (other lands' crops at half yield), Rare
+  seeds 3%, Water wise x0.5 time, Companion planting x0.9 near a different crop, Golden crop 2% (a dish with it fills
+  half as much again), Endless field.
+- **Animal pens** (`farming.json animals`, 17 farm animals in data, Pumicehog and Snowpuff on the island): up to 4
+  animals (Large pens +2), a **feed trough** (a hollowed log on trestles) filled with E from what they eat (pigs: any crop,
+  berries, spoiled food; Snowpuffs: snow turnips, lichen, seeds, berries), each product on its own clock eating one feed
+  (Pumicehog: animal fat 10 min; Snowpuff: eggs 10 min, feathers 20 min), nothing when the trough is empty ("hungry").
+  Products wait on the **shelf by the gate**: eggs in a straw nest box, bundles of feathers, a crock of fat. Two of a kind
+  with feed to spare raise a **young** every hour (half size, grown in 30 min, +10 XP). Husbandry perks live: Gentle hand,
+  Large pens, Shearer, Selective breeding, Content herd, Prize stock (an ember truffle from a pig, eiderdown from a
+  Snowpuff). Animal fat makes tallow.
+- **Beehive** (straw skep on a stand under a shingled hood; honey 15 min, wax 30 min, crops within 20 m x0.85 time, no
+  feed while crops are near): built and waiting for the Hiveback (Ancient forest); hidden until then, with Bee whisperer
+  and Royal jelly.
+- **Fishing in every land** (`fish.json`): 30 more fish, a common, a rare and a **legend** for each of the 10 new lands,
+  with their bait (a lure per land, Bait maker). Fishing XP by rarity: common 20, rare 60, a legend 500 the first time and
+  100 after. A legend bites only with Legend catch **and** its land's lure on, **once a real day** each; the first catch
+  gives its **trophy**, mounted at home on an oak board (12 trophy pieces, comfort trophy group). **Fish trap** (Hearth 2:
+  a willow funnel basket on a stake, set in 50 cm of water): a common fish of those waters every 20 min, up to 6, +2 XP.
+- **The kitchen** (Farm & kitchen tab): **campfire** (roasts meat, fish and vegetables; 10 m of light; meals moved off the
+  workbench), **cooking pot** (an iron tripod over its own fire, a copper pot), **oven** (Hearth 2: stone dome, arched
+  mouth, chimney, wood store), **smokehouse** (Hearth 2: plank shed, fire pit; 10 at a time, 48 h fresh), **salting
+  barrel** (Hearth 2: salt + meat or fish, 24 h), **drying rack** (open air only: jerky, dried fish, dried fruit, raisins,
+  72 h), **compost bin** (spoiled food or fish scraps into compost; worms for bait), **ice box** (Hearth 3; food keeps 5x as
+  long while an ice block burns, one every 4 h; free in the tundra), **salt pan** (on the upper beach: 1 salt every 10 min
+  of daylight). Ice blocks come from ice rocks.
+- **Discovery cooking**: E at the pot or oven opens the **Cook screen** (mouse and pad): four places in the pot, the food
+  in your bag by group (Meat, Fish, Grain, Veg, Fruit, Herb, Dairy, Sweet, Mushroom, Water, Fat), Cook. A pattern you've
+  never made is a **discovery**: a parchment card slides in with its chime, +100 Cooking XP, and it joins your list for
+  one-click cooking. No match: Grey mush. 22 dishes (`Data/cooking.json`: porridge, stew, fish soup, broth, omelette,
+  skewer, hunter's feast, bread, pie, honey cake, and one per land: fire pepper stew, snow turnip chowder...).
+  **Recipe scraps** (from the Treasure hook) hint at one you haven't found. **Sated**: a good meal holds hunger still
+  for its minutes (HUD line under Rested; +1% a Cooking level); never a stat buff (Raven's rule). Cooking perks live:
+  Recipe sense, Preserver, Camp chef, Banquet (a feast of 12 portions, 45 min sated).
+- **Spoilage**: food has freshness on its stack (a thin bar on the icon: green, amber, red; the item card says how
+  fresh and when it spoils). Timestamps, no ticking: a 10 s sweep re-stamps food whose container changed pace (bag,
+  chest, tundra chest x0.5, ice box x0.2) and turns spoiled food into Spoiled food. Stale (25% and under) gives half.
+  Stacks join with averaged freshness; the oldest is eaten first. Raw meat 40 min, fish 30 min, crops 4 h, dishes
+  1.5-8 h; grain, honey, dates and raisins never spoil. Saves keep freshness (a logged-out bag doesn't spoil).
+- New: `WRFarm.h/.cpp` (`FWRFarmDefs`, `FWRFarm`, `UWRFoodComponent` on the PlayerState, `UWRFarmSubsystem`),
+  `WRFarmLook.cpp` (plants, products, water, glass, trophies), `WRUICook.cpp`, `FWRSpoil` in `WRInventory`, kitchen
+  and farm pieces in `WRBuildLook` (FarmBlocks), `Tools/art/make_farm_icons.py` (148 icons) and the Sated glyph.
+- Not finished: a hungry animal shows it only on its prompt (no thin body or head-down clip); smoke from the smokehouse
+  and oven chimneys (their fires burn inside); bone meal waits for the grinder (machinery); young farm animals are full
+  grown after a server restart; the 10 new lands' crops, fish, animals, paddies, kelp lines, log beds and the hive wait
+  for their land (in data and code, hidden); POI dressing (old kitchens with recipe scraps, ash-pit vineyards) waits for
+  the map cooks.
+
 ## Unreleased: survival (sleep and Rested, comfort, weather, darkness and light, corruption)
 
 Aaron (lane build-survival: FULL-GAME 6.1; research, requirement ledger and plan in showcase-notes

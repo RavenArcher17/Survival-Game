@@ -226,6 +226,7 @@ void FWRWeatherDefs::Load()
 				W.AggroMult = Num(F, TEXT("aggroMult"), 1.f);
 				W.AggroCreatures = Names(F, TEXT("aggroCreatures"));
 				F->TryGetBoolField(TEXT("cropsPause"), W.bCropsPause);
+				F->TryGetBoolField(TEXT("watersCrops"), W.bWatersCrops);
 				const TSharedPtr<FJsonObject>* S = nullptr;
 				if (F->TryGetObjectField(TEXT("strikes"), S))
 				{
@@ -453,7 +454,6 @@ void UWRWeatherSubsystem::Tick(float DeltaTime)
 		}
 	}
 	TickStrikes(DeltaTime);
-	TickCrops(DeltaTime);
 }
 
 void UWRWeatherSubsystem::TickStrikes(float DeltaTime)
@@ -526,40 +526,6 @@ void UWRWeatherSubsystem::TickStrikes(float DeltaTime)
 	}
 }
 
-void UWRWeatherSubsystem::TickCrops(float DeltaTime)
-{
-	// Ashfall: outdoor crop plots stop growing (their ready time moves on with the clock); a roof over a plot keeps it.
-	CropScan -= DeltaTime;
-	if (CropScan <= 0.f)
-	{
-		CropScan = 10.f;
-		CropPlots.Reset();
-		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
-		{
-			const FWRPieceDef* Def = It->bGhost ? nullptr : It->GetDef();
-			if (Def && Def->Kind == TEXT("crop")) CropPlots.Add(*It);
-		}
-	}
-	CropClock += DeltaTime;
-	if (CropClock < 1.f)
-	{
-		return;
-	}
-	const float Step = CropClock;
-	CropClock = 0.f;
-	const float T = GetWorld()->GetTimeSeconds();
-	for (const TWeakObjectPtr<AWRBuildPiece>& Weak : CropPlots)
-	{
-		AWRBuildPiece* Plot = Weak.Get();
-		if (!Plot || !Plot->bPlanted || Plot->CropReadyAt <= T) continue;
-		const FWRWeatherKind* K = ActiveKind(this, WRBiome::At(this, Plot->GetActorLocation()));
-		if (K && K->bCropsPause && !WRBiome::IsUnderBuiltRoof(this, Plot->GetActorLocation() + FVector(0.f, 0.f, 60.f), 1500.f, Plot))
-		{
-			Plot->CropReadyAt += Step;
-		}
-	}
-}
-
 // ---------------------------------------------------------------- lights
 
 UWRLightSubsystem* UWRLightSubsystem::Get(const UObject* WorldContext)
@@ -581,7 +547,8 @@ void UWRLightSubsystem::Refresh()
 	for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
 	{
 		const FWRPieceDef* Def = It->bGhost ? nullptr : It->GetDef();
-		if (!Def || Def->Kind != TEXT("light")) continue;
+		// Lights, and anything else with a lights.<id> row (the campfire, the cooking pot's fire, the oven).
+		if (!Def || (Def->Kind != TEXT("light") && LightRadius(Def->Id) <= 0.f)) continue;
 		Sources.Add({ *It, LightRadius(Def->Id), LightFlag(Def->Id, TEXT("ward")), false });
 	}
 	for (TActorIterator<AWRHearth> It(World); It; ++It)

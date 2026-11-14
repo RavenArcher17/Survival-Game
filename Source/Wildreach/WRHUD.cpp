@@ -1,4 +1,5 @@
 #include "WRHUD.h"
+#include "WRFarm.h"
 #include "WRStatusComponent.h"
 #include "WRAbilities.h"
 #include "WRAltar.h"
@@ -335,7 +336,7 @@ void AWRHUD::DrawHUD()
 			const FWRPieceDef* Def = Piece->GetDef();
 			FString Prompt = FString::Printf(TEXT("E: %s"), *Def->Name);
 			if (Def->Kind == TEXT("door")) Prompt += Piece->bOpen ? TEXT(" (close)") : Piece->bLocked ? TEXT(" (locked)") : TEXT(" (open)");
-			if (Def->Kind == TEXT("crop") && Piece->bPlanted) Prompt += TEXT(" (growing)");
+			if (Def->IsFarm()) Prompt = FString::Printf(TEXT("E: %s"), *FWRFarm::Describe(Piece, PC));
 			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
 		}
 		else if (const AWRStation* Station = Cast<AWRStation>(PC->FindUseTarget()))

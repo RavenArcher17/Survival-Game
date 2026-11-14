@@ -66,6 +66,12 @@ struct FWRItemDef
 	// Gems / boss parts: stat -> amount
 	TMap<FName, float> GemStats;
 
+	/** Food (cooks/build-farming.md 2.8, 2.9): how many minutes it keeps fresh in a bag (0 = never spoils), and how many
+	 *  minutes eating it holds hunger off (use.sated: hunger doesn't drain; never a stat buff). */
+	float KeepsMinutes = 0.f;
+	float SatedMinutes = 0.f;
+	bool Perishes() const { return KeepsMinutes > 0.f; }
+
 	/** Statuses a drink ends (use.cures: bleed, shock, blind, curse, burn, frostbite, poison, rot). */
 	TArray<FName> Cures;
 	/** Worn status resistance by status id (equip.resist). */
@@ -113,6 +119,12 @@ struct FWRItemStack
 	UPROPERTY() TArray<FName> Sockets;
 	/** Path material infused at craft time ("fire"/"frost"), or None. */
 	UPROPERTY() FName Element;
+	/** Food that spoils (FWRSpoil): freshness 0..1 as it was at server time FreshAt, falling FreshRate a second (its
+	 *  container's pace). No ticking: freshness now is worked out from these three. Food's Roll is its worth (a golden
+	 *  crop's dish: 1.5), so stacks of a different worth don't merge. */
+	UPROPERTY() float Fresh = 1.f;
+	UPROPERTY() float FreshAt = 0.f;
+	UPROPERTY() float FreshRate = 0.f;
 
 	bool IsEmpty() const { return ItemId.IsNone() || Count <= 0; }
 	static int32 SocketCount(EWRQuality Q) { return static_cast<int32>(Q); }
@@ -124,6 +136,10 @@ struct WILDREACH_API FWRInventoryRules
 {
 	/** Adds as much as fits (fills existing stacks first). Returns how many didn't fit. */
 	static int32 Add(TArray<FWRItemStack>& Slots, FName ItemId, int32 Count);
+	/** The same, as food of this freshness and worth (stacks only join ones of the same worth; freshness averages). */
+	static int32 AddFood(TArray<FWRItemStack>& Slots, FName ItemId, int32 Count, float Fresh, float Worth = 1.f);
+	/** Moves up to N from a stack into a slot list, carrying its freshness, worth and (gear) the instance. Returns how many moved. */
+	static int32 MoveFrom(FWRItemStack& From, TArray<FWRItemStack>& To, int32 N);
 	/** Adds one prepared equipment instance. False if no free slot. */
 	static bool AddInstance(TArray<FWRItemStack>& Slots, const FWRItemStack& Instance);
 	/** Removes up to Count across stacks. Returns how many were removed. */
@@ -134,8 +150,42 @@ struct WILDREACH_API FWRInventoryRules
 	/** The next / previous kind of that ammo in the bag after Current (the mouse wheel). */
 	static FName NextAmmo(const TArray<FWRItemStack>& Slots, FName Kind, FName Current, int32 Dir);
 	static float TotalWeight(const TArray<FWRItemStack>& Slots);
+	/** A stack in a save (its freshness kept as it is now; the instance fields for gear). */
+	static TSharedRef<class FJsonObject> StackToJson(const FWRItemStack& S);
+	static FWRItemStack StackFromJson(const TSharedPtr<class FJsonObject>& O);
 	/** A fresh equipment instance with full durability. */
 	static FWRItemStack MakeInstance(FName ItemId, EWRQuality Quality = EWRQuality::Common, float Roll = 1.f);
+};
+
+/**
+ * Spoilage (cooks/build-farming.md 2.9; DST's freshness bar): timestamps, never a per-stack tick. A stack's freshness
+ * is Fresh - (now - FreshAt) x FreshRate; the farm subsystem's 10 s sweep re-stamps a stack when its container's pace
+ * changes (a bag, a chest, a tundra chest, an ice box with or without ice) and turns empty ones into Spoiled food.
+ */
+struct WILDREACH_API FWRSpoil
+{
+	/** Server seconds the rules stamp with (the farm subsystem keeps it current on the server). */
+	static double ServerNow;
+	/** The server's clock as this machine sees it (the farm subsystem keeps it current everywhere): what the UI reads. */
+	static double DisplayNow;
+	/** The server's clock as this machine knows it (clients: the game state's server time). */
+	static double NowFor(const UObject* WorldContext);
+	static bool Perishes(FName ItemId);
+	/** 0..1 now (1 for food that never spoils and for non-food). */
+	static float FreshOf(const FWRItemStack& S, double Now);
+	/** Seconds until it's spoiled at its current pace (< 0: never). */
+	static double SecondsLeft(const FWRItemStack& S, double Now);
+	/** Its pace a second when kept at Mult (1 = a bag). */
+	static float RateFor(FName ItemId, float Mult);
+	/** Keep its freshness as it is now and go on at Mult's pace. */
+	static void Restamp(FWRItemStack& S, double Now, float Mult);
+	/** A new stack of food: Fresh at Now, a bag's pace. */
+	static void StampNew(FWRItemStack& S, float Fresh, double Now);
+	/** Re-stamps every perishable stack whose pace isn't Mult's and turns spoiled ones into Spoiled food. Returns how
+	 *  many stacks it changed. */
+	static int32 Sweep(TArray<FWRItemStack>& Slots, double Now, float Mult);
+	/** Eating it now: x1, or x0.5 at food.staleBelow (25%) and under. */
+	static float ValueMult(const FWRItemStack& S, double Now);
 };
 
 /**
@@ -156,6 +206,8 @@ public:
 
 	// --- Server ---
 	int32 AddItem(FName ItemId, int32 Count);
+	/** Food of a given freshness and worth (a dish from a golden crop, stale catch...). */
+	int32 AddFood(FName ItemId, int32 Count, float Fresh, float Worth = 1.f);
 	bool AddInstance(const FWRItemStack& Instance);
 	int32 RemoveItem(FName ItemId, int32 Count);
 	/** Use the first usable item of a category ("potion", "food", "drink"). Returns a message. */
@@ -218,6 +270,8 @@ private:
 	UPROPERTY(Replicated) FWRItemStack EquippedArmor;
 	UPROPERTY(Replicated) FWRItemStack EquippedRanged;
 	UPROPERTY(Replicated) FWRItemStack EquippedLight;
+	/** Server: UseSlot's stack, so UseCategory eats that one. */
+	int32 PreferSlot = INDEX_NONE;
 	/** Server time the potion belt is ready again (replicated so the HUD can show it). */
 	UPROPERTY(Replicated) float PotionReadyAt = 0.f;
 };

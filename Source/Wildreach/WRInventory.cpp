@@ -1,5 +1,6 @@
 #include "WRInventory.h"
 #include "WRSurvival.h"
+#include "WRFarm.h"
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRCreature.h"
@@ -53,6 +54,7 @@ FWRItemRegistry::FWRItemRegistry()
 			O->TryGetNumberField(TEXT("weight"), D.Weight);
 			FString ClassId;
 			if (O->TryGetStringField(TEXT("class"), ClassId)) D.WeaponClass = FName(*ClassId);
+			O->TryGetNumberField(TEXT("keeps"), D.KeepsMinutes);
 			const TSharedPtr<FJsonObject>* Use = nullptr;
 			if (O->TryGetObjectField(TEXT("use"), Use))
 			{
@@ -60,6 +62,7 @@ FWRItemRegistry::FWRItemRegistry()
 				(*Use)->TryGetNumberField(TEXT("hunger"), D.Hunger);
 				(*Use)->TryGetNumberField(TEXT("thirst"), D.Thirst);
 				(*Use)->TryGetNumberField(TEXT("cooldown"), D.UseCooldown);
+				(*Use)->TryGetNumberField(TEXT("sated"), D.SatedMinutes);
 				double Cleanse = 0.0;
 				D.bCleanse = (*Use)->TryGetNumberField(TEXT("cleanse"), Cleanse) && Cleanse > 0.0;
 				// Status cures (cooks/build-combat-full.md 2.12): the statuses this drink ends.
@@ -190,11 +193,37 @@ int32 FWRInventoryRules::Add(TArray<FWRItemStack>& Slots, FName ItemId, int32 Co
 		}
 		return Count;
 	}
+	return AddFood(Slots, ItemId, Count, 1.f, 1.f);
+}
+
+int32 FWRInventoryRules::AddFood(TArray<FWRItemStack>& Slots, FName ItemId, int32 Count, float Fresh, float Worth)
+{
+	const FWRItemDef* Def = FWRItemRegistry::Get().Find(ItemId);
+	if (!Def || Count <= 0)
+	{
+		return Count;
+	}
+	if (Def->IsEquipment() && Def->StackSize <= 1)
+	{
+		return Add(Slots, ItemId, Count);
+	}
+	const bool bFood = Def->Perishes();
+	const double Now = FWRSpoil::ServerNow;
+	Fresh = FMath::Clamp(Fresh, 0.f, 1.f);
 	for (FWRItemStack& S : Slots)
 	{
-		if (Count > 0 && S.ItemId == ItemId && S.Count < Def->StackSize)
+		if (Count > 0 && S.ItemId == ItemId && S.Count < Def->StackSize && FMath::IsNearlyEqual(S.Roll, Worth, 0.01f))
 		{
 			const int32 Moved = FMath::Min(Count, Def->StackSize - S.Count);
+			if (bFood)
+			{
+				// Joining stacks average their freshness by count (DST), then go on at the stack's own pace.
+				const float Mine = FWRSpoil::FreshOf(S, Now);
+				const float Rate = S.FreshRate;
+				S.Fresh = (Mine * S.Count + Fresh * Moved) / float(S.Count + Moved);
+				S.FreshAt = float(Now);
+				S.FreshRate = Rate > 0.f ? Rate : FWRSpoil::RateFor(ItemId, 1.f);
+			}
 			S.Count += Moved;
 			Count -= Moved;
 		}
@@ -206,10 +235,120 @@ int32 FWRInventoryRules::Add(TArray<FWRItemStack>& Slots, FName ItemId, int32 Co
 			S = FWRItemStack();
 			S.ItemId = ItemId;
 			S.Count = FMath::Min(Count, Def->StackSize);
+			S.Roll = Worth;
+			if (bFood) FWRSpoil::StampNew(S, Fresh, Now);
 			Count -= S.Count;
 		}
 	}
 	return Count;
+}
+
+int32 FWRInventoryRules::MoveFrom(FWRItemStack& From, TArray<FWRItemStack>& To, int32 N)
+{
+	const FWRItemDef* ItemDef = From.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(From.ItemId);
+	if (!ItemDef)
+	{
+		return 0;
+	}
+	if (ItemDef->IsEquipment() && ItemDef->StackSize <= 1)
+	{
+		if (!AddInstance(To, From)) return 0;
+		From = FWRItemStack();
+		return 1;
+	}
+	N = FMath::Clamp(N, 1, From.Count);
+	const int32 Moved = N - AddFood(To, From.ItemId, N, FWRSpoil::FreshOf(From, FWRSpoil::ServerNow), From.Roll);
+	From.Count -= Moved;
+	if (From.Count <= 0) From = FWRItemStack();
+	return Moved;
+}
+
+// ---------------------------------------------------------------- spoilage
+
+double FWRSpoil::ServerNow = 0.0;
+double FWRSpoil::DisplayNow = 0.0;
+
+double FWRSpoil::NowFor(const UObject* WorldContext)
+{
+	const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+	if (!World) return ServerNow;
+	if (const AGameStateBase* GS = World->GetGameState()) return GS->GetServerWorldTimeSeconds();
+	return World->GetTimeSeconds();
+}
+
+bool FWRSpoil::Perishes(FName ItemId)
+{
+	const FWRItemDef* Def = FWRItemRegistry::Get().Find(ItemId);
+	return Def && Def->Perishes();
+}
+
+float FWRSpoil::RateFor(FName ItemId, float Mult)
+{
+	const FWRItemDef* Def = FWRItemRegistry::Get().Find(ItemId);
+	if (!Def || !Def->Perishes()) return 0.f;
+	return FMath::Max(0.f, Mult) / (Def->KeepsMinutes * 60.f);
+}
+
+float FWRSpoil::FreshOf(const FWRItemStack& S, double Now)
+{
+	if (S.IsEmpty()) return 1.f;
+	if (S.FreshRate <= 0.f) return FMath::Clamp(S.Fresh, 0.f, 1.f);
+	return FMath::Clamp(float(S.Fresh - (Now - S.FreshAt) * S.FreshRate), 0.f, 1.f);
+}
+
+double FWRSpoil::SecondsLeft(const FWRItemStack& S, double Now)
+{
+	if (S.IsEmpty() || S.FreshRate <= 0.f) return -1.0;
+	return FreshOf(S, Now) / S.FreshRate;
+}
+
+void FWRSpoil::Restamp(FWRItemStack& S, double Now, float Mult)
+{
+	S.Fresh = FreshOf(S, Now);
+	S.FreshAt = float(Now);
+	S.FreshRate = RateFor(S.ItemId, Mult);
+}
+
+void FWRSpoil::StampNew(FWRItemStack& S, float Fresh, double Now)
+{
+	S.Fresh = FMath::Clamp(Fresh, 0.f, 1.f);
+	S.FreshAt = float(Now);
+	S.FreshRate = RateFor(S.ItemId, 1.f);
+}
+
+int32 FWRSpoil::Sweep(TArray<FWRItemStack>& Slots, double Now, float Mult)
+{
+	int32 Changed = 0;
+	int32 Spoiled = 0;
+	for (FWRItemStack& S : Slots)
+	{
+		if (S.IsEmpty() || !Perishes(S.ItemId)) continue;
+		if (FreshOf(S, Now) <= 0.f)
+		{
+			Spoiled += S.Count;
+			S = FWRItemStack();
+			++Changed;
+			continue;
+		}
+		const float Want = RateFor(S.ItemId, Mult);
+		if (!FMath::IsNearlyEqual(S.FreshRate, Want, Want * 0.001f + 1e-9f))
+		{
+			Restamp(S, Now, Mult);
+			++Changed;
+		}
+	}
+	if (Spoiled > 0)
+	{
+		// What's left of it (compost, chum, pig feed); what doesn't fit is lost.
+		FWRInventoryRules::Add(Slots, TEXT("spoiled_food"), Spoiled);
+	}
+	return Changed;
+}
+
+float FWRSpoil::ValueMult(const FWRItemStack& S, double Now)
+{
+	if (!Perishes(S.ItemId)) return 1.f;
+	return FreshOf(S, Now) <= WRTune(TEXT("food.staleBelow"), 0.25f) ? WRTune(TEXT("food.staleValue"), 0.5f) : 1.f;
 }
 
 bool FWRInventoryRules::AddInstance(TArray<FWRItemStack>& Slots, const FWRItemStack& Instance)
@@ -304,6 +443,11 @@ AWRCharacterBase* UWRInventoryComponent::GetPawnCharacter() const
 int32 UWRInventoryComponent::AddItem(FName ItemId, int32 Count)
 {
 	return GetOwner()->HasAuthority() ? FWRInventoryRules::Add(Slots, ItemId, Count) : Count;
+}
+
+int32 UWRInventoryComponent::AddFood(FName ItemId, int32 Count, float Fresh, float Worth)
+{
+	return GetOwner()->HasAuthority() ? FWRInventoryRules::AddFood(Slots, ItemId, Count, Fresh, Worth) : Count;
 }
 
 bool UWRInventoryComponent::AddInstance(const FWRItemStack& Instance)
@@ -611,9 +755,18 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		}
 		return StartDrink(*Def);
 	}
+	// Farm things: a seed by an empty plot plants it, a recipe scrap is read, feed by a pen fills its trough.
+	{
+		const FString Farm = FWRFarm::UseItem(this, SlotIndex);
+		if (!Farm.IsEmpty()) return Farm;
+	}
 	if (Def->IsUsable())
 	{
-		return UseCategory(Def->Category);
+		// This very stack (its freshness and worth), not the first of its kind.
+		PreferSlot = SlotIndex;
+		const FString Said = UseCategory(Def->Category);
+		PreferSlot = INDEX_NONE;
+		return Said;
 	}
 	return FString::Printf(TEXT("%s can't be used"), *Def->Name);
 }
@@ -754,11 +907,32 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 			return Def && Def->Category == Category && Def->IsUsable();
 		});
 	}
+	if (Category == TEXT("food"))
+	{
+		// Food: the stack that would spoil first (fresh-keeping things last), so a bag eats its oldest.
+		const double Clock = FWRSpoil::ServerNow;
+		double Best = TNumericLimits<double>::Max();
+		for (const FWRItemStack& S : Slots)
+		{
+			const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+			if (!D || D->Category != Category || !D->IsUsable()) continue;
+			const double Left = FWRSpoil::SecondsLeft(S, Clock);
+			const double Key = Left < 0.0 ? 1.0e12 : Left;
+			if (Key < Best) { Best = Key; Stack = &S; }
+		}
+	}
+	if (Slots.IsValidIndex(PreferSlot) && !Slots[PreferSlot].IsEmpty())
+	{
+		Stack = &Slots[PreferSlot];
+	}
 	if (!Stack)
 	{
 		return FString::Printf(TEXT("no %s left"), *Category.ToString());
 	}
 	const FWRItemDef* Def = FWRItemRegistry::Get().Find(Stack->ItemId);
+	const int32 StackIndex = static_cast<int32>(Stack - Slots.GetData());
+	// Stale food (food.staleBelow) gives half; a golden crop's dish is worth more (its stack's Roll).
+	const float Value = Def->Category == TEXT("potion") ? 1.f : FWRSpoil::ValueMult(*Stack, FWRSpoil::ServerNow) * FMath::Max(0.1f, Stack->Roll);
 
 	// Healing comes only from crafted potions, limited by the belt cooldown.
 	const float Now = GetWorld()->GetTimeSeconds();
@@ -787,8 +961,13 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	{
 		PotionReadyAt = Now + Def->UseCooldown * FMath::Max(0.2f, 1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCooldown")));
 	}
-	const float Food = Def->Hunger * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("foodValue")));
-	const float Drink = Def->Thirst + (Def->Hunger > 0.f && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("mealsQuench")) > 0.f ? Def->Hunger * 0.5f : 0.f);
+	const float Food = Def->Hunger * Value * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("foodValue")));
+	const float Drink = (Def->Thirst + (Def->Hunger > 0.f && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("mealsQuench")) > 0.f ? Def->Hunger * 0.5f : 0.f)) * Value;
+	// Sated (cooks/build-farming.md 2.8): hunger holds still for the dish's minutes.
+	if (Def->SatedMinutes > 0.f)
+	{
+		UWRFoodComponent::Sate(GetOwner(), Def->SatedMinutes * Value);
+	}
 	if (Food > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), A->GetHunger() + Food);
 	if (Drink > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), A->GetThirst() + Drink);
 	// Shared meal (cooking perk): a meal feeds your clan mates close by too, at a share of its worth.
@@ -819,14 +998,21 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 
 	const FName Used = Def->Id;
 	WRSound::Broadcast(Character, Def->Category == TEXT("potion") ? FName(TEXT("potion")) : Def->Thirst > Def->Hunger ? FName(TEXT("drink")) : FName(TEXT("eat")));
-	RemoveItem(Used, 1);
+	if (Slots.IsValidIndex(StackIndex) && Slots[StackIndex].ItemId == Used)
+	{
+		if (--Slots[StackIndex].Count <= 0) Slots[StackIndex] = FWRItemStack();
+	}
+	else
+	{
+		RemoveItem(Used, 1);
+	}
 	UE_LOG(LogWildreach, Log, TEXT("ITEM %s used %s (%d left)"), *Character->GetName(), *Used.ToString(), CountOf(Used));
 	return FString::Printf(TEXT("Used %s"), *Def->Name);
 }
 
 // ---------------------------------------------------------------- persistence
 
-static TSharedRef<FJsonObject> StackToJson(const FWRItemStack& S)
+TSharedRef<FJsonObject> FWRInventoryRules::StackToJson(const FWRItemStack& S)
 {
 	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 	O->SetStringField(TEXT("id"), S.IsEmpty() ? FString() : S.ItemId.ToString());
@@ -843,10 +1029,18 @@ static TSharedRef<FJsonObject> StackToJson(const FWRItemStack& S)
 		for (const FName& G : S.Sockets) Sockets.Add(MakeShared<FJsonValueString>(G.ToString()));
 		O->SetArrayField(TEXT("sockets"), Sockets);
 	}
+	if (Def && Def->Perishes())
+	{
+		O->SetNumberField(TEXT("fresh"), FWRSpoil::FreshOf(S, FWRSpoil::ServerNow));
+	}
+	if (Def && !Def->IsEquipment() && !FMath::IsNearlyEqual(S.Roll, 1.f))
+	{
+		O->SetNumberField(TEXT("worth"), S.Roll);
+	}
 	return O;
 }
 
-static FWRItemStack StackFromJson(const TSharedPtr<FJsonObject>& O)
+FWRItemStack FWRInventoryRules::StackFromJson(const TSharedPtr<FJsonObject>& O)
 {
 	FWRItemStack S;
 	const FString Id = O->GetStringField(TEXT("id"));
@@ -869,6 +1063,14 @@ static FWRItemStack StackFromJson(const TSharedPtr<FJsonObject>& O)
 	{
 		for (const TSharedPtr<FJsonValue>& G : *Sockets) S.Sockets.Add(FName(*G->AsString()));
 	}
+	if (O->TryGetNumberField(TEXT("worth"), Num)) S.Roll = Num;
+	if (FWRSpoil::Perishes(S.ItemId))
+	{
+		// Kept as it was when saved (a logged-out bag doesn't spoil); the sweep sets its container's pace.
+		double Fresh = 1.0;
+		O->TryGetNumberField(TEXT("fresh"), Fresh);
+		FWRSpoil::StampNew(S, float(Fresh), FWRSpoil::ServerNow);
+	}
 	return S;
 }
 
@@ -878,13 +1080,13 @@ TSharedRef<FJsonObject> UWRInventoryComponent::ToJson() const
 	TArray<TSharedPtr<FJsonValue>> Array;
 	for (const FWRItemStack& S : Slots)
 	{
-		Array.Add(MakeShared<FJsonValueObject>(StackToJson(S)));
+		Array.Add(MakeShared<FJsonValueObject>(FWRInventoryRules::StackToJson(S)));
 	}
 	Root->SetArrayField(TEXT("slots"), Array);
-	Root->SetObjectField(TEXT("weapon"), StackToJson(EquippedWeapon));
-	Root->SetObjectField(TEXT("armor"), StackToJson(EquippedArmor));
-	Root->SetObjectField(TEXT("ranged"), StackToJson(EquippedRanged));
-	Root->SetObjectField(TEXT("light"), StackToJson(EquippedLight));
+	Root->SetObjectField(TEXT("weapon"), FWRInventoryRules::StackToJson(EquippedWeapon));
+	Root->SetObjectField(TEXT("armor"), FWRInventoryRules::StackToJson(EquippedArmor));
+	Root->SetObjectField(TEXT("ranged"), FWRInventoryRules::StackToJson(EquippedRanged));
+	Root->SetObjectField(TEXT("light"), FWRInventoryRules::StackToJson(EquippedLight));
 	Root->SetBoolField(TEXT("kitGiven"), bKitGiven);
 	return Root;
 }
@@ -900,16 +1102,16 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	Slots.SetNum(NumSlots);
 	for (int32 i = 0; i < NumSlots && i < Array->Num(); ++i)
 	{
-		Slots[i] = StackFromJson((*Array)[i]->AsObject());
+		Slots[i] = FWRInventoryRules::StackFromJson((*Array)[i]->AsObject());
 	}
 	const TSharedPtr<FJsonObject>* Weapon = nullptr;
-	if (Json->TryGetObjectField(TEXT("weapon"), Weapon)) EquippedWeapon = StackFromJson(*Weapon);
+	if (Json->TryGetObjectField(TEXT("weapon"), Weapon)) EquippedWeapon = FWRInventoryRules::StackFromJson(*Weapon);
 	const TSharedPtr<FJsonObject>* Armor = nullptr;
-	if (Json->TryGetObjectField(TEXT("armor"), Armor)) EquippedArmor = StackFromJson(*Armor);
+	if (Json->TryGetObjectField(TEXT("armor"), Armor)) EquippedArmor = FWRInventoryRules::StackFromJson(*Armor);
 	const TSharedPtr<FJsonObject>* RangedJson = nullptr;
-	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = StackFromJson(*RangedJson);
+	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = FWRInventoryRules::StackFromJson(*RangedJson);
 	const TSharedPtr<FJsonObject>* LightJson = nullptr;
-	if (Json->TryGetObjectField(TEXT("light"), LightJson)) EquippedLight = StackFromJson(*LightJson);
+	if (Json->TryGetObjectField(TEXT("light"), LightJson)) EquippedLight = FWRInventoryRules::StackFromJson(*LightJson);
 	Json->TryGetBoolField(TEXT("kitGiven"), bKitGiven);
 }
 

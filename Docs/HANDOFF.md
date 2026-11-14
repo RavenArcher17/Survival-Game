@@ -87,7 +87,23 @@ is in (the island's ridge split today; the 12-wedge lookup goes there). New rule
 row; decor gets a `pieces.json comfort` row; a creature that hunts in the dark gets `darkHunter: true`; code that
 should know about Rest binds `UWRSurvivalComponent::OnRest`.
 
+Also since 0.7.1: **farming and food** (FULL-GAME 6.2, cooks/build-farming.md): `UWRFarmSubsystem` runs plots
+(growth 0..1 moved every 2 s from `FWRFarm::GrowthRate`: land, plot type, light / dark / wind, water, bees, companions,
+Ashfall), the water network (wells, channels fed end to end), pens, hives, traps, salt pans, ice boxes and the freshness
+sweep; `AWRBuildPiece` carries the farm state (`CropId`, `Growth8`, `FarmFlags`, `FarmStop`, `Feed`) and `FWRFarmLook`
+draws it; `UWRFoodComponent` (PlayerState) holds known / hinted dishes, Sated, first harvests and legends. Crops, plot
+types, animals and wild seeds are `Data/farming.json`; food groups, dishes and fish recipes `Data/cooking.json` (dishes
+become `dish_<id>` station recipes the Cook screen orders, hidden from the Crafting tab). Food stacks carry freshness
+(`FWRItemStack::Fresh / FreshAt / FreshRate`, `FWRSpoil`): move stacks with `FWRInventoryRules::MoveFrom` / `AddFood` so
+freshness and worth travel with them. New rules for new code: a new crop is a `farming.json crops` row (seed and produce
+items, an icon); a new farm animal an `animals` row; a dish a `cooking.json dishes` row plus its item; a land's farm
+pieces, crops, fish, lures and recipes carry `biome` and stay hidden until it's in `tuning world.liveBiomes`.
+
 Open, as of 0.7.1:
+- **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
+  crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
+  their land is listed in `world.liveBiomes`. Greenhouse glass needs Hearth 4 (steel). Hungry animals show it only on
+  the prompt; no chimney smoke yet; bone meal waits for the grinder.
 - **Survival on the island is two biomes**: only Ashfall / Blizzard and the lesser volcanic and tundra weathers can
   happen; corruption, dark nights, strikes and gusts are live in code and data for the biomes that don't exist yet. The
   hero has no sleep clip (the death clip's end is held on the bed; `rest.pose*` in tuning).

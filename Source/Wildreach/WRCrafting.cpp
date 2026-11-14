@@ -1,4 +1,7 @@
 #include "WRCrafting.h"
+#include "WRFishing.h"
+#include "WRFarm.h"
+#include "WRSurvival.h"
 #include "WRSound.h"
 #include "WRBuildLook.h"
 #include "WRBuilding.h"
@@ -72,6 +75,8 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 			FString Needs;
 			if (O->TryGetStringField(TEXT("needsPerk"), Needs)) R.NeedsStat = FName(*Needs);
 			O->TryGetStringField(TEXT("needsText"), R.NeedsText);
+			FString RecipeBiome;
+			if (O->TryGetStringField(TEXT("biome"), RecipeBiome)) R.Biome = FName(*RecipeBiome);
 			const TSharedPtr<FJsonObject>* Inputs = nullptr;
 			if (O->TryGetObjectField(TEXT("inputs"), Inputs))
 			{
@@ -81,6 +86,67 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 				}
 			}
 			Recipes.Add(R);
+		}
+	}
+	// The kitchen (cooks/build-farming.md 2.8): every dish of Data/cooking.json is a recipe its station can make (the
+	// Cook screen orders it once the pattern matches), Grey mush included; and the fish recipes are written once in
+	// cooking.json fishRecipes, here made for every common and uncommon fish of fish.json.
+	if (const TSharedPtr<FJsonObject> Cook = FWRTuning::LoadDataFile(TEXT("cooking.json")))
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Dishes = nullptr;
+		if (Cook->TryGetArrayField(TEXT("dishes"), Dishes))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Dishes)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				if (!O.IsValid() || !O->HasField(TEXT("id"))) continue;
+				FWRRecipe R;
+				R.Output = FName(*O->GetStringField(TEXT("id")));
+				R.Id = FName(*(TEXT("dish_") + R.Output.ToString()));
+				FString S;
+				R.Station = O->TryGetStringField(TEXT("station"), S) ? FName(*S) : FName(TEXT("cooking_pot"));
+				double N = 0.0;
+				if (O->TryGetNumberField(TEXT("count"), N)) R.Count = FMath::Max(1, int32(N));
+				R.Seconds = O->TryGetNumberField(TEXT("seconds"), N) ? float(N) : 20.f;
+				R.bDish = true;
+				Recipes.Add(R);
+			}
+		}
+		FWRRecipe Mush;
+		Mush.Id = TEXT("dish_grey_mush");
+		Mush.Station = TEXT("cooking_pot");
+		Mush.Output = TEXT("grey_mush");
+		Mush.bDish = true;
+		Recipes.Add(Mush);
+		const TArray<TSharedPtr<FJsonValue>>* FishRecipes = nullptr;
+		if (Cook->TryGetArrayField(TEXT("fishRecipes"), FishRecipes))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *FishRecipes)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				if (!O.IsValid()) continue;
+				int32 FishCount = 1;
+				double N = 0.0;
+				if (O->TryGetNumberField(TEXT("fish"), N)) FishCount = FMath::Max(1, int32(N));
+				for (const FWRFishDef& F : FWRFishRegistry::Get().All())
+				{
+					if (F.Rarity != TEXT("common") && F.Rarity != TEXT("uncommon")) continue;
+					FWRRecipe R;
+					R.Id = FName(*FString::Printf(TEXT("%s_%s"), *O->GetStringField(TEXT("prefix")), *F.Id.ToString()));
+					R.Station = FName(*O->GetStringField(TEXT("station")));
+					R.Level = O->TryGetNumberField(TEXT("level"), N) ? FMath::Max(1, int32(N)) : 1;
+					R.Output = FName(*O->GetStringField(TEXT("output")));
+					R.Count = O->TryGetNumberField(TEXT("count"), N) ? FMath::Max(1, int32(N)) : 1;
+					R.Seconds = O->TryGetNumberField(TEXT("seconds"), N) ? float(N) : 15.f;
+					R.Inputs.Add({ F.Item, FishCount });
+					const TSharedPtr<FJsonObject>* Inputs = nullptr;
+					if (O->TryGetObjectField(TEXT("inputs"), Inputs))
+					{
+						for (const TPair<FString, TSharedPtr<FJsonValue>>& In : (*Inputs)->Values) R.Inputs.Add({ FName(*In.Key), static_cast<int32>(In.Value->AsNumber()) });
+					}
+					Recipes.Add(R);
+				}
+			}
 		}
 	}
 	const TSharedPtr<FJsonObject>* Q = nullptr;
@@ -114,7 +180,8 @@ TArray<const FWRRecipe*> FWRRecipeRegistry::ForStation(FName Station) const
 	TArray<const FWRRecipe*> Out;
 	for (const FWRRecipe& R : Recipes)
 	{
-		if (R.Station == Station) Out.Add(&R);
+		// Discovery dishes aren't listed: they're found in the Cook screen's pot.
+		if (R.Station == Station && !R.bDish && WRBiome::IsLive(R.Biome)) Out.Add(&R);
 	}
 	return Out;
 }
@@ -357,6 +424,18 @@ void AWRStation::OnRep_Type()
 	const FWRPieceDef* Def = FWRBuildLook::StationDef(StationType);
 	Visual = Def ? FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift) : nullptr;
 	Mesh->SetVisibility(Visual == nullptr);
+	// The kitchen's stations (campfire, cooking pot, oven, smokehouse, salting barrel, drying rack, compost bin) are
+	// drawn and collide as their build piece's own blocks (WRBuildLook FarmBlocks): no box of their own. The ones with
+	// a fire carry its light where the fire is (tuning farm.fireHeight.<type>, cm above the ground); WRFxAmbient puts
+	// the flames on that light.
+	if (Def && Def->Mesh.IsEmpty() && StationType != TEXT("workbench") && StationType != TEXT("forge") && StationType != TEXT("armorer") && StationType != TEXT("alchemy_table"))
+	{
+		Mesh->SetVisibility(false);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		const float FireZ = FWRTuning::Get().Num(FString::Printf(TEXT("farm.fireHeight.%s"), *StationType.ToString()), -1.f);
+		Glow->SetVisibility(FireZ >= 0.f);
+		if (FireZ >= 0.f) Glow->SetWorldLocation(GetActorLocation() + FVector(0.f, 0.f, FireZ - FWRBuildLook::ChildLift));
+	}
 }
 
 int32 AWRStation::GetTier() const
@@ -400,6 +479,15 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	if (!R || R->Station != StationType)
 	{
 		return TEXT("not made here");
+	}
+	if (R->bDish)
+	{
+		return TEXT("dishes are found by cooking: put ingredients in the pot");
+	}
+	// A drying rack dries in the open air only (cooks/build-farming.md 2.8): not under a roof.
+	if (StationType == TEXT("drying_rack") && WRBiome::IsUnderBuiltRoof(this, GetActorLocation() + FVector(0.f, 0.f, 150.f), WRTune(TEXT("farm.roofHeight"), 1500.f), GetOwner()))
+	{
+		return TEXT("A drying rack needs the open air: it won't dry under a roof");
 	}
 	if (R->Level > GetTier())
 	{
@@ -471,6 +559,37 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s queued %d x %s at %s (%.1f s each; %d orders)"), *Who, Times, *R->Id.ToString(), *StationType.ToString(), Seconds, Queue.Num());
 	return FString::Printf(TEXT("Queued %d %s: %s%s"), Times, *Name, *WRCraftDetail::Duration(Seconds * Times),
 		bOverclock ? *FString::Printf(TEXT(" (overclocked: %d wood burned)"), Times) : TEXT(""));
+}
+
+FString AWRStation::CookOrder(AWRPlayerController* Player, FName Dish, int32 Count, float Seconds, float Worth)
+{
+	FString Why;
+	if (!HasAuthority() || !CanUse(Player, Why))
+	{
+		return TEXT("!") + Why;
+	}
+	const FWRRecipe* R = FWRRecipeRegistry::Get().Find(FName(*(TEXT("dish_") + Dish.ToString())));
+	if (!R)
+	{
+		return TEXT("!that isn't a dish");
+	}
+	if (Queue.Num() >= FMath::RoundToInt(WRTune(TEXT("craft.queueOrders"), 6.f)))
+	{
+		return FString::Printf(TEXT("!The %s is full: wait for what's cooking"), *WRCraftDetail::PlainName(StationType));
+	}
+	const AWRPlayerState* PS = Player->GetPlayerState<AWRPlayerState>();
+	FWRCraftJob& Job = Queue.AddDefaulted_GetRef();
+	Job.Recipe = R->Id;
+	Job.Owner = PS ? PS->GetPlayerName() : FString();
+	Job.Left = 1;
+	Job.ItemSeconds = FMath::Max(0.f, Seconds * WRTune(TEXT("craft.timeScale"), 1.f) / (FMath::Max(0.1f, WRTune(TEXT("server.craftMultiplier"), 1.f)) * FWRCrafting::SpeedFor(Player, *R)));
+	Job.ItemLeft = Job.ItemSeconds;
+	Job.Worth = Worth;
+	Job.Hand = FWRCrafting::HandOf(Player, *R, StationType);
+	SetActorTickEnabled(true);
+	AdvanceQueue();
+	const FWRItemDef* Out = FWRItemRegistry::Get().Find(Dish);
+	return FString::Printf(TEXT("Cooking %s: %s"), Out ? *Out->Name : *Dish.ToString(), *WRCraftDetail::Duration(Job.ItemSeconds));
 }
 
 float AWRStation::SecondsFor(const FWRRecipe& Recipe, const AActor* Player)
@@ -631,7 +750,8 @@ void AWRStation::AdvanceQueue()
 		const APawn* MakerPawn = Maker ? Maker->GetPawn() : nullptr;
 		AWRPlayerState* MakerPS = Maker ? Maker->GetPlayerState<AWRPlayerState>() : nullptr;
 		const bool bNear = MakerPawn && MakerPS && FVector::Dist(MakerPawn->GetActorLocation(), GetActorLocation()) <= WRTune(TEXT("craft.deliverRange"), 2000.f);
-		const FWRCraftedOne One = FWRCrafting::MakeOne(*R, StationType, GetTier(), Job.Element, Job.Hand);
+		FWRCraftedOne One = FWRCrafting::MakeOne(*R, StationType, GetTier(), Job.Element, Job.Hand);
+		One.Item.Roll = One.bGear ? One.Item.Roll : Job.Worth;
 		const auto Fits = [&One](TArray<FWRItemStack> Slots) { return One.bGear ? FWRInventoryRules::AddInstance(Slots, One.Item) : FWRInventoryRules::Add(Slots, One.Item.ItemId, One.Item.Count) == 0; };
 		bool bToBag = bNear && Fits(MakerPS->GetInventory()->GetSlots());
 		TArray<FWRItemStack> Tray = Output;
@@ -645,12 +765,12 @@ void AWRStation::AdvanceQueue()
 		if (bToBag)
 		{
 			if (One.bGear) MakerPS->GetInventory()->AddInstance(One.Item);
-			else MakerPS->GetInventory()->AddItem(One.Item.ItemId, One.Item.Count);
+			else MakerPS->GetInventory()->AddFood(One.Item.ItemId, One.Item.Count, 1.f, Job.Worth);
 		}
 		else
 		{
 			if (One.bGear) FWRInventoryRules::AddInstance(Tray, One.Item);
-			else FWRInventoryRules::Add(Tray, One.Item.ItemId, One.Item.Count);
+			else FWRInventoryRules::AddFood(Tray, One.Item.ItemId, One.Item.Count, 1.f, Job.Worth);
 			Tray.RemoveAll([](const FWRItemStack& S) { return S.IsEmpty(); });
 			Output = Tray;
 		}
@@ -721,6 +841,7 @@ void AWRStation::QueueToJson(TSharedRef<FJsonObject> O) const
 		Q->SetBoolField(TEXT("minFine"), J.Hand.bMinFine);
 		Q->SetNumberField(TEXT("rollBonus"), J.Hand.RollBonus);
 		Q->SetNumberField(TEXT("doubleBrew"), J.Hand.DoubleBrew);
+		if (!FMath::IsNearlyEqual(J.Worth, 1.f)) Q->SetNumberField(TEXT("worth"), J.Worth);
 		Jobs.Add(MakeShared<FJsonValueObject>(Q));
 	}
 	if (Jobs.Num()) O->SetArrayField(TEXT("queue"), Jobs);
@@ -735,6 +856,7 @@ void AWRStation::QueueToJson(TSharedRef<FJsonObject> O) const
 		I->SetNumberField(TEXT("roll"), S.Roll);
 		I->SetNumberField(TEXT("durability"), S.Durability);
 		if (!S.Element.IsNone()) I->SetStringField(TEXT("element"), S.Element.ToString());
+		if (FWRSpoil::Perishes(S.ItemId)) I->SetNumberField(TEXT("fresh"), FWRSpoil::FreshOf(S, FWRSpoil::ServerNow));
 		Tray.Add(MakeShared<FJsonValueObject>(I));
 	}
 	if (Tray.Num()) O->SetArrayField(TEXT("tray"), Tray);
@@ -764,6 +886,8 @@ void AWRStation::QueueFromJson(const TSharedPtr<FJsonObject>& O)
 			J.Hand.bMinFine = Q->GetBoolField(TEXT("minFine"));
 			J.Hand.RollBonus = Q->GetNumberField(TEXT("rollBonus"));
 			J.Hand.DoubleBrew = Q->GetNumberField(TEXT("doubleBrew"));
+			double Worth = 1.0;
+			if (Q->TryGetNumberField(TEXT("worth"), Worth)) J.Worth = float(Worth);
 		}
 	}
 	const TArray<TSharedPtr<FJsonValue>>* Tray = nullptr;
@@ -778,6 +902,12 @@ void AWRStation::QueueFromJson(const TSharedPtr<FJsonObject>& O)
 			S.Count = I->GetIntegerField(TEXT("count"));
 			S.Quality = static_cast<EWRQuality>(I->GetIntegerField(TEXT("quality")));
 			S.Roll = I->GetNumberField(TEXT("roll"));
+			double Fresh = 1.0;
+			if (FWRSpoil::Perishes(S.ItemId))
+			{
+				I->TryGetNumberField(TEXT("fresh"), Fresh);
+				FWRSpoil::StampNew(S, float(Fresh), FWRSpoil::ServerNow);
+			}
 			S.Durability = I->GetNumberField(TEXT("durability"));
 			FString Element;
 			if (I->TryGetStringField(TEXT("element"), Element)) S.Element = FName(*Element);

@@ -5,6 +5,8 @@
 // spends stamina against a fish that pulls), Red Dead Redemption 2 (tension snaps a line) and Sea of Thieves (surges
 // you counter, no number meters). Server-authoritative; clients draw the float, the line and the HUD.
 #include "WRFishing.h"
+#include "WRFarm.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -81,7 +83,18 @@ FWRFishRegistry::FWRFishRegistry()
 				static_cast<int32>(O->GetNumberField(TEXT("max"))), static_cast<float>(O->GetNumberField(TEXT("weight")))));
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("Loaded %d fish, %d treasures"), Fish.Num(), TreasureTable.Num());
+	// Biome baits (Bait maker) and Fishing XP by rarity (cooks/build-farming.md 2.7).
+	const TSharedPtr<FJsonObject>* LureObj = nullptr;
+	if (Root->TryGetObjectField(TEXT("lures"), LureObj))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& L : (*LureObj)->Values) Lures.Add(FName(*L.Key), FName(*L.Value->AsString()));
+	}
+	const TSharedPtr<FJsonObject>* XpObj = nullptr;
+	if (Root->TryGetObjectField(TEXT("xp"), XpObj))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& X : (*XpObj)->Values) Xp.Add(FName(*X.Key), float(X.Value->AsNumber()));
+	}
+	UE_LOG(LogWildreach, Log, TEXT("Loaded %d fish, %d treasures, %d biome baits"), Fish.Num(), TreasureTable.Num(), Lures.Num());
 }
 
 const FWRFishDef* FWRFishRegistry::Find(FName Id) const
@@ -115,6 +128,13 @@ const FWRFishDef* FWRFishRegistry::Pick(FName Biome, FName Water, bool bNight, f
 		if (Roll <= 0.f) return P.Key;
 	}
 	return Pool.Num() > 0 ? Pool.Last().Key : nullptr;
+}
+
+float FWRFishRegistry::XpFor(FName Rarity, bool bFirstLegend) const
+{
+	if (bFirstLegend) return Xp.FindRef(TEXT("legendaryFirst")) > 0.f ? Xp.FindRef(TEXT("legendaryFirst")) : 500.f;
+	const float* X = Xp.Find(Rarity);
+	return X ? *X : 15.f;
 }
 
 TPair<FName, int32> FWRFishRegistry::Treasure(float Random01) const
@@ -224,8 +244,10 @@ AWRBobber* AWRBobber::CastFrom(AWRCharacter* Who, float Charge)
 	B->StartedAt = World->GetTimeSeconds();
 	B->CastSeconds = FMath::Lerp(0.45f, 0.9f, Charge);
 	// Bait in the bag makes bites come sooner; a lure for this biome draws the rare ones (it's used up at the bite).
-	B->bBaited = Inv && (Inv->CountOf(TEXT("cut_bait")) > 0 || Inv->CountOf(TEXT("ember_lure")) > 0 || Inv->CountOf(TEXT("rime_lure")) > 0);
-	const FName LureHere = B->BiomeHere() == TEXT("volcanic") ? FName(TEXT("ember_lure")) : FName(TEXT("rime_lure"));
+	bool bAnyBait = Inv && Inv->CountOf(TEXT("cut_bait")) > 0;
+	for (const FWRItemStack& S : Inv ? Inv->GetSlots() : TArray<FWRItemStack>()) bAnyBait |= !S.IsEmpty() && FWRFishRegistry::Get().IsLure(S.ItemId);
+	B->bBaited = bAnyBait;
+	const FName LureHere = FWRFishRegistry::Get().LureFor(B->BiomeHere());
 	B->Lure = Inv && Inv->CountOf(LureHere) > 0 ? LureHere : NAME_None;
 	WRSound::Broadcast(Who, TEXT("fish.cast"));
 	Who->MulticastBodyOneShot(TEXT("throw"));
@@ -236,7 +258,7 @@ AWRBobber* AWRBobber::CastFrom(AWRCharacter* Who, float Charge)
 
 FName AWRBobber::BiomeHere() const
 {
-	return GetActorLocation().X < WRTune(TEXT("sky.biomeCentre"), 0.f) ? FName(TEXT("volcanic")) : FName(TEXT("tundra"));
+	return WRBiome::At(this, GetActorLocation());
 }
 
 FName AWRBobber::WaterHere() const
@@ -250,19 +272,34 @@ FName AWRBobber::WaterHere() const
 const FWRFishDef* AWRBobber::ChooseFish() const
 {
 	const float Rare = UWRLifeSkillsComponent::StatFor(Angler, TEXT("rareFish")) + (Lure.IsNone() ? 0.f : WRTune(TEXT("fishing.lureRareBoost"), 2.f));
-	const bool bLegend = UWRLifeSkillsComponent::StatFor(Angler, TEXT("legendCatch")) > 0.f;
-	return FWRFishRegistry::Get().Pick(BiomeHere(), WaterHere(), AWRGameState::IsNightIn(this), Rare, bLegend, FMath::FRand());
+	// A legend bites only with Legend catch and this biome's bait on, once a real day each (cooks/build-farming.md 2.7).
+	const bool bLegend = UWRLifeSkillsComponent::StatFor(Angler, TEXT("legendCatch")) > 0.f && !Lure.IsNone();
+	const FWRFishDef* Got = FWRFishRegistry::Get().Pick(BiomeHere(), WaterHere(), AWRGameState::IsNightIn(this), Rare, bLegend, FMath::FRand());
+	if (Got && Got->Rarity == TEXT("legendary") && !FWRFarm::LegendAllowed(Angler ? Angler->GetPlayerState() : nullptr, Got->Id))
+	{
+		Got = FWRFishRegistry::Get().Pick(BiomeHere(), WaterHere(), AWRGameState::IsNightIn(this), Rare, false, FMath::FRand());
+	}
+	return Got;
 }
 
 bool AWRBobber::ConsumeBait()
 {
 	UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Angler);
 	if (!Inv) return false;
-	for (const FName Bait : { Lure, FName(TEXT("cut_bait")), FName(TEXT("ember_lure")), FName(TEXT("rime_lure")) })
+	for (const FName Bait : { Lure, FName(TEXT("cut_bait")) })
 	{
 		if (!Bait.IsNone() && Inv->CountOf(Bait) > 0)
 		{
 			Inv->RemoveItem(Bait, 1);
+			return true;
+		}
+	}
+	// Any other biome's lure still works as plain bait.
+	for (const FWRItemStack& S : Inv->GetSlots())
+	{
+		if (!S.IsEmpty() && FWRFishRegistry::Get().IsLure(S.ItemId))
+		{
+			Inv->RemoveItem(S.ItemId, 1);
 			return true;
 		}
 	}
@@ -363,8 +400,21 @@ void AWRBobber::Land()
 		AWRLootBag::Spill(GetWorld(), Angler->GetActorLocation() + Angler->GetActorForwardVector() * 60.f, PS ? PS->GetPlayerName() : FString(), Over);
 		Card += TEXT(" (your bag is full: it's on the ground)");
 	}
-	const float Times = Fish->Rarity == TEXT("legendary") ? 6.f : Fish->Rarity == TEXT("rare") ? 2.5f : Fish->Rarity == TEXT("uncommon") ? 1.6f : 1.f;
-	UWRLifeSkillsComponent::Award(Angler, TEXT("fishing"), TEXT("catch"), 15.f, Times);
+	// Fishing XP by rarity (fish.json xp: common 20, rare 60, a legend 500 the first time, 100 after). A legend is
+	// once a real day each, and its first catch gives its trophy (mount it at home: the fish trophy piece).
+	bool bFirstLegend = false;
+	if (Fish->Rarity == TEXT("legendary") && Got.Num() > 0 && Got[0].ItemId == Fish->Item)
+	{
+		FWRFarm::LegendCaught(Angler->GetPlayerState(), Fish->Id, bFirstLegend);
+		if (bFirstLegend)
+		{
+			const FName Trophy = FWRFishRegistry::TrophyItem(Fish->Id);
+			if (FWRItemRegistry::Get().Find(Trophy) && Inv->AddItem(Trophy, 1) == 0) Card += TEXT(". Its trophy is yours: mount it at home");
+		}
+		WRSound::Broadcast(Angler, TEXT("fish.legend"));
+	}
+	const float Xp = FWRFishRegistry::Get().XpFor(Fish->Rarity, bFirstLegend);
+	UWRLifeSkillsComponent::Award(Angler, TEXT("fishing"), TEXT("fishCatch"), Xp);   // (no tuning row of that name: the fish.json number)
 	Inv->WearEquipped(EWREquipSlot::Weapon, WRTune(TEXT("fishing.wearPerCatch"), 1.f));
 	WRFx::Broadcast(this, TEXT("fish.splash"), FloatAt, FRotator::ZeroRotator, 1.2f, TEXT("fish.land"));
 	if (Fish->Rarity == TEXT("legendary")) WRFx::Broadcast(Angler, TEXT("discover"), Angler->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("discover"));

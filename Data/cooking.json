@@ -1,0 +1,48 @@
+{
+  "_comment": "The kitchen (WRFarm.cpp, WRUICook.cpp; cooks/build-farming.md 2.8). groups: an item's food group (every fish is Fish and every crop Veg unless listed). dishes: what 1-4 ingredients make at a station (cooking_pot / oven; a campfire with Camp chef cooks either): each pattern entry is a group, an item id, or alternatives with |; the ingredients must fill the pattern one to one; the most specific match wins (biome dishes beat their base); no match is Grey mush. A dish shows only while its biome is live. count: how many one cooking makes; seconds: how long. fishRecipes: station recipes written once and made for every common and uncommon fish (prefix_<fish id>). The dishes' hunger, thirst, sated minutes and keeps are their items.json rows. All first drafts.",
+  "groups": {
+    "Meat": ["raw_meat"],
+    "Fish": [],
+    "Grain": ["stormrye", "meadow_oats", "windflax", "bog_rice", "black_rye", "ashen_grain"],
+    "Veg": ["snow_turnip", "candle_rhubarb", "sea_kelp"],
+    "Fruit": ["berries", "ember_grape", "prickly_pear", "idunn_apple", "cloudberry", "glowmelon", "sea_grapes"],
+    "Herb": ["fire_pepper", "roseroot", "gentian", "bloodroot", "asphodel", "mandrake"],
+    "Dairy": ["egg", "milk"],
+    "Sweet": ["honey", "dates", "raisins"],
+    "Mushroom": ["ember_truffle", "oyster_cap", "lions_mane"],
+    "Water": ["waterskin"],
+    "Fat": ["animal_fat"]
+  },
+  "dishes": [
+    {"id": "porridge", "station": "cooking_pot", "pattern": ["Grain", "Dairy|Water"], "count": 1, "seconds": 20},
+    {"id": "stew", "station": "cooking_pot", "pattern": ["Meat", "Veg", "Veg", "Water"], "count": 1, "seconds": 20},
+    {"id": "fish_soup", "station": "cooking_pot", "pattern": ["Fish", "Veg", "Water"], "count": 1, "seconds": 20},
+    {"id": "mushroom_broth", "station": "cooking_pot", "pattern": ["Mushroom", "Mushroom", "Water"], "count": 1, "seconds": 20},
+    {"id": "omelette", "station": "cooking_pot", "pattern": ["egg", "egg", "Veg|Herb"], "count": 1, "seconds": 20},
+    {"id": "skewer", "station": "cooking_pot", "pattern": ["Meat|Fish", "Veg", "Herb"], "count": 1, "seconds": 20},
+    {"id": "hunters_feast", "station": "cooking_pot", "pattern": ["Meat", "Meat", "Veg", "Herb"], "count": 6, "seconds": 40},
+    {"id": "bread", "station": "oven", "pattern": ["Grain", "Grain", "Water"], "count": 1, "seconds": 45},
+    {"id": "pie", "station": "oven", "pattern": ["Grain", "Fruit", "Dairy|Fat"], "count": 1, "seconds": 45},
+    {"id": "honey_cake", "station": "oven", "pattern": ["Grain", "Sweet", "Dairy"], "count": 1, "seconds": 45},
+    {"id": "fire_pepper_stew", "station": "cooking_pot", "pattern": ["Meat", "fire_pepper", "Veg|Herb", "Water"], "count": 1, "seconds": 20, "biome": "volcanic"},
+    {"id": "stormrye_flatbread", "station": "oven", "pattern": ["stormrye", "Water", "gentian"], "count": 1, "seconds": 45, "biome": "storm_peaks"},
+    {"id": "date_tagine", "station": "cooking_pot", "pattern": ["Meat", "dates", "prickly_pear", "Water"], "count": 1, "seconds": 20, "biome": "desert"},
+    {"id": "idunn_pie", "station": "oven", "pattern": ["meadow_oats", "idunn_apple", "Dairy"], "count": 1, "seconds": 45, "biome": "forest"},
+    {"id": "cloudberry_porridge", "station": "cooking_pot", "pattern": ["Grain", "milk", "cloudberry"], "count": 1, "seconds": 20, "biome": "sky_islands"},
+    {"id": "glowmelon_compote", "station": "cooking_pot", "pattern": ["glowmelon", "candle_rhubarb", "Sweet"], "count": 1, "seconds": 20, "biome": "crystal"},
+    {"id": "turnip_char_chowder", "station": "cooking_pot", "pattern": ["Fish", "snow_turnip", "snow_turnip", "Dairy|Water"], "count": 1, "seconds": 20, "biome": "tundra"},
+    {"id": "bog_rice_eel", "station": "cooking_pot", "pattern": ["Fish", "bog_rice", "Herb", "Water"], "count": 1, "seconds": 20, "biome": "swamp"},
+    {"id": "kelp_snapper", "station": "cooking_pot", "pattern": ["Fish", "sea_kelp", "sea_grapes"], "count": 1, "seconds": 20, "biome": "ocean"},
+    {"id": "mourners_bread", "station": "oven", "pattern": ["black_rye", "Fat", "Water"], "count": 1, "seconds": 45, "biome": "graveyard"},
+    {"id": "oyster_broth", "station": "cooking_pot", "pattern": ["oyster_cap", "Fish", "Mushroom", "Water"], "count": 1, "seconds": 20, "biome": "fungal"},
+    {"id": "grey_loaf", "station": "oven", "pattern": ["ashen_grain", "milk", "milk"], "count": 1, "seconds": 45, "biome": "wasteland"},
+    {"id": "banquet_portion", "station": "banquet", "pattern": ["Meat", "Meat", "Veg", "Herb"], "count": 12, "seconds": 40}
+  ],
+  "fishRecipes": [
+    {"prefix": "roast", "station": "campfire", "fish": 1, "inputs": {"wood": 1}, "output": "grilled_fish", "count": 1, "seconds": 15},
+    {"prefix": "salt", "station": "salting_barrel", "fish": 1, "inputs": {"salt": 1}, "output": "salted_fish", "count": 1, "seconds": 300},
+    {"prefix": "smoke", "station": "smokehouse", "fish": 5, "inputs": {"wood": 3}, "output": "smoked_fish", "count": 5, "seconds": 600},
+    {"prefix": "dry", "station": "drying_rack", "fish": 2, "output": "dried_fish", "count": 1, "seconds": 900},
+    {"prefix": "scrap", "station": "hand", "fish": 1, "output": "fish_scraps", "count": 3, "seconds": 2}
+  ]
+}

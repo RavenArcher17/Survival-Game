@@ -30,6 +30,22 @@ struct FWRPieceDef
 	 *  and how much; only the best piece of each group near a bed counts. */
 	FName ComfortGroup;
 	int32 Comfort = 0;
+	/** Farming and food (cooks/build-farming.md): the covering Hearth's tech level it needs ("hearth"), the biome it
+	 *  belongs to ("biome": placed only there, shown only while that land is live), the plot type a crop plot is
+	 *  ("plot": soil, ashpit, paddy, kelp, log), glazing ("glass": daylight through it, a greenhouse), a chest's cold
+	 *  ("cold": food keeps at this pace; an ice box burns "fuel" every "fuelMinutes"), a creature it needs ("needs":
+	 *  the hive's Hiveback), the legendary fish a trophy shows ("trophy"). */
+	int32 HearthLevel = 0;
+	FName Biome;
+	FName Plot;
+	bool bGlass = false;
+	float Cold = 0.f;
+	FName Fuel;
+	float FuelMinutes = 0.f;
+	FName NeedsCreature;
+	FName Trophy;
+	/** Plots, pens, hives, traps, salt pans, wells and channels: run by the farm subsystem (WRFarm). */
+	bool IsFarm() const { return Kind == TEXT("crop") || Kind == TEXT("pen") || Kind == TEXT("hive") || Kind == TEXT("trap") || Kind == TEXT("saltpan") || Kind == TEXT("well") || Kind == TEXT("channel"); }
 
 	/** Structure pieces snap to the grid and need support; everything else places freely. */
 	bool Snaps() const { return Kind == TEXT("structure") || Kind == TEXT("door"); }
@@ -125,8 +141,29 @@ public:
 	/** Crop plots: server time planting finished growing (0 = empty). */
 	UPROPERTY(Replicated) float CropReadyAt = 0.f;
 	UPROPERTY(Replicated) bool bPlanted = false;
-	/** Chests. */
-	UPROPERTY(Replicated) TArray<FWRItemStack> Storage;
+	/** Chests; a pen's, hive's, trap's or salt pan's products waiting to be collected (shown on it). */
+	UPROPERTY(ReplicatedUsing=OnRep_Farm) TArray<FWRItemStack> Storage;
+	/** Farming (WRFarm): a plot's crop, its growth 0..255, what's helping or stopping it (WRFarmFlag, EWRFarmStop);
+	 *  a pen's trough or a hive's feed; an ice box's ice. */
+	UPROPERTY(ReplicatedUsing=OnRep_Farm) FName CropId;
+	UPROPERTY(ReplicatedUsing=OnRep_Farm) uint8 Growth8 = 0;
+	UPROPERTY(ReplicatedUsing=OnRep_Farm) uint8 FarmFlags = 0;
+	UPROPERTY(Replicated) uint8 FarmStop = 0;
+	UPROPERTY(ReplicatedUsing=OnRep_Farm) int32 Feed = 0;
+	/** Server: growth 0..1, who planted it and their growing speed then, the crop it last grew; a producer's clocks. */
+	float Growth = 0.f;
+	FString Planter;
+	float PlanterSpeed = 1.f;
+	bool bPlanterCompanion = false;
+	bool bPlanterWaterWise = false;
+	bool bPlanterGraft = false;
+	FName LastCrop;
+	float ProduceClockA = 0.f, ProduceClockB = 0.f, FuelClock = 0.f;
+	/** Client: the plants / products / water drawn on it (WRFarmLook) and what they were drawn for. */
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> FarmMesh;
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> WaterSurface;
+	uint32 FarmLookKey = 0;
+	UFUNCTION() void OnRep_Farm();
 	/** A name its owner gave it (chests: "chestname"; empty = the piece's own name). Saved with the world. */
 	UPROPERTY(Replicated) FString CustomName;
 

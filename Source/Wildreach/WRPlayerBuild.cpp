@@ -2,6 +2,7 @@
 // code locks and demolish.
 
 #include "WRPlayerController.h"
+#include "WRFarm.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
 #include "WRBuildLook.h"
@@ -598,6 +599,12 @@ void AWRPlayerController::UpdatePlacement()
 		bPlaceValid = false;
 		PlaceWhy = FString::Printf(TEXT("no support (%s spans %d)"), *Def->Material.ToString(), FWRBuildRules::SpanFor(Def->Material));
 	}
+	else if (const FString Farm = FWRFarm::PlaceCheck(this, *Def, PlaceLoc); !Farm.IsEmpty())
+	{
+		// The farm's rules (a Hearth level, its biome, water under a trap or paddy, a beach for a salt pan).
+		bPlaceValid = false;
+		PlaceWhy = Farm;
+	}
 	else if (const FString Blocked = AWRBuildPiece::Blocked(GetWorld(), PlacingPiece, PlaceLoc); !Blocked.IsEmpty())
 	{
 		bPlaceValid = false;
@@ -651,6 +658,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
 	FString Group;
 	for (const FWRPieceDef& Def : FWRBuildRegistry::Get().All())
 	{
+		if (!FWRFarm::IsPieceLive(Def)) continue;   // a land that isn't in the game yet
 		const FString ThisGroup = Def.Category == TEXT("structure") ? Def.Material.ToString() : Def.Category.ToString();
 		if (ThisGroup != Group)
 		{
@@ -709,6 +717,10 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			const AWRClaimTotem* Claim = AWRClaimTotem::FindAt(GetWorld(), Loc);
 			if (!Claim || Claim->OwnerName != Who) OutResult = TEXT("a Hearth must be inside your own land claim");
 			else if (AWRHearth::FindCovering(GetWorld(), Loc)) OutResult = TEXT("this claim already has a Hearth");
+		}
+		if (OutResult.IsEmpty() && Def)
+		{
+			OutResult = FWRFarm::PlaceCheck(this, *Def, Loc);
 		}
 		int32 Support = 0;
 		if (OutResult.IsEmpty() && Def->Snaps())
@@ -887,20 +899,10 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		const FWRPieceDef* Def = Chest ? Chest->GetDef() : nullptr;
 		const int32 Index = FCString::Atoi(*Arg(1));
 		// Move up to N from one stack into a slot list; returns how many moved.
+		// (Food keeps its freshness and worth: FWRInventoryRules::MoveFrom.)
 		const auto MoveStack = [](FWRItemStack& From, TArray<FWRItemStack>& To, int32 N) -> int32
 		{
-			const FWRItemDef* ItemDef = FWRItemRegistry::Get().Find(From.ItemId);
-			if (ItemDef && ItemDef->IsEquipment() && ItemDef->StackSize <= 1)
-			{
-				if (!FWRInventoryRules::AddInstance(To, From)) return 0;
-				From = FWRItemStack();
-				return 1;
-			}
-			N = FMath::Clamp(N, 1, From.Count);
-			const int32 Moved = N - FWRInventoryRules::Add(To, From.ItemId, N);
-			From.Count -= Moved;
-			if (From.Count <= 0) From = FWRItemStack();
-			return Moved;
+			return FWRInventoryRules::MoveFrom(From, To, N);
 		};
 		if (!Def || Def->Kind != TEXT("chest")) OutResult = bTagged ? TEXT("In combat: not now") : TEXT("no chest nearby");
 		else if (!Chest->CanAccess(Who)) OutResult = TEXT("not your chest");

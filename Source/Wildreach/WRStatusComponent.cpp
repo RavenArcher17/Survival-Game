@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRFarm.h"
 #include "WRSurvival.h"
 #include "EngineUtils.h"
 #include "Wildreach.h"
@@ -791,7 +792,8 @@ void UWRStatusComponent::TickSurvival(float DeltaTime)
 	// Hearty (cooking perk): hunger drains slower for you.
 	const float HungerRate = WorldRate * 100.f / (WRTune(TEXT("survival.hungerMinutes"), 60.f) * 60.f)
 		* FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("hungerDrain")))
-		* (UWRSurvivalComponent::For(Owner) ? UWRSurvivalComponent::For(Owner)->HungerDrainMult() : 1.f);  // Rested
+		* (UWRSurvivalComponent::For(Owner) ? UWRSurvivalComponent::For(Owner)->HungerDrainMult() : 1.f)   // Rested
+		* (UWRFoodComponent::For(Owner) ? UWRFoodComponent::For(Owner)->HungerMult() : 1.f);              // Sated (a good meal)
 	const float ThirstRate = WorldRate * 100.f / (WRTune(TEXT("survival.thirstMinutes"), 40.f) * 60.f)
 		* (UWRSurvivalComponent::For(Owner) ? UWRSurvivalComponent::For(Owner)->ThirstDrainMult() : 1.f);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), Attr->GetHunger() - HungerRate * DeltaTime);

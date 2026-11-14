@@ -70,6 +70,14 @@ void UWRFxSubsystem::TickAmbient(float DeltaTime)
 			}
 		}
 
+		// The kitchen's fires (cooks/build-farming.md 2.8): a campfire, the pot's fire, the oven's mouth, the smokehouse's
+		// pit, each on its station's light (tuning farm.fireFx.<type>: the effect, farm.fireScale.<type>: its size).
+		for (TActorIterator<AWRStation> It(World); It; ++It)
+		{
+			const FString Fx = T.Str(FString::Printf(TEXT("farm.fireFx.%s"), *It->StationType.ToString()), FString());
+			if (!Fx.IsEmpty() && Near(*It)) Track(*It, FName(*Fx), T.Num(FString::Printf(TEXT("farm.fireScale.%s"), *It->StationType.ToString()), 1.f));
+		}
+
 		// Held lights (WRSurvival): a torch's flame and sparks, a lantern's small steady flame, on the light they carry.
 		for (TActorIterator<AWRCharacter> It(World); It; ++It)
 		{

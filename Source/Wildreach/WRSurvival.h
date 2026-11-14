@@ -62,6 +62,7 @@ struct FWRWeatherKind
 	float AggroMult = 1.f;           // these creatures notice you from further (fog ambushers)
 	TArray<FName> AggroCreatures;
 	bool bCropsPause = false;        // outdoor crop plots stop growing
+	bool bWatersCrops = false;       // rain: outdoor plots count as watered while it falls (WRFarm)
 	// Lightning strikes on the highest player in a cell (BotW's tell: a ground glow, then the bolt).
 	bool bStrikes = false;
 	float StrikeMinZ = 0.f;
@@ -172,15 +173,11 @@ public:
 private:
 	void Roll(FName Biome, float At);
 	void TickStrikes(float DeltaTime);
-	void TickCrops(float DeltaTime);
 	TMap<FName, float> NextRoll;
 	struct FPendingStrike { FVector At; float LandsAt = 0.f; FName Biome; FName Kind; };
 	TArray<FPendingStrike> Strikes;
 	TMap<FIntPoint, float> NextStrikeInCell;
 	float StrikeClock = 0.f;
-	float CropClock = 0.f;
-	TArray<TWeakObjectPtr<AWRBuildPiece>> CropPlots;
-	float CropScan = 0.f;
 };
 
 /** Lights in the world (pieces, Hearths, glowing creatures, held lights) and what they reach (server and clients). */

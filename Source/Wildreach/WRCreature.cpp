@@ -1940,28 +1940,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 			}
 		}
 	}
-	ProduceClock += DeltaSeconds;
-	if (IsTamed() && Def && Def->Products.Num() > 0)
-	{
-		const APlayerState* OwnerPS = FindPlayerByName(GetWorld(), TamedBy);
-		const float Interval = WRTune(TEXT("husbandry.produceSeconds"), 600.f) / (1.f + UWRLifeSkillsComponent::StatFor(OwnerPS, TEXT("produceRate")));
-		if (ProduceClock >= Interval)
-		{
-			ProduceClock = 0.f;
-			const int32 Extra = FMath::RoundToInt(UWRLifeSkillsComponent::StatFor(OwnerPS, TEXT("produceExtra")));
-			// Farm animals produce into an owned pen they stand in.
-			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
-			{
-				const FWRPieceDef* Piece = It->GetDef();
-				if (Piece && Piece->Kind == TEXT("pen") && It->OwnerName == TamedBy && FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < 450.f)
-				{
-					if (It->Storage.Num() == 0) It->Storage.SetNum(10);
-					for (const TPair<FName, int32>& P : Def->Products) FWRInventoryRules::Add(It->Storage, P.Key, P.Value + Extra);
-					break;
-				}
-			}
-		}
-	}
+	// Farm animals produce in pens on the farm's clock (UWRFarmSubsystem::TickPen: per product, fed from the trough).
 }
 
 void AWRCreature::OnDeath(AActor* Killer)

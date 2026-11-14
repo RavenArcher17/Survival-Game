@@ -12,6 +12,8 @@
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRBuilding.h"
+#include "WRBuildLook.h"
+#include "WRFarm.h"
 #include "WRInventory.h"
 #include "WRKeyBindings.h"
 #include "WRLifeSkills.h"
@@ -90,6 +92,7 @@ namespace WRBuildUI
 			{ TEXT("doors"), LOCTEXT("TabDoors", "Doors & windows") },
 			{ TEXT("stairs"), LOCTEXT("TabStairs", "Stairs") },
 			{ TEXT("stations"), LOCTEXT("TabStations", "Stations") },
+			{ TEXT("farm"), LOCTEXT("TabFarm", "Farm & kitchen") },
 			{ TEXT("claim"), LOCTEXT("TabClaim", "Claim") },
 			{ TEXT("storage"), LOCTEXT("TabStorage", "Storage & beds") },
 			{ TEXT("defense"), LOCTEXT("TabDefense", "Defense") },
@@ -102,6 +105,9 @@ namespace WRBuildUI
 	FName TabOf(const FWRPieceDef& D)
 	{
 		const FName S = D.Shape, K = D.Kind;
+		// Farm pieces of a land that isn't in the game yet (a paddy before the swamp...) aren't shown at all.
+		if (!FWRFarm::IsPieceLive(D)) return NAME_None;
+		if (D.Category == TEXT("farm") || D.Category == TEXT("kitchen")) return TEXT("farm");
 		if (D.Category == TEXT("defense")) return TEXT("defense");
 		if (S == TEXT("foundation") || S == TEXT("pillar")) return TEXT("foundations");
 		if (S == TEXT("wall") || S == TEXT("halfwall") || S == TEXT("upperwall")) return TEXT("walls");
@@ -130,6 +136,7 @@ namespace WRBuildUI
 	FString Describe(const FWRPieceDef& D)
 	{
 		FString Out = DescribeBase(D);
+		if (D.HearthLevel > 1) Out += FString::Printf(TEXT(" Needs a Hearth of level %d."), D.HearthLevel);
 		if (D.Comfort > 0)
 		{
 			Out += FString::Printf(TEXT(" Comfort +%d (%s) under a roof within %.0f m of a bed: longer Rested."), D.Comfort, *D.ComfortGroup.ToString(),
@@ -166,8 +173,24 @@ namespace WRBuildUI
 		if (K == TEXT("bed")) return TEXT("Where you wake up after you die. E: sleep 10 s for Rested, longer in a furnished room under a roof.");
 		if (K == TEXT("light")) return FString::Printf(TEXT("Lights %.0f m around it at night and in caves (the dark-hunters lose their edge), and keeps corruption from building there."),
 			FWRTuning::Get().Num(FString::Printf(TEXT("lights.%s.radius"), *D.Id.ToString()), 600.f) / 100.f);
-		if (K == TEXT("crop")) return TEXT("Plant seeds in it (E) and harvest food when it has grown.");
-		if (K == TEXT("pen")) return TEXT("Keep a tamed Pumicehog or Snowpuff inside and it produces over time.");
+		if (D.Plot == TEXT("ashpit")) return TEXT("A round bed of black ash behind a crescent of stacked basalt (volcanic slopes only). Ember grapes grow only here; fire peppers too. 9 seeds a planting.");
+		if (K == TEXT("crop")) return TEXT("Plant 9 seeds of a crop of this land (E) and harvest them all when ripe. Within 8 m of water, a well or a running channel it grows a third faster; compost or bone meal (E) adds a quarter.");
+		if (K == TEXT("pen")) return TEXT("Keep up to 4 tamed farm animals inside. Fill the trough with what they eat (E): each makes its own products onto the shelf by the gate, and two of a kind with feed to spare raise young.");
+		if (K == TEXT("hive")) return TEXT("Tell a tamed Hiveback to stay at it: honey and wax while crops or flowers grow within 40 m, and crops within 20 m grow faster.");
+		if (K == TEXT("trap")) return TEXT("Set in water at least 50 cm deep: catches a common fish of these waters every 20 min, up to 6.");
+		if (K == TEXT("saltpan")) return TEXT("Lay it on the upper beach by the sea: the sun dries 1 salt every 10 min of daylight, for salting meat and fish.");
+		if (K == TEXT("well")) return TEXT("Groundwater: crop plots within 8 m are watered, and irrigation channels laid end to end from it carry the water on.");
+		if (K == TEXT("channel")) return TEXT("A stone trough 4 m long. Lay them end to end from the sea's edge or a well: water runs along (never uphill) and waters plots within 8 m.");
+		if (D.bGlass) return TEXT("Glazing: daylight comes through. A crop plot under a glass roof with walls around it is a greenhouse and grows any land's crops.") + Span;
+		if (D.Cold > 0.f) return TEXT("A cold chest: food in it keeps five times as long while it has an ice block burning (one every 4 h), and needs none in the tundra.");
+		if (!D.Trophy.IsNone()) return TEXT("Mounts the legendary fish you caught on an oak board. Counts as a trophy for comfort.");
+		if (D.Station == TEXT("campfire")) return TEXT("Roasts meat, fish and vegetables, and lights 10 m around it. Learn Camp chef to cook any dish on it.");
+		if (D.Station == TEXT("cooking_pot")) return TEXT("Discovery cooking: put 1 to 4 ingredients in and see what they make. Each dish you find joins your list for one-click cooking.");
+		if (D.Station == TEXT("oven")) return TEXT("Bakes bread, pies and cakes: find them by putting ingredients in, like the cooking pot.");
+		if (D.Station == TEXT("smokehouse")) return TEXT("Smokes meat and fish ten at a time over a wood fire: smoked food keeps two days.");
+		if (D.Station == TEXT("salting_barrel")) return TEXT("Packs meat and fish in salt: salted food keeps a day.");
+		if (D.Station == TEXT("drying_rack")) return TEXT("Dries strips of meat, fish and fruit in the open air: they keep three days.");
+		if (D.Station == TEXT("compost_bin")) return TEXT("Turns spoiled food and fish scraps into compost for your crops (and worms for bait).");
 		return TEXT("Decoration. Places freely, no grid.");
 	}
 
@@ -182,7 +205,7 @@ namespace WRBuildUI
 			SLATE_ARGUMENT(FVector2D, Size)
 		SLATE_END_ARGS()
 
-		struct FBlock { FVector Size; FVector Centre; float Pitch = 0.f; FLinearColor Color; };
+		struct FBlock { FVector Size; FVector Centre; float Pitch = 0.f; FLinearColor Color; FQuat Rot = FQuat::Identity; bool bFull = false; };
 
 		void Construct(const FArguments& InArgs)
 		{
@@ -199,6 +222,20 @@ namespace WRBuildUI
 			const FLinearColor M = D.Material == TEXT("stone") ? Stone : Wood;
 			const FName S = D.Shape, K = D.Kind;
 			TArray<FBlock> B;
+			// Farm and kitchen pieces: their own modelled blocks (WRBuildLook), coloured by what each is made of.
+			if (FWRFarm::IsPieceLive(D) && (D.Category == TEXT("farm") || D.Category == TEXT("kitchen") || D.bGlass || !D.Trophy.IsNone()))
+			{
+				const FLinearColor ClothCol = FWRBuildLook::ClothColor(D);
+				for (const FWRLookBlock& L : FWRBuildLook::Blocks(D, FTransform::Identity))
+				{
+					if (L.Mesh != EWRLookMesh::Cube && L.Size.Z < 1.f) continue;
+					const FLinearColor Base = L.Mat == EWRLookMat::Wood ? Wood : L.Mat == EWRLookMat::Stone ? Stone : L.Mat == EWRLookMat::Trim ? Cloth
+						: FLinearColor(FMath::Pow(ClothCol.R, 1.f / 2.2f), FMath::Pow(ClothCol.G, 1.f / 2.2f), FMath::Pow(ClothCol.B, 1.f / 2.2f));
+					B.Add({ L.Size, L.Centre, 0.f, Base * FMath::Clamp(L.Dim, 0.15f, 1.3f), L.Rot.Quaternion(), true });
+				}
+				if (D.Kind == TEXT("crop")) for (int32 i = 0; i < 9; ++i) B.Add({ FVector(30, 30, 50), FVector(-110 + (i % 3) * 110, -110 + (i / 3) * 110, 40), 0.f, Green });
+				if (B.Num() > 0) return B;
+			}
 			const auto Add = [&B](FVector Sz, FVector Ce, const FLinearColor& Col, float Pitch = 0.f) { B.Add({ Sz, Ce, Pitch, Col }); };
 			const auto Frame = [&](float Len, float Opening, float Height, bool bLeaf)
 			{
@@ -304,7 +341,7 @@ namespace WRBuildUI
 			static const FVector Normals[6] = { FVector(-1, 0, 0), FVector(1, 0, 0), FVector(0, -1, 0), FVector(0, 1, 0), FVector(0, 0, -1), FVector(0, 0, 1) };
 			for (const FBlock& B : Blocks)
 			{
-				const FQuat Rot = FRotator(B.Pitch, 0.f, 0.f).Quaternion();
+				const FQuat Rot = B.bFull ? B.Rot : FRotator(B.Pitch, 0.f, 0.f).Quaternion();
 				FVector Corner[8];
 				for (int32 i = 0; i < 8; ++i)
 				{

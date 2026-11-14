@@ -3,6 +3,13 @@
 	"mix": {"effects": 1.0, "ui": 0.6, "ambient": 1.0, "music": 0.7},
 	"defaults": {"radius": 2500, "pitch": [0.96, 1.04], "minGap": 0.05, "maxVoices": 6},
 	"events": {
+    "cook.sizzle": {"files": ["spell/fire_impact_1", "spell/fire_impact_2", "spell/fire_impact_3"], "volume": 0.45, "pitch": [0.55, 0.65], "radius": 1200, "category": "effects", "minGap": 0.5},
+    "cook.discover": {"files": ["moment/discover"], "volume": 0.7, "pitch": [1.05, 1.1], "radius": 0, "category": "ui", "minGap": 0.5},
+    "farm.plant": {"files": ["foot/grass_2", "foot/grass_4", "combat/dodge_2", "combat/dodge_4"], "volume": 0.6, "pitch": [0.8, 0.9], "radius": 1500, "category": "effects", "minGap": 0.3},
+    "farm.harvest": {"files": ["foot/grass_2", "foot/grass_4", "combat/dodge_2", "combat/dodge_4", "item/pickup_1", "item/pickup_2", "item/pickup_3", "item/pickup_4"], "volume": 0.75, "pitch": [0.95, 1.05], "radius": 1800, "category": "effects", "minGap": 0.3},
+    "farm.mandrake": {"files": ["creature/boss_hurt_1", "creature/boss_hurt_2", "creature/boss_hurt_3"], "volume": 1.0, "pitch": [1.7, 1.9], "radius": 4000, "category": "effects", "minGap": 1.0},
+    "animal.collect": {"files": ["item/pickup_1", "item/pickup_2", "item/pickup_3", "item/pickup_4"], "volume": 0.65, "pitch": [0.95, 1.05], "radius": 1500, "category": "effects", "minGap": 0.3},
+    "fish.legend": {"files": ["moment/discover"], "volume": 0.9, "pitch": [0.8, 0.85], "radius": 3000, "category": "effects", "minGap": 2.0},
     "_combatFull": "cooks/build-combat-full.md: the final cue before a held strike (a bright ring), element reactions, a part breaking, the ground heaving before a burst, each status's proc. Built from the files already in Data/Audio (CREDITS.md).",
     "_survival": "cooks/build-survival.md: lying down, waking Rested, a torch or lantern lit, put out and doused, a lightning strike's crackling warning and its crack. Built from the files already in Data/Audio (CREDITS.md).",
     "rest.lie": {"files": ["item/equip_1", "item/equip_3"], "volume": 0.45, "pitch": [0.7, 0.8], "radius": 1200, "category": "effects", "minGap": 0.5},

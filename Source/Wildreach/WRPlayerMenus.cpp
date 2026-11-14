@@ -3,6 +3,7 @@
 
 #include "WRPlayerController.h"
 #include "WRSurvival.h"
+#include "WRFarm.h"
 #include "WRSound.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
@@ -222,7 +223,8 @@ void AWRPlayerController::WRInteract()
 	}
 	else if (AWRStation* Station = Cast<AWRStation>(Use))
 	{
-		Menu = EWRMenu::Craft;
+		// A cooking pot or an oven (a campfire with Camp chef) opens the Cook screen: ingredients in, find dishes.
+		Menu = UI && FWRScreens::Find(TEXT("cook")) && FWRFarm::IsCookStation(Station->StationType, GetPawn()) ? EWRMenu::Cook : EWRMenu::Craft;
 		MenuStation = Station;
 		MenuIndex = 0;
 		return;
@@ -838,6 +840,21 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 			}
 		}
 	}
+	else if (Cmd == TEXT("cook") || Cmd == TEXT("cookknown"))
+	{
+		// The Cook screen (WRUICook): "cook <bag slot> [slot...]" (1-4 ingredients, a slot twice = two from it), or
+		// "cookknown <dish>" (a known dish again, its ingredients picked from the bag).
+		AWRStation* Station = FindNearbyStation();
+		if (!Station) OutResult = TEXT("no cooking pot nearby");
+		else if (Cmd == TEXT("cookknown")) OutResult = FWRFarm::CookKnown(this, Station, FName(*Arg(1)));
+		else
+		{
+			TArray<int32> Slots;
+			for (int32 i = 1; i < 5 && !Arg(i).IsEmpty(); ++i) Slots.Add(FCString::Atoi(*Arg(i)));
+			OutResult = FWRFarm::Cook(this, Station, Slots);
+		}
+		UE_LOG(LogWildreach, Log, TEXT("COOK %s: %s"), *PS->GetPlayerName(), *OutResult);
+	}
 	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade") || Cmd == TEXT("craftcancel") || Cmd == TEXT("crafttake"))
 	{
 		AWRStation* Station = FindNearbyStation();
@@ -882,9 +899,18 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 			const int32 B = FCString::Atoi(*Arg(2));
 			const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[A].ItemId);
 			if (!Slots.IsValidIndex(B) || A == B) OutResult = TEXT("");
-			else if (Def && !Slots[B].IsEmpty() && Slots[B].ItemId == Slots[A].ItemId && Def->StackSize > 1 && !Def->IsEquipment())
+			else if (Def && !Slots[B].IsEmpty() && Slots[B].ItemId == Slots[A].ItemId && Def->StackSize > 1 && !Def->IsEquipment()
+				&& FMath::IsNearlyEqual(Slots[A].Roll, Slots[B].Roll, 0.01f))
 			{
 				const int32 Moved = FMath::Min(Slots[A].Count, Def->StackSize - Slots[B].Count);
+				if (Def->Perishes() && Moved > 0)
+				{
+					// Food joining food: freshness averages by count (cooks/build-farming.md 2.9).
+					const double Now = FWRSpoil::ServerNow;
+					const float FB = FWRSpoil::FreshOf(Slots[B], Now), FA = FWRSpoil::FreshOf(Slots[A], Now);
+					Slots[B].Fresh = (FB * Slots[B].Count + FA * Moved) / float(Slots[B].Count + Moved);
+					Slots[B].FreshAt = float(Now);
+				}
 				Slots[B].Count += Moved;
 				Slots[A].Count -= Moved;
 				if (Slots[A].Count <= 0) Slots[A] = FWRItemStack();

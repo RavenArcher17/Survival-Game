@@ -26,6 +26,8 @@ public:
 	class UWRLifeSkillsComponent* GetLifeSkills() const { return LifeSkills; }
 	/** Rest, Rested, the held light, darkness, weather on you, corruption (WRSurvival). */
 	class UWRSurvivalComponent* GetSurvival() const { return Survival; }
+	/** Dishes known and hinted, sated, crops and legends (WRFarm). */
+	class UWRFoodComponent* GetFood() const { return Food; }
 
 	/** Basic weapon abilities are granted once per player, not per pawn. */
 	bool bDefaultAbilitiesGranted = false;
@@ -77,4 +79,5 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRInventoryComponent> Inventory;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRLifeSkillsComponent> LifeSkills;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRSurvivalComponent> Survival;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRFoodComponent> Food;
 };

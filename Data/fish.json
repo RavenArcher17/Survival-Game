@@ -1,5 +1,5 @@
 {
-  "_comment": "Fishing (WRFishing.cpp, GAP-cooked in showcase-notes cooks/build-finish.md). Which fish bites is picked when the float goes under: by biome (volcanic west / tundra east of the ridge, any), water by the depth where the float lies (shallow under fishing.openDepth cm: rivers, lakes, the shore; open: the sea; deep over fishing.deepDepth cm, only with the Deep line perk, else it counts as open), time (day / night / any), weighted by rarity (tuning fishing.rarityWeight; Patient angler and a lure for the biome raise rare and legendary). Legendaries bite only with Legend catch. kg is rolled between kgMin and kgMax (big ones rarer); fight 0..1 is how hard and long it surges (x its size). item: what lands in the bag (items.json, category fish). treasure: what a Treasure hook brings up instead (weight, count min..max). All first drafts.",
+  "_comment": "lures: each biome's bait (Bait maker; a legend bites only with it on). xp: Fishing XP by rarity (a legend's first catch: legendaryFirst; it bites once a real day each and its first catch gives its trophy). look: a legend's colours on its trophy board (sRGB). Fishing (WRFishing.cpp, GAP-cooked in showcase-notes cooks/build-finish.md). Which fish bites is picked when the float goes under: by biome (volcanic west / tundra east of the ridge, any), water by the depth where the float lies (shallow under fishing.openDepth cm: rivers, lakes, the shore; open: the sea; deep over fishing.deepDepth cm, only with the Deep line perk, else it counts as open), time (day / night / any), weighted by rarity (tuning fishing.rarityWeight; Patient angler and a lure for the biome raise rare and legendary). Legendaries bite only with Legend catch. kg is rolled between kgMin and kgMax (big ones rarer); fight 0..1 is how hard and long it surges (x its size). item: what lands in the bag (items.json, category fish). treasure: what a Treasure hook brings up instead (weight, count min..max). All first drafts.",
   "fish": [
     { "id": "cinder_snapper", "name": "Cinder snapper", "biome": "volcanic", "water": "open", "time": "any", "rarity": "common", "kgMin": 0.8, "kgMax": 3.2, "fight": 0.35, "item": "fish_cinder_snapper" },
     { "id": "ashfin_mackerel", "name": "Ashfin mackerel", "biome": "volcanic", "water": "open", "time": "day", "rarity": "common", "kgMin": 0.5, "kgMax": 1.8, "fight": 0.45, "item": "fish_ashfin_mackerel" },
@@ -8,7 +8,7 @@
     { "id": "steamfin_trout", "name": "Steamfin trout", "biome": "volcanic", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.4, "kgMax": 2.2, "fight": 0.4, "item": "fish_steamfin_trout" },
     { "id": "sulfur_carp", "name": "Sulfur carp", "biome": "volcanic", "water": "shallow", "time": "any", "rarity": "uncommon", "kgMin": 1.5, "kgMax": 6.0, "fight": 0.5, "item": "fish_sulfur_carp" },
     { "id": "cinder_marlin", "name": "Cinder marlin", "biome": "volcanic", "water": "deep", "time": "any", "rarity": "uncommon", "kgMin": 20.0, "kgMax": 70.0, "fight": 0.85, "item": "fish_cinder_marlin" },
-    { "id": "emberking", "name": "the Emberking", "biome": "volcanic", "water": "deep", "time": "night", "rarity": "legendary", "kgMin": 60.0, "kgMax": 95.0, "fight": 1.0, "item": "fish_emberking" },
+    { "id": "emberking", "name": "the Emberking", "biome": "volcanic", "water": "deep", "time": "night", "rarity": "legendary", "kgMin": 60.0, "kgMax": 95.0, "fight": 1.0, "item": "fish_emberking", "look": {"back": [60, 20, 15], "belly": [220, 120, 50], "fins": [230, 90, 30]} },
 
     { "id": "rime_cod", "name": "Rime cod", "biome": "tundra", "water": "open", "time": "any", "rarity": "common", "kgMin": 1.0, "kgMax": 4.5, "fight": 0.35, "item": "fish_rime_cod" },
     { "id": "glassfin_herring", "name": "Glassfin herring", "biome": "tundra", "water": "open", "time": "day", "rarity": "common", "kgMin": 0.2, "kgMax": 0.8, "fight": 0.3, "item": "fish_glassfin_herring" },
@@ -17,7 +17,38 @@
     { "id": "silver_grayling", "name": "Silver grayling", "biome": "tundra", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.3, "kgMax": 1.6, "fight": 0.4, "item": "fish_silver_grayling" },
     { "id": "frostjaw_pike", "name": "Frostjaw pike", "biome": "tundra", "water": "shallow", "time": "any", "rarity": "uncommon", "kgMin": 2.0, "kgMax": 9.0, "fight": 0.65, "item": "fish_frostjaw_pike" },
     { "id": "pale_sturgeon", "name": "Pale sturgeon", "biome": "tundra", "water": "deep", "time": "any", "rarity": "uncommon", "kgMin": 25.0, "kgMax": 80.0, "fight": 0.8, "item": "fish_pale_sturgeon" },
-    { "id": "old_whitegill", "name": "Old Whitegill", "biome": "tundra", "water": "deep", "time": "day", "rarity": "legendary", "kgMin": 70.0, "kgMax": 120.0, "fight": 1.0, "item": "fish_old_whitegill" }
+    { "id": "old_whitegill", "name": "Old Whitegill", "biome": "tundra", "water": "deep", "time": "day", "rarity": "legendary", "kgMin": 70.0, "kgMax": 120.0, "fight": 1.0, "item": "fish_old_whitegill", "look": {"back": [170, 180, 190], "belly": [235, 238, 240], "fins": [130, 150, 170]} },
+
+    {"id": "ridge_trout", "name": "Ridge trout", "biome": "storm_peaks", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.4, "kgMax": 2.0, "fight": 0.4, "item": "fish_ridge_trout"},
+    {"id": "thunder_grayling", "name": "Thunder grayling", "biome": "storm_peaks", "water": "shallow", "time": "night", "rarity": "rare", "kgMin": 1.0, "kgMax": 3.5, "fight": 0.7, "item": "fish_thunder_grayling"},
+    {"id": "lightning_pike", "name": "the Lightning Pike", "biome": "storm_peaks", "water": "shallow", "time": "night", "rarity": "legendary", "kgMin": 40, "kgMax": 70, "fight": 1.0, "item": "fish_lightning_pike", "look": {"back": [70, 80, 110], "belly": [220, 225, 235], "fins": [230, 200, 60]}},
+    {"id": "oasis_catfish", "name": "Oasis catfish", "biome": "desert", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 1.0, "kgMax": 5.0, "fight": 0.4, "item": "fish_oasis_catfish"},
+    {"id": "sun_koi", "name": "Sun koi", "biome": "desert", "water": "shallow", "time": "day", "rarity": "rare", "kgMin": 1.5, "kgMax": 4.0, "fight": 0.6, "item": "fish_sun_koi"},
+    {"id": "sandfather", "name": "the Sandfather", "biome": "desert", "water": "shallow", "time": "night", "rarity": "legendary", "kgMin": 60, "kgMax": 95, "fight": 1.0, "item": "fish_sandfather", "look": {"back": [120, 100, 70], "belly": [210, 195, 160], "fins": [150, 110, 60]}},
+    {"id": "brook_trout", "name": "Brook trout", "biome": "forest", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.4, "kgMax": 2.2, "fight": 0.4, "item": "fish_brook_trout"},
+    {"id": "silver_salmon", "name": "Silver salmon", "biome": "forest", "water": "shallow", "time": "day", "rarity": "rare", "kgMin": 3.0, "kgMax": 9.0, "fight": 0.7, "item": "fish_silver_salmon"},
+    {"id": "grandfather_sturgeon", "name": "Grandfather Sturgeon", "biome": "forest", "water": "shallow", "time": "day", "rarity": "legendary", "kgMin": 80, "kgMax": 140, "fight": 1.0, "item": "fish_grandfather_sturgeon", "look": {"back": [80, 85, 70], "belly": [200, 195, 180], "fins": [100, 95, 80]}},
+    {"id": "cloud_minnow", "name": "Cloud minnow", "biome": "sky_islands", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.1, "kgMax": 0.5, "fight": 0.3, "item": "fish_cloud_minnow"},
+    {"id": "skyfin", "name": "Skyfin", "biome": "sky_islands", "water": "shallow", "time": "day", "rarity": "rare", "kgMin": 0.8, "kgMax": 2.4, "fight": 0.75, "item": "fish_skyfin"},
+    {"id": "aethercarp", "name": "the Aethercarp", "biome": "sky_islands", "water": "shallow", "time": "day", "rarity": "legendary", "kgMin": 30, "kgMax": 55, "fight": 1.0, "item": "fish_aethercarp", "look": {"back": [200, 220, 240], "belly": [250, 250, 255], "fins": [150, 190, 240]}},
+    {"id": "blind_cavefish", "name": "Blind cavefish", "biome": "crystal", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.1, "kgMax": 0.6, "fight": 0.3, "item": "fish_blind_cavefish"},
+    {"id": "glass_shrimp", "name": "Glass shrimp", "biome": "crystal", "water": "shallow", "time": "any", "rarity": "rare", "kgMin": 0.05, "kgMax": 0.2, "fight": 0.5, "item": "fish_glass_shrimp"},
+    {"id": "prism_eel", "name": "the Prism Eel", "biome": "crystal", "water": "shallow", "time": "any", "rarity": "legendary", "kgMin": 20, "kgMax": 40, "fight": 1.0, "item": "fish_prism_eel", "look": {"back": [150, 90, 200], "belly": [220, 200, 240], "fins": [110, 220, 230]}},
+    {"id": "bog_eel", "name": "Bog eel", "biome": "swamp", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.8, "kgMax": 3.0, "fight": 0.5, "item": "fish_bog_eel"},
+    {"id": "snakehead", "name": "Snakehead", "biome": "swamp", "water": "shallow", "time": "night", "rarity": "rare", "kgMin": 2.0, "kgMax": 7.0, "fight": 0.75, "item": "fish_snakehead"},
+    {"id": "old_gar", "name": "the Old Gar", "biome": "swamp", "water": "shallow", "time": "night", "rarity": "legendary", "kgMin": 90, "kgMax": 150, "fight": 1.0, "item": "fish_old_gar", "look": {"back": [70, 75, 50], "belly": [190, 180, 150], "fins": [110, 90, 60]}},
+    {"id": "red_snapper", "name": "Red snapper", "biome": "ocean", "water": "open", "time": "any", "rarity": "common", "kgMin": 1.0, "kgMax": 6.0, "fight": 0.45, "item": "fish_red_snapper"},
+    {"id": "bluefin", "name": "Bluefin", "biome": "ocean", "water": "deep", "time": "day", "rarity": "rare", "kgMin": 40, "kgMax": 180, "fight": 0.9, "item": "fish_bluefin"},
+    {"id": "lazarus_fish", "name": "the Lazarus Fish", "biome": "ocean", "water": "deep", "time": "night", "rarity": "legendary", "kgMin": 60, "kgMax": 90, "fight": 1.0, "item": "fish_lazarus_fish", "look": {"back": [60, 80, 110], "belly": [170, 180, 200], "fins": [200, 200, 220]}},
+    {"id": "ghost_carp", "name": "Ghost carp", "biome": "graveyard", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 1.0, "kgMax": 5.0, "fight": 0.4, "item": "fish_ghost_carp"},
+    {"id": "lamprey", "name": "Lamprey", "biome": "graveyard", "water": "shallow", "time": "night", "rarity": "rare", "kgMin": 0.5, "kgMax": 2.0, "fight": 0.65, "item": "fish_lamprey"},
+    {"id": "drowned_bell", "name": "the Drowned Bell", "biome": "graveyard", "water": "shallow", "time": "night", "rarity": "legendary", "kgMin": 60, "kgMax": 100, "fight": 1.0, "item": "fish_drowned_bell", "look": {"back": [60, 60, 60], "belly": [170, 165, 160], "fins": [176, 130, 60]}},
+    {"id": "glowfin", "name": "Glowfin", "biome": "fungal", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.2, "kgMax": 1.0, "fight": 0.35, "item": "fish_glowfin"},
+    {"id": "cave_crayfish", "name": "Cave crayfish", "biome": "fungal", "water": "shallow", "time": "any", "rarity": "rare", "kgMin": 0.1, "kgMax": 0.5, "fight": 0.5, "item": "fish_cave_crayfish"},
+    {"id": "mycelial_koi", "name": "the Mycelial Koi", "biome": "fungal", "water": "shallow", "time": "any", "rarity": "legendary", "kgMin": 30, "kgMax": 50, "fight": 1.0, "item": "fish_mycelial_koi", "look": {"back": [230, 220, 200], "belly": [250, 245, 235], "fins": [200, 120, 200]}},
+    {"id": "hollow_perch", "name": "Hollow perch", "biome": "wasteland", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.4, "kgMax": 2.0, "fight": 0.4, "item": "fish_hollow_perch"},
+    {"id": "null_eel", "name": "Null eel", "biome": "wasteland", "water": "shallow", "time": "night", "rarity": "rare", "kgMin": 1.5, "kgMax": 5.0, "fight": 0.75, "item": "fish_null_eel"},
+    {"id": "fish_that_isnt", "name": "the Fish That Isn't", "biome": "wasteland", "water": "shallow", "time": "night", "rarity": "legendary", "kgMin": 1, "kgMax": 1, "fight": 1.0, "item": "fish_fish_that_isnt", "look": {"back": [30, 20, 40], "belly": [90, 70, 110], "fins": [140, 100, 190]}}
   ],
   "treasure": [
     { "item": "copper_ore", "min": 2, "max": 4, "weight": 30 },
@@ -27,6 +58,9 @@
     { "item": "lichen", "min": 2, "max": 5, "weight": 10 },
     { "item": "gem_ruby", "min": 1, "max": 1, "weight": 3 },
     { "item": "gem_topaz", "min": 1, "max": 1, "weight": 3 },
-    { "item": "gem_onyx", "min": 1, "max": 1, "weight": 3 }
-  ]
+    { "item": "gem_onyx", "min": 1, "max": 1, "weight": 3 },
+    { "item": "recipe_scrap", "min": 1, "max": 1, "weight": 12 }
+  ],
+  "lures": {"volcanic": "ember_lure", "tundra": "rime_lure", "storm_peaks": "gale_lure", "desert": "sun_lure", "forest": "grub_lure", "sky_islands": "cloud_lure", "crystal": "prism_lure", "swamp": "mire_lure", "ocean": "tide_lure", "graveyard": "grave_lure", "fungal": "spore_lure", "wasteland": "void_lure"},
+  "xp": {"common": 20, "uncommon": 35, "rare": 60, "legendary": 100, "legendaryFirst": 500}
 }

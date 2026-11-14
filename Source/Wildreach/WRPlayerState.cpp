@@ -4,6 +4,7 @@
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRSurvival.h"
+#include "WRFarm.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -20,6 +21,7 @@ AWRPlayerState::AWRPlayerState()
 	Paths = CreateDefaultSubobject<UWRPathComponent>(TEXT("Paths"));
 	Inventory = CreateDefaultSubobject<UWRInventoryComponent>(TEXT("Inventory"));
 	Survival = CreateDefaultSubobject<UWRSurvivalComponent>(TEXT("Survival"));
+	Food = CreateDefaultSubobject<UWRFoodComponent>(TEXT("Food"));
 	LifeSkills = CreateDefaultSubobject<UWRLifeSkillsComponent>(TEXT("LifeSkills"));
 }
 

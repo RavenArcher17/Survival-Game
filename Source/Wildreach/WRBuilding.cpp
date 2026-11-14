@@ -1,4 +1,6 @@
 #include "WRBuilding.h"
+#include "WRFarm.h"
+#include "WRFarmLook.h"
 #include "WRBeds.h"
 #include "WRSurvival.h"
 #include "WRSound.h"
@@ -110,6 +112,16 @@ FWRBuildRegistry::FWRBuildRegistry()
 				(*Comfort)->TryGetNumberField(TEXT("value"), Value);
 				D.Comfort = FMath::RoundToInt(Value);
 			}
+			double Num = 0.0;
+			if (O->TryGetNumberField(TEXT("hearth"), Num)) D.HearthLevel = static_cast<int32>(Num);
+			if (O->TryGetStringField(TEXT("biome"), S)) D.Biome = FName(*S);
+			if (O->TryGetStringField(TEXT("plot"), S)) D.Plot = FName(*S);
+			O->TryGetBoolField(TEXT("glass"), D.bGlass);
+			O->TryGetNumberField(TEXT("cold"), D.Cold);
+			if (O->TryGetStringField(TEXT("fuel"), S)) D.Fuel = FName(*S);
+			O->TryGetNumberField(TEXT("fuelMinutes"), D.FuelMinutes);
+			if (O->TryGetStringField(TEXT("needs"), S)) D.NeedsCreature = FName(*S);
+			if (O->TryGetStringField(TEXT("trophy"), S)) D.Trophy = FName(*S);
 			Pieces.Add(D);
 		}
 	}
@@ -329,6 +341,11 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, CropReadyAt);
 	DOREPLIFETIME(AWRBuildPiece, bPlanted);
 	DOREPLIFETIME(AWRBuildPiece, Storage);
+	DOREPLIFETIME(AWRBuildPiece, CropId);
+	DOREPLIFETIME(AWRBuildPiece, Growth8);
+	DOREPLIFETIME(AWRBuildPiece, FarmFlags);
+	DOREPLIFETIME(AWRBuildPiece, FarmStop);
+	DOREPLIFETIME(AWRBuildPiece, Feed);
 	DOREPLIFETIME(AWRBuildPiece, Support);
 	DOREPLIFETIME(AWRBuildPiece, CustomName);
 	DOREPLIFETIME(AWRBuildPiece, UnlockedFor);
@@ -344,6 +361,11 @@ void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
 		if (Def->Kind == TEXT("chest"))
 		{
 			Storage.SetNum(20);
+		}
+		// Farm producers keep what they make on them until it's collected (a pen's shelf, a hive's combs, a trap's catch).
+		if (Def->Kind == TEXT("pen") || Def->Kind == TEXT("hive") || Def->Kind == TEXT("trap") || Def->Kind == TEXT("saltpan"))
+		{
+			Storage.SetNum(FMath::RoundToInt(WRTune(*FString::Printf(TEXT("farm.%s.slots"), *Def->Kind.ToString()), 10.f)));
 		}
 		// Claim totems and Hearths reach every player wherever they are (a few actors a base), so your base stays on
 		// your map from across the island; the map shows other people's claims only near them, as before.
@@ -361,6 +383,21 @@ void AWRBuildPiece::BeginPlay()
 	if (HasAuthority() && !bGhost)
 	{
 		SpawnChild();
+	}
+	// Farm pieces and chests (food keeps at their pace) run on the farm's clock.
+	const FWRPieceDef* FarmDef = GetDef();
+	if (!bGhost && HasAuthority() && FarmDef && (FarmDef->IsFarm() || FarmDef->Kind == TEXT("chest")))
+	{
+		if (UWRFarmSubsystem* Farm = UWRFarmSubsystem::Get(this)) Farm->Register(this);
+	}
+	OnRep_Farm();
+}
+
+void AWRBuildPiece::OnRep_Farm()
+{
+	if (!bGhost && GetNetMode() != NM_DedicatedServer && HasActorBegunPlay())
+	{
+		FWRFarmLook::Refresh(this);
 	}
 }
 
@@ -386,6 +423,10 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 			WRBeds::OnGone(this);
 		}
 	}
+	if (UWRFarmSubsystem* Farm = HasAuthority() ? UWRFarmSubsystem::Get(this) : nullptr)
+	{
+		Farm->Unregister(this);
+	}
 	if (AActor* Child = ChildActor.Get())
 	{
 		Child->Destroy();
@@ -396,6 +437,7 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 void AWRBuildPiece::OnRep_Piece()
 {
 	ApplyLook();
+	OnRep_Farm();
 }
 
 void AWRBuildPiece::OnRep_Door()
@@ -551,6 +593,24 @@ void AWRBuildPiece::ApplyLook()
 		Parts.Add({ FVector(200, 200, 500), FVector(0, 0, 250) });
 		Parts.Add({ FVector(400, 400, 20), FVector(0, 0, 510) });
 	}
+	// Farm and kitchen pieces collide as they're drawn (WRBuildLook FarmBlocks' measurements).
+	else if (Def->Id == TEXT("campfire")) Parts.Add({ FVector(110, 110, 18), FVector(0, 0, 9) });
+	else if (Def->Id == TEXT("cooking_pot")) { Parts.Add({ FVector(100, 100, 18), FVector(0, 0, 9) }); Parts.Add({ FVector(50, 50, 30), FVector(0, 0, 72) }); }
+	else if (Def->Id == TEXT("oven")) { Parts.Add({ FVector(140, 124, 64), FVector(0, 0, 32) }); Parts.Add({ FVector(116, 116, 66), FVector(-5, 0, 97) }); Parts.Add({ FVector(30, 34, 90), FVector(-36, 0, 145) }); }
+	else if (Def->Id == TEXT("smokehouse")) Parts.Add({ FVector(204, 204, 210), FVector(0, 0, 105) });
+	else if (Def->Id == TEXT("salting_barrel")) Parts.Add({ FVector(72, 72, 100), FVector(0, 0, 50) });
+	else if (Def->Id == TEXT("drying_rack")) { Parts.Add({ FVector(14, 60, 170), FVector(-90, 0, 85) }); Parts.Add({ FVector(14, 60, 170), FVector(90, 0, 85) }); }
+	else if (Def->Id == TEXT("compost_bin")) Parts.Add({ FVector(124, 104, 88), FVector(0, 0, 44) });
+	else if (Def->Id == TEXT("ice_box")) Parts.Add({ FVector(124, 78, 73), FVector(0, 0, 36) });
+	else if (Def->Id == TEXT("salt_pan")) Parts.Add({ FVector(300, 200, 10), FVector(0, 0, 5) });
+	else if (Def->Id == TEXT("well")) { Parts.Add({ FVector(136, 136, 70), FVector(0, 0, 35) }); Parts.Add({ FVector(11, 11, 190), FVector(0, -72, 95) }); Parts.Add({ FVector(11, 11, 190), FVector(0, 72, 95) }); }
+	else if (Def->Id == TEXT("irrigation_channel")) Parts.Add({ FVector(400, 74, 12), FVector(0, 0, 6) });
+	else if (K == TEXT("crop") && Def->Plot == TEXT("ashpit")) { Parts.Add({ FVector(340, 340, 4), FVector(0, 0, 2) }); Parts.Add({ FVector(60, 300, 100), FVector(-180, 0, 50) }); }
+	else if (K == TEXT("crop") && Def->Plot == TEXT("kelp")) Parts.Add({ FVector(440, 40, 30), FVector(0, 0, 15), FRotator::ZeroRotator, false });
+	else if (K == TEXT("crop") && Def->Plot == TEXT("log")) Parts.Add({ FVector(380, 360, 36), FVector(0, 0, 18) });
+	else if (K == TEXT("hive")) Parts.Add({ FVector(96, 90, 150), FVector(0, 0, 75) });
+	else if (K == TEXT("trap")) Parts.Add({ FVector(90, 50, 55), FVector(-5, 0, 27) });
+	else if (!Def->Trophy.IsNone()) Parts.Add({ FVector(146, 8, 64), FVector(0, -7, 150) });
 	else if (K == TEXT("chest")) Parts.Add({ FVector(100, 60, 60), FVector(0, 0, 30) });
 	// Furniture and lights collide as what you see (WRBuildLook's measurements): a bed's frame and headboard, a
 	// brazier's bowl on its legs, a table's top on four legs, a chair's seat, legs and back.
@@ -574,6 +634,8 @@ void AWRBuildPiece::ApplyLook()
 		Parts.Add({ FVector(814, 14, 130), FVector(0, 400, 65) });
 		Parts.Add({ FVector(14, 786, 130), FVector(-400, 0, 65) });
 		Parts.Add({ FVector(14, 786, 130), FVector(400, 0, 65) });
+		Parts.Add({ FVector(170, 44, 72), FVector(-260, -150, 36) });   // the trough
+		Parts.Add({ FVector(120, 76, 80), FVector(330, 260, 40) });     // the shelf
 	}
 	// Stations, the Hearth and the totem are child actors only the server spawns: the build-mode ghost previews their size.
 	else if (bGhost && K == TEXT("station")) Parts.Add({ FVector(120, 80, 90), FVector(0, 0, 50) });
@@ -920,51 +982,9 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 		const FString Refused = Survival ? Survival->TryStartSleep(this) : FString(TEXT("Respawn point set"));
 		return Refused.IsEmpty() ? FString(TEXT("Respawn point set. Sleeping...")) : FString::Printf(TEXT("Respawn point set. %s"), *Refused);
 	}
-	if (K == TEXT("crop"))
+	if (Def->IsFarm())
 	{
-		const float Now = GetWorld()->GetTimeSeconds();
-		if (!bPlanted)
-		{
-			if (PS->GetInventory()->CountOf(TEXT("seeds")) < 1)
-			{
-				return TEXT("Need seeds to plant (berry bushes drop them)");
-			}
-			PS->GetInventory()->RemoveItem(TEXT("seeds"), 1);
-			bPlanted = true;
-			CropReadyAt = Now + WRTune(TEXT("crops.commonMinutes"), 20.f) * 60.f / FMath::Max(0.1f, WRTune(TEXT("server.cropMultiplier"), 1.f))
-				/ (1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("cropSpeed")));
-			UWRLifeSkillsComponent::Award(PS, TEXT("farming"), TEXT("plant"), 10.f);
-			return FString::Printf(TEXT("Planted. Ready in %.0f min"), (CropReadyAt - Now) / 60.f);
-		}
-		if (Now < CropReadyAt)
-		{
-			return FString::Printf(TEXT("Growing: %.0f min left"), (CropReadyAt - Now) / 60.f);
-		}
-		const int32 Berries = FMath::RoundToInt(6.f * (1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("harvestExtra"))) * WRTune(TEXT("server.gatherMultiplier"), 1.f));
-		const int32 Seeds = 2 + FMath::RoundToInt(UWRLifeSkillsComponent::StatFor(PS, TEXT("seedExtra")));
-		PS->GetInventory()->AddItem(TEXT("berries"), Berries);
-		PS->GetInventory()->AddItem(TEXT("seeds"), Seeds);
-		UWRLifeSkillsComponent::Award(PS, TEXT("farming"), TEXT("harvest"), 20.f);
-		// Endless field: replants itself.
-		bPlanted = UWRLifeSkillsComponent::StatFor(PS, TEXT("autoReplant")) > 0.f;
-		CropReadyAt = bPlanted ? Now + WRTune(TEXT("crops.commonMinutes"), 20.f) * 60.f / FMath::Max(0.1f, WRTune(TEXT("server.cropMultiplier"), 1.f))
-			/ (1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("cropSpeed"))) : 0.f;
-		return FString::Printf(TEXT("Harvested %d berries, %d seeds%s"), Berries, Seeds, bPlanted ? TEXT(" (replanted)") : TEXT(""));
-	}
-	if (K == TEXT("pen"))
-	{
-		int32 Collected = 0;
-		for (FWRItemStack& S : Storage)
-		{
-			if (!S.IsEmpty() && PS->GetInventory()->AddItem(S.ItemId, S.Count) == 0)
-			{
-				Collected += S.Count;
-				S = FWRItemStack();
-			}
-		}
-		UWRLifeSkillsComponent::Award(PS, TEXT("husbandry"), TEXT("collect"), 5.f, Collected);
-		return Collected > 0 ? FString::Printf(TEXT("Collected %d animal products"), Collected)
-			: TEXT("Animal pen: keep a tamed Pumicehog or Snowpuff inside and it produces over time");
+		return FWRFarm::Interact(this, Player);
 	}
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
@@ -1115,16 +1135,25 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	O->SetStringField(TEXT("code"), LockCode);
 	if (!CustomName.IsEmpty()) O->SetStringField(TEXT("name"), CustomName);
 	O->SetBoolField(TEXT("locked"), bLocked);
-	O->SetBoolField(TEXT("planted"), bPlanted);
-	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	O->SetNumberField(TEXT("cropSecondsLeft"), bPlanted ? FMath::Max(0.f, CropReadyAt - Now) : 0.f);
+	// Farming (WRFarm): the crop and how far it's grown, who planted it, the trough / hive feed, the last crop.
+	if (!CropId.IsNone())
+	{
+		O->SetStringField(TEXT("crop"), CropId.ToString());
+		O->SetNumberField(TEXT("growth"), Growth);
+		O->SetStringField(TEXT("planter"), Planter);
+		O->SetNumberField(TEXT("planterSpeed"), PlanterSpeed);
+		O->SetBoolField(TEXT("fertilised"), (FarmFlags & WRFarmFlag::Fertilised) != 0);
+		O->SetBoolField(TEXT("grafted"), bPlanterGraft);
+		O->SetBoolField(TEXT("companion"), bPlanterCompanion);
+		O->SetBoolField(TEXT("waterWise"), bPlanterWaterWise);
+	}
+	if (!LastCrop.IsNone()) O->SetStringField(TEXT("lastCrop"), LastCrop.ToString());
+	if (Feed > 0) O->SetNumberField(TEXT("feed"), Feed);
+	// Stacks keep their freshness and worth (food) and their instance (gear) in storage too.
 	TArray<TSharedPtr<FJsonValue>> Items;
 	for (const FWRItemStack& S : Storage)
 	{
-		TSharedRef<FJsonObject> I = MakeShared<FJsonObject>();
-		I->SetStringField(TEXT("id"), S.IsEmpty() ? FString() : S.ItemId.ToString());
-		I->SetNumberField(TEXT("count"), S.IsEmpty() ? 0 : S.Count);
-		Items.Add(MakeShared<FJsonValueObject>(I));
+		Items.Add(MakeShared<FJsonValueObject>(FWRInventoryRules::StackToJson(S)));
 	}
 	O->SetArrayField(TEXT("storage"), Items);
 	if (const AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
@@ -1192,12 +1221,46 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 	O->TryGetStringField(TEXT("name"), CustomName);
 	O->TryGetBoolField(TEXT("locked"), bLocked);
 	O->TryGetBoolField(TEXT("planted"), bPlanted);
-	double Left = 0.0;
-	if (O->TryGetNumberField(TEXT("cropSecondsLeft"), Left) && bPlanted)
+	FString Str;
+	if (O->TryGetStringField(TEXT("crop"), Str) && FWRFarmDefs::Get().Crop(FName(*Str)))
 	{
-		CropReadyAt = GetWorld()->GetTimeSeconds() + Left;
+		CropId = FName(*Str);
+		double G = 0.0;
+		O->TryGetNumberField(TEXT("growth"), G);
+		Growth = FMath::Clamp(float(G), 0.f, 1.f);
+		O->TryGetStringField(TEXT("planter"), Planter);
+		double Speed = 1.0;
+		if (O->TryGetNumberField(TEXT("planterSpeed"), Speed)) PlanterSpeed = float(Speed);
+		bool bFert = false;
+		if (O->TryGetBoolField(TEXT("fertilised"), bFert) && bFert) FarmFlags |= WRFarmFlag::Fertilised;
+		O->TryGetBoolField(TEXT("grafted"), bPlanterGraft);
+		O->TryGetBoolField(TEXT("companion"), bPlanterCompanion);
+		O->TryGetBoolField(TEXT("waterWise"), bPlanterWaterWise);
 	}
-	ReadStacks(O, TEXT("storage"), Storage);
+	else if (bPlanted)
+	{
+		// Saved before biome crops (0.7): the old plot grew berries in commonMinutes.
+		CropId = TEXT("berry");
+		double Left = 0.0;
+		O->TryGetNumberField(TEXT("cropSecondsLeft"), Left);
+		Growth = FMath::Clamp(1.f - float(Left) / (WRTune(TEXT("crops.commonMinutes"), 20.f) * 60.f), 0.f, 1.f);
+	}
+	bPlanted = !CropId.IsNone();
+	Growth8 = static_cast<uint8>(FMath::RoundToInt(Growth * 255.f));
+	if (O->TryGetStringField(TEXT("lastCrop"), Str)) LastCrop = FName(*Str);
+	double FeedNum = 0.0;
+	if (O->TryGetNumberField(TEXT("feed"), FeedNum)) Feed = static_cast<int32>(FeedNum);
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (O->TryGetArrayField(TEXT("storage"), Arr))
+		{
+			for (int32 i = 0; i < Arr->Num(); ++i)
+			{
+				if (!Storage.IsValidIndex(i)) Storage.AddDefaulted();
+				Storage[i] = FWRInventoryRules::StackFromJson((*Arr)[i]->AsObject());
+			}
+		}
+	}
 	const TArray<TSharedPtr<FJsonValue>>* SleeperNames = nullptr;
 	if (O->TryGetArrayField(TEXT("sleepers"), SleeperNames))
 	{

@@ -23,6 +23,7 @@
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRFarm.h"
 #include "WRSurvival.h"
 #include "WRWorldDressing.h"
 #include "WRTuning.h"
@@ -745,7 +746,7 @@ private:
 		}
 		if (const AActor* Use = P->FindUseTarget())
 		{
-			if (const AWRStation* St = Cast<AWRStation>(Use)) { OutTarget = St->GetDisplayName(); return TEXT("Use"); }
+			if (const AWRStation* St = Cast<AWRStation>(Use)) { OutTarget = St->GetDisplayName(); return FWRFarm::IsCookStation(St->StationType, S) ? TEXT("Cook") : TEXT("Use"); }
 			if (const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(Use))
 			{
 				const FWRPieceDef* Def = Piece->GetDef();
@@ -758,9 +759,31 @@ private:
 					const TCHAR* Act = Piece->bOpen ? TEXT("Close") : TEXT("Open");
 					return Def->bLockable && Piece->SeemsShared(P) ? FString::Printf(TEXT("%s  ·  Hold: code lock"), Act) : FString(Act);
 				}
+				if (Def->Kind == TEXT("chest") && Def->Cold > 0.f)
+				{
+					// An ice box: whether it's cold (ice burning, or the tundra's ground) or needs ice.
+					OutTarget = Piece->Feed > 0 ? FString::Printf(TEXT("%s · cold: food keeps 5x as long"), *Def->Name) : FString::Printf(TEXT("%s · no ice: put ice blocks in"), *Def->Name);
+					return TEXT("Open");
+				}
 				if (Def->Kind == TEXT("chest")) return TEXT("Open");
 				if (Def->Kind == TEXT("totem")) return TEXT("Land claim");
-				if (Def->Kind == TEXT("crop")) return Piece->bPlanted ? TEXT("Growing") : TEXT("Plant");
+				if (Def->IsFarm())
+				{
+					// The farm piece's state on the second line (WRFarm::Describe), what E does on the first.
+					OutTarget = FWRFarm::Describe(Piece, P);
+					const AWRPlayerState* MyPS = P->GetPlayerState<AWRPlayerState>();
+					const UWRInventoryComponent* Inv = MyPS ? MyPS->GetInventory() : nullptr;
+					if (Def->Kind == TEXT("crop"))
+					{
+						if (Piece->CropId.IsNone()) return TEXT("Plant");
+						if (Piece->Growth8 >= 255) return TEXT("Harvest");
+						if (!(Piece->FarmFlags & WRFarmFlag::Fertilised) && Inv && (Inv->CountOf(TEXT("compost")) > 0 || Inv->CountOf(TEXT("bone_meal")) > 0)) return TEXT("Fertilise");
+						return TEXT("Growing");
+					}
+					if (Def->Kind == TEXT("pen")) return TEXT("Feed · collect");
+					if (Def->Kind == TEXT("well") || Def->Kind == TEXT("channel")) return TEXT("Water");
+					return TEXT("Collect");
+				}
 				if (Def->Kind == TEXT("bed")) return TEXT("Sleep · set respawn");
 				return TEXT("Use");
 			}
@@ -971,6 +994,12 @@ private:
 		return P ? P->GetSurvival() : nullptr;
 	}
 
+	const UWRFoodComponent* Food() const
+	{
+		const AWRPlayerState* P = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+		return P ? P->GetFood() : nullptr;
+	}
+
 	static FString Clock(float Seconds)
 	{
 		const int32 S = FMath::Max(0, FMath::CeilToInt(Seconds));
@@ -1047,6 +1076,20 @@ private:
 						return FText::FromString(FString::Printf(TEXT("Sleep in your bed (%s) for %d min of Rested"), *WRInput::ActionKey(TEXT("Interact")).ToString(),
 							FMath::RoundToInt(WRTune(TEXT("rested.bedMinutes"), 20.f) + C * WRTune(TEXT("rested.perComfort"), 1.f))));
 					})
+			]
+			// Sated after a good meal (cooks/build-farming.md 2.8): hunger holds still; it pulses in its last minute.
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				Condition([this]() { const UWRFoodComponent* F = Food(); return F && F->SatedSecondsLeft() > 0.f; },
+					[]() { return FName(TEXT("sated")); },
+					[this]()
+					{
+						const FLinearColor SatedTint(FColor(236, 190, 110));
+						const UWRFoodComponent* F = Food();
+						return F && F->SatedSecondsLeft() > 60.f ? SatedTint : WRUI::Alpha(SatedTint, 0.55f + 0.45f * float(FMath::Abs(FMath::Sin(FPlatformTime::Seconds() * 3.0))));
+					},
+					[this]() { const UWRFoodComponent* F = Food(); return FText::FromString(FString::Printf(TEXT("Sated · %s"), *Clock(F ? F->SatedSecondsLeft() : 0.f))); },
+					[]() { return FText::FromString(TEXT("A good meal: hunger holds still")); })
 			]
 			// The weather where you are: coming (with the count), or on, and whether you're beating it.
 			+ SVerticalBox::Slot().AutoHeight()
