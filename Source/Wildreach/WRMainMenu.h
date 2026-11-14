@@ -71,6 +71,8 @@ private:
 	static FString LatestVersion;
 	static FString LastFailure;
 	FReply OnPickPath(FName Path);
+	/** The main path choices, one per Data/paths file. */
+	TSharedRef<SWidget> MakePathPicker();
 	FReply OnPickBody(FName InBody);
 	FString Options() const;
 	void Remember() const;

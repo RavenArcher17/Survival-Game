@@ -111,9 +111,13 @@ struct FWRItemDef
 
 	/** Statuses a drink ends (use.cures: bleed, shock, blind, curse, burn, frostbite, poison, rot). */
 	TArray<FName> Cures;
+	/** A drink's timed protection (use.buff {id, minutes}): grounding (the Grounding salve: no strike stun, strike damage
+	 *  x0.5), shock_ward (the shock-resist potion: shock buildup x0.5). WRStorm::HasBuff asks. */
+	FName BuffId;
+	float BuffMinutes = 0.f;
 	/** Worn status resistance by status id (equip.resist). */
 	TMap<FName, float> Resists;
-	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse || Cures.Num() > 0; }
+	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse || Cures.Num() > 0 || !BuffId.IsNone(); }
 	bool IsEquipment() const { return Slot != EWREquipSlot::None; }
 };
 

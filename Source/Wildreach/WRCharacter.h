@@ -73,6 +73,10 @@ class WILDREACH_API AWRCharacter : public AWRCharacterBase
 	GENERATED_BODY()
 
 public:
+	/** This machine: the storm picked this body (cooks/biome-lightning.md 2.5): the hair lifts on the path marks' lift
+	 *  channel and flickers for Seconds, whatever path it's on (WRStormWorld's pre-tell). */
+	void StrikePreTell(float Seconds);
+	double StrikeTellUntil = 0.0;
 	AWRCharacter(const FObjectInitializer& ObjectInitializer);
 
 	virtual void PossessedBy(AController* NewController) override;

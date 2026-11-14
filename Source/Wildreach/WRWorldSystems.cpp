@@ -4,6 +4,7 @@
 // WRUIWorld.cpp.
 
 #include "WRWorldSystems.h"
+#include "WRStormWorld.h"
 #include "WRDeeds.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
@@ -111,7 +112,7 @@ namespace WRWorldImpl
 		{
 			FHitResult Hit;
 			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRWorldSettle), false);
-			if (!World->LineTraceSingleByChannel(Hit, FVector(Cm, 150000.f), FVector(Cm, -20000.f), ECC_WorldStatic, Q))
+			if (!World->LineTraceSingleByChannel(Hit, FVector(Cm, 200000.f), FVector(Cm, -20000.f), ECC_WorldStatic, Q))
 			{
 				return false;   // the ground isn't here yet (streaming)
 			}
@@ -901,7 +902,7 @@ void UWRWorldSystems::PlaceShrines()
 		Row->TryGetBoolField(TEXT("great"), bGreat);
 		FVector Ground;
 		FRotator Face = FRotator::ZeroRotator;
-		if (bGreat)
+		if (bGreat && !Row->HasField(TEXT("at")))
 		{
 			const TWeakObjectPtr<AWRVillage>* Vg = Villages.Find(FName(*WStrOf(Row, TEXT("village"))));
 			if (!Vg || !Vg->IsValid()) continue;
@@ -911,8 +912,9 @@ void UWRWorldSystems::PlaceShrines()
 		else
 		{
 			if (!WSettle(World, WMetres(Row->TryGetField(TEXT("at"))), Ground)) continue;
-			// The steps face the way most people come: toward the island's coast road (out from the middle).
-			Face = FRotator(0.f, FVector(Ground.X, Ground.Y, 0.f).Rotation().Yaw, 0.f);
+			// The steps face the way most people come: toward the island's coast road (out from the middle), or the
+			// row's own yaw (a Great Shrine with no village, Storm peaks' shrines on their paths).
+			Face = FRotator(0.f, Row->HasField(TEXT("yaw")) ? WNumOf(Row, TEXT("yaw"), 0.f) : FVector(Ground.X, Ground.Y, 0.f).Rotation().Yaw, 0.f);
 		}
 		AWRShrine* S = World->SpawnActorDeferred<AWRShrine>(AWRShrine::StaticClass(), FTransform(Face, Ground), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		if (!S) continue;
@@ -940,21 +942,34 @@ void UWRWorldSystems::PlaceMasters()
 	for (const TSharedPtr<FJsonValue>& V : *List)
 	{
 		const TSharedPtr<FJsonObject> Row = V->AsObject();
+		// A master lives in their village beside its Great Shrine, or (no village: Vesna Groza at her climbers' camp in
+		// Strikerock's split) at the row's own spot ("at", metres) and facing ("yaw").
+		const FName OwnBiome(*WStrOf(Row, TEXT("biome")));
+		if (!OwnBiome.IsNone() && !WRBiome::IsLive(OwnBiome)) continue;
 		const TWeakObjectPtr<AWRVillage>* Vg = Villages.Find(FName(*WStrOf(Row, TEXT("village"))));
-		if (!Vg || !Vg->IsValid()) continue;
-		const AWRVillage* Village = Vg->Get();
-		const FVector2D Off = WMetres(Row->TryGetField(TEXT("offset"))) / 100.f;   // the row is in cm (beside the shrine), not metres
-		const FVector Local(Off.X, Off.Y, 0.f);
-		FVector Spot = Village->GetActorTransform().TransformPosition(Local);
+		const AWRVillage* Village = Vg && Vg->IsValid() ? Vg->Get() : nullptr;
+		if (!Village && !Row->HasField(TEXT("at"))) continue;
+		FVector Spot;
+		FRotator Face;
+		if (Village)
+		{
+			const FVector2D Off = WMetres(Row->TryGetField(TEXT("offset"))) / 100.f;   // the row is in cm (beside the shrine), not metres
+			Spot = Village->GetActorTransform().TransformPosition(FVector(Off.X, Off.Y, 0.f));
+			Face = FRotator(0.f, Village->GetActorRotation().Yaw, 0.f);   // facing the work at their hands (the anvil, the hide frame), the shrine at their side
+		}
+		else
+		{
+			Spot = FVector(WMetres(Row->TryGetField(TEXT("at"))), 0.f);
+			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
+		}
 		FVector Ground;
 		if (WSettle(World, FVector2D(Spot), Ground)) Spot = Ground;
-		const FRotator Face(0.f, Village->GetActorRotation().Yaw, 0.f);   // facing the work at their hands (the anvil, the hide frame), the shrine at their side
 		AWRWorldNpc* N = World->SpawnActorDeferred<AWRWorldNpc>(AWRWorldNpc::StaticClass(), FTransform(Face, Spot + FVector(0.f, 0.f, 100.f)), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (!N) continue;
 		N->NpcRole = TEXT("master");
 		N->NpcId = FName(*WStrOf(Row, TEXT("id")));
 		N->NpcName = WStrOf(Row, TEXT("name"));
-		N->Biome = Village->Biome;
+		N->Biome = Village ? Village->Biome : OwnBiome;
 		FName Armor[4], Elements[4];
 		const TArray<TSharedPtr<FJsonValue>>* A = WArr(Row, TEXT("armor"));
 		const TArray<TSharedPtr<FJsonValue>>* E = WArr(Row, TEXT("elements"));
@@ -1347,6 +1362,9 @@ void UWRWorldSystems::QuestEvent(AWRPlayerState* PS, FName Type, FName What, int
 			bCounts = Type.ToString() == Want && What == FName(*WStrOf(Row, TEXT("creature")));
 		}
 		else if (QType == TEXT("tame")) bCounts = Type == TEXT("tame") && What == FName(*WStrOf(Row, TEXT("creature")));
+		// event: a land's own deed counted by its system (Storm peaks: rodroad = a rod touched on the rod-road, pretell =
+		// a strike's warning lived through above 600 m, lantern = a winch hut's lantern lit; WRStormWorld.cpp).
+		else if (QType == TEXT("event")) bCounts = Type == FName(*WStrOf(Row, TEXT("event")));
 		else if (QType == TEXT("shrines") && Type == TEXT("shrine"))
 		{
 			// Counted from the shrines you've kindled yourself.
@@ -1682,7 +1700,10 @@ void UWRWorldSystems::DropMeteor(FName Biome)
 	const FName High = WKindOf(Biome, TEXT("highland"), false);
 	for (int32 Try = 0; Try < 60; ++Try)
 	{
-		const FVector2D At(FMath::FRandRange(-180000.f, 180000.f), FMath::FRandRange(-180000.f, 180000.f));
+		// Anywhere on a land in the game: the island, or (once it's live) Storm peaks' frame to the north.
+		const bool bNorth = WRBiome::IsLive(TEXT("storm_peaks")) && FMath::FRand() < WRWorld::Num(TEXT("events.starfall.northShare"), 0.35f);
+		const FVector2D At = bNorth ? FVector2D(FMath::FRandRange(-260000.f, 60000.f), FMath::FRandRange(-560000.f, -230000.f))
+			: FVector2D(FMath::FRandRange(-180000.f, 180000.f), FMath::FRandRange(-180000.f, 180000.f));
 		if (!(Mid.IsNone() ? false : WRWildlife::CanStand(Mid, At)) && !(High.IsNone() ? false : WRWildlife::CanStand(High, At))) continue;
 		bool bNear = false;
 		for (const FWRPoi& P : FWRPoi::All) bNear |= FVector::Dist2D(P.Location, FVector(At, 0.f)) < Clear && P.Kind != TEXT("cave");
@@ -1833,6 +1854,8 @@ void UWRWorldSystems::StepInvasion(float Dt)
 		for (int32 i = 0; Pairs && i < Pairs->Num(); ++i)
 		{
 			const TSharedPtr<FJsonObject> Pair = (*Pairs)[i]->AsObject();
+			// Both lands must be in the game (the Storm <-> Swamp pair waits for the Swamp).
+			if (!WRBiome::IsLive(FName(*WStrOf(Pair, TEXT("from")))) || !WRBiome::IsLive(FName(*WStrOf(Pair, TEXT("to"))))) continue;
 			const FString Key = WStrOf(Pair, TEXT("from")) + TEXT(">") + WStrOf(Pair, TEXT("to"));
 			const double Every = 7.0 * 24.0 * 3600.0 / PerWeek;
 			double& Next = NextInvasionAt.FindOrAdd(Key, -1.0);
@@ -2287,6 +2310,14 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 		for (TActorIterator<AWRSummoningStone> It(PC->GetWorld()); It; ++It) if (It->BossId == FName(*Arg(2))) S = *It;
 		if (!S || !Near(S, 500.f)) return TEXT("No summoning stone here");
 		return S->Offer(PC);
+	}
+	if (Verb == TEXT("plank"))
+	{
+		// Storm peaks' rope bridges: lay a new plank in the gap you stand at (cooks/biome-lightning.md 2.5).
+		const APawn* Walker = PC->GetPawn();
+		int32 Plank = INDEX_NONE;
+		AWRStormBridge* B = Walker && UWRStormWorld::Get(PC) ? UWRStormWorld::Get(PC)->BridgeGapNear(Walker->GetActorLocation(), Plank) : nullptr;
+		return B ? B->Mend(PC, Plank) : TEXT("No gap to mend here");
 	}
 	if (Verb == TEXT("open"))
 	{

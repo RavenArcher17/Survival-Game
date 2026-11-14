@@ -3,6 +3,8 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRStormTypes.h"
+#include "WRSurvival.h"
 #include "WRUIEndgame.h"
 #include "WRPlayerUI.h"
 #include "WRPortals.h"
@@ -27,6 +29,8 @@
 #include "WRKeyBindings.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
+#include "WRPathLook.h"
+#include "WRLightningPath.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -158,6 +162,20 @@ public:
 			{
 				FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(2.f, 9.f), FSlateLayoutTransform(FVector2D(X - 1.f, Size.Y * 0.5f - 4.f))), WRUI::White(), ESlateDrawEffect::None, WRUI::Alpha(WRUI::Ink3, 0.6f));
 			}
+		}
+		// The altitude line (cooks/biome-lightning.md 2.5): in Storm peaks a hairline under the strip with your height; in a
+		// Thunderstorm above the strike altitude it turns storm violet-white (lightning picks you from here up).
+		if (WRBiome::At(P, Pawn->GetActorLocation()) == TEXT("storm_peaks"))
+		{
+			const float Z = Pawn->GetActorLocation().Z;
+			const float StrikeFrom = WRTune(TEXT("storm.strikeAltitude"), 60000.f);
+			const bool bLive = WRStorm::InStorm(P, Pawn->GetActorLocation()) && (Z >= StrikeFrom || WRStorm::GreatStorm(P));
+			const FLinearColor LineC = bLive ? FLinearColor(FColor(185, 167, 255)) : WRUI::Alpha(WRUI::Ink3, 0.5f);
+			FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(Size.X - 44.f, bLive ? 2.f : 1.f), FSlateLayoutTransform(FVector2D(22.f, Size.Y - 3.f))), WRUI::White(), ESlateDrawEffect::None, LineC);
+			const FText T = FText::FromString(bLive ? FString::Printf(TEXT("%d m  strikes"), FMath::RoundToInt(Z / 100.f)) : FString::Printf(TEXT("%d m"), FMath::RoundToInt(Z / 100.f)));
+			const FSlateFontInfo Font = WRUI::Body(11, 700);
+			const FVector2D TS = Measure(T, Font);
+			DrawTextAt(Out, Layer + 2, Geo, T, Font, FVector2D(Size.X - 22.f - TS.X, Size.Y - TS.Y - 5.f), LineC);
 		}
 		// Places: a coloured marker in the strip; the camp or boss nearest the middle gets its name and distance under it.
 		const FWRPoi* Nearest = nullptr;
@@ -354,7 +372,7 @@ private:
 						[
 							SNew(SBox).WidthOverride(30.f * U).HeightOverride(30.f * U)
 							[
-								SNew(SImage).Image_Lambda([this]() { return WRUI::Icon(MainPath() == TEXT("frost") ? TEXT("frost_essence") : TEXT("ember_essence")); })
+								SNew(SImage).Image_Lambda([this]() { return WRUI::Icon(WRPathLook::Icon(MainPath())); })
 							]
 						]
 					]
@@ -421,7 +439,7 @@ private:
 
 	const UWRPathComponent* PathComp() const { const AWRCharacter* S = Survivor(); return S ? UWRPathComponent::FindFor(S) : nullptr; }
 	FName MainPath() const { const UWRPathComponent* P = PathComp(); return P ? P->GetMainPath() : NAME_None; }
-	FLinearColor PathColor() const { return MainPath() == TEXT("frost") ? WRUI::Frost : WRUI::Ember; }
+	FLinearColor PathColor() const { return WRPathLook::Color(MainPath()); }
 	float PathXPFraction() const
 	{
 		const UWRPathComponent* P = PathComp();
@@ -1010,7 +1028,7 @@ private:
 			];
 	}
 
-	TSharedRef<SWidget> Gauge(const FText& Label, const FLinearColor& Color, FName Icon, TFunction<float()> Value, TFunction<bool()> Visible = nullptr)
+	TSharedRef<SWidget> Gauge(const FText& Label, const TAttribute<FLinearColor>& Color, FName Icon, TFunction<float()> Value, TFunction<bool()> Visible = nullptr)
 	{
 		return SNew(SHorizontalBox).Visibility_Lambda([Visible]() { return !Visible || Visible() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 			+ SHorizontalBox::Slot().AutoWidth()
@@ -1025,6 +1043,21 @@ private:
 				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([Value]() { return FText::AsNumber(FMath::RoundToInt(Value())); }), WRUI::Body(13, 800), WRUI::Ink)]
 				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(Label, WRUI::Body(11, 500), WRUI::Ink3)]
 			];
+	}
+
+	/** The Charge ring: violet-white #B9A7FF, flickering toward white at high Charge (the crackle). */
+	FLinearColor ChargeColor() const
+	{
+		const FLinearColor Violet = WRPathLook::Color(TEXT("lightning"));
+		const AWRCharacterBase* B = Body();
+		if (!B || !WRLightning::HighCharge(B))
+		{
+			return Violet;
+		}
+		const double Now = FPlatformTime::Seconds();
+		// Two fast flickers out of step: an uneven crackle, not a pulse.
+		const float Crackle = FMath::Clamp(0.5f + 0.5f * FMath::Sin(float(Now) * 37.f) * FMath::Sin(float(Now) * 23.f + 1.3f), 0.f, 1.f);
+		return FMath::Lerp(Violet, FLinearColor::White, Crackle * Crackle);
 	}
 
 	TSharedRef<SWidget> Vitals()
@@ -1054,6 +1087,10 @@ private:
 						[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("fire")); })]
 					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Chill", "Chill"), WRUI::Frost, TEXT("frost_essence"), [A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetChill() / FMath::Max(1.f, X->GetMaxChill()) : 0.f; },
 						[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("frost")); })]
+						// Charge (the Lightning path): violet-white; at 60 and over it crackles (cooks/biome-lightning.md 2.18.2).
+						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Charge", "Charge"), TAttribute<FLinearColor>::CreateLambda([this]() { return ChargeColor(); }), WRPathLook::Icon(TEXT("lightning")),
+							[A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetCharge() / FMath::Max(1.f, X->GetMaxCharge()) : 0.f; },
+							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("lightning")); })]
 				]
 				+ SVerticalBox::Slot().AutoHeight()[Conditions()]
 			]

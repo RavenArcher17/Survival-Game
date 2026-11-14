@@ -96,6 +96,141 @@ The files were cut, mixed to mono for 3D effects, loudness-matched and re-encode
 | Steam locomotive starting | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/locomotive-a-vapeur-starting-s3021.html | machine/start |
 | Steam locomotive stop | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/steam-locomotive-stop-s3015.html | machine/stop |
 
+## Audio: Storm peaks (2026-11-14)
+
+The Storm peaks music, creature voices, storm hazards and ambient beds (`Tools/audio/build_storm_audio.py`, sources in
+`Tools/audio/sources_storm.py`). All real recordings and real compositions, no AI generation and no synthesis. The music is
+**Kevin MacLeod (incompetech.com), CC-BY 4.0**: every piece must stay credited wherever the game is distributed, as
+"<Title>" Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution 4.0,
+http://creativecommons.org/licenses/by/4.0/. The recordings are from Freesound: CC0 except the six rows marked
+CC-BY 4.0 (MichiJung's red kite calls, J.Zazvurek's ferret, klankbeeld's goat sneeze, markb's aeolian harp), which must
+stay credited too. Calls were cut, layered (real electrical / material recordings under the animal calls), re-pitched,
+loudness-matched and encoded as Ogg Vorbis by the build script.
+
+| Source | Author | Licence | Page | Used for (Data/Audio/...) |
+| --- | --- | --- | --- | --- |
+| Tempting Secrets | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300038 | music/storm_explore_a |
+| Master Disorder | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600034 | music/storm_explore_b |
+| Long Road Ahead | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100588 | music/storm_explore_c |
+| Lost Frontier | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300039 | music/storm_night_a |
+| Decline | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300016 | music/storm_night_b |
+| Hitman | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300013 | music/storm_combat |
+| Interloper | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100401 | music/storm_mini |
+| Corruption | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600004 | music/storm_boss_a |
+| Truth of the Legend | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100592 | music/storm_boss_b |
+| Night Vigil | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900047 | music/storm_monastery |
+| Thunder Dreams | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200063 | music/storm_hollow_spire |
+| Nu Flute | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100680 | music/storm_camp |
+| Arcane | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100831 | music/storm_great_storm |
+| Phantasm | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100113 | music/storm_pass_stormgut |
+| Lion roaring.mp3 | Bidone (freesound) | CC0 1.0 | https://freesound.org/people/Bidone/sounds/69572/ | creature/roc_aggro (x3), creature/roc_attack (x3), creature/roc_death (x2), creature/roc_hurt (x2) |
+| Slow Creaking Stereo.wav | harveyism (freesound) | CC0 1.0 | https://freesound.org/people/harveyism/sounds/130364/ | amb/storm_shrines, world/storm_plank_creak (x3) |
+| wolfs.wav | ondrosik (freesound) | CC0 1.0 | https://freesound.org/people/ondrosik/sounds/143568/ | creature/stormwolf_aggro (x3) |
+| Tesla ascending-m.wav | Rmutt (freesound) | CC0 1.0 | https://freesound.org/people/Rmutt/sounds/145506/ | world/storm_charge_whine (x2), world/storm_pretell (x2) |
+| Mooring Rope.wav | Rmutt (freesound) | CC0 1.0 | https://freesound.org/people/Rmutt/sounds/145721/ | amb/storm_bridges |
+| Ferret | J.Zazvurek (freesound) | CC-BY 4.0 | https://freesound.org/people/J.Zazvurek/sounds/155115/ | creature/mustelid_idle (x3) |
+| Wind blowing into some cactus spine, on the top of the mountain, in the desert of Atacama (Chile). | felix.blume (freesound) | CC0 1.0 | https://freesound.org/people/felix.blume/sounds/156414/ | amb/storm_peaks_night |
+| Wind howling in an electric transformer box on the High Atlas mountain (Morocco). | felix.blume (freesound) | CC0 1.0 | https://freesound.org/people/felix.blume/sounds/157280/ | amb/storm_cliffs, world/storm_rod_hum (x2) |
+| wolves.wav | Paresh (freesound) | CC0 1.0 | https://freesound.org/people/Paresh/sounds/158780/ | creature/stormwolf_idle (x3) |
+| Wind blowing in an antenna on the High Atlas mountain (Morocco). | felix.blume (freesound) | CC0 1.0 | https://freesound.org/people/felix.blume/sounds/160469/ | amb/storm_rodfield, world/storm_rod_hum (x2) |
+| Gravel Impacts and Falls.wav | lolamadeus (freesound) | CC0 1.0 | https://freesound.org/people/lolamadeus/sounds/179341/ | world/storm_rockfall_trickle (x2) |
+| Whining Dog.flac | qubodup (freesound) | CC0 1.0 | https://freesound.org/people/qubodup/sounds/184808/ | creature/stormwolf_death (x2), creature/stormwolf_hurt (x3) |
+| Angry Ram | ReadeOnly (freesound) | CC0 1.0 | https://freesound.org/people/ReadeOnly/sounds/186921/ | creature/ram_aggro (x3), creature/ram_attack (x3) |
+| Dog snarl (Self-made) | deleted_user_3424813 (freesound) | CC0 1.0 | https://freesound.org/people/deleted_user_3424813/sounds/190595/ | creature/stormwolf_attack (x3) |
+| rayjensen - thunder-crack 41k 16bit mono.wav | rayjensen (freesound) | CC0 1.0 | https://freesound.org/people/rayjensen/sounds/200990/ | world/storm_clap (x3) |
+| Spark sounds | xavimuse (freesound) | CC0 1.0 | https://freesound.org/people/xavimuse/sounds/232841/ | world/storm_spark (x3) |
+| Arc Welding.wav | squashy555 (freesound) | CC0 1.0 | https://freesound.org/people/squashy555/sounds/256915/ | creature/mustelid_aggro (x3), creature/mustelid_attack (x3), world/storm_ground_current (x2) |
+| baby lamb calling his mother .WAV | EduFigueres (freesound) | CC0 1.0 | https://freesound.org/people/EduFigueres/sounds/266689/ | creature/sheep_death (x2), creature/sheep_hurt (x2) |
+| Rocky Mountain Outdoors:  wind and birds | petebuchwald (freesound) | CC0 1.0 | https://freesound.org/people/petebuchwald/sounds/288899/ | amb/storm_peaks_day |
+| Crumble #8.wav | abstraktgeneriert (freesound) | CC0 1.0 | https://freesound.org/people/abstraktgeneriert/sounds/348955/ | creature/mole_attack (x2), creature/mole_death (x2), world/storm_burrow (x3) |
+| Cowbell - Single 01.wav | RP1312 (freesound) | CC0 1.0 | https://freesound.org/people/RP1312/sounds/350711/ | world/storm_bell_clank (x3) |
+| gekko.mp3 | mopedmetzger (freesound) | CC0 1.0 | https://freesound.org/people/mopedmetzger/sounds/351301/ | creature/lizard_hurt (x3), creature/lizard_idle (x3) |
+| wind_gust.aif | joseph.larralde (freesound) | CC0 1.0 | https://freesound.org/people/joseph.larralde/sounds/352421/ | amb/storm_passes, world/storm_gust (x3) |
+| Goat .MP3 | macdaddyno1 (freesound) | CC0 1.0 | https://freesound.org/people/macdaddyno1/sounds/352600/ | creature/goat_hurt (x3) |
+| Sheep bleating | zachrau (freesound) | CC0 1.0 | https://freesound.org/people/zachrau/sounds/362283/ | creature/sheep_aggro (x3), creature/sheep_attack (x3) |
+| Big Tesla coil sound cut.wav | follytowers (freesound) | CC0 1.0 | https://freesound.org/people/follytowers/sounds/362975/ | world/storm_arc (x3) |
+| Eagle Cry.wav | kaydinhamby (freesound) | CC0 1.0 | https://freesound.org/people/kaydinhamby/sounds/381200/ | creature/raptor_death (x2), creature/roc_aggro (x3), creature/roc_death (x2) |
+| RockFall1b.wav | AlanCat (freesound) | CC0 1.0 | https://freesound.org/people/AlanCat/sounds/381645/ | world/storm_rockfall_impact (x3) |
+| Sheep bleating | zachrau (freesound) | CC0 1.0 | https://freesound.org/people/zachrau/sounds/383144/ | creature/sheep_aggro (x3), creature/sheep_death (x2), creature/sheep_hurt (x2) |
+| Digging a Hole and Shovelling Soil/Dirt 2 | Ali_6868 (freesound) | CC0 1.0 | https://freesound.org/people/Ali_6868/sounds/384362/ | world/storm_burrow (x3) |
+| rockfall2a.wav | AlanCat (freesound) | CC0 1.0 | https://freesound.org/people/AlanCat/sounds/389303/ | world/storm_rockfall_impact (x3) |
+| Goat.wav | Forpus_Prod (freesound) | CC0 1.0 | https://freesound.org/people/Forpus_Prod/sounds/391320/ | creature/goat_death (x2), creature/goat_idle (x3) |
+| wolf 2.wav | genel (freesound) | CC0 1.0 | https://freesound.org/people/genel/sounds/399186/ | creature/stormwolf_aggro (x3) |
+| Wood panel board cracking snapping long | LampEight (freesound) | CC0 1.0 | https://freesound.org/people/LampEight/sounds/400645/ | world/storm_plank_snap (x3) |
+| high-voltage-discharge-2.wav | follytowers (freesound) | CC0 1.0 | https://freesound.org/people/follytowers/sounds/415962/ | creature/mustelid_aggro (x3), world/storm_arc (x3), world/storm_ball_pop (x2), world/storm_shrine (x2) |
+| Close lightning strike 2018 07 07 | csengeri (freesound) | CC0 1.0 | https://freesound.org/people/csengeri/sounds/434359/ | world/storm_strike (x3) |
+| Heavy rain with thuder | dersinnsspace (freesound) | CC0 1.0 | https://freesound.org/people/dersinnsspace/sounds/435222/ | amb/storm_thunderstorm |
+| Very close lightning strike. | Simon Spiers (freesound) | CC0 1.0 | https://freesound.org/people/Simon Spiers/sounds/437243/ | world/storm_clap (x3), world/storm_strike (x3) |
+| Wind chimes 1 | giddster (freesound) | CC0 1.0 | https://freesound.org/people/giddster/sounds/437337/ | amb/storm_shrines |
+| G12-05-Camel Grunt.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/437937/ | creature/yak_aggro (x2), creature/yak_death (x2) |
+| hum electric transformer in large room2.flac | kyles (freesound) | CC0 1.0 | https://freesound.org/people/kyles/sounds/453445/ | amb/storm_hollow, world/storm_ball_hum (x2) |
+| mountain wind heavy strong gusts Swiss Alps.flac | kyles (freesound) | CC0 1.0 | https://freesound.org/people/kyles/sounds/454092/ | amb/storm_bridges, amb/storm_crags, amb/storm_peaks, amb/storm_peaks_day, amb/storm_peaks_night, amb/storm_shrines |
+| TOLLING BELL | SamuelGremaud (freesound) | CC0 1.0 | https://freesound.org/people/SamuelGremaud/sounds/454855/ | world/storm_bell_toll (x3), world/storm_shrine (x2) |
+| Sheep Bleating | Sheyvan (freesound) | CC0 1.0 | https://freesound.org/people/Sheyvan/sounds/471162/ | creature/sheep_attack (x3), creature/sheep_idle (x3) |
+| 21_Lobo_gruñendo.wav | JoseAgudelo (freesound) | CC0 1.0 | https://freesound.org/people/JoseAgudelo/sounds/472401/ | creature/stormwolf_attack (x3) |
+| 22_Lobo_aullando.wav | JoseAgudelo (freesound) | CC0 1.0 | https://freesound.org/people/JoseAgudelo/sounds/472402/ | creature/stormwolf_aggro (x3), creature/stormwolf_death (x2) |
+| 20120808_064004 Cathedral Mountain rock slide, slow blocky chunks.wav | betchkal (freesound) | CC0 1.0 | https://freesound.org/people/betchkal/sounds/500638/ | world/storm_rockfall_impact (x3) |
+| Cooper Creek 20160313_014852 solitary wolf howl very clear.wav | betchkal (freesound) | CC0 1.0 | https://freesound.org/people/betchkal/sounds/500646/ | creature/stormwolf_idle (x3) |
+| Snow crackling on the top of the mountain Chacaltaya (Corona Discharge) | felix.blume (freesound) | CC0 1.0 | https://freesound.org/people/felix.blume/sounds/503139/ | world/storm_cloud_static (x2) |
+| Wood Creak Single V10 | Rudmer_Rotteveel (freesound) | CC0 1.0 | https://freesound.org/people/Rudmer_Rotteveel/sounds/506665/ | world/storm_plank_creak (x3) |
+| Bison bellowing - Yellowstone National Park | Nivatius (freesound) | CC0 1.0 | https://freesound.org/people/Nivatius/sounds/519594/ | creature/ram_death (x2), creature/ram_hurt (x3), creature/yak_death (x2) |
+| Three Rams | D.jones (freesound) | CC0 1.0 | https://freesound.org/people/D.jones/sounds/521856/ | creature/ram_idle (x3) |
+| Stone Crumble 2 | Kastenfrosch (freesound) | CC0 1.0 | https://freesound.org/people/Kastenfrosch/sounds/521956/ | world/storm_rockfall_trickle (x2) |
+| Angry hedgehog sniffing 1 | fthgurdy (freesound) | CC0 1.0 | https://freesound.org/people/fthgurdy/sounds/528183/ | creature/mole_aggro (x3), creature/mole_attack (x2) |
+| Snake Hiss | xoiziox (freesound) | CC0 1.0 | https://freesound.org/people/xoiziox/sounds/553374/ | creature/lizard_aggro (x3) |
+| Fox scream in the forest | nielstii (freesound) | CC0 1.0 | https://freesound.org/people/nielstii/sounds/554308/ | creature/mustelid_death (x2) |
+| river-canyon-winter-heavy-flow-with-fadeout.wav | 1888software (freesound) | CC0 1.0 | https://freesound.org/people/1888software/sounds/555736/ | amb/storm_bridges |
+| LION ROAR | Podcapocalipsis (freesound) | CC0 1.0 | https://freesound.org/people/Podcapocalipsis/sounds/559600/ | creature/roc_attack (x3) |
+| 180903 Summer cricket heavy field hot clean PEC.mp3 | TRP (freesound) | CC0 1.0 | https://freesound.org/people/TRP/sounds/571206/ | creature/mole_aggro (x3), creature/mole_idle (x3) |
+| 180806 Thunder, distant rolling boomy, rain drops TORONTO.flac | TRP (freesound) | CC0 1.0 | https://freesound.org/people/TRP/sounds/572443/ | world/storm_thunder (x3) |
+| Thunder, single long rolling, distant, light rain, TORONTO, 2011.wav | TRP (freesound) | CC0 1.0 | https://freesound.org/people/TRP/sounds/577315/ | creature/roc_aggro (x3), creature/roc_death (x2), world/storm_thunder (x3), world/storm_wingbeat (x3) |
+| Purring Guinea Pig | Breviceps (freesound) | CC0 1.0 | https://freesound.org/people/Breviceps/sounds/583077/ | creature/mole_death (x2), creature/mole_idle (x3) |
+| sneeze goat 04.wav | klankbeeld (freesound) | CC-BY 4.0 | https://freesound.org/people/klankbeeld/sounds/587167/ | creature/goat_aggro (x3), creature/goat_attack (x3) |
+| Mountain River, Large 001.wav | Auxide_Audio (freesound) | CC0 1.0 | https://freesound.org/people/Auxide_Audio/sounds/588180/ | amb/storm_bridges |
+| Large Wings Flapping - Foley.wav | tothrec2 (freesound) | CC0 1.0 | https://freesound.org/people/tothrec2/sounds/596541/ | world/storm_wingbeat (x3) |
+| Big Lion Roar | _justMonke_ (freesound) | CC0 1.0 | https://freesound.org/people/_justMonke_/sounds/611721/ | creature/roc_death (x2), creature/roc_idle (x2) |
+| 210914 Thunder, crack, pretty close, bit of distortion, urban, TORONTO 1am.wav | TRP (freesound) | CC0 1.0 | https://freesound.org/people/TRP/sounds/616992/ | world/storm_clap (x3) |
+| 2022-02-06 wood creak 1.wav | sit_walk (freesound) | CC0 1.0 | https://freesound.org/people/sit_walk/sounds/618085/ | world/storm_plank_creak (x3) |
+| underground mine dripping.wav | poots (freesound) | CC0 1.0 | https://freesound.org/people/poots/sounds/627789/ | amb/storm_hollow |
+| Fox Screams | Soundburst (freesound) | CC0 1.0 | https://freesound.org/people/Soundburst/sounds/634005/ | creature/mustelid_aggro (x3), creature/mustelid_hurt (x3) |
+| spark2.ogg | Kneeling (freesound) | CC0 1.0 | https://freesound.org/people/Kneeling/sounds/643861/ | creature/mole_idle (x3), world/storm_spark (x3) |
+| Waterfall_Meraner_Höhenweg_01_160922.wav | datapopstar2 (freesound) | CC0 1.0 | https://freesound.org/people/datapopstar2/sounds/650699/ | amb/storm_cliffs |
+| Meadow prairie atmosphere with insect, subtle gust of wind, grass, cicada, distant bird in Agua Fría falls in Amazon rainforest | felix.blume (freesound) | CC0 1.0 | https://freesound.org/people/felix.blume/sounds/672330/ | amb/storm_passes |
+| 230104-060_normalized_titanic_bell.wav | mmmtoop (freesound) | CC0 1.0 | https://freesound.org/people/mmmtoop/sounds/674043/ | world/storm_bell_toll (x3), world/storm_shrine (x2) |
+| S28-16 Eagle squawks & calls.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/675962/ | amb/storm_peaks_day, creature/raptor_attack (x3), creature/raptor_death (x2), creature/roc_death (x2), creature/roc_idle (x2) |
+| Snake Tongue Hiss.WAV | bowlingballout (freesound) | CC0 1.0 | https://freesound.org/people/bowlingballout/sounds/678971/ | creature/lizard_aggro (x3), creature/lizard_attack (x3), creature/lizard_death (x2) |
+| Cat Growling and Hissing | dinoroki (freesound) | CC0 1.0 | https://freesound.org/people/dinoroki/sounds/679954/ | creature/mustelid_idle (x3) |
+| Tookgeh Gecko | Organuz (freesound) | CC0 1.0 | https://freesound.org/people/Organuz/sounds/686626/ | creature/lizard_aggro (x3), creature/lizard_death (x2), creature/lizard_hurt (x3) |
+| Digging Into Soft Soil with Small Trowell.wav | dhallcomposer (freesound) | CC0 1.0 | https://freesound.org/people/dhallcomposer/sounds/696531/ | world/storm_burrow (x3) |
+| Garip Island major from cliff side - binaural | tomhannen (freesound) | CC0 1.0 | https://freesound.org/people/tomhannen/sounds/698546/ | amb/storm_passes |
+| Large Wings / Superhero Cape Foley | Cultureshock007 (freesound) | CC0 1.0 | https://freesound.org/people/Cultureshock007/sounds/711122/ | world/storm_wingbeat (x3) |
+| BPSN electrical hum 1 | chungus43A (freesound) | CC0 1.0 | https://freesound.org/people/chungus43A/sounds/721812/ | world/storm_ball_hum (x2) |
+| Bleating Goat | aisselles (freesound) | CC0 1.0 | https://freesound.org/people/aisselles/sounds/722658/ | creature/goat_attack (x3), creature/goat_death (x2) |
+| Angry Cat (Perran) | Sadiquecat (freesound) | CC0 1.0 | https://freesound.org/people/Sadiquecat/sounds/750495/ | creature/mustelid_attack (x3), creature/mustelid_death (x2), creature/mustelid_idle (x3) |
+| Bird - Red-shouldered hawk | Vrymaa (freesound) | CC0 1.0 | https://freesound.org/people/Vrymaa/sounds/770032/ | creature/raptor_attack (x3), creature/roc_hurt (x2) |
+| Wind whistle 3 | Sadiquecat (freesound) | CC0 1.0 | https://freesound.org/people/Sadiquecat/sounds/770282/ | amb/storm_passes, world/storm_gust (x3) |
+| ELECArc_Electric arc hum and buzz. A longer movement of electricity, a power station switching arc when decoupled. designed with synth_Anton Bushinskiy_AB FX | pryanic (freesound) | CC0 1.0 | https://freesound.org/people/pryanic/sounds/776446/ | world/storm_pretell (x2), world/storm_ring_buzz (x2) |
+| Hoary marmot whistles | SoundsLikeYukon (freesound) | CC0 1.0 | https://freesound.org/people/SoundsLikeYukon/sounds/822939/ | creature/goat_aggro (x3) |
+| 250910_22h43 Gergueil D104 - Brame | Sadiquecat (freesound) | CC0 1.0 | https://freesound.org/people/Sadiquecat/sounds/826421/ | creature/ram_aggro (x3), creature/ram_death (x2) |
+| aeolian_harp_20250906_1721 | markb (freesound) | CC-BY 4.0 | https://freesound.org/people/markb/sounds/826812/ | amb/storm_rodfield |
+| Yak grunts | ali.g (freesound) | CC0 1.0 | https://freesound.org/people/ali.g/sounds/834331/ | creature/yak_aggro (x2), creature/yak_hurt (x2), creature/yak_idle (x3) |
+| Whistling wind | Artistic_Dragonborn (freesound) | CC0 1.0 | https://freesound.org/people/Artistic_Dragonborn/sounds/838744/ | amb/storm_crags, world/storm_gust (x3) |
+| Condor Scream | floatby (freesound) | CC0 1.0 | https://freesound.org/people/floatby/sounds/838963/ | creature/raptor_hurt (x3), creature/roc_aggro (x3), creature/roc_attack (x3) |
+| Closeup Thunder Strike 01 | loganzsound (freesound) | CC0 1.0 | https://freesound.org/people/loganzsound/sounds/840628/ | world/storm_strike (x3) |
+| Rodents - Brown Rats; Several Babies Squeaking, Close Perspective | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/841571/ | creature/mole_death (x2), creature/mole_hurt (x3) |
+| Tesla Tower Zap - Electric Zap Short - Game SFX | el_boss (freesound) | CC0 1.0 | https://freesound.org/people/el_boss/sounds/853286/ | creature/stormwolf_attack (x3), world/storm_arc (x3), world/storm_ball_pop (x2), world/storm_shrine (x2) |
+| Birds of Prey: Red Kite, soft social calls | MichiJung (freesound) | CC-BY 4.0 | https://freesound.org/people/MichiJung/sounds/865812/ | amb/storm_peaks_day, creature/raptor_idle (x3) |
+| Goats - Two Billies Sparring; Headbutt, Horns Clanking | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/866683/ | creature/goat_attack (x3), creature/ram_attack (x3) |
+| Bovines - American Bison; Nasal Huffs, Close Perspective | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/867549/ | creature/yak_attack (x2) |
+| Birds of Prey: Red Kite, medium loud excited calls | MichiJung (freesound) | CC-BY 4.0 | https://freesound.org/people/MichiJung/sounds/868531/ | creature/raptor_aggro (x3) |
+| Birds of Prey: Red Kite, loud territorial call | MichiJung (freesound) | CC-BY 4.0 | https://freesound.org/people/MichiJung/sounds/868738/ | creature/raptor_aggro (x3) |
+| Drips, Giant Cave Drips, Slow | CHallSmith (freesound) | CC0 1.0 | https://freesound.org/people/CHallSmith/sounds/870748/ | amb/storm_hollow |
+| ELECArc_Sparking Electricity Bed | harrisonlace (freesound) | CC0 1.0 | https://freesound.org/people/harrisonlace/sounds/871766/ | creature/stormwolf_aggro (x3), creature/stormwolf_death (x2), world/storm_ball_hum (x2), world/storm_ground_current (x2) |
+| WOODBrk_Layered Cracking Thin Plywood Board Splinters x 7 | harrisonlace (freesound) | CC0 1.0 | https://freesound.org/people/harrisonlace/sounds/873248/ | world/storm_plank_snap (x3) |
+| Bison | timpet55 (freesound) | CC0 1.0 | https://freesound.org/people/timpet55/sounds/873888/ | creature/ram_hurt (x3), creature/yak_attack (x2) |
+| Electrical Static - crackles and pops | cb9382 (freesound) | CC0 1.0 | https://freesound.org/people/cb9382/sounds/875011/ | amb/storm_crags, creature/sheep_aggro (x3), creature/stormwolf_hurt (x3), creature/stormwolf_idle (x3), world/storm_ball_hum (x2), world/storm_cloud_static (x2) |
+| Red Tailed Hawk Cries | loganzsound (freesound) | CC0 1.0 | https://freesound.org/people/loganzsound/sounds/875513/ | creature/raptor_hurt (x3), creature/raptor_idle (x3) |
+
 ## Animation
 
 | What | Files in the repo | Source | Author | Licence |

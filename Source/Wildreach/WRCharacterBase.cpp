@@ -14,6 +14,7 @@
 #include "WRSound.h"
 #include "WRFx.h"
 #include "WRCombatLibrary.h"
+#include "WRLightningPath.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -136,7 +137,8 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	if (IsCreature()) Slow *= WRPortals::CreaturePace(this);
 	// A blizzard's deep snow in the open (WRSurvival sets the tag; both machines read it).
 	if (HasTag(WRTags::Weather_DeepSnow)) Slow *= WRTune(TEXT("weather.deepSnowRun"), 0.85f);
-	return Slow * SpeedBoost * Load;
+	// The Lightning path: Swift and high Charge (both machines read them: the owner predicts with the same numbers).
+	return Slow * SpeedBoost * Load * WRLightning::MoveSpeedScale(this);
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)
@@ -155,6 +157,7 @@ void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPo
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetFrostBuildupAttribute(), 0.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), 0.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), 0.f);
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetChargeAttribute(), 0.f);
 	// Stance (creatures and bosses: COMBAT-AND-LESSONS 1.4), by its tier or its own number.
 	const float Stance = UWRCombatLibrary::MaxStanceFor(this);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetMaxStanceAttribute(), Stance);

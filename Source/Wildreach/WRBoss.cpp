@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRStormBosses.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -420,6 +421,7 @@ void AWRBoss::BeginPlay()
 	{
 		SetAirborne(true);
 	}
+	FWRStormBoss::Begin(this);
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s ready (%s, %.0f hp solo)"), *GetDisplayLabel(), bMajor ? TEXT("major") : TEXT("mini"), SoloHealth);
 }
 
@@ -427,6 +429,7 @@ void AWRBoss::EndPlay(const EEndPlayReason::Type Reason)
 {
 	for (const TWeakObjectPtr<AWRBossProp>& P : Props) if (P.IsValid()) P->Destroy();
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();
+	FWRStormBoss::EndPlay(this);
 	Super::EndPlay(Reason);
 }
 
@@ -604,6 +607,7 @@ void AWRBoss::ResetFight()
 	SetActorHiddenInGame(false);
 	SetAirborne(CreatureId == TEXT("ignessa"));
 	SpawnArena();
+	FWRStormBoss::Reset(this);
 }
 
 void AWRBoss::OnRep_Phase()
@@ -649,6 +653,7 @@ void AWRBoss::SetPhase(int32 NewPhase)
 	{
 		SetBodyColor(BaseBodyColor);
 	}
+	FWRStormBoss::PhaseChanged(this, Phase);
 }
 
 void AWRBoss::SetAirborne(bool bAir)
@@ -731,10 +736,11 @@ float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	const FWRCreatureDef* Def = GetDef();
 	// Weak to the opposite element.
 	const FGameplayTag Weak = BossElement() == WRTags::Element_Fire ? WRTags::Element_Frost : WRTags::Element_Fire;
-	if (Hit.Element == Weak)
+	if (Hit.Element == Weak && !FWRStormBoss::OwnWeakness(this))
 	{
 		Damage *= WRTune(TEXT("bosses.weaknessMultiplier"), 1.5f);
 	}
+	Damage = FWRStormBoss::Incoming(this, Hit, Damage);   // Storm peaks: weak to Blood and curse; stuck, dropped, cursed
 	if (CreatureId == TEXT("obsidian_warden") && ShellHealth > 0.f && !Hit.bDamageOverTime)
 	{
 		// The shell soaks most of it. Chilled shells crack faster.
@@ -798,6 +804,7 @@ void AWRBoss::OnDamageTaken(const FWRHit& Hit, float Damage)
 	{
 		RevealedUntil = Now + Tune(TEXT("revealSeconds"), 6.f);
 	}
+	FWRStormBoss::Damaged(this, Hit, Damage);   // the bell's and the star nose's own health
 	// Phases by health; never during a stance break or a crit (COMBAT-AND-LESSONS 1.4): the crit always finishes first
 	// and the change plays after it (CheckPhase in Tick).
 	CheckPhase();
@@ -930,7 +937,11 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 
 	if (!bEngaged)
 	{
-		TickRoam(DeltaSeconds);
+		bool bSkipWake = false;
+		if (!FWRStormBoss::TickIdle(this, DeltaSeconds, bSkipWake))
+		{
+			TickRoam(DeltaSeconds);
+		}
 		if (bReturning)
 		{
 			// Back home after a reset, on foot (or on the wing).
@@ -957,7 +968,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 			}
 		}
 		// Wake when someone walks into the arena (or comes at it on its way home).
-		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+		for (TActorIterator<AWRCharacter> It(GetWorld()); It && !bSkipWake; ++It)
 		{
 			// (Only someone it may fight: past its chase range they'd just stand it there until it reset again.)
 			if (It->IsAlive() && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < Def->AggroRadius
@@ -1128,6 +1139,13 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 		}
 	}
 
+	// The Storm peaks bosses' own counterplay (WRStormBosses): Galvara's cores and drop, Coilback underground, Kharvox's
+	// Charge, flight, called strikes, the eye and the bone drop's climb.
+	if (FWRStormBoss::Tick(this, DeltaSeconds))
+	{
+		return;
+	}
+
 	// Periodic flood (Vulkarn): in addition to the anvil slam, phase 2 floods more often.
 	if (Id == TEXT("vulkarn") && Phase >= 2 && Now >= NextFloodAt && Current == INDEX_NONE)
 	{
@@ -1160,7 +1178,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	{
 		return;  // Old Tusker rolling the fire out in the snow
 	}
-	AWRCharacterBase* Target = PickBossTarget();
+	AWRCharacterBase* Target = FWRStormBoss::PickTarget(this, PickBossTarget());   // Coilback: the most metal
 	if (!Target)
 	{
 		return;
@@ -1268,7 +1286,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 		{
 			// AL 5+: now and then it comes Scarred (its effect x1.5).
 			const bool bScarred = WRArtifacts::RollScarred(PS);
-			const FName Part = CreatureId == TEXT("vulkarn") ? FName(bScarred ? TEXT("part_giants_ember_scarred") : TEXT("part_giants_ember")) : FName(bScarred ? TEXT("part_wyrm_scale_scarred") : TEXT("part_wyrm_scale"));
+			const FName Part = FWRStormBoss::BossPart(this, bScarred, CreatureId == TEXT("vulkarn") ? FName(bScarred ? TEXT("part_giants_ember_scarred") : TEXT("part_giants_ember")) : FName(bScarred ? TEXT("part_wyrm_scale_scarred") : TEXT("part_wyrm_scale")));
 			PS->GetInventory()->AddItem(Part, 1);
 			Got += Part.ToString();
 		}
@@ -1281,6 +1299,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 	// A war-hall champion: the raid's own loot, and the win when its rival is down too (WRWarHall).
 	if (bChampion) WRWarHall::OnChampionDied(this);
 	FirstKillDrops();
+	FWRStormBoss::Died(this);
 	// Artifacts: a major's drop, the first one at your fourth great kill, geis records (WRArtifacts).
 	WRArtifacts::OnBossKilled(this);
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();

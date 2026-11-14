@@ -110,9 +110,39 @@ const skills = {
 	skill_sneaking: { s: "M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", a: "M12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z", c: "M3.6 19.2L19.2 3.6l1.2 1.2L4.8 20.4z" },
 };
 
+// Lightning (cooks/biome-lightning.md 2.18.3), drawn to match: a bolt is the path's mark.
+const boltPts = [[13, 1], [5, 13], [11, 13], [9, 23], [19, 10], [13, 10], [15, 1]];
+const bolt = (cx, cy, k) => "M" + boltPts.map(([x, y]) => `${(cx + (x - 12) * k).toFixed(2)} ${(cy + (y - 12) * k).toFixed(2)}`).join("L") + "z";
+const sword = "M5 19L17 7l2-4-4 2L3 17z";
+const lightning = {
+	spark: { a: bolt(12, 12, 0.9), b: circ(4.5, 6, 1.3) + circ(19.5, 18, 1.3) + circ(20, 5, 0.9) },
+	charge_capacity: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: bolt(12, 15.2, 0.38) },
+	shock_chance: { a: "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", c: bolt(12, 12, 0.3) },
+	static_strike: { b: sword, a: bolt(18, 15.5, 0.4) },
+	chain_lightning: { s: "M4 5l5.5 5L7 14l7.5 2.5L13 20", a: circ(4, 5, 2.2) + circ(9.5, 10, 1.8) + circ(14.5, 16.5, 1.8), c: circ(20, 20, 1.6) },
+	arc: { t: "M3 19A9.5 9.5 0 0 1 21 19", s: "M6.5 19a5.5 5.5 0 0 1 11 0", a: bolt(12, 9, 0.38) },
+	conductive: { a: "M12 2.5c3.8 4.8 6.5 8.4 6.5 12a6.5 6.5 0 0 1-13 0c0-3.6 2.7-7.2 6.5-12z", c: bolt(12, 14.5, 0.38) },
+	thunderclap: { t: "M4.5 19.5A10.6 10.6 0 0 1 4.5 4.5M19.5 4.5A10.6 10.6 0 0 1 19.5 19.5", s: "M7 17A7 7 0 0 1 7 7M17 7A7 7 0 0 1 17 17", a: bolt(12, 12, 0.42) },
+	overcharge: { t: "M3.5 18a8.5 8.5 0 0 1 17 0M4.7 13.8l1.3.75M12 9.5V11M19.3 13.8l-1.3.75", s: "M12 18l6-5", a: "M12 16a2 2 0 1 1 0 4 2 2 0 0 1 0-4z", c: bolt(19.5, 4.5, 0.28) },
+	tempest: { a: "M6 13a4 4 0 0 1 .5-8 5.5 5.5 0 0 1 10.5 1.5 3.3 3.3 0 0 1 1 6.5z", b: bolt(9, 18, 0.32) + bolt(15.5, 18.5, 0.3) },
+	bolt_dash: { s: "M2 8h5M1.5 12h6M2 16h5", a: bolt(15, 12, 0.85) },
+	swift: { s: "M4 6l6 6-6 6M11 6l6 6-6 6", b: circ(20.5, 12, 1.4) },
+	afterimage: { t: circ(8, 6.5, 2.8) + "M2.5 20c0-4 2.5-7 5.5-7s5.5 3 5.5 7", a: circ(15, 6.5, 3) + "M9 21c0-4.2 2.7-7.5 6-7.5s6 3.3 6 7.5z" },
+	rapid_fire: { s: "M3 7l5 5-5 5M8.5 7l5 5-5 5", a: bolt(18, 12, 0.5) },
+	recharge: { t: "M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.5v4h-4", a: bolt(12, 12.5, 0.42) },
+	lightning_step: { a: bolt(5, 13, 0.42) + bolt(12, 11, 0.5) + bolt(19, 9, 0.58) },
+	charged_weapon: { b: sword, a: bolt(9, 9, 0.55), c: circ(19, 19, 1.4) },
+	capacitor: { t: "M2 12h6M16 12h6", s: "M8 4v16M16 4v16", a: bolt(12, 12, 0.3) },
+	static_field: { a: "M2.5 17.5a9.5 3.5 0 1 0 19 0 9.5 3.5 0 1 0-19 0z", b: bolt(8, 9, 0.32) + bolt(15.5, 7, 0.36) },
+	discharge: { b: "M12 2.5l8 3V11c0 5.5-3.5 9-8 10.5-4.5-1.5-8-5-8-10.5V5.5z", a: bolt(12, 12, 0.5) },
+	field_strength: { t: "M1.5 16a10.5 4.5 0 1 0 21 0 10.5 4.5 0 1 0-21 0z", a: "M6 16a6 2.4 0 1 0 12 0 6 2.4 0 1 0-12 0z", b: bolt(12, 7, 0.36) },
+	thunder_god: { a: "M3 19l1.8-9 4.6 4 2.6-7 2.6 7 4.6-4L21 19z", b: "M3 20.5h18v2H3z", c: bolt(12, 15, 0.26) },
+};
+
 const glyphs = [];
 for (const [id, g] of Object.entries(fire)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(frost)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
+for (const [id, g] of Object.entries(lightning)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
 // ---------- single-colour marks (tinted in the UI)

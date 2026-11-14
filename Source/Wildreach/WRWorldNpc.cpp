@@ -3,6 +3,7 @@
 // client's side of the world systems: what E does near a world thing, the prompt, and opening their screens.
 
 #include "WRWorldSystems.h"
+#include "WRStormWorld.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCreature.h"
@@ -304,6 +305,17 @@ namespace WRNpcDetail
 
 bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString& OutVerb)
 {
+	// A gap in a Storm peaks rope bridge at your feet: mend it (2 wood).
+	if (const APawn* Me = PC ? PC->GetPawn() : nullptr)
+	{
+		int32 Plank = INDEX_NONE;
+		if (UWRStormWorld* SW = UWRStormWorld::Get(PC); SW && SW->BridgeGapNear(Me->GetActorLocation(), Plank))
+		{
+			OutTarget = TEXT("A gap in the bridge");
+			OutVerb = FString::Printf(TEXT("Lay a plank (%d wood)"), (int32)WRTune(TEXT("storm.plankWood"), 2.f));
+			return true;
+		}
+	}
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -342,6 +354,15 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 
 bool WRWorld::ClientInteract(AWRPlayerController* PC)
 {
+	if (const APawn* Me = PC ? PC->GetPawn() : nullptr)
+	{
+		int32 Plank = INDEX_NONE;
+		if (UWRStormWorld* SW = UWRStormWorld::Get(PC); SW && SW->BridgeGapNear(Me->GetActorLocation(), Plank))
+		{
+			PC->SendCommand(TEXT("world plank"));
+			return true;
+		}
+	}
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (AWRShrine* S = Cast<AWRShrine>(N.Actor))

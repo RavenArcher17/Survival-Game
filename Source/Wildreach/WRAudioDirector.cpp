@@ -1,4 +1,6 @@
 #include "WRAudio.h"
+#include "WRStormTypes.h"
+#include "WRWorldDressing.h"
 #include "WRPortals.h"
 #include "WRSurvival.h"
 #include "WRSound.h"
@@ -227,32 +229,54 @@ float UWRAudioDirector::SampleCoast()
 float UWRAudioDirector::LayerWeight(FName Layer) const
 {
 	const float Out = 1.f - Cave;
-	const float Volc = 1.f - Tundra;
+	// The island's beds give way to Storm peaks' across the Ash Sound and the neck.
+	const float Isl = 1.f - Storm;
+	const float Volc = (1.f - Tundra) * Isl;
+	const float TundraW = Tundra * Isl;
 	const float Night = 1.f - Daylight;
 	static const FName Volcanic(TEXT("volcanic")), TundraL(TEXT("tundra")), CoastL(TEXT("coast")), Day(TEXT("day")), NightL(TEXT("night")),
 		VolcanicDay(TEXT("volcanic.day")), VolcanicNight(TEXT("volcanic.night")), TundraDay(TEXT("tundra.day")), TundraNight(TEXT("tundra.night")),
 		CaveL(TEXT("cave")), LavaL(TEXT("lava")), HighL(TEXT("high")), Wind(TEXT("wind")), Always(TEXT("always"));
 	if (Layer == Volcanic) return Out * Volc;
-	if (Layer == TundraL) return Out * Tundra;
+	if (Layer == TundraL) return Out * TundraW;
 	if (Layer == CoastL) return Out * Coast;
 	if (Layer == Day) return Out * Daylight;
 	if (Layer == NightL) return Out * Night;
 	if (Layer == VolcanicDay) return Out * Volc * Daylight;
 	if (Layer == VolcanicNight) return Out * Volc * Night;
-	if (Layer == TundraDay) return Out * Tundra * Daylight;
-	if (Layer == TundraNight) return Out * Tundra * Night;
+	if (Layer == TundraDay) return Out * TundraW * Daylight;
+	if (Layer == TundraNight) return Out * TundraW * Night;
 	if (Layer == CaveL) return Cave;
 	if (Layer == LavaL) return Out * Lava;
 	if (Layer == HighL) return Out * High;
-	if (Layer == Wind) return Out * FMath::Max(Tundra, High);
+	if (Layer == Wind) return Out * FMath::Max(TundraW, High);
+	// Storm peaks' beds (Data/Audio/sounds.json ambient: layer storm_peaks / storm_peaks.day|night / storm.<zone>).
+	static const FName StormL(TEXT("storm_peaks")), StormDay(TEXT("storm_peaks.day")), StormNight(TEXT("storm_peaks.night")),
+		Passes(TEXT("storm.passes")), Cliffs(TEXT("storm.cliffs")), Bridges(TEXT("storm.bridges")), Crags(TEXT("storm.crags")),
+		Shrines(TEXT("storm.shrines")), RodfieldL(TEXT("storm.rodfield")), HollowL(TEXT("storm.hollow"));
+	if (Layer == StormL) return Out * Storm;
+	if (Layer == StormDay) return Out * Storm * Daylight;
+	if (Layer == StormNight) return Out * Storm * Night;
+	if (Layer == Passes) return Out * StormZone[1];
+	if (Layer == Cliffs) return Out * StormZone[2];
+	if (Layer == Bridges) return Out * StormZone[3];
+	if (Layer == Crags) return Out * FMath::Max(StormZone[4], StormZone[6]);
+	if (Layer == Shrines) return Out * StormZone[5];
+	if (Layer == RodfieldL) return Out * Rodfield;
+	if (Layer == HollowL) return 0.f;   // the Hollow Spire isn't on the map yet
 	if (Layer == Always) return 1.f;
 	// Weather beds ("weather.<kind>", WRSurvival): rising over the 60 s warning, full while it blows, muffled in a cave.
 	// Music is never touched by weather (it keeps playing; survival-crafting 2.4).
 	const FString L = Layer.ToString();
 	if (L.StartsWith(TEXT("weather.")))
 	{
-		const FName Kind(*L.RightChop(8));
+		// weather.<kind> anywhere, or weather.<kind>.<biome> only in that land (a thunderstorm's rain in the peaks).
+		FString KindStr = L.RightChop(8), OnlyIn;
+		KindStr.Split(TEXT("."), &KindStr, &OnlyIn);
+		if (!L.RightChop(8).Contains(TEXT("."))) { KindStr = L.RightChop(8); OnlyIn.Reset(); }
+		const FName Kind(*KindStr);
 		const FName Here = WRBiome::At(GetWorld(), Listener);
+		if (!OnlyIn.IsEmpty() && Here != FName(*OnlyIn)) return 0.f;
 		const FWRWeatherNow* W = UWRWeatherSubsystem::For(GetWorld(), Here);
 		if (!W || W->Kind != Kind) return 0.f;
 		const float Now = UWRWeatherSubsystem::Now(GetWorld());
@@ -290,6 +314,18 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 	const AWRGameState* GS = AWRGameState::Get(World);
 	Daylight = GS ? GS->GetDaylight() : 1.f;
 	High = Smooth(Tune(TEXT("ambient.highFrom"), 25000.f), Tune(TEXT("ambient.highTo"), 45000.f), Listener.Z);
+	// Storm peaks: its air north of the island, its sub-zones' beds eased over 3 s as you cross (they blend 60-120 m in
+	// the land itself), the Rodfield's aeolian wind-song within 250 m of the rods.
+	Storm = FMath::SmoothStep(0.f, 1.f, float((WRTune(TEXT("world.islandNorthEdge"), -201600.f) + Tune(TEXT("ambient.stormBlendFrom"), 10000.f) - Listener.Y) / Tune(TEXT("ambient.stormBlend"), 30000.f)));
+	{
+		const TCHAR Z = WRStorm::ZoneAt(World, Listener);
+		for (int32 i = 1; i <= 6; ++i)
+		{
+			const float Want = (Z == TCHAR('0' + i)) ? Storm : 0.f;
+			StormZone[i] = FMath::FInterpConstantTo(StormZone[i], Want, DeltaTime, 1.f / 3.f);
+		}
+		Rodfield = Storm * (1.f - Smooth(Tune(TEXT("ambient.rodfieldNear"), 12000.f), Tune(TEXT("ambient.rodfieldFar"), 25000.f), FVector::Dist2D(Listener, FVector(-115000.f, -315000.f, 0.f))));
+	}
 	if (Now >= NextCaveScan)
 	{
 		NextCaveScan = Now + 5.0;
@@ -398,7 +434,7 @@ UWRAudioDirector::EMusic UWRAudioDirector::WantedMusic()
 				if (const AWRBoss* B = Cast<AWRBoss>(C))
 				{
 					// As the HUD's boss bar: an engaged boss close by.
-					if (B->bEngaged && D2 < FMath::Square(BossRange)) bBoss = true;
+					if (B->bEngaged && D2 < FMath::Square(BossRange)) { bBoss = true; BossId = B->CreatureId; }
 					continue;
 				}
 				const AActor* Target = C->GetAggroRep();
@@ -423,7 +459,34 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 	UWRAudioSubsystem* Audio = UWRAudioSubsystem::Get(World);
 	FName PoolName = Which == EMusic::Menu ? FName(TEXT("menu")) : Which == EMusic::Combat ? FName(TEXT("combat")) : Which == EMusic::Boss ? FName(TEXT("boss"))
 		: Daylight < Tune(TEXT("music.nightBelow"), 0.35f) ? FName(TEXT("night")) : FName(TEXT("explore"));
-	const TArray<FWRMusicTrack>* Pool = Audio->GetMusicPool(PoolName);
+	// A land's own pools first (music.pools <pool>.<biome>; cooks/biome-lightning.md 2.12): its bosses' (boss.<id>, its
+	// minis' mini.<biome>), its places' (the Hanging Monastery, the camps, Stormgut), then its explore / night / combat.
+	const TArray<FWRMusicTrack>* Pool = nullptr;
+	const FName Land = Which == EMusic::Menu ? NAME_None : WRBiome::At(World, Listener);
+	if (!Land.IsNone())
+	{
+		TArray<FName> Try;
+		if (Which == EMusic::Boss && !BossId.IsNone())
+		{
+			Try.Add(FName(*FString::Printf(TEXT("boss.%s"), *BossId.ToString())));
+			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(BossId);
+			if (Def && Def->Role.Contains(TEXT("mini"))) Try.Add(FName(*FString::Printf(TEXT("mini.%s"), *Land.ToString())));
+		}
+		if (Which == EMusic::Explore)
+		{
+			const TCHAR Z = WRStorm::ZoneAt(World, Listener);
+			if (Z == TCHAR('5')) Try.Add(TEXT("sub.monastery"));
+			for (const FWRPoi& P : FWRPoi::All) if (P.Kind == TEXT("camp") && FVector::Dist2D(P.Location, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(FName(*FString::Printf(TEXT("camp.%s"), *Land.ToString()))); break; }
+			if (FVector::Dist2D(Listener, FVector(-30000.f, -490000.f, 0.f)) < Tune(TEXT("music.stormgutRange"), 60000.f) && Listener.X > -70000.f) Try.Add(TEXT("pass.stormgut"));
+		}
+		Try.Add(FName(*FString::Printf(TEXT("%s.%s"), *PoolName.ToString(), *Land.ToString())));
+		for (const FName& T : Try)
+		{
+			const TArray<FWRMusicTrack>* P = Audio->GetMusicPool(T);
+			if (P && P->Num() > 0) { Pool = P; PoolName = T; break; }
+		}
+	}
+	if (!Pool) Pool = Audio->GetMusicPool(PoolName);
 	if ((!Pool || Pool->Num() == 0) && PoolName == TEXT("night"))
 	{
 		Pool = Audio->GetMusicPool(TEXT("explore"));
@@ -509,6 +572,32 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 	}
 	DuckLevel = FMath::FInterpTo(DuckLevel, DuckTarget, DeltaTime, DuckTarget < DuckLevel ? 10.f : 1.2f);
 	const float Gain = WRSound::CategoryGain(TEXT("music")) * DuckLevel;
+	// The Great Storm: war drums and choir over whatever plays while it rages round you (DC 2.15).
+	{
+		const bool bWant = WRStorm::GreatStorm(World) && WRBiome::At(World, Listener) == TEXT("storm_peaks");
+		if (bWant && GreatStormLayer.Num() == 0)
+		{
+			if (const TArray<FWRMusicTrack>* L = UWRAudioSubsystem::Get(World)->GetMusicPool(TEXT("layer.great_storm")); L && L->Num() > 0)
+			{
+				FStream S;
+				S.Comp = UWRAudioSubsystem::Get(World)->CreateStream(World, (*L)[0].File, true);
+				if (S.Comp.IsValid())
+				{
+					Held.Add(S.Comp.Get());
+					S.File = (*L)[0].File;
+					S.Base = (*L)[0].Volume;
+					S.Target = 1.f;
+					S.FadeSeconds = Tune(TEXT("music.fadeIn"), 4.f);
+					GreatStormLayer.Add(S);
+				}
+			}
+		}
+		for (int32 i = GreatStormLayer.Num() - 1; i >= 0; --i)
+		{
+			if (!bWant) { GreatStormLayer[i].Target = 0.f; GreatStormLayer[i].FadeSeconds = Tune(TEXT("music.fadeOut"), 4.f) * 2.f; }
+			if (StepStream(GreatStormLayer[i], DeltaTime, Gain)) GreatStormLayer.RemoveAt(i);
+		}
+	}
 	for (int32 i = Music.Num() - 1; i >= 0; --i)
 	{
 		if (StepStream(Music[i], DeltaTime, Gain))

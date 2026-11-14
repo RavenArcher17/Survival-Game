@@ -15,6 +15,8 @@
 #include "WRTuning.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
+#include "WRPathLook.h"
+#include "WRPathTypes.h"
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -71,10 +73,11 @@ namespace WRPerkHudDetail
 			const bool bFire = Boss->GetBossElement() == WRTags::Element_Fire;
 			Lines.Add({ FString::Printf(TEXT("Weak to %s  x%.1f"), bFire ? TEXT("frost") : TEXT("fire"), WRTune(TEXT("bosses.weaknessMultiplier"), 1.5f)), bFire ? WRUI::Frost : WRUI::Ember });
 		}
-		else if (Def->Element == TEXT("fire") || Def->Element == TEXT("frost"))
+		else if (FWRPathRegistry::Get().Find(Def->Element))
 		{
-			Lines.Add({ FString::Printf(TEXT("%s-born: %s path magic calms it"), Def->Element == TEXT("fire") ? TEXT("Fire") : TEXT("Frost"), *Def->Element.ToString()),
-				Def->Element == TEXT("fire") ? WRUI::Ember : WRUI::Frost });
+			// Any path's own creatures (fire, frost, lightning...): that path's magic calms them (AWRCreature::TryPathMagic).
+			Lines.Add({ FString::Printf(TEXT("%s-born: %s path magic calms it"), *WRPathLook::Name(Def->Element), *Def->Element.ToString()),
+				WRPathLook::Color(Def->Element) });
 		}
 		TArray<FString> Shrugs;
 		for (const FName& R : Def->Resists)

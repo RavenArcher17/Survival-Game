@@ -1,0 +1,150 @@
+# Storm peaks sound pass sources (build_storm_audio.py). Music: Kevin MacLeod (incompetech.com), CC-BY 4.0, the MP3 from
+# each piece's page. Recordings: Freesound, CC0 or CC-BY 4.0 (licence read off each sound's page, 2026-11-14), the HQ
+# preview MP3 (cdn.freesound.org/previews/...-hq.mp3, no login needed). Docs/CREDITS.md lists them all.
+# Fetch: python -I sources_storm.py <work>  -> <work>/dl/music/<Title>.mp3, <work>/dl/fs/<id>.mp3, then
+#        python build_storm_audio.py <work> Data/Audio   (FFMPEG=<path to ffmpeg> if it isn't on PATH)
+import os, sys, urllib.parse, urllib.request
+
+MUSIC_PAGE = "https://incompetech.com/music/royalty-free/index.html?isrc="
+MUSIC_FILE = "https://incompetech.com/music/royalty-free/mp3-royaltyfree/"
+# title -> ISRC (the piece's page) and the cue it plays as
+MUSIC = {
+    "Tempting Secrets": ("USUAN1300038", "explore A"),
+    "Master Disorder": ("USUAN1600034", "explore B"),
+    "Long Road Ahead": ("USUAN1100588", "explore C"),
+    "Lost Frontier": ("USUAN1300039", "night A"),
+    "Decline": ("USUAN1300016", "night B"),
+    "Hitman": ("USUAN1300013", "combat"),
+    "Interloper": ("USUAN1100401", "mini-boss"),
+    "Corruption": ("USUAN1600004", "boss (Kharvox)"),
+    "Truth of the Legend": ("USUAN1100592", "boss (Kharvox)"),
+    "Night Vigil": ("USUAN1900047", "Monastery"),
+    "Thunder Dreams": ("USUAN1200063", "Hollow Spire"),
+    "Nu Flute": ("USUAN1100680", "camp"),
+    "Arcane": ("USUAN1100831", "Great Storm layer"),
+    "Phantasm": ("USUAN1100113", "Stormgut pass"),
+}
+
+# Freesound id -> (author, title, licence, HQ preview)
+FREESOUND = {
+    69572: ("Bidone", "Lion roaring.mp3", "CC0 1.0", "https://cdn.freesound.org/previews/69/69572_706955-hq.mp3"),
+    130364: ("harveyism", "Slow Creaking Stereo.wav", "CC0 1.0", "https://cdn.freesound.org/previews/130/130364_2371259-hq.mp3"),
+    143568: ("ondrosik", "wolfs.wav", "CC0 1.0", "https://cdn.freesound.org/previews/143/143568_2140699-hq.mp3"),
+    145506: ("Rmutt", "Tesla ascending-m.wav", "CC0 1.0", "https://cdn.freesound.org/previews/145/145506_981371-hq.mp3"),
+    145721: ("Rmutt", "Mooring Rope.wav", "CC0 1.0", "https://cdn.freesound.org/previews/145/145721_981371-hq.mp3"),
+    155115: ("J.Zazvurek", "Ferret", "CC-BY 4.0", "https://cdn.freesound.org/previews/155/155115_199526-hq.mp3"),
+    156414: ("felix.blume", "Wind blowing into some cactus spine, on the top of the mountain, in the desert of Atacama (Chile).", "CC0 1.0", "https://cdn.freesound.org/previews/156/156414_1661766-hq.mp3"),
+    157280: ("felix.blume", "Wind howling in an electric transformer box on the High Atlas mountain (Morocco).", "CC0 1.0", "https://cdn.freesound.org/previews/157/157280_1661766-hq.mp3"),
+    158780: ("Paresh", "wolves.wav", "CC0 1.0", "https://cdn.freesound.org/previews/158/158780_229952-hq.mp3"),
+    160469: ("felix.blume", "Wind blowing in an antenna on the High Atlas mountain (Morocco).", "CC0 1.0", "https://cdn.freesound.org/previews/160/160469_1661766-hq.mp3"),
+    179341: ("lolamadeus", "Gravel Impacts and Falls.wav", "CC0 1.0", "https://cdn.freesound.org/previews/179/179341_544580-hq.mp3"),
+    184808: ("qubodup", "Whining Dog.flac", "CC0 1.0", "https://cdn.freesound.org/previews/184/184808_71257-hq.mp3"),
+    186921: ("ReadeOnly", "Angry Ram", "CC0 1.0", "https://cdn.freesound.org/previews/186/186921_545448-hq.mp3"),
+    190595: ("deleted_user_3424813", "Dog snarl (Self-made)", "CC0 1.0", "https://cdn.freesound.org/previews/190/190595_3424813-hq.mp3"),
+    200990: ("rayjensen", "rayjensen - thunder-crack 41k 16bit mono.wav", "CC0 1.0", "https://cdn.freesound.org/previews/200/200990_3734677-hq.mp3"),
+    232841: ("xavimuse", "Spark sounds", "CC0 1.0", "https://cdn.freesound.org/previews/232/232841_3916867-hq.mp3"),
+    256915: ("squashy555", "Arc Welding.wav", "CC0 1.0", "https://cdn.freesound.org/previews/256/256915_1149179-hq.mp3"),
+    266689: ("EduFigueres", "baby lamb calling his mother .WAV", "CC0 1.0", "https://cdn.freesound.org/previews/266/266689_2454586-hq.mp3"),
+    288899: ("petebuchwald", "Rocky Mountain Outdoors:  wind and birds", "CC0 1.0", "https://cdn.freesound.org/previews/288/288899_2367139-hq.mp3"),
+    348955: ("abstraktgeneriert", "Crumble #8.wav", "CC0 1.0", "https://cdn.freesound.org/previews/348/348955_3610778-hq.mp3"),
+    350711: ("RP1312", "Cowbell - Single 01.wav", "CC0 1.0", "https://cdn.freesound.org/previews/350/350711_4582947-hq.mp3"),
+    351301: ("mopedmetzger", "gekko.mp3", "CC0 1.0", "https://cdn.freesound.org/previews/351/351301_4620503-hq.mp3"),
+    352421: ("joseph.larralde", "wind_gust.aif", "CC0 1.0", "https://cdn.freesound.org/previews/352/352421_269279-hq.mp3"),
+    352600: ("macdaddyno1", "Goat .MP3", "CC0 1.0", "https://cdn.freesound.org/previews/352/352600_313780-hq.mp3"),
+    362283: ("zachrau", "Sheep bleating", "CC0 1.0", "https://cdn.freesound.org/previews/362/362283_676927-hq.mp3"),
+    362975: ("follytowers", "Big Tesla coil sound cut.wav", "CC0 1.0", "https://cdn.freesound.org/previews/362/362975_6668765-hq.mp3"),
+    381200: ("kaydinhamby", "Eagle Cry.wav", "CC0 1.0", "https://cdn.freesound.org/previews/381/381200_6478384-hq.mp3"),
+    381645: ("AlanCat", "RockFall1b.wav", "CC0 1.0", "https://cdn.freesound.org/previews/381/381645_5486695-hq.mp3"),
+    383144: ("zachrau", "Sheep bleating", "CC0 1.0", "https://cdn.freesound.org/previews/383/383144_676927-hq.mp3"),
+    384362: ("Ali_6868", "Digging a Hole and Shovelling Soil/Dirt 2", "CC0 1.0", "https://cdn.freesound.org/previews/384/384362_984733-hq.mp3"),
+    389303: ("AlanCat", "rockfall2a.wav", "CC0 1.0", "https://cdn.freesound.org/previews/389/389303_5486695-hq.mp3"),
+    391320: ("Forpus_Prod", "Goat.wav", "CC0 1.0", "https://cdn.freesound.org/previews/391/391320_7361768-hq.mp3"),
+    399186: ("genel", "wolf 2.wav", "CC0 1.0", "https://cdn.freesound.org/previews/399/399186_1032573-hq.mp3"),
+    400645: ("LampEight", "Wood panel board cracking snapping long", "CC0 1.0", "https://cdn.freesound.org/previews/400/400645_706234-hq.mp3"),
+    415962: ("follytowers", "high-voltage-discharge-2.wav", "CC0 1.0", "https://cdn.freesound.org/previews/415/415962_6668765-hq.mp3"),
+    434359: ("csengeri", "Close lightning strike 2018 07 07", "CC0 1.0", "https://cdn.freesound.org/previews/434/434359_197070-hq.mp3"),
+    435222: ("dersinnsspace", "Heavy rain with thuder", "CC0 1.0", "https://cdn.freesound.org/previews/435/435222_8224400-hq.mp3"),
+    437243: ("Simon Spiers", "Very close lightning strike.", "CC0 1.0", "https://cdn.freesound.org/previews/437/437243_213249-hq.mp3"),
+    437337: ("giddster", "Wind chimes 1", "CC0 1.0", "https://cdn.freesound.org/previews/437/437337_1738686-hq.mp3"),
+    437937: ("craigsmith", "G12-05-Camel Grunt.wav", "CC0 1.0", "https://cdn.freesound.org/previews/437/437937_2524442-hq.mp3"),
+    453445: ("kyles", "hum electric transformer in large room2.flac", "CC0 1.0", "https://cdn.freesound.org/previews/453/453445_612689-hq.mp3"),
+    454092: ("kyles", "mountain wind heavy strong gusts Swiss Alps.flac", "CC0 1.0", "https://cdn.freesound.org/previews/454/454092_612689-hq.mp3"),
+    454855: ("SamuelGremaud", "TOLLING BELL", "CC0 1.0", "https://cdn.freesound.org/previews/454/454855_8031303-hq.mp3"),
+    471162: ("Sheyvan", "Sheep Bleating", "CC0 1.0", "https://cdn.freesound.org/previews/471/471162_3248005-hq.mp3"),
+    472401: ("JoseAgudelo", "21_Lobo_gruñendo.wav", "CC0 1.0", "https://cdn.freesound.org/previews/472/472401_9934646-hq.mp3"),
+    472402: ("JoseAgudelo", "22_Lobo_aullando.wav", "CC0 1.0", "https://cdn.freesound.org/previews/472/472402_9934646-hq.mp3"),
+    500638: ("betchkal", "20120808_064004 Cathedral Mountain rock slide, slow blocky chunks.wav", "CC0 1.0", "https://cdn.freesound.org/previews/500/500638_339183-hq.mp3"),
+    500646: ("betchkal", "Cooper Creek 20160313_014852 solitary wolf howl very clear.wav", "CC0 1.0", "https://cdn.freesound.org/previews/500/500646_339183-hq.mp3"),
+    503139: ("felix.blume", "Snow crackling on the top of the mountain Chacaltaya (Corona Discharge)", "CC0 1.0", "https://cdn.freesound.org/previews/503/503139_1661766-hq.mp3"),
+    506665: ("Rudmer_Rotteveel", "Wood Creak Single V10", "CC0 1.0", "https://cdn.freesound.org/previews/506/506665_4921277-hq.mp3"),
+    519594: ("Nivatius", "Bison bellowing - Yellowstone National Park", "CC0 1.0", "https://cdn.freesound.org/previews/519/519594_7143328-hq.mp3"),
+    521856: ("D.jones", "Three Rams", "CC0 1.0", "https://cdn.freesound.org/previews/521/521856_11431915-hq.mp3"),
+    521956: ("Kastenfrosch", "Stone Crumble 2", "CC0 1.0", "https://cdn.freesound.org/previews/521/521956_311243-hq.mp3"),
+    528183: ("fthgurdy", "Angry hedgehog sniffing 1", "CC0 1.0", "https://cdn.freesound.org/previews/528/528183_3302313-hq.mp3"),
+    553374: ("xoiziox", "Snake Hiss", "CC0 1.0", "https://cdn.freesound.org/previews/553/553374_3940234-hq.mp3"),
+    554308: ("nielstii", "Fox scream in the forest", "CC0 1.0", "https://cdn.freesound.org/previews/554/554308_6290213-hq.mp3"),
+    555736: ("1888software", "river-canyon-winter-heavy-flow-with-fadeout.wav", "CC0 1.0", "https://cdn.freesound.org/previews/555/555736_11447152-hq.mp3"),
+    559600: ("Podcapocalipsis", "LION ROAR", "CC0 1.0", "https://cdn.freesound.org/previews/559/559600_11490791-hq.mp3"),
+    571206: ("TRP", "180903 Summer cricket heavy field hot clean PEC.mp3", "CC0 1.0", "https://cdn.freesound.org/previews/571/571206_97550-hq.mp3"),
+    572443: ("TRP", "180806 Thunder, distant rolling boomy, rain drops TORONTO.flac", "CC0 1.0", "https://cdn.freesound.org/previews/572/572443_97550-hq.mp3"),
+    577315: ("TRP", "Thunder, single long rolling, distant, light rain, TORONTO, 2011.wav", "CC0 1.0", "https://cdn.freesound.org/previews/577/577315_97550-hq.mp3"),
+    583077: ("Breviceps", "Purring Guinea Pig", "CC0 1.0", "https://cdn.freesound.org/previews/583/583077_9159316-hq.mp3"),
+    587167: ("klankbeeld", "sneeze goat 04.wav", "CC-BY 4.0", "https://cdn.freesound.org/previews/587/587167_1648170-hq.mp3"),
+    588180: ("Auxide_Audio", "Mountain River, Large 001.wav", "CC0 1.0", "https://cdn.freesound.org/previews/588/588180_13207434-hq.mp3"),
+    596541: ("tothrec2", "Large Wings Flapping - Foley.wav", "CC0 1.0", "https://cdn.freesound.org/previews/596/596541_9801597-hq.mp3"),
+    611721: ("_justMonke_", "Big Lion Roar", "CC0 1.0", "https://cdn.freesound.org/previews/611/611721_13511310-hq.mp3"),
+    616992: ("TRP", "210914 Thunder, crack, pretty close, bit of distortion, urban, TORONTO 1am.wav", "CC0 1.0", "https://cdn.freesound.org/previews/616/616992_97550-hq.mp3"),
+    618085: ("sit_walk", "2022-02-06 wood creak 1.wav", "CC0 1.0", "https://cdn.freesound.org/previews/618/618085_11204664-hq.mp3"),
+    627789: ("poots", "underground mine dripping.wav", "CC0 1.0", "https://cdn.freesound.org/previews/627/627789_1038119-hq.mp3"),
+    634005: ("Soundburst", "Fox Screams", "CC0 1.0", "https://cdn.freesound.org/previews/634/634005_13454867-hq.mp3"),
+    643861: ("Kneeling", "spark2.ogg", "CC0 1.0", "https://cdn.freesound.org/previews/643/643861_7811934-hq.mp3"),
+    650699: ("datapopstar2", "Waterfall_Meraner_Höhenweg_01_160922.wav", "CC0 1.0", "https://cdn.freesound.org/previews/650/650699_11663878-hq.mp3"),
+    672330: ("felix.blume", "Meadow prairie atmosphere with insect, subtle gust of wind, grass, cicada, distant bird in Agua Fría falls in Amazon rainforest", "CC0 1.0", "https://cdn.freesound.org/previews/672/672330_1661766-hq.mp3"),
+    674043: ("mmmtoop", "230104-060_normalized_titanic_bell.wav", "CC0 1.0", "https://cdn.freesound.org/previews/674/674043_11007330-hq.mp3"),
+    675962: ("craigsmith", "S28-16 Eagle squawks & calls.wav", "CC0 1.0", "https://cdn.freesound.org/previews/675/675962_2524442-hq.mp3"),
+    678971: ("bowlingballout", "Snake Tongue Hiss.WAV", "CC0 1.0", "https://cdn.freesound.org/previews/678/678971_485650-hq.mp3"),
+    679954: ("dinoroki", "Cat Growling and Hissing", "CC0 1.0", "https://cdn.freesound.org/previews/679/679954_14816633-hq.mp3"),
+    686626: ("Organuz", "Tookgeh Gecko", "CC0 1.0", "https://cdn.freesound.org/previews/686/686626_8281041-hq.mp3"),
+    696531: ("dhallcomposer", "Digging Into Soft Soil with Small Trowell.wav", "CC0 1.0", "https://cdn.freesound.org/previews/696/696531_7678208-hq.mp3"),
+    698546: ("tomhannen", "Garip Island major from cliff side - binaural", "CC0 1.0", "https://cdn.freesound.org/previews/698/698546_1121623-hq.mp3"),
+    711122: ("Cultureshock007", "Large Wings / Superhero Cape Foley", "CC0 1.0", "https://cdn.freesound.org/previews/711/711122_7382637-hq.mp3"),
+    721812: ("chungus43A", "BPSN electrical hum 1", "CC0 1.0", "https://cdn.freesound.org/previews/721/721812_12024110-hq.mp3"),
+    722658: ("aisselles", "Bleating Goat", "CC0 1.0", "https://cdn.freesound.org/previews/722/722658_3200333-hq.mp3"),
+    750495: ("Sadiquecat", "Angry Cat (Perran)", "CC0 1.0", "https://cdn.freesound.org/previews/750/750495_5287430-hq.mp3"),
+    770032: ("Vrymaa", "Bird - Red-shouldered hawk", "CC0 1.0", "https://cdn.freesound.org/previews/770/770032_13973196-hq.mp3"),
+    770282: ("Sadiquecat", "Wind whistle 3", "CC0 1.0", "https://cdn.freesound.org/previews/770/770282_5287430-hq.mp3"),
+    776446: ("pryanic", "ELECArc_Electric arc hum and buzz. A longer movement of electricity, a power station switching arc when decoupled. designed with synth_Anton Bushinskiy_AB FX", "CC0 1.0", "https://cdn.freesound.org/previews/776/776446_11318300-hq.mp3"),
+    822939: ("SoundsLikeYukon", "Hoary marmot whistles", "CC0 1.0", "https://cdn.freesound.org/previews/822/822939_1544275-hq.mp3"),
+    826421: ("Sadiquecat", "250910_22h43 Gergueil D104 - Brame", "CC0 1.0", "https://cdn.freesound.org/previews/826/826421_5287430-hq.mp3"),
+    826812: ("markb", "aeolian_harp_20250906_1721", "CC-BY 4.0", "https://cdn.freesound.org/previews/826/826812_103289-hq.mp3"),
+    834331: ("ali.g", "Yak grunts", "CC0 1.0", "https://cdn.freesound.org/previews/834/834331_17584222-hq.mp3"),
+    838744: ("Artistic_Dragonborn", "Whistling wind", "CC0 1.0", "https://cdn.freesound.org/previews/838/838744_18047279-hq.mp3"),
+    838963: ("floatby", "Condor Scream", "CC0 1.0", "https://cdn.freesound.org/previews/838/838963_10870587-hq.mp3"),
+    840628: ("loganzsound", "Closeup Thunder Strike 01", "CC0 1.0", "https://cdn.freesound.org/previews/840/840628_16682330-hq.mp3"),
+    841571: ("TheKingOfGeeks360", "Rodents - Brown Rats; Several Babies Squeaking, Close Perspective", "CC0 1.0", "https://cdn.freesound.org/previews/841/841571_15895934-hq.mp3"),
+    853286: ("el_boss", "Tesla Tower Zap - Electric Zap Short - Game SFX", "CC0 1.0", "https://cdn.freesound.org/previews/853/853286_9129912-hq.mp3"),
+    865812: ("MichiJung", "Birds of Prey: Red Kite, soft social calls", "CC-BY 4.0", "https://cdn.freesound.org/previews/865/865812_7372878-hq.mp3"),
+    866683: ("TheKingOfGeeks360", "Goats - Two Billies Sparring; Headbutt, Horns Clanking", "CC0 1.0", "https://cdn.freesound.org/previews/866/866683_15895934-hq.mp3"),
+    867549: ("TheKingOfGeeks360", "Bovines - American Bison; Nasal Huffs, Close Perspective", "CC0 1.0", "https://cdn.freesound.org/previews/867/867549_15895934-hq.mp3"),
+    868531: ("MichiJung", "Birds of Prey: Red Kite, medium loud excited calls", "CC-BY 4.0", "https://cdn.freesound.org/previews/868/868531_7372878-hq.mp3"),
+    868738: ("MichiJung", "Birds of Prey: Red Kite, loud territorial call", "CC-BY 4.0", "https://cdn.freesound.org/previews/868/868738_7372878-hq.mp3"),
+    870748: ("CHallSmith", "Drips, Giant Cave Drips, Slow", "CC0 1.0", "https://cdn.freesound.org/previews/870/870748_18412227-hq.mp3"),
+    871766: ("harrisonlace", "ELECArc_Sparking Electricity Bed", "CC0 1.0", "https://cdn.freesound.org/previews/871/871766_9839964-hq.mp3"),
+    873248: ("harrisonlace", "WOODBrk_Layered Cracking Thin Plywood Board Splinters x 7", "CC0 1.0", "https://cdn.freesound.org/previews/873/873248_9839964-hq.mp3"),
+    873888: ("timpet55", "Bison", "CC0 1.0", "https://cdn.freesound.org/previews/873/873888_13154243-hq.mp3"),
+    875011: ("cb9382", "Electrical Static - crackles and pops", "CC0 1.0", "https://cdn.freesound.org/previews/875/875011_19181807-hq.mp3"),
+    875513: ("loganzsound", "Red Tailed Hawk Cries", "CC0 1.0", "https://cdn.freesound.org/previews/875/875513_16682330-hq.mp3"),
+}
+
+def page(sid):
+    return f"https://freesound.org/people/{FREESOUND[sid][0]}/sounds/{sid}/"
+
+if __name__ == "__main__":
+    work = sys.argv[1]; ua = {"User-Agent": "Mozilla/5.0"}
+    def get(url, out):
+        if os.path.exists(out): return
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        data = urllib.request.urlopen(urllib.request.Request(url, headers=ua), timeout=600).read()
+        open(out, "wb").write(data)
+    for t in MUSIC: get(MUSIC_FILE + urllib.parse.quote(t) + ".mp3", os.path.join(work, "dl", "music", t + ".mp3"))
+    for sid, (_a, _t, _l, url) in FREESOUND.items(): get(url, os.path.join(work, "dl", "fs", f"{sid}.mp3"))

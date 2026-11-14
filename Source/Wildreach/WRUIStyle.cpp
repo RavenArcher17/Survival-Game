@@ -111,7 +111,7 @@ namespace WRUI
 	{
 		const FString N = Name.ToString();
 		const bool bTile = N == TEXT("stone") || N == TEXT("leather") || N == TEXT("parchment");
-		const FVector2D Size = bTile ? FVector2D(256.f, 256.f) : N == TEXT("rivet") ? FVector2D(16.f, 16.f) : N.StartsWith(TEXT("wheel")) ? FVector2D(600.f, 600.f) : N == TEXT("map") ? FVector2D(1009.f, 1009.f) : FVector2D(256.f, 256.f);
+		const FVector2D Size = bTile ? FVector2D(256.f, 256.f) : N == TEXT("rivet") ? FVector2D(16.f, 16.f) : N.StartsWith(TEXT("wheel")) ? FVector2D(600.f, 600.f) : N == TEXT("map") ? FVector2D(WRTune(TEXT("ui.mapPixels"), 1009.f), WRTune(TEXT("ui.mapPixels"), 1009.f)) : FVector2D(256.f, 256.f);
 		return FileBrush(N + TEXT(".png"), Size, bTile ? ESlateBrushTileType::Both : ESlateBrushTileType::NoTile, false);
 	}
 

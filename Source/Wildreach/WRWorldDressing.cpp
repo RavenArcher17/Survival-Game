@@ -291,6 +291,9 @@ static const FWRHarvestSpec HarvestSpecs[] = {
 	{ TEXT("char_tree"), TEXT("tree"), TEXT("wood"), 30.f }, { TEXT("pine"), TEXT("tree"), TEXT("wood"), 30.f },
 	{ TEXT("basalt_rock"), TEXT("rock"), TEXT("stone"), 110.f }, { TEXT("ice_rock"), TEXT("rock"), TEXT("stone"), 90.f },
 	{ TEXT("ember_shrub"), TEXT("shrub"), TEXT("fiber"), 55.f }, { TEXT("snow_shrub"), TEXT("shrub"), TEXT("fiber"), 60.f },
+	// Storm peaks (Tools/terrain/storm_peaks.mjs): wind-bent mountain pine and krummholz, granite boulders, alpine scrub.
+	{ TEXT("storm_pine"), TEXT("tree"), TEXT("wood"), 26.f }, { TEXT("granite_rock"), TEXT("rock"), TEXT("stone"), 100.f },
+	{ TEXT("storm_shrub"), TEXT("shrub"), TEXT("fiber"), 50.f },
 };
 
 AWRDressing::AWRDressing()
@@ -353,6 +356,11 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// Ridge faces: decoration only (no collision), so the ridge stays a wall rather than gaining footholds.
 		{ TEXT("basalt_cliff"), { { Sphere, FLinearColor(0.03f, 0.028f, 0.027f), FVector(500, 440, 400), 60, false, 30000, FVector(12, 0, 0) } } },
 		{ TEXT("ice_cliff"), { { Sphere, FLinearColor(0.45f, 0.55f, 0.65f), FVector(500, 440, 400), 60, false, 30000, FVector(12, 0, 0) } } },
+		{ TEXT("storm_pine"), { { Cyl, FLinearColor(0.1f, 0.06f, 0.035f), FVector(40, 40, 280), 130, true, 24000, FVector::ZeroVector },
+		                        { Cone, FLinearColor(0.025f, 0.07f, 0.045f), FVector(260, 260, 560), 480, false, 24000, FVector::ZeroVector } } },
+		{ TEXT("granite_rock"), { { Sphere, FLinearColor(0.2f, 0.2f, 0.21f), FVector(240, 210, 150), 30, true, 24000, FVector(8, 0, 0) } } },
+		{ TEXT("slate_scree"), { { Sphere, FLinearColor(0.05f, 0.055f, 0.065f), FVector(380, 320, 220), 40, false, 30000, FVector(10, 0, 0) } } },
+		{ TEXT("storm_shrub"), { { Sphere, FLinearColor(0.12f, 0.15f, 0.1f), FVector(100, 100, 50), 12, false, 12000, FVector::ZeroVector } } },
 	};
 	// Real meshes from the art packs / AI props replace the shapes above where we have them.
 	// Size is what each mesh is fitted to (cm, before the instance's own scale): all three axes for rocks, so they keep
@@ -398,6 +406,15 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 240), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } },
 			{ { TEXT("Amount Min"), WRTune(TEXT("world.frostCoatMin"), 0.f) }, { TEXT("Amount Max"), 1.f } } } },
+		// Storm peaks: the island's pine meshes (no birch up here), granite and slate in the Storm palette, and the
+		// shrubs coated a lichen grey-green where the wind keeps them low.
+		{ TEXT("storm_pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")),
+		    Prop(TEXT("FirA"), TEXT("fir_a_textured")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("granite_rock"), { Rocks, FVector(240, 210, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.42f, 0.43f, 0.45f) } }, {} } },
+		{ TEXT("slate_scree"), { Rocks, FVector(420, 360, 260), 120, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.14f, 0.16f, 0.2f) } }, {} } },
+		{ TEXT("storm_shrub"), { Shrubs, FVector(0, 0, 200), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Snow Color"), FLinearColor(0.42f, 0.45f, 0.38f) } },
+			{ { TEXT("Amount Min"), 0.f }, { TEXT("Amount Max"), WRTune(TEXT("world.stormCoatMax"), 0.6f) } } } },
 	};
 	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
 	// machine in the same order, so a ledger key means the same decoration everywhere.
@@ -1136,6 +1153,7 @@ void AWRCave::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCave, Biome);
 	DOREPLIFETIME(AWRCave, Variant);
+	DOREPLIFETIME(AWRCave, Theme);
 }
 
 void AWRCave::BeginPlay()
@@ -1159,11 +1177,14 @@ void AWRCave::BuildShell()
 	if (UMaterialInterface* Mat = RockMat ? RockMat : ShapeMaterial())
 	{
 		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
+		// Storm peaks: slate, pink rock salt in the Halite Cave (cooks/biome-lightning.md 2.4 #18-20).
+		const bool bStorm = Biome == TEXT("storm_peaks");
+		const FLinearColor StormTint = Theme == TEXT("halite") ? FLinearColor(0.62f, 0.42f, 0.42f) : FLinearColor(0.11f, 0.125f, 0.15f);
 		MID->SetVectorParameterValue(RockMat ? TEXT("Tint") : TEXT("Color"),
-			bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
+			bStorm ? StormTint : bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
 		Rock->SetMaterial(0, MID);
 	}
-	Glow->SetLightColor(bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
+	Glow->SetLightColor(Biome == TEXT("storm_peaks") ? FLinearColor(0.62f, 0.55f, 1.f) : bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
 	// Enough light in the chamber to find the ore by (it was black inside: 1200 over a 16 m reach).
 	Glow->SetIntensity(WRTune(TEXT("caves.glowIntensity"), 8000.f));
 	Glow->SetAttenuationRadius(WRTune(TEXT("caves.glowRadius"), 2400.f) * GetActorScale3D().X);
@@ -1280,6 +1301,16 @@ void AWRCave::SpawnContents()
 		// and a clay bank in the damp low corner, clear of the hazard and the veins.
 		{ TEXT("saltpetre"), FVector(620, 330, 0) }, { TEXT("clay"), FVector(600, -380, 0) },
 	};
+	// Storm peaks' caves: the Rodwardens' copper country (DC 2.6): copper rich, tin, iron deeper; rock salt in the Halite
+	// Cave; no sulfur, no lichen.
+	if (Biome == TEXT("storm_peaks"))
+	{
+		Ores = { { TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("copper_ore"), FVector(-550, 550, 0) }, { TEXT("tin_ore"), FVector(0, -650, 0) },
+			{ TEXT("copper_ore"), FVector(300, 620, 0) }, { TEXT("copper_ore"), FVector(-700, 0, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
+		if (Theme == TEXT("halite")) { Ores[2].Key = TEXT("rock_salt"); Ores[4].Key = TEXT("rock_salt"); Ores.Add({ TEXT("rock_salt"), FVector(620, 330, 0) }); }
+		if (Theme == TEXT("adit")) Ores[1].Key = TEXT("iron_ore");
+		if (Theme == TEXT("grotto")) Ores[0].Key = TEXT("tin_ore");
+	}
 	// Star iron (cooks/build-crafting.md 2.1, ores by depth band 4): the highland caves' deepest chamber, back past the
 	// iron, 2.8 m clear of the other veins.
 	if (GetActorLocation().Z >= WRTune(TEXT("caves.starIronMinZ"), 20000.f))
@@ -1297,15 +1328,20 @@ void AWRCave::SpawnContents()
 			UE_LOG(LogWildreach, Verbose, TEXT("CAVE %s: %s at %s (%.0f cm over the cave's origin)"), *GetName(), *Ore.Key.ToString(), *T.GetLocation().ToCompactString(), T.GetLocation().Z - GetActorLocation().Z);
 		}
 	}
-	// Cave hazard: burning sulfur gas (volcanic) or slick ice (tundra). Permanent.
-	AWRHazard::Spawn(GetWorld(), nullptr, Floor(FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
-		WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")));
+	// Cave hazard: burning sulfur gas (volcanic) or slick ice (tundra). Permanent. Storm peaks' caves have none: their
+	// danger is the Coilburrows and the dark.
+	const bool bStormCave = Biome == TEXT("storm_peaks");
+	if (!bStormCave)
+	{
+		AWRHazard::Spawn(GetWorld(), nullptr, Floor(FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
+			WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")));
+	}
 	// A burrower colony (Kilnmites nest here and mine ore once tamed; Glacimaws lurk under the ice).
 	const FTransform SpawnAt(FRotator::ZeroRotator, Floor(FVector(-300, 0, 0)));
 	if (AWRCreatureSpawner* Spawner = GetWorld()->SpawnActorDeferred<AWRCreatureSpawner>(AWRCreatureSpawner::StaticClass(), SpawnAt, this))
 	{
-		Spawner->CreatureId = bFrost ? FName(TEXT("glacimaw")) : FName(TEXT("kilnmite"));
-		Spawner->Count = bFrost ? 1 : 2;
+		Spawner->CreatureId = bStormCave ? FName(TEXT("coilburrow")) : bFrost ? FName(TEXT("glacimaw")) : FName(TEXT("kilnmite"));
+		Spawner->Count = bStormCave ? 3 : bFrost ? 1 : 2;
 		Spawner->Radius = 300.f;
 		Spawner->RespawnSeconds = 300.f;
 		Spawner->FinishSpawning(SpawnAt);

@@ -388,6 +388,13 @@ const out = {
 	map: "L_Island", counts, caves: caves.map(({ biome, x, y, z, yaw, variant, scale }) => ({ biome, x, y, z, yaw, variant, scale })), instances: types, hazards, pois,
 };
 console.log("hazard cells", "lava", hazards.lava.length / 3, "ice", hazards.ice.length / 3, "| lava grid points", lavaRows.reduce((n, r) => n + r[2], 0), "visible", lavaVisible.size);
+// Storm peaks' dressing lives in the same file (one dressing file per map): keep what Tools/terrain/storm_peaks.mjs
+// wrote (its instance kinds and its POIs) when the island's is regenerated.
+try {
+	const old = JSON.parse(fs.readFileSync(path.join(root, "Data/island_dressing.json"), "utf8"));
+	for (const k of ["storm_pine", "granite_rock", "slate_scree", "storm_shrub"]) if (old.instances && old.instances[k]) { out.instances[k] = old.instances[k]; if (old.counts) out.counts[k] = old.counts[k]; }
+	out.pois = [...out.pois, ...(old.pois || []).filter(p => p.storm)];
+} catch {}
 fs.writeFileSync(path.join(root, "Data/island_dressing.json"), JSON.stringify(out));
 console.log("caves", caves.length, JSON.stringify(caves.map(c => [c.biome, Math.round(c.mx), Math.round(c.my)])));
 console.log("instances", JSON.stringify(counts), "total", Object.values(counts).reduce((a, b) => a + b, 0), "| undergrowth added", undergrowth);

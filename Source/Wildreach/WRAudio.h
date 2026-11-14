@@ -234,6 +234,12 @@ private:
 	float Cave = 0.f;
 	float Lava = 0.f;
 	float Tundra = 0.f;
+	/** Storm peaks (cooks/biome-lightning.md 2.12): how far into its air, and each sub-zone's bed weight (1-6 as the
+	 *  zone letters, eased), the Rodfield's wind-song by distance. */
+	float Storm = 0.f;
+	float StormZone[7] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	float Rodfield = 0.f;
+	/** The Great Storm's war-drum layer over whatever plays (music.pools layer.great_storm). */
 	float Daylight = 1.f;
 	float High = 0.f;
 	double NextCaveScan = 0.0;
@@ -249,7 +255,10 @@ private:
 	double NextEngageCheck = 0.0;
 	bool bEngaged = false;
 	bool bBoss = false;
+	/** The engaged boss's creature id (its own music pool: boss.<id>, or its land's mini pool). */
+	FName BossId;
 	FString LastExplore;
+	TArray<FStream> GreatStormLayer;
 	float DuckLevel = 1.f;
 	float DuckTarget = 1.f;
 	double DuckUntil = 0.0;

@@ -1,0 +1,212 @@
+{
+  "id": "lightning",
+  "name": "Lightning",
+  "biome": "storm_peaks",
+  "starter": "spark",
+  "color": "B9A7FF",
+  "icon": "stormglass",
+  "glyph": "weather_storm",
+  "resource": {
+    "id": "charge",
+    "name": "Charge"
+  },
+  "rootPassive": {
+    "id": "grounded",
+    "name": "Grounded",
+    "text": "Immune to lightning stuns, including from enemy storms. Storm strikes deal you half damage, and the storm picks you last."
+  },
+  "trunk": [
+    {
+      "id": "spark",
+      "name": "Spark",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic lightning spell: a fast bolt that shocks"
+    },
+    {
+      "id": "charge_capacity",
+      "name": "Charge capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Charge bar"
+    },
+    {
+      "id": "shock_chance",
+      "name": "Shock chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Weapon hits have a chance to add a free burst of shock"
+    },
+    {
+      "id": "static_strike",
+      "name": "Static strike",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic lightning weapon art: a thrust that arcs to one more enemy"
+    }
+  ],
+  "branches": [
+    {
+      "id": "storm",
+      "name": "Storm",
+      "nodes": [
+        {
+          "id": "chain_lightning",
+          "name": "Chain lightning",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: lightning that jumps from enemy to enemy",
+          "gate": 0
+        },
+        {
+          "id": "arc",
+          "name": "Arc",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "One more jump for Chain lightning and Static strike's arc",
+          "gate": 5
+        },
+        {
+          "id": "conductive",
+          "name": "Conductive",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Soaked enemies take more lightning damage",
+          "gate": 10
+        },
+        {
+          "id": "thunderclap",
+          "name": "Thunderclap",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spell: a thunderous burst around you that shocks and staggers",
+          "gate": 13
+        },
+        {
+          "id": "overcharge",
+          "name": "Overcharge",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "More lightning damage while your Charge is nearly full",
+          "gate": 17
+        },
+        {
+          "id": "tempest",
+          "name": "Tempest",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "a storm around you that strikes your enemies",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "surge",
+      "name": "Surge",
+      "nodes": [
+        {
+          "id": "bolt_dash",
+          "name": "Bolt dash",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Dash as lightning through enemies, shocking each one you pass",
+          "gate": 0
+        },
+        {
+          "id": "swift",
+          "name": "Swift",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "Faster movement",
+          "gate": 5
+        },
+        {
+          "id": "afterimage",
+          "name": "Afterimage",
+          "kind": "ability",
+          "cost": 3,
+          "text": "A dodge leaves a spark where it started that bursts a moment later",
+          "gate": 10
+        },
+        {
+          "id": "rapid_fire",
+          "name": "Rapid fire",
+          "kind": "ability",
+          "cost": 4,
+          "text": "At high Charge you attack faster and your spells come back sooner",
+          "gate": 13
+        },
+        {
+          "id": "recharge",
+          "name": "Recharge",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Gain more Charge",
+          "gate": 17
+        },
+        {
+          "id": "lightning_step",
+          "name": "Lightning step",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "bolt dash up to three times in quick succession",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "conductor",
+      "name": "Conductor",
+      "nodes": [
+        {
+          "id": "charged_weapon",
+          "name": "Charged weapon",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Weapon art: release all your Charge in one overhead blow; hold to store more",
+          "gate": 0
+        },
+        {
+          "id": "capacitor",
+          "name": "Capacitor",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More weapon art damage",
+          "gate": 5
+        },
+        {
+          "id": "static_field",
+          "name": "Static field",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spell: a field of static on the ground that shocks what stands in it",
+          "gate": 10
+        },
+        {
+          "id": "discharge",
+          "name": "Discharge",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Blocking a hit releases a shock around you; a parry doubles it",
+          "gate": 14
+        },
+        {
+          "id": "field_strength",
+          "name": "Field strength",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Bigger, longer Static field",
+          "gate": 17
+        },
+        {
+          "id": "thunder_god",
+          "name": "Thunder god",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "for a while every weapon hit calls down a bolt on the target",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

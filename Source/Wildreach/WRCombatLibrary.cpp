@@ -1,6 +1,7 @@
 #include "WRCombatLibrary.h"
 #include "WRDeeds.h"
 #include "WRWarHall.h"
+#include "WRStormBosses.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
@@ -22,6 +23,7 @@
 #include "WRWater.h"
 #include "WRWeapons.h"
 #include "WRLag.h"
+#include "WRLightningPath.h"
 #include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
@@ -109,6 +111,12 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	{
 		return;
 	}
+	// Charge (the Lightning path) has its own gain rules (Recharge, its prestige): WRLightningPath.cpp.
+	if (Element == WRTags::Element_Lightning)
+	{
+		WRLightning::GainCharge(Who, Amount);
+		return;
+	}
 	UAbilitySystemComponent* ASC = Who->GetAbilitySystemComponent();
 	UWRAttributeSet* Attr = Who->GetAttributes();
 	if (!ASC || !Attr)
@@ -150,6 +158,8 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 					Blast.BurnBuildup = 60.f;
 					Blast.Origin = Who->GetActorLocation();
 					ApplyHit(*It, Blast);
+					// Meltdown (Fire + Lightning combo): each body the blast hits takes a chain of lightning.
+					WRLightning::OnOverheatHit(Who, *It);
 				}
 			}
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT overheat by %s"), *Who->GetName());
@@ -550,6 +560,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Attacker->Status->ApplyStatus(WRTags::Status_Exposed, WRTune(TEXT("crit.exposedSeconds"), 2.f));
 		UE_LOG(LogWildreach, Log, TEXT("COMBAT %s parried %s (%d/%d)"), *Target->GetName(), *Attacker->GetName(), Attacker->ParriesTaken, Need);
 		if (bStanceBroke) Attacker->ParriesTaken = 0;
+		// Discharge (lightning node): a parry releases a doubled shock.
+		WRLightning::OnGuard(Target, Attacker, true);
 		uint16 Flags = WRFx::HitFlagsFor(Hit, false, false, false, false, false);
 		if (bStanceBroke) Flags |= WRFx::Hit_StanceBreak;
 		Target->ReportHit(0.f, EWRHitResult::Parried, Flags, Hit.Instigator, Hit.Origin);
@@ -597,6 +609,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			const float Stun = (Hit.Impact >= 3 ? WRTune(TEXT("defense.blockStun.heavy"), 0.35f) : WRTune(TEXT("defense.blockStun.light"), 0.2f)) * Guard.BlockStunScale;
 			Target->Status->ApplyStatus(WRTags::State_BlockStun, Stun);
 			Result = EWRHitResult::Blocked;
+			// Discharge (lightning node): a block releases a shock around you.
+			WRLightning::OnGuard(Target, Attacker, false);
 		}
 	}
 
@@ -606,6 +620,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (Hit.Element == WRTags::Element_Fire && Attacker && Attacker->GetAttributes())
 		{
 			Damage *= 1.f + HeatBonus(Attacker->GetAttributes()->GetHeat(), Attacker->GetAttributes()->GetMaxHeat());
+		}
+		// Lightning: high Charge, Overcharge, Conductive on soaked bodies, a Charged weapon's released Charge.
+		if (Hit.Element == WRTags::Element_Lightning && Attacker)
+		{
+			Damage *= WRLightning::DamageScale(Attacker, Target, Hit);
 		}
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
@@ -890,8 +909,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const AWRCreature* Creature = Cast<AWRCreature>(Target);
 		const bool bCreatureArmour = Creature && (TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) || TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor))
 			&& (Creature->GetDef() && (Creature->GetDef()->bHyperarmor || Creature->GetDef()->Archetype == TEXT("boss") || WRPortals::CreatureIronHide(Creature)));
-		// Stalwart (fighter tree): a tame that can't be knocked about.
-		if (Left > 0.f || bCreatureArmour || FWRTaming::StanceTaken(Target, 1.f) < 1.f)
+		// Stalwart (fighter tree): a tame that can't be knocked about. Grounded (the Lightning root passive): no stagger
+		// from any lightning blow (storm strikes, another player's Thunderclap).
+		const bool bGroundedVsLightning = Hit.Element == WRTags::Element_Lightning && WRLightning::IsGrounded(Target);
+		if (Left > 0.f || bCreatureArmour || bGroundedVsLightning || FWRTaming::StanceTaken(Target, 1.f) < 1.f)
 		{
 			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), FMath::Clamp(Left / Armour - GuardPoise, 0.f, TargetAttr->GetPoise()));
 		}
@@ -950,6 +971,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
 		Stance *= WRPortals::StanceScale(Target);   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
 		Stance *= WRWarHall::StanceScale(Target);   // a raid champion slipping on its melted footing
+		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
 		if (AWRCreature* Body = Cast<AWRCreature>(Target))
 		{
 			if (Hit.PhysType == 2 && Body->IsNearLockPoint(Hit.ImpactPoint, TEXT("head"), WRTune(TEXT("stance.headRadius"), 70.f)))
@@ -1044,6 +1066,12 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (Target->IsAlive()) Target->Status->AddBuildup(WRTags::Element_Fire, Burn, Attacker);
 		if (Target->IsAlive()) Target->Status->AddBuildup(WRTags::Element_Frost, Frost, Attacker);
 	}
+	// The Lightning path's procs on a landed blow (WRLightningPath.cpp): the violet flash, Shock chance, Static strike's
+	// arc, Charged weapon's shock, Thunder god's bolt, Plasma.
+	if (Result == EWRHitResult::Hit && Attacker && !Hit.bDamageOverTime)
+	{
+		WRLightning::AfterHit(Target, Hit, Damage);
+	}
 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.
 	if (AWRCreature* Mount = Cast<AWRCreature>(Target); Mount && Mount->GetRider() && Target->IsAlive()
@@ -1062,6 +1090,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		else if (Hit.Element == WRTags::Element_Frost)
 		{
 			GainResource(Attacker, Hit.Element, WRTune(TEXT("resources.chillPerHit"), 4.f));
+		}
+		else if (Hit.Element == WRTags::Element_Lightning && Result == EWRHitResult::Hit)
+		{
+			// Charge fills fast: every lightning hit you land (cooks/biome-lightning.md 2.18.2).
+			GainResource(Attacker, Hit.Element, WRTune(TEXT("resources.chargePerHit"), 10.f));
 		}
 		if (Hit.bMelee)
 		{
@@ -1119,6 +1152,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			const FName Main = Feed > 0.f && UWRPathComponent::FindFor(Attacker) ? UWRPathComponent::FindFor(Attacker)->GetMainPath() : NAME_None;
 			if (Main == TEXT("fire")) GainResource(Attacker, WRTags::Element_Fire, Feed);
 			else if (Main == TEXT("frost")) GainResource(Attacker, WRTags::Element_Frost, Feed);
+			else if (Main == TEXT("lightning")) GainResource(Attacker, WRTags::Element_Lightning, Feed);
 		}
 		Target->Die(Hit.Instigator);
 	}

@@ -3,6 +3,7 @@
 // punish windows, combos, packs that flank, surround and breathe with no attack token; lock points and breakable parts;
 // fighting from the saddle and being thrown off it.
 #include "WRCreature.h"
+#include "WRStormCreatures.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "GameFramework/GameStateBase.h"
@@ -459,6 +460,7 @@ void AWRCreature::MulticastTell_Implementation(uint8 Glint, FName BoneHint, FNam
 
 float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 {
+	Damage = FWRStormAI::Incoming(this, Hit, Damage);   // Galvara's cores: arrows and spells x1.5
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -604,6 +606,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // a full pack doesn't call for more
 		}
+		if (!FWRStormAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // a Storm peaks creature's own rule (charged, grounded, by a wall, from the flank)
+		}
 		const float W = Dist < Close ? R.WClose : Dist < Mid ? R.WMid : R.WFar;
 		if (W > 0.f)
 		{
@@ -656,6 +662,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	Self->PlaySwing(WRRowFight::SwingFor(R->Motion), (R->Windup + R->Hold) / Pace);
 	// The tell: its voice and a small glint on the attacking part (white blockable, crimson unblockable).
 	Self->MulticastTell(R->Glint, R->TellBone, TEXT("voice"));
+	FWRStormAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -728,6 +735,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 		if (Self->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Build; }
 		else if (Self->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Build; }
 	}
+	FWRStormAI::ModifyHit(Self, Hit, R);   // shock is lightning; a tame Raiju's storm bonus, a tame's shock bites
 	UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *RowId.ToString(), *Victim->GetName());
 	const float Knockback = R->Knockback;
 	TWeakObjectPtr<AWRCreature> WeakSelf(Self);
@@ -744,6 +752,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 			V->LaunchCharacter(Push, true, true);
 		}
 	});
+	FWRStormAI::AfterRowHit(Self, Victim, *R);
 }
 
 void AWRCreatureAI::StrikeRow(AWRCreature* Self)
@@ -759,6 +768,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	RowOrigin = Self->GetActorLocation();
 	RowStrikeStarted = GetWorld()->GetTimeSeconds();
 	UE_LOG(LogWildreach, Log, TEXT("AI %s uses %s"), *Self->GetName(), *RowId.ToString());
+	if (FWRStormAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // a Storm peaks move (discharge, darts, a kite's dive, a rebound off the rock)
+	}
 	if (M == TEXT("lunge") || M == TEXT("pounce"))
 	{
 		// A leap at where the target will be when it lands.
@@ -882,7 +895,7 @@ void AWRCreatureAI::TickRow(AWRCreature* Self, float DeltaSeconds)
 	{
 		// Wind-up: feet planted, turning toward the target only through its first part (180 deg/s), so a late step aside
 		// still makes it miss; then committed. A charge commits to its line at once.
-		const float Track = M == TEXT("charge") || M == TEXT("roll") ? 0.15f : R->TrackUntil;
+		const float Track = (M == TEXT("charge") || M == TEXT("roll")) && !FWRStormAI::TracksCharge(Self) ? 0.15f : R->TrackUntil;
 		if (RowPhase == 1 && Target && Now - RowStarted < R->Windup * Track)
 		{
 			RowDir = (Target->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D();
@@ -1095,7 +1108,7 @@ void AWRCreatureAI::TickRowFight(AWRCreature* Self, AWRCharacterBase* Target, fl
 	const FVector Goal = bInPlace ? Target->GetActorLocation() : Spot;
 	FVector Dir = (Goal - Self->GetActorLocation()).GetSafeNormal2D();
 	const float Stop = Self->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius() + (Def ? FMath::Min(Def->AttackRange * 0.5f, 120.f) : 80.f);
-	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered))
+	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered) && !FWRStormAI::Grounded(Self))
 	{
 		const float WantZ = Target->GetActorLocation().Z + (Dist > 700.f ? 450.f : 0.f);
 		Self->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
@@ -1307,6 +1320,7 @@ void AWRCreature::TickRider(float DeltaSeconds)
 			Hit.Element = Mount->Weapon.Element == TEXT("fire") ? WRTags::Element_Fire : Mount->Weapon.Element == TEXT("frost") ? WRTags::Element_Frost : WRTags::Element_Physical;
 			if (Mount->Weapon.Element == TEXT("fire")) Hit.BurnBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
 			else if (Mount->Weapon.Element == TEXT("frost")) Hit.FrostBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
+			FWRStormAI::ModifyHit(Mount, Hit, nullptr);   // a Voltfang's shock bites from under its rider
 			UWRCombatLibrary::ApplyHit(Victim, Hit);
 		}), 0.45f, false);
 	}

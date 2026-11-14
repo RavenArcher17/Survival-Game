@@ -79,12 +79,25 @@ bool FWRPathRegistry::ParsePath(const FString& JsonText, FWRPathDef& Out)
 	if (Root->TryGetObjectField(TEXT("resource"), Resource))
 	{
 		Out.ResourceId = FName(*(*Resource)->GetStringField(TEXT("id")));
+		(*Resource)->TryGetStringField(TEXT("name"), Out.ResourceName);
 	}
 	const TSharedPtr<FJsonObject>* Passive = nullptr;
 	if (Root->TryGetObjectField(TEXT("rootPassive"), Passive))
 	{
 		Out.RootPassiveName = (*Passive)->GetStringField(TEXT("name"));
+		(*Passive)->TryGetStringField(TEXT("text"), Out.RootPassiveText);
 	}
+	// The look (optional): colour (sRGB hex), item icon, line glyph.
+	FString Hex, IconStr;
+	if (Root->TryGetStringField(TEXT("color"), Hex) && Hex.Len() >= 6)
+	{
+		Out.Color = FLinearColor(FColor::FromHex(Hex));
+	}
+	if (Root->TryGetStringField(TEXT("icon"), IconStr) && !IconStr.IsEmpty())
+	{
+		Out.Icon = FName(*IconStr);
+	}
+	Root->TryGetStringField(TEXT("glyph"), Out.Glyph);
 
 	const TArray<TSharedPtr<FJsonValue>>* Trunk = nullptr;
 	if (Root->TryGetArrayField(TEXT("trunk"), Trunk))

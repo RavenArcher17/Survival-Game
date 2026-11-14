@@ -17,7 +17,7 @@
       "warden": "fold_warden_volcanic", "bosses": ["cinderfang_alpha", "kilnmite_broodqueen", "mould_born", "brannoch", "bodvildr"] },
     "tundra": { "land": true, "name": "Frozen tundra", "slots": ["1", "2", "3", "high"], "kit": "tundra", "signature": "lichen", "essence": "frost_essence", "artifact": "rime_ring", "edge": "glacier_ice",
       "warden": "fold_warden_tundra", "bosses": ["rimeclaw_alpha", "glacimaw_elder", "frostbound_thurs", "rime_witch", "hrimgerdr"] },
-    "storm": { "land": false, "name": "Storm peaks", "slots": ["1", "2", "3", "high"], "kit": "storm", "signature": "stormglass", "artifact": "copper_tongue", "edge": "copper" },
+    "storm_peaks": { "land": false, "name": "Storm peaks", "slots": ["1", "2", "3", "high"], "kit": "storm", "signature": "stormglass", "artifact": "copper_tongue", "edge": "copper" },
     "desert": { "land": false, "name": "Desert", "slots": ["1", "1", "2", "3", "high"], "kit": "desert", "signature": "sunstone", "artifact": "the_feather", "edge": "sunglass" },
     "forest": { "land": false, "name": "Ancient forest", "slots": ["1", "1", "2", "3", "high"], "kit": "forest", "signature": "heartwood", "artifact": "thorn_oath", "edge": "living_root" },
     "sky": { "land": false, "name": "Sky islands", "slots": ["1", "high"], "kit": "sky", "signature": "skystone", "artifact": "kite_string", "edge": "kite_silk" },

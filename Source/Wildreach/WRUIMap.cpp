@@ -12,6 +12,8 @@
 #include "WRUIMap.h"
 #include "GameFramework/GameStateBase.h"
 #include "WRTuning.h"
+#include "WRFarm.h"
+#include "WRSurvival.h"
 #include "WRPortals.h"
 #include "WRWorldSystems.h"
 #include "Wildreach.h"
@@ -49,8 +51,10 @@
 namespace WRMapTab
 {
 	using WRUI::U;
-	constexpr float MapMin = -201800.f;   // world cm at the picture's left / top edge
-	constexpr float MapSize = 403600.f;   // world cm across the picture
+	// The picture's world corner and size (cm): Data/UI/map.png covers every land on L_Island (the Old Island and Storm
+	// peaks, Tools/terrain/world_map.py), so they're tuning (ui.mapMin / ui.mapSize), written by that script.
+	static const float MapMin = WRTune(TEXT("ui.mapMin"), -201800.f);    // world cm at the picture's left / top edge
+	static const float MapSize = WRTune(TEXT("ui.mapSize"), 403600.f);   // world cm across the picture
 	constexpr float MaxZoom = 8.f;
 
 	FLinearColor Hex(const TCHAR* H) { return FLinearColor(FColor::FromHex(H)); }
@@ -918,8 +922,8 @@ namespace WRMapTab
 
 		FText WhereLine() const
 		{
-			// The ridge runs down the middle (x = 0): volcanic to the west, tundra to the east.
-			return FText::Format(LOCTEXT("Where", "4 × 4 km · you are on the {0} side"), Here().X < 0.f ? LOCTEXT("Volcanic", "volcanic") : LOCTEXT("Tundra", "tundra"));
+			// The land under you by name (the island's two sides, Storm peaks to the north).
+			return FText::Format(LOCTEXT("WhereLand", "you are in {0}"), FText::FromString(WRBiome::Name(WRBiome::At(PC.Get(), Here()))));
 		}
 
 		// ---------------------------------------------------------------- legend
@@ -1125,7 +1129,7 @@ namespace WRMapTab
 							[
 								WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 								{
-									return FText::Format(LOCTEXT("Side", "{0} side · {1} m up"), Live.World.X < 0.f ? LOCTEXT("SideWest", "Volcanic, west") : LOCTEXT("SideEast", "Tundra, east"), FMath::Max(0, FMath::RoundToInt(Live.World.Z / 100.f)));
+									return FText::Format(LOCTEXT("SideLand", "{0} · {1} m up"), FText::FromString(WRBiome::Name(WRBiome::At(PC.Get(), Live.World))), FMath::Max(0, FMath::RoundToInt(Live.World.Z / 100.f)));
 								}), WRUI::Body(13, 500), WRUI::Ink2)
 							]
 						]

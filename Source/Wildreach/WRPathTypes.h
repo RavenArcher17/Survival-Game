@@ -36,7 +36,15 @@ struct FWRPathDef
 	FString Name;
 	FName Biome;
 	FName ResourceId;
+	/** The resource's shown name ("Heat", "Charge"). */
+	FString ResourceName;
 	FString RootPassiveName;
+	FString RootPassiveText;
+	/** The path's colour (sRGB hex "color" in the JSON; unset alpha 0: the UI falls back by id), its item icon (Data/UI/Icons)
+	 *  and its line glyph (Data/UI/Glyphs). */
+	FLinearColor Color = FLinearColor(0.f, 0.f, 0.f, 0.f);
+	FName Icon;
+	FString Glyph;
 	TArray<FWRPathNodeDef> Nodes;
 	/** The starter node ("starter" in the JSON; else the trunk's first ability). */
 	FName Starter;

@@ -4,6 +4,7 @@
 // by range band, a transition attack at the phase change, breakable parts, a tame-punishing move, the roaming minis
 // (Cinderhorn among his basalt pillars, Old Tusker on the snow flats), shrine-stones and the first-kill drop.
 #include "WRBoss.h"
+#include "WRStormBosses.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWarHall.h"
@@ -162,6 +163,10 @@ int32 AWRBoss::ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBa
 		{
 			continue;
 		}
+		if (!FWRStormBoss::Allowed(this, A, Target))
+		{
+			continue;   // a Storm peaks boss's rule (bleed blocks the charge, underground moves, the eye)
+		}
 		AWRCharacterBase* Who = A.bRow && A.Row.bTamePunish && FarTame ? FarTame : Target;
 		const float D = Who == Target ? Dist : FarDist;
 		const float Reach = A.Shape == EWRBossShape::SelfCircle ? A.Size : A.Range;
@@ -245,6 +250,7 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 		AWRGroundMarker::Spawn(GetWorld(), AttackPoint + FVector(0, 0, 3), AttackFacing, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(0.75f, 0.9f, 1.f), Attack.Windup + Hold);
 	}
 	PlaySwing(EWRSwingKind::Heavy, Attack.Windup + Hold + 0.2f);
+	FWRStormBoss::AttackStarted(this, Attack, Target);
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s winds up %s at %s%s"), *GetDisplayLabel(), *Attack.Id.ToString(), *Target->GetName(), Hold > 0.f ? TEXT(" (held)") : TEXT(""));
 }
 
@@ -273,6 +279,10 @@ void AWRBoss::BeginStrike()
 	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, bAirborne ? 0.f : GetSimpleCollisionHalfHeight());
 	const FString Id = Attack.Id.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s strikes"), *GetDisplayLabel(), *Id);
+	if (FWRStormBoss::BeginStrike(this, Attack))
+	{
+		return;   // a Storm peaks move (strikes, rings, the bone drop, the eye bolt...)
+	}
 
 	if (WRBossDetail::IsThrown(Attack))
 	{
@@ -400,6 +410,15 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 	Hit.Tier = EWRHitTier::Heavy;
 	Hit.PhysType = Attack.bRow ? Attack.Row.PhysType : 2;
 	Hit.Origin = Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation();
+	// A row's other buildups (shock, bleed...) ride along; shock is lightning.
+	if (Attack.bRow)
+	{
+		for (const TPair<FName, float>& B : Attack.Row.Buildups)
+		{
+			if (B.Key != TEXT("burn") && B.Key != TEXT("frost")) Hit.Buildups.Add(B.Key, B.Value);
+		}
+	}
+	FWRStormBoss::ModifyHit(this, Attack, Hit);
 	const FName AttackId = Attack.Id;
 	const float Knockback = Attack.bRow ? Attack.Row.Knockback : 0.f;
 	const bool bFreezingBreath = Phase >= 3 && IsWyrm() && AttackId.ToString().Contains(TEXT("breath"));
@@ -414,6 +433,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 		{
 			return;
 		}
+		FWRStormBoss::HitLanded(Self, Victim, AttackId, Landed);
 		if (AttackId == TEXT("tongs_grab"))
 		{
 			if (Landed == EWRHitResult::Parried)
@@ -465,6 +485,10 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 	if (bThrown)
 	{
 		return;  // the lob does it
+	}
+	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds))
+	{
+		return;
 	}
 	const auto Hostiles = [this](TFunction<void(AWRCharacterBase*)> Fn)
 	{
@@ -524,6 +548,8 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 			{
 				// Into stone at full tilt: stunned, the weak point open (combat.md 2.17.4).
 				UE_LOG(LogWildreach, Log, TEXT("BOSS %s crashes into %s"), *GetDisplayLabel(), *GetNameSafe(What));
+				FWRStormBoss::WallStun(this, Stun);
+				FWRStormBoss::WallStun(this, Stun);
 				WRFx::Broadcast(this, TEXT("stomp"), Blocked.ImpactPoint, FRotator::ZeroRotator, 1.6f, TEXT("stomp"));
 				EndStrike();
 				Current = INDEX_NONE;
@@ -683,6 +709,7 @@ void AWRBoss::EndStrike()
 	}
 	FWRBossAttack& Attack = Attacks[Current];
 	const double Now = GetWorld()->GetTimeSeconds();
+	FWRStormBoss::EndStrike(this, Attack);
 	if (!bThrown)
 	{
 		Aftermath(Attack, Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight()));
@@ -743,6 +770,7 @@ void AWRBoss::TickAttack(float DeltaSeconds)
 	FWRBossAttack& Attack = Attacks[Current];
 	if (StrikeState == EStrike::Windup)
 	{
+		FWRStormBoss::TickWindup(this, Attack, DeltaSeconds);   // a dive's climb and fold, a bolt's aim lock
 		// Tracking through the first part of the wind-up, then committed (a late step aside still works).
 		AWRCharacterBase* Target = AttackTarget.Get();
 		const float Track = Attack.bRow ? Attack.Row.TrackUntil : 0.5f;
@@ -782,6 +810,7 @@ void AWRBoss::OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By)
 {
 	// Each boss's own consequence (combat.md 2.10, 2.17); a fold boss's arena brain hears it too (Brannoch's vents).
 	WRPortals::OnBossPart(this, Part.Id, Part.OnBreak);
+	FWRStormBoss::PartBroken(this, Part, By);
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (Part.OnBreak == TEXT("noHammer"))
 	{
@@ -891,6 +920,10 @@ void AWRBoss::SpawnRunbackStone()
 {
 	// A shrine-stone 40-60 m out from the arena toward the way in (the island's middle, where the passes are), on
 	// ground about level with the arena floor and clear of rock: the run back is the way you came.
+	if (FWRStormBoss::PlaceRunback(this))
+	{
+		return;   // the Storm peaks arenas' stones stand where the land says (storm_peaks.json arenas)
+	}
 	const FWRCreatureDef* Def = GetDef();
 	// A portal boss has its fold's entry stone (and an escaped one no arena at all); a raid champion its hall's gate.
 	if (!Def || Def->Roam.Num() > 0 || Def->PortalRank > 0 || bChampion || Runback.IsValid())

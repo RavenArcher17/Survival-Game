@@ -1,0 +1,28 @@
+{
+  "_comment": "Path combos (Docs/plan/DATA_SCHEMAS.md 'Combo', cooks/biome-lightning.md 2.18.4): a main path and subclass pair with at least at25 / at50 points spent in BOTH paths owns that level's combo. grants: the gameplay tags the owner gets (the combat code reads them). requires: 'path.node' the owner must have learned too (CB rule: Meltdown needs Overheat, Blizzard storm needs Blizzard). numbers: the combo's own first-draft numbers (FWRComboRegistry::Num). Loaded by WRCombos.cpp; the pairs with no grants yet are display-only.",
+  "thresholds": [25, 50],
+  "pairs": [
+    {
+      "paths": ["fire", "frost"], "wheel": "opposites",
+      "at25": { "id": "thaw", "name": "Thaw", "kind": "passive", "text": "Burning a frozen enemy deals a big burst of damage", "grants": ["Combo.Thaw"] },
+      "at50": { "id": "balance", "name": "Balance", "kind": "passive", "text": "Heat and Chill fill each other as you use them", "grants": ["Combo.Balance"] },
+      "requiresAbility": null
+    },
+    {
+      "paths": ["fire", "lightning"],
+      "at25": { "id": "plasma", "name": "Plasma", "kind": "passive", "text": "Fire on shocked enemies arcs as burning lightning", "grants": ["Combo.Plasma"],
+        "numbers": { "radius": 500, "targets": 1, "damageShare": 0.5, "burn": 30 } },
+      "at50": { "id": "meltdown", "name": "Meltdown", "kind": "passive", "text": "Overheat explosions chain lightning to every enemy they hit", "grants": ["Combo.Meltdown"], "requires": "fire.overheat",
+        "numbers": { "damage": 20, "shock": 40, "jumps": 1, "jumpRadius": 500 } },
+      "requiresAbility": "fire.overheat"
+    },
+    {
+      "paths": ["frost", "lightning"],
+      "at25": { "id": "brittle_shock", "name": "Brittle shock", "kind": "passive", "text": "Shocks on frozen enemies shatter them", "grants": ["Combo.BrittleShock"],
+        "numbers": { "damage": 30, "stanceMult": 2 } },
+      "at50": { "id": "blizzard_storm", "name": "Blizzard storm", "kind": "passive", "text": "Lightning strikes inside your blizzard", "grants": ["Combo.BlizzardStorm"], "requires": "frost.blizzard",
+        "numbers": { "every": 1.5, "damage": 25, "shock": 40, "tell": 1.0, "radius": 250 } },
+      "requiresAbility": "frost.blizzard"
+    }
+  ]
+}

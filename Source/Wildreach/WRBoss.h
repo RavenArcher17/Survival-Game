@@ -179,6 +179,8 @@ UCLASS()
 class WILDREACH_API AWRBoss : public AWRCreature
 {
 	GENERATED_BODY()
+	// The Storm peaks bosses' own mechanics drive this machine (WRStormBosses).
+	friend struct FWRStormBoss;
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

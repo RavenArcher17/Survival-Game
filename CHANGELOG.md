@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased: Storm peaks, the Lightning land (the first land off the Old Island) and the Lightning path
+
+Aaron (lane build-biome-lightning: requirement ledger, research and plan in showcase-notes cooks/build-biome-lightning.md,
+building cooks/biome-lightning.md). Built to compile (editor, adaptive build); not played here (Aaron and the testers
+test, F8).
+
+- **The land.** A second landscape north of the island (`Landscape_StormPeaks`, 4 km square at 2 m) across the Ash
+  Sound, joined by the north-west neck: the Wind Passes' grass coast and three valleys, the slate benches of the Cliff
+  Paths, three slot gorges with the Bridge of Nine Spans over the Thundergorge, Galvara's needle, the Struck Crags and
+  the Rodfield, the Hanging Monastery's ledges, the Ring terrace at 900 m and the Spire at 1,630 m with the Last Stair
+  spiralling to Kharvox's nest; Stormgut's west mouth. Made by `Tools/terrain/storm_peaks.mjs` (landmark heights from the
+  cook, the Rodwardens' graded roads and stairs carved last so every route walks), material `M_StormAuto` (grass, slate
+  scree, granite with ochre lichen, snow in high hollows, sand by the Desert rib, slate/granite cliffs projected
+  sideways), imported by `Tools/terrain/build_storm.ps1`. The sea, the swimming water, the wildlife walk map and the
+  journal map now cover both lands.
+- **What stands on it** (`WRStormWorld.cpp`, all from `Data/storm_peaks.json`): the ten landmarks (the Bell Rod with its
+  guy chains and bell-cages, Strikerock's glass-faced split and Vesna's camp, the Thunderstone Arch with its hanging
+  axe-head on copper chains, Galvara's Eyrie and its banner cloud, the Copperfall's green fall and pools, the Glass Scar,
+  the Hanging Monastery's whitewashed cells and chain walks, the Storm Mill, the Summit Nest of pine trunks and stolen
+  rods, the Lightning pillar on the Ring), 30 hand sites (camps with their wrecks, the Feeding Stones, the Melted Cell,
+  the kitchens' winch, the Stormgut fort with Coven hooks, the Burnt Drake, the Rust Pools, the Struck Climbers, the
+  Rams' Ring, the Bellwether's fold, the Warden Door...), 99 kit POIs (bidental rings, fulgurite fields, copper and tin
+  outcrops, basking rocks, folds, tarns, waystations, kite roosts, mound fields, kill scenes, struck pines) and 228
+  Rodwarden rods (waymarks every 150 m, the Rodfield's 176). Six rope bridges with real planks: rotten ones creak and
+  go, anyone can lay a new plank (2 wood), gaps mend in 2 game days. Caves (the Copper Adit, the Halite Cave's pink rock
+  salt, Thundergorge Grotto), site caches, 12,000 pines, boulders, scree and shrubs. Night lights, storm glow.
+- **Lightning** (`WRStorm::CallStrike`): above 600 m in a Thunderstorm the storm picks the highest body in each 60 m cell
+  (heavy armour x1.25, Stormweave x0.85; Grounded, a grounding charm or the Grounding salve only if nobody else is
+  there, a Rodcrest within 30 m draws it): 3 s of body tell (your hair lifts, St Elmo's fire on your hands and head, a
+  rising buzz), 1 s of violet ground glow with the stepped leader crawling down, then the stroke on the spot (never
+  following you): 60 damage and a stun, a ground current on wet ground (jump it), thunder after the distance, rods
+  within 3 m taking it, fulgurite left on granite and sand. The compass shows your height and turns violet where
+  strikes can find you. Gusts on the marked cliff paths and the Last Stair (brace with Block, crouch), rockfall under
+  overhangs, ball lightning on the Crags in storms, stormglass after every storm (fields refill, the Rodfield's rod
+  feet, the Glass Scar glows 2 game hours).
+- **Creatures** (9: Voltfang, Thunderhorn, Stormkite, Raiju, Cragstrider, Galeback, Coilburrow, Rodcrest, Puffram) with
+  every attack row of the cook, their storm behaviour, living-world beats, drops and tame uses; **minis** the
+  Bellwether (roaming with his herd, the bell part, charge into rock), Galvara (three shootable cloud cores, the drop,
+  retaking the sky), Coilback (rings along the copper veins, metal-seeking, frost slows it); **Kharvox, the Storm Roc**
+  (Charge on its feathers, bleed and curse counters, wing parts, bone drop, rod chain, eye bolts with stepped leaders,
+  the Thunderclap, called strikes with rod shadow, the hidden eye of the storm) at the Summit Nest with its altar.
+  Bodies are the nearest existing rigs retinted with code-built parts (sculpts need the art PC).
+- **Shrines, Vesna Groza and her quests.** The Great Shrine of Strikerock and four lesser shrines (copper rod-tip
+  braziers; the Glass Scar's gains a Raiju in storms); Vesna at her climbers' camp with seven summit quests (Glass, the
+  rod-road, Hair on end, Nine spans with the winch-hut lanterns, Banner, the bell, the Crown) and her Unlearning line.
+- **The Great Storm** (world event): warning, the Front, forty minutes of strikes everywhere in the peaks (faster above
+  600 m, never in claims or camps), ball lightning, war drums over the music, fulgurite x3 after.
+- **The Lightning path** (all 22 nodes, Charge, Grounded, procs, Fire+Lightning and Frost+Lightning combos; path files
+  drive the main menu's path picker and the UI's path colours).
+- **Sound and music**: real compositions and recordings (CC0 / CC-BY, `Docs/CREDITS.md`): Storm pools for explore, night,
+  combat, the minis, Kharvox, the monastery, the camps, Stormgut and the Great Storm; ten creature voice families; 23
+  storm events; eleven ambient beds by sub-zone (the Rodfield's aeolian harp).
+- **Items and recipes**: storm essence, thunderstone, every creature material, trophies and the Crown Plume talisman,
+  the Stormheart (every fifth hit chains), Grounding salve (a timed buff), stormglass arrows, the Rodwarden spear, rock
+  salt, lore items. Deeds, artifacts and the portal row now use the land's real id (`storm_peaks`).
+- Fixes found on the way: `rescueTraceTop` raised to 2,000 m (the Spire is taller than 1,500 m); world settling traces
+  from 2,000 m; a unity-build name clash in `WRGameMode.cpp`.
+
 ## Unreleased: the endgame (prestige, the Heron's draught, soul forging, mythic rules, boards, deeds, titles, cosmetics, monuments, the Thaw Hall raid)
 
 Aaron (lane build-endgame: research, requirement ledger and plan in showcase-notes cooks/build-endgame.md, following

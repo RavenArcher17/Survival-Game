@@ -19,7 +19,8 @@
     "rimeshell": 300,
     "glacimaw": 300,
     "rimeclaw": 350,
-    "floeback": 450
+    "floeback": 450,
+    "voltfang": 500, "thunderhorn": 650, "stormkite": 450, "raiju": 300, "cragstrider": 500, "galeback": 700, "coilburrow": 300, "rodcrest": 300, "puffram": 450
   },
   "regions": [
     {
@@ -138,7 +139,12 @@
       "night": {
         "rimeclaw": 6
       }
-    }
+    },
+    {"id":"storm_lowland","name":"Storm peaks lowland","side":"storm_peaks","band":"lowland","zones":"12","target":60,"creatures":{"puffram":12,"rodcrest":8},"night":{"puffram":10,"rodcrest":6}},
+    {"id":"storm_midland_passes","name":"Storm peaks passes and cliff paths","side":"storm_peaks","band":"midland","zones":"12","target":55,"creatures":{"galeback":8,"voltfang":6,"coilburrow":5,"cragstrider":4,"stormkite":3},"raiders":{"voltfang":2},"night":{"voltfang":10,"galeback":6,"coilburrow":5,"cragstrider":4,"stormkite":3},"storm":{"voltfang":8,"galeback":6,"stormkite":4}},
+    {"id":"storm_midland_gorges","name":"Storm peaks bridges and crags","side":"storm_peaks","band":"midland","zones":"34","target":40,"creatures":{"stormkite":8,"cragstrider":6,"coilburrow":2},"raiders":{"stormkite":1,"voltfang":1},"night":{"voltfang":8,"stormkite":6,"cragstrider":6},"storm":{"stormkite":8,"voltfang":4}},
+    {"id":"storm_highland","name":"Storm peaks heights","side":"storm_peaks","band":"highland","zones":"245","target":14,"creatures":{"thunderhorn":6},"raiders":{"thunderhorn":1},"night":{"thunderhorn":6},"storm":{"thunderhorn":4,"raiju":3}}
   ],
+  "_storm": "Storm peaks regions (cooks/biome-lightning.md 2.9 Where): side storm_peaks, zones = the Storm peaks sub-zone letters they live in (storm_peaks.json zones: 1 Wind Passes, 2 Cliff Paths, 3 Rope Bridges, 4 Struck Crags, 5 Cliff Shrines), storm = the table while a Thunderstorm is on (the Raiju only comes then).",
   "_night": "night: the region's table after dusk (cooks/build-world-systems.md 2.9, fire-frost 3.3.7 / 3.4.7). A kind only in creatures (the day table) lies up at night; a kind only in night lies up by day (its pack isn't brought out near players); a kind in both is out at all hours. New packs roll from the table of the hour. A whiteout runs the night table by day (world.json events)."
 }

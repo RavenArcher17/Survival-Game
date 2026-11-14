@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRStormTypes.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -79,6 +80,15 @@ FWRItemRegistry::FWRItemRegistry()
 				if ((*Use)->TryGetArrayField(TEXT("cures"), Cures))
 				{
 					for (const TSharedPtr<FJsonValue>& C : *Cures) D.Cures.Add(FName(*C->AsString()));
+				}
+				const TSharedPtr<FJsonObject>* Buff = nullptr;
+				if ((*Use)->TryGetObjectField(TEXT("buff"), Buff))
+				{
+					FString BuffStr;
+					if ((*Buff)->TryGetStringField(TEXT("id"), BuffStr)) D.BuffId = FName(*BuffStr);
+					double Minutes = 10.0;
+					(*Buff)->TryGetNumberField(TEXT("minutes"), Minutes);
+					D.BuffMinutes = float(Minutes);
 				}
 			}
 			const TSharedPtr<FJsonObject>* Equip = nullptr;
@@ -1086,6 +1096,7 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 		{
 			C->Status->CureStatus(WRStatus::FromName(Cure));
 		}
+		if (!D->BuffId.IsNone()) WRStorm::GrantBuff(C, D->BuffId, D->BuffMinutes * 60.f);
 		WRFx::BroadcastOn(C, TEXT("potion.heal"), NAME_None, 1.f, NAME_None, 0.5f);
 	}), T.Num(TEXT("potions.healAt"), 0.5f) * Drink / FMath::Max(0.1f, DrinkSeconds), false);
 	UE_LOG(LogWildreach, Log, TEXT("ITEM %s drinks %s (%d left)"), *Character->GetName(), *Id.ToString(), CountOf(Id));

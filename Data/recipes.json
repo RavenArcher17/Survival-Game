@@ -360,7 +360,12 @@
     { "id": "powder_charge", "station": "workbench", "level": 3, "inputs": { "black_powder": 4, "bronze_ingot": 2, "wood": 2, "fiber": 2 }, "output": "powder_charge", "count": 1, "seconds": 6 },
     { "id": "mining_charge", "station": "workbench", "level": 3, "inputs": { "black_powder": 2, "clay": 1, "hide": 1 }, "output": "mining_charge", "count": 1, "seconds": 3 },
     { "id": "siege_ladder", "station": "workbench", "level": 3, "inputs": { "wood": 20, "rope": 6, "iron_ingot": 1 }, "output": "siege_ladder", "count": 1, "seconds": 6 },
-    { "id": "code_breaker", "station": "workbench", "level": 4, "inputs": { "steel_plate": 2, "resonant_crystal": 1, "bronze_ingot": 2 }, "output": "code_breaker", "count": 1, "seconds": 8, "biome": "crystal" }
+    { "id": "code_breaker", "station": "workbench", "level": 4, "inputs": { "steel_plate": 2, "resonant_crystal": 1, "bronze_ingot": 2 }, "output": "code_breaker", "count": 1, "seconds": 8, "biome": "crystal" },
+    {"id": "grounding_salve", "station": "alchemy_table", "level": 1, "inputs": {"copper_scale": 2, "resin": 2, "rock_salt": 1}, "output": "grounding_salve", "count": 1, "seconds": 5, "biome": "storm_peaks", "blueprint": "quest_grounding_salve"},
+    {"id": "shock_resist_potion", "station": "alchemy_table", "level": 2, "inputs": {"gentian": 1, "stormglass": 1, "slimeshell_slime": 1}, "output": "shock_resist_potion", "count": 1, "seconds": 6, "biome": "storm_peaks", "waitsFor": "swamp"},
+    {"id": "stormglass_arrow", "station": "workbench", "level": 2, "inputs": {"stormglass": 1, "wood": 1, "stormkite_feather": 1}, "output": "stormglass_arrow", "count": 4, "seconds": 4, "biome": "storm_peaks", "blueprint": "quest_stormglass_arrow"},
+    {"id": "rodwarden_spear", "station": "forge", "level": 2, "inputs": {"copper_ingot": 6, "wood": 4, "thunderstone": 1}, "output": "rodwarden_spear", "count": 1, "seconds": 12, "biome": "storm_peaks"},
+    {"id": "talisman_crown_plume", "station": "armorer", "level": 1, "inputs": {"trophy_crown_plume": 1, "copper_ingot": 2}, "output": "talisman_crown_plume", "count": 1, "seconds": 6, "biome": "storm_peaks"}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

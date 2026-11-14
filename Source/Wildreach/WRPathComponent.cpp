@@ -14,6 +14,7 @@
 #include "GameFramework/PlayerState.h"
 #include "WRLifeSkills.h"
 #include "WRCombatLibrary.h"
+#include "WRCombos.h"
 #include "Misc/CommandLine.h"
 #include "Net/UnrealNetwork.h"
 
@@ -567,10 +568,16 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		GrantedTags.AddTag(WRTags::Passive_Permafrost);
 		GrantedTags.AddTag(WRTags::Resist_Ice);
 	}
-	const bool bFireFrost = (MainPath == TEXT("fire") && SubPath == TEXT("frost")) || (MainPath == TEXT("frost") && SubPath == TEXT("fire"));
-	const int32 Low = FMath::Min(GetSpent(MainPath), GetSpent(SubPath));
-	if (bFireFrost && Low >= 25) GrantedTags.AddTag(WRTags::Combo_Thaw);
-	if (bFireFrost && Low >= 50) GrantedTags.AddTag(WRTags::Combo_Balance);
+	else if (MainPath == TEXT("lightning"))
+	{
+		// Grounded (cooks/biome-lightning.md 2.18.3): no stun or stagger from lightning; storm strikes deal half.
+		GrantedTags.AddTag(WRTags::Passive_Grounded);
+	}
+	// Path combos for the main / sub pair (Data/combos.json: Thaw, Balance, Plasma, Meltdown, Brittle shock, Blizzard storm).
+	for (const FGameplayTag& Tag : FWRComboRegistry::Get().TagsFor(*this))
+	{
+		GrantedTags.AddTag(Tag);
+	}
 	for (const FGameplayTag& Tag : GrantedTags)
 	{
 		ASC->SetLooseGameplayTagCount(Tag, 1, EGameplayTagReplicationState::TagOnly);
@@ -587,6 +594,8 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		(WRTune(TEXT("resources.heatMax"), 100.f) + WRTune(TEXT("resources.heatCapacityPerRank"), 15.f) * RankIn(TEXT("fire"), TEXT("heat_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("fire")));
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChillAttribute(),
 		(WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("frost")));
+	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChargeAttribute(),
+		(WRTune(TEXT("resources.chargeMax"), 100.f) + WRTune(TEXT("resources.chargeCapacityPerRank"), 15.f) * RankIn(TEXT("lightning"), TEXT("charge_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("lightning")));
 
 	// Tempered: more poise.
 	// Reinforced (armorcraft perk) adds to the path nodes' poise.

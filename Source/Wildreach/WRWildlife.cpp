@@ -1,4 +1,5 @@
 #include "WRWildlife.h"
+#include "WRStormTypes.h"
 #include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
@@ -96,6 +97,9 @@ namespace WRWildlifeImpl
 			return true;
 		}
 
+		/** A cell north of the Old Island's frame: the continent's new land (Storm peaks), not the island. */
+		static bool IsNorthLand(const FVector2D& At) { return At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f); }
+
 		const FRange& RangeOf(const FWRCreatureDef& Def)
 		{
 			if (const FRange* Found = Ranges.Find(Def.Id))
@@ -106,6 +110,7 @@ namespace WRWildlifeImpl
 			R.Allowed.Init(false, N * N);
 			const bool bFlyer = Def.Archetype == TEXT("flyer");
 			const bool bVolcanic = Def.Biome == TEXT("volcanic");
+			const bool bIslandKind = Def.Biome == TEXT("volcanic") || Def.Biome == TEXT("tundra") || Def.Biome.IsNone();
 			const FVector2D* BandOf = Bands.Find(Def.Tier);
 			const FVector2D Band = BandOf ? *BandOf : FVector2D(0.0, 1.0e7);
 			const float* GapOf = CampGaps.Find(Def.Behavior);
@@ -123,9 +128,14 @@ namespace WRWildlifeImpl
 					continue;
 				}
 				const FVector2D At = Centre(i);
-				if (bVolcanic != (At.X < 0.0) || FMath::Abs(At.X) < Band.X || FMath::Abs(At.X) > Band.Y)
+				if (bIslandKind)
 				{
-					continue;
+					if (IsNorthLand(At) || bVolcanic != (At.X < 0.0) || FMath::Abs(At.X) < Band.X || FMath::Abs(At.X) > Band.Y) continue;
+				}
+				else
+				{
+					// A new land's kind lives anywhere on its own land; its spawn regions choose the sub-zones.
+					if (!IsNorthLand(At) || WRStorm::ZoneAt(nullptr, FVector(At, 0.f)) == 0 || WRStorm::ZoneAt(nullptr, FVector(At, 0.f)) == TCHAR('e')) continue;
 				}
 				if (Camps.ContainsByPredicate([&At, GapSq](const FVector2D& Camp) { return FVector2D::DistSquared(Camp, At) < GapSq; }))
 				{
@@ -338,6 +348,13 @@ namespace WRWildlifeImpl
 	{
 		FName Id;
 		bool bVolcanic = true;
+		/** Its land: volcanic, tundra or a new land's id (storm_peaks). */
+		FName Side;
+		/** A new land's region: its sub-zone letters (Data/storm_peaks.json zones), empty = all of the land. */
+		FString Zones;
+		/** The storm table (spawn_regions.json storm): what comes out while a Thunderstorm is on (the Raiju). */
+		TArray<TPair<const FWRCreatureDef*, float>> StormKinds;
+		float StormWeight = 0.f;
 		FName Band;
 		FBox2D Area = FBox2D(ForceInit);   // not valid: the whole band
 		float Target = 0.f;                // animals, before the world's creature numbers
@@ -651,6 +668,14 @@ namespace WRWildlifeImpl
 	/** Is this cell centre in the region (its side, its band, its box)? */
 	bool InRegion(const FRegion& R, const FVector2D& At)
 	{
+		if (R.Side != TEXT("volcanic") && R.Side != TEXT("tundra"))
+		{
+			if (!FWalkMap::IsNorthLand(At)) return false;
+			const TCHAR Z = WRStorm::ZoneAt(nullptr, FVector(At, 0.f));
+			if (Z == 0 || (!R.Zones.IsEmpty() && !R.Zones.Contains(FString::Chr(Z)))) return false;
+			return !R.Area.bIsValid || R.Area.IsInside(At);
+		}
+		if (FWalkMap::IsNorthLand(At)) return false;
 		const FVector2D* Band = Map().Bands.Find(R.Band);
 		if (R.bVolcanic != (At.X < 0.0) || (Band && (FMath::Abs(At.X) < Band->X || FMath::Abs(At.X) > Band->Y)))
 		{
@@ -687,7 +712,9 @@ namespace WRWildlifeImpl
 			if (!O.IsValid()) continue;
 			FRegion R;
 			R.Id = FName(*O->GetStringField(TEXT("id")));
-			R.bVolcanic = O->GetStringField(TEXT("side")) != TEXT("tundra");
+			R.Side = FName(*O->GetStringField(TEXT("side")));
+			R.bVolcanic = R.Side != TEXT("tundra");
+			O->TryGetStringField(TEXT("zones"), R.Zones);
 			R.Band = FName(*O->GetStringField(TEXT("band")));
 			R.Target = O->GetNumberField(TEXT("target"));
 			const TArray<TSharedPtr<FJsonValue>>* Box = nullptr;
@@ -698,10 +725,14 @@ namespace WRWildlifeImpl
 			}
 			const TSharedPtr<FJsonObject>* Weights = nullptr;
 			const TSharedPtr<FJsonObject>* NightWeights = nullptr;
+			const TSharedPtr<FJsonObject>* StormWeights = nullptr;
 			O->TryGetObjectField(TEXT("night"), NightWeights);
-			for (int32 Table = 0; Table < 2; ++Table)
+			O->TryGetObjectField(TEXT("storm"), StormWeights);
+			for (int32 Table = 0; Table < 3; ++Table)
 			{
-			if (Table == 0 ? O->TryGetObjectField(TEXT("creatures"), Weights) : (NightWeights != nullptr && (Weights = NightWeights) != nullptr))
+			if (Table == 0 ? O->TryGetObjectField(TEXT("creatures"), Weights)
+				: Table == 1 ? (NightWeights != nullptr && (Weights = NightWeights) != nullptr)
+				: (StormWeights != nullptr && (Weights = StormWeights) != nullptr))
 			{
 				for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Weights)->Values)
 				{
@@ -733,6 +764,11 @@ namespace WRWildlifeImpl
 						R.Kinds.Add({ Def, Weight });
 						R.TotalWeight += Weight;
 						R.DayIds.Add(Def->Id);
+					}
+					else if (Table == 2)
+					{
+						R.StormKinds.Add({ Def, Weight });
+						R.StormWeight += Weight;
 					}
 					else
 					{
@@ -780,9 +816,18 @@ namespace WRWildlifeImpl
 	AWRCreatureSpawner* SpawnIn(UWorld* World, const FRegion& R, const TArray<FVector2D>& Players, const TArray<FVector2D>& Buildings)
 	{
 		// The table of the hour (a whiteout runs the night table by day: WRWorld::IsNightTable).
-		const bool bNightTable = R.NightKinds.Num() > 0 && WRWorld::IsNightTable(World, R.bVolcanic ? FName(TEXT("volcanic")) : FName(TEXT("tundra")));
-		const TArray<TPair<const FWRCreatureDef*, float>>& Table = bNightTable ? R.NightKinds : R.Kinds;
-		float Roll = FMath::FRand() * (bNightTable ? R.NightWeight : R.TotalWeight);
+		const bool bNightTable = R.NightKinds.Num() > 0 && WRWorld::IsNightTable(World, R.Side);
+		// While a Thunderstorm is on, a storm table's kinds come out too, by their weights over the hour's table
+		// (Storm peaks: the Raiju hunt only in storms; DC 2.9).
+		bool bStormPick = false;
+		if (R.StormKinds.Num() > 0 && R.CellsOf.Num() > 0)
+		{
+			const TArray<int32>& Any = R.CellsOf.CreateConstIterator().Value();
+			const FVector2D Probe = Any.Num() ? Map().Centre(Any[0]) : FVector2D::ZeroVector;
+			bStormPick = WRStorm::InStorm(World, FVector(Probe, 0.f)) && FMath::FRand() < R.StormWeight / (R.StormWeight + (bNightTable ? R.NightWeight : R.TotalWeight));
+		}
+		const TArray<TPair<const FWRCreatureDef*, float>>& Table = bStormPick ? R.StormKinds : bNightTable ? R.NightKinds : R.Kinds;
+		float Roll = FMath::FRand() * (bStormPick ? R.StormWeight : bNightTable ? R.NightWeight : R.TotalWeight);
 		const FWRCreatureDef* Def = Table.Last().Key;
 		for (const TPair<const FWRCreatureDef*, float>& K : Table)
 		{
@@ -926,7 +971,22 @@ FName WRWildlife::RaidersAt(const FVector2D& At, TArray<TPair<FName, float>>& Ou
 	for (const TSharedPtr<FJsonValue>& V : *List)
 	{
 		const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
-		if (!O.IsValid() || (O->GetStringField(TEXT("side")) != TEXT("tundra")) != (At.X < 0.0))
+		if (!O.IsValid()) continue;
+		const FString Side = O->GetStringField(TEXT("side"));
+		const bool bIslandRegion = Side == TEXT("volcanic") || Side == TEXT("tundra");
+		if (bIslandRegion == FWalkMap::IsNorthLand(At)) continue;
+		if (!bIslandRegion)
+		{
+			// A north land's region: in it (its zones) or not at all.
+			FString Zones;
+			O->TryGetStringField(TEXT("zones"), Zones);
+			const TCHAR Z = WRStorm::ZoneAt(nullptr, FVector(At, 0.f));
+			if (Z == 0 || (!Zones.IsEmpty() && !Zones.Contains(FString::Chr(Z)))) continue;
+			Best = O;
+			BestGap = 0.0;
+			break;
+		}
+		if ((Side != TEXT("tundra")) != (At.X < 0.0))
 		{
 			continue;
 		}

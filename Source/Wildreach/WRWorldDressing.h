@@ -199,6 +199,9 @@ public:
 	UPROPERTY(Replicated) FName Biome = TEXT("volcanic");
 	/** Which sculpted cave (CaveA..C); the dressing file picks the one that fits the ground (-1: by position). */
 	UPROPERTY(Replicated) int32 Variant = -1;
+	/** A named cave's character (Storm peaks: halite = the Halite Cave's pink salt and rock salt, adit = the Copper
+	 *  Adit's copper and iron, grotto = Thundergorge's wet tin and copper). None: the biome's usual cave. */
+	UPROPERTY(Replicated) FName Theme;
 
 protected:
 	virtual void BeginPlay() override;

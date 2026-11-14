@@ -1,4 +1,6 @@
 #include "WRAbilities.h"
+#include "WRAbilitiesLightning.h"
+#include "WRLightningPath.h"
 #include "WRDeeds.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
@@ -174,7 +176,10 @@ void UWRGameplayAbility::ApplyCost(const FGameplayAbilitySpecHandle Handle, cons
 
 float UWRGameplayAbility::GetCooldownSeconds() const
 {
-	return CooldownKey.IsEmpty() ? CooldownFallback : FWRTuning::Get().Num(CooldownKey, CooldownFallback);
+	const float Seconds = CooldownKey.IsEmpty() ? CooldownFallback : FWRTuning::Get().Num(CooldownKey, CooldownFallback);
+	// Rapid fire (lightning node): at high Charge path spells come back sooner (not Wildbrands; the CDO has no avatar).
+	const AActor* Avatar = CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr;
+	return Avatar && !PathId.IsNone() && !IsA<UWRGA_Melee>() ? Seconds * WRLightning::SpellCooldownScale(Avatar) : Seconds;
 }
 
 float UWRGameplayAbility::GetCooldownRemaining() const
@@ -514,6 +519,11 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Variant = uint8(FMath::Clamp(Move->Clip, 0, 7));
 		CostOverride = Move->Stamina;
 		bJumpSwing = Move->Context == TEXT("air");
+		// Rapid fire (lightning node): at high Charge light and heavy swings play faster (the same on the owner and server).
+		const float Rate = WRLightning::SwingRate(Character);
+		Windup /= Rate;
+		Active /= Rate;
+		Recovery /= Rate;
 	}
 	else if (!ArtKey.IsEmpty())
 	{
@@ -2481,7 +2491,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 {
 	static const TSet<FName> Passives = {
 		TEXT("spreading_flames"), TEXT("fuel_the_fire"), TEXT("wildfire"), TEXT("explosive_bolt"), TEXT("searing_parry"),
-		TEXT("brittle"), TEXT("cold_return"), TEXT("chain_shatter"), TEXT("cold_riposte"), TEXT("frozen_moment"), TEXT("overheat"), TEXT("whiteout") };
+		TEXT("brittle"), TEXT("cold_return"), TEXT("chain_shatter"), TEXT("cold_riposte"), TEXT("frozen_moment"), TEXT("overheat"), TEXT("whiteout"),
+		// Lightning (WRLightningPath.cpp): Conductive, Afterimage, Rapid fire, Discharge.
+		TEXT("conductive"), TEXT("afterimage"), TEXT("rapid_fire"), TEXT("discharge") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2512,6 +2524,20 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("flurry")) return UWRGA_Flurry::StaticClass();
 		if (NodeId == TEXT("ice_wall")) return UWRGA_IceWall::StaticClass();
 		if (NodeId == TEXT("blizzard")) return UWRGA_Blizzard::StaticClass();
+	}
+	else if (PathId == TEXT("lightning"))
+	{
+		// The Lightning path (WRAbilitiesLightning.cpp, cooks/biome-lightning.md 2.18.3).
+		if (NodeId == TEXT("spark")) return UWRGA_Spark::StaticClass();
+		if (NodeId == TEXT("static_strike")) return UWRGA_StaticStrike::StaticClass();
+		if (NodeId == TEXT("chain_lightning")) return UWRGA_ChainLightning::StaticClass();
+		if (NodeId == TEXT("thunderclap")) return UWRGA_Thunderclap::StaticClass();
+		if (NodeId == TEXT("tempest")) return UWRGA_Tempest::StaticClass();
+		if (NodeId == TEXT("bolt_dash")) return UWRGA_BoltDash::StaticClass();
+		if (NodeId == TEXT("lightning_step")) return UWRGA_LightningStep::StaticClass();
+		if (NodeId == TEXT("charged_weapon")) return UWRGA_ChargedWeapon::StaticClass();
+		if (NodeId == TEXT("static_field")) return UWRGA_StaticField::StaticClass();
+		if (NodeId == TEXT("thunder_god")) return UWRGA_ThunderGod::StaticClass();
 	}
 	return nullptr;
 }

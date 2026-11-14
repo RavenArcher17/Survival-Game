@@ -17,6 +17,8 @@
 #include "WRCrafting.h"
 #include "WRFx.h"
 #include "WRSound.h"
+#include "WRLightningPath.h"
+#include "WRStormTypes.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
@@ -270,6 +272,11 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 		if (Id == WRStatus::Shock) Amount *= WRStatus::Def(WRStatus::Soak, TEXT("shockBuildup"), 1.5f);
 		if (Id == WRStatus::Frost) Amount *= WRStatus::Def(WRStatus::Soak, TEXT("frostBuildup"), 1.5f);
 	}
+	// The shock-resist potion (Storm peaks): shock builds slower while it lasts.
+	if (Id == WRStatus::Shock && WRStorm::HasBuff(GetOwner(), TEXT("shock_ward")))
+	{
+		Amount *= WRTune(TEXT("storm.shockWardMult"), 0.5f);
+	}
 	// Worn gear (cooks/build-crafting.md 2.5-2.6): a biome set's two pieces halve its land's status (Forgeplate burn,
 	// Rimeguard frostbite), talismans take some off (Hex mask curse): gear.json / items.json buildupTaken.<status>.
 	if (Owner->GetPlayerState())
@@ -424,6 +431,12 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() - Def(Shock, TEXT("playerStamina"), 20.f));
 			NotifyStaminaUsed();
 		}
+		// Brittle shock (Frost + Lightning combo): a shock on a frozen body shatters it.
+		WRLightning::OnShockProc(Owner, Source);
+		if (!Owner->IsAlive())
+		{
+			break;
+		}
 		// The arc: a share of the blow jumps to up to two others close by.
 		const float Chain = HitDamage * Def(Shock, TEXT("chainShare"), 0.25f);
 		int32 Left = FMath::RoundToInt(Def(Shock, TEXT("chainTargets"), 2.f));
@@ -479,6 +492,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		const float Loss = Def(Curse, TEXT("resourceLoss"), 0.25f);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), Attr->GetHeat() - Attr->GetMaxHeat() * Loss);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), Attr->GetChill() - Attr->GetMaxChill() * Loss);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChargeAttribute(), Attr->GetCharge() - Attr->GetMaxCharge() * Loss);
 		ApplyStatus(WRTags::Status_Curse, Def(Curse, TEXT("seconds"), 15.f));
 		break;
 	}
@@ -522,6 +536,7 @@ void UWRStatusComponent::NotifyResourceGained(const FGameplayTag& Element)
 {
 	if (Element == WRTags::Element_Fire) SinceHeatGain = 0.f;
 	else if (Element == WRTags::Element_Frost) SinceChillGain = 0.f;
+	else if (Element == WRTags::Element_Lightning) SinceChargeGain = 0.f;
 }
 
 bool UWRStatusComponent::IsDeprived() const
@@ -730,6 +745,7 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		|| ASC->HasMatchingGameplayTag(WRTags::State_Charging) || ASC->HasMatchingGameplayTag(WRTags::State_Drinking);
 	SinceHeatGain += DeltaTime;
 	SinceChillGain += DeltaTime;
+	SinceChargeGain += DeltaTime;
 
 	// The fast stroke in the water costs its own stamina (Strong stroke halves it, Seaborn makes it free).
 	const UCharacterMovementComponent* Move = Owner ? Owner->GetCharacterMovement() : nullptr;
@@ -801,6 +817,12 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	if (Attr->GetChill() > 0.f && SinceChillGain >= WRTune(TEXT("resources.chillDecayDelay"), 8.f))
 	{
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), Attr->GetChill() - WRTune(TEXT("resources.chillDecayPerSecond"), 2.f) * DeltaTime);
+	}
+	// Charge (the Lightning path) drains fast once you stop; Afterimage and Blizzard storm watch the survivor here.
+	WRLightning::TickCharge(Owner, SinceChargeGain, DeltaTime);
+	if (Owner->GetPlayerState())
+	{
+		WRLightning::TickOwner(Owner, DeltaTime);
 	}
 }
 

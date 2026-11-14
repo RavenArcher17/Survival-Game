@@ -114,7 +114,8 @@ void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& C
 	Hit = InHit;
 	TintColor = Color;
 	Movement->Velocity = GetActorForwardVector() * Speed;
-	TrailFx = InHit.Element == WRTags::Element_Fire ? FName(TEXT("fire.bolt")) : InHit.Element == WRTags::Element_Frost ? FName(TEXT("frost.shard")) : NAME_None;
+	TrailFx = InHit.Element == WRTags::Element_Fire ? FName(TEXT("fire.bolt")) : InHit.Element == WRTags::Element_Frost ? FName(TEXT("frost.shard"))
+		: InHit.Element == WRTags::Element_Lightning ? FName(TEXT("lightning.bolt")) : NAME_None;   // Spark (the Lightning path)
 	OnRep_Color();
 	OnRep_Fx();
 }

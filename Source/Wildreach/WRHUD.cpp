@@ -18,6 +18,7 @@
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
+#include "WRCombos.h"
 #include "WRPlayerController.h"
 #include "WRGameState.h"
 #include "WRPlayerUI.h"
@@ -207,6 +208,10 @@ void AWRHUD::DrawHUD()
 	{
 		DrawBar(TEXT("Chill"), A->GetChill(), A->GetMaxChill(), FLinearColor(0.55f, 0.85f, 1.f), X, Y); Y += BarSpacing;
 	}
+	if (Paths && Paths->IsActivePath(TEXT("lightning")))
+	{
+		DrawBar(TEXT("Charge"), A->GetCharge(), A->GetMaxCharge(), FLinearColor(FColor(0xB9, 0xA7, 0xFF)), X, Y); Y += BarSpacing;
+	}
 	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
 	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 
@@ -261,8 +266,14 @@ void AWRHUD::DrawHUD()
 					Paths->GetSpent(PathId), Paths->GetEarned(PathId));
 			}
 		}
-		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Thaw)) Line += TEXT("[Thaw] ");
-		if (ASC && ASC->HasMatchingGameplayTag(WRTags::Combo_Balance)) Line += TEXT("[Balance] ");
+		// The pair's combos the survivor owns (Data/combos.json).
+		for (const FWRComboPair& Pair : FWRComboRegistry::Get().All())
+		{
+			for (const FWRComboLevel& Combo : Pair.Levels)
+			{
+				if (ASC && Combo.Grants.Num() > 0 && ASC->HasMatchingGameplayTag(Combo.Grants[0])) Line += FString::Printf(TEXT("[%s] "), *Combo.Name);
+			}
+		}
 		DrawText(Line, FLinearColor::White, 24.f, 48.f);
 	}
 	DrawText(TEXT("WASD  Mouse  LMB light  R heavy  RMB block/parry  C dodge  Tab lock-on  1-8 abilities  Q/Z/X potion/eat/drink  E interact  I inventory  P paths  K skills  B build  M map  T chat  V view  G ranged weapon"),

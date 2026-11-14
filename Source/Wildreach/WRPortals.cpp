@@ -80,7 +80,8 @@ namespace WRPortalsSys
 	{
 		static const TMap<FString, FName> M = {
 			{ TEXT("volcanic.lowland"), TEXT("cinderfang") }, { TEXT("volcanic.midland"), TEXT("basaltback") }, { TEXT("volcanic.highland"), TEXT("magmaw") },
-			{ TEXT("tundra.lowland"), TEXT("gloomhowl") }, { TEXT("tundra.midland"), TEXT("frostantler") }, { TEXT("tundra.highland"), TEXT("rimeclaw") } };
+			{ TEXT("tundra.lowland"), TEXT("gloomhowl") }, { TEXT("tundra.midland"), TEXT("frostantler") }, { TEXT("tundra.highland"), TEXT("rimeclaw") },
+			{ TEXT("storm_peaks.lowland"), TEXT("voltfang") }, { TEXT("storm_peaks.midland"), TEXT("voltfang") }, { TEXT("storm_peaks.highland"), TEXT("voltfang") } };
 		const FName* F = M.Find(Biome.ToString() + TEXT(".") + Band.ToString());
 		return F ? *F : NAME_None;
 	}
@@ -878,7 +879,7 @@ bool UWRPortalSystem::SpotOk(FName Biome, const FVector& At, int32 Rank, FString
 	const float Keep = WRPortals::Num(TEXT("slots.keepFrom"), 15000.f);
 	const auto Fail = [Why](const TCHAR* S) { if (Why) *Why = S; return false; };
 	// The ridge between the lands is where the passes run: never a portal on it.
-	if (FMath::Abs(At.X - WRTune(TEXT("sky.biomeCentre"), 0.f)) < 20000.f) return Fail(TEXT("pass"));
+	if (At.Y > WRTune(TEXT("world.islandNorthEdge"), -201600.f) && FMath::Abs(At.X - WRTune(TEXT("sky.biomeCentre"), 0.f)) < 20000.f) return Fail(TEXT("pass"));
 	for (TActorIterator<AWRClaimTotem> It(World); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < Keep + It->Radius) return Fail(TEXT("claim"));
 	for (TActorIterator<AWRShrine> It(World); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < Keep) return Fail(TEXT("shrine"));
 	for (TActorIterator<AWRVillage> It(World); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < Keep + It->Ring) return Fail(TEXT("village"));
@@ -907,14 +908,16 @@ bool UWRPortalSystem::FindSpot(FName Biome, int32 Rank, FVector& OutAt, float& O
 		if (As.IsNone()) return false;
 		// A point on the island on this side (the walk map's cells are 1 km wide at most: sample anywhere and ask it).
 		const float Side = Biome == TEXT("volcanic") ? -1.f : 1.f;
-		const FVector2D P(Side * FMath::FRandRange(10000.f, 260000.f), FMath::FRandRange(-200000.f, 200000.f));
+		// Storm peaks: anywhere in its landscape's frame (north of the island); the island's lands: their side of it.
+		const FVector2D P = Biome == TEXT("storm_peaks") ? FVector2D(FMath::FRandRange(-290000.f, 100000.f), FMath::FRandRange(-580000.f, -205000.f))
+			: FVector2D(Side * FMath::FRandRange(10000.f, 260000.f), FMath::FRandRange(-200000.f, 200000.f));
 		if (!WRWildlife::CanStand(As, P)) continue;
 		const FVector Probe(P, 0.f);
 		if (WRBiome::At(World, Probe) != Biome || !SpotOk(Biome, Probe, Rank, nullptr)) continue;
 		// The ground has to be here (streamed) and flat enough; if it isn't loaded yet, try another.
 		FHitResult Hit;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRPortalSpot), false);
-		if (!World->LineTraceSingleByChannel(Hit, FVector(P, 150000.f), FVector(P, -20000.f), ECC_WorldStatic, Q) || Cast<APawn>(Hit.GetActor())) continue;
+		if (!World->LineTraceSingleByChannel(Hit, FVector(P, 200000.f), FVector(P, -20000.f), ECC_WorldStatic, Q) || Cast<APawn>(Hit.GetActor())) continue;
 		if (Hit.ImpactPoint.Z < WRTune(TEXT("sea.level"), -20.f) + 200.f || Hit.ImpactNormal.Z < Slope) continue;
 		OutAt = Hit.ImpactPoint;
 		OutYaw = FMath::FRandRange(0.f, 360.f);

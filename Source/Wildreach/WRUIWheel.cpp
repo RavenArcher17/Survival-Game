@@ -10,6 +10,7 @@
 #include "WRCreature.h"
 #include "WRKeyBindings.h"
 #include "WRPathTypes.h"
+#include "WRPathLook.h"
 #include "WRTuning.h"
 #include "WRPlayerController.h"
 #include "Widgets/Images/SImage.h"
@@ -158,7 +159,7 @@ private:
 		if (Mode() == 2) return IsDanger(i) ? WRUI::Bad : WRUI::Brass;
 		TArray<FWRCastable> S;
 		const FWRCastable* C = Ability(i, S);
-		return C && C->Path == TEXT("frost") ? WRUI::Frost : WRUI::Ember;
+		return C ? WRPathLook::Color(C->Path) : WRUI::Ember;
 	}
 
 	TSharedRef<SWidget> Header()
@@ -252,7 +253,7 @@ private:
 		TArray<FWRCastable> S;
 		const FWRCastable* C = Ability(Hover() >= 0 ? Hover() : UI()->GetWheelPicked(Wheel()), S);
 		if (!C) return FText::GetEmpty();
-		return C->Cooldown > 0.f ? FText::FromString(FString::Printf(TEXT("Ready in %.1f s"), C->Cooldown)) : FText::FromString(C->Path == TEXT("frost") ? TEXT("Frost ability") : TEXT("Fire ability"));
+		return C->Cooldown > 0.f ? FText::FromString(FString::Printf(TEXT("Ready in %.1f s"), C->Cooldown)) : FText::FromString(WRPathLook::Name(C->Path) + TEXT(" ability"));
 	}
 	FText CentreBody() const
 	{

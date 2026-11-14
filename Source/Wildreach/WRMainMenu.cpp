@@ -11,6 +11,8 @@
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRTuning.h"
+#include "WRPathLook.h"
+#include "WRPathTypes.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Character.h"
@@ -213,19 +215,27 @@ namespace WRMenuUI
 		TSharedPtr<SButton> Button;
 	};
 
-	/** One side of a two-way choice: Male / Female, Fire / Frost. Kind 0 plain, 1 fire, 2 frost. */
+	/** One side of a choice: Male / Female, or a path (Fire / Frost / Lightning, coloured by its Data/paths file). Kind 0
+	 *  plain, 1 fire, 2 frost; Path: any path by id (its colour and glyph, WRPathLook). */
 	class SWRChoice : public SCompoundWidget
 	{
 	public:
 		SLATE_BEGIN_ARGS(SWRChoice) : _Kind(0) {}
 			SLATE_ARGUMENT(FText, Text)
 			SLATE_ARGUMENT(int32, Kind)
+			SLATE_ARGUMENT(FName, Path)
 			SLATE_EVENT(FOnClicked, OnClicked)
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs, TFunction<bool()> InSelected)
 		{
 			Selected = MoveTemp(InSelected);
 			Kind = InArgs._Kind;
+			Path = InArgs._Path;
+			if (!Path.IsNone())
+			{
+				ConstructPath(InArgs);
+				return;
+			}
 			TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
 			if (Kind > 0)
 			{
@@ -261,8 +271,49 @@ namespace WRMenuUI
 			];
 		}
 	private:
+		/** A path's choice: its glyph and name in its colour, a dark fill of it when picked. */
+		void ConstructPath(const FArguments& InArgs)
+		{
+			const FLinearColor C = WRPathLook::Color(Path);
+			const FLinearColor Light = FMath::Lerp(C, FLinearColor::White, 0.7f);
+			const FLinearColor Fill = WRPathLook::Dark(Path, 0.28f);
+			TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+			Row->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 7.f * U, 0.f)
+			[
+				SNew(SBox).WidthOverride(15.f * U).HeightOverride(15.f * U)
+				[
+					SNew(SImage).Image(WRUI::Image(FName(*(TEXT("Glyphs/") + WRPathLook::Glyph(Path)))))
+					.ColorAndOpacity_Lambda([this, C]() { return FSlateColor(Selected() ? C : WRUI::Alpha(C, 0.65f)); })
+				]
+			];
+			Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
+			[
+				WRUI::Text(InArgs._Text, WRUI::Body(14, 700), TAttribute<FSlateColor>::CreateLambda([this, Light]()
+				{
+					if (!Selected()) return FSlateColor(IsHovered() ? WRUI::Ink2 : WRUI::Ink3);
+					return FSlateColor(Light);
+				}))
+			];
+			ChildSlot
+			[
+				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).OnClicked(InArgs._OnClicked)
+				[
+					SNew(SBox).HeightOverride(34.f * U)
+					[
+						SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center)
+						.BorderImage_Lambda([this, C, Fill]()
+						{
+							if (!Selected()) return WRUI::Box(IsHovered() ? FLinearColor(1.f, 1.f, 1.f, 0.04f) : FLinearColor::Transparent, 3.f);
+							return WRUI::Box(Fill, 3.f, C, 1.f);
+						})
+						[Row]
+					]
+				]
+			];
+		}
 		TFunction<bool()> Selected;
 		int32 Kind = 0;
+		FName Path;
 	};
 
 	TSharedRef<SWidget> ChoicePair(TSharedRef<SWidget> A, TSharedRef<SWidget> B)
@@ -301,7 +352,7 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 	GConfig->GetString(MenuSection, TEXT("Name"), Name, GGameUserSettingsIni);
 	GConfig->GetString(MenuSection, TEXT("Address"), Address, GGameUserSettingsIni);
 	GConfig->GetString(MenuSection, TEXT("Path"), SavedPath, GGameUserSettingsIni);
-	Path = FName(*SavedPath);
+	Path = FWRPathRegistry::Get().Find(FName(*SavedPath)) ? FName(*SavedPath) : FName(TEXT("fire"));
 	FString SavedBody;
 	GConfig->GetString(MenuSection, TEXT("Body"), SavedBody, GGameUserSettingsIni);
 	Body = SavedBody.IsEmpty() ? NAME_None : FName(*SavedBody);
@@ -415,9 +466,7 @@ TSharedRef<SWidget> SWRMainMenu::MakePanel()
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 11.f * U, 0.f, 0.f)
 					[
-						FieldRow(NSLOCTEXT("WRUI", "Path", "Path"), ChoicePair(
-							SNew(SWRChoice, [this]() { return Path == TEXT("fire"); }).Kind(1).Text(NSLOCTEXT("WRUI", "FirePath", "Fire · Volcanic")).OnClicked(this, &SWRMainMenu::OnPickPath, FName(TEXT("fire"))),
-							SNew(SWRChoice, [this]() { return Path == TEXT("frost"); }).Kind(2).Text(NSLOCTEXT("WRUI", "FrostPath", "Frost · Tundra")).OnClicked(this, &SWRMainMenu::OnPickPath, FName(TEXT("frost")))))
+						FieldRow(NSLOCTEXT("WRUI", "Path", "Path"), MakePathPicker())
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(60.f * U, 11.f * U, 0.f, 0.f)
 					[
@@ -594,6 +643,30 @@ void SWRMainMenu::ShowSettings(bool bShow)
 	{
 		Menu->SettingsHost->SetContent(SNullWidget::NullWidget);
 	}
+}
+
+TSharedRef<SWidget> SWRMainMenu::MakePathPicker()
+{
+	using namespace WRMenuUI;
+	// Every path in Data/paths (the path's biome is where you spawn: its PlayerStarts carry the biome's tag), built from
+	// the registry so a new path shows the day its file lands: two side by side, more in a column.
+	TArray<TSharedRef<SWidget>> Choices;
+	for (const FWRPathDef& D : FWRPathRegistry::Get().All())
+	{
+		const FName Id = D.Id;
+		const FText Label = FText::FromString(FString::Printf(TEXT("%s · %s"), *WRPathLook::Name(Id), *WRPathLook::BiomeName(Id)));
+		Choices.Add(SNew(SWRChoice, [this, Id]() { return Path == Id; }).Path(Id).Text(Label).OnClicked(this, &SWRMainMenu::OnPickPath, Id));
+	}
+	if (Choices.Num() == 2)
+	{
+		return ChoicePair(Choices[0], Choices[1]);
+	}
+	TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
+	for (int32 i = 0; i < Choices.Num(); ++i)
+	{
+		Column->AddSlot().AutoHeight().Padding(0.f, i > 0 ? 3.f * U : 0.f, 0.f, 0.f)[Choices[i]];
+	}
+	return SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.5f), 5.f, FLinearColor::Black, 1.f)).Padding(3.f * U)[Column];
 }
 
 FReply SWRMainMenu::OnPickPath(FName InPath)

@@ -56,10 +56,10 @@
    "cat": "explorer",
    "event": "landmarks",
    "params": {
-    "biome": "storm"
+    "biome": "storm_peaks"
    },
    "needs": [
-    "biome:storm"
+    "biome:storm_peaks"
    ],
    "title": "Cloudwalker"
   },
@@ -224,10 +224,10 @@
    "cat": "explorer",
    "event": "hidden",
    "params": {
-    "biome": "storm"
+    "biome": "storm_peaks"
    },
    "needs": [
-    "hiddenin:storm"
+    "hiddenin:storm_peaks"
    ],
    "hidden": true
   },
@@ -469,10 +469,10 @@
    "cat": "hunter",
    "event": "huntall",
    "params": {
-    "biome": "storm"
+    "biome": "storm_peaks"
    },
    "needs": [
-    "biome:storm"
+    "biome:storm_peaks"
    ]
   },
   {
@@ -625,10 +625,10 @@
    "cat": "hunter",
    "event": "tameall",
    "params": {
-    "biome": "storm"
+    "biome": "storm_peaks"
    },
    "needs": [
-    "biome:storm"
+    "biome:storm_peaks"
    ]
   },
   {
@@ -1129,7 +1129,7 @@
     "belt": "storm_swamp"
    },
    "needs": [
-    "biome:storm",
+    "biome:storm_peaks",
     "biome:swamp",
     "minis:storm_swamp"
    ]

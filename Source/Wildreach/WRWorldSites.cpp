@@ -5,6 +5,7 @@
 // steps, walls), and everything that glows reads at night.
 
 #include "WRWorldSystems.h"
+#include "WRStormTypes.h"
 #include "WRFarm.h"
 #include "WRPathComponent.h"
 #include "Wildreach.h"
@@ -262,8 +263,35 @@ void AWRShrine::BuildLook()
 		const FVector At = Out * (R + 110.f * Sc);
 		K.Add(FSurf::Lit(bFrost ? FLinearColor(0.45f, 0.65f, 1.f) : FLinearColor(0.55f, 0.75f, 1.f), 0.35f), FVector(3.f, 6.f, H * 0.55f), At - Out * 32.f + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) + H * 0.55f), FRotator(0.f, A, 0.f));
 	}
+	// Storm peaks: a copper rod rises out of the bowl, guyed to the pillar; its tip is the brazier (the spark runs up
+	// it when the shrine is kindled: shrine.storm), and the standing stones carry thunder marks.
+	if (Biome == TEXT("storm_peaks"))
+	{
+		const FSurf Verd = FSurf::Steel(FLinearColor(FColor(78, 154, 132)) * 0.55f, 0.62f);
+		const FSurf Cop = FSurf::Steel(FLinearColor(FColor(184, 115, 51)) * 0.75f, 0.38f);
+		K.Rod(Verd, FVector(0, 0, BowlZ - 10.f), FVector(0, 0, BowlZ + 420.f), 14.f);
+		K.Rod(Verd, FVector(0, 0, BowlZ + 420.f), FVector(0, 0, BowlZ + 620.f), 9.f);
+		K.Spike(Cop, FVector(0, 0, BowlZ + 620.f), FVector::UpVector, 10.f, 60.f);
+		for (int32 i = 0; i < 3; ++i)
+		{
+			const FRotator Rot(0.f, 120.f * i, 0.f);
+			K.Rod(Verd, FVector(0, 0, BowlZ + 300.f), FVector(0, 0, BowlZ) + Rot.Vector() * 58.f, 2.5f);
+		}
+	}
 	// Biome dressing at the dais foot.
-	if (bFrost)
+	if (Biome == TEXT("storm_peaks"))
+	{
+		// Thunder marks (six-petal rosettes) cut into flat stones laid at the dais foot.
+		for (int32 i = 0; i < 6; ++i)
+		{
+			const float A = 60.f * i + 30.f;
+			const FVector At = FRotator(0.f, A, 0.f).Vector() * (R + 40.f);
+			const FVector Base = At + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) + 6.f);
+			K.Add(Stone.Dim(1.1f), FVector(70.f, 70.f, 10.f), Base, FRotator(0.f, A, 0.f));
+			for (int32 p = 0; p < 6; ++p) K.Add(Dark, FVector(26.f, 8.f, 1.5f), Base + FVector(0, 0, 6.f) + FRotator(0.f, A + 60.f * p, 0.f).Vector() * 13.f, FRotator(0.f, A + 60.f * p, 0.f));
+		}
+	}
+	else if (bFrost)
 	{
 		const FSurf Granite = FSurf::Stone(SiteLin(RockC), 0.85f);
 		for (const float Side : { -1.f, 1.f })
@@ -323,8 +351,9 @@ void AWRShrine::OnRep_Fire()
 	const bool bBurning = bLit && !bHeld;
 	if (bBurning && !Fire)
 	{
-		Fire = WRFx::Attach(RootComponent, TEXT("shrine.fire"), NAME_None, bGreat ? 2.4f : 1.9f);
-		if (Fire) Fire->SetRelativeLocation(BowlLocation() - GetActorLocation());
+		const bool bStorm = Biome == TEXT("storm_peaks");
+		Fire = WRFx::Attach(RootComponent, bStorm ? FName(TEXT("shrine.storm")) : FName(TEXT("shrine.fire")), NAME_None, bGreat ? 2.4f : 1.9f);
+		if (Fire) Fire->SetRelativeLocation(BowlLocation() - GetActorLocation() + (bStorm ? FVector(0, 0, 680.f) : FVector::ZeroVector));
 		FireLight = SiteLight(this, RootComponent, BowlLocation() - GetActorLocation() + FVector(0, 0, 80.f), FLinearColor(1.f, 0.55f, 0.2f), WRTune(TEXT("world.shrineLight"), 9000.f), bGreat ? 2600.f : 2000.f);
 	}
 	else if (!bBurning && Fire)
@@ -437,7 +466,15 @@ void AWRShrine::StepGuards()
 					const TSharedPtr<FJsonObject>* GuardsObj = nullptr;
 					if (FName(*Id) != ShrineId || !Row->TryGetObjectField(TEXT("guards"), GuardsObj)) continue;
 					int32 n = 0;
-					for (const auto& KV : (*GuardsObj)->Values)
+					// stormGuards: more that only hold it while a storm is on (the Glass Scar's Raiju, DC 2.13).
+					TArray<TPair<FString, TSharedPtr<FJsonValue>>> All;
+					for (const auto& KV : (*GuardsObj)->Values) All.Add(KV);
+					const TSharedPtr<FJsonObject>* StormObj = nullptr;
+					if (Row->TryGetObjectField(TEXT("stormGuards"), StormObj) && WRStorm::InStorm(this, GetActorLocation()))
+					{
+						for (const auto& KV : (*StormObj)->Values) All.Add(KV);
+					}
+					for (const auto& KV : All)
 					{
 						const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(FName(*KV.Key));
 						for (int32 i = 0; Def && i < int32(KV.Value->AsNumber()); ++i, ++n)

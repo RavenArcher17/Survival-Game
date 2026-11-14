@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRStormCreatures.h"
 #include "WRRaiding.h"
 #include "WRDeeds.h"
 #include "WRArtifacts.h"
@@ -1281,6 +1282,8 @@ void AWRCreature::BeginPlay()
 			AbilitySystem->AddLooseGameplayTag(Tag, 1, EGameplayTagReplicationState::TagOnly);
 		}
 	}
+	// A Storm peaks creature's body state and look (WRStormCreatures).
+	UWRStormBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -2205,6 +2208,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 		DropTack();
 	}
 	// A wild kill stays down to be butchered (its loot comes off the body, hit by hit); tames still go the old way.
+	FWRStormAI::Died(this, Killer);   // a Storm peaks creature's chance drops (storm essence)
 	const bool bBody = BecomeBody(Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
@@ -2740,6 +2744,12 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		TickRow(Self, DeltaSeconds);  // an attack row plays out (its punish included) before anything else
 		return;
 	}
+	// The Storm peaks creatures' own moments (a Raiju in its strike, a Voltfang's grit roll, the Galeback ring, cornered
+	// prey, the living world's beats): WRStormCreatures.
+	if (FWRStormAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	if (Self->bRaidLeaving)
 	{
 		// The raid is over: away from the base at a trot, fighting no one (WRRaids takes it away out of sight).
@@ -3157,6 +3167,11 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	if (Target)
 	{
 		ChaseAndBite(Self, Target);
+		return;
+	}
+	// A Stormkite out scouting for its owner (WRStormCreatures).
+	if (FWRStormAI::TickTame(this, Self, DeltaSeconds))
+	{
 		return;
 	}
 	// Sent at a building ("Break that"): bite it down, then the next piece of the same owner beside it.

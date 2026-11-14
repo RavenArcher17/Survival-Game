@@ -122,6 +122,7 @@ private:
 	bool bResetting = false;
 	float SinceHeatGain = 10.f;
 	float SinceChillGain = 10.f;
+	float SinceChargeGain = 10.f;
 	float SinceBuildup = 10.f;
 	float HungerEmptyFor = 0.f;
 	float ThirstEmptyFor = 0.f;

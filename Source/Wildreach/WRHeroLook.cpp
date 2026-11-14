@@ -542,6 +542,16 @@ void AWRCharacter::MulticastPathPulse_Implementation(FName PathId)
 	PathMarkSig = 0;
 }
 
+void AWRCharacter::StrikePreTell(float Seconds)
+{
+	if (GetNetMode() == NM_DedicatedServer) return;
+	StrikeTellUntil = GetWorld()->GetTimeSeconds() + Seconds;
+	PathMarkSig = 0;
+	FTimerHandle H;
+	TWeakObjectPtr<AWRCharacter> Self(this);
+	GetWorldTimerManager().SetTimer(H, [Self]() { if (Self.IsValid()) Self->PathMarkSig = 0; }, Seconds + 0.05f, false);
+}
+
 void AWRCharacter::TickPathMarks(float DeltaSeconds)
 {
 	// Server: what every machine draws (the path progress itself only replicates to its owner).
@@ -589,6 +599,8 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, (uint32(PathMarks.MainS) << 8) | PathMarks.SubS);
 	Sig = HashCombine(Sig, (uint32(FMath::RoundToInt(PulseLeft * 20.f)) << 1) | (bWet ? 1u : 0u));
 	Sig = HashCombine(Sig, GetTypeHash(PulsePath));
+	const bool bStrikeTell = StrikeTellUntil > Now;
+	Sig = HashCombine(Sig, bStrikeTell ? 0x5717u : 0u);
 	Sig = HashCombine(Sig, WREndgameLook::LookSig(this));   // prestige gold threads, a raid mark on the seams
 	if (!bForce && Sig == PathMarkSig)
 	{
@@ -712,7 +724,10 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Blend(HairMIDs, TEXT("hair"), PathMarks.Main, MainS);
 	for (UMaterialInstanceDynamic* MID : HairMIDs)
 	{
-		MID->SetScalarParameterValue(TEXT("PathPulse"), Pulse);
+		MID->SetScalarParameterValue(TEXT("PathPulse"), bStrikeTell ? 1.f : Pulse);
+		// The storm's pre-tell lifts anyone's hair the full Lightning amount (the same channel a Lightning player
+		// reads on their own body, so they know it at once).
+		if (bStrikeTell) MID->SetScalarParameterValue(TEXT("PathLift"), WRTune(TEXT("storm.preTellHairLift"), 1.5f));
 	}
 
 	// Blood: sharper canines from strength 0.6 (main, or the sub path's share).

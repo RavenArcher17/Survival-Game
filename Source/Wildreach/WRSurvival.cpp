@@ -2,6 +2,8 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRStormTypes.h"
+#include "WRFarm.h"
 #include "WRWarHall.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -49,6 +51,13 @@ FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 	// A war-hall is both its lands: the west half the first's, the east half the second's (WRWarHall).
 	const FName Hall = WRWarHall::BiomeAt(WorldContext, Pos);
 	if (!Hall.IsNone()) return Hall;
+	// Storm peaks (cooks/build-biome-lightning.md 2.4): everything north of the Old Island's frame (its landscape, the
+	// Ash Sound, the neck north of the island's edge) once the land is live; the island's own ground stays the island's.
+	static const FName Storm(TEXT("storm_peaks"));
+	if (WRBiome::IsLive(Storm))
+	{
+		if (Pos.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f)) return Storm;
+	}
 	// The island's ridge: the same split the sky, the sound and the fishing use (sky.biomeCentre).
 	return Pos.X < WRTune(TEXT("sky.biomeCentre"), 0.f) ? FName(TEXT("volcanic")) : FName(TEXT("tundra"));
 }
@@ -520,37 +529,103 @@ void UWRWeatherSubsystem::TickStrikes(float DeltaTime)
 	}
 	StrikeClock = 1.f;
 	// Each storm cell picks its highest exposed player when its timer comes round (BotW: the tallest conductor).
-	TMap<FIntPoint, AWRCharacterBase*> Highest;
+	// Storm peaks (cooks/biome-lightning.md 2.5) weighs the pick: each heavy armour piece x1.25, each Stormweave piece
+	// x0.85, Grounded / a grounding charm only when nobody else in the cell can be picked; its bolts come with the 3 s
+	// body pre-tell and land through WRStorm::CallStrike (rods, ground current, fulgurite). In the Great Storm strikes
+	// fall everywhere in the land, faster above 600 m.
+	struct FCand { AWRCharacterBase* P; float W; };
+	TMap<FIntPoint, TArray<FCand>> Cands;
 	TMap<FIntPoint, const FWRWeatherKind*> KindOf;
 	TMap<FIntPoint, FName> BiomeOf;
+	TMap<FIntPoint, bool> GreatOf;
+	static const FName Storm(TEXT("storm_peaks"));
+	const bool bGreat = WRStorm::GreatStorm(this);
 	for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
 	{
 		AWRCharacterBase* P = *It;
 		if (!P->IsAlive() || !P->GetPlayerState()) continue;
 		const FName Biome = WRBiome::At(this, P->GetActorLocation());
 		const FWRWeatherKind* K = ActiveKind(this, Biome);
-		if (!K || !K->bStrikes || P->GetActorLocation().Z < K->StrikeMinZ) continue;
+		const bool bGS = bGreat && Biome == Storm;
+		if (!bGS && (!K || !K->bStrikes || P->GetActorLocation().Z < K->StrikeMinZ)) continue;
 		const UWRSurvivalComponent* Surv = UWRSurvivalComponent::For(P);
 		if (Surv && (Surv->IsWeatherCountered() || Surv->IsSheltered())) continue;
-		const FIntPoint Cell(FMath::FloorToInt(P->GetActorLocation().X / K->StrikeCell), FMath::FloorToInt(P->GetActorLocation().Y / K->StrikeCell));
-		AWRCharacterBase*& Best = Highest.FindOrAdd(Cell, nullptr);
-		if (!Best || P->GetActorLocation().Z > Best->GetActorLocation().Z)
+		const float CellSize = K ? K->StrikeCell : 6000.f;
+		const FIntPoint Cell(FMath::FloorToInt(P->GetActorLocation().X / CellSize), FMath::FloorToInt(P->GetActorLocation().Y / CellSize));
+		float W = 1.f;
+		if (Biome == Storm)
 		{
-			Best = P;
-			KindOf.Add(Cell, K);
-			BiomeOf.Add(Cell, Biome);
+			if (const AWRPlayerState* PS = P->GetPlayerState<AWRPlayerState>())
+			{
+				if (const UWRInventoryComponent* Inv = PS->GetInventory())
+				{
+					for (const EWREquipSlot Slot : WRGearSlots::Armour)
+					{
+						const FName Id = Inv->GetEquipped(Slot).ItemId;
+						if (Id.IsNone()) continue;
+						if (Id.ToString().StartsWith(TEXT("stormweave"))) W *= WRTune(TEXT("storm.pickWeave"), 0.85f);
+						else if (const FWRItemDef* Def = FWRItemRegistry::Get().Find(Id)) if (Def->Weight >= WRTune(TEXT("storm.heavyPieceKg"), 6.f)) W *= WRTune(TEXT("storm.pickHeavy"), 1.25f);
+					}
+					const bool bCharm = Inv->GetEquipped(EWREquipSlot::Talisman).ItemId == TEXT("grounding_charm");
+					const bool bGrounded = bCharm || (PS->GetPaths() && PS->GetPaths()->GetMainPath() == TEXT("lightning"));
+					if (bGrounded) W *= 0.001f;
+				}
+			}
 		}
+		Cands.FindOrAdd(Cell).Add({ P, W });
+		KindOf.Add(Cell, K);
+		BiomeOf.Add(Cell, Biome);
+		GreatOf.Add(Cell, bGS);
 	}
-	for (const TPair<FIntPoint, AWRCharacterBase*>& C : Highest)
+	for (TPair<FIntPoint, TArray<FCand>>& C : Cands)
 	{
 		const FWRWeatherKind* K = KindOf.FindRef(C.Key);
+		const bool bGS = GreatOf.FindRef(C.Key);
+		// The highest stands most exposed: weight by height above the cell's lowest candidate (8 m = x e).
+		float MaxZ = -1e9f;
+		for (const FCand& Cd : C.Value) MaxZ = FMath::Max(MaxZ, (float)Cd.P->GetActorLocation().Z);
+		float Sum = 0.f;
+		for (FCand& Cd : C.Value) { Cd.W *= FMath::Exp((Cd.P->GetActorLocation().Z - MaxZ) / 800.f); Sum += Cd.W; }
+		const bool bHigh = MaxZ >= WRTune(TEXT("storm.greatStorm.highFrom"), 60000.f);
+		const FVector2D Every = bGS ? (bHigh ? FVector2D(WRTune(TEXT("storm.greatStorm.highMin"), 10.f), WRTune(TEXT("storm.greatStorm.highMax"), 20.f))
+			: FVector2D(WRTune(TEXT("storm.greatStorm.lowMin"), 30.f), WRTune(TEXT("storm.greatStorm.lowMax"), 50.f))) : K->StrikeEvery;
 		float& Next = NextStrikeInCell.FindOrAdd(C.Key, -1.f);
-		if (Next < 0.f) { Next = T + FMath::FRandRange(K->StrikeEvery.X, K->StrikeEvery.Y); continue; }
+		if (Next < 0.f) { Next = T + FMath::FRandRange(Every.X, Every.Y); continue; }
 		if (T < Next) continue;
-		Next = T + FMath::FRandRange(K->StrikeEvery.X, K->StrikeEvery.Y);
-		const FVector Feet = C.Value->GetActorLocation() - FVector(0.f, 0.f, C.Value->GetSimpleCollisionHalfHeight());
+		Next = T + FMath::FRandRange(Every.X, Every.Y);
+		float Roll = FMath::FRand() * Sum;
+		AWRCharacterBase* Picked = C.Value[0].P;
+		for (const FCand& Cd : C.Value) { Roll -= Cd.W; if (Roll <= 0.f) { Picked = Cd.P; break; } }
+		const FVector Feet = Picked->GetActorLocation() - FVector(0.f, 0.f, Picked->GetSimpleCollisionHalfHeight());
+		if (BiomeOf.FindRef(C.Key) == Storm)
+		{
+			FWRStrikeCall Call;
+			Call.Spot = Feet;
+			Call.Picked = Picked;
+			Call.PreTell = WRTune(TEXT("storm.preTell"), 3.f);
+			Call.Tell = K ? K->StrikeWarn : WRTune(TEXT("storm.tell"), 1.f);
+			Call.Damage = K ? K->StrikeDamage : 60.f;
+			Call.Radius = K ? K->StrikeRadius : 300.f;
+			Call.Stun = 0.8f;
+			Call.Source = EWRStrikeSource::Weather;
+			// A Rodcrest basking within 30 m draws the bolt to itself (it's unharmed and glows after).
+			const float Draw = WRTune(TEXT("storm.drawnByRadius"), 3000.f);
+			const FName DrawnBy(*FWRTuning::Get().Str(TEXT("storm.drawnBy"), TEXT("rodcrest")));
+			for (TActorIterator<AWRCreature> Cr(World); Cr; ++Cr)
+			{
+				if (Cr->CreatureId == DrawnBy && Cr->IsAlive() && FVector::Dist(Cr->GetActorLocation(), Feet) < Draw)
+				{
+					Call.Spot = Cr->GetActorLocation();
+					Call.PreTell = 0.f;
+					Call.Picked = nullptr;
+					break;
+				}
+			}
+			WRStorm::CallStrike(this, Call);
+			continue;
+		}
 		Strikes.Add({ Feet, T + K->StrikeWarn, BiomeOf.FindRef(C.Key), K->Id });
-		WRFx::Broadcast(C.Value, TEXT("weather.strikeWarn"), Feet, FRotator::ZeroRotator, K->StrikeRadius / 300.f, TEXT("weather.strikeWarn"));
+		WRFx::Broadcast(Picked, TEXT("weather.strikeWarn"), Feet, FRotator::ZeroRotator, K->StrikeRadius / 300.f, TEXT("weather.strikeWarn"));
 	}
 }
 

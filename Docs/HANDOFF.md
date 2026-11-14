@@ -11,8 +11,8 @@ traps that already cost a day each.
 
 - **Raven owns the game.** Scope, names, looks and what goes out are Raven's call. Ask before building anything big,
   and before publishing a release.
-- **Scope is the build plan's First playable tier: fire and frost only** (Volcanic + Frozen tundra). Nothing from the
-  other ten biomes or paths, or from the Full release / Dream list tiers, unless Raven asks.
+- **Scope** (Aaron, 2026-11-13): the full game, all 12 lands, built land by land; Storm peaks (Lightning) is the first
+  off the Old Island.
 - **The design docs are first drafts.** Names, perks and starting numbers are meant to be tuned in playtests, so
   numbers live in data (`Data/*.json`, `Data/tuning.json`), never hard-coded around one value. Where the doc's tabs
   disagree, `Docs/DESIGN_REVIEW.md` lists the open questions and a proposed default: use the default, leave it open
@@ -226,6 +226,50 @@ Open, as of 0.7.1:
   put back at its portal); rank 3-5 bosses borrow built rigs (overlay colours in creatures.json) until they're sculpted;
   the new creatures' voices are pitched shared calls; only four artifacts can drop until more lands, majors and raids
   exist. Dev: `WRCmd portal dev open <land> <rank> | crack | spill | break | clear`, `WRCmd art dev give <id> <weight>`.
+Also since 0.7.1: **Storm peaks, the first land off the Old Island** (cooks/biome-lightning.md, build plan
+cooks/build-biome-lightning.md in showcase-notes). How a new land is put together, for every land after it:
+- **The ground** is a second landscape in `L_Island` (`Landscape_StormPeaks`, 4,032 m square at 2 m, north of the island,
+  overlapping its top 112 m so the north-west neck joins the island's shore). It comes from `Tools/terrain/storm_peaks.mjs`
+  (heights from the cook's landmark heights, the Crown, the Ring, gorges, needles and the Rodwardens' graded paths carved
+  last) and `Tools/terrain/build_storm.ps1` (heightmap, material `M_StormAuto` from `build_terrain_materials.py`
+  `WR_MATERIALS=storm`, then `import_storm.py` in the unattended editor, which also places the three Storm camps'
+  PlayerStarts tagged `storm_peaks`, their safe zones and starter stations). Re-running replaces the old one.
+  `Art/Terrain/storm_height.r16` isn't committed (the script makes it). After a terrain change also run
+  `node Tools/terrain/storm_walk.mjs`, `node Tools/terrain/sea_mask.mjs` and `python -I Tools/terrain/world_map.py`.
+- **Which land a point is in**: `WRBiome::At` answers `storm_peaks` for anything north of `world.islandNorthEdge`
+  (the island's frame). Its sub-zones (1-6, `WRStorm::ZoneAt`) are a 32 m grid in `Data/storm_peaks.json`.
+  `world.liveBiomes` lists the lands in the game; a land's crops, items, recipes, sets, machines, deeds, shrines,
+  masters and events show only once it's there.
+- **Everything on it is built at runtime from `Data/storm_peaks.json`** (generated, edit the script): `UWRStormWorld`
+  (`WRStormWorld.cpp`) builds the landmarks, hand sites and kit POIs as code-modelled scenery on every machine
+  (`AWRStormScenery`, one look per kind), the rods (`AWRStormRods`), and on the server the rope bridges with their planks
+  (`AWRStormBridge`), site caches, caves (`AWRCave` with `Theme`), ore and fulgurite nodes, ball lightning. The island's
+  dressing file also holds Storm peaks' trees, boulders, scree and shrubs (`storm_pine`, `granite_rock`, `slate_scree`,
+  `storm_shrub`; `dressing.mjs` keeps them when it rewrites the island's).
+- **Lightning strikes** from any source go through `WRStorm::CallStrike` (`WRStormTypes.h`): the 3 s body pre-tell (hair
+  lift through `AWRCharacter::StrikePreTell`, corona, buzz), the 1 s ground glow with its stepped leader, the stroke,
+  thunder delayed by distance, rods taking it within 3 m, ground current on wet ground, fulgurite. Creatures listen to
+  `WRStorm::OnStrikeLanded()`. The weather's picker (`UWRWeatherSubsystem::TickStrikes`) weighs heavy armour / Stormweave,
+  skips Grounded and charm wearers when it can, lets a Rodcrest draw the bolt.
+- Wildlife regions take any land as `side`, with `zones` (sub-zone letters) and a `storm` table; the walk map
+  (`island_walk.json`) is now a 249-cell square that covers both lands (`storm_walk.mjs` grows it from `walkmap.mjs`'s).
+  The map picture covers both (`ui.mapMin / mapSize / mapPixels`); the sky and the ambient beds blend into Storm peaks'
+  north of the island; music looks for `<pool>.<land>`, `boss.<id>`, `mini.<land>`, `sub.monastery`, `camp.<land>`,
+  `pass.stormgut` before the shared pools.
+- Shrines and masters can stand without a village (`at` / `yaw` in `world.json`); quests have a generic `event` type
+  counted by the land's own system (`rodroad`, `pretell`, `lantern`). Drinks can give a timed buff (`use.buff`:
+  `grounding`, `shock_ward`; `WRStorm::HasBuff`).
+- **Creatures and bosses** of Storm peaks: `WRStormCreatures.*` (a `UWRStormBody` on each: its code-built silhouette
+  parts on bones, charge glow, the land's specials and tame uses; `UWRStormLife` for the living-world beats) and
+  `WRStormBosses.*` (`FWRStormBoss` hooks for the Bellwether, Galvara, Coilback and Kharvox; `UWRStormArenas` places the
+  arena spawners, rim rods, altar and run-back stones once per world). Rows in `creatures.json` / `attacks.json` /
+  `spawn_regions.json`; numbers in tuning `creatureAI.storm*`, `bosses.<id>`, `tame.storm`. The bodies are the closest
+  existing rigs retinted (`look.tint`) with code-built parts: own sculpts need the art PC.
+- **The Lightning path**: `Data/paths/lightning.json`, `WRLightningPath.*` (Charge, Grounded, passives, procs),
+  `WRAbilitiesLightning.*` (every ability node), `WRCombos.*` + `Data/combos.json` (path pairs from data, Fire+Frost
+  included), `WRPathLook.*` (a path's colour, icon and resource name from its file: nothing in the UI names fire/frost
+  any more). The main menu's path picker lists every path file.
+
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
   never its own file in the world folder. Schema changes are a new `Data/db/migrations/NNNN_*.sql`. One server per world

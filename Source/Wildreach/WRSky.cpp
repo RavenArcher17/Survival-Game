@@ -364,6 +364,11 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	const float Target = FWRSkyRules::BiomeBlend(View.X, T.Num(TEXT("sky.biomeCentre"), 0.f), T.Num(TEXT("sky.biomeWidth"), 60000.f));
 	Biome = Biome < 0.f ? Target : FMath::FInterpTo(Biome, Target, DeltaSeconds, 1.5f);
 	const float B = Biome;
+	// Storm peaks' air north of the island (cooks/biome-lightning.md 2.1): iron-dark haze, a cool slate grade, blended in
+	// across the Ash Sound and the neck.
+	const float StormTarget = FMath::SmoothStep(0.f, 1.f, float((T.Num(TEXT("world.islandNorthEdge"), -201600.f) + T.Num(TEXT("sky.stormBlendFrom"), 15000.f) - View.Y) / T.Num(TEXT("sky.stormBlendWidth"), 40000.f)));
+	StormAir = StormAir < 0.f ? StormTarget : FMath::FInterpTo(StormAir, StormTarget, DeltaSeconds, 1.5f);
+	const float SA = StormAir;
 	const float Low = FWRSkyRules::LowSun(SunElevation, T.Num(TEXT("sky.goldenHourBelow"), 18.f));
 
 	// Weather (WRSurvival, Data/weather.json): the biome's weather at the camera thickens and tints the haze. Over the
@@ -397,12 +402,13 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	if (UExponentialHeightFogComponent* F = Fog.Get())
 	{
 		// Haze: warm ash west, cold blue east, deep blue at night (readable, not black).
-		const FLinearColor DayFog = FMath::Lerp(SRGB(TEXT("sky.volcanicFogColor"), FColor(176, 146, 120)), SRGB(TEXT("sky.tundraFogColor"), FColor(160, 190, 228)), B);
+		const FLinearColor DayFog = FMath::Lerp(FMath::Lerp(SRGB(TEXT("sky.volcanicFogColor"), FColor(176, 146, 120)), SRGB(TEXT("sky.tundraFogColor"), FColor(160, 190, 228)), B),
+			SRGB(TEXT("sky.stormFogColor"), FColor(132, 140, 156)), SA);
 		const FVector Night = Vec(TEXT("sky.nightFogColor"), FVector(0.01f, 0.015f, 0.035f));
 		const FLinearColor Haze = FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), DayFog * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
 		const FLinearColor Storm = WeatherFogColor * FMath::Lerp(T.Num(TEXT("sky.weatherNightFog"), 0.06f), T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
 		F->SetFogInscatteringColor(FMath::Lerp(Haze, Storm, WeatherAmount));
-		const float BaseDensity = FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B);
+		const float BaseDensity = FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B), T.Num(TEXT("sky.stormFogDensity"), 0.018f), SA);
 		F->SetFogDensity(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount));
 		// Toward a low sun the haze glows warm: the dawn and dusk glare across a valley.
 		F->SetDirectionalInscatteringExponent(T.Num(TEXT("sky.sunGlowExponent"), 6.f));
@@ -454,12 +460,13 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	// The grade: warm and a touch desaturated in the ash, cool on the snow; a faint shadow lift so night and caves
 	// never go to flat black; vignette kept light.
 	FPostProcessSettings& P = Exposure->Settings;
-	P.WhiteTemp = FMath::Lerp(T.Num(TEXT("sky.volcanicWhiteTemp"), 7000.f), T.Num(TEXT("sky.tundraWhiteTemp"), 5900.f), B);
-	const float Sat = FMath::Lerp(T.Num(TEXT("sky.volcanicSaturation"), 0.94f), T.Num(TEXT("sky.tundraSaturation"), 0.97f), B);
+	P.WhiteTemp = FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicWhiteTemp"), 7000.f), T.Num(TEXT("sky.tundraWhiteTemp"), 5900.f), B), T.Num(TEXT("sky.stormWhiteTemp"), 6200.f), SA);
+	const float Sat = FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicSaturation"), 0.94f), T.Num(TEXT("sky.tundraSaturation"), 0.97f), B), T.Num(TEXT("sky.stormSaturation"), 0.9f), SA);
 	P.ColorSaturation = FVector4(Sat, Sat, Sat, 1.f);
 	const float Contrast = T.Num(TEXT("sky.contrast"), 1.04f);
 	P.ColorContrast = FVector4(Contrast, Contrast, Contrast, 1.f);
-	const FVector Gain = FMath::Lerp(Vec(TEXT("sky.volcanicGain"), FVector(1.03f, 1.f, 0.95f)), Vec(TEXT("sky.tundraGain"), FVector(0.96f, 0.99f, 1.04f)), B);
+	const FVector Gain = FMath::Lerp(FMath::Lerp(Vec(TEXT("sky.volcanicGain"), FVector(1.03f, 1.f, 0.95f)), Vec(TEXT("sky.tundraGain"), FVector(0.96f, 0.99f, 1.04f)), B),
+		Vec(TEXT("sky.stormGain"), FVector(0.97f, 0.98f, 1.03f)), SA);
 	P.ColorGain = FVector4(Gain.X, Gain.Y, Gain.Z, 1.f);
 	const FVector Lift = Vec(TEXT("sky.shadowLift"), FVector(0.004f, 0.005f, 0.008f)) * FMath::Lerp(T.Num(TEXT("sky.nightShadowLift"), 2.f), 1.f, Daylight);
 	P.ColorOffsetShadows = FVector4(Lift.X, Lift.Y, Lift.Z, 0.f);

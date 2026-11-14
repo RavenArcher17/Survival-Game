@@ -251,7 +251,7 @@ void AWRGameMode::RescueUnderground()
 	// Traced from over the island's highest ground however deep the fall, and held at voidZ (nothing is ground below
 	// the sea floor) until the ground under them streams in: the map's old flat plane under the middle of the island
 	// used to catch some of them, and is gone now.
-	const float TopZ = WRTune(TEXT("water.rescueTraceTop"), 150000.f);
+	const float TraceTop = WRTune(TEXT("water.rescueTraceTop"), 150000.f);
 	const float VoidZ = WRTune(TEXT("water.voidZ"), -5000.f);
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
@@ -265,7 +265,7 @@ void AWRGameMode::RescueUnderground()
 		const float Need = UWRWaterSubsystem::IsInWater(C) ? SwimMargin : Margin;
 		TArray<FHitResult> Hits;
 		const FCollisionQueryParams Query(SCENE_QUERY_STAT(WRUnderground), false, C);
-		GetWorld()->LineTraceMultiByObjectType(Hits, FVector(L.X, L.Y, FMath::Max(L.Z + 80000.f, TopZ)), L, FCollisionObjectQueryParams(ECC_WorldStatic), Query);
+		GetWorld()->LineTraceMultiByObjectType(Hits, FVector(L.X, L.Y, FMath::Max(L.Z + 80000.f, TraceTop)), L, FCollisionObjectQueryParams(ECC_WorldStatic), Query);
 		bool bRescued = false;
 		for (const FHitResult& Hit : Hits)
 		{

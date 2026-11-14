@@ -333,6 +333,10 @@ public:
 	virtual float ModifyIncomingDamage(const struct FWRHit& Hit, float Damage) override;
 	/** Server: what a part's break did (bosses add their own moves: Vulkarn drops his hammer...). */
 	virtual void OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By);
+	/** Server: damage it took (the Storm peaks creatures' wing hits, crackle-howl, alarm: WRStormCreatures.cpp). */
+	virtual void OnDamageTaken(const struct FWRHit& Hit, float Damage) override;
+	/** Its art's body (null on a dedicated server's placeholder): the Storm peaks looks attach their parts to its bones. */
+	class USkeletalMeshComponent* GetCreatureSkel() const;
 
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_CreatureId, Category="Creature") FName CreatureId = TEXT("cinderfang");
 	/** A fold's rank scaling (WRPortals), set before it begins play: health, bite and stance times. */
@@ -592,6 +596,9 @@ UCLASS()
 class WILDREACH_API AWRCreatureAI : public AAIController
 {
 	GENERATED_BODY()
+	// The Storm peaks creatures' and bosses' own moves run through its row machine (WRStormCreatures / WRStormBosses).
+	friend struct FWRStormAI;
+	friend struct FWRStormBoss;
 
 public:
 	AWRCreatureAI();

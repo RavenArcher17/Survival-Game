@@ -13,6 +13,7 @@
 #include "WRPathComponent.h"
 #include "WRDeeds.h"
 #include "WRPathTypes.h"
+#include "WRPathLook.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
@@ -64,6 +65,11 @@ namespace WRPathsTab
 		if (Path == TEXT("frost"))
 		{
 			return { WRUI::Frost, Hex(TEXT("0F2E46")), Hex(TEXT("7FC0E8")), Hex(TEXT("D6ECF8")), Hex(TEXT("6FB3E0")), Hex(TEXT("E2F4FF")) };
+		}
+		if (Path == TEXT("lightning"))
+		{
+			// Violet-white (#B9A7FF, the path's trim colour: cooks/biome-lightning.md 2.18.2).
+			return { WRPathLook::Color(Path), Hex(TEXT("251B4A")), Hex(TEXT("A592F2")), Hex(TEXT("E6E0FF")), Hex(TEXT("9C8AEC")), Hex(TEXT("EEEAFF")) };
 		}
 		return { WRUI::Ember, Hex(TEXT("45190A")), Hex(TEXT("EC7A34")), Hex(TEXT("FFCF86")), Hex(TEXT("E5843A")), Hex(TEXT("FFD7A0")) };
 	}
@@ -791,7 +797,7 @@ private:
 		const FPathColours C = ColoursFor(Path);
 		const FWRPathDef* Def = FWRPathRegistry::Get().Find(Path);
 		const FString Name = Def ? Def->Name : Humanize(Path.ToString());
-		const FString Icon = Path == TEXT("frost") ? TEXT("snowflake") : TEXT("flame");
+		const FString Icon = WRPathLook::Glyph(Path);
 		return SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
 			.OnClicked_Lambda([this, Path]() { ViewPath(Path); return FReply::Handled(); })
 			[
@@ -877,7 +883,7 @@ private:
 							SNew(SHorizontalBox)
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 							[
-								SNew(SBox).WidthOverride(15.f * U).HeightOverride(15.f * U)[SNew(SImage).Image(Glyph(D.Id == TEXT("frost") ? TEXT("snowflake") : TEXT("flame"))).ColorAndOpacity(WRUI::Alpha(PC2.Main, 0.7f))]
+								SNew(SBox).WidthOverride(15.f * U).HeightOverride(15.f * U)[SNew(SImage).Image(Glyph(WRPathLook::Glyph(D.Id))).ColorAndOpacity(WRUI::Alpha(PC2.Main, 0.7f))]
 							]
 							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f * U, 0.f)
 							[
@@ -1199,7 +1205,9 @@ private:
 
 		// Numbers from the game: what a cast costs and does, or what each rank adds.
 		TArray<TSharedRef<SWidget>> Rows;
-		const bool bFrost = Model->Path == TEXT("frost");
+		// What a cast builds: the path's resource (Heat, Chill, Charge: spells.<key>.heat / chill / charge).
+		const FString ResKey = WRPathLook::ResourceId(Model->Path).ToString();
+		const FString ResName = WRPathLook::ResourceName(Model->Path);
 		if (N->Kind == EWRNodeKind::Stat)
 		{
 			const TSharedPtr<FJsonObject>* Effects = nullptr;
@@ -1227,9 +1235,9 @@ private:
 			const bool bHas = TuningFile().IsValid() && TuningFile()->TryGetObjectField(TEXT("spells"), Spells) && (*Spells)->TryGetObjectField(Key, Spell);
 			const auto Val = [&](const TCHAR* Field, float& Out) { double V = 0.0; if (!bHas || !(*Spell)->TryGetNumberField(Field, V)) return false; Out = FWRTuning::Get().Num(FString::Printf(TEXT("spells.%s.%s"), *Key, Field), static_cast<float>(V)); return true; };
 			float V = 0.f;
-			if (Val(bFrost ? TEXT("chill") : TEXT("heat"), V))
+			if (!ResKey.IsEmpty() && Val(*ResKey, V))
 			{
-				Rows.Add(StatRow(bFrost ? TEXT("snowflake") : TEXT("flame"), C.Main, bFrost ? LOCTEXT("BuildsChill", "Builds Chill") : LOCTEXT("BuildsHeat", "Builds Heat"), FText::FromString(TEXT("+") + Num(V)), C.Main, false));
+				Rows.Add(StatRow(WRPathLook::Glyph(Model->Path), C.Main, FText::Format(LOCTEXT("BuildsRes", "Builds {0}"), FText::FromString(ResName)), FText::FromString(TEXT("+") + Num(V)), C.Main, false));
 			}
 			const UWRGameplayAbility* CDO = Cast<UWRGameplayAbility>(Class->GetDefaultObject());
 			if (CDO && CDO->GetCooldownSeconds() > 0.f)

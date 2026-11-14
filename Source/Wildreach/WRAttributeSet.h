@@ -39,6 +39,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHeat) FGameplayAttributeData MaxHeat;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Chill) FGameplayAttributeData Chill;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxChill) FGameplayAttributeData MaxChill;
+	/** The Lightning path's Charge (cooks/biome-lightning.md 2.18.2): a builder that fills fast and empties fast. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Charge) FGameplayAttributeData Charge;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxCharge) FGameplayAttributeData MaxCharge;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BurnBuildup) FGameplayAttributeData BurnBuildup;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FrostBuildup) FGameplayAttributeData FrostBuildup;
 	/** Creature and boss stance (COMBAT-AND-LESSONS 1.4): hidden, so it lives on the server only; a break shows by the body
@@ -58,6 +61,8 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHeat)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Chill)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxChill)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Charge)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxCharge)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, BurnBuildup)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, FrostBuildup)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Stance)
@@ -76,6 +81,8 @@ private:
 	UFUNCTION() void OnRep_MaxHeat(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Chill(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxChill(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Charge(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxCharge(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_BurnBuildup(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_FrostBuildup(const FGameplayAttributeData& Old);
 };

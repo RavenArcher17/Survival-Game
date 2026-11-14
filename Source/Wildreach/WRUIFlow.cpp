@@ -32,6 +32,7 @@
 #include "WRUIMotion.h"
 #include "WRUISettings.h"
 #include "WRUIStyle.h"
+#include "WRPathLook.h"
 #include "WRUIWidgets.h"
 #include "WRUIWindowKit.h"
 #include "WRWorldDressing.h"
@@ -1376,8 +1377,8 @@ void FWRFlow::CheckLevel(const UWRPathComponent* Paths)
 		T.Over = LOCTEXT("PathPoint", "Path point");
 		T.Title = Unspent == 1 ? LOCTEXT("OnePoint", "1 point to spend") : FText::Format(LOCTEXT("NPoints", "{0} points to spend"), Unspent);
 		T.Sub = FText::Format(LOCTEXT("PointSub", "Open Paths ({0}) to learn abilities and passives."), WRFlowUI::KeyText(TEXT("Paths")));
-		T.Icon = Main == TEXT("frost") ? FName(TEXT("frost_essence")) : FName(TEXT("ember_essence"));
-		T.Accent = Main == TEXT("frost") ? WRUI::Frost : WRUI::Ember;
+		T.Icon = WRPathLook::Icon(Main);
+		T.Accent = WRPathLook::Color(Main);
 		ShowToast(T);
 	}
 	LastUnspent = Unspent;
@@ -1461,7 +1462,7 @@ void FWRFlow::CheckBosses(const FVector& At)
 		B.Title = FText::FromString(Name.ToUpper());
 		B.Sub = FText::FromString(Title);
 		B.Portrait = Boss->CreatureId;
-		B.Accent = Def && Def->Element == TEXT("frost") ? WRUI::Frost : WRUI::Ember;
+		B.Accent = Def && !Def->Element.IsNone() ? WRPathLook::Color(Def->Element) : WRUI::Ember;
 		B.Seconds = WRFlowUI::Tune(TEXT("bossCardSeconds"), 3.6f);
 		ShowBanner(B, true);
 		WRSound::PlayUI(P, TEXT("boss.intro"));
@@ -1920,7 +1921,7 @@ void FWRFlow::Preview(const TArray<FString>& Args)
 		B.Title = FText::FromString(Name.ToUpper());
 		B.Sub = FText::FromString(Title);
 		B.Portrait = Def ? Def->Id : FName(TEXT("vulkarn"));
-		B.Accent = Def && Def->Element == TEXT("frost") ? WRUI::Frost : WRUI::Ember;
+		B.Accent = Def && !Def->Element.IsNone() ? WRPathLook::Color(Def->Element) : WRUI::Ember;
 		B.Seconds = 6.f;
 		ShowBanner(B, true);
 		return;

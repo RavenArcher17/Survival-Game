@@ -104,11 +104,13 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	const FString Id = Item.ToString();
 	const FVector At = Node->GetActorLocation();
 	const bool bTundra = At.X > 0.f;  // the ridge runs down the island's middle (world X 0): ash west, snow east
+	// Storm peaks, north of the island (cooks/build-biome-lightning.md): grey granite rock, mountain pine.
+	const bool bStorm = At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f);
 	const uint32 Seed = GetTypeHash(FIntVector(FMath::FloorToInt(At.X / 50.f), FMath::FloorToInt(At.Y / 50.f), 0));
 	FRandomStream Rand(Seed);
 
 	// Collider: the node's engine mesh, now a hidden cylinder about the look's footprint (cm: width, height).
-	const bool bOre = Id.EndsWith(TEXT("_ore"));
+	const bool bOre = Id.EndsWith(TEXT("_ore")) || Item == TEXT("rock_salt");
 	// The cylinder is centred on the node's ground point, so half of it stands above the ground: at least 1.1 m, the height
 	// a swing sweeps at (a 45 cm lichen collider sat under the swing on uneven cave floors and never got hit).
 	FVector2D Body(110.f, 240.f);
@@ -117,6 +119,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (bOre) Body = FVector2D(190.f, 260.f);
 	else if (Item == TEXT("sulfur_crystal")) Body = FVector2D(110.f, 280.f);
 	else if (Item == TEXT("lichen")) Body = FVector2D(150.f, 240.f);
+	else if (Item == TEXT("stormglass")) Body = FVector2D(140.f, 220.f);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
@@ -135,7 +138,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		static const TCHAR* Char[][2] = { { TEXT("CharTreeA"), TEXT("char_tree_a_textured") }, { TEXT("CharTreeB"), TEXT("char_tree_b_textured") },
 			{ TEXT("CharTreeC"), TEXT("char_tree_c_textured") }, { TEXT("CharTreeD"), TEXT("char_tree_d_textured") } };
 		static const TCHAR* Pine[][2] = { { TEXT("PineB"), TEXT("pine_b_textured") }, { TEXT("PineC"), TEXT("pine_c_textured") }, { TEXT("FirA"), TEXT("fir_a_textured") } };
-		Main = bTundra ? LoadMesh(Prop(Pine[Seed % 3][0], Pine[Seed % 3][1])) : LoadMesh(Prop(Char[Seed % 4][0], Char[Seed % 4][1]));
+		Main = (bTundra || bStorm) ? LoadMesh(Prop(Pine[Seed % 3][0], Pine[Seed % 3][1])) : LoadMesh(Prop(Char[Seed % 4][0], Char[Seed % 4][1]));
 	}
 	else if (Item == TEXT("berries") || Item == TEXT("fiber"))
 	{
@@ -176,7 +179,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		Look->SetWorldScale3D(T.GetScale3D());
 	};
 	const auto Tint = [&](UMaterialInterface* M) { for (int32 Slot = 0; Slot < FMath::Max(1, Look->GetNumMaterials()); ++Slot) Look->SetMaterial(Slot, M); };
-	const FLinearColor BasaltTint(0.11f, 0.1f, 0.095f), FrostTint(0.62f, 0.74f, 0.88f);
+	const FLinearColor BasaltTint(0.11f, 0.1f, 0.095f), FrostTint(0.62f, 0.74f, 0.88f), GraniteTint(0.42f, 0.43f, 0.45f);
 	// Bits share one mesh per node: shards and lumps are stretched / squashed boulders, berries are small spheres.
 	const auto Bit = [&](const FVector& Where, const FRotator& Rot, const FVector& Size)
 	{
@@ -193,7 +196,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	if (Item == TEXT("wood"))
 	{
 		// A standing tree like the island's own (the node's random yaw turns it); the hidden trunk collider is the target.
-		Place(Fit(Main, FVector(0.f, 0.f, bTundra ? 950.f : 720.f), 30.f));
+		Place(Fit(Main, FVector(0.f, 0.f, bStorm ? 760.f : bTundra ? 950.f : 720.f), 30.f));
 		Bits->SetStaticMesh(nullptr);
 	}
 	else if (Item == TEXT("stone") || bOre)
@@ -207,6 +210,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			if (Item == TEXT("copper_ore")) { RockTint = FLinearColor(0.3f, 0.24f, 0.2f); Lump = FLinearColor(1.9f, 0.75f, 0.25f); Lump2 = FLinearColor(0.3f, 1.3f, 0.85f); }
 			else if (Item == TEXT("tin_ore")) { RockTint = FLinearColor(0.42f, 0.43f, 0.46f); Lump = FLinearColor(2.4f, 2.45f, 2.6f); Lump2 = Lump; }
 			else if (Item == TEXT("iron_ore")) { RockTint = FLinearColor(0.26f, 0.19f, 0.17f); Lump = FLinearColor(1.5f, 0.55f, 0.2f); Lump2 = Lump; }
+			// Halite: pink rock salt in the Halite Cave's walls, glassy pale-pink lumps.
+			else if (Item == TEXT("rock_salt")) { RockTint = FLinearColor(0.5f, 0.34f, 0.34f); Lump = FLinearColor(2.8f, 2.0f, 2.0f); Lump2 = Lump; }
 			// Meteoric iron: near-black blue rock with pale silver-blue lumps that catch the lamp light.
 			else if (Item == TEXT("star_iron_ore")) { RockTint = FLinearColor(0.12f, 0.13f, 0.17f); Lump = FLinearColor(2.2f, 2.4f, 2.9f); Lump2 = FLinearColor(1.2f, 1.5f, 2.4f); }
 			Tint(RockMaterial(Node, RockTint));
@@ -244,7 +249,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		}
 		else
 		{
-			Tint(RockMaterial(Node, bTundra ? FrostTint : BasaltTint));
+			Tint(RockMaterial(Node, bStorm ? GraniteTint : bTundra ? FrostTint : BasaltTint));
 			Bits->SetStaticMesh(nullptr);
 		}
 	}
@@ -268,6 +273,26 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
 			const FVector Centre = Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f));
 			Bit(Centre, Q.Rotator() + FRotator(0.f, 0.f, 0.f), FVector(W, W * 0.85f, Len));
+		}
+	}
+	else if (Item == TEXT("stormglass"))
+	{
+		// Fulgurite (cooks/biome-lightning.md 2.6): a granite crust glazed where the bolt hit, with hollow glass tubes
+		// standing out of it, branching like the strike's roots; fresh ones are faintly violet (the FX sparkle on top).
+		Place(Fit(Main, FVector(150.f, 130.f, 40.f), 14.f));
+		Tint(RockMaterial(Node, GraniteTint));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(1.6f, 1.5f, 2.4f)));   // pale glass with a violet cast
+		const int32 N = 11;
+		for (int32 k = 0; k < N; ++k)
+		{
+			const float A = (k + Rand.FRandRange(-0.4f, 0.4f)) * 2.f * PI / N;
+			const float Lean = Rand.FRandRange(8.f, 55.f);
+			const float Len = Rand.FRandRange(60.f, 150.f);
+			const float W = Len * Rand.FRandRange(0.1f, 0.16f);
+			const FVector Foot(FMath::Cos(A) * Rand.FRandRange(10.f, 60.f), FMath::Sin(A) * Rand.FRandRange(10.f, 50.f), 18.f);
+			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
+			Bit(Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f)), Q.Rotator(), FVector(W, W, Len));
 		}
 	}
 	else if (Item == TEXT("saltpetre"))

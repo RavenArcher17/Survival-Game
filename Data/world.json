@@ -4,7 +4,8 @@
   "biomes": {
     "_comment": "Per biome: its path, signature resource, essence, faction, the crater / glacier the event centres on, and the waymark round its summoning stones.",
     "volcanic": { "name": "Volcanic", "path": "fire", "signature": "sulfur_crystal", "essence": "ember_essence", "faction": "forgebound", "centre": [-786, 0], "waymark": "cairn", "rock": [30, 27, 25], "rockAlt": [52, 44, 38], "accent": [217, 194, 74], "glow": [255, 140, 60] },
-    "tundra": { "name": "Frozen tundra", "path": "frost", "signature": "lichen", "essence": "frost_essence", "faction": "rimekin", "centre": [804, 0], "waymark": "inuksuk", "rock": [185, 196, 206], "rockAlt": [140, 152, 166], "accent": [198, 40, 40], "glow": [150, 200, 255] }
+    "tundra": { "name": "Frozen tundra", "path": "frost", "signature": "lichen", "essence": "frost_essence", "faction": "rimekin", "centre": [804, 0], "waymark": "inuksuk", "rock": [185, 196, 206], "rockAlt": [140, 152, 166], "accent": [198, 40, 40], "glow": [150, 200, 255] },
+    "storm_peaks": { "name": "Storm peaks", "path": "lightning", "signature": "stormglass", "essence": "storm_essence", "faction": "", "centre": [-1300, -3300], "waymark": "rod", "rock": [62, 70, 80], "rockAlt": [138, 141, 145], "accent": [78, 154, 132], "glow": [185, 167, 255] }
   },
 
   "shrines": {
@@ -19,7 +20,12 @@
       { "id": "lake", "name": "Lake Island Shrine", "biome": "tundra", "at": [900, -1150], "guards": { "gloomhowl": 6 } },
       { "id": "pine", "name": "Pine Shrine", "biome": "tundra", "at": [700, 1150], "guards": { "gloomhowl": 3, "frostantler": 1 } },
       { "id": "crevasse", "name": "Crevasse Shrine", "biome": "tundra", "at": [450, 60], "guards": { "rimeshell": 3, "glacimaw": 1 } },
-      { "id": "glacier", "name": "Glacier Rim Shrine", "biome": "tundra", "at": [1050, 420], "guards": { "rimeclaw": 2 } }
+      { "id": "glacier", "name": "Glacier Rim Shrine", "biome": "tundra", "at": [1050, 420], "guards": { "rimeclaw": 2 } },
+      { "id": "strikerock", "name": "Great Shrine of Strikerock", "biome": "storm_peaks", "great": true, "at": [-1872, -3350], "yaw": 180 },
+      { "id": "windgap", "name": "Windgap Shrine", "biome": "storm_peaks", "at": [-2300, -4300], "yaw": 200, "guards": { "voltfang": 7 } },
+      { "id": "stormgut_mouth", "name": "Stormgut Mouth Shrine", "biome": "storm_peaks", "at": [-650, -4880], "yaw": 270, "guards": { "thunderhorn": 2, "stormkite": 1 } },
+      { "id": "glass_scar", "name": "Glass Scar Shrine", "biome": "storm_peaks", "at": [-1020, -2700], "yaw": 160, "guards": { "thunderhorn": 2 }, "stormGuards": { "raiju": 1 } },
+      { "id": "hanging", "name": "Hanging Shrine", "biome": "storm_peaks", "at": [-800, -3420], "yaw": 180, "guards": { "voltfang": 4 } }
     ],
     "guardRange": 12000, "guardRingMin": 1500, "guardRingMax": 2500,
     "kindleSeconds": 3.0, "kindleMove": 150, "interactRange": 450,
@@ -32,7 +38,10 @@
     { "id": "sigrun", "name": "Sigrun Ashhand", "path": "fire", "village": "emberwick", "sex": "f", "face": 2, "build": 2, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "fire", "", "fire"], "work": "chop", "workEvery": 2.6, "workSound": "world.anvil", "workFx": "world.anvil_sparks", "offset": [250, -620], "lineSound": "world.anvil_soft",
       "lines": { "first": "Another one off the boats. Stand clear of the sparks.", "offer": "I've work if you've hands.", "waiting": "Well? The fire doesn't wait.", "done": "Good. Again tomorrow.", "all": "You've the forge in you now. Go and use it." } },
     { "id": "ailu", "name": "Áilu the Tracker", "path": "frost", "village": "rimehold", "sex": "m", "face": 1, "build": 0, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "frost", "", "frost"], "work": "gather", "workEvery": 5.0, "workSound": "world.hide_scrape", "workFx": "", "offset": [250, 620], "lineSound": "world.chime",
-      "lines": { "first": "Quiet. You walk like a herd.", "offer": "There's something you could learn.", "waiting": "Not yet. Go.", "done": "Better.", "all": "The ice will carry you now." } }
+      "lines": { "first": "Quiet. You walk like a herd.", "offer": "There's something you could learn.", "waiting": "Not yet. Go.", "done": "Better.", "all": "The ice will carry you now." } },
+    { "id": "vesna", "name": "Vesna Groza", "path": "lightning", "biome": "storm_peaks", "at": [-1865, -3255], "yaw": 250, "sex": "f", "face": 3, "build": 1, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "lightning", "", "lightning"], "work": "chop", "workEvery": 3.4, "workSound": "world.anvil_soft", "workFx": "storm.piton_sparks", "lineSound": "world.chime",
+      "_why": "The path master of Lightning (cooks/biome-lightning.md 2.13): a climber struck on the Crown who came down alive, a Lichtenberg fern from her left shoulder to her jaw. By day she sharpens pitons at her lean-to in Strikerock's split beside the Great Shrine; the tap of the work loop is the file on the piton.",
+      "lines": { "first": "Hair standing up yet? It will. Stay low on the Crown.", "offer": "Want to learn to live up there? Ha. Then listen.", "waiting": "Still here? The sky won't wait for you.", "done": "Good. You came back down.", "all": "You've the storm in you now. Go up and bring it down." } }
   ],
 
   "quests": {
@@ -60,6 +69,19 @@
       { "id": "breath_held", "title": "The Unlearning: breath held", "task": "Get within 5 m of a sleeping Rimeclaw and back out without waking it.", "type": "sneak", "creature": "rimeclaw", "count": 1, "xp": 2000, "arc": "unlearning" },
       { "id": "wyrm_knew", "title": "The Unlearning: what the wyrm knew", "task": "Show Áilu Skaldrith's core.", "type": "show", "item": "core_skaldrith", "count": 1, "xp": 3000, "arc": "unlearning" },
       { "id": "herons_cup_frost", "title": "The Unlearning: the heron's cup", "task": "Bring Áilu 5 ember essence: the draught is warmed by the other land.", "type": "bring", "item": "ember_essence", "count": 5, "xp": 3000, "items": { "heron_draught": 1 }, "title_reward": "Unlearned", "arc": "unlearning" }
+    ],
+    "vesna": [
+      { "id": "glass", "title": "Glass", "task": "Bring Vesna 6 stormglass: you'll have to be out after a storm.", "type": "bring", "item": "stormglass", "count": 6, "xp": 800, "recipes": ["grounding_salve"] },
+      { "id": "rod_road", "title": "The rod-road", "task": "Walk the rod-road from the middle camp to the Thunderstone Arch, touching its rods on the way.", "type": "event", "event": "rodroad", "count": 8, "xp": 1000 },
+      { "id": "hair_on_end", "title": "Hair on end", "task": "Stand above 600 m in a Thunderstorm and live through 3 strikes' warnings without being struck.", "type": "event", "event": "pretell", "count": 3, "xp": 1200, "recipes": ["grounding_charm"] },
+      { "id": "nine_spans", "title": "Nine spans", "task": "Cross the Bridge of Nine Spans carrying a light and light the lanterns in its 8 winch huts.", "type": "event", "event": "lantern", "count": 8, "xp": 1500, "doneLine": "The fifth span? Its rope's still tied at the top. I'd not climb it. You would." },
+      { "id": "banner", "title": "Banner", "task": "Show Vesna the Kite crown from Galvara's Eyrie.", "type": "show", "item": "trophy_kite_crown", "count": 1, "xp": 2000, "recipes": ["stormglass_arrow"] },
+      { "id": "the_bell", "title_reward": "Bell-breaker", "title": "The bell", "task": "Kill the Bellwether, the belled ram of the cliff paths.", "type": "kill", "creature": "bellwether", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } },
+      { "id": "the_crown", "title": "The Crown", "task": "Reach the Ring by the Hanging Monastery and light the Hanging Shrine.", "type": "shrines", "shrines": ["hanging"], "count": 1, "xp": 3000 },
+      { "id": "spent_glass", "title": "The Unlearning: spent glass", "task": "Bring Vesna 20 stormglass: what a lightning path is made of, to be given up.", "type": "bring", "item": "stormglass", "count": 20, "xp": 2000, "arc": "unlearning" },
+      { "id": "below_the_strike", "title": "The Unlearning: below the strike", "task": "Live through 3 more strikes' warnings above 600 m.", "type": "event", "event": "pretell", "count": 3, "xp": 2000, "arc": "unlearning" },
+      { "id": "roc_knew", "title": "The Unlearning: what the roc knew", "task": "Show Vesna Kharvox's core.", "type": "show", "item": "core_kharvox", "count": 1, "xp": 3000, "arc": "unlearning" },
+      { "id": "herons_cup_storm", "title": "The Unlearning: the heron's cup", "task": "Bring Vesna 5 ember essence: the draught is lit by the other fire.", "type": "bring", "item": "ember_essence", "count": 5, "xp": 3000, "items": { "heron_draught": 1 }, "title_reward": "Unlearned", "arc": "unlearning" }
     ],
     "standing": 150, "greetRange": 600, "greetEvery": 90, "talkRange": 400, "sneakNear": 500, "sneakAway": 3000
   },
@@ -131,17 +153,21 @@
       "title": "A white wall", "warn": "A white wall rolls off the glacier", "startText": "Whiteout: you can't see 25 m; Gloomhowls hunt by day", "endText": "The whiteout lifts. Tonight the aurora will be full" },
     "starfall": { "everyHours": 48, "atDusk": true, "streakSeconds": 300, "streakEvery": [1.5, 3.0], "meteors": [3, 5], "fallSeconds": 2.4, "clearOfRadius": 40000,
       "craterHours": 24, "drawAfterHours": 2, "ore": { "star_iron": [6, 10] }, "oreBonus": { "gem_onyx": 0.25 }, "bands": ["midland", "highland"],
-      "title": "Starfall", "warn": "Stars are falling", "landText": "A star fell to the {dir}" }
+      "title": "Starfall", "warn": "Stars are falling", "landText": "A star fell to the {dir}" },
+    "great_storm": { "biome": "storm_peaks", "everyHours": 72, "weather": "thunderstorm", "end": 3600, "signatureScale": 3,
+      "_why": "cooks/biome-lightning.md 2.15: the Front (0-10 min), the Storm (10-50: strikes everywhere with the same tells, faster above 600 m; Raiju arrive in strikes; ball lightning on the Crags and the Cliff Shrines), the Clearing (50-60). Strikes never in claims or spawn camps. After: fulgurite x3 wherever strikes fell, the Glass Scar glows 2 game hours (WRStormWorld.cpp).",
+      "title": "The Great Storm", "warn": "A black wall rises over the Crown: every rod in the peaks is humming", "startText": "The Great Storm: lightning will fall everywhere in the peaks. Get low, get under rock, or ground yourself", "endText": "The storm breaks. Steam off the rock, and fresh stormglass wherever it struck" }
   },
 
   "invasions": {
     "_comment": "Setting invasions: off / rare / normal / frequent = per pair per real week. Pairs list both ways; pass mouths are found from the island's 'pass' points (the attacking side's mouth = passInset metres into the attacker's land).",
     "perWeek": { "rare": 1, "normal": 2, "frequent": 4 },
     "warnSeconds": 300, "holdSeconds": 1800, "targetRange": 150000, "passInset": 150, "count": [8, 14], "lootFraction": 0.1, "xp": 2000,
-    "pays": { "ember_essence": 3, "frost_essence": 3 },
+    "pays": { "ember_essence": 3, "frost_essence": 3, "storm_essence": 3 },
     "pairs": [
       { "from": "tundra", "to": "volcanic", "leader": "old_tusker", "day": { "woolly_drudge": 4, "frostantler": 4, "rimeclaw": 1 }, "night": { "gloomhowl": 8, "rimeclaw": 2 } },
-      { "from": "volcanic", "to": "tundra", "leader": "cinderhorn", "day": { "cinderfang": 6, "scorchwing": 3, "magmaw": 1 }, "night": { "cinderfang": 8, "magmaw": 1 } }
+      { "from": "volcanic", "to": "tundra", "leader": "cinderhorn", "day": { "cinderfang": 6, "scorchwing": 3, "magmaw": 1 }, "night": { "cinderfang": 8, "magmaw": 1 } },
+      { "from": "storm_peaks", "to": "swamp", "leader": "bellwether", "bringsWeather": "thunderstorm", "day": { "thunderhorn": 5, "stormkite": 4 }, "night": { "voltfang": 10 } }
     ]
   },
 

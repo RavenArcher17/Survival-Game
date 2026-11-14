@@ -272,3 +272,55 @@ if want("ice"):
     lift = mul(mul(far, scalar_p("FarLift", 30.0)), k=1.0 / 10000.0)
     wpo = op(unreal.MaterialExpressionAppendVector, expr(unreal.MaterialExpressionConstant2Vector, r=0.0, g=0.0), lift)
     finish(base, normal, rough, emissive, wpo, scalar_p("Specular", 0.8))
+
+# ================================================================ M_StormAuto (Storm peaks landscape)
+# cooks/build-biome-lightning.md 2.3. By height and slope (world Z in cm): wind-flattened grey-green grass on the low
+# Wind Passes, slate scree and dirt in the Cliff Paths, granite with ochre lichen on the Struck Crags, snow in the
+# hollows above 1,200 m, pale sand by the Desert rib (world Y < -5,250 m) and on the coves; cliffs are slate low and
+# granite high, projected sideways so gorge walls don't smear. Rain darkens it (parameter Wet 0..1, set at runtime).
+if want("storm"):
+    begin("/Game/Terrain/M_StormAuto")
+    wp, uv_top, uv_rock = world_uvs(700.0)
+    z = mask(wp, "b")
+    xy = mask(wp, "r", "g")
+    uv = mul(xy, k=1.0 / 400.0)
+    uv_stone = mul(xy, k=1.0 / 600.0)
+    uv_macro = mul(xy, k=1.0 / 11000.0)
+    scalar_p = lambda name, v: expr(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=v)
+
+    def band(lo, hi):
+        return sat(op(unreal.MaterialExpressionDivide, op(unreal.MaterialExpressionSubtract, z, const_b=lo), const_b=hi - lo))
+
+    normal_z = mask(expr(unreal.MaterialExpressionVertexNormalWS), "b")
+    rock_a = sat(mul(op(unreal.MaterialExpressionSubtract, None, normal_z, const_a=0.86), k=9.0))   # ~30 deg and up
+    var = mask(sample("Extra/TEX_MWAM_Variation_msk", uv_macro), "r")
+    var2 = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(xy, k=1.0 / 2300.0)), "r")
+    mid = band(18000.0, 32000.0)          # grass gives way to slate scree between 180 and 320 m
+    high = band(56000.0, 68000.0)         # granite crags from 560-680 m
+    snowy = mul(band(118000.0, 130000.0), sat(mul(op(unreal.MaterialExpressionSubtract, normal_z, const_b=0.9), k=10.0)))
+    shore = sat(op(unreal.MaterialExpressionDivide, op(unreal.MaterialExpressionSubtract, None, z, const_a=500.0), const_b=350.0))
+    desert = sat(op(unreal.MaterialExpressionDivide, op(unreal.MaterialExpressionSubtract, None, mask(wp, "g"), const_a=-525000.0), const_b=15000.0))
+    sandy = sat(op(unreal.MaterialExpressionAdd, shore, desert))
+    lichen = sat(mul(op(unreal.MaterialExpressionSubtract, var2, const_b=0.58), k=6.0))
+
+    grass, grass_n = sample("Ground/TEX_MWAM_Grass_col", uv), sample("Ground/TEX_MWAM_Grass_nrm", uv)
+    dirt, dirt_n = sample("Ground/TEX_MWAM_Dirt_col", uv), sample("Ground/TEX_MWAM_Dirt_nrm", uv)
+    stones, stones_n = sample("Ground/TEX_MWAM_Stones_col", uv_stone), sample("Ground/TEX_MWAM_Stones_nrm", uv_stone)
+    sand, sand_n = sample("Ground/TEX_MWAM_SandA_col", uv), sample("Ground/TEX_MWAM_SandA_nrm", uv)
+    snow, snow_n = sample("Ground/TEX_MWAM_Snow_col", uv), sample("Ground/TEX_MWAM_Snow_nrm", uv)
+    rock, rock_n = sample("Ground/TEX_MWAM_Rock_col", uv_rock), sample("Ground/TEX_MWAM_Rock_nrm", uv_rock)
+
+    tint = lambda layer, rgb: mul(layer, const3(rgb))
+    lowland = lerp(tint(grass, (0.62, 0.66, 0.55)), tint(dirt, (0.42, 0.4, 0.36)), sat(mul(op(unreal.MaterialExpressionSubtract, var, const_b=0.62), k=5.0)))
+    scree = lerp(tint(stones, (0.33, 0.36, 0.42)), tint(dirt, (0.3, 0.31, 0.33)), var)
+    granite = lerp(tint(stones, (0.62, 0.63, 0.64)), const3((0.47, 0.36, 0.1)), mul(lichen, k=0.55))
+    ground = lerp(lerp(lowland, scree, mid), granite, high)
+    ground = lerp(ground, tint(sand, (0.78, 0.74, 0.66)), sandy)
+    ground = lerp(ground, snow, snowy)
+    cliff = mul(rock, lerp(const3((0.11, 0.13, 0.16)), const3((0.36, 0.37, 0.39)), high))
+    base = mul(lerp(ground, cliff, rock_a), lerp(None, None, var, const_a=0.82, const_b=1.12))
+    wet = scalar_p("Wet", 0.0)
+    base = mul(base, lerp(None, None, wet, const_a=1.0, const_b=0.55))
+    normal = lerp(lerp(lerp(lerp(lerp(grass_n, stones_n, mid), stones_n, high), sand_n, sandy), snow_n, snowy), rock_n, rock_a)
+    rough = lerp(lerp(None, None, snowy, const_a=0.9, const_b=0.72), None, wet, const_b=0.35)
+    finish(base, normal, rough)
