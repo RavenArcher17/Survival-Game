@@ -1,5 +1,57 @@
 # Changelog
 
+## Unreleased: the MetaHuman hero moves (motion matching, retargeted actions, first person on the head)
+
+Aaron (cooks/hero.md, build lane build-hero-anim; research and plan in showcase-notes cooks/build-hero-anim.md): the
+Mixamo survivor is replaced by the MetaHuman hero from the hero lab, and the hero gets GASP motion-matched locomotion,
+its action clips, sockets and full-body first person. Built to compile and the assets built headless; not played here
+(Aaron and the testers test, F8).
+
+- **The hero** (`Data/player_art.json` schema 2, `AWRCharacter::LoadBodyArt`): the main menu's Male / Female pick is
+  now **M1 Ash** or **F1 Wren** (athletic build, Survivor Wraps), each the MetaHuman body, its face with the MetaHuman
+  face rig (`ABP_Face`, follows the body), hair / brows / lashes (and stubble on M1) as cards, the wraps' Chest, Hands
+  and Legs pieces following the body, and one LOD for all of it (LODSync led by the face). In first person the head,
+  hair and head-slot outfit are hidden from you (their shadow stays) and the rest of the body is yours to see.
+- **Locomotion is motion matching** (new `UWRHeroAnimInstance`, built on `UWRAnimInstance` so the block / aim loops,
+  swings, casts, rolls, hits, deaths, gathering, turn in place and slope feet all work as before). It searches 12
+  databases rebuilt from the Game Animation Sample's own (idle, walk / run / sprint starts, loops, stops, turns,
+  jumps, lands) on 58 GASP clips retargeted onto the hero, picked by a chooser in `player_art.json` (state x gait x
+  stance). The trajectory is the body's last 0.4 s plus the next 1.0 s simulated with the movement's own acceleration,
+  braking and turn rate; new matches blend over 0.2 s, clips play at the real ground speed within 0.8-1.25x (stride
+  matching), the pose turns up to 45 degrees onto the real travel with the spine turning back (orientation warping),
+  and footsteps come from the feet touching down. Your hero searches every frame, other players every 0.1 s, and at
+  LOD 3+ they drop to cheap loops (tuning `anim.mm`). No animation blueprint (Raven's rule; anim graphs can't be
+  authored headless either), so it runs the same in packaged builds.
+- **One clip set for both bodies**: the clips are retargeted once onto the male body; the female plays them with her
+  own bone lengths and her hips at her height (what the engine's Skeleton / AnimationScaled translation modes do), so
+  no second copy is in the repo. The female idle stance (hero.md 2.3: hips tipped 3 degrees and dropped 2 toward the
+  standing leg, shoulders back 2) is procedural.
+- **Movement** (FULL-GAME 9): 5000 cm/s/s acceleration (0.15 s to 750), 4000 braking, separate braking friction 6,
+  ground friction 8 (tuning `player`).
+- **Other players' acceleration replicates** (Lyra's pattern, 3 bytes + gait / stance / lock-on bits, simulated
+  proxies only), so their starts and stops show the moment the stick moves.
+- **Action clips**: 30 Mixamo clips (block, 3 slashes, 3 attacks, 2 casts, 3 hits, 2 deaths, roll, chop, gather, pick
+  up, swim, tread, kick, bow idle / equip / aim / recoil / draw, rifle aim / fire / reload, throw) retargeted through
+  an IK Retargeter onto the hero. The Mixamo walk / run / strafe / turn clips are gone (motion matching does those).
+- **Combat windows on the clips** (new `UWRANS_Window`, tags `State.ComboWindow`, `State.CancelWindow`,
+  `State.IFrames`, `State.TraceActive`): placed on every swing, cast, kick, chop and the roll from
+  `Data/anim_windows.json`, measured from each clip (hit frames where the striking hand moves at 55%+ of its top speed;
+  combo the last 40% of recovery; cancel from 50% of recovery on lights, 65% on heavies, chops and kicks, 60% on
+  casts; the roll's i-frames from tuning). One-shots forward them, so they fire on every machine that draws the body;
+  a dedicated server reads the same numbers through `FWRAnimWindows::Find` (for the combat lanes' timers).
+- **Sockets**: the sword, shield, held tools and ranged gear sit in the hero's sockets (`weapon_r`, `shield_l`,
+  `bow_l`: the palm's frame), not on Mixamo bones; the old palm-down maths is gone. `items.json`'s ranged `socket`s
+  are `weapon_r` / `bow_l`; along / face gain `grip`, `palm`, `backhand` and `arm`, so the bow and bola keep their
+  old hold on the new rest pose.
+- **First person on the head** (hero.md 2.7, tuning `fp`): the eye is the head bone after animation plus 9 cm forward
+  and 6 up, 1:1 across the ground, a critically damped spring (half-life 0.05 s, within 2.5 cm) up and down, the
+  view's turn always the controller's; a roll only drops the view 30 cm and back with a 0.1 s vignette; near clip
+  5 cm. The spine takes the aim pitch (first person and aiming).
+- **Removed**: `Content/Characters/Survivor` and `SurvivorF` (92 MB). Plugins enabled: PoseSearch, HairStrands,
+  RigLogic, MetaHumanCharacter (all ship with UE 5.8).
+- Assets: `Content/Wildreach/Characters/Hero` (372 MB in Git LFS: the two heroes 259 MB, clips and databases 90 MB,
+  wraps 17 MB, skin materials 7.5 MB), rebuilt with `Tools/anim/build_hero_anim.py`.
+
 ## Unreleased: F8 bug reports, the controller, the F1 controls page, look settings
 
 Aaron: build the in-game bug report first so testers can report (COMBAT-AND-LESSONS L10, C1), with the controls page,

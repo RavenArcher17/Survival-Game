@@ -10,6 +10,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/SkeletalMeshSocket.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
@@ -111,8 +112,8 @@ void AWRCharacter::UpdateToolLook(bool bShow)
 	const FWRToolDef* Tool = bShow ? FWRGathering::FindTool(MeleeItem) : nullptr;
 	const USkeletalMesh* BodyAsset = Body->GetSkeletalMeshAsset();
 	const FName Socket = WeaponMesh->GetAttachSocketName();
-	const int32 HandBone = BodyAsset && !Socket.IsNone() ? BodyAsset->GetRefSkeleton().FindBoneIndex(Socket) : INDEX_NONE;
-	if (!Tool || HandBone == INDEX_NONE)
+	const bool bHand = BodyAsset && !Socket.IsNone() && (BodyAsset->FindSocket(Socket) || BodyAsset->GetRefSkeleton().FindBoneIndex(Socket) != INDEX_NONE);
+	if (!Tool || !bHand)
 	{
 		for (UStaticMeshComponent* Part : ToolParts)
 		{
@@ -140,17 +141,9 @@ void AWRCharacter::UpdateToolLook(bool bShow)
 		ToolPartsFor = MeleeItem;
 	}
 
-	// The fist's frame, worked out as the sword's is (AWRCharacter::LoadBodyArt): in the reference pose a held blade points
-	// along the body's forward and the fingers run out along the arm; grip in the palm, partway to the index finger.
-	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
-	const FTransform HandCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, HandBone);
-	const int32 FingerBone = Ref.FindBoneIndex(FName(*(Socket.ToString() + TEXT("Index1"))));
-	const FVector FingerCS = FingerBone != INDEX_NONE ? FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, FingerBone).GetLocation() : HandCS.GetLocation();
-	const FVector BodyForward = FRotator(0.f, BodyYaw, 0.f).UnrotateVector(FVector::ForwardVector);
-	const FVector Blade = HandCS.InverseTransformVectorNoScale(BodyForward).GetSafeNormal();
-	const FVector Fingers = HandCS.InverseTransformPositionNoScale(FingerCS);
-	const FVector Grip = HandCS.InverseTransformPositionNoScale(FMath::Lerp(HandCS.GetLocation(), FingerCS, 0.6f));
-	const FTransform Fist(FQuat(FRotationMatrix::MakeFromXY(Blade, Fingers)), Grip);
+	// The fist's frame, as the sword's (AWRCharacter::FistFrame): the weapon socket sits in the palm, X out of the fist
+	// past the index finger (the handle runs that way to the head), Y toward the fingers (the striking side).
+	const FTransform Fist = FistFrame();
 	UMaterialInterface* Shape = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 
 	for (int32 i = 0; i < Parts.Num(); ++i)

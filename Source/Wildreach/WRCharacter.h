@@ -7,6 +7,20 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class UGroomComponent;
+class ULODSyncComponent;
+
+/** Acceleration for other machines' copies of a survivor (Lyra's pattern): motion matching sees a start or a stop the
+ *  moment the stick moves, not a round trip later when the velocity shows it. 3 bytes, plus the gait / stance bits. */
+USTRUCT()
+struct FWRReplicatedAccel
+{
+	GENERATED_BODY()
+	UPROPERTY() uint8 Angle = 0;      // direction on the ground, 0..255 = 0..360 degrees
+	UPROPERTY() uint8 Magnitude = 0;  // 0..255 = 0..the movement's max acceleration
+	UPROPERTY() int8 Z = 0;           // -127..127 = -max..max
+	UPROPERTY() uint8 Bits = 0;       // gait (2 bits), stance (3 bits), locked on (1 bit)
+};
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
@@ -88,6 +102,12 @@ protected:
 
 	/** Animated survivor body (Data/player_art.json); the placeholder shapes are hidden once it loads. */
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<class USkeletalMeshComponent> Body;
+	/** The MetaHuman head (its own face rig follows the body's pose), the hair grooms bound to it, the outfit pieces
+	 *  (Head, Chest, Hands, Legs) following the body's bones, and one LOD for them all. */
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<class USkeletalMeshComponent> Face;
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TArray<TObjectPtr<UGroomComponent>> Grooms;
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TArray<TObjectPtr<class USkeletalMeshComponent>> Outfit;
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<ULODSyncComponent> LODSync;
 	/** Shield strapped to the body's left forearm (player_art.json "shieldMesh"). */
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> ShieldMesh;
 	/** The ranged weapon in hand while it's out. */
@@ -118,7 +138,7 @@ private:
 	TSet<FName> FullBodyKeys;  // one-shots over the whole body (player_art.json "fullBody"); the rest are upper body
 	FName BodyAnim;            // the one-shot playing (None once it's done)
 	double BodyOneShotUntil = 0.0;
-	class UWRAnimInstance* BodyAnimInstance() const;
+	class UWRHeroAnimInstance* BodyAnimInstance() const;
 	/** Locomotion sets, turn clips and the upper body for the animation instance, from the loaded clips. */
 	void SetupBodyAnim(const TSharedPtr<class FJsonObject>& Art, const TSharedPtr<class FJsonObject>& Variant);
 	class UAnimSequenceBase* BodyClip(FName Key) const;
@@ -142,6 +162,17 @@ private:
 	float BodyAimTurn = 0.f;       // that turn, eased in and out (a spine twist, so walking legs keep their line)
 	float BodyBaseZ = 0.f;         // the body art's height on the capsule (feet on its bottom)
 	float SwimLift = 0.f;          // how much higher the body rides while swimming (WRWater), eased
+	FName WeaponSocket;            // player_art.json sockets: where the sword, shield and held gear go
+	FName ShieldSocket;
+	float AimPitchBlend = 0.f;     // the spine's share of the aim pitch (first person, aiming), eased
+	// First person: the eye on the head bone (hero.md 2.7).
+	float EyeZ = 0.f, EyeZSpeed = 0.f;
+	bool bEyeInit = false;
+	FVector DodgeEye = FVector::ZeroVector;  // the eye's place on the capsule when a roll began (the view only drops)
+	double DodgeStartedAt = -1.0;
+	void TickFirstPersonCamera(float DeltaSeconds);
+	UPROPERTY(Replicated) FWRReplicatedAccel ReplicatedAccel;
+	void UpdateReplicatedAccel();
 	FTimerHandle ThrowTimer;
 	UFUNCTION() void OnRep_RangedLook();
 	void UpdateWeaponLook();
@@ -158,6 +189,9 @@ private:
 	/** The weapon hand's item (WRHeldTool.cpp): a tool there is built from engine shapes in place of the sword. */
 	UPROPERTY(ReplicatedUsing=OnRep_RangedLook) FName MeleeItem;
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> ToolParts;
+	/** The weapon socket's frame for a held blade or tool, from the body's reference pose: X runs out of the fist on the
+	 *  index finger's side, Y toward the fingers (WRHeldTool.cpp, the sword). */
+	FTransform FistFrame() const;
 	FName ToolPartsFor;            // the tool ToolParts were built for
 	void UpdateToolLook(bool bShow);
 	void TickBodyAnim();

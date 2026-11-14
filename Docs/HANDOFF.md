@@ -38,6 +38,9 @@ and, from a client, in the host's `Saved/Reports`), **full controller support** 
 one input processor in `WRPadInput.cpp`, so a new screen needs nothing for the pad as long as its clickable pieces
 show the hand cursor or are buttons / slots), the **F1 controls page**, and **look sensitivity / invert**. New prompt
 rule: show a key with `WRInput::ActionKey(<action>)`, not `WRUI::KeyName(...Key(...))`, so pads see their buttons.
+Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
+with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
+full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.
 
 Open, as of 0.7.1:
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
@@ -145,3 +148,15 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
 - The humanoid bosses and the player were rigged on Mixamo with Raven's Adobe account.
 - Outside files and their licences are listed in `Docs/CREDITS.md` (shipped beside the game). Add a row for anything
   new from outside.
+- **The hero** is made in the hero lab (`C:\Dev\WildreachCharLab` on Aaron's PC: MetaHuman Creator, the outfits, the
+  retargeting in `Scripts/anim/`). Only built output comes here: `Content/Wildreach/Characters/Hero/{Unpacked,Outfits,
+  Materials,Anims}` (2K textures, cards hair, no editable `MH_*` sources). The skeleton and the face rig are the
+  MetaHumanCharacter plugin's (enabled in the `.uproject`, ships with 5.8), so they aren't in git. `Data/player_art.json`
+  (schema 2) says which body, face, grooms and outfit each sex wears, the sockets, the action clips by key and the
+  motion-matching chooser. After new clips arrive, run `Tools/anim/build_hero_anim.py` (the command line is in the
+  file) to rebuild the databases from `Tools/anim/hero_databases.json` and the combat windows from
+  `Data/anim_windows.json`.
+- The hero animates with **no animation blueprint**: `UWRHeroAnimInstance` (a `UWRAnimInstance`) does motion matching
+  in C++ (`UPoseSearchLibrary::MotionMatch` with its own pose history and blend stack), because the engine's
+  motion-matching node can't run outside an animation blueprint in a packaged build and anim graphs can't be made
+  headless.

@@ -21,6 +21,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/SkeletalMeshSocket.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -159,16 +160,19 @@ void AWRCharacter::AttachHeld(UStaticMeshComponent* Comp, UStaticMesh* Model, co
 	{
 		return;
 	}
-	// Directions come from the skeleton's reference pose (not always a T-pose: arms may hang), in mesh space, or from
-	// a clip's pose ("pose") for gear gripped the same way in every clip: a crossbow runs from the trigger hand to the
-	// other hand in the rifle-aim pose, which the reference pose can't tell.
+	// Held in a hand socket (weapon_r, bow_l: the palm's frame, its origin in the palm). The item's directions ("along",
+	// "face") are read from the body: the skeleton's reference pose, or a clip's pose ("pose") for gear gripped the same
+	// way in every clip (a crossbow runs from the trigger hand to the other hand in the rifle-aim pose, which the
+	// reference pose can't tell), and turned into the socket's own frame.
 	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
-	const FName Socket = Def.HeldSocket.IsNone() ? FName(TEXT("RightHand")) : Def.HeldSocket;
-	const int32 Bone = Ref.FindBoneIndex(Socket);
+	const FName SocketName = Def.HeldSocket.IsNone() ? WeaponSocket : Def.HeldSocket;
+	const USkeletalMeshSocket* Socket = BodyAsset->FindSocket(SocketName);
+	const int32 Bone = Ref.FindBoneIndex(Socket ? Socket->BoneName : SocketName);
 	if (Bone == INDEX_NONE)
 	{
 		return;
 	}
+	const FTransform SocketLocal = Socket ? Socket->GetSocketLocalTransform() : FTransform::Identity;
 	const FBodyAnimSet* PoseSet = Def.HeldPose.IsNone() ? nullptr : BodyAnims.Find(Def.HeldPose);
 	const UAnimSequence* PoseClip = PoseSet && PoseSet->Clips.Num() > 0 ? Cast<UAnimSequence>(PoseSet->Clips[0]) : nullptr;
 	const USkeleton* PoseSkeleton = PoseClip ? PoseClip->GetSkeleton() : nullptr;
@@ -183,48 +187,56 @@ void AWRCharacter::AttachHeld(UStaticMeshComponent* Comp, UStaticMesh* Model, co
 		FTransform Out = FTransform::Identity;
 		for (int32 B = First; B != INDEX_NONE; B = PoseSkeleton->GetReferenceSkeleton().GetParentIndex(B))
 		{
-			FTransform Local;
+			FTransform Local = PoseSkeleton->GetReferenceSkeleton().GetRefBonePose()[B];
 			PoseClip->GetBoneTransform(Local, FSkeletonPoseBoneIndex(B), At, false);
 			Out = Out * Local;
 		}
 		return Out;
 	};
-	const FTransform HandCS = BoneCS(Bone);
-	const FVector Hand = HandCS.GetLocation();
-	const int32 Parent = Ref.GetParentIndex(Bone);
-	const FVector Elbow = Parent != INDEX_NONE ? BoneCS(Parent).GetLocation() : Hand + FVector::UpVector;
-	const int32 Finger = Ref.FindBoneIndex(FName(*(Socket.ToString() + TEXT("Index1"))));
-	const FVector FingerDir = Finger != INDEX_NONE ? (BoneCS(Finger).GetLocation() - Hand).GetSafeNormal()
-	                                               : (Hand - Elbow).GetSafeNormal();  // no finger bones: the hand continues the forearm
-	const FString OtherName = Socket.ToString().StartsWith(TEXT("Left")) ? Socket.ToString().Replace(TEXT("Left"), TEXT("Right"))
-	                                                                     : Socket.ToString().Replace(TEXT("Right"), TEXT("Left"));
+	const FTransform SocketCS = SocketLocal * BoneCS(Bone);
+	const FVector Hand = SocketCS.GetLocation();
+	// The fingers run out of the hand toward the middle finger; the other hand is the same bone on the other side.
+	const FString BoneName = Ref.GetBoneName(Bone).ToString();
+	const FString Side = BoneName.Right(2);
+	const int32 Finger = Ref.FindBoneIndex(FName(*(TEXT("middle_01") + Side)));
+	const FVector FingerDir = Finger != INDEX_NONE ? (BoneCS(Finger).GetLocation() - BoneCS(Bone).GetLocation()).GetSafeNormal()
+	                                               : SocketCS.GetUnitAxis(EAxis::Y);
+	const FString OtherName = BoneName.LeftChop(2) + (Side == TEXT("_l") ? TEXT("_r") : TEXT("_l"));
 	const int32 OtherHand = Ref.FindBoneIndex(FName(*OtherName));
 	const FVector Forward = FRotator(0.f, BodyYaw, 0.f).UnrotateVector(FVector::ForwardVector);
-	const FVector Side = FVector(Hand.X, Hand.Y, 0.f).GetSafeNormal();  // the mesh origin is on the body's centre line
+	const FVector SideDir = FVector(Hand.X, Hand.Y, 0.f).GetSafeNormal();  // the mesh origin is on the body's centre line
 	const auto Dir = [&](FName Name) -> FVector
 	{
 		if (Name == TEXT("fingers")) return FingerDir;
+		if (Name == TEXT("grip")) return SocketCS.GetUnitAxis(EAxis::X);       // through the fist, out past the index finger
+		if (Name == TEXT("palm")) return SocketCS.GetUnitAxis(EAxis::Z);       // out of the palm
+		if (Name == TEXT("backhand")) return -SocketCS.GetUnitAxis(EAxis::Z);  // out of the back of the hand
+		if (Name == TEXT("arm"))                                               // down the forearm, elbow to wrist
+		{
+			const int32 Elbow = Ref.GetParentIndex(Bone);
+			return Elbow != INDEX_NONE ? (BoneCS(Bone).GetLocation() - BoneCS(Elbow).GetLocation()).GetSafeNormal() : FingerDir;
+		}
 		if (Name == TEXT("hands") && OtherHand != INDEX_NONE)
 		{
 			const FVector ToOther = BoneCS(OtherHand).GetLocation() - Hand;
 			return FVector(ToOther.X, ToOther.Y, 0.f).GetSafeNormal();  // level: the other hand holds it from below
 		}
 		if (Name == TEXT("up")) return FVector::UpVector;
-		if (Name == TEXT("out")) return Side;
+		if (Name == TEXT("out")) return SideDir;
 		if (Name == TEXT("back")) return -Forward;
 		return Forward;
 	};
 	const FVector Along = Dir(Def.HeldAlong);
 	if (Comp == RangedMesh)
 	{
-		// Mixamo's rifle aim holds the gun a little left of where the body faces: turn the body that much while aiming.
+		// A gun held across the body in the aim pose: turn the body that much while aiming so it points ahead.
 		const FVector AlongActor = FRotator(0.f, BodyYaw, 0.f).RotateVector(Along);
 		RangedAimYaw = PoseClip && Def.HeldAlong == TEXT("hands") ? -FMath::RadiansToDegrees(FMath::Atan2(AlongActor.Y, AlongActor.X)) : 0.f;
 	}
-	FVector Face = FVector::VectorPlaneProject(Dir(Def.HeldFace.IsNone() ? FName(TEXT("out")) : Def.HeldFace), Along).GetSafeNormal();
-	if (Face.IsNearlyZero())
+	FVector FaceDir = FVector::VectorPlaneProject(Dir(Def.HeldFace.IsNone() ? FName(TEXT("out")) : Def.HeldFace), Along).GetSafeNormal();
+	if (FaceDir.IsNearlyZero())
 	{
-		Face = FVector::VectorPlaneProject(FVector::UpVector, Along).GetSafeNormal();
+		FaceDir = FVector::VectorPlaneProject(FVector::UpVector, Along).GetSafeNormal();
 	}
 	const FBox Box = Model->GetBoundingBox();
 	const FVector LocalAlong = ParseAxis(Def.MeshAlong, LongAxis(Box));
@@ -233,15 +245,14 @@ void AWRCharacter::AttachHeld(UStaticMeshComponent* Comp, UStaticMesh* Model, co
 	{
 		LocalFace = FVector::VectorPlaneProject(FVector(0.31f, 0.53f, 0.79f), LocalAlong).GetSafeNormal();
 	}
-	const FQuat Want = FQuat(FRotationMatrix::MakeFromXY(HandCS.InverseTransformVectorNoScale(Along), HandCS.InverseTransformVectorNoScale(Face)));
+	const FQuat Want = FQuat(FRotationMatrix::MakeFromXY(SocketCS.InverseTransformVectorNoScale(Along), SocketCS.InverseTransformVectorNoScale(FaceDir)));
 	const FQuat Have = FQuat(FRotationMatrix::MakeFromXY(LocalAlong, LocalFace));
 	const FQuat Rot = FQuat(Def.HeldRot) * Want * Have.Inverse();
-	const FVector Grip = HandCS.InverseTransformPositionNoScale(Hand + FingerDir * WRTune(TEXT("ranged.gripFromWrist"), 5.f)) + Def.HeldOffset;
 	Comp->SetStaticMesh(Model);
 	Comp->EmptyOverrideMaterials();
-	Comp->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket);
+	Comp->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, Socket ? SocketName : Ref.GetBoneName(Bone));
 	Comp->SetRelativeRotation(Rot.Rotator());
-	Comp->SetRelativeLocation(Grip);
+	Comp->SetRelativeLocation(Def.HeldOffset);  // the socket's origin is already in the palm
 	Comp->SetRelativeScale3D(FVector::OneVector);
 }
 

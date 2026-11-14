@@ -444,7 +444,7 @@ bool FWRAnimProxy::Evaluate(FPoseContext& Output)
 {
 	const FBoneContainer& Bones = Output.Pose.GetBoneContainer();
 	RefreshMasks(Bones);
-	if (!SampleBlend(Frame.Loco, Output))
+	if (!EvaluateLoco(Output))
 	{
 		Output.ResetToRefPose();
 	}
@@ -524,6 +524,7 @@ bool FWRAnimProxy::Evaluate(FPoseContext& Output)
 		const FQuat Turn(Side, FMath::DegreesToRadians(Lift.Value));
 		Output.Pose[Bone].SetRotation((Parent.Inverse() * Turn * Parent * Output.Pose[Bone].GetRotation()).GetNormalized());
 	}
+	PostLayers(Output);
 	PlantFeet(Output.Pose);
 	PlaceCreatureFeet(Output.Pose);
 	PlaceCreatureSpine(Output.Pose);
@@ -1402,6 +1403,7 @@ void UWRAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Frame.SpineMaxBend = WRTune(TEXT("anim.creatureSpine.maxBend"), 35.f);
 	Frame.MeshForward = MeshForward;
 	Frame.PoseLift = PoseLift;
+	Frame.TurnWeight = TurnWeight;
 	if (CreatureLegs.Num() > 0)
 	{
 		const FWRTuning& T = FWRTuning::Get();
@@ -1415,6 +1417,7 @@ void UWRAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		Tune.FootMaxTilt = T.Num(TEXT("anim.creatureFeet.footMaxTilt"), 35.f);
 	}
 	MeasureSlide(DeltaSeconds);
+	PostStep(DeltaSeconds, Frame);
 }
 
 void UWRAnimInstance::MeasureSlide(float DeltaSeconds)

@@ -16,6 +16,10 @@
 		{ "Name": "PCG", "Enabled": true },
 		{ "Name": "PythonScriptPlugin", "Enabled": true },
 		{ "Name": "EditorScriptingUtilities", "Enabled": true },
-		{ "Name": "ModelingToolsEditorMode", "Enabled": true, "TargetAllowList": [ "Editor" ] }
+		{ "Name": "ModelingToolsEditorMode", "Enabled": true, "TargetAllowList": [ "Editor" ] },
+		{ "Name": "PoseSearch", "Enabled": true },
+		{ "Name": "HairStrands", "Enabled": true },
+		{ "Name": "RigLogic", "Enabled": true },
+		{ "Name": "MetaHumanCharacter", "Enabled": true }
 	]
 }

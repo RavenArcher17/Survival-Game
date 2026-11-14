@@ -1,58 +1,268 @@
 {
-  "_comment": "Player body art (Mixamo-rigged AI survivor, Tools/art/README.md). Each anim key lists one or more AnimSequences; one-shots pick variants in turn. speeds (optional) = a locomotion clip's natural pace in cm/s by anim key, overriding the pace measured from its feet; the play rate is the real speed over it, so feet don't slide. The old 150 / 420 guesses were ~20% over the measured 125 / 350, so feet skated forward.",
-  "mesh": "/Game/Characters/Survivor/survivor_m.survivor_m",
+  "_comment": "The player hero (cooks/hero.md, cooks/build-hero-anim.md): the MetaHuman male (m) and female (f) picked in the main menu (?Body= on the join URL), built from these parts by AWRCharacter::LoadBodyArt. One set of clips serves both (retargeted once onto the male body; UWRHeroAnimInstance fits them to the female's proportions). Locomotion is motion matching over the GASP 5.8 databases in mmDir, picked by the 'locomotion' chooser; everything else (swings, casts, rolls, hits, deaths, gathering, block and aim loops) is one-shots and loops by key, as before.",
+  "schema": 2,
   "meshYaw": -90,
-  "meshScale": 1.0,
-  "weaponSocket": "RightHand",
+  "faceAnim": "/MetaHumanCharacter/Face/ABP_Face.ABP_Face_C",
+  "hero": {
+    "m": {
+      "_name": "M1 Ash, athletic build, Survivor Wraps",
+      "body": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Body/SKM_MH_Hero_M1_BodyMesh.SKM_MH_Hero_M1_BodyMesh",
+      "face": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Face/SKM_MH_Hero_M1_FaceMesh.SKM_MH_Hero_M1_FaceMesh",
+      "grooms": {
+        "Hair": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Hair_S_Messy.Hair_S_Messy",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Hair_S_Messy_Binding.Hair_S_Messy_Binding"
+        },
+        "Eyebrows": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Eyebrows_M_Full.Eyebrows_M_Full",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Eyebrows_M_Full_Binding.Eyebrows_M_Full_Binding"
+        },
+        "Eyelashes": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Eyelashes_S_Fine.Eyelashes_S_Fine",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Eyelashes_S_Fine_Binding.Eyelashes_S_Fine_Binding"
+        },
+        "Beard": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Beard_S_Stubble.Beard_S_Stubble",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Beard_S_Stubble_Binding.Beard_S_Stubble_Binding"
+        },
+        "Mustache": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Mustache_S_Stubble.Mustache_S_Stubble",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_M1/Grooms/Mustache_S_Stubble_Binding.Mustache_S_Stubble_Binding"
+        }
+      },
+      "outfit": {
+        "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wraps/SKM_Wraps_M_Athletic_Chest.SKM_Wraps_M_Athletic_Chest",
+        "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wraps/SKM_Wraps_M_Athletic_Hands.SKM_Wraps_M_Athletic_Hands",
+        "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wraps/SKM_Wraps_M_Athletic_Legs.SKM_Wraps_M_Athletic_Legs"
+      }
+    },
+    "f": {
+      "_name": "F1 Wren, athletic build, Survivor Wraps",
+      "body": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Body/SKM_MH_Hero_F1_BodyMesh.SKM_MH_Hero_F1_BodyMesh",
+      "face": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Face/SKM_MH_Hero_F1_FaceMesh.SKM_MH_Hero_F1_FaceMesh",
+      "grooms": {
+        "Hair": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Grooms/Hair_M_Layered.Hair_M_Layered",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Grooms/Hair_M_Layered_Binding.Hair_M_Layered_Binding"
+        },
+        "Eyebrows": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Grooms/Eyebrows_M_SlightArch.Eyebrows_M_SlightArch",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Grooms/Eyebrows_M_SlightArch_Binding.Eyebrows_M_SlightArch_Binding"
+        },
+        "Eyelashes": {
+          "groom": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Grooms/Eyelashes_L_Curl.Eyelashes_L_Curl",
+          "binding": "/Game/Wildreach/Characters/Hero/Unpacked/BP_Hero_F1/Grooms/Eyelashes_L_Curl_Binding.Eyelashes_L_Curl_Binding"
+        }
+      },
+      "outfit": {
+        "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wraps/SKM_Wraps_F_Athletic_Chest.SKM_Wraps_F_Athletic_Chest",
+        "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wraps/SKM_Wraps_F_Athletic_Hands.SKM_Wraps_F_Athletic_Hands",
+        "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wraps/SKM_Wraps_F_Athletic_Legs.SKM_Wraps_F_Athletic_Legs"
+      }
+    }
+  },
+  "_sockets": "Sockets on every hero body (made in the lab, hero.md 3.1 L5). Hand sockets: X through the fist out past the index finger, Z out of the palm, origin in the palm. shield_l: X down the forearm, Z out of the back of the arm.",
+  "sockets": {
+    "weapon": "weapon_r",
+    "shield": "shield_l",
+    "bow": "bow_l",
+    "torch": "torch_l",
+    "back": "back_weapon",
+    "backShield": "back_shield",
+    "hipRight": "hip_r",
+    "hipLeft": "hip_l",
+    "mouth": "mouth"
+  },
   "weaponMesh": "/Game/Props/Sword/sword_game/StaticMeshes/sword_game.sword_game",
   "shieldMesh": "/Game/Props/Shield/shield_game/StaticMeshes/shield_game.shield_game",
-  "shieldSocket": "LeftForeArm",
-  "speeds": {},
+  "animDir": "/Game/Wildreach/Characters/Hero/Anims/Actions/",
   "anims": {
-    "idle": ["SwordAndShieldIdle"],
-    "walk": ["SwordAndShieldWalk"],
-    "run": ["SwordAndShieldRun"],
-    "fall": ["SwordAndShieldJump"],
-    "block": ["SwordAndShieldBlockIdle"],
-    "dodge": ["StandToRoll"],
-    "swim": ["Swimming"],
-    "tread": ["TreadingWater"],
-    "light": ["SwordAndShieldSlash", "SwordAndShieldSlash2", "SwordAndShieldSlash3"],
-    "heavy": ["SwordAndShieldAttack", "SwordAndShieldAttack2", "SwordAndShieldAttack3"],
-    "cast": ["SwordAndShieldCasting", "SwordAndShieldCasting2"],
-    "hit": ["SwordAndShieldImpact", "SwordAndShieldImpact2", "SwordAndShieldImpact3"],
-    "death": ["SwordAndShieldDeath", "SwordAndShieldDeath2"],
-    "gather": ["GatheringObjects"],
-    "chop": ["StandingMeleeAttackDownward"],
-    "pickup": ["PickingUpObject"],
-    "ranged_idle": ["BowIdle"],
-    "ranged_walk": ["BowWalk"],
-    "ranged_run": ["BowRun"],
-    "ranged_equip": ["BowEquip"],
-    "bow_aim": ["BowAim"],
-    "bow_aimwalk": ["BowAimWalk"],
-    "bow_fire": ["BowRecoil"],
-    "bow_reload": ["BowDraw"],
-    "rifle_aim": ["RifleAim"],
-    "rifle_fire": ["RifleFire"],
-    "rifle_reload": ["RifleReload"],
-    "throw": ["Throw"],
-    "walk_back": ["SwordAndShieldWalk2"], "walk_left": ["SwordAndShieldStrafe2"], "walk_right": ["SwordAndShieldStrafe"],
-    "run_back": ["SwordAndShieldRun2"], "run_left": ["SwordAndShieldStrafe3"], "run_right": ["SwordAndShieldStrafe4"],
-    "turn_left": ["SwordAndShieldTurn2"], "turn_right": ["SwordAndShieldTurn"],
-    "ranged_walk_back": ["BowWalkBack"], "ranged_walk_left": ["BowWalkLeft"], "ranged_walk_right": ["BowWalkRight"],
-    "ranged_run_back": ["BowRunBack"], "ranged_run_left": ["BowRunLeft"], "ranged_run_right": ["BowRunRight"],
-    "bow_aimwalk_back": ["BowAimWalkBack"], "bow_aimwalk_left": ["BowAimWalkLeft"], "bow_aimwalk_right": ["BowAimWalkRight"],
-    "ranged_turn_left": ["BowTurnLeft"], "ranged_turn_right": ["BowTurnRight"]
+    "block": [
+      "A_SwordAndShieldBlockIdle"
+    ],
+    "dodge": [
+      "A_StandToRoll"
+    ],
+    "swim": [
+      "A_Swimming"
+    ],
+    "tread": [
+      "A_TreadingWater"
+    ],
+    "light": [
+      "A_SwordAndShieldSlash",
+      "A_SwordAndShieldSlash2",
+      "A_SwordAndShieldSlash3"
+    ],
+    "heavy": [
+      "A_SwordAndShieldAttack",
+      "A_SwordAndShieldAttack2",
+      "A_SwordAndShieldAttack3"
+    ],
+    "cast": [
+      "A_SwordAndShieldCasting",
+      "A_SwordAndShieldCasting2"
+    ],
+    "hit": [
+      "A_SwordAndShieldImpact",
+      "A_SwordAndShieldImpact2",
+      "A_SwordAndShieldImpact3"
+    ],
+    "death": [
+      "A_SwordAndShieldDeath",
+      "A_SwordAndShieldDeath2"
+    ],
+    "gather": [
+      "A_GatheringObjects"
+    ],
+    "chop": [
+      "A_StandingMeleeAttackDownward"
+    ],
+    "pickup": [
+      "A_PickingUpObject"
+    ],
+    "kick": [
+      "A_SwordAndShieldKick"
+    ],
+    "ranged_idle": [
+      "A_BowIdle"
+    ],
+    "ranged_equip": [
+      "A_BowEquip"
+    ],
+    "bow_aim": [
+      "A_BowAim"
+    ],
+    "bow_fire": [
+      "A_BowRecoil"
+    ],
+    "bow_reload": [
+      "A_BowDraw"
+    ],
+    "rifle_aim": [
+      "A_RifleAim"
+    ],
+    "rifle_fire": [
+      "A_RifleFire"
+    ],
+    "rifle_reload": [
+      "A_RifleReload"
+    ],
+    "throw": [
+      "A_Throw"
+    ]
   },
-  "_layers": "Animation layers (UWRAnimInstance): a locomotion set is an idle plus walk / run clips with _back / _left / _right variants, blended by the direction of travel against the facing; paces come from 'speeds' where given, otherwise they're measured from the clips' feet. One-shots play from upperBody up (the legs keep walking) unless listed in fullBody. spineBones share the twist that keeps the chest facing the camera while the legs stand; turn_left / turn_right step the legs round.",
-  "upperBody": "Spine",
-  "spineBones": ["Spine", "Spine1", "Spine2"],
-  "legBones": ["LeftUpLeg", "LeftLeg", "LeftFoot", "RightUpLeg", "RightLeg", "RightFoot"],
-  "fullBody": ["dodge", "death", "fall", "swim", "tread", "gather", "chop", "pickup"],
-  "animPrefix": "/Game/Characters/Survivor/survivor_mArmature_",
-  "_bodies": "Body variants picked in the main menu (?Body= on the join URL). Each overrides any top-level field it lists.",
-  "bodies": {
-    "f": { "mesh": "/Game/Characters/SurvivorF/survivor_f.survivor_f", "animPrefix": "/Game/Characters/SurvivorF/survivor_fArmature_" }
-  }
+  "_layers": "One-shots play from upperBody up (the legs keep their locomotion) unless listed in fullBody. spineBones share the twist that keeps the chest on the facing while the legs stand (turn in place); legBones plant the feet on slopes.",
+  "upperBody": "spine_01",
+  "spineBones": [
+    "spine_02",
+    "spine_03",
+    "spine_04",
+    "spine_05"
+  ],
+  "legBones": [
+    "thigh_l",
+    "calf_l",
+    "foot_l",
+    "thigh_r",
+    "calf_r",
+    "foot_r"
+  ],
+  "fullBody": [
+    "dodge",
+    "death",
+    "swim",
+    "tread",
+    "gather",
+    "chop",
+    "pickup"
+  ],
+  "locoIdle": "/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Idle_Loop",
+  "turnLeft": "/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Turn_090_L",
+  "turnRight": "/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Turn_090_R",
+  "mmDir": "/Game/Wildreach/Characters/Hero/Anims/MM/",
+  "_locomotion": "The motion-matching chooser: the first row whose state (idle / moving / air / land / swim), gait (walk / run / sprint) and stance (melee / ranged / bow_aim / rifle_aim / block) match wins; its databases are searched together. Gaits: walk below anim.mm.walkBelow cm/s of top speed (aiming, blocking), sprint at player.sprintSpeed, run between. 'fallback' is for other players' heroes at LOD anim.mm.fallbackLOD and beyond (cheap loops only).",
+  "locomotion": [
+    {
+      "state": "air",
+      "dbs": [
+        "PSD_Hero_Jumps"
+      ]
+    },
+    {
+      "state": "land",
+      "dbs": [
+        "PSD_Hero_Lands",
+        "PSD_Hero_RunLoops",
+        "PSD_Hero_RunStops",
+        "PSD_Hero_Idle"
+      ]
+    },
+    {
+      "state": "idle",
+      "dbs": [
+        "PSD_Hero_Idle",
+        "PSD_Hero_RunStops",
+        "PSD_Hero_SprintStops"
+      ]
+    },
+    {
+      "state": "moving",
+      "gait": "walk",
+      "dbs": [
+        "PSD_Hero_WalkLoops",
+        "PSD_Hero_WalkStarts",
+        "PSD_Hero_RunStops"
+      ]
+    },
+    {
+      "state": "moving",
+      "gait": "sprint",
+      "dbs": [
+        "PSD_Hero_SprintLoops",
+        "PSD_Hero_SprintStarts",
+        "PSD_Hero_RunLoops"
+      ]
+    },
+    {
+      "state": "moving",
+      "dbs": [
+        "PSD_Hero_RunLoops",
+        "PSD_Hero_RunStarts"
+      ]
+    }
+  ],
+  "fallback": [
+    {
+      "state": "idle",
+      "dbs": [
+        "PSD_Hero_Idle"
+      ]
+    },
+    {
+      "state": "land",
+      "dbs": [
+        "PSD_Hero_Idle"
+      ]
+    },
+    {
+      "state": "air",
+      "dbs": [
+        "PSD_Hero_Jumps"
+      ]
+    },
+    {
+      "state": "moving",
+      "gait": "walk",
+      "dbs": [
+        "PSD_Hero_WalkLoops"
+      ]
+    },
+    {
+      "state": "moving",
+      "dbs": [
+        "PSD_Hero_RunLoops"
+      ]
+    }
+  ]
 }

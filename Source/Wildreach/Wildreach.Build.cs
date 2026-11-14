@@ -31,11 +31,14 @@ public class Wildreach : ModuleRules
 		PrivateDependencyModuleNames.Add("AnimationCore");  // two-bone IK: the survivor's feet planted on slopes (WRAnimInstance)
 		PrivateDependencyModuleNames.Add("MoviePlayer");  // the loading screen during map loads (WRUIFlow)
 		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "RHI" });  // effects: WRFx draws its sprites with its own scene proxy
+		// The MetaHuman hero (WRHeroAnimInstance, WRCharacter): motion matching over the GASP clips, the hair grooms.
+		PrivateDependencyModuleNames.AddRange(new string[] { "PoseSearch", "HairStrandsCore" });
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");
+			PrivateDependencyModuleNames.Add("AnimationBlueprintLibrary");  // the hero's window notifies (UWRHeroAnimTools)
 		}
 	}
 }

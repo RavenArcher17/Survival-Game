@@ -1,0 +1,113 @@
+{
+ "_comment": "Hero motion-matching databases (UWRHeroAnimTools::BuildDatabases, run by Tools/anim/build_hero_databases.py). Each row is a GASP 5.8 database rebuilt on the hero clips: the property lines are the GASP database's own settings (exported as text), with its clips, schema and normalization set swapped for ours.",
+ "normalizationSet": "/Game/Wildreach/Characters/Hero/Anims/MM/PSN_Hero",
+ "databases": {
+  "PSD_Hero_Idle": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Idle.PSS_Hero_Idle'\"",
+   "BaseCostBias=0.100000",
+   "LoopingCostBias=-0.100000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Idle_Loop.MM_Stand_Idle_Loop'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Transition_Crouch_to_Stand.MM_Transition_Crouch_to_Stand'\",bDisableReselection=True)"
+  ],
+  "PSD_Hero_Jumps": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Jump.PSS_Hero_Jump'\"",
+   "ContinuingPoseCostBias=-0.500000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_F_Start_Run_Rfoot.MM_Jump_F_Start_Run_Rfoot'\")",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_F_Start_Stand_Rfoot.MM_Jump_F_Start_Stand_Rfoot'\")",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_F_Off_Run_Lfoot.MM_Jump_F_Off_Run_Lfoot'\",bEnabled=False)",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_F_Off_Run_Rfoot.MM_Jump_F_Off_Run_Rfoot'\",bEnabled=False)",
+   "DatabaseAnimationAssets(4)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_Loop_Fall.MM_Jump_Loop_Fall'\")"
+  ],
+  "PSD_Hero_Lands": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Jump.PSS_Hero_Jump'\"",
+   "ContinuingPoseCostBias=-0.150000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_B_Land_Stand_Light_Lfoot.MM_Jump_B_Land_Stand_Light_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_F_Land_Stand_Light_Lfoot.MM_Jump_F_Land_Stand_Light_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_LL_Land_Stand_Light_Lfoot.MM_Jump_LL_Land_Stand_Light_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Jump_RL_Land_Stand_Light_Rfoot.MM_Jump_RL_Land_Stand_Light_Rfoot'\",bDisableReselection=True)"
+  ],
+  "PSD_Hero_RunLoops": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Loop_B.MM_Run_Loop_B'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Loop_F.MM_Run_Loop_F'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Loop_LR.MM_Run_Loop_LR'\")",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Arc_Small_L.MM_Run_Arc_Small_L'\")",
+   "DatabaseAnimationAssets(4)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Arc_Small_R.MM_Run_Arc_Small_R'\")",
+   "DatabaseAnimationAssets(5)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Loop_RL.MM_Run_Loop_RL'\")"
+  ],
+  "PSD_Hero_RunStarts": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "ContinuingPoseCostBias=-0.050000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Start_B_Lfoot.MM_Run_Start_B_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Start_B_Rfoot.MM_Run_Start_B_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Start_F_Lfoot.MM_Run_Start_F_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Start_F_Rfoot.MM_Run_Start_F_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(4)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Start_LL_Lfoot.MM_Run_Start_LL_Lfoot'\",bEnabled=False)",
+   "DatabaseAnimationAssets(5)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Start_RR_Rfoot.MM_Run_Start_RR_Rfoot'\",bEnabled=False)"
+  ],
+  "PSD_Hero_RunStops": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "ContinuingPoseCostBias=-0.100000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Stop_B_Lfoot.MM_Run_Stop_B_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Stop_B_Rfoot.MM_Run_Stop_B_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Stop_F_Lfoot.MM_Run_Stop_F_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Run_Stop_F_Rfoot.MM_Run_Stop_F_Rfoot'\",bDisableReselection=True)"
+  ],
+  "PSD_Hero_SprintLoops": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Sprint_Loop_F.MM_Sprint_Loop_F'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Transition_Run_to_Sprint_Rfoot.MM_Transition_Run_to_Sprint_Rfoot'\",bDisableReselection=True)",
+   "Tags(0)=\"Loops\""
+  ],
+  "PSD_Hero_SprintStarts": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "ContinuingPoseCostBias=-0.050000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Sprint_Start_F_Rfoot.MM_Sprint_Start_F_Rfoot'\")",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Sprint_Reface_Start_F_R_180.MM_Sprint_Reface_Start_F_R_180'\")"
+  ],
+  "PSD_Hero_SprintStops": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Stop.PSS_Hero_Stop'\"",
+   "ContinuingPoseCostBias=-0.200000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Sprint_Stop_F_Lfoot.MM_Sprint_Stop_F_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Sprint_Stop_F_Rfoot.MM_Sprint_Stop_F_Rfoot'\",bDisableReselection=True)",
+   "Tags(0)=\"Stops\""
+  ],
+  "PSD_Hero_TurnInPlace": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "ContinuingPoseCostBias=-0.050000",
+   "BaseCostBias=-0.200000",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Turn_090_L.MM_Stand_Turn_090_L'\")",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Turn_090_R.MM_Stand_Turn_090_R'\")",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Turn_180_L.MM_Stand_Turn_180_L'\")",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Stand_Turn_180_R.MM_Stand_Turn_180_R'\")",
+   "Tags(0)=\"TurnInPlace\""
+  ],
+  "PSD_Hero_WalkLoops": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_B.MM_Walk_Loop_B'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_BL.MM_Walk_Loop_BL'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_BR.MM_Walk_Loop_BR'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(3)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_F.MM_Walk_Loop_F'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(4)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_FL.MM_Walk_Loop_FL'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(5)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_FR.MM_Walk_Loop_FR'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(6)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_LL.MM_Walk_Loop_LL'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(7)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_RL.MM_Walk_Loop_RL'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(8)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Transition_Run_to_Walk_Rfoot.MM_Transition_Run_to_Walk_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(9)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Transition_Run_to_Walk_Lfoot.MM_Transition_Run_to_Walk_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(10)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Shuffle_LR_to_LL_Lfoot.MM_Walk_Shuffle_LR_to_LL_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(11)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Shuffle_LR_to_LL_Rfoot.MM_Walk_Shuffle_LR_to_LL_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(12)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Shuffle_RR_to_RL_Lfoot.MM_Walk_Shuffle_RR_to_RL_Lfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(13)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Shuffle_RR_to_RL_Rfoot.MM_Walk_Shuffle_RR_to_RL_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(14)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_F_L_20.MM_Walk_Loop_F_L_20'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(15)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_F_R_20.MM_Walk_Loop_F_R_20'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(16)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_RR_offset.MM_Walk_Loop_RR_offset'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(17)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Loop_LR_offset.MM_Walk_Loop_LR_offset'\",bDisableReselection=True)"
+  ],
+  "PSD_Hero_WalkStarts": [
+   "Schema=\"/Script/PoseSearch.PoseSearchSchema'/Game/Wildreach/Characters/Hero/Anims/MM/PSS_Hero_Default.PSS_Hero_Default'\"",
+   "DatabaseAnimationAssets(0)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Reface_Start_F_R_180.MM_Walk_Reface_Start_F_R_180'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(1)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Start_F_Rfoot.MM_Walk_Start_F_Rfoot'\",bDisableReselection=True)",
+   "DatabaseAnimationAssets(2)=(AnimAsset=\"/Script/Engine.AnimSequence'/Game/Wildreach/Characters/Hero/Anims/Loco/MM_Walk_Start_B_Rfoot.MM_Walk_Start_B_Rfoot'\",bDisableReselection=True)"
+  ]
+ }
+}

@@ -1,0 +1,168 @@
+{
+ "A_SwordAndShieldSlash": {
+  "family": "light",
+  "length": 1.5,
+  "peakSpeed": 1428,
+  "trace": [
+   0.55,
+   0.633
+  ],
+  "cancel": [
+   1.067,
+   1.5
+  ],
+  "combo": [
+   1.153,
+   1.5
+  ]
+ },
+ "A_SwordAndShieldSlash2": {
+  "family": "light",
+  "length": 3.533,
+  "peakSpeed": 773,
+  "trace": [
+   0.533,
+   0.867
+  ],
+  "cancel": [
+   2.2,
+   3.533
+  ],
+  "combo": [
+   2.467,
+   3.533
+  ]
+ },
+ "A_SwordAndShieldSlash3": {
+  "family": "light",
+  "length": 1.667,
+  "peakSpeed": 950,
+  "trace": [
+   0.767,
+   0.9
+  ],
+  "cancel": [
+   1.283,
+   1.667
+  ],
+  "combo": [
+   1.36,
+   1.667
+  ]
+ },
+ "A_SwordAndShieldAttack": {
+  "family": "heavy",
+  "length": 2.333,
+  "peakSpeed": 1002,
+  "trace": [
+   1.033,
+   1.25
+  ],
+  "cancel": [
+   1.954,
+   2.333
+  ],
+  "combo": [
+   1.9,
+   2.333
+  ]
+ },
+ "A_SwordAndShieldAttack2": {
+  "family": "heavy",
+  "length": 1.3,
+  "peakSpeed": 1036,
+  "trace": [
+   0.467,
+   0.7
+  ],
+  "cancel": [
+   1.09,
+   1.3
+  ],
+  "combo": [
+   1.06,
+   1.3
+  ]
+ },
+ "A_SwordAndShieldAttack3": {
+  "family": "heavy",
+  "length": 1.733,
+  "peakSpeed": 938,
+  "trace": [
+   0.567,
+   0.9
+  ],
+  "cancel": [
+   1.442,
+   1.733
+  ],
+  "combo": [
+   1.4,
+   1.733
+  ]
+ },
+ "A_StandingMeleeAttackDownward": {
+  "family": "chop",
+  "length": 2.267,
+  "peakSpeed": 801,
+  "trace": [
+   0.667,
+   0.9
+  ],
+  "cancel": [
+   1.788,
+   2.267
+  ]
+ },
+ "A_SwordAndShieldKick": {
+  "family": "kick",
+  "length": 1.2,
+  "peakSpeed": 925,
+  "trace": [
+   0.283,
+   0.5
+  ],
+  "cancel": [
+   0.955,
+   1.2
+  ]
+ },
+ "A_SwordAndShieldCasting": {
+  "family": "cast",
+  "length": 2.967,
+  "peakSpeed": 832,
+  "trace": [
+   1.55,
+   1.65
+  ],
+  "cancel": [
+   2.44,
+   2.967
+  ]
+ },
+ "A_SwordAndShieldCasting2": {
+  "family": "cast",
+  "length": 1.033,
+  "peakSpeed": 154,
+  "trace": [
+   0.133,
+   0.233
+  ],
+  "cancel": [
+   0.713,
+   1.033
+  ]
+ },
+ "A_StandToRoll": {
+  "family": "dodge",
+  "length": 2.367,
+  "iframes": [
+   0.169,
+   1.183
+  ],
+  "cancel": [
+   1.657,
+   2.367
+  ]
+ }
+}

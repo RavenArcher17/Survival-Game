@@ -1,5 +1,6 @@
 #include "WRCharacter.h"
 #include "WRAnimInstance.h"
+#include "WRHeroAnimInstance.h"
 #include "WRCameraBoom.h"
 #include "WRSocial.h"
 #include "WRWorldDressing.h"
@@ -39,6 +40,13 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Components/LODSyncComponent.h"
+#include "Engine/SkeletalMeshSocket.h"
+#include "GroomComponent.h"
+#include "GroomAsset.h"
+#include "GroomBindingAsset.h"
+#include "PoseSearch/PoseSearchDatabase.h"
+#include "Animation/AnimInstance.h"
 
 AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -84,6 +92,34 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	// person (where your body is hidden from you), come from the animation's foot phase.
 	Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPose;
 
+	// The MetaHuman's head and the rest of the hero (filled from player_art.json by LoadBodyArt).
+	Face = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Face"));
+	Face->SetupAttachment(Body);
+	Face->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Face->SetVisibility(false);
+	Face->bCastHiddenShadow = true;  // first person hides the head from you; your shadow keeps it
+	static const TCHAR* GroomSlots[] = { TEXT("Hair"), TEXT("Eyebrows"), TEXT("Eyelashes"), TEXT("Beard"), TEXT("Mustache") };
+	for (const TCHAR* Slot : GroomSlots)
+	{
+		UGroomComponent* Groom = CreateDefaultSubobject<UGroomComponent>(Slot);
+		Groom->SetupAttachment(Face);
+		Groom->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Groom->SetVisibility(false);
+		Groom->bCastHiddenShadow = true;
+		Grooms.Add(Groom);
+	}
+	static const TCHAR* OutfitSlots[] = { TEXT("OutfitHead"), TEXT("OutfitChest"), TEXT("OutfitHands"), TEXT("OutfitLegs") };
+	for (const TCHAR* Slot : OutfitSlots)
+	{
+		USkeletalMeshComponent* Piece = CreateDefaultSubobject<USkeletalMeshComponent>(Slot);
+		Piece->SetupAttachment(Body);
+		Piece->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Piece->SetVisibility(false);
+		Piece->bCastHiddenShadow = true;
+		Outfit.Add(Piece);
+	}
+	LODSync = CreateDefaultSubobject<ULODSyncComponent>(TEXT("LODSync"));
+
 	ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
 	ShieldMesh->SetupAttachment(Body);
 	ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -103,6 +139,16 @@ void AWRCharacter::BeginPlay()
 	ApplyViewMode();
 	Cast<UWRCharacterMovementComponent>(GetCharacterMovement())->SprintSpeed = WRTune(TEXT("player.sprintSpeed"), 750.f);
 	GetCharacterMovement()->MaxWalkSpeed = WRTune(TEXT("player.walkSpeed"), 450.f);
+	// Movement (FULL-GAME 9): 0.15 s to full speed and a quick stop, so starts and stops read; motion matching's
+	// warping keeps the feet planted on the snappier capsule.
+	{
+		UCharacterMovementComponent* Move = GetCharacterMovement();
+		Move->MaxAcceleration = WRTune(TEXT("player.maxAcceleration"), 5000.f);
+		Move->BrakingDecelerationWalking = WRTune(TEXT("player.brakingDeceleration"), 4000.f);
+		Move->bUseSeparateBrakingFriction = true;
+		Move->BrakingFriction = WRTune(TEXT("player.brakingFriction"), 6.f);
+		Move->GroundFriction = WRTune(TEXT("player.groundFriction"), 8.f);
+	}
 	DefaultFriction = GetCharacterMovement()->GroundFriction;
 	DefaultBraking = GetCharacterMovement()->BrakingDecelerationWalking;
 	DefaultAcceleration = GetCharacterMovement()->MaxAcceleration;
@@ -120,9 +166,14 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		if (IsLocallyControlled())
 		{
 			TickAimCamera(DeltaSeconds);
+			TickFirstPersonCamera(DeltaSeconds);
 		}
 		BodyAimTurn = FMath::FInterpTo(BodyAimTurn, IsAimingRanged() ? RangedAimYaw : 0.f, DeltaSeconds, 10.f);
 		TickBodyAnim();
+	}
+	if (HasAuthority())
+	{
+		UpdateReplicatedAccel();
 	}
 	// Slick ice: the same check runs on the server and the owning client, so movement prediction agrees.
 	if (HasAuthority() || IsLocallyControlled())
@@ -150,6 +201,7 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRCharacter, bAiming);
 	DOREPLIFETIME(AWRCharacter, SelectedAmmo);
 	DOREPLIFETIME(AWRCharacter, MeleeItem);
+	DOREPLIFETIME_CONDITION(AWRCharacter, ReplicatedAccel, COND_SimulatedOnly);
 }
 
 void AWRCharacter::InitAbilityActorInfo()
@@ -265,12 +317,107 @@ void AWRCharacter::ApplyViewMode()
 	ThirdPersonCamera->SetActive(!bFirstPerson);
 	BodyMesh->SetOwnerNoSee(bFirstPerson);
 	FaceMarker->SetOwnerNoSee(bFirstPerson);
-	Body->SetOwnerNoSee(bFirstPerson);
+	// Full-body first person (hero.md 2.7): you see your own arms, body and legs; the head and everything on it is
+	// hidden from you (its shadow stays), so the eye sits inside nothing.
+	Body->SetOwnerNoSee(false);
+	Face->SetOwnerNoSee(bFirstPerson);
+	for (UGroomComponent* Groom : Grooms)
+	{
+		Groom->SetOwnerNoSee(bFirstPerson);
+	}
+	if (Outfit.Num() > 0)
+	{
+		Outfit[0]->SetOwnerNoSee(bFirstPerson);  // the Head slot (hood, helm)
+	}
 	ShieldMesh->SetOwnerNoSee(bFirstPerson);  // it would fill the first-person view; the sword stays
+	bEyeInit = false;
 
 	// First person: body yaw follows the camera. Third person: body turns toward movement.
 	bUseControllerRotationYaw = bFirstPerson;
 	GetCharacterMovement()->bOrientRotationToMovement = !bFirstPerson;
+}
+
+void AWRCharacter::TickFirstPersonCamera(float DeltaSeconds)
+{
+	if (!bFirstPerson || !Body->IsVisible() || DeltaSeconds <= 0.f)
+	{
+		return;
+	}
+	// The eye: the head bone after animation, a little forward and up (hero.md 2.7). Across the ground it follows the head
+	// one to one; up and down it rides a critically damped spring with a short half-life and a small bob limit, so a
+	// stride's bounce doesn't shake the view. The view's turn is always the controller's, never the head's (no roll).
+	const FVector Forward = GetActorForwardVector();
+	const float EyeForward = WRTune(TEXT("fp.eyeForward"), 9.f), EyeUp = WRTune(TEXT("fp.eyeUp"), 6.f);
+	const FName HeadBone(TEXT("head"));
+	FVector Eye = Body->DoesSocketExist(HeadBone) ? Body->GetSocketLocation(HeadBone) + Forward * EyeForward + FVector(0.f, 0.f, EyeUp)
+	                                              : GetActorLocation() + FVector(0.f, 0.f, 64.f);
+	// A roll in first person: the view only drops (30 cm and back over the roll), it never tumbles with the head.
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (HasTag(WRTags::State_Dodging))
+	{
+		if (DodgeStartedAt < 0.0)
+		{
+			DodgeStartedAt = Now;
+			DodgeEye = FirstPersonCamera->GetComponentLocation() - GetActorLocation();
+		}
+		const float Length = FMath::Max(WRTune(TEXT("player.dodgeDuration"), 0.45f), 0.1f);
+		const float T = FMath::Clamp(float(Now - DodgeStartedAt) / Length, 0.f, 1.f);
+		Eye = GetActorLocation() + DodgeEye - FVector(0.f, 0.f, WRTune(TEXT("fp.rollDrop"), 30.f) * FMath::Sin(T * PI));
+		const float Vignette = WRTune(TEXT("fp.rollVignette"), 0.15f) * FMath::Clamp(1.f - float(Now - DodgeStartedAt) / 0.1f, 0.f, 1.f);
+		FirstPersonCamera->PostProcessSettings.bOverride_VignetteIntensity = Vignette > 0.f;
+		FirstPersonCamera->PostProcessSettings.VignetteIntensity = Vignette;
+	}
+	else if (DodgeStartedAt >= 0.0)
+	{
+		DodgeStartedAt = -1.0;
+		FirstPersonCamera->PostProcessSettings.bOverride_VignetteIntensity = false;
+	}
+	if (!bEyeInit)
+	{
+		bEyeInit = true;
+		EyeZ = float(Eye.Z);
+		EyeZSpeed = 0.f;
+	}
+	// Critically damped spring (half-life), clamped to the bob limit around the head.
+	const float HalfLife = FMath::Max(WRTune(TEXT("fp.halfLife"), 0.05f), 0.001f);
+	const float Y = (4.f * 0.69314718f) / HalfLife / 2.f;
+	const float J0 = EyeZ - float(Eye.Z);
+	const float J1 = EyeZSpeed + J0 * Y;
+	const float E = FMath::Exp(-Y * DeltaSeconds);
+	EyeZ = E * (J0 + J1 * DeltaSeconds) + float(Eye.Z);
+	EyeZSpeed = E * (EyeZSpeed - J1 * Y * DeltaSeconds);
+	const float Bob = WRTune(TEXT("fp.bob"), 2.5f);
+	EyeZ = FMath::Clamp(EyeZ, float(Eye.Z) - Bob, float(Eye.Z) + Bob);
+	FirstPersonCamera->SetWorldLocation(FVector(Eye.X, Eye.Y, EyeZ));
+}
+
+void AWRCharacter::UpdateReplicatedAccel()
+{
+	// Server: what other machines' copies need for motion matching (the owner and the server have the real thing).
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	const FVector Accel = Move->GetCurrentAcceleration();
+	const float Max = FMath::Max(Move->GetMaxAcceleration(), 1.f);
+	FWRReplicatedAccel Next;
+	const float Angle = FMath::Atan2(float(Accel.Y), float(Accel.X));
+	Next.Angle = uint8(FMath::RoundToInt(FMath::Fmod(Angle + 2.f * PI, 2.f * PI) / (2.f * PI) * 255.f));
+	Next.Magnitude = uint8(FMath::Clamp(FMath::RoundToInt(float(Accel.Size2D()) / Max * 255.f), 0, 255));
+	Next.Z = int8(FMath::Clamp(FMath::RoundToInt(float(Accel.Z) / Max * 127.f), -127, 127));
+	if (const UWRHeroAnimInstance* Anim = BodyAnimInstance())
+	{
+		Next.Bits = uint8(Anim->HeroInput.Gait) | (uint8(Anim->HeroInput.Stance) << 2) | (Anim->HeroInput.bLockedOn ? 0x20 : 0);
+	}
+	else
+	{
+		// A dedicated server has no body: the same rules from the movement itself.
+		const float Speed = Move->GetMaxSpeed();
+		const uint8 Gait = Speed >= WRTune(TEXT("player.sprintSpeed"), 750.f) - 1.f ? 2 : Speed <= WRTune(TEXT("anim.mm.walkBelow"), 320.f) ? 0 : 1;
+		const uint8 Stance = IsRangedOut() ? (bAiming ? 2 : 1) : HasTag(WRTags::State_Blocking) ? 4 : 0;
+		Next.Bits = Gait | (Stance << 2);
+	}
+	if (FMemory::Memcmp(&Next, &ReplicatedAccel, sizeof(FWRReplicatedAccel)) != 0)
+	{
+		ReplicatedAccel = Next;
+	}
 }
 
 // ---------------------------------------------------------------- body art
@@ -282,28 +429,25 @@ void AWRCharacter::LoadBodyArt()
 		return;  // the server never draws bodies
 	}
 	const TSharedPtr<FJsonObject> Art = FWRTuning::LoadDataFile(TEXT("player_art.json"));
-	if (!Art.IsValid())
+	const TSharedPtr<FJsonObject>* Heroes = nullptr;
+	if (!Art.IsValid() || !Art->TryGetObjectField(TEXT("hero"), Heroes))
 	{
 		return;
 	}
-	// A body variant ("bodies": {"f": {...}}) overrides any top-level field it has.
-	TSharedPtr<FJsonObject> Variant;
-	const TSharedPtr<FJsonObject>* Bodies = nullptr;
-	const TSharedPtr<FJsonObject>* Found = nullptr;
-	if (!BodyStyle.IsNone() && Art->TryGetObjectField(TEXT("bodies"), Bodies) && (*Bodies)->TryGetObjectField(BodyStyle.ToString(), Found))
-	{
-		Variant = *Found;
-	}
-	const auto Pick = [&Art, &Variant](const TCHAR* Field) { return Variant.IsValid() && Variant->HasField(Field) ? Variant : Art; };
-	FString MeshPath, Prefix, Socket, WeaponPath, ShieldPath, ShieldSocket;
-	if (!Pick(TEXT("mesh"))->TryGetStringField(TEXT("mesh"), MeshPath))
+	// The body picked in the menu: "f" the female hero, anything else the male.
+	const FString Sex = BodyStyle == TEXT("f") ? TEXT("f") : TEXT("m");
+	const TSharedPtr<FJsonObject>* HeroPtr = nullptr;
+	if (!(*Heroes)->TryGetObjectField(Sex, HeroPtr))
 	{
 		return;
 	}
-	USkeletalMesh* BodyAsset = LoadObject<USkeletalMesh>(nullptr, *MeshPath);
+	const TSharedPtr<FJsonObject> Hero = *HeroPtr;
+	FString BodyPath;
+	Hero->TryGetStringField(TEXT("body"), BodyPath);
+	USkeletalMesh* BodyAsset = BodyPath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *BodyPath);
 	if (!BodyAsset)
 	{
-		UE_LOG(LogWildreach, Warning, TEXT("Player art: mesh %s not found, keeping the placeholder"), *MeshPath);
+		UE_LOG(LogWildreach, Warning, TEXT("Player art: hero body %s not found, keeping the placeholder"), *BodyPath);
 		return;
 	}
 	LoadedBodyStyle = BodyStyle;
@@ -312,137 +456,233 @@ void AWRCharacter::LoadBodyArt()
 	BodyAnimRefs.Reset();
 	BodyAnim = NAME_None;
 	BodyOneShotUntil = 0.0;
-	Pick(TEXT("animPrefix"))->TryGetStringField(TEXT("animPrefix"), Prefix);
-	Pick(TEXT("weaponSocket"))->TryGetStringField(TEXT("weaponSocket"), Socket);
-	Pick(TEXT("weaponMesh"))->TryGetStringField(TEXT("weaponMesh"), WeaponPath);
-	Pick(TEXT("shieldMesh"))->TryGetStringField(TEXT("shieldMesh"), ShieldPath);
-	Pick(TEXT("shieldSocket"))->TryGetStringField(TEXT("shieldSocket"), ShieldSocket);
-	const double Yaw = Pick(TEXT("meshYaw"))->HasField(TEXT("meshYaw")) ? Pick(TEXT("meshYaw"))->GetNumberField(TEXT("meshYaw")) : 0.0;
-	const double Scale = Pick(TEXT("meshScale"))->HasField(TEXT("meshScale")) ? Pick(TEXT("meshScale"))->GetNumberField(TEXT("meshScale")) : 1.0;
+	const double Yaw = Art->HasField(TEXT("meshYaw")) ? Art->GetNumberField(TEXT("meshYaw")) : -90.0;
+	const TSharedPtr<FJsonObject>* Sockets = nullptr;
+	Art->TryGetObjectField(TEXT("sockets"), Sockets);
+	const auto SocketName = [Sockets](const TCHAR* Key, const TCHAR* Fallback)
+	{
+		FString Name;
+		return FName(Sockets && (*Sockets)->TryGetStringField(Key, Name) ? *Name : Fallback);
+	};
+	WeaponSocket = SocketName(TEXT("weapon"), TEXT("weapon_r"));
+	ShieldSocket = SocketName(TEXT("shield"), TEXT("shield_l"));
 
-	// Feet on the capsule's bottom, facing the actor's forward.
+	// Feet on the capsule's bottom, facing the actor's forward (the MetaHuman faces +Y).
 	Body->SetSkeletalMesh(BodyAsset);
 	const FBox Box = BodyAsset->GetBounds().GetBox();
-	Body->SetRelativeScale3D(FVector(Scale));
-	BodyBaseZ = -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - Box.Min.Z * Scale;
+	Body->SetRelativeScale3D(FVector::OneVector);
+	BodyBaseZ = -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - float(FMath::Min(Box.Min.Z, 0.0));
 	SwimLift = 0.f;
 	Body->SetRelativeLocation(FVector(0.f, 0.f, BodyBaseZ));
-	BodyYaw = Yaw;
+	BodyYaw = float(Yaw);
 	BodyAimTurn = 0.f;
 	Body->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));
 	Body->SetVisibility(true);
 	BodyMesh->SetVisibility(false);
 	FaceMarker->SetVisibility(false);
 
-	// The placeholder blade becomes a sword held in the right hand. Mixamo's rest pose is a T-pose with the palms down,
-	// so a held blade points along the body's forward there: work that out in the hand bone's space from the reference
-	// skeleton, gripped in the palm (partway from the wrist to the index finger), ~95 cm long.
-	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
-	const int32 HandBone = Socket.IsEmpty() ? INDEX_NONE : Ref.FindBoneIndex(FName(*Socket));
-	if (HandBone != INDEX_NONE)
+	// The head: the MetaHuman face mesh with its own animation blueprint (it copies the body's pose and runs the face
+	// rig: blinks, the jaw), the grooms bound to it, rendered as cards in the game.
+	FString FacePath, FaceAnimPath;
+	Hero->TryGetStringField(TEXT("face"), FacePath);
+	Art->TryGetStringField(TEXT("faceAnim"), FaceAnimPath);
+	USkeletalMesh* FaceAsset = FacePath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *FacePath);
+	Face->SetSkeletalMesh(FaceAsset);
+	Face->SetVisibility(FaceAsset != nullptr);
+	if (FaceAsset)
 	{
-		const FTransform HandCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, HandBone);
-		const int32 FingerBone = Ref.FindBoneIndex(FName(*(Socket + TEXT("Index1"))));
-		const FVector FingerCS = FingerBone != INDEX_NONE ? FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, FingerBone).GetLocation()
-		                                                  : HandCS.GetLocation();
-		const FVector BodyForward = FRotator(0.f, Yaw, 0.f).UnrotateVector(FVector::ForwardVector);  // in mesh space
-		const FVector Blade = HandCS.InverseTransformVectorNoScale(BodyForward).GetSafeNormal();
-		const FVector Grip = HandCS.InverseTransformPositionNoScale(FMath::Lerp(HandCS.GetLocation(), FingerCS, 0.6f));
-		WeaponMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(*Socket));
-		UStaticMesh* Sword = WeaponPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *WeaponPath);
-		if (Sword)
+		if (UClass* FaceAnim = FaceAnimPath.IsEmpty() ? nullptr : LoadClass<UAnimInstance>(nullptr, *FaceAnimPath))
 		{
-			// A modelled sword (Tools/art/normalize_gear.py: grip at the origin, blade along the longest axis, crossguard
-			// along the next). A palm-down fist holds it flat: blade forward, crossguard along the fingers.
-			const FBox SwordBox = Sword->GetBoundingBox();
-			const FVector Size = SwordBox.GetSize();
-			const int32 Long = Size.X >= Size.Y && Size.X >= Size.Z ? 0 : (Size.Y >= Size.Z ? 1 : 2);
-			const int32 Guard = Size[(Long + 1) % 3] >= Size[(Long + 2) % 3] ? (Long + 1) % 3 : (Long + 2) % 3;
-			FVector LocalBlade = FVector::ZeroVector, LocalGuard = FVector::ZeroVector;
-			LocalBlade[Long] = SwordBox.Max[Long] >= -SwordBox.Min[Long] ? 1.f : -1.f;  // the blade is the long side of the grip
-			LocalGuard[Guard] = 1.f;
-			const FVector Fingers = HandCS.InverseTransformPositionNoScale(FingerCS);
-			const FQuat Rot = FQuat(FRotationMatrix::MakeFromXY(Blade, Fingers)) * FQuat(FRotationMatrix::MakeFromXY(LocalBlade, LocalGuard)).Inverse();
-			WeaponMesh->SetStaticMesh(Sword);
-			WeaponMesh->EmptyOverrideMaterials();
-			WeaponMesh->SetRelativeRotation(Rot.Rotator());
-			WeaponMesh->SetRelativeLocation(Grip);
-			WeaponMesh->SetRelativeScale3D(FVector::OneVector);
+			Face->SetAnimInstanceClass(FaceAnim);
 		}
 		else
 		{
-			WeaponMesh->SetRelativeRotation(FRotationMatrix::MakeFromY(Blade).Rotator());  // the cube's long axis is its Y
-			WeaponMesh->SetRelativeLocation(Grip + Blade * 40.f);                               // centre: blade ahead, short grip behind
-			WeaponMesh->SetRelativeScale3D(FVector(0.05f, 0.95f, 0.1f));
+			Face->SetLeaderPoseComponent(Body);  // no face rig: the head still follows the body
 		}
-		bArtWeapon = true;
 	}
-
-	// Shield on the outside of the forearm (the back of the arm), centred a little past its middle, its back resting on
-	// the arm. The skeleton's reference pose isn't always the T-pose (Unreal can take a clip's first frame), so the face
-	// is worked out from the arm itself: away from the arm, between up and out from the body's centre line. In a T-pose
-	// (palms down) that's straight up; with the arms hanging (palms in) it's out to the side. Both are the back of the arm.
-	UStaticMesh* Shield = ShieldPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ShieldPath);
-	const int32 ArmBone = Shield ? Ref.FindBoneIndex(FName(*ShieldSocket)) : INDEX_NONE;
-	bShieldShown = ArmBone != INDEX_NONE;
-	ShieldMesh->SetVisibility(bShieldShown);
-	if (ArmBone != INDEX_NONE)
+	const TSharedPtr<FJsonObject>* GroomSet = nullptr;
+	Hero->TryGetObjectField(TEXT("grooms"), GroomSet);
+	for (UGroomComponent* Groom : Grooms)
 	{
-		const FTransform ArmCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, ArmBone);
-		FVector WristCS = ArmCS.GetLocation();
-		for (int32 Bone = 0; Bone < Ref.GetNum(); ++Bone)
+		const TSharedPtr<FJsonObject>* Slot = nullptr;
+		FString GroomPath, BindingPath;
+		if (FaceAsset && GroomSet && (*GroomSet)->TryGetObjectField(Groom->GetName(), Slot))
 		{
-			if (Ref.GetParentIndex(Bone) == ArmBone)
-			{
-				WristCS = FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Bone).GetLocation();
-				break;
-			}
+			(*Slot)->TryGetStringField(TEXT("groom"), GroomPath);
+			(*Slot)->TryGetStringField(TEXT("binding"), BindingPath);
 		}
-		const FVector ArmDir = (WristCS - ArmCS.GetLocation()).GetSafeNormal();
-		const FVector Side = FVector(ArmCS.GetLocation().X, ArmCS.GetLocation().Y, 0.f).GetSafeNormal();  // the mesh origin is on the centre line
-		const FVector Away = FVector::VectorPlaneProject(FVector::UpVector + Side, ArmDir).GetSafeNormal();
-		const FVector Out = ArmCS.InverseTransformVectorNoScale(Away);
-		const FVector Along = ArmCS.InverseTransformVectorNoScale(WristCS - ArmCS.GetLocation());
+		UGroomAsset* GroomAsset = GroomPath.IsEmpty() ? nullptr : LoadObject<UGroomAsset>(nullptr, *GroomPath);
+		UGroomBindingAsset* Binding = BindingPath.IsEmpty() ? nullptr : LoadObject<UGroomBindingAsset>(nullptr, *BindingPath);
+		Groom->SetUseCards(true);
+		Groom->SetGroomAsset(GroomAsset, Binding, false);
+		Groom->SetEnableSimulation(false);
+		Groom->SetVisibility(GroomAsset != nullptr);
+	}
+	// The outfit (hero.md 2.5: tier 0, Survivor Wraps): each piece follows the body's bones.
+	const TSharedPtr<FJsonObject>* OutfitSet = nullptr;
+	Hero->TryGetObjectField(TEXT("outfit"), OutfitSet);
+	static const TCHAR* OutfitKeys[] = { TEXT("Head"), TEXT("Chest"), TEXT("Hands"), TEXT("Legs") };
+	for (int32 i = 0; i < Outfit.Num() && i < UE_ARRAY_COUNT(OutfitKeys); ++i)
+	{
+		FString PiecePath;
+		if (OutfitSet) (*OutfitSet)->TryGetStringField(OutfitKeys[i], PiecePath);
+		USkeletalMesh* Piece = PiecePath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *PiecePath);
+		Outfit[i]->SetSkeletalMesh(Piece);
+		Outfit[i]->SetLeaderPoseComponent(Piece ? Body.Get() : nullptr);
+		Outfit[i]->SetVisibility(Piece != nullptr);
+	}
+	// One LOD for the whole hero, led by the face (it has the most levels): the body, outfit and hair follow.
+	LODSync->ComponentsToSync.Reset();
+	LODSync->CustomLODMapping.Reset();
+	LODSync->NumLODs = FaceAsset ? FaceAsset->GetLODNum() : BodyAsset->GetLODNum();
+	LODSync->ComponentsToSync.Add({ Face->GetFName(), FaceAsset ? ESyncOption::Drive : ESyncOption::Disabled });
+	LODSync->ComponentsToSync.Add({ Body->GetFName(), FaceAsset ? ESyncOption::Passive : ESyncOption::Drive });
+	const auto MapTo = [this](int32 Levels)
+	{
+		FLODMappingData Map;
+		for (int32 L = 0; L < LODSync->NumLODs; ++L)
+		{
+			Map.Mapping.Add(FMath::Min(Levels - 1, L * Levels / FMath::Max(LODSync->NumLODs, 1)));
+		}
+		return Map;
+	};
+	if (FaceAsset)
+	{
+		LODSync->CustomLODMapping.Add(Body->GetFName(), MapTo(BodyAsset->GetLODNum()));
+	}
+	for (USkeletalMeshComponent* Piece : Outfit)
+	{
+		if (Piece->GetSkeletalMeshAsset())
+		{
+			LODSync->ComponentsToSync.Add({ Piece->GetFName(), ESyncOption::Passive });
+			LODSync->CustomLODMapping.Add(Piece->GetFName(), MapTo(Piece->GetSkeletalMeshAsset()->GetLODNum()));
+		}
+	}
+	for (UGroomComponent* Groom : Grooms)
+	{
+		if (Groom->GroomAsset)
+		{
+			LODSync->ComponentsToSync.Add({ Groom->GetFName(), ESyncOption::Passive });
+		}
+	}
+	LODSync->RefreshSyncComponents();
+
+	// The sword in the right hand's socket (the palm's frame: X out of the fist past the index finger, Z out of the
+	// palm), the blade out of the fist and the crossguard across the knuckles.
+	FString WeaponPath, ShieldPath;
+	Art->TryGetStringField(TEXT("weaponMesh"), WeaponPath);
+	Art->TryGetStringField(TEXT("shieldMesh"), ShieldPath);
+	WeaponMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponSocket);
+	UStaticMesh* Sword = WeaponPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *WeaponPath);
+	const FTransform Fist = FistFrame();
+	if (Sword)
+	{
+		// A modelled sword (Tools/art/normalize_gear.py: grip at the origin, blade along the longest axis, crossguard
+		// along the next).
+		const FBox SwordBox = Sword->GetBoundingBox();
+		const FVector Size = SwordBox.GetSize();
+		const int32 Long = Size.X >= Size.Y && Size.X >= Size.Z ? 0 : (Size.Y >= Size.Z ? 1 : 2);
+		const int32 Guard = Size[(Long + 1) % 3] >= Size[(Long + 2) % 3] ? (Long + 1) % 3 : (Long + 2) % 3;
+		FVector LocalBlade = FVector::ZeroVector, LocalGuard = FVector::ZeroVector;
+		LocalBlade[Long] = SwordBox.Max[Long] >= -SwordBox.Min[Long] ? 1.f : -1.f;  // the blade is the long side of the grip
+		LocalGuard[Guard] = 1.f;
+		const FQuat Rot = Fist.GetRotation() * FQuat(FRotationMatrix::MakeFromXY(LocalBlade, LocalGuard)).Inverse();
+		WeaponMesh->SetStaticMesh(Sword);
+		WeaponMesh->EmptyOverrideMaterials();
+		WeaponMesh->SetRelativeRotation(Rot.Rotator());
+		WeaponMesh->SetRelativeLocation(Fist.GetLocation());
+		WeaponMesh->SetRelativeScale3D(FVector::OneVector);
+	}
+	else
+	{
+		WeaponMesh->SetRelativeRotation(FRotationMatrix::MakeFromY(Fist.GetUnitAxis(EAxis::X)).Rotator());  // the cube's long axis is its Y
+		WeaponMesh->SetRelativeLocation(Fist.GetLocation() + Fist.GetUnitAxis(EAxis::X) * 40.f);
+		WeaponMesh->SetRelativeScale3D(FVector(0.05f, 0.95f, 0.1f));
+	}
+	bArtWeapon = true;
+
+	// The shield on the left forearm's socket (X along the forearm toward the wrist, Z out of the back of the arm, its
+	// origin already off the arm): its face out, its top toward the hand, its back resting on the socket.
+	UStaticMesh* Shield = ShieldPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ShieldPath);
+	bShieldShown = Shield && BodyAsset->FindSocket(ShieldSocket);
+	ShieldMesh->SetVisibility(bShieldShown);
+	if (bShieldShown)
+	{
 		const FVector Size = Shield->GetBoundingBox().GetSize();
 		const int32 Thin = Size.X <= Size.Y && Size.X <= Size.Z ? 0 : (Size.Y <= Size.Z ? 1 : 2);
 		FVector LocalFace = FVector::ZeroVector;
 		LocalFace[Thin] = 1.f;  // normalize_gear.py faces the front along +Z (Unreal's glTF import keeps it)
 		const FVector LocalUp = Thin == 2 ? FVector::YAxisVector : FVector::ZAxisVector;
-		const FQuat Rot = FQuat(FRotationMatrix::MakeFromXY(Out, Along)) * FQuat(FRotationMatrix::MakeFromXY(LocalFace, LocalUp)).Inverse();
-		const FVector Centre = ArmCS.InverseTransformPositionNoScale(FMath::Lerp(ArmCS.GetLocation(), WristCS, WRTune(TEXT("player.shieldAlongArm"), 0.55f)));
+		const FQuat Rot = FQuat(FRotationMatrix::MakeFromXY(FVector::ZAxisVector, FVector::XAxisVector)) * FQuat(FRotationMatrix::MakeFromXY(LocalFace, LocalUp)).Inverse();
 		ShieldMesh->SetStaticMesh(Shield);
-		ShieldMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName(*ShieldSocket));
+		ShieldMesh->AttachToComponent(Body, FAttachmentTransformRules::SnapToTargetNotIncludingScale, ShieldSocket);
 		ShieldMesh->SetRelativeRotation(Rot.Rotator());
-		ShieldMesh->SetRelativeLocation(Centre + Out.GetSafeNormal() * (Size[Thin] * 0.5f + WRTune(TEXT("player.shieldOffArm"), 4.f)));
+		ShieldMesh->SetRelativeLocation(FVector(0.f, 0.f, Size[Thin] * 0.5f + WRTune(TEXT("player.shieldOffArm"), 0.f)));
 	}
 
+	// The clips (retargeted onto the hero once, Content/Wildreach/Characters/Hero/Anims).
+	FString AnimDir;
+	Art->TryGetStringField(TEXT("animDir"), AnimDir);
 	const TSharedPtr<FJsonObject>* Anims = nullptr;
-	if (Pick(TEXT("anims"))->TryGetObjectField(TEXT("anims"), Anims))
+	if (Art->TryGetObjectField(TEXT("anims"), Anims))
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& Set : (*Anims)->Values)
 		{
 			FBodyAnimSet& Out = BodyAnims.Add(FName(*Set.Key));
 			for (const TSharedPtr<FJsonValue>& Name : Set.Value->AsArray())
 			{
-				const FString Clip = Prefix + Name->AsString();
+				const FString Clip = Name->AsString().StartsWith(TEXT("/")) ? Name->AsString() : AnimDir + Name->AsString();
 				if (UAnimSequenceBase* Anim = LoadObject<UAnimSequenceBase>(nullptr, *FString::Printf(TEXT("%s.%s"), *Clip, *FPaths::GetBaseFilename(Clip))))
 				{
 					Out.Clips.Add(Anim);
 					BodyAnimRefs.Add(Anim);
 				}
+				else
+				{
+					UE_LOG(LogWildreach, Warning, TEXT("Player art: clip %s not found"), *Clip);
+				}
 			}
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("Player art: %s with %d clips"), *BodyAsset->GetName(), BodyAnimRefs.Num());
-	// The layered animation instance (no animation blueprint), set up after the mesh so it measures at its scale.
-	Body->SetAnimInstanceClass(UWRAnimInstance::StaticClass());
-	SetupBodyAnim(Art, Variant);
+	UE_LOG(LogWildreach, Log, TEXT("Player art: hero %s (%s) with %d clips"), *BodyAsset->GetName(), *Sex, BodyAnimRefs.Num());
+	// The hero's animation instance (motion-matched locomotion under the layered one-shots), set up after the mesh.
+	Body->SetAnimInstanceClass(UWRHeroAnimInstance::StaticClass());
+	SetupBodyAnim(Art, Hero);
+	ApplyViewMode();
 	UpdateWeaponLook();  // a ranged weapon may already be out
 }
 
-UWRAnimInstance* AWRCharacter::BodyAnimInstance() const
+FTransform AWRCharacter::FistFrame() const
 {
-	return Cast<UWRAnimInstance>(Body->GetAnimInstance());
+	// In the weapon socket's own space: X out of the fist (index side), Y toward the fingers (the knuckles' way).
+	const USkeletalMesh* BodyAsset = Body->GetSkeletalMeshAsset();
+	const USkeletalMeshSocket* Socket = BodyAsset ? BodyAsset->FindSocket(WeaponSocket) : nullptr;
+	if (!Socket)
+	{
+		return FTransform::Identity;
+	}
+	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
+	const int32 Bone = Ref.FindBoneIndex(Socket->BoneName);
+	const FString Side = Socket->BoneName.ToString().Right(2);  // "_r" / "_l"
+	const int32 Finger = Ref.FindBoneIndex(FName(*(TEXT("middle_01") + Side)));
+	if (Bone == INDEX_NONE || Finger == INDEX_NONE)
+	{
+		return FTransform::Identity;
+	}
+	const FTransform SocketCS = Socket->GetSocketLocalTransform() * FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Bone);
+	const FVector Fingers = SocketCS.InverseTransformVectorNoScale(FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Finger).GetLocation()
+		- FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Bone).GetLocation());
+	FVector Y = FVector::VectorPlaneProject(Fingers, FVector::XAxisVector).GetSafeNormal();
+	if (Y.IsNearlyZero())
+	{
+		Y = FVector::YAxisVector;
+	}
+	return FTransform(FQuat(FRotationMatrix::MakeFromXY(FVector::XAxisVector, Y)), FVector::ZeroVector);
+}
+
+UWRHeroAnimInstance* AWRCharacter::BodyAnimInstance() const
+{
+	return Cast<UWRHeroAnimInstance>(Body->GetAnimInstance());
 }
 
 UAnimSequenceBase* AWRCharacter::BodyClip(FName Key) const
@@ -451,98 +691,110 @@ UAnimSequenceBase* AWRCharacter::BodyClip(FName Key) const
 	return Set && Set->Clips.Num() > 0 ? Set->Clips[0].Get() : nullptr;
 }
 
-void AWRCharacter::SetupBodyAnim(const TSharedPtr<FJsonObject>& Art, const TSharedPtr<FJsonObject>& Variant)
+void AWRCharacter::SetupBodyAnim(const TSharedPtr<FJsonObject>& Art, const TSharedPtr<FJsonObject>& Hero)
 {
-	UWRAnimInstance* Anim = BodyAnimInstance();
+	UWRHeroAnimInstance* Anim = BodyAnimInstance();
 	if (!Anim)
 	{
 		UE_LOG(LogWildreach, Warning, TEXT("Player art: no animation instance on the body"));
 		return;
 	}
 	Anim->ResetSetup();
-	const auto Pick = [&Art, &Variant](const TCHAR* Field) { return Variant.IsValid() && Variant->HasField(Field) ? Variant : Art; };
-	// Paces from "speeds" (cm/s at play rate 1) where given; the rest are measured from the clips' feet.
-	const TSharedPtr<FJsonObject>* Speeds = nullptr;
-	Pick(TEXT("speeds"))->TryGetObjectField(TEXT("speeds"), Speeds);
-	const auto Pace = [Speeds](const FString& Key)
+	const auto LoadClipAt = [](const FString& Path) -> UAnimSequenceBase*
 	{
-		double Value = 0.0;
-		if (Speeds) (*Speeds)->TryGetNumberField(Key, Value);
-		return float(Value);
+		return Path.IsEmpty() ? nullptr : LoadObject<UAnimSequenceBase>(nullptr, *FString::Printf(TEXT("%s.%s"), *Path, *FPaths::GetBaseFilename(Path)));
 	};
-	// A set: an idle and walk / run clips forward, back, left and right (<walk>, <walk>_back, <walk>_left, ...).
-	const auto AddSet = [&](FName Name, const FString& Idle, const FString& Walk, const FString& Run)
+	FString IdlePath, TurnLeft, TurnRight;
+	Art->TryGetStringField(TEXT("locoIdle"), IdlePath);
+	Art->TryGetStringField(TEXT("turnLeft"), TurnLeft);
+	Art->TryGetStringField(TEXT("turnRight"), TurnRight);
+	UAnimSequenceBase* Idle = LoadClipAt(IdlePath);
+	if (Idle)
 	{
-		TArray<FWRLocoClipDesc> Clips;
-		const TPair<const TCHAR*, float> Dirs[] = { { TEXT(""), 0.f }, { TEXT("_back"), 180.f }, { TEXT("_left"), -90.f }, { TEXT("_right"), 90.f } };
-		for (int32 Gait = 0; Gait < 2; ++Gait)
+		BodyAnimRefs.Add(Idle);
+	}
+	// The base layer's own set holds the idle (until the first match) and the turn-in-place steps; motion matching does
+	// the rest of the locomotion.
+	Anim->AddLocoSet(TEXT("hero"), Idle, {});
+	Anim->SetTurnClips(TEXT("hero"), LoadClipAt(TurnLeft), LoadClipAt(TurnRight));
+	Anim->SetMeshForward(FRotator(0.f, BodyYaw, 0.f).UnrotateVector(FVector::ForwardVector));
+
+	const auto Names = [&Art](const TCHAR* Field, TArray<FName> Fallback)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+		if (Art->TryGetArrayField(Field, List))
 		{
-			const FString& Base = Gait == 0 ? Walk : Run;
-			for (const TPair<const TCHAR*, float>& Dir : Dirs)
+			Fallback.Reset();
+			for (const TSharedPtr<FJsonValue>& V : *List) Fallback.Add(FName(*V->AsString()));
+		}
+		return Fallback;
+	};
+	FString Upper = TEXT("spine_01");
+	Art->TryGetStringField(TEXT("upperBody"), Upper);
+	Anim->SetUpperBody(FName(*Upper), Names(TEXT("spineBones"), { TEXT("spine_02"), TEXT("spine_03"), TEXT("spine_04"), TEXT("spine_05") }));
+	Anim->SetLegs(Names(TEXT("legBones"), { TEXT("thigh_l"), TEXT("calf_l"), TEXT("foot_l"), TEXT("thigh_r"), TEXT("calf_r"), TEXT("foot_r") }));
+	FullBodyKeys.Reset();
+	for (const FName& Key : Names(TEXT("fullBody"), { TEXT("dodge"), TEXT("death"), TEXT("swim"), TEXT("tread"), TEXT("gather"), TEXT("chop"), TEXT("pickup") }))
+	{
+		FullBodyKeys.Add(Key);
+	}
+
+	// The chooser: state x gait x stance -> the databases to search (player_art.json "locomotion"; "fallback" for far
+	// copies of other players).
+	FString MMDir;
+	Art->TryGetStringField(TEXT("mmDir"), MMDir);
+	const auto Rows = [&](const TCHAR* Field)
+	{
+		TArray<FWRHeroLocoRow> Out;
+		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+		if (!Art->TryGetArrayField(Field, List))
+		{
+			return Out;
+		}
+		static const TMap<FString, EWRHeroMove> States = { { TEXT("idle"), EWRHeroMove::Idle }, { TEXT("moving"), EWRHeroMove::Moving },
+			{ TEXT("air"), EWRHeroMove::Air }, { TEXT("land"), EWRHeroMove::Land }, { TEXT("swim"), EWRHeroMove::Swim } };
+		static const TMap<FString, int32> Gaits = { { TEXT("walk"), 0 }, { TEXT("run"), 1 }, { TEXT("sprint"), 2 } };
+		static const TMap<FString, int32> Stances = { { TEXT("melee"), 0 }, { TEXT("ranged"), 1 }, { TEXT("bow_aim"), 2 }, { TEXT("rifle_aim"), 3 }, { TEXT("block"), 4 } };
+		for (const TSharedPtr<FJsonValue>& Value : *List)
+		{
+			const TSharedPtr<FJsonObject> Obj = Value->AsObject();
+			FString State, Gait, Stance;
+			if (!Obj.IsValid() || !Obj->TryGetStringField(TEXT("state"), State) || !States.Contains(State))
 			{
-				const FString Key = Base + Dir.Key;
-				if (UAnimSequenceBase* Clip = Base.IsEmpty() ? nullptr : BodyClip(FName(*Key)))
+				continue;
+			}
+			FWRHeroLocoRow& Row = Out.AddDefaulted_GetRef();
+			Row.State = States[State];
+			Row.Gait = Obj->TryGetStringField(TEXT("gait"), Gait) && Gaits.Contains(Gait) ? Gaits[Gait] : -1;
+			Row.Stance = Obj->TryGetStringField(TEXT("stance"), Stance) && Stances.Contains(Stance) ? Stances[Stance] : -1;
+			const TArray<TSharedPtr<FJsonValue>>* Dbs = nullptr;
+			if (Obj->TryGetArrayField(TEXT("dbs"), Dbs))
+			{
+				for (const TSharedPtr<FJsonValue>& Db : *Dbs)
 				{
-					Clips.Add({ Clip, Dir.Value, Gait, Pace(Key) });
+					const FString Path = MMDir + Db->AsString();
+					if (const UPoseSearchDatabase* Database = LoadObject<UPoseSearchDatabase>(nullptr, *FString::Printf(TEXT("%s.%s"), *Path, *FPaths::GetBaseFilename(Path))))
+					{
+						Row.Databases.Add(Database);
+					}
+					else
+					{
+						UE_LOG(LogWildreach, Warning, TEXT("Player art: motion matching database %s not found"), *Path);
+					}
 				}
 			}
 		}
-		Anim->AddLocoSet(Name, BodyClip(FName(*Idle)), Clips);
+		return Out;
 	};
-	const auto Have = [this](const TCHAR* Key, const TCHAR* Fallback) { return FString(BodyAnims.Contains(Key) ? Key : Fallback); };
-	AddSet(TEXT("melee"), TEXT("idle"), TEXT("walk"), TEXT("run"));
-	AddSet(TEXT("ranged"), Have(TEXT("ranged_idle"), TEXT("idle")), Have(TEXT("ranged_walk"), TEXT("walk")), Have(TEXT("ranged_run"), TEXT("run")));
-	if (BodyAnims.Contains(TEXT("bow_aimwalk")))
-	{
-		AddSet(TEXT("bow_aim"), TEXT("bow_aim"), TEXT("bow_aimwalk"), FString());  // aiming walks only (half speed)
-	}
-	Anim->SetTurnClips(TEXT("melee"), BodyClip(TEXT("turn_left")), BodyClip(TEXT("turn_right")));
-	const FName RangedTurn[] = { BodyAnims.Contains(TEXT("ranged_turn_left")) ? FName(TEXT("ranged_turn_left")) : FName(TEXT("turn_left")),
-	                             BodyAnims.Contains(TEXT("ranged_turn_right")) ? FName(TEXT("ranged_turn_right")) : FName(TEXT("turn_right")) };
-	Anim->SetTurnClips(TEXT("ranged"), BodyClip(RangedTurn[0]), BodyClip(RangedTurn[1]));
-	Anim->SetTurnClips(TEXT("bow_aim"), BodyClip(RangedTurn[0]), BodyClip(RangedTurn[1]));
-
-	// The upper body (block, swings, casts, shots) from this bone up; the spine bones share the twist that keeps the
-	// chest facing the camera while the legs stand.
-	FString Upper = TEXT("Spine");
-	Pick(TEXT("upperBody"))->TryGetStringField(TEXT("upperBody"), Upper);
-	TArray<FName> Spine;
-	const TArray<TSharedPtr<FJsonValue>>* SpineList = nullptr;
-	if (Pick(TEXT("spineBones"))->TryGetArrayField(TEXT("spineBones"), SpineList))
-	{
-		for (const TSharedPtr<FJsonValue>& Bone : *SpineList) Spine.Add(FName(*Bone->AsString()));
-	}
-	else
-	{
-		Spine = { TEXT("Spine"), TEXT("Spine1"), TEXT("Spine2") };
-	}
-	Anim->SetUpperBody(FName(*Upper), Spine);
-	TArray<FName> Legs;
-	const TArray<TSharedPtr<FJsonValue>>* LegList = nullptr;
-	if (Pick(TEXT("legBones"))->TryGetArrayField(TEXT("legBones"), LegList))
-	{
-		for (const TSharedPtr<FJsonValue>& Bone : *LegList) Legs.Add(FName(*Bone->AsString()));
-	}
-	Anim->SetLegs(Legs);  // feet planted on slopes while standing
-	FullBodyKeys.Reset();
-	const TArray<TSharedPtr<FJsonValue>>* Full = nullptr;
-	if (Pick(TEXT("fullBody"))->TryGetArrayField(TEXT("fullBody"), Full))
-	{
-		for (const TSharedPtr<FJsonValue>& Key : *Full) FullBodyKeys.Add(FName(*Key->AsString()));
-	}
-	else
-	{
-		FullBodyKeys = { TEXT("dodge"), TEXT("death"), TEXT("fall"), TEXT("swim"), TEXT("tread"), TEXT("gather"), TEXT("chop"), TEXT("pickup") };
-	}
-	UE_LOG(LogWildreach, Log, TEXT("Player anim: walk %.0f back %.0f left %.0f right %.0f | run %.0f back %.0f left %.0f right %.0f cm/s"),
-		Anim->LocoSpeed(TEXT("melee"), 0, 0.f), Anim->LocoSpeed(TEXT("melee"), 0, 180.f), Anim->LocoSpeed(TEXT("melee"), 0, -90.f), Anim->LocoSpeed(TEXT("melee"), 0, 90.f),
-		Anim->LocoSpeed(TEXT("melee"), 1, 0.f), Anim->LocoSpeed(TEXT("melee"), 1, 180.f), Anim->LocoSpeed(TEXT("melee"), 1, -90.f), Anim->LocoSpeed(TEXT("melee"), 1, 90.f));
+	Anim->SetLocomotion(Rows(TEXT("locomotion")), Rows(TEXT("fallback")));
+	Anim->SetFemale(BodyStyle == TEXT("f"));
+	Anim->SetupProportions(Idle);
 }
 
 float AWRCharacter::PlayBodyAnim(FName Key, bool bLoop, float PlayRate, float Duration)
 {
 	FBodyAnimSet* Set = BodyAnims.Find(Key);
-	UWRAnimInstance* Anim = BodyAnimInstance();
+	UWRHeroAnimInstance* Anim = BodyAnimInstance();
 	if (!Set || Set->Clips.Num() == 0 || !Anim)
 	{
 		return 0.f;
@@ -563,26 +815,28 @@ float AWRCharacter::PlayBodyAnim(FName Key, bool bLoop, float PlayRate, float Du
 
 void AWRCharacter::TickBodyAnim()
 {
-	UWRAnimInstance* Anim = BodyAnimInstance();
+	UWRHeroAnimInstance* Anim = BodyAnimInstance();
 	if (!Body->IsVisible() || BodyAnims.Num() == 0 || !Anim)
 	{
 		return;
 	}
 	const UCharacterMovementComponent* Move = GetCharacterMovement();
 	const double Now = GetWorld()->GetTimeSeconds();
+	const float Dt = GetWorld()->GetDeltaSeconds();
 	const FVector Velocity = GetVelocity();
 	const float Speed = Velocity.Size2D();
 	const bool bDead = HasTag(WRTags::State_Dead);
 	const bool bBusy = Now < BodyOneShotUntil;
 	const FName Group = IsRangedOut() ? RangedAnimGroup() : NAME_None;
+	const bool bBlocking = !IsRangedOut() && HasTag(WRTags::State_Blocking);
 
-	// What the body is doing this frame (the instance blends between states).
+	// The layers (UWRAnimInstance): loops over the upper body, swimming over all of it, turn in place, slopes.
 	FWRAnimInput& In = Anim->Input;
 	In.Speed = bDead ? 0.f : Speed;
 	In.ActorYaw = GetActorRotation().Yaw;
-	In.Angle = Speed > 1.f ? FRotator::NormalizeAxis(Velocity.Rotation().Yaw - In.ActorYaw) : 0.f;  // strafes, walking back
+	In.Angle = Speed > 1.f ? FRotator::NormalizeAxis(Velocity.Rotation().Yaw - In.ActorYaw) : 0.f;
 	In.bGrounded = Move->IsMovingOnGround();
-	In.Set = !IsRangedOut() ? FName(TEXT("melee")) : bAiming && Group == TEXT("bow") && BodyAnims.Contains(TEXT("bow_aimwalk")) ? FName(TEXT("bow_aim")) : FName(TEXT("ranged"));
+	In.Set = TEXT("hero");
 	In.UpperLoop = nullptr;
 	In.FullLoop = nullptr;
 	In.bFullLoopHold = false;
@@ -594,30 +848,79 @@ void AWRCharacter::TickBodyAnim()
 		{
 			In.FullLoop = BodyClip(Speed > 40.f ? FName(TEXT("swim")) : FName(TEXT("tread")));
 		}
-		else if (Move->IsFalling())
-		{
-			// Plays once and holds the airborne pose, skipping the crouch and take-off.
-			In.FullLoop = BodyClip(TEXT("fall"));
-			In.bFullLoopHold = true;
-			In.FullLoopStart = In.FullLoop ? In.FullLoop->GetPlayLength() * WRTune(TEXT("player.fallClipStart"), 0.35f) : 0.f;
-		}
 		if (bAiming && Group == TEXT("rifle"))
 		{
 			In.UpperLoop = BodyClip(TEXT("rifle_aim"));  // shouldered crossbow / blowgun over the walking legs
 		}
-		else if (bAiming && Group == TEXT("bow") && !BodyAnims.Contains(TEXT("bow_aimwalk")))
+		else if (bAiming && Group == TEXT("bow"))
 		{
 			In.UpperLoop = BodyClip(TEXT("bow_aim"));
 		}
-		else if (!IsRangedOut() && HasTag(WRTags::State_Blocking))
+		else if (IsRangedOut() && Group == TEXT("bow"))
+		{
+			In.UpperLoop = BodyClip(TEXT("ranged_idle"));  // the bow held ready at the side
+		}
+		else if (bBlocking)
 		{
 			In.UpperLoop = BodyClip(TEXT("block"));  // shield up, legs walking, strafing or backing off
 		}
 	}
 	In.bTurnInPlace = !bDead && !bBusy && In.bGrounded && !In.FullLoop;
-	// Standing on a slope: where the ground is under each foot, against the capsule's bottom (the instance sinks the
-	// hips to the lower one and bends the other leg up to its own).
-	const float Dt = GetWorld()->GetDeltaSeconds();
+
+	// Motion matching's input: where the body goes and where the stick says it's about to.
+	FWRHeroAnimInput& H = Anim->HeroInput;
+	const bool bOwnMove = IsLocallyControlled() || HasAuthority();
+	H.Velocity = bDead ? FVector::ZeroVector : Velocity;
+	if (bOwnMove)
+	{
+		H.Acceleration = Move->GetCurrentAcceleration();
+	}
+	else
+	{
+		const float Max = Move->GetMaxAcceleration();
+		const float Angle = ReplicatedAccel.Angle / 255.f * 2.f * PI;
+		const float Size = ReplicatedAccel.Magnitude / 255.f * Max;
+		H.Acceleration = FVector(FMath::Cos(Angle) * Size, FMath::Sin(Angle) * Size, ReplicatedAccel.Z / 127.f * Max);
+	}
+	if (bDead)
+	{
+		H.Acceleration = FVector::ZeroVector;
+	}
+	H.MaxSpeed = Move->GetMaxSpeed();
+	H.MaxAcceleration = Move->GetMaxAcceleration();
+	H.BrakingDeceleration = Move->GetMaxBrakingDeceleration();
+	H.TurnRate = Move->RotationRate.Yaw;
+	H.bOrientToMovement = Move->bOrientRotationToMovement && !bUseControllerRotationYaw;
+	H.DesiredYaw = IsLocallyControlled() && Controller ? float(Controller->GetControlRotation().Yaw) : float(GetActorRotation().Yaw);
+	H.bLocal = IsLocallyControlled();
+	if (bOwnMove)
+	{
+		const float Sprint = WRTune(TEXT("player.sprintSpeed"), 750.f);
+		H.Gait = H.MaxSpeed >= Sprint - 1.f ? EWRHeroGait::Sprint : H.MaxSpeed <= WRTune(TEXT("anim.mm.walkBelow"), 320.f) ? EWRHeroGait::Walk : EWRHeroGait::Run;
+		H.Stance = IsRangedOut() ? (bAiming ? (Group == TEXT("rifle") ? EWRHeroStance::RifleAim : EWRHeroStance::BowAim) : EWRHeroStance::Ranged)
+			: bBlocking ? EWRHeroStance::Block : EWRHeroStance::Melee;
+		const AWRPlayerController* PC = Cast<AWRPlayerController>(Controller);
+		H.bLockedOn = PC && PC->GetLockTarget() != nullptr;
+	}
+	else
+	{
+		H.Gait = EWRHeroGait(FMath::Min(ReplicatedAccel.Bits & 0x3, 2));
+		H.Stance = EWRHeroStance(FMath::Min((ReplicatedAccel.Bits >> 2) & 0x7, 4));
+		H.bLockedOn = (ReplicatedAccel.Bits & 0x20) != 0;
+		// Another machine's copy doesn't run the owner's sprint or aim speed: its top speed comes from the gait.
+		H.MaxSpeed = H.Gait == EWRHeroGait::Sprint ? WRTune(TEXT("player.sprintSpeed"), 750.f) : FMath::Max(H.MaxSpeed, Speed);
+	}
+	H.Move = Move->IsSwimming() ? EWRHeroMove::Swim : Move->IsFalling() ? EWRHeroMove::Air
+		: (Speed < 10.f && H.Acceleration.SizeSquared2D() < 1.f) ? EWRHeroMove::Idle : EWRHeroMove::Moving;
+	if (bDead)
+	{
+		H.Move = EWRHeroMove::Idle;
+	}
+	// The spine takes the aim's pitch in first person and while aiming (the arms and the weapon point where you look).
+	AimPitchBlend = FMath::FInterpTo(AimPitchBlend, !bDead && (bFirstPerson || IsAimingRanged()) ? 1.f : 0.f, Dt, 8.f);
+	H.AimPitch = FRotator::NormalizeAxis(GetBaseAimRotation().Pitch);
+	H.AimPitchAlpha = AimPitchBlend;
+
 	// Swimming (WRWater): one float height for the capsule, but the stroke lies along the surface (the body rides higher
 	// on the capsule) while treading water stands in it (head and shoulders out: a little lower).
 	const float LiftGoal = !bDead && Move->IsSwimming() ? WRTune(Speed > 40.f ? TEXT("water.swimLift") : TEXT("water.treadLift"), Speed > 40.f ? 60.f : -5.f) : 0.f;
@@ -626,6 +929,8 @@ void AWRCharacter::TickBodyAnim()
 		SwimLift = FMath::FInterpTo(SwimLift, LiftGoal, Dt, 4.f);
 		Body->SetRelativeLocation(FVector(0.f, 0.f, BodyBaseZ + SwimLift));
 	}
+	// Standing on a slope: where the ground is under each foot, against the capsule's bottom (the instance sinks the
+	// hips to the lower one and bends the other leg up to its own).
 	const FVector Bottom = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	for (int32 Side = 0; Side < 2; ++Side)
 	{

@@ -151,6 +151,7 @@ struct FWRAnimFrame
 	float SpineMaxBend = 35.f;  // degrees a bone may turn to follow the ground
 	FVector MeshForward = FVector::ForwardVector;
 	TArray<TPair<FName, float>> PoseLift;  // bones turned nose-up (degrees, about the body's side axis) over every clip
+	float TurnWeight = 0.f;   // a turn-in-place clip's share of the locomotion (the hero blends it over motion matching)
 };
 
 struct FWRAnimProxy : public FAnimInstanceProxy
@@ -162,9 +163,16 @@ struct FWRAnimProxy : public FAnimInstanceProxy
 
 	FWRAnimFrame Frame;
 
-private:
+protected:
+	/** The bottom layer (locomotion) into Output; false leaves the reference pose. A subclass may swap in its own
+	 *  locomotion (UWRHeroAnimInstance: motion matching). */
+	virtual bool EvaluateLoco(FPoseContext& Output) { return SampleBlend(Frame.Loco, Output); }
+	/** After every layer and the lifts, before the feet are planted: a subclass's last touches (the hero's proportions,
+	 *  stance, aim). */
+	virtual void PostLayers(FPoseContext& Output) {}
 	/** Sample and blend a weighted list into Out; false if the list is empty. */
 	bool SampleBlend(const TArray<FWRAnimSample>& Samples, FPoseContext& Out) const;
+private:
 	void RefreshMasks(const FBoneContainer& Bones);
 	void PlantFeet(FCompactPose& Pose) const;
 	void PlaceCreatureFeet(FCompactPose& Pose) const;
@@ -238,7 +246,9 @@ protected:
 	virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* InProxy) override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
-private:
+protected:  // (UWRHeroAnimInstance builds on these)
+	/** End of NativeUpdateAnimation, the frame filled: a subclass adds its own data. */
+	virtual void PostStep(float DeltaSeconds, FWRAnimFrame& Frame) {}
 	struct FLocoClip
 	{
 		UAnimSequenceBase* Clip = nullptr;

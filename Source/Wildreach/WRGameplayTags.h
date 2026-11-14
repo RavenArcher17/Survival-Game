@@ -11,6 +11,11 @@ namespace WRTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Parrying);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Attacking);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dodging);
+	// Combat windows carried by the hero's clips (UWRANS_Window, Data/anim_windows.json).
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_ComboWindow);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_CancelWindow);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_IFrames);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_TraceActive);
 
 	// Status effects (design review #6: full list official, fire/frost set built first)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Burn);

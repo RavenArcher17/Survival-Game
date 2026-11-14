@@ -8,6 +8,10 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Parrying, "State.Parrying");
 	UE_DEFINE_GAMEPLAY_TAG(State_Attacking, "State.Attacking");
 	UE_DEFINE_GAMEPLAY_TAG(State_Dodging, "State.Dodging");
+	UE_DEFINE_GAMEPLAY_TAG(State_ComboWindow, "State.ComboWindow");
+	UE_DEFINE_GAMEPLAY_TAG(State_CancelWindow, "State.CancelWindow");
+	UE_DEFINE_GAMEPLAY_TAG(State_IFrames, "State.IFrames");
+	UE_DEFINE_GAMEPLAY_TAG(State_TraceActive, "State.TraceActive");
 
 	UE_DEFINE_GAMEPLAY_TAG(Status_Burn, "Status.Burn");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Frostbite, "Status.Frostbite");
