@@ -599,7 +599,19 @@
     {"id": "bone", "name": "Bone", "category": "material", "stack": 50, "weight": 0.3, "note": "Butchered from beasts. A grinder makes bone meal of it."},
     {"id": "bone_meal", "name": "Bone meal", "category": "material", "stack": 50, "weight": 0.2, "note": "E on a growing plot: +25% at its harvest."},
     {"id": "stone_dust", "name": "Stone dust", "category": "material", "stack": 50, "weight": 0.3, "note": "Rock ground fine at a grinder: worked into a growing plot's soil (E) it feeds the crop, +25% at its harvest."},
-    {"id": "gears", "name": "Gears", "category": "material", "stack": 20, "weight": 0.6, "note": "Cast bronze cogs and pinions on oak arbors: every machine is built round them."}
+    {"id": "gears", "name": "Gears", "category": "material", "stack": 20, "weight": 0.6, "note": "Cast bronze cogs and pinions on oak arbors: every machine is built round them."},
+    {"id": "scratch_stone", "name": "Scratch-stone", "category": "special", "stack": 1, "weight": 0.3, "note": "use it to cut a message into a stone where you stand"},
+    {"id": "cinder_salve", "name": "Cinder salve", "category": "potion", "stack": 5, "weight": 0.3, "note": "Sigrun's salve: sulfur and ember worked into fat", "use": {"heal": 60, "cooldown": 6}},
+    {"id": "obsidian_arrow", "name": "Obsidian arrow", "category": "ammo", "stack": 50, "weight": 0.05, "note": "a knapped glass head: deep cuts", "ammo": {"kind": "arrow", "damage": 11, "mesh": "/Game/Props/Arrow/arrow_game/StaticMeshes/arrow_game.arrow_game", "meshAlong": "-Y"}},
+    {"id": "spiked_boots", "name": "Spiked boots", "category": "armor", "stack": 1, "weight": 1.4, "note": "iron spikes under hide: full grip on ice", "equip": {"slot": "legs", "armor": 4.0, "poise": 2.4, "durability": 200, "look": "hide_armor"}, "worn": {"passIce": 1}},
+    {"id": "effigy_vulkarn", "name": "Effigy of Vulkarn", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise Vulkarn now"},
+    {"id": "effigy_skaldrith", "name": "Effigy of Skaldrith", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise Skaldrith now"},
+    {"id": "effigy_obsidian_warden", "name": "Effigy of the Obsidian Warden", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise the Obsidian Warden now"},
+    {"id": "effigy_ignessa", "name": "Effigy of Ignessa", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise Ignessa now"},
+    {"id": "effigy_cinderhorn", "name": "Effigy of Cinderhorn", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise Cinderhorn now"},
+    {"id": "effigy_grimjaw", "name": "Effigy of Grimjaw", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise Grimjaw now"},
+    {"id": "effigy_pale_hunter", "name": "Effigy of the Pale Hunter", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise the Pale Hunter now"},
+    {"id": "effigy_old_tusker", "name": "Effigy of Old Tusker", "category": "effigy", "stack": 1, "weight": 1.0, "note": "offer it at the summoning stone to raise Old Tusker now"}
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },

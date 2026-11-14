@@ -1,4 +1,5 @@
 #include "WRWildlife.h"
+#include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
 #include "WRCreature.h"
@@ -341,6 +342,17 @@ namespace WRWildlifeImpl
 		float Target = 0.f;                // animals, before the world's creature numbers
 		TArray<TPair<const FWRCreatureDef*, float>> Kinds;   // each with its weight: the chance a new pack is of it
 		float TotalWeight = 0.f;
+		/** The night table (spawn_regions.json night): empty = the day table at all hours. */
+		TArray<TPair<const FWRCreatureDef*, float>> NightKinds;
+		float NightWeight = 0.f;
+		TSet<FName> DayIds, NightIds;
+		/** 0 out at all hours, 1 day only, 2 night only (AWRCreatureSpawner::Shift). */
+		uint8 ShiftOf(FName Kind) const
+		{
+			if (NightKinds.Num() == 0) return 0;
+			const bool bDay = DayIds.Contains(Kind), bNight = NightIds.Contains(Kind);
+			return bDay && bNight ? 0 : bNight ? 2 : bDay ? 1 : 0;
+		}
 		TMap<FName, TArray<int32>> CellsOf;   // where each kind can start in it
 	};
 
@@ -684,7 +696,11 @@ namespace WRWildlifeImpl
 				R.Area = FBox2D(FVector2D((*Box)[0]->AsNumber() * 100.0, (*Box)[1]->AsNumber() * 100.0), FVector2D((*Box)[2]->AsNumber() * 100.0, (*Box)[3]->AsNumber() * 100.0));
 			}
 			const TSharedPtr<FJsonObject>* Weights = nullptr;
-			if (O->TryGetObjectField(TEXT("creatures"), Weights))
+			const TSharedPtr<FJsonObject>* NightWeights = nullptr;
+			O->TryGetObjectField(TEXT("night"), NightWeights);
+			for (int32 Table = 0; Table < 2; ++Table)
+			{
+			if (Table == 0 ? O->TryGetObjectField(TEXT("creatures"), Weights) : (NightWeights != nullptr && (Weights = NightWeights) != nullptr))
 			{
 				for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Weights)->Values)
 				{
@@ -696,8 +712,9 @@ namespace WRWildlifeImpl
 						continue;
 					}
 					// Where it can start here: ground its kind can stand on that's in the region.
-					TArray<int32>& Cells = R.CellsOf.Add(Def->Id);
-					if (M.N > 0)
+					const bool bKnown = R.CellsOf.Contains(Def->Id);
+					TArray<int32>& Cells = R.CellsOf.FindOrAdd(Def->Id);
+					if (M.N > 0 && !bKnown)
 					{
 						for (const int32 Cell : M.RangeOf(*Def).All)
 						{
@@ -710,9 +727,20 @@ namespace WRWildlifeImpl
 						R.CellsOf.Remove(Def->Id);
 						continue;
 					}
-					R.Kinds.Add({ Def, Weight });
-					R.TotalWeight += Weight;
+					if (Table == 0)
+					{
+						R.Kinds.Add({ Def, Weight });
+						R.TotalWeight += Weight;
+						R.DayIds.Add(Def->Id);
+					}
+					else
+					{
+						R.NightKinds.Add({ Def, Weight });
+						R.NightWeight += Weight;
+						R.NightIds.Add(Def->Id);
+					}
 				}
+			}
 			}
 			if (R.Kinds.Num() == 0)
 			{
@@ -750,9 +778,12 @@ namespace WRWildlifeImpl
 	 */
 	AWRCreatureSpawner* SpawnIn(UWorld* World, const FRegion& R, const TArray<FVector2D>& Players, const TArray<FVector2D>& Buildings)
 	{
-		float Roll = FMath::FRand() * R.TotalWeight;
-		const FWRCreatureDef* Def = R.Kinds.Last().Key;
-		for (const TPair<const FWRCreatureDef*, float>& K : R.Kinds)
+		// The table of the hour (a whiteout runs the night table by day: WRWorld::IsNightTable).
+		const bool bNightTable = R.NightKinds.Num() > 0 && WRWorld::IsNightTable(World, R.bVolcanic ? FName(TEXT("volcanic")) : FName(TEXT("tundra")));
+		const TArray<TPair<const FWRCreatureDef*, float>>& Table = bNightTable ? R.NightKinds : R.Kinds;
+		float Roll = FMath::FRand() * (bNightTable ? R.NightWeight : R.TotalWeight);
+		const FWRCreatureDef* Def = Table.Last().Key;
+		for (const TPair<const FWRCreatureDef*, float>& K : Table)
 		{
 			if ((Roll -= K.Value) <= 0.f) { Def = K.Key; break; }
 		}
@@ -774,6 +805,7 @@ namespace WRWildlifeImpl
 			if (Pack)
 			{
 				Pack->Region = R.Id;
+				Pack->Shift = R.ShiftOf(Def->Id);
 				UE_LOG(LogWildreach, Log, TEXT("WILDLIFE spawned %s x%d in %s at %.0f %.0f: %d of %.0f there now; %s, %s"), *Def->Id.ToString(), Count,
 					*R.Id.ToString(), At.X, At.Y, AnimalsIn(R), TargetOf(R),
 					*(Players.Num() ? FString::Printf(TEXT("%.0f m from a player"), ToPlayer / 100.0) : FString(TEXT("no players"))),
@@ -988,6 +1020,7 @@ int32 WRWildlife::Start(UWorld* World)
 				FString Region;
 				Pack->Region = O->TryGetStringField(TEXT("region"), Region) && G.Regions.ContainsByPredicate([&Region](const FRegion& R) { return R.Id == FName(*Region); })
 					? FName(*Region) : RegionFor(*Def, FVector2D(At));
+				if (const FRegion* Home = G.Regions.FindByPredicate([Pack](const FRegion& R) { return R.Id == Pack->Region; })) Pack->Shift = Home->ShiftOf(Def->Id);
 				Pack->PackHealth = O->GetNumberField(TEXT("hp"));
 				Pack->Territory = FVector2D(O->GetNumberField(TEXT("tx")), O->GetNumberField(TEXT("ty")));
 				Pack->bWanderer = O->GetBoolField(TEXT("wander"));

@@ -1,4 +1,5 @@
 #include "WRCharacterBase.h"
+#include "WRWorldSystems.h"
 #include "WRSocial.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -190,6 +191,7 @@ void AWRCharacterBase::Die(AActor* Killer)
 	{
 		return;
 	}
+	WRWorld::OnKilled(this, Killer);   // quests (a kill with its status still on), before anything clears
 	AbilitySystem->CancelAllAbilities();
 	AbilitySystem->AddLooseGameplayTag(WRTags::State_Dead, 1, EGameplayTagReplicationState::TagOnly);
 	GetCharacterMovement()->DisableMovement();

@@ -10,6 +10,7 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
+#include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRFlowTypes.h"
 #include "WRPlayerUI.h"
@@ -63,7 +64,7 @@ namespace WRMapTab
 	}
 
 	/** Legend categories (the order of the legend). */
-	enum class ECat : uint8 { Camp, Cave, Boss, Pass, Base, Bed, Tame, Claim, Player, Count };
+	enum class ECat : uint8 { Camp, Cave, Boss, Pass, Shrine, Base, Bed, Tame, Claim, Player, Count };
 
 	struct FMarker
 	{
@@ -85,7 +86,7 @@ namespace WRMapTab
 		float Zoom = 1.f;
 		float ZoomLimit = MaxZoom;
 		FVector2D Centre = FVector2D::ZeroVector;   // world cm at the middle of the view
-		bool bShow[static_cast<int32>(ECat::Count)] = { true, true, true, true, true, true, true, true, false };
+		bool bShow[static_cast<int32>(ECat::Count)] = { true, true, true, true, true, true, true, true, true, false };
 		FString Selected;
 		bool bPicked = false;
 		/** Your Hearths and claims as last seen: they stop replicating once you walk out of range, but they're still there. */
@@ -107,6 +108,9 @@ namespace WRMapTab
 		case ECat::Boss: return M.Kind == TEXT("boss") ? FCatLook{ Hex(TEXT("EC6A48")), Hex(TEXT("3A1208")), Hex(TEXT("EC6A48")), TEXT("skull"), 34.f, false }
 			: FCatLook{ Hex(TEXT("EAB95A")), FLinearColor(0.025f, 0.012f, 0.002f, 0.94f), Hex(TEXT("EAB95A")), TEXT("skull"), 24.f, false };
 		case ECat::Pass: return { WRUI::Ink3, FLinearColor(0.01f, 0.01f, 0.012f, 0.9f), WRUI::Ink2, TEXT("mountain"), 22.f, false };
+		case ECat::Shrine: return M.Kind == TEXT("village") ? FCatLook{ Hex(TEXT("E8C27A")), FLinearColor(0.02f, 0.014f, 0.004f, 0.94f), Hex(TEXT("E8C27A")), TEXT("house"), 26.f, false }
+			: M.bMine ? FCatLook{ Hex(TEXT("FF9B45")), FLinearColor(0.03f, 0.012f, 0.002f, 0.94f), Hex(TEXT("FFB065")), TEXT("flame"), 24.f, false }
+			: FCatLook{ Hex(TEXT("9DB8D8")), FLinearColor(0.01f, 0.012f, 0.02f, 0.94f), Hex(TEXT("9DB8D8")), TEXT("flame"), 22.f, false };
 		case ECat::Base: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("house"), 24.f, false };
 		case ECat::Bed: return { M.bMine ? WRUI::Brass : WRUI::Frost, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), M.bMine ? WRUI::Brass : WRUI::Frost, TEXT("bed"), 20.f, false };
 		case ECat::Tame: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("paw"), 22.f, false };
@@ -132,6 +136,30 @@ namespace WRMapTab
 		UWorld* World = PC ? PC->GetWorld() : nullptr;
 		const APlayerState* PS = PC ? PC->PlayerState : nullptr;
 		if (!World || !PS) return Out;
+		// Villages, and the shrines you or your clan have found (lit: warm; dark or held: cold) (WRWorldSystems).
+		for (TActorIterator<AWRVillage> It(World); It; ++It)
+		{
+			FMarker& M = Out.AddDefaulted_GetRef();
+			M.Key = TEXT("village:") + It->VillageId.ToString();
+			M.Cat = ECat::Shrine;
+			M.Kind = TEXT("village");
+			M.Name = It->DisplayName;
+			M.World = It->GetActorLocation();
+			M.Actor = *It;
+		}
+		const UWRQuestLog* QLog = UWRQuestLog::For(PS);
+		for (TActorIterator<AWRShrine> It(World); It; ++It)
+		{
+			if (!QLog || !QLog->HasFound(It->ShrineId) || It->bGreat) continue;   // a Great Shrine is its village's marker
+			FMarker& M = Out.AddDefaulted_GetRef();
+			M.Key = TEXT("shrine:") + It->ShrineId.ToString();
+			M.Cat = ECat::Shrine;
+			M.Kind = TEXT("shrine");
+			M.Name = It->DisplayName;
+			M.World = It->GetActorLocation();
+			M.bMine = It->bLit && !It->bHeld;
+			M.Actor = *It;
+		}
 		const FString Me = PS->GetPlayerName();
 		for (TActorIterator<AWRHearth> It(World); It; ++It)
 		{
@@ -218,7 +246,7 @@ namespace WRMapTab
 
 	FString CatName(ECat C)
 	{
-		static const TCHAR* Names[] = { TEXT("Camps"), TEXT("Caves"), TEXT("Bosses"), TEXT("Passes"), TEXT("Your base"), TEXT("Beds"), TEXT("Tames"), TEXT("Land claims"), TEXT("Other players") };
+		static const TCHAR* Names[] = { TEXT("Camps"), TEXT("Caves"), TEXT("Bosses"), TEXT("Passes"), TEXT("Shrines & villages"), TEXT("Your base"), TEXT("Beds"), TEXT("Tames"), TEXT("Land claims"), TEXT("Other players") };
 		return Names[static_cast<int32>(C)];
 	}
 
@@ -481,7 +509,7 @@ namespace WRMapTab
 				FSlateDrawElement::MakeLines(Out, L, Geo.ToPaintGeometry(), Ring, ESlateDrawEffect::None, WRUI::Alpha(M.bMine ? WRUI::Brass : WRUI::Bad, 0.75f), true, 2.f);
 			}
 			// Markers, small things first so bosses sit on top.
-			const ECat Order[] = { ECat::Cave, ECat::Pass, ECat::Claim, ECat::Camp, ECat::Boss, ECat::Base, ECat::Bed, ECat::Tame, ECat::Player };
+			const ECat Order[] = { ECat::Cave, ECat::Pass, ECat::Claim, ECat::Shrine, ECat::Camp, ECat::Boss, ECat::Base, ECat::Bed, ECat::Tame, ECat::Player };
 			for (const ECat Cat : Order)
 			{
 				if (!S.bShow[static_cast<int32>(Cat)]) continue;
@@ -506,7 +534,7 @@ namespace WRMapTab
 					const float G = D * (bMajor ? 0.64f : 0.6f);
 					Box(L + 3, C - FVector2D(G * 0.5f), FVector2D(G), Glyph(Lk.Glyph), Lk.Icon);
 					// Names: camps and bosses always, the rest when you point at them (on the death screen, all of them).
-					const bool bLabel = MarkersFn || Cat == ECat::Camp || Cat == ECat::Boss || Cat == ECat::Tame || Cat == ECat::Player || bHot;
+					const bool bLabel = MarkersFn || Cat == ECat::Camp || Cat == ECat::Shrine || Cat == ECat::Boss || Cat == ECat::Tame || Cat == ECat::Player || bHot;
 					if (!bLabel) continue;
 					const FSlateFontInfo F = bMajor ? WRUI::Title(13) : WRUI::Body(11, 800);
 					const FText T = FText::FromString(bMajor ? M.Name.ToUpper() : M.Name);
@@ -893,7 +921,7 @@ namespace WRMapTab
 		// ---------------------------------------------------------------- the picked marker
 
 		/** What the game says about a marker; a Hearth's cores and a tame's orders change, so the panel reads it live. */
-		static FText About(const FMarker& M)
+		FText About(const FMarker& M) const
 		{
 			const bool bWest = M.World.X < 0.f;
 			switch (M.Cat)
@@ -901,6 +929,15 @@ namespace WRMapTab
 			case ECat::Camp: return LOCTEXT("AboutCamp", "Where new survivors of this side wake up. Wild creatures don't nest close by.");
 			case ECat::Cave: return bWest ? LOCTEXT("AboutCaveV", "A dark chamber of rich ore (better gem odds), sulfur gas and a burrower colony.") : LOCTEXT("AboutCaveT", "A dark chamber of rich ore (better gem odds), ice underfoot and a burrower colony.");
 			case ECat::Pass: return LOCTEXT("AboutPass", "A way over the ridge between the volcanic west and the tundra east.");
+			case ECat::Shrine:
+			{
+				if (M.Kind == TEXT("village")) return LOCTEXT("AboutVillage", "A newcomers' village round its Great Shrine: the path master, the merchant's stall when the caravan's home. Safe ground.");
+				const AWRShrine* S = Cast<AWRShrine>(M.Actor.Get());
+				if (!S) return FText::GetEmpty();
+				const FString Why = UWRWorldSystems::TravelBlock(PC.Get(), S);
+				return FText::FromString(FString::Printf(TEXT("%s. %s"), S->bHeld ? TEXT("Invaders hold it") : S->bLit ? TEXT("Its fire is lit") : S->bGuarded ? TEXT("Dark and guarded") : TEXT("Dark: kindle it again"),
+					Why.IsEmpty() ? TEXT("You can travel there from here.") : *FString::Printf(TEXT("Travel: %s."), *Why)));
+			}
 			case ECat::Base:
 			{
 				const AWRHearth* H = Cast<AWRHearth>(M.Actor.Get());
@@ -944,6 +981,7 @@ namespace WRMapTab
 			case ECat::Camp: Chip = LOCTEXT("ChipCamp", "Camp"); break;
 			case ECat::Cave: Chip = LOCTEXT("ChipCave", "Cave"); break;
 			case ECat::Pass: Chip = LOCTEXT("ChipPass", "Pass"); break;
+			case ECat::Shrine: Chip = M->Kind == TEXT("village") ? LOCTEXT("ChipVillage", "Village") : LOCTEXT("ChipShrine", "Shrine"); break;
 			case ECat::Base: Chip = LOCTEXT("ChipBase", "Your base"); break;
 			case ECat::Bed: Chip = M->Kind == TEXT("bedroll") ? LOCTEXT("ChipBedroll", "Bedroll") : LOCTEXT("ChipBed", "Bed"); break;
 			case ECat::Tame: Chip = LOCTEXT("ChipTame", "Your tame"); break;
@@ -1026,6 +1064,29 @@ namespace WRMapTab
 				Box->AddSlot().AutoHeight()[SNew(STextBlock).Text_Lambda([this]() { return About(Live); }).Font(WRUI::Body(14, 500)).ColorAndOpacity(WRUI::Ink2).AutoWrapText(true)];
 			}
 
+			if (M->Cat == ECat::Shrine && M->Kind == TEXT("shrine"))
+			{
+				// Travel from the lit shrine you stand at to this one (WRWorldSystems: the server checks it again).
+				const TWeakObjectPtr<AWRShrine> To = Cast<AWRShrine>(M->Actor.Get());
+				Box->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
+				[
+					SNew(SBox).HeightOverride(44.f * U)
+					[
+						SNew(SWRButton).Primary(true).FontSize(14)
+						.Text_Lambda([this, To]() { const FString Why = UWRWorldSystems::TravelBlock(PC.Get(), To.Get()); return Why.IsEmpty() ? LOCTEXT("TravelHere", "Travel here") : FText::FromString(Why); })
+						.IsEnabled_Lambda([this, To]() { return UWRWorldSystems::TravelBlock(PC.Get(), To.Get()).IsEmpty(); })
+						.OnClicked_Lambda([this, To]()
+						{
+							if (PC.IsValid() && To.IsValid() && UWRWorldSystems::TravelBlock(PC.Get(), To.Get()).IsEmpty())
+							{
+								PC->SendCommand(FString::Printf(TEXT("world travel %s"), *To->ShrineId.ToString()));
+								PC->SetMenu(EWRMenu::None);
+							}
+							return FReply::Handled();
+						})
+					]
+				];
+			}
 			Box->AddSlot().FillHeight(1.f)[SNullWidget::NullWidget];
 			// SWRButton's leather tile would size it to 256 units in an auto-height slot: give it its height.
 			Box->AddSlot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)

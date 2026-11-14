@@ -31,6 +31,8 @@ enum class EWRMenu : uint8
 	Machine,   // a machine's screen (MenuPiece): power, slots, switches (WRUIMachine)
 	TameCard,  // a tame's card (MenuCreature): stats, skills, tack, family, packs (WRUITameCard; the wheel's Tend)
 	Incubator, // an incubator's screen (MenuPiece): the egg, its fuel (WRUIIncubator)
+	World,     // a world system's screen (WorldScreen / WorldTarget): shrine, talk, trade, messages (WRUIWorld)
+	Quests,    // the journal's Quests tab (WRUIWorld)
 };
 
 class AWRBuildPiece;
@@ -212,6 +214,11 @@ public:
 	double GetNoticeTime() const { return NoticeTime; }
 
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
+	/** World systems (WRWorldSystems.h): open one of their screens (shrine, talk, trade, msgwrite, msgread) about Target. */
+	UFUNCTION(Client, Reliable) void ClientOpenWorldScreen(FName Screen, AActor* Target);
+	/** Which world screen shows under EWRMenu::World, and the thing it's about. */
+	FName WorldScreen;
+	TWeakObjectPtr<AActor> WorldTarget;
 	/** A creature raid on your claim (WRRaids): the notice, and for the warning (Stage 0) a banner with the raiders'
 	 *  portrait and Title ("Cinderfangs"). Stage 1: they're here; 2: it's over. */
 	UFUNCTION(Client, Reliable) void ClientRaid(FName Portrait, const FString& Title, const FString& Message, uint8 Stage);
@@ -341,6 +348,7 @@ private:
 	void ToggleInventory();
 	void ToggleSkills();
 	void ToggleClan();
+	void ToggleQuests();
 	void TogglePaths();
 public:
 	void ToggleMap();

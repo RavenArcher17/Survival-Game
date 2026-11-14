@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -1186,6 +1187,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 			if (PC) PC->ClientNotify(FString::Printf(TEXT("%s defeated - you dealt %.0f%%, need %.0f%% for loot"), *Def->Name, 100.f * Entry.Value / MaxHealth, 100.f * Needed / MaxHealth));
 			continue;
 		}
+		WRWorld::OnBossCredit(PS, CreatureId);   // its effigy's recipe (summoning stones)
 		FString Got;
 		for (const TPair<FName, int32>& L : Def->Loot)
 		{

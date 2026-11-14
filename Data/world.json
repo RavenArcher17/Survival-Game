@@ -1,0 +1,166 @@
+{
+  "_comment": "World systems (cooks/build-world-systems.md): shrines, path masters and their quests, villages and factions, the traveling merchants and their trade, message stones, world and biome events, invasions, hidden sub-biomes, summoning stones. Positions are metres on the island (x east, y south); every one is settled on land at runtime (traced down, stepped toward the island's middle if it lands in the sea), so a rebuilt island needs no re-placement. A new biome adds rows; nothing in code names a biome. Numbers are first drafts.",
+
+  "biomes": {
+    "_comment": "Per biome: its path, signature resource, essence, faction, the crater / glacier the event centres on, and the waymark round its summoning stones.",
+    "volcanic": { "name": "Volcanic", "path": "fire", "signature": "sulfur_crystal", "essence": "ember_essence", "faction": "forgebound", "centre": [-786, 0], "waymark": "cairn", "rock": [30, 27, 25], "rockAlt": [52, 44, 38], "accent": [217, 194, 74], "glow": [255, 140, 60] },
+    "tundra": { "name": "Frozen tundra", "path": "frost", "signature": "lichen", "essence": "frost_essence", "faction": "rimekin", "centre": [804, 0], "waymark": "inuksuk", "rock": [185, 196, 206], "rockAlt": [140, 152, 166], "accent": [198, 40, 40], "glow": [150, 200, 255] }
+  },
+
+  "shrines": {
+    "_comment": "great: a village's always-lit shrine with its path master. guards: creature id -> how many, spawned round a dark lesser shrine when someone comes near.",
+    "list": [
+      { "id": "forge", "name": "Great Shrine of the Forge", "biome": "volcanic", "great": true, "village": "emberwick" },
+      { "id": "kipuka", "name": "Kipuka Shrine", "biome": "volcanic", "at": [-1150, 650], "guards": { "cinderfang": 5 } },
+      { "id": "glasswall", "name": "Glasswall Shrine", "biome": "volcanic", "at": [-1180, -900], "guards": { "kilnmite": 4, "scorchwing": 2 } },
+      { "id": "bluefire", "name": "Blue Fire Shrine", "biome": "volcanic", "at": [-430, -1050], "guards": { "basaltback": 3 } },
+      { "id": "craterrim", "name": "Crater Rim Shrine", "biome": "volcanic", "at": [-1000, -250], "guards": { "magmaw": 2 } },
+      { "id": "rime", "name": "Great Shrine of the Rime", "biome": "tundra", "great": true, "village": "rimehold" },
+      { "id": "lake", "name": "Lake Island Shrine", "biome": "tundra", "at": [900, -1150], "guards": { "gloomhowl": 6 } },
+      { "id": "pine", "name": "Pine Shrine", "biome": "tundra", "at": [700, 1150], "guards": { "gloomhowl": 3, "frostantler": 1 } },
+      { "id": "crevasse", "name": "Crevasse Shrine", "biome": "tundra", "at": [450, 60], "guards": { "rimeshell": 3, "glacimaw": 1 } },
+      { "id": "glacier", "name": "Glacier Rim Shrine", "biome": "tundra", "at": [1050, 420], "guards": { "rimeclaw": 2 } }
+    ],
+    "guardRange": 12000, "guardRingMin": 1500, "guardRingMax": 2500,
+    "kindleSeconds": 3.0, "kindleMove": 150, "interactRange": 450,
+    "xpLesserOwn": 1000, "xpLesserEach": 500, "xpGreatOwn": 2000, "xpGreatEach": 1000, "rekindleFraction": 0.2,
+    "reguardDays": 4, "shareRadius": 3000, "standing": 60,
+    "travelFade": 1.2, "travelTameRadius": 3000, "travelMaxWeight": 1.0
+  },
+
+  "masters": [
+    { "id": "sigrun", "name": "Sigrun Ashhand", "path": "fire", "village": "emberwick", "sex": "f", "face": 2, "build": 2, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "fire", "", "fire"], "work": "chop", "workEvery": 2.6, "workSound": "world.anvil", "workFx": "world.anvil_sparks", "offset": [250, -620], "lineSound": "world.anvil_soft",
+      "lines": { "first": "Another one off the boats. Stand clear of the sparks.", "offer": "I've work if you've hands.", "waiting": "Well? The fire doesn't wait.", "done": "Good. Again tomorrow.", "all": "You've the forge in you now. Go and use it." } },
+    { "id": "ailu", "name": "Áilu the Tracker", "path": "frost", "village": "rimehold", "sex": "m", "face": 1, "build": 0, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "frost", "", "frost"], "work": "gather", "workEvery": 5.0, "workSound": "world.hide_scrape", "workFx": "", "offset": [250, 620], "lineSound": "world.chime",
+      "lines": { "first": "Quiet. You walk like a herd.", "offer": "There's something you could learn.", "waiting": "Not yet. Go.", "done": "Better.", "all": "The ice will carry you now." } }
+  ],
+
+  "quests": {
+    "_comment": "Per master, in order. type: bring (items taken), show (items checked), kill (creature, count, optional status: burning / slowed), shrines (all listed lit by you), quench (hold a weapon of an element in water), sneak (within 5 m of a sleeping kind, then 30 m off while it sleeps), tame (creature). pays: xp to the master's path, items, recipes learned.",
+    "sigrun": [
+      { "id": "feed_fire", "title": "Feed the fire", "task": "Bring Sigrun 10 sulfur crystals.", "type": "bring", "item": "sulfur_crystal", "count": 10, "xp": 800, "recipes": ["cinder_salve"] },
+      { "id": "quench", "title": "Quench", "task": "Quench a fire-infused weapon: hold it in water.", "type": "quench", "element": "fire", "count": 1, "xp": 1000 },
+      { "id": "ash_and_bone", "title": "Ash and bone", "task": "Kill 5 Cinderfangs while they burn.", "type": "kill", "creature": "cinderfang", "status": "burning", "count": 5, "xp": 1200 },
+      { "id": "kindle_vents", "title": "Kindle the vents", "task": "Light the Glasswall, Blue Fire and Crater Rim shrines.", "type": "shrines", "shrines": ["glasswall", "bluefire", "craterrim"], "count": 3, "xp": 1500, "recipes": ["obsidian_arrow"] },
+      { "id": "glass_heart", "title": "Glass heart", "task": "Show Sigrun the Obsidian Warden's heart.", "type": "show", "item": "trophy_obsidian_heart", "count": 1, "xp": 2000, "items": { "gem_ruby": 1, "ember_essence": 3 } },
+      { "id": "the_yoke", "title": "The yoke", "task": "Kill Cinderhorn, the bull that walks the ash plains.", "type": "kill", "creature": "cinderhorn", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } }
+    ],
+    "ailu": [
+      { "id": "listen", "title": "Listen", "task": "Get within 5 m of a sleeping Gloomhowl and back out without waking it.", "type": "sneak", "creature": "gloomhowl", "count": 1, "xp": 800 },
+      { "id": "lake_shrine", "title": "Cross to the lake shrine", "task": "Light the Lake Island Shrine.", "type": "shrines", "shrines": ["lake"], "count": 1, "xp": 1000, "recipes": ["spiked_boots"] },
+      { "id": "patient_hand", "title": "The patient hand", "task": "Tame a Woolly drudge.", "type": "tame", "creature": "woolly_drudge", "count": 1, "xp": 1200 },
+      { "id": "slow_saber", "title": "Slow the saber", "task": "Kill a Rimeclaw while it's slowed.", "type": "kill", "creature": "rimeclaw", "status": "slowed", "count": 1, "xp": 1500 },
+      { "id": "under_bridge", "title": "Under the bridge", "task": "Show Áilu Grimjaw's marrow.", "type": "show", "item": "trophy_troll_marrow", "count": 1, "xp": 2000 },
+      { "id": "earth_bull", "title": "The Earth-Bull", "task": "Kill Old Tusker, the feral drudge bull.", "type": "kill", "creature": "old_tusker", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } }
+    ],
+    "standing": 150, "greetRange": 600, "greetEvery": 90, "talkRange": 400, "sneakNear": 500, "sneakAway": 3000
+  },
+
+  "factions": {
+    "forgebound": { "name": "the Forgebound", "biome": "volcanic" },
+    "rimekin": { "name": "the Rime-kin", "biome": "tundra" },
+    "tiers": [ { "name": "Stranger", "at": 0, "discount": 0 }, { "name": "Known", "at": 300, "discount": 0 }, { "name": "Trusted", "at": 900, "discount": 0.1 }, { "name": "Kin", "at": 2000, "discount": 0.2 } ],
+    "perTrade": 5, "perDefence": 200
+  },
+
+  "villages": [
+    { "id": "emberwick", "name": "Emberwick", "biome": "volcanic", "camp": "Volcanic camp 3", "inland": 250, "radius": 4500, "style": "basalt", "huts": 5, "ring": 1600 },
+    { "id": "rimehold", "name": "Rimehold", "biome": "tundra", "camp": "Tundra camp 1", "inland": 250, "radius": 4500, "style": "lavvu", "huts": 5, "ring": 1600 }
+  ],
+
+  "caravans": [
+    { "id": "brannoc", "name": "Brannoc the Cinder-trader", "biome": "volcanic", "home": "emberwick", "sex": "m", "face": 4, "build": 2, "outrider": { "sex": "f", "face": 4, "build": 0 },
+      "stops": ["village:emberwick", "camp:Volcanic camp 1", "pass:North pass", "camp:Volcanic camp 1", "village:emberwick", "camp:Volcanic camp 2", "pass:South pass", "camp:Volcanic camp 2"], "trade": "volcanic" },
+    { "id": "ivalo", "name": "Ivalo the Furrier", "biome": "tundra", "home": "rimehold", "sex": "f", "face": 5, "build": 0, "outrider": { "sex": "m", "face": 3, "build": 2 },
+      "stops": ["village:rimehold", "camp:Tundra camp 2", "pass:North pass", "camp:Tundra camp 2", "village:rimehold", "camp:Tundra camp 3", "pass:South pass", "camp:Tundra camp 3"], "trade": "tundra" }
+  ],
+  "caravan": { "speed": 300, "stopHours": 1, "spawnRange": 15000, "despawnRange": 25000, "health": 400, "dropFraction": 0.1, "passInset": 120 },
+
+  "trade": {
+    "_comment": "Barter: give -> get, opened at a standing tier (0 Stranger .. 3 Kin). Discounts take off the give side (rounded up, at least 1).",
+    "volcanic": [
+      { "give": { "hide": 6 }, "get": { "iron_ingot": 1 }, "tier": 0 },
+      { "give": { "raw_meat": 8 }, "get": { "sulfur_crystal": 4 }, "tier": 0 },
+      { "give": { "lichen": 10 }, "get": { "obsidian": 2 }, "tier": 0 },
+      { "give": { "frost_essence": 2 }, "get": { "ember_essence": 2 }, "tier": 1 },
+      { "give": { "hide": 10, "iron_ingot": 2 }, "get": { "cinder_salve": 2 }, "tier": 1 },
+      { "give": { "iron_ingot": 6 }, "get": { "gem_ruby": 1 }, "tier": 2 },
+      { "give": { "frost_essence": 6, "iron_ingot": 4 }, "get": { "upgrade_shard": 1 }, "tier": 3 }
+    ],
+    "tundra": [
+      { "give": { "raw_meat": 8 }, "get": { "hide": 4 }, "tier": 0 },
+      { "give": { "sulfur_crystal": 6 }, "get": { "lichen": 10 }, "tier": 0 },
+      { "give": { "obsidian": 2 }, "get": { "ice_block": 6 }, "tier": 0 },
+      { "give": { "ember_essence": 2 }, "get": { "frost_essence": 2 }, "tier": 1 },
+      { "give": { "hide": 8, "iron_ingot": 1 }, "get": { "spiked_boots": 1 }, "tier": 1 },
+      { "give": { "iron_ingot": 6 }, "get": { "gem_topaz": 1 }, "tier": 2 },
+      { "give": { "ember_essence": 6, "iron_ingot": 4 }, "get": { "upgrade_shard": 1 }, "tier": 3 }
+    ]
+  },
+
+  "messages": {
+    "_comment": "Message stones (Elden Ring's frame): a template with **** for the word, an optional conjunction and a second clause. maxPerPlayer: the oldest crumbles. hideAt: net rating at or below this hides it. healFraction: what a Good gives the author (online, alive).",
+    "maxPerPlayer": 10, "hideAt": -3, "healFraction": 0.2, "readRange": 300, "nearRange": 900,
+    "templates": ["**** ahead", "No **** ahead", "**** required ahead", "Be wary of ****", "Try ****", "Could this be a ****?", "If only I had a ****...", "Visions of ****...", "Time for ****", "****", "****!", "****?", "****...", "Huh. It's a ****...", "Praise the ****!", "Let there be ****", "Ahh, ****...", "Look for ****", "Don't trust ****", "Beware the ****"],
+    "conjunctions": ["and then", "or", "but", "therefore", "in short", "except", "by the way", "so to speak", "all the more", ","],
+    "words": {
+      "Creatures": ["enemy", "pack", "Magmaw", "Cinderfang", "Scorchwing", "Basaltback", "Emberhorn", "Kilnmite", "Ashstrider", "Glowmoth", "Pumicehog", "Rimeclaw", "Glacimaw", "Gloomhowl", "Woolly drudge", "Frostantler", "Rimeshell", "Snowpuff", "Aurora fox", "Floeback", "boss", "mini-boss", "Cinderhorn", "Old Tusker", "Vulkarn", "Skaldrith"],
+      "Places": ["shrine", "camp", "village", "cave", "pass", "lava", "thin ice", "cliff", "high road", "shortcut", "dead end", "hiding place", "lava tube", "ice cave", "safe zone", "base", "water", "ore"],
+      "Things": ["torch", "fire", "frost", "sulfur", "lichen", "iron", "star iron", "obsidian", "food", "potion", "bow", "shield", "spear", "tame", "mount", "bed", "chest", "effigy"],
+      "Actions": ["jumping", "rolling", "parrying", "blocking", "running", "sneaking", "riding", "climbing", "patience", "a ranged attack", "a heavy hit", "fire magic", "frost magic", "taming", "luring it out", "turning back", "resting", "teamwork"],
+      "Feelings": ["hope", "despair", "triumph", "dread", "warmth", "cold", "home", "friend", "liar", "fool", "hero", "treasure", "trap", "ambush", "beauty", "danger", "luck", "regret"]
+    }
+  },
+
+  "events": {
+    "_comment": "Settings worldEvents / biomeEvents (off / rare / normal / frequent). everyHours: real hours between, at Normal (rare x2, frequent x0.5), counted on the world's played time. maxBiome / maxWorld at once.",
+    "maxWorld": 1, "maxBiome": 2, "warnSeconds": 300, "rareScale": 2.0, "frequentScale": 0.5,
+    "eruption": { "biome": "volcanic", "everyHours": 72, "weather": "eruption", "plume": [0, 600], "fire": [600, 3000], "end": 3600,
+      "tremorEvery": 30, "tremorShake": 0.05, "bombRange": 120000, "bombInterval": [8, 14], "bombOffset": [300, 1200], "bombRadius": 350, "bombDamage": 70, "bombBurn": 50,
+      "bombTravel": 1.2, "bombGlow": 0.9, "roofDamage": 60, "safeRadius": 5000, "coreSeconds": 600, "core": { "sulfur_crystal": [4, 6], "iron_ore": [1, 2] }, "coreBonus": { "obsidian": 0.2 },
+      "signatureScale": 3, "vaultHours": 24, "title": "The volcano stirs", "warn": "Tremors under the ash: the crater is waking", "startText": "The Eruption: lava bombs over the volcanic lands", "endText": "The ash settles. Bomb cores cool on the ground" },
+    "whiteout": { "biome": "tundra", "everyHours": 72, "weather": "whiteout", "end": 3600, "nightTable": true, "signatureScale": 3, "auroraNight": true,
+      "title": "A white wall", "warn": "A white wall rolls off the glacier", "startText": "Whiteout: you can't see 25 m; Gloomhowls hunt by day", "endText": "The whiteout lifts. Tonight the aurora will be full" },
+    "starfall": { "everyHours": 48, "atDusk": true, "streakSeconds": 300, "streakEvery": [1.5, 3.0], "meteors": [3, 5], "fallSeconds": 2.4, "clearOfRadius": 40000,
+      "craterHours": 24, "drawAfterHours": 2, "ore": { "star_iron": [6, 10] }, "oreBonus": { "gem_onyx": 0.25 }, "bands": ["midland", "highland"],
+      "title": "Starfall", "warn": "Stars are falling", "landText": "A star fell to the {dir}" }
+  },
+
+  "invasions": {
+    "_comment": "Setting invasions: off / rare / normal / frequent = per pair per real week. Pairs list both ways; pass mouths are found from the island's 'pass' points (the attacking side's mouth = passInset metres into the attacker's land).",
+    "perWeek": { "rare": 1, "normal": 2, "frequent": 4 },
+    "warnSeconds": 300, "holdSeconds": 1800, "targetRange": 150000, "passInset": 150, "count": [8, 14], "lootFraction": 0.1, "xp": 2000,
+    "pays": { "ember_essence": 3, "frost_essence": 3 },
+    "pairs": [
+      { "from": "tundra", "to": "volcanic", "leader": "old_tusker", "day": { "woolly_drudge": 4, "frostantler": 4, "rimeclaw": 1 }, "night": { "gloomhowl": 8, "rimeclaw": 2 } },
+      { "from": "volcanic", "to": "tundra", "leader": "cinderhorn", "day": { "cinderfang": 6, "scorchwing": 3, "magmaw": 1 }, "night": { "cinderfang": 8, "magmaw": 1 } }
+    ]
+  },
+
+  "hidden": [
+    { "id": "kilnroads", "name": "The Kiln Roads", "biome": "volcanic", "look": "lava", "width": 700, "height": 550, "skylights": [0, 3],
+      "route": [[-560, 250], [-640, 170], [-700, 60], [-720, -80], [-690, -210], [-620, -320]],
+      "rooms": [
+        { "at": 1, "name": "The Ember Gallery", "creatures": { "kilnmite": 3 }, "stream": true },
+        { "at": 2, "name": "Smiths' Hall", "ore": { "iron_ore": 3 }, "cache": { "gem_ruby": 1, "iron_ingot": 2 }, "lore": "Smith's tally: forty marks cut in the anvil's foot, and a forty-first half done." },
+        { "at": 4, "name": "Pele's Loom", "creatures": { "scorchwing": 2 } },
+        { "at": 5, "name": "The Sealed Vault", "vault": true, "cache": { "iron_ingot": 6, "gem_ruby": 1, "gem_onyx": 1, "upgrade_shard": 2 }, "lore": "Giant's first hammer-head, cracked through: the forge-giant was once small enough to need a smith." }
+      ] },
+    { "id": "bluebelow", "name": "The Blue Below", "biome": "tundra", "look": "ice", "width": 700, "height": 550, "skylights": [0],
+      "route": [[520, -380], [560, -250], [600, -100], [630, 60], [640, 180], [640, 300]],
+      "rooms": [
+        { "at": 1, "name": "Meltwater Hall", "creatures": { "rimeshell": 2 }, "stream": true },
+        { "at": 3, "name": "The Burnt Wyrm", "cache": { "ember_essence": 3 }, "lore": "Smith's spike: forged iron, driven into a wyrm's skull long before Skaldrith was hatched." },
+        { "at": 4, "name": "Rime-folk Ice Tomb", "cache": { "hide": 6, "bronze_ingot": 3 } },
+        { "at": 5, "name": "The Deep Vein", "ore": { "iron_ore": 6 }, "cache": { "gem_topaz": 1 } }
+      ] }
+  ],
+
+  "summoning": {
+    "_comment": "A stone beside each major's shrine-stone and at each mini's lair. holdSeconds to offer; partyRadius: who stands with the summoner shares the fight. heard: the rising sound's reach.",
+    "holdSeconds": 2.0, "partyRadius": 3000, "heard": 30000, "sideOffset": 600, "lairOffset": 1200,
+    "effigies": { "vulkarn": "effigy_vulkarn", "skaldrith": "effigy_skaldrith", "obsidian_warden": "effigy_obsidian_warden", "ignessa": "effigy_ignessa", "cinderhorn": "effigy_cinderhorn", "grimjaw": "effigy_grimjaw", "pale_hunter": "effigy_pale_hunter", "old_tusker": "effigy_old_tusker" }
+  },
+
+  "night": { "_comment": "Night tables (spawn_regions.json night): aggro range for nocturnal hunters at night.", "aggroScale": 1.25 }
+}

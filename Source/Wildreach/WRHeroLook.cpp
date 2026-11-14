@@ -548,8 +548,8 @@ void AWRCharacter::TickPathMarks(float DeltaSeconds)
 		if (PathMarkCheck <= 0.f)
 		{
 			PathMarkCheck = 1.f;
-			FWRPathMarks Next;
-			if (const AWRPlayerState* PS = GetPlayerState<AWRPlayerState>())
+			FWRPathMarks Next = bNpcMarks ? NpcMarks : FWRPathMarks();
+			if (const AWRPlayerState* PS = bNpcMarks ? nullptr : GetPlayerState<AWRPlayerState>())
 			{
 				if (const UWRPathComponent* P = PS->GetPaths())
 				{

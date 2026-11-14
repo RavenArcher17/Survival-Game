@@ -75,6 +75,9 @@ namespace WRWorldsFiles
 		}
 		O->TryGetStringField(TEXT("deathPenalty"), S.DeathPenalty);
 		O->TryGetStringField(TEXT("raids"), S.Raids);
+		O->TryGetStringField(TEXT("worldEvents"), S.WorldEvents);
+		O->TryGetStringField(TEXT("biomeEvents"), S.BiomeEvents);
+		O->TryGetStringField(TEXT("invasions"), S.Invasions);
 	}
 
 	/** The preset a server plays with no settings of its own (server_presets.json "default"). */
@@ -278,6 +281,9 @@ bool WRWorlds::WriteSettings(const FString& Id, const FWRWorldSettings& Settings
 	}
 	if (Settings.DeathPenalty != Preset.DeathPenalty) Changes->SetStringField(TEXT("deathPenalty"), Settings.DeathPenalty);
 	if (Settings.Raids != Preset.Raids) Changes->SetStringField(TEXT("raids"), Settings.Raids);
+	if (Settings.WorldEvents != Preset.WorldEvents) Changes->SetStringField(TEXT("worldEvents"), Settings.WorldEvents);
+	if (Settings.BiomeEvents != Preset.BiomeEvents) Changes->SetStringField(TEXT("biomeEvents"), Settings.BiomeEvents);
+	if (Settings.Invasions != Preset.Invasions) Changes->SetStringField(TEXT("invasions"), Settings.Invasions);
 	if (Changes->Values.Num() == 0)
 	{
 		return WRWorldsFiles::WritePreset(Dir(Id), Settings.Base);
@@ -297,7 +303,8 @@ bool WRWorlds::IsCustom(const FWRWorldSettings& Settings)
 		const float* Was = Preset.Numbers.Find(KV.Key);
 		if (!Was || !FMath::IsNearlyEqual(*Was, KV.Value, 0.001f)) return true;
 	}
-	return Settings.DeathPenalty != Preset.DeathPenalty || Settings.Raids != Preset.Raids;
+	return Settings.DeathPenalty != Preset.DeathPenalty || Settings.Raids != Preset.Raids || Settings.WorldEvents != Preset.WorldEvents
+		|| Settings.BiomeEvents != Preset.BiomeEvents || Settings.Invasions != Preset.Invasions;
 }
 
 FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings)

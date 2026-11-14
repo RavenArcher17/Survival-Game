@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRWorldSystems.h"
 #include "WRSurvival.h"
 #include "WRAnimInstance.h"
 #include "WRBoss.h"
@@ -1658,6 +1659,7 @@ int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
 
 void AWRCreature::CompleteTame(const FString& PlayerName, bool bTamed)
 {
+	if (bTamed && TamedBy.IsEmpty() && !PlayerName.IsEmpty()) WRWorld::OnTamed(this, PlayerName);   // quests (Áilu's patient hand)
 	TamedBy = PlayerName;
 	TameOrder = EWRTameOrder::Follow;
 	TameProgress = 1.f;
@@ -3326,6 +3328,29 @@ void AWRCreatureSpawner::SpawnOne()
 	}
 }
 
+bool AWRCreatureSpawner::IsLyingUp() const
+{
+	if (Shift == 0)
+	{
+		return false;
+	}
+	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
+	const bool bNightTable = WRWorld::IsNightTable(this, Def ? Def->Biome : NAME_None);
+	// A day kind that sleeps where it stands (diurnal herds: the sneak-tame window) stays in view asleep.
+	return Shift == 2 ? !bNightTable : (bNightTable && !(Def && Def->Activity == TEXT("diurnal")));
+}
+
+bool AWRCreatureSpawner::SummonNow()
+{
+	if (PendingRespawns.Num() == 0)
+	{
+		return false;
+	}
+	PendingRespawns.Sort();
+	PendingRespawns[0] = GetWorld()->GetTimeSeconds();
+	return true;
+}
+
 void AWRCreatureSpawner::AlertPack(AActor* Attacker)
 {
 	for (const TWeakObjectPtr<AWRCreature>& C : Alive)
@@ -3363,7 +3388,7 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 		const bool bNear = PlayerNear(bActive ? ActivationRadius * WRTune(TEXT("wildlife.leaveRadiusMult"), 1.2f) : ActivationRadius);
 		if (!bActive)
 		{
-			if (bNear && (!bRoams || Count > 0))
+			if (bNear && (!bRoams || Count > 0) && !IsLyingUp())
 			{
 				Activate();
 			}

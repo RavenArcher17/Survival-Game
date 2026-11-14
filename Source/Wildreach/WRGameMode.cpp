@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRFarm.h"
 #include "WRBeds.h"
@@ -109,6 +110,7 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		}
 		// A returning player's saved paths override the join URL.
 		LoadPlayer(PS);
+		if (UWRWorldSystems* WorldSys = UWRWorldSystems::Get(this)) WorldSys->PlayerJoined(PS);
 		// The engine picked the start spot inside Super::InitNewPlayer, before the main path was known, so the first
 		// spawn landed at any camp. Pick again now: the path's biome (or a saved bed).
 		// (FindPlayerStart hands back an existing StartSpot, so it's cleared first.)
@@ -174,7 +176,7 @@ void AWRGameMode::StepRoamingBosses()
 		bool bNear = false;
 		for (TActorIterator<AWRCharacter> It(GetWorld()); It && !bNear; ++It)
 		{
-			bNear = It->IsAlive() && FVector::Dist2D(It->GetActorLocation(), Start) < WRTune(TEXT("wildlife.activationRadius"), 15000.f);
+			bNear = It->IsAlive() && It->GetPlayerState() && FVector::Dist2D(It->GetActorLocation(), Start) < WRTune(TEXT("wildlife.activationRadius"), 15000.f);
 		}
 		FHitResult Ground;
 		const FCollisionQueryParams Q(SCENE_QUERY_STAT(WRRoamBoss), false);
@@ -484,6 +486,8 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	TArray<TSharedPtr<FJsonValue>> Known;
 	for (const FName& Bp : PS->KnownBlueprints) Known.Add(MakeShared<FJsonValueString>(Bp.ToString()));
 	Root->SetArrayField(TEXT("blueprints"), Known);
+	// Quests with the path masters, shrines you kindled, faction standing (WRWorldSystems).
+	if (const UWRQuestLog* Log = UWRQuestLog::For(PS)) Root->SetObjectField(TEXT("world"), Log->ToJson());
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -558,6 +562,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetArrayField(TEXT("blueprints"), Known))
 	{
 		for (const TSharedPtr<FJsonValue>& K : *Known) PS->KnownBlueprints.AddUnique(FName(*K->AsString()));
+	}
+	const TSharedPtr<FJsonObject>* WorldJson = nullptr;
+	if (Root->TryGetObjectField(TEXT("world"), WorldJson))
+	{
+		if (UWRQuestLog* Log = UWRQuestLog::For(PS)) Log->FromJson(*WorldJson);
 	}
 }
 

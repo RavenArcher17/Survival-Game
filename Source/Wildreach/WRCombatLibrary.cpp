@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRBoss.h"
@@ -381,6 +382,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Attacker && Attacker != Target && Attacker->GetPlayerState() && !Attacker->IsHostileTo(Target))
 	{
 		return Done(EWRHitResult::Ignored);  // PvP off, clanmate, safe zone, or your own tame
+	}
+	if (WRWorld::BlocksHit(Target, Hit))
+	{
+		return Done(EWRHitResult::Ignored);  // a path master, a merchant hit by a survivor, a summoned boss sealed to another party
 	}
 
 	// A creature's or boss's blow on a remote player waits for the defence it may already have pressed on its screen

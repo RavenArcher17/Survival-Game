@@ -161,6 +161,7 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("BackToMenu"), IE_Pressed, &AWRPlayerController::ReturnToMenu);
 	Bind(TEXT("Map"), IE_Pressed, &AWRPlayerController::ToggleMap);
 	Bind(TEXT("Clan"), IE_Pressed, &AWRPlayerController::ToggleClan);
+	Bind(TEXT("Quests"), IE_Pressed, &AWRPlayerController::ToggleQuests);
 	Bind(TEXT("Chat"), IE_Pressed, &AWRPlayerController::OpenChat);
 	Bind(TEXT("Build"), IE_Pressed, &AWRPlayerController::ToggleBuildMenu);
 	Bind(TEXT("Snap"), IE_Pressed, &AWRPlayerController::ToggleSnap);
@@ -1099,7 +1100,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
 		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("whistle "), TEXT("hearthfeed"), TEXT("hearthrepair"),
 		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode"), TEXT("light"),
-		TEXT("mon "), TEXT("moverclock "), TEXT("mput "), TEXT("mtake"), TEXT("mrepair "), TEXT("mlink "), TEXT("msend ") };  // chat is its own RPC
+		TEXT("world "), TEXT("mon "), TEXT("moverclock "), TEXT("mput "), TEXT("mtake"), TEXT("mrepair "), TEXT("mlink "), TEXT("msend ") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{

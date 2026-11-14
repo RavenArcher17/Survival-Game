@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRPlayerController.h"
+#include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRFarm.h"
@@ -139,6 +140,12 @@ void AWRPlayerController::ToggleClan()
 	OpenJournal(EWRMenu::Clan);
 }
 
+void AWRPlayerController::ToggleQuests()
+{
+	if (!UI) return;
+	OpenJournal(EWRMenu::Quests);
+}
+
 void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
 void AWRPlayerController::WRMenu(FName Which, int32 Select)
@@ -176,6 +183,11 @@ void AWRPlayerController::WRInteract()
 	if (FindNearby<AWRLaidEgg>(GetWorld(), GetPawn(), 300.f))
 	{
 		ServerCommand(TEXT("interact"));
+		return;
+	}
+	// A shrine, a path master, a merchant, a summoning stone, a message, a cache (WRWorldSystems): its screen or its act.
+	if (UI && WRWorld::ClientInteract(this))
+	{
 		return;
 	}
 	AWRCreature* Tame = FindNearbyCreature(true);
@@ -702,6 +714,13 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 
 	if (RunBuildCommand(Args, OutResult))
 	{
+		return true;
+	}
+	// World systems (WRWorldSystems): world kindle / travel / take / hand / trade / msg / rate / summon / open.
+	if (Cmd == TEXT("world"))
+	{
+		OutResult = WRWorld::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
 		return true;
 	}
 	// Machines' screens (mon, moverclock, mput, mtake, mtakeall, mrepair, mlink, msend: WRMachine).

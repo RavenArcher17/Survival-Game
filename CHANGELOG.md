@@ -1,5 +1,83 @@
 # Changelog
 
+## Unreleased: world systems (shrines and fast travel, path masters and quests, villages, factions and merchants, message stones, Starfall, the Eruption and the Whiteout, invasions, day and night tables, the hidden tubes, summoning stones)
+
+Aaron (lane build-world-systems: research, requirement ledger and plan in showcase-notes cooks/build-world-systems.md,
+following cooks/fire-frost.md 3.1 / 3.3.x / 3.4.x / 3.8, world-map.md 2.7-2.9, endgame.md 2.8). Built to compile
+(editor, adaptive and full unity); not played here (Aaron and the testers test, F8). Everything is `Data/world.json`
+rows: a new biome adds shrines, a master and quests, a village, a caravan, events, an invasion pair and its tubes.
+
+- **Shrines** (10: a Great Shrine in each village, four lesser per land): a hexagonal three-tier dais with steps, a
+  hexagonal pillar and a riveted iron fire-bowl on three straps, 7 (9) standing stones of the land's rock with a pale
+  rune line, slag cairns and sulfur crust (volcanic) or inuksuit and red / blue / yellow prayer strips (tundra). Dark:
+  the runes glow (a cold silhouette at night); lit: a fire and a warm light seen across the land. A dark lesser shrine
+  is guarded (its sub-zone's packs, in a ring) when you come near; clear them, then Interact to kindle (3 s, standing
+  still; a blow or a step off puts it out). Kindling lights it for the world, makes it found for you, your clan and
+  everyone standing with you, and pays 1,000 XP to the land's path if it's yours (else 500 to each of yours); a Great
+  Shrine pays 2,000 on your first visit; a re-kindle 20%. Four game days later a lesser shrine goes dark and its guards
+  come back. Saved in the world (`world_systems.json`).
+- **Fast travel**: Interact at a lit shrine (the Shrine screen) or pick a found shrine on the map: travel from a lit
+  shrine to any found one, not in a fight, not mounted, not to one invaders hold; a fade, then you arrive on its steps
+  with your following tames within 30 m.
+- **Path masters**: Sigrun Ashhand (Fire, Emberwick, at her anvil and quench trough) and Áilu the Tracker (Frost,
+  Rimehold, at his hide frame), on the MetaHuman hero rig with their path marks, working on a loop (the anvil ring and
+  sparks), turning to you when you come near and saying a short line (no camera grab). Talk: their task, progress,
+  what it pays, Take it / Hand it in. Six quests each (bring, quench a fire weapon in water, kill while burning /
+  slowed, kindle shrines, show a trophy, sneak past sleeping Gloomhowls, tame a Woolly drudge, kill the roaming mini)
+  paying path XP, recipes (Cinder salve, Obsidian arrow, Spiked boots: new items) and shards. Journal **Quests** tab
+  (U): each master's task and progress, standing, every shrine's state, events and invasions on.
+- **Villages and factions**: Emberwick (basalt round houses, turf-and-ash roofs with glowing smoke holes) and Rimehold
+  (hide lavvu, drying racks with fish) round their Great Shrines, 250 m inland of each middle camp, each a safe zone
+  with door lanterns, a flagstone path and the merchant's stall. The Forgebound and the Rime-kin: standing from
+  quests, kindling, trade and defence, tiers Stranger / Known / Trusted / Kin (10% / 20% off).
+- **Traveling merchants**: Brannoc (volcanic) and Ivalo (tundra) with an outrider, walking their side's loop (village,
+  camps, both pass mouths) at 3 m/s, an hour at each stop, placed by the world clock (there when you arrive), out only
+  near players. Trade screen: barter rows by standing tier. Creatures can kill them (players can't): a tenth of the
+  stock falls on the road and the caravan's back from home the next game day.
+- **Message stones**: craft a Scratch-stone (by hand), use it: pick a template, a word (five lists), optionally a
+  conjunction and a second part (all buttons: pad and mouse), and the words are cut into a leaning stone with a cloth
+  tied round it. Read: Good heals the author 20% if they're on (told later if not), Poor; net -3 hides it; 10 each,
+  the oldest crumbles.
+- **Starfall** (world events setting): from dusk every ~2 real days, meteors streak across the whole sky for 5 min,
+  then 3-5 fall (a fire-trailing rock, a glow where it lands, the roar) on midland / highland ground away from claims,
+  camps, shrines, villages and arenas, each a 20 m crater with thrown rock and scorch round a star holding star iron
+  6-10 (a gem 25%); its glow draws a midland pack after 2 game hours; it weathers away after a game day.
+- **The Eruption** (biome events setting, volcanic): 5 min of tremors and a warning, then the plume over the crater,
+  the `eruption` weather (80 m sight, ash), and from minute 10 to 50 lava bombs at everyone outdoors within 1.2 km: the
+  launch boom, a glowing rock on a ballistic arc (never homes), an orange glow where it lands for the last 0.9 s, 70 +
+  burn 50 unblockable through ApplyHit; a roof takes it (60 to the piece); never near camps or villages. Bomb cores to
+  take (sulfur, iron ore, obsidian 20%); sulfur gathers x3; the Kiln Roads' Sealed Vault opens for the day.
+- **The Whiteout** (tundra): the `whiteout` weather (25 m sight, glacier gusts, drifts), the night table runs by day
+  (Gloomhowls out), then an aurora night with lichen x3.
+- **Invasions** (invasions setting: off / rare / normal / frequent per pair per week): a 5 min warning card to the
+  defending land, then 8-14 of the other land (by day or night table) and its roaming mini (Old Tusker / Cinderhorn
+  leaves its loop) come out at the far mouth of a pass, march through it and on to the nearest claim (they break it as
+  raiders do) or lesser shrine (they hold it: dark, travel shut) for 30 min. The tracker shows how many are left.
+  Beaten: everyone who did 10% of their health gets 2,000 path XP, ember and frost essence and standing.
+- **Day and night tables**: `spawn_regions.json night` per region (fire-frost 3.3.7 / 3.4.7): a night-only kind lies
+  up by day, a day-only kind at night (diurnal herds still sleep in the open), new packs roll from the hour's table.
+- **Hidden sub-biomes**: the Kiln Roads (volcanic) and the Blue Below (tundra), built as rock-roofed tubes along their
+  route (walls of boulders sunk 3 m, roof slabs, skylights with an ash / snow heap under them, glowing crust seams or
+  meltwater ice, icicles, lights every 25 m) with the sculpted cave shells as rooms opening off them: Kilnmites,
+  Scorchwings, Rimeshells, iron nodes, stone coffers with lore and loot (refill every 4 game days) and the Sealed Vault
+  behind a banded basalt slab that sinks when an eruption shakes it loose.
+- **Summoning stones**: an altar stone with the boss's sigil glowing in its element, ringed by slag cairns or inuksuit,
+  beside each major's shrine-stone and at each mini's lair. Effigies (8, alchemy table) are learned on your first loot
+  from that boss; offering one raises a dead boss now (the stone flares, the call heard far off), and only the
+  summoner's party (clan and whoever stood with them) can hurt it.
+- Settings: World events / Biome events / Invasions (off / rare / normal / frequent) on the world settings screen and in
+  every preset. Dev: `WRCmd world dev event eruption|whiteout|starfall | invasion 0|1 | meteor | found | shrine <id>
+  lit|dark | quest <master> <n> | caravan`.
+- Data: `Data/world.json` (new), weather.json (`eruption`, `whiteout`, chance 0: events only), spawn_regions.json
+  (`night`), items.json (12), recipes.json (12, `blueprint`-gated), server_presets.json, fx.json (12 rows),
+  Audio/sounds.json (18 rows, reused CC0 recordings). Icons: 12 PNGs in Data/UI/Icons (82 KB,
+  `Tools/art/make_world_icons.py`). New code: `WRWorldSystems.*`, `WRWorldSites.cpp`, `WRWorldNpc.cpp`, `WRUIWorld.cpp`.
+- Not finished: masters speak in text (no voice recordings) and Sigrun swings the chop clip with empty hands; merchants
+  have no pack beasts; the tubes are boulder corridors on the island's ground (the routes cross terrain nobody has
+  looked at yet), without the Flooded Tube's sinking crust, Hekla's Mouth, the moulin drop or the frozen waterfall; the
+  eruption's river rise and spill channels, Magmaw / Scorchwing boosts and the event music layer aren't built; invaders
+  leave no slick ice or melted snow; the Dimming and the Migration aren't built.
+
 ## Unreleased: taming (levels, bond and role trees, saddles and barding, ground / pack / swimming / flying mounts, the Floeback, breeding, eggs and the incubator, babies and imprinting, mutations)
 
 Aaron (lane build-taming: FULL-GAME 6.5; research, requirement ledger and plan in showcase-notes cooks/build-taming.md,

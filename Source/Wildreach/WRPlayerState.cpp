@@ -1,4 +1,5 @@
 #include "WRPlayerState.h"
+#include "WRWorldSystems.h"
 #include "WRLifeSkills.h"
 #include "WRAttributeSet.h"
 #include "WRInventory.h"
@@ -22,6 +23,7 @@ AWRPlayerState::AWRPlayerState()
 	Inventory = CreateDefaultSubobject<UWRInventoryComponent>(TEXT("Inventory"));
 	Survival = CreateDefaultSubobject<UWRSurvivalComponent>(TEXT("Survival"));
 	Food = CreateDefaultSubobject<UWRFoodComponent>(TEXT("Food"));
+	QuestLog = CreateDefaultSubobject<UWRQuestLog>(TEXT("QuestLog"));
 	LifeSkills = CreateDefaultSubobject<UWRLifeSkillsComponent>(TEXT("LifeSkills"));
 }
 

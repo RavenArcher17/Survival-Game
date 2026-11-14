@@ -705,6 +705,13 @@ public:
 	void NotifyPackLoss(const AWRCreature* Dead);
 	bool IsActive() const { return bActive; }
 	int32 NumAlive() const;
+	/** Day and night tables (spawn_regions.json night; cooks/build-world-systems.md 2.9): 0 out at all hours, 1 a day
+	 *  pack (lies up while the night table runs, unless its kind sleeps where it stands), 2 a night pack (lies up by day). */
+	uint8 Shift = 0;
+	/** Lying up just now: not brought out near players. */
+	bool IsLyingUp() const;
+	/** A summoning stone (WRWorldSystems): the boss this spawner waits to bring back comes back now. False: none due. */
+	bool SummonNow();
 
 protected:
 	virtual void BeginPlay() override;

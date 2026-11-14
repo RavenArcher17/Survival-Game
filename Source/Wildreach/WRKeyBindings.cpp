@@ -45,6 +45,7 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Skills"), TEXT("Life skills"), Menus, EKeys::K);
 	Add(TEXT("Map"), TEXT("Map"), Menus, EKeys::M);
 	Add(TEXT("Clan"), TEXT("Clan"), Menus, EKeys::O);
+	Add(TEXT("Quests"), TEXT("Quests (path masters, shrines, standing)"), Menus, EKeys::U);
 	Add(TEXT("Chat"), TEXT("Chat"), Menus, EKeys::T);
 	Add(TEXT("Help"), TEXT("Controls page"), Menus, EKeys::F1);
 	Add(TEXT("Report"), TEXT("Report a problem"), Menus, EKeys::F8);

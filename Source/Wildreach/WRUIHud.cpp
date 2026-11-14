@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRPlayerUI.h"
+#include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRPadInput.h"
 #include "WRUIStyle.h"
@@ -735,6 +736,11 @@ private:
 		// The critical, the first time for each kind of creature (then never again: COMBAT-AND-LESSONS L6).
 		if (const AWRCharacterBase* Crit = S->CritPromptTarget()) { OutTarget = Crit->GetDisplayLabel(); return TEXT("Critical"); }
 		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }
+		{
+			// Shrines, masters, merchants, summoning stones, messages, cores and caches (WRWorldSystems).
+			FString WorldTarget, WorldVerb;
+			if (WRWorld::Prompt(P, WorldTarget, WorldVerb)) { OutTarget = WorldTarget; return WorldVerb; }
+		}
 		for (TActorIterator<AWRRunbackStone> It(P->GetWorld()); It; ++It)
 		{
 			// A shrine-stone by a boss arena: rest there and you wake there (cooks/build-combat-full.md 2.16).

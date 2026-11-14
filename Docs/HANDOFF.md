@@ -151,6 +151,23 @@ The Floeback's body is built and moved in code (`UWRSealBody`). Card and incubat
 incubator's position (`tamecard x y z <verb>`, `incubator x y z <verb>`) so the server acts on the one the screen shows.
 Dev: `WRTameDev now | bond N | grow X | care | mate | hatch`.
 
+Also since 0.7.1: **world systems** (`WRWorldSystems.*`, `WRWorldSites.cpp`, `WRWorldNpc.cpp`, `WRUIWorld.cpp`,
+`Data/world.json`, cooks/build-world-systems.md): `UWRWorldSystems` (server world subsystem) places the villages, shrines,
+path masters, summoning stones and hidden tubes once their ground traces to land (every data position is settled at
+runtime, stepped inland if it lands in the sea), runs Starfall, the biome events (they force their `weather.json` row:
+`eruption`, `whiteout`), invasions (invaders are raiders: `bRaider`, `RaidBase` walked from the far pass mouth to the
+target) and the caravans (placed on their loop by the game clock, actors only near players), and keeps
+`world_systems.json` in the world folder (shrines, who found them, messages, schedules, caches). `AWRWorldState`
+replicates the events and the invasion; each player's quests, found shrines, kindled shrines and standing are
+`UWRQuestLog` on the PlayerState (owner-only, saved as `world` in the player file). Masters and merchants are
+`AWRWorldNpc`, an `AWRCharacter` with no PlayerState (hero body, `bNpcMarks` for their path marks); masters have no
+health, merchants can only be hurt by creatures (`WRWorld::BlocksHit`, called from `ApplyHit`, also seals a summoned
+boss to its party and notes invasion damage). Rules for new code: a new biome is rows in world.json (biomes, shrines,
+masters + quests, villages, caravans + trade, events, invasion pairs, hidden, summoning effigies), a `night` table in
+spawn_regions.json and its event weather row; quest kinds are `bring / show / kill (+status) / shrines / quench / sneak /
+tame` (`UWRWorldSystems::QuestEvent`); world screens open through `ClientOpenWorldScreen` under `EWRMenu::World`;
+"world ..." is the one server command family. Dev: `WRCmd world dev ...`.
+
 Open, as of 0.7.1:
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
@@ -179,6 +196,10 @@ Open, as of 0.7.1:
   sculpted art. Saddle seats per species (`seat`, `back`) are first fits to eyeball. Pen-born farm young still grow on
   the farm's clock, not the baby system. Not built here: the stable (stored tames), necro raising, the Dadeni revive and
   Soulbond, tame names.
+- **World systems on the island are two lands**: two villages, ten shrines, two masters, two caravans, the Kiln Roads and the
+  Blue Below; masters speak in text, merchants have no pack beasts, the tubes are boulder corridors whose routes nobody has
+  walked yet (tune `world.json hidden.route`), and the eruption river rise, event music, invader ice / slush, the Dimming
+  and the Migration are not built (cooks/build-world-systems.md 4).
 - **Bounties** stay a setting only (nothing reads it) until the PvP pass. **54 perks** wait for their systems
   (`waitsFor` in `Data/lifeskills.json`: diving, bees, explosives, timed brews...; Breeder, Rare finder, Saddle master and
   Creature armorer are live since build-taming; Decorator, Turret tech,

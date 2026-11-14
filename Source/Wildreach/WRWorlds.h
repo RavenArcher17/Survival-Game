@@ -21,6 +21,9 @@ struct FWRWorldSettings
 	TMap<FString, float> Numbers;    // switches are 0 or 1
 	FString DeathPenalty;
 	FString Raids;                   // off / rare / normal / frequent (WRRaids)
+	FString WorldEvents;             // off / rare / normal / frequent (Starfall: WRWorldSystems)
+	FString BiomeEvents;             // off / rare / normal / frequent (Eruption, Whiteout)
+	FString Invasions;               // off / rare / normal / frequent (opposite-biome invasions)
 };
 
 /**

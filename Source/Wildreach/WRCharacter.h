@@ -188,6 +188,9 @@ protected:
 	/** Body picked in the menu (?Body= on the join URL, kept on the PlayerState): a variant under "bodies" in
 	 *  Data/player_art.json. None = the default body. */
 	UPROPERTY(ReplicatedUsing=OnRep_BodyStyle) FName BodyStyle;
+	/** A person of the world (AWRWorldNpc): its path marks are set, not read from a PlayerState it doesn't have. */
+	bool bNpcMarks = false;
+	FWRPathMarks NpcMarks;
 
 	UPROPERTY(VisibleAnywhere, Category="Camera") TObjectPtr<USpringArmComponent> ThirdPersonBoom;
 	UPROPERTY(VisibleAnywhere, Category="Camera") TObjectPtr<UCameraComponent> ThirdPersonCamera;

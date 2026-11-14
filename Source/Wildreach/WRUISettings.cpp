@@ -1840,6 +1840,17 @@ namespace WRSettingsUI
 					Segmented({ LOCTEXT("RaidsOff", "Off"), LOCTEXT("RaidsRare", "Rare"), LOCTEXT("RaidsNormal", "Normal"), LOCTEXT("RaidsFrequent", "Frequent") },
 						[this]() { for (int32 i = 0; i < 4; ++i) if (Values->Raids == RaidNames[i]) return i; return 2; },
 						[this](int32 i) { Values->Raids = RaidNames[i]; Changed(); }));
+				// World systems (WRWorldSystems, Data/world.json events / invasions): how often each comes.
+				const auto Often = [this](const FText& Label, const FText& Sub, FString FWRWorldSettings::* Field)
+				{
+					Add(Label, Sub,
+						Segmented({ LOCTEXT("OftenOff", "Off"), LOCTEXT("OftenRare", "Rare"), LOCTEXT("OftenNormal", "Normal"), LOCTEXT("OftenFrequent", "Frequent") },
+							[this, Field]() { for (int32 i = 0; i < 4; ++i) if (Values.Get()->*Field == RaidNames[i]) return i; return 2; },
+							[this, Field](int32 i) { Values.Get()->*Field = RaidNames[i]; Changed(); }));
+				};
+				Often(LOCTEXT("RuleWorldEvents", "World events"), LOCTEXT("RuleWorldEventsSub", "Starfall: stars that fall with rare iron"), &FWRWorldSettings::WorldEvents);
+				Often(LOCTEXT("RuleBiomeEvents", "Biome events"), LOCTEXT("RuleBiomeEventsSub", "The Eruption, the Whiteout: a land's day of danger and plenty"), &FWRWorldSettings::BiomeEvents);
+				Often(LOCTEXT("RuleInvasions", "Invasions"), LOCTEXT("RuleInvasionsSub", "The opposite land's creatures come through a pass"), &FWRWorldSettings::Invasions);
 			}
 			Range(LOCTEXT("RuleUpkeep", "Building upkeep"), LOCTEXT("RuleUpkeepSub", "What a land claim costs to keep up"), TEXT("upkeepMultiplier"), 0.f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleBoss", "Boss respawn"), LOCTEXT("RuleBossSub", "How long before a beaten boss comes back"), TEXT("bossRespawnHours"), 1.f, 24.f, 1.f, Hours);

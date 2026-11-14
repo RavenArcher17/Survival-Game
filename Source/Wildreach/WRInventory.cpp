@@ -1,4 +1,6 @@
 #include "WRInventory.h"
+#include "WRPlayerState.h"
+#include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRGear.h"
@@ -906,6 +908,15 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner());
 		const FString Said = Survival ? Survival->ToggleLight() : FString();
 		return Said.IsEmpty() ? FString::Printf(TEXT("%s lit"), *Def->Name) : Said;
+	}
+	if (Def->Category == TEXT("special") && Stack.ItemId == TEXT("scratch_stone"))
+	{
+		// Cut a message where you stand (WRWorldSystems: the Write screen opens on your machine).
+		return WRWorld::UseScratchStone(Cast<AWRPlayerState>(GetOwner()));
+	}
+	if (Def->Category == TEXT("effigy"))
+	{
+		return TEXT("Offer it at its boss's summoning stone");
 	}
 	if (Def->Category == TEXT("blueprint"))
 	{

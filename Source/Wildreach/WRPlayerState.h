@@ -83,4 +83,6 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRLifeSkillsComponent> LifeSkills;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRSurvivalComponent> Survival;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRFoodComponent> Food;
+	/** Quests, found shrines, faction standing (WRWorldSystems.h). */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRQuestLog> QuestLog;
 };

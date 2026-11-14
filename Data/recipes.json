@@ -332,7 +332,19 @@
     {"id": "smelt_bronze", "station": "smelter", "level": 2, "inputs": {"copper_ingot": 2, "tin_ore": 1}, "output": "bronze_ingot", "count": 1, "seconds": 6},
     {"id": "smelt_iron", "station": "smelter", "level": 3, "inputs": {"iron_ore": 2}, "output": "iron_ingot", "count": 1, "seconds": 6},
     {"id": "smelt_steel", "station": "smelter", "level": 4, "inputs": {"iron_ingot": 2, "charcoal": 2}, "output": "steel_ingot", "count": 1, "seconds": 6, "xp": "steel"},
-    {"id": "smelt_star_iron", "station": "smelter", "level": 4, "inputs": {"star_iron_ore": 2}, "output": "star_iron", "count": 1, "seconds": 6}
+    {"id": "smelt_star_iron", "station": "smelter", "level": 4, "inputs": {"star_iron_ore": 2}, "output": "star_iron", "count": 1, "seconds": 6},
+    {"id": "scratch_stone", "station": "hand", "level": 1, "inputs": {"stone": 2, "fiber": 1}, "output": "scratch_stone", "count": 1, "seconds": 2},
+    {"id": "cinder_salve", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 3, "raw_meat": 1, "ember_essence": 1}, "output": "cinder_salve", "count": 2, "seconds": 3, "blueprint": "quest_cinder_salve"},
+    {"id": "obsidian_arrow", "station": "workbench", "level": 1, "inputs": {"obsidian": 1, "wood": 1, "fiber": 1}, "output": "obsidian_arrow", "count": 4, "seconds": 2, "blueprint": "quest_obsidian_arrow"},
+    {"id": "spiked_boots", "station": "armorer", "level": 2, "inputs": {"iron_ingot": 2, "hide": 3}, "output": "spiked_boots", "count": 1, "seconds": 6, "blueprint": "quest_spiked_boots"},
+    {"id": "effigy_vulkarn", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 15, "ember_essence": 5, "trophy_obsidian_heart": 1}, "output": "effigy_vulkarn", "count": 1, "seconds": 5, "blueprint": "effigy_vulkarn"},
+    {"id": "effigy_skaldrith", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 15, "frost_essence": 5, "trophy_troll_marrow": 1}, "output": "effigy_skaldrith", "count": 1, "seconds": 5, "blueprint": "effigy_skaldrith"},
+    {"id": "effigy_obsidian_warden", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 5, "obsidian": 10}, "output": "effigy_obsidian_warden", "count": 1, "seconds": 5, "blueprint": "effigy_obsidian_warden"},
+    {"id": "effigy_ignessa", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 5, "ember_essence": 4, "hide": 6}, "output": "effigy_ignessa", "count": 1, "seconds": 5, "blueprint": "effigy_ignessa"},
+    {"id": "effigy_cinderhorn", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 5, "hide": 10}, "output": "effigy_cinderhorn", "count": 1, "seconds": 5, "blueprint": "effigy_cinderhorn"},
+    {"id": "effigy_grimjaw", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "hide": 10}, "output": "effigy_grimjaw", "count": 1, "seconds": 5, "blueprint": "effigy_grimjaw"},
+    {"id": "effigy_pale_hunter", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "frost_essence": 4, "hide": 6}, "output": "effigy_pale_hunter", "count": 1, "seconds": 5, "blueprint": "effigy_pale_hunter"},
+    {"id": "effigy_old_tusker", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "raw_meat": 10}, "output": "effigy_old_tusker", "count": 1, "seconds": 5, "blueprint": "effigy_old_tusker"}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",
