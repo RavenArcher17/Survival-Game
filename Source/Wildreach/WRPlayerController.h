@@ -115,6 +115,8 @@ public:
 	UFUNCTION(Exec) void WRTame(FName Order);
 	/** Every tame of yours within 30 m takes the order (follow, stay, aggressive, passive). */
 	UFUNCTION(Exec) void WRTameAll(FName Order);
+	void WhistlePressed();
+	void WhistleReleased();
 	UFUNCTION(Exec) void WRDismount();
 	UFUNCTION(Exec) void WRTorpor(float Amount);
 	UFUNCTION(Exec) void WRTameStat();
@@ -165,6 +167,8 @@ public:
 	/** What E uses (and the prompt shows): the nearer of the nearest usable piece (door, chest, bed, crop, claim) and station. */
 	AActor* FindUseTarget() const;
 	class AWRCreature* FindNearbyCreature(bool bOwnTame, float Range = 450.f) const;
+	/** Your living tames within the whistle's earshot (tuning taming.whistleRange), nearest first (this machine's view). */
+	int32 TamesInEarshot(TArray<class AWRCreature*>* Out = nullptr) const;
 
 	/** Place a piece at a world spot (testing; normal play uses the build ghost). */
 	UFUNCTION(Exec) void WRPlace(FName Piece, float X, float Y, float Z, float Yaw);

@@ -10,6 +10,10 @@
 #include "WRPathComponent.h"
 #include "WRInventory.h"
 #include "WRFx.h"
+#include "WRCreature.h"
+#include "WRWater.h"
+#include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "EngineUtils.h"
 
@@ -118,7 +122,7 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 		if (Attr->GetHeat() >= Attr->GetMaxHeat() && Attr->GetMaxHeat() > 0.f && UWRPathComponent::HasNode(Who, TEXT("fire"), TEXT("overheat")))
 		{
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), 0.f);
-			const float Radius = WRTune(TEXT("passives.overheatRadius"), 350.f);
+			const float Radius = WRTune(TEXT("passives.overheatRadius"), 350.f) * (1.f + UWRPathComponent::Stat(Who, TEXT("blastRadius")));  // Shockwave
 			WRFx::Broadcast(Who, TEXT("fire.impact"), Who->GetActorLocation() - FVector(0, 0, Who->GetSimpleCollisionHalfHeight() - 20.f), FRotator(90.f, 0.f, 0.f), Radius / 120.f, TEXT("fire.impact"));
 			for (TActorIterator<AWRCharacterBase> It(Who->GetWorld()); It; ++It)
 			{
@@ -173,6 +177,63 @@ float UWRCombatLibrary::SpendAllChill(AWRCharacterBase* Who)
 	return Fraction;
 }
 
+namespace WRCombatPerks
+{
+	/** A creature that hasn't noticed its attacker: no target, not fleeing, awake or asleep. */
+	static bool IsUnaware(const AWRCharacterBase* Target, const AWRCharacterBase* Attacker)
+	{
+		const AWRCreature* Creature = Cast<AWRCreature>(Target);
+		return Creature && !Creature->IsTamed() && Creature->GetAggroTarget() != Attacker && Creature->GetAggroRep() != Attacker
+			&& Creature->CombatTarget.Get() != Attacker;
+	}
+
+	/** Damage scale from the attacker's life-skill perks (1 = none); sets bOutCrit for Assassin's sure critical. */
+	static float DamageScale(const AWRCharacterBase* Attacker, const AWRCharacterBase* Target, bool bUnaware, bool& bOutCrit)
+	{
+		if (!Attacker || !Target || Attacker == Target)
+		{
+			return 1.f;
+		}
+		float Scale = 1.f;
+		if (Attacker->GetPlayerState())
+		{
+			// Backstab: from behind on a creature that hasn't noticed you.
+			if (bUnaware && !UWRCombatLibrary::IsInFront(Target, Attacker->GetActorLocation(), WRTune(TEXT("lifeSkills.backstabFrontDegrees"), 100.f)))
+			{
+				Scale *= 1.f + UWRLifeSkillsComponent::StatFor(Attacker, TEXT("backstab"));
+			}
+			// Assassin: the first hit on an unaware creature is critical.
+			if (bUnaware && UWRLifeSkillsComponent::StatFor(Attacker, TEXT("assassin")) > 0.f)
+			{
+				bOutCrit = true;
+			}
+			// Water fighter: your blows from the water (swimming or wading).
+			if (UWRWaterSubsystem::IsInWater(Attacker))
+			{
+				Scale *= 1.f + UWRLifeSkillsComponent::StatFor(Attacker, TEXT("waterDamage"));
+			}
+		}
+		else if (!Attacker->GetTameOwner().IsEmpty())
+		{
+			// Pack leader: a tame fighting near its owner.
+			if (const AGameStateBase* GS = Attacker->GetWorld()->GetGameState())
+			{
+				for (const APlayerState* PS : GS->PlayerArray)
+				{
+					const APawn* Owner = PS ? PS->GetPawn() : nullptr;
+					if (Owner && PS->GetPlayerName() == Attacker->GetTameOwner()
+						&& FVector::Dist(Owner->GetActorLocation(), Attacker->GetActorLocation()) < WRTune(TEXT("lifeSkills.packLeaderRange"), 2000.f))
+					{
+						Scale *= 1.f + UWRLifeSkillsComponent::StatFor(PS, TEXT("packLeader"));
+						break;
+					}
+				}
+			}
+		}
+		return Scale;
+	}
+}
+
 EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& Hit)
 {
 	if (!Target || !Target->HasAuthority() || !Target->IsAlive())
@@ -192,6 +253,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		return EWRHitResult::Ignored;  // PvP off, clanmate, safe zone, or your own tame
 	}
+	// Before this hit wakes it up: had the creature noticed its attacker? (Backstab, Assassin.)
+	const bool bWasUnaware = Attacker && !Hit.bDamageOverTime && WRCombatPerks::IsUnaware(Target, Attacker);
 	if (Attacker && !Hit.bDamageOverTime)
 	{
 		// Path magic: a same-element path hit calms a tamable creature instead of hurting it.
@@ -244,6 +307,12 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	float Damage = Hit.Damage;
 	float PoiseDamage = Hit.PoiseDamage;
 	EWRHitResult Result = EWRHitResult::Hit;
+	// Deep delver (mining perk): the world's own hazards (lava, cave gas and ice: damage over time with no one behind
+	// it) hurt less.
+	if (!Attacker && Hit.bDamageOverTime)
+	{
+		Damage *= FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("hazardDamage")));
+	}
 	// What kind of hit it was, for the effects and damage numbers on every machine.
 	bool bCrit = false, bRiposte = false, bShatter = false;
 
@@ -281,7 +350,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			return EWRHitResult::Parried;
 		}
 
-		const float Cost = BlockStaminaCost(Damage);
+		// Bastion (armorcraft perk): blocking costs less.
+		const float Cost = BlockStaminaCost(Damage) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")));
 		if (TargetAttr->GetStamina() >= Cost)
 		{
 			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), TargetAttr->GetStamina() - Cost);
@@ -332,11 +402,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			GainResource(Attacker, WRTags::Element_Fire, WRTune(TEXT("passives.fuelTheFireHeat"), 4.f));
 		}
-		if (Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit)
+		// Life-skill perks on the attacker (WRCombatPerks below): backstab, water fighter, pack leader; assassin crits.
+		bool bPerkCrit = false;
+		Damage *= WRCombatPerks::DamageScale(Attacker, Target, bWasUnaware, bPerkCrit);
+		if ((Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit) || bPerkCrit)
 		{
 			Damage *= 1.5f;
 			bCrit = true;
-			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s"), *Target->GetName());
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s%s"), *Target->GetName(), bPerkCrit ? TEXT(" (unaware: assassin)") : TEXT(""));
 		}
 		if (Hit.bMelee && TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
 		{

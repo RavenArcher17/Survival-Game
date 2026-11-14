@@ -4,11 +4,13 @@
 #include "WRCharacter.h"
 #include "WRTuning.h"
 #include "WRGameplayTags.h"
+#include "WRLifeSkills.h"
 
 bool UWRCharacterMovementComponent::IsSprinting() const
 {
 	const AWRCharacterBase* WRChar = Cast<AWRCharacterBase>(CharacterOwner);
-	if (!bWantsToSprint || bAttackSlow || bBlockSlow || !IsMovingOnGround() || !WRChar || !WRChar->GetAttributes())
+	// On the ground, or in the water: Sprint there is the fast stroke (WRWater), with the same stamina rule.
+	if (!bWantsToSprint || bAttackSlow || bBlockSlow || !(IsMovingOnGround() || IsSwimming()) || !WRChar || !WRChar->GetAttributes())
 	{
 		return false;
 	}
@@ -28,6 +30,15 @@ void UWRCharacterMovementComponent::BeginPlay()
 
 float UWRCharacterMovementComponent::GetMaxSpeed() const
 {
+	if (IsSwimming())
+	{
+		// Swimming: the swimming skill's every-level speed, and Sprint is the fast stroke. The skills replicate to the
+		// owner, so its prediction and the server agree.
+		float Swim = MaxSwimSpeed * (1.f + UWRLifeSkillsComponent::StatFor(CharacterOwner, TEXT("swimSpeed")));
+		if (IsSprinting()) Swim *= WRTune(TEXT("water.fastSwimMultiplier"), 1.6f);
+		const AWRCharacterBase* Swimmer = Cast<AWRCharacterBase>(CharacterOwner);
+		return Swimmer ? Swim * Swimmer->GetSpeedMultiplier() : Swim;
+	}
 	float Speed = IsSprinting() ? SprintSpeed : Super::GetMaxSpeed();
 	if (MovementMode == MOVE_Falling)
 	{

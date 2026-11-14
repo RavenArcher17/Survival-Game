@@ -1,98 +1,32 @@
-// Tools held in the weapon hand (Data/items.json "tool" + "equip": {"slot": "weapon"}): picking a hatchet or a pick on
-// the hotbar puts it in the right hand in place of the sword, and it's what you swing. There are no tool models in
-// Content, so each is built here from the engine's basic shapes (a wooden handle, a stone head, a lashing), held the
-// way the sword is: in the fist, the handle along the sword's blade, the head's edge on the side the fingers point
-// to (the side a downward chop leads with). Only clients draw it; the server just replicates MeleeItem.
+// Tools held in the weapon hand (Data/items.json "tool" + "equip": {"slot": "weapon"}): picking a hatchet, a pick or a
+// fishing rod on the hotbar puts it in the right hand in place of the sword. Each is a modelled mesh (WRToolMesh: a
+// turned haft, a knapped or ground head, rawhide lashing; the rod's wand, grip, spool and rings), held the way the
+// sword is: in the fist, the haft along the sword's blade, the head's edge on the side the fingers point to (the side
+// a downward chop leads with). Only clients draw it; the server just replicates MeleeItem.
 #include "WRCharacter.h"
 #include "WRResourceNode.h"
+#include "WRToolMesh.h"
 #include "WRTuning.h"
 #include "AnimationRuntime.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/SkeletalMeshSocket.h"
-#include "Engine/StaticMesh.h"
-#include "Materials/MaterialInstanceDynamic.h"
+#include "ProceduralMeshComponent.h"
 
 namespace WRHeldToolDetail
 {
-	enum class EShape : uint8 { Cube, Cylinder, Cone };
-
-	/** One piece of a tool in its own frame: X from the grip toward the head, Y toward the striking side (cm). */
-	struct FPart
-	{
-		EShape Shape = EShape::Cube;
-		FVector Size;                // cube: X/Y/Z; cylinder and cone: diameter, diameter, length (along their axis)
-		FVector Centre;
-		FVector Axis = FVector::ZAxisVector;  // where a cylinder's / cone's length (its tip) points
-		FLinearColor Color;
-	};
-
-	UStaticMesh* ShapeMesh(EShape Shape)
-	{
-		const TCHAR* Path = Shape == EShape::Cylinder ? TEXT("/Engine/BasicShapes/Cylinder.Cylinder")
-			: Shape == EShape::Cone ? TEXT("/Engine/BasicShapes/Cone.Cone") : TEXT("/Engine/BasicShapes/Cube.Cube");
-		return LoadObject<UStaticMesh>(nullptr, Path);
-	}
-
-	/** The pieces of a hatchet or a pick, sized by gather.toolLook in tuning.json. */
-	TArray<FPart> PartsFor(const FWRToolDef& Tool)
+	/** The tool's sizes (gather.toolLook, cm): length, how much handle sits behind the fist, thickness, head scale. */
+	struct FSizes { float Length, Back, Thick, Head; };
+	FSizes SizesFor(const FWRToolDef& Tool)
 	{
 		const FWRTuning& T = FWRTuning::Get();
-		const bool bPick = Tool.Kind == TEXT("pick");
-		const float Length = T.Num(bPick ? TEXT("gather.toolLook.pickLength") : TEXT("gather.toolLook.hatchetLength"), bPick ? 62.f : 52.f);
-		const float Back = T.Num(TEXT("gather.toolLook.gripBack"), 8.f);       // handle left behind the fist
-		const float Thick = T.Num(TEXT("gather.toolLook.handleThickness"), 3.4f);
-		const float Head = T.Num(TEXT("gather.toolLook.headScale"), 1.f);
-		const FLinearColor Wood(0.23f, 0.13f, 0.06f);
-		const FLinearColor Lash(0.42f, 0.33f, 0.18f);
-		const FLinearColor Edge = Tool.Head * 1.6f;
-		const float HeadX = Length - Back - 6.f * Head;  // the head sits just short of the handle's end
-
-		TArray<FPart> Out;
-		FPart& Handle = Out.AddDefaulted_GetRef();
-		Handle.Shape = EShape::Cylinder;
-		Handle.Size = FVector(Thick, Thick, Length);
-		Handle.Centre = FVector(Length * 0.5f - Back, 0.f, 0.f);
-		Handle.Axis = FVector::XAxisVector;
-		Handle.Color = Wood;
-		if (bPick)
-		{
-			// A bar across the handle's end, drawn to a point each way.
-			FPart& Bar = Out.AddDefaulted_GetRef();
-			Bar.Size = FVector(4.5f, 30.f, 4.f) * Head;
-			Bar.Centre = FVector(HeadX, 0.f, 0.f);
-			Bar.Color = Tool.Head;
-			for (const float Side : { 1.f, -1.f })
-			{
-				FPart& Point = Out.AddDefaulted_GetRef();
-				Point.Shape = EShape::Cone;
-				Point.Size = FVector(4.2f, 4.2f, 11.f) * Head;
-				Point.Centre = FVector(HeadX, Side * (15.f + 5.5f) * Head, 0.f);
-				Point.Axis = FVector(0.f, Side, 0.f);
-				Point.Color = Side > 0.f ? Edge : Tool.Head;
-			}
-		}
-		else
-		{
-			// A wedge of stone: a thick poll on the handle, a thinner, wider bit out on the striking side.
-			FPart& Poll = Out.AddDefaulted_GetRef();
-			Poll.Size = FVector(8.f, 12.f, 3.6f) * Head;
-			Poll.Centre = FVector(HeadX, 2.f * Head, 0.f);
-			Poll.Color = Tool.Head;
-			FPart& Bit = Out.AddDefaulted_GetRef();
-			Bit.Size = FVector(12.f, 6.f, 1.8f) * Head;
-			Bit.Centre = FVector(HeadX, 10.5f * Head, 0.f);
-			Bit.Color = Edge;
-		}
-		// Fibre lashing the head on.
-		FPart& Ring = Out.AddDefaulted_GetRef();
-		Ring.Shape = EShape::Cylinder;
-		Ring.Size = FVector(Thick + 1.4f, Thick + 1.4f, 3.f);
-		Ring.Centre = FVector(HeadX - 6.f * Head, 0.f, 0.f);
-		Ring.Axis = FVector::XAxisVector;
-		Ring.Color = Lash;
-		return Out;
+		const bool bPick = Tool.Kind == TEXT("pick"), bRod = Tool.Kind == TEXT("rod");
+		FSizes S;
+		S.Length = bRod ? T.Num(TEXT("gather.toolLook.rodLength"), 150.f) : T.Num(bPick ? TEXT("gather.toolLook.pickLength") : TEXT("gather.toolLook.hatchetLength"), bPick ? 62.f : 52.f);
+		S.Back = bRod ? T.Num(TEXT("gather.toolLook.rodGripBack"), 26.f) : T.Num(TEXT("gather.toolLook.gripBack"), 8.f);
+		S.Thick = bRod ? T.Num(TEXT("gather.toolLook.rodThickness"), 3.f) : T.Num(TEXT("gather.toolLook.handleThickness"), 3.4f);
+		S.Head = T.Num(TEXT("gather.toolLook.headScale"), 1.f);
+		return S;
 	}
 }
 
@@ -115,61 +49,46 @@ void AWRCharacter::UpdateToolLook(bool bShow)
 	const bool bHand = BodyAsset && !Socket.IsNone() && (BodyAsset->FindSocket(Socket) || BodyAsset->GetRefSkeleton().FindBoneIndex(Socket) != INDEX_NONE);
 	if (!Tool || !bHand)
 	{
-		for (UStaticMeshComponent* Part : ToolParts)
-		{
-			if (Part) Part->SetVisibility(false);
-		}
+		if (ToolMesh) ToolMesh->SetVisibility(false);
 		return;
 	}
-	const TArray<FPart> Parts = PartsFor(*Tool);
-	if (ToolPartsFor != MeleeItem || ToolParts.Num() != Parts.Num())
+	if (!ToolMesh)
 	{
-		for (UStaticMeshComponent* Part : ToolParts)
-		{
-			if (Part) Part->DestroyComponent();
-		}
-		ToolParts.Reset();
-		for (int32 i = 0; i < Parts.Num(); ++i)
-		{
-			UStaticMeshComponent* Part = NewObject<UStaticMeshComponent>(this, *FString::Printf(TEXT("ToolPart%d"), i));
-			Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Part->SetGenerateOverlapEvents(false);
-			Part->SetupAttachment(Body, Socket);
-			Part->RegisterComponent();
-			ToolParts.Add(Part);
-		}
-		ToolPartsFor = MeleeItem;
+		ToolMesh = NewObject<UProceduralMeshComponent>(this, TEXT("HeldTool"));
+		ToolMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ToolMesh->SetGenerateOverlapEvents(false);
+		ToolMesh->SetupAttachment(Body, Socket);
+		ToolMesh->RegisterComponent();
 	}
-
+	if (ToolMeshFor != MeleeItem)
+	{
+		// Crude tools (made by hand) are flint on a rough stick with plant-fibre cord; stone ones a ground head on a
+		// smoothed haft bound with rawhide.
+		const FSizes S = SizesFor(*Tool);
+		const bool bCrude = MeleeItem.ToString().StartsWith(TEXT("crude"));
+		FWRToolMesh::Tool(Tool->Kind, bCrude, Tool->Head, S.Length, S.Back, S.Thick, S.Head).ApplyTo(ToolMesh);
+		ToolMeshFor = MeleeItem;
+	}
 	// The fist's frame, as the sword's (AWRCharacter::FistFrame): the weapon socket sits in the palm, X out of the fist
-	// past the index finger (the handle runs that way to the head), Y toward the fingers (the striking side).
-	const FTransform Fist = FistFrame();
-	UMaterialInterface* Shape = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-
-	for (int32 i = 0; i < Parts.Num(); ++i)
+	// past the index finger (the haft runs that way to the head), Y toward the fingers (the striking side).
+	if (ToolMesh->GetAttachSocketName() != Socket)
 	{
-		const FPart& P = Parts[i];
-		UStaticMeshComponent* Comp = ToolParts[i];
-		UStaticMesh* ShapeAsset = ShapeMesh(P.Shape);
-		if (!Comp || !ShapeAsset)
-		{
-			continue;
-		}
-		Comp->SetStaticMesh(ShapeAsset);
-		// Scale the shape to its size and put its bounds' centre on the part's centre, its length (Z) along its axis.
-		const FBox Bounds = ShapeAsset->GetBoundingBox();
-		const FVector Scale = P.Size / Bounds.GetSize().ComponentMax(FVector(1.f));
-		const FQuat Rot = P.Shape == EShape::Cube ? FQuat::Identity : FQuat(FRotationMatrix::MakeFromZ(P.Axis));
-		const FVector Loc = P.Centre - Rot.RotateVector(Bounds.GetCenter() * Scale);
-		Comp->SetRelativeTransform(FTransform(Rot, Loc, Scale) * Fist);
-		if (Shape)
-		{
-			Comp->SetMaterial(0, Shape);
-			if (UMaterialInstanceDynamic* Mat = Comp->CreateAndSetMaterialInstanceDynamic(0))
-			{
-				Mat->SetVectorParameterValue(TEXT("Color"), P.Color);
-			}
-		}
-		Comp->SetVisibility(true);
+		ToolMesh->AttachToComponent(Body, FAttachmentTransformRules::KeepRelativeTransform, Socket);
 	}
+	ToolMesh->SetRelativeTransform(FistFrame());
+	ToolMesh->SetVisibility(true);
+}
+
+FVector AWRCharacter::RodTipLocation() const
+{
+	using namespace WRHeldToolDetail;
+	const FWRToolDef* Tool = FWRGathering::FindTool(MeleeItem);
+	if (!Tool || Tool->Kind != TEXT("rod") || !ToolMesh || !ToolMesh->IsVisible())
+	{
+		// Not drawn here (a dedicated server, first person hiding it): from the hand, a rod's length ahead and up.
+		const FVector Hand = Body ? Body->GetSocketLocation(WeaponMesh->GetAttachSocketName()) : GetActorLocation();
+		return Hand + GetActorForwardVector() * 120.f + FVector(0.f, 0.f, 60.f);
+	}
+	const FSizes S = SizesFor(*Tool);
+	return ToolMesh->GetComponentTransform().TransformPosition(FWRToolMesh::RodTip(S.Length, S.Back));
 }

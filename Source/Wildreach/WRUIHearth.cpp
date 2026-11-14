@@ -492,7 +492,7 @@ namespace WRUIHearthScreen
 		{
 			const AWRHearth* H = Hearth.Get();
 			if (!H || !PC.IsValid() || PC->FindNearbyHearth() != H) return false;
-			const TArray<TPair<FName, int32>> Cost = H->RepairCost();
+			const TArray<TPair<FName, int32>> Cost = H->RepairCost(PC.Get());
 			if (Cost.Num() == 0) return false;
 			for (const TPair<FName, int32>& C : Cost) if (Carried(C.Key) < C.Value) return false;
 			return true;
@@ -504,7 +504,7 @@ namespace WRUIHearthScreen
 			if (!H) return FText::GetEmpty();
 			if (!PC.IsValid() || PC->FindNearbyHearth() != H) return LOCTEXT("RepairGoThere", "Stand at the Hearth to repair it");
 			TArray<FString> Bits;
-			for (const TPair<FName, int32>& C : H->RepairCost())
+			for (const TPair<FName, int32>& C : H->RepairCost(PC.Get()))
 			{
 				const FWRItemDef* Def = FWRItemRegistry::Get().Find(C.Key);
 				Bits.Add(FString::Printf(TEXT("%d %s (you have %d)"), C.Value, Def ? *Def->Name.ToLower() : *C.Key.ToString(), Carried(C.Key)));

@@ -9,6 +9,8 @@
 #include "WRPlayerUI.h"
 #include "WRTuning.h"
 #include "WRUIStyle.h"
+#include "WRPerkHud.h"
+#include "WRFishing.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
@@ -175,6 +177,11 @@ public:
 					S.Tag, TagFont, ESlateDrawEffect::None, WRUI::Alpha(S.Color, Alpha * 0.9f));
 			}
 		}
+
+		// Life-skill perks drawn on your screen: Prospector, Predator sense, Beast lore (WRPerkHud).
+		Layer = WRPerkHud::Paint(P, Geo, Out, Layer, Size, VX, VY);
+		// Fishing: the cast's charge ring, the line's tension arc, what the button does now (WRFishing).
+		Layer = AWRBobber::PaintHud(P, Geo, Out, Layer, Size, VX, VY);
 
 		// What you've locked on to: four gold corners around it, sized to it.
 		if (const AWRCharacterBase* Lock = P->GetLockTarget())

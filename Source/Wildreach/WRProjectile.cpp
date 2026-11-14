@@ -267,7 +267,7 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	// Explosive bolt: fire bolts burst on impact.
 	if (Caster && Hit.PathId == TEXT("fire") && UWRPathComponent::HasNode(Caster, TEXT("fire"), TEXT("explosive_bolt")))
 	{
-		const float Radius = WRTune(TEXT("passives.explosiveBoltRadius"), 300.f);
+		const float Radius = WRTune(TEXT("passives.explosiveBoltRadius"), 300.f) * (1.f + UWRPathComponent::Stat(Caster, TEXT("blastRadius")));  // Shockwave
 		// (The burst is the impact effect at twice the size, sent above; no flat marker disc.)
 		for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 		{

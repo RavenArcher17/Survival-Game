@@ -41,13 +41,18 @@ rule: show a key with `WRInput::ActionKey(<action>)`, not `WRUI::KeyName(...Key(
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.
+Also since 0.7.1: **fishing** (`WRFishing.cpp`, `Data/fish.json`), **swimming and engineering XP**, **66 of 120 perks
+working** with the rest hidden by `waitsFor` in `Data/lifeskills.json` (remove it when a system ships), the **tame
+whistle** (H / hold X), **modelled held tools** (`WRToolMesh.cpp`, `M_HeldTool`), and build pieces that collide as
+they look (furniture, banner, rug; the Hearth, stations and totem fit their models via `FWRBuildLook::FitCollision`).
 
 Open, as of 0.7.1:
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
   at `C:\Dev\UE5Source` on Raven's PC (`Tools\build_engine.ps1`), needed only for that.
 - **The gate playtest** (a group of friends plays a full evening and wants to come back) hasn't been run.
 - **Volcanic shrubs stay green**: the ash-grey coat hung the GPU (VSM Nanite), so `ashCoatMin` stays 0.
-- **The tame whistle** (`WRTameAll <order>`, every tame of yours within 30 m) is the one player feature with no screen.
+- **Bounties** stay a setting only (nothing reads it) until the PvP pass. **54 perks** wait for their systems
+  (`waitsFor` in `Data/lifeskills.json`: diving, breeding, bees, machine power, turrets, explosives, timed brews...).
 - **F8 pictures from the game don't reach the web inbox yet**: the feedback endpoint keeps screenshots (and context over
   4000 characters) for signed-in players only, and the game isn't signed in. The full report and picture are in
   `Saved/Reports` on the tester's PC (and the host's). Text fields (chat, names, the report note) need a keyboard.

@@ -1,4 +1,5 @@
 #include "WRWorldDressing.h"
+#include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
 #include "WRCreature.h"
@@ -853,13 +854,24 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 	const FHarvestKind& HK = Harvestables[BestKind];
 	const FString Tune = TEXT("gathering.") + HK.Group;
 	const int32 Key = (BestKind << KeyShift) | BestIndex;
-	FWRGathering::Gather(Who, HK.Item, FWRTuning::Get().Num(Tune + TEXT(".perHit"), 2.f), bHeavy, FString::Printf(TEXT("%s %d"), *HK.Kind, BestIndex));
+	// Clean cut / Vein breaker (life-skill perks): a tree or rock down to its last third gives the rest in this blow.
+	const int32 HitsTotal = FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(Tune + TEXT(".hits"), 6.f)));
+	int32& Taken = HitsTaken.FindOrAdd(Key);
+	const float Break = HK.Group == TEXT("tree") ? UWRLifeSkillsComponent::StatFor(Who, TEXT("treeBreak"))
+		: HK.Group == TEXT("rock") ? UWRLifeSkillsComponent::StatFor(Who, TEXT("veinBreak")) : 0.f;
+	const int32 Remaining = HitsTotal - Taken;
+	int32 Blows = 1;
+	if (Break > 0.f && Remaining > 1 && Remaining <= FMath::Max(1, FMath::RoundToInt(HitsTotal * Break)))
+	{
+		Blows = Remaining;
+		Taken = HitsTotal - 1;
+	}
+	FWRGathering::Gather(Who, HK.Item, FWRTuning::Get().Num(Tune + TEXT(".perHit"), 2.f) * Blows, bHeavy, FString::Printf(TEXT("%s %d"), *HK.Kind, BestIndex));
 	if (HK.Group == TEXT("shrub") && FMath::FRand() < FWRTuning::Get().Num(Tune + TEXT(".berryChance"), 0.3f))
 	{
 		Inventory->AddItem(TEXT("berries"), 1);
 	}
-	int32& Taken = HitsTaken.FindOrAdd(Key);
-	const bool bUsedUp = Taken + 1 >= FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(Tune + TEXT(".hits"), 6.f)));
+	const bool bUsedUp = Taken + 1 >= HitsTotal;
 	{
 		// Chips fly back at the gatherer from the side of the trunk / rock / shrub they hit; the last blow throws more.
 		const FVector Ground = HK.Ground[BestIndex];
@@ -869,13 +881,15 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 		const FVector At = Ground + Toward * HK.Radius * HK.Scale[BestIndex] * 0.8f + FVector(0.f, 0.f, bTree ? 100.f : 45.f);
 		WRFx::Broadcast(this, Effect, At, Toward.Rotation(), bUsedUp ? 1.8f : (bHeavy ? 1.3f : 1.f), Effect);
 	}
-	if (++Taken >= FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(Tune + TEXT(".hits"), 6.f))))
+	if (++Taken >= HitsTotal)
 	{
 		HitsTaken.Remove(Key);
 		const UWRDressingSubsystem* Sub = GetWorld()->GetSubsystem<UWRDressingSubsystem>();
 		if (AWRHarvestLedger* Ledger = Sub ? Sub->GetLedger() : nullptr)
 		{
-			Ledger->Fell(Key, FWRTuning::Get().Num(Tune + TEXT(".respawnMinutes"), 15.f) * 60.f);
+			// Rich veins (life-skill perk): rocks you empty come back sooner.
+			const float Sooner = HK.Group == TEXT("rock") ? FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Who, TEXT("veinRespawn"))) : 1.f;
+			Ledger->Fell(Key, FWRTuning::Get().Num(Tune + TEXT(".respawnMinutes"), 15.f) * 60.f * Sooner);
 		}
 		UE_LOG(LogWildreach, Log, TEXT("HARVEST %s used up %s %d at %s"), *Who->GetName(), *HK.Kind, BestIndex, *HK.Ground[BestIndex].ToCompactString());
 	}

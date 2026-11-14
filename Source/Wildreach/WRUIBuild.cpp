@@ -501,7 +501,9 @@ private:
 	/** What a piece costs you: the server's price (the Thrifty perk makes building cheaper). */
 	TArray<TPair<FName, int32>> CostOf(const FWRPieceDef& D) const
 	{
-		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("buildCost")));
+		const bool bMachine = D.Kind == TEXT("station") || D.bLockable;   // Tinkerer (engineering perk)
+		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("buildCost"))
+			+ (bMachine ? UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("machineCost")) : 0.f));
 		TArray<TPair<FName, int32>> Out;
 		for (const TPair<FName, int32>& C : D.Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Mult)) });
 		return Out;

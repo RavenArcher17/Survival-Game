@@ -93,6 +93,16 @@ bool FWRGathering::WearHeld(AWRCharacterBase* Gatherer, bool bRightTool)
 	{
 		return false;
 	}
+	// Unbreaking / Endless edge (life-skill perks): your picks / hatchets don't wear from gathering.
+	if (const FWRToolDef* HeldTool = bRightTool ? FindTool(Held->ItemId) : nullptr)
+	{
+		const FName WearStat = HeldTool->Kind == TEXT("pick") ? FName(TEXT("pickWear")) : HeldTool->Kind == TEXT("hatchet") ? FName(TEXT("axeWear")) : FName();
+		const float Keep = WearStat.IsNone() ? 0.f : UWRLifeSkillsComponent::StatFor(Gatherer, WearStat);
+		if (Keep <= -1.f)
+		{
+			return false;
+		}
+	}
 	Inventory->WearEquipped(EWREquipSlot::Weapon, bRightTool ? WRTune(TEXT("gather.tools.wearPerHit"), 1.f) : WRTune(TEXT("gather.tools.wearOther"), 1.f));
 	if (Held->Durability > 0.f)
 	{
@@ -219,7 +229,16 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	{
 		return;
 	}
-	FWRGathering::Gather(Gatherer, ItemId, PerHit, bHeavy, FString::Printf(TEXT("%s (%d hits left)"), *GetName(), HitsLeft - 1));
+	// Vein breaker / Clean cut (life-skill perks): a vein or tree down to its last third gives the rest in this blow.
+	const bool bWoodNode = ItemId == TEXT("wood");
+	const float Break = UWRLifeSkillsComponent::StatFor(Gatherer, bWoodNode ? TEXT("treeBreak") : TEXT("veinBreak"));
+	int32 Blows = 1;
+	if (Break > 0.f && HitsLeft > 1 && HitsLeft <= FMath::Max(1, FMath::RoundToInt(Hits * Break)))
+	{
+		Blows = HitsLeft;
+		HitsLeft = 1;
+	}
+	FWRGathering::Gather(Gatherer, ItemId, PerHit * Blows, bHeavy, FString::Printf(TEXT("%s (%d hits left%s)"), *GetName(), HitsLeft - 1, Blows > 1 ? TEXT(", broke all at once") : TEXT("")));
 	{
 		// Wood chips, stone (and ore) chips with dust, or plant bits, toward the gatherer.
 		const FName Kind = FWRGathering::ToolKindFor(ItemId);
@@ -246,6 +265,6 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 			bDepleted = false;
 			HitsLeft = Hits;
 			OnRep_Depleted();
-		}), RespawnSeconds, false);
+		}), RespawnSeconds * FMath::Max(0.1f, 1.f + (bWoodNode ? 0.f : UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("veinRespawn")))), false);  // Rich veins
 	}
 }

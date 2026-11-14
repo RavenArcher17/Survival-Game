@@ -131,10 +131,13 @@ namespace WRFreeBuild
 		return FString();
 	}
 
-	/** A piece's cost for this player (the Thrifty perk makes building cheaper). */
+	/** A piece's cost for this player (Thrifty makes building cheaper; Tinkerer makes machines, the stations and
+	 *  code-lock doors, cheaper). */
 	static TArray<TPair<FName, int32>> CostFor(const AActor* Player, const FWRPieceDef& Def)
 	{
-		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("buildCost")));
+		const bool bMachine = Def.Kind == TEXT("station") || Def.bLockable;
+		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("buildCost"))
+			+ (bMachine ? UWRLifeSkillsComponent::StatFor(Player, TEXT("machineCost")) : 0.f));
 		TArray<TPair<FName, int32>> Out;
 		for (const TPair<FName, int32>& C : Def.Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Mult)) });
 		return Out;
@@ -731,7 +734,16 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			AWRBuildPiece* Piece = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 			Piece->InitPiece(PieceId, Who);
 			Piece->Support = Support;
+			// Building's every-level bonus (sturdier pieces) and Fortifier (walls, doors, gates, palisades, towers).
+			const bool bWall = Def->Shape == TEXT("wall") || Def->Shape == TEXT("halfwall") || Def->Shape == TEXT("upperwall") || Def->Shape == TEXT("window")
+				|| Def->Shape == TEXT("door") || Def->Shape == TEXT("doorway") || Def->Shape == TEXT("gate") || Def->Shape == TEXT("palisade") || Def->Shape == TEXT("tower");
+			Piece->ScaleHealth(1.f + UWRLifeSkillsComponent::StatFor(this, TEXT("pieceHealth")) + (bWall ? UWRLifeSkillsComponent::StatFor(this, TEXT("wallHealth")) : 0.f));
 			Piece->FinishSpawning(T);
+			// Engineering levels by building machines too: a station, a code-lock door.
+			if (Def->Kind == TEXT("station") || Def->bLockable)
+			{
+				UWRLifeSkillsComponent::Award(this, TEXT("engineering"), TEXT("machinePlace"), 30.f);
+			}
 			{
 				// A puff of dust where it settles, sized to the piece; at the piece's own height (a foundation's bounds reach
 				// down into the slope, so their bottom would bury the puff).
@@ -778,7 +790,12 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		else if (Cmd == TEXT("setcode"))
 		{
 			if (!Door->CanAccess(Who)) OutResult = TEXT("Not your door");
-			else { Door->LockCode = Code; Door->bLocked = true; Door->UnlockedFor.Reset(); OutResult = TEXT("Code set; door locked"); }
+			else
+			{
+				// Fitting a lock is engineering work (the first code on a door; changing it later isn't).
+				if (Door->LockCode.IsEmpty()) UWRLifeSkillsComponent::Award(this, TEXT("engineering"), TEXT("machineLock"), 20.f);
+				Door->LockCode = Code; Door->bLocked = true; Door->UnlockedFor.Reset(); OutResult = TEXT("Code set; door locked");
+			}
 		}
 		else if (Door->LockCode == Code)
 		{

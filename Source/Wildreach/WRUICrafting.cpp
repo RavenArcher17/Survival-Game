@@ -504,6 +504,8 @@ private:
 		{
 			for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(St))
 			{
+				// A recipe a perk opens (Bait maker's lures) shows once you have the perk.
+				if (!R->NeedsStat.IsNone() && UWRLifeSkillsComponent::StatFor(PC.Get(), R->NeedsStat) <= 0.f) continue;
 				const FWRItemDef* Out = FWRItemRegistry::Get().Find(R->Output);
 				FEntry E;
 				E.Kind = FEntry::EKind::Recipe;
@@ -516,7 +518,7 @@ private:
 				if (R->Count > 1) E.Name += FString::Printf(TEXT(" x%d"), R->Count);
 				E.Station = R->Station;
 				E.Level = R->Level;
-				E.Cost = R->Inputs;
+				E.Cost = FWRCrafting::CostFor(*R, FWRCrafting::MaterialDiscount(PC.Get(), *R));   // your price (Efficient smith / armorer)
 				// Hand recipes are made anywhere, a station's only standing at one (the server's rule).
 				E.bHere = R->Station == Hand || R->Station == Here;
 				E.bTierOk = R->Station == Hand || !E.bHere || R->Level <= T;
@@ -531,7 +533,7 @@ private:
 		// armorer, the ranged weapon where it's made.
 		const UWRInventoryComponent* I = Inv();
 		if (!I) return;
-		const float Fraction = FWRRecipeRegistry::Get().RepairCostFraction;
+		const float Fraction = FWRRecipeRegistry::Get().RepairCostFraction * FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("repairCost")));
 		for (const EWREquipSlot Slot : { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Armor })
 		{
 			const FWRItemStack& Worn = I->GetEquipped(Slot);
@@ -799,7 +801,7 @@ private:
 	FString TimeText(const FEntry& E) const
 	{
 		if (E.Kind != FEntry::EKind::Recipe || !E.Recipe || E.Recipe->Station == Hand) return FString();
-		const float Each = AWRStation::SecondsFor(*E.Recipe);
+		const float Each = AWRStation::SecondsFor(*E.Recipe, PC.Get());
 		if (Each <= 0.f) return FString();
 		const int32 N = FMath::Clamp(Quantity, 1, FMath::Max(1, MaxQuantity(E)));
 		const auto Time = [](float S)

@@ -1,4 +1,6 @@
 #include "WRCharacter.h"
+#include "WRLifeSkills.h"
+#include "WRFishing.h"
 #include "WRAnimInstance.h"
 #include "WRHeroAnimInstance.h"
 #include "WRCameraBoom.h"
@@ -174,6 +176,25 @@ void AWRCharacter::Tick(float DeltaSeconds)
 	if (HasAuthority())
 	{
 		UpdateReplicatedAccel();
+		// Swimming XP (life skill): metres swum across the water, checked twice a second (a jump in distance, a
+		// teleport or a respawn, doesn't count).
+		SwimCheck += DeltaSeconds;
+		if (SwimCheck >= 0.5f)
+		{
+			SwimCheck = 0.f;
+			const FVector Here = GetActorLocation();
+			if (GetCharacterMovement()->IsSwimming() && IsAlive() && !LastSwimAt.IsZero())
+			{
+				const float Step = FVector::Dist2D(Here, LastSwimAt);
+				if (Step < GetCharacterMovement()->GetMaxSpeed() * 0.5f * 1.5f + 50.f) SwumCm += Step;
+				if (SwumCm >= 1000.f)
+				{
+					UWRLifeSkillsComponent::Award(this, TEXT("swimming"), TEXT("swim"), 0.5f, SwumCm / 100.f);
+					SwumCm = 0.f;
+				}
+			}
+			LastSwimAt = GetCharacterMovement()->IsSwimming() ? Here : FVector::ZeroVector;
+		}
 	}
 	// Slick ice: the same check runs on the server and the owning client, so movement prediction agrees.
 	if (HasAuthority() || IsLocallyControlled())
@@ -1073,6 +1094,20 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 		else if (Input == EWRAbilityInput::Block) PC->CancelPlacement();
 		return;
 	}
+	// A fishing rod in hand: the attack casts, strikes and reels (WRFishing), Block lets the line go; no swings.
+	if (IsHoldingRod() && !IsRangedOut() && (Input == EWRAbilityInput::Light || Input == EWRAbilityInput::Heavy || Input == EWRAbilityInput::Block))
+	{
+		if (Input == EWRAbilityInput::Light)
+		{
+			FishChargeLocal = AWRBobber::FindFor(this) ? -1.0 : GetWorld()->GetTimeSeconds();
+			ServerFishInput(true);
+		}
+		else if (Input == EWRAbilityInput::Block)
+		{
+			ServerFishCancel();
+		}
+		return;
+	}
 	// Ranged weapon out: right mouse aims, left mouse fires (heavy has nothing to do).
 	if (IsRangedOut() && (Input == EWRAbilityInput::Block || Input == EWRAbilityInput::Light || Input == EWRAbilityInput::Heavy))
 	{
@@ -1088,6 +1123,12 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 
 void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)
 {
+	if (Input == EWRAbilityInput::Light && (IsHoldingRod() || FishChargeLocal >= 0.0))
+	{
+		FishChargeLocal = -1.0;
+		ServerFishInput(false);
+		return;
+	}
 	if (Input == EWRAbilityInput::Heavy)
 	{
 		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())

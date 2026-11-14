@@ -8,7 +8,7 @@ class USceneComponent;
 class UStaticMeshComponent;
 
 /** What a detail block is made of: the building materials' planks or stone, or a flat cloth / soil colour. */
-enum class EWRLookMat : uint8 { Wood, Stone, Cloth };
+enum class EWRLookMat : uint8 { Wood, Stone, Cloth, Trim };
 /** Engine shapes the blocks use (one instanced component per shape and material). */
 enum class EWRLookMesh : uint8 { Cube, Cylinder, Cone };
 
@@ -41,6 +41,8 @@ struct WILDREACH_API FWRBuildLook
 	static TArray<FWRLookBlock> LeafBlocks(const FWRPieceDef& Def, const FVector& LeafSize, const FTransform& PieceToWorld);
 	/** The flat colour of a piece's cloth / soil blocks (bed covers, the torch's wrapping, crop rows). */
 	static FLinearColor ClothColor(const FWRPieceDef& Def);
+	/** Woven trim on cloth (a rug's border and fringe, a banner's emblem and tassels): undyed wool. */
+	static FLinearColor TrimColor() { return FLinearColor(0.56f, 0.45f, 0.27f); }
 	/** 0..1, the same for the same world point (to 5 cm) on every machine. */
 	static float Hash01(const FVector& WorldPoint, int32 Salt);
 
@@ -57,6 +59,12 @@ struct WILDREACH_API FWRBuildLook
 	 * No collision: the gameplay box stays. Null (keep the plain shape) if the def has none or the mesh is missing.
 	 */
 	static UStaticMeshComponent* AttachProp(AActor* Owner, USceneComponent* Parent, const FWRPieceDef& Def, float BottomZ);
+	/**
+	 * Every machine (the server too, so movement agrees): the piece's collision becomes a box the size and place of the
+	 * prop AttachProp draws (its fitted bounds), and Plain (the engine shape it stood in for) stops colliding. Null if
+	 * the def has no prop or its mesh is missing (the plain shape keeps colliding).
+	 */
+	static class UBoxComponent* FitCollision(AActor* Owner, UPrimitiveComponent* Plain, const FWRPieceDef& Def, float BottomZ);
 	/** How far above its piece (the ground) a station, Hearth or totem actor stands (AWRBuildPiece::SpawnChild). */
 	static constexpr float ChildLift = 50.f;
 	/** The def that carries a station type's look (pieces.json entries with "station"). */

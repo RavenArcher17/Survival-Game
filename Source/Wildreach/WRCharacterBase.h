@@ -66,6 +66,9 @@ public:
 	float GetSpeedMultiplier() const;
 	/** Server-driven extra speed (creature AI: a charge, running for its life). */
 	float SpeedBoost = 1.f;
+	/** Biting cold (frost stat node): how much deeper the current Slowed status is, in percent (server sets, replicates
+	 *  so the slowed player's own movement prediction agrees). */
+	UPROPERTY(Replicated) uint8 SlowExtraPct = 0;
 
 	/** Server: health hit zero. */
 	virtual void Die(AActor* Killer);

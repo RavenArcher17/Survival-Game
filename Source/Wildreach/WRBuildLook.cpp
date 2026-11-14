@@ -3,6 +3,7 @@
 #include "WRBuilding.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/BoxComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -34,7 +35,7 @@ namespace WRBuildLookDetail
 		static UMaterialInterface* Wood = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
 		static UMaterialInterface* Stone = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
 		static UMaterialInterface* Shape = Rooted<UMaterialInterface>(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-		return Mat == EWRLookMat::Wood ? Wood : Mat == EWRLookMat::Stone ? Stone : Shape;
+		return Mat == EWRLookMat::Wood ? Wood : Mat == EWRLookMat::Stone ? Stone : Shape;   // cloth and trim: flat colours
 	}
 
 	static constexpr float Corner = 200.f;   // a cell's half width: wall ends, posts
@@ -600,6 +601,50 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 		for (int32 i = 0; i < 3; ++i) B.Box(EWRLookMat::Wood, FVector(-36.f + i * 24.f + 0.5f, -10.f, 114.f), FVector(-36.f + (i + 1) * 24.f - 0.5f, -4.f, 186.f));
 		for (const float S2 : { -1.f, 1.f }) B.Add(EWRLookMat::Stone, FVector(8.f, 8.f, 36.f), FVector(S2 * 18.f, 0.f, 172.f), FRotator(0.f, 0.f, S2 * -28.f), 1.f, EWRLookMesh::Cone);
 	}
+	else if (Def.Id == TEXT("banner"))
+	{
+		// A clan banner: an iron-capped pole, a crossbar it hangs from on rings, three panels of wool (hung a little
+		// apart, so they fold), a woven emblem, and tassels along the bottom edge.
+		B.Post(EWRLookMat::Wood, 0.f, 0.f, 0.f, 252.f, 8.f);
+		B.Add(EWRLookMat::Stone, FVector(10.f, 10.f, 14.f), FVector(0.f, 0.f, 259.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cone);   // finial
+		B.Box(EWRLookMat::Stone, FVector(-5.f, -5.f, 240.f), FVector(5.f, 5.f, 244.f), Iron);                                          // collar
+		B.Box(EWRLookMat::Wood, FVector(3.f, -40.f, 233.f), FVector(8.f, 40.f, 238.f));                                                 // crossbar
+		for (int32 i = 0; i < 3; ++i)
+		{
+			const float Y0 = -36.f + i * 24.f;
+			const float X = 5.f + (i == 1 ? 1.5f : 0.f);
+			B.Box(EWRLookMat::Cloth, FVector(X, Y0 + 0.4f, 88.f + (i == 1 ? 0.f : 3.f)), FVector(X + 2.f, Y0 + 23.6f, 232.f));
+			B.Add(EWRLookMat::Stone, FVector(3.f, 3.f, 3.f), FVector(5.5f, Y0 + 12.f, 233.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);  // ring
+		}
+		// The emblem: a diamond of trim over the middle panel, with a bar under it.
+		B.Add(EWRLookMat::Trim, FVector(1.f, 26.f, 26.f), FVector(8.6f, 0.f, 178.f), FRotator(0.f, 0.f, 45.f));
+		B.Box(EWRLookMat::Trim, FVector(8.f, -30.f, 140.f), FVector(9.f, 30.f, 145.f));
+		for (int32 t = 0; t < 9; ++t)
+		{
+			const float Y = -32.f + t * 8.f;
+			B.Box(EWRLookMat::Trim, FVector(5.5f, Y - 1.2f, 78.f), FVector(7.f, Y + 1.2f, 90.f));
+		}
+	}
+	else if (Def.Id == TEXT("rug"))
+	{
+		// A woven rug: a dyed field, a trim border, an inner band, fringe at both ends.
+		B.Box(EWRLookMat::Cloth, FVector(-100.f, -75.f, 0.f), FVector(100.f, 75.f, 1.6f));
+		B.Box(EWRLookMat::Trim, FVector(-100.f, -75.f, 1.6f), FVector(100.f, -64.f, 2.f));
+		B.Box(EWRLookMat::Trim, FVector(-100.f, 64.f, 1.6f), FVector(100.f, 75.f, 2.f));
+		B.Box(EWRLookMat::Trim, FVector(-100.f, -64.f, 1.6f), FVector(-89.f, 64.f, 2.f));
+		B.Box(EWRLookMat::Trim, FVector(89.f, -64.f, 1.6f), FVector(100.f, 64.f, 2.f));
+		B.Box(EWRLookMat::Trim, FVector(-70.f, -44.f, 1.6f), FVector(70.f, -40.f, 2.f));
+		B.Box(EWRLookMat::Trim, FVector(-70.f, 40.f, 1.6f), FVector(70.f, 44.f, 2.f));
+		B.Add(EWRLookMat::Trim, FVector(30.f, 30.f, 0.4f), FVector(0.f, 0.f, 1.8f), FRotator(0.f, 45.f, 0.f));
+		for (const float End : { -1.f, 1.f })
+		{
+			for (int32 t = 0; t < 15; ++t)
+			{
+				const float Y = -70.f + t * 10.f;
+				B.Box(EWRLookMat::Trim, FVector(End > 0.f ? 100.f : -106.f, Y - 1.5f, 0.f), FVector(End > 0.f ? 106.f : -100.f, Y + 1.5f, 0.8f));
+			}
+		}
+	}
 	else if (K == TEXT("crop"))
 	{
 		B.Box(EWRLookMat::Wood, FVector(-200.f, -200.f, 0.f), FVector(200.f, -190.f, 32.f));
@@ -691,10 +736,10 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 		Part->SetGenerateOverlapEvents(false);
 		Part->SetCanEverAffectNavigation(false);
 		Part->SetNumCustomDataFloats(3);
-		if (Mat == EWRLookMat::Cloth)
+		if (Mat == EWRLookMat::Cloth || Mat == EWRLookMat::Trim)
 		{
 			UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(MaterialFor(Mat), Owner);
-			MID->SetVectorParameterValue(TEXT("Color"), Cloth);
+			MID->SetVectorParameterValue(TEXT("Color"), Mat == EWRLookMat::Trim ? FWRBuildLook::TrimColor() : Cloth);
 			Part->SetMaterial(0, MID);
 		}
 		else
@@ -735,6 +780,73 @@ const FWRPieceDef* FWRBuildLook::KindDef(FName Kind)
 		if (D.Kind == Kind) return &D;
 	}
 	return nullptr;
+}
+
+namespace WRBuildLookDetail
+{
+	/** The prop mesh of a def (loaded once, rooted), on any machine. */
+	static UStaticMesh* PropMesh(const FWRPieceDef& Def)
+	{
+		static TMap<FString, UStaticMesh*> Cache;
+		if (Def.Mesh.IsEmpty()) return nullptr;
+		if (UStaticMesh* Found = Cache.FindRef(Def.Mesh)) return Found;
+		UStaticMesh* Mesh = Rooted<UStaticMesh>(*Def.Mesh);
+		if (Mesh) Cache.Add(Def.Mesh, Mesh);
+		return Mesh;
+	}
+
+	/** Where the fitted prop sits in its parent's unscaled space (AttachProp's maths): its box, scale and offset. */
+	static bool PropFit(UStaticMesh* Mesh, const FWRPieceDef& Def, float BottomZ, FBox& OutBox, float& OutScale, FVector& OutOffset)
+	{
+		if (!Mesh) return false;
+		const FRotator Turn(0.f, Def.MeshYaw, 0.f);
+		const FBox Local = Mesh->GetBoundingBox();
+		FBox Turned(ForceInit);
+		for (int32 i = 0; i < 8; ++i)
+		{
+			Turned += Turn.RotateVector(FVector(i & 1 ? Local.Max.X : Local.Min.X, i & 2 ? Local.Max.Y : Local.Min.Y, i & 4 ? Local.Max.Z : Local.Min.Z));
+		}
+		const FVector Ext = Turned.GetSize().ComponentMax(FVector(1.f));
+		const FVector Fit = Def.MeshFit.IsNearlyZero() ? Ext : Def.MeshFit;
+		OutScale = FMath::Min3(Fit.X / Ext.X, Fit.Y / Ext.Y, Fit.Z / Ext.Z);
+		const FVector Centre = Turned.GetCenter() * OutScale;
+		OutOffset = FVector(-Centre.X, -Centre.Y, BottomZ - Turned.Min.Z * OutScale);
+		OutBox = FBox(Turned.Min * OutScale + OutOffset, Turned.Max * OutScale + OutOffset);
+		return true;
+	}
+}
+
+UBoxComponent* FWRBuildLook::FitCollision(AActor* Owner, UPrimitiveComponent* Plain, const FWRPieceDef& Def, float BottomZ)
+{
+	using namespace WRBuildLookDetail;
+	FBox Box;
+	float Scale = 1.f;
+	FVector Offset;
+	if (!Owner || !Plain || !PropFit(PropMesh(Def), Def, BottomZ, Box, Scale, Offset))
+	{
+		return nullptr;
+	}
+	UBoxComponent* Fit = nullptr;
+	TArray<UBoxComponent*> Boxes;
+	Owner->GetComponents(Boxes);
+	for (UBoxComponent* B : Boxes) if (B->ComponentHasTag(TEXT("WRFit"))) Fit = B;
+	if (!Fit)
+	{
+		Fit = NewObject<UBoxComponent>(Owner, TEXT("FitCollision"));
+		Fit->ComponentTags.Add(TEXT("WRFit"));
+		Fit->SetupAttachment(Plain);
+		Fit->SetUsingAbsoluteScale(true);
+		Fit->RegisterComponent();
+	}
+	// The parent may be a scaled engine shape: undo its scale on the offset (as AttachProp does).
+	const FVector ParentScale = Plain->GetComponentScale().ComponentMax(FVector(0.001f));
+	Fit->SetBoxExtent(Box.GetExtent(), false);
+	Fit->SetRelativeLocation(Box.GetCenter() / ParentScale);
+	Fit->SetCollisionProfileName(TEXT("BlockAll"));
+	Fit->SetCanEverAffectNavigation(true);
+	Fit->SetHiddenInGame(true);
+	Plain->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	return Fit;
 }
 
 UStaticMeshComponent* FWRBuildLook::AttachProp(AActor* Owner, USceneComponent* Parent, const FWRPieceDef& Def, float BottomZ)

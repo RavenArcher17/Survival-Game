@@ -112,6 +112,10 @@ public:
 	UPROPERTY(Replicated) FString OwnerName;
 	UPROPERTY(Replicated) float Health = 300.f;
 	UPROPERTY(Replicated) float MaxHealth = 300.f;
+	/** Server, before it's spawned: its health x Scale (its builder's Building level and Fortifier perk; saved). */
+	void ScaleHealth(float Scale) { MaxHealth *= FMath::Max(0.1f, Scale); Health = MaxHealth; }
+	/** Server: when it last took damage (Self repair waits for a quiet minute). */
+	double LastDamagedAt = -1.0e9;
 	UPROPERTY(ReplicatedUsing=OnRep_Door) bool bOpen = false;
 	UPROPERTY(Replicated) bool bLocked = false;
 	/** Crop plots: server time planting finished growing (0 = empty). */

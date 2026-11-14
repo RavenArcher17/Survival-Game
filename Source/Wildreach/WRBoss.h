@@ -123,6 +123,8 @@ public:
 	virtual void OnDamageTaken(const FWRHit& Hit, float Damage) override;
 	virtual void NotifyAttackedBy(AActor* Attacker) override;
 	virtual FString GetDisplayLabel() const override;
+	/** Its own element (fire or frost); the opposite one hurts it more (Beast lore shows it). */
+	FGameplayTag GetBossElement() const { return BossElement(); }
 	/** Test control (WRCreatureAttack, Tools\creaturevideo.ps1): its next attack clip where it stands; no telegraph, no hit. */
 	virtual bool TestAttack() override;
 

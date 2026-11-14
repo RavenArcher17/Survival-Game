@@ -540,25 +540,52 @@ void AWRBuildPiece::ApplyLook()
 		Parts.Add({ FVector(400, 400, 20), FVector(0, 0, 510) });
 	}
 	else if (K == TEXT("chest")) Parts.Add({ FVector(100, 60, 60), FVector(0, 0, 30) });
-	else if (K == TEXT("bed")) Parts.Add({ Def->Id == TEXT("bedroll") ? FVector(200, 80, 15) : FVector(220, 100, 50), FVector(0, 0, Def->Id == TEXT("bedroll") ? 8 : 25) });
-	else if (K == TEXT("light")) Parts.Add({ Def->Id == TEXT("brazier") ? FVector(60, 60, 80) : FVector(10, 10, 150), FVector(0, 0, Def->Id == TEXT("brazier") ? 40 : 75) });
+	// Furniture and lights collide as what you see (WRBuildLook's measurements): a bed's frame and headboard, a
+	// brazier's bowl on its legs, a table's top on four legs, a chair's seat, legs and back.
+	else if (K == TEXT("bed") && Def->Id == TEXT("bedroll")) Parts.Add({ FVector(200, 80, 15), FVector(0, 0, 8) });
+	else if (K == TEXT("bed"))
+	{
+		Parts.Add({ FVector(216, 96, 40), FVector(0, 0, 20) });
+		Parts.Add({ FVector(6, 96, 78), FVector(-107, 0, 39) });
+	}
+	else if (Def->Id == TEXT("brazier"))
+	{
+		Parts.Add({ FVector(62, 62, 22), FVector(0, 0, 61) });
+		for (const float X : { -20.f, 20.f }) for (const float Y : { -20.f, 20.f }) Parts.Add({ FVector(6, 6, 52), FVector(X, Y, 26) });
+	}
+	else if (K == TEXT("light")) Parts.Add({ FVector(12, 12, 152), FVector(0, 0, 76) });
 	else if (K == TEXT("crop")) Parts.Add({ FVector(400, 400, 30), FVector(0, 0, 15) });
 	else if (K == TEXT("pen"))
 	{
-		Parts.Add({ FVector(800, 20, 120), FVector(0, -400, 60) });
-		Parts.Add({ FVector(800, 20, 120), FVector(0, 400, 60) });
-		Parts.Add({ FVector(20, 800, 120), FVector(-400, 0, 60) });
-		Parts.Add({ FVector(20, 800, 120), FVector(400, 0, 60) });
+		// The fence's line: posts 14 thick to 130, the rails on them (it stays a wall to animals between the rails).
+		Parts.Add({ FVector(814, 14, 130), FVector(0, -400, 65) });
+		Parts.Add({ FVector(814, 14, 130), FVector(0, 400, 65) });
+		Parts.Add({ FVector(14, 786, 130), FVector(-400, 0, 65) });
+		Parts.Add({ FVector(14, 786, 130), FVector(400, 0, 65) });
 	}
 	// Stations, the Hearth and the totem are child actors only the server spawns: the build-mode ghost previews their size.
 	else if (bGhost && K == TEXT("station")) Parts.Add({ FVector(120, 80, 90), FVector(0, 0, 50) });
 	else if (bGhost && K == TEXT("hearth")) Parts.Add({ FVector(150, 150, 120), FVector(0, 0, 50) });
 	else if (bGhost && K == TEXT("totem")) Parts.Add({ FVector(40, 40, 250), FVector(0, 0, 50) });
-	else if (Def->Id == TEXT("table")) Parts.Add({ FVector(150, 90, 80), FVector(0, 0, 40) });
-	else if (Def->Id == TEXT("chair")) Parts.Add({ FVector(50, 50, 90), FVector(0, 0, 45) });
-	else if (Def->Id == TEXT("rug")) Parts.Add({ FVector(200, 150, 2), FVector(0, 0, 1) });
-	else if (Def->Id == TEXT("banner")) Parts.Add({ FVector(10, 80, 250), FVector(0, 0, 125) });
-	else if (Def->Id == TEXT("trophy_mount")) Parts.Add({ FVector(80, 20, 80), FVector(0, 0, 150) });
+	else if (Def->Id == TEXT("table"))
+	{
+		Parts.Add({ FVector(150, 90, 6), FVector(0, 0, 77) });
+		for (const float X : { -66.f, 66.f }) for (const float Y : { -36.f, 36.f }) Parts.Add({ FVector(8, 8, 74), FVector(X, Y, 37) });
+	}
+	else if (Def->Id == TEXT("chair"))
+	{
+		Parts.Add({ FVector(46, 46, 4), FVector(0, 0, 46) });
+		for (const float X : { -20.f, 20.f }) for (const float Y : { -20.f, 20.f }) Parts.Add({ FVector(5, 5, 44), FVector(X, Y, 22) });
+		Parts.Add({ FVector(5, 45, 44), FVector(-20, 0, 70) });
+	}
+	else if (Def->Id == TEXT("rug")) Parts.Add({ FVector(212, 150, 2), FVector(0, 0, 1) });
+	else if (Def->Id == TEXT("banner"))
+	{
+		// The pole, and the hanging cloth (it doesn't let you walk through it).
+		Parts.Add({ FVector(9, 9, 262), FVector(0, 0, 131) });
+		Parts.Add({ FVector(4, 76, 150), FVector(6, 0, 157) });
+	}
+	else if (Def->Id == TEXT("trophy_mount")) Parts.Add({ FVector(74, 8, 74), FVector(0, -7, 150) });
 
 	FLinearColor Color = Def->Material == TEXT("stone") ? FLinearColor(0.45f, 0.45f, 0.47f) : FLinearColor(0.42f, 0.27f, 0.13f);
 	if (K == TEXT("crop")) Color = FLinearColor(0.25f, 0.16f, 0.08f);
@@ -711,7 +738,7 @@ void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
 	const TArray<FWRLookBlock> Blocks = Prop || bPlainGhost ? TArray<FWRLookBlock>() : FWRBuildLook::Blocks(Def, GetActorTransform());
 	if (!Prop && Blocks.Num() == 0)
 	{
-		return;  // rugs, banners: their flat block is the look
+		return;  // nothing modelled for it: its plain blocks are the look
 	}
 	if (Prop && bGhost)
 	{
@@ -819,6 +846,7 @@ void AWRBuildPiece::TakeBuildDamage(float Amount, AActor* DamageSource)
 		Amount *= 1.f - FMath::Clamp(Protection, 0.f, 1.f);
 	}
 	Health -= Amount;
+	LastDamagedAt = GetWorld()->GetTimeSeconds();
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
 		// A Hearth breaks and stays: its stations stop until it's repaired (E on it, Repair), and its cores are never
@@ -1063,6 +1091,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	O->SetNumberField(TEXT("z"), L.Z);
 	O->SetNumberField(TEXT("yaw"), GetActorRotation().Yaw);
 	O->SetNumberField(TEXT("hp"), Health);
+	O->SetNumberField(TEXT("maxHp"), MaxHealth);   // a builder's perks can raise it over the piece's own
 	O->SetStringField(TEXT("code"), LockCode);
 	if (!CustomName.IsEmpty()) O->SetStringField(TEXT("name"), CustomName);
 	O->SetBoolField(TEXT("locked"), bLocked);
@@ -1134,6 +1163,11 @@ static void ReadStacks(const TSharedPtr<FJsonObject>& O, const TCHAR* Field, TAr
 void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 {
 	Health = O->GetNumberField(TEXT("hp"));
+	double SavedMax = 0.0;
+	if (O->TryGetNumberField(TEXT("maxHp"), SavedMax) && SavedMax > 0.0)
+	{
+		MaxHealth = SavedMax;
+	}
 	LockCode = O->GetStringField(TEXT("code"));
 	O->TryGetStringField(TEXT("name"), CustomName);
 	O->TryGetBoolField(TEXT("locked"), bLocked);
@@ -1199,8 +1233,10 @@ AWRClaimTotem::AWRClaimTotem()
 void AWRClaimTotem::BeginPlay()
 {
 	Super::BeginPlay();
-	// Its piece puts it 50 cm up (SpawnChild), half its cylinder in the ground: the post stands on the ground.
+	// Its piece puts it 50 cm up (SpawnChild), half its cylinder in the ground: the post stands on the ground. It
+	// collides as the carved totem (every machine).
 	const FWRPieceDef* Def = FWRBuildLook::KindDef(TEXT("totem"));
+	if (Def) FWRBuildLook::FitCollision(this, Mesh, *Def, -FWRBuildLook::ChildLift);
 	if (Def && FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift))
 	{
 		Mesh->SetVisibility(false);
@@ -1288,6 +1324,29 @@ void AWRClaimTotem::Tick(float DeltaSeconds)
 
 	// Pay one minute of upkeep from storage, or mark the claim unpaid (its pieces decay).
 	bUnpaid = !FWRBuildRules::PayUpkeepMinute(UpkeepStorage, UpkeepOwed, CurrentUpkeepPerHour());
+	// Self repair (engineering perk, its owner on the server): the claim's stations and code-lock doors mend a share
+	// of their health each minute once they've gone a while without damage.
+	const APlayerState* OwnerPS = nullptr;
+	if (const AGameStateBase* GS = GetWorld()->GetGameState())
+	{
+		for (const APlayerState* PS : GS->PlayerArray) if (PS && PS->GetPlayerName() == OwnerName) { OwnerPS = PS; break; }
+	}
+	const float Mend = !bUnpaid && OwnerPS ? UWRLifeSkillsComponent::StatFor(OwnerPS, TEXT("selfRepair")) : 0.f;
+	if (Mend > 0.f)
+	{
+		const double Now = GetWorld()->GetTimeSeconds();
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+		{
+			const FWRPieceDef* D = It->GetDef();
+			if (!D || It->bGhost || It->OwnerName != OwnerName || (D->Kind != TEXT("station") && !D->bLockable) || It->Health >= It->MaxHealth
+				|| Now - It->LastDamagedAt < WRTune(TEXT("lifeSkills.selfRepairQuietSeconds"), 60.f)
+				|| FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) > Radius)
+			{
+				continue;
+			}
+			It->Health = FMath::Min(It->MaxHealth, It->Health + It->MaxHealth * Mend);
+		}
+	}
 	if (bUnpaid)
 	{
 		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)

@@ -11,8 +11,11 @@ struct FWRPerkDef
 	FName Id;
 	FString Name;
 	FString Text;
-	FName Stat;      // none = not wired to a system yet
+	FName Stat;      // what it adds to (UWRLifeSkillsComponent::Stat), read where its system is
 	float Value = 0.f;
+	/** The system it needs that isn't in the game yet ("diving"): not shown, can't be chosen. Empty = it works. */
+	FString WaitsFor;
+	bool IsLive() const { return WaitsFor.IsEmpty(); }
 };
 
 struct FWRLifeSkillDef
@@ -24,8 +27,15 @@ struct FWRLifeSkillDef
 	FString EveryLevelText;
 	FName EveryLevelStat;
 	float PerLevel = 0.f;
-	/** Perk choices at 25, 50, 75, 100 (two options each). */
+	/** Perk choices at 25, 50, 75, 100 (two options each; positions are what saves keep). */
 	TArray<TArray<FWRPerkDef>> Tiers;
+	/** How many of a tier's perks are in the game (0: the tier isn't shown or offered). */
+	int32 LiveCount(int32 Tier) const
+	{
+		int32 N = 0;
+		if (Tiers.IsValidIndex(Tier)) for (const FWRPerkDef& P : Tiers[Tier]) N += P.IsLive() ? 1 : 0;
+		return N;
+	}
 };
 
 class WILDREACH_API FWRLifeSkillRegistry

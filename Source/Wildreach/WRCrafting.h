@@ -20,6 +20,9 @@ struct FWRRecipe
 	bool bQuality = false;
 	/** How long one takes at a station (recipes.json "seconds"), before the world's crafting speed. */
 	float Seconds = 2.f;
+	/** A life-skill stat the maker needs (recipes.json "needsPerk": Bait maker's lures); none = anyone. Hidden without it. */
+	FName NeedsStat;
+	FString NeedsText;
 };
 
 class WILDREACH_API FWRRecipeRegistry
@@ -50,6 +53,7 @@ struct FWRCrafterHand
 	bool bMinFine = false;    // a Master perk: gear is Fine or better
 	float RollBonus = 0.f;    // weapons' stat roll
 	float DoubleBrew = 0.f;   // alchemy's chance of a double batch
+	bool bBulkCook = false;   // Bulk cook (cooking perk): food recipes make two
 };
 
 /** One made: the item (a piece of gear, or a stack), the skill it trains, and the "Crafted ..." line. */
@@ -75,7 +79,16 @@ struct WILDREACH_API FWRCrafting
 	/** Takes the inputs (and the essence) for Times. Check Shortfall first. */
 	static void TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times);
 	/** What the inputs (and essence) for Times are: a cancelled order's refund. */
-	static TArray<TPair<FName, int32>> InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times);
+	static TArray<TPair<FName, int32>> InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times, float Discount = 0.f);
+	/** Efficient smith / Efficient armorer (perks): the share of each material this player saves on this recipe (0..0.9). */
+	static float MaterialDiscount(const AActor* Player, const FWRRecipe& Recipe);
+	/** One of the recipe's inputs at a discount: each rounded down, never under 1. */
+	static int32 DiscountedInput(int32 Amount, float Discount);
+	/** The recipe's inputs for one, as this player pays them (the crafting screen's cost). */
+	static TArray<TPair<FName, int32>> CostFor(const FWRRecipe& Recipe, float Discount);
+	/** How much faster this player's orders run (1 = the world's speed): engineering's every-level bonus and Quick
+	 *  hands / Quick fit on weapons / armor. Overclock is added when an order is queued (it burns wood). */
+	static float SpeedFor(const AActor* Player, const FWRRecipe& Recipe);
 	static FWRCrafterHand HandOf(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType);
 	/** Makes one (its inputs already taken): the quality roll for gear, alchemy's double batch. */
 	static FWRCraftedOne MakeOne(const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element, const FWRCrafterHand& Hand);
@@ -102,6 +115,10 @@ struct FWRCraftJob
 	/** Why it waits: 0 it doesn't, 1 nowhere to put what it makes (its maker isn't near and the tray is full), 2 the
 	 *  Hearth is broken. */
 	UPROPERTY() uint8 Waiting = 0;
+	/** The maker's material discount when ordered (what a cancel gives back) and whether Overclock burns wood for it
+	 *  (one per item, taken when ordered, the unmade ones' back on a cancel). */
+	UPROPERTY() float Discount = 0.f;
+	UPROPERTY() bool bOverclocked = false;
 	FWRCrafterHand Hand;   // server only
 };
 
@@ -149,7 +166,8 @@ public:
 	 */
 	FString RepairFor(AWRPlayerController* Player);
 	/** What RepairFor would take now (empty when it's at full health). */
-	TArray<TPair<FName, int32>> RepairCost() const;
+	/** What mending it costs (For: the player paying; Quick repair halves it). */
+	TArray<TPair<FName, int32>> RepairCost(const AActor* For = nullptr) const;
 	void SetCores(const TArray<FName>& InCores) { Cores = InCores; }
 
 	/** Nearest Hearth whose claim covers this point (null = no claim: tier 1). */
@@ -207,7 +225,7 @@ public:
 	/** How far the first order is through the one it's making, 0..1 (any machine: from the server's clock). */
 	float JobProgress() const;
 	/** Seconds one of a recipe takes here and now (the recipe's, over the world's crafting speed; 0: at once). */
-	static float SecondsFor(const FWRRecipe& Recipe);
+	static float SecondsFor(const FWRRecipe& Recipe, const AActor* Player = nullptr);
 	/** Save / load (its build piece's JSON). */
 	void QueueToJson(TSharedRef<class FJsonObject> O) const;
 	void QueueFromJson(const TSharedPtr<class FJsonObject>& O);
@@ -228,7 +246,8 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
 	/** A forge's fire (other stations stay dark). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UPointLightComponent> Glow;
-	/** Its modelled prop where it's drawn (the box above stays as the collision), and the type it shows. */
+	/** Its modelled prop where it's drawn (it collides as a box fitted to the prop, FitCollision), and the type it shows. */
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Visual;
 	FName LookType;
+	FName FitType;   // the station type its collision box was fitted to (FWRBuildLook::FitCollision)
 };

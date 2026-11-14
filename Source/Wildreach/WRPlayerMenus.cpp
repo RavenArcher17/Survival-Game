@@ -452,7 +452,7 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 			const FWRSkillProgress* P = Skills ? Skills->FindProgress(Def.Id) : nullptr;
 			const int32 Level = P ? P->Level : 1;
 			Out.Add({ FString::Printf(TEXT("%s  %d   (%d/%d xp)   %s%s"), *Def.Name, Level, P ? P->XP : 0, FWRLifeSkillRules::XPToNext(Level),
-				*Def.EveryLevelText, Def.EveryLevelStat.IsNone() ? TEXT(" [not active yet]") : TEXT("")), FString() });
+				*Def.EveryLevelText, TEXT("")), FString() });
 			for (int32 T = 0; T < 4; ++T)
 			{
 				const int32 TierLevel = FWRLifeSkillRegistry::TierLevels[T];
@@ -461,10 +461,9 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 				for (int32 O = 0; O < Def.Tiers[T].Num(); ++O)
 				{
 					const FWRPerkDef& Perk = Def.Tiers[T][O];
-					if (Chosen >= 0 && Chosen != O) continue;
+					if ((Chosen >= 0 && Chosen != O) || (Chosen != O && !Perk.IsLive())) continue;   // perks waiting for their system aren't offered
 					FWRMenuEntry E;
-					E.Label = FString::Printf(TEXT("    L%d %s %s: %s%s"), TierLevel, Chosen == O ? TEXT("[x]") : TEXT("choose"), *Perk.Name, *Perk.Text,
-						Perk.Stat.IsNone() ? TEXT(" [not active yet]") : TEXT(""));
+					E.Label = FString::Printf(TEXT("    L%d %s %s: %s"), TierLevel, Chosen == O ? TEXT("[x]") : TEXT("choose"), *Perk.Name, *Perk.Text);
 					E.Command = Chosen >= 0 ? FString() : FString::Printf(TEXT("perk %s %d %d"), *Def.Id.ToString(), TierLevel, O);
 					Out.Add(E);
 				}
@@ -728,6 +727,46 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 			}
 		}
 		OutResult = FString::Printf(TEXT("%d tames: %s"), Count, *Arg(1));
+		ClientNotify(OutResult);
+		return true;
+	}
+	if (Cmd == TEXT("whistle") && PS && GetPawn())
+	{
+		// The whistle (H, or hold Interact with nothing in front): every tame of yours in earshot takes the order. You
+		// whistle for everyone near to hear; each tame that heard answers with its own call, a beat apart.
+		const FString Order = Arg(1);
+		static const TSet<FString> Allowed = { TEXT("follow"), TEXT("stay"), TEXT("passive"), TEXT("aggressive") };
+		if (!Allowed.Contains(Order))
+		{
+			OutResult = TEXT("the whistle can't give that order");
+			ClientNotify(OutResult);
+			return true;
+		}
+		APawn* Me = GetPawn();
+		WRSound::Broadcast(Me, TEXT("tame.whistle"));
+		const float Range = WRTune(TEXT("taming.whistleRange"), 3000.f);
+		int32 Count = 0;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			AWRCreature* Tame = *It;
+			if (!Tame->IsAlive() || Tame->TamedBy != PS->GetPlayerName() || Tame->Rider.IsValid() || FVector::Dist(Tame->GetActorLocation(), Me->GetActorLocation()) >= Range)
+			{
+				continue;
+			}
+			Tame->Order(this, Order);
+			if (Order == TEXT("follow") && Tame->IsAsleep()) Tame->SetAsleep(false);   // a whistle wakes them
+			++Count;
+			FTimerHandle Answer;
+			const TWeakObjectPtr<AWRCreature> Weak = Tame;
+			GetWorldTimerManager().SetTimer(Answer, FTimerDelegate::CreateLambda([Weak]()
+			{
+				if (AWRCreature* T = Weak.Get(); T && T->IsAlive()) T->MulticastSound(TEXT("voice.idle"));
+			}), FMath::FRandRange(0.35f, 0.35f + 0.18f * FMath::Min(Count, 6)), false);
+		}
+		static const TMap<FString, FString> Said = { { TEXT("follow"), TEXT("come to you") }, { TEXT("stay"), TEXT("stay put") }, { TEXT("passive"), TEXT("won't fight") }, { TEXT("aggressive"), TEXT("will fight your enemies") } };
+		OutResult = Count == 0 ? FString(TEXT("No tames of yours in earshot"))
+			: FString::Printf(TEXT("%d %s %s"), Count, Count == 1 ? TEXT("tame") : TEXT("tames"), *Said.FindRef(Order));
+		UE_LOG(LogWildreach, Log, TEXT("TAME %s whistled %s: %d tames"), *PS->GetPlayerName(), *Order, Count);
 		ClientNotify(OutResult);
 		return true;
 	}

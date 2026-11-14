@@ -1,5 +1,5 @@
 {
-  "_comment": "Recipes by station. Station tiers and what each level unlocks follow the Crafting tab (Hearth levels 1-3 for the first playable). Input amounts are placeholders. 'pathMaterial' means one ember or frost essence may be added to infuse the item with that element. Station 'hand' = made anywhere, from the build menu (B).",
+  "_comment": "Recipes by station. Station tiers and what each level unlocks follow the Crafting tab (Hearth levels 1-3 for the first playable). Input amounts are placeholders. 'pathMaterial' means one ember or frost essence may be added to infuse the item with that element. Station 'hand' = made anywhere, from the build menu (B). needsPerk: a life-skill stat the maker needs (the recipe stays hidden without it), needsText what the server says otherwise.",
   "recipes": [
     { "id": "crude_hatchet", "station": "hand", "level": 1, "inputs": { "wood": 3, "stone": 2 }, "output": "crude_hatchet", "count": 1, "seconds": 2 },
     { "id": "crude_pick", "station": "hand", "level": 1, "inputs": { "wood": 3, "stone": 3 }, "output": "crude_pick", "count": 1, "seconds": 2 },
@@ -8,6 +8,8 @@
     { "id": "stone_arrow", "station": "hand", "level": 1, "inputs": { "wood": 1, "stone": 1, "fiber": 1 }, "output": "stone_arrow", "count": 3, "seconds": 1 },
     { "id": "tranq_arrow", "station": "hand", "level": 1, "inputs": { "stone_arrow": 1, "narcotic": 1 }, "output": "tranq_arrow", "count": 1, "seconds": 1 },
     { "id": "tranq_bolt", "station": "hand", "level": 1, "inputs": { "crossbow_bolt": 1, "narcotic": 1 }, "output": "tranq_bolt", "count": 1, "seconds": 1 },
+    { "id": "fishing_rod", "station": "hand", "level": 1, "inputs": { "wood": 3, "fiber": 6, "stone": 1 }, "output": "fishing_rod", "count": 1, "seconds": 2 },
+    { "id": "cut_bait", "station": "hand", "level": 1, "inputs": { "raw_meat": 1 }, "output": "cut_bait", "count": 6, "seconds": 1 },
 
     { "id": "copper_ingot", "station": "forge", "level": 1, "inputs": { "copper_ore": 2 }, "output": "copper_ingot", "count": 1, "seconds": 2 },
     { "id": "bronze_ingot", "station": "forge", "level": 2, "inputs": { "copper_ingot": 2, "tin_ore": 1 }, "output": "bronze_ingot", "count": 1, "seconds": 3 },
@@ -35,6 +37,14 @@
     { "id": "blowgun", "station": "workbench", "level": 1, "inputs": { "wood": 6, "fiber": 4, "hide": 1 }, "output": "blowgun", "count": 1, "seconds": 3, "quality": true },
     { "id": "kibble", "station": "workbench", "level": 1, "inputs": { "cooked_meat": 1, "berries": 3, "egg": 1 }, "output": "kibble", "count": 2, "seconds": 2 },
     { "id": "cooked_meat", "station": "workbench", "level": 1, "inputs": { "raw_meat": 1, "wood": 1 }, "output": "cooked_meat", "count": 1, "seconds": 2 },
+    { "id": "ember_lure", "station": "workbench", "level": 1, "inputs": { "sulfur_crystal": 1, "fiber": 2, "raw_meat": 1 }, "output": "ember_lure", "count": 3, "seconds": 3, "needsPerk": "baitMaker", "needsText": "Lures need the Bait maker perk (fishing 50)" },
+    { "id": "rime_lure", "station": "workbench", "level": 1, "inputs": { "lichen": 2, "fiber": 2, "raw_meat": 1 }, "output": "rime_lure", "count": 3, "seconds": 3, "needsPerk": "baitMaker", "needsText": "Lures need the Bait maker perk (fishing 50)" },
+    { "id": "grill_cinder_snapper", "station": "workbench", "level": 1, "inputs": { "fish_cinder_snapper": 1, "wood": 1 }, "output": "grilled_fish", "count": 1, "seconds": 2 },
+    { "id": "grill_steamfin_trout", "station": "workbench", "level": 1, "inputs": { "fish_steamfin_trout": 1, "wood": 1 }, "output": "grilled_fish", "count": 1, "seconds": 2 },
+    { "id": "grill_rime_cod", "station": "workbench", "level": 1, "inputs": { "fish_rime_cod": 1, "wood": 1 }, "output": "grilled_fish", "count": 1, "seconds": 2 },
+    { "id": "grill_silver_grayling", "station": "workbench", "level": 1, "inputs": { "fish_silver_grayling": 1, "wood": 1 }, "output": "grilled_fish", "count": 1, "seconds": 2 },
+    { "id": "grill_sulfur_carp", "station": "workbench", "level": 1, "inputs": { "fish_sulfur_carp": 1, "wood": 1 }, "output": "grilled_fish", "count": 2, "seconds": 2 },
+    { "id": "grill_frostjaw_pike", "station": "workbench", "level": 1, "inputs": { "fish_frostjaw_pike": 1, "wood": 1 }, "output": "grilled_fish", "count": 2, "seconds": 2 },
     { "id": "waterskin", "station": "workbench", "level": 1, "inputs": { "hide": 1 }, "output": "waterskin", "count": 1, "seconds": 2 }
   ],
   "quality": {

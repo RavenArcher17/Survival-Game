@@ -10,6 +10,8 @@
 #include "WRGameplayTags.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRSocial.h"
+#include "WRPlayerController.h"
 #include "AbilitySystemComponent.h"
 #include "Dom/JsonObject.h"
 #include "GameFramework/GameStateBase.h"
@@ -652,6 +654,31 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	const float Drink = Def->Thirst + (Def->Hunger > 0.f && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("mealsQuench")) > 0.f ? Def->Hunger * 0.5f : 0.f);
 	if (Food > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), A->GetHunger() + Food);
 	if (Drink > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), A->GetThirst() + Drink);
+	// Shared meal (cooking perk): a meal feeds your clan mates close by too, at a share of its worth.
+	const float Share = Def->Category != TEXT("potion") && Food > 0.f ? UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("sharedMeal")) : 0.f;
+	const APlayerState* MyPS = Character->GetPlayerState();
+	if (Share > 0.f && MyPS)
+	{
+		const AGameStateBase* GS = Character->GetWorld()->GetGameState();
+		for (const APlayerState* Other : GS ? GS->PlayerArray : TArray<TObjectPtr<APlayerState>>())
+		{
+			AWRCharacterBase* Mate = Other && Other != MyPS ? Cast<AWRCharacterBase>(Other->GetPawn()) : nullptr;
+			if (!Mate || !Mate->IsAlive() || !FWRClans::Get().SameClan(MyPS->GetPlayerName(), Other->GetPlayerName())
+				|| FVector::Dist(Mate->GetActorLocation(), Character->GetActorLocation()) > WRTune(TEXT("lifeSkills.sharedMealRange"), 1000.f))
+			{
+				continue;
+			}
+			UAbilitySystemComponent* MateASC = Mate->GetAbilitySystemComponent();
+			if (MateASC && Mate->GetAttributes())
+			{
+				MateASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), FMath::Min(100.f, Mate->GetAttributes()->GetHunger() + Food * Share));
+				if (AWRPlayerController* MatePC = Cast<AWRPlayerController>(Mate->GetController()))
+				{
+					MatePC->ClientNotify(FString::Printf(TEXT("%s shared a meal with you"), *MyPS->GetPlayerName()));
+				}
+			}
+		}
+	}
 
 	const FName Used = Def->Id;
 	WRSound::Broadcast(Character, Def->Category == TEXT("potion") ? FName(TEXT("potion")) : Def->Thirst > Def->Hunger ? FName(TEXT("drink")) : FName(TEXT("eat")));
@@ -748,11 +775,30 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 
 float UWRInventoryComponent::GetCarryWeight() const
 {
-	float Kg = FWRInventoryRules::TotalWeight(Slots);
+	// Strong back / Light load / Light weave (life-skill perks): ore and stone, wood, armor weigh less for you. The
+	// skills replicate to the owner, so the owner's movement and the server agree on the load.
+	const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(GetOwner());
+	const float Ore = Skills ? FMath::Max(0.f, 1.f + Skills->Stat(TEXT("oreWeight"))) : 1.f;
+	const float Wood = Skills ? FMath::Max(0.f, 1.f + Skills->Stat(TEXT("woodWeight"))) : 1.f;
+	const float ArmorKg = Skills ? FMath::Max(0.f, 1.f + Skills->Stat(TEXT("armorWeight"))) : 1.f;
+	const auto Factor = [Ore, Wood, ArmorKg](const FName Id, const FWRItemDef& Def)
+	{
+		if (Id == TEXT("stone") || Id.ToString().EndsWith(TEXT("_ore"))) return Ore;
+		if (Id == TEXT("wood")) return Wood;
+		return Def.Slot == EWREquipSlot::Armor ? ArmorKg : 1.f;
+	};
+	float Kg = 0.f;
+	for (const FWRItemStack& S : Slots)
+	{
+		if (const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId))
+		{
+			Kg += Def->Weight * S.Count * Factor(S.ItemId, *Def);
+		}
+	}
 	for (const FWRItemStack* Worn : { &EquippedWeapon, &EquippedArmor, &EquippedRanged })
 	{
 		const FWRItemDef* Def = Worn->IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Worn->ItemId);
-		if (Def) Kg += Def->Weight * FMath::Max(1, Worn->Count);
+		if (Def) Kg += Def->Weight * FMath::Max(1, Worn->Count) * Factor(Worn->ItemId, *Def);
 	}
 	return Kg;
 }

@@ -1,0 +1,32 @@
+{
+  "_comment": "Fishing (WRFishing.cpp, GAP-cooked in showcase-notes cooks/build-finish.md). Which fish bites is picked when the float goes under: by biome (volcanic west / tundra east of the ridge, any), water by the depth where the float lies (shallow under fishing.openDepth cm: rivers, lakes, the shore; open: the sea; deep over fishing.deepDepth cm, only with the Deep line perk, else it counts as open), time (day / night / any), weighted by rarity (tuning fishing.rarityWeight; Patient angler and a lure for the biome raise rare and legendary). Legendaries bite only with Legend catch. kg is rolled between kgMin and kgMax (big ones rarer); fight 0..1 is how hard and long it surges (x its size). item: what lands in the bag (items.json, category fish). treasure: what a Treasure hook brings up instead (weight, count min..max). All first drafts.",
+  "fish": [
+    { "id": "cinder_snapper", "name": "Cinder snapper", "biome": "volcanic", "water": "open", "time": "any", "rarity": "common", "kgMin": 0.8, "kgMax": 3.2, "fight": 0.35, "item": "fish_cinder_snapper" },
+    { "id": "ashfin_mackerel", "name": "Ashfin mackerel", "biome": "volcanic", "water": "open", "time": "day", "rarity": "common", "kgMin": 0.5, "kgMax": 1.8, "fight": 0.45, "item": "fish_ashfin_mackerel" },
+    { "id": "obsidian_ray", "name": "Obsidian ray", "biome": "volcanic", "water": "open", "time": "any", "rarity": "uncommon", "kgMin": 3.0, "kgMax": 11.0, "fight": 0.6, "item": "fish_obsidian_ray" },
+    { "id": "magma_eel", "name": "Magma eel", "biome": "volcanic", "water": "open", "time": "night", "rarity": "rare", "kgMin": 2.0, "kgMax": 7.5, "fight": 0.75, "item": "fish_magma_eel" },
+    { "id": "steamfin_trout", "name": "Steamfin trout", "biome": "volcanic", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.4, "kgMax": 2.2, "fight": 0.4, "item": "fish_steamfin_trout" },
+    { "id": "sulfur_carp", "name": "Sulfur carp", "biome": "volcanic", "water": "shallow", "time": "any", "rarity": "uncommon", "kgMin": 1.5, "kgMax": 6.0, "fight": 0.5, "item": "fish_sulfur_carp" },
+    { "id": "cinder_marlin", "name": "Cinder marlin", "biome": "volcanic", "water": "deep", "time": "any", "rarity": "uncommon", "kgMin": 20.0, "kgMax": 70.0, "fight": 0.85, "item": "fish_cinder_marlin" },
+    { "id": "emberking", "name": "the Emberking", "biome": "volcanic", "water": "deep", "time": "night", "rarity": "legendary", "kgMin": 60.0, "kgMax": 95.0, "fight": 1.0, "item": "fish_emberking" },
+
+    { "id": "rime_cod", "name": "Rime cod", "biome": "tundra", "water": "open", "time": "any", "rarity": "common", "kgMin": 1.0, "kgMax": 4.5, "fight": 0.35, "item": "fish_rime_cod" },
+    { "id": "glassfin_herring", "name": "Glassfin herring", "biome": "tundra", "water": "open", "time": "day", "rarity": "common", "kgMin": 0.2, "kgMax": 0.8, "fight": 0.3, "item": "fish_glassfin_herring" },
+    { "id": "ice_halibut", "name": "Ice halibut", "biome": "tundra", "water": "open", "time": "any", "rarity": "uncommon", "kgMin": 4.0, "kgMax": 16.0, "fight": 0.55, "item": "fish_ice_halibut" },
+    { "id": "aurora_char", "name": "Aurora char", "biome": "tundra", "water": "open", "time": "night", "rarity": "rare", "kgMin": 1.5, "kgMax": 5.0, "fight": 0.7, "item": "fish_aurora_char" },
+    { "id": "silver_grayling", "name": "Silver grayling", "biome": "tundra", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.3, "kgMax": 1.6, "fight": 0.4, "item": "fish_silver_grayling" },
+    { "id": "frostjaw_pike", "name": "Frostjaw pike", "biome": "tundra", "water": "shallow", "time": "any", "rarity": "uncommon", "kgMin": 2.0, "kgMax": 9.0, "fight": 0.65, "item": "fish_frostjaw_pike" },
+    { "id": "pale_sturgeon", "name": "Pale sturgeon", "biome": "tundra", "water": "deep", "time": "any", "rarity": "uncommon", "kgMin": 25.0, "kgMax": 80.0, "fight": 0.8, "item": "fish_pale_sturgeon" },
+    { "id": "old_whitegill", "name": "Old Whitegill", "biome": "tundra", "water": "deep", "time": "day", "rarity": "legendary", "kgMin": 70.0, "kgMax": 120.0, "fight": 1.0, "item": "fish_old_whitegill" }
+  ],
+  "treasure": [
+    { "item": "copper_ore", "min": 2, "max": 4, "weight": 30 },
+    { "item": "tin_ore", "min": 2, "max": 4, "weight": 25 },
+    { "item": "iron_ore", "min": 1, "max": 3, "weight": 18 },
+    { "item": "sulfur_crystal", "min": 1, "max": 3, "weight": 10 },
+    { "item": "lichen", "min": 2, "max": 5, "weight": 10 },
+    { "item": "gem_ruby", "min": 1, "max": 1, "weight": 3 },
+    { "item": "gem_topaz", "min": 1, "max": 1, "weight": 3 },
+    { "item": "gem_onyx", "min": 1, "max": 1, "weight": 3 }
+  ]
+}

@@ -90,7 +90,7 @@
       { "verb": "QuickPrev", "does": "Previous ability (ammo while aiming)" }
     ] },
     { "title": "Items and the world", "rows": [
-      { "verb": "Interact", "does": "Use, gather, open, talk to your tame (hold: orders, a door's keypad)" },
+      { "verb": "Interact", "does": "Use, gather, open, talk to your tame (hold: orders, a door's keypad; with nothing in front, the whistle to every tame in earshot)" },
       { "verb": "UseBelt", "does": "Use the chosen belt item (drink, eat, a potion; a weapon or tool goes in hand)" },
       { "verb": "BeltNext", "does": "Choose the next belt item" },
       { "verb": "Journal", "does": "Menus: inventory, crafting, build, paths, skills, map, clan, settings" },

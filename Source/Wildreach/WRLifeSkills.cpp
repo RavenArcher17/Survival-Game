@@ -65,6 +65,12 @@ FWRLifeSkillRegistry::FWRLifeSkillRegistry()
 					if (P->TryGetStringField(TEXT("stat"), Stat)) Perk.Stat = FName(*Stat);
 					double Value = 0.0;
 					if (P->TryGetNumberField(TEXT("value"), Value)) Perk.Value = Value;
+					P->TryGetStringField(TEXT("waitsFor"), Perk.WaitsFor);
+					if (Perk.Stat.IsNone() && Perk.IsLive())
+					{
+						UE_LOG(LogWildreach, Warning, TEXT("lifeskills.json: perk %s has no stat and no waitsFor; it's hidden until it has one"), *Perk.Id.ToString());
+						Perk.WaitsFor = TEXT("its system");
+					}
 					Options.Add(Perk);
 				}
 			}
@@ -219,10 +225,14 @@ FString UWRLifeSkillsComponent::ChoosePerk(FName Skill, int32 TierLevel, int32 O
 	{
 		return TEXT("already chose that perk");  // choices are permanent
 	}
-	P.Perks[T] = Option;
 	const FWRPerkDef& Perk = Def->Tiers[T][Option];
+	if (!Perk.IsLive())
+	{
+		return FString::Printf(TEXT("%s isn't in the game yet"), *Perk.Name);   // the screen doesn't offer it
+	}
+	P.Perks[T] = Option;
 	UE_LOG(LogWildreach, Log, TEXT("SKILL %s chose %s perk %s"), *GetNameSafe(GetOwner()), *Skill.ToString(), *Perk.Id.ToString());
-	return FString::Printf(TEXT("%s perk: %s%s"), *Def->Name, *Perk.Name, Perk.Stat.IsNone() ? TEXT(" (takes effect once its system is in)") : TEXT(""));
+	return FString::Printf(TEXT("%s perk: %s"), *Def->Name, *Perk.Name);
 }
 
 TSharedRef<FJsonObject> UWRLifeSkillsComponent::ToJson() const

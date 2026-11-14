@@ -58,6 +58,10 @@ public:
 
 	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
+	/** Fishing (WRFishing): a rod is in the weapon hand. */
+	bool IsHoldingRod() const;
+	/** This machine: how long the cast has been wound up (0 when it isn't), for the HUD's charge ring. */
+	double GetFishChargeSeconds() const;
 	/** The body picked in the menu (None = the default body); the sound pass picks the voice by it. */
 	FName GetBodyStyle() const { return BodyStyle; }
 
@@ -162,6 +166,9 @@ private:
 	float BodyAimTurn = 0.f;       // that turn, eased in and out (a spine twist, so walking legs keep their line)
 	float BodyBaseZ = 0.f;         // the body art's height on the capsule (feet on its bottom)
 	float SwimLift = 0.f;          // how much higher the body rides while swimming (WRWater), eased
+	float SwumCm = 0.f;            // server: distance swum since the last swimming XP
+	FVector LastSwimAt = FVector::ZeroVector;
+	float SwimCheck = 0.f;
 	FName WeaponSocket;            // player_art.json sockets: where the sword, shield and held gear go
 	FName ShieldSocket;
 	float AimPitchBlend = 0.f;     // the spine's share of the aim pitch (first person, aiming), eased
@@ -185,15 +192,25 @@ private:
 	UFUNCTION(Server, Reliable) void ServerSetAiming(bool bOn);
 	UFUNCTION(Server, Reliable) void ServerFireRanged(FVector_NetQuantize AimPoint, FVector_NetQuantizeNormal ViewDir);
 	UFUNCTION(Server, Reliable) void ServerCycleAmmo(int32 Dir);
+	/** Fishing: the attack pressed / released with a rod in hand (cast, reel in, strike, reel), and Block (let it go). */
+	UFUNCTION(Server, Reliable) void ServerFishInput(bool bDown);
+	UFUNCTION(Server, Reliable) void ServerFishCancel();
+	double FishDownAt = -1.0;        // server: when the cast started winding up (-1: it isn't)
+	double FishChargeLocal = -1.0;   // owner: the same, for the HUD
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRangedShot(FName FireKey, FName ReloadKey, float Reload);
 	/** The weapon hand's item (WRHeldTool.cpp): a tool there is built from engine shapes in place of the sword. */
 	UPROPERTY(ReplicatedUsing=OnRep_RangedLook) FName MeleeItem;
-	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> ToolParts;
+	/** The held tool's modelled mesh (WRToolMesh), built on machines that draw. */
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ToolMesh;
 	/** The weapon socket's frame for a held blade or tool, from the body's reference pose: X runs out of the fist on the
 	 *  index finger's side, Y toward the fingers (WRHeldTool.cpp, the sword). */
 	FTransform FistFrame() const;
-	FName ToolPartsFor;            // the tool ToolParts were built for
+	FName ToolMeshFor;             // the tool ToolMesh was built for
 	void UpdateToolLook(bool bShow);
+public:
+	/** Where the held fishing rod's tip is in the world (the line leaves from there); the hand when the rod isn't drawn. */
+	FVector RodTipLocation() const;
+private:
 	void TickBodyAnim();
 	/** Play a one-shot clip from a set (its next variant), on the upper body or, for "fullBody" keys, the whole body.
 	 *  Duration > 0 stretches it to fit. Returns its play time. bLoop is unused: loops follow the body's state. */

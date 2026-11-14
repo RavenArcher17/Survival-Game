@@ -10,6 +10,7 @@
 #include "WRCreature.h"
 #include "WRKeyBindings.h"
 #include "WRPathTypes.h"
+#include "WRTuning.h"
 #include "WRPlayerController.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Layout/SBox.h"
@@ -40,7 +41,7 @@ public:
 			Labels->AddSlot().Position(Centre - Box * 0.5f).Size(Box)
 			[
 				// The tame wheel has six orders for eight wedges: its two spare wedges stay blank.
-				SNew(SVerticalBox).Visibility_Lambda([this, i]() { return Mode() == 2 && Empty(i) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+				SNew(SVerticalBox).Visibility_Lambda([this, i]() { return Mode() == 2 && Orders()[i].Key.IsNone() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 				[
 					SNew(SBox).WidthOverride(44.f * U).HeightOverride(44.f * U)
@@ -115,6 +116,10 @@ private:
 	int32 Wheel() const { const FWRPlayerUI* X = UI(); return X ? X->GetOpenWheel() : -1; }
 	int32 Hover() const { const FWRPlayerUI* X = UI(); return !X ? -1 : Mode() == 1 ? X->GetWheelHover() : Mode() == 2 ? X->GetTameHover() : -1; }
 	bool IsLit(int32 i) const { return Hover() == i && !Empty(i); }
+	/** The tame wheel is the whistle's: orders for every tame of yours in earshot. */
+	bool Whistle() const { const FWRPlayerUI* X = UI(); return Mode() == 2 && X && X->IsWhistleWheel(); }
+	const TArray<TPair<FName, FText>>& Orders() const { return Whistle() ? FWRPlayerUI::WhistleOrders() : FWRPlayerUI::TameOrders(); }
+	int32 Earshot(TArray<AWRCreature*>* Out = nullptr) const { return PC.IsValid() ? PC->TamesInEarshot(Out) : 0; }
 
 	const FWRCastable* Ability(int32 i, TArray<FWRCastable>& Store) const
 	{
@@ -125,14 +130,14 @@ private:
 	}
 	bool Empty(int32 i) const
 	{
-		if (Mode() == 2) return FWRPlayerUI::TameOrders()[i].Key.IsNone();
+		if (Mode() == 2) return Orders()[i].Key.IsNone() || (Whistle() && Earshot() == 0);   // no one to whistle to: every wedge dims
 		TArray<FWRCastable> S;
 		return Ability(i, S) == nullptr;
 	}
-	bool IsDanger(int32 i) const { return Mode() == 2 && FWRPlayerUI::TameOrders()[i].Key == TEXT("release"); }
+	bool IsDanger(int32 i) const { return Mode() == 2 && Orders()[i].Key == TEXT("release"); }
 	FText Label(int32 i) const
 	{
-		if (Mode() == 2) return FWRPlayerUI::TameOrders()[i].Value;
+		if (Mode() == 2) return Orders()[i].Value;
 		TArray<FWRCastable> S;
 		const FWRCastable* C = Ability(i, S);
 		return C ? C->Name : LOCTEXT("EmptySlot", "Empty");
@@ -163,11 +168,11 @@ private:
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)
 			[
-				SNew(SWRKeyCap).FontSize(13).Text_Lambda([this]() { return WRInput::ActionKey(Mode() == 2 ? TEXT("Interact") : Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1")); })
+				SNew(SWRKeyCap).FontSize(13).Text_Lambda([this]() { return WRInput::ActionKey(Whistle() && !WRInput::UsingPad() ? TEXT("Whistle") : Mode() == 2 ? TEXT("Interact") : Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1")); })
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Mode() == 2 ? LOCTEXT("TameOrders", "Tame orders") : Wheel() == 1 ? LOCTEXT("Wheel2", "Ability wheel 2") : LOCTEXT("Wheel1", "Ability wheel 1"); }), WRUI::Title(17), WRUI::Ink)
+				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Whistle() ? LOCTEXT("WhistleOrders", "Whistle") : Mode() == 2 ? LOCTEXT("TameOrders", "Tame orders") : Wheel() == 1 ? LOCTEXT("Wheel2", "Ability wheel 2") : LOCTEXT("Wheel1", "Ability wheel 1"); }), WRUI::Title(17), WRUI::Ink)
 			]
 		];
 	}
@@ -209,9 +214,22 @@ private:
 			];
 	}
 
-	const AWRCreature* Tame() const { return PC.IsValid() ? PC->FindNearbyCreature(true, 800.f) : nullptr; }
+	const AWRCreature* Tame() const
+	{
+		if (Whistle())
+		{
+			TArray<AWRCreature*> Near;
+			return Earshot(&Near) > 0 ? Near[0] : nullptr;   // the whistle's centre shows the nearest one
+		}
+		return PC.IsValid() ? PC->FindNearbyCreature(true, 800.f) : nullptr;
+	}
 	FText CentreTitle() const
 	{
+		if (Whistle())
+		{
+			const int32 N = Earshot();
+			return N == 0 ? LOCTEXT("WhistleNone", "No tames in earshot") : FText::Format(LOCTEXT("WhistleCount", "{0} {0}|plural(one=tame,other=tames) in earshot"), N);
+		}
 		if (Mode() == 2) { const AWRCreature* T = Tame(); return T ? FText::FromString(T->GetDisplayLabel()) : FText::GetEmpty(); }
 		const FWRPlayerUI* X = UI();
 		if (!X) return FText::GetEmpty();
@@ -221,6 +239,10 @@ private:
 	}
 	FText CentreSub() const
 	{
+		if (Whistle())
+		{
+			return FText::Format(LOCTEXT("WhistleRange", "Earshot {0} m"), FMath::RoundToInt(WRTune(TEXT("taming.whistleRange"), 3000.f) / 100.f));
+		}
 		if (Mode() == 2)
 		{
 			const AWRCreature* T = Tame();
@@ -234,6 +256,17 @@ private:
 	}
 	FText CentreBody() const
 	{
+		if (Whistle())
+		{
+			// Who hears it: the nearest few by name.
+			TArray<AWRCreature*> Near;
+			const int32 N = Earshot(&Near);
+			if (N == 0) return LOCTEXT("WhistleGoNear", "Your tames are out of earshot: go closer, or find them on the map.");
+			TArray<FString> Names;
+			for (int32 k = 0; k < FMath::Min(N, 3); ++k) Names.Add(Near[k]->GetDisplayLabel());
+			if (N > 3) Names.Add(FString::Printf(TEXT("%d more"), N - 3));
+			return FText::FromString(FString::Join(Names, TEXT(" · ")));
+		}
 		if (Mode() == 2) return FText::GetEmpty();
 		TArray<FWRCastable> S;
 		const FWRPlayerUI* X = UI();
@@ -252,6 +285,10 @@ private:
 		[
 			WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 			{
+				if (Whistle())
+				{
+					return Earshot() == 0 ? LOCTEXT("WhistleClose", "Release to close") : LOCTEXT("WhistleRelease", "Release on an order  ·  tap to call them to you");
+				}
 				if (Mode() == 2)
 				{
 					const FWRPlayerUI* X = UI();

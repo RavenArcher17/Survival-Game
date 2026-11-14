@@ -7,7 +7,9 @@
 #include "WRGameplayTags.h"
 #include "WRPathComponent.h"
 #include "WRTuning.h"
+#include "WRLifeSkills.h"
 #include "AbilitySystemComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 UWRStatusComponent::UWRStatusComponent()
 {
@@ -69,6 +71,7 @@ void UWRStatusComponent::ClearStatus(const FGameplayTag& Status)
 		return;
 	}
 	ASC->RemoveLooseGameplayTag(Status, 1, EGameplayTagReplicationState::TagOnly);
+	if (Status == WRTags::Status_Slowed) Owner->SlowExtraPct = 0;
 
 	if (Status == WRTags::Status_Staggered)
 	{
@@ -158,6 +161,8 @@ void UWRStatusComponent::AddBuildup(const FGameplayTag& Element, float Amount, A
 				const float Seconds = WRTune(TEXT("status.frostbiteSeconds"), 6.f);
 				ApplyStatus(WRTags::Status_Frostbite, Seconds);
 				ApplyStatus(WRTags::Status_Slowed, Seconds);
+				// Biting cold: the slower's ranks make this slow deeper (tuning nodeEffects frost.biting_cold).
+				Owner->SlowExtraPct = static_cast<uint8>(FMath::Clamp(FMath::RoundToInt(UWRPathComponent::Stat(Source, TEXT("slowStrength")) * 100.f), 0, 80));
 			}
 		}
 		else
@@ -261,9 +266,15 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	SinceHeatGain += DeltaTime;
 	SinceChillGain += DeltaTime;
 
-	if (bSprintDraining)
+	// The fast stroke in the water costs its own stamina (Strong stroke halves it, Seaborn makes it free).
+	const UCharacterMovementComponent* Move = Owner ? Owner->GetCharacterMovement() : nullptr;
+	const bool bFastStroke = bSprintDraining && Move && Move->IsSwimming();
+	const float DrainPerSecond = bFastStroke
+		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina")))
+		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f);
+	if (bSprintDraining && DrainPerSecond > 0.f)
 	{
-		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() - WRTune(TEXT("stamina.sprintPerSecond"), 5.f) * DeltaTime);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() - DrainPerSecond * DeltaTime);
 		SinceStaminaUse = 0.f;
 	}
 	else if (SinceStaminaUse >= WRTune(TEXT("player.staminaRegenDelay"), 0.8f) && Attr->GetStamina() < Attr->GetMaxStamina()
@@ -306,7 +317,9 @@ void UWRStatusComponent::TickSurvival(float DeltaTime)
 
 	// Meters are 0..100; full to empty in hungerMinutes / thirstMinutes of play.
 	const float WorldRate = FMath::Max(0.f, WRTune(TEXT("server.hungerMultiplier"), 1.f));
-	const float HungerRate = WorldRate * 100.f / (WRTune(TEXT("survival.hungerMinutes"), 60.f) * 60.f);
+	// Hearty (cooking perk): hunger drains slower for you.
+	const float HungerRate = WorldRate * 100.f / (WRTune(TEXT("survival.hungerMinutes"), 60.f) * 60.f)
+		* FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("hungerDrain")));
 	const float ThirstRate = WorldRate * 100.f / (WRTune(TEXT("survival.thirstMinutes"), 40.f) * 60.f);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), Attr->GetHunger() - HungerRate * DeltaTime);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), Attr->GetThirst() - ThirstRate * DeltaTime);

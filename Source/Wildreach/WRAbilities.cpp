@@ -17,6 +17,8 @@
 #include "GameFramework/PlayerState.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRLifeSkills.h"
+#include "WRCreature.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
@@ -597,6 +599,19 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	{
 		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
 		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), 1.f);  // (the dodge sound is the audio director's)
+		// Vanish (sneaking perk): the roll breaks the sight of the creatures on you, for a moment.
+		const float Vanish = UWRLifeSkillsComponent::StatFor(Character, TEXT("vanish"));
+		if (Vanish > 0.f)
+		{
+			for (TActorIterator<AWRCreature> It(Character->GetWorld()); It; ++It)
+			{
+				if (It->IsAlive() && !It->IsTamed() && It->GetAggroTarget() == Character
+					&& FVector::Dist(It->GetActorLocation(), Character->GetActorLocation()) < T.Num(TEXT("lifeSkills.vanishRange"), 1500.f))
+				{
+					It->LoseSightOf(Character, Vanish);
+				}
+			}
+		}
 	}
 
 	UAbilityTask_ApplyRootMotionConstantForce* Task = UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(
@@ -854,11 +869,19 @@ void UWRGA_AreaSpell::Execute()
 	}
 	UWorld* World = Caster->GetWorld();
 	const FWRTuning& T = FWRTuning::Get();
-	const auto Num = [&](const TCHAR* Key, float Fallback) { return T.Num(SpellKey + TEXT(".") + Key, Fallback); };
+	const bool bFire = Element == WRTags::Element_Fire;
+	// Shockwave (fire, "bigger blast radius") and Wide storm (frost, "larger area effects"): every radius, width and
+	// spacing of an area spell grows by the node's stat (tuning nodeEffects).
+	const float AreaScale = 1.f + UWRPathComponent::Stat(Caster, bFire ? TEXT("blastRadius") : TEXT("areaRadius"));
+	const auto Num = [&](const TCHAR* Key, float Fallback)
+	{
+		const float V = T.Num(SpellKey + TEXT(".") + Key, Fallback);
+		const FString K(Key);
+		return K == TEXT("radius") || K == TEXT("width") || K == TEXT("spacing") ? V * AreaScale : V;
+	};
 	const FRotator Aim = Caster->GetBaseAimRotation();
 	const FVector Flat = FRotator(0.f, Aim.Yaw, 0.f).Vector();
 	const FVector Feet = Caster->GetActorLocation() - FVector(0.f, 0.f, Caster->GetSimpleCollisionHalfHeight());
-	const bool bFire = Element == WRTags::Element_Fire;
 	const auto Ground = [World, Caster](const FVector& At)
 	{
 		FHitResult Hit;

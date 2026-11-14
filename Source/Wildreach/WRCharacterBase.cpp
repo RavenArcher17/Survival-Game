@@ -76,6 +76,7 @@ void AWRCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCharacterBase, Weapon);
+	DOREPLIFETIME(AWRCharacterBase, SlowExtraPct);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingSeq, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingKindRep, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingDurationRep, COND_SkipOwner);
@@ -115,7 +116,7 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	{
 		if (Inv->GetCarryWeight() > WRTune(TEXT("inventory.carryKg"), 80.f)) Load = WRTune(TEXT("inventory.overweightSpeed"), 0.7f);
 	}
-	return (HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) : 1.f) * SpeedBoost * Load;
+	return (HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) * FMath::Max(0.2f, 1.f - SlowExtraPct * 0.01f) : 1.f) * SpeedBoost * Load;
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)
@@ -264,6 +265,13 @@ void AWRCharacterBase::StartSwingVisual(EWRSwingKind Kind, float Duration)
 
 void AWRCharacterBase::MulticastSound_Implementation(FName Event)
 {
+	// "voice.<kind>": the character's own voice (a creature's call by its species, WRSound::Voice).
+	const FString E = Event.ToString();
+	if (E.StartsWith(TEXT("voice.")))
+	{
+		WRSound::Voice(this, FName(*E.RightChop(6)));
+		return;
+	}
 	WRSound::PlayOn(this, Event);
 }
 

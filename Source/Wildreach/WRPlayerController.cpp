@@ -150,6 +150,8 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("LockOn"), IE_Pressed, &AWRPlayerController::LockOnPressed);
 	Bind(TEXT("Interact"), IE_Pressed, &AWRPlayerController::InteractPressed);
 	Bind(TEXT("Interact"), IE_Released, &AWRPlayerController::InteractReleased);
+	Bind(TEXT("Whistle"), IE_Pressed, &AWRPlayerController::WhistlePressed);
+	Bind(TEXT("Whistle"), IE_Released, &AWRPlayerController::WhistleReleased);
 	Bind(TEXT("Inventory"), IE_Pressed, &AWRPlayerController::ToggleInventory);
 	Bind(TEXT("Skills"), IE_Pressed, &AWRPlayerController::ToggleSkills);
 	Bind(TEXT("Paths"), IE_Pressed, &AWRPlayerController::TogglePaths);
@@ -231,7 +233,8 @@ void AWRPlayerController::InteractPressed()
 			return;
 		}
 		// Your own (or your clan's) code-lock door: hold for its keypad, tap to open or shut it (FWRPlayerUI::DoorKey).
-		AWRBuildPiece* Door = Cast<AWRBuildPiece>(FindUseTarget());
+		AActor* UseTarget = FindUseTarget();
+		AWRBuildPiece* Door = Cast<AWRBuildPiece>(UseTarget);
 		const FWRPieceDef* DoorDef = Door ? Door->GetDef() : nullptr;
 		if (DoorDef && DoorDef->bLockable && !(Wild && Me && FVector::Dist2D(Wild->GetActorLocation(), Me->GetActorLocation()) < FVector::Dist2D(Door->GetActorLocation(), Me->GetActorLocation()))
 			&& Door->SeemsShared(this))
@@ -239,8 +242,47 @@ void AWRPlayerController::InteractPressed()
 			UI->DoorKey(true, Door);
 			return;
 		}
+		// Nothing in front to use, but tames of yours in earshot: hold for the whistle's wheel (the pad has no Whistle
+		// button), tap to interact as usual (on release).
+		if (!UseTarget && !Wild && TamesInEarshot() > 0)
+		{
+			UI->TameKey(true, true);
+			return;
+		}
 	}
 	WRInteract();
+}
+
+void AWRPlayerController::WhistlePressed()
+{
+	if (UI && Menu == EWRMenu::None && WRInput::AllowPress(this)) UI->WhistleKey(true);
+}
+
+void AWRPlayerController::WhistleReleased()
+{
+	if (UI) UI->WhistleKey(false);
+}
+
+int32 AWRPlayerController::TamesInEarshot(TArray<AWRCreature*>* Out) const
+{
+	const APawn* Me = GetPawn();
+	const APlayerState* PS = PlayerState;
+	if (!Me || !PS)
+	{
+		return 0;
+	}
+	const float Range = WRTune(TEXT("taming.whistleRange"), 3000.f);
+	TArray<AWRCreature*> Found;
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		if (It->IsAlive() && It->TamedBy == PS->GetPlayerName() && !It->Rider.IsValid() && FVector::Dist(It->GetActorLocation(), Me->GetActorLocation()) < Range)
+		{
+			Found.Add(*It);
+		}
+	}
+	Found.Sort([Me](const AWRCreature& A, const AWRCreature& B) { return FVector::DistSquared(A.GetActorLocation(), Me->GetActorLocation()) < FVector::DistSquared(B.GetActorLocation(), Me->GetActorLocation()); });
+	if (Out) *Out = Found;
+	return Found.Num();
 }
 
 void AWRPlayerController::InteractReleased()
@@ -928,7 +970,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
-		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("hearthfeed"), TEXT("hearthrepair"),
+		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("whistle "), TEXT("hearthfeed"), TEXT("hearthrepair"),
 		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)

@@ -54,7 +54,7 @@ namespace WRSkillsTab
 		{
 			if (Level(D.Id) > 1 || XP(D.Id) > 0) return false;
 			if (!D.EveryLevelStat.IsNone()) return false;
-			for (const TArray<FWRPerkDef>& Tier : D.Tiers) for (const FWRPerkDef& P : Tier) if (!P.Stat.IsNone()) return false;
+			for (const TArray<FWRPerkDef>& Tier : D.Tiers) for (const FWRPerkDef& P : Tier) if (P.IsLive()) return false;
 			return true;
 		}
 		/** First tier you've reached and not chosen yet (-1: none). */
@@ -62,7 +62,7 @@ namespace WRSkillsTab
 		{
 			for (int32 T = 0; T < 4 && T < D.Tiers.Num(); ++T)
 			{
-				if (Level(D.Id) >= FWRLifeSkillRegistry::TierLevels[T] && Chosen(D.Id, T) < 0 && D.Tiers[T].Num() > 0) return T;
+				if (Level(D.Id) >= FWRLifeSkillRegistry::TierLevels[T] && Chosen(D.Id, T) < 0 && D.LiveCount(T) > 0) return T;
 			}
 			return -1;
 		}
@@ -406,7 +406,7 @@ private:
 				]
 				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 3.f * U, 0.f, 0.f)
 				[
-					WRUI::Text(FText::AsNumber(FWRLifeSkillRegistry::TierLevels[T]), WRUI::Body(11, 800), TAttribute<FSlateColor>::CreateLambda([this, T]() { return FSlateColor(TierState(T) == 0 ? WRUI::Ink3 : TierState(T) == 1 ? WRUI::Warn : WRUI::Brass); }))
+					WRUI::Text(FText::AsNumber(FWRLifeSkillRegistry::TierLevels[T]), WRUI::Body(11, 800), TAttribute<FSlateColor>::CreateLambda([this, T]() { const int32 S = TierState(T); return FSlateColor(S == 3 ? WRUI::Alpha(WRUI::Ink3, 0.45f) : S == 0 ? WRUI::Ink3 : S == 1 ? WRUI::Warn : WRUI::Brass); }))
 				]
 			];
 		}
@@ -422,15 +422,18 @@ private:
 			];
 	}
 
-	/** 0 locked, 1 ready to choose, 2 chosen. */
+	/** 0 locked, 1 ready to choose, 2 chosen, 3 nothing at this level yet (its perks wait for their systems). */
 	int32 TierState(int32 T) const
 	{
 		if (Model->Chosen(Selected, T) >= 0) return 2;
+		const FWRLifeSkillDef* D = FWRLifeSkillRegistry::Get().Find(Selected);
+		if (D && D->LiveCount(T) == 0) return 3;
 		return Model->Level(Selected) >= FWRLifeSkillRegistry::TierLevels[T] ? 1 : 0;
 	}
 	FLinearColor TierColour(int32 T, bool bFill) const
 	{
 		const int32 S = TierState(T);
+		if (S == 3) return bFill ? Hex(TEXT("141517")) : Hex(TEXT("33363A"));
 		if (bFill) return S == 2 ? WRUI::Brass : S == 1 ? WRUI::Warn : Hex(TEXT("1D1F22"));
 		return S == 2 ? Hex(TEXT("F6DCA4")) : S == 1 ? Hex(TEXT("2A1D12")) : Hex(TEXT("6A6E73"));
 	}
@@ -444,7 +447,7 @@ private:
 		{
 			if (TierState(T) == 0) return FText::Format(LOCTEXT("KeyNext", "{0}: next choice at level {1}"), FText::FromString(D->Name), FWRLifeSkillRegistry::TierLevels[T]);
 		}
-		return FText::Format(LOCTEXT("KeyAll", "{0}: every perk chosen"), FText::FromString(D->Name));
+		return FText::Format(LOCTEXT("KeyAll", "{0}: every perk in the game chosen"), FText::FromString(D->Name));
 	}
 
 	TSharedRef<SWidget> Grid()
@@ -511,16 +514,12 @@ private:
 	TSharedRef<SWidget> PerkOption(const FWRLifeSkillDef& D, int32 Tier, int32 Option)
 	{
 		const FWRPerkDef& Perk = D.Tiers[Tier][Option];
-		const bool bLive = !Perk.Stat.IsNone();
+		const bool bLive = Perk.IsLive();   // only perks in the game are offered (see Side)
 		const FName SkillId = D.Id;
 		const int32 TierLevel = FWRLifeSkillRegistry::TierLevels[Tier];
 		TSharedRef<SVerticalBox> Words = SNew(SVerticalBox)
 			+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(FText::FromString(Perk.Name), WRUI::Title(17), WRUI::Ink)]
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[SNew(STextBlock).Text(FText::FromString(Perk.Text + TEXT("."))).Font(WRUI::Body(14, 500)).ColorAndOpacity(WRUI::Ink2).AutoWrapText(true)];
-		if (!bLive)
-		{
-			Words->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)[WRUI::Text(LOCTEXT("PerkSoon", "Takes effect once its system is in"), WRUI::Body(12, 500), WRUI::Ink3)];
-		}
 		return SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).Padding(FMargin(16.f * U, 14.f * U, 16.f * U, 12.f * U))
 			[
 				SNew(SVerticalBox)
@@ -551,7 +550,7 @@ private:
 				[
 					SNew(SBox).HeightOverride(38.f * U)
 					[
-						SNew(SWRButton).Text(LOCTEXT("Choose", "Choose")).Primary(true).FontSize(14).MinHeight(38.f * U)
+						SNew(SWRButton).Text(D.LiveCount(Tier) > 1 ? LOCTEXT("Choose", "Choose") : LOCTEXT("Take", "Take")).Primary(true).FontSize(14).MinHeight(38.f * U)
 						.OnClicked_Lambda([this, SkillId, TierLevel, Option]()
 						{
 							if (PC.IsValid()) PC->SendCommand(FString::Printf(TEXT("perk %s %d %d"), *SkillId.ToString(), TierLevel, Option));
@@ -596,6 +595,7 @@ private:
 			const FWRPerkDef& P = D.Tiers[T][O];
 			const bool bTaken = Pick == O;
 			const bool bPassed = Pick >= 0 && !bTaken;
+			if (!bTaken && !P.IsLive()) continue;   // waits for its system: not shown
 			Box->AddSlot().AutoHeight().Padding(22.f * U, 4.f * U, 0.f, 0.f)
 			[
 				SNew(SHorizontalBox)
@@ -658,10 +658,13 @@ private:
 		if (Pending >= 0)
 		{
 			Box->AddSlot().AutoHeight()[WRUI::Text(LOCTEXT("ChoosePerk", "Choose a perk"), WRUI::Title(18), WRUI::Ink)];
-			Box->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 12.f * U)[WRUI::Text(LOCTEXT("PickOne", "Pick one of the two. The choice is for good."), WRUI::Body(13, 500), WRUI::Ink2)];
+			const bool bOne = D->LiveCount(Pending) == 1;
+			Box->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 12.f * U)[WRUI::Text(bOne ? LOCTEXT("PickOnly", "One perk at this level. Take it: it's yours for good.") : LOCTEXT("PickOne", "Pick one of the two. The choice is for good."), WRUI::Body(13, 500), WRUI::Ink2)];
+			int32 Shown = 0;
 			for (int32 O = 0; O < D->Tiers[Pending].Num(); ++O)
 			{
-				if (O > 0)
+				if (!D->Tiers[Pending][O].IsLive()) continue;
+				if (Shown++ > 0)
 				{
 					Box->AddSlot().AutoHeight().Padding(0.f, 6.f * U)
 					[
@@ -676,7 +679,7 @@ private:
 			// The other tiers in a line each.
 			for (int32 T = 0; T < 4 && T < D->Tiers.Num(); ++T)
 			{
-				if (T == Pending) continue;
+				if (T == Pending || (D->LiveCount(T) == 0 && Model->Chosen(D->Id, T) < 0)) continue;
 				if (Model->Chosen(D->Id, T) < 0 && T > Pending + 1) continue;
 				Box->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)[TierLines(*D, T, true)];
 			}
@@ -684,9 +687,11 @@ private:
 		else
 		{
 			Box->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[WRUI::Text(LOCTEXT("Perks", "Perks"), WRUI::Title(18), WRUI::Ink)];
+			int32 Listed = 0;
 			for (int32 T = 0; T < 4 && T < D->Tiers.Num(); ++T)
 			{
-				Box->AddSlot().AutoHeight().Padding(0.f, T > 0 ? 10.f * U : 0.f, 0.f, 0.f)[TierLines(*D, T, false)];
+				if (D->LiveCount(T) == 0 && Model->Chosen(D->Id, T) < 0) continue;   // nothing at this level is in the game yet
+				Box->AddSlot().AutoHeight().Padding(0.f, Listed++ > 0 ? 10.f * U : 0.f, 0.f, 0.f)[TierLines(*D, T, false)];
 			}
 		}
 

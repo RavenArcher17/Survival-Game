@@ -1898,6 +1898,24 @@ AWRCreatureAI::AWRCreatureAI()
 	FlankAngle = FMath::FRandRange(-60.f, 60.f);
 }
 
+void AWRCreature::LoseSightOf(AActor* Who, float Seconds)
+{
+	if (!HasAuthority() || !Who)
+	{
+		return;
+	}
+	if (AggroTarget.Get() == Who) AggroTarget = nullptr;
+	if (CombatTarget.Get() == Who) CombatTarget = nullptr;
+	LostSight.Add(Who, GetWorld()->GetTimeSeconds() + Seconds);
+	UE_LOG(LogWildreach, Log, TEXT("AI %s lost sight of %s for %.1f s (vanish)"), *GetName(), *Who->GetName(), Seconds);
+}
+
+bool AWRCreature::HasLostSightOf(const AActor* Who) const
+{
+	const double* Until = LostSight.Find(Who);
+	return Until && GetWorld()->GetTimeSeconds() < *Until;
+}
+
 AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 {
 	const FWRCreatureDef* Def = Self->GetDef();
@@ -1914,11 +1932,20 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 		{
 			continue;
 		}
-		if (FWRSocialRules::IsInSafeZone(GetWorld(), It->GetActorLocation()))
+		if (FWRSocialRules::IsInSafeZone(GetWorld(), It->GetActorLocation()) || Self->HasLostSightOf(*It))
 		{
-			continue;
+			continue;   // (Vanish: a dodge broke its sight of you for a moment)
 		}
 		float Aggro = Def->AggroRadius;
+		// Shadow / Ghost (sneaking perks): in the dark you're noticed later, and standing still not at all.
+		if (It->GetPlayerState() && AWRGameState::IsNightIn(Self))
+		{
+			if (It->GetVelocity().Size2D() < 10.f && UWRLifeSkillsComponent::StatFor(*It, TEXT("ghost")) > 0.f)
+			{
+				continue;
+			}
+			Aggro *= FMath::Max(0.3f, 1.f + UWRLifeSkillsComponent::StatFor(*It, TEXT("darkAggro")));
+		}
 		// Asleep it notices you late; a night hunter at night notices you early.
 		if (Self->IsAsleep()) Aggro *= WRTune(TEXT("creatureAI.sleepAggroMult"), 0.35f);
 		else if (Def->Activity == TEXT("nocturnal") && AWRGameState::IsNightIn(Self)) Aggro *= WRTune(TEXT("creatureAI.nightAggroMult"), 1.4f);

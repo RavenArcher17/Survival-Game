@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased: finishing what was half-built (skill nodes, perks, fishing, swimming, engineering, the whistle, tools, build pieces)
+
+Aaron (lane build-finish; research and plan in showcase-notes cooks/build-finish.md): finish every built-but-unfinished
+feature. Built to compile; not played here (Aaron and the testers test, F8).
+
+- **Fire and Frost nodes**: every ability and passive node already worked; three stat nodes did nothing and now do
+  (tuning `nodeEffects`): **Shockwave** (fire area spells, Explosive bolt and Overheat reach 10% further a rank),
+  **Biting cold** (your frost slows go 8% deeper a rank; replicated so a slowed player's movement agrees), **Wide
+  storm** (Frost nova, Ice wall and Blizzard 8% larger a rank).
+- **Life-skill perks**: 41 more perks work (66 of 120); the 54 whose system isn't in the game (diving, breeding, bees,
+  machines' power, turrets, explosives, timed brews, spoilage...) are marked `waitsFor` in `Data/lifeskills.json` and
+  are **not shown**: a tier with none in the game is skipped, a tier with one offers just it ("Take"), the server
+  refuses them. The "takes effect once its system is in" line is gone. New working perks: Prospector (ore marks
+  through rock, 35 m), Strong back / Light load / Light weave (lighter ore, wood, armor), Deep delver (half hazard
+  damage), Vein breaker / Clean cut (the last third of a vein or tree at once), Rich veins, Unbreaking / Endless edge,
+  Predator sense ("Hunted" + a pip toward each predator after you), Beast lore (your lock-on target's weakness,
+  what it shrugs off, how it's tamed), Efficient smith / armorer, Quick hands / fit, Reinforced, Bastion, Bulk cook,
+  Shared meal (clan mates within 10 m), Hearty, Quick repair (gear and the Hearth), Fortifier, Tinkerer, Overclock,
+  Self repair, Chief engineer, Pack leader, Strong stroke, Water fighter, Seaborn, Shadow, Backstab, Vanish, Ghost,
+  Assassin, and the fishing perks. Every-level bonuses that did nothing now do: fishing (bites sooner), tracking
+  (more meat and hide), building (sturdier pieces, saved), engineering (stations run your orders faster), swimming
+  (faster). Beast lord's text no longer promises mini-boss taming.
+- **Fishing** (new `WRFishing.cpp`, `Data/fish.json`): craft a **fishing rod** by hand (3 wood, 6 fibre, 1 stone),
+  hold it, **hold the attack to wind up a cast and let go**; the float lands on water (sea, river, lake), nibbles one
+  to three times, then plunges: **strike** within 0.9 s; then **hold to reel** (stamina) and **ease off when it
+  surges** or the line snaps; land it close in. 16 fish by biome, water depth and time, two legendaries (Legend
+  catch) and two deep-sea fish (Deep line). Cut bait (meat) brings bites sooner; Ember / Rime lures (Bait maker)
+  draw rare fish. Fish are food (raw or grilled at the workbench). Everyone sees the float, its line, dips, plunges
+  and splashes; the angler gets a charge ring, a tension arc and prompts (mouse and pad). Fishing XP per catch.
+- **Swimming**: XP per metre swum; **Sprint in the water is a fast stroke** (1.6x, 8 stamina a second).
+- **Engineering**: XP for every item a station finishes for you, placing a station or code-lock door, and fitting a
+  lock; stations are its machines.
+- **The tame whistle**: **H** (rebindable) taps to call every tame of yours within 30 m, held opens the order wheel
+  in whistle mode (Come / Stay / Passive / Aggressive, the names of who hears it); on a pad, hold X with nothing in
+  front. You whistle for everyone near to hear; each tame answers with its call.
+- **Held tools are modelled** (new `WRToolMesh.cpp`, material `M_HeldTool` from `Tools/art/make_held_tool_material.py`):
+  a turned, oval haft with a knob, a knapped flint (crude) or ground stone head, criss-cross lashing; the pick's
+  curved double point; the rod's wand, grip, spool and rings; the float. No engine shapes.
+- **Build pieces collide as they look**: the bed (frame + headboard), table (top + legs), chair (seat, legs, back),
+  brazier (bowl on legs), torch, pen (along its rails), trophy mount and banner; the **banner and rug get detail**
+  (pole, crossbar, panels, emblem, tassels; border, bands, fringe); the **Hearth, stations and claim totem collide
+  as their models** (a box fitted to the prop, on every machine).
+- **Bounties** stay hidden (nothing reads the setting; the settings screen leaves it out) until the PvP pass.
+- New sounds (synthesized, `Data/Audio/item`): whistle, reel ratchet, line snap, nibble (12 files, 112 KB); new icons
+  for the 21 new items (`Tools/art/make_fish_icons.py`).
+
 ## Unreleased: the MetaHuman hero moves (motion matching, retargeted actions, first person on the head)
 
 Aaron (cooks/hero.md, build lane build-hero-anim; research and plan in showcase-notes cooks/build-hero-anim.md): the

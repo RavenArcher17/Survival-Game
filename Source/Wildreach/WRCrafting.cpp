@@ -69,6 +69,9 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 			O->TryGetBoolField(TEXT("quality"), R.bQuality);
 			double Seconds = 0.0;
 			if (O->TryGetNumberField(TEXT("seconds"), Seconds)) R.Seconds = static_cast<float>(Seconds);
+			FString Needs;
+			if (O->TryGetStringField(TEXT("needsPerk"), Needs)) R.NeedsStat = FName(*Needs);
+			O->TryGetStringField(TEXT("needsText"), R.NeedsText);
 			const TSharedPtr<FJsonObject>* Inputs = nullptr;
 			if (O->TryGetObjectField(TEXT("inputs"), Inputs))
 			{
@@ -192,8 +195,9 @@ AWRHearth::AWRHearth()
 void AWRHearth::BeginPlay()
 {
 	Super::BeginPlay();
-	// The stone fire ring (pieces.json "mesh") over the plain cone, which stays as the collision.
+	// The stone fire ring (pieces.json "mesh") over the plain cone; it collides as the ring (every machine).
 	const FWRPieceDef* Def = FWRBuildLook::KindDef(TEXT("hearth"));
+	if (Def) FWRBuildLook::FitCollision(this, Mesh, *Def, -FWRBuildLook::ChildLift);
 	if (Def && FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift))
 	{
 		Mesh->SetVisibility(false);
@@ -258,14 +262,14 @@ void AWRHearth::TakeRaidDamage(float Amount)
 	}
 }
 
-TArray<TPair<FName, int32>> AWRHearth::RepairCost() const
+TArray<TPair<FName, int32>> AWRHearth::RepairCost(const AActor* For) const
 {
 	TArray<TPair<FName, int32>> Out;
 	const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
 	const FWRPieceDef* Def = Piece ? Piece->GetDef() : nullptr;
 	const float Missing = MaxHealth > 0.f ? FMath::Clamp(1.f - Health / MaxHealth, 0.f, 1.f) : 0.f;
 	if (!Def || Missing <= KINDA_SMALL_NUMBER) return Out;
-	const float Share = WRTune(TEXT("hearth.repairShare"), 0.5f) * Missing;
+	const float Share = WRTune(TEXT("hearth.repairShare"), 0.5f) * Missing * FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(For, TEXT("repairCost")));
 	for (const TPair<FName, int32>& C : Def->Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Share)) });
 	return Out;
 }
@@ -276,7 +280,7 @@ FString AWRHearth::RepairFor(AWRPlayerController* Player)
 	AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
 	if (!PS || !Piece || !HasAuthority()) return TEXT("no Hearth here");
 	if (!Piece->CanAccess(PS->GetPlayerName())) return TEXT("Only its owner and their clan can repair this Hearth");
-	const TArray<TPair<FName, int32>> Cost = RepairCost();
+	const TArray<TPair<FName, int32>> Cost = RepairCost(Player);
 	if (Cost.Num() == 0) return TEXT("The Hearth is already at full health");
 	UWRInventoryComponent* Inv = PS->GetInventory();
 	for (const TPair<FName, int32>& C : Cost)
@@ -334,7 +338,12 @@ void AWRStation::OnRep_Type()
 	else if (StationType == TEXT("alchemy_table")) C = FLinearColor(0.3f, 0.15f, 0.4f);
 	Tint(Mesh, C);
 	Glow->SetVisibility(StationType == TEXT("forge"));
-	// The station's modelled prop (pieces.json "mesh") over the tinted box, which stays as the collision.
+	// The station's modelled prop (pieces.json "mesh") over the tinted box; it collides as the prop (every machine).
+	if (FitType != StationType)
+	{
+		FitType = StationType;
+		if (const FWRPieceDef* FitDef = FWRBuildLook::StationDef(StationType)) FWRBuildLook::FitCollision(this, Mesh, *FitDef, -FWRBuildLook::ChildLift);
+	}
 	if (Visual && Visual->GetStaticMesh() && LookType == StationType)
 	{
 		return;
@@ -396,8 +405,10 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	{
 		return FString::Printf(TEXT("needs a tier %d station (feed the Hearth boss cores)"), R->Level);
 	}
-	Times = FMath::Clamp(Times, 1, FMath::RoundToInt(WRTune(TEXT("craft.maxPerOrder"), 50.f)));
-	const float Seconds = SecondsFor(*R);
+	// Chief engineer (engineering perk): bigger orders and one more queue slot for you.
+	const bool bChief = UWRLifeSkillsComponent::StatFor(Player, TEXT("chiefEngineer")) > 0.f;
+	Times = FMath::Clamp(Times, 1, FMath::RoundToInt(WRTune(bChief ? TEXT("craft.maxPerOrderChief") : TEXT("craft.maxPerOrder"), bChief ? 99.f : 50.f)));
+	float Seconds = SecondsFor(*R, Player);
 	if (Seconds <= 0.f)
 	{
 		// At once, one after another (craft.timeScale 0).
@@ -412,14 +423,30 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	}
 	const AWRPlayerState* PS = Player->GetPlayerState<AWRPlayerState>();
 	const FString Who = PS ? PS->GetPlayerName() : FString();
+	const float Discount = FWRCrafting::MaterialDiscount(Player, *R);
+	// Overclock (engineering perk): this order runs much faster, burning a piece of wood per item; without the wood
+	// it runs at the usual speed. (Wood that's also an input stays for the recipe.)
+	const float Overclock = UWRLifeSkillsComponent::StatFor(Player, TEXT("overclock"));
+	int32 WoodForRecipe = 0;
+	for (const TPair<FName, int32>& In : FWRCrafting::InputsFor(*R, Element, Times, Discount)) if (In.Key == TEXT("wood")) WoodForRecipe += In.Value;
+	const bool bOverclock = Overclock > 0.f && PS && PS->GetInventory()->CountOf(TEXT("wood")) >= WoodForRecipe + Times;
+	if (bOverclock)
+	{
+		Seconds /= 1.f + Overclock;
+	}
 	// The same again from the same maker goes on the end of their last order.
 	FWRCraftJob* Last = Queue.Num() > 0 ? &Queue.Last() : nullptr;
-	const bool bJoin = Last && Last->Recipe == R->Id && Last->Element == Element && Last->Owner == Who && Last->Left + Times <= 99;
-	if (!bJoin && Queue.Num() >= FMath::RoundToInt(WRTune(TEXT("craft.queueOrders"), 6.f)))
+	const bool bJoin = Last && Last->Recipe == R->Id && Last->Element == Element && Last->Owner == Who && Last->Left + Times <= 99
+		&& FMath::IsNearlyEqual(Last->Discount, Discount) && Last->bOverclocked == bOverclock && FMath::IsNearlyEqual(Last->ItemSeconds, Seconds);
+	if (!bJoin && Queue.Num() >= FMath::RoundToInt(WRTune(TEXT("craft.queueOrders"), 6.f)) + (bChief ? 1 : 0))
 	{
 		return FString::Printf(TEXT("The %s's queue is full: wait for an order to finish, or cancel one"), *WRCraftDetail::PlainName(StationType));
 	}
 	FWRCrafting::TakeInputs(Player, *R, Element, Times);
+	if (bOverclock)
+	{
+		Player->GetPlayerState<AWRPlayerState>()->GetInventory()->RemoveItem(TEXT("wood"), Times);
+	}
 	if (bJoin)
 	{
 		Last->Left += Times;
@@ -433,6 +460,8 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 		Job.Left = Times;
 		Job.ItemSeconds = Seconds;
 		Job.ItemLeft = Seconds;
+		Job.Discount = Discount;
+		Job.bOverclocked = bOverclock;
 		Job.Hand = FWRCrafting::HandOf(Player, *R, StationType);
 	}
 	SetActorTickEnabled(true);
@@ -440,12 +469,13 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	const FWRItemDef* Out = FWRItemRegistry::Get().Find(R->Output);
 	const FString Name = Out ? Out->Name : R->Output.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s queued %d x %s at %s (%.1f s each; %d orders)"), *Who, Times, *R->Id.ToString(), *StationType.ToString(), Seconds, Queue.Num());
-	return FString::Printf(TEXT("Queued %d %s: %s"), Times, *Name, *WRCraftDetail::Duration(Seconds * Times));
+	return FString::Printf(TEXT("Queued %d %s: %s%s"), Times, *Name, *WRCraftDetail::Duration(Seconds * Times),
+		bOverclock ? *FString::Printf(TEXT(" (overclocked: %d wood burned)"), Times) : TEXT(""));
 }
 
-float AWRStation::SecondsFor(const FWRRecipe& Recipe)
+float AWRStation::SecondsFor(const FWRRecipe& Recipe, const AActor* Player)
 {
-	const float Speed = FMath::Max(0.1f, WRTune(TEXT("server.craftMultiplier"), 1.f));
+	const float Speed = FMath::Max(0.1f, WRTune(TEXT("server.craftMultiplier"), 1.f)) * FWRCrafting::SpeedFor(Player, Recipe);
 	return FMath::Max(0.f, Recipe.Seconds * WRTune(TEXT("craft.timeScale"), 1.f) / Speed);
 }
 
@@ -480,7 +510,9 @@ FString AWRStation::CancelJob(AWRPlayerController* Player, int32 Index)
 	{
 		// What wasn't made yet comes back (the one under way too); what doesn't fit goes in a bag at the station.
 		TArray<FWRItemStack> Over;
-		for (const TPair<FName, int32>& In : FWRCrafting::InputsFor(*R, Job.Element, Job.Left))
+		TArray<TPair<FName, int32>> Back = FWRCrafting::InputsFor(*R, Job.Element, Job.Left, Job.Discount);
+		if (Job.bOverclocked) Back.Add({ FName(TEXT("wood")), Job.Left });   // the fuel for what wasn't made
+		for (const TPair<FName, int32>& In : Back)
 		{
 			const int32 Left = PS->GetInventory()->AddItem(In.Key, In.Value);
 			if (Left > 0) { FWRItemStack& S = Over.AddDefaulted_GetRef(); S.ItemId = In.Key; S.Count = Left; Spilled += Left; }
@@ -625,6 +657,8 @@ void AWRStation::AdvanceQueue()
 		if (Maker)
 		{
 			UWRLifeSkillsComponent::Award(Maker, One.Skill, One.XPKey, One.XP);
+			// Engineering levels by running machines: every item a station finishes for you.
+			UWRLifeSkillsComponent::Award(Maker, TEXT("engineering"), TEXT("machineItem"), 3.f);
 			if (bToBag) Maker->ClientNotify(One.Text);
 		}
 		WRSound::Broadcast(this, TEXT("craft.done"));
@@ -656,7 +690,8 @@ void AWRStation::EndPlay(const EEndPlayReason::Type Reason)
 		{
 			if (const FWRRecipe* R = FWRRecipeRegistry::Get().Find(Job.Recipe))
 			{
-				for (const TPair<FName, int32>& In : FWRCrafting::InputsFor(*R, Job.Element, Job.Left)) FWRInventoryRules::Add(Left, In.Key, In.Value);
+				for (const TPair<FName, int32>& In : FWRCrafting::InputsFor(*R, Job.Element, Job.Left, Job.Discount)) FWRInventoryRules::Add(Left, In.Key, In.Value);
+				if (Job.bOverclocked) FWRInventoryRules::Add(Left, TEXT("wood"), Job.Left);
 			}
 		}
 		const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
@@ -787,13 +822,19 @@ FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Rec
 	{
 		return TEXT("no one to craft");
 	}
+	if (!Recipe.NeedsStat.IsNone() && UWRLifeSkillsComponent::StatFor(Player, Recipe.NeedsStat) <= 0.f)
+	{
+		return Recipe.NeedsText.IsEmpty() ? FString(TEXT("needs a perk you don't have")) : Recipe.NeedsText;
+	}
 	const UWRInventoryComponent* Inv = PS->GetInventory();
+	const float Discount = MaterialDiscount(Player, Recipe);
 	for (const TPair<FName, int32>& In : Recipe.Inputs)
 	{
-		if (Inv->CountOf(In.Key) < In.Value * Times)
+		const int32 Need = DiscountedInput(In.Value, Discount) * Times;
+		if (Inv->CountOf(In.Key) < Need)
 		{
 			const FWRItemDef* Def = FWRItemRegistry::Get().Find(In.Key);
-			return FString::Printf(TEXT("need %d %s"), In.Value * Times, Def ? *Def->Name : *In.Key.ToString());
+			return FString::Printf(TEXT("need %d %s"), Need, Def ? *Def->Name : *In.Key.ToString());
 		}
 	}
 	const FName Essence = WRCraftDetail::EssenceFor(Element);
@@ -810,10 +851,48 @@ FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Rec
 	return FString();
 }
 
-TArray<TPair<FName, int32>> FWRCrafting::InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times)
+int32 FWRCrafting::DiscountedInput(int32 Amount, float Discount)
+{
+	return Discount <= 0.f ? Amount : FMath::Max(1, FMath::FloorToInt(Amount * (1.f - Discount)));
+}
+
+float FWRCrafting::MaterialDiscount(const AActor* Player, const FWRRecipe& Recipe)
+{
+	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
+	if (!Player || !OutDef || !OutDef->IsEquipment() || OutDef->Category == TEXT("tool"))
+	{
+		return 0.f;
+	}
+	const FName Stat = OutDef->Slot == EWREquipSlot::Armor ? FName(TEXT("armorMaterials")) : FName(TEXT("weaponMaterials"));
+	return FMath::Clamp(-UWRLifeSkillsComponent::StatFor(Player, Stat), 0.f, 0.9f);
+}
+
+TArray<TPair<FName, int32>> FWRCrafting::CostFor(const FWRRecipe& Recipe, float Discount)
 {
 	TArray<TPair<FName, int32>> Out;
-	for (const TPair<FName, int32>& In : Recipe.Inputs) Out.Add({ In.Key, In.Value * Times });
+	for (const TPair<FName, int32>& In : Recipe.Inputs) Out.Add({ In.Key, DiscountedInput(In.Value, Discount) });
+	return Out;
+}
+
+float FWRCrafting::SpeedFor(const AActor* Player, const FWRRecipe& Recipe)
+{
+	if (!Player || Recipe.Station == TEXT("hand"))
+	{
+		return 1.f;
+	}
+	float Speed = 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("machineSpeed"));
+	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
+	if (OutDef && OutDef->IsEquipment() && OutDef->Category != TEXT("tool"))
+	{
+		Speed += UWRLifeSkillsComponent::StatFor(Player, OutDef->Slot == EWREquipSlot::Armor ? TEXT("armorSpeed") : TEXT("weaponSpeed"));
+	}
+	return FMath::Max(0.1f, Speed);
+}
+
+TArray<TPair<FName, int32>> FWRCrafting::InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times, float Discount)
+{
+	TArray<TPair<FName, int32>> Out;
+	for (const TPair<FName, int32>& In : Recipe.Inputs) Out.Add({ In.Key, DiscountedInput(In.Value, Discount) * Times });
 	const FName Essence = WRCraftDetail::EssenceFor(Element);
 	if (!Essence.IsNone() && IsGear(Recipe)) Out.Add({ Essence, Times });
 	return Out;
@@ -823,7 +902,7 @@ void FWRCrafting::TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recip
 {
 	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
 	if (!PS) return;
-	for (const TPair<FName, int32>& In : InputsFor(Recipe, Element, Times)) PS->GetInventory()->RemoveItem(In.Key, In.Value);
+	for (const TPair<FName, int32>& In : InputsFor(Recipe, Element, Times, MaterialDiscount(Player, Recipe))) PS->GetInventory()->RemoveItem(In.Key, In.Value);
 }
 
 FWRCrafterHand FWRCrafting::HandOf(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType)
@@ -837,6 +916,7 @@ FWRCrafterHand FWRCrafting::HandOf(AWRPlayerController* Player, const FWRRecipe&
 	Hand.bMinFine = UWRLifeSkillsComponent::StatFor(Player, bArmor ? TEXT("armorMinFine") : TEXT("weaponMinFine")) > 0.f;
 	Hand.RollBonus = bArmor ? 0.f : UWRLifeSkillsComponent::StatFor(Player, TEXT("weaponRoll"));
 	Hand.DoubleBrew = StationType == TEXT("alchemy_table") ? UWRLifeSkillsComponent::StatFor(Player, TEXT("doubleBrew")) : 0.f;
+	Hand.bBulkCook = UWRLifeSkillsComponent::StatFor(Player, TEXT("bulkCook")) > 0.f;
 	return Hand;
 }
 
@@ -870,6 +950,10 @@ FWRCraftedOne FWRCrafting::MakeOne(const FWRRecipe& Recipe, FName StationType, i
 		Count *= 2;
 	}
 	const bool bFood = OutDef && OutDef->Hunger > 0.f;
+	if (bFood && Hand.bBulkCook)
+	{
+		Count *= 2;   // Bulk cook
+	}
 	One.Skill = StationType == TEXT("alchemy_table") ? FName(TEXT("alchemy")) : bFood ? FName(TEXT("cooking"))
 		: StationType == TEXT("armorer") ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
 	One.XPKey = bFood ? TEXT("cook") : TEXT("craft");
@@ -948,7 +1032,8 @@ FString AWRStation::Repair(AWRPlayerController* Player, EWREquipSlot Slot)
 	{
 		return FString::Printf(TEXT("the %s is repaired where it's made (%s)"), *Def->Name, *R->Station.ToString().Replace(TEXT("_"), TEXT(" ")));
 	}
-	const float Fraction = FWRRecipeRegistry::Get().RepairCostFraction;
+	// Quick repair (building perk): repairs cost less.
+	const float Fraction = FWRRecipeRegistry::Get().RepairCostFraction * FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("repairCost")));
 	if (R)
 	{
 		for (const TPair<FName, int32>& In : R->Inputs)

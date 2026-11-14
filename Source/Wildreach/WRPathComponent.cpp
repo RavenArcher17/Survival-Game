@@ -9,6 +9,7 @@
 #include "Dom/JsonObject.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
+#include "WRLifeSkills.h"
 #include "Misc/CommandLine.h"
 #include "Net/UnrealNetwork.h"
 
@@ -520,7 +521,9 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity")));
 
 	// Tempered: more poise.
-	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxPoiseAttribute(), WRTune(TEXT("player.poise"), 40.f) + Stat(Character, TEXT("maxPoise")));
+	// Reinforced (armorcraft perk) adds to the path nodes' poise.
+	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxPoiseAttribute(), WRTune(TEXT("player.poise"), 40.f) + Stat(Character, TEXT("maxPoise"))
+		+ UWRLifeSkillsComponent::StatFor(Character, TEXT("armorPoise")));
 
 	const int32 Level = GetCharacterLevel();
 	const float HealthRatio = Attr->GetMaxHealth() > 0.f ? Attr->GetHealth() / Attr->GetMaxHealth() : 1.f;

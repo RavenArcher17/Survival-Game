@@ -106,6 +106,15 @@ void FWRPlayerUI::Tick(float DeltaTime)
 	if (bTameKeyDown && !bTameWheel && Now - TameDownAt > 0.25)
 	{
 		bTameWheel = true;
+		bWhistle = bTameKeyWhistle;
+		bTameSticky = false;
+		TameHover = -1;
+		CentreMouse();
+	}
+	if (bWhistleKeyDown && !bTameWheel && Now - WhistleDownAt > WRTune(TEXT("taming.whistleHoldSeconds"), 0.25f))
+	{
+		bTameWheel = true;
+		bWhistle = true;
 		bTameSticky = false;
 		TameHover = -1;
 		CentreMouse();
@@ -177,6 +186,7 @@ void FWRPlayerUI::SyncScreen()
 	{
 		// Tapping E on your tame: the order wheel stays up until you click an order (or press E / Esc).
 		bTameWheel = true;
+		bWhistle = false;
 		bTameSticky = true;
 		TameHover = -1;
 		CentreMouse();
@@ -887,6 +897,21 @@ void FWRPlayerUI::DebugWheel(int32 Which, int32 Hover)
 	UpdateInputMode();
 }
 
+const TArray<TPair<FName, FText>>& FWRPlayerUI::WhistleOrders()
+{
+	static const TArray<TPair<FName, FText>> Orders = {
+		{ TEXT("follow"), LOCTEXT("WhistleFollow", "Come / follow") },
+		{ TEXT("stay"), LOCTEXT("WhistleStay", "Stay") },
+		{ NAME_None, FText::GetEmpty() },
+		{ NAME_None, FText::GetEmpty() },
+		{ NAME_None, FText::GetEmpty() },
+		{ NAME_None, FText::GetEmpty() },
+		{ TEXT("passive"), LOCTEXT("WhistlePassive", "Passive") },
+		{ TEXT("aggressive"), LOCTEXT("WhistleAggressive", "Aggressive") },
+	};
+	return Orders;
+}
+
 const TArray<TPair<FName, FText>>& FWRPlayerUI::TameOrders()
 {
 	// Wheel positions clockwise from the top; empty names are blank wedges.
@@ -903,12 +928,38 @@ const TArray<TPair<FName, FText>>& FWRPlayerUI::TameOrders()
 	return Orders;
 }
 
-void FWRPlayerUI::TameKey(bool bDown)
+void FWRPlayerUI::WhistleKey(bool bDown)
+{
+	AWRPlayerController* P = PC.Get();
+	if (!P)
+	{
+		return;
+	}
+	if (bDown)
+	{
+		if (P->GetMenu() != EWRMenu::None || bTameWheel || OpenWheel >= 0) return;
+		bWhistleKeyDown = true;
+		WhistleDownAt = FPlatformTime::Seconds();
+		return;
+	}
+	if (!bWhistleKeyDown) return;
+	bWhistleKeyDown = false;
+	if (bTameWheel && bWhistle)
+	{
+		PickTameOrder(TameHover);   // released on an order (or in the middle: nothing)
+		return;
+	}
+	// A tap: every tame of yours in earshot comes to you.
+	P->SendCommand(TEXT("whistle follow"));
+}
+
+void FWRPlayerUI::TameKey(bool bDown, bool bWhistleMode)
 {
 	AWRPlayerController* P = PC.Get();
 	if (bDown)
 	{
 		bTameKeyDown = true;
+		bTameKeyWhistle = bWhistleMode;
 		TameDownAt = FPlatformTime::Seconds();
 		return;
 	}
@@ -941,11 +992,12 @@ void FWRPlayerUI::DoorKey(bool bDown, AWRBuildPiece* Door)
 void FWRPlayerUI::PickTameOrder(int32 Pos)
 {
 	AWRPlayerController* P = PC.Get();
-	const TArray<TPair<FName, FText>>& Orders = TameOrders();
-	if (Pos >= 0 && Orders.IsValidIndex(Pos) && !Orders[Pos].Key.IsNone())
+	const TArray<TPair<FName, FText>>& Orders = bWhistle ? WhistleOrders() : TameOrders();
+	if (Pos >= 0 && Orders.IsValidIndex(Pos) && !Orders[Pos].Key.IsNone() && (!bWhistle || P->TamesInEarshot() > 0))
 	{
-		P->SendCommand(TEXT("tame ") + Orders[Pos].Key.ToString());
+		P->SendCommand((bWhistle ? TEXT("whistle ") : TEXT("tame ")) + Orders[Pos].Key.ToString());
 	}
+	bWhistle = false;
 	bTameWheel = false;
 	bTameSticky = false;
 	TameHover = -1;

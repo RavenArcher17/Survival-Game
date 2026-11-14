@@ -78,15 +78,22 @@ public:
 	const FWRCastable* FindCastable(FName NodeId, const TArray<FWRCastable>& In) const;
 
 	// --- Tame order wheel (hold E on your tame).
-	/** Interact key on your own tame: a hold opens the order wheel (release on an order), a tap interacts as usual. */
-	void TameKey(bool bDown);
+	/** Interact key on your own tame: a hold opens the order wheel (release on an order), a tap interacts as usual.
+	 *  bWhistle: nothing in front to use but tames in earshot, so the hold opens the whistle's wheel instead. */
+	void TameKey(bool bDown, bool bWhistle = false);
+	/** The Whistle key (H): a tap calls every tame of yours in earshot to you, a hold opens the whistle's wheel. */
+	void WhistleKey(bool bDown);
 	bool IsTameWheelOpen() const { return bTameWheel; }
+	/** The open order wheel is the whistle's (orders every tame in earshot), not one tame's. */
+	bool IsWhistleWheel() const { return bTameWheel && bWhistle; }
 	/** The wheel was opened by a tap and waits for a click. */
 	bool IsTameWheelSticky() const { return bTameSticky; }
 	int32 GetTameHover() const { return TameHover; }
 	/** Give the order at a wheel position (a click on the wheel, or the hold released) and close it. */
 	void PickTameOrder(int32 Pos);
 	static const TArray<TPair<FName, FText>>& TameOrders();
+	/** The whistle's wedges: the same places as one tame's, without Ride and Release (one-tame acts). */
+	static const TArray<TPair<FName, FText>>& WhistleOrders();
 
 	// --- Your own code-lock door: hold E for its keypad (set or remove the code), tap to open or shut it.
 	void DoorKey(bool bDown, class AWRBuildPiece* Door);
@@ -185,7 +192,11 @@ private:
 	bool bTameWheel = false;
 	bool bTameSticky = false;
 	bool bTameKeyDown = false;
+	bool bTameKeyWhistle = false;   // the held Interact key opens the whistle's wheel
 	double TameDownAt = 0.0;
+	bool bWhistle = false;          // the open wheel is the whistle's
+	bool bWhistleKeyDown = false;
+	double WhistleDownAt = 0.0;
 	int32 TameHover = -1;
 	bool bDoorKeyDown = false;
 	double DoorDownAt = 0.0;

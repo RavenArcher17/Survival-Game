@@ -139,6 +139,9 @@ public:
 	FVector MouthLocation() const;
 	AActor* GetAggroTarget() const { return AggroTarget.Get(); }
 	void SetAggroTarget(AActor* Target) { AggroTarget = Target; }
+	/** Vanish (sneaking perk): drops Who as its target and won't pick them again for Seconds (server). */
+	void LoseSightOf(AActor* Who, float Seconds);
+	bool HasLostSightOf(const AActor* Who) const;
 	FVector GetHome() const { return Home; }
 	/** Its pack has moved on (WRWildlife): home goes with it. Heading: the way the pack is walking (zero: it's staying here). */
 	void FollowPack(const FVector2D& PackAt, const FVector2D& Heading);
@@ -284,6 +287,8 @@ private:
 	bool bDeathShown = false;      // this machine has shown the death (the clip holds its last pose)
 
 	TWeakObjectPtr<AActor> AggroTarget;
+	/** Who it has lost sight of (Vanish) and until when (world seconds). */
+	TMap<TWeakObjectPtr<const AActor>, double> LostSight;
 	FVector Home = FVector::ZeroVector;
 	FVector2D PackHeading = FVector2D::ZeroVector;
 	FString TamerName;
