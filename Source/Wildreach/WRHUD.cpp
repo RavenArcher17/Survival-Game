@@ -1,4 +1,6 @@
 #include "WRHUD.h"
+#include "WRArtifacts.h"
+#include "GameFramework/PlayerState.h"
 #include "WRFarm.h"
 #include "WRStatusComponent.h"
 #include "WRAbilities.h"
@@ -414,8 +416,12 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 			continue;
 		}
 		DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, Screen.Y - 12.f, W, 6.f);
-		DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f), 6.f);
+		// Gnomon Eye (artifact): no enemy health bars; names and statuses still show.
+		if (!(PlayerOwner.Get() && WRArtifacts::Has(PlayerOwner->PlayerState.Get(), TEXT("no_enemy_bars")) && !Other->GetPlayerState()))
+		{
+			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, Screen.Y - 12.f, W, 6.f);
+			DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f), 6.f);
+		}
 		// Buildup meters under the health bar: one thin row per status filling, in its colour (combat.md 2.11; bleed a
 		// dark red, never the crimson of an unblockable blow).
 		{

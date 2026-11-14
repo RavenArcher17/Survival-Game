@@ -1,5 +1,76 @@
 # Changelog
 
+## Unreleased: dungeon portals and artifacts
+
+Aaron (lane build-portals-artifacts: research, requirement ledger and plan in showcase-notes cooks/build-portals-artifacts.md,
+following cooks/endgame.md 2.5 / 2.6 and biome-desert 2.22). Built to compile (editor, adaptive and full unity); not
+played here (Aaron and the testers test, F8). Data: `Data/portals.json`, `Data/portal_rooms/volcanic.json` and
+`tundra.json`, `Data/artifacts.json`; a new land adds its kit file and flips `land` on.
+
+- **Portals** open at random in each land (Volcanic and Frozen tundra: four slots each, Common / Uncommon / Rare / a high
+  slot that's Epic, Legendary 5%), deeper ranks in deeper bands, ≥150 m from claims, shrines, villages, camps, boss
+  arenas and other portals, never on the ridge's passes, on flat ground. The look: 14 obsidian shards (or 12 glacier-ice
+  blades) round a turning tear in the rank's colour (bone white, green, blue, violet, flame orange) on a cracked plinth
+  set into the ground, a light pillar over it (60 m; a Legendary's 300 m, seen across the land), embers or snow drawn into
+  it, a hum by rank. A new Legendary is told to everyone.
+- **Breaking** on real days (1 / 3 / 6 / 10 / 18, times the new **Portal break timers** setting: half / normal / double /
+  never): cracking at half (the pillar flickers, cracks glow, a pack of its creatures steps out every 30 game min),
+  spilling at four fifths (every 15 min, and a 3,000 HP Warden of the Fold at the mouth), then the boss **walks out**, the
+  portal closes, and the boss roams 400 m round the spot, holding that rank of that land shut until it's killed (its roll
+  and shard to everyone who did 10%). A run inside holds the clock; winning it ends the break.
+- **The card** (E at a portal): rank, land, state and time left, the modifiers before you go in, the owner of a key
+  portal, who'll come; Enter / Back. Everyone within 10 m gets a 5 s Come / Stay card; others can follow until the boss
+  door seals. Up to 8 runs at once (the new **Portal runs** setting).
+- **The fold**: one of the land's handmade graphs (4 a rank) filled with its handmade rooms (33 Volcanic: the Smiths'
+  forge halls; 32 Tundra: the Rime-folk's Blue Below) in a closed bay high over the sea east of the island (Valheim's
+  way): coursed basalt ashlar or glacier-ice walls with door sockets and frames, flagstone floors, beamed ceilings,
+  corridors, and each room's pillars, ledges with steps, lava runnels (they burn), hanging crucibles, anvils, kilns, racks,
+  statues of smiths or inuksuit, bones, icicles, black-water pits with thick and thin ice, and lamps (iron cages of coals;
+  seal-oil lamps in ice niches). The entry stone is the run-back and the way out. A fight's or a trial's door stays shut
+  until the room is won and then slides up into its lintel; the boss door drops behind the first one through. Inside
+  it's the land's music, the cave's quiet, no weather; the map draws only the rooms you've walked into.
+- **Modifiers** (0 / 1 / 1-2 / 2 / 3 by rank, +25% loot each): No healing, Double damage, Darkness, Iron hide, Frenzy,
+  Venomous, Brittle gear, No tames, Bloodied, Swarming.
+- **Traps** (each tells ≥0.9 s ahead, can kill, hurts creatures too, has an answer): pulse grates over lava channels
+  (1.2 s red glow and hiss; plug one with a loose anvil block), slag chutes (a bell 1 s before; cut the rope to pour it
+  early), icicles (a crack and a growing shadow; any blow or flame drops them early), thin ice over black water (a creak
+  and white cracks; walk the dark blue).
+- **Trials**: quench the blade (the lintel's temper colour picks the trough: straw oil, purple water, blue brine), the
+  bellows rhythm (pump in the order the hammer automaton strikes), the sun's braziers (light dawn to dusk, east to west;
+  fire from a torch, the fire path or the seal-oil lamp), the aurora lock (turn three ice prisms to the bands overhead).
+- **Bosses** (one a rank a land, attack rows in attacks.json, numbers in tuning): Cinderfang Alpha (its mane relit at the
+  runnels; frost puts it out), the Kilnmite Broodqueen (her clutches lay mites until broken), the Mould-Born (frost
+  hardens it, fire feeds it; tip the hanging crucibles on it), Brannoch the Bellows-Keeper (break both chest vents: no
+  breath, staggered), Böðvildr the Smith's Daughter (bait her slam onto a quench tank's rim), the Rimeclaw Alpha (ice
+  plates until fire melts them), the Glacimaw Elder (erupting under the thick ice stuns it), the Frostbound Thurs (its
+  ice shell until it burns or bleeds), the Rime-Witch (her freeze fails in a lit brazier's light; she snuffs them),
+  Hrímgerðr (break the frost bolts on the dawn window: in the light she slows and turns toward stone).
+- **Rewards**: personal chests (a vault at Legendary), the boss roll and rank shard to everyone who did 10%, upgrade
+  shards, blueprints, fine or masterwork gear, artifacts at Rare 3% / Epic 8% / Legendary 15%, each boss's trophy.
+- **Keys**: ten (a land's five ranks) at the alchemy table from rank shards and its signature (sulfur crystal, lichen);
+  use one in its land and a portal of that rank tears open in front of you, sealed to you, your clan and your band; it
+  never breaks.
+- **Artifacts** (journal tab, N): three belt hooks, Weight I-V (bone, bronze, silver, blackened iron, starsteel),
+  **Artifact Level** = their sum (the new **Artifact level cap** and **Artifact hooks** settings). Per AL: +7% damage
+  taken from creatures, bosses and fold traps, +5% loot, +4% path XP, boss parts +1 point, dropped gear a step better
+  2%, drops +1 point; Scarred boss parts from AL 5 (their effect ×1.5), Weights III-V from AL 10. The party's highest
+  AL counts (clan or **band**: ask anyone in from the same tab); weird rules bind only the wearer; player blows pause it all
+  30 s and safe zones pause it. Hidden third phases open when the party with most of the ledger wears AL 1+. Tying a
+  charm on takes 2 s, out of a fight, never in a fold. Thirty artifacts, each one geis (no roll, half potions, light
+  halved, lightning finds you, no enemy bars, rooted drinking, double knockback, block costs double, regen only moving,
+  slow regen, freeze when winded, short parry, healing capped, the Feather, no block, brittle falls, loud spells, tames
+  that won't fight, no run-back, no HUD, the hollow coin, never turn back, blood-price, never sunwise, the challenge, the
+  Hag's cup, Hive Seed, Forge-brand, Omen of the End). Geis records pay XP once per new highest AL on a great boss, a
+  Scarred part at 5, a title at 15. Fuse two of a kind (+1 Weight) or salvage for essence at the alchemy table.
+- Code: `WRPortals.*`, `WRPortalFold.cpp`, `WRPortalThings.cpp`, `WRPortalBosses.cpp`, `WRArtifacts.*`, `WRUIPortals.cpp`;
+  hooks in ApplyHit, the roll / guard / parry, potions, regen, light, HUD, boss move choice and loot, path XP, the map.
+  Dev: `WRCmd portal dev open <land> <rank> | crack | spill | break | clear`, `WRCmd art dev give <id> <weight>`.
+- Not finished: portals open only in the two lands that exist (the other ten lands' kits and 50 bosses wait); rank 3-5
+  bosses borrow built rigs with their colours (their own sculpts, the Slag thrall and Rimecrawler aren't made); the new
+  creatures' voices are pitched shared calls; the Rime-Witch's mirror clones, the Crown flicker and the music's "through
+  stone" reverb aren't built; Connla's challenge doesn't double boss chase yet and Connla's third geis isn't wired (raid
+  artifacts, no raids yet); only four artifacts can drop on a two-boss island.
+
 ## Unreleased: world systems (shrines and fast travel, path masters and quests, villages, factions and merchants, message stones, Starfall, the Eruption and the Whiteout, invasions, day and night tables, the hidden tubes, summoning stones)
 
 Aaron (lane build-world-systems: research, requirement ledger and plan in showcase-notes cooks/build-world-systems.md,

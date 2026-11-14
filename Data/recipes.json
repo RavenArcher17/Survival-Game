@@ -344,7 +344,17 @@
     {"id": "effigy_cinderhorn", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 5, "hide": 10}, "output": "effigy_cinderhorn", "count": 1, "seconds": 5, "blueprint": "effigy_cinderhorn"},
     {"id": "effigy_grimjaw", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "hide": 10}, "output": "effigy_grimjaw", "count": 1, "seconds": 5, "blueprint": "effigy_grimjaw"},
     {"id": "effigy_pale_hunter", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "frost_essence": 4, "hide": 6}, "output": "effigy_pale_hunter", "count": 1, "seconds": 5, "blueprint": "effigy_pale_hunter"},
-    {"id": "effigy_old_tusker", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "raw_meat": 10}, "output": "effigy_old_tusker", "count": 1, "seconds": 5, "blueprint": "effigy_old_tusker"}
+    {"id": "effigy_old_tusker", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 5, "raw_meat": 10}, "output": "effigy_old_tusker", "count": 1, "seconds": 5, "blueprint": "effigy_old_tusker"},
+    {"id": "portal_key_volcanic_1", "station": "alchemy_table", "level": 1, "inputs": {"shard_common": 3, "sulfur_crystal": 2}, "output": "portal_key_volcanic_1", "count": 1, "seconds": 8},
+    {"id": "portal_key_volcanic_2", "station": "alchemy_table", "level": 1, "inputs": {"shard_common": 3, "shard_uncommon": 1, "sulfur_crystal": 4}, "output": "portal_key_volcanic_2", "count": 1, "seconds": 8},
+    {"id": "portal_key_volcanic_3", "station": "alchemy_table", "level": 1, "inputs": {"shard_uncommon": 3, "shard_rare": 1, "sulfur_crystal": 6}, "output": "portal_key_volcanic_3", "count": 1, "seconds": 8},
+    {"id": "portal_key_volcanic_4", "station": "alchemy_table", "level": 1, "inputs": {"shard_rare": 3, "shard_epic": 1, "sulfur_crystal": 8}, "output": "portal_key_volcanic_4", "count": 1, "seconds": 8},
+    {"id": "portal_key_volcanic_5", "station": "alchemy_table", "level": 1, "inputs": {"shard_epic": 3, "shard_legendary": 1, "sulfur_crystal": 10}, "output": "portal_key_volcanic_5", "count": 1, "seconds": 8},
+    {"id": "portal_key_tundra_1", "station": "alchemy_table", "level": 1, "inputs": {"shard_common": 3, "lichen": 2}, "output": "portal_key_tundra_1", "count": 1, "seconds": 8},
+    {"id": "portal_key_tundra_2", "station": "alchemy_table", "level": 1, "inputs": {"shard_common": 3, "shard_uncommon": 1, "lichen": 4}, "output": "portal_key_tundra_2", "count": 1, "seconds": 8},
+    {"id": "portal_key_tundra_3", "station": "alchemy_table", "level": 1, "inputs": {"shard_uncommon": 3, "shard_rare": 1, "lichen": 6}, "output": "portal_key_tundra_3", "count": 1, "seconds": 8},
+    {"id": "portal_key_tundra_4", "station": "alchemy_table", "level": 1, "inputs": {"shard_rare": 3, "shard_epic": 1, "lichen": 8}, "output": "portal_key_tundra_4", "count": 1, "seconds": 8},
+    {"id": "portal_key_tundra_5", "station": "alchemy_table", "level": 1, "inputs": {"shard_epic": 3, "shard_legendary": 1, "lichen": 10}, "output": "portal_key_tundra_5", "count": 1, "seconds": 8}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

@@ -33,6 +33,7 @@ enum class EWRMenu : uint8
 	Incubator, // an incubator's screen (MenuPiece): the egg, its fuel (WRUIIncubator)
 	World,     // a world system's screen (WorldScreen / WorldTarget): shrine, talk, trade, messages (WRUIWorld)
 	Quests,    // the journal's Quests tab (WRUIWorld)
+	Artifacts, // the journal's Artifacts tab: the belt, the pouch, geis records, the band (WRUIPortals)
 };
 
 class AWRBuildPiece;
@@ -349,6 +350,7 @@ private:
 	void ToggleSkills();
 	void ToggleClan();
 	void ToggleQuests();
+	void ToggleArtifacts();
 	void TogglePaths();
 public:
 	void ToggleMap();

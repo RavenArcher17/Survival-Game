@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRSurvival.h"
 #include "WRAnimInstance.h"
@@ -201,6 +202,19 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("meshWiden"), Num)) D.MeshWiden = Num;
 		if (O->TryGetNumberField(TEXT("glow"), Num)) D.Glow = Num;
 		if (O->TryGetNumberField(TEXT("nightGlow"), Num)) D.NightGlow = Num;
+		const TSharedPtr<FJsonObject>* Overlay = nullptr;
+		if (O->TryGetObjectField(TEXT("overlay"), Overlay))
+		{
+			D.bOverlay = true;
+			const TArray<TSharedPtr<FJsonValue>>* T = nullptr;
+			if ((*Overlay)->TryGetArrayField(TEXT("tint"), T) && T->Num() >= 3) D.OverlayTint = FLinearColor(FColor(uint8((*T)[0]->AsNumber()), uint8((*T)[1]->AsNumber()), uint8((*T)[2]->AsNumber())));
+			(*Overlay)->TryGetNumberField(TEXT("pale"), Num); D.OverlayPale = (*Overlay)->HasField(TEXT("pale")) ? Num : 0.f;
+			D.OverlayDark = (*Overlay)->HasField(TEXT("dark")) ? (*Overlay)->GetNumberField(TEXT("dark")) : 0.f;
+			D.OverlayBands = (*Overlay)->HasField(TEXT("bands")) ? (*Overlay)->GetNumberField(TEXT("bands")) : 0.f;
+			D.OverlayGlowLine = (*Overlay)->HasField(TEXT("glowLine")) ? (*Overlay)->GetNumberField(TEXT("glowLine")) : 0.f;
+		}
+		O->TryGetBoolField(TEXT("portalOnly"), D.bPortalOnly);
+		if (O->TryGetNumberField(TEXT("portalRank"), Num)) D.PortalRank = int32(Num);
 		const TArray<TSharedPtr<FJsonValue>>* LegList = nullptr;
 		if (O->TryGetArrayField(TEXT("legs"), LegList))
 		{
@@ -328,6 +342,16 @@ AWRCreature::AWRCreature(const FObjectInitializer& ObjectInitializer)
 	GlowLight->SetLightColor(FLinearColor(1.f, 0.85f, 0.5f));
 }
 
+void AWRCreature::OnRep_PortalMark()
+{
+	// A fold's boss or warden glows in its rank's colour; the alpha is how bright (a doused mane goes dim).
+	if (!GlowLight || GetNetMode() == NM_DedicatedServer) return;
+	GlowLight->SetVisibility(PortalMark.A > 0);
+	GlowLight->SetLightColor(FLinearColor(FColor(PortalMark.R, PortalMark.G, PortalMark.B)));
+	GlowLight->SetIntensity(3000.f * PortalMark.A / 255.f);
+	GlowLight->SetAttenuationRadius(FMath::Max(600.f, GetSimpleCollisionRadius() * 6.f));
+}
+
 AWRCreature* AWRCreature::SpawnCreature(UWorld* World, FName CreatureId, const FVector& Location, const FRotator& Rotation)
 {
 	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
@@ -353,6 +377,7 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCreature, PartsBroken);
 	DOREPLIFETIME(AWRCreature, CreatureId);
+	DOREPLIFETIME(AWRCreature, PortalMark);
 	DOREPLIFETIME(AWRCreature, TamedBy);
 	DOREPLIFETIME(AWRCreature, TameOrder);
 	DOREPLIFETIME(AWRCreature, bTameAggressive);
@@ -428,6 +453,20 @@ void AWRCreature::ApplyDef()
 			if (UMaterialInterface* Mat = Def->Materials[Slot].IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Def->Materials[Slot]))
 			{
 				Skel->SetMaterial(Slot, Mat);
+			}
+		}
+		// A portal boss on a shared rig: its own colouring laid over the texture.
+		if (Def->bOverlay)
+		{
+			if (UMaterialInterface* Morph = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Creatures/M_TameMorph.M_TameMorph")))
+			{
+				UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Morph, this);
+				M->SetVectorParameterValue(TEXT("Tint"), Def->OverlayTint);
+				M->SetScalarParameterValue(TEXT("Pale"), Def->OverlayPale);
+				M->SetScalarParameterValue(TEXT("Dark"), Def->OverlayDark);
+				M->SetScalarParameterValue(TEXT("Bands"), Def->OverlayBands);
+				M->SetScalarParameterValue(TEXT("GlowLine"), Def->OverlayGlowLine);
+				Skel->SetOverlayMaterial(M);
 			}
 		}
 		NightGlowMats.Reset();
@@ -1226,7 +1265,8 @@ void AWRCreature::BeginPlay()
 	{
 		RollWildGenes();
 	}
-	Weapon.FlatDamage = Def->Damage * Difficulty;
+	Weapon.FlatDamage = Def->Damage * Difficulty * PortalDamage;
+	if (PortalMark.A > 0) OnRep_PortalMark();
 	if (Def->Damage > 0.f)
 	{
 		GrantAbility(UWRGA_Bite::StaticClass());
@@ -2276,7 +2316,7 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 		if (Def->bHearing && It->GetVelocity().Size2D() > 600.f) Aggro *= 1.6f;
 		// Darkness, corruption and fog (WRSurvival): dark-hunters smell the unlit, the Marked are seen by the whole
 		// biome, fog ambushers strike from further.
-		if (It->GetPlayerState()) Aggro *= UWRSurvivalComponent::AggroMultFor(*It, *Def, Def->Biome);
+		if (It->GetPlayerState()) Aggro *= UWRSurvivalComponent::AggroMultFor(*It, *Def, Def->Biome) * WRArtifacts::AggroScale(*It);   // Connla's challenge
 		// Sneaking / Calm presence: you're noticed later.
 		Aggro *= FMath::Max(0.3f, 1.f + UWRLifeSkillsComponent::StatFor(*It, TEXT("aggroRadius")));
 		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());
@@ -3026,12 +3066,13 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 
 	// Fight the owner's target (or whatever attacks us) when aggressive.
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(Self->GetAggroTarget());
-	if (Self->bTameAggressive && OwnerBody && OwnerBody->CombatTarget.IsValid() && OwnerBody->CombatTarget->IsAlive() && Self->IsHostileTo(OwnerBody->CombatTarget.Get()))
+	// Lonely Tide (its owner's artifact): it won't fight.
+	if (Self->bTameAggressive && OwnerBody && OwnerBody->CombatTarget.IsValid() && OwnerBody->CombatTarget->IsAlive() && Self->IsHostileTo(OwnerBody->CombatTarget.Get()) && !WRArtifacts::Has(OwnerBody, TEXT("tames_wait")))
 	{
 		Target = OwnerBody->CombatTarget.Get();
 	}
 	// Not a knocked-out creature (no threat, and likely the owner's next tame), and a tame told to stay guards its post.
-	if (Target && (!Target->IsAlive() || !Self->bTameAggressive || Target->HasTag(WRTags::Status_Unconscious)
+	if (Target && (!Target->IsAlive() || !Self->bTameAggressive || Target->HasTag(WRTags::Status_Unconscious) || (OwnerBody && WRArtifacts::Has(OwnerBody, TEXT("tames_wait")))
 		|| (OwnerBody && FVector::Dist(Target->GetActorLocation(), OwnerBody->GetActorLocation()) > 2500.f)
 		|| (Self->TameOrder == EWRTameOrder::Stay && FVector::Dist(Target->GetActorLocation(), Self->GetHome()) > WRTune(TEXT("taming.stayGuardRadius"), 1500.f))))
 	{

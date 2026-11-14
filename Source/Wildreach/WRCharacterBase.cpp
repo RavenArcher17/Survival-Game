@@ -1,4 +1,6 @@
 #include "WRCharacterBase.h"
+#include "WRArtifacts.h"
+#include "WRPortals.h"
 #include "WRWorldSystems.h"
 #include "WRSocial.h"
 #include "Wildreach.h"
@@ -128,7 +130,9 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	// Soaked: a lighter slow (status.defs.soak.slow) that doesn't stack with frost's. Drinking: a slow walk (potions).
 	float Slow = HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) * FMath::Max(0.2f, 1.f - SlowExtraPct * 0.01f) : 1.f;
 	if (HasTag(WRTags::Status_Soak)) Slow = FMath::Min(Slow, WRTune(TEXT("status.defs.soak.slow"), 0.8f));
-	if (HasTag(WRTags::State_Drinking)) Slow *= WRTune(TEXT("potions.walkMultiplier"), 0.4f);
+	if (HasTag(WRTags::State_Drinking)) Slow *= WRArtifacts::Has(this, TEXT("rooted_potions")) ? 0.f : WRTune(TEXT("potions.walkMultiplier"), 0.4f);
+	// A fold's Frenzy: its creatures move faster.
+	if (IsCreature()) Slow *= WRPortals::CreaturePace(this);
 	// A blizzard's deep snow in the open (WRSurvival sets the tag; both machines read it).
 	if (HasTag(WRTags::Weather_DeepSnow)) Slow *= WRTune(TEXT("weather.deepSnowRun"), 0.85f);
 	return Slow * SpeedBoost * Load;
@@ -192,6 +196,8 @@ void AWRCharacterBase::Die(AActor* Killer)
 		return;
 	}
 	WRWorld::OnKilled(this, Killer);   // quests (a kill with its status still on), before anything clears
+	WRPortals::OnKilled(this, Killer);   // a fold's boss (its clear) or an escaped one
+	WRArtifacts::OnKilled(this, Killer); // The Feather's window, the Hive Seed, Grave Count
 	AbilitySystem->CancelAllAbilities();
 	AbilitySystem->AddLooseGameplayTag(WRTags::State_Dead, 1, EGameplayTagReplicationState::TagOnly);
 	GetCharacterMovement()->DisableMovement();

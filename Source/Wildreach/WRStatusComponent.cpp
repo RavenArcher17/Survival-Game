@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRArtifacts.h"
 #include "WRFarm.h"
 #include "WRSurvival.h"
 #include "EngineUtils.h"
@@ -720,7 +721,7 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		const float Regen = UWRInventoryComponent::GearStatFor(Owner, TEXT("outOfCombatRegen"));
 		if (Regen > 0.f)
 		{
-			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(Attr->GetMaxHealth(), Attr->GetHealth() + Regen * DeltaTime * HealingTakenScale()));
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(Attr->GetMaxHealth(), Attr->GetHealth() + WRArtifacts::HealFilter(Owner, Regen * DeltaTime * HealingTakenScale(), false)));
 		}
 	}
 	// No regen from a swing's press until its cancel window (ER): the stamina spent on a chain stays spent. Nor while a
@@ -768,6 +769,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		{
 			Regen *= Survival->StaminaRegenMult();
 		}
+		// Bellows Lung (x0.7) and Undertow Pearl (only while moving): artifacts.
+		Regen *= WRArtifacts::StaminaRegenScale(Owner);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() + Regen * DeltaTime);
 	}
 

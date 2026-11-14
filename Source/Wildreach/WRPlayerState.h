@@ -85,4 +85,6 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRFoodComponent> Food;
 	/** Quests, found shrines, faction standing (WRWorldSystems.h). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRQuestLog> QuestLog;
+	/** Artifacts: three hooks, the pouch, geis records, the band (WRArtifacts). */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRArtifactComponent> Artifacts;
 };

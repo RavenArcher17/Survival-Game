@@ -4,6 +4,8 @@
 // by range band, a transition attack at the phase change, breakable parts, a tame-punishing move, the roaming minis
 // (Cinderhorn among his basalt pillars, Old Tusker on the snow flats), shrine-stones and the first-kill drop.
 #include "WRBoss.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -129,7 +131,10 @@ int32 AWRBoss::ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBa
 		const FWRBossAttack& A = Attacks[i];
 		const int32 MaxPhase = A.bRow ? A.Row.MaxPhase : 9;
 		const bool bHeightOk = A.Height == 2 || (A.Height == 1) == bAirborne;
-		if (A.MinPhase > Phase || Phase > MaxPhase || !bHeightOk || Now < A.ReadyAt || (A.bRow && (A.Row.bTransition || A.Row.Id == TEXT("herd_bellow"))))
+		// Omen of the End (artifact): a boss turned on its wearer fights with its next phase's moves.
+		const int32 PhaseFor = Phase + (Target && WRArtifacts::Has(Target, TEXT("next_phase")) && (Phase < 2 || bPhase3Ready || AnyArtifactModifiers()) ? 1 : 0);
+		if (!WRPortals::AttackAllowed(this, A.Id)) continue;   // a fold boss's arena took the move away (Brannoch's vents)
+		if (A.MinPhase > PhaseFor || PhaseFor > MaxPhase || !bHeightOk || Now < A.ReadyAt || (A.bRow && (A.Row.bTransition || A.Row.Id == TEXT("herd_bellow"))))
 		{
 			continue;
 		}
@@ -204,6 +209,7 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	AttackTarget = Target;
 	SameInARow = Attack.Id == LastAttackId ? SameInARow + 1 : 1;
 	LastAttackId = Attack.Id;
+	WRPortals::OnBossAttack(this, Attack.Id);   // a fold boss's arena answers some moves
 	Attack.ReadyAt = Now + Attack.Cooldown * (CreatureId == TEXT("vulkarn") && Attack.Id == TEXT("anvil_slam") && Phase >= 2 ? 0.6f : 1.f);
 	const FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
 	AttackFacing = FRotator(0.f, ToTarget.Rotation().Yaw, 0.f);
@@ -433,7 +439,9 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 		}
 		if (Knockback > 0.f && Victim->IsAlive() && (Landed == EWRHitResult::Hit || Landed == EWRHitResult::GuardBroken))
 		{
-			const FVector Push = (Victim->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D() * Knockback + FVector(0.f, 0.f, Knockback * 0.3f);
+			// Gale Feather (artifact): thrown twice as far.
+			const float K = Knockback * WRArtifacts::KnockScale(Victim);
+			const FVector Push = (Victim->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D() * K + FVector(0.f, 0.f, K * 0.3f);
 			Victim->LaunchCharacter(Push, true, true);
 		}
 	});
@@ -764,7 +772,8 @@ void AWRBoss::TickAttack(float DeltaSeconds)
 
 void AWRBoss::OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By)
 {
-	// Each boss's own consequence (combat.md 2.10, 2.17).
+	// Each boss's own consequence (combat.md 2.10, 2.17); a fold boss's arena brain hears it too (Brannoch's vents).
+	WRPortals::OnBossPart(this, Part.Id, Part.OnBreak);
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (Part.OnBreak == TEXT("noHammer"))
 	{
@@ -875,7 +884,8 @@ void AWRBoss::SpawnRunbackStone()
 	// A shrine-stone 40-60 m out from the arena toward the way in (the island's middle, where the passes are), on
 	// ground about level with the arena floor and clear of rock: the run back is the way you came.
 	const FWRCreatureDef* Def = GetDef();
-	if (!Def || Def->Roam.Num() > 0 || Runback.IsValid())
+	// A portal boss has its fold's entry stone (and an escaped one no arena at all).
+	if (!Def || Def->Roam.Num() > 0 || Def->PortalRank > 0 || Runback.IsValid())
 	{
 		return;
 	}

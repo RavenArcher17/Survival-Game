@@ -2,6 +2,8 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "WRBuildSets.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
@@ -37,6 +39,12 @@ FWROnRest UWRSurvivalComponent::OnRest;
 
 FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 {
+	// A portal's fold belongs to its land (its sound, cold and dark), wherever its bay hangs.
+	if (WRPortals::InBaySpace(Pos))
+	{
+		const FName Fold = WRPortals::FoldBiome(WorldContext, Pos);
+		if (!Fold.IsNone()) return Fold;
+	}
 	// The island's ridge: the same split the sky, the sound and the fishing use (sky.biomeCentre).
 	return Pos.X < WRTune(TEXT("sky.biomeCentre"), 0.f) ? FName(TEXT("volcanic")) : FName(TEXT("tundra"));
 }
@@ -47,6 +55,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	if (!World)
 	{
 		return false;
+	}
+	// A fold is closed rock or ice on every side: as dark and as sheltered as a cave, no building, no bombs.
+	if (WRPortals::IsFold(WorldContext, Pos))
+	{
+		return true;
 	}
 	// AWRCave's local layout (BuildShell): the chamber x/y -900..900, 0..700 high; the entrance tunnel runs out along
 	// +X to the mouth at ~2300. Its inner part (past darkness.caveMouth from the chamber) is as dark as the chamber.
@@ -571,7 +584,16 @@ void UWRLightSubsystem::Refresh()
 		if (Def && Def->Utility == TEXT("light") && It->IsAlive())
 		{
 			// Bright (utility tree): its light reaches half again as far.
-			Sources.Add({ *It, LightRadius(TEXT("creature")) * (It->TameHasNode(TEXT("bright")) ? 1.5f : 1.f), false, LightFlag(TEXT("creature"), TEXT("halves")) });
+			// Mourner's Veil on its owner and a fold's Darkness halve it.
+			float Veil = 1.f;
+			if (It->IsTamed() && World->GetGameState())
+			{
+				for (APlayerState* P : World->GetGameState()->PlayerArray)
+				{
+					if (P && P->GetPlayerName() == It->TamedBy && WRArtifacts::Has(P, TEXT("half_light"))) Veil = WRArtifacts::RuleNum(P, TEXT("half_light"), TEXT("scale"), 0.5f);
+				}
+			}
+			Sources.Add({ *It, LightRadius(TEXT("creature")) * (It->TameHasNode(TEXT("bright")) ? 1.5f : 1.f) * Veil * WRPortals::LightScale(*It), false, LightFlag(TEXT("creature"), TEXT("halves")) });
 		}
 	}
 	for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
@@ -579,7 +601,8 @@ void UWRLightSubsystem::Refresh()
 		const UWRSurvivalComponent* S = It->GetPlayerState() ? UWRSurvivalComponent::For(*It) : nullptr;
 		if (S && S->IsLightOn() && It->IsAlive())
 		{
-			Sources.Add({ *It, LightRadius(S->GetLightItem()), false, LightFlag(S->GetLightItem(), TEXT("halves")) });
+			// Mourner's Veil (artifact) and a fold's Darkness: the light reaches half as far.
+			Sources.Add({ *It, LightRadius(S->GetLightItem()) * WRArtifacts::LightScale(*It), false, LightFlag(S->GetLightItem(), TEXT("halves")) });
 		}
 	}
 }

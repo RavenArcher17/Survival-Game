@@ -1,4 +1,6 @@
 #include "WRInventory.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "WRPlayerState.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
@@ -717,6 +719,7 @@ void UWRInventoryComponent::ApplyEquipment()
 		Stats.Element = EquippedWeapon.Element.IsNone() ? Def->InnateElement : EquippedWeapon.Element;
 		Stats.bStaggerShockwave = GemStat(TEXT("staggerShockwave")) > 0.f;
 		Stats.bBlockFreeze = GemStat(TEXT("blockFreeze")) > 0.f;
+		Stats.PartScale = FMath::Max(1.f, FMath::Max(GemStat(TEXT("staggerShockwave")), GemStat(TEXT("blockFreeze"))));
 		if (const FWRToolDef* Tool = FWRGathering::FindTool(EquippedWeapon.ItemId))
 		{
 			// A held tool swings as a modest weapon: its own flat damage (less when broken), not the sword table.
@@ -918,6 +921,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		return TEXT("Offer it at its boss's summoning stone");
 	}
+	if (Def->Category == TEXT("portal_key"))
+	{
+		// Opens a portal of its rank in its land, in front of you (WRPortals).
+		return WRPortals::UseKey(Cast<AWRPlayerState>(GetOwner()), Def->Id);
+	}
 	if (Def->Category == TEXT("blueprint"))
 	{
 		// Read it: the recipe is yours for good (WRGear).
@@ -1017,7 +1025,10 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 	const float Now = GetWorld()->GetTimeSeconds();
 	PotionReadyAt = Now + T.Num(TEXT("potions.sharedCooldown"), 1.5f) * FMath::Max(0.2f, 1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCooldown")));
 	Character->GetAbilitySystemComponent()->CancelAbilities();
-	Character->Status->ApplyStatus(WRTags::State_Drinking, T.Num(TEXT("potions.drinkSeconds"), 0.9f));
+	// Seed-heart (artifact): you drink standing still, slower.
+	const float DrinkSeconds = T.Num(TEXT("potions.drinkSeconds"), 0.9f);
+	const float Drink = WRArtifacts::Has(Character, TEXT("rooted_potions")) ? WRArtifacts::RuleNum(Character, TEXT("rooted_potions"), TEXT("seconds"), 1.5f) : DrinkSeconds;
+	Character->Status->ApplyStatus(WRTags::State_Drinking, Drink);
 	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
 	{
 		Hero->MulticastBodyOneShot(TEXT("drink"));
@@ -1043,7 +1054,8 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 		if (D->Heal > 0.f)
 		{
 			// Rot and decay halve healing taken.
-			const float Heal = D->Heal * (1.f + UWRLifeSkillsComponent::StatFor(Self->GetOwner(), TEXT("potionPotency"))) * C->Status->HealingTakenScale();
+			// A fold's No healing, Leech Tooth (half), Open Vein (no higher than 70%).
+			const float Heal = WRArtifacts::HealFilter(C, D->Heal * (1.f + UWRLifeSkillsComponent::StatFor(Self->GetOwner(), TEXT("potionPotency"))) * C->Status->HealingTakenScale(), true);
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + Heal);
 		}
 		if (D->bCleanse || UWRLifeSkillsComponent::StatFor(Self->GetOwner(), TEXT("potionCleanse")) > 0.f)
@@ -1057,7 +1069,7 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 			C->Status->CureStatus(WRStatus::FromName(Cure));
 		}
 		WRFx::BroadcastOn(C, TEXT("potion.heal"), NAME_None, 1.f, NAME_None, 0.5f);
-	}), T.Num(TEXT("potions.healAt"), 0.5f), false);
+	}), T.Num(TEXT("potions.healAt"), 0.5f) * Drink / FMath::Max(0.1f, DrinkSeconds), false);
 	UE_LOG(LogWildreach, Log, TEXT("ITEM %s drinks %s (%d left)"), *Character->GetName(), *Id.ToString(), CountOf(Id));
 	return FString::Printf(TEXT("Drinking %s"), *Name);
 }
@@ -1177,7 +1189,7 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	const UWRAttributeSet* A = Character->GetAttributes();
 	if (Def->Heal > 0.f)
 	{
-		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + Def->Heal * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionPotency"))));
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + WRArtifacts::HealFilter(Character, Def->Heal * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionPotency"))), false));
 	}
 	if (Def->bCleanse || (Def->Category == TEXT("potion") && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCleanse")) > 0.f))
 	{

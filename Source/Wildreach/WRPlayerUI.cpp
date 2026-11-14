@@ -183,6 +183,7 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::Incubator: Want = TEXT("incubator"); break;
 	case EWRMenu::World: Want = P->WorldScreen; break;
 	case EWRMenu::Quests: Want = TEXT("journal"); break;
+	case EWRMenu::Artifacts: Want = TEXT("journal"); break;
 	default: break;
 	}
 	if (!Want.IsNone() && !FWRScreens::Find(Want))
@@ -335,7 +336,7 @@ void FWRPlayerUI::PadTab(int32 Dir)
 {
 	AWRPlayerController* P = PC.Get();
 	if (!P) return;
-	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Quests, EWRMenu::Clan, EWRMenu::Settings };
+	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Quests, EWRMenu::Artifacts, EWRMenu::Clan, EWRMenu::Settings };
 	const int32 N = UE_ARRAY_COUNT(Order);
 	int32 At = INDEX_NONE;
 	for (int32 i = 0; i < N; ++i) if (Order[i] == P->GetMenu()) At = i;

@@ -1,4 +1,5 @@
 #include "WRAudio.h"
+#include "WRPortals.h"
 #include "WRSurvival.h"
 #include "WRSound.h"
 #include "Wildreach.h"
@@ -295,7 +296,15 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		Caves.Reset();
 		for (TActorIterator<AWRCave> It(World); It; ++It) Caves.Add(*It);
 	}
-	Cave = FMath::FInterpConstantTo(Cave, CaveFactor(), DeltaTime, 1.f / Tune(TEXT("ambient.caveFade"), 1.5f));
+	// Inside a portal's fold (its bay hangs high over the sea east of the island): its own land's colour, no high wind,
+	// and the closed stone of a cave round you (WRPortals).
+	const FName FoldLand = WRPortals::FoldBiome(World, Listener);
+	if (!FoldLand.IsNone())
+	{
+		Tundra = FoldLand == TEXT("tundra") ? 1.f : 0.f;
+		High = 0.f;
+	}
+	Cave = FMath::FInterpConstantTo(Cave, FoldLand.IsNone() ? CaveFactor() : 1.f, DeltaTime, 1.f / Tune(TEXT("ambient.caveFade"), 1.5f));
 	if (Now >= NextCoastSample)
 	{
 		NextCoastSample = Now + 0.25;

@@ -1,4 +1,6 @@
 #include "WRBoss.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -460,6 +462,11 @@ bool AWRBoss::AnyArtifactModifiers() const
 	{
 		return true;
 	}
+	// The hidden phase opens for the party with the most of the ledger wearing AL 1+ (cooks/endgame.md 2.6.4).
+	if (WRArtifacts::PhaseThreeOpen(this))
+	{
+		return true;
+	}
 	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
 	{
 		const AWRPlayerState* PS = It->GetPlayerState<AWRPlayerState>();
@@ -684,6 +691,8 @@ AWRCharacterBase* AWRBoss::PickBossTarget() const
 float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 {
 	HealthBeforeHit = GetAttributes()->GetHealth();
+	// A fold boss's arena (the Mould-Born cooling, Böðvildr quenched, the Thurs's shell, Hrímgerðr in the dawn).
+	Damage = WRPortals::BossIncoming(this, Hit, Damage);
 	// Mid-transition it takes less (combat.md 2.17.1: half): the change can't be skipped by burst.
 	if (Attacks.IsValidIndex(Current) && Attacks[Current].bRow && Attacks[Current].Row.DamageTaken < 1.f)
 	{
@@ -1191,7 +1200,9 @@ void AWRBoss::OnDeath(AActor* Killer)
 		FString Got;
 		for (const TPair<FName, int32>& L : Def->Loot)
 		{
-			const int32 N = L.Key == TEXT("upgrade_shard") ? FMath::RandRange(FMath::Max(1, L.Value - 1), L.Value + 1) : L.Value;
+			// The party's artifacts add to every quantity (+5% an AL), never below one.
+			const int32 Base = L.Key == TEXT("upgrade_shard") ? FMath::RandRange(FMath::Max(1, L.Value - 1), L.Value + 1) : L.Value;
+			const int32 N = FMath::Max(1, FMath::RoundToInt(Base * WRArtifacts::LootScale(PS)));
 			PS->GetInventory()->AddItem(L.Key, N);
 			Got += FString::Printf(TEXT("%s x%d  "), *L.Key.ToString(), N);
 		}
@@ -1219,9 +1230,11 @@ void AWRBoss::OnDeath(AActor* Killer)
 				UE_LOG(LogWildreach, Log, TEXT("BOSS %s blueprint for %s: %s"), *GetDisplayLabel(), *Entry.Key, *Bp.ToString());
 			}
 		}
-		if (bMajor && FMath::FRand() < WRTune(TEXT("bosses.partChance"), 0.25f))
+		if (bMajor && FMath::FRand() < WRTune(TEXT("bosses.partChance"), 0.25f) + WRArtifacts::PartChanceBonus(PS))
 		{
-			const FName Part = CreatureId == TEXT("vulkarn") ? FName(TEXT("part_giants_ember")) : FName(TEXT("part_wyrm_scale"));
+			// AL 5+: now and then it comes Scarred (its effect x1.5).
+			const bool bScarred = WRArtifacts::RollScarred(PS);
+			const FName Part = CreatureId == TEXT("vulkarn") ? FName(bScarred ? TEXT("part_giants_ember_scarred") : TEXT("part_giants_ember")) : FName(bScarred ? TEXT("part_wyrm_scale_scarred") : TEXT("part_wyrm_scale"));
 			PS->GetInventory()->AddItem(Part, 1);
 			Got += Part.ToString();
 		}
@@ -1229,6 +1242,8 @@ void AWRBoss::OnDeath(AActor* Killer)
 		if (PC) PC->ClientNotify(FString::Printf(TEXT("%s defeated! Loot: %s"), *Def->Name, *Got));
 	}
 	FirstKillDrops();
+	// Artifacts: a major's drop, the first one at your fourth great kill, geis records (WRArtifacts).
+	WRArtifacts::OnBossKilled(this);
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();
 	SetLifeSpan(6.f);
 	if (AController* AI = GetController())

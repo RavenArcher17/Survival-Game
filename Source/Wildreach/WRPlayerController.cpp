@@ -162,6 +162,7 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("Map"), IE_Pressed, &AWRPlayerController::ToggleMap);
 	Bind(TEXT("Clan"), IE_Pressed, &AWRPlayerController::ToggleClan);
 	Bind(TEXT("Quests"), IE_Pressed, &AWRPlayerController::ToggleQuests);
+	Bind(TEXT("Artifacts"), IE_Pressed, &AWRPlayerController::ToggleArtifacts);
 	Bind(TEXT("Chat"), IE_Pressed, &AWRPlayerController::OpenChat);
 	Bind(TEXT("Build"), IE_Pressed, &AWRPlayerController::ToggleBuildMenu);
 	Bind(TEXT("Snap"), IE_Pressed, &AWRPlayerController::ToggleSnap);

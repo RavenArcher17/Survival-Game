@@ -83,6 +83,14 @@ struct FWRCreatureDef
 	float MeshWiden = 1.f;        // extra scale side to side only
 	float Glow = 0.f;             // > 0, no mesh: a glowing orb (emissive sphere in its colour + a light this bright)
 	float NightGlow = 0.f;        // > 0: its materials' GlowStrength rises to this as the daylight goes (a night hunter's eyes)
+	/** An overlay over its own texture (creatures.json overlay: tint, pale, dark, bands, glowLine; M_TameMorph): a portal
+	 *  boss's colouring on a rig it shares with another creature. */
+	bool bOverlay = false;
+	FLinearColor OverlayTint = FLinearColor::White;
+	float OverlayPale = 0.f, OverlayDark = 0.f, OverlayBands = 0.f, OverlayGlowLine = 0.f;
+	/** A portal-only creature (never in the wild tables); a portal boss's rank (0: not one). */
+	bool bPortalOnly = false;
+	int32 PortalRank = 0;
 	TArray<FName> LegBones;       // a pack skeleton's legs for uneven ground: upper, lower, foot of each (front first, left then right)
 	// Animation overrides (0 / None: measured from the clips, see UWRAnimInstance).
 	float WalkPace = 0.f;         // cm/s the walk clip covers at play rate 1
@@ -324,6 +332,13 @@ public:
 	virtual void OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By);
 
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_CreatureId, Category="Creature") FName CreatureId = TEXT("cinderfang");
+	/** A fold's rank scaling (WRPortals), set before it begins play: health, bite and stance times. */
+	float PortalHealth = 1.f;
+	float PortalDamage = 1.f;
+	float PortalStance = 1.f;
+	/** A rank-coloured glow on a fold's boss or warden (alpha = how bright: the Alpha's mane lit or doused). */
+	UPROPERTY(ReplicatedUsing=OnRep_PortalMark) FColor PortalMark = FColor(0, 0, 0, 0);
+	UFUNCTION() void OnRep_PortalMark();
 	UPROPERTY(ReplicatedUsing=OnRep_Tamed) FString TamedBy;
 	UPROPERTY(Replicated) EWRTameOrder TameOrder = EWRTameOrder::Follow;
 	UPROPERTY(Replicated) bool bTameAggressive = true;

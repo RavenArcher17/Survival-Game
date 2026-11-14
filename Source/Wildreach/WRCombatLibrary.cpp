@@ -1,4 +1,6 @@
 #include "WRCombatLibrary.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSurvival.h"
@@ -281,11 +283,11 @@ float UWRCombatLibrary::MaxStanceFor(const AWRCharacterBase* Who)
 	}
 	if (Def->Stance > 0.f)
 	{
-		return Def->Stance;
+		return Def->Stance * Creature->PortalStance;
 	}
 	const FName Kind = StanceKind(Who);
 	const FString Tier = Kind != TEXT("normal") ? Kind.ToString() : Def->Tier.IsNone() ? FString(TEXT("none")) : Def->Tier.ToString();
-	return FWRTuning::Get().Num(FString::Printf(TEXT("stance.tiers.%s"), *Tier), WRTune(TEXT("stance.tiers.none"), 60.f));
+	return FWRTuning::Get().Num(FString::Printf(TEXT("stance.tiers.%s"), *Tier), WRTune(TEXT("stance.tiers.none"), 60.f)) * Creature->PortalStance;
 }
 
 float UWRCombatLibrary::StanceBreakSeconds(const AWRCharacterBase* Who)
@@ -387,6 +389,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		return Done(EWRHitResult::Ignored);  // a path master, a merchant hit by a survivor, a summoned boss sealed to another party
 	}
+	if (WRArtifacts::BlocksHit(Target, Hit))
+	{
+		return Done(EWRHitResult::Ignored);  // Grave Count: the wearer died in this boss's fight
+	}
 
 	// A creature's or boss's blow on a remote player waits for the defence it may already have pressed on its screen
 	// (server rewind, COMBAT-AND-LESSONS 1.17): it resolves a moment later, judged at the time that player saw it.
@@ -476,6 +482,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	float Damage = Hit.Damage;
 	float PoiseDamage = Hit.PoiseDamage;
 	EWRHitResult Result = EWRHitResult::Hit;
+	// A fold's Double damage and its boss's arena (the Alpha's lit mane); the artifacts' shared penalty on a player
+	// (the party's highest AL; never against another player) and The Feather.
+	Damage *= WRPortals::DamageScale(Target, Attacker, Hit) * WRArtifacts::DamageTakenScale(Target, Attacker, Hit);
 	// Deep delver (mining perk): the world's own hazards (lava, cave gas and ice: damage over time with no one behind
 	// it) hurt less.
 	if (!Attacker && Hit.bDamageOverTime)
@@ -538,7 +547,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		const FWRGuard Guard = FWRWeapons::Get().GuardFor(Target);
 		// Wyrm scale: a block can freeze the attacker.
-		if (Attacker && Hit.bMelee && Target->Weapon.bBlockFreeze && FMath::FRand() < WRTune(TEXT("bossParts.wyrmScaleFreezeChance"), 0.25f))
+		if (Attacker && Hit.bMelee && Target->Weapon.bBlockFreeze && FMath::FRand() < WRTune(TEXT("bossParts.wyrmScaleFreezeChance"), 0.25f) * Target->Weapon.PartScale)
 		{
 			Attacker->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
 			Attacker->GetAbilitySystemComponent()->CancelAllAbilities();
@@ -548,7 +557,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const bool bBossBlow = Attacker && StanceKind(Attacker) != TEXT("normal");
 		const float StaminaDamage = Hit.StaminaDamage >= 0.f ? Hit.StaminaDamage
 			: Damage * (bBossBlow ? WRTune(TEXT("defense.bossStaminaDamage"), 1.6f) : WRTune(TEXT("defense.creatureStaminaDamage"), 1.2f));
-		const float Cost = GuardStaminaCost(StaminaDamage, Guard.Boost) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")));
+		const float Cost = GuardStaminaCost(StaminaDamage, Guard.Boost) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")))
+			* (WRArtifacts::Has(Target, TEXT("block_cost")) ? WRArtifacts::RuleNum(Target, TEXT("block_cost"), TEXT("scale"), 2.f) : 1.f);   // Glass Guard
 		// Chip: what the guard doesn't stop of this kind of damage gets through.
 		const bool bElemental = Hit.Element.IsValid() && Hit.Element != WRTags::Element_Physical;
 		Damage *= 1.f - FMath::Clamp(bElemental ? Guard.Element : Guard.Phys, 0.f, 1.f);
@@ -766,14 +776,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		if (UWRInventoryComponent* AttackerInv = UWRInventoryComponent::FindFor(Attacker))
 		{
-			AttackerInv->WearEquipped(EWREquipSlot::Weapon, 1.f);
+			AttackerInv->WearEquipped(EWREquipSlot::Weapon, WRPortals::WearScale(Attacker));
 		}
 	}
 	if (!Hit.bDamageOverTime && Damage > 0.f)
 	{
 		if (UWRInventoryComponent* TargetInv = UWRInventoryComponent::FindFor(Target))
 		{
-			TargetInv->WearArmour(1.f);   // every worn piece wears (head, chest, hands, legs)
+			TargetInv->WearArmour(WRPortals::WearScale(Target));   // every worn piece wears (head, chest, hands, legs); Brittle gear x3
 		}
 	}
 
@@ -794,6 +804,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		Target->OnDamageTaken(Hit, Damage);
 		Target->Status->NotifyHurt();
+		WRArtifacts::OnHitLanded(Target, Hit, Damage);
 	}
 	// Worn gear on the blow (cooks/build-crafting.md 2.5-2.7): lifesteal (Rune of Thirst, Mirehide), stamina on a hit
 	// (Rune of the Tide), and what comes back at the attacker (Rune of Thorns on melee, Twin shard on projectiles).
@@ -856,7 +867,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// A creature with hyperarmor on its own attacks (big bodies, bosses) keeps swinging through it.
 		const AWRCreature* Creature = Cast<AWRCreature>(Target);
 		const bool bCreatureArmour = Creature && (TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) || TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor))
-			&& (Creature->GetDef() && (Creature->GetDef()->bHyperarmor || Creature->GetDef()->Archetype == TEXT("boss")));
+			&& (Creature->GetDef() && (Creature->GetDef()->bHyperarmor || Creature->GetDef()->Archetype == TEXT("boss") || WRPortals::CreatureIronHide(Creature)));
 		// Stalwart (fighter tree): a tame that can't be knocked about.
 		if (Left > 0.f || bCreatureArmour || FWRTaming::StanceTaken(Target, 1.f) < 1.f)
 		{
@@ -880,7 +891,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 					{
 						FWRHit Wave;
 						Wave.Instigator = Attacker;
-						Wave.Damage = WRTune(TEXT("bossParts.emberShockwaveDamage"), 20.f);
+						Wave.Damage = WRTune(TEXT("bossParts.emberShockwaveDamage"), 20.f) * Attacker->Weapon.PartScale;
 						Wave.Element = WRTags::Element_Fire;
 						Wave.BurnBuildup = 30.f;
 						Wave.bDamageOverTime = true;
@@ -915,6 +926,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (bWasUnaware) Stance *= 1.f + WRTune(TEXT("combat.stealth.stance"), 0.2f);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rimed)) Stance *= WRTune(TEXT("status.defs.frost.rimedStance"), 1.5f);
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
+		Stance *= WRPortals::StanceScale(Target);   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
 		if (AWRCreature* Body = Cast<AWRCreature>(Target))
 		{
 			if (Hit.PhysType == 2 && Body->IsNearLockPoint(Hit.ImpactPoint, TEXT("head"), WRTune(TEXT("stance.headRadius"), 70.f)))
@@ -980,7 +992,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// Buildup scales: a blow it never saw coming builds 20% more (stealth); against players 30% less (pvp.buildup).
 		// Rune of Haste: buildup from the weapon's hits +15% (buildupDealt); per status: buildupDealt.<status> (Queen's sting).
 		const float GearBuild = Hit.bMelee ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("buildupDealt")) : 0.f;
-		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f) * (1.f + GearBuild);
+		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f) * (1.f + GearBuild)
+			* WRPortals::BuildupScale(Attacker, Target);   // a fold's Venomous; the Rime-Witch's freeze in brazier light
 		const auto DealtBy = [Attacker](int32 Id) { return 1.f + UWRInventoryComponent::GearStatFor(Attacker, FName(*(FString(TEXT("buildupDealt.")) + WRStatus::Name(Id).ToString()))); };
 		for (const TPair<FName, float>& B : Hit.Buildups)
 		{

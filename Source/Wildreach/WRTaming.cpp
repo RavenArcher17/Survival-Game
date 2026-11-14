@@ -525,9 +525,9 @@ void AWRCreature::RecomputeStats()
 	const FName Kind = FWRTaming::MountKind(*Def);
 	const float MaxHealth = Def->Health * Difficulty * M[WRTameStat::Health] * Grown + (bTame && TameHasNode(TEXT("bulwark")) ? T(TEXT("tree.bulwarkHealth"), 200.f) : 0.f);
 	const float MaxStamina = (Kind.IsNone() ? 100.f : Kind == TEXT("fly") ? T(TEXT("fly.stamina"), 300.f) : T(TEXT("mount.stamina"), 200.f)) * M[WRTameStat::Stamina];
-	InitVitals(MaxHealth, MaxStamina, Def->Poise);
+	InitVitals(MaxHealth * (bTame ? 1.f : PortalHealth), MaxStamina, Def->Poise);
 	SetHealthFraction(Frac);
-	Weapon.FlatDamage = Def->Damage * Difficulty * M[WRTameStat::Damage] * Grown;
+	Weapon.FlatDamage = Def->Damage * Difficulty * M[WRTameStat::Damage] * Grown * (bTame ? 1.f : PortalDamage);
 	MaxTorpor = Def->Health * WRTune(TEXT("taming.torporPerHealth"), 1.f) * M[WRTameStat::Torpor];
 	// A tame keeps its own element: its bites carry it (FULL-GAME 6.5, DD How taming works).
 	Weapon.Element = bTame && (Def->Element == TEXT("fire") || Def->Element == TEXT("frost")) ? Def->Element : NAME_None;

@@ -2,6 +2,8 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRPlayerController.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSurvival.h"
@@ -146,6 +148,12 @@ void AWRPlayerController::ToggleQuests()
 	OpenJournal(EWRMenu::Quests);
 }
 
+void AWRPlayerController::ToggleArtifacts()
+{
+	if (!UI) return;
+	OpenJournal(EWRMenu::Artifacts);
+}
+
 void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
 void AWRPlayerController::WRMenu(FName Which, int32 Select)
@@ -187,6 +195,11 @@ void AWRPlayerController::WRInteract()
 	}
 	// A shrine, a path master, a merchant, a summoning stone, a message, a cache (WRWorldSystems): its screen or its act.
 	if (UI && WRWorld::ClientInteract(this))
+	{
+		return;
+	}
+	// A portal (its card), or a thing in a fold: a door's stone, a chest, a trap's block, a puzzle's part (WRPortals).
+	if (UI && WRPortals::ClientInteract(this))
 	{
 		return;
 	}
@@ -720,6 +733,20 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	if (Cmd == TEXT("world"))
 	{
 		OutResult = WRWorld::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
+	// Dungeon portals (WRPortals): portal enter / accept / leave / act / dev.
+	if (Cmd == TEXT("portal"))
+	{
+		OutResult = WRPortals::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
+	// Artifacts and the band (WRArtifacts): art hook / unhook / fuse / salvage; band invite / accept / decline / leave.
+	if (Cmd == TEXT("art") || Cmd == TEXT("band"))
+	{
+		OutResult = WRArtifacts::Command(this, Args);
 		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
 		return true;
 	}

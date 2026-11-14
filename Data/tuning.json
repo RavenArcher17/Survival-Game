@@ -312,7 +312,17 @@
     "obsidian_warden": { "fist": { "parryable": 1, "impact": 2 }, "ground_pound": { "low": 1, "impact": 3 }, "shellFraction": 0.4, "shellDamageTaken": 0.15, "chilledShellMultiplier": 2.5 },
     "ignessa": { "swipe": { "parryable": 1, "impact": 2 }, "wisps": 4, "wispDamage": 25, "landedSeconds": 8, "airborneDamageTaken": 0.25, "hoverHeight": 550 },
     "grimjaw": { "club": { "parryable": 1, "impact": 3 }, "stomp": { "low": 1, "impact": 3 }, "regenPerSecond": 0.015 },
-    "pale_hunter": { "claw": { "parryable": 1, "impact": 2 }, "pounce": { "parryable": 1, "impact": 3 }, "blizzardSeconds": 14, "clearSeconds": 10, "ambushMultiplier": 2, "revealSeconds": 6 }
+    "pale_hunter": { "claw": { "parryable": 1, "impact": 2 }, "pounce": { "parryable": 1, "impact": 3 }, "blizzardSeconds": 14, "clearSeconds": 10, "ambushMultiplier": 2, "revealSeconds": 6 },
+    "cinderfang_alpha": {"health": 1500, "arenaRadius": 1600, "chaseRadius": 4000, "maneDamage": 1.2, "maneRelight": 300, "douseSeconds": 15, "howlCalls": 2},
+    "kilnmite_broodqueen": {"health": 2500, "arenaRadius": 1600, "chaseRadius": 4000, "clutchHealth": 200, "layEvery": 20, "layCount": 4},
+    "mould_born": {"health": 4000, "arenaRadius": 1800, "chaseRadius": 4500, "frostStance": 1.5, "frostTaken": 0.8, "frostSeconds": 8, "fireHeal": 0.01, "crucibleDamage": 600, "crucibleStagger": 4, "crucibleRadius": 350, "chainSeconds": 1.5},
+    "brannoch": {"health": 7000, "arenaRadius": 1800, "chaseRadius": 4500, "ventStagger": 6, "oneVentCone": 0.5, "hammer_throw": {"parryable": 0}},
+    "bodvildr": {"health": 12000, "arenaRadius": 2400, "chaseRadius": 5000, "tankReach": 450, "tankStagger": 8, "cooledTaken": 1.3, "cooledSeconds": 12, "tankRefill": 60},
+    "rimeclaw_alpha": {"health": 1500, "arenaRadius": 1600, "chaseRadius": 4000, "platedStance": 0.5, "meltSeconds": 20},
+    "glacimaw_elder": {"health": 2500, "arenaRadius": 1600, "chaseRadius": 4000, "thickStun": 3},
+    "frostbound_thurs": {"health": 4000, "arenaRadius": 1800, "chaseRadius": 4500, "shellEvery": 25, "shellTaken": 0.4},
+    "rime_witch": {"health": 7000, "arenaRadius": 1800, "chaseRadius": 4500, "snuffEvery": 25, "relightSeconds": 2, "lightRadius": 500, "clones": 2},
+    "hrimgerdr": {"health": 12000, "arenaRadius": 2400, "chaseRadius": 5000, "boltHealth": 600, "dawnSlow": 0.7, "dawnTaken": 1.5, "shaftWidth": 450}
   },
 
   "ranged": { "_comment": "Bows, crossbows, blowguns, spears, bolas (weapon numbers are in items.json). Aiming camera arm cm / fov / walk speed x; hip-fire spread; throw release s; projectile radius cm, flight s, stuck s, stick depth cm; bola roots creatures up to this radius cm, else slows; poise per damage; grip cm from the wrist; durability per shot. placeholder",

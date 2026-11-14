@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRFarm.h"
@@ -488,6 +489,8 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	Root->SetArrayField(TEXT("blueprints"), Known);
 	// Quests with the path masters, shrines you kindled, faction standing (WRWorldSystems).
 	if (const UWRQuestLog* Log = UWRQuestLog::For(PS)) Root->SetObjectField(TEXT("world"), Log->ToJson());
+	// Artifacts: hooks, pouch, geis records, titles (WRArtifacts).
+	if (const UWRArtifactComponent* Art = UWRArtifactComponent::For(PS)) Root->SetObjectField(TEXT("artifacts"), Art->ToJson());
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -567,6 +570,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetObjectField(TEXT("world"), WorldJson))
 	{
 		if (UWRQuestLog* Log = UWRQuestLog::For(PS)) Log->FromJson(*WorldJson);
+	}
+	const TSharedPtr<FJsonObject>* ArtJson = nullptr;
+	if (Root->TryGetObjectField(TEXT("artifacts"), ArtJson))
+	{
+		if (UWRArtifactComponent* Art = UWRArtifactComponent::For(PS)) Art->FromJson(*ArtJson);
 	}
 }
 

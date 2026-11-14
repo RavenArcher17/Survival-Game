@@ -10,6 +10,7 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
+#include "WRPortals.h"
 #include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRFlowTypes.h"
@@ -413,6 +414,52 @@ namespace WRMapTab
 				if (bShadow) FSlateDrawElement::MakeText(Out, L, Geo.ToPaintGeometry(TS, FSlateLayoutTransform(Pos + FVector2D(1.f, 1.f))), T, F, ESlateDrawEffect::None, WRUI::Shadow);
 				FSlateDrawElement::MakeText(Out, L + 1, Geo.ToPaintGeometry(TS, FSlateLayoutTransform(Pos)), T, F, ESlateDrawEffect::None, C);
 			};
+			// Inside a portal's fold the map shows only the fold: the rooms you've walked into, drawn as you go (no chests,
+			// no exits marked: cooks/build-portals-artifacts.md 2.5), the entry stone and you.
+			if (const AWRFold* Fold = PC.IsValid() ? WRPortals::FoldOf(PC.Get()) : nullptr)
+			{
+				Box(Layer, FVector2D::ZeroVector, Size, WRUI::White(), Hex(TEXT("100C0A")));
+				const TArray<int32> Seen = WRPortals::SeenRooms(PC.Get());
+				FBox2D All(ForceInit);
+				for (int32 i = 0; i < Fold->Rooms.Num(); ++i)
+				{
+					const FWRFoldRoomRep& R = Fold->Rooms[i];
+					const FTransform F = Fold->RoomFrame(i);
+					All += FVector2D(F.TransformPosition(FVector(0.f, -R.D * 0.5f, 0.f)));
+					All += FVector2D(F.TransformPosition(FVector(R.W, R.D * 0.5f, 0.f)));
+				}
+				const FVector2D Span = All.GetSize();
+				const float Fit = FMath::Min((Size.X - 80.f) / FMath::Max(1.0, Span.X), (Size.Y - 80.f) / FMath::Max(1.0, Span.Y));
+				const auto Map = [&](const FVector& W) { return FVector2D(40.f, 40.f) + (FVector2D(W) - All.Min) * Fit + FVector2D((Size.X - 80.f - Span.X * Fit) * 0.5f, (Size.Y - 80.f - Span.Y * Fit) * 0.5f); };
+				const FLinearColor Edge = FLinearColor(WRPortals::RankColour(Fold->Rank));
+				for (const int32 i : Seen)
+				{
+					if (!Fold->Rooms.IsValidIndex(i)) continue;
+					const FWRFoldRoomRep& R = Fold->Rooms[i];
+					const FTransform F = Fold->RoomFrame(i);
+					const FVector2D A = Map(F.TransformPosition(FVector(0.f, -R.D * 0.5f, 0.f))), B = Map(F.TransformPosition(FVector(R.W, R.D * 0.5f, 0.f)));
+					const FVector2D Min(FMath::Min(A.X, B.X), FMath::Min(A.Y, B.Y)), Max(FMath::Max(A.X, B.X), FMath::Max(A.Y, B.Y));
+					Box(Layer + 1, Min, Max - Min, WRUI::White(), FLinearColor(0.16f, 0.13f, 0.1f, 1.f));
+					for (const FVector2D& E : { FVector2D(Max.X - Min.X, 2.f), FVector2D(2.f, Max.Y - Min.Y) })
+					{
+						Box(Layer + 2, Min, E, WRUI::White(), Edge);
+						Box(Layer + 2, Max - E, E, WRUI::White(), Edge);
+					}
+					if (const TSharedPtr<FJsonObject> Row = Fold->RoomRow(i))
+					{
+						FString Name;
+						Row->TryGetStringField(TEXT("name"), Name);
+						const FText T = FText::FromString(Name);
+						const FSlateFontInfo Font = WRUI::Body(12, 600);
+						const FVector2D TS = Measure(T, Font);
+						if (TS.X < Max.X - Min.X) Text(Layer + 3, T, Font, (Min + Max) * 0.5f - TS * 0.5f, WRUI::Ink2, true);
+					}
+				}
+				Box(Layer + 4, Map(Fold->EntryPoint()) - FVector2D(5.f), FVector2D(10.f), WRUI::White(), Edge);
+				if (const APawn* Me = PC->GetPawn()) Box(Layer + 5, Map(Me->GetActorLocation()) - FVector2D(6.f), FVector2D(12.f), WRUI::White(), WRUI::Brass);
+				Text(Layer + 6, FText::FromString(WRPortals::HudLine(PC.Get())), WRUI::Caps(13), FVector2D(24.f, 16.f), WRUI::Ink, true);
+				return Layer + 7;
+			}
 			// Sea, then the island picture.
 			Box(Layer, FVector2D::ZeroVector, Size, WRUI::White(), Hex(TEXT("18242E")));
 			const float Img = Size.Y * S.Zoom;

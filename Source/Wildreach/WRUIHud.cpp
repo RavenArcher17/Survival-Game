@@ -3,6 +3,8 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRPlayerUI.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRPadInput.h"
@@ -450,7 +452,30 @@ private:
 				+ SOverlay::Slot()[SNew(SBox).WidthOverride(560.f * U).HeightOverride(46.f * U)[SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(0.f)[SNullWidget::NullWidget]]]
 				+ SOverlay::Slot()[SNew(SWRCompass).PC(PC)]
 			]
-			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 40.f * U, 0.f, 0.f)
+			// In a portal's fold: which fold, its modifiers, the close count once it's won (WRPortals). Your artifact
+			// level beside it while it's on (grey while player damage has paused it).
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 8.f * U, 0.f, 0.f)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::FromString(PC.IsValid() ? WRPortals::HudLine(PC.Get()) : FString()); }), WRUI::Caps(13), WRUI::Ink, true)
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f * U, 0.f, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+					{
+						const UWRArtifactComponent* A = PC.IsValid() ? UWRArtifactComponent::For(PC->PlayerState) : nullptr;
+						const int32 AL = A ? A->RawAL() : 0;
+						return AL > 0 ? FText::FromString(FString::Printf(TEXT("AL %d%s"), AL, A->IsPaused() ? TEXT(" (paused)") : TEXT(""))) : FText::GetEmpty();
+					}), WRUI::Caps(13), TAttribute<FSlateColor>::CreateLambda([this]()
+					{
+						const UWRArtifactComponent* A = PC.IsValid() ? UWRArtifactComponent::For(PC->PlayerState) : nullptr;
+						return FSlateColor(A && A->IsPaused() ? WRUI::Ink3 : FLinearColor(FColor(196, 204, 214)));
+					}), true)
+				]
+			]
+			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 32.f * U, 0.f, 0.f)
 			[
 				SNew(SBox).WidthOverride(640.f * U).Visibility_Lambda([this]() { return EngagedBoss() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 				[
@@ -471,6 +496,8 @@ private:
 							const UWRAttributeSet* A = B ? B->GetAttributes() : nullptr;
 							return A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 0.f;
 						})
+						// Gnomon Eye (artifact): no enemy's health shows; read the body.
+						.Visibility_Lambda([this]() { return PC.IsValid() && WRArtifacts::Has(PC->PlayerState, TEXT("no_enemy_bars")) ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
 					[
@@ -740,6 +767,8 @@ private:
 			// Shrines, masters, merchants, summoning stones, messages, cores and caches (WRWorldSystems).
 			FString WorldTarget, WorldVerb;
 			if (WRWorld::Prompt(P, WorldTarget, WorldVerb)) { OutTarget = WorldTarget; return WorldVerb; }
+			// Portals and the things in a fold (WRPortals).
+			if (WRPortals::Prompt(P, WorldTarget, WorldVerb)) { OutTarget = WorldTarget; return WorldVerb; }
 		}
 		for (TActorIterator<AWRRunbackStone> It(P->GetWorld()); It; ++It)
 		{
@@ -992,7 +1021,8 @@ private:
 	TSharedRef<SWidget> Vitals()
 	{
 		const auto A = [this]() { return Attr(); };
-		return SNew(SBox).WidthOverride(360.f * U).Visibility_Lambda([this]() { return Body() && (!Hidden() || BuildMode()) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		// Mycelial Sight (artifact): your own bars are gone; the body tells you (the low-health edge, the breath).
+		return SNew(SBox).WidthOverride(360.f * U).Visibility_Lambda([this]() { return Body() && (!Hidden() || BuildMode()) && !(PC.IsValid() && WRArtifacts::Has(PC->PlayerState, TEXT("no_hud"))) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 		[
 			SNew(SWRPanel).Kind(EWRPanel::Leather).Rivets(true).Padding(FMargin(18.f * U, 14.f * U))
 			[

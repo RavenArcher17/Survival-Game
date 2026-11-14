@@ -1,4 +1,6 @@
 #include "WRAbilities.h"
+#include "WRArtifacts.h"
+#include "WRPortals.h"
 #include "WRBuildSets.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -213,6 +215,8 @@ bool UWRGameplayAbility::CommitAbility(const FGameplayAbilitySpecHandle Handle, 
 		if (AWRCharacter* Hero = Cast<AWRCharacter>(GetAvatarActorFromActorInfo()))
 		{
 			Hero->OnPathAbilityUsed(PathId);
+			// Artifacts: Blood-price (every Wildbrand and spell costs health), Wardcarver's Chime (spells ring out).
+			WRArtifacts::OnAbilityUsed(Hero, IsA<UWRGA_Spell>() || IsA<UWRGA_AreaSpell>());
 		}
 	}
 	return true;
@@ -969,6 +973,13 @@ void UWRGA_Melee::Sweep()
 
 	for (const FHitResult& HitResult : Hits)
 	{
+		// A fold's things take blows too: an egg clutch, a frost bolt, a chute's rope, an icicle (once a swing).
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && (Cast<AWRFoldThing>(Thing) || Cast<AWRFoldThing>(Thing->GetOwner())))
+		{
+			HitThisSwing.Add(Thing);
+			WRPortals::HitThing(Thing, Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character->Weapon.Element == TEXT("fire"));
+			continue;
+		}
 		// Raiding: weapons damage other people's buildings (stations/Hearths/totems belong to their piece).
 		AWRBuildPiece* Piece = Cast<AWRBuildPiece>(HitResult.GetActor());
 		if (!Piece && HitResult.GetActor())
@@ -1332,6 +1343,23 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	const FName Tier = bBackstep ? FName(TEXT("backstep")) : LoadTier(Character->GetEquipLoadRatio());
 	const FString Key = bBackstep ? FString(TEXT("defense.backstep.")) : FString::Printf(TEXT("defense.load.%s."), *Tier.ToString());
 	const bool bOverloaded = Tier == TEXT("overloaded");
+	// Artifacts: Wyrm's Stillness (no roll; a backstep still works) and Connla's first geis (never away from your target,
+	// or from where you face with none). The wearer's own rule: every machine reads it, so a refused roll never starts.
+	{
+		const FVector Move = bBackstep ? -Character->GetActorForwardVector().GetSafeNormal2D() : Input;
+		const FVector Away = Character->CombatTarget.IsValid() ? (Character->GetActorLocation() - Character->CombatTarget->GetActorLocation()).GetSafeNormal2D() : -Character->GetActorForwardVector().GetSafeNormal2D();
+		const bool bNoRoll = !bBackstep && WRArtifacts::Has(Character, TEXT("no_roll"));
+		const bool bNoRetreat = WRArtifacts::Has(Character, TEXT("never_turn_back")) && FVector::DotProduct(Move, Away) > 0.5f;
+		if (bNoRoll || bNoRetreat)
+		{
+			if (AWRPlayerController* PC = Character->IsLocallyControlled() ? Cast<AWRPlayerController>(Character->GetController()) : nullptr)
+			{
+				PC->ShowLocalNotice(bNoRoll ? TEXT("Wyrm's Stillness: you may not roll") : TEXT("Your geis: you may not turn back"));
+			}
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+	}
 	bWasBackstep = bBackstep;
 	// Light step (frost node): the same roll, quicker (its frames shrink with it).
 	const float Quick = 1.f + UWRPathComponent::Stat(Character, TEXT("dodgeSpeed"));
@@ -1484,9 +1512,14 @@ void UWRGA_Block::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	}
 	AWRCharacterBase* Character = GetCharacter();
 	const double Now = GetWorld()->GetTimeSeconds();
-	// Guard is up from the press (a guard pressed early still blocks: COMBAT-AND-LESSONS L4).
-	Character->SetCombatTag(WRTags::State_Blocking, true);
-	SetMoveSlow(true, true);
+	// Guard is up from the press (a guard pressed early still blocks: COMBAT-AND-LESSONS L4). Thorn Oath (artifact): no
+	// guard at all, only the parry.
+	const bool bNoGuard = WRArtifacts::Has(Character, TEXT("no_block"));
+	if (!bNoGuard)
+	{
+		Character->SetCombatTag(WRTags::State_Blocking, true);
+		SetMoveSlow(true, true);
+	}
 	bRecovering = false;
 	PressedAt = Now;
 
@@ -1497,7 +1530,8 @@ void UWRGA_Block::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	LastPressAt = Now;
 	if (Guard.bCanParry && Guard.ParryActive > 0.f)
 	{
-		const float Active = Guard.ParryActive * (bSpam ? 1.f - WRTune(TEXT("defense.parrySpamShrink"), 0.3f) : 1.f);
+		const float Active = Guard.ParryActive * (bSpam ? 1.f - WRTune(TEXT("defense.parrySpamShrink"), 0.3f) : 1.f)
+			* (WRArtifacts::Has(Character, TEXT("short_parry")) ? WRArtifacts::RuleNum(Character, TEXT("short_parry"), TEXT("scale"), 0.7f) : 1.f);   // Copper Tongue
 		After(Guard.ParryStartup, [this]() { SetParrying(true); });
 		After(Guard.ParryStartup + Active, [this]() { SetParrying(false); });
 	}

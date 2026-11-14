@@ -3,6 +3,8 @@
 // punish windows, combos, packs that flank, surround and breathe with no attack token; lock points and breakable parts;
 // fighting from the saddle and being thrown off it.
 #include "WRCreature.h"
+#include "WRPortals.h"
+#include "WRArtifacts.h"
 #include "GameFramework/GameStateBase.h"
 #include "WRAttackRows.h"
 #include "Wildreach.h"
@@ -630,7 +632,9 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	RowId = Id;
 	RowPhase = 1;
 	RowStarted = Now;
-	RowPhaseEnd = Now + R->Windup;
+	// A fold's Frenzy: its creatures wind up faster.
+	const float Pace = WRPortals::CreaturePace(Self);
+	RowPhaseEnd = Now + R->Windup / Pace;
 	RowTarget = Target;
 	RowHits.Reset();
 	bRowFinalCue = false;
@@ -649,7 +653,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	}
 	Self->SetCombatTag(WRTags::State_Attacking, true);
 	// Its real clip, warped so the strike lands at wind-up + hold; the rear-back pose and the rising cue come with it.
-	Self->PlaySwing(WRRowFight::SwingFor(R->Motion), R->Windup + R->Hold);
+	Self->PlaySwing(WRRowFight::SwingFor(R->Motion), (R->Windup + R->Hold) / Pace);
 	// The tell: its voice and a small glint on the attacking part (white blockable, crimson unblockable).
 	Self->MulticastTell(R->Glint, R->TellBone, TEXT("voice"));
 	if (R->Motion == TEXT("burst"))
@@ -734,7 +738,9 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 		AWRCharacterBase* V = WeakVictim.Get();
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{
-			const FVector Push = (V->GetActorLocation() - S->GetActorLocation()).GetSafeNormal2D() * Knockback + FVector(0.f, 0.f, Knockback * 0.35f);
+			// Gale Feather (artifact): thrown twice as far.
+			const float K = Knockback * WRArtifacts::KnockScale(V);
+			const FVector Push = (V->GetActorLocation() - S->GetActorLocation()).GetSafeNormal2D() * K + FVector(0.f, 0.f, K * 0.35f);
 			V->LaunchCharacter(Push, true, true);
 		}
 	});

@@ -60,7 +60,7 @@ namespace WRWorldsFiles
 		TEXT("pvp"), TEXT("pvpInBossArenas"), TEXT("offlineProtection"), TEXT("clanSizeLimit"),
 		TEXT("xpMultiplier"), TEXT("gatherMultiplier"), TEXT("tamingMultiplier"), TEXT("cropMultiplier"),
 		TEXT("dayMinutes"), TEXT("hungerMultiplier"), TEXT("creatureNumbers"), TEXT("creatureDifficulty"),
-		TEXT("upkeepMultiplier"), TEXT("bossRespawnHours"),
+		TEXT("upkeepMultiplier"), TEXT("bossRespawnHours"), TEXT("portalRuns"), TEXT("artifactSlots"),
 	};
 
 	/** Reads what an object sets over S: a preset's values, or a custom world's changes. */
@@ -78,6 +78,8 @@ namespace WRWorldsFiles
 		O->TryGetStringField(TEXT("worldEvents"), S.WorldEvents);
 		O->TryGetStringField(TEXT("biomeEvents"), S.BiomeEvents);
 		O->TryGetStringField(TEXT("invasions"), S.Invasions);
+		O->TryGetStringField(TEXT("portalBreak"), S.PortalBreak);
+		O->TryGetStringField(TEXT("artifactCap"), S.ArtifactCap);
 	}
 
 	/** The preset a server plays with no settings of its own (server_presets.json "default"). */
@@ -284,6 +286,8 @@ bool WRWorlds::WriteSettings(const FString& Id, const FWRWorldSettings& Settings
 	if (Settings.WorldEvents != Preset.WorldEvents) Changes->SetStringField(TEXT("worldEvents"), Settings.WorldEvents);
 	if (Settings.BiomeEvents != Preset.BiomeEvents) Changes->SetStringField(TEXT("biomeEvents"), Settings.BiomeEvents);
 	if (Settings.Invasions != Preset.Invasions) Changes->SetStringField(TEXT("invasions"), Settings.Invasions);
+	if (Settings.PortalBreak != Preset.PortalBreak) Changes->SetStringField(TEXT("portalBreak"), Settings.PortalBreak);
+	if (Settings.ArtifactCap != Preset.ArtifactCap) Changes->SetStringField(TEXT("artifactCap"), Settings.ArtifactCap);
 	if (Changes->Values.Num() == 0)
 	{
 		return WRWorldsFiles::WritePreset(Dir(Id), Settings.Base);
@@ -304,7 +308,8 @@ bool WRWorlds::IsCustom(const FWRWorldSettings& Settings)
 		if (!Was || !FMath::IsNearlyEqual(*Was, KV.Value, 0.001f)) return true;
 	}
 	return Settings.DeathPenalty != Preset.DeathPenalty || Settings.Raids != Preset.Raids || Settings.WorldEvents != Preset.WorldEvents
-		|| Settings.BiomeEvents != Preset.BiomeEvents || Settings.Invasions != Preset.Invasions;
+		|| Settings.BiomeEvents != Preset.BiomeEvents || Settings.Invasions != Preset.Invasions
+		|| Settings.PortalBreak != Preset.PortalBreak || Settings.ArtifactCap != Preset.ArtifactCap;
 }
 
 FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings)

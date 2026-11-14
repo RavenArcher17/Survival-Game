@@ -1,0 +1,52 @@
+{
+  "_comment": "Artifacts (FULL-GAME 8.3; cooks/endgame.md 2.6; cooks/build-portals-artifacts.md 2.12-2.14). Read by WRArtifacts.cpp. A charm on one of three belt hooks; Weight I-V by its metal; Artifact Level (AL) = the sum of the hooked Weights, capped by the server's artifactCap. perAL: what each AL adds (the party's highest AL counts for the shared numbers; the rule is the wearer's alone). rule: the code hook (WRArtifacts::Has); numbers per rule in its row. source: the boss or land whose drops carry it (boss = a creature id; portal:<biome>; raid:<pair>). All first drafts.",
+  "weights": [
+    { "w": 1, "metal": "Bone", "colour": [222, 214, 190] },
+    { "w": 2, "metal": "Bronze", "colour": [170, 112, 58] },
+    { "w": 3, "metal": "Silver", "colour": [196, 204, 214] },
+    { "w": 4, "metal": "Blackened iron", "colour": [70, 70, 76] },
+    { "w": 5, "metal": "Starsteel", "colour": [150, 176, 230] }
+  ],
+  "perAL": { "damageTaken": 0.07, "loot": 0.05, "partChance": 0.01, "qualityStep": 0.02, "pathXP": 0.04, "dropChance": 0.01 },
+  "scarredFromAL": 5, "scarredChance": 0.25, "scarredScale": 1.5, "highWeightsFromAL": 10, "phase3FromAL": 1,
+  "pvpPauseSeconds": 30, "hookSeconds": 2, "hookBossRange": 9000, "partyRange": 6000, "bandIdleMinutes": 10,
+  "drops": {
+    "majorBase": 0.08, "phase3Scale": 1.5, "firstArtifactAtMajors": 4,
+    "majorWeights": [ { "fromAL": 0, "weights": [60, 30, 10, 0, 0] }, { "fromAL": 5, "weights": [0, 60, 30, 10, 0] }, { "fromAL": 10, "weights": [0, 0, 60, 30, 10] } ],
+    "portalWeights": { "3": [70, 30, 0, 0, 0], "4": [0, 70, 30, 0, 0], "5": [0, 0, 60, 30, 10] }
+  },
+  "records": { "xpPerAL": 300, "scarredAt": 5, "baneAt": 15 },
+  "fuse": { "station": "alchemy_table", "signaturePerWeight": 5, "salvageEssencePerWeight": 2 },
+  "artifacts": [
+    { "id": "wyrms_stillness", "name": "Wyrm's Stillness", "source": "skaldrith", "biome": "tundra", "rule": "no_roll", "geis": "You may not roll. Backstep and jump still work.", "look": "A curled ice-white wyrm scale on a thong" },
+    { "id": "hive_seed", "name": "Hive Seed", "source": "mycelorn", "biome": "fungal", "rule": "kill_burst", "geis": "What you kill bursts: a breath's swell, then spores on you within 3 m.", "burst": { "delay": 1.0, "radius": 300, "damage": 40, "poison": 30 }, "look": "A dried spore pod in a wire cage" },
+    { "id": "forge_brand", "name": "Forge-brand", "source": "vulkarn", "biome": "volcanic", "rule": "path_backlash", "geis": "Your path's power burns you too: every ability you use deals you 8% of its damage.", "share": 0.08, "look": "A smith's nail bent into a ring" },
+    { "id": "leech_tooth", "name": "Leech Tooth", "source": "vharra", "biome": "swamp", "rule": "half_potions", "geis": "Healing potions heal you by half.", "scale": 0.5, "look": "A three-pointed leech jaw in amber" },
+    { "id": "omen_of_the_end", "name": "Omen of the End", "source": "vorhollow", "biome": "void", "rule": "next_phase", "geis": "A boss that turns on you fights with its next phase's moves.", "look": "A pebble that floats a finger's width above its cord" },
+    { "id": "mourners_veil", "name": "Mourner's Veil", "source": "nhal", "biome": "graveyard", "rule": "half_light", "geis": "Your light reaches half as far: torches, lanterns, glowing tames.", "scale": 0.5, "look": "A scrap of black lace with a tiny silver bell" },
+    { "id": "rod_crown", "name": "Rod-crown", "source": "kharvox", "biome": "storm", "rule": "lightning_finds", "geis": "Lightning finds you: outdoors in rain or storm, a bolt every 40 to 60 s.", "every": [40, 60], "damage": 60, "stun": 0.8, "warn": 1.0, "look": "A ring of green copper wire with a fulgurite bead" },
+    { "id": "gnomon_eye", "name": "Gnomon Eye", "source": "ahrumet", "biome": "desert", "rule": "no_enemy_bars", "geis": "You see no enemy's health. Read their bodies instead.", "look": "A sunstone eye in a bronze lid" },
+    { "id": "seed_heart", "name": "Seed-heart", "source": "sylvaroth", "biome": "forest", "rule": "rooted_potions", "geis": "Potions work only standing still: drinking roots you and takes 1.5 s.", "seconds": 1.5, "look": "A heartwood acorn" },
+    { "id": "gale_feather", "name": "Gale Feather", "source": "aeolith", "biome": "sky", "rule": "double_knockback", "geis": "You're thrown twice as far, and every heavy blow knocks you down.", "scale": 2.0, "down": 1.2, "look": "A long white feather bound with silk" },
+    { "id": "glass_guard", "name": "Glass Guard", "source": "lyrathis", "biome": "crystal", "rule": "block_cost", "geis": "Blocking costs you twice the stamina.", "scale": 2.0, "look": "A violet crystal shard" },
+    { "id": "undertow_pearl", "name": "Undertow Pearl", "source": "thalassor", "biome": "ocean", "rule": "moving_regen", "geis": "Your stamina comes back only while you move.", "look": "A black pearl" },
+    { "id": "bellows_lung", "name": "Bellows Lung", "source": "portal:volcanic", "biome": "volcanic", "rule": "slow_regen", "geis": "Your stamina comes back at seven tenths.", "scale": 0.7, "look": "A tiny leather bellows" },
+    { "id": "rime_ring", "name": "Rime Ring", "source": "portal:tundra", "biome": "tundra", "rule": "tired_freeze", "geis": "A blow that lands while you're winded (stamina under 30) freezes you.", "below": 30, "seconds": 0.8, "look": "A ring of blue glacier ice that never melts" },
+    { "id": "copper_tongue", "name": "Copper Tongue", "source": "portal:storm", "biome": "storm", "rule": "short_parry", "geis": "Your parry window is 30% shorter.", "scale": 0.7, "look": "A copper tongue-plate from a Rodwarden bell" },
+    { "id": "open_vein", "name": "Open Vein", "source": "portal:swamp", "biome": "swamp", "rule": "heal_cap", "geis": "Nothing heals you above 70% of your health.", "cap": 0.7, "look": "A bone hook with a red thread" },
+    { "id": "the_feather", "name": "The Feather", "source": "portal:desert", "biome": "desert", "rule": "weighed_heart", "geis": "A blow you take within 2 s of a kill hurts twice.", "window": 2.0, "scale": 2.0, "look": "An ostrich feather in a bronze clip" },
+    { "id": "thorn_oath", "name": "Thorn Oath", "source": "portal:forest", "biome": "forest", "rule": "no_block", "geis": "You may not block. Parry still works.", "look": "A twist of briar" },
+    { "id": "kite_string", "name": "Kite String", "source": "portal:sky", "biome": "sky", "rule": "brittle_falls", "geis": "Falls hurt from 3 m and kill from 10 m.", "hurtFrom": 300, "killFrom": 1000, "look": "A coil of kite line on a bone reel" },
+    { "id": "wardcarvers_chime", "name": "Wardcarver's Chime", "source": "portal:crystal", "biome": "crystal", "rule": "loud_spells", "geis": "Every spell you cast rings out: creatures within 40 m come.", "radius": 4000, "look": "A small chime stone" },
+    { "id": "lonely_tide", "name": "Lonely Tide", "source": "portal:ocean", "biome": "ocean", "rule": "tames_wait", "geis": "Your tames won't fight; at a boss they wait at its edge.", "look": "A Saltkin shell with a hole worn through" },
+    { "id": "grave_count", "name": "Grave Count", "source": "portal:graveyard", "biome": "graveyard", "rule": "no_runback", "geis": "Die in a boss fight and you can't hurt that boss again until the fight resets.", "look": "A lead coffin nail" },
+    { "id": "mycelial_sight", "name": "Mycelial Sight", "source": "portal:fungal", "biome": "fungal", "rule": "no_hud", "geis": "Your own bars are gone. Your body tells you: breath, a red edge, a heartbeat.", "look": "A glow-cap button" },
+    { "id": "hollow_coin", "name": "Hollow Coin", "source": "portal:void", "biome": "void", "rule": "hollowing", "geis": "Every blow you take lowers your greatest health by 1 until you rest.", "per": 1, "look": "A coin with a hole where its face was" },
+    { "id": "connla_turn_back", "name": "Connla's first geis: never turn back", "source": "raid:fire_frost", "biome": "", "rule": "never_turn_back", "geis": "You may not roll or step back away from your target.", "look": "A knot of red and white cord" },
+    { "id": "blood_price", "name": "Blood-price", "source": "raid:storm_blood", "biome": "", "rule": "blood_price", "geis": "Every Wildbrand and spell also costs you 5 health.", "cost": 5, "look": "A drake's fang in copper wire" },
+    { "id": "conaire_sunwise", "name": "Conaire's geis: never go sunwise", "source": "raid:sun_tide", "biome": "", "rule": "never_sunwise", "geis": "Circling your target sunwise (clockwise) costs 6 stamina a second.", "cost": 6, "look": "A sun disc with a crack across it" },
+    { "id": "connla_name", "name": "Connla's third geis: never tell your name", "source": "raid:nature_necro", "biome": "", "rule": "nameless", "geis": "No ally's heal, buff or revive reaches you; your name is hidden.", "look": "A blank bone tag" },
+    { "id": "connla_challenge", "name": "Connla's second geis: never refuse a challenge", "source": "raid:wind_spore", "biome": "", "rule": "every_challenge", "geis": "Every creature that sees you comes; you can't sneak; bosses chase you twice as far.", "chase": 2.0, "look": "A wind-pole scrap knotted round a spore" },
+    { "id": "hags_offer", "name": "The Hag's Offer", "source": "raid:void_arcane", "biome": "", "rule": "hags_offer", "geis": "The first time each fight you fall under half health, you drink a potion whether you want to or not.", "below": 0.5, "look": "A cracked clay cup on a cord" }
+  ]
+}

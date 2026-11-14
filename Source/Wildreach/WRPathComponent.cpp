@@ -1,4 +1,5 @@
 #include "WRPathComponent.h"
+#include "WRArtifacts.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
@@ -276,7 +277,8 @@ void UWRPathComponent::AwardXP(FName PathId, int32 Amount)
 	}
 	FWRPathProgress& P = FindOrAddProgress(PathId);
 	const int32 PointsBefore = FWRPathRules::PointsForXP(P.XP);
-	P.XP += FMath::RoundToInt(Amount * XPMultiplier());
+	// The party's artifacts: +4% an AL (to +60% at AL 15).
+	P.XP += FMath::RoundToInt(Amount * XPMultiplier() * WRArtifacts::XPScale(GetOwner()));
 	bDirty = true;
 	if (FWRPathRules::PointsForXP(P.XP) != PointsBefore)
 	{

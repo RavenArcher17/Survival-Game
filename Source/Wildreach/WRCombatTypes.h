@@ -124,4 +124,6 @@ struct FWRWeaponStats
 	/** Boss parts: Giant's ember (stagger -> lava shockwave), Wyrm scale (blocks can freeze the attacker). */
 	UPROPERTY() bool bStaggerShockwave = false;
 	UPROPERTY() bool bBlockFreeze = false;
+	/** A Scarred boss part (artifacts AL 5+): its effect x this. */
+	UPROPERTY() float PartScale = 1.f;
 };

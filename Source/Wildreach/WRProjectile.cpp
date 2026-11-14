@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRPortals.h"
 #include "WRBuilding.h"
 #include "WRTurret.h"
 #include "Wildreach.h"
@@ -245,6 +246,20 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(OtherActor);
 	const AWRCharacterBase* Caster = Cast<AWRCharacterBase>(Hit.Instigator);
+	// A fold's things: an arrow or a bolt drops an icicle, cuts a chute's rope, cracks a frost bolt (fire melts too).
+	{
+		const bool bFireShot = Hit.Element == WRTags::Element_Fire;
+		AWRCharacterBase* By = const_cast<AWRCharacterBase*>(Caster);
+		if (OtherActor) WRPortals::HitThing(OtherActor, By, Hit.Damage, bFireShot);
+		if (SplashRadius > 0.f || bFireShot)
+		{
+			const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+			for (TActorIterator<AWRFoldThing> It(GetWorld()); It; ++It)
+			{
+				if (*It != OtherActor && FVector::Dist(It->GetActorLocation(), At) < FMath::Max(SplashRadius, 150.f) + 100.f) WRPortals::HitThing(*It, By, Hit.Damage, bFireShot);
+			}
+		}
+	}
 	if (SplashRadius > 0.f)
 	{
 		// A lobbed thing bursts where it comes down: everyone hostile in the splash takes it (once), the ground shows it.

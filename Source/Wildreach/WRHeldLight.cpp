@@ -7,6 +7,7 @@
 //  - asleep: the body lies on the mattress (player_art "sleep" clip, else the end of the death clip held), and the
 //    owner's move / jump gets them up.
 #include "WRCharacter.h"
+#include "WRArtifacts.h"
 #include "WRSurvival.h"
 #include "WRToolMesh.h"
 #include "WRTuning.h"
@@ -81,6 +82,12 @@ void AWRCharacter::UpdateHeldLightLook()
 		HeldLight->SetIntensity(T.Num(Key + TEXT("intensity"), bTorch ? 5200.f : 3600.f));
 		HeldLight->SetLightColor(bTorch ? FLinearColor(1.f, 0.52f, 0.22f) : FLinearColor(1.f, 0.68f, 0.38f));
 		HeldLight->SetSourceRadius(bTorch ? 6.f : 3.f);
+	}
+	// Mourner's Veil (artifact) and a fold's Darkness: the light reaches half as far, to the eye as well as in play.
+	{
+		const float Base = FWRTuning::Get().Num(FString::Printf(TEXT("lights.%s.radius"), *Item.ToString()), bTorch ? 600.f : 900.f);
+		const float Want = Base * WRArtifacts::LightScale(this);
+		if (!FMath::IsNearlyEqual(HeldLight->AttenuationRadius, Want, 1.f)) HeldLight->SetAttenuationRadius(Want);
 	}
 	if (LightMesh->GetAttachSocketName() != Attach)
 	{

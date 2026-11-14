@@ -168,6 +168,12 @@ spawn_regions.json and its event weather row; quest kinds are `bring / show / ki
 tame` (`UWRWorldSystems::QuestEvent`); world screens open through `ClientOpenWorldScreen` under `EWRMenu::World`;
 "world ..." is the one server command family. Dev: `WRCmd world dev ...`.
 
+Also since 0.7.1: **dungeon portals and artifacts** (`WRPortals.*`, `WRPortalFold.cpp`, `WRPortalThings.cpp`,
+`WRPortalBosses.cpp`, `WRArtifacts.*`, `WRUIPortals.cpp`; data `Data/portals.json`, `Data/portal_rooms/`,
+`Data/artifacts.json`): ranked portals that break on real days and spill, handmade rooms shuffled into folds with traps,
+trials and a boss with an arena mechanic, keys, personal chests and shards; the artifact belt (journal tab N), the band,
+Artifact Level, geis records, fusing. Saved in the world's `portals.json` and each player's file (`artifacts`).
+
 Open, as of 0.7.1:
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
@@ -175,7 +181,7 @@ Open, as of 0.7.1:
   the prompt; no chimney smoke yet; bone meal waits for the grinder.
 - **Crafting tiers 4 and 5 need 4 and 6 major bosses**; the island has Vulkarn and Skaldrith, so steel, the biome
   sets, rings above iron and the boss-weapon blueprints' recipes show "Needs tier 4/5" (`WRHearthLevel` for tests).
-  Boss weapons use their class's moves; set-decor blueprints, portal drops and the Old Tusker talisman wait for their
+  Boss weapons use their class's moves; set-decor blueprints and the Old Tusker talisman wait for their
   systems.
 - **Survival on the island is two biomes**: only Ashfall / Blizzard and the lesser volcanic and tundra weathers can
   happen; corruption, dark nights, strikes and gusts are live in code and data for the biomes that don't exist yet. The
@@ -200,6 +206,12 @@ Open, as of 0.7.1:
   Blue Below; masters speak in text, merchants have no pack beasts, the tubes are boulder corridors whose routes nobody has
   walked yet (tune `world.json hidden.route`), and the eruption river rise, event music, invader ice / slush, the Dimming
   and the Migration are not built (cooks/build-world-systems.md 4).
+- **Portals and artifacts on the island are two lands** (cooks/build-portals-artifacts.md 4): portals open in the Volcanic
+  and the Tundra only (`Data/portals.json biomes.<land>.land`; a land's kit is `Data/portal_rooms/<land>.json`), their
+  folds hang in bays high over the sea east of the island (`portals.json bay`; anything there with no fold round it is
+  put back at its portal); rank 3-5 bosses borrow built rigs (overlay colours in creatures.json) until they're sculpted;
+  the new creatures' voices are pitched shared calls; only four artifacts can drop until more lands, majors and raids
+  exist. Dev: `WRCmd portal dev open <land> <rank> | crack | spill | break | clear`, `WRCmd art dev give <id> <weight>`.
 - **Bounties** stay a setting only (nothing reads it) until the PvP pass. **54 perks** wait for their systems
   (`waitsFor` in `Data/lifeskills.json`: diving, bees, explosives, timed brews...; Breeder, Rare finder, Saddle master and
   Creature armorer are live since build-taming; Decorator, Turret tech,

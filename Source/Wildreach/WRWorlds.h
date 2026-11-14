@@ -24,6 +24,8 @@ struct FWRWorldSettings
 	FString WorldEvents;             // off / rare / normal / frequent (Starfall: WRWorldSystems)
 	FString BiomeEvents;             // off / rare / normal / frequent (Eruption, Whiteout)
 	FString Invasions;               // off / rare / normal / frequent (opposite-biome invasions)
+	FString PortalBreak;             // half / normal / double / never (dungeon portals' break timers: WRPortals)
+	FString ArtifactCap;             // off / 5 / 10 / 15 (artifact level cap: WRArtifacts; off closes hidden phase 3s)
 };
 
 /**

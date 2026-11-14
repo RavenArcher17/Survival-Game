@@ -1,0 +1,68 @@
+{
+  "_comment": "Dungeon portals (FULL-GAME 8.2; cooks/endgame.md 2.5, cooks/biome-desert.md 2.22, cooks/build-portals-artifacts.md). Read by UWRPortalSystem (WRPortals.cpp). ranks: colour (sRGB, never gold or crimson), bands (spawn_regions tiers it opens in: deeper = higher), rooms on the main line, modifiers [min,max], boss HP solo (+80% a player or tame, the boss rule), breakDays (real days), pillar height / seen-from (cm), hum pitch, its shard, creature scaling {health, damage, stance} by tier, packs [min,max] creatures a room. biomes: all twelve; land false = its land isn't in the world yet (no slots, no keys shown). slots: what each slot opens (a rank, or high = Epic, Legendary at highLegendary). All first drafts.",
+  "ranks": [
+    { "rank": 1, "id": "common", "name": "Common", "colour": [232, 226, 208], "bands": ["lowland"], "rooms": 3, "modifiers": [0, 0], "bossHealth": 1500, "breakDays": 1, "pillar": 6000, "seen": 50000, "humPitch": 1.2, "shard": "shard_common",
+      "creatures": { "lowland": { "health": 1.0, "damage": 1.0 }, "midland": { "health": 0.6, "damage": 0.6 }, "highland": { "health": 0.35, "damage": 0.4 } }, "packs": [1, 3] },
+    { "rank": 2, "id": "uncommon", "name": "Uncommon", "colour": [79, 176, 74], "bands": ["lowland", "midland"], "rooms": 5, "modifiers": [1, 1], "bossHealth": 2500, "breakDays": 3, "pillar": 6000, "seen": 50000, "humPitch": 1.05, "shard": "shard_uncommon",
+      "creatures": { "lowland": { "health": 1.7, "damage": 1.65 }, "midland": { "health": 1.0, "damage": 1.0 }, "highland": { "health": 0.6, "damage": 0.62 } }, "packs": [2, 4] },
+    { "rank": 3, "id": "rare", "name": "Rare", "colour": [58, 123, 219], "bands": ["midland"], "rooms": 7, "modifiers": [1, 2], "bossHealth": 4000, "breakDays": 6, "pillar": 6000, "seen": 50000, "humPitch": 0.9, "shard": "shard_rare",
+      "creatures": { "lowland": { "health": 2.15, "damage": 1.65 }, "midland": { "health": 1.25, "damage": 1.0 }, "highland": { "health": 0.75, "damage": 0.62 } }, "packs": [2, 5] },
+    { "rank": 4, "id": "epic", "name": "Epic", "colour": [142, 79, 216], "bands": ["highland"], "rooms": 9, "modifiers": [2, 2], "bossHealth": 7000, "breakDays": 10, "pillar": 6000, "seen": 50000, "humPitch": 0.75, "shard": "shard_epic",
+      "creatures": { "lowland": { "health": 2.85, "damage": 2.65 }, "midland": { "health": 1.65, "damage": 1.6 }, "highland": { "health": 1.0, "damage": 1.0 } }, "packs": [2, 5] },
+    { "rank": 5, "id": "legendary", "name": "Legendary", "colour": [255, 122, 26], "bands": ["highland"], "rooms": 12, "modifiers": [3, 3], "bossHealth": 12000, "breakDays": 18, "pillar": 30000, "seen": 400000, "humPitch": 0.6, "shard": "shard_legendary",
+      "creatures": { "lowland": { "health": 4.55, "damage": 3.45, "stance": 1.3 }, "midland": { "health": 2.65, "damage": 2.1, "stance": 1.3 }, "highland": { "health": 1.6, "damage": 1.3, "stance": 1.3 } }, "packs": [3, 6] }
+  ],
+  "biomes": {
+    "volcanic": { "land": true, "name": "Volcanic", "slots": ["1", "2", "3", "high"], "kit": "volcanic", "signature": "sulfur_crystal", "essence": "ember_essence", "artifact": "bellows_lung", "edge": "obsidian",
+      "warden": "fold_warden_volcanic", "bosses": ["cinderfang_alpha", "kilnmite_broodqueen", "mould_born", "brannoch", "bodvildr"] },
+    "tundra": { "land": true, "name": "Frozen tundra", "slots": ["1", "2", "3", "high"], "kit": "tundra", "signature": "lichen", "essence": "frost_essence", "artifact": "rime_ring", "edge": "glacier_ice",
+      "warden": "fold_warden_tundra", "bosses": ["rimeclaw_alpha", "glacimaw_elder", "frostbound_thurs", "rime_witch", "hrimgerdr"] },
+    "storm": { "land": false, "name": "Storm peaks", "slots": ["1", "2", "3", "high"], "kit": "storm", "signature": "stormglass", "artifact": "copper_tongue", "edge": "copper" },
+    "desert": { "land": false, "name": "Desert", "slots": ["1", "1", "2", "3", "high"], "kit": "desert", "signature": "sunstone", "artifact": "the_feather", "edge": "sunglass" },
+    "forest": { "land": false, "name": "Ancient forest", "slots": ["1", "1", "2", "3", "high"], "kit": "forest", "signature": "heartwood", "artifact": "thorn_oath", "edge": "living_root" },
+    "sky": { "land": false, "name": "Sky islands", "slots": ["1", "high"], "kit": "sky", "signature": "skystone", "artifact": "kite_string", "edge": "kite_silk" },
+    "crystal": { "land": false, "name": "Crystal caves", "slots": ["1", "high"], "kit": "crystal", "signature": "resonant_crystal", "artifact": "wardcarvers_chime", "edge": "geode" },
+    "swamp": { "land": false, "name": "Swamp", "slots": ["1", "3", "high"], "kit": "swamp", "signature": "bloodmoss", "artifact": "open_vein", "edge": "bog_oak" },
+    "ocean": { "land": false, "name": "Ocean & reefs", "slots": ["1", "high"], "kit": "ocean", "signature": "pearl", "artifact": "lonely_tide", "edge": "coral" },
+    "graveyard": { "land": false, "name": "Graveyard", "slots": ["1", "3", "high"], "kit": "graveyard", "signature": "grave_wax", "artifact": "grave_count", "edge": "bone" },
+    "fungal": { "land": false, "name": "Fungal caverns", "slots": ["1", "3", "high"], "kit": "fungal", "signature": "glowcap", "artifact": "mycelial_sight", "edge": "mycelium" },
+    "void": { "land": false, "name": "Corrupted wasteland", "slots": ["1", "2", "3", "high"], "kit": "void", "signature": "void_shard", "artifact": "hollow_coin", "edge": "rift" }
+  },
+  "slots": { "highLegendary": 0.05, "refillHours": [2, 6], "keepFrom": 15000, "fromPortals": 15000, "maxSlope": 25, "tries": 40 },
+  "escalation": { "crackAt": 0.5, "spillAt": 0.8, "crackPackMinutes": 30, "spillPackMinutes": 15, "packRadius": 15000, "spillNear": 30000, "maxSpilled": 14, "wardenHealth": 3000, "wardenGuard": 1200, "escapedRoam": 40000, "breakScale": { "half": 0.5, "normal": 1.0, "double": 2.0 } },
+  "entry": { "partyRadius": 1000, "acceptSeconds": 5, "lootSeconds": 120, "idleResetMinutes": 30, "maxRuns": 8, "scorchHours": 24, "interactRange": 450, "keyDistance": 3000, "keyOpenSeconds": 3, "roomWake": 2500, "trapWake": 4000 },
+  "bay": { "x": 1500000, "ySpacing": 120000, "z": 200000, "corridor": 800, "branchGap": 800 },
+  "lootPerModifier": 0.25,
+  "modifiers": [
+    { "id": "no_healing", "name": "No healing", "line": "Potions and heals do nothing; lifesteal still works" },
+    { "id": "double_damage", "name": "Double damage", "line": "Everyone, both ways, takes double", "mult": 2.0 },
+    { "id": "darkness", "name": "Darkness", "line": "Your light reaches half as far; the creatures don't care", "light": 0.5 },
+    { "id": "iron_hide", "name": "Iron hide", "line": "Creatures shrug off flinches on every attack" },
+    { "id": "frenzy", "name": "Frenzy", "line": "Creatures move and attack 15% faster", "speed": 1.15 },
+    { "id": "venomous", "name": "Venomous", "line": "Creature status buildup x1.5", "buildup": 1.5 },
+    { "id": "brittle_gear", "name": "Brittle gear", "line": "Your gear wears three times as fast", "wear": 3.0 },
+    { "id": "no_tames", "name": "No tames", "line": "Your tames wait at the portal" },
+    { "id": "bloodied", "name": "Bloodied", "line": "You enter at half health", "health": 0.5 },
+    { "id": "swarming", "name": "Swarming", "line": "Half as many creatures again in every room", "count": 1.5 }
+  ],
+  "rewards": [
+    { "rank": 1, "chests": 1, "chest": { "@materials": [5, 7], "copper_ore": [6, 9], "tin_ore": [3, 5] }, "treasure": { "@materials": [4, 6] }, "treasureChance": { "@gem": 0.25 },
+      "boss": { "@materials": [7, 9], "copper_ore": [7, 9], "minor_healing_potion": 2 }, "upgradeShards": 0, "artifactChance": 0, "trophyComfort": 1 },
+    { "rank": 2, "chests": 2, "chest": { "@materials": [7, 9], "iron_ore": [5, 7] }, "treasure": { "@materials": [6, 8] }, "treasureChance": { "@gem": 0.5 },
+      "boss": { "@materials": [9, 11], "iron_ore": [7, 9], "charcoal": [4, 6], "healing_potion": 2 }, "bossChance": { "@fineGear": 0.3 }, "upgradeShards": 1, "artifactChance": 0, "trophyComfort": 1 },
+    { "rank": 3, "chests": 2, "chest": { "@materials": [9, 11], "iron_ore": [5, 7], "iron_ingot": 2 }, "treasure": { "@materials": [8, 10] }, "treasureChance": { "@rune": 0.15, "@gem": 0.5 },
+      "boss": { "@materials": [11, 13], "iron_ore": [8, 10], "@essence": 3, "healing_potion": 2 }, "upgradeShards": 2, "artifactChance": 0.03, "trophyComfort": 1 },
+    { "rank": 4, "chests": 3, "chest": { "charcoal": [9, 11], "steel_plate": 2, "@materials": [6, 8] }, "treasure": { "@gem": 3 },
+      "boss": { "@materials": [14, 16], "@essence": 5, "star_iron": 1, "greater_healing_potion": 2 }, "upgradeShards": 3, "artifactChance": 0.08, "trophyComfort": 2 },
+    { "rank": 5, "chests": 4, "chest": { "charcoal": [10, 12], "steel_plate": 3, "@materials": [8, 10] }, "treasure": { "@gem": 3, "core_shard": 1 }, "vault": { "star_iron": 3 }, "vaultChance": { "@masterwork": 0.2 },
+      "boss": { "@materials": [19, 21], "@essence": 8, "star_iron": 2, "core_shard": 2, "greater_healing_potion": 3 }, "upgradeShards": 4, "artifactChance": 0.15, "trophyComfort": 2 }
+  ],
+  "materials": {
+    "volcanic": ["sulfur_crystal", "obsidian", "magmaw_hide"],
+    "tundra": ["lichen", "hide", "bone"]
+  },
+  "gems": ["gem_ruby", "gem_topaz", "gem_onyx"],
+  "runes": ["rune_thirst", "rune_haste", "rune_anvil", "rune_tide", "rune_thorns", "rune_grave", "rune_sight", "rune_hollowing"],
+  "fineGear": { "2": ["iron_sword", "iron_spear", "iron_dagger", "iron_head", "iron_hands", "iron_legs"], "5": ["starsteel_sword", "starsteel_greatsword", "starsteel_spear", "starsteel_great_hammer"] },
+  "keys": { "station": "alchemy_table", "level": 1, "seconds": 8, "lowerShards": 3, "sameShards": 1, "firstShards": 3, "signaturePerRank": 2 }
+}

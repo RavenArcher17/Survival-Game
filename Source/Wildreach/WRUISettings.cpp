@@ -1804,6 +1804,7 @@ namespace WRSettingsUI
 			const TFunction<FText(float)> Minutes = [](float V) { return FText::Format(LOCTEXT("RuleMinutes", "{0} min"), FMath::RoundToInt(V)); };
 			const TFunction<FText(float)> Hours = [](float V) { return FText::Format(LOCTEXT("RuleHours", "{0} h"), FMath::RoundToInt(V)); };
 			const TFunction<FText(float)> Members = [](float V) { return V < 0.5f ? LOCTEXT("RuleNoLimit", "No limit") : FText::AsNumber(FMath::RoundToInt(V)); };
+			const TFunction<FText(float)> Plain = [](float V) { return FText::AsNumber(FMath::RoundToInt(V)); };
 			List = SNew(SVerticalBox);
 
 			Group(LOCTEXT("RulesPlayers", "Players"), true);
@@ -1851,7 +1852,20 @@ namespace WRSettingsUI
 				Often(LOCTEXT("RuleWorldEvents", "World events"), LOCTEXT("RuleWorldEventsSub", "Starfall: stars that fall with rare iron"), &FWRWorldSettings::WorldEvents);
 				Often(LOCTEXT("RuleBiomeEvents", "Biome events"), LOCTEXT("RuleBiomeEventsSub", "The Eruption, the Whiteout: a land's day of danger and plenty"), &FWRWorldSettings::BiomeEvents);
 				Often(LOCTEXT("RuleInvasions", "Invasions"), LOCTEXT("RuleInvasionsSub", "The opposite land's creatures come through a pass"), &FWRWorldSettings::Invasions);
+				// Dungeon portals (WRPortals): how fast an ignored portal breaks; artifacts (WRArtifacts): the level cap.
+				static const TCHAR* const BreakNames[] = { TEXT("half"), TEXT("normal"), TEXT("double"), TEXT("never") };
+				Add(LOCTEXT("RulePortalBreak", "Portal break timers"), LOCTEXT("RulePortalBreakSub", "How long an ignored portal lasts before its boss walks out (1 / 3 / 6 / 10 / 18 days at Normal)"),
+					Segmented({ LOCTEXT("BreakHalf", "Half"), LOCTEXT("BreakNormal", "Normal"), LOCTEXT("BreakDouble", "Double"), LOCTEXT("BreakNever", "Never") },
+						[this]() { for (int32 i = 0; i < 4; ++i) if (Values->PortalBreak == BreakNames[i]) return i; return 1; },
+						[this](int32 i) { Values->PortalBreak = BreakNames[i]; Changed(); }));
+				static const TCHAR* const CapNames[] = { TEXT("off"), TEXT("5"), TEXT("10"), TEXT("15") };
+				Add(LOCTEXT("RuleArtifactCap", "Artifact level cap"), LOCTEXT("RuleArtifactCapSub", "How heavy a set of artifacts may count; Off also closes the bosses' hidden third phases"),
+					Segmented({ LOCTEXT("CapOff", "Off"), LOCTEXT("Cap5", "5"), LOCTEXT("Cap10", "10"), LOCTEXT("Cap15", "15") },
+						[this]() { for (int32 i = 0; i < 4; ++i) if (Values->ArtifactCap == CapNames[i]) return i; return 3; },
+						[this](int32 i) { Values->ArtifactCap = CapNames[i]; Changed(); }));
 			}
+			Range(LOCTEXT("RulePortalRuns", "Portal runs at once"), LOCTEXT("RulePortalRunsSub", "How many portal folds can be open together"), TEXT("portalRuns"), 1.f, 8.f, 1.f, Plain);
+			Range(LOCTEXT("RuleArtifactSlots", "Artifact hooks"), LOCTEXT("RuleArtifactSlotsSub", "How many artifacts a survivor may wear (0: none)"), TEXT("artifactSlots"), 0.f, 3.f, 1.f, Plain);
 			Range(LOCTEXT("RuleUpkeep", "Building upkeep"), LOCTEXT("RuleUpkeepSub", "What a land claim costs to keep up"), TEXT("upkeepMultiplier"), 0.f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleBoss", "Boss respawn"), LOCTEXT("RuleBossSub", "How long before a beaten boss comes back"), TEXT("bossRespawnHours"), 1.f, 24.f, 1.f, Hours);
 
