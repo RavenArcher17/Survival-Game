@@ -212,8 +212,30 @@ Open, as of 0.7.1:
   put back at its portal); rank 3-5 bosses borrow built rigs (overlay colours in creatures.json) until they're sculpted;
   the new creatures' voices are pitched shared calls; only four artifacts can drop until more lands, majors and raids
   exist. Dev: `WRCmd portal dev open <land> <rank> | crack | spill | break | clear`, `WRCmd art dev give <id> <weight>`.
-- **Bounties** stay a setting only (nothing reads it) until the PvP pass. **54 perks** wait for their systems
-  (`waitsFor` in `Data/lifeskills.json`: diving, bees, explosives, timed brews...; Breeder, Rare finder, Saddle master and
+- **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
+  (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
+  never its own file in the world folder. Schema changes are a new `Data/db/migrations/NNNN_*.sql`. One server per world
+  folder (the DB is opened exclusive). Backups are in the world's `backups/` folder: to restore one, quit the game, copy
+  the backup over `world.db` (delete `world.db-wal` if it's there) and start the world. A player who lost their PC's key
+  (`Saved/Identity/key.bin`) gets their name back when the host clears it: open `world.db` in any SQLite browser while
+  the world is closed and run `UPDATE accounts SET key_hash = '' WHERE name = 'TheirName';` (the multiplayer cook's
+  admin screen will do this in game). Raven's headless test tools read the old JSON files: run them with
+  `-wrstore=json`.
+- **Steam / EOS identity**: the server binds whatever account id the online subsystem gives (`AWRGameMode::PreLogin`,
+  `WRIdentity`). Steam needs a Steamworks app id ($100 Steam Direct): not now. **EOS is free; to turn it on (Aaron):**
+  1. Go to https://dev.epicgames.com/portal and sign in with the studio's Epic account. 2. Create Product, name it
+  Wildreach. 3. In the product, Product Settings > Clients: Add New Client, policy "GameClient", copy the Client ID and
+  Client Secret. 4. Product Settings: copy the Product ID, Sandbox ID and Deployment ID (the Live deployment). 5. Paste
+  the five values into a message to the build lane; it enables the EOS online subsystem with them (`DefaultEngine.ini`)
+  and the game starts binding EOS ids at once (device-id login, no Epic account needed by players).
+- **Player raiding** (`WRRaiding`): every player-side source that hurts a building goes through
+  `FWRRaiding::DamagePiece` (it rings the claim's bell and keeps the raid record); creature raids still bite through
+  `TakeBuildDamage`. Raid tools are items of category `raid`. Siege engines (ram, catapult, ballista: biome-crystal
+  2.21.5), haulers pushing rams and necromancers raising the dead through walls aren't built (no siege engines, no
+  Necromancy tree yet); the Necromancy numbers wait in `tuning.json raiding.paths.necromancy`. The ladder has no climb
+  clip (the hero climbs in the idle pose). The code breaker waits for the Crystal caves (resonant crystal).
+- **Bounties** stay a setting only (nothing reads it) until the PvP pass. **52 perks** wait for their systems
+  (`waitsFor` in `Data/lifeskills.json`: diving, bees, siege weapons, timed brews...; Siege-proof and Silent charges are live since build-server-raids; Breeder, Rare finder, Saddle master and
   Creature armorer are live since build-taming; Decorator, Turret tech,
   Master builder and Ancient wood are live since build-building).
 - **F8 pictures from the game don't reach the web inbox yet**: the feedback endpoint keeps screenshots (and context over

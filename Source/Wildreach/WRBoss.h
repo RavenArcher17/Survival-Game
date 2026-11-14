@@ -48,6 +48,12 @@ public:
 	float Radius = 250.f;
 	float DamagePerSecond = 8.f;
 	FName Kind = TEXT("lava");   // lava, flood, ice
+	/** A player's fire (a fire pot, Fire wall, Lava pool): burns the wood of buildings it touches once a second, as
+	 *  FWRRaiding's fire source for Raider (PathId: the spell's path, for its raid multiplier). */
+	bool bBurnsPieces = false;
+	FString Raider;
+	FName PathId;
+	float PieceClock = 0.f;
 
 private:
 	float Clock = 0.f;

@@ -61,6 +61,8 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_Homing) TObjectPtr<AActor> HomingOn;
 	UPROPERTY(ReplicatedUsing=OnRep_Homing) float HomingAcceleration = 0.f;
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> Trail;
+	/** A thing modelled in code rather than a mesh asset (ModelPath "code:<what>": the fire pot). */
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> CodeModel;
 	FName Kind;
 	FName PickupItem;
 

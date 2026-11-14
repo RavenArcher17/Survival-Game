@@ -1,5 +1,74 @@
 # Changelog
 
+## Unreleased: the world store (SQLite), identity, player raiding, raid group settings
+
+Aaron (lane build-server-raids: research, requirement ledger and plan in showcase-notes cooks/build-server-raids.md,
+following Raven's M7 1, server-settings.md and cooks/multiplayer.md, survival-crafting.md 2.16 / 2.18 and
+biome-crystal.md 2.21.4-2.21.6). Built to compile (editor, adaptive and full unity); not played here (Aaron and the
+testers test, F8).
+
+- **The world store is SQLite** (M7 1): each world keeps everything in `Saved/Worlds/<id>/world.db` (the engine's
+  SQLiteCore plugin, now enabled; WAL, exclusive: one server per world folder). Tables from versioned migrations in
+  `Data/db/migrations/*.sql` (applied past `PRAGMA user_version` at start): `accounts`, `characters` (one row per
+  character, its JSON as the "inventory blob"), `world_docs` (world, clans, wildlife, portals, world_systems, raid),
+  `backups`, `meta`. The game thread hands rows to a writer thread that commits everything pending in one transaction
+  every `store.flushSeconds` (10) and at once on logout and shutdown; reads see pending writes. `WRStore.h/.cpp`.
+- **No wipe**: a 0.7 world's JSON saves (world, clans, wildlife, portals, world systems, players/) are brought in on its
+  first start in one transaction, after a pre-import snapshot; the files move to `json-before-sqlite/` (never deleted).
+  `info.json` and `settings.json` stay files (the menu reads them).
+- **Hourly backups**: `VACUUM INTO` snapshots in the world's `backups/` folder every hour while it runs (keep 24), the
+  first of each UTC day kept as a daily (keep 7), one on every clean shutdown (keep 5), and the import one (kept). A
+  damaged `world.db` (`quick_check` fails) is set aside and the newest backup that passes comes back, with an Error in the
+  log. `-wrstore=json` keeps the old JSON files (Raven's headless test tools read and delete them).
+- **Identity** (M7 1: "name + generated token in the client's Saved dir; Steam/EOS later"): every PC makes a 32-byte key
+  (`Saved/Identity/key.bin`, OS crypto random) and joins with `?WRKey=<SHA-256 token>`; the world's `accounts` table keeps
+  a hash per name. The first join claims a name; another PC's join with it is refused at `PreLogin` with "The name X
+  belongs to someone else on this world". Names from before claim on their next join. A Steam or EOS account id, once
+  an online subsystem gives one, is bound to the name too and lets that account in from any PC. Steam needs a paid app
+  id (not now); EOS is free but needs Aaron's product registration (HANDOFF has the steps). `WRIdentity.h/.cpp`.
+- **Player raiding** (`WRRaiding.h/.cpp`, numbers in `tuning.json raiding`): one rule for every player-side source that
+  hurts a building (weapons, charges, fire pots, path spells, burning ground, tames): a share per source x material, x
+  the path's multiplier (fire x2 on wood: Raven's "fire burns wooden walls"; lightning x1.5 metal, spore x1.5 wood, void
+  x1.25, arcane x1.25 stone as data for when they ship), then offline protection as before. Only on PvP worlds and never
+  your own or your clan's.
+  - **Black powder** is the real 75/15/10: saltpetre 2 + charcoal 1 + sulfur 1 at the alchemy table (L3). **Saltpetre**
+    (white nitre crust on a dry cave rock, pick) and **clay** (a wet clay bank, any tool) are new nodes in every cave.
+  - **Fire pot** (alchemy L2: clay, sulfur, fat): thrown from the ranged slot; aiming shows its arc (glowing dots and a
+    ring where it lands; it never homes); a modelled clay jar in the hand and in flight; it breaks into shards and fire,
+    hurts and burns anyone in 2 m (not your clan), hits wood pieces for 150 and leaves 10 s of burning ground that burns
+    wood (and hurts) as it goes.
+  - **Powder charge, the petard** (workbench L3: powder 4, bronze 2, wood 2, fiber 2): use it facing a wall, door, floor
+    or Hearth: a bronze petard on an oak plank sticks to that face, its slow match burns down to the touch hole over 5 s
+    (sparks, glow, hiss), then a 4 m blast: wood 800, stone 600, metal 300, biome 250, Hearth 300 to the piece it's on,
+    half to the others in reach; 120 to people in 4 m falling to half at the edge, unblockable, behind cover safe, the
+    placer not spared, clanmates spared. Raid costs hold: wood wall 1, stone 2, metal 9, biome 12. A charge on a piece
+    that breaks first drops and still goes off.
+  - **Mining charge** (powder 2, clay, hide): tamped into an ore, sulfur, nitre or rock node: it bursts the lot, x3, into
+    a heap on the ground.
+  - **Siege ladder** (workbench L3: wood 20, rope 6, iron 1): leaned on a wall, palisade or gate up to 6 m (its foot
+    1.6 m out, its iron hooks over the top). Walk into it to climb (a new predicted movement mode on the survivor's
+    movement component: up and down the rails, jump to drop, a hop over the top, knocked off by a stagger). 300 HP,
+    weapons chop it down; it lasts 10 minutes and falls with its wall.
+  - **Code breaker** (workbench L4, needs resonant crystal: hidden until the Crystal caves ship): 60 s held still at a
+    code-locked door, ringing 40 m; the owners' bell rings at the start; the lock opens for you at the end.
+  - **The raid bell**: every claim totem now carries a modelled bronze bell (a real bell's profile with its sound bow,
+    yoke, pin and clapper) on an iron bracket strapped round the post. A player-side hit on the claim (or a creature
+    raid's warning and arrival) strikes it: it swings as a damped pendulum with the clapper lagging, the same on every
+    machine, and rings (synthesised from bell partials) out to 300 m. Owners who are on get a "Claim attacked" card with
+    who and how far; the map shows the claim UNDER ATTACK for a minute; owners who were away get a "While you were away"
+    card (who, when, what broke) at their next login. The record (last 10 raids per claim) is in the world store.
+  - **Tames in raids**: "Break that" on the whistle wheel (and a tame's own wheel): biting tames in earshot go for the
+    building under your crosshair at their bite x0.5 (a fire tame's bite burns wood x2), then the next piece of the same
+    owner beside it, until called off.
+  - **Perks**: Siege-proof (walls you build take a quarter less from charges, saved per piece) and Silent charges (your
+    charges heard at a third of the distance) are live.
+- **Full-release server settings** (Raven's server-settings.md): portal break timers, artifact limits and invasion
+  frequency were built by the portals and world-systems lanes; **raid group sizes** are new: `raidGroupMax` (0 = no cap,
+  DR #22 "tuned for, not capped") and `raidGroupTuned` (8) in every preset, read by `FWRRaiding::RaidGroupMax/Tuned` for
+  the endgame war-halls; their settings rows show once those raids exist (`raiding.warHallsLive`).
+- New binaries: 8 synthesised OGGs (`Data/Audio/raid`, 235 KB; `Tools/audio/synth_raid.py`) and 8 item icons
+  (`Data/UI/Icons`, 60 KB; `Tools/art/make_raid_icons.py`).
+
 ## Unreleased: dungeon portals and artifacts
 
 Aaron (lane build-portals-artifacts: research, requirement ledger and plan in showcase-notes cooks/build-portals-artifacts.md,

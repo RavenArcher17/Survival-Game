@@ -6,6 +6,7 @@
 #include "WRGameState.h"
 #include "WRTuning.h"
 #include "WRWorlds.h"
+#include "WRStore.h"
 #include "Algo/Reverse.h"
 #include "Dom/JsonObject.h"
 #include "Engine/World.h"
@@ -993,7 +994,7 @@ int32 WRWildlife::Start(UWorld* World)
 	FString Text;
 	TSharedPtr<FJsonObject> Saved;
 	// (They're saved together: without its world.json a world is starting over, and so does its wildlife.)
-	if (!Dir.IsEmpty() && FPaths::FileExists(FPaths::Combine(Dir, TEXT("world.json"))) && FFileHelper::LoadFileToString(Text, *FPaths::Combine(Dir, TEXT("wildlife.json")))
+	if (!Dir.IsEmpty() && WRStore::HasDoc(TEXT("world")) && WRStore::ReadDoc(TEXT("wildlife"), Text)
 		&& FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Saved) && Saved.IsValid())
 	{
 		Saved->TryGetNumberField(TEXT("clock"), G.Clock);
@@ -1181,5 +1182,5 @@ void WRWildlife::Save(UWorld* World)
 	Root->SetArrayField(TEXT("packs"), List);
 	FString Text;
 	FJsonSerializer::Serialize(Root, TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text));
-	FFileHelper::SaveStringToFile(Text, *FPaths::Combine(Dir, TEXT("wildlife.json")));
+	WRStore::WriteDoc(TEXT("wildlife"), Text);
 }

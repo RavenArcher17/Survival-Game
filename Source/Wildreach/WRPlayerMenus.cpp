@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRPlayerController.h"
+#include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
@@ -900,7 +901,15 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		// The whistle (H, or hold Interact with nothing in front): every tame of yours in earshot takes the order. You
 		// whistle for everyone near to hear; each tame that heard answers with its own call, a beat apart.
 		const FString Order = Arg(1);
-		static const TSet<FString> Allowed = { TEXT("follow"), TEXT("stay"), TEXT("passive"), TEXT("aggressive") };
+		static const TSet<FString> Allowed = { TEXT("follow"), TEXT("stay"), TEXT("passive"), TEXT("aggressive"), TEXT("siege") };
+		if (Order == TEXT("siege"))
+		{
+			// Break that: every biting tame in earshot goes for the building under your crosshair (WRRaiding).
+			WRSound::Broadcast(GetPawn(), TEXT("tame.whistle"));
+			OutResult = FWRRaiding::OrderTamesToBreak(this);
+			ClientNotify(OutResult);
+			return true;
+		}
 		if (!Allowed.Contains(Order))
 		{
 			OutResult = TEXT("the whistle can't give that order");

@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
@@ -147,6 +148,16 @@ void AWRHazard::Tick(float DeltaSeconds)
 		return;
 	}
 	const AWRCharacterBase* SourceChar = Cast<AWRCharacterBase>(Source.Get());
+	// Burning the wood it touches (path raiding: "fire burns wooden walls"), once a second at its damage per second.
+	if (bBurnsPieces && !Raider.IsEmpty())
+	{
+		PieceClock += DeltaSeconds;
+		if (PieceClock >= 1.f)
+		{
+			FWRRaiding::SplashPieces(GetWorld(), GetActorLocation(), Radius, DamagePerSecond * PieceClock, EWRRaidSource::Fire, this, Raider, PathId);
+			PieceClock = 0.f;
+		}
+	}
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
 		AWRCharacterBase* Who = *It;

@@ -1,4 +1,5 @@
 #include "WRRaids.h"
+#include "WRRaiding.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
@@ -164,6 +165,8 @@ namespace WRRaidsImpl
 		int32 Most = 0;
 		for (const TPair<FName, int32>& K : R.Kinds) if (K.Value > Most) { Most = K.Value; Portrait = K.Key; }
 		const FString Title = Portrait.IsNone() ? FString() : NameOf(Portrait, 2).RightChop(2);   // "Cinderfangs"
+		// The warning and the arrival ring the claim's raid bell too (WRRaiding): heard in the world, not only read.
+		if (Stage <= 1) FWRRaiding::RingBell(R.Claim.Get());
 		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 		{
 			AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());

@@ -157,6 +157,8 @@ public:
 	UPROPERTY(Replicated) float MaxHealth = 300.f;
 	/** Server, before it's spawned: its health x Scale (its builder's Building level and Fortifier perk; saved). */
 	void ScaleHealth(float Scale) { MaxHealth *= FMath::Max(0.1f, Scale); Health = MaxHealth; }
+	/** Server: the share of a charge's blast it shrugs off (its builder's Siege-proof perk when it was built; saved). */
+	float BlastResist = 0.f;
 	/** Server: when it last took damage (Self repair waits for a quiet minute). */
 	double LastDamagedAt = -1.0e9;
 	UPROPERTY(ReplicatedUsing=OnRep_Door) bool bOpen = false;
@@ -289,6 +291,8 @@ public:
 	UPROPERTY(Replicated) int32 UpgradeLevel = 0;
 	UPROPERTY(Replicated) bool bUnpaid = false;
 	UPROPERTY(Replicated) TArray<FWRItemStack> UpkeepStorage;
+	/** Server time its raid bell was last struck (FWRRaiding): every machine swings the bell from it. */
+	UPROPERTY(Replicated) float BellRungAt = -1000.f;
 	/** Server: the game hour (AWRGameState::GetTotalHours) its next creature raid is due (WRRaids); < 0: not set yet. Saved. */
 	double NextRaidHours = -1.0;
 
@@ -310,4 +314,7 @@ private:
 	/** Upkeep due but not yet a whole item, per material (paid as it adds up to one). */
 	TMap<FName, float> UpkeepOwed;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
+	/** The raid bell hung on the post (cooks/build-server-raids.md 2.5). */
+	UPROPERTY(Transient) TObjectPtr<class UWRRaidBellComponent> Bell;
+	void HangBell();
 };

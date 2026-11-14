@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRRaiding.h"
 #include "WRArtifacts.h"
 #include "WRPortals.h"
 #include "WRBuildSets.h"
@@ -980,6 +981,16 @@ void UWRGA_Melee::Sweep()
 			WRPortals::HitThing(Thing, Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character->Weapon.Element == TEXT("fire"));
 			continue;
 		}
+		// A siege ladder: wood, so any blow hurts it fully.
+		if (AWRSiegeLadder* Ladder = Cast<AWRSiegeLadder>(HitResult.GetActor()))
+		{
+			if (!HitThisSwing.Contains(Ladder))
+			{
+				HitThisSwing.Add(Ladder);
+				Ladder->TakeHit(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character);
+			}
+			continue;
+		}
 		// Raiding: weapons damage other people's buildings (stations/Hearths/totems belong to their piece).
 		AWRBuildPiece* Piece = Cast<AWRBuildPiece>(HitResult.GetActor());
 		if (!Piece && HitResult.GetActor())
@@ -1000,13 +1011,11 @@ void UWRGA_Melee::Sweep()
 					WRFx::Broadcast(Character, bWood ? TEXT("gather.wood") : TEXT("hit.dust"), At, (Start - At).GetSafeNormal().Rotation(), bHeavy ? 1.3f : 1.f, bWood ? TEXT("gather.wood") : TEXT("hit.block"));
 				}
 				// Weapons and tools barely mark a wall: wood takes a tenth, stone a fiftieth, metal and the biome sets
-				// nothing (Data/building_sets.json materialDamage; survival-crafting 2.18). Raids bring charges and rams.
-				const float Share = PieceDef ? FWRBuildSets::Get().WeaponShare(PieceDef->Material) : 1.f;
-				if (Share > 0.f)
-				{
-					Piece->TakeBuildDamage(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f)
-						* T.Num(TEXT("building.raidDamageMultiplier"), 1.f) * Share, Character);
-				}
+				// nothing (Data/building_sets.json materialDamage; survival-crafting 2.18). Raids bring charges and fire.
+				// Through the raid rule (WRRaiding): a path-infused blade raids as its path (fire x2 on wood), the
+				// claim's bell rings, and PvE worlds have no raiding.
+				FWRRaiding::DamagePiece(Piece, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f)
+					* T.Num(TEXT("building.raidDamageMultiplier"), 1.f), EWRRaidSource::Weapon, Character, PS->GetPlayerName(), Character->Weapon.Element);
 			}
 			continue;
 		}
@@ -2130,7 +2139,13 @@ void UWRGA_AreaSpell::Execute()
 		for (int32 i = 0; i < Patches; ++i)
 		{
 			const FVector At = Center + Across * (Width * (i / FMath::Max(1.f, Patches - 1.f) - 0.5f));
-			AWRHazard::Spawn(World, Caster, Ground(At), Width / Patches * 0.7f, Num(TEXT("seconds"), 6.f), Num(TEXT("dps"), 10.f), TEXT("fire"), false);
+			if (AWRHazard* Fire = AWRHazard::Spawn(World, Caster, Ground(At), Width / Patches * 0.7f, Num(TEXT("seconds"), 6.f), Num(TEXT("dps"), 10.f), TEXT("fire"), false))
+			{
+				// Fire burns wooden walls (Raven, DD Multiplayer): the wall of flame chars any wood it stands against.
+				Fire->bBurnsPieces = true;
+				Fire->Raider = FWRRaiding::Responsible(Caster);
+				Fire->PathId = PathId;
+			}
 			WRFx::Broadcast(Caster, TEXT("firewall"), Ground(At), FRotator(0.f, Aim.Yaw, 0.f), Width / Patches * 0.7f / 100.f, i == Patches / 2 ? FName(TEXT("firewall")) : NAME_None, Num(TEXT("seconds"), 6.f));
 		}
 		break;
@@ -2139,7 +2154,12 @@ void UWRGA_AreaSpell::Execute()
 	{
 		// Lava where you aim (up to range), on the ground.
 		const FVector At = Aimed(Num(TEXT("range"), 1500.f), 0.f, 0.7f);
-		AWRHazard::Spawn(World, Caster, At, Num(TEXT("radius"), 300.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 12.f), TEXT("lava"), false);
+		if (AWRHazard* Lava = AWRHazard::Spawn(World, Caster, At, Num(TEXT("radius"), 300.f), Num(TEXT("seconds"), 8.f), Num(TEXT("dps"), 12.f), TEXT("lava"), false))
+		{
+			Lava->bBurnsPieces = true;
+			Lava->Raider = FWRRaiding::Responsible(Caster);
+			Lava->PathId = PathId;
+		}
 		WRFx::Broadcast(Caster, TEXT("lavapool"), At, FRotator::ZeroRotator, Num(TEXT("radius"), 300.f) / 100.f, TEXT("lavapool"), Num(TEXT("seconds"), 8.f));
 		break;
 	}
@@ -2155,6 +2175,8 @@ void UWRGA_AreaSpell::Execute()
 				Strike(*It, Caster->GetActorLocation());
 			}
 		}
+		// ...and the buildings in it (path raiding: WRRaiding's spell share x the path's multiplier).
+		FWRRaiding::SplashPieces(World, Caster->GetActorLocation(), Radius, Num(TEXT("damage"), 15.f), EWRRaidSource::Spell, Caster, FWRRaiding::Responsible(Caster), PathId);
 		break;
 	}
 	case EWRAreaShape::Meteor:
@@ -2166,8 +2188,9 @@ void UWRGA_AreaSpell::Execute()
 		TWeakObjectPtr<AWRCharacterBase> Weak = Caster;
 		const float Damage = Num(TEXT("damage"), 55.f), Burn = Num(TEXT("burnBuildup"), 70.f);
 		const FName Path = PathId;
+		const FString Raider = FWRRaiding::Responsible(Caster);
 		FTimerHandle Timer;
-		World->GetTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([Weak, At, Radius, Damage, Burn, Path]()
+		World->GetTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([Weak, At, Radius, Damage, Burn, Path, Raider]()
 		{
 			AWRCharacterBase* C = Weak.Get();
 			if (!C) return;
@@ -2180,7 +2203,13 @@ void UWRGA_AreaSpell::Execute()
 					UWRCombatLibrary::ApplyHit(*It, H);
 				}
 			}
-			AWRHazard::Spawn(C->GetWorld(), C, At, Radius * 0.6f, 5.f, 8.f, TEXT("fire"), false);
+			FWRRaiding::SplashPieces(C->GetWorld(), At, Radius, Damage, EWRRaidSource::Spell, C, Raider, Path);
+			if (AWRHazard* Fire = AWRHazard::Spawn(C->GetWorld(), C, At, Radius * 0.6f, 5.f, 8.f, TEXT("fire"), false))
+			{
+				Fire->bBurnsPieces = true;
+				Fire->Raider = Raider;
+				Fire->PathId = Path;
+			}
 			WRFx::Broadcast(C, TEXT("fire.impact"), At, FRotator(90.f, 0.f, 0.f), 3.f, TEXT("fire.impact"));
 			WRFx::Broadcast(C, TEXT("firewall"), At, FRotator::ZeroRotator, Radius * 0.6f / 100.f, NAME_None, 5.f);
 		}), Delay, false);
@@ -2229,6 +2258,13 @@ void UWRGA_AreaSpell::Execute()
 			{
 				Done.Add(Target);
 				Strike(Target, From);
+			}
+			// A building in its line takes it too (once), and stops it: ice doesn't go through walls.
+			if (AWRBuildPiece* Piece = FWRRaiding::PieceOf(H.GetActor()); Piece && !Done.Contains(Piece) && H.bBlockingHit)
+			{
+				Done.Add(Piece);
+				FWRRaiding::DamagePiece(Piece, Num(TEXT("damage"), 15.f), EWRRaidSource::Spell, Caster, FWRRaiding::Responsible(Caster), PathId);
+				break;
 			}
 		}
 		WRFx::Broadcast(Caster, TEXT("icelance"), From, Aim, Range / 100.f, TEXT("icelance"));

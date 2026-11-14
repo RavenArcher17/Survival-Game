@@ -63,6 +63,8 @@ namespace WRResourceLookParts
 		else if (ItemId == TEXT("copper_ore")) { Color = FLinearColor(0.75f, 0.4f, 0.2f); Scale = FVector(1.5f, 1.5f, 1.2f); }
 		else if (ItemId == TEXT("sulfur_crystal")) { Color = FLinearColor(0.9f, 0.85f, 0.2f); Scale = FVector(0.8f, 0.8f, 1.6f); }
 		else if (ItemId == TEXT("lichen")) { Color = FLinearColor(0.6f, 0.75f, 0.55f); Scale = FVector(1.5f, 1.5f, 0.4f); }
+		else if (ItemId == TEXT("saltpetre")) { Color = FLinearColor(0.9f, 0.9f, 0.86f); Scale = FVector(1.3f, 1.3f, 0.9f); }
+		else if (ItemId == TEXT("clay")) { Color = FLinearColor(0.32f, 0.27f, 0.21f); Scale = FVector(1.8f, 1.8f, 0.5f); }
 		else if (ItemId == TEXT("berries")) { Color = FLinearColor(0.45f, 0.1f, 0.25f); Scale = FVector(1.2f, 1.2f, 0.8f); }
 		else if (ItemId == TEXT("fiber")) { Color = FLinearColor(0.55f, 0.6f, 0.25f); Scale = FVector(0.8f, 0.8f, 1.2f); }
 		else if (ItemId == TEXT("tin_ore")) { Color = FLinearColor(0.7f, 0.72f, 0.75f); Scale = FVector(1.5f, 1.5f, 1.2f); }
@@ -266,6 +268,42 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
 			const FVector Centre = Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f));
 			Bit(Centre, Q.Rotator() + FRotator(0.f, 0.f, 0.f), FVector(W, W * 0.85f, Len));
+		}
+	}
+	else if (Item == TEXT("saltpetre"))
+	{
+		// Nitre: a low, dry cave rock furred with white crust (cooks/build-server-raids.md 1.4): many thin, short needles
+		// lying close along its flanks and top, thickest in its hollows, never standing out like crystals.
+		Place(Fit(Main, FVector(150.f, 130.f, 70.f), 14.f, FRotator(Rand.FRandRange(-5.f, 5.f), 0.f, Rand.FRandRange(-5.f, 5.f))));
+		Tint(RockMaterial(Node, FLinearColor(0.16f, 0.15f, 0.15f)));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(3.2f, 3.2f, 3.05f)));   // over 1: the rock texture is dark
+		const int32 N = 26;
+		for (int32 k = 0; k < N; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI);
+			const float H = Rand.FRandRange(0.15f, 0.95f);
+			const float Rr = FMath::Lerp(0.46f, 0.12f, H);
+			const FVector Where(FMath::Cos(A) * 150.f * Rr, FMath::Sin(A) * 130.f * Rr, 70.f * H - 10.f);
+			const float L = Rand.FRandRange(10.f, 22.f);
+			// Lying along the surface: tipped out from the middle by how far down the flank it grows.
+			Bit(Where, FRotator(FMath::Lerp(70.f, 15.f, H) + Rand.FRandRange(-12.f, 12.f), FMath::RadiansToDegrees(A), Rand.FRandRange(0.f, 180.f)), FVector(L * 0.18f, L * 0.5f, L));
+		}
+	}
+	else if (Item == TEXT("clay"))
+	{
+		// A clay bank: a low, wide, smooth wet mound of grey-brown clay on the cave floor, with dug scoops and spoil lumps
+		// round its foot where it's been taken before.
+		Place(Fit(Main, FVector(240.f, 210.f, 55.f), 10.f, FRotator(0.f, 0.f, Rand.FRandRange(-3.f, 3.f))));
+		Tint(RockMaterial(Node, FLinearColor(0.42f, 0.35f, 0.27f)));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(0.62f, 0.52f, 0.4f)));
+		for (int32 k = 0; k < 6; ++k)
+		{
+			const float A = (k + Rand.FRandRange(-0.3f, 0.3f)) * 2.f * PI / 6.f;
+			const FVector Where(FMath::Cos(A) * 128.f, FMath::Sin(A) * 112.f, 4.f);
+			const float S = Rand.FRandRange(18.f, 30.f);
+			Bit(Where, FRotator(Rand.FRandRange(-10.f, 10.f), FMath::RadiansToDegrees(A), 0.f), FVector(S, S * 0.9f, S * 0.45f));
 		}
 	}
 	else if (Item == TEXT("lichen"))

@@ -1,4 +1,11 @@
 #include "WRCharacterMovementComponent.h"
+#include "WRRaiding.h"
+#include "WRCharacterBase.h"
+#include "WRGameplayTags.h"
+#include "WRTuning.h"
+#include "Components/CapsuleComponent.h"
+#include "EngineUtils.h"
+#include "GameFramework/Character.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
 #include "WRCharacter.h"
@@ -30,6 +37,10 @@ void UWRCharacterMovementComponent::BeginPlay()
 
 float UWRCharacterMovementComponent::GetMaxSpeed() const
 {
+	if (IsOnLadder())
+	{
+		return WRTune(TEXT("raiding.ladder.climbSpeed"), 180.f);
+	}
 	if (IsSwimming())
 	{
 		// Swimming: the swimming skill's every-level speed, and Sprint is the fast stroke. The skills replicate to the
@@ -92,6 +103,104 @@ uint8 FSavedMove_WR::GetCompressedFlags() const
 	if (bSavedBlockSlow) Flags |= FLAG_Custom_2;
 	if (bSavedAttackRoot) Flags |= FLAG_Custom_3;
 	return Flags;
+}
+
+void UWRCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
+{
+	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+	if (IsOnLadder() || !CharacterOwner || !(IsMovingOnGround() || IsFalling()))
+	{
+		return;
+	}
+	const FVector Accel = GetCurrentAcceleration();
+	if (Accel.SizeSquared2D() < 1.f)
+	{
+		return;
+	}
+	// A ladder whose lane we're on, that we're pushing into (toward the wall): climb it.
+	const float Radius = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const FVector Feet = UpdatedComponent->GetComponentLocation() - FVector(0.f, 0.f, CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+	for (TActorIterator<AWRSiegeLadder> It(GetWorld()); It; ++It)
+	{
+		float Along = 0.f;
+		if (!It->OnLane(Feet, Radius, Along) || Along > 0.9f) continue;
+		if (FVector::DotProduct(Accel.GetSafeNormal2D(), (-It->Out()).GetSafeNormal2D()) < 0.6f) continue;
+		Ladder = *It;
+		Velocity = FVector::ZeroVector;
+		SetMovementMode(MOVE_Custom, CMOVE_Ladder);
+		return;
+	}
+}
+
+void UWRCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterations)
+{
+	if (CustomMovementMode != CMOVE_Ladder)
+	{
+		Super::PhysCustom(DeltaTime, Iterations);
+		return;
+	}
+	AWRSiegeLadder* L = Ladder.Get();
+	const float Radius = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const float Half = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector Loc = UpdatedComponent->GetComponentLocation();
+	const FVector Feet = Loc - FVector(0.f, 0.f, Half);
+	float Along = 0.f;
+	const AWRCharacterBase* Who = Cast<AWRCharacterBase>(CharacterOwner);
+	// Knocked off (a stagger, a freeze), the ladder gone, or off its lane: fall.
+	if (!L || !L->OnLane(Feet, Radius, Along) || (Who && (Who->HasTag(WRTags::Status_Staggered) || Who->HasTag(WRTags::Status_Frozen))))
+	{
+		Ladder = nullptr;
+		SetMovementMode(MOVE_Falling);
+		StartNewPhysics(DeltaTime, Iterations);
+		return;
+	}
+	const FVector Up = L->Up();
+	const FVector Into = (-L->Out()).GetSafeNormal2D();
+	if (CharacterOwner->bPressedJump)
+	{
+		// Jump off backwards.
+		Ladder = nullptr;
+		Velocity = -Into * 350.f + FVector(0.f, 0.f, 250.f);
+		CharacterOwner->bPressedJump = false;
+		SetMovementMode(MOVE_Falling);
+		StartNewPhysics(DeltaTime, Iterations);
+		return;
+	}
+	const FVector Accel = GetCurrentAcceleration();
+	const float Push = Accel.SizeSquared2D() > 1.f ? FVector::DotProduct(Accel.GetSafeNormal2D(), Into) : 0.f;
+	const float Speed = WRTune(TEXT("raiding.ladder.climbSpeed"), 180.f);
+	const float Climb = Push > 0.3f ? 1.f : Push < -0.3f ? -1.f : 0.f;
+	// At the top: a hop forward over the hooks onto the wall's top or the walkway behind it.
+	if (Climb > 0.f && Along >= 0.96f)
+	{
+		Ladder = nullptr;
+		const float Hop = WRTune(TEXT("raiding.ladder.topHopCm"), 120.f);
+		Velocity = Into * (Hop / 0.35f) + FVector(0.f, 0.f, 420.f);
+		SetMovementMode(MOVE_Falling);
+		StartNewPhysics(DeltaTime, Iterations);
+		return;
+	}
+	// At the bottom, climbing down: step off onto the ground.
+	if (Climb < 0.f && Along <= 0.02f)
+	{
+		Ladder = nullptr;
+		SetMovementMode(MOVE_Walking);
+		StartNewPhysics(DeltaTime, Iterations);
+		return;
+	}
+	// Along the rails, held on the lane in front of the rungs (eased to it, never snapped).
+	const FVector Side = L->GetActorRightVector();
+	const FVector Face = FVector::CrossProduct(Side, Up).GetSafeNormal();
+	const FVector Ideal = L->Foot() + Up * (Along * L->Length) + Face * (Radius + 8.f) + FVector(0.f, 0.f, Half);
+	const FVector Correct = (Ideal - Loc) * FMath::Min(1.f, 10.f * DeltaTime);
+	Velocity = Up * Speed * Climb;
+	const FVector Delta = Velocity * DeltaTime + Correct;
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Delta, Into.Rotation().Quaternion(), true, Hit);
+	if (Hit.IsValidBlockingHit())
+	{
+		SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
+	}
 }
 
 bool FSavedMove_WR::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const

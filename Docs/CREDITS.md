@@ -15,6 +15,7 @@ The files were cut, mixed to mono for 3D effects, loudness-matched and re-encode
 
 | Source | Author | Licence | Page | Used for (Data/Audio/...) |
 | --- | --- | --- | --- | --- |
+| Synthesised here (`Tools/audio/synth_raid.py`: bell partials, noise, sines) | Freedom35 Studios | CC0 1.0 | (no page: generated) | raid/bell_1-3, raid/blast_1-2, raid/fuse, raid/codebreaker, raid/pot_break |
 | Fire Crackling | AntumDeluge | CC0 1.0 | https://opengameart.org/content/fire-crackling | amb/volcanic_crackle, world/hearth_feed |
 | Crickets Ambient Noise - loopable | Wolfgang_ | CC0 1.0 | https://opengameart.org/content/crickets-ambient-noise-loopable | amb/night_insects |
 | Loopable Dungeon Ambience | JaggedStone | CC0 1.0 | https://opengameart.org/content/loopable-dungeon-ambience | amb/cave |

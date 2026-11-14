@@ -354,7 +354,13 @@
     {"id": "portal_key_tundra_2", "station": "alchemy_table", "level": 1, "inputs": {"shard_common": 3, "shard_uncommon": 1, "lichen": 4}, "output": "portal_key_tundra_2", "count": 1, "seconds": 8},
     {"id": "portal_key_tundra_3", "station": "alchemy_table", "level": 1, "inputs": {"shard_uncommon": 3, "shard_rare": 1, "lichen": 6}, "output": "portal_key_tundra_3", "count": 1, "seconds": 8},
     {"id": "portal_key_tundra_4", "station": "alchemy_table", "level": 1, "inputs": {"shard_rare": 3, "shard_epic": 1, "lichen": 8}, "output": "portal_key_tundra_4", "count": 1, "seconds": 8},
-    {"id": "portal_key_tundra_5", "station": "alchemy_table", "level": 1, "inputs": {"shard_epic": 3, "shard_legendary": 1, "lichen": 10}, "output": "portal_key_tundra_5", "count": 1, "seconds": 8}
+    {"id": "portal_key_tundra_5", "station": "alchemy_table", "level": 1, "inputs": {"shard_epic": 3, "shard_legendary": 1, "lichen": 10}, "output": "portal_key_tundra_5", "count": 1, "seconds": 8},
+    { "id": "black_powder", "station": "alchemy_table", "level": 3, "inputs": { "saltpetre": 2, "charcoal": 1, "sulfur_crystal": 1 }, "output": "black_powder", "count": 2, "seconds": 3 },
+    { "id": "fire_pot", "station": "alchemy_table", "level": 2, "inputs": { "clay": 1, "sulfur_crystal": 1, "animal_fat": 2 }, "output": "fire_pot", "count": 1, "seconds": 3 },
+    { "id": "powder_charge", "station": "workbench", "level": 3, "inputs": { "black_powder": 4, "bronze_ingot": 2, "wood": 2, "fiber": 2 }, "output": "powder_charge", "count": 1, "seconds": 6 },
+    { "id": "mining_charge", "station": "workbench", "level": 3, "inputs": { "black_powder": 2, "clay": 1, "hide": 1 }, "output": "mining_charge", "count": 1, "seconds": 3 },
+    { "id": "siege_ladder", "station": "workbench", "level": 3, "inputs": { "wood": 20, "rope": 6, "iron_ingot": 1 }, "output": "siege_ladder", "count": 1, "seconds": 6 },
+    { "id": "code_breaker", "station": "workbench", "level": 4, "inputs": { "steel_plate": 2, "resonant_crystal": 1, "bronze_ingot": 2 }, "output": "code_breaker", "count": 1, "seconds": 8, "biome": "crystal" }
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

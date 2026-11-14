@@ -34,6 +34,13 @@ public class Wildreach : ModuleRules
 		// The MetaHuman hero (WRHeroAnimInstance, WRCharacter): motion matching over the GASP clips, the hair grooms.
 		PrivateDependencyModuleNames.AddRange(new string[] { "PoseSearch", "HairStrandsCore" });
 
+		// The world store (WRStore): SQLite through the engine's SQLiteCore plugin; the identity key's random bytes (WRIdentity).
+		PrivateDependencyModuleNames.Add("SQLiteCore");
+		if (Target.Platform == UnrealTargetPlatform.Win64)
+		{
+			PublicSystemLibraries.Add("bcrypt.lib");
+		}
+
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)
 		{

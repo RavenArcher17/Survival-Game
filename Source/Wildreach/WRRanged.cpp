@@ -145,8 +145,10 @@ void AWRCharacter::UpdateWeaponLook()
 	UStaticMesh* Model = Def && !Def->HeldMesh.IsEmpty() ? LoadObject<UStaticMesh>(nullptr, *Def->HeldMesh) : nullptr;
 	// The weapon hand shows what it holds: the sword, a tool built from shapes (WRHeldTool.cpp), or nothing.
 	const bool bTool = !bRanged && Body->IsVisible() && (FWRGathering::FindTool(MeleeItem) != nullptr || IsClassWeapon(MeleeItem));
+	// A fire pot in the throwing hand is modelled in code too (WRRaidLook), drawn where a tool would be.
+	const bool bPot = bRanged && Def && Def->RangedKind == TEXT("firepot") && Body->IsVisible();
 	WeaponMesh->SetVisibility(!bRanged && !bTool && !MeleeItem.IsNone());
-	UpdateToolLook(bTool);
+	UpdateToolLook(bTool || bPot);
 	// The shield comes off the arm when two-handing (or with a great weapon: combat.md 2.4.0).
 	// ...and while a torch is lit in that hand (WRSurvival); the torch or lantern itself (WRHeldLight.cpp).
 	ShieldMesh->SetVisibility(!bRanged && bShieldShown && !FWRWeapons::IsTwoHanding(this) && !UWRSurvivalComponent::HoldsTorch(this));
@@ -532,7 +534,9 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AWRProjectile* Projectile = GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), Muzzle, Dir.Rotation(), Params))
 	{
-		const FString Model = Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;
+		// (The fire pot is modelled in code: the projectile builds it from "code:firepot".)
+		const FString Model = Launcher.RangedKind == TEXT("firepot") ? FString(TEXT("code:firepot"))
+			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;
 		const FString MeshAlong = Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->MeshAlong : Launcher.MeshAlong;
 		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed, Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
 			Launcher.IsThrowable() && Launcher.RangedKind == TEXT("spear") ? Launcher.Id : NAME_None);

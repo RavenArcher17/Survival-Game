@@ -1,4 +1,5 @@
 #include "WRMainMenu.h"
+#include "WRIdentity.h"
 #include "WRPadInput.h"
 #include "Wildreach.h"
 #include "WRPlayerController.h"
@@ -617,8 +618,10 @@ FString SWRMainMenu::Options() const
 	FString Look;
 	GConfig->GetString(MenuSection, TEXT("Look"), Look, GGameUserSettingsIni);
 	Look = Look.Replace(TEXT("?"), TEXT("")).Replace(TEXT("="), TEXT("")).Left(12);
-	return FString::Printf(TEXT("?WRName=%s?Path=%s%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()),
-		Look.IsEmpty() ? TEXT("") : *(TEXT("?Look=") + Look));
+	// This PC's identity token (WRIdentity): the server keeps the name for whoever claimed it first.
+	const FString Key = WRIdentity::Token();
+	return FString::Printf(TEXT("?WRName=%s?Path=%s%s%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()),
+		Look.IsEmpty() ? TEXT("") : *(TEXT("?Look=") + Look), Key.IsEmpty() ? TEXT("") : *(TEXT("?WRKey=") + Key));
 }
 
 void SWRMainMenu::Remember() const

@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRRaiding.h"
 #include "WRTaming.h"
 #include "WRFarm.h"
 #include "WRFarmLook.h"
@@ -1251,6 +1252,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	if (!Offering.IsNone()) O->SetStringField(TEXT("offering"), Offering.ToString());
 	O->SetNumberField(TEXT("hp"), Health);
 	O->SetNumberField(TEXT("maxHp"), MaxHealth);   // a builder's perks can raise it over the piece's own
+	if (BlastResist > 0.f) O->SetNumberField(TEXT("blastResist"), BlastResist);
 	O->SetStringField(TEXT("code"), LockCode);
 	if (!CustomName.IsEmpty()) O->SetStringField(TEXT("name"), CustomName);
 	O->SetBoolField(TEXT("locked"), bLocked);
@@ -1342,6 +1344,7 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 		MaxHealth = SavedMax;
 	}
 	LockCode = O->GetStringField(TEXT("code"));
+	O->TryGetNumberField(TEXT("blastResist"), BlastResist);
 	O->TryGetNumberField(TEXT("placedHours"), PlacedHours);
 	FString OfferingStr;
 	if (O->TryGetStringField(TEXT("offering"), OfferingStr)) Offering = FName(*OfferingStr);
@@ -1453,6 +1456,39 @@ void AWRClaimTotem::BeginPlay()
 	{
 		Mesh->SetVisibility(false);
 	}
+	HangBell();
+}
+
+void AWRClaimTotem::HangBell()
+{
+	// The raid bell (cooks/build-server-raids.md 2.5): strapped round the post at raiding.bell.height of its height, its
+	// arm out on the post's front. The strap's radius is the post's own there, found by tracing the post from four
+	// sides, so it neither floats nor sinks in. Drawn only where something draws.
+	if (Bell || GetNetMode() == NM_DedicatedServer) return;
+	FBox Box(ForceInit);
+	TArray<UPrimitiveComponent*> Parts;
+	GetComponents(Parts);
+	for (const UPrimitiveComponent* P : Parts) Box += P->Bounds.GetBox();
+	if (!Box.IsValid) return;
+	const FVector Base = GetActorLocation();
+	const float Height = (Box.Max.Z - Base.Z) * WRTune(TEXT("raiding.bell.height"), 0.72f);
+	const FVector At = Base + FVector(0.f, 0.f, Height);
+	float PostRadius = 6.f;
+	for (const FVector& Dir : { GetActorForwardVector(), -GetActorForwardVector(), GetActorRightVector(), -GetActorRightVector() })
+	{
+		for (UPrimitiveComponent* P : Parts)
+		{
+			FHitResult Hit;
+			if (P->LineTraceComponent(Hit, At + Dir * 200.f, At, FCollisionQueryParams(SCENE_QUERY_STAT(WRBellPost), true)))
+			{
+				PostRadius = FMath::Max(PostRadius, float(FVector::Dist2D(Hit.ImpactPoint, At)));
+			}
+		}
+	}
+	Bell = NewObject<UWRRaidBellComponent>(this, TEXT("RaidBell"));
+	Bell->SetupAttachment(GetRootComponent());
+	Bell->RegisterComponent();
+	Bell->Hang(Height, FMath::Min(PostRadius, 40.f));
 }
 
 void AWRClaimTotem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -1463,6 +1499,7 @@ void AWRClaimTotem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRClaimTotem, UpgradeLevel);
 	DOREPLIFETIME(AWRClaimTotem, bUnpaid);
 	DOREPLIFETIME(AWRClaimTotem, UpkeepStorage);
+	DOREPLIFETIME(AWRClaimTotem, BellRungAt);
 }
 
 AWRClaimTotem* AWRClaimTotem::FindAt(const UWorld* World, const FVector& Location)

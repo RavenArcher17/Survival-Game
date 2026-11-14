@@ -70,6 +70,9 @@ public:
 
 	/** Server: a melee swing landed on this node. */
 	void Harvest(AWRCharacterBase* Gatherer, bool bHeavy);
+	/** Server: a mining charge went off in it (FWRRaiding): all it had left x YieldMult lies in a heap where it stood
+	 *  (loose on the ground for anyone), and it's spent until it grows back. */
+	void Blast(AWRCharacterBase* By, const FString& Placer, float YieldMult);
 
 	bool IsDepleted() const { return bDepleted; }
 	/** Server: a running drill stands on this vein (WRMachine): it never runs out while drilled. */

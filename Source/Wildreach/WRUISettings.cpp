@@ -6,6 +6,7 @@
 // Key changes save as they're made (FWRKeyBindings saves on every change), so there is no Apply step.
 
 #include "WRUISettings.h"
+#include "WRTuning.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -1866,6 +1867,13 @@ namespace WRSettingsUI
 			}
 			Range(LOCTEXT("RulePortalRuns", "Portal runs at once"), LOCTEXT("RulePortalRunsSub", "How many portal folds can be open together"), TEXT("portalRuns"), 1.f, 8.f, 1.f, Plain);
 			Range(LOCTEXT("RuleArtifactSlots", "Artifact hooks"), LOCTEXT("RuleArtifactSlotsSub", "How many artifacts a survivor may wear (0: none)"), TEXT("artifactSlots"), 0.f, 3.f, 1.f, Plain);
+			// Raid group sizes (Raven's full-release setting; endgame war-halls, DR #22 "tuned for, not capped"): shown once
+			// the war-halls exist (tuning raiding.warHallsLive), so no row here does nothing.
+			if (WRTune(TEXT("raiding.warHallsLive"), 0.f) > 0.f)
+			{
+				Range(LOCTEXT("RuleRaidGroupMax", "Raid group cap"), LOCTEXT("RuleRaidGroupMaxSub", "The most survivors one war-hall raid lets in (No limit: anyone who comes)"), TEXT("raidGroupMax"), 0.f, 16.f, 1.f, Members);
+				Range(LOCTEXT("RuleRaidGroupTuned", "Raid tuned for"), LOCTEXT("RuleRaidGroupTunedSub", "The group the raid champions' health is balanced for"), TEXT("raidGroupTuned"), 4.f, 12.f, 1.f, Plain);
+			}
 			Range(LOCTEXT("RuleUpkeep", "Building upkeep"), LOCTEXT("RuleUpkeepSub", "What a land claim costs to keep up"), TEXT("upkeepMultiplier"), 0.f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleBoss", "Boss respawn"), LOCTEXT("RuleBossSub", "How long before a beaten boss comes back"), TEXT("bossRespawnHours"), 1.f, 24.f, 1.f, Hours);
 

@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRRaiding.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRSurvival.h"
@@ -1749,6 +1750,19 @@ FString AWRCreature::Order(AWRPlayerController* Player, const FString& Command)
 	{
 		return TEXT("not your tame");
 	}
+	if (Command == TEXT("siege"))
+	{
+		// Break that (the tame wheel's own order): the building under its owner's crosshair (cooks/build-server-raids.md 2.7).
+		const AWRCharacterBase* OwnerBody = Cast<AWRCharacterBase>(Player->GetPawn());
+		AWRBuildPiece* Piece = OwnerBody ? FWRRaiding::PieceInSights(OwnerBody, WRTune(TEXT("raiding.tames.sightCm"), 6000.f)) : nullptr;
+		FString Why;
+		if (!Piece) return TEXT("Look at a building to send it at");
+		if (!FWRRaiding::MayRaid(Piece, TamedBy, &Why)) return Why;
+		if (!GetDef() || GetDef()->Damage <= 0.f) return TEXT("It doesn't bite walls");
+		SiegePiece = Piece;
+		return TEXT("Going for it");
+	}
+	SiegePiece = nullptr;   // any other order calls it off
 	if (Command == TEXT("follow")) { TameOrder = EWRTameOrder::Follow; return TEXT("Following"); }
 	if (Command == TEXT("stay")) { TameOrder = EWRTameOrder::Stay; Home = GetActorLocation(); return TEXT("Staying"); }
 	if (Command == TEXT("aggressive")) { bTameAggressive = true; return TEXT("Will fight your enemies"); }
@@ -3037,6 +3051,66 @@ void AWRCreatureAI::TickRaid(AWRCreature* Self, float DeltaSeconds)
 	}
 }
 
+void AWRCreatureAI::TickSiege(AWRCreature* Self, float DeltaSeconds)
+{
+	const FWRCreatureDef* Def = Self->GetDef();
+	const double Now = GetWorld()->GetTimeSeconds();
+	// A bite under way lands when its wind-up is over, through the raid rule (a tame bites a piece at raiding.tameBite
+	// of its bite; its element is its path there: a fire tame burns wood x2).
+	if (RaidBiteLandsAt >= 0.0 && Now >= RaidBiteLandsAt)
+	{
+		RaidBiteLandsAt = -1.0;
+		AWRBuildPiece* Bitten = RaidBitePiece.Get();
+		if (Def && Bitten && !Bitten->IsActorBeingDestroyed() && RaidGap(Self, Bitten) <= Def->AttackRange)
+		{
+			const FWRPieceDef* PieceDef = Bitten->GetDef();
+			const bool bWood = PieceDef && PieceDef->Material == TEXT("wood");
+			const FVector At = RaidPieceBox(Bitten).GetClosestPointTo(Self->MouthLocation());
+			WRFx::Broadcast(Self, bWood ? TEXT("gather.wood") : TEXT("hit.dust"), At, (Self->GetActorLocation() - At).GetSafeNormal().Rotation(), 1.f, bWood ? TEXT("gather.wood") : TEXT("hit.block"));
+			FWRRaiding::DamagePiece(Bitten, Self->Weapon.FlatDamage * WRTune(TEXT("raiding.tameBite"), 0.5f), EWRRaidSource::Tame, Self, Self->TamedBy, Self->Weapon.Element);
+		}
+		RaidBitePiece = nullptr;
+	}
+	if (!Def || Self->HasTag(WRTags::State_Attacking) || RaidBiteLandsAt >= 0.0) return;
+	AWRBuildPiece* Piece = Self->SiegePiece.Get();
+	if (!Piece || Piece->IsActorBeingDestroyed() || !FWRRaiding::MayRaid(Piece, Self->TamedBy))
+	{
+		// That one's down: the next piece of the same owner within reach, so a pack works along a wall line.
+		const FString PieceOwner = Piece ? Piece->OwnerName : FString();
+		const FVector From = Piece ? Piece->GetActorLocation() : Self->GetActorLocation();
+		AWRBuildPiece* Next = nullptr;
+		float Best = FMath::Square(WRTune(TEXT("raiding.tames.nextCm"), 800.f));
+		if (!PieceOwner.IsEmpty())
+		{
+			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+			{
+				if (*It == Piece || It->bGhost || It->IsActorBeingDestroyed() || !FWRSocialRules::CanShare(PieceOwner, It->OwnerName) || !FWRRaiding::MayRaid(*It, Self->TamedBy)) continue;
+				const float D = FVector::DistSquared(It->GetActorLocation(), From);
+				if (D < Best) { Best = D; Next = *It; }
+			}
+		}
+		Self->SiegePiece = Next;
+		Piece = Next;
+		if (!Piece) return;
+	}
+	const FVector At = RaidPieceBox(Piece).GetClosestPointTo(Self->GetActorLocation());
+	const FVector To = At - Self->GetActorLocation();
+	if (RaidGap(Self, Piece) > Def->AttackRange * 0.6f)
+	{
+		Self->AddMovementInput(To.GetSafeNormal2D(), 1.f);
+		return;
+	}
+	if (!To.IsNearlyZero()) Self->SetActorRotation(FRotator(0.f, To.Rotation().Yaw, 0.f));
+	if (Now >= NextRaidBiteAt)
+	{
+		const float Windup = WRTune(TEXT("creature.biteTiming.windup"), 0.5f);
+		NextRaidBiteAt = Now + WRTune(TEXT("raid.biteSeconds"), 1.6f);
+		RaidBiteLandsAt = Now + Windup;
+		RaidBitePiece = Piece;
+		Self->PlaySwing(EWRSwingKind::Bite, Windup + WRTune(TEXT("creature.biteTiming.active"), 0.15f));
+	}
+}
+
 void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 {
 	Self->SpeedBoost = 1.f;
@@ -3082,6 +3156,12 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	if (Target)
 	{
 		ChaseAndBite(Self, Target);
+		return;
+	}
+	// Sent at a building ("Break that"): bite it down, then the next piece of the same owner beside it.
+	if (Self->SiegePiece.IsValid() || RaidBiteLandsAt >= 0.0)
+	{
+		TickSiege(Self, DeltaSeconds);
 		return;
 	}
 

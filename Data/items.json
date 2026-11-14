@@ -638,7 +638,17 @@
     {"id": "trophy_glacimaw_elder", "name": "The Elder's rimed tusk", "category": "trophy", "stack": 1, "weight": 2.0, "comfort": 1, "note": "A portal boss's trophy: decor"},
     {"id": "trophy_frostbound_thurs", "name": "The Thurs's icicle beard", "category": "trophy", "stack": 1, "weight": 2.0, "comfort": 1, "note": "A portal boss's trophy: decor"},
     {"id": "trophy_rime_witch", "name": "The Rime-Witch's bone staff", "category": "trophy", "stack": 1, "weight": 2.0, "comfort": 2, "note": "A portal boss's trophy: decor"},
-    {"id": "trophy_hrimgerdr", "name": "Hrímgerðr's stone tear", "category": "trophy", "stack": 1, "weight": 2.0, "comfort": 2, "note": "A portal boss's trophy: decor"}
+    {"id": "trophy_hrimgerdr", "name": "Hrímgerðr's stone tear", "category": "trophy", "stack": 1, "weight": 2.0, "comfort": 2, "note": "A portal boss's trophy: decor"},
+    { "_raiding": "Player raiding (cooks/build-server-raids.md 2.3): black powder is the real 75/15/10 of saltpetre, charcoal and sulfur, so raids run on the map's trade (sulfur from the Volcanic, saltpetre and clay from the caves, charcoal from the kiln). Category raid: used from the bag or belt (FWRRaiding::UseItem)." },
+    { "id": "saltpetre", "name": "Saltpetre", "category": "material", "stack": 50, "weight": 0.2, "note": "Nitre: the white feathery crust on dry cave walls, scraped off with a pick. Most of what black powder is." },
+    { "id": "clay", "name": "Clay", "category": "material", "stack": 50, "weight": 0.5, "note": "Fine wet clay dug from cave floors: fire pots are fired from it, charges tamped with it." },
+    { "id": "black_powder", "name": "Black powder", "category": "material", "stack": 50, "weight": 0.2, "note": "Saltpetre, charcoal and sulfur ground together: it doesn't burn, it goes." },
+    { "id": "fire_pot", "name": "Fire pot", "category": "ranged", "stack": 10, "weight": 0.8, "equip": { "slot": "ranged" }, "note": "A clay jar of burning fat and sulfur, wick lit as you throw it: it breaks where it lands and the ground burns. Burns wooden walls; aim the arc (right mouse / left trigger shows it).",
+      "ranged": { "kind": "firepot", "damage": 0, "speed": 1600, "gravity": 1.0, "reload": 1.4, "socket": "weapon_r", "face": "backhand" } },
+    { "id": "powder_charge", "name": "Powder charge (petard)", "category": "raid", "stack": 5, "weight": 4.0, "note": "A bronze petard on an oak plank: press it to a wall, door, floor or Hearth (use it facing one) and get clear. 5 s fuse. Wood wall 1, stone 2, metal 9, biome 12." },
+    { "id": "mining_charge", "name": "Mining charge", "category": "raid", "stack": 10, "weight": 1.0, "note": "Tamp it into an ore vein, sulfur, nitre or a rock: it bursts the lot for three times the yield." },
+    { "id": "siege_ladder", "name": "Siege ladder", "category": "raid", "stack": 1, "weight": 12.0, "note": "6 m of ash with iron hooks: lean it on a wall, palisade or gate and walk into it to climb over. Lasts 10 minutes; it can be chopped down." },
+    { "id": "code_breaker", "name": "Code breaker", "category": "raid", "stack": 1, "weight": 1.5, "note": "A resonant crystal fork in a bronze frame. Held to a code lock for 60 s, still, it rings the tumblers loose; the owners' bell rings when you start." }
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },

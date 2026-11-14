@@ -14,6 +14,8 @@ public:
 
 	/** Picks the world this game is (WRWorlds), then loads its settings and clans. */
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	/** Refuses a join whose name belongs to someone else on this world (WRIdentity: the name's key or platform account). */
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
@@ -28,9 +30,9 @@ public:
 	bool Wake(AController* Controller);
 
 	/**
-	 * Persistence v1: one JSON file per character in the world's folder (Saved/Worlds/<world>/players/), keyed by
-	 * player name. Autosaves dirty players every 10 s, and on logout and server shutdown. SQLite + real account ids
-	 * replace this in M7.
+	 * Persistence: one row per character in the world store (WRStore: Saved/Worlds/<world>/world.db, SQLite; the
+	 * characters table), keyed by player name, which WRIdentity ties to a PC's key. Autosaves every 10 s, and on logout
+	 * and server shutdown (-wrstore=json: one JSON file per character in players/, as before 0.8).
 	 */
 	void SavePlayer(class AWRPlayerState* PS);
 	void LoadPlayer(class AWRPlayerState* PS);
@@ -61,6 +63,7 @@ private:
 	FTimerHandle UndergroundTimer;
 	FTimerHandle WildlifeTimer;
 	FTimerHandle RaidTimer;
+	FTimerHandle RaidingTimer;
 	FTimerHandle RoamingBossTimer;
 	/** The roaming minis: when each may come out again, and which have been out this session. */
 	void StepRoamingBosses();

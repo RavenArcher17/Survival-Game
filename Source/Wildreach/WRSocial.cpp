@@ -6,6 +6,7 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRWorlds.h"
+#include "WRStore.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
@@ -38,7 +39,7 @@ void FWRClans::Load()
 	Clans.Reset();
 	FString Text;
 	TSharedPtr<FJsonObject> Root;
-	if (!FFileHelper::LoadFileToString(Text, *ClansPath()) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+	if (ClansPath().IsEmpty() || !WRStore::ReadDoc(TEXT("clans"), Text) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
 	{
 		return;
 	}
@@ -70,7 +71,7 @@ void FWRClans::Save() const
 	}
 	FString Text;
 	FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Text));
-	if (!ClansPath().IsEmpty()) FFileHelper::SaveStringToFile(Text, *ClansPath());
+	if (!ClansPath().IsEmpty()) WRStore::WriteDoc(TEXT("clans"), Text);
 }
 
 void FWRClans::RefreshPlayerStates(const UWorld* World) const

@@ -20,6 +20,7 @@
 		{ "Name": "PoseSearch", "Enabled": true },
 		{ "Name": "HairStrands", "Enabled": true },
 		{ "Name": "RigLogic", "Enabled": true },
-		{ "Name": "MetaHumanCharacter", "Enabled": true }
+		{ "Name": "MetaHumanCharacter", "Enabled": true },
+		{ "Name": "SQLiteCore", "Enabled": true }
 	]
 }

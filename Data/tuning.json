@@ -220,7 +220,7 @@
       "scale": 1, "maxAngle": 2.5, "maxOffset": 6, "decay": 1.6, "frequency": 22,
       "heavyDealt": { "strength": 0.3 }, "heavyTaken": { "strength": 0.5 }, "lightTaken": { "strength": 0.15 },
       "block": { "strength": 0.15 }, "guardBreak": { "strength": 0.45 }, "parry": { "strength": 0.3 },
-      "stomp": { "strength": 0.6, "radius": 2500 }, "spellImpact": { "strength": 0.2, "radius": 900 }, "nova": { "strength": 0.35, "radius": 1500 }
+      "stomp": { "strength": 0.6, "radius": 2500 }, "blast": { "strength": 1.0, "radius": 5000 }, "spellImpact": { "strength": 0.2, "radius": 900 }, "nova": { "strength": 0.35, "radius": 1500 }
     },
     "impact": { "heavyScale": 1.6, "elementScale": 0.45 },
     "hud": { "markerSeconds": 0.28, "parryFlashSeconds": 0.18, "parryFlashAlpha": 0.22 },
@@ -539,5 +539,33 @@
     "sense": { "_comment": "A sensing tame (Aurora fox) feels out the nearest cave or egg nest within range cm of its owner (Keen sense x1.5) each time it works, the same one again after repeatSeconds.", "range": 8000, "repeatSeconds": 600 },
     "element": { "_comment": "A tame keeps its own element (FULL-GAME 6.5): its plain bites carry its element's build-up (burn / frost) at buildup a blow.", "buildup": 12 },
     "incubator": { "_comment": "One fuel keeps an incubator warm fuelSeconds (x the maturation multiplier); an egg takes its kind's pregnancy time.", "fuelSeconds": 900 }
+  },
+  "raiding": {
+    "_comment": "Player raiding (WRRaiding; cooks/build-server-raids.md 2.4 to 2.7). material.<source>.<wood|stone|metal|biome|other>: the share of a hit that lands on a piece of that material (weapons use building_sets.json materialDamage; the Hearth reads as stone except to a charge, which has its own number). paths.<path>.<material|all>: that path's multiplier (fire burns wood: Raven). charge: the petard (fuse, 4 m blast: full on the piece it's on, neighbourShare on others in reach, people 120 falling to edgeShare at the edge; clanmates spared, the placer not). miningCharge: x yieldMult ore in a heap. firePot: impact on pieces in radiusCm, then burning ground burnDps for burnSeconds (it burns wood pieces too), people + burn buildup. ladder: rails up to heightCm, foot footOutCm from the wall, hp, lifeSeconds, climbSpeed cm/s, topHopCm. codeBreaker: seconds of standing still, ringSeconds between rings. bell: the totem's raid bell (swing, period, decay; minGapSeconds between strikes, alertGapSeconds between alerts to owners, raidQuietSeconds ends a raid, logRaids kept per claim; height on the post, reachCm of its arm). tameBite: a tame's bite on a piece x this; tames.sightCm: how far 'Break that' looks; tames.nextCm: how far a tame looks for the next piece. warHallsLive: 1 once the endgame war-hall raids exist (shows the raid group settings). All first drafts.",
+    "warHallsLive": 0,
+    "material": {
+      "blast": { "wood": 1, "stone": 1, "metal": 1, "biome": 1, "other": 1 },
+      "firepot": { "wood": 1, "stone": 0.13, "metal": 0, "biome": 0, "other": 0.6 },
+      "spell": { "wood": 0.5, "stone": 0.1, "metal": 0.03, "biome": 0.02, "other": 0.4 },
+      "tame": { "wood": 0.5, "stone": 0.25, "metal": 0.1, "biome": 0.08, "other": 0.4 },
+      "fire": { "wood": 1, "stone": 0, "metal": 0, "biome": 0, "other": 0.5 }
+    },
+    "paths": {
+      "fire": { "wood": 2 }, "lightning": { "metal": 1.5 }, "spore": { "wood": 1.5 }, "void": { "all": 1.25 }, "arcane": { "stone": 1.25 },
+      "necromancy": { "raiseThroughWalls": 1, "raiseCostMult": 3, "raiseReachCm": 1200 }
+    },
+    "charge": { "fuseSeconds": 5, "reachCm": 300, "radiusCm": 400, "wood": 800, "stone": 600, "metal": 300, "biome": 250, "hearth": 300, "neighbourShare": 0.5, "people": 120, "edgeShare": 0.5, "glow": 900 },
+    "miningCharge": { "fuseSeconds": 4, "reachCm": 300, "radiusCm": 200, "people": 40, "yieldMult": 3 },
+    "firePot": { "impact": 150, "radiusCm": 200, "burnSeconds": 10, "burnDps": 30, "people": 40, "burnBuildup": 60 },
+    "ladder": { "heightCm": 600, "minHeightCm": 200, "footOutCm": 160, "hp": 300, "lifeSeconds": 600, "climbSpeed": 180, "reachCm": 300, "topHopCm": 120 },
+    "codeBreaker": { "seconds": 60, "reachCm": 200, "ringSeconds": 4 },
+    "bell": { "swingDeg": 18, "periodSeconds": 1.1, "decaySeconds": 4, "minGapSeconds": 2, "alertGapSeconds": 30, "raidQuietSeconds": 600, "logRaids": 10, "height": 0.72, "reachCm": 34, "pingSeconds": 60 },
+    "tameBite": 0.5,
+    "awayCardSeconds": 10,
+    "tames": { "sightCm": 6000, "nextCm": 800 }
+  },
+  "store": {
+    "_comment": "The world store (WRStore: Saved/Worlds/<id>/world.db, SQLite). flushSeconds: how often the writer commits what's pending (also at once on logout and shutdown). Backups (VACUUM INTO snapshots in the world's backups/ folder): every hourlySeconds while the world runs (keep hourlyKeep), the first of each UTC day kept as a daily (dailyKeep), one at every clean shutdown (shutdownKeep), and one before the 0.7 JSON saves were brought in (kept).",
+    "flushSeconds": 10, "hourlySeconds": 3600, "hourlyKeep": 24, "dailyKeep": 7, "shutdownKeep": 5
   }
 }

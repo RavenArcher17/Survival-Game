@@ -6,6 +6,7 @@
 #include "WRCharacter.h"
 #include "WRResourceNode.h"
 #include "WRToolMesh.h"
+#include "WRRaidLook.h"
 #include "WRInventory.h"
 #include "WRTuning.h"
 #include "AnimationRuntime.h"
@@ -51,12 +52,15 @@ bool AWRCharacter::IsClassWeapon(FName ItemId)
 void AWRCharacter::UpdateToolLook(bool bShow)
 {
 	using namespace WRHeldToolDetail;
-	const FWRToolDef* Tool = bShow ? FWRGathering::FindTool(MeleeItem) : nullptr;
-	const FWRItemDef* WeaponDef = bShow && IsClassWeapon(MeleeItem) ? FWRItemRegistry::Get().Find(MeleeItem) : nullptr;
+	// A fire pot out to throw (the ranged slot): the clay jar in the hand, its wick up.
+	const FWRItemDef* PotDef = bShow && IsRangedOut() ? FWRItemRegistry::Get().Find(RangedItem) : nullptr;
+	if (PotDef && PotDef->RangedKind != TEXT("firepot")) PotDef = nullptr;
+	const FWRToolDef* Tool = bShow && !PotDef ? FWRGathering::FindTool(MeleeItem) : nullptr;
+	const FWRItemDef* WeaponDef = bShow && !PotDef && IsClassWeapon(MeleeItem) ? FWRItemRegistry::Get().Find(MeleeItem) : nullptr;
 	const USkeletalMesh* BodyAsset = Body->GetSkeletalMeshAsset();
 	const FName Socket = WeaponMesh->GetAttachSocketName();
 	const bool bHand = BodyAsset && !Socket.IsNone() && (BodyAsset->FindSocket(Socket) || BodyAsset->GetRefSkeleton().FindBoneIndex(Socket) != INDEX_NONE);
-	if ((!Tool && !WeaponDef) || !bHand)
+	if ((!Tool && !WeaponDef && !PotDef) || !bHand)
 	{
 		if (ToolMesh) ToolMesh->SetVisibility(false);
 		return;
@@ -69,7 +73,12 @@ void AWRCharacter::UpdateToolLook(bool bShow)
 		ToolMesh->SetupAttachment(Body, Socket);
 		ToolMesh->RegisterComponent();
 	}
-	if (ToolMeshFor != MeleeItem && WeaponDef)
+	if (PotDef && ToolMeshFor != RangedItem)
+	{
+		WRRaidLook::FirePot().ApplyTo(ToolMesh);
+		ToolMeshFor = RangedItem;
+	}
+	if (!PotDef && ToolMeshFor != MeleeItem && WeaponDef)
 	{
 		// Its metal: copper's red-brown, bronze's gold-brown, iron's dark grey (linear), the forge's look.
 		const FName Metal = WeaponDef->Metal;
@@ -79,7 +88,7 @@ void AWRCharacter::UpdateToolLook(bool bShow)
 		FWRToolMesh::Weapon(WeaponDef->WeaponClass, Colour, WRTune(TEXT("gather.toolLook.weaponScale"), 1.f)).ApplyTo(ToolMesh);
 		ToolMeshFor = MeleeItem;
 	}
-	if (ToolMeshFor != MeleeItem)
+	if (!PotDef && ToolMeshFor != MeleeItem)
 	{
 		// Crude tools (made by hand) are flint on a rough stick with plant-fibre cord; stone ones a ground head on a
 		// smoothed haft bound with rawhide.

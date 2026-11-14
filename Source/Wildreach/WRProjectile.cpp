@@ -1,4 +1,8 @@
 #include "WRProjectile.h"
+#include "WRRaiding.h"
+#include "WRRaidLook.h"
+#include "WRToolMesh.h"
+#include "ProceduralMeshComponent.h"
 #include "WRPortals.h"
 #include "WRBuilding.h"
 #include "WRTurret.h"
@@ -184,6 +188,20 @@ void AWRProjectile::InitPhysical(const FWRHit& InHit, const FVector& Velocity, f
 
 void AWRProjectile::OnRep_Model()
 {
+	if (ModelPath == TEXT("code:firepot"))
+	{
+		// The clay fire pot, modelled in code (WRRaidLook), its wick end trailing sparks.
+		if (GetNetMode() == NM_DedicatedServer || CodeModel) return;
+		CodeModel = NewObject<UProceduralMeshComponent>(this, TEXT("FirePot"));
+		CodeModel->SetupAttachment(GetRootComponent());
+		CodeModel->RegisterComponent();
+		WRRaidLook::FirePot().ApplyTo(CodeModel);
+		CodeModel->SetRelativeLocation(FVector(-6.f, 0.f, 0.f));
+		Mesh->SetVisibility(false);
+		TrailFx = TEXT("raid.fuse");
+		OnRep_Fx();
+		return;
+	}
 	UStaticMesh* Model = ModelPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ModelPath);
 	if (!Model)
 	{
@@ -259,6 +277,20 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 				if (*It != OtherActor && FVector::Dist(It->GetActorLocation(), At) < FMath::Max(SplashRadius, 150.f) + 100.f) WRPortals::HitThing(*It, By, Hit.Damage, bFireShot);
 			}
 		}
+	}
+	// A thrown fire pot breaks wherever it lands: shards, fire, burning ground (WRRaiding).
+	if (Kind == TEXT("firepot"))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		FWRRaiding::FirePotBurst(this, At, const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
+	// A survivor's spell or arrow on someone else's building: the raid rule's spell / weapon share x its path.
+	if (AWRBuildPiece* Piece = FWRRaiding::PieceOf(OtherActor); Piece && Caster && !Cast<AWRBuildPiece>(Hit.Instigator))
+	{
+		FWRRaiding::DamagePiece(Piece, Hit.Damage, ModelPath.IsEmpty() ? EWRRaidSource::Spell : EWRRaidSource::Weapon, this, FWRRaiding::Responsible(Caster),
+			ModelPath.IsEmpty() ? Hit.PathId : NAME_None);
 	}
 	if (SplashRadius > 0.f)
 	{

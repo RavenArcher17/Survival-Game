@@ -29,6 +29,7 @@
 #include "AbilitySystemComponent.h"
 #include "WRWorldDressing.h"
 #include "WRWorlds.h"
+#include "WRStore.h"
 #include "AIController.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Dom/JsonObject.h"
@@ -619,9 +620,8 @@ void UWRWorldSystems::Deinitialize()
 
 void UWRWorldSystems::Load()
 {
-	const FString Path = FPaths::Combine(WRWorlds::CurrentDir(), TEXT("world_systems.json"));
 	FString Text;
-	if (!FFileHelper::LoadFileToString(Text, *Path)) return;
+	if (!WRStore::ReadDoc(TEXT("world_systems"), Text)) return;
 	TSharedPtr<FJsonObject> Root;
 	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
 	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid()) return;
@@ -724,7 +724,7 @@ void UWRWorldSystems::Save()
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
 	FJsonSerializer::Serialize(Root, Writer);
-	FFileHelper::SaveStringToFile(Text, *FPaths::Combine(WRWorlds::CurrentDir(), TEXT("world_systems.json")));
+	WRStore::WriteDoc(TEXT("world_systems"), Text);
 }
 
 void UWRWorldSystems::Tick(float DeltaTime)

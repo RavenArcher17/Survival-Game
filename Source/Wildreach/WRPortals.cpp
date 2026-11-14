@@ -27,6 +27,7 @@
 #include "WRTuning.h"
 #include "WRWildlife.h"
 #include "WRWorlds.h"
+#include "WRStore.h"
 #include "WRWorldSystems.h"
 #include "WRAttributeSet.h"
 #include "AbilitySystemComponent.h"
@@ -685,9 +686,8 @@ void UWRPortalSystem::Deinitialize()
 
 void UWRPortalSystem::Load()
 {
-	const FString Path = FPaths::Combine(WRWorlds::CurrentDir(), TEXT("portals.json"));
 	FString Text;
-	if (!FFileHelper::LoadFileToString(Text, *Path)) return;
+	if (!WRStore::ReadDoc(TEXT("portals"), Text)) return;
 	TSharedPtr<FJsonObject> Root;
 	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
 	if (FJsonSerializer::Deserialize(Reader, Root) && Root.IsValid()) Loaded = Root;
@@ -833,7 +833,7 @@ void UWRPortalSystem::Save()
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
 	FJsonSerializer::Serialize(Root, Writer);
-	FFileHelper::SaveStringToFile(Text, *FPaths::Combine(WRWorlds::CurrentDir(), TEXT("portals.json")));
+	WRStore::WriteDoc(TEXT("portals"), Text);
 }
 
 void UWRPortalSystem::Tick(float DeltaTime)

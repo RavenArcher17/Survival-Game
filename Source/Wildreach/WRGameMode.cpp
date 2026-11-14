@@ -1,4 +1,7 @@
 #include "WRGameMode.h"
+#include "WRStore.h"
+#include "WRIdentity.h"
+#include "WRRaiding.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
@@ -68,8 +71,38 @@ void AWRGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 	}
 	WRWorlds::SetCurrent(Id);
 	FWRTuning::Get().Reload();   // the world's settings.json
+	// The world store (SQLite, Saved/Worlds/<id>/world.db): opened before anything loads; brings in 0.7's JSON saves once.
+	WRStore::Open(GetWorld());
 	FWRClans::Get().Load();
 	UE_LOG(LogWildreach, Log, TEXT("WORLD %s"), Id.IsEmpty() ? TEXT("none (the menu's island: nothing is loaded or saved)") : *FString::Printf(TEXT("'%s' (Saved/Worlds/%s), preset %s"), *Id, *Id, *FWRTuning::Get().GetPreset()));
+}
+
+namespace WRGameModeIdentity
+{
+	/** The online subsystem's account behind a join ("" when there's none: the Null subsystem's ids change every launch). */
+	void Platform(const FUniqueNetIdRepl& UniqueId, FString& OutType, FString& OutId)
+	{
+		OutType.Reset();
+		OutId.Reset();
+		if (!UniqueId.IsValid()) return;
+		const FName Type = UniqueId.GetType();
+		if (Type == NAME_None || Type == FName(TEXT("NULL"))) return;
+		OutType = Type.ToString();
+		OutId = UniqueId->ToString();
+	}
+}
+
+void AWRGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+	FString Type, Id;
+	WRGameModeIdentity::Platform(UniqueId, Type, Id);
+	const FString Name = UGameplayStatics::ParseOption(Options, TEXT("WRName")).Left(24);
+	ErrorMessage = WRIdentity::Check(Name, UGameplayStatics::ParseOption(Options, TEXT("WRKey")).Left(64), Type, Id);
 }
 
 FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
@@ -92,6 +125,12 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		if (!WRName.IsEmpty())
 		{
 			ChangeName(NewPlayerController, WRName.Left(24), false);
+		}
+		// The name is this PC's now (or still): its account in the world store (WRIdentity; PreLogin checked it).
+		{
+			FString Type, Id;
+			WRGameModeIdentity::Platform(UniqueId, Type, Id);
+			WRIdentity::Bind(PS->GetPlayerName(), UGameplayStatics::ParseOption(Options, TEXT("WRKey")).Left(64), Type, Id, NewPlayerController->GetPlayerNetworkAddress());
 		}
 		PS->GetPaths()->SetMainPath(FName(*Path));
 		const FString Body = UGameplayStatics::ParseOption(Options, TEXT("Body")).ToLower().Left(8);
@@ -126,6 +165,7 @@ void AWRGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	LoadWorld();
+	FWRRaiding::Load(GetWorld());
 	WRWildlife::Start(GetWorld());
 	WRRaids::Start(GetWorld());
 	if (!WRWorlds::Current().IsEmpty())
@@ -136,7 +176,9 @@ void AWRGameMode::BeginPlay()
 			FMath::Max(0.25f, WRTune(TEXT("raid.stepSeconds"), 2.f)), true);
 	}
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
-	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);
+	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); WRStore::Tick(); }), 60.f, true);
+	// Player raiding: code breakers at work, the raid record kept (WRRaiding).
+	GetWorldTimerManager().SetTimer(RaidingTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { FWRRaiding::Step(GetWorld()); }), 1.f, true);
 	GetWorldTimerManager().SetTimer(UndergroundTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { RescueUnderground(); }), 1.f, true);
 	GetWorldTimerManager().SetTimer(RoamingBossTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { StepRoamingBosses(); }), 5.f, true);
 }
@@ -248,6 +290,7 @@ void AWRGameMode::EndPlay(const EEndPlayReason::Type Reason)
 {
 	SaveAllPlayers(false);
 	SaveWorld();
+	WRStore::Flush(false);   // the store closes once the world's subsystems have saved too (WRStore::Open)
 	Super::EndPlay(Reason);
 }
 
@@ -313,12 +356,11 @@ void AWRGameMode::SaveWorld()
 		Root->SetNumberField(TEXT("clockHours"), State->GetTotalHours());  // the day and time carry over a restart
 	}
 	FString Text;
-	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text);
 	FJsonSerializer::Serialize(Root, Writer);
-	if (FFileHelper::SaveStringToFile(Text, *WorldSavePath()))
-	{
-		UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
-	}
+	WRStore::WriteDoc(TEXT("world"), Text);
+	FWRRaiding::Save();
+	UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
 	WRWildlife::Save(GetWorld());
 }
 
@@ -373,7 +415,7 @@ void AWRGameMode::CountPlayTime(const AController* Leaving)
 void AWRGameMode::LoadWorld()
 {
 	FString Text;
-	if (WorldSavePath().IsEmpty() || !FFileHelper::LoadFileToString(Text, *WorldSavePath()))
+	if (WorldSavePath().IsEmpty() || !WRStore::ReadDoc(TEXT("world"), Text))
 	{
 		return;
 	}
@@ -493,24 +535,18 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	if (const UWRArtifactComponent* Art = UWRArtifactComponent::For(PS)) Root->SetObjectField(TEXT("artifacts"), Art->ToJson());
 
 	FString Text;
-	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text);
 	FJsonSerializer::Serialize(Root, Writer);
-	const FString Path = PlayerSavePath(PS->GetPlayerName());
-	if (FFileHelper::SaveStringToFile(Text, *Path))
-	{
-		PS->GetPaths()->ClearDirty();
-		UE_LOG(LogWildreach, Log, TEXT("SAVE %s -> %s"), *PS->GetPlayerName(), *Path);
-	}
-	else
-	{
-		UE_LOG(LogWildreach, Error, TEXT("SAVE failed for %s (%s)"), *PS->GetPlayerName(), *Path);
-	}
+	// Into the world store (its writer commits within store.flushSeconds; a failed commit stays pending, never lost).
+	WRStore::WriteCharacter(PS->GetPlayerName(), PS->GetPaths()->GetMainPath().ToString(), Text);
+	PS->GetPaths()->ClearDirty();
+	UE_LOG(LogWildreach, Log, TEXT("SAVE %s (%d chars)"), *PS->GetPlayerName(), Text.Len());
 }
 
 void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 {
 	FString Text;
-	if (!PS || PlayerSavePath(PS->GetPlayerName()).IsEmpty() || !FFileHelper::LoadFileToString(Text, *PlayerSavePath(PS->GetPlayerName())))
+	if (!PS || PlayerSavePath(PS->GetPlayerName()).IsEmpty() || !WRStore::ReadCharacter(PS->GetPlayerName(), Text))
 	{
 		return;
 	}
@@ -602,6 +638,7 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 	FWRClans::Get().RefreshPlayerStates(GetWorld());
 	AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
 	WRBeds::Refresh(PS);
+	FWRRaiding::PlayerJoined(Cast<AWRPlayerController>(NewPlayer));
 	UE_LOG(LogWildreach, Log, TEXT("Player joined: %s main=%s (%d connected)"),
 		PS ? *PS->GetPlayerName() : TEXT("?"), PS ? *PS->GetPaths()->GetMainPath().ToString() : TEXT("?"), GetNumPlayers());
 }
@@ -610,6 +647,7 @@ void AWRGameMode::Logout(AController* Exiting)
 {
 	UE_LOG(LogWildreach, Log, TEXT("Player left: %s"), *GetNameSafe(Exiting));
 	SavePlayer(Exiting ? Exiting->GetPlayerState<AWRPlayerState>() : nullptr);
+	WRStore::Flush(false);   // a leaving character is committed now, not at the next batch
 	Super::Logout(Exiting);
 	CountPlayTime(Exiting);
 }

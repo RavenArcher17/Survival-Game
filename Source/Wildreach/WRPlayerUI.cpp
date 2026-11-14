@@ -948,7 +948,7 @@ const TArray<TPair<FName, FText>>& FWRPlayerUI::WhistleOrders()
 	static const TArray<TPair<FName, FText>> Orders = {
 		{ TEXT("follow"), LOCTEXT("WhistleFollow", "Come / follow") },
 		{ TEXT("stay"), LOCTEXT("WhistleStay", "Stay") },
-		{ NAME_None, FText::GetEmpty() },
+		{ TEXT("siege"), LOCTEXT("WhistleSiege", "Break that") },
 		{ NAME_None, FText::GetEmpty() },
 		{ NAME_None, FText::GetEmpty() },
 		{ NAME_None, FText::GetEmpty() },
@@ -967,7 +967,7 @@ const TArray<TPair<FName, FText>>& FWRPlayerUI::TameOrders()
 		{ TEXT("ride"), LOCTEXT("Ride", "Ride") },
 		{ TEXT("tend"), LOCTEXT("Tend", "Tend") },
 		{ TEXT("release"), LOCTEXT("Release", "Release") },
-		{ NAME_None, FText::GetEmpty() },
+		{ TEXT("siege"), LOCTEXT("Siege", "Break that") },
 		{ TEXT("passive"), LOCTEXT("Passive", "Passive") },
 		{ TEXT("aggressive"), LOCTEXT("Aggressive", "Aggressive") },
 	};

@@ -1276,6 +1276,9 @@ void AWRCave::SpawnContents()
 	TArray<TPair<FName, FVector>> Ores = {
 		{ TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("tin_ore"), FVector(0, -650, 0) },
 		{ TEXT("copper_ore"), FVector(300, 620, 0) }, { bFrost ? FName(TEXT("lichen")) : FName(TEXT("sulfur_crystal")), FVector(-700, 0, 0) },
+		// The raid economy's cave goods (cooks/build-server-raids.md 2.3): nitre crusting the dry rock on the far side
+		// and a clay bank in the damp low corner, clear of the hazard and the veins.
+		{ TEXT("saltpetre"), FVector(620, 330, 0) }, { TEXT("clay"), FVector(600, -380, 0) },
 	};
 	// Star iron (cooks/build-crafting.md 2.1, ores by depth band 4): the highland caves' deepest chamber, back past the
 	// iron, 2.8 m clear of the other veins.

@@ -10,6 +10,7 @@
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
 #include "WRPlayerController.h"
+#include "WRSocial.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -62,7 +63,7 @@ FName FWRGathering::ToolKindFor(FName ItemId)
 {
 	const FString Id = ItemId.ToString();
 	if (ItemId == TEXT("wood")) return TEXT("hatchet");
-	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur"))) return TEXT("pick");
+	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur")) || ItemId == TEXT("saltpetre")) return TEXT("pick");
 	return NAME_None;
 }
 
@@ -220,6 +221,41 @@ void AWRResourceNode::OnRep_Depleted()
 {
 	SetActorHiddenInGame(bDepleted);
 	SetActorEnableCollision(!bDepleted);
+}
+
+void AWRResourceNode::Blast(AWRCharacterBase* By, const FString& Placer, float YieldMult)
+{
+	if (!HasAuthority() || bDepleted)
+	{
+		return;
+	}
+	const int32 Count = FMath::Max(1, FMath::RoundToInt(FMath::Max(1, HitsLeft) * PerHit * FMath::Max(1.f, YieldMult) * WRTune(TEXT("server.gatherMultiplier"), 1.f)));
+	TArray<FWRItemStack> Heap;
+	FWRItemStack Ore = FWRInventoryRules::MakeInstance(ItemId);
+	Ore.Count = Count;
+	Heap.Add(Ore);
+	if (ItemId.ToString().EndsWith(TEXT("_ore")) && FMath::FRand() < GemChance * 3.f)
+	{
+		static const FName Gems[] = { TEXT("gem_ruby"), TEXT("gem_topaz"), TEXT("gem_onyx") };
+		Heap.Add(FWRInventoryRules::MakeInstance(Gems[FMath::RandRange(0, 2)]));
+	}
+	FVector Origin, Extent;
+	GetActorBounds(false, Origin, Extent);
+	if (AWRLootBag* Bag = AWRLootBag::Spill(GetWorld(), FVector(Origin.X, Origin.Y, GetActorLocation().Z + 20.f), Placer, Heap))
+	{
+		Bag->bOwnerOnly = false;   // loose ore on the ground: whoever picks it up
+	}
+	WRFx::Broadcast(this, TEXT("gather.stone"), Origin, FRotator::ZeroRotator, 2.5f, NAME_None);
+	UE_LOG(LogWildreach, Log, TEXT("GATHER %s blasted by %s: %d %s"), *GetName(), *Placer, Count, *ItemId.ToString());
+	HitsLeft = 0;
+	bDepleted = true;
+	OnRep_Depleted();
+	GetWorldTimerManager().SetTimer(RespawnTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		bDepleted = false;
+		HitsLeft = Hits;
+		OnRep_Depleted();
+	}), RespawnSeconds, false);
 }
 
 void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)

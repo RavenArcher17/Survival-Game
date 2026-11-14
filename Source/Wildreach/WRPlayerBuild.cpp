@@ -881,6 +881,8 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			const bool bWall = Def->Shape == TEXT("wall") || Def->Shape == TEXT("halfwall") || Def->Shape == TEXT("upperwall") || Def->Shape == TEXT("window")
 				|| Def->Shape == TEXT("door") || Def->Shape == TEXT("doorway") || Def->Shape == TEXT("gate") || Def->Shape == TEXT("palisade") || Def->Shape == TEXT("tower");
 			Piece->ScaleHealth(1.f + UWRLifeSkillsComponent::StatFor(this, TEXT("pieceHealth")) + (bWall ? UWRLifeSkillsComponent::StatFor(this, TEXT("wallHealth")) : 0.f));
+			// Siege-proof (Building 100): its builder's walls shrug off part of a charge's blast, for good (saved).
+			if (bWall) Piece->BlastResist = FMath::Clamp(UWRLifeSkillsComponent::StatFor(this, TEXT("blastResist")), 0.f, 0.9f);
 			Piece->FinishSpawning(T);
 			// Engineering levels by building machines too: a station, a code-lock door.
 			if (Def->Kind == TEXT("station") || Def->Kind == TEXT("machine") || Def->bLockable)

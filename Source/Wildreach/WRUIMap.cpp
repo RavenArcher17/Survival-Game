@@ -10,6 +10,8 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
+#include "GameFramework/GameStateBase.h"
+#include "WRTuning.h"
 #include "WRPortals.h"
 #include "WRWorldSystems.h"
 #include "Wildreach.h"
@@ -115,7 +117,9 @@ namespace WRMapTab
 		case ECat::Base: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("house"), 24.f, false };
 		case ECat::Bed: return { M.bMine ? WRUI::Brass : WRUI::Frost, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), M.bMine ? WRUI::Brass : WRUI::Frost, TEXT("bed"), 20.f, false };
 		case ECat::Tame: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("paw"), 22.f, false };
-		case ECat::Claim: return { M.bMine ? WRUI::Brass : WRUI::Bad, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), M.bMine ? WRUI::Brass : WRUI::Bad, TEXT("flag"), 20.f, false };
+		case ECat::Claim: return M.Kind == TEXT("attacked")   // its raid bell rang in the last minute (WRRaiding)
+			? FCatLook{ WRUI::Bad, FLinearColor(0.06f, 0.008f, 0.004f, 0.96f), WRUI::Bad, TEXT("flag"), 26.f, false }
+			: FCatLook{ M.bMine ? WRUI::Brass : WRUI::Bad, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), M.bMine ? WRUI::Brass : WRUI::Bad, TEXT("flag"), 20.f, false };
 		default: return { WRUI::Frost, Hex(TEXT("0C141B")), WRUI::Frost, TEXT("person"), 22.f, false };
 		}
 	}
@@ -212,6 +216,12 @@ namespace WRMapTab
 			M.Cat = ECat::Claim;
 			M.bMine = It->OwnerName == Me;
 			M.Name = M.bMine ? TEXT("Your land claim") : FString::Printf(TEXT("%s's claim"), *It->OwnerName);
+			// Under attack: its bell rang within raiding.bell.pingSeconds (the totem's replicated strike time).
+			if (const AGameStateBase* GS = World->GetGameState(); GS && GS->GetServerWorldTimeSeconds() - It->BellRungAt < WRTune(TEXT("raiding.bell.pingSeconds"), 60.f))
+			{
+				M.Kind = TEXT("attacked");
+				M.Name += TEXT(": UNDER ATTACK");
+			}
 			M.World = It->GetActorLocation();
 			M.Radius = It->Radius;
 			M.Actor = *It;

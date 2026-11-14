@@ -29,7 +29,17 @@ public:
 
 	bool IsSprinting() const;
 
+	/** Custom movement modes (MOVE_Custom + this). */
+	static constexpr uint8 CMOVE_Ladder = 1;
+	/** On a siege ladder (WRRaiding): walk into one facing it and you climb it; back off or jump to drop; at the top you
+	 *  step over onto the wall. Decided from the same input on the predicting client and the server, so it's predicted
+	 *  like walking. */
+	bool IsOnLadder() const { return MovementMode == MOVE_Custom && CustomMovementMode == CMOVE_Ladder; }
+	TWeakObjectPtr<class AWRSiegeLadder> Ladder;
+
 	virtual void BeginPlay() override;
+	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
 	virtual float GetMaxSpeed() const override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;

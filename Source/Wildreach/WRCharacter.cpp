@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRRaiding.h"
 #include "WRLifeSkills.h"
 #include "WRFishing.h"
 #include "WRAnimInstance.h"
@@ -185,6 +186,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		if (IsLocallyControlled())
 		{
 			TickAimCamera(DeltaSeconds);
+			FWRRaiding::TickThrowArc(this, DeltaSeconds);   // a fire pot's arc while you aim it
 			TickCombatCamera(DeltaSeconds);
 			TickFirstPersonCamera(DeltaSeconds);
 		}

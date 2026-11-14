@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRPlayerState.h"
@@ -925,6 +926,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		// Opens a portal of its rank in its land, in front of you (WRPortals).
 		return WRPortals::UseKey(Cast<AWRPlayerState>(GetOwner()), Def->Id);
+	}
+	if (Def->Category == TEXT("raid"))
+	{
+		// Raid tools (WRRaiding): a petard or mining charge pressed on, a siege ladder stood up, the code breaker.
+		return FWRRaiding::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id);
 	}
 	if (Def->Category == TEXT("blueprint"))
 	{

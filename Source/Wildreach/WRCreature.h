@@ -259,6 +259,9 @@ public:
 	// A raider makes for the nearest piece of the claim it came for and bites it, and turns on anyone who comes near as
 	// any hunter does. It never sleeps and never goes after prey; told to leave, it walks away from the base.
 	bool bRaider = false;
+	/** A tame sent at a building ("Break that": FWRRaiding::OrderTamesToBreak): it bites it, then the next piece of the
+	 *  same owner within raiding.tames.nextCm, until told otherwise (Come / Stay) or it's attacked. */
+	TWeakObjectPtr<class AWRBuildPiece> SiegePiece;
 	bool bRaidLeaving = false;
 	FVector RaidBase = FVector::ZeroVector;
 	/** The claim's radius: the pieces it breaks are the claim's owner's and their clan's within it. */
@@ -609,6 +612,8 @@ private:
 	void EndSpecial(AWRCreature* Self);
 	/** A raider with nobody to fight (WRRaids): to the nearest piece of the claim it came for, and bites it. */
 	void TickRaid(AWRCreature* Self, float DeltaSeconds);
+	/** A tame on a "Break that" order: to the piece, and bite it (FWRRaiding, bite x raiding.tameBite). */
+	void TickSiege(AWRCreature* Self, float DeltaSeconds);
 	class AWRBuildPiece* PickRaidPiece(AWRCreature* Self) const;
 	TWeakObjectPtr<class AWRBuildPiece> RaidPiece;
 	TWeakObjectPtr<class AWRBuildPiece> RaidBitePiece;
