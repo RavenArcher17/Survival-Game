@@ -67,6 +67,8 @@ namespace WRInput
 
 	/** A short rumble on the local player's pad (Settings can turn it off); Strength 0..1. */
 	WILDREACH_API void Rumble(UWorld* World, float Strength, float Seconds);
+	/** The same, the small (high-frequency) motors only: a light hit's tick without the heavy thump (COMBAT-AND-LESSONS L1). */
+	WILDREACH_API void RumbleLight(UWorld* World, float Strength, float Seconds);
 
 	/**
 	 * Held-input isolation (COMBAT-AND-LESSONS L8 / 1.16). Called when the player moves between play and a mode that

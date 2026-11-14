@@ -110,9 +110,11 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("guard back after the swing"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Blocked);
 	A.Heal();
 
-	// 4. Parry staggers the attacker.
+	// 4. Parry (only a parryable blow) staggers the attacker.
 	A.Tag(A.Target, WRTags::State_Parrying, true);
-	TestEqual(TEXT("parry result"), UWRCombatLibrary::ApplyHit(A.Target, A.Melee(20.f)), EWRHitResult::Parried);
+	FWRHit Parryable = A.Melee(20.f);
+	Parryable.bParryable = true;
+	TestEqual(TEXT("parry result"), UWRCombatLibrary::ApplyHit(A.Target, Parryable), EWRHitResult::Parried);
 	TestTrue(TEXT("parried attacker staggered"), A.Attacker->HasTag(WRTags::Status_Staggered));
 	A.Attacker->Status->ClearStatus(WRTags::Status_Staggered);
 	A.Tag(A.Target, WRTags::State_Parrying, false);
@@ -124,16 +126,13 @@ bool FWRCombatScenarioTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("dodge takes no damage"), A.Health(), Max);
 	A.Tag(A.Target, WRTags::State_Invulnerable, false);
 
-	// 6. Poise break -> stagger -> riposte for x3.
+	// 6. Poise break -> a reaction (crits are the critical ability's, not any blow on a staggered target).
 	FWRHit PoiseBreaker = A.Melee(1.f);
 	PoiseBreaker.PoiseDamage = 1000.f;
 	UWRCombatLibrary::ApplyHit(A.Target, PoiseBreaker);
 	TestTrue(TEXT("poise break staggers"), A.Target->HasTag(WRTags::Status_Staggered));
 	A.Heal();
-	UWRCombatLibrary::ApplyHit(A.Target, A.Melee(10.f));
-	TestEqual(TEXT("riposte triples damage"), A.Health(), Max - 10.f * WRTune(TEXT("weapon.riposteMultiplier"), 3.f));
-	TestFalse(TEXT("riposte consumes the stagger"), A.Target->HasTag(WRTags::Status_Staggered));
-	A.Heal();
+	A.Target->Status->ClearStatus(WRTags::Status_Staggered);
 
 	// 7. Frost buildup: first full meter = frostbite + slowed, second = frozen.
 	FWRHit Frost = A.Melee(0.f, false, WRTags::Element_Frost);

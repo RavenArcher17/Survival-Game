@@ -14,6 +14,11 @@
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "WRCharacterBase.h"
+#include "WRPlayerController.h"
+#include "WRPlayerUI.h"
+#include "WRKeyBindings.h"
 
 uint16 WRFx::HitFlagsFor(const FWRHit& Hit, bool bCrit, bool bRiposte, bool bWeak, bool bShatter, bool bArmored)
 {
@@ -28,7 +33,11 @@ uint16 WRFx::HitFlagsFor(const FWRHit& Hit, bool bCrit, bool bRiposte, bool bWea
 	if (Hit.Element == WRTags::Element_Fire) F |= Hit_Fire;
 	if (Hit.Element == WRTags::Element_Frost) F |= Hit_Frost;
 	if (bArmored) F |= Hit_Armored;
-	return F;
+	// How it lands: the move's tier (crits always crit-tier; old callers' heavy blows count as heavy).
+	EWRHitTier Tier = Hit.Tier;
+	if (Hit.bCritical || bRiposte) Tier = EWRHitTier::Crit;
+	else if (Tier == EWRHitTier::Light && (Hit.bHeavy || Hit.bWeaponArt || bShatter)) Tier = EWRHitTier::Heavy;
+	return WithTier(F, Tier);
 }
 
 namespace WRFxCombatDetail
@@ -70,42 +79,63 @@ void WRFx::ShowHit(AActor* Target, AActor* Source, float Damage, EWRHitResult Re
 	const bool bMine = Me && Source == Me;
 	const bool bOnMe = Me && Target == Me;
 	const bool bDot = (Flags & Hit_Dot) != 0;
-	const bool bHeavy = (Flags & (Hit_Heavy | Hit_Crit | Hit_Riposte | Hit_Shatter)) != 0;
+	// How hard it lands (COMBAT-AND-LESSONS L1): the tier picks the hit-stop, the flash, the weight of the shake and rumble.
+	const EWRHitTier Tier = TierOf(Flags);
+	const TCHAR* TierKey = Tier == EWRHitTier::BossKill ? TEXT("bossKill") : Tier == EWRHitTier::Crit ? TEXT("crit")
+		: Tier == EWRHitTier::Counter ? TEXT("counter") : Tier == EWRHitTier::Heavy ? TEXT("heavy") : TEXT("light");
+	const bool bHeavy = Tier != EWRHitTier::Light;
 	const FVector From = !Origin.IsNearlyZero() ? Origin : Source ? Source->GetActorLocation() : Target->GetActorLocation() + Target->GetActorForwardVector() * 100.f;
 	const FVector Point = HitPoint(Target, From, bDot);
 	const FVector Toward = (From - Target->GetActorLocation()).GetSafeNormal2D();
 	// Impacts spray out of the struck side, back toward the blow (where the camera usually is).
 	const FRotator Back = (Toward + FVector(0.f, 0.f, 0.25f)).Rotation();
-	const float StopSeconds = T.Num(TEXT("fx.hitStop.seconds"), 0.06f);
-	// The pad's rumble: a blow you land or take (heavier ones harder), never the ticks of a burn.
-	if ((bMine || bOnMe) && !bDot)
+	const float Weight = T.Num(FString::Printf(TEXT("fx.weight.%s"), Result == EWRHitResult::Parried ? TEXT("parry") : TierKey), 0.3f);
+	const float Stop = T.Num(FString::Printf(TEXT("fx.hitStop.%s"), TierKey), 0.06f);
+	// The freeze waits for the blade's deepest point, a moment after the contact the server saw (fx.hitStop.deep*).
+	const float Deep = FMath::Min(T.Num(TEXT("fx.hitStop.deepMax"), 0.04f), Stop * T.Num(TEXT("fx.hitStop.deepFraction"), 0.3f));
+	const float ShakeCm = FMath::Lerp(T.Num(TEXT("fx.victimShake.min"), 3.f), T.Num(TEXT("fx.victimShake.max"), 6.f), FMath::Clamp((Weight - 0.3f) / 0.7f, 0.f, 1.f));
+
+	// The people in it feel it: camera trauma 0.04 + 0.22 w^2, the FOV punch 0.2 + 1.3 w degrees, the pad 35 + 85 w ms
+	// (the heavy motors only for heavier blows). Never for burn ticks.
+	const auto Feel = [&](float W)
 	{
-		const TCHAR* Kind = bOnMe ? TEXT("taken") : bHeavy ? TEXT("heavy") : TEXT("light");
-		WRInput::Rumble(Target->GetWorld(), T.Num(FString::Printf(TEXT("pad.rumble.%s.strength"), Kind), bOnMe ? 0.7f : bHeavy ? 0.6f : 0.3f),
-			T.Num(FString::Printf(TEXT("pad.rumble.%s.seconds"), Kind), bOnMe ? 0.22f : bHeavy ? 0.18f : 0.1f));
-	}
+		if (!(bMine || bOnMe) || bDot)
+		{
+			return;
+		}
+		WRFx::Shake(Target, T.Num(TEXT("fx.trauma.base"), 0.04f) + T.Num(TEXT("fx.trauma.scale"), 0.22f) * W * W);
+		if (W >= 0.5f)
+		{
+			WRFx::FovPunch(Target, T.Num(TEXT("fx.fovPunch.base"), 0.2f) + T.Num(TEXT("fx.fovPunch.scale"), 1.3f) * W, T.Num(TEXT("fx.fovPunch.seconds"), 0.18f));
+		}
+		const float Ms = T.Num(TEXT("fx.rumble.base"), 35.f) + T.Num(TEXT("fx.rumble.scale"), 85.f) * W;
+		const float Strength = FMath::Clamp(T.Num(TEXT("fx.rumble.strength"), 0.9f) * W + (bOnMe ? 0.15f : 0.f), 0.f, 1.f);
+		if (W < 0.5f && !bOnMe) WRInput::RumbleLight(Target->GetWorld(), Strength, Ms / 1000.f);
+		else WRInput::Rumble(Target->GetWorld(), Strength, Ms / 1000.f);
+	};
 
 	switch (Result)
 	{
 	case EWRHitResult::Parried:
+		// Gold: block and parry (colour law). The parrier's gold rim, the sparks, the clang, both frozen a beat.
 		WRFx::SpawnAt(Target, TEXT("parry.flash"), Point, Back, 1.f);
 		WRSound::PlayAt(Target, TEXT("parry"), Point);
-		WRFx::HitStop(Target, Source, T.Num(TEXT("fx.hitStop.parrySeconds"), 0.09f));
-		if (bMine || bOnMe)
-		{
-			Fx->ShakeNamed(TEXT("parry"), FVector::ZeroVector);
-			if (bOnMe) Fx->ParryFlashTime = Target->GetWorld()->GetTimeSeconds();
-		}
+		WRFx::HitStopEx(Source, Target, T.Num(TEXT("fx.hitStop.parry"), 0.09f), 0.f, T.Num(TEXT("fx.victimShake.min"), 3.f), -Toward);
+		// The parried attacker takes the gold rim (the victim's flash, in the parry's colour).
+		Fx->Flash(Source ? Source : Target, T.Num(TEXT("fx.flash.parry"), 0.18f), true);
+		Feel(Weight);
+		if (bOnMe) Fx->ParryFlashTime = Target->GetWorld()->GetTimeSeconds();
 		break;
 	case EWRHitResult::Blocked:
 	case EWRHitResult::GuardBroken:
 	{
 		const bool bBroke = Result == EWRHitResult::GuardBroken;
-		WRFx::SpawnAt(Target, TEXT("hit.spark"), Point, Back, bBroke ? 1.6f : (bHeavy ? 1.3f : 1.f));
+		WRFx::SpawnAt(Target, bBroke ? TEXT("guard.break") : TEXT("hit.spark"), Point, Back, bBroke ? 1.2f : (bHeavy ? 1.3f : 1.f));
 		WRSound::PlayAt(Target, TEXT("hit.block"), Point, bBroke ? 1.3f : 1.f);
-		if (bBroke || bHeavy) WRFx::HitStop(Target, Source, StopSeconds);
-		if (bOnMe) Fx->ShakeNamed(bBroke ? TEXT("guardBreak") : TEXT("block"), FVector::ZeroVector);
-		else if (bMine && bBroke) Fx->ShakeNamed(TEXT("heavyDealt"), FVector::ZeroVector);
+		if (bBroke) WRSound::PlayAt(Target, TEXT("guard.break"), Point);
+		WRFx::HitStopEx(Target, Source, bBroke ? T.Num(TEXT("fx.hitStop.heavy"), 0.1f) : Stop * 0.6f, Deep, bBroke ? ShakeCm : 0.f, -Toward);
+		if (bBroke) Fx->Flash(Target, T.Num(TEXT("fx.flash.heavy"), 0.14f), false);
+		Feel(bBroke ? FMath::Max(Weight, 0.6f) : Weight * 0.6f);
 		break;
 	}
 	case EWRHitResult::Hit:
@@ -116,7 +146,8 @@ void WRFx::ShowHit(AActor* Target, AActor* Source, float Damage, EWRHitResult Re
 		}
 		const float Scale = bHeavy ? T.Num(TEXT("fx.impact.heavyScale"), 1.6f) : 1.f;
 		// Out of the wound, back toward the blow (where the camera usually is) and to the sides.
-		WRFx::SpawnAt(Target, Fx->ImpactFor(Target), Point, Back, Scale);
+		const FName Impact = Fx->ImpactFor(Target);
+		WRFx::SpawnAt(Target, Impact, Point, Back, Scale);
 		if (Flags & Hit_Shatter)
 		{
 			WRFx::SpawnAt(Target, TEXT("frost.impact"), Point, Back, 1.4f);
@@ -130,21 +161,41 @@ void WRFx::ShowHit(AActor* Target, AActor* Source, float Damage, EWRHitResult Re
 		{
 			WRFx::SpawnAt(Target, TEXT("hit.crit"), Point, Back, 1.f);
 		}
-		WRSound::PlayAt(Target, (Flags & Hit_Armored) ? TEXT("hit.armor") : TEXT("hit.flesh"), Point, bHeavy ? 1.25f : 1.f);
-		if (bHeavy)
-		{
-			WRFx::HitStop(Target, Source, StopSeconds);
-			if (bMine) Fx->ShakeNamed(TEXT("heavyDealt"), FVector::ZeroVector);
-			if (bOnMe) Fx->ShakeNamed(TEXT("heavyTaken"), FVector::ZeroVector);
-		}
-		else if (bOnMe)
-		{
-			Fx->ShakeNamed(TEXT("lightTaken"), FVector::ZeroVector);
-		}
+		// Four layers (COMBAT-AND-LESSONS L1): the edge's transient and the weight's thud by what was hit, the material,
+		// and the creature's own hurt call (UWRAudioDirector::OnHitShown).
+		const bool bArmour = (Flags & Hit_Armored) != 0 || Impact == TEXT("hit.spark");
+		const bool bStone = Impact == TEXT("hit.dust") || Impact == TEXT("hit.ice");
+		WRSound::PlayAt(Target, bArmour ? TEXT("hit.transient.armor") : bStone ? TEXT("hit.transient.stone") : TEXT("hit.transient.flesh"), Point);
+		WRSound::PlayAt(Target, Tier == EWRHitTier::Crit ? TEXT("crit.stab") : Tier == EWRHitTier::Counter ? TEXT("hit.counter")
+			: bHeavy ? TEXT("hit.body.heavy") : TEXT("hit.body.light"), Point);
+		if (Tier == EWRHitTier::BossKill) WRSound::PlayAt(Target, TEXT("boss.kill"), Point);
+		WRSound::PlayAt(Target, bArmour ? TEXT("hit.armor") : Impact == TEXT("hit.ice") ? TEXT("frost.impact") : Impact == TEXT("hit.dust") ? TEXT("hit.dust") : TEXT("hit.flesh"),
+			Point, bHeavy ? 1.25f : 1.f);
+		// Every connected blow freezes both bodies a beat by its tier, the victim shaking along it, flashing white.
+		WRFx::HitStopEx(Target, Source, Stop, Deep, ShakeCm, -Toward);
+		Fx->Flash(Target, T.Num(FString::Printf(TEXT("fx.flash.%s"), Tier == EWRHitTier::BossKill ? TEXT("crit") : TierKey), 0.07f), false);
+		Feel(Weight);
 		break;
 	}
 	default:
 		break;
+	}
+	// State words only (COMBAT-AND-LESSONS L6): GUARD BROKEN on the one whose guard broke and who broke it, STANCE BROKEN
+	// for who broke it (a parry's breaker is the one parrying). Never PERFECT or BLOCKED.
+	if (AWRPlayerController* PC = Me ? Cast<AWRPlayerController>(Me->GetController()) : nullptr)
+	{
+		if (FWRPlayerUI* UI = PC->GetUI())
+		{
+			if (Result == EWRHitResult::GuardBroken && (bMine || bOnMe))
+			{
+				UI->NoteNotice(TEXT("GUARD BROKEN"));
+			}
+			const bool bBreaker = Result == EWRHitResult::Parried ? bOnMe : bMine;
+			if ((Flags & Hit_StanceBreak) && bBreaker)
+			{
+				UI->NoteNotice(TEXT("STANCE BROKEN"));
+			}
+		}
 	}
 	Fx->AddHudHit(Target, Point, Damage, Result, Flags, bMine, bOnMe);
 }
@@ -157,6 +208,13 @@ void UWRFxSubsystem::AddHudHit(AActor* Target, const FVector& Point, float Damag
 		MarkerTime = Now;
 		MarkerFlags = Flags;
 		MarkerResult = Result;
+	}
+	// Damage numbers only when they're turned on (Settings, off by default: combat.md 2.14), and no number for a parry,
+	// a dodge or a guard that took it all (no hit words, COMBAT-AND-LESSONS L6).
+	if (!FWRKeyBindings::Get().DamageNumbers() || Result == EWRHitResult::Parried || Result == EWRHitResult::Dodged
+		|| ((Result == EWRHitResult::Blocked || Result == EWRHitResult::GuardBroken) && Damage < 0.5f))
+	{
+		return;
 	}
 	// Burn ticks and hazards add up into one number per half second instead of a stream of little ones.
 	if ((Flags & WRFx::Hit_Dot) && Result == EWRHitResult::Hit)
@@ -184,35 +242,54 @@ void UWRFxSubsystem::AddHudHit(AActor* Target, const FVector& Point, float Damag
 	if (HudHits.Num() > 48) HudHits.RemoveAt(0);
 }
 
-// ---------------------------------------------------------------- hit-stop
+/// ---------------------------------------------------------------- hit-stop
 
 void WRFx::HitStop(AActor* A, AActor* B, float Seconds)
 {
-	UWRFxSubsystem* Fx = UWRFxSubsystem::Get(A ? A : B);
+	HitStopEx(A, B, Seconds, 0.f, 0.f, FVector::ZeroVector);
+}
+
+void WRFx::HitStopEx(AActor* Victim, AActor* Attacker, float Seconds, float Delay, float ShakeCm, const FVector& Dir)
+{
+	UWRFxSubsystem* Fx = UWRFxSubsystem::Get(Victim ? Victim : Attacker);
 	if (!Fx || !Fx->IsActive() || Seconds <= 0.f)
 	{
 		return;
 	}
-	// The pause is on the animation only (bPauseAnims): movement, prediction and the server carry on, so a listen
-	// server's creatures don't really stop and a client never corrects. Never global time dilation.
-	const double Until = Fx->GetWorld()->GetTimeSeconds() + Seconds;
-	for (AActor* Actor : { A, B })
+	// Animation only (the mesh's GlobalAnimRateScale): movement, prediction and the server carry on, so a listen server's
+	// creatures don't really stop and a client never corrects. Never global time dilation (COMBAT-AND-LESSONS 1.17).
+	Seconds = FMath::Min(Seconds, 0.3f);  // nothing over 0.3 s (L1)
+	const double Now = Fx->GetWorld()->GetTimeSeconds();
+	const double Start = Now + FMath::Max(0.f, Delay);
+	const double Until = Start + Seconds;
+	const float CatchUp = FMath::Max(0.02f, WRTune(TEXT("fx.hitStop.catchUp"), 0.1f));
+	for (AActor* Actor : { Victim, Attacker })
 	{
 		if (!Actor) continue;
+		const bool bVictim = Actor == Victim;
 		TArray<USkeletalMeshComponent*> Meshes;
 		Actor->GetComponents(Meshes);
 		for (USkeletalMeshComponent* Mesh : Meshes)
 		{
 			if (!Mesh->IsVisible()) continue;
 			UWRFxSubsystem::FHitStop* Found = Fx->HitStops.FindByPredicate([Mesh](const UWRFxSubsystem::FHitStop& H) { return H.Mesh.Get() == Mesh; });
-			if (Found)
+			if (!Found)
 			{
-				Found->Until = FMath::Max(Found->Until, Until);
+				Found = &Fx->HitStops.AddDefaulted_GetRef();
+				Found->Mesh = Mesh;
+				Found->Start = Start;
 			}
-			else if (!Mesh->bPauseAnims)
+			Found->Until = FMath::Max(Found->Until, Until);
+			Found->Seconds = FMath::Max(0.f, float(Found->Until - Found->Start));
+			Found->CatchUpUntil = Found->Until + CatchUp;
+			// Only the body actually struck shakes, and only its root mesh (the pieces attached to it go with it); not a
+			// body posed by its own code right now (a creature rearing into a strike, or slumped in a stance break).
+			const AWRCharacterBase* Char = Cast<AWRCharacterBase>(Actor);
+			const bool bPosed = Char && (Char->HasTag(WRTags::Status_StanceBroken) || (Char->IsCreature() && Char->HasTag(WRTags::State_Windup)));
+			if (bVictim && ShakeCm > 0.f && !bPosed && !(Mesh->GetAttachParent() && Mesh->GetAttachParent()->IsA<USkeletalMeshComponent>()))
 			{
-				Mesh->bPauseAnims = true;
-				Fx->HitStops.Add({ Mesh, Until });
+				Found->ShakeCm = FMath::Max(Found->ShakeCm, ShakeCm);
+				Found->ShakeDir = Dir.IsNearlyZero() ? Actor->GetActorForwardVector() : Dir.GetSafeNormal();
 			}
 		}
 	}
@@ -221,13 +298,147 @@ void WRFx::HitStop(AActor* A, AActor* B, float Seconds)
 void UWRFxSubsystem::TickHitStops(float DeltaTime)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
+	const float Creep = FMath::Clamp(WRTune(TEXT("fx.hitStop.creep"), 0.02f), 0.f, 1.f);
+	const float Hz = WRTune(TEXT("fx.victimShake.hz"), 30.f);
+	const float CatchUp = FMath::Max(0.02f, WRTune(TEXT("fx.hitStop.catchUp"), 0.1f));
 	for (int32 i = HitStops.Num() - 1; i >= 0; --i)
 	{
-		USkeletalMeshComponent* Mesh = HitStops[i].Mesh.Get();
-		if (!Mesh || Now >= HitStops[i].Until)
+		FHitStop& H = HitStops[i];
+		USkeletalMeshComponent* Mesh = H.Mesh.Get();
+		if (!Mesh || Now >= H.CatchUpUntil)
 		{
-			if (Mesh) Mesh->bPauseAnims = false;
+			if (Mesh)
+			{
+				Mesh->GlobalAnimRateScale = 1.f;
+				if (!H.Applied.IsZero()) Mesh->AddWorldOffset(-H.Applied);
+			}
 			HitStops.RemoveAtSwap(i);
+			continue;
+		}
+		if (Now < H.Start)
+		{
+			continue;  // waiting for the blade's deepest point
+		}
+		FVector Offset = FVector::ZeroVector;
+		if (Now < H.Until)
+		{
+			// Frozen: creeping at a sliver of speed (it reads as weight, not a hitch); the struck body shakes along the
+			// blow at Hz, fading out as the freeze ends.
+			Mesh->GlobalAnimRateScale = Creep;
+			if (H.ShakeCm > 0.f)
+			{
+				const float Age = float(Now - H.Start);
+				const float Fade = 1.f - Age / FMath::Max(0.01f, H.Seconds);
+				Offset = H.ShakeDir * H.ShakeCm * Fade * FMath::Sin(2.f * PI * Hz * Age);
+			}
+		}
+		else
+		{
+			// Catch up: the time the freeze held back is played back over catchUp s, so the swing lands on the server's
+			// timing again with no snap.
+			Mesh->GlobalAnimRateScale = 1.f + (1.f - Creep) * H.Seconds / CatchUp;
+		}
+		if (!(Offset - H.Applied).IsNearlyZero())
+		{
+			Mesh->AddWorldOffset(Offset - H.Applied);
+			H.Applied = Offset;
+		}
+	}
+	TickFlashes();
+}
+
+void WRFx::FovPunch(const UObject* WorldContext, float Degrees, float Seconds)
+{
+	UWRFxSubsystem* Fx = UWRFxSubsystem::Get(WorldContext);
+	const UWorld* World = Fx && Fx->IsActive() ? Fx->GetWorld() : nullptr;
+	APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!PC || !PC->IsLocalController() || !PC->PlayerCameraManager || Degrees <= 0.f || WRTune(TEXT("fx.shake.scale"), 1.f) <= 0.f)
+	{
+		return;
+	}
+	UWRFxCameraModifier* Mod = Cast<UWRFxCameraModifier>(PC->PlayerCameraManager->FindCameraModifierByClass(UWRFxCameraModifier::StaticClass()));
+	if (!Mod)
+	{
+		Mod = Cast<UWRFxCameraModifier>(PC->PlayerCameraManager->AddNewCameraModifier(UWRFxCameraModifier::StaticClass()));
+	}
+	if (Mod)
+	{
+		Mod->AddFovPunch(Degrees, Seconds);
+	}
+}
+
+void UWRFxCameraModifier::AddFovPunch(float Degrees, float Seconds)
+{
+	// The bigger punch wins; it restarts from full.
+	if (Degrees >= FovPunch * FMath::Square(1.f - FMath::Clamp(FovAge / FMath::Max(0.01f, FovSeconds), 0.f, 1.f)))
+	{
+		FovPunch = Degrees;
+		FovSeconds = FMath::Max(0.05f, Seconds);
+		FovAge = 0.f;
+	}
+}
+
+// ---------------------------------------------------------------- the victim's flash
+
+void UWRFxSubsystem::Flash(AActor* Target, float Seconds, bool bGold)
+{
+	if (!Target || !bActive || Seconds <= 0.f)
+	{
+		return;
+	}
+	TObjectPtr<UMaterialInstanceDynamic>& Mat = bGold ? FlashGold : FlashWhite;
+	if (!Mat)
+	{
+		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FX/M_WindupGlow.M_WindupGlow")))
+		{
+			Mat = UMaterialInstanceDynamic::Create(Base, this);
+			// White for a blow, gold for a parry (colour law); sRGB.
+			Mat->SetVectorParameterValue(TEXT("Color"), bGold ? FLinearColor(FColor(255, 205, 110)) : FLinearColor(FColor(255, 255, 255)));
+			Mat->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("fx.flash.glow"), 2.f));
+			Mat->SetScalarParameterValue(TEXT("Opacity"), WRTune(TEXT("fx.flash.opacity"), 0.55f));
+			Mat->SetScalarParameterValue(TEXT("Wash"), bGold ? 0.15f : 0.55f);
+		}
+	}
+	if (!Mat)
+	{
+		return;
+	}
+	const double Until = GetWorld()->GetTimeSeconds() + Seconds;
+	TArray<UMeshComponent*> Meshes;
+	Target->GetComponents(Meshes);
+	for (UMeshComponent* Mesh : Meshes)
+	{
+		// The body and what it wears (the struck creature's art, the hero's body, face and outfit), not held props.
+		if (!Mesh->IsVisible() || !Mesh->IsA<USkeletalMeshComponent>())
+		{
+			continue;
+		}
+		FFlash* Found = Flashes.FindByPredicate([Mesh](const FFlash& F) { return F.Mesh.Get() == Mesh; });
+		if (!Found)
+		{
+			Found = &Flashes.AddDefaulted_GetRef();
+			Found->Mesh = Mesh;
+			Found->Previous = Mesh->GetOverlayMaterial();
+		}
+		Found->Until = FMath::Max(Found->Until, Until);
+		Mesh->SetOverlayMaterial(Mat);
+	}
+}
+
+void UWRFxSubsystem::TickFlashes()
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (int32 i = Flashes.Num() - 1; i >= 0; --i)
+	{
+		UMeshComponent* Mesh = Flashes[i].Mesh.Get();
+		if (!Mesh || Now >= Flashes[i].Until)
+		{
+			// Put back what it wore (a telegraph glow) unless something else changed it meanwhile.
+			if (Mesh && (Mesh->GetOverlayMaterial() == FlashWhite || Mesh->GetOverlayMaterial() == FlashGold))
+			{
+				Mesh->SetOverlayMaterial(Flashes[i].Previous.Get());
+			}
+			Flashes.RemoveAtSwap(i);
 		}
 	}
 }
@@ -276,6 +487,7 @@ void UWRFxCameraModifier::AddTrauma(float Amount)
 bool UWRFxCameraModifier::ModifyCamera(float DeltaTime, FMinimalViewInfo& InOutPOV)
 {
 	Super::ModifyCamera(DeltaTime, InOutPOV);
+	ModifyFov(DeltaTime, InOutPOV);
 	if (Trauma <= 0.f)
 	{
 		return false;
@@ -292,5 +504,21 @@ bool UWRFxCameraModifier::ModifyCamera(float DeltaTime, FMinimalViewInfo& InOutP
 	const FRotationMatrix Axes(InOutPOV.Rotation);
 	InOutPOV.Location += (Axes.GetScaledAxis(EAxis::Y) * FMath::PerlinNoise1D(Clock + 131.f) + Axes.GetScaledAxis(EAxis::Z) * FMath::PerlinNoise1D(Clock + 177.f)) * MaxOffset * K;
 	Trauma = FMath::Max(0.f, Trauma - DeltaTime * T.Num(TEXT("fx.shake.decay"), 1.6f));
+	return false;
+}
+
+bool UWRFxCameraModifier::ModifyFov(float DeltaTime, FMinimalViewInfo& InOutPOV)
+{
+	// The FOV punch: in at once, eased back out (squared), so a heavy blow reads as a jolt of the eyes, not a zoom.
+	if (FovPunch > 0.f && FovSeconds > 0.f)
+	{
+		FovAge += DeltaTime;
+		const float Left = 1.f - FMath::Clamp(FovAge / FovSeconds, 0.f, 1.f);
+		InOutPOV.FOV -= FovPunch * Left * Left;
+		if (Left <= 0.f)
+		{
+			FovPunch = 0.f;
+		}
+	}
 	return false;
 }

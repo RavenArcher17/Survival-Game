@@ -49,6 +49,11 @@ namespace WRFx
 	WILDREACH_API void Shake(const UObject* WorldContext, float Strength, const FVector& Epicentre = FVector::ZeroVector, float Radius = 0.f);
 	/** This machine: freeze these actors' animation for a moment (hit-stop). Visual only: movement and the server go on. */
 	WILDREACH_API void HitStop(AActor* A, AActor* B, float Seconds);
+	/** The full hit-stop: starts Delay from now (the blade's deepest point), both bodies creep then catch up; the victim
+	 *  (A) shakes ShakeCm along Dir at fx.victimShake.hz meanwhile, not the camera. */
+	WILDREACH_API void HitStopEx(AActor* Victim, AActor* Attacker, float Seconds, float Delay, float ShakeCm, const FVector& Dir);
+	/** This machine: the view narrows a little and eases back (the FOV punch). */
+	WILDREACH_API void FovPunch(const UObject* WorldContext, float Degrees, float Seconds);
 
 	/** What a hit carries from the server to every machine's hit presentation (AWRCharacterBase::MulticastHit). */
 	enum EHitFlags : uint16
@@ -63,7 +68,19 @@ namespace WRFx
 		Hit_Fire = 1 << 7,
 		Hit_Frost = 1 << 8,
 		Hit_Armored = 1 << 9,   // the target wears armour
+		Hit_StanceBreak = 1 << 10, // this blow (or parry) broke a stance: STANCE BROKEN for who caused it
+		// Bits 11-13: the blow's EWRHitTier (light, heavy, counter, crit, boss kill): how hard it lands (fx.hitStop...).
+		Hit_TierShift = 11,
+		Hit_TierMask = 7 << 11,
+		// Bits 14-15: the body's reaction (poise broke): 0 none (a shudder), 1 flinch, 2 stagger, 3 heavy stagger.
+		Hit_ReactShift = 14,
+		Hit_ReactMask = 3 << 14,
 	};
+	inline uint16 WithReaction(uint16 Flags, int32 Level) { return uint16((Flags & ~uint16(Hit_ReactMask)) | (uint16(FMath::Clamp(Level, 0, 3)) << Hit_ReactShift)); }
+	inline int32 ReactionOf(uint16 Flags) { return (Flags & Hit_ReactMask) >> Hit_ReactShift; }
+	/** The flags with the tier set. */
+	inline uint16 WithTier(uint16 Flags, EWRHitTier Tier) { return uint16((Flags & ~uint16(Hit_TierMask)) | (uint16(uint8(Tier)) << Hit_TierShift)); }
+	inline EWRHitTier TierOf(uint16 Flags) { return EWRHitTier((Flags & Hit_TierMask) >> Hit_TierShift); }
 	/** Server: the flags for a resolved hit. */
 	WILDREACH_API uint16 HitFlagsFor(const FWRHit& Hit, bool bCrit, bool bRiposte, bool bWeak, bool bShatter, bool bArmored);
 	/**

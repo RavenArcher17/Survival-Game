@@ -155,6 +155,8 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("damage"), Num)) D.Damage = Num;
 		if (O->TryGetNumberField(TEXT("speed"), Num)) D.Speed = Num;
 		if (O->TryGetNumberField(TEXT("poise"), Num)) D.Poise = Num;
+		if (O->TryGetNumberField(TEXT("stance"), Num)) D.Stance = Num;
+		O->TryGetBoolField(TEXT("hyperarmor"), D.bHyperarmor);
 		if (O->TryGetNumberField(TEXT("radius"), Num)) D.Radius = Num;
 		if (O->TryGetNumberField(TEXT("halfHeight"), Num)) D.HalfHeight = Num;
 		if (O->TryGetNumberField(TEXT("aggroRadius"), Num)) D.AggroRadius = Num;
@@ -919,17 +921,123 @@ void AWRCreature::TickNightGlow()
 
 void AWRCreature::OnHitVisual(EWRHitResult Result)
 {
-	// A flinch, unless it's mid-attack (or dying: the death takes over).
+	// A flinch when the blow broke its poise (it shudders otherwise), unless it's mid-attack or broken (or dying: the
+	// death takes over).
 	UWRAnimInstance* Anim = CreatureAnim();
 	UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, TEXT("hit"));
-	if (Anim && Clip && Skel->IsVisible() && Result == EWRHitResult::Hit && IsAlive() && GetWorld()->GetTimeSeconds() >= OneShotUntil)
+	if (Anim && Clip && Skel->IsVisible() && Result == EWRHitResult::Hit && WRFx::ReactionOf(HitFlagsShown) > 0 && IsAlive()
+		&& GetWorld()->GetTimeSeconds() >= OneShotUntil && !bStanceBrokenShown)
 	{
 		OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, 1.f);
 	}
 }
 
+FName AWRCreature::HeadBone() const
+{
+	const USkinnedAsset* Asset = Skel ? Skel->GetSkinnedAsset() : nullptr;
+	if (!Asset)
+	{
+		return NAME_None;
+	}
+	// The head (whatever the rig calls it: Head, head, BARGHEST_-Head, MOUNTAIN_DRAGON_-Head...), not its end bone.
+	const FReferenceSkeleton& Ref = Asset->GetRefSkeleton();
+	for (int32 i = 0; i < Ref.GetNum(); ++i)
+	{
+		const FString Name = Ref.GetBoneName(i).ToString();
+		if (Name.Contains(TEXT("head")) && !Name.Contains(TEXT("end")) && !Name.Contains(TEXT("nub")) && !Name.Contains(TEXT("top")))
+		{
+			return Ref.GetBoneName(i);
+		}
+	}
+	return NAME_None;
+}
+
+void AWRCreature::OnStanceBreakVisual(bool bBroken)
+{
+	if (GetNetMode() == NM_DedicatedServer || bStanceBrokenShown == bBroken)
+	{
+		return;
+	}
+	bStanceBrokenShown = bBroken;
+	UWRAnimInstance* Anim = CreatureAnim();
+	if (bBroken && IsAlive())
+	{
+		// Its recoil, slowed and held at the end for the whole break; the slump settles over it (TickStanceSlump).
+		if (UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, TEXT("hit")); Anim && Clip && Skel->IsVisible())
+		{
+			Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, WRTune(TEXT("stance.recoilRate"), 0.6f), 0.f, 0.f, true);
+			OneShotUntil = GetWorld()->GetTimeSeconds() + 60.0;
+		}
+		const FName Head = HeadBone();
+		const FVector At = Head.IsNone() || !Skel->IsVisible() ? GetActorLocation() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() * 0.6f) + GetActorForwardVector() * GetSimpleCollisionRadius() * 0.8f
+			: Skel->GetSocketLocation(Head);
+		WRFx::SpawnAt(this, TEXT("stance.break"), At, GetActorForwardVector().Rotation(), FMath::Clamp(GetSimpleCollisionRadius() / 80.f, 0.7f, 2.5f));
+		WRSound::PlayAt(this, TEXT("stance.break"), At);
+		WRSound::Voice(this, TEXT("hurt"));
+		// The gold weak-point mark (colour law: gold is yours to strike) on the head, where the crit lands.
+		if (!CritMark)
+		{
+			CritMark = Skel->IsVisible() && !Head.IsNone() ? WRFx::Attach(Skel, TEXT("crit.mark"), Head, FMath::Clamp(GetSimpleCollisionRadius() / 70.f, 0.8f, 2.4f))
+				: WRFx::Attach(GetRootComponent(), TEXT("crit.mark"), NAME_None, 1.f);
+			if (CritMark && (Head.IsNone() || !Skel->IsVisible()))
+			{
+				CritMark->SetRelativeLocation(FVector(GetSimpleCollisionRadius() * 0.8f, 0.f, GetSimpleCollisionHalfHeight() * 0.6f));
+			}
+		}
+	}
+	else
+	{
+		if (CritMark)
+		{
+			WRFx::Stop(CritMark);
+			CritMark = nullptr;
+		}
+		if (Anim && IsAlive())
+		{
+			Anim->StopOneShot(EWRAnimLayer::Upper);
+			OneShotUntil = 0.0;
+		}
+	}
+}
+
+void AWRCreature::TickStanceSlump(float DeltaSeconds)
+{
+	const FWRTuning& T = FWRTuning::Get();
+	const float Target = bStanceBrokenShown && IsAlive() ? 1.f : 0.f;
+	if (SlumpAlpha <= 0.f && Target <= 0.f)
+	{
+		return;
+	}
+	if (!bSlumpBase)
+	{
+		SlumpBaseLocation = Skel->GetRelativeLocation();
+		SlumpBaseRotation = Skel->GetRelativeRotation();
+		bSlumpBase = true;
+	}
+	SlumpAlpha = FMath::FInterpConstantTo(SlumpAlpha, Target, DeltaSeconds, 1.f / FMath::Max(0.05f, T.Num(TEXT("stance.slump.seconds"), 0.3f)));
+	// Head down on the front feet and a little lower (the weight gone out of it); eased so it settles, not snaps.
+	const float A = FMath::InterpEaseInOut(0.f, 1.f, SlumpAlpha, 2.f);
+	const float R = GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const float HH = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const float Pitch = T.Num(TEXT("stance.slump.pitch"), -8.f) * A;
+	const FVector Pivot(R, 0.f, -HH);
+	const FQuat Q(FRotator(Pitch, 0.f, 0.f));
+	const FVector Sink(0.f, 0.f, -T.Num(TEXT("stance.slump.sink"), 0.06f) * HH * A);
+	Skel->SetRelativeLocationAndRotation(Pivot + Q.RotateVector(SlumpBaseLocation - Pivot) + Sink, Q * FQuat(SlumpBaseRotation));
+	if (SlumpAlpha <= 0.f)
+	{
+		Skel->SetRelativeLocationAndRotation(SlumpBaseLocation, SlumpBaseRotation);
+		bSlumpBase = false;
+	}
+}
+
 void AWRCreature::OnDeathVisual()
 {
+	if (CritMark)
+	{
+		WRFx::Stop(CritMark);
+		CritMark = nullptr;
+	}
 	UWRAnimInstance* Anim = CreatureAnim();
 	if (Skel->IsVisible() && Anim)
 	{
@@ -984,6 +1092,7 @@ void AWRCreature::TestFlinch()
 
 void AWRCreature::MulticastTestFlinch_Implementation()
 {
+	HitFlagsShown = WRFx::WithReaction(0, 2);
 	OnHitVisual(EWRHitResult::Hit);
 	WRSound::Voice(this, TEXT("hurt"));
 }
@@ -1671,6 +1780,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	{
 		TickCreatureAnim(DeltaSeconds);
 		TickTelegraph();
+		TickStanceSlump(DeltaSeconds);
 		TickNightGlow();
 	}
 	if (HasAuthority() && AggroRep != AggroTarget.Get())
@@ -2129,14 +2239,27 @@ namespace
 		Hit.Origin = Self->GetActorLocation();
 		Hit.bMelee = true;
 		Hit.bHeavy = true;
-		const EWRHitResult Result = UWRCombatLibrary::ApplyHit(Victim, Hit);
+		// Its move's row (tuning creatureAI.<kind>): how hard it lands, whether a parry takes it, whether it passes under
+		// a jump (a stomp's ring rolls along the ground).
+		Hit.Impact = uint8(FMath::Clamp(FMath::RoundToInt(AttackNum(Kind, TEXT("impact"), 3.f)), 1, 5));
+		Hit.bParryable = AttackNum(Kind, TEXT("parryable"), 0.f) > 0.f;
+		Hit.bLow = AttackNum(Kind, TEXT("low"), 0.f) > 0.f;
+		Hit.Tier = EWRHitTier::Heavy;
 		UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *Kind.ToString(), *Victim->GetName());
+		// The knockback follows the real result (a blow on a remote player resolves when its defence has been judged).
 		const float Knockback = AttackNum(Kind, TEXT("knockback"), 0.f);
-		if (Knockback > 0.f && Result != EWRHitResult::Dodged && Result != EWRHitResult::Parried)
+		TWeakObjectPtr<AWRCreature> WeakSelf(Self);
+		TWeakObjectPtr<AWRCharacterBase> WeakVictim(Victim);
+		UWRCombatLibrary::ApplyHit(Victim, Hit, [WeakSelf, WeakVictim, Knockback](EWRHitResult Result)
 		{
-			const FVector Push = (Victim->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D() * Knockback + FVector(0.f, 0.f, Knockback * 0.35f);
-			Victim->LaunchCharacter(Push, true, true);
-		}
+			AWRCreature* S = WeakSelf.Get();
+			AWRCharacterBase* V = WeakVictim.Get();
+			if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
+			{
+				const FVector Push = (V->GetActorLocation() - S->GetActorLocation()).GetSafeNormal2D() * Knockback + FVector(0.f, 0.f, Knockback * 0.35f);
+				V->LaunchCharacter(Push, true, true);
+			}
+		});
 	}
 }
 
@@ -2166,6 +2289,13 @@ bool AWRCreatureAI::TryStartSpecial(AWRCreature* Self, AWRCharacterBase* Target,
 		SpecialClock = Windup;
 		SpecialTarget = Target;
 		bSpecialHit = false;
+		// Winding up (no backstab then: COMBAT-AND-LESSONS 1.3) and, on a big body, hyperarmor from the first tell to the
+		// end of the move (1.5): the punish window after it is real.
+		Self->SetCombatTag(WRTags::State_Windup, true);
+		if (const FWRCreatureDef* D = Self->GetDef(); D && (D->bHyperarmor || D->Archetype == TEXT("boss")))
+		{
+			Self->SetCombatTag(WRTags::State_Hyperarmor, true);
+		}
 		SpecialDir = (Target->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D();
 		SpecialReadyAt.Add(Kind, Now + Windup + AttackNum(Kind, TEXT("cooldown"), 6.f));
 		// Its attack clip, timed so the strike lands with the move (and paced to read differently for each).
@@ -2194,6 +2324,13 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 {
 	AWRCharacterBase* Target = SpecialTarget.Get();
 	SpecialClock -= DeltaSeconds;
+	// A blow that broke its poise (it had no hyperarmor), a freeze, a stance break or a crit cuts the move short.
+	if (Self->HasTag(WRTags::Status_Staggered) || Self->HasTag(WRTags::Status_Frozen) || Self->HasTag(WRTags::State_BeingCrit))
+	{
+		UE_LOG(LogWildreach, Log, TEXT("AI %s's %s interrupted"), *Self->GetName(), *Special.ToString());
+		EndSpecial(Self);
+		return;
+	}
 	if (SpecialPhase == 1)
 	{
 		// Windup: it keeps facing the target (a charge commits to its line when it starts).
@@ -2210,6 +2347,7 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 			return;
 		}
 		SpecialPhase = 2;
+		Self->SetCombatTag(WRTags::State_Windup, false);
 		UE_LOG(LogWildreach, Log, TEXT("AI %s uses %s"), *Self->GetName(), *Special.ToString());
 		if (Special == TEXT("lunge"))
 		{
@@ -2245,6 +2383,8 @@ void AWRCreatureAI::TickSpecial(AWRCreature* Self, float DeltaSeconds)
 				Hit.Instigator = Self;
 				Hit.Damage = Self->Weapon.FlatDamage * AttackNum(Special, TEXT("damageMult"), 0.8f);
 				Hit.PoiseDamage = AttackNum(Special, TEXT("poise"), 10.f);
+				Hit.Impact = uint8(FMath::Clamp(FMath::RoundToInt(AttackNum(Special, TEXT("impact"), 1.f)), 1, 5));
+				Hit.bProjectile = true;
 				Hit.Element = bFrost ? WRTags::Element_Frost : WRTags::Element_Fire;
 				(bFrost ? Hit.FrostBuildup : Hit.BurnBuildup) = AttackNum(Special, TEXT("buildup"), 25.f);
 				Glob->Init(Hit, AttackNum(Special, TEXT("speed"), 1800.f), bFrost ? FLinearColor(0.5f, 0.85f, 1.f) : FLinearColor(1.f, 0.45f, 0.05f));
@@ -2302,6 +2442,8 @@ void AWRCreatureAI::EndSpecial(AWRCreature* Self)
 	SpecialPhase = 0;
 	Special = NAME_None;
 	SpecialTarget = nullptr;
+	Self->SetCombatTag(WRTags::State_Windup, false);
+	Self->SetCombatTag(WRTags::State_Hyperarmor, false);
 }
 
 void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)

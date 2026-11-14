@@ -40,14 +40,17 @@ namespace WRFxHudDetail
 		FStyle S;
 		const bool bInvolved = H.bMine || H.bOnMe;
 		S.Alpha = bInvolved ? 1.f : 0.55f;   // other people's fights stay readable but quiet
-		switch (H.Result)
-		{
-		case EWRHitResult::Parried: S.Text = LOCTEXT("FxParried", "Parried"); S.Font = WRUI::Caps(20); S.Color = WRUI::Brass; S.Pop = 0.4f; return S;
-		case EWRHitResult::Blocked: S.Text = LOCTEXT("FxBlocked", "Blocked"); S.Font = WRUI::Caps(16); S.Color = FLinearColor(0.72f, 0.8f, 0.9f); return S;
-		case EWRHitResult::Dodged: S.Text = LOCTEXT("FxDodged", "Dodged"); S.Font = WRUI::Caps(15); S.Color = FLinearColor(0.75f, 0.85f, 0.95f); return S;
-		default: break;
-		}
+		// No hit words (COMBAT-AND-LESSONS L6): a parry, a block or a dodge shows by the body, the sparks and the sound;
+		// a guard's chip damage is a quiet number.
 		S.Text = FText::AsNumber(FMath::Max(1, FMath::RoundToInt(H.Damage)));
+		if (H.Result == EWRHitResult::Blocked)
+		{
+			S.Font = WRUI::Body(16, 700);
+			S.Color = FLinearColor(0.72f, 0.76f, 0.8f);
+			S.Life = 0.8f;
+			S.Rise = 40.f;
+			return S;
+		}
 		if (H.Flags & Hit_Dot)
 		{
 			S.Font = WRUI::Body(15, 700);
@@ -71,7 +74,6 @@ namespace WRFxHudDetail
 			S.Pop = 0.6f;
 			S.Life = 1.4f;
 			S.Rise = 95.f;
-			S.Tag = (H.Flags & Hit_Shatter) ? LOCTEXT("FxShatter", "shatter") : (H.Flags & Hit_Riposte) ? LOCTEXT("FxRiposte", "riposte") : LOCTEXT("FxCrit", "critical");
 		}
 		else if (bWeak)
 		{
@@ -79,7 +81,6 @@ namespace WRFxHudDetail
 			S.Color = (H.Flags & Hit_Frost) ? FLinearColor(0.55f, 0.85f, 1.f) : FLinearColor(1.f, 0.55f, 0.2f);
 			S.Pop = 0.45f;
 			S.Life = 1.3f;
-			S.Tag = LOCTEXT("FxWeak", "weak");
 		}
 		else if (H.Flags & Hit_Heavy)
 		{
@@ -151,7 +152,16 @@ public:
 			const float Age = static_cast<float>(Now - H.Time);
 			if (Age < 0.f || Age > S.Life) continue;
 			const float T = Age / S.Life;
-			const FVector World = H.World + FVector(0.f, 0.f, 25.f + S.Rise * (1.f - FMath::Square(1.f - T)));
+			// Beside the body (to the camera's right of it), never over its head where its tell plays (L6).
+			FVector World = H.World;
+			if (const AActor* Struck = H.Target.Get(); Struck && P->PlayerCameraManager)
+			{
+				float Radius = 40.f, HalfHeight = 90.f;
+				Struck->GetSimpleCollisionCylinder(Radius, HalfHeight);
+				const FVector Right = FRotationMatrix(P->PlayerCameraManager->GetCameraRotation()).GetScaledAxis(EAxis::Y).GetSafeNormal2D();
+				World = Struck->GetActorLocation() + Right * (Radius + 35.f) + FVector(0.f, 0.f, HalfHeight * 0.35f);
+			}
+			World += FVector(0.f, 0.f, S.Rise * (1.f - FMath::Square(1.f - T)));
 			FVector2D Screen;
 			if (!P->ProjectWorldLocationToScreen(World, Screen, true)) continue;
 			FVector2D Pos(Screen.X * Size.X / VX, Screen.Y * Size.Y / VY);

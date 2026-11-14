@@ -85,8 +85,17 @@ public:
 	void PressAbilityInput(EWRAbilityInput Input);
 	void ReleaseAbilityInput(EWRAbilityInput Input);
 	/** Let go of every held gameplay input (block, a charging heavy, sprint, jump): a menu, wheel, build placing, a mount
-	 *  or the death screen took the buttons (WRInput::Transition). */
+	 *  or the death screen took the buttons (WRInput::Transition). The input buffer empties too. */
 	void DropHeldInputs();
+
+	/** This machine: what a Light would crit right now, if the prompt for its kind hasn't done its job yet (the HUD's one
+	 *  prompt: shown once per species, COMBAT-AND-LESSONS L6). */
+	const AWRCharacterBase* CritPromptTarget() const;
+	/** This machine: the crit prompt for this target's species has been used: saved, never shown again. */
+	void NoteCritPromptSeen(const AWRCharacterBase* Target);
+
+	virtual bool CanJumpInternal_Implementation() const override;
+	virtual void OnJumped_Implementation() override;
 
 	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
@@ -309,6 +318,19 @@ private:
 	void InputView();
 	TSet<EWRAbilityInput> HeldInputs;
 	bool bPadFlickReady = true;
+	// The input buffer (COMBAT-AND-LESSONS 1.16): a press that can't start yet waits combat.bufferSeconds (a roll pressed
+	// mid-swing up to combat.dodgeBufferMax) and fires the moment it can; the last press wins.
+	EWRAbilityInput BufferedInput = EWRAbilityInput::None;
+	double BufferedAt = 0.0;
+	bool CanStartNow(EWRAbilityInput Input) const;
+	void FireAbilityInput(EWRAbilityInput Input);
+	void TickInputBuffer();
+	/** Light on a parried, guard-broken or stance-broken target in front (or an unaware one from behind): the critical. */
+	bool TryCritical();
+	// The guard's faint gold edge on the shield (COMBAT-AND-LESSONS 1.2, colour law: gold is block / parry).
+	void TickGuardEdge();
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> GuardEdgeMaterial;
+	bool bGuardEdgeOn = false;
 	void StartSprint();
 	void StopSprint();
 	void ToggleView();

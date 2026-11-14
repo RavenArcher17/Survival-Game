@@ -41,6 +41,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxChill) FGameplayAttributeData MaxChill;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BurnBuildup) FGameplayAttributeData BurnBuildup;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FrostBuildup) FGameplayAttributeData FrostBuildup;
+	/** Creature and boss stance (COMBAT-AND-LESSONS 1.4): hidden, so it lives on the server only; a break shows by the body
+	 *  (Status.StanceBroken replicates). */
+	UPROPERTY(BlueprintReadOnly) FGameplayAttributeData Stance;
+	UPROPERTY(BlueprintReadOnly) FGameplayAttributeData MaxStance;
 
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Health)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHealth)
@@ -56,6 +60,8 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxChill)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, BurnBuildup)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, FrostBuildup)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Stance)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxStance)
 
 private:
 	UFUNCTION() void OnRep_Health(const FGameplayAttributeData& Old);

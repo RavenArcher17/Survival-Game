@@ -1,5 +1,6 @@
 #include "WRAttributeSet.h"
 #include "Net/UnrealNetwork.h"
+#include "WRTuning.h"
 
 UWRAttributeSet::UWRAttributeSet()
 {
@@ -17,6 +18,8 @@ UWRAttributeSet::UWRAttributeSet()
 	InitMaxChill(100.f);
 	InitBurnBuildup(0.f);
 	InitFrostBuildup(0.f);
+	InitStance(60.f);
+	InitMaxStance(60.f);
 }
 
 #define WR_REP(Prop) DOREPLIFETIME_CONDITION_NOTIFY(UWRAttributeSet, Prop, COND_None, REPNOTIFY_Always)
@@ -53,7 +56,9 @@ void UWRAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute
 	Super::PreAttributeBaseChange(Attribute, NewValue);
 
 	if (Attribute == GetHealthAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
-	else if (Attribute == GetStaminaAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	// Stamina may dip below zero on the last action (COMBAT-AND-LESSONS 1.6, stamina.graceFloor): nothing starts until it's back over.
+	else if (Attribute == GetStaminaAttribute()) NewValue = FMath::Clamp(NewValue, FMath::Min(0.f, WRTune(TEXT("stamina.graceFloor"), -20.f)), GetMaxStamina());
+	else if (Attribute == GetStanceAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStance());
 	else if (Attribute == GetPoiseAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxPoise());
 	else if (Attribute == GetHeatAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHeat());
 	else if (Attribute == GetChillAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxChill());

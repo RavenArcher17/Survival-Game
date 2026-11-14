@@ -51,6 +51,18 @@ bronze, iron now; the 12 steel biome sets and their Ascendant versions are mappe
 crafting cook), body-hide masks under every piece, and **path marks** on skin, eyes and hair on every machine
 (`player_art.json paths`), with Blood's canines and Lightning's crackle on cast.
 
+Also since 0.7.1: **the combat core** (COMBAT-AND-LESSONS C2-C5, cooks/build-combat-core.md): melee swings are move
+rows in `Data/weapons.json` (`FWRWeapons`), timed the same on the server, the owner and in the warped clip; one rule set
+for what can start when (`WRCombatRules`: combo and cancel windows, block stun, parry recovery) shared by the abilities
+and the hero's **input buffer**; the **hit stack** by tier in `WRFxCombat.cpp` (hit-stop with creep and catch-up, victim
+shake and flash, FOV punch, rumble, four sound layers); stamina grace to -20, equip load tiers for the roll, backstep,
+jump legs; **guard boost / chip / block stun / guard counter**, tap **parry** with counts, **crits** (`UWRGA_Critical`);
+**stance** on creatures and bosses and **poise** from armour; and the **server rewind** (`UWRLagSubsystem`): a player's
+swing and crit are judged where it saw its target, and a creature's blow on a remote player waits for the defence it
+pressed. New rules for new code: every blow goes through `ApplyHit` with its flags (`bParryable`, `bLow`, `Impact`,
+`StanceDamage`, `Tier`); code that acts on a blow's result passes `ApplyHit`'s `OnResolved` (a held blow resolves later);
+window / state tags owned by an ability go through `AWRCharacterBase::SetCombatTag`.
+
 Open, as of 0.7.1:
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
   at `C:\Dev\UE5Source` on Raven's PC (`Tools\build_engine.ps1`), needed only for that.

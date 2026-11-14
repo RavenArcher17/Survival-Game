@@ -49,6 +49,23 @@
       {"sprite": "ring", "blend": "add", "count": 1, "life": [0.28,0.28], "size": [40,40], "grow": 5, "intensity": 2.2, "colors": [[1,0.92,0.7,1], [1,0.75,0.4,0]]},
       {"sprite": "spark", "blend": "add", "count": 30, "life": [0.2,0.5], "size": [2.5,4.5], "speed": [700,1600], "spread": 180, "gravity": 0.8, "drag": 2, "stretch": 0.035, "intensity": 10, "colors": [[1,0.92,0.65,1], [1,0.55,0.15,0]]}
     ]},
+    "crit.mark": { "loop": true, "light": {"color": [1,0.78,0.35], "intensity": 1400, "radius": 260, "seconds": 0.4}, "layers": [
+      {"sprite": "flare", "blend": "add", "rate": 3, "life": [0.5,0.5], "size": [26,26], "grow": 1.25, "rot": [0,45], "spin": [-40,40], "follow": true, "intensity": 6, "colors": [[1,0.82,0.42,0], [1,0.86,0.5,1], [1,0.7,0.3,0]]},
+      {"sprite": "glow", "blend": "add", "rate": 2, "life": [0.7,0.7], "size": [44,44], "grow": 1.1, "follow": true, "intensity": 2.2, "colors": [[1,0.75,0.32,0], [1,0.75,0.32,0.55], [1,0.7,0.3,0]]},
+      {"sprite": "ring", "blend": "add", "rate": 1.4, "life": [0.6,0.6], "size": [14,14], "grow": 3.2, "follow": true, "intensity": 2.4, "colors": [[1,0.88,0.55,0.9], [1,0.72,0.3,0]]},
+      {"sprite": "spark", "blend": "add", "rate": 10, "radius": 6, "life": [0.25,0.45], "size": [1.5,2.5], "speed": [40,110], "spread": 180, "gravity": -0.1, "drag": 2, "stretch": 0.03, "intensity": 7, "colors": [[1,0.9,0.6,1], [1,0.7,0.3,0]]}
+    ]},
+    "stance.break": { "shake": "guardBreak", "light": {"color": [1,0.82,0.5], "intensity": 9000, "radius": 900, "seconds": 0.35}, "layers": [
+      {"sprite": "flare", "blend": "add", "count": 1, "life": [0.26,0.26], "size": [190,190], "grow": 1.5, "rot": [0,45], "intensity": 4.5, "colors": [[1,0.95,0.8,1], [1,0.78,0.38,0]]},
+      {"sprite": "ring", "blend": "add", "count": 2, "life": [0.32,0.42], "size": [50,60], "grow": 5.5, "intensity": 2.4, "colors": [[1,0.9,0.65,1], [1,0.72,0.32,0]]},
+      {"sprite": "spark", "blend": "add", "count": 46, "life": [0.25,0.6], "size": [2.5,5], "speed": [600,1500], "spread": 180, "gravity": 1, "drag": 2.2, "stretch": 0.04, "intensity": 9, "colors": [[1,0.92,0.65,1], [1,0.65,0.25,0]]},
+      {"sprite": "chip_stone", "blend": "lit", "count": 10, "life": [0.5,1.0], "radius": 20, "size": [4,9], "speed": [160,420], "dir": [0,0,0.8], "spread": 70, "gravity": 1.4, "spin": [-500,500], "bounce": 0.3, "colors": [[0.4,0.37,0.33,1], [0.4,0.37,0.33,1], [0.4,0.37,0.33,0]]}
+    ]},
+    "guard.break": { "shake": "guardBreak", "light": {"color": [1,0.9,0.75], "intensity": 6000, "radius": 600, "seconds": 0.22}, "layers": [
+      {"sprite": "flare", "blend": "add", "count": 1, "life": [0.18,0.18], "size": [130,130], "grow": 1.4, "rot": [0,45], "intensity": 4, "colors": [[1,0.97,0.9,1], [1,0.85,0.6,0]]},
+      {"sprite": "spark", "blend": "add", "count": 60, "life": [0.2,0.55], "size": [2,4.5], "speed": [900,2100], "dir": [1,0,0.1], "spread": 70, "gravity": 1, "drag": 2.5, "stretch": 0.045, "intensity": 11, "colors": [[1,0.95,0.8,1], [1,0.7,0.35,0]]},
+      {"sprite": "ring", "blend": "add", "count": 1, "life": [0.24,0.24], "size": [40,40], "grow": 4.5, "intensity": 2, "colors": [[1,0.95,0.85,1], [1,0.85,0.6,0]]}
+    ]},
     "dodge.dust": { "layers": [
       {"sprite": "smoke2", "blend": "lit", "count": 6, "life": [0.5,0.8], "radius": 25, "disc": true, "size": [22,36], "grow": 2, "speed": [60,160], "dir": [1,0,0.25], "spread": 50, "drag": 3, "lift": 10, "colors": [[0.7,0.65,0.57,0.55], [0.7,0.65,0.57,0]]}
     ]},

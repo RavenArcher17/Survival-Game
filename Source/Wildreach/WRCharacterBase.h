@@ -88,8 +88,44 @@ public:
 	/** Name for HUD labels. */
 	virtual FString GetDisplayLabel() const;
 
-	/** Play a swing locally and, on the server, replicate it to everyone else. */
-	void PlaySwing(EWRSwingKind Kind, float Duration);
+	/** Play a swing locally and, on the server, replicate it to everyone else. Variant picks the clip (a light chain's
+	 *  1-2-3); Windup / Active / Recovery (> 0) time the clip so its strike lands on the active window on every machine. */
+	void PlaySwing(EWRSwingKind Kind, float Duration, uint8 Variant = 0, float Windup = -1.f, float Active = -1.f, float Recovery = -1.f);
+
+	// --- Combat core (cooks/build-combat-core.md 3.2-3.5) ---
+	/** One swing's timing on this machine (the server's timers, the owner's prediction). Start < 0: not swinging. */
+	struct FSwingWindows
+	{
+		double Start = -1.0, ActiveAt = 0.0, ActiveEnd = 0.0, ComboAt = 0.0, CancelAt = 0.0, End = 0.0;
+		FName Move;
+		bool bLight = false;
+	};
+	FSwingWindows Swing;
+	/** The last swing that ended: its move, when, and whether it got to its combo window (a light chain goes on). */
+	FName LastSwingMove;
+	double LastSwingEnd = -100.0;
+	bool bLastSwingChains = false;
+	bool IsSwinging() const;
+	/** A combat window / state tag: the server's replicates (TagOnly); the owning client adds its own copy at once. */
+	void SetCombatTag(const FGameplayTag& Tag, bool bOn);
+	/** This machine: the last time a press was refused for stamina (the HUD flashes the bar). */
+	double StaminaRefusedAt = -100.0;
+	/** Worn + held kg over the equip load max, x100 (server sets it; the owner's roll and HUD read it). */
+	UPROPERTY(Replicated) uint8 EquipLoadPct = 0;
+	float GetEquipLoadRatio() const { return EquipLoadPct / 100.f; }
+	/** Server: when the current roll began, back-dated for a remote player (the perfect dodge). */
+	double DodgeStartedAt = -100.0;
+	/** Server: parries taken toward a break (cleared when its stance comes back). */
+	int32 ParriesTaken = 0;
+	/** Every machine: its stance broke (true) or came back (false): creatures slump and wear the gold weak-point mark. */
+	UFUNCTION(NetMulticast, Reliable) void MulticastStanceBreak(bool bBroken);
+	/** The swing being shown (set before OnSwingVisual): its clip variant and the times its clip is warped to. */
+	uint8 SwingVariantShown = 0;
+	float SwingWindupShown = -1.f;
+	float SwingActiveShown = -1.f;
+	float SwingRecoveryShown = -1.f;
+	/** The flags of the hit being shown (set before OnHitVisual): its reaction level (WRFx::ReactionOf). */
+	uint16 HitFlagsShown = 0;
 
 	/** Server: a sound event on this character for everyone nearby (WRSound::Broadcast: eating, equipping...). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastSound(FName Event);
@@ -122,6 +158,8 @@ protected:
 	/** Every machine: an attack swing started / this character died (real meshes play animations here). */
 	virtual void OnSwingVisual(EWRSwingKind Kind, float Duration) {}
 	virtual void OnDeathVisual() {}
+	/** Every machine: a stance break starts / ends (MulticastStanceBreak). */
+	virtual void OnStanceBreakVisual(bool bBroken) {}
 	/** Clients: a hit landed on us (after the hit flash starts). */
 	virtual void OnHitVisual(EWRHitResult Result) {}
 
@@ -145,6 +183,12 @@ private:
 	UPROPERTY(ReplicatedUsing=OnRep_Swing) uint8 SwingSeq = 0;
 	UPROPERTY(Replicated) EWRSwingKind SwingKindRep = EWRSwingKind::None;
 	UPROPERTY(Replicated) float SwingDurationRep = 0.f;
+	UPROPERTY(Replicated) uint8 SwingVariantRep = 0;
+	UPROPERTY(Replicated) float SwingWindupRep = -1.f;
+	UPROPERTY(Replicated) float SwingActiveRep = -1.f;
+	UPROPERTY(Replicated) float SwingRecoveryRep = -1.f;
+	/** Tags this owning client added itself (SetCombatTag), so it removes only its own. */
+	TSet<FGameplayTag> LocalCombatTags;
 	UFUNCTION() void OnRep_Swing();
 
 	void StartSwingVisual(EWRSwingKind Kind, float Duration);

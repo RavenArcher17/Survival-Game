@@ -15,6 +15,17 @@ enum class EWRHitResult : uint8
 	Ignored,
 };
 
+/** How a landed blow feels (tuning fx.hitStop / weight / flash by tier). */
+UENUM(BlueprintType)
+enum class EWRHitTier : uint8
+{
+	Light,
+	Heavy,
+	Counter,   // charged heavies, guard counters
+	Crit,      // ripostes, backstabs, stance crits
+	BossKill,
+};
+
 /** Ability input ids (bound to GAS specs so held abilities like Block can wait for release). */
 UENUM(BlueprintType)
 enum class EWRAbilityInput : uint8
@@ -50,6 +61,31 @@ struct FWRHit
 	/** Extra knockout torpor (tranq arrows, bolts, darts). */
 	UPROPERTY() float Torpor = 0.f;
 	UPROPERTY() FVector Origin = FVector::ZeroVector;
+
+	// --- Combat core (cooks/build-combat-core.md 3.2) ---
+	/** Stance damage to creatures and bosses (< 0: worked out from the damage by the combat library). */
+	UPROPERTY() float StanceDamage = -1.f;
+	/** What blocking it costs before the guard boost (< 0: worked out from the damage). */
+	UPROPERTY() float StaminaDamage = -1.f;
+	/** How hard it hits a player whose poise it breaks: 1 flinch, 2 stagger, 3 heavy stagger (tuning poise.reactions). */
+	UPROPERTY() uint8 Impact = 2;
+	/** How it feels when it lands (hit-stop, flash, shake by tier). */
+	UPROPERTY() EWRHitTier Tier = EWRHitTier::Light;
+	/** Only these can be parried (creature / boss rows, player melee). */
+	UPROPERTY() bool bParryable = false;
+	/** Passes under a jump (ground waves, tail sweeps, stomps). */
+	UPROPERTY() bool bLow = false;
+	/** Goes through any guard. */
+	UPROPERTY() bool bUnblockable = false;
+	/** A grab: ignores hyperarmor and guards. */
+	UPROPERTY() bool bGrab = false;
+	UPROPERTY() bool bIgnoreHyperarmor = false;
+	/** A critical attack (riposte, backstab, stance crit): already multiplied, never parried. */
+	UPROPERTY() bool bCritical = false;
+	/** A projectile: never parried. */
+	UPROPERTY() bool bProjectile = false;
+	/** Server time the blow is judged at (0 = now): a deferred blow on a remote player is judged when it saw it. */
+	double JudgeTime = 0.0;
 };
 
 /** Weapon the character currently swings. Damage = base x metal x quality x (1 + upgrade x 5%). */

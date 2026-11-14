@@ -38,6 +38,11 @@
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 #include "WRKeyBindings.h"
+#include "WRAnimNotifies.h"
+#include "WRFx.h"
+#include "WRCombatRules.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/ConfigCacheIni.h"
 #include "WRPlayerUI.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -184,6 +189,11 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		}
 		BodyAimTurn = FMath::FInterpTo(BodyAimTurn, IsAimingRanged() ? RangedAimYaw : 0.f, DeltaSeconds, 10.f);
 		TickBodyAnim();
+		TickGuardEdge();
+	}
+	if (IsLocallyControlled())
+	{
+		TickInputBuffer();
 	}
 	if (HasAuthority())
 	{
@@ -286,6 +296,11 @@ void AWRCharacter::PossessedBy(AController* NewController)
 		GrantAbility(UWRGA_HeavyAttack::StaticClass(), EWRAbilityInput::Heavy);
 		GrantAbility(UWRGA_Dodge::StaticClass(), EWRAbilityInput::Dodge);
 		GrantAbility(UWRGA_Block::StaticClass(), EWRAbilityInput::Block);
+	}
+	// The critical (riposte, backstab) comes from Light when there's a target for it (TryCritical).
+	if (!AbilitySystem->FindAbilitySpecFromClass(UWRGA_Critical::StaticClass()))
+	{
+		GrantAbility(UWRGA_Critical::StaticClass(), EWRAbilityInput::None);
 	}
 
 	InitVitals(WRTune(TEXT("player.health"), 100.f), WRTune(TEXT("player.stamina"), 100.f), WRTune(TEXT("player.poise"), 40.f));
@@ -1069,6 +1084,39 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 		}
 	}
 	BodyAnim = NAME_None;  // restart even if the same set just played
+	// A swing with a move row is warped to it (COMBAT-AND-LESSONS L2, cooks/build-combat-core.md 3.2): the chain's clip
+	// (variant), its coil fitted to the wind-up (never faster than clipWarp.maxCoilRate: a longer lead-in starts later),
+	// its strike (the clip's measured trace frames, Data/anim_windows.json) on the active window, the follow-through at
+	// full speed. So what you see hit is when it hits, on every machine.
+	UWRHeroAnimInstance* Anim = BodyAnimInstance();
+	FBodyAnimSet* Set = BodyAnims.Find(Key);
+	if ((Key == TEXT("light") || Key == TEXT("heavy")) && SwingWindupShown > 0.f && Anim && Set && Set->Clips.Num() > 0)
+	{
+		UAnimSequenceBase* Clip = Set->Clips[SwingVariantShown % Set->Clips.Num()];
+		const float Length = Clip->GetPlayLength();
+		float S = 0.4f, E = 0.55f;
+		FWRAnimWindows::Find(Clip->GetFName(), TEXT("trace"), S, E);
+		const float T0 = S * Length, T1 = FMath::Max(E * Length, T0 + 0.02f);
+		const FWRTuning& T = FWRTuning::Get();
+		const float Windup = SwingWindupShown, Active = FMath::Max(0.05f, SwingActiveShown);
+		float RateA = T0 / Windup, Start = 0.f, Delay = 0.f;
+		const float MaxCoil = T.Num(TEXT("combat.clipWarp.maxCoilRate"), 2.2f), MinRate = T.Num(TEXT("combat.clipWarp.minRate"), 0.6f);
+		if (RateA > MaxCoil)
+		{
+			Start = T0 - Windup * MaxCoil;
+			RateA = MaxCoil;
+		}
+		else if (RateA < MinRate)
+		{
+			RateA = MinRate;
+			Delay = FMath::Max(0.f, Windup - T0 / RateA);
+		}
+		const float RateB = FMath::Clamp((T1 - T0) / Active, T.Num(TEXT("combat.clipWarp.activeMin"), 0.8f), T.Num(TEXT("combat.clipWarp.activeMax"), 2.f));
+		Anim->PlayOneShotWarped(Clip, FullBodyKeys.Contains(Key) ? EWRAnimLayer::Full : EWRAnimLayer::Upper, Start, RateA, T0, RateB, T1, 1.f, Delay);
+		BodyAnim = Key;
+		BodyOneShotUntil = GetWorld()->GetTimeSeconds() + Windup + Active + FMath::Max(0.f, SwingRecoveryShown);
+		return;
+	}
 	PlayBodyAnim(Key, false, 1.f, Duration);
 	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + Duration;
 }
@@ -1085,12 +1133,22 @@ void AWRCharacter::MulticastBodyOneShot_Implementation(FName Key)
 
 void AWRCharacter::OnHitVisual(EWRHitResult Result)
 {
-	if (!Body->IsVisible() || Result != EWRHitResult::Hit || GetWorld()->GetTimeSeconds() < BodyOneShotUntil)
+	// A blow that broke your poise plays the reaction for its impact (flinch, stagger, heavy stagger: the lock the server
+	// set); one that didn't is a shudder (the hit-stop's shake) and the swing goes on (COMBAT-AND-LESSONS 1.5, combat.md 2.5).
+	const int32 Reaction = WRFx::ReactionOf(HitFlagsShown);
+	if (!Body->IsVisible() || (Result != EWRHitResult::Hit && Result != EWRHitResult::GuardBroken) || (Reaction == 0 && Result != EWRHitResult::GuardBroken))
 	{
-		return;  // a swing in progress isn't interrupted by the flinch
+		return;
 	}
+	const float Lock = Result == EWRHitResult::GuardBroken ? WRTune(TEXT("defense.guardBreakStaggerSeconds"), 1.2f)
+		: FWRTuning::Get().Num(FString::Printf(TEXT("poise.reactions.%d"), Reaction), 0.55f);
 	BodyAnim = NAME_None;
-	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(TEXT("hit"), false, 1.f, 0.45f);
+	// The three impact clips by weight: a flinch, a stagger, a heavy stagger.
+	if (FBodyAnimSet* Set = BodyAnims.Find(TEXT("hit")); Set && Set->Clips.Num() > 0)
+	{
+		Set->Next = FMath::Clamp(Reaction - 1, 0, Set->Clips.Num() - 1);
+	}
+	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(TEXT("hit"), false, 1.f, Lock);
 }
 
 void AWRCharacter::OnDeathVisual()
@@ -1141,9 +1199,229 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 		else if (Input == EWRAbilityInput::Light) FireRanged();
 		return;
 	}
-	if (AbilitySystem)
+	if (!AbilitySystem)
 	{
-		AbilitySystem->AbilityLocalInputPressed(static_cast<int32>(Input));
+		return;
+	}
+	// Light on an opening is the critical (riposte / backstab).
+	if (Input == EWRAbilityInput::Light && TryCritical())
+	{
+		BufferedInput = EWRAbilityInput::None;
+		return;
+	}
+	// Committed to a swing, a roll, a block stun or a parry's recovery: the press waits in the buffer.
+	if (!CanStartNow(Input))
+	{
+		BufferedInput = Input;
+		BufferedAt = GetWorld()->GetTimeSeconds();
+		return;
+	}
+	BufferedInput = EWRAbilityInput::None;
+	FireAbilityInput(Input);
+}
+
+bool AWRCharacter::CanStartNow(EWRAbilityInput Input) const
+{
+	using namespace WRCombatRules;
+	switch (Input)
+	{
+	case EWRAbilityInput::Light:
+	case EWRAbilityInput::Heavy:
+		return Allows(this, EAct::Attack) && !(HasTag(WRTags::State_Attacking) && !IsSwinging());
+	case EWRAbilityInput::Dodge:
+		return Allows(this, EAct::Dodge);
+	case EWRAbilityInput::Block:
+		return Allows(this, EAct::Guard);
+	default:
+		// Quick slots (weapon arts, spells): once the swing or cast in progress is over.
+		return Allows(this, EAct::Attack) && !HasTag(WRTags::State_Attacking);
+	}
+}
+
+void AWRCharacter::FireAbilityInput(EWRAbilityInput Input)
+{
+	if (!AbilitySystem)
+	{
+		return;
+	}
+	// A light or heavy into the swing in progress: the same ability starts again (its retrigger ends the swing it's in),
+	// which an input press on an active ability wouldn't do.
+	if (Input == EWRAbilityInput::Light || Input == EWRAbilityInput::Heavy)
+	{
+		for (FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+		{
+			if (Spec.InputID == static_cast<int32>(Input) && Spec.IsActive())
+			{
+				AbilitySystem->TryActivateAbility(Spec.Handle);
+				return;
+			}
+		}
+	}
+	AbilitySystem->AbilityLocalInputPressed(static_cast<int32>(Input));
+}
+
+void AWRCharacter::TickInputBuffer()
+{
+	if (BufferedInput == EWRAbilityInput::None)
+	{
+		return;
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	const double Age = GetWorld()->GetTimeSeconds() - BufferedAt;
+	// A roll pressed mid-swing waits for the swing's cancel window (up to dodgeBufferMax: DS3's rule); the rest bufferSeconds.
+	const float Life = BufferedInput == EWRAbilityInput::Dodge && IsSwinging() ? T.Num(TEXT("combat.dodgeBufferMax"), 0.6f) : T.Num(TEXT("combat.bufferSeconds"), 0.33f);
+	// A guard held through a swing waits for as long as it's held: it goes up the moment the swing allows (a guard
+	// pressed early still blocks, COMBAT-AND-LESSONS L4); let go first, it's forgotten.
+	const bool bHeldGuard = BufferedInput == EWRAbilityInput::Block && HeldInputs.Contains(EWRAbilityInput::Block);
+	if ((Age > Life && !bHeldGuard) || !IsAlive())
+	{
+		BufferedInput = EWRAbilityInput::None;
+		return;
+	}
+	if (BufferedInput == EWRAbilityInput::Block && !bHeldGuard)
+	{
+		BufferedInput = EWRAbilityInput::None;
+		return;
+	}
+	if (BufferedInput == EWRAbilityInput::Light && TryCritical())
+	{
+		BufferedInput = EWRAbilityInput::None;
+		return;
+	}
+	if (CanStartNow(BufferedInput))
+	{
+		const EWRAbilityInput Input = BufferedInput;
+		BufferedInput = EWRAbilityInput::None;
+		FireAbilityInput(Input);
+	}
+}
+
+bool AWRCharacter::TryCritical()
+{
+	UWRGA_Critical::EKind Kind = UWRGA_Critical::EKind::None;
+	if (!AbilitySystem || IsRangedOut() || !WRCombatRules::Allows(this, WRCombatRules::EAct::Critical)
+		|| !UWRGA_Critical::FindTarget(this, Kind, false))
+	{
+		return false;
+	}
+	return AbilitySystem->TryActivateAbilityByClass(UWRGA_Critical::StaticClass());
+}
+
+namespace WRCritPromptDetail
+{
+	const TCHAR* Section = TEXT("Wildreach.Prompts");
+
+	TSet<FString>& Seen()
+	{
+		static TSet<FString> Kinds;
+		static bool bLoaded = false;
+		if (!bLoaded)
+		{
+			bLoaded = true;
+			FString Saved;
+			if (GConfig && GConfig->GetString(Section, TEXT("CritSeen"), Saved, GGameUserSettingsIni))
+			{
+				TArray<FString> Parts;
+				Saved.ParseIntoArray(Parts, TEXT(","));
+				Kinds.Append(Parts);
+			}
+		}
+		return Kinds;
+	}
+
+	FString KindOf(const AWRCharacterBase* Who)
+	{
+		const AWRCreature* Creature = Cast<AWRCreature>(Who);
+		return Creature && Creature->GetDef() ? Creature->GetDef()->Id.ToString() : FString(TEXT("survivor"));
+	}
+}
+
+const AWRCharacterBase* AWRCharacter::CritPromptTarget() const
+{
+	UWRGA_Critical::EKind Kind = UWRGA_Critical::EKind::None;
+	const AWRCharacterBase* Target = IsLocallyControlled() && !IsRangedOut() ? UWRGA_Critical::FindTarget(this, Kind, false) : nullptr;
+	return Target && !WRCritPromptDetail::Seen().Contains(WRCritPromptDetail::KindOf(Target)) ? Target : nullptr;
+}
+
+void AWRCharacter::NoteCritPromptSeen(const AWRCharacterBase* Target)
+{
+	TSet<FString>& Seen = WRCritPromptDetail::Seen();
+	const FString Kind = WRCritPromptDetail::KindOf(Target);
+	if (Target && !Seen.Contains(Kind) && GConfig)
+	{
+		Seen.Add(Kind);
+		GConfig->SetString(WRCritPromptDetail::Section, TEXT("CritSeen"), *FString::Join(Seen.Array(), TEXT(",")), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+bool AWRCharacter::CanJumpInternal_Implementation() const
+{
+	if (!Super::CanJumpInternal_Implementation())
+	{
+		return false;
+	}
+	// Committed to a roll or a swing's strike: no jump (the swing's cancel window frees it, as for a roll).
+	if (HasTag(WRTags::State_Dodging) || HasTag(WRTags::State_BlockStun) || HasTag(WRTags::State_ParryRecovery) || HasTag(WRTags::State_BeingCrit)
+		|| (IsSwinging() && GetWorld()->GetTimeSeconds() < Swing.CancelAt))
+	{
+		return false;
+	}
+	// A jump costs stamina (COMBAT-AND-LESSONS 1.6); with none left it doesn't happen, and the bar says why.
+	const UWRAttributeSet* A = GetAttributes();
+	if (A && A->GetStamina() <= 0.f)
+	{
+		if (IsLocallyControlled())
+		{
+			const_cast<AWRCharacter*>(this)->StaminaRefusedAt = GetWorld()->GetTimeSeconds();
+		}
+		return false;
+	}
+	return true;
+}
+
+void AWRCharacter::OnJumped_Implementation()
+{
+	Super::OnJumped_Implementation();
+	if (HasAuthority() && AbilitySystem && GetAttributes())
+	{
+		AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), GetAttributes()->GetStamina() - WRTune(TEXT("stamina.jump"), 8.f));
+		Status->NotifyStaminaUsed();
+		// Legs and lower body clear of the ground: blows flagged low (ground waves, tail sweeps, stomps) pass under.
+		Status->ApplyStatus(WRTags::State_JumpLegsInvuln, WRTune(TEXT("defense.jumpLegInvuln"), 0.8f));
+	}
+}
+
+void AWRCharacter::TickGuardEdge()
+{
+	const bool bOn = bShieldShown && ShieldMesh->IsVisible() && HasTag(WRTags::State_Blocking) && IsAlive();
+	if (bOn == bGuardEdgeOn)
+	{
+		return;
+	}
+	bGuardEdgeOn = bOn;
+	if (!bOn)
+	{
+		ShieldMesh->SetOverlayMaterial(nullptr);
+		return;
+	}
+	if (!GuardEdgeMaterial)
+	{
+		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FX/M_WindupGlow.M_WindupGlow")))
+		{
+			GuardEdgeMaterial = UMaterialInstanceDynamic::Create(Base, this);
+		}
+	}
+	if (GuardEdgeMaterial)
+	{
+		// The faint gold rim (sRGB in tuning fx.guardEdge): gold means block and parry, nothing else wears it.
+		const FWRTuning& T = FWRTuning::Get();
+		const FColor Gold(uint8(T.Num(TEXT("fx.guardEdge.r"), 214.f)), uint8(T.Num(TEXT("fx.guardEdge.g"), 170.f)), uint8(T.Num(TEXT("fx.guardEdge.b"), 70.f)));
+		GuardEdgeMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(Gold));
+		GuardEdgeMaterial->SetScalarParameterValue(TEXT("Glow"), T.Num(TEXT("fx.guardEdge.glow"), 1.2f));
+		GuardEdgeMaterial->SetScalarParameterValue(TEXT("Opacity"), T.Num(TEXT("fx.guardEdge.opacity"), 0.22f));
+		GuardEdgeMaterial->SetScalarParameterValue(TEXT("Wash"), T.Num(TEXT("fx.guardEdge.wash"), 0.f));
+		ShieldMesh->SetOverlayMaterial(GuardEdgeMaterial);
 	}
 }
 
@@ -1410,6 +1688,7 @@ void AWRCharacter::DropHeldInputs()
 {
 	const TArray<EWRAbilityInput> Held = HeldInputs.Array();
 	HeldInputs.Reset();
+	BufferedInput = EWRAbilityInput::None;  // a press waiting in the buffer goes with them (COMBAT-AND-LESSONS 1.16)
 	for (const EWRAbilityInput Input : Held) ReleaseAbilityInput(Input);
 	StopSprint();
 	StopJumping();

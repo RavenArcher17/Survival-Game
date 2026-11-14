@@ -33,6 +33,10 @@ struct FWRItemDef
 	EWREquipSlot Slot = EWREquipSlot::None;
 	FName Metal;
 	float Armor = 0.f;
+	/** Worn poise (armour, COMBAT-AND-LESSONS 1.5): what a blow's poise damage has to get through before you react. */
+	float Poise = 0.f;
+	/** Weapon class in Data/weapons.json (its moves); none = sword. */
+	FName WeaponClass;
 	float MaxDurability = 0.f;
 	// Ranged weapons ("ranged": {...}): bow, crossbow, blowgun; spear and bola are thrown (no ammo kind).
 	FName RangedKind;
@@ -179,6 +183,13 @@ public:
 	float GetCarryWeight() const;
 	/** Sum of a gem stat over the equipped weapon's sockets ("damage", "critChance", ...). */
 	float GemStat(FName Stat) const;
+	/** Worn poise: the armour's (items.json equip.poise, while it holds) and socketed poise (COMBAT-AND-LESSONS 1.5). */
+	float GetWornPoise() const;
+	/** Equip load, kg: the worn armour, the weapon and ranged weapon in their slots and the carried shield (weapons.json
+	 *  carried); not the bag (COMBAT-AND-LESSONS 1.7). Light weave lightens armour as it does in the bag. */
+	float GetEquipLoadKg() const;
+	/** What the equip load may reach before the roll gets heavier: defense.maxEquipLoad + the equipLoad stat. */
+	float GetMaxEquipLoad() const;
 	float GetArmorValue() const;
 	/** The equipped bow / crossbow / blowgun's quality x roll (x0.5 worn out): scales its own damage and torpor. */
 	float GetRangedMultiplier() const;

@@ -28,6 +28,10 @@ struct FWRCreatureDef
 	float Damage = 12.f;
 	float Speed = 450.f;
 	float Poise = 30.f;
+	/** Stance at full (COMBAT-AND-LESSONS 1.4); 0 = its tier's (tuning stance.tiers). */
+	float Stance = 0.f;
+	/** Its own attacks carry hyperarmor: a blow that breaks its poise mid-attack doesn't stop it (big bodies, bosses). */
+	bool bHyperarmor = false;
 	float Radius = 40.f;
 	float HalfHeight = 60.f;
 	float AggroRadius = 1500.f;
@@ -129,6 +133,7 @@ public:
 	virtual void OnSwingVisual(EWRSwingKind Kind, float Duration) override;
 	virtual void OnDeathVisual() override;
 	virtual void OnHitVisual(EWRHitResult Result) override;
+	virtual void OnStanceBreakVisual(bool bBroken) override;
 	/** AI movement curves round instead of sliding sideways: the way it walks leads its facing by at most
 	 *  anim.creatureLeadDegrees; nearly stopped and facing well away, it turns on the spot first. */
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.f, bool bForce = false) override;
@@ -336,6 +341,16 @@ private:
 	float LastYaw = 0.f;      // for its turn rate (feet step while it turns on the spot)
 	float EarshotClock = 0.f;
 	class UWRAnimInstance* CreatureAnim() const;
+	/** Stance break, the look (COMBAT-AND-LESSONS 1.4): its recoil held, the head dropped and the body sunk a little
+	 *  (tuning stance.slump), and the gold weak-point mark on its head where the crit goes. */
+	void TickStanceSlump(float DeltaSeconds);
+	FName HeadBone() const;
+	bool bStanceBrokenShown = false;
+	float SlumpAlpha = 0.f;
+	FVector SlumpBaseLocation = FVector::ZeroVector;
+	FRotator SlumpBaseRotation = FRotator::ZeroRotator;
+	bool bSlumpBase = false;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> CritMark;
 	/** The layered animation instance: locomotion paced to the ground speed, attacks / hits over it, crossfades. */
 	void SetupCreatureAnim(const FWRCreatureDef& Def);
 	void TickCreatureAnim(float DeltaSeconds);

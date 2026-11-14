@@ -75,8 +75,20 @@ void UWRStatusComponent::ClearStatus(const FGameplayTag& Status)
 
 	if (Status == WRTags::Status_Staggered)
 	{
-		// Poise comes back full once a stagger ends.
+		// Poise comes back full once a stagger ends (ER: at once after a reaction).
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), Owner->GetAttributes()->GetMaxPoise());
+	}
+	if (Status == WRTags::Status_StanceBroken && Owner->IsAlive())
+	{
+		// The break is over (or a crit spent it): the stance is back full and the gold mark goes.
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), Owner->GetAttributes()->GetMaxStance());
+		Owner->ParriesTaken = 0;
+		Owner->MulticastStanceBreak(false);
+	}
+	if (Status == WRTags::State_BlockStun && Owner->IsAlive() && !bResetting)
+	{
+		// The block stun is over: Heavy is the guard counter for a moment (COMBAT-AND-LESSONS 1.2).
+		ApplyStatus(WRTags::State_GuardCounterWindow, WRTune(TEXT("defense.guardCounterWindow"), 0.6f));
 	}
 	UE_LOG(LogWildreach, Log, TEXT("STATUS %s -%s"), *Owner->GetName(), *Status.ToString());
 }
@@ -187,10 +199,12 @@ void UWRStatusComponent::ResetAll()
 {
 	TArray<FGameplayTag> Active;
 	StatusEnds.GetKeys(Active);
+	bResetting = true;
 	for (const FGameplayTag& Tag : Active)
 	{
 		ClearStatus(Tag);
 	}
+	bResetting = false;
 	HungerEmptyFor = ThirstEmptyFor = 0.f;
 }
 
@@ -263,6 +277,9 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 
 	SinceStaminaUse += DeltaTime;
 	SincePoiseDamage += DeltaTime;
+	SinceStanceDamage += DeltaTime;
+	// No regen from a swing's press until its cancel window (ER): the stamina spent on a chain stays spent.
+	const bool bMidSwing = Owner->IsSwinging() && GetWorld()->GetTimeSeconds() < Owner->Swing.CancelAt;
 	SinceHeatGain += DeltaTime;
 	SinceChillGain += DeltaTime;
 
@@ -277,10 +294,10 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() - DrainPerSecond * DeltaTime);
 		SinceStaminaUse = 0.f;
 	}
-	else if (SinceStaminaUse >= WRTune(TEXT("player.staminaRegenDelay"), 0.8f) && Attr->GetStamina() < Attr->GetMaxStamina()
-		&& !ASC->HasMatchingGameplayTag(WRTags::State_Blocking))
+	else if (SinceStaminaUse >= WRTune(TEXT("player.staminaRegenDelay"), 0.5f) && Attr->GetStamina() < Attr->GetMaxStamina()
+		&& !ASC->HasMatchingGameplayTag(WRTags::State_Blocking) && !bMidSwing)
 	{
-		float Regen = WRTune(TEXT("player.staminaRegenPerSecond"), 30.f);
+		float Regen = WRTune(TEXT("player.staminaRegenPerSecond"), 45.f);
 		if (bSurvivalNeeds && (Attr->GetHunger() <= 0.f || Attr->GetThirst() <= 0.f))
 		{
 			Regen *= WRTune(TEXT("survival.deprivedStaminaRegenMultiplier"), 0.5f);
@@ -293,10 +310,24 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() + Regen * DeltaTime);
 	}
 
-	if (SincePoiseDamage >= WRTune(TEXT("player.poiseRegenDelay"), 2.f) && Attr->GetPoise() < Attr->GetMaxPoise()
+	// Poise: back to full poiseResetSeconds after the last poise hit (ER; at once after a reaction, ClearStatus).
+	if (SincePoiseDamage >= WRTune(TEXT("player.poiseResetSeconds"), 30.f) && Attr->GetPoise() < Attr->GetMaxPoise()
 		&& !HasStatus(WRTags::Status_Staggered))
 	{
-		ASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), Attr->GetPoise() + WRTune(TEXT("player.poiseRegenPerSecond"), 10.f) * DeltaTime);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), Attr->GetMaxPoise());
+	}
+	// Stance (creatures and bosses): refills max / regenDelayDivisor s after the last stance hit, at regenPerSecond,
+	// half as fast below half health (Sekiro); parries counted toward a break are forgotten once it's full.
+	if (Owner->IsCreature() && Attr->GetMaxStance() > 0.f && Attr->GetStance() < Attr->GetMaxStance() && !HasStatus(WRTags::Status_StanceBroken)
+		&& SinceStanceDamage >= Attr->GetMaxStance() / FMath::Max(1.f, WRTune(TEXT("stance.regenDelayDivisor"), 13.f)))
+	{
+		const bool bLow = Attr->GetMaxHealth() > 0.f && Attr->GetHealth() < Attr->GetMaxHealth() * 0.5f;
+		const float Rate = WRTune(TEXT("stance.regenPerSecond"), 13.f) * (bLow ? WRTune(TEXT("stance.lowHealthRegen"), 0.5f) : 1.f);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), Attr->GetStance() + Rate * DeltaTime);
+		if (Attr->GetStance() >= Attr->GetMaxStance())
+		{
+			Owner->ParriesTaken = 0;
+		}
 	}
 
 	if (Attr->GetHeat() > 0.f && SinceHeatGain >= WRTune(TEXT("resources.heatDecayDelay"), 4.f))

@@ -12,6 +12,14 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(State_CancelWindow, "State.CancelWindow");
 	UE_DEFINE_GAMEPLAY_TAG(State_IFrames, "State.IFrames");
 	UE_DEFINE_GAMEPLAY_TAG(State_TraceActive, "State.TraceActive");
+	UE_DEFINE_GAMEPLAY_TAG(State_Windup, "State.Windup");
+	UE_DEFINE_GAMEPLAY_TAG(State_Hyperarmor, "State.Hyperarmor");
+	UE_DEFINE_GAMEPLAY_TAG(State_BlockStun, "State.BlockStun");
+	UE_DEFINE_GAMEPLAY_TAG(State_GuardCounterWindow, "State.GuardCounterWindow");
+	UE_DEFINE_GAMEPLAY_TAG(State_ParryRecovery, "State.ParryRecovery");
+	UE_DEFINE_GAMEPLAY_TAG(State_JumpLegsInvuln, "State.JumpLegsInvuln");
+	UE_DEFINE_GAMEPLAY_TAG(State_BeingCrit, "State.BeingCrit");
+	UE_DEFINE_GAMEPLAY_TAG(State_Critting, "State.Critting");
 
 	UE_DEFINE_GAMEPLAY_TAG(Status_Burn, "Status.Burn");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Frostbite, "Status.Frostbite");
@@ -20,6 +28,10 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(Status_Frozen, "Status.Frozen");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Staggered, "Status.Staggered");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Unconscious, "Status.Unconscious");
+	UE_DEFINE_GAMEPLAY_TAG(Status_StanceBroken, "Status.StanceBroken");
+	UE_DEFINE_GAMEPLAY_TAG(Status_GuardBroken, "Status.GuardBroken");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Exposed, "Status.Exposed");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Flinch, "Status.Flinch");
 
 	UE_DEFINE_GAMEPLAY_TAG(Element_Physical, "Element.Physical");
 	UE_DEFINE_GAMEPLAY_TAG(Element_Fire, "Element.Fire");
@@ -41,6 +53,9 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Dodge, "Ability.Dodge");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Block, "Ability.Block");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Path, "Ability.Path");
+	UE_DEFINE_GAMEPLAY_TAG(Ability_Melee, "Ability.Melee");
+	UE_DEFINE_GAMEPLAY_TAG(Ability_Critical, "Ability.Critical");
+	UE_DEFINE_GAMEPLAY_TAG(Event_PerfectDodge, "Event.PerfectDodge");
 
 	FGameplayTag PathTag(FName PathId)
 	{

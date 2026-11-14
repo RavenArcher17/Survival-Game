@@ -781,6 +781,16 @@ void UWRAnimInstance::FChannel::Step(float DeltaSeconds, float BlendIn, float Bl
 		}
 		else
 		{
+			if (Track.RateB > 0.f && Track.Time >= Track.SwitchAt)
+			{
+				Track.Rate = Track.RateB;
+				Track.RateB = -1.f;
+			}
+			else if (Track.RateB <= 0.f && Track.RateC > 0.f && Track.Time >= Track.SwitchAt2)
+			{
+				Track.Rate = Track.RateC;
+				Track.RateC = -1.f;
+			}
 			Track.Time += DeltaSeconds * Track.Rate;
 			if (Track.bLoop)
 			{
@@ -1105,6 +1115,31 @@ float UWRAnimInstance::PlayOneShot(UAnimSequenceBase* Clip, EWRAnimLayer Layer, 
 		UpperShot.FadeAll();  // a dodge or a death takes over from a swing
 	}
 	return Delay + FMath::Max(0.f, Clip->GetPlayLength() - Start) / Rate;
+}
+
+float UWRAnimInstance::PlayOneShotWarped(UAnimSequenceBase* Clip, EWRAnimLayer Layer, float Start, float RateA, float SwitchAt, float RateB, float SwitchAt2, float RateC, float Delay)
+{
+	if (!Clip)
+	{
+		return 0.f;
+	}
+	RateA = RateA > KINDA_SMALL_NUMBER ? RateA : 1.f;
+	RateB = RateB > KINDA_SMALL_NUMBER ? RateB : RateA;
+	RateC = RateC > KINDA_SMALL_NUMBER ? RateC : RateB;
+	PlayOneShot(Clip, Layer, RateA, Start, Delay, false);
+	FChannel& Channel = Layer == EWRAnimLayer::Full ? FullShot : UpperShot;
+	const float Length = Clip->GetPlayLength();
+	const float Switch = FMath::Clamp(SwitchAt, Start, Length);
+	const float Switch2 = FMath::Clamp(SwitchAt2, Switch, Length);
+	if (Channel.Tracks.Num() > 0)
+	{
+		FTrack& Track = Channel.Tracks.Last();
+		Track.RateB = RateB;
+		Track.SwitchAt = Switch;
+		Track.RateC = RateC;
+		Track.SwitchAt2 = Switch2;
+	}
+	return Delay + (Switch - Start) / RateA + (Switch2 - Switch) / RateB + (Length - Switch2) / RateC;
 }
 
 void UWRAnimInstance::StopOneShot(EWRAnimLayer Layer)

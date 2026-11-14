@@ -2,6 +2,9 @@
 #include "WRSound.h"
 #include "WRCreature.h"
 #include "WRLifeSkills.h"
+#include "WRCombatLibrary.h"
+#include "WRWeapons.h"
+#include "WRPathComponent.h"
 #include "WRResourceNode.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -46,6 +49,8 @@ FWRItemRegistry::FWRItemRegistry()
 			D.Category = FName(*O->GetStringField(TEXT("category")));
 			D.StackSize = FMath::Max(1, static_cast<int32>(O->GetNumberField(TEXT("stack"))));
 			O->TryGetNumberField(TEXT("weight"), D.Weight);
+			FString ClassId;
+			if (O->TryGetStringField(TEXT("class"), ClassId)) D.WeaponClass = FName(*ClassId);
 			const TSharedPtr<FJsonObject>* Use = nullptr;
 			if (O->TryGetObjectField(TEXT("use"), Use))
 			{
@@ -65,6 +70,7 @@ FWRItemRegistry::FWRItemRegistry()
 				FString Metal;
 				if ((*Equip)->TryGetStringField(TEXT("metal"), Metal)) D.Metal = FName(*Metal);
 				(*Equip)->TryGetNumberField(TEXT("armor"), D.Armor);
+				(*Equip)->TryGetNumberField(TEXT("poise"), D.Poise);
 				(*Equip)->TryGetNumberField(TEXT("durability"), D.MaxDurability);
 			}
 			const TSharedPtr<FJsonObject>* Ranged = nullptr;
@@ -398,6 +404,10 @@ void UWRInventoryComponent::ApplyEquipment()
 	}
 	Character->Weapon = Stats;
 	Character->ArmorValue = GetArmorValue();
+	// The roll's tier by what's worn and held (replicates to the owner, whose roll predicts with it), and the poise
+	// the worn armour gives.
+	Character->EquipLoadPct = uint8(FMath::Clamp(FMath::RoundToInt(100.f * GetEquipLoadKg() / FMath::Max(1.f, GetMaxEquipLoad())), 0, 255));
+	UWRCombatLibrary::RefreshPoise(Character);
 	// The worn armour's look on the hero (cook hero-look-2): broken armour still shows; an empty slot wears the wraps.
 	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
 	{
@@ -776,6 +786,39 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	const TSharedPtr<FJsonObject>* RangedJson = nullptr;
 	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = StackFromJson(*RangedJson);
 	Json->TryGetBoolField(TEXT("kitGiven"), bKitGiven);
+}
+
+float UWRInventoryComponent::GetWornPoise() const
+{
+	const FWRItemDef* Def = EquippedArmor.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedArmor.ItemId);
+	const float Armour = Def && EquippedArmor.Durability > 0.f ? Def->Poise : 0.f;
+	return Armour + GemStat(TEXT("poise"));
+}
+
+float UWRInventoryComponent::GetEquipLoadKg() const
+{
+	const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(GetOwner());
+	const float ArmorKg = Skills ? FMath::Max(0.f, 1.f + Skills->Stat(TEXT("armorWeight"))) : 1.f;
+	float Kg = 0.f;
+	for (const FWRItemStack* S : { &EquippedArmor, &EquippedWeapon, &EquippedRanged })
+	{
+		if (const FWRItemDef* Def = S->IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S->ItemId))
+		{
+			Kg += Def->Weight * (Def->Slot == EWREquipSlot::Armor ? ArmorKg : 1.f);
+		}
+	}
+	// The shield on the left arm (survivors carry it: weapons.json carried).
+	if (const FWRGuard* Carried = FWRWeapons::Get().Offhand(FWRWeapons::Get().Carried()))
+	{
+		Kg += Carried->Weight;
+	}
+	return Kg;
+}
+
+float UWRInventoryComponent::GetMaxEquipLoad() const
+{
+	return WRTune(TEXT("defense.maxEquipLoad"), 60.f) + UWRPathComponent::Stat(GetOwner(), TEXT("equipLoad"))
+		+ UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("equipLoad"));
 }
 
 float UWRInventoryComponent::GetCarryWeight() const

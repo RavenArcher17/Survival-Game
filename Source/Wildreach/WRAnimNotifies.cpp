@@ -32,6 +32,12 @@ void UWRANS_Window::Apply(USkeletalMeshComponent* MeshComp, int32 Delta) const
 	{
 		return;
 	}
+	// The move rows time the windows on every machine (UWRGA_Melee, cooks/build-combat-core.md 3.2) and the swing clips
+	// are warped to them; the clips' own notifies only drive the windows when combat.windowsFromClips is 1.
+	if (WRTune(TEXT("combat.windowsFromClips"), 0.f) <= 0.f)
+	{
+		return;
+	}
 	const APawn* Pawn = Cast<APawn>(Owner);
 	if (Owner->HasAuthority())
 	{

@@ -4,6 +4,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "GameplayTagContainer.h"
 #include "WRCharacterBase.h"
+#include "WRCombatRules.h"
 #include "WRAbilities.generated.h"
 
 class AWRCharacterBase;
@@ -22,6 +23,7 @@ class WILDREACH_API UWRGameplayAbility : public UGameplayAbility
 public:
 	UWRGameplayAbility();
 
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
 	virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
@@ -53,6 +55,14 @@ protected:
 	/** Tuning key for the stamina cost (e.g. "stamina.lightAttack") and its fallback. */
 	FString StaminaKey;
 	float StaminaFallback = 0.f;
+	/** >= 0: this activation's stamina cost instead of StaminaKey's (a move row's). Set before CommitAbility. */
+	float CostOverride = -1.f;
+	/** The commitment rule it obeys (WRCombatRules): attacks wait for the combo window, rolls and guards for the cancel
+	 *  window. bRules false: none (creature bites keep their own AI timing). */
+	WRCombatRules::EAct RuleAct = WRCombatRules::EAct::Attack;
+	bool bRules = false;
+	/** Predicted root: no movement at all (heavies; a CMC saved-move flag). */
+	void SetMoveRoot(bool bOn);
 	/** Tuning key for the cooldown in seconds; empty = no cooldown. */
 	FString CooldownKey;
 	float CooldownFallback = 0.f;
@@ -62,6 +72,7 @@ private:
 	TArray<FTimerHandle> Timers;
 	bool bAppliedAttackSlow = false;
 	bool bAppliedBlockSlow = false;
+	bool bAppliedRoot = false;
 };
 
 /** Melee swing: windup -> active sweep window -> recovery. Used by weapon attacks, weapon arts and creature bites. */
@@ -78,22 +89,36 @@ public:
 protected:
 	bool bHeavy = false;
 	EWRSwingKind SwingKind = EWRSwingKind::Light;
-	/** "weapon.lightTiming" / "weapon.heavyTiming"; windup/active/recovery read from it. */
+	/** "weapon.lightTiming" / "weapon.heavyTiming"; windup/active/recovery read from it (weapon arts, bites). */
 	FString TimingKey = TEXT("weapon.lightTiming");
 	float DamageMultiplier = 1.f;
 	FGameplayTag Element;
 	float BurnBuildup = 0.f;
 	float FrostBuildup = 0.f;
+	/** Weapon arts: stance damage x the class's light stance (tuning spells.<art>.stance overrides). */
+	float StanceMultiplier = 1.f;
 
 	/** Per-ability tuning block (e.g. "spells.flameSlash") overriding multiplier/buildup/cooldown. */
 	FString ArtKey;
 
+	/** Light / Heavy: the swing is a move row of the held weapon's class (Data/weapons.json): the chain, the guard counter. */
+	bool bUsesMoves = false;
+	/** Which row this activation plays (picked at activation, the same on the server and the owner). */
+	FName PickMove(const AWRCharacterBase* Character) const;
+
 private:
 	void Sweep();
+	void SetWindows(AWRCharacterBase* Character, double Now, float Windup, float Active, float Recovery, bool bHyperarmor);
+	void ClearWindows(AWRCharacterBase* Character, bool bEnded);
+	/** The step-in target: the lock, else the nearest enemy in the swing's cone (COMBAT-AND-LESSONS 1.17). */
+	AWRCharacterBase* StepTarget(AWRCharacterBase* Character, float Reach) const;
 	TSet<TWeakObjectPtr<AActor>> HitThisSwing;
 	FTimerHandle SweepTimer;
 	double ActiveEnd = 0.0;
 	bool bFromGuard = false;  // this swing came out of a held block (server, for the log)
+	FName MoveId;             // this activation's move row (bUsesMoves)
+	float MoveActive = 0.18f;
+	bool bWindowsSet = false;
 };
 
 UCLASS() class WILDREACH_API UWRGA_LightAttack : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_LightAttack(); };
@@ -114,7 +139,11 @@ public:
 /** Creature bite: flat damage from the creature's weapon stats, slower telegraphed windup. */
 UCLASS() class WILDREACH_API UWRGA_Bite : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_Bite(); };
 
-/** Dodge roll: root-motion burst in the input direction with an i-frame window. */
+/**
+ * Dodge: a roll in the stick's direction whose distance, i-frames and recovery come from the equip load tier
+ * (defense.load), or a backstep with the stick at rest (defense.backstep). Overloaded: a slow step with no i-frames.
+ * Stops at a ledge unless the stick still holds toward it. Fires on press (COMBAT-AND-LESSONS 1.7).
+ */
 UCLASS()
 class WILDREACH_API UWRGA_Dodge : public UWRGameplayAbility
 {
@@ -125,12 +154,20 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+	/** The tier a load share falls in: light, medium, heavy, overloaded. */
+	static FName LoadTier(float Ratio);
+
 private:
 	void SetInvulnerable(bool bOn);
 	bool bInvulnerable = false;
+	UPROPERTY() TObjectPtr<class UAbilityTask_ApplyRootMotionConstantForce> Travel;
 };
 
-/** Hold to block; the first moments of a block are a parry. */
+/**
+ * Guard (Block input): pressed, the guard is up at once and the carried off-hand's parry window opens after its startup
+ * (a press soon after the last shrinks it); let go before defense.parryTapSeconds and it was a committed parry (its
+ * recovery plays); held longer it's a plain guard with nothing to pay on release (COMBAT-AND-LESSONS 1.2-1.3).
+ */
 UCLASS()
 class WILDREACH_API UWRGA_Block : public UWRGameplayAbility
 {
@@ -145,6 +182,38 @@ private:
 	UFUNCTION() void OnReleased(float TimeHeld);
 	void SetParrying(bool bOn);
 	bool bParrying = false;
+	bool bRecovering = false;
+	double PressedAt = 0.0;
+	double LastPressAt = -100.0;
+};
+
+/**
+ * A critical attack from Light (COMBAT-AND-LESSONS 1.3-1.4): a riposte on a parried, guard-broken or stance-broken target
+ * in front, or a backstab from behind. The attacker warps to the sync point, plays the paired stab and is untouchable
+ * until its damage frame; the target is held through it. The server finds the target again on its own (rewound) view.
+ */
+UCLASS()
+class WILDREACH_API UWRGA_Critical : public UWRGameplayAbility
+{
+	GENERATED_BODY()
+
+public:
+	UWRGA_Critical();
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+
+	enum class EKind : uint8 { None, Riposte, Backstab };
+	/** Who Attacker can crit right now and how (Riposte covers parries, guard breaks and stance breaks). bRewound: the
+	 *  server judges against bodies where the attacker saw them. */
+	static AWRCharacterBase* FindTarget(const AWRCharacterBase* Attacker, EKind& OutKind, bool bRewound);
+
+private:
+	void SetInvulnerable(bool bOn);
+	void Hold(bool bOn, float Seconds);
+	TWeakObjectPtr<AWRCharacterBase> Victim;
+	EKind Kind = EKind::None;
+	bool bInvulnerable = false;
+	bool bHolding = false;
 };
 
 /** Spell that fires a projectile along the aim. */

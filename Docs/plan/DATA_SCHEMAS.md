@@ -102,3 +102,27 @@ All 66 pairs are imported for display; `grants` stays empty until a pair is impl
 ## Tuning: `Data/tuning.json`
 Every global number in one place (XP curves, stamina costs, i-frame windows, regen rates, status
 buildup thresholds). This is where Raven's starting numbers go.
+
+## Weapons: `Data/weapons.json`
+Weapon classes, their move rows and the guard tools (combat core, cooks/build-combat-core.md). An item picks its class
+with `items.json` `"class"` (none = `sword`); creatures and tools swing the sword's timing until their classes are built.
+```json
+{ "carried": "crude_shield",
+  "classes": { "sword": {
+    "reach": 220, "sweepRadius": 45,
+    "crit": { "backstab": 2.30, "riposte": 3.45 },
+    "guard": { "boost": 25, "phys": 0.60, "element": 0.30, "parry": [0.13, 0.10, 0.50] },
+    "moves": {
+      "light1": { "windup": 0.25, "active": 0.18, "recovery": 0.30, "dmg": 1.0, "stance": 5, "stamina": 10,
+                  "poise": 30, "guardStamina": 30, "impact": 2, "next": "light2", "clip": 0, "tier": "light" },
+      "heavy":  { "windup": 0.55, "active": 0.22, "recovery": 0.45, "dmg": 1.0, "stance": 10, "stamina": 20,
+                  "poise": 48, "guardStamina": 45, "impact": 3, "ha": true, "heavy": true, "tier": "heavy" },
+      "riposte": { "total": 1.6, "damageAt": 0.9, "clip": 0 } } } },
+  "offhands": { "crude_shield": { "weight": 2.0, "guardBoost": 45, "phys": 0.85, "element": 0.40,
+                                  "parry": [0.13, 0.17, 0.45], "canParry": true } } }
+```
+`moves` the code asks for: `light1`-`light3` (the chain via `next`), `heavy`, `guardCounter`, `riposte`, `backstab`; a
+class missing one takes the sword's. `clip` = which of the hero's light / heavy clips plays (the clip is warped so its
+measured strike lands on the active window). `tier` = light / heavy / counter / crit (hit-stop, flash, shake).
+Creatures add `stance` (else the tier's, tuning `stance.tiers`) and `hyperarmor`; armour adds `equip.poise`; creature and
+boss moves add `parryable`, `low`, `grab`, `unblockable`, `impact` (tuning `creatureAI.<move>`, `bosses.<id>.<attack>`).

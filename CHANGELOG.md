@@ -1,5 +1,96 @@
 # Changelog
 
+## Unreleased: the combat core (feel, stamina and roll, guard / parry / crits with server rewind, stance and poise)
+
+Aaron (lane build-combat-core: COMBAT-AND-LESSONS C0 and C2-C5; research, requirement ledger and plan in showcase-notes
+cooks/build-combat-core.md, following cooks/combat.md). Built to compile (editor and a full unity build); not played here
+(Aaron and the testers test, F8).
+
+- **Read and check (C0)**: what was built, what differed and what was missing is in the cook doc section 1. The big
+  gaps it closes: no swing commitment (a roll cut any swing), no input buffer, the swing clip stretched so its strike
+  landed anywhere, a flat block cost with no chip, any blow in the first 0.2 s of a block was a parry, any blow on a
+  staggered target was a x3 riposte, one poise for everyone, and no lag compensation at all.
+- **Swings are move rows** (new `Data/weapons.json`, `FWRWeapons`): the sword's **light chain 1-2-3** (0.25/0.18/0.30,
+  0.22/0.16/0.30, 0.30/0.20/0.42; x1.0, 1.0, 1.15; the three slashes in order on every machine), the **heavy** (hyperarmor
+  from the press to the end of its strike) and the **guard counter**. Stance, poise, guard cost, impact and how it lands
+  are per move. Items pick a class with `items.json` `class` (swords now; axes, picks and the rest come with C6).
+- **Commitment and windows** (`WRCombatRules`): nothing starts mid-swing until its window: the next chain attack from
+  the **combo window** (last 40% of the recovery), a roll or the guard from the **cancel window** (50% of a light's
+  recovery, 65% of a heavy's). The same numbers time the swing on the server, on the predicting owner and in the clip
+  everyone sees; window tags (`State.ComboWindow / CancelWindow / Windup / Hyperarmor`) replicate. The server allows a
+  remote player's press its lag early (`UWRLagSubsystem::WindowTolerance`).
+- **Input buffer** (0.33 s, the last press wins): a press that can't start yet fires the moment it can; a roll pressed
+  mid-swing waits up to 0.6 s for the cancel window; a guard held through a swing goes up when it may; menus, build mode
+  and death empty it.
+- **Swing weight**: the swing clip is warped to the move (its measured contact frames, `anim_windows.json`, land on the
+  active window): the coil plays at most 2.2x (a longer lead-in starts later), the strike fits the active time, the
+  follow-through runs at full speed. **Step-in**: a swing steps 45-130 cm toward the lock target (else the nearest enemy
+  in a 60 degree cone within 3 m) over its wind-up, predicted. **Waist split**: lights keep the legs walking at 0.35x,
+  heavies root you (new CMC flag).
+- **The hit stack** on every connected blow, by tier (light / heavy / counter / crit / boss kill): **hit-stop** 0.06 /
+  0.10 / 0.14 / 0.20 / 0.30 s (parry 0.09) on both bodies, starting at the blade's deepest point, creeping at 2% (no dead
+  freeze) and **catching up over 0.1 s**, the struck body **shaking 3-6 cm at 30 Hz** (not the camera); a **white flash**
+  on the struck body 70-260 ms (a parried attacker flashes **gold**); camera trauma 0.04 + 0.22 w², an **FOV punch**
+  0.2 + 1.3 w degrees, **rumble** 35 + 85 w ms (lights only the small motors); **four sound layers**: the edge's
+  transient and the weight's thud by what was hit (new `hit.transient.*`, `hit.body.*`, `hit.counter`, `crit.stab`,
+  `boss.kill`), the material, and the creature's hurt call; heavy blows duck the music 2 dB, counters and breaks 3,
+  crits and boss kills 4. Bodies only play their **reaction clip when poise breaks** (flinch / stagger / heavy stagger by
+  the blow's impact); otherwise it's a shudder and the action goes on.
+- **Stamina** (C3): regen **45/s after 0.5 s**, paused while guarding, sprinting and from a swing's press until its cancel
+  window; costs from the move rows, roll 12, backstep 8, **jump 8**; the **last-swing grace** (an action starts with any
+  stamina and may take it to -20; nothing starts below zero); a refused press **flashes the stamina bar white and shakes
+  it**.
+- **Equip load and the roll**: worn + held kg (armour, weapon, ranged, the carried shield; not the bag) over 60 kg + the
+  `equipLoad` stat: **light** < 30% (500 cm, i-frames 0.03-0.46, recovery 0.27), **medium** < 70% (420 cm), **heavy**
+  < 100% (330 cm, 0.03-0.43, recovery 0.53), **overloaded** (a slow step, no i-frames). Shown in the inventory (Equip load
+  bar and the roll it gives). **Backstep** with the stick at rest (250 cm, 0.10 s i-frames). **Jump**: blows flagged
+  `low` (stomps, tail sweeps, ground pounds, anvil slams) pass under for 0.8 s. **Perfect dodge** (a blow taken by the
+  i-frames in the roll's first 0.2 s) fires `Event.PerfectDodge`; Frozen moment now needs one. A roll **stops at a drop
+  over 2 m** unless the stick still holds toward it.
+- **Guard** (C4): up from the press; a blocked blow costs its stamina damage x (1 - Guard Boost / 100), only when it lands
+  (the hero's carried shield: boost 45, 85% physical / 40% element stopped; a weapon alone 25 / 60% / 30%); **chip
+  damage** gets through; **block stun** 0.20 / 0.35 s, then a 0.6 s **guard counter** window (Heavy: x1.3, stance 30,
+  hit-stop 0.14); out of stamina the **guard breaks** (1.2 s stagger; a guard-broken player is open to a riposte for 1 s).
+  The guarding shield wears a **faint gold edge** on every machine.
+- **Parry**: a guard tap; the shield's window opens after 0.13 s for 0.17 s (a sword alone 0.10 s); let go within 0.3 s
+  and the parry's recovery holds you (spam punished), a press within 0.5 s of the last shrinks the window 30%. Only blows
+  flagged **parryable** can be parried (bites and lunges; boss melee as marked, the Vulkarn tongs included; never
+  projectiles). Parries to break: creature 1, mini-boss 2, major boss 3 (a parry that doesn't break interrupts and takes
+  25% stance); a parried creature takes **x1.5 from everyone for 2 s**.
+- **Criticals** (new `UWRGA_Critical`, from Light): a **riposte** on a parried, guard-broken or stance-broken target from
+  its front (x3.45), a **backstab** from behind on a body no bigger than a person that isn't winding up (x2.3; PvP arc
+  75 degrees, x0.7). The attacker warps to the sync point over 0.12 s, is untouchable until the damage frame (0.9 s /
+  0.75 s), the target is held through it; the stab is the heavy thrust warped to the damage frame. The crit prompt shows
+  **once per species**, then never (saved).
+- **Server rewind** (new `UWRLagSubsystem`, server only): every body sampled at 30 Hz for 1 s. A player's swing and crit
+  are judged against bodies **where that player saw them** (ping / 2 + interpolation, at most 250 ms). A creature's or
+  boss's blow on a remote player that isn't defended right now **waits for the defence that player pressed on its
+  screen** (its guard, parry, i-frames and jump history, back-dated by its ping), then resolves at the moment it saw the
+  blow; boss tongs, Skaldrith's freezing breath and knockbacks act on the real result.
+- **Stance and poise** (C5): creatures and bosses have a hidden **stance** by tier (lowland 20, midland 35, highland 55,
+  mini 90, major 140; Vulkarn 180, Skaldrith 160), refilling after stance / 13 s at 13/s (half as fast below half health);
+  bosses take less with more fighters (x0.6 / 0.45 / 0.35, tames count). **A break** stuns 2.5-5 s: the creature's recoil
+  is held, it slumps, a **gold weak-point mark** burns on its head and **STANCE BROKEN** shows for who broke it; the crit
+  opens. **Phases never turn during a break or a crit**. Players have **poise** from armour (hide 8, copper 18, bronze 24,
+  iron 32) + Tempered + Reinforced + gems; it resets 30 s after the last poise hit and at once after a reaction.
+  **Hyperarmor**: the heavy's window x1.5 poise and 7.5% less damage; Basaltback, the Woolly drudge and bosses swing
+  through blows on their own attacks (and a flinch now cuts a creature's special short). Nothing holds health at 1.
+- **Prompt diet**: no hit words (Parried / Blocked / Dodged / riposte / critical / weak are gone); state words only
+  (GUARD BROKEN, STANCE BROKEN); **damage numbers** are off by default (Settings > Controls), and sit beside the body,
+  never over its head.
+- Data: `Data/weapons.json` (new), `tuning.json` (`combat`, `crit`, `stance`, `poise`, `net` blocks; `player`,
+  `stamina`, `defense`, `fx` reworked; creature and boss move flags), `creatures.json` (stance, hyperarmor),
+  `items.json` (armour poise), `fx.json` (`crit.mark`, `stance.break`, `guard.break`), `sounds.json` (+10 events);
+  21 new sounds (172 KB, `Tools/audio/make_combat_layers.py` from the CC0 Kenney impacts; CREDITS row updated). Tests
+  updated to the new block cost and parry rules.
+
+Not finished (hidden or noted): **knockdown / launch** reactions (impact 4-5) play as a heavy stagger until there are
+get-up clips; the **backstep** plays the roll clip; creatures' **stance break** holds their hit clip with a slump (no
+dedicated kneel clips yet) and the crit victims play their hit clip (no paired victim clips); **shields as items** and the
+other off-hands are data only (the hero's carried shield is the guard) until the crafting cook; weapon classes beyond the
+sword, charged / running / rolling / jump / crouch attacks and counter-hits are C6; breakable parts and head daze are C10;
+PvP blows are judged at the attacker's view only (the defender's lag isn't waited for).
+
 ## Unreleased: the hero's look (12 faces, 3 builds, armour tiers and the 12 biome sets, path marks on skin, eyes and hair)
 
 Aaron (lane build-hero-look-2; research and plan in showcase-notes cooks/hero-look-2.md, following cooks/hero.md 2.2-2.6).

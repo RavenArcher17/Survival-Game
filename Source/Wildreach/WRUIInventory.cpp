@@ -13,6 +13,7 @@
 #include "WRCombatTypes.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
+#include "WRAbilities.h"
 #include "WRKeyBindings.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
@@ -1099,8 +1100,41 @@ namespace WRInvTab
 						}), WRUI::Body(12, 500), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Carry() > CarryCap() ? WRUI::Bad : WRUI::Ink3); }))
 					]
 				]
+				// Equip load (COMBAT-AND-LESSONS 1.7): what's worn and held, not the bag; it sets how far and how safely you roll.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Bottom)[WRUI::Text(LOCTEXT("EquipLoad", "Equip load"), WRUI::Caps(12), WRUI::Ink2)]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::FromString(WRInv::Kg(EquipLoad())); }), WRUI::Body(14, 800),
+							TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(EquipLoad() >= EquipCap() ? WRUI::Bad : WRUI::Ink); }))]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom).Padding(4.f, 0.f, 0.f, 0.f)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::FromString(FString::Printf(TEXT("/ %s kg"), *WRInv::Kg(EquipCap()))); }), WRUI::Body(14, 500), WRUI::Ink3)]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						SNew(SWRBar).Height(10.f * U).Fraction_Lambda([this]() { return FMath::Min(1.f, EquipLoad() / FMath::Max(1.f, EquipCap())); })
+						.Color_Lambda([this]() { return EquipLoad() >= EquipCap() ? WRUI::Bad : FLinearColor(FColor(150, 128, 96)); })
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+						{
+							const float R = EquipLoad() / FMath::Max(1.f, EquipCap());
+							const FName Tier = UWRGA_Dodge::LoadTier(R);
+							if (Tier == TEXT("light")) return FText::FromString(FString::Printf(TEXT("Light roll: the farthest and quickest (under %.0f%%)"), WRTune(TEXT("defense.load.lightBelow"), 0.3f) * 100.f));
+							if (Tier == TEXT("medium")) return FText::FromString(FString::Printf(TEXT("Medium roll (under %.0f%%)"), WRTune(TEXT("defense.load.mediumBelow"), 0.7f) * 100.f));
+							if (Tier == TEXT("heavy")) return FText::FromString(TEXT("Heavy roll: shorter, slower to get up"));
+							return FText::FromString(TEXT("Overloaded: no roll, only a slow step"));
+						}), WRUI::Body(12, 500), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(EquipLoad() >= EquipCap() ? WRUI::Bad : WRUI::Ink3); }))
+					]
+				]
 			];
 		}
+
+		float EquipLoad() const { const UWRInventoryComponent* I = Inv(); return I ? I->GetEquipLoadKg() : 0.f; }
+		float EquipCap() const { const UWRInventoryComponent* I = Inv(); return I ? I->GetMaxEquipLoad() : 60.f; }
 
 		bool Resists(FName Kind) const
 		{
@@ -1394,6 +1428,7 @@ namespace WRInvTab
 			else if (D->Slot == EWREquipSlot::Armor)
 			{
 				AddRow(StatRow(TEXT("Armor"), FString::Printf(TEXT("%.0f"), ArmorOf(*S, *D))));
+				if (D->Poise > 0.f) AddRow(StatRow(TEXT("Poise"), FString::Printf(TEXT("%.0f"), D->Poise)));
 				if (S->Element == TEXT("fire")) AddRow(StatRow(TEXT("Fire-infused"), TEXT("lava can't burn you"), WRUI::Ember));
 				if (S->Element == TEXT("frost")) AddRow(StatRow(TEXT("Frost-infused"), TEXT("grip on ice"), WRUI::Frost));
 			}

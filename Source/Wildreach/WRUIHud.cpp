@@ -684,6 +684,8 @@ private:
 		AWRPlayerController* P = PC.Get();
 		const AWRCharacter* S = Survivor();
 		if (!P || !S || P->GetMenu() != EWRMenu::None || P->IsPlacing()) return FString();
+		// The critical, the first time for each kind of creature (then never again: COMBAT-AND-LESSONS L6).
+		if (const AWRCharacterBase* Crit = S->CritPromptTarget()) { OutTarget = Crit->GetDisplayLabel(); return TEXT("Critical"); }
 		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }
 		if (const AWRCreature* Tame = P->FindNearbyCreature(true)) { OutTarget = Tame->GetDisplayLabel(); return TEXT("Hold: orders  ·  Tap: interact"); }
 		if (const AWRCreature* Wild = P->FindNearbyCreature(false, 400.f))
@@ -725,7 +727,12 @@ private:
 			SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(FMargin(12.f * U, 8.f * U))
 			[
 				SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRKeyCap).FontSize(14).Text_Lambda([]() { return WRInput::ActionKey(TEXT("Interact")); })]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRKeyCap).FontSize(14).Text_Lambda([this]()
+				{
+					// The crit is Light; everything else in this slot is Interact. The device in use names the button.
+					const AWRCharacter* S = Survivor();
+					return WRInput::ActionKey(S && S->CritPromptTarget() ? TEXT("Light") : TEXT("Interact"));
+				})]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 				[
 					SNew(SVerticalBox)
@@ -825,16 +832,34 @@ private:
 	}
 
 	// ---------------------------------------------------------------- bottom left: vitals
-	TSharedRef<SWidget> VitalRow(const FText& Label, const FLinearColor& Color, float Height, TFunction<float()> Value, TFunction<float()> Max)
+	/** 0..1: how much of the "no stamina" flash is left (a refused press, combat.md 2.3: no dead button). */
+	float StaminaRefusal() const
+	{
+		const AWRCharacter* S = Survivor();
+		const float Len = WRTune(TEXT("stamina.refuseFlashSeconds"), 0.35f);
+		const float Age = S && S->GetWorld() ? float(S->GetWorld()->GetTimeSeconds() - S->StaminaRefusedAt) : 100.f;
+		return Age >= 0.f && Age < Len ? 1.f - Age / Len : 0.f;
+	}
+
+	TSharedRef<SWidget> VitalRow(const FText& Label, const FLinearColor& Color, float Height, TFunction<float()> Value, TFunction<float()> Max, TFunction<float()> Flash = nullptr)
 	{
 		return SNew(SHorizontalBox)
+			// A refused press shakes the row a few px and flashes the bar white (never gold: that's block / parry).
+			.RenderTransform_Lambda([this, Flash]()
+			{
+				const float F = Flash ? Flash() : 0.f;
+				const float Px = F > 0.f ? WRTune(TEXT("stamina.refuseShake"), 3.f) * U * F * FMath::Sin(float(WRUIMotion::Now()) * 2.f * PI * 22.f) : 0.f;
+				return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(Px, 0.f)));
+			})
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(62.f * U)[WRUI::Text(Label, WRUI::Caps(12), WRUI::Ink2)]]
-			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(SWRBar).Height(Height).Color(Color).Fraction_Lambda([Value, Max]() { return Value() / FMath::Max(1.f, Max()); })]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(SWRBar).Height(Height)
+				.Color_Lambda([Color, Flash]() { return Flash ? FMath::Lerp(Color, FLinearColor(FColor(245, 240, 230)), Flash()) : Color; })
+				.Fraction_Lambda([Value, Max]() { return FMath::Max(0.f, Value()) / FMath::Max(1.f, Max()); })]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
 			[
 				SNew(SBox).WidthOverride(64.f * U).HAlign(HAlign_Right)
 				[
-					WRUI::Text(TAttribute<FText>::CreateLambda([Value, Max]() { return FText::FromString(FString::Printf(TEXT("%.0f/%.0f"), Value(), Max())); }), WRUI::Body(13, 700), WRUI::Ink)
+					WRUI::Text(TAttribute<FText>::CreateLambda([Value, Max]() { return FText::FromString(FString::Printf(TEXT("%.0f/%.0f"), FMath::Max(0.f, Value()), Max())); }), WRUI::Body(13, 700), WRUI::Ink)
 				]
 			];
 	}
@@ -869,7 +894,7 @@ private:
 					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* M = PC.IsValid() ? Cast<AWRCreature>(PC->GetPawn()) : nullptr; return M ? FText::Format(LOCTEXT("Riding", "Riding {0}  ·  {1} to dismount"), FText::FromString(M->GetDisplayLabel()), WRInput::ActionKey(TEXT("Interact"))) : FText::GetEmpty(); }), WRUI::Body(13, 700), WRUI::Brass)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; })]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Stamina", "Stamina"), WRUI::Stamina, 14.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetStamina() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxStamina() : 1.f; })]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Stamina", "Stamina"), WRUI::Stamina, 14.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetStamina() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxStamina() : 1.f; }, [this]() { return StaminaRefusal(); })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Poise", "Poise"), WRUI::Poise, 6.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetPoise() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxPoise() : 1.f; })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f * U, 0.f, 8.f * U)[WRUI::Divider()]
 				+ SVerticalBox::Slot().AutoHeight()

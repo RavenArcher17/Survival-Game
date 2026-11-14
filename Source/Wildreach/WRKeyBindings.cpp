@@ -109,6 +109,7 @@ void FWRKeyBindings::ResetAll()
 	CastMode = EWRCastMode::Both;
 	bCastOnRelease = false;
 	bShowCrosshair = true;
+	bDamageNumbers = false;
 	MouseSens = PadSens = 1.f;
 	bInvertMouse = bInvertPad = false;
 	PadLabelSet = 0;
@@ -143,6 +144,12 @@ void FWRKeyBindings::SetCastOnRelease(bool b)
 	OnChanged.Broadcast();
 }
 
+void FWRKeyBindings::SetDamageNumbers(bool b)
+{
+	bDamageNumbers = b;
+	Save();
+}
+
 void FWRKeyBindings::SetShowCrosshair(bool b)
 {
 	bShowCrosshair = b;
@@ -172,6 +179,7 @@ void FWRKeyBindings::Load()
 	CastMode = static_cast<EWRCastMode>(FMath::Clamp(Mode, 0, 2));
 	GConfig->GetBool(KeySection, TEXT("CastOnRelease"), bCastOnRelease, GGameUserSettingsIni);
 	GConfig->GetBool(KeySection, TEXT("ShowCrosshair"), bShowCrosshair, GGameUserSettingsIni);
+	GConfig->GetBool(KeySection, TEXT("DamageNumbers"), bDamageNumbers, GGameUserSettingsIni);
 	GConfig->GetFloat(KeySection, TEXT("MouseSensitivity"), MouseSens, GGameUserSettingsIni);
 	GConfig->GetFloat(KeySection, TEXT("PadSensitivity"), PadSens, GGameUserSettingsIni);
 	GConfig->GetBool(KeySection, TEXT("InvertMouse"), bInvertMouse, GGameUserSettingsIni);
@@ -200,6 +208,7 @@ void FWRKeyBindings::Save() const
 	GConfig->SetInt(KeySection, TEXT("CastMode"), static_cast<int32>(CastMode), GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("CastOnRelease"), bCastOnRelease, GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("ShowCrosshair"), bShowCrosshair, GGameUserSettingsIni);
+	GConfig->SetBool(KeySection, TEXT("DamageNumbers"), bDamageNumbers, GGameUserSettingsIni);
 	GConfig->SetFloat(KeySection, TEXT("MouseSensitivity"), MouseSens, GGameUserSettingsIni);
 	GConfig->SetFloat(KeySection, TEXT("PadSensitivity"), PadSens, GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("InvertMouse"), bInvertMouse, GGameUserSettingsIni);

@@ -224,6 +224,14 @@ void WRInput::Rumble(UWorld* World, float Strength, float Seconds)
 	PC->PlayDynamicForceFeedback(S, Seconds, true, S > 0.5f, true, true);
 }
 
+void WRInput::RumbleLight(UWorld* World, float Strength, float Seconds)
+{
+	if (!World || !FWRKeyBindings::Get().PadRumble() || !UsingPad() || Strength <= 0.f || Seconds <= 0.f) return;
+	APlayerController* PC = World->GetFirstPlayerController();
+	if (!PC || !PC->IsLocalController()) return;
+	PC->PlayDynamicForceFeedback(FMath::Clamp(Strength, 0.f, 1.f), Seconds, false, true, false, true);
+}
+
 void WRInput::Transition(APlayerController* PC, const TCHAR* Why)
 {
 	// Leaving a mode: a moment with no gameplay presses, so the press that closed it never also acts.

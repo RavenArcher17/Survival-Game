@@ -46,6 +46,9 @@ public:
 	/** The crosshair stays up all the time (off: only while aiming, placing or in first person). */
 	bool ShowCrosshair() const { return bShowCrosshair; }
 	void SetShowCrosshair(bool b);
+	/** Damage numbers beside what you hit (off by default, combat.md 2.14). */
+	bool DamageNumbers() const { return bDamageNumbers; }
+	void SetDamageNumbers(bool b);
 
 	// Look (Settings > Look & controller). Sensitivity is a multiplier on the base speeds in tuning "look".
 	float MouseSensitivity() const { return MouseSens; }
@@ -74,6 +77,7 @@ private:
 	EWRCastMode CastMode = EWRCastMode::Both;
 	bool bCastOnRelease = false;
 	bool bShowCrosshair = true;
+	bool bDamageNumbers = false;
 	float MouseSens = 1.f;
 	float PadSens = 1.f;
 	bool bInvertMouse = false;

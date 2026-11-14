@@ -36,6 +36,8 @@ public:
 
 	void NotifyStaminaUsed() { SinceStaminaUse = 0.f; }
 	void NotifyPoiseDamaged() { SincePoiseDamage = 0.f; }
+	/** A stance hit: its regen waits max stance / stance.regenDelayDivisor s from now. */
+	void NotifyStanceDamaged() { SinceStanceDamage = 0.f; }
 	void NotifyResourceGained(const FGameplayTag& Element);
 
 	/** Set every tick by the owner while it is sprinting and moving. */
@@ -62,6 +64,8 @@ private:
 
 	float SinceStaminaUse = 10.f;
 	float SincePoiseDamage = 10.f;
+	float SinceStanceDamage = 100.f;
+	bool bResetting = false;
 	float SinceHeatGain = 10.f;
 	float SinceChillGain = 10.f;
 	float SinceBuildup = 10.f;

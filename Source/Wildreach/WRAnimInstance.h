@@ -227,6 +227,10 @@ public:
 	/** Play a clip once. Rate 0 keeps 1. Start skips into it, Delay holds its first frame first, bHold keeps the last
 	 *  frame until the layer gets something else. Returns its play time in seconds (Delay included). */
 	float PlayOneShot(UAnimSequenceBase* Clip, EWRAnimLayer Layer, float Rate = 1.f, float Start = 0.f, float Delay = 0.f, bool bHold = false);
+	/** A one-shot timed to gameplay (a swing warped to its move row): from Start at RateA until clip time SwitchAt, then
+	 *  at RateB (the coil fitted to the wind-up, the strike to the active window, the follow-through after it). Returns
+	 *  its play time. */
+	float PlayOneShotWarped(UAnimSequenceBase* Clip, EWRAnimLayer Layer, float Start, float RateA, float SwitchAt, float RateB, float SwitchAt2, float RateC, float Delay = 0.f);
 	/** Fade out whatever one-shot plays on a layer. */
 	void StopOneShot(EWRAnimLayer Layer);
 	/** Measured ground speed of a set's clip at rate 1, cm/s (0 if unknown); for logs and tests. */
@@ -276,6 +280,8 @@ protected:  // (UWRHeroAnimInstance builds on these)
 	{
 		UAnimSequenceBase* Clip = nullptr;
 		float Time = 0.f, Rate = 1.f, Length = 1.f, Delay = 0.f;
+		float RateB = -1.f, SwitchAt = -1.f;   // a warped one-shot: Rate until clip time SwitchAt, then RateB...
+		float RateC = -1.f, SwitchAt2 = -1.f;  // ...until SwitchAt2, then RateC
 		float Weight = 0.f, Target = 1.f;
 		bool bLoop = false, bHold = false;
 	};

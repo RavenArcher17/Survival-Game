@@ -98,11 +98,17 @@ class WILDREACH_API UWRFxCameraModifier : public UCameraModifier
 
 public:
 	void AddTrauma(float Amount);
+	/** A quick narrowing of the view on a heavy blow, eased back over Seconds (COMBAT-AND-LESSONS L1 FOV punch). */
+	void AddFovPunch(float Degrees, float Seconds);
 	virtual bool ModifyCamera(float DeltaTime, FMinimalViewInfo& InOutPOV) override;
 
 private:
+	bool ModifyFov(float DeltaTime, FMinimalViewInfo& InOutPOV);
 	float Trauma = 0.f;
 	float Clock = 0.f;
+	float FovPunch = 0.f;
+	float FovSeconds = 0.f;
+	float FovAge = 0.f;
 };
 
 namespace WRFxDetail
@@ -339,7 +345,25 @@ private:
 	float ShelterTarget = 0.f;
 
 public:
-	/** Hit-stop bookkeeping (WRFx::HitStop): meshes this machine paused, and until when. */
-	struct FHitStop { TWeakObjectPtr<class USkeletalMeshComponent> Mesh; double Until = 0.0; };
+	/**
+	 * Hit-stop bookkeeping (WRFx::HitStop, COMBAT-AND-LESSONS L1): each mesh creeps at fx.hitStop.creep from Start to
+	 * Until, then catches up (faster than real time) until CatchUpUntil; a victim's mesh shakes along the blow meanwhile.
+	 */
+	struct FHitStop
+	{
+		TWeakObjectPtr<class USkeletalMeshComponent> Mesh;
+		double Start = 0.0, Until = 0.0, CatchUpUntil = 0.0;
+		float Seconds = 0.f;
+		float ShakeCm = 0.f;
+		FVector ShakeDir = FVector::ZeroVector;
+		FVector Applied = FVector::ZeroVector;   // the shake offset on it now (taken back off at the end)
+	};
 	TArray<FHitStop> HitStops;
+	/** The victim's flash (overlay over its own materials, the previous overlay put back after). */
+	struct FFlash { TWeakObjectPtr<class UMeshComponent> Mesh; TWeakObjectPtr<class UMaterialInterface> Previous; double Until = 0.0; };
+	TArray<FFlash> Flashes;
+	void Flash(AActor* Target, float Seconds, bool bGold);
+	void TickFlashes();
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> FlashWhite;
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> FlashGold;
 };

@@ -10,6 +10,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "WRLifeSkills.h"
+#include "WRCombatLibrary.h"
 #include "Misc/CommandLine.h"
 #include "Net/UnrealNetwork.h"
 
@@ -522,8 +523,8 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 
 	// Tempered: more poise.
 	// Reinforced (armorcraft perk) adds to the path nodes' poise.
-	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxPoiseAttribute(), WRTune(TEXT("player.poise"), 40.f) + Stat(Character, TEXT("maxPoise"))
-		+ UWRLifeSkillsComponent::StatFor(Character, TEXT("armorPoise")));
+	// With the worn armour's poise (COMBAT-AND-LESSONS 1.5): one sum, UWRCombatLibrary::RefreshPoise.
+	UWRCombatLibrary::RefreshPoise(Character);
 
 	const int32 Level = GetCharacterLevel();
 	const float HealthRatio = Attr->GetMaxHealth() > 0.f ? Attr->GetHealth() / Attr->GetMaxHealth() : 1.f;

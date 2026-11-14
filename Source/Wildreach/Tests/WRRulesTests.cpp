@@ -155,8 +155,9 @@ bool FWRDamageMathTest::RunTest(const FString& Parameters)
 	// Lowland creature (70 HP) takes about 6 copper light hits.
 	TestEqual(TEXT("lowland hits"), FMath::CeilToInt(70.f / UWRCombatLibrary::WeaponDamage(Copper, false)), 6);
 
-	TestEqual(TEXT("block cost floor"), UWRCombatLibrary::BlockStaminaCost(0.f), 10.f);
-	TestEqual(TEXT("block cost ceiling"), UWRCombatLibrary::BlockStaminaCost(100.f), 25.f);
+	// A blocked blow costs its stamina damage less the guard boost (COMBAT-AND-LESSONS 1.2).
+	TestTrue(TEXT("crude shield block cost"), FMath::IsNearlyEqual(UWRCombatLibrary::GuardStaminaCost(30.f, 45.f), 16.5f, 0.01f));
+	TestEqual(TEXT("full guard boost costs nothing"), UWRCombatLibrary::GuardStaminaCost(30.f, 100.f), 0.f);
 	TestTrue(TEXT("full heat bonus"), FMath::IsNearlyEqual(UWRCombatLibrary::HeatBonus(100.f, 100.f), 0.3f));
 	TestEqual(TEXT("no heat bonus"), UWRCombatLibrary::HeatBonus(0.f, 100.f), 0.f);
 	return true;

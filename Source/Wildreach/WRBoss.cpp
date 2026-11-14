@@ -281,6 +281,11 @@ FWRBossAttack AWRBoss::MakeAttack(FName AttackId, EWRBossShape Shape, float Rang
 	A.Cooldown = T.Num(P + TEXT("cooldown"), Cooldown);
 	A.Poise = T.Num(P + TEXT("poise"), Damage * 0.8f);
 	A.bMelee = Shape == EWRBossShape::Cone || Shape == EWRBossShape::Line || Shape == EWRBossShape::SelfCircle;
+	A.bParryable = T.Num(P + TEXT("parryable"), 0.f) > 0.f;
+	A.bLow = T.Num(P + TEXT("low"), 0.f) > 0.f;
+	A.bGrab = T.Num(P + TEXT("grab"), 0.f) > 0.f;
+	A.bUnblockable = T.Num(P + TEXT("unblockable"), 0.f) > 0.f;
+	A.Impact = uint8(FMath::Clamp(FMath::RoundToInt(T.Num(P + TEXT("impact"), 3.f)), 1, 5));
 	return A;
 }
 
@@ -710,16 +715,9 @@ void AWRBoss::OnDamageTaken(const FWRHit& Hit, float Damage)
 	{
 		RevealedUntil = Now + Tune(TEXT("revealSeconds"), 6.f);
 	}
-	// Phases by health.
-	const float Fraction = GetAttributes()->GetHealth() / FMath::Max(1.f, GetAttributes()->GetMaxHealth());
-	if (Phase == 1 && Fraction < Tune(TEXT("phase2At"), 0.5f) && bMajor)
-	{
-		SetPhase(2);
-	}
-	if (Phase == 2 && Fraction < Tune(TEXT("phase3At"), 0.25f) && bMajor && AnyArtifactModifiers())
-	{
-		SetPhase(3);
-	}
+	// Phases by health; never during a stance break or a crit (COMBAT-AND-LESSONS 1.4): the crit always finishes first
+	// and the change plays after it (CheckPhase in Tick).
+	CheckPhase();
 }
 
 bool AWRBoss::BreathBlocked(const FVector& Point) const
@@ -839,26 +837,48 @@ void AWRBoss::ResolveAttack()
 		(BossElement() == WRTags::Element_Fire ? Hit.BurnBuildup : Hit.FrostBuildup) = Attack.Buildup;
 		Hit.bMelee = Attack.bMelee;
 		Hit.bHeavy = true;
+		Hit.bParryable = Attack.bParryable && Attack.bMelee;
+		Hit.bLow = Attack.bLow;
+		Hit.bGrab = Attack.bGrab;
+		Hit.bUnblockable = Attack.bUnblockable;
+		Hit.Impact = Attack.Impact;
+		Hit.Tier = EWRHitTier::Heavy;
 		Hit.Origin = Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation();
-		const EWRHitResult Result = UWRCombatLibrary::ApplyHit(Who, Hit);
+		// What follows the blow needs its real result: a blow on a remote player resolves once its defence is judged.
+		const FName AttackId = Attack.Id;
+		const bool bFreezingBreath = Phase >= 3 && CreatureId == TEXT("skaldrith") && Attack.Id.ToString().Contains(TEXT("breath"));
+		TWeakObjectPtr<AWRBoss> WeakSelf(this);
+		TWeakObjectPtr<AWRCharacterBase> WeakWho(Who);
+		const EWRHitResult Result = UWRCombatLibrary::ApplyHit(Who, Hit, [WeakSelf, WeakWho, AttackId, bFreezingBreath](EWRHitResult Landed)
+		{
+			AWRBoss* Self = WeakSelf.Get();
+			AWRCharacterBase* Victim = WeakWho.Get();
+			if (!Self || !Victim)
+			{
+				return;
+			}
+			if (AttackId == TEXT("tongs_grab"))
+			{
+				if (Landed == EWRHitResult::Parried)
+				{
+					// Parrying the tongs staggers him (longer than a normal parry; it counts toward his parry break too).
+					if (!Self->HasTag(WRTags::Status_StanceBroken))
+					{
+						Self->Status->Stagger(Self->Tune(TEXT("grabParryStagger"), 4.f));
+					}
+					UE_LOG(LogWildreach, Log, TEXT("BOSS %s staggered: tongs grab parried"), *Self->GetDisplayLabel());
+				}
+				else if (Landed == EWRHitResult::Hit && Victim->IsAlive())
+				{
+					Victim->Status->Stagger(Self->Tune(TEXT("grabHoldSeconds"), 1.5f));
+				}
+			}
+			if (bFreezingBreath && Landed == EWRHitResult::Hit && Victim->IsAlive())
+			{
+				Victim->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
+			}
+		});
 		Hits += Result == EWRHitResult::Hit ? 1 : 0;
-		if (Attack.Id == TEXT("tongs_grab"))
-		{
-			if (Result == EWRHitResult::Parried)
-			{
-				// Parrying the tongs staggers him (longer than a normal parry).
-				Status->Stagger(Tune(TEXT("grabParryStagger"), 4.f));
-				UE_LOG(LogWildreach, Log, TEXT("BOSS %s staggered: tongs grab parried"), *GetDisplayLabel());
-			}
-			else if (Result == EWRHitResult::Hit)
-			{
-				Who->Status->Stagger(Tune(TEXT("grabHoldSeconds"), 1.5f));
-			}
-		}
-		if (Phase >= 3 && CreatureId == TEXT("skaldrith") && Attack.Id.ToString().Contains(TEXT("breath")) && Result == EWRHitResult::Hit)
-		{
-			Who->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
-		}
 	}
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s lands: %d hit"), *GetDisplayLabel(), *Attack.Id.ToString(), Hits);
 
@@ -925,6 +945,23 @@ void AWRBoss::ResolveAttack()
 	BusyUntil = Now + Tune(TEXT("recoverySeconds"), 0.8f);
 }
 
+void AWRBoss::CheckPhase()
+{
+	if (!bMajor || !GetAttributes() || HasTag(WRTags::Status_StanceBroken) || HasTag(WRTags::State_BeingCrit) || !IsAlive())
+	{
+		return;
+	}
+	const float Fraction = GetAttributes()->GetHealth() / FMath::Max(1.f, GetAttributes()->GetMaxHealth());
+	if (Phase == 1 && Fraction < Tune(TEXT("phase2At"), 0.5f))
+	{
+		SetPhase(2);
+	}
+	if (Phase == 2 && Fraction < Tune(TEXT("phase3At"), 0.25f) && AnyArtifactModifiers())
+	{
+		SetPhase(3);
+	}
+}
+
 void AWRBoss::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -937,6 +974,7 @@ void AWRBoss::Tick(float DeltaSeconds)
 			TickTestControl(DeltaSeconds);
 			return;
 		}
+		CheckPhase();
 		TickCombat(DeltaSeconds);
 	}
 }
@@ -1139,6 +1177,11 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	}
 
 	// --- Attack state machine ---
+	// A boss's own attacks carry hyperarmor from the first tell to the blow (COMBAT-AND-LESSONS 1.5): poise damage
+	// doesn't stop them; the recovery after is the punish window. The wind-up also rules out a backstab.
+	const bool bInAttack = Current != INDEX_NONE && !HasTag(WRTags::Status_Staggered);
+	SetCombatTag(WRTags::State_Hyperarmor, bInAttack);
+	SetCombatTag(WRTags::State_Windup, bInAttack && Now < ResolveAt);
 	if (HasTag(WRTags::Status_Staggered) || HasTag(WRTags::Status_Frozen))
 	{
 		Current = INDEX_NONE;

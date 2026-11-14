@@ -12,6 +12,9 @@
 #include "WRFx.h"
 #include "WRCreature.h"
 #include "WRWater.h"
+#include "WRWeapons.h"
+#include "WRLag.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemComponent.h"
@@ -77,14 +80,6 @@ float UWRCombatLibrary::HeatBonus(float Heat, float MaxHeat)
 		return 0.f;
 	}
 	return WRTune(TEXT("resources.heatDamageBonusAtFull"), 0.3f) * FMath::Clamp(Heat / MaxHeat, 0.f, 1.f);
-}
-
-float UWRCombatLibrary::BlockStaminaCost(float Damage)
-{
-	// The doc gives 10-25 "depending on the hit"; map 0..40 damage onto that range.
-	const float Min = WRTune(TEXT("stamina.blockMin"), 10.f);
-	const float Max = WRTune(TEXT("stamina.blockMax"), 25.f);
-	return FMath::Lerp(Min, Max, FMath::Clamp(Damage / 40.f, 0.f, 1.f));
 }
 
 bool UWRCombatLibrary::IsInFront(const AActor* Defender, const FVector& AttackOrigin, float HalfAngleDegrees)
@@ -234,25 +229,125 @@ namespace WRCombatPerks
 	}
 }
 
-EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& Hit)
+void UWRCombatLibrary::RefreshPoise(AWRCharacterBase* Who)
 {
+	UAbilitySystemComponent* ASC = Who ? Who->GetAbilitySystemComponent() : nullptr;
+	UWRAttributeSet* Attr = Who ? Who->GetAttributes() : nullptr;
+	if (!ASC || !Attr || !Who->HasAuthority() || !Who->GetPlayerState())
+	{
+		return;
+	}
+	const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Who);
+	const float Max = FMath::Max(0.f, WRTune(TEXT("player.poise"), 0.f) + UWRPathComponent::Stat(Who, TEXT("maxPoise"))
+		+ UWRLifeSkillsComponent::StatFor(Who, TEXT("armorPoise")) + (Inv ? Inv->GetWornPoise() : 0.f));
+	const bool bWasFull = Attr->GetPoise() >= Attr->GetMaxPoise() - KINDA_SMALL_NUMBER;
+	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxPoiseAttribute(), Max);
+	ASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), bWasFull ? Max : FMath::Min(Attr->GetPoise(), Max));
+}
+
+FName UWRCombatLibrary::StanceKind(const AWRCharacterBase* Who)
+{
+	const AWRCreature* Creature = Cast<AWRCreature>(Who);
+	const FWRCreatureDef* Def = Creature ? Creature->GetDef() : nullptr;
+	if (Def && Def->Archetype == TEXT("boss"))
+	{
+		return Def->Role.Contains(TEXT("major")) ? FName(TEXT("major")) : FName(TEXT("mini"));
+	}
+	return TEXT("normal");
+}
+
+float UWRCombatLibrary::MaxStanceFor(const AWRCharacterBase* Who)
+{
+	const AWRCreature* Creature = Cast<AWRCreature>(Who);
+	const FWRCreatureDef* Def = Creature ? Creature->GetDef() : nullptr;
+	if (!Def)
+	{
+		return WRTune(TEXT("stance.tiers.none"), 60.f);
+	}
+	if (Def->Stance > 0.f)
+	{
+		return Def->Stance;
+	}
+	const FName Kind = StanceKind(Who);
+	const FString Tier = Kind != TEXT("normal") ? Kind.ToString() : Def->Tier.IsNone() ? FString(TEXT("none")) : Def->Tier.ToString();
+	return FWRTuning::Get().Num(FString::Printf(TEXT("stance.tiers.%s"), *Tier), WRTune(TEXT("stance.tiers.none"), 60.f));
+}
+
+float UWRCombatLibrary::StanceBreakSeconds(const AWRCharacterBase* Who)
+{
+	const AWRCreature* Creature = Cast<AWRCreature>(Who);
+	const FWRCreatureDef* Def = Creature ? Creature->GetDef() : nullptr;
+	const FName Kind = StanceKind(Who);
+	const FString Tier = Kind != TEXT("normal") ? Kind.ToString() : (Def && !Def->Tier.IsNone()) ? Def->Tier.ToString() : FString(TEXT("none"));
+	return FWRTuning::Get().Num(FString::Printf(TEXT("stance.breakSeconds.%s"), *Tier), 2.5f);
+}
+
+void UWRCombatLibrary::BreakStance(AWRCharacterBase* Who, float Seconds, AActor* By)
+{
+	if (!Who || !Who->HasAuthority() || !Who->IsAlive() || Seconds <= 0.f)
+	{
+		return;
+	}
+	UAbilitySystemComponent* ASC = Who->GetAbilitySystemComponent();
+	if (ASC && Who->GetAttributes())
+	{
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), 0.f);
+	}
+	Who->ParriesTaken = 0;
+	// Stunned (its abilities stop, its AI waits) and open to a critical; the stance refills when the break ends.
+	Who->Status->Stagger(Seconds);
+	Who->Status->ApplyStatus(WRTags::Status_StanceBroken, Seconds);
+	Who->MulticastStanceBreak(true);
+	UE_LOG(LogWildreach, Log, TEXT("STANCE %s broken by %s for %.1f s"), *Who->GetName(), *GetNameSafe(By), Seconds);
+}
+
+float UWRCombatLibrary::GuardStaminaCost(float StaminaDamage, float GuardBoost)
+{
+	return FMath::Max(0.f, StaminaDamage) * FMath::Clamp(1.f - GuardBoost / 100.f, 0.f, 1.f);
+}
+
+EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& Hit, TFunction<void(EWRHitResult)> OnResolved)
+{
+	const auto Done = [&OnResolved](EWRHitResult R)
+	{
+		if (OnResolved) OnResolved(R);
+		return R;
+	};
 	if (!Target || !Target->HasAuthority() || !Target->IsAlive())
 	{
-		return EWRHitResult::Ignored;
+		return Done(EWRHitResult::Ignored);
 	}
 	UAbilitySystemComponent* TargetASC = Target->GetAbilitySystemComponent();
 	UWRAttributeSet* TargetAttr = Target->GetAttributes();
 	if (!TargetASC || !TargetAttr)
 	{
-		return EWRHitResult::Ignored;
+		return Done(EWRHitResult::Ignored);
 	}
 
 	AWRCharacterBase* Attacker = Cast<AWRCharacterBase>(Hit.Instigator);
 	UAbilitySystemComponent* AttackerASC = Attacker ? Attacker->GetAbilitySystemComponent() : nullptr;
 	if (Attacker && Attacker != Target && Attacker->GetPlayerState() && !Attacker->IsHostileTo(Target))
 	{
-		return EWRHitResult::Ignored;  // PvP off, clanmate, safe zone, or your own tame
+		return Done(EWRHitResult::Ignored);  // PvP off, clanmate, safe zone, or your own tame
 	}
+
+	// A creature's or boss's blow on a remote player waits for the defence it may already have pressed on its screen
+	// (server rewind, COMBAT-AND-LESSONS 1.17): it resolves a moment later, judged at the time that player saw it.
+	UWRLagSubsystem* Lag = UWRLagSubsystem::Get(Target);
+	if (Lag && Lag->ShouldHold(Target, Hit))
+	{
+		Lag->Hold(Target, Hit, MoveTemp(OnResolved));
+		return EWRHitResult::Ignored;
+	}
+	const bool bJudged = Lag && Hit.JudgeTime > 0.0;
+	// A defence the target had up when the blow is judged (now, or when a remote player saw it land).
+	const auto Defended = [&](const FGameplayTag& Tag)
+	{
+		return bJudged ? Lag->WasDefended(Target, Tag, Hit.JudgeTime) : TargetASC->HasMatchingGameplayTag(Tag);
+	};
+	const double Now = Target->GetWorld()->GetTimeSeconds();
+	const double JudgeAt = bJudged ? Hit.JudgeTime : Now;
+
 	// Before this hit wakes it up: had the creature noticed its attacker? (Backstab, Assassin.)
 	const bool bWasUnaware = Attacker && !Hit.bDamageOverTime && WRCombatPerks::IsUnaware(Target, Attacker);
 	if (Attacker && !Hit.bDamageOverTime)
@@ -260,7 +355,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// Path magic: a same-element path hit calms a tamable creature instead of hurting it.
 		if (Target->TryPathMagic(Hit))
 		{
-			return EWRHitResult::Ignored;
+			return Done(EWRHitResult::Ignored);
 		}
 		Target->NotifyAttackedBy(Attacker);
 		// Remember who's fighting whom (tames help their owner).
@@ -268,25 +363,42 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Target->CombatTarget = Attacker;
 	}
 
-	if (!Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Invulnerable))
+	// --- I-frames, and blows that pass under a jump ---
+	if (!Hit.bDamageOverTime && Defended(WRTags::State_Invulnerable))
 	{
-		// Frozen moment: a perfect dodge freezes everything close to you (once every few seconds).
-		static TMap<TWeakObjectPtr<AActor>, double> LastFrozenMoment;
-		const double Now = Target->GetWorld()->GetTimeSeconds();
-		if (Attacker && UWRPathComponent::HasNode(Target, TEXT("frost"), TEXT("frozen_moment")) && Now - LastFrozenMoment.FindRef(Target) > WRTune(TEXT("passives.frozenMomentCooldown"), 6.f))
+		// A perfect dodge: the roll's i-frames took it right as the roll began (combat.md 2.6). Nodes listen for it.
+		const bool bPerfect = Attacker && Now - Target->DodgeStartedAt < 5.0
+			&& JudgeAt - Target->DodgeStartedAt <= WRTune(TEXT("defense.perfectDodgeSeconds"), 0.2f) && JudgeAt >= Target->DodgeStartedAt;
+		if (bPerfect)
 		{
-			LastFrozenMoment.Add(Target, Now);
-			for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+			FGameplayEventData Event;
+			Event.Instigator = Attacker;
+			Event.Target = Target;
+			TargetASC->HandleGameplayEvent(WRTags::Event_PerfectDodge, &Event);
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT %s perfect dodge of %s"), *Target->GetName(), *GetNameSafe(Attacker));
+			// Frozen moment: a perfect dodge freezes everything close to you (once every few seconds).
+			static TMap<TWeakObjectPtr<AActor>, double> LastFrozenMoment;
+			if (UWRPathComponent::HasNode(Target, TEXT("frost"), TEXT("frozen_moment")) && Now - LastFrozenMoment.FindRef(Target) > WRTune(TEXT("passives.frozenMomentCooldown"), 6.f))
 			{
-				if (*It != Target && It->IsAlive() && Target->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) < WRTune(TEXT("passives.frozenMomentRadius"), 400.f))
+				LastFrozenMoment.Add(Target, Now);
+				for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
 				{
-					It->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
+					if (*It != Target && It->IsAlive() && Target->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) < WRTune(TEXT("passives.frozenMomentRadius"), 400.f))
+					{
+						It->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
+					}
 				}
+				UE_LOG(LogWildreach, Log, TEXT("COMBAT frozen moment by %s"), *Target->GetName());
 			}
-			UE_LOG(LogWildreach, Log, TEXT("COMBAT frozen moment by %s"), *Target->GetName());
 		}
 		Target->ReportHit(0.f, EWRHitResult::Dodged, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
-		return EWRHitResult::Dodged;
+		return Done(EWRHitResult::Dodged);
+	}
+	if (Hit.bLow && Defended(WRTags::State_JumpLegsInvuln))
+	{
+		UE_LOG(LogWildreach, Log, TEXT("COMBAT %s jumps over %s's low blow"), *Target->GetName(), *GetNameSafe(Attacker));
+		Target->ReportHit(0.f, EWRHitResult::Dodged, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
+		return Done(EWRHitResult::Dodged);
 	}
 
 	// Whiteout: enemies inside a frost storm whose caster has the node miss more often.
@@ -299,7 +411,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 				&& UWRPathComponent::HasNode(Caster, TEXT("frost"), TEXT("whiteout")) && FMath::FRand() < WRTune(TEXT("passives.whiteoutMissChance"), 0.3f))
 			{
 				Target->ReportHit(0.f, EWRHitResult::Dodged, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
-				return EWRHitResult::Dodged;
+				return Done(EWRHitResult::Dodged);
 			}
 		}
 	}
@@ -314,60 +426,90 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("hazardDamage")));
 	}
 	// What kind of hit it was, for the effects and damage numbers on every machine.
-	bool bCrit = false, bRiposte = false, bShatter = false;
+	bool bCrit = false, bRiposte = Hit.bCritical, bShatter = false, bStanceBroke = false;
+	int32 Reaction = 0;  // the body's reaction for every machine's clip: 0 a shudder, 1-3 by the blow's impact
+	const float BlockAngle = WRTune(TEXT("defense.blockAngleDegrees"), 70.f);
+	const bool bFacing = IsInFront(Target, Hit.Origin, BlockAngle);
+	const bool bSwinging = TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking);
 
-	// --- Block and parry (melee only, from the front; not while the blocker is swinging or casting out of the guard) ---
-	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) && UE_LOG_ACTIVE(LogWildreach, Verbose))
+	// --- Parry (COMBAT-AND-LESSONS 1.3): only blows flagged parryable, in the parry window, from the front ---
+	if (Hit.bMelee && Hit.bParryable && !Hit.bCritical && !Hit.bProjectile && !Hit.bDamageOverTime && Attacker && bFacing && !bSwinging
+		&& Defended(WRTags::State_Parrying))
 	{
-		const FVector To = (Hit.Origin - Target->GetActorLocation()).GetSafeNormal2D();
-		const float Off = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(FVector::DotProduct(Target->GetActorForwardVector().GetSafeNormal2D(), To), -1.f, 1.f)));
-		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) || Off > WRTune(TEXT("defense.blockAngleDegrees"), 70.f))
+		// Searing parry: parries set the attacker burning.
+		if (UWRPathComponent::HasNode(Target, TEXT("fire"), TEXT("searing_parry")))
 		{
-			UE_LOG(LogWildreach, Verbose, TEXT("COMBAT %s's guard misses %s: %s (%.0f deg off its facing)"), *Target->GetName(), *GetNameSafe(Hit.Instigator),
-				TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) ? TEXT("swinging") : TEXT("not in front"), Off);
+			Attacker->Status->AddBuildup(WRTags::Element_Fire, WRTune(TEXT("passives.searingParryBuildup"), 100.f), Target);
 		}
+		// Counted toward a break: a creature 1, a mini-boss 2, a major boss 3 (a player: 1). A parry that doesn't break
+		// still interrupts and takes a quarter of its stance.
+		const FName Kind = Attacker->GetPlayerState() ? FName(TEXT("normal")) : StanceKind(Attacker);
+		const int32 Need = FMath::Max(1, FMath::RoundToInt(FWRTuning::Get().Num(FString::Printf(TEXT("stance.parriesToBreak.%s"), *Kind.ToString()), 1.f)));
+		++Attacker->ParriesTaken;
+		if (Attacker->ParriesTaken >= Need)
+		{
+			BreakStance(Attacker, WRTune(TEXT("crit.parryOpenSeconds"), 1.6f), Target);
+			bStanceBroke = true;
+		}
+		else
+		{
+			Attacker->Status->Stagger(WRTune(TEXT("crit.parryInterruptSeconds"), 0.6f));
+			if (UWRAttributeSet* AA = Attacker->GetAttributes(); AA && AttackerASC && Attacker->IsCreature())
+			{
+				AttackerASC->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), AA->GetStance() - AA->GetMaxStance() * WRTune(TEXT("stance.nonBreakParryStance"), 0.25f));
+				Attacker->Status->NotifyStanceDamaged();
+			}
+		}
+		// Valheim's group reward: a parried creature takes more from everyone for a moment.
+		Attacker->Status->ApplyStatus(WRTags::Status_Exposed, WRTune(TEXT("crit.exposedSeconds"), 2.f));
+		UE_LOG(LogWildreach, Log, TEXT("COMBAT %s parried %s (%d/%d)"), *Target->GetName(), *Attacker->GetName(), Attacker->ParriesTaken, Need);
+		if (bStanceBroke) Attacker->ParriesTaken = 0;
+		uint16 Flags = WRFx::HitFlagsFor(Hit, false, false, false, false, false);
+		if (bStanceBroke) Flags |= WRFx::Hit_StanceBreak;
+		Target->ReportHit(0.f, EWRHitResult::Parried, Flags, Hit.Instigator, Hit.Origin);
+		return Done(EWRHitResult::Parried);
 	}
-	if (Hit.bMelee && !Hit.bDamageOverTime && TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking)
-		&& !TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking)
-		&& IsInFront(Target, Hit.Origin, WRTune(TEXT("defense.blockAngleDegrees"), 70.f)))
+
+	// --- Guard (COMBAT-AND-LESSONS 1.2): from the front, not while swinging, not a grab or an unblockable blow ---
+	if (!Hit.bDamageOverTime && !Hit.bUnblockable && !Hit.bGrab && !Hit.bCritical && !bSwinging && bFacing && Defended(WRTags::State_Blocking))
 	{
+		const FWRGuard Guard = FWRWeapons::Get().GuardFor(Target);
 		// Wyrm scale: a block can freeze the attacker.
-		if (Attacker && Target->Weapon.bBlockFreeze && FMath::FRand() < WRTune(TEXT("bossParts.wyrmScaleFreezeChance"), 0.25f))
+		if (Attacker && Hit.bMelee && Target->Weapon.bBlockFreeze && FMath::FRand() < WRTune(TEXT("bossParts.wyrmScaleFreezeChance"), 0.25f))
 		{
 			Attacker->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
 			Attacker->GetAbilitySystemComponent()->CancelAllAbilities();
 		}
-		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Parrying) && Attacker)
+		// What blocking it costs: the blow's stamina damage (a move row's; a creature's or boss's x its damage), less
+		// the guard boost; Bastion (armorcraft perk) takes some off.
+		const bool bBossBlow = Attacker && StanceKind(Attacker) != TEXT("normal");
+		const float StaminaDamage = Hit.StaminaDamage >= 0.f ? Hit.StaminaDamage
+			: Damage * (bBossBlow ? WRTune(TEXT("defense.bossStaminaDamage"), 1.6f) : WRTune(TEXT("defense.creatureStaminaDamage"), 1.2f));
+		const float Cost = GuardStaminaCost(StaminaDamage, Guard.Boost) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")));
+		// Chip: what the guard doesn't stop of this kind of damage gets through.
+		const bool bElemental = Hit.Element.IsValid() && Hit.Element != WRTags::Element_Physical;
+		Damage *= 1.f - FMath::Clamp(bElemental ? Guard.Element : Guard.Phys, 0.f, 1.f);
+		PoiseDamage = 0.f;
+		Target->Status->NotifyStaminaUsed();
+		if (TargetAttr->GetStamina() - Cost < 0.f)
 		{
-			Attacker->Status->Stagger(WRTune(TEXT("defense.staggerSeconds"), 1.5f));
-			// Searing parry: parries set the attacker burning.
-			if (UWRPathComponent::HasNode(Target, TEXT("fire"), TEXT("searing_parry")))
+			// The guard breaks: stamina gone, staggered, and a player is open to a riposte for a moment.
+			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), 0.f);
+			Target->Status->Stagger(WRTune(TEXT("defense.guardBreakStaggerSeconds"), 1.2f));
+			if (Target->GetPlayerState())
 			{
-				Attacker->Status->AddBuildup(WRTags::Element_Fire, WRTune(TEXT("passives.searingParryBuildup"), 100.f), Target);
+				Target->Status->ApplyStatus(WRTags::Status_GuardBroken, WRTune(TEXT("crit.guardBrokenRiposte"), 1.f));
 			}
-			UE_LOG(LogWildreach, Log, TEXT("COMBAT %s parried %s"), *Target->GetName(), *Attacker->GetName());
-			Target->ReportHit(0.f, EWRHitResult::Parried, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
-			return EWRHitResult::Parried;
-		}
-
-		// Bastion (armorcraft perk): blocking costs less.
-		const float Cost = BlockStaminaCost(Damage) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")));
-		if (TargetAttr->GetStamina() >= Cost)
-		{
-			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), TargetAttr->GetStamina() - Cost);
-			Target->Status->NotifyStaminaUsed();
-			Damage *= WRTune(TEXT("defense.blockDamageTaken"), 0.f);
-			PoiseDamage *= 0.25f;
-			Result = EWRHitResult::Blocked;
+			Result = EWRHitResult::GuardBroken;
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT %s's guard broken by %s (cost %.1f)"), *Target->GetName(), *GetNameSafe(Attacker), Cost);
 		}
 		else
 		{
-			// Out of stamina: the guard breaks and the hit lands at half strength.
-			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), 0.f);
-			Target->Status->NotifyStaminaUsed();
-			Target->Status->Stagger(WRTune(TEXT("defense.guardBreakStaggerSeconds"), 1.2f));
-			Damage *= 0.5f;
-			Result = EWRHitResult::GuardBroken;
+			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), TargetAttr->GetStamina() - Cost);
+			// Block stun, then the guard counter window (it opens as the stun ends: UWRStatusComponent).
+			const float Stun = (Hit.Impact >= 3 ? WRTune(TEXT("defense.blockStun.heavy"), 0.35f) : WRTune(TEXT("defense.blockStun.light"), 0.2f)) * Guard.BlockStunScale;
+			Target->Status->ApplyStatus(WRTags::State_BlockStun, Stun);
+			Result = EWRHitResult::Blocked;
 		}
 	}
 
@@ -386,6 +528,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + WRTune(TEXT("status.permafrostBonusVsSlowed"), 0.15f);
 		}
+		// Just parried: everyone's blows land harder (crit.exposedDamage).
+		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Exposed))
+		{
+			Damage *= WRTune(TEXT("crit.exposedDamage"), 1.5f);
+		}
 		// Stat nodes (Data/tuning.json nodeEffects).
 		if (Hit.bWeaponArt)
 		{
@@ -394,6 +541,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
 		{
 			Damage *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("vsStaggered"));
+		}
+		// Hyperarmor (a heavy's wind-up and strike): it shrugs off a little (COMBAT-AND-LESSONS 1.5).
+		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor) && !Hit.bIgnoreHyperarmor && !Hit.bGrab)
+		{
+			Damage *= 1.f - WRTune(TEXT("poise.hyperarmorDamageTaken"), 0.075f);
 		}
 		// Brittle: frozen enemies take more critical hits. Fuel the fire: hitting burning enemies builds Heat.
 		const float BrittleCrit = TargetASC->HasMatchingGameplayTag(WRTags::Status_Frozen) && UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("brittle"))
@@ -405,24 +557,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// Life-skill perks on the attacker (WRCombatPerks below): backstab, water fighter, pack leader; assassin crits.
 		bool bPerkCrit = false;
 		Damage *= WRCombatPerks::DamageScale(Attacker, Target, bWasUnaware, bPerkCrit);
-		if ((Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit) || bPerkCrit)
+		if (!Hit.bCritical && ((Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit) || bPerkCrit))
 		{
 			Damage *= 1.5f;
 			bCrit = true;
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s%s"), *Target->GetName(), bPerkCrit ? TEXT(" (unaware: assassin)") : TEXT(""));
-		}
-		if (Hit.bMelee && TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
-		{
-			// Riposte / critical on a staggered target.
-			Damage *= WRTune(TEXT("weapon.riposteMultiplier"), 3.f);
-			bRiposte = true;
-			Target->Status->ClearStatus(WRTags::Status_Staggered);
-			UE_LOG(LogWildreach, Log, TEXT("COMBAT riposte on %s"), *Target->GetName());
-			// Cold riposte: ripostes freeze the target.
-			if (UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("cold_riposte")))
-			{
-				Target->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
-			}
 		}
 
 		// Frozen targets: fire thaws them (Thaw combo), heavy hits shatter them.
@@ -497,7 +636,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
 	const bool bWeak = BeforeModify > 0.f && Damage > BeforeModify * 1.05f;
 
-	// --- Apply ---
+	// --- Apply (a blow that takes it to zero kills it: nothing holds health at 1, COMBAT-AND-LESSONS L5) ---
 	const float NewHealth = TargetAttr->GetHealth() - Damage;
 	TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), NewHealth);
 	if (Damage > 0.f)
@@ -505,14 +644,30 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Target->OnDamageTaken(Hit, Damage);
 	}
 
-	if (PoiseDamage > 0.f && !TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered))
+	// --- Poise (COMBAT-AND-LESSONS 1.5): a blow that breaks it makes the body react ---
+	if (Result == EWRHitResult::Hit && PoiseDamage > 0.f && !Hit.bDamageOverTime && TargetAttr->GetHealth() > 0.f
+		&& !TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered) && !TargetASC->HasMatchingGameplayTag(WRTags::Status_StanceBroken))
 	{
-		const float NewPoise = TargetAttr->GetPoise() - PoiseDamage;
-		TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), NewPoise);
+		const bool bHyper = !Hit.bIgnoreHyperarmor && !Hit.bGrab && TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor);
+		const float Armour = bHyper ? WRTune(TEXT("poise.hyperarmor.heavy"), 1.5f) : 1.f;
+		const float Left = TargetAttr->GetPoise() * Armour - PoiseDamage;
 		Target->Status->NotifyPoiseDamaged();
-		if (NewPoise <= 0.f)
+		// A creature with hyperarmor on its own attacks (big bodies, bosses) keeps swinging through it.
+		const AWRCreature* Creature = Cast<AWRCreature>(Target);
+		const bool bCreatureArmour = Creature && (TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) || TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor))
+			&& (Creature->GetDef() && (Creature->GetDef()->bHyperarmor || Creature->GetDef()->Archetype == TEXT("boss")));
+		if (Left > 0.f || bCreatureArmour)
 		{
-			Target->Status->Stagger(WRTune(TEXT("defense.staggerSeconds"), 1.5f));
+			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), FMath::Max(0.f, Left / Armour));
+		}
+		else
+		{
+			// Broken: a player reacts by the blow's impact, a creature flinches; poise comes back full after it.
+			const float Lock = Target->GetPlayerState()
+				? FWRTuning::Get().Num(FString::Printf(TEXT("poise.reactions.%d"), FMath::Clamp<int32>(Hit.Impact, 1, 5)), 0.55f)
+				: WRTune(TEXT("poise.creatureFlinchSeconds"), 0.45f);
+			Target->Status->Stagger(Lock);
+			Reaction = FMath::Clamp<int32>(Hit.Impact, 1, 3);
 			// Giant's ember: staggering an enemy sends out a small lava shockwave.
 			if (Attacker && Attacker->Weapon.bStaggerShockwave)
 			{
@@ -530,6 +685,35 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 						ApplyHit(*It, Wave);
 					}
 				}
+			}
+		}
+	}
+
+	// --- Stance (creatures, bosses, tames; COMBAT-AND-LESSONS 1.4) ---
+	if ((Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken) && Target->IsCreature() && !Hit.bDamageOverTime && !Hit.bCritical
+		&& TargetAttr->GetHealth() > 0.f && !TargetASC->HasMatchingGameplayTag(WRTags::Status_StanceBroken))
+	{
+		float Stance = Hit.StanceDamage >= 0.f ? Hit.StanceDamage
+			: Damage * (Attacker && Attacker->GetPlayerState() ? WRTune(TEXT("stance.spellPerDamage"), 0.3f) : WRTune(TEXT("stance.creaturePerDamage"), 0.3f));
+		if (bShatter)
+		{
+			Stance *= WRTune(TEXT("stance.shatterMult"), 2.f);
+		}
+		// A boss fought by many takes less stance from each (ER): x group[participants - 1], tames counting.
+		if (const AWRBoss* Boss = Cast<AWRBoss>(Target))
+		{
+			const int32 N = FMath::Clamp(Boss->Participants, 1, 4);
+			Stance *= FWRTuning::Get().Num(FString::Printf(TEXT("stance.group.%d"), N), N == 1 ? 1.f : N == 2 ? 0.6f : N == 3 ? 0.45f : 0.35f);
+		}
+		if (Stance > 0.f)
+		{
+			const float NewStance = TargetAttr->GetStance() - Stance;
+			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), NewStance);
+			Target->Status->NotifyStanceDamaged();
+			if (NewStance <= 0.f)
+			{
+				BreakStance(Target, StanceBreakSeconds(Target), Attacker);
+				bStanceBroke = true;
 			}
 		}
 	}
@@ -562,7 +746,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Target->Status->AddBuildup(WRTags::Element_Frost, Frost, Attacker);
 	}
 
-	if (!Hit.bDamageOverTime && Attacker && Result != EWRHitResult::Parried)
+	if (!Hit.bDamageOverTime && Attacker)
 	{
 		if (Hit.Element == WRTags::Element_Fire)
 		{
@@ -586,12 +770,22 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 	}
 
-	UE_LOG(LogWildreach, Log, TEXT("COMBAT %s -> %s dmg=%.1f poise=%.1f elem=%s result=%s hp=%.1f"),
+	UE_LOG(LogWildreach, Log, TEXT("COMBAT %s -> %s dmg=%.1f poise=%.1f elem=%s result=%s hp=%.1f%s%s"),
 		*GetNameSafe(Hit.Instigator), *Target->GetName(), Damage, PoiseDamage,
-		Hit.Element.IsValid() ? *Hit.Element.ToString() : TEXT("none"), ResultName(Result), TargetAttr->GetHealth());
+		Hit.Element.IsValid() ? *Hit.Element.ToString() : TEXT("none"), ResultName(Result), TargetAttr->GetHealth(),
+		bJudged ? TEXT(" (judged at the player's view)") : TEXT(""), bStanceBroke ? TEXT(" STANCE BROKEN") : TEXT(""));
 
-	Target->ReportHit(Damage, Result, WRFx::HitFlagsFor(Hit, bCrit, bRiposte, bWeak, bShatter, Target->ArmorValue > 0.f), Hit.Instigator, Hit.Origin);
-	if (TargetAttr->GetHealth() <= 0.f)
+	uint16 Flags = WRFx::HitFlagsFor(Hit, bCrit, bRiposte, bWeak, bShatter, Target->ArmorValue > 0.f);
+	if (bStanceBroke) Flags |= WRFx::Hit_StanceBreak;
+	if (Hit.bCritical) Reaction = 3;  // a crit's victim always recoils
+	Flags = WRFx::WithReaction(Flags, Reaction);
+	const bool bDies = TargetAttr->GetHealth() <= 0.f;
+	if (bDies && StanceKind(Target) == TEXT("major") && !Hit.bDamageOverTime)
+	{
+		Flags = WRFx::WithTier(Flags, EWRHitTier::BossKill);  // the last blow on a major boss (fx.hitStop.bossKill)
+	}
+	Target->ReportHit(Damage, Result, Flags, Hit.Instigator, Hit.Origin);
+	if (bDies)
 	{
 		// Wildfire: burning enemies erupt into flames when they die.
 		if (Attacker && TargetASC->HasMatchingGameplayTag(WRTags::Status_Burn) && UWRPathComponent::HasNode(Attacker, TEXT("fire"), TEXT("wildfire")))
@@ -608,5 +802,5 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 		Target->Die(Hit.Instigator);
 	}
-	return Result;
+	return Done(Result);
 }

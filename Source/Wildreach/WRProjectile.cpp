@@ -209,6 +209,7 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	if (Target && (!Caster || Caster->IsHostileTo(Target)))
 	{
 		Hit.Origin = GetActorLocation() - GetVelocity().GetSafeNormal() * 100.f;
+		Hit.bProjectile = true;  // never parried (COMBAT-AND-LESSONS 1.3)
 		UWRCombatLibrary::ApplyHit(Target, Hit);
 		if (Kind == TEXT("bola"))
 		{

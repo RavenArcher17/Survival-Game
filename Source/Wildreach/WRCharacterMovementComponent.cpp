@@ -10,11 +10,11 @@ bool UWRCharacterMovementComponent::IsSprinting() const
 {
 	const AWRCharacterBase* WRChar = Cast<AWRCharacterBase>(CharacterOwner);
 	// On the ground, or in the water: Sprint there is the fast stroke (WRWater), with the same stamina rule.
-	if (!bWantsToSprint || bAttackSlow || bBlockSlow || !(IsMovingOnGround() || IsSwimming()) || !WRChar || !WRChar->GetAttributes())
+	if (!bWantsToSprint || bAttackSlow || bBlockSlow || bAttackRoot || !(IsMovingOnGround() || IsSwimming()) || !WRChar || !WRChar->GetAttributes())
 	{
 		return false;
 	}
-	return WRChar->GetAttributes()->GetStamina() > 1.f && WRChar->GetSpeedMultiplier() >= 1.f;
+	return WRChar->GetAttributes()->GetStamina() > 0.f && WRChar->GetSpeedMultiplier() >= 1.f;
 }
 
 void UWRCharacterMovementComponent::BeginPlay()
@@ -44,7 +44,9 @@ float UWRCharacterMovementComponent::GetMaxSpeed() const
 	{
 		return Speed;
 	}
-	if (bAttackSlow) Speed *= 0.35f;
+	// Lights keep the legs walking (combat.lightMoveMultiplier); heavies root you (COMBAT-AND-LESSONS C2).
+	if (bAttackRoot) Speed = 0.f;
+	else if (bAttackSlow) Speed *= WRTune(TEXT("combat.lightMoveMultiplier"), 0.35f);
 	else if (bBlockSlow) Speed *= 0.5f;  // a swing out of a held block moves like any swing (the slows don't stack)
 	if (const AWRCharacter* Survivor = Cast<AWRCharacter>(CharacterOwner); Survivor && Survivor->IsAimingRanged())
 	{
@@ -60,6 +62,7 @@ void UWRCharacterMovementComponent::UpdateFromCompressedFlags(uint8 Flags)
 	bWantsToSprint = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 	bAttackSlow = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
 	bBlockSlow = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
+	bAttackRoot = (Flags & FSavedMove_Character::FLAG_Custom_3) != 0;
 }
 
 FNetworkPredictionData_Client* UWRCharacterMovementComponent::GetPredictionData_Client() const
@@ -78,6 +81,7 @@ void FSavedMove_WR::Clear()
 	bSavedWantsToSprint = false;
 	bSavedAttackSlow = false;
 	bSavedBlockSlow = false;
+	bSavedAttackRoot = false;
 }
 
 uint8 FSavedMove_WR::GetCompressedFlags() const
@@ -86,13 +90,14 @@ uint8 FSavedMove_WR::GetCompressedFlags() const
 	if (bSavedWantsToSprint) Flags |= FLAG_Custom_0;
 	if (bSavedAttackSlow) Flags |= FLAG_Custom_1;
 	if (bSavedBlockSlow) Flags |= FLAG_Custom_2;
+	if (bSavedAttackRoot) Flags |= FLAG_Custom_3;
 	return Flags;
 }
 
 bool FSavedMove_WR::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
 	const FSavedMove_WR* Other = static_cast<const FSavedMove_WR*>(NewMove.Get());
-	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedAttackSlow != Other->bSavedAttackSlow || bSavedBlockSlow != Other->bSavedBlockSlow)
+	if (bSavedWantsToSprint != Other->bSavedWantsToSprint || bSavedAttackSlow != Other->bSavedAttackSlow || bSavedBlockSlow != Other->bSavedBlockSlow || bSavedAttackRoot != Other->bSavedAttackRoot)
 	{
 		return false;
 	}
@@ -107,6 +112,7 @@ void FSavedMove_WR::SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& 
 		bSavedWantsToSprint = Move->bWantsToSprint;
 		bSavedAttackSlow = Move->bAttackSlow;
 		bSavedBlockSlow = Move->bBlockSlow;
+		bSavedAttackRoot = Move->bAttackRoot;
 	}
 }
 
@@ -118,6 +124,7 @@ void FSavedMove_WR::PrepMoveFor(ACharacter* C)
 		Move->bWantsToSprint = bSavedWantsToSprint;
 		Move->bAttackSlow = bSavedAttackSlow;
 		Move->bBlockSlow = bSavedBlockSlow;
+		Move->bAttackRoot = bSavedAttackRoot;
 	}
 }
 

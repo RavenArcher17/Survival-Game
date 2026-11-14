@@ -100,7 +100,14 @@ struct FWRBossAttack
 	float RepeatGap = 0.55f;
 	int32 MinPhase = 1;
 	uint8 Height = 0;         // 0 = only on the ground, 1 = only airborne, 2 = either
-	bool bMelee = true;       // blockable / parryable
+	bool bMelee = true;       // blockable
+	// COMBAT-AND-LESSONS 1.3 / 1.13 flags (tuning bosses.<id>.<attack>.*): parryable only where marked (boss grabs are),
+	// low passes under a jump, a grab ignores guards and hyperarmor, impact 1-5 (poise.reactions).
+	bool bParryable = false;
+	bool bLow = false;
+	bool bGrab = false;
+	bool bUnblockable = false;
+	uint8 Impact = 3;
 	double ReadyAt = 0.0;
 };
 
@@ -169,6 +176,8 @@ private:
 	FGameplayTag BossElement() const;
 	bool AnyArtifactModifiers() const;
 	float Tune(const TCHAR* Key, float Fallback) const;
+	/** Phases by health, held while its stance is broken or it's in a crit (the crit finishes, then the phase turns). */
+	void CheckPhase();
 
 	bool bMajor = false;
 	float SoloHealth = 3000.f;

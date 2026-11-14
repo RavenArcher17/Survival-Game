@@ -878,6 +878,11 @@ namespace WRSettingsUI
 					SettingRow(LOCTEXT("CrosshairRow", "Crosshair"), LOCTEXT("CrosshairRowSub", "Where spells and shots go. Off: only while aiming, placing or in first person."),
 						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().ShowCrosshair(); }, []() { FWRKeyBindings::Get().SetShowCrosshair(!FWRKeyBindings::Get().ShowCrosshair()); }))
 				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+				[
+					SettingRow(LOCTEXT("DamageNumbersRow", "Damage numbers"), LOCTEXT("DamageNumbersRowSub", "How much each blow did, beside what you hit."),
+						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().DamageNumbers(); }, []() { FWRKeyBindings::Get().SetDamageNumbers(!FWRKeyBindings::Get().DamageNumbers()); }))
+				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
 				[
 					SNew(SHorizontalBox).Visibility_Lambda(NotWheel(true))

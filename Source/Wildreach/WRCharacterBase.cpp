@@ -9,6 +9,7 @@
 #include "WRInventory.h"
 #include "WRSound.h"
 #include "WRFx.h"
+#include "WRCombatLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -80,6 +81,11 @@ void AWRCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingSeq, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingKindRep, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingDurationRep, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingVariantRep, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingWindupRep, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingActiveRep, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingRecoveryRep, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AWRCharacterBase, EquipLoadPct, COND_OwnerOnly);
 }
 
 UAbilitySystemComponent* AWRCharacterBase::GetAbilitySystemComponent() const
@@ -135,6 +141,11 @@ void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPo
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetFrostBuildupAttribute(), 0.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), 0.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), 0.f);
+	// Stance (creatures and bosses: COMBAT-AND-LESSONS 1.4), by its tier or its own number.
+	const float Stance = UWRCombatLibrary::MaxStanceFor(this);
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetMaxStanceAttribute(), Stance);
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), Stance);
+	ParriesTaken = 0;
 }
 
 FGameplayAbilitySpecHandle AWRCharacterBase::GrantAbility(TSubclassOf<UGameplayAbility> AbilityClass, EWRAbilityInput Input, int32 Level)
@@ -216,6 +227,7 @@ void AWRCharacterBase::ReportHit(float Damage, EWRHitResult Result, uint16 FxFla
 void AWRCharacterBase::MulticastHit_Implementation(float Damage, EWRHitResult Result, uint16 FxFlags, AActor* Source, FVector_NetQuantize Origin)
 {
 	HitFlash = Result == EWRHitResult::Hit ? 0.15f : 0.f;
+	HitFlagsShown = FxFlags;
 	OnHitVisual(Result);
 	OnHitShown.Broadcast(this, Damage, Result);
 	// Impact, hit sound, hit-stop, shake, hit marker and damage number (nothing on a dedicated server).
@@ -232,23 +244,72 @@ void AWRCharacterBase::MulticastDied_Implementation()
 	WRSound::Voice(this, TEXT("death"));   // here, not by watching health: a boss is gone soon after
 }
 
-void AWRCharacterBase::PlaySwing(EWRSwingKind Kind, float Duration)
+void AWRCharacterBase::PlaySwing(EWRSwingKind Kind, float Duration, uint8 Variant, float Windup, float Active, float Recovery)
 {
 	if (IsLocallyControlled() || GetNetMode() != NM_DedicatedServer)
 	{
+		SwingVariantShown = Variant;
+		SwingWindupShown = Windup;
+		SwingActiveShown = Active;
+		SwingRecoveryShown = Recovery;
 		StartSwingVisual(Kind, Duration);
 	}
 	if (HasAuthority())
 	{
 		SwingKindRep = Kind;
 		SwingDurationRep = Duration;
+		SwingVariantRep = Variant;
+		SwingWindupRep = Windup;
+		SwingActiveRep = Active;
+		SwingRecoveryRep = Recovery;
 		++SwingSeq;
 	}
 }
 
 void AWRCharacterBase::OnRep_Swing()
 {
+	SwingVariantShown = SwingVariantRep;
+	SwingWindupShown = SwingWindupRep;
+	SwingActiveShown = SwingActiveRep;
+	SwingRecoveryShown = SwingRecoveryRep;
 	StartSwingVisual(SwingKindRep, SwingDurationRep);
+}
+
+bool AWRCharacterBase::IsSwinging() const
+{
+	const UWorld* World = GetWorld();
+	return Swing.Start >= 0.0 && World && World->GetTimeSeconds() < Swing.End;
+}
+
+void AWRCharacterBase::SetCombatTag(const FGameplayTag& Tag, bool bOn)
+{
+	if (!AbilitySystem || !Tag.IsValid())
+	{
+		return;
+	}
+	if (HasAuthority())
+	{
+		// One count per tag from here (the ability that owns the window), replicated so others and the AI read it.
+		AbilitySystem->SetLooseGameplayTagCount(Tag, bOn ? 1 : 0, EGameplayTagReplicationState::TagOnly);
+	}
+	else if (IsLocallyControlled())
+	{
+		// The owner's own copy, so a buffered press sees its window at once (the server's arrives a round trip later).
+		if (bOn && !LocalCombatTags.Contains(Tag))
+		{
+			LocalCombatTags.Add(Tag);
+			AbilitySystem->AddLooseGameplayTag(Tag);
+		}
+		else if (!bOn && LocalCombatTags.Remove(Tag) > 0)
+		{
+			AbilitySystem->RemoveLooseGameplayTag(Tag);
+		}
+	}
+}
+
+void AWRCharacterBase::MulticastStanceBreak_Implementation(bool bBroken)
+{
+	OnStanceBreakVisual(bBroken);
 }
 
 void AWRCharacterBase::StartSwingVisual(EWRSwingKind Kind, float Duration)

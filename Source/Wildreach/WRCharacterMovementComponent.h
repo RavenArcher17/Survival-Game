@@ -24,6 +24,8 @@ public:
 	bool bAttackSlow = false;
 	/** Set by the block ability on the predicting machine. */
 	bool bBlockSlow = false;
+	/** Set by heavy swings on the predicting machine: rooted (COMBAT-AND-LESSONS C2, the waist split's other half). */
+	bool bAttackRoot = false;
 
 	bool IsSprinting() const;
 
@@ -41,6 +43,7 @@ public:
 	uint8 bSavedWantsToSprint : 1;
 	uint8 bSavedAttackSlow : 1;
 	uint8 bSavedBlockSlow : 1;
+	uint8 bSavedAttackRoot : 1;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;
