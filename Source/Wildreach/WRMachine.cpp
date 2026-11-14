@@ -3,6 +3,7 @@
 // FWRMachineRep (WRMachineLook.cpp turns the parts, WRUIMachine.cpp is the screen).
 
 #include "WRMachine.h"
+#include "WRTurret.h"
 #include "WRMachineLook.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
@@ -512,6 +513,7 @@ FString FWRMachines::StateWord(EWRMachineState State)
 	case EWRMachineState::NoLink: return TEXT("Not linked");
 	case EWRMachineState::NoStorm: return TEXT("Waiting for a storm");
 	case EWRMachineState::NoSun: return TEXT("Waiting for the sun");
+	case EWRMachineState::NoAmmo: return TEXT("Nothing to shoot");
 	default: return TEXT("Idle");
 	}
 }
@@ -541,7 +543,9 @@ FString FWRMachines::StateText(const AWRBuildPiece* Piece)
 	case EWRMachineState::NoLink: return TEXT("Not linked: Link it to another lift within 120 m");
 	case EWRMachineState::NoStorm: return TEXT("Waiting for a thunderstorm (battery flat)");
 	case EWRMachineState::NoSun: return TEXT("Waiting for the sun (battery flat)");
+	case EWRMachineState::NoAmmo: return UWRTurretSubsystem::AmmoText(Piece);
 	case EWRMachineState::Running:
+		if (M->Role == TEXT("turret")) return FString::Printf(TEXT("%s: %s"), Piece->Turret.bTracking ? TEXT("Tracking") : TEXT("On watch"), *UWRTurretSubsystem::AmmoText(Piece));
 		if (M->IsSource()) return FString::Printf(TEXT("Running: %.1f P to its line"), Own);
 		if (M->Carries() && M->Role != TEXT("conveyor")) return Supply > 0.f ? FString::Printf(TEXT("Turning: %.1f P on the line, %.1f drawn"), Supply, Load) : TEXT("Still: no source on this line");
 		return Word;
@@ -669,6 +673,7 @@ namespace WRMachineDetail
 		if (M.Role == TEXT("source")) return Item == FName(*FWRMachineDefs::Get().RuleStr(TEXT("soul.fuel"), TEXT("soulstone")));
 		if (M.Role == TEXT("still") || M.Role == TEXT("vat")) return Item == M.Input;
 		if (M.Role == TEXT("sorter") || M.Role == TEXT("riftchest")) return true;
+		if (M.Role == TEXT("turret")) return UWRTurretSubsystem::AmmoFor(M.Piece, Item) != nullptr;
 		if (M.IsProcessor())
 		{
 			for (const FWRRecipe* Rec : FWRRecipeRegistry::Get().ForStation(M.Station))
@@ -1341,6 +1346,11 @@ float UWRMachineSubsystem::Demand(AWRBuildPiece* P, const FWRMachineDef& D, EWRM
 	else if (Role == TEXT("coldstore"))
 	{
 		if (D.FreeIn.IsNone() || WRBiome::At(P, P->GetActorLocation()) != D.FreeIn) Load = D.Load;
+	}
+	else if (Role == TEXT("turret"))
+	{
+		// A turret draws its power while it has something to shoot (it keeps its bow spanned, its vessel pumped).
+		if (UWRTurretSubsystem::IsArmed(P)) Load = D.Load; else OutState = EWRMachineState::NoAmmo;
 	}
 	if (Load > 0.f)
 	{

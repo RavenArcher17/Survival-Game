@@ -55,6 +55,28 @@
     { "piece": "resonance_pylon", "role": "pylon", "rpm": 6 },
     { "piece": "blood_still", "role": "still", "rpm": 8, "slots": { "in": 4, "out": 4 }, "input": "bloodmoss", "output": "slimeshell_slime" },
     { "piece": "mycelium_vat", "role": "vat", "slots": { "in": 4, "out": 8 }, "input": "compost", "outputs": ["oyster_cap", "lions_mane"] },
-    { "piece": "rift_chest", "role": "riftchest", "rpm": 3 }
-  ]
+    { "piece": "rift_chest", "role": "riftchest", "rpm": 3 },
+    { "piece": "bolt_turret", "role": "turret", "load": 6, "rpm": 24, "slots": { "in": 2, "out": 0 } },
+    { "piece": "element_turret", "role": "turret", "load": 8, "rpm": 24, "slots": { "in": 1, "out": 0 } }
+  ],
+  "turrets": {
+    "_comment": "Powered turrets (cooks/build-building.md 2.6; WRTurret). A turret looks for a target every lookSeconds, turns its head at yawDegPerSec / pitchDegPerSec (pitch pitchMin..pitchMax), and once on target and spanned shows the red aim line for tellSeconds: it follows at tellFollow of its speed, holding still for the last holdSeconds, then shoots. Spanning again takes intervalSeconds at full power (longer short of power). ammo: what each turret takes; shots = shots one item gives (an essence 50); shape bolt (straight, never homing, speed cm/s) or cone (cone cm long, coneAngle degrees wide); damage, burn / frost buildup, a status and its buildup. Rows for items not in the game yet wait for their land.",
+    "lookSeconds": 0.2, "yawDegPerSec": 120, "pitchDegPerSec": 60, "pitchMin": -20, "pitchMax": 45,
+    "tellSeconds": 0.9, "holdSeconds": 0.3, "tellFollow": 0.25, "intervalSeconds": 1.5,
+    "ammo": [
+      { "turret": "bolt_turret", "item": "crossbow_bolt", "element": "bolt", "shape": "bolt", "damage": 45, "speed": 4000, "range": 3000, "shots": 1 },
+      { "turret": "element_turret", "item": "ember_essence", "element": "fire", "shape": "cone", "damage": 30, "burn": 20, "range": 2000, "cone": 600, "coneAngle": 30, "shots": 50, "color": [1.0, 0.4, 0.08] },
+      { "turret": "element_turret", "item": "frost_essence", "element": "frost", "shape": "bolt", "damage": 20, "frost": 40, "speed": 3000, "range": 2000, "shots": 50, "color": [0.55, 0.85, 1.0] },
+      { "turret": "element_turret", "item": "storm_essence", "element": "shock", "shape": "bolt", "damage": 22, "status": "shock", "buildup": 30, "speed": 4500, "range": 2000, "shots": 50, "color": [0.5, 0.65, 1.0] },
+      { "turret": "element_turret", "item": "tide_essence", "element": "soak", "shape": "bolt", "damage": 18, "status": "soak", "buildup": 40, "speed": 3000, "range": 2000, "shots": 50, "color": [0.2, 0.55, 0.85] },
+      { "turret": "element_turret", "item": "sun_essence", "element": "blind", "shape": "bolt", "damage": 20, "status": "blind", "buildup": 30, "speed": 3500, "range": 2000, "shots": 50, "color": [1.0, 0.8, 0.3] },
+      { "turret": "element_turret", "item": "grave_essence", "element": "decay", "shape": "bolt", "damage": 20, "status": "decay", "buildup": 30, "speed": 3000, "range": 2000, "shots": 50, "color": [0.4, 0.9, 0.55] },
+      { "turret": "element_turret", "item": "arcane_essence", "element": "mark", "shape": "bolt", "damage": 22, "status": "mark", "buildup": 35, "speed": 3500, "range": 2000, "shots": 50, "color": [0.75, 0.55, 1.0] },
+      { "turret": "element_turret", "item": "void_essence", "element": "curse", "shape": "bolt", "damage": 22, "status": "curse", "buildup": 30, "speed": 3000, "range": 2000, "shots": 50, "color": [0.55, 0.15, 0.9] },
+      { "turret": "element_turret", "item": "blood_essence", "element": "bleed", "shape": "bolt", "damage": 18, "status": "bleed", "buildup": 35, "speed": 3500, "range": 2000, "shots": 50, "color": [0.7, 0.05, 0.08] },
+      { "turret": "element_turret", "item": "spore_essence", "element": "poison", "shape": "bolt", "damage": 16, "status": "poison", "buildup": 40, "speed": 2800, "range": 2000, "shots": 50, "color": [0.5, 0.8, 0.2] },
+      { "turret": "element_turret", "item": "verdant_essence", "element": "rot", "shape": "bolt", "damage": 18, "status": "rot", "buildup": 35, "speed": 3000, "range": 2000, "shots": 50, "color": [0.3, 0.6, 0.2] },
+      { "turret": "element_turret", "item": "gale_essence", "element": "gale", "shape": "bolt", "damage": 26, "speed": 5000, "range": 2000, "shots": 50, "color": [0.8, 0.9, 1.0] }
+    ]
+  }
 }

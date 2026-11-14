@@ -42,7 +42,7 @@ struct WILDREACH_API FWRMachineLook
 };
 
 /** One moving assembly of a machine (client), turned / slid / swung from the machine's drive angle each frame. */
-enum class EWRMotion : uint8 { Spin, Slide, Swing, Cam, Rod, CrankSlide, Beam, BeamTip, Cleat, Cap, Fan, Chute, Mirror, Platform, Coil, Free };
+enum class EWRMotion : uint8 { Spin, Slide, Swing, Cam, Rod, CrankSlide, Beam, BeamTip, Cleat, Cap, Fan, Chute, Mirror, Platform, Coil, Free, TurretYaw, TurretPitch };
 
 struct FWRMovePart
 {
@@ -93,6 +93,14 @@ struct FWRMachineVisual
 	/** Shafts and gearboxes: which ports carry a drive pulley into a station (its belt down into the station's side). */
 	TArray<int32> Pulleys;
 	float StationLook = 0.f;
+	/** Turrets (WRTurret): the head's eased turn and slope, the last tell / shot seen, the aim line drawn in the tell. */
+	bool bTurret = false;
+	float TurretYaw = 0.f;
+	float TurretPitch = 0.f;
+	float LastTell = 0.f;
+	float LastShot = 0.f;
+	TWeakObjectPtr<USceneComponent> TurretHead;
+	TWeakObjectPtr<UStaticMeshComponent> AimLine;
 };
 
 /**
@@ -115,4 +123,6 @@ public:
 private:
 	TArray<FWRMachineVisual> Visuals;
 	void TickOne(FWRMachineVisual& V, float Dt, const FVector& Eye);
+	/** A turret's head after the server's aim, its tell's red line and sound, its shot's puff (WRTurret). */
+	void TickTurret(FWRMachineVisual& V, float Dt, float Now);
 };

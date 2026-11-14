@@ -1,0 +1,183 @@
+{
+  "_comment": "Building tiers past wood and stone (cooks/build-building.md; survival-crafting 2.17). FWRBuildSets expands each tier into the 12 structure shapes (shapes: cost and HP as a share of the tier's wall; foundation and door HP named outright) and the 4 freeform structural pieces (freeform), and each set's decor rows. Pieces are named <tier>_<shape> (metal_wall, basalt_hall_roof...), freeform <tier>_beam2 / _beam4 / _post / _brace. biome: the land the tier belongs to (shown only while that land is live, built anywhere). block: the item its pieces cost and its upkeep is paid in (upkeep: per piece per hour). look: the WRBuildLook style and its colours (sRGB hex), metal / rough / glow of its main surfaces. materialDamage: what share of a weapon's or tool's hit a piece of this material takes. All first drafts.",
+  "materialDamage": { "wood": 0.1, "stone": 0.02, "metal": 0.0, "biome": 0.0 },
+  "shapes": [
+    { "shape": "foundation", "name": "foundation", "cost": 1.5, "kind": "structure" },
+    { "shape": "wall", "name": "wall", "cost": 1.0, "hp": 1.0, "kind": "structure" },
+    { "shape": "halfwall", "name": "half wall", "cost": 0.5, "hp": 0.6, "kind": "structure" },
+    { "shape": "upperwall", "name": "upper wall (under a roof's high side)", "cost": 0.7, "hp": 0.8, "kind": "structure" },
+    { "shape": "doorway", "name": "doorway (no door)", "cost": 0.8, "hp": 0.9, "kind": "structure" },
+    { "shape": "door", "name": "doorway + door (code lock)", "cost": 1.2, "kind": "door", "lockable": true },
+    { "shape": "window", "name": "window wall", "cost": 0.8, "hp": 0.8, "kind": "structure" },
+    { "shape": "floor", "name": "floor / ceiling", "cost": 0.8, "hp": 0.9, "kind": "structure" },
+    { "shape": "stairs", "name": "stairs (one storey)", "cost": 1.1, "hp": 0.8, "kind": "structure" },
+    { "shape": "roof", "name": "roof (sloped)", "cost": 0.8, "hp": 0.8, "kind": "structure" },
+    { "shape": "gable", "name": "gable (roof side)", "cost": 0.5, "hp": 0.7, "kind": "structure" },
+    { "shape": "pillar", "name": "pillar", "cost": 0.5, "hp": 0.8, "kind": "structure" }
+  ],
+  "freeform": [
+    { "shape": "post", "name": "post (3 m)", "length": 300, "cost": 0.4, "hp": 0.6 },
+    { "shape": "beam2", "name": "beam (2 m)", "length": 200, "cost": 0.3, "hp": 0.6 },
+    { "shape": "beam4", "name": "beam (4 m)", "length": 400, "cost": 0.5, "hp": 0.6 },
+    { "shape": "brace", "name": "brace (45°)", "length": 283, "cost": 0.3, "hp": 0.6 }
+  ],
+  "tiers": [
+    { "id": "wood", "name": "Wood", "freeformOnly": true, "wall": { "wood": 12 }, "wallHp": 400,
+      "look": { "style": "wood" } },
+    { "id": "stone", "name": "Stone", "freeformOnly": true, "wall": { "stone": 20 }, "wallHp": 1000,
+      "look": { "style": "stone" } },
+    { "id": "metal", "name": "Metal", "hearth": 4, "span": 8, "wall": { "steel_plate": 8, "stone": 10 }, "wallHp": 2500, "foundationHp": 3500, "doorHp": 2800,
+      "upkeepItem": "steel_plate", "upkeep": 0.1, "biomeTier": false,
+      "look": { "style": "panels", "a": "#4a4e54", "b": "#7d7468", "c": "#2a2c30", "glass": "#2b3a40", "metal": 0.85, "rough": 0.42 } },
+    { "id": "basalt_hall", "name": "Basalt hall", "biome": "volcanic", "block": "basalt_block", "hearth": 5, "span": 8, "wall": { "basalt_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "vulkarn", "signature": "sulfur_crystal",
+      "look": { "style": "columns", "a": "#2c2a2a", "b": "#121013", "c": "#3b3634", "glow": "#ff6a1a", "glass": "#ff7a22", "glassGlow": 0.8, "rough": 0.8 } },
+    { "id": "crag_hold", "name": "Crag hold", "biome": "storm_peaks", "block": "crag_block", "hearth": 5, "span": 8, "wall": { "crag_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "kharvox", "signature": "stormglass",
+      "look": { "style": "granite", "a": "#8a817c", "b": "#3c4248", "c": "#5fa08c", "glass": "#3a4a58", "trim": "#2a2420", "rough": 0.85 } },
+    { "id": "sun_court", "name": "Sun court", "biome": "desert", "block": "sandstone_block", "hearth": 5, "span": 8, "wall": { "sandstone_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "ahrumet", "signature": "sunstone",
+      "look": { "style": "sandstone", "a": "#d6bf98", "b": "#b46a42", "c": "#efe2c6", "glow": "#ffb23a", "glass": "#e8a85a", "glassGlow": 0.25, "rough": 0.9 } },
+    { "id": "heartwood_lodge", "name": "Heartwood lodge", "biome": "forest", "block": "heartwood_block", "hearth": 5, "span": 8, "wall": { "heartwood_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "sylvaroth", "signature": "heartwood",
+      "look": { "style": "timberframe", "a": "#6b3520", "b": "#a8743e", "c": "#4f6b2a", "glow": "#ffa63a", "glass": "#e89a3a", "glassGlow": 0.35, "rough": 0.7 } },
+    { "id": "cloud_spire", "name": "Cloud spire", "biome": "sky_islands", "block": "skystone_block", "hearth": 5, "span": 8, "wall": { "skystone_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "aeolith", "signature": "levistone",
+      "look": { "style": "whitestone", "a": "#e6e3dc", "b": "#2c5ea8", "c": "#b8c8e0", "glow": "#9fd2ff", "glass": "#9fc4e8", "rough": 0.75 } },
+    { "id": "geode_sanctum", "name": "Geode sanctum", "biome": "crystal", "block": "geode_block", "hearth": 5, "span": 8, "wall": { "geode_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "lyrathis", "signature": "resonant_crystal",
+      "look": { "style": "geode", "a": "#24202b", "b": "#151219", "c": "#8a5cd6", "glow": "#a874ff", "glass": "#9a78e0", "glassGlow": 0.45, "rough": 0.8 } },
+    { "id": "rime_lodge", "name": "Rime lodge", "biome": "tundra", "block": "rime_block", "hearth": 5, "span": 8, "wall": { "rime_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "skaldrith", "signature": "lichen",
+      "look": { "style": "logs", "a": "#8a6440", "b": "#6e6a66", "c": "#eef2f6", "glass": "#c8e2f2", "glassGlow": 0.12, "rough": 0.75 } },
+    { "id": "stilt_house", "name": "Stilt house", "biome": "swamp", "block": "mangrove_block", "hearth": 5, "span": 8, "wall": { "mangrove_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "vharra", "signature": "bloodmoss",
+      "look": { "style": "reeds", "a": "#1d1814", "b": "#a08850", "c": "#9c1e1a", "trim": "#e8dcc0", "glass": "#3a3020", "rough": 0.85 } },
+    { "id": "coral_keep", "name": "Coral keep", "biome": "ocean", "block": "coralstone_block", "hearth": 5, "span": 8, "wall": { "coralstone_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "thalassor", "signature": "tidecoral",
+      "look": { "style": "coral", "a": "#c9bba4", "b": "#e2d6c6", "c": "#e0705a", "glow": "#5ad0c8", "glass": "#4ab8b0", "glassGlow": 0.2, "rough": 0.8 } },
+    { "id": "mourning_chapel", "name": "Mourning chapel", "biome": "graveyard", "block": "chapel_stone", "hearth": 5, "span": 8, "wall": { "chapel_stone": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "nhal", "signature": "soulstone",
+      "look": { "style": "chapel", "a": "#6c6a6a", "b": "#2e2c30", "c": "#1a1a1c", "glow": "#7a3aa0", "glass": "#6a2a8a", "glassGlow": 0.5, "rough": 0.88 } },
+    { "id": "mycelium_den", "name": "Mycelium den", "biome": "fungal", "block": "mycel_block", "hearth": 5, "span": 8, "wall": { "mycel_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "mycelorn", "signature": "deepcap",
+      "look": { "style": "felt", "a": "#d9ccb0", "b": "#6a4a32", "c": "#8a5a3a", "glow": "#5af0c8", "glass": "#4ad8b8", "glassGlow": 0.6, "rough": 0.95 } },
+    { "id": "hollow_bastion", "name": "Hollow bastion", "biome": "wasteland", "block": "voidstone_block", "hearth": 5, "span": 8, "wall": { "voidstone_block": 20 }, "wallHp": 3000, "foundationHp": 4200, "doorHp": 3200,
+      "upkeep": 0.1, "boss": "vorhollow", "signature": "voidglass",
+      "look": { "style": "voidstone", "a": "#5a5a5e", "b": "#0a080e", "c": "#3a3840", "glow": "#9a40ff", "glass": "#120a1a", "glassGlow": 0.1, "rough": 0.85 } }
+  ],
+  "decor": {
+    "_comment": "Each biome set's 6 decor pieces and its rug (id <tier>_<key>). arch: the model (WRBuildLookDecor); kind: decor, light (lights its room, tuning lights.<id>), bed (sleep there), bath. Cost: the set's block x block + its signature resource x sig + extra. Comfort: group biomeset value 2, rugs floor 2 (a bed in its set counts in biomeset, not twice). Blueprint bp_<tier>_decor teaches them all; it drops from the land's major boss.",
+    "block": 6, "sig": 2, "comfortGroup": "biomeset", "comfort": 2, "rugComfort": 2,
+    "sets": {
+      "basalt_hall": [
+        { "key": "throne", "name": "Obsidian throne", "arch": "throne" },
+        { "key": "fireplace", "name": "Forge-hearth fireplace", "arch": "fireplace", "kind": "light" },
+        { "key": "lamp", "name": "Lava-glass lamp", "arch": "lamp_stand", "kind": "light" },
+        { "key": "table", "name": "Anvil table", "arch": "anvil_table" },
+        { "key": "bench", "name": "Ash-wood bench", "arch": "bench" },
+        { "key": "bath", "name": "Hot spring bath", "arch": "bath", "needs": "vent", "extra": { "stone": 20 } },
+        { "key": "rug", "name": "Basalt hall rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "crag_hold": [
+        { "key": "lamp", "name": "Copper lightning-rod lamp", "arch": "rod_lamp", "kind": "light" },
+        { "key": "bench", "name": "Fur-draped bench", "arch": "bench", "variant": "fur", "extra": { "hide": 4 } },
+        { "key": "table", "name": "Slate table", "arch": "table" },
+        { "key": "chime", "name": "Wind chime", "arch": "chimes" },
+        { "key": "horns", "name": "Horn rack", "arch": "horn_rack" },
+        { "key": "drum", "name": "Storm drum", "arch": "drum", "extra": { "hide": 2 } },
+        { "key": "rug", "name": "Crag hold rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "sun_court": [
+        { "key": "fountain", "name": "Tiled fountain", "arch": "fountain" },
+        { "key": "divan", "name": "Cushioned divan", "arch": "divan", "extra": { "linen": 6 } },
+        { "key": "lantern", "name": "Brass lantern", "arch": "lantern_hang", "kind": "light" },
+        { "key": "table", "name": "Low table", "arch": "table", "variant": "low" },
+        { "key": "loom", "name": "Rug loom", "arch": "loom" },
+        { "key": "sundial", "name": "Sun-dial", "arch": "sundial" },
+        { "key": "rug", "name": "Sun court rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "heartwood_lodge": [
+        { "key": "throne", "name": "Root throne", "arch": "throne", "variant": "root" },
+        { "key": "table", "name": "Carved long table", "arch": "table", "variant": "long" },
+        { "key": "herbs", "name": "Hanging herb rack", "arch": "herb_rack" },
+        { "key": "lamptree", "name": "Lantern tree", "arch": "lantern_tree", "kind": "light" },
+        { "key": "harp", "name": "Harp", "arch": "harp" },
+        { "key": "trough", "name": "Flower trough", "arch": "planter", "variant": "trough" },
+        { "key": "rug", "name": "Heartwood lodge rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "cloud_spire": [
+        { "key": "lamp", "name": "Floating lamp", "arch": "lamp_float", "kind": "light" },
+        { "key": "harp", "name": "Wind harp", "arch": "harp", "variant": "wind" },
+        { "key": "bed", "name": "Feather bed", "arch": "bed", "kind": "bed", "extra": { "linen": 6 } },
+        { "key": "maptable", "name": "Sky map table", "arch": "map_table" },
+        { "key": "bath", "name": "Open-air bath", "arch": "bath" },
+        { "key": "kites", "name": "Kite rack", "arch": "kite_rack", "extra": { "linen": 4 } },
+        { "key": "rug", "name": "Cloud spire rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "geode_sanctum": [
+        { "key": "lamp", "name": "Crystal lamp", "arch": "crystal_lamp", "kind": "light" },
+        { "key": "desk", "name": "Rune-carved desk", "arch": "desk" },
+        { "key": "throne", "name": "Crystal throne", "arch": "throne", "variant": "crystal" },
+        { "key": "chimetree", "name": "Chime tree", "arch": "chimes", "variant": "tree" },
+        { "key": "globe", "name": "Star globe", "arch": "globe" },
+        { "key": "alcove", "name": "Reading alcove", "arch": "alcove", "extra": { "linen": 4 } },
+        { "key": "rug", "name": "Geode sanctum rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "rime_lodge": [
+        { "key": "bed", "name": "Fur bed", "arch": "bed", "kind": "bed", "variant": "fur", "extra": { "hide": 6 } },
+        { "key": "chandelier", "name": "Antler chandelier", "arch": "chandelier", "kind": "light" },
+        { "key": "bench", "name": "Carved bench", "arch": "bench", "variant": "carved" },
+        { "key": "seat", "name": "Ice-clear window seat", "arch": "window_seat" },
+        { "key": "rug", "name": "Wolf-pelt rug", "arch": "pelt_rug", "extra": { "hide": 4 } },
+        { "key": "bath", "name": "Hot spring bath", "arch": "bath", "needs": "vent", "extra": { "stone": 20 } },
+        { "key": "tapestry", "name": "Rime lodge wall hanging", "arch": "tapestry", "extra": { "linen": 6 } }
+      ],
+      "stilt_house": [
+        { "key": "cauldron", "name": "Witch's cauldron hearth", "arch": "cauldron", "kind": "light" },
+        { "key": "chimes", "name": "Bone chimes", "arch": "chimes", "variant": "bone" },
+        { "key": "bed", "name": "Moss bed", "arch": "bed", "kind": "bed", "variant": "moss" },
+        { "key": "lamp", "name": "Lantern-toad lamp", "arch": "toad_lamp", "kind": "light" },
+        { "key": "stool", "name": "Carved stool", "arch": "stool" },
+        { "key": "shelf", "name": "Reliquary shelf", "arch": "shelf", "variant": "reliquary" },
+        { "key": "rug", "name": "Stilt house rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "coral_keep": [
+        { "key": "basin", "name": "Shell basin", "arch": "fountain", "variant": "shell" },
+        { "key": "hammock", "name": "Net hammock", "arch": "hammock", "kind": "bed", "extra": { "fiber": 10 } },
+        { "key": "lamp", "name": "Pearl lamp", "arch": "lamp_stand", "variant": "pearl", "kind": "light" },
+        { "key": "table", "name": "Ship's wheel table", "arch": "wheel_table" },
+        { "key": "aquarium", "name": "Aquarium", "arch": "aquarium" },
+        { "key": "throne", "name": "Coral throne", "arch": "throne", "variant": "coral" },
+        { "key": "rug", "name": "Coral keep rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "mourning_chapel": [
+        { "key": "candles", "name": "Candle rack", "arch": "candle_rack", "kind": "light" },
+        { "key": "pew", "name": "Carved pew", "arch": "pew" },
+        { "key": "lectern", "name": "Lectern", "arch": "lectern" },
+        { "key": "ossuary", "name": "Ossuary shelf", "arch": "shelf", "variant": "ossuary" },
+        { "key": "bell", "name": "Bell", "arch": "bell" },
+        { "key": "chaise", "name": "Velvet chaise", "arch": "divan", "variant": "chaise", "extra": { "linen": 6 } },
+        { "key": "rug", "name": "Mourning chapel rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "mycelium_den": [
+        { "key": "lamp", "name": "Glowcap lamp", "arch": "glowcap", "kind": "light" },
+        { "key": "hammock", "name": "Spore-silk hammock", "arch": "hammock", "kind": "bed", "variant": "silk", "extra": { "linen": 4 } },
+        { "key": "table", "name": "Stump table", "arch": "stump_table" },
+        { "key": "seats", "name": "Puffball seats", "arch": "puffballs" },
+        { "key": "bath", "name": "Moss bath", "arch": "bath", "variant": "moss" },
+        { "key": "jar", "name": "Lantern grub jar", "arch": "grub_jar", "kind": "light" },
+        { "key": "rug", "name": "Mycelium den rug", "arch": "rug", "extra": { "linen": 4 } }
+      ],
+      "hollow_bastion": [
+        { "key": "throne", "name": "Null throne", "arch": "throne", "variant": "null" },
+        { "key": "table", "name": "Floating rubble table", "arch": "rubble_table" },
+        { "key": "lamp", "name": "Rift lamp", "arch": "lamp_float", "variant": "rift", "kind": "light" },
+        { "key": "mirror", "name": "Black mirror", "arch": "mirror", "variant": "black" },
+        { "key": "crown", "name": "Broken crown stand", "arch": "crown_stand" },
+        { "key": "bell", "name": "Silence bell", "arch": "bell", "variant": "silence" },
+        { "key": "rug", "name": "Hollow bastion rug", "arch": "rug", "extra": { "linen": 4 } }
+      ]
+    }
+  }
+}

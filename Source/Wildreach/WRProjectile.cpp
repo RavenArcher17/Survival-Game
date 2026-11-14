@@ -1,4 +1,6 @@
 #include "WRProjectile.h"
+#include "WRBuilding.h"
+#include "WRTurret.h"
 #include "Wildreach.h"
 #include "GameFramework/PlayerState.h"
 #include "WRBoss.h"
@@ -264,7 +266,9 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		Destroy();
 		return;
 	}
-	if (Target && (!Caster || Caster->IsHostileTo(Target)))
+	// A turret's shot (build-building) hurts only what that turret may shoot at: never its builder, their clan or tames.
+	const AWRBuildPiece* FromTurret = Cast<AWRBuildPiece>(Hit.Instigator);
+	if (Target && (FromTurret ? UWRTurretSubsystem::MayHit(FromTurret, Target) : (!Caster || Caster->IsHostileTo(Target))))
 	{
 		Hit.Origin = GetActorLocation() - GetVelocity().GetSafeNormal() * 100.f;
 		Hit.bProjectile = true;  // never parried (COMBAT-AND-LESSONS 1.3)

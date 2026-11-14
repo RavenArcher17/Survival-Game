@@ -8,7 +8,9 @@ class USceneComponent;
 class UStaticMeshComponent;
 
 /** What a detail block is made of: the building materials' planks or stone, or a flat cloth / soil colour. */
-enum class EWRLookMat : uint8 { Wood, Stone, Cloth, Trim };
+enum class EWRLookMat : uint8 { Wood, Stone, Cloth, Trim, Tinted };
+/** A tinted block's surface (M_BuildTinted custom data 9): mottled stone, wood grain, brushed metal, smooth (glass, glaze). */
+namespace WRLookPattern { constexpr float Mottle = 0.f, Grain = 1.f, Brushed = 2.f, Smooth = 3.f; }
 /** Engine shapes the blocks use (one instanced component per shape and material). */
 enum class EWRLookMesh : uint8 { Cube, Cylinder, Cone };
 
@@ -24,6 +26,12 @@ struct FWRLookBlock
 	float Tone = 0.5f;
 	float Axis = 0.f;
 	float Dim = 1.f;
+	/** Tinted blocks (metal, the biome sets, their furniture): colour (linear), metalness, roughness, glow and pattern. */
+	FLinearColor Color = FLinearColor::White;
+	float Metal = 0.f;
+	float Rough = 0.85f;
+	float Glow = 0.f;
+	float Pattern = 0.f;
 };
 
 /**
@@ -67,6 +75,20 @@ struct WILDREACH_API FWRBuildLook
 	static class UBoxComponent* FitCollision(AActor* Owner, UPrimitiveComponent* Plain, const FWRPieceDef& Def, float BottomZ);
 	/** How far above its piece (the ground) a station, Hearth or totem actor stands (AWRBuildPiece::SpawnChild). */
 	static constexpr float ChildLift = 50.f;
+	/** Metal and the 12 biome sets' structure shapes, every tier's beams and posts (WRBuildLookSets.cpp); empty: not one. */
+	static TArray<FWRLookBlock> TierBlocks(const FWRPieceDef& Def, const FTransform& PieceToWorld);
+	/** A tier's door leaf (WRBuildLookSets.cpp), in the leaf's space as LeafBlocks. */
+	static TArray<FWRLookBlock> TierLeafBlocks(const FWRPieceDef& Def, const FVector& LeafSize, const FTransform& PieceToWorld);
+	/** Furniture with a model (pieces with "arch": the comfort decor and the 12 sets', WRBuildLookDecor.cpp). */
+	static TArray<FWRLookBlock> DecorBlocks(const FWRPieceDef& Def, const FTransform& PieceToWorld);
+	/** What a modelled piece of furniture collides as: boxes (size, centre) in its own space. */
+	static TArray<TPair<FVector, FVector>> DecorCollision(const FWRPieceDef& Def);
+	/** Where a modelled lamp's light sits (its flame, crystal or glow), in its own space. */
+	static FVector DecorLightAt(const FWRPieceDef& Def);
+	/** A freeform beam / post / brace's solid box in its own space (it runs along +X from its start). */
+	static FBox BeamBox(const FWRPieceDef& Def);
+	/** The card picture's colour of a tier (its main surface, sRGB-ish for Slate). */
+	static FLinearColor TierCardColor(FName Tier);
 	/** The def that carries a station type's look (pieces.json entries with "station"). */
 	static const FWRPieceDef* StationDef(FName StationType);
 	/** The first def of a kind ("hearth", "totem"). */

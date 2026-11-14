@@ -2,6 +2,8 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRBuildSets.h"
+#include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBeds.h"
@@ -555,7 +557,9 @@ void UWRLightSubsystem::Refresh()
 		if (!Def || (Def->Kind != TEXT("light") && LightRadius(Def->Id) <= 0.f)) continue;
 		// Machines (coil lamps, greenhouse lights) light only while their power has them lit.
 		if (Def->Kind == TEXT("machine") && !(It->Machine.Flags & WRMachineFlag::Lit)) continue;
-		Sources.Add({ *It, LightRadius(Def->Id), LightFlag(Def->Id, TEXT("ward")), false });
+		// A modelled lamp with no row of its own (a set's lamps, the candles): lights.decor_lamp (build-building).
+		const FName Row = LightRadius(Def->Id) > 0.f ? Def->Id : FName(TEXT("decor_lamp"));
+		Sources.Add({ *It, LightRadius(Row), LightFlag(Row, TEXT("ward")), false });
 	}
 	for (TActorIterator<AWRHearth> It(World); It; ++It)
 	{
@@ -759,7 +763,7 @@ FString UWRSurvivalComponent::TryStartSleep(AWRBuildPiece* Bed)
 	}
 
 	// Comfort is counted as you lie down (the room you chose).
-	SleepComfort = FWRComfort::At(Bed);
+	SleepComfort = FWRComfort::At(Bed, UWRLifeSkillsComponent::StatFor(Pawn, TEXT("comfortBonus")));
 	SleepBed = Bed;
 	SleepHealth = Attr ? Attr->GetHealth() : 0.f;
 	SleepStartedAt = UWRWeatherSubsystem::Now(this);
@@ -823,7 +827,7 @@ void UWRSurvivalComponent::FinishSleep(AWRCharacterBase* Pawn)
 	}
 	Corruption *= WRTune(TEXT("corruption.restKeeps"), 0.5f);
 	const float Base = bRoll ? WRTune(TEXT("rested.bedrollMinutes"), 10.f) : WRTune(TEXT("rested.bedMinutes"), 20.f);
-	const int32 Comfort = FMath::Clamp(SleepComfort, 0, FMath::RoundToInt(WRTune(TEXT("comfort.cap"), 20.f)));
+	const int32 Comfort = FMath::Clamp(SleepComfort, 0, FWRComfort::Cap(UWRLifeSkillsComponent::StatFor(Pawn, TEXT("comfortBonus"))));
 	RestedMinutes = FMath::RoundToInt(Base + Comfort * WRTune(TEXT("rested.perComfort"), 1.f));
 	RestedUntil = UWRWeatherSubsystem::Now(this) + RestedMinutes * 60.f;
 	ComfortHere = Comfort;
@@ -860,7 +864,12 @@ void UWRSurvivalComponent::OnRep_Sleeping()
 
 // ---------------------------------------------------------------- comfort
 
-int32 FWRComfort::At(const AActor* Bed)
+int32 FWRComfort::Cap(float Decorator)
+{
+	return FMath::RoundToInt(Decorator > 0.f ? WRTune(TEXT("comfort.decoratorCap"), 23.f) : WRTune(TEXT("comfort.cap"), 20.f));
+}
+
+int32 FWRComfort::At(const AActor* Bed, float Decorator)
 {
 	const UWorld* World = Bed ? Bed->GetWorld() : nullptr;
 	if (!World)
@@ -898,7 +907,10 @@ int32 FWRComfort::At(const AActor* Bed)
 	}
 	int32 Total = FMath::Min(Trophies.Num(), FMath::RoundToInt(WRTune(TEXT("comfort.trophyMax"), 3.f)));
 	for (const TPair<FName, int32>& G : Best) Total += G.Value;
-	return FMath::Clamp(Total, 0, FMath::RoundToInt(WRTune(TEXT("comfort.cap"), 20.f)));
+	// A new Hearth fed its first meal warms every bed in its claim; the Decorator perk adds its own.
+	Total += FWRBuildSets::OfferingComfort(Bed, Bed->GetActorLocation());
+	Total += FMath::RoundToInt(Decorator);
+	return FMath::Clamp(Total, 0, Cap(Decorator));
 }
 
 void UWRSurvivalComponent::TickComfort(AWRCharacterBase* Pawn)
@@ -915,7 +927,7 @@ void UWRSurvivalComponent::TickComfort(AWRCharacterBase* Pawn)
 		const float D = FVector::Dist(It->GetActorLocation(), Pawn->GetActorLocation());
 		if (D < Best) { Best = D; Nearest = *It; }
 	}
-	ComfortHere = Nearest ? FWRComfort::At(Nearest) : -1;
+	ComfortHere = Nearest ? FWRComfort::At(Nearest, UWRLifeSkillsComponent::StatFor(Pawn, TEXT("comfortBonus"))) : -1;
 }
 
 // ---------------------------------------------------------------- weather on the player

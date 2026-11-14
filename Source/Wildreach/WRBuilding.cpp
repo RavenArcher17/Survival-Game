@@ -17,6 +17,8 @@
 #include "WRFx.h"
 #include "WRMachine.h"
 #include "WRMachineLook.h"
+#include "WRBuildIntegrity.h"
+#include "WRBuildSets.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -126,9 +128,18 @@ FWRBuildRegistry::FWRBuildRegistry()
 			if (O->TryGetStringField(TEXT("trophy"), S)) D.Trophy = FName(*S);
 			O->TryGetStringField(TEXT("note"), D.Note);
 			if (O->TryGetStringField(TEXT("liveWith"), S)) D.LiveWith = FName(*S);
+			// Modelled furniture (WRBuildLookDecor) and its rules (build-building).
+			if (O->TryGetStringField(TEXT("arch"), S)) D.Arch = FName(*S);
+			if (O->TryGetStringField(TEXT("variant"), S)) D.Variant = FName(*S);
+			if (O->TryGetStringField(TEXT("needsPlace"), S)) D.Needs = FName(*S);
+			if (O->TryGetStringField(TEXT("blueprint"), S)) D.Blueprint = FName(*S);
+			if (O->TryGetStringField(TEXT("tier"), S)) D.Tier = FName(*S);
 			Pieces.Add(D);
 		}
 	}
+	for (const TPair<FName, float>& U : UpkeepPerPiecePerHour) UpkeepItem.Add(U.Key, U.Key);   // wood and stone pay in themselves
+	// Metal, the 12 biome sets, every tier's beams and posts, the sets' decor (Data/building_sets.json).
+	FWRBuildSets::Expand(Pieces, Span, UpkeepPerPiecePerHour, UpkeepItem);
 	UE_LOG(LogWildreach, Log, TEXT("Loaded %d buildable pieces"), Pieces.Num());
 }
 
@@ -284,7 +295,9 @@ TMap<FName, float> FWRBuildRules::UpkeepPerHour(const TMap<FName, int32>& Pieces
 	TMap<FName, float> Out;
 	for (const TPair<FName, int32>& P : PiecesByMaterial)
 	{
-		Out.FindOrAdd(P.Key) += P.Value * FWRBuildRegistry::Get().UpkeepPerPiecePerHour.FindRef(P.Key);
+		const FWRBuildRegistry& Reg = FWRBuildRegistry::Get();
+		const float Rate = Reg.UpkeepPerPiecePerHour.FindRef(P.Key);
+		if (Rate > 0.f) Out.FindOrAdd(Reg.UpkeepItemFor(P.Key)) += P.Value * Rate;
 	}
 	return Out;
 }
@@ -354,6 +367,7 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, CustomName);
 	DOREPLIFETIME(AWRBuildPiece, UnlockedFor);
 	DOREPLIFETIME(AWRBuildPiece, Machine);
+	DOREPLIFETIME(AWRBuildPiece, Turret);
 	DOREPLIFETIME(AWRBuildPiece, Belt);
 }
 
@@ -570,6 +584,17 @@ void AWRBuildPiece::ApplyLook()
 		const float Hub = (Def->Id == TEXT("water_wheel") || Def->Id == TEXT("tide_mill")) && !bGhost ? FWRMachines::HubZ(this, *Def, GetActorTransform()) : 150.f;
 		for (const TPair<FVector, FVector>& B : FWRMachineLook::CollisionBoxes(*Def, Hub)) Parts.Add({ B.Key, B.Value });
 	}
+	// Freeform beams, posts and braces: one timber / steel / stone member along +X from where it was placed.
+	else if (Def->IsBeam())
+	{
+		const FBox Box = FWRBuildLook::BeamBox(*Def);
+		Parts.Add({ Box.GetSize(), Box.GetCenter() });
+	}
+	// Modelled furniture (the comfort decor, the biome sets'): it collides as its model's boxes.
+	else if (!Def->Arch.IsNone())
+	{
+		for (const TPair<FVector, FVector>& B : FWRBuildLook::DecorCollision(*Def)) Parts.Add({ B.Key, B.Value });
+	}
 	// A deep slab: the top is the floor (100 above the piece), the rest sinks into the ground so slopes don't show a gap.
 	else if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 250), FVector(0, 0, -25) });
 	else if (S == TEXT("wall")) Parts.Add({ FVector(Len, 20, 300), FVector(0, 0, 150) });
@@ -697,6 +722,10 @@ void AWRBuildPiece::ApplyLook()
 	else if (Def->Id == TEXT("trophy_mount")) Parts.Add({ FVector(74, 8, 74), FVector(0, -7, 150) });
 
 	FLinearColor Color = Def->Material == TEXT("stone") ? FLinearColor(0.45f, 0.45f, 0.47f) : FLinearColor(0.42f, 0.27f, 0.13f);
+	if (const FWRTierDef* Tier = FWRBuildSets::Get().Tier(Def->Tier); Tier && Tier->Look.Style != TEXT("wood") && Tier->Look.Style != TEXT("stone"))
+	{
+		Color = Tier->Look.A;   // the ghost of a metal or biome piece in its own colour
+	}
 	if (K == TEXT("crop")) Color = FLinearColor(0.25f, 0.16f, 0.08f);
 	if (Def->Id == TEXT("rug") || Def->Id == TEXT("banner")) Color = FLinearColor(0.5f, 0.1f, 0.1f);
 	// Built pieces wear world-aligned planks or stone blocks (Tools/make_build_materials.py); ghosts stay a flat tint.
@@ -787,7 +816,12 @@ void AWRBuildPiece::ApplyLook()
 	if (K == TEXT("light"))
 	{
 		Light->SetVisibility(!bGhost);
-		Light->SetRelativeLocation(FVector(0.f, 0.f, Def->Id == TEXT("brazier") ? 100.f : 160.f));
+		Light->SetRelativeLocation(!Def->Arch.IsNone() ? FWRBuildLook::DecorLightAt(*Def) : FVector(0.f, 0.f, Def->Id == TEXT("brazier") ? 100.f : 160.f));
+		// A set's lamp shines in its land's colour (crystal violet, rift purple, gill green); fire stays firelight.
+		const FWRTierDef* Tier = FWRBuildSets::Get().Tier(Def->Tier);
+		const bool bFire = Def->Arch == TEXT("fireplace") || Def->Arch == TEXT("candle_rack") || Def->Arch == TEXT("cauldron") || Def->Arch == TEXT("chandelier")
+			|| Def->Arch == TEXT("lantern_hang") || Def->Arch == TEXT("candles") || Def->Arch == TEXT("lantern");
+		if (Tier && !bFire && Tier->Look.Glow.GetLuminance() > 0.01f) Light->SetLightColor(Tier->Look.Glow);
 	}
 
 	// Built pieces, where they're drawn, get their real shape. So does a ghost, all in its tint: you see what you're placing.
@@ -1041,6 +1075,8 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	}
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
+		// A new Hearth's first meal (survival-crafting 2.2): a cooked dish left on it in its first day.
+		if (const FString Offered = FWRBuildSets::TryOffer(this, Player); !Offered.IsEmpty()) return Offered;
 		return Hearth->DepositCores(Player);
 	}
 	if (AWRClaimTotem* Totem = Cast<AWRClaimTotem>(ChildActor.Get()))
@@ -1050,13 +1086,14 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	return Def->Name;
 }
 
-int32 AWRBuildPiece::SupportAt(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore)
+int32 AWRBuildPiece::SupportAt(UWorld* World, FName PieceId, const FTransform& At, const AWRBuildPiece* Ignore)
 {
 	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PieceId);
-	if (!Def || !Def->Snaps())
+	if (!Def || !Def->IsStructural())
 	{
 		return 0;
 	}
+	const FVector Location = At.GetLocation();
 	static const FName GroundShapes[] = { TEXT("foundation"), TEXT("pillar"), TEXT("palisade"), TEXT("tower"), TEXT("gate") };
 	bool bGroundShape = false;
 	for (const FName& G : GroundShapes) bGroundShape |= Def->Shape == G;
@@ -1076,22 +1113,27 @@ int32 AWRBuildPiece::SupportAt(UWorld* World, FName PieceId, const FVector& Loca
 			Query.AddIgnoredActor(H.GetActor());
 		}
 	}
-	const float Grid = FWRBuildRegistry::Get().GridSize;
 	int32 Best = TNumericLimits<int32>::Max();
+	// A beam or post with an end on the ground: its own reach from there (a post standing up: 0, like a pillar).
+	if (Def->IsBeam() && FWRIntegrity::BeamGrounded(World, *Def, At, Ignore))
+	{
+		Best = FWRIntegrity::LengthSteps(*Def, At);
+	}
 	for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
 	{
 		const FWRPieceDef* Other = It->GetDef();
-		if (*It == Ignore || It->bGhost || !Other || !Other->Snaps() || It->IsActorBeingDestroyed())
+		if (*It == Ignore || It->bGhost || !Other || !Other->IsStructural() || It->IsActorBeingDestroyed())
 		{
 			continue;
 		}
-		const int32 Cost = FWRBuildRules::SupportCost(It->GetActorLocation(), Other->Shape, Location, Grid);
+		if (FVector::DistSquared(It->GetActorLocation(), Location) > 1200.f * 1200.f) continue;
+		const int32 Cost = FWRIntegrity::LinkCost(*Other, It->GetActorTransform(), *Def, At);
 		if (Cost != INDEX_NONE && It->Support < TNumericLimits<int32>::Max())
 		{
 			Best = FMath::Min(Best, It->Support + Cost);
 		}
 	}
-	return Best <= FWRBuildRules::SpanFor(Def->Material) ? Best : INDEX_NONE;
+	return Best <= FWRIntegrity::Allowed(World, *Def, At, Ignore) ? Best : INDEX_NONE;
 }
 
 FString AWRBuildPiece::Blocked(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore)
@@ -1133,42 +1175,61 @@ void AWRBuildPiece::RecomputeSupport(UWorld* World, const FVector& Around, float
 	for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
 	{
 		const FWRPieceDef* Def = It->GetDef();
-		if (Def && Def->Snaps() && !It->bGhost && !It->IsActorBeingDestroyed() && FVector::Dist(It->GetActorLocation(), Around) <= Radius)
+		if (Def && Def->IsStructural() && !It->bGhost && !It->IsActorBeingDestroyed() && FVector::Dist(It->GetActorLocation(), Around) <= Radius)
 		{
 			It->Support = TNumericLimits<int32>::Max();
 			Pieces.Add(*It);
 		}
 	}
-	// Seed grounded pieces, then relax until nothing changes.
+	// Seed what stands on the ground (a beam on the ground starts at its own reach), then relax until nothing changes.
 	for (AWRBuildPiece* P : Pieces)
 	{
-		if (SupportAt(World, P->PieceId, P->GetActorLocation(), P) == 0) P->Support = 0;
+		const FWRPieceDef* Def = P->GetDef();
+		if (Def->IsBeam())
+		{
+			if (FWRIntegrity::BeamGrounded(World, *Def, P->GetActorTransform(), P)) P->Support = FWRIntegrity::LengthSteps(*Def, P->GetActorTransform());
+		}
+		else if (SupportAt(World, P->PieceId, P->GetActorTransform(), P) == 0) P->Support = 0;
+	}
+	// What each piece may bear on (pairs that touch), found once.
+	TArray<TArray<TPair<int32, int32>>> Links;
+	Links.SetNum(Pieces.Num());
+	for (int32 i = 0; i < Pieces.Num(); ++i)
+	{
+		const FWRPieceDef* PD = Pieces[i]->GetDef();
+		const FTransform PT = Pieces[i]->GetActorTransform();
+		for (int32 j = 0; j < Pieces.Num(); ++j)
+		{
+			if (i == j || FVector::DistSquared(Pieces[i]->GetActorLocation(), Pieces[j]->GetActorLocation()) > 1200.f * 1200.f) continue;
+			const int32 Cost = FWRIntegrity::LinkCost(*Pieces[j]->GetDef(), Pieces[j]->GetActorTransform(), *PD, PT);
+			if (Cost != INDEX_NONE) Links[i].Add({ j, Cost });
+		}
 	}
 	bool bChanged = true;
-	for (int32 Iter = 0; bChanged && Iter < 32; ++Iter)
+	for (int32 Iter = 0; bChanged && Iter < 48; ++Iter)
 	{
 		bChanged = false;
-		for (AWRBuildPiece* P : Pieces)
+		for (int32 i = 0; i < Pieces.Num(); ++i)
 		{
+			AWRBuildPiece* P = Pieces[i];
 			if (P->Support == 0) continue;
-			const float Grid = FWRBuildRegistry::Get().GridSize;
-			for (AWRBuildPiece* N : Pieces)
+			for (const TPair<int32, int32>& L : Links[i])
 			{
-				const int32 Cost = N == P ? INDEX_NONE : FWRBuildRules::SupportCost(N->GetActorLocation(), N->GetDef()->Shape, P->GetActorLocation(), Grid);
-				if (Cost != INDEX_NONE && N->Support < TNumericLimits<int32>::Max() && N->Support + Cost < P->Support)
+				const AWRBuildPiece* N = Pieces[L.Key];
+				if (N->Support < TNumericLimits<int32>::Max() && N->Support + L.Value < P->Support)
 				{
-					P->Support = N->Support + Cost;
+					P->Support = N->Support + L.Value;
 					bChanged = true;
 				}
 			}
 		}
 	}
+	// What's out past its span falls (rubble, dust and a crack: FWRIntegrity::Collapse).
 	for (AWRBuildPiece* P : Pieces)
 	{
-		if (P->Support > FWRBuildRules::SpanFor(P->GetDef()->Material))
+		if (P->Support > FWRIntegrity::Allowed(World, *P->GetDef(), P->GetActorTransform(), P))
 		{
-			UE_LOG(LogWildreach, Log, TEXT("BUILD %s collapsed (no support)"), *P->GetName());
-			P->Destroy();
+			FWRIntegrity::Collapse(P);
 		}
 	}
 }
@@ -1183,6 +1244,9 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	O->SetNumberField(TEXT("y"), L.Y);
 	O->SetNumberField(TEXT("z"), L.Z);
 	O->SetNumberField(TEXT("yaw"), GetActorRotation().Yaw);
+	if (!FMath::IsNearlyZero(GetActorRotation().Pitch)) O->SetNumberField(TEXT("pitch"), GetActorRotation().Pitch);   // beams, braces
+	if (PlacedHours >= 0.0) O->SetNumberField(TEXT("placedHours"), PlacedHours);
+	if (!Offering.IsNone()) O->SetStringField(TEXT("offering"), Offering.ToString());
 	O->SetNumberField(TEXT("hp"), Health);
 	O->SetNumberField(TEXT("maxHp"), MaxHealth);   // a builder's perks can raise it over the piece's own
 	O->SetStringField(TEXT("code"), LockCode);
@@ -1275,6 +1339,9 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 		MaxHealth = SavedMax;
 	}
 	LockCode = O->GetStringField(TEXT("code"));
+	O->TryGetNumberField(TEXT("placedHours"), PlacedHours);
+	FString OfferingStr;
+	if (O->TryGetStringField(TEXT("offering"), OfferingStr)) Offering = FName(*OfferingStr);
 	FWRMachines::FromJson(this, O);
 	O->TryGetStringField(TEXT("name"), CustomName);
 	O->TryGetBoolField(TEXT("locked"), bLocked);
@@ -1429,7 +1496,7 @@ TMap<FName, float> AWRClaimTotem::CurrentUpkeepPerHour() const
 	{
 		const FWRPieceDef* Def = It->GetDef();
 		if (Def && !It->bGhost && It->OwnerName == OwnerName && FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) <= Radius
-			&& (Def->Material == TEXT("wood") || Def->Material == TEXT("stone")))
+			&& FWRBuildRegistry::Get().UpkeepPerPiecePerHour.Contains(Def->Material))
 		{
 			ByMaterial.FindOrAdd(Def->Material)++;
 		}
@@ -1508,7 +1575,10 @@ FString AWRClaimTotem::Deposit(AWRPlayerController* Player)
 		return FString();
 	}
 	int32 Moved = 0;
-	for (const FName Mat : { FName(TEXT("wood")), FName(TEXT("stone")) })
+	// Everything a claim pays upkeep in: wood, stone, steel plate, the biome blocks.
+	TArray<FName> Items;
+	for (const TPair<FName, FName>& U : FWRBuildRegistry::Get().UpkeepItem) Items.AddUnique(U.Value);
+	for (const FName Mat : Items)
 	{
 		const int32 Have = PS->GetInventory()->CountOf(Mat);
 		const int32 Left = FWRInventoryRules::Add(UpkeepStorage, Mat, Have);

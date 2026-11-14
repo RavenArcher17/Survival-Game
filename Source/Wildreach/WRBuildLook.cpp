@@ -35,6 +35,8 @@ namespace WRBuildLookDetail
 		static UMaterialInterface* Wood = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
 		static UMaterialInterface* Stone = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
 		static UMaterialInterface* Shape = Rooted<UMaterialInterface>(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		static UMaterialInterface* Tinted = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+		if (Mat == EWRLookMat::Tinted) return Tinted ? Tinted : Shape;
 		return Mat == EWRLookMat::Wood ? Wood : Mat == EWRLookMat::Stone ? Stone : Shape;   // cloth and trim: flat colours
 	}
 
@@ -914,6 +916,13 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 	const FName K = Def.Kind;
 	const bool bStone = Def.Material == TEXT("stone");
 	const float Len = S == TEXT("palisade") || S == TEXT("gate") ? 440.f : 420.f;
+	// Metal, the biome sets and every tier's beams (WRBuildLookSets), modelled furniture (WRBuildLookDecor).
+	if (!Def.Tier.IsNone() && Def.Arch.IsNone())
+	{
+		TArray<FWRLookBlock> Tier = TierBlocks(Def, PieceToWorld);
+		if (Tier.Num() > 0) return Tier;
+	}
+	if (!Def.Arch.IsNone()) return DecorBlocks(Def, PieceToWorld);
 	if (FarmBlocks(B, Def)) {}
 	else if (S == TEXT("foundation")) bStone ? B.StoneFoundation() : B.WoodFoundation();
 	else if (S == TEXT("wall")) bStone ? B.StoneWall(300.f) : B.WoodWall(300.f);
@@ -1065,6 +1074,11 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 TArray<FWRLookBlock> FWRBuildLook::LeafBlocks(const FWRPieceDef& Def, const FVector& LeafSize, const FTransform& PieceToWorld)
 {
 	using namespace WRBuildLookDetail;
+	if (!Def.Tier.IsNone())
+	{
+		TArray<FWRLookBlock> Tier = TierLeafBlocks(Def, LeafSize, PieceToWorld);
+		if (Tier.Num() > 0) return Tier;
+	}
 	TArray<FWRLookBlock> Out;
 	const FTransform LeafToWorld = FTransform(FVector(0.f, 0.f, LeafSize.Z * 0.5f)) * PieceToWorld;
 	FBuilder B(LeafToWorld, Out);
@@ -1126,7 +1140,7 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Part->SetGenerateOverlapEvents(false);
 		Part->SetCanEverAffectNavigation(false);
-		Part->SetNumCustomDataFloats(3);
+		Part->SetNumCustomDataFloats(Mat == EWRLookMat::Tinted ? 10 : 3);
 		if (Mat == EWRLookMat::Cloth || Mat == EWRLookMat::Trim)
 		{
 			UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(MaterialFor(Mat), Owner);
@@ -1147,7 +1161,15 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 		Part->AddInstances(Transforms, false, false, false);
 		for (int32 i = 0; i < G.Value.Num(); ++i)
 		{
-			const float Data[3] = { G.Value[i]->Tone, G.Value[i]->Axis, G.Value[i]->Dim };
+			const FWRLookBlock& Bl = *G.Value[i];
+			if (Mat == EWRLookMat::Tinted)
+			{
+				// M_BuildTinted: shade, axis, brightness, colour, metallic, roughness, glow, pattern.
+				const float Data[10] = { Bl.Tone, Bl.Axis, Bl.Dim, Bl.Color.R, Bl.Color.G, Bl.Color.B, Bl.Metal, Bl.Rough, Bl.Glow, Bl.Pattern };
+				Part->SetCustomData(i, Data, i == G.Value.Num() - 1);
+				continue;
+			}
+			const float Data[3] = { Bl.Tone, Bl.Axis, Bl.Dim };
 			Part->SetCustomData(i, Data, i == G.Value.Num() - 1);
 		}
 		++Made;

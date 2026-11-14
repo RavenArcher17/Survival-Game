@@ -1,4 +1,5 @@
 #include "WRWorldDressing.h"
+#include "WRBuildSets.h"
 #include "WRFarm.h"
 #include "WRSurvival.h"
 #include "Algo/Sort.h"
@@ -917,6 +918,20 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 	if (++Taken >= HitsTotal)
 	{
 		HitsTaken.Remove(Key);
+		// Ancient wood (Woodcutting 100, build-building): a felled tree now and then gives a block of its land's building set.
+		if (HK.Group == TEXT("tree"))
+		{
+			const float Chance = UWRLifeSkillsComponent::StatFor(Who, TEXT("ancientWood"));
+			const FName Land = WRBiome::At(this, HK.Ground[BestIndex]);
+			for (const FWRTierDef& T : FWRBuildSets::Get().All())
+			{
+				if (Chance > 0.f && T.Biome == Land && !T.Block.IsNone() && FMath::FRand() < Chance)
+				{
+					Inventory->AddItem(T.Block, 1);
+					break;
+				}
+			}
+		}
 		const UWRDressingSubsystem* Sub = GetWorld()->GetSubsystem<UWRDressingSubsystem>();
 		if (AWRHarvestLedger* Ledger = Sub ? Sub->GetLedger() : nullptr)
 		{

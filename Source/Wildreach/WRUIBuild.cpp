@@ -12,6 +12,9 @@
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRBuilding.h"
+#include "WRBuildSets.h"
+#include "WRSurvival.h"
+#include "WRGear.h"
 #include "WRBuildLook.h"
 #include "WRFarm.h"
 #include "WRInventory.h"
@@ -91,6 +94,7 @@ namespace WRBuildUI
 			{ TEXT("floors"), LOCTEXT("TabFloors", "Floors & roofs") },
 			{ TEXT("doors"), LOCTEXT("TabDoors", "Doors & windows") },
 			{ TEXT("stairs"), LOCTEXT("TabStairs", "Stairs") },
+			{ TEXT("beams"), LOCTEXT("TabBeams", "Beams & posts") },
 			{ TEXT("stations"), LOCTEXT("TabStations", "Stations") },
 			{ TEXT("farm"), LOCTEXT("TabFarm", "Farm & kitchen") },
 			{ TEXT("machines"), LOCTEXT("TabMachines", "Machines & power") },
@@ -115,6 +119,7 @@ namespace WRBuildUI
 			return TEXT("machines");
 		}
 		if (D.Category == TEXT("defense")) return TEXT("defense");
+		if (D.IsBeam()) return TEXT("beams");
 		if (S == TEXT("foundation") || S == TEXT("pillar")) return TEXT("foundations");
 		if (S == TEXT("wall") || S == TEXT("halfwall") || S == TEXT("upperwall")) return TEXT("walls");
 		if (S == TEXT("floor") || S == TEXT("roof") || S == TEXT("gable")) return TEXT("floors");
@@ -159,7 +164,18 @@ namespace WRBuildUI
 		{
 			return D.HearthLevel > 1 ? FString::Printf(TEXT("%s Needs a Hearth of level %d (one of yours, anywhere)."), *D.Note, D.HearthLevel) : D.Note;
 		}
-		const FString Span = FString::Printf(TEXT(" Needs support: %s spans %d pieces from the ground."), *D.Material.ToString(), FWRBuildRules::SpanFor(D.Material));
+		const FWRTierDef* TierDef = FWRBuildSets::Get().Tier(D.Tier);
+		const FString MatName = TierDef ? TierDef->Name.ToLower() : D.Material.ToString();
+		const FString Span = FString::Printf(TEXT(" Needs support: %s spans %d pieces from the ground."), *MatName, FWRBuildRules::SpanFor(D.Material));
+		if (D.IsBeam())
+		{
+			const FString Base = D.Shape == TEXT("post") ? TEXT("A 3 m post: stands straight up from where you aim (aimed under a floor, its top meets it) and bears like a pillar.")
+				: D.Shape == TEXT("brace") ? TEXT("A 45-degree brace: from a wall to a pillar or post it lets that wall reach one piece further.")
+				: FString::Printf(TEXT("A %.0f m beam: starts where you aim (on a wall it runs out toward you) and slopes as you look; it holds what rests on it."), D.FreeLength / 100.f);
+			return Base + FString::Printf(TEXT(" Each 2 m it reaches out costs a step of %s's span (%d)."), *MatName, FWRBuildRules::SpanFor(D.Material));
+		}
+		if (TierDef && TierDef->IsBiome() && S == TEXT("foundation")) return FString::Printf(TEXT("%s: the base for walls, floors and stairs, in %s. Its pieces pay upkeep in %s."), *TierDef->Name, *WRBiome::Name(TierDef->Biome), *ItemName(TierDef->Block));
+		if (TierDef && TierDef->Id == TEXT("metal") && S == TEXT("foundation")) return TEXT("Steel on a stone footing: the base for walls, floors and stairs. Metal pieces pay upkeep in steel plate.");
 		if (S == TEXT("foundation")) return TEXT("The base for walls, floors and stairs. Lines up with the foundations beside it.");
 		if (S == TEXT("pillar")) return TEXT("Stands on a cell corner and carries what's stacked on it at no span cost.");
 		if (S == TEXT("wall")) return TEXT("Stands on a cell edge: on a foundation, a floor or another wall.") + Span;
@@ -202,6 +218,8 @@ namespace WRBuildUI
 		if (D.Station == TEXT("salting_barrel")) return TEXT("Packs meat and fish in salt: salted food keeps a day.");
 		if (D.Station == TEXT("drying_rack")) return TEXT("Dries strips of meat, fish and fruit in the open air: they keep three days.");
 		if (D.Station == TEXT("compost_bin")) return TEXT("Turns spoiled food and fish scraps into compost for your crops (and worms for bait).");
+		if (!D.Note.IsEmpty()) return D.Note;
+		if (D.Needs == TEXT("vent")) return TEXT("A stone bath fed by hot water: it only goes on a volcanic vent (lava within 8 m) or a hot spring.");
 		return TEXT("Decoration. Places freely, no grid.");
 	}
 
@@ -230,9 +248,23 @@ namespace WRBuildUI
 			const auto C = [](uint8 R, uint8 G, uint8 B) { return FLinearColor(FColor(R, G, B)); };
 			const FLinearColor Wood = C(0xA8, 0x74, 0x3F), Stone = C(0x8B, 0x8F, 0x94), Dark = C(0x6E, 0x45, 0x24), Cloth = C(0xC9, 0xB4, 0x8A);
 			const FLinearColor Red = C(0x9A, 0x2E, 0x22), Ember = C(0xEC, 0x7A, 0x34), Soil = C(0x4A, 0x30, 0x20), Green = C(0x5F, 0x9E, 0x3E);
-			const FLinearColor M = D.Material == TEXT("stone") ? Stone : Wood;
+			FLinearColor M = D.Material == TEXT("stone") ? Stone : Wood;
+			if (!D.Tier.IsNone()) M = FWRBuildLook::TierCardColor(D.Tier);
 			const FName S = D.Shape, K = D.Kind;
 			TArray<FBlock> B;
+			// Modelled furniture and machines draw their own blocks; a beam is one bar along its length.
+			if (!D.Arch.IsNone() || D.IsBeam())
+			{
+				for (const FWRLookBlock& L : D.IsBeam() ? FWRBuildLook::TierBlocks(D, FTransform(FRotator(D.Shape == TEXT("post") ? 90.f : D.Shape == TEXT("brace") ? 45.f : 0.f, 0.f, 0.f), FVector(-D.FreeLength * 0.4f, 0.f, 0.f)))
+					: FWRBuildLook::DecorBlocks(D, FTransform::Identity))
+				{
+					if (L.Size.GetMin() < 1.f) continue;
+					const FLinearColor Lin = L.Mat == EWRLookMat::Tinted ? L.Color : L.Mat == EWRLookMat::Wood ? Wood : Stone;
+					const FLinearColor Col = L.Mat == EWRLookMat::Tinted ? FLinearColor(FMath::Pow(Lin.R, 1.f / 2.2f), FMath::Pow(Lin.G, 1.f / 2.2f), FMath::Pow(Lin.B, 1.f / 2.2f)) : Lin;
+					B.Add({ L.Size, L.Centre, 0.f, Col * FMath::Clamp(L.Dim, 0.3f, 1.2f), L.Rot.Quaternion(), true });
+				}
+				if (B.Num() > 0) return B;
+			}
 			// Farm and kitchen pieces: their own modelled blocks (WRBuildLook), coloured by what each is made of.
 			if (FWRFarm::IsPieceLive(D) && (D.Category == TEXT("farm") || D.Category == TEXT("kitchen") || D.bGlass || !D.Trophy.IsNone()))
 			{
@@ -569,7 +601,8 @@ private:
 	{
 		const bool bMachine = D.Kind == TEXT("station") || D.Kind == TEXT("machine") || D.bLockable;   // Tinkerer (engineering perk)
 		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("buildCost"))
-			+ (bMachine ? UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("machineCost")) : 0.f));
+			+ (bMachine ? UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("machineCost")) : 0.f)
+			+ (FWRBuildSets::IsHighTier(D) ? UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("highTierCost")) : 0.f));
 		TArray<TPair<FName, int32>> Out;
 		for (const TPair<FName, int32>& C : D.Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Mult)) });
 		return Out;
@@ -585,7 +618,16 @@ private:
 			Out.Add(&D);
 			Shapes.AddUnique(D.Shape.IsNone() ? D.Id : D.Shape);
 		}
-		Algo::StableSortBy(Out, [&Shapes](const FWRPieceDef* D) { return Shapes.IndexOfByKey(D->Shape.IsNone() ? D->Id : D->Shape); });
+		// Structure tabs run material by material (wood, stone, metal, then each biome set): a page is a material.
+		const bool bStructure = Tab == TEXT("foundations") || Tab == TEXT("walls") || Tab == TEXT("floors") || Tab == TEXT("doors") || Tab == TEXT("stairs") || Tab == TEXT("beams");
+		const auto TierRank = [](const FWRPieceDef* D)
+		{
+			if (D->Material == TEXT("wood") || D->Material.IsNone()) return 0;
+			if (D->Material == TEXT("stone")) return 1;
+			const int32 i = FWRBuildSets::Get().All().IndexOfByPredicate([D](const FWRTierDef& T) { return T.Id == D->Material; });
+			return i == INDEX_NONE ? 99 : 2 + i;
+		};
+		Algo::StableSortBy(Out, [&Shapes, &TierRank, bStructure](const FWRPieceDef* D) { return (bStructure ? TierRank(D) * 100 : 0) + Shapes.IndexOfByKey(D->Shape.IsNone() ? D->Id : D->Shape); });
 		return Out;
 	}
 	int32 Pages() const { return FMath::Max(1, FMath::DivideAndRoundUp(InTab().Num(), PerPage)); }
@@ -732,13 +774,22 @@ private:
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 24.f * U, -14.f * U, 0.f)[Arrow(1)]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, -10.f * U, 22.f * U, 0.f)
 			[
-				SNew(SBorder).Visibility_Lambda([this]() { return InTab().Num() > PerPage ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				SNew(SBorder).Visibility_Lambda([this]() { return InTab().Num() > PerPage || (InTab().Num() > 0 && InTab()[0]->Category == TEXT("structure")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 				.BorderImage(WRUI::Box(FLinearColor(FColor(0x16, 0x18, 0x1B)), 8.f, WRUI::Brass2, 1.f)).Padding(FMargin(8.f * U, 1.f * U))
 				[
 					WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 					{
-						const int32 N = InTab().Num(), From = Page * PerPage + 1, To = FMath::Min(N, (Page + 1) * PerPage);
-						return FText::FromString(From == To ? FString::Printf(TEXT("%d of %d"), From, N) : FString::Printf(TEXT("%d–%d of %d"), From, To, N));
+						const TArray<const FWRPieceDef*> All = InTab();
+						const int32 N = All.Num(), From = Page * PerPage + 1, To = FMath::Min(N, (Page + 1) * PerPage);
+						// A structure tab's page names its material (Metal, Basalt hall...).
+						FString Mat;
+						if (All.IsValidIndex(From - 1) && All[From - 1]->Category == TEXT("structure"))
+						{
+							const FWRTierDef* T = FWRBuildSets::Get().Tier(All[From - 1]->Material);
+							Mat = T ? T->Name : All[From - 1]->Material.ToString().Left(1).ToUpper() + All[From - 1]->Material.ToString().Mid(1);
+							Mat += TEXT(" · ");
+						}
+						return FText::FromString(Mat + (From == To ? FString::Printf(TEXT("%d of %d"), From, N) : FString::Printf(TEXT("%d–%d of %d"), From, To, N)));
 					}), WRUI::Body(11, 800), WRUI::Ink2)
 				]
 			]
@@ -847,7 +898,13 @@ private:
 		}
 		FString Enough;
 		FLinearColor EnoughColor = WRUI::Good;
-		if (bShort)
+		if (!D.Blueprint.IsNone() && !FWRBlueprints::Knows(PC.Get(), D.Blueprint))
+		{
+			// A biome set's furnishing: its blueprint comes from the land's major boss.
+			Enough = FString::Printf(TEXT("Blueprint: %s drops it"), *FWRBuildSets::BlueprintSource(D.Blueprint));
+			EnoughColor = WRUI::Warn;
+		}
+		else if (bShort)
 		{
 			for (const TPair<FName, int32>& C : Cost)
 			{
@@ -982,11 +1039,12 @@ private:
 
 		// Upkeep: wood and stone pieces each cost their material per hour inside a claim (pieces.json).
 		const float PerHour = FWRBuildRegistry::Get().UpkeepPerPiecePerHour.FindRef(D->Material);
-		const bool bUpkeep = PerHour > 0.f && (D->Material == TEXT("wood") || D->Material == TEXT("stone"));
+		const bool bUpkeep = PerHour > 0.f && D->IsStructural();
+		const FName UpkeepItem = FWRBuildRegistry::Get().UpkeepItemFor(D->Material);
 		TSharedRef<SWidget> Upkeep = bUpkeep
 			? StaticCastSharedRef<SWidget>(SNew(SHorizontalBox)
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 4.f * U, 0.f)[SNew(SBox).WidthOverride(18.f * U).HeightOverride(18.f * U)[SNew(SImage).Image(WRUI::Icon(D->Material))]]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::AsNumber(FMath::RoundToInt(PerHour)), WRUI::Body(13, 700), WRUI::Ink)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 4.f * U, 0.f)[SNew(SBox).WidthOverride(18.f * U).HeightOverride(18.f * U)[SNew(SImage).Image(WRUI::Icon(UpkeepItem))]]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::FromString(PerHour >= 1.f ? FString::FromInt(FMath::RoundToInt(PerHour)) : FString::Printf(TEXT("%.1f"), PerHour)), WRUI::Body(13, 700), WRUI::Ink)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(5.f * U, 0.f, 0.f, 0.f)[WRUI::Text(LOCTEXT("PerHour", "per hour"), WRUI::Body(12, 500), WRUI::Ink3)])
 			: WRUI::Text(LOCTEXT("NoUpkeep", "None"), WRUI::Body(13, 700), WRUI::Ink);
 
@@ -1001,7 +1059,7 @@ private:
 			for (TActorIterator<AWRBuildPiece> It(Claim->GetWorld()); It; ++It)
 			{
 				const FWRPieceDef* O = It->GetDef();
-				if (O && !It->bGhost && It->OwnerName == Claim->OwnerName && FVector::Dist2D(It->GetActorLocation(), Claim->GetActorLocation()) <= Claim->Radius && (O->Material == TEXT("wood") || O->Material == TEXT("stone")))
+				if (O && !It->bGhost && It->OwnerName == Claim->OwnerName && FVector::Dist2D(It->GetActorLocation(), Claim->GetActorLocation()) <= Claim->Radius && FWRBuildRegistry::Get().UpkeepPerPiecePerHour.Contains(O->Material))
 				{
 					Pieces.FindOrAdd(O->Material)++;
 				}
@@ -1011,7 +1069,7 @@ private:
 			TArray<FString> Bits;
 			for (const TPair<FName, float>& P : FWRBuildRules::UpkeepPerHour(Pieces))
 			{
-				Bits.Add(FString::Printf(TEXT("%.0f %s"), P.Value, *P.Key.ToString()));
+				Bits.Add(P.Value >= 1.f ? FString::Printf(TEXT("%.0f %s"), P.Value, *ItemName(P.Key)) : FString::Printf(TEXT("%.1f %s"), P.Value, *ItemName(P.Key)));
 			}
 			for (const TPair<FName, int32>& P : Pieces) Total += P.Value;
 			Effect = FString::Printf(TEXT("Placing it makes %d pieces in %s's claim: upkeep goes to %s per hour."), Total, *Claim->OwnerName, *FString::Join(Bits, TEXT(" + ")));

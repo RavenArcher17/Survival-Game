@@ -694,6 +694,7 @@ void AWRPlayerController::PlayerTick(float DeltaTime)
 	{
 		UpdatePlacement();
 	}
+	UpdateBuildTint(DeltaTime);
 	UpdateLockOn(DeltaTime);
 	if (UI)
 	{

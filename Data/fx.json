@@ -288,6 +288,10 @@
       {"sprite": "chip_stone", "blend": "lit", "count": 24, "radius": 50, "life": [1,1.8], "size": [10,20], "scaleSize": false, "speed": [180,480], "dir": [0,0,1], "spread": 75, "gravity": 1.4, "spin": [-600,600], "bounce": 0.25, "colors": [[0.45,0.43,0.4,1], [0.45,0.43,0.4,1], [0.45,0.43,0.4,0]]},
       {"sprite": "smoke", "blend": "lit", "count": 12, "radius": 55, "life": [1,1.8], "size": [50,80], "scaleSize": false, "grow": 2.2, "speed": [40,120], "dir": [0,0,1], "spread": 80, "drag": 1.5, "colors": [[0.7000000000000001,0.67,0.62,0.65], [0.7000000000000001,0.67,0.62,0]]}
     ]},
+    "build.collapse": { "layers": [
+      {"sprite": "chip_stone", "blend": "lit", "count": 40, "radius": 120, "life": [1.2,2.2], "size": [12,28], "scaleSize": false, "speed": [120,380], "dir": [0,0,1], "spread": 80, "gravity": 1.5, "spin": [-500,500], "bounce": 0.2, "colors": [[0.42,0.4,0.37,1], [0.42,0.4,0.37,1], [0.42,0.4,0.37,0]]},
+      {"sprite": "smoke", "blend": "lit", "count": 26, "radius": 160, "life": [1.8,3.2], "size": [90,160], "scaleSize": false, "grow": 2.6, "speed": [40,140], "dir": [0,0,0.6], "spread": 85, "drag": 1.2, "lift": 20, "colors": [[0.66,0.62,0.56,0.7], [0.66,0.62,0.56,0]]}
+    ]},
     "build.break.wood": { "layers": [
       {"sprite": "chip_wood", "blend": "lit", "count": 28, "radius": 50, "life": [1,1.8], "size": [14,30], "scaleSize": false, "speed": [180,480], "dir": [0,0,1], "spread": 75, "gravity": 1.4, "spin": [-600,600], "bounce": 0.25, "colors": [[0.4,0.28,0.17,1], [0.4,0.28,0.17,1], [0.4,0.28,0.17,0]]},
       {"sprite": "smoke2", "blend": "lit", "count": 10, "radius": 55, "life": [0.9,1.6], "size": [45,70], "scaleSize": false, "grow": 2.2, "speed": [40,120], "dir": [0,0,1], "spread": 80, "drag": 1.5, "colors": [[0.75,0.67,0.57,0.65], [0.75,0.67,0.57,0]]}

@@ -374,7 +374,9 @@ void AWRGameMode::LoadWorld()
 		{
 			continue;
 		}
-		const FTransform T(FRotator(0.f, O->GetNumberField(TEXT("yaw")), 0.f),
+		double Pitch = 0.0;   // beams and braces slope (build-building)
+		O->TryGetNumberField(TEXT("pitch"), Pitch);
+		const FTransform T(FRotator(Pitch, O->GetNumberField(TEXT("yaw")), 0.f),
 			FVector(O->GetNumberField(TEXT("x")), O->GetNumberField(TEXT("y")), O->GetNumberField(TEXT("z"))));
 		AWRBuildPiece* Piece = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		Piece->InitPiece(PieceId, O->GetStringField(TEXT("owner")));

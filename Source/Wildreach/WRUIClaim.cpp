@@ -9,6 +9,7 @@
 #include "WRUIWidgets.h"
 #include "WRUIWindowKit.h"
 #include "WRBuilding.h"
+#include "WRBuildSets.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPlayerController.h"
@@ -43,9 +44,18 @@ namespace WRUIClaimScreen
 	FString ItemName(FName Id) { const FWRItemDef* Def = FWRItemRegistry::Get().Find(Id); return Def ? Def->Name.ToLower() : Id.ToString(); }
 
 	/** The claim's numbers as the server works them out (AWRClaimTotem::CurrentUpkeepPerHour and its minute tick). */
+	/** An item's own name, lower case (steel plate, basalt block). */
+	FString ItemLabel(FName Item)
+	{
+		const FWRItemDef* D = FWRItemRegistry::Get().Find(Item);
+		return D ? D->Name.ToLower() : Item.ToString().Replace(TEXT("_"), TEXT(" "));
+	}
+
 	struct FUpkeep
 	{
-		FName Mat;
+		FName Mat;            // the item it's paid in (wood, stone, steel plate, a biome block)
+		FName Material;       // the pieces' material (wood, stone, metal, basalt_hall...)
+		FString Name;         // what the pieces are called ("wood", "metal", "Basalt hall")
 		int32 Pieces = 0;     // your pieces of this material inside the circle
 		float PerPiece = 0.f; // pieces.json
 		float PerHour = 0.f;  // after the server's multiplier and perks
@@ -309,18 +319,28 @@ namespace WRUIClaimScreen
 			const AWRClaimTotem* T = Totem.Get();
 			if (!T) return Out;
 			const TMap<FName, float> PerHour = T->CurrentUpkeepPerHour();
-			for (const FName Mat : { FName(TEXT("wood")), FName(TEXT("stone")) })
+			const FWRBuildRegistry& Reg = FWRBuildRegistry::Get();
+			// Wood and stone always; metal and the biome sets once the claim holds some (build-building).
+			TMap<FName, int32> Count;
+			for (TActorIterator<AWRBuildPiece> It(T->GetWorld()); It; ++It)
+			{
+				const FWRPieceDef* Def = It->GetDef();
+				if (Def && !It->bGhost && It->OwnerName == T->OwnerName && Reg.UpkeepPerPiecePerHour.Contains(Def->Material)
+					&& FVector::Dist2D(It->GetActorLocation(), T->GetActorLocation()) <= T->Radius) Count.FindOrAdd(Def->Material)++;
+			}
+			TArray<FName> Mats = { FName(TEXT("wood")), FName(TEXT("stone")) };
+			for (const TPair<FName, int32>& C : Count) if (C.Value > 0) Mats.AddUnique(C.Key);
+			for (const FName Material : Mats)
 			{
 				FUpkeep U2;
-				U2.Mat = Mat;
-				U2.PerPiece = FWRBuildRegistry::Get().UpkeepPerPiecePerHour.FindRef(Mat);
-				U2.PerHour = PerHour.FindRef(Mat);
-				U2.Stock = FWRInventoryRules::CountOf(T->UpkeepStorage, Mat);
-				for (TActorIterator<AWRBuildPiece> It(T->GetWorld()); It; ++It)
-				{
-					const FWRPieceDef* Def = It->GetDef();
-					if (Def && !It->bGhost && It->OwnerName == T->OwnerName && Def->Material == Mat && FVector::Dist2D(It->GetActorLocation(), T->GetActorLocation()) <= T->Radius) ++U2.Pieces;
-				}
+				U2.Material = Material;
+				U2.Mat = Reg.UpkeepItemFor(Material);
+				const FWRTierDef* Tier = FWRBuildSets::Get().Tier(Material);
+				U2.Name = Tier && Tier->Id != TEXT("wood") && Tier->Id != TEXT("stone") ? Tier->Name : Material.ToString();
+				U2.PerPiece = Reg.UpkeepPerPiecePerHour.FindRef(Material);
+				U2.PerHour = PerHour.FindRef(U2.Mat);
+				U2.Stock = FWRInventoryRules::CountOf(T->UpkeepStorage, U2.Mat);
+				U2.Pieces = Count.FindRef(Material);
 				Out.Add(U2);
 			}
 			return Out;
@@ -568,7 +588,7 @@ namespace WRUIClaimScreen
 					{
 						if (!Upkeep.IsValidIndex(Index)) return FText::GetEmpty();
 						const FUpkeep& X = Upkeep[Index];
-						return FText::FromString(FString::Printf(TEXT("%d %s piece%s"), X.Pieces, *X.Mat.ToString(), X.Pieces == 1 ? TEXT("") : TEXT("s")));
+						return FText::FromString(FString::Printf(TEXT("%d %s piece%s"), X.Pieces, *X.Name, X.Pieces == 1 ? TEXT("") : TEXT("s")));
 					}), WRUI::Body(15, 800), WRUI::Ink)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.f * U, 0.f)
@@ -579,7 +599,7 @@ namespace WRUIClaimScreen
 						const FUpkeep& X = Upkeep[Index];
 						const float Base = X.Pieces * X.PerPiece;
 						const float Mult = Base > 0.f ? X.PerHour / Base : 1.f;
-						FString S = FString::Printf(TEXT("x %g %s"), X.PerPiece, *X.Mat.ToString());
+						FString S = FString::Printf(TEXT("x %g %s"), X.PerPiece, *ItemLabel(X.Mat));
 						if (!FMath::IsNearlyEqual(Mult, 1.f, 0.01f)) S += FString::Printf(TEXT(" x %g (server)"), FMath::RoundToFloat(Mult * 100.f) / 100.f);
 						return FText::FromString(S + TEXT(" ="));
 					}), WRUI::Body(15, 500), WRUI::Ink3)
@@ -589,7 +609,7 @@ namespace WRUIClaimScreen
 					WRUI::Text(TAttribute<FText>::CreateLambda([this, Index]()
 					{
 						if (!Upkeep.IsValidIndex(Index)) return FText::GetEmpty();
-						return FText::FromString(FString::Printf(TEXT("%g %s"), FMath::RoundToFloat(Upkeep[Index].PerHour * 10.f) / 10.f, *Upkeep[Index].Mat.ToString()));
+						return FText::FromString(FString::Printf(TEXT("%g %s"), FMath::RoundToFloat(Upkeep[Index].PerHour * 10.f) / 10.f, *ItemLabel(Upkeep[Index].Mat)));
 					}), WRUI::Body(17, 800), WRUI::Ink)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(6.f * U, 0.f, 0.f, 0.f)[WRUI::Text(LOCTEXT("PerHour", "an hour"), WRUI::Body(15, 500), WRUI::Ink3)];
@@ -612,7 +632,7 @@ namespace WRUIClaimScreen
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()
 					[
-						WRUI::Text(TAttribute<FText>::CreateLambda([this, Index]() { return Upkeep.IsValidIndex(Index) ? FText::FromString(FString::Printf(TEXT("%d %s stocked"), Upkeep[Index].Stock, *Upkeep[Index].Mat.ToString())) : FText::GetEmpty(); }), WRUI::Body(15, 700), WRUI::Ink)
+						WRUI::Text(TAttribute<FText>::CreateLambda([this, Index]() { return Upkeep.IsValidIndex(Index) ? FText::FromString(FString::Printf(TEXT("%d %s stocked"), Upkeep[Index].Stock, *ItemLabel(Upkeep[Index].Mat))) : FText::GetEmpty(); }), WRUI::Body(15, 700), WRUI::Ink)
 					]
 					+ SVerticalBox::Slot().AutoHeight()
 					[
@@ -620,7 +640,7 @@ namespace WRUIClaimScreen
 						{
 							if (!Upkeep.IsValidIndex(Index)) return FText::GetEmpty();
 							const FUpkeep& X = Upkeep[Index];
-							if (!X.Pays()) return FText::FromString(FString::Printf(TEXT("Not needed: no %s pieces"), *X.Mat.ToString()));
+							if (!X.Pays()) return FText::FromString(FString::Printf(TEXT("Not needed: no %s pieces"), *X.Name));
 							return X.Stock <= 0 ? LOCTEXT("StockOut", "Run out") : FText::FromString(TEXT("Lasts ") + Duration(X.Hours()));
 						}), WRUI::Body(13, 500), TAttribute<FSlateColor>::CreateLambda([this, Index]()
 						{
@@ -653,18 +673,28 @@ namespace WRUIClaimScreen
 			const AWRClaimTotem* T = Totem.Get();
 			if (!T) return FText::GetEmpty();
 			if (!IsOwner()) return FText::Format(LOCTEXT("StockNotOwner", "Only {0} can stock this totem."), FText::FromString(T->OwnerName));
-			const int32 Wood = Have(TEXT("wood")), Stone = Have(TEXT("stone"));
-			if (Wood + Stone == 0) return LOCTEXT("StockNothing", "You carry no wood or stone to stock.");
+			// Everything a claim pays upkeep in that you carry (wood, stone, steel plate, biome blocks).
+			TArray<FName> Items;
+			for (const TPair<FName, FName>& I : FWRBuildRegistry::Get().UpkeepItem) Items.AddUnique(I.Value);
+			int32 Carried = 0, Left = 0;
+			TArray<FString> Bits;
 			TArray<FWRItemStack> After = T->UpkeepStorage;
-			const int32 WoodLeft = FWRInventoryRules::Add(After, TEXT("wood"), Wood);
-			const int32 StoneLeft = FWRInventoryRules::Add(After, TEXT("stone"), Stone);
+			for (const FName Item : Items)
+			{
+				const int32 N = Have(Item);
+				if (N <= 0) continue;
+				Carried += N;
+				Left += FWRInventoryRules::Add(After, Item, N);
+				Bits.Add(FString::Printf(TEXT("%d %s"), N, *ItemLabel(Item)));
+			}
+			if (Carried == 0) return LOCTEXT("StockNothing", "You carry nothing a claim's upkeep is paid in (wood, stone, steel plate, biome blocks).");
 			TArray<FUpkeep> Then = Upkeep;
 			for (FUpkeep& X : Then) X.Stock = FWRInventoryRules::CountOf(After, X.Mat);
 			const float H = HoursLeft(Then);
-			FString S = FString::Printf(TEXT("You carry %d wood and %d stone."), Wood, Stone);
-			if (WoodLeft + StoneLeft >= Wood + Stone) return FText::FromString(S + TEXT(" The totem's stock is full."));
+			FString S = FString::Printf(TEXT("You carry %s."), *FString::Join(Bits, TEXT(", ")));
+			if (Left >= Carried) return FText::FromString(S + TEXT(" The totem's stock is full."));
 			if (H < TNumericLimits<float>::Max()) S += FString::Printf(TEXT(" Stocking it all makes it last %s."), *Duration(H));
-			if (WoodLeft + StoneLeft > 0) S += FString::Printf(TEXT(" %d won't fit."), WoodLeft + StoneLeft);
+			if (Left > 0) S += FString::Printf(TEXT(" %d won't fit."), Left);
 			return FText::FromString(S);
 		}
 
@@ -682,17 +712,26 @@ namespace WRUIClaimScreen
 							// The totem takes whole items as each hour's share comes due (a wood every 10 minutes at 6 an hour).
 							bool bAny = false;
 							for (const FUpkeep& X : Upkeep) bAny |= X.Pays();
-							return bAny ? LOCTEXT("UpkeepDue", "Taken from the totem's stock a little at a time, as it comes due") : LOCTEXT("UpkeepFree", "None of your wood or stone pieces are inside");
+							return bAny ? LOCTEXT("UpkeepDue", "Taken from the totem's stock a little at a time, as it comes due") : LOCTEXT("UpkeepFree", "None of your building pieces are inside");
 						}), WRUI::Body(13, 500), WRUI::Ink3)
 					]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)[UpkeepRow(0)]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[UpkeepRow(1)]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[UpkeepRow(2)]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[UpkeepRow(3)]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().FillWidth(1.f)[StockCell(0)]
 					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(12.f * U, 0.f, 0.f, 0.f)[StockCell(1)]
+				]
+				// Metal and a biome set's block, when the claim holds those pieces.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)
+				[
+					SNew(SHorizontalBox).Visibility_Lambda([this]() { return Upkeep.Num() > 2 ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+					+ SHorizontalBox::Slot().FillWidth(1.f)[SNew(SBox).Visibility_Lambda([this]() { return Upkeep.Num() > 2 ? EVisibility::SelfHitTestInvisible : EVisibility::Hidden; })[StockCell(2)]]
+					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(12.f * U, 0.f, 0.f, 0.f)[SNew(SBox).Visibility_Lambda([this]() { return Upkeep.Num() > 3 ? EVisibility::SelfHitTestInvisible : EVisibility::Hidden; })[StockCell(3)]]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
 				[
@@ -735,8 +774,13 @@ namespace WRUIClaimScreen
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth()
 					[
-						SNew(SWRButton).Primary(true).FontSize(14).MinHeight(44.f * U).Text(LOCTEXT("StockAll", "Stock all your wood and stone"))
-						.IsEnabled_Lambda([this]() { return IsOwner() && Have(TEXT("wood")) + Have(TEXT("stone")) > 0; })
+						SNew(SWRButton).Primary(true).FontSize(14).MinHeight(44.f * U).Text(LOCTEXT("StockAll", "Stock all your upkeep materials"))
+						.IsEnabled_Lambda([this]()
+						{
+							int32 N = 0;
+							for (const TPair<FName, FName>& I : FWRBuildRegistry::Get().UpkeepItem) N += Have(I.Value);
+							return IsOwner() && N > 0;
+						})
 						.OnClicked_Lambda([this]() { if (PC.IsValid()) PC->SendCommand(TEXT("claimdeposit")); return FReply::Handled(); })
 					]
 				]

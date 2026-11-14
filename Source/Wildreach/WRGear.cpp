@@ -392,6 +392,11 @@ FString FWRBlueprints::Learn(UWRInventoryComponent* Inv, int32 SlotIndex)
 	if (--Stack.Count <= 0) Stack = FWRItemStack();
 	WRSound::Broadcast(PS->GetPawn(), TEXT("blueprint.learn"));
 	UE_LOG(LogWildreach, Log, TEXT("BLUEPRINT %s learned %s"), *PS->GetPlayerName(), *Bp->Id.ToString());
+	if (Bp->Kind == TEXT("set decor"))
+	{
+		// A biome set's furnishings (cooks/build-building.md 2.4): they open in the Build bar.
+		return FString::Printf(TEXT("You learned %s: its furnishings are in the Build bar's Decor and Light tabs"), *Def->Name.Replace(TEXT("Blueprint: "), TEXT("")));
+	}
 	return FString::Printf(TEXT("You learned %s: it's in your Crafting tab under Blueprints"), *What);
 }
 
@@ -424,6 +429,7 @@ FName FWRBlueprints::PortalDrop(const AWRPlayerState* PS, int32 Rank)
 	TArray<FName> Pool;
 	for (const FWRBlueprintDef& B : G.AllBlueprints())
 	{
+		if (B.Kind == TEXT("set decor")) continue;   // a set's furnishings come from its land's major boss only
 		const bool bLegendary = B.Kind == TEXT("legendary");
 		if (bLegendary && Rank < G.LegendaryFromRank) continue;
 		if (PS && PS->KnownBlueprints.Contains(B.Id)) continue;

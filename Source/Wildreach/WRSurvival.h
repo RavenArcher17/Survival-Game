@@ -207,7 +207,11 @@ private:
  *  (pieces.json comfort), up to comfort.trophyMax different trophies, a near Hearth as a fireplace, capped. */
 struct WILDREACH_API FWRComfort
 {
-	static int32 At(const AActor* Bed);
+	/** Decorator: the sleeper's perk (+3, and the cap rises to comfort.decoratorCap). A new Hearth's offering adds to
+	 *  every bed in its claim (build-building). */
+	static int32 At(const AActor* Bed, float Decorator = 0.f);
+	/** The highest comfort can go for someone with this Decorator bonus. */
+	static int32 Cap(float Decorator);
 };
 
 /** Called once for each finished sleep (Rest): Deathless re-arms, Void gives back max health. */

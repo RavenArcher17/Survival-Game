@@ -303,6 +303,78 @@
           "rimefang"
         ],
         "kind": "boss weapon"
+      },
+      {
+        "id": "bp_basalt_hall_decor",
+        "boss": "vulkarn",
+        "kind": "set decor",
+        "set": "basalt_hall"
+      },
+      {
+        "id": "bp_crag_hold_decor",
+        "boss": "kharvox",
+        "kind": "set decor",
+        "set": "crag_hold"
+      },
+      {
+        "id": "bp_sun_court_decor",
+        "boss": "ahrumet",
+        "kind": "set decor",
+        "set": "sun_court"
+      },
+      {
+        "id": "bp_heartwood_lodge_decor",
+        "boss": "sylvaroth",
+        "kind": "set decor",
+        "set": "heartwood_lodge"
+      },
+      {
+        "id": "bp_cloud_spire_decor",
+        "boss": "aeolith",
+        "kind": "set decor",
+        "set": "cloud_spire"
+      },
+      {
+        "id": "bp_geode_sanctum_decor",
+        "boss": "lyrathis",
+        "kind": "set decor",
+        "set": "geode_sanctum"
+      },
+      {
+        "id": "bp_rime_lodge_decor",
+        "boss": "skaldrith",
+        "kind": "set decor",
+        "set": "rime_lodge"
+      },
+      {
+        "id": "bp_stilt_house_decor",
+        "boss": "vharra",
+        "kind": "set decor",
+        "set": "stilt_house"
+      },
+      {
+        "id": "bp_coral_keep_decor",
+        "boss": "thalassor",
+        "kind": "set decor",
+        "set": "coral_keep"
+      },
+      {
+        "id": "bp_mourning_chapel_decor",
+        "boss": "nhal",
+        "kind": "set decor",
+        "set": "mourning_chapel"
+      },
+      {
+        "id": "bp_mycelium_den_decor",
+        "boss": "mycelorn",
+        "kind": "set decor",
+        "set": "mycelium_den"
+      },
+      {
+        "id": "bp_hollow_bastion_decor",
+        "boss": "vorhollow",
+        "kind": "set decor",
+        "set": "hollow_bastion"
       }
     ]
   },

@@ -24,6 +24,7 @@ enum class EWRMachineState : uint8
 	NoLink,      // an updraft lift with no partner
 	NoStorm,     // a storm coil between storms with a flat battery
 	NoSun,       // a sun mirror array at night with a flat battery
+	NoAmmo,      // a turret with nothing to shoot (build-building)
 };
 
 namespace WRMachineFlag
@@ -81,4 +82,25 @@ struct FWRBeltItem
 	UPROPERTY() FName Item;
 	UPROPERTY() int32 Count = 0;
 	UPROPERTY() float Enter = 0.f;
+};
+
+/**
+ * A turret's replicated aim (WRTurret, cooks/build-building.md 2.6): where its head points (degrees, in the piece's own
+ * space), the aim line's start (server time) and the point it runs to, its last shot. Every machine eases the head
+ * toward Yaw / Pitch and draws the line from TellAt for the tell's length, so everyone sees the same warning.
+ */
+USTRUCT()
+struct FWRTurretRep
+{
+	GENERATED_BODY()
+	UPROPERTY() float Yaw = 0.f;
+	UPROPERTY() float Pitch = 0.f;
+	UPROPERTY() float TellAt = 0.f;
+	UPROPERTY() FVector_NetQuantize AimAt = FVector::ZeroVector;
+	UPROPERTY() float ShotAt = 0.f;
+	/** What it shoots now: bolt, fire, frost, or another path's status (the loaded material's row). */
+	UPROPERTY() FName Element;
+	/** Shots left of the burning path material (element turrets), and a target's in sight (the head tracks). */
+	UPROPERTY() uint8 ShotsLeft = 0;
+	UPROPERTY() bool bTracking = false;
 };

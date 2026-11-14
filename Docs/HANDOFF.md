@@ -120,6 +120,20 @@ model. Machines use the Hearth level of a Hearth their builder owns anywhere (no
 beach or a drill in a cave can be built. A station a shaft runs into is retimed through `AWRStation::AppliedBoost`
 (queue `ItemLeft` / `ItemSeconds` are at 1x). Planks pay for wood in build costs (`FWRMachines::CanPay / Pay`).
 
+Also since 0.7.1: **building past wood and stone** (cooks/build-building.md): `Data/building_sets.json` holds the tiers
+(metal, the 12 biome sets, wood and stone for beams), the 12 shapes' cost / HP shares, the freeform pieces and each set's
+decor; `FWRBuildSets::Expand` (`WRBuildSets.cpp`) turns them into ordinary `FWRPieceDef` rows inside
+`FWRBuildRegistry` (ids `<tier>_<shape>`, `<tier>_beam2/_beam4/_post/_brace`, `<tier>_<key>`), so placing, saving,
+upkeep and the build bar treat them like wood and stone. Their look is `WRBuildLookSets.cpp` (one style per tier over the
+unchanged collision) and `WRBuildLookDecor.cpp` (furniture archetypes, also the comfort decor in pieces.json with
+`arch`), drawn with one material, `M_BuildTinted` (`Tools/make_build_materials_tinted.py`: colour, metal, roughness,
+glow and pattern per instance). Support is `FWRIntegrity` (`WRBuildIntegrity.cpp`): `LinkCost` between any two
+structural pieces (Raven's grid rule unchanged, beams by their ends and length, a brace's +1), `Allowed`, the build-mode
+overlay colours (`M_BuildOverlay`, `AWRPlayerController::UpdateBuildTint`) and `AWRRubble` for a collapse. Beams carry
+their slope in the place command (`p<deg>`) and the save (`pitch`). Turrets are machines (role `turret`, `WRTurret.cpp`
+server brain, model and aim line in `WRMachineLook.cpp`, ammo rows in `machines.json` `turrets`). Rules: no base piece in
+a cave (`FWRBuildSets::PlaceCheck`), weapon / tool hits on pieces scaled by `materialDamage`.
+
 Open, as of 0.7.1:
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
@@ -136,8 +150,14 @@ Open, as of 0.7.1:
   at `C:\Dev\UE5Source` on Raven's PC (`Tools\build_engine.ps1`), needed only for that.
 - **The gate playtest** (a group of friends plays a full evening and wants to come back) hasn't been run.
 - **Volcanic shrubs stay green**: the ash-grey coat hung the GPU (VSM Nanite), so `ashCoatMin` stays 0.
+- **Building tiers 4 and 5 and the set decor** need a Hearth of 4 / 5 and the land's major boss: on the island metal
+  waits for a fourth core, the Basalt hall and Rime lodge for a fifth, and their decor blueprints drop from Vulkarn and
+  Skaldrith; the other ten sets (structure, beams, decor) stay hidden until their land is live. Tundra hot springs
+  aren't on the map yet, so the hot spring bath goes only by lava. The other ten paths' element-turret essences wait
+  for their items (rows in `machines.json`).
 - **Bounties** stay a setting only (nothing reads it) until the PvP pass. **54 perks** wait for their systems
-  (`waitsFor` in `Data/lifeskills.json`: diving, breeding, bees, machine power, turrets, explosives, timed brews...).
+  (`waitsFor` in `Data/lifeskills.json`: diving, breeding, bees, explosives, timed brews...; Decorator, Turret tech,
+  Master builder and Ancient wood are live since build-building).
 - **F8 pictures from the game don't reach the web inbox yet**: the feedback endpoint keeps screenshots (and context over
   4000 characters) for signed-in players only, and the game isn't signed in. The full report and picture are in
   `Saved/Reports` on the tester's PC (and the host's). Text fields (chat, names, the report note) need a keyboard.

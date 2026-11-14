@@ -17,6 +17,11 @@
 #include "WRPlayerUI.h"
 #include "WRKeyBindings.h"
 #include "WRSound.h"
+#include "WRBuildIntegrity.h"
+#include "WRBuildSets.h"
+#include "WRGameState.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Camera/PlayerCameraManager.h"
 #include "EngineUtils.h"
 
@@ -30,18 +35,7 @@ namespace WRFreeBuild
 	/** The solid box of a structure piece around its location (cm, before yaw): AWRBuildPiece::ApplyLook's blocks. */
 	static FBox PieceBox(const FWRPieceDef& Def)
 	{
-		const FName S = Def.Shape;
-		if (S == TEXT("foundation")) return FBox(FVector(-200, -200, -150), FVector(200, 200, 100));
-		if (S == TEXT("floor")) return FBox(FVector(-200, -200, 0), FVector(200, 200, 20));
-		if (S == TEXT("roof")) return FBox(FVector(-240, -210, 0), FVector(210, 210, 215));
-		if (S == TEXT("pillar")) return FBox(FVector(-20, -20, 0), FVector(20, 20, 300));
-		if (S == TEXT("stairs")) return FBox(FVector(-250, -104, 0), FVector(250, 104, 300));
-		if (S == TEXT("halfwall")) return FBox(FVector(-210, -10, 0), FVector(210, 10, 150));
-		if (S == TEXT("upperwall") || S == TEXT("gable")) return FBox(FVector(-210, -10, 0), FVector(210, 10, 210));
-		if (S == TEXT("palisade")) return FBox(FVector(-220, -20, 0), FVector(220, 20, 400));
-		if (S == TEXT("gate")) return FBox(FVector(-220, -10, 0), FVector(220, 10, 400));
-		if (S == TEXT("tower")) return FBox(FVector(-100, -100, 0), FVector(100, 100, 520));
-		return FBox(FVector(-210, -10, 0), FVector(210, 10, 300));   // wall, door, doorway, window
+		return FWRIntegrity::BoxOf(Def);   // one place for every piece's solid box (beams too)
 	}
 
 	/** A piece that goes where you aim, aimed at nothing. */
@@ -140,7 +134,8 @@ namespace WRFreeBuild
 	{
 		const bool bMachine = Def.Kind == TEXT("station") || Def.Kind == TEXT("machine") || Def.bLockable;
 		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("buildCost"))
-			+ (bMachine ? UWRLifeSkillsComponent::StatFor(Player, TEXT("machineCost")) : 0.f));
+			+ (bMachine ? UWRLifeSkillsComponent::StatFor(Player, TEXT("machineCost")) : 0.f)
+			+ (FWRBuildSets::IsHighTier(Def) ? UWRLifeSkillsComponent::StatFor(Player, TEXT("highTierCost")) : 0.f));
 		TArray<TPair<FName, int32>> Out;
 		for (const TPair<FName, int32>& C : Def.Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Mult)) });
 		return Out;
@@ -385,8 +380,9 @@ void AWRPlayerController::ConfirmPlacement()
 		}
 		// A structure piece placed with snap off says so: the server checks it box against box, not by grid slot.
 		const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
-		ServerCommand(FString::Printf(TEXT("place %s %.0f %.0f %.0f %.0f%s"), *PlacingPiece.ToString(), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z, PlaceYaw,
-			Def && Def->Snaps() && !IsSnapOn() ? TEXT(" free") : TEXT("")));
+		const FString PitchArg = Def && Def->IsBeam() ? FString::Printf(TEXT(" p%.0f"), PlacePitch) : FString();
+		ServerCommand(FString::Printf(TEXT("place %s %.0f %.0f %.0f %.0f%s%s"), *PlacingPiece.ToString(), PlaceLoc.X, PlaceLoc.Y, PlaceLoc.Z, PlaceYaw,
+			Def && Def->Snaps() && !IsSnapOn() ? TEXT(" free") : TEXT(""), *PitchArg));
 	}
 }
 
@@ -469,7 +465,48 @@ void AWRPlayerController::UpdatePlacement()
 	PlaceStep = 0.f;
 
 	const bool bFreeStructure = Def->Snaps() && !IsSnapOn();
-	if (Def->Snaps() && IsSnapOn())
+	PlacePitch = 0.f;
+	if (Def->IsBeam())
+	{
+		// A beam, post or brace (build-building 2.3): its start is the point you aim at, on any surface. A post stands
+		// straight up (aimed at a ceiling, its top meets it); a brace rises 45 degrees; a beam slopes as you look. On a
+		// wall it runs out from the face toward you, on a floor or the ground along your look. With snap on its start
+		// takes another beam's or post's end within reach, so they chain.
+		const float Len = FMath::Max(50.f, Def->FreeLength);
+		const bool bPost = Def->Shape == TEXT("post"), bBrace = Def->Shape == TEXT("brace");
+		const bool bOnWall = bHit && FMath::Abs(Hit.ImpactNormal.Z) < 0.5f;
+		const float Yaw = bOnWall && !bPost ? Hit.ImpactNormal.Rotation().Yaw + PlaceTurn : Wanted;
+		float Pitch = bPost ? 90.f : bBrace ? 45.f : 0.f;
+		if (!bPost && !bBrace)
+		{
+			const float Step = SnapMode == 2 ? WRTune(TEXT("building.beamPitchFine"), 5.f) : IsSnapOn() ? WRTune(TEXT("building.beamPitchStep"), 15.f) : 1.f;
+			const float Max = WRTune(TEXT("building.beamPitchMax"), 60.f);
+			Pitch = FMath::Clamp(FMath::RoundToFloat(FRotator::NormalizeAxis(GetControlRotation().Pitch) / Step) * Step, -Max, Max);
+		}
+		FVector Start = Point;
+		if (bPost && bHit && Hit.ImpactNormal.Z < -0.5f) Start = Point - FVector(0.f, 0.f, Len);   // propping a floor from below
+		if (IsSnapOn())
+		{
+			float Best = WRTune(TEXT("building.beamSnap"), 40.f);
+			const FVector Aimed = Start;
+			for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+			{
+				const FWRPieceDef* O = It->GetDef();
+				if (It->bGhost || !O || !O->IsBeam()) continue;
+				FVector A, B;
+				FWRIntegrity::Ends(*O, It->GetActorTransform(), A, B);
+				for (const FVector& E : { A, B })
+				{
+					const float D = FVector::Dist(E, Aimed);
+					if (D < Best) { Best = D; Start = E; }
+				}
+			}
+		}
+		PlaceLoc = Start;
+		PlaceYaw = Yaw;
+		PlacePitch = Pitch;
+	}
+	else if (Def->Snaps() && IsSnapOn())
 	{
 		// The nearest foundation: its top sets the storey heights, and close by its grid is the grid (one placed at an angle
 		// takes what's built beside it to that angle too).
@@ -577,7 +614,9 @@ void AWRPlayerController::UpdatePlacement()
 	// Whole centimetres and degrees, as the place command carries them, so the server checks exactly the spot you see.
 	PlaceLoc = FVector(FMath::RoundToFloat(PlaceLoc.X), FMath::RoundToFloat(PlaceLoc.Y), FMath::RoundToFloat(PlaceLoc.Z));
 	PlaceYaw = FMath::RoundToFloat(FRotator::NormalizeAxis(PlaceYaw));
-	G->SetActorLocationAndRotation(PlaceLoc, FRotator(0.f, PlaceYaw, 0.f));
+	PlacePitch = FMath::RoundToFloat(PlacePitch);
+	G->SetActorLocationAndRotation(PlaceLoc, FRotator(PlacePitch, PlaceYaw, 0.f));
+	const FTransform PlaceT(FRotator(PlacePitch, PlaceYaw, 0.f), PlaceLoc);
 	ShowSnapDots(DotsOn, DotsEvery);
 
 	// Quick client-side checks (the server re-checks everything).
@@ -598,7 +637,7 @@ void AWRPlayerController::UpdatePlacement()
 	{
 		bPlaceValid = false;
 	}
-	else if (Def->Snaps() && AWRBuildPiece::SupportAt(GetWorld(), PlacingPiece, PlaceLoc) == INDEX_NONE)
+	else if (Def->IsStructural() && AWRBuildPiece::SupportAt(GetWorld(), PlacingPiece, PlaceT) == INDEX_NONE)
 	{
 		// Same rules as the server (support values replicate), so red means it really won't go there.
 		bPlaceValid = false;
@@ -615,6 +654,12 @@ void AWRPlayerController::UpdatePlacement()
 		// Machines: a Hearth of yours of their level, moving water, open ground, lava, an ore vein...
 		bPlaceValid = false;
 		PlaceWhy = Machine;
+	}
+	else if (const FString Rule = FWRBuildSets::PlaceCheck(this, *Def, PlaceLoc, this); !Rule.IsEmpty())
+	{
+		// Its blueprint, no bases underground, a hot spring bath on a vent.
+		bPlaceValid = false;
+		PlaceWhy = Rule;
 	}
 	else if (const FString Blocked = AWRBuildPiece::Blocked(GetWorld(), PlacingPiece, PlaceLoc); !Blocked.IsEmpty())
 	{
@@ -639,6 +684,59 @@ void AWRPlayerController::UpdatePlacement()
 		}
 	}
 	G->SetGhostValid(bPlaceValid);
+	// A structural piece's ghost wears the stability colour it would have (blue on the ground ... red at the last step).
+	if (bPlaceValid && Def->IsStructural())
+	{
+		const int32 Support = AWRBuildPiece::SupportAt(GetWorld(), PlacingPiece, PlaceT);
+		G->SetGhostColor(FWRIntegrity::StepColor(Support, FWRIntegrity::Allowed(GetWorld(), *Def, PlaceT)));
+	}
+}
+
+void AWRPlayerController::UpdateBuildTint(float DeltaTime)
+{
+	// While the build bar is open, every structure piece, beam and post near you wears a see-through stability colour
+	// (the hammer view): blue on the ground, green, yellow, orange, red one step from falling.
+	const bool bOn = Menu == EWRMenu::Build && GetPawn() && GetNetMode() != NM_DedicatedServer;
+	if (!bOn && !bBuildTinting) return;
+	BuildTintClock -= DeltaTime;
+	if (bOn && BuildTintClock > 0.f) return;
+	BuildTintClock = 0.3f;
+	static UMaterialInterface* Overlay = nullptr;
+	if (!Overlay)
+	{
+		Overlay = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildOverlay.M_BuildOverlay"));
+		if (Overlay) Overlay->AddToRoot();
+	}
+	if (!Overlay) return;
+	static TArray<UMaterialInstanceDynamic*> Steps;
+	if (Steps.Num() == 0)
+	{
+		for (int32 i = 0; i < 5; ++i)
+		{
+			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Overlay, GetTransientPackage());
+			M->AddToRoot();
+			M->SetVectorParameterValue(TEXT("Color"), FWRIntegrity::StepColor(i, 4));
+			Steps.Add(M);
+		}
+	}
+	const float Range = WRTune(TEXT("building.tintRange"), 2500.f);
+	const FVector Me = GetPawn() ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
+	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+	{
+		const FWRPieceDef* Def = It->GetDef();
+		if (It->bGhost || !Def || !Def->IsStructural()) continue;
+		const bool bNear = bOn && FVector::DistSquared(It->GetActorLocation(), Me) < Range * Range;
+		const int32 Step = bNear ? FWRIntegrity::StepIndex(It->Support, FWRIntegrity::Allowed(GetWorld(), *Def, It->GetActorTransform(), *It)) : -1;
+		if (Step == It->TintStep) continue;
+		It->TintStep = Step;
+		TArray<UMeshComponent*> Comps;
+		It->GetComponents(Comps);
+		for (UMeshComponent* C : Comps)
+		{
+			if (C && C->IsVisible()) C->SetOverlayMaterial(Step >= 0 ? Steps[Step] : nullptr);
+		}
+	}
+	bBuildTinting = bOn;
 }
 
 TArray<FWRMenuEntry> AWRPlayerController::BuildPieceMenu() const
@@ -710,6 +808,11 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PieceId);
 		const FVector Loc(FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)), FCString::Atof(*Arg(4)));
 		const float Yaw = FCString::Atof(*Arg(5));
+		// A beam's slope rides as "p<degrees>" after the rest (build-building); anything else stands level.
+		float Pitch = 0.f;
+		for (int32 i = 6; i < Args.Num(); ++i) if (Args[i].StartsWith(TEXT("p"))) Pitch = FCString::Atof(*Args[i].Mid(1));
+		Pitch = Def && Def->IsBeam() ? FMath::Clamp(Pitch, -90.f, 90.f) : 0.f;
+		const FTransform At(FRotator(Pitch, Yaw, 0.f), Loc);
 		// Snap off (the client says "free"), or anything off the grid: checked box against box, not only by grid slot.
 		const bool bFree = Def && Def->Snaps() && (Arg(6) == TEXT("free") || !WRFreeBuild::IsOnGrid(GetWorld(), *Def, Loc, Yaw));
 		OutResult.Reset();
@@ -737,13 +840,17 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		{
 			OutResult = FWRMachines::PlaceCheck(this, *Def, Loc, Yaw, Who, Self);
 		}
-		int32 Support = 0;
-		if (OutResult.IsEmpty() && Def->Snaps())
+		if (OutResult.IsEmpty() && Def)
 		{
-			Support = AWRBuildPiece::SupportAt(GetWorld(), PieceId, Loc);
+			OutResult = FWRBuildSets::PlaceCheck(this, *Def, Loc, this);   // blueprint, no underground bases, vents
+		}
+		int32 Support = 0;
+		if (OutResult.IsEmpty() && Def->IsStructural())
+		{
+			Support = AWRBuildPiece::SupportAt(GetWorld(), PieceId, At);
 			if (Support == INDEX_NONE) OutResult = FString::Printf(TEXT("no support (%s spans %d)"), *Def->Material.ToString(), FWRBuildRules::SpanFor(Def->Material));
-			else OutResult = AWRBuildPiece::Blocked(GetWorld(), PieceId, Loc);
-			if (OutResult.IsEmpty()) OutResult = WRFreeBuild::OverlapWhy(GetWorld(), *Def, Loc, Yaw, bFree);
+			else if (Def->Snaps()) OutResult = AWRBuildPiece::Blocked(GetWorld(), PieceId, Loc);
+			if (OutResult.IsEmpty() && Def->Snaps()) OutResult = WRFreeBuild::OverlapWhy(GetWorld(), *Def, Loc, Yaw, bFree);
 		}
 		// Thrifty perk: cheaper building.
 		TMap<FName, int32> Cost;
@@ -758,11 +865,18 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		if (OutResult.IsEmpty())
 		{
 			for (const TPair<FName, int32>& C : Cost) FWRMachines::Pay(Inv, C.Key, C.Value);   // planks pay for wood first
-			UWRLifeSkillsComponent::Award(this, TEXT("building"), TEXT("place"), 8.f);
-			const FTransform T(FRotator(0.f, Yaw, 0.f), Loc);
+			// Building XP: metal and biome pieces teach more (survival-crafting 2.24).
+			const bool bHighTier = FWRBuildSets::PlaceXP(*Def) > WRTune(TEXT("lifeSkills.xp.place"), 8.f);
+			UWRLifeSkillsComponent::Award(this, TEXT("building"), bHighTier ? TEXT("placeHighTier") : TEXT("place"), bHighTier ? 12.f : 8.f);
+			const FTransform T = At;
 			AWRBuildPiece* Piece = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 			Piece->InitPiece(PieceId, Who);
 			Piece->Support = Support;
+			if (Def->Kind == TEXT("hearth"))
+			{
+				// Its first day takes an offering (a cooked meal: FWRBuildSets::TryOffer).
+				if (const AWRGameState* WGS = AWRGameState::Get(this)) Piece->PlacedHours = WGS->GetTotalHours();
+			}
 			// Building's every-level bonus (sturdier pieces) and Fortifier (walls, doors, gates, palisades, towers).
 			const bool bWall = Def->Shape == TEXT("wall") || Def->Shape == TEXT("halfwall") || Def->Shape == TEXT("upperwall") || Def->Shape == TEXT("window")
 				|| Def->Shape == TEXT("door") || Def->Shape == TEXT("doorway") || Def->Shape == TEXT("gate") || Def->Shape == TEXT("palisade") || Def->Shape == TEXT("tower");

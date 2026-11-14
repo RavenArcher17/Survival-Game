@@ -394,6 +394,13 @@ private:
 	bool bPlaceSpin = false;
 	double PlaceSpinAt = 0.0;
 	FVector PlaceLoc = FVector::ZeroVector;
+	/** A beam's or brace's slope (degrees; a post stands at 90): the place command carries it (build-building). */
+	float PlacePitch = 0.f;
+	/** Build mode's stability colours on the structure around you (WRBuildIntegrity; client): on while the build bar is
+	 *  open, refreshed a few times a second, cleared when it closes. */
+	void UpdateBuildTint(float DeltaTime);
+	float BuildTintClock = 0.f;
+	bool bBuildTinting = false;
 	bool bPlaceValid = false;
 	FString PlaceWhy;
 	/** The little marks on a foundation showing where a piece will snap (this machine only). */

@@ -4,6 +4,7 @@
 
 #include "WRMachineLook.h"
 #include "WRMachine.h"
+#include "WRTurret.h"
 #include "WRBuilding.h"
 #include "WRBuildLook.h"
 #include "WRCrafting.h"
@@ -1036,9 +1037,119 @@ namespace WRMachineLookDetail
 		M.LightIntensity = 1200.f;
 	}
 
+	/**
+	 * A powered turret (cooks/build-building.md 2.6). A stone plinth carries a bronze slewing ring; the drive shaft from
+	 * the network joins at the back, into a cast-iron gear housing whose worm turns the ring's gear (the head slews on
+	 * it). Up the ring's centre a spindle (on the slewing axis, so turning doesn't disturb it) drives a cross shaft on the
+	 * trunnion axis (so tilting doesn't either), and its sprocket chains to the windlass at the back of the stock, which
+	 * spans the steel bow (bolt turret) or works the pump of the pressure vessel (element turret).
+	 */
+	void Turret(FModel& M, bool bElement)
+	{
+		const FLinearColor Steel(0.32f, 0.33f, 0.35f), Rope2(0.5f, 0.42f, 0.28f);
+		const float Slew = FWRTurretGeom::SlewZ, Trun = FWRTurretGeom::TrunnionZ - FWRTurretGeom::SlewZ;
+		// The plinth: coursed stone, a coping, the fixed outer race of the slewing ring.
+		M.Frame.Box(EM::Stone, FVector(-80.f, -80.f, 0.f), FVector(80.f, 80.f, 58.f), 1.f);
+		for (float Z = 14.f; Z < 58.f; Z += 14.f) M.Frame.Box(EM::Stone, FVector(-81.f, -81.f, Z - 1.f), FVector(81.f, 81.f, Z), 0.6f);   // mortar lines
+		M.Frame.Box(EM::Stone, FVector(-84.f, -84.f, 58.f), FVector(84.f, 84.f, 62.f), 1.12f);
+		M.Frame.Disc(EM::Cloth, FVector(0.f, 0.f, 64.f), FVector::UpVector, 128.f, 4.f, 1.f, Bronze * 0.85f);
+		// The gear housing at the back: the input bearing, the worm's bearings either side of the ring.
+		M.Frame.Box(EM::Iron, FVector(-94.f, -20.f, 62.f), FVector(-60.f, 20.f, 102.f));
+		M.Frame.Disc(EM::Cloth, FWRTurretGeom::PortLocal() + FVector(4.f, 0.f, 0.f), FVector::ForwardVector, 22.f, 6.f, 1.f, Bronze);
+		for (const float Y : { -24.f, 24.f }) M.Frame.Box(EM::Iron, FVector(-64.f, Y - 4.f, 62.f), FVector(-48.f, Y + 4.f, 78.f));
+		// The input shaft out of the housing to the port (a drive shaft's end snaps here).
+		FPartModel& In = M.Part(FWRTurretGeom::PortLocal(), EWRMotion::Spin, FVector::ForwardVector, 1.f);
+		In.Blocks.Rod(EM::Iron, FVector(-2.f, 0.f, 0.f), FVector(30.f, 0.f, 0.f), 8.f);
+		In.Blocks.Flange(FVector(2.f, 0.f, 0.f), FVector::ForwardVector);
+		// The worm, across the ring's back edge, meshing its teeth.
+		FPartModel& Worm = M.Part(FVector(-56.f, 0.f, 70.f), EWRMotion::Spin, FVector::RightVector, 3.f);
+		Worm.Blocks.Rod(EM::Iron, FVector(0.f, -24.f, 0.f), FVector(0.f, 24.f, 0.f), 5.f);
+		for (float Y = -14.f; Y <= 14.f; Y += 4.f) Worm.Blocks.Disc(EM::Cloth, FVector(0.f, Y, 0.f), FVector(0.05f, 1.f, 0.f), 15.f, 1.6f, 1.f, Bronze * 0.9f);
+
+		// The head: it turns on the ring.
+		FPartModel& Head = M.Part(FVector(0.f, 0.f, Slew), EWRMotion::TurretYaw, FVector::UpVector, 1.f);
+		const int32 HeadIx = M.Parts.Num() - 1;
+		Head.Blocks.Gear(EM::Cloth, FVector(0.f, 0.f, 3.f), FVector::UpVector, 46.f, 6.f, 36, 5.f, 1.f, 0.f, Bronze);
+		Head.Blocks.Disc(EM::Wood, FVector(0.f, 0.f, 10.f), FVector::UpVector, 116.f, 8.f, 0.9f);
+		for (const float Y : { -28.f, 28.f })
+		{
+			// Oak cheeks with iron straps and the trunnion bearings.
+			Head.Blocks.Box(EM::Wood, FVector(-34.f, Y - 4.f, 14.f), FVector(34.f, Y + 4.f, Trun + 12.f), 0.95f);
+			Head.Blocks.Box(EM::Iron, FVector(-35.f, Y - 4.5f, 30.f), FVector(35.f, Y + 4.5f, 34.f));
+			Head.Blocks.Disc(EM::Cloth, FVector(0.f, Y * 1.18f, Trun), FVector::RightVector, 20.f, 5.f, 1.f, Bronze);
+		}
+		// The spindle up the slewing axis and the cross shaft on the trunnion axis (with its sprocket for the chain).
+		FPartModel& Spindle = M.Part(FVector(0.f, 0.f, 14.f), EWRMotion::Spin, FVector::UpVector, 2.f, HeadIx);
+		Spindle.Blocks.Rod(EM::Iron, FVector::ZeroVector, FVector(0.f, 0.f, Trun - 26.f), 6.f);
+		Spindle.Blocks.Gear(EM::Iron, FVector(0.f, 0.f, Trun - 26.f), FVector::UpVector, 6.f, 4.f, 8, 3.f);
+		FPartModel& Cross = M.Part(FVector(0.f, 0.f, Trun), EWRMotion::Spin, FVector::RightVector, 0.5f, HeadIx);
+		Cross.Blocks.Rod(EM::Iron, FVector(0.f, -24.f, 0.f), FVector(0.f, 24.f, 0.f), 6.f);
+		Cross.Blocks.Crown(EM::Iron, FVector(0.f, -4.f, 0.f), FVector::RightVector, 9.f, 3.f, 14, 3.f);
+		Cross.Blocks.Gear(EM::Iron, FVector(0.f, 18.f, 0.f), FVector::RightVector, 8.f, 3.f, 10, 2.5f);
+
+		// What tilts on the trunnions: the stock and what it carries.
+		FPartModel& Pitch = M.Part(FVector(0.f, 0.f, Trun), EWRMotion::TurretPitch, FVector::RightVector, 1.f, HeadIx);
+		const int32 PitchIx = M.Parts.Num() - 1;
+		const float Up = FWRTurretGeom::MuzzleUp;
+		Pitch.Blocks.Box(EM::Wood, FVector(-72.f, -8.f, 8.f), FVector(FWRTurretGeom::MuzzleFwd, 8.f, Up), 1.f);
+		Pitch.Blocks.Box(EM::Iron, FVector(-62.f, -2.f, Up), FVector(FWRTurretGeom::MuzzleFwd - 2.f, 2.f, Up + 1.5f));   // the groove's iron
+		for (const float X : { -40.f, 0.f, 40.f }) Pitch.Blocks.Box(EM::Iron, FVector(X - 2.f, -9.f, 7.f), FVector(X + 2.f, 9.f, Up + 0.5f));   // bands
+		// The chain from the cross shaft's sprocket back to the windlass (both on the trunnion line's side).
+		Pitch.Blocks.Rod(EM::Iron, FVector(0.f, 18.f, 7.f), FVector(-62.f, 18.f, 16.f), 1.6f, 1.f, true);
+		Pitch.Blocks.Rod(EM::Iron, FVector(0.f, 18.f, -7.f), FVector(-62.f, 18.f, 4.f), 1.6f, 1.f, true);
+		if (!bElement)
+		{
+			// The steel bow across the front on its prod block, the string drawn back to the nut, a bolt in the groove,
+			// the bolt box over it that drops the next one in.
+			Pitch.Blocks.Box(EM::Iron, FVector(FWRTurretGeom::MuzzleFwd - 18.f, -11.f, 8.f), FVector(FWRTurretGeom::MuzzleFwd, 11.f, Up + 2.f));
+			for (const float S : { -1.f, 1.f })
+			{
+				const FVector Root(FWRTurretGeom::MuzzleFwd - 9.f, S * 10.f, Up - 6.f), Mid(FWRTurretGeom::MuzzleFwd - 14.f, S * 46.f, Up - 6.f), Tip(FWRTurretGeom::MuzzleFwd - 28.f, S * 80.f, Up - 6.f);
+				Pitch.Blocks.Rod(EM::Cloth, Root, Mid, 5.f, 1.f, true, Steel);
+				Pitch.Blocks.Rod(EM::Cloth, Mid, Tip, 4.f, 1.f, true, Steel);
+				Pitch.Blocks.Rod(EM::Cloth, Tip, FVector(-30.f, S * 2.f, Up + 1.f), 0.9f, 1.f, false, Rope2);   // the string
+			}
+			Pitch.Blocks.Box(EM::Iron, FVector(-36.f, -6.f, Up - 2.f), FVector(-24.f, 6.f, Up + 6.f));   // nut and claw
+			Pitch.Blocks.Rod(EM::Wood, FVector(-24.f, 0.f, Up + 2.5f), FVector(FWRTurretGeom::MuzzleFwd - 6.f, 0.f, Up + 2.5f), 2.6f);
+			Pitch.Blocks.Add(EM::Iron, FVector(4.f, 4.f, 9.f), FVector(FWRTurretGeom::MuzzleFwd - 2.f, 0.f, Up + 2.5f), FRotator(-90.f, 0.f, 0.f), 1.f, EWRLookMesh::Cone);   // the head
+			for (const float S : { -1.f, 1.f }) Pitch.Blocks.Add(EM::Cloth, FVector(10.f, 0.6f, 3.f), FVector(-18.f, S * 1.5f, Up + 4.f), FRotator(0.f, S * 10.f, 0.f), 1.f, EWRLookMesh::Cube, FLinearColor(0.6f, 0.55f, 0.45f));   // fletching
+			Pitch.Blocks.Box(EM::Wood, FVector(-14.f, -11.f, Up + 6.f), FVector(22.f, -9.f, Up + 34.f), 0.9f);
+			Pitch.Blocks.Box(EM::Wood, FVector(-14.f, 9.f, Up + 6.f), FVector(22.f, 11.f, Up + 34.f), 0.9f);
+			Pitch.Blocks.Box(EM::Wood, FVector(-16.f, -11.f, Up + 6.f), FVector(-14.f, 11.f, Up + 34.f), 0.9f);
+			Pitch.Blocks.Box(EM::Wood, FVector(22.f, -11.f, Up + 6.f), FVector(24.f, 11.f, Up + 34.f), 0.9f);
+			for (int32 b = 0; b < 4; ++b) Pitch.Blocks.Rod(EM::Wood, FVector(-12.f, -6.f + b * 4.f, Up + 30.f), FVector(20.f, -6.f + b * 4.f, Up + 30.f), 2.2f);   // bolts waiting
+			Pitch.Blocks.Box(EM::Iron, FVector(-17.f, -12.f, Up + 20.f), FVector(25.f, 12.f, Up + 23.f));
+			// The windlass at the back: a drum the cords wind on, a ratchet wheel, the chain's sprocket.
+			FPartModel& Windlass = M.Part(FVector(-62.f, 0.f, 10.f), EWRMotion::Spin, FVector::RightVector, 0.5f, PitchIx);
+			Windlass.Blocks.Add(EM::Wood, FVector(18.f, 18.f, 32.f), FVector::ZeroVector, FRotator(0.f, 0.f, 90.f), 1.f, EWRLookMesh::Cylinder);
+			Windlass.Blocks.Gear(EM::Iron, FVector(0.f, -18.f, 0.f), FVector::RightVector, 11.f, 3.f, 12, 3.f);
+			Windlass.Blocks.Gear(EM::Iron, FVector(0.f, 18.f, 0.f), FVector::RightVector, 8.f, 3.f, 10, 2.5f);
+			for (const float S : { -1.f, 1.f }) Pitch.Blocks.Rod(EM::Cloth, FVector(-62.f, S * 8.f, 19.f), FVector(-34.f, S * 4.f, Up + 2.f), 1.2f, 1.f, false, Rope2);   // cords to the claw
+			for (const float S : { -1.f, 1.f }) Pitch.Blocks.Box(EM::Iron, FVector(-70.f, S * 18.f - 2.f, 4.f), FVector(-54.f, S * 18.f + 2.f, 16.f));   // its bearings
+			return;
+		}
+		// Element turret: a riveted copper pressure vessel, a pump the windlass works, a brass siphon to the nozzle and
+		// a pilot flame at its mouth.
+		const FLinearColor CopperC(0.55f, 0.24f, 0.1f);
+		Pitch.Blocks.Add(EM::Cloth, FVector(34.f, 34.f, 64.f), FVector(-30.f, 0.f, Up + 16.f), FRotator(90.f, 0.f, 0.f), 1.f, EWRLookMesh::Cylinder, CopperC);
+		for (const float X : { -56.f, -30.f, -4.f }) Pitch.Blocks.Add(EM::Cloth, FVector(36.f, 36.f, 2.f), FVector(X, 0.f, Up + 16.f), FRotator(90.f, 0.f, 0.f), 1.f, EWRLookMesh::Cylinder, CopperC * 0.75f);
+		Pitch.Blocks.Add(EM::Iron, FVector(10.f, 10.f, 8.f), FVector(-30.f, 0.f, Up + 36.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);   // the filler cap
+		Pitch.Blocks.Rod(EM::Cloth, FVector(2.f, 0.f, Up + 16.f), FVector(FWRTurretGeom::MuzzleFwd - 10.f, 0.f, Up + 4.f), 7.f, 1.f, false, Bronze);
+		Pitch.Blocks.Add(EM::Cloth, FVector(12.f, 12.f, 14.f), FVector(FWRTurretGeom::MuzzleFwd - 4.f, 0.f, Up + 3.f), FRotator(-90.f, 0.f, 0.f), 1.f, EWRLookMesh::Cone, Bronze);
+		Pitch.Blocks.Add(EM::Cloth, FVector(3.f, 3.f, 5.f), FVector(FWRTurretGeom::MuzzleFwd + 3.f, 0.f, Up + 9.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cone, LampGlow);   // pilot
+		FPartModel& Pump = M.Part(FVector(-62.f, 0.f, 10.f), EWRMotion::Spin, FVector::RightVector, 0.5f, PitchIx);
+		Pump.Blocks.Gear(EM::Iron, FVector(0.f, 18.f, 0.f), FVector::RightVector, 8.f, 3.f, 10, 2.5f);
+		Pump.Blocks.Disc(EM::Iron, FVector(0.f, -10.f, 0.f), FVector::RightVector, 22.f, 4.f);
+		Pump.Blocks.Rod(EM::Iron, FVector(0.f, -10.f, 0.f), FVector(8.f, -10.f, 6.f), 3.f);   // the crank pin
+		Pitch.Blocks.Add(EM::Cloth, FVector(10.f, 10.f, 26.f), FVector(-52.f, -10.f, Up + 4.f), FRotator(90.f, 0.f, 0.f), 1.f, EWRLookMesh::Cylinder, Bronze);   // pump barrel
+		for (const float S : { -1.f, 1.f }) Pitch.Blocks.Box(EM::Iron, FVector(-70.f, S * 18.f - 2.f, 4.f), FVector(-54.f, S * 18.f + 2.f, 16.f));
+	}
+
 	void Build(FModel& M, const FWRPieceDef& Def, float Hub)
 	{
 		const FName Id = Def.Id;
+		if (Id == TEXT("bolt_turret")) { Turret(M, false); return; }
+		if (Id == TEXT("element_turret")) { Turret(M, true); return; }
 		if (Id == TEXT("drive_shaft")) DriveShaft(M, 400.f);
 		else if (Id == TEXT("long_drive_shaft")) DriveShaft(M, 600.f);
 		else if (Id == TEXT("gearbox")) Gearbox(M);
@@ -1162,6 +1273,7 @@ TArray<FWRPort> FWRMachineLook::LocalPorts(const FWRPieceDef& Def, float Hub)
 	else if (Id == TEXT("drill")) P.Add({ FVector(-150.f, 0.f, 190.f), X });
 	else if (Id == TEXT("coil_lamp") || Id == TEXT("greenhouse_lights")) P.Add({ FVector(-50.f, 0.f, 27.f), X });
 	else if (Id == TEXT("cold_store")) P.Add({ FVector(0.f, -70.f, 110.f), Y });
+	else if (Id == TEXT("bolt_turret") || Id == TEXT("element_turret")) P.Add({ FWRTurretGeom::PortLocal(), X });
 	else if (Id == TEXT("conveyor") || Id == TEXT("long_conveyor"))
 	{
 		const float L = Id == TEXT("conveyor") ? 200.f : 600.f;
@@ -1219,6 +1331,13 @@ TArray<TPair<FVector, FVector>> FWRMachineLook::CollisionBoxes(const FWRPieceDef
 	else if (Id == TEXT("resonance_pylon")) Box(FVector(-30.f, -30.f, 0.f), FVector(30.f, 30.f, 450.f));
 	else if (Id == TEXT("blood_still")) Box(FVector(-60.f, -60.f, 0.f), FVector(110.f, 60.f, 170.f));
 	else if (Id == TEXT("mycelium_vat")) Box(FVector(-95.f, -95.f, 0.f), FVector(95.f, 95.f, 112.f));
+	else if (Id == TEXT("bolt_turret") || Id == TEXT("element_turret"))
+	{
+		// The plinth and the gear housing; the head's sweep stands over the plinth (it turns inside this box).
+		Box(FVector(-84.f, -84.f, 0.f), FVector(84.f, 84.f, 62.f));
+		Box(FVector(-94.f, -20.f, 62.f), FVector(-60.f, 20.f, 102.f));
+		Box(FVector(-40.f, -40.f, 62.f), FVector(40.f, 40.f, FWRTurretGeom::TrunnionZ + 20.f));
+	}
 	return B;
 }
 
@@ -1258,6 +1377,7 @@ void FWRMachineLook::Build(AWRBuildPiece* Piece, const FWRPieceDef& Def)
 	USceneComponent* Root = Piece->GetRootComponent();
 	FWRMachineVisual V;
 	V.Piece = Piece;
+	V.bTurret = UWRTurretSubsystem::IsTurret(Def);
 	if (const FWRMachineDef* MD = FWRMachineDefs::Get().Find(Def.Id)) V.Rpm = MD->Rpm;
 	if (bDraws)
 	{
@@ -1381,6 +1501,63 @@ void UWRMachineLookSubsystem::Tick(float DeltaTime)
 		Eye = PC->PlayerCameraManager->GetCameraLocation();
 	}
 	for (FWRMachineVisual& V : Visuals) TickOne(V, DeltaTime, Eye);
+}
+
+void UWRMachineLookSubsystem::TickTurret(FWRMachineVisual& V, float Dt, float Now)
+{
+	using namespace WRMachineLookDetail;
+	AWRBuildPiece* Piece = V.Piece.Get();
+	const FWRTurretRep& T = Piece->Turret;
+	// The head eases after the server's aim a little faster than it slews, so it never lags far behind.
+	const auto Ease = [Dt](float From, float To, float Rate) { const float D = FRotator::NormalizeAxis(To - From); return FRotator::NormalizeAxis(From + FMath::Clamp(D, -Rate * Dt, Rate * Dt)); };
+	V.TurretYaw = Ease(V.TurretYaw, T.Yaw, 180.f);
+	V.TurretPitch = Ease(V.TurretPitch, T.Pitch, 100.f);
+	const float Tell = UWRTurretSubsystem::TellSeconds();
+	const bool bTelling = T.TellAt > 0.f && Now - T.TellAt >= 0.f && Now - T.TellAt < Tell;
+	const FVector Muzzle = FWRTurretGeom::Muzzle(Piece, V.TurretYaw, V.TurretPitch);
+	if (T.TellAt != V.LastTell)
+	{
+		V.LastTell = T.TellAt;
+		if (bTelling) WRSound::PlayAt(Piece, TEXT("turret.tell"), Muzzle);
+	}
+	if (T.ShotAt != V.LastShot)
+	{
+		V.LastShot = T.ShotAt;
+		WRFx::SpawnAt(Piece, TEXT("hit.dust"), Muzzle, FRotator::ZeroRotator, 0.35f);   // the snap of the bow (or the vessel's breath)
+	}
+	// The aim line: a thin red light down the shot's lane for the tell, brightening as it ends.
+	UStaticMeshComponent* Line = V.AimLine.Get();
+	if (!Line)
+	{
+		Line = NewObject<UStaticMeshComponent>(Piece);
+		Line->SetStaticMesh(ShapeMesh(true));
+		Line->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Line->SetCastShadow(false);
+		Line->SetUsingAbsoluteLocation(true);
+		Line->SetUsingAbsoluteRotation(true);
+		Line->SetUsingAbsoluteScale(true);
+		Line->SetupAttachment(Piece->GetRootComponent());
+		Line->RegisterComponent();
+		if (UMaterialInterface* Glow = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Creatures/M_Glow.M_Glow")))
+		{
+			UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Glow, Piece);
+			MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.f, 0.05f, 0.03f));
+			MID->SetScalarParameterValue(TEXT("Glow"), 4.f);
+			Line->SetMaterial(0, MID);
+		}
+		V.AimLine = Line;
+	}
+	const FVector End = FVector(T.AimAt);
+	const bool bShow = bTelling && !End.IsZero();
+	Line->SetVisibility(bShow);
+	if (bShow)
+	{
+		const FVector D = End - Muzzle;
+		const float Len = D.Size();
+		const float Grow = FMath::Clamp((Now - T.TellAt) / Tell, 0.f, 1.f);
+		Line->SetWorldLocationAndRotation((Muzzle + End) * 0.5f, FRotationMatrix::MakeFromZ(D / FMath::Max(1.f, Len)).Rotator());
+		Line->SetWorldScale3D(FVector(0.012f + 0.01f * Grow, 0.012f + 0.01f * Grow, Len / 100.f));
+	}
 }
 
 void UWRMachineLookSubsystem::TickOne(FWRMachineVisual& V, float Dt, const FVector& Eye)
@@ -1632,11 +1809,18 @@ void UWRMachineLookSubsystem::TickOne(FWRMachineVisual& V, float Dt, const FVect
 				C->SetRelativeRotation(FQuat::Slerp(C->GetRelativeRotation().Quaternion(), Want, FMath::Min(1.f, Dt * 0.5f)));
 				break;
 			}
+			case EWRMotion::TurretYaw:
+				C->SetRelativeRotation(FRotator(0.f, V.TurretYaw, 0.f));
+				break;
+			case EWRMotion::TurretPitch:
+				C->SetRelativeRotation(FRotator(V.TurretPitch, 0.f, 0.f));
+				break;
 			default:
 				break;
 			}
 		}
 	}
+	if (V.bTurret && bDraws) TickTurret(V, Dt, Now);
 
 	// Belt riders: one shape per stack, gliding from the tail at the belt's run, waiting at the head if it's jammed.
 	if (V.BeltLen > 0.f)

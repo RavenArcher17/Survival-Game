@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRBuildSets.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
@@ -974,15 +975,21 @@ void UWRGA_Melee::Sweep()
 			if (!HitThisSwing.Contains(Piece) && PS && !Piece->CanAccess(PS->GetPlayerName()))
 			{
 				HitThisSwing.Add(Piece);
+				const FWRPieceDef* PieceDef = Piece->GetDef();
 				{
 					// Splinters off a wooden wall, grit off a stone one.
-					const FWRPieceDef* PieceDef = Piece->GetDef();
 					const bool bWood = PieceDef && PieceDef->Material == TEXT("wood");
 					const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : Piece->GetActorLocation();
 					WRFx::Broadcast(Character, bWood ? TEXT("gather.wood") : TEXT("hit.dust"), At, (Start - At).GetSafeNormal().Rotation(), bHeavy ? 1.3f : 1.f, bWood ? TEXT("gather.wood") : TEXT("hit.block"));
 				}
-				Piece->TakeBuildDamage(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f)
-					* T.Num(TEXT("building.raidDamageMultiplier"), 1.f), Character);
+				// Weapons and tools barely mark a wall: wood takes a tenth, stone a fiftieth, metal and the biome sets
+				// nothing (Data/building_sets.json materialDamage; survival-crafting 2.18). Raids bring charges and rams.
+				const float Share = PieceDef ? FWRBuildSets::Get().WeaponShare(PieceDef->Material) : 1.f;
+				if (Share > 0.f)
+				{
+					Piece->TakeBuildDamage(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f)
+						* T.Num(TEXT("building.raidDamageMultiplier"), 1.f) * Share, Character);
+				}
 			}
 			continue;
 		}

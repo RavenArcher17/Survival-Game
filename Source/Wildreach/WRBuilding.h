@@ -50,6 +50,20 @@ struct FWRPieceDef
 	/** Shown only while this biome's land is live, though it builds anywhere (pieces.json "liveWith": the cold store,
 	 *  the soul engine, the resonance pylon, the rift chest: cooks/build-machinery.md 2.5). */
 	FName LiveWith;
+	/** build-building (Data/building_sets.json, FWRBuildSets): the tier a generated piece belongs to (metal, wood,
+	 *  basalt_hall...; Material is the same for its structure), a decor piece's model and variant (WRBuildLookDecor), a
+	 *  freeform beam's length (cm: it runs that far along its own X from where it's placed), the blueprint that must be
+	 *  learned to build it, a placing rule ("vent": lava within reach, a hot spring bath). */
+	FName Tier;
+	FName Arch;
+	FName Variant;
+	float FreeLength = 0.f;
+	FName Blueprint;
+	FName Needs;
+	/** Freeform structural pieces (beams, posts, braces): placed at any angle, carry support from their ends. */
+	bool IsBeam() const { return Kind == TEXT("beam"); }
+	/** Anything that takes part in support (snapped structure and beams). */
+	bool IsStructural() const { return Snaps() || IsBeam(); }
 	/** Plots, pens, hives, traps, salt pans, wells and channels: run by the farm subsystem (WRFarm). */
 	bool IsFarm() const { return Kind == TEXT("crop") || Kind == TEXT("pen") || Kind == TEXT("hive") || Kind == TEXT("trap") || Kind == TEXT("saltpan") || Kind == TEXT("well") || Kind == TEXT("channel"); }
 
@@ -67,6 +81,9 @@ public:
 	float GridSize = 400.f;
 	TMap<FName, int32> Span;
 	TMap<FName, float> UpkeepPerPiecePerHour;
+	/** The item a material's upkeep is paid in (wood -> wood, stone -> stone, metal -> steel plate, a set -> its block). */
+	TMap<FName, FName> UpkeepItem;
+	FName UpkeepItemFor(FName Material) const { const FName* I = UpkeepItem.Find(Material); return I ? *I : Material; }
 	float ClaimRadius = 3000.f;
 	float ClaimRadiusPerUpgrade = 1000.f;
 	float ClaimMaxRadius = 6000.f;
@@ -109,7 +126,7 @@ struct WILDREACH_API FWRBuildRules
 	static int32 LevelFor(FName Shape, float PointZ, float Top);
 	/** Max support distance (pieces) for a material: wood 4, stone 6. */
 	static int32 SpanFor(FName Material);
-	/** Upkeep per hour for a claim holding these pieces. */
+	/** Upkeep per hour for a claim holding these pieces (by material), keyed by the item it's paid in. */
 	static TMap<FName, float> UpkeepPerHour(const TMap<FName, int32>& PiecesByMaterial);
 	/**
 	 * One minute of a claim's upkeep: adds each rate's sixtieth to Owed and takes whole items from Storage as they fall
@@ -173,6 +190,8 @@ public:
 	/** Machines (WRMachine, cooks/build-machinery.md): what every machine draws and the screen reads; a conveyor's
 	 *  riding stacks (their stacks themselves are in Storage, in the same order); the server's own state (saved). */
 	UPROPERTY(Replicated) FWRMachineRep Machine;
+	/** Turrets (WRTurret): where the head points, its aim line and its last shot (every machine draws them). */
+	UPROPERTY(Replicated) FWRTurretRep Turret;
 	UPROPERTY(Replicated) TArray<FWRBeltItem> Belt;
 	FWRMachineState Mach;
 	/** A name its owner gave it (chests: "chestname"; empty = the piece's own name). Saved with the world. */
@@ -185,6 +204,11 @@ public:
 	UPROPERTY(Replicated) TArray<FString> UnlockedFor;
 	/** Server bookkeeping. */
 	FString LockCode;
+	/** A Hearth's piece: the game hour it was built (its first day takes an offering) and the meal left on it (saved). */
+	double PlacedHours = -1.0;
+	FName Offering;
+	/** Build mode's stability colour laid over it (client, WRBuildIntegrity): which colour it wears now (-1 none). */
+	int32 TintStep = -1;
 	/** Beds: the players who've set it to wake at (WRBeds; saved with the world). */
 	TArray<FString> Sleepers;
 	/** Ghosts are local previews in build mode: no collision, tinted, in the piece's real shape. */
@@ -219,10 +243,15 @@ public:
 	TSharedRef<class FJsonObject> ToJson() const;
 	void FromJson(const TSharedPtr<class FJsonObject>& Json);
 
-	/** Server: recompute support for structure pieces around a point; collapse what's unsupported. */
+	/** Server: recompute support for structure pieces around a point; what's unsupported falls (rubble, WRBuildIntegrity). */
 	static void RecomputeSupport(UWorld* World, const FVector& Around, float Radius);
 	/** Support a new structure piece would have at this spot (INDEX_NONE = unsupported). */
-	static int32 SupportAt(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore = nullptr);
+	static int32 SupportAt(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore = nullptr)
+	{
+		return SupportAt(World, PieceId, FTransform(Location), Ignore);
+	}
+	/** The same with its turn and slope (a beam reaches from its location along its own X). */
+	static int32 SupportAt(UWorld* World, FName PieceId, const FTransform& At, const AWRBuildPiece* Ignore = nullptr);
 	/** Why a piece can't go here because of what's already built (its slot is taken, or stairs need the opening above them); empty = free. */
 	static FString Blocked(UWorld* World, FName PieceId, const FVector& Location, const AWRBuildPiece* Ignore = nullptr);
 

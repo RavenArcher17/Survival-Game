@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased: building (metal, the 12 biome sets, beams and posts, structural integrity, comfort decor, powered turrets)
+
+Aaron (lane build-building: FULL-GAME 6.4; research, requirement ledger and plan in showcase-notes
+cooks/build-building.md, following cooks/survival-crafting.md 2.2 / 2.17 / 2.18). Built to compile (editor and full
+unity); not played here (Aaron and the testers test, F8).
+
+- **Metal tier** (Hearth 4, span 8): the 12 shapes (foundation, wall, half wall, upper wall, doorway, door with a code
+  lock, window, floor, stairs, roof, gable, pillar) at wall 2,500 / foundation 3,500 / door 2,800 HP, a wall costs 8
+  steel plate + 10 stone, upkeep 0.1 steel plate a piece an hour. Riveted brushed-steel panels on a dark core over a
+  45 cm stone footing, H-section corner posts, a steel mid-rail and top channel, riveted deck plates, standing-seam
+  roofs, steel stairs with grip ribs, a strapped steel door.
+- **The 12 biome building sets** (Hearth 5, span 8, wall 3,000 / foundation 4,200 / door 3,200, 20 biome blocks a
+  wall, upkeep 0.1 block): Basalt hall (hexagonal basalt columns under an obsidian lintel, ember-glass windows, causeway
+  hex pavers), Crag hold (granite with slate bands, verdigris copper flashing, storm shutters), Sun court (sandstone
+  ashlar, round arches of voussoirs, a sunstone inlay band, barrel tiles), Heartwood lodge (a braced heartwood frame
+  with amber in its notches, boards infill, moss on the shingles), Cloud spire (white ashlar, blue tile bands, arches
+  with a levistone keystone hovering over them), Geode sanctum (dark stone with violet crystal druses, faceted crystal
+  windows, pillars with a glowing core), Rime lodge (pine logs crossing at saddle-notched corners on a stone sill,
+  carved prows on the gables, packed snow on the roof), Stilt house (mangrove stilts, woven reed walls, lacquered bands
+  and bone pegs, thick thatch), Coral keep (coral-rag with coral sprigs, porthole windows of sea-glass, shell scallop
+  roofs), Mourning chapel (grey ashlar with buttresses, pointed arches, stained glass in bruise colours, iron cresting),
+  Mycelium den (quilted mycelium felt between root stems, shelf-fungus floors, a fungal cap roof with glowing gills),
+  Hollow bastion (grey stone with voidglass slabs rimmed in violet). **Biome blocks**: workbench L5, 4 stone + the
+  land's signature resource + a steel plate -> 4. One material, `M_BuildTinted`, draws all of them.
+- **Each set's 6 furnishings and its rug** (72 + 12, modelled at furniture sizes in the set's colours: thrones,
+  benches, tables, lamps, baths, beds, hammocks, racks, chimes, bells, drums, harps, a fountain, an aquarium, a star
+  globe...), comfort group "biome set" 2 (the rug floor 2). A blueprint per set (`bp_<set>_decor`) teaches all seven and
+  drops from the land's major boss (Vulkarn, Skaldrith on the island); the card says who drops it until you know it.
+- **Freeform beams, posts and braces** in every tier (wood, stone, metal, each set): a 2 m and 4 m beam, a 3 m post, a
+  45-degree brace, a new "Beams & posts" tab. The start goes where you aim (on a wall a beam runs out toward you, on a
+  floor along your look; a post aimed under a floor props it), with snap on it takes another beam's end, a beam slopes
+  with your look in 15-degree steps (5 on the fine grid). **Integrity**: Raven's span rule kept; a beam or post costs 1
+  span step per 2 m it reaches out (a post standing up bears like a pillar), passes support to what rests on it, and a
+  brace from a wall to a pillar or post lets that wall reach one more. **Stability colours** while the build bar is open
+  (blue on the ground, green, yellow, orange, red at the last step) on every structure piece within 25 m, and on the
+  ghost. **Collapse**: what loses its support falls as 4 to 8 rubble chunks of its own material with dust and a crack,
+  a falling chunk deals 50 to whoever it lands on (ApplyHit), then they sink away (`AWRRubble`).
+- **Comfort**: every decor piece of the comfort table now exists (bench, carved throne, long table, fur bed, tapestry,
+  fireplace, candelabrum, standing lantern, crystal lamp, sunstone lamp, potted plant, flowering pot, wooden tub, hot
+  spring bath on a vent, hand drum, lyre, mirror), their lamps light their rooms (`lights.decor_lamp`); the **Hearth
+  offering** (a cooked meal left on a new Hearth in its first day: +2 at every bed in its claim, saved); the
+  **Decorator** perk (+3, cap 23).
+- **Powered turrets**: the **bolt turret** (Hearth 4, 6 P) is a springald on a slewing ring: the drive shaft joins at
+  the back, a worm turns the ring, a spindle and cross shaft run a chain to the windlass that spans the steel bow; it
+  finds hostile wild creatures within 30 m (on PvP servers, players not of your clan inside your claim), turns onto
+  them, shows a red aim line for 0.9 s (following slowly, still for the last 0.3) and looses a crossbow bolt straight
+  at 4,000 cm/s, 45 damage, every 1.5 s at full power (slower short of power). The **element turret** (Hearth 5, 8 P):
+  ember essence throws a 6 m cone of fire (30 + burn 20), frost essence a slowing frost bolt, 50 shots an essence; the
+  other paths' essences are rows waiting for their items. Machine screen: their state and shots left; Turret tech
+  (+20%) live. They never move, chase or hurt what only stands near them.
+- **Rules**: no base piece in a cave (lights, drills, dark crops and greenhouse lights still go underground); weapons
+  and tools barely mark walls (wood a tenth, stone a fiftieth, metal and biome nothing: `materialDamage`). Metal and
+  biome pieces give 12 Building XP; Master builder (a quarter off metal and biome pieces) and Ancient wood (a felled tree
+  now and then gives its land's block) are live. The claim screen and totem take every upkeep material.
+- Data: `Data/building_sets.json` (new), pieces.json, items.json (12 blocks, 12 blueprints), recipes.json, gear.json,
+  machines.json (turret rows and ammo), lifeskills.json, tuning.json, fx.json, sounds.json (reused CC0 recordings).
+  Assets: `Content/Building/M_BuildTinted.uasset`, `M_BuildOverlay.uasset` (47 KB). New code: `WRBuildSets.*`,
+  `WRBuildIntegrity.*`, `WRBuildLookKit.h`, `WRBuildLookSets.cpp`, `WRBuildLookDecor.cpp`, `WRTurret.*`.
+- Not finished: tundra hot springs aren't on the map (the bath goes by lava); ten sets and their decor wait for their
+  lands; ten element-turret essences wait for their paths' items; turrets reuse the crossbow and spell sounds.
+
 ## Unreleased: machinery and power (water wheels, windmills, turbines, shafts, conveyors, sorting, drills, the 12 biome machines)
 
 Aaron (lane build-machinery: FULL-GAME 6.3 machinery; research, requirement ledger and plan in showcase-notes
