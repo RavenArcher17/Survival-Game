@@ -36,6 +36,9 @@ public:
 	TWeakObjectPtr<AActor> RespawnPoint;
 	/** Server: named bosses this player has felled (saved): each one's first-kill drop comes once. */
 	TSet<FName> BossKills;
+	/** Blueprints this survivor has read (saved; cooks/build-crafting.md 2.9): their recipes are open to them for good.
+	 *  Only their own client gets them (the Crafting tab). */
+	UPROPERTY(Replicated) TArray<FName> KnownBlueprints;
 	/** Server: the shrine-stones by boss arenas this player has rested at (wake choices on the death screen). */
 	TArray<TWeakObjectPtr<AActor>> BoundStones;
 	/** The beds you've set and your clan's, for your map and death screen (only your own client gets them). */

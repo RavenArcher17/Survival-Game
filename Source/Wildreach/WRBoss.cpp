@@ -5,6 +5,8 @@
 #include "WRCombatLibrary.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
+#include "WRGear.h"
+#include "WRSocial.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRStatusComponent.h"
@@ -1190,6 +1192,30 @@ void AWRBoss::OnDeath(AActor* Killer)
 			const int32 N = L.Key == TEXT("upgrade_shard") ? FMath::RandRange(FMath::Max(1, L.Value - 1), L.Value + 1) : L.Value;
 			PS->GetInventory()->AddItem(L.Key, N);
 			Got += FString::Printf(TEXT("%s x%d  "), *L.Key.ToString(), N);
+		}
+		// Blueprints (cooks/build-crafting.md 2.9): a major boss's first kill per survivor always teaches something new,
+		// later kills now and then (gear.json blueprints.repeatChance). No room in the bag: it waits in a bag on the ground.
+		if (bMajor)
+		{
+			const FName Bp = FWRBlueprints::BossDrop(PS, CreatureId, !PS->BossKills.Contains(CreatureId));
+			if (!Bp.IsNone())
+			{
+				if (PS->GetInventory()->AddItem(Bp, 1) > 0)
+				{
+					FActorSpawnParameters BagParams;
+					BagParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					if (AWRLootBag* Bag = GetWorld()->SpawnActor<AWRLootBag>(AWRLootBag::StaticClass(), GetActorLocation(), FRotator::ZeroRotator, BagParams))
+					{
+						Bag->OwnerName = PS->GetPlayerName();
+						Bag->bOwnerOnly = true;
+						Bag->Items.Add(FWRInventoryRules::MakeInstance(Bp));
+						Bag->SetLifeSpan(WRTune(TEXT("death.bagMinutes"), 30.f) * 60.f);
+					}
+				}
+				const FWRItemDef* BpDef = FWRItemRegistry::Get().Find(Bp);
+				Got += FString::Printf(TEXT("%s  "), BpDef ? *BpDef->Name : *Bp.ToString());
+				UE_LOG(LogWildreach, Log, TEXT("BOSS %s blueprint for %s: %s"), *GetDisplayLabel(), *Entry.Key, *Bp.ToString());
+			}
 		}
 		if (bMajor && FMath::FRand() < WRTune(TEXT("bosses.partChance"), 0.25f))
 		{

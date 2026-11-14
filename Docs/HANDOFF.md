@@ -99,11 +99,26 @@ freshness and worth travel with them. New rules for new code: a new crop is a `f
 items, an icon); a new farm animal an `animals` row; a dish a `cooking.json dishes` row plus its item; a land's farm
 pieces, crops, fish, lures and recipes carry `biome` and stay hidden until it's in `tuning world.liveBiomes`.
 
+Also since 0.7.1: **crafting to tier 5** (`WRGear.cpp`, `Data/gear.json`, cooks/build-crafting.md): steel and
+starsteel, a charcoal kiln, star iron in the highland caves, core shards; the armour slot is now **Head, Chest
+(`EWREquipSlot::Armor`), Hands, Legs** plus **Talisman** and **Ring / Ring2** (`WRGearSlots::All`, `GetEquipped`); the
+12 biome sets and their Ascendant pieces with 2 / 4-piece bonuses; rings, talismans from trophies, runes, salvage,
+removing extras, blueprints (`AWRPlayerState::KnownBlueprints`, saved). Rules for new code: anything that reads worn
+gear asks `UWRInventoryComponent::GearStat(<stat>)` (or `GearStatFor(actor, ...)`): it adds the weapon's sockets and
+innate effects, the active set bonuses, the talisman and the rings. A stat named like a life-skill stat already adds to
+`StatFor`. A land's lane wires its set's and talismans' stats (fallDamage, glideSeconds, passWards, spellCost,
+riftDrain, breathSeconds, sprintStamina...: the list is in gear.json and items.json `worn`). A recipe whose effect has no
+system yet gets `"waitsFor"` and stays hidden. Saves carry `gearSlots: 2`; an older one migrates the armour.
+
 Open, as of 0.7.1:
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
   their land is listed in `world.liveBiomes`. Greenhouse glass needs Hearth 4 (steel). Hungry animals show it only on
   the prompt; no chimney smoke yet; bone meal waits for the grinder.
+- **Crafting tiers 4 and 5 need 4 and 6 major bosses**; the island has Vulkarn and Skaldrith, so steel, the biome
+  sets, rings above iron and the boss-weapon blueprints' recipes show "Needs tier 4/5" (`WRHearthLevel` for tests).
+  Boss weapons use their class's moves; set-decor blueprints, portal drops and the Old Tusker talisman wait for their
+  systems.
 - **Survival on the island is two biomes**: only Ashfall / Blizzard and the lesser volcanic and tundra weathers can
   happen; corruption, dark nights, strikes and gusts are live in code and data for the biomes that don't exist yet. The
   hero has no sleep clip (the death clip's end is held on the bed; `rest.pose*` in tuning).

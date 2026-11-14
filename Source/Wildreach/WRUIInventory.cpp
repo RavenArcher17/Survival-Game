@@ -15,6 +15,8 @@
 #include "WRCombatTypes.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
+#include "WRGear.h"
+#include "WRCrafting.h"
 #include "WRAbilities.h"
 #include "WRKeyBindings.h"
 #include "WRPlayerController.h"
@@ -445,13 +447,24 @@ namespace WRInv
 
 namespace WRInvTab
 {
-	constexpr int32 NumEquip = 4;
-	const EWREquipSlot EquipSlots[NumEquip] = { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Armor, EWREquipSlot::Light };
-	const TCHAR* EquipNames[NumEquip] = { TEXT("weapon"), TEXT("ranged"), TEXT("armor"), TEXT("light") };
+	// The worn places (cooks/build-crafting.md 2.3): the first four keep their old indices (weapon, ranged, chest, light).
+	constexpr int32 NumEquip = 10;
+	const EWREquipSlot EquipSlots[NumEquip] = { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Armor, EWREquipSlot::Light,
+		EWREquipSlot::Head, EWREquipSlot::Hands, EWREquipSlot::Legs, EWREquipSlot::Talisman, EWREquipSlot::Ring, EWREquipSlot::Ring2 };
+	const TCHAR* EquipNames[NumEquip] = { TEXT("weapon"), TEXT("ranged"), TEXT("armor"), TEXT("light"), TEXT("head"), TEXT("hands"), TEXT("legs"),
+		TEXT("talisman"), TEXT("ring"), TEXT("ring2") };
 
 	int32 EquipIndexOf(EWREquipSlot Slot)
 	{
-		return Slot == EWREquipSlot::Weapon ? 0 : Slot == EWREquipSlot::Ranged ? 1 : Slot == EWREquipSlot::Armor ? 2 : Slot == EWREquipSlot::Light ? 3 : INDEX_NONE;
+		for (int32 e = 0; e < NumEquip; ++e) if (EquipSlots[e] == Slot) return e;
+		return INDEX_NONE;
+	}
+
+	/** Can a piece of this slot kind go into equip place e (either ring slot takes a ring)? */
+	bool FitsEquip(EWREquipSlot DefSlot, int32 e)
+	{
+		if (e < 0 || e >= NumEquip) return false;
+		return EquipSlots[e] == DefSlot || (WRGearSlots::IsRing(DefSlot) && WRGearSlots::IsRing(EquipSlots[e]));
 	}
 
 	enum class EFilter : uint8 { All, Gear, Resources, Food, Ammo, Taming };
@@ -462,8 +475,8 @@ namespace WRInvTab
 		const FName C = D->Category;
 		switch (F)
 		{
-		case EFilter::Gear: return C == TEXT("weapon") || C == TEXT("armor") || C == TEXT("ranged") || C == TEXT("tool") || C == TEXT("light");
-		case EFilter::Resources: return C == TEXT("material") || C == TEXT("core") || C == TEXT("trophy") || C == TEXT("gem");
+		case EFilter::Gear: return C == TEXT("weapon") || C == TEXT("armor") || C == TEXT("ranged") || C == TEXT("tool") || C == TEXT("light") || C == TEXT("talisman") || C == TEXT("ring");
+		case EFilter::Resources: return C == TEXT("material") || C == TEXT("core") || C == TEXT("trophy") || C == TEXT("gem") || C == TEXT("rune") || C == TEXT("blueprint");
 		case EFilter::Food: return C == TEXT("food") || C == TEXT("drink") || C == TEXT("potion");
 		case EFilter::Ammo: return C == TEXT("ammo") || C == TEXT("dart") || D->IsThrowable();
 		case EFilter::Taming: return C == TEXT("tame_food") || C == TEXT("egg") || C == TEXT("dart") || D->Id == TEXT("narcotic") || D->AmmoTorpor > 0.f;
@@ -544,7 +557,16 @@ namespace WRInvTab
 		if (D.IsRanged()) return FString::Printf(TEXT("Ranged weapon · shoots %s"), *AmmoWord(D.AmmoKind, true));
 		if (C == TEXT("tool")) return TEXT("Tool · held in the weapon hand");
 		if (D.Slot == EWREquipSlot::Weapon) return D.Metal.IsNone() ? FString(TEXT("Melee weapon")) : FString::Printf(TEXT("Melee weapon · %s"), *D.Metal.ToString());
-		if (D.Slot == EWREquipSlot::Armor) return TEXT("Armor · worn on the body");
+		if (WRGearSlots::IsArmour(D.Slot))
+		{
+			const FWRSetDef* Set = D.Set.IsNone() ? nullptr : FWRGear::Get().FindSet(D.Set);
+			const FString Where = WRGearSlots::Label(D.Slot).ToString();
+			return Set ? FString::Printf(TEXT("%s armour · %s set"), *Where, *Set->Name) : FString::Printf(TEXT("%s armour"), *Where);
+		}
+		if (C == TEXT("talisman")) return TEXT("Talisman · one worn at a time");
+		if (C == TEXT("ring")) return TEXT("Ring · two fingers, two rings");
+		if (C == TEXT("rune")) return TEXT("Rune · sits in a weapon socket");
+		if (C == TEXT("blueprint")) return TEXT("Blueprint · read it to learn the recipe");
 		if (C == TEXT("ammo")) return FString::Printf(TEXT("Ammo · for %s"), *LauncherOf(D.AmmoOf));
 		if (C == TEXT("dart")) return TEXT("Dart · blowgun ammo, or use it by hand");
 		if (C == TEXT("potion")) return TEXT("Potion · drink it");
@@ -563,7 +585,9 @@ namespace WRInvTab
 		const FName C = D.Category;
 		return C == TEXT("material") ? TEXT("Resource") : C == TEXT("tool") ? TEXT("Tool") : C == TEXT("ammo") ? TEXT("Ammo") : C == TEXT("dart") ? TEXT("Dart")
 			: C == TEXT("potion") ? TEXT("Potion") : C == TEXT("food") ? TEXT("Food") : C == TEXT("drink") ? TEXT("Drink") : C == TEXT("tame_food") ? TEXT("Taming")
-			: C == TEXT("egg") ? TEXT("Egg") : C == TEXT("gem") ? TEXT("Gem") : C == TEXT("core") ? TEXT("Boss core") : C == TEXT("trophy") ? TEXT("Trophy") : TEXT("Item");
+			: C == TEXT("egg") ? TEXT("Egg") : C == TEXT("gem") ? TEXT("Gem") : C == TEXT("core") ? TEXT("Boss core") : C == TEXT("trophy") ? TEXT("Trophy")
+			: C == TEXT("talisman") ? TEXT("Talisman") : C == TEXT("ring") ? TEXT("Ring") : C == TEXT("rune") ? TEXT("Rune") : C == TEXT("blueprint") ? TEXT("Blueprint")
+			: C == TEXT("armor") ? TEXT("Armour") : TEXT("Item");
 	}
 
 	/** One line of advice the game's rules back up (the details panel's tinted box); bTaming picks the paw icon. */
@@ -594,9 +618,15 @@ namespace WRInvTab
 		if (D.Id == TEXT("narcotic")) { bTaming = true; return TEXT("Feed it to a knocked-out creature to keep it under."); }
 		if (C == TEXT("tool")) return TEXT("Hold it (its hotbar key) to gather more: a hatchet for wood, a pick for stone and ore. It wears with every hit; repair it at a workbench.");
 		if (C == TEXT("potion")) return TEXT("Potions share a belt: one, then a cooldown.");
-		if (C == TEXT("core")) return TEXT("Bring it to your Hearth to raise its tech level.");
-		if (D.Slot == EWREquipSlot::Weapon) return TEXT("Gems socket into it; upgrade shards raise its damage.");
-		if (D.Slot == EWREquipSlot::Armor) return TEXT("Wears down as you're hit; repair it before it breaks.");
+		if (D.Slot == EWREquipSlot::Weapon) return TEXT("Gems and runes socket into it (a forge takes one out); upgrade shards raise its damage.");
+		if (C == TEXT("trophy")) return TEXT("Mount it at home, or make it into its talisman at an armorer.");
+		if (WRGearSlots::IsArmour(D.Slot)) return D.Set.IsNone() ? TEXT("Every piece you wear wears down as you're hit; repair it before it breaks.")
+			: TEXT("Wear more of the set for its bonuses. Every piece wears down as you're hit; a broken one counts for nothing.");
+		if (C == TEXT("talisman")) return TEXT("Made from a mini-boss trophy at the armorer. You wear one talisman.");
+		if (C == TEXT("ring")) return TEXT("Two ring slots; two of the same ring don't add up.");
+		if (C == TEXT("rune")) return TEXT("Right-click to set it in your weapon. One of each rune to a weapon.");
+		if (C == TEXT("blueprint")) return TEXT("Right-click to read it: the recipe is yours for good. Already known? Give it to a clan mate.");
+		if (C == TEXT("core")) return TEXT("Bring it to your Hearth to raise its tech level, or break a spare one into core shards at a tier 5 forge.");
 		return FString();
 	}
 
@@ -886,7 +916,7 @@ namespace WRInvTab
 			const FWRItemStack* Target = StackAt(EWRSlotKind::Bag, b);
 			if (!Worn || Worn->IsEmpty() || !Target) return;
 			const FWRItemDef* TargetDef = DefOf(Target);
-			if (TargetDef && TargetDef->Slot == EquipSlots[e])
+			if (TargetDef && FitsEquip(TargetDef->Slot, e))
 			{
 				Send(FString::Printf(TEXT("slot %d"), b));   // the same kind of gear: wear that one instead (a swap)
 				return;
@@ -902,12 +932,14 @@ namespace WRInvTab
 			const FWRItemDef* Def = DefOf(StackAt(EWRSlotKind::Bag, i));
 			if (!Def) return;
 			if (!Def->IsEquipment()) { Notice(FString::Printf(TEXT("%s can't be worn or held"), *Def->Name)); return; }
-			if (IntoSlot != INDEX_NONE && EquipSlots[IntoSlot] != Def->Slot)
+			if (IntoSlot != INDEX_NONE && !FitsEquip(Def->Slot, IntoSlot))
 			{
-				Notice(FString::Printf(TEXT("%s goes in the %s slot"), *Def->Name, EquipNames[EquipIndexOf(Def->Slot)]));
+				Notice(FString::Printf(TEXT("%s goes in the %s slot"), *Def->Name, *WRGearSlots::Label(Def->Slot).ToString().ToLower()));
 				return;
 			}
-			Send(FString::Printf(TEXT("slot %d"), i));
+			// Into the very slot it was dropped on (the second ring), else wherever it goes.
+			if (IntoSlot != INDEX_NONE) Send(FString::Printf(TEXT("equipto %d %s"), i, EquipNames[IntoSlot]));
+			else Send(FString::Printf(TEXT("slot %d"), i));
 		}
 
 		void SetKey(int32 Key, FName Item) const { if (FWRPlayerUI* X = UI()) X->SetHotbarItem(Key, Item); }
@@ -1041,6 +1073,10 @@ namespace WRInvTab
 		{
 			return SNew(SWRPanel).Kind(EWRPanel::Inset).Padding(FMargin(16.f * U, 16.f * U, 16.f * U, 18.f * U))
 			[
+				// Scrolls on short screens: the doll, four armour pieces, two rings and the light make a tall column.
+				SNew(SScrollBox).ScrollBarThickness(FVector2D(4.f, 4.f))
+				+ SScrollBox::Slot()
+				[
 				SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight()
 				[
@@ -1055,13 +1091,22 @@ namespace WRInvTab
 						SNew(SOverlay)
 						+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top)[SNew(SWRInvFigure)]
 						+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(0.f, 8.f * U, 0.f, 0.f)[EquipBlock(0, LOCTEXT("SlotWeapon", "Weapon"))]
-						+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(0.f, 160.f * U, 0.f, 0.f)[EquipBlock(2, LOCTEXT("SlotArmor", "Armor"))]
+						+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(0.f, 160.f * U, 0.f, 0.f)[EquipBlock(7, LOCTEXT("SlotTalisman", "Talisman"))]
 						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 8.f * U, 0.f, 0.f)[EquipBlock(1, LOCTEXT("SlotRanged", "Ranged"))]
 						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 168.f * U, 0.f, 0.f)[LoadedBlock()]
 					]
 				]
-				// The Light slot (WRSurvival): a torch in the off hand or a lantern on the hip, its burn time and the key.
-				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 6.f * U, 0.f, 0.f)[LightBlock()]
+				// The four armour pieces head to legs (cooks/build-crafting.md 2.3), and what their sets give.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[ArmourRow()]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[SetLines()]
+				// Two rings, and the Light slot (WRSurvival): a torch in the off hand or a lantern on the hip.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)[SmallEquip(8, LOCTEXT("SlotRing", "Ring"))]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(6.f * U, 0.f, 0.f, 0.f)[SmallEquip(9, LOCTEXT("SlotRing2", "Ring"))]
+					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)[LightBlock()]
+				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U)[WRUI::Divider()]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
@@ -1136,6 +1181,7 @@ namespace WRInvTab
 							return FText::FromString(TEXT("Overloaded: no roll, only a slow step"));
 						}), WRUI::Body(12, 500), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(EquipLoad() >= EquipCap() ? WRUI::Bad : WRUI::Ink3); }))
 					]
+				]
 				]
 			];
 		}
@@ -1245,6 +1291,86 @@ namespace WRInvTab
 			];
 		}
 
+		/** A small worn place: its caption, the slot (click, right-click to take off, drop to put on) and its state. */
+		TSharedRef<SWidget> SmallEquip(int32 e, const FText& Title)
+		{
+			return SNew(SBox).WidthOverride(74.f * U)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[WRUI::Text(Title, WRUI::Caps(10), WRUI::Ink2)]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 3.f * U, 0.f, 0.f)
+				[
+					SNew(SWRSlot).Size(54.f * U).Kind(EWRSlotKind::Equipment).Index(e)
+					.View_Lambda([this, e]() { return EquipView(e); })
+					.OnClicked_Lambda([this, e](const FPointerEvent& Ev) { ClickedEquipSlot(Ev, e); })
+					.OnDropped_Lambda([this, e](EWRSlotKind From, int32 Idx) { DroppedOnEquipSlot(From, Idx, e); })
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 2.f * U, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this, e]()
+					{
+						const FWRItemStack* S = StackAt(EWRSlotKind::Equipment, e);
+						const FWRItemDef* D = DefOf(S);
+						if (!D) return LOCTEXT("EmptyShort", "Empty");
+						if (D->MaxDurability > 0.f) return FText::FromString(S->Durability <= 0.f ? FString(TEXT("Broken")) : FString::Printf(TEXT("%d%%"), FMath::RoundToInt(100.f * S->Durability / D->MaxDurability)));
+						return FText::FromString(S->Upgrade > 0 ? FString::Printf(TEXT("+%d"), S->Upgrade) : FString(FWRItemStack::QualityName(S->Quality)));
+					}), WRUI::Body(10, 600), TAttribute<FSlateColor>::CreateLambda([this, e]()
+					{
+						const FWRItemStack* S = StackAt(EWRSlotKind::Equipment, e);
+						const FWRItemDef* D = DefOf(S);
+						return FSlateColor(!D ? WRUI::Ink3 : D->MaxDurability > 0.f && S->Durability <= 0.f ? WRUI::Bad : D->MaxDurability > 0.f && S->Durability < D->MaxDurability * 0.25f ? WRUI::Warn : WRUI::Ink2);
+					}))
+				]
+			];
+		}
+
+		TSharedRef<SWidget> ArmourRow()
+		{
+			return SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Center)[SmallEquip(4, LOCTEXT("SlotHead", "Head"))]
+				+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Center)[SmallEquip(2, LOCTEXT("SlotChest", "Chest"))]
+				+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Center)[SmallEquip(5, LOCTEXT("SlotHands", "Hands"))]
+				+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Center)[SmallEquip(6, LOCTEXT("SlotLegs", "Legs"))];
+		}
+
+		/** The sets worn and their bonuses that are on ("Forgeplate 2/4 · Burn builds up half as fast"). */
+		FText SetLinesText() const
+		{
+			const UWRInventoryComponent* I = Inv();
+			if (!I) return FText::GetEmpty();
+			TArray<FString> Lines;
+			TArray<FName> Seen;
+			for (const EWREquipSlot Slot : WRGearSlots::Armour)
+			{
+				const FWRItemDef* D = DefOf(&I->GetEquipped(Slot));
+				if (!D || D->Set.IsNone() || Seen.Contains(D->Set)) continue;
+				Seen.Add(D->Set);
+				const FWRSetDef* Set = FWRGear::Get().FindSet(D->Set);
+				if (!Set) continue;
+				const int32 N = I->SetPieces(D->Set);
+				TArray<FString> On;
+				int32 Next = 0;
+				for (const FWRSetBonus& B : Set->Bonuses)
+				{
+					if (N >= B.Pieces) On.Add(B.Text);
+					else if (Next == 0) Next = B.Pieces;
+				}
+				FString Line = FString::Printf(TEXT("%s %d/4"), *Set->Name, FMath::Min(4, N));
+				if (On.Num() > 0) Line += TEXT(" · ") + FString::Join(On, TEXT(" · "));
+				else if (Next > 0) Line += FString::Printf(TEXT(" · its first bonus at %d"), Next);
+				Lines.Add(Line);
+			}
+			return FText::FromString(FString::Join(Lines, TEXT("\n")));
+		}
+
+		TSharedRef<SWidget> SetLines()
+		{
+			return SNew(SBox).Visibility_Lambda([this]() { return SetLinesText().IsEmpty() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+			[
+				WRInv::Label(TAttribute<FText>::CreateLambda([this]() { return SetLinesText(); }), WRUI::Body(11, 600), WRUI::Good, true, ETextJustify::Center)
+			];
+		}
+
 		TSharedRef<SWidget> LightBlock()
 		{
 			constexpr int32 e = 3;
@@ -1258,7 +1384,7 @@ namespace WRInvTab
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
 				[
-					SNew(SBox).WidthOverride(200.f * U)
+					SNew(SBox).WidthOverride(150.f * U)
 					[
 						SNew(SVerticalBox)
 						+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(LOCTEXT("SlotLight", "Light"), WRUI::Caps(11), WRUI::Ink2)]
@@ -1476,12 +1602,39 @@ namespace WRInvTab
 				const float Crit = GemSum(*S, TEXT("critChance"));
 				if (Crit > 0.f) AddRow(StatRow(TEXT("Critical chance"), FString::Printf(TEXT("+%.0f%%"), Crit * 100.f)));
 			}
-			else if (D->Slot == EWREquipSlot::Armor)
+			else if (WRGearSlots::IsArmour(D->Slot))
 			{
 				AddRow(StatRow(TEXT("Armor"), FString::Printf(TEXT("%.0f"), ArmorOf(*S, *D))));
 				if (D->Poise > 0.f) AddRow(StatRow(TEXT("Poise"), FString::Printf(TEXT("%.0f"), D->Poise)));
-				if (S->Element == TEXT("fire")) AddRow(StatRow(TEXT("Fire-infused"), TEXT("lava can't burn you"), WRUI::Ember));
-				if (S->Element == TEXT("frost")) AddRow(StatRow(TEXT("Frost-infused"), TEXT("grip on ice"), WRUI::Frost));
+				// Infusion counts on the chest piece (the body): lava and ice.
+				const bool bChest = D->Slot == EWREquipSlot::Armor;
+				if (S->Element == TEXT("fire")) AddRow(StatRow(TEXT("Fire-infused"), bChest ? TEXT("lava can't burn you") : TEXT("its trim (on the chest it wards lava)"), WRUI::Ember));
+				if (S->Element == TEXT("frost")) AddRow(StatRow(TEXT("Frost-infused"), bChest ? TEXT("grip on ice") : TEXT("its trim (on the chest it grips ice)"), WRUI::Frost));
+				// Its biome set (Diablo II's green set lines): pieces worn, each bonus lit when it's on.
+				if (const FWRSetDef* Set = D->Set.IsNone() ? nullptr : FWRGear::Get().FindSet(D->Set))
+				{
+					const UWRInventoryComponent* Wearer = Inv();
+					const int32 Worn = Wearer ? Wearer->SetPieces(D->Set) : 0;
+					AddRow(StatRow(FString::Printf(TEXT("%s set"), *Set->Name), FString::Printf(TEXT("%d/4 worn"), FMath::Min(4, Worn)), WRUI::Brass2));
+					for (const FWRSetBonus& B : Set->Bonuses)
+					{
+						const bool bOn = Worn >= B.Pieces;
+						AddRow(StatRow(FString::Printf(TEXT("%d pieces"), B.Pieces), B.Text, bOn ? WRUI::Good : WRUI::Ink3), 6.f);
+					}
+				}
+			}
+			else if (D->Slot == EWREquipSlot::Talisman)
+			{
+				AddRow(StatRow(TEXT("Worn"), D->Note.IsEmpty() ? FString(TEXT("-")) : D->Note, WRUI::Good));
+			}
+			else if (WRGearSlots::IsRing(D->Slot))
+			{
+				for (const FName Stat : { FName(TEXT("damage")), FName(TEXT("critChance")), FName(TEXT("poise")) })
+				{
+					const float V = UWRInventoryComponent::RingStat(*D, Stat);
+					if (V != 0.f) AddRow(StatRow(TEXT("Worn"), Stat == TEXT("poise") ? FString::Printf(TEXT("+%.0f poise"), V) : GemLine(Stat, V), WRUI::Good));
+				}
+				AddRow(StatRow(TEXT("Band"), D->Metal.IsNone() ? FString(TEXT("-")) : D->Metal.ToString()));
 			}
 			else if (D->IsRanged())
 			{
@@ -1602,7 +1755,7 @@ namespace WRInvTab
 				WhereRows.Add({ TEXT("Repair at"), StationName(TEXT("workbench")) });  // tools aren't upgraded
 				if (Recipe) WhereRows.Add({ TEXT("Made at"), StationName(Recipe->Station) });
 			}
-			else if (D->Slot == EWREquipSlot::Weapon || D->Slot == EWREquipSlot::Armor)
+			else if (D->Slot == EWREquipSlot::Weapon || WRGearSlots::IsArmour(D->Slot))
 			{
 				const FString Station = D->Slot == EWREquipSlot::Weapon ? TEXT("Forge") : TEXT("Armorer");
 				WhereRows.Add({ TEXT("Repair at"), Station });
@@ -1637,7 +1790,8 @@ namespace WRInvTab
 			else if (D->IsEquipment()) UseText = LOCTEXT("Equip", "Equip");
 			else if (C == TEXT("food")) UseText = LOCTEXT("Eat", "Eat");
 			else if (C == TEXT("drink") || C == TEXT("potion")) UseText = LOCTEXT("Drink", "Drink");
-			else if (C == TEXT("gem")) UseText = LOCTEXT("Socket", "Socket");
+			else if (C == TEXT("gem") || C == TEXT("rune")) UseText = LOCTEXT("Socket", "Socket");
+			else if (C == TEXT("blueprint")) UseText = LOCTEXT("Read", "Read");
 			else if (C == TEXT("egg")) UseText = LOCTEXT("Hatch", "Hatch");
 			else if (C == TEXT("dart")) UseText = LOCTEXT("UseDart", "Use");
 			else bCanUse = false;

@@ -632,7 +632,8 @@ void FWRPlayerUI::CycleHotbar(int32 Dir)
 	{
 		const int32 i = ((HotbarSelected + Dir * Step) % 8 + 8) % 8;
 		const FWRItemDef* Def = Hotbar[i].IsNone() ? nullptr : FWRItemRegistry::Get().Find(Hotbar[i]);
-		if (Def && Def->IsEquipment() && Def->Slot != EWREquipSlot::Armor && Def->Slot != EWREquipSlot::Light)
+		// Weapons, tools and ranged: not armour, talismans, rings or lights.
+		if (Def && (Def->Slot == EWREquipSlot::Weapon || Def->Slot == EWREquipSlot::Ranged))
 		{
 			UseHotbar(i);
 			return;

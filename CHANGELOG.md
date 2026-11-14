@@ -1,5 +1,68 @@
 # Changelog
 
+## Unreleased: crafting (steel and starsteel, the four armour slots and 12 biome sets, rings, talismans, runes, salvage, blueprints)
+
+Aaron (lane build-crafting: FULL-GAME 6.3; research, requirement ledger and plan in showcase-notes
+cooks/build-crafting.md, following cooks/survival-crafting.md 2.13 / 2.14 and hero.md 2.5). Built to compile (editor);
+not played here (Aaron and the testers test, F8).
+
+- **Steel (Hearth 4) and starsteel (Hearth 5)**: a **charcoal kiln** (Hearth 2 station: a domed stone kiln with an
+  arched fire mouth, vent holes round the crown, a chimney stub, split logs stacked to feed it and a heap of lump
+  charcoal; 10 wood -> 4 charcoal, 2 min), **steel ingot** (2 iron + 2 charcoal) and **steel plate** at a tier 4 forge,
+  **star iron** (a black-blue, silver-flecked meteoric vein in the deepest chamber of the two highland caves, above
+  `caves.starIronMinZ`; smelted 2 ore -> 1), **core shards** (a spare major boss core broken at a tier 5 forge -> 10; a
+  core fed to a Hearth is never touched) and **starsteel ingot** (2 steel + star iron + a core shard). Steel and
+  starsteel in every weapon class (sword, dagger, spear, greatsword, great hammer, scythe: x2.2 / x2.8, `weapon.metal`);
+  starsteel blades are modelled blue-black. Upgrades go to +8 / +10 at those tiers (Hearth x 2, as before).
+- **Four armour slots**: Head, Chest, Hands, Legs, plus one **Talisman** and two **Rings**. Hide, copper, bronze and
+  iron are now four pieces each (15 / 40 / 15 / 30 of the old armour, poise and weight; each piece keeps the old
+  durability). Every worn piece wears on each blow (Valheim). Armour, poise, resists, equip load and carry weight sum the
+  pieces; a broken piece gives nothing. **Old saves migrate**: the old armour is the chest piece and the matching hood,
+  bracers and leggings are made at its quality, roll and infusion and put on. The hero shows **each slot's own piece**
+  (mixed sets look mixed; hair hides by the head piece; the Ascendant crest needs an Ascendant helm). The inventory's
+  doll: weapon, ranged and talisman by the figure, the four armour pieces in a row under it with the sets' lines, then
+  the two rings and the light (it scrolls on short screens).
+- **The 12 biome sets** (steel, armorer 4) and their **Ascendant** versions (starsteel, armorer 5, the starsteel inlay):
+  bonuses at 2 and 4 worn pieces (`Data/gear.json sets`; Set crafter counts one more piece, now live). Live on the
+  island: **Forgeplate** (steel plate, sulfur, obsidian, Magmaw hide): burn builds up half as fast; four pieces walk
+  lava unhurt and Heat fills 15% faster. **Rimeguard** (steel plate, lichen, Rimeclaw spines, wool): frostbite half and
+  blizzards don't wear you down; four pieces grip slick ice and Chill fills 15% faster. New drops: Magmaw hide, Rimeclaw
+  spines, obsidian (Basaltback, the Obsidian Warden). Weather counters now name sets and pieces (`weather.json
+  counters.sets`), and a hazard item counts worn as well as carried. The other 10 sets, their materials and bonuses are
+  in data and hidden until their land is live.
+- **Rings** (forge, at the metal's tier): a band of copper to starsteel set with a ruby, topaz or onyx: 60% of the
+  gem's socket value, +10% a metal tier above copper; two ring slots, two of the same ring count once.
+- **Talismans** (armorer 2): a mini-boss trophy + 2 of its land's signature resource. On the island: Obsidian heart (+10
+  poise while you guard), Wisp crown (your spells build 5% more burn), Cinder horn (attacks out of a sprint +15%
+  stance), Troll marrow (8 s unhurt: heal 0.5 HP a second), Stalker fang (a blizzard doesn't close in on your sight).
+  Cinderhorn and Old Tusker now drop their trophies every kill like the other minis. All 40 talismans and the three
+  hazard charms are in data; gear stats named like a life-skill stat (woodYield, swimSpeed, blockStamina, hungerDrain...)
+  add to it through `UWRLifeSkillsComponent::StatFor`; corruption rate reads gear too.
+- **Runes** (alchemy 3: resonant crystal + a land's material; hidden until the Crystal caves): sit in a weapon socket,
+  one of each to a weapon. Thirst (lifesteal 3%), Haste (buildup +15%), the Anvil (stance +10%), the Tide (+3 stamina a
+  hit), Thorns (melee attackers take 10% back), the Grave (kills +5 path resource), Clear Sight (crits +10%), Hollowing
+  (ignore 10% armour): all wired in `ApplyHit`.
+- **Salvage** (Crafting tab -> Salvage): any piece of gear in the bag at its station (weapons and rings at a forge,
+  armour and talismans at an armorer, tools and bows where they're made): 40% of its metal and main material (+10% a
+  quality step above crude), a quarter of the upgrade shards spent; its infusion and every socketed extra are listed in
+  crimson before you confirm and destroyed. What the bag can't hold waits in the station's tray. +5 XP.
+- **Removing extras** (Repair -> "Remove: Ruby" at a forge): frees the socket and destroys the extra; **Careful hands**
+  (smithing perk, now live) saves it half the time.
+- **Blueprints**: an item; right-click to read it and its recipe is yours for good (saved with you; the Crafting tab's
+  **Blueprints** category is your known list). Already known: keep it for a clan mate. A major boss's first kill per
+  survivor always drops one of its blueprints, later kills 20% (`gear.json blueprints`); no room in the bag, it waits in
+  a bag only you can open. Vulkarn's **Cinderbrand** (great hammer, always fire, a stagger sends out the lava ring) and
+  Skaldrith's **Rimefang** (spear, always frost, a blocked blow can freeze its maker): steel, forge 4. Portal odds by
+  rank are in data (`FWRBlueprints::PortalDrop`) for the portals.
+- New: `WRGear.h/.cpp` (`FWRGear`, `FWRBlueprints`, `AWRStation::Salvage / RemoveExtra`), `Data/gear.json`,
+  `Tools/art/make_gear_icons.py` (260 icons). Commands: `salvage <bag slot>`, `unsocket <socket>`, `equipto <bag slot>
+  <slot>`; testing: `WRHearthLevel <1-5>` sets the nearest Hearth's tech level.
+- Not finished: steel and starsteel need 4 and 6 different major bosses' cores, and the island has 2 (testers use
+  `WRHearthLevel`); boss weapons have the class's moveset, not their own (combat lane); each boss's set-decor blueprint
+  waits for the biome building sets; the Old Tusker talisman waits for hauler tames that carry loads (its recipe is
+  hidden); portals don't exist yet, so nothing calls `PortalDrop`; the other lands' set bonuses and talismans whose
+  systems don't exist yet (glide, fall damage, rifts, ward fields...) are hidden with their land and read by nothing yet.
+
 ## Unreleased: farming and food (biome crops, water, greenhouses, pens, hives, fishing in every land, the kitchen, spoilage)
 
 Aaron (lane build-farming: FULL-GAME 6.2; research, requirement ledger and plan in showcase-notes cooks/build-farming.md,

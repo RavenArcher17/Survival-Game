@@ -182,9 +182,18 @@ bool FWRBiomeHazards::Resists(const AWRCharacterBase* Who, FName Kind)
 	{
 		return true;
 	}
-	// Infused armor: fire-infused resists lava, frost-infused resists ice.
+	// Infused armour: a fire-infused chest piece resists lava, a frost-infused one ice. A biome set worn to four pieces
+	// passes its own land's ground (cooks/build-crafting.md 2.5: Forgeplate walks lava, Rimeguard grips ice).
 	const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Who);
-	return Inv && Inv->GetEquipped(EWREquipSlot::Armor).Element == (bLava ? FName(TEXT("fire")) : FName(TEXT("frost")));
+	if (!Inv)
+	{
+		return false;
+	}
+	if (Inv->GetEquipped(EWREquipSlot::Armor).Element == (bLava ? FName(TEXT("fire")) : FName(TEXT("frost"))))
+	{
+		return true;
+	}
+	return Kind == TEXT("lava") ? Inv->GearStat(TEXT("passLava")) > 0.f : Kind == TEXT("ice") ? Inv->GearStat(TEXT("passIce")) > 0.f : false;
 }
 
 // ---------------------------------------------------------------- subsystem
@@ -1249,10 +1258,16 @@ void AWRCave::SpawnContents()
 		return GetWorld()->LineTraceSingleByChannel(Hit, Top, Top - FVector(0, 0, 2000), ECC_WorldStatic, Query) ? Hit.ImpactPoint : Top - FVector(0, 0, 650);
 	};
 	// Rich ore: the better metals live in caves, with three times the usual gem odds.
-	const TArray<TPair<FName, FVector>> Ores = {
+	TArray<TPair<FName, FVector>> Ores = {
 		{ TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("tin_ore"), FVector(0, -650, 0) },
 		{ TEXT("copper_ore"), FVector(300, 620, 0) }, { bFrost ? FName(TEXT("lichen")) : FName(TEXT("sulfur_crystal")), FVector(-700, 0, 0) },
 	};
+	// Star iron (cooks/build-crafting.md 2.1, ores by depth band 4): the highland caves' deepest chamber, back past the
+	// iron, 2.8 m clear of the other veins.
+	if (GetActorLocation().Z >= WRTune(TEXT("caves.starIronMinZ"), 20000.f))
+	{
+		Ores.Add({ TEXT("star_iron_ore"), FVector(-650, -280, 0) });
+	}
 	for (const TPair<FName, FVector>& Ore : Ores)
 	{
 		const FTransform T(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Floor(Ore.Value));

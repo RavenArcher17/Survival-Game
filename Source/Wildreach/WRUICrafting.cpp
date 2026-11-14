@@ -11,6 +11,7 @@
 #include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRInventory.h"
+#include "WRGear.h"
 #include "GameFramework/GameStateBase.h"
 #include "WRKeyBindings.h"
 #include "WRLifeSkills.h"
@@ -39,7 +40,7 @@ namespace WRCraftUI
 
 	const FName Hand(TEXT("hand"));
 	const FName Stations[] = { TEXT("hand"), TEXT("workbench"), TEXT("forge"), TEXT("armorer"), TEXT("alchemy_table"),
-		TEXT("campfire"), TEXT("smokehouse"), TEXT("salting_barrel"), TEXT("drying_rack"), TEXT("compost_bin") };
+		TEXT("charcoal_kiln"), TEXT("campfire"), TEXT("smokehouse"), TEXT("salting_barrel"), TEXT("drying_rack"), TEXT("compost_bin") };
 
 	FText StationName(FName Type)
 	{
@@ -54,6 +55,7 @@ namespace WRCraftUI
 		if (Type == TEXT("salting_barrel")) return LOCTEXT("StSalting", "Salting barrel");
 		if (Type == TEXT("drying_rack")) return LOCTEXT("StDrying", "Drying rack");
 		if (Type == TEXT("compost_bin")) return LOCTEXT("StCompost", "Compost bin");
+		if (Type == TEXT("charcoal_kiln")) return LOCTEXT("StKiln", "Charcoal kiln");
 		return LOCTEXT("StHand", "By hand");
 	}
 
@@ -69,6 +71,7 @@ namespace WRCraftUI
 		if (Type == TEXT("salting_barrel")) return TEXT("salted_meat");
 		if (Type == TEXT("drying_rack")) return TEXT("jerky");
 		if (Type == TEXT("compost_bin")) return TEXT("compost");
+		if (Type == TEXT("charcoal_kiln")) return TEXT("charcoal");
 		return TEXT("crude_hatchet");
 	}
 
@@ -80,11 +83,14 @@ namespace WRCraftUI
 			{ TEXT("weapons"), LOCTEXT("CatWeapons", "Weapons"), TEXT("copper_sword") },
 			{ TEXT("ranged"), LOCTEXT("CatRanged", "Ranged"), TEXT("hunting_bow") },
 			{ TEXT("armor"), LOCTEXT("CatArmor", "Armor"), TEXT("hide_armor") },
+			{ TEXT("trinkets"), LOCTEXT("CatTrinkets", "Trinkets"), TEXT("ring_iron_ruby") },
 			{ TEXT("food"), LOCTEXT("CatFood", "Food"), TEXT("cooked_meat") },
 			{ TEXT("potions"), LOCTEXT("CatPotions", "Potions"), TEXT("minor_healing_potion") },
 			{ TEXT("taming"), LOCTEXT("CatTaming", "Taming"), TEXT("kibble") },
 			{ TEXT("materials"), LOCTEXT("CatMaterials", "Materials"), TEXT("copper_ingot") },
 			{ TEXT("repair"), LOCTEXT("CatRepair", "Repair"), TEXT("upgrade_shard") },
+			{ TEXT("salvage"), LOCTEXT("CatSalvage", "Salvage"), TEXT("core_shard") },
+			{ TEXT("blueprints"), LOCTEXT("CatBlueprints", "Blueprints"), TEXT("bp_cinderbrand") },
 		};
 		return List;
 	}
@@ -99,6 +105,7 @@ namespace WRCraftUI
 		if (C == TEXT("weapon")) return TEXT("weapons");
 		if (C == TEXT("ranged") || C == TEXT("ammo")) return TEXT("ranged");
 		if (C == TEXT("armor")) return TEXT("armor");
+		if (C == TEXT("talisman") || C == TEXT("ring") || C == TEXT("rune")) return TEXT("trinkets");
 		if (C == TEXT("food") || C == TEXT("drink")) return TEXT("food");
 		if (C == TEXT("potion")) return TEXT("potions");
 		return TEXT("materials");
@@ -151,7 +158,11 @@ namespace WRCraftUI
 		if (Def->IsThrowable()) return LOCTEXT("KThrown", "Thrown weapon");
 		if (Def->IsRanged()) return LOCTEXT("KRanged", "Ranged weapon");
 		if (C == TEXT("ammo") || C == TEXT("dart")) return LOCTEXT("KAmmo", "Ammo");
-		if (C == TEXT("armor")) return LOCTEXT("KArmor", "Armor");
+		if (C == TEXT("armor")) return WRGearSlots::Label(Def->Slot);
+		if (C == TEXT("talisman")) return LOCTEXT("KTalisman", "Talisman");
+		if (C == TEXT("ring")) return LOCTEXT("KRing", "Ring");
+		if (C == TEXT("rune")) return LOCTEXT("KRune", "Rune · sits in a weapon socket");
+		if (C == TEXT("blueprint")) return LOCTEXT("KBlueprint", "Blueprint");
 		if (C == TEXT("tool")) return LOCTEXT("KTool", "Tool");
 		if (C == TEXT("food")) return LOCTEXT("KFood", "Food");
 		if (C == TEXT("drink")) return LOCTEXT("KDrink", "Drink");
@@ -175,6 +186,17 @@ namespace WRCraftUI
 		else if (Def->IsRanged()) Bits.Add(FString::Printf(TEXT("Shoots %ss: %.0f damage, %.1f s between shots"), *Def->AmmoKind.ToString(), Def->RangedDamage, Def->Reload));
 		else if (!Def->AmmoOf.IsNone()) Bits.Add(FString::Printf(TEXT("%.0f damage%s"), Def->AmmoDamage, Def->AmmoTorpor > 0.f ? *FString::Printf(TEXT(", %.0f torpor"), Def->AmmoTorpor) : TEXT("")));
 		if (Def->Armor > 0.f) Bits.Add(FString::Printf(TEXT("%.0f armor"), Def->Armor));
+		if (Def->Poise > 0.f) Bits.Add(FString::Printf(TEXT("%.0f poise"), Def->Poise));
+		if (const FWRSetDef* Set = Def->Set.IsNone() ? nullptr : FWRGear::Get().FindSet(Def->Set)) Bits.Add(FString::Printf(TEXT("%s set"), *Set->Name));
+		if (!Def->RingGem.IsNone())
+		{
+			for (const FName Stat : { FName(TEXT("damage")), FName(TEXT("critChance")), FName(TEXT("poise")) })
+			{
+				const float V = UWRInventoryComponent::RingStat(*Def, Stat);
+				if (V != 0.f) Bits.Add(Stat == TEXT("poise") ? FString::Printf(TEXT("+%.0f poise"), V) : FString::Printf(TEXT("+%.1f%% %s"), V * 100.f, Stat == TEXT("damage") ? TEXT("damage") : TEXT("critical chance")));
+			}
+		}
+		if ((Def->Category == TEXT("talisman") || Def->Category == TEXT("rune")) && X && !X->Note.IsEmpty()) Bits.Add(X->Note);
 		if (X && X->Yield > 0.f) Bits.Add(FString::Printf(TEXT("Gathers %s x%.1f while held"), X->ToolKind == TEXT("hatchet") ? TEXT("wood") : X->ToolKind == TEXT("pick") ? TEXT("stone and ore") : *X->ToolKind, X->Yield));
 		if (Def->Heal > 0.f) Bits.Add(FString::Printf(TEXT("Heals %.0f"), Def->Heal));
 		if (Def->Hunger > 0.f) Bits.Add(FString::Printf(TEXT("+%.0f food"), Def->Hunger));
@@ -311,7 +333,7 @@ namespace WRCraftUI
 	/** One line of the recipe book: a recipe, or a repair / upgrade of a piece of equipped gear. */
 	struct FEntry
 	{
-		enum class EKind : uint8 { Recipe, Repair, Upgrade };
+		enum class EKind : uint8 { Recipe, Repair, Upgrade, Salvage, Unsocket };
 		EKind Kind = EKind::Recipe;
 		FString Key;                      // recipe id, or "repair weapon" / "upgrade armor"
 		const FWRRecipe* Recipe = nullptr;
@@ -332,6 +354,10 @@ namespace WRCraftUI
 		float MaxDurability = 0.f;
 		int32 Upgrade = 0;
 		int32 UpgradeCap = 0;
+		// Salvage: what comes back and what's destroyed (FWRGear::SalvageReturns); Unsocket: the extra.
+		TArray<TPair<FName, int32>> Gives;
+		TArray<FString> Lost;
+		FName Extra;
 
 		bool Locked() const { return !bHere || !bTierOk; }
 		bool Ready() const { return !Locked() && Blocker.IsEmpty() && CanMake > 0; }
@@ -489,11 +515,15 @@ private:
 		if (const UWRInventoryComponent* I = Inv())
 		{
 			for (const FWRItemStack& S : I->GetSlots()) H = HashCombine(H, HashCombine(GetTypeHash(S.ItemId), GetTypeHash(S.Count)));
-			for (const EWREquipSlot Slot : { EWREquipSlot::Weapon, EWREquipSlot::Armor, EWREquipSlot::Ranged })
+			for (const EWREquipSlot Slot : WRGearSlots::All)
 			{
 				const FWRItemStack& E = I->GetEquipped(Slot);
-				H = HashCombine(H, HashCombine(GetTypeHash(E.ItemId), HashCombine(GetTypeHash(FMath::RoundToInt(E.Durability)), GetTypeHash(E.Upgrade))));
+				H = HashCombine(H, HashCombine(GetTypeHash(E.ItemId), HashCombine(GetTypeHash(FMath::RoundToInt(E.Durability)), HashCombine(GetTypeHash(E.Upgrade), GetTypeHash(E.Sockets.Num())))));
 			}
+		}
+		if (const AWRPlayerState* Mine = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr)
+		{
+			for (const FName& Bp : Mine->KnownBlueprints) H = HashCombine(H, GetTypeHash(Bp));
 		}
 		if (const UWRLifeSkillsComponent* S = Skills())
 		{
@@ -519,12 +549,14 @@ private:
 			{
 				// A recipe a perk opens (Bait maker's lures) shows once you have the perk.
 				if (!R->NeedsStat.IsNone() && UWRLifeSkillsComponent::StatFor(PC.Get(), R->NeedsStat) <= 0.f) continue;
+				// A blueprint's recipe shows once it's read (under Blueprints: the journal's known blueprints).
+				if (!FWRCrafting::IsOpenTo(PC.Get(), *R)) continue;
 				const FWRItemDef* Out = FWRItemRegistry::Get().Find(R->Output);
 				FEntry E;
 				E.Kind = FEntry::EKind::Recipe;
 				E.Key = R->Id.ToString();
 				E.Recipe = R;
-				E.Category = CategoryOf(Out);
+				E.Category = R->Blueprint.IsNone() ? CategoryOf(Out) : FName(TEXT("blueprints"));
 				E.Icon = R->Output;
 				E.OutCount = R->Count;
 				E.Name = Out ? Out->Name : R->Output.ToString();
@@ -547,15 +579,15 @@ private:
 		const UWRInventoryComponent* I = Inv();
 		if (!I) return;
 		const float Fraction = FWRRecipeRegistry::Get().RepairCostFraction * FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("repairCost")));
-		for (const EWREquipSlot Slot : { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Armor })
+		for (const EWREquipSlot Slot : { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Head, EWREquipSlot::Armor, EWREquipSlot::Hands, EWREquipSlot::Legs })
 		{
 			const FWRItemStack& Worn = I->GetEquipped(Slot);
 			const FWRItemDef* Def = Worn.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Worn.ItemId);
 			if (!Def || Def->MaxDurability <= 0.f) continue;
 			const FWRRecipe* R = FWRRecipeRegistry::Get().ForOutput(Def->Id);
-			const TCHAR* SlotName = Slot == EWREquipSlot::Armor ? TEXT("armor") : Slot == EWREquipSlot::Ranged ? TEXT("ranged") : TEXT("weapon");
+			const TCHAR* SlotName = WRGearSlots::Word(Slot);
 			const bool bTool = Slot == EWREquipSlot::Weapon && Def->Category == TEXT("tool");  // the tool in hand: at a workbench
-			const FName At = bTool ? FName(TEXT("workbench")) : Slot == EWREquipSlot::Weapon ? FName(TEXT("forge")) : Slot == EWREquipSlot::Armor ? FName(TEXT("armorer")) : R ? R->Station : NAME_None;
+			const FName At = FWRCrafting::GearStation(*Def);
 			if (At.IsNone() || At == Hand) continue;
 
 			FEntry Fix;
@@ -595,6 +627,60 @@ private:
 			Up.CanMake = FMath::Min(1, MaxTimes(Up.Cost));
 			Entries.Add(MoveTemp(Up));
 		}
+		// Taking an extra out of the held weapon (at a forge): it's destroyed, unless Careful hands saves it.
+		const FWRItemStack& Held = I->GetEquipped(EWREquipSlot::Weapon);
+		for (int32 g = 0; g < Held.Sockets.Num(); ++g)
+		{
+			const FWRItemDef* GemDef = FWRItemRegistry::Get().Find(Held.Sockets[g]);
+			FEntry Out;
+			Out.Kind = FEntry::EKind::Unsocket;
+			Out.Key = FString::Printf(TEXT("unsocket %d"), g);
+			Out.Slot = EWREquipSlot::Weapon;
+			Out.Category = TEXT("repair");
+			Out.Icon = Held.Sockets[g];
+			Out.Extra = Held.Sockets[g];
+			Out.Name = FString::Printf(TEXT("Remove: %s"), GemDef ? *GemDef->Name : *Held.Sockets[g].ToString());
+			Out.Station = TEXT("forge");
+			Out.bHere = Here == Out.Station;
+			Out.Command = Out.Key;
+			if (!Out.bHere) Out.Blocker = StationName(Out.Station).ToString();
+			Out.CanMake = 1;
+			Entries.Add(MoveTemp(Out));
+		}
+		// Salvage: every piece of gear in the bag breaks down at its own station; a spare boss core at a tier-5 forge.
+		const TArray<FWRItemStack>& Bag = I->GetSlots();
+		const FWRGear& Gear = FWRGear::Get();
+		for (int32 b = 0; b < Bag.Num(); ++b)
+		{
+			const FWRItemStack& S = Bag[b];
+			const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+			if (!Def) continue;
+			const bool bCore = Def->Category == TEXT("core");
+			if (!bCore && (!Def->IsEquipment() || Def->StackSize > 1 || Def->Slot == EWREquipSlot::Light)) continue;
+			FEntry Sv;
+			Sv.Kind = FEntry::EKind::Salvage;
+			Sv.Key = FString::Printf(TEXT("salvage %d"), b);
+			Sv.Category = TEXT("salvage");
+			Sv.Icon = Def->Id;
+			Sv.Name = FString::Printf(TEXT("Salvage: %s"), *Def->Name);
+			Sv.Station = bCore ? FName(TEXT("forge")) : FWRCrafting::GearStation(*Def);
+			Sv.Level = bCore ? Gear.CoreLevel : 1;
+			Sv.bHere = Here == Sv.Station;
+			Sv.bTierOk = !Sv.bHere || T >= Sv.Level;
+			if (bCore) Sv.Gives.Add({ TEXT("core_shard"), Gear.CoreShards });
+			else Sv.Gives = FWRGear::SalvageReturns(S, &Sv.Lost);
+			if (!S.IsEmpty() && Def->MaxDurability > 0.f)
+			{
+				Sv.Durability = S.Durability;
+				Sv.MaxDurability = Def->MaxDurability;
+			}
+			Sv.Upgrade = S.Upgrade;
+			Sv.Command = Sv.Key;
+			if (!Sv.bHere) Sv.Blocker = Sv.Level > 1 ? FString::Printf(TEXT("%s · tier %d"), *StationName(Sv.Station).ToString(), Sv.Level) : StationName(Sv.Station).ToString();
+			else if (!Sv.bTierOk) Sv.Blocker = FString::Printf(TEXT("Needs a tier %d forge"), Sv.Level);
+			Sv.CanMake = 1;
+			Entries.Add(MoveTemp(Sv));
+		}
 	}
 
 	int32 MaxTimes(const TArray<TPair<FName, int32>>& Cost) const
@@ -620,7 +706,8 @@ private:
 	bool CanInfuse(const FEntry& E) const
 	{
 		const FWRItemDef* Out = E.Recipe ? FWRItemRegistry::Get().Find(E.Recipe->Output) : nullptr;
-		return E.Kind == FEntry::EKind::Recipe && E.Recipe->bQuality && E.Recipe->Station != Hand && Out && Out->IsEquipment() && Out->StackSize <= 1 && !Out->IsRanged();
+		return E.Kind == FEntry::EKind::Recipe && E.Recipe->bQuality && E.Recipe->Station != Hand && Out && Out->IsEquipment() && Out->StackSize <= 1 && !Out->IsRanged()
+			&& Out->InnateElement.IsNone() && Out->Slot != EWREquipSlot::Talisman && !WRGearSlots::IsRing(Out->Slot);
 	}
 	static FName EssenceFor(FName El) { return El == TEXT("fire") ? FName(TEXT("ember_essence")) : El == TEXT("frost") ? FName(TEXT("frost_essence")) : NAME_None; }
 
@@ -637,8 +724,8 @@ private:
 	FName SkillFor(const FEntry& E) const
 	{
 		const FWRItemDef* Out = FWRItemRegistry::Get().Find(E.Kind == FEntry::EKind::Recipe ? E.Recipe->Output : E.Icon);
-		if (E.Kind != FEntry::EKind::Recipe) return E.Slot == EWREquipSlot::Armor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
-		if (Out && Out->IsEquipment() && Out->StackSize <= 1) return Out->Slot == EWREquipSlot::Armor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
+		if (E.Kind != FEntry::EKind::Recipe) return Out && FWRCrafting::IsArmourMade(*Out) ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
+		if (Out && Out->IsEquipment() && Out->StackSize <= 1) return FWRCrafting::IsArmourMade(*Out) ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
 		if (E.Station == TEXT("alchemy_table")) return TEXT("alchemy");
 		if (Out && Out->Hunger > 0.f) return TEXT("cooking");
 		return E.Station == TEXT("armorer") ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
@@ -681,7 +768,7 @@ private:
 			const auto Carried = [I](FName Item)
 			{
 				if (!I) return false;
-				for (const EWREquipSlot S : { EWREquipSlot::Weapon, EWREquipSlot::Armor, EWREquipSlot::Ranged }) if (I->GetEquipped(S).ItemId == Item) return true;
+				for (const EWREquipSlot S : WRGearSlots::All) if (I->GetEquipped(S).ItemId == Item) return true;
 				return I->CountOf(Item) > 0;
 			};
 			const FName Here = StationType();
@@ -1217,8 +1304,11 @@ private:
 		else if (E.CanMake > 0)
 		{
 			Mark = SNew(SGlyph).Kind(SGlyph::EKind::Ok).Size(18.f * U);
-			Note = E.Kind == FEntry::EKind::Recipe ? FString::Printf(TEXT("Can make %d"), E.CanMake) : E.Kind == FEntry::EKind::Repair ? TEXT("Ready to repair") : TEXT("Ready to upgrade");
-			NoteColor = WRUI::Good;
+			Note = E.Kind == FEntry::EKind::Recipe ? FString::Printf(TEXT("Can make %d"), E.CanMake) : E.Kind == FEntry::EKind::Repair ? TEXT("Ready to repair")
+				: E.Kind == FEntry::EKind::Salvage ? (E.Lost.Num() > 0 ? FString::Printf(TEXT("Destroys %s"), *FString::Join(E.Lost, TEXT(", "))) : FString(TEXT("Ready to salvage")))
+				: E.Kind == FEntry::EKind::Unsocket ? FString(TEXT("Destroys it")) : TEXT("Ready to upgrade");
+			NoteColor = (E.Kind == FEntry::EKind::Salvage && E.Lost.Num() > 0) || E.Kind == FEntry::EKind::Unsocket ? WRUI::Bad : WRUI::Good;
+			if (NoteColor == WRUI::Bad) Mark = SNew(SGlyph).Kind(SGlyph::EKind::Ok).Size(18.f * U).Color(WRUI::Warn);
 		}
 		else
 		{
@@ -1234,15 +1324,17 @@ private:
 		if (E.Kind == FEntry::EKind::Repair && E.MaxDurability > 0.f && Note.IsEmpty()) Note = FString::Printf(TEXT("%.0f/%.0f"), E.Durability, E.MaxDurability);
 
 		TSharedRef<SHorizontalBox> Ingredients = SNew(SHorizontalBox);
-		for (int32 i = 0; i < E.Cost.Num() && i < 3; ++i)
+		const TArray<TPair<FName, int32>>& Shown = E.Kind == FEntry::EKind::Salvage ? E.Gives : E.Cost;
+		for (int32 i = 0; i < Shown.Num() && i < 3; ++i)
 		{
-			const TPair<FName, int32>& C = E.Cost[i];
-			const bool bShort = !bLocked && Have(C.Key) < C.Value;
+			const TPair<FName, int32>& C = Shown[i];
+			const bool bShort = !bLocked && E.Kind != FEntry::EKind::Salvage && Have(C.Key) < C.Value;
 			Ingredients->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(i == 0 ? 0.f : 9.f * U, 0.f, 0.f, 0.f)
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 3.f * U, 0.f)[SNew(SBox).WidthOverride(22.f * U).HeightOverride(22.f * U)[SNew(SImage).Image(WRUI::Icon(C.Key))]]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::AsNumber(C.Value), WRUI::Body(12, 800), bShort ? WRUI::Bad : WRUI::Ink)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::FromString(E.Kind == FEntry::EKind::Salvage ? FString::Printf(TEXT("+%d"), C.Value) : FString::FromInt(C.Value)),
+					WRUI::Body(12, 800), bShort ? WRUI::Bad : E.Kind == FEntry::EKind::Salvage ? WRUI::Good : WRUI::Ink)]
 			];
 		}
 
@@ -1253,7 +1345,7 @@ private:
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(E.Name), WRUI::Body(14, 800), WRUI::Ink, false, true)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(6.f * U, 0.f, 0.f, 0.f)[Mark]
 			];
-		if (E.Cost.Num() > 0) Body->AddSlot().AutoHeight().Padding(0.f, 7.f * U, 0.f, 0.f)[Ingredients];
+		if (Shown.Num() > 0) Body->AddSlot().AutoHeight().Padding(0.f, 7.f * U, 0.f, 0.f)[Ingredients];
 		if (E.Kind == FEntry::EKind::Repair && E.MaxDurability > 0.f)
 		{
 			const float F = E.Durability / E.MaxDurability;
@@ -1325,6 +1417,22 @@ private:
 			Label = FText::Format(LOCTEXT("RepairAt", "Repair · {0}"), StationName(E->Station));
 			Line = FString::Printf(TEXT("Back to full durability (%.0f / %.0f now) for %d%% of what it cost to make."), E->Durability, E->MaxDurability, FMath::RoundToInt(FWRRecipeRegistry::Get().RepairCostFraction * 100.f));
 		}
+		else if (E->Kind == FEntry::EKind::Salvage)
+		{
+			Label = FText::Format(LOCTEXT("SalvageAt", "Salvage · {0}"), StationName(E->Station));
+			const FWRGear& G = FWRGear::Get();
+			Line = Out && Out->Category == TEXT("core")
+				? FString::Printf(TEXT("A spare boss core broken into %d core shards for starsteel. Cores in your Hearth are never touched."), G.CoreShards)
+				: FString::Printf(TEXT("Breaks it down for %d%% of its metal and main material (+%d%% a quality step above crude) and %d%% of the upgrade shards spent."),
+					FMath::RoundToInt(G.SalvageBase * 100.f), FMath::RoundToInt(G.SalvagePerQuality * 100.f), FMath::RoundToInt(G.SalvageShards * 100.f));
+		}
+		else if (E->Kind == FEntry::EKind::Unsocket)
+		{
+			Label = FText::Format(LOCTEXT("UnsocketAt", "Remove an extra · {0}"), StationName(E->Station));
+			const float Save = UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("extraSave"));
+			Line = Save > 0.f ? FString::Printf(TEXT("Takes it out of your weapon. Your careful hands save it %d%% of the time; otherwise it shatters."), FMath::RoundToInt(Save * 100.f))
+				: FString(TEXT("Takes it out of your weapon and frees the socket. The extra is destroyed."));
+		}
 		else
 		{
 			Label = FText::Format(LOCTEXT("UpgradeAt", "Upgrade · {0}"), StationName(E->Station));
@@ -1340,11 +1448,55 @@ private:
 			+ SHorizontalBox::Slot().FillWidth(1.f)[WRUI::Text(E->Kind == FEntry::EKind::Recipe ? LOCTEXT("Ingredients", "Ingredients") : LOCTEXT("Cost", "Cost"), WRUI::Caps(12), WRUI::Ink2)]
 			+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(LOCTEXT("HaveNeed", "have / need"), WRUI::Body(11, 500), WRUI::Ink3)]
 		];
-		if (E->Cost.Num() == 0)
+		if (E->Kind == FEntry::EKind::Salvage || E->Kind == FEntry::EKind::Unsocket)
+		{
+			Middle->ClearChildren();
+			if (E->Kind == FEntry::EKind::Salvage)
+			{
+				Middle->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f * U)[WRUI::Text(LOCTEXT("YouGetBack", "You get back"), WRUI::Caps(12), WRUI::Ink2)];
+				if (E->Gives.Num() == 0)
+				{
+					Middle->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f * U)[WRUI::Text(LOCTEXT("GetsNothing", "Nothing: it wasn't made from metal"), WRUI::Body(13, 500), WRUI::Ink3)];
+				}
+				for (const TPair<FName, int32>& G : E->Gives)
+				{
+					FWRSlotView Small;
+					Small.ItemId = G.Key;
+					Middle->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f * U)
+					[
+						SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.28f), 4.f, FLinearColor(0.f, 0.f, 0.f, 0.6f), 1.f)).Padding(FMargin(3.f * U, 3.f * U, 10.f * U, 3.f * U))
+						[
+							SNew(SHorizontalBox)
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRSlot).Size(30.f * U).View(Small)]
+							+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(ItemName(G.Key)), WRUI::Body(13, 700), WRUI::Ink)]
+							+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::FromString(FString::Printf(TEXT("+%d"), G.Value)), WRUI::Body(14, 800), WRUI::Good)]
+						]
+					];
+				}
+			}
+			// What's destroyed, in crimson, before you confirm (Diablo IV's extraction rule).
+			TArray<FString> Gone = E->Lost;
+			if (E->Kind == FEntry::EKind::Unsocket) Gone.Add(ItemName(E->Extra));
+			if (Gone.Num() > 0)
+			{
+				Middle->AddSlot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 6.f * U)[WRUI::Text(LOCTEXT("Destroyed", "Destroyed"), WRUI::Caps(12), WRUI::Bad)];
+				for (const FString& L : Gone)
+				{
+					Middle->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)
+					[
+						SNew(SBorder).BorderImage(WRUI::Box(WRUI::Alpha(WRUI::Bad, 0.12f), 4.f, WRUI::Alpha(WRUI::Bad, 0.7f), 1.f)).Padding(FMargin(10.f * U, 5.f * U))
+						[
+							WRUI::Text(FText::FromString(L), WRUI::Body(13, 700), WRUI::Bad)
+						]
+					];
+				}
+			}
+		}
+		else if (E->Cost.Num() == 0)
 		{
 			Middle->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f * U)[WRUI::Text(LOCTEXT("Free", "Nothing"), WRUI::Body(13, 500), WRUI::Ink3)];
 		}
-		for (const TPair<FName, int32>& C : E->Cost)
+		for (const TPair<FName, int32>& C : E->Kind == FEntry::EKind::Salvage || E->Kind == FEntry::EKind::Unsocket ? TArray<TPair<FName, int32>>() : E->Cost)
 		{
 			const int32 H = Have(C.Key);
 			FWRSlotView Small;
@@ -1461,7 +1613,7 @@ private:
 		const int32 H = Essence.IsNone() ? 0 : Have(Essence);
 		const bool bUsable = Essence.IsNone() || H >= 1;
 		const FWRItemDef* Out = FWRItemRegistry::Get().Find(E.Recipe->Output);
-		const bool bArmor = Out && Out->Slot == EWREquipSlot::Armor;
+		const bool bArmor = Out && WRGearSlots::IsArmour(Out->Slot);
 		const bool bRanged = Out && Out->Slot == EWREquipSlot::Ranged;
 		FText Name, Need, Effect;
 		FLinearColor NameColor = WRUI::Ink;
@@ -1576,6 +1728,8 @@ private:
 		if (!E->bTierOk) return FText::Format(LOCTEXT("NeedsTier", "Needs tier {0}"), E->Level);
 		if (E->Kind == FEntry::EKind::Repair) return FText::Format(LOCTEXT("RepairX", "Repair {0}"), FText::FromString(ItemName(E->Icon)));
 		if (E->Kind == FEntry::EKind::Upgrade) return FText::Format(LOCTEXT("UpgradeX", "Upgrade to +{0}"), E->Upgrade + 1);
+		if (E->Kind == FEntry::EKind::Salvage) return FText::Format(LOCTEXT("SalvageX", "Salvage {0}"), FText::FromString(ItemName(E->Icon)));
+		if (E->Kind == FEntry::EKind::Unsocket) return FText::Format(LOCTEXT("UnsocketX", "Remove the {0}"), FText::FromString(ItemName(E->Extra)));
 		const int32 N = FMath::Clamp(Quantity, 1, FMath::Max(1, MaxQuantity(*E)));
 		return N > 1 ? FText::Format(LOCTEXT("CraftN", "Craft {0} ({1})"), FText::FromString(E->Name), N) : FText::Format(LOCTEXT("CraftX", "Craft {0}"), FText::FromString(E->Name));
 	}
@@ -1608,6 +1762,7 @@ private:
 	{
 		const FString N = NoticeText();
 		return N.StartsWith(TEXT("Crafted")) || N.StartsWith(TEXT("Repaired")) || N.StartsWith(TEXT("Upgraded")) || N.StartsWith(TEXT("Queued")) || N.StartsWith(TEXT("Took"))
+			|| N.StartsWith(TEXT("Salvaged")) || N.StartsWith(TEXT("Removed")) || N.StartsWith(TEXT("You learned"))
 			|| N.StartsWith(TEXT("Cancelled")) || N.StartsWith(TEXT("Your ")) ? WRUI::Good : WRUI::Warn;
 	}
 };

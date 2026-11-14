@@ -391,7 +391,10 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 	if (Menu == EWRMenu::Inventory)
 	{
 		Out.Add({ FString::Printf(TEXT("Weapon: %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Weapon))), TEXT("unequip weapon") });
-		Out.Add({ FString::Printf(TEXT("Armor:  %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Armor))), TEXT("unequip armor") });
+		for (const EWREquipSlot Slot : { EWREquipSlot::Head, EWREquipSlot::Armor, EWREquipSlot::Hands, EWREquipSlot::Legs, EWREquipSlot::Talisman, EWREquipSlot::Ring, EWREquipSlot::Ring2 })
+		{
+			Out.Add({ FString::Printf(TEXT("%s:  %s"), *WRGearSlots::Label(Slot).ToString(), *GearLabel(Inv->GetEquipped(Slot))), FString::Printf(TEXT("unequip %s"), WRGearSlots::Word(Slot)) });
+		}
 		Out.Add({ FString::Printf(TEXT("Ranged: %s"), *GearLabel(Inv->GetEquipped(EWREquipSlot::Ranged))), TEXT("unequip ranged") });
 		const TArray<FWRItemStack>& Slots = Inv->GetSlots();
 		for (int32 i = 0; i < Slots.Num(); ++i)
@@ -636,7 +639,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	}
 	const FString& Cmd = Args[0];
 	const auto Arg = [&Args](int32 i) { return Args.IsValidIndex(i) ? Args[i] : FString(); };
-	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : S == TEXT("ranged") ? EWREquipSlot::Ranged : S == TEXT("light") ? EWREquipSlot::Light : EWREquipSlot::Weapon; };
+	const auto SlotOf = [](const FString& S) { return WRGearSlots::FromWord(S); };
 
 	if (RunBuildCommand(Args, OutResult))
 	{
@@ -855,7 +858,8 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		}
 		UE_LOG(LogWildreach, Log, TEXT("COOK %s: %s"), *PS->GetPlayerName(), *OutResult);
 	}
-	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade") || Cmd == TEXT("craftcancel") || Cmd == TEXT("crafttake"))
+	else if (Cmd == TEXT("craft") || Cmd == TEXT("repair") || Cmd == TEXT("upgrade") || Cmd == TEXT("craftcancel") || Cmd == TEXT("crafttake")
+		|| Cmd == TEXT("salvage") || Cmd == TEXT("unsocket"))
 	{
 		AWRStation* Station = FindNearbyStation();
 		if (!Station)
@@ -878,6 +882,16 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		else if (Cmd == TEXT("repair"))
 		{
 			OutResult = Station->Repair(this, SlotOf(Arg(1)));
+		}
+		else if (Cmd == TEXT("salvage"))
+		{
+			// salvage <bag slot>: gear broken down at its station, or a spare boss core into shards (WRGear).
+			OutResult = Station->Salvage(this, FCString::Atoi(*Arg(1)));
+		}
+		else if (Cmd == TEXT("unsocket"))
+		{
+			// unsocket <socket>: the held weapon's extra comes out (destroyed; Careful hands may save it).
+			OutResult = Station->RemoveExtra(this, FCString::Atoi(*Arg(1)));
 		}
 		else
 		{
@@ -968,6 +982,11 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	else if (Cmd == TEXT("unequip"))
 	{
 		OutResult = PS->GetInventory()->Unequip(SlotOf(Arg(1)));
+	}
+	else if (Cmd == TEXT("equipto"))
+	{
+		// equipto <bag slot> <slot word>: into that very slot (a ring dragged onto the second ring).
+		OutResult = PS->GetInventory()->EquipTo(FCString::Atoi(*Arg(1)), SlotOf(Arg(2)));
 	}
 	else if (Cmd == TEXT("use"))
 	{

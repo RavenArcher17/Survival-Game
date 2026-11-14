@@ -1,5 +1,6 @@
 #include "WRSky.h"
 #include "WRSurvival.h"
+#include "WRInventory.h"
 #include "Wildreach.h"
 #include "WRGameState.h"
 #include "WRSea.h"
@@ -377,6 +378,12 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			if (const FWRWeatherKind* K = FWRWeatherDefs::Get().Kind(WBiome, W->Kind))
 			{
 				WTarget = W->IsComing(Now) ? W->Approach(Now) * 0.45f : W->Strength(Now);
+				// Stalker fang talisman (the Pale Hunter's eye for snow): a blizzard doesn't close in on its wearer.
+				const APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+				if (W->Kind == TEXT("blizzard") && LocalPC && LocalPC->GetPawn() && UWRInventoryComponent::GearStatFor(LocalPC->GetPawn(), TEXT("blizzardSight")) > 0.f)
+				{
+					WTarget *= T.Num(TEXT("gear.blizzardSightFog"), 0.2f);
+				}
 				if (WTarget > 0.f)
 				{
 					WeatherFogDensity = K->FogDensity;

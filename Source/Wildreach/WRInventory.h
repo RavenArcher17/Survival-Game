@@ -15,7 +15,31 @@ enum class EWREquipSlot : uint8
 	Ranged,
 	/** A torch (off hand) or lantern (hip) that lights you (WRSurvival). */
 	Light,
+	// Gear slots (cooks/build-crafting.md 2.3): Armor above is the Chest; the head, hands and legs pieces, one
+	// talisman and two rings.
+	Head,
+	Hands,
+	Legs,
+	Talisman,
+	Ring,
+	Ring2,
 };
+
+namespace WRGearSlots
+{
+	/** The four armour slots, head to legs (the hero look's visual slot order). */
+	inline constexpr EWREquipSlot Armour[4] = { EWREquipSlot::Head, EWREquipSlot::Armor, EWREquipSlot::Hands, EWREquipSlot::Legs };
+	/** Every slot something is worn or held in. */
+	inline constexpr EWREquipSlot All[10] = { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Light, EWREquipSlot::Head, EWREquipSlot::Armor,
+		EWREquipSlot::Hands, EWREquipSlot::Legs, EWREquipSlot::Talisman, EWREquipSlot::Ring, EWREquipSlot::Ring2 };
+	inline bool IsArmour(EWREquipSlot S) { return S == EWREquipSlot::Head || S == EWREquipSlot::Armor || S == EWREquipSlot::Hands || S == EWREquipSlot::Legs; }
+	inline bool IsRing(EWREquipSlot S) { return S == EWREquipSlot::Ring || S == EWREquipSlot::Ring2; }
+	/** The command word for a slot ("unequip head", "equipto 3 ring2"), and back. */
+	WILDREACH_API const TCHAR* Word(EWREquipSlot S);
+	WILDREACH_API EWREquipSlot FromWord(const FString& Word);
+	/** What players call it: "Head", "Chest", "Ring"... */
+	WILDREACH_API FText Label(EWREquipSlot S);
+}
 
 /** One item definition from Data/items.json. */
 struct FWRItemDef
@@ -63,8 +87,21 @@ struct FWRItemDef
 	FString ProjectileMesh;
 	bool IsRanged() const { return !RangedKind.IsNone(); }
 	bool IsThrowable() const { return IsRanged() && AmmoKind.IsNone(); }
-	// Gems / boss parts: stat -> amount
+	// Gems / boss parts / runes: stat -> amount (in a weapon's socket)
 	TMap<FName, float> GemStats;
+	/** Armour (equip.look): the player_art.json armorLooks key whose outfit this piece shows in its slot (a head piece
+	 *  looks as its family's: hide_head as hide_armor). */
+	FName LookAs;
+	/** A biome armour set it belongs to (equip.set: Data/gear.json sets). */
+	FName Set;
+	/** A boss weapon's own element and effects (equip.element, equip.innate): always on, never taking a socket. */
+	FName InnateElement;
+	TMap<FName, float> Innate;
+	/** Talismans (worn): what wearing it gives. Rings (ring.gem): the gem set in the band. */
+	TMap<FName, float> Worn;
+	FName RingGem;
+	/** The player-facing line (items.json "note"): a talisman's effect, a material's use. */
+	FString Note;
 
 	/** Food (cooks/build-farming.md 2.8, 2.9): how many minutes it keeps fresh in a bag (0 = never spoils), and how many
 	 *  minutes eating it holds hunger off (use.sated: hunger doesn't drain; never a stat buff). */
@@ -219,9 +256,13 @@ public:
 	/** Use / equip / socket the item in a slot. Returns a message. */
 	FString UseSlot(int32 SlotIndex);
 	FString Unequip(EWREquipSlot Slot);
+	/** Puts the bag slot's gear into this very equip slot (a ring onto Ring 2): it has to be that kind of slot. */
+	FString EquipTo(int32 SlotIndex, EWREquipSlot Slot);
 	void GiveStartingKit();
 	/** Wear on equipped gear (weapon on hit, armor when hit). Breaks at 0 (stats off until repaired). */
 	void WearEquipped(EWREquipSlot Slot, float Amount);
+	/** A blow taken wears every worn armour piece (Valheim's rule): head, chest, hands and legs. */
+	void WearArmour(float Amount);
 	/** Push equipment stats onto the current pawn. */
 	void ApplyEquipment();
 	FWRItemStack* GetEquippedMutable(EWREquipSlot Slot);
@@ -230,7 +271,7 @@ public:
 	/** Server: direct access (death penalty, loot bags). Call ApplyEquipment after changing equipped gear. */
 	TArray<FWRItemStack>& GetSlotsMutable() { return Slots; }
 	const TArray<FWRItemStack>& GetSlots() const { return Slots; }
-	const FWRItemStack& GetEquipped(EWREquipSlot Slot) const { return Slot == EWREquipSlot::Armor ? EquippedArmor : Slot == EWREquipSlot::Ranged ? EquippedRanged : Slot == EWREquipSlot::Light ? EquippedLight : EquippedWeapon; }
+	const FWRItemStack& GetEquipped(EWREquipSlot Slot) const;
 	/** Ammo of a kind to fire: Preferred if we still have it, else the first we carry. None if out. */
 	FName FindAmmo(FName Kind, FName Preferred) const;
 	/** The next (Dir +1) or previous (-1) ammo type of a kind we carry, after Current. */
@@ -241,8 +282,19 @@ public:
 	float GetPotionCooldownRemaining() const;
 	/** Everything carried: the bag plus what's worn and held (kg). */
 	float GetCarryWeight() const;
-	/** Sum of a gem stat over the equipped weapon's sockets ("damage", "critChance", ...). */
+	/** Sum of a gem stat over the equipped weapon's sockets ("damage", "critChance", ...) and its innate effects. */
 	float GemStat(FName Stat) const;
+	/**
+	 * Everything worn that gives Stat (cooks/build-crafting.md 2.5-2.7): the weapon's sockets and innate effects, the
+	 * active biome set bonuses, the talisman and the rings (two of the same ring count once). Intact pieces only.
+	 */
+	float GearStat(FName Stat) const;
+	/** The same for whoever this is (a pawn or its player state; 0 for creatures). */
+	static float GearStatFor(const AActor* Who, FName Stat);
+	/** Intact pieces of a biome set worn (its Ascendant pieces count), plus one with Set crafter once any is worn. */
+	int32 SetPieces(FName Set) const;
+	/** A ring's stat: its gem's socket value x rings.share x (1 + perTier x the band's tier above copper). */
+	static float RingStat(const FWRItemDef& Ring, FName Stat);
 	/** Worn poise: the armour's (items.json equip.poise, while it holds) and socketed poise (COMBAT-AND-LESSONS 1.5). */
 	float GetWornPoise() const;
 	/** Worn status resistance (items.json equip.resist): added to the wearer's buildup threshold for that status. */
@@ -270,6 +322,12 @@ private:
 	UPROPERTY(Replicated) FWRItemStack EquippedArmor;
 	UPROPERTY(Replicated) FWRItemStack EquippedRanged;
 	UPROPERTY(Replicated) FWRItemStack EquippedLight;
+	UPROPERTY(Replicated) FWRItemStack EquippedHead;
+	UPROPERTY(Replicated) FWRItemStack EquippedHands;
+	UPROPERTY(Replicated) FWRItemStack EquippedLegs;
+	UPROPERTY(Replicated) FWRItemStack EquippedTalisman;
+	UPROPERTY(Replicated) FWRItemStack EquippedRing;
+	UPROPERTY(Replicated) FWRItemStack EquippedRing2;
 	/** Server: UseSlot's stack, so UseCategory eats that one. */
 	int32 PreferSlot = INDEX_NONE;
 	/** Server time the potion belt is ready again (replicated so the HUD can show it). */

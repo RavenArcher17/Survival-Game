@@ -636,6 +636,45 @@ namespace WRBuildLookDetail
 			B.Add(EWRLookMat::Stone, FVector(70.f, 70.f, 14.f), FVector(0.f, 0.f, 12.f), FRotator::ZeroRotator, 0.9f, EWRLookMesh::Cylinder);
 			return true;
 		}
+		if (Id == TEXT("charcoal_kiln"))
+		{
+			// A domed clay-and-stone kiln (cooks/build-crafting.md 2.1, the charcoal burner's beehive kiln): a stone plinth
+			// ring, seven courses of dome closing to a chimney stub, an arched fire mouth facing out (+X) with its lintel,
+			// six vent holes round the crown that let the smoke out slow, split logs stacked on the right to feed it and a
+			// heap of black lump charcoal raked out on the left.
+			B.Add(EWRLookMat::Stone, FVector(232.f, 232.f, 30.f), FVector(0.f, 0.f, 15.f), FRotator::ZeroRotator, 1.1f, EWRLookMesh::Cylinder);
+			for (int32 c = 0; c < 7; ++c)
+			{
+				const float R = 104.f * FMath::Cos(c / 7.f * HALF_PI);
+				B.Add(EWRLookMat::Stone, FVector(R * 2.f, R * 2.f, 17.f), FVector(0.f, 0.f, 38.f + c * 16.f), FRotator(0.f, c * 23.f, 0.f), 0.85f + 0.06f * (c % 2), EWRLookMesh::Cylinder);
+			}
+			B.Add(EWRLookMat::Stone, FVector(42.f, 42.f, 44.f), FVector(0.f, 0.f, 162.f), FRotator::ZeroRotator, 0.7f, EWRLookMesh::Cylinder);   // the chimney stub
+			B.Add(EWRLookMat::Stone, FVector(30.f, 30.f, 4.f), FVector(0.f, 0.f, 184.5f), FRotator::ZeroRotator, 0.05f, EWRLookMesh::Cylinder); // its sooty mouth
+			B.Box(EWRLookMat::Stone, FVector(86.f, -30.f, 30.f), FVector(104.f, 30.f, 92.f), 0.06f);      // the fire mouth, dark inside
+			B.Box(EWRLookMat::Stone, FVector(84.f, -40.f, 92.f), FVector(108.f, 40.f, 104.f), 1.2f);     // its lintel stone
+			for (const float Y : { -38.f, 38.f }) B.Box(EWRLookMat::Stone, FVector(86.f, Y - 8.f, 30.f), FVector(108.f, Y + 8.f, 92.f), 1.15f);   // jambs
+			for (int32 v = 0; v < 6; ++v)
+			{
+				const float A = v * 60.f + 30.f;
+				const FVector Dir(FMath::Cos(FMath::DegreesToRadians(A)), FMath::Sin(FMath::DegreesToRadians(A)), 0.f);
+				B.Add(EWRLookMat::Stone, FVector(10.f, 10.f, 6.f), Dir * 64.f + FVector(0.f, 0.f, 118.f), FRotator(0.f, A, 0.f), 0.04f);   // vent holes
+			}
+			for (int32 Row = 0; Row < 3; ++Row)
+			{
+				for (int32 L = 0; L < 4 - Row; ++L)
+				{
+					const FVector C(-20.f + 8.f * B.Jit(FVector(L, Row, 1.f), 3), 146.f + L * 18.f + Row * 9.f, 9.f + Row * 16.f);
+					B.Add(EWRLookMat::Wood, FVector(16.f, 16.f, 110.f), C, FRotator(90.f, 0.f, 6.f * B.Jit(C, 5)), 0.85f + 0.1f * B.Rand(C, 7), EWRLookMesh::Cylinder);
+				}
+			}
+			B.Add(EWRLookMat::Stone, FVector(90.f, 90.f, 34.f), FVector(10.f, -160.f, 17.f), FRotator::ZeroRotator, 0.05f, EWRLookMesh::Cone);    // the charcoal heap
+			for (int32 k = 0; k < 6; ++k)
+			{
+				const FVector C(10.f + 48.f * B.Jit(FVector(k, 0.f, 2.f), 11), -160.f + 48.f * B.Jit(FVector(k, 1.f, 2.f), 13), 5.f);
+				B.Add(EWRLookMat::Stone, FVector(10.f, 8.f, 7.f), C, FRotator(20.f * B.Jit(C, 3), 90.f * B.Rand(C, 4), 0.f), 0.05f);           // lumps rolled off it
+			}
+			return true;
+		}
 		if (Id == TEXT("salting_barrel"))
 		{
 			// An oak cask with three iron hoops on a low stand, its lid held down by a river stone.

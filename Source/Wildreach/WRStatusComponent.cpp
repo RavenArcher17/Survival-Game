@@ -269,6 +269,13 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 		if (Id == WRStatus::Shock) Amount *= WRStatus::Def(WRStatus::Soak, TEXT("shockBuildup"), 1.5f);
 		if (Id == WRStatus::Frost) Amount *= WRStatus::Def(WRStatus::Soak, TEXT("frostBuildup"), 1.5f);
 	}
+	// Worn gear (cooks/build-crafting.md 2.5-2.6): a biome set's two pieces halve its land's status (Forgeplate burn,
+	// Rimeguard frostbite), talismans take some off (Hex mask curse): gear.json / items.json buildupTaken.<status>.
+	if (Owner->GetPlayerState())
+	{
+		Amount *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Owner, FName(*(FString(TEXT("buildupTaken.")) + WRStatus::Name(Id).ToString()))));
+		if (Amount <= 0.f) return;
+	}
 	SinceBuildup = 0.f;
 	const float Value = GetMeter(Id) + Amount;
 	const float Need = Threshold(Id);
@@ -706,6 +713,16 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	SinceStaminaUse += DeltaTime;
 	SincePoiseDamage += DeltaTime;
 	SinceStanceDamage += DeltaTime;
+	// Troll marrow talisman: out of a fight (status.outOfCombatSeconds unhurt) the wearer heals slowly.
+	if (Owner->HasAuthority() && Owner->GetPlayerState() && Owner->IsAlive() && SinceHurt >= WRTune(TEXT("gear.outOfCombatSeconds"), 8.f)
+		&& Attr->GetHealth() < Attr->GetMaxHealth())
+	{
+		const float Regen = UWRInventoryComponent::GearStatFor(Owner, TEXT("outOfCombatRegen"));
+		if (Regen > 0.f)
+		{
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(Attr->GetMaxHealth(), Attr->GetHealth() + Regen * DeltaTime * HealingTakenScale()));
+		}
+	}
 	// No regen from a swing's press until its cancel window (ER): the stamina spent on a chain stays spent. Nor while a
 	// charge is held, or a drink is going down (combat.md 2.3).
 	const bool bMidSwing = (Owner->IsSwinging() && GetWorld()->GetTimeSeconds() < Owner->Swing.CancelAt)

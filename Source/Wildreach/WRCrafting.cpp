@@ -1,4 +1,5 @@
 #include "WRCrafting.h"
+#include "WRGear.h"
 #include "WRFishing.h"
 #include "WRFarm.h"
 #include "WRSurvival.h"
@@ -77,6 +78,10 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 			O->TryGetStringField(TEXT("needsText"), R.NeedsText);
 			FString RecipeBiome;
 			if (O->TryGetStringField(TEXT("biome"), RecipeBiome)) R.Biome = FName(*RecipeBiome);
+			FString Str;
+			if (O->TryGetStringField(TEXT("blueprint"), Str)) R.Blueprint = FName(*Str);
+			if (O->TryGetStringField(TEXT("xp"), Str)) R.XPKey = FName(*Str);
+			O->TryGetStringField(TEXT("waitsFor"), R.WaitsFor);
 			const TSharedPtr<FJsonObject>* Inputs = nullptr;
 			if (O->TryGetObjectField(TEXT("inputs"), Inputs))
 			{
@@ -181,7 +186,7 @@ TArray<const FWRRecipe*> FWRRecipeRegistry::ForStation(FName Station) const
 	for (const FWRRecipe& R : Recipes)
 	{
 		// Discovery dishes aren't listed: they're found in the Cook screen's pot.
-		if (R.Station == Station && !R.bDish && WRBiome::IsLive(R.Biome)) Out.Add(&R);
+		if (R.Station == Station && !R.bDish && WRBiome::IsLive(R.Biome) && R.WaitsFor.IsEmpty()) Out.Add(&R);
 	}
 	return Out;
 }
@@ -945,6 +950,25 @@ bool FWRCrafting::IsGear(const FWRRecipe& Recipe)
 	return OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1 && OutDef->Category != TEXT("tool");
 }
 
+bool FWRCrafting::IsArmourMade(const FWRItemDef& Def)
+{
+	return WRGearSlots::IsArmour(Def.Slot) || Def.Slot == EWREquipSlot::Talisman;
+}
+
+FName FWRCrafting::GearStation(const FWRItemDef& Def)
+{
+	if (Def.Category == TEXT("tool")) return TEXT("workbench");
+	if (IsArmourMade(Def)) return TEXT("armorer");
+	if (Def.Slot == EWREquipSlot::Weapon || WRGearSlots::IsRing(Def.Slot)) return TEXT("forge");
+	const FWRRecipe* R = FWRRecipeRegistry::Get().ForOutput(Def.Id);
+	return R ? R->Station : FName(TEXT("workbench"));
+}
+
+bool FWRCrafting::IsOpenTo(const AActor* Player, const FWRRecipe& Recipe)
+{
+	return WRBiome::IsLive(Recipe.Biome) && Recipe.WaitsFor.IsEmpty() && (Recipe.Blueprint.IsNone() || FWRBlueprints::Knows(Player, Recipe.Blueprint));
+}
+
 FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times)
 {
 	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
@@ -955,6 +979,10 @@ FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Rec
 	if (!Recipe.NeedsStat.IsNone() && UWRLifeSkillsComponent::StatFor(Player, Recipe.NeedsStat) <= 0.f)
 	{
 		return Recipe.NeedsText.IsEmpty() ? FString(TEXT("needs a perk you don't have")) : Recipe.NeedsText;
+	}
+	if (!IsOpenTo(Player, Recipe))
+	{
+		return !Recipe.Blueprint.IsNone() && !FWRBlueprints::Knows(Player, Recipe.Blueprint) ? TEXT("you haven't learned that blueprint") : TEXT("not in this world yet");
 	}
 	const UWRInventoryComponent* Inv = PS->GetInventory();
 	const float Discount = MaterialDiscount(Player, Recipe);
@@ -978,6 +1006,11 @@ FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Rec
 	{
 		return TEXT("ranged weapons can't carry an infusion yet");
 	}
+	// Rings and talismans aren't infused; a boss weapon carries its own element already.
+	if (!Essence.IsNone() && InfuseDef && (!InfuseDef->InnateElement.IsNone() || InfuseDef->Slot == EWREquipSlot::Talisman || WRGearSlots::IsRing(InfuseDef->Slot)))
+	{
+		return InfuseDef->InnateElement.IsNone() ? TEXT("only weapons and armour take an infusion") : TEXT("it carries its own element");
+	}
 	return FString();
 }
 
@@ -993,7 +1026,7 @@ float FWRCrafting::MaterialDiscount(const AActor* Player, const FWRRecipe& Recip
 	{
 		return 0.f;
 	}
-	const FName Stat = OutDef->Slot == EWREquipSlot::Armor ? FName(TEXT("armorMaterials")) : FName(TEXT("weaponMaterials"));
+	const FName Stat = IsArmourMade(*OutDef) ? FName(TEXT("armorMaterials")) : FName(TEXT("weaponMaterials"));
 	return FMath::Clamp(-UWRLifeSkillsComponent::StatFor(Player, Stat), 0.f, 0.9f);
 }
 
@@ -1014,7 +1047,7 @@ float FWRCrafting::SpeedFor(const AActor* Player, const FWRRecipe& Recipe)
 	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
 	if (OutDef && OutDef->IsEquipment() && OutDef->Category != TEXT("tool"))
 	{
-		Speed += UWRLifeSkillsComponent::StatFor(Player, OutDef->Slot == EWREquipSlot::Armor ? TEXT("armorSpeed") : TEXT("weaponSpeed"));
+		Speed += UWRLifeSkillsComponent::StatFor(Player, IsArmourMade(*OutDef) ? TEXT("armorSpeed") : TEXT("weaponSpeed"));
 	}
 	return FMath::Max(0.1f, Speed);
 }
@@ -1040,7 +1073,7 @@ FWRCrafterHand FWRCrafting::HandOf(AWRPlayerController* Player, const FWRRecipe&
 	// Smithing (weapons) / Armorcraft (armor) improve gear's odds; the Master perks floor it at Fine.
 	FWRCrafterHand Hand;
 	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
-	const bool bArmor = OutDef && OutDef->Slot == EWREquipSlot::Armor;
+	const bool bArmor = OutDef && IsArmourMade(*OutDef);
 	const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(Player);
 	Hand.SkillLevel = Skills ? Skills->GetLevel(bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"))) : 0;
 	Hand.bMinFine = UWRLifeSkillsComponent::StatFor(Player, bArmor ? TEXT("armorMinFine") : TEXT("weaponMinFine")) > 0.f;
@@ -1057,7 +1090,7 @@ FWRCraftedOne FWRCrafting::MakeOne(const FWRRecipe& Recipe, FName StationType, i
 	One.bGear = IsGear(Recipe);
 	if (One.bGear)
 	{
-		const bool bArmor = OutDef->Slot == EWREquipSlot::Armor;
+		const bool bArmor = IsArmourMade(*OutDef);
 		EWRQuality Quality = Recipe.bQuality ? FWRCraftingRules::RollQuality(FMath::FRand(), Tier, Hand.SkillLevel) : EWRQuality::Common;
 		if (Hand.bMinFine && Quality < EWRQuality::Fine)
 		{
@@ -1065,7 +1098,8 @@ FWRCraftedOne FWRCrafting::MakeOne(const FWRRecipe& Recipe, FName StationType, i
 		}
 		const float Spread = FWRRecipeRegistry::Get().RollSpread;
 		One.Item = FWRInventoryRules::MakeInstance(Recipe.Output, Quality, 1.f + FMath::FRandRange(-Spread + Hand.RollBonus, Spread));
-		One.Item.Element = Element;
+		// A boss weapon's element is its own (Cinderbrand burns, Rimefang freezes).
+		One.Item.Element = Element.IsNone() ? OutDef->InnateElement : Element;
 		One.Skill = bArmor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
 		One.XPKey = TEXT("craftGear");
 		One.XP = 25.f;
@@ -1088,6 +1122,11 @@ FWRCraftedOne FWRCrafting::MakeOne(const FWRRecipe& Recipe, FName StationType, i
 		: StationType == TEXT("armorer") ? FName(TEXT("armorcraft")) : FName(TEXT("smithing"));
 	One.XPKey = bFood ? TEXT("cook") : TEXT("craft");
 	One.XP = bFood ? 15.f : 10.f;
+	if (Recipe.XPKey == TEXT("steel"))
+	{
+		One.XPKey = TEXT("steel");   // steel and starsteel ingots (cooks/survival-crafting.md 2.23)
+		One.XP = 5.f;
+	}
 	One.Item.ItemId = Recipe.Output;
 	One.Item.Count = Count;
 	One.Text = FString::Printf(TEXT("Crafted %d %s"), Count, OutDef ? *OutDef->Name : *Recipe.Output.ToString());
@@ -1139,19 +1178,20 @@ FString AWRStation::Repair(AWRPlayerController* Player, EWREquipSlot Slot)
 	UWRInventoryComponent* Inv = Player->GetPlayerState<AWRPlayerState>()->GetInventory();
 	FWRItemStack* Item = Inv->GetEquippedMutable(Slot);
 	const FWRItemDef* Def = Item && !Item->IsEmpty() ? FWRItemRegistry::Get().Find(Item->ItemId) : nullptr;
-	// Repairs happen at the matching station: the tool in your hand at a workbench, weapons at a forge.
-	const bool bTool = Slot == EWREquipSlot::Weapon && Def && Def->Category == TEXT("tool");
-	if (bTool && StationType != TEXT("workbench"))
-	{
-		return TEXT("tools are repaired at a workbench");
-	}
-	if ((Slot == EWREquipSlot::Weapon && !bTool && StationType != TEXT("forge")) || (Slot == EWREquipSlot::Armor && StationType != TEXT("armorer")))
-	{
-		return Slot == EWREquipSlot::Weapon ? TEXT("weapons are repaired at a forge") : TEXT("armor is repaired at an armorer");
-	}
 	if (!Def)
 	{
 		return TEXT("nothing equipped");
+	}
+	if (Def->MaxDurability <= 0.f)
+	{
+		return FString::Printf(TEXT("the %s doesn't wear"), *Def->Name);
+	}
+	// Repairs happen at the matching station: the tool in your hand at a workbench, weapons at a forge, armour at an
+	// armorer (FWRCrafting::GearStation).
+	const FName At = FWRCrafting::GearStation(*Def);
+	if (Slot != EWREquipSlot::Ranged && At != StationType)
+	{
+		return FString::Printf(TEXT("the %s is repaired at a %s"), *Def->Name, *At.ToString().Replace(TEXT("_"), TEXT(" ")));
 	}
 	if (Item->Durability >= Def->MaxDurability)
 	{
@@ -1191,15 +1231,19 @@ FString AWRStation::Upgrade(AWRPlayerController* Player, EWREquipSlot Slot)
 	{
 		return Why;
 	}
-	if ((Slot == EWREquipSlot::Weapon && StationType != TEXT("forge")) || (Slot == EWREquipSlot::Armor && StationType != TEXT("armorer")))
+	if (Slot != EWREquipSlot::Weapon && !WRGearSlots::IsArmour(Slot))
 	{
-		return TEXT("upgrade weapons at a forge and armor at an armorer");
+		return TEXT("weapons and armour are upgraded");
 	}
 	UWRInventoryComponent* Inv = Player->GetPlayerState<AWRPlayerState>()->GetInventory();
 	FWRItemStack* Item = Inv->GetEquippedMutable(Slot);
 	if (!Item || Item->IsEmpty())
 	{
 		return TEXT("nothing equipped");
+	}
+	if (const FWRItemDef* UpDef = FWRItemRegistry::Get().Find(Item->ItemId); UpDef && FWRCrafting::GearStation(*UpDef) != StationType && !FWRGathering::FindTool(Item->ItemId))
+	{
+		return TEXT("upgrade weapons at a forge and armour at an armorer");
 	}
 	if (Slot == EWREquipSlot::Weapon && FWRGathering::FindTool(Item->ItemId))
 	{
@@ -1218,6 +1262,6 @@ FString AWRStation::Upgrade(AWRPlayerController* Player, EWREquipSlot Slot)
 	Inv->RemoveItem(TEXT("upgrade_shard"), Cost);
 	++Item->Upgrade;
 	Inv->ApplyEquipment();
-	UWRLifeSkillsComponent::Award(Player, Slot == EWREquipSlot::Armor ? FName(TEXT("armorcraft")) : FName(TEXT("smithing")), TEXT("upgrade"), 15.f);
+	UWRLifeSkillsComponent::Award(Player, WRGearSlots::IsArmour(Slot) ? FName(TEXT("armorcraft")) : FName(TEXT("smithing")), TEXT("upgrade"), 15.f);
 	return FString::Printf(TEXT("Upgraded to +%d"), Item->Upgrade);
 }

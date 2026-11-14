@@ -76,7 +76,7 @@ struct FWRWeatherKind
 	// Counters: any one of these and it doesn't touch you.
 	float RoofWithin = 0.f;          // cm; something solid this close above you (0 = a roof doesn't help)
 	TArray<FName> Resist;            // infused armour: frost / lava (FWRBiomeHazards::Resists)
-	TArray<FName> Armor;             // worn armour ids
+	TMap<FName, int32> Sets;         // a biome armour set worn to this many pieces (Data/gear.json; Set crafter counts one more)
 	TArray<FName> PathNodes;         // "path.node" you hold (Grounded, Sandwalker...)
 	TArray<FName> Items;             // carried in the bag (a grounding charm)
 

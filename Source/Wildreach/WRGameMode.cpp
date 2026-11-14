@@ -447,6 +447,9 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	TArray<TSharedPtr<FJsonValue>> Kills;
 	for (const FName& Boss : PS->BossKills) Kills.Add(MakeShared<FJsonValueString>(Boss.ToString()));
 	Root->SetArrayField(TEXT("bossKills"), Kills);
+	TArray<TSharedPtr<FJsonValue>> Known;
+	for (const FName& Bp : PS->KnownBlueprints) Known.Add(MakeShared<FJsonValueString>(Bp.ToString()));
+	Root->SetArrayField(TEXT("blueprints"), Known);
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -516,6 +519,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetArrayField(TEXT("bossKills"), Kills))
 	{
 		for (const TSharedPtr<FJsonValue>& K : *Kills) PS->BossKills.Add(FName(*K->AsString()));
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Known = nullptr;
+	if (Root->TryGetArrayField(TEXT("blueprints"), Known))
+	{
+		for (const TSharedPtr<FJsonValue>& K : *Known) PS->KnownBlueprints.AddUnique(FName(*K->AsString()));
 	}
 }
 

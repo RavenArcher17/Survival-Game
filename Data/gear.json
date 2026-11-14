@@ -1,0 +1,326 @@
+{
+  "_comment": "build-crafting (cooks/build-crafting.md, survival-crafting 2.13 / 2.14). sets: each biome set's bonuses at 2 and 4 worn pieces (Set crafter: one more piece counted); a piece of the set's Ascendant version counts for the set. Stats are named for the system that reads them (UWRInventoryComponent::GearStat; names a life-skill stat also uses add to it through StatFor). rings: a band's gem stat x share x (1 + perTier x the metal's tier above copper); two of the same ring count once. salvage: what breaking gear down gives back. blueprints: what each teaches and where it drops; portalOdds by portal rank 1..5 for the portals when they come.",
+  "sets": [
+    {
+      "id": "forgeplate",
+      "name": "Forgeplate",
+      "biome": "volcanic",
+      "load": "heavy",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.burn": -0.5
+          },
+          "text": "Burn builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "passLava": 1,
+            "heatGain": 0.15
+          },
+          "text": "Walk on lava unhurt · Heat fills 15% faster"
+        }
+      }
+    },
+    {
+      "id": "stormweave",
+      "name": "Stormweave",
+      "biome": "storm_peaks",
+      "load": "light",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.shock": -0.5
+          },
+          "text": "Shock builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "passStorm": 1,
+            "sprintStamina": -0.25
+          },
+          "text": "Storm strikes never pick you · sprinting costs 25% less stamina"
+        }
+      }
+    },
+    {
+      "id": "dunewrap",
+      "name": "Dunewrap",
+      "biome": "desert",
+      "load": "light",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.blind": -0.5,
+            "heatwaveThirst": -1
+          },
+          "text": "Blind builds up half as fast · heat waves don't raise your thirst"
+        },
+        "4": {
+          "stats": {
+            "passSandstorm": 1,
+            "radianceNight": 0.5
+          },
+          "text": "Sandstorms slow you half as much and you see 60 m · Radiance fills at night at half rate"
+        }
+      }
+    },
+    {
+      "id": "heartguard",
+      "name": "Heartguard",
+      "biome": "forest",
+      "load": "medium",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.bleed": -0.5
+          },
+          "text": "Bleed builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "passThorns": 1,
+            "stillRegen": 1
+          },
+          "text": "Pass through thornbrakes · standing still 2 s heals 1 HP a second"
+        }
+      }
+    },
+    {
+      "id": "skysilk",
+      "name": "Skysilk",
+      "biome": "sky_islands",
+      "load": "light",
+      "bonus": {
+        "2": {
+          "stats": {
+            "fallDamage": -0.5
+          },
+          "text": "Falls hurt half as much"
+        },
+        "4": {
+          "stats": {
+            "passGusts": 1,
+            "glideSeconds": 6
+          },
+          "text": "Gusts never push you · glide 6 s from any jump"
+        }
+      }
+    },
+    {
+      "id": "wardcloth",
+      "name": "Wardcloth",
+      "biome": "crystal",
+      "load": "light",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.mark": -0.5
+          },
+          "text": "Mark builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "passWards": 1,
+            "spellCost": -0.1
+          },
+          "text": "Walk through ward fields · spells cost 10% less"
+        }
+      }
+    },
+    {
+      "id": "rimeguard",
+      "name": "Rimeguard",
+      "biome": "tundra",
+      "load": "medium",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.frost": -0.5
+          },
+          "text": "Frostbite builds up half as fast · blizzards don't wear you down"
+        },
+        "4": {
+          "stats": {
+            "passIce": 1,
+            "chillGain": 0.15
+          },
+          "text": "Full grip on slick ice · Chill fills 15% faster"
+        }
+      }
+    },
+    {
+      "id": "mirehide",
+      "name": "Mirehide",
+      "biome": "swamp",
+      "load": "medium",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.bleed": -0.5
+          },
+          "text": "Bleed builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "passBleedwater": 1,
+            "lifesteal": 0.02
+          },
+          "text": "Wade bleedwater unhurt · heal 2% of the damage you deal"
+        }
+      }
+    },
+    {
+      "id": "reefmail",
+      "name": "Reefmail",
+      "biome": "ocean",
+      "load": "medium",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.soak": -0.5
+          },
+          "text": "Soak builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "breathMult": 1,
+            "passDepth": 4000
+          },
+          "text": "Twice the breath · no crushing depth to 40 m"
+        }
+      }
+    },
+    {
+      "id": "gravecloth",
+      "name": "Gravecloth",
+      "biome": "graveyard",
+      "load": "light",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.decay": -0.5
+          },
+          "text": "Decay builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "corruptionRate": -0.5,
+            "noDoubleAggro": 1
+          },
+          "text": "Corruption builds at half rate · dark-hunters never double their aggro on you"
+        }
+      }
+    },
+    {
+      "id": "sporeweave",
+      "name": "Sporeweave",
+      "biome": "fungal",
+      "load": "medium",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.poison": -0.5,
+            "buildupTaken.rot": -0.5
+          },
+          "text": "Poison and rot build up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "passSpores": 1
+          },
+          "text": "Walk through spore clouds unhurt"
+        }
+      }
+    },
+    {
+      "id": "hollowplate",
+      "name": "Hollowplate",
+      "biome": "wasteland",
+      "load": "heavy",
+      "bonus": {
+        "2": {
+          "stats": {
+            "buildupTaken.curse": -0.5
+          },
+          "text": "Curse builds up half as fast on you"
+        },
+        "4": {
+          "stats": {
+            "riftDrain": -0.5,
+            "voidSelfDrain": -0.25
+          },
+          "text": "Rifts drain your max HP half as fast · void abilities take 25% less of it"
+        }
+      }
+    }
+  ],
+  "rings": {
+    "share": 0.6,
+    "perTier": 0.1,
+    "metalTier": {
+      "copper": 0,
+      "bronze": 1,
+      "iron": 2,
+      "steel": 3,
+      "starsteel": 4
+    }
+  },
+  "salvage": {
+    "base": 0.4,
+    "perQuality": 0.1,
+    "shards": 0.25,
+    "coreShards": 10,
+    "coreLevel": 5,
+    "xp": 5
+  },
+  "extras": {
+    "removeLevel": 1
+  },
+  "blueprints": {
+    "repeatChance": 0.2,
+    "portalOdds": [
+      0.1,
+      0.2,
+      0.3,
+      0.45,
+      0.6
+    ],
+    "legendaryFromRank": 4,
+    "list": [
+      {
+        "id": "bp_cinderbrand",
+        "boss": "vulkarn",
+        "recipes": [
+          "cinderbrand"
+        ],
+        "kind": "boss weapon"
+      },
+      {
+        "id": "bp_rimefang",
+        "boss": "skaldrith",
+        "recipes": [
+          "rimefang"
+        ],
+        "kind": "boss weapon"
+      }
+    ]
+  },
+  "talismans": {
+    "trophyLevel": 2,
+    "signature": {
+      "volcanic": "sulfur_crystal",
+      "storm_peaks": "stormglass",
+      "desert": "sunstone",
+      "forest": "heartwood",
+      "sky_islands": "levistone",
+      "crystal": "resonant_crystal",
+      "tundra": "lichen",
+      "swamp": "bloodmoss",
+      "ocean": "tidecoral",
+      "graveyard": "soulstone",
+      "fungal": "deepcap",
+      "wasteland": "voidglass"
+    }
+  }
+}

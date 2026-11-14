@@ -55,6 +55,7 @@
     {"id": "campfire", "name": "Campfire", "category": "kitchen", "kind": "station", "station": "campfire", "cost": {"stone": 5, "wood": 4}, "hp": 200, "comfort": {"group": "fire", "value": 1}},
     {"id": "cooking_pot", "name": "Cooking pot", "category": "kitchen", "kind": "station", "station": "cooking_pot", "cost": {"copper_ingot": 4, "stone": 6}, "hp": 300, "comfort": {"group": "fire", "value": 1}},
     {"id": "oven", "name": "Oven", "category": "kitchen", "kind": "station", "station": "oven", "hearth": 2, "cost": {"stone": 30, "copper_ingot": 4}, "hp": 900, "comfort": {"group": "fire", "value": 2}},
+    {"id": "charcoal_kiln", "name": "Charcoal kiln", "category": "utility", "kind": "station", "station": "charcoal_kiln", "hearth": 2, "cost": {"stone": 20, "copper_ingot": 4, "wood": 10}, "hp": 800, "note": "Burns wood slow into charcoal: the carbon for steel (10 wood, 4 charcoal, 2 min)."},
     {"id": "smokehouse", "name": "Smokehouse", "category": "kitchen", "kind": "station", "station": "smokehouse", "hearth": 2, "cost": {"wood": 30, "stone": 10}, "hp": 700},
     {"id": "salting_barrel", "name": "Salting barrel", "category": "kitchen", "kind": "station", "station": "salting_barrel", "hearth": 2, "cost": {"wood": 12, "copper_ingot": 2}, "hp": 250},
     {"id": "drying_rack", "name": "Drying rack", "category": "kitchen", "kind": "station", "station": "drying_rack", "cost": {"wood": 6, "fiber": 4}, "hp": 150},

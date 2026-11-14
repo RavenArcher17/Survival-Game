@@ -233,6 +233,9 @@ public:
 	 *  surface over this spot: for rendering faults such as ground that draws as something else. */
 	UFUNCTION(Exec) void WRProbe();
 	UFUNCTION(Exec) void WRGive(FName Item, int32 Count);
+	/** Testing (cooks/build-crafting.md): set the nearest Hearth to tech level 1-5 (steel at 4, starsteel at 5) by giving it
+	 *  that many different cores; the island's real cores stay first. */
+	UFUNCTION(Exec) void WRHearthLevel(int32 Level);
 	/** Ranged weapon (bots): out (1) / away (0), aim, fire, cycle ammo, face the nearest creature of an id. */
 	UFUNCTION(Exec) void WRRanged(int32 bOn);
 	UFUNCTION(Exec) void WRAim(int32 bOn);

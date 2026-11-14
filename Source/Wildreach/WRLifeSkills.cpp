@@ -1,4 +1,5 @@
 #include "WRLifeSkills.h"
+#include "WRInventory.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRPlayerState.h"
@@ -112,8 +113,10 @@ UWRLifeSkillsComponent* UWRLifeSkillsComponent::FindFor(const AActor* Actor)
 
 float UWRLifeSkillsComponent::StatFor(const AActor* Actor, FName StatName)
 {
+	// Worn gear named for a life-skill stat adds to it (cooks/build-crafting.md 2.6: Gnarl heart's woodYield, Tyrant
+	// fin's swimSpeed, Barnacle claw's blockStamina...).
 	const UWRLifeSkillsComponent* C = FindFor(Actor);
-	return C ? C->Stat(StatName) : 0.f;
+	return (C ? C->Stat(StatName) : 0.f) + UWRInventoryComponent::GearStatFor(Actor, StatName);
 }
 
 void UWRLifeSkillsComponent::Award(const AActor* Actor, FName Skill, const TCHAR* XPKey, float Fallback, float Times)

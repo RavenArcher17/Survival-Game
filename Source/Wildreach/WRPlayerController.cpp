@@ -473,6 +473,7 @@ void AWRPlayerController::WRAimAt(FName Creature)
 }
 
 void AWRPlayerController::WRGive(FName Item, int32 Count) { ServerCommand(FString::Printf(TEXT("give %s %d"), *Item.ToString(), FMath::Max(1, Count))); }
+void AWRPlayerController::WRHearthLevel(int32 Level) { ServerCommand(FString::Printf(TEXT("hearthlevel %d"), Level)); }
 
 AWRBossAltar* AWRPlayerController::FindNearbyAltar() const
 {
@@ -1501,6 +1502,25 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		const FWRItemStack& Held = PS->GetInventory()->GetEquipped(EWREquipSlot::Weapon);
 		Result = Held.IsEmpty() ? FString(TEXT("nothing held")) : FString::Printf(TEXT("%s durability %.0f"), *Held.ItemId.ToString(), Held.Durability);
 		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("hearthlevel"))
+	{
+		// Testing: the nearest Hearth at a tech level (0 / 1 / 2 / 4 / 6 different major cores), its real cores kept first.
+		AWRHearth* Hearth = FindNearbyHearth();
+		const int32 Level = FMath::Clamp(FCString::Atoi(*Arg(1)), 1, 5);
+		static const int32 Needed[] = { 0, 1, 2, 4, 6 };
+		if (!Hearth)
+		{
+			Result = TEXT("no Hearth nearby");
+		}
+		else
+		{
+			TArray<FName> Cores;
+			for (const FName& C : Hearth->GetCores()) if (Cores.Num() < Needed[Level - 1]) Cores.AddUnique(C);
+			for (int32 i = 1; Cores.Num() < Needed[Level - 1]; ++i) Cores.AddUnique(FName(*FString::Printf(TEXT("core_test_%d"), i)));
+			Hearth->SetCores(Cores);
+			Result = FString::Printf(TEXT("Hearth at tech level %d (%d cores)"), Hearth->GetTechLevel(), Cores.Num());
+		}
 	}
 	else if (Cmd == TEXT("give") && PS)
 	{

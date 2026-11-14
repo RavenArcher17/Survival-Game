@@ -27,6 +27,12 @@ struct FWRRecipe
 	bool bDish = false;
 	/** The land its ingredients come from (recipes.json "biome"): not listed until that land is in the game. */
 	FName Biome;
+	/** A blueprint item that teaches it (recipes.json "blueprint"): hidden and refused until its maker has read one. */
+	FName Blueprint;
+	/** Its own life-skill XP row (recipes.json "xp": lifeSkills.xp.<it>), e.g. steel. */
+	FName XPKey;
+	/** What it waits for (recipes.json "waitsFor"): a recipe whose effect has no system yet stays hidden until it does. */
+	FString WaitsFor;
 };
 
 class WILDREACH_API FWRRecipeRegistry
@@ -98,6 +104,13 @@ struct WILDREACH_API FWRCrafting
 	static FWRCraftedOne MakeOne(const FWRRecipe& Recipe, FName StationType, int32 Tier, FName Element, const FWRCrafterHand& Hand);
 	/** Gear: one per craft; the rest come as a stack. */
 	static bool IsGear(const FWRRecipe& Recipe);
+	/** Made by the armorer (armorcraft): armour pieces and talismans. Everything else that's worn is smithing. */
+	static bool IsArmourMade(const FWRItemDef& Def);
+	/** Where a worn thing is repaired, upgraded and salvaged: tools at a workbench, weapons and rings at a forge, armour
+	 *  and talismans at an armorer, bows where they're made. */
+	static FName GearStation(const FWRItemDef& Def);
+	/** Can this player see and make the recipe: its land is live, and its blueprint (if any) is learned. */
+	static bool IsOpenTo(const AActor* Player, const FWRRecipe& Recipe);
 };
 
 /** One order in a station's queue (AWRStation::Queue): a recipe to make Left more times, one after another. */
@@ -229,6 +242,11 @@ public:
 	FString TakeOutput(AWRPlayerController* Player);
 	FString Repair(AWRPlayerController* Player, EWREquipSlot Slot);
 	FString Upgrade(AWRPlayerController* Player, EWREquipSlot Slot);
+	/** Breaks a piece of gear in the bag down (WRGear.cpp, cooks/build-crafting.md 2.8), or a spare boss core into core
+	 *  shards at a forge of tier 5. */
+	FString Salvage(AWRPlayerController* Player, int32 BagSlot);
+	/** Takes the extra out of the held weapon's socket Index: it's destroyed (Careful hands: half the time it isn't). */
+	FString RemoveExtra(AWRPlayerController* Player, int32 Index);
 
 	/**
 	 * Crafting time (0.7): what it's making, first under way. It keeps going with nobody at it; each one goes into its

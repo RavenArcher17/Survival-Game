@@ -29,14 +29,20 @@ struct FWRHeroLook
 	GENERATED_BODY()
 	UPROPERTY() uint8 Face = 0;           // index into player_art.json hero.<sex>.faces
 	UPROPERTY() uint8 Build = 1;          // 0 lean, 1 athletic, 2 strong (hero.<sex>.builds)
-	UPROPERTY() FName Look;               // worn armour look id; None = the tier-0 Survivor Wraps
-	UPROPERTY() FName Element;            // the worn armour's element (TrimColor palette); None = the look's own trim
-	UPROPERTY() bool bAscendant = false;  // tier 6: starsteel inlay + halo-crest
+	/** Per visual slot (head, chest, hands, legs: cooks/build-crafting.md 2.4): the look of the piece worn there (None =
+	 *  the tier-0 Survivor Wraps' piece), its element (TrimColor palette; None = the look's own trim). */
+	UPROPERTY() FName Looks[4];
+	UPROPERTY() FName Elements[4];
+	UPROPERTY() uint8 AscendantMask = 0;  // tier 6 pieces by slot bit: starsteel inlay; an Ascendant helm wears the halo-crest
 	UPROPERTY() bool bHideHelmet = false; // the hide-helmet option (the Head slot shows the face; tier 0 always does)
 	bool SameBody(const FWRHeroLook& O) const { return Face == O.Face && Build == O.Build; }
 	bool operator==(const FWRHeroLook& O) const
 	{
-		return SameBody(O) && Look == O.Look && Element == O.Element && bAscendant == O.bAscendant && bHideHelmet == O.bHideHelmet;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			if (Looks[i] != O.Looks[i] || Elements[i] != O.Elements[i]) return false;
+		}
+		return SameBody(O) && AscendantMask == O.AscendantMask && bHideHelmet == O.bHideHelmet;
 	}
 };
 
@@ -106,7 +112,8 @@ public:
 	/** The body picked in the menu (None = the default body); the sound pass picks the voice by it. */
 	FName GetBodyStyle() const { return BodyStyle; }
 	/** Server: the armour now worn (WRInventory ApplyEquipment) picks the outfit look, its trim and its inlay. */
-	void SetWornArmor(FName ItemId, FName Element);
+	/** Server: the four armour slots' items and elements (head, chest, hands, legs) set what the hero wears. */
+	void SetWornArmor(const FName (&ItemIds)[4], const FName (&InElements)[4]);
 	/** Server: the face and build from the menu (?Look=), clamped to what player_art.json has. */
 	void SetHeroAppearance(uint8 Face, uint8 Build);
 	/** Server: the hide-helmet option. */

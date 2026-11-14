@@ -10,6 +10,7 @@
 #include "WRTuning.h"
 #include "WRPathComponent.h"
 #include "WRInventory.h"
+#include "WRCharacterMovementComponent.h"
 #include "WRFx.h"
 #include "WRCreature.h"
 #include "WRWater.h"
@@ -113,6 +114,9 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	{
 		Amount *= Survival->ResourceGainMult();
 	}
+
+	// Forgeplate / Rimeguard worn to four pieces: Heat / Chill fill 15% faster (Data/gear.json heatGain, chillGain).
+	Amount *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Who, Element == WRTags::Element_Fire ? FName(TEXT("heatGain")) : FName(TEXT("chillGain"))));
 
 	const bool bBalance = ASC->HasMatchingGameplayTag(WRTags::Combo_Balance);
 	const float Share = WRTune(TEXT("resources.balanceShare"), 0.5f);
@@ -644,9 +648,27 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRCombatPerks::DamageScale(Attacker, Target, bWasUnaware, bPerkCrit);
 		if (!Hit.bCritical && ((Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit) || bPerkCrit))
 		{
-			Damage *= 1.5f;
+			Damage *= 1.5f + UWRInventoryComponent::GearStatFor(Attacker, TEXT("critDamage"));   // Rune of Clear Sight
 			bCrit = true;
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s%s"), *Target->GetName(), bPerkCrit ? TEXT(" (unaware: assassin)") : TEXT(""));
+		}
+
+		// The attacker's worn gear against this target (cooks/build-crafting.md 2.6): strikes on armoured foes (Empress
+		// stinger), hits on swimming ones (Maw tooth) and on rotting ones (Rot crown).
+		if (Attacker && Attacker->GetPlayerState())
+		{
+			float Gear = 0.f;
+			const AWRCreature* Shelled = Cast<AWRCreature>(Target);
+			const bool bArmoured = Target->ArmorValue > 0.f || (Shelled && Shelled->GetDef() && Shelled->GetDef()->PhysResist[1] < 1.f);
+			if (Hit.PhysType == 2 && bArmoured) Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("strikeVsArmored"));
+			if (Target->GetCharacterMovement() && Target->GetCharacterMovement()->IsSwimming()) Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("vsSwimming"));
+			if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rot)) Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("vsRotting"));
+			Damage *= 1.f + Gear;
+		}
+		// Spells hurt a Tyrant plate's wearer less.
+		if (Hit.bSpell || (!Hit.bMelee && !Hit.PathId.IsNone()))
+		{
+			Damage *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Target, TEXT("spellDamageTaken")));
 		}
 
 		// Frozen targets: fire thaws them (Thaw combo), heavy hits shatter them.
@@ -702,7 +724,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// Armor from equipped gear (players).
 	if (!Hit.bDamageOverTime && Target->ArmorValue > 0.f)
 	{
-		Damage *= 100.f / (100.f + Target->ArmorValue);
+		// Rune of Hollowing: the attacker ignores a share of it.
+		const float Pen = FMath::Clamp(UWRInventoryComponent::GearStatFor(Attacker, TEXT("armorPen")), 0.f, 1.f);
+		Damage *= 100.f / (100.f + Target->ArmorValue * (1.f - Pen));
 	}
 	// Player against player: its own multipliers (combat.md 2.20, ER patch 1.07): global, the weapon class, Wildbrands
 	// and spells; a tame's bite on a player counts half.
@@ -741,7 +765,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		if (UWRInventoryComponent* TargetInv = UWRInventoryComponent::FindFor(Target))
 		{
-			TargetInv->WearEquipped(EWREquipSlot::Armor, 1.f);
+			TargetInv->WearArmour(1.f);   // every worn piece wears (head, chest, hands, legs)
 		}
 	}
 
@@ -757,6 +781,39 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		Target->OnDamageTaken(Hit, Damage);
 		Target->Status->NotifyHurt();
+	}
+	// Worn gear on the blow (cooks/build-crafting.md 2.5-2.7): lifesteal (Rune of Thirst, Mirehide), stamina on a hit
+	// (Rune of the Tide), and what comes back at the attacker (Rune of Thorns on melee, Twin shard on projectiles).
+	if (Damage > 0.f && !Hit.bDamageOverTime && !Hit.bReaction && Result == EWRHitResult::Hit)
+	{
+		if (Attacker && Attacker->IsAlive() && Attacker->GetPlayerState() && AttackerASC && Attacker->GetAttributes())
+		{
+			const float Steal = UWRInventoryComponent::GearStatFor(Attacker, TEXT("lifesteal"));
+			if (Steal > 0.f)
+			{
+				const UWRAttributeSet* AA = Attacker->GetAttributes();
+				AttackerASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(AA->GetMaxHealth(), AA->GetHealth() + Damage * Steal * Attacker->Status->HealingTakenScale()));
+			}
+			const float Breath = Hit.bMelee ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("staminaOnHit")) : 0.f;
+			if (Breath > 0.f)
+			{
+				const UWRAttributeSet* AA = Attacker->GetAttributes();
+				AttackerASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), FMath::Min(AA->GetMaxStamina(), AA->GetStamina() + Breath));
+			}
+		}
+		const float Back = Attacker && Attacker != Target && Attacker->IsAlive() && Target->GetPlayerState()
+			? (Hit.bMelee ? UWRInventoryComponent::GearStatFor(Target, TEXT("thorns")) : Hit.bProjectile ? UWRInventoryComponent::GearStatFor(Target, TEXT("reflectProjectile")) : 0.f)
+			: 0.f;
+		if (Back > 0.f)
+		{
+			FWRHit Thorns;
+			Thorns.Instigator = Target;
+			Thorns.Damage = Damage * Back;
+			Thorns.bDamageOverTime = true;   // no guard, poise or hit-stop: the wound simply bites back
+			Thorns.bReaction = true;         // and never bounces again
+			Thorns.Origin = Target->GetActorLocation();
+			ApplyHit(Attacker, Thorns);
+		}
 	}
 	// Fire ends frostbite (ER; the thaw): the cold's grip and its slow go.
 	if (Hit.Element == WRTags::Element_Fire && TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
@@ -779,7 +836,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// The move's own hyperarmor (heavy 1.5, charged 2, great weapons 2.5: weapons.json haMult).
 		const float MoveArmour = Target->IsSwinging() && Target->Swing.HyperarmorMult > 0.f ? Target->Swing.HyperarmorMult : WRTune(TEXT("poise.hyperarmor.heavy"), 1.5f);
 		const float Armour = bHyper ? MoveArmour : 1.f;
-		const float Left = TargetAttr->GetPoise() * Armour - PoiseDamage;
+		// A raised guard braces the body against what gets round it (Obsidian heart talisman: guardPoise).
+		const float GuardPoise = TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) ? UWRInventoryComponent::GearStatFor(Target, TEXT("guardPoise")) : 0.f;
+		const float Left = (TargetAttr->GetPoise() + GuardPoise) * Armour - PoiseDamage;
 		Target->Status->NotifyPoiseDamaged();
 		// A creature with hyperarmor on its own attacks (big bodies, bosses) keeps swinging through it.
 		const AWRCreature* Creature = Cast<AWRCreature>(Target);
@@ -787,7 +846,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			&& (Creature->GetDef() && (Creature->GetDef()->bHyperarmor || Creature->GetDef()->Archetype == TEXT("boss")));
 		if (Left > 0.f || bCreatureArmour)
 		{
-			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), FMath::Max(0.f, Left / Armour));
+			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), FMath::Clamp(Left / Armour - GuardPoise, 0.f, TargetAttr->GetPoise()));
 		}
 		else
 		{
@@ -831,6 +890,13 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// Counter-hits, blows it never saw coming (stealth), a blunt blow to the head and a rimed body all take more
 		// stance (combat.md 2.4.0, 2.10, 2.11).
 		if (bCounterHit) Stance *= 1.f + WRTune(TEXT("combat.counterHit.stance"), 0.3f);
+		// Rune of the Anvil on melee; Cinderhorn's talisman on an attack out of a sprint.
+		if (Hit.bMelee && Attacker && Attacker->GetPlayerState())
+		{
+			const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(Attacker->GetCharacterMovement());
+			Stance *= 1.f + UWRInventoryComponent::GearStatFor(Attacker, TEXT("stanceDealt"))
+				+ (Move && Move->IsSprinting() ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("sprintStance")) : 0.f);
+		}
 		if (bWasUnaware) Stance *= 1.f + WRTune(TEXT("combat.stealth.stance"), 0.2f);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rimed)) Stance *= WRTune(TEXT("status.defs.frost.rimedStance"), 1.5f);
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
@@ -897,7 +963,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Result == EWRHitResult::Hit && Target->IsAlive())
 	{
 		// Buildup scales: a blow it never saw coming builds 20% more (stealth); against players 30% less (pvp.buildup).
-		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f);
+		// Rune of Haste: buildup from the weapon's hits +15% (buildupDealt); per status: buildupDealt.<status> (Queen's sting).
+		const float GearBuild = Hit.bMelee ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("buildupDealt")) : 0.f;
+		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f) * (1.f + GearBuild);
+		const auto DealtBy = [Attacker](int32 Id) { return 1.f + UWRInventoryComponent::GearStatFor(Attacker, FName(*(FString(TEXT("buildupDealt.")) + WRStatus::Name(Id).ToString()))); };
 		for (const TPair<FName, float>& B : Hit.Buildups)
 		{
 			const int32 Id = WRStatus::FromName(B.Key);
@@ -905,10 +974,12 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			{
 				continue;  // burn / frost go through the element path below
 			}
-			Target->Status->AddStatusBuildup(Id, B.Value * BuildScale, Attacker, Damage);
+			Target->Status->AddStatusBuildup(Id, B.Value * BuildScale * DealtBy(Id), Attacker, Damage);
 			if (!Target->IsAlive()) break;
 		}
-		float Burn = (Hit.BurnBuildup + Hit.Buildups.FindRef(TEXT("burn"))) * BuildScale;
+		float Burn = (Hit.BurnBuildup + Hit.Buildups.FindRef(TEXT("burn"))) * BuildScale * DealtBy(WRStatus::Burn);
+		// Wisp crown talisman: your spells' burn +5%.
+		if (Hit.bSpell || (!Hit.bMelee && !Hit.PathId.IsNone())) Burn *= 1.f + UWRInventoryComponent::GearStatFor(Attacker, TEXT("spellBurn"));
 		// Ignite chance: any fire hit can set the target burning outright.
 		if (Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("igniteChance")))
 		{
@@ -984,6 +1055,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 				}
 			}
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT wildfire from %s"), *Target->GetName());
+		}
+		// Rune of the Grave: a kill feeds the killer's main path resource.
+		if (Attacker && Attacker != Target)
+		{
+			const float Feed = UWRInventoryComponent::GearStatFor(Attacker, TEXT("killResource"));
+			const FName Main = Feed > 0.f && UWRPathComponent::FindFor(Attacker) ? UWRPathComponent::FindFor(Attacker)->GetMainPath() : NAME_None;
+			if (Main == TEXT("fire")) GainResource(Attacker, WRTags::Element_Fire, Feed);
+			else if (Main == TEXT("frost")) GainResource(Attacker, WRTags::Element_Frost, Feed);
 		}
 		Target->Die(Hit.Instigator);
 	}

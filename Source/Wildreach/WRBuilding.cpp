@@ -599,6 +599,7 @@ void AWRBuildPiece::ApplyLook()
 	else if (Def->Id == TEXT("oven")) { Parts.Add({ FVector(140, 124, 64), FVector(0, 0, 32) }); Parts.Add({ FVector(116, 116, 66), FVector(-5, 0, 97) }); Parts.Add({ FVector(30, 34, 90), FVector(-36, 0, 145) }); }
 	else if (Def->Id == TEXT("smokehouse")) Parts.Add({ FVector(204, 204, 210), FVector(0, 0, 105) });
 	else if (Def->Id == TEXT("salting_barrel")) Parts.Add({ FVector(72, 72, 100), FVector(0, 0, 50) });
+	else if (Def->Id == TEXT("charcoal_kiln")) { Parts.Add({ FVector(232, 232, 30), FVector(0, 0, 15) }); Parts.Add({ FVector(200, 200, 120), FVector(0, 0, 90) }); Parts.Add({ FVector(60, 80, 56), FVector(-20, 172, 28) }); }
 	else if (Def->Id == TEXT("drying_rack")) { Parts.Add({ FVector(14, 60, 170), FVector(-90, 0, 85) }); Parts.Add({ FVector(14, 60, 170), FVector(90, 0, 85) }); }
 	else if (Def->Id == TEXT("compost_bin")) Parts.Add({ FVector(124, 104, 88), FVector(0, 0, 44) });
 	else if (Def->Id == TEXT("ice_box")) Parts.Add({ FVector(124, 78, 73), FVector(0, 0, 36) });

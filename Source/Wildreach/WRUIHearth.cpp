@@ -184,6 +184,8 @@ namespace WRUIHearthScreen
 			Cores = MajorCores();
 			MaxLevel = FWRCraftingRules::TechLevelForCores(Cores.Num());
 			Hearth = FindHearth();
+			// A Hearth already past what this world's bosses reach (a test world's WRHearthLevel) shows its own levels too.
+			if (const AWRHearth* H = Hearth.Get()) MaxLevel = FMath::Max(MaxLevel, H->GetTechLevel());
 
 			ChildSlot
 			[

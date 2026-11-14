@@ -254,7 +254,11 @@ void FWRWeatherDefs::Load()
 			{
 				W.RoofWithin = Num(*C, TEXT("roofWithin"), 0.f);
 				W.Resist = Names(*C, TEXT("resist"));
-				W.Armor = Names(*C, TEXT("armor"));
+				const TSharedPtr<FJsonObject>* SetsObj = nullptr;
+				if ((*C)->TryGetObjectField(TEXT("sets"), SetsObj))
+				{
+					for (const auto& Pair : (*SetsObj)->Values) W.Sets.Add(FName(*Pair.Key), FMath::Max(1, int32(Pair.Value->AsNumber())));
+				}
 				W.PathNodes = Names(*C, TEXT("pathNodes"));
 				W.Items = Names(*C, TEXT("items"));
 			}
@@ -938,9 +942,14 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 		for (const FName& R : K->Resist) bCountered |= FWRBiomeHazards::Resists(Pawn, R);
 		if (Inv)
 		{
-			const FName Worn = Inv->GetEquipped(EWREquipSlot::Armor).ItemId;
-			bCountered |= K->Armor.Contains(Worn);
-			for (const FName& Item : K->Items) bCountered |= Inv->CountOf(Item) > 0;
+			// A biome armour set worn to its count (gear sets: Rimeguard holds a blizzard off at 2 pieces).
+			for (const TPair<FName, int32>& Set : K->Sets) bCountered |= Inv->SetPieces(Set.Key) >= Set.Value;
+			// Carried, or worn (a grounding charm in the talisman slot, a sand veil on the head).
+			for (const FName& Item : K->Items)
+			{
+				bCountered |= Inv->CountOf(Item) > 0;
+				for (const EWREquipSlot Slot : WRGearSlots::All) bCountered |= !Inv->GetEquipped(Slot).IsEmpty() && Inv->GetEquipped(Slot).ItemId == Item;
+			}
 		}
 		for (const FName& Node : K->PathNodes)
 		{
@@ -1216,6 +1225,8 @@ void UWRSurvivalComponent::TickCorruption(AWRCharacterBase* Pawn, float DeltaTim
 		float Rate = 1.f / FMath::Max(0.5f, Per) * WCorruption;
 		if (Lights && Lights->IsWarded(At)) Rate = 0.f;
 		else if (Lights && Lights->IsHalving(At)) Rate *= 0.5f;
+		// Gravecloth (four pieces) and the Bell clapper talisman slow it (Data/gear.json corruptionRate).
+		Rate *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Pawn, TEXT("corruptionRate")));
 		if (Rate > 0.f) CorruptionFrom = BiomeHere;
 		AddCorruption(Rate * DeltaTime);
 	}

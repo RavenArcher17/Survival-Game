@@ -2,6 +2,7 @@
 // Ascendant inlay, the body-hide masks under it, and the path marks on the skin, eyes and hair.
 // Everything here is data (Data/player_art.json "looks", "armorLooks", "elements", "paths"); the code only applies it.
 #include "WRCharacter.h"
+#include "WRInventory.h"
 #include "Wildreach.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
@@ -72,37 +73,48 @@ using namespace WRHeroLookImpl;
 
 // ---------------------------------------------------------------------------------------------------- server: what's worn
 
-void AWRCharacter::SetWornArmor(FName ItemId, FName Element)
+void AWRCharacter::SetWornArmor(const FName (&ItemIds)[4], const FName (&InElements)[4])
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
+	// Each of the four visual slots (head, chest, hands, legs) shows the look of the piece worn in it (hero.md 2.5,
+	// cooks/build-crafting.md 2.4): a piece names its family's armorLooks key (hide_head looks as hide_armor), whose row
+	// gives the look, its Cinderhide / Snowhide by element, and the Ascendant inlay.
 	FWRHeroLook Next = HeroLook;
-	Next.Look = NAME_None;
-	Next.bAscendant = false;
-	Next.Element = Element;
-	if (!ItemId.IsNone())
+	Next.AscendantMask = 0;
+	const TSharedPtr<FJsonObject> Art = FWRTuning::LoadDataFile(TEXT("player_art.json"));
+	const TSharedPtr<FJsonObject> Map = Obj(Art, TEXT("armorLooks"));
+	for (int32 i = 0; i < 4; ++i)
 	{
-		const TSharedPtr<FJsonObject> Art = FWRTuning::LoadDataFile(TEXT("player_art.json"));
-		const TSharedPtr<FJsonObject> Map = Obj(Art, TEXT("armorLooks"));
+		Next.Looks[i] = NAME_None;
+		Next.Elements[i] = InElements[i];
+		if (ItemIds[i].IsNone())
+		{
+			continue;
+		}
+		const FWRItemDef* Def = FWRItemRegistry::Get().Find(ItemIds[i]);
+		const FString Key = Def && !Def->LookAs.IsNone() ? Def->LookAs.ToString() : ItemIds[i].ToString();
 		FString LookId;
-		if (const TSharedPtr<FJsonObject> Row = Obj(Map, ItemId.ToString()))
+		if (const TSharedPtr<FJsonObject> Row = Obj(Map, Key))
 		{
 			// { "look": "hidewear", "byElement": { "fire": "cinderhide" }, "ascendant": true }
 			Row->TryGetStringField(TEXT("look"), LookId);
-			Row->TryGetBoolField(TEXT("ascendant"), Next.bAscendant);
+			bool bAsc = false;
+			Row->TryGetBoolField(TEXT("ascendant"), bAsc);
+			if (bAsc) Next.AscendantMask |= uint8(1 << i);
 			FString ByElement;
-			if (!Element.IsNone() && Obj(Row, TEXT("byElement")).IsValid() && Obj(Row, TEXT("byElement"))->TryGetStringField(Element.ToString(), ByElement))
+			if (!InElements[i].IsNone() && Obj(Row, TEXT("byElement")).IsValid() && Obj(Row, TEXT("byElement"))->TryGetStringField(InElements[i].ToString(), ByElement))
 			{
 				LookId = ByElement;
 			}
 		}
 		else if (Map.IsValid())
 		{
-			Map->TryGetStringField(ItemId.ToString(), LookId);
+			Map->TryGetStringField(Key, LookId);
 		}
-		Next.Look = LookId.IsEmpty() ? NAME_None : FName(*LookId);
+		Next.Looks[i] = LookId.IsEmpty() ? NAME_None : FName(*LookId);
 	}
 	if (!(Next == HeroLook))
 	{
@@ -175,27 +187,30 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 	const FString Sex = bFemale ? TEXT("f") : TEXT("m");
 	const FString BodyKey = FString::Printf(TEXT("%s_%s"), bFemale ? TEXT("F") : TEXT("M"), BuildNames[FMath::Min<int32>(HeroLook.Build, 2)]);
 	const TSharedPtr<FJsonObject> Looks = Obj(Art, TEXT("looks"));
-	FName LookId = HeroLook.Look.IsNone() ? FName(TEXT("wraps")) : HeroLook.Look;
-	TSharedPtr<FJsonObject> Look = Obj(Looks, LookId.ToString());
-	if (!Look.IsValid())
+	// Each visual slot shows its own piece's look (cooks/build-crafting.md 2.4); an empty slot wears the wraps' piece.
+	FName SlotLookId[4];
+	TSharedPtr<FJsonObject> SlotLook[4];
+	double SlotTier[4] = { 0.0, 0.0, 0.0, 0.0 };
+	for (int32 i = 0; i < 4; ++i)
 	{
-		UE_LOG(LogWildreach, Warning, TEXT("Player art: no look '%s', wearing the wraps"), *LookId.ToString());
-		LookId = TEXT("wraps");
-		Look = Obj(Looks, TEXT("wraps"));
+		SlotLookId[i] = HeroLook.Looks[i].IsNone() ? FName(TEXT("wraps")) : HeroLook.Looks[i];
+		SlotLook[i] = Obj(Looks, SlotLookId[i].ToString());
+		if (!SlotLook[i].IsValid())
+		{
+			UE_LOG(LogWildreach, Warning, TEXT("Player art: no look '%s', wearing the wraps there"), *SlotLookId[i].ToString());
+			SlotLookId[i] = TEXT("wraps");
+			SlotLook[i] = Obj(Looks, TEXT("wraps"));
+		}
+		if (SlotLook[i].IsValid())
+		{
+			SlotLook[i]->TryGetNumberField(TEXT("tier"), SlotTier[i]);
+		}
 	}
-	LoadedOutfit = LookId;
-	double Tier = 0.0;
-	if (Look.IsValid())
-	{
-		Look->TryGetNumberField(TEXT("tier"), Tier);
-	}
-	const TSharedPtr<FJsonObject> Meshes = Obj(Obj(Look, TEXT("meshes")), BodyKey);
+	LoadedOutfit = SlotLookId[1];   // the chest's: what the body reads as
 	// Legacy (schema before hero-look-2): one outfit per sex under hero.<sex>.outfit.
 	const TSharedPtr<FJsonObject> Legacy = Obj(Obj(Obj(Art, TEXT("hero")), Sex), TEXT("outfit"));
-	// The element's trim palette (hero.md 2.5), the main path's colour on the seams.
+	// Each piece's element trim palette (hero.md 2.5), the main path's colour on the seams.
 	const TSharedPtr<FJsonObject> Elements = Obj(Art, TEXT("elements"));
-	const bool bElement = !HeroLook.Element.IsNone() && Elements.IsValid() && Elements->HasField(HeroLook.Element.ToString());
-	const FLinearColor Trim = bElement ? Color(Elements, *HeroLook.Element.ToString(), FLinearColor::White) : FLinearColor::White;
 	const TSharedPtr<FJsonObject> MainRow = Obj(Obj(Art, TEXT("paths")), PathMarks.Main.ToString());
 	const FLinearColor PathColor = Color(MainRow, TEXT("color"), FLinearColor(0.886f, 0.329f, 0.102f));
 	double SeamGlow = 0.0, InlayNits = 0.0;
@@ -207,21 +222,23 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 	const float MainS = PathMarks.MainS / 255.f;
 
 	OutfitMIDs.Reset();
+	// The hair goes by the head piece's look; the hide-helmet option takes the Head slot off (tier 0 has nothing to hide).
 	bool bHidesHair = false;
-	if (Look.IsValid())
+	if (SlotLook[0].IsValid())
 	{
-		Look->TryGetBoolField(TEXT("hidesHair"), bHidesHair);
+		SlotLook[0]->TryGetBoolField(TEXT("hidesHair"), bHidesHair);
 	}
-	// The hide-helmet option takes the Head slot off (tier 0 has nothing to hide).
-	const bool bHeadOff = HeroLook.bHideHelmet && Tier > 0.0;
+	const bool bHeadOff = HeroLook.bHideHelmet && SlotTier[0] > 0.0;
 	for (int32 i = 0; i < Outfit.Num() && i < UE_ARRAY_COUNT(SlotNames); ++i)
 	{
+		const TSharedPtr<FJsonObject>& Look = SlotLook[i];
+		const TSharedPtr<FJsonObject> Meshes = Obj(Obj(Look, TEXT("meshes")), BodyKey);
 		FString PiecePath;
 		if (Meshes.IsValid())
 		{
 			Meshes->TryGetStringField(SlotNames[i], PiecePath);
 		}
-		else if (Legacy.IsValid() && LookId == TEXT("wraps"))
+		else if (Legacy.IsValid() && SlotLookId[i] == TEXT("wraps"))
 		{
 			Legacy->TryGetStringField(SlotNames[i], PiecePath);
 		}
@@ -232,7 +249,7 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 		USkeletalMesh* Piece = PiecePath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *PiecePath);
 		if (!PiecePath.IsEmpty() && !Piece)
 		{
-			UE_LOG(LogWildreach, Warning, TEXT("Player art: look %s piece %s not found"), *LookId.ToString(), *PiecePath);
+			UE_LOG(LogWildreach, Warning, TEXT("Player art: look %s piece %s not found"), *SlotLookId[i].ToString(), *PiecePath);
 		}
 		Outfit[i]->EmptyOverrideMaterials();
 		Outfit[i]->SetSkeletalMesh(Piece);
@@ -258,6 +275,10 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 		{
 			continue;
 		}
+		const FName El = HeroLook.Elements[i];
+		const bool bElement = !El.IsNone() && Elements.IsValid() && Elements->HasField(El.ToString());
+		const FLinearColor Trim = bElement ? Color(Elements, *El.ToString(), FLinearColor::White) : FLinearColor::White;
+		const bool bAscendant = (HeroLook.AscendantMask & (1 << i)) != 0;
 		for (int32 M = 0; M < Outfit[i]->GetNumMaterials(); ++M)
 		{
 			UMaterialInstanceDynamic* MID = Outfit[i]->CreateDynamicMaterialInstance(M);
@@ -272,7 +293,7 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 			MID->SetVectorParameterValue(TEXT("PathTint"), PathColor);
 			MID->SetScalarParameterValue(TEXT("PathGlow"), float(SeamGlow) * MainS);
 			MID->SetVectorParameterValue(TEXT("InlayColor"), PathColor);
-			MID->SetScalarParameterValue(TEXT("InlayNits"), HeroLook.bAscendant ? float(InlayNits) : 0.f);
+			MID->SetScalarParameterValue(TEXT("InlayNits"), bAscendant ? float(InlayNits) : 0.f);
 			OutfitMIDs.Add(MID);
 		}
 	}
@@ -282,9 +303,9 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 	{
 		Grooms[0]->SetVisibility(Grooms[0]->GroomAsset != nullptr && !bHairHiddenByHelm);
 	}
-	// Ascendant halo-crest (hero.md 2.5 tier 6) behind the head.
+	// Ascendant halo-crest (hero.md 2.5 tier 6) behind the head: an Ascendant helm wears it.
 	USkeletalMesh* Crest = nullptr;
-	if (HeroLook.bAscendant && !bHeadOff)
+	if ((HeroLook.AscendantMask & 1) != 0 && !bHeadOff)
 	{
 		FString CrestPath;
 		if (const TSharedPtr<FJsonObject> Crests = Obj(Art, TEXT("ascendantCrest")))
@@ -305,17 +326,17 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 		}
 	}
 
-	// Body-hide masks (cook hero-look-2 3.6): the skin under each worn piece is clipped, so cloth never shows skin
-	// through it in motion. White = keep; the body material multiplies the four.
+	// Body-hide masks (cook hero-look-2 3.6): the skin under each worn piece is clipped by that piece's own look, so
+	// cloth never shows skin through it in motion. White = keep; the body material multiplies the four.
 	if (SkinMIDs.Num() > 0 && SkinMIDs[0])
 	{
-		const TSharedPtr<FJsonObject> Hide = Obj(Obj(Look, TEXT("hide")), Sex);
 		// "keep everything": a white linear-greyscale texture (the material's mask samplers are linear greyscale)
 		FString WhitePath;
 		Art->TryGetStringField(TEXT("hideWhite"), WhitePath);
 		UTexture* White = WhitePath.IsEmpty() ? nullptr : LoadObject<UTexture>(nullptr, *WhitePath);
 		for (int32 i = 0; i < UE_ARRAY_COUNT(SlotNames); ++i)
 		{
+			const TSharedPtr<FJsonObject> Hide = Obj(Obj(SlotLook[i], TEXT("hide")), Sex);
 			FString MaskPath;
 			if (Hide.IsValid() && !(i == 0 && bHeadOff) && Outfit.IsValidIndex(i) && Outfit[i]->IsVisible())
 			{

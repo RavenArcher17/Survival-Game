@@ -34,14 +34,14 @@
       "perks": {
         "25": [ {"id": "efficient_smith", "name": "Efficient smith", "text": "Weapons take 20% fewer materials", "stat": "weaponMaterials", "value": -0.2}, {"id": "quick_hands", "name": "Quick hands", "text": "Weapons craft 30% faster", "stat": "weaponSpeed", "value": 0.3} ],
         "50": [ {"id": "fine_edge", "name": "Fine edge", "text": "Better stat rolls", "stat": "weaponRoll", "value": 0.05}, {"id": "infuser", "name": "Infuser", "text": "Stronger elements from path materials", "waitsFor": "infusion strength"} ],
-        "75": [ {"id": "reforger", "name": "Reforger", "text": "Reroll one stat on a weapon", "waitsFor": "rerolling weapon stats"}, {"id": "careful_hands", "name": "Careful hands", "text": "50% chance to save an extra when removing it", "waitsFor": "removing gems"} ],
+        "75": [ {"id": "reforger", "name": "Reforger", "text": "Reroll one stat on a weapon", "waitsFor": "rerolling weapon stats"}, {"id": "careful_hands", "name": "Careful hands", "text": "50% chance to save an extra when removing it", "stat": "extraSave", "value": 0.5} ],
         "100": [ {"id": "master_smith", "name": "Master smith", "text": "Weapons are always fine or better", "stat": "weaponMinFine", "value": 1}, {"id": "signature", "name": "Signature", "text": "Your weapons carry your name and a small bonus", "waitsFor": "maker's marks"} ] } },
     { "id": "armorcraft", "name": "Armorcraft", "group": "Making", "levelsBy": "Crafting armor, shields and creature armor",
       "everyLevel": {"text": "Better quality odds on armor", "stat": "armorQuality", "perLevel": 1},
       "perks": {
         "25": [ {"id": "efficient_armorer", "name": "Efficient armorer", "text": "Armor takes 20% fewer materials", "stat": "armorMaterials", "value": -0.2}, {"id": "quick_fit", "name": "Quick fit", "text": "Armor crafts 30% faster", "stat": "armorSpeed", "value": 0.3} ],
         "50": [ {"id": "reinforced", "name": "Reinforced", "text": "+10 poise", "stat": "armorPoise", "value": 10}, {"id": "light_weave", "name": "Light weave", "text": "Armor weighs 30% less", "stat": "armorWeight", "value": -0.3} ],
-        "75": [ {"id": "set_crafter", "name": "Set crafter", "text": "Set bonuses need one fewer piece", "waitsFor": "armor sets"}, {"id": "creature_armorer", "name": "Creature armorer", "text": "Stronger tame armor", "waitsFor": "tame armor"} ],
+        "75": [ {"id": "set_crafter", "name": "Set crafter", "text": "Set bonuses need one fewer piece", "stat": "setCrafter", "value": 1}, {"id": "creature_armorer", "name": "Creature armorer", "text": "Stronger tame armor", "waitsFor": "tame armor"} ],
         "100": [ {"id": "master_armorer", "name": "Master armorer", "text": "Armor is always fine or better", "stat": "armorMinFine", "value": 1}, {"id": "bastion", "name": "Bastion", "text": "Blocking costs 25% less stamina", "stat": "blockStamina", "value": -0.25} ] } },
     { "id": "alchemy", "name": "Alchemy", "group": "Making", "levelsBy": "Brewing potions and brews",
       "everyLevel": {"text": "Stronger potions", "stat": "potionPotency", "perLevel": 0.005},

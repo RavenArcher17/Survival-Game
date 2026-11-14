@@ -353,7 +353,8 @@ void AWRLootBag::ApplyDeathPenalty(AWRCharacterBase* Died, AWRPlayerState* PS)
 	}
 	if (Mode == TEXT("full"))
 	{
-		for (EWREquipSlot Slot : { EWREquipSlot::Weapon, EWREquipSlot::Armor, EWREquipSlot::Light })
+		for (EWREquipSlot Slot : { EWREquipSlot::Weapon, EWREquipSlot::Head, EWREquipSlot::Armor, EWREquipSlot::Hands, EWREquipSlot::Legs,
+			EWREquipSlot::Talisman, EWREquipSlot::Ring, EWREquipSlot::Ring2, EWREquipSlot::Light })
 		{
 			FWRItemStack* E = Inv->GetEquippedMutable(Slot);
 			if (E && !E->IsEmpty()) { Items.Add(*E); *E = FWRItemStack(); }

@@ -1,5 +1,6 @@
 #include "WRInventory.h"
 #include "WRSurvival.h"
+#include "WRGear.h"
 #include "WRFarm.h"
 #include "WRFx.h"
 #include "WRSound.h"
@@ -21,6 +22,7 @@
 #include "AbilitySystemComponent.h"
 #include "Dom/JsonObject.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
@@ -55,6 +57,7 @@ FWRItemRegistry::FWRItemRegistry()
 			FString ClassId;
 			if (O->TryGetStringField(TEXT("class"), ClassId)) D.WeaponClass = FName(*ClassId);
 			O->TryGetNumberField(TEXT("keeps"), D.KeepsMinutes);
+			O->TryGetStringField(TEXT("note"), D.Note);
 			const TSharedPtr<FJsonObject>* Use = nullptr;
 			if (O->TryGetObjectField(TEXT("use"), Use))
 			{
@@ -76,8 +79,21 @@ FWRItemRegistry::FWRItemRegistry()
 			if (O->TryGetObjectField(TEXT("equip"), Equip))
 			{
 				const FString Slot = (*Equip)->GetStringField(TEXT("slot"));
-				D.Slot = Slot == TEXT("weapon") ? EWREquipSlot::Weapon : Slot == TEXT("armor") ? EWREquipSlot::Armor
-					: Slot == TEXT("ranged") ? EWREquipSlot::Ranged : Slot == TEXT("light") ? EWREquipSlot::Light : EWREquipSlot::None;
+				D.Slot = Slot == TEXT("weapon") ? EWREquipSlot::Weapon : Slot == TEXT("armor") || Slot == TEXT("chest") ? EWREquipSlot::Armor
+					: Slot == TEXT("ranged") ? EWREquipSlot::Ranged : Slot == TEXT("light") ? EWREquipSlot::Light
+					: Slot == TEXT("head") ? EWREquipSlot::Head : Slot == TEXT("hands") ? EWREquipSlot::Hands : Slot == TEXT("legs") ? EWREquipSlot::Legs
+					: Slot == TEXT("talisman") ? EWREquipSlot::Talisman : Slot == TEXT("ring") ? EWREquipSlot::Ring : EWREquipSlot::None;
+				// Gear (cooks/build-crafting.md): the outfit it shows, its biome set, a boss weapon's own element and effects.
+				FString GearStr;
+				if ((*Equip)->TryGetStringField(TEXT("look"), GearStr)) D.LookAs = FName(*GearStr);
+				else if (WRGearSlots::IsArmour(D.Slot)) D.LookAs = D.Id;
+				if ((*Equip)->TryGetStringField(TEXT("set"), GearStr)) D.Set = FName(*GearStr);
+				if ((*Equip)->TryGetStringField(TEXT("element"), GearStr)) D.InnateElement = FName(*GearStr);
+				const TSharedPtr<FJsonObject>* Innate = nullptr;
+				if ((*Equip)->TryGetObjectField(TEXT("innate"), Innate))
+				{
+					for (const auto& In : (*Innate)->Values) D.Innate.Add(FName(*In.Key), float(In.Value->AsNumber()));
+				}
 				FString Metal;
 				if ((*Equip)->TryGetStringField(TEXT("metal"), Metal)) D.Metal = FName(*Metal);
 				(*Equip)->TryGetNumberField(TEXT("armor"), D.Armor);
@@ -123,6 +139,15 @@ FWRItemRegistry::FWRItemRegistry()
 				(*AmmoObj)->TryGetStringField(TEXT("mesh"), D.ProjectileMesh);
 				(*AmmoObj)->TryGetStringField(TEXT("meshAlong"), D.MeshAlong);
 			}
+			// Talismans: what wearing it gives. Rings: the gem set in the band (its stats come from the gem's, WRGear).
+			const TSharedPtr<FJsonObject>* WornObj = nullptr;
+			if (O->TryGetObjectField(TEXT("worn"), WornObj))
+			{
+				for (const auto& W : (*WornObj)->Values) D.Worn.Add(FName(*W.Key), float(W.Value->AsNumber()));
+			}
+			const TSharedPtr<FJsonObject>* RingObj = nullptr;
+			FString RingGem;
+			if (O->TryGetObjectField(TEXT("ring"), RingObj) && (*RingObj)->TryGetStringField(TEXT("gem"), RingGem)) D.RingGem = FName(*RingGem);
 			const TSharedPtr<FJsonObject>* Gem = nullptr;
 			if (O->TryGetObjectField(TEXT("gem"), Gem))
 			{
@@ -424,6 +449,12 @@ void UWRInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedArmor, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedRanged, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedLight, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedHead, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedHands, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedLegs, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedTalisman, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedRing, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedRing2, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, PotionReadyAt, COND_OwnerOnly);
 }
 
@@ -490,13 +521,138 @@ float UWRInventoryComponent::GetPotionCooldownRemaining() const
 
 FWRItemStack* UWRInventoryComponent::GetEquippedMutable(EWREquipSlot Slot)
 {
-	return Slot == EWREquipSlot::Armor ? &EquippedArmor : Slot == EWREquipSlot::Weapon ? &EquippedWeapon : Slot == EWREquipSlot::Ranged ? &EquippedRanged
-		: Slot == EWREquipSlot::Light ? &EquippedLight : nullptr;
+	switch (Slot)
+	{
+	case EWREquipSlot::Weapon: return &EquippedWeapon;
+	case EWREquipSlot::Armor: return &EquippedArmor;
+	case EWREquipSlot::Ranged: return &EquippedRanged;
+	case EWREquipSlot::Light: return &EquippedLight;
+	case EWREquipSlot::Head: return &EquippedHead;
+	case EWREquipSlot::Hands: return &EquippedHands;
+	case EWREquipSlot::Legs: return &EquippedLegs;
+	case EWREquipSlot::Talisman: return &EquippedTalisman;
+	case EWREquipSlot::Ring: return &EquippedRing;
+	case EWREquipSlot::Ring2: return &EquippedRing2;
+	default: return nullptr;
+	}
+}
+
+const FWRItemStack& UWRInventoryComponent::GetEquipped(EWREquipSlot Slot) const
+{
+	static const FWRItemStack Empty;
+	const FWRItemStack* S = const_cast<UWRInventoryComponent*>(this)->GetEquippedMutable(Slot);
+	return S ? *S : Empty;
+}
+
+namespace WRInvGear
+{
+	/** Worn and whole: a piece at 0 durability gives nothing (talismans and rings never wear). */
+	bool Intact(const FWRItemStack& S, const FWRItemDef& D) { return !S.IsEmpty() && (D.MaxDurability <= 0.f || S.Durability > 0.f); }
+}
+
+float UWRInventoryComponent::RingStat(const FWRItemDef& Ring, FName Stat)
+{
+	const FWRItemDef* Gem = Ring.RingGem.IsNone() ? nullptr : FWRItemRegistry::Get().Find(Ring.RingGem);
+	const float Base = Gem ? Gem->GemStats.FindRef(Stat) : 0.f;
+	if (Base == 0.f)
+	{
+		return 0.f;
+	}
+	const FWRGear& G = FWRGear::Get();
+	return Base * G.RingShare * (1.f + G.RingPerTier * float(G.MetalTier.FindRef(Ring.Metal)));
+}
+
+int32 UWRInventoryComponent::SetPieces(FName Set) const
+{
+	if (Set.IsNone())
+	{
+		return 0;
+	}
+	int32 N = 0;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
+	{
+		const FWRItemStack& S = GetEquipped(Slot);
+		const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		if (D && D->Set == Set && WRInvGear::Intact(S, *D)) ++N;
+	}
+	// Set crafter (armorcraft perk): set bonuses need one fewer piece. The perk alone, not gear (no loop through StatFor).
+	const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(GetOwner());
+	if (N > 0 && Skills && Skills->Stat(TEXT("setCrafter")) > 0.f) ++N;
+	return N;
+}
+
+float UWRInventoryComponent::GearStat(FName Stat) const
+{
+	float Total = GemStat(Stat);
+	// The biome sets worn: each set once, its bonuses for the pieces worn.
+	TArray<FName, TInlineAllocator<4>> Seen;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
+	{
+		const FWRItemStack& S = GetEquipped(Slot);
+		const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		if (!D || D->Set.IsNone() || Seen.Contains(D->Set)) continue;
+		Seen.Add(D->Set);
+		const FWRSetDef* SetDef = FWRGear::Get().FindSet(D->Set);
+		if (!SetDef) continue;
+		const int32 N = SetPieces(D->Set);
+		for (const FWRSetBonus& B : SetDef->Bonuses)
+		{
+			if (N >= B.Pieces) Total += B.Stats.FindRef(Stat);
+		}
+	}
+	if (const FWRItemDef* T = EquippedTalisman.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedTalisman.ItemId))
+	{
+		Total += T->Worn.FindRef(Stat);
+	}
+	// Two of the same ring count once (Elden Ring's talisman rule).
+	const FWRItemDef* R1 = EquippedRing.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedRing.ItemId);
+	const FWRItemDef* R2 = EquippedRing2.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedRing2.ItemId);
+	if (R1) Total += RingStat(*R1, Stat);
+	if (R2 && R2 != R1) Total += RingStat(*R2, Stat);
+	return Total;
+}
+
+float UWRInventoryComponent::GearStatFor(const AActor* Who, FName Stat)
+{
+	const UWRInventoryComponent* Inv = nullptr;
+	if (const APlayerState* PS = Cast<APlayerState>(Who)) Inv = PS->FindComponentByClass<UWRInventoryComponent>();
+	else if (const AController* C = Cast<AController>(Who)) Inv = C->PlayerState ? C->PlayerState->FindComponentByClass<UWRInventoryComponent>() : nullptr;
+	else Inv = FindFor(Who);
+	return Inv ? Inv->GearStat(Stat) : 0.f;
+}
+
+void UWRInventoryComponent::WearArmour(float Amount)
+{
+	if (!GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	bool bBroke = false;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
+	{
+		FWRItemStack* Item = GetEquippedMutable(Slot);
+		if (!Item || Item->IsEmpty() || Item->Durability <= 0.f) continue;
+		Item->Durability = FMath::Max(0.f, Item->Durability - Amount);
+		if (Item->Durability <= 0.f)
+		{
+			UE_LOG(LogWildreach, Log, TEXT("ITEM %s broke"), *Item->ItemId.ToString());
+			bBroke = true;
+		}
+	}
+	if (bBroke)
+	{
+		ApplyEquipment();
+	}
 }
 
 float UWRInventoryComponent::GemStat(FName Stat) const
 {
 	float Total = 0.f;
+	// A boss weapon's own effects (Cinderbrand's lava ring, Rimefang's freezing guard): always on, no socket.
+	if (const FWRItemDef* W = EquippedWeapon.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedWeapon.ItemId))
+	{
+		Total += W->Innate.FindRef(Stat);
+	}
 	for (const FName& Gem : EquippedWeapon.Sockets)
 	{
 		if (const FWRItemDef* Def = FWRItemRegistry::Get().Find(Gem))
@@ -509,13 +665,17 @@ float UWRInventoryComponent::GemStat(FName Stat) const
 
 float UWRInventoryComponent::GetArmorValue() const
 {
-	const FWRItemDef* Def = EquippedArmor.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedArmor.ItemId);
-	if (!Def || EquippedArmor.Durability <= 0.f)
+	// Head, chest, hands and legs: each piece's armour by its quality, roll and upgrade; broken pieces give none.
+	float Total = 0.f;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
 	{
-		return 0.f;
+		const FWRItemStack& Piece = GetEquipped(Slot);
+		const FWRItemDef* Def = Piece.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Piece.ItemId);
+		if (!Def || Piece.Durability <= 0.f) continue;
+		const float QualityMult = FWRTuning::Get().Num(FString::Printf(TEXT("weapon.quality.%s"), *FString(FWRItemStack::QualityName(Piece.Quality)).ToLower()), 1.f);
+		Total += Def->Armor * QualityMult * Piece.Roll * (1.f + Piece.Upgrade * WRTune(TEXT("weapon.upgradePerLevel"), 0.05f));
 	}
-	const float QualityMult = FWRTuning::Get().Num(FString::Printf(TEXT("weapon.quality.%s"), *FString(FWRItemStack::QualityName(EquippedArmor.Quality)).ToLower()), 1.f);
-	return Def->Armor * QualityMult * EquippedArmor.Roll * (1.f + EquippedArmor.Upgrade * WRTune(TEXT("weapon.upgradePerLevel"), 0.05f));
+	return Total;
 }
 
 float UWRInventoryComponent::GetRangedMultiplier() const
@@ -544,10 +704,11 @@ void UWRInventoryComponent::ApplyEquipment()
 		Stats.Quality = FName(*FString(FWRItemStack::QualityName(EquippedWeapon.Quality)).ToLower());
 		Stats.Upgrade = EquippedWeapon.Upgrade;
 		Stats.Roll = EquippedWeapon.Roll;
-		Stats.GemDamage = GemStat(TEXT("damage"));
-		Stats.GemCrit = GemStat(TEXT("critChance"));
+		// Sockets, a boss weapon's own effects and the rings (GearStat).
+		Stats.GemDamage = GearStat(TEXT("damage"));
+		Stats.GemCrit = GearStat(TEXT("critChance"));
 		Stats.bBroken = EquippedWeapon.Durability <= 0.f;
-		Stats.Element = EquippedWeapon.Element;
+		Stats.Element = EquippedWeapon.Element.IsNone() ? Def->InnateElement : EquippedWeapon.Element;
 		Stats.bStaggerShockwave = GemStat(TEXT("staggerShockwave")) > 0.f;
 		Stats.bBlockFreeze = GemStat(TEXT("blockFreeze")) > 0.f;
 		if (const FWRToolDef* Tool = FWRGathering::FindTool(EquippedWeapon.ItemId))
@@ -568,10 +729,18 @@ void UWRInventoryComponent::ApplyEquipment()
 	// the worn armour gives.
 	Character->EquipLoadPct = uint8(FMath::Clamp(FMath::RoundToInt(100.f * GetEquipLoadKg() / FMath::Max(1.f, GetMaxEquipLoad())), 0, 255));
 	UWRCombatLibrary::RefreshPoise(Character);
-	// The worn armour's look on the hero (cook hero-look-2): broken armour still shows; an empty slot wears the wraps.
+	// The worn armour's look on the hero, piece by piece (hero.md 2.5, cooks/build-crafting.md 2.4): broken armour
+	// still shows; an empty slot wears the wraps' piece.
 	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
 	{
-		Hero->SetWornArmor(EquippedArmor.IsEmpty() ? NAME_None : EquippedArmor.ItemId, EquippedArmor.IsEmpty() ? NAME_None : EquippedArmor.Element);
+		FName Ids[4], Elements[4];
+		for (int32 i = 0; i < 4; ++i)
+		{
+			const FWRItemStack& Piece = GetEquipped(WRGearSlots::Armour[i]);
+			Ids[i] = Piece.IsEmpty() ? NAME_None : Piece.ItemId;
+			Elements[i] = Piece.IsEmpty() ? NAME_None : Piece.Element;
+		}
+		Hero->SetWornArmor(Ids, Elements);
 	}
 	if (AWRCharacter* Survivor = Cast<AWRCharacter>(Character))
 	{
@@ -689,6 +858,31 @@ FString UWRInventoryComponent::Unequip(EWREquipSlot Slot)
 	return TEXT("unequipped");
 }
 
+FString UWRInventoryComponent::EquipTo(int32 SlotIndex, EWREquipSlot Slot)
+{
+	if (!Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].IsEmpty() || !GetOwner()->HasAuthority())
+	{
+		return TEXT("empty slot");
+	}
+	const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[SlotIndex].ItemId);
+	if (!Def || !Def->IsEquipment())
+	{
+		return TEXT("that isn't worn");
+	}
+	const bool bFits = Def->Slot == Slot || (WRGearSlots::IsRing(Def->Slot) && WRGearSlots::IsRing(Slot));
+	if (!bFits)
+	{
+		return FString::Printf(TEXT("%s goes in the %s slot"), *Def->Name, *WRGearSlots::Label(Def->Slot).ToString().ToLower());
+	}
+	FWRItemStack* Equipped = GetEquippedMutable(Slot);
+	const FWRItemStack Previous = *Equipped;
+	*Equipped = Slots[SlotIndex];
+	Slots[SlotIndex] = Previous;
+	ApplyEquipment();
+	WRSound::Broadcast(GetPawnCharacter(), TEXT("equip"));
+	return FString::Printf(TEXT("Equipped %s"), *Def->Name);
+}
+
 FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 {
 	if (!Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].IsEmpty() || !GetOwner()->HasAuthority())
@@ -709,10 +903,20 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		const FString Said = Survival ? Survival->ToggleLight() : FString();
 		return Said.IsEmpty() ? FString::Printf(TEXT("%s lit"), *Def->Name) : Said;
 	}
+	if (Def->Category == TEXT("blueprint"))
+	{
+		// Read it: the recipe is yours for good (WRGear).
+		return FWRBlueprints::Learn(this, SlotIndex);
+	}
 	if (Def->IsEquipment())
 	{
-		// Swap with whatever is in that slot.
-		FWRItemStack* Equipped = GetEquippedMutable(Def->Slot);
+		// Swap with whatever is in that slot. A ring goes on the first free finger, else replaces the first ring.
+		EWREquipSlot Into = Def->Slot;
+		if (WRGearSlots::IsRing(Into))
+		{
+			Into = EquippedRing.IsEmpty() ? EWREquipSlot::Ring : EquippedRing2.IsEmpty() ? EWREquipSlot::Ring2 : EWREquipSlot::Ring;
+		}
+		FWRItemStack* Equipped = GetEquippedMutable(Into);
 		const FWRItemStack Previous = *Equipped;
 		*Equipped = Stack;
 		Stack = Previous;
@@ -720,16 +924,21 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		WRSound::Broadcast(GetPawnCharacter(), TEXT("equip"));
 		return FString::Printf(TEXT("Equipped %s %s"), FWRItemStack::QualityName(Equipped->Quality), *Def->Name);
 	}
-	if (Def->Category == TEXT("gem"))
+	if (Def->Category == TEXT("gem") || Def->Category == TEXT("rune"))
 	{
-		// Socket into the equipped weapon if it has a free socket (quality sets the count).
+		// Socket into the equipped weapon if it has a free socket (quality sets the count). Runes sit in sockets like
+		// gems, one of each rune to a weapon (cooks/build-crafting.md 2.7).
 		if (EquippedWeapon.IsEmpty() || FWRGathering::FindTool(EquippedWeapon.ItemId))
 		{
-			return TEXT("equip a weapon to socket gems");
+			return Def->Category == TEXT("rune") ? TEXT("equip a weapon to set a rune in it") : TEXT("equip a weapon to socket gems");
 		}
 		if (EquippedWeapon.Sockets.Num() >= FWRItemStack::SocketCount(EquippedWeapon.Quality))
 		{
 			return TEXT("no free socket (quality sets sockets: crude 0 ... masterwork 3)");
+		}
+		if (Def->Category == TEXT("rune") && EquippedWeapon.Sockets.Contains(Def->Id))
+		{
+			return FString::Printf(TEXT("this weapon already carries a %s"), *Def->Name);
 		}
 		EquippedWeapon.Sockets.Add(Def->Id);
 		const FString Name = Def->Name;
@@ -1087,6 +1296,14 @@ TSharedRef<FJsonObject> UWRInventoryComponent::ToJson() const
 	Root->SetObjectField(TEXT("armor"), FWRInventoryRules::StackToJson(EquippedArmor));
 	Root->SetObjectField(TEXT("ranged"), FWRInventoryRules::StackToJson(EquippedRanged));
 	Root->SetObjectField(TEXT("light"), FWRInventoryRules::StackToJson(EquippedLight));
+	// The gear slots (cooks/build-crafting.md 2.3); gearSlots 2 marks a save from after the armour split.
+	Root->SetObjectField(TEXT("head"), FWRInventoryRules::StackToJson(EquippedHead));
+	Root->SetObjectField(TEXT("hands"), FWRInventoryRules::StackToJson(EquippedHands));
+	Root->SetObjectField(TEXT("legs"), FWRInventoryRules::StackToJson(EquippedLegs));
+	Root->SetObjectField(TEXT("talisman"), FWRInventoryRules::StackToJson(EquippedTalisman));
+	Root->SetObjectField(TEXT("ring"), FWRInventoryRules::StackToJson(EquippedRing));
+	Root->SetObjectField(TEXT("ring2"), FWRInventoryRules::StackToJson(EquippedRing2));
+	Root->SetNumberField(TEXT("gearSlots"), 2);
 	Root->SetBoolField(TEXT("kitGiven"), bKitGiven);
 	return Root;
 }
@@ -1112,20 +1329,64 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = FWRInventoryRules::StackFromJson(*RangedJson);
 	const TSharedPtr<FJsonObject>* LightJson = nullptr;
 	if (Json->TryGetObjectField(TEXT("light"), LightJson)) EquippedLight = FWRInventoryRules::StackFromJson(*LightJson);
+	const auto LoadSlot = [&Json](const TCHAR* Field, FWRItemStack& Into)
+	{
+		const TSharedPtr<FJsonObject>* O = nullptr;
+		if (Json->TryGetObjectField(Field, O)) Into = FWRInventoryRules::StackFromJson(*O);
+	};
+	LoadSlot(TEXT("head"), EquippedHead);
+	LoadSlot(TEXT("hands"), EquippedHands);
+	LoadSlot(TEXT("legs"), EquippedLegs);
+	LoadSlot(TEXT("talisman"), EquippedTalisman);
+	LoadSlot(TEXT("ring"), EquippedRing);
+	LoadSlot(TEXT("ring2"), EquippedRing2);
+	// A save from before the armour split (cooks/build-crafting.md 2.3): the one armour is now the chest piece, and the
+	// rest of its kit is made to match (its quality, roll and infusion; new durability) and put on.
+	double GearSlots = 1.0;
+	Json->TryGetNumberField(TEXT("gearSlots"), GearSlots);
+	if (GearSlots < 2.0 && !EquippedArmor.IsEmpty())
+	{
+		const FString Chest = EquippedArmor.ItemId.ToString();
+		if (Chest.EndsWith(TEXT("_armor")))
+		{
+			const FString Tier = Chest.LeftChop(6);
+			const TPair<const TCHAR*, FWRItemStack*> Kit[] = { { TEXT("_head"), &EquippedHead }, { TEXT("_hands"), &EquippedHands }, { TEXT("_legs"), &EquippedLegs } };
+			for (const TPair<const TCHAR*, FWRItemStack*>& Piece : Kit)
+			{
+				const FName Id(*(Tier + Piece.Key));
+				if (!Piece.Value->IsEmpty() || !FWRItemRegistry::Get().Find(Id)) continue;
+				*Piece.Value = FWRInventoryRules::MakeInstance(Id, EquippedArmor.Quality, EquippedArmor.Roll);
+				Piece.Value->Element = EquippedArmor.Element;
+			}
+			UE_LOG(LogWildreach, Log, TEXT("ITEM save from before the armour split: %s is the chest, its kit made to match"), *Chest);
+		}
+	}
 	Json->TryGetBoolField(TEXT("kitGiven"), bKitGiven);
 }
 
 float UWRInventoryComponent::GetWornPoise() const
 {
-	const FWRItemDef* Def = EquippedArmor.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedArmor.ItemId);
-	const float Armour = Def && EquippedArmor.Durability > 0.f ? Def->Poise : 0.f;
-	return Armour + GemStat(TEXT("poise"));
+	// Every intact armour piece's poise, socketed onyx and onyx rings (GearStat).
+	float Armour = 0.f;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
+	{
+		const FWRItemStack& Piece = GetEquipped(Slot);
+		const FWRItemDef* Def = Piece.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Piece.ItemId);
+		if (Def && Piece.Durability > 0.f) Armour += Def->Poise;
+	}
+	return Armour + GearStat(TEXT("poise"));
 }
 
 float UWRInventoryComponent::GetWornResist(FName Status) const
 {
-	const FWRItemDef* Def = EquippedArmor.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedArmor.ItemId);
-	return Def && EquippedArmor.Durability > 0.f ? Def->Resists.FindRef(Status) : 0.f;
+	float Total = 0.f;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
+	{
+		const FWRItemStack& Piece = GetEquipped(Slot);
+		const FWRItemDef* Def = Piece.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Piece.ItemId);
+		if (Def && Piece.Durability > 0.f) Total += Def->Resists.FindRef(Status);
+	}
+	return Total;
 }
 
 float UWRInventoryComponent::GetEquipLoadKg() const
@@ -1133,11 +1394,13 @@ float UWRInventoryComponent::GetEquipLoadKg() const
 	const UWRLifeSkillsComponent* Skills = UWRLifeSkillsComponent::FindFor(GetOwner());
 	const float ArmorKg = Skills ? FMath::Max(0.f, 1.f + Skills->Stat(TEXT("armorWeight"))) : 1.f;
 	float Kg = 0.f;
-	for (const FWRItemStack* S : { &EquippedArmor, &EquippedWeapon, &EquippedRanged })
+	for (const EWREquipSlot Slot : WRGearSlots::All)
 	{
-		if (const FWRItemDef* Def = S->IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S->ItemId))
+		const FWRItemStack& S = GetEquipped(Slot);
+		if (Slot == EWREquipSlot::Light) continue;
+		if (const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId))
 		{
-			Kg += Def->Weight * (Def->Slot == EWREquipSlot::Armor ? ArmorKg : 1.f);
+			Kg += Def->Weight * (WRGearSlots::IsArmour(Def->Slot) ? ArmorKg : 1.f);
 		}
 	}
 	// The shield on the left arm (survivors carry it: weapons.json carried).
@@ -1166,7 +1429,7 @@ float UWRInventoryComponent::GetCarryWeight() const
 	{
 		if (Id == TEXT("stone") || Id.ToString().EndsWith(TEXT("_ore"))) return Ore;
 		if (Id == TEXT("wood")) return Wood;
-		return Def.Slot == EWREquipSlot::Armor ? ArmorKg : 1.f;
+		return WRGearSlots::IsArmour(Def.Slot) ? ArmorKg : 1.f;
 	};
 	float Kg = 0.f;
 	for (const FWRItemStack& S : Slots)
@@ -1176,7 +1439,7 @@ float UWRInventoryComponent::GetCarryWeight() const
 			Kg += Def->Weight * S.Count * Factor(S.ItemId, *Def);
 		}
 	}
-	for (const FWRItemStack* Worn : { &EquippedWeapon, &EquippedArmor, &EquippedRanged })
+	for (const FWRItemStack* Worn : { &EquippedWeapon, &EquippedArmor, &EquippedRanged, &EquippedHead, &EquippedHands, &EquippedLegs, &EquippedTalisman, &EquippedRing, &EquippedRing2 })
 	{
 		const FWRItemDef* Def = Worn->IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Worn->ItemId);
 		if (Def) Kg += Def->Weight * FMath::Max(1, Worn->Count) * Factor(Worn->ItemId, *Def);

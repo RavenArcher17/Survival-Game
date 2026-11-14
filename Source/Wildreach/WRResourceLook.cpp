@@ -67,6 +67,7 @@ namespace WRResourceLookParts
 		else if (ItemId == TEXT("fiber")) { Color = FLinearColor(0.55f, 0.6f, 0.25f); Scale = FVector(0.8f, 0.8f, 1.2f); }
 		else if (ItemId == TEXT("tin_ore")) { Color = FLinearColor(0.7f, 0.72f, 0.75f); Scale = FVector(1.5f, 1.5f, 1.2f); }
 		else if (ItemId == TEXT("iron_ore")) { Color = FLinearColor(0.35f, 0.2f, 0.18f); Scale = FVector(1.6f, 1.6f, 1.3f); }
+		else if (ItemId == TEXT("star_iron_ore")) { Color = FLinearColor(0.15f, 0.17f, 0.25f); Scale = FVector(1.6f, 1.6f, 1.3f); }
 		Node->SetActorScale3D(Scale);
 		Collider->SetHiddenInGame(false);
 		if (UMaterialInstanceDynamic* Mat = Collider->CreateAndSetMaterialInstanceDynamic(0))
@@ -204,6 +205,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			if (Item == TEXT("copper_ore")) { RockTint = FLinearColor(0.3f, 0.24f, 0.2f); Lump = FLinearColor(1.9f, 0.75f, 0.25f); Lump2 = FLinearColor(0.3f, 1.3f, 0.85f); }
 			else if (Item == TEXT("tin_ore")) { RockTint = FLinearColor(0.42f, 0.43f, 0.46f); Lump = FLinearColor(2.4f, 2.45f, 2.6f); Lump2 = Lump; }
 			else if (Item == TEXT("iron_ore")) { RockTint = FLinearColor(0.26f, 0.19f, 0.17f); Lump = FLinearColor(1.5f, 0.55f, 0.2f); Lump2 = Lump; }
+			// Meteoric iron: near-black blue rock with pale silver-blue lumps that catch the lamp light.
+			else if (Item == TEXT("star_iron_ore")) { RockTint = FLinearColor(0.12f, 0.13f, 0.17f); Lump = FLinearColor(2.2f, 2.4f, 2.9f); Lump2 = FLinearColor(1.2f, 1.5f, 2.4f); }
 			Tint(RockMaterial(Node, RockTint));
 			Bits->SetStaticMesh(Shard);
 			Bits->SetMaterial(0, RockMaterial(Node, Lump));
