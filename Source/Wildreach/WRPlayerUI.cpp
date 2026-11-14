@@ -1,4 +1,6 @@
 #include "WRPlayerUI.h"
+#include "WRDeeds.h"
+#include "Dom/JsonObject.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
@@ -184,6 +186,7 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::World: Want = P->WorldScreen; break;
 	case EWRMenu::Quests: Want = TEXT("journal"); break;
 	case EWRMenu::Artifacts: Want = TEXT("journal"); break;
+	case EWRMenu::Deeds: Want = TEXT("journal"); break;
 	default: break;
 	}
 	if (!Want.IsNone() && !FWRScreens::Find(Want))
@@ -336,7 +339,7 @@ void FWRPlayerUI::PadTab(int32 Dir)
 {
 	AWRPlayerController* P = PC.Get();
 	if (!P) return;
-	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Quests, EWRMenu::Artifacts, EWRMenu::Clan, EWRMenu::Settings };
+	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Quests, EWRMenu::Artifacts, EWRMenu::Deeds, EWRMenu::Clan, EWRMenu::Settings };
 	const int32 N = UE_ARRAY_COUNT(Order);
 	int32 At = INDEX_NONE;
 	for (int32 i = 0; i < N; ++i) if (Order[i] == P->GetMenu()) At = i;
@@ -711,10 +714,19 @@ TArray<FWRCastable> FWRPlayerUI::GetCastables() const
 		FWRCastable C;
 		C.NodeId = Slots[i];
 		C.Path = FName(*PathStr);
-		C.Name = FText::FromString(Node ? Node->Name : NodeStr);
+		const bool bSoul = PathStr == TEXT("soul");
+		FString SoulName;
+		if (bSoul)
+		{
+			// An awakened boss weapon's Soul art (WRDeeds): its name from Data/souls.json.
+			const TSharedPtr<FJsonObject> SoulRow = WRDeeds::SoulRow(FName(*NodeStr));
+			const TSharedPtr<FJsonObject>* Art = nullptr;
+			if (SoulRow.IsValid() && SoulRow->TryGetObjectField(TEXT("art"), Art)) (*Art)->TryGetStringField(TEXT("name"), SoulName);
+		}
+		C.Name = FText::FromString(Node ? Node->Name : !SoulName.IsEmpty() ? SoulName : NodeStr);
 		C.InputIndex = i;
 		// A Wildbrand that doesn't fit what's in your hand greys out with the reason (combat.md 2.12).
-		UWRGA_Melee::WildbrandFits(Survivor, FName(*NodeStr), C.Blocked);
+		UWRGA_Melee::WildbrandFits(Survivor, bSoul ? FName(*(TEXT("soul_") + NodeStr)) : FName(*NodeStr), C.Blocked);
 		if (ASC)
 		{
 			const int32 InputId = static_cast<int32>(EWRAbilityInput::Slot1) + i;

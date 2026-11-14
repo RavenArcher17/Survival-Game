@@ -29,7 +29,7 @@
 
   "weapon": {
     "copperSwordLight": 12, "copperSwordHeavy": 22,
-    "metal": { "copper": 1.0, "bronze": 1.3, "iron": 1.7, "steel": 2.2, "starsteel": 2.8 },
+    "metal": { "copper": 1.0, "bronze": 1.3, "iron": 1.7, "steel": 2.2, "starsteel": 2.8, "mythic": 3.22 },
     "quality": { "crude": 0.9, "common": 1.0, "fine": 1.1, "masterwork": 1.2 },
     "upgradePerLevel": 0.05,
     "lightPoiseDamage": 10, "heavyPoiseDamage": 25,
@@ -322,7 +322,9 @@
     "glacimaw_elder": {"health": 2500, "arenaRadius": 1600, "chaseRadius": 4000, "thickStun": 3},
     "frostbound_thurs": {"health": 4000, "arenaRadius": 1800, "chaseRadius": 4500, "shellEvery": 25, "shellTaken": 0.4},
     "rime_witch": {"health": 7000, "arenaRadius": 1800, "chaseRadius": 4500, "snuffEvery": 25, "relightSeconds": 2, "lightRadius": 500, "clones": 2},
-    "hrimgerdr": {"health": 12000, "arenaRadius": 2400, "chaseRadius": 5000, "boltHealth": 600, "dawnSlow": 0.7, "dawnTaken": 1.5, "shaftWidth": 450}
+    "hrimgerdr": {"health": 12000, "arenaRadius": 2400, "chaseRadius": 5000, "boltHealth": 600, "dawnSlow": 0.7, "dawnTaken": 1.5, "shaftWidth": 450},
+    "fallen_smith": { "health": 12000, "chaseRadius": 9500, "arenaRadius": 5600, "phase2At": 0.5, "phase3At": 0.25, "phase3DamageScale": 1.25, "hammer_combo": { "parryable": 1, "impact": 3 }, "overhead_slam": { "impact": 5 }, "tongs_grab": { "grab": 1, "unblockable": 1, "impact": 4 }, "quench_feint": { "impact": 5 }, "late_hammer": { "parryable": 1, "impact": 3 }, "dual_hammer": { "parryable": 1, "impact": 4 } },
+    "burnt_wyrm": { "health": 12000, "chaseRadius": 9500, "arenaRadius": 5600, "phase2At": 0.5, "phase3At": 0.25, "phase3DamageScale": 1.25, "wingHitsToGround": 8, "groundedSeconds": 8, "airSeconds": 12, "landedSeconds": 10, "hoverHeight": 900, "lunge_bite": { "parryable": 1, "impact": 4 }, "tail_sweep": { "low": 1, "impact": 4 }, "pin": { "grab": 1, "unblockable": 1, "impact": 5 } }
   },
 
   "ranged": { "_comment": "Bows, crossbows, blowguns, spears, bolas (weapon numbers are in items.json). Aiming camera arm cm / fov / walk speed x; hip-fire spread; throw release s; projectile radius cm, flight s, stuck s, stick depth cm; bola roots creatures up to this radius cm, else slows; poise per damage; grip cm from the wrist; durability per shot. placeholder",
@@ -483,7 +485,9 @@
     "molten_edge": { "fits": ["sword", "axe", "dagger", "greatsword", "scythe"], "windup": 0.24, "active": 0.18, "recovery": 0.36, "dmg": 1.1, "stance": 1.5, "buildup": { "burn": 55 }, "ha": 0, "heat": 8, "stamina": 18, "followUp": { "window": 0.5, "dmg": 1.1, "windup": 0.2 } },
     "molten_cleave": { "fits": ["axe", "greatsword", "great_hammer", "pick_hammer"], "windup": 0.60, "active": 0.28, "recovery": 0.70, "dmg": 2.0, "stance": 6, "buildup": { "burn": 80 }, "ha": 1, "heat": 20, "stamina": 25, "charge": { "max": 1.0, "dmg": 1.3 } },
     "ice_slash": { "fits": [], "windup": 0.30, "active": 0.22, "recovery": 0.44, "dmg": 1.3, "stance": 2, "buildup": { "frost": 50 }, "ha": 1, "chill": 8, "stamina": 18, "mounted": true },
-    "flurry": { "fits": ["dagger", "sword", "spear", "fists"], "windup": 0.20, "active": 0.40, "recovery": 0.36, "dmg": 0.9, "stance": 0.5, "buildup": { "frost": 35 }, "ha": 0, "chill": 6, "stamina": 18, "followUp": { "window": 0.4, "dmg": 0.9, "windup": 0.18 } }
+    "flurry": { "fits": ["dagger", "sword", "spear", "fists"], "windup": 0.20, "active": 0.40, "recovery": 0.36, "dmg": 0.9, "stance": 0.5, "buildup": { "frost": 35 }, "ha": 0, "chill": 6, "stamina": 18, "followUp": { "window": 0.4, "dmg": 0.9, "windup": 0.18 } },
+    "soul_vulkarn": { "fits": ["great_hammer"], "windup": 0.75, "active": 0.2, "recovery": 0.6, "dmg": 2.2, "stance": 5, "buildup": { "burn": 40 }, "ha": 1, "stamina": 25, "cooldown": 30, "crack": { "length": 600, "width": 160, "seconds": 4, "dps": 20, "burn": 20 } },
+    "soul_skaldrith": { "fits": ["spear"], "windup": 0.5, "active": 0.3, "recovery": 0.5, "dmg": 1.6, "stance": 3, "buildup": { "frost": 50 }, "ha": 1, "stamina": 25, "cooldown": 30, "spikes": { "from": 100, "length": 400, "width": 160, "dmg": 1.6, "frost": 50, "stance": 3 } }
   },
 
   "potions": {
@@ -542,7 +546,7 @@
   },
   "raiding": {
     "_comment": "Player raiding (WRRaiding; cooks/build-server-raids.md 2.4 to 2.7). material.<source>.<wood|stone|metal|biome|other>: the share of a hit that lands on a piece of that material (weapons use building_sets.json materialDamage; the Hearth reads as stone except to a charge, which has its own number). paths.<path>.<material|all>: that path's multiplier (fire burns wood: Raven). charge: the petard (fuse, 4 m blast: full on the piece it's on, neighbourShare on others in reach, people 120 falling to edgeShare at the edge; clanmates spared, the placer not). miningCharge: x yieldMult ore in a heap. firePot: impact on pieces in radiusCm, then burning ground burnDps for burnSeconds (it burns wood pieces too), people + burn buildup. ladder: rails up to heightCm, foot footOutCm from the wall, hp, lifeSeconds, climbSpeed cm/s, topHopCm. codeBreaker: seconds of standing still, ringSeconds between rings. bell: the totem's raid bell (swing, period, decay; minGapSeconds between strikes, alertGapSeconds between alerts to owners, raidQuietSeconds ends a raid, logRaids kept per claim; height on the post, reachCm of its arm). tameBite: a tame's bite on a piece x this; tames.sightCm: how far 'Break that' looks; tames.nextCm: how far a tame looks for the next piece. warHallsLive: 1 once the endgame war-hall raids exist (shows the raid group settings). All first drafts.",
-    "warHallsLive": 0,
+    "warHallsLive": 1,
     "material": {
       "blast": { "wood": 1, "stone": 1, "metal": 1, "biome": 1, "other": 1 },
       "firepot": { "wood": 1, "stone": 0.13, "metal": 0, "biome": 0, "other": 0.6 },
@@ -567,5 +571,9 @@
   "store": {
     "_comment": "The world store (WRStore: Saved/Worlds/<id>/world.db, SQLite). flushSeconds: how often the writer commits what's pending (also at once on logout and shutdown). Backups (VACUUM INTO snapshots in the world's backups/ folder): every hourlySeconds while the world runs (keep hourlyKeep), the first of each UTC day kept as a daily (dailyKeep), one at every clean shutdown (shutdownKeep), and one before the 0.7 JSON saves were brought in (kept).",
     "flushSeconds": 10, "hourlySeconds": 3600, "hourlyKeep": 24, "dailyKeep": 7, "shutdownKeep": 5
-  }
+  },
+  "prestige": { "_comment": "Prestige (cooks/build-endgame.md 2.1, biome-void 2.23.4): a path at atPoints earned, at its altar, held Return holdSeconds: XP and ranks go (the layout is kept for Restore), one mark (maxMarks a path) with a perk: keener (that path's damage + damage a mark), deeper (its resource capacity and gain + resource a mark), rooted (its root passive on the subclass at rootShare, once a path). Marks count while the path is main or subclass. goldPerMark: the skin marks' lerp toward goldColour (sRGB) per mark.", "atPoints": 100, "maxMarks": 3, "holdSeconds": 1.5, "damage": 0.05, "resource": 0.1, "rootShare": 0.5, "goldPerMark": 0.12, "goldColour": [214, 170, 70] },
+  "deeds": { "_comment": "Deeds (WRDeeds): respec (the Heron's draught: holdSeconds to drink-forget one active path; drops: majorRepeat + majorPerAL x party AL on a major's repeat kill, portal by rank 3/4/5), trophy heads (headFirst on your first kill, headRepeat after), achievement census every censusSeconds, landmarks within landmarkCm, passes crossed within passCm of the pass point, toastSeconds, a fight is deathless when no survivor within deathlessCm of the boss's home died.", "respecHoldSeconds": 1.5, "draught": { "majorRepeat": 0.03, "majorPerAL": 0.005, "portal": [0, 0, 0.02, 0.04, 0.06] }, "headFirst": 1.0, "headRepeat": 0.25, "censusSeconds": 30, "landmarkCm": 6000, "passCm": 30000, "toastSeconds": 3.0, "deathlessCm": 9000, "soulArtSlot": 8, "talismans": { "forgeHeartAbove": 0.7, "rimeScaleQuiet": 10.0 } },
+  "records": { "_comment": "Kill-time boards (WRRecords; biome-void 2.23.5): bands by group size (players + tames: the first band whose max fits), keep the top keep per band and per band's artifact column; tablets beside each major's shrine-stone (sideCm to its left), each mini's summoning stone (miniSideCm to its right) and the war-hall gates; heightCm tall; grind heard within grindCm.", "bands": [{ "id": "solo", "name": "Solo", "max": 1 }, { "id": "2", "name": "Two", "max": 2 }, { "id": "3-4", "name": "Three to four", "max": 4 }, { "id": "5-7", "name": "Five to seven", "max": 7 }, { "id": "8-10", "name": "Eight to ten", "max": 10 }, { "id": "11+", "name": "Eleven or more", "max": 999 }], "keep": 10, "tabletReach": 320, "sideCm": 600, "miniSideCm": 350, "heightCm": 190, "grindCm": 1000 },
+  "monuments": { "_comment": "Boss monuments (WREndgameLook): the head on the plinth at scale, lifted lift cm from the collar, turned yaw / pitch degrees, the bronze collar collar cm across.", "vulkarn": { "scale": 0.45, "lift": -4, "yaw": 0, "pitch": 0, "collar": 52 }, "skaldrith": { "scale": 0.3, "lift": -2, "yaw": 0, "pitch": -8, "collar": 64 } }
 }

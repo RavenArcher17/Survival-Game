@@ -3,6 +3,8 @@
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
+#include "WRDeeds.h"
+#include "WRWarHall.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -396,6 +398,7 @@ void AWRBoss::BeginPlay()
 	Super::BeginPlay();
 	const FWRCreatureDef* Def = GetDef();
 	bMajor = Def && Def->Role.Contains(TEXT("major"));
+	bChampion = Def && Def->Role.Contains(TEXT("champion"));
 	if (!HasAuthority())
 	{
 		return;
@@ -459,6 +462,13 @@ void AWRBoss::SpawnArena()
 			Props.Add(Prop);
 		}
 	}
+}
+
+bool AWRBoss::IsHostileTo(const AWRCharacterBase* Other) const
+{
+	// Raid champions are each other's enemies as well as yours (WRWarHall).
+	if (WRWarHall::IsRival(this, Other)) return true;
+	return Super::IsHostileTo(Other);
 }
 
 FString AWRBoss::GetDisplayLabel() const
@@ -569,6 +579,8 @@ void AWRBoss::ResetFight()
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s reset (nobody within %.0f m)%s"), *GetDisplayLabel(), ChaseRadius / 100.f, bReturning ? TEXT(": walks home") : TEXT(""));
 	Participants = 1;
 	Ledger.Reset();
+	FirstHitAt = 0.0;
+	bSomeoneDied = false;
 	Current = INDEX_NONE;
 	StrikeState = EStrike::None;
 	PendingPhase = 0;
@@ -618,9 +630,9 @@ void AWRBoss::SetPhase(int32 NewPhase)
 	{
 		SetBodyColor(FLinearColor(1.f, 0.95f, 0.8f));  // white-hot armor
 	}
-	if (Phase == 2 && CreatureId == TEXT("skaldrith"))
+	if (Phase == 2 && IsWyrm())
 	{
-		// Few pillars remain.
+		// Few pillars remain (Skaldrith's arena; the Burnt Wyrm's hall has none).
 		for (int32 i = 0; i < Props.Num(); i += 2) if (Props[i].IsValid()) Props[i]->Shatter();
 		SpecialClock = GetWorld()->GetTimeSeconds();
 		SetAirborne(true);
@@ -690,6 +702,11 @@ AWRCharacterBase* AWRBoss::PickBossTarget() const
 			continue;
 		}
 		const float D = FVector::Dist(It->GetActorLocation(), GetActorLocation());
+		// A raid champion turns on its rival only when it's right there, and not again for a while (WRWarHall).
+		if (WRWarHall::IsRival(this, *It) && !WRWarHall::MayTargetRival(this, D))
+		{
+			continue;
+		}
 		if (D < BestDist)
 		{
 			BestDist = D;
@@ -704,6 +721,8 @@ float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	HealthBeforeHit = GetAttributes()->GetHealth();
 	// A fold boss's arena (the Mould-Born cooling, Böðvildr quenched, the Thurs's shell, Hrímgerðr in the dawn).
 	Damage = WRPortals::BossIncoming(this, Hit, Damage);
+	// A war-hall champion: its rival's blows land at half (WRWarHall).
+	Damage = WRWarHall::Incoming(this, Hit, Damage);
 	// Mid-transition it takes less (combat.md 2.17.1: half): the change can't be skipped by burst.
 	if (Attacks.IsValidIndex(Current) && Attacks[Current].bRow && Attacks[Current].Row.DamageTaken < 1.f)
 	{
@@ -752,6 +771,8 @@ void AWRBoss::OnDamageTaken(const FWRHit& Hit, float Damage)
 	{
 		// Overkill doesn't count.
 		Ledger.FindOrAdd(Who) += FMath::Min(Damage, HealthBeforeHit);
+		// The kill-time boards run from the first survivor's blow (WRRecords).
+		if (FirstHitAt <= 0.0) FirstHitAt = GetWorld()->GetTimeSeconds();
 	}
 	if (!bEngaged)
 	{
@@ -759,7 +780,7 @@ void AWRBoss::OnDamageTaken(const FWRHit& Hit, float Damage)
 	}
 	const double Now = GetWorld()->GetTimeSeconds();
 	// Skaldrith: hitting his wings in the air grounds him (fire counts double).
-	if (CreatureId == TEXT("skaldrith") && bAirborne && !Hit.bDamageOverTime)
+	if (IsWyrm() && bAirborne && !Hit.bDamageOverTime)
 	{
 		WingHits += Hit.Element == WRTags::Element_Fire ? 2.f : 1.f;
 		if (WingHits >= Tune(TEXT("wingHitsToGround"), 6.f))
@@ -831,7 +852,7 @@ bool AWRBoss::InShape(const FWRBossAttack& Attack, const FVector& Point) const
 
 void AWRBoss::CheckPhase()
 {
-	if (!bMajor || !GetAttributes() || HasTag(WRTags::Status_StanceBroken) || HasTag(WRTags::State_BeingCrit) || !IsAlive())
+	if (!(bMajor || bChampion) || !GetAttributes() || HasTag(WRTags::Status_StanceBroken) || HasTag(WRTags::State_BeingCrit) || !IsAlive())
 	{
 		return;
 	}
@@ -1020,7 +1041,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 			}
 		}
 	}
-	else if (Id == TEXT("skaldrith") && Phase >= 2)
+	else if (IsWyrm() && Phase >= 2)
 	{
 		// Flight cycle: air for a while, then lands (or is grounded early by wing hits).
 		if (bAirborne && Now - SpecialClock > Tune(TEXT("airSeconds"), 14.f) && Current == INDEX_NONE)
@@ -1124,7 +1145,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	{
 		Current = INDEX_NONE;
 		StrikeState = EStrike::None;
-		if (bAirborne && Id == TEXT("skaldrith"))
+		if (bAirborne && IsWyrm())
 		{
 			SetAirborne(false);
 		}
@@ -1169,9 +1190,11 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	// Close in (on foot) or hover over the fight (airborne).
 	if (bAirborne)
 	{
-		const FVector Hover = Target->GetActorLocation() + (GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D() * 500.f
+		FVector Hover = Target->GetActorLocation() + (GetActorLocation() - Target->GetActorLocation()).GetSafeNormal2D() * 500.f
 			+ FVector(0.f, 0.f, Tune(TEXT("hoverHeight"), 650.f));
-		SetActorLocation(FMath::VInterpConstantTo(GetActorLocation(), Hover, DeltaSeconds, Def->Speed));
+		// Under a war-hall's vault the hover stays inside its walls, and Triumph speeds the wings too (WRWarHall).
+		Hover = WRWarHall::ClampInside(this, Hover);
+		SetActorLocation(FMath::VInterpConstantTo(GetActorLocation(), Hover, DeltaSeconds, Def->Speed * WRWarHall::SpeedScale(this)));
 		SetActorRotation(FRotator(0.f, (Target->GetActorLocation() - GetActorLocation()).Rotation().Yaw, 0.f));
 	}
 	else if (Dist > GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius() + 150.f)
@@ -1252,6 +1275,11 @@ void AWRBoss::OnDeath(AActor* Killer)
 		UE_LOG(LogWildreach, Log, TEXT("BOSS loot: %s dealt %.0f (%.1f%%) -> %s"), *Entry.Key, Entry.Value, 100.f * Entry.Value / MaxHealth, *Got);
 		if (PC) PC->ClientNotify(FString::Printf(TEXT("%s defeated! Loot: %s"), *Def->Name, *Got));
 	}
+	// Deeds (WRDeeds): its soul, its head, the Heron's draught, the boards, the solo / deathless deeds. Before the
+	// first-kill drops mark it killed, so a first kill reads as one.
+	WRDeeds::OnBossKilled(this);
+	// A war-hall champion: the raid's own loot, and the win when its rival is down too (WRWarHall).
+	if (bChampion) WRWarHall::OnChampionDied(this);
 	FirstKillDrops();
 	// Artifacts: a major's drop, the first one at your fourth great kill, geis records (WRArtifacts).
 	WRArtifacts::OnBossKilled(this);

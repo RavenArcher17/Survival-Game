@@ -121,6 +121,12 @@ struct FWRWeaponStats
 	UPROPERTY() bool bBroken = false;
 	/** Path material infused at craft time ("fire"/"frost"): plain attacks carry that element. */
 	UPROPERTY() FName Element;
+	/** A mythic weapon's second element (Data/mythic.json): blows alternate Element, Element2, Element... */
+	UPROPERTY() FName Element2;
+	/** Which of the two the next blow carries (flips each blow; never replicated, the server deals the blows). */
+	uint8 SwingParity = 0;
+	/** The element this blow carries (and flips to the other for the next one when there are two). */
+	FName NextElement() { if (Element2.IsNone()) return Element; SwingParity ^= 1; return SwingParity ? Element : Element2; }
 	/** Boss parts: Giant's ember (stagger -> lava shockwave), Wyrm scale (blocks can freeze the attacker). */
 	UPROPERTY() bool bStaggerShockwave = false;
 	UPROPERTY() bool bBlockFreeze = false;

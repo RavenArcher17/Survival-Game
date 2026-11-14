@@ -198,6 +198,15 @@ public:
 	double StanceOpenUntil = 0.0;
 
 	bool IsMajor() const { return bMajor; }
+	/** A war-hall's raid champion (creatures.json role "raid champion": its phases, its rival; WRWarHall). */
+	bool IsChampion() const { return bChampion; }
+	/** Skaldrith and the Burnt Wyrm fly the same way (the flight cycle, wings that ground it, the whiteout). */
+	bool IsWyrm() const { return CreatureId == TEXT("skaldrith") || CreatureId == TEXT("burnt_wyrm"); }
+	virtual bool IsHostileTo(const AWRCharacterBase* Other) const override;
+	/** Server: the world time a survivor's first blow landed this fight (kill-time boards, WRRecords); 0 before. */
+	double FirstHitAt = 0.0;
+	/** Server: a survivor in this fight died (the deathless deeds). */
+	bool bSomeoneDied = false;
 	bool IsReturning() const { return bReturning; }
 	float GetChaseRadius() const { return ChaseRadius; }
 
@@ -281,6 +290,7 @@ private:
 	void CheckPhase();
 
 	bool bMajor = false;
+	bool bChampion = false;
 	float SoloHealth = 3000.f;
 	/** The floor its floods and props cover (bosses.<id>.arenaRadius). */
 	float ArenaRadius = 3000.f;

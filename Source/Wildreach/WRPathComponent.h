@@ -39,6 +39,16 @@ public:
 	/** Gives exactly enough XP for this many more points (cheat). */
 	void GivePoints(FName PathId, int32 Points);
 
+	// --- The endgame (WRDeeds; cooks/build-endgame.md 2.1, 2.2) ---
+	/** Prestige: the path's ranks and XP go back to the start (its starter stays). Returns the ranks it had (its layout). */
+	TArray<FWRNodeRank> ReturnPath(FName PathId);
+	/** Respec (the Heron's draught): the path's ranks go (the starter stays); its XP stays, so every point is free. */
+	bool UnlearnPath(FName PathId);
+	/** Buys a saved layout back, in its order, as far as points allow. Returns how many ranks it bought. */
+	int32 RestoreLayout(FName PathId, const TArray<FWRNodeRank>& Layout);
+	/** The held weapon's soul art came or went: the quick slots and grants follow. */
+	void RefreshSoulArt() { Changed(); }
+
 	/** Server: push grants (abilities, stats, passives, combos, level) onto the current pawn. */
 	void ApplyToCharacter(AWRCharacter* Character);
 
@@ -85,6 +95,8 @@ private:
 	UPROPERTY(Replicated) TArray<FWRPathProgress> Progress;
 	/** "path.node" per slot, None when empty. */
 	UPROPERTY(Replicated) TArray<FName> QuickSlots;
+	/** The ability a Soul art took the last quick slot from (put back there when the awakened weapon leaves the hand). */
+	FName SoulDisplaced;
 
 	bool bDirty = false;
 

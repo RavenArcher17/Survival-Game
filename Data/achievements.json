@@ -1,0 +1,2065 @@
+{
+ "_comment": "Achievements (cooks/endgame.md 2.12, biome-void 2.23.6, cooks/build-endgame.md 2.6): 150 rows in 10 categories, 20 hidden until earned. id, name, text, cat, event (what the server watches: landmarks, hidden, pass, huntall, tameall, bosssolo, bossdeathless, belt, path100, combos, skill100, census {stat, count}, days, unmade, raidheld, escaped, portal {rank, mods}, artifactal, raid, triumph, raidal, mythic, prestige, prestige3, prestigepaths, prestigemarks, geis), params, needs (a row is live only when all of these exist: boss:<id>, biome:<id>, path:<id>, paths:<n>, skill:<id>, raid:<id>, raids:<n>, majors:<n>, pass:<poi name>, hiddenin:<biome>, minis:<belt>, mythic), hidden, title (worn from Journal > Deeds > Titles), cosmetic (Data/cosmetics.json). Rows that aren't live never show and never unlock. All first drafts.",
+ "categories": {
+  "explorer": "Explorer",
+  "hunter": "Hunter",
+  "slayer": "Slayer",
+  "path": "Path",
+  "life": "Life",
+  "builder": "Builder",
+  "survivor": "Survivor",
+  "raider": "Raider",
+  "mythic": "Mythic",
+  "prestige": "Prestige"
+ },
+ "titles": {
+  "_comment": "Titles that don't come from an achievement row: prestige (<sworn>-sworn at 3 marks, by path), the masters' quest lines (by master id) and The Unlearning; the artifacts' Banes are WRArtifacts'.",
+  "sworn": {
+   "fire": "Ember-sworn",
+   "lightning": "Thunder-sworn",
+   "sun": "Sun-sworn",
+   "nature": "Root-sworn",
+   "wind": "Gale-sworn",
+   "arcane": "Prism-sworn",
+   "frost": "Rime-sworn",
+   "blood": "Mire-sworn",
+   "tide": "Tide-sworn",
+   "necromancy": "Grave-sworn",
+   "spore": "Spore-sworn",
+   "void": "Hollow-sworn"
+  },
+  "quests": {
+   "sigrun": "Ashhand's hand",
+   "ailu": "Ice-patient",
+   "unlearning": "Unlearned"
+  }
+ },
+ "achievements": [
+  {
+   "id": "landmarks_volcanic",
+   "name": "Every stone of Volcanic",
+   "text": "Stand at every landmark of the Volcanic: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "volcanic"
+   },
+   "needs": [
+    "biome:volcanic"
+   ],
+   "title": "Ashwalker"
+  },
+  {
+   "id": "landmarks_storm",
+   "name": "Every stone of Storm Peaks",
+   "text": "Stand at every landmark of the Storm Peaks: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "storm"
+   },
+   "needs": [
+    "biome:storm"
+   ],
+   "title": "Cloudwalker"
+  },
+  {
+   "id": "landmarks_desert",
+   "name": "Every stone of Desert",
+   "text": "Stand at every landmark of the Desert: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "desert"
+   },
+   "needs": [
+    "biome:desert"
+   ],
+   "title": "Sandwalker"
+  },
+  {
+   "id": "landmarks_forest",
+   "name": "Every stone of Ancient Forest",
+   "text": "Stand at every landmark of the Ancient Forest: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "forest"
+   },
+   "needs": [
+    "biome:forest"
+   ],
+   "title": "Leafwalker"
+  },
+  {
+   "id": "landmarks_sky",
+   "name": "Every stone of Sky Islands",
+   "text": "Stand at every landmark of the Sky Islands: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "sky"
+   },
+   "needs": [
+    "biome:sky"
+   ],
+   "title": "Windwalker"
+  },
+  {
+   "id": "landmarks_crystal",
+   "name": "Every stone of Crystal Caves",
+   "text": "Stand at every landmark of the Crystal Caves: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "crystal"
+   },
+   "needs": [
+    "biome:crystal"
+   ],
+   "title": "Glasswalker"
+  },
+  {
+   "id": "landmarks_tundra",
+   "name": "Every stone of Frozen Tundra",
+   "text": "Stand at every landmark of the Frozen Tundra: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "tundra"
+   },
+   "needs": [
+    "biome:tundra"
+   ],
+   "title": "Snowwalker"
+  },
+  {
+   "id": "landmarks_swamp",
+   "name": "Every stone of Swamp",
+   "text": "Stand at every landmark of the Swamp: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "swamp"
+   },
+   "needs": [
+    "biome:swamp"
+   ],
+   "title": "Bogwalker"
+  },
+  {
+   "id": "landmarks_ocean",
+   "name": "Every stone of Ocean & Reefs",
+   "text": "Stand at every landmark of the Ocean & Reefs: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "ocean"
+   },
+   "needs": [
+    "biome:ocean"
+   ],
+   "title": "Shorewalker"
+  },
+  {
+   "id": "landmarks_graveyard",
+   "name": "Every stone of Graveyard",
+   "text": "Stand at every landmark of the Graveyard: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "graveyard"
+   },
+   "needs": [
+    "biome:graveyard"
+   ],
+   "title": "Gravewalker"
+  },
+  {
+   "id": "landmarks_fungal",
+   "name": "Every stone of Fungal Caverns",
+   "text": "Stand at every landmark of the Fungal Caverns: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "fungal"
+   },
+   "needs": [
+    "biome:fungal"
+   ],
+   "title": "Deepwalker"
+  },
+  {
+   "id": "landmarks_void",
+   "name": "Every stone of Corrupted Wasteland",
+   "text": "Stand at every landmark of the Corrupted Wasteland: its boss grounds, camps, caves, shrines and villages.",
+   "cat": "explorer",
+   "event": "landmarks",
+   "params": {
+    "biome": "void"
+   },
+   "needs": [
+    "biome:void"
+   ],
+   "title": "Voidwalker"
+  },
+  {
+   "id": "hidden_volcanic",
+   "name": "Into the Kiln Roads",
+   "text": "Find the way into the Kiln Roads, the Volcanic's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "volcanic"
+   },
+   "needs": [
+    "hiddenin:volcanic"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_storm",
+   "name": "Into the Hollow Bell",
+   "text": "Find the way into the Hollow Bell, the Storm Peaks's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "storm"
+   },
+   "needs": [
+    "hiddenin:storm"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_desert",
+   "name": "Into the Sunken Court",
+   "text": "Find the way into the Sunken Court, the Desert's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "desert"
+   },
+   "needs": [
+    "hiddenin:desert"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_forest",
+   "name": "Into the Green Vault",
+   "text": "Find the way into the Green Vault, the Ancient Forest's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "forest"
+   },
+   "needs": [
+    "hiddenin:forest"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_sky",
+   "name": "Into the Kite Roads",
+   "text": "Find the way into the Kite Roads, the Sky Islands's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "sky"
+   },
+   "needs": [
+    "hiddenin:sky"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_crystal",
+   "name": "Into the Singing Deep",
+   "text": "Find the way into the Singing Deep, the Crystal Caves's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "crystal"
+   },
+   "needs": [
+    "hiddenin:crystal"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_tundra",
+   "name": "Into the Rime Galleries",
+   "text": "Find the way into the Rime Galleries, the Frozen Tundra's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "tundra"
+   },
+   "needs": [
+    "hiddenin:tundra"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_swamp",
+   "name": "Into the Drowned Coven",
+   "text": "Find the way into the Drowned Coven, the Swamp's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "swamp"
+   },
+   "needs": [
+    "hiddenin:swamp"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_ocean",
+   "name": "Into the Pearl Grotto",
+   "text": "Find the way into the Pearl Grotto, the Ocean & Reefs's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "ocean"
+   },
+   "needs": [
+    "hiddenin:ocean"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_graveyard",
+   "name": "Into the Ossuary Stair",
+   "text": "Find the way into the Ossuary Stair, the Graveyard's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "graveyard"
+   },
+   "needs": [
+    "hiddenin:graveyard"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_fungal",
+   "name": "Into the Glowing Under",
+   "text": "Find the way into the Glowing Under, the Fungal Caverns's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "fungal"
+   },
+   "needs": [
+    "hiddenin:fungal"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "hidden_void",
+   "name": "Into the Gullet",
+   "text": "Find the way into the Gullet, the Corrupted Wasteland's hidden road.",
+   "cat": "explorer",
+   "event": "hidden",
+   "params": {
+    "biome": "void"
+   },
+   "needs": [
+    "hiddenin:void"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "pass_north_pass",
+   "name": "Over the North pass",
+   "text": "Cross the North pass on foot, from one land into the other.",
+   "cat": "explorer",
+   "event": "pass",
+   "params": {
+    "pass": "North pass"
+   },
+   "needs": [
+    "pass:North pass"
+   ]
+  },
+  {
+   "id": "pass_south_pass",
+   "name": "Over the South pass",
+   "text": "Cross the South pass on foot, from one land into the other.",
+   "cat": "explorer",
+   "event": "pass",
+   "params": {
+    "pass": "South pass"
+   },
+   "needs": [
+    "pass:South pass"
+   ]
+  },
+  {
+   "id": "pass_stormgut",
+   "name": "Through Stormgut",
+   "text": "Cross Stormgut on foot, from one land into the other.",
+   "cat": "explorer",
+   "event": "pass",
+   "params": {
+    "pass": "Stormgut"
+   },
+   "needs": [
+    "pass:Stormgut"
+   ]
+  },
+  {
+   "id": "pass_saltgate",
+   "name": "Through Saltgate",
+   "text": "Cross Saltgate on foot, from one land into the other.",
+   "cat": "explorer",
+   "event": "pass",
+   "params": {
+    "pass": "Saltgate"
+   },
+   "needs": [
+    "pass:Saltgate"
+   ]
+  },
+  {
+   "id": "pass_rootgrave",
+   "name": "Under Rootgrave",
+   "text": "Cross Rootgrave on foot, from one land into the other.",
+   "cat": "explorer",
+   "event": "pass",
+   "params": {
+    "pass": "Rootgrave"
+   },
+   "needs": [
+    "pass:Rootgrave"
+   ]
+  },
+  {
+   "id": "pass_the_flue",
+   "name": "Up the Flue",
+   "text": "Cross the Flue on foot, from one land into the other.",
+   "cat": "explorer",
+   "event": "pass",
+   "params": {
+    "pass": "The Flue"
+   },
+   "needs": [
+    "pass:The Flue"
+   ]
+  },
+  {
+   "id": "hunt_volcanic",
+   "name": "The hunt of Volcanic",
+   "text": "Kill one of every creature that lives in the Volcanic.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "volcanic"
+   },
+   "needs": [
+    "biome:volcanic"
+   ]
+  },
+  {
+   "id": "hunt_storm",
+   "name": "The hunt of Storm Peaks",
+   "text": "Kill one of every creature that lives in the Storm Peaks.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "storm"
+   },
+   "needs": [
+    "biome:storm"
+   ]
+  },
+  {
+   "id": "hunt_desert",
+   "name": "The hunt of Desert",
+   "text": "Kill one of every creature that lives in the Desert.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "desert"
+   },
+   "needs": [
+    "biome:desert"
+   ]
+  },
+  {
+   "id": "hunt_forest",
+   "name": "The hunt of Ancient Forest",
+   "text": "Kill one of every creature that lives in the Ancient Forest.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "forest"
+   },
+   "needs": [
+    "biome:forest"
+   ]
+  },
+  {
+   "id": "hunt_sky",
+   "name": "The hunt of Sky Islands",
+   "text": "Kill one of every creature that lives in the Sky Islands.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "sky"
+   },
+   "needs": [
+    "biome:sky"
+   ]
+  },
+  {
+   "id": "hunt_crystal",
+   "name": "The hunt of Crystal Caves",
+   "text": "Kill one of every creature that lives in the Crystal Caves.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "crystal"
+   },
+   "needs": [
+    "biome:crystal"
+   ]
+  },
+  {
+   "id": "hunt_tundra",
+   "name": "The hunt of Frozen Tundra",
+   "text": "Kill one of every creature that lives in the Frozen Tundra.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "tundra"
+   },
+   "needs": [
+    "biome:tundra"
+   ]
+  },
+  {
+   "id": "hunt_swamp",
+   "name": "The hunt of Swamp",
+   "text": "Kill one of every creature that lives in the Swamp.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "swamp"
+   },
+   "needs": [
+    "biome:swamp"
+   ]
+  },
+  {
+   "id": "hunt_ocean",
+   "name": "The hunt of Ocean & Reefs",
+   "text": "Kill one of every creature that lives in the Ocean & Reefs.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "ocean"
+   },
+   "needs": [
+    "biome:ocean"
+   ]
+  },
+  {
+   "id": "hunt_graveyard",
+   "name": "The hunt of Graveyard",
+   "text": "Kill one of every creature that lives in the Graveyard.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "graveyard"
+   },
+   "needs": [
+    "biome:graveyard"
+   ]
+  },
+  {
+   "id": "hunt_fungal",
+   "name": "The hunt of Fungal Caverns",
+   "text": "Kill one of every creature that lives in the Fungal Caverns.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "fungal"
+   },
+   "needs": [
+    "biome:fungal"
+   ]
+  },
+  {
+   "id": "hunt_void",
+   "name": "The hunt of Corrupted Wasteland",
+   "text": "Kill one of every creature that lives in the Corrupted Wasteland.",
+   "cat": "hunter",
+   "event": "huntall",
+   "params": {
+    "biome": "void"
+   },
+   "needs": [
+    "biome:void"
+   ]
+  },
+  {
+   "id": "tame_volcanic",
+   "name": "Every beast of Volcanic",
+   "text": "Tame one of every creature of the Volcanic that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "volcanic"
+   },
+   "needs": [
+    "biome:volcanic"
+   ]
+  },
+  {
+   "id": "tame_storm",
+   "name": "Every beast of Storm Peaks",
+   "text": "Tame one of every creature of the Storm Peaks that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "storm"
+   },
+   "needs": [
+    "biome:storm"
+   ]
+  },
+  {
+   "id": "tame_desert",
+   "name": "Every beast of Desert",
+   "text": "Tame one of every creature of the Desert that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "desert"
+   },
+   "needs": [
+    "biome:desert"
+   ]
+  },
+  {
+   "id": "tame_forest",
+   "name": "Every beast of Ancient Forest",
+   "text": "Tame one of every creature of the Ancient Forest that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "forest"
+   },
+   "needs": [
+    "biome:forest"
+   ]
+  },
+  {
+   "id": "tame_sky",
+   "name": "Every beast of Sky Islands",
+   "text": "Tame one of every creature of the Sky Islands that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "sky"
+   },
+   "needs": [
+    "biome:sky"
+   ]
+  },
+  {
+   "id": "tame_crystal",
+   "name": "Every beast of Crystal Caves",
+   "text": "Tame one of every creature of the Crystal Caves that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "crystal"
+   },
+   "needs": [
+    "biome:crystal"
+   ]
+  },
+  {
+   "id": "tame_tundra",
+   "name": "Every beast of Frozen Tundra",
+   "text": "Tame one of every creature of the Frozen Tundra that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "tundra"
+   },
+   "needs": [
+    "biome:tundra"
+   ]
+  },
+  {
+   "id": "tame_swamp",
+   "name": "Every beast of Swamp",
+   "text": "Tame one of every creature of the Swamp that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "swamp"
+   },
+   "needs": [
+    "biome:swamp"
+   ]
+  },
+  {
+   "id": "tame_ocean",
+   "name": "Every beast of Ocean & Reefs",
+   "text": "Tame one of every creature of the Ocean & Reefs that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "ocean"
+   },
+   "needs": [
+    "biome:ocean"
+   ]
+  },
+  {
+   "id": "tame_graveyard",
+   "name": "Every beast of Graveyard",
+   "text": "Tame one of every creature of the Graveyard that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "graveyard"
+   },
+   "needs": [
+    "biome:graveyard"
+   ]
+  },
+  {
+   "id": "tame_fungal",
+   "name": "Every beast of Fungal Caverns",
+   "text": "Tame one of every creature of the Fungal Caverns that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "fungal"
+   },
+   "needs": [
+    "biome:fungal"
+   ]
+  },
+  {
+   "id": "tame_void",
+   "name": "Every beast of Corrupted Wasteland",
+   "text": "Tame one of every creature of the Corrupted Wasteland that can be tamed.",
+   "cat": "hunter",
+   "event": "tameall",
+   "params": {
+    "biome": "void"
+   },
+   "needs": [
+    "biome:void"
+   ]
+  },
+  {
+   "id": "solo_vulkarn",
+   "name": "Vulkarn, alone",
+   "text": "Kill Vulkarn with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "vulkarn"
+   },
+   "needs": [
+    "boss:vulkarn"
+   ],
+   "title": "Forge-breaker"
+  },
+  {
+   "id": "solo_kharvox",
+   "name": "Kharvox, alone",
+   "text": "Kill Kharvox with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "kharvox"
+   },
+   "needs": [
+    "boss:kharvox"
+   ],
+   "title": "Stormbreaker"
+  },
+  {
+   "id": "solo_ahrumet",
+   "name": "Ahrumet, alone",
+   "text": "Kill Ahrumet with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "ahrumet"
+   },
+   "needs": [
+    "boss:ahrumet"
+   ],
+   "title": "Sun-shadow"
+  },
+  {
+   "id": "solo_sylvaroth",
+   "name": "Sylvaroth, alone",
+   "text": "Kill Sylvaroth with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "sylvaroth"
+   },
+   "needs": [
+    "boss:sylvaroth"
+   ],
+   "title": "Root-cutter"
+  },
+  {
+   "id": "solo_aeolith",
+   "name": "Aeolith, alone",
+   "text": "Kill Aeolith with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "aeolith"
+   },
+   "needs": [
+    "boss:aeolith"
+   ],
+   "title": "Skyfeller"
+  },
+  {
+   "id": "solo_lyrathis",
+   "name": "Lyrathis, alone",
+   "text": "Kill Lyrathis with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "lyrathis"
+   },
+   "needs": [
+    "boss:lyrathis"
+   ],
+   "title": "Glass-breaker"
+  },
+  {
+   "id": "solo_skaldrith",
+   "name": "Skaldrith, alone",
+   "text": "Kill Skaldrith with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "skaldrith"
+   },
+   "needs": [
+    "boss:skaldrith"
+   ],
+   "title": "Wyrm-felled"
+  },
+  {
+   "id": "solo_vharra",
+   "name": "Vharra, alone",
+   "text": "Kill Vharra with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "vharra"
+   },
+   "needs": [
+    "boss:vharra"
+   ],
+   "title": "Mirewalker"
+  },
+  {
+   "id": "solo_thalassor",
+   "name": "Thalassor, alone",
+   "text": "Kill Thalassor with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "thalassor"
+   },
+   "needs": [
+    "boss:thalassor"
+   ],
+   "title": "Deep-diver"
+  },
+  {
+   "id": "solo_nhal",
+   "name": "Nhal, alone",
+   "text": "Kill Nhal with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "nhal"
+   },
+   "needs": [
+    "boss:nhal"
+   ],
+   "title": "Grave-quiet"
+  },
+  {
+   "id": "solo_mycelorn",
+   "name": "Mycelorn, alone",
+   "text": "Kill Mycelorn with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "mycelorn"
+   },
+   "needs": [
+    "boss:mycelorn"
+   ],
+   "title": "Spore-proof"
+  },
+  {
+   "id": "solo_vorhollow",
+   "name": "Vorhollow, alone",
+   "text": "Kill Vorhollow with no one beside you: no friend, no tame.",
+   "cat": "slayer",
+   "event": "bosssolo",
+   "params": {
+    "boss": "vorhollow"
+   },
+   "needs": [
+    "boss:vorhollow"
+   ],
+   "title": "Devourer"
+  },
+  {
+   "id": "deathless_vulkarn",
+   "name": "Nobody fell to Vulkarn",
+   "text": "Kill Vulkarn without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "vulkarn"
+   },
+   "needs": [
+    "boss:vulkarn"
+   ],
+   "cosmetic": "glow_vulkarn"
+  },
+  {
+   "id": "deathless_kharvox",
+   "name": "Nobody fell to Kharvox",
+   "text": "Kill Kharvox without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "kharvox"
+   },
+   "needs": [
+    "boss:kharvox"
+   ],
+   "cosmetic": "glow_kharvox"
+  },
+  {
+   "id": "deathless_ahrumet",
+   "name": "Nobody fell to Ahrumet",
+   "text": "Kill Ahrumet without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "ahrumet"
+   },
+   "needs": [
+    "boss:ahrumet"
+   ],
+   "cosmetic": "glow_ahrumet"
+  },
+  {
+   "id": "deathless_sylvaroth",
+   "name": "Nobody fell to Sylvaroth",
+   "text": "Kill Sylvaroth without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "sylvaroth"
+   },
+   "needs": [
+    "boss:sylvaroth"
+   ],
+   "cosmetic": "glow_sylvaroth"
+  },
+  {
+   "id": "deathless_aeolith",
+   "name": "Nobody fell to Aeolith",
+   "text": "Kill Aeolith without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "aeolith"
+   },
+   "needs": [
+    "boss:aeolith"
+   ],
+   "cosmetic": "glow_aeolith"
+  },
+  {
+   "id": "deathless_lyrathis",
+   "name": "Nobody fell to Lyrathis",
+   "text": "Kill Lyrathis without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "lyrathis"
+   },
+   "needs": [
+    "boss:lyrathis"
+   ],
+   "cosmetic": "glow_lyrathis"
+  },
+  {
+   "id": "deathless_skaldrith",
+   "name": "Nobody fell to Skaldrith",
+   "text": "Kill Skaldrith without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "skaldrith"
+   },
+   "needs": [
+    "boss:skaldrith"
+   ],
+   "cosmetic": "glow_skaldrith"
+  },
+  {
+   "id": "deathless_vharra",
+   "name": "Nobody fell to Vharra",
+   "text": "Kill Vharra without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "vharra"
+   },
+   "needs": [
+    "boss:vharra"
+   ],
+   "cosmetic": "glow_vharra"
+  },
+  {
+   "id": "deathless_thalassor",
+   "name": "Nobody fell to Thalassor",
+   "text": "Kill Thalassor without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "thalassor"
+   },
+   "needs": [
+    "boss:thalassor"
+   ],
+   "cosmetic": "glow_thalassor"
+  },
+  {
+   "id": "deathless_nhal",
+   "name": "Nobody fell to Nhal",
+   "text": "Kill Nhal without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "nhal"
+   },
+   "needs": [
+    "boss:nhal"
+   ],
+   "cosmetic": "glow_nhal"
+  },
+  {
+   "id": "deathless_mycelorn",
+   "name": "Nobody fell to Mycelorn",
+   "text": "Kill Mycelorn without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "mycelorn"
+   },
+   "needs": [
+    "boss:mycelorn"
+   ],
+   "cosmetic": "glow_mycelorn"
+  },
+  {
+   "id": "deathless_vorhollow",
+   "name": "Nobody fell to Vorhollow",
+   "text": "Kill Vorhollow without anyone in the fight dying.",
+   "cat": "slayer",
+   "event": "bossdeathless",
+   "params": {
+    "boss": "vorhollow"
+   },
+   "needs": [
+    "boss:vorhollow"
+   ],
+   "cosmetic": "glow_vorhollow"
+  },
+  {
+   "id": "belt_fire_frost",
+   "name": "Every warden of Fire and Frost lands",
+   "text": "Kill every mini-boss of the Fire and Frost lands.",
+   "cat": "slayer",
+   "event": "belt",
+   "params": {
+    "belt": "fire_frost",
+    "minis": [
+     "obsidian_warden",
+     "ignessa",
+     "cinderhorn",
+     "grimjaw",
+     "pale_hunter",
+     "old_tusker"
+    ]
+   },
+   "needs": [
+    "biome:volcanic",
+    "biome:tundra"
+   ]
+  },
+  {
+   "id": "belt_storm_swamp",
+   "name": "Every warden of Storm and Swamp lands",
+   "text": "Kill every mini-boss of the Storm and Swamp lands.",
+   "cat": "slayer",
+   "event": "belt",
+   "params": {
+    "belt": "storm_swamp"
+   },
+   "needs": [
+    "biome:storm",
+    "biome:swamp",
+    "minis:storm_swamp"
+   ]
+  },
+  {
+   "id": "belt_desert_ocean",
+   "name": "Every warden of Desert and Ocean lands",
+   "text": "Kill every mini-boss of the Desert and Ocean lands.",
+   "cat": "slayer",
+   "event": "belt",
+   "params": {
+    "belt": "desert_ocean"
+   },
+   "needs": [
+    "biome:desert",
+    "biome:ocean",
+    "minis:desert_ocean"
+   ]
+  },
+  {
+   "id": "belt_forest_grave",
+   "name": "Every warden of Forest and Graveyard lands",
+   "text": "Kill every mini-boss of the Forest and Graveyard lands.",
+   "cat": "slayer",
+   "event": "belt",
+   "params": {
+    "belt": "forest_grave"
+   },
+   "needs": [
+    "biome:forest",
+    "biome:graveyard",
+    "minis:forest_grave"
+   ]
+  },
+  {
+   "id": "belt_sky_fungal",
+   "name": "Every warden of Sky and Fungal lands",
+   "text": "Kill every mini-boss of the Sky and Fungal lands.",
+   "cat": "slayer",
+   "event": "belt",
+   "params": {
+    "belt": "sky_fungal"
+   },
+   "needs": [
+    "biome:sky",
+    "biome:fungal",
+    "minis:sky_fungal"
+   ]
+  },
+  {
+   "id": "belt_void_crystal",
+   "name": "Every warden of Void and Crystal lands",
+   "text": "Kill every mini-boss of the Void and Crystal lands.",
+   "cat": "slayer",
+   "event": "belt",
+   "params": {
+    "belt": "void_crystal"
+   },
+   "needs": [
+    "biome:void",
+    "biome:crystal",
+    "minis:void_crystal"
+   ]
+  },
+  {
+   "id": "path100_fire",
+   "name": "Fire to the root",
+   "text": "Earn all 100 points of the Fire path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "fire"
+   },
+   "needs": [
+    "path:fire"
+   ],
+   "title": "Ember-master"
+  },
+  {
+   "id": "path100_lightning",
+   "name": "Lightning to the root",
+   "text": "Earn all 100 points of the Lightning path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "lightning"
+   },
+   "needs": [
+    "path:lightning"
+   ],
+   "title": "Thunder-master"
+  },
+  {
+   "id": "path100_sun",
+   "name": "Sun & sand to the root",
+   "text": "Earn all 100 points of the Sun & sand path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "sun"
+   },
+   "needs": [
+    "path:sun"
+   ],
+   "title": "Sun-master"
+  },
+  {
+   "id": "path100_nature",
+   "name": "Nature to the root",
+   "text": "Earn all 100 points of the Nature path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "nature"
+   },
+   "needs": [
+    "path:nature"
+   ],
+   "title": "Root-master"
+  },
+  {
+   "id": "path100_wind",
+   "name": "Wind to the root",
+   "text": "Earn all 100 points of the Wind path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "wind"
+   },
+   "needs": [
+    "path:wind"
+   ],
+   "title": "Gale-master"
+  },
+  {
+   "id": "path100_arcane",
+   "name": "Arcane to the root",
+   "text": "Earn all 100 points of the Arcane path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "arcane"
+   },
+   "needs": [
+    "path:arcane"
+   ],
+   "title": "Prism-master"
+  },
+  {
+   "id": "path100_frost",
+   "name": "Frost to the root",
+   "text": "Earn all 100 points of the Frost path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "frost"
+   },
+   "needs": [
+    "path:frost"
+   ],
+   "title": "Rime-master"
+  },
+  {
+   "id": "path100_blood",
+   "name": "Blood & curse to the root",
+   "text": "Earn all 100 points of the Blood & curse path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "blood"
+   },
+   "needs": [
+    "path:blood"
+   ],
+   "title": "Mire-master"
+  },
+  {
+   "id": "path100_tide",
+   "name": "Tide to the root",
+   "text": "Earn all 100 points of the Tide path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "tide"
+   },
+   "needs": [
+    "path:tide"
+   ],
+   "title": "Tide-master"
+  },
+  {
+   "id": "path100_necromancy",
+   "name": "Necromancy to the root",
+   "text": "Earn all 100 points of the Necromancy path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "necromancy"
+   },
+   "needs": [
+    "path:necromancy"
+   ],
+   "title": "Grave-master"
+  },
+  {
+   "id": "path100_spore",
+   "name": "Spore to the root",
+   "text": "Earn all 100 points of the Spore path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "spore"
+   },
+   "needs": [
+    "path:spore"
+   ],
+   "title": "Spore-master"
+  },
+  {
+   "id": "path100_void",
+   "name": "Void to the root",
+   "text": "Earn all 100 points of the Void path.",
+   "cat": "path",
+   "event": "path100",
+   "params": {
+    "path": "void"
+   },
+   "needs": [
+    "path:void"
+   ],
+   "title": "Hollow-master"
+  },
+  {
+   "id": "combos_10",
+   "name": "Ten pairs",
+   "text": "Own ten combo pairs: two paths both at 25 or more (saved progress counts).",
+   "cat": "path",
+   "event": "combos",
+   "params": {
+    "count": 10
+   },
+   "needs": [
+    "paths:5"
+   ]
+  },
+  {
+   "id": "combos_66",
+   "name": "All the pairs",
+   "text": "Own all 66 combo pairs.",
+   "cat": "path",
+   "event": "combos",
+   "params": {
+    "count": 66
+   },
+   "needs": [
+    "paths:12"
+   ],
+   "title": "Twelvefold-learned"
+  },
+  {
+   "id": "skill100_mining",
+   "name": "Mining to 100",
+   "text": "Raise mining to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "mining"
+   },
+   "needs": [
+    "skill:mining"
+   ],
+   "title": "Master Miner"
+  },
+  {
+   "id": "skill100_woodcutting",
+   "name": "Woodcutting to 100",
+   "text": "Raise woodcutting to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "woodcutting"
+   },
+   "needs": [
+    "skill:woodcutting"
+   ],
+   "title": "Master Woodsman"
+  },
+  {
+   "id": "skill100_fishing",
+   "name": "Fishing to 100",
+   "text": "Raise fishing to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "fishing"
+   },
+   "needs": [
+    "skill:fishing"
+   ],
+   "title": "Master Angler"
+  },
+  {
+   "id": "skill100_tracking",
+   "name": "Tracking to 100",
+   "text": "Raise tracking to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "tracking"
+   },
+   "needs": [
+    "skill:tracking"
+   ],
+   "title": "Master Tracker"
+  },
+  {
+   "id": "skill100_smithing",
+   "name": "Smithing to 100",
+   "text": "Raise smithing to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "smithing"
+   },
+   "needs": [
+    "skill:smithing"
+   ],
+   "title": "Master Smith"
+  },
+  {
+   "id": "skill100_armorcraft",
+   "name": "Armorcraft to 100",
+   "text": "Raise armorcraft to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "armorcraft"
+   },
+   "needs": [
+    "skill:armorcraft"
+   ],
+   "title": "Master Armorer"
+  },
+  {
+   "id": "skill100_alchemy",
+   "name": "Alchemy to 100",
+   "text": "Raise alchemy to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "alchemy"
+   },
+   "needs": [
+    "skill:alchemy"
+   ],
+   "title": "Master Alchemist"
+  },
+  {
+   "id": "skill100_cooking",
+   "name": "Cooking to 100",
+   "text": "Raise cooking to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "cooking"
+   },
+   "needs": [
+    "skill:cooking"
+   ],
+   "title": "Master Cook"
+  },
+  {
+   "id": "skill100_farming",
+   "name": "Farming to 100",
+   "text": "Raise farming to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "farming"
+   },
+   "needs": [
+    "skill:farming"
+   ],
+   "title": "Master Farmer"
+  },
+  {
+   "id": "skill100_husbandry",
+   "name": "Husbandry to 100",
+   "text": "Raise husbandry to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "husbandry"
+   },
+   "needs": [
+    "skill:husbandry"
+   ],
+   "title": "Master Herder"
+  },
+  {
+   "id": "skill100_building",
+   "name": "Building to 100",
+   "text": "Raise building to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "building"
+   },
+   "needs": [
+    "skill:building"
+   ],
+   "title": "Master Builder"
+  },
+  {
+   "id": "skill100_engineering",
+   "name": "Engineering to 100",
+   "text": "Raise engineering to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "engineering"
+   },
+   "needs": [
+    "skill:engineering"
+   ],
+   "title": "Master Engineer"
+  },
+  {
+   "id": "skill100_taming",
+   "name": "Taming to 100",
+   "text": "Raise taming to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "taming"
+   },
+   "needs": [
+    "skill:taming"
+   ],
+   "title": "Master Tamer"
+  },
+  {
+   "id": "skill100_swimming",
+   "name": "Swimming to 100",
+   "text": "Raise swimming to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "swimming"
+   },
+   "needs": [
+    "skill:swimming"
+   ],
+   "title": "Master Swimmer"
+  },
+  {
+   "id": "skill100_sneaking",
+   "name": "Sneaking to 100",
+   "text": "Raise sneaking to 100.",
+   "cat": "life",
+   "event": "skill100",
+   "params": {
+    "skill": "sneaking"
+   },
+   "needs": [
+    "skill:sneaking"
+   ],
+   "title": "Master of Shadows"
+  },
+  {
+   "id": "first_claim",
+   "name": "A stake in the ground",
+   "text": "Set your first land claim.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "claims",
+    "count": 1
+   },
+   "needs": []
+  },
+  {
+   "id": "hearth_5",
+   "name": "The fifth flame",
+   "text": "Raise a Hearth to level 5.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "hearth",
+    "count": 5
+   },
+   "needs": []
+  },
+  {
+   "id": "biome_set",
+   "name": "Built in the old style",
+   "text": "Place 40 pieces of one biome's building set.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "setPieces",
+    "count": 40
+   },
+   "needs": []
+  },
+  {
+   "id": "monuments_3",
+   "name": "Three heads",
+   "text": "Raise three boss monuments on your claims.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "monuments",
+    "count": 3
+   },
+   "needs": []
+  },
+  {
+   "id": "monuments_12",
+   "name": "Keeper of heads",
+   "text": "Raise a monument to every one of the twelve great bosses.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "monumentKinds",
+    "count": 12
+   },
+   "needs": [
+    "majors:12"
+   ],
+   "title": "Keeper of Heads"
+  },
+  {
+   "id": "comfort_20",
+   "name": "Hearth and home",
+   "text": "Rest in a room with comfort 20.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "comfort",
+    "count": 20
+   },
+   "needs": []
+  },
+  {
+   "id": "stations_5",
+   "name": "The full workshop",
+   "text": "Have a workbench, forge, alchemy table and armorer on one claim with its Hearth at level 5.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "stations5",
+    "count": 1
+   },
+   "needs": []
+  },
+  {
+   "id": "tames_50",
+   "name": "A household of fifty",
+   "text": "Keep 50 tames.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "tames",
+    "count": 50
+   },
+   "needs": []
+  },
+  {
+   "id": "machines_3",
+   "name": "Wheels within wheels",
+   "text": "Link three machines into one working chain.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "machineLinks",
+    "count": 3
+   },
+   "needs": []
+  },
+  {
+   "id": "turrets_6",
+   "name": "The line holds",
+   "text": "Build six turrets within 30 m of each other on one claim.",
+   "cat": "builder",
+   "event": "census",
+   "params": {
+    "stat": "turretLine",
+    "count": 6
+   },
+   "needs": []
+  },
+  {
+   "id": "days_100",
+   "name": "A hundred days",
+   "text": "Live 100 days in a row without dying.",
+   "cat": "survivor",
+   "event": "days",
+   "params": {
+    "count": 100
+   },
+   "needs": [],
+   "title": "Hundred-Day"
+  },
+  {
+   "id": "unmade",
+   "name": "Unmade",
+   "text": "Be drained to nothing by the rift and live to rest.",
+   "cat": "survivor",
+   "event": "unmade",
+   "needs": [
+    "biome:void"
+   ],
+   "hidden": true,
+   "title": "Unmade"
+  },
+  {
+   "id": "raid_held",
+   "name": "Not one wall",
+   "text": "See a creature raid off your claim without losing a wall.",
+   "cat": "survivor",
+   "event": "raidheld",
+   "needs": []
+  },
+  {
+   "id": "escaped_slain",
+   "name": "Back into the dark",
+   "text": "Kill a portal boss that escaped its broken portal.",
+   "cat": "survivor",
+   "event": "escaped",
+   "needs": [],
+   "hidden": true
+  },
+  {
+   "id": "rank5_mods3",
+   "name": "The deep fold",
+   "text": "Clear a Legendary portal with three modifiers.",
+   "cat": "survivor",
+   "event": "portal",
+   "params": {
+    "rank": 5,
+    "mods": 3
+   },
+   "needs": [],
+   "hidden": true
+  },
+  {
+   "id": "al_15",
+   "name": "Fifteen weights",
+   "text": "Wear artifacts to Artifact Level 15.",
+   "cat": "survivor",
+   "event": "artifactal",
+   "params": {
+    "count": 15
+   },
+   "needs": [],
+   "hidden": true
+  },
+  {
+   "id": "raid_thaw_hall",
+   "name": "The Thaw Hall",
+   "text": "Defeat both champions of The Thaw Hall.",
+   "cat": "raider",
+   "event": "raid",
+   "params": {
+    "raid": "thaw_hall"
+   },
+   "needs": [
+    "raid:thaw_hall"
+   ],
+   "title": "Thawbreaker"
+  },
+  {
+   "id": "raid_gut_hall",
+   "name": "The Gut Hall",
+   "text": "Defeat both champions of The Gut Hall.",
+   "cat": "raider",
+   "event": "raid",
+   "params": {
+    "raid": "gut_hall"
+   },
+   "needs": [
+    "raid:gut_hall"
+   ],
+   "title": "Rodbreaker"
+  },
+  {
+   "id": "raid_salt_hall",
+   "name": "The Salt Hall",
+   "text": "Defeat both champions of The Salt Hall.",
+   "cat": "raider",
+   "event": "raid",
+   "params": {
+    "raid": "salt_hall"
+   },
+   "needs": [
+    "raid:salt_hall"
+   ],
+   "title": "Saltbreaker"
+  },
+  {
+   "id": "raid_root_crypt",
+   "name": "The Root Crypt",
+   "text": "Defeat both champions of The Root Crypt.",
+   "cat": "raider",
+   "event": "raid",
+   "params": {
+    "raid": "root_crypt"
+   },
+   "needs": [
+    "raid:root_crypt"
+   ],
+   "title": "Cryptbreaker"
+  },
+  {
+   "id": "raid_flue_shaft",
+   "name": "The Flue Shaft",
+   "text": "Defeat both champions of The Flue Shaft.",
+   "cat": "raider",
+   "event": "raid",
+   "params": {
+    "raid": "flue_shaft"
+   },
+   "needs": [
+    "raid:flue_shaft"
+   ],
+   "title": "Fluebreaker"
+  },
+  {
+   "id": "raid_severance",
+   "name": "The Severance",
+   "text": "Defeat both champions of The Severance.",
+   "cat": "raider",
+   "event": "raid",
+   "params": {
+    "raid": "severance"
+   },
+   "needs": [
+    "raid:severance"
+   ],
+   "title": "Choirbreaker"
+  },
+  {
+   "id": "triumph_prevented",
+   "name": "Even-handed",
+   "text": "Win a raid without either champion gaining Triumph.",
+   "cat": "raider",
+   "event": "triumph",
+   "needs": [
+    "raids:1"
+   ],
+   "hidden": true,
+   "title": "Even-handed"
+  },
+  {
+   "id": "raid_al10",
+   "name": "Heavy-laden",
+   "text": "Win a raid at Artifact Level 10 or more.",
+   "cat": "raider",
+   "event": "raidal",
+   "params": {
+    "count": 10
+   },
+   "needs": [
+    "raids:1"
+   ],
+   "hidden": true
+  },
+  {
+   "id": "mythic_weapon",
+   "name": "Twelvefold",
+   "text": "Forge your first mythic weapon at the Ring.",
+   "cat": "mythic",
+   "event": "mythic",
+   "params": {
+    "kind": "weapon"
+   },
+   "needs": [
+    "mythic"
+   ],
+   "title": "Twelvefold"
+  },
+  {
+   "id": "mythic_armour",
+   "name": "Twelve seams",
+   "text": "Forge your first piece of mythic armour.",
+   "cat": "mythic",
+   "event": "mythic",
+   "params": {
+    "kind": "armour"
+   },
+   "needs": [
+    "mythic"
+   ]
+  },
+  {
+   "id": "mythic_four",
+   "name": "Clad in every land",
+   "text": "Wear four pieces of mythic armour.",
+   "cat": "mythic",
+   "event": "mythic",
+   "params": {
+    "kind": "armour4"
+   },
+   "needs": [
+    "mythic"
+   ]
+  },
+  {
+   "id": "mythic_classes",
+   "name": "Every hand",
+   "text": "Forge a mythic of every weapon class.",
+   "cat": "mythic",
+   "event": "mythic",
+   "params": {
+    "kind": "classes"
+   },
+   "needs": [
+    "mythic"
+   ]
+  },
+  {
+   "id": "mythic_brand_raid",
+   "name": "The twelvefold brand",
+   "text": "Kill a raid champion with a mythic Wildbrand.",
+   "cat": "mythic",
+   "event": "mythic",
+   "params": {
+    "kind": "brandraid"
+   },
+   "needs": [
+    "mythic",
+    "raids:1"
+   ]
+  },
+  {
+   "id": "mythic_contested",
+   "name": "Forged under arms",
+   "text": "Forge a mythic while another clan contests the Ring.",
+   "cat": "mythic",
+   "event": "mythic",
+   "params": {
+    "kind": "contested"
+   },
+   "needs": [
+    "mythic"
+   ]
+  },
+  {
+   "id": "prestige_first",
+   "name": "Returned",
+   "text": "Return a path at its altar for the first time.",
+   "cat": "prestige",
+   "event": "prestige",
+   "params": {
+    "count": 1
+   },
+   "needs": [],
+   "title": "Returned"
+  },
+  {
+   "id": "prestige_three",
+   "name": "Sworn",
+   "text": "Earn three prestige marks on one path.",
+   "cat": "prestige",
+   "event": "prestige3",
+   "needs": []
+  },
+  {
+   "id": "prestige_twelve",
+   "name": "Every altar",
+   "text": "Return each of the twelve paths once.",
+   "cat": "prestige",
+   "event": "prestigepaths",
+   "params": {
+    "count": 12
+   },
+   "needs": [
+    "paths:12"
+   ]
+  },
+  {
+   "id": "prestige_36",
+   "name": "Twelve times sworn",
+   "text": "Earn all 36 prestige marks.",
+   "cat": "prestige",
+   "event": "prestigemarks",
+   "params": {
+    "count": 36
+   },
+   "needs": [
+    "paths:12"
+   ],
+   "title": "Twelve-sworn"
+  },
+  {
+   "id": "geis_5",
+   "name": "Under a geis",
+   "text": "Kill a great boss at Artifact Level 5 or more.",
+   "cat": "prestige",
+   "event": "geis",
+   "params": {
+    "count": 5
+   },
+   "needs": []
+  },
+  {
+   "id": "geis_10",
+   "name": "Bound by ten",
+   "text": "Kill a great boss at Artifact Level 10 or more.",
+   "cat": "prestige",
+   "event": "geis",
+   "params": {
+    "count": 10
+   },
+   "needs": [],
+   "hidden": true
+  },
+  {
+   "id": "geis_15",
+   "name": "Geis-bound",
+   "text": "Kill a great boss at Artifact Level 15.",
+   "cat": "prestige",
+   "event": "geis",
+   "params": {
+    "count": 15
+   },
+   "needs": [],
+   "hidden": true,
+   "title": "Geis-bound"
+  }
+ ]
+}

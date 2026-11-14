@@ -4,6 +4,7 @@
 // WRUIWorld.cpp.
 
 #include "WRWorldSystems.h"
+#include "WRDeeds.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
 #include "WRBuilding.h"
@@ -2202,6 +2203,7 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 		Q.Progress = 0;
 		Q.Stage = 0;
 		N->MulticastSound(TEXT("levelup"));
+		WRDeeds::OnQuestStep(PS, Row);   // a step's title (the masters' last steps), the deeds
 		UE_LOG(LogWildreach, Log, TEXT("QUEST %s handed in %s to %s: %s"), *PS->GetPlayerName(), *Title, *Master.ToString(), *FString::Join(Got, TEXT(", ")));
 		return FString::Printf(TEXT("%s done: %s"), *Title, *FString::Join(Got, TEXT(", ")));
 	}

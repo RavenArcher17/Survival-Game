@@ -45,6 +45,8 @@ struct FWRPieceDef
 	float FuelMinutes = 0.f;
 	FName NeedsCreature;
 	FName Trophy;
+	/** A boss monument (pieces.json "monument": the boss whose head it raises; WREndgameLook, cooks/build-endgame.md 2.9). */
+	FName Monument;
 	/** The build card's line (pieces.json "note"). */
 	FString Note;
 	/** Shown only while this biome's land is live, though it builds anywhere (pieces.json "liveWith": the cold store,
@@ -197,7 +199,14 @@ public:
 	UPROPERTY(Replicated) TArray<FWRBeltItem> Belt;
 	FWRMachineState Mach;
 	/** A name its owner gave it (chests: "chestname"; empty = the piece's own name). Saved with the world. */
-	UPROPERTY(Replicated) FString CustomName;
+	UPROPERTY(ReplicatedUsing=OnRep_CustomName) FString CustomName;
+	/** A monument's plaque follows its name line (WREndgameLook); other pieces ignore it. */
+	UFUNCTION() void OnRep_CustomName();
+	/** A banner's woven boss sigil (its owner's choice, cosmetics.json sigils; None: the plain emblem). Saved. */
+	UPROPERTY(ReplicatedUsing=OnRep_Emblem) FName Emblem;
+	UFUNCTION() void OnRep_Emblem();
+	/** The emblem drawn now (WREndgameLook) so a change replaces it. */
+	UPROPERTY(Transient) TArray<TObjectPtr<UActorComponent>> EmblemParts;
 
 	/** Steps to the ground (0 = grounded); replicated so the build ghost can tell you before you place. */
 	UPROPERTY(Replicated) int32 Support = 0;
@@ -215,6 +224,7 @@ public:
 	TArray<FString> Sleepers;
 	/** Ghosts are local previews in build mode: no collision, tinted, in the piece's real shape. */
 	bool bGhost = false;
+	bool IsGhost() const { return bGhost; }
 	/** A ghost without the detail blocks (demolish's glowing copy of what you aim at: its glow isn't made for instanced blocks). */
 	bool bPlainGhost = false;
 

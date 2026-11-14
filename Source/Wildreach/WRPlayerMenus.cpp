@@ -1,6 +1,8 @@
 // AWRPlayerController: interaction, crafting and inventory menus, and the gameplay commands they send.
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
+#include "WRDeeds.h"
+#include "WRWarHall.h"
 #include "WRPlayerController.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
@@ -155,6 +157,12 @@ void AWRPlayerController::ToggleArtifacts()
 	OpenJournal(EWRMenu::Artifacts);
 }
 
+void AWRPlayerController::ToggleDeeds()
+{
+	if (!UI) return;
+	OpenJournal(EWRMenu::Deeds);
+}
+
 void AWRPlayerController::WRArtifacts(int32 bOn) { ServerCommand(FString::Printf(TEXT("artifacts %d"), bOn)); }
 
 void AWRPlayerController::WRMenu(FName Which, int32 Select)
@@ -201,6 +209,12 @@ void AWRPlayerController::WRInteract()
 	}
 	// A portal (its card), or a thing in a fold: a door's stone, a chest, a trap's block, a puzzle's part (WRPortals).
 	if (UI && WRPortals::ClientInteract(this))
+	{
+		return;
+	}
+	// The endgame: a war-hall's gate (its card), a record tablet (its board), a boss altar (its pages: path, Return,
+	// Forge soul), a monument's plaque (WRWarHall, WRDeeds).
+	if (UI && (WRWarHall::ClientInteract(this) || WRDeeds::ClientInteract(this)))
 	{
 		return;
 	}
@@ -741,6 +755,20 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	if (Cmd == TEXT("portal"))
 	{
 		OutResult = WRPortals::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
+	// The endgame (WRDeeds): deeds return / restore / forget / forge / salvage / subclass / title / wear / records.
+	if (Cmd == TEXT("deeds"))
+	{
+		OutResult = WRDeeds::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
+	// The war-halls (WRWarHall): warhall enter / leave.
+	if (Cmd == TEXT("warhall"))
+	{
+		OutResult = WRWarHall::Command(this, Args);
 		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
 		return true;
 	}

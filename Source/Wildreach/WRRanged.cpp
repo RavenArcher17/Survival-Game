@@ -158,6 +158,8 @@ void AWRCharacter::UpdateWeaponLook()
 	{
 		AttachHeld(RangedMesh, Model, *Def);
 	}
+	// A worn weapon glow follows the weapon into the hand (WREndgameLook).
+	ApplyDeedsLook();
 }
 
 void AWRCharacter::AttachHeld(UStaticMeshComponent* Comp, UStaticMesh* Model, const FWRItemDef& Def)

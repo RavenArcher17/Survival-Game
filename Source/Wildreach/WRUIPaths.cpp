@@ -11,6 +11,7 @@
 #include "WRAbilities.h"
 #include "WRKeyBindings.h"
 #include "WRPathComponent.h"
+#include "WRDeeds.h"
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
@@ -132,6 +133,23 @@ struct FWRPathsModel
 		return PS ? PS->GetPaths() : nullptr;
 	}
 	const FWRPathDef* Def() const { return FWRPathRegistry::Get().Find(Path); }
+	/** The layout this path had when it was last returned at its altar (prestige; WRDeeds), or null. */
+	const FWRPathLayout* Layout(FName ForPath) const
+	{
+		const UWRDeedsComponent* D = PC.IsValid() ? UWRDeedsComponent::For(PC->PlayerState) : nullptr;
+		const FWRPathLayout* L = D ? D->Layouts.FindByPredicate([ForPath](const FWRPathLayout& X) { return X.Path == ForPath; }) : nullptr;
+		return L && L->Ranks.Num() > 0 ? L : nullptr;
+	}
+	/** A node of the saved layout not yet bought back (a gold dot on it). */
+	bool InLayoutToRestore(FName NodeId) const
+	{
+		const FWRPathLayout* L = Layout(Path);
+		const FWRNodeRank* Saved = L ? L->Ranks.FindByPredicate([NodeId](const FWRNodeRank& X) { return X.NodeId == NodeId; }) : nullptr;
+		if (!Saved) return false;
+		const FWRPathProgress P = Progress();
+		const FWRNodeRank* Have = P.Ranks.FindByPredicate([NodeId](const FWRNodeRank& X) { return X.NodeId == NodeId; });
+		return (Have ? Have->Rank : 0) < Saved->Rank;
+	}
 	const FWRPathNodeDef* Node(FName Id) const { const FWRPathDef* D = Def(); return D ? D->FindNode(Id) : nullptr; }
 	FWRPathProgress Progress() const
 	{
@@ -306,6 +324,12 @@ public:
 			+ SOverlay::Slot()[SNew(SImage).Image(Glyph(TEXT("diamond"))).ColorAndOpacity_Lambda([this]() { return DiamondFill(); })]
 			+ SOverlay::Slot()[SNew(SImage).Image(Glyph(TEXT("diamond_line"))).ColorAndOpacity_Lambda([this]() { return Look().Ring == WRUI::Brass ? Hex(TEXT("FFD9A0")) : Look().Ring; })]
 			+ SOverlay::Slot().Padding(5.5f * U)[SNew(SImage).Image(Glyph(TEXT("diamond"))).ColorAndOpacity_Lambda([this]() { return State() == ENodeState::Locked ? Hex(TEXT("3E4247")) : State() == ENodeState::Learned ? Hex(TEXT("FFF0D0")) : WRUI::Brass; })]
+		];
+		// Part of the layout saved when this path was returned (prestige), still to buy back: a gold dot at the top left.
+		Badges->AddSlot().Position(FVector2D(8.f, 8.f) * U).Size(FVector2D(14.f, 14.f) * U)
+		[
+			SNew(SImage).Visibility_Lambda([this]() { return Model->InLayoutToRestore(NodeId) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			.Image(WRUI::Box(FLinearColor(0.85f, 0.62f, 0.18f), 7.f * U, FLinearColor(1.f, 0.86f, 0.5f), 1.5f))
 		];
 		// Locked: a padlock; maxed: a brass tick.
 		Badges->AddSlot().Position(FVector2D(44.f, 44.f) * U).Size(FVector2D(22.f, 22.f) * U)
@@ -810,6 +834,15 @@ private:
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(5.f * U, 2.f * U, 0.f, 0.f)
 						[
 							WRUI::Text(TAttribute<FText>::CreateLambda([this, Path]() { const UWRPathComponent* P = Model->Comp(); return FText::Format(LOCTEXT("Earned", "· {0} earned"), P ? P->GetEarned(Path) : 0); }), WRUI::Body(12, 500), WRUI::Ink3)
+						]
+						// A path returned at its altar keeps its old layout: one click buys it back as far as the points go (WRDeeds).
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
+						[
+							SNew(SBox).HeightOverride(30.f * U).Visibility_Lambda([this, Path]() { return Model->Layout(Path) ? EVisibility::Visible : EVisibility::Collapsed; })
+							[
+								SNew(SWRButton).Text(LOCTEXT("RestoreLayout", "Restore layout")).FontSize(12).MinHeight(30.f)
+								.OnClicked_Lambda([this, Path]() { if (Model->PC.IsValid()) Model->PC->SendCommand(FString::Printf(TEXT("deeds restore %s"), *Path.ToString())); return FReply::Handled(); })
+							]
 						]
 					]
 				]

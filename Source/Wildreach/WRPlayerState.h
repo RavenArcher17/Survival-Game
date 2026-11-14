@@ -87,4 +87,6 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRQuestLog> QuestLog;
 	/** Artifacts: three hooks, the pouch, geis records, the band (WRArtifacts). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRArtifactComponent> Artifacts;
+	/** The endgame's deeds: prestige marks, souls forged, achievements, titles, cosmetics (WRDeeds). */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRDeedsComponent> Deeds;
 };

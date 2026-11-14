@@ -1,5 +1,6 @@
 #include "WRPathComponent.h"
 #include "WRArtifacts.h"
+#include "WRDeeds.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
@@ -287,6 +288,50 @@ void UWRPathComponent::AwardXP(FName PathId, int32 Amount)
 	// XP alone changes no grants; skip a full re-apply.
 }
 
+TArray<FWRNodeRank> UWRPathComponent::ReturnPath(FName PathId)
+{
+	FWRPathProgress& P = FindOrAddProgress(PathId);
+	TArray<FWRNodeRank> Layout;
+	for (const FWRNodeRank& R : P.Ranks) if (R.Rank > 0) Layout.Add(R);
+	P.Ranks.Reset();
+	P.XP = 0;
+	UE_LOG(LogWildreach, Log, TEXT("PATH %s returned: %d ranks kept as its layout"), *PathId.ToString(), Layout.Num());
+	Changed();   // the starter comes back free; level, health and grants follow
+	return Layout;
+}
+
+bool UWRPathComponent::UnlearnPath(FName PathId)
+{
+	if (!IsActivePath(PathId)) return false;
+	FWRPathProgress& P = FindOrAddProgress(PathId);
+	if (P.Ranks.Num() == 0) return false;
+	P.Ranks.Reset();
+	UE_LOG(LogWildreach, Log, TEXT("PATH %s unlearned (xp %d kept)"), *PathId.ToString(), P.XP);
+	Changed();
+	return true;
+}
+
+int32 UWRPathComponent::RestoreLayout(FName PathId, const TArray<FWRNodeRank>& Layout)
+{
+	const FWRPathDef* Def = FWRPathRegistry::Get().Find(PathId);
+	if (!Def || !IsActivePath(PathId)) return 0;
+	// Tree order (trunk first, gates respected): keep buying the layout's nodes up to their saved ranks while anything sells.
+	int32 Bought = 0;
+	bool bAny = true;
+	while (bAny)
+	{
+		bAny = false;
+		for (const FWRPathNodeDef& Node : Def->Nodes)
+		{
+			const FWRNodeRank* Want = Layout.FindByPredicate([&Node](const FWRNodeRank& R) { return R.NodeId == Node.Id; });
+			const FWRPathProgress* P = GetProgress(PathId);
+			if (!Want || !P || P->GetRank(Node.Id) >= Want->Rank) continue;
+			if (BuyNode(PathId, Node.Id).IsEmpty()) { ++Bought; bAny = true; }
+		}
+	}
+	return Bought;
+}
+
 void UWRPathComponent::GivePoints(FName PathId, int32 Points)
 {
 	if (!IsActivePath(PathId))
@@ -319,12 +364,30 @@ void UWRPathComponent::RefreshQuickSlots()
 			}
 		}
 	}
+	// An awakened boss weapon in the hand gives its Soul art a quick slot (WRDeeds): first in the owned list.
+	const FName SoulArt = WRDeeds::SoulArtFor(GetOwner());
+	if (!SoulArt.IsNone())
+	{
+		Owned.Insert(SoulArt, 0);
+	}
 	for (FName& Slot : QuickSlots)
 	{
 		if (!Owned.Contains(Slot))
 		{
 			Slot = NAME_None;
 		}
+	}
+	if (!SoulArt.IsNone() && !QuickSlots.Contains(SoulArt) && QuickSlots.IndexOfByKey(NAME_None) == INDEX_NONE && QuickSlots.Num() > 0)
+	{
+		// Every slot taken: it goes in the last one, and that slot's ability is remembered to come back to it when the
+		// weapon leaves the hand.
+		SoulDisplaced = QuickSlots.Last();
+		QuickSlots.Last() = SoulArt;
+	}
+	if (SoulArt.IsNone() && !SoulDisplaced.IsNone())
+	{
+		if (QuickSlots.Num() > 0 && QuickSlots.Last().IsNone() && Owned.Contains(SoulDisplaced) && !QuickSlots.Contains(SoulDisplaced)) QuickSlots.Last() = SoulDisplaced;
+		SoulDisplaced = NAME_None;
 	}
 	for (const FName& Ability : Owned)
 	{
@@ -519,10 +582,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		const FWRPathProgress* P = IsActivePath(PathId) ? GetProgress(PathId) : nullptr;
 		return P ? P->GetRank(NodeId) : 0;
 	};
+	// Prestige (Deeper marks): that path's resource holds more (WRDeeds).
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxHeatAttribute(),
-		WRTune(TEXT("resources.heatMax"), 100.f) + WRTune(TEXT("resources.heatCapacityPerRank"), 15.f) * RankIn(TEXT("fire"), TEXT("heat_capacity")));
+		(WRTune(TEXT("resources.heatMax"), 100.f) + WRTune(TEXT("resources.heatCapacityPerRank"), 15.f) * RankIn(TEXT("fire"), TEXT("heat_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("fire")));
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChillAttribute(),
-		WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity")));
+		(WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("frost")));
 
 	// Tempered: more poise.
 	// Reinforced (armorcraft perk) adds to the path nodes' poise.

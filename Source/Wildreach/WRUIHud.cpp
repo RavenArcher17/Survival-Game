@@ -2,6 +2,8 @@
 // the item hotbar, the ability keys, your tame, the taming panel, prompts, pickups, chat, boss bar and help (H).
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
+#include "WRWarHall.h"
+#include "WRUIEndgame.h"
 #include "WRPlayerUI.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -304,6 +306,7 @@ public:
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[ClockPlate()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 150.f * U)[TamingPanel()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 0.f, 0.f, 0.f)[Crosshair()]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 150.f * U)[WRUIEndgame::MakeToast(PC)]   // a deed earned (WRUIEndgame)
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 250.f * U)[CentreNotice()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 330.f * U)[Prompt()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 175.f * U)[Pickups()]
@@ -762,7 +765,13 @@ private:
 		if (!P || !S || P->GetMenu() != EWRMenu::None || P->IsPlacing()) return FString();
 		// The critical, the first time for each kind of creature (then never again: COMBAT-AND-LESSONS L6).
 		if (const AWRCharacterBase* Crit = S->CritPromptTarget()) { OutTarget = Crit->GetDisplayLabel(); return TEXT("Critical"); }
-		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }
+		{
+			// The endgame: a war-hall's gate, a record tablet, a monument (WRWarHall).
+			FString EndTarget, EndVerb;
+			if (WRWarHall::Prompt(P, EndTarget, EndVerb)) { OutTarget = EndTarget; return EndVerb; }
+		}
+		// A boss altar opens its pages (its path, Return, Forge soul: WRDeeds).
+		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return P->GetUI() ? FString(TEXT("Path  ·  Return  ·  Forge soul")) : Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }
 		{
 			// Shrines, masters, merchants, summoning stones, messages, cores and caches (WRWorldSystems).
 			FString WorldTarget, WorldVerb;

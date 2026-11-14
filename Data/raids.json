@@ -1,0 +1,32 @@
+{
+  "_comment": "Endgame raids for 6 to 10 (DD; biome-void 2.23.2; cooks/endgame.md 2.9; cooks/build-endgame.md 2.10). One war-hall under each pass: a gate at the pass (the pass fort's undercroft door, once the forts exist), the hall built at runtime in hall space (hallSpace, cm; like the portal bays), two single-element champions who are each other's enemies as well as yours. frame: rival blows hit the other at crossDamage (nobody's ledger); a champion picks its rival only within rivalReach cm when it's nearer than any survivor, at most every rivalEvery s; when one falls under triumphAt while the other is above it, the other gains Triumph (triumphDamage more damage, triumphSpeed faster) for the rest of the fight. The door seals when the first raider crosses the inner threshold; sealed, only the sealed group may come back in. It opens when both champions are dead (lootSeconds to gather) or no raider has been inside for emptySeconds (they reset; bags left in the hall go to the gate). Group cap and tuning: server raidGroupMax (0: none) and raidGroupTuned (champion damage x clamp(tuned / 8, tunedMin, tunedMax)); respawn: server raidRespawnHours. partyRadius: who the gate card lists. openSeconds: a group that goes in but doesn't cross the line within it is walked out. gate: side (cm beside the pass road, +Y), back (the run-back stone's cm west along the road from the gate's foot). loot: per champion (the 10% rule each), its creatures.json loot plus cosmeticChance at one of the raid's cosmetics (cosmetics.json) and draughtChance at the Heron's draught. halls: live = built in this build; the rest are data for the passes to come. All first drafts.",
+  "hallSpace": { "x": -1500000, "y": 0, "z": 200000, "spacing": 60000 },
+  "frame": {
+    "crossDamage": 0.5, "openSeconds": 120, "triumphAt": 0.3, "triumphDamage": 0.2, "triumphSpeed": 1.15,
+    "rivalReach": 700, "rivalEvery": 12, "emptySeconds": 8, "lootSeconds": 120, "partyRadius": 1000,
+    "tunedMin": 0.5, "tunedMax": 1.5, "gateRange": 450
+  },
+  "loot": { "cosmeticChance": 0.03, "draughtChance": 0.03 },
+  "halls": [
+    {
+      "id": "thaw_hall", "name": "The Thaw Hall", "live": true, "pass": "North pass", "lands": ["volcanic", "tundra"],
+      "line": "Under the North pass, where the Smith and the Wyrm were laid after they killed each other.",
+      "gate": { "side": 1800, "back": 4000 },
+      "champions": ["fallen_smith", "burnt_wyrm"],
+      "size": [11200, 7200], "vault": 4000, "vestibule": [1200, 1000],
+      "spawns": { "fallen_smith": [-3000, 0], "burnt_wyrm": [3000, 0] },
+      "tiles": {
+        "size": 400, "lavaDps": 30, "lavaBurn": 20, "revertSeconds": 25,
+        "thawWindow": 3.0, "thawDamage": 150, "thawBlind": 20, "thawRadius": 300,
+        "slam": 600, "slag": 200, "sweep": 650, "breath": 1200, "breathCone": 30, "airBreath": 450, "transition": 1200,
+        "slipSeconds": 4, "slipStance": 1.5, "hardenSeconds": 6, "hardenSpeed": 0.85,
+        "quenchBlind": 20, "quenchRadius": 300
+      }
+    },
+    { "id": "gut_hall", "name": "The Gut Hall", "live": false, "pass": "Stormgut", "lands": ["storm", "swamp"], "champions": ["rodwarden_roc", "coven_leech_drake"], "size": [12000, 4000], "machines": { "groundRods": { "count": 8, "driveSeconds": 2, "rustSeconds": 20 } } },
+    { "id": "salt_hall", "name": "The Salt Hall", "live": false, "pass": "Saltgate", "lands": ["desert", "ocean"], "champions": ["salt_serpent", "barnacled_colossus"], "size": [13000, 6000], "machines": { "sluices": { "cycle": 90, "flood": 30, "drain": 15, "jamSeconds": 3 } } },
+    { "id": "root_crypt", "name": "The Root Crypt", "live": false, "pass": "Rootgrave", "lands": ["forest", "graveyard"], "champions": ["rotted_warden", "rooted_ossuary"], "size": [12000, 7000], "machines": { "rootPlatforms": { "rise": 3, "hold": 10, "sink": 3 } } },
+    { "id": "flue_shaft", "name": "The Flue Shaft", "live": false, "pass": "The Flue", "lands": ["sky", "fungal"], "champions": ["fallen_kitewright", "paper_titan"], "size": [7000, 7000], "machines": { "chainLift": { "speed": 150, "cages": 2, "top": 4500 } } },
+    { "id": "severance", "name": "The Severance", "live": false, "pass": "The Severance", "lands": ["void", "crystal"], "champions": ["the_cantor", "hollowed_giantess"], "size": [12000, 6000] }
+  ]
+}

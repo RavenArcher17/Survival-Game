@@ -1,4 +1,5 @@
 #include "WRPlayerController.h"
+#include "WRDeeds.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
@@ -95,11 +96,14 @@ void AWRPlayerController::ServerChat_Implementation(const FString& Message)
 		return;
 	}
 	UE_LOG(LogWildreach, Log, TEXT("CHAT %s: %s"), *From, *Clean);
+	// A worn title goes before the name: "‹Ember-sworn› Aaron: ..." (WRDeeds).
+	const UWRDeedsComponent* Deeds = UWRDeedsComponent::For(PlayerState);
+	const FString Shown = Deeds && !Deeds->ActiveTitle.IsEmpty() ? FString::Printf(TEXT("\u2039%s\u203A %s"), *Deeds->ActiveTitle, *From) : From;
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		if (AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get()))
 		{
-			PC->ClientChat(From, Clean);
+			PC->ClientChat(Shown, Clean);
 		}
 	}
 }
@@ -163,6 +167,7 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("Clan"), IE_Pressed, &AWRPlayerController::ToggleClan);
 	Bind(TEXT("Quests"), IE_Pressed, &AWRPlayerController::ToggleQuests);
 	Bind(TEXT("Artifacts"), IE_Pressed, &AWRPlayerController::ToggleArtifacts);
+	Bind(TEXT("Deeds"), IE_Pressed, &AWRPlayerController::ToggleDeeds);
 	Bind(TEXT("Chat"), IE_Pressed, &AWRPlayerController::OpenChat);
 	Bind(TEXT("Build"), IE_Pressed, &AWRPlayerController::ToggleBuildMenu);
 	Bind(TEXT("Snap"), IE_Pressed, &AWRPlayerController::ToggleSnap);

@@ -156,6 +156,11 @@ struct FWRItemStack
 	UPROPERTY() TArray<FName> Sockets;
 	/** Path material infused at craft time ("fire"/"frost"), or None. */
 	UPROPERTY() FName Element;
+	/** The endgame's mark on a piece of gear (WRDeeds): "awakened" (a boss weapon its soul woke: starsteel's metal
+	 *  factor, its Soul art while held) or "mythic" (Data/mythic.json: the mythic metal factor, two elements). */
+	UPROPERTY() FName Mark;
+	/** A mythic piece's second element: blows alternate between Element and this. */
+	UPROPERTY() FName Element2;
 	/** Food that spoils (FWRSpoil): freshness 0..1 as it was at server time FreshAt, falling FreshRate a second (its
 	 *  container's pace). No ticking: freshness now is worked out from these three. Food's Roll is its worth (a golden
 	 *  crop's dish: 1.5), so stacks of a different worth don't merge. */

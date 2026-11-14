@@ -307,7 +307,21 @@
     "world.appraise": {"files": ["moment/recipe_unlock"], "volume": 0.5, "pitch": [1.2, 1.25], "radius": 0, "category": "effects", "minGap": 0.5},
     "world.trade": {"files": ["item/pickup_1", "item/pickup_2", "item/pickup_3", "item/pickup_4"], "volume": 0.6, "pitch": [0.9, 1.0], "radius": 1500, "category": "effects", "minGap": 0.2},
     "world.travel": {"files": ["moment/respawn"], "volume": 0.6, "pitch": [0.9, 0.95], "radius": 0, "category": "effects", "minGap": 1.0},
-    "world.vault": {"files": ["world/build_demolish_2", "world/build_demolish_4"], "volume": 1.2, "pitch": [0.3, 0.35], "radius": 6000, "category": "effects", "minGap": 2.0}
+    "world.vault": {"files": ["world/build_demolish_2", "world/build_demolish_4"], "volume": 1.2, "pitch": [0.3, 0.35], "radius": 6000, "category": "effects", "minGap": 2.0},
+		"endgame.return": { "files": ["spell/cast_fire_1", "spell/fire_impact_3"], "volume": 0.9, "pitch": [0.62, 0.68], "radius": 3000, "category": "effects", "minGap": 1.0 },
+		"endgame.forge": { "files": ["combat/parry_2", "moment/recipe_unlock"], "volume": 0.9, "pitch": [0.7, 0.75], "radius": 2000, "category": "effects", "minGap": 0.5 },
+		"endgame.forget": { "files": ["item/drink_1", "item/drink_2", "item/drink_3", "item/drink_4"], "volume": 0.8, "pitch": [0.8, 0.85], "radius": 1200, "category": "effects", "minGap": 0.6 },
+		"endgame.deed": { "files": ["moment/discover"], "volume": 0.5, "pitch": [0.92, 0.98], "radius": 0, "category": "effects", "minGap": 0.5, "duck": 0.5 },
+		"records.grind": { "files": ["world/gather_stone_2", "world/gather_stone_4"], "volume": 0.7, "pitch": [0.55, 0.6], "radius": 1000, "category": "effects", "minGap": 0.5 },
+		"warhall.door": { "files": ["world/door_open_1", "world/door_open_2", "world/build_demolish_3"], "volume": 0.9, "pitch": [0.7, 0.75], "radius": 3000, "category": "effects", "minGap": 0.5 },
+		"warhall.seal": { "files": ["world/door_close_1", "world/door_close_3", "combat/stance_break_1"], "volume": 1.0, "pitch": [0.6, 0.65], "radius": 6000, "category": "effects", "minGap": 0.5 },
+		"warhall.lava": { "files": ["spell/lavapool_1", "spell/lavapool_2", "spell/fire_impact_2"], "volume": 0.7, "pitch": [0.8, 0.9], "radius": 2500, "category": "effects", "minGap": 0.3 },
+		"warhall.ice": { "files": ["foot/snow_3", "world/gather_wood_3"], "volume": 0.7, "pitch": [0.9, 1.0], "radius": 2500, "category": "effects", "minGap": 0.3 },
+		"warhall.thaw": { "files": ["foot/water_1", "foot/water_3", "foot/water_5"], "volume": 1.0, "pitch": [0.75, 0.85], "radius": 4000, "category": "effects", "minGap": 0.2, "maxVoices": 6 },
+		"warhall.triumph": { "files": ["moment/boss_intro"], "volume": 1.0, "pitch": [0.8, 0.85], "radius": 8000, "category": "effects", "minGap": 5.0, "duck": 0.85 },
+		"warhall.win": { "files": ["combat/stance_break_1", "combat/stance_break_2"], "volume": 1.0, "pitch": [0.9, 0.95], "radius": 8000, "category": "effects", "minGap": 1.0, "duck": 0.37 },
+		"soul.flood": { "files": ["spell/lavapool_1", "spell/lavapool_2"], "volume": 1.0, "pitch": [0.8, 0.85], "radius": 3000, "category": "effects", "minGap": 0.5 },
+		"soul.pillar": { "files": ["spell/cast_frost_1", "spell/frost_impact_1"], "volume": 1.0, "pitch": [0.8, 0.85], "radius": 3000, "category": "effects", "minGap": 0.5 }
   },
 	"creatures": {
     "cinderfang_alpha": {"family": "canine", "pitch": 0.82},
@@ -323,7 +337,9 @@
     "anvil_mite": {"family": "bug", "pitch": 1.55},
     "rime_calf": {"family": "herd", "pitch": 1.25},
     "fold_warden_volcanic": {"family": "beast", "pitch": 0.72},
-    "fold_warden_tundra": {"family": "beast", "pitch": 0.82},"cinderfang": {"family": "canine", "pitch": 1.12}, "gloomhowl": {"family": "canine", "pitch": 0.9}, "magmaw": {"family": "beast", "pitch": 0.85}, "rimeclaw": {"family": "beast", "pitch": 1.0}, "scorchwing": {"family": "flyer", "pitch": 0.9}, "basaltback": {"family": "herd", "pitch": 0.7}, "woolly_drudge": {"family": "herd", "pitch": 0.78}, "emberhorn": {"family": "herd", "pitch": 1.05}, "frostantler": {"family": "herd", "pitch": 1.15}, "ashstrider": {"family": "herd", "pitch": 1.3}, "kilnmite": {"family": "bug", "pitch": 1.15}, "glacimaw": {"family": "bug", "pitch": 0.75}, "rimeshell": {"family": "bug", "pitch": 0.9}, "glowmoth": {"family": "critter", "pitch": 1.5}, "pumicehog": {"family": "critter", "pitch": 1.0}, "snowpuff": {"family": "critter", "pitch": 1.35}, "aurora_fox": {"family": "critter", "pitch": 1.2}, "floeback": {"family": "canine", "pitch": 0.68}, "windmane": {"family": "flyer", "pitch": 1.15}, "wisp": {"family": "wisp", "pitch": 1.0}, "vulkarn": {"family": "boss", "pitch": 0.85}, "skaldrith": {"family": "boss", "pitch": 0.75}, "obsidian_warden": {"family": "golem", "pitch": 0.9}, "ignessa": {"family": "wisp", "pitch": 0.75}, "grimjaw": {"family": "boss", "pitch": 1.0}, "pale_hunter": {"family": "humanoid", "pitch": 0.9}},
+    "fold_warden_tundra": {"family": "beast", "pitch": 0.82},"cinderfang": {"family": "canine", "pitch": 1.12}, "gloomhowl": {"family": "canine", "pitch": 0.9}, "magmaw": {"family": "beast", "pitch": 0.85}, "rimeclaw": {"family": "beast", "pitch": 1.0}, "scorchwing": {"family": "flyer", "pitch": 0.9}, "basaltback": {"family": "herd", "pitch": 0.7}, "woolly_drudge": {"family": "herd", "pitch": 0.78}, "emberhorn": {"family": "herd", "pitch": 1.05}, "frostantler": {"family": "herd", "pitch": 1.15}, "ashstrider": {"family": "herd", "pitch": 1.3}, "kilnmite": {"family": "bug", "pitch": 1.15}, "glacimaw": {"family": "bug", "pitch": 0.75}, "rimeshell": {"family": "bug", "pitch": 0.9}, "glowmoth": {"family": "critter", "pitch": 1.5}, "pumicehog": {"family": "critter", "pitch": 1.0}, "snowpuff": {"family": "critter", "pitch": 1.35}, "aurora_fox": {"family": "critter", "pitch": 1.2}, "floeback": {"family": "canine", "pitch": 0.68}, "windmane": {"family": "flyer", "pitch": 1.15}, "wisp": {"family": "wisp", "pitch": 1.0}, "vulkarn": {"family": "boss", "pitch": 0.85}, "skaldrith": {"family": "boss", "pitch": 0.75}, "obsidian_warden": {"family": "golem", "pitch": 0.9}, "ignessa": {"family": "wisp", "pitch": 0.75}, "grimjaw": {"family": "boss", "pitch": 1.0}, "pale_hunter": {"family": "humanoid", "pitch": 0.9},
+		"fallen_smith": { "family": "boss", "pitch": 0.72 },
+		"burnt_wyrm": { "family": "boss", "pitch": 0.66 }},
 	"ambient": {
 		"fadeSeconds": 3.0,
 		"caveFade": 1.5,

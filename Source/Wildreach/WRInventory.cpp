@@ -710,6 +710,12 @@ void UWRInventoryComponent::ApplyEquipment()
 	if (const FWRItemDef* Def = EquippedWeapon.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedWeapon.ItemId))
 	{
 		Stats.Metal = Def->Metal;
+		// The endgame's marks (WRDeeds): an awakened boss weapon strikes with starsteel's metal factor (never less than
+		// its own), a mythic one with the mythic factor and both its elements, blow by blow.
+		const float OwnFactor = WRTune(*FString::Printf(TEXT("weapon.metal.%s"), *Def->Metal.ToString()), 1.f);
+		if (EquippedWeapon.Mark == TEXT("awakened") && WRTune(TEXT("weapon.metal.starsteel"), 2.8f) > OwnFactor) Stats.Metal = TEXT("starsteel");
+		if (EquippedWeapon.Mark == TEXT("mythic")) Stats.Metal = TEXT("mythic");
+		Stats.Element2 = EquippedWeapon.Element2;
 		Stats.Quality = FName(*FString(FWRItemStack::QualityName(EquippedWeapon.Quality)).ToLower());
 		Stats.Upgrade = EquippedWeapon.Upgrade;
 		Stats.Roll = EquippedWeapon.Roll;
@@ -917,6 +923,12 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		// Cut a message where you stand (WRWorldSystems: the Write screen opens on your machine).
 		return WRWorld::UseScratchStone(Cast<AWRPlayerState>(GetOwner()));
+	}
+	if (Stack.ItemId == TEXT("heron_draught"))
+	{
+		// The Heron's draught: its screen opens on your machine (pick the path to forget, hold Forget; WRDeeds).
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(GetOwner()->GetOwner())) PC->ClientOpenWorldScreen(TEXT("respec"), nullptr);
+		return TEXT("Choose the path the heron takes");
 	}
 	if (Def->Category == TEXT("effigy"))
 	{
@@ -1271,6 +1283,8 @@ TSharedRef<FJsonObject> FWRInventoryRules::StackToJson(const FWRItemStack& S)
 		O->SetNumberField(TEXT("upgrade"), S.Upgrade);
 		O->SetNumberField(TEXT("durability"), S.Durability);
 		O->SetStringField(TEXT("element"), S.Element.IsNone() ? FString() : S.Element.ToString());
+		if (!S.Mark.IsNone()) O->SetStringField(TEXT("mark"), S.Mark.ToString());
+		if (!S.Element2.IsNone()) O->SetStringField(TEXT("element2"), S.Element2.ToString());
 		TArray<TSharedPtr<FJsonValue>> Sockets;
 		for (const FName& G : S.Sockets) Sockets.Add(MakeShared<FJsonValueString>(G.ToString()));
 		O->SetArrayField(TEXT("sockets"), Sockets);
@@ -1315,6 +1329,8 @@ FWRItemStack FWRInventoryRules::StackFromJson(const TSharedPtr<FJsonObject>& O)
 	else if (const FWRItemDef* Def = FWRItemRegistry::Get().Find(S.ItemId)) S.Durability = Def->MaxDurability;  // saved before it had any (0.4 tools)
 	FString Element;
 	if (O->TryGetStringField(TEXT("element"), Element) && !Element.IsEmpty()) S.Element = FName(*Element);
+	if (O->TryGetStringField(TEXT("mark"), Element) && !Element.IsEmpty()) S.Mark = FName(*Element);
+	if (O->TryGetStringField(TEXT("element2"), Element) && !Element.IsEmpty()) S.Element2 = FName(*Element);
 	const TArray<TSharedPtr<FJsonValue>>* Sockets = nullptr;
 	if (O->TryGetArrayField(TEXT("sockets"), Sockets))
 	{

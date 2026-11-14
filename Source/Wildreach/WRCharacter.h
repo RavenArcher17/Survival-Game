@@ -327,6 +327,8 @@ private:
 public:
 	/** Re-dress the hands (the shield comes off for a torch; the torch / lantern shows): WRSurvival's light changes. */
 	void RefreshHeldLook() { UpdateWeaponLook(); }
+	/** The endgame look on this hero (WREndgameLook.cpp): a weapon glow, an armour dye, a raid mark, gold threads. */
+	void ApplyDeedsLook();
 	/** Where the held fishing rod's tip is in the world (the line leaves from there); the hand when the rod isn't drawn. */
 	FVector RodTipLocation() const;
 private:
@@ -367,6 +369,11 @@ private:
 	// The guard's faint gold edge on the shield (COMBAT-AND-LESSONS 1.2, colour law: gold is block / parry).
 	void TickGuardEdge();
 	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> GuardEdgeMaterial;
+	/** The worn weapon glow (cosmetics.json glows: an element edge over the held weapon, WREndgameLook). */
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> DeedGlowMaterial;
+	/** The dye and raid mark the outfit was last built with, and a guard while it rebuilds for them. */
+	uint32 DeedsOutfitKey = 0;
+	bool bInDeedsOutfit = false;
 	bool bGuardEdgeOn = false;
 	void StartSprint();
 	void StopSprint();

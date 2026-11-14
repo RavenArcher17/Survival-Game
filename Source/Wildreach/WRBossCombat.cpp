@@ -6,6 +6,7 @@
 #include "WRBoss.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
+#include "WRWarHall.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -210,6 +211,7 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	SameInARow = Attack.Id == LastAttackId ? SameInARow + 1 : 1;
 	LastAttackId = Attack.Id;
 	WRPortals::OnBossAttack(this, Attack.Id);   // a fold boss's arena answers some moves
+	WRWarHall::OnAttackStart(this, Target);     // a raid champion swinging at its rival waits a while before the next
 	Attack.ReadyAt = Now + Attack.Cooldown * (CreatureId == TEXT("vulkarn") && Attack.Id == TEXT("anvil_slam") && Phase >= 2 ? 0.6f : 1.f);
 	const FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
 	AttackFacing = FRotator(0.f, ToTarget.Rotation().Yaw, 0.f);
@@ -286,7 +288,7 @@ void AWRBoss::BeginStrike()
 		{
 			FWRHit Hit;
 			Hit.Instigator = this;
-			Hit.Damage = Attack.Damage * WRBossDetail::DamageScale() * (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f);
+			Hit.Damage = Attack.Damage * WRBossDetail::DamageScale() * (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f) * WRWarHall::Outgoing(this);
 			Hit.PoiseDamage = Attack.Poise;
 			Hit.Impact = Attack.Impact;
 			Hit.bUnblockable = Attack.bUnblockable;
@@ -376,7 +378,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 	FWRBossAttack& Attack = Attacks[Current];
 	const double Now = GetWorld()->GetTimeSeconds();
 	const bool bHiddenStrike = IsHidden() && Now > RevealedUntil;
-	float Scale = (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f) * WRBossDetail::DamageScale();
+	float Scale = (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f) * WRBossDetail::DamageScale() * WRWarHall::Outgoing(this);
 	if (bHiddenStrike && CreatureId == TEXT("pale_hunter"))
 	{
 		Scale *= Tune(TEXT("ambushMultiplier"), 2.f);  // ambush from cover
@@ -400,7 +402,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 	Hit.Origin = Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation();
 	const FName AttackId = Attack.Id;
 	const float Knockback = Attack.bRow ? Attack.Row.Knockback : 0.f;
-	const bool bFreezingBreath = Phase >= 3 && CreatureId == TEXT("skaldrith") && AttackId.ToString().Contains(TEXT("breath"));
+	const bool bFreezingBreath = Phase >= 3 && IsWyrm() && AttackId.ToString().Contains(TEXT("breath"));
 	TWeakObjectPtr<AWRBoss> WeakSelf(this);
 	TWeakObjectPtr<AWRCharacterBase> WeakWho(Who);
 	// What follows the blow needs its real result: a blow on a remote player resolves once its defence is judged.
@@ -602,6 +604,11 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 void AWRBoss::Aftermath(const FWRBossAttack& Attack, const FVector& At)
 {
 	// What the blow leaves in the world (real ground effects: lava cracks, the flood, slick ice, pillars broken).
+	// A war-hall champion's blows turn the hall's flags instead (WRWarHall: lava, ice, the Thaw).
+	if (WRWarHall::Aftermath(this, Attack.Id, At, Attack.Size, AttackFacing))
+	{
+		return;
+	}
 	const FString Id = Attack.Id.ToString();
 	if (Id == TEXT("overhead_slam") || Id == TEXT("slag_throw") || Id == TEXT("quench_feint") || Id == TEXT("bellows_into_slam"))
 	{
@@ -717,7 +724,8 @@ void AWRBoss::EndStrike()
 	SpeedBoost = 1.f;
 	Current = INDEX_NONE;
 	StrikeState = EStrike::None;
-	BusyUntil = Now + (Attack.bRow ? Attack.Row.Punish : Tune(TEXT("recoverySeconds"), 0.8f)) + Idle();
+	// (A raid champion's hardened seams: the breath between its strings stretches: WRWarHall.)
+	BusyUntil = Now + ((Attack.bRow ? Attack.Row.Punish : Tune(TEXT("recoverySeconds"), 0.8f)) + Idle()) * WRWarHall::RecoveryScale(this);
 	if (bTransition && PendingPhase > 0)
 	{
 		SetPhase(PendingPhase);
@@ -884,8 +892,8 @@ void AWRBoss::SpawnRunbackStone()
 	// A shrine-stone 40-60 m out from the arena toward the way in (the island's middle, where the passes are), on
 	// ground about level with the arena floor and clear of rock: the run back is the way you came.
 	const FWRCreatureDef* Def = GetDef();
-	// A portal boss has its fold's entry stone (and an escaped one no arena at all).
-	if (!Def || Def->Roam.Num() > 0 || Def->PortalRank > 0 || Runback.IsValid())
+	// A portal boss has its fold's entry stone (and an escaped one no arena at all); a raid champion its hall's gate.
+	if (!Def || Def->Roam.Num() > 0 || Def->PortalRank > 0 || bChampion || Runback.IsValid())
 	{
 		return;
 	}

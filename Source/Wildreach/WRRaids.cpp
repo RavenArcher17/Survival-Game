@@ -1,5 +1,7 @@
 #include "WRRaids.h"
 #include "WRRaiding.h"
+#include "WRDeeds.h"
+#include "WRDeedsInternal.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
@@ -312,6 +314,8 @@ namespace WRRaidsImpl
 		UE_LOG(LogWildreach, Log, TEXT("RAID over at %s's claim (%s): %d of %d leave, %d pieces lost"), *R.Owner, Why, Alive, R.Raiders.Num(), Lost);
 		Tell(World, R, 2, FString::Printf(TEXT("Raid over: %s%s"), Alive > 0 ? *FString::Printf(TEXT("the last %d are leaving"), Alive) : TEXT("you held them off"),
 			Lost > 0 ? *FString::Printf(TEXT(", %d %s lost"), Lost, Lost == 1 ? TEXT("piece") : TEXT("pieces")) : TEXT("")));
+		// Not one wall lost: the owner's deed (WRDeeds).
+		if (Lost == 0) WRDeeds::OnRaidHeld(WRDeedsImpl::DStateNamed(World, R.Owner));
 		ScheduleNext(World, R.Claim.Get());
 	}
 

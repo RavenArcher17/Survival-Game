@@ -1873,7 +1873,10 @@ namespace WRSettingsUI
 			{
 				Range(LOCTEXT("RuleRaidGroupMax", "Raid group cap"), LOCTEXT("RuleRaidGroupMaxSub", "The most survivors one war-hall raid lets in (No limit: anyone who comes)"), TEXT("raidGroupMax"), 0.f, 16.f, 1.f, Members);
 				Range(LOCTEXT("RuleRaidGroupTuned", "Raid tuned for"), LOCTEXT("RuleRaidGroupTunedSub", "The group the raid champions' health is balanced for"), TEXT("raidGroupTuned"), 4.f, 12.f, 1.f, Plain);
+				Range(LOCTEXT("RuleRaidRespawn", "Raid respawn"), LOCTEXT("RuleRaidRespawnSub", "How long a war-hall's champions lie still after a win"), TEXT("raidRespawnHours"), 1.f, 168.f, 1.f, Hours);
 			}
+			// Kill-time boards are kept forever; a new season starts empty boards and keeps the old ones readable (WRRecords).
+			Range(LOCTEXT("RuleRecordsSeason", "Records season"), LOCTEXT("RuleRecordsSeasonSub", "Raise it to start fresh kill-time boards; earlier seasons stay readable"), TEXT("recordsSeason"), 1.f, 20.f, 1.f, Plain);
 			Range(LOCTEXT("RuleUpkeep", "Building upkeep"), LOCTEXT("RuleUpkeepSub", "What a land claim costs to keep up"), TEXT("upkeepMultiplier"), 0.f, 2.f, 0.1f, Times);
 			Range(LOCTEXT("RuleBoss", "Boss respawn"), LOCTEXT("RuleBossSub", "How long before a beaten boss comes back"), TEXT("bossRespawnHours"), 1.f, 24.f, 1.f, Hours);
 

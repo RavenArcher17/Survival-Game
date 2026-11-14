@@ -1,4 +1,6 @@
 #include "WRCombatLibrary.h"
+#include "WRDeeds.h"
+#include "WRWarHall.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
@@ -121,6 +123,8 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 
 	// Forgeplate / Rimeguard worn to four pieces: Heat / Chill fill 15% faster (Data/gear.json heatGain, chillGain).
 	Amount *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Who, Element == WRTags::Element_Fire ? FName(TEXT("heatGain")) : FName(TEXT("chillGain"))));
+	// Prestige (Deeper marks) on that path, and Vulkarn's Forge-heart talisman above 70% health (WRDeeds).
+	Amount *= WRDeeds::PrestigeResource(Who, Element == WRTags::Element_Fire ? FName(TEXT("fire")) : FName(TEXT("frost"))) * WRDeeds::ResourceGainScale(Who);
 
 	const bool bBalance = ASC->HasMatchingGameplayTag(WRTags::Combo_Balance);
 	const float Share = WRTune(TEXT("resources.balanceShare"), 0.5f);
@@ -485,6 +489,16 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// A fold's Double damage and its boss's arena (the Alpha's lit mane); the artifacts' shared penalty on a player
 	// (the party's highest AL; never against another player) and The Feather.
 	Damage *= WRPortals::DamageScale(Target, Attacker, Hit) * WRArtifacts::DamageTakenScale(Target, Attacker, Hit);
+	// Prestige (Keener marks): that path's blows land harder while it's walked (WRDeeds).
+	if (Attacker) Damage *= WRDeeds::PrestigeDamage(Attacker, Hit);
+	// Rooted (a prestige mark): the subclass's root passive at half. Fire's Burning blood halves your own burns and lava.
+	{
+		FName RootedPath;
+		if (Target->GetPlayerState() && Hit.bDamageOverTime && Hit.Element == WRTags::Element_Fire && WRDeeds::RootedSub(Target, RootedPath) && RootedPath == TEXT("fire"))
+		{
+			Damage *= 1.f - WRTune(TEXT("prestige.rootShare"), 0.5f);
+		}
+	}
 	// Deep delver (mining perk): the world's own hazards (lava, cave gas and ice: damage over time with no one behind
 	// it) hurt less.
 	if (!Attacker && Hit.bDamageOverTime)
@@ -601,6 +615,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + WRTune(TEXT("status.permafrostBonusVsSlowed"), 0.15f);
 		}
+		// Rooted Permafrost on the subclass (a prestige mark): the same at half strength.
+		else if (FName RootedPath; Attacker && TargetASC->HasMatchingGameplayTag(WRTags::Status_Slowed) && WRDeeds::RootedSub(Attacker, RootedPath) && RootedPath == TEXT("frost"))
+		{
+			Damage *= 1.f + WRTune(TEXT("status.permafrostBonusVsSlowed"), 0.15f) * WRTune(TEXT("prestige.rootShare"), 0.5f);
+		}
+		// Rime-scale (Skaldrith's soul talisman): the first blow after a quiet spell lands softer.
+		// (Only real blows count: burns, lava ticks and touches that do nothing neither use it up nor take it.)
+		if (Target->GetPlayerState() && !Hit.bDamageOverTime && Damage >= 1.f) Damage *= WRDeeds::FirstHitScale(Target);
 		// Just parried: everyone's blows land harder (crit.exposedDamage).
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Exposed))
 		{
@@ -927,6 +949,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rimed)) Stance *= WRTune(TEXT("status.defs.frost.rimedStance"), 1.5f);
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
 		Stance *= WRPortals::StanceScale(Target);   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
+		Stance *= WRWarHall::StanceScale(Target);   // a raid champion slipping on its melted footing
 		if (AWRCreature* Body = Cast<AWRCreature>(Target))
 		{
 			if (Hit.PhysType == 2 && Body->IsNearLockPoint(Hit.ImpactPoint, TEXT("head"), WRTune(TEXT("stance.headRadius"), 70.f)))

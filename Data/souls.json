@@ -1,0 +1,49 @@
+{
+  "_comment": "Boss soul forging (cooks/endgame.md 2.7, cooks/build-endgame.md 2.3). A major boss drops its soul to each looter: drop.first on your first kill, drop.repeat + drop.perAL x the party's Artifact Level after, x drop.phase3Mult in its hidden third phase, drop.geisAt: a first kill at that AL or more always drops. At the boss's own altar (Forge soul): A awakens the boss's weapon (its blueprint weapon from the bag, any quality / upgrade: metal factor becomes starsteel, the element fixed, the Soul art is yours while it's held), B makes the soul talisman. A second soul buys the other; after both, a soul salvages there into salvage.item x salvage.count. Soul arts are weapon arts (tuning wildbrands.<art>), held in a quick slot while the awakened weapon is in your hand: 25 stamina, 30 s. live: the boss exists in this build (rows of bosses not built yet stay hidden until they ship). All first drafts.",
+  "drop": { "first": 1.0, "repeat": 0.10, "perAL": 0.01, "phase3Mult": 2.0, "geisAt": 10 },
+  "salvage": { "item": "core_shard", "count": 5 },
+  "bosses": {
+    "vulkarn": {
+      "live": true, "soul": "soul_vulkarn", "weapon": "cinderbrand", "weaponClass": "great_hammer", "element": "fire",
+      "art": { "id": "soul_vulkarn", "name": "Vulkarn's Flood", "line": "An overhead slam that splits the ground: a 6 m crack of lava ahead for 4 s." },
+      "talisman": { "id": "talisman_forge_heart", "name": "Forge-heart", "line": "Path resource fills 10% faster while you're above 70% health." },
+      "colour": [255, 112, 32]
+    },
+    "skaldrith": {
+      "live": true, "soul": "soul_skaldrith", "weapon": "rimefang", "weaponClass": "spear", "element": "frost",
+      "art": { "id": "soul_skaldrith", "name": "Pillar-breaker", "line": "A driving thrust whose frost bursts along the ground ahead: a 4 m line of ice spikes, heavy frostbite, three times the stance damage." },
+      "talisman": { "id": "talisman_rime_scale", "name": "Rime-scale", "line": "The first blow you take after 10 s unhurt deals 30% less." },
+      "colour": [150, 205, 255]
+    },
+    "kharvox": { "live": false, "soul": "soul_kharvox", "weapon": "talon_of_kharvox", "weaponClass": "dagger", "element": "lightning",
+      "art": { "id": "soul_kharvox", "name": "Rod-call", "line": "A stab that marks; 1 s later lightning strikes the mark from above (a 1 s glow on the ground)." },
+      "talisman": { "id": "talisman_storm_eye", "name": "Storm-eye", "line": "Sprint 6% faster; the roll after a parry costs no stamina." }, "colour": [190, 170, 255] },
+    "ahrumet": { "live": false, "soul": "soul_ahrumet", "weapon": "gnomon_maul", "weaponClass": "great_hammer", "element": "sun",
+      "art": { "id": "soul_ahrumet", "name": "Noon", "line": "Plant the maul: a 6 m sundial ring for 6 s; allies inside crit 20% more, enemies inside are blinded." },
+      "talisman": { "id": "talisman_sun_dial", "name": "Sun-dial", "line": "+8% damage outdoors by day, -4% at night." }, "colour": [255, 226, 170] },
+    "sylvaroth": { "live": false, "soul": "soul_sylvaroth", "weapon": "world_root_maul", "weaponClass": "great_hammer", "element": "nature",
+      "art": { "id": "soul_sylvaroth", "name": "Re-root", "line": "A slam that roots everything in 5 m for 2 s; stand still after and heal 5% over 5 s." },
+      "talisman": { "id": "talisman_heart_tree_seed", "name": "Heart-tree seed", "line": "Potions heal a further 15% over 6 s." }, "colour": [110, 200, 90] },
+    "aeolith": { "live": false, "soul": "soul_aeolith", "weapon": "galespine", "weaponClass": "bow", "element": "wind",
+      "art": { "id": "soul_aeolith", "name": "Serpent's gale", "line": "A shot charged to 1.2 s: one arrow x3 that pierces and pushes (straight, never homing)." },
+      "talisman": { "id": "talisman_serpents_feather", "name": "Serpent's feather", "line": "Falls hurt half as much; jump attacks +15%." }, "colour": [140, 230, 220] },
+    "lyrathis": { "live": false, "soul": "soul_lyrathis", "weapon": "prismglass_spear", "weaponClass": "spear", "element": "arcane",
+      "art": { "id": "soul_lyrathis", "name": "Prism split", "line": "A thrust in three lines of light 15 degrees apart." },
+      "talisman": { "id": "talisman_prism", "name": "Prism", "line": "Guard +10; a shot you block sends a quarter of its damage back along its line." }, "colour": [160, 110, 255] },
+    "vharra": { "live": false, "soul": "soul_vharra", "weapon": "three_jaw_glaive", "weaponClass": "scythe", "element": "blood",
+      "art": { "id": "soul_vharra", "name": "Mire drink", "line": "A 300 degree sweep that bleeds and heals you a tenth of what it deals." },
+      "talisman": { "id": "talisman_mire_mothers_tooth", "name": "Mire-mother's tooth", "line": "Your bleed builds 15% faster." }, "colour": [140, 30, 90] },
+    "thalassor": { "live": false, "soul": "soul_thalassor", "weapon": "tidebreaker", "weaponClass": "spear", "element": "tide",
+      "art": { "id": "soul_thalassor", "name": "Leviathan's hook", "line": "Throw the harpoon on its chain (straight): pull a small foe to you, or yourself to a large one." },
+      "talisman": { "id": "talisman_leviathans_breath", "name": "Leviathan's breath", "line": "Hold your breath twice as long; stamina +10% in rain or water." }, "colour": [60, 200, 180] },
+    "nhal": { "live": false, "soul": "soul_nhal", "weapon": "mourners_scythe", "weaponClass": "scythe", "element": "necromancy",
+      "art": { "id": "soul_nhal", "name": "Procession", "line": "A wide reap; each foe it hits gives you path resource." },
+      "talisman": { "id": "talisman_mourners_candle", "name": "Mourner's candle", "line": "Your light reaches 40% further." }, "colour": [190, 230, 190] },
+    "mycelorn": { "live": false, "soul": "soul_mycelorn", "weapon": "stipe_maul", "weaponClass": "great_hammer", "element": "spore",
+      "art": { "id": "soul_mycelorn", "name": "Fruiting", "line": "A slam that plants a spore cap; it bursts 1.5 s later in a 4 m poison cloud." },
+      "talisman": { "id": "talisman_hive_heart", "name": "Hive-heart", "line": "Poison and rot build on you 25% slower." }, "colour": [90, 230, 170] },
+    "vorhollow": { "live": false, "soul": "soul_vorhollow", "weapon": "gnashblade", "weaponClass": "greatsword", "element": "void",
+      "art": { "id": "soul_vorhollow", "name": "Swallow", "line": "A 4 m lunge; a kill gives back 10 max health the void took." },
+      "talisman": { "id": "talisman_void_hearts_shell", "name": "Void-heart's shell", "line": "Max health lost to the void comes back twice as fast out of a fight." }, "colour": [110, 70, 170] }
+  }
+}

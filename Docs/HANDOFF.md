@@ -174,7 +174,21 @@ Also since 0.7.1: **dungeon portals and artifacts** (`WRPortals.*`, `WRPortalFol
 trials and a boss with an arena mechanic, keys, personal chests and shards; the artifact belt (journal tab N), the band,
 Artifact Level, geis records, fusing. Saved in the world's `portals.json` and each player's file (`artifacts`).
 
+Also since 0.7.1: **the endgame** (`WRDeeds.*` + `WRDeedsAchieve.cpp`, `WRRecords.*`, `WRWarHall.*`,
+`WREndgameLook.*`, `WRUIEndgame.*`; data `Data/achievements.json`, `souls.json`, `cosmetics.json`, `mythic.json`,
+`raids.json`, tuning `prestige` / `deeds` / `records` / `monuments`): prestige at the boss altar (its screen has Path,
+Return and Forge soul pages), the Heron's draught (respec item + The Unlearning quest lines), boss soul forging and Soul
+arts, mythic rules (data-ready, hidden), kill-time boards with stone tablets, 150 achievements / titles / cosmetics in
+the journal's Deeds tab (key `.`), boss monuments, and the Thaw Hall raid (gate by the North pass road; hall in hall
+space at X -1,500,000). Each player's deeds save in their character (`deeds`); boards in the world document `records`,
+war-hall rests in `warhalls`. Testing aids on Development builds: `deeds dev give <achievement>`, `deeds dev soul
+<boss>`, `deeds dev cosmetic <id>`.
+
 Open, as of 0.7.1:
+- **The endgame on two lands**: souls, monuments, glows and achievements show only for bosses and lands in this build
+  (`live` / `needs` in their data); the other five war-halls and mythic forging wait for their lands and the Ring on the
+  Crown. The war-hall gate stands by the North pass road until the pass forts exist. Raid champions reuse Vulkarn's and
+  Skaldrith's rigs with overlays.
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
   their land is listed in `world.liveBiomes`. Greenhouse glass needs Hearth 4 (steel). Hungry animals show it only on

@@ -2,6 +2,7 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRWarHall.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRBuildSets.h"
@@ -45,6 +46,9 @@ FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 		const FName Fold = WRPortals::FoldBiome(WorldContext, Pos);
 		if (!Fold.IsNone()) return Fold;
 	}
+	// A war-hall is both its lands: the west half the first's, the east half the second's (WRWarHall).
+	const FName Hall = WRWarHall::BiomeAt(WorldContext, Pos);
+	if (!Hall.IsNone()) return Hall;
 	// The island's ridge: the same split the sky, the sound and the fishing use (sky.biomeCentre).
 	return Pos.X < WRTune(TEXT("sky.biomeCentre"), 0.f) ? FName(TEXT("volcanic")) : FName(TEXT("tundra"));
 }
@@ -58,6 +62,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	}
 	// A fold is closed rock or ice on every side: as dark and as sheltered as a cave, no building, no bombs.
 	if (WRPortals::IsFold(WorldContext, Pos))
+	{
+		return true;
+	}
+	// So is a war-hall: a vaulted hall under the pass (no building, no bombs, no sky).
+	if (WRWarHall::HallAt(WorldContext, Pos))
 	{
 		return true;
 	}

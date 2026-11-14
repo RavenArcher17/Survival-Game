@@ -34,6 +34,7 @@ enum class EWRMenu : uint8
 	World,     // a world system's screen (WorldScreen / WorldTarget): shrine, talk, trade, messages (WRUIWorld)
 	Quests,    // the journal's Quests tab (WRUIWorld)
 	Artifacts, // the journal's Artifacts tab: the belt, the pouch, geis records, the band (WRUIPortals)
+	Deeds,     // the journal's Deeds tab: achievements, records, titles, cosmetics, prestige marks (WRUIEndgame)
 };
 
 class AWRBuildPiece;
@@ -217,6 +218,12 @@ public:
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
 	/** World systems (WRWorldSystems.h): open one of their screens (shrine, talk, trade, msgwrite, msgread) about Target. */
 	UFUNCTION(Client, Reliable) void ClientOpenWorldScreen(FName Screen, AActor* Target);
+	/** An achievement earned (WRDeeds): its toast, top-centre for 3 s, queued. */
+	UFUNCTION(Client, Reliable) void ClientDeed(FName Id);
+	/** A kill-time board (WRRecords) as JSON: Board None is the summary of every board. */
+	UFUNCTION(Client, Reliable) void ClientRecords(FName Board, const FString& Json);
+	/** The toasts waiting to show (the UI takes them in order). */
+	TArray<FName> DeedToasts;
 	/** Which world screen shows under EWRMenu::World, and the thing it's about. */
 	FName WorldScreen;
 	TWeakObjectPtr<AActor> WorldTarget;
@@ -351,6 +358,7 @@ private:
 	void ToggleClan();
 	void ToggleQuests();
 	void ToggleArtifacts();
+	void ToggleDeeds();
 	void TogglePaths();
 public:
 	void ToggleMap();

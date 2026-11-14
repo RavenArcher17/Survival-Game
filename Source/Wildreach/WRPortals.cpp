@@ -6,6 +6,7 @@
 #include "WRPortals.h"
 #include "WRPortalsInternal.h"
 #include "WRArtifacts.h"
+#include "WRDeeds.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
 #include "WRBuilding.h"
@@ -1193,6 +1194,7 @@ void UWRPortalSystem::EscapedDied(AWRCreature* Boss)
 			Items.FindOrAdd(FName(PStr(WRPortals::Rank(E.Rank), TEXT("shard")))) += 1;
 			const FString Got = PsGive(PS, Items);
 			if (AWRPlayerController* PC = PsControllerOf(PS)) PC->ClientNotify(FString::Printf(TEXT("The escaped boss is down: %s"), *Got));
+			WRDeeds::OnEscapedSlain(PS);
 		}
 	}
 	PsForPlayers(GetWorld(), [&](AWRPlayerController* PC)
@@ -1651,6 +1653,7 @@ void UWRPortalSystem::Reward(AWRFold* F)
 		const FString Art = WRArtifacts::PortalDrop(PS, F->Biome, F->Rank, PNum(Row, TEXT("artifactChance"), 0.f));
 		if (!Art.IsEmpty()) Got += TEXT(", ") + Art;
 		if (AWRPlayerController* PC = PsControllerOf(PS)) PC->ClientNotify(FString::Printf(TEXT("The fold's guardian falls: %s"), *Got));
+		WRDeeds::OnPortalCleared(PS, F->Rank, F->Modifiers.Num(), 0.f);   // the Heron's draught now and then; the portal deeds
 		UE_LOG(LogWildreach, Log, TEXT("PORTAL reward %s (x%.2f): %s"), *L.Key, Q, *Got);
 	}
 }

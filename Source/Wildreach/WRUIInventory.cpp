@@ -521,6 +521,9 @@ namespace WRInvTab
 			return Stats;
 		}
 		Stats.Metal = D->Metal;
+		// The endgame's marks (as UWRInventoryComponent::ApplyEquipment): awakened strikes as starsteel, mythic as mythic.
+		if (S->Mark == TEXT("awakened") && WRTune(TEXT("weapon.metal.starsteel"), 2.8f) > WRTune(*FString::Printf(TEXT("weapon.metal.%s"), *D->Metal.ToString()), 1.f)) Stats.Metal = TEXT("starsteel");
+		if (S->Mark == TEXT("mythic")) Stats.Metal = TEXT("mythic");
 		Stats.Quality = FName(*FString(FWRItemStack::QualityName(S->Quality)).ToLower());
 		Stats.Upgrade = S->Upgrade;
 		Stats.Roll = S->Roll;
@@ -1579,6 +1582,10 @@ namespace WRInvTab
 			FString QualityLine = bGear ? FString(FWRItemStack::QualityName(S->Quality)) : CategoryWord(*D);
 			if (bGear && S->Upgrade > 0) QualityLine += FString::Printf(TEXT("  +%d"), S->Upgrade);
 			if (bGear && !S->Element.IsNone()) QualityLine += FString::Printf(TEXT("  ·  %s"), *S->Element.ToString());
+			if (bGear && !S->Element2.IsNone()) QualityLine += FString::Printf(TEXT(" and %s"), *S->Element2.ToString());
+			// The endgame's marks: a boss weapon its soul woke (its Soul art while held), a mythic piece (WRDeeds).
+			if (bGear && S->Mark == TEXT("awakened")) QualityLine += TEXT("  ·  Awakened");
+			if (bGear && S->Mark == TEXT("mythic")) QualityLine += TEXT("  ·  Mythic");
 			const FLinearColor QColor = bGear ? QualityColor(S->Quality) : WRUI::Brass;
 
 			TSharedRef<SVerticalBox> Stats = SNew(SVerticalBox);
@@ -1797,6 +1804,7 @@ namespace WRInvTab
 			else if (C == TEXT("blueprint")) UseText = LOCTEXT("Read", "Read");
 			else if (C == TEXT("egg") && !D->Id.ToString().StartsWith(TEXT("fertile_"))) UseText = LOCTEXT("Hatch", "Hatch");
 			else if (C == TEXT("dart")) UseText = LOCTEXT("UseDart", "Use");
+			else if (D->Id == TEXT("heron_draught")) UseText = LOCTEXT("DrinkHeron", "Drink");   // the respec screen (WRDeeds)
 			else bCanUse = false;
 			const int32 Sel = SelIndex;
 			const bool bCanSplit = !bWorn && S->Count >= 2 && FirstEmpty() != INDEX_NONE;

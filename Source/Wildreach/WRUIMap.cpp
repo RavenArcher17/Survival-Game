@@ -27,6 +27,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRWorldDressing.h"
+#include "WRDeeds.h"
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -78,10 +79,42 @@ namespace WRMapTab
 		FVector World = FVector::ZeroVector;
 		FName CreatureId;        // bosses and tames: portrait / drops
 		float Radius = 0.f;      // claims
+		FName Sigil;             // claims: the boss sigil woven on its owner's banners, or its monument's (WRDeeds)
 		bool bMine = false;
 		float Alpha = 1.f;       // a resting bed on the death screen's map is dimmed
 		TWeakObjectPtr<AActor> Actor;
 	};
+
+	/** A claim's sigil on the map: the boss its owner weaves on their banners, else the boss of a monument raised inside
+	 *  it (looked up every few seconds, not every frame). None: a plain claim mark. */
+	FName ClaimSigil(const UWorld* World, const AWRClaimTotem* Claim)
+	{
+		struct FSeen { double At = -100.0; FName Sigil; };
+		static TMap<TWeakObjectPtr<const AWRClaimTotem>, FSeen> Cache;
+		FSeen& S = Cache.FindOrAdd(Claim);
+		const double Now = FPlatformTime::Seconds();
+		if (Now - S.At < 3.0) return S.Sigil;
+		S.At = Now;
+		S.Sigil = NAME_None;
+		if (World && World->GetGameState())
+		{
+			for (APlayerState* P : World->GetGameState()->PlayerArray)
+			{
+				const UWRDeedsComponent* D = P && P->GetPlayerName() == Claim->OwnerName ? UWRDeedsComponent::For(P) : nullptr;
+				if (D && !D->BannerSigil.IsNone()) S.Sigil = D->BannerSigil;
+			}
+		}
+		if (S.Sigil.IsNone())
+		{
+			for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
+			{
+				const FWRPieceDef* Def = It->GetDef();
+				if (Def && !Def->Monument.IsNone() && !It->IsGhost() && It->OwnerName == Claim->OwnerName && FVector::Dist2D(It->GetActorLocation(), Claim->GetActorLocation()) <= Claim->Radius) { S.Sigil = Def->Monument; break; }
+			}
+		}
+		if (WRDeeds::Sigil(S.Sigil).Num() == 0) S.Sigil = NAME_None;
+		return S.Sigil;
+	}
 
 	/** View and filters, kept while the game runs (reopening the map shows it as you left it). */
 	struct FMapState
@@ -225,6 +258,7 @@ namespace WRMapTab
 			M.World = It->GetActorLocation();
 			M.Radius = It->Radius;
 			M.Actor = *It;
+			M.Sigil = ClaimSigil(World, *It);
 		}
 		for (TActorIterator<AWRCharacter> It(World); It; ++It)
 		{
@@ -589,7 +623,19 @@ namespace WRMapTab
 					Box(L + 1, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor(0.f, 0.f, 0.f, M.Alpha), Lk.bSquare ? 6.f : D * 0.5f + 1.f));
 					Box(L + 2, C - FVector2D(D * 0.5f), FVector2D(D), WRUI::Box(Lk.Fill, Lk.bSquare ? 5.f : D * 0.5f, Lk.Ring, bMajor ? 2.f : 1.5f));
 					const float G = D * (bMajor ? 0.64f : 0.6f);
-					Box(L + 3, C - FVector2D(G * 0.5f), FVector2D(G), Glyph(Lk.Glyph), Lk.Icon);
+					const TArray<FString> SigilRows = Cat == ECat::Claim && !M.Sigil.IsNone() ? WRDeeds::Sigil(M.Sigil) : TArray<FString>();
+					if (SigilRows.Num() > 0)
+					{
+						// A claim under a boss's sigil: the sigil's woven grid in place of the claim glyph.
+						int32 Cols = 0;
+						for (const FString& Rw : SigilRows) Cols = FMath::Max(Cols, Rw.Len());
+						const float Cell = G / FMath::Max(SigilRows.Num(), FMath::Max(1, Cols));
+						const FVector2D O = C - FVector2D(Cell * Cols, Cell * SigilRows.Num()) * 0.5f;
+						for (int32 y = 0; y < SigilRows.Num(); ++y)
+							for (int32 x = 0; x < SigilRows[y].Len(); ++x)
+								if (SigilRows[y][x] == TEXT('#')) Box(L + 3, O + FVector2D(x * Cell, y * Cell), FVector2D(Cell * 0.9f), WRUI::White(), Lk.Icon);
+					}
+					else Box(L + 3, C - FVector2D(G * 0.5f), FVector2D(G), Glyph(Lk.Glyph), Lk.Icon);
 					// Names: camps and bosses always, the rest when you point at them (on the death screen, all of them).
 					const bool bLabel = MarkersFn || Cat == ECat::Camp || Cat == ECat::Shrine || Cat == ECat::Boss || Cat == ECat::Tame || Cat == ECat::Player || bHot;
 					if (!bLabel) continue;

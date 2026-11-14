@@ -1,0 +1,56 @@
+{
+  "_comment": "Cosmetics (cooks/endgame.md 2.12, biome-void 2.23.8, cooks/build-endgame.md 2.8). Only from hard content, never sold. glows: a faint element-coloured edge on any held weapon (the M_WindupGlow overlay: colour sRGB, glow, opacity; wash 0 = only the rim), earned by killing a major boss with nobody in the fight dying (achievements deathless_<boss>). dyes: the armour's trim recoloured (outfit TrimColor, sRGB), from the raids (source raid id, chance per champion kill). marks: raid pieces, a look laid on the armour (seam: PathGlow strength and colour along the seams; inlay: InlayNits and colour). sigils: each boss's mark, a 9 x 9 grid ('#' = woven / cut), woven on your claim banners (pick one of the bosses you've killed), cut into its record tablet and monument plinth, drawn on a claim's map icon. Gold and crimson are never used (gold is yours and the guard; crimson is unblockable). live: what exists in this build; the rest are data for the biomes to come. All first drafts.",
+  "glows": [
+    { "id": "glow_vulkarn", "name": "Forge-ember edge", "boss": "vulkarn", "colour": [255, 112, 36], "glow": 0.9, "opacity": 0.16, "live": true },
+    { "id": "glow_skaldrith", "name": "Wyrm-rime edge", "boss": "skaldrith", "colour": [150, 205, 255], "glow": 0.9, "opacity": 0.16, "live": true },
+    { "id": "glow_kharvox", "name": "Rod-light edge", "boss": "kharvox", "colour": [190, 170, 255], "glow": 0.9, "opacity": 0.16 },
+    { "id": "glow_ahrumet", "name": "Noon edge", "boss": "ahrumet", "colour": [255, 236, 200], "glow": 0.8, "opacity": 0.14 },
+    { "id": "glow_sylvaroth", "name": "Heartwood edge", "boss": "sylvaroth", "colour": [110, 200, 90], "glow": 0.8, "opacity": 0.16 },
+    { "id": "glow_aeolith", "name": "Gale edge", "boss": "aeolith", "colour": [140, 230, 220], "glow": 0.8, "opacity": 0.16 },
+    { "id": "glow_lyrathis", "name": "Prism edge", "boss": "lyrathis", "colour": [160, 110, 255], "glow": 0.9, "opacity": 0.16 },
+    { "id": "glow_vharra", "name": "Mire edge", "boss": "vharra", "colour": [140, 30, 90], "glow": 1.0, "opacity": 0.18 },
+    { "id": "glow_thalassor", "name": "Deep-water edge", "boss": "thalassor", "colour": [60, 200, 180], "glow": 0.8, "opacity": 0.16 },
+    { "id": "glow_nhal", "name": "Grave-light edge", "boss": "nhal", "colour": [190, 230, 190], "glow": 0.7, "opacity": 0.14 },
+    { "id": "glow_mycelorn", "name": "Spore edge", "boss": "mycelorn", "colour": [90, 230, 170], "glow": 0.8, "opacity": 0.16 },
+    { "id": "glow_vorhollow", "name": "Hollow edge", "boss": "vorhollow", "colour": [110, 70, 170], "glow": 1.0, "opacity": 0.2 }
+  ],
+  "dyes": [
+    { "id": "dye_quench_black", "name": "Quench-black", "line": "Oak-gall iron black, the colour of a blade drawn from the trough.", "colour": [30, 28, 32], "raid": "thaw_hall", "chance": 0.03, "live": true },
+    { "id": "dye_thaw_blue", "name": "Thaw-blue", "line": "Woad, the blue of meltwater over basalt.", "colour": [52, 86, 140], "raid": "thaw_hall", "chance": 0.03, "live": true },
+    { "id": "dye_rod_violet", "name": "Rod-violet", "line": "Orchil from storm lichen.", "colour": [104, 62, 112], "raid": "gut_hall", "chance": 0.03 },
+    { "id": "dye_bog_brown", "name": "Bog-brown", "line": "Walnut hull and peat.", "colour": [92, 64, 44], "raid": "gut_hall", "chance": 0.03 },
+    { "id": "dye_salt_white", "name": "Salt-white", "line": "Bleached linen white.", "colour": [222, 216, 200], "raid": "salt_hall", "chance": 0.03 },
+    { "id": "dye_murex", "name": "Murex", "line": "Sea-snail purple, the deep kind.", "colour": [90, 40, 82], "raid": "salt_hall", "chance": 0.03 },
+    { "id": "dye_weld", "name": "Weld-green", "line": "Weld over woad: a green that holds.", "colour": [96, 120, 60], "raid": "root_crypt", "chance": 0.03 },
+    { "id": "dye_grave_grey", "name": "Grave-grey", "line": "Wood ash and lime.", "colour": [120, 118, 114], "raid": "root_crypt", "chance": 0.03 },
+    { "id": "dye_lichen", "name": "Lichen-grey", "line": "Crottle from the high rocks.", "colour": [130, 138, 116], "raid": "flue_shaft", "chance": 0.03 },
+    { "id": "dye_verdigris", "name": "Verdigris", "line": "Copper green.", "colour": [70, 130, 110], "raid": "flue_shaft", "chance": 0.03 },
+    { "id": "dye_rift_black", "name": "Rift-black", "line": "Black with a violet ghost in it.", "colour": [26, 20, 36], "raid": "severance", "chance": 0.03 },
+    { "id": "dye_choir_white", "name": "Choir-white", "line": "Crystal-dust white.", "colour": [214, 220, 232], "raid": "severance", "chance": 0.03 },
+    { "id": "dye_madder_rust", "name": "Madder-rust", "line": "Madder root on iron mordant: a rust red, never the blood colour.", "colour": [150, 62, 40], "raid": "thaw_hall", "chance": 0.0 },
+    { "id": "dye_indigo", "name": "Night-indigo", "line": "Deep indigo.", "colour": [34, 40, 90], "raid": "salt_hall", "chance": 0.0 }
+  ],
+  "marks": [
+    { "id": "mark_smiths_seams", "name": "Smith's seams", "line": "The Fallen Smith's molten iron runs in your armour's seams.", "seam": { "colour": [255, 104, 30], "glow": 1.6 }, "raid": "thaw_hall", "champion": "fallen_smith", "chance": 0.03, "live": true },
+    { "id": "mark_wyrms_rime", "name": "Wyrm's rime", "line": "The Burnt Wyrm's black ice grows in the plates' inlay.", "inlay": { "colour": [150, 205, 255], "nits": 1.4 }, "raid": "thaw_hall", "champion": "burnt_wyrm", "chance": 0.03, "live": true },
+    { "id": "mark_rod_veins", "name": "Rod veins", "line": "Lightning in the seams.", "seam": { "colour": [190, 170, 255], "glow": 1.4 }, "raid": "gut_hall", "champion": "rodwarden_roc", "chance": 0.03 },
+    { "id": "mark_leech_lace", "name": "Leech lace", "line": "Dark wet inlay.", "inlay": { "colour": [120, 30, 70], "nits": 0.8 }, "raid": "gut_hall", "champion": "coven_leech_drake", "chance": 0.03 },
+    { "id": "mark_salt_crust", "name": "Salt crust", "line": "Salt in the inlay.", "inlay": { "colour": [230, 226, 214], "nits": 0.6 }, "raid": "salt_hall", "champion": "salt_serpent", "chance": 0.03 },
+    { "id": "mark_sunstone_seams", "name": "Sunstone seams", "line": "Amber light in the seams.", "seam": { "colour": [255, 220, 170], "glow": 1.2 }, "raid": "salt_hall", "champion": "barnacled_colossus", "chance": 0.03 },
+    { "id": "mark_root_veins", "name": "Root veins", "line": "Black roots in the seams.", "seam": { "colour": [70, 120, 50], "glow": 0.8 }, "raid": "root_crypt", "champion": "rotted_warden", "chance": 0.03 },
+    { "id": "mark_grave_light", "name": "Grave-light", "line": "Lantern light in the inlay.", "inlay": { "colour": [190, 230, 190], "nits": 1.0 }, "raid": "root_crypt", "champion": "rooted_ossuary", "chance": 0.03 },
+    { "id": "mark_kite_silk", "name": "Kite silk", "line": "Wind-pale inlay.", "inlay": { "colour": [140, 230, 220], "nits": 0.9 }, "raid": "flue_shaft", "champion": "fallen_kitewright", "chance": 0.03 },
+    { "id": "mark_paper_gills", "name": "Paper gills", "line": "Spore glow in the seams.", "seam": { "colour": [90, 230, 170], "glow": 1.0 }, "raid": "flue_shaft", "champion": "paper_titan", "chance": 0.03 }
+  ],
+  "sigils": {
+    "vulkarn":         [".#######.", ".#######.", ".#######.", "....#....", "....#....", "....#....", "....#....", "...###...", "....#...."],
+    "skaldrith":       ["#.......#", ".#.....#.", "..#####..", ".#######.", "##.###.##", ".#######.", "..##.##..", "..#...#..", ".#.....#."],
+    "obsidian_warden": ["....#....", "...###...", "..#####..", ".###.###.", "#########", ".###.###.", "..#####..", "...###...", "....#...."],
+    "ignessa":         ["....#....", "...#.#...", "....#....", "#..#.#..#", "##.###.##", "#########", "#########", ".#######.", "........."],
+    "grimjaw":         ["#.......#", "#.......#", "##.....##", ".#######.", ".#.#.#.#.", ".........", ".#.#.#.#.", ".#######.", "..#####.."],
+    "pale_hunter":     ["....#....", "...###...", "..#...#..", ".#..#..#.", "#..###..#", ".#..#..#.", "..#...#..", "...###...", "....#...."],
+    "cinderhorn":      ["#.......#", "#.......#", ".#.....#.", "..#####..", ".#######.", ".##.#.##.", "..#####..", "...###...", "....#...."],
+    "old_tusker":      ["..#####..", ".#######.", ".##.#.##.", ".#######.", "#..###..#", "#...#...#", ".#.....#.", "..#...#..", "........."],
+    "thaw_hall":       ["#...#...#", ".#..#..#.", "..#.#.#..", "...###...", "#########", "...###...", "..#.#.#..", ".#..#..#.", "#...#...#"]
+  }
+}

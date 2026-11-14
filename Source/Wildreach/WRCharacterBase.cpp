@@ -1,5 +1,6 @@
 #include "WRCharacterBase.h"
 #include "WRArtifacts.h"
+#include "WRDeeds.h"
 #include "WRPortals.h"
 #include "WRWorldSystems.h"
 #include "WRSocial.h"
@@ -198,6 +199,7 @@ void AWRCharacterBase::Die(AActor* Killer)
 	WRWorld::OnKilled(this, Killer);   // quests (a kill with its status still on), before anything clears
 	WRPortals::OnKilled(this, Killer);   // a fold's boss (its clear) or an escaped one
 	WRArtifacts::OnKilled(this, Killer); // The Feather's window, the Hive Seed, Grave Count
+	WRDeeds::OnKilled(this, Killer);     // species and belts for the achievements; a survivor's days alive and deathless runs
 	AbilitySystem->CancelAllAbilities();
 	AbilitySystem->AddLooseGameplayTag(WRTags::State_Dead, 1, EGameplayTagReplicationState::TagOnly);
 	GetCharacterMovement()->DisableMovement();

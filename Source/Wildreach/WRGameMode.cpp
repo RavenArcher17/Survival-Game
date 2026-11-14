@@ -3,6 +3,7 @@
 #include "WRIdentity.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
+#include "WRDeeds.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRFarm.h"
@@ -168,6 +169,8 @@ void AWRGameMode::BeginPlay()
 	FWRRaiding::Load(GetWorld());
 	WRWildlife::Start(GetWorld());
 	WRRaids::Start(GetWorld());
+	// The endgame: achievements' census, the kill-time boards and their tablets, the war-halls (WRDeeds, WRRecords, WRWarHall).
+	WRDeeds::Start(GetWorld());
 	if (!WRWorlds::Current().IsEmpty())
 	{
 		const float Every = FMath::Max(0.1f, WRTune(TEXT("wildlife.stepSeconds"), 20.f));
@@ -533,6 +536,8 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	if (const UWRQuestLog* Log = UWRQuestLog::For(PS)) Root->SetObjectField(TEXT("world"), Log->ToJson());
 	// Artifacts: hooks, pouch, geis records, titles (WRArtifacts).
 	if (const UWRArtifactComponent* Art = UWRArtifactComponent::For(PS)) Root->SetObjectField(TEXT("artifacts"), Art->ToJson());
+	// Deeds: prestige marks and layouts, souls forged, achievements, titles, cosmetics (WRDeeds).
+	if (UWRDeedsComponent* Deeds = UWRDeedsComponent::For(PS)) { Root->SetObjectField(TEXT("deeds"), Deeds->ToJson()); Deeds->bDirty = false; }
 
 	FString Text;
 	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer = TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text);
@@ -611,6 +616,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetObjectField(TEXT("artifacts"), ArtJson))
 	{
 		if (UWRArtifactComponent* Art = UWRArtifactComponent::For(PS)) Art->FromJson(*ArtJson);
+	}
+	const TSharedPtr<FJsonObject>* DeedsJson = nullptr;
+	if (Root->TryGetObjectField(TEXT("deeds"), DeedsJson))
+	{
+		if (UWRDeedsComponent* Deeds = UWRDeedsComponent::For(PS)) Deeds->FromJson(*DeedsJson);
 	}
 }
 

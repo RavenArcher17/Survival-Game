@@ -9,6 +9,7 @@
 #include "WRPlayerState.h"
 #include "WRSound.h"
 #include "WRTuning.h"
+#include "WREndgameLook.h"
 #include "Components/LODSyncComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -350,6 +351,8 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 		}
 	}
 	RefreshLODSync();
+	// The endgame's look over the fresh outfit: an armour dye, a raid mark (WREndgameLook).
+	ApplyDeedsLook();
 }
 
 void AWRCharacter::RefreshLODSync()
@@ -586,6 +589,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, (uint32(PathMarks.MainS) << 8) | PathMarks.SubS);
 	Sig = HashCombine(Sig, (uint32(FMath::RoundToInt(PulseLeft * 20.f)) << 1) | (bWet ? 1u : 0u));
 	Sig = HashCombine(Sig, GetTypeHash(PulsePath));
+	Sig = HashCombine(Sig, WREndgameLook::LookSig(this));   // prestige gold threads, a raid mark on the seams
 	if (!bForce && Sig == PathMarkSig)
 	{
 		return;
@@ -608,7 +612,8 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 			{
 				continue;
 			}
-			MID->SetVectorParameterValue(FName(*(Prefix + TEXT("Color"))), Color(Row, TEXT("color"), FLinearColor::White));
+			// Prestige: each mark draws a gold thread into the path's marks (cooks/build-endgame.md 2.1; gold is yours).
+			MID->SetVectorParameterValue(FName(*(Prefix + TEXT("Color"))), FMath::Lerp(Color(Row, TEXT("color"), FLinearColor::White), WREndgameLook::GoldColour(), WREndgameLook::Gold(this, PathId)));
 			for (const auto& Pair : Skin->Values)
 			{
 				const FName Name(*(Prefix + Pair.Key));
@@ -738,11 +743,16 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 		{
 			Glow->TryGetNumberField(TEXT("pathSeam"), SeamGlow);
 		}
-		const FLinearColor PathColor = Color(Obj(Paths, PathMarks.Main.ToString()), TEXT("color"), FLinearColor(0.886f, 0.329f, 0.102f));
+		FLinearColor PathColor = Color(Obj(Paths, PathMarks.Main.ToString()), TEXT("color"), FLinearColor(0.886f, 0.329f, 0.102f));
+		float SeamNits = float(SeamGlow) * MainS * (1.f + Pulse);
+		// A raid mark on the seams (the Smith's molten iron) runs in them instead of the path's colour.
+		FLinearColor MarkColour;
+		float MarkGlow = 0.f;
+		if (WREndgameLook::SeamMark(this, MarkColour, MarkGlow)) { PathColor = MarkColour; SeamNits = FMath::Max(SeamNits, MarkGlow * (1.f + 0.5f * Pulse)); }
 		for (UMaterialInstanceDynamic* MID : OutfitMIDs)
 		{
 			MID->SetVectorParameterValue(TEXT("PathTint"), PathColor);
-			MID->SetScalarParameterValue(TEXT("PathGlow"), float(SeamGlow) * MainS * (1.f + Pulse));
+			MID->SetScalarParameterValue(TEXT("PathGlow"), SeamNits);
 			MID->SetScalarParameterValue(TEXT("SeamPulse"), Pulse);
 		}
 	}

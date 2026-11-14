@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRWarHall.h"
 #include "WRRaiding.h"
 #include "WRLifeSkills.h"
 #include "WRFishing.h"
@@ -226,7 +227,8 @@ void AWRCharacter::Tick(float DeltaSeconds)
 	if (HasAuthority() || IsLocallyControlled())
 	{
 		const FVector Feet = GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
-		const bool bIce = FWRBiomeHazards::KindAt(Feet) == TEXT("ice") && !FWRBiomeHazards::Resists(this, TEXT("ice"));
+		// (A war-hall's ice flags are slick the same way: WRWarHall.)
+		const bool bIce = (FWRBiomeHazards::KindAt(Feet) == TEXT("ice") || WRWarHall::IceAt(this, Feet)) && !FWRBiomeHazards::Resists(this, TEXT("ice"));
 		if (bIce != bOnIce)
 		{
 			bOnIce = bIce;

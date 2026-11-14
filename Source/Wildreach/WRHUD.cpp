@@ -1,5 +1,6 @@
 #include "WRHUD.h"
 #include "WRArtifacts.h"
+#include "WRDeeds.h"
 #include "GameFramework/PlayerState.h"
 #include "WRFarm.h"
 #include "WRStatusComponent.h"
@@ -415,7 +416,14 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 			}
 			continue;
 		}
-		DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
+		// A survivor's worn title on a smaller line in pale brass under the name (WRDeeds).
+		const UWRDeedsComponent* Deeds = Other->GetPlayerState() ? UWRDeedsComponent::For(Other->GetPlayerState()) : nullptr;
+		if (Deeds && !Deeds->ActiveTitle.IsEmpty())
+		{
+			DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 45.f, nullptr, 0.9f);
+			DrawText(Deeds->ActiveTitle, FLinearColor(0.86f, 0.74f, 0.5f), BX, Screen.Y - 29.f, nullptr, 0.72f);
+		}
+		else DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
 		// Gnomon Eye (artifact): no enemy health bars; names and statuses still show.
 		if (!(PlayerOwner.Get() && WRArtifacts::Has(PlayerOwner->PlayerState.Get(), TEXT("no_enemy_bars")) && !Other->GetPlayerState()))
 		{

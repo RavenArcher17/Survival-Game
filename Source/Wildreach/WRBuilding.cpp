@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRCreature.h"
 #include "WRRaiding.h"
 #include "WRTaming.h"
 #include "WRFarm.h"
@@ -32,6 +33,7 @@
 #include "Net/UnrealNetwork.h"
 #include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "WREndgameLook.h"
 
 // ---------------------------------------------------------------- registry
 
@@ -128,6 +130,7 @@ FWRBuildRegistry::FWRBuildRegistry()
 			O->TryGetNumberField(TEXT("fuelMinutes"), D.FuelMinutes);
 			if (O->TryGetStringField(TEXT("needs"), S)) D.NeedsCreature = FName(*S);
 			if (O->TryGetStringField(TEXT("trophy"), S)) D.Trophy = FName(*S);
+			if (O->TryGetStringField(TEXT("monument"), S)) D.Monument = FName(*S);
 			O->TryGetStringField(TEXT("note"), D.Note);
 			if (O->TryGetStringField(TEXT("liveWith"), S)) D.LiveWith = FName(*S);
 			// Modelled furniture (WRBuildLookDecor) and its rules (build-building).
@@ -136,6 +139,8 @@ FWRBuildRegistry::FWRBuildRegistry()
 			if (O->TryGetStringField(TEXT("needsPlace"), S)) D.Needs = FName(*S);
 			if (O->TryGetStringField(TEXT("blueprint"), S)) D.Blueprint = FName(*S);
 			if (O->TryGetStringField(TEXT("tier"), S)) D.Tier = FName(*S);
+			// A monument to a great boss not in this build (its row waits in the data): left out until the boss ships.
+			if (!D.Monument.IsNone() && !FWRCreatureRegistry::Get().Find(D.Monument)) continue;
 			Pieces.Add(D);
 		}
 	}
@@ -367,6 +372,7 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, Feed);
 	DOREPLIFETIME(AWRBuildPiece, Support);
 	DOREPLIFETIME(AWRBuildPiece, CustomName);
+	DOREPLIFETIME(AWRBuildPiece, Emblem);
 	DOREPLIFETIME(AWRBuildPiece, UnlockedFor);
 	DOREPLIFETIME(AWRBuildPiece, Machine);
 	DOREPLIFETIME(AWRBuildPiece, Turret);
@@ -409,6 +415,11 @@ void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
 void AWRBuildPiece::BeginPlay()
 {
 	Super::BeginPlay();
+	// A banner wears its owner's chosen boss sigil from the day it's raised (cooks/build-endgame.md 2.8).
+	if (HasAuthority() && !bGhost && Emblem.IsNone() && PieceId == TEXT("banner")) Emblem = WREndgameLook::SigilOf(GetWorld(), OwnerName);
+	// A monument's plaque line (its owners' best kill from the boards) is the server's, dedicated or not: set it here,
+	// not only in the look the server's own screen draws.
+	if (HasAuthority() && !bGhost && GetDef() && !GetDef()->Monument.IsNone()) WREndgameLook::SetPlaqueLine(this);
 	ApplyLook();
 	if (HasAuthority() && !bGhost)
 	{
@@ -674,6 +685,8 @@ void AWRBuildPiece::ApplyLook()
 	else if (K == TEXT("hive")) Parts.Add({ FVector(96, 90, 150), FVector(0, 0, 75) });
 	else if (K == TEXT("trap")) Parts.Add({ FVector(90, 50, 55), FVector(-5, 0, 27) });
 	else if (!Def->Trophy.IsNone()) Parts.Add({ FVector(146, 8, 64), FVector(0, -7, 150) });
+	// A boss monument: its stepped plinth (the head on top is a look, WREndgameLook).
+	else if (!Def->Monument.IsNone()) { Parts.Add({ FVector(150, 150, 30), FVector(0, 0, 15) }); Parts.Add({ FVector(110, 110, 110), FVector(0, 0, 85) }); Parts.Add({ FVector(80, 80, 80), FVector(0, 0, 180) }); }   // plinth, then the head on its collar
 	else if (K == TEXT("chest")) Parts.Add({ FVector(100, 60, 60), FVector(0, 0, 30) });
 	// Furniture and lights collide as what you see (WRBuildLook's measurements): a bed's frame and headboard, a
 	// brazier's bowl on its legs, a table's top on four legs, a chair's seat, legs and back.
@@ -883,6 +896,15 @@ FString AWRBuildPiece::GhostLook() const
 
 void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
 {
+	// A boss monument is the endgame's own look: its granite plinth, the boss's head, the bronze plaque (WREndgameLook).
+	if (!Def.Monument.IsNone())
+	{
+		TArray<UMeshComponent*> Plain;
+		GetComponents(Plain);
+		for (UMeshComponent* C : Plain) C->SetVisibility(false);
+		WREndgameLook::BuildMonument(this, Def, bGhost);
+		return;
+	}
 	// Machines are modelled with their moving parts (WRMachineLook); the plain blocks stay as their collision, hidden.
 	if (FWRMachineLook::Handles(Def))
 	{
@@ -919,6 +941,17 @@ void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
 	{
 		FWRBuildLook::Spawn(this, Leaf, FWRBuildLook::LeafBlocks(Def, LeafSize, GetActorTransform()), FWRBuildLook::ClothColor(Def), true);
 	}
+	if (Def.Id == TEXT("banner") && !bGhost) WREndgameLook::DressBanner(this);
+}
+
+void AWRBuildPiece::OnRep_CustomName()
+{
+	if (HasActorBegunPlay() && GetDef() && !GetDef()->Monument.IsNone()) WREndgameLook::RefreshPlaque(this);
+}
+
+void AWRBuildPiece::OnRep_Emblem()
+{
+	if (HasActorBegunPlay()) WREndgameLook::DressBanner(this);
 }
 
 void AWRBuildPiece::SetGhostValid(bool bValid)
@@ -1242,6 +1275,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 	O->SetStringField(TEXT("piece"), PieceId.ToString());
 	O->SetStringField(TEXT("owner"), OwnerName);
+	if (!Emblem.IsNone()) O->SetStringField(TEXT("emblem"), Emblem.ToString());
 	const FVector L = GetActorLocation();
 	O->SetNumberField(TEXT("x"), L.X);
 	O->SetNumberField(TEXT("y"), L.Y);
@@ -1351,6 +1385,8 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 	FWRMachines::FromJson(this, O);
 	FWRTaming::PieceFromJson(this, O);
 	O->TryGetStringField(TEXT("name"), CustomName);
+	FString EmblemStr;
+	if (O->TryGetStringField(TEXT("emblem"), EmblemStr)) { Emblem = FName(*EmblemStr); if (GetNetMode() != NM_DedicatedServer) OnRep_Emblem(); }
 	O->TryGetBoolField(TEXT("locked"), bLocked);
 	O->TryGetBoolField(TEXT("planted"), bPlanted);
 	FString Str;

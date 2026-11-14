@@ -61,7 +61,7 @@ namespace WRWorldsFiles
 		TEXT("xpMultiplier"), TEXT("gatherMultiplier"), TEXT("tamingMultiplier"), TEXT("cropMultiplier"),
 		TEXT("dayMinutes"), TEXT("hungerMultiplier"), TEXT("creatureNumbers"), TEXT("creatureDifficulty"),
 		TEXT("upkeepMultiplier"), TEXT("bossRespawnHours"), TEXT("portalRuns"), TEXT("artifactSlots"),
-		TEXT("raidGroupMax"), TEXT("raidGroupTuned"),
+		TEXT("raidGroupMax"), TEXT("raidGroupTuned"), TEXT("raidRespawnHours"), TEXT("recordsSeason"),
 	};
 
 	/** Reads what an object sets over S: a preset's values, or a custom world's changes. */

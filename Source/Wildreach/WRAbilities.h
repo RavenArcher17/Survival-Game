@@ -164,6 +164,34 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 };
 
+/**
+ * Soul arts (cooks/build-endgame.md 2.3): an awakened boss weapon's own weapon art, in a quick slot while that weapon is
+ * in your hand (no new button). The swing is the weapon's heavy (its row: tuning wildbrands.soul_<boss>); what the
+ * soul adds is what the blow does to the ground. Not a path Wildbrand: it spends stamina, not a path's resource.
+ */
+UCLASS() class WILDREACH_API UWRGA_SoulArtVulkarn : public UWRGA_Melee
+{
+	GENERATED_BODY()
+public:
+	UWRGA_SoulArtVulkarn();
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+	/** Bumped when a swing is cut off (stagger, cancel): its ground effect, timed for the blow's landing, doesn't come. */
+	int32 CastSerial = 0;
+};
+UCLASS() class WILDREACH_API UWRGA_SoulArtSkaldrith : public UWRGA_Melee
+{
+	GENERATED_BODY()
+public:
+	UWRGA_SoulArtSkaldrith();
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+	/** Bumped when a swing is cut off (stagger, cancel): its ground effect, timed for the blow's landing, doesn't come. */
+	int32 CastSerial = 0;
+};
+
 /** Creature bite: flat damage from the creature's weapon stats, slower telegraphed windup. */
 UCLASS() class WILDREACH_API UWRGA_Bite : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_Bite(); };
 

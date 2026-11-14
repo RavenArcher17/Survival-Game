@@ -1,5 +1,56 @@
 # Changelog
 
+## Unreleased: the endgame (prestige, the Heron's draught, soul forging, mythic rules, boards, deeds, titles, cosmetics, monuments, the Thaw Hall raid)
+
+Aaron (lane build-endgame: research, requirement ledger and plan in showcase-notes cooks/build-endgame.md, following
+cooks/endgame.md 2.7-2.12 and biome-void.md 2.23.2-2.23.9, Raven's DD Endgame, DR #9 and DR #22). Built to compile
+(editor, adaptive build); not played here (Aaron and the testers test, F8).
+
+- **Prestige** (`WRDeeds`): a path at 100 earned points, at its boss altar, held Return (1.5 s): XP and ranks go back to
+  the starter, the layout is saved, and you carry one mark of it for good (3 at most): Keener (+5% that path's damage),
+  Deeper (+10% its resource capacity and gain) or Rooted (its root passive at half on the subclass, once a path). Marks
+  work only while the path is main or subclass. Gold threads in the path's skin marks (0.12 a mark), "Ember-sworn" /
+  "Rime-sworn" at three. **Restore layout** (Paths tab, altar, Deeds > Marks) buys the old layout back as points come;
+  its nodes carry a gold dot until then.
+- **The Heron's draught** (respec, DD / DR #9): a rare drop (great bosses' repeat kills 3% + 0.5% a party AL, portal
+  guardians rank 3/4/5 2/4/6%, war-hall champions 3%) and the last step of each path master's new four-step line, *The
+  Unlearning* (title Unlearned). Drink it from the bag: pick your main path or subclass, hold Forget; its ranks go, XP
+  stays, every point back. Paths set aside at an altar can't be picked (they keep their ranks).
+- **Boss soul forging**: a great boss's soul to every looter (first kill always, then 10% + 1% a party AL, x2 in its
+  hidden phase 3, always on a first kill at AL 10+). At its altar (Forge soul page): A awakens its blueprint weapon
+  (Cinderbrand / Rimefang: starsteel's metal factor, element fixed, its **Soul art** in a quick slot while held:
+  Vulkarn's Flood, Pillar-breaker), B makes its talisman (Forge-heart, Rime-scale); a second soul buys the other, spares
+  give core shards. `Data/souls.json` has all 12 majors; only built bosses show.
+- **Mythic gear, data-ready**: `Data/mythic.json` (the Ring rule: 10 of each of the 12 signature resources, 3 Champion's
+  marks, a +10 masterwork starsteel piece; x1.15, 3 sockets, two elements). Items now carry `mark` (awakened / mythic)
+  and `element2` (blows alternate the two), saved, shown on the item card; `live: false` until the Ring exists.
+- **Kill-time boards** (`WRRecords`): every great boss, lesser boss, portal guardian and war-hall timed from the first
+  survivor blow; bands by group size (tames count), artifact runs in their own column with AL; world document
+  `records`, never reset; server setting **Records season** starts fresh boards and keeps old ones readable. Granite
+  tablets by each boss's shrine-stone / summoning stone and the war-hall gate show the top three (letters regrind when
+  a record falls); E opens the full board.
+- **Deeds** (journal tab, key `.`): 150 achievements in 10 categories (`Data/achievements.json`, 20 hidden; only rows
+  whose content is in this build are live), progress shown, a brass toast for 3 s when one lands. **Titles** (from
+  deeds, prestige, raids, the Banes, the masters' last tasks) under your name and before it in chat. **Cosmetics**
+  (`Data/cosmetics.json`, only from hard content): weapon glows (deathless great-boss kills), armour dyes and raid
+  marks (war-hall champions, 3%), banner sigils of any boss you've beaten (woven on your banners and drawn on your
+  claim's map mark). **Marks** page for prestige.
+- **Monuments**: a great boss's trophy head (first kill always, 25% after) + stone + bronze builds its monument: a
+  granite plinth with a carved niche, the boss's own head on a bronze collar, a bronze plaque with its owners' best kill
+  time, names and highest AL (knot border at 15). Comfort 3. A claim with one shows that boss's sigil on the map.
+- **Raids for 6 to 10: the Thaw Hall** (`WRWarHall`, `Data/raids.json`): its gate cut into the ridge by the North pass
+  road (stair, oak doors, braziers, the two sigils on the lintel; run-back stone 40 m back, record tablet by the stair).
+  The hall (built at runtime in hall space): 112 x 72 m of 4 m basalt flags over a lava sump, basalt ashlar west, glacier
+  ice east. The Fallen Smith's slams turn flags to lava, the Burnt Wyrm's sweeps and breath to ice, and a flag flipped
+  from one to the other within 3 s bursts in steam (150, champions too). Rivals: their blows hit each other at half; one
+  driven under 30% while the other is above gives the other Triumph. The door seals when the first raider crosses the
+  bronze line; opens on the win (2 min loot) or when no raider is inside for 8 s (reset; bags go to the gate). Loot per
+  champion by the 10% rule (path materials, Champion's mark, 3 upgrade shards, 3% raid cosmetic, 3% Heron's draught).
+  Server settings: raid group cap / tuned for (now shown), **Raid respawn** 1-168 h (24). The other five halls are data
+  rows, hidden until their lands exist.
+- Server: `deeds ...` and `warhall ...` commands (everything checked on the server); the deeds save in each character
+  (`deeds`). Hall space counts as its two lands (west / east), sheltered, and its ice flags are slick for movement.
+
 ## Unreleased: the world store (SQLite), identity, player raiding, raid group settings
 
 Aaron (lane build-server-raids: research, requirement ledger and plan in showcase-notes cooks/build-server-raids.md,

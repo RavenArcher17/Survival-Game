@@ -1,5 +1,6 @@
 #include "WRCreature.h"
 #include "WRRaiding.h"
+#include "WRDeeds.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRSurvival.h"
@@ -1700,7 +1701,7 @@ int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
 
 void AWRCreature::CompleteTame(const FString& PlayerName, bool bTamed)
 {
-	if (bTamed && TamedBy.IsEmpty() && !PlayerName.IsEmpty()) WRWorld::OnTamed(this, PlayerName);   // quests (Áilu's patient hand)
+	if (bTamed && TamedBy.IsEmpty() && !PlayerName.IsEmpty()) { WRWorld::OnTamed(this, PlayerName); WRDeeds::OnTamed(this, PlayerName); }   // quests (Áilu's patient hand); achievements
 	TamedBy = PlayerName;
 	TameOrder = EWRTameOrder::Follow;
 	TameProgress = 1.f;

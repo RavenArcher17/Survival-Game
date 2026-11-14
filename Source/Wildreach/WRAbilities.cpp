@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRDeeds.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
 #include "WRPortals.h"
@@ -1158,8 +1159,9 @@ void UWRGA_Melee::Sweep()
 		{
 			const float Infused = MoveId == TEXT("charged") ? T.Num(TEXT("status.infusedBuildup.charged"), 22.f)
 				: bHeavy ? T.Num(TEXT("status.infusedBuildup.heavy"), 14.f) : T.Num(TEXT("status.infusedBuildup.light"), 8.f);
-			if (Character->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Infused; }
-			else if (Character->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Infused; }
+			const FName BlowElement = Character->Weapon.NextElement();   // a mythic weapon alternates its two
+			if (BlowElement == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Infused; }
+			else if (BlowElement == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Infused; }
 		}
 		// Where the blade meets the body: the nearer point of its capsule along the swing (head strikes, parts).
 		{
@@ -1263,6 +1265,150 @@ void UWRGA_MoltenCleave::ActivateAbility(const FGameplayAbilitySpecHandle Handle
 			WRFx::Broadcast(C, TEXT("lavapool"), At, FRotator::ZeroRotator, WRTune(TEXT("spells.moltenCleave.lavaRadius"), 220.f) / 100.f, TEXT("lavapool"), WRTune(TEXT("spells.moltenCleave.lavaSeconds"), 6.f));
 		}
 	}), WRTune(TEXT("weapon.heavyTiming.windup"), 0.5f) + 0.05f, false);
+}
+
+// ---------------------------------------------------------------- soul arts (cooks/build-endgame.md 2.3)
+
+namespace WRSoulArts
+{
+	/** The art is yours only while its awakened weapon is the one in your hand. */
+	bool Held(const FGameplayAbilityActorInfo* ActorInfo, const TCHAR* Node)
+	{
+		const AActor* Who = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+		return WRDeeds::SoulArtFor(Who) == FName(*FString::Printf(TEXT("soul.%s"), Node));
+	}
+}
+
+void UWRGA_SoulArtVulkarn::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	if (bWasCancelled) ++CastSerial;
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UWRGA_SoulArtSkaldrith::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	if (bWasCancelled) ++CastSerial;
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+UWRGA_SoulArtVulkarn::UWRGA_SoulArtVulkarn()
+{
+	DisplayName = TEXT("Vulkarn's Flood"); PathId = TEXT("soul"); NodeId = TEXT("soul_vulkarn");
+	StaminaKey = TEXT("wildbrands.soul_vulkarn.stamina"); StaminaFallback = 25.f;
+	CooldownKey = TEXT("wildbrands.soul_vulkarn.cooldown"); CooldownFallback = 30.f;
+	TimingKey = TEXT("weapon.heavyTiming"); SwingKind = EWRSwingKind::WeaponArt; bHeavy = true;
+	Element = WRTags::Element_Fire; ArtKey = TEXT("wildbrands.soul_vulkarn");
+	StanceMultiplier = 5.f;
+}
+
+bool UWRGA_SoulArtVulkarn::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	return WRSoulArts::Held(ActorInfo, TEXT("vulkarn")) && Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+void UWRGA_SoulArtVulkarn::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	AWRCharacterBase* Caster = GetCharacter();
+	if (!Caster || !IsServer())
+	{
+		return;
+	}
+	// Vulkarn's Flood: as the hammer meets the ground, the ground splits ahead of it and the crack fills with lava for a
+	// few seconds (a line of lava pools, 6 m; it burns what stands in it: the world's hazard, through ApplyHit).
+	const FWRTuning& T = FWRTuning::Get();
+	const FString K = TEXT("wildbrands.soul_vulkarn");
+	TWeakObjectPtr<AWRCharacterBase> Weak = Caster;
+	TWeakObjectPtr<ThisClass> Self = this;
+	const int32 Serial = ++CastSerial;
+	FTimerHandle Timer;
+	Caster->GetWorldTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([Weak, K, Self, Serial]()
+	{
+		AWRCharacterBase* C = Weak.Get();
+		if (!C || !C->IsAlive() || !Self.IsValid() || Self->CastSerial != Serial) return;   // the swing was cut off
+		const FWRTuning& Tn = FWRTuning::Get();
+		const float Length = Tn.Num(K + TEXT(".crack.length"), 600.f), Width = Tn.Num(K + TEXT(".crack.width"), 160.f), Seconds = Tn.Num(K + TEXT(".crack.seconds"), 4.f);
+		const FVector Fwd = C->GetActorForwardVector().GetSafeNormal2D();
+		const FVector Feet = C->GetActorLocation() - FVector(0, 0, C->GetSimpleCollisionHalfHeight());
+		const int32 Pools = FMath::Max(2, FMath::RoundToInt(Length / Width));
+		for (int32 i = 0; i < Pools; ++i)
+		{
+			FVector At = Feet + Fwd * (120.f + (Length - 120.f) * (i + 0.5f) / Pools);
+			FHitResult Ground;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRSoulFlood), false, C);
+			if (C->GetWorld()->LineTraceSingleByChannel(Ground, At + FVector(0, 0, 200.f), At - FVector(0, 0, 400.f), ECC_WorldStatic, Q)) At = Ground.ImpactPoint;
+			AWRHazard* H = AWRHazard::Spawn(C->GetWorld(), C, At, Width * 0.6f, Seconds, Tn.Num(K + TEXT(".crack.dps"), 20.f), TEXT("lava"), false);
+			if (H && C->GetPlayerState()) { H->bBurnsPieces = false; }
+			WRFx::Broadcast(C, TEXT("lavapool"), At, FRotator(0.f, Fwd.Rotation().Yaw, 0.f), Width / 110.f, i == 0 ? FName(TEXT("soul.flood")) : NAME_None, Seconds);
+		}
+		WRFx::Shake(C, 0.35f, Feet, 1500.f);
+	}), T.Num(K + TEXT(".windup"), 0.75f) + T.Num(K + TEXT(".active"), 0.2f) * 0.5f, false);
+}
+
+UWRGA_SoulArtSkaldrith::UWRGA_SoulArtSkaldrith()
+{
+	DisplayName = TEXT("Pillar-breaker"); PathId = TEXT("soul"); NodeId = TEXT("soul_skaldrith");
+	StaminaKey = TEXT("wildbrands.soul_skaldrith.stamina"); StaminaFallback = 25.f;
+	CooldownKey = TEXT("wildbrands.soul_skaldrith.cooldown"); CooldownFallback = 30.f;
+	TimingKey = TEXT("weapon.heavyTiming"); SwingKind = EWRSwingKind::WeaponArt; bHeavy = true;
+	Element = WRTags::Element_Frost; ArtKey = TEXT("wildbrands.soul_skaldrith");
+	StanceMultiplier = 3.f;
+}
+
+bool UWRGA_SoulArtSkaldrith::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	return WRSoulArts::Held(ActorInfo, TEXT("skaldrith")) && Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+void UWRGA_SoulArtSkaldrith::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	AWRCharacterBase* Caster = GetCharacter();
+	if (!Caster || !IsServer())
+	{
+		return;
+	}
+	// Pillar-breaker: the thrust's frost runs on into the ground and bursts up ahead in a line of ice spikes (Skaldrith's
+	// own ice spikes, small): what they rise under takes the blow, frostbite and stance damage.
+	const FWRTuning& T = FWRTuning::Get();
+	const FString K = TEXT("wildbrands.soul_skaldrith");
+	TWeakObjectPtr<AWRCharacterBase> Weak = Caster;
+	TWeakObjectPtr<ThisClass> Self = this;
+	const int32 Serial = ++CastSerial;
+	FTimerHandle Timer;
+	Caster->GetWorldTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([Weak, K, Self, Serial]()
+	{
+		AWRCharacterBase* C = Weak.Get();
+		if (!C || !C->IsAlive() || !Self.IsValid() || Self->CastSerial != Serial) return;   // the swing was cut off
+		const FWRTuning& Tn = FWRTuning::Get();
+		const float From = Tn.Num(K + TEXT(".spikes.from"), 100.f), Length = Tn.Num(K + TEXT(".spikes.length"), 400.f), Width = Tn.Num(K + TEXT(".spikes.width"), 160.f);
+		const FVector Fwd = C->GetActorForwardVector().GetSafeNormal2D();
+		const FVector Feet = C->GetActorLocation() - FVector(0, 0, C->GetSimpleCollisionHalfHeight());
+		const FVector A = Feet + Fwd * From, B = Feet + Fwd * (From + Length);
+		for (int32 i = 0; i < 4; ++i) WRFx::Broadcast(C, TEXT("frostnova"), FMath::Lerp(A, B, (i + 0.5f) / 4.f), FRotator::ZeroRotator, Width / 160.f, i == 0 ? FName(TEXT("soul.pillar")) : NAME_None);
+		for (TActorIterator<AWRCharacterBase> It(C->GetWorld()); It; ++It)
+		{
+			AWRCharacterBase* Who = *It;
+			if (Who == C || !Who->IsAlive() || !C->IsHostileTo(Who)) continue;
+			const FVector P = FMath::ClosestPointOnSegment(Who->GetActorLocation(), A, B);
+			if (FVector::Dist2D(P, Who->GetActorLocation()) > Width * 0.5f + Who->GetSimpleCollisionRadius() || FMath::Abs(Who->GetActorLocation().Z - Who->GetSimpleCollisionHalfHeight() - P.Z) > 250.f) continue;
+			FWRHit Hit;
+			Hit.Instigator = C;
+			Hit.Damage = UWRCombatLibrary::WeaponDamage(C->Weapon, true) * Tn.Num(K + TEXT(".spikes.dmg"), 1.6f);
+			Hit.PoiseDamage = 60.f;
+			Hit.Element = WRTags::Element_Frost;
+			Hit.FrostBuildup = Tn.Num(K + TEXT(".spikes.frost"), 50.f);
+			Hit.StanceDamage = UWRCombatLibrary::WeaponDamage(C->Weapon, true) * Tn.Num(K + TEXT(".spikes.stance"), 3.f) * 0.1f;
+			Hit.bWeaponArt = true;
+			Hit.bHeavy = true;
+			Hit.Tier = EWRHitTier::Heavy;
+			Hit.Impact = 4;
+			Hit.PhysType = 3;
+			Hit.Origin = P;
+			Hit.ImpactPoint = Who->GetActorLocation();
+			UWRCombatLibrary::ApplyHit(Who, Hit);
+		}
+	}), T.Num(K + TEXT(".windup"), 0.5f) + T.Num(K + TEXT(".active"), 0.3f), false);
 }
 
 UWRGA_FlameSlash::UWRGA_FlameSlash()
@@ -1776,8 +1922,9 @@ void UWRGA_Critical::ActivateAbility(const FGameplayAbilitySpecHandle Handle, co
 		Hit.Damage = UWRCombatLibrary::WeaponDamage(Me->Weapon, false) * (CritKind == EKind::Backstab ? C.CritBackstab : C.CritRiposte)
 			* (Who->GetPlayerState() ? Tune.Num(TEXT("crit.pvpDamage"), 0.7f) : 1.f);
 		Hit.Element = WRTags::Element_Physical;
-		if (Me->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup = Tune.Num(TEXT("weapon.infusedBuildup"), 15.f); }
-		else if (Me->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup = Tune.Num(TEXT("weapon.infusedBuildup"), 15.f); }
+		const FName BlowElement = Me->Weapon.NextElement();
+		if (BlowElement == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup = Tune.Num(TEXT("weapon.infusedBuildup"), 15.f); }
+		else if (BlowElement == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup = Tune.Num(TEXT("weapon.infusedBuildup"), 15.f); }
 		Hit.StanceDamage = 0.f;
 		Hit.PoiseDamage = 0.f;
 		Hit.Impact = 3;
@@ -2349,6 +2496,12 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("molten_edge")) return UWRGA_MoltenEdge::StaticClass();
 		if (NodeId == TEXT("molten_cleave")) return UWRGA_MoltenCleave::StaticClass();
 		if (NodeId == TEXT("meteor")) return UWRGA_Meteor::StaticClass();
+	}
+	else if (PathId == TEXT("soul"))
+	{
+		// An awakened boss weapon's Soul art (WRDeeds::SoulArtFor puts "soul.<boss>" in a quick slot).
+		if (NodeId == TEXT("vulkarn")) return UWRGA_SoulArtVulkarn::StaticClass();
+		if (NodeId == TEXT("skaldrith")) return UWRGA_SoulArtSkaldrith::StaticClass();
 	}
 	else if (PathId == TEXT("frost"))
 	{

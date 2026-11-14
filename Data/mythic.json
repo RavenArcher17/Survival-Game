@@ -1,0 +1,30 @@
+{
+  "_comment": "Mythic gear (DD: 'mythic gear that needs materials from every biome'; biome-void 2.23.3, cooks/endgame.md 2.10, cooks/build-endgame.md 2.4). Forged at the Ring on the Crown, no NPC, no menu: offer.perPillar of each biome's signature resource on its pillar, the base item and champion's marks on the centre stone, hold channelSeconds (taking damage breaks it). The result: metal factor tuning weapon.metal.mythic (starsteel x damageScale), sockets fixed at sockets, upgrade cap upgradeCap, two elements at once (your main and subclass paths: each swing carries one, 50/50), and its class's mythic Wildbrand. Mythic armour: armour.marks marks + armour.perPillar of each resource on a +10 biome-set piece; it also counts as a piece of a second set you pick. live is false until the Ring and all twelve resources exist in the build (until then nothing shows). All first drafts.",
+  "live": false,
+  "channelSeconds": 180,
+  "damageScale": 1.15,
+  "sockets": 3,
+  "upgradeCap": 10,
+  "offer": {
+    "perPillar": 10,
+    "pillars": {
+      "volcanic": "sulfur_crystal", "storm": "stormglass", "desert": "sunstone", "forest": "heartwood",
+      "sky": "levistone", "crystal": "resonant_crystal", "tundra": "lichen", "swamp": "bloodmoss",
+      "ocean": "tidecoral", "graveyard": "soulstone", "fungal": "deepcap", "void": "voidglass"
+    }
+  },
+  "base": { "marks": 3, "markItem": "champion_mark", "metal": "starsteel", "quality": "masterwork", "upgrade": 10, "slots": ["weapon", "ring"] },
+  "armour": { "marks": 1, "perPillar": 5, "upgrade": 10, "secondSet": true },
+  "weapons": [
+    { "id": "reachblade", "name": "Reachblade", "class": "sword", "brand": { "id": "twelvefold_cut", "name": "Twelvefold cut", "line": "Three cuts, the third x2.0 with both your elements' buildup at 60.", "windup": [0.28, 0.18, 0.36], "dmg": [1.0, 1.0, 2.0], "buildup": 60 } },
+    { "id": "spinebreaker", "name": "Spinebreaker", "class": "great_hammer", "brand": { "id": "fault_line", "name": "Fault line", "line": "A slam that sends a crack 12 m along the ground (low), stance x6.", "windup": 0.7, "travel": 1200, "stance": 6 } },
+    { "id": "giantsfell", "name": "Giantsfell", "class": "axe", "brand": { "id": "fell", "name": "Fell", "line": "A charged overhead (to 1.0 s): x2.6 on staggered foes.", "chargeMax": 1.0, "dmgStaggered": 2.6 } },
+    { "id": "crownspear", "name": "Crownspear", "class": "spear", "brand": { "id": "pillar_thrust", "name": "Pillar thrust", "line": "A 6 m lunge that pins lowland and midland foes 1.5 s.", "windup": 0.4, "reach": 600, "pin": 1.5 } },
+    { "id": "wakebreaker", "name": "Wakebreaker", "class": "greatsword", "brand": { "id": "wake", "name": "Wake", "line": "A 300 degree sweep leaving a 3 s line of your main element.", "arc": 300, "lineSeconds": 3 } },
+    { "id": "tidewhisper", "name": "Tidewhisper", "class": "dagger", "brand": { "id": "unseen_edge", "name": "Unseen edge", "line": "A 4 m dash-stab that backstabs from any side once every 20 s.", "reach": 400, "cooldown": 20 } },
+    { "id": "harrowmoon", "name": "Harrowmoon", "class": "scythe", "brand": { "id": "harvest", "name": "Harvest", "line": "A spin; each kill inside gives back 15% stamina.", "refund": 0.15 } },
+    { "id": "delvewright", "name": "Delvewright", "class": "pick_hammer", "brand": { "id": "deep_strike", "name": "Deep strike", "line": "Ignores half the armour; mining yields x2 for 60 s after.", "armourIgnore": 0.5, "yieldSeconds": 60 } },
+    { "id": "farsight", "name": "Farsight", "class": "bow", "brand": { "id": "twelve_arrows", "name": "Twelve arrows", "line": "Twelve arrows in a 20 degree fan (straight, never homing).", "arrows": 12, "fan": 20 } },
+    { "id": "twelvefold_band", "name": "Twelvefold band", "class": "ring", "worn": { "resourceGainBoth": 0.05, "elementDamageBoth": 0.05 }, "line": "+5% to both paths' resource gain and both elements' damage." }
+  ]
+}

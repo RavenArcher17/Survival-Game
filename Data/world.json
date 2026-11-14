@@ -36,14 +36,18 @@
   ],
 
   "quests": {
-    "_comment": "Per master, in order. type: bring (items taken), show (items checked), kill (creature, count, optional status: burning / slowed), shrines (all listed lit by you), quench (hold a weapon of an element in water), sneak (within 5 m of a sleeping kind, then 30 m off while it sleeps), tame (creature). pays: xp to the master's path, items, recipes learned.",
+    "_comment": "Per master, in order. type: bring (items taken), show (items checked), kill (creature, count, optional status: burning / slowed), shrines (all listed lit by you), quench (hold a weapon of an element in water), sneak (within 5 m of a sleeping kind, then 30 m off while it sleeps), tame (creature). pays: xp to the master's path, items, recipes learned. The last four of each master's line are The Unlearning (arc: unlearning; its last step pays the Heron's draught: a respec, cooks/build-endgame.md 2.2). title_reward: a title the step gives.",
     "sigrun": [
       { "id": "feed_fire", "title": "Feed the fire", "task": "Bring Sigrun 10 sulfur crystals.", "type": "bring", "item": "sulfur_crystal", "count": 10, "xp": 800, "recipes": ["cinder_salve"] },
       { "id": "quench", "title": "Quench", "task": "Quench a fire-infused weapon: hold it in water.", "type": "quench", "element": "fire", "count": 1, "xp": 1000 },
       { "id": "ash_and_bone", "title": "Ash and bone", "task": "Kill 5 Cinderfangs while they burn.", "type": "kill", "creature": "cinderfang", "status": "burning", "count": 5, "xp": 1200 },
       { "id": "kindle_vents", "title": "Kindle the vents", "task": "Light the Glasswall, Blue Fire and Crater Rim shrines.", "type": "shrines", "shrines": ["glasswall", "bluefire", "craterrim"], "count": 3, "xp": 1500, "recipes": ["obsidian_arrow"] },
       { "id": "glass_heart", "title": "Glass heart", "task": "Show Sigrun the Obsidian Warden's heart.", "type": "show", "item": "trophy_obsidian_heart", "count": 1, "xp": 2000, "items": { "gem_ruby": 1, "ember_essence": 3 } },
-      { "id": "the_yoke", "title": "The yoke", "task": "Kill Cinderhorn, the bull that walks the ash plains.", "type": "kill", "creature": "cinderhorn", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } }
+      { "id": "the_yoke", "title_reward": "Ashhand's hand", "title": "The yoke", "task": "Kill Cinderhorn, the bull that walks the ash plains.", "type": "kill", "creature": "cinderhorn", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } },
+      { "id": "cold_ashes", "title": "The Unlearning: cold ashes", "task": "Bring Sigrun 20 obsidian: the glass a fire path is made of, to be given up.", "type": "bring", "item": "obsidian", "count": 20, "xp": 2000, "arc": "unlearning" },
+      { "id": "hot_iron", "title": "The Unlearning: hot iron, cold water", "task": "Quench a fire-infused weapon three times.", "type": "quench", "element": "fire", "count": 3, "xp": 2000, "arc": "unlearning" },
+      { "id": "giant_knew", "title": "The Unlearning: what the giant knew", "task": "Show Sigrun Vulkarn's core.", "type": "show", "item": "core_vulkarn", "count": 1, "xp": 3000, "arc": "unlearning" },
+      { "id": "herons_cup_fire", "title": "The Unlearning: the heron's cup", "task": "Bring Sigrun 5 frost essence: the draught is drunk cold.", "type": "bring", "item": "frost_essence", "count": 5, "xp": 3000, "items": { "heron_draught": 1 }, "title_reward": "Unlearned", "arc": "unlearning" }
     ],
     "ailu": [
       { "id": "listen", "title": "Listen", "task": "Get within 5 m of a sleeping Gloomhowl and back out without waking it.", "type": "sneak", "creature": "gloomhowl", "count": 1, "xp": 800 },
@@ -51,7 +55,11 @@
       { "id": "patient_hand", "title": "The patient hand", "task": "Tame a Woolly drudge.", "type": "tame", "creature": "woolly_drudge", "count": 1, "xp": 1200 },
       { "id": "slow_saber", "title": "Slow the saber", "task": "Kill a Rimeclaw while it's slowed.", "type": "kill", "creature": "rimeclaw", "status": "slowed", "count": 1, "xp": 1500 },
       { "id": "under_bridge", "title": "Under the bridge", "task": "Show Áilu Grimjaw's marrow.", "type": "show", "item": "trophy_troll_marrow", "count": 1, "xp": 2000 },
-      { "id": "earth_bull", "title": "The Earth-Bull", "task": "Kill Old Tusker, the feral drudge bull.", "type": "kill", "creature": "old_tusker", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } }
+      { "id": "earth_bull", "title_reward": "Ice-patient", "title": "The Earth-Bull", "task": "Kill Old Tusker, the feral drudge bull.", "type": "kill", "creature": "old_tusker", "count": 1, "xp": 3000, "items": { "upgrade_shard": 2 } },
+      { "id": "thin_ice", "title": "The Unlearning: thin ice", "task": "Bring Áilu 20 blocks of ice: what a frost path is made of, to be given up.", "type": "bring", "item": "ice_block", "count": 20, "xp": 2000, "arc": "unlearning" },
+      { "id": "breath_held", "title": "The Unlearning: breath held", "task": "Get within 5 m of a sleeping Rimeclaw and back out without waking it.", "type": "sneak", "creature": "rimeclaw", "count": 1, "xp": 2000, "arc": "unlearning" },
+      { "id": "wyrm_knew", "title": "The Unlearning: what the wyrm knew", "task": "Show Áilu Skaldrith's core.", "type": "show", "item": "core_skaldrith", "count": 1, "xp": 3000, "arc": "unlearning" },
+      { "id": "herons_cup_frost", "title": "The Unlearning: the heron's cup", "task": "Bring Áilu 5 ember essence: the draught is warmed by the other land.", "type": "bring", "item": "ember_essence", "count": 5, "xp": 3000, "items": { "heron_draught": 1 }, "title_reward": "Unlearned", "arc": "unlearning" }
     ],
     "standing": 150, "greetRange": 600, "greetEvery": 90, "talkRange": 400, "sneakNear": 500, "sneakAway": 3000
   },
