@@ -1,4 +1,5 @@
 #include "WRResourceNode.h"
+#include "WRTaming.h"
 #include "WRResourceLook.h"
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
@@ -137,6 +138,7 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 	const bool bWood = ItemId == TEXT("wood");
 	const FName Skill = bOre ? FName(TEXT("mining")) : bWood ? FName(TEXT("woodcutting")) : NAME_None;
 	float Raw = PerHit * (bHeavy ? 2 : 1) * WRTune(TEXT("server.gatherMultiplier"), 1.f) * (Tool ? Tool->Yield : 1.f);
+	Raw *= FWRTaming::GatherScale(Gatherer);   // Lodestar: a utility tame beside you (cooks/build-taming.md 2.2)
 	if (bOre) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("miningYield"));
 	if (bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodYield")) + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodExtra"));
 	if (!bOre && !bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("herbExtra"));

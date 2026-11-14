@@ -81,6 +81,8 @@ public:
 
 	/** Server: last chance to change damage before it lands (boss shells, airborne bosses, weaknesses). */
 	virtual float ModifyIncomingDamage(const struct FWRHit& Hit, float Damage) { return Damage; }
+	/** A ridden mount's own sprint stamina rules (cooks/build-taming.md 2.4): true and its drain / regen per second. */
+	virtual bool MountStaminaRates(float& OutDrain, float& OutRegen) const { return false; }
 	/** Server: damage actually taken (boss damage ledger). */
 	virtual void OnDamageTaken(const struct FWRHit& Hit, float Damage) {}
 

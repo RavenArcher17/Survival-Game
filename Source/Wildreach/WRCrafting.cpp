@@ -1,4 +1,5 @@
 #include "WRCrafting.h"
+#include "WRTaming.h"
 #include "WRGear.h"
 #include "WRFishing.h"
 #include "WRFarm.h"
@@ -970,12 +971,13 @@ bool FWRCrafting::IsGear(const FWRRecipe& Recipe)
 {
 	// Spears and bolas stack: made like ammo. So are tools: no quality roll, just a new one at full durability.
 	const FWRItemDef* OutDef = FWRItemRegistry::Get().Find(Recipe.Output);
-	return OutDef && OutDef->IsEquipment() && OutDef->StackSize <= 1 && OutDef->Category != TEXT("tool");
+	// Saddles and barding are made like armour: a quality roll, Armorcraft XP (cooks/build-taming.md 2.3).
+	return OutDef && ((OutDef->IsEquipment() && OutDef->StackSize <= 1 && OutDef->Category != TEXT("tool")) || FWRTaming::Tack(OutDef->Id));
 }
 
 bool FWRCrafting::IsArmourMade(const FWRItemDef& Def)
 {
-	return WRGearSlots::IsArmour(Def.Slot) || Def.Slot == EWREquipSlot::Talisman;
+	return WRGearSlots::IsArmour(Def.Slot) || Def.Slot == EWREquipSlot::Talisman || FWRTaming::Tack(Def.Id);
 }
 
 FName FWRCrafting::GearStation(const FWRItemDef& Def)

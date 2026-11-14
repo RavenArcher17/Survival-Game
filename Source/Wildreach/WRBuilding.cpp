@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRTaming.h"
 #include "WRFarm.h"
 #include "WRFarmLook.h"
 #include "WRBeds.h"
@@ -431,6 +432,7 @@ void AWRBuildPiece::OnRep_Farm()
 	if (!bGhost && GetNetMode() != NM_DedicatedServer && HasActorBegunPlay())
 	{
 		FWRFarmLook::Refresh(this);
+		FWRTameLook::RefreshPiece(this);   // an incubator's egg and warmth (WRTameLook.cpp)
 	}
 }
 
@@ -1273,6 +1275,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 		Items.Add(MakeShared<FJsonValueObject>(FWRInventoryRules::StackToJson(S)));
 	}
 	O->SetArrayField(TEXT("storage"), Items);
+	FWRTaming::PieceToJson(this, O);
 	if (const AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
 		TArray<TSharedPtr<FJsonValue>> Cores;
@@ -1343,6 +1346,7 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 	FString OfferingStr;
 	if (O->TryGetStringField(TEXT("offering"), OfferingStr)) Offering = FName(*OfferingStr);
 	FWRMachines::FromJson(this, O);
+	FWRTaming::PieceFromJson(this, O);
 	O->TryGetStringField(TEXT("name"), CustomName);
 	O->TryGetBoolField(TEXT("locked"), bLocked);
 	O->TryGetBoolField(TEXT("planted"), bPlanted);

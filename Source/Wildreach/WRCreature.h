@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "AIController.h"
 #include "WRCharacterBase.h"
+#include "WRTaming.h"
 #include "WRCreature.generated.h"
 
 class AWRCreature;
@@ -46,6 +47,18 @@ struct FWRCreatureDef
 	TArray<FName> Food;
 	bool bMount = false;
 	float RideSpeed = 600.f;
+	// Mounts, breeding and bodies (cooks/build-taming.md)
+	FName MountKind;              // ground / pack / swim / fly (creatures.json mountKind; "" = ground, or pack for haulers)
+	FName Birth;                  // egg / live (creatures.json birth; "" = live)
+	FName Habitat;                // shore: lives only where the land meets the sea (WRWildlife)
+	float SeatFwd = 0.f;          // where the saddle sits: forward x radius, up x half height from the capsule centre
+	float SeatUp = 1.f;
+	float Back = 0.55f;           // half the back's width under the saddle, x radius
+	float Carry = 0.f;            // kg its packs hold (haulers)
+	float SwimSpeed = 0.f;        // > 0: a swimmer (cm/s at the surface); LandSpeed on land when it has one
+	float LandSpeed = 0.f;
+	float FlySpeed = 0.f;         // fly mounts: cm/s in the air
+	FName ProcBody;               // a body built in code (seal: the Floeback, WRSealBody)
 	FName Utility;                // light, mine_ore, sense_secrets
 	TArray<TPair<FName, int32>> Products;
 	bool bNest = false;
@@ -197,7 +210,8 @@ public:
 	FString GiveNarcotic(AWRPlayerController* Player);
 	/** Taming value of a food for this creature: kibble x2, what it eats x1, anything else 0. */
 	float FoodValue(FName Item) const;
-	void CompleteTame(const FString& PlayerName);
+	/** bTamed: it was tamed just now (Taming XP, the tame moment); false for a hatch, a birth or a load. */
+	void CompleteTame(const FString& PlayerName, bool bTamed = true);
 	/** Tames come out stronger the better they were tamed: health and bite x (1 + bonus). */
 	void ApplyTameBonus(float Bonus);
 	FString Order(AWRPlayerController* Player, const FString& Command);
@@ -326,6 +340,57 @@ public:
 	UPROPERTY(Replicated) float WakeIn = 0.f;             // seconds until a knocked-out creature wakes (the server's drain)
 	UPROPERTY(Replicated) TWeakObjectPtr<AWRCharacter> Rider;
 
+	// --- Levels, bond, trees, tack, breeding, babies, mounts (WRTaming.cpp; cooks/build-taming.md) ---
+	friend struct FWRTaming;
+	/** Every machine: its levels, stats, tree, saddle, barding, growth, care, breeding and hunger. */
+	UPROPERTY(ReplicatedUsing=OnRep_TameRep) FWRTameRep TameRep;
+	/** A hauler's packs (every machine: the card's Cargo tab). */
+	UPROPERTY(Replicated) TArray<FWRItemStack> Cargo;
+	UFUNCTION() void OnRep_TameRep();
+	/** Server: its genes (stats, mutations, morphs, sex) and the child she carries. */
+	FWRTameGenes Genes;
+	FWRTameGenes PregnantGenes;
+	bool bPregnantTwins = false;
+	/** Server: wild genes for its band (and now and then a wild mutant). */
+	void RollWildGenes();
+	void InitGenes(const FWRTameGenes& In);
+	/** Server: its stats from genes, bond, tree, growth and tack (keeps its health share). */
+	void RecomputeStats();
+	/** Every machine: its multiplier on a stat (WRTameStat) as the server last worked it out. */
+	float StatMult(int32 Stat) const;
+	/** Has it learned this node of its role tree (by id)? */
+	bool TameHasNode(FName NodeId) const;
+	/** Server: XP from its own work (fight, ride, haul, dig, light, farm). */
+	void GainBondXP(float Amount, const TCHAR* Why);
+	/** Its imprint bonus now: x(1 + imprint x tame.imprint.bonus) while its imprinter rides it or is beside it. */
+	float ImprintScale() const;
+	FName GetMountKind() const;
+	bool IsBaby() const { return TameRep.IsBaby(); }
+	/** Where the saddle sits on its back (world). */
+	FVector SeatLocation() const;
+	/** Its packs: slots, kg it holds, kg in them. */
+	int32 CargoSlots() const;
+	float CargoCapacityKg() const;
+	float CargoKg() const;
+	/** Server: puts what fits into its packs; returns how many didn't. */
+	int32 AddCargo(FName ItemId, int32 Count);
+	/** Server: the care it asks for answered by Player (feed / walk / cuddle). */
+	void AnswerCare(const FString& Player);
+	/** Server: start a 2 s cuddle by Player (answered if they're still beside it at the end). */
+	FString StartCuddle(AWRPlayerController* Player);
+	/** Server: its saddle, barding and packs onto the ground (death, release). */
+	void DropTack();
+	/** The mate it's walking to (server). */
+	TWeakObjectPtr<AWRCreature> MatePartner;
+	/** Both machines that move it: ride speeds from its stats, tack, imprint, kind and load. */
+	void ApplyRideSpeeds();
+	/** Server: the mount takes off / lands (fly mounts). */
+	UFUNCTION(Server, Reliable) void ServerFly(bool bFly);
+	/** Every machine: the saddle, barding, morph overlay and baby size it shows (WRTameLook.cpp). */
+	void RefreshTameLook();
+	/** Called by the base's stamina regen: a ridden mount's own sprint drain and regen. */
+	virtual bool MountStaminaRates(float& OutDrain, float& OutRegen) const override;
+
 	FWROnCreatureDied OnCreatureDied;
 	/** Spawner that owns this creature (nests aggro its pack). */
 	TWeakObjectPtr<class AWRCreatureSpawner> Spawner;
@@ -451,6 +516,41 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RidePadLookAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideJumpAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> RideDismountAction;
+
+	// Taming (WRTaming.cpp) and its look (WRTameLook.cpp).
+	UPROPERTY(Transient) TObjectPtr<UInputAction> RideSprintAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> RideDiveAction;
+	void RideSprintPressed();
+	void RideSprintReleased();
+	void RideJumpPressed();
+	void RideJumpReleased();
+	void RideDivePressed();
+	void RideDiveReleased();
+	bool bClimbHeld = false;
+	bool bDiveHeld = false;
+	/** Server: once a second (and each frame for the cheap parts) while tamed. */
+	void TickTameLife(float DeltaSeconds);
+	/** Both machines that move it: flight (climb, glide, ceiling, stamina), swimming, a mount's charge. */
+	void TickMount(float DeltaSeconds);
+	float TameClock = 0.f;
+	int32 CareSlice = -1;
+	double CuddleUntil = -1.0;
+	FString CuddleBy;
+	double StarvingSince = -1.0;
+	float RideMetres = 0.f, HaulMetres = 0.f, LightClock = 0.f;
+	FVector LastTameAt = FVector::ZeroVector;
+	bool bHasLastTameAt = false;
+	double ChargeReadyAt = 0.0, ChargeStrikeAt = -1.0;
+	TWeakObjectPtr<AWRCharacterBase> ChargeTarget;
+	bool bBirthHeldNotified = false;
+	bool bBardingLava = false, bBardingIce = false;
+	uint32 TackLookKey = 0;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> SaddleMesh;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> BardingMesh;
+	UPROPERTY(Transient) TArray<TObjectPtr<class UProceduralMeshComponent>> BardingPlates;
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> MorphMat;
+	UPROPERTY(Transient) TObjectPtr<class UWRSealBody> SealBody;
+	float ExpectedPoints() const;
 };
 
 /** Stationary target for testing combat. Never dies; resets to full health a few seconds after the last hit. */

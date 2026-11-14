@@ -29,6 +29,8 @@ enum class EWRMenu : uint8
 	Clan,      // the journal's Clan tab
 	Cook,      // a cooking pot or oven's Cook screen (MenuStation): discovery cooking (WRUICook)
 	Machine,   // a machine's screen (MenuPiece): power, slots, switches (WRUIMachine)
+	TameCard,  // a tame's card (MenuCreature): stats, skills, tack, family, packs (WRUITameCard; the wheel's Tend)
+	Incubator, // an incubator's screen (MenuPiece): the egg, its fuel (WRUIIncubator)
 };
 
 class AWRBuildPiece;
@@ -133,6 +135,8 @@ public:
 	UFUNCTION(Exec) void WRDismount();
 	UFUNCTION(Exec) void WRTorpor(float Amount);
 	UFUNCTION(Exec) void WRTameStat();
+	/** Testing (cooks/build-taming.md): "now" tames the nearest wild creature; "bond N", "grow X", "care", "mate", "hatch". */
+	UFUNCTION(Exec) void WRTameDev(const FString& What);
 	/** Knockout taming (the Taming menu's lines): all of a food into the nearest knocked-out creature's stash / a narcotic. */
 	UFUNCTION(Exec) void WRTameGive(FName Item);
 	UFUNCTION(Exec) void WRNarcotic();

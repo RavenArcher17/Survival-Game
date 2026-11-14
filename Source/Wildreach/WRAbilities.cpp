@@ -112,6 +112,12 @@ bool UWRGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Han
 	{
 		return false;
 	}
+	// Bareback, nothing at all (cooks/build-taming.md 2.3): the rider has both hands on its neck.
+	if (const AWRCharacterBase* Rider = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr; Rider && Rider->HasTag(WRTags::State_Mounted))
+	{
+		const AWRCreature* Mount = Cast<AWRCreature>(Rider->GetAttachParentActor());
+		if (Mount && Mount->TameRep.Saddle.IsEmpty()) return false;
+	}
 	if (!bRules)
 	{
 		return true;

@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRGear.h"
 #include "WRFarm.h"
@@ -473,7 +474,10 @@ AWRCharacterBase* UWRInventoryComponent::GetPawnCharacter() const
 
 int32 UWRInventoryComponent::AddItem(FName ItemId, int32 Count)
 {
-	return GetOwner()->HasAuthority() ? FWRInventoryRules::Add(Slots, ItemId, Count) : Count;
+	if (!GetOwner()->HasAuthority()) return Count;
+	const int32 Left = FWRInventoryRules::Add(Slots, ItemId, Count);
+	// Forager (hauler tree): what doesn't fit goes into its packs when it's beside you (cooks/build-taming.md 2.2).
+	return Left > 0 ? FWRTaming::Forage(GetOwner(), ItemId, Left) : 0;
 }
 
 int32 UWRInventoryComponent::AddFood(FName ItemId, int32 Count, float Fresh, float Worth)
@@ -1056,6 +1060,10 @@ FString UWRInventoryComponent::UseTamingItem(const FWRItemDef& Def)
 	}
 	const FName Used = Def.Id;
 	const FString Name = Def.Name;
+	if (Def.Category == TEXT("egg") && Used.ToString().StartsWith(TEXT("fertile_")))
+	{
+		return TEXT("A fertilised egg hatches in an incubator (workbench, Hearth 3): keep it warm with its fuel");
+	}
 	if (Def.Category == TEXT("egg"))
 	{
 		// Hatch: the newborn imprints on you.
@@ -1245,6 +1253,17 @@ TSharedRef<FJsonObject> FWRInventoryRules::StackToJson(const FWRItemStack& S)
 	if (Def && !Def->IsEquipment() && !FMath::IsNearlyEqual(S.Roll, 1.f))
 	{
 		O->SetNumberField(TEXT("worth"), S.Roll);
+	}
+	// A fertilised egg carries its child's genes, tack its quality (cooks/build-taming.md 2.3, 2.6).
+	if (Def && !Def->IsEquipment() && S.Sockets.Num() > 0)
+	{
+		TArray<TSharedPtr<FJsonValue>> Genes;
+		for (const FName& G : S.Sockets) Genes.Add(MakeShared<FJsonValueString>(G.ToString()));
+		O->SetArrayField(TEXT("sockets"), Genes);
+	}
+	if (Def && !Def->IsEquipment() && FWRTaming::Tack(S.ItemId))
+	{
+		O->SetNumberField(TEXT("quality"), static_cast<int32>(S.Quality));
 	}
 	return O;
 }

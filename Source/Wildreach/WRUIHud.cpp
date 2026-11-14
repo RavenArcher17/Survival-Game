@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRPlayerUI.h"
+#include "WRTaming.h"
 #include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -739,7 +740,18 @@ private:
 			// A shrine-stone by a boss arena: rest there and you wake there (cooks/build-combat-full.md 2.16).
 			if (FVector::Dist(It->GetActorLocation(), S->GetActorLocation()) < 300.f) { OutTarget = TEXT("Shrine-stone"); return TEXT("Rest (wake here)"); }
 		}
-		if (const AWRCreature* Tame = P->FindNearbyCreature(true)) { OutTarget = Tame->GetDisplayLabel(); return TEXT("Hold: orders  ·  Tap: interact"); }
+		for (TActorIterator<AWRLaidEgg> It(P->GetWorld()); It; ++It)
+		{
+			// A fertilised egg in its scrape (cooks/build-taming.md 2.6).
+			if (FVector::Dist(It->GetActorLocation(), S->GetActorLocation()) < 300.f) { const FWRItemDef* E = FWRItemRegistry::Get().Find(It->Egg.ItemId); OutTarget = E ? E->Name : TEXT("Egg"); return TEXT("Take egg"); }
+		}
+		if (const AWRCreature* Tame = P->FindNearbyCreature(true))
+		{
+			// A baby asking for care says so (its card's Answer, from the wheel's Tend).
+			static const TCHAR* Asks[] = { TEXT(""), TEXT("hungry"), TEXT("wants a walk"), TEXT("wants a cuddle") };
+			OutTarget = Tame->TameRep.Care >= 1 && Tame->TameRep.Care <= 3 ? FString::Printf(TEXT("%s · %s"), *Tame->GetDisplayLabel(), Asks[Tame->TameRep.Care]) : Tame->GetDisplayLabel();
+			return Tame->TameRep.Care >= 1 && Tame->TameRep.Care <= 3 ? TEXT("Hold: orders  ·  Tend: care") : TEXT("Hold: orders  ·  Tap: interact");
+		}
 		if (const AWRCreature* Wild = P->FindNearbyCreature(false, 400.f))
 		{
 			if (Wild->IsUnconscious()) { OutTarget = Wild->GetDisplayLabel(); return TEXT("Tame"); }
@@ -767,6 +779,16 @@ private:
 				}
 				if (Def->Kind == TEXT("chest")) return TEXT("Open");
 				if (Def->Kind == TEXT("totem")) return TEXT("Land claim");
+				if (Def->Kind == TEXT("incubator"))
+				{
+					// An incubator: what's in it and how it's doing on the second line.
+					const FWRItemDef* E = Piece->Storage.Num() > 0 && !Piece->Storage[0].IsEmpty() ? FWRItemRegistry::Get().Find(Piece->Storage[0].ItemId) : nullptr;
+					OutTarget = !E ? FString::Printf(TEXT("%s · empty"), *Def->Name)
+						: Piece->FarmStop == 1 ? FString::Printf(TEXT("%s · %s, cold: needs fuel"), *Def->Name, *E->Name)
+						: Piece->FarmStop == 2 ? FString::Printf(TEXT("%s · ready: make room under your tame limit"), *Def->Name)
+						: FString::Printf(TEXT("%s · %s %.0f%%"), *Def->Name, *E->Name, Piece->Growth8 / 2.55f);
+					return TEXT("Incubator");
+				}
 				if (FWRMachines::IsMachine(*Def))
 				{
 					// A machine: what it's doing on the second line (cooks/build-machinery.md 2.7).
@@ -1332,9 +1354,45 @@ private:
 		for (TActorIterator<AWRCreature> It(Me->GetWorld()); It; ++It)
 		{
 			const float D = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
-			if (It->IsAlive() && It->IsTamed() && It->TamedBy == PS->GetPlayerName() && It->TameOrder == EWRTameOrder::Follow && D < BestDist) { BestDist = D; Best = *It; }
+			// The one you ride first, then a baby asking for care (cooks/build-taming.md 2.6), then the nearest following.
+			const bool bRidden = *It == Me;
+			const bool bAsks = It->TameRep.Care >= 1 && It->TameRep.Care <= 3;
+			const float Score = bRidden ? -2.f : bAsks ? D - 3000.f : D;
+			if (It->IsAlive() && It->IsTamed() && It->TamedBy == PS->GetPlayerName() && (It->TameOrder == EWRTameOrder::Follow || bAsks || bRidden) && D < 3000.f && Score < BestDist) { BestDist = Score; Best = *It; }
 		}
 		return Best;
+	}
+
+	/** The tame card's last line: what it needs or is doing (care, hunger, mating, young, its follow and stance). */
+	FText TameStatus() const
+	{
+		const AWRCreature* T = NearTame();
+		if (!T) return FText::GetEmpty();
+		const FWRTameRep& R = T->TameRep;
+		if (R.Care == 1) { const FWRItemDef* Food = FWRItemRegistry::Get().Find(R.CareFood); return FText::FromString(FString::Printf(TEXT("Hungry for %s: Tend"), Food ? *Food->Name.ToLower() : *R.CareFood.ToString())); }
+		if (R.Care == 2) return FText::FromString(FString::Printf(TEXT("Wants a walk: %.0f / 50 m"), R.CareWalked));
+		if (R.Care == 3) return FText::FromString(TEXT("Wants a cuddle: Tend"));
+		if (R.Hunger <= 0.f) return FText::FromString(TEXT("Starving: feed it"));
+		if (R.Hunger < 25.f) return FText::FromString(TEXT("Hungry"));
+		if (R.MateBar > 0.f) return FText::FromString(FString::Printf(TEXT("Mating %.0f%%"), R.MateBar * 100.f));
+		if (R.Pregnant > 0.f) return FText::FromString(TEXT("Carrying young"));
+		if (T->IsBaby()) return FText::FromString(FString::Printf(TEXT("Growing %.0f%% · imprint %.0f%%"), R.Growth * 100.f, R.Imprint * 100.f));
+		return T->bTameAggressive ? LOCTEXT("FollowAggro", "Following · aggressive") : LOCTEXT("Follow", "Following · passive");
+	}
+
+	FLinearColor TameStatusColour() const
+	{
+		const AWRCreature* T = NearTame();
+		if (!T) return WRUI::Good;
+		const FWRTameRep& R = T->TameRep;
+		return (R.Care >= 1 && R.Care <= 3) || R.Hunger < 25.f ? WRUI::Warn : WRUI::Good;
+	}
+
+	/** Riding a flyer: its wings' stamina (cooks/build-taming.md 2.4). */
+	const AWRCreature* RiddenFlyer() const
+	{
+		const AWRCreature* Mount = PC.IsValid() ? Cast<AWRCreature>(PC->GetPawn()) : nullptr;
+		return Mount && Mount->GetMountKind() == TEXT("fly") ? Mount : nullptr;
 	}
 
 	TSharedRef<SWidget> TameCard()
@@ -1358,7 +1416,14 @@ private:
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* T = NearTame(); return T ? FText::FromString(T->GetDisplayLabel()) : FText::GetEmpty(); }), WRUI::Body(14, 800), WRUI::Ink)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 3.f * U)[SNew(SWRBar).Height(5.f * U).Color(WRUI::Hp).Fraction_Lambda([this]() { const AWRCreature* T = NearTame(); const UWRAttributeSet* A = T ? T->GetAttributes() : nullptr; return A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 0.f; })]
-					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* T = NearTame(); return T && T->bTameAggressive ? LOCTEXT("FollowAggro", "Following · aggressive") : LOCTEXT("Follow", "Following · passive"); }), WRUI::Body(12, 700), WRUI::Good)]
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SBox).Visibility_Lambda([this]() { return RiddenFlyer() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						[
+							SNew(SWRBar).Height(5.f * U).Color(WRUI::Frost).Fraction_Lambda([this]() { const AWRCreature* F = RiddenFlyer(); return F ? FMath::Clamp(F->TameRep.FlyStamina / FMath::Max(1.f, WRTune(TEXT("tame.fly.stamina"), 300.f) * F->StatMult(WRTameStat::Stamina)), 0.f, 1.f) : 0.f; })
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return TameStatus(); }), WRUI::Body(12, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(TameStatusColour()); }))]
 				]
 			]
 		];

@@ -1,0 +1,40 @@
+{
+  "_comment": "Tame role trees (cooks/build-taming.md 2.2, survival-crafting 2.19; FULL-GAME 6.5 'one 20-point tree per role'). A tame uses its role's tree (creatures.json role, first word: 'fighter, scout' is fighter, 'farm animal' is farm). Nodes 0-3 are a line (each needs the one before), 4 and 5 are capstones: one of the two, after all four. cost: skill points (1 per bond level, 20 in all: 2 + 3 + 3 + 4 + 8). What each does lives in code by id (WRTaming.cpp, WRCombatLibrary, WRFarm); numbers in tuning.json tame.tree.",
+  "trees": [
+    { "id": "fighter", "name": "Fighter", "nodes": [
+      { "id": "hardened", "name": "Hardened", "text": "+15% health", "cost": 2 },
+      { "id": "bite_force", "name": "Bite force", "text": "+15% damage", "cost": 3 },
+      { "id": "pack_tactics", "name": "Pack tactics", "text": "+10% damage for each ally on the same target (up to 3)", "cost": 3 },
+      { "id": "guardian", "name": "Guardian", "text": "Within 4 m of you it takes 30% of the blows meant for you", "cost": 4 },
+      { "id": "berserk", "name": "Berserk", "text": "Below 30% health: +40% damage", "cost": 8 },
+      { "id": "stalwart", "name": "Stalwart", "text": "Takes 40% less stance damage and is never knocked about", "cost": 8 } ] },
+    { "id": "mount", "name": "Mount", "nodes": [
+      { "id": "sure_footed", "name": "Sure-footed", "text": "Sprinting costs 15% less stamina", "cost": 2 },
+      { "id": "stride", "name": "Stride", "text": "+8% speed", "cost": 3 },
+      { "id": "charge", "name": "Charge", "text": "Sprinting into an enemy: it lowers its head, then hits for 40 and knocks it back", "cost": 3 },
+      { "id": "steady_seat", "name": "Steady seat", "text": "You stay in the saddle through blows under 80 stance", "cost": 4 },
+      { "id": "warhorse", "name": "Warhorse", "text": "Your attacks from its saddle +20%", "cost": 8 },
+      { "id": "courser", "name": "Courser", "text": "+15% speed, stamina comes back 50% faster", "cost": 8 } ] },
+    { "id": "hauler", "name": "Hauler", "nodes": [
+      { "id": "broad_back", "name": "Broad back", "text": "Carries 25% more", "cost": 2 },
+      { "id": "packing", "name": "Packing", "text": "+8 pack slots", "cost": 3 },
+      { "id": "steady", "name": "Steady", "text": "A full load doesn't slow it", "cost": 3 },
+      { "id": "forager", "name": "Forager", "text": "What doesn't fit in your bag goes into its packs (8 m)", "cost": 4 },
+      { "id": "caravan", "name": "Caravan", "text": "Carries 50% more", "cost": 8 },
+      { "id": "bulwark", "name": "Bulwark", "text": "+200 health; you and your clan within 6 m take 10% less damage", "cost": 8 } ] },
+    { "id": "utility", "name": "Utility", "nodes": [
+      { "id": "keen_sense", "name": "Keen sense", "text": "Its senses reach 50% further", "cost": 2 },
+      { "id": "tireless", "name": "Tireless", "text": "Works 25% faster", "cost": 3 },
+      { "id": "bright", "name": "Bright", "text": "Its light reaches 50% further; digging tames find 25% more ore", "cost": 3 },
+      { "id": "lucky_find", "name": "Lucky find", "text": "Now and then a gem in what it digs (15%)", "cost": 4 },
+      { "id": "seeker", "name": "Seeker", "text": "What it finds is called out to your clan with where", "cost": 8 },
+      { "id": "lodestar", "name": "Lodestar", "text": "You and your clan within 10 m gather 15% more", "cost": 8 } ] },
+    { "id": "farm", "name": "Farm", "nodes": [
+      { "id": "content", "name": "Content", "text": "Eats 25% less", "cost": 2 },
+      { "id": "bountiful", "name": "Bountiful", "text": "+20% product", "cost": 3 },
+      { "id": "fertile", "name": "Fertile", "text": "Breeds half again as fast", "cost": 3 },
+      { "id": "calm_herd", "name": "Calm herd", "text": "Its pen-mates make 10% more", "cost": 4 },
+      { "id": "prize_stock", "name": "Prize stock", "text": "5% of its products are prize ones", "cost": 8 },
+      { "id": "prolific", "name": "Prolific", "text": "A quarter of its births are twins", "cost": 8 } ] }
+  ]
+}

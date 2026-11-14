@@ -1,5 +1,74 @@
 # Changelog
 
+## Unreleased: taming (levels, bond and role trees, saddles and barding, ground / pack / swimming / flying mounts, the Floeback, breeding, eggs and the incubator, babies and imprinting, mutations)
+
+Aaron (lane build-taming: FULL-GAME 6.5; research, requirement ledger and plan in showcase-notes cooks/build-taming.md,
+numbers from cooks/survival-crafting.md 2.19-2.21). Built to compile (editor); not played here (Aaron and the testers
+test, F8).
+
+- **Creature levels**: every wild creature has a level by its band (lowland 1-10, midland 11-20, highland 21-30), each a
+  point in one of six stats (health, stamina, damage, carry, speed, torpor); a stat's multiplier is held to +-10% for
+  wild ones so combat tuning holds. Labels show it ("Cinderfang · Lv 14"). 1% of wild spawns are mutants (2% near
+  Rare finder).
+- **Bond levels 1-20** from the tame's own work: 1 XP per 10 damage it deals (half from the saddle), kill XP for kills
+  it helped with (20 / 40 / 80 / 300 by tier), 1 per 50 m ridden, 1 per 100 m hauled loaded, 3 per ore dug or place
+  sensed, 1 per 5 min lighting your dark, 2 per pen product; level n costs 100 + 40n, each +2% every stat and a skill
+  point; your Taming skill gets 20 a level. A gold ring and its call when it levels.
+- **Role trees** (`Data/tame_trees.json`): Fighter, Mount, Hauler, Utility, Farm, four skills in a line then one of two
+  capstones, 20 points; every node works: Hardened, Bite force, Pack tactics, Guardian (takes 30% of blows on you
+  through ApplyHit), Berserk, Stalwart; Sure-footed, Stride, Charge (sprint into an enemy: a 0.4 s lowered head, then 40
+  and a knock), Steady seat, Warhorse, Courser; Broad back, Packing, Steady, Forager (what your bag can't take goes in
+  its packs), Caravan, Bulwark; Keen sense, Tireless, Bright, Lucky find (gems), Seeker (calls finds to your clan),
+  Lodestar (+15% gathering near it); Content, Bountiful, Fertile, Calm herd, Prize stock, Prolific (twins).
+- **The Aurora fox senses** for you now: every minute it names the nearest cave or egg nest within 80 m and where.
+- **Saddles and barding**: hide, bronze-fitted, iron and steel saddles (10-40% less damage to the mount; bareback you
+  can't fight from its back and it takes 25% more), the pack saddle (+10 packs), iron and steel barding (20 / 30%,
+  5% slower), Forgeplate barding (carries it across lava) and Rimeguard barding (full grip on ice); the other ten lands'
+  barding is in data, hidden with its land. Quality rolls like armour; Saddle master and Creature armorer perks live.
+  All modelled in code from their real parts on each creature's back: blanket, seat between pommel and cantle, skirts,
+  girth round the belly, stirrups, breast collar, the tier's metal and rivets; the pack saddle's sawbuck, panniers,
+  bedroll, lash ropes and breeching; barding's chest plate, flank plates, neck lames and face plate.
+- **Mounts**: ground mounts gallop on their own stamina (Sprint, 200 stamina, shown on the HUD); haulers are pack
+  mounts with packs by weight (Basaltback 300 kg, Woolly drudge 280 kg; slow past three quarters loaded), moved in the
+  tame card; swimming mounts carry you over water; flying mounts take off (Jump), climb (hold Jump), dive (Dodge),
+  glide down when out of wing stamina, 400 m ceiling, won't fly near a boss arena.
+- **The Floeback** (tundra shore, offer it tundra fish, easy): a 3.2 m harp-seal build with a crust of sea ice on its
+  back where you sit, silver-grey dappled coat, dark harp and muzzle, big dark eyes, whiskers, clawed fore flippers and
+  fanned hind flippers, built and moved in code (a side-to-side stroke in water, a gallumph on land, breathing and
+  looking about when still, a jerk when hit, rolling onto its side in death). It spawns only on the tundra's shore
+  ground and slips into the sea when threatened. Rides through the water at 900, 250 on land.
+- **Breeding**: tames have a sex; two of a kind (yours or your clan's), mating on, fed and within 10 m fill a mating
+  bar over 2 min (they walk together, hearts and calls); she rests 4 h. Egg layers lay a fertilised egg in a straw
+  scrape at her feet (E takes it); the rest carry young (30 min / 2 h / 6 h by difficulty, x the server's maturation:
+  playtest 10x) and give birth beside her. Each stat comes from one parent (55% the higher); 3 mutation rolls at 2.5%
+  (Breeder x1.5) add 2 points and a visible morph (pale, dark, bands, a glow line along the back), 20 per line at most.
+- **The incubator** (Hearth 3: stone, iron, linen): a clay firebox with a stone-arched mouth, an iron grate, a straw
+  tray and a brass-banded wicker hood; the egg sits in the straw and the firebox glows while it burns the egg's fuel
+  (charcoal or sulfur for fire eggs, ice blocks for frost, wood for the rest). Out of fuel the egg waits. Stolen eggs
+  go in too. Its screen shows the egg, the fire and your bag.
+- **Babies** grow from 10% to full over 2 / 8 / 24 h (x maturation), weaker while small; every eighth of the way they
+  ask for care (a bubble over them, the HUD card, a notice): feed a named food, walk 50 m beside you, or a cuddle.
+  Each answered +12.5% imprint; the imprinter riding or fighting beside it gets up to +20% to its damage, toughness,
+  speed and carry. Babies can't be ridden, mate or wear tack.
+- **Hunger**: tames eat their food from their packs or a pen's trough within 20 m (or by hand from the card); starving
+  for 30 min they waste away. Nothing ticks with no player near.
+- **Element**: tames keep their own: their bites carry their element's build-up, barding passes stack with their own.
+- **The tame card** (the tame wheel's new Tend wedge, mouse and pad): level, bond, the six stats with mutations and
+  morphs, hunger and feeding, the role tree with Learn, saddle and barding (click to fit from your bag or take off),
+  mating, pregnancy, growth, imprint and the care button, a hauler's packs beside your bag.
+- Everything saves: genes, bond, tree, tack, packs, growth, care, pregnancy (and her young's genes), laid eggs, eggs in
+  incubators. Dev: `WRTameDev now | bond N | grow X | care | mate | hatch`.
+- Data: `Data/tame_trees.json` (new), creatures.json (Floeback, Windmane, birth / seat / back / carry / mountKind /
+  habitat / procBody), items.json (5 saddles, 14 barding, 9 fertilised eggs, rope), recipes.json, pieces.json
+  (incubator), spawn_regions.json, server_presets.json (maturationMultiplier), lifeskills.json (4 perks live),
+  tuning.json `tame`, fx.json and Audio/sounds.json rows (reused CC0 recordings). Assets: `Content/Creatures/
+  M_TameMorph.uasset` (31 KB), 29 icons in Data/UI/Icons (284 KB). New code: `WRTaming.*`, `WRTameLook.cpp`,
+  `WRSealBody.*`, `WRUITameCard.cpp`, `WRUIIncubator.cpp`.
+- Not finished: the Windmane never spawns (Sky islands not on the map) and has only a stand-in body for testing; ten
+  lands' barding passes wait for their hazards; the Floeback is code-modelled, not sculpted; no courtship or cuddle
+  clips (they walk to each other and face, the hero plays its pick-up); saddle fits per species are first estimates;
+  stable, necro raising, revive, Soulbond and tame names aren't built.
+
 ## Unreleased: building (metal, the 12 biome sets, beams and posts, structural integrity, comfort decor, powered turrets)
 
 Aaron (lane build-building: FULL-GAME 6.4; research, requirement ledger and plan in showcase-notes

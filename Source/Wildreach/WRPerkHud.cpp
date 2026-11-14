@@ -2,6 +2,8 @@
 // the panels, so menus and the map cover it; numbers in tuning lifeSkills.hud.
 
 #include "WRPerkHud.h"
+#include "WRSocial.h"
+#include "GameFramework/PlayerState.h"
 #include "WRBoss.h"
 #include "WRCreature.h"
 #include "WRGameplayTags.h"
@@ -12,6 +14,7 @@
 #include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "WRUIStyle.h"
+#include "WRUIWidgets.h"
 #include "EngineUtils.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -117,6 +120,28 @@ int32 WRPerkHud::Paint(AWRPlayerController* PC, const FGeometry& Geo, FSlateWind
 	const FWRTuning& T = FWRTuning::Get();
 	const double Now = PC->GetWorld()->GetTimeSeconds();
 	const auto ToLocal = [&Size, VX, VY](const FVector2D& Screen) { return FVector2D(Screen.X * Size.X / VX, Screen.Y * Size.Y / VY); };
+
+	// A baby asking for care (cooks/build-taming.md 2.6): a speech bubble over its head saying what it wants, for its
+	// owner's clan within 25 m. It bobs a little so it reads as asking, not as a label.
+	if (const APlayerState* MyPS = PC->GetPlayerState<APlayerState>())
+	{
+		for (TActorIterator<AWRCreature> It(PC->GetWorld()); It; ++It)
+		{
+			const uint8 Care = It->TameRep.Care;
+			if (Care < 1 || Care > 3 || !It->IsAlive() || !(It->TamedBy == MyPS->GetPlayerName() || FWRClans::Get().SameClan(It->TamedBy, MyPS->GetPlayerName()))) continue;
+			const float Dist = FVector::Dist(It->GetActorLocation(), Me->GetActorLocation());
+			FVector2D Screen;
+			const FVector Head = It->GetActorLocation() + FVector(0.f, 0.f, It->GetSimpleCollisionHalfHeight() + 45.f);
+			if (Dist > 2500.f || !PC->ProjectWorldLocationToScreen(Head, Screen, true)) continue;
+			const FVector2D At = ToLocal(Screen) + FVector2D(0.f, -6.f * FMath::Sin(static_cast<float>(Now) * 3.f));
+			const FString Word = Care == 1 ? TEXT("Hungry") : Care == 2 ? TEXT("Walk me") : TEXT("Cuddle");
+			const float Alpha = FMath::GetMappedRangeValueClamped(FVector2D(1500.f, 2500.f), FVector2D(1.f, 0.35f), Dist);
+			const FVector2D Box(78.f, 24.f);
+			WRUI::DrawBox(Out, Layer + 1, Geo.ToPaintGeometry(Box, FSlateLayoutTransform(At - FVector2D(Box.X * 0.5f, Box.Y + 8.f))), WRUI::Box(FLinearColor(0.96f, 0.92f, 0.82f, 0.92f * Alpha), 11.f, FLinearColor(0.15f, 0.1f, 0.05f, 0.8f * Alpha), 1.5f));
+			Diamond(Out, Layer + 1, Geo, At + FVector2D(0.f, -6.f), 4.f, FLinearColor(0.96f, 0.92f, 0.82f, 0.92f * Alpha), 2.f);   // the bubble's tail
+			Label(Out, Layer + 2, Geo, Word, WRUI::Body(12, 800), At - FVector2D(0.f, Box.Y + 4.f), FLinearColor(0.25f, 0.12f, 0.05f, Alpha));
+		}
+	}
 
 	// --- Prospector: ore veins near you, through rock ---
 	if (Skills->Stat(TEXT("prospect")) > 0.f)

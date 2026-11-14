@@ -28,7 +28,7 @@
         "25": [ {"id": "scent", "name": "Scent", "text": "Search for one kind of creature", "waitsFor": "creature tracks"}, {"id": "spoor_reader", "name": "Spoor reader", "text": "See a creature's level from its tracks", "waitsFor": "creature levels"} ],
         "50": [ {"id": "hunters_mark", "name": "Hunter's mark", "text": "A marked creature shows on your map", "waitsFor": "map marks on creatures"}, {"id": "field_dressing", "name": "Field dressing", "text": "More meat and hide", "stat": "creatureLoot", "value": 0.5} ],
         "75": [ {"id": "predator_sense", "name": "Predator sense", "text": "Warning when a predator starts hunting you", "stat": "predatorSense", "value": 1}, {"id": "beast_lore", "name": "Beast lore", "text": "See what your target is weak to", "stat": "beastLore", "value": 1} ],
-        "100": [ {"id": "apex_hunter", "name": "Apex hunter", "text": "Track roaming mini-bosses", "waitsFor": "roaming mini-bosses on the map"}, {"id": "rare_finder", "name": "Rare finder", "text": "Creatures with mutations show up more often", "waitsFor": "creature mutations"} ] } },
+        "100": [ {"id": "apex_hunter", "name": "Apex hunter", "text": "Track roaming mini-bosses", "waitsFor": "roaming mini-bosses on the map"}, {"id": "rare_finder", "name": "Rare finder", "text": "Wild creatures with mutations show up twice as often near you", "stat": "rareFinder", "value": 1} ] } },
     { "id": "smithing", "name": "Smithing", "group": "Making", "levelsBy": "Crafting and upgrading weapons",
       "everyLevel": {"text": "Better quality odds on weapons", "stat": "weaponQuality", "perLevel": 1},
       "perks": {
@@ -41,7 +41,7 @@
       "perks": {
         "25": [ {"id": "efficient_armorer", "name": "Efficient armorer", "text": "Armor takes 20% fewer materials", "stat": "armorMaterials", "value": -0.2}, {"id": "quick_fit", "name": "Quick fit", "text": "Armor crafts 30% faster", "stat": "armorSpeed", "value": 0.3} ],
         "50": [ {"id": "reinforced", "name": "Reinforced", "text": "+10 poise", "stat": "armorPoise", "value": 10}, {"id": "light_weave", "name": "Light weave", "text": "Armor weighs 30% less", "stat": "armorWeight", "value": -0.3} ],
-        "75": [ {"id": "set_crafter", "name": "Set crafter", "text": "Set bonuses need one fewer piece", "stat": "setCrafter", "value": 1}, {"id": "creature_armorer", "name": "Creature armorer", "text": "Stronger tame armor", "waitsFor": "tame armor"} ],
+        "75": [ {"id": "set_crafter", "name": "Set crafter", "text": "Set bonuses need one fewer piece", "stat": "setCrafter", "value": 1}, {"id": "creature_armorer", "name": "Creature armorer", "text": "Barding you fit guards your tames 30% better", "stat": "bardingValue", "value": 0.3} ],
         "100": [ {"id": "master_armorer", "name": "Master armorer", "text": "Armor is always fine or better", "stat": "armorMinFine", "value": 1}, {"id": "bastion", "name": "Bastion", "text": "Blocking costs 25% less stamina", "stat": "blockStamina", "value": -0.25} ] } },
     { "id": "alchemy", "name": "Alchemy", "group": "Making", "levelsBy": "Brewing potions and brews",
       "everyLevel": {"text": "Stronger potions", "stat": "potionPotency", "perLevel": 0.005},
@@ -89,8 +89,8 @@
       "everyLevel": {"text": "Faster taming", "stat": "tamingSpeed", "perLevel": 0.005},
       "perks": {
         "25": [ {"id": "calm_presence", "name": "Calm presence", "text": "Wild creatures notice you later", "stat": "aggroRadius", "value": -0.2}, {"id": "strong_knockout", "name": "Strong knockout", "text": "Creatures go down faster", "stat": "torporDealt", "value": 0.3} ],
-        "50": [ {"id": "bonded", "name": "Bonded", "text": "One more active tame", "stat": "extraTames", "value": 1}, {"id": "saddle_master", "name": "Saddle master", "text": "Better saddle stats", "stat": "rideSpeed", "value": 0.15} ],
-        "75": [ {"id": "breeder", "name": "Breeder", "text": "Better mutation odds", "waitsFor": "breeding"}, {"id": "pack_leader", "name": "Pack leader", "text": "Your tames within 20 m hit 20% harder", "stat": "packLeader", "value": 0.2} ],
+        "50": [ {"id": "bonded", "name": "Bonded", "text": "One more active tame", "stat": "extraTames", "value": 1}, {"id": "saddle_master", "name": "Saddle master", "text": "Saddles you fit guard your mounts 25% better", "stat": "saddleValue", "value": 0.25} ],
+        "75": [ {"id": "breeder", "name": "Breeder", "text": "Your tames' young mutate half again as often", "stat": "mutationOdds", "value": 0.5}, {"id": "pack_leader", "name": "Pack leader", "text": "Your tames within 20 m hit 20% harder", "stat": "packLeader", "value": 0.2} ],
         "100": [ {"id": "beast_lord", "name": "Beast lord", "text": "One more active tame", "stat": "extraTames", "value": 1}, {"id": "soulbond", "name": "Soulbond", "text": "One chosen tame can't die permanently", "waitsFor": "permanent tame death"} ] } },
     { "id": "swimming", "name": "Swimming", "group": "Exploration", "levelsBy": "Swimming (distance swum)",
       "everyLevel": {"text": "Swim faster", "stat": "swimSpeed", "perLevel": 0.004},

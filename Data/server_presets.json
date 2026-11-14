@@ -5,22 +5,22 @@
     "pvp_standard": {
       "pvp": true, "deathPenalty": "souls", "offlineProtection": 0.75, "pvpInBossArenas": true, "bounties": true,
       "clanSizeLimit": 8, "xpMultiplier": 1, "gatherMultiplier": 1, "tamingMultiplier": 1, "cropMultiplier": 1, "craftMultiplier": 1,
-      "bossRespawnHours": 4, "upkeepMultiplier": 1, "raids": "normal"
+      "bossRespawnHours": 4, "upkeepMultiplier": 1, "raids": "normal", "maturationMultiplier": 1
     },
     "pve": {
       "pvp": false, "deathPenalty": "souls", "offlineProtection": 0, "pvpInBossArenas": false, "bounties": false,
       "clanSizeLimit": 12, "xpMultiplier": 1, "gatherMultiplier": 1, "tamingMultiplier": 1, "cropMultiplier": 1, "craftMultiplier": 1,
-      "bossRespawnHours": 4, "upkeepMultiplier": 1, "raids": "normal"
+      "bossRespawnHours": 4, "upkeepMultiplier": 1, "raids": "normal", "maturationMultiplier": 1
     },
     "casual_coop": {
       "pvp": false, "deathPenalty": "gentle", "offlineProtection": 0, "pvpInBossArenas": false, "bounties": false,
       "clanSizeLimit": 0, "xpMultiplier": 2, "gatherMultiplier": 2, "tamingMultiplier": 3, "cropMultiplier": 2, "craftMultiplier": 2,
-      "bossRespawnHours": 2, "upkeepMultiplier": 0.5, "raids": "rare"
+      "bossRespawnHours": 2, "upkeepMultiplier": 0.5, "raids": "rare", "maturationMultiplier": 3
     },
     "playtest": {
       "pvp": false, "deathPenalty": "gentle", "offlineProtection": 0, "pvpInBossArenas": false, "bounties": false,
       "clanSizeLimit": 0, "xpMultiplier": 10, "gatherMultiplier": 2, "tamingMultiplier": 10, "cropMultiplier": 2, "craftMultiplier": 2,
-      "bossRespawnHours": 1, "upkeepMultiplier": 0.5, "raids": "rare"
+      "bossRespawnHours": 1, "upkeepMultiplier": 0.5, "raids": "rare", "maturationMultiplier": 10
     }
   }
 }

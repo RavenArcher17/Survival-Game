@@ -3,6 +3,7 @@
 // punish windows, combos, packs that flank, surround and breathe with no attack token; lock points and breakable parts;
 // fighting from the saddle and being thrown off it.
 #include "WRCreature.h"
+#include "GameFramework/GameStateBase.h"
 #include "WRAttackRows.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -456,6 +457,19 @@ void AWRCreature::MulticastTell_Implementation(uint8 Glint, FName BoneHint, FNam
 
 float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 {
+	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
+	// more; its imprinter beside it hardens it.
+	if (IsTamed() && !Hit.bDamageOverTime)
+	{
+		const APlayerState* OwnerPS = nullptr;
+		if (const AGameStateBase* GS = GetWorld()->GetGameState())
+		{
+			for (const APlayerState* PS : GS->PlayerArray) if (PS && PS->GetPlayerName() == TamedBy) { OwnerPS = PS; break; }
+		}
+		Damage *= (1.f - FWRTaming::TackValue(TameRep.Saddle, OwnerPS)) * (1.f - FWRTaming::TackValue(TameRep.Barding, OwnerPS));
+		if (Rider.IsValid() && TameRep.Saddle.IsEmpty()) Damage *= WRTune(TEXT("tame.mount.bareback"), 1.25f);
+		Damage /= ImprintScale();
+	}
 	// Shelled up: blows glance off the shell, blunt ones less (creatureAI.withdraw).
 	if (HasAuthority() && GetWorld()->GetTimeSeconds() < WithdrawnUntil && !Hit.bDamageOverTime)
 	{
@@ -702,6 +716,13 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 		if (B.Key == TEXT("burn")) { Hit.BurnBuildup += B.Value; Hit.Element = WRTags::Element_Fire; }
 		else if (B.Key == TEXT("frost")) { Hit.FrostBuildup += B.Value; Hit.Element = WRTags::Element_Frost; }
 		else Hit.Buildups.Add(B.Key, B.Value);
+	}
+	// A tame keeps its own element (FULL-GAME 6.5): its plain blows carry it (cooks/build-taming.md 2.7).
+	if (Self->IsTamed() && Hit.Element == WRTags::Element_Physical)
+	{
+		const float Build = WRTune(TEXT("tame.element.buildup"), 12.f);
+		if (Self->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Build; }
+		else if (Self->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Build; }
 	}
 	UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *RowId.ToString(), *Victim->GetName());
 	const float Knockback = R->Knockback;
@@ -1115,6 +1136,12 @@ void AWRCreature::ServerRideAttack_Implementation(bool bHeavy, bool bHeld)
 	{
 		return;
 	}
+	// Bareback the rider can't fight from its back (cooks/build-taming.md 2.3): a saddle first.
+	if (TameRep.Saddle.IsEmpty())
+	{
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(GetController())) PC->ClientNotify(TEXT("No saddle: you can't fight from its back (fit one: Tend)"));
+		return;
+	}
 	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Hero);
 	// The couched spear (combat.md 2.19): holding Heavy with a spear at a gallop lowers it; the first body in its line
 	// takes the mount's speed.
@@ -1270,6 +1297,10 @@ void AWRCreature::TickRider(float DeltaSeconds)
 			Hit.bMelee = true;
 			Hit.bParryable = true;
 			Hit.Origin = Mount->GetActorLocation();
+			// Its own element on its bite (cooks/build-taming.md 2.7).
+			Hit.Element = Mount->Weapon.Element == TEXT("fire") ? WRTags::Element_Fire : Mount->Weapon.Element == TEXT("frost") ? WRTags::Element_Frost : WRTags::Element_Physical;
+			if (Mount->Weapon.Element == TEXT("fire")) Hit.BurnBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
+			else if (Mount->Weapon.Element == TEXT("frost")) Hit.FrostBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
 			UWRCombatLibrary::ApplyHit(Victim, Hit);
 		}), 0.45f, false);
 	}

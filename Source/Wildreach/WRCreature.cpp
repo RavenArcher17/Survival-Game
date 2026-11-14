@@ -5,6 +5,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "WRLifeSkills.h"
 #include "WRSocial.h"
+#include "WRCharacterMovementComponent.h"
+#include "WRSealBody.h"
 #include "GameFramework/GameStateBase.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
@@ -166,6 +168,22 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("attackRange"), Num)) D.AttackRange = Num;
 		if (O->TryGetNumberField(TEXT("rideSpeed"), Num)) D.RideSpeed = Num;
 		O->TryGetBoolField(TEXT("mount"), D.bMount);
+		// Mounts, breeding and bodies (cooks/build-taming.md).
+		if (O->TryGetStringField(TEXT("mountKind"), Str)) D.MountKind = FName(*Str);
+		if (O->TryGetStringField(TEXT("birth"), Str)) D.Birth = FName(*Str);
+		if (O->TryGetStringField(TEXT("habitat"), Str)) D.Habitat = FName(*Str);
+		if (O->TryGetStringField(TEXT("procBody"), Str)) D.ProcBody = FName(*Str);
+		const TArray<TSharedPtr<FJsonValue>>* SeatArr = nullptr;
+		if (O->TryGetArrayField(TEXT("seat"), SeatArr) && SeatArr->Num() == 2)
+		{
+			D.SeatFwd = (*SeatArr)[0]->AsNumber();
+			D.SeatUp = (*SeatArr)[1]->AsNumber();
+		}
+		if (O->TryGetNumberField(TEXT("back"), Num)) D.Back = Num;
+		if (O->TryGetNumberField(TEXT("carry"), Num)) D.Carry = Num;
+		if (O->TryGetNumberField(TEXT("swimSpeed"), Num)) D.SwimSpeed = Num;
+		if (O->TryGetNumberField(TEXT("landSpeed"), Num)) D.LandSpeed = Num;
+		if (O->TryGetNumberField(TEXT("flySpeed"), Num)) D.FlySpeed = Num;
 		O->TryGetBoolField(TEXT("nest"), D.bNest);
 		O->TryGetBoolField(TEXT("hearing"), D.bHearing);
 		O->TryGetBoolField(TEXT("darkHunter"), D.bDarkHunter);
@@ -352,6 +370,8 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRCreature, AggroRep);
 	DOREPLIFETIME(AWRCreature, Rider);
 	DOREPLIFETIME(AWRCreature, BodyHitsLeft);
+	DOREPLIFETIME(AWRCreature, TameRep);
+	DOREPLIFETIME(AWRCreature, Cargo);
 }
 
 void AWRCreature::ApplyDef()
@@ -362,8 +382,14 @@ void AWRCreature::ApplyDef()
 		return;
 	}
 	GetCapsuleComponent()->SetCapsuleSize(Def->Radius, Def->HalfHeight);
-	GetCharacterMovement()->MaxWalkSpeed = Def->Speed;
+	GetCharacterMovement()->MaxWalkSpeed = Def->SwimSpeed > 0.f && Def->LandSpeed > 0.f ? Def->LandSpeed : Def->Speed;
 	GetCharacterMovement()->MaxFlySpeed = Def->Speed;
+	if (Def->SwimSpeed > 0.f)
+	{
+		// A swimmer (the Floeback): at home in the sea, floating with its back out of the water.
+		GetCharacterMovement()->MaxSwimSpeed = Def->SwimSpeed * 0.5f;
+		GetCharacterMovement()->Buoyancy = WRTune(TEXT("tame.swim.buoyancy"), 1.25f);
+	}
 	BaseBodyColor = Def->Color;
 	SetBodyColor(Def->Color);
 
@@ -386,6 +412,11 @@ void AWRCreature::ApplyDef()
 		GlowLight->SetVisibility(true);
 	}
 
+	// A body built in code (the Floeback's seal body, WRSealBody): it draws and moves itself from the creature's state.
+	if (!Def->ProcBody.IsNone() && GetNetMode() != NM_DedicatedServer)
+	{
+		RefreshTameLook();
+	}
 	// Real art: swap the placeholder shape for the skeletal mesh, fitted to the capsule with its feet on the ground.
 	USkeletalMesh* ArtMesh = Def->Mesh.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *Def->Mesh);
 	if (ArtMesh && GetNetMode() != NM_DedicatedServer)
@@ -930,6 +961,7 @@ void AWRCreature::TickNightGlow()
 
 void AWRCreature::OnHitVisual(EWRHitResult Result)
 {
+	if (SealBody) SealBody->Flinch();   // the Floeback's body built in code jerks from the blow
 	// A flinch when the blow broke its poise (it shudders otherwise), unless it's mid-attack or broken (or dying: the
 	// death takes over).
 	UWRAnimInstance* Anim = CreatureAnim();
@@ -1042,6 +1074,7 @@ void AWRCreature::TickStanceSlump(float DeltaSeconds)
 
 void AWRCreature::OnDeathVisual()
 {
+	if (SealBody) SealBody->Die();   // rolls onto its side
 	if (CritMark)
 	{
 		WRFx::Stop(CritMark);
@@ -1145,7 +1178,9 @@ void AWRCreature::AddMovementInput(FVector WorldDirection, float ScaleValue, boo
 		}
 	}
 	// Wades in the shallows but never walks off into the sea (on the server, and a rider's client so it predicts the same).
-	if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying())
+	// (A swimmer, the Floeback, is at home in it.)
+	const FWRCreatureDef* MoveDef = GetDef();
+	if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying() && !(MoveDef && MoveDef->SwimSpeed > 0.f))
 	{
 		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
 		{
@@ -1185,6 +1220,11 @@ void AWRCreature::BeginPlay()
 	InitVitals(Def->Health * Difficulty, 100.f, Def->Poise);
 	MaxTorpor = Def->Health * WRTune(TEXT("taming.torporPerHealth"), 1.f);
 	HungryAt = GetWorld()->GetTimeSeconds() + FMath::FRand() * WRTune(TEXT("creatureAI.huntIntervalMinutes"), 5.f) * 60.f;
+	// Its level and stats (cooks/build-taming.md 2.1): a hatchling or a loaded tame gets its own genes right after.
+	if (!Genes.bValid && !IsTamed())
+	{
+		RollWildGenes();
+	}
 	Weapon.FlatDamage = Def->Damage * Difficulty;
 	if (Def->Damage > 0.f)
 	{
@@ -1252,7 +1292,9 @@ bool AWRCreature::IsHostileTo(const AWRCharacterBase* Other) const
 FString AWRCreature::GetDisplayLabel() const
 {
 	const FWRCreatureDef* Def = GetDef();
-	const FString Name = Def ? Def->Name : GetName();
+	// Its level (cooks/build-taming.md 2.1): wild level, plus its bond once tamed; a baby says so.
+	const int32 Level = TameRep.WildLevel + (IsTamed() ? TameRep.Bond : 0);
+	const FString Name = (Def ? Def->Name : GetName()) + (IsTamed() && IsBaby() ? TEXT(" (baby)") : TEXT("")) + (Level > 0 ? FString::Printf(TEXT(" · Lv %d"), Level) : FString());
 	return IsTamed() ? FString::Printf(TEXT("%s's %s"), *TamedBy, *Name) : bAsleep ? Name + TEXT(" (asleep)") : Name;
 }
 
@@ -1614,7 +1656,7 @@ int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
 	return N;
 }
 
-void AWRCreature::CompleteTame(const FString& PlayerName)
+void AWRCreature::CompleteTame(const FString& PlayerName, bool bTamed)
 {
 	TamedBy = PlayerName;
 	TameOrder = EWRTameOrder::Follow;
@@ -1627,7 +1669,16 @@ void AWRCreature::CompleteTame(const FString& PlayerName)
 	TameFoodCount = 0;
 	TameEta = -1.f;
 	OnRep_Tamed();
-	UWRLifeSkillsComponent::Award(FindPlayerByName(GetWorld(), PlayerName), TEXT("taming"), TEXT("tame"), 100.f);
+	if (!Genes.bValid) RollWildGenes();
+	TameRep.Hunger = 100.f;
+	TameRep.FlyStamina = WRTune(TEXT("tame.fly.stamina"), 300.f);
+	CareSlice = -1;
+	RecomputeStats();
+	OnRep_TameRep();
+	if (bTamed)
+	{
+		UWRLifeSkillsComponent::Award(FindPlayerByName(GetWorld(), PlayerName), TEXT("taming"), TEXT("tame"), 100.f);
+	}
 	if (Spawner.IsValid())
 	{
 		// No longer part of the wild pack; the spawner will replace it.
@@ -1645,8 +1696,8 @@ void AWRCreature::ApplyTameBonus(float Bonus)
 		return;
 	}
 	TameBonus = FMath::Max(0.f, Bonus);
-	InitVitals(Def->Health * (1.f + TameBonus), 100.f, Def->Poise);
-	Weapon.FlatDamage = Def->Damage * (1.f + TameBonus);
+	// Health, bite, stamina and the rest from its genes, bond, tree and growth too (WRTaming).
+	RecomputeStats();
 }
 
 FString AWRCreature::Order(AWRPlayerController* Player, const FString& Command)
@@ -1662,7 +1713,16 @@ FString AWRCreature::Order(AWRPlayerController* Player, const FString& Command)
 	if (Command == TEXT("passive")) { bTameAggressive = false; AggroTarget = nullptr; return TEXT("Won't fight"); }
 	if (Command == TEXT("release"))
 	{
+		if (Rider.IsValid()) Dismount();
+		DropTack();
+		TameRep.Bond = 0;
+		TameRep.BondXP = 0.f;
+		TameRep.Nodes = 0;
+		TameRep.bMating = false;
+		TameRep.Imprint = 0.f;
+		TameRep.Imprinter.Reset();
 		TamedBy.Reset();
+		RecomputeStats();
 		OnRep_Tamed();
 		Home = GetActorLocation();
 		return TEXT("Released into the wild");
@@ -1682,6 +1742,10 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 	{
 		return Def && !Def->bMount ? TEXT("can't ride that") : TEXT("can't ride now");
 	}
+	if (IsBaby())
+	{
+		return TEXT("Too young to ride: let it grow up");
+	}
 	Rider = NewRider;
 	// Mounted (combat.md 2.19): no guard, parry or drink in the saddle; only mounted Wildbrands and bolt / lance spells.
 	NewRider->Status->ApplyStatus(WRTags::State_Mounted, 1.0e7f);
@@ -1689,7 +1753,8 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 	NewRider->SetActorEnableCollision(false);
 	NewRider->GetCharacterMovement()->DisableMovement();
 	NewRider->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	NewRider->SetActorRelativeLocation(FVector(0.f, 0.f, Def->HalfHeight + 60.f));
+	// On its saddle's seat (creatures.json seat: forward x radius, up x half height), the rider's hips just above it.
+	NewRider->SetActorRelativeLocation(FVector(Def->SeatFwd * Def->Radius, 0.f, Def->SeatUp * Def->HalfHeight + WRTune(TEXT("tame.mount.riderLift"), 60.f)));
 	if (AController* AI = GetController())
 	{
 		AI->UnPossess();
@@ -1697,9 +1762,13 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 	}
 	PC->UnPossess();
 	PC->Possess(this);
-	GetCharacterMovement()->MaxWalkSpeed = Def->RideSpeed * (1.f + UWRLifeSkillsComponent::StatFor(NewRider, TEXT("rideSpeed")));
+	ApplyRideSpeeds();
 	UE_LOG(LogWildreach, Log, TEXT("TAME %s ridden by %s"), *GetName(), *NewRider->GetName());
-	return TEXT("Riding (E to dismount)");
+	const FName Kind = GetMountKind();
+	FString Help = Kind == TEXT("fly") ? TEXT("Riding: Jump takes off, hold Jump to climb, Dodge to dive") : Kind == TEXT("swim") ? TEXT("Riding: it swims the cold water for you")
+		: Kind == TEXT("pack") ? TEXT("Riding: a hauler walks, it doesn't sprint") : TEXT("Riding: Sprint gallops on its stamina");
+	if (TameRep.Saddle.IsEmpty() && Kind != TEXT("pack")) Help += TEXT(" - bareback: no attacks, it takes more damage (fit a saddle: Tend)");
+	return Help;
 }
 
 void AWRCreature::ServerDismount_Implementation()
@@ -1728,10 +1797,11 @@ void AWRCreature::Dismount()
 		PC->UnPossess();
 		PC->Possess(Character);
 	}
-	if (const FWRCreatureDef* Def = GetDef())
-	{
-		GetCharacterMovement()->MaxWalkSpeed = Def->Speed;
-	}
+	bClimbHeld = bDiveHeld = false;
+	GetCharacterMovement()->GravityScale = 1.f;
+	if (GetCharacterMovement()->MovementMode == MOVE_Flying) GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+	if (UWRCharacterMovementComponent* WRMove = Cast<UWRCharacterMovementComponent>(GetCharacterMovement())) WRMove->bWantsToSprint = false;
+	RecomputeStats();   // its own walking speeds again
 	SpawnDefaultController();
 }
 
@@ -1770,6 +1840,14 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		if (Pad.Key(TEXT("Look")).IsValid()) RideMapping->MapKey(RidePadLookAction, Pad.Key(TEXT("Look")));
 		if (Pad.Key(TEXT("Jump")).IsValid()) RideMapping->MapKey(RideJumpAction, Pad.Key(TEXT("Jump")));
 		if (Pad.Key(TEXT("Interact")).IsValid()) RideMapping->MapKey(RideDismountAction, Pad.Key(TEXT("Interact")));
+		// Sprint gallops on the mount's stamina; Dodge dives a flyer (cooks/build-taming.md 2.4). Same keys as on foot.
+		RideSprintAction = NewObject<UInputAction>(this);
+		RideDiveAction = NewObject<UInputAction>(this);
+		const FKey SprintKey = FWRKeyBindings::Get().Key(TEXT("Sprint")), DodgeKey = FWRKeyBindings::Get().Key(TEXT("Dodge"));
+		if (SprintKey.IsValid()) RideMapping->MapKey(RideSprintAction, SprintKey);
+		if (DodgeKey.IsValid()) RideMapping->MapKey(RideDiveAction, DodgeKey);
+		if (Pad.Key(TEXT("Sprint")).IsValid()) RideMapping->MapKey(RideSprintAction, Pad.Key(TEXT("Sprint")));
+		if (Pad.Key(TEXT("Dodge")).IsValid()) RideMapping->MapKey(RideDiveAction, Pad.Key(TEXT("Dodge")));
 		// Fighting from the saddle (combat.md 2.19): Light and Heavy on the same keys and buttons as on foot.
 		RideLightAction = NewObject<UInputAction>(this);
 		RideHeavyAction = NewObject<UInputAction>(this);
@@ -1792,7 +1870,18 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		Input->BindAction(RideMoveAction, ETriggerEvent::Triggered, this, &AWRCreature::RideMove);
 		Input->BindAction(RideLookAction, ETriggerEvent::Triggered, this, &AWRCreature::RideLook);
 		Input->BindAction(RidePadLookAction, ETriggerEvent::Triggered, this, &AWRCreature::RidePadLook);
-		Input->BindAction(RideJumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		Input->BindAction(RideJumpAction, ETriggerEvent::Started, this, &AWRCreature::RideJumpPressed);
+		Input->BindAction(RideJumpAction, ETriggerEvent::Completed, this, &AWRCreature::RideJumpReleased);
+		if (RideSprintAction)
+		{
+			Input->BindAction(RideSprintAction, ETriggerEvent::Started, this, &AWRCreature::RideSprintPressed);
+			Input->BindAction(RideSprintAction, ETriggerEvent::Completed, this, &AWRCreature::RideSprintReleased);
+		}
+		if (RideDiveAction)
+		{
+			Input->BindAction(RideDiveAction, ETriggerEvent::Started, this, &AWRCreature::RideDivePressed);
+			Input->BindAction(RideDiveAction, ETriggerEvent::Completed, this, &AWRCreature::RideDiveReleased);
+		}
 		Input->BindAction(RideDismountAction, ETriggerEvent::Started, this, &AWRCreature::ServerDismount);
 		if (RideLightAction) Input->BindAction(RideLightAction, ETriggerEvent::Started, this, &AWRCreature::RideLightPressed);
 		if (RideHeavyAction)
@@ -1812,6 +1901,52 @@ void AWRCreature::RideMove(const FInputActionValue& Value)
 		AddMovementInput(Yaw.GetUnitAxis(EAxis::X), Axis.Y);
 		AddMovementInput(Yaw.GetUnitAxis(EAxis::Y), Axis.X);
 	}
+}
+
+void AWRCreature::RideSprintPressed()
+{
+	// A hauler walks; every other mount gallops (swimmers: a burst through the water) on its own stamina.
+	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement()); Move && GetMountKind() != TEXT("pack"))
+	{
+		Move->bWantsToSprint = true;
+	}
+}
+
+void AWRCreature::RideSprintReleased()
+{
+	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement())) Move->bWantsToSprint = false;
+}
+
+void AWRCreature::RideJumpPressed()
+{
+	bClimbHeld = true;
+	if (GetMountKind() == TEXT("fly") && GetCharacterMovement()->MovementMode != MOVE_Flying)
+	{
+		// Take off: from the ground or out of a glide, with stamina and away from a boss's ground.
+		if (TameRep.FlyStamina > 0.f && !TameRep.bNoFly)
+		{
+			GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+			ServerFly(true);
+		}
+		return;
+	}
+	if (GetMountKind() != TEXT("fly")) Jump();
+}
+
+void AWRCreature::RideJumpReleased()
+{
+	bClimbHeld = false;
+	StopJumping();
+}
+
+void AWRCreature::RideDivePressed()
+{
+	bDiveHeld = true;
+}
+
+void AWRCreature::RideDiveReleased()
+{
+	bDiveHeld = false;
 }
 
 void AWRCreature::RideLook(const FInputActionValue& Value)
@@ -1838,6 +1973,15 @@ void AWRCreature::Tick(float DeltaSeconds)
 	{
 		AggroRep = AggroTarget.Get();   // sound only (WRAudioDirector): the AI keeps using AggroTarget
 	}
+	// Mounts (both machines that move it) and the tame's life (server): WRTaming.cpp.
+	if (Rider.IsValid() && (HasAuthority() || IsLocallyControlled()))
+	{
+		TickMount(DeltaSeconds);
+	}
+	if (HasAuthority() && IsTamed() && IsAlive())
+	{
+		TickTameLife(DeltaSeconds);
+	}
 	if (!HasAuthority() || !IsAlive())
 	{
 		return;
@@ -1857,7 +2001,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 		TickRider(DeltaSeconds);
 	}
 	// Out of its depth in the sea (WRWater): it swims for the shallows, whatever its brain wants.
-	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming())
+	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming() && !(Def && Def->SwimSpeed > 0.f))
 	{
 		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
 		{
@@ -1922,9 +2066,14 @@ void AWRCreature::Tick(float DeltaSeconds)
 
 	// Tame utilities and farm produce, once a minute.
 	UtilityClock += DeltaSeconds;
-	if (IsTamed() && Def && UtilityClock >= 60.f)
+	// Tireless (utility tree): it works a quarter faster.
+	if (IsTamed() && Def && !IsBaby() && UtilityClock >= 60.f * (TameHasNode(TEXT("tireless")) ? 0.75f : 1.f))
 	{
 		UtilityClock = 0.f;
+		if (Def->Utility == TEXT("sense_secrets") && TameOrder == EWRTameOrder::Follow)
+		{
+			FWRTaming::Sense(this);   // the Aurora fox: caves and egg nests near you (cooks/build-taming.md 2.2)
+		}
 		if (Def->Utility == TEXT("mine_ore") && TameOrder == EWRTameOrder::Follow)
 		{
 			for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
@@ -1934,7 +2083,33 @@ void AWRCreature::Tick(float DeltaSeconds)
 				{
 					if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(*It))
 					{
-						Inv->AddItem(Def->Id == TEXT("rimeshell") ? FName(TEXT("iron_ore")) : FName(TEXT("copper_ore")), 1);
+						const FName Ore = Def->Id == TEXT("rimeshell") ? FName(TEXT("iron_ore")) : FName(TEXT("copper_ore"));
+						// Bright: a quarter more ore; Lucky find: now and then a gem in the spoil.
+						const int32 N = 1 + (TameHasNode(TEXT("bright")) && FMath::FRand() < 0.25f ? 1 : 0);
+						FWRTaming::Forage(PS, Ore, Inv->AddItem(Ore, N));
+						static const FName Gems[] = { TEXT("gem_ruby"), TEXT("gem_topaz"), TEXT("gem_onyx") };
+						if (TameHasNode(TEXT("lucky_find")) && FMath::FRand() < WRTune(TEXT("tame.tree.luckyGem"), 0.15f))
+						{
+							const FName Gem = Gems[FMath::RandHelper(3)];
+							Inv->AddItem(Gem, 1);
+							if (AWRPlayerController* PC = Cast<AWRPlayerController>(PS->GetOwner())) PC->ClientNotify(FString::Printf(TEXT("Your %s dug up a gem"), *Def->Name));
+						}
+						GainBondXP(WRTune(TEXT("tame.xp.dig"), 3.f), TEXT("dig"));
+						// Seeker: what it finds is called out to your clan.
+						if (TameHasNode(TEXT("seeker")))
+						{
+							const FString Clan = FWRClans::Get().ClanOf(TamedBy);
+							const FVector At = GetActorLocation();
+							for (FConstPlayerControllerIterator P = GetWorld()->GetPlayerControllerIterator(); P; ++P)
+							{
+								AWRPlayerController* Other = Cast<AWRPlayerController>(P->Get());
+								const APlayerState* OPS = Other ? Other->GetPlayerState<APlayerState>() : nullptr;
+								if (OPS && OPS->GetPlayerName() != TamedBy && !Clan.IsEmpty() && FWRClans::Get().ClanOf(OPS->GetPlayerName()) == Clan)
+								{
+									Other->ClientNotify(FString::Printf(TEXT("%s's %s found %s at %.0f, %.0f"), *TamedBy, *Def->Name, *Ore.ToString().Replace(TEXT("_"), TEXT(" ")), At.X / 100.f, At.Y / 100.f));
+								}
+							}
+						}
 					}
 				}
 			}
@@ -1966,6 +2141,11 @@ void AWRCreature::OnDeath(AActor* Killer)
 	if (Rider.IsValid())
 	{
 		Dismount();
+	}
+	// A tame's saddle, barding and packs fall where it died (cooks/build-taming.md 2.9).
+	if (IsTamed())
+	{
+		DropTack();
 	}
 	// A wild kill stays down to be butchered (its loot comes off the body, hit by hit); tames still go the old way.
 	const bool bBody = BecomeBody(Killer);
@@ -2597,7 +2777,16 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		Self->SpeedBoost = WRTune(TEXT("creatureAI.fleeSpeedMult"), 1.2f);
 		const AActor* From = Self->GetFleeFrom();
-		const FVector Away = From ? Self->GetActorLocation() - From->GetActorLocation() : Self->GetActorLocation() - Self->GetHome();
+		FVector Away = From ? Self->GetActorLocation() - From->GetActorLocation() : Self->GetActorLocation() - Self->GetHome();
+		// A swimmer slips into the sea: away from the threat, bent seaward (cooks/build-taming.md 2.5).
+		if (Def->SwimSpeed > 0.f)
+		{
+			if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(Self))
+			{
+				const FVector Sea = -Water->ShoreDirection(Self);
+				if (!Sea.IsNearlyZero()) Away = Away.GetSafeNormal2D() + Sea.GetSafeNormal2D() * 1.5f;
+			}
+		}
 		Self->AddMovementInput(Away.IsNearlyZero() ? Self->GetActorForwardVector() : Away.GetSafeNormal2D(), 1.f);
 		return;
 	}
@@ -2853,6 +3042,15 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 
+	// A mating pair walk to each other and stand nuzzling while the bar fills (cooks/build-taming.md 2.6).
+	if (const AWRCreature* Mate = Self->MatePartner.Get(); Mate && Self->TameRep.MateBar > 0.f && !Self->GetRider())
+	{
+		const FVector ToMate = Mate->GetActorLocation() - Self->GetActorLocation();
+		const float Close = Self->GetSimpleCollisionRadius() + Mate->GetSimpleCollisionRadius() + 60.f;
+		if (ToMate.Size2D() > Close) Self->AddMovementInput(ToMate.GetSafeNormal2D(), 0.45f);
+		else Self->SetActorRotation(FMath::RInterpTo(Self->GetActorRotation(), FRotator(0.f, ToMate.Rotation().Yaw, 0.f), DeltaSeconds, 3.f));
+		return;
+	}
 	const FVector Goal = Self->TameOrder == EWRTameOrder::Follow && OwnerBody ? OwnerBody->GetActorLocation() : Self->GetHome();
 	const FVector To = Goal - Self->GetActorLocation();
 	const float Stop = Self->TameOrder == EWRTameOrder::Follow ? 350.f : 100.f;

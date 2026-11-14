@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRTaming.h"
 #include "WRFarm.h"
 #include "WRBeds.h"
 #include "WRSurvival.h"
@@ -282,12 +283,28 @@ void AWRGameMode::SaveWorld()
 			O->SetBoolField(TEXT("stay"), It->TameOrder == EWRTameOrder::Stay);
 			O->SetBoolField(TEXT("aggressive"), It->bTameAggressive);
 			O->SetNumberField(TEXT("bonus"), It->TameBonus);
+			// Its genes, bond, tree, tack, packs, growth, care and breeding (cooks/build-taming.md 2.9).
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& F : FWRTaming::SaveTame(*It)->Values) O->SetField(F.Key, F.Value);
 			const FVector L = It->GetActorLocation();
 			O->SetNumberField(TEXT("x"), L.X); O->SetNumberField(TEXT("y"), L.Y); O->SetNumberField(TEXT("z"), L.Z - It->GetSimpleCollisionHalfHeight());
 			Tames.Add(MakeShared<FJsonValueObject>(O));
 		}
 	}
 	Root->SetArrayField(TEXT("tames"), Tames);
+	// Eggs your tames laid that nobody has picked up yet (cooks/build-taming.md 2.6).
+	TArray<TSharedPtr<FJsonValue>> Eggs;
+	for (TActorIterator<AWRLaidEgg> It(GetWorld()); It; ++It)
+	{
+		if (It->Egg.IsEmpty()) continue;
+		const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		const FVector L = It->GetActorLocation();
+		O->SetNumberField(TEXT("x"), L.X); O->SetNumberField(TEXT("y"), L.Y); O->SetNumberField(TEXT("z"), L.Z);
+		O->SetStringField(TEXT("owner"), It->OwnerName);
+		O->SetObjectField(TEXT("egg"), FWRInventoryRules::StackToJson(It->Egg));
+		O->SetStringField(TEXT("shell"), It->Shell.ToFColor(true).ToHex());
+		Eggs.Add(MakeShared<FJsonValueObject>(O));
+	}
+	Root->SetArrayField(TEXT("laidEggs"), Eggs);
 	if (const AWRGameState* State = GetGameState<AWRGameState>())
 	{
 		Root->SetNumberField(TEXT("clockHours"), State->GetTotalHours());  // the day and time carry over a restart
@@ -395,12 +412,27 @@ void AWRGameMode::LoadWorld()
 			const FVector L(O->GetNumberField(TEXT("x")), O->GetNumberField(TEXT("y")), O->GetNumberField(TEXT("z")));
 			if (AWRCreature* Tame = AWRCreature::SpawnCreature(GetWorld(), FName(*O->GetStringField(TEXT("id"))), L, FRotator::ZeroRotator))
 			{
-				Tame->CompleteTame(O->GetStringField(TEXT("owner")));
+				Tame->CompleteTame(O->GetStringField(TEXT("owner")), false);
 				Tame->TameOrder = O->GetBoolField(TEXT("stay")) ? EWRTameOrder::Stay : EWRTameOrder::Follow;
 				Tame->bTameAggressive = O->GetBoolField(TEXT("aggressive"));
 				Tame->ApplyTameBonus(O->HasField(TEXT("bonus")) ? O->GetNumberField(TEXT("bonus")) : 0.f);  // older saves: none
+				FWRTaming::LoadTame(Tame, O);
 				++LoadedTames;
 			}
+		}
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Eggs = nullptr;
+	if (Root->TryGetArrayField(TEXT("laidEggs"), Eggs))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Eggs)
+		{
+			const TSharedPtr<FJsonObject> O = V->AsObject();
+			const TSharedPtr<FJsonObject>* EggObj = nullptr;
+			if (!O.IsValid() || !O->TryGetObjectField(TEXT("egg"), EggObj)) continue;
+			const FWRItemStack Egg = FWRInventoryRules::StackFromJson(*EggObj);
+			if (Egg.IsEmpty()) continue;
+			AWRLaidEgg::Lay(GetWorld(), FVector(O->GetNumberField(TEXT("x")), O->GetNumberField(TEXT("y")), O->GetNumberField(TEXT("z"))), Egg, O->GetStringField(TEXT("owner")),
+				FLinearColor(FColor::FromHex(O->GetStringField(TEXT("shell")))));
 		}
 	}
 	double ClockHours = 0.0;

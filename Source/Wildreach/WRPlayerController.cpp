@@ -405,6 +405,7 @@ void AWRPlayerController::WRStreaming()
 		Mode, Pieces, Components, Area.IsValid ? Area.Min.X / 100.f : 0.f, Area.IsValid ? Area.Max.X / 100.f : 0.f, Area.IsValid ? Area.Min.Y / 100.f : 0.f, Area.IsValid ? Area.Max.Y / 100.f : 0.f,
 		Actors, WRTune(TEXT("world.streamingRangeScale"), 24.f));
 }
+void AWRPlayerController::WRTameDev(const FString& What) { ServerCommand(TEXT("tamedev ") + What); }
 void AWRPlayerController::WRSpawnAt(FName Creature, float X, float Y) { ServerCommand(FString::Printf(TEXT("spawnat %s %.0f %.0f"), *Creature.ToString(), X, Y)); }
 void AWRPlayerController::WRCreatureHP(FName Creature, float Fraction) { ServerCommand(FString::Printf(TEXT("creaturehp %s %.3f"), *Creature.ToString(), Fraction)); }
 void AWRPlayerController::WRCreatureDrive(FName Creature, float Yaw, float Seconds, float Scale)
@@ -1235,6 +1236,43 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			Best->IsUnconscious() ? TEXT("unconscious ") : TEXT(""), Best->TameOrder == EWRTameOrder::Stay ? TEXT("stay") : TEXT("follow"),
 			*GetNameSafe(Best->GetRider()), Best->TameBonus * 100.f, Best->GetAttributes() ? Best->GetAttributes()->GetMaxHealth() : 0.f,
 			*Best->GetActorLocation().ToCompactString()) : TEXT("no creature nearby");
+		ClientNotify(Result);
+	}
+	else if (Cmd == TEXT("tamedev") && GetPawn())
+	{
+		// Testing aid (cooks/build-taming.md): "tamedev now" tames the nearest wild creature for you; "tamedev bond 5"
+		// gives your nearest tame bond levels; "tamedev grow 1" sets its growth; "tamedev care" answers its care;
+		// "tamedev mate" fills a mating bar; "tamedev hatch" finishes the nearest incubator's egg.
+		const FString Me = PlayerState ? PlayerState->GetPlayerName() : FString();
+		AWRCreature* Best = nullptr;
+		float BestDist = 2000.f;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist(It->GetActorLocation(), GetPawn()->GetActorLocation());
+			const bool bWant = Arg(1) == TEXT("now") ? !It->IsTamed() && It->GetDef() && It->GetDef()->Archetype != TEXT("boss") : It->TamedBy == Me;
+			if (It->IsAlive() && bWant && !It->IsA<AWRTrainingDummy>() && D < BestDist) { BestDist = D; Best = *It; }
+		}
+		if (Arg(1) == TEXT("hatch"))
+		{
+			if (AWRBuildPiece* Inc = FindNearbyPiece(800.f, true); Inc && Inc->GetDef() && Inc->GetDef()->Kind == TEXT("incubator")) { Inc->Growth = 1.f; Inc->FuelClock = FMath::Max(Inc->FuelClock, 1.f); Result = TEXT("egg ready"); }
+			else Result = TEXT("no incubator near");
+		}
+		else if (!Best) Result = TEXT("no creature near");
+		else if (Arg(1) == TEXT("now")) { Best->CompleteTame(Me); Result = FString::Printf(TEXT("tamed %s"), *Best->GetDisplayLabel()); }
+		else if (Arg(1) == TEXT("bond"))
+		{
+			// One bond level's XP at a time (the server's XP multiplier taken back out).
+			const float Mult = FMath::Max(0.01f, WRTune(TEXT("server.xpMultiplier"), 1.f));
+			for (int32 i = 0; i < FMath::Max(1, FCString::Atoi(*Arg(2))); ++i)
+			{
+				Best->GainBondXP((WRTune(TEXT("tame.bondBase"), 100.f) + WRTune(TEXT("tame.bondPer"), 40.f) * (Best->TameRep.Bond + 1)) / Mult + 0.01f, TEXT("dev"));
+			}
+			Result = FString::Printf(TEXT("bond %d"), Best->TameRep.Bond);
+		}
+		else if (Arg(1) == TEXT("grow")) { Best->TameRep.Growth = FMath::Clamp(FCString::Atof(*Arg(2)), 0.1f, 1.f); Best->SetActorScale3D(FVector(Best->TameRep.Growth)); Best->RecomputeStats(); Result = FString::Printf(TEXT("growth %.2f"), Best->TameRep.Growth); }
+		else if (Arg(1) == TEXT("care")) { Best->AnswerCare(Me); Result = FString::Printf(TEXT("imprint %.0f%%"), Best->TameRep.Imprint * 100.f); }
+		else if (Arg(1) == TEXT("mate")) { Best->TameRep.bMating = true; Best->TameRep.MateBar = 0.99f; Result = TEXT("mating"); }
+		else Result = TEXT("tamedev now | bond N | grow X | care | mate | hatch");
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("spawnat"))

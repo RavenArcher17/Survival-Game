@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRBoss.h"
 #include "WRLifeSkills.h"
@@ -236,6 +237,8 @@ namespace WRCombatPerks
 				}
 			}
 		}
+		// The tame's own: Berserk, Pack tactics, its imprinter beside it; a Warhorse's rider (cooks/build-taming.md 2.2).
+		Scale *= FWRTaming::AttackerScale(Attacker, Target);
 		return Scale;
 	}
 }
@@ -769,6 +772,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 	}
 
+	// A player's tames stand with them: a Bulwark hauler near, a Guardian taking its share (cooks/build-taming.md 2.2).
+	if (Target->GetPlayerState())
+	{
+		Damage = FWRTaming::PlayerTakes(Target, Hit, Damage);
+	}
 	const float BeforeModify = Damage;
 	Damage = Target->ModifyIncomingDamage(Hit, Damage);
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
@@ -844,7 +852,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const AWRCreature* Creature = Cast<AWRCreature>(Target);
 		const bool bCreatureArmour = Creature && (TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) || TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor))
 			&& (Creature->GetDef() && (Creature->GetDef()->bHyperarmor || Creature->GetDef()->Archetype == TEXT("boss")));
-		if (Left > 0.f || bCreatureArmour)
+		// Stalwart (fighter tree): a tame that can't be knocked about.
+		if (Left > 0.f || bCreatureArmour || FWRTaming::StanceTaken(Target, 1.f) < 1.f)
 		{
 			TargetASC->SetNumericAttributeBase(UWRAttributeSet::GetPoiseAttribute(), FMath::Clamp(Left / Armour - GuardPoise, 0.f, TargetAttr->GetPoise()));
 		}
@@ -887,6 +896,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Stance *= WRTune(TEXT("stance.shatterMult"), 2.f);
 		}
+		Stance = FWRTaming::StanceTaken(Target, Stance);
 		// Counter-hits, blows it never saw coming (stealth), a blunt blow to the head and a rimed body all take more
 		// stance (combat.md 2.4.0, 2.10, 2.11).
 		if (bCounterHit) Stance *= 1.f + WRTune(TEXT("combat.counterHit.stance"), 0.3f);
@@ -997,7 +1007,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.
 	if (AWRCreature* Mount = Cast<AWRCreature>(Target); Mount && Mount->GetRider() && Target->IsAlive()
 		&& (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken) && !Hit.bDamageOverTime
-		&& (Hit.Impact >= uint8(WRTune(TEXT("mounted.unhorseImpact"), 4.f)) || Reaction > 0))
+		&& (Hit.Impact >= uint8(WRTune(TEXT("mounted.unhorseImpact"), 4.f)) || Reaction > 0) && !FWRTaming::KeepsSeat(Mount, Hit, Damage))
 	{
 		Mount->Unhorse(Attacker);
 	}
@@ -1036,6 +1046,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Hit.bCritical) Reaction = 3;  // a crit's victim always recoils
 	Flags = WRFx::WithReaction(Flags, Reaction);
 	const bool bDies = TargetAttr->GetHealth() <= 0.f;
+	// Bond XP for the tames in it (their blows, the kills they helped with: cooks/build-taming.md 2.1).
+	if (!Hit.bDamageOverTime && Damage > 0.f)
+	{
+		FWRTaming::AfterHit(Attacker, Target, Damage, bDies);
+	}
 	if (bDies && StanceKind(Target) == TEXT("major") && !Hit.bDamageOverTime)
 	{
 		Flags = WRFx::WithTier(Flags, EWRHitTier::BossKill);  // the last blow on a major boss (fx.hitStop.bossKill)

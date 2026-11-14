@@ -179,6 +179,8 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::Door: Want = TEXT("door"); break;
 	case EWRMenu::Cook: Want = TEXT("cook"); break;
 	case EWRMenu::Machine: Want = TEXT("machine"); break;
+	case EWRMenu::TameCard: Want = TEXT("tamecard"); break;
+	case EWRMenu::Incubator: Want = TEXT("incubator"); break;
 	default: break;
 	}
 	if (!Want.IsNone() && !FWRScreens::Find(Want))
@@ -960,7 +962,7 @@ const TArray<TPair<FName, FText>>& FWRPlayerUI::TameOrders()
 		{ TEXT("follow"), LOCTEXT("Follow", "Follow") },
 		{ TEXT("stay"), LOCTEXT("Stay", "Stay") },
 		{ TEXT("ride"), LOCTEXT("Ride", "Ride") },
-		{ NAME_None, FText::GetEmpty() },
+		{ TEXT("tend"), LOCTEXT("Tend", "Tend") },
 		{ TEXT("release"), LOCTEXT("Release", "Release") },
 		{ NAME_None, FText::GetEmpty() },
 		{ TEXT("passive"), LOCTEXT("Passive", "Passive") },
@@ -1034,7 +1036,9 @@ void FWRPlayerUI::PickTameOrder(int32 Pos)
 {
 	AWRPlayerController* P = PC.Get();
 	const TArray<TPair<FName, FText>>& Orders = bWhistle ? WhistleOrders() : TameOrders();
-	if (Pos >= 0 && Orders.IsValidIndex(Pos) && !Orders[Pos].Key.IsNone() && (!bWhistle || P->TamesInEarshot() > 0))
+	// Tend: the tame's card (its stats, skills, tack, family and packs: cooks/build-taming.md 2.8), opened here.
+	const bool bTend = !bWhistle && Pos >= 0 && Orders.IsValidIndex(Pos) && Orders[Pos].Key == TEXT("tend") && P->GetMenuCreature();
+	if (!bTend && Pos >= 0 && Orders.IsValidIndex(Pos) && !Orders[Pos].Key.IsNone() && (!bWhistle || P->TamesInEarshot() > 0))
 	{
 		P->SendCommand((bWhistle ? TEXT("whistle ") : TEXT("tame ")) + Orders[Pos].Key.ToString());
 	}
@@ -1042,7 +1046,8 @@ void FWRPlayerUI::PickTameOrder(int32 Pos)
 	bTameWheel = false;
 	bTameSticky = false;
 	TameHover = -1;
-	if (P->GetMenu() == EWRMenu::Tame) P->SetMenu(EWRMenu::None);
+	if (bTend) P->SetMenu(EWRMenu::TameCard);
+	else if (P->GetMenu() == EWRMenu::Tame) P->SetMenu(EWRMenu::None);
 	UpdateInputMode();
 }
 

@@ -42,6 +42,7 @@
     { "id": "alchemy_table", "name": "Alchemy table", "category": "utility", "kind": "station", "station": "alchemy_table", "cost": { "wood": 25, "stone": 10 }, "hp": 400, "mesh": "/Game/Props/AlchemyTable/alchemy_game/StaticMeshes/alchemy_game.alchemy_game", "meshYaw": 90, "meshFit": [130, 95, 110] },
     { "id": "crop_plot", "name": "Crop plot", "category": "farm", "plot": "soil", "kind": "crop", "cost": { "wood": 10, "fiber": 4 }, "hp": 200 },
     { "id": "animal_pen", "name": "Animal pen", "category": "farm", "kind": "pen", "cost": { "wood": 40 }, "hp": 500 },
+    { "id": "incubator", "name": "Incubator", "category": "farm", "kind": "incubator", "arch": "incubator", "hearth": 3, "cost": { "stone": 20, "iron_ingot": 4, "linen": 4 }, "hp": 600, "note": "Hatches eggs: a fertilised egg your tame laid or one you stole. Feed its firebox the egg's fuel: charcoal or sulfur for fire eggs, ice blocks for frost eggs, wood for the rest." },
 
     {"id": "ash_pit", "name": "Ash pit", "category": "farm", "kind": "crop", "plot": "ashpit", "biome": "volcanic", "cost": {"stone": 20}, "hp": 500},
     {"id": "paddy", "name": "Paddy", "category": "farm", "kind": "crop", "plot": "paddy", "biome": "swamp", "cost": {"wood": 10, "stone": 10}, "hp": 300},

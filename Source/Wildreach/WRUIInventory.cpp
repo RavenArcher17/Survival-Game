@@ -369,7 +369,7 @@ namespace WRInv
 		int32 InvCategoryRank(const FWRItemDef* Def)
 		{
 			static const TCHAR* Order[] = { TEXT("weapon"), TEXT("ranged"), TEXT("armor"), TEXT("tool"), TEXT("ammo"), TEXT("dart"), TEXT("potion"), TEXT("food"), TEXT("drink"),
-				TEXT("tame_food"), TEXT("egg"), TEXT("gem"), TEXT("material"), TEXT("core"), TEXT("trophy") };
+				TEXT("tame_food"), TEXT("egg"), TEXT("tack"), TEXT("gem"), TEXT("material"), TEXT("core"), TEXT("trophy") };
 			for (int32 i = 0; Def && i < int32(UE_ARRAY_COUNT(Order)); ++i) if (Def->Category == Order[i]) return i;
 			return int32(UE_ARRAY_COUNT(Order));
 		}
@@ -479,7 +479,7 @@ namespace WRInvTab
 		case EFilter::Resources: return C == TEXT("material") || C == TEXT("core") || C == TEXT("trophy") || C == TEXT("gem") || C == TEXT("rune") || C == TEXT("blueprint");
 		case EFilter::Food: return C == TEXT("food") || C == TEXT("drink") || C == TEXT("potion");
 		case EFilter::Ammo: return C == TEXT("ammo") || C == TEXT("dart") || D->IsThrowable();
-		case EFilter::Taming: return C == TEXT("tame_food") || C == TEXT("egg") || C == TEXT("dart") || D->Id == TEXT("narcotic") || D->AmmoTorpor > 0.f;
+		case EFilter::Taming: return C == TEXT("tame_food") || C == TEXT("egg") || C == TEXT("tack") || C == TEXT("dart") || D->Id == TEXT("narcotic") || D->AmmoTorpor > 0.f;
 		default: return true;
 		}
 	}
@@ -573,7 +573,8 @@ namespace WRInvTab
 		if (C == TEXT("food")) return TEXT("Food · eat it");
 		if (C == TEXT("drink")) return TEXT("Drink");
 		if (C == TEXT("tame_food")) return TEXT("Taming food");
-		if (C == TEXT("egg")) return TEXT("Creature egg · hatch it");
+		if (C == TEXT("egg")) return D.Id.ToString().StartsWith(TEXT("fertile_")) ? TEXT("Fertilised egg · for an incubator") : TEXT("Creature egg · hatch it");
+		if (C == TEXT("tack")) return TEXT("Tack · fit it on a tame (Tend)");
 		if (C == TEXT("gem")) return TEXT("Gem · goes in a weapon socket");
 		if (C == TEXT("core")) return TEXT("Boss core · for your Hearth");
 		if (C == TEXT("trophy")) return TEXT("Trophy");
@@ -585,7 +586,7 @@ namespace WRInvTab
 		const FName C = D.Category;
 		return C == TEXT("material") ? TEXT("Resource") : C == TEXT("tool") ? TEXT("Tool") : C == TEXT("ammo") ? TEXT("Ammo") : C == TEXT("dart") ? TEXT("Dart")
 			: C == TEXT("potion") ? TEXT("Potion") : C == TEXT("food") ? TEXT("Food") : C == TEXT("drink") ? TEXT("Drink") : C == TEXT("tame_food") ? TEXT("Taming")
-			: C == TEXT("egg") ? TEXT("Egg") : C == TEXT("gem") ? TEXT("Gem") : C == TEXT("core") ? TEXT("Boss core") : C == TEXT("trophy") ? TEXT("Trophy")
+			: C == TEXT("egg") ? TEXT("Egg") : C == TEXT("tack") ? TEXT("Tack") : C == TEXT("gem") ? TEXT("Gem") : C == TEXT("core") ? TEXT("Boss core") : C == TEXT("trophy") ? TEXT("Trophy")
 			: C == TEXT("talisman") ? TEXT("Talisman") : C == TEXT("ring") ? TEXT("Ring") : C == TEXT("rune") ? TEXT("Rune") : C == TEXT("blueprint") ? TEXT("Blueprint")
 			: C == TEXT("armor") ? TEXT("Armour") : TEXT("Item");
 	}
@@ -613,7 +614,9 @@ namespace WRInvTab
 		if (D.AmmoTorpor > 0.f || C == TEXT("dart")) { bTaming = true; return TEXT("Knocks creatures out for taming (torpor)."); }
 		if (C == TEXT("ammo")) return FString::Printf(TEXT("Carried in your bag: %s fire it."), *LauncherOf(D.AmmoOf));
 		if (C == TEXT("gem")) return TEXT("Right-click to socket it into your weapon. Its quality sets the sockets.");
-		if (C == TEXT("egg")) { bTaming = true; return TEXT("Right-click to hatch it: the newborn imprints on you."); }
+		if (C == TEXT("egg") && D.Id.ToString().StartsWith(TEXT("fertile_"))) { bTaming = true; return TEXT("Set it in an incubator (workbench, Hearth 3) and keep its firebox fed: the hatchling is yours, a baby to raise."); }
+		if (C == TEXT("egg")) { bTaming = true; return TEXT("Right-click to hatch it: the newborn imprints on you. Or set it in an incubator."); }
+		if (C == TEXT("tack")) { bTaming = true; return TEXT("Fit it from a tame's card: hold Interact on your tame, then Tend. A saddle lets you fight from its back; barding guards it."); }
 		if (C == TEXT("tame_food")) { bTaming = true; return TEXT("Every tameable creature eats it; it tames twice as fast."); }
 		if (D.Id == TEXT("narcotic")) { bTaming = true; return TEXT("Feed it to a knocked-out creature to keep it under."); }
 		if (C == TEXT("tool")) return TEXT("Hold it (its hotbar key) to gather more: a hatchet for wood, a pick for stone and ore. It wears with every hit; repair it at a workbench.");
@@ -1792,7 +1795,7 @@ namespace WRInvTab
 			else if (C == TEXT("drink") || C == TEXT("potion")) UseText = LOCTEXT("Drink", "Drink");
 			else if (C == TEXT("gem") || C == TEXT("rune")) UseText = LOCTEXT("Socket", "Socket");
 			else if (C == TEXT("blueprint")) UseText = LOCTEXT("Read", "Read");
-			else if (C == TEXT("egg")) UseText = LOCTEXT("Hatch", "Hatch");
+			else if (C == TEXT("egg") && !D->Id.ToString().StartsWith(TEXT("fertile_"))) UseText = LOCTEXT("Hatch", "Hatch");
 			else if (C == TEXT("dart")) UseText = LOCTEXT("UseDart", "Use");
 			else bCanUse = false;
 			const int32 Sel = SelIndex;

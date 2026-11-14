@@ -110,6 +110,7 @@ namespace WRBuildLookDecorDetail
 			else if (A == TEXT("candles")) Candles();
 			else if (A == TEXT("lantern")) Lantern();
 			else if (A == TEXT("fireplace")) Fireplace();
+			else if (A == TEXT("incubator")) Incubator();
 			else if (A == TEXT("cauldron")) Cauldron();
 			else if (A == TEXT("bath")) Bath();
 			else if (A == TEXT("fountain")) Fountain();
@@ -685,6 +686,64 @@ namespace WRBuildLookDecorDetail
 				Box(Hide, FVector(8.f, 50.f, 60.f), FVector(14.f, 72.f, 110.f));
 				Spike(Iron, FVector(11.f, 61.f, 60.f), FVector(0.f, 0.f, -1.f), 6.f, 14.f);
 			}
+		}
+
+		void Incubator()
+		{
+			// An egg incubator (cooks/build-taming.md 2.6): a clay-and-stone firebox whose mouth faces +X (you feed it
+			// from the front), its flue rising at the back; over the firebox an iron grate carries a clay tray bedded in
+			// straw where the egg stands (its top at 78 cm: WRTameLook puts the egg there); four iron posts hold a
+			// brass-banded wicker hood over the tray, open at the front so you can see the egg, vented at the crown. The
+			// warmth (a light in the firebox) comes on while it burns fuel.
+			const FSurf Clay = FSurf::Stone(FLinearColor(0.36f, 0.2f, 0.11f), 0.92f);
+			const FSurf Stones = FSurf::Stone(FLinearColor(0.24f, 0.23f, 0.21f));
+			const FSurf Straw = FSurf::Cloth(FLinearColor(0.42f, 0.33f, 0.15f));
+			const FSurf Wicker = FSurf::Wood(FLinearColor(0.34f, 0.24f, 0.12f));
+			// Firebox: a stone footing course, clay walls, the arched mouth, coals and ash inside.
+			Box(Stones, FVector(-42.f, -38.f, 0.f), FVector(42.f, 38.f, 10.f));
+			Box(Clay, FVector(-38.f, -34.f, 10.f), FVector(30.f, -24.f, 58.f));
+			Box(Clay, FVector(-38.f, 24.f, 10.f), FVector(30.f, 34.f, 58.f));
+			Box(Clay, FVector(-38.f, -24.f, 10.f), FVector(-28.f, 24.f, 58.f));
+			Box(Clay, FVector(20.f, -34.f, 40.f), FVector(32.f, 34.f, 58.f));   // over the mouth
+			Frame = FTransform(FRotator(0.f, 90.f, 0.f), FVector(30.f, 0.f, 0.f));
+			Ring(Stones, FVector(0.f, 0.f, 26.f), 16.f, 6.f, 8.f, 7, 0.f, 180.f);   // the mouth's arch of fired stones
+			Frame = FTransform::Identity;
+			Box(Dark, FVector(-28.f, -24.f, 10.f), FVector(20.f, 24.f, 13.f));      // ash
+			for (int32 c = 0; c < 6; ++c) Add(Dark, FVector(9.f, 7.f, 5.f), FVector(-18.f + c * 6.f, -12.f + (c % 3) * 11.f, 15.f), FRotator(0.f, c * 37.f, 0.f));   // coals
+			// The flue at the back corner, capped.
+			Add(Clay, FVector(14.f, 14.f, 70.f), FVector(-34.f, 26.f, 93.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			Add(Stones, FVector(18.f, 18.f, 4.f), FVector(-34.f, 26.f, 130.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			// The grate: iron bars across the firebox top.
+			for (int32 g = 0; g < 7; ++g) Rod(Iron, FVector(-36.f, -30.f + g * 10.f, 60.f), FVector(28.f, -30.f + g * 10.f, 60.f), 2.4f);
+			// The tray: a shallow clay dish on the grate, straw heaped in it.
+			Add(Clay, FVector(58.f, 58.f, 8.f), FVector(-4.f, 0.f, 66.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			Add(Straw, FVector(50.f, 50.f, 10.f), FVector(-4.f, 0.f, 73.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			for (int32 k = 0; k < 10; ++k)
+			{
+				const float A = k * 0.63f;
+				Rod(Straw, FVector(-4.f + FMath::Cos(A) * 14.f, FMath::Sin(A) * 14.f, 78.f), FVector(-4.f + FMath::Cos(A + 1.1f) * 24.f, FMath::Sin(A + 1.1f) * 24.f, 77.f), 1.4f);
+			}
+			// The hood: four posts, two brass bands, a wicker dome open at the front, a vent at its crown.
+			for (const float X : { -34.f, 26.f }) for (const float Y : { -30.f, 30.f }) Rod(Iron, FVector(X, Y, 58.f), FVector(X * 0.85f, Y * 0.85f, 112.f), 2.6f);
+			for (int32 w = 0; w < 9; ++w)
+			{
+				// Ribs over the back half only (the front stays open).
+				const float A = FMath::DegreesToRadians(90.f + w * 22.5f);
+				const FVector Foot(-4.f + FMath::Cos(A) * 34.f, FMath::Sin(A) * 34.f, 106.f);
+				Rod(Wicker, Foot, FVector(-4.f + FMath::Cos(A) * 10.f, FMath::Sin(A) * 10.f, 132.f), 2.f);
+			}
+			// The brass band round the hood's foot (a ring of riveted segments; the front left open) and the crown's ring.
+			for (int32 b = 0; b < 12; ++b)
+			{
+				const float A = FMath::DegreesToRadians(75.f + b * 17.5f);
+				Add(Brass, FVector(3.f, 12.5f, 4.f), FVector(-4.f + FMath::Cos(A) * 35.f, FMath::Sin(A) * 35.f, 106.f), FRotator(0.f, FMath::RadiansToDegrees(A), 0.f));
+			}
+			for (int32 b = 0; b < 8; ++b)
+			{
+				const float A = FMath::DegreesToRadians(b * 45.f);
+				Add(Brass, FVector(2.f, 5.f, 3.f), FVector(-4.f + FMath::Cos(A) * 10.f, FMath::Sin(A) * 10.f, 132.f), FRotator(0.f, FMath::RadiansToDegrees(A), 0.f));
+			}
+			Add(Wicker, FVector(14.f, 14.f, 8.f), FVector(-4.f, 0.f, 137.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);   // the vent's cap
 		}
 
 		void Cauldron()

@@ -134,6 +134,23 @@ their slope in the place command (`p<deg>`) and the save (`pitch`). Turrets are 
 server brain, model and aim line in `WRMachineLook.cpp`, ammo rows in `machines.json` `turrets`). Rules: no base piece in
 a cave (`FWRBuildSets::PlaceCheck`), weapon / tool hits on pieces scaled by `materialDamage`.
 
+Also since 0.7.1: **taming past the tame** (`WRTaming.cpp`, `WRTameLook.cpp`, `WRSealBody.cpp`, `WRUITameCard.cpp`,
+`WRUIIncubator.cpp`, `Data/tame_trees.json`, tuning `tame`, cooks/build-taming.md): every creature carries genes
+(`FWRTameGenes`: points in six stats, mutations per line, morphs, sex) rolled at spawn by its band, and every machine
+reads `AWRCreature::TameRep` (levels, bond, tree, saddle, barding, growth, care, breeding, hunger, fly stamina, the
+stat multipliers). `AWRCreature::RecomputeStats` is the one place a creature's health, bite, stamina, torpor and speed
+come from (genes x bond x tree x growth x taming effectiveness); call it after changing any of those. Tame XP is
+`GainBondXP(amount, why)`; role-tree effects ask `TameHasNode(<id>)` (ids in tame_trees.json). The combat hooks are
+`FWRTaming::AttackerScale / PlayerTakes / StanceTaken / KeepsSeat / AfterHit` inside `ApplyHit`, the tack's share in
+`AWRCreature::ModifyIncomingDamage`. Mount kinds are creatures.json `mountKind` (ground / pack / swim / fly; haulers
+default to pack): `ApplyRideSpeeds` and `TickMount` run on the server and the rider's machine. Saddles, pack saddles and
+barding are items with `tack`; they're modelled in code from their parts (`RidingSaddle`, `PackSaddle`, `BardingBody`)
+on a back fitted per species by creatures.json `seat` / `back`, attached to `spine2` (neck lames and face plate to
+`neck` / `head`). Mutations show through `M_TameMorph` (`Tools/art/make_tame_morph_material.py`) as the mesh's overlay.
+The Floeback's body is built and moved in code (`UWRSealBody`). Card and incubator commands carry the tame's /
+incubator's position (`tamecard x y z <verb>`, `incubator x y z <verb>`) so the server acts on the one the screen shows.
+Dev: `WRTameDev now | bond N | grow X | care | mate | hatch`.
+
 Open, as of 0.7.1:
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until
@@ -155,8 +172,16 @@ Open, as of 0.7.1:
   Skaldrith; the other ten sets (structure, beams, decor) stay hidden until their land is live. Tundra hot springs
   aren't on the map yet, so the hot spring bath goes only by lava. The other ten paths' element-turret essences wait
   for their items (rows in `machines.json`).
+- **Taming on the island is two lands**: the Windmane (first flying mount) is in creatures.json but never spawns (its Sky
+  islands aren't on the map) and wears the Griffon pack body only for testing flight (`WRSpawn windmane`, `WRTameDev
+  now`); it needs its own four-winged sky-stag body. Ten lands' barding is hidden with its land, and only the lava and
+  slick-ice passes are wired (the others' hazards don't exist yet). The Floeback's body is modelled in code, not
+  sculpted art. Saddle seats per species (`seat`, `back`) are first fits to eyeball. Pen-born farm young still grow on
+  the farm's clock, not the baby system. Not built here: the stable (stored tames), necro raising, the Dadeni revive and
+  Soulbond, tame names.
 - **Bounties** stay a setting only (nothing reads it) until the PvP pass. **54 perks** wait for their systems
-  (`waitsFor` in `Data/lifeskills.json`: diving, breeding, bees, explosives, timed brews...; Decorator, Turret tech,
+  (`waitsFor` in `Data/lifeskills.json`: diving, bees, explosives, timed brews...; Breeder, Rare finder, Saddle master and
+  Creature armorer are live since build-taming; Decorator, Turret tech,
   Master builder and Ancient wood are live since build-building).
 - **F8 pictures from the game don't reach the web inbox yet**: the feedback endpoint keeps screenshots (and context over
   4000 characters) for signed-in players only, and the game isn't signed in. The full report and picture are in

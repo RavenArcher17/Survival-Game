@@ -734,7 +734,10 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	const UCharacterMovementComponent* Move = Owner ? Owner->GetCharacterMovement() : nullptr;
 	const bool bFastStroke = bSprintDraining && Move && Move->IsSwimming();
 	const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(Owner);
-	const float DrainPerSecond = bFastStroke
+	// A ridden mount sprints on its own stamina (cooks/build-taming.md 2.4: Sure-footed, Courser).
+	float MountDrain = 0.f, MountRegen = 0.f;
+	const bool bMountRates = Owner && Owner->MountStaminaRates(MountDrain, MountRegen);
+	const float DrainPerSecond = bMountRates ? MountDrain : bFastStroke
 		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina"))) * (Survival ? Survival->SwimStaminaMult() : 1.f)
 		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f);
 	if (bSprintDraining && DrainPerSecond > 0.f)
@@ -745,7 +748,7 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	else if (SinceStaminaUse >= WRTune(TEXT("player.staminaRegenDelay"), 0.5f) && Attr->GetStamina() < Attr->GetMaxStamina()
 		&& !ASC->HasMatchingGameplayTag(WRTags::State_Blocking) && !bMidSwing)
 	{
-		float Regen = WRTune(TEXT("player.staminaRegenPerSecond"), 45.f);
+		float Regen = bMountRates ? MountRegen : WRTune(TEXT("player.staminaRegenPerSecond"), 45.f);
 		if (bSurvivalNeeds && (Attr->GetHunger() <= 0.f || Attr->GetThirst() <= 0.f))
 		{
 			Regen *= WRTune(TEXT("survival.deprivedStaminaRegenMultiplier"), 0.5f);

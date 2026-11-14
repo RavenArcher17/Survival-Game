@@ -570,7 +570,8 @@ void UWRLightSubsystem::Refresh()
 		const FWRCreatureDef* Def = It->GetDef();
 		if (Def && Def->Utility == TEXT("light") && It->IsAlive())
 		{
-			Sources.Add({ *It, LightRadius(TEXT("creature")), false, LightFlag(TEXT("creature"), TEXT("halves")) });
+			// Bright (utility tree): its light reaches half again as far.
+			Sources.Add({ *It, LightRadius(TEXT("creature")) * (It->TameHasNode(TEXT("bright")) ? 1.5f : 1.f), false, LightFlag(TEXT("creature"), TEXT("halves")) });
 		}
 	}
 	for (TActorIterator<AWRCharacterBase> It(World); It; ++It)

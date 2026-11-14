@@ -350,6 +350,18 @@
       {"sprite": "ring", "blend": "lit", "count": 2, "flat": true, "life": [0.8, 1.2], "size": [8, 12], "grow": 4, "lift": 1, "intensity": 0.25, "colors": [[0.9, 0.95, 1, 0.45], [0.9, 0.95, 1, 0]]},
       {"sprite": "droplet", "blend": "lit", "count": 6, "radius": 4, "radial": true, "life": [0.3, 0.5], "size": [1.5, 3], "speed": [60, 120], "dir": [0, 0, 1], "spread": 30, "gravity": 1, "intensity": 0.2, "colors": [[0.85, 0.92, 0.98, 0.8], [0.85, 0.92, 0.98, 0]]}
     ]},
+    "tame.levelup": { "light": {"color": [1,0.82,0.45], "intensity": 4000, "radius": 450, "seconds": 0.9, "lift": 80}, "layers": [
+      {"sprite": "ring", "blend": "add", "count": 1, "flat": true, "life": [0.8,0.8], "size": [50,50], "grow": 4, "lift": 6, "intensity": 2.2, "colors": [[1,0.85,0.5,0.95], [1,0.7,0.3,0]]},
+      {"sprite": "dot", "blend": "add", "count": 36, "radius": 60, "ring": true, "life": [0.9,1.6], "size": [3,5], "speed": [80,170], "dir": [0,0,1], "spread": 15, "gravity": -0.25, "turbulence": 120, "intensity": 6, "colors": [[1,0.9,0.6,1], [1,0.7,0.3,0]]}
+    ]},
+    "tame.heart": { "layers": [
+      {"sprite": "glow", "blend": "add", "count": 5, "radius": 25, "life": [1.1,1.6], "size": [9,14], "speed": [25,55], "dir": [0,0,1], "spread": 25, "gravity": -0.15, "turbulence": 40, "intensity": 3, "colors": [[1,0.45,0.5,0.95], [1,0.6,0.7,0]]},
+      {"sprite": "dot", "blend": "add", "count": 14, "radius": 30, "life": [0.7,1.2], "size": [2,3.5], "speed": [40,90], "dir": [0,0,1], "spread": 35, "gravity": -0.2, "intensity": 4, "colors": [[1,0.75,0.8,1], [1,0.6,0.7,0]]}
+    ]},
+    "tame.hatch": { "light": {"color": [1,0.9,0.7], "intensity": 3000, "radius": 400, "seconds": 0.7, "lift": 40}, "layers": [
+      {"sprite": "chip_stone", "blend": "lit", "count": 12, "radius": 10, "radial": true, "life": [0.6,1.0], "size": [2,4], "speed": [120,240], "dir": [0,0,1], "spread": 60, "gravity": 1, "bounce": true, "intensity": 0.4, "colors": [[0.9,0.85,0.75,1], [0.9,0.85,0.75,0]]},
+      {"sprite": "dot", "blend": "add", "count": 24, "radius": 40, "ring": true, "life": [0.8,1.4], "size": [3,5], "speed": [50,120], "dir": [0,0,1], "spread": 20, "gravity": -0.2, "intensity": 5, "colors": [[1,0.95,0.75,1], [1,0.8,0.45,0]]}
+    ]},
     "discover": { "layers": [
       {"sprite": "dot", "blend": "add", "count": 30, "radius": 60, "ring": true, "life": [1,1.8], "size": [3,5], "speed": [40,120], "dir": [0,0,1], "spread": 20, "gravity": -0.2, "turbulence": 120, "intensity": 6, "colors": [[1,0.9,0.6,1], [1,0.75,0.35,0]]},
       {"sprite": "ring", "blend": "add", "count": 1, "flat": true, "life": [0.7,0.7], "size": [40,40], "grow": 4.5, "lift": 8, "intensity": 1.8, "colors": [[1,0.9,0.6,0.9], [1,0.75,0.35,0]]}

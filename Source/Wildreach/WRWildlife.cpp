@@ -115,6 +115,11 @@ namespace WRWildlifeImpl
 				{
 					continue;
 				}
+				// A shore creature (the Floeback: cooks/build-taming.md 2.5) lives only on the ground by the sea.
+				if (Def.Habitat == TEXT("shore") && C != TEXT('w'))
+				{
+					continue;
+				}
 				const FVector2D At = Centre(i);
 				if (bVolcanic != (At.X < 0.0) || FMath::Abs(At.X) < Band.X || FMath::Abs(At.X) > Band.Y)
 				{

@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRPlayerController.h"
+#include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRFarm.h"
 #include "WRSound.h"
@@ -171,6 +172,12 @@ void AWRPlayerController::WRInteract()
 		MenuClose();
 		return;
 	}
+	// A laid egg at your feet comes first (its mother stands over it): E takes it (cooks/build-taming.md 2.6).
+	if (FindNearby<AWRLaidEgg>(GetWorld(), GetPawn(), 300.f))
+	{
+		ServerCommand(TEXT("interact"));
+		return;
+	}
 	AWRCreature* Tame = FindNearbyCreature(true);
 	AWRCreature* Wild = FindNearbyCreature(false, 400.f);
 	const auto DistTo = [this](const AActor* A) { return FVector::Dist2D(A->GetActorLocation(), GetPawn()->GetActorLocation()); };
@@ -203,6 +210,14 @@ void AWRPlayerController::WRInteract()
 		{
 			// Locked, and not to you: its keypad, to enter the code (the right one opens it).
 			OpenDoorKeypad(Piece);
+			return;
+		}
+		if (UI && Def && Def->Kind == TEXT("incubator") && Piece->SeemsShared(this))
+		{
+			// An incubator: its egg and its fuel (cooks/build-taming.md 2.6).
+			Menu = EWRMenu::Incubator;
+			MenuPiece = Piece;
+			MenuIndex = 0;
 			return;
 		}
 		if (Def && FWRMachines::IsMachine(*Def))
@@ -781,6 +796,43 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		ClientNotify(OutResult);
 		return true;
 	}
+	if (Cmd == TEXT("tamecard"))
+	{
+		// The tame card (WRUITameCard): "tamecard <x> <y> <z> learn 2", "... saddle 5", "... care": the card's tame is the
+		// one of yours (or your clan's) nearest where the card says it stands, within reach of you.
+		const FVector At(FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)));
+		const FString Me = PS ? PS->GetPlayerName() : FString();
+		AWRCreature* Tame = nullptr;
+		float Best = 600.f;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist(It->GetActorLocation(), At);
+			if (It->IsAlive() && It->IsTamed() && (It->TamedBy == Me || FWRClans::Get().SameClan(It->TamedBy, Me)) && D < Best) { Best = D; Tame = *It; }
+		}
+		if (Tame && GetPawn() && GetPawn() != Tame && FVector::Dist(Tame->GetActorLocation(), GetPawn()->GetActorLocation()) > 1500.f) Tame = nullptr;
+		TArray<FString> Rest;
+		for (int32 i = 4; i < Args.Num(); ++i) Rest.Add(Args[i]);
+		OutResult = FWRTaming::CardCommand(this, Tame, Rest);
+		ClientNotify(OutResult);
+		return true;
+	}
+	if (Cmd == TEXT("incubator"))
+	{
+		// "incubator <x> <y> <z> in 5": the incubator standing there, within reach of you.
+		const FVector At(FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)));
+		AWRBuildPiece* Piece = nullptr;
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+		{
+			const FWRPieceDef* D = It->bGhost ? nullptr : It->GetDef();
+			if (D && D->Kind == TEXT("incubator") && FVector::Dist(It->GetActorLocation(), At) < 50.f) { Piece = *It; break; }
+		}
+		if (Piece && (!GetPawn() || FVector::Dist(Piece->GetActorLocation(), GetPawn()->GetActorLocation()) > 800.f)) Piece = nullptr;
+		TArray<FString> Rest;
+		for (int32 i = 4; i < Args.Num(); ++i) Rest.Add(Args[i]);
+		OutResult = FWRTaming::IncubatorCommand(this, Piece, Rest);
+		ClientNotify(OutResult);
+		return true;
+	}
 	if (Cmd == TEXT("tameall") && PS && GetPawn())
 	{
 		// A whistle: every tame of yours within 30 m takes the order.
@@ -841,6 +893,16 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	{
 		AWRBuildPiece* Piece = FindNearbyPiece(350.f, true);  // the door, not the wall beside it
 		AWRNest* Nest = FindNearby<AWRNest>(GetWorld(), GetPawn(), 350.f);
+		if (AWRLaidEgg* Laid = FindNearby<AWRLaidEgg>(GetWorld(), GetPawn(), 300.f))
+		{
+			OutResult = Laid->Take(this);
+			if (!OutResult.IsEmpty())
+			{
+				WRSound::Broadcast(GetPawn(), TEXT("pickup"));
+				ClientNotify(OutResult);
+				return true;
+			}
+		}
 		AWRLootBag* Bag = FindNearby<AWRLootBag>(GetWorld(), GetPawn(), 300.f);
 		AWRRunbackStone* Stone = FindNearby<AWRRunbackStone>(GetWorld(), GetPawn(), 300.f);
 		AWRCreature* Wild = FindNearbyCreature(false, 400.f);

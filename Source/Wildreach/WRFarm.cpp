@@ -1504,14 +1504,18 @@ void UWRFarmSubsystem::TickPen(AWRBuildPiece* Pen, float Dt)
 			if (bShelfFull) { Stop = EWRFarmStop::Full; Clocks[i] = Prod.Every; continue; }
 			if (Pen->Feed <= 0) { Stop = EWRFarmStop::Hungry; Clocks[i] = Prod.Every; continue; }
 			Clocks[i] = 0.f;
-			// Content herd: half the time a cycle eats nothing.
-			if (FMath::FRand() >= UWRLifeSkillsComponent::StatFor(Keeper, TEXT("contentHerd"))) Pen->Feed = FMath::Max(0, Pen->Feed - 1);
+			// Content herd: half the time a cycle eats nothing; a Content animal (farm tree) a quarter of the time.
+			if (FMath::FRand() >= UWRLifeSkillsComponent::StatFor(Keeper, TEXT("contentHerd")) && !(A->TameHasNode(TEXT("content")) && FMath::FRand() < 0.25f)) Pen->Feed = FMath::Max(0, Pen->Feed - 1);
 			float N = 1.f;
+			// The farm tree (cooks/build-taming.md 2.2): Bountiful +20%, a Calm herd pen-mate +10%.
+			if (A->TameHasNode(TEXT("bountiful"))) N *= 1.2f;
+			if (Animals.ContainsByPredicate([A](const AWRCreature* O) { return O != A && O->TameHasNode(TEXT("calm_herd")); })) N *= 1.1f;
 			if (Prod.bGentle) N += UWRLifeSkillsComponent::StatFor(Keeper, TEXT("produceExtra"));
 			if (Prod.bShear) N += UWRLifeSkillsComponent::StatFor(Keeper, TEXT("shearer"));
 			if (Clocks.Last() != 0.f) N += UWRLifeSkillsComponent::StatFor(Keeper, TEXT("selectiveBreeding"));
 			FWRInventoryRules::Add(Pen->Storage, Prod.Item, Whole(N));
-			if (!Def->Prize.IsNone() && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Keeper, TEXT("prizeStock"))) FWRInventoryRules::Add(Pen->Storage, Def->Prize, 1);
+			if (!Def->Prize.IsNone() && FMath::FRand() < UWRLifeSkillsComponent::StatFor(Keeper, TEXT("prizeStock")) + (A->TameHasNode(TEXT("prize_stock")) ? 0.05f : 0.f)) FWRInventoryRules::Add(Pen->Storage, Def->Prize, 1);
+			A->GainBondXP(WRTune(TEXT("tame.xp.farm"), 2.f), TEXT("farm"));
 			Pen->OnRep_Farm();
 		}
 	}
@@ -1522,14 +1526,16 @@ void UWRFarmSubsystem::TickPen(AWRBuildPiece* Pen, float Dt)
 	if (!Pair.IsNone() && Counted < Capacity && Pen->Feed >= FMath::RoundToInt(Tune(TEXT("farm.pen.breedFeed"), 5.f)) && Keeper
 		&& AWRCreature::CountTames(World, Keeper->GetPlayerName()) < AWRCreature::TameLimitFor(Keeper))
 	{
-		Breed += Dt * Pace;
+		// Fertile (farm tree): a pair with one breeds half again as fast.
+		const bool bFertile = Animals.ContainsByPredicate([Pair](const AWRCreature* O) { return O->CreatureId == Pair && O->TameHasNode(TEXT("fertile")); });
+		Breed += Dt * Pace * (bFertile ? 1.5f : 1.f);
 		if (Breed >= Tune(TEXT("farm.pen.breedMinutes"), 60.f) * 60.f)
 		{
 			Breed = 0.f;
 			const FVector At = Pen->GetActorTransform().TransformPosition(FVector(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), 60.f));
 			if (AWRCreature* Young = AWRCreature::SpawnCreature(World, Pair, At, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
 			{
-				Young->CompleteTame(Keeper->GetPlayerName());
+				Young->CompleteTame(Keeper->GetPlayerName(), false);
 				Young->TameOrder = EWRTameOrder::Stay;
 				Young->SetActorScale3D(FVector(0.5f));
 				TArray<float>& C = AnimalClocks.FindOrAdd(Young);
@@ -1540,6 +1546,20 @@ void UWRFarmSubsystem::TickPen(AWRBuildPiece* Pen, float Dt)
 				UWRLifeSkillsComponent::Award(Keeper, TEXT("husbandry"), TEXT("birth"), 10.f);
 				WRFx::Broadcast(Pen, TEXT("discover"), At, FRotator::ZeroRotator, 0.6f, TEXT("animal.collect"));
 				if (AWRPlayerController* PC = Cast<AWRPlayerController>(Keeper->GetOwner())) PC->ClientNotify(FString::Printf(TEXT("A young %s was born in your pen"), *Pair.ToString()));
+				// Prolific (farm tree): a quarter of the time, twins.
+				const bool bProlific = Animals.ContainsByPredicate([Pair](const AWRCreature* O) { return O->CreatureId == Pair && O->TameHasNode(TEXT("prolific")); });
+				if (bProlific && FMath::FRand() < WRTune(TEXT("tame.breed.twinChance"), 0.25f) && AWRCreature::CountTames(World, Keeper->GetPlayerName()) < AWRCreature::TameLimitFor(Keeper))
+				{
+					if (AWRCreature* Twin = AWRCreature::SpawnCreature(World, Pair, At + FVector(80.f, 0.f, 0.f), FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f)))
+					{
+						Twin->CompleteTame(Keeper->GetPlayerName(), false);
+						Twin->TameOrder = EWRTameOrder::Stay;
+						Twin->SetActorScale3D(FVector(0.5f));
+						TArray<float>& TC = AnimalClocks.FindOrAdd(Twin);
+						TC.SetNumZeroed((Def ? Def->Products.Num() : 0) + 1);
+						TC.Last() = 0.01f;
+					}
+				}
 				Pen->OnRep_Farm();
 			}
 		}
