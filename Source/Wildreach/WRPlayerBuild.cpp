@@ -138,7 +138,7 @@ namespace WRFreeBuild
 	 *  code-lock doors, cheaper). */
 	static TArray<TPair<FName, int32>> CostFor(const AActor* Player, const FWRPieceDef& Def)
 	{
-		const bool bMachine = Def.Kind == TEXT("station") || Def.bLockable;
+		const bool bMachine = Def.Kind == TEXT("station") || Def.Kind == TEXT("machine") || Def.bLockable;
 		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Player, TEXT("buildCost"))
 			+ (bMachine ? UWRLifeSkillsComponent::StatFor(Player, TEXT("machineCost")) : 0.f));
 		TArray<TPair<FName, int32>> Out;
@@ -568,6 +568,11 @@ void AWRPlayerController::UpdatePlacement()
 			// Snap off: where you aim, a foundation sunk into the ground as on the grid.
 			PlaceLoc.Z -= WRTune(TEXT("building.foundationSink"), 60.f);
 		}
+		// A drive shaft, gearbox or belt: its end snaps onto a machine's stub near it, in line (cooks/build-machinery.md 2.0).
+		if (FWRMachines::SnapPlacement(this, *Def, PlaceLoc, PlaceYaw))
+		{
+			DotsOn = nullptr;
+		}
 	}
 	// Whole centimetres and degrees, as the place command carries them, so the server checks exactly the spot you see.
 	PlaceLoc = FVector(FMath::RoundToFloat(PlaceLoc.X), FMath::RoundToFloat(PlaceLoc.Y), FMath::RoundToFloat(PlaceLoc.Z));
@@ -605,6 +610,12 @@ void AWRPlayerController::UpdatePlacement()
 		bPlaceValid = false;
 		PlaceWhy = Farm;
 	}
+	else if (const FString Machine = FWRMachines::PlaceCheck(this, *Def, PlaceLoc, PlaceYaw, PS ? PS->GetPlayerName() : FString(), GetPawn()); !Machine.IsEmpty())
+	{
+		// Machines: a Hearth of yours of their level, moving water, open ground, lava, an ore vein...
+		bPlaceValid = false;
+		PlaceWhy = Machine;
+	}
 	else if (const FString Blocked = AWRBuildPiece::Blocked(GetWorld(), PlacingPiece, PlaceLoc); !Blocked.IsEmpty())
 	{
 		bPlaceValid = false;
@@ -619,7 +630,7 @@ void AWRPlayerController::UpdatePlacement()
 	{
 		for (const TPair<FName, int32>& C : WRFreeBuild::CostFor(this, *Def))
 		{
-			if (PS->GetInventory()->CountOf(C.Key) < C.Value)
+			if (FWRMachines::CanPay(PS->GetInventory(), C.Key) < C.Value)
 			{
 				bPlaceValid = false;
 				PlaceWhy = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString());
@@ -722,6 +733,10 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		{
 			OutResult = FWRFarm::PlaceCheck(this, *Def, Loc);
 		}
+		if (OutResult.IsEmpty() && Def)
+		{
+			OutResult = FWRMachines::PlaceCheck(this, *Def, Loc, Yaw, Who, Self);
+		}
 		int32 Support = 0;
 		if (OutResult.IsEmpty() && Def->Snaps())
 		{
@@ -737,12 +752,12 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		{
 			for (const TPair<FName, int32>& C : Cost)
 			{
-				if (Inv->CountOf(C.Key) < C.Value) { OutResult = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString()); break; }
+				if (FWRMachines::CanPay(Inv, C.Key) < C.Value) { OutResult = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString()); break; }
 			}
 		}
 		if (OutResult.IsEmpty())
 		{
-			for (const TPair<FName, int32>& C : Cost) Inv->RemoveItem(C.Key, C.Value);
+			for (const TPair<FName, int32>& C : Cost) FWRMachines::Pay(Inv, C.Key, C.Value);   // planks pay for wood first
 			UWRLifeSkillsComponent::Award(this, TEXT("building"), TEXT("place"), 8.f);
 			const FTransform T(FRotator(0.f, Yaw, 0.f), Loc);
 			AWRBuildPiece* Piece = GetWorld()->SpawnActorDeferred<AWRBuildPiece>(AWRBuildPiece::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
@@ -754,7 +769,7 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			Piece->ScaleHealth(1.f + UWRLifeSkillsComponent::StatFor(this, TEXT("pieceHealth")) + (bWall ? UWRLifeSkillsComponent::StatFor(this, TEXT("wallHealth")) : 0.f));
 			Piece->FinishSpawning(T);
 			// Engineering levels by building machines too: a station, a code-lock door.
-			if (Def->Kind == TEXT("station") || Def->bLockable)
+			if (Def->Kind == TEXT("station") || Def->Kind == TEXT("machine") || Def->bLockable)
 			{
 				UWRLifeSkillsComponent::Award(this, TEXT("engineering"), TEXT("machinePlace"), 30.f);
 			}

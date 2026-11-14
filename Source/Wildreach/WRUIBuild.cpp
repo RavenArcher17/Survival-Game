@@ -93,6 +93,7 @@ namespace WRBuildUI
 			{ TEXT("stairs"), LOCTEXT("TabStairs", "Stairs") },
 			{ TEXT("stations"), LOCTEXT("TabStations", "Stations") },
 			{ TEXT("farm"), LOCTEXT("TabFarm", "Farm & kitchen") },
+			{ TEXT("machines"), LOCTEXT("TabMachines", "Machines & power") },
 			{ TEXT("claim"), LOCTEXT("TabClaim", "Claim") },
 			{ TEXT("storage"), LOCTEXT("TabStorage", "Storage & beds") },
 			{ TEXT("defense"), LOCTEXT("TabDefense", "Defense") },
@@ -108,6 +109,11 @@ namespace WRBuildUI
 		// Farm pieces of a land that isn't in the game yet (a paddy before the swamp...) aren't shown at all.
 		if (!FWRFarm::IsPieceLive(D)) return NAME_None;
 		if (D.Category == TEXT("farm") || D.Category == TEXT("kitchen")) return TEXT("farm");
+		if (D.Category == TEXT("machines"))
+		{
+			// Machines whose builder needs a perk (Long lines) show to everyone; the card says what it needs.
+			return TEXT("machines");
+		}
 		if (D.Category == TEXT("defense")) return TEXT("defense");
 		if (S == TEXT("foundation") || S == TEXT("pillar")) return TEXT("foundations");
 		if (S == TEXT("wall") || S == TEXT("halfwall") || S == TEXT("upperwall")) return TEXT("walls");
@@ -148,6 +154,11 @@ namespace WRBuildUI
 	FString DescribeBase(const FWRPieceDef& D)
 	{
 		const FName S = D.Shape, K = D.Kind;
+		// Pieces that say it themselves (pieces.json "note": every machine).
+		if (!D.Note.IsEmpty() && (K == TEXT("machine") || D.Category == TEXT("machines")))
+		{
+			return D.HearthLevel > 1 ? FString::Printf(TEXT("%s Needs a Hearth of level %d (one of yours, anywhere)."), *D.Note, D.HearthLevel) : D.Note;
+		}
 		const FString Span = FString::Printf(TEXT(" Needs support: %s spans %d pieces from the ground."), *D.Material.ToString(), FWRBuildRules::SpanFor(D.Material));
 		if (S == TEXT("foundation")) return TEXT("The base for walls, floors and stairs. Lines up with the foundations beside it.");
 		if (S == TEXT("pillar")) return TEXT("Stands on a cell corner and carries what's stacked on it at no span cost.");
@@ -539,7 +550,8 @@ private:
 		const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
 		return PS ? PS->GetInventory() : nullptr;
 	}
-	int32 Have(FName Item) const { const UWRInventoryComponent* I = Inv(); return I ? I->CountOf(Item) : 0; }
+	/** What the bag can pay with (planks pay for wood one for one). */
+	int32 Have(FName Item) const { return FWRMachines::CanPay(Inv(), Item); }
 	FString Me() const { const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr; return PS ? PS->GetPlayerName() : FString(); }
 
 	uint32 BagHash() const
@@ -555,7 +567,7 @@ private:
 	/** What a piece costs you: the server's price (the Thrifty perk makes building cheaper). */
 	TArray<TPair<FName, int32>> CostOf(const FWRPieceDef& D) const
 	{
-		const bool bMachine = D.Kind == TEXT("station") || D.bLockable;   // Tinkerer (engineering perk)
+		const bool bMachine = D.Kind == TEXT("station") || D.Kind == TEXT("machine") || D.bLockable;   // Tinkerer (engineering perk)
 		const float Mult = FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("buildCost"))
 			+ (bMachine ? UWRLifeSkillsComponent::StatFor(PC.Get(), TEXT("machineCost")) : 0.f));
 		TArray<TPair<FName, int32>> Out;

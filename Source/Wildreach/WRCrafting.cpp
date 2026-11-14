@@ -81,6 +81,7 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 			FString Str;
 			if (O->TryGetStringField(TEXT("blueprint"), Str)) R.Blueprint = FName(*Str);
 			if (O->TryGetStringField(TEXT("xp"), Str)) R.XPKey = FName(*Str);
+			if (O->TryGetStringField(TEXT("skill"), Str)) R.Skill = FName(*Str);
 			O->TryGetStringField(TEXT("waitsFor"), R.WaitsFor);
 			const TSharedPtr<FJsonObject>* Inputs = nullptr;
 			if (O->TryGetObjectField(TEXT("inputs"), Inputs))
@@ -186,7 +187,9 @@ TArray<const FWRRecipe*> FWRRecipeRegistry::ForStation(FName Station) const
 	for (const FWRRecipe& R : Recipes)
 	{
 		// Discovery dishes aren't listed: they're found in the Cook screen's pot.
-		if (R.Station == Station && !R.bDish && WRBiome::IsLive(R.Biome) && R.WaitsFor.IsEmpty()) Out.Add(&R);
+		// The lava forge makes everything a forge does, and its own steel (cooks/build-machinery.md 2.5).
+		const bool bHere = R.Station == Station || (Station == TEXT("lava_forge") && R.Station == TEXT("forge"));
+		if (bHere && !R.bDish && WRBiome::IsLive(R.Biome) && R.WaitsFor.IsEmpty()) Out.Add(&R);
 	}
 	return Out;
 }
@@ -394,6 +397,16 @@ void AWRStation::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AWRStation, StationType);
 	DOREPLIFETIME(AWRStation, Queue);
 	DOREPLIFETIME(AWRStation, Output);
+	DOREPLIFETIME(AWRStation, AppliedBoost);
+}
+
+float AWRStation::SpeedHere() const
+{
+	const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
+	const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this);
+	float Speed = Machines && Piece ? Machines->StationBoost(Piece) : 1.f;
+	if (StationType == TEXT("lava_forge")) Speed *= WRTune(TEXT("craft.lavaForgeSpeed"), 2.f);
+	return FMath::Max(0.1f, Speed);
 }
 
 void AWRStation::BeginPlay()
@@ -453,7 +466,8 @@ FString AWRStation::GetDisplayName() const
 {
 	FString Name = StationType.ToString().Replace(TEXT("_"), TEXT(" "));
 	Name[0] = FChar::ToUpper(Name[0]);
-	return FString::Printf(TEXT("%s (tier %d)"), *Name, GetTier());
+	// A drive shaft runs into it: say it's powered (and how fast it's going).
+	return AppliedBoost > 1.01f ? FString::Printf(TEXT("%s (tier %d, powered x%.1f)"), *Name, GetTier(), AppliedBoost) : FString::Printf(TEXT("%s (tier %d)"), *Name, GetTier());
 }
 
 bool AWRStation::CanUse(AWRPlayerController* Player, FString& OutWhy) const
@@ -694,7 +708,7 @@ float AWRStation::JobProgress() const
 	const UWorld* World = GetWorld();
 	const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
 	const double Now = GS ? GS->GetServerWorldTimeSeconds() : World ? World->GetTimeSeconds() : 0.0;
-	const float Left = J.DoneAt > 0.0 ? static_cast<float>(J.DoneAt - Now) : J.ItemLeft;
+	const float Left = J.DoneAt > 0.0 ? static_cast<float>(J.DoneAt - Now) * AppliedBoost : J.ItemLeft;
 	return FMath::Clamp(1.f - Left / FMath::Max(0.01f, J.ItemSeconds), 0.f, 1.f);
 }
 
@@ -732,13 +746,22 @@ void AWRStation::AdvanceQueue()
 		const uint8 Wait = Hearth && Hearth->IsBroken() ? 2 : 0;
 		if (Wait != 0)
 		{
-			if (Job.DoneAt > 0.0) { Job.ItemLeft = FMath::Max(0.f, static_cast<float>(Job.DoneAt - Now)); Job.DoneAt = 0.0; }
+			if (Job.DoneAt > 0.0) { Job.ItemLeft = FMath::Max(0.f, static_cast<float>(Job.DoneAt - Now) * AppliedBoost); Job.DoneAt = 0.0; }
 			Job.Waiting = Wait;
 			return;
 		}
+		// Power through a drive shaft (or the lava forge's heat) speeds it: the one under way is retimed when that changes.
+		const float Boost = SpeedHere();
+		if (Job.DoneAt > 0.0 && !FMath::IsNearlyEqual(Boost, AppliedBoost, 0.01f))
+		{
+			const float Work = FMath::Max(0.f, static_cast<float>(Job.DoneAt - Now)) * AppliedBoost;
+			Job.DoneAt = Now + Work / Boost;
+			AppliedBoost = Boost;
+		}
 		if (Job.DoneAt <= 0.0)
 		{
-			Job.DoneAt = Now + FMath::Max(0.f, Job.ItemLeft);
+			AppliedBoost = Boost;
+			Job.DoneAt = Now + FMath::Max(0.f, Job.ItemLeft) / Boost;
 			Job.Waiting = 0;
 		}
 		if (Now < Job.DoneAt)
@@ -841,7 +864,7 @@ void AWRStation::QueueToJson(TSharedRef<FJsonObject> O) const
 		Q->SetNumberField(TEXT("made"), J.Made);
 		Q->SetNumberField(TEXT("each"), J.ItemSeconds);
 		// The one under way: how long it still has (the server's clock starts again with the next game).
-		Q->SetNumberField(TEXT("itemLeft"), J.DoneAt > 0.0 ? FMath::Max(0.0, J.DoneAt - GetWorld()->GetTimeSeconds()) : J.ItemLeft);
+		Q->SetNumberField(TEXT("itemLeft"), J.DoneAt > 0.0 ? FMath::Max(0.0, J.DoneAt - GetWorld()->GetTimeSeconds()) * AppliedBoost : J.ItemLeft);
 		Q->SetNumberField(TEXT("skill"), J.Hand.SkillLevel);
 		Q->SetBoolField(TEXT("minFine"), J.Hand.bMinFine);
 		Q->SetNumberField(TEXT("rollBonus"), J.Hand.RollBonus);
@@ -1126,6 +1149,12 @@ FWRCraftedOne FWRCrafting::MakeOne(const FWRRecipe& Recipe, FName StationType, i
 	{
 		One.XPKey = TEXT("steel");   // steel and starsteel ingots (cooks/survival-crafting.md 2.23)
 		One.XP = 5.f;
+	}
+	if (!Recipe.Skill.IsNone())
+	{
+		// Its own skill: gears are machine parts, Engineering 15 (cooks/build-machinery.md 2.9).
+		One.Skill = Recipe.Skill;
+		if (Recipe.XPKey == TEXT("machinePart")) { One.XPKey = TEXT("machinePart"); One.XP = 15.f; }
 	}
 	One.Item.ItemId = Recipe.Output;
 	One.Item.Count = Count;

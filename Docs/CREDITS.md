@@ -79,6 +79,21 @@ The files were cut, mixed to mono for 3D effects, loudness-matched and re-encode
 | Crossbow sounds | HolgiB | CC-BY 3.0 | https://opengameart.org/content/crossbow-sounds | ranged/crossbow |
 | Footsteps Leather, Cloth, Armor | HaelDB | CC0 1.0 | https://opengameart.org/content/footsteps-leather-cloth-armor | combat/jump |
 | Swishes Sound Pack | artisticdude | CC0 1.0 | https://opengameart.org/content/swishes-sound-pack | combat/swing_heavy, combat/swing_light (x6), ranged/throw |
+| Mill wheel, bladed | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/mill-wheel-bladed-s2768.html | machine/waterwheel |
+| Inside a traditional Dutch windmill | pcwvdmark (freesound) | CC0 1.0 | https://freesound.org/people/pcwvdmark/sounds/345846/ | machine/windmill |
+| Wind and tree squeaks | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/wind-and-tree-squeaks-s1051.html | machine/windmill |
+| Steam engine foley #2 | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/steam-engine-foley-2-s3311.html | machine/turbine, machine/smelter |
+| Hiss of steam train #1 | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/hiss-of-steam-train-1-s0227.html | machine/turbine |
+| Manual chain hoist, downhill | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/manual-chain-hoist-downhill-s1134.html | machine/conveyor |
+| Wooden gear rattling | hisoul (freesound) | CC0 1.0 | https://freesound.org/people/hisoul/sounds/461166/ | machine/conveyor, machine/coil |
+| Trip hammer | leinadsorihcak (freesound) | CC0 1.0 | https://freesound.org/people/leinadsorihcak/sounds/449241/ | machine/drill (x4) |
+| Millstone grinding grain | PLukx (freesound) | CC0 1.0 | https://freesound.org/people/PLukx/sounds/430589/ | machine/grinder |
+| Sawmill #3 | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/sawmill-3-s1538.html | machine/sawmill |
+| Navette de metier a tisser (loom shuttle) | Naima (freesound) | CC0 1.0 | https://freesound.org/people/Na%C3%AFma/sounds/510266/ | machine/loom |
+| Large ratchet | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/large-ratchet-s0795.html | machine/sort (x3) |
+| Manual water pump and metal bucket | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/manual-water-pump-and-metal-bucket-s0542.html | machine/pump |
+| Steam locomotive starting | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/locomotive-a-vapeur-starting-s3021.html | machine/start |
+| Steam locomotive stop | Joseph Sardin (BigSoundBank.com) | CC0 1.0 | https://bigsoundbank.com/steam-locomotive-stop-s3015.html | machine/stop |
 
 ## Animation
 

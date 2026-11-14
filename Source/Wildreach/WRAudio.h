@@ -110,6 +110,8 @@ public:
 	/** Plays an event; returns the component (null when held back, unknown, out of earshot or silent). */
 	UAudioComponent* Play(const FPlay& P);
 
+	/** A looping 3D sound on an actor (machines: WRSound::StartLoop). */
+	UAudioComponent* PlayLoop(AActor* Actor, FName Event);
 	/** A looping or long 2D stream (music, ambient beds) the director fades itself. */
 	UAudioComponent* CreateStream(UWorld* World, const FString& File, bool bLoop);
 	float StreamSeconds(const FString& File) const;

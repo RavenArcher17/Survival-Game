@@ -767,6 +767,12 @@ private:
 				}
 				if (Def->Kind == TEXT("chest")) return TEXT("Open");
 				if (Def->Kind == TEXT("totem")) return TEXT("Land claim");
+				if (FWRMachines::IsMachine(*Def))
+				{
+					// A machine: what it's doing on the second line (cooks/build-machinery.md 2.7).
+					OutTarget = FString::Printf(TEXT("%s · %s"), *Def->Name, *FWRMachines::StateText(Piece));
+					return TEXT("Machine");
+				}
 				if (Def->IsFarm())
 				{
 					// The farm piece's state on the second line (WRFarm::Describe), what E does on the first.
@@ -777,7 +783,7 @@ private:
 					{
 						if (Piece->CropId.IsNone()) return TEXT("Plant");
 						if (Piece->Growth8 >= 255) return TEXT("Harvest");
-						if (!(Piece->FarmFlags & WRFarmFlag::Fertilised) && Inv && (Inv->CountOf(TEXT("compost")) > 0 || Inv->CountOf(TEXT("bone_meal")) > 0)) return TEXT("Fertilise");
+						if (!(Piece->FarmFlags & WRFarmFlag::Fertilised) && Inv && (Inv->CountOf(TEXT("compost")) > 0 || Inv->CountOf(TEXT("bone_meal")) > 0 || Inv->CountOf(TEXT("stone_dust")) > 0)) return TEXT("Fertilise");
 						return TEXT("Growing");
 					}
 					if (Def->Kind == TEXT("pen")) return TEXT("Feed · collect");

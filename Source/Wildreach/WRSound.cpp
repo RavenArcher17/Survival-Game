@@ -767,6 +767,44 @@ void WRSound::PlayUI(const UObject* WorldContext, FName Event)
 	PlayEvent(WorldContext, Event, FVector::ZeroVector, nullptr, true, 1.f);
 }
 
+UAudioComponent* WRSound::StartLoop(AActor* Actor, FName Event)
+{
+	UWRAudioSubsystem* Audio = UWRAudioSubsystem::Get(Actor);
+	return Audio && Actor ? Audio->PlayLoop(Actor, Event) : nullptr;
+}
+
+UAudioComponent* UWRAudioSubsystem::PlayLoop(AActor* Actor, FName Event)
+{
+	UWorld* World = Actor ? Actor->GetWorld() : nullptr;
+	if (!CanPlayIn(World) || !EnsureLoaded() || !Actor->GetRootComponent())
+	{
+		return nullptr;
+	}
+	const FWRSoundEvent* E = Events.Find(Event);
+	if (!E || E->Files.Num() == 0)
+	{
+		if (!E && !Unknown.Contains(Event))
+		{
+			Unknown.Add(Event);
+			UE_LOG(LogWildreach, Warning, TEXT("SOUND unknown event %s (silent; add it to Data/Audio/sounds.json)"), *Event.ToString());
+		}
+		return nullptr;
+	}
+	UWRPcmSound* Sound = LoadFile(E->Files[0], false, true);
+	if (!Sound)
+	{
+		return nullptr;
+	}
+	const float Volume = E->Volume * WRSound::CategoryGain(E->Category);
+	UAudioComponent* Comp = UGameplayStatics::SpawnSoundAttached(Sound, Actor->GetRootComponent(), NAME_None, FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator,
+		EAttachLocation::KeepRelativeOffset, false, Volume, 1.f, FMath::FRand() * 5.f, AttenuationFor(E->Radius), nullptr, false);
+	if (Comp && SoundLogLevel() >= 1)
+	{
+		Log(FString::Printf(TEXT("%s loop file=%s vol=%.2f on %s"), *Event.ToString(), *E->Files[0], Volume, *Actor->GetName()));
+	}
+	return Comp;
+}
+
 bool WRSound::Has(FName Event)
 {
 	UWRAudioSubsystem* Audio = UWRAudioSubsystem::Get(nullptr);

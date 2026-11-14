@@ -1,5 +1,71 @@
 # Changelog
 
+## Unreleased: machinery and power (water wheels, windmills, turbines, shafts, conveyors, sorting, drills, the 12 biome machines)
+
+Aaron (lane build-machinery: FULL-GAME 6.3 machinery; research, requirement ledger and plan in showcase-notes
+cooks/build-machinery.md, following cooks/survival-crafting.md 2.15 / 2.17 / 2.23 / 2.25). Built to compile (editor);
+not played here (Aaron and the testers test, F8).
+
+- **Power is rotation you can see** (`WRMachine.h/.cpp`, `Data/machines.json`). Sources end in a turning output stub,
+  machines take one; pieces whose stubs meet (50 cm) share a **network**. A network runs at supply / load: short of
+  power, every machine on it slows by that share and its shafts, gears and belts visibly turn slower (Factorio's rule,
+  the spec's). Load counts machines switched on with work (an idle smelter draws nothing). Networks run only while a
+  player is within 250 m; asleep, they hold where they were. Placing a **drive shaft**, **gearbox** or **conveyor**
+  snaps its end onto the nearest stub in line, and its trestle legs reach the ground. A shaft whose end runs into a
+  **station** (forge, armorer, alchemy table, workbench, oven, smokehouse...) powers it: a bronze pulley and a leather
+  belt drive it, it draws 5 P while it has an order and runs x1.5 (its order under way is retimed as the power changes:
+  `AWRStation::AppliedBoost`).
+- **Sources**: the **water wheel** (Hearth 2: an undershot wheel 4 m across set 3 m out from a bank into the surf line,
+  axle into a stone-pier headstock, outer bearing post in the water; 10 P x the water's run, pulsing with the swell),
+  the **windmill** (Hearth 3: an octagonal smock mill whose boat cap turns into the wind on its curb while the fantail
+  spins, four common sails of cloth on lattices; 6 P x a gusting wind, x2 in a storm, x1.5 on the storm peaks and sky
+  islands; blocked by anything as tall within 10 m), the **geothermal turbine** (Hearth 4: a steam bore within 6 m of
+  lava into a riveted drum, flywheel and stack; 25 P), and the soul engine, storm coil (60 P in a thunderstorm, a
+  stormglass battery 2 h at 20 P), sun mirror array (six mirrors that follow the sun onto a boiler, 20 P by day, a
+  sunstone battery 4 h at 10 P) and tide mill (20 P to 30 at high tide) for their lands.
+- **Machines** (Hearth 3-4): **sawmill** (a sash saw on a crank and pitman rod: 10 wood -> 15 **planks**, and planks
+  pay for wood in every build cost, one for one, planks first), **grinder** (millstones in a hurst frame driven through
+  a crown wheel and stone nut at 4x: grain -> **flour**, **bone** -> 2 **bone meal**, 2 stone -> **stone dust**), **loom**
+  (heddles and batten on a cam shaft: 8 fiber -> 3 linen, half again the bench's), **smelter** (a shaft furnace blown
+  by cam-pressed bellows: every ingot recipe by itself, 6 s each), **irrigation pump** (a crank rocks a beam that works a
+  piston in a barrel: within 40 m of water its trough is a channel source), **conveyor** (2 m: a stack every 2 s, items
+  ride on the leather belt and cleats run round the drums; jams stop it), **sorting chest** (20 slots: sends each stack
+  to a chest within 20 m that already holds that item, its bronze chute turning to it), **coil lamp** (light without
+  fuel at night), **drill** (a cam-lifted stamp over an ore vein: 1 ore a minute into its 40-slot hopper; the vein never
+  runs out while drilled; emptying it gives Mining XP), **greenhouse lights** (a walled room lit by them is a greenhouse
+  with no glass, at night or underground).
+- **Production chains**: machines joined by belts, 4 machines long (Chief engineer 6); a belt won't feed a 5th and says
+  so. Reference chain: drill -> belt -> smelter -> belt -> sorting chest.
+- **The 12 biome machines** (Hearth 5): **lava forge** (volcanic, over lava: every forge recipe x2 and steel from 2 iron
+  with no charcoal), **cold store** (any land: every chest under the same roof within 8 m keeps food x0.05; free in the
+  tundra, 6 P elsewhere), storm coil, sun mirror array, grove press (compost and now and then a rare seed), updraft lift
+  (two linked lifts within 120 m; one levistone platform rides the guide cable between them in 10 s, eased, with riders
+  standing on it on every machine), resonance pylon (joins every line within 40 m), blood still (bloodmoss -> slime in
+  bog water), tide mill, soul engine, mycelium vat (mushrooms in the dark, fed compost) and rift chest (60 slots shared
+  by every rift chest of your clan). The lava forge and cold store are live on the island; the other ten are built and
+  stay hidden with their land (`biome` / new `liveWith` in pieces.json).
+- **Wear and repair**: a running machine loses 2% of its health an hour (never all of it); at a quarter it runs at half
+  speed ("Worn"). Repair on its screen costs half its build cost scaled by what's missing.
+- **The machine screen** (`WRUIMachine.cpp`, E on any machine; mouse and pad): its state in a word and why, the power
+  line (made, drawn, a % bar, sources and machines on it, this one's share and the factor behind it), what it's making
+  and how far, a battery's charge or the soulstone burning, its switches (on / off, overclock, repair, link / send for
+  lifts), its slots (click to take) and your bag (click to put in what it takes). The HUD prompt names its state too.
+  `-oldui` gets a text panel with the same commands.
+- **Engineering**: XP for placing a machine (30), every 5 min each of yours runs (1, up to 10 machines at once),
+  repairing one (10) and casting **gears** (forge 2: 2 bronze + 1 wood, 15); every level +0.3% machine speed (was 0.5%
+  on stations only: the spec's number, survival-crafting 2.23). Perks now live: Efficient power (-20% draw), Long lines
+  (the 6 m shaft and 6 m belt), Overclock (also: set a machine to x1.5 at x2 power), Self-repair (also: your machines
+  don't wear), Chief engineer (also: chains 6 long), Tinkerer (machines too). Turret tech and Siege engineer stay hidden.
+- **Sound** (`Data/Audio/machine/`, `Tools/audio/build_machine_audio.py`, CC0 recordings in Docs/CREDITS.md): a loop
+  per machine that follows its speed (fades in on spin-up, out on run-down) over 30 m, the stamp's knock on each blow,
+  the sorting chute's ratchet, a line starting and stopping. Beasts now drop **bone**; flour cooks as grain; stone dust
+  fertilises a plot like compost. Icons: `Tools/art/make_machine_icons.py`.
+- Commands: `mon`, `moverclock`, `mput`, `mtake`, `mtakeall`, `mrepair`, `mlink`, `msend` (each with the machine's
+  x y z). New files: `WRMachine.*`, `WRMachineTypes.h`, `WRMachineLook.*`, `WRUIMachine.cpp`, `Data/machines.json`.
+- Not finished: the island has no rivers or steam vents, so water wheels run in the surf line and turbines by lava only
+  (rivers and vents join `FWRMachines::FlowAt` / `LavaNear` when the map has them); turrets and siege weapons (the
+  other two engineering perks) aren't built; ten biome machines wait for their lands.
+
 ## Unreleased: crafting (steel and starsteel, the four armour slots and 12 biome sets, rings, talismans, runes, salvage, blueprints)
 
 Aaron (lane build-crafting: FULL-GAME 6.3; research, requirement ledger and plan in showcase-notes

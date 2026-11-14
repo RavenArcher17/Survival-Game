@@ -205,6 +205,14 @@ void AWRPlayerController::WRInteract()
 			OpenDoorKeypad(Piece);
 			return;
 		}
+		if (Def && FWRMachines::IsMachine(*Def))
+		{
+			// A machine: its screen (power, what's in it, its switches). Someone else's shows its state only.
+			Menu = EWRMenu::Machine;
+			MenuPiece = Piece;
+			MenuIndex = 0;
+			return;
+		}
 		if (Def && (Def->Kind == TEXT("chest") || Def->Kind == TEXT("totem")))
 		{
 			// In a fight with a player (the combat tag, combat.md 2.20): no reaching into shared storage.
@@ -341,6 +349,11 @@ FString AWRPlayerController::GetMenuTitle() const
 	if (Menu == EWRMenu::Claim)
 	{
 		return TEXT("Land claim  (E = close)");
+	}
+	if (Menu == EWRMenu::Machine)
+	{
+		const AWRBuildPiece* Piece = MenuPiece.Get();
+		return FString::Printf(TEXT("%s  (Enter = do it, E = close)"), Piece && Piece->GetDef() ? *Piece->GetDef()->Name : TEXT("Machine"));
 	}
 	if (Menu == EWRMenu::Paths)
 	{
@@ -543,6 +556,37 @@ TArray<FWRMenuEntry> AWRPlayerController::BuildMenuEntries() const
 		Out.Add(Narcotic);
 		return Out;
 	}
+	if (Menu == EWRMenu::Machine)
+	{
+		// The old text panel (-oldui): the machine's state, its switches, what's in it.
+		const AWRBuildPiece* Piece = MenuPiece.Get();
+		if (!Piece) return Out;
+		const FString At = FString::Printf(TEXT("%.0f %.0f %.0f"), Piece->GetActorLocation().X, Piece->GetActorLocation().Y, Piece->GetActorLocation().Z);
+		Out.Add({ FWRMachines::StateText(Piece), FString() });
+		Out.Add({ (Piece->Machine.Flags & WRMachineFlag::On) ? TEXT("Switch off") : TEXT("Switch on"), FString::Printf(TEXT("mon %s"), *At) });
+		Out.Add({ TEXT("Take all"), FString::Printf(TEXT("mtakeall %s"), *At) });
+		Out.Add({ TEXT("Repair"), FString::Printf(TEXT("mrepair %s"), *At) });
+		if (Piece->PieceId == TEXT("updraft_lift"))
+		{
+			Out.Add({ TEXT("Link"), FString::Printf(TEXT("mlink %s"), *At) });
+			Out.Add({ TEXT("Send the platform"), FString::Printf(TEXT("msend %s"), *At) });
+		}
+		for (int32 i = 0; i < Piece->Storage.Num(); ++i)
+		{
+			const FWRItemStack& S = Piece->Storage[i];
+			if (S.IsEmpty()) continue;
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(S.ItemId);
+			Out.Add({ FString::Printf(TEXT("take  %s x%d"), Def ? *Def->Name : *S.ItemId.ToString(), S.Count), FString::Printf(TEXT("mtake %s %d"), *At, i) });
+		}
+		const TArray<FWRItemStack>& Slots = Inv->GetSlots();
+		for (int32 i = 0; i < Slots.Num(); ++i)
+		{
+			if (Slots[i].IsEmpty()) continue;
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[i].ItemId);
+			Out.Add({ FString::Printf(TEXT("put in %s x%d"), Def ? *Def->Name : *Slots[i].ItemId.ToString(), Slots[i].Count), FString::Printf(TEXT("mput %s %d"), *At, i) });
+		}
+		return Out;
+	}
 	if (Menu == EWRMenu::Chest || Menu == EWRMenu::Claim)
 	{
 		const AWRBuildPiece* Piece = MenuPiece.Get();
@@ -643,6 +687,12 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 
 	if (RunBuildCommand(Args, OutResult))
 	{
+		return true;
+	}
+	// Machines' screens (mon, moverclock, mput, mtake, mtakeall, mrepair, mlink, msend: WRMachine).
+	if (FWRMachines::RunCommand(this, Args, OutResult))
+	{
+		ClientNotify(OutResult);
 		return true;
 	}
 	if (Cmd == TEXT("learn"))

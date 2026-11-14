@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "WRInventory.h"
+#include "WRMachine.h"
 #include "WRBuilding.generated.h"
 
 class AWRPlayerController;
@@ -44,6 +45,11 @@ struct FWRPieceDef
 	float FuelMinutes = 0.f;
 	FName NeedsCreature;
 	FName Trophy;
+	/** The build card's line (pieces.json "note"). */
+	FString Note;
+	/** Shown only while this biome's land is live, though it builds anywhere (pieces.json "liveWith": the cold store,
+	 *  the soul engine, the resonance pylon, the rift chest: cooks/build-machinery.md 2.5). */
+	FName LiveWith;
 	/** Plots, pens, hives, traps, salt pans, wells and channels: run by the farm subsystem (WRFarm). */
 	bool IsFarm() const { return Kind == TEXT("crop") || Kind == TEXT("pen") || Kind == TEXT("hive") || Kind == TEXT("trap") || Kind == TEXT("saltpan") || Kind == TEXT("well") || Kind == TEXT("channel"); }
 
@@ -164,6 +170,11 @@ public:
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> WaterSurface;
 	uint32 FarmLookKey = 0;
 	UFUNCTION() void OnRep_Farm();
+	/** Machines (WRMachine, cooks/build-machinery.md): what every machine draws and the screen reads; a conveyor's
+	 *  riding stacks (their stacks themselves are in Storage, in the same order); the server's own state (saved). */
+	UPROPERTY(Replicated) FWRMachineRep Machine;
+	UPROPERTY(Replicated) TArray<FWRBeltItem> Belt;
+	FWRMachineState Mach;
 	/** A name its owner gave it (chests: "chestname"; empty = the piece's own name). Saved with the world. */
 	UPROPERTY(Replicated) FString CustomName;
 

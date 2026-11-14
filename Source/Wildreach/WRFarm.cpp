@@ -438,6 +438,7 @@ namespace WRFarmDetail
 bool FWRFarm::IsPieceLive(const FWRPieceDef& Def)
 {
 	if (!Def.Biome.IsNone() && !WRBiome::IsLive(Def.Biome)) return false;
+	if (!Def.LiveWith.IsNone() && !WRBiome::IsLive(Def.LiveWith)) return false;
 	if (!Def.NeedsCreature.IsNone() && !FWRCreatureRegistry::Get().Find(Def.NeedsCreature)) return false;
 	if (!Def.Plot.IsNone())
 	{
@@ -459,7 +460,7 @@ FString FWRFarm::PlaceCheck(const UObject* WorldContext, const FWRPieceDef& Def,
 	const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
 	if (!World) return FString();
 	if (!IsPieceLive(Def)) return TEXT("not in this world yet");
-	if (Def.HearthLevel > 1)
+	if (Def.HearthLevel > 1 && Def.Kind != TEXT("machine"))   // machines: a Hearth of yours anywhere (FWRMachines::PlaceCheck)
 	{
 		const AWRHearth* Hearth = AWRHearth::FindCovering(World, Location);
 		const int32 Tier = Hearth && !Hearth->IsBroken() ? Hearth->GetTechLevel() : 1;
@@ -519,9 +520,13 @@ float FWRFarm::GrowthRate(const AWRBuildPiece* Plot, EWRFarmStop& Why, uint8& Fl
 	const bool bUnderground = WRBiome::IsUnderground(World, At);
 	const bool bGlassRoof = Roof && Roof->GetDef() && Roof->GetDef()->bGlass;
 	const bool bWalled = (Roof || bCovered) && Walled(World, At + FVector(0.f, 0.f, 60.f), Tune(TEXT("farm.wallReach"), 800.f), Plot) >= Tune(TEXT("farm.greenhouseWalls"), 0.8f);
-	const bool bGreenhouse = bGlassRoof && bWalled;
+	// Greenhouse lights (cooks/build-machinery.md 2.3): a walled room lit by running grow lights is a greenhouse even
+	// with no glass and no sun (indoors, at night, underground), and it isn't dark.
+	const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(World);
+	const bool bGrowLit = Machines && Machines->GrowLightNear(At, FWRMachineDefs::Get().Rule(TEXT("growLightReach"), 800.f));
+	const bool bGreenhouse = (bGlassRoof || ((Roof || bCovered) && bGrowLit)) && bWalled;
 	const bool bDaylight = !bUnderground && !bCovered && (!Roof || bGlassRoof);
-	const bool bDarkShed = bUnderground || ((Roof || bCovered) && !bGlassRoof && bWalled && !WindowNear(World, At, Tune(TEXT("farm.wallReach"), 800.f)));
+	const bool bDarkShed = !bGrowLit && (bUnderground || ((Roof || bCovered) && !bGlassRoof && bWalled && !WindowNear(World, At, Tune(TEXT("farm.wallReach"), 800.f))));
 	if (bGreenhouse) Flags |= WRFarmFlag::Greenhouse;
 
 	if (Crop->Biome != TEXT("any") && Crop->Biome != Biome && !bGreenhouse)
@@ -786,7 +791,7 @@ FString FWRFarm::Interact(AWRBuildPiece* Piece, AWRPlayerController* Player)
 		// Growing: fertilise it if you carry compost or bone meal and it hasn't had any.
 		if (!(Piece->FarmFlags & WRFarmFlag::Fertilised))
 		{
-			for (const FName F : { FName(TEXT("compost")), FName(TEXT("bone_meal")) })
+			for (const FName F : { FName(TEXT("compost")), FName(TEXT("bone_meal")), FName(TEXT("stone_dust")) })
 			{
 				if (Inv->CountOf(F) > 0)
 				{
@@ -1267,6 +1272,8 @@ void UWRFarmSubsystem::TickWater()
 		if (D->Kind == TEXT("well")) { Sources.Add(P->GetActorLocation()); if (!(P->FarmFlags & WRFarmFlag::Watered)) { P->FarmFlags |= WRFarmFlag::Watered; P->OnRep_Farm(); } }
 		else if (D->Kind == TEXT("channel")) Channels.Add(P);
 	}
+	// A running irrigation pump fills its trough: a channel joined at the trough's lip runs on from it.
+	if (const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this)) Sources.Append(Machines->PumpOutlets());
 	const float Half = Tune(TEXT("farm.channel.half"), 200.f);
 	const float Join = Tune(TEXT("farm.channel.join"), 250.f);
 	const auto Ends = [Half](const AWRBuildPiece* C) { const FVector F = C->GetActorForwardVector() * Half; return TPair<FVector, FVector>(C->GetActorLocation() + F, C->GetActorLocation() - F); };
@@ -1354,6 +1361,11 @@ float UWRFarmSubsystem::ContainerMult(const AWRBuildPiece* Piece) const
 	const FWRPieceDef* D = Piece ? Piece->GetDef() : nullptr;
 	if (!D) return 1.f;
 	const bool bTundra = WRBiome::At(this, Piece->GetActorLocation()) == TEXT("tundra");
+	// A running cold store in the same room keeps everything in it near frozen (cooks/build-machinery.md 2.5).
+	if (const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this); Machines && Machines->ColdStoreFor(Piece))
+	{
+		return FMath::Min(FWRMachineDefs::Get().Rule(TEXT("coldStoreMult"), 0.05f), D->Cold > 0.f ? D->Cold : 1.f);
+	}
 	if (D->Cold > 0.f)
 	{
 		// An ice box keeps cold while it has ice (Feed = ice burning now); in the tundra the ground does it.

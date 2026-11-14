@@ -33,6 +33,8 @@ struct FWRRecipe
 	FName XPKey;
 	/** What it waits for (recipes.json "waitsFor"): a recipe whose effect has no system yet stays hidden until it does. */
 	FString WaitsFor;
+	/** The life skill it trains when not its station's own (recipes.json "skill": gears train engineering). */
+	FName Skill;
 };
 
 class WILDREACH_API FWRRecipeRegistry
@@ -254,6 +256,12 @@ public:
 	 */
 	UPROPERTY(Replicated) TArray<FWRCraftJob> Queue;
 	UPROPERTY(Replicated) TArray<FWRItemStack> Output;
+	/** How much faster than its orders were timed it runs now (a drive shaft into it: x1.5 at full power; the lava
+	 *  forge x2): the one under way was timed at this (cooks/build-machinery.md 2.0). Its queue's ItemLeft and
+	 *  ItemSeconds are in seconds at 1x; DoneAt is real. */
+	UPROPERTY(Replicated) float AppliedBoost = 1.f;
+	/** Server: what its speed should be now (power through a shaft, its own kind). */
+	float SpeedHere() const;
 	/** How far the first order is through the one it's making, 0..1 (any machine: from the server's clock). */
 	float JobProgress() const;
 	/** Seconds one of a recipe takes here and now (the recipe's, over the world's crafting speed; 0: at once). */

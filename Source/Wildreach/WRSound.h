@@ -44,6 +44,10 @@ namespace WRSound
 	 *  locally on a listen server or standalone too. */
 	WILDREACH_API void Broadcast(AActor* Actor, FName Event);
 
+	/** A machine's loop (cooks/build-machinery.md 2.10): the event's first file looping on the actor, 3D over the event's
+	 *  radius, at its volume and category gain. The caller sets volume / pitch multipliers as the machine runs, and
+	 *  stops it. Null where nothing plays (a dedicated server, an unknown or empty event). */
+	WILDREACH_API class UAudioComponent* StartLoop(AActor* Actor, FName Event);
 	/** Whether the table has this event. */
 	WILDREACH_API bool Has(FName Event);
 	/** The surface under an actor's feet (sand, snow, stone, wood, grass, gravel, water). */

@@ -178,6 +178,7 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::Settings: Want = TEXT("settings"); break;
 	case EWRMenu::Door: Want = TEXT("door"); break;
 	case EWRMenu::Cook: Want = TEXT("cook"); break;
+	case EWRMenu::Machine: Want = TEXT("machine"); break;
 	default: break;
 	}
 	if (!Want.IsNone() && !FWRScreens::Find(Want))

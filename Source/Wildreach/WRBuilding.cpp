@@ -15,6 +15,8 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRFx.h"
+#include "WRMachine.h"
+#include "WRMachineLook.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -122,6 +124,8 @@ FWRBuildRegistry::FWRBuildRegistry()
 			O->TryGetNumberField(TEXT("fuelMinutes"), D.FuelMinutes);
 			if (O->TryGetStringField(TEXT("needs"), S)) D.NeedsCreature = FName(*S);
 			if (O->TryGetStringField(TEXT("trophy"), S)) D.Trophy = FName(*S);
+			O->TryGetStringField(TEXT("note"), D.Note);
+			if (O->TryGetStringField(TEXT("liveWith"), S)) D.LiveWith = FName(*S);
 			Pieces.Add(D);
 		}
 	}
@@ -349,6 +353,8 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, Support);
 	DOREPLIFETIME(AWRBuildPiece, CustomName);
 	DOREPLIFETIME(AWRBuildPiece, UnlockedFor);
+	DOREPLIFETIME(AWRBuildPiece, Machine);
+	DOREPLIFETIME(AWRBuildPiece, Belt);
 }
 
 void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
@@ -373,6 +379,14 @@ void AWRBuildPiece::InitPiece(FName InPieceId, const FString& InOwner)
 		{
 			bAlwaysRelevant = true;
 		}
+		// Machines: their hoppers and trays (input slots, then output slots), switched on.
+		if (const FWRMachineDef* M = FWRMachineDefs::Get().Find(Def->Id); M && Def->Kind == TEXT("machine"))
+		{
+			const int32 Slots = M->Role == TEXT("riftchest") ? FMath::RoundToInt(FWRMachineDefs::Get().Rule(TEXT("rift.slots"), 60.f)) : M->In + M->Out;
+			Storage.SetNum(Slots);
+			Mach.bOn = true;
+			Machine.Flags = WRMachineFlag::On;
+		}
 	}
 }
 
@@ -389,6 +403,11 @@ void AWRBuildPiece::BeginPlay()
 	if (!bGhost && HasAuthority() && FarmDef && (FarmDef->IsFarm() || FarmDef->Kind == TEXT("chest")))
 	{
 		if (UWRFarmSubsystem* Farm = UWRFarmSubsystem::Get(this)) Farm->Register(this);
+	}
+	// Machines, and the stations and chests they feed (WRMachine runs them).
+	if (!bGhost && HasAuthority() && FarmDef && (FarmDef->Kind == TEXT("machine") || FarmDef->Kind == TEXT("station") || FarmDef->Kind == TEXT("chest")))
+	{
+		if (UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this)) Machines->Register(this);
 	}
 	OnRep_Farm();
 }
@@ -413,6 +432,11 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 		if (Extent.IsNearlyZero()) { Origin = GetActorLocation(); Extent = FVector(60.f); }
 		const FName Effect = Def->Material == TEXT("wood") ? TEXT("build.break.wood") : Def->Material == TEXT("stone") ? TEXT("build.break.stone") : TEXT("build.break");
 		WRFx::Broadcast(this, Effect, Origin, GetActorRotation(), FMath::Clamp(Extent.Size() / 150.f, 0.4f, 3.f), TEXT("build.demolish"));
+		// A rift chest's slots are shared with its clan's other rift chests: they stay there, nothing spills.
+		if (Def->Id == TEXT("rift_chest"))
+		{
+			if (const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this); Machines && Machines->HasOtherRift(this)) Storage.Reset();
+		}
 		// A chest broken open (by raiders, or upkeep running out) leaves what it held in a bag where it stood.
 		if (const AWRLootBag* Bag = AWRLootBag::Spill(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 25.f), OwnerName, Storage))
 		{
@@ -426,6 +450,10 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 	if (UWRFarmSubsystem* Farm = HasAuthority() ? UWRFarmSubsystem::Get(this) : nullptr)
 	{
 		Farm->Unregister(this);
+	}
+	if (UWRMachineSubsystem* Machines = HasAuthority() ? UWRMachineSubsystem::Get(this) : nullptr)
+	{
+		Machines->Unregister(this);
 	}
 	if (AActor* Child = ChildActor.Get())
 	{
@@ -536,8 +564,14 @@ void AWRBuildPiece::ApplyLook()
 	const FName S = Def->Shape;
 	const FName K = Def->Kind;
 	const float Len = S == TEXT("palisade") || S == TEXT("gate") ? 440.f : 420.f;
+	// Machines collide as they're modelled (WRMachineLook's boxes): what you bump into is what you see.
+	if (FWRMachineLook::Handles(*Def))
+	{
+		const float Hub = (Def->Id == TEXT("water_wheel") || Def->Id == TEXT("tide_mill")) && !bGhost ? FWRMachines::HubZ(this, *Def, GetActorTransform()) : 150.f;
+		for (const TPair<FVector, FVector>& B : FWRMachineLook::CollisionBoxes(*Def, Hub)) Parts.Add({ B.Key, B.Value });
+	}
 	// A deep slab: the top is the floor (100 above the piece), the rest sinks into the ground so slopes don't show a gap.
-	if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 250), FVector(0, 0, -25) });
+	else if (S == TEXT("foundation")) Parts.Add({ FVector(400, 400, 250), FVector(0, 0, -25) });
 	else if (S == TEXT("wall")) Parts.Add({ FVector(Len, 20, 300), FVector(0, 0, 150) });
 	else if (S == TEXT("halfwall")) Parts.Add({ FVector(Len, 20, 150), FVector(0, 0, 75) });
 	else if (S == TEXT("upperwall")) Parts.Add({ FVector(Len, 20, 210), FVector(0, 0, 105) });  // up into the roof slab, no gap
@@ -775,6 +809,11 @@ void AWRBuildPiece::ApplyLook()
 			}
 		}
 	}
+	else if (!bGhost && Def->Id == TEXT("updraft_lift"))
+	{
+		// A dedicated server draws nothing, but an updraft lift's platform collides wherever it rides (WRMachineLook).
+		FWRMachineLook::Build(this, *Def);
+	}
 }
 
 FString AWRBuildPiece::GhostLook() const
@@ -807,6 +846,15 @@ FString AWRBuildPiece::GhostLook() const
 
 void AWRBuildPiece::ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize)
 {
+	// Machines are modelled with their moving parts (WRMachineLook); the plain blocks stay as their collision, hidden.
+	if (FWRMachineLook::Handles(Def))
+	{
+		TArray<UMeshComponent*> Plain;
+		GetComponents(Plain);
+		for (UMeshComponent* C : Plain) C->SetVisibility(false);
+		FWRMachineLook::Build(this, Def);
+		return;
+	}
 	// A prop mesh (the chest) or detail blocks (WRBuildLook: planks, coursed stone, shingles, frames). Either way the
 	// plain blocks made above stay as the piece's collision, hidden, so placing, snapping and support don't change.
 	UStaticMeshComponent* Prop = FWRBuildLook::AttachProp(this, RootComponent, Def, 0.f);
@@ -986,6 +1034,10 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	if (Def->IsFarm())
 	{
 		return FWRFarm::Interact(this, Player);
+	}
+	if (FWRMachines::IsMachine(*Def))
+	{
+		return FWRMachines::Interact(this, Player);
 	}
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
@@ -1167,6 +1219,10 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	{
 		Station->QueueToJson(O);   // its orders and its tray
 	}
+	if (const FWRPieceDef* Def = GetDef(); Def && FWRMachines::IsMachine(*Def))
+	{
+		FWRMachines::ToJson(this, O);   // on / overclock, progress, batteries, fuel, links (its slots are "storage")
+	}
 	if (const AWRClaimTotem* Totem = Cast<AWRClaimTotem>(ChildActor.Get()))
 	{
 		O->SetNumberField(TEXT("claimUpgrade"), Totem->UpgradeLevel);
@@ -1219,6 +1275,7 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 		MaxHealth = SavedMax;
 	}
 	LockCode = O->GetStringField(TEXT("code"));
+	FWRMachines::FromJson(this, O);
 	O->TryGetStringField(TEXT("name"), CustomName);
 	O->TryGetBoolField(TEXT("locked"), bLocked);
 	O->TryGetBoolField(TEXT("planted"), bPlanted);

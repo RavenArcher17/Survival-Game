@@ -553,6 +553,8 @@ void UWRLightSubsystem::Refresh()
 		const FWRPieceDef* Def = It->bGhost ? nullptr : It->GetDef();
 		// Lights, and anything else with a lights.<id> row (the campfire, the cooking pot's fire, the oven).
 		if (!Def || (Def->Kind != TEXT("light") && LightRadius(Def->Id) <= 0.f)) continue;
+		// Machines (coil lamps, greenhouse lights) light only while their power has them lit.
+		if (Def->Kind == TEXT("machine") && !(It->Machine.Flags & WRMachineFlag::Lit)) continue;
 		Sources.Add({ *It, LightRadius(Def->Id), LightFlag(Def->Id, TEXT("ward")), false });
 	}
 	for (TActorIterator<AWRHearth> It(World); It; ++It)

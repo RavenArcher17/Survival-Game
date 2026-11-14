@@ -72,6 +72,8 @@ public:
 	void Harvest(AWRCharacterBase* Gatherer, bool bHeavy);
 
 	bool IsDepleted() const { return bDepleted; }
+	/** Server: a running drill stands on this vein (WRMachine): it never runs out while drilled. */
+	bool bDrilled = false;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

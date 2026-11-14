@@ -3,7 +3,7 @@
   "groups": {
     "Meat": ["raw_meat"],
     "Fish": [],
-    "Grain": ["stormrye", "meadow_oats", "windflax", "bog_rice", "black_rye", "ashen_grain"],
+    "Grain": ["flour", "stormrye", "meadow_oats", "windflax", "bog_rice", "black_rye", "ashen_grain"],
     "Veg": ["snow_turnip", "candle_rhubarb", "sea_kelp"],
     "Fruit": ["berries", "ember_grape", "prickly_pear", "idunn_apple", "cloudberry", "glowmelon", "sea_grapes"],
     "Herb": ["fire_pepper", "roseroot", "gentian", "bloodroot", "asphodel", "mandrake"],

@@ -110,6 +110,16 @@ innate effects, the active set bonuses, the talisman and the rings. A stat named
 riftDrain, breathSeconds, sprintStamina...: the list is in gear.json and items.json `worn`). A recipe whose effect has no
 system yet gets `"waitsFor"` and stays hidden. Saves carry `gearSlots: 2`; an older one migrates the armour.
 
+Also since 0.7.1: **machinery and power** (`WRMachine.cpp`, `WRMachineLook.cpp`, `WRUIMachine.cpp`, `Data/machines.json`,
+cooks/build-machinery.md): `UWRMachineSubsystem` (server) joins machine pieces whose ports meet into networks (rebuilt
+when a piece comes or goes), runs them in 0.5 s steps near players, and writes each piece's `FWRMachineRep` (speed,
+state, line totals, progress, battery, a lift's trip) which every machine draws from; `UWRMachineLookSubsystem` turns the
+modelled parts from that (one drive angle per machine, eased), moves belt items from the belt's run and moves the lift
+platform's collision (the server too). A machine's ports are defined once, in `FWRMachineLook::LocalPorts`, next to its
+model. Machines use the Hearth level of a Hearth their builder owns anywhere (not the covering one), so a wheel on a
+beach or a drill in a cave can be built. A station a shaft runs into is retimed through `AWRStation::AppliedBoost`
+(queue `ItemLeft` / `ItemSeconds` are at 1x). Planks pay for wood in build costs (`FWRMachines::CanPay / Pay`).
+
 Open, as of 0.7.1:
 - **Farming on the island is two lands**: 4 crops, 2 farm animals, the volcanic and tundra fish; the other 10 lands'
   crops, fish, lures, animals, paddies, kelp lines, log beds and the beehive (Hiveback) are in data and hidden until

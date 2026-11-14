@@ -1096,7 +1096,8 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
 		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("whistle "), TEXT("hearthfeed"), TEXT("hearthrepair"),
-		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode"), TEXT("light") };  // chat is its own RPC
+		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode"), TEXT("light"),
+		TEXT("mon "), TEXT("moverclock "), TEXT("mput "), TEXT("mtake"), TEXT("mrepair "), TEXT("mlink "), TEXT("msend ") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{

@@ -256,6 +256,11 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 		Inventory->AddItem(Gems[FMath::RandRange(0, 2)], 1);
 	}
 
+	// A drilled vein never runs out (cooks/build-machinery.md 2.3): hand mining it takes its share and it stays.
+	if (bDrilled && HitsLeft <= 1)
+	{
+		HitsLeft = Hits + 1;
+	}
 	if (--HitsLeft <= 0)
 	{
 		bDepleted = true;

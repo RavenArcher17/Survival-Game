@@ -40,7 +40,7 @@ namespace WRCraftUI
 
 	const FName Hand(TEXT("hand"));
 	const FName Stations[] = { TEXT("hand"), TEXT("workbench"), TEXT("forge"), TEXT("armorer"), TEXT("alchemy_table"),
-		TEXT("charcoal_kiln"), TEXT("campfire"), TEXT("smokehouse"), TEXT("salting_barrel"), TEXT("drying_rack"), TEXT("compost_bin") };
+		TEXT("charcoal_kiln"), TEXT("lava_forge"), TEXT("campfire"), TEXT("smokehouse"), TEXT("salting_barrel"), TEXT("drying_rack"), TEXT("compost_bin") };
 
 	FText StationName(FName Type)
 	{
@@ -56,6 +56,7 @@ namespace WRCraftUI
 		if (Type == TEXT("drying_rack")) return LOCTEXT("StDrying", "Drying rack");
 		if (Type == TEXT("compost_bin")) return LOCTEXT("StCompost", "Compost bin");
 		if (Type == TEXT("charcoal_kiln")) return LOCTEXT("StKiln", "Charcoal kiln");
+		if (Type == TEXT("lava_forge")) return LOCTEXT("StLavaForge", "Lava forge");
 		return LOCTEXT("StHand", "By hand");
 	}
 
@@ -72,6 +73,7 @@ namespace WRCraftUI
 		if (Type == TEXT("drying_rack")) return TEXT("jerky");
 		if (Type == TEXT("compost_bin")) return TEXT("compost");
 		if (Type == TEXT("charcoal_kiln")) return TEXT("charcoal");
+		if (Type == TEXT("lava_forge")) return TEXT("steel_ingot");
 		return TEXT("crude_hatchet");
 	}
 

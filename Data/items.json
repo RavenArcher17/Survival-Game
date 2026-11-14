@@ -540,7 +540,13 @@
     {"id": "rune_thorns", "name": "Rune of Thorns", "category": "rune", "stack": 10, "weight": 0.1, "biome": "crystal", "gem": {"thorns": 0.1}, "note": "Melee attackers take 10% of their damage back"},
     {"id": "rune_grave", "name": "Rune of the Grave", "category": "rune", "stack": 10, "weight": 0.1, "biome": "crystal", "gem": {"killResource": 5}, "note": "Kills give +5 path resource"},
     {"id": "rune_sight", "name": "Rune of Clear Sight", "category": "rune", "stack": 10, "weight": 0.1, "biome": "crystal", "gem": {"critDamage": 0.1}, "note": "Critical hits do 10% more"},
-    {"id": "rune_hollowing", "name": "Rune of Hollowing", "category": "rune", "stack": 10, "weight": 0.1, "biome": "crystal", "gem": {"armorPen": 0.1}, "note": "Ignore 10% of the target's armour"}
+    {"id": "rune_hollowing", "name": "Rune of Hollowing", "category": "rune", "stack": 10, "weight": 0.1, "biome": "crystal", "gem": {"armorPen": 0.1}, "note": "Ignore 10% of the target's armour"},
+    {"id": "planks", "name": "Planks", "category": "material", "stack": 100, "weight": 0.1, "note": "Sawn at a sawmill (10 wood, 15 planks). Pay for building with them like wood, one for one."},
+    {"id": "flour", "name": "Flour", "category": "material", "stack": 50, "weight": 0.2, "note": "Grain ground at a grinder. Counts as grain in the cooking pot."},
+    {"id": "bone", "name": "Bone", "category": "material", "stack": 50, "weight": 0.3, "note": "Butchered from beasts. A grinder makes bone meal of it."},
+    {"id": "bone_meal", "name": "Bone meal", "category": "material", "stack": 50, "weight": 0.2, "note": "E on a growing plot: +25% at its harvest."},
+    {"id": "stone_dust", "name": "Stone dust", "category": "material", "stack": 50, "weight": 0.3, "note": "Rock ground fine at a grinder: worked into a growing plot's soil (E) it feeds the crop, +25% at its harvest."},
+    {"id": "gears", "name": "Gears", "category": "material", "stack": 20, "weight": 0.6, "note": "Cast bronze cogs and pinions on oak arbors: every machine is built round them."}
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },
