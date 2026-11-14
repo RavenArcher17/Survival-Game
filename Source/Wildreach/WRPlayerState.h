@@ -46,6 +46,10 @@ public:
 
 	/** Server: body picked in the menu (?Body= on the join URL); each new pawn takes it (AWRCharacter::BodyStyle). */
 	FName BodyStyle;
+	/** Server: the face and build from the menu (?Look=<face>.<build>, the creator writes it) and the hide-helmet option. */
+	uint8 HeroFace = 0;
+	uint8 HeroBuild = 1;
+	bool bHideHelmet = false;
 
 	/** Replicated so clients apply clan rules too (lock-on, PvP). Server keeps it in sync with FWRClans. */
 	UPROPERTY(Replicated) FString ClanName;

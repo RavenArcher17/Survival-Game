@@ -157,6 +157,11 @@ bool UWRGameplayAbility::CommitAbility(const FGameplayAbilitySpecHandle Handle, 
 		{
 			Paths->AwardXP(PathId, FMath::RoundToInt(WRTune(TEXT("paths.xpPerAbilityUse"), 6.f)));
 		}
+		// The path marks flare on every machine (hero.md 2.6: the combat pulse; Lightning's scar flicker and crackle).
+		if (AWRCharacter* Hero = Cast<AWRCharacter>(GetAvatarActorFromActorInfo()))
+		{
+			Hero->OnPathAbilityUsed(PathId);
+		}
 	}
 	return true;
 }

@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased: the hero's look (12 faces, 3 builds, armour tiers and the 12 biome sets, path marks on skin, eyes and hair)
+
+Aaron (lane build-hero-look-2; research and plan in showcase-notes cooks/hero-look-2.md, following cooks/hero.md 2.2-2.6).
+Built to compile; not played here (Aaron and the testers test, F8).
+
+- **Twelve faces** (hero.md 2.2): M1 Ash, M2 Kade, M3 Ren, M4 Kofi, M5 Varro, M6 Obi; F1 Wren, F2 Nima, F3 Sora, F4 Amara,
+  F5 Mila, F6 Kesi, all on their sex's athletic body, 2K. `player_art.json` `hero.<sex>.faces` (face 1 stays the
+  default). **Lean and strong builds** go in as body meshes only (`hero.<sex>.builds`); every build wears the picked
+  face's skin. The face and build come from `?Look=<face>.<build>[.h]` (`[Wildreach.Menu] Look`, for the creator
+  screen); the server clamps them and every machine draws the same.
+- **Hair is the engine's**: grooms point at the MetaHumanCharacter plugin's own groom assets with a small binding per
+  face (`Hero/Grooms/<face>/`), and every hair, brow, beard and lash option of that sex is bound to every face
+  (`faces[].options`, for the creator). Each face's hair colour is data (`hairColor`). The two big groom copies
+  (F1's 63 MB hair, M1's 19 MB) are gone from the tree.
+- **Armour shows**: the worn armour picks its look (`armorLooks`): hide → **Hidewear** (fire **Cinderhide**, frost
+  **Snowhide** by the item's element), copper → **Copperscale**, bronze → **Bronze Lamellar**, iron → **Ironmail**, and
+  the steel biome sets are mapped by id for when the crafting cook adds them: **Forgeplate, Stormweave, Dunewrap,
+  Heartguard, Skysilk, Wardcloth, Rimeguard, Mirehide, Reefmail, Gravecloth, Sporeweave, Hollowplate**, plus their
+  **Ascendant** (starsteel) versions with the halo-crest. Four slots (Head, Chest, Hands, Legs) on all six bodies.
+  Plates are solid with rolled rims and move rigid on their bone; pauldrons are articulated lames; helms fit every face
+  of the sex. The element sets the trim colour; the seams carry the main path's colour; helms and raised hoods hide
+  the hair. Replicated (`AWRCharacter::HeroLook`).
+- **Skin never shows through cloth**: each look has body-hide masks (512 px, skin under a piece clipped 1.2 cm inside its
+  edge), set on the body skin when it's worn (`looks.<id>.hide`; `M_WR_Skin` is masked).
+- **Path marks on every machine** (hero.md 2.6, `WRHeroLook.cpp`, `player_art.json paths`): the server sends each
+  player's main/sub path and strength; skin, eyes and hair follow. Fire's veins are darker ember and **exposure-
+  relative** (they read by day and don't blow out at night) with **soot-dark nails**; eyes per path (ember pupil ring,
+  violet spark ring, gold iris, black Void eyes, Blood's red sclera...); hair per path (sun-bleached, rime-white or
+  mossy tips, Necromancy greying, Tide wet, Wind stirring, Lightning lifting). Using a path ability flares the marks
+  (Lightning: scar flicker, hair lift and a static crackle, `path.lightning.crackle`). **Blood** grows sharper canines
+  from strength 0.6.
+
+Not finished (hidden or noted): no creator screen picks a face, build, hair or the hide-helmet option yet (everyone is
+face 1, athletic); capes, veils and strips are skinned, not cloth-simulated; Void follows path strength until
+corruption is a stat; the steel set items come with the crafting cook; path Niagara extras (heat haze, frost breath,
+spore motes) aren't built.
+
 ## Unreleased: finishing what was half-built (skill nodes, perks, fishing, swimming, engineering, the whistle, tools, build pieces)
 
 Aaron (lane build-finish; research and plan in showcase-notes cooks/build-finish.md): finish every built-but-unfinished

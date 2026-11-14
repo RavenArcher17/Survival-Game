@@ -45,6 +45,11 @@ Also since 0.7.1: **fishing** (`WRFishing.cpp`, `Data/fish.json`), **swimming an
 working** with the rest hidden by `waitsFor` in `Data/lifeskills.json` (remove it when a system ships), the **tame
 whistle** (H / hold X), **modelled held tools** (`WRToolMesh.cpp`, `M_HeldTool`), and build pieces that collide as
 they look (furniture, banner, rug; the Hearth, stations and totem fit their models via `FWRBuildLook::FitCollision`).
+Also since 0.7.1: **the hero's look** (`WRHeroLook.cpp`): 12 faces and 3 builds (`hero.<sex>.faces / builds`, picked by
+`?Look=<face>.<build>`; no creator screen yet, so everyone is face 1, athletic), **worn armour shows** (hide, copper,
+bronze, iron now; the 12 steel biome sets and their Ascendant versions are mapped by item id in `armorLooks` for the
+crafting cook), body-hide masks under every piece, and **path marks** on skin, eyes and hair on every machine
+(`player_art.json paths`), with Blood's canines and Lightning's crackle on cast.
 
 Open, as of 0.7.1:
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
@@ -161,6 +166,13 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
   motion-matching chooser. After new clips arrive, run `Tools/anim/build_hero_anim.py` (the command line is in the
   file) to rebuild the databases from `Tools/anim/hero_databases.json` and the combat windows from
   `Data/anim_windows.json`.
+- **The hero's look** (`WRHeroLook.cpp`, all data in `Data/player_art.json`): `hero.<sex>.faces` (head, its skin for
+  every build, default grooms, hair colour, every groom option), `builds` (lean / athletic / strong body meshes),
+  `looks` (4 slot meshes per build, body-hide masks per slot, `hidesHair`, material swaps), `armorLooks` (item id ->
+  look, by element), `elements` (trim colours), `paths` (skin / eye / hair parameters per path). Grooms are the
+  MetaHumanCharacter plugin's own assets with a small binding per face (`Hero/Grooms/<face>/`): never copy groom assets
+  into the repo (they carry strand data; F1's was 63 MB). Lab scripts that make all of it: `Scripts/hero2/` in the lab
+  (faces via `faces2.sh`, armour via `hero_armor.py`, masks via `gen_hide_masks.py`, migration via `migrate.sh`).
 - The hero animates with **no animation blueprint**: `UWRHeroAnimInstance` (a `UWRAnimInstance`) does motion matching
   in C++ (`UPoseSearchLibrary::MotionMatch` with its own pose history and blend stack), because the engine's
   motion-matching node can't run outside an animation blueprint in a packaged build and anim graphs can't be made

@@ -91,6 +91,19 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 		PS->GetPaths()->SetMainPath(FName(*Path));
 		const FString Body = UGameplayStatics::ParseOption(Options, TEXT("Body")).ToLower().Left(8);
 		PS->BodyStyle = Body.IsEmpty() ? NAME_None : FName(*Body);
+		// ?Look=<face>.<build>[.h] (cook hero-look-2): the pawn clamps them to the faces and builds the art has.
+		FString LookOpt = UGameplayStatics::ParseOption(Options, TEXT("Look")).Left(12), FaceStr, Rest;
+		if (LookOpt.Split(TEXT("."), &FaceStr, &Rest))
+		{
+			FString BuildStr, Flags;
+			if (!Rest.Split(TEXT("."), &BuildStr, &Flags))
+			{
+				BuildStr = Rest;
+			}
+			PS->HeroFace = uint8(FMath::Clamp(FCString::Atoi(*FaceStr), 0, 255));
+			PS->HeroBuild = uint8(FMath::Clamp(FCString::Atoi(*BuildStr), 0, 255));
+			PS->bHideHelmet = Flags.Contains(TEXT("h"));
+		}
 		// A returning player's saved paths override the join URL.
 		LoadPlayer(PS);
 		// The engine picked the start spot inside Super::InitNewPlayer, before the main path was known, so the first

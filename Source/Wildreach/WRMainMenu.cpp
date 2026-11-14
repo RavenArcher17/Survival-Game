@@ -613,7 +613,12 @@ FString SWRMainMenu::Options() const
 	// Keep names to what the server's file names and chat can handle.
 	Name = Name.Replace(TEXT("?"), TEXT("")).Replace(TEXT("="), TEXT("")).Replace(TEXT(" "), TEXT("_")).Left(20);
 	if (Name.IsEmpty()) Name = TEXT("Survivor");
-	return FString::Printf(TEXT("?WRName=%s?Path=%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()));
+	// The face and build (cook hero-look-2): [Wildreach.Menu] Look=<face>.<build>[.h], written by the creator.
+	FString Look;
+	GConfig->GetString(MenuSection, TEXT("Look"), Look, GGameUserSettingsIni);
+	Look = Look.Replace(TEXT("?"), TEXT("")).Replace(TEXT("="), TEXT("")).Left(12);
+	return FString::Printf(TEXT("?WRName=%s?Path=%s%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()),
+		Look.IsEmpty() ? TEXT("") : *(TEXT("?Look=") + Look));
 }
 
 void SWRMainMenu::Remember() const

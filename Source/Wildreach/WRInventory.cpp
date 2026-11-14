@@ -398,6 +398,11 @@ void UWRInventoryComponent::ApplyEquipment()
 	}
 	Character->Weapon = Stats;
 	Character->ArmorValue = GetArmorValue();
+	// The worn armour's look on the hero (cook hero-look-2): broken armour still shows; an empty slot wears the wraps.
+	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
+	{
+		Hero->SetWornArmor(EquippedArmor.IsEmpty() ? NAME_None : EquippedArmor.ItemId, EquippedArmor.IsEmpty() ? NAME_None : EquippedArmor.Element);
+	}
 	if (AWRCharacter* Survivor = Cast<AWRCharacter>(Character))
 	{
 		Survivor->SetRangedItem(EquippedRanged.IsEmpty() ? NAME_None : EquippedRanged.ItemId);

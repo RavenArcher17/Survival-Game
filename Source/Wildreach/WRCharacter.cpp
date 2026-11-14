@@ -120,6 +120,17 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 		Piece->bCastHiddenShadow = true;
 		Outfit.Add(Piece);
 	}
+	// Ascendant halo-crest (tier 6) and the Blood path's canine caps (WRHeroLook.cpp).
+	HaloCrest = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("HaloCrest"));
+	HaloCrest->SetupAttachment(Body);
+	HaloCrest->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HaloCrest->SetVisibility(false);
+	HaloCrest->bCastHiddenShadow = true;
+	Canines = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Canines"));
+	Canines->SetupAttachment(Body, TEXT("teeth_upper"));
+	Canines->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Canines->SetVisibility(false);
+	Canines->SetCastShadow(false);
 	LODSync = CreateDefaultSubobject<ULODSyncComponent>(TEXT("LODSync"));
 
 	ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
@@ -163,6 +174,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 	// strafe or a step back, or the two fight every frame and the body wobbles (worse on a long frame). Same rule as
 	// aiming and first person; set on every machine so prediction agrees.
 	GetCharacterMovement()->bOrientRotationToMovement = !(bFirstPerson || bAiming || HasTag(WRTags::State_Blocking));
+	TickPathMarks(DeltaSeconds);  // the path marks (server picks the strengths, every drawing machine applies them)
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		if (IsLocallyControlled())
@@ -217,6 +229,8 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRCharacter, bFirstPerson);
 	DOREPLIFETIME(AWRCharacter, BodyStyle);
+	DOREPLIFETIME(AWRCharacter, HeroLook);
+	DOREPLIFETIME(AWRCharacter, PathMarks);
 	DOREPLIFETIME(AWRCharacter, RangedItem);
 	DOREPLIFETIME(AWRCharacter, bRangedMode);
 	DOREPLIFETIME(AWRCharacter, bAiming);
@@ -260,6 +274,8 @@ void AWRCharacter::PossessedBy(AController* NewController)
 		return;
 	}
 	BodyStyle = PS->BodyStyle;  // replicates; a listen server or standalone game swaps its own copy now
+	HeroLook.bHideHelmet = PS->bHideHelmet;
+	SetHeroAppearance(PS->HeroFace, PS->HeroBuild);  // the face and build from the menu (?Look=), clamped
 	LoadBodyArt();
 
 	ClearStaleTags();
@@ -351,6 +367,8 @@ void AWRCharacter::ApplyViewMode()
 		Outfit[0]->SetOwnerNoSee(bFirstPerson);  // the Head slot (hood, helm)
 	}
 	ShieldMesh->SetOwnerNoSee(bFirstPerson);  // it would fill the first-person view; the sword stays
+	HaloCrest->SetOwnerNoSee(bFirstPerson);
+	Canines->SetOwnerNoSee(bFirstPerson);
 	bEyeInit = false;
 
 	// First person: body yaw follows the camera. Third person: body turns toward movement.
@@ -445,7 +463,7 @@ void AWRCharacter::UpdateReplicatedAccel()
 
 void AWRCharacter::LoadBodyArt()
 {
-	if (GetNetMode() == NM_DedicatedServer || (bBodyLoaded && LoadedBodyStyle == BodyStyle))
+	if (GetNetMode() == NM_DedicatedServer || (bBodyLoaded && LoadedBodyStyle == BodyStyle && LoadedLook.SameBody(HeroLook)))
 	{
 		return;  // the server never draws bodies
 	}
@@ -463,8 +481,29 @@ void AWRCharacter::LoadBodyArt()
 		return;
 	}
 	const TSharedPtr<FJsonObject> Hero = *HeroPtr;
+	// The face picked in the menu (hero.<sex>.faces, cook hero-look-2): its head, grooms and skin. Older art without
+	// "faces" keeps its single face on the hero entry itself.
+	TSharedPtr<FJsonObject> FaceRow = Hero;
+	const TArray<TSharedPtr<FJsonValue>>* FaceRows = nullptr;
+	if (Hero->TryGetArrayField(TEXT("faces"), FaceRows) && FaceRows->Num() > 0 && (*FaceRows)[HeroLook.Face % FaceRows->Num()]->AsObject().IsValid())
+	{
+		FaceRow = (*FaceRows)[HeroLook.Face % FaceRows->Num()]->AsObject();
+	}
+	// The build's body (lean / athletic / strong: one mesh per sex each, the face's own skin on it).
 	FString BodyPath;
-	Hero->TryGetStringField(TEXT("body"), BodyPath);
+	const TArray<TSharedPtr<FJsonValue>>* BuildRows = nullptr;
+	if (Hero->TryGetArrayField(TEXT("builds"), BuildRows) && BuildRows->Num() > 0)
+	{
+		BodyPath = (*BuildRows)[FMath::Min<int32>(HeroLook.Build, BuildRows->Num() - 1)]->AsString();
+	}
+	if (BodyPath.IsEmpty())
+	{
+		FaceRow->TryGetStringField(TEXT("body"), BodyPath);
+	}
+	if (BodyPath.IsEmpty())
+	{
+		Hero->TryGetStringField(TEXT("body"), BodyPath);
+	}
 	USkeletalMesh* BodyAsset = BodyPath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *BodyPath);
 	if (!BodyAsset)
 	{
@@ -472,6 +511,7 @@ void AWRCharacter::LoadBodyArt()
 		return;
 	}
 	LoadedBodyStyle = BodyStyle;
+	LoadedLook = HeroLook;
 	bBodyLoaded = true;
 	BodyAnims.Reset();
 	BodyAnimRefs.Reset();
@@ -490,6 +530,16 @@ void AWRCharacter::LoadBodyArt()
 
 	// Feet on the capsule's bottom, facing the actor's forward (the MetaHuman faces +Y).
 	Body->SetSkeletalMesh(BodyAsset);
+	// The face's skin on whichever build is worn (all builds share one UV layout, so the neck seam matches).
+	Body->EmptyOverrideMaterials();
+	FString BodyMaterialPath;
+	if (FaceRow->TryGetStringField(TEXT("bodyMaterial"), BodyMaterialPath))
+	{
+		if (UMaterialInterface* FaceSkin = LoadObject<UMaterialInterface>(nullptr, *BodyMaterialPath))
+		{
+			Body->SetMaterial(0, FaceSkin);
+		}
+	}
 	const FBox Box = BodyAsset->GetBounds().GetBox();
 	Body->SetRelativeScale3D(FVector::OneVector);
 	BodyBaseZ = -GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - float(FMath::Min(Box.Min.Z, 0.0));
@@ -505,7 +555,7 @@ void AWRCharacter::LoadBodyArt()
 	// The head: the MetaHuman face mesh with its own animation blueprint (it copies the body's pose and runs the face
 	// rig: blinks, the jaw), the grooms bound to it, rendered as cards in the game.
 	FString FacePath, FaceAnimPath;
-	Hero->TryGetStringField(TEXT("face"), FacePath);
+	FaceRow->TryGetStringField(TEXT("face"), FacePath);
 	Art->TryGetStringField(TEXT("faceAnim"), FaceAnimPath);
 	USkeletalMesh* FaceAsset = FacePath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *FacePath);
 	Face->SetSkeletalMesh(FaceAsset);
@@ -522,7 +572,15 @@ void AWRCharacter::LoadBodyArt()
 		}
 	}
 	const TSharedPtr<FJsonObject>* GroomSet = nullptr;
-	Hero->TryGetObjectField(TEXT("grooms"), GroomSet);
+	FaceRow->TryGetObjectField(TEXT("grooms"), GroomSet);
+	FaceHairParams.Reset();
+	if (const TSharedPtr<FJsonObject>* HairColor = nullptr; FaceRow->TryGetObjectField(TEXT("hairColor"), HairColor))
+	{
+		for (const auto& P : (*HairColor)->Values)
+		{
+			FaceHairParams.Add(FName(*P.Key), float(P.Value->AsNumber()));
+		}
+	}
 	for (UGroomComponent* Groom : Grooms)
 	{
 		const TSharedPtr<FJsonObject>* Slot = nullptr;
@@ -538,55 +596,23 @@ void AWRCharacter::LoadBodyArt()
 		Groom->SetGroomAsset(GroomAsset, Binding, false);
 		Groom->SetEnableSimulation(false);
 		Groom->SetVisibility(GroomAsset != nullptr);
-	}
-	// The outfit (hero.md 2.5: tier 0, Survivor Wraps): each piece follows the body's bones.
-	const TSharedPtr<FJsonObject>* OutfitSet = nullptr;
-	Hero->TryGetObjectField(TEXT("outfit"), OutfitSet);
-	static const TCHAR* OutfitKeys[] = { TEXT("Head"), TEXT("Chest"), TEXT("Hands"), TEXT("Legs") };
-	for (int32 i = 0; i < Outfit.Num() && i < UE_ARRAY_COUNT(OutfitKeys); ++i)
-	{
-		FString PiecePath;
-		if (OutfitSet) (*OutfitSet)->TryGetStringField(OutfitKeys[i], PiecePath);
-		USkeletalMesh* Piece = PiecePath.IsEmpty() ? nullptr : LoadObject<USkeletalMesh>(nullptr, *PiecePath);
-		Outfit[i]->SetSkeletalMesh(Piece);
-		Outfit[i]->SetLeaderPoseComponent(Piece ? Body.Get() : nullptr);
-		Outfit[i]->SetVisibility(Piece != nullptr);
-	}
-	// One LOD for the whole hero, led by the face (it has the most levels): the body, outfit and hair follow.
-	LODSync->ComponentsToSync.Reset();
-	LODSync->CustomLODMapping.Reset();
-	LODSync->NumLODs = FaceAsset ? FaceAsset->GetLODNum() : BodyAsset->GetLODNum();
-	LODSync->ComponentsToSync.Add({ Face->GetFName(), FaceAsset ? ESyncOption::Drive : ESyncOption::Disabled });
-	LODSync->ComponentsToSync.Add({ Body->GetFName(), FaceAsset ? ESyncOption::Passive : ESyncOption::Drive });
-	const auto MapTo = [this](int32 Levels)
-	{
-		FLODMappingData Map;
-		for (int32 L = 0; L < LODSync->NumLODs; ++L)
+		// The hair cards in the Wildreach hair material (path motion: Lightning's lift, Wind's stir; hero.md 2.6).
+		Groom->EmptyOverrideMaterials();
+		FString CardsPath, CardsSlot = TEXT("MI_Hair_Cards");
+		Art->TryGetStringField(TEXT("hairCardsMaterial"), CardsPath);
+		Art->TryGetStringField(TEXT("hairCardsSlot"), CardsSlot);
+		const int32 CardsIndex = GroomAsset ? Groom->GetMaterialIndex(FName(*CardsSlot)) : INDEX_NONE;
+		UMaterialInterface* Cards = CardsPath.IsEmpty() || CardsIndex == INDEX_NONE ? nullptr : LoadObject<UMaterialInterface>(nullptr, *CardsPath);
+		if (Cards)
 		{
-			Map.Mapping.Add(FMath::Min(Levels - 1, L * Levels / FMath::Max(LODSync->NumLODs, 1)));
-		}
-		return Map;
-	};
-	if (FaceAsset)
-	{
-		LODSync->CustomLODMapping.Add(Body->GetFName(), MapTo(BodyAsset->GetLODNum()));
-	}
-	for (USkeletalMeshComponent* Piece : Outfit)
-	{
-		if (Piece->GetSkeletalMeshAsset())
-		{
-			LODSync->ComponentsToSync.Add({ Piece->GetFName(), ESyncOption::Passive });
-			LODSync->CustomLODMapping.Add(Piece->GetFName(), MapTo(Piece->GetSkeletalMeshAsset()->GetLODNum()));
+			Groom->SetMaterial(CardsIndex, Cards);
 		}
 	}
-	for (UGroomComponent* Groom : Grooms)
-	{
-		if (Groom->GroomAsset)
-		{
-			LODSync->ComponentsToSync.Add({ Groom->GetFName(), ESyncOption::Passive });
-		}
-	}
-	LODSync->RefreshSyncComponents();
+	// The worn armour's look (or the Survivor Wraps), its trims and the skin hidden under it; then the skin, eye and
+	// hair materials for the path marks (WRHeroLook.cpp). ApplyOutfit also rebuilds the LOD sync.
+	BuildLookMaterials();
+	ApplyOutfit(Art);
+	ApplyPathMarks(true);
 
 	// The sword in the right hand's socket (the palm's frame: X out of the fist past the index finger, Z out of the
 	// palm), the blade out of the fist and the crossguard across the knuckles.

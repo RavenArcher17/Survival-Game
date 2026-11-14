@@ -21,6 +21,38 @@ struct FWRReplicatedAccel
 	UPROPERTY() int8 Z = 0;           // -127..127 = -max..max
 	UPROPERTY() uint8 Bits = 0;       // gait (2 bits), stance (3 bits), locked on (1 bit)
 };
+/** How a survivor looks on every machine (cook hero-look-2 3.9): the face and build picked in the menu (?Look=), and the
+ *  look of the armour worn (player_art.json "armorLooks"), its element (the trim palette) and tier-6 inlay. Server set. */
+USTRUCT()
+struct FWRHeroLook
+{
+	GENERATED_BODY()
+	UPROPERTY() uint8 Face = 0;           // index into player_art.json hero.<sex>.faces
+	UPROPERTY() uint8 Build = 1;          // 0 lean, 1 athletic, 2 strong (hero.<sex>.builds)
+	UPROPERTY() FName Look;               // worn armour look id; None = the tier-0 Survivor Wraps
+	UPROPERTY() FName Element;            // the worn armour's element (TrimColor palette); None = the look's own trim
+	UPROPERTY() bool bAscendant = false;  // tier 6: starsteel inlay + halo-crest
+	UPROPERTY() bool bHideHelmet = false; // the hide-helmet option (the Head slot shows the face; tier 0 always does)
+	bool SameBody(const FWRHeroLook& O) const { return Face == O.Face && Build == O.Build; }
+	bool operator==(const FWRHeroLook& O) const
+	{
+		return SameBody(O) && Look == O.Look && Element == O.Element && bAscendant == O.bAscendant && bHideHelmet == O.bHideHelmet;
+	}
+};
+
+/** The path marks every machine draws (server computes from the PlayerState's path progress, which only the owner gets):
+ *  main and sub path and their strengths 0..255 (hero.md 2.6: smoothstep(0.08, 1, points / max)). */
+USTRUCT()
+struct FWRPathMarks
+{
+	GENERATED_BODY()
+	UPROPERTY() FName Main;
+	UPROPERTY() FName Sub;
+	UPROPERTY() uint8 MainS = 0;
+	UPROPERTY() uint8 SubS = 0;
+	bool operator==(const FWRPathMarks& O) const { return Main == O.Main && Sub == O.Sub && MainS == O.MainS && SubS == O.SubS; }
+};
+
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
@@ -64,6 +96,15 @@ public:
 	double GetFishChargeSeconds() const;
 	/** The body picked in the menu (None = the default body); the sound pass picks the voice by it. */
 	FName GetBodyStyle() const { return BodyStyle; }
+	/** Server: the armour now worn (WRInventory ApplyEquipment) picks the outfit look, its trim and its inlay. */
+	void SetWornArmor(FName ItemId, FName Element);
+	/** Server: the face and build from the menu (?Look=), clamped to what player_art.json has. */
+	void SetHeroAppearance(uint8 Face, uint8 Build);
+	/** Server: the hide-helmet option. */
+	UFUNCTION(Server, Reliable) void ServerSetHideHelmet(bool bHide);
+	/** A path ability was used (UWRGameplayAbility commit): the path marks flare (hero.md 2.6 combat pulse). */
+	void OnPathAbilityUsed(FName PathId);
+	const FWRHeroLook& GetHeroLook() const { return HeroLook; }
 
 	// Held tools (WRHeldTool.cpp).
 	/** Server (from the inventory): what's in the weapon hand, None for bare hands. A tool there shows in the hand. */
@@ -150,6 +191,38 @@ private:
 	bool bBodyLoaded = false;
 	/** Load (or swap to) the body for BodyStyle; does nothing if that body is already on. */
 	void LoadBodyArt();
+
+	// ---- the hero's look (WRHeroLook.cpp, cook hero-look-2) ----
+	UPROPERTY(ReplicatedUsing=OnRep_HeroLook) FWRHeroLook HeroLook;
+	FWRHeroLook LoadedLook;               // what the drawn body was built for
+	FString LoadedFaceKey;                // "<sex><face>-<build>": the body/face/grooms on now
+	FName LoadedOutfit;                   // the look whose pieces are on now ("wraps" for tier 0)
+	UFUNCTION() void OnRep_HeroLook();
+	/** Put on the worn look's 4 slot pieces, their trims and the body-hide masks (or the Wraps). */
+	void ApplyOutfit(const TSharedPtr<class FJsonObject>& Art);
+	/** Skin, eye and hair materials made dynamic once per body so path marks and hide masks can be set. */
+	void BuildLookMaterials();
+	/** Path marks on the skin, eyes and hair from the main and sub paths (hero.md 2.6), refreshed when they change. */
+	void ApplyPathMarks(bool bForce);
+	void TickPathMarks(float DeltaSeconds);
+	UFUNCTION(NetMulticast, Unreliable) void MulticastPathPulse(FName PathId);
+	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> SkinMIDs;   // [0] = body, then the head's
+	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> EyeMIDs;
+	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> HairMIDs;
+	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> OutfitMIDs;
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> Canines;  // Blood path (hero.md 2.6)
+	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<USkeletalMeshComponent> HaloCrest; // Ascendant
+	TMap<FName, float> FaceHairParams;    // the face's hair colour (hairMelanin, hairRedness) on the shared plugin grooms
+	TMap<FName, float> EyeDefaults;       // the eye/hair material's own values, so marks blend from them
+	TMap<FName, FLinearColor> EyeDefaultColors;
+	UPROPERTY(Replicated) FWRPathMarks PathMarks;
+	void RefreshLODSync();
+	uint32 PathMarkSig = 0;
+	float PathMarkCheck = 0.f;
+	FName PulsePath;
+	double PulseUntil = -1.0;
+	float PulseSeconds = 1.5f;
+	bool bHairHiddenByHelm = false;
 	UFUNCTION() void OnRep_BodyStyle();
 	FName QueuedOneShot;          // played when the current one-shot ends (a bow's nock, a crossbow's reload)
 	float QueuedOneShotSeconds = 0.f;
