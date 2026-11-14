@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRSurvival.h"
 #include "WRBoss.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
@@ -106,6 +107,11 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	if (!ASC || !Attr)
 	{
 		return;
+	}
+	// Marked by corruption: path resources fill slower (WRSurvival).
+	if (const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(Who))
+	{
+		Amount *= Survival->ResourceGainMult();
 	}
 
 	const bool bBalance = ASC->HasMatchingGameplayTag(WRTags::Combo_Balance);
@@ -577,6 +583,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Exposed))
 		{
 			Damage *= WRTune(TEXT("crit.exposedDamage"), 1.5f);
+		}
+		// Corruption on the matching path: path damage (spells, Wildbrands) grows with it (WRSurvival).
+		if (Hit.bWeaponArt || Hit.bSpell || !Hit.PathId.IsNone())
+		{
+			if (const UWRSurvivalComponent* Survival = Attacker ? UWRSurvivalComponent::For(Attacker) : nullptr) Damage *= Survival->PathDamageMult();
 		}
 		// Stat nodes (Data/tuning.json nodeEffects).
 		if (Hit.bWeaponArt)

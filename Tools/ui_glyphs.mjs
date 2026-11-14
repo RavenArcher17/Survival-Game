@@ -141,6 +141,25 @@ const masks = {
 	mouse_right: [S("M12 2.5a6 6 0 0 1 6 6v7a6 6 0 0 1-12 0v-7a6 6 0 0 1 6-6zM6 10h12M12 2.5V10", 1.6), F("M12 2.8a5.7 5.7 0 0 1 5.7 5.7V10H12z")],
 	ring: [S(circ(12, 12, 10.5), 1.2)],
 };
+// Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
+const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
+const smallFlake = (cx, cy, r) => `M${cx} ${cy - r}v${2 * r}M${cx - r * 0.87} ${cy - r / 2}l${r * 1.73} ${r}M${cx - r * 0.87} ${cy + r / 2}l${r * 1.73} ${-r}`;
+Object.assign(masks, {
+	rested: [F("M14.5 3.2a8.8 8.8 0 1 0 6.3 14.9A7.6 7.6 0 0 1 14.5 3.2z"), S("M15.5 5.5h4l-4 4.4h4", 1.7)],
+	dark: [S("M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", 1.9), F(circ(12, 12, 2.6)), S("M4 20L20 4", 2.2)],
+	corruption: [S("M12 2.8a9.2 9.2 0 1 1-9.2 9.2", 2), S("M12 6.6a5.4 5.4 0 1 1-5.4 5.4 3.2 3.2 0 0 1 3.2-3.2 2 2 0 0 1 2 2", 1.9), F(circ(12, 12, 1.3))],
+	weather_ashfall: [F(cloud(0, -1.5, 1)), F(circ(8, 17.2, 1.15) + circ(12, 18.6, 1.15) + circ(16, 17.2, 1.15) + circ(10, 21.6, 0.95) + circ(14.2, 22, 0.95))],
+	weather_blizzard: [S("M2 8.5h10.5a2.8 2.8 0 1 0-2.8-2.8M2 13h14.5a3 3 0 1 1-3 3M2 17.5h6", 1.9), S(smallFlake(19, 6, 3.2), 1.4), S(smallFlake(18.5, 19.5, 2.4), 1.3)],
+	weather_storm: [F(cloud(0, -2.5, 1)), F("M12.6 12.5l-3.6 5.4h3l-1.8 5 5.6-6.6h-3l1.9-3.8z")],
+	weather_heat: [F(circ(12, 9, 4.2)), S("M12 1.5v2.2M12 14.3v2.2M4.5 9h2.2M17.3 9h2.2M6.7 3.7l1.5 1.5M15.8 12.8l1.5 1.5M17.3 3.7l-1.5 1.5M8.2 12.8l-1.5 1.5", 1.6), S("M4 20c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 4-1.6", 1.6)],
+	weather_rain: [F(cloud(0, -2.5, 1)), S("M8 16l-1.4 3.6M12.2 16l-1.4 3.6M16.4 16l-1.4 3.6M10 20.2l-0.9 2.2M14.2 20.2l-0.9 2.2", 1.6)],
+	weather_fog: [S("M3 7.5h12M17.5 7.5H21M3 12h4.5M10 12h11M3 16.5h9M14.5 16.5H21", 2)],
+	weather_gale: [S("M2.5 8h11a3 3 0 1 0-3-3M2.5 12.5h16a3.2 3.2 0 1 1-3.2 3.2M2.5 17h8", 2.1)],
+	weather_snow: [F(cloud(0, -3, 1)), S(smallFlake(8, 18.5, 2.3) + smallFlake(16, 18.5, 2.3), 1.3)],
+	weather_spores: [F(circ(8, 9, 3.2) + circ(15.5, 7.5, 2.4) + circ(16, 15.5, 3.6) + circ(8.5, 17, 2.2)), CUT(F(circ(8, 9, 1.2) + circ(16, 15.5, 1.4)))],
+	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
+	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
+});
 const maskPx = { flame: 48, snowflake: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
@@ -162,6 +181,34 @@ glyphs.push({ id: "map_compass", kind: "color", px: 200, box: 100, ops: [
 glyphs.push({ id: "map_pin", kind: "color", px: 48, box: 30, ops: [
 	{ d: "M15 1.5a8.5 8.5 0 0 0-8.5 8.5c0 6.5 8.5 18.5 8.5 18.5s8.5-12 8.5-18.5A8.5 8.5 0 0 0 15 1.5z", fill: "#cfa35e", stroke: "#1a1206", w: 1.4 },
 	{ d: circ(15, 10, 3.2), fill: "#1a1206" },
+] });
+
+// ---------- item icons drawn the same way (Data/UI/Icons, 128 px): the survival lights and their fuel
+const ink = "#1a1006";
+glyphs.push({ id: "hand_torch", dir: "Icons", kind: "color", px: 128, box: 24, ops: [
+	{ d: "M10.4 22.6l2.6-11.2 1.8.5-2.6 11.1z", fill: "#8a5a2e", stroke: ink, w: 0.8 },
+	{ d: "M11.7 17.2l1.6.4", stroke: "#5a3a1c", w: 0.5 },
+	{ d: "M11.4 9.2c.2-1.8 3.8-1.4 4.6.4l-.6 3.3c-.8 1.2-3.6.6-4.6-.6z", fill: "#2a1d12", stroke: ink, w: 0.8 },
+	{ d: "M11.6 11.2l4.2 1M11.9 9.9l4 .9", stroke: "#a88a52", w: 0.55 },
+	{ d: "M13.6 1.4c2.4 2.4 3.6 4.2 2.6 6.4-.6 1.4-2 2-3.4 1.6-1.6-.4-2.2-2-1.4-3.6.2 1 .8 1.6 1.4 1.4-.6-1.8.2-3.8.8-5.8z", fill: "#f39a2c", stroke: "#7a2d06", w: 0.6 },
+	{ d: "M13.8 5.4c1 1 1.4 2 .8 3-.4.6-1.2.7-1.6.2-.4-.6 0-1.4.8-3.2z", fill: "#ffe08a" },
+] });
+glyphs.push({ id: "horn_lantern", dir: "Icons", kind: "color", px: 128, box: 24, ops: [
+	{ d: "M8.8 4.6a3.2 3.2 0 0 1 6.4 0", stroke: "#8e6b38", w: 1.1 },
+	{ d: "M7 7.4l1.8-2.4h6.4L17 7.4z", fill: "#a87a3c", stroke: ink, w: 0.8 },
+	{ d: "M7.4 7.4h9.2v11.2H7.4z", fill: "#e3a24a", stroke: ink, w: 0.8 },
+	{ d: "M8.4 8.6h7.2v9H8.4z", fill: "#f6c870" },
+	{ d: "M10.4 15.4h3.2v2.2h-3.2z", fill: "#efe3c2", stroke: "#8a7a5a", w: 0.4 },
+	{ d: "M12 10.6c1.2 1.4 1.4 2.6.6 3.6-.4.5-1 .5-1.3 0-.5-.8-.2-1.8.7-3.6z", fill: "#fff2b8", stroke: "#e07a1e", w: 0.35 },
+	{ d: "M7.4 7.4v11.2M16.6 7.4v11.2M12 7.4v1.2", stroke: "#6e4f24", w: 1.1 },
+	{ d: "M6.4 18.6h11.2l-.8 2.2H7.2z", fill: "#a87a3c", stroke: ink, w: 0.8 },
+] });
+glyphs.push({ id: "tallow", dir: "Icons", kind: "color", px: 128, box: 24, ops: [
+	{ d: "M4.5 13.5l7.5-4 7.5 4v4.2l-7.5 4-7.5-4z", fill: "#d9cba2", stroke: ink, w: 0.8 },
+	{ d: "M4.5 13.5l7.5 4 7.5-4M12 17.5v4.2", stroke: "#9c8c62", w: 0.6 },
+	{ d: "M4.5 13.5l7.5-4 7.5 4-7.5 4z", fill: "#efe5c6" },
+	{ d: "M8 12.8c1.4-.6 2.6-.3 3.4.4M13.4 11.6c.9-.2 1.8 0 2.4.6", stroke: "#fffaf0", w: 0.6 },
+	{ d: "M12 3c1.6 1.8 2.4 3 2.4 4.2a2.4 2.4 0 0 1-4.8 0c0-1.2.8-2.4 2.4-4.2z", fill: "#e7d7aa", stroke: "#9c8c62", w: 0.5 },
 ] });
 
 // ---------- render in headless Edge
@@ -208,7 +255,16 @@ const edge = ["C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "C
 const dom = execFileSync(edge, ["--headless=new", "--disable-gpu", "--no-first-run", "--user-data-dir=" + path.join(tmp, "profile"), "--dump-dom", "file:///" + html.replace(/\\/g, "/")], { encoding: "utf8", maxBuffer: 64 << 20 });
 const json = dom.slice(dom.indexOf('<pre id="out">') + 14, dom.indexOf("</pre>")).replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 const res = JSON.parse(json);
+// node Tools/ui_glyphs.mjs [id ...]: only those (the rest stay as they are on disk).
+const only = process.argv.slice(2);
+const dirOf = Object.fromEntries(glyphs.map((g) => [g.id, g.dir]));
 let n = 0;
-for (const [id, url] of Object.entries(res)) { fs.writeFileSync(path.join(out, id + ".png"), Buffer.from(url.split(",")[1], "base64")); n++; }
+for (const [id, url] of Object.entries(res)) {
+	const base = id.replace(/_[ap]$/, "");
+	if (only.length && !only.includes(id) && !only.includes(base)) continue;
+	const dir = dirOf[base] || dirOf[id] ? path.join(root, "Data", "UI", dirOf[base] || dirOf[id]) : out;
+	fs.writeFileSync(path.join(dir, id + ".png"), Buffer.from(url.split(",")[1], "base64"));
+	n++;
+}
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`${n} glyph images in ${out}`);

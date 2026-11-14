@@ -264,6 +264,8 @@ private:
 	float SwimCheck = 0.f;
 	FName WeaponSocket;            // player_art.json sockets: where the sword, shield and held gear go
 	FName ShieldSocket;
+	FName TorchSocket;             // the off hand's torch grip (sockets.torch) and the left hip (sockets.hipLeft): the lantern
+	FName HipSocket;
 	float AimPitchBlend = 0.f;     // the spine's share of the aim pitch (first person, aiming), eased
 	// First person: the eye on the head bone (hero.md 2.7).
 	float EyeZ = 0.f, EyeZSpeed = 0.f;
@@ -300,7 +302,21 @@ private:
 	FTransform FistFrame() const;
 	FName ToolMeshFor;             // the tool ToolMesh was built for
 	void UpdateToolLook(bool bShow);
+	// --- Survival on the body (WRHeldLight.cpp): the lit torch in the off hand or the lantern on the hip, its light,
+	// and lying on a bed while asleep. Clients draw them from the player state's UWRSurvivalComponent.
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> LightMesh;
+	UPROPERTY(Transient) TObjectPtr<class UPointLightComponent> HeldLight;
+	FName LightMeshFor;
+	bool bSleepPose = false;
+	double WakeAskedAt = -10.0;
+	double LightLookCheckedAt = -10.0;
+	void UpdateHeldLightLook();
+	void TickSurvivalLook(float DeltaSeconds);
+	/** Owner: a move or jump while asleep gets you up (the server checks it too). */
+	UFUNCTION(Server, Reliable) void ServerWakeUp();
 public:
+	/** Re-dress the hands (the shield comes off for a torch; the torch / lantern shows): WRSurvival's light changes. */
+	void RefreshHeldLook() { UpdateWeaponLook(); }
 	/** Where the held fishing rod's tip is in the world (the line leaves from there); the hand when the rod isn't drawn. */
 	FVector RodTipLocation() const;
 private:

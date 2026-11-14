@@ -24,6 +24,8 @@ public:
 	UWRPathComponent* GetPaths() const { return Paths; }
 	class UWRInventoryComponent* GetInventory() const { return Inventory; }
 	class UWRLifeSkillsComponent* GetLifeSkills() const { return LifeSkills; }
+	/** Rest, Rested, the held light, darkness, weather on you, corruption (WRSurvival). */
+	class UWRSurvivalComponent* GetSurvival() const { return Survival; }
 
 	/** Basic weapon abilities are granted once per player, not per pawn. */
 	bool bDefaultAbilitiesGranted = false;
@@ -74,4 +76,5 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UWRPathComponent> Paths;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRInventoryComponent> Inventory;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRLifeSkillsComponent> LifeSkills;
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRSurvivalComponent> Survival;
 };

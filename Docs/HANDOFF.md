@@ -77,7 +77,20 @@ creature or boss move is a row in `attacks.json`, not code; a new status is a `s
 `UWRStatusComponent::Proc`; a new path's Wildbrand is a `wildbrands.<node>` row plus its `ClassForNode` line; anything
 that fires at players from a creature or boss never homes (`AWRProjectile::HomeOn` refuses).
 
+Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
+owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light
+(`EWREquipSlot::Light`, `EquippedLight`); `UWRWeatherSubsystem` rolls `Data/weather.json` per biome into
+`AWRGameState::Weather` (every machine draws and hears it from there); `UWRLightSubsystem::IsLit / IsWarded / IsHalving`
+(placed lights, Hearths, glowing creatures, held lights); `WRBiome::At` is the one place that says which biome a point
+is in (the island's ridge split today; the 12-wedge lookup goes there). New rules for new code: a new weather is a
+`weather.json` row (effects, counters, look, glyph) plus a `weather.<kind>` bed; a new light is a `tuning lights.<id>`
+row; decor gets a `pieces.json comfort` row; a creature that hunts in the dark gets `darkHunter: true`; code that
+should know about Rest binds `UWRSurvivalComponent::OnRest`.
+
 Open, as of 0.7.1:
+- **Survival on the island is two biomes**: only Ashfall / Blizzard and the lesser volcanic and tundra weathers can
+  happen; corruption, dark nights, strikes and gusts are live in code and data for the biomes that don't exist yet. The
+  hero has no sleep clip (the death clip's end is held on the bed; `rest.pose*` in tuning).
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
   at `C:\Dev\UE5Source` on Raven's PC (`Tools\build_engine.ps1`), needed only for that.
 - **The gate playtest** (a group of friends plays a full evening and wants to come back) hasn't been run.

@@ -24,6 +24,7 @@ void AWRGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRGameState, ServerSettings);
 	DOREPLIFETIME(AWRGameState, ClockAnchorHours);
 	DOREPLIFETIME(AWRGameState, ClockAnchorTime);
+	DOREPLIFETIME(AWRGameState, Weather);
 }
 
 void AWRGameState::OnRep_ServerSettings()

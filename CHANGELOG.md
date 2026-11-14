@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased: survival (sleep and Rested, comfort, weather, darkness and light, corruption)
+
+Aaron (lane build-survival: FULL-GAME 6.1; research, requirement ledger and plan in showcase-notes
+cooks/build-survival.md, following cooks/survival-crafting.md 2.2-2.6 and world-map 2.6 for the lesser weathers). Built
+to compile (editor); not played here (Aaron and the testers test, F8).
+
+- **Sleep and Rest**: E on your bed or bedroll still sets where you wake, and now **lies you down** for a 10 s sleep
+  (`rest.sleepSeconds`): you're placed on the mattress along the bed, the view dims, a bar fills. Moving, jumping, a
+  blow, hunger or thirst running out, or the bed going away gets you up with nothing. Refused (with the reason) in
+  combat, with a creature after you within 15 m (Valheim's rule), when starving or parched, swimming or mounted. Time
+  never skips (multiplayer). A finished sleep is a **Rest**: Decay's lost max health comes back, corruption halves, and
+  `UWRSurvivalComponent::OnRest` fires (Deathless and Void hang off it when those paths land).
+- **Rested**: stamina regen +20%, hunger and thirst drain x0.8, life-skill XP +10% (`rested`); 10 min from a bedroll,
+  20 from a bed, **+1 min per comfort** point. Death ends it; it saves across log-outs. HUD: a Rested line under the
+  Food / Water gauges with the minutes left (it pulses in the last minute); near your bed it shows the room's comfort
+  and how long a sleep there would give.
+- **Comfort** (`comfort`, `pieces.json comfort`): decor within 12 m of the bed **under a built roof**, best piece per
+  group (seat, table, bed, floor, wall, fire, light; up to 3 trophies; a Hearth close by counts as a fireplace), cap 20.
+  Build cards say what each piece adds.
+- **Darkness and light**: in a cave (the chamber and the deeper tunnel), or a dark biome's night, with no light
+  reaching you, you're **Unlit** (HUD line, one-time hint) and **dark-hunters** (`creatures.json darkHunter`: the
+  Gloomhowl today) notice you from twice as far. Lights: placed torches (6 m) and braziers (10 m), the Hearth (10 m),
+  glowing creatures like the Glowmoth (12 m), and the new **Light slot**: a **Torch** (by hand: 1 wood, 2 fibre) held
+  in the off hand, the shield off that arm while it burns, 20 min, faster in rain, out in water; a **Horn lantern**
+  (workbench L2: 2 bronze, 1 hide, 1 tallow) hung at the left hip, both hands free, 9 m, burns **Tallow** (workbench: 2
+  raw meat) 90 min each and takes the next from the bag. Both are modelled (`FWRToolMesh::Torch / Lantern`: ash haft and
+  pitch-rag head bound with cord; bronze cap, posts and plinth, amber horn panes, a tallow candle), carry their own
+  warm light at their play radius, and flame and sparks from `fx.json held.torch / held.lantern`. L lights or puts out
+  (on a pad: its belt slot); the bag has a Light cell with the burn time left.
+- **Weather** (`Data/weather.json`, all 12 biomes): each biome rolls every 30 min; one weather at a time; a toast and
+  the HUD line 60 s ahead ("A blizzard is coming"), the haze closing in from the horizon and its wind bed rising; in
+  over 20 s, out over 30. **No temperature meter** (Raven's rule): every effect is a gear check or what you can see,
+  each with its counter in the data. On the island now: **Ashfall** (volcanic: ~60 m sight, heavy ash, thirst x1.25 in
+  the open, outdoor crop plots stop growing; a roof or Forgeplate) and **Blizzard** (tundra: ~40 m whiteout, sideways
+  snow, run x0.85 in deep snow, stamina regen x0.8, Gloomhowls from further; a roof within 6 m or frost-infused armour
+  / Rimeguard), plus Snowfall, Freezing fog, Rain and Overcast. Rows for the other ten biomes (Thunderstorm with
+  lightning strikes and gusts, Heat wave in direct sun only, Gale, Fog, Squall, Corpse fog, Spore bloom, Grey wind)
+  run the same code and come alive when their land does. Strikes: a 1 s ground glow under the highest exposed player
+  in a 60 m cell above 600 m, then 60 lightning damage and a stagger **through ApplyHit** (it can kill). Gusts: a
+  whistle, then a shove along the storm's wind. Look: `snow.blizzard` / `ash.fall` emitters, thicker base fall, fog
+  density and colour, a dimmer sun (`look` in each row); sound: `weather.<kind>` beds; music is never touched.
+- **Corruption** (Graveyard and Corrupted wasteland rows): a 0-100 meter, built faster at night, underground or in a
+  rift, stopped by a brazier / torch / Hearth, halved by a lit lantern or a glowing creature, halved by Rest, draining
+  outside. 25: healing -10%; 50: stamina regen -15% and dark-hunters treat you as unlit; 75: max stamina -20; 100:
+  **Marked** (the biome's creatures from twice as far, path resources fill 25% slower). The biome's own path (Necromancy
+  / Void) takes none of it and gains path damage +3 / 6 / 10 / 15%. HUD: "Corruption NN" with its bar, only above 0.
+  **Not on the island yet**: neither biome exists, so it never builds today.
+- Saves: `survival` in the player JSON (Rested left, corruption and where it came from, whether the light was lit);
+  the inventory saves the Light slot.
+- New: `WRSurvival.h/.cpp` (`WRBiome`, `FWRWeatherDefs`, `UWRWeatherSubsystem`, `UWRLightSubsystem`, `FWRComfort`,
+  `UWRSurvivalComponent` on the PlayerState), `WRHeldLight.cpp`; glyphs (rested, dark, corruption, 11 weathers) and the
+  torch / lantern / tallow icons drawn by `Tools/ui_glyphs.mjs` (which now takes ids to write only those).
+- Not finished: the hero has **no sleep clip** yet: the end of the death clip is held on the mattress (`rest.pose*`
+  fit it; a `player_art anims.sleep` key replaces it with no code). Rain's Wet status in ApplyHit (world-map W1), the
+  Cleansing draught, grounding charm, sand veil, anchor boots and filter mask items, the Rodcrest's grounding, gale
+  stamina for flyers and spore-cloud spread wait for the systems and biomes they belong to.
+
 ## Unreleased: the full combat (every weapon class, every status, Wildbrands and spells, creature rows, bosses, camera, flasks, the saddle, PvP)
 
 Aaron (lane build-combat-full: COMBAT-AND-LESSONS C6-C12 and the full-game combat rows; research, requirement ledger and

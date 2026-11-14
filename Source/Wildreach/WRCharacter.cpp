@@ -192,6 +192,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		TickBodyAnim();
 		TickGuardEdge();
 	}
+	TickSurvivalLook(DeltaSeconds);
 	if (IsLocallyControlled())
 	{
 		TickInputBuffer();
@@ -543,6 +544,8 @@ void AWRCharacter::LoadBodyArt()
 	};
 	WeaponSocket = SocketName(TEXT("weapon"), TEXT("weapon_r"));
 	ShieldSocket = SocketName(TEXT("shield"), TEXT("shield_l"));
+	TorchSocket = SocketName(TEXT("torch"), TEXT("torch_l"));
+	HipSocket = SocketName(TEXT("hipLeft"), TEXT("hip_l"));
 
 	// Feet on the capsule's bottom, facing the actor's forward (the MetaHuman faces +Y).
 	Body->SetSkeletalMesh(BodyAsset);

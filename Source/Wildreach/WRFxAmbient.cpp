@@ -10,6 +10,8 @@
 #include "WRGameplayTags.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
+#include "WRCharacter.h"
+#include "WRSurvival.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Engine/World.h"
@@ -65,6 +67,17 @@ void UWRFxSubsystem::TickAmbient(float DeltaTime)
 			if (Def && Def->Kind == TEXT("light") && Near(*It))
 			{
 				Track(*It, Def->Id == TEXT("brazier") ? FName(TEXT("brazier.fire")) : FName(TEXT("torch.fire")), 1.f);
+			}
+		}
+
+		// Held lights (WRSurvival): a torch's flame and sparks, a lantern's small steady flame, on the light they carry.
+		for (TActorIterator<AWRCharacter> It(World); It; ++It)
+		{
+			const UWRSurvivalComponent* S = UWRSurvivalComponent::For(*It);
+			if (S && S->IsLightOn() && Near(*It) && It->IsAlive())
+			{
+				const bool bTorch = S->HoldsTorch();
+				Track(*It, bTorch ? FName(TEXT("held.torch")) : FName(TEXT("held.lantern")), 1.f);
 			}
 		}
 
@@ -161,8 +174,8 @@ void UWRFxSubsystem::TickWeather(float DeltaTime)
 	Sheltered = FMath::FInterpTo(Sheltered, ShelterTarget, DeltaTime, 3.f);
 	// The ridge runs down x = 0: tundra east, volcanic west; the weather builds up away from the ridge.
 	const float Start0 = T.Num(TEXT("fx.weather.ridgeStart"), 5000.f), Full = T.Num(TEXT("fx.weather.ridgeFull"), 25000.f);
-	const float Snow = bIsland ? FMath::SmoothStep(Start0, Full, static_cast<float>(ViewLocation.X)) * T.Num(TEXT("fx.weather.snow"), 1.f) : 0.f;
-	const float Ash = bIsland ? FMath::SmoothStep(Start0, Full, static_cast<float>(-ViewLocation.X)) * T.Num(TEXT("fx.weather.ash"), 1.f) : 0.f;
+	float Snow = bIsland ? FMath::SmoothStep(Start0, Full, static_cast<float>(ViewLocation.X)) * T.Num(TEXT("fx.weather.snow"), 1.f) : 0.f;
+	float Ash = bIsland ? FMath::SmoothStep(Start0, Full, static_cast<float>(-ViewLocation.X)) * T.Num(TEXT("fx.weather.ash"), 1.f) : 0.f;
 	const FTransform At(ViewLocation);
 	const auto Run = [&](int32& Handle, FName Effect, float Amount)
 	{
@@ -174,6 +187,37 @@ void UWRFxSubsystem::TickWeather(float DeltaTime)
 			SetRateScale(Handle, Rate);
 		}
 	};
+	// The weather where the camera is (WRSurvival, Data/weather.json look): it thickens the biome's own fall over its
+	// warning and ramp (the far distance closes in first: WRSky's fog), and adds its own (a blizzard's sideways snow).
+	float WeatherRate = 0.f;
+	FName WFx;
+	if (bIsland)
+	{
+		const FName Biome = WRBiome::At(GetWorld(), ViewLocation);
+		if (const FWRWeatherNow* W = UWRWeatherSubsystem::For(GetWorld(), Biome))
+		{
+			const float Now = UWRWeatherSubsystem::Now(GetWorld());
+			const float Amount = FMath::Max(W->Strength(Now), W->Approach(Now) * 0.35f);
+			if (const FWRWeatherKind* K = Amount > 0.f ? FWRWeatherDefs::Get().Kind(Biome, W->Kind) : nullptr)
+			{
+				const float Thick = FMath::Lerp(1.f, K->BaseRate, Amount);
+				if (K->BaseFx == TEXT("snow")) Snow = FMath::Max(Snow, 0.2f * Amount) * Thick;
+				else if (K->BaseFx == TEXT("ash")) Ash = FMath::Max(Ash, 0.2f * Amount) * Thick;
+				WFx = K->Fx;
+				WeatherRate = K->FxRate * W->Strength(Now);
+			}
+		}
+	}
 	Run(SnowEmitter, TEXT("snow"), Snow);
 	Run(AshEmitter, TEXT("ash"), Ash);
+	if (WFx != WeatherFx)
+	{
+		if (WeatherEmitter != INDEX_NONE) StopEmitter(WeatherEmitter);
+		WeatherEmitter = INDEX_NONE;
+		WeatherFx = WFx;
+	}
+	if (!WeatherFx.IsNone() && HasEffect(WeatherFx))
+	{
+		Run(WeatherEmitter, WeatherFx, WeatherRate);
+	}
 }

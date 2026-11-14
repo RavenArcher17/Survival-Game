@@ -1,4 +1,5 @@
 #include "WRPathComponent.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -529,7 +530,10 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	const int32 Level = GetCharacterLevel();
 	const float HealthRatio = Attr->GetMaxHealth() > 0.f ? Attr->GetHealth() / Attr->GetMaxHealth() : 1.f;
 	const float MaxHealth = FWRPathRules::LevelStat(WRTune(TEXT("player.health"), 100.f), WRTune(TEXT("player.healthAtLevel50"), 250.f), Level);
-	const float MaxStamina = FWRPathRules::LevelStat(WRTune(TEXT("player.stamina"), 100.f), WRTune(TEXT("player.staminaAtLevel50"), 150.f), Level);
+	// Corruption at 75 takes some max stamina while it lasts (WRSurvival).
+	const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner());
+	const float MaxStamina = FWRPathRules::LevelStat(WRTune(TEXT("player.stamina"), 100.f), WRTune(TEXT("player.staminaAtLevel50"), 150.f), Level)
+		- (Survival ? Survival->MaxStaminaPenalty() : 0.f);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxHealthAttribute(), MaxHealth);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxStaminaAttribute(), MaxStamina);
 	if (Character->IsAlive())

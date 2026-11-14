@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRSurvival.h"
 #include "EngineUtils.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -524,6 +525,7 @@ float UWRStatusComponent::HealingTakenScale() const
 	float Scale = 1.f;
 	if (HasStatus(WRTags::Status_Rot)) Scale *= WRStatus::Def(WRStatus::Rot, TEXT("healingTaken"), 0.5f);
 	if (HasStatus(WRTags::Status_Decay)) Scale *= WRStatus::Def(WRStatus::Decay, TEXT("healingTaken"), 0.5f);
+	if (const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner())) Scale *= Survival->HealingTakenMult();  // corruption 25
 	return Scale;
 }
 
@@ -713,8 +715,9 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	// The fast stroke in the water costs its own stamina (Strong stroke halves it, Seaborn makes it free).
 	const UCharacterMovementComponent* Move = Owner ? Owner->GetCharacterMovement() : nullptr;
 	const bool bFastStroke = bSprintDraining && Move && Move->IsSwimming();
+	const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(Owner);
 	const float DrainPerSecond = bFastStroke
-		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina")))
+		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina"))) * (Survival ? Survival->SwimStaminaMult() : 1.f)
 		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f);
 	if (bSprintDraining && DrainPerSecond > 0.f)
 	{
@@ -738,6 +741,11 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		{
 			// Frostbitten players recover stamina slower (ER: frostbite slows stamina regen).
 			Regen *= WRStatus::Def(WRStatus::Frost, TEXT("playerStaminaRegen"), 0.6f);
+		}
+		// Rested, a blizzard in the open, corruption (WRSurvival).
+		if (Survival)
+		{
+			Regen *= Survival->StaminaRegenMult();
 		}
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() + Regen * DeltaTime);
 	}
@@ -782,8 +790,10 @@ void UWRStatusComponent::TickSurvival(float DeltaTime)
 	const float WorldRate = FMath::Max(0.f, WRTune(TEXT("server.hungerMultiplier"), 1.f));
 	// Hearty (cooking perk): hunger drains slower for you.
 	const float HungerRate = WorldRate * 100.f / (WRTune(TEXT("survival.hungerMinutes"), 60.f) * 60.f)
-		* FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("hungerDrain")));
-	const float ThirstRate = WorldRate * 100.f / (WRTune(TEXT("survival.thirstMinutes"), 40.f) * 60.f);
+		* FMath::Max(0.1f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("hungerDrain")))
+		* (UWRSurvivalComponent::For(Owner) ? UWRSurvivalComponent::For(Owner)->HungerDrainMult() : 1.f);  // Rested
+	const float ThirstRate = WorldRate * 100.f / (WRTune(TEXT("survival.thirstMinutes"), 40.f) * 60.f)
+		* (UWRSurvivalComponent::For(Owner) ? UWRSurvivalComponent::For(Owner)->ThirstDrainMult() : 1.f);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), Attr->GetHunger() - HungerRate * DeltaTime);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), Attr->GetThirst() - ThirstRate * DeltaTime);
 

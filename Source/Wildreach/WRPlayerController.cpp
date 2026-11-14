@@ -1,4 +1,5 @@
 #include "WRPlayerController.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
 #include "WRCrafting.h"
@@ -153,6 +154,7 @@ void AWRPlayerController::BindKeys()
 	Bind(TEXT("Interact"), IE_Released, &AWRPlayerController::InteractReleased);
 	Bind(TEXT("Whistle"), IE_Pressed, &AWRPlayerController::WhistlePressed);
 	Bind(TEXT("Whistle"), IE_Released, &AWRPlayerController::WhistleReleased);
+	Bind(TEXT("LightToggle"), IE_Pressed, &AWRPlayerController::LightTogglePressed);
 	Bind(TEXT("Inventory"), IE_Pressed, &AWRPlayerController::ToggleInventory);
 	Bind(TEXT("Skills"), IE_Pressed, &AWRPlayerController::ToggleSkills);
 	Bind(TEXT("Paths"), IE_Pressed, &AWRPlayerController::TogglePaths);
@@ -258,6 +260,12 @@ void AWRPlayerController::InteractPressed()
 		}
 	}
 	WRInteract();
+}
+
+void AWRPlayerController::LightTogglePressed()
+{
+	// The torch or lantern in the Light slot on / off (or the first one in the bag into it). On a pad: its belt slot.
+	if (Menu == EWRMenu::None && WRInput::AllowPress(this)) SendCommand(TEXT("light"));
 }
 
 void AWRPlayerController::WhistlePressed()
@@ -1087,7 +1095,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
 		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
 		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("whistle "), TEXT("hearthfeed"), TEXT("hearthrepair"),
-		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode") };  // chat is its own RPC
+		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode"), TEXT("light") };  // chat is its own RPC
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{
@@ -1527,6 +1535,12 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), 0.f);
 	}
 	else if (Cmd == TEXT("water") && UWRWaterSubsystem::Get(this)) { Result = UWRWaterSubsystem::Get(this)->DevCommand(this, Args); }  // swim / drink checks
+	else if (Cmd == TEXT("weather") && Args.Num() >= 3 && GetWorld()->GetSubsystem<UWRWeatherSubsystem>())
+	{
+		// weather <biome> <kind> [minutes] (kind "clear" ends it): start a weather now, for trying its look and counters.
+		GetWorld()->GetSubsystem<UWRWeatherSubsystem>()->Force(FName(*Args[1]), FName(*Args[2]), Args.Num() >= 4 ? FCString::Atof(*Args[3]) : 10.f);
+	}
+	else if (Cmd == TEXT("corruption") && Args.Num() >= 2 && PS && PS->GetSurvival()) { PS->GetSurvival()->AddCorruption(FCString::Atof(*Args[1])); }
 	else { Result = TEXT("unknown command or no pawn"); }
 
 	UE_LOG(LogWildreach, Log, TEXT("CMD %s: %s -> %s"), *GetNameSafe(PS), *Command, Result.IsEmpty() ? TEXT("ok") : *Result);

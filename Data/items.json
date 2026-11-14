@@ -9,6 +9,9 @@
     { "id": "warming_draught", "name": "Warming draught", "category": "potion", "stack": 5, "weight": 0.4, "use": { "cures": ["frost"], "cooldown": 6 }, "note": "ember-steeped berry wine: ends frostbite and the slow" },
     { "id": "cooked_meat", "name": "Cooked meat", "category": "food", "stack": 10, "weight": 0.3, "use": { "hunger": 35 } },
     { "id": "berries", "name": "Berries", "category": "food", "stack": 20, "weight": 0.1, "use": { "hunger": 10 } },
+    {"id": "hand_torch", "name": "Torch", "category": "light", "stack": 1, "weight": 0.6, "equip": {"slot": "light", "durability": 1200}, "note": "Held in the off hand (no shield while it burns); 6 m of light; 20 min of burn (durability = seconds); rain burns it twice as fast; water puts it out."},
+    {"id": "horn_lantern", "name": "Horn lantern", "category": "light", "stack": 1, "weight": 1.2, "equip": {"slot": "light", "durability": 5400}, "note": "Hangs at the hip, both hands free; 9 m of light; one tallow burns 90 min (durability = seconds), the next comes from the bag."},
+    {"id": "tallow", "name": "Tallow", "category": "material", "stack": 20, "weight": 0.2, "note": "Rendered animal fat: lantern fuel."},
     { "id": "waterskin", "name": "Waterskin", "category": "drink", "stack": 5, "weight": 0.5, "use": { "thirst": 40 } },
 
     { "id": "raw_meat", "name": "Raw meat", "category": "material", "stack": 20, "weight": 0.3 },

@@ -27,6 +27,7 @@
 #include "WRResourceNode.h"
 #include "WRSocial.h"
 #include "WRSound.h"
+#include "WRSurvival.h"
 #include "WRTuning.h"
 #include "WRUIMotion.h"
 #include "WRUISettings.h"
@@ -685,7 +686,14 @@ private:
 					[
 						SNew(SOverlay)
 						+ SOverlay::Slot()[SNew(SImage).Image_Lambda([Accent]() { return WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.45f), 4.f, WRUI::Alpha(Accent(), 0.8f), 1.5f); })]
-						+ SOverlay::Slot().Padding(5.f * U)[SNew(SImage).Image_Lambda([Get]() { float A; const FWRFlow::FToast* T = Get(A); return T && !T->Icon.IsNone() ? WRUI::Icon(T->Icon) : WRUI::Icon(TEXT("_unknown")); })]
+						// An item's icon, or a glyph ("Glyphs/<name>": weather, rest, darkness) tinted in the toast's accent.
+						+ SOverlay::Slot().Padding(5.f * U)[SNew(SImage).Image_Lambda([Get]()
+						{
+							float A;
+							const FWRFlow::FToast* T = Get(A);
+							if (T && T->Icon.ToString().StartsWith(TEXT("Glyphs/"))) return WRUI::Image(T->Icon);
+							return T && !T->Icon.IsNone() ? WRUI::Icon(T->Icon) : WRUI::Icon(TEXT("_unknown"));
+						}).ColorAndOpacity_Lambda([Get, Accent]() { float A; const FWRFlow::FToast* T = Get(A); return FSlateColor(T && T->Icon.ToString().StartsWith(TEXT("Glyphs/")) ? Accent() : FLinearColor::White); })]
 					]
 				]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
@@ -1295,6 +1303,12 @@ void FWRFlow::TickMoments()
 	const UWRPathComponent* Paths = Survivor ? UWRPathComponent::FindFor(Survivor) : nullptr;
 	if (!bSettled || bQuiet)
 	{
+		// Survival state already there on arrival (Rested from the save, corruption) isn't news.
+		if (const AWRPlayerState* SPS = P->GetPlayerState<AWRPlayerState>(); SPS && SPS->GetSurvival())
+		{
+			bWasRested = SPS->GetSurvival()->IsRested();
+			LastCorruptionToast = SPS->GetSurvival()->CorruptionStep();
+		}
 		if (Paths)
 		{
 			LastLevel = Paths->GetCharacterLevel();
@@ -1312,6 +1326,7 @@ void FWRFlow::TickMoments()
 	CheckLevel(Paths);
 	CheckBosses(At);
 	CheckTames(At);
+	CheckSurvival();
 	if (Now >= NextSlowCheck)
 	{
 		NextSlowCheck = Now + 0.5;
@@ -1560,6 +1575,71 @@ void FWRFlow::CheckHearths(const FVector& At)
 			WRSound::PlayUI(P, TEXT("recipe.unlock"));
 		}
 		*Known = Level;
+	}
+}
+
+void FWRFlow::CheckSurvival()
+{
+	// Survival news (WRSurvival): a weather coming to your biome (60 s ahead, what it does, how to beat it), waking
+	// Rested, corruption crossing a step; and the one-time hint the first time the dark finds you.
+	AWRPlayerController* P = GetPC();
+	const AWRPlayerState* PS = P ? P->GetPlayerState<AWRPlayerState>() : nullptr;
+	const UWRSurvivalComponent* S = PS ? PS->GetSurvival() : nullptr;
+	const APawn* Pawn = P ? P->GetPawn() : nullptr;
+	if (!S || !Pawn)
+	{
+		return;
+	}
+	const FName Biome = WRBiome::At(Pawn, Pawn->GetActorLocation());
+	const float Now = UWRWeatherSubsystem::Now(Pawn);
+	if (const FWRWeatherNow* W = UWRWeatherSubsystem::For(Pawn, Biome); W && W->IsComing(Now))
+	{
+		const FString Key = FString::Printf(TEXT("%s.%s.%.0f"), *Biome.ToString(), *W->Kind.ToString(), W->WarnAt);
+		if (Key != LastWeatherToast)
+		{
+			LastWeatherToast = Key;
+			if (const FWRWeatherKind* K = FWRWeatherDefs::Get().Kind(Biome, W->Kind))
+			{
+				FToast T;
+				T.Over = LOCTEXT("WeatherOver", "Weather");
+				T.Title = FText::FromString(K->Coming.IsEmpty() ? K->Name + TEXT(" coming") : K->Coming);
+				T.Sub = FText::FromString(K->Does);
+				T.Icon = FName(*(TEXT("Glyphs/") + (K->Glyph.IsNone() ? FString(TEXT("weather_storm")) : K->Glyph.ToString())));
+				T.Accent = WRUI::Warn;
+				T.Seconds = 9.f;
+				ShowToast(T);
+			}
+		}
+	}
+	const bool bRested = S->IsRested();
+	if (bRested && !bWasRested && S->GetRestedMinutes() > 0)
+	{
+		FToast T;
+		T.Over = LOCTEXT("RestedOver", "Rested");
+		T.Title = FText::Format(LOCTEXT("RestedTitle", "Rested for {0} min"), S->GetRestedMinutes());
+		T.Sub = S->GetComfortHere() > 0 ? FText::Format(LOCTEXT("RestedComfort", "Comfort {0} made it longer. Stamina +20%, slower hunger and thirst, skills learn faster."), S->GetComfortHere())
+			: LOCTEXT("RestedPlain", "A roofed room with a table, chairs, a fire and more makes it longer.");
+		T.Icon = FName(TEXT("Glyphs/rested"));
+		T.Accent = FLinearColor(FColor(196, 176, 255));
+		ShowToast(T);
+	}
+	bWasRested = bRested;
+	const int32 Step = S->CorruptionStep();
+	if (LastCorruptionToast >= 0 && Step > LastCorruptionToast)
+	{
+		FToast T;
+		T.Over = LOCTEXT("CorruptOver", "Corruption");
+		T.Title = FText::Format(LOCTEXT("CorruptTitle", "Corruption {0}"), FMath::RoundToInt(S->GetCorruption()));
+		T.Sub = S->MatchesCorruption() ? LOCTEXT("CorruptMatch", "Your path feeds on it: your path's damage grows.")
+			: LOCTEXT("CorruptSub", "Stand by a fire or the Hearth to stop it; sleep halves it; leaving lets it drain.");
+		T.Icon = FName(TEXT("Glyphs/corruption"));
+		T.Accent = FLinearColor(FColor(150, 70, 190));
+		ShowToast(T);
+	}
+	LastCorruptionToast = Step;
+	if (S->IsUnlit() && HintsEnabled() && !WasSeen(TEXT("dark")) && Hints.Num() == 0)
+	{
+		ShowHint(TEXT("dark"), TEXT("LightToggle"), LOCTEXT("HintDark", "Unlit: dark-hunters smell you from twice as far. Light a torch or lantern."));
 	}
 }
 

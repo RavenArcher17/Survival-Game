@@ -23,6 +23,7 @@
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRSurvival.h"
 #include "WRWorldDressing.h"
 #include "WRTuning.h"
 #include "WRUIFlow.h"
@@ -291,6 +292,7 @@ public:
 		[
 			SNew(SOverlay)
 			+ SOverlay::Slot()[WRFx::MakeHudOverlay(PC)]   // damage numbers, hit marker, parry flash (under the panels)
+			+ SOverlay::Slot()[SleepCover()]               // asleep: the view dims, a bar fills (WRSurvival)
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[LevelPlate()]
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 104.f * U)[RaidTracker()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 18.f * U)[CompassAndBoss()]
@@ -759,7 +761,7 @@ private:
 				if (Def->Kind == TEXT("chest")) return TEXT("Open");
 				if (Def->Kind == TEXT("totem")) return TEXT("Land claim");
 				if (Def->Kind == TEXT("crop")) return Piece->bPlanted ? TEXT("Growing") : TEXT("Plant");
-				if (Def->Kind == TEXT("bed")) return TEXT("Set respawn");
+				if (Def->Kind == TEXT("bed")) return TEXT("Sleep · set respawn");
 				return TEXT("Use");
 			}
 		}
@@ -957,8 +959,199 @@ private:
 					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Chill", "Chill"), WRUI::Frost, TEXT("frost_essence"), [A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetChill() / FMath::Max(1.f, X->GetMaxChill()) : 0.f; },
 						[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("frost")); })]
 				]
+				+ SVerticalBox::Slot().AutoHeight()[Conditions()]
 			]
 		];
+	}
+
+	// ---------------------------------------------------------------- survival (WRSurvival): rested, weather, dark, corruption
+	const UWRSurvivalComponent* Surv() const
+	{
+		const AWRPlayerState* P = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+		return P ? P->GetSurvival() : nullptr;
+	}
+
+	static FString Clock(float Seconds)
+	{
+		const int32 S = FMath::Max(0, FMath::CeilToInt(Seconds));
+		return S >= 60 ? FString::Printf(TEXT("%d min"), FMath::CeilToInt(S / 60.f)) : FString::Printf(TEXT("%d s"), S);
+	}
+
+	/** One condition under the gauges: a tinted glyph, a line, and a muted second line. */
+	TSharedRef<SWidget> Condition(TFunction<bool()> Show, TFunction<FName()> Glyph, TFunction<FLinearColor()> Tint, TFunction<FText()> Line, TFunction<FText()> Sub)
+	{
+		return SNew(SBox).Padding(FMargin(0.f, 6.f * U, 0.f, 0.f)).Visibility_Lambda([Show]() { return Show() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(26.f * U).HeightOverride(26.f * U)
+				[
+					SNew(SImage).Image_Lambda([Glyph]() { return WRUI::Image(FName(*(TEXT("Glyphs/") + Glyph().ToString()))); })
+					.ColorAndOpacity_Lambda([Tint]() { return FSlateColor(Tint()); })
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(9.f * U, 0.f, 0.f, 0.f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda(MoveTemp(Line)), WRUI::Body(13, 800), TAttribute<FSlateColor>::CreateLambda([Tint]() { return FSlateColor(FMath::Lerp(WRUI::Ink, Tint(), 0.35f)); }))]
+				+ SVerticalBox::Slot().AutoHeight()[SNew(STextBlock).Font(WRUI::Body(11, 500)).ColorAndOpacity(WRUI::Ink3).AutoWrapText(true).Text_Lambda(MoveTemp(Sub))]
+			]
+		];
+	}
+
+	/** The weather of the biome you're in, when one is coming or on (and its row). */
+	const FWRWeatherNow* WeatherHere(const FWRWeatherKind*& OutKind) const
+	{
+		OutKind = nullptr;
+		const APawn* P = PC.IsValid() ? PC->GetPawn() : nullptr;
+		if (!P) return nullptr;
+		const FName Biome = WRBiome::At(P, P->GetActorLocation());
+		const FWRWeatherNow* W = UWRWeatherSubsystem::For(P, Biome);
+		const float Now = UWRWeatherSubsystem::Now(P);
+		if (!W || W->Kind.IsNone() || Now >= W->EndAt || Now < W->WarnAt) return nullptr;
+		OutKind = FWRWeatherDefs::Get().Kind(Biome, W->Kind);
+		return W;
+	}
+
+	TSharedRef<SWidget> Conditions()
+	{
+		const FLinearColor RestTint(FColor(196, 176, 255)), DarkTint(FColor(150, 150, 170)), CorruptTint(FColor(150, 70, 190));
+		return SNew(SVerticalBox).Visibility_Lambda([this]() { return Survivor() ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
+			// Rested, or the comfort of the bed you're standing by (survival-crafting 2.2); it pulses in its last minute.
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				Condition([this]() { const UWRSurvivalComponent* S = Surv(); return S && (S->IsRested() || S->GetComfortHere() >= 0); },
+					[]() { return FName(TEXT("rested")); },
+					[this, RestTint]()
+					{
+						const UWRSurvivalComponent* S = Surv();
+						if (!S || !S->IsRested()) return WRUI::Alpha(RestTint, 0.45f);
+						return S->RestedSecondsLeft() > 60.f ? RestTint : WRUI::Alpha(RestTint, 0.55f + 0.45f * float(FMath::Abs(FMath::Sin(FPlatformTime::Seconds() * 3.0))));
+					},
+					[this]()
+					{
+						const UWRSurvivalComponent* S = Surv();
+						if (S && S->IsRested()) return FText::FromString(FString::Printf(TEXT("Rested · %s"), *Clock(S->RestedSecondsLeft())));
+						return FText::FromString(FString::Printf(TEXT("Comfort %d"), S ? FMath::Max(0, S->GetComfortHere()) : 0));
+					},
+					[this]()
+					{
+						const UWRSurvivalComponent* S = Surv();
+						const int32 C = S ? FMath::Max(0, S->GetComfortHere()) : 0;
+						if (S && S->IsRested())
+						{
+							return FText::FromString(S->GetComfortHere() >= 0 ? FString::Printf(TEXT("Stamina +20%%, slower hunger and thirst, skills learn faster · comfort %d here"), C)
+								: FString(TEXT("Stamina +20%, slower hunger and thirst, skills learn faster")));
+						}
+						return FText::FromString(FString::Printf(TEXT("Sleep in your bed (%s) for %d min of Rested"), *WRInput::ActionKey(TEXT("Interact")).ToString(),
+							FMath::RoundToInt(WRTune(TEXT("rested.bedMinutes"), 20.f) + C * WRTune(TEXT("rested.perComfort"), 1.f))));
+					})
+			]
+			// The weather where you are: coming (with the count), or on, and whether you're beating it.
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				Condition([this]() { const FWRWeatherKind* K = nullptr; return WeatherHere(K) && K; },
+					[this]() { const FWRWeatherKind* K = nullptr; WeatherHere(K); return K && !K->Glyph.IsNone() ? K->Glyph : FName(TEXT("weather_storm")); },
+					[this]()
+					{
+						const UWRSurvivalComponent* S = Surv();
+						return S && (S->IsWeatherCountered() || S->IsSheltered()) ? WRUI::Good : WRUI::Warn;
+					},
+					[this]()
+					{
+						const FWRWeatherKind* K = nullptr;
+						const FWRWeatherNow* W = WeatherHere(K);
+						if (!W || !K) return FText::GetEmpty();
+						const float Now = UWRWeatherSubsystem::Now(PC.Get());
+						return FText::FromString(W->IsComing(Now) ? FString::Printf(TEXT("%s coming · %s"), *K->Name, *Clock(W->StartAt - Now))
+							: FString::Printf(TEXT("%s · %s"), *K->Name, *Clock(W->EndAt - Now)));
+					},
+					[this]()
+					{
+						const FWRWeatherKind* K = nullptr;
+						WeatherHere(K);
+						const UWRSurvivalComponent* S = Surv();
+						if (!K || !S) return FText::GetEmpty();
+						if (S->IsSheltered()) return LOCTEXT("Sheltered", "Sheltered: it can't reach you here");
+						if (S->IsWeatherCountered()) return LOCTEXT("Countered", "Your gear holds it off");
+						return FText::FromString(K->Does);
+					})
+			]
+			// Unlit: dark-hunters smell you from twice as far.
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				Condition([this]() { const UWRSurvivalComponent* S = Surv(); return S && S->IsUnlit(); },
+					[]() { return FName(TEXT("dark")); },
+					[DarkTint]() { return DarkTint; },
+					[]() { return LOCTEXT("Unlit", "Unlit"); },
+					[]()
+					{
+						// A pad has no light button: the torch or lantern is lit from the belt.
+						const FString Key = WRInput::ActionKey(TEXT("LightToggle")).ToString();
+						return FText::FromString(Key.IsEmpty() ? FString(TEXT("Dark-hunters smell you from twice as far · light a torch or lantern from your belt"))
+							: FString::Printf(TEXT("Dark-hunters smell you from twice as far · %s: torch or lantern"), *Key));
+					})
+			]
+			// Corruption (never "Void": that's the Void path's own resource).
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				Condition([this]() { const UWRSurvivalComponent* S = Surv(); return S && S->GetCorruption() >= 0.5f; },
+					[]() { return FName(TEXT("corruption")); },
+					[CorruptTint]() { return CorruptTint; },
+					[this]() { const UWRSurvivalComponent* S = Surv(); return FText::FromString(FString::Printf(TEXT("Corruption %d"), S ? FMath::RoundToInt(S->GetCorruption()) : 0)); },
+					[this]()
+					{
+						const UWRSurvivalComponent* S = Surv();
+						if (!S) return FText::GetEmpty();
+						if (S->MatchesCorruption()) return FText::FromString(FString::Printf(TEXT("Your path feeds on it: path damage +%.0f%%"), (S->PathDamageMult() - 1.f) * 100.f));
+						static const TCHAR* Steps[] = { TEXT("A fire or the Hearth stops it; sleep halves it"), TEXT("Healing -10%"), TEXT("Healing -10%, stamina regen -15%, the dark finds you"),
+							TEXT("Healing -10%, stamina regen -15%, max stamina -20"), TEXT("Marked: everything here hunts you, path power fills slower") };
+						return FText::FromString(Steps[FMath::Clamp(S->CorruptionStep(), 0, 4)]);
+					})
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(35.f * U, 3.f * U, 0.f, 0.f)
+			[
+				SNew(SBox).Visibility_Lambda([this]() { const UWRSurvivalComponent* S = Surv(); return S && S->GetCorruption() >= 0.5f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				[
+					SNew(SWRBar).Height(5.f * U).Color(CorruptTint).Fraction_Lambda([this]() { const UWRSurvivalComponent* S = Surv(); return S ? S->GetCorruption() / 100.f : 0.f; })
+				]
+			];
+	}
+
+	/** Asleep: the view dims to rest.dimTo over rest.dimSeconds; the bar fills; any move gets you up. */
+	TSharedRef<SWidget> SleepCover()
+	{
+		return SNew(SOverlay).Visibility_Lambda([this]() { const UWRSurvivalComponent* S = Surv(); return S && S->IsSleeping() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			+ SOverlay::Slot()
+			[
+				SNew(SImage).Image(WRUI::White()).ColorAndOpacity_Lambda([this]()
+				{
+					const UWRSurvivalComponent* S = Surv();
+					const float Since = S ? UWRWeatherSubsystem::Now(PC.Get()) - S->GetSleepStartedAt() : 0.f;
+					const float Dim = FMath::Clamp(Since / FMath::Max(0.1f, WRTune(TEXT("rest.dimSeconds"), 2.f)), 0.f, 1.f) * (1.f - WRTune(TEXT("rest.dimTo"), 0.3f));
+					return FSlateColor(FLinearColor(0.f, 0.f, 0.01f, Dim));
+				})
+			]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 120.f * U, 0.f, 0.f)
+			[
+				SNew(SBox).WidthOverride(320.f * U)
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[WRUI::Text(LOCTEXT("Sleeping", "Sleeping"), WRUI::Title(20), WRUI::Ink)]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U)
+					[
+						SNew(SWRBar).Height(8.f * U).Color(FLinearColor(FColor(196, 176, 255))).Fraction_Lambda([this]()
+						{
+							const UWRSurvivalComponent* S = Surv();
+							if (!S) return 0.f;
+							const float Now = UWRWeatherSubsystem::Now(PC.Get());
+							return FMath::Clamp((Now - S->GetSleepStartedAt()) / FMath::Max(0.1f, S->GetSleepEndsAt() - S->GetSleepStartedAt()), 0.f, 1.f);
+						})
+					]
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[WRUI::Text(LOCTEXT("SleepMove", "Move to get up (no rest)"), WRUI::Body(12, 500), WRUI::Ink3)]
+				]
+			];
 	}
 
 	// ---------------------------------------------------------------- bottom centre: hotbar

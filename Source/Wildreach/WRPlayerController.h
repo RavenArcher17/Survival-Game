@@ -126,6 +126,7 @@ public:
 	/** Every tame of yours within 30 m takes the order (follow, stay, aggressive, passive). */
 	UFUNCTION(Exec) void WRTameAll(FName Order);
 	void WhistlePressed();
+	void LightTogglePressed();
 	void WhistleReleased();
 	UFUNCTION(Exec) void WRDismount();
 	UFUNCTION(Exec) void WRTorpor(float Amount);

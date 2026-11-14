@@ -26,6 +26,10 @@ struct FWRPieceDef
 	FString Mesh;
 	float MeshYaw = 0.f;
 	FVector MeshFit = FVector::ZeroVector;
+	/** Comfort (survival-crafting 2.2): the group it counts in (seat, table, bed, floor, wall, fire, light, trophy...)
+	 *  and how much; only the best piece of each group near a bed counts. */
+	FName ComfortGroup;
+	int32 Comfort = 0;
 
 	/** Structure pieces snap to the grid and need support; everything else places freely. */
 	bool Snaps() const { return Kind == TEXT("structure") || Kind == TEXT("door"); }

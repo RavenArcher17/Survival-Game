@@ -1,5 +1,6 @@
 #include "WRGameMode.h"
 #include "WRBeds.h"
+#include "WRSurvival.h"
 #include "WRGameState.h"
 #include "Wildreach.h"
 #include "WRCharacter.h"
@@ -435,6 +436,7 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	Root->SetObjectField(TEXT("paths"), PS->GetPaths()->ToJson());
 	Root->SetObjectField(TEXT("inventory"), PS->GetInventory()->ToJson());
 	Root->SetObjectField(TEXT("lifeSkills"), PS->GetLifeSkills()->ToJson());
+	Root->SetObjectField(TEXT("survival"), PS->GetSurvival()->ToJson());
 	if (const TSharedPtr<FJsonObject> Bed = WRBeds::SaveDefault(PS))
 	{
 		Root->SetObjectField(TEXT("bed"), Bed);
@@ -472,6 +474,12 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	{
 		UE_LOG(LogWildreach, Error, TEXT("LOAD %s: save file is corrupt, starting fresh"), *PS->GetPlayerName());
 		return;
+	}
+	// Survival first: whether the saved light was lit decides how the inventory's Light slot comes back.
+	const TSharedPtr<FJsonObject>* Survival = nullptr;
+	if (Root->TryGetObjectField(TEXT("survival"), Survival))
+	{
+		PS->GetSurvival()->FromJson(*Survival);
 	}
 	const TSharedPtr<FJsonObject>* Inventory = nullptr;
 	if (Root->TryGetObjectField(TEXT("inventory"), Inventory))

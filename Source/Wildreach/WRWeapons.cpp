@@ -1,4 +1,5 @@
 #include "WRWeapons.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
@@ -277,7 +278,9 @@ bool FWRWeapons::IsTwoHanding(const AWRCharacterBase* Character)
 
 bool FWRWeapons::HasShield(const AWRCharacterBase* Character) const
 {
-	return Character && Character->GetPlayerState() && !CarriedId.IsNone() && Offhands.Contains(CarriedId) && !IsTwoHanding(Character);
+	// A lit torch takes the shield's hand (WRSurvival).
+	return Character && Character->GetPlayerState() && !CarriedId.IsNone() && Offhands.Contains(CarriedId) && !IsTwoHanding(Character)
+		&& !UWRSurvivalComponent::HoldsTorch(Character);
 }
 
 FWRGuard FWRWeapons::GuardFor(const AWRCharacterBase* Character) const

@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRSurvival.h"
 #include "WRWeapons.h"
 #include "WRSound.h"
 #include "Wildreach.h"
@@ -147,7 +148,9 @@ void AWRCharacter::UpdateWeaponLook()
 	WeaponMesh->SetVisibility(!bRanged && !bTool && !MeleeItem.IsNone());
 	UpdateToolLook(bTool);
 	// The shield comes off the arm when two-handing (or with a great weapon: combat.md 2.4.0).
-	ShieldMesh->SetVisibility(!bRanged && bShieldShown && !FWRWeapons::IsTwoHanding(this));
+	// ...and while a torch is lit in that hand (WRSurvival); the torch or lantern itself (WRHeldLight.cpp).
+	ShieldMesh->SetVisibility(!bRanged && bShieldShown && !FWRWeapons::IsTwoHanding(this) && !UWRSurvivalComponent::HoldsTorch(this));
+	UpdateHeldLightLook();
 	RangedMesh->SetVisibility(Model != nullptr && Body->IsVisible());
 	if (Model && Body->IsVisible())
 	{

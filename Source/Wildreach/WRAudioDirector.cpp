@@ -1,4 +1,5 @@
 #include "WRAudio.h"
+#include "WRSurvival.h"
 #include "WRSound.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
@@ -244,6 +245,18 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 	if (Layer == HighL) return Out * High;
 	if (Layer == Wind) return Out * FMath::Max(Tundra, High);
 	if (Layer == Always) return 1.f;
+	// Weather beds ("weather.<kind>", WRSurvival): rising over the 60 s warning, full while it blows, muffled in a cave.
+	// Music is never touched by weather (it keeps playing; survival-crafting 2.4).
+	const FString L = Layer.ToString();
+	if (L.StartsWith(TEXT("weather.")))
+	{
+		const FName Kind(*L.RightChop(8));
+		const FName Here = WRBiome::At(GetWorld(), Listener);
+		const FWRWeatherNow* W = UWRWeatherSubsystem::For(GetWorld(), Here);
+		if (!W || W->Kind != Kind) return 0.f;
+		const float Now = UWRWeatherSubsystem::Now(GetWorld());
+		return FMath::Max(W->Strength(Now), W->Approach(Now) * 0.6f) * FMath::Lerp(1.f, Tune(TEXT("ambient.weatherInCave"), 0.15f), Cave);
+	}
 	return 0.f;
 }
 

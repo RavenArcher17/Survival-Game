@@ -1,5 +1,6 @@
 #include "WRBuilding.h"
 #include "WRBeds.h"
+#include "WRSurvival.h"
 #include "WRSound.h"
 #include "WRBuildLook.h"
 #include "WRLifeSkills.h"
@@ -99,6 +100,15 @@ FWRBuildRegistry::FWRBuildRegistry()
 			if (O->TryGetArrayField(TEXT("meshFit"), Fit) && Fit->Num() == 3)
 			{
 				D.MeshFit = FVector((*Fit)[0]->AsNumber(), (*Fit)[1]->AsNumber(), (*Fit)[2]->AsNumber());
+			}
+			const TSharedPtr<FJsonObject>* Comfort = nullptr;
+			if (O->TryGetObjectField(TEXT("comfort"), Comfort))
+			{
+				FString Group;
+				if ((*Comfort)->TryGetStringField(TEXT("group"), Group)) D.ComfortGroup = FName(*Group);
+				double Value = 0.0;
+				(*Comfort)->TryGetNumberField(TEXT("value"), Value);
+				D.Comfort = FMath::RoundToInt(Value);
 			}
 			Pieces.Add(D);
 		}
@@ -905,7 +915,10 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 			return TEXT("In combat: not now");
 		}
 		WRBeds::Set(PS, this);
-		return TEXT("Respawn point set");
+		// And lie down: a finished sleep is a Rest and starts Rested (WRSurvival). Why not, when you can't.
+		UWRSurvivalComponent* Survival = PS->GetSurvival();
+		const FString Refused = Survival ? Survival->TryStartSleep(this) : FString(TEXT("Respawn point set"));
+		return Refused.IsEmpty() ? FString(TEXT("Respawn point set. Sleeping...")) : FString::Printf(TEXT("Respawn point set. %s"), *Refused);
 	}
 	if (K == TEXT("crop"))
 	{

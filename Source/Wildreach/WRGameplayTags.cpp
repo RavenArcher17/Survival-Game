@@ -66,6 +66,7 @@ namespace WRTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Resist_Lava, "Resist.Lava");
 	UE_DEFINE_GAMEPLAY_TAG(Resist_Ice, "Resist.Ice");
+	UE_DEFINE_GAMEPLAY_TAG(Weather_DeepSnow, "Weather.DeepSnow");
 
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Light, "Ability.Light");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Heavy, "Ability.Heavy");

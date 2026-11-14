@@ -30,6 +30,7 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Wheel2"), TEXT("Ability wheel 2"), Combat, EKeys::Z);
 	Add(TEXT("Interact"), TEXT("Interact (hold on your tame: orders)"), Items, EKeys::E);
 	Add(TEXT("Whistle"), TEXT("Whistle to your tames (hold: orders for all)"), Items, EKeys::H);
+	Add(TEXT("LightToggle"), TEXT("Light or put out your torch / lantern"), Items, EKeys::L);
 	const FKey Numbers[] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight };
 	for (int32 i = 0; i < 8; ++i)
 	{

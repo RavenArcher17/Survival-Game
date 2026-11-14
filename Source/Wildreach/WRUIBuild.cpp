@@ -18,6 +18,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRSocial.h"
+#include "WRTuning.h"
 #include "Algo/StableSort.h"
 #include "EngineUtils.h"
 #include "Framework/Application/SlateApplication.h"
@@ -123,7 +124,21 @@ namespace WRBuildUI
 	}
 
 	/** What a piece is for, true to the building rules (one or two short sentences). */
+	FString DescribeBase(const FWRPieceDef& D);
+
+	/** What the piece is, and what it adds to the comfort of a bed near it (survival-crafting 2.2). */
 	FString Describe(const FWRPieceDef& D)
+	{
+		FString Out = DescribeBase(D);
+		if (D.Comfort > 0)
+		{
+			Out += FString::Printf(TEXT(" Comfort +%d (%s) under a roof within %.0f m of a bed: longer Rested."), D.Comfort, *D.ComfortGroup.ToString(),
+				FWRTuning::Get().Num(TEXT("comfort.radius"), 1200.f) / 100.f);
+		}
+		return Out;
+	}
+
+	FString DescribeBase(const FWRPieceDef& D)
 	{
 		const FName S = D.Shape, K = D.Kind;
 		const FString Span = FString::Printf(TEXT(" Needs support: %s spans %d pieces from the ground."), *D.Material.ToString(), FWRBuildRules::SpanFor(D.Material));
@@ -147,8 +162,10 @@ namespace WRBuildUI
 		if (K == TEXT("hearth")) return TEXT("Goes inside your own land claim, one per claim. E on it: feed it major bosses' cores to raise every station's tier.");
 		if (K == TEXT("totem")) return TEXT("Claims the land around it: only you and your clan build there. Stock it with wood and stone for upkeep.");
 		if (K == TEXT("chest")) return TEXT("Stores what doesn't fit in your bag. Only you and your clan can open it.");
-		if (K == TEXT("bed")) return TEXT("Where you wake up after you die.");
-		if (K == TEXT("light")) return TEXT("Light for the night.");
+		if (K == TEXT("bed") && D.Id == TEXT("bedroll")) return TEXT("Where you wake up after you die (used up when you do). E: sleep 10 s for 10 min of Rested.");
+		if (K == TEXT("bed")) return TEXT("Where you wake up after you die. E: sleep 10 s for Rested, longer in a furnished room under a roof.");
+		if (K == TEXT("light")) return FString::Printf(TEXT("Lights %.0f m around it at night and in caves (the dark-hunters lose their edge), and keeps corruption from building there."),
+			FWRTuning::Get().Num(FString::Printf(TEXT("lights.%s.radius"), *D.Id.ToString()), 600.f) / 100.f);
 		if (K == TEXT("crop")) return TEXT("Plant seeds in it (E) and harvest food when it has grown.");
 		if (K == TEXT("pen")) return TEXT("Keep a tamed Pumicehog or Snowpuff inside and it produces over time.");
 		return TEXT("Decoration. Places freely, no grid.");

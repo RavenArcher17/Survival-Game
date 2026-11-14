@@ -3,6 +3,7 @@
 #include "WRAttributeSet.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
+#include "WRSurvival.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -18,6 +19,7 @@ AWRPlayerState::AWRPlayerState()
 	Attributes = CreateDefaultSubobject<UWRAttributeSet>(TEXT("Attributes"));
 	Paths = CreateDefaultSubobject<UWRPathComponent>(TEXT("Paths"));
 	Inventory = CreateDefaultSubobject<UWRInventoryComponent>(TEXT("Inventory"));
+	Survival = CreateDefaultSubobject<UWRSurvivalComponent>(TEXT("Survival"));
 	LifeSkills = CreateDefaultSubobject<UWRLifeSkillsComponent>(TEXT("LifeSkills"));
 }
 

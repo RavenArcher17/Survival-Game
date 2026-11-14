@@ -128,6 +128,8 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	float Slow = HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) * FMath::Max(0.2f, 1.f - SlowExtraPct * 0.01f) : 1.f;
 	if (HasTag(WRTags::Status_Soak)) Slow = FMath::Min(Slow, WRTune(TEXT("status.defs.soak.slow"), 0.8f));
 	if (HasTag(WRTags::State_Drinking)) Slow *= WRTune(TEXT("potions.walkMultiplier"), 0.4f);
+	// A blizzard's deep snow in the open (WRSurvival sets the tag; both machines read it).
+	if (HasTag(WRTags::Weather_DeepSnow)) Slow *= WRTune(TEXT("weather.deepSnowRun"), 0.85f);
 	return Slow * SpeedBoost * Load;
 }
 

@@ -50,6 +50,8 @@ struct FWRCreatureDef
 	TArray<TPair<FName, int32>> Products;
 	bool bNest = false;
 	bool bHearing = false;
+	/** Hunts in the dark (FULL-GAME 6.1): notices an unlit player from darkness.darkHunterAggroMult x as far. */
+	bool bDarkHunter = false;
 	// Wild life
 	TArray<FName> Attacks;        // besides the bite: lunge, charge, spit, stomp (numbers in tuning.json creatureAI.<attack>)
 	FName Diet;                   // carnivore (hunts), herbivore, lithovore; from its food when not given

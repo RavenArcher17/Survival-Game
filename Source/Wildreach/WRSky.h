@@ -88,6 +88,12 @@ private:
 	float LastLoggedHour = -1.f;
 	/** Smoothed biome blend at the camera (0 volcanic .. 1 tundra). */
 	float Biome = -1.f;
+	/** The weather at the camera (WRSurvival): how far in it is (eased; the 60 s approach brings the far fog in first)
+	 *  and its look (weather.json look: fog density and colour, how much it dims the sun). */
+	float WeatherAmount = 0.f;
+	float WeatherFogDensity = 0.f;
+	FLinearColor WeatherFogColor = FLinearColor::Gray;
+	float WeatherSkyDim = 0.f;
 	/** The valley mist (BuildMist): one local fog volume per hollow, all at the same density. */
 	UPROPERTY(Transient) TArray<TObjectPtr<class ULocalFogVolumeComponent>> Mist;
 	float MistDensity = -1.f;

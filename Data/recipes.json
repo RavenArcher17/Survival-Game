@@ -5,6 +5,7 @@
     { "id": "crude_pick", "station": "hand", "level": 1, "inputs": { "wood": 3, "stone": 3 }, "output": "crude_pick", "count": 1, "seconds": 2 },
     { "id": "throwing_spear", "station": "hand", "level": 1, "inputs": { "wood": 4, "stone": 2, "fiber": 2 }, "output": "throwing_spear", "count": 1, "seconds": 2 },
     { "id": "bola", "station": "hand", "level": 1, "inputs": { "fiber": 6, "stone": 3 }, "output": "bola", "count": 1, "seconds": 2 },
+    { "id": "hand_torch", "station": "hand", "level": 1, "inputs": { "wood": 1, "fiber": 2 }, "output": "hand_torch", "count": 1, "seconds": 2 },
     { "id": "stone_arrow", "station": "hand", "level": 1, "inputs": { "wood": 1, "stone": 1, "fiber": 1 }, "output": "stone_arrow", "count": 3, "seconds": 1 },
     { "id": "tranq_arrow", "station": "hand", "level": 1, "inputs": { "stone_arrow": 1, "narcotic": 1 }, "output": "tranq_arrow", "count": 1, "seconds": 1 },
     { "id": "tranq_bolt", "station": "hand", "level": 1, "inputs": { "crossbow_bolt": 1, "narcotic": 1 }, "output": "tranq_bolt", "count": 1, "seconds": 1 },
@@ -49,6 +50,8 @@
     { "id": "narcotic", "station": "alchemy_table", "level": 1, "inputs": { "berries": 3, "raw_meat": 1 }, "output": "narcotic", "count": 2, "seconds": 2 },
     { "id": "torpor_dart", "station": "alchemy_table", "level": 1, "inputs": { "narcotic": 1, "fiber": 1 }, "output": "torpor_dart", "count": 3, "seconds": 2 },
 
+    { "id": "tallow", "station": "workbench", "level": 1, "inputs": { "raw_meat": 2 }, "output": "tallow", "count": 1, "seconds": 3 },
+    { "id": "horn_lantern", "station": "workbench", "level": 2, "inputs": { "bronze_ingot": 2, "hide": 1, "tallow": 1 }, "output": "horn_lantern", "count": 1, "seconds": 5 },
     { "id": "stone_hatchet", "station": "workbench", "level": 1, "inputs": { "wood": 6, "stone": 6, "fiber": 4 }, "output": "stone_hatchet", "count": 1, "seconds": 3 },
     { "id": "stone_pick", "station": "workbench", "level": 1, "inputs": { "wood": 6, "stone": 8, "fiber": 4 }, "output": "stone_pick", "count": 1, "seconds": 3 },
     { "id": "hunting_bow", "station": "workbench", "level": 1, "inputs": { "wood": 10, "fiber": 12, "hide": 2 }, "output": "hunting_bow", "count": 1, "seconds": 4, "quality": true },

@@ -500,6 +500,83 @@ FWRToolMesh FWRToolMesh::Float()
 	return M;
 }
 
+FWRToolMesh FWRToolMesh::Torch()
+{
+	// A real hand torch: a split-ash stave, the top wrapped in rag soaked in pine pitch and bound with twisted cord, the
+	// wrap's crown charred where it burns. The fist holds it a hand's width above the butt.
+	FWRToolMesh M;
+	const FLinearColor Ash(0.32f, 0.22f, 0.12f), Pitch(0.045f, 0.032f, 0.022f), Cord(0.36f, 0.28f, 0.15f), Char(0.02f, 0.018f, 0.016f);
+	// Haft: a knob at the butt, tapering a little toward the head.
+	M.Lathe(FVector(-14.f, 0.f, 0.f), FVector::XAxisVector, 54.f,
+		{ FVector(0.f, 0.9f, 0.9f), FVector(0.03f, 1.95f, 1.95f), FVector(0.08f, 1.75f, 1.75f), FVector(0.5f, 1.65f, 1.65f), FVector(1.f, 1.5f, 1.5f) }, 9, Ash, 0.75f, 0.35f, 3.f);
+	// The rag head: lumpy layers wound round the top of the stave.
+	M.Lathe(FVector(36.f, 0.f, 0.f), FVector::XAxisVector, 22.f,
+		{ FVector(0.f, 1.6f, 1.6f), FVector(0.08f, 3.3f, 3.1f), FVector(0.3f, 3.9f, 3.7f), FVector(0.55f, 4.2f, 4.0f), FVector(0.8f, 3.9f, 3.8f), FVector(0.95f, 3.1f, 3.0f), FVector(1.f, 2.4f, 2.3f) }, 12, Pitch, 0.92f, 0.f, 11.f);
+	// The charred crown it burns from.
+	M.Lathe(FVector(57.5f, 0.f, 0.f), FVector::XAxisVector, 3.5f, { FVector(0.f, 2.6f, 2.5f), FVector(0.6f, 1.9f, 1.8f), FVector(1.f, 0.6f, 0.6f) }, 10, Char, 1.f, 0.f, 17.f);
+	// Twisted cord binding the wrap's foot (a tight helix) and a band near its top.
+	for (const TPair<float, float>& Band : { TPair<float, float>(37.f, 5.f), TPair<float, float>(49.f, 2.5f) })
+	{
+		TArray<FVector> Helix;
+		const float R = Band.Key < 40.f ? 3.45f : 4.15f;
+		const int32 Steps = 64;
+		for (int32 i = 0; i <= Steps; ++i)
+		{
+			const float T = float(i) / Steps;
+			const float A = T * 2.f * PI * (Band.Value / 1.1f);
+			Helix.Add(FVector(Band.Key + T * Band.Value, FMath::Cos(A) * R, FMath::Sin(A) * R));
+		}
+		M.Tube(Helix, 0.42f, 5, Cord, 0.85f);
+	}
+	return M;
+}
+
+FWRToolMesh FWRToolMesh::Lantern()
+{
+	// A lanthorn: horn scraped thin enough to glow, in a cast bronze frame, carried by a ring bail. Z up, the bail's top
+	// at the origin (where it hangs from the belt), 22 cm to the base.
+	FWRToolMesh M;
+	const FLinearColor Bronze(0.42f, 0.27f, 0.1f), Horn(0.62f, 0.4f, 0.16f), Tallow(0.86f, 0.8f, 0.64f), Wick(0.03f, 0.02f, 0.015f);
+	// The bail: a half ring over the cap.
+	{
+		TArray<FVector> Arc;
+		for (int32 i = 0; i <= 20; ++i)
+		{
+			const float A = PI * i / 20.f;
+			Arc.Add(FVector(FMath::Cos(A) * 4.2f, 0.f, -4.2f + FMath::Sin(A) * 4.2f));
+		}
+		M.Tube(Arc, 0.35f, 6, Bronze, 0.35f);
+	}
+	// The cap: a vented cone with a finial ring the bail passes through.
+	M.Lathe(FVector(0.f, 0.f, -4.6f), -FVector::ZAxisVector, 4.f, { FVector(0.f, 1.2f, 1.2f), FVector(0.3f, 2.f, 2.f), FVector(0.85f, 5.6f, 5.6f), FVector(1.f, 5.9f, 5.9f) }, 8, Bronze, 0.35f);
+	// The base: a stepped octagonal plinth (the cap and base are eight-sided; the posts stand inside their rims).
+	M.Lathe(FVector(0.f, 0.f, -20.f), -FVector::ZAxisVector, 2.4f, { FVector(0.f, 5.9f, 5.9f), FVector(0.6f, 6.2f, 6.2f), FVector(1.f, 5.4f, 5.4f) }, 8, Bronze, 0.35f);
+	// Four corner posts between cap and base.
+	for (int32 c = 0; c < 4; ++c)
+	{
+		const float A = PI * 0.25f + c * PI * 0.5f;
+		const FVector At(FMath::Cos(A) * 4.9f, FMath::Sin(A) * 4.9f, -8.5f);
+		M.Lathe(At, -FVector::ZAxisVector, 11.6f, { FVector(0.f, 0.45f, 0.45f), FVector(1.f, 0.45f, 0.45f) }, 5, Bronze, 0.35f);
+	}
+	// Four horn panes, each a thin slab between two posts.
+	for (int32 p = 0; p < 4; ++p)
+	{
+		const float A0 = PI * 0.25f + p * PI * 0.5f, A1 = A0 + PI * 0.5f;
+		const FVector P0(FMath::Cos(A0) * 4.7f, FMath::Sin(A0) * 4.7f, 0.f), P1(FMath::Cos(A1) * 4.7f, FMath::Sin(A1) * 4.7f, 0.f);
+		const FVector In = -((P0 + P1) * 0.5f).GetSafeNormal() * 0.25f;
+		TArray<TArray<FVector>> Rings;
+		for (const float Z : { -8.6f, -20.f })
+		{
+			Rings.Add({ P0 + FVector(0.f, 0.f, Z), P1 + FVector(0.f, 0.f, Z), P1 + In + FVector(0.f, 0.f, Z), P0 + In + FVector(0.f, 0.f, Z) });
+		}
+		M.Loft(Rings, Horn, 0.4f, true);
+	}
+	// The tallow candle and its wick.
+	M.Lathe(FVector(0.f, 0.f, -20.f), FVector::ZAxisVector, 4.2f, { FVector(0.f, 1.1f, 1.1f), FVector(0.9f, 1.05f, 1.05f), FVector(1.f, 0.8f, 0.8f) }, 8, Tallow, 0.6f, 0.f, 5.f);
+	M.Lathe(FVector(0.f, 0.f, -15.8f), FVector::ZAxisVector, 0.9f, { FVector(0.f, 0.12f, 0.12f), FVector(1.f, 0.08f, 0.08f) }, 4, Wick, 0.9f);
+	return M;
+}
+
 UMaterialInterface* FWRToolMesh::Material()
 {
 	// Built by Tools/art/make_held_tool_material.py (engine content only). Rooted: tools and floats come and go.

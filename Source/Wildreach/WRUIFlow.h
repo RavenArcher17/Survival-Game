@@ -121,6 +121,7 @@ private:
 	void CheckTames(const FVector& At);
 	void CheckHearths(const FVector& At);
 	void CheckHints(const FVector& At);
+	void CheckSurvival();
 	void ShowBanner(const FBanner& Banner, bool bFirst = false);
 	void ShowToast(const FToast& Toast);
 	void ShowHint(FName Id, FName Action, const FText& Text);
@@ -175,6 +176,9 @@ private:
 	int32 LastLevel = -1;
 	int32 LastUnspent = -1;
 	int32 LastCastables = -1;
+	FString LastWeatherToast;
+	bool bWasRested = false;
+	int32 LastCorruptionToast = -1;
 	bool bWasNight = false;
 	TArray<FBanner> Banners;
 	TArray<FToast> Toasts;

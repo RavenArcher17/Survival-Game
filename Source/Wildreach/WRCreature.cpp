@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRSurvival.h"
 #include "WRAnimInstance.h"
 #include "WRBoss.h"
 #include "Camera/PlayerCameraManager.h"
@@ -167,6 +168,7 @@ void FWRCreatureRegistry::Reload()
 		O->TryGetBoolField(TEXT("mount"), D.bMount);
 		O->TryGetBoolField(TEXT("nest"), D.bNest);
 		O->TryGetBoolField(TEXT("hearing"), D.bHearing);
+		O->TryGetBoolField(TEXT("darkHunter"), D.bDarkHunter);
 
 		const TArray<TSharedPtr<FJsonValue>>* Color = nullptr;
 		if (O->TryGetArrayField(TEXT("color"), Color) && Color->Num() >= 3)
@@ -2111,6 +2113,9 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 		else if (Def->Activity == TEXT("nocturnal") && AWRGameState::IsNightIn(Self)) Aggro *= WRTune(TEXT("creatureAI.nightAggroMult"), 1.4f);
 		// Gloomhowls hunt by sound: sprinting survivors are heard from much further.
 		if (Def->bHearing && It->GetVelocity().Size2D() > 600.f) Aggro *= 1.6f;
+		// Darkness, corruption and fog (WRSurvival): dark-hunters smell the unlit, the Marked are seen by the whole
+		// biome, fog ambushers strike from further.
+		if (It->GetPlayerState()) Aggro *= UWRSurvivalComponent::AggroMultFor(*It, *Def, Def->Biome);
 		// Sneaking / Calm presence: you're noticed later.
 		Aggro *= FMath::Max(0.3f, 1.f + UWRLifeSkillsComponent::StatFor(*It, TEXT("aggroRadius")));
 		const float Dist = FVector::Dist(It->GetActorLocation(), Self->GetActorLocation());

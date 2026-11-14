@@ -1,4 +1,5 @@
 #include "WRLifeSkills.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRPlayerState.h"
 #include "WRTuning.h"
@@ -154,7 +155,9 @@ void UWRLifeSkillsComponent::AwardXP(FName Skill, float Amount)
 	}
 	// The server's XP multiplier applies to life skills too; fractions carry over.
 	float& Rest = Carry.FindOrAdd(Skill);
-	Rest += Amount * FMath::Clamp(WRTune(TEXT("server.xpMultiplier"), 1.f), 0.5f, 10.f);
+	// Rested: life skills learn faster (WRSurvival).
+	const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner());
+	Rest += Amount * FMath::Clamp(WRTune(TEXT("server.xpMultiplier"), 1.f), 0.5f, 10.f) * (Survival ? Survival->SkillXpMult() : 1.f);
 	const int32 Whole = FMath::FloorToInt(Rest);
 	Rest -= Whole;
 	if (Whole <= 0)

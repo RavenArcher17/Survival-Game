@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRPlayerController.h"
+#include "WRSurvival.h"
 #include "WRSound.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
@@ -633,7 +634,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	}
 	const FString& Cmd = Args[0];
 	const auto Arg = [&Args](int32 i) { return Args.IsValidIndex(i) ? Args[i] : FString(); };
-	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : S == TEXT("ranged") ? EWREquipSlot::Ranged : EWREquipSlot::Weapon; };
+	const auto SlotOf = [](const FString& S) { return S == TEXT("armor") ? EWREquipSlot::Armor : S == TEXT("ranged") ? EWREquipSlot::Ranged : S == TEXT("light") ? EWREquipSlot::Light : EWREquipSlot::Weapon; };
 
 	if (RunBuildCommand(Args, OutResult))
 	{
@@ -945,6 +946,12 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	else if (Cmd == TEXT("use"))
 	{
 		OutResult = PS->GetInventory()->UseCategory(FName(*Arg(1)));
+	}
+	else if (Cmd == TEXT("light"))
+	{
+		// The Light key / the belt's torch: light it or put it out (WRSurvival).
+		OutResult = PS->GetSurvival()->ToggleLight();
+		if (OutResult.IsEmpty()) return true;
 	}
 	else
 	{

@@ -80,6 +80,7 @@ namespace WRTags
 	// Resistances (hazard gear checks)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Resist_Lava);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Resist_Ice);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Weather_DeepSnow);  // a blizzard's deep snow on you: run speed x weather runMult (WRSurvival)
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Light);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Heavy);

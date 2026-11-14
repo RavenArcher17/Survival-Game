@@ -1,4 +1,5 @@
 #include "WRSky.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRGameState.h"
 #include "WRSea.h"
@@ -311,7 +312,7 @@ void AWRSky::Apply(bool bForce)
 	const float SunUp = FMath::SmoothStep(-4.f, 3.f, SunElevation);
 	if (UDirectionalLightComponent* S = Sun.Get())
 	{
-		S->SetIntensity(SunLux * SunUp);
+		S->SetIntensity(SunLux * SunUp * (1.f - WeatherSkyDim * WeatherAmount));
 		S->SetVisibility(SunUp > 0.f);
 	}
 	const float MoonLux = T.Num(TEXT("sky.moonLux"), 0.5f) * FMath::SmoothStep(-2.f, 10.f, MoonElevation) * (1.f - SunUp);
@@ -364,13 +365,38 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	const float B = Biome;
 	const float Low = FWRSkyRules::LowSun(SunElevation, T.Num(TEXT("sky.goldenHourBelow"), 18.f));
 
+	// Weather (WRSurvival, Data/weather.json): the biome's weather at the camera thickens and tints the haze. Over the
+	// 60 s warning the fog comes in from the far distance first (the storm wall on the horizon), then it closes to the
+	// weather's vision; it lifts over the last 30 s.
+	{
+		float WTarget = 0.f;
+		const FName WBiome = WRBiome::At(this, View);
+		if (const FWRWeatherNow* W = UWRWeatherSubsystem::For(this, WBiome))
+		{
+			const float Now = UWRWeatherSubsystem::Now(this);
+			if (const FWRWeatherKind* K = FWRWeatherDefs::Get().Kind(WBiome, W->Kind))
+			{
+				WTarget = W->IsComing(Now) ? W->Approach(Now) * 0.45f : W->Strength(Now);
+				if (WTarget > 0.f)
+				{
+					WeatherFogDensity = K->FogDensity;
+					WeatherFogColor = K->FogColor;
+					WeatherSkyDim = K->SkyDim;
+				}
+			}
+		}
+		WeatherAmount = FMath::FInterpTo(WeatherAmount, WTarget, DeltaSeconds, 0.6f);
+	}
 	if (UExponentialHeightFogComponent* F = Fog.Get())
 	{
 		// Haze: warm ash west, cold blue east, deep blue at night (readable, not black).
 		const FLinearColor DayFog = FMath::Lerp(SRGB(TEXT("sky.volcanicFogColor"), FColor(176, 146, 120)), SRGB(TEXT("sky.tundraFogColor"), FColor(160, 190, 228)), B);
 		const FVector Night = Vec(TEXT("sky.nightFogColor"), FVector(0.01f, 0.015f, 0.035f));
-		F->SetFogInscatteringColor(FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), DayFog * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight));
-		F->SetFogDensity(FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B));
+		const FLinearColor Haze = FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), DayFog * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
+		const FLinearColor Storm = WeatherFogColor * FMath::Lerp(T.Num(TEXT("sky.weatherNightFog"), 0.06f), T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
+		F->SetFogInscatteringColor(FMath::Lerp(Haze, Storm, WeatherAmount));
+		const float BaseDensity = FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B);
+		F->SetFogDensity(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount));
 		// Toward a low sun the haze glows warm: the dawn and dusk glare across a valley.
 		F->SetDirectionalInscatteringExponent(T.Num(TEXT("sky.sunGlowExponent"), 6.f));
 		F->SetDirectionalInscatteringColor(SRGB(TEXT("sky.sunGlowColor"), FColor(255, 150, 80)) * (Low * T.Num(TEXT("sky.sunGlow"), 0.6f)));

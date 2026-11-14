@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "WRSurvival.h"
 #include "WRGameState.generated.h"
 
 /**
@@ -40,6 +41,9 @@ public:
 	/** Server: restore a saved clock exactly (total hours since day 1, 00:00). */
 	void SetTotalHours(double Hours);
 	double GetTotalHours() const;
+
+	/** Each biome's weather (UWRWeatherSubsystem rolls it on the server; every machine draws and hears it). */
+	UPROPERTY(Replicated) TArray<FWRWeatherNow> Weather;
 
 	/** The world's game state, or null (e.g. before it exists). */
 	static const AWRGameState* Get(const UObject* WorldContext);

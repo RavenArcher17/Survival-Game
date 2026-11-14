@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRSurvival.h"
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRCreature.h"
@@ -73,7 +74,7 @@ FWRItemRegistry::FWRItemRegistry()
 			{
 				const FString Slot = (*Equip)->GetStringField(TEXT("slot"));
 				D.Slot = Slot == TEXT("weapon") ? EWREquipSlot::Weapon : Slot == TEXT("armor") ? EWREquipSlot::Armor
-					: Slot == TEXT("ranged") ? EWREquipSlot::Ranged : EWREquipSlot::None;
+					: Slot == TEXT("ranged") ? EWREquipSlot::Ranged : Slot == TEXT("light") ? EWREquipSlot::Light : EWREquipSlot::None;
 				FString Metal;
 				if ((*Equip)->TryGetStringField(TEXT("metal"), Metal)) D.Metal = FName(*Metal);
 				(*Equip)->TryGetNumberField(TEXT("armor"), D.Armor);
@@ -283,6 +284,7 @@ void UWRInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedWeapon, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedArmor, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedRanged, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRInventoryComponent, EquippedLight, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRInventoryComponent, PotionReadyAt, COND_OwnerOnly);
 }
 
@@ -344,7 +346,8 @@ float UWRInventoryComponent::GetPotionCooldownRemaining() const
 
 FWRItemStack* UWRInventoryComponent::GetEquippedMutable(EWREquipSlot Slot)
 {
-	return Slot == EWREquipSlot::Armor ? &EquippedArmor : Slot == EWREquipSlot::Weapon ? &EquippedWeapon : Slot == EWREquipSlot::Ranged ? &EquippedRanged : nullptr;
+	return Slot == EWREquipSlot::Armor ? &EquippedArmor : Slot == EWREquipSlot::Weapon ? &EquippedWeapon : Slot == EWREquipSlot::Ranged ? &EquippedRanged
+		: Slot == EWREquipSlot::Light ? &EquippedLight : nullptr;
 }
 
 float UWRInventoryComponent::GemStat(FName Stat) const
@@ -430,6 +433,11 @@ void UWRInventoryComponent::ApplyEquipment()
 	{
 		Survivor->SetRangedItem(EquippedRanged.IsEmpty() ? NAME_None : EquippedRanged.ItemId);
 		Survivor->SetMeleeItem(EquippedWeapon.IsEmpty() ? NAME_None : EquippedWeapon.ItemId);
+	}
+	// The Light slot: a torch or lantern put in it comes on (WRSurvival).
+	if (UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner()))
+	{
+		Survival->OnLightSlotChanged();
 	}
 }
 
@@ -550,6 +558,13 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		return TEXT("unknown item");
 	}
 
+	if (Def->Slot == EWREquipSlot::Light && EquippedLight.ItemId == Stack.ItemId && !EquippedLight.IsEmpty())
+	{
+		// The same light again from the bag or belt: light it or put it out rather than swapping one for the other.
+		UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner());
+		const FString Said = Survival ? Survival->ToggleLight() : FString();
+		return Said.IsEmpty() ? FString::Printf(TEXT("%s lit"), *Def->Name) : Said;
+	}
 	if (Def->IsEquipment())
 	{
 		// Swap with whatever is in that slot.
@@ -869,6 +884,7 @@ TSharedRef<FJsonObject> UWRInventoryComponent::ToJson() const
 	Root->SetObjectField(TEXT("weapon"), StackToJson(EquippedWeapon));
 	Root->SetObjectField(TEXT("armor"), StackToJson(EquippedArmor));
 	Root->SetObjectField(TEXT("ranged"), StackToJson(EquippedRanged));
+	Root->SetObjectField(TEXT("light"), StackToJson(EquippedLight));
 	Root->SetBoolField(TEXT("kitGiven"), bKitGiven);
 	return Root;
 }
@@ -892,6 +908,8 @@ void UWRInventoryComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	if (Json->TryGetObjectField(TEXT("armor"), Armor)) EquippedArmor = StackFromJson(*Armor);
 	const TSharedPtr<FJsonObject>* RangedJson = nullptr;
 	if (Json->TryGetObjectField(TEXT("ranged"), RangedJson)) EquippedRanged = StackFromJson(*RangedJson);
+	const TSharedPtr<FJsonObject>* LightJson = nullptr;
+	if (Json->TryGetObjectField(TEXT("light"), LightJson)) EquippedLight = StackFromJson(*LightJson);
 	Json->TryGetBoolField(TEXT("kitGiven"), bKitGiven);
 }
 

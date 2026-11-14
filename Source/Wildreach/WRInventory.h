@@ -13,6 +13,8 @@ enum class EWREquipSlot : uint8
 	Weapon,
 	Armor,
 	Ranged,
+	/** A torch (off hand) or lantern (hip) that lights you (WRSurvival). */
+	Light,
 };
 
 /** One item definition from Data/items.json. */
@@ -176,7 +178,7 @@ public:
 	/** Server: direct access (death penalty, loot bags). Call ApplyEquipment after changing equipped gear. */
 	TArray<FWRItemStack>& GetSlotsMutable() { return Slots; }
 	const TArray<FWRItemStack>& GetSlots() const { return Slots; }
-	const FWRItemStack& GetEquipped(EWREquipSlot Slot) const { return Slot == EWREquipSlot::Armor ? EquippedArmor : Slot == EWREquipSlot::Ranged ? EquippedRanged : EquippedWeapon; }
+	const FWRItemStack& GetEquipped(EWREquipSlot Slot) const { return Slot == EWREquipSlot::Armor ? EquippedArmor : Slot == EWREquipSlot::Ranged ? EquippedRanged : Slot == EWREquipSlot::Light ? EquippedLight : EquippedWeapon; }
 	/** Ammo of a kind to fire: Preferred if we still have it, else the first we carry. None if out. */
 	FName FindAmmo(FName Kind, FName Preferred) const;
 	/** The next (Dir +1) or previous (-1) ammo type of a kind we carry, after Current. */
@@ -215,6 +217,7 @@ private:
 	UPROPERTY(Replicated) FWRItemStack EquippedWeapon;
 	UPROPERTY(Replicated) FWRItemStack EquippedArmor;
 	UPROPERTY(Replicated) FWRItemStack EquippedRanged;
+	UPROPERTY(Replicated) FWRItemStack EquippedLight;
 	/** Server time the potion belt is ready again (replicated so the HUD can show it). */
 	UPROPERTY(Replicated) float PotionReadyAt = 0.f;
 };

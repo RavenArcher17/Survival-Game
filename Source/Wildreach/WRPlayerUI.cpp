@@ -1,4 +1,5 @@
 #include "WRPlayerUI.h"
+#include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRBuilding.h"
@@ -605,6 +606,7 @@ void FWRPlayerUI::UseHotbar(int32 Index)
 			// Already in hand: a ranged weapon comes out (or goes away); a melee weapon puts the ranged one away.
 			if (Survivor && Def->Slot == EWREquipSlot::Ranged) Survivor->SetRangedMode(!Survivor->IsRangedOut());
 			else if (Survivor && Def->Slot == EWREquipSlot::Weapon && Survivor->IsRangedOut()) Survivor->SetRangedMode(false);
+			else if (Def->Slot == EWREquipSlot::Light) P->SendCommand(TEXT("light"));   // the torch in hand: light it / put it out
 			return;
 		}
 	}
@@ -629,7 +631,7 @@ void FWRPlayerUI::CycleHotbar(int32 Dir)
 	{
 		const int32 i = ((HotbarSelected + Dir * Step) % 8 + 8) % 8;
 		const FWRItemDef* Def = Hotbar[i].IsNone() ? nullptr : FWRItemRegistry::Get().Find(Hotbar[i]);
-		if (Def && Def->IsEquipment() && Def->Slot != EWREquipSlot::Armor)
+		if (Def && Def->IsEquipment() && Def->Slot != EWREquipSlot::Armor && Def->Slot != EWREquipSlot::Light)
 		{
 			UseHotbar(i);
 			return;
@@ -658,7 +660,10 @@ FWRSlotView FWRPlayerUI::HotbarView(int32 Index) const
 		// The slot's rim only marks the better grades (crude and common look plain), as the inventory shows them.
 		if (Inst && Def->IsEquipment()) V.Quality = Inst->Quality == EWRQuality::Masterwork ? 2 : Inst->Quality == EWRQuality::Fine ? 1 : 0;
 		const AWRCharacter* Survivor = Cast<AWRCharacter>(PC->GetPawn());
-		V.bSelected = bWorn && (Def->Slot == EWREquipSlot::Ranged ? (Survivor && Survivor->IsRangedOut()) : (Def->Slot == EWREquipSlot::Weapon && !(Survivor && Survivor->IsRangedOut())));
+		const UWRSurvivalComponent* Survival = PS ? PS->GetSurvival() : nullptr;
+		V.bSelected = bWorn && (Def->Slot == EWREquipSlot::Ranged ? (Survivor && Survivor->IsRangedOut())
+			: Def->Slot == EWREquipSlot::Light ? (Survival && Survival->IsLightOn())
+			: (Def->Slot == EWREquipSlot::Weapon && !(Survivor && Survivor->IsRangedOut())));
 		if (Def->IsThrowable()) { V.Count = (bWorn ? Worn.Count : 0) + Inv->CountOf(V.ItemId); V.bShowCount = true; }
 		else if (Def->IsRanged())
 		{

@@ -3,6 +3,8 @@
 // commands: slot (use / equip), unequip, move, split, drop. Also the pieces the storage screen shares (WRUIInventory.h).
 
 #include "WRUIInventory.h"
+#include "WRSurvival.h"
+#include "WRPlayerState.h"
 #include "WRPadInput.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
@@ -441,12 +443,13 @@ namespace WRInv
 
 namespace WRInvTab
 {
-	const EWREquipSlot EquipSlots[3] = { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Armor };
-	const TCHAR* EquipNames[3] = { TEXT("weapon"), TEXT("ranged"), TEXT("armor") };
+	constexpr int32 NumEquip = 4;
+	const EWREquipSlot EquipSlots[NumEquip] = { EWREquipSlot::Weapon, EWREquipSlot::Ranged, EWREquipSlot::Armor, EWREquipSlot::Light };
+	const TCHAR* EquipNames[NumEquip] = { TEXT("weapon"), TEXT("ranged"), TEXT("armor"), TEXT("light") };
 
 	int32 EquipIndexOf(EWREquipSlot Slot)
 	{
-		return Slot == EWREquipSlot::Weapon ? 0 : Slot == EWREquipSlot::Ranged ? 1 : Slot == EWREquipSlot::Armor ? 2 : INDEX_NONE;
+		return Slot == EWREquipSlot::Weapon ? 0 : Slot == EWREquipSlot::Ranged ? 1 : Slot == EWREquipSlot::Armor ? 2 : Slot == EWREquipSlot::Light ? 3 : INDEX_NONE;
 	}
 
 	enum class EFilter : uint8 { All, Gear, Resources, Food, Ammo, Taming };
@@ -457,7 +460,7 @@ namespace WRInvTab
 		const FName C = D->Category;
 		switch (F)
 		{
-		case EFilter::Gear: return C == TEXT("weapon") || C == TEXT("armor") || C == TEXT("ranged") || C == TEXT("tool");
+		case EFilter::Gear: return C == TEXT("weapon") || C == TEXT("armor") || C == TEXT("ranged") || C == TEXT("tool") || C == TEXT("light");
 		case EFilter::Resources: return C == TEXT("material") || C == TEXT("core") || C == TEXT("trophy") || C == TEXT("gem");
 		case EFilter::Food: return C == TEXT("food") || C == TEXT("drink") || C == TEXT("potion");
 		case EFilter::Ammo: return C == TEXT("ammo") || C == TEXT("dart") || D->IsThrowable();
@@ -791,7 +794,7 @@ namespace WRInvTab
 			const UWRInventoryComponent* I = Inv();
 			if (!I) return nullptr;
 			if (Kind == EWRSlotKind::Bag) return I->GetSlots().IsValidIndex(Index) ? &I->GetSlots()[Index] : nullptr;
-			if (Kind == EWRSlotKind::Equipment && Index >= 0 && Index < 3) return &I->GetEquipped(EquipSlots[Index]);
+			if (Kind == EWRSlotKind::Equipment && Index >= 0 && Index < NumEquip) return &I->GetEquipped(EquipSlots[Index]);
 			return nullptr;
 		}
 		static const FWRItemDef* DefOf(const FWRItemStack* S) { return S && !S->IsEmpty() ? FWRItemRegistry::Get().Find(S->ItemId) : nullptr; }
@@ -983,7 +986,7 @@ namespace WRInvTab
 			// A left click shows the key's item in the details (worn first, else its first stack in the bag).
 			const FName Id = X->GetHotbarItem(k);
 			if (Id.IsNone()) return;
-			for (int32 e = 0; e < 3; ++e) if (I->GetEquipped(EquipSlots[e]).ItemId == Id && !I->GetEquipped(EquipSlots[e]).IsEmpty()) { Select(EWRSlotKind::Equipment, e); return; }
+			for (int32 e = 0; e < NumEquip; ++e) if (I->GetEquipped(EquipSlots[e]).ItemId == Id && !I->GetEquipped(EquipSlots[e]).IsEmpty()) { Select(EWRSlotKind::Equipment, e); return; }
 			const int32 At = I->GetSlots().IndexOfByPredicate([Id](const FWRItemStack& S) { return !S.IsEmpty() && S.ItemId == Id; });
 			if (At != INDEX_NONE) Select(EWRSlotKind::Bag, At);
 		}
@@ -1055,6 +1058,8 @@ namespace WRInvTab
 						+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 168.f * U, 0.f, 0.f)[LoadedBlock()]
 					]
 				]
+				// The Light slot (WRSurvival): a torch in the off hand or a lantern on the hip, its burn time and the key.
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 6.f * U, 0.f, 0.f)[LightBlock()]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U)[WRUI::Divider()]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
@@ -1236,6 +1241,50 @@ namespace WRInvTab
 					]
 				]
 			];
+		}
+
+		TSharedRef<SWidget> LightBlock()
+		{
+			constexpr int32 e = 3;
+			return SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+				[
+					SNew(SWRSlot).Size(56.f * U).Kind(EWRSlotKind::Equipment).Index(e)
+					.View_Lambda([this]() { return EquipView(e); })
+					.OnClicked_Lambda([this](const FPointerEvent& Ev) { ClickedEquipSlot(Ev, e); })
+					.OnDropped_Lambda([this](EWRSlotKind From, int32 Idx) { DroppedOnEquipSlot(From, Idx, e); })
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
+				[
+					SNew(SBox).WidthOverride(200.f * U)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(LOCTEXT("SlotLight", "Light"), WRUI::Caps(11), WRUI::Ink2)]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const FWRItemDef* D = DefOf(StackAt(EWRSlotKind::Equipment, e)); return D ? FText::FromString(D->Name) : LOCTEXT("NoLight", "A torch or lantern goes here"); }),
+								WRUI::Body(12, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(DefOf(StackAt(EWRSlotKind::Equipment, e)) ? WRUI::Ink : WRUI::Ink3); }))
+						]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+							{
+								const FWRItemStack* S = StackAt(EWRSlotKind::Equipment, e);
+								const FWRItemDef* D = DefOf(S);
+								if (!D) return FText::GetEmpty();
+								const AWRPlayerState* P = PS();
+								const UWRSurvivalComponent* Surv = P ? P->GetSurvival() : nullptr;
+								const bool bOn = Surv && Surv->IsLightOn();
+								const int32 Min = FMath::CeilToInt(S->Durability / 60.f);
+								FString Key = WRInput::ActionKey(TEXT("LightToggle")).ToString();
+								if (Key.IsEmpty()) Key = TEXT("its belt slot");   // a pad lights it from the belt
+								return FText::FromString(bOn ? FString::Printf(TEXT("Lit · %d min left"), Min)
+									: S->Durability > 0.f ? FString::Printf(TEXT("Out · %d min left · %s to light"), Min, *Key)
+									: FString::Printf(TEXT("Empty · needs tallow · %s"), *Key));
+							}), WRUI::Body(11, 500), WRUI::Ink3)
+						]
+					]
+				];
 		}
 
 		TSharedRef<SWidget> LoadedBlock()
@@ -1759,7 +1808,7 @@ static FAutoConsoleCommandWithWorldAndArgs GWRUISelect(TEXT("WRUISelect"), TEXT(
 		const AWRPlayerState* PS = PC ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
 		if (!Tab.IsValid() || !PS || !PS->GetInventory() || Args.Num() == 0) return;
 		const FString& A = Args[0];
-		for (int32 e = 0; e < 3; ++e) if (A == WRInvTab::EquipNames[e]) { Tab->Select(EWRSlotKind::Equipment, e); return; }
+		for (int32 e = 0; e < WRInvTab::NumEquip; ++e) if (A == WRInvTab::EquipNames[e]) { Tab->Select(EWRSlotKind::Equipment, e); return; }
 		if (A.IsNumeric()) { Tab->Select(EWRSlotKind::Bag, FCString::Atoi(*A)); return; }
 		const int32 At = PS->GetInventory()->GetSlots().IndexOfByPredicate([&A](const FWRItemStack& S) { return !S.IsEmpty() && S.ItemId == FName(*A); });
 		if (At != INDEX_NONE) Tab->Select(EWRSlotKind::Bag, At);

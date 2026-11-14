@@ -29,6 +29,14 @@ struct WILDREACH_API FWRToolMesh
 	static FWRToolMesh Weapon(FName Class, const FLinearColor& Metal, float Scale = 1.f);
 	/** The fishing float, centred on its waterline: the red cap up +Z. */
 	static FWRToolMesh Float();
+	/** The hand torch (WRSurvival): an ash haft from the fist (0) up +X, a pitch-soaked rag head bound with cord, its
+	 *  charred crown at TorchTip(). */
+	static FWRToolMesh Torch();
+	static FVector TorchTip() { return FVector(61.f, 0.f, 0.f); }
+	/** The horn lantern: hung by its ring bail at the origin, the body below (-Z): a bronze cap and base, four corner
+	 *  posts, four amber horn panes, a tallow candle inside at LanternFlame(). */
+	static FWRToolMesh Lantern();
+	static FVector LanternFlame() { return FVector(0.f, 0.f, -15.f); }
 	/** Where the rod's tip sits in tool space (the line leaves from there). */
 	static FVector RodTip(float Length, float Back);
 

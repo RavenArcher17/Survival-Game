@@ -341,6 +341,9 @@ private:
 	float LavaSpawnAcc = 0.f;
 	int32 SnowEmitter = INDEX_NONE;
 	int32 AshEmitter = INDEX_NONE;
+	/** The weather's own fall (weather.json look.fx: a blizzard's sideways snow, heavy ash) and which one it is. */
+	int32 WeatherEmitter = INDEX_NONE;
+	FName WeatherFx;
 	float Sheltered = 0.f;
 	float ShelterTarget = 0.f;
 
