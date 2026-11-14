@@ -28,6 +28,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
+#include "Dom/JsonObject.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h"
@@ -81,6 +82,8 @@ UWRGameplayAbility::UWRGameplayAbility()
 	Blocked.AddTag(WRTags::Status_Frozen);
 	Blocked.AddTag(WRTags::Status_Staggered);
 	Blocked.AddTag(WRTags::Status_Unconscious);
+	// A drink going down is committed (CAL 1.10): nothing else starts until it's done.
+	Blocked.AddTag(WRTags::State_Drinking);
 	ActivationBlockedTags = Blocked;
 }
 
@@ -98,6 +101,13 @@ bool UWRGameplayAbility::IsServer() const
 bool UWRGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
 {
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	{
+		return false;
+	}
+	// In the saddle only what's made for it (combat.md 2.19): the rider's swings come through the mount, Wildbrands
+	// check their mounted flag (UWRGA_Melee), spells only as bolts and lances.
+	if (const AWRCharacterBase* Rider = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+		Rider && Rider->HasTag(WRTags::State_Mounted) && !bAllowedMounted)
 	{
 		return false;
 	}
@@ -319,21 +329,42 @@ UWRGA_Melee::UWRGA_Melee()
 
 FName UWRGA_Melee::PickMove(const AWRCharacterBase* Character) const
 {
+	// The full attack grammar (COMBAT-AND-LESSONS 1.1, cooks/build-combat-full.md 2.2), in this order: guard counter,
+	// in the air, sprinting, straight out of a roll / backstep, a spear's poke from behind the shield, the chain. The
+	// owner and the server read the same state (sprint is a saved move, falling is the CMC's, the dodge end is stamped
+	// on both), so both pick the same row.
 	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	const auto Has = [&Class](const TCHAR* Row) { return Class.Move(Row) != nullptr; };
+	const double Now = Character->GetWorld()->GetTimeSeconds();
+	const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(Character->GetCharacterMovement());
+	const bool bAir = Move && Move->IsFalling() && !Character->IsCreature();
+	const bool bRunning = Move && Move->IsSprinting() && Character->GetVelocity().Size2D() > WRTune(TEXT("combat.runAttackSpeed"), 450.f);
+	const float Window = WRTune(TEXT("combat.contextWindow"), 0.3f);
+	const bool bFromDodge = Now - Character->LastDodgeEnd <= Window;
+	const bool bChains = Character->bLastSwingChains && Now - Character->LastSwingEnd <= WRTune(TEXT("combat.chainGrace"), 0.35f);
+	const FWRMove* Last = bChains ? Class.Move(Character->LastSwingMove) : nullptr;
 	if (bHeavy)
 	{
 		// Heavy inside the window after a blocked blow is the guard counter (COMBAT-AND-LESSONS 1.2).
-		return Character->HasTag(WRTags::State_GuardCounterWindow) && Class.Move(TEXT("guardCounter")) ? FName(TEXT("guardCounter")) : FName(TEXT("heavy"));
+		if (Character->HasTag(WRTags::State_GuardCounterWindow) && Has(TEXT("guardCounter"))) return TEXT("guardCounter");
+		if (bAir && Has(TEXT("jumpHeavy"))) return TEXT("jumpHeavy");
+		if (bRunning && Has(TEXT("runHeavy"))) return TEXT("runHeavy");
+		// Heavy from a light's combo window: the chain heavy (combat.md 2.4.0, Conan's lesson).
+		if (Last && !Last->bHeavy && Last->Context.IsNone() && Has(TEXT("chainHeavy"))) return TEXT("chainHeavy");
+		return TEXT("heavy");
 	}
-	// The light chain: the next light of a swing that got to its combo window (and ended no longer ago than chainGrace).
-	const double Now = Character->GetWorld()->GetTimeSeconds();
-	if (Character->bLastSwingChains && Now - Character->LastSwingEnd <= WRTune(TEXT("combat.chainGrace"), 0.35f))
+	if (bAir && Has(TEXT("jumpLight"))) return TEXT("jumpLight");
+	if (bRunning && Has(TEXT("runLight"))) return TEXT("runLight");
+	if (bFromDodge && Has(Character->bLastDodgeBackstep ? TEXT("backstepLight") : TEXT("rollLight")))
 	{
-		const FWRMove* Last = Class.Move(Character->LastSwingMove);
-		if (Last && !Last->Next.IsNone() && Class.Move(Last->Next))
-		{
-			return Last->Next;
-		}
+		return Character->bLastDodgeBackstep ? FName(TEXT("backstepLight")) : FName(TEXT("rollLight"));
+	}
+	// A spear behind a raised shield pokes past it and keeps the guard up (ER's turtle poke).
+	if (Character->HasTag(WRTags::State_Blocking) && Has(TEXT("guardPoke")) && FWRWeapons::Get().HasShield(Character)) return TEXT("guardPoke");
+	// The light chain: the next light of a swing that got to its combo window (and ended no longer ago than chainGrace).
+	if (Last && !Last->Next.IsNone() && Class.Move(Last->Next))
+	{
+		return Last->Next;
 	}
 	return TEXT("light1");
 }
@@ -383,8 +414,15 @@ void UWRGA_Melee::SetWindows(AWRCharacterBase* Character, double Now, float Wind
 	// The swing's windows (COMBAT-AND-LESSONS 1.16): the same numbers on the server and the predicting owner. The combo
 	// window is the last comboFraction of the recovery; the cancel window opens cancelFraction into it.
 	const FWRTuning& T = FWRTuning::Get();
-	const float Cancel = bHeavy ? T.Num(TEXT("combat.cancelFraction.heavy"), 0.65f) : T.Num(TEXT("combat.cancelFraction.light"), 0.5f);
+	// Great weapons commit longer (combat.md 2.4.0: their cancel window opens at 75% of the recovery).
+	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	const float Cancel = bUsesMoves && Class.CancelFraction > 0.f ? Class.CancelFraction
+		: bHeavy ? T.Num(TEXT("combat.cancelFraction.heavy"), 0.65f) : T.Num(TEXT("combat.cancelFraction.light"), 0.5f);
 	AWRCharacterBase::FSwingWindows& W = Character->Swing;
+	const FWRMove* Row = bUsesMoves ? Class.Move(MoveId) : nullptr;
+	W.HyperarmorMult = !Row ? 0.f : Row->HyperarmorMult > 0.f ? Row->HyperarmorMult : Class.bGreat ? T.Num(TEXT("poise.hyperarmor.great"), 2.5f) : 0.f;
+	W.bGreat = bUsesMoves && Class.bGreat;
+	W.bKeepsGuard = Row && Row->bKeepsGuard;
 	W.Start = Now;
 	W.ActiveAt = Now + Windup;
 	W.ActiveEnd = W.ActiveAt + Active;
@@ -437,9 +475,14 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	}
 	const FWRTuning& T = FWRTuning::Get();
 	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	const double Now = GetWorld()->GetTimeSeconds();
+	ChargeFactor = 1.f;
+	bCharging = false;
+	bThisFollowUp = false;
+	bJumpSwing = false;
 
-	// The move: a row of the held weapon's class (light chain, heavy, guard counter), or the ability's own timing
-	// (weapon arts, creature bites).
+	// The move: a row of the held weapon's class (the full grammar: PickMove), a Wildbrand's own row
+	// (tuning wildbrands.<node>), or the ability's own timing (creature bites).
 	float Windup = 0.f, Active = 0.f, Recovery = 0.f;
 	bool bHyperarmor = bHeavy;
 	uint8 Variant = 0;
@@ -457,6 +500,24 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		bHyperarmor = Move->bHyperarmor;
 		Variant = uint8(FMath::Clamp(Move->Clip, 0, 7));
 		CostOverride = Move->Stamina;
+		bJumpSwing = Move->Context == TEXT("air");
+	}
+	else if (!ArtKey.IsEmpty())
+	{
+		// A Wildbrand (combat.md 2.12): its frames, hyperarmor and stamina from its row; a second press inside the follow-up
+		// window is the follow-up (no cooldown, its own damage).
+		const FString W = WildbrandKey();
+		bThisFollowUp = FollowUpReady();
+		Windup = T.Num(W + TEXT(".windup"), T.Num(TimingKey + TEXT(".windup"), 0.3f));
+		Active = T.Num(W + TEXT(".active"), T.Num(TimingKey + TEXT(".active"), 0.2f));
+		Recovery = T.Num(W + TEXT(".recovery"), T.Num(TimingKey + TEXT(".recovery"), 0.4f));
+		if (bThisFollowUp)
+		{
+			Windup = T.Num(W + TEXT(".followUp.windup"), Windup * 0.8f);
+		}
+		bHyperarmor = T.Num(W + TEXT(".ha"), bHeavy ? 1.f : 0.f) > 0.f;
+		CostOverride = T.Num(W + TEXT(".stamina"), T.Num(TEXT("stamina.weaponArt"), 18.f));
+		Windup = FMath::Max(Windup, T.Num(TEXT("combat.minArtWindup"), 0.2f));  // the heavy coil rule
 	}
 	else
 	{
@@ -473,17 +534,17 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-	const double Now = GetWorld()->GetTimeSeconds();
 
 	// Face the target the swing steps in on, else the aim; a survivor's swing steps in toward it, motion-warped and
-	// clamped (COMBAT-AND-LESSONS 1.17): the swing meets the body instead of the air in front of it.
-	AWRCharacterBase* Step = Character->IsCreature() ? nullptr : StepTarget(Character, Class.Reach);
+	// clamped (COMBAT-AND-LESSONS 1.17): the swing meets the body instead of the air in front of it. (Not in the air.)
+	AWRCharacterBase* Step = Character->IsCreature() || bJumpSwing ? nullptr : StepTarget(Character, Class.Reach);
 	if (Step)
 	{
 		const FVector To = (Step->GetActorLocation() - Character->GetActorLocation()).GetSafeNormal2D();
 		Character->SetActorRotation(To.Rotation());
 		const float Gap = FVector::Dist2D(Step->GetActorLocation(), Character->GetActorLocation()) - Step->GetSimpleCollisionRadius() - Character->GetSimpleCollisionRadius();
-		const float Want = Gap - T.Num(TEXT("combat.stepIn.ideal"), 0.55f) * Class.Reach;
+		const float Reach = Move && Move->Reach > 0.f ? Move->Reach : Class.Reach;
+		const float Want = Gap - T.Num(TEXT("combat.stepIn.ideal"), 0.55f) * Reach;
 		const float StepCm = FMath::Min(Want, T.Num(TEXT("combat.stepIn.max"), 130.f));
 		if (StepCm >= T.Num(TEXT("combat.stepIn.min"), 45.f) && Character->GetCharacterMovement()->IsMovingOnGround())
 		{
@@ -501,9 +562,136 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Character->SetActorRotation(FRotator(0.f, Character->GetControlRotation().Yaw, 0.f));
 	}
 
+	// Swinging out of a held block (survivors): log the guard dropping and coming back, for the bot tests.
+	bFromGuard = IsServer() && !Character->IsCreature() && Character->HasTag(WRTags::State_Blocking) && !(Move && Move->bKeepsGuard);
+	if (bFromGuard)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("BLOCK %s swings from the guard (%s): the guard is down for %.2f s"), *Character->GetName(), *GetClass()->GetName(), Windup + Active + Recovery);
+	}
+	if (IsServer() && !ArtKey.IsEmpty())
+	{
+		// Heat and Chill are built by Wildbrands (combat.md 2.12: builder resources).
+		const FString W = WildbrandKey();
+		UWRCombatLibrary::GainResource(Character, WRTags::Element_Fire, T.Num(W + TEXT(".heat"), T.Num(ArtKey + TEXT(".heat"), 0.f)));
+		UWRCombatLibrary::GainResource(Character, WRTags::Element_Frost, T.Num(W + TEXT(".chill"), T.Num(ArtKey + TEXT(".chill"), 0.f)));
+	}
+
+	// A heavy (or a chargeable Wildbrand) whose button is still held charges (combat.md 2.4.2): the coil holds at its
+	// top, hyperarmored, until release or the cap. A quick release is the plain swing.
+	const bool bChargeableHeavy = Move && MoveId == TEXT("heavy") && Class.Move(TEXT("charged")) && !Character->IsCreature();
+	const bool bChargeableArt = !ArtKey.IsEmpty() && !bThisFollowUp && T.Num(WildbrandKey() + TEXT(".charge.max"), 0.f) > 0.f;
+	const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
+	const bool bHeld = Spec && Spec->InputPressed;
+	if ((bChargeableHeavy || bChargeableArt) && bHeld)
+	{
+		BeginCharge(Windup, Active, Recovery, Variant);
+		return;
+	}
+	StartSwing(Windup, Active, Recovery, bHyperarmor, Variant, Step != nullptr);
+}
+
+void UWRGA_Melee::BeginCharge(float Windup, float Active, float Recovery, uint8 Variant)
+{
+	AWRCharacterBase* Character = GetCharacter();
+	const FWRTuning& T = FWRTuning::Get();
+	bCharging = true;
+	ChargeStartedAt = GetWorld()->GetTimeSeconds();
+	PendingVariant = Variant;
+	// Charging: hyperarmored and rooted, the coil drawn over the hold (the clip's lead-in over the charge time, held at
+	// its top), State.Charging for the creatures that answer it (readsAction).
+	const float Max = ArtKey.IsEmpty() ? T.Num(TEXT("combat.charge.max"), 1.0f) : T.Num(WildbrandKey() + TEXT(".charge.max"), 1.0f);
+	Character->SetCombatTag(WRTags::State_Charging, true);
+	Character->SetCombatTag(WRTags::State_Hyperarmor, true);
+	SetMoveRoot(true);
+	Character->PlaySwing(SwingKind, Max + Windup + Active, Variant, Max + Windup, Active, Recovery);
+	if (UAbilityTask_WaitInputRelease* Wait = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true))
+	{
+		Wait->OnRelease.AddDynamic(this, &UWRGA_Melee::OnChargeReleased);
+		Wait->ReadyForActivation();
+	}
+	// The cap: it lets go on its own.
+	After(Max, [this]() { if (bCharging) OnChargeReleased(0.f); });
+	if (IsServer())
+	{
+		UE_LOG(LogWildreach, Verbose, TEXT("SWING %s charging %s"), *GetNameSafe(Character), ArtKey.IsEmpty() ? *MoveId.ToString() : *ArtKey);
+	}
+}
+
+void UWRGA_Melee::OnChargeReleased(float /*TimeHeld*/)
+{
+	if (!bCharging)
+	{
+		return;
+	}
+	bCharging = false;
+	AWRCharacterBase* Character = GetCharacter();
+	if (!Character)
+	{
+		EndSelf(true);
+		return;
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	Character->SetCombatTag(WRTags::State_Charging, false);
+	Character->SetCombatTag(WRTags::State_Hyperarmor, false);
+	const float Held = float(GetWorld()->GetTimeSeconds() - ChargeStartedAt);
+	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	if (!ArtKey.IsEmpty())
+	{
+		// A charged Wildbrand (Molten cleave): x charge.dmg at charge.max, linear from nothing.
+		const FString W = WildbrandKey();
+		const float Max = FMath::Max(0.05f, T.Num(W + TEXT(".charge.max"), 1.f));
+		ChargeFactor = FMath::Lerp(1.f, T.Num(W + TEXT(".charge.dmg"), 1.f), FMath::Clamp(Held / Max, 0.f, 1.f));
+		const float Windup = FMath::Max(0.12f, T.Num(W + TEXT(".windup"), 0.6f) - Held);
+		StartSwing(Windup, T.Num(W + TEXT(".active"), 0.28f), T.Num(W + TEXT(".recovery"), 0.7f), true, PendingVariant, false);
+		return;
+	}
+	const float Min = T.Num(TEXT("combat.charge.min"), 0.35f), Full = T.Num(TEXT("combat.charge.full"), 0.8f);
+	if (Held < Min || !Class.Move(TEXT("charged")))
+	{
+		// A tap: the plain heavy, the time already held off its wind-up (never under the heavy coil minimum).
+		const FWRMove* Heavy = Class.Move(TEXT("heavy"));
+		const float Windup = FMath::Max(T.Num(TEXT("combat.minHeavyCoil"), 0.2f), (Heavy ? Heavy->Windup : 0.55f) - Held);
+		StartSwing(Windup, Heavy ? Heavy->Active : 0.22f, Heavy ? Heavy->Recovery : 0.45f, Heavy && Heavy->bHyperarmor, PendingVariant, false);
+		return;
+	}
+	// Charged: the charged row, its damage from 1.0 at the minimum to the row's at full (combat.md 2.4.2); the extra
+	// stamina over the heavy's is paid now (the grace rule still lets it go below zero).
+	MoveId = TEXT("charged");
+	const FWRMove* Charged = Class.Move(MoveId);
+	ChargeFactor = FMath::Lerp(1.f / FMath::Max(0.1f, Charged->Damage), 1.f, FMath::Clamp((Held - Min) / FMath::Max(0.05f, Full - Min), 0.f, 1.f));
+	if (IsServer() && Character->GetAttributes())
+	{
+		const FWRMove* Heavy = Class.Move(TEXT("heavy"));
+		const float Extra = FMath::Max(0.f, Charged->Stamina - (Heavy ? Heavy->Stamina : 0.f));
+		Character->GetAbilitySystemComponent()->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(),
+			FMath::Max(T.Num(TEXT("stamina.graceFloor"), -20.f), Character->GetAttributes()->GetStamina() - Extra));
+		Character->Status->NotifyStaminaUsed();
+	}
+	if (Held >= Full)
+	{
+		// The full charge reads on the weapon: a white glint (yours to read; gold stays for guard and parry).
+		WRFx::BroadcastOn(Character, TEXT("charge.full"), TEXT("weapon"), 1.f, TEXT("charge.full"), 0.3f);
+	}
+	StartSwing(Charged->Windup, Charged->Active, Charged->Recovery, true, uint8(FMath::Clamp(Charged->Clip, 0, 7)), false);
+}
+
+void UWRGA_Melee::StartSwing(float Windup, float Active, float Recovery, bool bHyperarmor, uint8 Variant, bool bStepping)
+{
+	AWRCharacterBase* Character = GetCharacter();
+	if (!Character)
+	{
+		return;
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	const double Now = GetWorld()->GetTimeSeconds();
+	MoveActive = Active;
 	Character->PlaySwing(SwingKind, Windup + Active, Variant, Windup, Active, Recovery);
-	// The waist split: lights keep the legs walking, heavies root (COMBAT-AND-LESSONS C2).
-	if (bHeavy && !Character->IsCreature())
+	// The waist split: lights keep the legs walking, heavies root (COMBAT-AND-LESSONS C2). A jump swing keeps its arc.
+	if (bJumpSwing)
+	{
+		// (no movement change in the air)
+	}
+	else if (bHeavy && !Character->IsCreature())
 	{
 		SetMoveRoot(true);
 	}
@@ -512,24 +700,30 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		SetMoveSlow(false, true);
 	}
 	SetWindows(Character, Now, Windup, Active, Recovery, bHyperarmor);
-
-	// Swinging out of a held block (survivors): log the guard dropping and coming back, for the bot tests.
-	bFromGuard = IsServer() && !Character->IsCreature() && Character->HasTag(WRTags::State_Blocking);
-	if (bFromGuard)
-	{
-		UE_LOG(LogWildreach, Log, TEXT("BLOCK %s swings from the guard (%s): the guard is down for %.2f s"), *Character->GetName(), *GetClass()->GetName(), Windup + Active + Recovery);
-	}
 	if (IsServer() && bUsesMoves)
 	{
-		UE_LOG(LogWildreach, Verbose, TEXT("SWING %s %s %.2f/%.2f/%.2f%s"), *Character->GetName(), *MoveId.ToString(), Windup, Active, Recovery, Step ? TEXT(" (stepping in)") : TEXT(""));
+		UE_LOG(LogWildreach, Verbose, TEXT("SWING %s %s %.2f/%.2f/%.2f x%.2f%s"), *Character->GetName(), *MoveId.ToString(), Windup, Active, Recovery, ChargeFactor, bStepping ? TEXT(" (stepping in)") : TEXT(""));
 	}
-
-	if (IsServer() && !ArtKey.IsEmpty())
+	if (!ArtKey.IsEmpty())
 	{
-		UWRCombatLibrary::GainResource(Character, WRTags::Element_Fire, T.Num(ArtKey + TEXT(".heat"), 0.f));
-		UWRCombatLibrary::GainResource(Character, WRTags::Element_Frost, T.Num(ArtKey + TEXT(".chill"), 0.f));
+		// The follow-up window (combat.md 2.12) runs from this swing's combo window to followUp.window after its end.
+		const float Window = T.Num(WildbrandKey() + TEXT(".followUp.window"), 0.f);
+		FollowUpFrom = bThisFollowUp || Window <= 0.f ? -1.0 : Now + Windup + Active + Recovery * (1.f - T.Num(TEXT("combat.comboFraction"), 0.4f));
+		FollowUpUntil = FollowUpFrom < 0.0 ? -1.0 : Now + Windup + Active + Recovery + Window;
 	}
 
+	if (bJumpSwing)
+	{
+		// A jump attack's blade is live from its wind-up until it lands (+ landing grace), then its recovery plays on the
+		// ground (COMBAT-AND-LESSONS 1.1).
+		After(Windup, [this]()
+		{
+			HitThisSwing.Reset();
+			JumpActiveSince = GetWorld()->GetTimeSeconds();
+			JumpTick();
+		});
+		return;
+	}
 	After(Windup, [this, Active]()
 	{
 		if (!IsServer())
@@ -549,6 +743,133 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	After(Windup + Active + Recovery, [this]() { EndSelf(); });
 }
 
+void UWRGA_Melee::JumpTick()
+{
+	AWRCharacterBase* Character = GetCharacter();
+	if (!Character)
+	{
+		return;
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	if (IsServer())
+	{
+		Sweep();
+	}
+	const double Since = GetWorld()->GetTimeSeconds() - JumpActiveSince;
+	const bool bLanded = !Character->GetCharacterMovement()->IsFalling();
+	if (!bLanded && Since < T.Num(TEXT("combat.jumpAttack.maxAir"), 1.2f))
+	{
+		After(0.03f, [this]() { JumpTick(); });
+		return;
+	}
+	// Landed (or out of air time): a last grace of the blade, then the recovery on the ground, rooted.
+	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	const FWRMove* Row = Class.Move(MoveId);
+	const float Grace = T.Num(TEXT("combat.jumpAttack.landGrace"), 0.1f);
+	const float Recovery = Row ? Row->Recovery : 0.4f;
+	if (IsServer())
+	{
+		const int32 Steps = FMath::Max(1, FMath::CeilToInt(Grace / 0.03f));
+		for (int32 i = 1; i <= Steps; ++i)
+		{
+			After(i * Grace / Steps, [this]() { Sweep(); });
+		}
+		if (bHeavy)
+		{
+			// A jump heavy lands with a thud the feet feel: dust where it came down.
+			const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
+			WRFx::Broadcast(Character, TEXT("stomp"), Feet, FRotator::ZeroRotator, 0.8f, TEXT("stomp"));
+		}
+	}
+	SetMoveRoot(true);
+	// The windows follow the ground: combo and cancel from the landing.
+	AWRCharacterBase::FSwingWindows& W = Character->Swing;
+	const double Now = GetWorld()->GetTimeSeconds();
+	W.ActiveEnd = Now + Grace;
+	W.End = W.ActiveEnd + Recovery;
+	W.ComboAt = W.ActiveEnd + Recovery * (1.f - T.Num(TEXT("combat.comboFraction"), 0.4f));
+	W.CancelAt = W.ActiveEnd + Recovery * (bHeavy ? T.Num(TEXT("combat.cancelFraction.heavy"), 0.65f) : T.Num(TEXT("combat.cancelFraction.light"), 0.5f));
+	TWeakObjectPtr<AWRCharacterBase> Weak(Character);
+	After(float(W.ComboAt - Now), [Weak]() { if (AWRCharacterBase* C = Weak.Get()) C->SetCombatTag(WRTags::State_ComboWindow, true); });
+	After(float(W.CancelAt - Now), [Weak]() { if (AWRCharacterBase* C = Weak.Get()) C->SetCombatTag(WRTags::State_CancelWindow, true); });
+	After(Grace + Recovery, [this]() { EndSelf(); });
+}
+
+FString UWRGA_Melee::WildbrandKey() const
+{
+	return FString::Printf(TEXT("wildbrands.%s"), *NodeId.ToString());
+}
+
+bool UWRGA_Melee::FollowUpReady() const
+{
+	const UWorld* World = GetWorld();
+	const double Now = World ? World->GetTimeSeconds() : 0.0;
+	return FollowUpFrom >= 0.0 && Now + 0.05 >= FollowUpFrom && Now <= FollowUpUntil;
+}
+
+bool UWRGA_Melee::CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	// A Wildbrand's follow-up press isn't held back by the first press's cooldown.
+	return FollowUpReady() || Super::CheckCooldown(Handle, ActorInfo, OptionalRelevantTags);
+}
+
+void UWRGA_Melee::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	if (!FollowUpReady())
+	{
+		Super::ApplyCooldown(Handle, ActorInfo, ActivationInfo);
+	}
+}
+
+bool UWRGA_Melee::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	{
+		return false;
+	}
+	const AWRCharacterBase* Who = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (!Who || ArtKey.IsEmpty())
+	{
+		return true;
+	}
+	// A Wildbrand needs a weapon of a class it fits, and (riding) the mounted flag (combat.md 2.12, 2.19).
+	FString Why;
+	return WildbrandFits(Who, NodeId, Why);
+}
+
+bool UWRGA_Melee::WildbrandFits(const AWRCharacterBase* Who, FName Node, FString& OutWhy)
+{
+	const FString Key = FString::Printf(TEXT("wildbrands.%s"), *Node.ToString());
+	const TSharedPtr<FJsonObject> Row = FWRTuning::Get().Object(Key);
+	if (!Row.IsValid() || !Who)
+	{
+		return true;
+	}
+	if (Who->HasTag(WRTags::State_Mounted) && !(Row->HasField(TEXT("mounted")) && Row->GetBoolField(TEXT("mounted"))))
+	{
+		OutWhy = TEXT("not while riding");
+		return false;
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Fits = nullptr;
+	if (!Row->TryGetArrayField(TEXT("fits"), Fits) || Fits->Num() == 0)
+	{
+		return true;  // all melee
+	}
+	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Who);
+	TArray<FString> Names;
+	for (const TSharedPtr<FJsonValue>& V : *Fits)
+	{
+		const FString Id = V->AsString();
+		if (Id == TEXT("all") || FName(*Id) == Class.Id)
+		{
+			return true;
+		}
+		Names.Add(FWRWeapons::Get().Class(FName(*Id)).Name.ToLower());
+	}
+	OutWhy = FString::Printf(TEXT("needs a %s"), *FString::Join(Names, TEXT(", ")));
+	return false;
+}
+
 void UWRGA_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
 	// (Here, not in the swing's last timer: on a server the owning client's end of the swing usually arrives first.)
@@ -559,6 +880,13 @@ void UWRGA_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 			Self->HasTag(WRTags::State_Blocking) ? TEXT("block still held, guard back up") : TEXT("block let go"));
 	}
 	bFromGuard = false;
+	if (bCharging && Self)
+	{
+		// Cut while charging (a stagger, a freeze): the charge is lost.
+		bCharging = false;
+		Self->SetCombatTag(WRTags::State_Charging, false);
+		Self->SetCombatTag(WRTags::State_Hyperarmor, false);
+	}
 	// A swing cut by the next chain attack still counts as reaching its combo window (it was only allowed there); one
 	// cut by a stagger, a freeze or death doesn't.
 	const bool bEndedWell = Self && Self->IsAlive() && !Self->HasTag(WRTags::Status_Staggered) && !Self->HasTag(WRTags::Status_Frozen);
@@ -581,7 +909,16 @@ void UWRGA_Melee::Sweep()
 	{
 		Reach = FMath::Max(Reach, Creature->GetDef()->AttackRange);
 	}
-	const float Radius = Character->IsCreature() ? T.Num(TEXT("weapon.sweepRadius"), 45.f) : Class.SweepRadius;
+	const FWRMove* RowNow = bUsesMoves ? Class.Move(MoveId) : nullptr;
+	if (RowNow && RowNow->Reach > 0.f)
+	{
+		Reach = RowNow->Reach;  // a spear's longer lunge
+	}
+	float Radius = Character->IsCreature() ? T.Num(TEXT("weapon.sweepRadius"), 45.f) : Class.SweepRadius;
+	if (bJumpSwing && bHeavy)
+	{
+		Radius *= T.Num(TEXT("combat.jumpAttack.heavyRadius"), 1.25f);  // a jump heavy comes down wide
+	}
 	const FVector Start = Character->GetActorLocation();
 	const FVector End = Start + Character->GetActorForwardVector() * Reach;
 
@@ -694,12 +1031,27 @@ void UWRGA_Melee::Sweep()
 		float Burn = BurnBuildup;
 		float Frost = FrostBuildup;
 		float StanceMult = StanceMultiplier;
+		TMap<FName, float> ArtBuildups;
+		const FString WB = WildbrandKey();
 		if (!ArtKey.IsEmpty())
 		{
-			Mult = T.Num(ArtKey + TEXT(".multiplier"), Mult);
-			Burn = T.Num(ArtKey + TEXT(".burnBuildup"), Burn);
-			Frost = T.Num(ArtKey + TEXT(".frostBuildup"), Frost);
-			StanceMult = T.Num(ArtKey + TEXT(".stance"), StanceMult);
+			// A Wildbrand's row (tuning wildbrands.<node>), Raven's spells.<art> numbers as the fallback; a follow-up and a
+			// charge scale it (combat.md 2.12).
+			Mult = T.Num(WB + TEXT(".dmg"), T.Num(ArtKey + TEXT(".multiplier"), Mult));
+			Burn = T.Num(WB + TEXT(".buildup.burn"), T.Num(ArtKey + TEXT(".burnBuildup"), Burn));
+			Frost = T.Num(WB + TEXT(".buildup.frost"), T.Num(ArtKey + TEXT(".frostBuildup"), Frost));
+			StanceMult = T.Num(WB + TEXT(".stance"), T.Num(ArtKey + TEXT(".stance"), StanceMult));
+			if (const TSharedPtr<FJsonObject> Build = FWRTuning::Get().Object(WB + TEXT(".buildup")))
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& B : Build->Values)
+				{
+					if (B.Key != TEXT("burn") && B.Key != TEXT("frost")) ArtBuildups.Add(FName(*B.Key), float(B.Value->AsNumber()));
+				}
+			}
+			if (bThisFollowUp)
+			{
+				Mult = T.Num(WB + TEXT(".followUp.dmg"), Mult);
+			}
 		}
 
 		FWRHit Hit;
@@ -707,16 +1059,36 @@ void UWRGA_Melee::Sweep()
 		Hit.Element = Element;
 		Hit.BurnBuildup = Burn;
 		Hit.FrostBuildup = Frost;
+		Hit.Buildups = ArtBuildups;
+		// A class's own base damage over the sword's (a dagger hits lighter, a great hammer harder); tools and creatures keep
+		// their flat damage (WeaponDamage).
+		const auto ClassScale = [&](bool bHeavyBase)
+		{
+			if (Character->Weapon.FlatDamage > 0.f || Character->IsCreature())
+			{
+				return 1.f;
+			}
+			const float Sword = bHeavyBase ? T.Num(TEXT("weapon.copperSwordHeavy"), 22.f) : T.Num(TEXT("weapon.copperSwordLight"), 12.f);
+			return FWRWeapons::ClassBase(Class, bHeavyBase) / FMath::Max(1.f, Sword);
+		};
+		// Two-handing a one-handed weapon (combat.md 2.4.0): +15% damage, +30% stance on lights, +10% on heavies.
+		const bool bTwoHandBonus = !Character->IsCreature() && Character->bTwoHanded && Class.Hands == TEXT("1h");
 		if (Move)
 		{
-			// A move row: its damage, stance, poise, guard cost and how it lands (Data/weapons.json).
-			Hit.Damage = UWRCombatLibrary::WeaponDamage(Character->Weapon, Move->bHeavy) * Move->Damage;
+			// A move row: its damage, stance, poise, guard cost and how it lands (Data/weapons.json); a charge scales it.
+			Hit.Damage = UWRCombatLibrary::WeaponDamage(Character->Weapon, Move->bHeavy) * ClassScale(Move->bHeavy) * Move->Damage * ChargeFactor;
 			Hit.PoiseDamage = Move->Poise;
-			Hit.StanceDamage = Move->Stance;
+			Hit.StanceDamage = Move->Stance * (MoveId == TEXT("charged") ? FMath::Max(0.34f, ChargeFactor) : 1.f);
 			Hit.StaminaDamage = Move->GuardStamina;
 			Hit.Impact = Move->Impact;
 			Hit.Tier = Move->Tier;
-			Hit.bParryable = true;
+			Hit.PhysType = Move->PhysType;
+			// Every player melee blow can be parried but a great hammer's and a charged heavy (combat.md 2.9).
+			Hit.bParryable = !(Move->bCharge || Class.Id == TEXT("great_hammer"));
+			for (const TPair<FName, float>& B : Class.Buildups)
+			{
+				Hit.Buildups.FindOrAdd(B.Key) += B.Value;
+			}
 		}
 		else if (Character->IsCreature())
 		{
@@ -727,25 +1099,42 @@ void UWRGA_Melee::Sweep()
 			Hit.bParryable = T.Num(TEXT("creatureAI.bite.parryable"), 1.f) > 0.f;
 			Hit.bLow = T.Num(TEXT("creatureAI.bite.low"), 0.f) > 0.f;
 			Hit.Tier = EWRHitTier::Light;
+			Hit.PhysType = 3;
 		}
 		else
 		{
-			// A weapon art: the class's light / heavy numbers, its own multiplier and stance (combat.md 2.12).
+			// A Wildbrand: the class's light / heavy numbers, its own multiplier and stance (combat.md 2.12).
 			const FWRMove* Base = bHeavy ? Heavy : Light;
-			Hit.Damage = UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * Mult;
+			Hit.Damage = UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * ClassScale(bHeavy) * Mult * ChargeFactor;
 			Hit.PoiseDamage = Base ? Base->Poise : 30.f;
-			Hit.StanceDamage = (Light ? Light->Stance : 5.f) * StanceMult;
+			Hit.StanceDamage = (Light ? Light->Stance : 5.f) * StanceMult * FMath::Max(1.f, ChargeFactor);
 			Hit.StaminaDamage = Base ? Base->GuardStamina : 30.f;
 			Hit.Impact = bHeavy ? 3 : 2;
-			Hit.Tier = bHeavy ? EWRHitTier::Heavy : EWRHitTier::Light;
+			Hit.Tier = bHeavy || ChargeFactor > 1.f ? EWRHitTier::Heavy : EWRHitTier::Light;
+			Hit.PhysType = Base ? Base->PhysType : 1;
 			Hit.bParryable = true;
 		}
-		// An infused weapon gives plain attacks its element (the path infuses the weapon).
+		if (bTwoHandBonus)
+		{
+			Hit.Damage *= 1.f + T.Num(TEXT("combat.twoHand.damage"), 0.15f);
+			Hit.StanceDamage *= 1.f + (bHeavy ? T.Num(TEXT("combat.twoHand.heavyStance"), 0.1f) : T.Num(TEXT("combat.twoHand.lightStance"), 0.3f));
+		}
+		// An infused weapon gives plain attacks its element and buildup by the blow's weight (combat.md 2.4.0: light 8,
+		// heavy 14, charged 22; Wildbrands carry their own).
 		if (Element == WRTags::Element_Physical && !Character->Weapon.Element.IsNone())
 		{
-			const float Infused = T.Num(TEXT("weapon.infusedBuildup"), 15.f);
+			const float Infused = MoveId == TEXT("charged") ? T.Num(TEXT("status.infusedBuildup.charged"), 22.f)
+				: bHeavy ? T.Num(TEXT("status.infusedBuildup.heavy"), 14.f) : T.Num(TEXT("status.infusedBuildup.light"), 8.f);
 			if (Character->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Infused; }
 			else if (Character->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Infused; }
+		}
+		// Where the blade meets the body: the nearer point of its capsule along the swing (head strikes, parts).
+		{
+			FVector OnSwing, OnBody;
+			const float HH = Target->GetSimpleCollisionHalfHeight(), R = Target->GetSimpleCollisionRadius();
+			const FVector C = Target->GetActorLocation();
+			FMath::SegmentDistToSegmentSafe(Start + FVector(0.f, 0.f, 40.f), End + FVector(0.f, 0.f, 40.f), C - FVector(0.f, 0.f, FMath::Max(0.f, HH - R)), C + FVector(0.f, 0.f, FMath::Max(0.f, HH - R)), OnSwing, OnBody);
+			Hit.ImpactPoint = OnBody + (OnSwing - OnBody).GetSafeNormal() * R;
 		}
 		Hit.PathId = PathId;
 		Hit.bMelee = true;
@@ -796,7 +1185,7 @@ UWRGA_MoltenEdge::UWRGA_MoltenEdge()
 	StaminaKey = TEXT("stamina.weaponArt"); StaminaFallback = 14.f;
 	CooldownKey = TEXT("spells.moltenEdge.cooldown"); CooldownFallback = 2.f;
 	TimingKey = TEXT("weapon.lightTiming"); SwingKind = EWRSwingKind::WeaponArt;
-	Element = WRTags::Element_Fire; ArtKey = TEXT("spells.moltenEdge");
+	Element = WRTags::Element_Fire; ArtKey = TEXT("spells.moltenEdge"); bAllowedMounted = true;
 	StanceMultiplier = 1.5f;  // combat.md 2.12
 }
 
@@ -806,7 +1195,7 @@ UWRGA_Flurry::UWRGA_Flurry()
 	StaminaKey = TEXT("stamina.weaponArt"); StaminaFallback = 12.f;
 	CooldownKey = TEXT("spells.flurry.cooldown"); CooldownFallback = 1.5f;
 	TimingKey = TEXT("weapon.lightTiming"); SwingKind = EWRSwingKind::WeaponArt;
-	Element = WRTags::Element_Frost; ArtKey = TEXT("spells.flurry");
+	Element = WRTags::Element_Frost; ArtKey = TEXT("spells.flurry"); bAllowedMounted = true;
 	StanceMultiplier = 0.5f;
 }
 
@@ -816,7 +1205,7 @@ UWRGA_MoltenCleave::UWRGA_MoltenCleave()
 	StaminaKey = TEXT("stamina.weaponArt"); StaminaFallback = 25.f;
 	CooldownKey = TEXT("spells.moltenCleave.cooldown"); CooldownFallback = 12.f;
 	TimingKey = TEXT("weapon.heavyTiming"); SwingKind = EWRSwingKind::WeaponArt; bHeavy = true;
-	Element = WRTags::Element_Fire; ArtKey = TEXT("spells.moltenCleave");
+	Element = WRTags::Element_Fire; ArtKey = TEXT("spells.moltenCleave"); bAllowedMounted = true;
 	StanceMultiplier = 6.f;
 }
 
@@ -856,7 +1245,7 @@ UWRGA_FlameSlash::UWRGA_FlameSlash()
 	SwingKind = EWRSwingKind::WeaponArt;
 	bHeavy = true;
 	Element = WRTags::Element_Fire;
-	ArtKey = TEXT("spells.flameSlash");
+	ArtKey = TEXT("spells.flameSlash"); bAllowedMounted = true;
 	StanceMultiplier = 2.f;
 }
 
@@ -873,7 +1262,7 @@ UWRGA_IceSlash::UWRGA_IceSlash()
 	SwingKind = EWRSwingKind::WeaponArt;
 	bHeavy = true;
 	Element = WRTags::Element_Frost;
-	ArtKey = TEXT("spells.iceSlash");
+	ArtKey = TEXT("spells.iceSlash"); bAllowedMounted = true;
 	StanceMultiplier = 2.f;
 }
 
@@ -930,6 +1319,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	const FName Tier = bBackstep ? FName(TEXT("backstep")) : LoadTier(Character->GetEquipLoadRatio());
 	const FString Key = bBackstep ? FString(TEXT("defense.backstep.")) : FString::Printf(TEXT("defense.load.%s."), *Tier.ToString());
 	const bool bOverloaded = Tier == TEXT("overloaded");
+	bWasBackstep = bBackstep;
 	// Light step (frost node): the same roll, quicker (its frames shrink with it).
 	const float Quick = 1.f + UWRPathComponent::Stat(Character, TEXT("dodgeSpeed"));
 	const float Distance = T.Num(Key + TEXT("distance"), bBackstep ? 250.f : 500.f);
@@ -1044,6 +1434,12 @@ void UWRGA_Dodge::SetInvulnerable(bool bOn)
 void UWRGA_Dodge::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
 	SetInvulnerable(false);
+	if (AWRCharacterBase* Character = GetCharacter(); Character && IsActive() && !bWasCancelled)
+	{
+		// The rolling / backstep light picks from this (combat.contextWindow), on the server and the owner alike.
+		Character->LastDodgeEnd = GetWorld()->GetTimeSeconds();
+		Character->bLastDodgeBackstep = bWasBackstep;
+	}
 	Travel = nullptr;
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -1400,6 +1796,7 @@ void UWRGA_Critical::EndAbility(const FGameplayAbilitySpecHandle Handle, const F
 UWRGA_Spell::UWRGA_Spell()
 {
 	StaminaKey = TEXT("stamina.spell");
+	bAllowedMounted = true;  // bolts fly from the saddle (combat.md 2.19)
 	StaminaFallback = 12.f;
 	ActivationOwnedTags.AddTag(WRTags::State_Attacking);
 	FGameplayTagContainer Blocked = ActivationBlockedTags;
@@ -1416,15 +1813,19 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		return;
 	}
 	AWRCharacterBase* Character = GetCharacter();
-	Character->PlaySwing(EWRSwingKind::Cast, 0.25f);
-	SetMoveSlow(false, true);
+	// The bolt shape (combat.md 2.13, tuning spells.shapes.bolt): cast walking at half speed, its wind-up read by the
+	// creatures that answer a cast (State.Casting).
+	const float Windup = WRTune(TEXT("spells.shapes.bolt.windup"), 0.3f), Recovery = WRTune(TEXT("spells.shapes.bolt.recovery"), 0.35f);
+	Character->PlaySwing(EWRSwingKind::Cast, Windup + 0.1f);
+	SetMoveSlow(true, true);
+	Character->SetCombatTag(WRTags::State_Casting, true);
 	if (IsServer())
 	{
 		const bool bFire = Element == WRTags::Element_Fire;
-		WRFx::BroadcastOn(Character, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), TEXT("hand"), 1.f, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), 0.4f);
+		WRFx::BroadcastOn(Character, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), TEXT("hand"), 1.f, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), Windup + 0.1f);
 	}
 
-	After(0.15f, [this]()
+	After(Windup, [this]()
 	{
 		AWRCharacterBase* Caster = GetCharacter();
 		if (!Caster || !IsServer())
@@ -1448,6 +1849,7 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Hit.BurnBuildup = T.Num(SpellKey + TEXT(".burnBuildup"), 0.f);
 		Hit.FrostBuildup = T.Num(SpellKey + TEXT(".frostBuildup"), 0.f);
 		Hit.PathId = PathId;
+		Hit.bSpell = true;
 
 		// Point blank: a target between the caster and the spawn point would be spawned inside
 		// and never get a hit event, so resolve it directly.
@@ -1483,7 +1885,15 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		UWRCombatLibrary::GainResource(Caster, WRTags::Element_Fire, T.Num(SpellKey + TEXT(".heat"), 0.f));
 		UWRCombatLibrary::GainResource(Caster, WRTags::Element_Frost, T.Num(SpellKey + TEXT(".chill"), 0.f));
 	});
-	After(0.35f, [this]() { EndSelf(); });
+	After(Windup, [this]() { if (AWRCharacterBase* C = GetCharacter()) C->SetCombatTag(WRTags::State_Casting, false); });
+	After(Windup + Recovery, [this]() { EndSelf(); });
+}
+
+void UWRGA_Spell::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// Cut mid-cast (a stagger): the creatures stop reading a cast that isn't happening.
+	if (AWRCharacterBase* C = GetCharacter()) C->SetCombatTag(WRTags::State_Casting, false);
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 UWRGA_FireBolt::UWRGA_FireBolt()
@@ -1512,6 +1922,21 @@ UWRGA_FrostShard::UWRGA_FrostShard()
 
 // ---------------------------------------------------------------- area spells
 
+FString UWRGA_AreaSpell::ShapeKey() const
+{
+	switch (Shape)
+	{
+	case EWRAreaShape::Wall:
+	case EWRAreaShape::IceWall: return TEXT("spells.shapes.wall");
+	case EWRAreaShape::Pool: return TEXT("spells.shapes.pool");
+	case EWRAreaShape::Nova: return TEXT("spells.shapes.nova");
+	case EWRAreaShape::Lance: return TEXT("spells.shapes.lance");
+	case EWRAreaShape::Meteor: return TEXT("spells.shapes.strike");
+	case EWRAreaShape::Storm: return TEXT("spells.shapes.storm");
+	}
+	return TEXT("spells.shapes.nova");
+}
+
 void UWRGA_AreaSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -1519,15 +1944,75 @@ void UWRGA_AreaSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-	GetCharacter()->PlaySwing(EWRSwingKind::Cast, 0.35f);
-	SetMoveSlow(false, true);
+	SpellCharge = 1.f;
+	// A chargeable spell (spells.<key>.chargeable: Ice lance, Frost nova, Meteor) whose key is still held charges, up to
+	// x1.5 at 1.0 s (combat.md 2.13); otherwise it casts at once.
+	const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
+	if (WRTune(*(SpellKey + TEXT(".chargeable")), 0.f) > 0.f && Spec && Spec->InputPressed)
+	{
+		bSpellCharging = true;
+		SpellChargeStarted = GetWorld()->GetTimeSeconds();
+		GetCharacter()->SetCombatTag(WRTags::State_Charging, true);
+		SetMoveRoot(true);
+		GetCharacter()->PlaySwing(EWRSwingKind::Cast, 1.2f);
+		if (UAbilityTask_WaitInputRelease* Wait = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true))
+		{
+			Wait->OnRelease.AddDynamic(this, &UWRGA_AreaSpell::OnSpellChargeReleased);
+			Wait->ReadyForActivation();
+		}
+		After(WRTune(TEXT("spells.chargeMax"), 1.f), [this]() { if (bSpellCharging) OnSpellChargeReleased(0.f); });
+		return;
+	}
+	CastNow();
+}
+
+void UWRGA_AreaSpell::OnSpellChargeReleased(float /*TimeHeld*/)
+{
+	if (!bSpellCharging)
+	{
+		return;
+	}
+	bSpellCharging = false;
+	const float Held = float(GetWorld()->GetTimeSeconds() - SpellChargeStarted);
+	const float Max = FMath::Max(0.1f, WRTune(TEXT("spells.chargeMax"), 1.f));
+	SpellCharge = FMath::Lerp(1.f, WRTune(TEXT("spells.chargeDamage"), 1.5f), FMath::Clamp(Held / Max, 0.f, 1.f));
+	if (AWRCharacterBase* C = GetCharacter()) C->SetCombatTag(WRTags::State_Charging, false);
+	CastNow();
+}
+
+void UWRGA_AreaSpell::CastNow()
+{
+	AWRCharacterBase* Caster = GetCharacter();
+	if (!Caster)
+	{
+		EndSelf(true);
+		return;
+	}
+	// The shape's wind-up and recovery; walls, novas, Meteor and Blizzard root you, pools and lances cast walking.
+	const FString Key = ShapeKey();
+	const float Windup = WRTune(*(Key + TEXT(".windup")), 0.5f), Recovery = WRTune(*(Key + TEXT(".recovery")), 0.45f);
+	if (WRTune(*(Key + TEXT(".roots")), 1.f) > 0.f) SetMoveRoot(true);
+	else SetMoveSlow(true, true);
+	Caster->PlaySwing(EWRSwingKind::Cast, Windup + 0.1f);
+	Caster->SetCombatTag(WRTags::State_Casting, true);
 	if (IsServer())
 	{
 		const bool bFire = Element == WRTags::Element_Fire;
-		WRFx::BroadcastOn(GetCharacter(), bFire ? TEXT("cast.fire") : TEXT("cast.frost"), TEXT("hand"), 1.4f, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), 0.5f);
+		WRFx::BroadcastOn(Caster, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), TEXT("hand"), 1.4f * SpellCharge, bFire ? TEXT("cast.fire") : TEXT("cast.frost"), Windup + 0.1f);
 	}
-	After(0.25f, [this]() { if (IsServer()) Execute(); });
-	After(0.45f, [this]() { EndSelf(); });
+	After(Windup, [this]() { if (AWRCharacterBase* C = GetCharacter()) C->SetCombatTag(WRTags::State_Casting, false); if (IsServer()) Execute(); });
+	After(Windup + Recovery, [this]() { EndSelf(); });
+}
+
+void UWRGA_AreaSpell::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	if (AWRCharacterBase* C = GetCharacter())
+	{
+		C->SetCombatTag(WRTags::State_Casting, false);
+		C->SetCombatTag(WRTags::State_Charging, false);
+	}
+	bSpellCharging = false;
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UWRGA_AreaSpell::Execute()
@@ -1547,7 +2032,7 @@ void UWRGA_AreaSpell::Execute()
 	{
 		const float V = T.Num(SpellKey + TEXT(".") + Key, Fallback);
 		const FString K(Key);
-		return K == TEXT("radius") || K == TEXT("width") || K == TEXT("spacing") ? V * AreaScale : V;
+		return K == TEXT("radius") || K == TEXT("width") || K == TEXT("spacing") ? V * AreaScale : K == TEXT("damage") ? V * SpellCharge : V;
 	};
 	const FRotator Aim = Caster->GetBaseAimRotation();
 	const FVector Flat = FRotator(0.f, Aim.Yaw, 0.f).Vector();
@@ -1581,6 +2066,7 @@ void UWRGA_AreaSpell::Execute()
 		Hit.Element = Element;
 		(bFire ? Hit.BurnBuildup : Hit.FrostBuildup) = Num(bFire ? TEXT("burnBuildup") : TEXT("frostBuildup"), 40.f);
 		Hit.PathId = PathId;
+		Hit.bSpell = true;
 		Hit.Origin = Origin;
 		UWRCombatLibrary::ApplyHit(Target, Hit);
 	};
@@ -1643,7 +2129,7 @@ void UWRGA_AreaSpell::Execute()
 				if (*It != C && It->IsAlive() && C->IsHostileTo(*It) && FVector::Dist2D(It->GetActorLocation(), At) < Radius + It->GetSimpleCollisionRadius())
 				{
 					FWRHit H;
-					H.Instigator = C; H.Damage = Damage; H.PoiseDamage = 40.f; H.Element = WRTags::Element_Fire; H.BurnBuildup = Burn; H.PathId = Path; H.bHeavy = true; H.Origin = At;
+					H.Instigator = C; H.Damage = Damage; H.PoiseDamage = 40.f; H.Element = WRTags::Element_Fire; H.BurnBuildup = Burn; H.PathId = Path; H.bHeavy = true; H.bSpell = true; H.Origin = At;
 					UWRCombatLibrary::ApplyHit(*It, H);
 				}
 			}
@@ -1735,7 +2221,7 @@ UWRGA_IceLance::UWRGA_IceLance()
 {
 	DisplayName = TEXT("Ice lance"); PathId = TEXT("frost"); NodeId = TEXT("ice_lance");
 	SpellKey = TEXT("spells.iceLance"); CooldownKey = TEXT("spells.iceLance.cooldown"); CooldownFallback = 6.f;
-	Shape = EWRAreaShape::Lance; Element = WRTags::Element_Frost;
+	Shape = EWRAreaShape::Lance; Element = WRTags::Element_Frost; bAllowedMounted = true;
 }
 
 UWRGA_Meteor::UWRGA_Meteor()

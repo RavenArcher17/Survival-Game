@@ -185,6 +185,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		if (IsLocallyControlled())
 		{
 			TickAimCamera(DeltaSeconds);
+			TickCombatCamera(DeltaSeconds);
 			TickFirstPersonCamera(DeltaSeconds);
 		}
 		BodyAimTurn = FMath::FInterpTo(BodyAimTurn, IsAimingRanged() ? RangedAimYaw : 0.f, DeltaSeconds, 10.f);
@@ -1128,7 +1129,11 @@ void AWRCharacter::MulticastBodyOneShot_Implementation(FName Key)
 		return;
 	}
 	BodyAnim = NAME_None;
-	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(Key, false, 1.f, WRTune(TEXT("player.pickupVisualSeconds"), 1.2f));
+	// A drink plays its own clip when the hero has one (player_art drink); until then the hand-to-mouth of the cast clip,
+	// held for the drink's committed time (potions.drinkSeconds).
+	const bool bDrink = Key == TEXT("drink");
+	const FName Use = bDrink && !BodyAnims.Contains(Key) ? FName(TEXT("cast")) : Key;
+	BodyOneShotUntil = GetWorld()->GetTimeSeconds() + PlayBodyAnim(Use, false, 1.f, bDrink ? WRTune(TEXT("potions.drinkSeconds"), 0.9f) : WRTune(TEXT("player.pickupVisualSeconds"), 1.2f));
 }
 
 void AWRCharacter::OnHitVisual(EWRHitResult Result)
@@ -1201,6 +1206,11 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 	}
 	if (!AbilitySystem)
 	{
+		return;
+	}
+	if (HasTag(WRTags::Status_Frozen))
+	{
+		ServerMashFrozen();
 		return;
 	}
 	// Light on an opening is the critical (riposte / backstab).

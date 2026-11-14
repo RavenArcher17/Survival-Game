@@ -57,6 +57,14 @@
   },
 
   "combat": {
+    "_full": "Full attack set (cooks/build-combat-full.md 2.2-2.4): charge (Heavy held: min s to count, full s for the charged row's whole damage, max s it lets go by itself), contextWindow s after a roll / backstep for the rolling / backstep light, runAttackSpeed cm/s for a running attack, jumpAttack (maxAir s the blade stays live in the air, landGrace s after landing, heavyRadius x its sweep), counterHit (on a body winding up: damage, pierceDamage, stance), stealth (an unaware target: stance, buildup), twoHand (a 1h weapon held in both: damage, lightStance, heavyStance), minArtWindup / minHeavyCoil (the coil rule).",
+    "charge": { "min": 0.35, "full": 0.8, "max": 1.0 },
+    "contextWindow": 0.3, "runAttackSpeed": 450,
+    "jumpAttack": { "maxAir": 1.2, "landGrace": 0.1, "heavyRadius": 1.25 },
+    "counterHit": { "damage": 0.15, "pierceDamage": 0.3, "stance": 0.3 },
+    "stealth": { "stance": 0.2, "buildup": 0.2 },
+    "twoHand": { "damage": 0.15, "lightStance": 0.3, "heavyStance": 0.1, "holdSeconds": 0.5 },
+    "minArtWindup": 0.2, "minHeavyCoil": 0.2,
     "_comment": "Feel and commitment (COMBAT-AND-LESSONS 1.16, L2; cooks/build-combat-core.md 3.2). bufferSeconds: a press that can't start yet waits this long (the last press wins); a dodge pressed mid-swing waits up to dodgeBufferMax for the cancel window. comboFraction: the last part of a swing's recovery in which the next chain attack starts; cancelFraction: from this share of the recovery a roll or guard cuts the swing (lights / heavies). chainGrace: s after a swing ends in which a light still continues its chain. stepIn: the lock target (else the nearest enemy within range cm and cone degrees) pulls the swing in toward ideal x reach off its body, min..max cm (shorter steps are skipped), over stepFraction of the wind-up. lightMoveMultiplier: the legs keep walking at this speed while a light swings (heavies root you). clipWarp: the swing clip is timed so its contact frames land on the active window: the coil plays at most maxCoilRate (a longer lead-in starts later), below minRate it holds the first frame instead of crawling, the strike plays between activeMin and activeMax x. windowsFromClips 1 lets the clips' own notifies set the windows (0: the move rows do, the same on every machine and the server).",
     "bufferSeconds": 0.33, "dodgeBufferMax": 0.6, "comboFraction": 0.4,
     "cancelFraction": { "light": 0.5, "heavy": 0.65 }, "chainGrace": 0.35,
@@ -77,6 +85,8 @@
   },
 
   "stance": {
+    "_parts": "Breakable parts and head strikes (combat.md 2.10): a strike within headRadius cm of the head lock point x headStrikeMult stance; a blow within partRadius cm of a part takes its stance too; broken: partStaggerSeconds stagger and partBreakBodyStance of the body's stance.",
+    "headRadius": 70, "headStrikeMult": 1.5, "partRadius": 120, "partStaggerSeconds": 1.2, "partBreakBodyStance": 0.3,
     "_comment": "Creature and boss stance (COMBAT-AND-LESSONS 1.4): a hidden meter by tier (creatures.json stance overrides); hits take it down by their stance damage (weapons.json moves; spells and creatures' own blows by damage x spellPerDamage / creaturePerDamage; a shatter x shatterMult). It starts refilling max / regenDelayDivisor s after the last stance hit, at regenPerSecond (x lowHealthRegen below half health, Sekiro). At zero it breaks for breakSeconds by tier: the crit opens. Bosses take stance damage x group.<participants> (4 or more: group.4; tames count). Parries: parriesToBreak by kind; a parry that doesn't break takes nonBreakParryStance of max. slump: the broken body's head drops pitch degrees and it sinks by sink x its half height over seconds.",
     "tiers": { "lowland": 20, "midland": 35, "highland": 55, "mini": 90, "major": 140, "none": 60 },
     "breakSeconds": { "lowland": 2.5, "midland": 2.5, "highland": 3.0, "mini": 4.0, "major": 5.0, "none": 2.5 },
@@ -88,9 +98,10 @@
   },
 
   "poise": {
+    "hyperarmorDamageTakenGreat": 0.175,
     "_comment": "Poise (COMBAT-AND-LESSONS 1.5; combat.md 2.5). A player whose poise breaks reacts by the blow's impact (1 flinch, 2 stagger, 3+ heavy stagger: s locked); a blow that doesn't break it is a shudder. Creatures flinch for creatureFlinchSeconds unless they're attacking with hyperarmor (creatures.json hyperarmor, bosses). The hyperarmor window of a heavy (wind-up to the end of its strike) multiplies poise by hyperarmor.heavy and takes hyperarmorDamageTaken less damage.",
     "reactions": { "1": 0.25, "2": 0.55, "3": 0.85, "4": 0.85, "5": 0.85 },
-    "hyperarmor": { "heavy": 1.5 }, "hyperarmorDamageTaken": 0.075,
+    "hyperarmor": { "heavy": 1.5, "great": 2.5 }, "hyperarmorDamageTaken": 0.075,
     "shudderSeconds": 0.12, "creatureFlinchSeconds": 0.45
   },
 
@@ -117,9 +128,26 @@
   },
 
   "status": {
+    "_full": "Every status (cooks/build-combat-full.md 2.9, combat.md 2.11): a meter fills per hit and procs at the threshold (thresholds by tier; players 100 + worn resist), x procGrowth after each proc until resetAfterCombat s without a blow; bosses x bossParticipantResist per extra participant. infusedBuildup: what an infused weapon's light / heavy / charged blow builds. defs: each status's colour (sRGB hex, on the bars) and proc numbers.",
+    "thresholds": { "player": 100, "lowland": 100, "midland": 120, "highland": 150, "mini": 250, "major": 400, "none": 100 },
+    "procGrowth": 1.3, "resetAfterCombat": 30, "bossParticipantResist": 1.25,
+    "infusedBuildup": { "light": 8, "heavy": 14, "charged": 22 },
+    "defs": {
+      "burn": { "color": "FF7A1E", "seconds": 6 },
+      "frost": { "color": "A8DCFF", "seconds": 12, "burstPct": 0.08, "bossBurstPct": 0.04, "burstFlat": 20, "playerStaminaRegen": 0.6, "rimedSeconds": 4, "rimedStance": 1.5, "mashSeconds": 0.15, "mashMinSeconds": 1.2 },
+      "bleed": { "color": "7A0A14", "burstPct": 0.12, "burstFlat": 15, "bossScale": 0.7, "markSeconds": 6 },
+      "poison": { "color": "5FB830", "seconds": 30, "pctPerSecond": 0.004, "flatPerSecond": 2 },
+      "rot": { "color": "A0522D", "seconds": 20, "pctPerSecond": 0.008, "flatPerSecond": 4, "healingTaken": 0.5 },
+      "shock": { "color": "C9B8FF", "stagger": 0.4, "bossStance": 15, "playerStamina": 20, "chainShare": 0.25, "chainTargets": 2, "chainRadius": 400 },
+      "soak": { "color": "2FA8A0", "seconds": 10, "slow": 0.8, "fireBuildup": 0.5, "shockBuildup": 1.5, "frostBuildup": 1.5, "fireRadius": 400, "drySeconds": 3 },
+      "blind": { "color": "EEF2F6", "seconds": 3, "bossSeconds": 1.5, "vignette": 0.4 },
+      "decay": { "color": "7E8C6A", "maxHealthPct": 0.1, "seconds": 20, "healingTaken": 0.5, "playerRestSeconds": 600 },
+      "mark": { "color": "9A5CE6", "seconds": 10, "damageTaken": 0.15 },
+      "curse": { "color": "3A1A4A", "seconds": 15, "resourceLoss": 0.25, "damageDealt": 0.15 }
+    },
     "buildupThreshold": 100, "buildupDecayPerSecond": 8, "buildupDecayDelay": 3,
     "burnSeconds": 6, "burnDamagePerSecond": 4, "igniteChancePerRank": 0.05,
-    "frostbiteSeconds": 6, "frostbiteDamageTakenBonus": 0.15, "slowMultiplier": 0.6,
+    "frostbiteSeconds": 12, "frostbiteDamageTakenBonus": 0.2, "slowMultiplier": 0.6,
     "frozenSeconds": 2.5,
     "shatterDamage": 30,
     "thawDamage": 40,
@@ -148,6 +176,17 @@
   },
 
   "spells": {
+    "_shapes": "Spell shapes (combat.md 2.13): wind-up and recovery s; roots 1 = you stand to cast (walls, novas, Meteor, Blizzard), 0 = you walk at half speed (bolts, lances, pools). A spell with chargeable 1 charges while its key is held: x chargeDamage at chargeMax s.",
+    "shapes": {
+      "bolt": { "windup": 0.30, "recovery": 0.35, "roots": 0 },
+      "lance": { "windup": 0.45, "recovery": 0.40, "roots": 0 },
+      "nova": { "windup": 0.55, "recovery": 0.45, "roots": 1 },
+      "wall": { "windup": 0.60, "recovery": 0.45, "roots": 1 },
+      "pool": { "windup": 0.50, "recovery": 0.40, "roots": 0 },
+      "strike": { "windup": 0.90, "recovery": 0.50, "roots": 1 },
+      "storm": { "windup": 0.80, "recovery": 0.50, "roots": 1 }
+    },
+    "chargeMax": 1.0, "chargeDamage": 1.5,
     "lockLead": 1, "lockHoming": 6000, "lockHomingPlayers": 2000, "lockRange": 4000,
     "_lock": "With a target locked on, bolts aim ahead of where it's going (lockLead 0 = at where it is), then curve toward it: cm/s/s, less against other players so they can dodge. A target past lockRange cm isn't aimed at.",
     "fireBolt": { "damage": 18, "burnBuildup": 35, "speed": 2600, "cooldown": 1.2, "heat": 10 },
@@ -156,14 +195,14 @@
     "iceSlash": { "multiplier": 1.3, "frostBuildup": 50, "cooldown": 3.0, "chill": 8 },
     "fireWall": { "dps": 10, "seconds": 6, "distance": 600, "width": 800, "patches": 5, "cooldown": 10, "heat": 15 },
     "lavaPool": { "dps": 12, "seconds": 8, "radius": 300, "range": 1500, "cooldown": 12, "heat": 15 },
-    "frostNova": { "damage": 16, "frostBuildup": 55, "poise": 15, "radius": 500, "cooldown": 8, "chill": 10 },
+    "frostNova": { "chargeable": 1, "damage": 16, "frostBuildup": 55, "poise": 15, "radius": 500, "cooldown": 8, "chill": 10 },
     "moltenEdge": { "multiplier": 1.1, "burnBuildup": 55, "cooldown": 2.0, "heat": 8 },
     "flurry": { "multiplier": 0.9, "frostBuildup": 35, "cooldown": 1.5, "chill": 6 },
     "moltenCleave": { "multiplier": 2.0, "burnBuildup": 80, "cooldown": 12, "heat": 20, "lavaRadius": 220, "lavaSeconds": 6, "lavaDps": 10 },
-    "meteor": { "damage": 55, "burnBuildup": 70, "radius": 450, "delay": 1.2, "range": 2500, "cooldown": 30, "heat": 25 },
+    "meteor": { "chargeable": 1, "damage": 55, "burnBuildup": 70, "radius": 450, "delay": 1.2, "range": 2500, "cooldown": 30, "heat": 25 },
     "iceWall": { "pillars": 5, "spacing": 200, "distance": 500, "seconds": 8, "cooldown": 14, "chill": 10 },
     "blizzard": { "radius": 650, "seconds": 8, "dps": 6, "cooldown": 30, "chill": 20 },
-    "iceLance": { "damage": 30, "frostBuildup": 45, "poise": 20, "range": 2000, "cooldown": 6, "chill": 10 },
+    "iceLance": { "chargeable": 1, "damage": 30, "frostBuildup": 45, "poise": 20, "range": 2000, "cooldown": 6, "chill": 10 },
     "_all": "placeholder"
   },
 
@@ -248,9 +287,21 @@
 
   "camera": { "_comment": "Third-person camera (WRCameraBoom, polish pass): the wall / tree probe radius cm; how fast the camera eases back out after something pulled it in (it always pulls in at once); degrees the view widens while sprinting and how fast; lock-on turns start at lockOnStartSpeed and firm up to lockOnSpeed over lockOnEaseSeconds. Lock-on takes what's visible within lockOnRange cm and lockOnAngle degrees of the crosshair, nearest it (lockOnDistanceWeight degrees is what being at the far end of the range counts for); it lets go past lockOnKeepRange cm or after lockOnLostSeconds out of sight.",
     "probeSize": 16, "returnSpeed": 3.5, "sprintFov": 6, "sprintFovSpeed": 3, "lockOnStartSpeed": 2.5, "lockOnSpeed": 7, "lockOnEaseSeconds": 0.5,
-    "lockOnRange": 2500, "lockOnAngle": 40, "lockOnDistanceWeight": 15, "lockOnKeepRange": 3500, "lockOnLostSeconds": 2.5 },
+    "lockOnRange": 2500, "lockOnAngle": 40, "lockOnDistanceWeight": 15, "lockOnKeepRange": 3500, "lockOnLostSeconds": 2.5,
+    "_full": "cooks/build-combat-full.md 2.19 (CAL 1.15): the arm collides only with walls, cliffs and big rocks (the WRCamera channel; props and bodies ignore it), pulls in at once, holds holdSeconds, then eases out over easeOutSeconds; the hero hides under hideUnder cm from the lens. Giant framing: a lock target taller than giantRatio x you pulls the arm back giantBoom cm and pitches the view up giantPitch degrees (over giantSeconds). Mouse flick: a sideways mouse sweep of mouseFlickPx px/s with a lock on switches target (flickRearm s between).",
+    "holdSeconds": 0.15, "easeOutSeconds": 0.4, "hideUnder": 100, "giantRatio": 3, "giantBoom": 150, "giantPitch": 10, "giantSeconds": 0.4, "mouseFlickPx": 300, "mouseFlickMinPx": 40, "flickRearm": 0.25, "blockMinExtent": 160},
 
   "bosses": {
+    "_full": "The attack machine (cooks/build-combat-full.md 2.16): bands (close / mid cm) pick rows by their weights; a move never three times running (maxRepeats); things in the air at once (projectilesInFlight p1 / p2); idle gaps after a string (idleGap p1 / p2 min-max s); tracking turns at trackRate deg/s through a row's track share; slam waves roll at waveSpeed cm/s, waveDepth deep; dives come down at diveSpeed. Shrine-stones (runbackStone) min-max cm from the arena, height / width cm, rune light. First-kill drops rise firstKillRise cm/s, fly at firstKillFlySpeed after firstKillFlySeconds or within firstKillPickup cm. Roaming minis walk their loop at roamInput. Cinderhorn's basalt pillars (basaltWidth / Height / Sink cm) take pillarCharges charges.",
+    "bands": { "close": 400, "mid": 1200 }, "maxRepeats": 2,
+    "projectilesInFlight": { "p1": 1, "p2": 2 },
+    "idleGap": { "p1": { "min": 0.6, "max": 1.4 }, "p2": { "min": 0.3, "max": 0.9 } },
+    "trackRate": 120, "waveSpeed": 1200, "waveDepth": 180, "diveSpeed": 3000,
+    "runbackStone": { "min": 4000, "max": 6000, "height": 160, "width": 70, "light": 1800 },
+    "firstKillRise": 180, "firstKillFlySeconds": 6, "firstKillFlySpeed": 1200, "firstKillPickup": 400,
+    "roamInput": 0.45, "basaltWidth": 120, "basaltHeight": 320, "basaltSink": 60,
+    "cinderhorn": { "health": 3200, "trailEvery": 0.18, "trailRadius": 150, "trailSeconds": 6, "trailDps": 8, "frostTrailOffSeconds": 20, "pillarCharges": 2, "arenaRadius": 2600, "chaseRadius": 6500 },
+    "old_tusker": { "health": 3600, "bellowAt": 0.6, "bellowCalls": 2, "wallowSeconds": 6, "wallowCooldown": 12, "wallowStance": 1.5, "snowSeconds": 6, "arenaRadius": 2600, "chaseRadius": 6500 },
     "_comment": "Shared boss rules, then per-boss overrides: bosses.<id>.<attack>.damage/windup/cooldown/range/size, bosses.<id>.health/arenaRadius/chaseRadius/... (see WRBoss.cpp for every key). arenaRadius (30 m major, 22 m mini) is the floor its floods and props cover; it chases, and counts as fighting, anyone within chaseRadiusMajor / Mini cm of its home. With nobody there for resetSeconds (8) it resets and walks home; one that isn't home after returnStuckSeconds is put back.",
     "_flags": "bosses.<id>.<attack>.parryable / low / grab / unblockable / impact (COMBAT-AND-LESSONS 1.3, 1.13): only parryable blows can be parried (boss grabs like the tongs are), low ones pass under a jump, grabs ignore hyperarmor and guards. Blocked boss blows cost defense.bossStaminaDamage x damage before the guard boost.", "lootDamageFraction": 0.1, "partChance": 0.25, "weaknessMultiplier": 1.5, "arenaPvpRadius": 3000,
     "chaseRadiusMajor": 9000, "chaseRadiusMini": 6500, "returnStuckSeconds": 25,
@@ -351,7 +402,16 @@
                       "enabled": 1, "range": 6000, "maxPitch": 30, "maxRoll": 15, "tiltScale": 1.0, "pivot": 1.0, "maxDrop": 0.35, "maxRaise": 0.5, "footMaxTilt": 35, "smoothing": 18, "fadeSeconds": 0.25 },
     "creatureSpine": { "_comment": "Legless creatures with a spine chain (Tools/art/rig_special.py worm: Glacimaw) on uneven ground: the ground under every joint is traced like the creature feet (same range, smoothing, fade), and each spine bone turns up to maxBend degrees so the body lies along it. Off with creatureFeet.enabled 0. placeholder", "maxBend": 35 } },
   "artCam": { "_comment": "WRArtCam (art checks, animshots, creaturevideo): the camera stands sizes x the subject's largest half-extent + extra cm away. Videos pass a tighter framing with -Tune.", "sizes": 3.2, "extra": 150 },
-  "creatureAI": { "_comment": "Wild creature behaviour. Hunting: carnivores get hungry every huntIntervalMinutes (x0.75-1.25), hunt the nearest wild non-carnivore up to preySizeRatio x their own radius (pack hunters packPreySizeRatio), eat a kill for eatSeconds (every hunter on it within shareKillRadius shares it), retry huntRetrySeconds after prey gets away; prey notice a hunter within preyNoticeRadius and bolt in bursts (preyRestSeconds between runs); a hunter in pursuit runs at huntSpeedMult and follows prey up to huntLeash cm from home. Morale: flee below fleeHealth, or below packFleeHealth when a packmate died in the last packLossSeconds, for fleeSeconds at fleeSpeedMult. Sleep: aggro x sleepAggroMult asleep, x nightAggroMult for night hunters at night; a hit keeps it awake wokenSeconds. Attacks: min/max range cm, windup s (telegraphed), cooldown s, damageMult x its bite, poise, plus per-move numbers. placeholder",
+  "creatureAI": {
+    "_rows": "Attack rows (Data/attacks.json, cooks/build-combat-full.md 2.15): minWindup s (no faster tell), finalCueSeconds before a held strike's contact, maxProjectileSpeed cm/s (Fire / Frost; never homing), offscreen (a wind-up starts only within offscreenHalfAngle degrees of its target's view, or within offscreenAudibleRadius cm), readsActionCooldown s, stomp waves (waveSpeed cm/s, waveDepth cm), breathe (after a string: min-max s, at distance.min-max cm), flank (inner-outer cm ring, tolerance cm), withdraw (a quarter of its stance in window s: shelled up seconds, damageTaken x, strikeMult x), howl callRadius, pulling (a hit from beyond pullRange cm alerts packmates within pullAlertRadius cm that see it).",
+    "minWindup": 0.34, "finalCueSeconds": 0.2, "maxProjectileSpeed": 1000,
+    "offscreenHalfAngle": 55, "offscreenAudibleRadius": 800, "readsActionCooldown": 6,
+    "stomp": { "radius": 320, "bodyRadius": 90, "waveSpeed": 1200, "waveDepth": 150 },
+    "breathe": { "min": 1.0, "max": 2.5, "distance": { "min": 500, "max": 800 } },
+    "flank": { "inner": 400, "outer": 700, "tolerance": 160 },
+    "withdraw": { "window": 2, "share": 0.25, "seconds": 3, "damageTaken": 0.2, "strikeMult": 1.5 },
+    "howl": { "callRadius": 4000 },
+    "pullRange": 600, "pullAlertRadius": 600, "_comment": "Wild creature behaviour. Hunting: carnivores get hungry every huntIntervalMinutes (x0.75-1.25), hunt the nearest wild non-carnivore up to preySizeRatio x their own radius (pack hunters packPreySizeRatio), eat a kill for eatSeconds (every hunter on it within shareKillRadius shares it), retry huntRetrySeconds after prey gets away; prey notice a hunter within preyNoticeRadius and bolt in bursts (preyRestSeconds between runs); a hunter in pursuit runs at huntSpeedMult and follows prey up to huntLeash cm from home. Morale: flee below fleeHealth, or below packFleeHealth when a packmate died in the last packLossSeconds, for fleeSeconds at fleeSpeedMult. Sleep: aggro x sleepAggroMult asleep, x nightAggroMult for night hunters at night; a hit keeps it awake wokenSeconds. Attacks: min/max range cm, windup s (telegraphed), cooldown s, damageMult x its bite, poise, plus per-move numbers. placeholder",
     "huntIntervalMinutes": 5, "eatSeconds": 8, "huntRetrySeconds": 45, "preySizeRatio": 1.25, "packPreySizeRatio": 2.0, "preyNoticeRadius": 1500, "huntSpeedMult": 1.3, "preyRestSeconds": 4, "huntLeash": 8000, "shareKillRadius": 1200,
     "fleeHealth": 0.25, "packFleeHealth": 0.5, "packLossSeconds": 15, "fleeSeconds": 8, "fleeSpeedMult": 1.2,
     "sleepAggroMult": 0.35, "nightAggroMult": 1.4, "wokenSeconds": 30,
@@ -393,5 +453,38 @@
     "endpoint": "https://freedom35studios.pages.dev/api/feedback", "game": "wildreach",
     "shotMaxWidth": 1280, "shotMaxBytes": 330000, "contextMaxChars": 3900, "retrySeconds": 30,
     "forwardChunkBytes": 8192, "forwardBytesPerTick": 8192, "hostMinSeconds": 10
+  },
+
+  "reactions": {
+    "_comment": "Element reactions (FULL-GAME 4.2, cooks/build-combat-full.md 2.10): the last element to strike a body clings for window s; a different one landing inside it reacts and uses it up. Two players' elements meeting (or the owner of the pair) react in full, one player alone at nonOwnerScale. Fire then frost = the steam burst: damage, poise, soak and blind to everyone within radius cm. Lightning on a soaked body: + damage share and a shockChance free shock.",
+    "window": 4, "nonOwnerScale": 0.5,
+    "steam": { "radius": 300, "damage": 30, "poise": 20, "soak": 30, "blind": 40 },
+    "lightningOnSoak": { "damage": 0.25, "shockChance": 0.3 }
+  },
+
+  "wildbrands": {
+    "_comment": "Wildbrands (combat.md 2.12): a weapon art slotted and fired through the held weapon. fits: the classes it works with (empty: every melee class; a slot that doesn't fit greys out with the reason); windup / active / recovery s; dmg x the class's light (heavy for heavy arts) hit; stance x the class's light stance; buildup per hit; ha: hyperarmor through it; heat / chill: what it builds; stamina; charge (hold the slot: max s, dmg x at max); followUp (a second press from its combo window until window s after it: dmg, windup); mounted: usable from the saddle. Raven's spells.<art> numbers are the fallback.",
+    "flame_slash": { "fits": [], "windup": 0.32, "active": 0.22, "recovery": 0.45, "dmg": 1.4, "stance": 2, "buildup": { "burn": 45 }, "ha": 1, "heat": 12, "stamina": 18, "mounted": true },
+    "molten_edge": { "fits": ["sword", "axe", "dagger", "greatsword", "scythe"], "windup": 0.24, "active": 0.18, "recovery": 0.36, "dmg": 1.1, "stance": 1.5, "buildup": { "burn": 55 }, "ha": 0, "heat": 8, "stamina": 18, "followUp": { "window": 0.5, "dmg": 1.1, "windup": 0.2 } },
+    "molten_cleave": { "fits": ["axe", "greatsword", "great_hammer", "pick_hammer"], "windup": 0.60, "active": 0.28, "recovery": 0.70, "dmg": 2.0, "stance": 6, "buildup": { "burn": 80 }, "ha": 1, "heat": 20, "stamina": 25, "charge": { "max": 1.0, "dmg": 1.3 } },
+    "ice_slash": { "fits": [], "windup": 0.30, "active": 0.22, "recovery": 0.44, "dmg": 1.3, "stance": 2, "buildup": { "frost": 50 }, "ha": 1, "chill": 8, "stamina": 18, "mounted": true },
+    "flurry": { "fits": ["dagger", "sword", "spear", "fists"], "windup": 0.20, "active": 0.40, "recovery": 0.36, "dmg": 0.9, "stance": 0.5, "buildup": { "frost": 35 }, "ha": 0, "chill": 6, "stamina": 18, "followUp": { "window": 0.4, "dmg": 0.9, "windup": 0.18 } }
+  },
+
+  "potions": {
+    "_comment": "The drink (CAL 1.10, combat.md 2.16): drinkSeconds committed (no cancelling), the heal lands at healAt s, walking at walkMultiplier meanwhile; one sharedCooldown s for every drink on the belt. A stagger mid-drink loses it.",
+    "drinkSeconds": 0.9, "healAt": 0.5, "walkMultiplier": 0.4, "sharedCooldown": 1.5
+  },
+
+  "mounted": {
+    "_comment": "Fighting from the saddle (combat.md 2.19): Light swings to the side the camera faces, Heavy rears and strikes ahead (running-attack rows). A spear at couchSpeed cm/s or more: hold Heavy to couch it for couchSeconds: the first body within couchRadius of its line couchReach cm ahead takes couchDamage x the heavy, couchStance x stance, impact 5. A hit of unhorseImpact or more (or one that staggers the mount) throws the rider (unhorseKnockdown s down). The mount bites its rider's lock target every mountBiteSeconds when in reach.",
+    "couchSpeed": 900, "couchSeconds": 1.5, "couchReach": 260, "couchRadius": 60, "couchDamage": 2.0, "couchStance": 4,
+    "unhorseImpact": 4, "unhorseKnockdown": 1.2, "mountBiteSeconds": 2.0
+  },
+
+  "pvp": {
+    "_comment": "Player against player (combat.md 2.20, ER patch 1.07): damage x global, then x the weapon class's pvp (Data/weapons.json), Wildbrands x wildbrand, spells x spell, a tame's bite x tameDamage; status buildup x buildup. Crits: crit.pvpBackstabArc, crit.pvpDamage, crit.riseIFrames. combatTagSeconds: hitting or being hit by a player holds you in the fight (no fast travel, no changing where you wake, no clan storage); logging out meanwhile leaves your body in the world logoutBodySeconds.",
+    "damage": 0.6, "buildup": 0.7, "wildbrand": 0.85, "spell": 0.85, "capstone": 0.7, "tameDamage": 0.5,
+    "dodgeSkillIFrames": 0.7, "combatTagSeconds": 15, "logoutBodySeconds": 30, "defenderLag": 1
   }
 }

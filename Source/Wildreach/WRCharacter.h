@@ -118,6 +118,17 @@ public:
 	// Held tools (WRHeldTool.cpp).
 	/** Server (from the inventory): what's in the weapon hand, None for bare hands. A tool there shows in the hand. */
 	void SetMeleeItem(FName ItemId);
+	/** A weapon the hero holds as a modelled class weapon (dagger, spear, greatsword, great hammer, scythe). */
+	static bool IsClassWeapon(FName ItemId);
+	/** Two-handing (combat.md 2.4.0): the owner asks, the server sets bTwoHanded (one-handed weapons only). */
+	UFUNCTION(Server, Reliable) void ServerSetTwoHanded(bool bOn);
+	virtual void OnRep_TwoHanded() override;
+	/** Players: a press while frozen breaks free sooner. */
+	UFUNCTION(Server, Unreliable) void ServerMashFrozen();
+	/** Giant framing and hiding the hero from a camera pressed against it (WRCharacterCombat.cpp). */
+	void TickCombatCamera(float DeltaSeconds);
+	float GiantBlend = 0.f;
+	bool bHiddenByCamera = false;
 	FName GetMeleeItem() const { return MeleeItem; }
 
 	// Ranged weapons (WRRanged.cpp).

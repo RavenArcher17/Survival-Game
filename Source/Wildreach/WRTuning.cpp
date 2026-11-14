@@ -90,6 +90,33 @@ TSharedPtr<FJsonObject> FWRTuning::Find(const FString& Path) const
 	return Cur;
 }
 
+TSharedPtr<FJsonObject> FWRTuning::Object(const FString& Path) const
+{
+	const TSharedPtr<FJsonObject> Holder = Find(Path);
+	FString Leaf;
+	if (!Path.Split(TEXT("."), nullptr, &Leaf, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+	{
+		Leaf = Path;
+	}
+	const TSharedPtr<FJsonObject>* Obj = nullptr;
+	return Holder.IsValid() && Holder->TryGetObjectField(Leaf, Obj) ? *Obj : nullptr;
+}
+
+bool FWRTuning::Has(const FString& Path) const
+{
+	if (Overrides.Contains(Path))
+	{
+		return true;
+	}
+	const TSharedPtr<FJsonObject> Holder = Find(Path);
+	FString Leaf;
+	if (!Path.Split(TEXT("."), nullptr, &Leaf, ESearchCase::IgnoreCase, ESearchDir::FromEnd))
+	{
+		Leaf = Path;
+	}
+	return Holder.IsValid() && Holder->HasField(Leaf);
+}
+
 float FWRTuning::Num(const FString& Path, float Fallback) const
 {
 	if (const float* Override = Overrides.Find(Path))

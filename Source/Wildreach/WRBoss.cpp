@@ -210,6 +210,23 @@ void AWRBossProp::Setup(FName InKind)
 
 void AWRBossProp::OnRep_Kind()
 {
+	if (Kind == TEXT("basalt"))
+	{
+		// A basalt column of the ash plains (Cinderhorn's loop): one of the rock set stood upright 1.2 m across and
+		// 3 m tall, rooted 60 cm into the ash, in the island's rock; it blocks a charge (and breaks after two).
+		if (UStaticMesh* Rock = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_07A.SM_SimpleRock_07A")))
+		{
+			Mesh->SetStaticMesh(Rock);
+			const FBox B = Rock->GetBoundingBox();
+			const FVector Size = B.GetSize();
+			const float Wide = WRTune(TEXT("bosses.basaltWidth"), 120.f), Tall = WRTune(TEXT("bosses.basaltHeight"), 320.f);
+			const FVector Scale(Wide / FMath::Max(1.f, Size.X), Wide / FMath::Max(1.f, Size.Y), Tall / FMath::Max(1.f, Size.Z));
+			Mesh->SetRelativeScale3D(Scale);
+			if (UMaterialInterface* RockMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Rock.M_Rock"))) Mesh->SetMaterial(0, RockMat);
+		}
+		Radius = WRTune(TEXT("bosses.basaltWidth"), 120.f) * 0.5f;
+		return;
+	}
 	if (Kind == TEXT("pillar"))
 	{
 		if (UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
@@ -295,6 +312,16 @@ void AWRBoss::BuildAttacks()
 	Attacks.Reset();
 	const auto Add = [this](FWRBossAttack A) -> FWRBossAttack& { return Attacks.Add_GetRef(A); };
 	const FName Id = CreatureId;
+	// The rows in Data/attacks.json (windup, hold, active, punish, combos, bands, tells: cooks/build-combat-full.md
+	// 2.16); the built-in moves below are what a boss without rows still has.
+	if (const TArray<FWRAttackRow>* Rows = FWRAttackRows::Get().Boss(Id))
+	{
+		for (const FWRAttackRow& Row : *Rows)
+		{
+			Add(MakeFromRow(Row));
+		}
+		return;
+	}
 	if (Id == TEXT("vulkarn"))
 	{
 		Add(MakeAttack(TEXT("hammer_combo"), S::Cone, 480.f, 55.f, 0.6f, 40.f, 5.f)).Repeats = 3;
@@ -522,6 +549,13 @@ void AWRBoss::ResetFight()
 	Participants = 1;
 	Ledger.Reset();
 	Current = INDEX_NONE;
+	StrikeState = EStrike::None;
+	PendingPhase = 0;
+	TransitionsDone.Reset();
+	bBellowed = false;
+	InFlight = 0;
+	NoHammerUntil = TrailOffUntil = CoolUntil = StanceOpenUntil = 0.0;
+	ResetParts();
 	SetPhase(1);
 	AbilitySystem->RemoveLooseGameplayTag(WRTags::State_Invulnerable, 100);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetMaxHealthAttribute(), SoloHealth);
@@ -647,6 +681,11 @@ AWRCharacterBase* AWRBoss::PickBossTarget() const
 float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 {
 	HealthBeforeHit = GetAttributes()->GetHealth();
+	// Mid-transition it takes less (combat.md 2.17.1: half): the change can't be skipped by burst.
+	if (Attacks.IsValidIndex(Current) && Attacks[Current].bRow && Attacks[Current].Row.DamageTaken < 1.f)
+	{
+		Damage *= Attacks[Current].Row.DamageTaken;
+	}
 	const FWRCreatureDef* Def = GetDef();
 	// Weak to the opposite element.
 	const FGameplayTag Weak = BossElement() == WRTags::Element_Fire ? WRTags::Element_Frost : WRTags::Element_Fire;
@@ -767,184 +806,6 @@ bool AWRBoss::InShape(const FWRBossAttack& Attack, const FVector& Point) const
 	return false;
 }
 
-void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
-{
-	const double Now = GetWorld()->GetTimeSeconds();
-	Current = Attacks.IndexOfByPredicate([&Attack](const FWRBossAttack& A) { return A.Id == Attack.Id; });
-	RepeatsLeft = Attack.Repeats;
-	Attack.ReadyAt = Now + Attack.Cooldown * (CreatureId == TEXT("vulkarn") && Attack.Id == TEXT("anvil_slam") && Phase >= 2 ? 0.6f : 1.f);
-	const FVector ToTarget = Target->GetActorLocation() - GetActorLocation();
-	AttackFacing = FRotator(0.f, ToTarget.Rotation().Yaw, 0.f);
-	SetActorRotation(AttackFacing);
-	AttackPoint = Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight());
-	ResolveAt = Now + Attack.Windup;
-
-	// Telegraph: every attack shows where it lands.
-	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, bAirborne ? 0.f : GetSimpleCollisionHalfHeight());
-	const FLinearColor Color = Attack.bMelee ? FLinearColor(1.f, 0.15f, 0.05f) : FLinearColor(1.f, 0.75f, 0.1f);
-	switch (Attack.Shape)
-	{
-	case EWRBossShape::SelfCircle: AWRGroundMarker::Spawn(GetWorld(), Floor, AttackFacing, FVector2D(Attack.Size, Attack.Size), false, Color, Attack.Windup); break;
-	case EWRBossShape::TargetCircle: AWRGroundMarker::Spawn(GetWorld(), AttackPoint, AttackFacing, FVector2D(Attack.Size, Attack.Size), false, Color, Attack.Windup); break;
-	case EWRBossShape::Cone: AWRGroundMarker::Spawn(GetWorld(), Floor, AttackFacing, FVector2D(Attack.Range, Attack.Range * FMath::Tan(FMath::DegreesToRadians(Attack.Size)) * 0.8f), true, Color, Attack.Windup); break;
-	case EWRBossShape::Line: AWRGroundMarker::Spawn(GetWorld(), Floor, AttackFacing, FVector2D(Attack.Range, Attack.Size), true, Color, Attack.Windup); break;
-	}
-	PlaySwing(EWRSwingKind::Heavy, Attack.Windup + 0.2f);
-	UE_LOG(LogWildreach, Log, TEXT("BOSS %s winds up %s at %s"), *GetDisplayLabel(), *Attack.Id.ToString(), *Target->GetName());
-}
-
-void AWRBoss::ResolveAttack()
-{
-	FWRBossAttack& Attack = Attacks[Current];
-	const double Now = GetWorld()->GetTimeSeconds();
-	const bool bHiddenStrike = IsHidden() && Now > RevealedUntil;
-	float Scale = (Phase >= 3 ? Tune(TEXT("phase3DamageScale"), 1.4f) : 1.f) * BossDamageScale();
-	if (bHiddenStrike && CreatureId == TEXT("pale_hunter"))
-	{
-		Scale *= Tune(TEXT("ambushMultiplier"), 2.f);  // ambush from cover
-		RevealedUntil = Now + 3.0;
-	}
-
-	// Movement attacks carry the boss.
-	if (Attack.Shape == EWRBossShape::Line && Attack.Id != TEXT("tongs_grab"))
-	{
-		const FVector End = GetActorLocation() + AttackFacing.Vector().GetSafeNormal2D() * Attack.Range * 0.8f;
-		SetActorLocation(End, true);
-	}
-	if (Attack.Id == TEXT("dive"))
-	{
-		SetActorLocation(AttackPoint + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() + 20.f), false);
-	}
-
-	int32 Hits = 0;
-	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
-	{
-		AWRCharacterBase* Who = *It;
-		if (Who == this || !Who->IsAlive() || !IsHostileTo(Who) || Who->GetAttachParentActor())
-		{
-			continue;
-		}
-		const FVector Feet = Who->GetActorLocation() - FVector(0.f, 0.f, Who->GetSimpleCollisionHalfHeight());
-		if (!InShape(Attack, Feet) || (Attack.Id.ToString().Contains(TEXT("breath")) && Attack.Shape == EWRBossShape::Cone && BreathBlocked(Feet)))
-		{
-			continue;
-		}
-		FWRHit Hit;
-		Hit.Instigator = this;
-		Hit.Damage = Attack.Damage * Scale;
-		Hit.PoiseDamage = Attack.Poise;
-		Hit.Element = Attack.Buildup > 0.f || Attack.Id == TEXT("anvil_slam") ? BossElement() : WRTags::Element_Physical;
-		(BossElement() == WRTags::Element_Fire ? Hit.BurnBuildup : Hit.FrostBuildup) = Attack.Buildup;
-		Hit.bMelee = Attack.bMelee;
-		Hit.bHeavy = true;
-		Hit.bParryable = Attack.bParryable && Attack.bMelee;
-		Hit.bLow = Attack.bLow;
-		Hit.bGrab = Attack.bGrab;
-		Hit.bUnblockable = Attack.bUnblockable;
-		Hit.Impact = Attack.Impact;
-		Hit.Tier = EWRHitTier::Heavy;
-		Hit.Origin = Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation();
-		// What follows the blow needs its real result: a blow on a remote player resolves once its defence is judged.
-		const FName AttackId = Attack.Id;
-		const bool bFreezingBreath = Phase >= 3 && CreatureId == TEXT("skaldrith") && Attack.Id.ToString().Contains(TEXT("breath"));
-		TWeakObjectPtr<AWRBoss> WeakSelf(this);
-		TWeakObjectPtr<AWRCharacterBase> WeakWho(Who);
-		const EWRHitResult Result = UWRCombatLibrary::ApplyHit(Who, Hit, [WeakSelf, WeakWho, AttackId, bFreezingBreath](EWRHitResult Landed)
-		{
-			AWRBoss* Self = WeakSelf.Get();
-			AWRCharacterBase* Victim = WeakWho.Get();
-			if (!Self || !Victim)
-			{
-				return;
-			}
-			if (AttackId == TEXT("tongs_grab"))
-			{
-				if (Landed == EWRHitResult::Parried)
-				{
-					// Parrying the tongs staggers him (longer than a normal parry; it counts toward his parry break too).
-					if (!Self->HasTag(WRTags::Status_StanceBroken))
-					{
-						Self->Status->Stagger(Self->Tune(TEXT("grabParryStagger"), 4.f));
-					}
-					UE_LOG(LogWildreach, Log, TEXT("BOSS %s staggered: tongs grab parried"), *Self->GetDisplayLabel());
-				}
-				else if (Landed == EWRHitResult::Hit && Victim->IsAlive())
-				{
-					Victim->Status->Stagger(Self->Tune(TEXT("grabHoldSeconds"), 1.5f));
-				}
-			}
-			if (bFreezingBreath && Landed == EWRHitResult::Hit && Victim->IsAlive())
-			{
-				Victim->Status->ApplyStatus(WRTags::Status_Frozen, WRTune(TEXT("status.frozenSeconds"), 2.5f));
-			}
-		});
-		Hits += Result == EWRHitResult::Hit ? 1 : 0;
-	}
-	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s lands: %d hit"), *GetDisplayLabel(), *Attack.Id.ToString(), Hits);
-
-	// Aftermath.
-	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
-	{
-		// The blow lands for everyone to see: dust and rubble where a slam hits the ground (it shakes nearby cameras),
-		// a burst where thrown fire or ice strikes.
-		const FString Id = Attack.Id.ToString();
-		const FVector Centre = Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : Floor;
-		if (Id.Contains(TEXT("slam")) || Id == TEXT("ground_pound") || Id == TEXT("stomp") || Id == TEXT("dive") || Id == TEXT("boulder") || Id == TEXT("tail_sweep"))
-		{
-			WRFx::Broadcast(this, TEXT("stomp"), Centre, FRotator::ZeroRotator, Attack.Size / 100.f, TEXT("stomp"));
-		}
-		else if (Id == TEXT("slag_throw") || Id == TEXT("fire_bolt"))
-		{
-			WRFx::Broadcast(this, TEXT("fire.impact"), Centre, FRotator(90.f, 0.f, 0.f), 2.f, TEXT("fire.impact"));
-		}
-		else if (Id == TEXT("ice_spikes") || Id == TEXT("air_breath"))
-		{
-			WRFx::Broadcast(this, TEXT("frostnova"), Centre, FRotator::ZeroRotator, Attack.Size / 100.f, TEXT("frostnova"));
-		}
-	}
-	if (Attack.Id == TEXT("overhead_slam") || Attack.Id == TEXT("slag_throw"))
-	{
-		AWRHazard::Spawn(GetWorld(), this, AttackPoint, Attack.Id == TEXT("slag_throw") ? 160.f : 250.f, Tune(TEXT("crackSeconds"), 12.f), Tune(TEXT("crackDps"), 10.f), TEXT("lava"));
-		if (Phase >= 3 && Attack.Id == TEXT("overhead_slam")) Flood();
-	}
-	if (Attack.Id == TEXT("anvil_slam"))
-	{
-		Flood();
-	}
-	if (Attack.Id == TEXT("air_breath"))
-	{
-		AWRHazard::Spawn(GetWorld(), this, AttackPoint, Attack.Size, Tune(TEXT("iceSeconds"), 10.f), 0.f, TEXT("ice"));
-	}
-	if (Attack.Id == TEXT("tail_sweep") || Attack.Id == TEXT("lunge_bite"))
-	{
-		// Tail and charges shatter pillars they touch.
-		for (const TWeakObjectPtr<AWRBossProp>& P : Props)
-		{
-			if (P.IsValid() && (InShape(Attack, P->GetActorLocation()) || FVector::Dist2D(P->GetActorLocation(), GetActorLocation()) < P->Radius + GetSimpleCollisionRadius() + 100.f))
-			{
-				P->Shatter();
-			}
-		}
-	}
-
-	if (--RepeatsLeft > 0)
-	{
-		ResolveAt = Now + Attack.RepeatGap;
-		if (Attack.Shape == EWRBossShape::TargetCircle)
-		{
-			// Spikes and combos follow the target.
-			if (AWRCharacterBase* Target = PickBossTarget())
-			{
-				AttackPoint = Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight());
-				AWRGroundMarker::Spawn(GetWorld(), AttackPoint, AttackFacing, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(1.f, 0.75f, 0.1f), Attack.RepeatGap);
-			}
-		}
-		return;
-	}
-	Current = INDEX_NONE;
-	BusyUntil = Now + Tune(TEXT("recoverySeconds"), 0.8f);
-}
-
 void AWRBoss::CheckPhase()
 {
 	if (!bMajor || !GetAttributes() || HasTag(WRTags::Status_StanceBroken) || HasTag(WRTags::State_BeingCrit) || !IsAlive())
@@ -952,9 +813,20 @@ void AWRBoss::CheckPhase()
 		return;
 	}
 	const float Fraction = GetAttributes()->GetHealth() / FMath::Max(1.f, GetAttributes()->GetMaxHealth());
-	if (Phase == 1 && Fraction < Tune(TEXT("phase2At"), 0.5f))
+	if (Phase == 1 && Fraction < Tune(TEXT("phase2At"), 0.5f) && PendingPhase == 0)
 	{
-		SetPhase(2);
+		// The change is an attack (combat.md 2.17.1): the transition move plays at the next moment it's free (never in a
+		// stance break or a crit), and phase 2 starts as it lands. A boss without one turns at once.
+		const bool bHasTransition = Attacks.ContainsByPredicate([](const FWRBossAttack& A) { return A.bRow && A.Row.bTransition; });
+		if (bHasTransition)
+		{
+			PendingPhase = 2;
+			UE_LOG(LogWildreach, Log, TEXT("BOSS %s readies its transition"), *GetDisplayLabel());
+		}
+		else
+		{
+			SetPhase(2);
+		}
 	}
 	if (Phase == 2 && Fraction < Tune(TEXT("phase3At"), 0.25f) && AnyArtifactModifiers())
 	{
@@ -975,6 +847,19 @@ void AWRBoss::Tick(float DeltaSeconds)
 			return;
 		}
 		CheckPhase();
+		// The arena's furniture once the ground under it has streamed in (Trails T9: nothing spawns over no ground).
+		if (!bFurnished && GetWorld()->GetTimeSeconds() >= NextFurnishTry)
+		{
+			NextFurnishTry = GetWorld()->GetTimeSeconds() + 2.0;
+			FHitResult Ground;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRBossGround), false, this);
+			if (GetWorld()->LineTraceSingleByChannel(Ground, GetActorLocation(), GetActorLocation() - FVector(0.f, 0.f, 5000.f), ECC_WorldStatic, Q))
+			{
+				bFurnished = true;
+				SpawnRoamProps();
+				SpawnRunbackStone();
+			}
+		}
 		TickCombat(DeltaSeconds);
 	}
 }
@@ -1001,6 +886,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 
 	if (!bEngaged)
 	{
+		TickRoam(DeltaSeconds);
 		if (bReturning)
 		{
 			// Back home after a reset, on foot (or on the wing).
@@ -1051,6 +937,35 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 
 	// --- Boss-specific counterplay ---
 	const FName Id = CreatureId;
+	if (Id == TEXT("cinderhorn") && HasTag(WRTags::Status_Frostbite))
+	{
+		// Frost on him puts his trail out a while (combat.md 2.17.4).
+		TrailOffUntil = Now + Tune(TEXT("frostTrailOffSeconds"), 20.f);
+	}
+	if (Id == TEXT("old_tusker"))
+	{
+		// Hurt to 60%: he bellows and two of the herd answer (once).
+		if (!bBellowed && Current == INDEX_NONE && GetAttributes()->GetHealth() < GetAttributes()->GetMaxHealth() * Tune(TEXT("bellowAt"), 0.6f))
+		{
+			const int32 Bellow = Attacks.IndexOfByPredicate([](const FWRBossAttack& A) { return A.Id == TEXT("herd_bellow"); });
+			if (Attacks.IsValidIndex(Bellow) && PickBossTarget())
+			{
+				bBellowed = true;
+				StartAttack(Attacks[Bellow], PickBossTarget());
+				return;
+			}
+		}
+		// Set burning, he throws himself down and rolls the fire out in the snow: his back's open meanwhile.
+		if (HasTag(WRTags::Status_Burn) && Now >= CoolUntil + Tune(TEXT("wallowCooldown"), 12.f) && Current == INDEX_NONE)
+		{
+			CoolUntil = Now + Tune(TEXT("wallowSeconds"), 6.f);
+			StanceOpenUntil = CoolUntil;
+			Status->ClearStatus(WRTags::Status_Burn);
+			PlayCreatureOneShot(TEXT("hit"));
+			WRFx::Broadcast(this, TEXT("snow.wallow"), GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, GetSimpleCollisionRadius() / 100.f, TEXT("water.splash"), Tune(TEXT("wallowSeconds"), 6.f));
+			UE_LOG(LogWildreach, Log, TEXT("BOSS Old Tusker wallows in the snow to put the fire out"));
+		}
+	}
 	if (Id == TEXT("vulkarn"))
 	{
 		if (PlungeUntil > 0.0 && Now >= PlungeUntil)
@@ -1176,15 +1091,16 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 		Flood();
 	}
 
-	// --- Attack state machine ---
+	// --- Attack state machine (WRBossCombat.cpp) ---
 	// A boss's own attacks carry hyperarmor from the first tell to the blow (COMBAT-AND-LESSONS 1.5): poise damage
 	// doesn't stop them; the recovery after is the punish window. The wind-up also rules out a backstab.
 	const bool bInAttack = Current != INDEX_NONE && !HasTag(WRTags::Status_Staggered);
 	SetCombatTag(WRTags::State_Hyperarmor, bInAttack);
-	SetCombatTag(WRTags::State_Windup, bInAttack && Now < ResolveAt);
+	SetCombatTag(WRTags::State_Windup, bInAttack && StrikeState == EStrike::Windup);
 	if (HasTag(WRTags::Status_Staggered) || HasTag(WRTags::Status_Frozen))
 	{
 		Current = INDEX_NONE;
+		StrikeState = EStrike::None;
 		if (bAirborne && Id == TEXT("skaldrith"))
 		{
 			SetAirborne(false);
@@ -1193,11 +1109,12 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	}
 	if (Current != INDEX_NONE)
 	{
-		if (Now >= ResolveAt)
-		{
-			ResolveAttack();
-		}
+		TickAttack(DeltaSeconds);
 		return;
+	}
+	if (Now < CoolUntil)
+	{
+		return;  // Old Tusker rolling the fire out in the snow
 	}
 	AWRCharacterBase* Target = PickBossTarget();
 	if (!Target)
@@ -1206,24 +1123,22 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	}
 	const float Dist = FVector::Dist2D(Target->GetActorLocation(), GetActorLocation());
 
+	// Bosses read actions (CAL 1.13): a drink, a cast or a charge started in reach is answered without the usual pause.
+	const bool bReadable = (Target->HasTag(WRTags::State_Drinking) || Target->HasTag(WRTags::State_Casting) || Target->HasTag(WRTags::State_Charging))
+		&& Now - BossReadAt > Tune(TEXT("readsActionCooldown"), WRTune(TEXT("creatureAI.readsActionCooldown"), 6.f));
+	if (bReadable && Now < BusyUntil)
+	{
+		BossReadAt = Now;
+		BusyUntil = Now;
+		UE_LOG(LogWildreach, Log, TEXT("BOSS %s reads %s's action"), *GetDisplayLabel(), *Target->GetName());
+	}
 	if (Now >= BusyUntil)
 	{
-		// Pick a ready attack that can reach; prefer the big ones.
-		TArray<int32> Ready;
-		for (int32 i = 0; i < Attacks.Num(); ++i)
+		AWRCharacterBase* Aim = Target;
+		const int32 Pick = ChooseAttack(Target, Dist, Aim);
+		if (Pick != INDEX_NONE && Aim)
 		{
-			const FWRBossAttack& A = Attacks[i];
-			const bool bHeightOk = A.Height == 2 || (A.Height == 1) == bAirborne;
-			const float Reach = A.Shape == EWRBossShape::SelfCircle ? A.Size : A.Range;
-			if (A.MinPhase <= Phase && bHeightOk && Now >= A.ReadyAt && Dist <= Reach + Target->GetSimpleCollisionRadius() + GetSimpleCollisionRadius())
-			{
-				Ready.Add(i);
-			}
-		}
-		if (Ready.Num() > 0)
-		{
-			Ready.Sort([this](int32 L, int32 R) { return Attacks[L].Cooldown > Attacks[R].Cooldown; });
-			StartAttack(Attacks[Ready[FMath::RandRange(0, FMath::Min(1, Ready.Num() - 1))]], Target);
+			StartAttack(Attacks[Pick], Aim);
 			return;
 		}
 	}
@@ -1285,6 +1200,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 		UE_LOG(LogWildreach, Log, TEXT("BOSS loot: %s dealt %.0f (%.1f%%) -> %s"), *Entry.Key, Entry.Value, 100.f * Entry.Value / MaxHealth, *Got);
 		if (PC) PC->ClientNotify(FString::Printf(TEXT("%s defeated! Loot: %s"), *Def->Name, *Got));
 	}
+	FirstKillDrops();
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();
 	SetLifeSpan(6.f);
 	if (AController* AI = GetController())

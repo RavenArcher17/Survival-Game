@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRFx.h"
 #include "WRSound.h"
 #include "WRCreature.h"
 #include "WRLifeSkills.h"
@@ -60,6 +61,12 @@ FWRItemRegistry::FWRItemRegistry()
 				(*Use)->TryGetNumberField(TEXT("cooldown"), D.UseCooldown);
 				double Cleanse = 0.0;
 				D.bCleanse = (*Use)->TryGetNumberField(TEXT("cleanse"), Cleanse) && Cleanse > 0.0;
+				// Status cures (cooks/build-combat-full.md 2.12): the statuses this drink ends.
+				const TArray<TSharedPtr<FJsonValue>>* Cures = nullptr;
+				if ((*Use)->TryGetArrayField(TEXT("cures"), Cures))
+				{
+					for (const TSharedPtr<FJsonValue>& C : *Cures) D.Cures.Add(FName(*C->AsString()));
+				}
 			}
 			const TSharedPtr<FJsonObject>* Equip = nullptr;
 			if (O->TryGetObjectField(TEXT("equip"), Equip))
@@ -71,6 +78,12 @@ FWRItemRegistry::FWRItemRegistry()
 				if ((*Equip)->TryGetStringField(TEXT("metal"), Metal)) D.Metal = FName(*Metal);
 				(*Equip)->TryGetNumberField(TEXT("armor"), D.Armor);
 				(*Equip)->TryGetNumberField(TEXT("poise"), D.Poise);
+				// Status resistance worn (raises the wearer's buildup threshold per status).
+				const TSharedPtr<FJsonObject>* Resist = nullptr;
+				if ((*Equip)->TryGetObjectField(TEXT("resist"), Resist))
+				{
+					for (const TPair<FString, TSharedPtr<FJsonValue>>& R : (*Resist)->Values) D.Resists.Add(FName(*R.Key), float(R.Value->AsNumber()));
+				}
 				(*Equip)->TryGetNumberField(TEXT("durability"), D.MaxDurability);
 			}
 			const TSharedPtr<FJsonObject>* Ranged = nullptr;
@@ -569,11 +582,92 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		return UseTamingItem(*Def);
 	}
+	if (Def->Category == TEXT("potion") && Def->IsUsable())
+	{
+		// The very drink picked (a cure is not a healing potion): committed, on the shared belt cooldown.
+		if (GetWorld()->GetTimeSeconds() < PotionReadyAt)
+		{
+			return TEXT("potion belt cooling down");
+		}
+		AWRCharacterBase* Drinker = GetPawnCharacter();
+		if (!Drinker || !Drinker->IsAlive() || !Drinker->GetAbilitySystemComponent())
+		{
+			return TEXT("can't use items now");
+		}
+		return StartDrink(*Def);
+	}
 	if (Def->IsUsable())
 	{
 		return UseCategory(Def->Category);
 	}
 	return FString::Printf(TEXT("%s can't be used"), *Def->Name);
+}
+
+FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
+{
+	// The drink (CAL 1.10, combat.md 2.16): committed for potions.drinkSeconds (no guard, roll or swing meanwhile, a slow
+	// walk), the heal or cure lands at potions.healAt if it's still going down, and a stagger, a freeze or death before
+	// then loses it. The potion is used up as it starts. Creatures that read actions answer the drink (State.Drinking).
+	AWRCharacterBase* Character = GetPawnCharacter();
+	const FWRTuning& T = FWRTuning::Get();
+	if (Character->HasTag(WRTags::State_Drinking))
+	{
+		return TEXT("already drinking");
+	}
+	if (Character->HasTag(WRTags::State_Mounted))
+	{
+		return TEXT("not while riding");
+	}
+	if (Character->HasTag(WRTags::Status_Staggered) || Character->HasTag(WRTags::Status_Frozen) || Character->HasTag(WRTags::State_Dodging))
+	{
+		return TEXT("can't drink now");
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	PotionReadyAt = Now + T.Num(TEXT("potions.sharedCooldown"), 1.5f) * FMath::Max(0.2f, 1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCooldown")));
+	Character->GetAbilitySystemComponent()->CancelAbilities();
+	Character->Status->ApplyStatus(WRTags::State_Drinking, T.Num(TEXT("potions.drinkSeconds"), 0.9f));
+	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
+	{
+		Hero->MulticastBodyOneShot(TEXT("drink"));
+	}
+	WRSound::Broadcast(Character, TEXT("potion"));
+	const FName Id = Def.Id;
+	const FString Name = Def.Name;
+	RemoveItem(Id, 1);
+	TWeakObjectPtr<UWRInventoryComponent> WeakThis(this);
+	FTimerHandle Lands;
+	GetWorld()->GetTimerManager().SetTimer(Lands, FTimerDelegate::CreateWeakLambda(this, [WeakThis, Id]()
+	{
+		UWRInventoryComponent* Self = WeakThis.Get();
+		AWRCharacterBase* C = Self ? Self->GetPawnCharacter() : nullptr;
+		const FWRItemDef* D = FWRItemRegistry::Get().Find(Id);
+		if (!C || !D || !C->IsAlive() || !C->HasTag(WRTags::State_Drinking))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("ITEM %s's %s was lost (interrupted)"), *GetNameSafe(C), *Id.ToString());
+			return;
+		}
+		UAbilitySystemComponent* ASC = C->GetAbilitySystemComponent();
+		const UWRAttributeSet* A = C->GetAttributes();
+		if (D->Heal > 0.f)
+		{
+			// Rot and decay halve healing taken.
+			const float Heal = D->Heal * (1.f + UWRLifeSkillsComponent::StatFor(Self->GetOwner(), TEXT("potionPotency"))) * C->Status->HealingTakenScale();
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + Heal);
+		}
+		if (D->bCleanse || UWRLifeSkillsComponent::StatFor(Self->GetOwner(), TEXT("potionCleanse")) > 0.f)
+		{
+			C->Status->ClearStatus(WRTags::Status_Burn);
+			C->Status->ClearStatus(WRTags::Status_Frostbite);
+			C->Status->ClearStatus(WRTags::Status_Slowed);
+		}
+		for (const FName& Cure : D->Cures)
+		{
+			C->Status->CureStatus(WRStatus::FromName(Cure));
+		}
+		WRFx::BroadcastOn(C, TEXT("potion.heal"), NAME_None, 1.f, NAME_None, 0.5f);
+	}), T.Num(TEXT("potions.healAt"), 0.5f), false);
+	UE_LOG(LogWildreach, Log, TEXT("ITEM %s drinks %s (%d left)"), *Character->GetName(), *Id.ToString(), CountOf(Id));
+	return FString::Printf(TEXT("Drinking %s"), *Name);
 }
 
 FString UWRInventoryComponent::UseTamingItem(const FWRItemDef& Def)
@@ -631,11 +725,20 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 		return TEXT("can't use items now");
 	}
 
+	// A healing drink first when the category is potions (the quick heal), then anything else usable of it.
 	const FWRItemStack* Stack = Slots.FindByPredicate([Category](const FWRItemStack& S)
 	{
 		const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
-		return Def && Def->Category == Category && Def->IsUsable();
+		return Def && Def->Category == Category && Def->IsUsable() && (Category != TEXT("potion") || Def->Heal > 0.f);
 	});
+	if (!Stack)
+	{
+		Stack = Slots.FindByPredicate([Category](const FWRItemStack& S)
+		{
+			const FWRItemDef* Def = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+			return Def && Def->Category == Category && Def->IsUsable();
+		});
+	}
 	if (!Stack)
 	{
 		return FString::Printf(TEXT("no %s left"), *Category.ToString());
@@ -647,6 +750,10 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	if (Def->Category == TEXT("potion") && Now < PotionReadyAt)
 	{
 		return TEXT("potion belt cooling down");
+	}
+	if (Def->Category == TEXT("potion"))
+	{
+		return StartDrink(*Def);
 	}
 
 	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
@@ -793,6 +900,12 @@ float UWRInventoryComponent::GetWornPoise() const
 	const FWRItemDef* Def = EquippedArmor.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedArmor.ItemId);
 	const float Armour = Def && EquippedArmor.Durability > 0.f ? Def->Poise : 0.f;
 	return Armour + GemStat(TEXT("poise"));
+}
+
+float UWRInventoryComponent::GetWornResist(FName Status) const
+{
+	const FWRItemDef* Def = EquippedArmor.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedArmor.ItemId);
+	return Def && EquippedArmor.Durability > 0.f ? Def->Resists.FindRef(Status) : 0.f;
 }
 
 float UWRInventoryComponent::GetEquipLoadKg() const

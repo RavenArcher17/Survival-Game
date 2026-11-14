@@ -39,6 +39,9 @@ public:
 
 	/** Stamina a blocked blow costs: its stamina damage x (1 - guard boost / 100) (COMBAT-AND-LESSONS 1.2). */
 	static float GuardStaminaCost(float StaminaDamage, float GuardBoost);
+	/** Server: fire then frost on one body (the reactions table): a scalding steam burst around it. Strength 1 or the
+	 *  non-owner share. */
+	static void SteamBurst(AWRCharacterBase* Target, AWRCharacterBase* By, float Strength);
 
 	/** Server: break a creature's stance (or open a parried / guard-broken fighter) for Seconds: the crit opens. */
 	static void BreakStance(AWRCharacterBase* Who, float Seconds, AActor* By);

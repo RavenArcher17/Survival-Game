@@ -86,6 +86,8 @@ void AWRCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingActiveRep, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, SwingRecoveryRep, COND_SkipOwner);
 	DOREPLIFETIME_CONDITION(AWRCharacterBase, EquipLoadPct, COND_OwnerOnly);
+	DOREPLIFETIME(AWRCharacterBase, bTwoHanded);
+	DOREPLIFETIME(AWRCharacterBase, BuildupPct);
 }
 
 UAbilitySystemComponent* AWRCharacterBase::GetAbilitySystemComponent() const
@@ -122,7 +124,11 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	{
 		if (Inv->GetCarryWeight() > WRTune(TEXT("inventory.carryKg"), 80.f)) Load = WRTune(TEXT("inventory.overweightSpeed"), 0.7f);
 	}
-	return (HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) * FMath::Max(0.2f, 1.f - SlowExtraPct * 0.01f) : 1.f) * SpeedBoost * Load;
+	// Soaked: a lighter slow (status.defs.soak.slow) that doesn't stack with frost's. Drinking: a slow walk (potions).
+	float Slow = HasTag(WRTags::Status_Slowed) ? WRTune(TEXT("status.slowMultiplier"), 0.6f) * FMath::Max(0.2f, 1.f - SlowExtraPct * 0.01f) : 1.f;
+	if (HasTag(WRTags::Status_Soak)) Slow = FMath::Min(Slow, WRTune(TEXT("status.defs.soak.slow"), 0.8f));
+	if (HasTag(WRTags::State_Drinking)) Slow *= WRTune(TEXT("potions.walkMultiplier"), 0.4f);
+	return Slow * SpeedBoost * Load;
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)

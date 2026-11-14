@@ -64,7 +64,11 @@ struct FWRItemDef
 	// Gems / boss parts: stat -> amount
 	TMap<FName, float> GemStats;
 
-	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse; }
+	/** Statuses a drink ends (use.cures: bleed, shock, blind, curse, burn, frostbite, poison, rot). */
+	TArray<FName> Cures;
+	/** Worn status resistance by status id (equip.resist). */
+	TMap<FName, float> Resists;
+	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse || Cures.Num() > 0; }
 	bool IsEquipment() const { return Slot != EWREquipSlot::None; }
 };
 
@@ -154,6 +158,8 @@ public:
 	int32 RemoveItem(FName ItemId, int32 Count);
 	/** Use the first usable item of a category ("potion", "food", "drink"). Returns a message. */
 	FString UseCategory(FName Category);
+	/** Server: a potion or cure starts going down (committed; the heal lands part way: combat.md 2.16). */
+	FString StartDrink(const FWRItemDef& Def);
 	/** Torpor darts and creature eggs. */
 	FString UseTamingItem(const struct FWRItemDef& Def);
 	/** Use / equip / socket the item in a slot. Returns a message. */
@@ -185,6 +191,8 @@ public:
 	float GemStat(FName Stat) const;
 	/** Worn poise: the armour's (items.json equip.poise, while it holds) and socketed poise (COMBAT-AND-LESSONS 1.5). */
 	float GetWornPoise() const;
+	/** Worn status resistance (items.json equip.resist): added to the wearer's buildup threshold for that status. */
+	float GetWornResist(FName Status) const;
 	/** Equip load, kg: the worn armour, the weapon and ranged weapon in their slots and the carried shield (weapons.json
 	 *  carried); not the bag (COMBAT-AND-LESSONS 1.7). Light weave lightens armour as it does in the bag. */
 	float GetEquipLoadKg() const;

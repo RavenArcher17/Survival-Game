@@ -24,7 +24,9 @@ enum class EWRSwingKind : uint8
 	None, Light, Heavy, WeaponArt, Cast, Bite,
 	// Creature moves, so the attack clip can be timed to each (the strike lands when the damage does): a snap at
 	// running prey, and the special attacks (creatureAI.<kind> in tuning.json).
-	Snap, Lunge, Charge, Stomp, Spit
+	Snap, Lunge, Charge, Stomp, Spit,
+	// A creature attack row's strike (Data/attacks.json): the clip's strike lands at the end of Duration (wind-up + hold).
+	Strike
 };
 
 /**
@@ -99,6 +101,12 @@ public:
 		double Start = -1.0, ActiveAt = 0.0, ActiveEnd = 0.0, ComboAt = 0.0, CancelAt = 0.0, End = 0.0;
 		FName Move;
 		bool bLight = false;
+		/** Its hyperarmor's poise multiplier (0: tuning poise.hyperarmor.heavy) and whether it's a great weapon's
+		 *  (damage taken poise.hyperarmorDamageTakenGreat). */
+		float HyperarmorMult = 0.f;
+		bool bGreat = false;
+		/** A spear's guard poke: the raised guard still counts through it. */
+		bool bKeepsGuard = false;
 	};
 	FSwingWindows Swing;
 	/** The last swing that ended: its move, when, and whether it got to its combo window (a light chain goes on). */
@@ -117,6 +125,25 @@ public:
 	double DodgeStartedAt = -100.0;
 	/** Server: parries taken toward a break (cleared when its stance comes back). */
 	int32 ParriesTaken = 0;
+
+	// --- Full combat (cooks/build-combat-full.md 2) ---
+	/** Two-handing the held weapon (survivors choose it; 2h / great weapons always are): damage and stance up, the guard
+	 *  is the weapon's, the shield comes off the arm. */
+	UPROPERTY(ReplicatedUsing=OnRep_TwoHanded) bool bTwoHanded = false;
+	UFUNCTION() virtual void OnRep_TwoHanded() {}
+	/** When the last roll / backstep ended (server and the owner stamp it): the rolling / backstep light picks from it. */
+	double LastDodgeEnd = -100.0;
+	bool bLastDodgeBackstep = false;
+	/** Status meters for every machine's bars, 0-100 each, in WRStatus::EId order (the server's buildup / threshold). */
+	UPROPERTY(Replicated) TArray<uint8> BuildupPct;
+	/** Server: the last element that struck it and who (element reactions, 4 s window). */
+	FGameplayTag AuraElement;
+	TWeakObjectPtr<AActor> AuraBy;
+	double AuraAt = -100.0;
+	/** Server: max health taken by Decay (given back when the fight ends / on rest). */
+	float DecayLost = 0.f;
+	/** Every machine: the attacker's charged heavy is held (0..1 of the full charge) for the weapon's glint. */
+	float ChargeShown = -1.f;
 	/** Every machine: its stance broke (true) or came back (false): creatures slump and wear the gold weak-point mark. */
 	UFUNCTION(NetMulticast, Reliable) void MulticastStanceBreak(bool bBroken);
 	/** The swing being shown (set before OnSwingVisual): its clip variant and the times its clip is warped to. */

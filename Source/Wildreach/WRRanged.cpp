@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRWeapons.h"
 #include "WRSound.h"
 #include "Wildreach.h"
 #include "WRCameraBoom.h"
@@ -142,10 +143,11 @@ void AWRCharacter::UpdateWeaponLook()
 	const FWRItemDef* Def = bRanged ? ItemDef(RangedItem) : nullptr;
 	UStaticMesh* Model = Def && !Def->HeldMesh.IsEmpty() ? LoadObject<UStaticMesh>(nullptr, *Def->HeldMesh) : nullptr;
 	// The weapon hand shows what it holds: the sword, a tool built from shapes (WRHeldTool.cpp), or nothing.
-	const bool bTool = !bRanged && Body->IsVisible() && FWRGathering::FindTool(MeleeItem) != nullptr;
+	const bool bTool = !bRanged && Body->IsVisible() && (FWRGathering::FindTool(MeleeItem) != nullptr || IsClassWeapon(MeleeItem));
 	WeaponMesh->SetVisibility(!bRanged && !bTool && !MeleeItem.IsNone());
 	UpdateToolLook(bTool);
-	ShieldMesh->SetVisibility(!bRanged && bShieldShown);
+	// The shield comes off the arm when two-handing (or with a great weapon: combat.md 2.4.0).
+	ShieldMesh->SetVisibility(!bRanged && bShieldShown && !FWRWeapons::IsTwoHanding(this));
 	RangedMesh->SetVisibility(Model != nullptr && Body->IsVisible());
 	if (Model && Body->IsVisible())
 	{

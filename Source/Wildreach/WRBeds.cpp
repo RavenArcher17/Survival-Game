@@ -2,6 +2,7 @@
 // bedrolls.
 
 #include "WRBeds.h"
+#include "WRBoss.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
 #include "WRFlowTypes.h"
@@ -34,6 +35,14 @@ namespace
 			}
 		}
 		return Best ? Best->Name : FString(TEXT("Camp"));
+	}
+
+	/** "Vulkarn, the Forge Giant": the boss a shrine-stone belongs to. */
+	FString StoneBossName(const AActor* Stone)
+	{
+		const AWRRunbackStone* S = Cast<AWRRunbackStone>(Stone);
+		const FWRCreatureDef* Def = S ? FWRCreatureRegistry::Get().Find(S->BossId) : nullptr;
+		return Def ? Def->Name : FString(TEXT("the arena"));
 	}
 
 	/** The camps of the player's path (player starts tagged with its biome), one per camp, nearest to Near first. */
@@ -219,6 +228,14 @@ void WRBeds::FillWakeChoices(AController* Controller, AWRPlayerState* PS, FWRDea
 			if (Bed->Sleepers.Contains(PS->GetPlayerName()) && RestLeft(PS, Bed, Now) <= 0.0) { Default = Bed; break; }
 		}
 	}
+	// A shrine-stone you rested at last (by a boss arena: ER's stake) is where you wake by default, so the run back is
+	// the way you came (cooks/build-combat-full.md 2.16).
+	TArray<AActor*> Stones;
+	for (const TWeakObjectPtr<AActor>& S : PS->BoundStones) if (S.IsValid()) Stones.Add(S.Get());
+	if (!Default && PS->RespawnPoint.IsValid() && Stones.Contains(PS->RespawnPoint.Get()))
+	{
+		Default = PS->RespawnPoint.Get();
+	}
 	if (!Default)
 	{
 		AActor* Start = Controller->StartSpot.Get();
@@ -229,6 +246,7 @@ void WRBeds::FillWakeChoices(AController* Controller, AWRPlayerState* PS, FWRDea
 	if (Default) Order.Add(Default);
 	for (AWRBuildPiece* Bed : Beds) if (Bed != Default) Order.Add(Bed);
 	for (AActor* Camp : Camps) if (Camp != Default) Order.Add(Camp);
+	for (AActor* Stone : Stones) if (Stone != Default) Order.Add(Stone);
 
 	PS->WakeActors.Reset();
 	PS->WakeHalfHeight = HalfHeight;
@@ -244,6 +262,11 @@ void WRBeds::FillWakeChoices(AController* Controller, AWRPlayerState* PS, FWRDea
 			O.Kind = IsBedroll(Bed) ? FName(TEXT("bedroll")) : FName(TEXT("bed"));
 			O.RestSeconds = float(RestLeft(PS, Bed, Now));
 			O.bClan = !Bed->Sleepers.Contains(PS->GetPlayerName());
+		}
+		else if (Stones.Contains(A))
+		{
+			O.Name = FString::Printf(TEXT("Shrine-stone by %s"), *StoneBossName(A));
+			O.Kind = TEXT("shrine");
 		}
 		else
 		{

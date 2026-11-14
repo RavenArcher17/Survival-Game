@@ -63,6 +63,20 @@ pressed. New rules for new code: every blow goes through `ApplyHit` with its fla
 `StanceDamage`, `Tier`); code that acts on a blow's result passes `ApplyHit`'s `OnResolved` (a held blow resolves later);
 window / state tags owned by an ability go through `AWRCharacterBase::SetCombatTag`.
 
+Also since 0.7.1: **the full combat** (COMBAT-AND-LESSONS C6-C12, cooks/build-combat-full.md): nine weapon classes with
+full row sets in `Data/weapons.json` (charged, chain, running, rolling, jump, guard poke; `PickMove` reads the state),
+two-handing (`bTwoHanded`), every status in `UWRStatusComponent` (`WRStatus::EId`, `status.defs`; meters replicate as
+`AWRCharacterBase::BuildupPct`), element reactions in `ApplyHit` (`reactions`), the committed drink
+(`UWRInventoryComponent::StartDrink`), Wildbrand rows (`wildbrands`) and spell shapes (`spells.shapes`), **creature and
+boss attack rows in `Data/attacks.json`** (`AWRCreatureAI::TickRowFight` in `WRCreatureCombat.cpp`, the boss machine in
+`WRBossCombat.cpp`), lock points and breakable parts (`creatures.json lockPoints / parts`), the roaming minis Cinderhorn
+and Old Tusker (`creatures.json roam / props`, spawned by `AWRGameMode::StepRoamingBosses`), shrine-stones
+(`AWRRunbackStone`) and first-kill drops (`AWRFirstKillDrop`, `bossKills` in the player save), the saddle
+(`ServerRideAttack`, `Unhorse`), PvP multipliers and the combat tag (`State.CombatTagged`). New rules for new code: a new
+creature or boss move is a row in `attacks.json`, not code; a new status is a `status.defs` row plus a case in
+`UWRStatusComponent::Proc`; a new path's Wildbrand is a `wildbrands.<node>` row plus its `ClassForNode` line; anything
+that fires at players from a creature or boss never homes (`AWRProjectile::HomeOn` refuses).
+
 Open, as of 0.7.1:
 - **No packaged dedicated server** (on hold, Raven's call). The host's PC is the server. Unreal built from source sits
   at `C:\Dev\UE5Source` on Raven's PC (`Tools\build_engine.ps1`), needed only for that.

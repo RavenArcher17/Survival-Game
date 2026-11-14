@@ -61,6 +61,11 @@ private:
 	FTimerHandle UndergroundTimer;
 	FTimerHandle WildlifeTimer;
 	FTimerHandle RaidTimer;
+	FTimerHandle RoamingBossTimer;
+	/** The roaming minis: when each may come out again, and which have been out this session. */
+	void StepRoamingBosses();
+	TMap<FName, double> RoamingBossBack;
+	TSet<FName> RoamingBossSeen;
 	/** Adds to the world's play time (WRWorlds::Touch). Leaving: a player on their way out, who doesn't count from now on. */
 	void CountPlayTime(const AController* Leaving = nullptr);
 	/** When the world's play time was last counted (FPlatformTime), and whether anyone has been here since. */

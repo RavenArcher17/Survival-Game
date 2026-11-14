@@ -27,13 +27,18 @@ FVector UWRCameraBoom::BlendLocations(const FVector& DesiredArmLocation, const F
 	}
 	// As a share of the full arm, so the aiming zoom (a shorter arm) doesn't count as an obstacle clearing.
 	const float Want = bHitSomething ? FMath::Clamp(FVector::Dist(Origin, TraceHitLocation) / Full, 0.f, 1.f) : 1.f;
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	if (Reach < 0.f || Want <= Reach)
 	{
-		Reach = Want;  // in: at once
+		Reach = Want;  // in: at once (never inside the wall)
+		PulledAt = Now;
 	}
-	else
+	else if (Now - PulledAt >= WRTune(TEXT("camera.holdSeconds"), 0.15f))
 	{
-		Reach = FMath::FInterpTo(Reach, Want, DeltaTime, WRTune(TEXT("camera.returnSpeed"), 3.5f));  // out: eased
+		// Out: held a moment (no breathing against a wall you brush past), then eased back over easeOutSeconds.
+		const float Ease = FMath::Max(0.05f, WRTune(TEXT("camera.easeOutSeconds"), 0.4f));
+		const float Step = FMath::Max(DeltaTime / Ease, (Want - Reach) * FMath::Min(1.f, DeltaTime * WRTune(TEXT("camera.returnSpeed"), 3.5f)));
+		Reach = FMath::Min(Want, Reach + Step);
 	}
 	return Origin + ToDesired * Reach;
 }

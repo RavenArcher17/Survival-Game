@@ -28,5 +28,7 @@ protected:
 private:
 	/** How much of the full arm the camera is out (eased back toward 1 after a pull-in); -1 = not started. */
 	float Reach = -1.f;
+	/** When it last pulled in (the hold before easing back out). */
+	double PulledAt = -100.0;
 	float SprintBlend = 0.f;
 };

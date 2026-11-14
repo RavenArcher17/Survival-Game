@@ -44,9 +44,28 @@ namespace WRTags
 	/** Poise broke: a short reaction (flinch / stagger by the blow's impact). */
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Flinch);
 
+	// --- Full combat (cooks/build-combat-full.md): every status, the drink, charging, mounted, combat tag ---
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Poison);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Rot);        // also halves healing taken
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Shock);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Soak);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Blind);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Decay);      // healing x0.5 while it lasts (max HP loss stays until the fight / rest)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Mark);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Curse);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Rimed);      // bosses in place of Frozen: stance taken x1.5
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Bleeding);   // a moment after a bleed burst (Grimjaw's regen check, the HUD)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Drinking);    // a potion's committed drink (AI reads it)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Charging);    // a held charged heavy / Wildbrand / spell (AI reads it)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Casting);     // a spell's wind-up (AI reads it)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Mounted);     // riding: only mounted-flagged abilities
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_CombatTagged);// hit or hit by a player in the last pvp.combatTagSeconds
+
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Physical);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Fire);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Frost);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Lightning);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Water);
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Path_Fire);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Path_Frost);
@@ -54,6 +73,7 @@ namespace WRTags
 	// Root passives (main path only) and combos (both paths >= threshold)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Passive_BurningBlood);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Passive_Permafrost);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Passive_Grounded);   // Lightning root passive: no shock stagger
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_Thaw);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_Balance);
 

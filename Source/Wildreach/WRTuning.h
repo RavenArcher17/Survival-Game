@@ -17,6 +17,10 @@ public:
 
 	float Num(const FString& Path, float Fallback) const;
 	FString Str(const FString& Path, const FString& Fallback) const;
+	/** The object at a dotted path (a data row: wildbrands.flame_slash, status.defs.bleed), or null; no warning. */
+	TSharedPtr<FJsonObject> Object(const FString& Path) const;
+	/** True if a number / value exists at the path (optional rows), without the missing-key warning. */
+	bool Has(const FString& Path) const;
 
 	/** Re-read the file (console: WR.ReloadTuning) and the -wrtune=key:value,key:value overrides. */
 	void Reload();

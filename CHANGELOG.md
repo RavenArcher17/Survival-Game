@@ -1,5 +1,103 @@
 # Changelog
 
+## Unreleased: the full combat (every weapon class, every status, Wildbrands and spells, creature rows, bosses, camera, flasks, the saddle, PvP)
+
+Aaron (lane build-combat-full: COMBAT-AND-LESSONS C6-C12 and the full-game combat rows; research, requirement ledger and
+plan in showcase-notes cooks/build-combat-full.md, following cooks/combat.md). Built to compile (editor and a full unity
+build); not played here (Aaron and the testers test, F8).
+
+- **Nine weapon classes** (`Data/weapons.json`): fists, dagger, sword, axe (the hatchets), pick-hammer (the picks),
+  spear, greatsword, great hammer, scythe, each with its whole row set from combat.md 2.4: the light chain (dagger 5,
+  fists 4, great hammer 2), heavy, **chain heavy** (Heavy from a light's combo window), **charged heavy** (hold Heavy:
+  from 0.35 s, full at 0.8 s, lets go at 1.0 s; hyperarmored; a white glint on the weapon at full charge), **running**
+  light / heavy, **rolling** and **backstep** lights (0.3 s after a roll / backstep), **jump** light / heavy (the blade is
+  live until you land, the recovery on the ground), the guard counter, and the spear's **guard poke** (Light behind a
+  raised shield keeps the guard up). Per class: base damage, reach, sweep, stamina, stance, poise, guard cost, slash /
+  strike / pierce, crit multipliers, its own guard when there's no shield, a later cancel window for great weapons
+  (75%), hyperarmor x2.5 and -17.5% damage taken on great weapons, innate bleed on daggers and scythes, a PvP multiplier.
+  Empty hands fight with fists. 15 new weapons (copper / bronze / iron daggers, spears, greatswords, great hammers,
+  scythes) at the forge; they're modelled in code like the tools (`FWRToolMesh::Weapon`: a seax, a boar spear with lugs,
+  a longsword, a war maul, a war scythe), drawn in the hand's metal.
+- **Two-handing** (hold Y, or hold D-pad down; a tap of D-pad down is still the belt): +15% damage, +30% / +10% stance on
+  lights / heavies, the weapon's own guard, the shield off the arm. Great weapons are always two-handed.
+- **Counter-hits** (+15% damage, +30% stance; thrusts +30%) on a body winding up, **physical types** against
+  `creatures.json physResist` (shells take blunt blows, fur turns them), a blunt blow to the **head lock point** x1.5
+  stance, **stealth** (+20% stance and buildup on a target that hasn't noticed you).
+- **Every status** (`UWRStatusComponent`, `status.defs` in tuning): burn, frost, **bleed** (12% + 15 burst, bosses
+  x0.7), **poison**, **rot** (heals halved), **shock** (a short stagger, a chain to two others; a boss mid-swing takes
+  stance instead), **soak** (slow; fire builds half, frost and shock half again; a fire dries it), **blind** (creatures
+  lose you; players' view closes in and the lock-on drops), **decay** (max health -10% until the fight's over / you
+  rest, heals halved), **mark** (+15% taken), **curse** (path resource -25%, damage dealt -15%). Thresholds by tier
+  (creatures 100-150, minis 250, majors 400; players 100 + worn resist), x1.3 after each proc until the fight's been over
+  30 s, bosses x1.25 per extra fighter. **Frostbite** to the new numbers (a burst of 8% + 20, +20% taken, slowed, players'
+  stamina regen x0.6, 12 s; the next fill freezes); **frozen players break free sooner** by pressing buttons; minis and
+  majors are **Rimed** (stance x1.5) instead of frozen; **fire ends frostbite**; a proc stops a creature's attack. The
+  meters show on every machine: under the bars over creatures and above your stamina bar, in each status's colour.
+- **Element reactions**: the last element on a body clings 4 s; **fire then frost = a steam burst** (a scalding cloud:
+  damage, soak and blind to everyone close; the burn goes out); Thaw also works for a second player's fire on someone
+  else's freeze (at half); lightning on the soaked does more and may shock. Two players' elements meeting react in full.
+- **Cures and the drink**: drinking is committed (0.9 s, the heal lands at 0.5 s, a slow walk; a stagger loses it), one
+  shared 1.5 s cooldown; creatures and bosses that read actions punish it. New: **Ember salve** (ends a burn),
+  **Warming draught** (ends frostbite), **Greater healing potion**; the antidote also ends poison and rot. The belt now
+  drinks the exact item you pick (a cure was being swapped for the first potion in the bag).
+- **Wildbrands** (`wildbrands` in tuning): each Fire and Frost weapon art has its own frames, hyperarmor, buildup,
+  stamina and **fits** (a slot that doesn't fit the weapon in hand greys out with "needs a ..."), **Molten cleave charges**
+  (hold the slot: x1.3, D-pad up held on a pad), **Molten edge and Flurry have follow-ups** (press again from the combo
+  window: no cooldown). **Spells by shape** (`spells.shapes`): bolts, lances and pools cast walking at half speed; walls,
+  novas, Meteor and Blizzard root you; **Ice lance, Frost nova and Meteor charge** to x1.5. Casting and charging are read
+  by the creatures that answer them. **Enemy projectiles never home** (a code rule now).
+- **Every creature fights by its attack rows** (new `Data/attacks.json`, `AWRCreatureAI::TickRowFight`): for all 17
+  fighting creatures, every move of combat.md 2.18.2 with its wind-up, tracking that commits, a **held delay with a final
+  glint and sting 0.2 s before contact**, the active window (damage only while the jaw / claw / horn / body travels), a
+  **punish window**, **combos** by chance (at most 4), cooldowns and range-band weights. Tells: a small **glint on the
+  attacking part** (white blockable, crimson unblockable) and its voice; the ground heaves before a **burst** from below;
+  stomps send a **ground wave** at 12 m/s that you can jump. **Off-screen rule**: a wind-up starts only where its target
+  can see it (or hear it within 8 m). **readsAction** (Magmaw's lunge, Rimeclaw's saber bite): a drink, cast or charge in
+  reach is answered. **Packs** flank and surround with no attack token (the biggest presses, the others take 90 / 150
+  degree angles, one keeps the far side), **breathe** (back off and circle 1-2.5 s after a string), retreat when hurt
+  (kept). **Pulling**: a hit from range brings the one hit and the packmates close to it that saw it. Basaltback and
+  Rimeshell **shell up** after a beating. Spit flies at 10 m/s at where you stood.
+- **Bosses** (`WRBossCombat.cpp`): every boss reads its moves from `attacks.json` (Vulkarn and Skaldrith to combat.md
+  2.17.2-3, the four minis with their flags and punish). No more full-area floor paint: a **glint on the attacking part**
+  and a voice; damage only while the part travels (**arcs sweep** side to side, the **breath sweeps** its cone, **charges
+  run** their line on their legs, **slams roll out as waves**, thrown slag, boulders, snow and fire bolts **fly as real
+  lobs** with a falling shadow and burst where they land). **Transition attacks** at 50% (Vulkarn's Forge roar floods the
+  forge, Skaldrith's Take-off gust): unblockable, half damage taken, then phase 2 with its **delayed variants** (late
+  hammer, quench feint, late tail) and **new combos** (bellows into slam, claw-claw-lunge) and shorter gaps. Choice by
+  range band, never three in a row, one (phase 2: two) thrown thing at a time; the **tame-punish** moves go for the
+  furthest tame; bosses **read actions**. **Breakable parts**: Vulkarn's hammer arm (he fights with the tongs a while),
+  Skaldrith's wings (grounded), the Warden's shell; each drops its material once to everyone in the fight.
+  **Lock points** on bosses and big creatures (head, chest, wings, horn, tusks).
+- **Two new roaming minis** (spawned from data on their loops, no map change): **Cinderhorn**, the Emberhorn herd's old
+  bull on the ash plains (25 m charges with a burning trail, horn hook, buck, ash stomp; **eight basalt columns** along
+  his loop stop a charge dead and stun him with the weak point open, two charges break one; frost puts the trail out;
+  the horn breaks), and **Old Tusker**, the drudge herd's bull on the snow flats (tusk sweep, trample, rear-and-crash,
+  snow fling, a herd bellow at 60% that brings two drudges; set burning he **rolls the fire out in the snow**, back open;
+  both tusks broken: no sweep). Their trophies: Cinderhorn's horn, Old Tusker's tusk.
+- **First kill**: a named boss's first fall for you sends a **gold light** that rises from the body and flies to you
+  (6 s, or when you're within 4 m) with its name card: the majors' parts and the minis' trophies (remembered in your
+  save). **Shrine-stones** stand 50 m out from each fixed arena toward the way in, facing it: rest at one and you wake
+  there (on the death screen's list too).
+- **Camera** (CAL 1.15): trees, shrubs and small rocks no longer push the camera in (walls, cliffs and big rocks do); a
+  pull-in **holds 0.15 s then eases out over 0.4 s**; the hero hides when the camera is pressed against it; **giant
+  framing** (a lock target over 3x your height: the arm pulls back 1.5 m, the view tips up 10 degrees); the lock aims at
+  the **lock point** (flick to the next point of the same body first); **mouse flick** switches targets.
+- **The saddle** (combat.md 2.19): Light swings to the side the camera faces, Heavy rears and strikes ahead (running-attack
+  rows); a **couched spear** at a gallop (hold Heavy above 9 m/s: x2, impact 5); the mount bites your lock target; a
+  blow of impact 4+ (or one that staggers the mount) **throws you off**; mounted you can't guard, drink, or use more
+  than the mounted Wildbrands and bolt / lance spells.
+- **PvP** (`pvp` in tuning): player against player x0.6, then the class's multiplier, Wildbrands / spells x0.85, a tame's
+  bite x0.5, status buildup x0.7; the **combat tag** (15 s after hitting or being hit by a player: no shared chests, no
+  setting a bed or shrine-stone); the **defender's lag** is judged too (a guard or roll pressed on its screen counts).
+
+Not finished (in LATER-COOKS): per-class hero clips (every class plays the sword's clips warped to its own frames; two
+hands aren't on a two-handed haft), a crouch stance (its crouch-light rows are written), a drink clip (the cast clip's
+hand-raise stands in), distinct attack clips per creature row (the AI-pipeline creatures have one attack clip each),
+Magmaw's lava-burst ambush, the logout body (a tagged player's body staying 30 s), bleed / shock / blind / curse cures
+(their ingredients come with their biomes), the other ten paths' Wildbrands and spells (their trees aren't in the data
+yet), Cinderhorn and Old Tusker share their herd's textures (bigger, no new hide), the parts break without a visible
+piece coming off, mark's "seen through walls".
+
 ## Unreleased: the combat core (feel, stamina and roll, guard / parry / crits with server rewind, stance and poise)
 
 Aaron (lane build-combat-core: COMBAT-AND-LESSONS C0 and C2-C5; research, requirement ledger and plan in showcase-notes

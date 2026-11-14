@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "WRCreature.h"
+#include "WRAttackRows.h"
 #include "WRBoss.generated.h"
 
 class UStaticMeshComponent;
@@ -109,6 +110,58 @@ struct FWRBossAttack
 	bool bUnblockable = false;
 	uint8 Impact = 3;
 	double ReadyAt = 0.0;
+	/** Its Data/attacks.json row (hold, active, punish, combo, bands, tell...): bRow false = the built-in move. */
+	FWRAttackRow Row;
+	bool bRow = false;
+};
+
+/**
+ * A shrine-stone by a boss arena's approach (combat.md 2.17.1, ER's stake): interact to wake there after a death, so the
+ * run back is the way you came in. Spawned by its boss; carved standing stone, a pale rune glow (never gold: gold is
+ * yours and the guard).
+ */
+UCLASS()
+class WILDREACH_API AWRRunbackStone : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AWRRunbackStone();
+	virtual void BeginPlay() override;
+	/** Server: a survivor touched it: their wake point is set here. */
+	FString Bind(class AWRCharacter* Who);
+	UPROPERTY(Replicated) FName BossId;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+private:
+	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Stone;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> Rune;
+};
+
+/**
+ * A named boss's first-kill reward (CAL L14, combat.md 2.17.1): a gold light (gold = yours) rises from the body and flies
+ * to the player who earned it after firstKillFlySeconds or when they come within firstKillPickup cm, then the item and
+ * its name card are theirs. Only its owner can take it.
+ */
+UCLASS()
+class WILDREACH_API AWRFirstKillDrop : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AWRFirstKillDrop();
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	UPROPERTY(Replicated) TWeakObjectPtr<APawn> ForPawn;
+	FName Item;
+	FString BossName;
+	FString OwnerName;
+
+private:
+	double Born = 0.0;
+	bool bFlying = false;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> Glow;
 };
 
 /**
@@ -134,6 +187,9 @@ public:
 	FGameplayTag GetBossElement() const { return BossElement(); }
 	/** Test control (WRCreatureAttack, Tools\creaturevideo.ps1): its next attack clip where it stands; no telegraph, no hit. */
 	virtual bool TestAttack() override;
+	virtual void OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By) override;
+	/** Old Tusker cooling his burns in the snow: his stance is open (x1.5 taken) until then. */
+	double StanceOpenUntil = 0.0;
 
 	bool IsMajor() const { return bMajor; }
 	bool IsReturning() const { return bReturning; }
@@ -167,6 +223,45 @@ private:
 	void TickCombat(float DeltaSeconds);
 	void StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target);
 	void ResolveAttack();
+	// --- The attack machine (WRBossCombat.cpp, cooks/build-combat-full.md 2.16) ---
+	FWRBossAttack MakeFromRow(const FWRAttackRow& Row) const;
+	/** Picks by range band and weight, never a third time running, the projectile cap, the tame-punish target. */
+	int32 ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBase*& OutTarget);
+	void TickAttack(float DeltaSeconds);
+	void BeginStrike();
+	void TickStrike(float DeltaSeconds);
+	void EndStrike();
+	void StrikeHit(AWRCharacterBase* Victim);
+	void Aftermath(const FWRBossAttack& Attack, const FVector& At);
+	void TickRoam(float DeltaSeconds);
+	void SpawnRoamProps();
+	void SpawnRunbackStone();
+	void FirstKillDrops();
+	float Idle() const;
+	enum class EStrike : uint8 { None, Windup, Strike };
+	EStrike StrikeState = EStrike::None;
+	int32 RepeatIndex = 0;
+	double StrikeStarted = 0.0;
+	double StrikeEnds = 0.0;
+	bool bFinalCue = false;
+	bool bThrown = false;
+	FVector StrikeFrom = FVector::ZeroVector;
+	FVector StrikeTo = FVector::ZeroVector;
+	TSet<TWeakObjectPtr<AActor>> StrikeHits;
+	TWeakObjectPtr<AWRCharacterBase> AttackTarget;
+	FName LastAttackId;
+	int32 SameInARow = 0;
+	int32 PendingPhase = 0;
+	TSet<FName> TransitionsDone;
+	int32 InFlight = 0;
+	double NoHammerUntil = 0.0;
+	double TrailOffUntil = 0.0;
+	double NextTrailAt = 0.0;
+	double CoolUntil = 0.0;
+	bool bBellowed = false;
+	int32 RoamIndex = 0;
+	TMap<TWeakObjectPtr<AActor>, int32> PillarHits;
+	TWeakObjectPtr<AWRRunbackStone> Runback;
 	bool InShape(const FWRBossAttack& Attack, const FVector& Point) const;
 	bool BreathBlocked(const FVector& Point) const;
 	void SetPhase(int32 NewPhase);
@@ -213,5 +308,10 @@ private:
 	float MaxShell = 0.f;
 	bool bWispsOut = false;
 	bool bPhase3Ready = false;
+	bool bFurnished = false;
+	float LineTravelled = 0.f;
+	bool bLineLeap = false;
+	double BossReadAt = -100.0;
+	double NextFurnishTry = 0.0;
 	double PlungeUntil = 0.0;
 };

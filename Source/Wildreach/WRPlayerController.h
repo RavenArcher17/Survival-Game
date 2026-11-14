@@ -83,6 +83,16 @@ public:
 	AWRCharacterBase* GetLockTarget() const { return LockTarget.Get(); }
 	/** The pad's right stick flicked while locked on: the lock moves to the nearest target that way on screen. */
 	void FlickLock(FVector2D Stick);
+	/** A fast sideways mouse sweep while locked on (WRInput::MouseLook). */
+	void MouseFlick(FVector2D Delta);
+	/** Two-handing on a hold (keyboard TwoHand, pad D-pad down whose tap stays the belt). */
+	void BeginTwoHandHold(bool bPadBelt);
+	void EndTwoHandHold(bool bPadBelt);
+	FTimerHandle TwoHandTimer;
+	bool bTwoHandFired = false;
+	bool bTwoHandFromBelt = false;
+	/** The lock point of a big body being aimed at (INDEX_NONE: its centre). */
+	int32 GetLockPoint() const { return LockPoint; }
 	/** Building: snap off / grid / fine grid in turn (the Snap key; D-pad down while placing on a pad). */
 	void CycleSnap() { ToggleSnap(); }
 
@@ -407,6 +417,10 @@ private:
 	TWeakObjectPtr<AWRCharacterBase> ServerLock;
 	/** Seconds since the lock-on target last changed (the camera eases into the turn). */
 	float LockAge = 0.f;
+	int32 LockPoint = INDEX_NONE;
+	double NextMouseFlick = 0.0;
+	double FlickWindowStart = 0.0;
+	float FlickAccum = 0.f;
 	/** Seconds the lock-on target has been out of sight: too long and the lock lets go. */
 	float LockUnseen = 0.f;
 	FString Notice;

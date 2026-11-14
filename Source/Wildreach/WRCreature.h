@@ -77,6 +77,34 @@ struct FWRCreatureDef
 	FName AnimUpper;             // bone the attack / hit layer starts from (its subtree), so running legs keep running
 	TArray<TPair<FName, float>> PoseLift;  // bones turned nose-up by these degrees over every clip (a head held low)
 
+	// --- Full combat (cooks/build-combat-full.md 2.7, 2.16) ---
+	/** Damage x by physical type: [0] unused, [1] slash, [2] strike, [3] pierce (creatures.json physResist). */
+	float PhysResist[4] = { 1.f, 1.f, 1.f, 1.f };
+	/** What a blow on it sounds and sparks like (flesh, scale, chitin, stone, ice, metal, ember...). */
+	FName PhysMaterial;
+	/** Where the lock-on and the parts are: a bone the client finds by name, and the same place in body units for the
+	 *  server (forward x radius, right x radius, up x half height from the capsule centre: the server has no mesh). */
+	struct FBodyPoint
+	{
+		FName Id;
+		FString Name;
+		FName Bone;
+		FVector At = FVector::ZeroVector;
+		// Parts only: their own stance, what breaking them does and drops (combat.md 2.10).
+		float Stance = 0.f;
+		FName OnBreak;
+		FName Drop;
+	};
+	TArray<FBodyPoint> LockPoints;
+	TArray<FBodyPoint> Parts;
+	/** Roaming mini-bosses wander a loop between these (cm, world), the arena being wherever they're met. */
+	TArray<FVector> Roam;
+	/** The first-kill drop's item and the name on its card (bosses). */
+	FName FirstKillItem;
+
+	/** Reads the combat fields above from its creatures.json row (WRCreatureCombat.cpp). */
+	void ReadCombat(const TSharedPtr<class FJsonObject>& Row);
+
 	bool CanTameBy(FName Method) const { return TamingMethods.Contains(Method); }
 	float TameSeconds() const;
 	/** Taming value of a food: kibble x taming.kibbleValue, what it eats x1, anything else 0. */
@@ -242,6 +270,42 @@ public:
 	FString Ride(AWRCharacter* Rider);
 	void Dismount();
 	AWRCharacter* GetRider() const { return Rider.Get(); }
+	/** Server: a big blow throws the rider off (combat.md 2.19): dismounted and knocked down. */
+	void Unhorse(AActor* By);
+	/** Server: the rider's swing from the saddle (Light / Heavy on the mount: side by the camera, rear-up heavy, the
+	 *  couched spear above mounted.couchSpeed). */
+	UFUNCTION(Server, Reliable) void ServerRideAttack(bool bHeavy, bool bHeld);
+	UFUNCTION(Server, Reliable) void ServerRideAttackRelease();
+
+	// --- Lock points and parts (combat.md 2.10, 2.15) ---
+	int32 NumLockPoints() const;
+	/** World location of lock point i (the bone where this machine has the mesh, else the body-unit point). */
+	FVector LockPointLocation(int32 Index) const;
+	/** World location of a body point (lock point or part). */
+	FVector BodyPointLocation(const FWRCreatureDef::FBodyPoint& Point) const;
+	/** Is At within Radius of the lock point called Name (head strikes)? */
+	bool IsNearLockPoint(const FVector& At, FName Name, float Radius) const;
+	/** Server: a blow's stance also goes into the breakable part it landed on. */
+	void DamagePart(const struct FWRHit& Hit, float Stance, AActor* By);
+	/** A part has been broken this fight (its onBreak rule holds). */
+	bool IsPartBroken(FName PartId) const;
+	/** Every machine: the parts broken so far (bit per part). */
+	UPROPERTY(ReplicatedUsing=OnRep_PartsBroken) uint8 PartsBroken = 0;
+	UFUNCTION() void OnRep_PartsBroken();
+	/** Server: forget the parts (a boss reset). */
+	void ResetParts();
+
+	/** Every machine: an attack's tell (cooks/build-combat-full.md 2.15): a small glint on the attacking part (0 none,
+	 *  1 white = blockable, 2 crimson = unblockable) and a sound on it (its voice, a final cue). BoneHint is found in
+	 *  this machine's skeleton by name (jaw, head, claw, tail, horn, hand). */
+	UFUNCTION(NetMulticast, Unreliable) void MulticastTell(uint8 Glint, FName BoneHint, FName Sound);
+	/** A bone whose name holds Hint (case-insensitive), or none (this machine has no mesh, or no such bone). */
+	FName FindBone(FName Hint) const;
+	/** Server: shelled up (Basaltback, Rimeshell): blows mostly glance off, blunt ones less so. */
+	double WithdrawnUntil = 0.0;
+	virtual float ModifyIncomingDamage(const struct FWRHit& Hit, float Damage) override;
+	/** Server: what a part's break did (bosses add their own moves: Vulkarn drops his hammer...). */
+	virtual void OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By);
 
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_CreatureId, Category="Creature") FName CreatureId = TEXT("cinderfang");
 	UPROPERTY(ReplicatedUsing=OnRep_Tamed) FString TamedBy;
@@ -290,6 +354,19 @@ private:
 	double BodyClaimUntil = 0.0;
 	float BodyCarry = 0.f;         // bare hands keep part of a unit: the rest of it carries to the next hit
 	bool bDeathShown = false;      // this machine has shown the death (the clip holds its last pose)
+
+	TArray<float> PartStance;
+	uint8 PartsShown = 0;
+	double NextRiderBite = 0.0;
+	double CouchUntil = 0.0;
+	bool bCouchHit = false;
+	TArray<TWeakObjectPtr<AActor>> RideHits;
+	void TickRider(float DeltaSeconds);
+	UPROPERTY(Transient) TObjectPtr<UInputAction> RideLightAction;
+	UPROPERTY(Transient) TObjectPtr<UInputAction> RideHeavyAction;
+	void RideLightPressed();
+	void RideHeavyPressed();
+	void RideHeavyReleased();
 
 	TWeakObjectPtr<AActor> AggroTarget;
 	/** Who it has lost sight of (Vanish) and until when (world seconds). */
@@ -428,6 +505,40 @@ private:
 	bool bSpecialHit = false;
 	TWeakObjectPtr<AWRCharacterBase> SpecialTarget;
 	TMap<FName, double> SpecialReadyAt;
+
+	// --- Attack rows (Data/attacks.json, cooks/build-combat-full.md 2.15) ---
+	/** A creature with rows fights by them: pick, tell, track, hold, strike, punish, combo, breathe. */
+	void TickRowFight(AWRCreature* Self, AWRCharacterBase* Target, float DeltaSeconds);
+	bool StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName RowId, bool bCombo);
+	void TickRow(AWRCreature* Self, float DeltaSeconds);
+	void StrikeRow(AWRCreature* Self);
+	void EndRow(AWRCreature* Self, bool bInterrupted);
+	FName PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool bReading) const;
+	void RowHit(AWRCreature* Self, AWRCharacterBase* Victim);
+	/** Where a pack member wants to stand (leader in front, flankers at their angle, one on the far side). */
+	FVector GroupSpot(AWRCreature* Self, AWRCharacterBase* Target, bool& bInPlace) const;
+	FName RowId;
+	int32 RowPhase = 0;          // 0 none, 1 wind-up, 2 hold, 3 strike, 4 punish
+	double RowPhaseEnd = 0.0;
+	double RowStarted = 0.0;
+	double RowStrikeStarted = 0.0;
+	bool bRowFinalCue = false;
+	int32 RowCombo = 0;
+	FVector RowDir = FVector::ForwardVector;
+	FVector RowAim = FVector::ZeroVector;
+	FVector RowOrigin = FVector::ZeroVector;
+	float RowTravelled = 0.f;
+	TWeakObjectPtr<AWRCharacterBase> RowTarget;
+	TSet<TWeakObjectPtr<AActor>> RowHits;
+	TMap<FName, double> RowReadyAt;
+	double BreatheUntil = 0.0;
+	float BreatheSide = 1.f;
+	double ReadUsedAt = -100.0;
+	double RegroupUntil = 0.0;
+	FVector RegroupAt = FVector::ZeroVector;
+	float StanceWindow = 0.f;    // stance lost in the last few seconds (Basaltback withdraws)
+	double StanceWindowStart = 0.0;
+	float LastStance = -1.f;
 	double BiteTrackUntil = 0.0;  // a bite's wind-up turns toward the target until then, then commits
 	double NextSnapAt = 0.0;      // its next bite at running prey
 	double NextChaseLogAt = 0.0;  // verbose log while hunting

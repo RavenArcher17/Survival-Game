@@ -1,4 +1,5 @@
 #include "WRWorldDressing.h"
+#include "Algo/Sort.h"
 #include "WRLifeSkills.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
@@ -446,6 +447,12 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, -Box.Min.Z * Scale.Z - A.Sink * S), Scale);
 			}
 			UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(Meshes[m], A.bCollision, A.Cull);
+			{
+				// The camera passes through what's smaller than camera.blockMinExtent across (trees, shrubs, small rocks).
+				float Extents[3] = { float(A.Size.X), float(A.Size.Y), float(A.Size.Z) };
+				Algo::Sort(Extents);
+				if (Extents[1] < WRTune(TEXT("camera.blockMinExtent"), 160.f)) Part->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+			}
 			UMaterialInterface* Override = A.Material ? LoadObject<UMaterialInterface>(nullptr, A.Material) : nullptr;
 			for (int32 Slot = 0; Slot < Meshes[m]->GetStaticMaterials().Num() && (Override || A.Params.Num() + A.Scalars.Num() > 0); ++Slot)
 			{
@@ -497,6 +504,11 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, Part.Lift * S - 20.f), Part.Size / 100.f * S);
 			}
 			UHierarchicalInstancedStaticMeshComponent* Shape = MakePart(Part.Mesh, Part.Color, Part.bCollision, Part.Cull);
+			{
+				float Extents[3] = { float(Part.Size.X), float(Part.Size.Y), float(Part.Size.Z) };
+				Algo::Sort(Extents);
+				if (Extents[1] < WRTune(TEXT("camera.blockMinExtent"), 160.f)) Shape->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+			}
 			if (bArt)
 			{
 				Shape->SetHiddenInGame(true);  // invisible collision under an art mesh

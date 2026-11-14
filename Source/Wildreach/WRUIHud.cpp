@@ -10,6 +10,7 @@
 #include "WRAltar.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
+#include "WRStatusComponent.h"
 #include "WRBuilding.h"
 #include "WRCharacter.h"
 #include "WRCrafting.h"
@@ -67,6 +68,49 @@ namespace
 }
 
 /** The compass strip: headings and the island's places within 90 degrees of where you look. */
+/** The player's own status meters (combat.md 2.11): a thin bar per status that's building, in its colour, above the
+ *  stamina bar; nothing when none are. */
+class SWRStatusMeters : public SLeafWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SWRStatusMeters) {}
+		SLATE_ATTRIBUTE(const AWRCharacterBase*, Who)
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs) { Who = InArgs._Who; }
+
+	virtual FVector2D ComputeDesiredSize(float) const override
+	{
+		return FVector2D(300.f, FMath::Max(0, Count()) * 7.f);
+	}
+
+	virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override
+	{
+		const AWRCharacterBase* C = Who.Get();
+		if (!C) return Layer;
+		const float W = Geo.GetLocalSize().X;
+		float Y = 0.f;
+		for (int32 i = 0; i < C->BuildupPct.Num() && i < WRStatus::Count; ++i)
+		{
+			if (C->BuildupPct[i] == 0) continue;
+			FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(FVector2D(W, 5.f), FSlateLayoutTransform(FVector2D(0.f, Y))), WRUI::White(), ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.f, 0.5f));
+			FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(W * C->BuildupPct[i] / 100.f, 5.f), FSlateLayoutTransform(FVector2D(0.f, Y))), WRUI::White(), ESlateDrawEffect::None, WRStatus::Color(i));
+			Y += 7.f;
+		}
+		return Layer + 1;
+	}
+
+private:
+	int32 Count() const
+	{
+		const AWRCharacterBase* C = Who.Get();
+		int32 N = 0;
+		if (C) for (const uint8 P : C->BuildupPct) N += P > 0 ? 1 : 0;
+		return N;
+	}
+	TAttribute<const AWRCharacterBase*> Who;
+};
+
 class SWRCompass : public SLeafWidget
 {
 public:
@@ -687,6 +731,11 @@ private:
 		// The critical, the first time for each kind of creature (then never again: COMBAT-AND-LESSONS L6).
 		if (const AWRCharacterBase* Crit = S->CritPromptTarget()) { OutTarget = Crit->GetDisplayLabel(); return TEXT("Critical"); }
 		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }
+		for (TActorIterator<AWRRunbackStone> It(P->GetWorld()); It; ++It)
+		{
+			// A shrine-stone by a boss arena: rest there and you wake there (cooks/build-combat-full.md 2.16).
+			if (FVector::Dist(It->GetActorLocation(), S->GetActorLocation()) < 300.f) { OutTarget = TEXT("Shrine-stone"); return TEXT("Rest (wake here)"); }
+		}
 		if (const AWRCreature* Tame = P->FindNearbyCreature(true)) { OutTarget = Tame->GetDisplayLabel(); return TEXT("Hold: orders  ·  Tap: interact"); }
 		if (const AWRCreature* Wild = P->FindNearbyCreature(false, 400.f))
 		{
@@ -894,6 +943,7 @@ private:
 					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* M = PC.IsValid() ? Cast<AWRCreature>(PC->GetPawn()) : nullptr; return M ? FText::Format(LOCTEXT("Riding", "Riding {0}  ·  {1} to dismount"), FText::FromString(M->GetDisplayLabel()), WRInput::ActionKey(TEXT("Interact"))) : FText::GetEmpty(); }), WRUI::Body(13, 700), WRUI::Brass)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; })]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)[SNew(SWRStatusMeters).Who_Lambda([this]() { return Cast<AWRCharacterBase>(Body()); })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Stamina", "Stamina"), WRUI::Stamina, 14.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetStamina() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxStamina() : 1.f; }, [this]() { return StaminaRefusal(); })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Poise", "Poise"), WRUI::Poise, 6.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetPoise() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxPoise() : 1.f; })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f * U, 0.f, 8.f * U)[WRUI::Divider()]
@@ -994,7 +1044,7 @@ private:
 		if (!X) return FString();
 		const TArray<FWRCastable> All = X->GetCastables();
 		const FWRCastable* C = X->FindCastable(X->GetWheelAbility(Wheel, X->GetWheelPicked(Wheel)), All);
-		return C ? C->Name.ToString() : FString();
+		return !C ? FString() : C->Blocked.IsEmpty() ? C->Name.ToString() : FString::Printf(TEXT("%s  (%s)"), *C->Name.ToString(), *C->Blocked);
 	}
 	float Cooldown(int32 Wheel) const
 	{

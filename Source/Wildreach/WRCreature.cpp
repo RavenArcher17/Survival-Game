@@ -24,6 +24,7 @@
 #include "WRSound.h"
 #include "WRWater.h"
 #include "WRWildlife.h"
+#include "WRAttackRows.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -35,6 +36,7 @@
 #include "Dom/JsonObject.h"
 #include "EnhancedInputComponent.h"
 #include "WRPadInput.h"
+#include "WRKeyBindings.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -240,6 +242,7 @@ void FWRCreatureRegistry::Reload()
 		{
 			D.Loot = { { TEXT("raw_meat"), 2 }, { TEXT("hide"), 1 } };
 		}
+		D.ReadCombat(O);
 		Defs.Add(D);
 	}
 	UE_LOG(LogWildreach, Log, TEXT("Loaded %d creature definitions"), Defs.Num());
@@ -327,6 +330,7 @@ AWRCreature* AWRCreature::SpawnCreature(UWorld* World, FName CreatureId, const F
 void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AWRCreature, PartsBroken);
 	DOREPLIFETIME(AWRCreature, CreatureId);
 	DOREPLIFETIME(AWRCreature, TamedBy);
 	DOREPLIFETIME(AWRCreature, TameOrder);
@@ -737,6 +741,7 @@ void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
 	case EWRSwingKind::Charge: Move = TEXT("charge"); Hit = Duration + WRTune(TEXT("anim.creatureAttack.charge.hit"), 0.5f); break;  // into the run
 	case EWRSwingKind::Stomp:  Move = TEXT("stomp");  Hit = Duration; break;
 	case EWRSwingKind::Spit:   Move = TEXT("spit");   Hit = Duration; break;
+	case EWRSwingKind::Strike: Move = TEXT("strike"); Hit = Duration; break;  // an attack row: wind-up + hold, then the strike
 	default: break;
 	}
 	Hit = FMath::Max(Hit, 0.05f);
@@ -762,7 +767,8 @@ namespace WRTelegraphDetail
 		case EWRSwingKind::Lunge:
 		case EWRSwingKind::Charge:
 		case EWRSwingKind::Stomp:
-		case EWRSwingKind::Spit: return Duration;  // the move starts as its wind-up ends
+		case EWRSwingKind::Spit:
+		case EWRSwingKind::Strike: return Duration;  // the move starts as its wind-up ends
 		case EWRSwingKind::Heavy:
 		case EWRSwingKind::WeaponArt: return Duration - 0.2f;  // a boss's attack resolves 0.2 s before its swing ends
 		default: return 0.f;  // a snap at running prey lands at once (prey can't block or dodge)
@@ -778,6 +784,7 @@ namespace WRTelegraphDetail
 		case EWRSwingKind::Charge: return TEXT("charge");
 		case EWRSwingKind::Stomp: return TEXT("stomp");
 		case EWRSwingKind::Spit: return TEXT("spit");
+		case EWRSwingKind::Strike: return TEXT("strike");
 		default: return TEXT("heavy");
 		}
 	}
@@ -1266,6 +1273,28 @@ void AWRCreature::NotifyAttackedBy(AActor* Attacker)
 		// Neutral herds defend each other.
 		Spawner->AlertPack(Attacker);
 	}
+	// Pulling (combat.md 2.18.4): a thrown stone or an arrow from range brings the one it hit, and the packmates close
+	// to it that can see it happen; the rest of the pack stays put. The player's tool for taking a pack apart.
+	if (!IsTamed() && Def && Def->Behavior == TEXT("aggressive") && Attacker
+		&& FVector::Dist(Attacker->GetActorLocation(), GetActorLocation()) > WRTune(TEXT("creatureAI.pullRange"), 600.f))
+	{
+		const float Alert = WRTune(TEXT("creatureAI.pullAlertRadius"), 600.f);
+		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+		{
+			if (*It == this || It->IsTamed() || !It->IsAlive() || It->GetAggroTarget() || It->Spawner != Spawner
+				|| FVector::Dist(It->GetActorLocation(), GetActorLocation()) > Alert)
+			{
+				continue;
+			}
+			FHitResult Block;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRPullSight), false, *It);
+			Q.AddIgnoredActor(this);
+			if (!GetWorld()->LineTraceSingleByChannel(Block, It->GetActorLocation(), GetActorLocation(), ECC_Visibility, Q))
+			{
+				It->SetAggroTarget(Attacker);
+			}
+		}
+	}
 	// Grazers bolt from whatever hurt them (wild ones; the hunt they were part of is over).
 	if (!IsTamed() && Def && Def->Behavior == TEXT("passive") && !IsUnconscious())
 	{
@@ -1652,6 +1681,9 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 		return Def && !Def->bMount ? TEXT("can't ride that") : TEXT("can't ride now");
 	}
 	Rider = NewRider;
+	// Mounted (combat.md 2.19): no guard, parry or drink in the saddle; only mounted Wildbrands and bolt / lance spells.
+	NewRider->Status->ApplyStatus(WRTags::State_Mounted, 1.0e7f);
+	NewRider->GetAbilitySystemComponent()->CancelAllAbilities();
 	NewRider->SetActorEnableCollision(false);
 	NewRider->GetCharacterMovement()->DisableMovement();
 	NewRider->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
@@ -1682,6 +1714,9 @@ void AWRCreature::Dismount()
 		return;
 	}
 	Rider = nullptr;
+	CouchUntil = 0.0;
+	Character->Status->ClearStatus(WRTags::State_Mounted);
+	Character->SetCombatTag(WRTags::State_Attacking, false);
 	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	Character->SetActorLocation(GetActorLocation() + GetActorRightVector() * (GetSimpleCollisionRadius() + 80.f) + FVector(0.f, 0.f, 50.f));
 	Character->SetActorEnableCollision(true);
@@ -1733,6 +1768,14 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		if (Pad.Key(TEXT("Look")).IsValid()) RideMapping->MapKey(RidePadLookAction, Pad.Key(TEXT("Look")));
 		if (Pad.Key(TEXT("Jump")).IsValid()) RideMapping->MapKey(RideJumpAction, Pad.Key(TEXT("Jump")));
 		if (Pad.Key(TEXT("Interact")).IsValid()) RideMapping->MapKey(RideDismountAction, Pad.Key(TEXT("Interact")));
+		// Fighting from the saddle (combat.md 2.19): Light and Heavy on the same keys and buttons as on foot.
+		RideLightAction = NewObject<UInputAction>(this);
+		RideHeavyAction = NewObject<UInputAction>(this);
+		const FKey LightKey = FWRKeyBindings::Get().Key(TEXT("Light")), HeavyKey = FWRKeyBindings::Get().Key(TEXT("Heavy"));
+		if (LightKey.IsValid()) RideMapping->MapKey(RideLightAction, LightKey);
+		if (HeavyKey.IsValid()) RideMapping->MapKey(RideHeavyAction, HeavyKey);
+		if (Pad.Key(TEXT("Light")).IsValid()) RideMapping->MapKey(RideLightAction, Pad.Key(TEXT("Light")));
+		if (Pad.Key(TEXT("Heavy")).IsValid()) RideMapping->MapKey(RideHeavyAction, Pad.Key(TEXT("Heavy")));
 	}
 	if (const APlayerController* PC = Cast<APlayerController>(Controller))
 	{
@@ -1749,6 +1792,12 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		Input->BindAction(RidePadLookAction, ETriggerEvent::Triggered, this, &AWRCreature::RidePadLook);
 		Input->BindAction(RideJumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		Input->BindAction(RideDismountAction, ETriggerEvent::Started, this, &AWRCreature::ServerDismount);
+		if (RideLightAction) Input->BindAction(RideLightAction, ETriggerEvent::Started, this, &AWRCreature::RideLightPressed);
+		if (RideHeavyAction)
+		{
+			Input->BindAction(RideHeavyAction, ETriggerEvent::Started, this, &AWRCreature::RideHeavyPressed);
+			Input->BindAction(RideHeavyAction, ETriggerEvent::Completed, this, &AWRCreature::RideHeavyReleased);
+		}
 	}
 }
 
@@ -1803,6 +1852,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	else if (Def && Rider.IsValid())
 	{
 		GetCharacterMovement()->RotationRate.Yaw = 400.f;
+		TickRider(DeltaSeconds);
 	}
 	// Out of its depth in the sea (WRWater): it swims for the shallows, whatever its brain wants.
 	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming())
@@ -2088,6 +2138,10 @@ void AWRCreatureAI::Tick(float DeltaSeconds)
 		{
 			EndSpecial(Self);
 		}
+		if (Self && RowPhase != 0)
+		{
+			EndRow(Self, true);
+		}
 		return;
 	}
 	if (Self->IsTestControlled())
@@ -2117,6 +2171,12 @@ namespace
 
 void AWRCreatureAI::ChaseAndBite(AWRCreature* Self, AWRCharacterBase* Target)
 {
+	// A creature with attack rows (Data/attacks.json) fights by them; prey on the run still gets the quick snap.
+	if (FWRAttackRows::Get().Creature(Self->CreatureId) && Self->HuntTarget.Get() != Target)
+	{
+		TickRowFight(Self, Target, GetWorld()->GetDeltaSeconds());
+		return;
+	}
 	const FWRCreatureDef* Def = Self->GetDef();
 	const FVector To = Target->GetActorLocation() - Self->GetActorLocation();
 	const float Dist = To.Size2D();
@@ -2454,6 +2514,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		TickSpecial(Self, DeltaSeconds);
 		return;
 	}
+	if (RowPhase != 0)
+	{
+		TickRow(Self, DeltaSeconds);  // an attack row plays out (its punish included) before anything else
+		return;
+	}
 	if (Self->bRaidLeaving)
 	{
 		// The raid is over: away from the base at a trot, fighting no one (WRRaids takes it away out of sight).
@@ -2764,6 +2829,11 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	if (SpecialPhase != 0)
 	{
 		TickSpecial(Self, DeltaSeconds);
+		return;
+	}
+	if (RowPhase != 0)
+	{
+		TickRow(Self, DeltaSeconds);
 		return;
 	}
 	// Find the owner's body.

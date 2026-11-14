@@ -7,6 +7,7 @@
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
 #include "WRCreature.h"
+#include "WRWeapons.h"
 #include "WRBoss.h"
 #include "WRCombatLibrary.h"
 #include "WRLifeSkills.h"
@@ -187,9 +188,14 @@ void AWRPlayerController::BindKeys()
 	BindLambda(Pad.Key(TEXT("Interact")), IE_Released, [this]() { InteractReleased(); });
 	PadPress(TEXT("LockOn"), [this]() { ToggleLockOn(); });
 	PadPress(TEXT("QuickFire"), [this]() { if (UI) UI->PadQuickFire(); });
+	BindLambda(Pad.Key(TEXT("QuickFire")), IE_Released, [this]() { if (UI) UI->ReleaseQuickSlot(); });
 	PadPress(TEXT("QuickPrev"), [this]() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAimingRanged()) C->CycleAmmo(-1); else if (UI) UI->PadQuickStep(-1); });
 	PadPress(TEXT("QuickNext"), [this]() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAimingRanged()) C->CycleAmmo(1); else if (UI) UI->PadQuickStep(1); });
-	PadPress(TEXT("BeltNext"), [this]() { if (UI) UI->PadBeltStep(1); });
+	// D-pad down: a tap steps the belt, a hold two-hands the weapon (combat.md 2.1: a hold is its own verb, never a chord).
+	BindLambda(Pad.Key(TEXT("BeltNext")), IE_Pressed, [this]() { if (WRInput::AllowPress(this)) BeginTwoHandHold(true); });
+	BindLambda(Pad.Key(TEXT("BeltNext")), IE_Released, [this]() { EndTwoHandHold(true); });
+	BindLambda(Keys.Key(TEXT("TwoHand")), IE_Pressed, [this]() { if (WRInput::AllowPress(this)) BeginTwoHandHold(false); });
+	BindLambda(Keys.Key(TEXT("TwoHand")), IE_Released, [this]() { EndTwoHandHold(false); });
 	PadPress(TEXT("UseBelt"), [this]() { if (UI) UI->PadBeltUse(); });
 	for (int32 i = 0; i < 8; ++i)
 	{
@@ -212,7 +218,8 @@ void AWRPlayerController::BindKeys()
 		{
 			if (A.Group != TEXT("Abilities") || !A.Key.IsValid()) continue;
 			const FName Node(*A.Id.ToString().RightChop(8));   // "Ability." + path.node
-			BindLambda(A.Key, IE_Pressed, [this, Node]() { if (UI) UI->CastAbility(Node); });
+			BindLambda(A.Key, IE_Pressed, [this, Node]() { if (UI) UI->CastAbilityHeld(Node); });
+			BindLambda(A.Key, IE_Released, [this]() { if (UI) UI->ReleaseQuickSlot(); });
 		}
 	}
 }
@@ -810,6 +817,18 @@ void AWRPlayerController::SetLockTarget(AWRCharacterBase* Target)
 	{
 		return;
 	}
+	// A big body's lock point nearest the crosshair (combat.md 2.15: head, chest, the parts).
+	LockPoint = INDEX_NONE;
+	if (const AWRCreature* Creature = Cast<AWRCreature>(Target); Creature && Creature->NumLockPoints() > 0 && PlayerCameraManager)
+	{
+		const FVector Eye = PlayerCameraManager->GetCameraLocation(), Fwd = PlayerCameraManager->GetCameraRotation().Vector();
+		float Best = -2.f;
+		for (int32 i = 0; i < Creature->NumLockPoints(); ++i)
+		{
+			const float Dot = FVector::DotProduct((Creature->LockPointLocation(i) - Eye).GetSafeNormal(), Fwd);
+			if (Dot > Best) { Best = Dot; LockPoint = i; }
+		}
+	}
 	LockTarget = Target;
 	LockAge = 0.f;
 	LockUnseen = 0.f;
@@ -838,6 +857,33 @@ void AWRPlayerController::FlickLock(FVector2D Stick)
 	if (!ProjectWorldLocationToScreen(Current->GetActorLocation(), From, true)) return;
 	// Screen y grows downward; the stick's up is +y.
 	const FVector2D Dir = FVector2D(Stick.X, -Stick.Y).GetSafeNormal();
+	// First the next lock point of the same body that way (a wing, the head), then the next body.
+	if (const AWRCreature* Body = Cast<AWRCreature>(Current); Body && Body->NumLockPoints() > 1)
+	{
+		FVector2D FromPoint;
+		if (ProjectWorldLocationToScreen(Body->LockPointLocation(FMath::Max(0, LockPoint)), FromPoint, true))
+		{
+			int32 BestPoint = INDEX_NONE;
+			float BestPointScore = TNumericLimits<float>::Max();
+			for (int32 i = 0; i < Body->NumLockPoints(); ++i)
+			{
+				FVector2D At;
+				if (i == LockPoint || !ProjectWorldLocationToScreen(Body->LockPointLocation(i), At, true)) continue;
+				const FVector2D D = At - FromPoint;
+				const float Along = FVector2D::DotProduct(D, Dir);
+				if (Along <= 1.f) continue;
+				const float Score = Along + FMath::Abs(FVector2D::CrossProduct(D, Dir)) * 1.5f;
+				if (Score < BestPointScore) { BestPointScore = Score; BestPoint = i; }
+			}
+			if (BestPoint != INDEX_NONE)
+			{
+				LockPoint = BestPoint;
+				LockAge = 0.f;
+				UE_LOG(LogWildreach, Log, TEXT("LOCK flick to %s point %d"), *Body->GetName(), BestPoint);
+				return;
+			}
+		}
+	}
 	const float Range = WRTune(TEXT("camera.lockOnRange"), 2500.f);
 	const float Cross = WRTune(TEXT("look.flickCrossWeight"), 1.5f);
 	AWRCharacterBase* Best = nullptr;
@@ -871,7 +917,64 @@ void AWRPlayerController::ServerReportPart_Implementation(int32 Id, int32 Part, 
 
 void AWRPlayerController::ToggleLockOn()
 {
+	// Blinded: nothing to lock on to (combat.md 2.11).
+	const AWRCharacterBase* Me = Cast<AWRCharacterBase>(GetPawn());
+	if (!LockTarget.IsValid() && Me && Me->HasTag(WRTags::Status_Blind))
+	{
+		return;
+	}
 	SetLockTarget(LockTarget.IsValid() ? nullptr : FindLockTarget());
+}
+
+void AWRPlayerController::BeginTwoHandHold(bool bPadBelt)
+{
+	bTwoHandFired = false;
+	bTwoHandFromBelt = bPadBelt;
+	GetWorldTimerManager().SetTimer(TwoHandTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		bTwoHandFired = true;
+		AWRCharacter* Hero = Cast<AWRCharacter>(GetPawn());
+		const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Hero);
+		if (!Hero || Class.Hands != TEXT("1h"))
+		{
+			ShowLocalNotice(Hero && Class.bGreat ? TEXT("A great weapon is always held in both hands") : TEXT("Nothing to two-hand"));
+			return;
+		}
+		Hero->ServerSetTwoHanded(!Hero->bTwoHanded);
+		ShowLocalNotice(Hero->bTwoHanded ? TEXT("Shield up") : TEXT("Two-handed"));
+	}), WRTune(TEXT("combat.twoHand.holdSeconds"), 0.5f), false);
+}
+
+void AWRPlayerController::EndTwoHandHold(bool bPadBelt)
+{
+	GetWorldTimerManager().ClearTimer(TwoHandTimer);
+	// A tap of D-pad down is still the belt.
+	if (bPadBelt && bTwoHandFromBelt && !bTwoHandFired && UI)
+	{
+		UI->PadBeltStep(1);
+	}
+	bTwoHandFired = false;
+}
+
+void AWRPlayerController::MouseFlick(FVector2D Delta)
+{
+	// A quick sideways mouse sweep with a lock on switches target (CAL 1.15: mouseFlickPx px/s over at least
+	// mouseFlickMinPx), re-armed after flickRearm s.
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float Dt = FMath::Max(0.001f, GetWorld()->GetDeltaSeconds());
+	if (Now - FlickWindowStart > 0.15)
+	{
+		FlickWindowStart = Now;
+		FlickAccum = 0.f;
+	}
+	FlickAccum += Delta.X;
+	if (Now < NextMouseFlick || FMath::Abs(Delta.X) / Dt < WRTune(TEXT("camera.mouseFlickPx"), 300.f) || FMath::Abs(FlickAccum) < WRTune(TEXT("camera.mouseFlickMinPx"), 40.f))
+	{
+		return;
+	}
+	NextMouseFlick = Now + WRTune(TEXT("camera.flickRearm"), 0.25f);
+	FlickAccum = 0.f;
+	FlickLock(FVector2D(FMath::Sign(Delta.X), 0.f));
 }
 
 void AWRPlayerController::WRLockOn()
@@ -909,8 +1012,21 @@ void AWRPlayerController::UpdateLockOn(float DeltaTime)
 			return;
 		}
 	}
+	if (Me && Me->HasTag(WRTags::Status_Blind))
+	{
+		UE_LOG(LogWildreach, Log, TEXT("LOCK lost: blinded"));
+		SetLockTarget(nullptr);
+		return;
+	}
 	const FVector Eye = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : Self->GetActorLocation();
-	const FRotator Desired = (Target->GetActorLocation() + FVector(0.f, 0.f, 30.f) - Eye).Rotation();
+	// Aim at the lock point (a big body's head, chest, a wing), not the feet; at a giant the view tips up a little more.
+	const AWRCreature* Body = Cast<AWRCreature>(Target);
+	const FVector AimAt = Body && Body->NumLockPoints() > 0 ? Body->LockPointLocation(FMath::Clamp(LockPoint, 0, Body->NumLockPoints() - 1)) : Target->GetActorLocation() + FVector(0.f, 0.f, 30.f);
+	FRotator Desired = (AimAt - Eye).Rotation();
+	if (Me && Target->GetSimpleCollisionHalfHeight() > Me->GetSimpleCollisionHalfHeight() * WRTune(TEXT("camera.giantRatio"), 3.f))
+	{
+		Desired.Pitch = FMath::Clamp(Desired.Pitch + WRTune(TEXT("camera.giantPitch"), 10.f), -70.f, 60.f);
+	}
 	// Soft lock: the turn toward a new target starts gently and firms up over camera.lockOnEaseSeconds (bots snap).
 	LockAge += DeltaTime;
 	const float Ease = FMath::SmoothStep(0.f, FMath::Max(0.01f, WRTune(TEXT("camera.lockOnEaseSeconds"), 0.5f)), LockAge);

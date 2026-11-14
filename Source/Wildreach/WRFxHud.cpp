@@ -3,6 +3,7 @@
 // reads what WRFx::ShowHit recorded on this machine.
 
 #include "WRFx.h"
+#include "WRGameplayTags.h"
 #include "WRCharacterBase.h"
 #include "WRFxSystem.h"
 #include "WRPlayerController.h"
@@ -143,6 +144,25 @@ public:
 		{
 			const float A = WRTune(TEXT("fx.hud.parryFlashAlpha"), 0.22f) * (1.f - ParryAge / ParryLen);
 			FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(), WRUI::White(), ESlateDrawEffect::None, FLinearColor(1.f, 0.9f, 0.65f, A));
+		}
+
+		// Blinded (combat.md 2.11): the edges of the view close in (to status.defs.blind.vignette), never a blackout; the
+		// lock-on is off meanwhile (AWRPlayerController).
+		if (const AWRCharacterBase* Me = Cast<AWRCharacterBase>(P->GetPawn()); Me && Me->HasTag(WRTags::Status_Blind))
+		{
+			const float A = WRTune(TEXT("status.defs.blind.vignette"), 0.4f);
+			const int32 Bands = 6;
+			for (int32 b = 0; b < Bands; ++b)
+			{
+				// Rings of darkness thinning toward the middle: a soft vignette out of plain boxes.
+				const float In = (b + 1) / float(Bands) * 0.22f;
+				const FLinearColor C(0.01f, 0.012f, 0.015f, A / Bands * 1.6f);
+				const FVector2D H(Size.X, Size.Y * In * 0.5f), V(Size.X * In * 0.5f, Size.Y);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(H, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(H, FSlateLayoutTransform(FVector2D(0.f, Size.Y - H.Y))), WRUI::White(), ESlateDrawEffect::None, C);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(V, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(V, FSlateLayoutTransform(FVector2D(Size.X - V.X, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
+			}
 		}
 
 		// Damage numbers, oldest first so new ones draw on top.

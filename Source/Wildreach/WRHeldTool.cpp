@@ -6,6 +6,7 @@
 #include "WRCharacter.h"
 #include "WRResourceNode.h"
 #include "WRToolMesh.h"
+#include "WRInventory.h"
 #include "WRTuning.h"
 #include "AnimationRuntime.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -40,14 +41,22 @@ void AWRCharacter::SetMeleeItem(FName ItemId)
 	OnRep_RangedLook();  // a listen server or standalone game draws its own copy now
 }
 
+bool AWRCharacter::IsClassWeapon(FName ItemId)
+{
+	// A weapon of a class the hero has no art mesh for (the sword has its own): modelled in code (WRToolMesh::Weapon).
+	const FWRItemDef* Def = ItemId.IsNone() ? nullptr : FWRItemRegistry::Get().Find(ItemId);
+	return Def && !Def->WeaponClass.IsNone() && Def->WeaponClass != TEXT("sword") && Def->WeaponClass != TEXT("fists");
+}
+
 void AWRCharacter::UpdateToolLook(bool bShow)
 {
 	using namespace WRHeldToolDetail;
 	const FWRToolDef* Tool = bShow ? FWRGathering::FindTool(MeleeItem) : nullptr;
+	const FWRItemDef* WeaponDef = bShow && IsClassWeapon(MeleeItem) ? FWRItemRegistry::Get().Find(MeleeItem) : nullptr;
 	const USkeletalMesh* BodyAsset = Body->GetSkeletalMeshAsset();
 	const FName Socket = WeaponMesh->GetAttachSocketName();
 	const bool bHand = BodyAsset && !Socket.IsNone() && (BodyAsset->FindSocket(Socket) || BodyAsset->GetRefSkeleton().FindBoneIndex(Socket) != INDEX_NONE);
-	if (!Tool || !bHand)
+	if ((!Tool && !WeaponDef) || !bHand)
 	{
 		if (ToolMesh) ToolMesh->SetVisibility(false);
 		return;
@@ -59,6 +68,15 @@ void AWRCharacter::UpdateToolLook(bool bShow)
 		ToolMesh->SetGenerateOverlapEvents(false);
 		ToolMesh->SetupAttachment(Body, Socket);
 		ToolMesh->RegisterComponent();
+	}
+	if (ToolMeshFor != MeleeItem && WeaponDef)
+	{
+		// Its metal: copper's red-brown, bronze's gold-brown, iron's dark grey (linear), the forge's look.
+		const FName Metal = WeaponDef->Metal;
+		const FLinearColor Colour = Metal == TEXT("bronze") ? FLinearColor(0.42f, 0.27f, 0.1f) : Metal == TEXT("iron") ? FLinearColor(0.16f, 0.16f, 0.17f)
+			: Metal == TEXT("steel") ? FLinearColor(0.3f, 0.31f, 0.33f) : FLinearColor(0.45f, 0.18f, 0.08f);
+		FWRToolMesh::Weapon(WeaponDef->WeaponClass, Colour, WRTune(TEXT("gather.toolLook.weaponScale"), 1.f)).ApplyTo(ToolMesh);
+		ToolMeshFor = MeleeItem;
 	}
 	if (ToolMeshFor != MeleeItem)
 	{

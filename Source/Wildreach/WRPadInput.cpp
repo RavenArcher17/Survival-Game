@@ -188,6 +188,10 @@ void WRInput::MouseLook(APawn* Pawn, FVector2D Delta)
 	if (!Pawn) return;
 	const FWRKeyBindings& K = FWRKeyBindings::Get();
 	const float S = K.MouseSensitivity() * WRTune(TEXT("look.mouseScale"), 1.f);
+	if (AWRPlayerController* Locked = Cast<AWRPlayerController>(Pawn->GetController()); Locked && Locked->GetLockTarget())
+	{
+		Locked->MouseFlick(Delta);
+	}
 	Pawn->AddControllerYawInput(Delta.X * S);
 	Pawn->AddControllerPitchInput((K.InvertMouse() ? Delta.Y : -Delta.Y) * S);
 }

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Widgets/SWidget.h"
 #include "WRUIWidgets.h"
+#include "WRCombatTypes.h"
 
 class AWRPlayerController;
 class SWidget;
@@ -42,6 +43,8 @@ struct FWRCastable
 	float Cooldown = 0.f;  // seconds left
 	float Cost = 0.f;      // Heat / Chill
 	bool bLearned = true;
+	/** Why it can't be used right now (a Wildbrand that doesn't fit the held weapon: "needs a spear"); empty: it can. */
+	FString Blocked;
 };
 
 class WILDREACH_API FWRPlayerUI
@@ -140,6 +143,11 @@ public:
 	/** D-pad left / right: the previous / next ability on the two wheels (the quick slot); D-pad up casts it. */
 	void PadQuickStep(int32 Dir);
 	void PadQuickFire();
+	/** Cast with the key still down (it charges what can charge); ReleaseQuickSlot lets it go. */
+	void CastAbilityHeld(FName NodeId);
+	void ReleaseQuickSlot();
+	bool bQuickHeld = false;
+	EWRAbilityInput HeldQuickInput = EWRAbilityInput::None;
 	/** D-pad down: the next item on the belt (the hotbar); Y uses it (a drink, food, a potion; a weapon or tool goes in hand). */
 	void PadBeltStep(int32 Dir);
 	void PadBeltUse();

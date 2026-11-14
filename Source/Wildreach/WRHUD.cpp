@@ -1,4 +1,5 @@
 #include "WRHUD.h"
+#include "WRStatusComponent.h"
 #include "WRAbilities.h"
 #include "WRAltar.h"
 #include "WRBuilding.h"
@@ -414,9 +415,18 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 		DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, Screen.Y - 12.f, W, 6.f);
 		DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f), 6.f);
-		// Buildup meters under the health bar.
-		DrawRect(FLinearColor(1.f, 0.45f, 0.1f), BX, Screen.Y - 5.f, W * FMath::Clamp(A->GetBurnBuildup() / 100.f, 0.f, 1.f), 3.f);
-		DrawRect(FLinearColor(0.55f, 0.85f, 1.f), BX, Screen.Y - 1.f, W * FMath::Clamp(A->GetFrostBuildup() / 100.f, 0.f, 1.f), 3.f);
+		// Buildup meters under the health bar: one thin row per status filling, in its colour (combat.md 2.11; bleed a
+		// dark red, never the crimson of an unblockable blow).
+		{
+			float RowY = Screen.Y - 5.f;
+			for (int32 i = 0; i < Other->BuildupPct.Num() && i < WRStatus::Count; ++i)
+			{
+				if (Other->BuildupPct[i] == 0) continue;
+				DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.45f), BX, RowY, W, 3.f);
+				DrawRect(WRStatus::Color(i), BX, RowY, W * Other->BuildupPct[i] / 100.f, 3.f);
+				RowY += 4.f;
+			}
+		}
 		if (const AWRCreature* Creature = Cast<AWRCreature>(Other))
 		{
 			// Torpor (purple) and taming progress (green) while you work on a tame.

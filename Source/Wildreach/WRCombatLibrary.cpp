@@ -14,6 +14,7 @@
 #include "WRWater.h"
 #include "WRWeapons.h"
 #include "WRLag.h"
+#include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
@@ -301,6 +302,44 @@ void UWRCombatLibrary::BreakStance(AWRCharacterBase* Who, float Seconds, AActor*
 	UE_LOG(LogWildreach, Log, TEXT("STANCE %s broken by %s for %.1f s"), *Who->GetName(), *GetNameSafe(By), Seconds);
 }
 
+void UWRCombatLibrary::SteamBurst(AWRCharacterBase* Target, AWRCharacterBase* By, float Strength)
+{
+	// Fire then frost (FULL-GAME 4.2): the frost hits the hot body and flashes to steam. A scalding white jet, a hiss;
+	// everyone close (the target included) is scalded, soaked and half-blinded by it; the burn is put out.
+	if (!Target || !Target->HasAuthority())
+	{
+		return;
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	const FVector At = Target->GetActorLocation();
+	const float Radius = T.Num(TEXT("reactions.steam.radius"), 300.f);
+	WRFx::Broadcast(Target, TEXT("reaction.steam"), At, FRotator(90.f, 0.f, 0.f), Radius / 150.f, TEXT("reaction.steam"));
+	Target->Status->ClearStatus(WRTags::Status_Burn);
+	UE_LOG(LogWildreach, Log, TEXT("COMBAT steam burst on %s (x%.2f)"), *Target->GetName(), Strength);
+	TArray<AWRCharacterBase*> Caught;
+	for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+	{
+		if (It->IsAlive() && (*It == Target || (By && By->IsHostileTo(*It) && *It != By)) && FVector::Dist(It->GetActorLocation(), At) < Radius + It->GetSimpleCollisionRadius())
+		{
+			Caught.Add(*It);
+		}
+	}
+	for (AWRCharacterBase* Who : Caught)
+	{
+		FWRHit Steam;
+		Steam.Instigator = By;
+		Steam.Damage = T.Num(TEXT("reactions.steam.damage"), 30.f) * Strength;
+		Steam.PoiseDamage = T.Num(TEXT("reactions.steam.poise"), 20.f) * Strength;
+		Steam.Element = WRTags::Element_Water;
+		Steam.bReaction = true;
+		Steam.Impact = 1;
+		Steam.Origin = At;
+		Steam.Buildups.Add(TEXT("soak"), T.Num(TEXT("reactions.steam.soak"), 30.f) * Strength);
+		Steam.Buildups.Add(TEXT("blind"), T.Num(TEXT("reactions.steam.blind"), 40.f) * Strength);
+		ApplyHit(Who, Steam);
+	}
+}
+
 float UWRCombatLibrary::GuardStaminaCost(float StaminaDamage, float GuardBoost)
 {
 	return FMath::Max(0.f, StaminaDamage) * FMath::Clamp(1.f - GuardBoost / 100.f, 0.f, 1.f);
@@ -430,7 +469,13 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	int32 Reaction = 0;  // the body's reaction for every machine's clip: 0 a shudder, 1-3 by the blow's impact
 	const float BlockAngle = WRTune(TEXT("defense.blockAngleDegrees"), 70.f);
 	const bool bFacing = IsInFront(Target, Hit.Origin, BlockAngle);
-	const bool bSwinging = TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking);
+	// Swinging drops the guard, except a spear's poke from behind a raised shield (it keeps the guard up).
+	const bool bSwinging = TargetASC->HasMatchingGameplayTag(WRTags::State_Attacking) && !(Target->IsSwinging() && Target->Swing.bKeepsGuard);
+	// Player against player (or a player's tame against one): the pvp block (combat.md 2.20) scales it below.
+	const bool bTameAttacker = Attacker && !Attacker->GetTameOwner().IsEmpty();
+	const bool bPvP = Attacker && Attacker != Target && Target->GetPlayerState() && (Attacker->GetPlayerState() || bTameAttacker);
+	// Counter-hit: a blow that lands on a body winding up its own (COMBAT-AND-LESSONS 1.1).
+	const bool bCounterHit = Attacker && !Hit.bDamageOverTime && !Hit.bCritical && TargetASC->HasMatchingGameplayTag(WRTags::State_Windup);
 
 	// --- Parry (COMBAT-AND-LESSONS 1.3): only blows flagged parryable, in the parry window, from the front ---
 	if (Hit.bMelee && Hit.bParryable && !Hit.bCritical && !Hit.bProjectile && !Hit.bDamageOverTime && Attacker && bFacing && !bSwinging
@@ -542,10 +587,39 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("vsStaggered"));
 		}
-		// Hyperarmor (a heavy's wind-up and strike): it shrugs off a little (COMBAT-AND-LESSONS 1.5).
+		// Hyperarmor (a heavy's wind-up and strike): it shrugs off a little, a great weapon's more (COMBAT-AND-LESSONS 1.5).
 		if (TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor) && !Hit.bIgnoreHyperarmor && !Hit.bGrab)
 		{
-			Damage *= 1.f - WRTune(TEXT("poise.hyperarmorDamageTaken"), 0.075f);
+			Damage *= 1.f - (Target->IsSwinging() && Target->Swing.bGreat ? WRTune(TEXT("poise.hyperarmorDamageTakenGreat"), 0.175f) : WRTune(TEXT("poise.hyperarmorDamageTaken"), 0.075f));
+		}
+		// Counter-hit: +15%, a thrust +30% (combat.md 2.4.0).
+		if (bCounterHit)
+		{
+			Damage *= 1.f + (Hit.PhysType == 3 ? WRTune(TEXT("combat.counterHit.pierceDamage"), 0.3f) : WRTune(TEXT("combat.counterHit.damage"), 0.15f));
+		}
+		// Slash / strike / pierce against what the body is made of (creatures.json physResist: shells take blunt blows,
+		// fur turns blunt ones and parts for blades).
+		if (const AWRCreature* Body = Cast<AWRCreature>(Target); Body && Body->GetDef() && Hit.PhysType >= 1 && Hit.PhysType <= 3)
+		{
+			Damage *= Body->GetDef()->PhysResist[Hit.PhysType];
+		}
+		// Marked: everyone's blows land harder. Cursed attackers hit softer.
+		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Mark))
+		{
+			Damage *= 1.f + WRTune(TEXT("status.defs.mark.damageTaken"), 0.15f);
+		}
+		if (AttackerASC && AttackerASC->HasMatchingGameplayTag(WRTags::Status_Curse))
+		{
+			Damage *= 1.f - WRTune(TEXT("status.defs.curse.damageDealt"), 0.15f);
+		}
+		// Lightning on a soaked body: +25% and a chance of a free shock (the reactions table).
+		if (Hit.Element == WRTags::Element_Lightning && TargetASC->HasMatchingGameplayTag(WRTags::Status_Soak))
+		{
+			Damage *= 1.f + WRTune(TEXT("reactions.lightningOnSoak.damage"), 0.25f);
+			if (FMath::FRand() < WRTune(TEXT("reactions.lightningOnSoak.shockChance"), 0.3f))
+			{
+				Target->Status->AddStatusBuildup(WRStatus::Shock, Target->Status->Threshold(WRStatus::Shock), Attacker, Damage);
+			}
 		}
 		// Brittle: frozen enemies take more critical hits. Fuel the fire: hitting burning enemies builds Heat.
 		const float BrittleCrit = TargetASC->HasMatchingGameplayTag(WRTags::Status_Frozen) && UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("brittle"))
@@ -567,9 +641,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// Frozen targets: fire thaws them (Thaw combo), heavy hits shatter them.
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frozen))
 		{
-			if (Hit.Element == WRTags::Element_Fire && AttackerASC && AttackerASC->HasMatchingGameplayTag(WRTags::Combo_Thaw))
+			// Thaw: the owners of the Fire + Frost combo always; anyone else when someone else's frost froze it (the
+			// reactions rule: two players' elements meeting), at half strength (FULL-GAME 4.2).
+			const bool bOwnsThaw = AttackerASC && AttackerASC->HasMatchingGameplayTag(WRTags::Combo_Thaw);
+			const bool bGroupThaw = !bOwnsThaw && Target->AuraElement == WRTags::Element_Frost && Target->AuraBy.Get() != Attacker
+				&& Now - Target->AuraAt <= WRTune(TEXT("reactions.window"), 4.f);
+			if (Hit.Element == WRTags::Element_Fire && (bOwnsThaw || bGroupThaw))
 			{
-				Damage += WRTune(TEXT("status.thawDamage"), 40.f);
+				Damage += WRTune(TEXT("status.thawDamage"), 40.f) * (bOwnsThaw ? 1.f : WRTune(TEXT("reactions.nonOwnerScale"), 0.5f));
 				Target->Status->ClearStatus(WRTags::Status_Frozen);
 				UE_LOG(LogWildreach, Log, TEXT("COMBAT thaw on %s"), *Target->GetName());
 			}
@@ -614,6 +693,30 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		Damage *= 100.f / (100.f + Target->ArmorValue);
 	}
+	// Player against player: its own multipliers (combat.md 2.20, ER patch 1.07): global, the weapon class, Wildbrands
+	// and spells; a tame's bite on a player counts half.
+	if (bPvP && !Hit.bDamageOverTime)
+	{
+		const FWRTuning& Tn = FWRTuning::Get();
+		float Scale = Tn.Num(TEXT("pvp.damage"), 0.6f);
+		if (bTameAttacker)
+		{
+			Scale *= Tn.Num(TEXT("pvp.tameDamage"), 0.5f);
+		}
+		else if (Hit.bWeaponArt)
+		{
+			Scale *= Tn.Num(TEXT("pvp.wildbrand"), 0.85f);
+		}
+		else if (Hit.bSpell || (!Hit.bMelee && !Hit.PathId.IsNone()))
+		{
+			Scale *= Tn.Num(TEXT("pvp.spell"), 0.85f);
+		}
+		else if (Hit.bMelee)
+		{
+			Scale *= FWRWeapons::Get().ClassFor(Attacker).PvpScale;
+		}
+		Damage *= Scale;
+	}
 
 	// Gear wears with use.
 	if (Hit.bMelee && Result != EWRHitResult::Dodged)
@@ -642,6 +745,19 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Damage > 0.f)
 	{
 		Target->OnDamageTaken(Hit, Damage);
+		Target->Status->NotifyHurt();
+	}
+	// Fire ends frostbite (ER; the thaw): the cold's grip and its slow go.
+	if (Hit.Element == WRTags::Element_Fire && TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
+	{
+		Target->Status->ClearStatus(WRTags::Status_Frostbite);
+	}
+	// Combat tag (combat.md 2.20): hitting or being hit by a player (or their tame) holds both in the fight a while.
+	if (bPvP)
+	{
+		const float Tag = WRTune(TEXT("pvp.combatTagSeconds"), 15.f);
+		Target->Status->ApplyStatus(WRTags::State_CombatTagged, Tag);
+		if (Attacker->GetPlayerState()) Attacker->Status->ApplyStatus(WRTags::State_CombatTagged, Tag);
 	}
 
 	// --- Poise (COMBAT-AND-LESSONS 1.5): a blow that breaks it makes the body react ---
@@ -649,7 +765,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		&& !TargetASC->HasMatchingGameplayTag(WRTags::Status_Staggered) && !TargetASC->HasMatchingGameplayTag(WRTags::Status_StanceBroken))
 	{
 		const bool bHyper = !Hit.bIgnoreHyperarmor && !Hit.bGrab && TargetASC->HasMatchingGameplayTag(WRTags::State_Hyperarmor);
-		const float Armour = bHyper ? WRTune(TEXT("poise.hyperarmor.heavy"), 1.5f) : 1.f;
+		// The move's own hyperarmor (heavy 1.5, charged 2, great weapons 2.5: weapons.json haMult).
+		const float MoveArmour = Target->IsSwinging() && Target->Swing.HyperarmorMult > 0.f ? Target->Swing.HyperarmorMult : WRTune(TEXT("poise.hyperarmor.heavy"), 1.5f);
+		const float Armour = bHyper ? MoveArmour : 1.f;
 		const float Left = TargetAttr->GetPoise() * Armour - PoiseDamage;
 		Target->Status->NotifyPoiseDamaged();
 		// A creature with hyperarmor on its own attacks (big bodies, bosses) keeps swinging through it.
@@ -699,6 +817,21 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Stance *= WRTune(TEXT("stance.shatterMult"), 2.f);
 		}
+		// Counter-hits, blows it never saw coming (stealth), a blunt blow to the head and a rimed body all take more
+		// stance (combat.md 2.4.0, 2.10, 2.11).
+		if (bCounterHit) Stance *= 1.f + WRTune(TEXT("combat.counterHit.stance"), 0.3f);
+		if (bWasUnaware) Stance *= 1.f + WRTune(TEXT("combat.stealth.stance"), 0.2f);
+		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rimed)) Stance *= WRTune(TEXT("status.defs.frost.rimedStance"), 1.5f);
+		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
+		if (AWRCreature* Body = Cast<AWRCreature>(Target))
+		{
+			if (Hit.PhysType == 2 && Body->IsNearLockPoint(Hit.ImpactPoint, TEXT("head"), WRTune(TEXT("stance.headRadius"), 70.f)))
+			{
+				Stance *= WRTune(TEXT("stance.headStrikeMult"), 1.5f);
+			}
+			// A breakable part near where it landed takes the blow's stance too (combat.md 2.10).
+			Body->DamagePart(Hit, Stance, Attacker);
+		}
 		// A boss fought by many takes less stance from each (ER): x group[participants - 1], tames counting.
 		if (const AWRBoss* Boss = Cast<AWRBoss>(Target))
 		{
@@ -729,21 +862,62 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Target->AddTorpor(Torpor * (1.f + UWRLifeSkillsComponent::StatFor(Attacker, TEXT("torporDealt"))));
 	}
 
-	if (Result == EWRHitResult::Hit)
+	// Element reactions (FULL-GAME 4.2, cooks/build-combat-full.md 2.10): a different element landing while the last one
+	// still clings (reactions.window s) reacts, and uses it up. Fire then frost = a steam burst.
+	if (Result == EWRHitResult::Hit && Attacker && !Hit.bDamageOverTime && !Hit.bReaction && Hit.Element.IsValid() && Hit.Element != WRTags::Element_Physical
+		&& TargetAttr->GetHealth() > 0.f)
 	{
-		float Burn = Hit.BurnBuildup;
+		const bool bFresh = Now - Target->AuraAt <= WRTune(TEXT("reactions.window"), 4.f) && Target->AuraElement.IsValid();
+		if (bFresh && Target->AuraElement == WRTags::Element_Fire && Hit.Element == WRTags::Element_Frost)
+		{
+			// Two players' elements meeting (or one who owns the Fire + Frost pair) react in full; one player alone at half.
+			const bool bFull = Target->AuraBy.Get() != Attacker || (AttackerASC && AttackerASC->HasMatchingGameplayTag(WRTags::Combo_Thaw));
+			Target->AuraElement = FGameplayTag();
+			SteamBurst(Target, Attacker, bFull ? 1.f : WRTune(TEXT("reactions.nonOwnerScale"), 0.5f));
+		}
+		else
+		{
+			Target->AuraElement = Hit.Element;
+			Target->AuraBy = Attacker;
+			Target->AuraAt = Now;
+		}
+	}
+
+	if (Result == EWRHitResult::Hit && Target->IsAlive())
+	{
+		// Buildup scales: a blow it never saw coming builds 20% more (stealth); against players 30% less (pvp.buildup).
+		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f);
+		for (const TPair<FName, float>& B : Hit.Buildups)
+		{
+			const int32 Id = WRStatus::FromName(B.Key);
+			if (Id == WRStatus::Burn || Id == WRStatus::Frost || Id >= WRStatus::Count)
+			{
+				continue;  // burn / frost go through the element path below
+			}
+			Target->Status->AddStatusBuildup(Id, B.Value * BuildScale, Attacker, Damage);
+			if (!Target->IsAlive()) break;
+		}
+		float Burn = (Hit.BurnBuildup + Hit.Buildups.FindRef(TEXT("burn"))) * BuildScale;
 		// Ignite chance: any fire hit can set the target burning outright.
 		if (Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("igniteChance")))
 		{
 			Burn += WRTune(TEXT("status.buildupThreshold"), 100.f);
 		}
-		float Frost = Hit.FrostBuildup * (1.f + UWRPathComponent::Stat(Attacker, TEXT("frostBuildup")));
+		float Frost = (Hit.FrostBuildup + Hit.Buildups.FindRef(TEXT("frost"))) * BuildScale * (1.f + UWRPathComponent::Stat(Attacker, TEXT("frostBuildup")));
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Slowed))
 		{
 			Frost *= 1.f + UWRPathComponent::Stat(Attacker, TEXT("freezeBuildup"));
 		}
-		Target->Status->AddBuildup(WRTags::Element_Fire, Burn, Attacker);
-		Target->Status->AddBuildup(WRTags::Element_Frost, Frost, Attacker);
+		if (Target->IsAlive()) Target->Status->AddBuildup(WRTags::Element_Fire, Burn, Attacker);
+		if (Target->IsAlive()) Target->Status->AddBuildup(WRTags::Element_Frost, Frost, Attacker);
+	}
+
+	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.
+	if (AWRCreature* Mount = Cast<AWRCreature>(Target); Mount && Mount->GetRider() && Target->IsAlive()
+		&& (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken) && !Hit.bDamageOverTime
+		&& (Hit.Impact >= uint8(WRTune(TEXT("mounted.unhorseImpact"), 4.f)) || Reaction > 0))
+	{
+		Mount->Unhorse(Attacker);
 	}
 
 	if (!Hit.bDamageOverTime && Attacker)

@@ -114,6 +114,12 @@ void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& C
 
 void AWRProjectile::HomeOn(AActor* Target, float Acceleration)
 {
+	// Enemy projectiles never home (COMBAT-AND-LESSONS 1.9, the hard rule): only a player's (or its tame's) may curve.
+	const AWRCharacterBase* By = Cast<AWRCharacterBase>(Hit.Instigator);
+	if (!By || (!By->GetPlayerState() && By->GetTameOwner().IsEmpty()))
+	{
+		return;
+	}
 	HomingOn = Target;
 	HomingAcceleration = Acceleration;
 	OnRep_Homing();
@@ -125,6 +131,37 @@ void AWRProjectile::OnRep_Homing()
 	Movement->HomingTargetComponent = At;
 	Movement->HomingAccelerationMagnitude = HomingAcceleration;
 	Movement->bIsHomingProjectile = At != nullptr && HomingAcceleration > 0.f;
+}
+
+FVector AWRProjectile::LobVelocity(const FVector& From, const FVector& To, float HorizontalSpeed, float Gravity)
+{
+	const FVector Flat = (To - From) * FVector(1.f, 1.f, 0.f);
+	const float T = FMath::Max(0.25f, Flat.Size() / FMath::Max(100.f, HorizontalSpeed));
+	const float G = 980.f * Gravity;
+	// z(t) = vz t - g t^2 / 2 = dz  ->  vz = dz / t + g t / 2.
+	return Flat / T + FVector(0.f, 0.f, (To.Z - From.Z) / T + 0.5f * G * T);
+}
+
+void AWRProjectile::InitLob(const FWRHit& InHit, const FVector& Velocity, float Gravity, float InSplashRadius, const FString& MeshPath)
+{
+	Hit = InHit;
+	SplashRadius = InSplashRadius;
+	Movement->ProjectileGravityScale = Gravity;
+	Movement->MaxSpeed = FMath::Max(4000.f, Velocity.Size());
+	Movement->Velocity = Velocity;
+	SetLifeSpan(8.f);
+	if (!MeshPath.IsEmpty())
+	{
+		ModelPath = MeshPath;
+		OnRep_Model();
+	}
+	else
+	{
+		TintColor = InHit.Element == WRTags::Element_Frost ? FLinearColor(0.5f, 0.85f, 1.f) : FLinearColor(1.f, 0.45f, 0.05f);
+		TrailFx = InHit.Element == WRTags::Element_Fire ? FName(TEXT("fire.bolt")) : InHit.Element == WRTags::Element_Frost ? FName(TEXT("frost.shard")) : NAME_None;
+		OnRep_Color();
+		OnRep_Fx();
+	}
 }
 
 void AWRProjectile::InitPhysical(const FWRHit& InHit, const FVector& Velocity, float Gravity, const FString& MeshPath, const FString& MeshAlong, FName InKind, FName InPickupItem)
@@ -206,6 +243,27 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(OtherActor);
 	const AWRCharacterBase* Caster = Cast<AWRCharacterBase>(Hit.Instigator);
+	if (SplashRadius > 0.f)
+	{
+		// A lobbed thing bursts where it comes down: everyone hostile in the splash takes it (once), the ground shows it.
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+		{
+			if (It->IsAlive() && (!Caster || (Caster->IsHostileTo(*It) && *It != Caster)) && FVector::Dist(It->GetActorLocation(), At) < SplashRadius + It->GetSimpleCollisionRadius() + It->GetSimpleCollisionHalfHeight() * 0.5f)
+			{
+				FWRHit Splash = Hit;
+				Splash.Origin = At;
+				Splash.bProjectile = true;
+				UWRCombatLibrary::ApplyHit(*It, Splash);
+			}
+		}
+		const bool bFire = Hit.Element == WRTags::Element_Fire, bFrost = Hit.Element == WRTags::Element_Frost;
+		WRFx::Broadcast(this, bFire ? TEXT("fire.impact") : bFrost ? TEXT("frost.impact") : TEXT("stomp"), At, FRotator(90.f, 0.f, 0.f), FMath::Max(1.f, SplashRadius / 120.f),
+			bFire ? TEXT("fire.impact") : bFrost ? TEXT("frost.impact") : TEXT("stomp"));
+		if (OnLanded) OnLanded(At);
+		Destroy();
+		return;
+	}
 	if (Target && (!Caster || Caster->IsHostileTo(Target)))
 	{
 		Hit.Origin = GetActorLocation() - GetVelocity().GetSafeNormal() * 100.f;

@@ -30,6 +30,19 @@ struct FWRMove
 	// Paired crits: total length and the damage frame.
 	float Total = 0.f;
 	float DamageAt = 0.f;
+	// --- Full attack set (cooks/build-combat-full.md 2.1-2.4) ---
+	/** 1 slash, 2 strike, 3 pierce (creatures.json physResist). */
+	uint8 PhysType = 1;
+	/** The held-Heavy charged swing (damage grows with the hold: combat.charge). */
+	bool bCharge = false;
+	/** Poise multiplier of this move's hyperarmor (0: tuning poise.hyperarmor.heavy). */
+	float HyperarmorMult = 0.f;
+	/** Where the row is picked: run, roll, backstep, air, crouch, guard (none: the chain / heavy). */
+	FName Context;
+	/** Spear guard poke: the guard stays up through it. */
+	bool bKeepsGuard = false;
+	/** > 0: this row's own reach (a spear's longer lunge). */
+	float Reach = 0.f;
 
 	float Length() const { return Windup + Active + Recovery; }
 };
@@ -60,6 +73,19 @@ struct FWRWeaponClass
 	float CritRiposte = 3.45f;
 	float CritStance = 3.f;
 	FWRGuard Guard;
+	/** none / 1h / 2h; great weapons are always two-handed and cancel later (CancelFraction). */
+	FName Hands = TEXT("1h");
+	bool bGreat = false;
+	float Weight = 0.f;
+	/** Copper base damage of a light / heavy hit (the sword's 12 / 22). */
+	float DamageLight = 12.f;
+	float DamageHeavy = 22.f;
+	/** > 0: the share of the recovery after which a roll or guard cuts the swing (great weapons 0.75). */
+	float CancelFraction = 0.f;
+	/** Player-vs-player class multiplier (tuning pvp). */
+	float PvpScale = 1.f;
+	/** Innate status buildup per hit (dagger bleed...). */
+	TMap<FName, float> Buildups;
 	TMap<FName, FWRMove> Moves;
 
 	const FWRMove* Move(FName MoveName) const { return Moves.Find(MoveName); }
@@ -81,6 +107,12 @@ public:
 	const FWRGuard* Offhand(FName Id) const { return Offhands.Find(Id); }
 	/** What the hero carries on the left arm (weapons.json "carried"). */
 	FName Carried() const { return CarriedId; }
+	/** The carried shield is on the arm: a survivor that isn't two-handing (combat.md 2.4.0). */
+	bool HasShield(const AWRCharacterBase* Character) const;
+	/** Two-handing: by choice (bTwoHanded), or always with a 2h / great weapon. */
+	static bool IsTwoHanding(const AWRCharacterBase* Character);
+	/** Copper base damage of the class's light or heavy (x the row's dmg, metal, quality...). */
+	static float ClassBase(const FWRWeaponClass& Class, bool bHeavy) { return bHeavy ? Class.DamageHeavy : Class.DamageLight; }
 
 private:
 	FWRWeapons();

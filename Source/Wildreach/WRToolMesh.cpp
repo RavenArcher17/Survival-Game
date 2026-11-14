@@ -357,6 +357,135 @@ FWRToolMesh FWRToolMesh::Tool(FName Kind, bool bCrude, const FLinearColor& Head,
 	return M;
 }
 
+namespace WRWeaponMeshDetail
+{
+	/** A blade's cross-section at X: a flattened diamond (the edge along +Y / -Y, the flat along Z), Width wide and Thick
+	 *  through at the spine; Fuller > 0 dishes the flats a little (a forged blade, not a slab). */
+	TArray<FVector> BladeRing(float X, float Width, float Thick, float Fuller, float Curve = 0.f)
+	{
+		const float W = Width * 0.5f, T = Thick * 0.5f;
+		return { FVector(X, W + Curve, 0.f), FVector(X, W * 0.45f + Curve, T * (1.f - Fuller)), FVector(X, Curve, T), FVector(X, -W * 0.45f + Curve, T * (1.f - Fuller)),
+			FVector(X, -W + Curve * 0.6f, 0.f), FVector(X, -W * 0.45f + Curve, -T * (1.f - Fuller)), FVector(X, Curve, -T), FVector(X, W * 0.45f + Curve, -T * (1.f - Fuller)) };
+	}
+}
+
+FWRToolMesh FWRToolMesh::Weapon(FName Class, const FLinearColor& Metal, float Scale)
+{
+	// The weapon classes beyond the sword (cooks/build-combat-full.md 2.8): forged metal over turned and wrapped wood,
+	// each shaped by how it's used. Space as the tools: X from the fist toward the business end, Y the edge (the side a
+	// cut leads with), Z the flat. Lengths are real-world (a seax, a boar spear, a longsword, a war maul, a war scythe).
+	using namespace WRWeaponMeshDetail;
+	FWRToolMesh M;
+	const FLinearColor Wood(0.24f, 0.14f, 0.065f), Leather(0.17f, 0.1f, 0.06f), Dark = Metal * 0.55f;
+	const float S = Scale;
+	const auto Grip = [&M, &Leather](float From, float Length, float R)
+	{
+		// A leather-wrapped grip: ridged turns of the wrap over the core.
+		TArray<FVector> Wrap;
+		const int32 Turns = FMath::Max(6, FMath::RoundToInt(Length / 1.6f));
+		for (int32 k = 0; k <= Turns; ++k) Wrap.Add(FVector(float(k) / Turns, (k % 2 ? 0.94f : 1.f) * R, (k % 2 ? 0.86f : 0.92f) * R));
+		M.Lathe(FVector(From, 0.f, 0.f), FVector::XAxisVector, Length, Wrap, 10, Leather, 0.85f);
+	};
+	const auto Blade = [&M, &Metal](float From, float Length, float Width, float Thick, float TipShare, float Fuller, float Belly, float Curve)
+	{
+		// From the guard to the point: straight flats, a belly toward the tip, then the point.
+		TArray<TArray<FVector>> Rings;
+		const int32 N = 10;
+		for (int32 k = 0; k <= N; ++k)
+		{
+			const float t = float(k) / N;
+			const float Taper = t < 1.f - TipShare ? 1.f - 0.15f * t + Belly * FMath::Sin(t * PI) : FMath::Max(0.02f, (1.f - t) / TipShare) * (0.85f + Belly);
+			Rings.Add(BladeRing(From + t * Length, Width * Taper, Thick * FMath::Max(0.25f, Taper), t < 0.8f ? Fuller : 0.f, Curve * t * t));
+		}
+		M.Loft(Rings, Metal, 0.32f, true);
+	};
+	const auto Guard = [&M, &Dark](float X, float Span, float Depth, float Thick)
+	{
+		TArray<TArray<FVector>> Rings;
+		for (const float Y : { -Span * 0.5f, -Span * 0.42f, Span * 0.42f, Span * 0.5f })
+		{
+			const float E = FMath::Abs(Y) > Span * 0.45f ? 0.7f : 1.f;
+			Rings.Add({ FVector(X - Depth * 0.5f * E, Y, -Thick * 0.5f * E), FVector(X + Depth * 0.5f * E, Y, -Thick * 0.5f * E), FVector(X + Depth * 0.5f * E, Y, Thick * 0.5f * E), FVector(X - Depth * 0.5f * E, Y, Thick * 0.5f * E) });
+		}
+		// Lofted along Y: rotate the rings' order into a bar.
+		M.Loft(Rings, Dark, 0.4f, true);
+	};
+	const auto Pommel = [&M, &Dark](float X, float R)
+	{
+		M.Lathe(FVector(X - R * 1.6f, 0.f, 0.f), FVector::XAxisVector, R * 1.6f, { FVector(0.f, R * 0.4f, R * 0.4f), FVector(0.3f, R, R * 0.9f), FVector(0.75f, R * 0.95f, R * 0.85f), FVector(1.f, R * 0.5f, R * 0.5f) }, 10, Dark, 0.4f);
+	};
+
+	if (Class == TEXT("dagger"))
+	{
+		// A seax: a 30 cm single-edged blade with a heavy spine, a short antler-and-leather grip, a small guard.
+		Pommel(-6.f * S, 1.8f * S);
+		Grip(-6.f * S, 11.f * S, 1.5f * S);
+		Guard(5.5f * S, 6.f * S, 1.2f * S, 1.6f * S);
+		Blade(6.2f * S, 30.f * S, 3.6f * S, 0.7f * S, 0.25f, 0.15f, 0.05f, 0.f);
+	}
+	else if (Class == TEXT("spear"))
+	{
+		// A boar spear: a 2 m ash shaft held a third of the way along, a leaf blade with lugs below it, a butt cap.
+		const float Back = 70.f * S, Shaft = 200.f * S;
+		M.Lathe(FVector(-Back, 0.f, 0.f), FVector::XAxisVector, Shaft, { FVector(0.f, 1.7f * S, 1.7f * S), FVector(0.5f, 1.6f * S, 1.6f * S), FVector(1.f, 1.35f * S, 1.35f * S) }, 10, Wood, 0.6f, 0.4f, 4.f);
+		M.Lathe(FVector(-Back - 3.f * S, 0.f, 0.f), FVector::XAxisVector, 5.f * S, { FVector(0.f, 1.2f * S, 1.2f * S), FVector(0.3f, 1.9f * S, 1.9f * S), FVector(1.f, 1.8f * S, 1.8f * S) }, 10, Dark, 0.4f);
+		Grip(-8.f * S, 16.f * S, 1.85f * S);
+		const float Socket = Shaft - Back;
+		M.Lathe(FVector(Socket - 12.f * S, 0.f, 0.f), FVector::XAxisVector, 14.f * S, { FVector(0.f, 1.9f * S, 1.9f * S), FVector(0.8f, 1.6f * S, 1.6f * S), FVector(1.f, 1.2f * S, 1.2f * S) }, 10, Dark, 0.35f);
+		Guard(Socket - 6.f * S, 10.f * S, 1.5f * S, 1.4f * S);   // the lugs that stop a boar running up the shaft
+		Blade(Socket + 2.f * S, 34.f * S, 6.5f * S, 1.1f * S, 0.35f, 0.2f, 0.18f, 0.f);
+	}
+	else if (Class == TEXT("greatsword"))
+	{
+		// A longsword for two hands: a 115 cm blade with a fuller, a wide cross, a 28 cm grip, a scent-stopper pommel.
+		Pommel(-14.f * S, 3.f * S);
+		Grip(-14.f * S, 28.f * S, 1.8f * S);
+		Guard(14.f * S, 30.f * S, 2.2f * S, 2.2f * S);
+		Blade(15.f * S, 115.f * S, 5.4f * S, 0.9f * S, 0.12f, 0.35f, 0.f, 0.f);
+	}
+	else if (Class == TEXT("great_hammer"))
+	{
+		// A war maul: a 110 cm haft bound in iron langets, a block head with a flat face and a squared back.
+		const float Back = 36.f * S, Haft = 110.f * S;
+		M.Lathe(FVector(-Back, 0.f, 0.f), FVector::XAxisVector, Haft, { FVector(0.f, 2.4f * S, 2.2f * S), FVector(0.04f, 2.8f * S, 2.6f * S), FVector(0.1f, 2.3f * S, 2.1f * S), FVector(0.9f, 2.4f * S, 2.2f * S), FVector(1.f, 2.2f * S, 2.f * S) }, 12, Wood, 0.6f, 0.3f, 7.f);
+		Grip(-Back + 4.f * S, 30.f * S, 2.5f * S);
+		const float Head = Haft - Back - 9.f * S;
+		M.Lathe(FVector(Head - 22.f * S, 0.f, 0.f), FVector::XAxisVector, 24.f * S, { FVector(0.f, 2.6f * S, 2.4f * S), FVector(1.f, 2.6f * S, 2.4f * S) }, 8, Dark, 0.45f);  // langets
+		TArray<TArray<FVector>> Block;
+		for (const float Y : { -16.f, -15.f, 15.f, 16.f })
+		{
+			const float E = FMath::Abs(Y) > 15.5f ? 0.88f : 1.f;   // the faces' chamfer
+			const float H = 9.f * E * S, D = 8.f * E * S;
+			Block.Add({ FVector(Head - H, Y * S, -D), FVector(Head + H, Y * S, -D), FVector(Head + H, Y * S, D), FVector(Head - H, Y * S, D) });
+		}
+		M.Loft(Block, Metal, 0.38f, true);
+	}
+	else if (Class == TEXT("scythe"))
+	{
+		// A war scythe: a 160 cm snath with a hand peg, the 75 cm blade set across its top, curving back toward the haft.
+		const float Back = 60.f * S, Snath = 160.f * S;
+		M.Lathe(FVector(-Back, 0.f, 0.f), FVector::XAxisVector, Snath, { FVector(0.f, 1.7f * S, 1.6f * S), FVector(0.5f, 1.8f * S, 1.7f * S), FVector(1.f, 1.6f * S, 1.5f * S) }, 10, Wood, 0.6f, 1.2f, 11.f);
+		Grip(-8.f * S, 14.f * S, 1.9f * S);
+		M.Lathe(FVector(30.f * S, 0.f, 0.f), FVector::ZAxisVector, 11.f * S, { FVector(0.f, 1.1f * S, 1.1f * S), FVector(1.f, 0.9f * S, 0.9f * S) }, 8, Wood, 0.6f);  // the peg
+		const float Top = Snath - Back;
+		M.Lathe(FVector(Top - 7.f * S, 0.f, 0.f), FVector::XAxisVector, 8.f * S, { FVector(0.f, 2.f * S, 2.f * S), FVector(1.f, 2.f * S, 2.f * S) }, 8, Dark, 0.4f);  // the ring
+		// The blade runs out along Y from the top (its edge toward the wielder, -X), sweeping back as it goes.
+		TArray<TArray<FVector>> Rings;
+		const int32 N = 12;
+		for (int32 k = 0; k <= N; ++k)
+		{
+			const float t = float(k) / N;
+			const float Y = t * 75.f * S;
+			const float X = Top - 2.f * S - 18.f * S * t * t;
+			const float W = (7.f - 5.5f * t) * S * (t > 0.92f ? (1.f - t) / 0.08f + 0.05f : 1.f);
+			const float T = (0.9f - 0.5f * t) * S;
+			Rings.Add({ FVector(X + W * 0.5f, Y, 0.f), FVector(X, Y, T * 0.5f), FVector(X - W * 0.5f, Y, 0.f), FVector(X, Y, -T * 0.5f) });
+		}
+		M.Loft(Rings, Metal, 0.3f, true);
+	}
+	return M;
+}
+
 FWRToolMesh FWRToolMesh::Float()
 {
 	// A carved float: a keel stick under, a pale spindle body, a red cap over the waterline with a dark band, a quill.

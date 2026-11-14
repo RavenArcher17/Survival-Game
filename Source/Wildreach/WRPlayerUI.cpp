@@ -363,6 +363,23 @@ void FWRPlayerUI::PadQuickStep(int32 Dir)
 	if (AWRPlayerController* P = PC.Get()) P->ShowLocalNotice(TEXT("No abilities on your wheels: learn them in Paths"));
 }
 
+void FWRPlayerUI::CastAbilityHeld(FName NodeId)
+{
+	bQuickHeld = true;
+	CastAbility(NodeId);
+	bQuickHeld = false;
+}
+
+void FWRPlayerUI::ReleaseQuickSlot()
+{
+	AWRCharacter* Survivor = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr;
+	if (Survivor && HeldQuickInput != EWRAbilityInput::None)
+	{
+		Survivor->ReleaseAbilityInput(HeldQuickInput);
+	}
+	HeldQuickInput = EWRAbilityInput::None;
+}
+
 void FWRPlayerUI::PadQuickFire()
 {
 	const int32 Wheel = WRInput::PadQuickWheel();
@@ -372,7 +389,7 @@ void FWRPlayerUI::PadQuickFire()
 		PadQuickStep(1);
 	}
 	const int32 Now = WRInput::PadQuickWheel();
-	CastAbility(GetWheelAbility(Now, WheelPicked[Now]));
+	CastAbilityHeld(GetWheelAbility(Now, WheelPicked[Now]));
 }
 
 void FWRPlayerUI::PadBeltStep(int32 Dir)
@@ -683,6 +700,8 @@ TArray<FWRCastable> FWRPlayerUI::GetCastables() const
 		C.Path = FName(*PathStr);
 		C.Name = FText::FromString(Node ? Node->Name : NodeStr);
 		C.InputIndex = i;
+		// A Wildbrand that doesn't fit what's in your hand greys out with the reason (combat.md 2.12).
+		UWRGA_Melee::WildbrandFits(Survivor, FName(*NodeStr), C.Blocked);
 		if (ASC)
 		{
 			const int32 InputId = static_cast<int32>(EWRAbilityInput::Slot1) + i;
@@ -836,9 +855,23 @@ void FWRPlayerUI::CastAbility(FName NodeId)
 		if (PC.IsValid()) PC->ShowLocalNotice(TEXT("Nothing on that slot: learn abilities in Paths"));
 		return;
 	}
+	if (!C->Blocked.IsEmpty())
+	{
+		if (PC.IsValid()) PC->ShowLocalNotice(FString::Printf(TEXT("%s: %s"), *C->Name.ToString(), *C->Blocked));
+		return;
+	}
 	const EWRAbilityInput Input = static_cast<EWRAbilityInput>(static_cast<int32>(EWRAbilityInput::Slot1) + C->InputIndex);
 	Survivor->PressAbilityInput(Input);
-	Survivor->ReleaseAbilityInput(Input);
+	// A held quick-slot key or D-pad up charges what can be charged (Molten cleave, Ice lance...): its release comes
+	// from ReleaseQuickSlot; a click or a wheel pick casts at once.
+	if (!bQuickHeld)
+	{
+		Survivor->ReleaseAbilityInput(Input);
+	}
+	else
+	{
+		HeldQuickInput = Input;
+	}
 }
 
 void FWRPlayerUI::WheelKey(int32 Wheel, bool bDown)

@@ -61,6 +61,8 @@ protected:
 	 *  window. bRules false: none (creature bites keep their own AI timing). */
 	WRCombatRules::EAct RuleAct = WRCombatRules::EAct::Attack;
 	bool bRules = false;
+	/** Usable in the saddle (bolts, lances; Wildbrands then check their own mounted flag). */
+	bool bAllowedMounted = false;
 	/** Predicted root: no movement at all (heavies; a CMC saved-move flag). */
 	void SetMoveRoot(bool bOn);
 	/** Tuning key for the cooldown in seconds; empty = no cooldown. */
@@ -85,6 +87,13 @@ public:
 	UWRGA_Melee();
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual bool CheckCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
+	/** Can Who use the Wildbrand Node now (its fits list vs the held class; riding needs its mounted flag)? OutWhy says
+	 *  why not ("needs a spear", "not while riding") for the slot's greyed label. */
+	static bool WildbrandFits(const AWRCharacterBase* Who, FName Node, FString& OutWhy);
 
 protected:
 	bool bHeavy = false;
@@ -119,6 +128,25 @@ private:
 	FName MoveId;             // this activation's move row (bUsesMoves)
 	float MoveActive = 0.18f;
 	bool bWindowsSet = false;
+
+	// --- Full attack set (cooks/build-combat-full.md 2.2-2.3, 2.13) ---
+	/** The swing proper, after any charge: clip, movement, windows, sweeps, end. */
+	void StartSwing(float Windup, float Active, float Recovery, bool bHyperarmor, uint8 Variant, bool bStepping);
+	/** A held heavy / chargeable Wildbrand: hold the coil until release or the cap. */
+	void BeginCharge(float Windup, float Active, float Recovery, uint8 Variant);
+	UFUNCTION() void OnChargeReleased(float TimeHeld);
+	/** A jump attack's blade stays live until it lands. */
+	void JumpTick();
+	FString WildbrandKey() const;
+	bool FollowUpReady() const;
+	float ChargeFactor = 1.f;     // damage x from the charge (1 = none)
+	bool bCharging = false;
+	double ChargeStartedAt = 0.0;
+	uint8 PendingVariant = 0;
+	bool bThisFollowUp = false;   // this activation is a Wildbrand's follow-up
+	bool bJumpSwing = false;
+	double JumpActiveSince = 0.0;
+	double FollowUpFrom = -1.0, FollowUpUntil = -1.0;
 };
 
 UCLASS() class WILDREACH_API UWRGA_LightAttack : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_LightAttack(); };
@@ -160,6 +188,7 @@ public:
 private:
 	void SetInvulnerable(bool bOn);
 	bool bInvulnerable = false;
+	bool bWasBackstep = false;
 	UPROPERTY() TObjectPtr<class UAbilityTask_ApplyRootMotionConstantForce> Travel;
 };
 
@@ -225,6 +254,7 @@ class WILDREACH_API UWRGA_Spell : public UWRGameplayAbility
 public:
 	UWRGA_Spell();
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
 	/** e.g. "spells.fireBolt" with damage/burnBuildup/frostBuildup/speed/cooldown/heat/chill. */
@@ -256,12 +286,21 @@ class WILDREACH_API UWRGA_AreaSpell : public UWRGameplayAbility
 
 public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
 	void Execute();
+	/** The cast proper (after any charge): the shape's wind-up, rooted or walking, then Execute. */
+	void CastNow();
+	UFUNCTION() void OnSpellChargeReleased(float TimeHeld);
+	/** tuning spells.shapes.<shape> for this spell's shape (combat.md 2.13). */
+	FString ShapeKey() const;
 	FString SpellKey;
 	EWRAreaShape Shape = EWRAreaShape::Nova;
 	FGameplayTag Element;
+	float SpellCharge = 1.f;
+	bool bSpellCharging = false;
+	double SpellChargeStarted = 0.0;
 };
 
 UCLASS() class WILDREACH_API UWRGA_FireWall : public UWRGA_AreaSpell { GENERATED_BODY() public: UWRGA_FireWall(); };

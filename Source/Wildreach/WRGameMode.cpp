@@ -132,6 +132,60 @@ void AWRGameMode::BeginPlay()
 	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
 	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); }), 60.f, true);
 	GetWorldTimerManager().SetTimer(UndergroundTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { RescueUnderground(); }), 1.f, true);
+	GetWorldTimerManager().SetTimer(RoamingBossTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { StepRoamingBosses(); }), 5.f, true);
+}
+
+void AWRGameMode::StepRoamingBosses()
+{
+	// The roaming minis (cooks/build-combat-full.md 2.17-2.18: Cinderhorn, Old Tusker) aren't placed in the map: each
+	// walks its loop (creatures.json roam). One comes out when a survivor is near its loop and the ground there has
+	// streamed in, and comes back server.bossRespawnHours after it falls.
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (const FWRCreatureDef& Def : FWRCreatureRegistry::Get().All())
+	{
+		if (Def.Roam.Num() == 0 || Def.Archetype != TEXT("boss"))
+		{
+			continue;
+		}
+		bool bAlive = false;
+		for (TActorIterator<AWRCreature> It(GetWorld()); It && !bAlive; ++It)
+		{
+			bAlive = It->CreatureId == Def.Id && It->IsAlive();
+		}
+		double& Back = RoamingBossBack.FindOrAdd(Def.Id);
+		if (bAlive)
+		{
+			Back = -1.0;
+			continue;
+		}
+		if (Back < 0.0)
+		{
+			// It just fell (or the world just started: then at once).
+			Back = RoamingBossSeen.Contains(Def.Id) ? Now + WRTune(TEXT("server.bossRespawnHours"), 4.f) * 3600.0 : Now;
+		}
+		if (Now < Back)
+		{
+			continue;
+		}
+		const FVector Start = Def.Roam[0];
+		bool bNear = false;
+		for (TActorIterator<AWRCharacter> It(GetWorld()); It && !bNear; ++It)
+		{
+			bNear = It->IsAlive() && FVector::Dist2D(It->GetActorLocation(), Start) < WRTune(TEXT("wildlife.activationRadius"), 15000.f);
+		}
+		FHitResult Ground;
+		const FCollisionQueryParams Q(SCENE_QUERY_STAT(WRRoamBoss), false);
+		if (!bNear || !GetWorld()->LineTraceSingleByChannel(Ground, Start + FVector(0, 0, 80000), Start - FVector(0, 0, 80000), ECC_WorldStatic, Q))
+		{
+			continue;
+		}
+		if (AWRCreature* Boss = AWRCreature::SpawnCreature(GetWorld(), Def.Id, Ground.ImpactPoint + FVector(0.f, 0.f, Def.HalfHeight + 30.f), FRotator::ZeroRotator))
+		{
+			RoamingBossSeen.Add(Def.Id);
+			Back = -1.0;
+			UE_LOG(LogWildreach, Log, TEXT("BOSS %s comes out on its loop at %s"), *Def.Name, *Boss->GetActorLocation().ToCompactString());
+		}
+	}
 }
 
 void AWRGameMode::RescueUnderground()
@@ -385,6 +439,10 @@ void AWRGameMode::SavePlayer(AWRPlayerState* PS)
 	{
 		Root->SetObjectField(TEXT("bed"), Bed);
 	}
+	// Named bosses this player has felled (the first-kill drop is once each: cooks/build-combat-full.md 2.16).
+	TArray<TSharedPtr<FJsonValue>> Kills;
+	for (const FName& Boss : PS->BossKills) Kills.Add(MakeShared<FJsonValueString>(Boss.ToString()));
+	Root->SetArrayField(TEXT("bossKills"), Kills);
 
 	FString Text;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
@@ -438,6 +496,11 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	if (Root->TryGetObjectField(TEXT("bed"), Bed))
 	{
 		WRBeds::LoadDefault(PS, *Bed);
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Kills = nullptr;
+	if (Root->TryGetArrayField(TEXT("bossKills"), Kills))
+	{
+		for (const TSharedPtr<FJsonValue>& K : *Kills) PS->BossKills.Add(FName(*K->AsString()));
 	}
 }
 

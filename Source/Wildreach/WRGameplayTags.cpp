@@ -33,15 +33,34 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(Status_Exposed, "Status.Exposed");
 	UE_DEFINE_GAMEPLAY_TAG(Status_Flinch, "Status.Flinch");
 
+	UE_DEFINE_GAMEPLAY_TAG(Status_Poison, "Status.Poison");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Rot, "Status.Rot");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Shock, "Status.Shock");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Soak, "Status.Soak");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Blind, "Status.Blind");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Decay, "Status.Decay");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Mark, "Status.Mark");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Curse, "Status.Curse");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Rimed, "Status.Rimed");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Bleeding, "Status.Bleeding");
+	UE_DEFINE_GAMEPLAY_TAG(State_Drinking, "State.Drinking");
+	UE_DEFINE_GAMEPLAY_TAG(State_Charging, "State.Charging");
+	UE_DEFINE_GAMEPLAY_TAG(State_Casting, "State.Casting");
+	UE_DEFINE_GAMEPLAY_TAG(State_Mounted, "State.Mounted");
+	UE_DEFINE_GAMEPLAY_TAG(State_CombatTagged, "State.CombatTagged");
+
 	UE_DEFINE_GAMEPLAY_TAG(Element_Physical, "Element.Physical");
 	UE_DEFINE_GAMEPLAY_TAG(Element_Fire, "Element.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(Element_Frost, "Element.Frost");
+	UE_DEFINE_GAMEPLAY_TAG(Element_Lightning, "Element.Lightning");
+	UE_DEFINE_GAMEPLAY_TAG(Element_Water, "Element.Water");
 
 	UE_DEFINE_GAMEPLAY_TAG(Path_Fire, "Path.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(Path_Frost, "Path.Frost");
 
 	UE_DEFINE_GAMEPLAY_TAG(Passive_BurningBlood, "Passive.BurningBlood");
 	UE_DEFINE_GAMEPLAY_TAG(Passive_Permafrost, "Passive.Permafrost");
+	UE_DEFINE_GAMEPLAY_TAG(Passive_Grounded, "Passive.Grounded");
 	UE_DEFINE_GAMEPLAY_TAG(Combo_Thaw, "Combo.Thaw");
 	UE_DEFINE_GAMEPLAY_TAG(Combo_Balance, "Combo.Balance");
 

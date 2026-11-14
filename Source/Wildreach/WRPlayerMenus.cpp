@@ -4,7 +4,10 @@
 #include "WRPlayerController.h"
 #include "WRSound.h"
 #include "Wildreach.h"
+#include "WRCharacterBase.h"
+#include "WRGameplayTags.h"
 #include "WRAltar.h"
+#include "WRBoss.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRCreature.h"
@@ -202,6 +205,14 @@ void AWRPlayerController::WRInteract()
 		}
 		if (Def && (Def->Kind == TEXT("chest") || Def->Kind == TEXT("totem")))
 		{
+			// In a fight with a player (the combat tag, combat.md 2.20): no reaching into shared storage.
+			const AWRCharacterBase* Me = Cast<AWRCharacterBase>(GetPawn());
+			const APlayerState* MyPS = GetPlayerState<APlayerState>();
+			if (Me && Me->HasTag(WRTags::State_CombatTagged) && MyPS && Piece->OwnerName != MyPS->GetPlayerName())
+			{
+				ShowLocalNotice(TEXT("In combat: not now"));
+				return;
+			}
 			Menu = Def->Kind == TEXT("chest") ? EWRMenu::Chest : EWRMenu::Claim;
 			MenuPiece = Piece;
 			MenuIndex = 0;
@@ -775,6 +786,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		AWRBuildPiece* Piece = FindNearbyPiece(350.f, true);  // the door, not the wall beside it
 		AWRNest* Nest = FindNearby<AWRNest>(GetWorld(), GetPawn(), 350.f);
 		AWRLootBag* Bag = FindNearby<AWRLootBag>(GetWorld(), GetPawn(), 300.f);
+		AWRRunbackStone* Stone = FindNearby<AWRRunbackStone>(GetWorld(), GetPawn(), 300.f);
 		AWRCreature* Wild = FindNearbyCreature(false, 400.f);
 		const FWRPieceDef* PieceDef = Piece ? Piece->GetDef() : nullptr;
 		if ((Bag || Nest || Wild) && Cast<AWRCharacter>(GetPawn()))
@@ -788,6 +800,10 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		if (Bag)
 		{
 			OutResult = Bag->Loot(this);
+		}
+		else if (Stone)
+		{
+			OutResult = Stone->Bind(Cast<AWRCharacter>(GetPawn()));
 		}
 		else if (Nest)
 		{

@@ -25,6 +25,13 @@ public:
 	 *  Kind "bola" tangles what it hits; arrows, bolts, darts and spears stick where they land, and PickupItem (a thrown
 	 *  spear) is left on the ground there to pick up again. */
 	void InitPhysical(const FWRHit& InHit, const FVector& Velocity, float Gravity, const FString& MeshPath, const FString& MeshAlong, FName InKind, FName InPickupItem);
+	/** Server: a thing a boss throws (slag, a boulder, snow, a fire bolt): it arcs under Gravity and bursts where it
+	 *  lands, hitting everyone in SplashRadius (cooks/build-combat-full.md 2.16). It never homes. MeshPath: a model
+	 *  (a boulder); empty: the element's trail. OnLanded runs on the server where it came down (lava cracks...). */
+	void InitLob(const FWRHit& InHit, const FVector& Velocity, float Gravity, float InSplashRadius, const FString& MeshPath);
+	TFunction<void(const FVector&)> OnLanded;
+	/** Velocity that carries a lob from From to To at HorizontalSpeed under Gravity (x 980 cm/s2). */
+	static FVector LobVelocity(const FVector& From, const FVector& To, float HorizontalSpeed, float Gravity);
 	/** Server: a bola tangles small creatures' legs (rooted) and slows big ones. */
 	static void ApplyBola(class AWRCharacterBase* Target);
 
@@ -59,4 +66,5 @@ private:
 
 	FWRHit Hit;
 	bool bSpent = false;
+	float SplashRadius = 0.f;
 };

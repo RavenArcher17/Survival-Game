@@ -30,6 +30,10 @@ public:
 
 	/** Server: the bed/bedroll this player wakes at by default (WRBeds; falls back to a camp). */
 	TWeakObjectPtr<AActor> RespawnPoint;
+	/** Server: named bosses this player has felled (saved): each one's first-kill drop comes once. */
+	TSet<FName> BossKills;
+	/** Server: the shrine-stones by boss arenas this player has rested at (wake choices on the death screen). */
+	TArray<TWeakObjectPtr<AActor>> BoundStones;
 	/** The beds you've set and your clan's, for your map and death screen (only your own client gets them). */
 	UPROPERTY(Replicated) TArray<FWRBedSpot> Beds;
 	/** Server: where the death screen offered to wake (in its order), what's picked, and the body's half height. */

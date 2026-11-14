@@ -271,9 +271,11 @@ bool UWRLagSubsystem::ShouldHold(const AWRCharacterBase* Target, const FWRHit& H
 	{
 		return false;
 	}
-	// Player against player is judged at the attacker's time instead (the swing's rewind): only the world's blows wait.
+	// Player against player: the swing is already judged where its attacker saw the target (the rewind); the defender's
+	// guard, parry or roll pressed on its own screen is judged back-dated too, by waiting the same capped moment (the
+	// favour-the-defender rule for defences, cooks/build-combat-full.md 2.22; pvp.defenderLag 0 turns it off).
 	const AWRCharacterBase* By = Cast<AWRCharacterBase>(Hit.Instigator);
-	if (By && By->IsPlayerControlled())
+	if (By && By->IsPlayerControlled() && WRTune(TEXT("pvp.defenderLag"), 1.f) <= 0.f)
 	{
 		return false;
 	}

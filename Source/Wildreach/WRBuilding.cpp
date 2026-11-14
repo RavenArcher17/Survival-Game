@@ -5,6 +5,8 @@
 #include "WRLifeSkills.h"
 #include "WRSocial.h"
 #include "Wildreach.h"
+#include "WRCharacterBase.h"
+#include "WRGameplayTags.h"
 #include "WRCrafting.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
@@ -896,6 +898,11 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 		if (!CanAccess(Who))
 		{
 			return TEXT("Not your bed");
+		}
+		// The combat tag (combat.md 2.20): no moving where you wake mid-fight with a player.
+		if (const AWRCharacterBase* Sleeper = PS ? Cast<AWRCharacterBase>(PS->GetPawn()) : nullptr; Sleeper && Sleeper->HasTag(WRTags::State_CombatTagged))
+		{
+			return TEXT("In combat: not now");
 		}
 		WRBeds::Set(PS, this);
 		return TEXT("Respawn point set");

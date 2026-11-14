@@ -25,6 +25,7 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Heavy"), TEXT("Heavy attack"), Combat, EKeys::R);
 	Add(TEXT("Block"), TEXT("Block / parry / aim"), Combat, EKeys::RightMouseButton);
 	Add(TEXT("SwapRanged"), TEXT("Swap to ranged weapon"), Combat, EKeys::G);
+	Add(TEXT("TwoHand"), TEXT("Two-hand the weapon (hold)"), Combat, EKeys::Y);
 	Add(TEXT("Wheel1"), TEXT("Ability wheel 1"), Combat, EKeys::Q);
 	Add(TEXT("Wheel2"), TEXT("Ability wheel 2"), Combat, EKeys::Z);
 	Add(TEXT("Interact"), TEXT("Interact (hold on your tame: orders)"), Items, EKeys::E);

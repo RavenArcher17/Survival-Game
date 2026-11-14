@@ -86,6 +86,19 @@ struct FWRHit
 	UPROPERTY() bool bProjectile = false;
 	/** Server time the blow is judged at (0 = now): a deferred blow on a remote player is judged when it saw it. */
 	double JudgeTime = 0.0;
+
+	// --- Full combat (cooks/build-combat-full.md 2) ---
+	/** 0 none, 1 slash, 2 strike, 3 pierce: creatures.json physResist, counter-hits (pierce), head strikes. */
+	UPROPERTY() uint8 PhysType = 0;
+	/** Status buildup by status id (bleed, poison, rot, shock, soak, blind, decay, mark, curse; burn / frost may also go
+	 *  here, added to BurnBuildup / FrostBuildup). */
+	UPROPERTY() TMap<FName, float> Buildups;
+	/** A spell (PvP spell multiplier; stance from damage). */
+	UPROPERTY() bool bSpell = false;
+	/** Part of an element reaction already (a steam burst): it doesn't start another. */
+	UPROPERTY() bool bReaction = false;
+	/** Where the blow landed on the body (world), for head strikes and breakable parts; zero = the body's centre. */
+	UPROPERTY() FVector ImpactPoint = FVector::ZeroVector;
 };
 
 /** Weapon the character currently swings. Damage = base x metal x quality x (1 + upgrade x 5%). */

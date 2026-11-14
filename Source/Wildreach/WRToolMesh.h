@@ -25,6 +25,8 @@ struct WILDREACH_API FWRToolMesh
 
 	/** What to build: "hatchet" / "pick" / "rod" (Kind), crude or stone (bCrude), its head colour (linear). */
 	static FWRToolMesh Tool(FName Kind, bool bCrude, const FLinearColor& Head, float Length, float Back, float Thick, float HeadScale);
+	/** A weapon of a class beyond the sword (dagger, spear, greatsword, great_hammer, scythe) in its metal. */
+	static FWRToolMesh Weapon(FName Class, const FLinearColor& Metal, float Scale = 1.f);
 	/** The fishing float, centred on its waterline: the red cap up +Z. */
 	static FWRToolMesh Float();
 	/** Where the rod's tip sits in tool space (the line leaves from there). */

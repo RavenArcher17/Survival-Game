@@ -1,28 +1,207 @@
 {
   "_comment": "Weapon classes and their moves, and the guard tools (COMBAT-AND-LESSONS 1.1-1.3, cooks/combat.md 2.4, cooks/build-combat-core.md 3.1). Read by FWRWeapons (WRWeapons.cpp). An item picks its class with items.json \"class\" (weapons without one are swords). moves: windup / active / recovery s (the swing clip is timed to them), dmg x the weapon's light (heavy moves: heavy) damage, stance = stance damage to creatures, stamina, poise = poise damage to players, guardStamina = what blocking it costs before the guard boost, impact 1-5 (poise.reactions), next = the light chain's next move, clip = which of the hero's light / heavy clips it plays, ha = hyperarmor from the press to the end of the strike, tier = how its hits feel (fx.hitStop). guard: the class's own guard when no off-hand is carried (boost, physical / element negation, parry startup / active / recovery s). crit: backstab / riposte multipliers of a light hit (a stance-break crit is a riposte). offhands: guard tools; carried = what the hero holds on the left arm today (player_art.json shieldMesh). Shields as items come with the crafting cook: only the carried one is in the game now. All first drafts.",
   "carried": "crude_shield",
+  "_moves": "Full attack sets (cooks/build-combat-full.md 2.1-2.4): every class has light1..N (the chain), heavy, chainHeavy (Heavy inside a light's combo window), charged (Heavy held: tuning combat.charge; haMult = its hyperarmor poise multiplier), runLight/runHeavy (sprinting), rollLight/backstepLight (combat.contextWindow s after a roll / backstep), jumpLight/jumpHeavy (in the air: the sweep stays live until landing), crouchLight (written for the crouch cook; no crouch stance yet), guardCounter, guardPoke (spear: Light while guarding with a shield keeps the guard up). type = slash / strike / pierce (creatures.json physResist). damage = the class's copper light / heavy base (x metal x quality x upgrade). hands: 1h / 2h / none; great = always two-handed, its cancel window opens at cancelFraction of the recovery. buildup = innate status buildup per hit. pvp = player-vs-player class multiplier (tuning pvp). Every number is a first draft.",
   "classes": {
-    "sword": {
-      "name": "Sword", "hands": "1h", "reach": 220, "sweepRadius": 45,
-      "crit": { "backstab": 2.30, "riposte": 3.45 },
-      "guard": { "boost": 25, "phys": 0.60, "element": 0.30, "parry": [0.13, 0.10, 0.50] },
+    "fists": {
+      "name": "Fists", "hands": "none", "great": false, "weight": 0, "reach": 150, "sweepRadius": 28, "damage": {"light": 5, "heavy": 9}, "types": {"light": "strike", "heavy": "strike"}, "crit": {"backstab": 2.5, "riposte": 3.5}, "guard": {"boost": 10, "phys": 0.4, "element": 0.2, "parry": [0.13, 0.13, 0.45], "canParry": true}, "pvp": 1.0,
       "moves": {
-        "light1": { "windup": 0.25, "active": 0.18, "recovery": 0.30, "dmg": 1.0, "stance": 5, "stamina": 10, "poise": 30, "guardStamina": 30, "impact": 2, "next": "light2", "clip": 0, "tier": "light" },
-        "light2": { "windup": 0.22, "active": 0.16, "recovery": 0.30, "dmg": 1.0, "stance": 5, "stamina": 10, "poise": 30, "guardStamina": 30, "impact": 2, "next": "light3", "clip": 1, "tier": "light" },
-        "light3": { "windup": 0.30, "active": 0.20, "recovery": 0.42, "dmg": 1.15, "stance": 6, "stamina": 10, "poise": 34, "guardStamina": 34, "impact": 2, "clip": 2, "tier": "light" },
-        "heavy": { "windup": 0.55, "active": 0.22, "recovery": 0.45, "dmg": 1.0, "stance": 10, "stamina": 20, "poise": 48, "guardStamina": 45, "impact": 3, "clip": 0, "ha": true, "heavy": true, "tier": "heavy" },
-        "guardCounter": { "windup": 0.30, "active": 0.20, "recovery": 0.50, "dmg": 1.3, "stance": 30, "stamina": 20, "poise": 54, "guardStamina": 60, "impact": 3, "clip": 2, "heavy": true, "tier": "counter" },
-        "riposte": { "total": 1.6, "damageAt": 0.9, "clip": 0 },
-        "backstab": { "total": 1.4, "damageAt": 0.75, "clip": 1 }
+        "light1": {"windup": 0.15, "active": 0.1, "recovery": 0.2, "dmg": 1.0, "stance": 2.0, "stamina": 6, "poise": 12.0, "guardStamina": 10.0, "impact": 1, "clip": 0, "tier": "light", "type": "strike", "next": "light2"},
+        "light2": {"windup": 0.15, "active": 0.1, "recovery": 0.2, "dmg": 1.0, "stance": 2.0, "stamina": 6, "poise": 12.0, "guardStamina": 10.0, "impact": 1, "clip": 1, "tier": "light", "type": "strike", "next": "light3"},
+        "light3": {"windup": 0.15, "active": 0.1, "recovery": 0.2, "dmg": 1.0, "stance": 2.0, "stamina": 6, "poise": 12.0, "guardStamina": 10.0, "impact": 1, "clip": 2, "tier": "light", "type": "strike", "next": "light4"},
+        "light4": {"windup": 0.18, "active": 0.12, "recovery": 0.3, "dmg": 1.15, "stance": 2.4, "stamina": 6, "poise": 13.56, "guardStamina": 11.3, "impact": 1, "clip": 0, "tier": "light", "type": "strike"},
+        "heavy": {"windup": 0.4, "active": 0.14, "recovery": 0.36, "dmg": 1.0, "stance": 4, "stamina": 12, "poise": 19.2, "guardStamina": 15.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "strike", "heavy": true},
+        "chainHeavy": {"windup": 0.36, "active": 0.14, "recovery": 0.38, "dmg": 1.1, "stance": 4.8, "stamina": 12, "poise": 19.2, "guardStamina": 15.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "strike", "heavy": true},
+        "charged": {"windup": 0.14, "active": 0.16, "recovery": 0.42, "dmg": 1.5, "stance": 12, "stamina": 18, "poise": 26.4, "guardStamina": 20.0, "impact": 3, "clip": 0, "tier": "counter", "type": "strike", "heavy": true, "charge": true, "haMult": 2.0},
+        "runLight": {"windup": 0.16, "active": 0.12, "recovery": 0.3, "dmg": 1.1, "stance": 2.4, "stamina": 7, "poise": 13.2, "guardStamina": 11.0, "impact": 1, "clip": 2, "tier": "light", "type": "strike", "context": "run"},
+        "runHeavy": {"windup": 0.34, "active": 0.16, "recovery": 0.42, "dmg": 1.25, "stance": 5.6, "stamina": 14, "poise": 21.6, "guardStamina": 16.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "strike", "heavy": true, "context": "run"},
+        "rollLight": {"windup": 0.15, "active": 0.1, "recovery": 0.26, "dmg": 1.0, "stance": 2.0, "stamina": 6, "poise": 12, "guardStamina": 10, "impact": 1, "clip": 0, "tier": "light", "type": "strike", "context": "roll"},
+        "backstepLight": {"windup": 0.15, "active": 0.1, "recovery": 0.26, "dmg": 0.9, "stance": 1.6, "stamina": 6, "poise": 10.8, "guardStamina": 9.0, "impact": 1, "clip": 1, "tier": "light", "type": "strike", "context": "backstep"},
+        "jumpLight": {"windup": 0.18, "active": 0.3, "recovery": 0.3, "dmg": 1.1, "stance": 3.2, "stamina": 9, "poise": 14.4, "guardStamina": 12.0, "impact": 1, "clip": 2, "tier": "light", "type": "strike", "context": "air"},
+        "jumpHeavy": {"windup": 0.26, "active": 0.3, "recovery": 0.4, "dmg": 1.5, "stance": 8, "stamina": 15, "poise": 24.0, "guardStamina": 18.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "strike", "heavy": true, "context": "air"},
+        "crouchLight": {"windup": 0.14, "active": 0.1, "recovery": 0.22, "dmg": 0.9, "stance": 1.6, "stamina": 5, "poise": 9.6, "guardStamina": 8.0, "impact": 1, "clip": 0, "tier": "light", "type": "strike", "context": "crouch"},
+        "guardCounter": {"windup": 0.26, "active": 0.14, "recovery": 0.38, "dmg": 1.3, "stance": 12, "stamina": 12, "poise": 21.6, "guardStamina": 20.0, "impact": 3, "clip": 2, "tier": "counter", "type": "strike", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "dagger": {
+      "name": "Dagger", "hands": "1h", "great": false, "weight": 1.5, "reach": 170, "sweepRadius": 34, "damage": {"light": 8, "heavy": 15}, "types": {"light": "slash", "heavy": "pierce"}, "crit": {"backstab": 2.94, "riposte": 4.2}, "guard": {"boost": 15, "phys": 0.5, "element": 0.25, "parry": [0.13, 0.13, 0.45], "canParry": true}, "pvp": 1.0, "buildup": {"bleed": 12},
+      "moves": {
+        "light1": {"windup": 0.16, "active": 0.12, "recovery": 0.22, "dmg": 1.0, "stance": 3.0, "stamina": 7, "poise": 18.0, "guardStamina": 18.0, "impact": 1, "clip": 0, "tier": "light", "type": "slash", "next": "light2"},
+        "light2": {"windup": 0.15, "active": 0.12, "recovery": 0.22, "dmg": 1.0, "stance": 3.0, "stamina": 7, "poise": 18.0, "guardStamina": 18.0, "impact": 1, "clip": 1, "tier": "light", "type": "slash", "next": "light3"},
+        "light3": {"windup": 0.15, "active": 0.12, "recovery": 0.22, "dmg": 1.0, "stance": 3.0, "stamina": 7, "poise": 18.0, "guardStamina": 18.0, "impact": 1, "clip": 2, "tier": "light", "type": "slash", "next": "light4"},
+        "light4": {"windup": 0.16, "active": 0.12, "recovery": 0.24, "dmg": 1.0, "stance": 3.0, "stamina": 7, "poise": 18.0, "guardStamina": 18.0, "impact": 1, "clip": 0, "tier": "light", "type": "slash", "next": "light5"},
+        "light5": {"windup": 0.2, "active": 0.14, "recovery": 0.34, "dmg": 1.15, "stance": 3.6, "stamina": 7, "poise": 20.34, "guardStamina": 20.34, "impact": 1, "clip": 1, "tier": "light", "type": "slash"},
+        "heavy": {"windup": 0.4, "active": 0.16, "recovery": 0.38, "dmg": 1.0, "stance": 6, "stamina": 14, "poise": 28.8, "guardStamina": 27.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true},
+        "chainHeavy": {"windup": 0.36, "active": 0.16, "recovery": 0.4, "dmg": 1.1, "stance": 7.2, "stamina": 14, "poise": 28.8, "guardStamina": 27.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true},
+        "charged": {"windup": 0.14, "active": 0.18, "recovery": 0.45, "dmg": 1.5, "stance": 18, "stamina": 21, "poise": 39.6, "guardStamina": 36.0, "impact": 3, "clip": 0, "tier": "counter", "type": "pierce", "heavy": true, "charge": true, "haMult": 2.0},
+        "runLight": {"windup": 0.16, "active": 0.14, "recovery": 0.3, "dmg": 1.1, "stance": 3.6, "stamina": 8, "poise": 19.8, "guardStamina": 19.8, "impact": 1, "clip": 2, "tier": "light", "type": "slash", "context": "run"},
+        "runHeavy": {"windup": 0.35, "active": 0.18, "recovery": 0.45, "dmg": 1.25, "stance": 8.4, "stamina": 17, "poise": 32.4, "guardStamina": 28.8, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "context": "run"},
+        "rollLight": {"windup": 0.15, "active": 0.12, "recovery": 0.28, "dmg": 1.0, "stance": 3.0, "stamina": 7, "poise": 18, "guardStamina": 18, "impact": 1, "clip": 0, "tier": "light", "type": "slash", "context": "roll"},
+        "backstepLight": {"windup": 0.16, "active": 0.12, "recovery": 0.28, "dmg": 0.9, "stance": 2.4, "stamina": 7, "poise": 16.2, "guardStamina": 16.2, "impact": 1, "clip": 1, "tier": "light", "type": "slash", "context": "backstep"},
+        "jumpLight": {"windup": 0.18, "active": 0.3, "recovery": 0.3, "dmg": 1.1, "stance": 4.8, "stamina": 10, "poise": 21.6, "guardStamina": 21.6, "impact": 1, "clip": 2, "tier": "light", "type": "slash", "context": "air"},
+        "jumpHeavy": {"windup": 0.26, "active": 0.3, "recovery": 0.4, "dmg": 1.5, "stance": 12, "stamina": 18, "poise": 36.0, "guardStamina": 32.4, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true, "context": "air"},
+        "crouchLight": {"windup": 0.14, "active": 0.12, "recovery": 0.24, "dmg": 0.9, "stance": 2.4, "stamina": 6, "poise": 14.4, "guardStamina": 14.4, "impact": 1, "clip": 0, "tier": "light", "type": "slash", "context": "crouch"},
+        "guardCounter": {"windup": 0.26, "active": 0.16, "recovery": 0.4, "dmg": 1.3, "stance": 18, "stamina": 14, "poise": 32.4, "guardStamina": 36.0, "impact": 3, "clip": 2, "tier": "counter", "type": "pierce", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "sword": {
+      "name": "Sword", "hands": "1h", "great": false, "weight": 3.0, "reach": 220, "sweepRadius": 45, "damage": {"light": 12, "heavy": 22}, "types": {"light": "slash", "heavy": "pierce"}, "crit": {"backstab": 2.3, "riposte": 3.45}, "guard": {"boost": 25, "phys": 0.6, "element": 0.3, "parry": [0.13, 0.1, 0.5], "canParry": true}, "pvp": 1.0,
+      "moves": {
+        "light1": {"windup": 0.25, "active": 0.18, "recovery": 0.3, "dmg": 1.0, "stance": 5, "stamina": 10, "poise": 30, "guardStamina": 30, "impact": 2, "next": "light2", "clip": 0, "tier": "light", "type": "slash"},
+        "light2": {"windup": 0.22, "active": 0.16, "recovery": 0.3, "dmg": 1.0, "stance": 5, "stamina": 10, "poise": 30, "guardStamina": 30, "impact": 2, "next": "light3", "clip": 1, "tier": "light", "type": "slash"},
+        "light3": {"windup": 0.3, "active": 0.2, "recovery": 0.42, "dmg": 1.15, "stance": 6, "stamina": 10, "poise": 34, "guardStamina": 34, "impact": 2, "clip": 2, "tier": "light", "type": "slash"},
+        "heavy": {"windup": 0.55, "active": 0.22, "recovery": 0.45, "dmg": 1.0, "stance": 10, "stamina": 20, "poise": 48, "guardStamina": 45, "impact": 3, "clip": 0, "ha": true, "heavy": true, "tier": "heavy", "type": "pierce"},
+        "chainHeavy": {"windup": 0.5, "active": 0.22, "recovery": 0.48, "dmg": 1.1, "stance": 12.0, "stamina": 20, "poise": 48.0, "guardStamina": 45.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true},
+        "charged": {"windup": 0.14, "active": 0.24, "recovery": 0.55, "dmg": 1.6, "stance": 30, "stamina": 30, "poise": 66.0, "guardStamina": 60.0, "impact": 3, "clip": 0, "tier": "counter", "type": "pierce", "heavy": true, "ha": true, "charge": true, "haMult": 2.0},
+        "runLight": {"windup": 0.2, "active": 0.18, "recovery": 0.4, "dmg": 1.1, "stance": 6.0, "stamina": 12, "poise": 33.0, "guardStamina": 33.0, "impact": 2, "clip": 2, "tier": "light", "type": "slash", "context": "run"},
+        "runHeavy": {"windup": 0.45, "active": 0.24, "recovery": 0.55, "dmg": 1.25, "stance": 14.0, "stamina": 24, "poise": 54.0, "guardStamina": 48.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.18, "active": 0.16, "recovery": 0.35, "dmg": 1.0, "stance": 5.0, "stamina": 10, "poise": 30, "guardStamina": 30, "impact": 2, "clip": 0, "tier": "light", "type": "slash", "context": "roll"},
+        "backstepLight": {"windup": 0.2, "active": 0.16, "recovery": 0.35, "dmg": 0.9, "stance": 4.0, "stamina": 10, "poise": 27.0, "guardStamina": 27.0, "impact": 2, "clip": 1, "tier": "light", "type": "slash", "context": "backstep"},
+        "jumpLight": {"windup": 0.2, "active": 0.3, "recovery": 0.35, "dmg": 1.1, "stance": 8.0, "stamina": 15, "poise": 36.0, "guardStamina": 36.0, "impact": 2, "clip": 2, "tier": "light", "type": "slash", "context": "air"},
+        "jumpHeavy": {"windup": 0.3, "active": 0.3, "recovery": 0.5, "dmg": 1.5, "stance": 20, "stamina": 25, "poise": 60.0, "guardStamina": 54.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.16, "active": 0.14, "recovery": 0.3, "dmg": 0.9, "stance": 4.0, "stamina": 8, "poise": 24.0, "guardStamina": 24.0, "impact": 2, "clip": 0, "tier": "light", "type": "slash", "context": "crouch"},
+        "guardCounter": {"windup": 0.3, "active": 0.2, "recovery": 0.5, "dmg": 1.3, "stance": 30, "stamina": 20, "poise": 54, "guardStamina": 60, "impact": 3, "clip": 2, "heavy": true, "tier": "counter", "type": "pierce"},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "axe": {
+      "name": "Axe", "hands": "1h", "great": false, "weight": 3.5, "reach": 210, "sweepRadius": 48, "damage": {"light": 13, "heavy": 25}, "types": {"light": "slash", "heavy": "slash"}, "crit": {"backstab": 2.3, "riposte": 3.3}, "guard": {"boost": 25, "phys": 0.6, "element": 0.3, "parry": [0.13, 0.1, 0.5], "canParry": true}, "pvp": 1.0,
+      "moves": {
+        "light1": {"windup": 0.3, "active": 0.18, "recovery": 0.34, "dmg": 1.0, "stance": 6.0, "stamina": 12, "poise": 34.0, "guardStamina": 34.0, "impact": 2, "clip": 0, "tier": "light", "type": "slash", "next": "light2"},
+        "light2": {"windup": 0.28, "active": 0.18, "recovery": 0.34, "dmg": 1.0, "stance": 6.0, "stamina": 12, "poise": 34.0, "guardStamina": 34.0, "impact": 2, "clip": 1, "tier": "light", "type": "slash", "next": "light3"},
+        "light3": {"windup": 0.36, "active": 0.2, "recovery": 0.46, "dmg": 1.15, "stance": 7.2, "stamina": 12, "poise": 38.42, "guardStamina": 38.42, "impact": 2, "clip": 2, "tier": "light", "type": "slash"},
+        "heavy": {"windup": 0.62, "active": 0.24, "recovery": 0.5, "dmg": 1.0, "stance": 12, "stamina": 22, "poise": 54.4, "guardStamina": 51.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "slash", "heavy": true, "ha": true},
+        "chainHeavy": {"windup": 0.56, "active": 0.24, "recovery": 0.52, "dmg": 1.1, "stance": 14.4, "stamina": 22, "poise": 54.4, "guardStamina": 51.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "slash", "heavy": true, "ha": true},
+        "charged": {"windup": 0.16, "active": 0.26, "recovery": 0.6, "dmg": 1.6, "stance": 36, "stamina": 33, "poise": 74.8, "guardStamina": 68.0, "impact": 3, "clip": 0, "tier": "counter", "type": "slash", "heavy": true, "ha": true, "charge": true, "haMult": 2.0},
+        "runLight": {"windup": 0.24, "active": 0.18, "recovery": 0.42, "dmg": 1.1, "stance": 7.2, "stamina": 14, "poise": 37.4, "guardStamina": 37.4, "impact": 2, "clip": 2, "tier": "light", "type": "slash", "context": "run"},
+        "runHeavy": {"windup": 0.5, "active": 0.24, "recovery": 0.58, "dmg": 1.25, "stance": 16.8, "stamina": 26, "poise": 61.2, "guardStamina": 54.4, "impact": 3, "clip": 1, "tier": "heavy", "type": "slash", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.2, "active": 0.16, "recovery": 0.38, "dmg": 1.0, "stance": 6.0, "stamina": 12, "poise": 34, "guardStamina": 34, "impact": 2, "clip": 0, "tier": "light", "type": "slash", "context": "roll"},
+        "backstepLight": {"windup": 0.22, "active": 0.16, "recovery": 0.38, "dmg": 0.9, "stance": 4.8, "stamina": 12, "poise": 30.6, "guardStamina": 30.6, "impact": 2, "clip": 1, "tier": "light", "type": "slash", "context": "backstep"},
+        "jumpLight": {"windup": 0.22, "active": 0.3, "recovery": 0.38, "dmg": 1.1, "stance": 9.6, "stamina": 18, "poise": 40.8, "guardStamina": 40.8, "impact": 2, "clip": 2, "tier": "light", "type": "slash", "context": "air"},
+        "jumpHeavy": {"windup": 0.32, "active": 0.3, "recovery": 0.52, "dmg": 1.5, "stance": 24, "stamina": 28, "poise": 68.0, "guardStamina": 61.2, "impact": 3, "clip": 0, "tier": "heavy", "type": "slash", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.18, "active": 0.14, "recovery": 0.32, "dmg": 0.9, "stance": 4.8, "stamina": 10, "poise": 27.2, "guardStamina": 27.2, "impact": 2, "clip": 0, "tier": "light", "type": "slash", "context": "crouch"},
+        "guardCounter": {"windup": 0.32, "active": 0.2, "recovery": 0.52, "dmg": 1.3, "stance": 36, "stamina": 22, "poise": 61.2, "guardStamina": 68.0, "impact": 3, "clip": 2, "tier": "counter", "type": "slash", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "pick_hammer": {
+      "name": "Pick-hammer", "hands": "1h", "great": false, "weight": 4.0, "reach": 200, "sweepRadius": 48, "damage": {"light": 12, "heavy": 24}, "types": {"light": "strike", "heavy": "pierce"}, "crit": {"backstab": 2.2, "riposte": 3.0}, "guard": {"boost": 25, "phys": 0.6, "element": 0.3, "parry": [0.13, 0.1, 0.5], "canParry": true}, "pvp": 0.95,
+      "moves": {
+        "light1": {"windup": 0.32, "active": 0.18, "recovery": 0.36, "dmg": 1.0, "stance": 7.0, "stamina": 12, "poise": 38.0, "guardStamina": 36.0, "impact": 2, "clip": 0, "tier": "light", "type": "strike", "next": "light2"},
+        "light2": {"windup": 0.3, "active": 0.18, "recovery": 0.36, "dmg": 1.0, "stance": 7.0, "stamina": 12, "poise": 38.0, "guardStamina": 36.0, "impact": 2, "clip": 1, "tier": "light", "type": "strike", "next": "light3"},
+        "light3": {"windup": 0.38, "active": 0.2, "recovery": 0.48, "dmg": 1.15, "stance": 8.4, "stamina": 12, "poise": 42.94, "guardStamina": 40.68, "impact": 2, "clip": 2, "tier": "light", "type": "strike"},
+        "heavy": {"windup": 0.66, "active": 0.24, "recovery": 0.52, "dmg": 1.0, "stance": 14, "stamina": 22, "poise": 60.8, "guardStamina": 54.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true},
+        "chainHeavy": {"windup": 0.6, "active": 0.24, "recovery": 0.54, "dmg": 1.1, "stance": 16.8, "stamina": 22, "poise": 60.8, "guardStamina": 54.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true},
+        "charged": {"windup": 0.18, "active": 0.26, "recovery": 0.62, "dmg": 1.6, "stance": 42, "stamina": 33, "poise": 83.6, "guardStamina": 72.0, "impact": 3, "clip": 0, "tier": "counter", "type": "pierce", "heavy": true, "ha": true, "charge": true, "haMult": 2.0},
+        "runLight": {"windup": 0.26, "active": 0.18, "recovery": 0.44, "dmg": 1.1, "stance": 8.4, "stamina": 14, "poise": 41.8, "guardStamina": 39.6, "impact": 2, "clip": 2, "tier": "light", "type": "strike", "context": "run"},
+        "runHeavy": {"windup": 0.52, "active": 0.24, "recovery": 0.6, "dmg": 1.25, "stance": 19.6, "stamina": 26, "poise": 68.4, "guardStamina": 57.6, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.22, "active": 0.16, "recovery": 0.4, "dmg": 1.0, "stance": 7.0, "stamina": 12, "poise": 38, "guardStamina": 36, "impact": 2, "clip": 0, "tier": "light", "type": "strike", "context": "roll"},
+        "backstepLight": {"windup": 0.24, "active": 0.16, "recovery": 0.4, "dmg": 0.9, "stance": 5.6, "stamina": 12, "poise": 34.2, "guardStamina": 32.4, "impact": 2, "clip": 1, "tier": "light", "type": "strike", "context": "backstep"},
+        "jumpLight": {"windup": 0.24, "active": 0.3, "recovery": 0.4, "dmg": 1.1, "stance": 11.2, "stamina": 18, "poise": 45.6, "guardStamina": 43.2, "impact": 2, "clip": 2, "tier": "light", "type": "strike", "context": "air"},
+        "jumpHeavy": {"windup": 0.34, "active": 0.3, "recovery": 0.54, "dmg": 1.5, "stance": 28, "stamina": 28, "poise": 76.0, "guardStamina": 64.8, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.2, "active": 0.14, "recovery": 0.34, "dmg": 0.9, "stance": 5.6, "stamina": 10, "poise": 30.4, "guardStamina": 28.8, "impact": 2, "clip": 0, "tier": "light", "type": "strike", "context": "crouch"},
+        "guardCounter": {"windup": 0.34, "active": 0.2, "recovery": 0.54, "dmg": 1.3, "stance": 42, "stamina": 22, "poise": 68.4, "guardStamina": 72.0, "impact": 3, "clip": 2, "tier": "counter", "type": "pierce", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "spear": {
+      "name": "Spear", "hands": "1h", "great": false, "weight": 3.5, "reach": 300, "sweepRadius": 30, "damage": {"light": 11, "heavy": 20}, "types": {"light": "pierce", "heavy": "pierce"}, "crit": {"backstab": 2.3, "riposte": 3.2}, "guard": {"boost": 25, "phys": 0.6, "element": 0.3, "parry": [0.13, 0.1, 0.5], "canParry": true}, "pvp": 1.0,
+      "moves": {
+        "light1": {"windup": 0.24, "active": 0.16, "recovery": 0.3, "dmg": 1.0, "stance": 5.0, "stamina": 10, "poise": 30.0, "guardStamina": 30.0, "impact": 2, "clip": 0, "tier": "light", "type": "pierce", "next": "light2", "reach": 340},
+        "light2": {"windup": 0.22, "active": 0.16, "recovery": 0.3, "dmg": 1.0, "stance": 5.0, "stamina": 10, "poise": 30.0, "guardStamina": 30.0, "impact": 2, "clip": 1, "tier": "light", "type": "pierce", "next": "light3", "reach": 340},
+        "light3": {"windup": 0.28, "active": 0.18, "recovery": 0.4, "dmg": 1.15, "stance": 6.0, "stamina": 10, "poise": 33.9, "guardStamina": 33.9, "impact": 2, "clip": 2, "tier": "light", "type": "pierce", "reach": 340},
+        "heavy": {"windup": 0.55, "active": 0.24, "recovery": 0.48, "dmg": 1.0, "stance": 10, "stamina": 20, "poise": 48.0, "guardStamina": 45.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true},
+        "chainHeavy": {"windup": 0.5, "active": 0.24, "recovery": 0.5, "dmg": 1.1, "stance": 12.0, "stamina": 20, "poise": 48.0, "guardStamina": 45.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true},
+        "charged": {"windup": 0.14, "active": 0.26, "recovery": 0.55, "dmg": 1.6, "stance": 30, "stamina": 30, "poise": 66.0, "guardStamina": 60.0, "impact": 3, "clip": 0, "tier": "counter", "type": "pierce", "heavy": true, "ha": true, "charge": true, "haMult": 2.0},
+        "runLight": {"windup": 0.2, "active": 0.18, "recovery": 0.4, "dmg": 1.1, "stance": 6.0, "stamina": 12, "poise": 33.0, "guardStamina": 33.0, "impact": 2, "clip": 2, "tier": "light", "type": "pierce", "context": "run"},
+        "runHeavy": {"windup": 0.45, "active": 0.24, "recovery": 0.55, "dmg": 1.25, "stance": 14.0, "stamina": 24, "poise": 54.0, "guardStamina": 48.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.18, "active": 0.16, "recovery": 0.34, "dmg": 1.0, "stance": 5.0, "stamina": 10, "poise": 30, "guardStamina": 30, "impact": 2, "clip": 0, "tier": "light", "type": "pierce", "context": "roll"},
+        "backstepLight": {"windup": 0.2, "active": 0.16, "recovery": 0.34, "dmg": 0.9, "stance": 4.0, "stamina": 10, "poise": 27.0, "guardStamina": 27.0, "impact": 2, "clip": 1, "tier": "light", "type": "pierce", "context": "backstep"},
+        "jumpLight": {"windup": 0.2, "active": 0.3, "recovery": 0.34, "dmg": 1.1, "stance": 8.0, "stamina": 15, "poise": 36.0, "guardStamina": 36.0, "impact": 2, "clip": 2, "tier": "light", "type": "pierce", "context": "air"},
+        "jumpHeavy": {"windup": 0.3, "active": 0.3, "recovery": 0.5, "dmg": 1.5, "stance": 20, "stamina": 25, "poise": 60.0, "guardStamina": 54.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "pierce", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.16, "active": 0.14, "recovery": 0.28, "dmg": 0.9, "stance": 4.0, "stamina": 8, "poise": 24.0, "guardStamina": 24.0, "impact": 2, "clip": 0, "tier": "light", "type": "pierce", "context": "crouch"},
+        "guardCounter": {"windup": 0.3, "active": 0.2, "recovery": 0.5, "dmg": 1.3, "stance": 30, "stamina": 20, "poise": 54.0, "guardStamina": 60.0, "impact": 3, "clip": 2, "tier": "counter", "type": "pierce", "heavy": true},
+        "guardPoke": {"windup": 0.28, "active": 0.14, "recovery": 0.36, "dmg": 0.85, "stance": 5, "stamina": 12, "poise": 30, "guardStamina": 30, "impact": 2, "clip": 0, "tier": "light", "type": "pierce", "context": "guard", "keepsGuard": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "greatsword": {
+      "name": "Greatsword", "hands": "2h", "great": true, "weight": 9.0, "reach": 270, "sweepRadius": 56, "damage": {"light": 18, "heavy": 32}, "types": {"light": "slash", "heavy": "strike"}, "crit": {"backstab": 2.2, "riposte": 2.75}, "guard": {"boost": 40, "phys": 0.7, "element": 0.35, "parry": [0, 0, 0], "canParry": false}, "pvp": 0.9, "cancelFraction": 0.75,
+      "moves": {
+        "light1": {"windup": 0.42, "active": 0.22, "recovery": 0.52, "dmg": 1.0, "stance": 9.0, "stamina": 18, "poise": 55.0, "guardStamina": 50.0, "impact": 3, "clip": 0, "tier": "light", "type": "slash", "next": "light2"},
+        "light2": {"windup": 0.4, "active": 0.22, "recovery": 0.52, "dmg": 1.0, "stance": 9.0, "stamina": 18, "poise": 55.0, "guardStamina": 50.0, "impact": 3, "clip": 1, "tier": "light", "type": "slash", "ha": true, "next": "light3"},
+        "light3": {"windup": 0.48, "active": 0.24, "recovery": 0.62, "dmg": 1.15, "stance": 10.8, "stamina": 18, "poise": 62.15, "guardStamina": 56.5, "impact": 3, "clip": 2, "tier": "light", "type": "slash", "ha": true},
+        "heavy": {"windup": 0.8, "active": 0.26, "recovery": 0.7, "dmg": 1.0, "stance": 18, "stamina": 28, "poise": 88.0, "guardStamina": 75.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "strike", "heavy": true, "ha": true},
+        "chainHeavy": {"windup": 0.74, "active": 0.26, "recovery": 0.72, "dmg": 1.1, "stance": 21.6, "stamina": 28, "poise": 88.0, "guardStamina": 75.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "strike", "heavy": true, "ha": true},
+        "charged": {"windup": 0.2, "active": 0.28, "recovery": 0.8, "dmg": 1.7, "stance": 54, "stamina": 40, "poise": 121.0, "guardStamina": 100.0, "impact": 4, "clip": 0, "tier": "counter", "type": "strike", "heavy": true, "ha": true, "charge": true, "haMult": 2.5},
+        "runLight": {"windup": 0.34, "active": 0.22, "recovery": 0.58, "dmg": 1.1, "stance": 10.8, "stamina": 22, "poise": 60.5, "guardStamina": 55.0, "impact": 3, "clip": 2, "tier": "light", "type": "slash", "ha": true, "context": "run"},
+        "runHeavy": {"windup": 0.7, "active": 0.26, "recovery": 0.75, "dmg": 1.25, "stance": 25.2, "stamina": 34, "poise": 99.0, "guardStamina": 80.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "strike", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.3, "active": 0.2, "recovery": 0.52, "dmg": 1.0, "stance": 9.0, "stamina": 18, "poise": 55, "guardStamina": 50, "impact": 3, "clip": 0, "tier": "light", "type": "slash", "ha": true, "context": "roll"},
+        "backstepLight": {"windup": 0.32, "active": 0.2, "recovery": 0.52, "dmg": 0.9, "stance": 7.2, "stamina": 18, "poise": 49.5, "guardStamina": 45.0, "impact": 3, "clip": 1, "tier": "light", "type": "slash", "context": "backstep"},
+        "jumpLight": {"windup": 0.3, "active": 0.3, "recovery": 0.52, "dmg": 1.1, "stance": 14.4, "stamina": 27, "poise": 66.0, "guardStamina": 60.0, "impact": 3, "clip": 2, "tier": "light", "type": "slash", "context": "air"},
+        "jumpHeavy": {"windup": 0.4, "active": 0.3, "recovery": 0.7, "dmg": 1.5, "stance": 36, "stamina": 35, "poise": 110.0, "guardStamina": 90.0, "impact": 4, "clip": 0, "tier": "heavy", "type": "strike", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.28, "active": 0.18, "recovery": 0.46, "dmg": 0.9, "stance": 7.2, "stamina": 14, "poise": 44.0, "guardStamina": 40.0, "impact": 3, "clip": 0, "tier": "light", "type": "slash", "context": "crouch"},
+        "guardCounter": {"windup": 0.42, "active": 0.24, "recovery": 0.66, "dmg": 1.3, "stance": 54, "stamina": 28, "poise": 99.0, "guardStamina": 100.0, "impact": 3, "clip": 2, "tier": "counter", "type": "strike", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "great_hammer": {
+      "name": "Great hammer", "hands": "2h", "great": true, "weight": 12.0, "reach": 250, "sweepRadius": 70, "damage": {"light": 20, "heavy": 36}, "types": {"light": "strike", "heavy": "strike"}, "crit": {"backstab": 2.2, "riposte": 2.5}, "guard": {"boost": 45, "phys": 0.75, "element": 0.35, "parry": [0, 0, 0], "canParry": false}, "pvp": 0.85, "cancelFraction": 0.75,
+      "moves": {
+        "light1": {"windup": 0.5, "active": 0.24, "recovery": 0.6, "dmg": 1.0, "stance": 12.0, "stamina": 20, "poise": 70.0, "guardStamina": 62.0, "impact": 3, "clip": 0, "tier": "light", "type": "strike", "next": "light2"},
+        "light2": {"windup": 0.56, "active": 0.26, "recovery": 0.7, "dmg": 1.15, "stance": 14.4, "stamina": 20, "poise": 79.1, "guardStamina": 70.06, "impact": 3, "clip": 1, "tier": "light", "type": "strike", "ha": true},
+        "heavy": {"windup": 0.95, "active": 0.28, "recovery": 0.8, "dmg": 1.0, "stance": 24, "stamina": 30, "poise": 112.0, "guardStamina": 93.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "strike", "heavy": true, "ha": true},
+        "chainHeavy": {"windup": 0.88, "active": 0.28, "recovery": 0.82, "dmg": 1.1, "stance": 28.8, "stamina": 30, "poise": 112.0, "guardStamina": 93.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "strike", "heavy": true, "ha": true},
+        "charged": {"windup": 0.22, "active": 0.3, "recovery": 0.9, "dmg": 1.8, "stance": 72, "stamina": 42, "poise": 154.0, "guardStamina": 124.0, "impact": 4, "clip": 0, "tier": "counter", "type": "strike", "heavy": true, "ha": true, "charge": true, "haMult": 2.5},
+        "runLight": {"windup": 0.4, "active": 0.24, "recovery": 0.66, "dmg": 1.1, "stance": 14.4, "stamina": 24, "poise": 77.0, "guardStamina": 68.2, "impact": 3, "clip": 2, "tier": "light", "type": "strike", "ha": true, "context": "run"},
+        "runHeavy": {"windup": 0.8, "active": 0.28, "recovery": 0.85, "dmg": 1.25, "stance": 33.6, "stamina": 36, "poise": 126.0, "guardStamina": 99.2, "impact": 3, "clip": 1, "tier": "heavy", "type": "strike", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.36, "active": 0.22, "recovery": 0.58, "dmg": 1.0, "stance": 12.0, "stamina": 20, "poise": 70, "guardStamina": 62, "impact": 3, "clip": 0, "tier": "light", "type": "strike", "ha": true, "context": "roll"},
+        "backstepLight": {"windup": 0.38, "active": 0.22, "recovery": 0.58, "dmg": 0.9, "stance": 9.6, "stamina": 20, "poise": 63.0, "guardStamina": 55.8, "impact": 3, "clip": 1, "tier": "light", "type": "strike", "context": "backstep"},
+        "jumpLight": {"windup": 0.34, "active": 0.3, "recovery": 0.58, "dmg": 1.1, "stance": 19.2, "stamina": 30, "poise": 84.0, "guardStamina": 74.4, "impact": 3, "clip": 2, "tier": "light", "type": "strike", "context": "air"},
+        "jumpHeavy": {"windup": 0.44, "active": 0.3, "recovery": 0.8, "dmg": 1.5, "stance": 48, "stamina": 38, "poise": 140.0, "guardStamina": 111.6, "impact": 4, "clip": 0, "tier": "heavy", "type": "strike", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.32, "active": 0.2, "recovery": 0.52, "dmg": 0.9, "stance": 9.6, "stamina": 16, "poise": 56.0, "guardStamina": 49.6, "impact": 3, "clip": 0, "tier": "light", "type": "strike", "context": "crouch"},
+        "guardCounter": {"windup": 0.48, "active": 0.26, "recovery": 0.72, "dmg": 1.3, "stance": 72, "stamina": 30, "poise": 126.0, "guardStamina": 124.0, "impact": 3, "clip": 2, "tier": "counter", "type": "strike", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
+      }
+    },
+    "scythe": {
+      "name": "Scythe", "hands": "2h", "great": true, "weight": 7.0, "reach": 290, "sweepRadius": 42, "damage": {"light": 15, "heavy": 27}, "types": {"light": "slash", "heavy": "slash"}, "crit": {"backstab": 2.3, "riposte": 3.2}, "guard": {"boost": 30, "phys": 0.6, "element": 0.3, "parry": [0, 0, 0], "canParry": false}, "pvp": 0.9, "cancelFraction": 0.75, "buildup": {"bleed": 10},
+      "moves": {
+        "light1": {"windup": 0.38, "active": 0.22, "recovery": 0.46, "dmg": 1.0, "stance": 7.0, "stamina": 16, "poise": 45.0, "guardStamina": 44.0, "impact": 3, "clip": 0, "tier": "light", "type": "slash", "next": "light2"},
+        "light2": {"windup": 0.36, "active": 0.22, "recovery": 0.46, "dmg": 1.0, "stance": 7.0, "stamina": 16, "poise": 45.0, "guardStamina": 44.0, "impact": 3, "clip": 1, "tier": "light", "type": "slash", "next": "light3"},
+        "light3": {"windup": 0.44, "active": 0.24, "recovery": 0.56, "dmg": 1.15, "stance": 8.4, "stamina": 16, "poise": 50.85, "guardStamina": 49.72, "impact": 3, "clip": 2, "tier": "light", "type": "slash", "ha": true},
+        "heavy": {"windup": 0.75, "active": 0.26, "recovery": 0.65, "dmg": 1.0, "stance": 14, "stamina": 26, "poise": 72.0, "guardStamina": 66.0, "impact": 3, "clip": 0, "tier": "heavy", "type": "slash", "heavy": true, "ha": true},
+        "chainHeavy": {"windup": 0.7, "active": 0.26, "recovery": 0.68, "dmg": 1.1, "stance": 16.8, "stamina": 26, "poise": 72.0, "guardStamina": 66.0, "impact": 3, "clip": 1, "tier": "heavy", "type": "slash", "heavy": true, "ha": true},
+        "charged": {"windup": 0.2, "active": 0.28, "recovery": 0.75, "dmg": 1.7, "stance": 42, "stamina": 38, "poise": 99.0, "guardStamina": 88.0, "impact": 4, "clip": 0, "tier": "counter", "type": "slash", "heavy": true, "ha": true, "charge": true, "haMult": 2.5},
+        "runLight": {"windup": 0.3, "active": 0.22, "recovery": 0.52, "dmg": 1.1, "stance": 8.4, "stamina": 19, "poise": 49.5, "guardStamina": 48.4, "impact": 3, "clip": 2, "tier": "light", "type": "slash", "context": "run"},
+        "runHeavy": {"windup": 0.65, "active": 0.26, "recovery": 0.7, "dmg": 1.25, "stance": 19.6, "stamina": 31, "poise": 81.0, "guardStamina": 70.4, "impact": 3, "clip": 1, "tier": "heavy", "type": "slash", "heavy": true, "ha": true, "context": "run"},
+        "rollLight": {"windup": 0.28, "active": 0.2, "recovery": 0.48, "dmg": 1.0, "stance": 7.0, "stamina": 16, "poise": 45, "guardStamina": 44, "impact": 3, "clip": 0, "tier": "light", "type": "slash", "context": "roll"},
+        "backstepLight": {"windup": 0.3, "active": 0.2, "recovery": 0.48, "dmg": 0.9, "stance": 5.6, "stamina": 16, "poise": 40.5, "guardStamina": 39.6, "impact": 3, "clip": 1, "tier": "light", "type": "slash", "context": "backstep"},
+        "jumpLight": {"windup": 0.28, "active": 0.3, "recovery": 0.48, "dmg": 1.1, "stance": 11.2, "stamina": 24, "poise": 54.0, "guardStamina": 52.8, "impact": 3, "clip": 2, "tier": "light", "type": "slash", "context": "air"},
+        "jumpHeavy": {"windup": 0.38, "active": 0.3, "recovery": 0.65, "dmg": 1.5, "stance": 28, "stamina": 32, "poise": 90.0, "guardStamina": 79.2, "impact": 4, "clip": 0, "tier": "heavy", "type": "slash", "heavy": true, "ha": true, "context": "air"},
+        "crouchLight": {"windup": 0.26, "active": 0.18, "recovery": 0.42, "dmg": 0.9, "stance": 5.6, "stamina": 13, "poise": 36.0, "guardStamina": 35.2, "impact": 3, "clip": 0, "tier": "light", "type": "slash", "context": "crouch"},
+        "guardCounter": {"windup": 0.4, "active": 0.24, "recovery": 0.6, "dmg": 1.3, "stance": 42, "stamina": 26, "poise": 81.0, "guardStamina": 88.0, "impact": 3, "clip": 2, "tier": "counter", "type": "slash", "heavy": true},
+        "riposte": {"total": 1.6, "damageAt": 0.9, "clip": 0},
+        "backstab": {"total": 1.4, "damageAt": 0.75, "clip": 1}
       }
     }
   },
   "offhands": {
-    "crude_shield": { "name": "Crude shield", "weight": 2.0, "guardBoost": 45, "phys": 0.85, "element": 0.40, "parry": [0.13, 0.17, 0.45], "canParry": true },
-    "buckler": { "name": "Buckler", "weight": 1.5, "guardBoost": 35, "boostPerUpgrade": 1, "phys": 0.75, "element": 0.45, "parry": [0.13, 0.17, 0.45], "canParry": true },
-    "wooden_shield": { "name": "Wooden shield", "weight": 3.5, "guardBoost": 55, "phys": 1.0, "element": 0.55, "parry": [0.13, 0.10, 0.50], "canParry": true },
-    "metal_shield": { "name": "Metal shield", "weight": 5.0, "guardBoost": 65, "boostPerUpgrade": 2, "phys": 1.0, "element": 0.60, "parry": [0.13, 0.10, 0.50], "canParry": true },
-    "greatshield": { "name": "Greatshield", "weight": 12.0, "guardBoost": 80, "phys": 1.0, "element": 0.70, "parry": [0, 0, 0], "canParry": false, "blockStun": 0.7 },
-    "torch": { "name": "Torch", "weight": 0.8, "guardBoost": 15, "phys": 0.40, "element": 0.20, "parry": [0.13, 0.10, 0.50], "canParry": true }
+    "crude_shield": {"name": "Crude shield", "weight": 2.0, "guardBoost": 45, "phys": 0.85, "element": 0.4, "parry": [0.13, 0.17, 0.45], "canParry": true},
+    "buckler": {"name": "Buckler", "weight": 1.5, "guardBoost": 35, "boostPerUpgrade": 1, "phys": 0.75, "element": 0.45, "parry": [0.13, 0.17, 0.45], "canParry": true},
+    "wooden_shield": {"name": "Wooden shield", "weight": 3.5, "guardBoost": 55, "phys": 1.0, "element": 0.55, "parry": [0.13, 0.1, 0.5], "canParry": true},
+    "metal_shield": {"name": "Metal shield", "weight": 5.0, "guardBoost": 65, "boostPerUpgrade": 2, "phys": 1.0, "element": 0.6, "parry": [0.13, 0.1, 0.5], "canParry": true},
+    "greatshield": {"name": "Greatshield", "weight": 12.0, "guardBoost": 80, "phys": 1.0, "element": 0.7, "parry": [0, 0, 0], "canParry": false, "blockStun": 0.7},
+    "torch": {"name": "Torch", "weight": 0.8, "guardBoost": 15, "phys": 0.4, "element": 0.2, "parry": [0.13, 0.1, 0.5], "canParry": true}
   }
 }

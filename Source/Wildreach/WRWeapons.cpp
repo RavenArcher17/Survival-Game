@@ -3,6 +3,7 @@
 #include "WRCharacterBase.h"
 #include "WRInventory.h"
 #include "WRTuning.h"
+#include "WRResourceNode.h"
 #include "Dom/JsonObject.h"
 #include "HAL/IConsoleManager.h"
 #include "GameFramework/PlayerState.h"
@@ -117,6 +118,26 @@ void FWRWeapons::Reload()
 			O->TryGetStringField(TEXT("name"), C.Name);
 			C.Reach = Num(O, TEXT("reach"), 220.f);
 			C.SweepRadius = Num(O, TEXT("sweepRadius"), 45.f);
+			FString Hands;
+			if (O->TryGetStringField(TEXT("hands"), Hands)) C.Hands = FName(*Hands);
+			C.bGreat = Flag(O, TEXT("great"));
+			C.Weight = Num(O, TEXT("weight"), 0.f);
+			C.CancelFraction = Num(O, TEXT("cancelFraction"), 0.f);
+			C.PvpScale = Num(O, TEXT("pvp"), 1.f);
+			const TSharedPtr<FJsonObject>* Dmg = nullptr;
+			if (O->TryGetObjectField(TEXT("damage"), Dmg))
+			{
+				C.DamageLight = Num(*Dmg, TEXT("light"), 12.f);
+				C.DamageHeavy = Num(*Dmg, TEXT("heavy"), 22.f);
+			}
+			const TSharedPtr<FJsonObject>* Build = nullptr;
+			if (O->TryGetObjectField(TEXT("buildup"), Build))
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& B : (*Build)->Values)
+				{
+					C.Buildups.Add(FName(*B.Key), float(B.Value->AsNumber()));
+				}
+			}
 			const TSharedPtr<FJsonObject>* Crit = nullptr;
 			if (O->TryGetObjectField(TEXT("crit"), Crit))
 			{
@@ -132,6 +153,8 @@ void FWRWeapons::Reload()
 				C.Guard.Boost = Num(*Guard, TEXT("boost"), 25.f);
 				C.Guard.Phys = Num(*Guard, TEXT("phys"), 0.6f);
 				C.Guard.Element = Num(*Guard, TEXT("element"), 0.3f);
+				C.Guard.bCanParry = !(*Guard)->HasField(TEXT("canParry")) || Flag(*Guard, TEXT("canParry"));
+				C.Guard.Weight = C.Weight;
 				ReadParry(*Guard, C.Guard);
 			}
 			const TSharedPtr<FJsonObject>* MovesObj = nullptr;
@@ -160,6 +183,12 @@ void FWRWeapons::Reload()
 					FString S;
 					if (R->TryGetStringField(TEXT("next"), S)) M.Next = FName(*S);
 					if (R->TryGetStringField(TEXT("tier"), S)) M.Tier = Tier(S);
+					if (R->TryGetStringField(TEXT("type"), S)) M.PhysType = S == TEXT("strike") ? 2 : S == TEXT("pierce") ? 3 : 1;
+					if (R->TryGetStringField(TEXT("context"), S)) M.Context = FName(*S);
+					M.bCharge = Flag(R, TEXT("charge"));
+					M.bKeepsGuard = Flag(R, TEXT("keepsGuard"));
+					M.HyperarmorMult = Num(R, TEXT("haMult"), 0.f);
+					M.Reach = Num(R, TEXT("reach"), 0.f);
 					// The coil rule (COMBAT-AND-LESSONS L2): never less than a visible wind-up.
 					M.Windup = FMath::Max(M.Windup, M.bHeavy ? 0.2f : 0.14f);
 					C.Moves.Add(M.Id, M);
@@ -217,18 +246,45 @@ const FWRWeaponClass& FWRWeapons::ClassFor(const AWRCharacterBase* Character) co
 	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Character))
 	{
 		const FWRItemStack& Held = Inv->GetEquipped(EWREquipSlot::Weapon);
-		if (const FWRItemDef* Def = Held.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Held.ItemId))
+		const FWRItemDef* Def = Held.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Held.ItemId);
+		if (!Def)
+		{
+			// Empty-handed: fists (combat.md 2.4.1: never useless).
+			Id = Classes.Contains(TEXT("fists")) ? FName(TEXT("fists")) : NAME_None;
+		}
+		else if (!Def->WeaponClass.IsNone())
 		{
 			Id = Def->WeaponClass;
+		}
+		else if (const FWRToolDef* Tool = FWRGathering::FindTool(Held.ItemId))
+		{
+			// The hatchet swings as an axe, the pick as a pick-hammer (each with the tool's own flat damage).
+			Id = Tool->Kind == TEXT("hatchet") ? FName(TEXT("axe")) : Tool->Kind == TEXT("pick") ? FName(TEXT("pick_hammer")) : NAME_None;
 		}
 	}
 	return Class(Id);
 }
 
+bool FWRWeapons::IsTwoHanding(const AWRCharacterBase* Character)
+{
+	if (!Character)
+	{
+		return false;
+	}
+	const FWRWeaponClass& C = Get().ClassFor(Character);
+	return C.bGreat || C.Hands == TEXT("2h") || (Character->bTwoHanded && C.Hands != TEXT("none"));
+}
+
+bool FWRWeapons::HasShield(const AWRCharacterBase* Character) const
+{
+	return Character && Character->GetPlayerState() && !CarriedId.IsNone() && Offhands.Contains(CarriedId) && !IsTwoHanding(Character);
+}
+
 FWRGuard FWRWeapons::GuardFor(const AWRCharacterBase* Character) const
 {
-	// Survivors carry the left-arm shield (weapons.json carried); creatures and anyone without it guard with the weapon.
-	if (Character && Character->GetPlayerState() && !CarriedId.IsNone())
+	// Survivors carry the left-arm shield (weapons.json carried) unless they two-hand; creatures, two-handers and anyone
+	// without it guard with the weapon (combat.md 2.4.0).
+	if (HasShield(Character))
 	{
 		if (const FWRGuard* G = Offhands.Find(CarriedId))
 		{

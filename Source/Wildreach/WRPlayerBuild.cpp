@@ -9,6 +9,8 @@
 #include "WRCrafting.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
+#include "WRGameplayTags.h"
+#include "WRCharacterBase.h"
 #include "WRTuning.h"
 #include "WRFx.h"
 #include "WRPlayerUI.h"
@@ -875,6 +877,13 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			const float Dist = FVector::Dist(It->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation());
 			if (!It->bGhost && ItDef && ItDef->Kind == TEXT("chest") && Dist < 450.f && (!Chest || Dist < FVector::Dist(Chest->GetActorLocation() + FVector(0.f, 0.f, 100.f), Self->GetActorLocation()))) Chest = *It;
 		}
+		// The combat tag (combat.md 2.20): no shared storage mid-fight with a player (the server says no as well).
+		const AWRCharacterBase* SelfBody = Cast<AWRCharacterBase>(Self);
+		const bool bTagged = Chest && SelfBody && SelfBody->HasTag(WRTags::State_CombatTagged) && Chest->OwnerName != Who;
+		if (bTagged)
+		{
+			Chest = nullptr;
+		}
 		const FWRPieceDef* Def = Chest ? Chest->GetDef() : nullptr;
 		const int32 Index = FCString::Atoi(*Arg(1));
 		// Move up to N from one stack into a slot list; returns how many moved.
@@ -893,7 +902,7 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			if (From.Count <= 0) From = FWRItemStack();
 			return Moved;
 		};
-		if (!Def || Def->Kind != TEXT("chest")) OutResult = TEXT("no chest nearby");
+		if (!Def || Def->Kind != TEXT("chest")) OutResult = bTagged ? TEXT("In combat: not now") : TEXT("no chest nearby");
 		else if (!Chest->CanAccess(Who)) OutResult = TEXT("not your chest");
 		else if (Cmd == TEXT("storeall") || Cmd == TEXT("takeall"))
 		{
