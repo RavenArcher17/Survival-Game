@@ -316,6 +316,13 @@ Code: `WRGrave*` (types, world, scenery, catacombs, creatures). Numbers: tuning 
 Dev: `world grave ...`. The Risen are skeletons built on the Mixamo rigs' bones (look.hideMesh): their clips drive them.
 Hazards (subsidence lids, lime, draughts) are `UWRGraveHazards` (server, numbers in tuning `hazards.graveyard`); the
 sky's Graveyard air and its moonless nights are in `WRSky` (`graveyardWorld.sky`); the Blood Moon sets `WRGraveSky::BloodMoon`.
+The bosses are `WRGraveBosses.cpp` (the fights: hooks AWRBoss calls beside the forest's, `friend struct FWRGraveBoss`),
+`WRGraveBossLook.cpp` (`AWRGraveBossProp`: the Belfry's bell machine, egg sacs, the chandelier, chapel tombs, dug graves,
+thrown headstones, the Procession; `UWRGraveBossBody`: their code-built bodies) and `WRGraveArenas.cpp` (placement when
+a survivor is within `bosses.graveyard.placeRadius`; E actions `world grave boss help|pull|stake`). Arena layouts come
+from `Data/graveyard.json` (sites L1/L3 and rooms C5/C9 carry `arena`; the Gravedigger's lair, route and stops) and
+`WRGraveChapel` / `WRGraveBelfry` in `WRGraveTypes.h` (the scenery and the boss share them). Graveyard sound rows are
+stand-ins (`_standin: true` in sounds.json): replace their files when real recordings exist.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

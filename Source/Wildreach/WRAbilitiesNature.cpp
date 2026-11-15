@@ -1,4 +1,5 @@
 #include "WRAbilitiesNature.h"
+#include "WRGraveBosses.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -755,6 +756,9 @@ AWRNatureField* AWRNatureField::Spawn(EKind Kind, AWRCharacterBase* Caster, cons
 		F->SetLifeSpan(Seconds + 0.5f);
 		// The first tick comes at once (a heal you see land, roots that catch who stood there).
 		F->Clock = 100.f;
+		// Roots coming up (a snare, strangling vines): an open tomb in Nhal's chapel or the Ossuary Lord's pile in reach
+		// is bound (WRGraveBosses).
+		if (Kind == EKind::Snare || Kind == EKind::Strangle) FWRGraveBoss::NatureLanded(Caster->GetWorld(), On ? On->GetActorLocation() : At, Radius, Caster);
 	}
 	return F;
 }

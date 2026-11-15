@@ -1107,7 +1107,7 @@ void FWRGraveAI::Resolved(AWRCreature* Self, AWRCharacterBase* Victim, FName Row
 		// A touch: found (the click-lock).
 		Body->Found = Victim;
 		Body->FoundUntil = GcNow(Self) + GcT(TEXT("foundSeconds"), 8.f);
-		WRSound::PlayAt(Self, TEXT("creature.cryptstalker.found"), Victim->GetActorLocation());
+		WRFx::Broadcast(Self, NAME_None, Victim->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("creature.cryptstalker.found"));
 		return;
 	}
 	if (!bLanded) return;
@@ -1116,7 +1116,7 @@ void FWRGraveAI::Resolved(AWRCreature* Self, AWRCharacterBase* Victim, FName Row
 	else if (RowId == TEXT("light_dive"))
 	{
 		// A hit puts out a held torch; then it's down on the ground, the window to bring it down.
-		if (UWRSurvivalComponent* S = UWRSurvivalComponent::For(Victim); S && S->SnuffTorch()) WRSound::PlayAt(Self, TEXT("light.off"), Victim->GetActorLocation());
+		if (UWRSurvivalComponent* S = UWRSurvivalComponent::For(Victim); S && S->SnuffTorch()) WRSound::Broadcast(Victim, TEXT("light.off"));
 		Body->Set(WRGraveFlag::Grounded, true);
 		Body->GroundedUntil = GcNow(Self) + GcT(TEXT("mothGrounded"), 1.4f);
 		Self->GetCharacterMovement()->SetMovementMode(MOVE_Falling);

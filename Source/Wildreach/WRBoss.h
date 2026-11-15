@@ -185,6 +185,8 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	friend struct FWRVoidBoss;
 	// The Ancient forest's bosses (WRForestBosses: Old Gnarl, the Bramblequeen, the Grey Matron, the Hornwarden, Sylvaroth).
 	friend struct FWRForestBoss;
+	// The Graveyard's (WRGraveBosses: the Bell-Ringer, the Crypt Mother, the Ossuary Lord, the Gravedigger, Nhal).
+	friend struct FWRGraveBoss;
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

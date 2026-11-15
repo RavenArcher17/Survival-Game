@@ -65,6 +65,8 @@ public:
 	UPROPERTY(ReplicatedUsing=OnRep_State) float StairGoldUntilHours = -1.f;
 	UPROPERTY(ReplicatedUsing=OnRep_State) bool bChapelCryptOpen = false;
 	UPROPERTY(ReplicatedUsing=OnRep_State) bool bSeventhOpen = false;
+	/** Nhal's Opening: every lantern in her chapel out (the arena dark) until she falls or the fight resets. */
+	UPROPERTY(ReplicatedUsing=OnRep_State) bool bChapelDark = false;
 	/** Every machine: the Stair burns gold now. */
 	bool StairGold() const;
 

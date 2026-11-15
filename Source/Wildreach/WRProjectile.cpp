@@ -4,6 +4,8 @@
 #include "WRSwampSystems.h"
 #include "WRSwampBosses.h"
 #include "WRForestBosses.h"
+#include "WRGraveBosses.h"
+#include "WRGraveHazards.h"
 #include "WRForestHazards.h"
 #include "WRRaiding.h"
 #include "WRRaidLook.h"
@@ -218,7 +220,7 @@ void AWRProjectile::OnRep_Model()
 		CodeModel->RegisterComponent();
 		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
 		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
-			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel))
+			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -301,6 +303,8 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		if (OtherActor) WRPortals::HitThing(OtherActor, By, Hit.Damage, bFireShot);
 		// The forest's boss arenas: an arrow cuts a Bower rope anchor, splits a brood comb, bites a Root Knot or an amber heart.
 		if (OtherActor && OtherComp) FWRForestBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
+		// The Graveyard's: an arrow cuts the Belfry rope, bursts an egg sac, parts the chandelier's chain.
+		if (OtherActor && OtherComp) FWRGraveBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
 		if (SplashRadius > 0.f || bFireShot)
 		{
 			const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
@@ -323,6 +327,15 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 			Destroy();
 			return;
 		}
+	}
+	// The Graveyard's lime pot breaks where it lands: a quicklime splash (WRGraveHazards; on the Ossuary Lord's pile it
+	// stops the grave-light knitting the bones).
+	if (Kind == TEXT("limepot"))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		UWRGraveHazards::LimePotLanded(GetWorld(), At, const_cast<AWRCharacterBase*>(Caster), Hit.Damage);
+		Destroy();
+		return;
 	}
 	// The Swamp's thrown things break where they land: salt bursts, a stormglass jar shocks the water (WRSwampSystems).
 	if (Kind == TEXT("saltpouch") || Kind == TEXT("stormjar"))

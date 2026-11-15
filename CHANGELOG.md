@@ -94,6 +94,44 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   edges close, from 75 whispers behind you, at 100 the tōrō gutter. Graveyard Riftborn: 15% of Gravehounds,
   Wraithmoths and Tombbacks south of the neck's line come back changed (voidglass on the spine, black-violet eyes,
   +25% health, curse on every blow). (`WRVoidUnmade.cpp`: a local renamed for a unity-build name clash.)
+- **The bosses** (piece 5; `WRGraveBosses.*` the fights, `WRGraveBossLook.cpp` the arena pieces and code-built bodies,
+  `WRGraveArenas.cpp` placement and held actions; rows in creatures / attacks, tuning `bosses.<id>` and
+  `bosses.graveyard`): the four minis and the major, each placed with its pieces once a survivor comes within 300 m.
+  **The Bell-Ringer** (Grimjaw, 4.2 m, half a cracked bell for a helm) in the Belfry yard: every 20 s (15 on a Blood
+  Moon) he goes back to the rope and the Toll comes: the great bell turns a full revolution on its headstock with its
+  wheel, the rope's sally rising and falling with it, a ring of force round the tower's foot and three Risen mourners
+  climbing out of the yard's mounds (9 at most); the rope's frayed section 4 m up takes 400 (blades and fire x2) and
+  cut, the bell falls silent, he takes the hand-bell from his belt and his stance drops to 60; thrown headstones stay
+  standing where they land as cover. **The Crypt Mother** (9 m span, about twenty young riding her back) in the Brood
+  Gallery: eight egg sacs moored on the pillars and end walls (150, fire x3, a torch held to one 2 s burns it) hatch two
+  young every 30 s; fire on her back burns the riders off (the Brood shed throws what's left at the furthest survivor);
+  she climbs into the dark and drops on the dust; the whip sweep's touch takes the delay out of her next move. **The
+  Ossuary Lord** (a 6 m bone giant: bound femurs, stacked ribcages, a crown of skulls, three soulstone keystone skulls)
+  in the Chandelier Hall: at 0 it falls into its pile and re-forms in 8 s at half health unless roots bind the pile
+  (any Nature snare or vines over it), two lime pots land on it, or its three keystones are smashed (120 each, strikes
+  x1.5); the bone chandelier's chain (300) lets it fall once on gravity onto whatever is under it (400 and a 4 s stance
+  break on the Lord); the ribcage holds a survivor (allies break it open; from inside you hit its chest keystone x2).
+  **The Gravedigger** (Obsidian warden rig, horse skull under a sheet, a mortsafe cage on his back, a lantern over his
+  shoulder): asleep at the Watch House by day; from 19:00 he walks his round with three Gravehounds 30 m behind,
+  stopping at six graves to dig (the spade carries 40 m; the graves stay open till morning; two more on a Blood Moon);
+  Bury heaps earth over a 3 m circle (mash, or a friend holds E 1 s), the Mortsafe shuts you in the cage (break the
+  door, or hit his back), smash the lantern (150) and he's blind 10 s and lights a spare once. **Nhal, the Last
+  Mourner** (Ignessa rig at 9 m, wings hidden under a veil of moth cards that flutter, a crown of tōrō lantern-horns, an
+  8 m yew-and-bronze scythe) in the roofless chapel: twelve chest tombs in the aisles; at half health The Opening
+  (forced: every lantern in the chapel gutters out and stays out, a 14 m ring, every tomb cracks open, the veil lifts
+  into a wheeling cloud on the roof ribs); in phase 2 each open tomb raises a Risen every 25 s (one in four a bearer, 8
+  at most) until it is sealed by a Nature blow or roots within 2 m or a heartwood stake (hold E 1.5 s); Grave hands
+  crack the floor green under everyone for 0.9 s, the Keen is a cone that pillars and tombs block, Lay to rest drags the
+  furthest tame half into the floor (hold E 2 s on it to pull it up); hidden phase 3 (artifacts): she kneels and forty
+  shades pour out and walk a breathing ring down the nave, turned back by the tower's bell every 10 s. Her first fall
+  opens the chapel crypt's stair; the Necromancy altar stands in the apse. Run-back stones by the Belfry's gate and the
+  chapel; the catacomb halls' stones by their doors. Every blow is `ApplyHit`; lobs fly real arcs and never home.
+- **Lime pots** now work as thrown weapons (`code:limepot` modelled in `WRGraveHazards`): a 4 m splash, 20 and then 8
+  a second for 3 s (tuning `hazards.graveyard.limePot*`); the Graveyard's own don't burn.
+- **Graveyard sounds and effects**: 43 effect rows (`fx.json grave.*`, every tell, crack, toll, burst and cloud the
+  pieces above and pieces 1-4 call) and 50 sound rows (`sounds.json grave.*` and the creature moments), plus voice
+  families for all eighteen Graveyard creatures and bosses. The sounds are stand-ins: each row plays the nearest
+  existing recording pitched (`_standin`, its `_comment` names it); Graveyard recordings are a later cook.
 
 ## Unreleased: the Ancient forest (the Nature land)
 

@@ -1,6 +1,7 @@
 // The Graveyard's world (see WRGraveWorld.h; cooks/build-biome-graveyard.md 2.3-2.9).
 
 #include "WRGraveWorld.h"
+#include "WRGraveBosses.h"
 #include "Wildreach.h"
 #include "WRCharacter.h"
 #include "WRFarm.h"
@@ -81,6 +82,7 @@ void AWRGraveState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRGraveState, StairGoldUntilHours);
 	DOREPLIFETIME(AWRGraveState, bChapelCryptOpen);
+	DOREPLIFETIME(AWRGraveState, bChapelDark);
 	DOREPLIFETIME(AWRGraveState, bSeventhOpen);
 }
 
@@ -188,7 +190,7 @@ FString AWRGraveSpot::Start(AWRPlayerController* PC)
 	Doer = Name;
 	DoerPawn = Me;
 	DoerFrom = Me->GetActorLocation();
-	if (Kind == TEXT("dig")) WRSound::PlayAt(this, TEXT("grave.dig"), GetActorLocation());
+	if (Kind == TEXT("dig")) WRFx::Broadcast(this, NAME_None, GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("grave.dig"));
 	return Verb + TEXT("...");
 }
 
@@ -208,7 +210,7 @@ void AWRGraveSpot::Tick(float DeltaSeconds)
 		DoerPawn = nullptr;
 		return;
 	}
-	if (Kind == TEXT("dig") && FMath::Fmod(Now, 0.8f) < DeltaSeconds) WRSound::PlayAt(this, TEXT("grave.dig"), GetActorLocation());
+	if (Kind == TEXT("dig") && FMath::Fmod(Now, 0.8f) < DeltaSeconds) WRFx::Broadcast(this, NAME_None, GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("grave.dig"));
 	if (Now >= DoneAt) Finish();
 }
 
@@ -251,7 +253,7 @@ void AWRGraveSpot::Finish()
 	{
 		bLit = true;
 		OnRep_Lit();
-		WRSound::PlayAt(this, TEXT("grave.toro_light"), GetActorLocation() + FVector(0, 0, 120.f));
+		WRFx::Broadcast(this, NAME_None, GetActorLocation() + FVector(0, 0, 120.f), FRotator::ZeroRotator, 1.f, TEXT("grave.toro_light"));
 		if (SpotId == TEXT("S3"))
 		{
 			// The one unlit lantern at the Stair's break (GY 2.6 S3): every tōrō on the Stair burns gold for a game day.
@@ -268,7 +270,7 @@ void AWRGraveSpot::Finish()
 	{
 		// The seventh name (GY 2.6 S4): the bronze door opens on the seventh crypt.
 		if (AWRGraveState* S = AWRGraveState::Get(this)) { S->bSeventhOpen = true; S->OnRep_State(); }
-		WRSound::PlayAt(this, TEXT("grave.bronze_door"), GetActorLocation());
+		WRFx::Broadcast(this, NAME_None, GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("grave.bronze_door"));
 	}
 	if (!Got.IsEmpty()) Tell(Who, FString::Printf(TEXT("%s: %s"), *Title, *Got));
 	else if (!bFirst) Tell(Who, TEXT("Nothing more here"));
@@ -683,7 +685,9 @@ void UWRGraveWorld::StepLights(float Dt)
 		AWRGraveScenery* S = W.Get();
 		if (!S) continue;
 		const bool bUnder = S->Kind == TEXT("room") || S->Kind == TEXT("link");
-		const bool bLit = bNight || bUnder;
+		// Nhal's Opening puts out every lantern in her chapel until the fight ends (the arena dark).
+		const bool bDarkChapel = S->Kind == TEXT("chapel") && State && State->bChapelDark;
+		const bool bLit = (bNight || bUnder) && !bDarkChapel;
 		for (int32 i = 0; i < S->NightLights.Num(); ++i)
 		{
 			if (UPointLightComponent* L = S->NightLights[i]) L->SetIntensity(bLit ? (S->NightPower.IsValidIndex(i) ? S->NightPower[i] : 1000.f) : 0.f);
@@ -709,7 +713,8 @@ void UWRGraveWorld::StepLights(float Dt)
 		UPointLightComponent* L = AllNear[i].Get();
 		if (!L) continue;
 		const float D2 = float(FVector::DistSquared(L->GetComponentLocation(), View));
-		if (bNight && D2 < Range * Range) Near.Add({ D2, i });
+		const bool bDark = State && State->bChapelDark && L->GetOwner() && L->GetOwner()->IsA<AWRGraveScenery>() && Cast<AWRGraveScenery>(L->GetOwner())->Kind == TEXT("chapel");
+		if (bNight && !bDark && D2 < Range * Range) Near.Add({ D2, i });
 		else if (L->IsVisible()) L->SetVisibility(false);
 	}
 	Near.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key < B.Key; });
@@ -789,6 +794,8 @@ FString UWRGraveWorld::Command(AWRPlayerController* PC, const TArray<FString>& A
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!G || !G->bActive || !Me) return TEXT("Not here");
 	const FString Verb = Args.IsValidIndex(2) ? Args[2] : FString();
+	// The boss fights' held actions (WRGraveBosses): world grave boss <help|stake>.
+	if (Verb == TEXT("boss")) { UWRGraveArenas* A = UWRGraveArenas::Get(PC); return A ? A->Command(PC, Args) : FString(TEXT("Not here")); }
 	if (Verb == TEXT("spot"))
 	{
 		// The named spot if it's in reach (a little slack), else the nearest.

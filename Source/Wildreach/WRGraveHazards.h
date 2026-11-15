@@ -62,6 +62,11 @@ public:
 	virtual bool IsTickable() const override;
 	/** In a lime pit's slurry here (any machine: the data). */
 	static bool InLime(const FVector& At, float* OutSurface = nullptr);
+	/** The thrown lime pot's model ("code:limepot", WRProjectile builds it on every machine that draws). */
+	static bool BuildThrownModel(const FString& ModelPath, class UProceduralMeshComponent* Mesh);
+	/** Server: a lime pot broke here: a 4 m splash of quicklime (its damage, then a burn a second while the cloud hangs),
+	 *  and on the Ossuary Lord's pile it counts toward stopping it re-forming (WRGraveBosses). */
+	static void LimePotLanded(UWorld* World, const FVector& At, AWRCharacterBase* Thrower, float Damage);
 
 private:
 	void SpawnLids();

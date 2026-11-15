@@ -11,6 +11,10 @@
 #include "WRGameplayTags.h"
 #include "WRGameState.h"
 #include "WRGraveCreatures.h"
+#include "WRGraveBosses.h"
+#include "WRToolMesh.h"
+#include "ProceduralMeshComponent.h"
+#include "TimerManager.h"
 #include "WRGraveTypes.h"
 #include "WRInventory.h"
 #include "WRLand.h"
@@ -104,8 +108,9 @@ void AWRGraveLid::BuildLook()
 
 void AWRGraveLid::OnRep_Stage()
 {
-	if (Stage == 1) WRFx::SpawnAt(this, TEXT("grave.subsidence_crack"), GetActorLocation(), FRotator::ZeroRotator, 1.f);
-	if (Stage == 2) WRFx::SpawnAt(this, TEXT("grave.chalk_fall"), GetActorLocation(), FRotator::ZeroRotator, 1.5f);
+	// Every machine: the crack's ring of dust and the crunch from below (the tell), then the fall.
+	if (Stage == 1) { WRFx::SpawnAt(this, TEXT("grave.subsidence_crack"), GetActorLocation(), FRotator::ZeroRotator, 1.f); WRSound::PlayAt(this, TEXT("grave.subsidence_crunch"), GetActorLocation()); }
+	if (Stage == 2) { WRFx::SpawnAt(this, TEXT("grave.chalk_fall"), GetActorLocation(), FRotator::ZeroRotator, 1.5f); WRSound::PlayAt(this, TEXT("grave.subsidence_fall"), GetActorLocation()); }
 	ApplyStage();
 }
 
@@ -147,7 +152,7 @@ void AWRGraveLid::Tick(float DeltaSeconds)
 				const float D = float(FVector::Dist2D(Pawn->GetActorLocation(), C));
 				if (D < HzT(TEXT("crowWarn"), 700.f) && D > 330.f && FVector::Dist(It->GetActorLocation(), Pawn->GetActorLocation()) < 4000.f)
 				{
-					WRSound::PlayAt(this, TEXT("creature.gloamcrow.scream"), It->GetActorLocation());
+					WRSound::Broadcast(*It, TEXT("creature.gloamcrow.scream"));
 					NextScreamAt = Now + 6.0;
 				}
 			}
@@ -158,14 +163,12 @@ void AWRGraveLid::Tick(float DeltaSeconds)
 		Stage = 1;
 		StageAt = Now;
 		OnRep_Stage();
-		WRSound::PlayAt(this, TEXT("grave.subsidence_crunch"), C);
 	}
 	else if (Stage == 1 && Now - StageAt >= HzT(TEXT("subsidenceTell"), 1.0f))
 	{
 		Stage = 2;
 		StageAt = Now;
 		OnRep_Stage();
-		WRSound::PlayAt(this, TEXT("grave.subsidence_fall"), C);
 		// Half the pits hold a sleeping den: 2-3 wake in the dark under you.
 		if (bDen)
 		{
@@ -274,8 +277,7 @@ void UWRGraveHazards::StepLime(float Dt)
 		if (!Since)
 		{
 			LimeSince.Add(C, Now);
-			WRSound::PlayAt(C, TEXT("grave.lime_hiss"), C->GetActorLocation());
-			WRFx::SpawnAt(C, TEXT("grave.lime_steam"), C->GetActorLocation() - FVector(0.f, 0.f, C->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 1.f);
+			WRFx::Broadcast(C, TEXT("grave.lime_steam"), C->GetActorLocation() - FVector(0.f, 0.f, C->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 1.f, TEXT("grave.lime_hiss"));
 			continue;
 		}
 		if (Now - *Since < HzT(TEXT("limeTell"), 0.9f)) continue;
@@ -290,7 +292,7 @@ void UWRGraveHazards::StepLime(float Dt)
 			Hit.Element = WRTags::Element_Physical;
 			UWRCombatLibrary::ApplyHit(C, Hit);
 			if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(C)) Inv->WearArmour(HzT(TEXT("limeWear"), 0.01f));
-			WRFx::SpawnAt(C, TEXT("grave.lime_steam"), C->GetActorLocation() - FVector(0.f, 0.f, C->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 0.7f);
+			WRFx::Broadcast(C, TEXT("grave.lime_steam"), C->GetActorLocation() - FVector(0.f, 0.f, C->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 0.7f);
 		}
 	}
 }
@@ -313,8 +315,7 @@ void UWRGraveHazards::StepDraughts(float Dt)
 		{
 			bWhistle = true;
 			const FVector Mid = R.bSpiral ? FVector(R.At.X, R.At.Y, (R.At.Z + R.Bottom) * 0.5f) : R.At + FVector(0.f, 0.f, 150.f);
-			WRSound::PlayAt(this, TEXT("grave.draught_whistle"), Mid);
-			WRFx::Broadcast(this, TEXT("grave.draught"), Mid, FRotator(0.f, R.Yaw, 0.f), FMath::Max(1.f, R.W / 1000.f), NAME_None, Tell);
+			WRFx::Broadcast(this, TEXT("grave.draught"), Mid, FRotator(0.f, R.Yaw, 0.f), FMath::Max(1.f, R.W / 1000.f), TEXT("grave.draught_whistle"), Tell);
 		}
 		if (Now < Next) continue;
 		bWhistle = false;
@@ -324,9 +325,73 @@ void UWRGraveHazards::StepDraughts(float Dt)
 			if (!It->IsAlive() || !R.Contains(It->GetActorLocation(), 120.f)) continue;
 			if (UWRSurvivalComponent* S = UWRSurvivalComponent::For(*It); S && S->SnuffTorch())
 			{
-				WRSound::PlayAt(*It, TEXT("light.off"), It->GetActorLocation());
+				WRSound::Broadcast(*It, TEXT("light.off"));
 				if (AWRPlayerController* PC = Cast<AWRPlayerController>(It->GetController())) PC->ClientNotify(TEXT("The draught put your torch out (relight it at a flame)"));
 			}
 		}
+	}
+}
+
+// ================================================================================================ the lime pot
+
+bool UWRGraveHazards::BuildThrownModel(const FString& ModelPath, UProceduralMeshComponent* Mesh)
+{
+	if (!Mesh || ModelPath != TEXT("code:limepot")) return false;
+	// The lime pot (GY 2.19): a squat unglazed clay pot 15 cm long, quicklime caked white round its lip and run down one
+	// side where it was filled, the mouth stopped with a wooden bung under a tied scrap of sacking (a cord round the neck).
+	FWRToolMesh M;
+	const FLinearColor Clay = FLinearColor(FColor(168, 132, 98)) * 0.55f, Lime = FLinearColor(FColor(237, 235, 224)) * 0.72f;
+	const FLinearColor Bung = FLinearColor(FColor(110, 84, 58)) * 0.5f, Sack = FLinearColor(FColor(150, 132, 104)) * 0.45f, Cord = FLinearColor(FColor(92, 76, 58)) * 0.5f;
+	M.Lathe(FVector(-7.5f, 0.f, 0.f), FVector::ForwardVector, 15.f, { FVector(0.f, 3.5f, 3.5f), FVector(0.12f, 6.4f, 6.4f), FVector(0.5f, 7.4f, 7.4f), FVector(0.8f, 5.6f, 5.6f), FVector(0.9f, 3.4f, 3.4f), FVector(1.f, 3.8f, 3.8f) }, 12, Clay, 0.9f);
+	// The white crust: a collar on the lip, a run down the belly.
+	M.Lathe(FVector(5.6f, 0.f, 0.f), FVector::ForwardVector, 2.f, { FVector(0.f, 4.f, 4.f), FVector(1.f, 4.1f, 4.1f) }, 12, Lime, 0.97f);
+	M.Lathe(FVector(-3.f, 0.f, 6.6f), FVector::ForwardVector, 8.f, { FVector(0.f, 0.6f, 1.6f), FVector(0.5f, 0.9f, 2.2f), FVector(1.f, 0.6f, 1.4f) }, 6, Lime, 0.97f);
+	M.Lathe(FVector(7.4f, 0.f, 0.f), FVector::ForwardVector, 2.6f, { FVector(0.f, 3.f, 3.f), FVector(1.f, 2.6f, 2.6f) }, 8, Bung, 0.8f);
+	M.Lathe(FVector(8.6f, 0.f, 0.f), FVector::ForwardVector, 1.6f, { FVector(0.f, 4.4f, 4.4f), FVector(0.5f, 3.6f, 3.6f), FVector(1.f, 1.f, 1.f) }, 8, Sack, 0.95f);
+	M.Tube({ FVector(6.8f, 3.8f, 0.f), FVector(6.8f, 0.f, 3.9f), FVector(6.8f, -3.8f, 0.f), FVector(6.8f, 0.f, -3.9f) }, 0.45f, 5, Cord, 0.85f, true);
+	M.ApplyTo(Mesh);
+	WRFx::Attach(Mesh, TEXT("grave.lime_trail"));
+	return true;
+}
+
+void UWRGraveHazards::LimePotLanded(UWorld* World, const FVector& At, AWRCharacterBase* Thrower, float Damage)
+{
+	if (!World || World->GetNetMode() == NM_Client) return;
+	const float Radius = WRTune(TEXT("hazards.graveyard.limePotRadius"), 400.f);
+	const float Seconds = WRTune(TEXT("hazards.graveyard.limePotSeconds"), 3.f);
+	const float Dps = WRTune(TEXT("hazards.graveyard.limePotDps"), 8.f);
+	WRFx::Broadcast(World, TEXT("grave.lime_burst"), At, FRotator::ZeroRotator, Radius / 200.f, TEXT("grave.lime_pot"), Seconds);
+	const auto Burn = [World, At, Radius](AWRCharacterBase* By, float Amount, bool bTick)
+	{
+		for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
+		{
+			AWRCharacterBase* C = *It;
+			if (!C->IsAlive() || C == By || FVector::Dist(C->GetActorLocation(), At) > Radius + C->GetSimpleCollisionRadius()) continue;
+			if (By && !By->IsHostileTo(C)) continue;
+			// The Graveyard's own don't mind lime (creatures.json resists); everyone else burns.
+			if (const AWRCreature* Cr = Cast<AWRCreature>(C); Cr && Cr->GetDef() && Cr->GetDef()->Resists.Contains(TEXT("lime"))) continue;
+			FWRHit Hit;
+			Hit.Instigator = By;
+			Hit.Damage = Amount;
+			Hit.Origin = At;
+			Hit.Element = WRTags::Element_Physical;
+			Hit.bDamageOverTime = bTick;
+			Hit.bProjectile = !bTick;
+			Hit.bUnblockable = bTick;
+			UWRCombatLibrary::ApplyHit(C, Hit);
+		}
+	};
+	Burn(Thrower, Damage, false);
+	FWRGraveBoss::LimeLanded(World, At, Thrower);
+	// The cloud hangs and burns a second at a time.
+	TWeakObjectPtr<AWRCharacterBase> WeakBy(Thrower);
+	TWeakObjectPtr<UWorld> WeakW(World);
+	for (int32 s = 1; s <= int32(Seconds); ++s)
+	{
+		FTimerHandle H;
+		World->GetTimerManager().SetTimer(H, [WeakW, WeakBy, Burn, Dps]()
+		{
+			if (WeakW.IsValid()) Burn(WeakBy.Get(), Dps, true);
+		}, float(s), false);
 	}
 }

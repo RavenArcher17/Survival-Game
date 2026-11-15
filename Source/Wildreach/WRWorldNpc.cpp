@@ -8,6 +8,7 @@
 #include "WRForestHazards.h"
 #include "WRForestWorld.h"
 #include "WRGraveWorld.h"
+#include "WRGraveBosses.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCreature.h"
@@ -330,6 +331,8 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	if (UWRForestWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Graveyard's spots (WRGraveWorld): keepsakes, digs, the Stair's last lantern, the seventh name, the drowned bell.
 	if (UWRGraveWorld::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Graveyard's boss fights (WRGraveBosses): dig a buried friend out, pull a tame up, drive a stake into a tomb.
+	if (UWRGraveArenas::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -380,6 +383,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 	if (WRSwamp::ClientInteract(PC)) return true;
 	if (WRForestHazards::ClientInteract(PC)) return true;
 	if (UWRForestWorld::ClientInteract(PC)) return true;
+	if (UWRGraveArenas::ClientInteract(PC)) return true;
 	if (UWRGraveWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;

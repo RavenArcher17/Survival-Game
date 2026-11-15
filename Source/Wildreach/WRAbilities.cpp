@@ -9,6 +9,7 @@
 #include "WRAbilitiesBlood.h"
 #include "WRBloodPath.h"
 #include "WRAbilitiesNature.h"   // the Nature path's abilities (ClassForNode)
+#include "WRGraveBosses.h"       // the Graveyard arenas' things (the Belfry rope, egg sacs, the chandelier chain)
 #include "WRForestBosses.h"      // the forest arenas' things a swing can hit (rope anchors, knots, combs, amber hearts)
 #include "WRSurvival.h"          // a torch in the off hand (a fire blow on the forest's things)
 #include "WRDeeds.h"
@@ -1031,6 +1032,14 @@ void UWRGA_Melee::Sweep()
 		// heart, the root hand's wrist (once a swing; a torch in the off hand makes it a fire blow).
 		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
 			&& FWRForestBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
+				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
+		{
+			HitThisSwing.Add(Thing);
+			continue;
+		}
+		// The Graveyard's arena pieces (WRGraveBosses): the Belfry rope's frayed section, an egg sac, the chandelier's chain.
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
+			&& FWRGraveBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
 				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
 		{
 			HitThisSwing.Add(Thing);
