@@ -1,5 +1,7 @@
 #include "WRAudio.h"
 #include "WRCrystalTypes.h"
+#include "WRFungalTypes.h"
+#include "WRFungalHazards.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
 #include "WRWorldDressing.h"
@@ -322,6 +324,22 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 		if (Layer == ForestHollow) return ForestZone[6];
 	}
 	if (Layer == Always) return 1.f;
+	// The Fungal caverns' beds (fungal.<zone>, fungal.F1.night, fungal.flue_roar; cooks/biome-fungal.md 2.15-2.16): the
+	// plateau's wind and the doline glow's night by day and night, each cavern zone's own air under it (long tails in the
+	// Glow-moss Halls, tight in the Webs), and the Flue's roar on the Fall Field, which its planned silence leaves alone.
+	{
+		const FString LF = Layer.ToString();
+		if (LF.StartsWith(TEXT("fungal.")))
+		{
+			if (LF == TEXT("fungal.flue_roar")) return FlueRoar;
+			if (FungalZone.IsNone()) return 0.f;
+			TArray<FString> Parts;
+			LF.ParseIntoArray(Parts, TEXT("."));
+			if (Parts.Num() < 2 || FName(*Parts[1]) != FungalZone) return 0.f;
+			const float W = Parts.Num() >= 3 ? (Parts[2] == TEXT("night") ? 1.f - Daylight : Parts[2] == TEXT("day") ? Daylight : 1.f) : 1.f;
+			return W * (1.f - Hush);
+		}
+	}
 	// Weather beds ("weather.<kind>", WRSurvival): rising over the 60 s warning, full while it blows, muffled in a cave.
 	// Music is never touched by weather (it keeps playing; survival-crafting 2.4).
 	const FString L = Layer.ToString();
@@ -441,7 +459,26 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		}
 		// The Silent Vault (cooks/biome-crystal.md 2.5): the one planned silence of the caves, no music and no beds.
 		if (WRCrystal::InVault(Listener)) Want = 1.f;
-		Hush = FMath::FInterpConstantTo(Hush, Want, DeltaTime, 1.f / FMath::Max(0.5f, Tune(TEXT("ambient.silenceFade"), 8.f)));
+		// The Fungal caverns: under the plateau, its cavern zone; on it, F1. Stepping onto the Fall Field the music fades
+		// over 4 s and leaves only the Flue's roar for 20 s, then the Fall Field's own cue (cooks/biome-fungal.md 2.16).
+		float FadeSeconds = Tune(TEXT("ambient.silenceFade"), 8.f);
+		FungalZone = NAME_None;
+		if (WRFungal::Live())
+		{
+			if (WRFungal::InCave(Listener)) FungalZone = WRFungal::ZoneAt(Listener);
+			else if (LandBiome == WRFungal::Biome()) FungalZone = TEXT("F1");
+			if (!FungalZone.IsNone()) { LandBiome = WRFungal::Biome(); LandZone = FungalZone; }
+			const bool bField = WRFungal::OnFallField(Listener);
+			if (bField && FallFieldSince < 0.0) FallFieldSince = Now;
+			if (!bField) FallFieldSince = -1.0;
+			FlueRoar = FMath::FInterpConstantTo(FlueRoar, bField ? 1.f : 0.f, DeltaTime, 0.5f);
+			if (bField && Now - FallFieldSince < Tune(TEXT("ambient.fallFieldSilence"), 20.f))
+			{
+				Want = 1.f;
+				FadeSeconds = Tune(TEXT("ambient.fallFieldFade"), 4.f);
+			}
+		}
+		Hush = FMath::FInterpConstantTo(Hush, Want, DeltaTime, 1.f / FMath::Max(0.5f, FadeSeconds));
 	}
 	if (Now >= NextCoastSample)
 	{
@@ -679,6 +716,21 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 				}
 			}
 		}
+		// The Fungal caverns (cooks/biome-fungal.md 2.16): the Heart Grotto's piano, the Fall Field's cue after its silence,
+		// the camps', then explore by zone: the plateau (by day; its night pool by night), A the Spore Gardens, B the
+		// Glow-moss Halls, C the Mycelium Webs, D the Flooded Grottos (underground they play day and night).
+		if (Land == WRFungal::Biome() && Which == EMusic::Explore)
+		{
+			if (WRFungal::InHeartGrotto(Listener)) Try.Add(TEXT("sub.heart_grotto"));
+			if (WRFungal::OnFallField(Listener)) Try.Add(TEXT("sub.fall_field"));
+			for (const FWRFungalData::FSite& S : FWRFungalData::Get().Sites)
+			{
+				if (S.bCamp && FVector::Dist2D(S.At, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(TEXT("camp.fungal")); break; }
+			}
+			const FName FZ = WRFungal::InCave(Listener) ? WRFungal::ZoneAt(Listener) : FName(TEXT("F1"));
+			if (FZ == TEXT("F1")) Try.Add(PoolName == TEXT("night") ? FName(TEXT("night.fungal")) : FName(TEXT("explore.fungal.surface")));
+			else Try.Add(FZ == TEXT("F2") ? FName(TEXT("explore.fungal.a")) : FZ == TEXT("F3") ? FName(TEXT("explore.fungal.b")) : FZ == TEXT("F4") ? FName(TEXT("explore.fungal.c")) : FName(TEXT("explore.fungal.d")));
+		}
 		// The Sky: inside the Undercloud its own intimate piece (sub.undercloud, cooks/biome-sky.md 2.12), not in a fight.
 		if (Land == WRSkyIsles::Biome() && PoolName != TEXT("combat") && WRSkyIsles::InUndercloud(Listener)) Try.Add(TEXT("sub.undercloud"));
 		Try.Add(FName(*FString::Printf(TEXT("%s.%s"), *PoolName.ToString(), *Land.ToString())));
@@ -809,6 +861,8 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		StepMusicLayer(WildHuntLayer, bHunt, TEXT("layer.wild_hunt"), DeltaTime, Gain);
 		StepMusicLayer(BloomLayer, bHere && !bHunt && WRForest::Bloom(World), TEXT("layer.bloom"), DeltaTime, Gain);
 	}
+	// The Sporefall: the Heart pulse as a deep drum over whatever plays in the caverns (cooks/biome-fungal.md 2.16).
+	StepMusicLayer(SporefallLayer, !FungalZone.IsNone() && WRFungal::Sporefall(World) >= 2, TEXT("layer.sporefall"), DeltaTime, Gain);
 	// The Turning Wind: its canon over whatever plays in the Sky (the theme against itself backwards; biome-sky 2.12).
 	{
 		const AWRSkyState* SkyS = AWRSkyState::Get(World);

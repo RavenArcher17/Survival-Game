@@ -246,6 +246,12 @@ private:
 	FName LandBiome;
 	FName LandZone;
 	float Hush = 0.f;
+	/** The Fungal caverns (cooks/biome-fungal.md 2.16): the zone the listener is in (F1 on the plateau, F2-F5 and HG under
+	 *  it), the Flue's roar on the Fall Field, and when the Fall Field was stepped onto (its 20 s planned silence). */
+	FName FungalZone;
+	float FlueRoar = 0.f;
+	double FallFieldSince = -1.0;
+	TArray<FStream> SporefallLayer;
 	/** Storm peaks (cooks/biome-lightning.md 2.12): how far into its air, and each sub-zone's bed weight (1-6 as the
 	 *  zone letters, eased), the Rodfield's wind-song by distance. */
 	float Storm = 0.f;

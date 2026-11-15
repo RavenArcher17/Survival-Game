@@ -193,6 +193,16 @@ Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and pl
 cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
 not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveBiomes`.
 
+- **Fungal (7): the caverns' sound** (fungal 2.15-2.16; plan 2.15-2.16). `Data/Audio/sounds.json`: 73 events (the
+  hazards' tells and flashes, lines, springcaps, cap-falls and the knockers, the mole's knocks, the vents, the webs, the
+  creatures' and bosses' signature moments, the Spore path's proc feedback: the plant's wet tick, the popping chain),
+  16 creature voices (the nearest family, pitched), 8 beds and 19 music pools, all stand-ins from the recordings we have
+  (`_standin`: the fused calls and the 70 BPM Bb Locrian cues of the cook are a later audio job). `UWRAudioDirector`:
+  the caverns' beds by zone (`fungal.F1.day` / `.night`, `fungal.F2`-`F5`, `fungal.HG`), the Flue's roar on the Fall
+  Field, and its one **planned silence** (stepping onto the Fall Field the music fades over 4 s, 20 s of only the roar,
+  then `sub.fall_field`); the cues by zone (`explore.fungal.surface` / `.a` Gardens / `.b` Halls / `.c` Webs / `.d`
+  Grottos, `night.fungal`, `combat.fungal`, `mini.fungal` and each mini's, `boss.mycelorn.p1`-`p3`,
+  `sub.heart_grotto`, `camp.fungal`) and `layer.sporefall` (the Heart pulse over whatever plays). Compiled; not played.
 - **Fungal (6): the Spore path** (fungal 2.17-2.18; plan 2.17). `Data/paths/spore.json` (trunk, Rot, Colony,
   Symbiote; gates 0/5/10/14/17/20), tuning `spores`, `sporePath`, `spells.*` (sporeCloud, detonate, blight, sporeling,
   fungalBehemoth, sporeArmor, livingColony, infectStrike), `wildbrands.infect_strike`, `nodeEffects spore.*`. **Spores**
