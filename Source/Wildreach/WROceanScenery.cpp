@@ -227,35 +227,8 @@ namespace WROceanParts
 			B.K.Add(OcBronze(), FVector(30.f, 220.f, 30.f), Pl + FVector(0, 0, 110.f), Ry + FRotator(0, 90.f, 0));
 			B.Box(Pl + FVector(0, 0, 45.f), FVector(80.f, 80.f, 45.f));
 		}
-		// The flat: eight stilt-tower stumps (5 m, 4 m across their tops, a stair up one side) and four bronze bollards.
-		for (const FVector& Tw : C.D.ArenaPoints(TEXT("thalassor"), TEXT("towers")))
-		{
-			const FVector Lp = C.L(FVector(Tw.X, Tw.Y, C.A->GetActorLocation().Z));
-			const FVector Base(Lp.X, Lp.Y, B.G(Lp.X, Lp.Y, Flat));
-			for (int32 c = 0; c < 10; ++c)
-			{
-				const float Z = Base.Z + 25.f + c * 50.f;
-				const float W = 400.f - c * 4.f;
-				for (int32 sd = 0; sd < 4; ++sd)
-				{
-					const FRotator Rs(0.f, sd * 90.f + (c % 2) * 3.f, 0.f);
-					B.K.Add(OcLime(0.86f + 0.2f * B.Rand(c * 7 + sd)), FVector(46.f, W, 48.f), Base + Rs.RotateVector(FVector(W * 0.5f - 23.f, 0, 0)) + FVector(0, 0, Z - Base.Z), Rs);
-				}
-			}
-			B.K.Add(OcLime(0.98f), FVector(400.f, 400.f, 30.f), Base + FVector(0, 0, 515.f));
-			B.Box(Base + FVector(0, 0, 260.f), FVector(200.f, 200.f, 260.f));
-			// Its stair: blocks climbing the outer face (toward the wall), each a step a player can take.
-			const FVector Out = FVector(Lp.X, Lp.Y, 0.f).GetSafeNormal2D();
-			const FVector Side = FVector(-Out.Y, Out.X, 0.f);
-			for (int32 k = 0; k < 14; ++k)
-			{
-				const FVector P = Base + Out * 260.f + Side * (-200.f + k * 30.f) + FVector(0, 0, 20.f + k * 36.f);
-				B.K.Add(OcLime(0.92f), FVector(110.f, 34.f, 40.f), P, FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(Out.Y, Out.X)), 0.f));
-				B.Box(P, FVector(55.f, 17.f, 20.f), FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(Out.Y, Out.X)), 0.f));
-			}
-			// A rusted harpoon stuck in its side (the old hunts).
-			OcHarpoon(B, Base + Side * 230.f + FVector(0, 0, 150.f), (Side + FVector(0, 0, 0.6f)), 260.f, true);
-		}
+		// The flat's eight stilt-tower stumps are AWROceanBossProp towers (WROceanBosses: Thalassor's breach breaks them);
+		// its four bronze bollards are scenery.
 		for (const FVector& Bo : C.D.ArenaPoints(TEXT("thalassor"), TEXT("bollards")))
 		{
 			const FVector Lp = C.L(FVector(Bo.X, Bo.Y, C.A->GetActorLocation().Z));

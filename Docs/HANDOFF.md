@@ -333,7 +333,7 @@ The Blood Moon is `UWRGraveEvents` (world.json events.bloodmoon is scheduled by 
 `UWRGraveEvents::Sign / Rising / On` are what the rest asks). The Graveyard's ambient beds are `land.graveyard[.night]`
 and `zone.G1..G4 / zone.neck` rows; its music pools `<pool>.graveyard` and `boss.nhal`.
 
-Also since 0.7.1 (live from Ocean (4); the bosses come in Ocean (5)): **the Ocean & reefs** (cooks/biome-ocean.md, plan
+Also since 0.7.1 (live from Ocean (4)): **the Ocean & reefs** (cooks/biome-ocean.md, plan
 cooks/build-biome-ocean.md), the strait between the Sky's Chain Cliffs and the Storm crown. `node Tools/terrain/ocean.mjs`
 writes `Data/lands/ocean.json` + `ocean_ground.bin` (heightfield, sea floor drawn) and `Data/ocean.json` (landmarks,
 sites, kit, decor, caves, the Drowned Hall, nodes, spots, caches, hazards, arenas; read by `FWROceanData`,
@@ -359,6 +359,11 @@ The hazards and the King Tide are `WROceanHazards.*` (`UWROceanHazards`, every m
 server; the fleets are drawn locally from `ManAt`). The King Tide reads world.json `events.king_tide` through
 `AWRWorldState::Event` and writes `AWROceanState` (stage, start, bore), which `WRTide::Level` already follows.
 Secrets are `AWROceanSpot` kind `secret` (`When` / `Needs`); a mooring stone tie-off is `world ocean tie`.
+The bosses are `WROceanBosses.*` (`FWROceanBoss`, friend of `AWRBoss`, called beside `FWRFungalBoss`; per-boss server
+state in a map keyed by the boss; `AWROceanBossProp` the spare shells and the Pound's breakable towers; `AWRSunMirror`
+the three mirrors, `world ocean mirror`; the Pound's flood from `AWROceanState::SluicesBurstAt` in
+`UWROceanArenas::FloodLevel`). Boss grabs reuse the sea creatures' hold (`FWROceanAI::StartHold`: pinch, under, drag,
+swallow), so a held player's presses mash them like any other.
 
 Also since 0.7.1 (in progress): **the Sky islands, over the Hollow Cape north of the Storm peaks** (cooks/biome-sky.md,
 plan cooks/build-biome-sky.md). One generator: `node Tools/terrain/sky.mjs` writes the cape's ground

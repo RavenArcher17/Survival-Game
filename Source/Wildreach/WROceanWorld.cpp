@@ -17,6 +17,7 @@
 #include "WRUnderwater.h"
 #include "WRWorldSystems.h"
 #include "WRAbilitiesTide.h"
+#include "WROceanBosses.h"
 #include "WRSurvival.h"
 #include "Components/PointLightComponent.h"
 #include "Components/PostProcessComponent.h"
@@ -756,6 +757,8 @@ bool UWROceanWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FS
 	const UWROceanWorld* W = Get(PC);
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!W || !W->bActive || !Me) return false;
+	// A Sunwatch mirror on the Pound's wall (WROceanBosses).
+	if (UWROceanArenas::Prompt(PC, OutTarget, OutVerb)) return true;
 	// A harpoon line in hand by a mooring stone: tie it off (the Reef Tyrant's tether, a Whaler's harpoon's catch).
 	FVector Ring;
 	if (W->TieRing(Me, Ring))
@@ -778,6 +781,7 @@ bool UWROceanWorld::ClientInteract(AWRPlayerController* PC)
 	const UWROceanWorld* W = Get(PC);
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!W || !W->bActive || !Me) return false;
+	if (UWROceanArenas::ClientInteract(PC)) return true;
 	FVector Ring;
 	if (W->TieRing(Me, Ring)) { PC->SendCommand(TEXT("world ocean tie")); return true; }
 	if (W->SpotNear(Me->GetActorLocation())) { PC->SendCommand(TEXT("world ocean spot")); return true; }
@@ -790,6 +794,7 @@ FString UWROceanWorld::Command(AWRPlayerController* PC, const TArray<FString>& A
 	AWRCharacterBase* Me = PC ? Cast<AWRCharacterBase>(PC->GetPawn()) : nullptr;
 	if (!W || !W->bActive || !Me) return TEXT("Not here");
 	const FString Verb = Args.IsValidIndex(2) ? Args[2] : FString();
+	if (Verb == TEXT("mirror")) return UWROceanArenas::Command(PC);
 	if (Verb == TEXT("tie"))
 	{
 		FVector Ring;

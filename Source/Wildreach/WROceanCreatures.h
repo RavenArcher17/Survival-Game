@@ -129,6 +129,8 @@ public:
 	double HoldUntil = 0.0, HoldTickAt = 0.0;
 	FName HoldKind;
 	float FreeDamage = 0.f;
+	/** The hold's own numbers (a boss's grab sets them): damage a second, seconds, how far down, what frees, the throw. */
+	float HoldDps = 0.f, HoldSeconds = 2.f, HoldDepth = 0.f, HoldFree = 100.f, HoldThrow = 0.f;
 	double StrandedUntil = 0.0, GuardUntil = 0.0, FlippedUntil = 0.0, ColumnAt = 0.0;
 	FVector ColumnSpot = FVector::ZeroVector;
 	double NextVoiceAt = 0.0;
@@ -166,6 +168,8 @@ struct WILDREACH_API FWROceanAI
 	/** Server, every tick (the body): holds, strandings, the Gullraider's flight home, the herd's sleep, the school. */
 	static void TickBody(AWRCreature* Self, UWROceanBody* Body, float DeltaTime);
 	static void Release(AWRCreature* Self, UWROceanBody* Body);
+	/** Server: a hold (drag = down, jaw = to its hole, pinch = in the claw then thrown, swallow = inside then spat). */
+	static void StartHold(AWRCreature* Self, AWRCharacterBase* Victim, FName Kind, float Seconds, float Dps, float Depth, float Free, float Throw);
 	static void Mash(AWRCharacterBase* Victim);
 	static AWRCreature* HolderOf(const AActor* Victim);
 	/** Every tick of a row's strike (the drag's line, the breach's rise). */

@@ -187,6 +187,20 @@ void WRTidePath::HoldDrain(AWRCharacterBase* Who, float Seconds)
 
 void WRTidePath::OnDodge(AWRCharacterBase* Who, bool bPerfect)
 {
+	// The Leviathan pearl (Thalassor's part): a dodge or kick-dodge in the water gives back stamina, once a second.
+	if (Who && Who->HasAuthority() && Who->GetAttributes())
+	{
+		const float Back = UWRInventoryComponent::GearStatFor(Who, TEXT("waterDodgeStamina"));
+		static TMap<TWeakObjectPtr<AActor>, double> Last;
+		const double Now = Who->GetWorld()->GetTimeSeconds();
+		const bool bInWater = (Who->GetCharacterMovement() && Who->GetCharacterMovement()->IsSwimming()) || WRUnderwater::WaterAt(Who->GetWorld(), Who->GetActorLocation() - FVector(0, 0, Who->GetSimpleCollisionHalfHeight() * 0.6f));
+		if (Back > 0.f && bInWater && Now - Last.FindRef(Who) >= 1.0)
+		{
+			Last.Add(Who, Now);
+			const UWRAttributeSet* A = Who->GetAttributes();
+			TpSetAttr(Who, UWRAttributeSet::GetStaminaAttribute(), FMath::Min(A->GetMaxStamina(), A->GetStamina() + Back));
+		}
+	}
 	if (!Who || !Who->HasAuthority() || !Walks(Who)) return;
 	const bool bWater = Who->GetCharacterMovement() && Who->GetCharacterMovement()->IsSwimming();
 	const float Mult = bWater && Who->HasTag(Passive_Gills) ? TpF(TEXT("gillsWaterMult"), 1.5f) : 1.f;

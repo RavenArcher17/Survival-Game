@@ -8,6 +8,8 @@
 #include "WRCharacterMovementComponent.h"
 #include "WRCombatLibrary.h"
 #include "WRCreature.h"
+#include "WRBoss.h"
+#include "WRSkyAir.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
 #include "WRGameState.h"
@@ -263,21 +265,34 @@ namespace WROceanCrAI
 {
 	void OcStartHold(AWRCreature* Self, UWROceanBody* Body, AWRCharacterBase* Victim, FName Kind, float Seconds)
 	{
-		if (!Self || !Body || !Victim || !Victim->IsAlive() || FWROceanAI::HolderOf(Victim)) return;
-		Body->HeldBody = Victim;
-		Body->Holding = Victim;
-		Body->HoldKind = Kind;
-		Body->HoldUntil = OcNow(Self) + Seconds;
-		Body->HoldTickAt = OcNow(Self) + 1.0;
-		Body->FreeDamage = 0.f;
-		Body->DragFrom = Victim->GetActorLocation();
-		Body->Set(WROceanFlag::Gape, true);
-		if (Victim->Status) Victim->Status->Stagger(Seconds + 0.1f);
-		// No breath back while held (the drag down, the second jaw).
-		if (UWRDiveComponent* Dive = UWRDiveComponent::Of(Victim)) Dive->HoldBreath(Seconds + 0.5f);
-		Body->MulticastMoment(TEXT("hit.blood"), 1.3f, Kind == TEXT("drag") ? FName(TEXT("creature.reefjaw.signature")) : FName(TEXT("creature.tidecoil.signature")));
-		UE_LOG(LogWildreach, Log, TEXT("OCEAN %s holds %s (%s, %.1f s)"), *Self->GetName(), *Victim->GetName(), *Kind.ToString(), Seconds);
+		const bool bDrag = Kind == TEXT("drag");
+		FWROceanAI::StartHold(Self, Victim, Kind, Seconds, bDrag ? OcTn(TEXT("reefjaw.dragDps"), 15.f) : OcTn(TEXT("tidecoil.holdDps"), 12.f),
+			bDrag ? OcTn(TEXT("reefjaw.dragDepth"), 600.f) : 0.f, bDrag ? OcTn(TEXT("reefjaw.freeDamage"), 100.f) : 1.f, 0.f);
 	}
+}
+
+void FWROceanAI::StartHold(AWRCreature* Self, AWRCharacterBase* Victim, FName Kind, float Seconds, float Dps, float Depth, float Free, float Throw)
+{
+	UWROceanBody* Body = UWROceanBody::Get(Self);
+	if (!Self || !Body || !Victim || !Victim->IsAlive() || HolderOf(Victim)) return;
+	Body->HeldBody = Victim;
+	Body->Holding = Victim;
+	Body->HoldKind = Kind;
+	Body->HoldSeconds = FMath::Max(0.3f, Seconds);
+	Body->HoldUntil = OcNow(Self) + Seconds;
+	Body->HoldTickAt = OcNow(Self) + 1.0;
+	Body->HoldDps = Dps;
+	Body->HoldDepth = Depth;
+	Body->HoldFree = Free;
+	Body->HoldThrow = Throw;
+	Body->FreeDamage = 0.f;
+	Body->DragFrom = Victim->GetActorLocation();
+	Body->Set(WROceanFlag::Gape, true);
+	if (Victim->Status) Victim->Status->Stagger(Seconds + 0.1f);
+	// No breath back while held (the drag down, the second jaw, inside the Leviathan).
+	if (UWRDiveComponent* Dive = UWRDiveComponent::Of(Victim)) Dive->HoldBreath(Seconds + 0.5f);
+	Body->MulticastMoment(TEXT("hit.blood"), 1.3f, Kind == TEXT("drag") ? FName(TEXT("creature.reefjaw.signature")) : FName(TEXT("creature.tidecoil.signature")));
+	UE_LOG(LogWildreach, Log, TEXT("OCEAN %s holds %s (%s, %.1f s)"), *Self->GetName(), *Victim->GetName(), *Kind.ToString(), Seconds);
 }
 
 void FWROceanAI::Release(AWRCreature* Self, UWROceanBody* Body)
@@ -287,6 +302,14 @@ void FWROceanAI::Release(AWRCreature* Self, UWROceanBody* Body)
 	Body->Holding = nullptr;
 	Body->Set(WROceanFlag::Gape, false);
 	if (V && V->Status) V->Status->ClearStatus(WRTags::Status_Staggered);
+	// Thrown out of the claw, spat out of the mouth: away from the holder.
+	if (V && Self && V->IsAlive() && Body->HoldThrow > 0.f)
+	{
+		const FVector Away = (V->GetActorLocation() - Self->GetActorLocation()).GetSafeNormal2D();
+		WRSkyAir::Push(V, (Away.IsNearlyZero() ? Self->GetActorForwardVector() : Away) * Body->HoldThrow / 0.5f + FVector(0, 0, 300.f), 0.5f, TEXT("throw"), Self);
+	}
+	Body->HoldThrow = 0.f;
+	if (V) V->SetActorHiddenInGame(false);
 	if (V) UE_LOG(LogWildreach, Log, TEXT("OCEAN %s lets go of %s"), Self ? *Self->GetName() : TEXT("?"), *V->GetName());
 }
 
@@ -321,28 +344,34 @@ void FWROceanAI::TickBody(AWRCreature* Self, UWROceanBody* Body, float DeltaTime
 	// mashing, an ally's blows on the holder (the Tidecoil: any ally's hit, fire or a shock).
 	if (AWRCharacterBase* V = Body->HeldBody.Get())
 	{
-		const bool bDrag = Body->HoldKind == TEXT("drag");
-		const float Free = bDrag ? OcTn(TEXT("reefjaw.freeDamage"), 100.f) : 1.f;
-		if (!V->IsAlive() || T >= Body->HoldUntil || Body->FreeDamage >= Free) Release(Self, Body);
+		const FName HK = Body->HoldKind;
+		const bool bDrag = HK == TEXT("drag");
+		if (!V->IsAlive() || T >= Body->HoldUntil || Body->FreeDamage >= Body->HoldFree) Release(Self, Body);
 		else
 		{
-			const float Total = FMath::Max(0.5f, bDrag ? OcTn(TEXT("reefjaw.dragSeconds"), 2.f) : OcTn(TEXT("tidecoil.holdSeconds"), 2.f));
+			const float Total = FMath::Max(0.3f, Body->HoldSeconds);
 			const float S = FMath::Clamp(1.f - float(Body->HoldUntil - T) / Total, 0.f, 1.f);
-			FVector Want = bDrag ? Body->DragFrom - FVector(0, 0, OcTn(TEXT("reefjaw.dragDepth"), 600.f) * S) : FMath::Lerp(Body->DragFrom, Body->Home, S);
+			// Down (the drag), to its hole (the jaw), in the claw or in the mouth (the pinch, the swallow: at its head).
+			const FVector Mouth = Self->GetActorLocation() + Self->GetActorForwardVector() * (Self->GetSimpleCollisionRadius() + 80.f);
+			FVector Want = bDrag || HK == TEXT("under") ? Body->DragFrom - FVector(0, 0, Body->HoldDepth * S)
+				: HK == TEXT("jaw") ? FMath::Lerp(Body->DragFrom, Body->Home, S) : Mouth;
 			// Never through the floor.
 			Want.Z = FMath::Max(Want.Z, OcFloor(Want, Want.Z - 1.f) + V->GetSimpleCollisionHalfHeight() + 20.f);
 			V->SetActorLocation(FMath::VInterpTo(V->GetActorLocation(), Want, DeltaTime, 8.f), true);
-			Self->SetActorLocation(FMath::VInterpTo(P, Want + (P - V->GetActorLocation()).GetSafeNormal() * (Self->GetSimpleCollisionRadius() + 60.f), DeltaTime, 6.f), true);
+			if (bDrag || HK == TEXT("jaw") || HK == TEXT("under")) Self->SetActorLocation(FMath::VInterpTo(P, Want + (P - V->GetActorLocation()).GetSafeNormal() * (Self->GetSimpleCollisionRadius() + 60.f), DeltaTime, 6.f), true);
+			// Swallowed: out of sight inside it.
+			if (HK == TEXT("swallow")) V->SetActorHiddenInGame(true);
 			if (T >= Body->HoldTickAt)
 			{
 				Body->HoldTickAt = T + 1.0;
-				OcHit(Self, V, bDrag ? OcTn(TEXT("reefjaw.dragDps"), 15.f) : OcTn(TEXT("tidecoil.holdDps"), 12.f), WRTags::Element_Physical, true, true);
+				OcHit(Self, V, Body->HoldDps, WRTags::Element_Physical, true, true);
 				if (V->Status) V->Status->Stagger(1.1f);
 				if (UWRDiveComponent* Dive = UWRDiveComponent::Of(V)) Dive->HoldBreath(1.5f);
 			}
 		}
 	}
 
+	if (Self->IsA<AWRBoss>()) return;
 	// Swimmers: in the water they steer in 3D inside their depth band (the default chase drives the flat; this adds the
 	// up and down); out of it, the water-only ones head back to the sea.
 	const FWRCreatureDef* Def = Self->GetDef();

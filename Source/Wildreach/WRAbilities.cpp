@@ -5,6 +5,7 @@
 #include "WRCrystalHazards.h"
 #include "WRFungalHazards.h"
 #include "WRFungalBosses.h"
+#include "WROceanBosses.h"
 #include "WRInventory.h"
 #include "WRWindPath.h"          // Sky lord's swings and dodge
 #include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
@@ -1160,6 +1161,14 @@ void UWRGA_Melee::Sweep()
 		// The Fungal caverns' boss things (WRFungalBosses): a wall egg sac, a Draught gate's plug, a mound pod, a web sheet.
 		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
 			&& FWRFungalBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
+				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
+		{
+			HitThisSwing.Add(Thing);
+			continue;
+		}
+		// The Ocean's boss things (WROceanBosses): Old Barnacle's spare shells on the cove's beach.
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
+			&& FWROceanBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
 				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
 		{
 			HitThisSwing.Add(Thing);

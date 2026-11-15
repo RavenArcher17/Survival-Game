@@ -6,6 +6,55 @@ Aaron (lane build-biome-ocean: requirement ledger R1-R54, build research and pla
 cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; compiled (editor target) after each; not
 played here (Aaron and the testers test, F8). Live from Ocean (4) (`ocean` in `world.liveBiomes`); underwater play is live everywhere water is.
 
+- **Ocean (5): the bosses** (cooks/biome-ocean.md 2.13-2.14; plan build-biome-ocean.md 2.13-2.14). `WROceanBosses.*`:
+  `FWROceanBoss` hooks beside the other lands' in the boss machine, `UWROceanArenas` placing them, their rows in
+  attacks.json (`bosses.<id>`) and numbers in tuning `bosses.<id>`; all four built in code (`WROceanBeast`). **Old
+  Barnacle** in Barnacle Cove: the crab at x2.5 under an upturned newcomer longboat (keel up, planked, barnacle-crusted,
+  a mast stub, a dangling anchor), red-and-cream striped legs. Crusher pinch (parryable; 40% into the pinch and hold:
+  18 a second for 2 s in the claw, then thrown 8 m), hull slam (a 5 m low ring), debris toss (at anyone past 6 m, the
+  landing ring shown the whole flight), shell charge (15 m sideways, a rock stuns him 2.5 s), hull fortress (6 s
+  withdrawn: slash and pierce x0.2; below 60% or flanked by two). The hull has its own 1,200 (blunt x2; a plank torn off
+  with splinters each 300; he takes a fifth through it); fire on the tarred hull 3 s and he bolts out naked; naked 12 s
+  he takes x2 and uses only the pinch and the charge, then runs for a spare shell on the beach: the bronze bell (800, he's
+  slower in it) or the Driftback carapace (400, faster): break them first (they take blows) or stand on one and he won't
+  take it; with none left he stays naked. **The Siren Eel** in Siren's Hollow: the eel at x5 as a silver oarfish (flat as
+  a blade, dark bars) with a crest of scarlet-orange rays that blazes when she sings. Her song only from by a rock island
+  (a 1.2 s windup, 8 s): every tame within 30 m (furthest first) leaves the fight and swims to her unless its owner wears
+  the Siren scale; every player within 20 m without beeswax plugs is drawn toward her at 250 cm/s; 150 to her crest in the
+  windup breaks it and staggers her 3 s. Coil whip (low then high), the second jaw at the water's edge (15 a second for
+  2 s, dragged 4 m under, breath held), crest lash, shatter shriek (5 stalactites with their falling shadows). **The Reef
+  Tyrant**: the shark at x2.3, bars faded to ghost lines, a white-scarred snout, a Saltkin harpoon still in its jaw hinge
+  trailing bronze chain, a saw-notched dorsal; it swims its 3.2 km loop (lighthouse, the Blue Wall, the Whale Fall, the
+  drop, the reef, out along the dyke) and rests at the Mooring Stones 13:00-15:00. Slingshot bite (bleed 40), ram,
+  thrash-drag (18 a second for 3 s, 15 m down), breach (from below at the surface: the bubble column and thrum first;
+  landing in under 2 m beaches it), tail scythe. Harpoon it and tie the line off on a mooring stone: it can't get 10 m
+  from the stone (it strains the line); two tethers in under 2 m of water beach it 8 s (x1.3, stance open). Beaten after
+  being tied off counts for Hae-won's sixth for everyone in the fight. **Thalassor, the Tide Leviathan** in the Pound: a
+  new code-built body, 52 m (a sperm whale's squared ram of a head with white sucker scars and an underslung jaw of 40
+  ivory cones, the blowhole off to the left, snapped bronze collar chains, then 38 m of serpent bristling with broken
+  Saltkin harpoons, a 9 m fluke, 14 blue-green photophores a side), the trunk waving like an eel's, the jaw dropping. It
+  clicks the whole fight; the clicks speed into a creak before every move, and stop dead before a grab. Phase 1 in the
+  pool (it lunges out onto the flat and swims back): head ram, jaw snap x3 (the slam's low splash), swallow lunge (inside
+  it 3 s at 20 a second, spat 10 m; 150 to its head frees you), fluke slam (the low ring), spout volley (5 lobbed water
+  bombs with rings), wave wash, and from 75% the bubble net round the furthest tame (inside it swimmers sink, waders slow;
+  then it lunges up through it). A lunge that ends 10 m out from the pool or into a tower beaches it 5 s (x1.3, stance
+  open, beam counts double). **The Sluice Breaks** at 50% (it rears 16 m, every photophore flares; the transition move,
+  half damage taken): it rams the east sluices, a surge crosses the flat (60 and a knockdown unless you're up high or in
+  the air), and the Pound floods 4 m over 10 s (a water volume and a surface on every machine from the replicated burst
+  time). Phase 2: breach (a tower in its line is broken: the eight stumps on the flat are breakable props now), undertow
+  (swimmers within 15 m pulled in 3 s, swim sideways), coil-snap-lash, and every 30 s it surfaces 4 s to breathe (a 12 m
+  plume; the blowhole takes x1.5 and breaks at 1,000: no more spout volleys this phase). The hidden **Maelstrom** (25%,
+  with artifacts): the Pound spins, swimmers are drawn to the eye (20 a second there), it rides the vortex wall and rams
+  out at a perch every 6 s. **The Sun**: three Sunwatch mirrors stand on the wall's plinths: E takes one and it follows
+  your aim; in daylight (06:00-20:00; Overcast half; Sea fog, Rain, Squall none) or with a sunstone loaded (E again, 30 s
+  each, day or night) it throws a gold beam drawn on every machine; 2 s of beam on a part (head, blowhole, flank, fluke)
+  dries it 20 s (x1.5 damage, cracks and dust), once a part a phase; 3 s of beam breaks the Maelstrom 8 s. A sunstone
+  flare's burst is a second of beam; Sun path hits count a second each and take x1.5. The Tide altar and the run-back
+  stone 50 m out from the north stair. **Drops**: Thalassor's core, tide essence x5, ambergris, the Tidebreaker and Coral
+  keep decor blueprints, its head (first kill), the Leviathan pearl (part: a dodge in the water gives back 10 stamina, once
+  a second); the minis their trophies, shards and essence. Stand-in voices and every boss sound and effect as rows.
+  Not yet: the Tidebreaker's moveset (the boss-weapons cook) and the Coral keep decor pieces (the building lane) are
+  blueprints only.
 - **Ocean (4): the coast's world, and the Ocean goes live** (cooks/biome-ocean.md 2.8-2.11, 2.19-2.21; plan
   build-biome-ocean.md 2.8-2.11, 2.17-2.19). `ocean` joins `world.liveBiomes`: the coast, its creatures, hazards, shrines
   and Hae-won are in the game (the three minis and Thalassor come with Ocean (5)). **Hazards** (`WROceanHazards.*`): five

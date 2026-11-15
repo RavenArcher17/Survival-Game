@@ -192,6 +192,8 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	friend struct FWRCrystalBoss;
 	// The Fungal caverns' (WRFungalBosses: the Sporemother, the Rot King, the Weaver, Mycelorn).
 	friend struct FWRFungalBoss;
+	// The Ocean's (WROceanBosses: Old Barnacle, the Siren Eel, the Reef Tyrant, Thalassor).
+	friend struct FWROceanBoss;
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

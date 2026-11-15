@@ -4,6 +4,7 @@
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
 #include "WRAbilitiesTide.h"
+#include "WROceanBosses.h"
 #include "WRFx.h"
 #include "WRWorldSystems.h"
 #include "WRPlayerState.h"
@@ -643,6 +644,8 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 				AWRCharacter* Me = WeakSelf.Get();
 				if (!Me) return;
 				WRFx::Broadcast(Me, TEXT("ocean.sunflare"), At, FRotator::ZeroRotator, 1.f, TEXT("ocean.sunflare"));
+				// On the Tide Leviathan: a second of the sun's beam on the part it burst at.
+				FWROceanBoss::SunBurst(Me->GetWorld(), At, WRTune(TEXT("oceanWorld.sunflareBeam"), 1.f));
 				for (TActorIterator<AWRCharacterBase> It(Me->GetWorld()); It; ++It)
 				{
 					if (*It == Me || !It->IsAlive() || FVector::Dist(It->GetActorLocation(), At) > WRTune(TEXT("oceanWorld.sunflareRadius"), 200.f) + It->GetSimpleCollisionRadius()) continue;
