@@ -1,4 +1,5 @@
 #include "WRDesertWorld.h"
+#include "WRDesertHazards.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
@@ -113,6 +114,11 @@ void AWRDesertState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AWRDesertState, VaultOpenAt);
 	DOREPLIFETIME(AWRDesertState, SignalAt);
 	DOREPLIFETIME(AWRDesertState, bLongNoon);
+	DOREPLIFETIME(AWRDesertState, NoonStage);
+	DOREPLIFETIME(AWRDesertState, NoonStageAt);
+	DOREPLIFETIME(AWRDesertState, FloodStart);
+	DOREPLIFETIME(AWRDesertState, BrineBrokenUntil);
+	DOREPLIFETIME(AWRDesertState, Sinkers);
 }
 
 AWRDesertState* AWRDesertState::Get(const UObject* WorldContext)
@@ -161,13 +167,13 @@ AWRDesertScenery::AWRDesertScenery()
 void AWRDesertScenery::BuildDesert()
 {
 	WRDesertParts::Build(this);
-	SetActorTickEnabled(Wheel || Signal || Dust.Num() > 0 || Mirrors.Num() > 0 || VaultDoor || LeeSand || DigSand || Shafts.Num() > 0 || Spin);
+	SetActorTickEnabled(Wheel || Signal || Dust.Num() > 0 || Mirrors.Num() > 0 || VaultDoor || SeventhDoor || LeeSand || DigSand || Shafts.Num() > 0 || Spin);
 }
 
 void AWRDesertScenery::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (GetNetMode() == NM_DedicatedServer && !LeeSand && !DigSand && !VaultDoor) return;
+	if (GetNetMode() == NM_DedicatedServer && !LeeSand && !DigSand && !VaultDoor && !SeventhDoor) return;
 	const float NowS = DwNow(this);
 	const AWRDesertState* S = AWRDesertState::Get(this);
 	// The qanat tower's bucket wheel: 6 rpm, a pure function of the server clock (every machine shows the same turn).
@@ -199,14 +205,27 @@ void AWRDesertScenery::Tick(float DeltaSeconds)
 		for (USceneComponent* B : Beam) if (B && B->IsVisible() != bAligned) B->SetVisibility(bAligned, true);
 	}
 	// The Sun-Vault's stone door slides aside (3 s) once the beam reaches its lock.
+	if (!bDoorBases)
+	{
+		bDoorBases = true;
+		if (VaultDoor) VaultDoorBase = VaultDoor->GetRelativeLocation();
+		if (SeventhDoor) SeventhDoorBase = SeventhDoor->GetRelativeLocation();
+	}
 	if (VaultDoor && S)
 	{
+		// (It slides along its own wall, 3.3 m aside.)
 		const float T = S->bVaultOpen ? FMath::Clamp((NowS - S->VaultOpenAt) / 3.f, 0.f, 1.f) : 0.f;
 		const float Ease = T * T * (3.f - 2.f * T);
-		FVector P = VaultDoor->GetRelativeLocation();
-		P.Y = Ease * 330.f;
-		VaultDoor->SetRelativeLocation(P);
+		VaultDoor->SetRelativeLocation(VaultDoorBase + FVector(Ease * 330.f, 0.f, 0.f));
 		if (UPrimitiveComponent* Pr = Cast<UPrimitiveComponent>(VaultDoor)) Pr->SetCollisionEnabled(T >= 1.f ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	}
+	// The Seventh Vault's door: open while the Long Noon holds (4 s each way).
+	if (SeventhDoor && S)
+	{
+		SeventhOpen = FMath::FInterpConstantTo(SeventhOpen, S->bLongNoon ? 1.f : 0.f, DeltaSeconds, 0.25f);
+		const float Ease = SeventhOpen * SeventhOpen * (3.f - 2.f * SeventhOpen);
+		SeventhDoor->SetRelativeLocation(SeventhDoorBase + FVector(Ease * 330.f, 0.f, 0.f));
+		if (UPrimitiveComponent* Pr = Cast<UPrimitiveComponent>(SeventhDoor)) Pr->SetCollisionEnabled(SeventhOpen >= 0.99f ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
 	}
 	// The Lee Door's sand bank slumps down over 6 s when it opens (after a Sandstorm block) and pours back when it closes;
 	// the Dig's sand sinks once (4 s). Their collision goes with them.
@@ -315,6 +334,16 @@ FString AWRDesertSpot::Start(AWRPlayerController* PC)
 		if (S && S->bDigDone) return TEXT("The steps go down under the sand");
 		if (!DwHasDigger(Me)) return TEXT("Packed sand to the lintel. You need a pick or a shovel to clear it");
 	}
+	if (Kind == TEXT("fill_jars"))
+	{
+		const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me);
+		if (!Inv || Inv->CountOf(TEXT("water_jar")) <= 0) return TEXT("Cold, deep water. You need a water jar to carry it (clay, made by hand)");
+	}
+	if (Kind == TEXT("seventh_vault") && !IsDoneBy(Who, DwGameHours(this)))
+	{
+		const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me);
+		if (!Inv || Inv->CountOf(TEXT("seventh_key")) <= 0) return TEXT("A lock shaped like a sun disc. The key would be where the seventh stela's noon shadow ends");
+	}
 	if (Kind == TEXT("squeeze") && IsDoneBy(Who, DwGameHours(this))) return TEXT("It's gone back into the clay. Leave it be a while");
 	if (IsDoneBy(Who, DwGameHours(this)))
 	{
@@ -365,6 +394,19 @@ void AWRDesertSpot::Finish()
 		if (AWRDesertState* S = AWRDesertState::Get(this)) { S->bDigDone = true; S->DigDoneAt = DwNow(this); }
 		WRSound::Broadcast(this, TEXT("desert.sand_pour"));
 		DwQuestEvent(P, TEXT("event"), TEXT("hourhold_dig"), 1);
+	}
+	if (Kind == TEXT("fill_jars"))
+	{
+		DwQuestEvent(P, TEXT("event"), TEXT("water_jars"), 1);
+		WRSound::PlayAt(P, TEXT("tide.splash"), GetActorLocation());
+		DwTell(P, TEXT("You lower the jar and draw it up full: cold water that tastes of stone"));
+	}
+	if (Kind == TEXT("seventh_vault"))
+	{
+		// The key stays in the lock.
+		if (Inv->CountOf(TEXT("seventh_key")) <= 0) return;
+		Inv->RemoveItem(TEXT("seventh_key"), 1);
+		WRSound::Broadcast(this, TEXT("desert.vault_open"));
 	}
 	if (Kind == TEXT("squeeze"))
 	{
@@ -565,6 +607,7 @@ float UWRDesertWorld::SunstoneYield(const UObject* WorldContext)
 	float Mult = 1.f;
 	const UWRDesertWorld* W = Get(WorldContext);
 	if (W && W->LastWeather == TEXT("after_sandstorm")) Mult *= DwTn(TEXT("desertWorld.stormPlenty"), 1.5f);
+	if (WRDesertHz::LongNoon(WorldContext)) Mult *= DwTn(TEXT("desertEvents.longNoon.sunstoneMult"), 3.f);
 	return Mult;
 }
 
@@ -689,6 +732,32 @@ void UWRDesertWorld::SpawnServerActors()
 		if (Tl.bSeventh) S->Gives.Add(TEXT("seventh_key"), 1);
 		++NTilted;
 	}
+	// The Sevenfold Wells' lowest step (Amastan's first quest): fill a water jar there.
+	if (const FWRDesertData::FPlace* Wells = D.FindLandmark(TEXT("sevenfold_wells")))
+	{
+		if (AWRDesertSpot* S = SpawnSpot(TEXT("fill_jars"), TEXT("sevenfold_fill"), Wells->At + FVector(0, 0, 60.f), TEXT("The Sevenfold Wells' water"), TEXT("Fill a water jar"), 1.5f))
+		{
+			S->RespawnHours = T.Num(TEXT("desertWorld.fillHours"), 0.05f);
+			S->Reach = 600.f;
+		}
+	}
+	// The Seventh Vault (the Hourhold's room 16): its door slides aside only in the Long Noon; the sun-disc key from
+	// the seventh tilted stela's cache opens the king's chest inside (cook 2.10: an Ascendant sunstone cache until
+	// artifacts drop here).
+	if (const FWRDesertData::FRoom* Rm = D.FindRoom(TEXT("seventh_vault")))
+	{
+		if (AWRDesertSpot* S = SpawnSpot(TEXT("seventh_vault"), TEXT("seventh_vault"), Rm->At + FVector(0, Rm->D * 0.15f, 60.f), TEXT("The last king's chest"), TEXT("Turn the sun-disc key"), 2.f))
+		{
+			S->bConcealed = true;
+			S->RespawnHours = 0.f;
+			S->Gives.Add(TEXT("sunstone"), int32(T.Num(TEXT("desertEvents.longNoon.vaultSunstone"), 16.f)));
+			S->Gives.Add(TEXT("radiant_essence"), 3);
+			S->Gives.Add(TEXT("gold_flakes"), 8);
+			S->Gives.Add(TEXT("@gem"), 2);
+			S->Gives.Add(TEXT("lore_last_king_disc"), 1);
+			S->Lore = TEXT("A gold sun-disc as wide as your hand, a crown cut into its rim, laid face down: the last king of the Sunwatch turned his sun away.");
+		}
+	}
 	// The Scarab digger's finds (cook 2.12.1): a sand mound every ~200 m over D1-D3, shown and dug only with a tamed
 	// Scarab digger near (WRDesertLife marks them).
 	int32 NDigs = 0;
@@ -800,6 +869,7 @@ bool UWRDesertWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, F
 	const UWRDesertWorld* W = Get(PC);
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!W || !W->bActive || !Me) return false;
+	if (WRDesertHz::PullPrompt(PC, OutTarget, OutVerb)) return true;
 	if (const AWRDesertSpot* S = W->SpotNear(Me->GetActorLocation()))
 	{
 		OutTarget = S->Title;
@@ -814,6 +884,8 @@ bool UWRDesertWorld::ClientInteract(AWRPlayerController* PC)
 	const UWRDesertWorld* W = Get(PC);
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!W || !W->bActive || !Me) return false;
+	FString PullTarget, PullVerb;
+	if (WRDesertHz::PullPrompt(PC, PullTarget, PullVerb)) { PC->SendCommand(TEXT("world desert pull")); return true; }
 	if (W->SpotNear(Me->GetActorLocation())) { PC->SendCommand(TEXT("world desert spot")); return true; }
 	return false;
 }
@@ -829,5 +901,6 @@ FString UWRDesertWorld::Command(AWRPlayerController* PC, const TArray<FString>& 
 		if (AWRDesertSpot* S = W->SpotNear(Me->GetActorLocation())) return S->Start(PC);
 		return TEXT("Nothing here");
 	}
-	return TEXT("world desert spot");
+	if (Verb == TEXT("pull")) return WRDesertHz::StartPull(PC);
+	return TEXT("world desert spot | pull");
 }

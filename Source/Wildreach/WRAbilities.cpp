@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRDesertHazards.h"
 #include "WRAbilitiesSpore.h"
 #include "WRAbilitiesTide.h"
 #include "WRTidePath.h"
@@ -1762,7 +1763,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		const FVector Move = bBackstep ? -Character->GetActorForwardVector().GetSafeNormal2D() : Input;
 		const FVector Away = Character->CombatTarget.IsValid() ? (Character->GetActorLocation() - Character->CombatTarget->GetActorLocation()).GetSafeNormal2D() : -Character->GetActorForwardVector().GetSafeNormal2D();
 		// Sunk to the knee in the Swamp's quag (WRSwampSystems): no roll until you're out; a backstep or a jump still work.
-		const bool bSunk = !bBackstep && Character->HasTag(WRSwampTags::Sunk);
+		const bool bSunk = (!bBackstep && Character->HasTag(WRSwampTags::Sunk)) || WRDesertHz::NoRoll(Character);
 		const bool bNoRoll = (!bBackstep && WRArtifacts::Has(Character, TEXT("no_roll"))) || bSunk;
 		const bool bNoRetreat = WRArtifacts::Has(Character, TEXT("never_turn_back")) && FVector::DotProduct(Move, Away) > 0.5f;
 		if (bNoRoll || bNoRetreat)
@@ -1798,6 +1799,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		// Back-dated to the press for a remote player: the perfect dodge is judged from when it really began.
 		Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
 		WRTidePath::OnDodge(Character, false);   // the Tide path's Flow: +10 a dodge
+		WRDesertHz::OnDodge(Character);          // quicksand: each dodge lifts you 25% (WRDesertHazards)
 		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
 		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), bBackstep ? 0.7f : 1.f);  // (the dodge sound is the audio director's)
 		// In the Crystal caves a roll is an 8 m noise (crystal 2.1): the crystals light and the hunters hear it.

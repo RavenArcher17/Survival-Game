@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRDesertHazards.h"
 #include "WROceanTypes.h"
 #include "WRDesertTypes.h"
 #include "WRSkyBosses.h"
@@ -399,6 +400,14 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	{
 		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
 		WRSwamp::ThrownLanded(this, Kind, At, OtherActor, const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
+	// The Desert's thrown things: the Oasis water jar wets the sand, the flash pot blinds (WRDesertHazards).
+	if (WRDesertHz::IsThrownKind(Kind))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		WRDesertHz::ThrownLanded(this, Kind, At, OtherActor, const_cast<AWRCharacterBase*>(Caster));
 		Destroy();
 		return;
 	}

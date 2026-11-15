@@ -9,6 +9,7 @@
 #include "WRSkyCreatures.h"
 #include "WROceanCreatures.h"
 #include "WRDesertCreatures.h"
+#include "WRDesertHazards.h"
 #include "WROceanHazards.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
@@ -2281,7 +2282,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 	// Taming progresses while the creature is fed and either knocked out or calm.
 	if (!IsTamed() && Def && !TamerName.IsEmpty() && Now < FedUntil && (IsUnconscious() || bCalm))
 	{
-		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds * TamerSpeed * UWROceanHazards::TameSpeedMult(this) * MealValue / FMath::Max(1.f, Def->TameSeconds()));
+		TameProgress = FMath::Min(1.f, TameProgress + DeltaSeconds * TamerSpeed * UWROceanHazards::TameSpeedMult(this) * WRDesertHz::TameSpeedMult(this) * MealValue / FMath::Max(1.f, Def->TameSeconds()));
 		if (TameProgress >= 1.f)
 		{
 			CompleteTame(TamerName);

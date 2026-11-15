@@ -15,6 +15,15 @@ class AWRCharacterBase;
 class AWRResourceNode;
 class AWRWorldCache;
 
+/** A body sinking (quicksand), dropped (brine pit) or buried (a slipface): how deep it shows on every machine (cm). */
+USTRUCT()
+struct FWRDesertSinker
+{
+	GENERATED_BODY()
+	UPROPERTY() TObjectPtr<AActor> Who;
+	UPROPERTY() float Depth = 0.f;
+};
+
 /**
  * The Desert's replicated state (one per world, server-spawned): the Lee Door's sand (open for 3 game hours after every
  * Sandstorm block), the Dig cleared at the Lost Expedition, the Mirror Gallery's four mirrors and the Sun-Vault's lock,
@@ -49,6 +58,15 @@ public:
 	UPROPERTY(Replicated) bool bLongNoon = false;
 	/** The Lookout's bronze signal mirror flashed Saltgate (secret X3) today: the server time of the flash. */
 	UPROPERTY(Replicated) float SignalAt = -100.f;
+	/** The Long Noon's stage (0 none, 1 the sign, 2 the held noon, 3 the dusk after) and when it began (server time). */
+	UPROPERTY(Replicated) uint8 NoonStage = 0;
+	UPROPERTY(Replicated) float NoonStageAt = -100.f;
+	/** Each flood wadi's running flood: the server time its wall set off down the wadi (< 0 none). */
+	UPROPERTY(Replicated) TArray<float> FloodStart;
+	/** The brine patches broken open, till when (server time). */
+	UPROPERTY(Replicated) TArray<float> BrineBrokenUntil;
+	/** Bodies sunk into the ground (WRDesertHazards). */
+	UPROPERTY(Replicated) TArray<FWRDesertSinker> Sinkers;
 
 	/** Server: the gallery's beam reaches the vault's lock (every mirror on its right step). */
 	bool GalleryAligned() const;
@@ -83,6 +101,11 @@ public:
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> Mirrors;
 	/** The Sun-Vault's sliding stone door; the gallery's beam (a lit bar from mirror to mirror). */
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> VaultDoor;
+	/** The Seventh Vault's door (open only in the Long Noon). */
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> SeventhDoor;
+	FVector VaultDoorBase = FVector::ZeroVector, SeventhDoorBase = FVector::ZeroVector;
+	bool bDoorBases = false;
+	float SeventhOpen = 0.f;
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> Beam;
 	/** The Lee Door's sand bank, the Dig pit's sand (they sink away when opened). */
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> LeeSand;

@@ -1,4 +1,5 @@
 #include "WRCharacterBase.h"
+#include "WRDesertHazards.h"
 #include "WRTidePath.h"
 #include "WRFungalHazards.h"
 #include "WRWindPath.h"
@@ -159,6 +160,8 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	// Pushing through the Ancient forest's thornbrake without a pass: run x0.5 (the server sets the tag 0.6 s after
 	// contact; both machines read the replicated tag, cooks/biome-forest.md 2.8).
 	Slow *= WRForestHazards::MoveScale(this);
+	// The Desert: soft sand, the belt, quicksand, a broken brine crust, a slide's burial (replicated tags: WRDesertHazards).
+	Slow *= WRDesertHz::MoveScale(this);
 	// The Lightning path: Swift and high Charge (both machines read them: the owner predicts with the same numbers).
 	// The Nature path: an enemy's Pollen haze (both machines see the plants), an Entangle's boss slow (server bodies).
 	// The Tide path: an ally's Current (+6/12/18%), Heavy water's deeper soak on creatures (WRTidePath.cpp).

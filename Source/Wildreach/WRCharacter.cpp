@@ -1,6 +1,7 @@
 #include "WRCharacter.h"
 #include "WROceanCreatures.h"
 #include "WRDesertCreatures.h"
+#include "WRDesertHazards.h"
 #include "WRUnderwater.h"
 #include "WRGraveBosses.h"
 #include "WRSkyBosses.h"
@@ -1090,10 +1091,12 @@ void AWRCharacter::TickBodyAnim()
 	SeatLastRel = SeatMount ? SeatMount->GetActorTransform().InverseTransformPositionNoScale(GetActorLocation()) : FVector::ZeroVector;
 	bSeatHasLast = true;
 	const FVector EaseLocal = GetActorTransform().InverseTransformVectorNoScale(EaseWorld);
-	const bool bOffset = !FMath::IsNearlyZero(SwimLift, 0.05f) || !EaseLocal.IsNearlyZero(0.05f) || !FMath::IsNearlyZero(SeatBob, 0.05f);
+	// Sunk into quicksand, dropped into a brine pit, buried by a slide (WRDesertHazards: eased on every machine).
+	const float DesertSink = WRDesertHz::SinkDepth(this);
+	const bool bOffset = !FMath::IsNearlyZero(SwimLift, 0.05f) || !EaseLocal.IsNearlyZero(0.05f) || !FMath::IsNearlyZero(SeatBob, 0.05f) || DesertSink > 0.05f;
 	if (bOffset || bBodyOffset)
 	{
-		Body->SetRelativeLocation(FVector(EaseLocal.X, EaseLocal.Y, BodyBaseZ + SwimLift + EaseLocal.Z + SeatBob));
+		Body->SetRelativeLocation(FVector(EaseLocal.X, EaseLocal.Y, BodyBaseZ + SwimLift + EaseLocal.Z + SeatBob - DesertSink));
 		bBodyOffset = bOffset;
 	}
 	// Standing on a slope: where the ground is under each foot, against the capsule's bottom (the instance sinks the
@@ -1281,7 +1284,7 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 {
 	// In a swamp creature's jaws or mouth (the Murkjaw's death roll, the Bogstalker's gulp): every press fights the hold
 	// (-0.15 s each, WRSwampCreatures); nothing else can start in there.
-	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this) || FWROceanAI::HolderOf(this) || FWRDesertAI::HolderOf(this))
+	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this) || FWROceanAI::HolderOf(this) || FWRDesertAI::HolderOf(this) || WRDesertHz::IsHeld(this))
 	{
 		ServerMashFrozen();
 		return;
@@ -1848,7 +1851,7 @@ void AWRCharacter::InputJump()
 	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
 	// Held in a swamp creature's jaws or mouth: the jump button mashes too.
 	// Riding Aeolith's back (the Last Circle): Jump lets go.
-	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this) || FWRSkyBoss::IsRiding(this) || FWROceanAI::HolderOf(this) || FWRDesertAI::HolderOf(this))
+	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this) || FWRSkyBoss::IsRiding(this) || FWROceanAI::HolderOf(this) || FWRDesertAI::HolderOf(this) || WRDesertHz::IsHeld(this))
 	{
 		ServerMashFrozen();
 		return;

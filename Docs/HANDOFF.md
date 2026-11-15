@@ -384,6 +384,7 @@ about: `ScaleBuildups`, `DamageScale`, `AfterHit`, `OnParry`; `WRSun::Exposed` i
 beacon / storms / quicksand, `AWRSunColumn` the light columns). Numbers: tuning `sun.radiance`, `sun.path`,
 `spells.<key>`, `wildbrands.<node>`, `nodeEffects sun.*`.
 The Desert's creatures are `WRDesertCreatures` (`FWRDesertAI` hooks friend of `AWRCreatureAI`, like `FWROceanAI`; `UWRDesertBody` holds each one's server state and multicasts its moments; `UWRDesertLife` keeps the populations by sub-zone from tuning `desertLife.tables`) and `WRDesertBeast.cpp` (the code-built bodies). Numbers: tuning `desertLife.*`; attacks in `attacks.json`.
+The Desert's hazards and the Long Noon are `WRDesertHazards` (`UWRDesertHazards`; the slows are replicated tags `Desert.*` that `AWRCharacterBase::GetSpeedMultiplier` reads through `WRDesertHz::MoveScale`; sinking bodies are `AWRDesertState::Sinkers`, eased into the body offset on every machine; floods, brine and the Long Noon's stage are on `AWRDesertState` too; `WRDesertHz::SkyHour` holds the sky at noon). Numbers: tuning `hazards.desert.*`, `desertEvents.longNoon.*`.
 
 Also since 0.7.1 (live from Ocean (4)): **the Ocean & reefs** (cooks/biome-ocean.md, plan
 cooks/build-biome-ocean.md), the strait between the Sky's Chain Cliffs and the Storm crown. `node Tools/terrain/ocean.mjs`

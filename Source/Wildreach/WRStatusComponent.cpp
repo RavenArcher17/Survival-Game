@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRDesertHazards.h"
 #include "WROceanHazards.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
@@ -815,7 +816,7 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	const bool bMountRates = Owner && Owner->MountStaminaRates(MountDrain, MountRegen);
 	const float DrainPerSecond = bMountRates ? MountDrain : bFastStroke
 		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina"))) * (Survival ? Survival->SwimStaminaMult() : 1.f) * UWROceanHazards::RipStaminaMult(Owner)
-		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f);
+		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f) * WRDesertHz::SprintStaminaMult(Owner);
 	// Gliding (WRSkyAir): its own stamina a second (none in an updraft); no regen while it carries you.
 	const float GlideDrain = WRSkyAir::GlideDrain(Owner);
 	if (GlideDrain >= 0.f)

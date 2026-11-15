@@ -100,6 +100,8 @@ private:
 	/** 0..1: how far into the Graveyard's air the camera is (eased), its mist layer's height (knee for Ground mist,
 	 *  chest for Corpse fog) and whether the second fog layer was last set by it (so leaving it clears the layer). */
 	float GraveAir = -1.f;
+	/** The Desert's air and its belt's sand fog (eased), and how far you see in it (cm). */
+	float DesertAir = -1.f, BeltAir = 0.f, BeltVision = 2500.f;
 	float GraveMistTop = 0.f;
 	float GraveMist = 0.f;
 	bool bGraveFogSet = false;

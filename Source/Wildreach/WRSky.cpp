@@ -1,4 +1,6 @@
 #include "WRSky.h"
+#include "WRDesertHazards.h"
+#include "WRDesertTypes.h"
 #include "WRUnderwater.h"
 #include "WRSurvival.h"
 #include "WRInventory.h"
@@ -274,8 +276,11 @@ void AWRSky::Tick(float DeltaSeconds)
 	Apply(false);
 	if (const AWRGameState* State = AWRGameState::Get(this))
 	{
-		ApplyAtmosphere(DeltaSeconds, State->GetDaylight());
-		UpdateExposure(DeltaSeconds, State->GetDaylight());
+		// The Long Noon holds the Desert's light at noon (WRDesertHazards); everywhere else the clock's own.
+		float Daylight = State->GetDaylight();
+		WRDesertHz::SkyHour(this, State->GetHour(), Daylight);
+		ApplyAtmosphere(DeltaSeconds, Daylight);
+		UpdateExposure(DeltaSeconds, Daylight);
 	}
 	TickFrameStats(DeltaSeconds);
 }
@@ -325,8 +330,9 @@ void AWRSky::Apply(bool bForce)
 		return;
 	}
 	const FWRTuning& T = FWRTuning::Get();
-	const float Hour = State->GetHour();
-	const float Daylight = State->GetDaylight();
+	// The Long Noon: in the Desert the sun stands at noon for the day (and eases back through a short dusk after).
+	float Daylight = State->GetDaylight();
+	const float Hour = WRDesertHz::SkyHour(this, State->GetHour(), Daylight);
 	const FVector SunDir = FWRSkyRules::SunDirection(Hour, T.Num(TEXT("clock.dawnHour"), 6.f), T.Num(TEXT("clock.duskHour"), 20.f),
 		T.Num(TEXT("sky.noonElevation"), 65.f), T.Num(TEXT("sky.midnightDepth"), 50.f));
 	// The moon rides opposite the sun, lifted a little so it's up all night.
@@ -585,6 +591,34 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		{
 			F->SetSecondFogDensity(0.f);
 			bGraveFogSet = false;
+		}
+	}
+	// The Desert's air (cooks/biome-desert.md 2.1, 2.8): a pale warm haze over the sand by day; in the belt or a
+	// sandstorm a wall of ochre dust you see 25 m into (60 m in a sand veil or Dunewrap 4: WRDesertHz::BeltAmount).
+	if (UExponentialHeightFogComponent* F = Fog.Get(); F && WRDesert::Live())
+	{
+		const APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+		const APawn* Me = LocalPC ? LocalPC->GetPawn() : nullptr;
+		float Vision = 0.f;
+		const float BeltTarget = WRDesertHz::BeltAmount(Me, Vision);
+		const float DesertTarget = WRDesert::Contains(View) && !WRDesert::InCave(View) && !WRDesert::InHourhold(View) ? 1.f : 0.f;
+		DesertAir = DesertAir < 0.f ? DesertTarget : FMath::FInterpTo(DesertAir, DesertTarget, DeltaSeconds, 0.7f);
+		BeltAir = FMath::FInterpTo(BeltAir, BeltTarget, DeltaSeconds, 0.8f);
+		if (Vision > 0.f) BeltVision = Vision;
+		if (DesertAir > 0.001f)
+		{
+			const FLinearColor DesertDay = SRGB(TEXT("hazards.desert.sky.hazeColor"), FColor(236, 214, 170)) * T.Num(TEXT("sky.fogBrightness"), 1.f);
+			const FLinearColor DesertHaze = FMath::Lerp(FLinearColor(0.05f, 0.06f, 0.1f), DesertDay, Daylight);
+			F->SetFogInscatteringColor(FMath::Lerp(F->FogInscatteringLuminance, DesertHaze, DesertAir * (1.f - WeatherAmount * 0.5f)));
+			F->SetFogDensity(FMath::Lerp(F->FogDensity, FMath::Max(T.Num(TEXT("hazards.desert.sky.hazeDensity"), 0.012f), F->FogDensity * 0.6f), DesertAir));
+		}
+		if (BeltAir > 0.001f)
+		{
+			// Exponential fog: density ~ 3 / (the distance you see, in metres x 1000) gets ~95% at that distance.
+			const float Dense = FMath::Clamp(3.f / FMath::Max(1.f, BeltVision / 100.f), 0.f, 0.5f) * T.Num(TEXT("hazards.desert.sky.beltDensityScale"), 8.f);
+			const FLinearColor Dust = SRGB(TEXT("hazards.desert.sky.dustColor"), FColor(176, 128, 74)) * FMath::Lerp(0.08f, 1.f, Daylight);
+			F->SetFogInscatteringColor(FMath::Lerp(F->FogInscatteringLuminance, Dust, BeltAir));
+			F->SetFogDensity(FMath::Lerp(F->FogDensity, Dense, BeltAir));
 		}
 	}
 	// Under water (cooks/biome-ocean.md 2.1, 2.6): the murk closes in round the local head, blue-green, by depth band.

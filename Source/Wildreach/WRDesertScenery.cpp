@@ -913,8 +913,9 @@ namespace WRDesertParts
 			K.Add(DsSandstone(0.95f), FVector(60.f, 340.f, 470.f), FVector(0, 0, 235.f));
 			K.Disc(DsGold(), FVector(-32.f, 0, 300.f), FVector(-1, 0, 0), 110.f, 6.f);
 			const FVector DoorAt(0, -Dp * 0.5f, 0.f);
+			// (On the server the door is its collision box alone, and it slides with the door so both machines agree.)
 			if (USceneComponent* Door = DsPart(B, DoorAt, FRotator(0.f, 90.f, 0.f), Bl)) C.A->VaultDoor = Door;
-			else B.Box(DoorAt + FVector(0, 0, 235.f), FVector(170.f, 30.f, 235.f));
+			else C.A->VaultDoor = B.Box(DoorAt + FVector(0, 0, 235.f), FVector(170.f, 30.f, 235.f));
 			if (!B.bServer && C.A->VaultDoor)
 			{
 				UBoxComponent* Bx = B.Box(FVector(0, 0, 235.f), FVector(30.f, 170.f, 235.f));
@@ -924,8 +925,20 @@ namespace WRDesertParts
 		}
 		else if (Id == TEXT("seventh_vault"))
 		{
-			B.K.Add(DsSandstone(0.95f), FVector(60.f, 340.f, 470.f), FVector(0, -Dp * 0.5f + 30.f, 235.f), FRotator(0.f, 90.f, 0.f));
-			B.K.Disc(DsGold(), FVector(0, -Dp * 0.5f, 300.f), FVector(0, -1, 0), 90.f, 6.f);
+			// The seventh vault's door: a sandstone slab with a gold sun disc; it slides aside only while the Long Noon
+			// holds the sun (AWRDesertState::bLongNoon) and closes again after.
+			TArray<FWRLookBlock> Bl;
+			FKit K(FTransform::Identity, Bl);
+			K.Add(DsSandstone(0.95f), FVector(60.f, 340.f, 470.f), FVector(0, 0, 235.f));
+			K.Disc(DsGold(), FVector(-32.f, 0, 300.f), FVector(-1, 0, 0), 90.f, 6.f);
+			const FVector DoorAt(0, -Dp * 0.5f + 30.f, 0.f);
+			if (USceneComponent* Door = DsPart(B, DoorAt, FRotator(0.f, 90.f, 0.f), Bl)) C.A->SeventhDoor = Door;
+			else C.A->SeventhDoor = B.Box(DoorAt + FVector(0, 0, 235.f), FVector(170.f, 30.f, 235.f));
+			if (!B.bServer && C.A->SeventhDoor)
+			{
+				UBoxComponent* Bx = B.Box(FVector(0, 0, 235.f), FVector(30.f, 170.f, 235.f));
+				if (Bx) Bx->AttachToComponent(C.A->SeventhDoor, FAttachmentTransformRules::KeepRelativeTransform);
+			}
 			B.K.Add(DsSandstone(0.9f), FVector(W * 0.8f, Dp * 0.8f, 20.f), FVector(0, 0, 10.f), FRotator(0.f, 0.f, 4.f));     // the tilted floor
 		}
 		else if (Id == TEXT("drowned_stair"))

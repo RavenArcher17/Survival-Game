@@ -2,6 +2,7 @@
 // WRDesertCreatures.h; cooks/biome-desert.md 2.12, build-biome-desert.md 2.12. Numbers: tuning desertLife.
 
 #include "WRDesertCreatures.h"
+#include "WRDesertHazards.h"
 #include "Wildreach.h"
 #include "WRAttackRows.h"
 #include "WRAttributeSet.h"
@@ -219,7 +220,7 @@ void UWRDesertBody::TickComponent(float DeltaTime, ELevelTick TickType, FActorCo
 bool FWRDesertAI::CanDive(const AActor* Who)
 {
 	// Soft sand only (the cook's rule made real): never wet sand, hardpan, rock, the slot floors or the plaza.
-	return Who && DcSoftUnder(Who);
+	return Who && DcSoftUnder(Who) && !WRDesertHz::WetSandAt(Who, Who->GetActorLocation());
 }
 
 AWRCreature* FWRDesertAI::HolderOf(const AActor* Victim)

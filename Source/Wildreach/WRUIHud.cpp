@@ -46,6 +46,7 @@
 #include "WRCrystalCreatures.h"  // the Mana bar and the shield film (the Arcane path)
 #include "WROceanCreatures.h"
 #include "WRDesertCreatures.h"
+#include "WRDesertHazards.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -590,6 +591,8 @@ private:
 				SAssignNew(FadeCompass, SBox).Visibility_Lambda([this]()
 				{
 					const FWRKeyBindings& K = FWRKeyBindings::Get();
+					// In the Desert's belt or a sandstorm there's no sun to read: the ribbon hides (a Sunwatch lens or a tame Scarab digger near brings it back).
+					if (WRDesertHz::CompassHidden(PC.IsValid() ? PC->GetPawn() : nullptr)) return EVisibility::Collapsed;
 					return K.PrefOn(TEXT("Compass")) && K.PrefInt(TEXT("HudMode")) != 2 ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 				})
 				[
