@@ -1,5 +1,6 @@
 #include "WRCharacterBase.h"
 #include "WRTidePath.h"
+#include "WRFungalHazards.h"
 #include "WRWindPath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
@@ -151,6 +152,8 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	Slow *= WRSwampGrip::MoveScale(this);
 	// Held in a forest creature's hug or coils (no moving), Hivebacks clinging in a heat ball (-10% each): WRForestCreatures.
 	Slow *= WRForestGrip::MoveScale(this);
+	// Foul air in the Fungal caverns: just under full pace, so no sprint (WRFungalHazards).
+	Slow *= WRFungal::MoveScale(this);
 	// Wading the Mother's Throat's risen flood (Vharra's Sinking): x0.75 (both machines read the replicated flood).
 	Slow *= FWRSwampBoss::WadeScale(this);
 	// Pushing through the Ancient forest's thornbrake without a pass: run x0.5 (the server sets the tag 0.6 s after

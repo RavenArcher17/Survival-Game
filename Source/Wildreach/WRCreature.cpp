@@ -3,6 +3,7 @@
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRFungalHazards.h"
 #include "WRSkyCreatures.h"
 #include "WROceanCreatures.h"
 #include "WRStormCreatures.h"
@@ -2280,7 +2281,8 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRSwampAI::Died(this, Killer);   // a Swamp creature lets go of what it held; the Red Tide's extra sacs
 	FWRVoidAI::Died(this, Killer);    // a void creature lets go; a Riftborn's void essence
 	FWRForestAI::Died(this, Killer);   // a forest creature lets go; chance drops; a Mossmaul's larder; a sign for the finches
-	FWRCrystalAI::Died(this, Killer);  // a Geodemite bursts; a hearing hunter stops listening
+	FWRCrystalAI::Died(this, Killer);
+	WRFungal::CreatureDied(this, Killer);  // a bloomed beast bursts in a cloud (the Sporefall)  // a Geodemite bursts; a hearing hunter stops listening
 	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
 	FWRSkyAI::Died(this, Killer);      // a Sky creature lets go; a Sailbell pops in fire or deflates and stings 60 s
 	FWROceanAI::Died(this, Killer);    // a sea creature lets go; a Gullraider drops what it stole; the blood cloud

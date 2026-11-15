@@ -198,6 +198,19 @@ void UWRFungalWorld::Tick(float DeltaTime)
 		bServerDone = true;
 		SpawnServerActors();
 	}
+	if (!bHazardsDone)
+	{
+		bHazardsDone = true;
+		SpawnHazards();
+	}
+	StepSporefall(DeltaTime);
+	if (World->GetNetMode() != NM_Client)
+	{
+		StepHazards(DeltaTime);
+		StepIlmari(DeltaTime);
+		StepInvasionMarks(DeltaTime);
+	}
+	if (World->GetNetMode() != NM_DedicatedServer) StepClientLooks(DeltaTime);
 }
 
 void UWRFungalWorld::StepGlow(float Dt)

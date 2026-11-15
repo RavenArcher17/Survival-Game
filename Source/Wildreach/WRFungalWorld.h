@@ -67,6 +67,12 @@ public:
 	/** The Sporefall is on (WRFungalEvents sets it). */
 	bool bSporefall = false;
 	const TArray<TWeakObjectPtr<class AWRResourceNode>>& GetNodes() const { return Nodes; }
+	/** Server: a survivor was reeled on a lure line (Ilmari's Cold light walk is spoiled for this crossing). */
+	void GalleryWalkSpoiled(const FString& Player);
+	/** E at a door or a secret (the interaction chain in WRWorldNpc, the command in WRWorldSystems: world fungal spot). */
+	static bool Prompt(const class AWRPlayerController* PC, FString& OutTarget, FString& OutVerb);
+	static bool ClientInteract(class AWRPlayerController* PC);
+	static FString Command(class AWRPlayerController* PC, const TArray<FString>& Args);
 
 private:
 	/** WRFungalThings.cpp: the server's nodes, caches and keepsakes, once the scenery is built. */
@@ -74,6 +80,33 @@ private:
 	bool bServerDone = false;
 	TArray<TWeakObjectPtr<class AWRResourceNode>> Nodes;
 	TArray<TWeakObjectPtr<class AWRWorldCache>> Caches;
+	// WRFungalEvents.cpp: the hazard machines, foul air, glow paste, the bloom's beat, Spore drift, the Sporefall, the
+	// invasions' marks, Ilmari's day and night, the Lure Gallery walk, the bloomed beasts' caps.
+	void SpawnHazards();
+	void StepHazards(float Dt);
+	void StepSporefall(float Dt);
+	void StepFlush(float Dt);
+	void StepIlmari(float Dt);
+	void StepInvasionMarks(float Dt);
+	void StepClientLooks(float Dt);
+	bool bHazardsDone = false;
+	TWeakObjectPtr<class AWRFungalState> State;
+	float HazardClock = 0.f, DriftClock = 0.f, FlushClock = 0.f, IlmariClock = 0.f, InvClock = 0.f, LookClock = 0.f;
+	TMap<TWeakObjectPtr<class AWRCharacterBase>, float> FoulTime;
+	TMap<FString, int32> GalleryFrom;
+	TSet<FString> GallerySpoiled;
+	TArray<TWeakObjectPtr<class AWRSporeCloud>> Flush;
+	TSet<FIntPoint> FlushCells;
+	TArray<TWeakObjectPtr<class AWRResourceNode>> FlushNodes;
+	TMap<TWeakObjectPtr<class AWRCreature>, float> BloomTime;
+	TMap<TWeakObjectPtr<class AWRCreature>, FVector> StandAt;
+	TMap<TWeakObjectPtr<class AWRCreature>, float> StandStill;
+	int32 IlmariPhase = 0;
+	FVector IlmariHome = FVector::ZeroVector;
+	FRotator IlmariFace = FRotator::ZeroRotator;
+	TWeakObjectPtr<USceneComponent> GoldBreath;
+	TMap<TWeakObjectPtr<class AWRCharacterBase>, TWeakObjectPtr<class UPointLightComponent>> PasteLights;
+	TMap<TWeakObjectPtr<class AWRCharacterBase>, TWeakObjectPtr<class UProceduralMeshComponent>> BloomCaps;
 	void BuildScenery();
 	void StepBuild();
 	void StepLights(float Dt);

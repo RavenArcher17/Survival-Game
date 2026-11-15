@@ -3,6 +3,7 @@
 #include "WRTidePath.h"
 #include "WRCrystalTypes.h"
 #include "WRCrystalHazards.h"
+#include "WRFungalHazards.h"
 #include "WRInventory.h"
 #include "WRWindPath.h"          // Sky lord's swings and dodge
 #include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
@@ -142,6 +143,16 @@ bool UWRGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Han
 				WRFx::SpawnAt(Who, TEXT("dust.cloud"), Who->GetActorLocation(), FRotator::ZeroRotator, 0.5f);
 				WRSound::PlayUI(Who, TEXT("void.fizzle"));
 				if (AWRPlayerController* PC = Cast<AWRPlayerController>(P->GetController())) PC->ShowLocalNotice(TEXT("The null field: your spell fizzles"));
+			}
+			return false;
+		}
+		// Foul air (fungal 2.8): no fire can be lit there; a fire spell gutters out blue.
+		if (WRFungal::SpellFails(Who, PathId == TEXT("fire") ? WRTags::Element_Fire : FGameplayTag()))
+		{
+			if (const APawn* P = Cast<APawn>(Who); P && P->IsLocallyControlled())
+			{
+				WRFx::SpawnAt(Who, TEXT("fungal.fizzle"), Who->GetActorLocation() + FVector(0.f, 0.f, 60.f), FRotator::ZeroRotator, 1.f);
+				if (AWRPlayerController* PC = Cast<AWRPlayerController>(P->GetController())) PC->ShowLocalNotice(TEXT("Foul air: the flame gutters out blue"));
 			}
 			return false;
 		}
@@ -1104,6 +1115,8 @@ void UWRGA_Melee::Sweep()
 		}
 	}
 
+	// The Fungal caverns: a swing cuts lure lines within 1.5 m and fires a springcap it meets (WRFungalHazards).
+	WRFungal::Swing(Character, Start, End, Radius);
 	// A fire blade swept through thornbrake burns a lane where it went (the Ancient forest; cheap with none near).
 	if (Character->Weapon.Element == TEXT("fire"))
 	{
