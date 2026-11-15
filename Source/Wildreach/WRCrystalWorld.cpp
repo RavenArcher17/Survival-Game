@@ -135,10 +135,12 @@ void UWRCrystalWorld::Tick(float DeltaTime)
 	// night; every machine with a view lights the crystals.
 	if (World->GetNetMode() != NM_Client)
 	{
-		if (!bServerDone) { bServerDone = true; SpawnServerActors(); }
+		if (!bServerDone) { bServerDone = true; SpawnServerActors(); SpawnHazards(); }
 		StepServerNoise(DeltaTime);
+		StepPools(DeltaTime);
 		StepVenn(DeltaTime);
 	}
+	StepResonance(DeltaTime);
 	if (World->GetNetMode() != NM_DedicatedServer) StepLight(DeltaTime);
 }
 

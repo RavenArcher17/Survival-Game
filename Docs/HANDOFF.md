@@ -366,6 +366,9 @@ The live half is `WRCrystalThings.*`: `WRCrystal::Emit` is the one noise entry (
 a sound in the caves: the server hears it on `UWRCrystalWorld::OnNoise`, every machine's crystals light from it), the
 keystone chimes and keepsakes are `AWRCrystalSpot` (E: `world crystal spot`), `AWRCrystalState` replicates the halls'
 keystone light. Numbers: tuning `crystalWorld` (noise radii, light, nodes, Saga's night place).
+Hazards are `WRCrystalHazards.*` (ward fields + keystones, chandeliers, thin floors, the Silent Vault's door
+`AWRSilentDoor` (the hidden-vault door is `AWRVaultDoor`, a different thing), scalding pools, the Resonance); they hear
+noises through `OnNoise` and the creatures will listen to `OnPeal`. Numbers: tuning `hazards.crystal`, `crystalEvents`.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

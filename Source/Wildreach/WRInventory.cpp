@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRCrystalHazards.h"
 #include "WRStormTypes.h"
 #include "WRSwampSystems.h"
 #include "WRForestWorld.h"
@@ -1008,6 +1009,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		const FString Forest = UWRForestWorld::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id);
 		if (!Forest.IsEmpty()) return Forest;
+	}
+	// The Crystal caves' (WRCrystalHazards): attuning chalk on the forearms, a ward fork struck.
+	{
+		const FString Crystal = WRCrystal::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id, SlotIndex);
+		if (!Crystal.IsEmpty()) return Crystal;
 	}
 	if (Def->Category == TEXT("raid"))
 	{

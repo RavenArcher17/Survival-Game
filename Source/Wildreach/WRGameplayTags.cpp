@@ -55,6 +55,8 @@ namespace WRTags
 	UE_DEFINE_GAMEPLAY_TAG(Element_Lightning, "Element.Lightning");
 	UE_DEFINE_GAMEPLAY_TAG(Element_Water, "Element.Water");
 	UE_DEFINE_GAMEPLAY_TAG(Element_Void, "Element.Void");
+	UE_DEFINE_GAMEPLAY_TAG(Element_Arcane, "Element.Arcane");
+	UE_DEFINE_GAMEPLAY_TAG(Status_Attuned, "Status.Crystal.Attuned");
 
 	UE_DEFINE_GAMEPLAY_TAG(Path_Fire, "Path.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(Path_Frost, "Path.Frost");

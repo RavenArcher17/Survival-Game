@@ -1,5 +1,6 @@
 #include "WRAbilities.h"
 #include "WRCrystalTypes.h"
+#include "WRCrystalHazards.h"
 #include "WRInventory.h"
 #include "WRWindPath.h"          // Sky lord's swings and dodge
 #include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
@@ -135,6 +136,16 @@ bool UWRGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Han
 				WRFx::SpawnAt(Who, TEXT("dust.cloud"), Who->GetActorLocation(), FRotator::ZeroRotator, 0.5f);
 				WRSound::PlayUI(Who, TEXT("void.fizzle"));
 				if (AWRPlayerController* PC = Cast<AWRPlayerController>(P->GetController())) PC->ShowLocalNotice(TEXT("The null field: your spell fizzles"));
+			}
+			return false;
+		}
+		// The Silent Vault (crystal 2.5): no spell sounds there; it fizzles in a violet puff (passives still hold).
+		if (WRCrystal::SpellFails(Who))
+		{
+			if (const APawn* P = Cast<APawn>(Who); P && P->IsLocallyControlled())
+			{
+				WRFx::SpawnAt(Who, TEXT("crystal.fizzle"), Who->GetActorLocation() + FVector(0.f, 0.f, 60.f), FRotator::ZeroRotator, 1.f);
+				if (AWRPlayerController* PC = Cast<AWRPlayerController>(P->GetController())) PC->ShowLocalNotice(TEXT("The Vault takes the sound out of it: no spell will speak here"));
 			}
 			return false;
 		}

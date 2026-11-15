@@ -1,4 +1,5 @@
 #include "WRAudio.h"
+#include "WRCrystalTypes.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
 #include "WRWorldDressing.h"
@@ -428,6 +429,8 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 			const FWRWeatherKind* K = W ? FWRWeatherDefs::Get().Kind(LD->Biome, W->Kind) : nullptr;
 			if (K && K->bSilence) Want = W->Strength(UWRWeatherSubsystem::Now(World));
 		}
+		// The Silent Vault (cooks/biome-crystal.md 2.5): the one planned silence of the caves, no music and no beds.
+		if (WRCrystal::InVault(Listener)) Want = 1.f;
 		Hush = FMath::FInterpConstantTo(Hush, Want, DeltaTime, 1.f / FMath::Max(0.5f, Tune(TEXT("ambient.silenceFade"), 8.f)));
 	}
 	if (Now >= NextCoastSample)

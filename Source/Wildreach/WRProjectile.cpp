@@ -1,5 +1,6 @@
 #include "WRProjectile.h"
 #include "WRCrystalWorld.h"
+#include "WRCrystalHazards.h"
 #include "WRWindPath.h"
 #include "WRVoidHazards.h"
 #include "WRVoidWorld.h"
@@ -328,6 +329,9 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 			bQuiet = !Bow.IsNone() && FWRTuning::Get().Str(TEXT("crystalWorld.quietBows"), TEXT("glassleg_bow")).Contains(Bow.ToString());
 		}
 		UWRCrystalWorld::ProjectileLanded(this, At, By, Kind, bQuiet);
+		// A ward's lead keystone plate struck by it drops the ward (crystal 2.8): a hit on the plate, or close enough.
+		if (AWRWardKeystone* Key = Cast<AWRWardKeystone>(OtherActor)) Key->Struck(By);
+		else for (TActorIterator<AWRWardKeystone> KIt(GetWorld()); KIt; ++KIt) if (FVector::Dist(KIt->GetActorLocation(), At) < WRTune(TEXT("hazards.crystal.ward.keystoneReach"), 90.f)) { KIt->Struck(By); break; }
 	}
 	// The Ancient forest's things: an arrow brings a widowmaker limb down or stirs a wasp nest; fire landing (a fire
 	// bolt, a fire pot) burns a lane through thornbrake and the barred door's bark (WRForestHazards).

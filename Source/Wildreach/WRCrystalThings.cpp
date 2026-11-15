@@ -205,9 +205,71 @@ void AWRCrystalSpot::BeginPlay()
 	Super::BeginPlay();
 	if (UWRCrystalWorld* W = UWRCrystalWorld::Get(this)) W->AddSpot(this);
 	// A keepsake or a find shows itself by a faint lilac mote over where it lies (the scenery draws the thing itself).
-	if (GetNetMode() != NM_DedicatedServer && (Kind == TEXT("keepsake") || Kind == TEXT("find")))
+	if (GetNetMode() != NM_DedicatedServer && (Kind == TEXT("keepsake") || Kind == TEXT("find") || Kind == TEXT("geode")))
 	{
 		Glint = WRFx::Attach(GetRootComponent(), TEXT("crystal.keepsake"), NAME_None, 1.f);
+	}
+	if (GetNetMode() != NM_DedicatedServer && Kind == TEXT("geode"))
+	{
+		// A singing geode split along its seam (crystal 2.10): two basalt half-shells 1.6 m across fallen apart, agate
+		// bands at the break, the violet druse inside each lit by the peals.
+		FWRToolMesh Sh;
+		const float R = 80.f;
+		for (const float Side : { -1.f, 1.f })
+		{
+			TArray<TArray<FVector>> Rings;
+			const FRotator Open(0.f, 0.f, Side * 28.f);
+			for (int32 b = 0; b <= 6; ++b)
+			{
+				const float Ph = b / 6.f * PI * 0.5f;
+				TArray<FVector> Ring;
+				for (int32 a = 0; a <= 12; ++a)
+				{
+					const float Th = a / 12.f * PI;
+					const FVector P(FMath::Cos(Th) * FMath::Cos(Ph) * R, Side * FMath::Sin(Ph) * R * 0.95f + Side * 12.f, FMath::Sin(Th) * FMath::Cos(Ph) * R * 0.85f);
+					Ring.Add(Open.RotateVector(P) + FVector(0.f, 0.f, 6.f));
+				}
+				Rings.Add(Ring);
+			}
+			const FVector2D Z = FVector2D::ZeroVector;
+			for (int32 b = 0; b < 6; ++b) for (int32 a = 0; a < 12; ++a)
+			{
+				const FVector P0 = Rings[b][a], P1 = Rings[b][a + 1], P2 = Rings[b + 1][a + 1], P3 = Rings[b + 1][a];
+				const FColor Out = FWRToolMesh::Pack(FLinearColor(FColor(28, 28, 32)) * 0.7f, 0.8f), Band = FWRToolMesh::Pack(b == 0 ? FLinearColor(FColor(230, 216, 192)) * 0.6f : FLinearColor(FColor(28, 28, 32)) * 0.7f, 0.5f);
+				Sh.Tri(P0, P1, P2, b == 0 ? Band : Out, Z, Z, Z); Sh.Tri(P0, P2, P3, b == 0 ? Band : Out, Z, Z, Z);
+				Sh.Tri(P0, P2, P1, b == 0 ? Band : Out, Z, Z, Z); Sh.Tri(P0, P3, P2, b == 0 ? Band : Out, Z, Z, Z);
+			}
+		}
+		UProceduralMeshComponent* Shell = NewObject<UProceduralMeshComponent>(this, TEXT("GeodeShell"));
+		Shell->SetupAttachment(RootComponent);
+		Shell->RegisterComponent();
+		Sh.ApplyTo(Shell);
+		// The druse: a carpet of points on each half's open face.
+		FWRToolMesh Pts;
+		FRandomStream Rng(static_cast<int32>(GetTypeHash(GetName())));
+		for (int32 i = 0; i < 46; ++i)
+		{
+			const float Side = i % 2 ? 1.f : -1.f;
+			const float A = Rng.FRandRange(0.15f, PI - 0.15f);
+			const FRotator Open(0.f, 0.f, Side * 28.f);
+			const FVector Root = Open.RotateVector(FVector(FMath::Cos(A) * R * Rng.FRandRange(0.2f, 0.85f), Side * 10.f, FMath::Sin(A) * R * 0.75f * Rng.FRandRange(0.2f, 0.9f))) + FVector(0, 0, 6.f);
+			const FVector Dir = Open.RotateVector(FVector(Rng.FRandRange(-0.3f, 0.3f), -Side, Rng.FRandRange(-0.2f, 0.4f))).GetSafeNormal();
+			WRCrystalThingsImpl::Point(Pts, Root, Dir, Rng.FRandRange(10.f, 26.f), 7.f, FLinearColor(FColor(74, 40, 120)), FLinearColor(FColor(150, 110, 220)), FLinearColor(FColor(214, 196, 255)), Rng.FRandRange(0.f, PI));
+		}
+		UProceduralMeshComponent* Druse = NewObject<UProceduralMeshComponent>(this, TEXT("GeodeDruse"));
+		Druse->SetupAttachment(RootComponent);
+		Druse->RegisterComponent();
+		Pts.ApplyTo(Druse);
+		if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_CrystalGlow.M_CrystalGlow")))
+		{
+			UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, Druse);
+			MID->SetVectorParameterValue(TEXT("GlowColor"), FLinearColor(0.62f, 0.42f, 1.f));
+			MID->SetScalarParameterValue(TEXT("GlowScale"), Tn(TEXT("crystalWorld.glow.scale"), 6.f));
+			MID->SetScalarParameterValue(TEXT("Rest"), 0.6f);
+			Druse->SetMaterial(0, MID);
+			if (UWRCrystalWorld* W = UWRCrystalWorld::Get(this)) W->RegisterGlow(MID, GetActorLocation());
+		}
+		Reach = 300.f;
 	}
 }
 
@@ -234,6 +296,13 @@ FString AWRCrystalSpot::Use(AWRPlayerController* PC)
 	}
 	if (Got.IsEmpty()) return TEXT("Your bag is full");
 	DoneBy.Add(Name);
+	// A singing geode is one hoard: the first to reach it takes it, and it closes behind them.
+	if (Kind == TEXT("geode"))
+	{
+		WRSound::PlayAt(this, TEXT("crystal.ring_on"), GetActorLocation());
+		SetLifeSpan(0.5f);
+		return FString::Printf(TEXT("Took %s from the geode"), *Got);
+	}
 	WRSound::PlayAt(this, TEXT("crystal.pickup"), GetActorLocation());
 	UE_LOG(LogWildreach, Log, TEXT("CRYSTAL %s took %s at %s"), *Name, *Got, *SpotId.ToString());
 	return Lore.IsEmpty() ? FString::Printf(TEXT("Took %s"), *Got) : FString::Printf(TEXT("Took %s. %s"), *Got, *Lore);
@@ -709,6 +778,26 @@ void UWRCrystalWorld::SpawnServerActors()
 	if (D.FindHall(TEXT("A12"))) Find(TEXT("rune_prism"), HallFloor(TEXT("A12"), FVector::ZeroVector), TEXT("rune_prism"), TEXT("Set in a lead tray with a hexafoil pressed into the lid."));
 	if (D.FindHall(TEXT("A13"))) Find(TEXT("rune_warding"), HallFloor(TEXT("A13"), FVector::ZeroVector), TEXT("rune_warding"), TEXT("Wrapped in waxed linen, with a second, empty wrapping beside it."));
 	if (D.FindHall(TEXT("W3"))) Find(TEXT("rune_doubling"), HallFloor(TEXT("W3"), FVector(-250.f, 180.f, 60.f)), TEXT("rune_doubling"), TEXT("On the lathe's bed among the lens grindings: a rune, and its reflection scratched beside it."));
+
+	// The Silent Vault's pay (crystal 2.5): V3 the Archive of Forks (three ward forks), V6 the Last Carver (the Carver's
+	// Chisel in her hand, and the Rune of Silence: only here, once per survivor).
+	if (const FWRCrystalData::FSite* V3 = D.FindSite(TEXT("V3")))
+	{
+		if (AWRCrystalSpot* Sp = MakeSpot(TEXT("find"), TEXT("vault_forks"), V3->At + FVector(Tn(TEXT("crystalWorld.vaultAt.V3.x"), 280.f), 0.f, 60.f), TEXT("A rack of ward forks"), TEXT("Take three")))
+		{
+			Sp->Gives.Add(TEXT("ward_fork"), 3);
+			Sp->Lore = TEXT("Hundreds of forks in racks to the ceiling, each tuned and labelled with a ward's name. Three still ring.");
+		}
+	}
+	if (const FWRCrystalData::FSite* V6 = D.FindSite(TEXT("V6")))
+	{
+		if (AWRCrystalSpot* Sp = MakeSpot(TEXT("find"), TEXT("last_carver"), V6->At + FVector(Tn(TEXT("crystalWorld.vaultAt.V6.x"), 220.f), 0.f, 60.f), TEXT("The Last Carver's hand"), TEXT("Take the chisel")))
+		{
+			Sp->Gives.Add(TEXT("carvers_chisel"), 1);
+			Sp->Gives.Add(TEXT("rune_silence"), 1);
+			Sp->Lore = TEXT("Her hexafoil is one petal short. The chisel was still in her hand.");
+		}
+	}
 
 	// ---- the chime junction caches behind their wards (crystal 2.4: kit chime_cache) ----
 	int32 Caches = 0;

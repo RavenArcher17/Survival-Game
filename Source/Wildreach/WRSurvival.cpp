@@ -5,6 +5,7 @@
 #include "WRNecroPath.h"
 #include "WRGraveEvents.h"
 #include "WRCrystalTypes.h"
+#include "WRCrystalHazards.h"
 #include "WRGraveTypes.h"
 #include "WRSwampSystems.h"
 #include "WRStormTypes.h"
@@ -1229,6 +1230,8 @@ void UWRSurvivalComponent::SetLightOn(bool bOn)
 	if (AWRCharacterBase* Pawn = GetPawnCharacter())
 	{
 		WRSound::Broadcast(Pawn, bOn ? TEXT("light.on") : TEXT("light.off"));
+		// A light struck awake flares (the Lumen lantern: lights.<id>.flare, WRCrystalHazards).
+		if (bOn && Pawn->HasAuthority()) WRCrystal::LanternLit(Pawn, LightItem);
 		// The shield comes off the arm while a torch is in that hand: guard with the weapon (combat.md 2.4.0).
 		if (UAbilitySystemComponent* ASC = Pawn->GetAbilitySystemComponent())
 		{

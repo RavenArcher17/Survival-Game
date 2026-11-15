@@ -75,6 +75,8 @@ public:
 	void Blast(AWRCharacterBase* By, const FString& Placer, float YieldMult);
 
 	bool IsDepleted() const { return bDepleted; }
+	/** Server: grow back now, whatever its timer says (the Crystal caves' Resonance regrows every resonant node). */
+	void RegrowNow();
 	/** Server: a running drill stands on this vein (WRMachine): it never runs out while drilled. */
 	bool bDrilled = false;
 

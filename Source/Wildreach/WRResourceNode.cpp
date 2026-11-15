@@ -267,6 +267,16 @@ void AWRResourceNode::Blast(AWRCharacterBase* By, const FString& Placer, float Y
 	}), RespawnSeconds, false);
 }
 
+void AWRResourceNode::RegrowNow()
+{
+	if (!HasAuthority()) return;
+	GetWorldTimerManager().ClearTimer(RespawnTimer);
+	bDepleted = false;
+	HitsLeft = Hits;
+	OnRep_Depleted();
+	ForceNetUpdate();
+}
+
 void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 {
 	if (!HasAuthority() || bDepleted || !Gatherer)

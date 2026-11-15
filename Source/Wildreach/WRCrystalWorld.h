@@ -14,6 +14,7 @@
 #include "WRResourceNode.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Components/AudioComponent.h"
 #include "WRCrystalWorld.generated.h"
 
 class AWRCrystalCaves;
@@ -77,6 +78,9 @@ public:
 	/** The Resonance's multiplier on resonant crystal and its glow on every lining (WRCrystalEvents sets them). */
 	float ResonanceYield = 1.f;
 	float ResonanceGlow = 0.f;
+	/** Server: each of the Resonance's peals (its number from 0, where it rolls out from, its speed cm/s): the
+	 *  Echobats go deaf, the nest geodes crack (the creatures listen). */
+	TMulticastDelegate<void(int32, const FVector&, float)> OnPeal;
 	AWRCrystalState* GetState() const { return State.Get(); }
 	const TArray<TWeakObjectPtr<AWRResourceNode>>& GetNodes() const { return Nodes; }
 	AWRCrystalSpot* SpotNear(const FVector& At) const;
@@ -99,6 +103,12 @@ private:
 	};
 	struct FGlow { TWeakObjectPtr<UMaterialInstanceDynamic> MID; FVector At; int32 Hall = -1; };
 	void SpawnServerActors();
+	/** WRCrystalHazards.cpp: ward fields and keystones, chandeliers, thin floors, the Vault door; scalding pools; the
+	 *  Resonance (every machine: its glow, swell and peals; the server: the peals' work). */
+	void SpawnHazards();
+	void StepPools(float Dt);
+	void StepResonance(float Dt);
+	void Peal(int32 Index, const FVector& Source, float Speed);
 	void StepLight(float Dt);
 	void StepServerNoise(float Dt);
 	void StepVenn(float Dt);
@@ -120,6 +130,12 @@ private:
 	FVector VennHome = FVector::ZeroVector;
 	FRotator VennFace = FRotator::ZeroRotator;
 	mutable double RainSeenAt = -1.0;
+	float PoolClock = 0.f;
+	float ChimeClock = 0.f;
+	int32 PealsDone = 0;
+	int32 PealHeard = -1;
+	TWeakObjectPtr<UAudioComponent> Swell;
+	TArray<TWeakObjectPtr<AWRCrystalSpot>> SingingGeodes;
 
 	struct FPiece
 	{

@@ -468,7 +468,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			Target->CombatTarget = Attacker;
 		}
 		// A blow landing is a 12 m noise in the Crystal caves (crystal 2.1).
-		WRCrystal::Emit(Target, Target->GetActorLocation(), WRCrystal::NoiseRadius(TEXT("hitCreature")), Attacker, TEXT("hit"));
+		WRCrystal::Emit(Target, Target->GetActorLocation(), WRCrystal::NoiseRadius(TEXT("hitCreature")), Attacker, Hit.bHeavy && Hit.bMelee ? TEXT("heavy") : TEXT("hit"));
 		// Remember who's fighting whom (tames help their owner).
 		Attacker->CombatTarget = Target;
 	}

@@ -7,6 +7,35 @@ cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in piece
 not played here (Aaron tests). Hidden until it's whole: `crystal` is not in `world.liveBiomes`, so nothing below is
 built in a running game yet.
 
+- **Crystal (3): the hazards, the Silent Vault, the Resonance** (`WRCrystalHazards.*`, numbers in tuning
+  `hazards.crystal` and `crystalEvents.resonance`). **Ward fields** (34, `AWRWardField`): a sheet across each doorway,
+  only its edges shimmering; an unattuned character within 3 m brings up the tell on every machine over 0.9 s (the
+  floor's crystal dust lights into Chladni lines along the sheet, the hexafoil over the door glows, a hum rises two
+  octaves); crossing it unattuned is 25 arcane through `ApplyHit` (unblockable, no stance) and a throw 6 m back (a void
+  creature 12 m), then 1.5 s before it can throw you again (the Wardcarver compass adds 1.5 s). Attuned (the Arcane path,
+  the ward charm, Wardcloth's four, Venn's ring, crystal-born creatures) pass with a soft chime; attuning chalk (now
+  drawn on from the bag: `Status.Crystal.Attuned`, 5 min) halves it and stops the throw. Each field's **lead keystone
+  plate** (`AWRWardKeystone`, a real blocking box) drops it 90 s when an arrow, bolt, spell bolt or thrown stone strikes
+  it (Saga's "Drop the door" counts it); a **ward fork** from the bag quiets the nearest within 10 m for 60 s. Pattern
+  A normally, B in the Resonance. **Shard chandeliers** (`AWRChandelier`): a 15 m noise reaching the floor under one
+  makes it shiver 1 s, then fall on a gravity curve on the server's clock (every machine draws the same fall): 70
+  damage, impact 5 in 3 m (the Geode Tyrant takes 400 and a 6 s stagger); its shards lie 2 game days, then the chain
+  draws it up over 20 s. **Thin geode floors** (`AWRThinFloor`): a crust disc with violet-lit cracks over each cup's
+  drop; your steps boom hollow within 6 m; a roll, a landing, a heavy blow or a heavy creature's tread breaks a 4 m hole
+  (collision off on every machine); it reforms after 2 game days when no one is in it. **Scalding pools**: wading is 4
+  fire a second and 15 burn buildup, immersed 12 a second; Burning blood passes, fire resistance halves. **The Silent
+  Vault's door** (`AWRSilentDoor`): stand on the hexafoil before it and let nothing within 20 m make a sound for 10 s,
+  and its six petals go dark one each 1.7 s (any sound relights all six); at the sixth the lead-plated round door rolls
+  3 s along its rail into the wall, stays 60 s and rolls back once the doorway is clear; it won't open in the
+  Resonance. Inside, every spell fizzles in a violet puff and the audio director holds the planned silence. V3's rack
+  gives three ward forks, V6's Last Carver the Carver's Chisel and the Rune of Silence (once each). **The Resonance**
+  (`world.json events.resonance`, about every 3 real days for a game day): the warning's 40 Hz swell and self-ringing
+  chime stones, then a peal every 4 minutes rolling out of the Prism Hall at 300 m/s (every crystal flares as it passes
+  you, a shake, chandeliers fall as it reaches them, `OnPeal` for the creatures), the first peal regrows every resonant
+  node (`AWRResourceNode::RegrowNow`) and splits the six singing geodes (a split basalt geode with its violet druse: 12
+  resonant crystal, an amethyst, 10% each of a found rune, first to it), resonant crystal x3. The **Lumen lantern**
+  flares 20 m for 5 s when lit (`lights.<id>.flare`, a 10 m noise). New tags `Element.Arcane`, `Status.Crystal.Attuned`.
+
 - **Crystal (2): the gathering, sound makes light, the keystone chimes, the rows.** The noise model
   (`WRCrystalThings.cpp`, radii in tuning `crystalWorld.noise`): every blow that lands (12 m), path ability (10 m), roll
   (8 m), landing from a jump (6 m), strike on crystal (20 m), keystone chime (25 m), arrow or thrown stone landing (6 / 15
