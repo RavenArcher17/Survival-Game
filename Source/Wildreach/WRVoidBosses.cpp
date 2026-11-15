@@ -39,22 +39,22 @@
 
 namespace WRVoidBossImpl
 {
-	const FLinearColor Violet = FLinearColor(FColor(0x7B, 0x4F, 0xD6));
-	const FLinearColor Deep = FLinearColor(FColor(0x2B, 0x18, 0x40));
-	const FLinearColor Glass = FLinearColor(0.004f, 0.0035f, 0.006f);
-	const FLinearColor Dolo = FLinearColor(FColor(201, 195, 184));
+	const FLinearColor VbViolet = FLinearColor(FColor(0x7B, 0x4F, 0xD6));
+	const FLinearColor VbDeep = FLinearColor(FColor(0x2B, 0x18, 0x40));
+	const FLinearColor VbGlass = FLinearColor(0.004f, 0.0035f, 0.006f);
+	const FLinearColor VbDolo = FLinearColor(FColor(201, 195, 184));
 
-	double SNow(const UObject* W)
+	double VbSNow(const UObject* W)
 	{
 		const UWorld* World = W ? W->GetWorld() : nullptr;
 		const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
 		return GS ? GS->GetServerWorldTimeSeconds() : (World ? World->GetTimeSeconds() : 0.0);
 	}
-	double Now(const UObject* W) { return W && W->GetWorld() ? W->GetWorld()->GetTimeSeconds() : 0.0; }
-	float BT(const AWRBoss* B, const TCHAR* Key, float F) { return B ? WRTune(*FString::Printf(TEXT("bosses.%s.%s"), *B->CreatureId.ToString(), Key), F) : F; }
+	double VbNow(const UObject* W) { return W && W->GetWorld() ? W->GetWorld()->GetTimeSeconds() : 0.0; }
+	float VbT(const AWRBoss* B, const TCHAR* Key, float F) { return B ? WRTune(*FString::Printf(TEXT("bosses.%s.%s"), *B->CreatureId.ToString(), Key), F) : F; }
 
 	/** Per boss, the server's state for its counter. */
-	struct FState
+	struct FVbState
 	{
 		// The Unravelled.
 		float SinceReform = 0.f;
@@ -85,15 +85,15 @@ namespace WRVoidBossImpl
 		FVector DiveAt = FVector::ZeroVector;
 		bool bGulletOpen = false;
 	};
-	TMap<TWeakObjectPtr<const AWRBoss>, FState>& States()
+	TMap<TWeakObjectPtr<const AWRBoss>, FVbState>& VbStates()
 	{
-		static TMap<TWeakObjectPtr<const AWRBoss>, FState> M;
+		static TMap<TWeakObjectPtr<const AWRBoss>, FVbState> M;
 		return M;
 	}
-	FState& St(const AWRBoss* B) { return States().FindOrAdd(B); }
+	FVbState& VbSt(const AWRBoss* B) { return VbStates().FindOrAdd(B); }
 
 	/** The land file's boss block (wasteland.json "bosses"). */
-	TSharedPtr<FJsonObject> BossRow(FName Id)
+	TSharedPtr<FJsonObject> VbBossRow(FName Id)
 	{
 		for (const FWRLandDef& D : WRLand::All())
 		{
@@ -103,13 +103,13 @@ namespace WRVoidBossImpl
 		}
 		return nullptr;
 	}
-	FVector2D V2(const TSharedPtr<FJsonObject>& O, const TCHAR* F)
+	FVector2D VbV2(const TSharedPtr<FJsonObject>& O, const TCHAR* F)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
 		return O.IsValid() && O->TryGetArrayField(F, A) && A->Num() >= 2 ? FVector2D((*A)[0]->AsNumber(), (*A)[1]->AsNumber()) : FVector2D::ZeroVector;
 	}
 
-	AWRCharacterBase* NearestPlayer(const AActor* From, float Range)
+	AWRCharacterBase* VbNearestPlayer(const AActor* From, float Range)
 	{
 		AWRCharacterBase* Best = nullptr;
 		float BestD = Range;
@@ -122,7 +122,7 @@ namespace WRVoidBossImpl
 		return Best;
 	}
 
-	void Hurt(AActor* By, AWRCharacterBase* V, float Damage, uint8 Impact, bool bUnblockable, const FVector& From, float Curse = 0.f)
+	void VbHurt(AActor* By, AWRCharacterBase* V, float Damage, uint8 Impact, bool bUnblockable, const FVector& From, float Curse = 0.f)
 	{
 		FWRHit Hit;
 		Hit.Instigator = By;
@@ -158,13 +158,13 @@ void FWRVoidBoss::Begin(AWRBoss* Boss)
 	if (!IsVoidBoss(Boss)) return;
 	UWRVoidBody::AttachLook(Boss);
 	if (!Boss->HasAuthority()) return;
-	FState& S = St(Boss);
-	S = FState();
+	FVbState& S = VbSt(Boss);
+	S = FVbState();
 	const FVector Home = Boss->GetActorLocation();
 	if (Boss->CreatureId == TEXT("mother_of_rifts"))
 	{
 		// Her six pens round the court (the Rift Pens' layout: a ring 17 m out), each a brood-rift socket.
-		const TSharedPtr<FJsonObject> R = BossRow(Boss->CreatureId);
+		const TSharedPtr<FJsonObject> R = VbBossRow(Boss->CreatureId);
 		const float Yaw = float(R.IsValid() ? R->GetNumberField(TEXT("yaw")) : 0.0);
 		for (int32 p = 0; p < 6; ++p)
 		{
@@ -190,20 +190,20 @@ void FWRVoidBoss::Begin(AWRBoss* Boss)
 void FWRVoidBoss::EndPlay(AWRBoss* Boss)
 {
 	if (!IsVoidBoss(Boss)) return;
-	FState* S = States().Find(Boss);
+	FVbState* S = VbStates().Find(Boss);
 	if (S) for (const TWeakObjectPtr<AWRCreature>& C : S->Brood) if (C.IsValid()) C->Destroy();
-	States().Remove(Boss);
+	VbStates().Remove(Boss);
 }
 
 bool FWRVoidBoss::TickIdle(AWRBoss* Boss, float DeltaSeconds)
 {
 	if (!IsVoidBoss(Boss) || Boss->CreatureId != TEXT("echo")) return false;
-	// The Echo's loop: by night it walks its 2.4 km route at 3 m/s; by day it rests on the Glass Sea (the route's first point).
-	const TSharedPtr<FJsonObject> R = BossRow(Boss->CreatureId);
+	// The Echo's loop: by night it walks its 2.4 km route at 3 m/s; by day it rests on the VbGlass Sea (the route's first point).
+	const TSharedPtr<FJsonObject> R = VbBossRow(Boss->CreatureId);
 	const TArray<TSharedPtr<FJsonValue>>* Route = nullptr;
 	const FWRLandDef* D = WRLand::Find(TEXT("wasteland"));
 	if (!R.IsValid() || !D || !R->TryGetArrayField(TEXT("route"), Route) || Route->Num() < 2) return false;
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	const bool bNight = WRWorld::IsNightTable(Boss, TEXT("wasteland"));
 	const int32 Want = bNight ? S.RouteIndex : 0;
 	const FVector Goal = D->GroundPoint(WRLand::Vec2((*Route)[Want % Route->Num()]));
@@ -211,9 +211,9 @@ bool FWRVoidBoss::TickIdle(AWRBoss* Boss, float DeltaSeconds)
 	if (To.Size2D() < 300.f)
 	{
 		if (bNight) S.RouteIndex = (S.RouteIndex + 1) % Route->Num();
-		return !bNight;   // at rest on the Glass Sea by day
+		return !bNight;   // at rest on the VbGlass Sea by day
 	}
-	Boss->SpeedBoost = BT(Boss, TEXT("walkSpeed"), 300.f) / FMath::Max(1.f, Boss->GetDef() ? Boss->GetDef()->Speed : 300.f);
+	Boss->SpeedBoost = VbT(Boss, TEXT("walkSpeed"), 300.f) / FMath::Max(1.f, Boss->GetDef() ? Boss->GetDef()->Speed : 300.f);
 	Boss->AddMovementInput(To.GetSafeNormal2D(), 1.f);
 	Boss->SetActorRotation(FMath::RInterpConstantTo(Boss->GetActorRotation(), FRotator(0.f, To.Rotation().Yaw, 0.f), DeltaSeconds, 90.f));
 	Boss->SetHome(Boss->GetActorLocation());
@@ -223,7 +223,7 @@ bool FWRVoidBoss::TickIdle(AWRBoss* Boss, float DeltaSeconds)
 bool FWRVoidBoss::Allowed(const AWRBoss* Boss, const FWRBossAttack& Attack, const AWRCharacterBase* Target)
 {
 	if (!IsVoidBoss(Boss)) return true;
-	const FState* S = States().Find(Boss);
+	const FVbState* S = VbStates().Find(Boss);
 	if (!S) return true;
 	// Forced moves never come out of the machine's own choice.
 	static const TSet<FName> Forced = { TEXT("reform_slam"), TEXT("hollow") };
@@ -233,13 +233,13 @@ bool FWRVoidBoss::Allowed(const AWRBoss* Boss, const FWRBossAttack& Attack, cons
 	{
 		int32 Open = 0;
 		for (const TWeakObjectPtr<AWRCreature>& C : S->Brood) Open += C.IsValid() && C->IsAlive();
-		return Open < int32(BT(Boss, TEXT("broodMax"), 4.f));
+		return Open < int32(VbT(Boss, TEXT("broodMax"), 4.f));
 	}
-	if (Boss->CreatureId == TEXT("starving_one") && Now(Boss) < S->EatingUntil) return false;
+	if (Boss->CreatureId == TEXT("starving_one") && VbNow(Boss) < S->EatingUntil) return false;
 	if (Boss->CreatureId == TEXT("vorhollow"))
 	{
 		if (S->bForceBeam) return Attack.Id == TEXT("rift_beam") || Attack.Id == TEXT("twin_beam");
-		if (Now(Boss) < S->ShellUntil && S->ShellHp > 0.f) return Attack.Id != TEXT("lamprey_lunge");
+		if (VbNow(Boss) < S->ShellUntil && S->ShellHp > 0.f) return Attack.Id != TEXT("lamprey_lunge");
 	}
 	return true;
 }
@@ -247,9 +247,9 @@ bool FWRVoidBoss::Allowed(const AWRBoss* Boss, const FWRBossAttack& Attack, cons
 void FWRVoidBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharacterBase* Target)
 {
 	if (!IsVoidBoss(Boss)) return;
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	UWRVoidBody* Body = UWRVoidBody::Get(Boss);
-	if (Attack.bGrab && Body) { Body->Set(WRVoidFlag::Gape, true); Body->GapeUntil = Now(Boss) + Attack.Windup + 0.6f; }
+	if (Attack.bGrab && Body) { Body->Set(WRVoidFlag::Gape, true); Body->GapeUntil = VbNow(Boss) + Attack.Windup + 0.6f; }
 	if (Boss->CreatureId == TEXT("vorhollow"))
 	{
 		if (Attack.Id == TEXT("rift_beam") || Attack.Id == TEXT("twin_beam")) S.bForceBeam = false;
@@ -258,7 +258,7 @@ void FWRVoidBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharact
 			// It leaps off its piece into the black; 1.2 s before it comes up, a lensing ring opens beside your piece and
 			// rubble rises round its edge (the tell), with a hold of up to 0.4 s.
 			S.DiveAt = Target->GetActorLocation() - FVector(0, 0, Target->GetSimpleCollisionHalfHeight());
-			S.DiveRingAt = Now(Boss) + FMath::Max(0.f, Attack.Windup - 1.2f);
+			S.DiveRingAt = VbNow(Boss) + FMath::Max(0.f, Attack.Windup - 1.2f);
 			WRFx::Broadcast(Boss, TEXT("void.rift.plunge"), Boss->GetActorLocation(), FRotator::ZeroRotator, 3.f, TEXT("void.rift.plunge"));
 			Boss->SetActorHiddenInGame(true);
 			Boss->SetActorEnableCollision(false);
@@ -275,7 +275,7 @@ void FWRVoidBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharact
 bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 {
 	if (!IsVoidBoss(Boss)) return false;
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	AWRCharacterBase* Target = Boss->AttackTarget.Get();
 	const FName Id = Attack.Id;
 	if (Id == TEXT("open_rift"))
@@ -288,7 +288,7 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			if (AWRCreature* R = AWRCreature::SpawnCreature(Boss->GetWorld(), TEXT("brood_rift"), S.Pens[Pick] + FVector(0, 0, 170.f), FRotator::ZeroRotator))
 			{
 				S.Brood[Pick] = R;
-				S.BroodNext[Pick] = Now(Boss) + 2.0;
+				S.BroodNext[Pick] = VbNow(Boss) + 2.0;
 				S.bHadBrood = true;
 				WRFx::Broadcast(Boss, TEXT("void.rift.burst"), S.Pens[Pick], FRotator::ZeroRotator, 1.4f, TEXT("void.rift.open"));
 			}
@@ -327,18 +327,18 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			&& (S.Heard[N - 1].PathId != S.Heard[N - 3].PathId || S.Heard[N - 1].Element != S.Heard[N - 3].Element);
 		if (bVaried || N == 0)
 		{
-			S.FailUntil = Now(Boss) + BT(Boss, TEXT("failStun"), 2.f);
-			if (Boss->Status) Boss->Status->Stagger(BT(Boss, TEXT("failStun"), 2.f));
+			S.FailUntil = VbNow(Boss) + VbT(Boss, TEXT("failStun"), 2.f);
+			if (Boss->Status) Boss->Status->Stagger(VbT(Boss, TEXT("failStun"), 2.f));
 			WRFx::Broadcast(Boss, TEXT("storm.discharge"), Boss->GetActorLocation(), FRotator::ZeroRotator, 1.2f, TEXT("void.echo.short"));
 			S.Heard.Reset();
 			return true;
 		}
 		// Its own version from its beak: never homing, nothing inside 4 m, max 1,600 cm/s, x0.8.
 		const FWRHit Last = S.Heard.Last();
-		if (!Target || FVector::Dist(Target->GetActorLocation(), Boss->GetActorLocation()) < BT(Boss, TEXT("mimicMin"), 400.f)) return true;
+		if (!Target || FVector::Dist(Target->GetActorLocation(), Boss->GetActorLocation()) < VbT(Boss, TEXT("mimicMin"), 400.f)) return true;
 		FWRHit Hit = Last;
 		Hit.Instigator = Boss;
-		Hit.Damage = Last.Damage * BT(Boss, TEXT("mimicShare"), 0.8f);
+		Hit.Damage = Last.Damage * VbT(Boss, TEXT("mimicShare"), 0.8f);
 		Hit.PathId = NAME_None;
 		Hit.bProjectile = true;
 		Hit.bSpell = true;
@@ -350,7 +350,7 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (AWRProjectile* P = Boss->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), From, (Aim - From).Rotation(), Params))
 		{
-			P->Init(Hit, FMath::Min(BT(Boss, TEXT("mimicSpeed"), 1600.f), 1600.f), Last.Element == WRTags::Element_Fire ? FLinearColor(1.f, 0.45f, 0.05f) : Last.Element == WRTags::Element_Frost ? FLinearColor(0.5f, 0.85f, 1.f) : Deep);
+			P->Init(Hit, FMath::Min(VbT(Boss, TEXT("mimicSpeed"), 1600.f), 1600.f), Last.Element == WRTags::Element_Fire ? FLinearColor(1.f, 0.45f, 0.05f) : Last.Element == WRTags::Element_Frost ? FLinearColor(0.5f, 0.85f, 1.f) : VbDeep);
 		}
 		return true;
 	}
@@ -361,16 +361,16 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		{
 			// It rears; the chest hole's rim brightens; a beam 40 m long sweeps the floor (the twin beam stops 0.5 s mid-sweep).
 			const bool bTwin = Id == TEXT("twin_beam");
-			const float Sweep = BT(Boss, bTwin ? TEXT("twinSweep") : TEXT("beamSweep"), bTwin ? 200.f : 100.f);
-			const float Rate = BT(Boss, bTwin ? TEXT("twinRate") : TEXT("beamRate"), bTwin ? 35.f : 50.f);
+			const float Sweep = VbT(Boss, bTwin ? TEXT("twinSweep") : TEXT("beamSweep"), bTwin ? 200.f : 100.f);
+			const float Rate = VbT(Boss, bTwin ? TEXT("twinRate") : TEXT("beamRate"), bTwin ? 35.f : 50.f);
 			const float Yaw0 = Boss->GetActorRotation().Yaw - Sweep * 0.5f;
-			if (Stage) Stage->StartBeam(Boss->GetActorLocation() + Boss->GetActorForwardVector() * Boss->GetSimpleCollisionRadius() * 0.6f, Yaw0, Sweep, Rate, bTwin ? Sweep * 0.5f / Rate : -1.f, bTwin ? BT(Boss, TEXT("twinStop"), 0.5f) : 0.f, Attack.Range);
-			Boss->StrikeEnds = Now(Boss) + Sweep / FMath::Max(1.f, Rate) + (bTwin ? BT(Boss, TEXT("twinStop"), 0.5f) : 0.f);
+			if (Stage) Stage->StartBeam(Boss->GetActorLocation() + Boss->GetActorForwardVector() * Boss->GetSimpleCollisionRadius() * 0.6f, Yaw0, Sweep, Rate, bTwin ? Sweep * 0.5f / Rate : -1.f, bTwin ? VbT(Boss, TEXT("twinStop"), 0.5f) : 0.f, Attack.Range);
+			Boss->StrikeEnds = VbNow(Boss) + Sweep / FMath::Max(1.f, Rate) + (bTwin ? VbT(Boss, TEXT("twinStop"), 0.5f) : 0.f);
 			return true;
 		}
 		if (Id == TEXT("inhale"))
 		{
-			Boss->StrikeEnds = Now(Boss) + 3.f;   // the pull itself; the snap is EndStrike's
+			Boss->StrikeEnds = VbNow(Boss) + 3.f;   // the pull itself; the snap is EndStrike's
 			return true;
 		}
 		if (Id == TEXT("rift_dive"))
@@ -384,7 +384,7 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			for (TActorIterator<AWRCharacter> It(Boss->GetWorld()); It; ++It)
 			{
 				if (!It->IsAlive() || FVector::Dist2D(It->GetActorLocation(), At) > Attack.Size) continue;
-				Hurt(Boss, *It, Attack.Damage, 5, false, At);
+				VbHurt(Boss, *It, Attack.Damage, 5, false, At);
 				It->LaunchCharacter(FVector(0, 0, 900.f) + (It->GetActorLocation() - At).GetSafeNormal2D() * 400.f, true, true);
 			}
 			return true;
@@ -392,10 +392,10 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		if (Id == TEXT("hollow"))
 		{
 			// It folds its hooks and draws the void round itself: light bends round its body (the shell: 1,000).
-			S.ShellHp = BT(Boss, TEXT("shellHealth"), 1000.f);
-			S.ShellUntil = Now(Boss) + BT(Boss, TEXT("shellSeconds"), 20.f);
+			S.ShellHp = VbT(Boss, TEXT("shellHealth"), 1000.f);
+			S.ShellUntil = VbNow(Boss) + VbT(Boss, TEXT("shellSeconds"), 20.f);
 			Boss->ShellFraction = 1.f;
-			WRFx::BroadcastOn(Boss, TEXT("void.nowhere"), TEXT("spine"), 6.f, TEXT("void.nowhere"), BT(Boss, TEXT("shellSeconds"), 20.f));
+			WRFx::BroadcastOn(Boss, TEXT("void.nowhere"), TEXT("spine"), 6.f, TEXT("void.nowhere"), VbT(Boss, TEXT("shellSeconds"), 20.f));
 			return true;
 		}
 	}
@@ -416,9 +416,9 @@ bool FWRVoidBoss::TickStrike(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaSe
 		{
 			if (!It->IsAlive() || !Boss->IsHostileTo(*It)) continue;
 			const FVector To = Mouth - It->GetActorLocation();
-			if (To.Size2D() > Attack.Range || FVector::DotProduct(-To.GetSafeNormal2D(), Fwd) < FMath::Cos(FMath::DegreesToRadians(BT(Boss, TEXT("inhaleArc"), 60.f)))) continue;
+			if (To.Size2D() > Attack.Range || FVector::DotProduct(-To.GetSafeNormal2D(), Fwd) < FMath::Cos(FMath::DegreesToRadians(VbT(Boss, TEXT("inhaleArc"), 60.f)))) continue;
 			if (Stage && Stage->PillarBetween(It->GetActorLocation(), Mouth)) continue;
-			It->LaunchCharacter(To.GetSafeNormal2D() * BT(Boss, TEXT("inhalePull"), 350.f), true, false);
+			It->LaunchCharacter(To.GetSafeNormal2D() * VbT(Boss, TEXT("inhalePull"), 350.f), true, false);
 		}
 		return true;
 	}
@@ -437,7 +437,7 @@ bool FWRVoidBoss::TickStrike(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaSe
 			if (FVector::Dist2D(P, Q) > Attack.Size + It->GetSimpleCollisionRadius() || Stage->PillarBetween(P, O)) continue;
 			if (Boss->StrikeHits.Contains(*It)) continue;
 			Boss->StrikeHits.Add(*It);
-			Hurt(Boss, *It, Attack.Damage, 2, true, Q, 10.f);
+			VbHurt(Boss, *It, Attack.Damage, 2, true, Q, 10.f);
 			TWeakObjectPtr<AWRBoss> WB(Boss);
 			TWeakObjectPtr<AWRCharacterBase> WV(*It);
 			FTimerHandle H;
@@ -462,7 +462,7 @@ void FWRVoidBoss::EndStrike(AWRBoss* Boss, const FWRBossAttack& Attack)
 			for (TActorIterator<AWRCharacterBase> It(Boss->GetWorld()); It; ++It)
 			{
 				if (!It->IsAlive() || !Boss->IsHostileTo(*It) || FVector::Dist(It->GetActorLocation(), Mouth) > 300.f + It->GetSimpleCollisionRadius()) continue;
-				Hurt(Boss, *It, Cast<AWRCreature>(*It) && Cast<AWRCreature>(*It)->IsTamed() ? 150.f : Attack.Damage, 5, false, Mouth);
+				VbHurt(Boss, *It, Cast<AWRCreature>(*It) && Cast<AWRCreature>(*It)->IsTamed() ? 150.f : Attack.Damage, 5, false, Mouth);
 			}
 		}
 		if ((Attack.Id == TEXT("rift_beam") || Attack.Id == TEXT("twin_beam")) && Stage) Stage->EndBeam();
@@ -474,7 +474,7 @@ void FWRVoidBoss::EndStrike(AWRBoss* Boss, const FWRBossAttack& Attack)
 	}
 	if (Boss->CreatureId == TEXT("unravelled") && Attack.Id == TEXT("reform_slam"))
 	{
-		St(Boss).UnravelStage = 0;
+		VbSt(Boss).UnravelStage = 0;
 	}
 }
 
@@ -484,24 +484,24 @@ void FWRVoidBoss::ModifyHit(const AWRBoss* Boss, const FWRBossAttack& Attack, FW
 	Hit.Element = WRTags::Element_Void;
 	if (Boss->CreatureId == TEXT("starving_one"))
 	{
-		const FState* S = States().Find(Boss);
-		if (S) Hit.Damage *= 1.f + BT(Boss, TEXT("damagePer"), 0.1f) * S->Stacks;
+		const FVbState* S = VbStates().Find(Boss);
+		if (S) Hit.Damage *= 1.f + VbT(Boss, TEXT("damagePer"), 0.1f) * S->Stacks;
 	}
 }
 
 void FWRVoidBoss::HitLanded(AWRBoss* Boss, AWRCharacterBase* Victim, FName AttackId, EWRHitResult Result)
 {
 	if (!IsVoidBoss(Boss) || !Victim || (Result != EWRHitResult::Hit && Result != EWRHitResult::GuardBroken)) return;
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	if (Boss->CreatureId == TEXT("starving_one") && Result == EWRHitResult::Hit)
 	{
 		// Every blow that lands eats one of your buffs; it grows on it.
 		bool bAte = !WRStorm::TakeOneBuff(Victim).IsNone() || WRVoid::TakeBrew(Victim);
 		if (!bAte && Victim->HasTag(WRVoidPath::Status_Sacrifice)) { if (Victim->Status) Victim->Status->ClearStatus(WRVoidPath::Status_Sacrifice); bAte = true; }
-		if (bAte && S.Stacks < int32(BT(Boss, TEXT("maxStacks"), 5.f)))
+		if (bAte && S.Stacks < int32(VbT(Boss, TEXT("maxStacks"), 5.f)))
 		{
 			++S.Stacks;
-			Boss->SpeedBoost = 1.f + BT(Boss, TEXT("speedPer"), 0.05f) * S.Stacks;
+			Boss->SpeedBoost = 1.f + VbT(Boss, TEXT("speedPer"), 0.05f) * S.Stacks;
 			if (UWRVoidBody* B = UWRVoidBody::Get(Boss)) B->Stacks = uint8(S.Stacks);
 			WRFx::BroadcastOn(Boss, TEXT("void.feed"), TEXT("spine"), 2.f, TEXT("void.consume"));
 			if (AWRPlayerController* PC = Cast<AWRPlayerController>(Victim->GetController())) PC->ClientNotify(TEXT("It ate what you'd taken: it grows"));
@@ -511,7 +511,7 @@ void FWRVoidBoss::HitLanded(AWRBoss* Boss, AWRCharacterBase* Victim, FName Attac
 	{
 		// Swallowed: 15% of your max HP into the band, and you drop out through the chest hole behind it, knocked down.
 		const UWRAttributeSet* A = Victim->GetAttributes();
-		if (A) WRVoid::LoseMaxHealth(Victim, A->GetMaxHealth() * BT(Boss, TEXT("swallowShare"), 0.15f), Boss);
+		if (A) WRVoid::LoseMaxHealth(Victim, A->GetMaxHealth() * VbT(Boss, TEXT("swallowShare"), 0.15f), Boss);
 		const FVector Behind = Boss->GetActorLocation() - Boss->GetActorForwardVector() * (Boss->GetSimpleCollisionRadius() + 300.f);
 		TWeakObjectPtr<AWRCharacterBase> WV(Victim);
 		FTimerHandle H;
@@ -530,33 +530,33 @@ void FWRVoidBoss::HitLanded(AWRBoss* Boss, AWRCharacterBase* Victim, FName Attac
 float FWRVoidBoss::Incoming(AWRBoss* Boss, const FWRHit& Hit, float Damage)
 {
 	if (!IsVoidBoss(Boss)) return Damage;
-	FState& S = St(Boss);
-	if (Hit.Element == WRTags::Element_Void) Damage *= BT(Boss, TEXT("voidTaken"), 0.75f);
+	FVbState& S = VbSt(Boss);
+	if (Hit.Element == WRTags::Element_Void) Damage *= VbT(Boss, TEXT("voidTaken"), 0.75f);
 	if (Boss->CreatureId == TEXT("unravelled"))
 	{
 		// The pieces part round a blow (x0.3); the core alone in the air takes x3.
 		if (S.UnravelStage == 1 || S.UnravelStage == 3) return 0.f;
-		return Damage * (S.UnravelStage == 2 ? BT(Boss, TEXT("coreTaken"), 3.f) : BT(Boss, TEXT("bodyTaken"), 0.3f));
+		return Damage * (S.UnravelStage == 2 ? VbT(Boss, TEXT("coreTaken"), 3.f) : VbT(Boss, TEXT("bodyTaken"), 0.3f));
 	}
 	if (Boss->CreatureId == TEXT("vorhollow"))
 	{
 		if (Boss->IsHidden()) return 0.f;   // under the stage, mid-dive
-		if (S.ShellHp > 0.f && Now(Boss) < S.ShellUntil)
+		if (S.ShellHp > 0.f && VbNow(Boss) < S.ShellUntil)
 		{
 			// The Hollow: x0.2 through the shell; void heals the shell (x0.5); the rest wears it down.
 			if (Hit.Element == WRTags::Element_Void) S.ShellHp += Damage * 0.5f;
 			else S.ShellHp -= Damage;
-			Boss->ShellFraction = FMath::Clamp(S.ShellHp / FMath::Max(1.f, BT(Boss, TEXT("shellHealth"), 1000.f)), 0.f, 1.f);
+			Boss->ShellFraction = FMath::Clamp(S.ShellHp / FMath::Max(1.f, VbT(Boss, TEXT("shellHealth"), 1000.f)), 0.f, 1.f);
 			if (S.ShellHp <= 0.f)
 			{
 				S.ShellHp = 0.f;
-				if (Boss->Status) Boss->Status->Stagger(BT(Boss, TEXT("shellBreakStagger"), 3.f));
-				Boss->StanceOpenUntil = Now(Boss) + BT(Boss, TEXT("shellBreakStagger"), 3.f);
+				if (Boss->Status) Boss->Status->Stagger(VbT(Boss, TEXT("shellBreakStagger"), 3.f));
+				Boss->StanceOpenUntil = VbNow(Boss) + VbT(Boss, TEXT("shellBreakStagger"), 3.f);
 				WRFx::Broadcast(Boss, TEXT("void.crush"), Boss->GetActorLocation(), FRotator::ZeroRotator, 4.f, TEXT("void.maw.close"));
 			}
-			return Damage * BT(Boss, TEXT("shellTaken"), 0.2f);
+			return Damage * VbT(Boss, TEXT("shellTaken"), 0.2f);
 		}
-		if (Boss->Phase >= 3) Damage *= BT(Boss, TEXT("bodyShareP3"), 0.75f);
+		if (Boss->Phase >= 3) Damage *= VbT(Boss, TEXT("bodyShareP3"), 0.75f);
 	}
 	return Damage;
 }
@@ -564,24 +564,24 @@ float FWRVoidBoss::Incoming(AWRBoss* Boss, const FWRHit& Hit, float Damage)
 void FWRVoidBoss::Damaged(AWRBoss* Boss, const FWRHit& Hit, float Damage)
 {
 	if (!IsVoidBoss(Boss)) return;
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	if (Boss->CreatureId == TEXT("echo") && !Hit.PathId.IsNone()) NoteAbility(Boss, Hit);
 	if (Boss->CreatureId == TEXT("unravelled") && S.UnravelStage == 0)
 	{
 		// After 300 damage or a heavy blow it unravels: the pieces burst into a whirling column and travel 8-15 m.
 		S.SinceReform += Damage;
-		if (S.SinceReform >= BT(Boss, TEXT("unravelAfter"), 300.f) || Hit.Impact >= 4 || Hit.bHeavy)
+		if (S.SinceReform >= VbT(Boss, TEXT("unravelAfter"), 300.f) || Hit.Impact >= 4 || Hit.bHeavy)
 		{
 			S.SinceReform = 0.f;
 			S.UnravelStage = 1;
 			const float A = FMath::FRandRange(0.f, 2.f * PI);
 			const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.f);
 			S.TravelFrom = Boss->GetActorLocation();
-			FVector To = Boss->GetHome() + Dir * FMath::FRandRange(BT(Boss, TEXT("travelMin"), 800.f), BT(Boss, TEXT("travelMax"), 1500.f)) * 0.8f;
+			FVector To = Boss->GetHome() + Dir * FMath::FRandRange(VbT(Boss, TEXT("travelMin"), 800.f), VbT(Boss, TEXT("travelMax"), 1500.f)) * 0.8f;
 			To.Z = WRLand::GroundZAt(To, S.TravelFrom.Z - Boss->GetSimpleCollisionHalfHeight()) + Boss->GetSimpleCollisionHalfHeight();
 			S.TravelTo = To;
-			S.TravelStart = Now(Boss);
-			S.StageUntil = Now(Boss) + FMath::Max(0.6f, FVector::Dist(S.TravelFrom, To) / 1200.f);
+			S.TravelStart = VbNow(Boss);
+			S.StageUntil = VbNow(Boss) + FMath::Max(0.6f, FVector::Dist(S.TravelFrom, To) / 1200.f);
 			if (UWRVoidBody* B = UWRVoidBody::Get(Boss)) B->Set(WRVoidFlag::Drifting, true);
 			WRFx::Broadcast(Boss, TEXT("void.collapse"), S.TravelFrom, FRotator::ZeroRotator, 0.8f, TEXT("void.unravelled.burst"));
 		}
@@ -592,19 +592,19 @@ float FWRVoidBoss::StanceTaken(AWRCharacterBase* Target, const FWRHit& Hit, floa
 {
 	const AWRBoss* Boss = Cast<AWRBoss>(Target);
 	if (!IsVoidBoss(Boss)) return 1.f;
-	const FState* S = States().Find(Boss);
+	const FVbState* S = VbStates().Find(Boss);
 	if (!S) return 1.f;
-	const double T = Now(Boss);
-	if (Boss->CreatureId == TEXT("unravelled") && S->UnravelStage == 2) return BT(Boss, TEXT("coreStance"), 4.f);
-	if (Boss->CreatureId == TEXT("mother_of_rifts") && T < S->StrainUntil) return BT(Boss, TEXT("strainStance"), 2.f);
-	if (Boss->CreatureId == TEXT("starving_one") && T < S->EatingUntil) return BT(Boss, TEXT("eatStance"), 2.f);
-	if (Boss->CreatureId == TEXT("echo") && T < S->FailUntil) return BT(Boss, TEXT("failStance"), 2.f);
+	const double T = VbNow(Boss);
+	if (Boss->CreatureId == TEXT("unravelled") && S->UnravelStage == 2) return VbT(Boss, TEXT("coreStance"), 4.f);
+	if (Boss->CreatureId == TEXT("mother_of_rifts") && T < S->StrainUntil) return VbT(Boss, TEXT("strainStance"), 2.f);
+	if (Boss->CreatureId == TEXT("starving_one") && T < S->EatingUntil) return VbT(Boss, TEXT("eatStance"), 2.f);
+	if (Boss->CreatureId == TEXT("echo") && T < S->FailUntil) return VbT(Boss, TEXT("failStance"), 2.f);
 	return 1.f;
 }
 
 void FWRVoidBoss::NoteAbility(AWRBoss* Boss, const FWRHit& Hit)
 {
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	S.Heard.Add(Hit);
 	while (S.Heard.Num() > 3) S.Heard.RemoveAt(0);
 }
@@ -612,11 +612,11 @@ void FWRVoidBoss::NoteAbility(AWRBoss* Boss, const FWRHit& Hit)
 void FWRVoidBoss::HelperDied(AWRCreature* Helper)
 {
 	if (!Helper || Helper->CreatureId != TEXT("brood_rift")) return;
-	for (TPair<TWeakObjectPtr<const AWRBoss>, FState>& KV : States())
+	for (TPair<TWeakObjectPtr<const AWRBoss>, FVbState>& KV : VbStates())
 	{
 		AWRBoss* Boss = const_cast<AWRBoss*>(KV.Key.Get());
 		if (!Boss || Boss->CreatureId != TEXT("mother_of_rifts")) continue;
-		FState& S = KV.Value;
+		FVbState& S = KV.Value;
 		int32 Open = 0;
 		for (const TWeakObjectPtr<AWRCreature>& C : S.Brood) Open += C.IsValid() && C->IsAlive() && C.Get() != Helper;
 		WRFx::Broadcast(Helper, TEXT("void.rift.plunge"), Helper->GetActorLocation(), FRotator::ZeroRotator, 1.4f, TEXT("void.rift.plunge"));
@@ -624,8 +624,8 @@ void FWRVoidBoss::HelperDied(AWRCreature* Helper)
 		{
 			// Every brood rift closed: the strain stuns her 4 s (stance x2 taken): the punish window.
 			S.bHadBrood = false;
-			S.StrainUntil = Now(Boss) + BT(Boss, TEXT("strainStun"), 4.f);
-			if (Boss->Status) Boss->Status->Stagger(BT(Boss, TEXT("strainStun"), 4.f));
+			S.StrainUntil = VbNow(Boss) + VbT(Boss, TEXT("strainStun"), 4.f);
+			if (Boss->Status) Boss->Status->Stagger(VbT(Boss, TEXT("strainStun"), 4.f));
 			WRFx::Broadcast(Boss, TEXT("void.crush"), Boss->GetActorLocation(), FRotator::ZeroRotator, 2.f, TEXT("void.mother.strain"));
 		}
 	}
@@ -637,7 +637,7 @@ void FWRVoidBoss::PhaseChanged(AWRBoss* Boss, int32 NewPhase)
 	if (NewPhase >= 3)
 	{
 		// Inside: it climbs onto the Stage and opens its chest wide; a pull covers the arena toward the hole.
-		St(Boss).bGulletOpen = true;
+		VbSt(Boss).bGulletOpen = true;
 		if (AWRVorhollowStage* Stage = AWRVorhollowStage::Find(Boss->GetWorld())) Stage->OpenGullet(true);
 	}
 }
@@ -645,7 +645,7 @@ void FWRVoidBoss::PhaseChanged(AWRBoss* Boss, int32 NewPhase)
 void FWRVoidBoss::Died(AWRBoss* Boss)
 {
 	if (!IsVoidBoss(Boss)) return;
-	FState& S = St(Boss);
+	FVbState& S = VbSt(Boss);
 	for (const TWeakObjectPtr<AWRCreature>& C : S.Brood) if (C.IsValid()) C->Destroy();
 	// Maren's quests: the Choir's road counts the first two stations (each player near the kill).
 	if (Boss->CreatureId == TEXT("unravelled") || Boss->CreatureId == TEXT("mother_of_rifts"))
@@ -669,8 +669,8 @@ void FWRVoidBoss::Died(AWRBoss* Boss)
 bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 {
 	if (!IsVoidBoss(Boss) || !Boss->HasAuthority()) return false;
-	FState& S = St(Boss);
-	const double T = Now(Boss);
+	FVbState& S = VbSt(Boss);
+	const double T = VbNow(Boss);
 	if (Boss->CreatureId == TEXT("unravelled") && S.UnravelStage != 0)
 	{
 		UWRVoidBody* B = UWRVoidBody::Get(Boss);
@@ -681,17 +681,17 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 			Boss->SetActorLocation(FMath::Lerp(S.TravelFrom, S.TravelTo, FMath::InterpEaseInOut(0.f, 1.f, A, 2.f)), false, nullptr, ETeleportType::TeleportPhysics);
 			for (TActorIterator<AWRCharacter> It(Boss->GetWorld()); It; ++It)
 			{
-				if (It->IsAlive() && FVector::Dist2D(It->GetActorLocation(), Boss->GetActorLocation()) < BT(Boss, TEXT("whirlRadius"), 300.f) && !Boss->StrikeHits.Contains(*It))
+				if (It->IsAlive() && FVector::Dist2D(It->GetActorLocation(), Boss->GetActorLocation()) < VbT(Boss, TEXT("whirlRadius"), 300.f) && !Boss->StrikeHits.Contains(*It))
 				{
 					Boss->StrikeHits.Add(*It);
-					Hurt(Boss, *It, BT(Boss, TEXT("whirlDamage"), 10.f), 1, true, Boss->GetActorLocation());
+					VbHurt(Boss, *It, VbT(Boss, TEXT("whirlDamage"), 10.f), 1, true, Boss->GetActorLocation());
 				}
 			}
 			if (T >= S.StageUntil)
 			{
 				// It reforms over 1.2 s: for the first 0.6 the core hangs alone, exposed.
 				S.UnravelStage = 2;
-				S.StageUntil = T + BT(Boss, TEXT("coreOpen"), 0.6f);
+				S.StageUntil = T + VbT(Boss, TEXT("coreOpen"), 0.6f);
 				Boss->StrikeHits.Reset();
 				if (B) { B->Set(WRVoidFlag::Drifting, false); B->Set(WRVoidFlag::Gape, true); B->GapeUntil = S.StageUntil; }
 				WRSound::PlayAt(Boss, TEXT("void.unravelled.core"), Boss->GetActorLocation());
@@ -702,14 +702,14 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 		{
 			// Then the pieces swirl inward, loud and visible, and snap shut: the Reform slam.
 			S.UnravelStage = 3;
-			S.StageUntil = T + BT(Boss, TEXT("reform"), 1.2f) - BT(Boss, TEXT("coreOpen"), 0.6f);
+			S.StageUntil = T + VbT(Boss, TEXT("reform"), 1.2f) - VbT(Boss, TEXT("coreOpen"), 0.6f);
 			WRFx::Broadcast(Boss, TEXT("void.collapse"), Boss->GetActorLocation(), FRotator::ZeroRotator, 0.5f, TEXT("void.unravelled.swirl"));
 		}
 		if (S.UnravelStage == 3 && T >= S.StageUntil)
 		{
 			if (FWRBossAttack* Slam = FindAttack(Boss, TEXT("reform_slam")))
 			{
-				AWRCharacterBase* Near = NearestPlayer(Boss, 4000.f);
+				AWRCharacterBase* Near = VbNearestPlayer(Boss, 4000.f);
 				if (Near) { Boss->StartAttack(*Slam, Near); S.UnravelStage = 4; return true; }
 			}
 			S.UnravelStage = 0;
@@ -723,10 +723,10 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 		{
 			AWRCreature* R = S.Brood[i].Get();
 			if (!R || !R->IsAlive() || T < S.BroodNext[i]) continue;
-			S.BroodNext[i] = T + BT(Boss, TEXT("broodEvery"), 15.f);
+			S.BroodNext[i] = T + VbT(Boss, TEXT("broodEvery"), 15.f);
 			const bool bGnawers = FMath::RandBool();
-			const int32 N = bGnawers ? int32(BT(Boss, TEXT("broodGnawers"), 6.f)) : 1;
-			AActor* Prey = NearestPlayer(Boss, 6000.f);
+			const int32 N = bGnawers ? int32(VbT(Boss, TEXT("broodGnawers"), 6.f)) : 1;
+			AActor* Prey = VbNearestPlayer(Boss, 6000.f);
 			for (int32 k = 0; k < N; ++k)
 			{
 				const FVector At = R->GetActorLocation() + FVector(FMath::FRandRange(-150.f, 150.f), FMath::FRandRange(-150.f, 150.f), 0.f);
@@ -748,7 +748,7 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 		{
 			for (TActorIterator<AWRLootBag> It(Boss->GetWorld()); It; ++It)
 			{
-				if (FVector::Dist(It->GetActorLocation(), Boss->GetActorLocation()) > BT(Boss, TEXT("smell"), 1500.f)) continue;
+				if (FVector::Dist(It->GetActorLocation(), Boss->GetActorLocation()) > VbT(Boss, TEXT("smell"), 1500.f)) continue;
 				const bool bFood = It->Items.ContainsByPredicate([](const FWRItemStack& X) { const FWRItemDef* D = FWRItemRegistry::Get().Find(X.ItemId); return D && D->Category == TEXT("food") && X.Count > 0; });
 				if (bFood) { S.Bait = *It; break; }
 			}
@@ -773,11 +773,11 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 			}
 			if (Bag->Items.Num() == 0) Bag->Destroy();
 			S.Bait = nullptr;
-			S.EatingUntil = T + BT(Boss, TEXT("eatSeconds"), 2.5f);
+			S.EatingUntil = T + VbT(Boss, TEXT("eatSeconds"), 2.5f);
 			S.Stacks = FMath::Max(0, S.Stacks - 1);
-			Boss->SpeedBoost = 1.f + BT(Boss, TEXT("speedPer"), 0.05f) * S.Stacks;
+			Boss->SpeedBoost = 1.f + VbT(Boss, TEXT("speedPer"), 0.05f) * S.Stacks;
 			if (UWRVoidBody* B = UWRVoidBody::Get(Boss)) B->Stacks = uint8(S.Stacks);
-			WRFx::BroadcastOn(Boss, TEXT("void.consume"), TEXT("head"), 1.5f, TEXT("void.starving.eat"), BT(Boss, TEXT("eatSeconds"), 2.5f));
+			WRFx::BroadcastOn(Boss, TEXT("void.consume"), TEXT("head"), 1.5f, TEXT("void.starving.eat"), VbT(Boss, TEXT("eatSeconds"), 2.5f));
 			return true;
 		}
 		return false;
@@ -785,7 +785,7 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 	if (Boss->CreatureId == TEXT("null_warden"))
 	{
 		// Projectiles entering his field drop dead.
-		const float Field = BT(Boss, TEXT("field"), 1200.f);
+		const float Field = VbT(Boss, TEXT("field"), 1200.f);
 		for (TActorIterator<AWRProjectile> It(Boss->GetWorld()); It; ++It)
 		{
 			const AWRCharacterBase* By = Cast<AWRCharacterBase>(It->GetInstigator());
@@ -807,7 +807,7 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 		{
 			if (FWRBossAttack* H = FindAttack(Boss, TEXT("hollow")))
 			{
-				if (AWRCharacterBase* Near = NearestPlayer(Boss, 8000.f)) { ++S.ShellsDone; Boss->StartAttack(*H, Near); }
+				if (AWRCharacterBase* Near = VbNearestPlayer(Boss, 8000.f)) { ++S.ShellsDone; Boss->StartAttack(*H, Near); }
 			}
 		}
 		if (S.ShellHp > 0.f)
@@ -823,13 +823,13 @@ bool FWRVoidBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 			{
 				for (int32 i = 0; i < 6; ++i)
 				{
-					if (Stage->PillarRinging(i) && FVector::Dist(Stage->PillarAt(i), Boss->GetActorLocation()) < BT(Boss, TEXT("pillarReach"), 1200.f) + Boss->GetSimpleCollisionRadius())
+					if (Stage->PillarRinging(i) && FVector::Dist(Stage->PillarAt(i), Boss->GetActorLocation()) < VbT(Boss, TEXT("pillarReach"), 1200.f) + Boss->GetSimpleCollisionRadius())
 					{
-						S.ShellHp -= BT(Boss, TEXT("pillarDps"), 150.f) * DeltaSeconds;
+						S.ShellHp -= VbT(Boss, TEXT("pillarDps"), 150.f) * DeltaSeconds;
 					}
 				}
-				Boss->ShellFraction = FMath::Clamp(S.ShellHp / FMath::Max(1.f, BT(Boss, TEXT("shellHealth"), 1000.f)), 0.f, 1.f);
-				if (S.ShellHp <= 0.f && Boss->Status) { S.ShellHp = 0.f; Boss->Status->Stagger(BT(Boss, TEXT("shellBreakStagger"), 3.f)); }
+				Boss->ShellFraction = FMath::Clamp(S.ShellHp / FMath::Max(1.f, VbT(Boss, TEXT("shellHealth"), 1000.f)), 0.f, 1.f);
+				if (S.ShellHp <= 0.f && Boss->Status) { S.ShellHp = 0.f; Boss->Status->Stagger(VbT(Boss, TEXT("shellBreakStagger"), 3.f)); }
 			}
 		}
 		// The dive's tell: the lensing ring opens beside your piece and rubble rises round its edge.
@@ -887,7 +887,7 @@ void FWRVoidBoss::PlaceArenas(AWRLand* Land)
 			if (!W) return;
 			for (TActorIterator<AWRCreature> It(W); It; ++It)
 			{
-				if (It->CreatureId == TEXT("brood_rift") && It->IsAlive() && FVector::Dist(It->GetActorLocation(), At) < Radius + 200.f) Hurt(By, *It, 99999.f, 3, true, At);
+				if (It->CreatureId == TEXT("brood_rift") && It->IsAlive() && FVector::Dist(It->GetActorLocation(), At) < Radius + 200.f) VbHurt(By, *It, 99999.f, 3, true, At);
 			}
 			if (AWRVorhollowStage* Stage = AWRVorhollowStage::Find(W)) Stage->WardAt(At, WRTune(TEXT("bosses.vorhollow.saltWard"), 10.f));
 		});
@@ -900,12 +900,12 @@ void FWRVoidBoss::PlaceArenas(AWRLand* Land)
 	{
 		if (KV.Key.StartsWith(TEXT("_"))) continue;
 		const TSharedPtr<FJsonObject> R = KV.Value->AsObject();
-		const FVector2D At = V2(R, TEXT("at"));
+		const FVector2D At = VbV2(R, TEXT("at"));
 		FVector G = D->GroundPoint(At);
 		if (R->HasField(TEXT("lipBelow")))
 		{
 			// The island hangs at the rift's centre below the lip (the stage places itself; the boss sits on its dais).
-			const FVector2D Lip = V2(R, TEXT("lip"));
+			const FVector2D Lip = VbV2(R, TEXT("lip"));
 			const float LipZ = D->Origin.Z + D->Height(Lip) * 100.f;
 			G = FVector(G.X, G.Y, LipZ - R->GetNumberField(TEXT("lipBelow")) * 100.f);
 			const FTransform ST(G);
@@ -918,9 +918,9 @@ void FWRVoidBoss::PlaceArenas(AWRLand* Land)
 		}
 		if (R->HasField(TEXT("gate")))
 		{
-			const FVector2D GateAt = V2(R, TEXT("gate"));
+			const FVector2D GateAt = VbV2(R, TEXT("gate"));
 			const FVector GW = D->GroundPoint(GateAt);
-			const FVector2D Face = V2(R, TEXT("gateFace"));
+			const FVector2D Face = VbV2(R, TEXT("gateFace"));
 			const FTransform GT(FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(Face.Y - GateAt.Y, Face.X - GateAt.X)), 0.f), GW);
 			World->SpawnActor<AWRNullGate>(AWRNullGate::StaticClass(), GT);
 		}
@@ -958,7 +958,7 @@ void AWRNullGate::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRNullGate, FromOpenness);
 }
 
-double AWRNullGate::Now() const { return SNow(this); }
+double AWRNullGate::Now() const { return VbSNow(this); }
 
 AWRNullGate* AWRNullGate::Find(const UWorld* World)
 {
@@ -995,7 +995,7 @@ void AWRNullGate::Build()
 	// Local frame: X through the gate (toward the bridge), Y across it. The gatehouse: two counterweight towers either side
 	// of the 8 m opening (their shafts open at slit windows), a roof beam carrying the two pulleys, curtain walls out to the
 	// court's sides, the portcullis (a grid of iron bars) hung on two chains from the pulleys down to the counterweights.
-	UMaterialInterface* Stone = WRFoldLook::RockMat(this, Dolo * 0.35f);
+	UMaterialInterface* Stone = WRFoldLook::RockMat(this, VbDolo * 0.35f);
 	UMaterialInterface* Iron = WRFoldLook::RockMat(this, FLinearColor(0.035f, 0.033f, 0.035f));
 	const bool bDraw = GetNetMode() != NM_DedicatedServer;
 	const auto Solid = [&](const TCHAR* Shape, const FVector& Size, const FVector& At, const FRotator& Rot, UMaterialInterface* M, bool bCollide) -> UStaticMeshComponent*
@@ -1126,7 +1126,7 @@ void AWRVorhollowStage::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AWRVorhollowStage, bGullet);
 }
 
-double AWRVorhollowStage::Now() const { return SNow(this); }
+double AWRVorhollowStage::Now() const { return VbSNow(this); }
 
 AWRVorhollowStage* AWRVorhollowStage::Find(const UWorld* World)
 {
@@ -1150,9 +1150,9 @@ void AWRVorhollowStage::Build()
 	// The island: a 72 m disc of Choir paving on a rock body, a 30 m voidglass keel underneath. Seven pieces: the Stage
 	// (the dais, 30 m) and six sectors of the outer ring, each its own frame (with collision) so it can split and orbit.
 	// Six stepped stone rings rise toward the dais (the amphitheatre); six voice pillars stand on the third ring.
-	UMaterialInterface* Pave = WRFoldLook::RockMat(this, Dolo * 0.42f);
+	UMaterialInterface* Pave = WRFoldLook::RockMat(this, VbDolo * 0.42f);
 	UMaterialInterface* Rock = WRFoldLook::RockMat(this, FLinearColor(0.06f, 0.058f, 0.055f));
-	UMaterialInterface* GlassM = WRFoldLook::RockMat(this, Glass);
+	UMaterialInterface* GlassM = WRFoldLook::RockMat(this, VbGlass);
 	UMaterialInterface* Iron = WRFoldLook::RockMat(this, FLinearColor(0.035f, 0.033f, 0.035f));
 	UMaterialInterface* Bronze = WRFoldLook::RockMat(this, FLinearColor(0.2f, 0.12f, 0.05f));
 	const bool bDraw = GetNetMode() != NM_DedicatedServer;
@@ -1271,7 +1271,7 @@ void AWRVorhollowStage::Build()
 	// The beam: a long thin shaft of violet-white (shown while it burns), and the Gullet below (shown when it opens).
 	if (bDraw)
 	{
-		Beam = WRFoldLook::Shape(this, RootComponent, TEXT("Cylinder"), FVector(150.f, 150.f, 4000.f), FVector::ZeroVector, FRotator(90.f, 0.f, 0.f), WRFoldLook::Glow(this, Violet * 3.f, 6.f));
+		Beam = WRFoldLook::Shape(this, RootComponent, TEXT("Cylinder"), FVector(150.f, 150.f, 4000.f), FVector::ZeroVector, FRotator(90.f, 0.f, 0.f), WRFoldLook::Glow(this, VbViolet * 3.f, 6.f));
 		if (Beam) Beam->SetVisibility(false, true);
 	}
 	Gullet = NewObject<USceneComponent>(this);
@@ -1287,7 +1287,7 @@ void AWRVorhollowStage::Build()
 	}
 	Solid(Gullet, TEXT("Cylinder"), FVector(3200.f, 3200.f, 100.f), FVector(0, 0, 1450.f), FRotator::ZeroRotator, GlassM, true);
 	for (int32 b = 0; b < 30; ++b) if (bDraw) WRFoldLook::Shape(this, Gullet, TEXT("Cube"), FVector(60.f, 20.f, 14.f), FVector(FMath::Sin(b * 2.3f) * 1100.f, FMath::Cos(b * 1.7f) * 1100.f, 8.f), FRotator(0.f, b * 37.f, 0.f), Pave);
-	if (bDraw) WRFoldLook::Light(this, Gullet, FVector(0, 0, 900.f), Violet, 6000.f, 2600.f);
+	if (bDraw) WRFoldLook::Light(this, Gullet, FVector(0, 0, 900.f), VbViolet, 6000.f, 2600.f);
 	Gullet->SetVisibility(false, true);
 	if (HasAuthority())
 	{
@@ -1300,7 +1300,7 @@ void AWRVorhollowStage::Build()
 	// The island's own light: the rift glow from below, the dais's braziers.
 	if (bDraw)
 	{
-		WRFoldLook::Light(this, RootComponent, FVector(0, 0, -1500.f), Violet, 12000.f, 6000.f);
+		WRFoldLook::Light(this, RootComponent, FVector(0, 0, -1500.f), VbViolet, 12000.f, 6000.f);
 		WRFoldLook::Light(this, RootComponent, FVector(0, 0, 1200.f), FLinearColor(1.f, 0.75f, 0.5f), 4000.f, 3000.f);
 	}
 }
@@ -1392,7 +1392,7 @@ void AWRVorhollowStage::Tick(float DeltaSeconds)
 		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
 		{
 			if (!It->IsAlive() || !WRLand::InHole(It->GetActorLocation()) || It->GetActorLocation().Z > Floor || InGullet.Contains(*It)) continue;
-			Hurt(this, *It, 99999.f, 5, true, It->GetActorLocation());
+			VbHurt(this, *It, 99999.f, 5, true, It->GetActorLocation());
 			if (AWRPlayerController* PC = Cast<AWRPlayerController>(It->GetController())) PC->ClientNotify(TEXT("Unmade: the black took you."));
 		}
 	}
@@ -1442,7 +1442,7 @@ void AWRVorhollowStage::Tick(float DeltaSeconds)
 					const FVector L = C->GetActorLocation() - Self->GulletCentre();
 					const float Ang = FMath::Fmod(FMath::RadiansToDegrees(FMath::Atan2(L.Y, L.X)) + 360.f, 30.f);
 					const bool bAlcove = L.Size2D() > 1300.f && Ang > 8.f && Ang < 22.f;
-					if (!bAlcove) Hurt(Self.Get(), C, WRTune(TEXT("bosses.vorhollow.gulletCrush"), 60.f), 4, true, Self->GulletCentre());
+					if (!bAlcove) VbHurt(Self.Get(), C, WRTune(TEXT("bosses.vorhollow.gulletCrush"), 60.f), 4, true, Self->GulletCentre());
 				}
 				WRFx::Broadcast(Self.Get(), TEXT("void.collapse"), Self->GulletCentre(), FRotator::ZeroRotator, 3.f, TEXT("void.crush"));
 			}, 1.2f, false);

@@ -33,9 +33,9 @@
 
 namespace WRVoidHazardsImpl
 {
-	float HT(const TCHAR* Key, float F) { return WRTune(*FString::Printf(TEXT("voidHazards.%s"), Key), F); }
-	const float Cell = 6.f;   // m
-	double SNow(const UObject* W)
+	float VhT(const TCHAR* Key, float F) { return WRTune(*FString::Printf(TEXT("voidHazards.%s"), Key), F); }
+	const float FireCellM = 6.f;   // m
+	double VhSNow(const UObject* W)
 	{
 		const UWorld* World = W ? W->GetWorld() : nullptr;
 		const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
@@ -61,7 +61,7 @@ void AWRVoidState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRVoidState, StormStage);
 }
 
-double AWRVoidState::Now() const { return SNow(this); }
+double AWRVoidState::Now() const { return VhSNow(this); }
 
 AWRVoidState* AWRVoidState::Find(const UWorld* World)
 {
@@ -114,26 +114,26 @@ void AWRVoidState::BeginPlay()
 
 FIntPoint AWRVoidState::CellOf(const FVector2D& M) const
 {
-	return FIntPoint(FMath::FloorToInt(M.X / Cell), FMath::FloorToInt(M.Y / Cell));
+	return FIntPoint(FMath::FloorToInt(M.X / FireCellM), FMath::FloorToInt(M.Y / FireCellM));
 }
 
 FVector AWRVoidState::CellCentre(const FIntPoint& C) const
 {
 	const FWRLandDef* D = WRLand::Find(LandId);
-	return D ? D->GroundPoint(FVector2D((C.X + 0.5f) * Cell, (C.Y + 0.5f) * Cell)) : FVector::ZeroVector;
+	return D ? D->GroundPoint(FVector2D((C.X + 0.5f) * FireCellM, (C.Y + 0.5f) * FireCellM)) : FVector::ZeroVector;
 }
 
 bool AWRVoidState::Burnable(const FIntPoint& C) const
 {
 	const FWRLandDef* D = WRLand::Find(LandId);
 	if (!D) return false;
-	const FVector2D M((C.X + 0.5f) * Cell, (C.Y + 0.5f) * Cell);
+	const FVector2D M((C.X + 0.5f) * FireCellM, (C.Y + 0.5f) * FireCellM);
 	const FWRLandZone* Z = D->ZoneAt(M);
 	if (!Z || Z->Id != TEXT("V1") || D->CoastDistance(M) < 3.f) return false;
 	// The road is bare: no litter on it.
 	if (const FWRLandFeature* Road = D->Feature(TEXT("gauntlet_road"))) if (WRLand::DistToPolyline(M, Road->Points) < Road->Width * 0.5f) return false;
 	const double* Burnt = BurntAt.Find(C);
-	if (Burnt && Now() - *Burnt < HT(TEXT("litter.regrowSeconds"), 7200.f)) return false;
+	if (Burnt && Now() - *Burnt < VhT(TEXT("litter.regrowSeconds"), 7200.f)) return false;
 	return !Fire.ContainsByPredicate([&](const FWRFireCell& F) { return F.X == C.X && F.Y == C.Y; });
 }
 
@@ -145,7 +145,7 @@ void AWRVoidState::FireAt(const UObject* WorldContext, const FVector& At)
 	const FWRLandDef* D = WRLand::Find(S->LandId);
 	if (!D || !D->Contains(At, 0.f)) return;
 	const FIntPoint C = S->CellOf(D->ToMap(At));
-	if (!S->Burnable(C) || S->Fire.Num() >= int32(HT(TEXT("litter.maxCells"), 500.f))) return;
+	if (!S->Burnable(C) || S->Fire.Num() >= int32(VhT(TEXT("litter.maxCells"), 500.f))) return;
 	FWRFireCell F;
 	F.X = C.X;
 	F.Y = C.Y;
@@ -162,7 +162,7 @@ bool AWRVoidState::Burning(const UWorld* World, const FVector& At)
 	if (!D) return false;
 	const FIntPoint C = S->CellOf(D->ToMap(At));
 	const float T = float(S->Now());
-	return S->Fire.ContainsByPredicate([&](const FWRFireCell& F) { return F.X == C.X && F.Y == C.Y && T - F.Lit > HT(TEXT("litter.smoulder"), 0.9f); });
+	return S->Fire.ContainsByPredicate([&](const FWRFireCell& F) { return F.X == C.X && F.Y == C.Y && T - F.Lit > VhT(TEXT("litter.smoulder"), 0.9f); });
 }
 
 void AWRVoidState::Tick(float DeltaSeconds)
@@ -178,9 +178,9 @@ void AWRVoidState::TickFire(float Dt)
 {
 	if (!HasAuthority() || Fire.Num() == 0) return;
 	const float T = float(Now());
-	const float Smoulder = HT(TEXT("litter.smoulder"), 0.9f), Burn = HT(TEXT("litter.burnSeconds"), 60.f);
-	const float Down = HT(TEXT("litter.downwind"), 1.5f), Up = HT(TEXT("litter.upwind"), 0.5f);
-	FVector2D Wind(HT(TEXT("litter.windX"), 1.f), HT(TEXT("litter.windY"), 0.3f));
+	const float Smoulder = VhT(TEXT("litter.smoulder"), 0.9f), Burn = VhT(TEXT("litter.burnSeconds"), 60.f);
+	const float Down = VhT(TEXT("litter.downwind"), 1.5f), Up = VhT(TEXT("litter.upwind"), 0.5f);
+	FVector2D Wind(VhT(TEXT("litter.windX"), 1.f), VhT(TEXT("litter.windY"), 0.3f));
 	Wind.Normalize();
 	// The front walks: each burning cell lights its neighbours after the time the fire takes to cross 6 m that way
 	// (downwind 1.5 m/s, upwind 0.5, across in between).
@@ -195,7 +195,7 @@ void AWRVoidState::TickFire(float Dt)
 			const FVector2D Dir = FVector2D(dx, dy).GetSafeNormal();
 			const float Align = FVector2D::DotProduct(Dir, Wind);
 			const float Speed = FMath::Lerp(Up, Down, Align * 0.5f + 0.5f);
-			const float Need = Cell * FVector2D(dx, dy).Size() / FMath::Max(0.1f, Speed);
+			const float Need = FireCellM * FVector2D(dx, dy).Size() / FMath::Max(0.1f, Speed);
 			if (Age < Need) continue;
 			const FIntPoint N(F.X + dx, F.Y + dy);
 			if (!Burnable(N) || New.ContainsByPredicate([&](const FWRFireCell& Q) { return Q.X == N.X && Q.Y == N.Y; })) continue;
@@ -206,7 +206,7 @@ void AWRVoidState::TickFire(float Dt)
 			New.Add(Q);
 		}
 	}
-	if (New.Num() && Fire.Num() + New.Num() <= int32(HT(TEXT("litter.maxCells"), 500.f))) Fire.Append(New);
+	if (New.Num() && Fire.Num() + New.Num() <= int32(VhT(TEXT("litter.maxCells"), 500.f))) Fire.Append(New);
 	// Burnt out: black ground for 2 game days.
 	for (int32 i = Fire.Num() - 1; i >= 0; --i)
 	{
@@ -226,9 +226,9 @@ void AWRVoidState::TickFire(float Dt)
 		if (!It->IsAlive() || !D || !D->Contains(It->GetActorLocation(), 0.f) || !Burning(GetWorld(), It->GetActorLocation())) continue;
 		FWRHit Hit;
 		Hit.Instigator = this;
-		Hit.Damage = HT(TEXT("litter.dps"), 3.f) * 0.5f;
+		Hit.Damage = VhT(TEXT("litter.dps"), 3.f) * 0.5f;
 		Hit.Element = WRTags::Element_Fire;
-		Hit.BurnBuildup = HT(TEXT("litter.burnPerSecond"), 8.f) * 0.5f;
+		Hit.BurnBuildup = VhT(TEXT("litter.burnPerSecond"), 8.f) * 0.5f;
 		Hit.bDamageOverTime = true;
 		Hit.Origin = It->GetActorLocation();
 		UWRCombatLibrary::ApplyHit(*It, Hit);
@@ -239,7 +239,7 @@ void AWRVoidState::DrawFire()
 {
 	// Each cell: smoke while it smoulders, flame while it burns; drawn from the replicated rows, gone when they go.
 	const float T = float(Now());
-	const float Smoulder = HT(TEXT("litter.smoulder"), 0.9f);
+	const float Smoulder = VhT(TEXT("litter.smoulder"), 0.9f);
 	TSet<FIntPoint> Seen;
 	for (const FWRFireCell& F : Fire)
 	{
@@ -383,13 +383,13 @@ void AWRVoidState::TickCrust(float Dt)
 			if ((CrustBroken & (1u << i)) || FVector2D::Distance(M, Crusts[i].At) > Crusts[i].R) continue;
 			const AWRCreature* Cr = Cast<AWRCreature>(*It);
 			const bool bHeavy = It->HasTag(WRTags::State_Dodging) || FWRVoidBoss::HeavySwing(*It) || (Cr && Cr->GetSimpleCollisionRadius() >= 150.f)
-				|| It->GetCharacterMovement()->Velocity.Z < -HT(TEXT("crust.landingSpeed"), 900.f);
+				|| It->GetCharacterMovement()->Velocity.Z < -VhT(TEXT("crust.landingSpeed"), 900.f);
 			if (bHeavy) CrustStruck(this, It->GetActorLocation(), 0.f);
 		}
 	}
 	for (int32 i = 0; i < Crusts.Num() && i < 32; ++i)
 	{
-		if ((CrustBroken & (1u << i)) && Now() - Crusts[i].BrokenAt > HT(TEXT("crust.regrowSeconds"), 1800.f)) CrustBroken &= ~(1u << i);
+		if ((CrustBroken & (1u << i)) && Now() - Crusts[i].BrokenAt > VhT(TEXT("crust.regrowSeconds"), 1800.f)) CrustBroken &= ~(1u << i);
 	}
 }
 
@@ -409,7 +409,7 @@ void AWRVoidState::TickStorm(float Dt)
 	}
 	if (StormStage != 2) return;
 	const double T = Now();
-	const int32 Waves = int32(HT(TEXT("storm.waves"), 3.f));
+	const int32 Waves = int32(VhT(TEXT("storm.waves"), 3.f));
 	for (int32 r = 0; r < Storm.Num(); ++r)
 	{
 		FStormRift& S = Storm[r];
@@ -418,7 +418,7 @@ void AWRVoidState::TickStorm(float Dt)
 		{
 			Wave(r, S.WavesSent);
 			++S.WavesSent;
-			S.NextWave = T + HT(TEXT("storm.waveEvery"), 240.f);
+			S.NextWave = T + VhT(TEXT("storm.waveEvery"), 240.f);
 		}
 	}
 }
@@ -440,7 +440,7 @@ void AWRVoidState::OpenStorm()
 		const auto Near = [&](int32 i) { float Best = 1e9f; for (const FVector& C : Claims) Best = FMath::Min(Best, float(FVector::Dist2D(C, D->GroundPoint(WRLand::Vec2((*Seeds)[i]))))); return Best; };
 		return Near(A) < Near(B);
 	});
-	const int32 Open = FMath::Min(int32(HT(TEXT("storm.open"), 6.f)), Order.Num());
+	const int32 Open = FMath::Min(int32(VhT(TEXT("storm.open"), 6.f)), Order.Num());
 	for (int32 k = Claims.Num() == 0 ? 0 : Open; k < Order.Num(); ++k) Order.Swap(k, FMath::RandRange(k, Order.Num() - 1));
 	for (int32 k = 0; k < Open; ++k)
 	{
@@ -452,7 +452,7 @@ void AWRVoidState::OpenStorm()
 		{
 			R->RiftId = FName(*FString::Printf(TEXT("storm_%d"), k));
 			R->bLarge = true;
-			R->ZoneRadius = HT(TEXT("storm.zone"), 4000.f);
+			R->ZoneRadius = VhT(TEXT("storm.zone"), 4000.f);
 			R->Rubble = 4;
 			R->FinishSpawning(FTransform(At));
 			S.Rift = R;
@@ -476,7 +476,7 @@ void AWRVoidState::Wave(int32 Index, int32 N)
 	else if (N == 1) Kinds = { { TEXT("hollowfang"), 3 }, { TEXT("nullwing"), 1 } };
 	else Kinds = { { TEXT("riftmaw"), 1 }, { TEXT("hollowfang"), 2 } };
 	const AWRClaimTotem* Claim = nullptr;
-	float Best = HT(TEXT("storm.targetRange"), 150000.f);
+	float Best = VhT(TEXT("storm.targetRange"), 150000.f);
 	for (TActorIterator<AWRClaimTotem> It(GetWorld()); It; ++It)
 	{
 		const float D = FVector::Dist2D(It->GetActorLocation(), S.At);
@@ -559,7 +559,7 @@ void AWRVoidState::HeartDied(AWRCreature* Heart)
 			{
 				Node->ItemId = TEXT("voidglass");
 				Node->Hits = 4;
-				Node->PerHit = int32(WRTune(TEXT("void.ring.perHit"), 1.6f) * HT(TEXT("storm.ringMult"), 3.f));
+				Node->PerHit = int32(WRTune(TEXT("void.ring.perHit"), 1.6f) * VhT(TEXT("storm.ringMult"), 3.f));
 				Node->RespawnSeconds = 99999.f;
 				Node->GemChance = 0.f;
 				Node->Tags.Add(TEXT("storm_ring"));
@@ -572,7 +572,7 @@ void AWRVoidState::HeartDied(AWRCreature* Heart)
 		for (const TPair<FString, float>& KV : R.Dealt) Total += KV.Value;
 		for (const TPair<FString, float>& KV : R.Dealt)
 		{
-			const int32 Xp = FMath::RoundToInt(HT(TEXT("storm.xp"), 1500.f) * KV.Value / FMath::Max(1.f, Total));
+			const int32 Xp = FMath::RoundToInt(VhT(TEXT("storm.xp"), 1500.f) * KV.Value / FMath::Max(1.f, Total));
 			for (TActorIterator<AWRCharacter> It(S->GetWorld()); It; ++It)
 			{
 				if (!It->GetPlayerState() || It->GetPlayerState()->GetPlayerName() != KV.Key) continue;

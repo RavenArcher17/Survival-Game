@@ -699,7 +699,9 @@
     "void.litter.smoulder": {"files": ["world/swamp_candle_out_1", "world/swamp_candle_out_2"], "volume": 0.9, "pitch": [0.6, 0.7], "radius": 2500, "category": "effects", "minGap": 0.3, "maxVoices": 3},
     "void.crust.drum": {"files": ["world/swamp_plank_creak_1", "world/swamp_plank_creak_2", "world/swamp_plank_creak_3"], "volume": 0.8, "pitch": [0.45, 0.5], "radius": 1500, "category": "effects", "minGap": 0.8, "maxVoices": 2},
     "void.crust.break": {"files": ["world/storm_plank_snap_1", "world/storm_plank_snap_2"], "volume": 1.6, "pitch": [0.55, 0.65], "radius": 4000, "category": "effects", "minGap": 0.2, "maxVoices": 2},
-    "void.storm.warning": {"files": ["world/swamp_tide_warning_1", "world/swamp_tide_warning_2"], "volume": 1.6, "pitch": [0.5, 0.55], "radius": 0, "category": "ambient", "minGap": 5.0, "maxVoices": 1}
+    "void.storm.warning": {"files": ["world/swamp_tide_warning_1", "world/swamp_tide_warning_2"], "volume": 1.6, "pitch": [0.5, 0.55], "radius": 0, "category": "ambient", "minGap": 5.0, "maxVoices": 1},
+    "void.lift.pawl": {"files": ["world/swamp_key_1", "world/swamp_key_2"], "volume": 0.8, "pitch": [1.3, 1.5], "radius": 2500, "category": "effects", "minGap": 0.08, "maxVoices": 4},
+    "void.lift.mended": {"files": ["world/swamp_plank_repair_1", "world/swamp_plank_repair_2"], "volume": 1.2, "pitch": [0.8, 0.9], "radius": 3000, "category": "effects", "minGap": 1.0, "maxVoices": 1}
 	},
 	"ambient": {
 		"fadeSeconds": 3.0,

@@ -4,6 +4,7 @@
 // you push off and comes back as you step ashore at the other end. Server authority: the server places both ends,
 // checks reach, moves the rower; clients draw the landings from the replicated state.
 #include "WRLandThings.h"
+#include "WRVoidUnmade.h"
 #include "WRVoidBosses.h"
 #include "WRVoidWorld.h"
 #include "WRLand.h"
@@ -253,6 +254,11 @@ bool WRLandThings::Prompt(const AWRPlayerController* PC, FString& OutTarget, FSt
 		OutVerb = C->PromptVerb();
 		return true;
 	}
+	if (const AWRDescentLift* Lift = AWRDescentLift::Find(PC->GetWorld()))
+	{
+		FString V;
+		if (Lift->PromptFor(Me->GetActorLocation(), V)) { OutTarget = TEXT("The Descent lift"); OutVerb = V; return true; }
+	}
 	if (const AWRNullGate* G = AWRNullGate::Find(PC->GetWorld()); G && G->CrankNear(Me->GetActorLocation()) && G->Openness() < 0.99f)
 	{
 		OutTarget = TEXT("The Null Gate's winch");
@@ -280,6 +286,11 @@ bool WRLandThings::ClientInteract(AWRPlayerController* PC)
 			if (Weak.IsValid() && Weak->PlayerCameraManager) Weak->PlayerCameraManager->StartCameraFade(1.f, 0.f, Fade, FLinearColor::Black, true, false);
 		}, Fade * 0.6f + 1.4f, false);
 		return true;
+	}
+	if (const AWRDescentLift* Lift = AWRDescentLift::Find(PC->GetWorld()))
+	{
+		FString V;
+		if (Lift->PromptFor(Me->GetActorLocation(), V)) { PC->SendCommand(TEXT("land lift")); return true; }
 	}
 	if (const AWRNullGate* G = AWRNullGate::Find(PC->GetWorld()); G && G->CrankNear(Me->GetActorLocation()) && G->Openness() < 0.99f)
 	{
@@ -319,6 +330,11 @@ FString WRLandThings::Command(AWRPlayerController* PC, const TArray<FString>& Ar
 		}, Fade * 0.6f + 0.1f, false);
 		UE_LOG(LogWildreach, Log, TEXT("LAND %s crosses to the %s end"), *Me->GetName(), To->bLandEnd ? TEXT("land") : TEXT("island"));
 		return To->bLandEnd ? FString::Printf(TEXT("You row across the Broken Race to %s."), D ? *D->Name : TEXT("the far shore")) : FString(TEXT("You row back across the Broken Race."));
+	}
+	if (Verb == TEXT("lift"))
+	{
+		AWRDescentLift* Lift = AWRDescentLift::Find(PC->GetWorld());
+		return Lift ? Lift->Use(PC) : FString(TEXT("No lift here."));
 	}
 	if (Verb == TEXT("winch"))
 	{

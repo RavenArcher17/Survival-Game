@@ -97,6 +97,18 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
   inrush howls through the warning; 6 of 10 seeds open as storm rifts with a floating rift heart (1,500; void x0.5;
   anchor salt -300); three waves 4 min apart walk to the nearest claim within 1.5 km as raiders (else the nearest
   shrine); a broken heart closes its rift and leaves voidglass at x3, 1,500 path XP split by heart damage.
+- **The Unmade Place** (`WRVoidUnmade.*`, tuning `voidUnmade`, wasteland.json `unmade`): the Choir's Descent (343 cut
+  steps spiralling 120 m down the Great Rift's north wall, solid), floating stones on voidglass keels between the eight
+  places (gaps about 1.5-2.5 m, never more than a step's rise), U1 the Descent's foot (ledge, cage rest, rope anchor,
+  brazier), U2 the Seated Choir (200 dead on four floating terraces facing one point of black), U3 the black pool and
+  its false stars, U4 the Inverted Tower, U5 the rubble garden (ten voidglass nodes at x2, 12 game h), U6 the Riftmaw
+  drift (three), U7 the Cantor's reliquary (a sealed chapel; void essence 6), U8 the last note (her figure at the
+  farthest edge; reaching her is Maren's fifth quest). Drain x1.5 inside. The Descent lift (`AWRDescentLift`): a
+  timber drum on an iron axle in two bearing blocks, a ratchet wheel and pawl, two cranks, a jib with its sheave, the
+  rope to a basket cage of iron straps; mended with rope 10 and iron 4 (5 s); E on the crank (or in the cage) moves
+  the cage 1.2 m/s, the drum winding the rope, the pawl clicking every 20 cm and holding wherever you let go.
+- Unity-build hygiene: every new file's file-scope helpers carry a prefix (Vc / Vb / Vh / Vp / Vw / Va / Um), so no
+  unity grouping can make them collide or hide another file's names.
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
   palette ahead of it).
 

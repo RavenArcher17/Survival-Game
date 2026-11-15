@@ -33,19 +33,19 @@
 
 namespace WRVoidAim
 {
-	static const FLinearColor Violet = FLinearColor(FColor(0x7B, 0x4F, 0xD6));
-	static const FLinearColor Deep = FLinearColor(FColor(0x2B, 0x18, 0x40));
+	static const FLinearColor VaViolet = FLinearColor(FColor(0x7B, 0x4F, 0xD6));
+	static const FLinearColor VaDeep = FLinearColor(FColor(0x2B, 0x18, 0x40));
 
-	AWRCharacterBase* Locked(const AWRCharacterBase* Caster)
+	AWRCharacterBase* VaLocked(const AWRCharacterBase* Caster)
 	{
 		const AWRPlayerController* PC = Caster ? Cast<AWRPlayerController>(Caster->GetController()) : nullptr;
 		AWRCharacterBase* Target = PC ? (Caster->HasAuthority() ? PC->GetServerLock() : PC->GetLockTarget()) : nullptr;
 		return Target && Target->IsAlive() && !Target->IsHidden() && Caster->IsHostileTo(Target)
 			&& FVector::Dist(Target->GetActorLocation(), Caster->GetActorLocation()) <= WRTune(TEXT("spells.lockRange"), 4000.f) ? Target : nullptr;
 	}
-	FVector AimDir(const AWRCharacterBase* Caster, const FVector& From, float Speed, AWRCharacterBase*& OutLock)
+	FVector VaAimDir(const AWRCharacterBase* Caster, const FVector& From, float Speed, AWRCharacterBase*& OutLock)
 	{
-		OutLock = Locked(Caster);
+		OutLock = VaLocked(Caster);
 		if (OutLock)
 		{
 			const FVector Velocity = WRTune(TEXT("spells.lockLead"), 1.f) > 0.f && Speed > 0.f ? OutLock->GetVelocity() : FVector::ZeroVector;
@@ -58,13 +58,13 @@ namespace WRVoidAim
 		const FVector Dir = (Point - From).GetSafeNormal();
 		return Dir.IsNearlyZero() || FVector::DotProduct(Dir, View) < 0.3f ? View : Dir;
 	}
-	double ServerNow(const UObject* W)
+	double VaServerNow(const UObject* W)
 	{
 		const UWorld* World = W ? W->GetWorld() : nullptr;
 		const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
 		return GS ? GS->GetServerWorldTimeSeconds() : (World ? World->GetTimeSeconds() : 0.0);
 	}
-	FVector Ground(const UWorld* World, const FVector& P, const AActor* Ignore)
+	FVector VaGround(const UWorld* World, const FVector& P, const AActor* Ignore)
 	{
 		const float Z = WRLand::GroundZAt(P, TNumericLimits<float>::Lowest());
 		if (Z > TNumericLimits<float>::Lowest()) return FVector(P.X, P.Y, Z);
@@ -72,8 +72,8 @@ namespace WRVoidAim
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRVoidAimGround), false, Ignore);
 		return World->LineTraceSingleByChannel(Hit, P + FVector(0, 0, 800.f), P - FVector(0, 0, 3000.f), ECC_WorldStatic, Q) ? FVector(Hit.ImpactPoint) : P;
 	}
-	bool Boss(const AActor* A) { return Cast<AWRBoss>(A) != nullptr; }
-	FName TierOf(const AActor* A)
+	bool VaIsBoss(const AActor* A) { return Cast<AWRBoss>(A) != nullptr; }
+	FName VaTierOf(const AActor* A)
 	{
 		const AWRCreature* C = Cast<AWRCreature>(A);
 		return C && C->GetDef() ? C->GetDef()->Tier : FName(TEXT("highland"));
@@ -157,12 +157,12 @@ void UWRGA_VoidSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 
 FVector UWRGA_VoidSpell::AimGround(const AWRCharacterBase* Caster, float Range) const
 {
-	if (AWRCharacterBase* Lock = Locked(Caster)) if (FVector::Dist(Lock->GetActorLocation(), Caster->GetActorLocation()) <= Range) return Ground(Caster->GetWorld(), Lock->GetActorLocation(), Caster);
+	if (AWRCharacterBase* Lock = VaLocked(Caster)) if (FVector::Dist(Lock->GetActorLocation(), Caster->GetActorLocation()) <= Range) return VaGround(Caster->GetWorld(), Lock->GetActorLocation(), Caster);
 	FVector Point;
 	const AWRCharacter* S = Cast<AWRCharacter>(Caster);
-	if (S && S->CrosshairPoint(Range, false, Point) && FVector::Dist(Point, Caster->GetActorLocation()) <= Range) return Ground(Caster->GetWorld(), Point, Caster);
+	if (S && S->CrosshairPoint(Range, false, Point) && FVector::Dist(Point, Caster->GetActorLocation()) <= Range) return VaGround(Caster->GetWorld(), Point, Caster);
 	const FVector Ahead = Caster->GetActorLocation() + FRotator(0.f, Caster->GetControlRotation().Yaw, 0.f).Vector() * FMath::Min(Range, 600.f);
-	return Ground(Caster->GetWorld(), Ahead, Caster);
+	return VaGround(Caster->GetWorld(), Ahead, Caster);
 }
 
 // ---------------------------------------------------------------- Void bolt
@@ -180,7 +180,7 @@ void UWRGA_VoidBolt::CastVoid(AWRCharacterBase* Caster)
 	const float Speed = Spell(TEXT("speed"), 2800.f);
 	const FVector Chest = Caster->GetActorLocation() + FVector(0.f, 0.f, 40.f);
 	AWRCharacterBase* Lock = nullptr;
-	const FVector Dir = AimDir(Caster, Chest, Speed, Lock);
+	const FVector Dir = VaAimDir(Caster, Chest, Speed, Lock);
 	FWRHit Hit;
 	Hit.Instigator = Caster;
 	Hit.Damage = Spell(TEXT("damage"), 24.f);
@@ -195,7 +195,7 @@ void UWRGA_VoidBolt::CastVoid(AWRCharacterBase* Caster)
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AWRProjectile* Bolt = Caster->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), Chest + Dir * 70.f, Dir.Rotation(), Params))
 	{
-		Bolt->Init(Hit, Speed, Deep);
+		Bolt->Init(Hit, Speed, VaDeep);
 		if (Lock)
 		{
 			const float Homing = Lock->IsCreature() ? WRTune(TEXT("spells.lockHoming"), 6000.f) : Spell(TEXT("lockHomingPlayers"), 0.f);
@@ -208,7 +208,7 @@ void UWRGA_VoidBolt::CastVoid(AWRCharacterBase* Caster)
 
 namespace WRVoidAim
 {
-	AWRVoidField* SpawnField(AWRCharacterBase* Caster, const FVector& At, uint8 Kind, float Radius, float Seconds)
+	AWRVoidField* VaSpawnField(AWRCharacterBase* Caster, const FVector& At, uint8 Kind, float Radius, float Seconds)
 	{
 		const FTransform T(At);
 		AWRVoidField* F = Caster->GetWorld()->SpawnActorDeferred<AWRVoidField>(AWRVoidField::StaticClass(), T, Caster, Caster, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
@@ -216,7 +216,7 @@ namespace WRVoidAim
 		F->Kind = Kind;
 		F->Radius = Radius;
 		F->Seconds = Seconds;
-		F->Born = ServerNow(Caster);
+		F->Born = VaServerNow(Caster);
 		F->Caster = Caster;
 		F->bSwallow = UWRPathComponent::HasNode(Caster, TEXT("void"), TEXT("event_horizon"));
 		F->bSpark = Kind == 1 && Caster->HasTag(WRVoidPath::Combo_SingularitySpark);
@@ -235,7 +235,7 @@ UWRGA_VoidRift::UWRGA_VoidRift()
 void UWRGA_VoidRift::CastVoid(AWRCharacterBase* Caster)
 {
 	const FVector At = AimGround(Caster, Spell(TEXT("range"), 1500.f));
-	if (AWRVoidField* F = SpawnField(Caster, At, 0, Spell(TEXT("radius"), 300.f), Spell(TEXT("seconds"), 6.f)))
+	if (AWRVoidField* F = VaSpawnField(Caster, At, 0, Spell(TEXT("radius"), 300.f), Spell(TEXT("seconds"), 6.f)))
 	{
 		F->Dps = Spell(TEXT("dps"), 14.f);
 		F->FinishSpawning(FTransform(At));
@@ -252,7 +252,7 @@ UWRGA_BlackHole::UWRGA_BlackHole()
 void UWRGA_BlackHole::CastVoid(AWRCharacterBase* Caster)
 {
 	const FVector At = AimGround(Caster, Spell(TEXT("range"), 2000.f));
-	if (AWRVoidField* F = SpawnField(Caster, At, 1, Spell(TEXT("radius"), 600.f), Spell(TEXT("seconds"), 4.f)))
+	if (AWRVoidField* F = VaSpawnField(Caster, At, 1, Spell(TEXT("radius"), 600.f), Spell(TEXT("seconds"), 4.f)))
 	{
 		F->Pull = Spell(TEXT("pull"), 600.f);
 		F->Crush = Spell(TEXT("damage"), 80.f);
@@ -283,8 +283,8 @@ void UWRGA_Collapse::CastVoid(AWRCharacterBase* Caster)
 	{
 		if (*It == Caster || !It->IsAlive() || !Caster->IsHostileTo(*It) || FVector::Dist(It->GetActorLocation(), Centre) > Radius + It->GetSimpleCollisionRadius()) continue;
 		Pulled.Add(*It);
-		if (Boss(*It)) continue;
-		const float Share = TierOf(*It) == TEXT("highland") ? Spell(TEXT("highlandShare"), 0.5f) : 1.f;
+		if (VaIsBoss(*It)) continue;
+		const float Share = VaTierOf(*It) == TEXT("highland") ? Spell(TEXT("highlandShare"), 0.5f) : 1.f;
 		const FVector To = Centre - It->GetActorLocation();
 		const float Dist = FMath::Max(0.f, To.Size2D() - Caster->GetSimpleCollisionRadius() - It->GetSimpleCollisionRadius() - 30.f) * Share;
 		It->LaunchCharacter(To.GetSafeNormal2D() * Dist / FMath::Max(0.1f, PullT) + FVector(0, 0, 120.f), true, true);
@@ -332,7 +332,7 @@ void UWRGA_MawOfTheVoid::CastVoid(AWRCharacterBase* Caster)
 	const FTransform T(Face, Feet + Face.Vector() * Range * 0.5f);
 	if (AWRVoidMaw* M = Caster->GetWorld()->SpawnActorDeferred<AWRVoidMaw>(AWRVoidMaw::StaticClass(), T, Caster, Caster, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 	{
-		M->Born = ServerNow(Caster);
+		M->Born = VaServerNow(Caster);
 		M->Range = Range;
 		M->Close = Close;
 		M->SetLifeSpan(Close + 1.2f);
@@ -353,7 +353,7 @@ void UWRGA_MawOfTheVoid::CastVoid(AWRCharacterBase* Caster)
 			if (To.Size2D() > Range + It->GetSimpleCollisionRadius() || FVector::DotProduct(Face.Vector(), To.GetSafeNormal2D()) < FMath::Cos(FMath::DegreesToRadians(Arc * 0.5f))) continue;
 			// Lowland and midland foes under 30% are eaten outright (each wins back 5 max HP).
 			const AWRCreature* Cr = Cast<AWRCreature>(*It);
-			const bool bEat = Cr && !Boss(Cr) && (TierOf(Cr) == TEXT("lowland") || TierOf(Cr) == TEXT("midland")) && Cr->GetHealthFraction() < EatBelow;
+			const bool bEat = Cr && !VaIsBoss(Cr) && (VaTierOf(Cr) == TEXT("lowland") || VaTierOf(Cr) == TEXT("midland")) && Cr->GetHealthFraction() < EatBelow;
 			FWRHit Hit;
 			Hit.Instigator = C;
 			Hit.Damage = bEat ? FMath::Max(Damage, It->GetAttributes() ? It->GetAttributes()->GetHealth() + 1.f : Damage) : Damage;
@@ -453,7 +453,7 @@ bool UWRGA_VoidBlink::CanActivateAbility(const FGameplayAbilitySpecHandle Handle
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags)) return false;
 	// Shadow step needs someone locked to step behind.
 	const AWRCharacterBase* Who = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
-	return !bBehindLock || Locked(Who) != nullptr;
+	return !bBehindLock || VaLocked(Who) != nullptr;
 }
 
 bool UWRGA_VoidBlink::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
@@ -509,7 +509,7 @@ void UWRGA_VoidBlink::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 	FVector Dir = C->GetCharacterMovement()->GetCurrentAcceleration().GetSafeNormal2D();
 	if (Dir.IsNearlyZero()) Dir = FRotator(0.f, C->GetControlRotation().Yaw, 0.f).Vector();
 	float Distance = T.Num(Key + TEXT(".distance"), 700.f);
-	AWRCharacterBase* Lock = bBehindLock ? Locked(C) : nullptr;
+	AWRCharacterBase* Lock = bBehindLock ? VaLocked(C) : nullptr;
 	if (Lock)
 	{
 		const FVector Behind = Lock->GetActorLocation() - Lock->GetActorForwardVector().GetSafeNormal2D() * (T.Num(Key + TEXT(".behind"), 120.f) + Lock->GetSimpleCollisionRadius() + C->GetSimpleCollisionRadius());
@@ -643,8 +643,8 @@ AWRCharacterBase* UWRGA_Consume::Prey(const AWRCharacterBase* Who)
 		const float Frac = A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 1.f;
 		// Bosses only while their stance is broken; Ice maw: any frozen non-boss; Insatiable 3: Riftborn and highland
 		// creatures at full.
-		bool bOk = Boss(*It) ? It->HasTag(WRTags::Status_StanceBroken) : Frac < Threshold || (bIceMaw && It->HasTag(WRTags::Status_Frozen));
-		if (!bOk && UWRPathComponent::Stat(Who, TEXT("consumeThreshold")) >= 0.09f && !Boss(*It) && TierOf(*It) == TEXT("highland")) bOk = true;
+		bool bOk = VaIsBoss(*It) ? It->HasTag(WRTags::Status_StanceBroken) : Frac < Threshold || (bIceMaw && It->HasTag(WRTags::Status_Frozen));
+		if (!bOk && UWRPathComponent::Stat(Who, TEXT("consumeThreshold")) >= 0.09f && !VaIsBoss(*It) && VaTierOf(*It) == TEXT("highland")) bOk = true;
 		if (bOk) { BestD = D; Best = *It; }
 	}
 	return Best;
@@ -704,7 +704,7 @@ void UWRGA_Consume::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 		Hit.Impact = 5;
 		Hit.Origin = Ch->GetActorLocation();
 		// A boss (stance-broken) takes the riposte x1.2 instead of being eaten.
-		Hit.Damage = Boss(Vi) ? UWRCombatLibrary::WeaponDamage(Ch->Weapon, false) * WRTune(TEXT("voidPath.critMult"), 3.f) * WRVoidPath::SpellNum(TEXT("consume"), TEXT("bossRiposte"), 1.2f)
+		Hit.Damage = VaIsBoss(Vi) ? UWRCombatLibrary::WeaponDamage(Ch->Weapon, false) * WRTune(TEXT("voidPath.critMult"), 3.f) * WRVoidPath::SpellNum(TEXT("consume"), TEXT("bossRiposte"), 1.2f)
 			: (Vi->GetAttributes() ? Vi->GetAttributes()->GetHealth() + 1.f : 9999.f);
 		UWRCombatLibrary::ApplyHit(Vi, Hit);
 		// It gives back 10% of what the Void took (Abyssal hunger heals a quarter of your max HP too).
@@ -744,7 +744,7 @@ void AWRVoidField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRVoidField, Born);
 }
 
-double AWRVoidField::Now() const { return ServerNow(this); }
+double AWRVoidField::Now() const { return VaServerNow(this); }
 
 void AWRVoidField::BeginPlay()
 {
@@ -901,7 +901,7 @@ void AWRVoidMaw::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AWRVoidMaw, Close);
 }
 
-double AWRVoidMaw::Now() const { return ServerNow(this); }
+double AWRVoidMaw::Now() const { return VaServerNow(this); }
 
 void AWRVoidMaw::BeginPlay()
 {
@@ -911,7 +911,7 @@ void AWRVoidMaw::BeginPlay()
 	// Four petals of black glass, each a long curved plate edged with hooked teeth, hinged at the ground round the cone's
 	// middle; they rise (open) and fold over (close). Each petal is its own frame so it turns about its hinge.
 	const FSurf Glass = FSurf::Glaze(FLinearColor(0.004f, 0.0035f, 0.006f), 0.1f);
-	const FSurf Edge = FSurf::Lit(Violet, 2.5f);
+	const FSurf Edge = FSurf::Lit(VaViolet, 2.5f);
 	const float R = Range * 0.45f;
 	for (int32 p = 0; p < 4; ++p)
 	{

@@ -1,5 +1,6 @@
 // The Corrupted wasteland's world things (see WRVoidWorld.h): its gathering, keepsakes, thrown things and Maren's deeds.
 #include "WRVoidWorld.h"
+#include "WRVoidUnmade.h"
 #include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "Wildreach.h"
@@ -32,17 +33,17 @@ namespace WRVoidWorldImpl
 	using WRLookKit::FSurf;
 	using WRLookKit::FKit;
 
-	double ServerNow(const UWorld* W)
+	double VwServerNow(const UWorld* W)
 	{
 		const AGameStateBase* GS = W ? W->GetGameState() : nullptr;
 		return GS ? GS->GetServerWorldTimeSeconds() : (W ? W->GetTimeSeconds() : 0.0);
 	}
-	float JNum(const TSharedPtr<FJsonObject>& O, const TCHAR* K, float F)
+	float VwNum(const TSharedPtr<FJsonObject>& O, const TCHAR* K, float F)
 	{
 		double V = F;
 		return O.IsValid() && O->TryGetNumberField(K, V) ? float(V) : F;
 	}
-	FString JStr(const TSharedPtr<FJsonObject>& O, const TCHAR* K)
+	FString VwStr(const TSharedPtr<FJsonObject>& O, const TCHAR* K)
 	{
 		FString V;
 		if (O.IsValid()) O->TryGetStringField(K, V);
@@ -50,28 +51,28 @@ namespace WRVoidWorldImpl
 	}
 
 	/** A keepsake: a lore item lying at a story site (wasteland.json pois "lore"). */
-	struct FKeepsake
+	struct FVwKeepsake
 	{
 		FName Land;
 		FName Item;
 		FString Site;
 		FVector World = FVector::ZeroVector;
 	};
-	TArray<FKeepsake>& Keepsakes()
+	TArray<FVwKeepsake>& VwKeepsakes()
 	{
-		static TArray<FKeepsake> L;
+		static TArray<FVwKeepsake> L;
 		return L;
 	}
 
 	/** The rifts a player's thrown stones have floated in (Count the stones: 3 different ones). */
-	TMap<FString, TSet<FName>>& Floated()
+	TMap<FString, TSet<FName>>& VwFloated()
 	{
 		static TMap<FString, TSet<FName>> M;
 		return M;
 	}
 
 	/** Where a keepsake lies: beside its site's middle (the site's own build stands on the middle), on the ground. */
-	FVector KeepsakeSpot(const FWRLandDef& D, const TSharedPtr<FJsonObject>& Poi)
+	FVector VwKeepsakeSpot(const FWRLandDef& D, const TSharedPtr<FJsonObject>& Poi)
 	{
 		const FVector2D At = WRLand::Vec2(Poi->TryGetField(TEXT("at")));
 		FVector2D Off(3.5f, 2.5f);
@@ -81,14 +82,14 @@ namespace WRVoidWorldImpl
 	}
 
 	/** A stone of rough facets, for the float stone and the thrown one: a lathe along Z with a jittered profile. */
-	void Stone(FWRToolMesh& M, float Size, float Seed, const FLinearColor& C)
+	void VwStone(FWRToolMesh& M, float Size, float Seed, const FLinearColor& C)
 	{
 		M.Lathe(FVector(0.f, 0.f, -Size * 0.42f), FVector::UpVector, Size * 0.84f,
 			{ FVector(0.f, Size * 0.18f, Size * 0.16f), FVector(0.22f, Size * 0.5f, Size * 0.44f), FVector(0.55f, Size * 0.55f, Size * 0.48f), FVector(0.82f, Size * 0.4f, Size * 0.36f), FVector(1.f, Size * 0.12f, Size * 0.1f) },
 			7, C, 0.92f, 0.15f, Seed);
 	}
 
-	AWRRift* RiftAt(UWorld* World, const FVector& At, float& OutShare)
+	AWRRift* VwRiftAt(UWorld* World, const FVector& At, float& OutShare)
 	{
 		AWRRift* Best = nullptr;
 		float BestD = TNumericLimits<float>::Max();
@@ -101,15 +102,15 @@ namespace WRVoidWorldImpl
 		return Best;
 	}
 
-	AWRResourceNode* SpawnNode(UWorld* World, FName Item, const FVector& At, float Yaw, const TSharedPtr<FJsonObject>& Row)
+	AWRResourceNode* VwSpawnNode(UWorld* World, FName Item, const FVector& At, float Yaw, const TSharedPtr<FJsonObject>& Row)
 	{
 		const FTransform T(FRotator(0.f, Yaw, 0.f), At);
 		AWRResourceNode* N = World->SpawnActorDeferred<AWRResourceNode>(AWRResourceNode::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		if (!N) return nullptr;
 		N->ItemId = Item;
-		N->Hits = FMath::Max(1, int32(JNum(Row, TEXT("hits"), 4.f)));
-		N->PerHit = FMath::Max(1, int32(JNum(Row, TEXT("perHit"), 1.f)));
-		N->RespawnSeconds = JNum(Row, TEXT("respawn"), 900.f);
+		N->Hits = FMath::Max(1, int32(VwNum(Row, TEXT("hits"), 4.f)));
+		N->PerHit = FMath::Max(1, int32(VwNum(Row, TEXT("perHit"), 1.f)));
+		N->RespawnSeconds = VwNum(Row, TEXT("respawn"), 900.f);
 		N->GemChance = 0.f;
 		N->Tags.Add(TEXT("void_land"));
 		N->FinishSpawning(T);
@@ -117,7 +118,7 @@ namespace WRVoidWorldImpl
 	}
 
 	/** Server: the land's gathering, from its "resources" rows. */
-	int32 SpawnResources(AWRLand* Land)
+	int32 VwSpawnResources(AWRLand* Land)
 	{
 		const FWRLandDef& D = *Land->Def();
 		const TSharedPtr<FJsonObject> Res = D.Section(TEXT("resources"));
@@ -133,14 +134,14 @@ namespace WRVoidWorldImpl
 			if (KV.Key.StartsWith(TEXT("_"))) continue;
 			const TSharedPtr<FJsonObject> Row = KV.Value->AsObject();
 			if (!Row.IsValid()) continue;
-			const FName Item(*JStr(Row, TEXT("item")));
+			const FName Item(*VwStr(Row, TEXT("item")));
 			const uint32 Salt = GetTypeHash(KV.Key);
 			// Fixed points (the Quire's mandrakes, the meteor bowl).
 			const TArray<TSharedPtr<FJsonValue>>* AtList = nullptr;
 			if (Row->TryGetArrayField(TEXT("at"), AtList))
 			{
 				int32 i = 0;
-				for (const TSharedPtr<FJsonValue>& A : *AtList) { if (SpawnNode(World, Item, D.GroundPoint(WRLand::Vec2(A)), 47.f * i++, Row)) ++Count; }
+				for (const TSharedPtr<FJsonValue>& A : *AtList) { if (VwSpawnNode(World, Item, D.GroundPoint(WRLand::Vec2(A)), 47.f * i++, Row)) ++Count; }
 				continue;
 			}
 			// A disc (the Glass Sea's voidglass): a sunflower spread, so they never bunch.
@@ -148,36 +149,36 @@ namespace WRVoidWorldImpl
 			if (Row->TryGetArrayField(TEXT("disc"), Disc) && Disc->Num() >= 2)
 			{
 				const FVector2D C((*Disc)[0]->AsNumber(), (*Disc)[1]->AsNumber());
-				const float R = JNum(Row, TEXT("r"), 100.f);
-				const int32 N = int32(JNum(Row, TEXT("count"), 10.f));
+				const float R = VwNum(Row, TEXT("r"), 100.f);
+				const int32 N = int32(VwNum(Row, TEXT("count"), 10.f));
 				for (int32 i = 0; i < N; ++i)
 				{
 					const float A = i * 2.39996f, Rr = R * FMath::Sqrt((i + 0.5f) / N);
-					if (SpawnNode(World, Item, D.GroundPoint(C + FVector2D(FMath::Cos(A), FMath::Sin(A)) * Rr), 61.f * i, Row)) ++Count;
+					if (VwSpawnNode(World, Item, D.GroundPoint(C + FVector2D(FMath::Cos(A), FMath::Sin(A)) * Rr), 61.f * i, Row)) ++Count;
 				}
 				continue;
 			}
 			// On every kit POI of a kind (the Grey Strand's salt pans: four crusts round the pan).
-			const FString Kit = JStr(Row, TEXT("kit"));
+			const FString Kit = VwStr(Row, TEXT("kit"));
 			if (!Kit.IsEmpty())
 			{
-				const int32 Per = int32(JNum(Row, TEXT("per"), 1.f));
-				const float Spread = JNum(Row, TEXT("spread"), 8.f);
+				const int32 Per = int32(VwNum(Row, TEXT("per"), 1.f));
+				const float Spread = VwNum(Row, TEXT("spread"), 8.f);
 				for (const WRLandSites::FKitPoi& K : WRLandSites::KitPois())
 				{
 					if (K.Land != D.Id || K.Kind != FName(*Kit)) continue;
 					for (int32 p = 0; p < Per; ++p)
 					{
 						const float A = 2.f * PI * (p + 0.5f) / Per + 0.4f;
-						if (SpawnNode(World, Item, D.GroundPoint(K.At + FVector2D(FMath::Cos(A), FMath::Sin(A)) * Spread), 90.f * p, Row)) ++Count;
+						if (VwSpawnNode(World, Item, D.GroundPoint(K.At + FVector2D(FMath::Cos(A), FMath::Sin(A)) * Spread), 90.f * p, Row)) ++Count;
 					}
 				}
 				continue;
 			}
 			// A zone pass: a seeded grid, kept to density and clear of the places; greywood in the forest's stands,
 			// ashen grain in its clearings (the stand noise the decoration pass grows its pines from).
-			const FName ZoneId(*JStr(Row, TEXT("zone")));
-			const float Step = JNum(Row, TEXT("step"), 50.f), Density = JNum(Row, TEXT("density"), 0.3f), Gap = JNum(Row, TEXT("gap"), 30.f);
+			const FName ZoneId(*VwStr(Row, TEXT("zone")));
+			const float Step = VwNum(Row, TEXT("step"), 50.f), Density = VwNum(Row, TEXT("density"), 0.3f), Gap = VwNum(Row, TEXT("gap"), 30.f);
 			bool bClearing = false;
 			Row->TryGetBoolField(TEXT("clearing"), bClearing);
 			const FWRLandZone* Zone = D.Zones.FindByPredicate([&](const FWRLandZone& Z) { return Z.Id == ZoneId; });
@@ -196,7 +197,7 @@ namespace WRVoidWorldImpl
 					for (const FVector2D& P : Places) if (FVector2D::DistSquared(P, M) < Gap * Gap) { bNear = true; break; }
 					if (bNear) continue;
 					if (D.Height(M + FVector2D(2.f, 0.f)) - D.Height(M - FVector2D(2.f, 0.f)) > 3.f) continue;   // not on a steep bank
-					if (SpawnNode(World, Item, D.GroundPoint(M), 360.f * (D.Noise(M) * 0.5f + 0.5f), Row)) ++Count;
+					if (VwSpawnNode(World, Item, D.GroundPoint(M), 360.f * (D.Noise(M) * 0.5f + 0.5f), Row)) ++Count;
 				}
 			}
 		}
@@ -204,7 +205,7 @@ namespace WRVoidWorldImpl
 	}
 
 	/** Every machine: each keepsake's look (a small thing set down where the story left it, with a faint glint). */
-	void BuildKeepsakes(AWRLand* Land)
+	void VwBuildKeepsakes(AWRLand* Land)
 	{
 		const FWRLandDef& D = *Land->Def();
 		const bool bDraw = Land->GetNetMode() != NM_DedicatedServer;
@@ -219,13 +220,13 @@ namespace WRVoidWorldImpl
 		for (const TSharedPtr<FJsonValue>& V : *Pois)
 		{
 			const TSharedPtr<FJsonObject> P = V->AsObject();
-			const FString Lore = JStr(P, TEXT("lore"));
+			const FString Lore = VwStr(P, TEXT("lore"));
 			if (Lore.IsEmpty()) continue;
-			FKeepsake& S = Keepsakes().AddDefaulted_GetRef();
+			FVwKeepsake& S = VwKeepsakes().AddDefaulted_GetRef();
 			S.Land = D.Id;
 			S.Item = FName(*Lore);
-			S.Site = JStr(P, TEXT("name"));
-			S.World = KeepsakeSpot(D, P);
+			S.Site = VwStr(P, TEXT("name"));
+			S.World = VwKeepsakeSpot(D, P);
 			if (!bDraw) continue;
 			const FVector L = S.World - Land->GetActorLocation();
 			// A flat stone set down like a table, a cloth folded on it, the thing itself on the cloth.
@@ -241,11 +242,11 @@ namespace WRVoidWorldImpl
 		if (bDraw && Blocks.Num()) FWRBuildLook::Spawn(Land, Land->GetRootComponent(), Blocks, FLinearColor(FColor(150, 142, 128)), false);
 	}
 
-	const FKeepsake* KeepsakeNear(const FVector& At, float Range)
+	const FVwKeepsake* VwKeepsakeNear(const FVector& At, float Range)
 	{
-		const FKeepsake* Best = nullptr;
+		const FVwKeepsake* Best = nullptr;
 		float BestD = Range;
-		for (const FKeepsake& S : Keepsakes())
+		for (const FVwKeepsake& S : VwKeepsakes())
 		{
 			const float Dd = FVector::Dist(S.World, At);
 			if (Dd < BestD) { BestD = Dd; Best = &S; }
@@ -261,16 +262,18 @@ using namespace WRVoidWorldImpl;
 void WRVoidWorld::LandReady(AWRLand* Land)
 {
 	if (!Land || !Land->Def() || Land->Def()->Biome != TEXT("wasteland")) return;
-	BuildKeepsakes(Land);
+	VwBuildKeepsakes(Land);
 	if (Land->GetNetMode() == NM_Client) return;
-	const int32 N = SpawnResources(Land);
+	const int32 N = VwSpawnResources(Land);
 	// Its dens (WRVoidCreatures): day and night tables per zone, the Riftmaws in the large rifts, the Hush on the road.
 	UWRVoidLife::PlaceDens(Land);
 	// Its bosses' arenas, the Null Gate and Vorhollow's stage (WRVoidBosses).
 	FWRVoidBoss::PlaceArenas(Land);
 	// Its litter fire, hollow crust and the Rift Storm (WRVoidHazards).
 	AWRVoidState::Spawn(Land);
-	UE_LOG(LogWildreach, Log, TEXT("VOID %s: %d resource nodes, %d keepsakes"), *Land->LandId.ToString(), N, Keepsakes().Num());
+	// The Unmade Place in the Great Rift, its stair and its lift (WRVoidUnmade).
+	AWRUnmadePlace::Spawn(Land);
+	UE_LOG(LogWildreach, Log, TEXT("VOID %s: %d resource nodes, %d keepsakes"), *Land->LandId.ToString(), N, VwKeepsakes().Num());
 }
 
 FWRVoidSalted& WRVoidWorld::OnSalted()
@@ -300,7 +303,7 @@ void WRVoidWorld::Harvested(AWRResourceNode* Node, AWRCharacterBase* Gatherer, b
 	{
 		// The pull: the root shivers in your hands for 0.9 s (dust off the leaves, a thin rising whine), then screams.
 		const TSharedPtr<FJsonObject> Row = [&]() { const FWRLandDef* D = WRLand::At(Node->GetActorLocation()); return D ? D->Section(TEXT("mandrake")) : TSharedPtr<FJsonObject>(); }();
-		const float Shiver = JNum(Row, TEXT("shiver"), 0.9f), Radius = JNum(Row, TEXT("radius"), 12.f) * 100.f, Stagger = JNum(Row, TEXT("stagger"), 0.8f);
+		const float Shiver = VwNum(Row, TEXT("shiver"), 0.9f), Radius = VwNum(Row, TEXT("radius"), 12.f) * 100.f, Stagger = VwNum(Row, TEXT("stagger"), 0.8f);
 		const FVector At = Node->GetActorLocation() + FVector(0, 0, 40.f);
 		WRFx::Broadcast(Node, TEXT("void.mandrake.shiver"), At, FRotator::ZeroRotator, 1.f, TEXT("void.mandrake.shiver"));
 		TWeakObjectPtr<UWorld> WeakWorld(Node->GetWorld());
@@ -336,7 +339,7 @@ bool WRVoidWorld::BuildThrownModel(const FString& ModelPath, UProceduralMeshComp
 	if (ModelPath == TEXT("code:riftstone"))
 	{
 		// A fist-sized grey stone, flat-faceted.
-		Stone(M, 9.f, 3.f, FLinearColor(FColor(110, 106, 100)));
+		VwStone(M, 9.f, 3.f, FLinearColor(FColor(110, 106, 100)));
 	}
 	else if (ModelPath == TEXT("code:anchorsalt"))
 	{
@@ -376,14 +379,14 @@ void WRVoidWorld::ThrownLanded(AActor* Projectile, FName Kind, const FVector& At
 		// On hollow crust: it cracks through and shows the drop.
 		AWRVoidState::CrustStruck(World, At, 120.f);
 		float Share = 1.f;
-		AWRRift* Rift = RiftAt(World, At, Share);
+		AWRRift* Rift = VwRiftAt(World, At, Share);
 		if (!Rift) return;
 		// In a zone: it lifts off the ground and hangs, bobbing (the floating rule). Higher the nearer the tear.
 		const FVector Ground(At.X, At.Y, WRLand::GroundZAt(At, At.Z));
 		const FTransform T(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Ground);
 		if (AWRVoidFloatStone* S = World->SpawnActorDeferred<AWRVoidFloatStone>(AWRVoidFloatStone::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 		{
-			S->LandedAt = ServerNow(World);
+			S->LandedAt = VwServerNow(World);
 			S->Ground = Ground;
 			S->Rise = FMath::Lerp(WRTune(TEXT("voidWorld.floatStone.riseNear"), 40.f), WRTune(TEXT("voidWorld.floatStone.riseFar"), 12.f), Share);
 			S->SetLifeSpan(WRTune(TEXT("voidWorld.floatStone.seconds"), 30.f));
@@ -393,7 +396,7 @@ void WRVoidWorld::ThrownLanded(AActor* Projectile, FName Kind, const FVector& At
 		const APawn* Thrower = Cast<APawn>(By);
 		if (Thrower && Thrower->GetPlayerState())
 		{
-			TSet<FName>& Seen = Floated().FindOrAdd(Thrower->GetPlayerState()->GetPlayerName());
+			TSet<FName>& Seen = VwFloated().FindOrAdd(Thrower->GetPlayerState()->GetPlayerName());
 			if (!Seen.Contains(Rift->RiftId))
 			{
 				Seen.Add(Rift->RiftId);
@@ -409,7 +412,7 @@ bool WRVoidWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FStr
 {
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!Me) return false;
-	const FKeepsake* S = KeepsakeNear(Me->GetActorLocation(), WRTune(TEXT("voidWorld.keepsakeRange"), 260.f));
+	const FVwKeepsake* S = VwKeepsakeNear(Me->GetActorLocation(), WRTune(TEXT("voidWorld.keepsakeRange"), 260.f));
 	if (!S) return false;
 	OutTarget = S->Site;
 	OutVerb = FString::Printf(TEXT("Take: %s"), *WRWorld::ItemName(S->Item));
@@ -419,7 +422,7 @@ bool WRVoidWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FStr
 bool WRVoidWorld::ClientInteract(AWRPlayerController* PC)
 {
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
-	if (!Me || !KeepsakeNear(Me->GetActorLocation(), WRTune(TEXT("voidWorld.keepsakeRange"), 260.f))) return false;
+	if (!Me || !VwKeepsakeNear(Me->GetActorLocation(), WRTune(TEXT("voidWorld.keepsakeRange"), 260.f))) return false;
 	PC->SendCommand(TEXT("land keep"));
 	return true;
 }
@@ -430,7 +433,7 @@ FString WRVoidWorld::Command(AWRPlayerController* PC, const TArray<FString>& Arg
 	const FString Verb = Args.IsValidIndex(1) ? Args[1] : FString();
 	if (!Me || Verb != TEXT("keep")) return FString();
 	// A little slack over the prompt's reach: the client asked from where it stood a moment ago.
-	const FKeepsake* S = KeepsakeNear(Me->GetActorLocation(), WRTune(TEXT("voidWorld.keepsakeRange"), 260.f) + 150.f);
+	const FVwKeepsake* S = VwKeepsakeNear(Me->GetActorLocation(), WRTune(TEXT("voidWorld.keepsakeRange"), 260.f) + 150.f);
 	if (!S) return TEXT("Nothing to take here.");
 	UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me);
 	if (!Inv) return FString();
@@ -468,7 +471,7 @@ void AWRVoidFloatStone::BeginPlay()
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		FWRToolMesh M;
-		Stone(M, 9.f, 3.f, FLinearColor(FColor(110, 106, 100)));
+		VwStone(M, 9.f, 3.f, FLinearColor(FColor(110, 106, 100)));
 		M.ApplyTo(Model);
 		WRFx::Attach(Model, TEXT("void.stone.float"), NAME_None, 1.f);
 	}
@@ -476,7 +479,7 @@ void AWRVoidFloatStone::BeginPlay()
 
 double AWRVoidFloatStone::Now() const
 {
-	return ServerNow(GetWorld());
+	return VwServerNow(GetWorld());
 }
 
 void AWRVoidFloatStone::Tick(float DeltaSeconds)

@@ -294,7 +294,9 @@ on that land's height function (`WRLand::PlaceOn`). The Void path: rules `WRVoid
 spell>, nodeEffects.void.*), abilities `WRAbilitiesVoid.*` (pay through `WRVoidPath::Pay`; registry in WRAbilities.cpp). Its bosses:
 `WRVoidBosses.*` (FWRVoidBoss hooks beside the Storm / Swamp ones in WRBoss*.cpp; arenas from wasteland.json `bosses`;
 the Null Gate and Vorhollow's stage are actors whose motion is a function of their replicated clocks). Its hazards and
-the Rift Storm: `WRVoidHazards.*` (one replicated `AWRVoidState` per land; the event schedule is world.json's).
+the Rift Storm: `WRVoidHazards.*` (one replicated `AWRVoidState` per land; the event schedule is world.json's). The
+Unmade Place and the Descent lift: `WRVoidUnmade.*` (E prompts through `WRLandThings`: `land lift`, `land winch`,
+`land keep`). In these files keep file-scope helper names prefixed (unity builds join files).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

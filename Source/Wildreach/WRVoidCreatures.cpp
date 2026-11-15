@@ -101,7 +101,7 @@ namespace WRVoidCreaturesLocal
 	bool VcWild(const AWRCreature* C) { return C && C->IsAlive() && !C->IsTamed(); }
 
 	/** A row's own object (the numbers its motion reads beyond the schema: blink, trail, latch, scream). */
-	TSharedPtr<FJsonObject> RowExtra(FName CreatureId, FName RowId)
+	TSharedPtr<FJsonObject> VcRowExtra(FName CreatureId, FName RowId)
 	{
 		static TSharedPtr<FJsonObject> Root;
 		if (!Root.IsValid()) Root = FWRTuning::LoadDataFile(TEXT("attacks.json"));
@@ -111,14 +111,14 @@ namespace WRVoidCreaturesLocal
 		if (Root.IsValid() && Root->TryGetObjectField(TEXT("creatures"), Cs) && (*Cs)->TryGetObjectField(CreatureId.ToString(), C) && (*C)->TryGetObjectField(RowId.ToString(), R)) return *R;
 		return nullptr;
 	}
-	TSharedPtr<FJsonObject> Sub(const TSharedPtr<FJsonObject>& O, const TCHAR* Field)
+	TSharedPtr<FJsonObject> VcSub(const TSharedPtr<FJsonObject>& O, const TCHAR* Field)
 	{
 		const TSharedPtr<FJsonObject>* S = nullptr;
 		return O.IsValid() && O->TryGetObjectField(Field, S) ? *S : nullptr;
 	}
 
 	/** The nearest rift tear (large ones only if asked) within Max cm of a point, or null. */
-	AWRRift* NearestRift(const UWorld* World, const FVector& At, float Max, bool bLargeOnly)
+	AWRRift* VcNearestRift(const UWorld* World, const FVector& At, float Max, bool bLargeOnly)
 	{
 		AWRRift* Best = nullptr;
 		float BestD = Max;
@@ -132,7 +132,7 @@ namespace WRVoidCreaturesLocal
 	}
 
 	/** The ground under a point: a live land's height function, else a trace, else the point. */
-	FVector GroundUnder(const UWorld* World, const FVector& P, const AActor* Ignore)
+	FVector VcGroundUnder(const UWorld* World, const FVector& P, const AActor* Ignore)
 	{
 		const float Z = WRLand::GroundZAt(P, TNumericLimits<float>::Lowest());
 		if (Z > TNumericLimits<float>::Lowest()) return FVector(P.X, P.Y, Z);
@@ -142,9 +142,9 @@ namespace WRVoidCreaturesLocal
 		return P;
 	}
 
-	AWRCharacter* PlayerOf(AActor* A) { return Cast<AWRCharacter>(A); }
+	AWRCharacter* VcPlayerOf(AActor* A) { return Cast<AWRCharacter>(A); }
 
-	enum EGroup : int32 { GrpStatic = 0, GrpJaw = 1, GrpEars = 2, GrpStrand = 3, GrpHoles = 4, GrpSeam = 5, GrpRows = 6, GrpEyes = 7 };
+	enum EVcGroup : int32 { VGrpStatic = 0, VGrpJaw = 1, VGrpEars = 2, VGrpStrand = 3, VGrpHoles = 4, VGrpSeam = 5, VGrpRows = 6, VGrpEyes = 7 };
 }
 using namespace WRVoidCreaturesLocal;
 
@@ -237,7 +237,7 @@ void UWRVoidBody::BeginPlay()
 	// A Riftmaw lies in the large rift it was found by.
 	if (C->CreatureId == TEXT("riftmaw"))
 	{
-		if (AWRRift* R = NearestRift(GetWorld(), C->GetActorLocation(), VcT(TEXT("riftmaw.homeSearch"), 6000.f), true))
+		if (AWRRift* R = VcNearestRift(GetWorld(), C->GetActorLocation(), VcT(TEXT("riftmaw.homeSearch"), 6000.f), true))
 		{
 			HomeRift = R;
 			FTimerHandle H;
@@ -480,7 +480,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Add(EdgeLit, FVector(4.f, 3.f, 26.f), FVector(0.f, W * 0.5f + 1.f, T * 150.f));
 				Kit.Add(EdgeLit, FVector(4.f, 3.f, 26.f), FVector(0.f, -W * 0.5f - 1.f, T * 150.f));
 			}
-		}), GrpRows);
+		}), VGrpRows);
 	}
 	else if (K == TEXT("rift_heart"))
 	{
@@ -489,7 +489,7 @@ void UWRVoidBody::BuildLook()
 		{
 			for (int32 i = 0; i < 6; ++i) Kit.Add(Glass, FVector(110.f - 10.f * i, 90.f - 6.f * i, 120.f - 8.f * i), FVector::ZeroVector, FRotator(30.f * i, 47.f * i, 13.f * i));
 			for (int32 i = 0; i < 6; ++i) Kit.Add(EdgeLit, FVector(4.f, 4.f, 110.f), FVector(FMath::Cos(i * 1.05f) * 40.f, FMath::Sin(i * 1.05f) * 40.f, 0.f), FRotator(20.f * i, 60.f * i, 0.f));
-		}), GrpStrand);
+		}), VGrpStrand);
 		Glow = NewObject<UPointLightComponent>(C);
 		Glow->SetupAttachment(Body);
 		Glow->SetIntensity(2500.f);
@@ -509,7 +509,7 @@ void UWRVoidBody::BuildLook()
 			}
 			for (int32 f = 0; f < 6; ++f) Kit.Add(EdgeLit, FVector(4.f, 4.f, 120.f), FVector(FMath::Cos(f * 1.05f) * 70.f, FMath::Sin(f * 1.05f) * 70.f, 0.f), FRotator(0.f, 0.f, 15.f));
 			for (int32 c = 0; c < 4; ++c) Kit.Rod(FSurf::Stone(VcHex(TEXT("#3A3438")), 0.8f), FVector(FMath::Cos(c * 1.57f) * 60.f, FMath::Sin(c * 1.57f) * 60.f, 90.f), FVector(FMath::Cos(c * 1.57f) * 300.f, FMath::Sin(c * 1.57f) * 300.f, 1300.f), 8.f);
-		}), GrpRows);
+		}), VGrpRows);
 		Glow = NewObject<UPointLightComponent>(C);
 		Glow->SetupAttachment(Body);
 		Glow->SetIntensity(3000.f);
@@ -527,7 +527,7 @@ void UWRVoidBody::BuildLook()
 		{
 			Kit.Add(FSurf::Lit(VcHex(TEXT("#2B1840")), 4.f), FVector(22.f), FVector::ZeroVector, FRotator(35.f, 20.f, 10.f));
 			Kit.Add(EdgeLit, FVector(26.f, 4.f, 4.f), FVector::ZeroVector, FRotator(0.f, 45.f, 0.f));
-		}), GrpEyes);
+		}), VGrpEyes);
 		FVector Hand = C->GetActorLocation();
 		const FName HandBone = BoneAt(TEXT("righthand"), Hand);
 		if (!HandBone.IsNone())
@@ -539,7 +539,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Rod(IronS, FVector(0.f, -20.f, 180.f), FVector(0.f, -20.f, 250.f), 5.f);
 				Kit.Rod(IronS, FVector(0.f, 20.f, 180.f), FVector(0.f, 20.f, 250.f), 5.f);
 				Kit.Rod(IronS, FVector(0.f, -20.f, 180.f), FVector(0.f, 20.f, 180.f), 6.f);
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 	}
 	else if (K == TEXT("null_warden"))
@@ -552,7 +552,7 @@ void UWRVoidBody::BuildLook()
 			Kit.Add(Bronze, FVector(H * 0.3f, H * 0.3f, H * 0.32f), FVector(0.f, 0.f, H * 0.04f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 			Kit.Add(Bronze, FVector(H * 0.36f, H * 0.36f, H * 0.06f), FVector(0.f, 0.f, -H * 0.13f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 			Kit.Add(EdgeLit, FVector(H * 0.02f, H * 0.22f, H * 0.02f), FVector(H * 0.15f, 0.f, 0.f));
-		}), GrpStatic);
+		}), VGrpStatic);
 		FVector LHand = C->GetActorLocation();
 		const FName LBone = BoneAt(TEXT("lefthand"), LHand);
 		if (!LBone.IsNone())
@@ -564,7 +564,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Rod(IronS, FVector::ZeroVector, FVector(0.f, 0.f, -90.f), 4.f);
 				Kit.Add(Bronze, FVector(160.f, 160.f, 180.f), FVector(0.f, 0.f, -190.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
 				Kit.Add(Bronze, FVector(170.f, 170.f, 20.f), FVector(0.f, 0.f, -280.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 	}
 	else if (K == TEXT("starving_one"))
@@ -575,7 +575,7 @@ void UWRVoidBody::BuildLook()
 			const FSurf BoneS = FSurf::Stone(VcHex(TEXT("#B8B0A0")), 0.7f);
 			Kit.Add(BoneS, FVector(Snout * 0.9f, H * 0.18f, H * 0.04f), FVector(Snout * 0.3f, 0.f, -H * 0.28f), FRotator(-35.f, 0.f, 0.f));
 			for (int32 t = 0; t < 8; ++t) Kit.Spike(BoneS, FVector(Snout * (0.05f + 0.08f * t), (t % 2 ? 1.f : -1.f) * H * 0.06f, -H * 0.2f - t * H * 0.03f), FVector(0.f, 0.f, 1.f), H * 0.02f, H * 0.05f);
-		}), GrpJaw);
+		}), VGrpJaw);
 	}
 	else if (K == TEXT("echo"))
 	{
@@ -593,7 +593,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Add(Plume, FVector(30.f, 4.f, 90.f), Dir.GetSafeNormal() * 360.f, Dir.GetSafeNormal().Rotation() + FRotator(-90.f, 0.f, 0.f));
 				Kit.Add(EdgeLit, FVector(2.f, 2.f, 40.f), Dir.GetSafeNormal() * 395.f, Dir.GetSafeNormal().Rotation() + FRotator(-90.f, 0.f, 0.f));
 			}
-		}), GrpHoles);
+		}), VGrpHoles);
 	}
 	else if (K == TEXT("vorhollow"))
 	{
@@ -611,14 +611,14 @@ void UWRVoidBody::BuildLook()
 				Kit.Spike(Glass, FVector(0.f, FMath::Cos(A) * 200.f, FMath::Sin(A) * 200.f), FVector(0.3f, -FMath::Cos(A), -FMath::Sin(A)).GetSafeNormal(), 20.f, 60.f);
 			}
 			Kit.Disc(EdgeLit, FVector(-4.f, 0.f, 0.f), FVector(1.f, 0.f, 0.f), 420.f, 6.f);
-		}), GrpEyes);
+		}), VGrpEyes);
 		for (const TPair<FName, FVector>& Sp : BonesWith(TEXT("spine")))
 		{
 			AddGroup(Sp.Key, Sp.Value + FVector(0, 0, H * 0.25f), Yaw, Blocks([&](FKit& Kit)
 			{
 				Kit.Spike(Glass, FVector::ZeroVector, FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), H * 0.05f, H * 0.18f);
 				Kit.Spike(EdgeLit, FVector(1.f, 0.f, 0.f), FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), H * 0.012f, H * 0.16f);
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 		for (const TCHAR* Hand : { TEXT("l-hand"), TEXT("r-hand") })
 		{
@@ -636,7 +636,7 @@ void UWRVoidBody::BuildLook()
 					P = Q;
 				}
 				Kit.Spike(EdgeLit, P, FVector(0.3f, 0.f, -1.f).GetSafeNormal(), 4.f, 30.f);
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 	}
 	else if (K == TEXT("hollowfang"))
@@ -657,20 +657,20 @@ void UWRVoidBody::BuildLook()
 					Kit.Spike(Glass, FVector(X, Side * H * (0.085f - 0.006f * t), -H * 0.11f), FVector(0.1f, Side * 0.15f, 1.f).GetSafeNormal(), H * 0.022f, Len * 0.8f);
 				}
 			}
-		}), GrpEyes);
+		}), VGrpEyes);
 		const TArray<TPair<FName, FVector>> Spine = BonesWith(TEXT("spine"));
 		for (const TPair<FName, FVector>& Sp : Spine)
 		{
 			AddGroup(Sp.Key, Sp.Value + FVector(0, 0, H * 0.32f), Yaw, Blocks([&](FKit& Kit)
 			{
 				Kit.Add(FSurf::Stone(VcHex(TEXT("#6E6A66")), 0.8f), FVector(H * 0.08f, H * 0.05f, H * 0.07f), FVector::ZeroVector, FRotator(12.f, 0.f, 0.f));
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 	}
 	else if (K == TEXT("riftmaw"))
 	{
 		// The lamprey mouth: a ring of hooked black-glass teeth round the snout's end, inside four bone jaw-plates that
-		// fold shut over it like petals and flare open for the grab (GrpJaw turns them).
+		// fold shut over it like petals and flare open for the grab (VGrpJaw turns them).
 		const FVector Mouth = Tip - Fwd * Snout * 0.1f;
 		const float R0 = H * 0.42f;
 		AddGroup(HeadBone, Mouth, Yaw, Blocks([&](FKit& Kit)
@@ -682,7 +682,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Spike(Glass, At, FVector(0.35f, -FMath::Cos(A), -FMath::Sin(A)).GetSafeNormal(), R0 * 0.09f, R0 * 0.4f);
 			}
 			Kit.Disc(VoidLit, FVector(-R0 * 0.2f, 0.f, 0.f), FVector(1.f, 0.f, 0.f), R0 * 1.1f, 2.f);
-		}), GrpStatic);
+		}), VGrpStatic);
 		for (int32 p = 0; p < 4; ++p)
 		{
 			const float A = 90.f * p + 45.f;
@@ -695,7 +695,7 @@ void UWRVoidBody::BuildLook()
 				{
 					Kit.Spike(Glass, FVector(R0 * (0.7f + 0.1f * t), -R0 * 0.3f + R0 * 0.2f * t, R0 * 0.52f), FVector(0.4f, 0.f, -1.f).GetSafeNormal(), R0 * 0.07f, R0 * 0.26f);
 				}
-			}), GrpJaw);
+			}), VGrpJaw);
 		}
 	}
 	else if (K == TEXT("nullwing"))
@@ -708,13 +708,13 @@ void UWRVoidBody::BuildLook()
 			{
 				Kit.Disc(EdgeLit, FVector(0.f, 0.f, 0.f), FVector(0.f, 0.f, 1.f), H * 0.2f, 1.2f);
 				Kit.Disc(FSurf::Lit(VcHex(TEXT("#0B0A10")), 0.f), FVector(0.f, 0.f, 0.6f), FVector(0.f, 0.f, 1.f), H * 0.16f, 1.2f);
-			}), GrpHoles);
+			}), VGrpHoles);
 		}
 		AddGroup(HeadBone, Head, Yaw, Blocks([&](FKit& Kit)
 		{
 			for (int32 t = 0; t < 6; ++t) for (const float Side : { -1.f, 1.f })
 				Kit.Spike(Glass, FVector(Snout * (0.5f + 0.08f * t), Side * H * 0.04f, -H * 0.05f), FVector(0.f, 0.f, -1.f), H * 0.015f, H * 0.05f);
-		}), GrpStatic);
+		}), VGrpStatic);
 	}
 	else if (K == TEXT("gnawer"))
 	{
@@ -728,7 +728,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Add(Tooth, FVector(H * 0.26f, H * 0.06f, H * 0.035f), FVector(H * 0.06f, Side * H * 0.04f, -H * 0.1f), FRotator(30.f, 0.f, 0.f));
 				Kit.Disc(FSurf::Glaze(VcHex(TEXT("#120F10")), 0.1f), FVector(-Snout * 0.5f, Side * H * 0.22f, H * 0.18f), FVector(0.2f, Side, 0.2f), H * 0.05f, 0.6f);
 			}
-		}), GrpStatic);
+		}), VGrpStatic);
 	}
 	else if (K == TEXT("hush"))
 	{
@@ -746,7 +746,7 @@ void UWRVoidBody::BuildLook()
 					const float A = FMath::DegreesToRadians(-60.f + 30.f * v);
 					Kit.Rod(Vein, FVector(1.f, 0.f, H * 0.02f), FVector(1.f, FMath::Sin(A) * H * 0.19f, H * 0.18f + FMath::Cos(A) * H * 0.19f), 1.2f);
 				}
-			}), GrpEars);
+			}), VGrpEars);
 		}
 		FVector Hand = C->GetActorLocation();
 		const FName HandBone = BoneAt(TEXT("righthand"), Hand).IsNone() ? BoneAt(TEXT("hand_r"), Hand) : C->FindBone(TEXT("righthand"));
@@ -768,7 +768,7 @@ void UWRVoidBody::BuildLook()
 					Dir = (Dir + FVector(0.f, 0.f, -0.25f)).GetSafeNormal();
 				}
 				Kit.Spike(FSurf::Glaze(VcHex(TEXT("#0B0A10")), 0.2f), P, Dir, H * 0.03f, H * 0.08f);
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 	}
 	else if (K == TEXT("voidstrider"))
@@ -789,7 +789,7 @@ void UWRVoidBody::BuildLook()
 					P = Q;
 				}
 				Kit.Spike(FSurf::Lit(VcHex(TEXT("#7B4FD6")), 2.f), P, FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), 1.2f, Len * 0.12f);
-			}), GrpStrand);
+			}), VGrpStrand);
 		};
 		for (const TPair<FName, FVector>& N : Neck)
 		{
@@ -818,7 +818,7 @@ void UWRVoidBody::BuildLook()
 			{
 				Kit.Disc(FSurf::Lit(VcHex(TEXT("#E8E4FF")), 6.f), FVector((s / 11.f - 0.5f) * Rad * 1.4f, (s % 3 - 1) * H * 0.03f, 2.5f), FVector::UpVector, 2.f + (s % 2), 0.5f);
 			}
-		}), GrpSeam);
+		}), VGrpSeam);
 		AddGroup(SpineBone, Back, Yaw, Blocks([&](FKit& Kit)
 		{
 			for (int32 s = 0; s < 14; ++s)
@@ -826,7 +826,7 @@ void UWRVoidBody::BuildLook()
 				const float A = 2.f * PI * s / 14.f;
 				Kit.Spike(Glass, FVector(FMath::Cos(A) * Rad * 0.92f, FMath::Sin(A) * Rad * 0.62f, -H * 0.35f), FVector(FMath::Cos(A), FMath::Sin(A), 0.4f).GetSafeNormal(), H * 0.05f, H * 0.12f);
 			}
-		}), GrpStatic);
+		}), VGrpStatic);
 	}
 	else if (K == TEXT("driftmote"))
 	{
@@ -839,7 +839,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Add(FSurf::Lit(VcHex(TEXT("#B8A8F0")), 3.f), FVector(1.6f, 1.6f, H * 0.9f), FVector(FMath::Cos(A) * H * 0.75f, FMath::Sin(A) * H * 0.75f, 0.f));
 			}
 			Kit.Add(FSurf::Glaze(VcHex(TEXT("#08070A")), 0.2f), FVector(H * 0.22f), FVector::ZeroVector, FRotator(20.f, 30.f, 10.f));
-		}), GrpRows);
+		}), VGrpRows);
 		for (int32 f = 0; f < 10; ++f)
 		{
 			const float A = 2.f * PI * f / 10.f;
@@ -847,7 +847,7 @@ void UWRVoidBody::BuildLook()
 			{
 				FVector P(0.f, 0.f, 0.f);
 				for (int32 s = 0; s < 4; ++s) { const FVector Q = P + FVector(0.f, 0.f, -40.f - 6.f * s); Kit.Rod(FSurf::Lit(VcHex(TEXT("#8E80C0")), 0.8f), P, Q, 0.5f); P = Q; }
-			}), GrpStrand);
+			}), VGrpStrand);
 		}
 		Glow = NewObject<UPointLightComponent>(C);
 		Glow->SetupAttachment(Body);
@@ -878,7 +878,7 @@ void UWRVoidBody::BuildLook()
 				Kit.Add(FSurf::Cloth(VcHex(TEXT("#8E8A82"))), FVector(H * 0.07f, H * 0.03f, H * 0.32f), FVector(-H * 0.02f, Side * H * 0.16f, -H * 0.22f), FRotator(0.f, 0.f, Side * 12.f));
 				Kit.Disc(FSurf::Lit(VcHex(TEXT("#C8A040")), 1.4f), FVector(Snout * 0.35f, Side * H * 0.1f, -H * 0.02f), FVector(0.3f, Side, 0.f), H * 0.05f, 0.8f);
 			}
-		}), GrpStatic);
+		}), VGrpStatic);
 	}
 
 	// Riftborn: eye sockets solid black-violet and voidglass shards grown out along the spine (biome-void 2.12.5).
@@ -887,7 +887,7 @@ void UWRVoidBody::BuildLook()
 		AddGroup(HeadBone, Head, Yaw, Blocks([&](FKit& Kit)
 		{
 			for (const float Side : { -1.f, 1.f }) Kit.Disc(FSurf::Lit(VcHex(TEXT("#2B1840")), 5.f), FVector(Snout * 0.4f, Side * H * 0.12f, H * 0.1f), FVector(0.3f, Side, 0.2f), H * 0.08f, 1.5f);
-		}), GrpEyes);
+		}), VGrpEyes);
 		int32 n = 0;
 		for (const TPair<FName, FVector>& Sp : BonesWith(TEXT("spine")))
 		{
@@ -896,7 +896,7 @@ void UWRVoidBody::BuildLook()
 			{
 				Kit.Spike(Glass, FVector::ZeroVector, FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), H * 0.05f, H * (0.14f + 0.04f * (n % 2)));
 				Kit.Spike(EdgeLit, FVector(1.f, 0.f, 0.f), FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), H * 0.012f, H * 0.12f);
-			}), GrpStatic);
+			}), VGrpStatic);
 		}
 	}
 }
@@ -925,24 +925,24 @@ void UWRVoidBody::TickLook(float DeltaTime)
 	{
 		USceneComponent* F = G.Frame.Get();
 		if (!F) continue;
-		if (G.Kind == GrpJaw)
+		if (G.Kind == VGrpJaw)
 		{
 			// The petals flare open from the tooth ring (the grab's tell, and while it holds).
 			F->SetRelativeRotation((FQuat(G.BaseRot) * FQuat(FRotator(-55.f * GapeAlpha, 0.f, 0.f))).Rotator());
 		}
-		else if (G.Kind == GrpEars)
+		else if (G.Kind == VGrpEars)
 		{
 			// Folded flat against the skull until it rises; spread wide (with a leathery snap) when it listens.
 			F->SetRelativeScale3D(G.BaseScale * FMath::Lerp(0.35f, 1.f, RiseAlpha) * Scream);
 		}
-		else if (G.Kind == GrpStrand)
+		else if (G.Kind == VGrpStrand)
 		{
 			// Drifting as if underwater: each strand turns on its own slow wave (never set from its last frame).
 			const float T = Clock * 0.7f + G.Phase;
 			F->SetRelativeRotation((FQuat(G.BaseRot) * FQuat(FRotator(9.f * FMath::Sin(T), 0.f, 7.f * FMath::Sin(T * 1.37f + 1.f)))).Rotator());
 		}
 	}
-	if (VcKind(C->CreatureId) == TEXT("nullwing")) SetGroupGlow(GrpHoles, Has(WRVoidFlag::Trail) ? 6.f : 1.2f);
+	if (VcKind(C->CreatureId) == TEXT("nullwing")) SetGroupGlow(VGrpHoles, Has(WRVoidFlag::Trail) ? 6.f : 1.2f);
 	if (C->CreatureId == TEXT("starving_one") && bMeshBaseSaved)
 	{
 		const float Want = 1.f + WRTune(TEXT("bosses.starving_one.sizePer"), 0.1f) * Stacks;
@@ -954,7 +954,7 @@ void UWRVoidBody::TickLook(float DeltaTime)
 		// Apart: the rig gone to a whirl of dust; the core alone lit (Gape) as it reforms.
 		const bool bApart = Has(WRVoidFlag::Drifting);
 		if (Body->IsVisible() == bApart) Body->SetVisibility(!bApart, false);
-		SetGroupGlow(GrpEyes, Has(WRVoidFlag::Gape) ? 12.f : 3.f);
+		SetGroupGlow(VGrpEyes, Has(WRVoidFlag::Gape) ? 12.f : 3.f);
 	}
 	// The Driftmote floats on the voidglass grit in its bell (the floating rule): its body hovers and bobs; drifting off it
 	// rises high. Its light breathes; a tame one pulses toward the nearest rift (0.5 Hz at 30 m, 3 Hz at 3 m).
@@ -979,7 +979,7 @@ void UWRVoidBody::TickLook(float DeltaTime)
 		PulseClock += DeltaTime * Hz;
 		const float Pulse = 0.5f + 0.5f * FMath::Sin(PulseClock * 2.f * PI);
 		if (Glow) Glow->SetIntensity(250.f + 900.f * Pulse);
-		SetGroupGlow(GrpRows, 1.5f + 3.f * Pulse);
+		SetGroupGlow(VGrpRows, 1.5f + 3.f * Pulse);
 	}
 	else if (Has(WRVoidFlag::Shudder) && bMeshBaseSaved)
 	{
@@ -1038,14 +1038,14 @@ float FWRVoidAI::NoiseReach(const AWRCharacterBase* Who)
 void FWRVoidAI::PlanBlink(AWRCreature* Self, UWRVoidBody* Body, AWRCharacterBase* Target, float Lead, bool bBehind, FName Then)
 {
 	if (!Self || !Body || !Target) return;
-	const TSharedPtr<FJsonObject> B = Sub(RowExtra(Self->CreatureId, TEXT("blink")), TEXT("blink"));
+	const TSharedPtr<FJsonObject> B = VcSub(VcRowExtra(Self->CreatureId, TEXT("blink")), TEXT("blink"));
 	const float MinD = VcNum(B, TEXT("min"), 400.f), MaxD = VcNum(B, TEXT("max"), 600.f);
 	const float F0 = VcNum(B, TEXT("flankMin"), 90.f), F1 = VcNum(B, TEXT("flankMax"), 150.f);
 	const float Facing = Target->GetController() ? Target->GetControlRotation().Yaw : Target->GetActorRotation().Yaw;
 	float Ang = bBehind ? 180.f : FMath::FRandRange(F0, F1) * (FMath::RandBool() ? 1.f : -1.f);
 	const float Dist = bBehind ? VcT(TEXT("blink.behind"), 220.f) + Self->GetSimpleCollisionRadius() : FMath::FRandRange(MinD, MaxD);
 	FVector Dest = Target->GetActorLocation() + FRotator(0.f, Facing + Ang, 0.f).Vector() * Dist;
-	Dest = GroundUnder(Self->GetWorld(), Dest, Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight() + 5.f);
+	Dest = VcGroundUnder(Self->GetWorld(), Dest, Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight() + 5.f);
 	// Never into a hole or a wall: a sweep from the target to the spot; short of anything in the way.
 	FHitResult Hit;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(WRVoidBlink), false, Self);
@@ -1190,7 +1190,7 @@ void FWRVoidAI::OutOfRift(AWRCreature* Self, UWRVoidBody* Body, const FVector& A
 
 void FWRVoidAI::LayTrail(AWRCreature* Self, const FWRAttackRow& Row, AWRCharacterBase* Target)
 {
-	const TSharedPtr<FJsonObject> T = Sub(RowExtra(Self->CreatureId, Row.Id), TEXT("trail"));
+	const TSharedPtr<FJsonObject> T = VcSub(VcRowExtra(Self->CreatureId, Row.Id), TEXT("trail"));
 	if (!Target) return;
 	// Across your route: ahead of where you're going (your velocity, else your facing), square to it, never within 3 m.
 	FVector Route = Target->GetVelocity().GetSafeNormal2D();
@@ -1203,8 +1203,8 @@ void FWRVoidAI::LayTrail(AWRCreature* Self, const FWRAttackRow& Row, AWRCharacte
 	float H0 = 100.f, H1 = 400.f;
 	if (T.IsValid() && T->TryGetArrayField(TEXT("height"), Hh) && Hh->Num() >= 2) { H0 = float((*Hh)[0]->AsNumber()); H1 = float((*Hh)[1]->AsNumber()); }
 	const float Hgt = FMath::FRandRange(H0, H1);
-	const FVector A = GroundUnder(Self->GetWorld(), Mid - Across * Len * 0.5f, Self) + FVector(0, 0, Hgt);
-	const FVector B = GroundUnder(Self->GetWorld(), Mid + Across * Len * 0.5f, Self) + FVector(0, 0, Hgt);
+	const FVector A = VcGroundUnder(Self->GetWorld(), Mid - Across * Len * 0.5f, Self) + FVector(0, 0, Hgt);
+	const FVector B = VcGroundUnder(Self->GetWorld(), Mid + Across * Len * 0.5f, Self) + FVector(0, 0, Hgt);
 	const FTransform X((B - A).Rotation(), (A + B) * 0.5f);
 	if (AWRVoidTrail* Tr = Self->GetWorld()->SpawnActorDeferred<AWRVoidTrail>(AWRVoidTrail::StaticClass(), X, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 	{
@@ -1224,7 +1224,7 @@ void FWRVoidAI::LayTrail(AWRCreature* Self, const FWRAttackRow& Row, AWRCharacte
 
 void FWRVoidAI::Scream(AWRCreature* Self, const FWRAttackRow& Row)
 {
-	const TSharedPtr<FJsonObject> S = Sub(RowExtra(Self->CreatureId, Row.Id), TEXT("scream"));
+	const TSharedPtr<FJsonObject> S = VcSub(VcRowExtra(Self->CreatureId, Row.Id), TEXT("scream"));
 	const float Radius = Row.Radius > 0.f ? Row.Radius : 1200.f;
 	WRFx::Broadcast(Self, TEXT("void.hush.scream"), Self->GetActorLocation() + FVector(0, 0, Self->GetSimpleCollisionHalfHeight() * 0.6f), FRotator::ZeroRotator, Radius / 600.f, TEXT("void.hush.scream"));
 	for (TActorIterator<AWRCharacter> It(Self->GetWorld()); It; ++It)
@@ -1269,7 +1269,7 @@ void FWRVoidAI::RowStarted(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttack
 	if (Row.Id == TEXT("blink_kick"))
 	{
 		// A lensing ripple behind you for 0.5 s: it blinks there, then the rear kick plays its own wind-up.
-		const TSharedPtr<FJsonObject> X = Sub(RowExtra(Self->CreatureId, Row.Id), TEXT("blinkFirst"));
+		const TSharedPtr<FJsonObject> X = VcSub(VcRowExtra(Self->CreatureId, Row.Id), TEXT("blinkFirst"));
 		PlanBlink(Self, B, Target, VcNum(X, TEXT("tell"), 0.5f), true, NAME_None);
 	}
 	if (Row.bGrab) { B->Set(WRVoidFlag::Gape, true); B->GapeUntil = VcNow(Self) + Row.Windup + Row.Hold + Row.Active + 0.2f; }
@@ -1315,7 +1315,7 @@ bool FWRVoidAI::StrikeRow(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttackR
 	if (M == TEXT("scream")) { Scream(Self, Row); return true; }
 	if (M == TEXT("retreat"))
 	{
-		if (AWRRift* R = NearestRift(Self->GetWorld(), Self->GetActorLocation(), VcT(TEXT("riftmaw.reach"), 3000.f), false))
+		if (AWRRift* R = VcNearestRift(Self->GetWorld(), Self->GetActorLocation(), VcT(TEXT("riftmaw.reach"), 3000.f), false))
 		{
 			IntoRift(Self, B, R);
 			B->BackInUntil = VcNow(Self) + VcT(TEXT("riftmaw.backIn"), 6.f);
@@ -1326,11 +1326,11 @@ bool FWRVoidAI::StrikeRow(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttackR
 	{
 		// Out of the rift nearest you: the tear's edge bulged and gasped through the wind-up; now the tooth ring and a
 		// thick grey body come through it at you.
-		AWRRift* R = NearestRift(Self->GetWorld(), Target->GetActorLocation(), VcT(TEXT("riftmaw.burstFrom"), 800.f) + 400.f, false);
+		AWRRift* R = VcNearestRift(Self->GetWorld(), Target->GetActorLocation(), VcT(TEXT("riftmaw.burstFrom"), 800.f) + 400.f, false);
 		if (!R) R = B->HomeRift.Get();
 		if (!R) return true;
 		const FVector Dir = (Target->GetActorLocation() - R->GetActorLocation()).GetSafeNormal2D();
-		const FVector Mouth = GroundUnder(Self->GetWorld(), R->GetActorLocation() + Dir * VcT(TEXT("riftmaw.outOfRift"), 250.f), Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight());
+		const FVector Mouth = VcGroundUnder(Self->GetWorld(), R->GetActorLocation() + Dir * VcT(TEXT("riftmaw.outOfRift"), 250.f), Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight());
 		OutOfRift(Self, B, Mouth);
 		Self->SetActorRotation(Dir.Rotation());
 		B->HomeRift = R;
@@ -1379,7 +1379,7 @@ void FWRVoidAI::Resolved(AWRCreature* Self, AWRCharacterBase* Victim, FName RowI
 	else if (RowId == TEXT("lift")) StartHold(Self, B, Victim, RowId, VcT(TEXT("hush.catch"), 1.6f));
 	else if (RowId == TEXT("hamstring") && Victim->Status)
 	{
-		const TSharedPtr<FJsonObject> S = Sub(RowExtra(Self->CreatureId, RowId), TEXT("slow"));
+		const TSharedPtr<FJsonObject> S = VcSub(VcRowExtra(Self->CreatureId, RowId), TEXT("slow"));
 		Victim->Status->ApplyStatus(WRTags::Status_Slowed, VcNum(S, TEXT("seconds"), 2.f));
 	}
 }
@@ -1443,7 +1443,7 @@ void FWRVoidAI::Died(AWRCreature* Self, AActor* Killer)
 	if (B->Has(WRVoidFlag::InRift))
 	{
 		// It dies in the tear's mouth: it falls out onto the ring, where its body can be reached.
-		if (AWRRift* R = B->HomeRift.Get()) OutOfRift(Self, B, GroundUnder(Self->GetWorld(), R->GetActorLocation() + FVector(500.f, 0.f, 0.f), Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight()));
+		if (AWRRift* R = B->HomeRift.Get()) OutOfRift(Self, B, VcGroundUnder(Self->GetWorld(), R->GetActorLocation() + FVector(500.f, 0.f, 0.f), Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight()));
 	}
 	// A Riftborn gives its own drops and a bead of void essence.
 	if (B->IsRiftborn())
@@ -1477,7 +1477,7 @@ void FWRVoidAI::RideBlink(AWRCreature* Self)
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(WRVoidRideBlink), false, Self);
 	Q.AddIgnoredActor(Rider);
 	if (Self->GetWorld()->SweepSingleByChannel(Hit, Self->GetActorLocation(), To, FQuat::Identity, ECC_WorldStatic, FCollisionShape::MakeSphere(Self->GetSimpleCollisionRadius() * 0.8f), Q)) To = Hit.Location;
-	To = GroundUnder(Self->GetWorld(), To, Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight() + 5.f);
+	To = VcGroundUnder(Self->GetWorld(), To, Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight() + 5.f);
 	if (WRLand::InHole(To)) return;
 	// The rider's i-frames cover the travel.
 	Rider->SetCombatTag(WRTags::State_IFrames, true);
@@ -1527,7 +1527,7 @@ void FWRVoidAI::TickBody(AWRCreature* Self, UWRVoidBody* Body, float DeltaTime)
 	// A latch: eating you (3 a second and 3 max health a second) until you roll, swing, or it's knocked off.
 	if (AWRCharacterBase* V = Body->LatchedOn.Get())
 	{
-		const TSharedPtr<FJsonObject> L = Sub(RowExtra(Self->CreatureId, TEXT("latch")), TEXT("latch"));
+		const TSharedPtr<FJsonObject> L = VcSub(VcRowExtra(Self->CreatureId, TEXT("latch")), TEXT("latch"));
 		if (!V->IsAlive() || !Self->IsAlive() || V->HasTag(WRTags::State_Dodging) || V->HasTag(WRTags::State_Attacking) || Now - Body->LatchedAt > VcT(TEXT("gnawer.maxLatch"), 15.f))
 		{
 			if (V->HasTag(WRTags::State_Dodging) || V->HasTag(WRTags::State_Attacking)) ShakeOff(V);
@@ -1568,7 +1568,7 @@ void FWRVoidAI::TickBody(AWRCreature* Self, UWRVoidBody* Body, float DeltaTime)
 	// Unconscious in its tear: it falls out onto the ring (only then can it be tamed).
 	if (Body->Has(WRVoidFlag::InRift) && Self->IsUnconscious())
 	{
-		if (AWRRift* R = Body->HomeRift.Get()) OutOfRift(Self, Body, GroundUnder(Self->GetWorld(), R->GetActorLocation() + FVector(500.f, 0.f, 0.f), Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight()));
+		if (AWRRift* R = Body->HomeRift.Get()) OutOfRift(Self, Body, VcGroundUnder(Self->GetWorld(), R->GetActorLocation() + FVector(500.f, 0.f, 0.f), Self) + FVector(0, 0, Self->GetSimpleCollisionHalfHeight()));
 	}
 }
 
@@ -1594,7 +1594,7 @@ bool FWRVoidAI::TickWild(AWRCreatureAI* AI, AWRCreature* Self, float DeltaSecond
 				}
 			}
 			if (Target && (!Target->IsAlive() || FVector::Dist2D(Target->GetActorLocation(), Self->GetActorLocation()) > VcT(TEXT("riftmaw.giveUp"), 5000.f))) { Self->SetAggroTarget(nullptr); Target = nullptr; }
-			if (Target && Now >= B->BackInUntil && NearestRift(Self->GetWorld(), Target->GetActorLocation(), VcT(TEXT("riftmaw.burstFrom"), 800.f) + 400.f, false))
+			if (Target && Now >= B->BackInUntil && VcNearestRift(Self->GetWorld(), Target->GetActorLocation(), VcT(TEXT("riftmaw.burstFrom"), 800.f) + 400.f, false))
 			{
 				AI->StartRow(Self, Target, TEXT("rift_burst"), false);
 			}
@@ -1602,7 +1602,7 @@ bool FWRVoidAI::TickWild(AWRCreatureAI* AI, AWRCreature* Self, float DeltaSecond
 		}
 		// Out: after 3 attacks or at a quarter of its health it goes back in (if a rift is near); far from any it fights
 		// on, slowed, and can't.
-		const AWRRift* Near = NearestRift(Self->GetWorld(), Self->GetActorLocation(), VcT(TEXT("riftmaw.reach"), 3000.f), false);
+		const AWRRift* Near = VcNearestRift(Self->GetWorld(), Self->GetActorLocation(), VcT(TEXT("riftmaw.reach"), 3000.f), false);
 		Self->SpeedBoost = Near ? 1.f : VcT(TEXT("riftmaw.landSpeed"), 0.6f);
 		if (Near && (B->AttacksOut >= int32(VcT(TEXT("riftmaw.attacksOut"), 3.f)) || (Self->GetHealthFraction() < VcT(TEXT("riftmaw.retreatAt"), 0.25f) && B->AttacksOut > 0)) && Target)
 		{
@@ -1797,7 +1797,7 @@ void UWRVoidLife::PlaceDens(AWRLand* Land)
 	const float Gap = VcNum(S, TEXT("denGap"), 170.f);
 	const float Act = VcNum(S, TEXT("activation"), 12000.f);
 	const float Respawn = VcNum(S, TEXT("respawn"), 600.f);
-	const TSharedPtr<FJsonObject> Zones = Sub(S, TEXT("zones"));
+	const TSharedPtr<FJsonObject> Zones = VcSub(S, TEXT("zones"));
 	if (!Zones.IsValid()) return;
 	TArray<FVector2D> Places;
 	const TArray<TSharedPtr<FJsonValue>>* Pois = nullptr;
@@ -1832,7 +1832,7 @@ void UWRVoidLife::PlaceDens(AWRLand* Land)
 		const float Rb = VcNum(Z, TEXT("riftborn"), 5.f);
 		const auto Roll = [&](const TCHAR* Table, float R) -> FName
 		{
-			const TSharedPtr<FJsonObject> Tb = Sub(Z, Table);
+			const TSharedPtr<FJsonObject> Tb = VcSub(Z, Table);
 			if (!Tb.IsValid()) return NAME_None;
 			float Total = 0.f;
 			for (const auto& KV : Tb->Values) Total += float(KV.Value->AsNumber());
