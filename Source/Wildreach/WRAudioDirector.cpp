@@ -1,6 +1,9 @@
 #include "WRAudio.h"
 #include "WRCrystalTypes.h"
 #include "WRFungalTypes.h"
+#include "WRUnderwater.h"
+#include "WRTide.h"
+#include "WROceanTypes.h"
 #include "WRFungalHazards.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
@@ -324,6 +327,8 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 		if (Layer == ForestHollow) return ForestZone[6];
 	}
 	if (Layer == Always) return 1.f;
+	// The Ocean's underwater bed (the hum of the sea under the surface; pressure past 20 m is its own one-shot).
+	if (Layer == FName(TEXT("ocean.underwater"))) return UnderBlend;
 	// The Fungal caverns' beds (fungal.<zone>, fungal.F1.night, fungal.flue_roar; cooks/biome-fungal.md 2.15-2.16): the
 	// plateau's wind and the doline glow's night by day and night, each cavern zone's own air under it (long tails in the
 	// Glow-moss Halls, tight in the Webs), and the Flue's roar on the Fall Field, which its planned silence leaves alone.
@@ -391,6 +396,9 @@ bool UWRAudioDirector::StepStream(FStream& S, float DeltaTime, float Gain)
 		return true;   // faded out: let it go
 	}
 	C->SetVolumeMultiplier(FMath::Max(S.Base * S.Gain * Gain, 0.001f));
+	// Under the water every bed and every tune goes thick and low (the underwater bed itself stays clear).
+	C->SetLowPassFilterEnabled(UnderBlend > 0.01f);
+	if (UnderBlend > 0.01f) C->SetLowPassFilterFrequency(FMath::Lerp(20000.f, Tune(TEXT("ambient.underwaterLowPass"), 700.f), UnderBlend));
 	return false;
 }
 
@@ -437,6 +445,11 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		High = 0.f;
 	}
 	Cave = FMath::FInterpConstantTo(Cave, FoldLand.IsNone() ? CaveFactor() : 1.f, DeltaTime, 1.f / Tune(TEXT("ambient.caveFade"), 1.5f));
+	{
+		const APlayerController* UPC = World->GetFirstPlayerController();
+		const APawn* UMe = UPC ? UPC->GetPawn() : nullptr;
+		UnderBlend = FMath::FInterpConstantTo(UnderBlend, UMe && WRUnderwater::IsUnder(UMe) ? 1.f : 0.f, DeltaTime, 1.f / Tune(TEXT("ambient.underwaterFade"), 0.4f));
+	}
 	// A runtime land (the Corrupted wasteland): its own beds ("land.<biome>", "zone.<id>"), none of the island's; and its
 	// planned silence (a weather row with "silence": Dead calm) fading every bed and the music out over its seconds.
 	{
@@ -733,6 +746,21 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 		}
 		// The Sky: inside the Undercloud its own intimate piece (sub.undercloud, cooks/biome-sky.md 2.12), not in a fight.
 		if (Land == WRSkyIsles::Biome() && PoolName != TEXT("combat") && WRSkyIsles::InUndercloud(Listener)) Try.Add(TEXT("sub.undercloud"));
+		// The Ocean (cooks/biome-ocean.md 2.16): the Drowned Hall's own cue, a camp's, the pass's (Saltgate), then by sub-zone.
+		if (WROcean::Live() && Land == WROcean::Biome() && PoolName != TEXT("combat"))
+		{
+			if (WROcean::InHall(Listener)) Try.Add(TEXT("sub.drowned_hall"));
+			for (const FWROceanData::FPlace& S : FWROceanData::Get().Sites)
+			{
+				if (S.bCamp && FVector::Dist2D(S.At, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(TEXT("camp.ocean")); break; }
+			}
+			if (WROcean::ZoneAt(Listener) == TEXT("O3") && Listener.X < 110000.f) Try.Add(TEXT("pass.saltgate"));
+			if (PoolName == TEXT("explore"))
+			{
+				const FName OZ = WROcean::ZoneAt(Listener);
+				Try.Add(OZ == TEXT("O1") || OZ == TEXT("O2") ? FName(TEXT("explore.ocean.a")) : OZ == TEXT("O3") ? FName(TEXT("explore.ocean.b")) : FName(TEXT("explore.ocean.c")));
+			}
+		}
 		Try.Add(FName(*FString::Printf(TEXT("%s.%s"), *PoolName.ToString(), *Land.ToString())));
 		for (const FName& T : Try)
 		{
@@ -860,6 +888,13 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		const bool bHunt = bHere && WRForest::WildHuntActive(World);
 		StepMusicLayer(WildHuntLayer, bHunt, TEXT("layer.wild_hunt"), DeltaTime, Gain);
 		StepMusicLayer(BloomLayer, bHere && !bHunt && WRForest::Bloom(World), TEXT("layer.bloom"), DeltaTime, Gain);
+	}
+	// The King Tide (cooks/biome-ocean.md 2.16): its layer over whatever plays on the coast while the sea is out.
+	{
+		const AWROceanState* OS = AWROceanState::Get(World);
+		const APlayerController* KPC = World->GetFirstPlayerController();
+		const APawn* KMe = KPC ? KPC->GetPawn() : nullptr;
+		StepMusicLayer(KingTideLayer, OS && OS->KingTide != EWRKingTide::None && KMe && WROcean::Contains(KMe->GetActorLocation()), TEXT("layer.king_tide"), DeltaTime, Gain);
 	}
 	// The Sporefall: the Heart pulse as a deep drum over whatever plays in the caverns (cooks/biome-fungal.md 2.16).
 	StepMusicLayer(SporefallLayer, !FungalZone.IsNone() && WRFungal::Sporefall(World) >= 2, TEXT("layer.sporefall"), DeltaTime, Gain);

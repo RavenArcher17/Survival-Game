@@ -364,6 +364,8 @@ state in a map keyed by the boss; `AWROceanBossProp` the spare shells and the Po
 the three mirrors, `world ocean mirror`; the Pound's flood from `AWROceanState::SluicesBurstAt` in
 `UWROceanArenas::FloodLevel`). Boss grabs reuse the sea creatures' hold (`FWROceanAI::StartHold`: pinch, under, drag,
 swallow), so a held player's presses mash them like any other.
+Under the water the audio director eases `UnderBlend` and low-passes every stream it owns, and `WRSound` low-passes
+3D one-shots spawned while the local listener is under; the King Tide layer is `KingTideLayer` (`layer.king_tide`).
 
 Also since 0.7.1 (in progress): **the Sky islands, over the Hollow Cape north of the Storm peaks** (cooks/biome-sky.md,
 plan cooks/build-biome-sky.md). One generator: `node Tools/terrain/sky.mjs` writes the cape's ground

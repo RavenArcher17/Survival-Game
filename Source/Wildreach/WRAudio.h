@@ -252,6 +252,10 @@ private:
 	float FlueRoar = 0.f;
 	double FallFieldSince = -1.0;
 	TArray<FStream> SporefallLayer;
+	/** The Ocean (cooks/biome-ocean.md 2.15-2.16): the King Tide's layer, and how far under the water the listener is
+	 *  (0..1: every bed and tune muffled through a low-pass as it rises; the underwater bed comes up). */
+	TArray<FStream> KingTideLayer;
+	float UnderBlend = 0.f;
 	/** Storm peaks (cooks/biome-lightning.md 2.12): how far into its air, and each sub-zone's bed weight (1-6 as the
 	 *  zone letters, eased), the Rodfield's wind-song by distance. */
 	float Storm = 0.f;

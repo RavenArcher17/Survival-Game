@@ -6,6 +6,17 @@ Aaron (lane build-biome-ocean: requirement ledger R1-R54, build research and pla
 cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; compiled (editor target) after each; not
 played here (Aaron and the testers test, F8). Live from Ocean (4) (`ocean` in `world.liveBiomes`); underwater play is live everywhere water is.
 
+- **Ocean (6): the sea's sound** (cooks/biome-ocean.md 2.15-2.16; plan build-biome-ocean.md 2.15). **Under the water**
+  every bed, every tune and every 3D sound goes thick and low through a low-pass (700 Hz, eased in 0.4 s as your head goes
+  under; sounds.json `ambient.underwaterLowPass` / `underwaterFade`), while your own breath, heart and the ear pop stay
+  clear, and the underwater bed (the sea's hum under the surface) comes up. **Beds** (`land.ocean` by day and night,
+  `zone.O1`..`O5`: the strand's long breakers, the shelf's wind and distant booms, the terraces' dry wind, the kelp's
+  lapping, the reef's heavy surf). **Music** pools: explore A (the strand and the shelf), B (the terraces), C (the kelp
+  and the reef), night, combat, mini, camp, the Saltgate pass, the Drowned Hall's own cue, Thalassor's three phases and
+  each mini's, and **the King Tide's layer** over whatever plays on the coast while the sea is out. All stand-ins from
+  the repo's recordings (`_standin`; the cook's Eb major 76 BPM cue sheet is for the audio cook). Thalassor drops the
+  Coral keep furnishings blueprint through the set rule (its own duplicate row and the Tidebreaker blueprint, which has
+  no weapon behind it yet, are gone).
 - **Ocean (5): the bosses** (cooks/biome-ocean.md 2.13-2.14; plan build-biome-ocean.md 2.13-2.14). `WROceanBosses.*`:
   `FWROceanBoss` hooks beside the other lands' in the boss machine, `UWROceanArenas` placing them, their rows in
   attacks.json (`bosses.<id>`) and numbers in tuning `bosses.<id>`; all four built in code (`WROceanBeast`). **Old
@@ -50,11 +61,10 @@ played here (Aaron and the testers test, F8). Live from Ocean (4) (`ocean` in `w
   each, day or night) it throws a gold beam drawn on every machine; 2 s of beam on a part (head, blowhole, flank, fluke)
   dries it 20 s (x1.5 damage, cracks and dust), once a part a phase; 3 s of beam breaks the Maelstrom 8 s. A sunstone
   flare's burst is a second of beam; Sun path hits count a second each and take x1.5. The Tide altar and the run-back
-  stone 50 m out from the north stair. **Drops**: Thalassor's core, tide essence x5, ambergris, the Tidebreaker and Coral
-  keep decor blueprints, its head (first kill), the Leviathan pearl (part: a dodge in the water gives back 10 stamina, once
+  stone 50 m out from the north stair. **Drops**: Thalassor's core, tide essence x5, ambergris, the Coral keep
+  furnishings blueprint (the set rule), its head (first kill), the Leviathan pearl (part: a dodge in the water gives back 10 stamina, once
   a second); the minis their trophies, shards and essence. Stand-in voices and every boss sound and effect as rows.
-  Not yet: the Tidebreaker's moveset (the boss-weapons cook) and the Coral keep decor pieces (the building lane) are
-  blueprints only.
+  Not yet: the Tidebreaker (Thalassor's weapon) waits for the boss-weapons cook.
 - **Ocean (4): the coast's world, and the Ocean goes live** (cooks/biome-ocean.md 2.8-2.11, 2.19-2.21; plan
   build-biome-ocean.md 2.8-2.11, 2.17-2.19). `ocean` joins `world.liveBiomes`: the coast, its creatures, hazards, shrines
   and Hae-won are in the game (the three minis and Thalassor come with Ocean (5)). **Hazards** (`WROceanHazards.*`): five

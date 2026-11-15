@@ -1055,9 +1055,7 @@
     {"id": "ambergris", "name": "Ambergris", "category": "material", "stack": 10, "weight": 0.3, "biome": "ocean", "note": "Grey, waxy, sweet-smelling: washed up after a squall. Alchemists and traders pay well for it."},
     {"id": "core_thalassor", "name": "Thalassor's core", "category": "core", "stack": 1, "weight": 2.0, "biome": "ocean", "note": "The Tide Leviathan's heart-stone, still cold and wet: the Tide path's boss core."},
     {"id": "leviathan_pearl", "name": "Leviathan pearl", "category": "ring", "stack": 1, "weight": 0.3, "biome": "ocean", "equip": {"slot": "ring"}, "worn": {"waterDodgeStamina": 10}, "note": "A pearl the size of a fist from Thalassor's gut. A dodge or kick-dodge in the water gives you back 10 stamina (once a second)."},
-    {"id": "trophy_thalassor_head", "name": "Thalassor's head", "category": "trophy", "stack": 1, "weight": 30.0, "biome": "ocean", "note": "The Tide Leviathan's ram of a head: a monument for your base."},
-    {"id": "tidebreaker_bp", "name": "Blueprint: Tidebreaker", "category": "blueprint", "stack": 1, "weight": 0.1, "biome": "ocean", "note": "A spear-class harpoon on a chain (its moveset comes with the boss weapons)."},
-    {"id": "coral_keep_decor_bp", "name": "Blueprint: Coral keep decor", "category": "blueprint", "stack": 1, "weight": 0.1, "biome": "ocean", "note": "The Coral keep's dressing: coral sconces, shell curtains, a pearl-inlay table."}
+    {"id": "trophy_thalassor_head", "name": "Thalassor's head", "category": "trophy", "stack": 1, "weight": 30.0, "biome": "ocean", "note": "The Tide Leviathan's ram of a head: a monument for your base."}
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },

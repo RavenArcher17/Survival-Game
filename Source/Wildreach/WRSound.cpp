@@ -1,4 +1,5 @@
 #include "WRSound.h"
+#include "WRUnderwater.h"
 #include "WRSurvival.h"
 #include "WRAudio.h"
 #include "Wildreach.h"
@@ -663,6 +664,18 @@ UAudioComponent* UWRAudioSubsystem::Play(const FPlay& P)
 	else
 	{
 		Comp = UGameplayStatics::SpawnSoundAtLocation(World, Sound, Where, FRotator::ZeroRotator, Volume, Pitch, 0.f, AttenuationFor(E->Radius));
+	}
+	// Under the water (the local listener's head in it: WRUnderwater) everything you hear is thick and low, but your own
+	// breath and heart (the ocean's 2D ones) stay clear.
+	if (Comp && !b2D)
+	{
+		const APlayerController* LPC = World->GetFirstPlayerController();
+		if (const APawn* LMe = LPC ? LPC->GetPawn() : nullptr; LMe && WRUnderwater::IsUnder(LMe))
+		{
+			Comp->SetLowPassFilterEnabled(true);
+			const UWRAudioSubsystem* AudioSys = UWRAudioSubsystem::Get(World);
+			Comp->SetLowPassFilterFrequency(AudioSys ? AudioSys->Tune(TEXT("ambient.underwaterLowPass"), 700.f) : 700.f);
+		}
 	}
 	if (SoundLogLevel() >= 1)
 	{
