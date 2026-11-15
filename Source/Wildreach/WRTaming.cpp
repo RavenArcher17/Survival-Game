@@ -31,6 +31,7 @@
 #include "WRInventory.h"   // the rider's worn gear (the Huntsman's crown: mount sprint stamina)
 #include "Wildreach.h"
 #include "WRNecroPath.h"
+#include "WRVoid.h"
 #include "WRSporePath.h"
 #include "Misc/Guid.h"
 #include "Serialization/JsonReader.h"
@@ -638,7 +639,9 @@ int32 AWRCreature::CargoSlots() const
 float AWRCreature::CargoCapacityKg() const
 {
 	const FWRCreatureDef* Def = GetDef();
-	return Def ? Def->Carry * StatMult(WRTameStat::Carry) * ImprintScale() : 0.f;
+	// Its owner's gear too: the Tusker ivory talisman's +15% (items.json worn tameCarry).
+	const float Gear = 1.f + UWRInventoryComponent::GearStatFor(PlayerNamed(GetWorld(), TamedBy), TEXT("tameCarry"));
+	return Def ? Def->Carry * StatMult(WRTameStat::Carry) * ImprintScale() * FMath::Max(0.f, Gear) : 0.f;
 }
 
 float AWRCreature::CargoKg() const
@@ -903,6 +906,11 @@ void AWRCreature::TickTameLife(float DeltaSeconds)
 	const float Dt = TameClock;
 	TameClock = 0.f;
 
+	// Max health a rift took mends once it's been clear of them a while (cooks/cookpass-taming.md L13).
+	if (const UWRAttributeSet* Attr = GetAttributes(); Attr && Attr->GetMaxHealthLost() > 0.f && Now - RiftDrainedAt > T(TEXT("riftMend.after"), 30.f))
+	{
+		WRVoid::RestoreMaxHealth(this, Attr->GetMaxHealth() * T(TEXT("riftMend.perMinute"), 0.05f) * Dt / 60.f);
+	}
 	// Up again after a soulbound fall (cooks/cookpass-taming.md 3.10).
 	if (TameRep.bSoulDown && Now >= SoulDownUntil)
 	{

@@ -12,6 +12,9 @@
 #include "WRBuildLookKit.h"
 #include "WRCharacter.h"
 #include "WRCharacterBase.h"
+#include "WRCreature.h"
+#include "WRNecroPath.h"
+#include "WRSporePath.h"
 #include "WRCombatLibrary.h"
 #include "WRCombatTypes.h"
 #include "WRFx.h"
@@ -485,6 +488,22 @@ void AWRRift::ServerStep(float Dt)
 				C->LaunchCharacter((Out.IsNearlyZero() ? FVector(1, 0, 0) : Out) * VT(TEXT("touch.knock"), 600.f) + FVector(0, 0, 250.f), true, true);
 				WRFx::Broadcast(this, TEXT("hit.void"), P);
 			}
+		}
+	}
+	// Tames from other lands lose themselves to it too, on their own max health (cooks/cookpass-taming.md L13); the
+	// Wasteland's own don't (the CR rule), and Hollowplate barding halves it like the set does for its rider.
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		AWRCreature* Tame = *It;
+		const FWRCreatureDef* TDef = Tame->GetDef();
+		if (!Tame->IsTamed() || !Tame->IsAlive() || !TDef || TDef->Biome == FName(TEXT("wasteland")) || WRNecro::IsRaised(Tame) || WRSporePath::IsSummon(Tame)) continue;
+		const FVector P = Tame->GetActorLocation();
+		if (FVector::Dist2D(P, Me) > ZoneRadius || FMath::Abs(P.Z - Me.Z) > 3000.f) continue;
+		const float Mult = WRVoid::RiftDrainMult(Tame);
+		if (Mult > 0.f)
+		{
+			WRVoid::LoseMaxHealth(Tame, Drain * Mult * Dt, this);
+			Tame->RiftDrainedAt = GetWorld()->GetTimeSeconds();
 		}
 	}
 	// The pulse: stones dropped this pulse hit whoever is under them (once), then the next pulse is set.

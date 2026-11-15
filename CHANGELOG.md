@@ -5,6 +5,10 @@
 Aaron (lane cookpass-taming: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-taming.md;
 a cook pass on build-taming's work). Compiled (editor target); not played here (Aaron and the testers test, F8).
 
+- **Taming (3): the Tusker talisman, tames in the rifts.** The Tusker ivory talisman's +15% carry is live on your
+  haulers (its recipe no longer waits). Tames from other lands lose max health in a Wasteland rift zone as their riders
+  do (the Wasteland's own don't; Hollowplate halves it) and mend 5% of it a minute once 30 s clear of the rifts (tuning
+  `tame.riftMend`); a tame the rift empties is Unmade (its collar falls).
 - **Taming (2): every land's barding works; the seat's ease holds on a client.** The land barding sets that came live
   with their lands promised passes nothing gave: now Stormweave grounds storm strikes, Heartguard walks thornbrake,
   Skysilk ignores gusts, Wardcloth crosses ward fields, Mirehide wades bleedwater, Reefmail takes its mount to 40 m,

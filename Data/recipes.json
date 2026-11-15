@@ -296,7 +296,7 @@
     {"id": "talisman_tyrant_plate", "station": "armorer", "level": 2, "inputs": {"trophy_tyrant_plate": 1, "resonant_crystal": 2}, "output": "talisman_tyrant_plate", "count": 1, "seconds": 6, "biome": "crystal"},
     {"id": "talisman_troll_marrow", "station": "armorer", "level": 2, "inputs": {"trophy_troll_marrow": 1, "lichen": 2}, "output": "talisman_troll_marrow", "count": 1, "seconds": 6, "biome": "tundra"},
     {"id": "talisman_stalker_fang", "station": "armorer", "level": 2, "inputs": {"trophy_stalker_fang": 1, "lichen": 2}, "output": "talisman_stalker_fang", "count": 1, "seconds": 6, "biome": "tundra"},
-    {"id": "talisman_old_tusk", "station": "armorer", "level": 2, "inputs": {"trophy_old_tusk": 1, "lichen": 2}, "output": "talisman_old_tusk", "count": 1, "seconds": 6, "biome": "tundra", "waitsFor": "hauler tames that carry loads (taming lane)"},
+    {"id": "talisman_old_tusk", "station": "armorer", "level": 2, "inputs": {"trophy_old_tusk": 1, "lichen": 2}, "output": "talisman_old_tusk", "count": 1, "seconds": 6, "biome": "tundra"},
     {"id": "talisman_maw_tooth", "station": "armorer", "level": 2, "inputs": {"trophy_maw_tooth": 1, "bloodmoss": 2}, "output": "talisman_maw_tooth", "count": 1, "seconds": 6, "biome": "swamp"},
     {"id": "talisman_hex_mask", "station": "armorer", "level": 2, "inputs": {"trophy_hex_mask": 1, "bloodmoss": 2}, "output": "talisman_hex_mask", "count": 1, "seconds": 6, "biome": "swamp"},
     {"id": "talisman_bloat_sac", "station": "armorer", "level": 2, "inputs": {"trophy_bloat_sac": 1, "bloodmoss": 2}, "output": "talisman_bloat_sac", "count": 1, "seconds": 6, "biome": "swamp"},

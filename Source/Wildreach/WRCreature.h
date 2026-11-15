@@ -442,6 +442,8 @@ public:
 	bool SaddleBoneLocation(FVector& Out) const;
 	mutable FName SaddleBoneCache;
 	mutable bool bSaddleBoneLooked = false;
+	/** Server: when a rift last drained its max health (it mends once clear of them: cooks/cookpass-taming.md L13). */
+	double RiftDrainedAt = -1000.0;
 	/** Every machine: the courting / cuddle head dip's weight (eased), and whether the pose lift carries it now. */
 	float NuzzleWeight = 0.f;
 	bool bNuzzleLifted = false;
