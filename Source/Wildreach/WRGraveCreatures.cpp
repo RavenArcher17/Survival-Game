@@ -140,6 +140,21 @@ void UWRGraveBody::Attach(AWRCreature* Creature)
 	Creature->AddInstanceComponent(Body);
 }
 
+void UWRGraveBody::AttachRaised(AWRCreature* Creature, FName Variant)
+{
+	if (!Creature || !Creature->HasAuthority()) return;
+	UWRGraveBody* Body = Get(Creature);
+	if (!Body)
+	{
+		Body = NewObject<UWRGraveBody>(Creature, TEXT("GraveBody"));
+		Body->RegisterComponent();
+		Creature->AddInstanceComponent(Body);
+	}
+	Body->Set(WRGraveFlag::Raised, true);
+	Body->Set(WRGraveFlag::Ash, Variant == TEXT("ash"));
+	Body->Set(WRGraveFlag::Ice, Variant == TEXT("ice"));
+}
+
 void UWRGraveBody::Set(uint16 Flag, bool bOn)
 {
 	const uint16 Was = Flags;
@@ -149,7 +164,7 @@ void UWRGraveBody::Set(uint16 Flag, bool bOn)
 
 void UWRGraveBody::OnRep_Flags()
 {
-	if (LookFlags != (Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn))) LookTries = 0;   // raised or Riftborn: rebuild
+	if (LookFlags != (Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn | WRGraveFlag::Ash | WRGraveFlag::Ice))) LookTries = 0;   // raised or Riftborn: rebuild
 	ApplyBuriedLook();
 }
 
@@ -304,7 +319,7 @@ void UWRGraveBody::BuildLook()
 	if (!Def || !Body || !Body->GetSkeletalMeshAsset()) return;
 	ClearLook();
 	LookFor = C->CreatureId;
-	LookFlags = Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn);
+	LookFlags = Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn | WRGraveFlag::Ash | WRGraveFlag::Ice);
 	const TSharedPtr<FJsonObject> Look = GcLook(C->CreatureId);
 	const FName K = GcKind(C->CreatureId);
 	const bool bRaised = Has(WRGraveFlag::Raised);
@@ -384,10 +399,22 @@ void UWRGraveBody::BuildLook()
 	// A raised body (Necromancy): grave-light threads in its wounds, pale-green eyes (GY 2.17).
 	if (bRaised)
 	{
+		// An ash wraith's threads burn ember-orange with sparks of ash on its back; an ice minion's are pale blue under a
+		// crust of rime.
+		const bool bAsh = Has(WRGraveFlag::Ash), bIce = Has(WRGraveFlag::Ice);
+		const FSurf T = bAsh ? FSurf::Lit(GcHex(TEXT("#FF8A3A")) * 0.6f, 4.f) : bIce ? FSurf::Lit(GcHex(TEXT("#A8D8F0")) * 0.6f, 3.f) : Thread;
 		AddGroup(SpineBone, Spine, Yaw, Blocks([&](FKit& Kit)
 		{
-			for (int32 t = 0; t < 7; ++t) Kit.Add(Thread, FVector(2.f, 2.f, Rad * (0.3f + 0.1f * (t % 3))), FVector((t - 3) * Rad * 0.15f, (t % 2 ? 1.f : -1.f) * Rad * 0.3f, HH * 0.2f), FRotator(20.f * t, 30.f * t, 60.f), EWRLookMesh::Cylinder);
+			for (int32 t = 0; t < 7; ++t) Kit.Add(T, FVector(2.f, 2.f, Rad * (0.3f + 0.1f * (t % 3))), FVector((t - 3) * Rad * 0.15f, (t % 2 ? 1.f : -1.f) * Rad * 0.3f, HH * 0.2f), FRotator(20.f * t, 30.f * t, 60.f), EWRLookMesh::Cylinder);
+			if (bAsh) for (int32 e = 0; e < 10; ++e) Kit.Add(FSurf::Lit(GcHex(TEXT("#FF6A20")) * 0.6f, 6.f), FVector(Rad * 0.04f), FVector((e - 4.5f) * Rad * 0.12f, (e % 3 - 1) * Rad * 0.2f, HH * 0.5f + (e % 2) * Rad * 0.05f));
+			if (bIce) for (int32 r = 0; r < 8; ++r) Kit.Add(FSurf::Glass(GcHex(TEXT("#DDEFFA")) * 0.6f, 0.4f), FVector(Rad * 0.18f, Rad * 0.14f, Rad * 0.05f), FVector((r - 3.5f) * Rad * 0.14f, (r % 2 ? 1.f : -1.f) * Rad * 0.18f, HH * 0.48f), FRotator(0.f, 40.f * r, 12.f));
 		}), GThreads);
+		// The eyes: pale-green points (pale blue on an ice minion) where the head is.
+		AddGroup(HeadBone, Head, Yaw, Blocks([&](FKit& Kit)
+		{
+			const FSurf Eye = FSurf::Lit(bIce ? GcHex(TEXT("#A8D8F0")) * 0.6f : GcHex(TEXT("#9FE3C0")) * 0.6f, 7.f);
+			for (const float S : { -1.f, 1.f }) Kit.Add(Eye, FVector(Rad * 0.05f), FVector(Rad * 0.32f, S * Rad * 0.12f, Rad * 0.1f));
+		}), GEyes);
 	}
 	// A Riftborn: voidglass shards grown out along its spine and black-violet glints where its eyes catch the light.
 	if (bRift)
@@ -746,7 +773,7 @@ void UWRGraveBody::TickLook(float DeltaTime)
 	AWRCreature* C = Cast<AWRCreature>(GetOwner());
 	USkeletalMeshComponent* Body = Skel();
 	if (!C || !Body) return;
-	if (LookFor != C->CreatureId || (Groups.Num() == 0 && !bMeshHidden) || LookFlags != (Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn)))
+	if (LookFor != C->CreatureId || (Groups.Num() == 0 && !bMeshHidden) || LookFlags != (Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn | WRGraveFlag::Ash | WRGraveFlag::Ice)))
 	{
 		// The rig and its materials arrive a frame or two after the creature (OnRep): try for a few seconds.
 		if (LookTries < 40 && Body->GetSkeletalMeshAsset()) { ++LookTries; BuildLook(); }

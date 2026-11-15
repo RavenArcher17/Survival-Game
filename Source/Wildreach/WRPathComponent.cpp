@@ -1,4 +1,5 @@
 #include "WRPathComponent.h"
+#include "WRNecroPath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
 #include "WRSurvival.h"
@@ -582,6 +583,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	{
 		// Rooted (cooks/biome-forest.md 2.17): standing still slowly heals (WRNaturePath.cpp).
 		GrantedTags.AddTag(WRNature::Passive_Rooted);
+	}
+	else if (MainPath == TEXT("necromancy"))
+	{
+		// Deathless (cooks/biome-graveyard.md 2.17): once per Rest a killing blow leaves you at 1 HP (WRNecroPath.cpp).
+		GrantedTags.AddTag(WRNecro::Passive_Deathless);
 	}
 	// Path combos for the main / sub pair (Data/combos.json: Thaw, Balance, Plasma, Meltdown, Brittle shock, Blizzard storm).
 	for (const FGameplayTag& Tag : FWRComboRegistry::Get().TagsFor(*this))

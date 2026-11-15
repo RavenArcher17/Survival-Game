@@ -323,6 +323,12 @@ a survivor is within `bosses.graveyard.placeRadius`; E actions `world grave boss
 from `Data/graveyard.json` (sites L1/L3 and rooms C5/C9 carry `arena`; the Gravedigger's lair, route and stops) and
 `WRGraveChapel` / `WRGraveBelfry` in `WRGraveTypes.h` (the scenery and the boss share them). Graveyard sound rows are
 stand-ins (`_standin: true` in sounds.json): replace their files when real recordings exist.
+The Necromancy path is `WRNecroPath.*` (Souls attributes, Deathless, the minion and body tables, the passives the combat
+pipeline calls: `DamageScale`, `Incoming`, `ScaleBuildups`, `AfterHit`, `OnKill`; `CreatureDied` from `AWRCreature`'s
+death) and `WRAbilitiesNecro.*` (ClassForNode "necromancy"). A raised minion is a fresh creature with `TamedBy` set and
+the `Status.Necro.Raised` tag: `CountTames`, the world save and the death loot skip it. Not built yet: the bone altar's
+permanent undead tames, Jolt of life / Blood bond / Rot and bloom, the Necromancy node icons (the path screen shows
+the nodes without their glyphs).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

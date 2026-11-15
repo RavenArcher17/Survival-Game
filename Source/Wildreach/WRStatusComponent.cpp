@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRNecroPath.h"
 #include "WRGraveCreatures.h"
 #include "WRVoid.h"
 #include "WRVoidPath.h"
@@ -871,6 +872,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRVoidPath::TickOwner(Owner, DeltaTime);
 		// Growth (the Nature path) regrows by the ground around you; Rooted heals a survivor standing still (WRNaturePath.cpp).
 		WRNature::TickOwner(Owner, DeltaTime);
+		// Souls (the Necromancy path): their cap by Soul capacity, the raised minions' upkeep (WRNecroPath.cpp).
+		WRNecro::TickOwner(Owner, DeltaTime);
 	}
 }
 

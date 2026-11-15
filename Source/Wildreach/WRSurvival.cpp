@@ -2,6 +2,7 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRNecroPath.h"
 #include "WRSwampSystems.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
@@ -997,6 +998,8 @@ void UWRSurvivalComponent::FinishSleep(AWRCharacterBase* Pawn)
 	UE_LOG(LogWildreach, Log, TEXT("REST %s rested in their %s: %d min (comfort %d)"), *GetNameSafe(GetPS()), Bed ? *Bed->PieceId.ToString() : TEXT("bed"), RestedMinutes, Comfort);
 	Wake(FString());
 	WRSound::PlayOn(Pawn, TEXT("rest.wake"));
+	// Necromancy's Deathless re-arms on a Rest (WRNecroPath.cpp).
+	WRNecro::Rested(Pawn);
 	OnRest.Broadcast(GetPS());
 }
 

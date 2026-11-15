@@ -9,6 +9,7 @@
 #include "WRAbilitiesBlood.h"
 #include "WRBloodPath.h"
 #include "WRAbilitiesNature.h"   // the Nature path's abilities (ClassForNode)
+#include "WRAbilitiesNecro.h"    // the Necromancy path's abilities (ClassForNode)
 #include "WRGraveBosses.h"       // the Graveyard arenas' things (the Belfry rope, egg sacs, the chandelier chain)
 #include "WRForestBosses.h"      // the forest arenas' things a swing can hit (rope anchors, knots, combs, amber hearts)
 #include "WRSurvival.h"          // a torch in the off hand (a fire blow on the forest's things)
@@ -2562,7 +2563,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		// Void (WRVoidPath.cpp): Event horizon, Feed.
 		TEXT("event_horizon"), TEXT("feed"),
 		// Nature (WRNaturePath.cpp, WRPlantSummon.cpp): Purify, Thorned skin, Pollen, Overgrowth.
-		TEXT("purify"), TEXT("thorned_skin"), TEXT("pollen"), TEXT("overgrowth") };
+		TEXT("purify"), TEXT("thorned_skin"), TEXT("pollen"), TEXT("overgrowth"),
+		// Necromancy (WRNecroPath.cpp): Second wave, Shared pain, Soul siphon, Reaping stride, Final harvest.
+		TEXT("second_wave"), TEXT("shared_pain"), TEXT("soul_siphon"), TEXT("reaping_stride"), TEXT("final_harvest") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2651,6 +2654,19 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("strangling_vines")) return UWRGA_StranglingVines::StaticClass();
 		if (NodeId == TEXT("sprout_turret")) return UWRGA_SproutTurret::StaticClass();
 		if (NodeId == TEXT("ancient_guardian")) return UWRGA_AncientGuardian::StaticClass();
+	}
+	else if (PathId == TEXT("necromancy"))
+	{
+		// The Necromancy path (WRAbilitiesNecro.cpp, cooks/biome-graveyard.md 2.17).
+		if (NodeId == TEXT("raise_dead")) return UWRGA_RaiseDead::StaticClass();
+		if (NodeId == TEXT("grave_strike")) return UWRGA_GraveStrike::StaticClass();
+		if (NodeId == TEXT("corpse_explosion")) return UWRGA_CorpseExplosion::StaticClass();
+		if (NodeId == TEXT("army_of_the_dead")) return UWRGA_ArmyOfTheDead::StaticClass();
+		if (NodeId == TEXT("scythe_sweep")) return UWRGA_ScytheSweep::StaticClass();
+		if (NodeId == TEXT("shadow_bolt")) return UWRGA_ShadowBolt::StaticClass();
+		if (NodeId == TEXT("curse_of_weakness")) return UWRGA_CurseOfWeakness::StaticClass();
+		if (NodeId == TEXT("life_drain")) return UWRGA_LifeDrain::StaticClass();
+		if (NodeId == TEXT("lich_form")) return UWRGA_LichForm::StaticClass();
 	}
 	return nullptr;
 }

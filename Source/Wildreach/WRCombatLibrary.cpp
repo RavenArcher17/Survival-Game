@@ -34,6 +34,7 @@
 #include "WRForestTypes.h"
 #include "WRForestHazards.h"
 #include "WRBloodPath.h"
+#include "WRNecroPath.h"
 #include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
@@ -660,6 +661,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRBlood::DamageScale(Attacker, Target, Hit);
 		// Void: the bar's power, Abyssal power, Gluttony, Sacrifice, Dark matter, Nowhere's crit (WRVoidPath.cpp).
 		Damage *= WRVoidPath::DamageScale(Attacker, Target, Hit);
+		// Necromancy: the Graveyard's corruption buff, Necrotic power, Final harvest on bosses, a minion's scale (WRNecroPath.cpp).
+		Damage *= WRNecro::DamageScale(Attacker, Target, Hit);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
 			Damage *= 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);
@@ -870,6 +873,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	}
 	const float BeforeModify = Damage;
 	Damage = Target->ModifyIncomingDamage(Hit, Damage);
+	// Necromancy (WRNecroPath.cpp): Soul shield, Shared pain, and Deathless (once per Rest a killing blow leaves 1 HP).
+	Damage = WRNecro::Incoming(Target, Hit, Damage);
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
 	const bool bWeak = BeforeModify > 0.f && Damage > BeforeModify * 1.05f;
 
@@ -1088,6 +1093,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// The Swamp's coatings and charms (WRSwampSystems): thinblood oil's bleed on a blade, the Coven ring's +5% curse.
 		FWRHit Coated = Hit;
 		WRSwamp::ScaleBuildups(Attacker, Coated);
+		// Necromancy's Wither chance (decay on every weapon hit), an ash wraith's burn, a frozen legion's frost.
+		WRNecro::ScaleBuildups(Attacker, Coated);
 		for (const TPair<FName, float>& B : Coated.Buildups)
 		{
 			const int32 Id = WRStatus::FromName(B.Key);
@@ -1128,6 +1135,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRBlood::AfterHit(Target, Hit, Damage);
 		// The Void path's (WRVoidPath.cpp): Unravel chance.
 		WRVoidPath::AfterHit(Target, Hit, Damage);
+	}
+	// The Necromancy path's (WRNecroPath.cpp): who had a hand in it (Souls), Death mark, Final harvest's reaping finish.
+	if (Result == EWRHitResult::Hit && Attacker)
+	{
+		WRNecro::AfterHit(Target, Hit, Damage);
 	}
 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.
@@ -1216,6 +1228,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRBlood::OnKill(Target, Hit);
 		// Void: Feed wins back max health on a kill (WRVoidPath.cpp).
 		WRVoidPath::OnKill(Target, Hit);
+		// Necromancy: Souls to every Necromancer who had a hand in it, Soul siphon, Reaping stride, the body's clock.
+		WRNecro::OnKill(Target, Hit);
 		Target->Die(Hit.Instigator);
 	}
 	// A fire blow, a fire spell's touch (not a burn's tick): marsh gas near it lights (WRSwampSystems; cheap when none).

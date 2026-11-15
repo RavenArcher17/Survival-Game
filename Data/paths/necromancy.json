@@ -1,0 +1,44 @@
+{
+  "id": "necromancy",
+  "name": "Necromancy",
+  "biome": "graveyard",
+  "starter": "raise_dead",
+  "color": "A8B89A",
+  "icon": "soulstone",
+  "glyph": "skull",
+  "_comment": "cooks/biome-graveyard.md 2.17 (nodes SPEC from the skill tree; numbers in tuning necromancy.*, spells.<key>, wildbrands.<node>). Souls are collected from kills (within 30 m, by tier) and spent to raise and empower the dead; lost on death. Code: WRNecroPath (Souls, Deathless, raising, minions, passives), WRAbilitiesNecro (the abilities).",
+  "resource": { "id": "souls", "name": "Souls" },
+  "rootPassive": { "id": "deathless", "name": "Deathless", "text": "Once per rest, survive a killing blow at 1 HP." },
+  "trunk": [
+    { "id": "raise_dead", "name": "Raise dead", "kind": "ability", "cost": 3, "text": "Basic spell: briefly raise a fallen enemy" },
+    { "id": "soul_capacity", "name": "Soul capacity", "kind": "stat", "ranks": 3, "text": "Hold more Souls" },
+    { "id": "wither_chance", "name": "Wither chance", "kind": "stat", "ranks": 2, "text": "Higher chance to inflict decay" },
+    { "id": "grave_strike", "name": "Grave strike", "kind": "ability", "cost": 2, "text": "Basic necrotic weapon art" }
+  ],
+  "branches": [
+    { "id": "horde", "name": "Horde", "nodes": [
+      { "id": "second_wave", "name": "Second wave", "kind": "ability", "cost": 4, "text": "Raise two dead at once", "gate": 0 },
+      { "id": "restless_dead", "name": "Restless dead", "kind": "stat", "ranks": 5, "text": "More minion health", "gate": 4 },
+      { "id": "dead_march", "name": "Dead march", "kind": "stat", "ranks": 3, "text": "Faster, harder-hitting minions", "gate": 9 },
+      { "id": "corpse_explosion", "name": "Corpse explosion", "kind": "ability", "cost": 5, "text": "Spell: detonate one of your minions", "gate": 12 },
+      { "id": "shared_pain", "name": "Shared pain", "kind": "ability", "cost": 3, "text": "Minions take some of your damage", "gate": 17 },
+      { "id": "army_of_the_dead", "name": "Army of the dead", "kind": "capstone", "cost": 10, "text": "Capstone: raise every corpse nearby at once", "gate": 20 }
+    ] },
+    { "id": "reaper", "name": "Reaper", "nodes": [
+      { "id": "scythe_sweep", "name": "Scythe sweep", "kind": "ability", "cost": 5, "text": "Wide sweeping weapon art", "gate": 0 },
+      { "id": "harvest", "name": "Harvest", "kind": "stat", "ranks": 5, "text": "More Souls per kill", "gate": 5 },
+      { "id": "soul_siphon", "name": "Soul siphon", "kind": "ability", "cost": 4, "text": "Kills heal you", "gate": 10 },
+      { "id": "death_mark", "name": "Death mark", "kind": "stat", "ranks": 3, "text": "Marked enemies drop extra Souls", "gate": 14 },
+      { "id": "reaping_stride", "name": "Reaping stride", "kind": "ability", "cost": 3, "text": "Kills restore stamina", "gate": 17 },
+      { "id": "final_harvest", "name": "Final harvest", "kind": "capstone", "cost": 10, "text": "Capstone: execute enemies below 20% health", "gate": 20 }
+    ] },
+    { "id": "lich", "name": "Lich", "nodes": [
+      { "id": "shadow_bolt", "name": "Shadow bolt", "kind": "ability", "cost": 5, "text": "Spell: heavy necrotic bolt", "gate": 0 },
+      { "id": "necrotic_power", "name": "Necrotic power", "kind": "stat", "ranks": 5, "text": "More necrotic spell damage", "gate": 5 },
+      { "id": "curse_of_weakness", "name": "Curse of weakness", "kind": "ability", "cost": 4, "text": "Spell: cursed enemies deal less damage", "gate": 10 },
+      { "id": "soul_shield", "name": "Soul shield", "kind": "stat", "ranks": 3, "text": "Spend Souls to absorb damage", "gate": 14 },
+      { "id": "life_drain", "name": "Life drain", "kind": "ability", "cost": 3, "text": "Spell: drain HP from one enemy", "gate": 17 },
+      { "id": "lich_form", "name": "Lich form", "kind": "capstone", "cost": 10, "text": "Capstone: transform; spells cost no Souls for a short time", "gate": 20 }
+    ] }
+  ]
+}

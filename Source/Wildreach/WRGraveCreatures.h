@@ -48,6 +48,8 @@ namespace WRGraveFlag
 		Sweeping = 1 << 9,   // a Cryptstalker's whips fanned out
 		Riftborn = 1 << 10,  // came back from the south's rifts changed (GY 2.12: Gravehound, Wraithmoth, Tombback south
 		                     // of the neck): desaturated hide, black-violet eyes and voidglass on the spine, +25% HP, curse
+		Ash      = 1 << 11,  // raised as an ash wraith (Fire + Necromancy: it died burning): embers in its threads
+		Ice      = 1 << 12,  // raised as an ice minion (Frost + Necromancy, Frozen legion): rime and pale-blue threads
 	};
 }
 
@@ -70,6 +72,9 @@ public:
 	static bool IsRisen(FName CreatureId);
 	/** Server: the component on a new Graveyard creature (AWRCreature::BeginPlay); also on a raised body. */
 	static void Attach(AWRCreature* Creature);
+	/** Server: a body a Necromancer raised (any creature, not only the Graveyard's): the raised look (grey hide where the
+	 *  rig takes the tint, grave-light threads in its wounds, pale-green eyes); Variant ash / ice / blood. */
+	static void AttachRaised(AWRCreature* Creature, FName Variant);
 	/** Server, once at spawn: the Graveyard's Riftborn roll (graveyardLife.riftborn: its share of Gravehounds,
 	 *  Wraithmoths and Tombbacks south of fromY; +25% health, curse on every blow). */
 	void RollRiftborn(AWRCreature* C);

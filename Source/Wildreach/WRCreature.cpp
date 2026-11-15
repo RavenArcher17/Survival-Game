@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRNecroPath.h"
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRStormCreatures.h"
@@ -1727,7 +1728,7 @@ int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
 	int32 N = 0;
 	for (TActorIterator<AWRCreature> It(World); It; ++It)
 	{
-		N += It->TamedBy == PlayerName && It->IsAlive() ? 1 : 0;
+		N += It->TamedBy == PlayerName && It->IsAlive() && !WRNecro::IsRaised(*It) ? 1 : 0;   // a raised minion is never a tame
 	}
 	return N;
 }
@@ -2255,7 +2256,10 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRForestAI::Died(this, Killer);   // a forest creature lets go; chance drops; a Mossmaul's larder; a sign for the finches
 	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
 	// The Risen leave no body (GY 2.12.4): their bones go straight to the killer.
-	const bool bBody = !FWRGraveAI::NoBody(this) && BecomeBody(Killer);
+	const bool bRaisedMinion = WRNecro::IsRaised(this);
+	const bool bBody = !FWRGraveAI::NoBody(this) && !bRaisedMinion && BecomeBody(Killer);
+	// Necromancy: the body's clock for raising starts; a raised minion goes to bones (no loot, no body).
+	WRNecro::CreatureDied(this, Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
 		if (const FWRCreatureDef* Def = GetDef())
@@ -2266,7 +2270,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 			for (const TPair<FName, int32>& L : Def->Loot)
 			{
 				const bool bCarcass = L.Key == TEXT("raw_meat") || L.Key == TEXT("hide");
-				if (!bBody) Inv->AddItem(L.Key, FMath::Max(1, FMath::RoundToInt(L.Value * Mult * (bCarcass ? Dressing : 1.f))));
+				if (!bBody && !bRaisedMinion) Inv->AddItem(L.Key, FMath::Max(1, FMath::RoundToInt(L.Value * Mult * (bCarcass ? Dressing : 1.f))));
 			}
 			const float TierXP = Def->Tier == TEXT("highland") ? 3.f : Def->Tier == TEXT("midland") ? 2.f : 1.f;
 			UWRLifeSkillsComponent::Award(Killer, TEXT("tracking"), TEXT("kill"), 10.f, TierXP);

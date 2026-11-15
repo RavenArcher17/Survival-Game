@@ -35,7 +35,8 @@
 #include "WRPathLook.h"
 #include "WRLightningPath.h"
 #include "WRBloodPath.h"
-#include "WRNaturePath.h"   // the Growth gauge (the Nature path)
+#include "WRNaturePath.h"
+#include "WRNecroPath.h"   // the Growth gauge (the Nature path)
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -1117,6 +1118,57 @@ private:
 			];
 	}
 
+	/** The Souls row (the Necromancy path, cooks/biome-graveyard.md 2.17): a small bone-green flame for each Soul, under
+	 *  the stamina bar, the unlit ones dark up to your capacity; it flashes pale when a press was refused for Souls. Under
+	 *  it on the main path, Deathless: ready, or spent until your next Rest. */
+	TSharedRef<SWidget> SoulsRow()
+	{
+		TSharedRef<SHorizontalBox> Flames = SNew(SHorizontalBox);
+		for (int32 i = 0; i < 40; ++i)
+		{
+			Flames->AddSlot().AutoWidth().Padding(0.f, 0.f, 1.5f * U, 0.f)
+			[
+				SNew(SBox).WidthOverride(8.f * U).HeightOverride(11.f * U)
+				.Visibility_Lambda([this, i]() { const AWRCharacterBase* B = Body(); return B && i < FMath::RoundToInt(WRNecro::MaxSoulsOf(B)) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				[
+					SNew(SImage).Image(WRUI::Image(TEXT("Glyphs/flame")))
+					.ColorAndOpacity_Lambda([this, i]()
+					{
+						const AWRCharacterBase* B = Body();
+						const FLinearColor Bone = WRPathLook::Color(TEXT("necromancy"));
+						const bool bLit = B && i < FMath::FloorToInt(WRNecro::SoulsOf(B) + 0.01f);
+						const float F = B ? WRNecro::RefusedFlash(B) : 0.f;
+						const FLinearColor C = bLit ? Bone : FLinearColor(0.08f, 0.09f, 0.08f, 0.55f);
+						return FSlateColor(F > 0.f ? FMath::Lerp(C, FLinearColor(FColor(245, 240, 230)), F) : C);
+					})
+				]
+			];
+		}
+		return SNew(SVerticalBox).Visibility_Lambda([this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("necromancy")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+				[
+					SNew(SBox).WidthOverride(54.f * U)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCharacterBase* B = Body(); return FText::Format(LOCTEXT("Souls", "Souls {0}"), FText::AsNumber(B ? FMath::FloorToInt(WRNecro::SoulsOf(B) + 0.01f) : 0)); }), WRUI::Body(11, 600), WRUI::Ink3)
+					]
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Flames]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
+			[
+				WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+				{
+					const AWRCharacterBase* B = Body();
+					const UWRPathComponent* P = PathComp();
+					if (!B || !P || P->GetMainPath() != TEXT("necromancy")) return FText::GetEmpty();
+					return B->HasTag(WRNecro::Status_DeathlessSpent) ? LOCTEXT("DeathlessSpent", "Deathless spent: rest to restore it") : LOCTEXT("DeathlessReady", "Deathless ready");
+				}), WRUI::Body(10, 500), WRUI::Ink3)
+			];
+	}
+
 	TSharedRef<SWidget> Vitals()
 	{
 		const auto A = [this]() { return Attr(); };
@@ -1143,6 +1195,7 @@ private:
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)[SNew(SWRStatusMeters).Who_Lambda([this]() { return Cast<AWRCharacterBase>(Body()); })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Stamina", "Stamina"), WRUI::Stamina, 14.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetStamina() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxStamina() : 1.f; }, [this]() { return StaminaRefusal(); })]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[SoulsRow()]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Poise", "Poise"), WRUI::Poise, 6.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetPoise() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxPoise() : 1.f; })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f * U, 0.f, 8.f * U)[WRUI::Divider()]
 				+ SVerticalBox::Slot().AutoHeight()

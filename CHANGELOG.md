@@ -132,6 +132,29 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   pieces above and pieces 1-4 call) and 50 sound rows (`sounds.json grave.*` and the creature moments), plus voice
   families for all eighteen Graveyard creatures and bosses. The sounds are stand-ins: each row plays the nearest
   existing recording pitched (`_standin`, its `_comment` names it); Graveyard recordings are a later cook.
+- **The Necromancy path** (piece 6; `Data/paths/necromancy.json`, `WRNecroPath.*` the rules, `WRAbilitiesNecro.*` the
+  abilities, tuning `necromancy`, `spells.<key>`, `wildbrands.grave_strike / scythe_sweep`, combos.json): the 22 nodes
+  (trunk, Horde, Reaper, Lich) as the cook lists them. **Souls** (new attributes `Souls` / `MaxSouls`): a death within
+  30 m that you or your minions hit in its last 10 s gives lowland 1, midland 2, highland 3, a Risen 1, a mini 10, a
+  major 25, a player 3 (x Harvest, + Death mark), each a pale-green wisp to your chest; 20 to hold, +5 a Soul capacity
+  rank; all lost when you die; the HUD shows a row of bone-green flames under the stamina bar (flashing when a press is
+  refused). **Deathless** (main path): once per Rest a killing blow leaves you at exactly 1 HP (ash flash, one toll); the
+  HUD says ready or spent; a Rest re-arms it. **Raising**: a creature's body under 3 minutes old and not yet butchered
+  stands up for you at 60% for 30 s with its own attacks, following you and fighting your lock, your fight or the
+  nearest foe; at most 3 (5 with Second wave), the oldest crumbling first; never a tame (no limit, never saved, no body
+  or loot when it falls); it crumbles to bones. Raised bodies of any creature get the raised look (grave-light threads,
+  pale eyes; ember threads on an ash wraith, rime on an ice minion). Abilities: Raise dead, Grave strike (any melee,
+  decay 40), Corpse explosion (40 in 4 m, decay 50), Army of the dead (every body in 12 m for 20 s), Scythe sweep (a 300
+  degree sweep 3.2 m round you with a scythe, greatsword or spear, hyperarmor), Shadow bolt (30, decay 40), Curse of
+  weakness (curse 80), Life drain (a 2 s beam, 12 a second, heals half), Lich form (15 s of free spells, the full ash
+  look and a crown of grave-light). Passives in the one damage pipeline: Wither chance, Restless dead, Dead march,
+  Shared pain, Harvest, Soul siphon, Death mark, Reaping stride, Final harvest (a weapon hit on a non-boss creature under
+  20% reaps it; bosses and players take +30% instead), Necrotic power, Soul shield; the Graveyard's corruption buff (+3 to
+  +15% path damage at 25-100). Combos with Fire (Ash wraith, Funeral pyre), Frost (Preserved, Frozen legion), Lightning
+  (Storm lich), Blood (Death curse), Nature (Cycle of life); Jolt of life, Blood bond and Rot and bloom are listed but not
+  built (their text says so). Raising through walls (raiding.paths.necromancy): a body you can't see within 12 m rises at
+  3x the Souls. The body change is the hero's player_art row (paths.necromancy); Lich form shows the full ash look at any
+  point count and each raise flares the pupil ring.
 
 ## Unreleased: the Ancient forest (the Nature land)
 
