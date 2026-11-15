@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "WRVoidPath.h"
 #include "WRDeeds.h"
@@ -1193,6 +1194,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Result == EWRHitResult::Hit && Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime && WRSwamp::IsLive())
 	{
 		WRSwamp::FireAt(Target, Target->GetActorLocation(), Attacker);
+	}
+	// Fire on the Withered Forest's litter catches (the Wasteland: WRVoidHazards).
+	if (Result == EWRHitResult::Hit && Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime)
+	{
+		AWRVoidState::FireAt(Target, Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight()));
 	}
 	return Done(Result);
 }

@@ -5,6 +5,7 @@
 // corrects), a touch that burns (through ApplyHit), and a pulse every 40-90 s: the inrush stops for a second, the
 // stones' shadows sharpen, and they drop for 2 s. Numbers in tuning "void".
 #include "WRVoid.h"
+#include "WRVoidHazards.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBuildLook.h"
@@ -441,7 +442,9 @@ void AWRRift::Tick(float DeltaSeconds)
 	{
 		const float S = float(T - NextPulse);
 		const bool bSilent = !bSteady && S >= 0.f && S < VT(TEXT("pulse.tell"), 1.0f);
-		Inrush->SetVolumeMultiplier(bSilent ? 0.f : 1.f);
+		// The Rift Storm's warning and the storm itself: every inrush rises to a howl (biome-void 2.10).
+		const AWRVoidState* Storm = AWRVoidState::Find(GetWorld());
+		Inrush->SetVolumeMultiplier(bSilent ? 0.f : Storm && Storm->StormStage > 0 ? WRTune(TEXT("voidHazards.storm.howl"), 2.2f) : 1.f);
 	}
 }
 

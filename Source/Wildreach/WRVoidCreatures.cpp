@@ -1,6 +1,7 @@
 // The Corrupted wasteland's creatures (see WRVoidCreatures.h). cooks/biome-void.md 2.12; numbers in tuning "voidCreatures"
 // and in their rows (Data/attacks.json), the dens in Data/lands/wasteland.json "spawns".
 #include "WRVoidCreatures.h"
+#include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "WRVoid.h"
 #include "WRVoidWorld.h"
@@ -480,6 +481,21 @@ void UWRVoidBody::BuildLook()
 				Kit.Add(EdgeLit, FVector(4.f, 3.f, 26.f), FVector(0.f, -W * 0.5f - 1.f, T * 150.f));
 			}
 		}), GrpRows);
+	}
+	else if (K == TEXT("rift_heart"))
+	{
+		// A storm rift's heart: a 1.5 m faceted voidglass core hanging in the tear, violet light in its seams.
+		AddGroup(NAME_None, C->GetActorLocation(), Yaw, Blocks([&](FKit& Kit)
+		{
+			for (int32 i = 0; i < 6; ++i) Kit.Add(Glass, FVector(110.f - 10.f * i, 90.f - 6.f * i, 120.f - 8.f * i), FVector::ZeroVector, FRotator(30.f * i, 47.f * i, 13.f * i));
+			for (int32 i = 0; i < 6; ++i) Kit.Add(EdgeLit, FVector(4.f, 4.f, 110.f), FVector(FMath::Cos(i * 1.05f) * 40.f, FMath::Sin(i * 1.05f) * 40.f, 0.f), FRotator(20.f * i, 60.f * i, 0.f));
+		}), GrpStrand);
+		Glow = NewObject<UPointLightComponent>(C);
+		Glow->SetupAttachment(Body);
+		Glow->SetIntensity(2500.f);
+		Glow->SetAttenuationRadius(1200.f);
+		Glow->SetLightColor(VcHex(TEXT("#7B4FD6")));
+		Glow->RegisterComponent();
 	}
 	else if (K == TEXT("void_heart"))
 	{
@@ -1373,6 +1389,11 @@ float FWRVoidAI::Incoming(const AWRCreature* Self, const FWRHit& Hit, float Dama
 	const UWRVoidBody* B = UWRVoidBody::Get(Self);
 	if (!B) return Damage;
 	if (B->Has(WRVoidFlag::InRift)) return 0.f;   // inside the tear: nothing reaches it
+	if (Self->CreatureId == TEXT("rift_heart"))
+	{
+		// The storm's heart remembers who broke it (the XP split).
+		if (AWRVoidState* St = AWRVoidState::Find(Self->GetWorld())) St->NoteHeart(const_cast<AWRCreature*>(Self), Hit, Damage);
+	}
 	if (Self->CreatureId == TEXT("void_heart"))
 	{
 		// The heart shares Vorhollow's health: every hit on it counts x1.5 there, and the heart itself never falls.
@@ -1416,6 +1437,7 @@ void FWRVoidAI::Died(AWRCreature* Self, AActor* Killer)
 	UWRVoidBody* B = UWRVoidBody::Get(Self);
 	if (!B) return;
 	FWRVoidBoss::HelperDied(Self);
+	if (Self->CreatureId == TEXT("rift_heart")) AWRVoidState::HeartDied(Self);
 	if (B->HeldBody.IsValid()) Release(Self, B, false);
 	if (B->LatchedOn.IsValid()) Unlatch(Self, B, false);
 	if (B->Has(WRVoidFlag::InRift))

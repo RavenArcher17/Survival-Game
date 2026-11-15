@@ -293,7 +293,8 @@ Swamp's hook pattern, wasteland.json `spawns`, tuning `voidCreatures`). Shrine a
 on that land's height function (`WRLand::PlaceOn`). The Void path: rules `WRVoidPath.*` (tuning `voidPath`, spells.<void
 spell>, nodeEffects.void.*), abilities `WRAbilitiesVoid.*` (pay through `WRVoidPath::Pay`; registry in WRAbilities.cpp). Its bosses:
 `WRVoidBosses.*` (FWRVoidBoss hooks beside the Storm / Swamp ones in WRBoss*.cpp; arenas from wasteland.json `bosses`;
-the Null Gate and Vorhollow's stage are actors whose motion is a function of their replicated clocks).
+the Null Gate and Vorhollow's stage are actors whose motion is a function of their replicated clocks). Its hazards and
+the Rift Storm: `WRVoidHazards.*` (one replicated `AWRVoidState` per land; the event schedule is world.json's).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRVoidHazards.h"
 #include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
 #include "WRSwampBosses.h"
@@ -323,6 +324,7 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	if (Hit.Element == WRTags::Element_Fire || Kind == TEXT("firepot"))
 	{
 		WRSwamp::FireAt(this, HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation(), const_cast<AWRCharacterBase*>(Caster));
+		AWRVoidState::FireAt(this, HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation());
 	}
 	// A thrown fire pot breaks wherever it lands: shards, fire, burning ground (WRRaiding).
 	if (Kind == TEXT("firepot"))

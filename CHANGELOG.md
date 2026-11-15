@@ -88,6 +88,15 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
   chest, a chamber with the Void heart sharing its health x1.5, crushing ribs every 20 s with safe alcoves, a cough
   every 30 s). Falling into the black past the void floor is Unmade. Looks drawn over stand-in rigs (the core, the
   bell helm and bell, the unhinged jaw, the plume tail, the chest hole and its starfield, the hooks and spines).
+- **Litter fire, hollow crust and the Rift Storm** (`WRVoidHazards.*`, tuning `voidHazards`, wasteland.json `crust` /
+  `riftStorm`, world.json `events.riftstorm`): fire on the Withered Forest's litter (a fire blow, a fire bolt's
+  landing, a burning pool) smoulders 0.9 s then walks downwind at 1.5 m/s (0.5 upwind) over 6 m cells, each burning
+  60 s (3/s, burn 8/s) and black for 2 game days. Eight hollow-crust patches over pockets cut into the ground (a
+  `pit` land feature) drum underfoot within 6 m and break under a roll, a heavy landing, a heavy blow, a heavy creature
+  or a thrown stone (one pocket holds a small rift). The Rift Storm (one game day about every 3 real days): every
+  inrush howls through the warning; 6 of 10 seeds open as storm rifts with a floating rift heart (1,500; void x0.5;
+  anchor salt -300); three waves 4 min apart walk to the nearest claim within 1.5 km as raiders (else the nearest
+  shrine); a broken heart closes its rift and leaves voidglass at x3, 1,500 path XP split by heart damage.
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
   palette ahead of it).
 

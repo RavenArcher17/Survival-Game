@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
@@ -128,6 +129,8 @@ AWRHazard* AWRHazard::Spawn(UWorld* World, AActor* InSource, const FVector& Loca
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AWRHazard* H = World->SpawnActor<AWRHazard>(AWRHazard::StaticClass(), Location, FRotator::ZeroRotator, Params);
+	// A burning pool or wall on the Withered Forest's litter sets it alight (WRVoidHazards).
+	if (H && InKind != TEXT("frost") && InKind != TEXT("ice") && InKind != TEXT("flood")) AWRVoidState::FireAt(World, Location);
 	if (!H)
 	{
 		return nullptr;

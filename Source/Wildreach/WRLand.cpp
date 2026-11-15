@@ -266,6 +266,20 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			}
 		}
 	}
+	// Each hollow-crust patch is a pocket in the ground under it (WRVoidHazards lays the crust over).
+	if (J->TryGetArrayField(TEXT("crust"), A))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *A)
+		{
+			const TSharedPtr<FJsonObject> C = V->AsObject();
+			if (!C.IsValid()) continue;
+			FWRLandFeature& Fe = Features.AddDefaulted_GetRef();
+			Fe.Kind = TEXT("pit");
+			Fe.A = WRLand::Vec2(C->TryGetField(TEXT("at")));
+			Fe.R = LNum(C, TEXT("r"), 8.f);
+			Fe.Depth = LNum(C, TEXT("depth"), 5.f);
+		}
+	}
 	return Coast.Num() >= 3 && HeightCurve.Num() >= 2;
 }
 
@@ -352,6 +366,12 @@ float FWRLandDef::Height(const FVector2D& M) const
 			const float D = WRLand::DistToSegment(M, F.A, F.B, &T);
 			const float Half = F.Width * 0.5f;
 			if (D < Half + F.Walls) H = FMath::Lerp(H, FMath::Min(H, FMath::Lerp(F.Levels[0], F.Levels[1], T)), 1.f - Smooth(Half, Half + F.Walls, D));
+		}
+		else if (F.Kind == TEXT("pit"))
+		{
+			// A pocket under hollow crust: steep sides, its floor Depth down (the crust lies over it: WRVoidHazards).
+			const float D = FVector2D::Distance(M, F.A);
+			if (D < F.R) H -= F.Depth * (1.f - Smooth(F.R - 1.5f, F.R, D));
 		}
 		else if (F.Kind == TEXT("hole"))
 		{

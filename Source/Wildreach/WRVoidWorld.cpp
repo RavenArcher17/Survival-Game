@@ -1,5 +1,6 @@
 // The Corrupted wasteland's world things (see WRVoidWorld.h): its gathering, keepsakes, thrown things and Maren's deeds.
 #include "WRVoidWorld.h"
+#include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "Wildreach.h"
 #include "WRBuildLook.h"
@@ -267,6 +268,8 @@ void WRVoidWorld::LandReady(AWRLand* Land)
 	UWRVoidLife::PlaceDens(Land);
 	// Its bosses' arenas, the Null Gate and Vorhollow's stage (WRVoidBosses).
 	FWRVoidBoss::PlaceArenas(Land);
+	// Its litter fire, hollow crust and the Rift Storm (WRVoidHazards).
+	AWRVoidState::Spawn(Land);
 	UE_LOG(LogWildreach, Log, TEXT("VOID %s: %d resource nodes, %d keepsakes"), *Land->LandId.ToString(), N, Keepsakes().Num());
 }
 
@@ -370,6 +373,8 @@ void WRVoidWorld::ThrownLanded(AActor* Projectile, FName Kind, const FVector& At
 	if (Kind == TEXT("riftstone"))
 	{
 		WRSound::PlayAt(World, TEXT("void.stone.land"), At);
+		// On hollow crust: it cracks through and shows the drop.
+		AWRVoidState::CrustStruck(World, At, 120.f);
 		float Share = 1.f;
 		AWRRift* Rift = RiftAt(World, At, Share);
 		if (!Rift) return;
