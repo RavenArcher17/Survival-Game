@@ -1,0 +1,212 @@
+{
+  "id": "wind",
+  "name": "Wind",
+  "biome": "sky_islands",
+  "starter": "gust",
+  "color": "9FD6CF",
+  "icon": "puffwing_feathers",
+  "glyph": "weather_wind",
+  "resource": {
+    "id": "momentum",
+    "name": "Momentum"
+  },
+  "rootPassive": {
+    "id": "wind_featherfall",
+    "name": "Featherfall",
+    "text": "No fall damage from any height. Gliders cost half the stamina, and a glider that closes low never hurts you."
+  },
+  "trunk": [
+    {
+      "id": "gust",
+      "name": "Gust",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic wind spell: a blast that throws enemies back in a cone. In the air it throws you the other way too"
+    },
+    {
+      "id": "momentum_capacity",
+      "name": "Momentum capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Momentum bar"
+    },
+    {
+      "id": "off_balance",
+      "name": "Off balance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Wind hits and slams into walls break more stance"
+    },
+    {
+      "id": "wind_cut",
+      "name": "Wind cut",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic wind weapon art: a slash that sends a blade of wind ahead and knocks back what it meets"
+    }
+  ],
+  "branches": [
+    {
+      "id": "skyborne",
+      "name": "Skyborne",
+      "nodes": [
+        {
+          "id": "wind_glide",
+          "name": "Glide",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Jump again in the air to glide from any height with no glider, on Momentum",
+          "gate": 0
+        },
+        {
+          "id": "air_dash",
+          "name": "Air dash",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: dash through the air, untouchable for the dash; once each time you leave the ground",
+          "gate": 5
+        },
+        {
+          "id": "plunge",
+          "name": "Plunge",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Weapon art from the air: dive blade-first and burst the ground where you land; the higher, the harder",
+          "gate": 10
+        },
+        {
+          "id": "wind_lift",
+          "name": "Lift",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Jump higher; at rank 3, a second small jump in the air",
+          "gate": 14
+        },
+        {
+          "id": "aerial_mastery",
+          "name": "Aerial mastery",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "More damage while you're in the air",
+          "gate": 17
+        },
+        {
+          "id": "sky_lord",
+          "name": "Sky lord",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "rise and hover for a while, every attack coming from the air",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "cyclone",
+      "name": "Cyclone",
+      "nodes": [
+        {
+          "id": "whirlwind",
+          "name": "Whirlwind",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Weapon art for great weapons and axes: spin, hitting everything round you; hold to keep spinning",
+          "gate": 0
+        },
+        {
+          "id": "vortex",
+          "name": "Vortex",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: pull enemies in from all round you, into your spin if you're spinning",
+          "gate": 5
+        },
+        {
+          "id": "eye_of_the_storm",
+          "name": "Eye of the storm",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Take less damage while you spin",
+          "gate": 10
+        },
+        {
+          "id": "wind_debris",
+          "name": "Debris",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Each spin throws stones out round you",
+          "gate": 14
+        },
+        {
+          "id": "lingering_gale",
+          "name": "Lingering gale",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Your spins leave a gale on the ground that hurts and holds small creatures off",
+          "gate": 17
+        },
+        {
+          "id": "tornado",
+          "name": "Tornado",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "a tornado you steer that lifts small creatures and drags bigger ones in",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "windblade",
+      "name": "Windblade",
+      "nodes": [
+        {
+          "id": "wind_arrow",
+          "name": "Wind arrow",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Weapon art for bows and crossbows: a shot on the wind that knocks back and goes through a body",
+          "gate": 0
+        },
+        {
+          "id": "swift_draw",
+          "name": "Swift draw",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "Draw and throw faster",
+          "gate": 5
+        },
+        {
+          "id": "piercing_gale",
+          "name": "Piercing gale",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Your arrows, bolts and thrown weapons go through one more body",
+          "gate": 10
+        },
+        {
+          "id": "crosswind",
+          "name": "Crosswind",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Faster, harder-hitting shots",
+          "gate": 14
+        },
+        {
+          "id": "tailwind_shot",
+          "name": "Tailwind shot",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Aimed shots push you back a step (further in the air); hold Sprint as you shoot to stand fast",
+          "gate": 17
+        },
+        {
+          "id": "storm_volley",
+          "name": "Storm volley",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "loose into the sky and rain thirty arrows where you aim",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

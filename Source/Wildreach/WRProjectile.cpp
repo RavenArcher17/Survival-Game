@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRWindPath.h"
 #include "WRVoidHazards.h"
 #include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
@@ -106,14 +107,14 @@ void AWRProjectile::EndPlay(const EEndPlayReason::Type Reason)
 void AWRProjectile::OnRep_Fx()
 {
 	// Before BeginPlay (initial replication) BeginPlay calls this again; during it, IsActorBeginningPlay.
-	if (Trail || TrailFx.IsNone() || !ModelPath.IsEmpty() || GetNetMode() == NM_DedicatedServer || IsActorBeingDestroyed() || !(HasActorBegunPlay() || IsActorBeginningPlay()))
+	if (Trail || TrailFx.IsNone() || GetNetMode() == NM_DedicatedServer || IsActorBeingDestroyed() || !(HasActorBegunPlay() || IsActorBeginningPlay()))
 	{
 		return;
 	}
 	Trail = WRFx::Attach(Collision, TrailFx);
-	if (Trail)
+	if (Trail && ModelPath.IsEmpty())
 	{
-		Mesh->SetVisibility(false);  // the glowing core and its trail are the bolt now
+		Mesh->SetVisibility(false);  // the glowing core and its trail are the bolt now (a modelled shot keeps its model)
 	}
 }
 
@@ -400,10 +401,24 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	{
 		Hit.Origin = GetActorLocation() - GetVelocity().GetSafeNormal() * 100.f;
 		Hit.bProjectile = true;  // never parried (COMBAT-AND-LESSONS 1.3)
-		UWRCombatLibrary::ApplyHit(Target, Hit);
+		TFunction<void(EWRHitResult)> Struck;
+		if (OnStruck)
+		{
+			const TFunction<void(AWRCharacterBase*, EWRHitResult)> Cb = OnStruck;
+			const TWeakObjectPtr<AWRCharacterBase> WeakT(Target);
+			Struck = [Cb, WeakT](EWRHitResult Result) { if (WeakT.IsValid()) Cb(WeakT.Get(), Result); };
+		}
+		UWRCombatLibrary::ApplyHit(Target, Hit, Struck);
 		if (Kind == TEXT("bola") && !FWRForestBoss::BolaHold(Target))   // the Hornwarden: a bola holds him like a snare
 		{
 			ApplyBola(Target);
+		}
+		// A shot that goes through bodies (Wind arrow, Piercing gale, an ammo's own pierce) flies on past this one.
+		if (PierceLeft > 0 && !ModelPath.IsEmpty() && Kind != TEXT("bola"))
+		{
+			ContinuePast(Target);
+			Destroy();
+			return;
 		}
 	}
 	if (!ModelPath.IsEmpty())
@@ -437,6 +452,11 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 			AttachToComponent(OtherComp, FAttachmentTransformRules::KeepWorldTransform);
 		}
 		SetLifeSpan(WRTune(TEXT("ranged.stuckSeconds"), 12.f));
+		// Windborne seeds (Nature + Wind 50): an arrow of yours coming down may plant a Sprout turret (WRWindPath.cpp).
+		if ((Kind == TEXT("arrow") || Kind == TEXT("bolt")) && Caster)
+		{
+			WRWind::OnArrowLanded(const_cast<AWRCharacterBase*>(Caster), HitResult.ImpactPoint);
+		}
 		if (!PickupItem.IsNone())
 		{
 			// A thrown spear can be picked up again where it fell.
@@ -473,4 +493,34 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		}
 	}
 	Destroy();
+}
+
+void AWRProjectile::ContinuePast(AActor* Through)
+{
+	const FVector V = Movement && !Movement->Velocity.IsNearlyZero() ? Movement->Velocity : GetVelocity();
+	if (!HasAuthority() || V.IsNearlyZero())
+	{
+		return;
+	}
+	const float Clear = Through ? Through->GetSimpleCollisionRadius() * 2.f + 30.f : 40.f;
+	FActorSpawnParameters Params;
+	Params.Owner = GetOwner();
+	Params.Instigator = GetInstigator();
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AWRProjectile* Next = GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), GetActorLocation() + V.GetSafeNormal() * Clear, V.Rotation(), Params);
+	if (!Next)
+	{
+		return;
+	}
+	Next->PierceLeft = PierceLeft - 1;
+	Next->OnStruck = OnStruck;
+	if (Through)
+	{
+		Next->Collision->IgnoreActorWhenMoving(Through, true);
+	}
+	Next->InitPhysical(Hit, V, Movement ? Movement->ProjectileGravityScale : 1.f, ModelPath, ModelAlong, Kind, PickupItem);
+	if (!TrailFx.IsNone())
+	{
+		Next->SetTrail(TrailFx);
+	}
 }

@@ -1,4 +1,5 @@
 #include "WRPathComponent.h"
+#include "WRWindPath.h"
 #include "WRNecroPath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
@@ -584,6 +585,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		// Rooted (cooks/biome-forest.md 2.17): standing still slowly heals (WRNaturePath.cpp).
 		GrantedTags.AddTag(WRNature::Passive_Rooted);
 	}
+	else if (MainPath == TEXT("wind"))
+	{
+		// Featherfall (cooks/biome-sky.md 2.18.3): no fall damage from any height; gliders at half the stamina.
+		GrantedTags.AddTag(WRWind::Passive_Featherfall);
+	}
 	else if (MainPath == TEXT("necromancy"))
 	{
 		// Deathless (cooks/biome-graveyard.md 2.17): once per Rest a killing blow leaves you at 1 HP (WRNecroPath.cpp).
@@ -621,6 +627,13 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 			* WRDeeds::PrestigeResource(GetOwner(), TEXT("nature"));
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxGrowthAttribute(), NewMax);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetGrowthAttribute(), NewMax * Share);
+	}
+	// Momentum (the Wind path): 100 + 15 a rank of Momentum capacity (nodeEffects wind.momentum_capacity maxMomentum).
+	{
+		const float NewMax = (WRTune(TEXT("resources.momentum.max"), 100.f) + (IsActivePath(TEXT("wind")) ? FMath::Max(0.f, Stat(Character, TEXT("maxMomentum"))) : 0.f))
+			* WRDeeds::PrestigeResource(GetOwner(), TEXT("wind"));
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxMomentumAttribute(), NewMax);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMomentumAttribute(), FMath::Min(Attr->GetMomentum(), NewMax));
 	}
 
 	// Tempered: more poise.

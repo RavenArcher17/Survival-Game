@@ -78,6 +78,21 @@ played here (Aaron and the testers test, F8). This first piece is the land, the 
 - New hooks: `AWRResourceNode::Divert` (a land's own yield in place of the bag), `WRSkyAir::NoteHit` in `ApplyHit`, the
   glide drain in `UWRStatusComponent`, `AWRCharacter::GliderKind` (replicated), the Toll Shrine's kindle, the Sky's
   E prompts and `world sky ...`.
+- **The Wind path** (piece 2; `Data/paths/wind.json`, `WRWindPath.*`, `WRAbilitiesWind.*`; cooks/biome-sky.md 2.18): the
+  Featherfall root (a tag on the main path, like Grounded: no fall damage from any height, gliders at half the stamina,
+  a glider closing low never hurts) and 22 nodes. **Momentum** (attribute pair, the HUD's pale-teal ring and the -oldui
+  bar): +14 a second airborne, +8 at a sprint, +4 a blow struck from the air, draining 10 a second after 2.5 s without a
+  gain; at 60 and over knockback x1.25, stamina regen +15% and streaks of air run round the ring. A Wind ability short
+  of its Momentum still goes off at half strength for its stamina (no dead button). Abilities (all `UWRGameplayAbility`,
+  in `ClassForNode`): Gust, Wind cut, Air dash, Plunge, Sky lord (hover: light and heavy become air strikes, dodge a free
+  air dash, hold Jump to climb), Whirlwind, Vortex, Tornado (steered by holding its slot), Wind arrow (a ranged
+  Wildbrand through the bow), Storm volley; the wave, tornado and ground-patch actors; every passive live (Off balance,
+  Eye of the storm, Lingering gale, Piercing gale, Crosswind, Swift draw, Tailwind shot, Aerial mastery, Lift's air hop,
+  Wind debris, Path Glide through `WRSkyAir`); knockback and wall-slams through `WRSkyAir::Push`; the 8 combos in
+  `combos.json` (the Necromancy pair data-ready); the body change (spirals drifting on the skin, hair stirring, racing at
+  high Momentum in a fight). Projectiles gain `PierceLeft` / `OnStruck` / `ContinuePast` (the ammo `pierce` field now
+  works), modelled shots keep their trail (the fire pot's fuse sparks show now). Tuning `resources.momentum`, `spells.*`,
+  `wildbrands.*`, `nodeEffects`, `passives.wind`, `knockback`; 19 fx and 23 sound rows (existing audio files).
 
 ## Unreleased: the Graveyard (the Necromancy land)
 

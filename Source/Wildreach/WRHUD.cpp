@@ -217,6 +217,11 @@ void AWRHUD::DrawHUD()
 	{
 		DrawBar(TEXT("Growth"), A->GetGrowth(), A->GetMaxGrowth(), FLinearColor(FColor(0x5E, 0x8C, 0x31)), X, Y); Y += BarSpacing;
 	}
+	// Momentum (the Wind path, -oldui): pale teal #9FD6CF.
+	if (Paths && Paths->IsActivePath(TEXT("wind")))
+	{
+		DrawBar(TEXT("Momentum"), A->GetMomentum(), A->GetMaxMomentum(), FLinearColor(FColor(0x9F, 0xD6, 0xCF)), X, Y); Y += BarSpacing;
+	}
 	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
 	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 

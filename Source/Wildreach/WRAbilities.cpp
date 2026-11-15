@@ -1,4 +1,7 @@
 #include "WRAbilities.h"
+#include "WRInventory.h"
+#include "WRWindPath.h"          // Sky lord's swings and dodge
+#include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
 #include "WRVoidBosses.h"
 #include "WRSound.h"
 #include "WRVoidPath.h"
@@ -527,6 +530,19 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	bThisFollowUp = false;
 	bJumpSwing = false;
 
+	// Sky lord (the Wind path): while it hovers, light and heavy are its air strikes (WRAbilitiesWind.cpp).
+	if (bUsesMoves && WRWind::InSkyLord(Character))
+	{
+		CostOverride = T.Num(bHeavy ? TEXT("spells.skyLord.staminaHeavy") : TEXT("spells.skyLord.staminaLight"), bHeavy ? 24.f : 14.f);
+		if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+		SkyLordSwing();
+		return;
+	}
+
 	// The move: a row of the held weapon's class (the full grammar: PickMove), a Wildbrand's own row
 	// (tuning wildbrands.<node>), or the ability's own timing (creature bites).
 	float Windup = 0.f, Active = 0.f, Recovery = 0.f;
@@ -903,6 +919,28 @@ bool UWRGA_Melee::WildbrandFits(const AWRCharacterBase* Who, FName Node, FString
 	if (Who->HasTag(WRTags::State_Mounted) && !(Row->HasField(TEXT("mounted")) && Row->GetBoolField(TEXT("mounted"))))
 	{
 		OutWhy = TEXT("not while riding");
+		return false;
+	}
+	// A ranged Wildbrand (Wind arrow): its fits are the ranged slot's kinds (bow, crossbow), and it's drawn through it.
+	bool bRangedArt = false;
+	if (Row->TryGetBoolField(TEXT("ranged"), bRangedArt) && bRangedArt)
+	{
+		const AWRCharacter* Survivor = Cast<AWRCharacter>(Who);
+		const FWRItemDef* Launcher = Survivor && !Survivor->GetRangedItem().IsNone() ? FWRItemRegistry::Get().Find(Survivor->GetRangedItem()) : nullptr;
+		const TArray<TSharedPtr<FJsonValue>>* Kinds = nullptr;
+		if (Launcher && Row->TryGetArrayField(TEXT("fits"), Kinds))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Kinds)
+			{
+				if (FName(*V->AsString()) == Launcher->RangedKind)
+				{
+					if (Survivor->IsRangedOut()) return true;
+					OutWhy = TEXT("draw your bow");
+					return false;
+				}
+			}
+		}
+		OutWhy = TEXT("needs a bow or crossbow");
 		return false;
 	}
 	const TArray<TSharedPtr<FJsonValue>>* Fits = nullptr;
@@ -1557,6 +1595,29 @@ FName UWRGA_Dodge::LoadTier(float Ratio)
 void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	AWRCharacterBase* Character = GetCharacter();
+	if (Character && WRWind::InSkyLord(Character))
+	{
+		// Sky lord (the Wind path): dodge is a free air dash toward the stick (back with none), untouchable on the way.
+		const FWRTuning& Tw = FWRTuning::Get();
+		CostOverride = 0.f;
+		if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+		FVector Dir = Character->GetCharacterMovement()->GetCurrentAcceleration().GetSafeNormal2D();
+		if (Dir.IsNearlyZero()) Dir = -Character->GetActorForwardVector().GetSafeNormal2D();
+		const float TravelTime = FMath::Max(0.05f, Tw.Num(TEXT("spells.airDash.travel"), 0.18f));
+		const float Distance = Tw.Num(TEXT("spells.airDash.distance"), 400.f);
+		SetInvulnerable(true);
+		Travel = UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(this, TEXT("SkyLordDash"), Dir, Distance / TravelTime, TravelTime, false, nullptr,
+			ERootMotionFinishVelocityMode::ClampVelocity, FVector::ZeroVector, Character->GetCharacterMovement()->GetMaxSpeed(), false);
+		if (Travel) Travel->ReadyForActivation();
+		if (IsServer()) WRFx::BroadcastOn(Character, TEXT("wind.dash"), NAME_None, 1.f, TEXT("wind.dash"), TravelTime);
+		After(TravelTime, [this]() { SetInvulnerable(false); });
+		After(TravelTime + Tw.Num(TEXT("spells.airDash.recovery"), 0.15f), [this]() { EndSelf(); });
+		return;
+	}
 	if (!Character || Character->GetCharacterMovement()->IsFalling())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -2565,7 +2626,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		// Nature (WRNaturePath.cpp, WRPlantSummon.cpp): Purify, Thorned skin, Pollen, Overgrowth.
 		TEXT("purify"), TEXT("thorned_skin"), TEXT("pollen"), TEXT("overgrowth"),
 		// Necromancy (WRNecroPath.cpp): Second wave, Shared pain, Soul siphon, Reaping stride, Final harvest.
-		TEXT("second_wave"), TEXT("shared_pain"), TEXT("soul_siphon"), TEXT("reaping_stride"), TEXT("final_harvest") };
+		TEXT("second_wave"), TEXT("shared_pain"), TEXT("soul_siphon"), TEXT("reaping_stride"), TEXT("final_harvest"),
+		// Wind (WRWindPath.cpp, WRSkyAir): Glide, Eye of the storm, Lingering gale, Piercing gale, Tailwind shot.
+		TEXT("wind_glide"), TEXT("eye_of_the_storm"), TEXT("lingering_gale"), TEXT("piercing_gale"), TEXT("tailwind_shot") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2654,6 +2717,20 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("strangling_vines")) return UWRGA_StranglingVines::StaticClass();
 		if (NodeId == TEXT("sprout_turret")) return UWRGA_SproutTurret::StaticClass();
 		if (NodeId == TEXT("ancient_guardian")) return UWRGA_AncientGuardian::StaticClass();
+	}
+	else if (PathId == TEXT("wind"))
+	{
+		// The Wind path (WRAbilitiesWind.cpp, cooks/biome-sky.md 2.18.3).
+		if (NodeId == TEXT("gust")) return UWRGA_Gust::StaticClass();
+		if (NodeId == TEXT("wind_cut")) return UWRGA_WindCut::StaticClass();
+		if (NodeId == TEXT("air_dash")) return UWRGA_AirDash::StaticClass();
+		if (NodeId == TEXT("plunge")) return UWRGA_Plunge::StaticClass();
+		if (NodeId == TEXT("sky_lord")) return UWRGA_SkyLord::StaticClass();
+		if (NodeId == TEXT("whirlwind")) return UWRGA_Whirlwind::StaticClass();
+		if (NodeId == TEXT("vortex")) return UWRGA_Vortex::StaticClass();
+		if (NodeId == TEXT("tornado")) return UWRGA_Tornado::StaticClass();
+		if (NodeId == TEXT("wind_arrow")) return UWRGA_WindArrow::StaticClass();
+		if (NodeId == TEXT("storm_volley")) return UWRGA_StormVolley::StaticClass();
 	}
 	else if (PathId == TEXT("necromancy"))
 	{

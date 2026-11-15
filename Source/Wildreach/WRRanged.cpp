@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRWindPath.h"
 #include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
 #include "WRForestHazards.h"
@@ -471,8 +472,10 @@ void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint,
 	{
 		Dir = FMath::VRandCone(Dir, FMath::DegreesToRadians(WRTune(TEXT("ranged.hipSpreadDegrees"), 4.f)));  // hip fire wanders
 	}
-	const float Delay = bThrow ? WRTune(TEXT("ranged.throwDelay"), 0.45f) : 0.f;
-	NextShotAt = Now + Gun->Reload + Delay;
+	// Swift draw (the Wind path): the draw and the throw's wind-up go faster.
+	const float Draw = WRWind::DrawTimeScale(this);
+	const float Delay = bThrow ? WRTune(TEXT("ranged.throwDelay"), 0.45f) * Draw : 0.f;
+	NextShotAt = Now + Gun->Reload * Draw + Delay;
 	const FName Group = RangedAnimGroup();
 	MulticastRangedShot(Group == TEXT("throw") ? FName(TEXT("throw")) : FName(*(Group.ToString() + TEXT("_fire"))),
 		Group == TEXT("throw") ? NAME_None : FName(*(Group.ToString() + TEXT("_reload"))), Gun->Reload);
@@ -496,6 +499,8 @@ void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint,
 		// A crafted launcher's quality scales its shots; each shot wears it a little.
 		LaunchProjectile(*Gun, Ammo, Dir, Inv->GetRangedMultiplier());
 		Inv->WearEquipped(EWREquipSlot::Ranged, WRTune(TEXT("ranged.wearPerShot"), 1.f));
+		// Tailwind shot (the Wind path): an aimed (fully drawn) shot pushes you back unless Sprint is held.
+		WRWind::OnShotFired(this, nullptr, bAiming);
 	}
 }
 
@@ -508,7 +513,7 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	const FWRItemDef* Ammo = ItemDef(AmmoId);
 	FWRHit Hit;
 	Hit.Instigator = this;
-	Hit.Damage = Launcher.RangedDamage * LauncherMult + (Ammo ? Ammo->AmmoDamage : 0.f);
+	Hit.Damage = (Launcher.RangedDamage * LauncherMult + (Ammo ? Ammo->AmmoDamage : 0.f)) * WRWind::ProjectileDamageScale(this);   // Crosswind
 	Hit.PoiseDamage = Hit.Damage * WRTune(TEXT("ranged.poisePerDamage"), 0.4f);
 	Hit.Element = WRTags::Element_Physical;
 	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult * LauncherMult;
@@ -551,8 +556,10 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;
 		const FString MeshAlong = Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->MeshAlong : Launcher.MeshAlong;
-		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed, Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
+		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed * WRWind::ProjectileSpeedScale(this), Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
 			Launcher.IsThrowable() && Launcher.RangedKind == TEXT("spear") ? Launcher.Id : NAME_None);
+		// Through bodies: the ammo's own pierce (items.json) and Piercing gale's one (the Wind path).
+		Projectile->PierceLeft = WRWind::ShotPierce(this, AmmoId);
 	}
 }
 

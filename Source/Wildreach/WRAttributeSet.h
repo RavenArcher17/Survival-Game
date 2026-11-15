@@ -45,6 +45,9 @@ public:
 	/** The Nature path's Growth (cooks/biome-forest.md 2.17): a spender that regrows by the ground around you. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Growth) FGameplayAttributeData Growth;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxGrowth) FGameplayAttributeData MaxGrowth;
+	/** The Wind path's Momentum (cooks/biome-sky.md 2.18.2): a spender that builds in the air and at a sprint. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Momentum) FGameplayAttributeData Momentum;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxMomentum) FGameplayAttributeData MaxMomentum;
 	/** The Necromancy path's Souls (cooks/biome-graveyard.md 2.17): collected from kills, spent to raise and empower the dead. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Souls) FGameplayAttributeData Souls;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxSouls) FGameplayAttributeData MaxSouls;
@@ -77,6 +80,8 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxCharge)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Growth)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxGrowth)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Momentum)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxMomentum)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Souls)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxSouls)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHealthLost)
@@ -106,6 +111,8 @@ private:
 	UFUNCTION() void OnRep_MaxCharge(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Growth(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxGrowth(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Momentum(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxMomentum(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Souls(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxSouls(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxHealthLost(const FGameplayAttributeData& Old);

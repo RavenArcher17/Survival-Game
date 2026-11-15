@@ -3312,7 +3312,7 @@
         }
       }
     },
-    "wind": {
+    "wind": { "castSound": "path.wind.rush", "pulseSeconds": 0.3,
       "color": [
         0.624,
         0.839,

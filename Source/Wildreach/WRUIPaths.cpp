@@ -81,6 +81,11 @@ namespace WRPathsTab
 			// Moss green (#5E8C31, cooks/biome-forest.md 2.17), lit toward the young-leaf gold-green of the World tree's crown.
 			return { WRPathLook::Color(Path), Hex(TEXT("17260C")), Hex(TEXT("7DB043")), Hex(TEXT("DCEFB8")), Hex(TEXT("6FA23A")), Hex(TEXT("E6F4CC")) };
 		}
+		if (Path == TEXT("wind"))
+		{
+			// Pale teal (#9FD6CF, cooks/biome-sky.md 2.18.2), lit toward the white of a gust's crest.
+			return { WRPathLook::Color(Path), Hex(TEXT("12302C")), Hex(TEXT("7FC4BA")), Hex(TEXT("E2F6F3")), Hex(TEXT("8ACFC6")), Hex(TEXT("EEFAF8")) };
+		}
 		return { WRUI::Ember, Hex(TEXT("45190A")), Hex(TEXT("EC7A34")), Hex(TEXT("FFCF86")), Hex(TEXT("E5843A")), Hex(TEXT("FFD7A0")) };
 	}
 

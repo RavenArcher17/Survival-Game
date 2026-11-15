@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRWindPath.h"
 #include "WRSkyAir.h"
 #include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
@@ -134,6 +135,12 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	if (Element == WRNature::Element_Nature)
 	{
 		WRForest::GrantGrowth(Who, Amount);
+		return;
+	}
+	// Momentum (the Wind path): its own gain rules (WRWindPath.cpp).
+	if (Element == WRWind::Element_Wind)
+	{
+		WRWind::GainMomentum(Who, Amount);
 		return;
 	}
 	UAbilitySystemComponent* ASC = Who->GetAbilitySystemComponent();
@@ -662,6 +669,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRBlood::DamageScale(Attacker, Target, Hit);
 		// Void: the bar's power, Abyssal power, Gluttony, Sacrifice, Dark matter, Nowhere's crit (WRVoidPath.cpp).
 		Damage *= WRVoidPath::DamageScale(Attacker, Target, Hit);
+		// Wind: Aerial mastery on blows from the air; Eye of the storm on a spinning body (WRWindPath.cpp).
+		Damage *= WRWind::DamageScale(Attacker, Target, Hit);
 		// Necromancy: the Graveyard's corruption buff, Necrotic power, Final harvest on bosses, a minion's scale (WRNecroPath.cpp).
 		Damage *= WRNecro::DamageScale(Attacker, Target, Hit);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
@@ -1018,6 +1027,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
 		Stance *= WRPortals::StanceScale(Target);
 		Stance *= WRVoidPath::StanceScale(Target);   // Unravelled: +15% stance taken   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
+		Stance *= WRWind::StanceScale(Attacker, Hit);   // Off balance: Wind hits break more stance
 		Stance *= WRWarHall::StanceScale(Target);   // a raid champion slipping on its melted footing
 		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);
 		Stance *= FWRVoidBoss::StanceTaken(Target, Hit, Stance);   // the Wasteland: an open core, the Mother's strain, eating, a failed Mimic   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
@@ -1138,6 +1148,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRBlood::AfterHit(Target, Hit, Damage);
 		// The Void path's (WRVoidPath.cpp): Unravel chance.
 		WRVoidPath::AfterHit(Target, Hit, Damage);
+		// The Wind path's (WRWindPath.cpp): Momentum for a blow struck from the air.
+		WRWind::AfterHit(Target, Hit, Damage);
 	}
 	// The Necromancy path's (WRNecroPath.cpp): who had a hand in it (Souls), Death mark, Final harvest's reaping finish.
 	if (Result == EWRHitResult::Hit && Attacker)
@@ -1226,6 +1238,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			else if (Main == TEXT("frost")) GainResource(Attacker, WRTags::Element_Frost, Feed);
 			else if (Main == TEXT("lightning")) GainResource(Attacker, WRTags::Element_Lightning, Feed);
 			else if (Main == TEXT("nature")) GainResource(Attacker, WRNature::Element_Nature, Feed);
+			else if (Main == TEXT("wind")) GainResource(Attacker, WRWind::Element_Wind, Feed);
 		}
 		// Blood: Feast heals the killer, Contagion passes a dying body's curse on (WRBloodPath.cpp).
 		WRBlood::OnKill(Target, Hit);

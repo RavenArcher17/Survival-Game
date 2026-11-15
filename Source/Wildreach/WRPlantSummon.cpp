@@ -1469,3 +1469,19 @@ void AWRThornShot::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrim
 	SetActorLocation(At);
 	SetLifeSpan(WRTune(TEXT("nature.plants.thornStickSeconds"), 4.f));
 }
+
+void AWRPlantSummon::ScaleLife(float HealthShare, float Seconds)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	PlantHealth *= FMath::Clamp(HealthShare, 0.05f, 1.f);
+	if (UWRAttributeSet* A = GetAttributes())
+	{
+		GetAbilitySystemComponent()->SetNumericAttributeBase(UWRAttributeSet::GetMaxHealthAttribute(), PlantHealth);
+		GetAbilitySystemComponent()->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(A->GetHealth(), PlantHealth));
+	}
+	DieAt = ServerNow() + FMath::Max(0.5f, Seconds);
+	PlantSeconds = DieAt - BornAt;
+}

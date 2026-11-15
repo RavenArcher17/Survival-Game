@@ -21,6 +21,7 @@
 #include "WRSound.h"
 #include "WRFx.h"
 #include "WRToolMesh.h"
+#include "WRWindPath.h"
 #include "WRTuning.h"
 #include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -70,7 +71,9 @@ namespace WRSkyAirImpl
 
 bool WRSkyAir::HasFeatherfall(const AActor* Who)
 {
-	return Who && UWRPathComponent::HasNode(Who, WRSkyAirImpl::NWind, TEXT("wind_featherfall"));
+	// Featherfall is the Wind path's root (a tag on the main path), and Sky lord's hover, the fall after it and Plunge's
+	// own dive take no fall damage either (WRWindPath).
+	return Who && WRWind::NoFallDamage(Who);
 }
 
 bool WRSkyAir::GlideParams(const ACharacter* Who, FWRGlideParams& Out)
@@ -81,7 +84,13 @@ bool WRSkyAir::GlideParams(const ACharacter* Who, FWRGlideParams& Out)
 	const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Survivor);
 	if (GliderStack(Inv, NLevi)) Out = Row(NLevi);
 	else if (GliderStack(Inv, NCrude)) Out = Row(NCrude);
-	else if (UWRPathComponent::HasNode(Survivor, NWind, TEXT("wind_glide"))) Out = Row(TEXT("path"));
+	else if (WRWind::CanPathGlide(Survivor))
+	{
+		// Path Glide: the path's own speeds; its Momentum, then stamina, are the path's to spend (PathGlideTick).
+		Out = Row(TEXT("path"));
+		WRWind::PathGlideStats(Survivor, Out.Forward, Out.Sink);
+		Out.StaminaPerSecond = 0.f;
+	}
 	else if (Inv && Inv->GearStat(TEXT("glideSeconds")) > 0.f)
 	{
 		Out = Row(TEXT("skysilk"));
@@ -89,7 +98,9 @@ bool WRSkyAir::GlideParams(const ACharacter* Who, FWRGlideParams& Out)
 	}
 	else return false;
 	Out.bFeatherfall = HasFeatherfall(Survivor);
-	if (Out.bFeatherfall) Out.StaminaPerSecond *= WRTune(TEXT("glide.featherfallStamina"), 0.5f);
+	// Featherfall halves a glider's stamina; Leaf glide sinks it slower (WRWindPath).
+	Out.StaminaPerSecond *= WRWind::GliderStaminaScale(Survivor);
+	Out.Sink *= WRWind::GlideSinkScale(Survivor);
 	// The Kitewright's last kite (the Bonebell's echo): glider stamina -20%.
 	if (Inv) Out.StaminaPerSecond *= FMath::Max(0.f, 1.f + Inv->GearStat(TEXT("glideStamina")));
 	return true;
@@ -543,6 +554,19 @@ void UWRSkyAirSubsystem::StepFalls(float Dt)
 		const float Z = C->GetActorLocation().Z;
 		const bool bGlide = WRSkyAir::IsGliding(C);
 		if (F.bWasGliding && !bGlide) { F.GlideClosedAt = Now; F.GlideClosedZ = Z; }
+		if (bGlide && Survivor)
+		{
+			// The Wind path's Path Glide spends Momentum, then stamina (WRWindPath); an updraft re-arms its air dash.
+			const bool bLift = WRSkyIsles::LiftAt(C, C->GetActorLocation()) > 50.f;
+			if (bLift && !F.bInLift) WRWind::OnEnteredUpdraft(C);
+			F.bInLift = bLift;
+			FWRGlideParams GP;
+			if (WRSkyAir::GlideParams(C, GP) && GP.Kind == TEXT("path") && !WRWind::PathGlideTick(Survivor, Dt, bLift))
+			{
+				C->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+			}
+		}
+		else F.bInLift = false;
 		F.bWasGliding = bGlide;
 		const bool bHeld = !M || bGlide || M->IsSwimming() || M->IsFlying() || M->MovementMode == MOVE_Custom || C->GetAttachParentActor() != nullptr;
 		if (bHeld)

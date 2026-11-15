@@ -2,6 +2,7 @@
 // Ascendant inlay, the body-hide masks under it, and the path marks on the skin, eyes and hair.
 // Everything here is data (Data/player_art.json "looks", "armorLooks", "elements", "paths"); the code only applies it.
 #include "WRCharacter.h"
+#include "WRWindPath.h"     // the Wind body change (cooks/biome-sky.md 2.18.5)
 #include "WRNecroPath.h"
 #include "WRVoidPath.h"
 #include "WRInventory.h"
@@ -915,6 +916,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, WRBlood::LookSig(this));         // Blood: veins with Spilled, Sanguine lord, the flush, the pulse
 	Sig = HashCombine(Sig, WRVoidPath::LookSig(this));      // Void: the bar and the band move the greying within its stage
 	Sig = HashCombine(Sig, WRNature::LookSig(this));        // Nature: Rooted's green tint on the bark while it heals
+	Sig = HashCombine(Sig, WRWind::LookSig(this));          // Wind: the spirals race and the hair streams at high Momentum in a fight
 	Sig = HashCombine(Sig, WRNecro::LookSig(this));         // Necromancy: Lich form's full ash, a raise's pupil flare
 	if (!bForce && Sig == PathMarkSig)
 	{
@@ -1050,6 +1052,9 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	// with Fire / Frost / Blood, and Rooted's green tint while it heals (WRNaturePath.cpp). After Blood's, so its garnet
 	// threads can follow the bark.
 	WRNature::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);
+	// Wind (cooks/biome-sky.md 2.18.5): the row's drifting spirals and stirring hair by strength; in a fight at >= 60
+	// Momentum the drift x4, +1 nit, the hair streaming (WRWindPath.cpp).
+	WRWind::ApplyLook(this, SkinMIDs, HairMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 	// Necromancy (cooks/biome-graveyard.md 2.18): the stages are the player_art row; Lich form shows the full ash at any
 	// point count and a raise flares the pupil ring (WRNecroPath.cpp).
 	WRNecro::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);

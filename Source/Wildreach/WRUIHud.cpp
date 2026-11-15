@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRWindPath.h"     // the Momentum gauge (the Wind path)
 #include "WRStormTypes.h"
 #include "WRSurvival.h"
 #include "WRLandThings.h"
@@ -1073,6 +1074,21 @@ private:
 		return FMath::Lerp(Violet, FLinearColor::White, Crackle * Crackle);
 	}
 
+	/** The Momentum ring (the Wind path, cooks/biome-sky.md 2.18.2): pale teal #9FD6CF; at 60 and over streaks of air run
+	 *  along it (a bright band sweeping round, not a pulse). */
+	FLinearColor MomentumColor() const
+	{
+		const FLinearColor Teal = WRPathLook::Color(TEXT("wind"));
+		const AWRCharacterBase* B = Body();
+		if (!B || !WRWind::HighMomentum(B))
+		{
+			return Teal;
+		}
+		const double Now = FPlatformTime::Seconds();
+		const float Streak = FMath::Pow(FMath::Clamp(0.5f + 0.5f * FMath::Sin(float(Now) * 9.f), 0.f, 1.f), 4.f);
+		return FMath::Lerp(Teal, FLinearColor(0.95f, 1.f, 1.f), Streak * 0.8f);
+	}
+
 	/** The Growth ring (the Nature path, cooks/biome-forest.md 2.17): moss green #5E8C31, flashing pale when a press was
 	 *  refused for Growth (no dead button), with the ground the sampler read beside its label: Lush (a bright leaf),
 	 *  Normal (a dry leaf), Barren (bare rock): the rate it regrows at, readable at a glance. */
@@ -1221,6 +1237,10 @@ private:
 							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("void")); })]
 						// Growth (the Nature path): moss green, the ground it regrows by beside the label.
 						+ SHorizontalBox::Slot().FillWidth(1.f)[GrowthGauge()]
+						// Momentum (the Wind path): pale teal; at 60 and over streaks of air run along it.
+						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Momentum", "Momentum"), TAttribute<FLinearColor>::CreateLambda([this]() { return MomentumColor(); }), WRPathLook::Icon(TEXT("wind")),
+							[A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetMomentum() / FMath::Max(1.f, X->GetMaxMomentum()) : 0.f; },
+							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("wind")); })]
 				]
 				+ SVerticalBox::Slot().AutoHeight()[Conditions()]
 			]

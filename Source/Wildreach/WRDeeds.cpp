@@ -3,6 +3,7 @@
 // Heron's draught (respec), soul forging, mythic forging's rule check (data-ready), titles and cosmetics worn, and the
 // "deeds ..." commands the screens send. The achievement engine, the census and the hooks are in WRDeedsAchieve.cpp.
 #include "WRDeeds.h"
+#include "WRWindPath.h"     // Element.Wind
 #include "WRDeedsInternal.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
@@ -44,6 +45,7 @@ namespace WRDeedsData
 		if (Tag == WRTags::Element_Frost) return TEXT("frost");
 		if (Tag == WRTags::Element_Lightning) return TEXT("lightning");
 		if (Tag == WRNature::Element_Nature) return TEXT("nature");
+		if (Tag == WRWind::Element_Wind) return TEXT("wind");
 		return NAME_None;
 	}
 	AWRPlayerController* ControllerOf(const AWRPlayerState* PS) { return PS ? Cast<AWRPlayerController>(PS->GetOwner()) : nullptr; }

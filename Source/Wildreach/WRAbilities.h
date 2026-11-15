@@ -40,6 +40,8 @@ public:
 
 	float GetCooldownRemaining() const;
 	float GetCooldownSeconds() const;
+	/** Ready again now (Jet stream: an air dash right after a Bolt dash readies it; both machines). */
+	void ResetCooldown() { LastCommitTime = -1000.0; }
 
 protected:
 	AWRCharacterBase* GetCharacter() const;
@@ -114,6 +116,8 @@ protected:
 	bool bUsesMoves = false;
 	/** Which row this activation plays (picked at activation, the same on the server and the owner). */
 	FName PickMove(const AWRCharacterBase* Character) const;
+	/** Sky lord's air strikes for Light / Heavy while it hovers (the Wind path; defined in WRAbilitiesWind.cpp). */
+	void SkyLordSwing();
 
 private:
 	void Sweep();

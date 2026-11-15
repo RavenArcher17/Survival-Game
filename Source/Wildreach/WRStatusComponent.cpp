@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRWindPath.h"
 #include "WRNecroPath.h"
 #include "WRSkyAir.h"
 #include "WRGraveCreatures.h"
@@ -841,6 +842,7 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		Regen *= WRArtifacts::StaminaRegenScale(Owner);
 		// A Wraithmoth's scale dust (x0.6 for 6 s) and the moth-dust tonic (+15%: a timed brew).
 		Regen *= FWRGraveAI::StaminaRegenScale(Owner) * (1.f + WRVoid::BrewStat(Owner, TEXT("staminaRegen")));
+		Regen *= WRWind::StaminaRegenScale(Owner);   // high Momentum: +15%
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() + Regen * DeltaTime);
 	}
 
@@ -883,6 +885,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRVoidPath::TickOwner(Owner, DeltaTime);
 		// Growth (the Nature path) regrows by the ground around you; Rooted heals a survivor standing still (WRNaturePath.cpp).
 		WRNature::TickOwner(Owner, DeltaTime);
+		// Momentum (the Wind path) builds in the air and at a sprint, drains after a pause (WRWindPath.cpp).
+		WRWind::TickOwner(Owner, DeltaTime);
 		// Souls (the Necromancy path): their cap by Soul capacity, the raised minions' upkeep (WRNecroPath.cpp).
 		WRNecro::TickOwner(Owner, DeltaTime);
 	}

@@ -338,6 +338,15 @@ private:
 public:
 	/** Re-dress the hands (the shield comes off for a torch; the torch / lantern shows): WRSurvival's light changes. */
 	void RefreshHeldLook() { UpdateWeaponLook(); }
+	/** The Wind path's Wind arrow (WRAbilitiesWind.cpp), server: every machine plays the ranged weapon's shot and its
+	 *  reload; HoldNextShot keeps the next plain shot back until the bow is ready (server time). */
+	void PlayAbilityShot(float Reload)
+	{
+		const FName Group = RangedAnimGroup();
+		MulticastRangedShot(Group == TEXT("throw") ? FName(TEXT("throw")) : FName(*(Group.ToString() + TEXT("_fire"))),
+			Group == TEXT("throw") ? NAME_None : FName(*(Group.ToString() + TEXT("_reload"))), Reload);
+	}
+	void HoldNextShot(double Until) { NextShotAt = FMath::Max(NextShotAt, Until); }
 	/** The endgame look on this hero (WREndgameLook.cpp): a weapon glow, an armour dye, a raid mark, gold threads. */
 	void ApplyDeedsLook();
 	/** Where the held fishing rod's tip is in the world (the line leaves from there); the hand when the rod isn't drawn. */

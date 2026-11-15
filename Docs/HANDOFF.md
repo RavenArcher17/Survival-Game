@@ -347,6 +347,10 @@ game-wide** (`WRSkyAir`): fall damage for everyone (tuning `fall`), gliding is t
 of the server time (`WindPushAt`), so they predict. Numbers: tuning `skyWorld`, `glide`, `fall`, `hazards.sky`.
 Dev: `world sky ...`. Building the editor target while another project's editor has Live Coding open needs UBT's
 `-NoHotReloadFromIDE` (the Live Coding check keys on the shared engine's UnrealEditor.exe).
+The Wind path is `WRWindPath` (Momentum, passives, combos, look; Featherfall is the tag `Passive.Featherfall` on the
+main path, so ask `WRWind::NoFallDamage`, not HasNode) and `WRAbilitiesWind` (its abilities); `WRSkyAir` calls its
+Path Glide hooks (`CanPathGlide`, `PathGlideStats`, `PathGlideTick`, `GliderStaminaScale`, `GlideSinkScale`,
+`OnEnteredUpdraft`).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

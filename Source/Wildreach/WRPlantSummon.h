@@ -53,6 +53,8 @@ public:
 	void Quicken(float Until) { QuickenedUntil = FMath::Max(QuickenedUntil, Until); }
 	/** Server: Thorn feast: heal Share of its max health. */
 	void HealShare(float Share);
+	/** Server: Windborne seeds' turret: HealthShare of its health, Seconds to live from now. */
+	void ScaleLife(float HealthShare, float Seconds);
 	/** The server's clock every machine agrees on (the game state's), for the growth and the moves. */
 	float ServerNow() const;
 

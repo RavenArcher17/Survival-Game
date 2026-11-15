@@ -1,4 +1,5 @@
 #include "WRCharacterBase.h"
+#include "WRWindPath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
 #include "WRPortals.h"
@@ -199,6 +200,8 @@ void AWRCharacterBase::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateVisuals(DeltaSeconds);
+	// The Wind path's movement (every machine the same: Lift's jump, the air hop, the air dash's airtime).
+	WRWind::TickMovement(this, DeltaSeconds);
 
 	// Blocking keeps you facing where you aim, so the guard covers what you're looking at.
 	if (Controller && HasTag(WRTags::State_Blocking))

@@ -113,7 +113,7 @@ public:
 	virtual bool IsTickable() const override { return !IsTemplate(); }
 
 private:
-	struct FFall { float TopZ = 0.f; bool bAir = false; float GlideClosedAt = -100.f; float GlideClosedZ = 0.f; bool bWasGliding = false; float AirSince = 0.f; };
+	struct FFall { float TopZ = 0.f; bool bAir = false; float GlideClosedAt = -100.f; float GlideClosedZ = 0.f; bool bWasGliding = false; bool bInLift = false; float AirSince = 0.f; };
 	TMap<TWeakObjectPtr<ACharacter>, FFall> Falls;
 	float WearClock = 0.f;
 	float LookClock = 0.f;

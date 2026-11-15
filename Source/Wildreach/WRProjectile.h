@@ -34,6 +34,12 @@ public:
 	static FVector LobVelocity(const FVector& From, const FVector& To, float HorizontalSpeed, float Gravity);
 	/** Server: a bola tangles small creatures' legs (rooted) and slows big ones. */
 	static void ApplyBola(class AWRCharacterBase* Target);
+	/** Bodies a modelled shot goes through before it stops (Wind arrow, Piercing gale, an ammo's own "pierce"). */
+	int32 PierceLeft = 0;
+	/** Server: after each body the shot strikes, with the result (the Wind path's knockback, Hex storm's count). */
+	TFunction<void(class AWRCharacterBase*, EWRHitResult)> OnStruck;
+	/** Server: a trail on a shot (WRFx, e.g. wind.arrow_trail); replicates to every machine (with a model or without). */
+	void SetTrail(FName Fx) { TrailFx = Fx; OnRep_Fx(); }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -47,6 +53,8 @@ private:
 	UFUNCTION() void OnRep_Model();
 	UFUNCTION() void OnRep_Fx();
 	UFUNCTION() void OnRep_Homing();
+	/** Server: a piercing shot flies on past Through (a fresh shot one body further, the same hit, one pierce less). */
+	void ContinuePast(AActor* Through);
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<USphereComponent> Collision;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;

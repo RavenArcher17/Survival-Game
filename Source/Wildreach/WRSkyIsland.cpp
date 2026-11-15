@@ -128,10 +128,10 @@ void AWRSkyScenery::BuildIsland()
 		const FVector W = WorldOf(L0);
 		Top.Add(FVector(0, 0, TopAt(L0)), FVector::UpVector, TopColour(I, W, 0.f, 0.f, bNearFlue), W + FVector(0, 0, C0.Z));
 	}
-	TArray<TArray<int32>> Rings;
+	TArray<TArray<int32>> TopRings;
 	for (int32 k = 1; k <= NR; ++k)
 	{
-		TArray<int32>& Row = Rings.AddDefaulted_GetRef();
+		TArray<int32>& Row = TopRings.AddDefaulted_GetRef();
 		const float Rho = RhoAt(k);
 		for (int32 s = 0; s < NS; ++s)
 		{
@@ -146,13 +146,13 @@ void AWRSkyScenery::BuildIsland()
 			Row.Add(Top.Add(FVector(L.X, L.Y, Z), Nrm, TopColour(I, W, Rho, 1.f - Nrm.Z, bNearFlue), W + FVector(0, 0, C0.Z + Z)));
 		}
 	}
-	for (int32 s = 0; s < NS; ++s) Top.T.Append({ 0, Rings[0][(s + 1) % NS], Rings[0][s] });
-	for (int32 k = 0; k + 1 < Rings.Num(); ++k)
+	for (int32 s = 0; s < NS; ++s) Top.T.Append({ 0, TopRings[0][(s + 1) % NS], TopRings[0][s] });
+	for (int32 k = 0; k + 1 < TopRings.Num(); ++k)
 	{
 		for (int32 s = 0; s < NS; ++s)
 		{
 			const int32 S1 = (s + 1) % NS;
-			Top.Quad(Rings[k][s], Rings[k][S1], Rings[k + 1][S1], Rings[k + 1][s]);
+			Top.Quad(TopRings[k][s], TopRings[k][S1], TopRings[k + 1][S1], TopRings[k + 1][s]);
 		}
 	}
 

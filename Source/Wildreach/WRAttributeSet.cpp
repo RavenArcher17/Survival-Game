@@ -20,6 +20,8 @@ UWRAttributeSet::UWRAttributeSet()
 	InitMaxCharge(100.f);
 	InitGrowth(0.f);
 	InitMaxGrowth(100.f);
+	InitMomentum(0.f);
+	InitMaxMomentum(100.f);
 	InitSouls(0.f);
 	InitMaxSouls(20.f);
 	InitMaxHealthLost(0.f);
@@ -63,6 +65,8 @@ void UWRAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	WR_REP_OWNER(MaxCharge);
 	WR_REP_OWNER(Growth);
 	WR_REP_OWNER(MaxGrowth);
+	WR_REP_OWNER(Momentum);
+	WR_REP_OWNER(MaxMomentum);
 	WR_REP_OWNER(Souls);
 	WR_REP_OWNER(MaxSouls);
 }
@@ -85,6 +89,7 @@ void UWRAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute
 	else if (Attribute == GetChillAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxChill());
 	else if (Attribute == GetChargeAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxCharge());
 	else if (Attribute == GetGrowthAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxGrowth());
+	else if (Attribute == GetMomentumAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxMomentum());
 	else if (Attribute == GetSoulsAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxSouls());
 	else if (Attribute == GetHungerAttribute() || Attribute == GetThirstAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, 100.f);
 	else if (Attribute == GetBurnBuildupAttribute() || Attribute == GetFrostBuildupAttribute()) NewValue = FMath::Max(0.f, NewValue);
@@ -110,6 +115,8 @@ WR_ONREP(Charge)
 WR_ONREP(MaxCharge)
 WR_ONREP(Growth)
 WR_ONREP(MaxGrowth)
+WR_ONREP(Momentum)
+WR_ONREP(MaxMomentum)
 WR_ONREP(Souls)
 WR_ONREP(MaxSouls)
 WR_ONREP(BurnBuildup)
