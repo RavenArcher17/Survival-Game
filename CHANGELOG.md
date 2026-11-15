@@ -4,8 +4,9 @@
 
 Aaron (lane build-biome-crystal: requirement ledger R1-R50, build research and plan in showcase-notes
 cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in pieces; compiled (editor target) after each;
-not played here (Aaron tests). Hidden until it's whole: `crystal` is not in `world.liveBiomes`, so nothing below is
-built in a running game yet.
+not played here (Aaron tests). Live from Crystal (4): `crystal` is in `world.liveBiomes`. Not built yet: the four
+bosses (the Mirrored Twins, the Echo Warden, the Geode Tyrant, Lyrathis) and their arenas' machines, the Arcane path,
+the composed music, the two crystal shields (no shield items exist in the game yet).
 
 - **Crystal (4): the nine creatures, and the Crystal caves go live** (`crystal` joins `world.liveBiomes`). Rows in
   `creatures.json` / `attacks.json` (24 attack rows from biome-crystal 2.12.2, mark on bites and claws) on borrowed rigs
