@@ -393,6 +393,23 @@ void AWRCharacter::SetHeroAppearance(uint8 InFace, uint8 InBuild)
 	}
 }
 
+void AWRCharacter::PreviewLook(FName InBodyStyle, uint8 InFace, uint8 InBuild, bool bHide)
+{
+	// Never in a shared world: this is the menu's private stage (its game is standalone until Host or Join).
+	if (!HasAuthority() || GetNetMode() != NM_Standalone)
+	{
+		return;
+	}
+	HeroLook.bHideHelmet = bHide;
+	if (BodyStyle != InBodyStyle)
+	{
+		BodyStyle = InBodyStyle;
+		OnRep_BodyStyle();   // the other body: LoadBodyArt swaps it
+	}
+	SetHeroAppearance(InFace, InBuild);   // clamped to the art; rebuilds the body for a new face / build
+	OnRep_HeroLook();                     // the helmet (and a body that's already right) applied now
+}
+
 void AWRCharacter::ServerSetHideHelmet_Implementation(bool bHide)
 {
 	if (AWRPlayerState* PS = GetPlayerState<AWRPlayerState>())

@@ -49,6 +49,7 @@ Network failures go to the main menu's card (`SWRMainMenu::NoteFailure`, plain l
 a crashed run's report is offered once on the next start (`WRReport::PendingCrash`, stamps in `Saved/Wildreach`).
 Text boxes need nothing for the pad: A over one opens the pad keyboard (`WRUIPadKeyboard.cpp`); a screen that
 wants its own Done / Cancel calls `WRPadKeyboard::Open` with a target (the chat line does).
+The main menu's look picker previews on the menu world's own survivor (`AWRCharacter::PreviewLook`, standalone only).
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.
@@ -57,7 +58,7 @@ working** with the rest hidden by `waitsFor` in `Data/lifeskills.json` (remove i
 whistle** (H / hold X), **modelled held tools** (`WRToolMesh.cpp`, `M_HeldTool`), and build pieces that collide as
 they look (furniture, banner, rug; the Hearth, stations and totem fit their models via `FWRBuildLook::FitCollision`).
 Also since 0.7.1: **the hero's look** (`WRHeroLook.cpp`): 12 faces and 3 builds (`hero.<sex>.faces / builds`, picked by
-`?Look=<face>.<build>`; no creator screen yet, so everyone is face 1, athletic), **worn armour shows** (hide, copper,
+`?Look=<face>.<build>`; picked on the main menu's Look row (UI cook pass)), **worn armour shows** (hide, copper,
 bronze, iron now; the 12 steel biome sets and their Ascendant versions are mapped by item id in `armorLooks` for the
 crafting cook), body-hide masks under every piece, and **path marks** on skin, eyes and hair on every machine
 (`player_art.json paths`), with Blood's canines and Lightning's crackle on cast.

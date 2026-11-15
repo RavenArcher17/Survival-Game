@@ -83,6 +83,24 @@ private:
 	/** The main path choices, one per Data/paths file. */
 	TSharedRef<SWidget> MakePathPicker();
 	FReply OnPickBody(FName InBody);
+
+	/**
+	 * The look picker (cookpass-ui 3.5, the hero look's ?Look=): a Look row under Body opens a side panel with the
+	 * faces by name, the three builds and the helmet; while it's open the menu's camera frames your survivor (the menu's
+	 * own standalone world: AWRCharacter::PreviewLook), lit by a soft key light, so every pick is seen at once. Saved to
+	 * [Wildreach.Menu] Look like the settings' helmet switch.
+	 */
+	TSharedRef<SWidget> MakeLookPanel();
+	void ApplyPreview();
+	void FrameSurvivor(float DeltaTime);
+	void EndFraming();
+	/** The face names for the body picked (player_art.json hero.<m|f>.faces[].name). */
+	TArray<FString> FaceNames() const;
+	FText LookSummary() const;
+	bool bLookOpen = false;
+	int32 LookFace = 0, LookBuild = 1;
+	bool bLookHideHelmet = false;
+	TWeakObjectPtr<class UPointLightComponent> LookLight;
 	FString Options() const;
 	void Remember() const;
 	TSharedRef<SWidget> MakePanel();

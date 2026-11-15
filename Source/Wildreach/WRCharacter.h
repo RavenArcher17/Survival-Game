@@ -125,6 +125,9 @@ public:
 	void SetHeroAppearance(uint8 Face, uint8 Build);
 	/** Server: the hide-helmet option. */
 	UFUNCTION(Server, Reliable) void ServerSetHideHelmet(bool bHide);
+	/** The main menu's look picker (cookpass-ui 3.5): in the menu's own standalone world only, the survivor behind the
+	 *  menu wears the body, face, build and helmet being picked, so the player sees them before joining. */
+	void PreviewLook(FName InBodyStyle, uint8 Face, uint8 Build, bool bHideHelmet);
 	/** A path ability was used (UWRGameplayAbility commit): the path marks flare (hero.md 2.6 combat pulse). */
 	void OnPathAbilityUsed(FName PathId);
 	const FWRHeroLook& GetHeroLook() const { return HeroLook; }

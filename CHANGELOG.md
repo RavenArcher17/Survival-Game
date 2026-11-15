@@ -75,6 +75,17 @@ and the testers test, F8).
     keyboard up on it; Done sends to everyone, B closes the line. The F1 page says where.
   - `Data/gamepad.json` **reserves** D-pad up hold (the ping / quick-chat wheel) and View hold (the player list) for the
     multiplayer cook, so nothing else claims them.
+- **UI (5): pick your face, build and helmet on the main menu, seen on your survivor.** Why: the hero look's runtime
+  (12 faces, 3 builds, `?Look=`) had no screen, so everyone played face 1, athletic (LATER-COOKS, build-hero-look-2).
+  - The character panel has a **Look** row ("Wren · Athletic", Change). Change opens **Your look** beside the panel:
+    the faces by name for the body picked (`player_art.json hero.<m|f>.faces[].name`), the build (Lean / Athletic /
+    Strong; Slim / Athletic / Curvy), the helmet (Shown / Hidden), Done.
+  - While it's open the menu's camera glides to a portrait of your survivor (300 cm, chest height, 20° off the face,
+    FOV 40; other angles tried when rock is in the way) with a warm key light beside the camera, and every pick shows
+    on the body at once (`AWRCharacter::PreviewLook`: the menu's own standalone world only, never a shared one; the
+    body too). Done (or Change again) goes back to the island view. Tuning `flow.lookCamera`.
+  - Picks are saved to `[Wildreach.Menu] Look` and travel with Host and Join (`?Look=<face>.<build>[.h]`); switching
+    the body keeps the face inside its list. The settings' Show my helmet and this panel are the same value.
 
 ## Unreleased: the Desert / Sun & sand
 
