@@ -6,6 +6,7 @@
 
 #include "WRGraveTypes.h"
 #include "WRCrystalTypes.h"
+#include "WRFungalTypes.h"
 #include "WRSkyWorld.h"
 #include "WRWorldSystems.h"
 #include "WRLand.h"
@@ -695,7 +696,7 @@ void AWRShrine::StepGuards()
 							// In a loose ring round the dais, facing out: the place they hold.
 							const float A = 360.f * n / 7.f + FMath::FRandRange(-15.f, 15.f);
 							// A shrine under the ground (the Graveyard's Watchers' Vault) keeps its guards in its room.
-							const bool bUnder = WRGrave::InCatacombs(GetActorLocation() + FVector(0, 0, 100.f)) || WRCrystal::InCave(GetActorLocation() + FVector(0, 0, 100.f));
+							const bool bUnder = WRGrave::InCatacombs(GetActorLocation() + FVector(0, 0, 100.f)) || WRCrystal::InCave(GetActorLocation() + FVector(0, 0, 100.f)) || WRFungal::InCave(GetActorLocation() + FVector(0, 0, 100.f));
 							const float Dist = bUnder ? FMath::FRandRange(250.f, 480.f) : FMath::FRandRange(WRWorld::Num(TEXT("shrines.guardRingMin"), 1500.f), WRWorld::Num(TEXT("shrines.guardRingMax"), 2500.f));
 							const FVector P = GetActorLocation() + FRotator(0.f, A, 0.f).Vector() * Dist;
 							FHitResult G;

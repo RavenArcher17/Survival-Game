@@ -7,6 +7,7 @@
 #include "WRForestWorld.h"
 #include "WRBuildLook.h"
 #include "WRLand.h"
+#include "WRFungalTypes.h"
 #include "WRTreeKit.h"
 #include "WRTuning.h"
 #include "Components/BoxComponent.h"
@@ -534,10 +535,19 @@ void WRSkyParts::Flue(FCtx& C)
 			Tan.Add(FProcMeshTangent(FVector(0, 0, 1), false));
 		}
 	}
+	// The Fungal caverns' river passage comes through the wall at the floor (cooks/build-biome-fungal.md 2.0.7): while they
+	// are live, the quads in its window are left out (the caverns' rock closes round the hole's edges).
+	float MouthYaw = 0.f, MouthHalf = 0.f, MouthTop = 0.f;
+	const bool bMouth = WRFungal::FlueMouth(MouthYaw, MouthHalf, MouthTop);
 	for (int32 r = 0; r < Rows; ++r)
 	{
 		for (int32 s = 0; s < Sides; ++s)
 		{
+			if (bMouth && Top * float(r) / Rows < MouthTop)
+			{
+				const float Mid = 360.f * (s + 0.5f) / Sides;
+				if (FMath::Abs(FMath::FindDeltaAngleDegrees(Mid, MouthYaw)) <= MouthHalf + 180.f / Sides) continue;   // the one panel the mouth chamber covers
+			}
 			const int32 A0 = r * (Sides + 1) + s, A1 = A0 + 1, B0 = A0 + Sides + 1, B1 = B0 + 1;
 			T.Append({ A0, A1, B1, A0, B1, B0 });
 		}
