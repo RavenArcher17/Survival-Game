@@ -117,7 +117,10 @@ struct FWRItemDef
 	float BuffMinutes = 0.f;
 	/** Worn status resistance by status id (equip.resist). */
 	TMap<FName, float> Resists;
-	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse || Cures.Num() > 0 || !BuffId.IsNone(); }
+	/** A timed brew (items.json use.brew {stat: value} for use.minutes): anchor salt's riftDrain -0.5 for 5 min (WRVoid). */
+	TMap<FName, float> Brew;
+	float BrewMinutes = 0.f;
+	bool IsUsable() const { return Heal > 0.f || Hunger > 0.f || Thirst > 0.f || bCleanse || Cures.Num() > 0 || !BuffId.IsNone() || Brew.Num() > 0; }
 	bool IsEquipment() const { return Slot != EWREquipSlot::None; }
 };
 

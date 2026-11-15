@@ -108,6 +108,8 @@ public:
 		SLATE_ATTRIBUTE(float, Fraction)
 		SLATE_ARGUMENT(float, Height)
 		SLATE_ATTRIBUTE(FLinearColor, Color)
+		/** A share at the bar's right end lost for now (the Void's grey hatched band: max health it took until you rest). */
+		SLATE_ATTRIBUTE(float, Lost)
 	SLATE_END_ARGS()
 	void Construct(const FArguments& InArgs);
 	virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override;
@@ -115,6 +117,10 @@ public:
 private:
 	TAttribute<float> Fraction;
 	TAttribute<FLinearColor> Color;
+	TAttribute<float> Lost;
+	/** The band's last share and when it last grew (a grey pulse each time it does). */
+	mutable float LastLost = 0.f;
+	mutable double GrewAt = -10.0;
 	float Height = 14.f;
 };
 

@@ -2,6 +2,7 @@
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
 #include "WRWorldDressing.h"
+#include "WRLand.h"
 #include "WRPortals.h"
 #include "WRSurvival.h"
 #include "WRSound.h"
@@ -295,6 +296,22 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 	// Weather beds ("weather.<kind>", WRSurvival): rising over the 60 s warning, full while it blows, muffled in a cave.
 	// Music is never touched by weather (it keeps playing; survival-crafting 2.4).
 	const FString L = Layer.ToString();
+	// A runtime land's beds, and its silence over all of them (biome-void 2.9: Dead calm).
+	if (L.StartsWith(TEXT("land.")) || L.StartsWith(TEXT("zone.")))
+	{
+		if (LandBiome.IsNone()) return 0.f;
+		TArray<FString> Parts;
+		L.ParseIntoArray(Parts, TEXT("."));
+		float W = 0.f;
+		if (Parts[0] == TEXT("land") && Parts.Num() >= 2 && FName(*Parts[1]) == LandBiome)
+		{
+			W = Parts.Num() >= 3 ? (Parts[2] == TEXT("night") ? Night : Parts[2] == TEXT("day") ? Daylight : 1.f) : 1.f;
+		}
+		else if (Parts[0] == TEXT("zone") && Parts.Num() >= 2 && FName(*Parts[1]) == LandZone) W = 1.f;
+		return W * Out * (1.f - Hush);
+	}
+	if (!LandBiome.IsNone() && !L.StartsWith(TEXT("weather.")) && Layer != Always && Layer != CaveL && Layer != CoastL) return 0.f;
+	if (!LandBiome.IsNone() && Layer == CoastL) return 0.f + 0.f * Out;   // (the strand's surf is the land's own bed: zone.V2)
 	if (L.StartsWith(TEXT("weather.")))
 	{
 		// weather.<kind> anywhere, or weather.<kind>.<biome> only in that land (a thunderstorm's rain in the peaks).
@@ -371,6 +388,21 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		High = 0.f;
 	}
 	Cave = FMath::FInterpConstantTo(Cave, FoldLand.IsNone() ? CaveFactor() : 1.f, DeltaTime, 1.f / Tune(TEXT("ambient.caveFade"), 1.5f));
+	// A runtime land (the Corrupted wasteland): its own beds ("land.<biome>", "zone.<id>"), none of the island's; and its
+	// planned silence (a weather row with "silence": Dead calm) fading every bed and the music out over its seconds.
+	{
+		const FWRLandDef* LD = WRLand::At(Listener);
+		LandBiome = LD ? LD->Biome : NAME_None;
+		LandZone = WRLand::ZoneAt(Listener);
+		float Want = 0.f;
+		if (LD)
+		{
+			const FWRWeatherNow* W = UWRWeatherSubsystem::For(World, LD->Biome);
+			const FWRWeatherKind* K = W ? FWRWeatherDefs::Get().Kind(LD->Biome, W->Kind) : nullptr;
+			if (K && K->bSilence) Want = W->Strength(UWRWeatherSubsystem::Now(World));
+		}
+		Hush = FMath::FInterpConstantTo(Hush, Want, DeltaTime, 1.f / FMath::Max(0.5f, Tune(TEXT("ambient.silenceFade"), 8.f)));
+	}
 	if (Now >= NextCoastSample)
 	{
 		NextCoastSample = Now + 0.25;
@@ -689,7 +721,9 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		DuckTarget = 1.f;
 	}
 	DuckLevel = FMath::FInterpTo(DuckLevel, DuckTarget, DeltaTime, DuckTarget < DuckLevel ? 10.f : 1.2f);
-	const float Gain = WRSound::CategoryGain(TEXT("music")) * DuckLevel;
+	// The planned silence takes the music too (8 s out, 8 s back); a fight inside it keeps half (biome-void 2.9, 2.16).
+	const float Silence = Mode == EMusic::Combat || Mode == EMusic::Boss ? Hush * 0.5f : Hush;
+	const float Gain = WRSound::CategoryGain(TEXT("music")) * DuckLevel * (1.f - Silence);
 	// The Great Storm: war drums and choir over whatever plays while it rages round you (DC 2.15).
 	StepMusicLayer(GreatStormLayer, WRStorm::GreatStorm(World) && WRBiome::At(World, Listener) == TEXT("storm_peaks"), TEXT("layer.great_storm"), DeltaTime, Gain);
 	// The Red Tide: a sub-bass pulse and a second, faster heartbeat over whatever plays in the swamp (cooks/biome-swamp.md 2.16).

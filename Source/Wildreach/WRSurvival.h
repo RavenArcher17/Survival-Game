@@ -63,6 +63,9 @@ struct FWRWeatherKind
 	TArray<FName> AggroCreatures;
 	bool bCropsPause = false;        // outdoor crop plots stop growing
 	bool bWatersCrops = false;       // rain: outdoor plots count as watered while it falls (WRFarm)
+	// A planned silence (the Wasteland's Dead calm): no wind, no beds, the music fades out; footsteps louder in the mix.
+	bool bSilence = false;
+	float FootstepMix = 1.f;
 	// Lightning strikes on the highest player in a cell (BotW's tell: a ground glow, then the bolt).
 	bool bStrikes = false;
 	float StrikeMinZ = 0.f;

@@ -6,6 +6,7 @@
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
 #include "WRFarm.h"
+#include "WRLand.h"
 #include "WRWarHall.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -53,6 +54,9 @@ FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 	// A war-hall is both its lands: the west half the first's, the east half the second's (WRWarHall).
 	const FName Hall = WRWarHall::BiomeAt(WorldContext, Pos);
 	if (!Hall.IsNone()) return Hall;
+	// A runtime land (Data/lands: the Corrupted wasteland) is its own biome wherever it sits (WRLand).
+	const FName Land = WRLand::BiomeAt(Pos);
+	if (!Land.IsNone()) return Land;
 	// Storm peaks (cooks/build-biome-lightning.md 2.4): everything north of the Old Island's frame (its landscape, the
 	// Ash Sound, the neck north of the island's edge) once the land is live; the island's own ground stays the island's.
 	// The Swamp (cooks/build-biome-swamp.md 2.1, 2.10) is checked first: east of the Crown's east-face line and the
@@ -271,6 +275,8 @@ void FWRWeatherDefs::Load()
 				W.AggroCreatures = Names(F, TEXT("aggroCreatures"));
 				F->TryGetBoolField(TEXT("cropsPause"), W.bCropsPause);
 				F->TryGetBoolField(TEXT("watersCrops"), W.bWatersCrops);
+				F->TryGetBoolField(TEXT("silence"), W.bSilence);
+				W.FootstepMix = Num(F, TEXT("footstepMix"), 1.f);
 				const TSharedPtr<FJsonObject>* S = nullptr;
 				if (F->TryGetObjectField(TEXT("strikes"), S))
 				{

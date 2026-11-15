@@ -267,6 +267,7 @@ void SWRBar::Construct(const FArguments& InArgs)
 	Fraction = InArgs._Fraction;
 	Color = InArgs._Color;
 	Height = InArgs._Height;
+	Lost = InArgs._Lost;
 }
 
 int32 SWRBar::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const
@@ -283,6 +284,31 @@ int32 SWRBar::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlate
 		// Gloss on the top half.
 		WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(FVector2D(FillSize.X, FillSize.Y * 0.45f), FSlateLayoutTransform(FVector2D(1.f, 1.f))), WRUI::Box(FLinearColor(1.f, 1.f, 1.f, 0.16f), FMath::Max(0.f, R - 1.f)));
 	}
+	// The Void's band: grey, hatched, at the right end; a soft grey pulse each time it grows (biome-void 2.17.1).
+	const float L = Lost.IsSet() ? FMath::Clamp(Lost.Get(), 0.f, 1.f) : 0.f;
+	if (L > 0.001f)
+	{
+		const double Now = FPlatformTime::Seconds();
+		if (L > LastLost + 0.0005f) GrewAt = Now;
+		LastLost = L;
+		const float Pulse = FMath::Clamp(1.f - float(Now - GrewAt) / 0.6f, 0.f, 1.f);
+		const float W = FMath::Max(2.f, (Size.X - 2.f) * L);
+		const FVector2D At(Size.X - 1.f - W, 1.f);
+		const FLinearColor Grey = FMath::Lerp(FLinearColor(FColor(110, 106, 102)), FLinearColor(FColor(200, 196, 190)), Pulse * 0.6f);
+		WRUI::DrawBox(Out, Layer + 3, Geo.ToPaintGeometry(FVector2D(W, Size.Y - 2.f), FSlateLayoutTransform(At)), WRUI::Box(Grey, FMath::Max(0.f, R - 1.f)));
+		// Hatching: dark diagonals every 6 px across the band.
+		const float Hh = Size.Y - 2.f;
+		for (float X = At.X - Hh; X < At.X + W; X += 6.f)
+		{
+			const FVector2D P0(FMath::Clamp(X, At.X, At.X + W), At.Y + Hh - FMath::Clamp(At.X - X, 0.f, Hh));
+			const FVector2D P1(FMath::Clamp(X + Hh, At.X, At.X + W), At.Y + FMath::Clamp(X + Hh - (At.X + W), 0.f, Hh));
+			if (P1.X - P0.X < 0.5f) continue;
+			TArray<FVector2D> Pts = { P0, P1 };
+			FSlateDrawElement::MakeLines(Out, Layer + 4, Geo.ToPaintGeometry(), Pts, ESlateDrawEffect::None, FLinearColor(FColor(43, 24, 64, 200)), true, 1.2f);
+		}
+		return Layer + 4;
+	}
+	LastLost = 0.f;
 	return Layer + 2;
 }
 

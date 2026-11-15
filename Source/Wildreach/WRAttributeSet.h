@@ -42,6 +42,12 @@ public:
 	/** The Lightning path's Charge (cooks/biome-lightning.md 2.18.2): a builder that fills fast and empties fast. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Charge) FGameplayAttributeData Charge;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxCharge) FGameplayAttributeData MaxCharge;
+	/** Max health taken by the Void (cooks/biome-void.md 2.8, 2.17): rift zones, Gnawer latches, Vorhollow's bite and your
+	 *  own void abilities. Health can't rise past MaxHealth - MaxHealthLost (the grey band); Rest gives it all back. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHealthLost) FGameplayAttributeData MaxHealthLost;
+	/** The Void path's bar (shown as "Void", never "Corruption": that's the world meter). 0..MaxVoid. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Void) FGameplayAttributeData Void;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxVoid) FGameplayAttributeData MaxVoid;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_BurnBuildup) FGameplayAttributeData BurnBuildup;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_FrostBuildup) FGameplayAttributeData FrostBuildup;
 	/** Creature and boss stance (COMBAT-AND-LESSONS 1.4): hidden, so it lives on the server only; a break shows by the body
@@ -63,6 +69,11 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxChill)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Charge)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxCharge)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHealthLost)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Void)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxVoid)
+	/** The most health can be now: MaxHealth less what the Void took. */
+	float GetEffectiveMaxHealth() const { return FMath::Max(0.f, GetMaxHealth() - GetMaxHealthLost()); }
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, BurnBuildup)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, FrostBuildup)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Stance)
@@ -83,6 +94,9 @@ private:
 	UFUNCTION() void OnRep_MaxChill(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Charge(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxCharge(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxHealthLost(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Void(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxVoid(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_BurnBuildup(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_FrostBuildup(const FGameplayAttributeData& Old);
 };

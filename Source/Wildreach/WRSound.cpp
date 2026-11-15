@@ -1,4 +1,5 @@
 #include "WRSound.h"
+#include "WRSurvival.h"
 #include "WRAudio.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
@@ -949,6 +950,13 @@ FName WRSound::SurfaceUnder(const AActor* Actor)
 
 void WRSound::Footstep(AActor* Actor, float VolumeScale)
 {
+	// In a planned silence (Dead calm) your own steps are what you hear (biome-void 2.9: footsteps doubled in the mix).
+	if (Actor)
+	{
+		float Strength = 0.f;
+		const FWRWeatherKind* K = UWRWeatherSubsystem::ActiveKind(Actor, WRBiome::At(Actor, Actor->GetActorLocation()), &Strength);
+		if (K && K->bSilence) VolumeScale *= FMath::Lerp(1.f, K->FootstepMix, Strength);
+	}
 	const FName Surface = SurfaceUnder(Actor);
 	if (Surface.IsNone())
 	{

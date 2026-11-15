@@ -238,6 +238,10 @@ private:
 	float Cave = 0.f;
 	float Lava = 0.f;
 	float Tundra = 0.f;
+	/** A runtime land the listener stands in (WRLand), its sub-zone, and how far a planned silence (Dead calm) has fallen. */
+	FName LandBiome;
+	FName LandZone;
+	float Hush = 0.f;
 	/** Storm peaks (cooks/biome-lightning.md 2.12): how far into its air, and each sub-zone's bed weight (1-6 as the
 	 *  zone letters, eased), the Rodfield's wind-song by distance. */
 	float Storm = 0.f;

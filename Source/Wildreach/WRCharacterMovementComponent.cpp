@@ -1,4 +1,5 @@
 #include "WRCharacterMovementComponent.h"
+#include "WRVoid.h"
 #include "WRRaiding.h"
 #include "WRCharacterBase.h"
 #include "WRGameplayTags.h"
@@ -111,6 +112,17 @@ void UWRCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 	if (IsOnLadder() || !CharacterOwner || !(IsMovingOnGround() || IsFalling()))
 	{
 		return;
+	}
+	// A rift's pull (WRVoid): a drift toward the tear, the same on the server and the owning client (a pure function of
+	// where you stand), so it never corrects. Survivors only: void creatures don't feel it, tames brace.
+	if (CharacterOwner->GetPlayerState() && CharacterOwner->GetLocalRole() != ROLE_SimulatedProxy)
+	{
+		const FVector Pull = WRVoid::PullAt(GetWorld(), UpdatedComponent->GetComponentLocation());
+		if (!Pull.IsNearlyZero())
+		{
+			FHitResult PullHit;
+			SafeMoveUpdatedComponent(Pull * DeltaSeconds, UpdatedComponent->GetComponentQuat(), true, PullHit);
+		}
 	}
 	const FVector Accel = GetCurrentAcceleration();
 	if (Accel.SizeSquared2D() < 1.f)

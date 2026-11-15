@@ -66,6 +66,7 @@ namespace WRTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Frost);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Lightning);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Water);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Void);      // the Wasteland's (cooks/biome-void.md): its tears, creatures and path
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Path_Fire);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Path_Frost);

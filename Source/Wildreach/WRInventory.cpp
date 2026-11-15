@@ -1,6 +1,7 @@
 #include "WRInventory.h"
 #include "WRStormTypes.h"
 #include "WRSwampSystems.h"
+#include "WRVoid.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -90,6 +91,12 @@ FWRItemRegistry::FWRItemRegistry()
 					double Minutes = 10.0;
 					(*Buff)->TryGetNumberField(TEXT("minutes"), Minutes);
 					D.BuffMinutes = float(Minutes);
+				}
+				const TSharedPtr<FJsonObject>* BrewObj = nullptr;
+				if ((*Use)->TryGetObjectField(TEXT("brew"), BrewObj))
+				{
+					for (const auto& KV : (*BrewObj)->Values) D.Brew.Add(FName(*KV.Key), float(KV.Value->AsNumber()));
+					(*Use)->TryGetNumberField(TEXT("minutes"), D.BrewMinutes);
 				}
 			}
 			const TSharedPtr<FJsonObject>* Equip = nullptr;
@@ -1219,6 +1226,11 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 
 	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
 	const UWRAttributeSet* A = Character->GetAttributes();
+	// A timed brew (anchor salt, the curse-resist draught: WRVoid).
+	if (Def->Brew.Num() > 0)
+	{
+		if (AWRPlayerController* BrewPC = Cast<AWRPlayerController>(Character->GetController())) BrewPC->ClientNotify(WRVoid::Brew(Character, *Def));
+	}
 	if (Def->Heal > 0.f)
 	{
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + WRArtifacts::HealFilter(Character, Def->Heal * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionPotency"))), false));

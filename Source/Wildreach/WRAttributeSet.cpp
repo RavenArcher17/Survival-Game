@@ -18,6 +18,9 @@ UWRAttributeSet::UWRAttributeSet()
 	InitMaxChill(100.f);
 	InitCharge(0.f);
 	InitMaxCharge(100.f);
+	InitMaxHealthLost(0.f);
+	InitVoid(0.f);
+	InitMaxVoid(100.f);
 	InitBurnBuildup(0.f);
 	InitFrostBuildup(0.f);
 	InitStance(60.f);
@@ -38,6 +41,10 @@ void UWRAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	WR_REP(FrostBuildup);
 	WR_REP(Poise);
 	WR_REP(MaxPoise);
+	// The grey band and the Void bar drive the Void body change on everyone (biome-void 2.18).
+	WR_REP(MaxHealthLost);
+	WR_REP(Void);
+	WR_REP(MaxVoid);
 
 	// Personal resources only matter to the owner's HUD.
 	WR_REP_OWNER(Stamina);
@@ -59,7 +66,9 @@ void UWRAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute
 {
 	Super::PreAttributeBaseChange(Attribute, NewValue);
 
-	if (Attribute == GetHealthAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
+	if (Attribute == GetHealthAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetEffectiveMaxHealth());
+	else if (Attribute == GetMaxHealthLostAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
+	else if (Attribute == GetVoidAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxVoid());
 	// Stamina may dip below zero on the last action (COMBAT-AND-LESSONS 1.6, stamina.graceFloor): nothing starts until it's back over.
 	else if (Attribute == GetStaminaAttribute()) NewValue = FMath::Clamp(NewValue, FMath::Min(0.f, WRTune(TEXT("stamina.graceFloor"), -20.f)), GetMaxStamina());
 	else if (Attribute == GetStanceAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStance());
@@ -83,6 +92,9 @@ WR_ONREP(Thirst)
 WR_ONREP(Heat)
 WR_ONREP(MaxHeat)
 WR_ONREP(Chill)
+WR_ONREP(MaxHealthLost)
+WR_ONREP(Void)
+WR_ONREP(MaxVoid)
 WR_ONREP(MaxChill)
 WR_ONREP(Charge)
 WR_ONREP(MaxCharge)

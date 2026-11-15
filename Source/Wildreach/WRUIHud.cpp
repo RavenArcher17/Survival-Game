@@ -5,6 +5,7 @@
 #include "WRWarHall.h"
 #include "WRStormTypes.h"
 #include "WRSurvival.h"
+#include "WRLandThings.h"
 #include "WRUIEndgame.h"
 #include "WRPlayerUI.h"
 #include "WRPortals.h"
@@ -789,6 +790,8 @@ private:
 			// The endgame: a war-hall's gate, a record tablet, a monument (WRWarHall).
 			FString EndTarget, EndVerb;
 			if (WRWarHall::Prompt(P, EndTarget, EndVerb)) { OutTarget = EndTarget; return EndVerb; }
+			// A runtime land's boats, lift and winch (WRLandThings).
+			if (WRLandThings::Prompt(P, EndTarget, EndVerb)) { OutTarget = EndTarget; return EndVerb; }
 		}
 		// A boss altar opens its pages (its path, Return, Forge soul: WRDeeds).
 		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return P->GetUI() ? FString(TEXT("Path  ·  Return  ·  Forge soul")) : Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }
@@ -1009,7 +1012,7 @@ private:
 		return Age >= 0.f && Age < Len ? 1.f - Age / Len : 0.f;
 	}
 
-	TSharedRef<SWidget> VitalRow(const FText& Label, const FLinearColor& Color, float Height, TFunction<float()> Value, TFunction<float()> Max, TFunction<float()> Flash = nullptr)
+	TSharedRef<SWidget> VitalRow(const FText& Label, const FLinearColor& Color, float Height, TFunction<float()> Value, TFunction<float()> Max, TFunction<float()> Flash = nullptr, TFunction<float()> Lost = nullptr)
 	{
 		return SNew(SHorizontalBox)
 			// A refused press shakes the row a few px and flashes the bar white (never gold: that's block / parry).
@@ -1022,7 +1025,8 @@ private:
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(62.f * U)[WRUI::Text(Label, WRUI::Caps(12), WRUI::Ink2)]]
 			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(SWRBar).Height(Height)
 				.Color_Lambda([Color, Flash]() { return Flash ? FMath::Lerp(Color, FLinearColor(FColor(245, 240, 230)), Flash()) : Color; })
-				.Fraction_Lambda([Value, Max]() { return FMath::Max(0.f, Value()) / FMath::Max(1.f, Max()); })]
+				.Fraction_Lambda([Value, Max]() { return FMath::Max(0.f, Value()) / FMath::Max(1.f, Max()); })
+				.Lost_Lambda([Lost, Max]() { return Lost ? FMath::Max(0.f, Lost()) / FMath::Max(1.f, Max()) : 0.f; })]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
 			[
 				SNew(SBox).WidthOverride(64.f * U).HAlign(HAlign_Right)
@@ -1080,7 +1084,7 @@ private:
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
 				[
 					SNew(SOverlay)
-					+ SOverlay::Slot()[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; })]
+					+ SOverlay::Slot()[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; }, nullptr, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealthLost() : 0.f; })]
 					// The Blood path's Spilled bar (cooks/biome-swamp.md 2.17): the garnet segment after your health for the HP your
 					// Blood abilities spent, its far edge the rally window, over the bar's own track (VitalRow's label / number widths).
 					+ SOverlay::Slot().VAlign(VAlign_Center).Padding(62.f * U, 0.f, 74.f * U, 0.f)
