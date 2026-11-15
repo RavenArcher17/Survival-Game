@@ -4,6 +4,8 @@
 #include "WRUnderwater.h"
 #include "WRTide.h"
 #include "WROceanTypes.h"
+#include "WRDesertHazards.h"
+#include "WRDesertTypes.h"
 #include "WRFungalHazards.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
@@ -397,8 +399,10 @@ bool UWRAudioDirector::StepStream(FStream& S, float DeltaTime, float Gain)
 	}
 	C->SetVolumeMultiplier(FMath::Max(S.Base * S.Gain * Gain, 0.001f));
 	// Under the water every bed and every tune goes thick and low (the underwater bed itself stays clear).
-	C->SetLowPassFilterEnabled(UnderBlend > 0.01f);
-	if (UnderBlend > 0.01f) C->SetLowPassFilterFrequency(FMath::Lerp(20000.f, Tune(TEXT("ambient.underwaterLowPass"), 700.f), UnderBlend));
+	// In the Desert's storm belt (or a sandstorm) the tunes go low under the roar (never muted: the music rule).
+	const float Thick = FMath::Max(UnderBlend, BeltBlend * Tune(TEXT("ambient.beltLowPassShare"), 0.8f));
+	C->SetLowPassFilterEnabled(Thick > 0.01f);
+	if (Thick > 0.01f) C->SetLowPassFilterFrequency(FMath::Lerp(20000.f, UnderBlend >= BeltBlend ? Tune(TEXT("ambient.underwaterLowPass"), 700.f) : Tune(TEXT("ambient.beltLowPass"), 1200.f), Thick));
 	return false;
 }
 
@@ -449,6 +453,8 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		const APlayerController* UPC = World->GetFirstPlayerController();
 		const APawn* UMe = UPC ? UPC->GetPawn() : nullptr;
 		UnderBlend = FMath::FInterpConstantTo(UnderBlend, UMe && WRUnderwater::IsUnder(UMe) ? 1.f : 0.f, DeltaTime, 1.f / Tune(TEXT("ambient.underwaterFade"), 0.4f));
+		float BeltVision = 0.f;
+		BeltBlend = FMath::FInterpConstantTo(BeltBlend, WRDesertHz::BeltAmount(UMe, BeltVision), DeltaTime, 0.5f);
 	}
 	// A runtime land (the Corrupted wasteland): its own beds ("land.<biome>", "zone.<id>"), none of the island's; and its
 	// planned silence (a weather row with "silence": Dead calm) fading every bed and the music out over its seconds.
@@ -761,6 +767,20 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 				Try.Add(OZ == TEXT("O1") || OZ == TEXT("O2") ? FName(TEXT("explore.ocean.a")) : OZ == TEXT("O3") ? FName(TEXT("explore.ocean.b")) : FName(TEXT("explore.ocean.c")));
 			}
 		}
+		// The Desert (cooks/biome-desert.md 2.16): the Hourhold's own cue, the Wall's storm piece, a camp's, the pass's
+		// (Saltgate's west mouth), then by sub-zone.
+		if (WRDesert::Live() && Land == WRDesert::Biome() && PoolName != TEXT("combat"))
+		{
+			if (WRDesert::InHourhold(Listener)) Try.Add(TEXT("sub.hourhold"));
+			if (WRDesert::InBelt(Listener)) Try.Add(TEXT("sub.haboob_wall"));
+			for (const FWRDesertData::FPlace& S : FWRDesertData::Get().Sites)
+			{
+				if (S.bCamp && FVector::Dist2D(S.At, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(TEXT("camp.desert")); break; }
+			}
+			const FName DZ = WRDesert::ZoneAt(Listener);
+			if (Listener.X > FWRTuning::Get().Num(TEXT("desertWorld.saltgateMusicX"), -60000.f)) Try.Add(TEXT("pass.saltgate"));
+			if (PoolName == TEXT("explore")) Try.Add(DZ == TEXT("D1") || DZ == TEXT("D2") ? FName(TEXT("explore.desert.a")) : DZ == TEXT("D3") ? FName(TEXT("explore.desert.b")) : FName(TEXT("explore.desert.c")));
+		}
 		Try.Add(FName(*FString::Printf(TEXT("%s.%s"), *PoolName.ToString(), *Land.ToString())));
 		for (const FName& T : Try)
 		{
@@ -895,6 +915,12 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		const APlayerController* KPC = World->GetFirstPlayerController();
 		const APawn* KMe = KPC ? KPC->GetPawn() : nullptr;
 		StepMusicLayer(KingTideLayer, OS && OS->KingTide != EWRKingTide::None && KMe && WROcean::Contains(KMe->GetActorLocation()), TEXT("layer.king_tide"), DeltaTime, Gain);
+	}
+	// The Long Noon (cooks/biome-desert.md 2.16): its layer (a held high drone) over whatever plays in the Desert.
+	{
+		const APlayerController* NPC = World->GetFirstPlayerController();
+		const APawn* NMe = NPC ? NPC->GetPawn() : nullptr;
+		StepMusicLayer(LongNoonLayer, WRDesertHz::LongNoon(World) && NMe && WRDesert::Contains(NMe->GetActorLocation()), TEXT("layer.long_noon"), DeltaTime, Gain);
 	}
 	// The Sporefall: the Heart pulse as a deep drum over whatever plays in the caverns (cooks/biome-fungal.md 2.16).
 	StepMusicLayer(SporefallLayer, !FungalZone.IsNone() && WRFungal::Sporefall(World) >= 2, TEXT("layer.sporefall"), DeltaTime, Gain);

@@ -256,6 +256,10 @@ private:
 	 *  (0..1: every bed and tune muffled through a low-pass as it rises; the underwater bed comes up). */
 	TArray<FStream> KingTideLayer;
 	float UnderBlend = 0.f;
+	/** The Desert (cooks/biome-desert.md 2.15-2.16): the Long Noon's layer, and how deep in the storm belt or a
+	 *  sandstorm the listener is (0..1: the music low-passed under the wind, never muted). */
+	TArray<FStream> LongNoonLayer;
+	float BeltBlend = 0.f;
 	/** Storm peaks (cooks/biome-lightning.md 2.12): how far into its air, and each sub-zone's bed weight (1-6 as the
 	 *  zone letters, eased), the Rodfield's wind-song by distance. */
 	float Storm = 0.f;
