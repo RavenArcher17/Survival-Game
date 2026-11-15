@@ -419,7 +419,8 @@ and `WRFungalSceneryCaves.cpp` (halls by zone, sites, the city), kit `WRFungalLo
 veil mesh). The Flue junction: `WRSkyParts::Flue` skips the wall panel at `WRFungal::FlueMouth`, and the caverns' mesher
 unions the shaft's air (radius `flue.r`) and drops its duplicate skin. Things in the caverns stand at their hall's local
 z 0 (never `FBuild::G`, which traces to the plateau); walls and ceilings come from the air (`FgWall`). Numbers: tuning
-`fungalWorld`.
+`fungalWorld`. The server's things are `WRFungalThings.cpp` (nodes with their rules, caches, keepsakes; node looks in
+`WRFungal::NodeLook`, called first in `WRResourceLook::Apply`).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

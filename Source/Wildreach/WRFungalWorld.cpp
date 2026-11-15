@@ -193,6 +193,11 @@ void UWRFungalWorld::Tick(float DeltaTime)
 		if (!bSceneryDone) return;
 	}
 	if (World->GetNetMode() != NM_DedicatedServer) StepLights(DeltaTime);
+	if (World->GetNetMode() != NM_Client && !bServerDone)
+	{
+		bServerDone = true;
+		SpawnServerActors();
+	}
 }
 
 void UWRFungalWorld::StepGlow(float Dt)

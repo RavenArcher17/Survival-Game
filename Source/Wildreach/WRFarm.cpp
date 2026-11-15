@@ -20,6 +20,7 @@
 #include "WRSurvival.h"
 #include "WRTuning.h"
 #include "WRWater.h"
+#include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
@@ -677,6 +678,8 @@ namespace WRFarmDetail
 			Extra += TEXT(" (bag full: the rest is on the ground)");
 		}
 		UWRLifeSkillsComponent::Award(PS, TEXT("farming"), TEXT("harvest"), 20.f);
+		// A master's quest may ask for a crop's first flush (Ilmari's "First flush": harvest_oyster_cap).
+		if (UWRWorldSystems* WS = Plot->GetWorld()->GetSubsystem<UWRWorldSystems>()) WS->QuestEvent(PS, TEXT("event"), FName(*(TEXT("harvest_") + Crop->Id.ToString())), 1);
 		if (UWRFoodComponent* Food = PS->FindComponentByClass<UWRFoodComponent>())
 		{
 			if (!Food->CropsHarvested.Contains(Crop->Id))

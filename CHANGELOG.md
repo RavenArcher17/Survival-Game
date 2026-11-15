@@ -94,6 +94,25 @@ Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and pl
 cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
 not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveBiomes`.
 
+- **Fungal (2): the caverns' things, the master and his road** (fungal 2.4, 2.7, 2.9, 2.11, 2.19-2.21). Items (47:
+  glow-moss, amadou, spore sac, capling cap, the creatures' parts, spore essence, the queen's jelly / king's slurry /
+  star-thread extras, Mycelorn's core, the Hive spore part, the Heart-seed husk trophy, the filter mask (head:
+  `passSpores`), the spore wad, the poison- and rot-resist draughts (`poison_ward` / `rot_ward`: half buildup, in
+  `UWRStatusComponent`), the glow-cap lantern (a cold hip light, tuning `lights`), glow paste, the Gale flask, amadou
+  tinder (two torches from one, no flint), chitin arrows, the knocker idol, the Farmer's and Deepfarmer rings, three
+  effigies, ten lore keepsakes) and 16 recipes. The server's nodes (`WRFungalThings.cpp`, tuning `fungalWorld.nodes`):
+  deepcap only on the dead (a blade doubles it, 3 game days to regrow, the Sporefall x3), glow-moss, amadou, rhizomorph
+  (an axe's), silk, saltpetre, the four galleries' ores, wild oyster caps and lion's mane with their spawn, clay, each
+  modelled in code (`WRFungal::NodeLook`: a deepcap on the bones it grew from, a hoof fungus on its stump...). Caches
+  where the hand sites say (the terraces' tool chest, the caravan's pots, the diving bell...), the summited's leavings,
+  the four secrets' pay, and the lore keepsakes (they refill, so everyone finds one). World rows: the fungal biome, five
+  shrines (the Great Shrine of the Garden Doline on its floor, the Ring, Starfall, Cable and Flue Floor shrines with their
+  guards), **Ilmari Kask** at the Great Shrine with his six quests (First flush fires from any harvest:
+  `harvest_<crop>`; the Lure Gallery walk and the lone cap are the hazards' and creatures' events), three effigies,
+  the Sporefall event row, the Spore invasion of the Sky islands through the Flue (led by the Weaver). Weather: the
+  surface's Overcast / Rain / Spore drift (Clear the rest); the Spore bloom is the caverns' own clock, not a weather.
+  The Stipe Maul blueprint waits for its weapon (the boss-weapons cook): not dropped. Compiled; not played.
+
 - **Fungal (1): the land, the caverns and their places** (fungal 2.1-2.6, 2.20; plan 2.0-2.6). `node
   Tools/terrain/fungal.mjs` writes `Data/lands/fungal.json` + `fungal_ground.bin` (0.97 MB: the Sinkhole Rim, a karst
   plateau of limestone pavement cut by grykes on the Hollow Cape's west half, sea cliffs west and north, the Desert's

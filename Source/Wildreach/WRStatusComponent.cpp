@@ -298,6 +298,9 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 	{
 		Amount *= WRTune(TEXT("storm.shockWardMult"), 0.5f);
 	}
+	// The Fungal caverns' resist draughts: poison / rot build at half while they last.
+	if (Id == WRStatus::Poison && WRStorm::HasBuff(GetOwner(), TEXT("poison_ward"))) Amount *= WRTune(TEXT("hazards.fungal.wardMult"), 0.5f);
+	if (Id == WRStatus::Rot && WRStorm::HasBuff(GetOwner(), TEXT("rot_ward"))) Amount *= WRTune(TEXT("hazards.fungal.wardMult"), 0.5f);
 	// The curse-resist draught (the Corrupted wasteland): curse builds at half while it lasts.
 	if (Id == WRStatus::Curse && WRStorm::HasBuff(GetOwner(), TEXT("curse_ward")))
 	{

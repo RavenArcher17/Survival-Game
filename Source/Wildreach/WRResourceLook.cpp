@@ -1,6 +1,7 @@
 #include "WRResourceLook.h"
 #include "WROceanTypes.h"
 #include "WRCrystalTypes.h"
+#include "WRFungalTypes.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
 #include "WRResourceNode.h"
@@ -148,6 +149,13 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("selenite")) Body = FVector2D(150.f, 220.f);
 	else if (Item == TEXT("crystal_dust") || Item == TEXT("ochre")) Body = FVector2D(220.f, 200.f);
 	else if (Item == TEXT("candle_rhubarb") || Item == TEXT("glowmelon")) Body = FVector2D(130.f, 230.f);
+	// The Fungal caverns' (cooks/build-biome-fungal.md 2.7): a deepcap on its bones, glow-moss, a hoof fungus on its stump,
+	// a rhizomorph knot, a silk bundle, a grounded puffball, a log of oyster caps, a lion's mane.
+	else if (Item == TEXT("deepcap")) Body = FVector2D(130.f, 210.f);
+	else if (Item == TEXT("glow_moss")) Body = FVector2D(200.f, 200.f);
+	else if (Item == TEXT("amadou") || Item == TEXT("lions_mane")) Body = FVector2D(130.f, 230.f);
+	else if (Item == TEXT("bootlace_rhizomorph")) Body = FVector2D(160.f, 240.f);
+	else if (Item == TEXT("webspinner_silk") || Item == TEXT("spore_sac") || Item == TEXT("oyster_cap")) Body = FVector2D(140.f, 220.f);
 	// The Ocean's (cooks/build-biome-ocean.md 2.5): tidecoral, sea kelp, sea grapes, oysters, urchins, salt, sea-glass,
 	// driftwood, kelp ash, bronze scrap, the caves' topaz (WROceanNodes.cpp models them).
 	const bool bOceanNode = WROcean::IsNodeItem(Item) && WROcean::Contains(At);
@@ -227,6 +235,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	{
 		return;  // the server only needs the collider
 	}
+	// The Fungal caverns' nodes are modelled in code (WRFungal::NodeLook): nothing of the pack look below.
+	if (WRFungal::NodeLook(Node, Item, Seed)) return;
 
 	UStaticMeshComponent* Look = Part<UStaticMeshComponent>(Node, Collider, TEXT("WRLook"));
 	UInstancedStaticMeshComponent* Bits = Part<UInstancedStaticMeshComponent>(Node, Collider, TEXT("WRLookBits"));

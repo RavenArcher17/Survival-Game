@@ -190,6 +190,9 @@ namespace WRFungal
 	/** The Flue's wall has the river passage's opening here (the Sky lane's shaft skips its wall quads in it): yaw (degrees,
 	 *  from the shaft's axis), half its width (degrees) and its top over the floor (cm). False while the caverns aren't live. */
 	WILDREACH_API bool FlueMouth(float& OutYaw, float& OutHalfDeg, float& OutTop);
+	/** Every machine: a Fungal resource node's look, modelled in code (WRFungalThings.cpp). False: not one of its kinds
+	 *  or not in the caverns (the caller draws its own). */
+	WILDREACH_API bool NodeLook(AActor* Node, FName Item, uint32 Seed);
 	/** The cavern glow's level now (0.35 at noon .. 1.0 at midnight: the surface clock), eased; the Spore bloom's and
 	 *  the Sporefall's sync beat multiply it. Every machine. */
 	WILDREACH_API float GlowNow(const UObject* WorldContext);
