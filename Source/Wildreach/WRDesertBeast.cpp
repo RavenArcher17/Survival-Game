@@ -364,6 +364,62 @@ void UWRDesertBeast::Build()
 			K = Mk(M);
 		}
 	}
+	else if (Kind == TEXT("colossus"))
+	{
+		// Ahrumet (cook 2.14): a 16 m sandstone colossus of a king: broad shoulders, a pleated stone kilt, arms banded with
+		// bronze; a face worn smooth (no nose, no mouth) with one great sunstone eye in the brow; a 6 m sun-disc ring behind
+		// its head; cracks through the chest that pour sand. Built standing at full size (the pose seats it).
+		const FLinearColor Stone = Dbc(0xC8, 0xA0, 0x70, 0.5f), Worn = Dbc(0xB0, 0x8A, 0x5E, 0.5f), Bronze = Dbc(0x8C, 0x5A, 0x2C, 0.6f), Basalt = Dbc(0x22, 0x20, 0x1E, 0.6f);
+		// Hips and the pleated kilt (a flared skirt of vertical pleats), the torso, the chest.
+		M.Lathe(FVector(0, 0, 640.f), FVector(0, 0, 1), 260.f, { FVector(0.f, 230.f, 170.f), FVector(1.f, 175.f, 130.f) }, 18, Worn, 0.75f);
+		for (int32 p = 0; p < 14; ++p) { const float A = p * PI / 7.f; Seg(M, FVector(FMath::Cos(A) * 215.f, FMath::Sin(A) * 160.f, 900.f), FVector(FMath::Cos(A) * 250.f, FMath::Sin(A) * 190.f, 640.f), 14.f, 16.f, Stone * 0.9f, 0.75f, 4); }
+		M.Lathe(FVector(0, 0, 900.f), FVector(0, 0, 1), 480.f, { FVector(0.f, 170.f, 125.f), FVector(0.45f, 230.f, 150.f), FVector(0.8f, 290.f, 165.f), FVector(1.f, 120.f, 95.f) }, 18, Stone, 0.7f);
+		Blob(M, FVector(70.f, 0, 1220.f), 70.f, 210.f, 110.f, Stone * 1.05f, 0.7f);
+		M.Lathe(FVector(0, 0, 1380.f), FVector(0, 0, 1), 60.f, { FVector(0.f, 95.f, 80.f), FVector(1.f, 85.f, 75.f) }, 12, Worn, 0.7f);
+		Take(M, K.V, K.T, Body, PBody); K = Mk(M);
+		// The head: smooth and worn, a royal head-cloth's lappets, and the sun-disc ring standing behind it.
+		Blob(M, FVector(10.f, 0, 1530.f), 95.f, 90.f, 115.f, Worn, 0.8f);
+		for (int32 sd = -1; sd <= 1; sd += 2) Seg(M, FVector(-10.f, sd * 95.f, 1560.f), FVector(10.f, sd * 120.f, 1380.f), 30.f, 40.f, Stone, 0.75f, 5);
+		M.Lathe(FVector(-90.f, 0, 1560.f), FVector(-1, 0, 0), 26.f, { FVector(0.f, 300.f, 300.f), FVector(1.f, 300.f, 300.f) }, 28, Bronze, 0.35f);
+		M.Lathe(FVector(-90.f, 0, 1560.f), FVector(-1, 0, 0), 30.f, { FVector(0.f, 250.f, 250.f), FVector(1.f, 250.f, 250.f) }, 28, Bronze * 0.7f, 0.35f);
+		Take(M, K.V, K.T, Body, PHead); K = Mk(M);
+		// Arms: shoulder to elbow to a stone fist, bronze bands at the biceps and the wrists.
+		for (int32 sd = -1; sd <= 1; sd += 2)
+		{
+			const FVector Sh(0, sd * 300.f, 1300.f), El(30.f, sd * 340.f, 960.f), Wr(70.f, sd * 330.f, 640.f);
+			Seg(M, Sh, El, 85.f, 70.f, Stone, 0.7f, 10); Seg(M, El, Wr, 70.f, 58.f, Stone, 0.7f, 10);
+			Seg(M, FMath::Lerp(Sh, El, 0.45f), FMath::Lerp(Sh, El, 0.6f), 90.f, 90.f, Bronze, 0.35f, 12);
+			Seg(M, FMath::Lerp(El, Wr, 0.75f), FMath::Lerp(El, Wr, 0.9f), 66.f, 66.f, Bronze, 0.35f, 12);
+			Blob(M, Wr + FVector(10.f, 0, -70.f), 70.f, 60.f, 80.f, Worn, 0.75f);
+			Take(M, K.V, K.T, Body, sd < 0 ? PWingL : PWingR); K = Mk(M);
+		}
+		// Legs: hip to knee to a squared foot.
+		for (int32 sd = -1; sd <= 1; sd += 2)
+		{
+			const FVector Hip(0, sd * 130.f, 660.f), Knee(30.f, sd * 140.f, 340.f), Ank(0, sd * 140.f, 60.f);
+			Seg(M, Hip, Knee, 110.f, 90.f, Stone, 0.7f, 10); Take(M, K.V, K.T, Body, uint8(PLeg0 + (sd < 0 ? 0 : 1)), 0.4f); K = Mk(M);
+			Seg(M, Knee, Ank, 90.f, 75.f, Stone, 0.7f, 10);
+			Blob(M, Ank + FVector(60.f, 0, -20.f), 150.f, 80.f, 40.f, Worn, 0.8f);
+			Take(M, K.V, K.T, Body, uint8(PLeg0 + (sd < 0 ? 0 : 1)), 1.f); K = Mk(M);
+		}
+		// The gnomon as a club (phase 2): carried in the right fist, shown only once it is torn from the dial.
+		M.Lathe(FVector(70.f, 330.f, 560.f), FVector(1, 0, 0), 2800.f, { FVector(0.f, 150.f, 150.f), FVector(0.9f, 90.f, 90.f), FVector(1.f, 10.f, 10.f) }, 4, Basalt, 0.4f);
+		Take(M, K.V, K.T, Body, PHorns); K = Mk(M);
+		// The glow: the sunstone eye, and the cracks through the chest, arms and knees that glow sun-hot.
+		FWRToolMesh G;
+		Blob(G, FVector(95.f, 0, 1580.f), 22.f, 34.f, 26.f, FLinearColor::White, 0.1f);
+		Take(G, 0, 0, Glow, PBulb);
+		FMk GK = Mk(G);
+		for (int32 c = 0; c < 6; ++c) Seg(G, FVector(130.f, -120.f + c * 45.f, 1290.f - c * 30.f), FVector(135.f, -90.f + c * 40.f, 1160.f - c * 20.f), 7.f, 5.f, FLinearColor::White, 0.2f, 4);
+		Take(G, GK.V, GK.T, Glow, PBody); GK = Mk(G);
+		for (int32 sd = -1; sd <= 1; sd += 2)
+		{
+			Seg(G, FVector(95.f, sd * 330.f, 760.f), FVector(110.f, sd * 330.f, 880.f), 6.f, 5.f, FLinearColor::White, 0.2f, 4);
+			Take(G, GK.V, GK.T, Glow, sd < 0 ? PWingL : PWingR); GK = Mk(G);
+			Seg(G, FVector(115.f, sd * 140.f, 320.f), FVector(120.f, sd * 140.f, 400.f), 6.f, 5.f, FLinearColor::White, 0.2f, 4);
+			Take(G, GK.V, GK.T, Glow, uint8(PLeg0 + (sd < 0 ? 0 : 1)), 0.4f); GK = Mk(G);
+		}
+	}
 	for (FV& V : Body.Rest) V.Rest *= S;
 	for (FV& V : Glow.Rest) V.Rest *= S;
 	MinX = 1.0e9f; MaxX = -1.0e9f;
@@ -504,7 +560,41 @@ FVector UWRDesertBeast::Place(const FV& V) const
 		P.Z += FMath::Abs(FMath::Sin(Phase)) * 10.f * S * Amp;
 		P.Z -= Bury * 26.f * S;
 	}
-	if (Dead > 0.f) P = FRotator(0.f, 0.f, 175.f * Dead).RotateVector(P - FVector(0, 0, 30.f * S)) + FVector(0, 0, 30.f * S);
+	else if (Kind == TEXT("colossus"))
+	{
+		// Seated on its throne (Asleep): the hips drop, the thighs come level, the shins hang. Walking: a slow heavy stride.
+		// The arms swing; a blow (Jaw) brings both down; a grab (Grip) reaches the right one forward; the eye charging
+		// (Raised) bows the head forward. The gnomon club shows in the right fist once it is torn up (Dulla).
+		const bool bArmL = V.Part == PWingL, bArmR = V.Part == PWingR || V.Part == PHorns;
+		const float Stride = FMath::Sin(Phase) * Amp;
+		if (bLeg)
+		{
+			const float Sd = L == 0 ? 1.f : -1.f;
+			const FVector HipP(0, 0, 660.f * S);
+			P = FRotator(-Stride * 22.f * Sd, 0.f, 0.f).RotateVector(P - HipP) + HipP;
+			if (Sleep > 0.f)
+			{
+				// Seated: the thigh swings level, the shin hangs from the knee.
+				const FVector Hip(0, P.Y, 660.f * S);
+				const FVector Knee = Hip + FVector(320.f * S, 0, 0);
+				const FVector Seated = V.B < 0.5f ? Hip + FRotator(90.f, 0.f, 0.f).RotateVector(P - Hip) : Knee + FVector(0, 0, P.Z - 340.f * S);
+				P = FMath::Lerp(P, Seated, Sleep);
+			}
+		}
+		else if (bArmL || bArmR)
+		{
+			const float Sd = bArmL ? -1.f : 1.f;
+			const FVector Sh(0, Sd * 300.f * S, 1300.f * S);
+			float Pitch = Stride * 18.f * Sd - JawOut * 95.f;
+			if (bArmR) Pitch -= GripAmt * 80.f;
+			P = FRotator(Pitch, 0.f, 0.f).RotateVector(P - Sh) + Sh;
+		}
+		if (V.Part == PHead || V.Part == PBulb) { const FVector N(0, 0, 1400.f * S); P = FRotator(-RaiseAmt * 25.f, 0.f, 0.f).RotateVector(P - N) + N; }
+		if (V.Part == PHorns && DullaAmt < 0.5f) P.Z -= 100000.f;   // not torn up yet: hidden under the dial
+		P.Z -= Sleep * 300.f * S;
+		P.Z += FMath::Abs(Stride) * 10.f * S;
+	}
+	if (Dead > 0.f) P = Kind == TEXT("colossus") ? FRotator(-80.f * Dead, 0.f, 0.f).RotateVector(P) : FRotator(0.f, 0.f, 175.f * Dead).RotateVector(P - FVector(0, 0, 30.f * S)) + FVector(0, 0, 30.f * S);
 	return P;
 }
 
@@ -550,7 +640,9 @@ void UWRDesertBeast::Pose(float Dt)
 	if (GlowMat)
 	{
 		const bool bGlowing = B && B->Has(WRDesertFlag::Glowing);
-		const float G = (bGlowing ? (Kind == TEXT("scorpion") ? 1.4f : 2.0f) : 0.f) + FlareAmt * 8.f;
+		// (The colossus's eye burns amber while it is awake; sun-hot, its cracks glow; charging, it brightens to white.)
+		const float Awake = Kind == TEXT("colossus") && C->IsAlive() && Sleep < 0.5f ? 1.f : 0.f;
+		const float G = (bGlowing ? (Kind == TEXT("scorpion") ? 1.4f : 2.0f) : 0.f) + FlareAmt * 8.f + Awake + (Kind == TEXT("colossus") ? RaiseAmt * 4.f : 0.f);
 		if (!FMath::IsNearlyEqual(G, GlowNow, 0.02f)) { GlowNow = G; GlowMat->SetScalarParameterValue(TEXT("Glow"), G); }
 	}
 }

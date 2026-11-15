@@ -119,6 +119,7 @@ void AWRDesertState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AWRDesertState, FloodStart);
 	DOREPLIFETIME(AWRDesertState, BrineBrokenUntil);
 	DOREPLIFETIME(AWRDesertState, Sinkers);
+	DOREPLIFETIME(AWRDesertState, bGnomonUprooted);
 }
 
 AWRDesertState* AWRDesertState::Get(const UObject* WorldContext)
@@ -167,13 +168,13 @@ AWRDesertScenery::AWRDesertScenery()
 void AWRDesertScenery::BuildDesert()
 {
 	WRDesertParts::Build(this);
-	SetActorTickEnabled(Wheel || Signal || Dust.Num() > 0 || Mirrors.Num() > 0 || VaultDoor || SeventhDoor || LeeSand || DigSand || Shafts.Num() > 0 || Spin);
+	SetActorTickEnabled(Wheel || Signal || Dust.Num() > 0 || Mirrors.Num() > 0 || VaultDoor || SeventhDoor || GnomonPart || GnomonBox || LeeSand || DigSand || Shafts.Num() > 0 || Spin);
 }
 
 void AWRDesertScenery::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (GetNetMode() == NM_DedicatedServer && !LeeSand && !DigSand && !VaultDoor && !SeventhDoor) return;
+	if (GetNetMode() == NM_DedicatedServer && !LeeSand && !DigSand && !VaultDoor && !SeventhDoor && !GnomonBox) return;
 	const float NowS = DwNow(this);
 	const AWRDesertState* S = AWRDesertState::Get(this);
 	// The qanat tower's bucket wheel: 6 rpm, a pure function of the server clock (every machine shows the same turn).
@@ -218,6 +219,13 @@ void AWRDesertScenery::Tick(float DeltaSeconds)
 		const float Ease = T * T * (3.f - 2.f * T);
 		VaultDoor->SetRelativeLocation(VaultDoorBase + FVector(Ease * 330.f, 0.f, 0.f));
 		if (UPrimitiveComponent* Pr = Cast<UPrimitiveComponent>(VaultDoor)) Pr->SetCollisionEnabled(T >= 1.f ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+	}
+	// The gnomon: gone from the dial while Ahrumet carries it (phase 2), back when the fight resets.
+	if (S && (GnomonPart || GnomonBox))
+	{
+		const bool bGone = S->bGnomonUprooted;
+		if (GnomonPart && GnomonPart->IsVisible() == bGone) GnomonPart->SetVisibility(!bGone, true);
+		if (GnomonBox) GnomonBox->SetCollisionEnabled(bGone ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
 	}
 	// The Seventh Vault's door: open while the Long Noon holds (4 s each way).
 	if (SeventhDoor && S)

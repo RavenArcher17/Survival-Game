@@ -7,6 +7,7 @@
 #include "WRCrystalBosses.h"
 #include "WRFungalBosses.h"
 #include "WROceanBosses.h"
+#include "WRDesertBosses.h"
 #include "WRVoidBosses.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
@@ -173,7 +174,7 @@ int32 AWRBoss::ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBa
 		{
 			continue;
 		}
-		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target) || !FWRForestBoss::Allowed(this, A, Target) || !FWRGraveBoss::Allowed(this, A, Target) || !FWRSkyBoss::Allowed(this, A, Target) || !FWRCrystalBoss::Allowed(this, A, Target) || !FWRFungalBoss::Allowed(this, A, Target) || !FWROceanBoss::Allowed(this, A, Target))
+		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target) || !FWRForestBoss::Allowed(this, A, Target) || !FWRGraveBoss::Allowed(this, A, Target) || !FWRSkyBoss::Allowed(this, A, Target) || !FWRCrystalBoss::Allowed(this, A, Target) || !FWRFungalBoss::Allowed(this, A, Target) || !FWROceanBoss::Allowed(this, A, Target) || !FWRDesertBoss::Allowed(this, A, Target))
 		{
 			continue;   // a Storm peaks boss's rule (bleed blocks the charge, underground moves, the eye)
 		}
@@ -267,6 +268,7 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	FWRSkyBoss::AttackStarted(this, Attack, Target);   // the Sky's: the vanes stopped, the hood spread, the sac swelling, the shadows   // the Graveyard's: the rope wrapped, the dust from the ceiling, the floor cracking
 	FWRCrystalBoss::AttackStarted(this, Attack, Target);
 	FWROceanBoss::AttackStarted(this, Attack, Target);   // the Ocean's: the creak, the crest, the bubble column, the drum
+	FWRDesertBoss::AttackStarted(this, Attack, Target);   // the Desert: Ssarrok, the Mirage Matriarch, the Glass Empress, Ahrumet
 	FWRFungalBoss::AttackStarted(this, Attack, Target);   // the Fungal caverns': the sac to the vent, the thread, the vein, the crown pouring   // the Crystal caves': the double's swing, the guide thread, the noise point   // the Graveyard's: the rope wrapped, the dust from the ceiling, the floor cracking
 	FWRForestBoss::AttackStarted(this, Attack, Target);   // the forest's tells: the stump torn up, the bulging line, the root hand's ring
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s winds up %s at %s%s"), *GetDisplayLabel(), *Attack.Id.ToString(), *Target->GetName(), Hold > 0.f ? TEXT(" (held)") : TEXT(""));
@@ -297,7 +299,7 @@ void AWRBoss::BeginStrike()
 	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, bAirborne ? 0.f : GetSimpleCollisionHalfHeight());
 	const FString Id = Attack.Id.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s strikes"), *GetDisplayLabel(), *Id);
-	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack) || FWRForestBoss::BeginStrike(this, Attack) || FWRGraveBoss::BeginStrike(this, Attack) || FWRSkyBoss::BeginStrike(this, Attack) || FWRCrystalBoss::BeginStrike(this, Attack) || FWRFungalBoss::BeginStrike(this, Attack) || FWROceanBoss::BeginStrike(this, Attack))
+	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack) || FWRForestBoss::BeginStrike(this, Attack) || FWRGraveBoss::BeginStrike(this, Attack) || FWRSkyBoss::BeginStrike(this, Attack) || FWRCrystalBoss::BeginStrike(this, Attack) || FWRFungalBoss::BeginStrike(this, Attack) || FWROceanBoss::BeginStrike(this, Attack) || FWRDesertBoss::BeginStrike(this, Attack))
 	{
 		return;   // a Storm peaks move (strikes, rings, the bone drop, the eye bolt...)
 	}
@@ -464,6 +466,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 		FWRSkyBoss::HitLanded(Self, Victim, AttackId, Landed);   // the snatches, the hurl   // the Knell, the palps, the ribcage, the cage, the Shroud hold
 		FWRCrystalBoss::HitLanded(Self, Victim, AttackId, Landed);
 		FWROceanBoss::HitLanded(Self, Victim, AttackId, Landed);   // the claw, the jaw, the drag, the swallow
+		FWRDesertBoss::HitLanded(Self, Victim, AttackId, Landed);   // the Desert: Ssarrok, the Mirage Matriarch, the Glass Empress, Ahrumet
 		FWRFungalBoss::HitLanded(Self, Victim, AttackId, Landed);   // the press, the engulf, the cocoon, the eruption's launch   // the Warden's ring after a blow, Lyrathis's grasp   // the Knell, the palps, the ribcage, the cage, the Shroud hold
 		FWRForestBoss::HitLanded(Self, Victim, AttackId, Landed);   // Gnarl's grasp holds, the antler toss throws
 		if (AttackId == TEXT("tongs_grab"))
@@ -520,7 +523,7 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 	{
 		return;  // the lob does it
 	}
-	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds) || FWRForestBoss::TickStrike(this, Attack, DeltaSeconds) || FWRGraveBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSkyBoss::TickStrike(this, Attack, DeltaSeconds) || FWRCrystalBoss::TickStrike(this, Attack, DeltaSeconds) || FWRFungalBoss::TickStrike(this, Attack, DeltaSeconds) || FWROceanBoss::TickStrike(this, Attack, DeltaSeconds))
+	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds) || FWRForestBoss::TickStrike(this, Attack, DeltaSeconds) || FWRGraveBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSkyBoss::TickStrike(this, Attack, DeltaSeconds) || FWRCrystalBoss::TickStrike(this, Attack, DeltaSeconds) || FWRFungalBoss::TickStrike(this, Attack, DeltaSeconds) || FWROceanBoss::TickStrike(this, Attack, DeltaSeconds) || FWRDesertBoss::TickStrike(this, Attack, DeltaSeconds))
 	{
 		return;
 	}
@@ -751,6 +754,7 @@ void AWRBoss::EndStrike()
 	FWRSkyBoss::EndStrike(this, Attack);
 	FWRCrystalBoss::EndStrike(this, Attack);
 	FWROceanBoss::EndStrike(this, Attack);
+	FWRDesertBoss::EndStrike(this, Attack);   // the Desert: Ssarrok, the Mirage Matriarch, the Glass Empress, Ahrumet
 	FWRFungalBoss::EndStrike(this, Attack);
 	if (!bThrown)
 	{
@@ -966,7 +970,7 @@ void AWRBoss::SpawnRunbackStone()
 {
 	// A shrine-stone 40-60 m out from the arena toward the way in (the island's middle, where the passes are), on
 	// ground about level with the arena floor and clear of rock: the run back is the way you came.
-	if (FWRStormBoss::PlaceRunback(this) || FWRSwampBoss::PlaceRunback(this) || FWRForestBoss::PlaceRunback(this) || FWRGraveBoss::PlaceRunback(this) || FWRSkyBoss::PlaceRunback(this) || FWRCrystalBoss::PlaceRunback(this) || FWRFungalBoss::PlaceRunback(this) || FWROceanBoss::PlaceRunback(this))
+	if (FWRStormBoss::PlaceRunback(this) || FWRSwampBoss::PlaceRunback(this) || FWRForestBoss::PlaceRunback(this) || FWRGraveBoss::PlaceRunback(this) || FWRSkyBoss::PlaceRunback(this) || FWRCrystalBoss::PlaceRunback(this) || FWRFungalBoss::PlaceRunback(this) || FWROceanBoss::PlaceRunback(this) || FWRDesertBoss::PlaceRunback(this))
 	{
 		return;   // the Storm peaks arenas' stones stand where the land says (storm_peaks.json arenas)
 	}

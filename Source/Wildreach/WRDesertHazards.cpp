@@ -508,7 +508,8 @@ void UWRDesertHazards::StepBody(AWRCharacterBase* C, FTrack& W, double T, float 
 	if (bEased != W.bEased) { W.bEased = bEased; DzTag(C, WRDesertTags::Eased, bEased); }
 
 	// --- Quicksand.
-	const int32 Q = bIn && !bMounted && !bWalker ? WRDesert::QuicksandAt(Feet) : INDEX_NONE;
+	int32 Q = bIn && !bMounted && !bWalker ? WRDesert::QuicksandAt(Feet) : INDEX_NONE;
+	if (Q == INDEX_NONE && bIn && !bMounted && !bWalker) for (const FWet& F : Funnels) if (FVector::Dist2D(F.At, Feet) < F.R) Q = 10000;
 	auto FreeQuick = [&](const TCHAR* Line)
 	{
 		W.QuickPhase = 0;

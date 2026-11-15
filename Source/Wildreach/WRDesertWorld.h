@@ -67,6 +67,8 @@ public:
 	UPROPERTY(Replicated) TArray<float> BrineBrokenUntil;
 	/** Bodies sunk into the ground (WRDesertHazards). */
 	UPROPERTY(Replicated) TArray<FWRDesertSinker> Sinkers;
+	/** Ahrumet has torn the gnomon out of the dial (phase 2 until the fight resets): the plaza's gnomon hides. */
+	UPROPERTY(Replicated) bool bGnomonUprooted = false;
 
 	/** Server: the gallery's beam reaches the vault's lock (every mirror on its right step). */
 	bool GalleryAligned() const;
@@ -103,6 +105,9 @@ public:
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> VaultDoor;
 	/** The Seventh Vault's door (open only in the Long Noon). */
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> SeventhDoor;
+	/** The plaza's gnomon (torn up by Ahrumet in phase 2: hidden while the state says so). */
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> GnomonPart;
+	UPROPERTY(Transient) TObjectPtr<UPrimitiveComponent> GnomonBox;
 	FVector VaultDoorBase = FVector::ZeroVector, SeventhDoorBase = FVector::ZeroVector;
 	bool bDoorBases = false;
 	float SeventhOpen = 0.f;

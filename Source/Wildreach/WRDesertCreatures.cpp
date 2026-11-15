@@ -188,12 +188,15 @@ void UWRDesertBody::BuildLook()
 	if (C->CreatureId == TEXT("glass_empress")) Scale = 4.f;
 	else if (C->CreatureId == TEXT("mirage_matriarch")) Scale = 2.f;
 	else if (C->CreatureId == TEXT("ssarrok")) Scale = 3.7f;
+	else if (C->CreatureId == TEXT("matriarch_mirage")) Scale = 2.f;
 	Beast = NewObject<UWRDesertBeast>(C, TEXT("DesertBeast"));
 	Beast->SetupAttachment(C->GetRootComponent());
 	Beast->RegisterComponent();
 	// The body stands on its feet at the capsule's bottom.
 	Beast->SetRelativeLocation(FVector(0.f, 0.f, -C->GetSimpleCollisionHalfHeight()));
 	Beast->Init(C, Def->ProcBody, Scale, Seed);
+	// The Matriarch's mirages cast no shadow: only the real one does (cook 2.13.2).
+	if (C->CreatureId == TEXT("matriarch_mirage")) Beast->SetCastShadow(false);
 	for (UActorComponent* Comp : C->GetComponents())
 	{
 		UStaticMeshComponent* SM = Cast<UStaticMeshComponent>(Comp);
@@ -239,7 +242,8 @@ void FWRDesertAI::TickBody(AWRCreature* Self, UWRDesertBody* Body, float DeltaTi
 	const double T = DcNow(Self);
 	// The grip (the Glasstail's pincer grab): held 1.5 s at the pincers, then the sting (x2, blind 40), unless an ally's
 	// blows on it freed you first.
-	if (AWRCharacterBase* V = Body->HeldBody.Get())
+	// (A boss's holds are its own: WRDesertBosses.)
+	if (AWRCharacterBase* V = Self->GetDef() && Self->GetDef()->Tier == TEXT("boss") ? nullptr : Body->HeldBody.Get())
 	{
 		if (!Self->IsAlive() || !V->IsAlive() || Body->FreeDamage >= DcTn(TEXT("glasstail.gripFree"), 60.f))
 		{

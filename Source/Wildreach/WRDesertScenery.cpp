@@ -160,19 +160,23 @@ namespace WRDesertParts
 		for (float Y = -400.f; Y > Throne + 200.f; Y -= 200.f) B.K.Add(DsBronzeDull(), FVector(70.f, 6.f, 5.f), FVector(0, Y, G + 3.f));
 		// The gnomon: 3 m square at the foot tapering to 1.8 m at 27 m, the sighting hole (a bronze-lined frame) from 25.8 to
 		// 27.0 m, a bronze-capped pyramidion to 30 m. Courses of black basalt with fine joints.
+		// (The gnomon is its own part: Ahrumet tears it out of the dial at half health, and it goes with him.)
+		TArray<FWRLookBlock> GBl;
+		FKit GK(FTransform::Identity, GBl);
 		const float H = 3000.f, HoleZ0 = 2580.f, HoleZ1 = 2700.f;
 		for (int32 c = 0; c < 26; ++c)
 		{
 			const float Z0 = c * 100.f;
 			const float W0 = FMath::Lerp(300.f, 180.f, Z0 / 2700.f);
-			B.K.Add(DsBasalt(0.92f + 0.12f * B.Rand(c)), FVector(W0, W0, 97.f), FVector(0, 0, G + Z0 + 50.f));
+			GK.Add(DsBasalt(0.92f + 0.12f * B.Rand(c)), FVector(W0, W0, 97.f), FVector(0, 0, G + Z0 + 50.f));
 		}
 		const float WH = 182.f;
-		for (int32 s = -1; s <= 1; s += 2) B.K.Add(DsBasalt(1.f), FVector(WH, 40.f, HoleZ1 - HoleZ0), FVector(0, s * (WH * 0.5f - 20.f), G + (HoleZ0 + HoleZ1) * 0.5f));
-		B.K.Ring(DsBronze(), FVector(0, 0, G + (HoleZ0 + HoleZ1) * 0.5f), 60.f, WH * 0.5f, 10.f, 14, 0.f, 360.f, 1.f);
-		B.K.Add(DsBasalt(1.f), FVector(WH, WH, 60.f), FVector(0, 0, G + HoleZ1 + 30.f));
-		B.K.Add(DsGold(), FVector(WH, WH, H - HoleZ1 - 60.f), FVector(0, 0, G + HoleZ1 + 60.f + (H - HoleZ1 - 60.f) * 0.5f), FRotator::ZeroRotator, EWRLookMesh::Cone);
-		B.Box(FVector(0, 0, G + H * 0.5f), FVector(140.f, 140.f, H * 0.5f));
+		for (int32 s = -1; s <= 1; s += 2) GK.Add(DsBasalt(1.f), FVector(WH, 40.f, HoleZ1 - HoleZ0), FVector(0, s * (WH * 0.5f - 20.f), G + (HoleZ0 + HoleZ1) * 0.5f));
+		GK.Ring(DsBronze(), FVector(0, 0, G + (HoleZ0 + HoleZ1) * 0.5f), 60.f, WH * 0.5f, 10.f, 14, 0.f, 360.f, 1.f);
+		GK.Add(DsBasalt(1.f), FVector(WH, WH, 60.f), FVector(0, 0, G + HoleZ1 + 30.f));
+		GK.Add(DsGold(), FVector(WH, WH, H - HoleZ1 - 60.f), FVector(0, 0, G + HoleZ1 + 60.f + (H - HoleZ1 - 60.f) * 0.5f), FRotator::ZeroRotator, EWRLookMesh::Cone);
+		C.A->GnomonPart = DsPart(B, FVector::ZeroVector, FRotator::ZeroRotator, GBl);
+		C.A->GnomonBox = B.Box(FVector(0, 0, G + H * 0.5f), FVector(140.f, 140.f, H * 0.5f));
 		// The throne on the north edge, facing the gnomon: a block seat 8 m wide, its back 12 m, lion-paw feet, the sun
 		// ring's socket behind.
 		const FVector T(0, Throne, B.G(0, Throne, G));

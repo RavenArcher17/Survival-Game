@@ -127,6 +127,8 @@ public:
 	TMap<TWeakObjectPtr<const AActor>, float> ShownSink;
 	struct FWet { FVector At; float R; double Until; };
 	TArray<FWet> WetSand;
+	/** Quicksand funnels made in a fight (Ahrumet's collapsed dial centre): extra pockets until the arena resets. */
+	TArray<FWet> Funnels;
 
 private:
 	void StepServer(float Dt);

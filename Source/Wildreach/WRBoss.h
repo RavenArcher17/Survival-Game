@@ -194,6 +194,7 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	friend struct FWRFungalBoss;
 	// The Ocean's (WROceanBosses: Old Barnacle, the Siren Eel, the Reef Tyrant, Thalassor).
 	friend struct FWROceanBoss;
+	friend struct FWRDesertBoss;   // the Desert's bosses (WRDesertBosses: Ssarrok, the Mirage Matriarch, the Glass Empress, Ahrumet)
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);
