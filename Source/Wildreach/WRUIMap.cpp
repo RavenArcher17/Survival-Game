@@ -10,6 +10,8 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
+#include "Engine/Texture2D.h"
+#include "WRMapReveal.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -241,6 +243,72 @@ namespace WRMapTab
 		TAttribute<FLinearColor> Color;
 	};
 
+	// ---------------------------------------------------------------- the fill-in map's fog (cookpass-ui 3.9)
+	/** A texture over the map picture: parchment-dark where you haven't been, clear where you have, each texel two
+	 *  cells across with a share of alpha for each cell seen, so the bilinear filter feathers the edge. */
+	struct FRevealFog
+	{
+		// Rooted while the game runs (a function-static strong pointer would be torn down after the GC at exit).
+		TWeakObjectPtr<UTexture2D> Tex;
+		FSlateBrush Brush;
+		int32 Version = -1;
+		int32 Width = 0;
+		double BuiltAt = -100.0;
+		TWeakObjectPtr<const UWRMapRevealComponent> For;
+	};
+	FRevealFog& RevealFog() { static FRevealFog F; return F; }
+
+	const FSlateBrush* FogBrush(const UWRMapRevealComponent* Reveal, float& OutCoverCm)
+	{
+		FRevealFog& F = RevealFog();
+		if (!Reveal || Reveal->Cells() <= 0) return nullptr;
+		const int32 W = FMath::DivideAndRoundUp(Reveal->Cells(), 2);
+		OutCoverCm = W * 2.f * WRTune(TEXT("ui.reveal.cellCm"), 800.f);
+		const double Now = FPlatformTime::Seconds();
+		const bool bNew = !F.Tex.IsValid() || F.Width != W || F.For.Get() != Reveal;
+		// Rebuilt when what's seen changed, at most once a second (a walk marks new cells every second).
+		if (bNew || (F.Version != Reveal->GetVersion() && Now - F.BuiltAt > WRTune(TEXT("ui.reveal.redrawSeconds"), 1.f)))
+		{
+			if (bNew)
+			{
+				if (UTexture2D* Old = F.Tex.Get()) Old->RemoveFromRoot();
+				UTexture2D* NewTex = UTexture2D::CreateTransient(W, W, PF_B8G8R8A8);
+				if (!NewTex) return nullptr;
+				NewTex->AddToRoot();
+				F.Tex = NewTex;
+				F.Tex->Filter = TF_Bilinear;
+				F.Tex->SRGB = true;
+				F.Tex->AddressX = TA_Clamp;
+				F.Tex->AddressY = TA_Clamp;
+				F.Tex->UpdateResource();
+				F.Width = W;
+				F.For = Reveal;
+				F.Brush = FSlateBrush();
+				F.Brush.SetResourceObject(F.Tex.Get());
+				F.Brush.ImageSize = FVector2D(W, W);
+				F.Brush.DrawAs = ESlateBrushDrawType::Image;
+			}
+			const FColor Ink = FColor::FromHex(FWRTuning::Get().Str(TEXT("ui.reveal.fogColor"), TEXT("2A241C")));
+			const float MaxA = FMath::Clamp(WRTune(TEXT("ui.reveal.fogAlpha"), 0.86f), 0.f, 1.f) * 255.f;
+			uint8* Data = new uint8[W * W * 4];
+			for (int32 Y = 0; Y < W; ++Y)
+			{
+				for (int32 X = 0; X < W; ++X)
+				{
+					const int32 Seen = int32(Reveal->Cell(2 * X, 2 * Y)) + int32(Reveal->Cell(2 * X + 1, 2 * Y)) + int32(Reveal->Cell(2 * X, 2 * Y + 1)) + int32(Reveal->Cell(2 * X + 1, 2 * Y + 1));
+					uint8* P = Data + (Y * W + X) * 4;
+					P[0] = Ink.B; P[1] = Ink.G; P[2] = Ink.R;
+					P[3] = uint8(MaxA * (4 - Seen) / 4.f);
+				}
+			}
+			FUpdateTextureRegion2D* Region = new FUpdateTextureRegion2D(0, 0, 0, 0, W, W);
+			F.Tex->UpdateTextureRegions(0, 1, Region, W * 4, 4, Data, [](uint8* SrcData, const FUpdateTextureRegion2D* Regions) { delete[] SrcData; delete Regions; });
+			F.Version = Reveal->GetVersion();
+			F.BuiltAt = Now;
+		}
+		return &F.Brush;
+	}
+
 	/** The waypoint (WRUIMap::GetWaypoint): where, and the world it belongs to. */
 	struct FWaypoint { TWeakObjectPtr<const UWorld> World; FVector Where = FVector::ZeroVector; bool bSet = false; };
 	FWaypoint& Waypoint() { static FWaypoint W; return W; }
@@ -274,8 +342,13 @@ namespace WRMapTab
 	TArray<FMarker> Gather(const AWRPlayerController* PC)
 	{
 		TArray<FMarker> Out;
+		// The fill-in map: camps, caves, passes, mini-bosses and villages show once you've seen where they are; the major
+		// bosses always (their volcano, glacier or spire is seen from afar: the landmarks you steer by).
+		const UWRMapRevealComponent* Reveal = PC ? UWRMapRevealComponent::For(PC->PlayerState) : nullptr;
+		const auto WasSeen = [Reveal](const FVector& At) { return !Reveal || Reveal->IsRevealed(FVector2D(At)); };
 		for (const FWRPoi& P : FWRPoi::All)
 		{
+			if (P.Kind != TEXT("boss") && !WasSeen(P.Location)) continue;
 			FMarker& M = Out.AddDefaulted_GetRef();
 			M.Key = TEXT("poi:") + P.Name;
 			M.Name = P.Name;
@@ -290,6 +363,7 @@ namespace WRMapTab
 		// Villages, and the shrines you or your clan have found (lit: warm; dark or held: cold) (WRWorldSystems).
 		for (TActorIterator<AWRVillage> It(World); It; ++It)
 		{
+			if (!WasSeen(It->GetActorLocation())) continue;
 			FMarker& M = Out.AddDefaulted_GetRef();
 			M.Key = TEXT("village:") + It->VillageId.ToString();
 			M.Cat = ECat::Shrine;
@@ -687,6 +761,13 @@ namespace WRMapTab
 			if (const FSlateBrush* Map = WRUI::Image(TEXT("map")))
 			{
 				FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(Img, Img), FSlateLayoutTransform(ImgPos)), Map);
+			}
+			// The fill-in map: where you haven't been lies under the fog (the coast and mountains faintly through).
+			float CoverCm = MapSize;
+			if (const FSlateBrush* Fog = PC.IsValid() ? FogBrush(UWRMapRevealComponent::For(PC->PlayerState), CoverCm) : nullptr)
+			{
+				const float FogPx = Img * CoverCm / MapSize;
+				FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(FogPx, FogPx), FSlateLayoutTransform(ImgPos)), Fog);
 			}
 			// A 500 m grid over everything.
 			const float Step = 50000.f;

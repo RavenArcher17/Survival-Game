@@ -1017,7 +1017,6 @@ private:
 		SCompoundWidget::Tick(Geo, Time, Delta);
 		UpdateCrosshair();
 		TickHudMode(Delta);
-		if (FWRPlayerUI* X = UI()) X->TickTracked();
 		if (NoticeBox.IsValid())
 		{
 			float A = 0.f;

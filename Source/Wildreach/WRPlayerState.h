@@ -85,6 +85,8 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRFoodComponent> Food;
 	/** Quests, found shrines, faction standing (WRWorldSystems.h). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRQuestLog> QuestLog;
+	/** The fill-in map: what this player has seen (WRMapReveal; saved with them, sent to their client). */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRMapRevealComponent> MapReveal;
 	/** Artifacts: three hooks, the pouch, geis records, the band (WRArtifacts). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRArtifactComponent> Artifacts;
 	/** The endgame's deeds: prestige marks, souls forged, achievements, titles, cosmetics (WRDeeds). */

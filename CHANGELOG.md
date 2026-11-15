@@ -110,6 +110,37 @@ and the testers test, F8).
     "have / need" from your bag, green once there's enough. It clears itself (with a line) once the item lands in
     your bag, and goes with a recipe that leaves the data. Never fades (you asked for it); not in build mode or under
     a screen. This PC's own (`[Wildreach.UI] Tracked`).
+- **UI (9): the fill-in map.** Why: RAVEN-PLANNED ("a map you complete by exploring", DD World; ui-controls 2.12), and
+  the world-map lane asked for the reveal grid at 8 m cells over the whole map (LATER-COOKS).
+  - New `UWRMapRevealComponent` (`WRMapReveal.cpp`) on every PlayerState: a grid of 8 m cells over the map picture
+    (`ui.mapMin / mapSize`, so it grows with the continent; 1,466 x 1,466 on today's map), kept by the server. Every
+    second the cells within 150 m of your body are seen (walking, riding, swimming, gliding); a shrine you find inks
+    600 m around it (the map-fragment idea, tied to the built shrines). Changed 64 x 64 tiles (512 bytes) go to your
+    client 4 a frame; a client asks for all of its tiles once when it joins. Saved with the player (`mapReveal`: the
+    seen tiles zlib-packed, base64); a grid saved for another map size starts fresh.
+  - The journal map draws unseen land under a parchment fog (`#2A241C` at 86%: the coast and mountains show faintly
+    through), feathered at the edge (two cells a texel, bilinear), redrawn at most once a second while it changes.
+    Camps, caves, passes, mini-bosses and villages show once you've seen their spot; major bosses always (their
+    volcano, glacier or spire is seen from afar). Your Hearths, claims, beds, tames and pins show as before.
+  - Numbers in tuning `ui.reveal`. **Players who already played start with a blank map** around where they stand
+    (nothing was recorded before this).
+- **UI (10): the set-complete moment.** Why: putting on the last piece of a biome set did nothing you could see or hear
+  (LATER-COOKS, build-crafting).
+  - The frame a worn set reaches its last bonus (gear.json sets: the 4-piece), a chime (new sounds.json row
+    `gear.setComplete`: the unlock and discovery chimes pitched down to a fuller ring), the centre line "<Set>
+    complete: <its bonus>", and that set's pieces on the inventory doll flash brass for 1.6 s (tuning
+    `ui.setComplete`). Client-side from the replicated equipment (`FWRPlayerUI::TickSetComplete`); joining in full
+    armour is no moment. The tracked recipe's check moved to the same per-frame tick.
+- **UI (11): the Necromancy path's node glyphs.** Why: the Paths screen showed the Necromancy tree's 22 nodes without
+  icons (LATER-COOKS, build-biome-graveyard).
+  - 22 duo glyphs drawn in `Tools/ui_glyphs.mjs` like every path's (`node Tools/ui_glyphs.mjs path_<id> ...` renders
+    only the ones named): a skull is the path's mark with its eyes the accent, souls are wisps (a drop with two eyes),
+    the Reaper branch draws the scythe, the Lich the crown; capacity / chance / ability shapes follow the other
+    paths' (the flask, the four-point star, the sword, the burst). 44 PNGs, 45 KB (Git LFS).
+- **UI (12): read-through fixes.** The map's fog texture is rooted for the run instead of held by a function-static
+  strong pointer (that one would have been released after the garbage collector at quit: a crash on exit). The crash
+  check runs on whichever asks first, the log's install or the main menu's card, so the card can't miss a crash when
+  the menu opens before the player's UI.
 
 ## Unreleased: the Desert / Sun & sand
 

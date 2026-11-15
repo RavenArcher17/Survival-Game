@@ -150,8 +150,18 @@ public:
 	 */
 	void SetTrackedRecipe(FName RecipeId);
 	FName GetTrackedRecipe() const { return TrackedRecipe; }
-	/** Each frame from the HUD: clears the tracking once the output arrived in the bag. */
+	/** Each frame (FWRPlayerUI::Tick): clears the tracking once the output arrived in the bag. */
 	void TickTracked();
+
+	/**
+	 * The set-complete moment (cookpass-ui, LATER-COOKS build-crafting): the frame a worn set reaches its last bonus
+	 * (gear.json sets: the 4-piece), a chime (sounds.json gear.setComplete), a line naming the set and its bonus, and
+	 * the doll's pieces of that set flashing brass for ui.setComplete.glowSeconds. Client-side, from the replicated
+	 * equipment.
+	 */
+	void TickSetComplete();
+	/** The set that just completed and since when (the inventory's doll glows its pieces). */
+	FName GetSetCompleteId(double& OutSince) const { OutSince = SetCompleteAt; return SetCompleteId; }
 	bool IsItemWheelOpen() const { return bItemWheel; }
 	int32 GetItemHover() const { return ItemHover; }
 	/** Menu on the pad: the journal at the page last used. */
@@ -212,6 +222,10 @@ private:
 	int32 WheelPicked[2] = { 0, 0 };
 	bool bWheelsLoaded = false;
 	int32 OpenWheel = -1;
+	TMap<FName, int32> LastSetPieces;   // worn pieces of each set, last frame
+	bool bSetsSeeded = false;           // the first read only learns what's worn (joining in full armour is no moment)
+	FName SetCompleteId;
+	double SetCompleteAt = -100.0;
 	FName TrackedRecipe;
 	int32 TrackedOutBaseline = -1;   // the output's count in the bag when tracking began (-1: not read yet)
 	bool bTrackedLoaded = false;
