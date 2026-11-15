@@ -38,6 +38,18 @@ namespace WRUIMap
 	WILDREACH_API void ClearWaypoint();
 
 	/**
+	 * Your map pins (cookpass-ui 3.6): up to ui.pins.max marks with a glyph (0 camp, 1 ore, 2 danger, 3 creature, 4 loot,
+	 * 5 flag) and a label, placed with a right-click (X on a pad) on the journal map; this PC's own, kept per world in
+	 * Saved/Wildreach/Pins/<world>.json (the host's world id, or the address joined). The compass shows those near.
+	 */
+	struct FPin { FVector2D Where = FVector2D::ZeroVector; uint8 Glyph = 5; FString Label; };
+	WILDREACH_API const TArray<FPin>& GetPins(const UWorld* World);
+	/** A pin glyph drawn in code (line strokes) centred at Centre, Size across. */
+	WILDREACH_API void DrawPinGlyph(class FSlateWindowElementList& Out, int32 Layer, const struct FGeometry& Geo, const FVector2D& Centre, float Size, uint8 Glyph, const FLinearColor& Color);
+	/** "Camp", "Ore"... (a pin with no label shows its glyph's name). */
+	WILDREACH_API FString PinGlyphName(uint8 Glyph);
+
+	/**
 	 * A vision on the map (the Hollow Root's Thrumming Root: the four heart-trees, cooks/biome-forest.md 2.5): these
 	 * places flash on this client's journal map for Seconds, pulsing green, and the map centres on them. Client only.
 	 */

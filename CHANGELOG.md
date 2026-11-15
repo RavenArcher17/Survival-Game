@@ -86,6 +86,15 @@ and the testers test, F8).
     body too). Done (or Change again) goes back to the island view. Tuning `flow.lookCamera`.
   - Picks are saved to `[Wildreach.Menu] Look` and travel with Host and Join (`?Look=<face>.<build>[.h]`); switching
     the body keeps the face inside its list. The settings' Show my helmet and this panel are the same value.
+- **UI (6): map pins.** Why: the map held one waypoint; players mark ore, dens, loot and camps (Valheim's pins).
+  - Right-click on the journal map (X on a pad) opens a small card beside the spot: a name (24 letters, optional; the
+    pad keyboard on a pad), the six marks (Camp, Ore, Danger, Creature, Loot, Flag, drawn in code), Waypoint here,
+    Cancel. Picking a mark pins the spot. On a pin the card renames it, changes its mark (Save), removes it, or sets
+    the waypoint there. Right-click on your waypoint still clears it. B or Esc closes the card.
+  - Pins draw as brass-rimmed badges with their mark, the name under them once zoomed in (or hovered); the compass
+    shows pins within 400 m as small badges, with the name and distance when you face one.
+  - Up to 30 a world (tuning `ui.pins`), this PC's own, saved in `Saved/Wildreach/Pins/<world>.json` (the host's world
+    id, or the address a client joined), so each world keeps its own.
 
 ## Unreleased: the Desert / Sun & sand
 

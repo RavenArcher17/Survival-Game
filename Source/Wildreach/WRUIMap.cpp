@@ -10,6 +10,19 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
+#include "Styling/CoreStyle.h"
+#include "Widgets/Layout/SWidgetSwitcher.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonWriter.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
+#include "WRSound.h"
+#include "WRPadInput.h"
+#include "WRWorlds.h"
 #include "GameFramework/GameStateBase.h"
 #include "WRTuning.h"
 #include "WRFarm.h"
@@ -137,6 +150,96 @@ namespace WRMapTab
 	/** A vision's places flashing on the map until a real time (WRUIMap::Flash: the Thrumming Root). */
 	struct FMapFlash { TArray<FVector> Where; FString Name; double From = 0.0, Until = 0.0; };
 	FMapFlash& MapFlash() { static FMapFlash F; return F; }
+
+	// ---------------------------------------------------------------- pins (cookpass-ui 3.6)
+	/** The pins of one world, loaded from its file the first time that world asks. */
+	struct FPinStore { FString Key; TArray<WRUIMap::FPin> Pins; };
+	FPinStore& PinStore() { static FPinStore P; return P; }
+
+	/** Which world's pins: the host's world id, or for a client the address it joined (each friend's world its own). */
+	FString PinKey(const UWorld* World)
+	{
+		FString Key = World && World->GetNetMode() == NM_Client ? FString::Printf(TEXT("join_%s_%d"), *World->URL.Host, World->URL.Port) : FString(TEXT("world_")) + WRWorlds::Current();
+		for (TCHAR& C : Key) if (!FChar::IsAlnum(C) && C != TEXT('_') && C != TEXT('-')) C = TEXT('_');
+		return Key;
+	}
+	FString PinFile(const FString& Key) { return FPaths::ProjectSavedDir() / TEXT("Wildreach") / TEXT("Pins") / (Key + TEXT(".json")); }
+
+	TArray<WRUIMap::FPin>& PinsFor(const UWorld* World)
+	{
+		FPinStore& P = PinStore();
+		const FString Key = PinKey(World);
+		if (P.Key == Key) return P.Pins;
+		P.Key = Key;
+		P.Pins.Reset();
+		FString Json;
+		TSharedPtr<FJsonObject> Root;
+		if (FFileHelper::LoadFileToString(Json, *PinFile(Key)) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) && Root.IsValid())
+		{
+			const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+			if (Root->TryGetArrayField(TEXT("pins"), List))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *List)
+				{
+					const TSharedPtr<FJsonObject> O = V.IsValid() ? V->AsObject() : nullptr;
+					if (!O.IsValid()) continue;
+					WRUIMap::FPin& Pin = P.Pins.AddDefaulted_GetRef();
+					Pin.Where = FVector2D(O->GetNumberField(TEXT("x")), O->GetNumberField(TEXT("y")));
+					Pin.Glyph = uint8(FMath::Clamp(static_cast<int32>(O->GetNumberField(TEXT("glyph"))), 0, 5));
+					O->TryGetStringField(TEXT("label"), Pin.Label);
+				}
+			}
+		}
+		return P.Pins;
+	}
+
+	void SavePins()
+	{
+		const FPinStore& P = PinStore();
+		if (P.Key.IsEmpty()) return;
+		TArray<TSharedPtr<FJsonValue>> List;
+		for (const WRUIMap::FPin& Pin : P.Pins)
+		{
+			TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+			O->SetNumberField(TEXT("x"), FMath::RoundToDouble(Pin.Where.X));
+			O->SetNumberField(TEXT("y"), FMath::RoundToDouble(Pin.Where.Y));
+			O->SetNumberField(TEXT("glyph"), Pin.Glyph);
+			O->SetStringField(TEXT("label"), Pin.Label);
+			List.Add(MakeShared<FJsonValueObject>(O));
+		}
+		TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+		Root->SetArrayField(TEXT("pins"), List);
+		FString Out;
+		FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Out));
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(PinFile(P.Key)), true);
+		FFileHelper::SaveStringToFile(Out, *PinFile(P.Key), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+
+	/** The pin card over the map: where it was asked (the view's local point), and for which pin (-1: a new one). */
+	struct FPinCard { bool bOpen = false; int32 Index = -1; FVector2D World = FVector2D::ZeroVector; FVector2D Local = FVector2D::ZeroVector; uint8 Glyph = 5; };
+	FPinCard& PinCard() { static FPinCard C; return C; }
+
+	/** A glyph as a widget (the card's buttons). */
+	class SWRPinGlyphIcon : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRPinGlyphIcon) : _Glyph(5), _Size(22.f) {}
+			SLATE_ARGUMENT(uint8, Glyph)
+			SLATE_ARGUMENT(float, Size)
+			SLATE_ATTRIBUTE(FLinearColor, Color)
+		SLATE_END_ARGS()
+		void Construct(const FArguments& InArgs) { Glyph = InArgs._Glyph; Size = InArgs._Size; Color = InArgs._Color; }
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(Size, Size); }
+		virtual int32 OnPaint(const FPaintArgs&, const FGeometry& Geo, const FSlateRect&, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle&, bool) const override
+		{
+			WRUIMap::DrawPinGlyph(Out, Layer, Geo, Geo.GetLocalSize() * 0.5f, FMath::Min(Geo.GetLocalSize().X, Geo.GetLocalSize().Y), Glyph, Color.Get());
+			return Layer + 1;
+		}
+	private:
+		uint8 Glyph = 5;
+		float Size = 22.f;
+		TAttribute<FLinearColor> Color;
+	};
 
 	/** The waypoint (WRUIMap::GetWaypoint): where, and the world it belongs to. */
 	struct FWaypoint { TWeakObjectPtr<const UWorld> World; FVector Where = FVector::ZeroVector; bool bSet = false; };
@@ -446,8 +549,30 @@ namespace WRMapTab
 			{
 				const FVector2D L = Geo.AbsoluteToLocal(Event.GetScreenSpacePosition());
 				FVector Have;
-				if (WRUIMap::GetWaypoint(PC->GetWorld(), Have) && FVector2D::Distance(ToLocal(Have, Geo.GetLocalSize()), L) < 16.f * U) WRUIMap::ClearWaypoint();
-				else { const FVector2D W = ToWorld(L, Geo.GetLocalSize()); WRUIMap::SetWaypoint(PC->GetWorld(), FVector(W.X, W.Y, 0.f)); }
+				// On your waypoint: off. On a pin: its card. Anywhere else: the card to pin it or set the waypoint there.
+				if (WRUIMap::GetWaypoint(PC->GetWorld(), Have) && FVector2D::Distance(ToLocal(Have, Geo.GetLocalSize()), L) < 16.f * U)
+				{
+					WRUIMap::ClearWaypoint();
+					PinCard().bOpen = false;
+					return FReply::Handled();
+				}
+				FPinCard& Card = PinCard();
+				Card = FPinCard();
+				Card.bOpen = true;
+				Card.Local = L;
+				Card.World = ToWorld(L, Geo.GetLocalSize());
+				const TArray<WRUIMap::FPin>& Pins = PinsFor(PC->GetWorld());
+				for (int32 i = 0; i < Pins.Num(); ++i)
+				{
+					if (FVector2D::Distance(ToLocal(FVector(Pins[i].Where, 0.f), Geo.GetLocalSize()), L) < 14.f * U)
+					{
+						Card.Index = i;
+						Card.World = Pins[i].Where;
+						Card.Glyph = Pins[i].Glyph;
+						break;
+					}
+				}
+				WRSound::PlayUI(nullptr, TEXT("ui.click"));
 				return FReply::Handled();
 			}
 			if (Event.GetEffectingButton() != EKeys::LeftMouseButton) return FReply::Unhandled();
@@ -707,6 +832,30 @@ namespace WRMapTab
 					Text(L + 5, T, F, Pos, TextC, true);
 				}
 			}
+			// Your pins: a dark brass-rimmed badge with its glyph; the label under it once zoomed in (or hovered).
+			if (!MarkersFn && PC.IsValid())
+			{
+				const TArray<WRUIMap::FPin>& Pins = PinsFor(PC->GetWorld());
+				for (int32 i = 0; i < Pins.Num(); ++i)
+				{
+					const FVector2D C = ToLocal(FVector(Pins[i].Where, 0.f), Size);
+					if (C.X < -30.f || C.Y < -30.f || C.X > Size.X + 30.f || C.Y > Size.Y + 30.f) continue;
+					const float D = 22.f * U;
+					const bool bHot = FVector2D::Distance(C, MouseLocal) < 14.f * U || (PinCard().bOpen && PinCard().Index == i);
+					Box(L + 5, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor::Black, D * 0.5f + 1.f));
+					Box(L + 5, C - FVector2D(D * 0.5f), FVector2D(D), WRUI::Box(FLinearColor(0.07f, 0.045f, 0.012f, 0.95f), D * 0.5f, bHot ? Hex(TEXT("F0D49B")) : WRUI::Brass2, bHot ? 2.f : 1.5f));
+					WRUIMap::DrawPinGlyph(Out, L + 6, Geo, C, D * 0.62f, Pins[i].Glyph, Hex(TEXT("F0D49B")));
+					if (S.Zoom >= 2.f || bHot)
+					{
+						const FSlateFontInfo F = WRUI::Body(11, 700);
+						const FText T = FText::FromString(Pins[i].Label.IsEmpty() ? WRUIMap::PinGlyphName(Pins[i].Glyph) : Pins[i].Label);
+						const FVector2D TS = Measure(T, F);
+						const FVector2D Pos = C + FVector2D(-TS.X * 0.5f, D * 0.5f + 2.f);
+						Box(L + 6, Pos - FVector2D(5.f, 1.f), TS + FVector2D(10.f, 2.f), WRUI::Box(FLinearColor(0.03f, 0.035f, 0.03f, 0.7f), 3.f));
+						Text(L + 6, T, F, Pos, Hex(TEXT("F0D49B")), true);
+					}
+				}
+			}
 			// Your waypoint: a brass pin and how far it is.
 			FVector Way;
 			if (!MarkersFn && PC.IsValid() && WRUIMap::GetWaypoint(PC->GetWorld(), Way))
@@ -859,9 +1008,182 @@ namespace WRMapTab
 			SLATE_ARGUMENT(TWeakObjectPtr<AWRPlayerController>, PC)
 		SLATE_END_ARGS()
 
+		virtual ~SWRMapTabWidget() override
+		{
+			WRInput::PopPadHandler(this);
+			PinCard().bOpen = false;
+		}
+
+		/** The pin card: a name, the six marks (a new spot: picking one places it; a pin: picking one changes it),
+		 *  Waypoint here, and for a pin Save / Remove. B or Esc closes it. */
+		TSharedRef<SWidget> PinCardWidget()
+		{
+			TSharedRef<SHorizontalBox> Glyphs = SNew(SHorizontalBox);
+			for (uint8 G = 0; G < 6; ++G)
+			{
+				Glyphs->AddSlot().FillWidth(1.f).Padding(G > 0 ? 3.f * U : 0.f, 0.f, 0.f, 0.f)
+				[
+					SNew(SButton).ButtonStyle(&FCoreStyle::Get().GetWidgetStyle<FButtonStyle>("NoBorder")).ContentPadding(0.f)
+					.ToolTipText(FText::FromString(WRUIMap::PinGlyphName(G)))
+					.IsEnabled_Lambda([this]() { return PinCard().Index >= 0 || CanAddPin(); })
+					.OnClicked_Lambda([this, G]() { PickGlyph(G); return FReply::Handled(); })
+					[
+						SNew(SBox).HeightOverride(40.f * U)
+						[
+							SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center)
+							.BorderImage_Lambda([G]() { const bool bOn = PinCard().Index >= 0 && PinCard().Glyph == G; return WRUI::Box(bOn ? FLinearColor(FColor(0x4D, 0x39, 0x20)) : FLinearColor(0.f, 0.f, 0.f, 0.45f), 4.f, bOn ? WRUI::Brass : WRUI::Brass2, 1.f); })
+							[
+								SNew(SWRPinGlyphIcon).Glyph(G).Size(22.f * U).Color(Hex(TEXT("F0D49B")))
+							]
+						]
+					]
+				];
+			}
+			SAssignNew(PinLabel, SEditableTextBox).Font(WRUI::Body(13, 700))
+				.HintText(LOCTEXT("PinLabelHint", "Name it (optional)"))
+				.OnTextChanged_Lambda([this](const FText& T) { if (T.ToString().Len() > PinLabelMax()) PinLabel->SetText(FText::FromString(T.ToString().Left(PinLabelMax()))); });
+			return SNew(SBox).WidthOverride(320.f * U).Visibility_Lambda([]() { return PinCard().bOpen ? EVisibility::Visible : EVisibility::Collapsed; })
+			[
+				SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).Padding(FMargin(14.f * U, 12.f * U))
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+						{
+							const FPinCard& C = PinCard();
+							if (C.Index < 0) return LOCTEXT("PinNew", "Mark this spot");
+							const TArray<WRUIMap::FPin>& Pins = PinsFor(PC.IsValid() ? PC->GetWorld() : nullptr);
+							return Pins.IsValidIndex(C.Index) ? FText::FromString(Pins[C.Index].Label.IsEmpty() ? WRUIMap::PinGlyphName(Pins[C.Index].Glyph) : Pins[C.Index].Label) : LOCTEXT("PinNew", "Mark this spot");
+						}), WRUI::Title(14), WRUI::Ink, true)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[SNew(SBox).HeightOverride(36.f * U)[PinLabel.ToSharedRef()]]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 4.f * U)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+						{
+							if (PinCard().Index >= 0) return LOCTEXT("PinChange", "Its mark");
+							return CanAddPin() ? LOCTEXT("PinPick", "Pick a mark to pin it") : FText::Format(LOCTEXT("PinFull", "{0} pins already: remove one first"), PinMax());
+						}), WRUI::Caps(11), WRUI::Ink2)
+					]
+					+ SVerticalBox::Slot().AutoHeight()[Glyphs]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 3.f * U, 0.f)
+						[
+							SNew(SWRButton).Ghost(true).FontSize(12).Text(LOCTEXT("PinWaypoint", "Waypoint here"))
+							.OnClicked_Lambda([this]()
+							{
+								if (PC.IsValid()) WRUIMap::SetWaypoint(PC->GetWorld(), FVector(PinCard().World, 0.f));
+								CloseCard();
+								return FReply::Handled();
+							})
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(3.f * U, 0.f, 0.f, 0.f)
+						[
+							SNew(SWidgetSwitcher).WidgetIndex_Lambda([]() { return PinCard().Index >= 0 ? 1 : 0; })
+							+ SWidgetSwitcher::Slot()[SNew(SWRButton).Ghost(true).FontSize(12).Text(LOCTEXT("PinCancel", "Cancel")).OnClicked_Lambda([this]() { CloseCard(); return FReply::Handled(); })]
+							+ SWidgetSwitcher::Slot()[SNew(SWRButton).Ghost(true).FontSize(12).Text(LOCTEXT("PinRemove", "Remove")).OnClicked_Lambda([this]() { RemovePin(); return FReply::Handled(); })]
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+					[
+						SNew(SBox).Visibility_Lambda([]() { return PinCard().Index >= 0 ? EVisibility::Visible : EVisibility::Collapsed; })
+						[
+							SNew(SWRButton).Primary(true).FontSize(12).Text(LOCTEXT("PinSave", "Save")).OnClicked_Lambda([this]() { SaveCard(); return FReply::Handled(); })
+						]
+					]
+				]
+			];
+		}
+
+		static int32 PinMax() { return FMath::Max(1, static_cast<int32>(WRTune(TEXT("ui.pins.max"), 30.f))); }
+		static int32 PinLabelMax() { return FMath::Max(4, static_cast<int32>(WRTune(TEXT("ui.pins.labelMax"), 24.f))); }
+		bool CanAddPin() const { return PC.IsValid() && PinsFor(PC->GetWorld()).Num() < PinMax(); }
+
+		void PickGlyph(uint8 G)
+		{
+			FPinCard& C = PinCard();
+			if (!PC.IsValid()) return;
+			TArray<WRUIMap::FPin>& Pins = PinsFor(PC->GetWorld());
+			if (C.Index >= 0)
+			{
+				C.Glyph = G;   // a pin's mark changes on Save
+				return;
+			}
+			if (Pins.Num() >= PinMax()) return;
+			WRUIMap::FPin& Pin = Pins.AddDefaulted_GetRef();
+			Pin.Where = C.World;
+			Pin.Glyph = G;
+			Pin.Label = PinLabel.IsValid() ? PinLabel->GetText().ToString().TrimStartAndEnd().Left(PinLabelMax()) : FString();
+			SavePins();
+			UE_LOG(LogWildreach, Log, TEXT("PIN added %s at %.0f %.0f"), *WRUIMap::PinGlyphName(G), C.World.X, C.World.Y);
+			CloseCard();
+		}
+		void SaveCard()
+		{
+			FPinCard& C = PinCard();
+			TArray<WRUIMap::FPin>& Pins = PinsFor(PC.IsValid() ? PC->GetWorld() : nullptr);
+			if (Pins.IsValidIndex(C.Index))
+			{
+				Pins[C.Index].Glyph = C.Glyph;
+				Pins[C.Index].Label = PinLabel.IsValid() ? PinLabel->GetText().ToString().TrimStartAndEnd().Left(PinLabelMax()) : Pins[C.Index].Label;
+				SavePins();
+			}
+			CloseCard();
+		}
+		void RemovePin()
+		{
+			FPinCard& C = PinCard();
+			TArray<WRUIMap::FPin>& Pins = PinsFor(PC.IsValid() ? PC->GetWorld() : nullptr);
+			if (Pins.IsValidIndex(C.Index))
+			{
+				Pins.RemoveAt(C.Index);
+				SavePins();
+				UE_LOG(LogWildreach, Log, TEXT("PIN removed"));
+			}
+			CloseCard();
+		}
+		void CloseCard()
+		{
+			PinCard().bOpen = false;
+			if (PinLabel.IsValid()) PinLabel->SetText(FText::GetEmpty());
+			WRSound::PlayUI(nullptr, TEXT("ui.click"));
+		}
+
+		void TickPinCard()
+		{
+			// A card just opened on a pin: its name in the box (once per opening).
+			const FPinCard& C = PinCard();
+			const int32 Opened = C.bOpen ? C.Index + 2 : 0;
+			if (Opened != LastCardFor)
+			{
+				LastCardFor = Opened;
+				const TArray<WRUIMap::FPin>& Pins = PinsFor(PC.IsValid() ? PC->GetWorld() : nullptr);
+				if (PinLabel.IsValid()) PinLabel->SetText(C.bOpen && Pins.IsValidIndex(C.Index) ? FText::FromString(Pins[C.Index].Label) : FText::GetEmpty());
+			}
+		}
+
+		virtual FReply OnKeyDown(const FGeometry& Geo, const FKeyEvent& E) override
+		{
+			if (PinCard().bOpen && E.GetKey() == EKeys::Escape) { CloseCard(); return FReply::Handled(); }
+			return FReply::Unhandled();
+		}
+
+		TSharedPtr<SEditableTextBox> PinLabel;
+		int32 LastCardFor = 0;
+
 		void Construct(const FArguments& InArgs)
 		{
 			PC = InArgs._PC;
+			PinCard().bOpen = false;
+			// On a pad, B closes the pin card (not the whole journal).
+			WRInput::PushPadHandler(this, [this](FName Verb)
+			{
+				if (PinCard().bOpen && Verb == TEXT("MenuBack")) { CloseCard(); return true; }
+				return false;
+			});
 			// Until you pick a marker, the panel shows the major boss nearest you.
 			if (!State().bPicked) State().Selected = NearestBoss();
 
@@ -877,6 +1199,17 @@ namespace WRMapTab
 							SNew(SOverlay)
 							+ SOverlay::Slot()[SAssignNew(View, SWRMapView).PC(PC)]
 							+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(14.f * U)[Compass()]
+							// The pin card, beside where it was asked (kept inside the map).
+							+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top)
+							.Padding(TAttribute<FMargin>::CreateLambda([this]()
+							{
+								const FVector2D Area = View.IsValid() ? View->GetCachedGeometry().GetLocalSize() : FVector2D(862.f, 678.f) * U;
+								const FVector2D At = PinCard().Local + FVector2D(18.f, -20.f) * U;
+								return FMargin(FMath::Clamp(At.X, 6.f, FMath::Max(6.f, Area.X - 326.f * U)), FMath::Clamp(At.Y, 6.f, FMath::Max(6.f, Area.Y - 300.f * U)), 0.f, 0.f);
+							}))
+							[
+								PinCardWidget()
+							]
 							+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(14.f * U)
 							[
 								SNew(SVerticalBox)
@@ -915,6 +1248,7 @@ namespace WRMapTab
 		virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override
 		{
 			SCompoundWidget::Tick(Geo, Time, Delta);
+			TickPinCard();
 			// Look the picked marker up again now and then (tames move, a Hearth gains cores): the panel's distance and
 			// state lines read it live. The panel itself is rebuilt only when it shows something else (another pick, or
 			// the marker came or went). 0.4.1 rebuilt it twice a second, here inside Slate's paint, so each rebuild drew
@@ -1280,11 +1614,76 @@ namespace WRMapTab
 					+ SHorizontalBox::Slot().FillWidth(1.f)
 					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_left"), LOCTEXT("ClickMarker", "Click: details"))]
 					+ SHorizontalBox::Slot().FillWidth(1.f)
-					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_right"), LOCTEXT("RightClickWaypoint", "Right-click: waypoint"))]
+					+ SHorizontalBox::Slot().AutoWidth()[Hint(TEXT("mouse_right"), LOCTEXT("RightClickPin", "Right-click: pin or waypoint"))]
 				];
 		}
 	};
 } // namespace WRMapTab
+
+const TArray<WRUIMap::FPin>& WRUIMap::GetPins(const UWorld* World)
+{
+	return WRMapTab::PinsFor(World);
+}
+
+FString WRUIMap::PinGlyphName(uint8 Glyph)
+{
+	static const TCHAR* Names[] = { TEXT("Camp"), TEXT("Ore"), TEXT("Danger"), TEXT("Creature"), TEXT("Loot"), TEXT("Flag") };
+	return Names[FMath::Min<uint8>(Glyph, 5)];
+}
+
+void WRUIMap::DrawPinGlyph(FSlateWindowElementList& Out, int32 Layer, const FGeometry& Geo, const FVector2D& Centre, float Size, uint8 Glyph, const FLinearColor& Color)
+{
+	// Unit shapes (-1..1, y down) stroked at Size / 2 a unit: a tent, a cut gem, a warning triangle, a paw, a chest, a flag.
+	const float H = Size * 0.5f;
+	const float W = FMath::Max(1.f, Size * 0.09f);
+	const auto P = [&](float X, float Y) { return FVector2f(Centre.X + X * H, Centre.Y + Y * H); };
+	const auto Lines = [&](std::initializer_list<FVector2f> Pts, bool bClosed)
+	{
+		TArray<FVector2f> A(Pts);
+		if (bClosed && A.Num() > 0) A.Add(A[0]);
+		FSlateDrawElement::MakeLines(Out, Layer, Geo.ToPaintGeometry(), MoveTemp(A), ESlateDrawEffect::None, Color, true, W);
+	};
+	const auto Ring = [&](float CX, float CY, float R)
+	{
+		TArray<FVector2f> A;
+		for (int32 i = 0; i <= 12; ++i) { const float Ang = i * 2.f * PI / 12.f; A.Add(P(CX + FMath::Cos(Ang) * R, CY + FMath::Sin(Ang) * R)); }
+		FSlateDrawElement::MakeLines(Out, Layer, Geo.ToPaintGeometry(), MoveTemp(A), ESlateDrawEffect::None, Color, true, W);
+	};
+	switch (FMath::Min<uint8>(Glyph, 5))
+	{
+	case 0:   // camp: a tent on the ground, its door open
+		Lines({ P(-0.85f, 0.7f), P(0.f, -0.75f), P(0.85f, 0.7f) }, false);
+		Lines({ P(-1.f, 0.7f), P(1.f, 0.7f) }, false);
+		Lines({ P(0.f, -0.1f), P(-0.25f, 0.7f) }, false);
+		break;
+	case 1:   // ore: a cut gem
+		Lines({ P(-0.55f, -0.65f), P(0.55f, -0.65f), P(0.85f, -0.2f), P(0.f, 0.85f), P(-0.85f, -0.2f) }, true);
+		Lines({ P(-0.85f, -0.2f), P(0.85f, -0.2f) }, false);
+		Lines({ P(-0.25f, -0.65f), P(0.f, 0.85f), P(0.25f, -0.65f) }, false);
+		break;
+	case 2:   // danger: a warning triangle with its mark
+		Lines({ P(0.f, -0.85f), P(0.9f, 0.75f), P(-0.9f, 0.75f) }, true);
+		Lines({ P(0.f, -0.3f), P(0.f, 0.25f) }, false);
+		Ring(0.f, 0.5f, 0.06f);
+		break;
+	case 3:   // creature: a paw
+		Ring(0.f, 0.35f, 0.38f);
+		Ring(-0.62f, -0.2f, 0.2f);
+		Ring(-0.22f, -0.6f, 0.2f);
+		Ring(0.22f, -0.6f, 0.2f);
+		Ring(0.62f, -0.2f, 0.2f);
+		break;
+	case 4:   // loot: a chest with its lid and lock
+		Lines({ P(-0.85f, -0.15f), P(0.85f, -0.15f), P(0.85f, 0.7f), P(-0.85f, 0.7f) }, true);
+		Lines({ P(-0.85f, -0.15f), P(-0.7f, -0.6f), P(0.7f, -0.6f), P(0.85f, -0.15f) }, false);
+		Lines({ P(0.f, -0.15f), P(0.f, 0.25f) }, false);
+		break;
+	default:  // flag: a pole and its cloth
+		Lines({ P(-0.55f, 0.9f), P(-0.55f, -0.9f) }, false);
+		Lines({ P(-0.55f, -0.85f), P(0.75f, -0.5f), P(-0.55f, -0.1f) }, false);
+		break;
+	}
+}
 
 bool WRUIMap::GetWaypoint(const UWorld* World, FVector& OutWhere)
 {
