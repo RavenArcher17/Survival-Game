@@ -3,6 +3,7 @@
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRFungalCreatures.h"
 #include "WRFungalHazards.h"
 #include "WRSkyCreatures.h"
 #include "WRStormCreatures.h"
@@ -1309,6 +1310,8 @@ void AWRCreature::BeginPlay()
 	UWRGraveBody::Attach(this);
 	// A Crystal caves creature's body state and look (WRCrystalCreatures).
 	UWRCrystalBody::Attach(this);
+	// A Fungal caverns creature's body state and look (WRFungalCreatures).
+	UWRFungalBody::Attach(this);
 	// A Sky islands creature's body state and look (WRSkyCreatures).
 	UWRSkyBody::Attach(this);
 }
@@ -2268,6 +2271,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRVoidAI::Died(this, Killer);    // a void creature lets go; a Riftborn's void essence
 	FWRForestAI::Died(this, Killer);   // a forest creature lets go; chance drops; a Mossmaul's larder; a sign for the finches
 	FWRCrystalAI::Died(this, Killer);
+	FWRFungalAI::Died(this, Killer);    // a Mycomite's, a Sporeling's or a Puffball's burst; the lone cap's credit
 	WRFungal::CreatureDied(this, Killer);  // a bloomed beast bursts in a cloud (the Sporefall)  // a Geodemite bursts; a hearing hunter stops listening
 	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
 	FWRSkyAI::Died(this, Killer);      // a Sky creature lets go; a Sailbell pops in fire or deflates and stings 60 s
@@ -2839,6 +2843,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// The Fungal caverns' (a hunter on its ceiling, a Rotmaw in its mound, a latch, a hold, the warm light, the beats).
+	if (FWRFungalAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	// The Sky's (a ring over its home node, a stoop on its line, grounded after, a hold, a parachute, a bloom's drift).
 	if (FWRSkyAI::TickWild(this, Self, DeltaSeconds))
 	{
@@ -3285,6 +3294,11 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 	if (FWRCrystalAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	// A tame Truffle mole's sense and knocks (WRFungalCreatures).
+	if (FWRFungalAI::TickTame(this, Self, DeltaSeconds))
 	{
 		return;
 	}

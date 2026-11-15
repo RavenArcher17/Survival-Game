@@ -207,6 +207,7 @@ void UWRFungalWorld::Tick(float DeltaTime)
 	if (World->GetNetMode() != NM_Client)
 	{
 		StepHazards(DeltaTime);
+		StepDens(DeltaTime);
 		StepIlmari(DeltaTime);
 		StepInvasionMarks(DeltaTime);
 	}

@@ -94,6 +94,34 @@ Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and pl
 cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
 not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveBiomes`.
 
+- **Fungal (4): the ten creatures and the Sporelings** (fungal 2.12; plan 2.12). Rows in `creatures.json` (biome
+  `fungal`, element spore, resists spore_cloud / foul_air; rigs borrowed and recoloured through `M_CreatureTint`):
+  **Sporestalker** (Rimeclaw rig), **Rotmaw** (Rimeshell x2.6), **Mycomite** (Kilnmite x0.5, 25 HP swarm),
+  **Webspinner** (Kilnmite x1.9), **Tunnel toad** (Magmaw rig, mount), **Shroomback** (Basaltback rig, hauler 220),
+  **Truffle mole** (Pumicehog rig), **Glowgrub** (Rimeshell x0.45, light), **Capling** (Snowpuff rig), **Puffball** (its
+  whole body in code) and the bosses' **Sporeling**; 30 attack rows in `attacks.json` from the cook's table (2.12.2).
+  `WRFungalCreatures.*`: `UWRFungalBody` (replicated flags + the look built in code in `M_FungalGlow`: the stalk crest
+  with cyan tips that swells for the volley, the gill ruff that flares for the bite, the Rotmaw's cap mound and its
+  glowing deepcap lure, the mite caps, the Webspinner's eight 4 m banded legs stepping with its speed, eyes and dotted
+  abdomen, the toad's throat sac, the oyster garden and club tail, the star nose, the grub's lantern and light, the
+  Capling's spotted cap, the floating Puffball sac and tendrils) and `FWRFungalAI` (hooked beside the other biomes' in
+  `WRCreature.cpp`, `WRCreatureCombat.cpp`, `WRStormCreatures.cpp`, `WRCharacterCombat.cpp`): ceiling hunters (they
+  climb a cave hall's roof, drop on what walks under with grit or a bright thread as the tell, climb back after a fight);
+  the Rotmaw's **mound** (reach for the lone cap: the lure snap's 1.5 s hold; near the mound: the burst; strike the lure
+  from range and it comes out stunned 2 s, credit for Ilmari's "The lone cap"; its belly x1.3 while it rears); the
+  **latch** (one per limb, four at most, x0.9 speed each through `WRFungal::MoveScale`, drain and poison a second, off
+  by a roll half the time, fire, a hit or its death); the **stalk volley** (five lobbed pellets, each a 2 m cloud), the
+  **web net** (webbed 2 s, mash frees sooner), the **croak blast** (lines within 8 m snap, the colony rallies), the
+  **leap slam** (12 m, a low ring: jump it), the **rot belch** cone (four ticks); reactions (the spore shake, the
+  garden puff and the Shroomback's tuck, the Glowgrub's flash, the Capling's puff, the Puffball's 6 m burst, at once in
+  fire); warm light draws Mycomites from twice as far (twice again in the bloom); a Webspinner answers a twanged line;
+  the Shroomback's garden halves spore buildup within 3 m; the tamed mole senses ore, deepcap and the hidden doors within
+  15 m, knocks toward them and marks cap-falls 10 s early; the toad's held Jump charges its leap (0.6 s), a ridden
+  landing slams 3 m. Living beats: Rotmaws eat Caplings at their lures, Webspinners reel Glowgrubs up into the False
+  Sky, Sporestalkers stalk the Toad Leaps and the croak scatters them, Caplings ride Shroombacks. **Dens**
+  (`UWRFungalWorld::StepDens`): the generator's 70 dens fill from their own or their sub-zone's day / night table
+  (underground night 22-04) when a survivor is near. 16 new `fx.json` rows, tuning `fungalLife`, the Shroomback's oyster
+  cap every 10 min (`farming.json`). Compiled; not played.
 - **Fungal (3): the hazards and the Sporefall** (fungal 2.8-2.10, 2.21; plan 2.8-2.10). `WRFungalHazards.*`:
   **spore clouds** (`AWRSporeCloud`, replicated pockets 6-20 m: 12 poison a second after a 0.9 s grace, rot too after 10 s
   without a 3 s break, through the status component; the Immune system, a filter mask or Sporeweave 4 pass, the spore wad

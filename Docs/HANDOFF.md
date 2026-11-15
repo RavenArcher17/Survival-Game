@@ -423,7 +423,10 @@ z 0 (never `FBuild::G`, which traces to the plateau); walls and ceilings come fr
 `WRFungal::NodeLook`, called first in `WRResourceLook::Apply`). Hazards are `WRFungalHazards.*` (`AWRSporeCloud`: anything new that makes a cloud should spawn one;
 `WRFungal::Wind` / `FireAt` / `FrostAt` are the entries for anything new that blows, burns or freezes in the caverns; every
 hit already calls `WRFungal::OnHit`, every melee swing `WRFungal::Swing`), doors and secrets `WRFungalSpots.cpp` (E: `world
-fungal spot`), the live steps and the Sporefall `WRFungalEvents.cpp`.
+fungal spot`), the live steps and the Sporefall `WRFungalEvents.cpp`. Creatures are `WRFungalCreatures.*`
+(`UWRFungalBody` on every `fungal` creature, `FWRFungalAI` hooked beside the Crystal / Grave ones; the dens are
+`UWRFungalWorld::StepDens` over `Data/fungal.json` dens and `denTables`; numbers in tuning `fungalLife`). A new grab
+that holds a survivor should answer `FWRFungalAI::Mash`'s chain the same way (`WRCharacterCombat.cpp`).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

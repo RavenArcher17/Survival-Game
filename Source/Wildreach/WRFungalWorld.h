@@ -89,6 +89,11 @@ private:
 	void StepIlmari(float Dt);
 	void StepInvasionMarks(float Dt);
 	void StepClientLooks(float Dt);
+	// WRFungalCreatures.cpp: the dens (fungal 2.12.3).
+	void StepDens(float Dt);
+	struct FDenLive { TArray<TWeakObjectPtr<class AWRCreature>> Alive; double NextAt = 0.0; bool bNight = false; };
+	TArray<FDenLive> DenLive;
+	float DenClock = 0.f;
 	bool bHazardsDone = false;
 	TWeakObjectPtr<class AWRFungalState> State;
 	float HazardClock = 0.f, DriftClock = 0.f, FlushClock = 0.f, IlmariClock = 0.f, InvClock = 0.f, LookClock = 0.f;

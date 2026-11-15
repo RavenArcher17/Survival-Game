@@ -515,7 +515,33 @@ void WRFungal::CreatureDied(AWRCreature* Self, AActor* Killer)
 
 bool WRFungal::BuildThrownModel(const FString& ModelPath, UProceduralMeshComponent* Mesh)
 {
-	if (!Mesh || ModelPath != TEXT("code:galeflask")) return false;
+	if (!Mesh) return false;
+	if (ModelPath == TEXT("code:sporepellet"))
+	{
+		// A Sporestalker's pellet (fungal 2.12.2): a swollen stalk-tip, bone-white with a cyan head, shown the whole flight.
+		FWRToolMesh M;
+		M.Lathe(FVector(-9.f, 0.f, 0.f), FVector::ForwardVector, 18.f, { FVector(0.f, 1.f, 1.f), FVector(0.35f, 3.f, 3.f), FVector(0.7f, 5.f, 5.f), FVector(1.f, 0.f, 0.f) }, 8, FLinearColor(FColor(232, 226, 208)) * 0.62f, 0.6f);
+		M.Lathe(FVector(3.f, 0.f, 0.f), FVector::ForwardVector, 6.f, { FVector(0.f, 5.4f, 5.4f), FVector(1.f, 0.f, 0.f) }, 8, FLinearColor(FColor(57, 230, 194)) * 0.8f, 0.3f);
+		M.ApplyTo(Mesh);
+		Mesh->SetWorldScale3D(FVector(2.f));
+		return true;
+	}
+	if (ModelPath == TEXT("code:webnet"))
+	{
+		// A Webspinner's net (fungal 2.12.2): a sticky spread of silk threads, beaded, flung open as it flies.
+		FWRToolMesh M;
+		const FLinearColor Silk = FLinearColor(FColor(226, 230, 228)) * 0.6f;
+		for (int32 r = 1; r <= 3; ++r)
+		{
+			TArray<FVector> Ring;
+			for (int32 k = 0; k < 10; ++k) { const float A = k * 2.f * PI / 10.f; Ring.Add(FVector(0.f, FMath::Cos(A) * r * 14.f, FMath::Sin(A) * r * 14.f)); }
+			M.Tube(Ring, 0.6f, 4, Silk, 0.3f, true);
+		}
+		for (int32 k = 0; k < 10; ++k) { const float A = k * 2.f * PI / 10.f; M.Tube({ FVector(4.f, 0.f, 0.f), FVector(-6.f, FMath::Cos(A) * 46.f, FMath::Sin(A) * 46.f) }, 0.6f, 4, Silk, 0.3f); }
+		M.ApplyTo(Mesh);
+		return true;
+	}
+	if (ModelPath != TEXT("code:galeflask")) return false;
 	// The Gale flask (fungal 2.19): a flat clay flask 16 cm long, a levistone shard showing blue-white through a window cut
 	// in its belly (it tugs upward), a wax stopper, a twine sling.
 	FWRToolMesh M;

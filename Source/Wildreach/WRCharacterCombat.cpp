@@ -1,5 +1,6 @@
 // The hero in a fight beyond the core (cooks/build-combat-full.md 2.6, 2.19): two-handing, breaking out of a freeze,
 // framing giants and the camera at walls (CAL 1.15).
+#include "WRFungalCreatures.h"
 #include "WRCharacter.h"
 #include "WRGraveBosses.h"
 #include "WRGraveCreatures.h"
@@ -65,6 +66,8 @@ void AWRCharacter::ServerMashFrozen_Implementation()
 	if (FWRGraveBoss::Mash(this)) return;
 	// Carried in a snatch, swallowed by Old Gulper, or riding Aeolith (a rider's Jump lets go): WRSkyBosses.
 	if (FWRSkyBoss::Mash(this)) return;
+	// Webbed by a Webspinner's net or in a Rotmaw's beak (WRFungalCreatures).
+	if (FWRFungalAI::Mash(this)) return;
 	// In a Cryptstalker's palps or under a Wraithmoth drinking (WRGraveCreatures).
 	if (FWRGraveAI::HolderOf(this))
 	{
