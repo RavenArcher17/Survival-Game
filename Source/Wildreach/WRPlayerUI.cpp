@@ -8,6 +8,7 @@
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
 #include "WRInventory.h"
+#include "WRCrafting.h"
 #include "WRKeyBindings.h"
 #include "WRMainMenu.h"
 #include "WRPadInput.h"
@@ -944,6 +945,45 @@ void FWRPlayerUI::WheelKey(int32 Wheel, bool bDown)
 		return;
 	}
 	CastAbility(GetWheelAbility(Wheel, WheelPicked[Wheel]));
+}
+
+void FWRPlayerUI::SetTrackedRecipe(FName RecipeId)
+{
+	TrackedRecipe = RecipeId;
+	TrackedOutBaseline = -1;
+	bTrackedLoaded = true;
+	GConfig->SetString(UISection, TEXT("Tracked"), RecipeId.IsNone() ? TEXT("") : *RecipeId.ToString(), GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+	UE_LOG(LogWildreach, Log, TEXT("TRACK %s"), RecipeId.IsNone() ? TEXT("none") : *RecipeId.ToString());
+}
+
+void FWRPlayerUI::TickTracked()
+{
+	if (!bTrackedLoaded)
+	{
+		bTrackedLoaded = true;
+		FString Saved;
+		if (GConfig->GetString(UISection, TEXT("Tracked"), Saved, GGameUserSettingsIni) && !Saved.IsEmpty()) TrackedRecipe = FName(*Saved);
+	}
+	const FWRRecipe* R = TrackedRecipe.IsNone() ? nullptr : FWRRecipeRegistry::Get().Find(TrackedRecipe);
+	if (!R)
+	{
+		if (!TrackedRecipe.IsNone()) SetTrackedRecipe(NAME_None);   // a recipe gone from the data
+		return;
+	}
+	const AWRPlayerController* P = PC.Get();
+	const AWRPlayerState* PS = P ? P->GetPlayerState<AWRPlayerState>() : nullptr;
+	const UWRInventoryComponent* Inv = PS ? PS->GetInventory() : nullptr;
+	if (!Inv) return;
+	const int32 Have = Inv->CountOf(R->Output);
+	if (TrackedOutBaseline < 0) TrackedOutBaseline = Have;
+	else if (Have > TrackedOutBaseline)
+	{
+		// Made (or collected from the station): the list has done its job.
+		SetTrackedRecipe(NAME_None);
+		NoteNotice(TEXT("Tracked recipe made"));
+	}
+	else TrackedOutBaseline = FMath::Min(TrackedOutBaseline, Have);   // used some up: count from the new low
 }
 
 void FWRPlayerUI::ItemWheelKey(bool bDown)

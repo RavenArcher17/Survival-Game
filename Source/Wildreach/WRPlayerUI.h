@@ -142,6 +142,16 @@ public:
 	 * still the next ability (the next ammo while aiming).
 	 */
 	void ItemWheelKey(bool bDown);
+
+	/**
+	 * The tracked recipe (cookpass-ui 3.8): one recipe pinned from the crafting details; the HUD lists its ingredients
+	 * against your bag until one is made (its output's count in the bag goes up) or it's untracked. This PC's own
+	 * ([Wildreach.UI] Tracked).
+	 */
+	void SetTrackedRecipe(FName RecipeId);
+	FName GetTrackedRecipe() const { return TrackedRecipe; }
+	/** Each frame from the HUD: clears the tracking once the output arrived in the bag. */
+	void TickTracked();
 	bool IsItemWheelOpen() const { return bItemWheel; }
 	int32 GetItemHover() const { return ItemHover; }
 	/** Menu on the pad: the journal at the page last used. */
@@ -202,6 +212,9 @@ private:
 	int32 WheelPicked[2] = { 0, 0 };
 	bool bWheelsLoaded = false;
 	int32 OpenWheel = -1;
+	FName TrackedRecipe;
+	int32 TrackedOutBaseline = -1;   // the output's count in the bag when tracking began (-1: not read yet)
+	bool bTrackedLoaded = false;
 	bool bItemKeyDown = false;
 	double ItemDownAt = 0.0;
 	bool bItemWheel = false;

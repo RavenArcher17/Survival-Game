@@ -103,6 +103,13 @@ and the testers test, F8).
     held inputs drop on open and close like every wheel.
   - A **tap** stays the next ability (the next ammo while aiming), now on the release (`FWRPlayerUI::ItemWheelKey`).
   - The F1 page says so.
+- **UI (8): track a recipe.** Why: gathering for a recipe meant reopening the crafting tab to see what was still
+  missing (Grounded / Subnautica pin one recipe's list to the HUD).
+  - A **Track** button beside Craft on a recipe's details (again: untrack); one recipe at a time.
+  - The HUD shows a **Tracking** card under the clock: the output's icon and name, then each ingredient with its icon,
+    "have / need" from your bag, green once there's enough. It clears itself (with a line) once the item lands in
+    your bag, and goes with a recipe that leaves the data. Never fades (you asked for it); not in build mode or under
+    a screen. This PC's own (`[Wildreach.UI] Tracked`).
 
 ## Unreleased: the Desert / Sun & sand
 

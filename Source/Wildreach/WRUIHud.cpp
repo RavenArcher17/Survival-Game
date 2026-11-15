@@ -360,7 +360,12 @@ public:
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 104.f * U)[RaidTracker()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 18.f * U)[CompassAndBoss()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[SAssignNew(FadeClock, SBox).Visibility_Lambda([this]() { return PlateVisibility(); })[ClockPlate()]]
-			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 150.f * U)[TamingPanel()]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 150.f * U)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[TamingPanel()]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[TrackedCard()]
+			]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 0.f, 0.f, 0.f)[Crosshair()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[BreathArc()]   // under water: breath and depth (WRUnderwater)
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 150.f * U)[WRUIEndgame::MakeToast(PC)]   // a deed earned (WRUIEndgame)
@@ -719,6 +724,81 @@ private:
 		return Best;
 	}
 
+	// ---------------------------------------------------------------- right: the tracked recipe (cookpass-ui 3.8)
+	const FWRRecipe* Tracked() const
+	{
+		const FWRPlayerUI* X = UI();
+		return X && !X->GetTrackedRecipe().IsNone() ? FWRRecipeRegistry::Get().Find(X->GetTrackedRecipe()) : nullptr;
+	}
+	int32 InBag(FName Item) const
+	{
+		const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+		return PS && PS->GetInventory() ? PS->GetInventory()->CountOf(Item) : 0;
+	}
+	/** The recipe's list: each ingredient, what you have of what it needs, green when there's enough. Never fades
+	 *  (you asked for it); gone in build mode and under screens. */
+	TSharedRef<SWidget> TrackedCard()
+	{
+		TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+		for (int32 i = 0; i < 8; ++i)
+		{
+			const auto Input = [this, i]() -> const TPair<FName, int32>* { const FWRRecipe* R = Tracked(); return R && R->Inputs.IsValidIndex(i) ? &R->Inputs[i] : nullptr; };
+			const auto Met = [this, Input]() { const TPair<FName, int32>* In = Input(); return In && InBag(In->Key) >= In->Value; };
+			Rows->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
+			[
+				SNew(SHorizontalBox).Visibility_Lambda([Input]() { return Input() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+				[
+					SNew(SBox).WidthOverride(22.f * U).HeightOverride(22.f * U)[SNew(SImage).Image_Lambda([Input]() { const TPair<FName, int32>* In = Input(); return WRUI::Icon(In ? In->Key : NAME_None); })]
+				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([Input]()
+					{
+						const TPair<FName, int32>* In = Input();
+						const FWRItemDef* D = In ? FWRItemRegistry::Get().Find(In->Key) : nullptr;
+						return FText::FromString(D ? D->Name : In ? In->Key.ToString() : FString());
+					}), WRUI::Body(13, 700), TAttribute<FSlateColor>::CreateLambda([Met]() { return FSlateColor(Met() ? WRUI::Good : WRUI::Ink); }))
+				]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f * U, 0.f, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this, Input]() { const TPair<FName, int32>* In = Input(); return In ? FText::FromString(FString::Printf(TEXT("%d / %d"), FMath::Min(InBag(In->Key), 9999), In->Value)) : FText::GetEmpty(); }),
+						WRUI::Body(13, 800), TAttribute<FSlateColor>::CreateLambda([Met]() { return FSlateColor(Met() ? WRUI::Good : WRUI::Ink2); }))
+				]
+			];
+		}
+		return SNew(SBox).WidthOverride(300.f * U).Visibility_Lambda([this]() { return Survivor() && !BuildMode() && !Covered() && Tracked() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+		[
+			SNew(SWRPanel).Kind(EWRPanel::Leather).Rivets(true).Padding(FMargin(14.f * U, 10.f * U))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+					[
+						SNew(SBox).WidthOverride(26.f * U).HeightOverride(26.f * U)[SNew(SImage).Image_Lambda([this]() { const FWRRecipe* R = Tracked(); return WRUI::Icon(R ? R->Output : NAME_None); })]
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(LOCTEXT("TrackHead", "Tracking"), WRUI::Caps(11), WRUI::Ink3)]
+						+ SVerticalBox::Slot().AutoHeight()
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+							{
+								const FWRRecipe* R = Tracked();
+								const FWRItemDef* D = R ? FWRItemRegistry::Get().Find(R->Output) : nullptr;
+								return FText::FromString(D ? D->Name : FString());
+							}), WRUI::Title(14), WRUI::Ink)
+						]
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[Rows]
+			]
+		];
+	}
+
 	TSharedRef<SWidget> TamingPanel()
 	{
 		return SNew(SBox).WidthOverride(330.f * U).Visibility_Lambda([this]() { return !Covered() && KnockedOut() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
@@ -935,6 +1015,7 @@ private:
 		SCompoundWidget::Tick(Geo, Time, Delta);
 		UpdateCrosshair();
 		TickHudMode(Delta);
+		if (FWRPlayerUI* X = UI()) X->TickTracked();
 		if (NoticeBox.IsValid())
 		{
 			float A = 0.f;
