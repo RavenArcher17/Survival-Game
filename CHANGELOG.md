@@ -7,6 +7,57 @@ cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; c
 played here (Aaron and the testers test, F8). Not live until `ocean` joins `world.liveBiomes` (a later piece), so nothing
 of the coast shows yet; underwater play is live everywhere water is.
 
+- **Ocean (3): the sea's creatures** (cooks/biome-ocean.md 2.12; plan build-biome-ocean.md 2.12). No sea pack exists in
+  `Content/`, so all eleven are built in code the Sky's way (`UWROceanBeast`, `WROceanBeast.cpp`): every vertex keeps its
+  part and its place along the body and is re-placed each frame from how the real animal moves. The **Reefjaw** (a 6 m
+  tiger shark: bronze-grey back with faded bars, bone belly, tall dorsal and scythe tail beating side to side, the wave
+  growing toward the tail; its goblin-shark jaw a part of its own that shoots 120 cm forward on the bite), the
+  **Tidecoil** (a 3.5 m honeycomb moray ribbon undulating its whole length, a pale inner jaw in the throat, a row of
+  organs down each flank that light blue-white on the shock pulse), the **Spinecrab** (a spined rust-red dome on eight
+  stilt legs stepping in alternating fours with planted feet, a crusher and a blue-green club that cocks back; buried,
+  only its blue eyestalks show; it turns over on its back when its guard breaks), the **Gullraider** (a dark skua body,
+  white wing flashes, hooked bill, a scarlet-orange throat pouch that swells), the **Wavecharger** (an upright seahorse
+  head on ring plates, olive-gold fronds streaming, a dolphin's tail stock that drives and curls), the **Driftback** (a 5 m
+  leatherback dome with seven keels, a barnacle-and-weed garden, long rowing flippers), the **Glowray** (a 4 m midnight
+  manta whose wings ripple root to tip, curled horns, a barb that arches; blue-green spots brighter at night and pulsing
+  in sync in a ring), the **Pearldiver** (a sea otter on its back, silver head, its stone on its chest, cracking shells),
+  the **Kelpgrazer** (a 7 m bark-hide sea cow, whiskers, a forked fluke stroking up and down), the **Tidefowl** (a
+  puffin-billed eider) and the **Ripplefin** school (thirty silver-and-green mackerel darting, balling into a spinning
+  sphere when a Reefjaw is near). All die belly up. **Their state** rides a replicated `UWROceanBody`; **their brains**
+  are `FWROceanAI` hooks beside the other lands' (wild, tame, row allowed / started / strike, resolved, incoming,
+  damaged, died, mash): swimmers hang at neutral buoyancy (`bHoldDepth` on the movement) and steer up and down inside
+  their depth band, never into the shallows on their own, and circle at the edge facing someone on the land. The
+  Reefjaw's slingshot bite; its thrash-drag (caught, you're dragged 6 m down at 15 a second for 2 s with no breath back;
+  100 damage from allies or mashing frees you); the breach strike (only at someone at the surface: a bubble column and
+  thrum 1 s ahead, then up through it); the surf lunge (at someone on the wet sand: out of the surf and stranded belly
+  up 1.5 s taking x1.3). The Tidecoil waits in its hole and strikes what comes within 4 m; its second jaw drags you to
+  its hole (any ally's blow, fire or a shock frees you); the shock pulse hits everything in the same water, its own kind
+  too (2 m on land; grounded immune); at low tide it slithers to another pool. The Spinecrab buries and bursts out at 5
+  m; its shell guard (when you swing at its face) takes x0.3 from the front and 60 stance flips it 2 s (x1.3); the club
+  snap's cavitation pop is a second hit 0.06 s behind (a block takes both; under water it hits all within 1.5 m). The
+  Gullraider's snatch takes one food or fish stack (5 at most, never gear) and flies it to the Gullery: kill it within a
+  minute and it drops where it falls, or it's left in a bag at the colony; its mob call brings every Gullraider within 50
+  m, once a fight. Wavechargers, Driftbacks and Glowrays defend each other (the herd's click chorus); Glowrays flare
+  (blind) and glide off. **Taming**: the Reefjaw's path magic (10+ Tide points, in the water with it, knocked out or
+  soaked under 30%: hold E 4 s, 30 Flow, then feed it; the prompt, the hold and the release work like the Prismback's);
+  a Wavecharger egg eased out of a sleeping male's pouch at the Kelp Cathedral (hold E 3 s; not sneaking or swimming, or
+  one time in four anyway, the herd wakes and comes for you). The Wavecharger is a swim mount that dives (hold Dodge to
+  go under to 40 m on your own breath, Jump to rise, nothing held keeps its depth; `diveDepth` / `depthRange` are new
+  creature fields). A tame Glowray shows hostile swimmers' bubble lines within 30 m; a tame Pearldiver brings you pearls
+  from clams within 20 m and marks sunken caches within 40 m with bubbles. **Populations** (`UWROceanLife`, tuning
+  `oceanLife.tables`): each sub-zone's day and night weights from the cook (2.12.3), about 12 kept round each survivor,
+  filled 60-110 m away out of sight (swimmers in water deep enough for them, crabs and Tidefowl on the sand and shelf,
+  Gullraiders over the cliffs, Tidecoils in holes on the floor; at night the herd at the Kelp Cathedral, Driftbacks
+  hauled out on the Turtle Beach, Glowrays in rings over the reef), taken in when nobody is within 220 m. Beats: hunting
+  Reefjaws go for Kelpgrazers and schools; a kill in the water leaves a blood cloud and the Gullraiders come circling it.
+  **Rows**: 11 creature rows, 10 attack sets (2.12.2), 14 items (raw fish, sharkskin, shark tooth, eel skin, shock
+  gland, crab meat, frond, turtle hide, ray wing, photophore gland, otter pelt, fat, Wavecharger egg, tide essence).
+  **Effects and sounds**: 48 effect rows and 54 sound rows for the whole Ocean so far (the water's bubbles, kick,
+  splash and shock; the Beacon Stack's fire, surf crests and wash, spray over the Pound, god-rays, drips, gulls wheeling;
+  every Tide spell's look and sound; the creatures' moments) and 11 voice families: pieces 1 and 2 named them in code
+  without table rows, so they were silent and invisible until now. Sounds are stand-ins (`_standin`).
+  Not yet: the minis and Thalassor (piece 5); the hazards, King Tide, shrines, Hae-won, gear (piece 4); nothing here
+  shows until the Ocean goes live.
 - **Ocean (2): the Tide path** (cooks/biome-ocean.md 2.17-2.18; plan build-biome-ocean.md 2.16). `Data/paths/tide.json`
   (22 nodes: trunk Water bolt / Flow capacity / Soak chance / Wave cut; Undertow, Harpooner and Tidecaller branches; root
   passive Gills), numbers in tuning `tide.flow`, `tide.path`, `tide.combos`, `spells.<key>`, `wildbrands.wave_cut` /

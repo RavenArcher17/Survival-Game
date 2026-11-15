@@ -349,6 +349,11 @@ sea elsewhere).
 The Tide path is `WRTidePath` (Flow, Gills = `Passive.Gills`, passives, combos, look; named so because `WRTide` is the
 sea's tide) and `WRAbilitiesTide` (its abilities, `AWRHarpoonLine` the shared harpoon line any thrown harpoon can use:
 `Make`, `TieTo` a mooring stone, `AddPull`, `On(body)`; `AWRTideWave` the travelling waves, `AWRTideField` the whirlpools).
+The sea's creatures are `WROceanCreatures.*` (`UWROceanBody` state + `FWROceanAI` hooks, friend of `AWRCreatureAI`,
+called beside the Sky's; `UWROceanLife` populations from tuning `oceanLife`) and `WROceanBeast.cpp` (the code-built
+bodies, kinds by creatures.json `procBody`; Old Barnacle, the Siren Eel and the Reef Tyrant reuse crab / eel / shark at
+their scale). A sea creature holds its depth through `UWRCharacterMovementComponent::bHoldDepth` (neutral buoyancy);
+the Wavecharger's dive is `diveDepth` in `AWRCreature::TickMount`.
 
 Also since 0.7.1 (in progress): **the Sky islands, over the Hollow Cape north of the Storm peaks** (cooks/biome-sky.md,
 plan cooks/build-biome-sky.md). One generator: `node Tools/terrain/sky.mjs` writes the cape's ground
