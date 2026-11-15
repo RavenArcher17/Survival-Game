@@ -690,6 +690,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRArcane::DamageScale(Attacker, Target, Hit);
 		// Under water fire fizzles (cooks/biome-ocean.md 2.6): x0.3 on a body in the water, and no burn (below).
 		if (Hit.Element == WRTags::Element_Fire) Damage *= WRUnderwater::FireMult(Target);
+		if (Hit.SwimTargetMult != 1.f && Target->GetCharacterMovement() && Target->GetCharacterMovement()->IsSwimming()) Damage *= Hit.SwimTargetMult;
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
 			Damage *= 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);

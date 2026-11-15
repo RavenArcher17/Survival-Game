@@ -65,6 +65,8 @@ struct FWRHit
 	// --- Combat core (cooks/build-combat-core.md 3.2) ---
 	/** Stance damage to creatures and bosses (< 0: worked out from the damage by the combat library). */
 	UPROPERTY() float StanceDamage = -1.f;
+	/** x damage on a target that is swimming (the shark-tooth arrow: cooks/biome-ocean.md 2.19). */
+	UPROPERTY() float SwimTargetMult = 1.f;
 	/** What blocking it costs before the guard boost (< 0: worked out from the damage). */
 	UPROPERTY() float StaminaDamage = -1.f;
 	/** How hard it hits a player whose poise it breaks: 1 flinch, 2 stagger, 3 heavy stagger (tuning poise.reactions). */

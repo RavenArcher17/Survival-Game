@@ -24,6 +24,7 @@
 #include "WRTuning.h"
 #include "WRUIStyle.h"
 #include "WRWater.h"
+#include "WROceanTypes.h"
 #include "WRSwampSystems.h"
 #include "AbilitySystemComponent.h"
 #include "Dom/JsonObject.h"
@@ -302,6 +303,11 @@ FName AWRBobber::WaterHere() const
 	// The Old Gar's chapel pool in the Sunken Coven (fish.json water "chapel").
 	float ChapelZ = 0.f, ChapelDepth = 0.f;
 	if (WRSwamp::CovenPool(GetActorLocation(), ChapelZ, ChapelDepth)) return TEXT("chapel");
+	// The Lazarus Deep's black water off the Drop (the Lazarus Fish's own, fish.json water "lazarus").
+	if (const FWROceanData::FCave* Laz = WROcean::Live() ? FWROceanData::Get().FindCave(TEXT("lazarus_deep")) : nullptr)
+	{
+		if (FVector::Dist2D(Laz->At, GetActorLocation()) < WRTune(TEXT("fishing.lazarusReach"), 4000.f)) return TEXT("lazarus");
+	}
 	const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this);
 	const float Depth = Water ? Water->DepthAt(GetActorLocation()) : 0.f;
 	if (Depth >= WRTune(TEXT("fishing.deepDepth"), 700.f) && UWRLifeSkillsComponent::StatFor(Angler, TEXT("deepLine")) > 0.f) return TEXT("deep");

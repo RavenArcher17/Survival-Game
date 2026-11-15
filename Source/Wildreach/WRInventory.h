@@ -138,6 +138,8 @@ public:
 	static FWRItemRegistry& Get();
 	const FWRItemDef* Find(FName Id) const;
 	const TArray<TPair<FName, int32>>& StartingKit() const { return Kit; }
+	/** Every item row (a random gem for a secret's pay, lists by category). */
+	const TArray<FWRItemDef>& All() const { return Defs; }
 
 private:
 	FWRItemRegistry();

@@ -1,4 +1,6 @@
 #include "WRAbilitiesTide.h"
+#include "WRPlayerState.h"
+#include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRArcanePath.h"
 #include "WRAttributeSet.h"
@@ -869,6 +871,11 @@ void UWRGA_HarpoonThrow::Throw(AWRCharacterBase* Caster)
 		if (!C || !Struck || (Result != EWRHitResult::Hit && Result != EWRHitResult::GuardBroken)) return;
 		AWRHarpoonLine::Make(C, Struck, Struck->GetActorLocation(), bHook);
 		WRSound::PlayAt(C, TEXT("tide.harpoon_hit"), Struck->GetActorLocation());
+		if (Struck->IsA<AWRCreature>() && (WRUnderwater::IsUnder(Struck) || WRUnderwater::IsUnder(C)))
+		{
+			AWRPlayerState* PS = C->GetPlayerState<AWRPlayerState>();
+			if (UWRWorldSystems* WS = PS ? C->GetWorld()->GetSubsystem<UWRWorldSystems>() : nullptr) WS->QuestEvent(PS, TEXT("event"), TEXT("harpoon_underwater"), 1);
+		}
 	};
 	// A wall, a rock, a hull: with Tow it's a grapple (within 18 m).
 	P->OnLanded = [WeakC, LineRange, From, bHook](const FVector& At)

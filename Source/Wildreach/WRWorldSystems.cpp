@@ -1475,7 +1475,8 @@ void UWRWorldSystems::QuestEvent(AWRPlayerState* PS, FName Type, FName What, int
 		else if (QType == TEXT("tame")) bCounts = Type == TEXT("tame") && What == FName(*WStrOf(Row, TEXT("creature")));
 		// event: a land's own deed counted by its system (Storm peaks: rodroad = a rod touched on the rod-road, pretell =
 		// a strike's warning lived through above 600 m, lantern = a winch hut's lantern lit; WRStormWorld.cpp).
-		else if (QType == TEXT("event")) bCounts = Type == FName(*WStrOf(Row, TEXT("event")));
+		// (Sent either way: the deed as the type, or "event" with the deed as What.)
+		else if (QType == TEXT("event")) bCounts = Type == FName(*WStrOf(Row, TEXT("event"))) || (Type == TEXT("event") && What == FName(*WStrOf(Row, TEXT("event"))));
 		else if (QType == TEXT("shrines") && Type == TEXT("shrine"))
 		{
 			// Counted from the shrines you've kindled yourself.

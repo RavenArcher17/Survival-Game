@@ -4,9 +4,57 @@
 
 Aaron (lane build-biome-ocean: requirement ledger R1-R54, build research and plan in showcase-notes
 cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; compiled (editor target) after each; not
-played here (Aaron and the testers test, F8). Not live until `ocean` joins `world.liveBiomes` (a later piece), so nothing
-of the coast shows yet; underwater play is live everywhere water is.
+played here (Aaron and the testers test, F8). Live from Ocean (4) (`ocean` in `world.liveBiomes`); underwater play is live everywhere water is.
 
+- **Ocean (4): the coast's world, and the Ocean goes live** (cooks/biome-ocean.md 2.8-2.11, 2.19-2.21; plan
+  build-biome-ocean.md 2.8-2.11, 2.17-2.19). `ocean` joins `world.liveBiomes`: the coast, its creatures, hazards, shrines
+  and Hae-won are in the game (the three minis and Thalassor come with Ocean (5)). **Hazards** (`WROceanHazards.*`): five
+  **rips** at the White Strand's bar gaps, an 8 x 120 m lane pulling 250 cm/s out to sea on the falling tide (170
+  rising), a pure function of the tide and where you swim so it never corrects; swimming straight against one costs the
+  fast stroke double, and out by its side is the way (a line on screen the first time; Hae-won's second quest checks the
+  side). Foam and kelp drift out along each lane. The shelf's **blowholes** and the **Spouting Horn** breathe from
+  mid-rising to high water, each on its own 9-16 s beat: a 1 s tell (boom, hiss, spray, the rock shaking), then the
+  column: 40 and thrown 6 m up (the Horn 18 m); jump just before and you ride it unhurt, and the Horn's ride lands you on
+  secret O-S3's ledge. The six **surge channels** send a wave up every ~14 s (a 1 s heave of white at the mouth): 30, a
+  knockdown and dragged 6 m out. Two **man o' war fleets** drift a slow loop with the wind on the reef's sea (code-built
+  blue-violet floats with their crest and 8 m tentacles, every machine drawing the same); a touch stings 25 + poison 50
+  (half on a swim mount or in Reefmail 2), a glassy tick within 6 m; a Squall blows one sail of each fleet onto the
+  strand, still stinging. The **air pockets** (the Pearl Cave, the Drowned Hall's dome, bell chamber, King's tower and
+  archive) are air over the water: your breath comes back there. **The King Tide** (world.json `events.king_tide`, every
+  ~3 real days for a game day): the warning (the sea draws back, every chime beacon rings with no wind, the drowned bell
+  under the reef, the flocks lift inland); the Low (-6 m; 3-5 Kelpgrazers and Driftbacks stranded on the flats, tamed by
+  offering food three times as fast; 4-6 Reefjaws bound in the deep pools, x1.3 damage taken; Spinecrabs out on the
+  flats; nodes x3, pearls x2); a spawning night if the Low falls 20:00-06:00 (glowing clouds off the coral, every
+  tidecoral regrows, Glowrays tame twice as fast); the Return (a white line and a roar out past the reef at T-10 min;
+  the 3 m bore at T-3 min running in at 6 m/s: below the Tsunami Line 80, carried 20 m, soaked; build pieces below the
+  line 200 once; standing above the stones counts for Hae-won's fifth). **Weather** (weather.json ocean): Squall 15
+  (rain and gale, surface swimming x1.5 stamina, man o' war inshore, Reefjaws x2 at sea; no lightning on land: the
+  open-sea mast strike waits for boats), Sea fog 15 (70 m, most things notice you later), Rain 15, Overcast 15, Clear
+  the rest. **Shrines** (world.json): the Great Shrine of the Mirror Pool, the Driftwood Shrine, the Gate Shrine at
+  Saltgate's mouth, the Kelp Stack Shrine on its sea stack's top, the Lighthouse Shrine in the broken lamp room (their
+  guards per the cook). **Hae-won**, the Harpooner (the Tide path's master, on the porch of her stilt house over the
+  Mirror Pool) and her six quests: First breath (the Kelp Cathedral's anchor stone: the Diver's draught), Sideways (out
+  of a rip by its side: swim fins), A line on the reef (5 harpoon or thrown-spear hits under the water: the Whaler's
+  harpoon), Coral for the helm (show her a diving helm: shark-tooth arrows and the helm's recipe), The stones say (all
+  nine tsunami stones read, or above their line when a King Tide comes back: the sun mirror), Tie the Tyrant (the Reef
+  Tyrant beaten after tying it off: Hae-won's knife; it completes once the Tyrant lands in Ocean (5)). Event quests sent
+  as "event" + the deed now count everywhere (the Fungal caverns' two were silently not counting). **Secrets** O-S1..S6
+  as spots, each open only in its window or with what it needs, and saying so plainly: the bell window (midnight at the
+  top of the flood), the dyke vault (the sluice key), the Horn ledge, the mirror line (noon under a clear sky), the
+  Lazarus ledge (your Pearldiver finds the way), the Low Gate (the King Tide's Low). **Tie-off**: E by a mooring stone
+  with a harpoon line in hand ties it off (the struck body is tethered). **Gear** (items, recipes): the Diver's draught
+  (breath x3 for 10 min), swim fins (swim +25%, land -10%), the Whaler's harpoon (a thrown spear on an 18 m line: small
+  things are hauled in, anything can be tied off), beeswax plugs (no Siren lure, no Gullraider mob call), the sunstone
+  flare (a 2 m burst of daylight: blind 25), shark-tooth arrows (bleed 20, x1.1 on swimmers), the eel-skin waterskin (60),
+  the pearl ring (+3% Flow, +5 s breath), the pearl circlet, the diving helm (breath x2, no crush to 40 m), Hae-won's knife
+  (soak 20 a hit in anyone's hand), the harpoon head, gold coin, sun disc, ambergris. **Life skills**: Diver (breath
+  x1.5), Pressure (15 m more before the crush), Current rider (a rip carries you x1.5, against it x0.5), Salvager (sunken
+  caches within 40 m show you a thread of bubbles) and Abyss diver (no crush) are live. **The Lazarus Fish** bites only
+  in the Lazarus Deep's black water (fish.json water `lazarus`). **No building in the Drowned Hall.** **Invasions**: the
+  Ocean's side through Saltgate (Old Barnacle leading Spinecrab ranks and Gullraider flocks), dormant until the Desert
+  is live. Effect and sound rows for all of it (stand-in sounds `_standin`).
+  Not yet: the minis and Thalassor, the Pound's mirrors and sluices (Ocean (5)); fire popping a man o' war's sail (no hook
+  for fire on a non-character yet: LATER-COOKS); the Ocean's portal slots stay hidden (no Ocean fold kit).
 - **Ocean (3): the sea's creatures** (cooks/biome-ocean.md 2.12; plan build-biome-ocean.md 2.12). No sea pack exists in
   `Content/`, so all eleven are built in code the Sky's way (`UWROceanBeast`, `WROceanBeast.cpp`): every vertex keeps its
   part and its place along the body and is re-placed each frame from how the real animal moves. The **Reefjaw** (a 6 m

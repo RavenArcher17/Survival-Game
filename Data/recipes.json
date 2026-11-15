@@ -453,7 +453,16 @@
     {"id": "puffball_sac_cure", "station": "workbench", "level": 1, "inputs": {"spore_sac": 2, "fiber": 1}, "output": "puffball_sac", "count": 1, "seconds": 5, "biome": "fungal"},
     {"id": "effigy_mycelorn", "station": "alchemy_table", "level": 1, "inputs": {"deepcap": 20, "resin": 6, "spore_essence": 2}, "output": "effigy_mycelorn", "count": 1, "seconds": 5, "blueprint": "effigy_mycelorn", "biome": "fungal"},
     {"id": "effigy_sporemother", "station": "alchemy_table", "level": 1, "inputs": {"mite_chitin": 12, "spore_sac": 4, "clay": 2}, "output": "effigy_sporemother", "count": 1, "seconds": 5, "blueprint": "effigy_sporemother", "biome": "fungal"},
-    {"id": "effigy_rot_king", "station": "alchemy_table", "level": 1, "inputs": {"rot_shell": 3, "deepcap": 4}, "output": "effigy_rot_king", "count": 1, "seconds": 5, "blueprint": "effigy_rot_king", "biome": "fungal"}
+    {"id": "effigy_rot_king", "station": "alchemy_table", "level": 1, "inputs": {"rot_shell": 3, "deepcap": 4}, "output": "effigy_rot_king", "count": 1, "seconds": 5, "blueprint": "effigy_rot_king", "biome": "fungal"},
+    {"id": "divers_draught", "station": "alchemy_table", "level": 1, "inputs": {"sea_grapes": 2, "salt": 1, "sea_kelp": 1}, "output": "divers_draught", "count": 1, "seconds": 4, "biome": "ocean", "blueprint": "quest_divers_draught"},
+    {"id": "swim_fins", "station": "workbench", "level": 2, "inputs": {"ray_wing": 2, "eel_skin": 1, "fiber": 4}, "output": "swim_fins", "count": 1, "seconds": 6, "biome": "ocean", "blueprint": "quest_swim_fins"},
+    {"id": "whalers_harpoon", "station": "workbench", "level": 2, "inputs": {"iron_ingot": 2, "wood": 2, "rope": 4, "shark_tooth": 2}, "output": "whalers_harpoon", "count": 1, "seconds": 8, "biome": "ocean", "blueprint": "bp_whalers_harpoon"},
+    {"id": "beeswax_plugs", "station": "alchemy_table", "level": 1, "inputs": {"wax": 2, "fiber": 1}, "output": "beeswax_plugs", "count": 1, "seconds": 3, "biome": "ocean"},
+    {"id": "sunstone_flare", "station": "alchemy_table", "level": 2, "inputs": {"sunstone": 1, "glass": 1, "kelp_ash": 1}, "output": "sunstone_flare", "count": 2, "seconds": 5, "biome": "ocean"},
+    {"id": "shark_tooth_arrow", "station": "workbench", "level": 2, "inputs": {"shark_tooth": 1, "wood": 1, "feathers": 1}, "output": "shark_tooth_arrow", "count": 4, "seconds": 2, "biome": "ocean", "blueprint": "quest_shark_tooth_arrow"},
+    {"id": "eel_waterskin", "station": "workbench", "level": 1, "inputs": {"eel_skin": 1, "fiber": 2}, "output": "eel_waterskin", "count": 1, "seconds": 3, "biome": "ocean"},
+    {"id": "pearl_ring", "station": "forge", "level": 2, "inputs": {"bronze_ingot": 1, "pearl": 1}, "output": "pearl_ring", "count": 1, "seconds": 6, "biome": "ocean"},
+    {"id": "diving_helm", "station": "armorer", "level": 3, "inputs": {"tidecoral": 4, "copper_ingot": 6, "glass": 1}, "output": "diving_helm", "count": 1, "seconds": 8, "biome": "ocean"}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

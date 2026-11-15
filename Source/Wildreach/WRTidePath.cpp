@@ -1,4 +1,5 @@
 #include "WRTidePath.h"
+#include "WRInventory.h"
 #include "Wildreach.h"
 #include "WRArcanePath.h"
 #include "WRAttributeSet.h"
@@ -244,7 +245,7 @@ void WRTidePath::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 		return;
 	}
 	// Capacity 100, +15 a Flow capacity rank (nodeEffects tide.flow_capacity maxFlow).
-	const float Max = TpF(TEXT("max"), 100.f) + FMath::Max(0.f, UWRPathComponent::Stat(Who, TEXT("maxFlow")));
+	const float Max = (TpF(TEXT("max"), 100.f) + FMath::Max(0.f, UWRPathComponent::Stat(Who, TEXT("maxFlow")))) * (1.f + UWRInventoryComponent::GearStatFor(Who, TEXT("maxFlowMult")));
 	if (!FMath::IsNearlyEqual(A->GetMaxFlow(), Max))
 	{
 		TpSetAttr(Who, UWRAttributeSet::GetMaxFlowAttribute(), Max);
@@ -297,6 +298,11 @@ void WRTidePath::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 
 void WRTidePath::ScaleBuildups(const AWRCharacterBase* Attacker, FWRHit& Hit)
 {
+	// Hae-won's knife (her sixth quest): a tidecoral edge soaks whatever it cuts, in anyone's hand.
+	if (const UWRInventoryComponent* Inv = Attacker && Hit.bMelee && !Hit.bDamageOverTime ? UWRInventoryComponent::FindFor(Attacker) : nullptr)
+	{
+		if (Inv->GetEquipped(EWREquipSlot::Weapon).ItemId == TEXT("haewons_knife")) Hit.Buildups.FindOrAdd(TEXT("soak")) += WRTune(TEXT("oceanWorld.knifeSoak"), 20.f);
+	}
 	if (!Attacker || !Walks(Attacker)) return;
 	const int32 Soak = Rank(Attacker, TEXT("soak_chance"));
 	if (Soak <= 0) return;

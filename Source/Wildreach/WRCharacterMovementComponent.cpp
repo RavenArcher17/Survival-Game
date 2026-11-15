@@ -1,4 +1,5 @@
 #include "WRCharacterMovementComponent.h"
+#include "WROceanHazards.h"
 #include "WRVoid.h"
 #include "WRRaiding.h"
 #include "WRCharacterBase.h"
@@ -177,6 +178,23 @@ uint8 FSavedMove_WR::GetCompressedFlags() const
 void UWRCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+	// The Ocean's rips (WROceanHazards): a seaward current on a swimmer, a pure function of the tide and where you swim,
+	// so the owner and the server move the same. Survivors only (a mount's rider rides; creatures know the water).
+	if (CharacterOwner && IsSwimming() && CharacterOwner->GetPlayerState() && CharacterOwner->GetLocalRole() != ROLE_SimulatedProxy)
+	{
+		FVector Current = UWROceanHazards::CurrentAt(CharacterOwner, UpdatedComponent->GetComponentLocation());
+		if (!Current.IsNearlyZero() && UWRLifeSkillsComponent::StatFor(CharacterOwner, TEXT("currentRider")) > 0.f)
+		{
+			// Current rider (Swimming 75): the water carries you half again as fast, and pushes half as hard against you.
+			Current *= FVector::DotProduct(GetCurrentAcceleration().GetSafeNormal2D(), Current.GetSafeNormal()) >= 0.f ? 1.5f : 0.5f;
+		}
+		if (!Current.IsNearlyZero())
+		{
+			FHitResult CurHit;
+			SafeMoveUpdatedComponent(Current * DeltaSeconds, UpdatedComponent->GetComponentQuat(), true, CurHit);
+			if (CurHit.IsValidBlockingHit()) SlideAlongSurface(Current * DeltaSeconds, 1.f - CurHit.Time, CurHit.Normal, CurHit, true);
+		}
+	}
 	if (IsOnLadder() || !CharacterOwner || !(IsMovingOnGround() || IsFalling() || IsGliding()))
 	{
 		return;

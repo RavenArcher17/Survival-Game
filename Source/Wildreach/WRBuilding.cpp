@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WROceanTypes.h"
 #include "WRSwampSystems.h"
 #include "WRCreature.h"
 #include "WRRaiding.h"
@@ -1558,6 +1559,12 @@ bool AWRClaimTotem::CanBuild(const UWorld* World, const FVector& Location, const
 	if (FWRSocialRules::IsInSafeZone(World, Location))
 	{
 		OutWhy = TEXT("no building in the safe zone");
+		return false;
+	}
+	// The Drowned Hall (cooks/biome-ocean.md 2.5): a drowned town's halls, never anyone's base (no claims, no pieces).
+	if (WROcean::Live() && WROcean::InHall(Location))
+	{
+		OutWhy = TEXT("nothing can be built in the Drowned Hall");
 		return false;
 	}
 	const AWRClaimTotem* Claim = FindAt(World, Location);

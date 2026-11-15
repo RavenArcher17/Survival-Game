@@ -16,6 +16,8 @@
 #include "WRTuning.h"
 #include "WRUnderwater.h"
 #include "WRWorldSystems.h"
+#include "WRAbilitiesTide.h"
+#include "WRSurvival.h"
 #include "Components/PointLightComponent.h"
 #include "Components/PostProcessComponent.h"
 #include "Engine/World.h"
@@ -194,7 +196,7 @@ FString AWROceanSpot::Start(AWRPlayerController* PC)
 			LexFromString(Index, *SpotId.ToString().RightChop(15));
 			TSet<int32>& Read = W->StonesRead.FindOrAdd(Who);
 			Read.Add(Index);
-			if (Read.Num() >= 9) QuestEvent(Me, TEXT("event"), TEXT("tsunami_stones_read"), 1);
+			if (Read.Num() >= 9) QuestEvent(Me, TEXT("event"), TEXT("stones_say"), 1);
 			return FString::Printf(TEXT("A wave carved deep, and one line under it. (%d of 9 read)"), Read.Num());
 		}
 		return FString();
@@ -230,6 +232,34 @@ FString AWROceanSpot::Start(AWRPlayerController* PC)
 	{
 		UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me);
 		if (Inv && Inv->CountOf(TEXT("sluice_key")) > 0) return TEXT("The lock is empty. You have the key.");
+	}
+	if (Kind == TEXT("secret"))
+	{
+		// Its window and what it needs (cook 2.20): said plainly, so a secret found early can be come back to.
+		const float H = AWRGameState::HourIn(this);
+		const float Full = WRTide::Fullness(this);
+		if (When == TEXT("midnight_high") && !((H >= 23.f || H < 1.f) && Full > Tn(TEXT("oceanWorld.secretHighTide"), 0.8f)))
+			return TEXT("The window's under the water. At midnight, at the top of the flood, it stands clear");
+		if (When == TEXT("noon_clear"))
+		{
+			const FWRWeatherKind* Wx = UWRWeatherSubsystem::ActiveKind(this, WROcean::Biome());
+			if (!(H >= 11.f && H < 13.f) || (Wx && (Wx->Id == TEXT("fog") || Wx->Id == TEXT("rain") || Wx->Id == TEXT("squall") || Wx->Id == TEXT("overcast"))))
+				return TEXT("The groove in the stone means nothing now. At noon, under a clear sky, it points somewhere");
+		}
+		if (When == TEXT("king_tide"))
+		{
+			const AWROceanState* S = AWROceanState::Get(this);
+			if (!S || S->KingTide != EWRKingTide::Low) return TEXT("Barnacled stone under deep water. The King Tide's Low lays it bare");
+			if (Me->GetPlayerState()) QuestEvent(Me, TEXT("event"), TEXT("low_gate"), 1);
+			return TEXT("The Low Gate stands out of the sea. Through it, the Drowned Hall, while the water is out");
+		}
+		if (Needs == TEXT("sluice_key"))
+		{
+			const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me);
+			if (!Inv || Inv->CountOf(TEXT("sluice_key")) <= 0) return TEXT("A bronze door with a sluice-keeper's lock. It wants its key");
+		}
+		if (Needs == TEXT("pearldiver") && !OwnsTameNear(Me, TEXT("pearldiver"), GetActorLocation(), Tn(TEXT("oceanWorld.pearldiverRange"), 2000.f) * 1.5f))
+			return TEXT("Black water and rock. Something with a better nose than yours could find a way in");
 	}
 	if (IsDoneBy(Who, GameHours(this)))
 	{
@@ -297,6 +327,15 @@ void AWROceanSpot::Finish()
 		if (OwnsTameNear(P, TEXT("pearldiver"), GetActorLocation(), Tn(TEXT("oceanWorld.pearldiverRange"), 2000.f))) Chance *= Tn(TEXT("oceanWorld.pearldiverPearls"), 5.f);
 		if (const AWROceanState* S = AWROceanState::Get(this); S && S->KingTide != EWRKingTide::None) Chance *= Tn(TEXT("tide.kingTide.pearlMult"), 2.f);
 		if (FMath::FRand() < Chance) Pay.Add(TEXT("pearl"), 1);
+	}
+	if (const int32* Gem = Pay.Find(TEXT("@gem")))
+	{
+		// A gem of any kind (the secret's "@gem").
+		TArray<FName> Gems;
+		for (const FWRItemDef& I : FWRItemRegistry::Get().All()) if (I.Category == TEXT("gem")) Gems.Add(I.Id);
+		const int32 N = *Gem;
+		Pay.Remove(TEXT("@gem"));
+		if (Gems.Num() > 0) Pay.FindOrAdd(Gems[FMath::RandRange(0, Gems.Num() - 1)]) += N;
 	}
 	DoneBy.Add(Who, GameHours(this));
 	TArray<FString> Got;
@@ -570,7 +609,30 @@ void UWROceanWorld::SpawnServerActors()
 		if (SpawnCache(K.At + FVector(120.f, 0.f, bHouse ? 60.f : 20.f), K.Yaw, bHull ? TEXT("A castaway's sea chest") : bHouse ? TEXT("A Saltkin jar") : TEXT("A sunk barrel"), Items,
 			bHull ? TEXT("Ship's biscuit gone to green, and a carved name.") : FString(), T.Num(TEXT("oceanWorld.kitRefillHours"), 96.f))) ++NCaches;
 	}
-	UE_LOG(LogWildreach, Log, TEXT("OCEAN server: %d nodes, %d clams, %d spots, %d caches"), Nodes, Clams, NSpots, NCaches);
+	// ---- the secrets O-S1..S6 (cook 2.20): a spot each, open only in its window or with what it needs ----
+	int32 NSecrets = 0;
+	for (const FWROceanData::FSecret& Sec : D.Secrets)
+	{
+		const FName K = Sec.Kind;
+		const FString Title = K == TEXT("bell_window") ? TEXT("A window in the bell") : K == TEXT("dyke_vault") ? TEXT("A sluice-keeper's vault")
+			: K == TEXT("horn_ledge") ? TEXT("A ledge over the Horn") : K == TEXT("mirror_line") ? TEXT("A mirror's sighting stone")
+			: K == TEXT("lazarus_ledge") ? TEXT("A ledge in the dark water") : TEXT("The Low Gate");
+		const FString Verb = K == TEXT("dyke_vault") ? TEXT("Turn the key") : K == TEXT("low_gate") ? TEXT("Go through") : K == TEXT("mirror_line") ? TEXT("Set the mirror on the line") : TEXT("Search");
+		AWROceanSpot* S = SpawnSpot(TEXT("secret"), Sec.Id, Sec.At + FVector(0, 0, 60.f), Title, Verb, K == TEXT("low_gate") ? 0.f : 2.f);
+		if (!S) continue;
+		S->When = Sec.When;
+		S->Needs = Sec.Needs;
+		S->Gives = Sec.Pays;
+		S->RespawnHours = 0.f;
+		S->Lore = K == TEXT("bell_window") ? TEXT("At the top of the flood the window stands just clear of the water, and the moon comes through onto a shelf nobody could reach.")
+			: K == TEXT("dyke_vault") ? TEXT("The key turns. The keeper kept the town's last good things here, above the sluice he never opened.")
+			: K == TEXT("horn_ledge") ? TEXT("Old footholds cut in the rock, and a harpooner's cache wedged in a crack.")
+			: K == TEXT("mirror_line") ? TEXT("At noon the stone's groove points straight at the Pound. Someone sat here and aimed the light by hand.")
+			: K == TEXT("lazarus_ledge") ? TEXT("Your Pearldiver finds the seam in the dark. Behind it, a drowned diver's kit.")
+			: TEXT("The Low Gate stands out of the sea. The Drowned Hall's way is open while the water is out.");
+		++NSecrets;
+	}
+	UE_LOG(LogWildreach, Log, TEXT("OCEAN server: %d nodes, %d clams, %d spots, %d caches, %d secrets"), Nodes, Clams, NSpots, NCaches, NSecrets);
 }
 
 void UWROceanWorld::StepLights(float Dt)
@@ -694,6 +756,14 @@ bool UWROceanWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FS
 	const UWROceanWorld* W = Get(PC);
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!W || !W->bActive || !Me) return false;
+	// A harpoon line in hand by a mooring stone: tie it off (the Reef Tyrant's tether, a Whaler's harpoon's catch).
+	FVector Ring;
+	if (W->TieRing(Me, Ring))
+	{
+		OutTarget = TEXT("A mooring stone");
+		OutVerb = TEXT("Tie the line off");
+		return true;
+	}
 	if (const AWROceanSpot* S = W->SpotNear(Me->GetActorLocation()))
 	{
 		OutTarget = S->Title;
@@ -708,6 +778,8 @@ bool UWROceanWorld::ClientInteract(AWRPlayerController* PC)
 	const UWROceanWorld* W = Get(PC);
 	const APawn* Me = PC ? PC->GetPawn() : nullptr;
 	if (!W || !W->bActive || !Me) return false;
+	FVector Ring;
+	if (W->TieRing(Me, Ring)) { PC->SendCommand(TEXT("world ocean tie")); return true; }
 	if (W->SpotNear(Me->GetActorLocation())) { PC->SendCommand(TEXT("world ocean spot")); return true; }
 	return false;
 }
@@ -718,10 +790,37 @@ FString UWROceanWorld::Command(AWRPlayerController* PC, const TArray<FString>& A
 	AWRCharacterBase* Me = PC ? Cast<AWRCharacterBase>(PC->GetPawn()) : nullptr;
 	if (!W || !W->bActive || !Me) return TEXT("Not here");
 	const FString Verb = Args.IsValidIndex(2) ? Args[2] : FString();
+	if (Verb == TEXT("tie"))
+	{
+		FVector Ring;
+		AWRHarpoonLine* L = AWRHarpoonLine::HeldBy(Me);
+		if (!L || !W->TieRing(Me, Ring)) return TEXT("Nothing to tie off here");
+		L->TieTo(Ring);
+		WRSound::PlayAt(Me, TEXT("tide.rope_creak"), Ring);
+		QuestEvent(Me, TEXT("event"), TEXT("line_tied"), 1);
+		if (AWRCreature* C = Cast<AWRCreature>(L->Struck)) UE_LOG(LogWildreach, Log, TEXT("OCEAN %s tied %s off on a mooring stone"), *Me->GetName(), *C->GetName());
+		return TEXT("The line's tied off on the stone: whatever's on the end of it is going nowhere");
+	}
 	if (Verb == TEXT("spot"))
 	{
 		if (AWROceanSpot* S = W->SpotNear(Me->GetActorLocation())) return S->Start(PC);
 		return TEXT("Nothing here");
 	}
 	return TEXT("world ocean spot");
+}
+
+bool UWROceanWorld::TieRing(const APawn* Who, FVector& OutRing) const
+{
+	const AWRHarpoonLine* L = Who ? AWRHarpoonLine::HeldBy(Who) : nullptr;
+	if (!L || L->bTied || !L->Struck) return false;
+	const float Reach = Tn(TEXT("oceanWorld.tieReach"), 300.f);
+	for (const FVector& M : FWROceanData::Get().MooringStones)
+	{
+		if (FVector::Dist2D(M, Who->GetActorLocation()) < Reach && FMath::Abs(M.Z - Who->GetActorLocation().Z) < 400.f)
+		{
+			OutRing = M + FVector(0.f, 0.f, 120.f);
+			return true;
+		}
+	}
+	return false;
 }

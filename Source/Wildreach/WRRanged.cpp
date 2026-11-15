@@ -3,6 +3,11 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRAbilitiesTide.h"
+#include "WRFx.h"
+#include "WRWorldSystems.h"
+#include "WRPlayerState.h"
+#include "WRCreature.h"
 #include "WRUnderwater.h"
 #include "WRPlayerController.h"
 #include "WRWindPath.h"
@@ -32,6 +37,7 @@
 #include "Engine/SkeletalMeshSocket.h"
 #include "Engine/StaticMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "EngineUtils.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "TimerManager.h"
 
@@ -531,6 +537,7 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult * LauncherMult;
 	// An arrow's own status (items.json ammo: the Murkjaw-tooth arrow's bleed 25): WRSwampSystems reads it.
 	if (Ammo) WRSwamp::AddAmmoBuildups(Ammo->Id, Hit);
+	if (Ammo && Ammo->Id == TEXT("shark_tooth_arrow")) Hit.SwimTargetMult = WRTune(TEXT("oceanWorld.sharkToothSwimmingMult"), 1.1f);
 	// Hush arrows: silent, sneak hits x1.15 (cooks/biome-sky.md 2.17).
 	if (Ammo) { Hit.UnawareMult = Ammo->AmmoSneakMult; Hit.bQuiet = Ammo->bAmmoSilent; }
 	// Arrows, bolts, darts and thrown spears fly straight enough to be thrown back by a reflector (crystal 2.12); bolas
@@ -593,6 +600,65 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 				if (!Struck || !Struck->IsAlive() || (Result != EWRHitResult::Hit && Result != EWRHitResult::GuardBroken)) return;
 				WRWind::Knock(WeakSelf.Get(), Struck, KnockDir, Knock, WRTune(TEXT("ranged.knockSeconds"), 0.35f), TEXT("arrow"));
 			};
+		}
+		// A thrown spear or harpoon (cooks/biome-ocean.md 2.11, 2.19): Hae-won's third quest counts it under the water; the
+		// Whaler's harpoon puts its 18 m line on what it strikes (hauling the small in; E at a mooring stone ties it off).
+		if (Launcher.RangedKind == TEXT("spear"))
+		{
+			TWeakObjectPtr<AWRCharacter> WeakSelf(this);
+			const bool bLine = Launcher.Id == TEXT("whalers_harpoon");
+			TFunction<void(AWRCharacterBase*, EWRHitResult)> Before = Projectile->OnStruck;
+			Projectile->OnStruck = [WeakSelf, bLine, Before](AWRCharacterBase* Struck, EWRHitResult Result)
+			{
+				if (Before) Before(Struck, Result);
+				AWRCharacter* Me = WeakSelf.Get();
+				if (!Me || !Struck || (Result != EWRHitResult::Hit && Result != EWRHitResult::GuardBroken)) return;
+				if (Struck->IsA<AWRCreature>() && (WRUnderwater::IsUnder(Struck) || WRUnderwater::IsUnder(Me)))
+				{
+					AWRPlayerState* PS = Me->GetPlayerState<AWRPlayerState>();
+					if (UWRWorldSystems* WS = PS ? Me->GetWorld()->GetSubsystem<UWRWorldSystems>() : nullptr) WS->QuestEvent(PS, TEXT("event"), TEXT("harpoon_underwater"), 1);
+				}
+				if (!bLine) return;
+				AWRHarpoonLine* L = AWRHarpoonLine::Make(Me, Struck, Struck->GetActorLocation(), false);
+				if (!L) return;
+				// It waits on the line (to be tied off) as long as it lasts; the lowland and midland are hauled in.
+				L->ReelUntil = L->BornAt + L->Lifetime;
+				const AWRCreature* C = Cast<AWRCreature>(Struck);
+				const FName Tier = C && C->GetDef() ? C->GetDef()->Tier : NAME_None;
+				if (Tier == TEXT("lowland") || Tier == TEXT("midland"))
+				{
+					const FVector Toward = (Me->GetActorLocation() - Struck->GetActorLocation()).GetSafeNormal();
+					Struck->LaunchCharacter(Toward * WRTune(TEXT("oceanWorld.whalerReel"), 1600.f) + FVector(0, 0, 150.f), true, true);
+					L->bTaut = true;
+				}
+				WRSound::PlayAt(Me, TEXT("tide.harpoon_hit"), Struck->GetActorLocation());
+			};
+		}
+		// The sunstone flare: a 2 m burst of daylight where it comes down or strikes (blind 25 to all but the thrower).
+		if (Launcher.RangedKind == TEXT("sunflare"))
+		{
+			TWeakObjectPtr<AWRCharacter> WeakSelf(this);
+			auto Burst = [WeakSelf](const FVector& At)
+			{
+				AWRCharacter* Me = WeakSelf.Get();
+				if (!Me) return;
+				WRFx::Broadcast(Me, TEXT("ocean.sunflare"), At, FRotator::ZeroRotator, 1.f, TEXT("ocean.sunflare"));
+				for (TActorIterator<AWRCharacterBase> It(Me->GetWorld()); It; ++It)
+				{
+					if (*It == Me || !It->IsAlive() || FVector::Dist(It->GetActorLocation(), At) > WRTune(TEXT("oceanWorld.sunflareRadius"), 200.f) + It->GetSimpleCollisionRadius()) continue;
+					FWRHit Flash;
+					Flash.Instigator = Me;
+					Flash.Damage = 0.f;
+					Flash.bUnblockable = true;
+					Flash.Origin = At;
+					Flash.Element = WRTags::Element_Physical;
+					Flash.Buildups.Add(TEXT("blind"), WRTune(TEXT("oceanWorld.sunflareBlind"), 25.f));
+					UWRCombatLibrary::ApplyHit(*It, Flash);
+				}
+			};
+			Projectile->OnLanded = Burst;
+			TFunction<void(AWRCharacterBase*, EWRHitResult)> Before = Projectile->OnStruck;
+			Projectile->OnStruck = [Burst, Before](AWRCharacterBase* Struck, EWRHitResult Result) { if (Before) Before(Struck, Result); if (Struck) Burst(Struck->GetActorLocation()); };
 		}
 	}
 }

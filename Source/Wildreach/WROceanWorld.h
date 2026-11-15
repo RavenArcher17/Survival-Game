@@ -74,6 +74,8 @@ public:
 
 	// Server.
 	TMap<FName, int32> Gives;
+	/** A secret's window (midnight_high, noon_clear, king_tide) and what it needs (an item carried, a tame near). */
+	FName When, Needs;
 	FString Lore;
 	float RespawnHours = 0.f;       // 0 = once per survivor
 	TMap<FString, double> DoneBy;   // survivor -> game hours
@@ -123,6 +125,8 @@ public:
 	static FString Command(AWRPlayerController* PC, const TArray<FString>& Args);
 
 	AWROceanSpot* SpotNear(const FVector& P, float Range = 0.f) const;
+	/** A harpoon line held by Who and a mooring stone's ring within 3 m of them: where to tie it. */
+	bool TieRing(const APawn* Who, FVector& OutRing) const;
 	AWROceanSpot* FindSpot(FName Id) const;
 	const TArray<TWeakObjectPtr<AWROceanScenery>>& GetScenery() const { return Scenery; }
 	AWRResourceNode* SpawnNode(FName Item, const FVector& At, int32 Hits, float PerHit, float RespawnSeconds, float Yaw = -1.f);

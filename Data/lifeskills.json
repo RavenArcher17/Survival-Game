@@ -95,10 +95,10 @@
     { "id": "swimming", "name": "Swimming", "group": "Exploration", "levelsBy": "Swimming (distance swum)",
       "everyLevel": {"text": "Swim faster", "stat": "swimSpeed", "perLevel": 0.004},
       "perks": {
-        "25": [ {"id": "diver", "name": "Diver", "text": "Much longer breath", "waitsFor": "diving"}, {"id": "strong_stroke", "name": "Strong stroke", "text": "The fast stroke costs half the stamina", "stat": "swimStamina", "value": -0.5} ],
-        "50": [ {"id": "pressure", "name": "Pressure", "text": "Dive deeper safely", "waitsFor": "diving"}, {"id": "water_fighter", "name": "Water fighter", "text": "Your hits land 25% harder from the water", "stat": "waterDamage", "value": 0.25} ],
-        "75": [ {"id": "current_rider", "name": "Current rider", "text": "Currents speed you up", "waitsFor": "sea currents"}, {"id": "salvager", "name": "Salvager", "text": "Find sunken loot", "waitsFor": "sunken loot"} ],
-        "100": [ {"id": "seaborn", "name": "Seaborn", "text": "The fast stroke costs no stamina", "stat": "swimStamina", "value": -1}, {"id": "abyss_diver", "name": "Abyss diver", "text": "Reach the deepest areas", "waitsFor": "diving"} ] } },
+        "25": [ {"id": "diver", "name": "Diver", "text": "Much longer breath", "stat": "breathMult", "value": 0.5}, {"id": "strong_stroke", "name": "Strong stroke", "text": "The fast stroke costs half the stamina", "stat": "swimStamina", "value": -0.5} ],
+        "50": [ {"id": "pressure", "name": "Pressure", "text": "Dive deeper safely (15 m more before the crush)", "stat": "crushDepth", "value": 1500}, {"id": "water_fighter", "name": "Water fighter", "text": "Your hits land 25% harder from the water", "stat": "waterDamage", "value": 0.25} ],
+        "75": [ {"id": "current_rider", "name": "Current rider", "text": "Currents carry you: half again as fast swimming with a rip, half as hard against it", "stat": "currentRider", "value": 1}, {"id": "salvager", "name": "Salvager", "text": "Find sunken loot: sunken caches within 40 m of you show a thread of bubbles", "stat": "salvager", "value": 1} ],
+        "100": [ {"id": "seaborn", "name": "Seaborn", "text": "The fast stroke costs no stamina", "stat": "swimStamina", "value": -1}, {"id": "abyss_diver", "name": "Abyss diver", "text": "Reach the deepest areas: no crushing depth at all", "stat": "noCrush", "value": 1} ] } },
     { "id": "sneaking", "name": "Sneaking", "group": "Exploration", "levelsBy": "Moving unseen (walking near aggressive creatures that haven't noticed you)",
       "everyLevel": {"text": "Quieter movement", "stat": "aggroRadius", "perLevel": -0.003},
       "perks": {

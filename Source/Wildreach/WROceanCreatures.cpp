@@ -903,6 +903,8 @@ bool FWROceanAI::StrikeRow(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttack
 		// Every Gullraider within 50 m comes (once a fight).
 		Body->bMobCalled = true;
 		Body->MulticastMoment(NAME_None, 1.f, TEXT("creature.gullraider.mob"));
+		// Wax in your ears (beeswax plugs): the call doesn't reach you, so nothing comes for you.
+		if (Target && UWRInventoryComponent::GearStatFor(Target, TEXT("passMobCall")) > 0.f) { Body->Set(WROceanFlag::Pouch, false); return true; }
 		OcEachKind(Self->GetWorld(), TEXT("gullraider"), Self->GetActorLocation(), OcTn(TEXT("gullraider.mobReach"), 5000.f), [&](AWRCreature* C, UWROceanBody*)
 		{
 			if (C != Self && Target) C->SetAggroTarget(Target);
@@ -1345,7 +1347,7 @@ void UWROceanLife::StepPopulations()
 		int32 Have = 0;
 		for (const TWeakObjectPtr<AWRCreature>& C : Spawned) if (C.IsValid() && FVector::Dist(C->GetActorLocation(), Pl.At) < Reach) ++Have;
 		// The open sea's Reefjaws double in a Squall and at night (the tables carry the night).
-		const int32 Want = FMath::RoundToInt(OcTn(TEXT("perPlayer"), 12.f) * Mult * (bSquall && Zone == TEXT("O5") ? 1.5f : 1.f));
+		const int32 Want = FMath::RoundToInt(OcTn(TEXT("perPlayer"), 12.f) * Mult * (bSquall && Zone == TEXT("O5") ? OcTn(TEXT("squallSeaMult"), 2.f) : 1.f));
 		if (Have >= Want) continue;
 		// A weighted pick from the table.
 		float Sum = 0.f;
