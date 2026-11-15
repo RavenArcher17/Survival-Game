@@ -31,6 +31,7 @@ public class Wildreach : ModuleRules
 		PrivateDependencyModuleNames.Add("AnimationCore");  // two-bone IK: the survivor's feet planted on slopes (WRAnimInstance)
 		PrivateDependencyModuleNames.Add("MoviePlayer");  // the loading screen during map loads (WRUIFlow)
 		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "RHI" });  // effects: WRFx draws its sprites with its own scene proxy
+		PrivateDependencyModuleNames.AddRange(new string[] { "MeshDescription", "StaticMeshDescription" });  // the forest's tree kit builds static meshes at runtime (WRTreeKit)
 		// The MetaHuman hero (WRHeroAnimInstance, WRCharacter): motion matching over the GASP clips, the hair grooms.
 		PrivateDependencyModuleNames.AddRange(new string[] { "PoseSearch", "HairStrandsCore" });
 
