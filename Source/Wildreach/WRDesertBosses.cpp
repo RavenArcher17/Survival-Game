@@ -230,7 +230,7 @@ namespace WRDesertBossImpl
 		S.FreeAt = FreeAt;
 		S.Freed = 0.f;
 		if (UWRDesertBody* Bd = Body(Boss)) { Bd->Holding = V; Bd->HeldBody = V; Bd->Set(WRDesertFlag::Grip, true); }
-		DbTell(V, Kind == TEXT("swallow") ? TEXT("Swallowed! Struggle (dodge) - your allies can cut you free at the throat") : TEXT("Caught! Struggle (dodge), or have someone strike the hand that holds you"));
+		DbTell(V, Kind == TEXT("swallow") ? TEXT("Swallowed! Your allies can cut you free: strike it hard before it spits you out") : TEXT("Caught! Have someone strike the hand that holds you"));
 	}
 	void SpawnMirage(AWRBoss* Boss, FState& S, int32 i, AActor* Target)
 	{
