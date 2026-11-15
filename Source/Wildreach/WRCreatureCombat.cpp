@@ -9,6 +9,7 @@
 #include "WRSkyIsleTypes.h"
 #include "WRSkyAir.h"
 #include "WRSkyCreatures.h"
+#include "WROceanCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampBosses.h"
 #include "WRSwampCreatures.h"
@@ -480,6 +481,7 @@ float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRCrystalAI::Incoming(this, Hit, Damage);  // a Prismback's plates throw a shot back, a rolled Druseback, a Spindleglass's legs
 	Damage = FWRGraveAI::Incoming(this, Hit, Damage);   // a buried hound, the Tombback's slab, the Risen and necrotic magic
 	Damage = FWRSkyAI::Incoming(this, Hit, Damage);   // grounded after a stoop: open
+	Damage = FWROceanAI::Incoming(this, Hit, Damage); // a Spinecrab's guard and flip, a stranded Reefjaw, a pool-bound one
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -649,6 +651,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;
 		}
+		if (!FWROceanAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // an Ocean creature's rule (the breach at the surface, the surf lunge on the wet sand, the hole)
+		}
 		if (!FWRGraveAI::RowAllowed(this, Self, R, Target, bReading))
 		{
 			continue;  // a Graveyard creature's own rule (the Rising, the howl once, the drop from a ceiling, the dark, the downed)
@@ -711,6 +717,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	FWRForestAI::RowStarted(this, Self, *R, Target);
 	FWRGraveAI::RowStarted(this, Self, *R, Target);
 	FWRSkyAI::RowStarted(this, Self, *R, Target);
+	FWROceanAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -810,6 +817,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 			FWRCrystalAI::Resolved(S, V, HitRowId, Result);
 			// A Sky creature's (the impale, the smother, the meat theft, the lash's sting, the cornered Puffwing's run).
 			FWRSkyAI::Resolved(S, V, HitRowId, Result);
+			FWROceanAI::Resolved(S, V, HitRowId, Result);   // the drag, the second jaw, the snatch, the club's pop
 		}
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{
@@ -858,6 +866,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	if (FWRGraveAI::StrikeRow(this, Self, *R, Target))
 	{
 		return;  // a Graveyard move (the Cryptstalker's drop off its ceiling)
+	}
+	if (FWROceanAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // an Ocean move (the breach up the column, the shock pulse, the sand burst, the mob call, the flare)
 	}
 	if (FWRSkyAI::StrikeRow(this, Self, *R, Target))
 	{
@@ -1027,6 +1039,7 @@ void AWRCreatureAI::TickRow(AWRCreature* Self, float DeltaSeconds)
 		const float BodyR = Self->GetSimpleCollisionRadius();
 		// A Swamp strike's own moves the shapes below don't cover (the cry's cone, the tongue, the flurry, the flop's ring).
 		FWRSwampAI::TickStrike(this, Self, *R, DeltaSeconds);
+		FWROceanAI::TickStrike(this, Self, *R, DeltaSeconds);
 		FWRSkyAI::TickStrike(this, Self, *R, DeltaSeconds);   // the Undertow's pull, the belly-flop's landing, the glide's end
 		if (M == TEXT("bite") || M == TEXT("claw") || M == TEXT("sweep") || M == TEXT("kick") || M == TEXT("buffet") || M == TEXT("snap"))
 		{

@@ -1023,7 +1023,21 @@
     {"id": "lore_champions_kite_token", "name": "Champion's kite-token", "category": "lore", "stack": 1, "weight": 0.2, "biome": "fungal", "note": "Jade, larger, from the champion's fist on the Fall Field. Its kite has no string. It points up the shaft."},
     {"id": "lore_elders_bowl", "name": "Elder's bowl", "category": "lore", "stack": 1, "weight": 0.8, "biome": "fungal", "note": "The bronze bowl from the top of the Elders' Tower. Seven mouths drank from it, then climbed. It's clean."},
     {"id": "lore_heart_seed_husk", "name": "Heart-seed husk", "category": "lore", "stack": 1, "weight": 0.4, "biome": "fungal", "note": "A small amber husk from the Seed Vault, a seed of the Heart. It's warm, and it beats if you wait."},
-    {"id": "lore_trade_token", "name": "Trade token", "category": "lore", "stack": 1, "weight": 0.1, "biome": "fungal", "note": "A disc cut half from sunstone and half from a dried deepcap, the two halves pinned together. Someone made a pair of these."}
+    {"id": "lore_trade_token", "name": "Trade token", "category": "lore", "stack": 1, "weight": 0.1, "biome": "fungal", "note": "A disc cut half from sunstone and half from a dried deepcap, the two halves pinned together. Someone made a pair of these."},
+    {"id": "raw_fish", "name": "Raw fish", "category": "food", "stack": 20, "weight": 0.4, "keeps": 30, "use": {"hunger": 8}, "biome": "ocean", "note": "Cut from a sea creature. Grill it, salt it, or bait a sea pen."},
+    {"id": "sharkskin", "name": "Sharkskin", "category": "material", "stack": 20, "weight": 0.6, "biome": "ocean", "note": "Rough as a file one way, smooth the other: Reefmail's under-layer, a harpoon's grip."},
+    {"id": "shark_tooth", "name": "Shark tooth", "category": "material", "stack": 50, "weight": 0.02, "biome": "ocean", "note": "Serrated, a thumb long. Arrowheads that make wounds bleed."},
+    {"id": "eel_skin", "name": "Eel skin", "category": "material", "stack": 20, "weight": 0.3, "biome": "ocean", "note": "Tough and waterproof: waterskins, swim fins."},
+    {"id": "shock_gland", "name": "Shock gland", "category": "material", "stack": 10, "weight": 0.2, "biome": "ocean", "note": "A Tidecoil's banded organ; it still tingles."},
+    {"id": "crab_meat", "name": "Crab meat", "category": "food", "stack": 20, "weight": 0.3, "keeps": 30, "use": {"hunger": 10}, "biome": "ocean"},
+    {"id": "frond", "name": "Wavecharger frond", "category": "material", "stack": 20, "weight": 0.1, "biome": "ocean", "note": "A leafy streamer off a Wavecharger; it dries olive-gold."},
+    {"id": "turtle_hide", "name": "Turtle hide", "category": "material", "stack": 20, "weight": 0.8, "biome": "ocean", "note": "A Driftback's leathery shell-hide, ridged and oily."},
+    {"id": "ray_wing", "name": "Ray wing", "category": "material", "stack": 20, "weight": 0.5, "biome": "ocean", "note": "A strip of Glowray wing: supple cartilage. Swim fins."},
+    {"id": "photophore_gland", "name": "Photophore gland", "category": "material", "stack": 10, "weight": 0.1, "biome": "ocean", "note": "A Glowray's light organ; it glows blue-green for days."},
+    {"id": "otter_pelt", "name": "Pearldiver pelt", "category": "material", "stack": 10, "weight": 0.3, "biome": "ocean", "note": "The densest fur in the sea, chocolate with a silver head."},
+    {"id": "fat", "name": "Blubber", "category": "material", "stack": 20, "weight": 0.5, "biome": "ocean", "note": "Rendered for lamp oil and tallow."},
+    {"id": "egg_wavecharger", "name": "Wavecharger egg", "category": "egg", "stack": 1, "weight": 0.6, "biome": "ocean", "note": "Taken from a sleeping male's brood pouch. Keep it in salt water (a sea pen or a kelp line) or the incubator; it hatches in 20 minutes."},
+    {"id": "tide_essence", "name": "Tide essence", "category": "material", "stack": 20, "weight": 0.1, "biome": "ocean", "note": "Sea-green and never still in the vial."}
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },

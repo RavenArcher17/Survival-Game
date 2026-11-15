@@ -3,6 +3,7 @@
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
 #include "WRSkyCreatures.h"
+#include "WROceanCreatures.h"
 #include "WRStormBosses.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -1963,6 +1964,11 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWRSkyBody::Get(this))
 	{
 		FWRSkyAI::Damaged(this, Hit, Damage);
+	}
+	// An Ocean creature: a held survivor struck free, a Spinecrab's guard broken, a herd woken (WROceanCreatures).
+	if (HasAuthority() && UWROceanBody::Get(this))
+	{
+		FWROceanAI::Damaged(this, Hit, Damage);
 	}
 }
 

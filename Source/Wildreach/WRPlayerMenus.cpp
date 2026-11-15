@@ -6,6 +6,7 @@
 #include "WRLandThings.h"
 #include "WRPlayerController.h"
 #include "WRCrystalCreatures.h"
+#include "WROceanCreatures.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -254,6 +255,12 @@ void AWRPlayerController::WRInteract()
 	}
 	// A Prismback open to the Arcane path's ward (WRCrystalCreatures): the same held E ("world cpathtame" on release).
 	if (FString WardVerb; Wild && FWRCrystalAI::PathTamePrompt(Wild, GetPawn(), WardVerb))
+	{
+		ServerCommand(TEXT("interact"));
+		return;
+	}
+	// A Reefjaw open to the Tide path's calm, a sleeping Wavecharger's pouch (WROceanCreatures): held E too.
+	if (FString OceanVerb; Wild && (FWROceanAI::PathTamePrompt(Wild, GetPawn(), OceanVerb) || FWROceanAI::EggPrompt(Wild, GetPawn(), OceanVerb)))
 	{
 		ServerCommand(TEXT("interact"));
 		return;
@@ -783,6 +790,12 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	if (Cmd == TEXT("world") && Arg(1) == TEXT("cpathtame"))
 	{
 		FWRCrystalAI::StopPathTame(this);
+		return true;
+	}
+	// The Reefjaw's calm or the Wavecharger's egg let go (WROceanCreatures): "world opathtame".
+	if (Cmd == TEXT("world") && Arg(1) == TEXT("opathtame"))
+	{
+		FWROceanAI::StopPathTame(this);
 		return true;
 	}
 	// World systems (WRWorldSystems): world kindle / travel / take / hand / trade / msg / rate / summon / open.

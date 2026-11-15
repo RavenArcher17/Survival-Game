@@ -4,6 +4,7 @@
 #include "WRGraveBosses.h"
 #include "WRGraveCreatures.h"
 #include "WRSkyCreatures.h"
+#include "WROceanCreatures.h"
 #include "WRSkyBosses.h"
 #include "Wildreach.h"
 #include "WRCameraBoom.h"
@@ -75,6 +76,12 @@ void AWRCharacter::ServerMashFrozen_Implementation()
 	if (FWRSkyAI::HolderOf(this))
 	{
 		FWRSkyAI::Mash(this);
+		return;
+	}
+	// Dragged down by a Reefjaw or held in a Tidecoil's second jaw (WROceanCreatures).
+	if (FWROceanAI::HolderOf(this))
+	{
+		FWROceanAI::Mash(this);
 		return;
 	}
 	Status->MashFrozen();

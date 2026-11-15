@@ -59,6 +59,8 @@ struct FWRCreatureDef
 	float LandSpeed = 0.f;
 	float FlySpeed = 0.f;         // fly mounts: cm/s in the air
 	FName ProcBody;               // a body built in code (seal: the Floeback, WRSealBody)
+	float DiveDepth = 0.f;        // a swim mount that dives (cm below the surface; the Wavecharger 4000)
+	float DepthMin = 0.f, DepthMax = 0.f;   // a wild swimmer's depth band below the surface (cm; creatures.json depthRange)
 	FName Utility;                // light, mine_ore, sense_secrets
 	TArray<TPair<FName, int32>> Products;
 	bool bNest = false;
@@ -613,6 +615,7 @@ class WILDREACH_API AWRCreatureAI : public AAIController
 	friend struct FWRForestAI;   // the Ancient forest's creatures (WRForestCreatures): drops, grabs, heat balls, bugles
 	friend struct FWRCrystalAI;  // the Crystal caves' creatures (WRCrystalCreatures): hearing hunters, plates, legs, rolls
 	friend struct FWRGraveAI;    // the Graveyard's creatures (WRGraveCreatures): buried hounds, ceiling drops, light dives, holds
+	friend struct FWROceanAI;    // the Ocean's creatures (WROceanCreatures): holes, the drag, the breach, buried crabs, herds
 	friend struct FWRSkyAI;      // the Sky islands' creatures (WRSkyCreatures): soaring rings, stoops, the Undertow, holds, drift
 
 public:

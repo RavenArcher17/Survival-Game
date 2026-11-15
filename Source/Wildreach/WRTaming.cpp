@@ -10,6 +10,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRLifeSkills.h"
+#include "WRTide.h"
 #include "WRTuning.h"
 #include "WRFx.h"
 #include "WRSound.h"
@@ -726,6 +727,21 @@ void AWRCreature::TickMount(float DeltaSeconds)
 	ApplyRideSpeeds();
 	const FName Kind = FWRTaming::MountKind(*Def);
 	UCharacterMovementComponent* Move = GetCharacterMovement();
+	// A diving swim mount (the Wavecharger, creatures.json diveDepth): Dodge held takes it under, as deep as it goes; Jump
+	// held brings it up; nothing held, it holds its depth under the water (the rider's own breath runs).
+	if (Kind == TEXT("swim") && Def->DiveDepth > 0.f)
+	{
+		if (UWRCharacterMovementComponent* WRMove = Cast<UWRCharacterMovementComponent>(Move))
+		{
+			const float Depth = WRTide::SurfaceAt(this, GetActorLocation()) - GetActorLocation().Z;
+			WRMove->bHoldDepth = true;
+			if (IsLocallyControlled())
+			{
+				WRMove->bWantsToDive = bDiveHeld && Depth < Def->DiveDepth;
+				WRMove->bWantsToRise = bClimbHeld;
+			}
+		}
+	}
 	if (Kind == TEXT("fly"))
 	{
 		const bool bFlying = Move->MovementMode == MOVE_Flying;

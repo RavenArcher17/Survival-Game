@@ -30,6 +30,8 @@ public:
 	bool IsSprinting() const;
 	/** Underwater (cooks/build-biome-ocean.md 2.7): Dive held sinks, Rise (Jump) held rises, neither holds your depth.
 	 *  Both ride the saved move's two spare engine bits (FLAG_Reserved_1 / _2), so the server replays them exactly. */
+	/** A sea creature that hangs at neutral buoyancy under the water (holds its depth; WROceanCreatures steers it). */
+	bool bHoldDepth = false;
 	bool bWantsToDive = false;
 	bool bWantsToRise = false;
 	/** Swimming with the capsule wholly under the surface. */

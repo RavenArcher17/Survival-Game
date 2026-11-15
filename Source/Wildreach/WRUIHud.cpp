@@ -42,6 +42,7 @@
 #include "WRNecroPath.h"   // the Growth gauge (the Nature path)
 #include "WRArcanePath.h"
 #include "WRCrystalCreatures.h"  // the Mana bar and the shield film (the Arcane path)
+#include "WROceanCreatures.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -884,6 +885,8 @@ private:
 			if (FString CalmVerb; FWRForestAI::PathTamePrompt(Wild, S, CalmVerb)) { OutTarget = Wild->GetDisplayLabel(); return CalmVerb; }
 			// The Prismback's ward for an Arcane walker (WRCrystalCreatures).
 			if (FString WardVerb; FWRCrystalAI::PathTamePrompt(Wild, S, WardVerb)) { OutTarget = Wild->GetDisplayLabel(); return WardVerb; }
+			// The Reefjaw's calm for a Tide walker, a sleeping Wavecharger's egg (WROceanCreatures).
+			if (FString OceanVerb; FWROceanAI::PathTamePrompt(Wild, S, OceanVerb) || FWROceanAI::EggPrompt(Wild, S, OceanVerb)) { OutTarget = Wild->GetDisplayLabel(); return OceanVerb; }
 			if (Wild->IsUnconscious()) { OutTarget = Wild->GetDisplayLabel(); return TEXT("Tame"); }
 		}
 		if (const AActor* Use = P->FindUseTarget())

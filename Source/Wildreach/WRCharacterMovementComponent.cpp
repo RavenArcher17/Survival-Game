@@ -124,7 +124,7 @@ void UWRCharacterMovementComponent::PhysSwimming(float DeltaTime, int32 Iteratio
 	// own pitch (Move swims where you look under the surface) rides in Acceleration, which the engine keeps in 3D while
 	// swimming. Survivors only: creatures and mounts keep their own buoyancy.
 	const float Saved = Buoyancy;
-	if (CharacterOwner && CharacterOwner->GetPlayerState())
+	if (CharacterOwner && (CharacterOwner->GetPlayerState() || bHoldDepth))
 	{
 		const bool bUnder = ImmersionDepth() >= 0.999f;
 		if (bWantsToRise) Buoyancy = WRTune(TEXT("underwater.riseBuoyancy"), 1.35f);

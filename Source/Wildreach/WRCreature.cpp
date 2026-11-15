@@ -4,6 +4,7 @@
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
 #include "WRSkyCreatures.h"
+#include "WROceanCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -197,6 +198,12 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("swimSpeed"), Num)) D.SwimSpeed = Num;
 		if (O->TryGetNumberField(TEXT("landSpeed"), Num)) D.LandSpeed = Num;
 		if (O->TryGetNumberField(TEXT("flySpeed"), Num)) D.FlySpeed = Num;
+		if (O->TryGetNumberField(TEXT("diveDepth"), Num)) D.DiveDepth = Num;
+		if (const TArray<TSharedPtr<FJsonValue>>* Band = nullptr; O->TryGetArrayField(TEXT("depthRange"), Band) && Band->Num() == 2)
+		{
+			D.DepthMin = (*Band)[0]->AsNumber();
+			D.DepthMax = (*Band)[1]->AsNumber();
+		}
 		O->TryGetBoolField(TEXT("nest"), D.bNest);
 		O->TryGetBoolField(TEXT("hearing"), D.bHearing);
 		O->TryGetBoolField(TEXT("darkHunter"), D.bDarkHunter);
@@ -1310,6 +1317,8 @@ void AWRCreature::BeginPlay()
 	UWRCrystalBody::Attach(this);
 	// A Sky islands creature's body state and look (WRSkyCreatures).
 	UWRSkyBody::Attach(this);
+	// An Ocean creature's body state and code-built look (WROceanCreatures).
+	UWROceanBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -1583,6 +1592,11 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	if (FString Ward; FWRCrystalAI::TryPathTame(this, Player, Ward))
 	{
 		return Ward;
+	}
+	// The Reefjaw's path-magic calm (the Tide path, WROceanCreatures), the Wavecharger's egg out of a sleeping male's pouch.
+	if (FString Calm; FWROceanAI::TryPathTame(this, Player, Calm) || FWROceanAI::TryStealEgg(this, Player, Calm))
+	{
+		return Calm;
 	}
 	const bool bKnockout = Def->CanTameBy(TEXT("knockout_feed")) && IsUnconscious();
 	const bool bOffer = Def->CanTameBy(TEXT("offer_food")) && !AggroTarget.IsValid();
@@ -1868,7 +1882,7 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 	ApplyRideSpeeds();
 	UE_LOG(LogWildreach, Log, TEXT("TAME %s ridden by %s"), *GetName(), *NewRider->GetName());
 	const FName Kind = GetMountKind();
-	FString Help = Kind == TEXT("fly") ? TEXT("Riding: Jump takes off, hold Jump to climb, Dodge to dive") : Kind == TEXT("swim") ? TEXT("Riding: it swims the cold water for you")
+	FString Help = Kind == TEXT("fly") ? TEXT("Riding: Jump takes off, hold Jump to climb, Dodge to dive") : Kind == TEXT("swim") ? (GetDef() && GetDef()->DiveDepth > 0.f ? TEXT("Riding: it swims for you; hold Dodge to dive (your own breath), hold Jump to rise") : TEXT("Riding: it swims the cold water for you"))
 		: Kind == TEXT("pack") ? TEXT("Riding: a hauler walks, it doesn't sprint") : TEXT("Riding: Sprint gallops on its stamina");
 	if (TameRep.Saddle.IsEmpty() && Kind != TEXT("pack")) Help += TEXT(" - bareback: no attacks, it takes more damage (fit a saddle: Tend)");
 	return Help;
@@ -2269,6 +2283,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRCrystalAI::Died(this, Killer);  // a Geodemite bursts; a hearing hunter stops listening
 	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
 	FWRSkyAI::Died(this, Killer);      // a Sky creature lets go; a Sailbell pops in fire or deflates and stings 60 s
+	FWROceanAI::Died(this, Killer);    // a sea creature lets go; a Gullraider drops what it stole; the blood cloud
 	// The Risen leave no body (GY 2.12.4): their bones go straight to the killer.
 	const bool bRaisedMinion = WRNecro::IsRaised(this);
 	const bool bBody = !FWRGraveAI::NoBody(this) && !bRaisedMinion && BecomeBody(Killer);
@@ -2842,6 +2857,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// The Ocean's (a hole, buried in the sand, the shallows' edge, a herd asleep, a ring, a bait ball, a hold).
+	if (FWROceanAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	// The Ancient forest creatures' own moments (a perch over a trail, a log at rest, a hold, a heat ball, a raid, a
 	// larder, the roar and the bugle, hovering, a cornered butt): WRForestCreatures.
 	if (FWRForestAI::TickWild(this, Self, DeltaSeconds))
@@ -3288,6 +3308,10 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	}
 	// A tame Mistlark circling the nearest column (WRSkyCreatures).
 	if (FWRSkyAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	if (FWROceanAI::TickTame(this, Self, DeltaSeconds))
 	{
 		return;
 	}
