@@ -351,6 +351,15 @@ The Wind path is `WRWindPath` (Momentum, passives, combos, look; Featherfall is 
 main path, so ask `WRWind::NoFallDamage`, not HasNode) and `WRAbilitiesWind` (its abilities); `WRSkyAir` calls its
 Path Glide hooks (`CanPathGlide`, `PathGlideStats`, `PathGlideTick`, `GliderStaminaScale`, `GlideSinkScale`,
 `OnEnteredUpdraft`).
+Also since 0.7.1 (in progress, hidden: `crystal` is not in `world.liveBiomes` yet): **the Crystal caves**
+(cooks/biome-crystal.md, plan cooks/build-biome-crystal.md). `node Tools/terrain/crystal.mjs` writes
+`Data/lands/crystal.json` + `crystal_ground.bin` (the plateau, on the Wasteland's frame so the Severance runs through
+both; `Tools/terrain/wasteland_ground.mjs` is the JS port of the Wasteland's ground it meets) and `Data/crystal.json`
+(halls, tubes, shafts, sites, kit POIs, hazards, nodes: read by `FWRCrystalData` in `WRCrystalTypes.cpp`); it also adds its
+POIs to `island_dressing.json` (dressing.mjs keeps them). The caves are one signed-distance union (`FWRCrystalData::Air`)
+meshed by surface nets in `AWRCrystalCaves`, so what you see, stand on and what `WRCrystal::InCave` answers agree.
+Crystal linings glow through `M_CrystalGlow` (`Tools/terrain/build_crystal_materials.py`, a commandlet). Scenery:
+`WRCrystalScenery*.cpp` on the forest's FBuild with the kit `WRCrystalLook.h`; built by `UWRCrystalWorld`.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

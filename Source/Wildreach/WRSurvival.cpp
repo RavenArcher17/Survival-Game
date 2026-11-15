@@ -4,6 +4,7 @@
 #include "WRSurvival.h"
 #include "WRNecroPath.h"
 #include "WRGraveEvents.h"
+#include "WRCrystalTypes.h"
 #include "WRGraveTypes.h"
 #include "WRSwampSystems.h"
 #include "WRStormTypes.h"
@@ -104,6 +105,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	}
 	// And the Graveyard's catacombs (WRGraveTypes): the crypt stairs, the rooms and the galleries under the grave fields.
 	if (WRGrave::InCatacombs(Pos))
+	{
+		return true;
+	}
+	// And the Crystal caves (WRCrystalTypes): every hall, tube, passage and shaft under the plateau and the Spine.
+	if (WRCrystal::InCave(Pos))
 	{
 		return true;
 	}

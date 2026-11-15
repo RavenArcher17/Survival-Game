@@ -395,7 +395,7 @@ try {
 	const old = JSON.parse(fs.readFileSync(path.join(root, "Data/island_dressing.json"), "utf8"));
 	const kept = ["storm_pine", "granite_rock", "slate_scree", "storm_shrub", ...Object.keys(old.instances || {}).filter(k => k.startsWith("forest_") || k.startsWith("swamp_"))];
 	for (const k of kept) if (old.instances && old.instances[k]) { out.instances[k] = old.instances[k]; if (old.counts) out.counts[k] = old.counts[k]; }
-	out.pois = [...out.pois, ...(old.pois || []).filter(p => p.storm || p.forest || p.swamp || p.biome === "swamp")];
+	out.pois = [...out.pois, ...(old.pois || []).filter(p => p.storm || p.forest || p.swamp || p.crystal || p.biome === "swamp" || p.biome === "graveyard")];
 } catch {}
 fs.writeFileSync(path.join(root, "Data/island_dressing.json"), JSON.stringify(out));
 console.log("caves", caves.length, JSON.stringify(caves.map(c => [c.biome, Math.round(c.mx), Math.round(c.my)])));

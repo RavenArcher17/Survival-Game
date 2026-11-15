@@ -52,9 +52,12 @@ struct WILDREACH_API FWRToolMesh
 	/** A closed convex-ish solid lofted through cross-section rings (each ring the same vertex count), flat-shaded. */
 	void Loft(const TArray<TArray<FVector>>& Rings, const FLinearColor& Colour, float Rough, bool bCapEnds = true);
 
-private:
+	/** One flat triangle (the crystal kit builds facets with it). */
 	void Tri(const FVector& A, const FVector& B, const FVector& C, const FColor& Col, const FVector2D& UA, const FVector2D& UB, const FVector2D& UC);
+	/** Colour + roughness in the vertex colour M_HeldTool reads. */
 	static FColor Pack(const FLinearColor& Colour, float Rough);
+
+private:
 	void HatchetHead(const FVector& At, float S, bool bCrude, const FLinearColor& Head);
 	void PickHead(const FVector& At, float S, bool bCrude, const FLinearColor& Head);
 	void Lashing(const FVector& At, float HaftR, float Span, bool bCrude, bool bCross);

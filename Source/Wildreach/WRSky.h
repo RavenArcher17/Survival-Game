@@ -95,6 +95,8 @@ private:
 	float ForestAir = -1.f;
 	float ForestCanopy = 0.f;
 	float ForestSkySet = -1.f;
+	/** 0..1: the view is in the Crystal caves (the sky light fades out under their rock). */
+	float CrystalCave = 0.f;
 	/** 0..1: how far into the Graveyard's air the camera is (eased), its mist layer's height (knee for Ground mist,
 	 *  chest for Corpse fog) and whether the second fog layer was last set by it (so leaving it clears the layer). */
 	float GraveAir = -1.f;

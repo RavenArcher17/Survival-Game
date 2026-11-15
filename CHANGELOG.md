@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: the Crystal caves (the Arcane land)
+
+Aaron (lane build-biome-crystal: requirement ledger R1-R50, build research and plan in showcase-notes
+cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in pieces; compiled (editor target) after each;
+not played here (Aaron tests). Hidden until it's whole: `crystal` is not in `world.liveBiomes`, so nothing below is
+built in a running game yet.
+
+- **Crystal (1): the land, the caves' rock and what stands on it.** `node Tools/terrain/crystal.mjs` writes the
+  plateau (`Data/lands/crystal.json` + `crystal_ground.bin`, 4 m samples: columnar basalt tilting from the Spine's foot
+  to 80-100 m black sea cliffs, the three geo coves, four descents, ten collapsed domes, the Organ's eleven vents, the
+  Severance's east mouth meeting the Wasteland's gorge floor exactly) and the places contract `Data/crystal.json`
+  (27 halls, the lava tubes and hewn passages between them, shafts, the Silent Vault's rooms, sites, kit POIs, chime
+  stones, chandeliers, pools, selenite beams, thin floors, ward fields, resource nodes). `FWRCrystalData::Air` is the
+  caves' air as one signed distance; `AWRCrystalCaves` meshes its boundary with collision in 31 m cubes on every
+  machine (agate bands, quartz, amethyst, lava glaze, guano and hewn courses in the vertex colours) and grows each
+  hall's crystal lining as one mesh with its own `M_CrystalGlow` instance (built by
+  `Tools/terrain/build_crystal_materials.py`: vertex colour, fresnel rim, rest / lit glow and four rings of noise).
+  `WRCrystal::InCave` makes the caves underground (`WRBiome::IsUnderground`) and the sky light fades out under their
+  rock (`WRSky`, tuning `crystalWorld.sky`). The scenery (`WRCrystalScenery*.cpp`, kit `WRCrystalLook.h`): the camps'
+  geos and wrecks, the Prism Crown, the Hollowed Giantess, the Split Geode, the descents' stairs, vents, domes, chime
+  stones, the surface sites, the halls' and tubes' furniture, the plateau's columns and grass by cell. `FWRToolMesh`'s
+  `Tri` / `Pack` are public (the crystal kit builds facets with them). `dressing.mjs` keeps the crystal and graveyard
+  POIs when the island is regenerated.
 ## Unreleased: the Sky islands (the Wind land)
 
 Aaron (lane build-biome-sky: requirement ledger R1-R62, build research and plan in showcase-notes

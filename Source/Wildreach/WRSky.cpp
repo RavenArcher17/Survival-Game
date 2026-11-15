@@ -7,6 +7,7 @@
 #include "WRSwampTypes.h"
 #include "WRForestTypes.h"
 #include "WRGraveTypes.h"
+#include "WRCrystalTypes.h"
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRTuning.h"
@@ -420,6 +421,10 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	ForestAir = ForestAir < 0.f ? ForestTarget : FMath::FInterpTo(ForestAir, ForestTarget, DeltaSeconds, T.Num(TEXT("sky.forestBlendSpeed"), 0.7f));
 	ForestCanopy = FMath::FInterpTo(ForestCanopy, ForestTarget > 0.f ? WRForest::Canopy(View) : 0.f, DeltaSeconds, T.Num(TEXT("sky.forestCanopySpeed"), 1.2f));
 	const float FA = ForestAir, CN = ForestCanopy * ForestAir;
+	// Under the Crystal caves' rock the open sky is gone (crystal 2.8 full dark): the sky light fades out within a second
+	// or two of going in, so only carried light, tames and crystals woken by sound light the caves (the caves' rock is
+	// procedural mesh, which the sky light's occlusion can't see).
+	CrystalCave = FMath::FInterpTo(CrystalCave, WRCrystal::InCave(View) ? 1.f : 0.f, DeltaSeconds, T.Num(TEXT("crystalWorld.sky.caveFadeSpeed"), 1.5f));
 	// The Graveyard's air west of the Spine (cooks/biome-graveyard.md 2.7): a bruise-violet haze by day that never quite
 	// clears, a sickly yellow-green rim on the dusk instead of gold, and its two mists: Ground mist pooled knee-deep over
 	// the graves by day, Corpse fog standing chest-high at night (the second fog layer, its floor at your feet).
@@ -582,14 +587,14 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	}
 	// Under the canopy the open sky's light is mostly leaves away: the sky light dims with the cover (the sun's own light
 	// is the trees' shadows' job). Only touched when the value moves, so the rest of the world never pays for it.
-	if (USkyLightComponent* SkyL = SkyLight.Get(); SkyL && (FA > 0.f || ForestSkySet >= 0.f))
+	if (USkyLightComponent* SkyL = SkyLight.Get(); SkyL && (FA > 0.f || CrystalCave > 0.001f || ForestSkySet >= 0.f))
 	{
 		const float Want = SkyIntensity * FMath::Lerp(T.Num(TEXT("sky.nightSkyLight"), 3.f), 1.f, Daylight) * (1.f - CN * T.Num(TEXT("sky.forestCanopyDim"), 0.6f))
-			* (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastDim"), 0.7f));
+			* (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastDim"), 0.7f)) * (1.f - CrystalCave * T.Num(TEXT("crystalWorld.sky.caveSkyDim"), 0.97f));
 		if (FMath::Abs(Want - SkyL->Intensity) > 0.005f * FMath::Max(SkyIntensity, 0.01f))
 		{
 			SkyL->SetIntensity(Want);
-			ForestSkySet = FA > 0.f ? Want : -1.f;
+			ForestSkySet = FA > 0.f || CrystalCave > 0.001f ? Want : -1.f;
 		}
 	}
 
