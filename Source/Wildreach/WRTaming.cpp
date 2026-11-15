@@ -30,6 +30,11 @@
 #include "WRWorldDressing.h"
 #include "WRInventory.h"   // the rider's worn gear (the Huntsman's crown: mount sprint stamina)
 #include "Wildreach.h"
+#include "WRNecroPath.h"
+#include "WRSporePath.h"
+#include "Misc/Guid.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Dom/JsonObject.h"
@@ -38,6 +43,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
 #include "ProceduralMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 
 namespace WRTameDetail
 {
@@ -226,6 +232,8 @@ void FWRTameGenes::ToSockets(TArray<FName>& Out, FName Species) const
 	Out.Add(FName(*(TEXT("mut:") + Join(MutPoints, WRTameStat::Count))));
 	Out.Add(FName(*FString::Printf(TEXT("line:%d,%d"), MutFather, MutMother)));
 	if (bBred) Out.Add(FName(TEXT("bred:1")));
+	if (!Father.IsEmpty()) Out.Add(FName(*(TEXT("father:") + Father.Left(80))));
+	if (!Mother.IsEmpty()) Out.Add(FName(*(TEXT("mother:") + Mother.Left(80))));
 	for (const TPair<uint8, FColor>& M : Morphs) Out.Add(FName(*FString::Printf(TEXT("morph:%d:%s"), M.Key, *M.Value.ToHex())));
 }
 
@@ -243,6 +251,8 @@ FWRTameGenes FWRTameGenes::FromSockets(const TArray<FName>& In, FName* OutSpecie
 		else if (Key == TEXT("mut")) Split(Value, G.MutPoints, WRTameStat::Count);
 		else if (Key == TEXT("line")) { uint8 L[2] = { 0, 0 }; Split(Value, L, 2); G.MutFather = L[0]; G.MutMother = L[1]; }
 		else if (Key == TEXT("bred")) G.bBred = true;
+		else if (Key == TEXT("father")) G.Father = Value;
+		else if (Key == TEXT("mother")) G.Mother = Value;
 		else if (Key == TEXT("morph"))
 		{
 			FString Kind, Hex;
@@ -450,6 +460,8 @@ void AWRCreature::InitGenes(const FWRTameGenes& In)
 	}
 	TameRep.MutFather = Genes.MutFather;
 	TameRep.MutMother = Genes.MutMother;
+	TameRep.Father = Genes.Father;
+	TameRep.Mother = Genes.Mother;
 	TameRep.MorphKinds.Reset();
 	TameRep.MorphColors.Reset();
 	for (const TPair<uint8, FColor>& M : Genes.Morphs)
@@ -532,7 +544,7 @@ void AWRCreature::RecomputeStats()
 	Weapon.FlatDamage = Def->Damage * Difficulty * M[WRTameStat::Damage] * Grown * (bTame ? 1.f : PortalDamage);
 	MaxTorpor = Def->Health * WRTune(TEXT("taming.torporPerHealth"), 1.f) * M[WRTameStat::Torpor];
 	// A tame keeps its own element: its bites carry it (FULL-GAME 6.5, DD How taming works).
-	Weapon.Element = bTame && (Def->Element == TEXT("fire") || Def->Element == TEXT("frost")) ? Def->Element : NAME_None;
+	Weapon.Element = bTame && Def->Element != TEXT("physical") ? Def->Element : NAME_None;
 	if (!Rider.IsValid())
 	{
 		GetCharacterMovement()->MaxWalkSpeed = (Def->SwimSpeed > 0.f && Def->LandSpeed > 0.f ? Def->LandSpeed : Def->Speed) * M[WRTameStat::Speed];
@@ -596,7 +608,7 @@ void AWRCreature::GainBondXP(float Amount, const TCHAR* Why)
 		WRFx::Broadcast(this, TEXT("tame.levelup"), GetActorLocation(), FRotator::ZeroRotator, FMath::Max(0.6f, GetSimpleCollisionRadius() / 80.f), TEXT("tame.levelup"));
 		MulticastSound(TEXT("voice.idle"));
 		UWRLifeSkillsComponent::Award(PlayerNamed(GetWorld(), TamedBy), TEXT("taming"), TEXT("tameBond"), T(TEXT("skillXp.bond"), 20.f));
-		Notify(GetWorld(), TamedBy, FString::Printf(TEXT("%s reached bond %d: a skill point to spend (Tend)"), *Def->Name, TameRep.Bond));
+		Notify(GetWorld(), TamedBy, FString::Printf(TEXT("%s reached bond %d: a skill point to spend (Tend)"), *TameName(), TameRep.Bond));
 		UE_LOG(LogWildreach, Log, TEXT("TAME %s bond %d (%s)"), *GetName(), TameRep.Bond, Why);
 	}
 }
@@ -880,6 +892,7 @@ void AWRCreature::TickTameLife(float DeltaSeconds)
 	if (CuddleUntil > 0.0 && Now >= CuddleUntil)
 	{
 		CuddleUntil = -1.0;
+		TameRep.bCuddled = false;
 		const AActor* Body = BodyOf(World, CuddleBy);
 		if (TameRep.Care == 3 && Body && FVector::Dist(Body->GetActorLocation(), Here) < T(TEXT("imprint.cuddleRange"), 350.f)) AnswerCare(CuddleBy);
 		else Notify(World, CuddleBy, TEXT("You moved away: stay beside it for the cuddle"));
@@ -889,6 +902,16 @@ void AWRCreature::TickTameLife(float DeltaSeconds)
 	if (TameClock < 1.f) return;
 	const float Dt = TameClock;
 	TameClock = 0.f;
+
+	// Up again after a soulbound fall (cooks/cookpass-taming.md 3.10).
+	if (TameRep.bSoulDown && Now >= SoulDownUntil)
+	{
+		TameRep.bSoulDown = false;
+		Status->ClearStatus(WRTags::Status_Unconscious);
+		SetHealthFraction(T(TEXT("soulbond.wakeHealth"), 0.25f));
+		MulticastSound(TEXT("voice.idle"));
+		Notify(World, TamedBy, FString::Printf(TEXT("%s is back on its feet"), *FWRTaming::Label(this)));
+	}
 
 	// Nothing ticks with nobody near (the world's own rule): a tame left at home doesn't starve or age while you're away.
 	bool bNear = false;
@@ -936,7 +959,7 @@ void AWRCreature::TickTameLife(float DeltaSeconds)
 		if (StarvingSince < 0.0)
 		{
 			StarvingSince = Now;
-			Notify(World, TamedBy, FString::Printf(TEXT("Your %s is starving: put its food in its packs or a pen's trough nearby"), *Def->Name));
+			Notify(World, TamedBy, FString::Printf(TEXT("%s is starving: put its food in its packs or a pen's trough nearby"), *FWRTaming::Label(this)));
 		}
 		if (Now - StarvingSince > T(TEXT("hunger.starveMinutes"), 30.f) * 60.f && GetAttributes())
 		{
@@ -976,7 +999,7 @@ void AWRCreature::TickTameLife(float DeltaSeconds)
 		if (TameRep.Growth >= 1.f)
 		{
 			SetActorScale3D(FVector(1.f));
-			Notify(World, TamedBy, FString::Printf(TEXT("Your %s is grown (imprint %.0f%%)"), *Def->Name, TameRep.Imprint * 100.f));
+			Notify(World, TamedBy, FString::Printf(TEXT("%s is grown (imprint %.0f%%)"), *FWRTaming::Label(this), TameRep.Imprint * 100.f));
 		}
 	}
 
@@ -1009,7 +1032,7 @@ void AWRCreature::TickTameLife(float DeltaSeconds)
 				bPregnantTwins = false;
 				WRFx::Broadcast(this, TEXT("tame.hatch"), Here, FRotator::ZeroRotator, 1.f, TEXT("tame.birth"));
 				UWRLifeSkillsComponent::Award(PS, TEXT("taming"), TEXT("tameBirth"), T(TEXT("skillXp.birth"), 40.f));
-				Notify(World, TamedBy, FString::Printf(TEXT("Your %s gave birth"), *Def->Name));
+				Notify(World, TamedBy, FString::Printf(TEXT("%s gave birth"), *FWRTaming::Label(this)));
 			}
 		}
 	}
@@ -1040,7 +1063,7 @@ void AWRCreature::AnswerCare(const FString& Player)
 	WRFx::Broadcast(this, TEXT("tame.heart"), GetActorLocation() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 1.f, TEXT("tame.care"));
 	MulticastSound(TEXT("voice.idle"));
 	UWRLifeSkillsComponent::Award(PlayerNamed(GetWorld(), Player), TEXT("taming"), TEXT("tameImprint"), T(TEXT("skillXp.imprint"), 10.f));
-	Notify(GetWorld(), Player, FString::Printf(TEXT("%s imprint %.0f%%"), *Def->Name, TameRep.Imprint * 100.f));
+	Notify(GetWorld(), Player, FString::Printf(TEXT("%s imprint %.0f%%"), *TameName(), TameRep.Imprint * 100.f));
 }
 
 FString AWRCreature::StartCuddle(AWRPlayerController* Player)
@@ -1052,6 +1075,7 @@ FString AWRCreature::StartCuddle(AWRPlayerController* Player)
 	if (!Body || FVector::Dist(Body->GetActorLocation(), GetActorLocation()) > T(TEXT("imprint.cuddleRange"), 350.f)) return TEXT("Go right up to it to cuddle it");
 	CuddleBy = PS->GetPlayerName();
 	CuddleUntil = GetWorld()->GetTimeSeconds() + T(TEXT("imprint.cuddleSeconds"), 2.f);
+	TameRep.bCuddled = true;   // it nuzzles into them on every machine (cooks/cookpass-taming.md 3.11)
 	if (AWRCharacter* Hero = Cast<AWRCharacter>(const_cast<AActor*>(Body))) Hero->MulticastBodyOneShot(TEXT("pickup"));
 	MulticastSound(TEXT("voice.idle"));
 	return TEXT("Cuddling... stay beside it");
@@ -1178,6 +1202,30 @@ bool FWRTaming::KeepsSeat(const AWRCreature* Mount, const FWRHit& Hit, float Dam
 	return Stance < T(TEXT("tree.steadyStance"), 80.f);
 }
 
+void FWRTaming::ElementHit(const AWRCreature* Tame, FWRHit& Hit)
+{
+	if (!Tame || !Tame->IsTamed() || Tame->Weapon.Element.IsNone() || Hit.Element != WRTags::Element_Physical
+		|| Hit.BurnBuildup > 0.f || Hit.FrostBuildup > 0.f || Hit.Buildups.Num() > 0)
+	{
+		return;
+	}
+	const FString Key = FString(TEXT("tame.element.")) + Tame->Weapon.Element.ToString();
+	const TSharedPtr<FJsonObject> Row = FWRTuning::Get().Object(Key);
+	if (!Row.IsValid()) return;
+	const float Build = T(TEXT("element.buildup"), 12.f);
+	const FString Tag = Row->GetStringField(TEXT("tag")), Status = Row->GetStringField(TEXT("status"));
+	if (!Tag.IsEmpty())
+	{
+		const FGameplayTag ElementTag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("Element.") + Tag)), false);
+		if (ElementTag.IsValid()) Hit.Element = ElementTag;
+	}
+	if (Status == TEXT("burn")) Hit.BurnBuildup += Build;
+	else if (Status == TEXT("frost")) Hit.FrostBuildup += Build;
+	else if (!Status.IsEmpty()) Hit.Buildups.Add(FName(*Status), Build);
+	double StaminaMult = 1.0;
+	if (Row->TryGetNumberField(TEXT("staminaMult"), StaminaMult)) Hit.StaminaDamage *= float(StaminaMult);
+}
+
 int32 FWRTaming::Forage(const AActor* Owner, FName ItemId, int32 Count)
 {
 	const APlayerState* PS = Cast<APlayerState>(Owner);
@@ -1298,6 +1346,10 @@ TSharedRef<FJsonObject> FWRTaming::SaveTame(const AWRCreature* Tame)
 	O->SetNumberField(TEXT("hunger"), R.Hunger);
 	O->SetNumberField(TEXT("flyStamina"), R.FlyStamina);
 	O->SetNumberField(TEXT("health"), Tame->GetHealthFraction());
+	if (!R.Name.IsEmpty()) O->SetStringField(TEXT("name"), R.Name);
+	if (!Tame->LastRider.IsEmpty()) O->SetStringField(TEXT("lastRider"), Tame->LastRider);
+	if (R.bSoulbound) O->SetBoolField(TEXT("soulbound"), true);
+	if (Tame->bRevivedOnce) O->SetBoolField(TEXT("revived"), true);
 	TArray<TSharedPtr<FJsonValue>> Cargo;
 	for (const FWRItemStack& S : Tame->Cargo) Cargo.Add(MakeShared<FJsonValueObject>(FWRInventoryRules::StackToJson(S)));
 	O->SetArrayField(TEXT("cargo"), Cargo);
@@ -1332,6 +1384,10 @@ void FWRTaming::LoadTame(AWRCreature* Tame, const TSharedPtr<FJsonObject>& O)
 	O->TryGetBoolField(TEXT("twins"), Tame->bPregnantTwins);
 	if (O->TryGetNumberField(TEXT("hunger"), N)) R.Hunger = N;
 	if (O->TryGetNumberField(TEXT("flyStamina"), N)) R.FlyStamina = N;
+	O->TryGetStringField(TEXT("name"), R.Name);
+	O->TryGetStringField(TEXT("lastRider"), Tame->LastRider);
+	O->TryGetBoolField(TEXT("soulbound"), R.bSoulbound);
+	O->TryGetBoolField(TEXT("revived"), Tame->bRevivedOnce);
 	const TArray<TSharedPtr<FJsonValue>>* Cargo = nullptr;
 	Tame->Cargo.Reset();
 	if (O->TryGetArrayField(TEXT("cargo"), Cargo))
@@ -1453,6 +1509,26 @@ FString FWRTaming::CardCommand(AWRPlayerController* Player, AWRCreature* Tame, c
 		Tame->MulticastSound(TEXT("tame.saddle"));
 		return TEXT("Taken off");
 	}
+	if (Verb == TEXT("name"))
+	{
+		TArray<FString> Words = Args;
+		Words.RemoveAt(0);
+		FString Clean, Why;
+		if (!CleanName(FString::Join(Words, TEXT(" ")), Clean, Why)) return Why;
+		R.Name = Clean;
+		Tame->OnRep_TameRep();
+		return FString::Printf(TEXT("Named %s"), *Clean);
+	}
+	if (Verb == TEXT("soulbind"))
+	{
+		// Soulbond (Taming 100): one tame a player; binding another frees the last (cooks/cookpass-taming.md 3.10).
+		if (UWRLifeSkillsComponent::StatFor(PS, TEXT("soulbond")) <= 0.f) return TEXT("Soulbond is a Taming 100 perk");
+		if (R.bSoulbound) { R.bSoulbound = false; return FString::Printf(TEXT("%s is no longer soulbound"), *Tame->TameName()); }
+		for (TActorIterator<AWRCreature> It(Tame->GetWorld()); It; ++It) if (It->TamedBy == Me && It->TameRep.bSoulbound) It->TameRep.bSoulbound = false;
+		R.bSoulbound = true;
+		WRFx::Broadcast(Tame, TEXT("tame.levelup"), Tame->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("tame.soulbind"));
+		return FString::Printf(TEXT("%s is soulbound: at the end it falls, it doesn't die"), *Tame->TameName());
+	}
 	if (Verb == TEXT("mate"))
 	{
 		if (Tame->IsBaby()) return TEXT("Babies don't mate");
@@ -1511,6 +1587,7 @@ FString FWRTaming::CardCommand(AWRPlayerController* Player, AWRCreature* Tame, c
 
 void FWRTaming::PieceToJson(const AWRBuildPiece* Piece, const TSharedRef<FJsonObject>& O)
 {
+	StableToJson(Piece, O);
 	const FWRPieceDef* Def = Piece ? Piece->GetDef() : nullptr;
 	if (!Def || Def->Kind != TEXT("incubator")) return;
 	O->SetNumberField(TEXT("incubation"), Piece->Growth);
@@ -1520,6 +1597,7 @@ void FWRTaming::PieceToJson(const AWRBuildPiece* Piece, const TSharedRef<FJsonOb
 
 void FWRTaming::PieceFromJson(AWRBuildPiece* Piece, const TSharedPtr<FJsonObject>& O)
 {
+	StableFromJson(Piece, O);
 	const FWRPieceDef* Def = Piece ? Piece->GetDef() : nullptr;
 	if (!Def || Def->Kind != TEXT("incubator") || !O.IsValid()) return;
 	double N = 0.0;
@@ -1678,6 +1756,7 @@ void UWRTamingSubsystem::Tick(float DeltaTime)
 	Clock = 0.f;
 	TickPairs(Dt);
 	TickIncubators(Dt);
+	TickStables(Dt);
 	for (auto It = Hits.CreateIterator(); It; ++It) if (!It->Key.IsValid()) It.RemoveCurrent();
 }
 
@@ -1721,7 +1800,10 @@ void UWRTamingSubsystem::TickPairs(float Dt)
 		const APlayerState* Owner = PlayerNamed(World, F->TamedBy);
 		const float Odds = 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("mutationOdds"));
 		int32 Mutations = 0;
-		const FWRTameGenes Child = FWRTameGenes::Child(Best->Genes, F->Genes, Odds, Mutations);
+		FWRTameGenes Child = FWRTameGenes::Child(Best->Genes, F->Genes, Odds, Mutations);
+		// Its parents as its card names them (cooks/cookpass-taming.md 3.5).
+		Child.Father = FString::Printf(TEXT("%s, Lv %d"), *FWRTaming::Label(Best), Best->TameRep.WildLevel + Best->TameRep.Bond);
+		Child.Mother = FString::Printf(TEXT("%s, Lv %d"), *FWRTaming::Label(F), F->TameRep.WildLevel + F->TameRep.Bond);
 		const bool bTwins = FMath::FRand() < (F->TameHasNode(TEXT("prolific")) ? T(TEXT("breed.twinChance"), 0.25f) : 0.f);
 		F->TameRep.MateBar = 0.f;
 		Best->TameRep.MateBar = 0.f;
@@ -1902,4 +1984,471 @@ void AWRLaidEgg::BeginPlay()
 		M.Tube({ P, P + FVector(0.6f, 0.f, 0.f) }, 1.1f, 5, ShellCol * 0.55f, 0.5f);
 	}
 	M.ApplyTo(Mesh);
+}
+
+// ================================================================ names, the stable, the bond token, Soulbond, the call
+// (cooks/cookpass-taming.md 3.3-3.10; numbers in tuning "tame": name, stable, revive, soulbond, call)
+
+FString AWRCreature::TameName() const
+{
+	const FWRCreatureDef* Def = GetDef();
+	return !TameRep.Name.IsEmpty() ? TameRep.Name : Def ? Def->Name : FString(TEXT("tame"));
+}
+
+bool FWRTaming::CleanName(const FString& In, FString& Out, FString& Why)
+{
+	// Letters (any alphabet), spaces, ' and -; runs of spaces closed up; trimmed.
+	const int32 Max = FMath::RoundToInt(T(TEXT("name.maxLength"), 20.f));
+	FString Clean;
+	for (const TCHAR C : In.TrimStartAndEnd())
+	{
+		if (FChar::IsWhitespace(C)) { if (!Clean.IsEmpty() && !Clean.EndsWith(TEXT(" "))) Clean.AppendChar(TEXT(' ')); continue; }
+		if (!FChar::IsAlpha(C) && C != TEXT('\'') && C != TEXT('-'))
+		{
+			Why = TEXT("A name is letters, spaces, ' and - only");
+			return false;
+		}
+		Clean.AppendChar(C);
+	}
+	Clean.TrimEndInline();
+	if (Clean.IsEmpty()) { Why = TEXT("Give it a name first"); return false; }
+	if (Clean.Len() > Max) { Why = FString::Printf(TEXT("At most %d letters"), Max); return false; }
+	Out = Clean;
+	return true;
+}
+
+FString FWRTaming::Label(const AWRCreature* Tame)
+{
+	const FWRCreatureDef* Def = Tame ? Tame->GetDef() : nullptr;
+	if (!Def) return TEXT("Your tame");
+	return Tame->TameRep.Name.IsEmpty() ? FString::Printf(TEXT("Your %s"), *Def->Name) : FString::Printf(TEXT("%s (%s)"), *Tame->TameRep.Name, *Def->Name);
+}
+
+TSharedRef<FJsonObject> FWRTaming::WholeTame(const AWRCreature* Tame)
+{
+	// The same line the world save writes (AWRGameMode::SaveWorld), so a stabled or fallen tame comes back whole.
+	const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+	O->SetStringField(TEXT("id"), Tame->CreatureId.ToString());
+	O->SetStringField(TEXT("owner"), Tame->TamedBy);
+	O->SetBoolField(TEXT("stay"), Tame->TameOrder == EWRTameOrder::Stay);
+	O->SetBoolField(TEXT("aggressive"), Tame->bTameAggressive);
+	O->SetNumberField(TEXT("bonus"), Tame->TameBonus);
+	for (const TPair<FString, TSharedPtr<FJsonValue>>& F : SaveTame(Tame)->Values) O->SetField(F.Key, F.Value);
+	return O;
+}
+
+AWRCreature* FWRTaming::RespawnTame(UWorld* World, const TSharedPtr<FJsonObject>& O, const FVector& Feet, float Yaw)
+{
+	if (!World || !O.IsValid()) return nullptr;
+	const FName Species(*O->GetStringField(TEXT("id")));
+	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Species);
+	if (!Def) return nullptr;
+	AWRCreature* Tame = AWRCreature::SpawnCreature(World, Species, Feet + FVector(0.f, 0.f, Def->HalfHeight + 20.f), FRotator(0.f, Yaw, 0.f));
+	if (!Tame) return nullptr;
+	Tame->CompleteTame(O->GetStringField(TEXT("owner")), false);
+	Tame->TameOrder = O->GetBoolField(TEXT("stay")) ? EWRTameOrder::Stay : EWRTameOrder::Follow;
+	Tame->bTameAggressive = O->GetBoolField(TEXT("aggressive"));
+	Tame->ApplyTameBonus(O->HasField(TEXT("bonus")) ? O->GetNumberField(TEXT("bonus")) : 0.f);
+	LoadTame(Tame, O);
+	Tame->SetHome(Tame->GetActorLocation());
+	return Tame;
+}
+
+// ---------------------------------------------------------------- the stable
+
+namespace WRTameStable
+{
+	bool IsStable(const AWRBuildPiece* Piece)
+	{
+		const FWRPieceDef* Def = Piece && !Piece->bGhost ? Piece->GetDef() : nullptr;
+		return Def && Def->Kind == TEXT("stable");
+	}
+
+	FString RosterLine(const AWRCreature* Tame)
+	{
+		const FWRCreatureDef* Def = Tame->GetDef();
+		return FString::Printf(TEXT("%s\t%s\t%s\t%d\t%d\t%.2f"), *Tame->TamedBy, *Tame->TameRep.Name, Def ? *Def->Id.ToString() : TEXT(""),
+			Tame->TameRep.WildLevel + Tame->TameRep.Bond, Tame->TameRep.Sex, Tame->GetHealthFraction());
+	}
+
+	FString Owner(const FString& Line)
+	{
+		FString O, Rest;
+		return Line.Split(TEXT("\t"), &O, &Rest) ? O : FString();
+	}
+
+	/** Store it now (it reached the gate). */
+	void Store(AWRBuildPiece* Stable, AWRCreature* Tame)
+	{
+		FString Json;
+		const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);
+		FJsonSerializer::Serialize(FWRTaming::WholeTame(Tame), W);
+		Stable->Roster.Add(RosterLine(Tame));
+		Stable->StableJson.Add(Json);
+		WRFx::Broadcast(Stable, TEXT("land.dust"), Tame->GetActorLocation() - FVector(0.f, 0.f, Tame->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 1.f, TEXT("tame.stable.in"));
+		Notify(Stable->GetWorld(), Tame->TamedBy, FString::Printf(TEXT("%s is in the stable"), *FWRTaming::Label(Tame)));
+		UE_LOG(LogWildreach, Log, TEXT("TAME %s stabled by %s"), *Tame->GetName(), *Tame->TamedBy);
+		Tame->Destroy();
+	}
+
+	AWRCreature* LetOut(AWRBuildPiece* Stable, int32 Index)
+	{
+		if (!Stable->StableJson.IsValidIndex(Index)) return nullptr;
+		TSharedPtr<FJsonObject> O;
+		const TSharedRef<TJsonReader<>> R = TJsonReaderFactory<>::Create(Stable->StableJson[Index]);
+		AWRCreature* Tame = nullptr;
+		if (FJsonSerializer::Deserialize(R, O) && O.IsValid())
+		{
+			// Out of the middle stall's half door: it stands at the gate, clear of the stable, and walks on a step.
+			Tame = FWRTaming::RespawnTame(Stable->GetWorld(), O, FWRTaming::StableGate(Stable) + Stable->GetActorForwardVector() * 40.f, Stable->GetActorRotation().Yaw);
+		}
+		Stable->StableJson.RemoveAt(Index);
+		if (Stable->Roster.IsValidIndex(Index)) Stable->Roster.RemoveAt(Index);
+		if (Tame)
+		{
+			Tame->CallTo = nullptr;
+			Tame->SetHome(FWRTaming::StableGate(Stable) + Stable->GetActorForwardVector() * 300.f);
+			WRFx::Broadcast(Stable, TEXT("land.dust"), FWRTaming::StableGate(Stable), FRotator::ZeroRotator, 1.f, TEXT("tame.stable.out"));
+			Tame->MulticastSound(TEXT("voice.idle"));
+		}
+		return Tame;
+	}
+}
+
+FVector FWRTaming::StableGate(const AWRBuildPiece* Piece)
+{
+	// The look (WRBuildLookDecor Stable()) faces +X: the stalls' half doors stand on its front, gateOut cm out.
+	return Piece ? Piece->GetActorLocation() + Piece->GetActorForwardVector() * T(TEXT("stable.gateOut"), 330.f) : FVector::ZeroVector;
+}
+
+int32 FWRTaming::StabledBy(const AWRBuildPiece* Piece, const FString& Player)
+{
+	int32 N = 0;
+	if (Piece) for (const FString& L : Piece->Roster) N += WRTameStable::Owner(L) == Player ? 1 : 0;
+	return N;
+}
+
+FString FWRTaming::StableCommand(AWRPlayerController* Player, AWRBuildPiece* Piece, const TArray<FString>& Args)
+{
+	const APlayerState* PS = Player ? Player->GetPlayerState<APlayerState>() : nullptr;
+	if (!PS || !WRTameStable::IsStable(Piece)) return TEXT("no stable there");
+	const FString Me = PS->GetPlayerName();
+	UWorld* World = Piece->GetWorld();
+	const FString Verb = Args.IsValidIndex(0) ? Args[0] : FString();
+	if (Verb == TEXT("store"))
+	{
+		if (!Args.IsValidIndex(3)) return TEXT("which tame?");
+		const FVector At(FCString::Atof(*Args[1]), FCString::Atof(*Args[2]), FCString::Atof(*Args[3]));
+		AWRCreature* Tame = nullptr;
+		for (TActorIterator<AWRCreature> It(World); It; ++It)
+		{
+			if (It->TamedBy == Me && FVector::Dist(It->GetActorLocation(), At) < 200.f) { Tame = *It; break; }
+		}
+		if (!Tame || !Tame->IsAlive()) return TEXT("That tame isn't here");
+		if (WRNecro::IsRaised(Tame) || WRSporePath::IsSummon(Tame)) return TEXT("A raised or summoned thing has no stall");
+		if (Tame->GetRider()) return TEXT("Get off it first");
+		if (Tame->TameRep.Pregnant > 0.f) return TEXT("Not while she carries young");
+		if (Tame->TameRep.bSoulDown) return TEXT("Let it get up first");
+		if (FVector::Dist(Tame->GetActorLocation(), Piece->GetActorLocation()) > T(TEXT("stable.storeRange"), 2000.f)) return TEXT("Bring it within 20 m of the stable");
+		if (StabledBy(Piece, Me) >= int32(T(TEXT("stable.perPlayer"), 10.f))) return FString::Printf(TEXT("Your stalls here are full (%d)"), int32(T(TEXT("stable.perPlayer"), 10.f)));
+		UWRTamingSubsystem* Sub = UWRTamingSubsystem::Get(World);
+		if (!Sub) return TEXT("not now");
+		for (const UWRTamingSubsystem::FGoingIn& G : Sub->GoingIn) if (G.Tame.Get() == Tame) return TEXT("It's on its way in");
+		// It walks to the gate and in (cooks/cookpass-taming.md 3.9); TickStables stores it there.
+		Tame->CallTo = Piece;
+		Tame->CallUntil = World->GetTimeSeconds() + T(TEXT("stable.walkSeconds"), 12.f);
+		Tame->MatePartner = nullptr;
+		Sub->GoingIn.Add({ Tame, Piece, World->GetTimeSeconds() + T(TEXT("stable.walkSeconds"), 12.f) });
+		return FString::Printf(TEXT("%s goes into the stable"), *Tame->TameName());
+	}
+	if (Verb == TEXT("out"))
+	{
+		const int32 i = Args.IsValidIndex(1) ? FCString::Atoi(*Args[1]) : -1;
+		if (!Piece->Roster.IsValidIndex(i) || WRTameStable::Owner(Piece->Roster[i]) != Me) return TEXT("That one isn't yours");
+		if (Piece->CallingOut >= 0) return TEXT("One at a time: another is coming out");
+		if (AWRCreature::CountTames(World, Me) >= AWRCreature::TameLimitFor(PS)) return TEXT("You're at your tame limit: stable one first");
+		UWRTamingSubsystem* Sub = UWRTamingSubsystem::Get(World);
+		if (!Sub) return TEXT("not now");
+		Piece->CallingOut = i;
+		Piece->CallingOutAt = World->GetTimeSeconds() + T(TEXT("stable.callSeconds"), 5.f);
+		Sub->CallOuts.Add({ Piece, i, Me, World->GetTimeSeconds() + T(TEXT("stable.callSeconds"), 5.f) });
+		WRSound::Broadcast(Piece, TEXT("tame.stable.call"));
+		return TEXT("Calling it out...");
+	}
+	return TEXT("unknown");
+}
+
+void FWRTaming::StableToJson(const AWRBuildPiece* Piece, const TSharedRef<FJsonObject>& O)
+{
+	if (!WRTameStable::IsStable(Piece)) return;
+	TArray<TSharedPtr<FJsonValue>> A;
+	for (const FString& J : Piece->StableJson) A.Add(MakeShared<FJsonValueString>(J));
+	O->SetArrayField(TEXT("stabled"), A);
+	TArray<TSharedPtr<FJsonValue>> L;
+	for (const FString& R : Piece->Roster) L.Add(MakeShared<FJsonValueString>(R));
+	O->SetArrayField(TEXT("roster"), L);
+}
+
+void FWRTaming::StableFromJson(AWRBuildPiece* Piece, const TSharedPtr<FJsonObject>& O)
+{
+	if (!WRTameStable::IsStable(Piece) || !O.IsValid()) return;
+	const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+	const TArray<TSharedPtr<FJsonValue>>* L = nullptr;
+	Piece->StableJson.Reset();
+	Piece->Roster.Reset();
+	if (O->TryGetArrayField(TEXT("stabled"), A) && O->TryGetArrayField(TEXT("roster"), L) && A->Num() == L->Num())
+	{
+		for (int32 i = 0; i < A->Num(); ++i) { Piece->StableJson.Add((*A)[i]->AsString()); Piece->Roster.Add((*L)[i]->AsString()); }
+	}
+}
+
+void FWRTaming::StableDestroyed(AWRBuildPiece* Piece)
+{
+	if (!WRTameStable::IsStable(Piece) || !Piece->HasAuthority()) return;
+	// Torn down: every tame in it comes out at the gate (nobody loses tames to a raid; over the limit they still come).
+	while (Piece->StableJson.Num() > 0) WRTameStable::LetOut(Piece, 0);
+}
+
+void UWRTamingSubsystem::TickStables(float Dt)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (int32 i = GoingIn.Num() - 1; i >= 0; --i)
+	{
+		FGoingIn& G = GoingIn[i];
+		AWRCreature* Tame = G.Tame.Get();
+		AWRBuildPiece* Stable = G.Stable.Get();
+		if (!Tame || !Stable || !Tame->IsAlive() || Tame->GetRider() || Tame->CallTo.Get() != Stable)
+		{
+			GoingIn.RemoveAt(i);   // it died, was ridden, ordered elsewhere or the stable fell
+			continue;
+		}
+		const bool bThere = FVector::Dist2D(Tame->GetActorLocation(), FWRTaming::StableGate(Stable)) < T(TEXT("stable.gateReach"), 250.f);
+		if (bThere || Now >= G.Until)
+		{
+			if (FWRTaming::StabledBy(Stable, Tame->TamedBy) < int32(T(TEXT("stable.perPlayer"), 10.f))) WRTameStable::Store(Stable, Tame);
+			else Tame->CallTo = nullptr;
+			GoingIn.RemoveAt(i);
+		}
+	}
+	for (int32 i = CallOuts.Num() - 1; i >= 0; --i)
+	{
+		FCallOut& C = CallOuts[i];
+		AWRBuildPiece* Stable = C.Stable.Get();
+		if (!Stable) { CallOuts.RemoveAt(i); continue; }
+		if (Now < C.At) continue;
+		Stable->CallingOut = -1;
+		if (Stable->Roster.IsValidIndex(C.Index) && WRTameStable::Owner(Stable->Roster[C.Index]) == C.Owner)
+		{
+			if (AWRCreature* Tame = WRTameStable::LetOut(Stable, C.Index)) Notify(GetWorld(), C.Owner, FString::Printf(TEXT("%s is out of the stable"), *FWRTaming::Label(Tame)));
+		}
+		CallOuts.RemoveAt(i);
+	}
+}
+
+// ---------------------------------------------------------------- the bond token and the Dadeni draught
+
+void FWRTaming::TameDied(AWRCreature* Tame)
+{
+	UWorld* World = Tame ? Tame->GetWorld() : nullptr;
+	UWRTamingSubsystem* Sub = UWRTamingSubsystem::Get(World);
+	const FWRCreatureDef* Def = Tame ? Tame->GetDef() : nullptr;
+	if (!Sub || !Def || !Tame->HasAuthority() || Tame->TamedBy.IsEmpty() || WRNecro::IsRaised(Tame) || WRSporePath::IsSummon(Tame)) return;
+	if (!FWRItemRegistry::Get().Find(TEXT("bond_token"))) return;
+	UWRTamingSubsystem::FFallen F;
+	F.Owner = Tame->TamedBy;
+	F.Species = Def->Id;
+	F.Name = Tame->TameName();
+	F.DiedUnix = FDateTime::UtcNow().ToUnixTimestamp();
+	F.bRevived = Tame->bRevivedOnce;
+	FString Json;
+	const TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Json);
+	FJsonSerializer::Serialize(WholeTame(Tame), W);
+	F.Json = Json;
+	const FString Id = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	if (!F.bRevived) Sub->Fallen.Add(Id, F);
+	// Its collar (a braided band with its name plate) where it fell; the stack carries what its tooltip shows.
+	FWRItemStack Token;
+	Token.ItemId = TEXT("bond_token");
+	Token.Count = 1;
+	Token.Sockets = { FName(*(TEXT("fallen:") + Id)), FName(*(TEXT("name:") + F.Name.Left(40))), FName(*(TEXT("species:") + Def->Id.ToString())),
+		FName(*FString::Printf(TEXT("died:%lld"), F.DiedUnix)), FName(*(TEXT("owner:") + F.Owner.Left(40))) };
+	if (F.bRevived) Token.Sockets.Add(FName(TEXT("revived:1")));
+	AWRLootBag::Spill(World, Tame->GetActorLocation() - FVector(0.f, 0.f, Tame->GetSimpleCollisionHalfHeight()) + FVector(0.f, 0.f, 20.f), Tame->TamedBy, { Token });
+	Notify(World, Tame->TamedBy, F.bRevived ? FString::Printf(TEXT("%s has died. Its collar fell where it lay"), *Label(Tame))
+		: FString::Printf(TEXT("%s has died. Its collar fell where it lay: a Dadeni draught at your Hearth within %.0f h can bring it back"), *Label(Tame), T(TEXT("revive.hours"), 72.f)));
+}
+
+namespace WRTameToken
+{
+	FString Field(const FWRItemStack& S, const TCHAR* Key)
+	{
+		const FString Prefix = FString(Key) + TEXT(":");
+		for (const FName& N : S.Sockets) { const FString V = N.ToString(); if (V.StartsWith(Prefix)) return V.Mid(Prefix.Len()); }
+		return FString();
+	}
+}
+
+FString FWRTaming::TokenLine(const FWRItemStack& Stack)
+{
+	const FString Name = WRTameToken::Field(Stack, TEXT("name"));
+	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(FName(*WRTameToken::Field(Stack, TEXT("species"))));
+	const int64 Died = FCString::Atoi64(*WRTameToken::Field(Stack, TEXT("died")));
+	const float HoursLeft = T(TEXT("revive.hours"), 72.f) - float(FDateTime::UtcNow().ToUnixTimestamp() - Died) / 3600.f;
+	const FString Who = Def && Name != Def->Name ? FString::Printf(TEXT("%s, %s"), *Name, *Def->Name) : Name;
+	if (!WRTameToken::Field(Stack, TEXT("revived")).IsEmpty()) return FString::Printf(TEXT("%s: brought back once already; its spirit has gone on"), *Who);
+	if (HoursLeft <= 0.f) return FString::Printf(TEXT("%s: its spirit has gone on"), *Who);
+	return FString::Printf(TEXT("%s: %.0f h left to bring it back (a Dadeni draught at your Hearth)"), *Who, FMath::CeilToFloat(HoursLeft));
+}
+
+FString FWRTaming::UseBondToken(APlayerState* Player, int32 BagSlot)
+{
+	UWRInventoryComponent* Bag = UWRInventoryComponent::FindFor(Player);
+	UWorld* World = Player ? Player->GetWorld() : nullptr;
+	UWRTamingSubsystem* Sub = UWRTamingSubsystem::Get(World);
+	if (!Bag || !Sub || !Bag->GetSlots().IsValidIndex(BagSlot)) return TEXT("not now");
+	const FWRItemStack Token = Bag->GetSlots()[BagSlot];
+	const FString Me = Player->GetPlayerName();
+	const FString Id = WRTameToken::Field(Token, TEXT("fallen"));
+	UWRTamingSubsystem::FFallen* F = Sub->Fallen.Find(Id);
+	if (!F) return TEXT("Its spirit has gone on");
+	if (F->Owner != Me) return FString::Printf(TEXT("This was %s's: only they can call it back"), *F->Owner);
+	if (float(FDateTime::UtcNow().ToUnixTimestamp() - F->DiedUnix) > T(TEXT("revive.hours"), 72.f) * 3600.f) return TEXT("Too late: its spirit has gone on");
+	// At your (or your clan's) Hearth: the claim's heart is where it comes back (survival-crafting 2.22).
+	const AActor* Body = BodyOf(World, Me);
+	const AWRBuildPiece* Hearth = nullptr;
+	for (TActorIterator<AWRBuildPiece> It(World); Body && It; ++It)
+	{
+		const FWRPieceDef* PD = It->GetDef();
+		if (!It->bGhost && PD && PD->Kind == TEXT("hearth") && Allies(It->OwnerName, Me) && FVector::Dist(It->GetActorLocation(), Body->GetActorLocation()) < T(TEXT("revive.hearthRange"), 800.f)) { Hearth = *It; break; }
+	}
+	if (!Hearth) return TEXT("Bring its collar to your Hearth (within 8 m)");
+	if (Bag->CountOf(TEXT("dadeni_draught")) < 1) return TEXT("It needs a Dadeni draught (alchemy table)");
+	if (AWRCreature::CountTames(World, Me) >= AWRCreature::TameLimitFor(Player)) return TEXT("You're at your tame limit: stable one first");
+	TSharedPtr<FJsonObject> O;
+	const TSharedRef<TJsonReader<>> R = TJsonReaderFactory<>::Create(F->Json);
+	if (!FJsonSerializer::Deserialize(R, O) || !O.IsValid()) return TEXT("Its spirit has gone on");
+	// Beside the Hearth, on your side of it, facing you.
+	const FVector Feet = Hearth->GetActorLocation() + (Body->GetActorLocation() - Hearth->GetActorLocation()).GetSafeNormal2D() * 300.f;
+	AWRCreature* Tame = RespawnTame(World, O, Feet, (Body->GetActorLocation() - Feet).Rotation().Yaw);
+	if (!Tame) return TEXT("Its spirit has gone on");
+	Bag->RemoveItem(TEXT("dadeni_draught"), 1);
+	// The collar is used up (find it again: the draught may have shifted the slots).
+	for (FWRItemStack& S : Bag->GetSlotsMutable())
+	{
+		if (S.ItemId == TEXT("bond_token") && WRTameToken::Field(S, TEXT("fallen")) == Id) { S = FWRItemStack(); break; }
+	}
+	Tame->bRevivedOnce = true;
+	Tame->SetHealthFraction(1.f);
+	Tame->TameRep.Hunger = 100.f;
+	Sub->Fallen.Remove(Id);
+	WRFx::Broadcast(Tame, TEXT("tame.revive"), Tame->GetActorLocation(), FRotator::ZeroRotator, FMath::Max(0.8f, Tame->GetSimpleCollisionRadius() / 70.f), TEXT("tame.revive"));
+	UWRLifeSkillsComponent::Award(Player, TEXT("taming"), TEXT("tameRevive"), T(TEXT("skillXp.revive"), 50.f));
+	UE_LOG(LogWildreach, Log, TEXT("TAME %s revived by %s at the Hearth"), *Tame->GetName(), *Me);
+	return FString::Printf(TEXT("%s comes back to you"), *Tame->TameName());
+}
+
+TSharedRef<FJsonObject> UWRTamingSubsystem::FallenToJson() const
+{
+	TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+	const int64 Now = FDateTime::UtcNow().ToUnixTimestamp();
+	const float Keep = WRTune(TEXT("tame.revive.hours"), 72.f) * 3600.f;
+	for (const TPair<FString, FFallen>& P : Fallen)
+	{
+		if (P.Value.bRevived || float(Now - P.Value.DiedUnix) > Keep) continue;   // gone on: dropped from the save
+		TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+		F->SetStringField(TEXT("owner"), P.Value.Owner);
+		F->SetStringField(TEXT("species"), P.Value.Species.ToString());
+		F->SetStringField(TEXT("name"), P.Value.Name);
+		F->SetNumberField(TEXT("died"), double(P.Value.DiedUnix));
+		F->SetStringField(TEXT("tame"), P.Value.Json);
+		O->SetObjectField(P.Key, F);
+	}
+	return O;
+}
+
+void UWRTamingSubsystem::FallenFromJson(const TSharedPtr<FJsonObject>& O)
+{
+	Fallen.Reset();
+	if (!O.IsValid()) return;
+	for (const TPair<FString, TSharedPtr<FJsonValue>>& P : O->Values)
+	{
+		const TSharedPtr<FJsonObject> F = P.Value.IsValid() ? P.Value->AsObject() : nullptr;
+		if (!F.IsValid()) continue;
+		FFallen Row;
+		Row.Owner = F->GetStringField(TEXT("owner"));
+		Row.Species = FName(*F->GetStringField(TEXT("species")));
+		Row.Name = F->GetStringField(TEXT("name"));
+		Row.DiedUnix = int64(F->GetNumberField(TEXT("died")));
+		Row.Json = F->GetStringField(TEXT("tame"));
+		Fallen.Add(P.Key, Row);
+	}
+}
+
+// ---------------------------------------------------------------- Soulbond
+
+float FWRTaming::SoulbondIncoming(AWRCharacterBase* Target, float Damage)
+{
+	AWRCreature* Tame = Cast<AWRCreature>(Target);
+	if (!Tame || !Tame->IsTamed() || !Tame->TameRep.bSoulbound || !Tame->GetAttributes() || Damage <= 0.f) return Damage;
+	if (Tame->TameRep.bSoulDown) return 0.f;   // down: nothing more takes it
+	const float Health = Tame->GetAttributes()->GetHealth();
+	if (Damage < Health) return Damage;
+	// The blow that would kill it lays it down instead (its owner's Soulbond; not a floor on anyone else).
+	const float Seconds = T(TEXT("soulbond.seconds"), 60.f);
+	Tame->TameRep.bSoulDown = true;
+	Tame->SoulDownUntil = Tame->GetWorld()->GetTimeSeconds() + Seconds;
+	if (Tame->GetRider()) Tame->Dismount();
+	Tame->Status->ApplyStatus(WRTags::Status_Unconscious, Seconds);
+	Tame->AggroTarget = nullptr;
+	Tame->CallTo = nullptr;
+	WRFx::Broadcast(Tame, TEXT("tame.heart"), Tame->GetActorLocation() + FVector(0.f, 0.f, Tame->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 1.2f, TEXT("tame.soulfall"));
+	Notify(Tame->GetWorld(), Tame->TamedBy, FString::Printf(TEXT("%s falls, but its soul holds: up again in %.0f s"), *Label(Tame), Seconds));
+	return FMath::Max(0.f, Health - 1.f);
+}
+
+// ---------------------------------------------------------------- calling your mount
+
+FString FWRTaming::CallMount(AWRPlayerController* Player)
+{
+	const APlayerState* PS = Player ? Player->GetPlayerState<APlayerState>() : nullptr;
+	AWRCharacter* Me = Player ? Cast<AWRCharacter>(Player->GetPawn()) : nullptr;
+	if (!PS || !Me) return TEXT("You're already riding");
+	UWorld* World = Player->GetWorld();
+	const FString Name = PS->GetPlayerName();
+	const bool bUnder = WRBiome::IsUnderground(Me, Me->GetActorLocation());
+	// The one you rode last; else the nearest saddled mount of yours; else the nearest mount.
+	AWRCreature* Best = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	for (TActorIterator<AWRCreature> It(World); It; ++It)
+	{
+		AWRCreature* C = *It;
+		if (C->TamedBy != Name || !C->IsAlive() || C->GetRider() || C->IsBaby() || C->TameRep.bSoulDown || !C->GetDef() || !C->GetDef()->bMount) continue;
+		const float Score = FVector::Dist(C->GetActorLocation(), Me->GetActorLocation()) - (C->LastRider == Name ? 1.0e7f : 0.f) - (C->TameRep.Saddle.IsEmpty() ? 0.f : 1.0e6f);
+		if (Score < BestScore) { BestScore = Score; Best = C; }
+	}
+	if (!Best) return TEXT("No mount of yours to call (stabled ones wait in their stalls)");
+	const float Range = T(TEXT("call.range"), 30000.f) + T(TEXT("call.perBond"), 500.f) * Best->TameRep.Bond;
+	const float Dist = FVector::Dist(Best->GetActorLocation(), Me->GetActorLocation());
+	if (Dist > Range) return FString::Printf(TEXT("%s is out of earshot (%.0f m)"), *Best->TameName(), Dist / 100.f);
+	if (WRBiome::IsUnderground(Best, Best->GetActorLocation()) != bUnder) return FString::Printf(TEXT("%s can't hear you through the rock"), *Best->TameName());
+	if (Best->GetCharacterMovement()->MovementMode == MOVE_Flying) Best->GetCharacterMovement()->SetMovementMode(MOVE_Falling);   // it lands, then comes on foot
+	Best->CallTo = Me;
+	Best->CallUntil = World->GetTimeSeconds() + T(TEXT("call.seconds"), 90.f);
+	Best->TameOrder = EWRTameOrder::Follow;
+	Best->SiegePiece = nullptr;
+	Best->MulticastSound(TEXT("voice.idle"));   // it answers (each species' own answer call waits for the voice pass)
+	return Dist < 1500.f ? FString::Printf(TEXT("%s comes to your side"), *Best->TameName()) : FString::Printf(TEXT("%s heard you: it's coming (%.0f m)"), *Best->TameName(), Dist / 100.f);
+}
+
+bool AWRCreature::SaddleBoneLocation(FVector& Out) const
+{
+	// The bone the saddle is fitted to (WRTameLook: "spine2" by hint); looked up once its body has loaded.
+	if (!bSaddleBoneLooked && Skel && Skel->GetSkinnedAsset())
+	{
+		bSaddleBoneLooked = true;
+		SaddleBoneCache = SealBody ? NAME_None : FindBone(TEXT("spine2"));
+	}
+	if (SaddleBoneCache.IsNone() || !Skel || !Skel->IsVisible()) return false;
+	Out = Skel->GetBoneLocation(SaddleBoneCache);
+	return true;
 }

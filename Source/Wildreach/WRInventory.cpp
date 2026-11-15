@@ -1020,6 +1020,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		// Raid tools (WRRaiding): a petard or mining charge pressed on, a siege ladder stood up, the code breaker.
 		return FWRRaiding::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id);
 	}
+	if (Def->Id == TEXT("bond_token"))
+	{
+		// A fallen tame's collar: at your Hearth with a Dadeni draught it comes back (cooks/cookpass-taming.md 3.10).
+		return FWRTaming::UseBondToken(Cast<APlayerState>(GetOwner()), SlotIndex);
+	}
 	if (Def->Category == TEXT("blueprint"))
 	{
 		// Read it: the recipe is yours for good (WRGear).

@@ -282,6 +282,17 @@ private:
 	float BodyAimTurn = 0.f;       // that turn, eased in and out (a spine twist, so walking legs keep their line)
 	float BodyBaseZ = 0.f;         // the body art's height on the capsule (feet on its bottom)
 	float SwimLift = 0.f;          // how much higher the body rides while swimming (WRWater), eased
+	// Riding (cooks/cookpass-taming.md 3.6, 3.7): the seated pose's weight, the body eased onto / off the saddle from
+	// where it stood (a world offset that dies away), and the saddle bone's rise and fall the body follows.
+	float SeatBlend = 0.f;
+	TWeakObjectPtr<AActor> SeatParent;
+	FVector SeatEaseFrom = FVector::ZeroVector;
+	float SeatEaseT = 1.f, SeatEaseSeconds = 0.45f;
+	FVector SeatLastAt = FVector::ZeroVector;
+	bool bSeatHasLast = false;
+	float SeatBoneAvg = 0.f, SeatBob = 0.f;
+	bool bSeatBoneInit = false;
+	bool bBodyOffset = false;      // the body is off its base (swimming, seated, easing): put back when done
 	float SwumCm = 0.f;            // server: distance swum since the last swimming XP
 	FVector LastSwimAt = FVector::ZeroVector;
 	float SwimCheck = 0.f;

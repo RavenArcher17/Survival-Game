@@ -3,6 +3,7 @@
 // commands: slot (use / equip), unequip, move, split, drop. Also the pieces the storage screen shares (WRUIInventory.h).
 
 #include "WRUIInventory.h"
+#include "WRTaming.h"
 #include "WRSurvival.h"
 #include "WRPlayerState.h"
 #include "WRPadInput.h"
@@ -1679,6 +1680,8 @@ namespace WRInvTab
 					+ SVerticalBox::Slot().AutoHeight()[StatRow(TEXT("Durability"), FString::Printf(TEXT("%.0f/%.0f"), S->Durability, D->MaxDurability), S->Durability <= 0.f ? WRUI::Bad : WRUI::Ink)]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)[SNew(SWRBar).Height(6.f * U).Fraction(F).Color(F < 0.25f ? WRUI::Bad : F < 0.5f ? WRUI::Warn : WRUI::Good)]);
 			}
+			// A fallen tame's collar: whose, and how long its spirit stays (cooks/cookpass-taming.md 3.10).
+			if (S->ItemId == TEXT("bond_token")) AddRow(StatRow(TEXT("Its spirit"), FWRTaming::TokenLine(*S), WRUI::Brass2));
 			if (D->StackSize > 1) AddRow(StatRow(TEXT("Stack"), FString::Printf(TEXT("%d / %d"), S->Count, D->StackSize)));
 			AddRow(StatRow(TEXT("Weight"), S->Count > 1 ? FString::Printf(TEXT("%s kg each · %s kg"), *WRInv::Kg(D->Weight), *WRInv::Kg(D->Weight * S->Count)) : FString::Printf(TEXT("%s kg"), *WRInv::Kg(D->Weight))));
 

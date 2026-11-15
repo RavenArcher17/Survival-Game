@@ -71,6 +71,9 @@ struct FWRHeroAnimInput
 	bool bLocal = false;                         // your own hero: searches every frame
 	float AimPitch = 0.f;                        // degrees, + up; spread over the spine while AimPitchAlpha > 0
 	float AimPitchAlpha = 0.f;
+	float Seat = 0.f;                            // 0..1 seated on a mount (cooks/cookpass-taming.md 3.6)
+	float SeatSpread = 22.f;                     // degrees each thigh opens round the mount's back
+	float SeatLean = 0.f;                        // 0 at a walk .. 1 at a gallop (the torso leans forward)
 };
 
 /** What the proxy needs for the motion matching, handed over each frame. */
@@ -91,6 +94,10 @@ struct FWRHeroFrame
 	bool bRetargetBones = false;     // bone lengths from the playing body (off when it's the body the clips were made on)
 	float AimPitch = 0.f, AimPitchAlpha = 0.f;
 	float FootContactHeight = 12.f;  // cm above the ground a foot counts as planted
+	// The seated rider (cooks/cookpass-taming.md 3.6): its weight, the thigh spread, and the pose's degrees (tuning
+	// tame.seat, read on the game thread).
+	float Seat = 0.f, SeatSpread = 22.f, SeatLeanDeg = 4.f, SeatArms = 0.f;
+	float HipFlex = 72.f, KneeBend = 76.f, FootLevel = -4.f, ArmForward = 28.f, ArmIn = 10.f, ElbowBend = 64.f;
 	struct FShotNotify { const UAnimSequenceBase* Clip = nullptr; float From = 0.f, Delta = 0.f, Weight = 1.f; };
 	TArray<FShotNotify> ShotNotifies;
 };

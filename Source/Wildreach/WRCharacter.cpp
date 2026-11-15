@@ -20,6 +20,7 @@
 #include "WRAttributeSet.h"
 #include "WRCharacterMovementComponent.h"
 #include "WRCreature.h"
+#include "WRSound.h"
 #include "WRGameMode.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
@@ -1017,7 +1018,62 @@ void AWRCharacter::TickBodyAnim()
 	if (!FMath::IsNearlyEqual(SwimLift, LiftGoal, 0.05f))
 	{
 		SwimLift = FMath::FInterpTo(SwimLift, LiftGoal, Dt, 4.f);
-		Body->SetRelativeLocation(FVector(0.f, 0.f, BodyBaseZ + SwimLift));
+	}
+	// Riding (cooks/cookpass-taming.md 3.6, 3.7). Seated: the seat pose's weight, the thighs opened round this mount's
+	// back, the lean from its pace, and the body following the saddle bone's rise and fall (its gait's bob: the bone's
+	// height less its slow average). Getting on or off: the body starts where it stood (or sat) and is eased over an arc
+	// onto the seat (or down beside it), never snapped; the attachment itself is the server's, already done.
+	AWRCreature* SeatMount = Cast<AWRCreature>(GetAttachParentActor());
+	const bool bSeated = !bDead && SeatMount && SeatMount->GetRider() == this;
+	SeatBlend = FMath::FInterpConstantTo(SeatBlend, bSeated ? 1.f : 0.f, Dt, 1.f / FMath::Max(0.05f, WRTune(TEXT("tame.mountEase.onSeconds"), 0.45f)));
+	H.Seat = SeatBlend;
+	if (bSeated)
+	{
+		const FWRCreatureDef* MountDef = SeatMount->GetDef();
+		const float BackCm = MountDef ? MountDef->Back * MountDef->Radius : 40.f;
+		H.SeatSpread = FMath::Clamp(WRTune(TEXT("tame.seat.spreadMin"), 16.f) + WRTune(TEXT("tame.seat.spreadPerCm"), 0.22f) * BackCm, WRTune(TEXT("tame.seat.spreadMin"), 16.f), WRTune(TEXT("tame.seat.spreadMax"), 34.f));
+		H.SeatLean = FMath::Clamp(float(SeatMount->GetVelocity().Size2D()) / FMath::Max(1.f, WRTune(TEXT("tame.seat.gallopSpeed"), 1100.f)), 0.f, 1.f);
+		FVector Bone;
+		if (SeatMount->SaddleBoneLocation(Bone))
+		{
+			const float Z = float(Bone.Z - SeatMount->GetActorLocation().Z);
+			if (!bSeatBoneInit) { SeatBoneAvg = Z; bSeatBoneInit = true; }
+			SeatBoneAvg = FMath::FInterpTo(SeatBoneAvg, Z, Dt, WRTune(TEXT("tame.seat.bobFollow"), 2.f));
+			const float Max = WRTune(TEXT("tame.seat.bobMax"), 25.f);
+			SeatBob = FMath::FInterpTo(SeatBob, FMath::Clamp(Z - SeatBoneAvg, -Max, Max), Dt, 20.f);
+		}
+	}
+	else
+	{
+		bSeatBoneInit = false;
+		SeatBob = FMath::FInterpTo(SeatBob, 0.f, Dt, 8.f);
+	}
+	AActor* NowParent = bSeated ? SeatMount : nullptr;
+	if (NowParent != SeatParent.Get())
+	{
+		// On or off this frame: the body starts where it was (a jump across the world is a teleport, not a dismount).
+		const FVector From = bSeatHasLast ? SeatLastAt - GetActorLocation() : FVector::ZeroVector;
+		SeatEaseFrom = From.Size() < 1500.f ? From : FVector::ZeroVector;
+		SeatEaseT = 0.f;
+		SeatEaseSeconds = FMath::Max(0.05f, WRTune(NowParent ? TEXT("tame.mountEase.onSeconds") : TEXT("tame.mountEase.offSeconds"), NowParent ? 0.45f : 0.35f));
+		WRSound::PlayAt(this, NowParent ? TEXT("mount.on") : TEXT("mount.off"), GetActorLocation());
+		SeatParent = NowParent;
+	}
+	FVector EaseWorld = FVector::ZeroVector;
+	if (SeatEaseT < 1.f)
+	{
+		SeatEaseT = FMath::Min(1.f, SeatEaseT + Dt / SeatEaseSeconds);
+		const float Smooth = SeatEaseT * SeatEaseT * (3.f - 2.f * SeatEaseT);
+		EaseWorld = SeatEaseFrom * (1.f - Smooth) + FVector(0.f, 0.f, WRTune(TEXT("tame.mountEase.arc"), 30.f) * FMath::Sin(SeatEaseT * PI));
+	}
+	SeatLastAt = GetActorLocation();
+	bSeatHasLast = true;
+	const FVector EaseLocal = GetActorTransform().InverseTransformVectorNoScale(EaseWorld);
+	const bool bOffset = !FMath::IsNearlyZero(SwimLift, 0.05f) || !EaseLocal.IsNearlyZero(0.05f) || !FMath::IsNearlyZero(SeatBob, 0.05f);
+	if (bOffset || bBodyOffset)
+	{
+		Body->SetRelativeLocation(FVector(EaseLocal.X, EaseLocal.Y, BodyBaseZ + SwimLift + EaseLocal.Z + SeatBob));
+		bBodyOffset = bOffset;
 	}
 	// Standing on a slope: where the ground is under each foot, against the capsule's bottom (the instance sinks the
 	// hips to the lower one and bends the other leg up to its own).

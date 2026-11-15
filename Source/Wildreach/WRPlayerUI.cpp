@@ -183,6 +183,7 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::Machine: Want = TEXT("machine"); break;
 	case EWRMenu::TameCard: Want = TEXT("tamecard"); break;
 	case EWRMenu::Incubator: Want = TEXT("incubator"); break;
+	case EWRMenu::Stable: Want = TEXT("stable"); break;
 	case EWRMenu::World: Want = P->WorldScreen; break;
 	case EWRMenu::Quests: Want = TEXT("journal"); break;
 	case EWRMenu::Artifacts: Want = TEXT("journal"); break;
@@ -962,7 +963,7 @@ const TArray<TPair<FName, FText>>& FWRPlayerUI::WhistleOrders()
 		{ TEXT("stay"), LOCTEXT("WhistleStay", "Stay") },
 		{ TEXT("siege"), LOCTEXT("WhistleSiege", "Break that") },
 		{ TEXT("call"), LOCTEXT("WhistleCall", "Call (a Lumenhorn bellows)") },
-		{ NAME_None, FText::GetEmpty() },
+		{ TEXT("mount"), LOCTEXT("WhistleMount", "Call your mount") },
 		{ NAME_None, FText::GetEmpty() },
 		{ TEXT("passive"), LOCTEXT("WhistlePassive", "Passive") },
 		{ TEXT("aggressive"), LOCTEXT("WhistleAggressive", "Aggressive") },
@@ -1053,7 +1054,7 @@ void FWRPlayerUI::PickTameOrder(int32 Pos)
 	const TArray<TPair<FName, FText>>& Orders = bWhistle ? WhistleOrders() : TameOrders();
 	// Tend: the tame's card (its stats, skills, tack, family and packs: cooks/build-taming.md 2.8), opened here.
 	const bool bTend = !bWhistle && Pos >= 0 && Orders.IsValidIndex(Pos) && Orders[Pos].Key == TEXT("tend") && P->GetMenuCreature();
-	if (!bTend && Pos >= 0 && Orders.IsValidIndex(Pos) && !Orders[Pos].Key.IsNone() && (!bWhistle || P->TamesInEarshot() > 0))
+	if (!bTend && Pos >= 0 && Orders.IsValidIndex(Pos) && !Orders[Pos].Key.IsNone() && (!bWhistle || P->TamesInEarshot() > 0 || Orders[Pos].Key == TEXT("mount")))
 	{
 		P->SendCommand((bWhistle ? TEXT("whistle ") : TEXT("tame ")) + Orders[Pos].Key.ToString());
 	}

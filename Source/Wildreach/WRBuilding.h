@@ -213,6 +213,13 @@ public:
 	/** Code-locked doors: who has entered its code since it was set (replicated so the prompt and E know who may open it:
 	 *  the keypad only comes up for someone who can't). Not saved: after a restart, the code again. */
 	UPROPERTY(Replicated) TArray<FString> UnlockedFor;
+	/** A stable's tames (cooks/cookpass-taming.md 3.9), one line each for every machine's screen:
+	 *  "owner	name	species	level	sex	health"; their save lines (server) in StableJson, the same order. */
+	UPROPERTY(Replicated) TArray<FString> Roster;
+	TArray<FString> StableJson;
+	/** A tame being called out of it: its roster index and when it walks out (server time; -1 none). */
+	UPROPERTY(Replicated) int32 CallingOut = -1;
+	UPROPERTY(Replicated) float CallingOutAt = 0.f;
 	/** Server bookkeeping. */
 	FString LockCode;
 	/** A Hearth's piece: the game hour it was built (its first day takes an offering) and the meal left on it (saved). */

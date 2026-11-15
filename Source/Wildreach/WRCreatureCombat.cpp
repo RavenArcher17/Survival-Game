@@ -32,6 +32,7 @@
 #include "WRSound.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "WRTaming.h"
 #include "WRWeapons.h"
 #include "WRPadInput.h"
 #include "WRInventory.h"
@@ -790,18 +791,13 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 		else if (B.Key == TEXT("frost")) { Hit.FrostBuildup += B.Value; Hit.Element = WRTags::Element_Frost; }
 		else Hit.Buildups.Add(B.Key, B.Value);
 	}
-	// A tame keeps its own element (FULL-GAME 6.5): its plain blows carry it (cooks/build-taming.md 2.7).
-	if (Self->IsTamed() && Hit.Element == WRTags::Element_Physical)
-	{
-		const float Build = WRTune(TEXT("tame.element.buildup"), 12.f);
-		if (Self->Weapon.Element == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Build; }
-		else if (Self->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Build; }
-	}
 	FWRStormAI::ModifyHit(Self, Hit, R);   // shock is lightning; a tame Raiju's storm bonus, a tame's shock bites
 	FWRSwampAI::ModifyHit(Self, Hit, R);   // a hexed beast's curse; the Miasma's worse cry
 	FWRVoidAI::ModifyHit(Self, Hit, R);    // void bites; a Riftborn's curse
 	FWRForestAI::ModifyHit(Self, Hit, R);  // a Thornlynx's bite straight off its drop
 	FWRGraveAI::ModifyHit(Self, Hit, R);   // a raised body's blows are its Necromancer's
+	// A tame keeps its own element in every land (FULL-GAME 6.5; cooks/cookpass-taming.md 3.1): a plain blow carries it.
+	FWRTaming::ElementHit(Self, Hit);
 	UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *RowId.ToString(), *Victim->GetName());
 	const float Knockback = R->Knockback;
 	TWeakObjectPtr<AWRCreature> WeakSelf(Self);
@@ -1437,11 +1433,10 @@ void AWRCreature::TickRider(float DeltaSeconds)
 			Hit.bParryable = true;
 			Hit.Origin = Mount->GetActorLocation();
 			// Its own element on its bite (cooks/build-taming.md 2.7).
-			Hit.Element = Mount->Weapon.Element == TEXT("fire") ? WRTags::Element_Fire : Mount->Weapon.Element == TEXT("frost") ? WRTags::Element_Frost : WRTags::Element_Physical;
-			if (Mount->Weapon.Element == TEXT("fire")) Hit.BurnBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
-			else if (Mount->Weapon.Element == TEXT("frost")) Hit.FrostBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
+			Hit.Element = WRTags::Element_Physical;
 			FWRStormAI::ModifyHit(Mount, Hit, nullptr);   // a Voltfang's shock bites from under its rider
 			FWRSwampAI::ModifyHit(Mount, Hit, nullptr);   // a hexed mount's bites carry the hex
+			FWRTaming::ElementHit(Mount, Hit);            // else its own element (cooks/cookpass-taming.md 3.1)
 			UWRCombatLibrary::ApplyHit(Victim, Hit);
 		}), 0.45f, false);
 	}

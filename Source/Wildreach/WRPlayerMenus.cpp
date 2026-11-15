@@ -295,6 +295,14 @@ void AWRPlayerController::WRInteract()
 			OpenDoorKeypad(Piece);
 			return;
 		}
+		if (UI && Def && Def->Kind == TEXT("stable") && Piece->SeemsShared(this))
+		{
+			// A stable: your tames in its stalls and near it (cooks/cookpass-taming.md 3.9).
+			Menu = EWRMenu::Stable;
+			MenuPiece = Piece;
+			MenuIndex = 0;
+			return;
+		}
 		if (UI && Def && Def->Kind == TEXT("incubator") && Piece->SeemsShared(this))
 		{
 			// An incubator: its egg and its fuel (cooks/build-taming.md 2.6).
@@ -965,6 +973,23 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		ClientNotify(OutResult);
 		return true;
 	}
+	if (Cmd == TEXT("stable"))
+	{
+		// "stable <x> <y> <z> store <tx> <ty> <tz>" / "... out <i>": the stable standing there, within reach of you.
+		const FVector At(FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2)), FCString::Atof(*Arg(3)));
+		AWRBuildPiece* Piece = nullptr;
+		for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+		{
+			const FWRPieceDef* D = It->bGhost ? nullptr : It->GetDef();
+			if (D && D->Kind == TEXT("stable") && FVector::Dist(It->GetActorLocation(), At) < 50.f) { Piece = *It; break; }
+		}
+		if (Piece && (!GetPawn() || FVector::Dist(Piece->GetActorLocation(), GetPawn()->GetActorLocation()) > 1200.f)) Piece = nullptr;
+		TArray<FString> Rest;
+		for (int32 i = 4; i < Args.Num(); ++i) Rest.Add(Args[i]);
+		OutResult = FWRTaming::StableCommand(this, Piece, Rest);
+		ClientNotify(OutResult);
+		return true;
+	}
 	if (Cmd == TEXT("incubator"))
 	{
 		// "incubator <x> <y> <z> in 5": the incubator standing there, within reach of you.
@@ -1004,6 +1029,14 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		// whistle for everyone near to hear; each tame that heard answers with its own call, a beat apart.
 		const FString Order = Arg(1);
 		static const TSet<FString> Allowed = { TEXT("follow"), TEXT("stay"), TEXT("passive"), TEXT("aggressive"), TEXT("siege"), TEXT("call") };
+		if (Order == TEXT("mount"))
+		{
+			// Call your mount (cooks/cookpass-taming.md 3.8): the one you rode last comes to your side from afar.
+			WRSound::Broadcast(GetPawn(), TEXT("tame.whistle"));
+			OutResult = FWRTaming::CallMount(this);
+			ClientNotify(OutResult);
+			return true;
+		}
 		if (Order == TEXT("call"))
 		{
 			// Call: a tame's own call on order (a Lumenhorn's Bellow, crystal 2.12.1): the one you ride, or those in earshot.

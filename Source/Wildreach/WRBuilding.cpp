@@ -376,6 +376,9 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, CustomName);
 	DOREPLIFETIME(AWRBuildPiece, Emblem);
 	DOREPLIFETIME(AWRBuildPiece, UnlockedFor);
+	DOREPLIFETIME(AWRBuildPiece, Roster);
+	DOREPLIFETIME(AWRBuildPiece, CallingOut);
+	DOREPLIFETIME(AWRBuildPiece, CallingOutAt);
 	DOREPLIFETIME(AWRBuildPiece, Machine);
 	DOREPLIFETIME(AWRBuildPiece, Turret);
 	DOREPLIFETIME(AWRBuildPiece, Belt);
@@ -476,6 +479,8 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 		{
 			WRBeds::OnGone(this);
 		}
+		// A stable torn down lets its tames out at its gate: nobody loses tames to a raid (cooks/cookpass-taming.md 3.9).
+		FWRTaming::StableDestroyed(this);
 	}
 	if (UWRFarmSubsystem* Farm = HasAuthority() ? UWRFarmSubsystem::Get(this) : nullptr)
 	{

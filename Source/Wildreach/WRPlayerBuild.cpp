@@ -835,6 +835,19 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 			if (!Claim || Claim->OwnerName != Who) OutResult = TEXT("a Hearth must be inside your own land claim");
 			else if (AWRHearth::FindCovering(GetWorld(), Loc)) OutResult = TEXT("this claim already has a Hearth");
 		}
+		else if (Def->Kind == TEXT("stable"))
+		{
+			// Stables (cooks/cookpass-taming.md 3.9): inside a claim, tame.stable.perClaim of them at most.
+			const AWRClaimTotem* Claim = AWRClaimTotem::FindAt(GetWorld(), Loc);
+			int32 Stables = 0;
+			for (TActorIterator<AWRBuildPiece> It(GetWorld()); Claim && It; ++It)
+			{
+				const FWRPieceDef* D = It->GetDef();
+				Stables += !It->bGhost && D && D->Kind == TEXT("stable") && FVector::Dist2D(It->GetActorLocation(), Claim->GetActorLocation()) <= Claim->Radius ? 1 : 0;
+			}
+			if (!Claim) OutResult = TEXT("a stable goes inside a land claim");
+			else if (Stables >= int32(WRTune(TEXT("tame.stable.perClaim"), 3.f))) OutResult = FString::Printf(TEXT("this claim has its %d stables"), Stables);
+		}
 		if (OutResult.IsEmpty() && Def)
 		{
 			OutResult = FWRFarm::PlaceCheck(this, *Def, Loc);

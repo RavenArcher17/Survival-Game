@@ -31,6 +31,7 @@ enum class EWRMenu : uint8
 	Machine,   // a machine's screen (MenuPiece): power, slots, switches (WRUIMachine)
 	TameCard,  // a tame's card (MenuCreature): stats, skills, tack, family, packs (WRUITameCard; the wheel's Tend)
 	Incubator, // an incubator's screen (MenuPiece): the egg, its fuel (WRUIIncubator)
+	Stable,    // a stable's screen (MenuPiece): your tames in its stalls and near it (WRUIStable; cooks/cookpass-taming.md 3.9)
 	World,     // a world system's screen (WorldScreen / WorldTarget): shrine, talk, trade, messages (WRUIWorld)
 	Quests,    // the journal's Quests tab (WRUIWorld)
 	Artifacts, // the journal's Artifacts tab: the belt, the pouch, geis records, the band (WRUIPortals)

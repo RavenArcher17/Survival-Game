@@ -150,6 +150,19 @@ on a back fitted per species by creatures.json `seat` / `back`, attached to `spi
 The Floeback's body is built and moved in code (`UWRSealBody`). Card and incubator commands carry the tame's /
 incubator's position (`tamecard x y z <verb>`, `incubator x y z <verb>`) so the server acts on the one the screen shows.
 Dev: `WRTameDev now | bond N | grow X | care | mate | hatch`.
+The taming cook pass (cooks/cookpass-taming.md) added: a tame's **name** (`TameRep.Name`; `AWRCreature::TameName()`,
+`FWRTaming::Label()` for lines to its owner; card Rename with suggestions from `Data/tame_names.json`), **Release asks
+twice** (`ReleaseArmedBy`), **every land's element** on a tame's plain blows (`FWRTaming::ElementHit`, tuning
+`tame.element.<element>`), **ride keys from the bindings**, the **rider's seat** (a procedural seated pose in
+`FWRHeroAnimProxy::PostLayers`, numbers in tuning `tame.seat`; the body follows the saddle bone's bob and is eased
+onto / off the seat in `AWRCharacter`'s anim update, `tame.mountEase`), **getting off onto clear ground**
+(`AWRCreature::DismountSpot`), **Call your mount** (the whistle wheel's wedge, `FWRTaming::CallMount`, `CallTo` on the
+creature), the **courting / cuddle nuzzle** (a head dip through the pose lift), the **stable** (piece kind `stable`,
+`WRUIStable.cpp`, `FWRTaming::StableCommand`, its tames as save lines in `AWRBuildPiece::StableJson` with a replicated
+`Roster`, 3 a claim checked in `WRPlayerBuild`), the **bond token** and **Dadeni draught** (a dead tame's line kept in
+`UWRTamingSubsystem::Fallen`, saved as the world save's `fallenTames`; the token's sockets carry its id; use it at your
+Hearth) and **Soulbond** (`FWRTaming::SoulbondIncoming` inside `ApplyHit`; `TameRep.bSoulbound / bSoulDown`). The card
+has tabs (Overview, Skills, Gear, Family, Packs; LB / RB on a pad) with real stat values and its parents.
 
 Also since 0.7.1: **world systems** (`WRWorldSystems.*`, `WRWorldSites.cpp`, `WRWorldNpc.cpp`, `WRUIWorld.cpp`,
 `Data/world.json`, cooks/build-world-systems.md): `UWRWorldSystems` (server world subsystem) places the villages, shrines,
@@ -214,8 +227,9 @@ Open, as of 0.7.1:
   now`); it needs its own four-winged sky-stag body. Ten lands' barding is hidden with its land, and only the lava and
   slick-ice passes are wired (the others' hazards don't exist yet). The Floeback's body is modelled in code, not
   sculpted art. Saddle seats per species (`seat`, `back`) are first fits to eyeball. Pen-born farm young still grow on
-  the farm's clock, not the baby system. Not built here: the stable (stored tames), necro raising, the Dadeni revive and
-  Soulbond, tame names.
+  the farm's clock, not the baby system. The stable, names, the Dadeni revive and Soulbond are built (cookpass-taming);
+  not built: the bone altar's permanent undead tames (necro raising by ritual), each species' own whistle-answer call
+  (they answer with their idle call), and the rider's seat is a procedural pose over the idle (no riding clips yet).
 - **World systems on the island are two lands**: two villages, ten shrines, two masters, two caravans, the Kiln Roads and the
   Blue Below; masters speak in text, merchants have no pack beasts, the tubes are boulder corridors whose routes nobody has
   walked yet (tune `world.json hidden.route`), and the eruption river rise, event music, invader ice / slush, the Dimming

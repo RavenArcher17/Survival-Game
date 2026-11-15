@@ -41,6 +41,7 @@
     {"id": "bronze_armor", "station": "armorer", "level": 2, "inputs": {"bronze_ingot": 2, "hide": 1}, "output": "bronze_armor", "count": 1, "seconds": 5, "quality": true},
     {"id": "iron_armor", "station": "armorer", "level": 3, "inputs": {"iron_ingot": 2, "hide": 1}, "output": "iron_armor", "count": 1, "seconds": 5, "quality": true},
 
+    { "id": "dadeni_draught", "station": "alchemy_table", "level": 5, "inputs": { "asphodel": 2, "soulstone": 1, "healing_potion": 2 }, "output": "dadeni_draught", "count": 1, "seconds": 8 },
     { "id": "minor_healing_potion", "station": "alchemy_table", "level": 1, "inputs": { "berries": 3, "fiber": 1 }, "output": "minor_healing_potion", "count": 1, "seconds": 2 },
     { "id": "healing_potion", "station": "alchemy_table", "level": 2, "inputs": { "minor_healing_potion": 2, "sulfur_crystal": 1, "lichen": 1 }, "output": "healing_potion", "count": 1, "seconds": 3 },
     { "id": "antidote", "station": "alchemy_table", "level": 2, "inputs": { "berries": 2, "lichen": 2 }, "output": "antidote", "count": 1, "seconds": 2 },
