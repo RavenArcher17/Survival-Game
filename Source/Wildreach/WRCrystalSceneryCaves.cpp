@@ -189,16 +189,13 @@ namespace WRCrystalUnder
 		}
 		if (H.Arena == TEXT("echo_warden"))
 		{
-			// The Hall of the Door: four chime stones on bronze posts at the compass points (the Warden hammers what
-			// rings), heaps of throwing stones by the walls, and the Vault Door's lead ring in the south-west wall.
+			// The Hall of the Door: heaps of throwing stones behind the four chime stones at the compass points (the chimes
+			// themselves are the Echo Warden's machines, AWRCrystalBossProp "chime": they ring, swing and break), and the
+			// Vault Door's lead ring in the south-west wall.
 			for (int32 c = 0; c < 4; ++c)
 			{
 				const float Ang = c * PI * 0.5f;
 				const FVector P(FMath::Cos(Ang) * H.Rx * 0.62f, FMath::Sin(Ang) * H.Ry * 0.62f, 0.f);
-				B.K.Rod(Bronze(), P, P + FVector(0, 0, 300.f), 10.f);
-				B.K.Rod(Bronze(), P + FVector(0, 0, 300.f), P + FVector(0, 0, 300.f) - P.GetSafeNormal() * 90.f, 6.f);
-				Point(B, AmethystPale(0.2f), P + FVector(0, 0, 290.f) - P.GetSafeNormal() * 90.f, FVector(0, 0, -1.f), 160.f, 22.f, 0.f);
-				B.Box(P + FVector(0, 0, 150.f), FVector(20.f, 20.f, 150.f));
 				for (int32 s = 0; s < 8; ++s) B.Rock(s + c * 8, FVector(30.f, 26.f, 22.f), P * 1.3f + FVector((Hash(c, s) - 0.5f) * 160.f, (Hash(c, s + 9) - 0.5f) * 160.f, 0.f), FRotator(0.f, Hash(c, s) * 360.f, 0.f), Rgb(40, 40, 46) * 0.7f, false, 3.f);
 			}
 		}

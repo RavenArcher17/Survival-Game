@@ -62,8 +62,68 @@ of the coast shows yet; underwater play is live everywhere water is.
 Aaron (lane build-biome-crystal: requirement ledger R1-R50, build research and plan in showcase-notes
 cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in pieces; compiled (editor target) after each;
 not played here (Aaron tests). Live from Crystal (4): `crystal` is in `world.liveBiomes`; the Arcane path from Crystal
-(5). Not built yet: the four bosses (the Mirrored Twins, the Echo Warden, the Geode Tyrant, Lyrathis) and their arenas'
-machines, the composed music, the two crystal shields (no shield items exist in the game yet).
+(5); the four bosses from Crystal (6). Not built yet: the composed music (stand-ins play), the two crystal shields (no
+shield items exist in the game yet), the Prismglass spear's Soul art.
+
+- **Crystal (6b): the three trophy talismans do what the cook says** (crystal 2.13): the Twin shard (`dodgeEcho` 0.4:
+  the first blow you land within 1.5 s of a dodge lands again at 40%, `WRArcane::AfterHit`), the Warden's tuning fork
+  (`quietSteps` 0.5: your steps, rolls and landings make half the noise, `WRCrystal::Emit`), the Tyrant plate
+  (`shieldBonus` 0.2 on Barrier and Aegis; `blockStaminaNonArcane` -0.1 on your guard's stamina if you don't walk the
+  Arcane path). They carried older stand-in stats. Compiled; not played.
+
+- **Crystal (6): the four bosses and their arenas' machines** (cooks/biome-crystal.md 2.13-2.14; plan
+  build-biome-crystal.md Part 2 P2.3-P2.7). `WRCrystalBosses.*` (`FWRCrystalBoss`, a friend of `AWRBoss` called beside
+  the Graveyard's hooks; `UWRCrystalArenas` places them once the caves are built near a survivor), `WRCrystalBossLook.cpp`
+  (the machines and bodies), `WRCrystalLyrathis.cpp` (her hall and fight), `WRCrystalBossState.h`; rows in
+  `creatures.json` / `attacks.json` / tuning `bosses.<id>`. **The Mirrored Twins** (the Archive of Wards): one real
+  knight (the Obsidian Warden rig in crystal plate: hexafoil helm, crystal longsword, kite shield) and the Spar Lens's
+  double (a second actor that takes nothing, that you walk through, whose blows can't be parried); only the real one has
+  a reflection in the water (its pose copied under the floor, drawn by the new `M_MirrorWater` only where you look at the
+  floor; its steps ring the water, the double's don't). The lens hangs in a bronze gimbal under the light vent and turns
+  a quarter every 12 s (the chain over its sprocket, the ring swinging and settling): the two trade places along its light
+  over 1 s, the real one taking nothing. Three shots on the flaring lens shatter it: one knight while the magazine on
+  the north wall lowers a spare down its chain, over the ceiling pulley and along the track (20 s, its counterweight
+  rising in the wall slot); after three spares, one knight for good. The double makes every move at the same instant from
+  its own side of you (its Mirror lunge converges from the other side); Ward guard throws shots back 3 s. **The Echo
+  Warden** (the Hall of the Door): a bronze construct on the Frostantler rig with a tuning-fork head, two ear-horns that
+  swivel to every sound and humming back plates; blind, it wakes to a noise and goes to the loudest one within 30 m
+  (crouching is silent; a thrown stone pulls it); its Fork slam lands on the noise, not on you; a struck chime stone (the
+  four are machines now: they swing, crack and break) sends it to hammer the chime 4 s with its back to you (stance open);
+  three hammerings break a chime; Listening holds it still 2 s and a noise then brings the Snap lunge; every blow that
+  lands brings the Resonance blast (a low ring you jump). **The Geode Tyrant** (roaming): a Prismback 12 m long with six
+  rows of split geodes (basalt rind, violet druse) and a clouded eye, walking a real round along the tubes' floors (the
+  Wallow, the Hall of Beams, the Chandelier Gallery, the Guano Mines, the Organ's east end, the Agate Rinds), feeding at
+  its stops and resting 2 game hours in the Wallow's hot pool; a row's plates throw shots back from its side until
+  strikes break it (a broken row falls away); Mana burn cracks rows instead; the Void passes; a Plate charge into a
+  selenite beam shatters the beam and stuns it 3 s (chandeliers already drop on it); Glare (needs a light within 15 m),
+  Shard shrug (eight lobbed shards, each landing spot glinting the whole flight). **Lyrathis, the Prism Sovereign**:
+  the Ignessa rig at 9 m in violet glass over basalt with a brow gem, a crown of eight spires, ~40 chiming selenite
+  needles for hair, a turning heart crystal, wrist blades (parts: a broken one is gone) and a selenite mantle. Her hall's
+  eight prisms (calcite rhombs with a phantom inside) stand on bronze turntables 22 m round the dais: a disc on sixteen
+  rollers in a carved race, a 48-tooth ring gear meshing a 12-tooth pinion on a vertical shaft up to a lever with a
+  hexafoil hand-plate and a counterweight, a ratchet and pawl; strike the hand-plate (blade, arrow or spell) and the disc
+  comes round exactly 45 degrees clockwise over 0.8 s, the pinion half a turn, the lever out and back, the pawl home.
+  Prism beam: a pale guide thread from her brow gem to the prism nearest her, then three rays fanned 30 degrees out of its
+  far face sweeping 40 (`AWRPrismBeam`, traced the same on every machine, stopped by walls, pillars, prisms, the dais; the
+  centre ray bends toward the furthest tame); a prism left facing its own shaft throws the light up it and its spire on
+  the surface beams. Shard rain (real shadows 1 s), Sovereign's grasp (2 s crush, then thrown; 150 from the others frees
+  you), the Prism ward at 85% and 65% (her dome: shots and spells stop on it, blades reach through at a quarter; her own
+  split beam turned onto it eats 400 a second; Mana burn x2, the Void x3, a void rift at once; broken: 3 s stagger;
+  unbroken it fades at 25 s), the Sundering Flare at 50% (line of sight to her heart: prisms, pillars and the dais are
+  cover), phase 2 copies standing on the prisms' lines 15 m out (they repeat her blows 0.5 s later and take nothing; turn
+  the prism so the line meets a wall or a prism and the copy goes out for 20 s), Held facet, Glint lance (it stands in the
+  floor 20 s as a prism; three hits break it), Prism waltz, Late Shardblade, Double prism beam; hidden phase 3 (artifacts):
+  on the dais, a beam turning 30 degrees a second through every prism, all eight spires blazing, a permanent dome that
+  breaks only when three prisms are turned to face her within 10 s (8 s stagger). Two run-back stones (the West Door and
+  the Severance Door), the Arcane altar on the dais, her summoning stone (effigy: resonant crystal x20 + prism plate x4,
+  learned on her first kill), drops (core, arcane essence x5, the Prismglass spear blueprint, the Geode sanctum decor
+  blueprint, her crowned head; the Prism heart as her first-kill part and her boss-part chance). Voices, the machines'
+  sounds and the bosses' music are stand-ins from the nearest existing recordings and composed tracks, marked
+  (`_standin`, `_waitsFor`). **Saga Venn's fifth quest** ("Two of one") is back; a boss kill now counts for everyone who
+  dealt their share. **Invasions through the Severance** (`world.json invasions.pairs`): the Crystal caves west led by the
+  Geode Tyrant, the Void east led by the Echo, paying arcane and void essence (a pair may now name its own pay). **The
+  Lumenhorn's bellow on order**: the whistle wheel's new Call wedge (or its rider): a 40 m noise that calls Echobats and
+  holds the crystals in reach lit 20 s. New material `M_MirrorWater` (26 KB). Compiled (editor target); not played.
 
 - **Crystal (5): the Arcane path** (cooks/biome-crystal.md 2.17-2.18; plan build-biome-crystal.md Part 2 P2.9).
   `Data/paths/arcane.json` (22 nodes: trunk Arcane missile / Mana capacity / Mark chance / Runic strike; Ward, Sorcery and

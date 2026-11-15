@@ -1,5 +1,7 @@
 #include "WRProjectile.h"
 #include "WRSkyBosses.h"
+#include "WRCrystalBosses.h"
+#include "WRBoss.h"
 #include "WRCrystalWorld.h"
 #include "WRCrystalHazards.h"
 #include "WRWindPath.h"
@@ -312,6 +314,8 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		if (OtherActor && OtherComp) FWRForestBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
 		// The Graveyard's: an arrow cuts the Belfry rope, bursts an egg sac, parts the chandelier's chain.
 		if (OtherActor && OtherComp) FWRGraveBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
+		// The Crystal caves': an arrow or a bolt rings a chime stone, turns a prism's hand-plate, cracks the flaring lens.
+		if (OtherActor && OtherComp && Hit.Instigator != nullptr && !Cast<AWRBoss>(Hit.Instigator)) FWRCrystalBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, true);
 		if (SplashRadius > 0.f || bFireShot)
 		{
 			const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();

@@ -399,7 +399,11 @@ Graveyard's in `WRCreature*.cpp` / `WRStormCreatures.cpp`, the dens and the quie
 clocks and films); shields are a shared layer (`WRArcane::GiveShield`, taken in `ApplyHit` after guard): anything new
 that shields should use it. `WRArcane::Reflect` throws a projectile back (set `FWRHit::bReflectable` on straight shots).
 Hard light (shields, runes, beams) uses `/Game/Terrain/M_ArcaneWard`. Numbers: tuning `arcane`, `spells.*`.
-Not built: the four bosses (Saga's Twins quest is parked in `world.json quests._saga_venn_later`), composed music.
+The bosses are `WRCrystalBosses.*` (hooks `FWRCrystalBoss` beside the Graveyard's in `WRBoss*.cpp`; the machines
+`AWRCrystalBossProp`: lens, magazine, chime, turntable, lance; `UWRCrystalBossBody` builds their parts and the Twins'
+water reflection via `M_MirrorWater`) and `WRCrystalLyrathis.cpp` (her beam `AWRPrismBeam`, dome, copies, phase 3, the
+turntables' look). A move that needs the room is in the hooks; numbers in tuning `bosses.<id>`. Not built: composed
+music (stand-in pools marked `_standin`).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

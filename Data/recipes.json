@@ -355,6 +355,7 @@
     {"id": "cinder_salve", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 3, "raw_meat": 1, "ember_essence": 1}, "output": "cinder_salve", "count": 2, "seconds": 3, "blueprint": "quest_cinder_salve"},
     {"id": "obsidian_arrow", "station": "workbench", "level": 1, "inputs": {"obsidian": 1, "wood": 1, "fiber": 1}, "output": "obsidian_arrow", "count": 4, "seconds": 2, "blueprint": "quest_obsidian_arrow"},
     {"id": "spiked_boots", "station": "armorer", "level": 2, "inputs": {"iron_ingot": 2, "hide": 3}, "output": "spiked_boots", "count": 1, "seconds": 6, "blueprint": "quest_spiked_boots"},
+    {"id": "effigy_lyrathis", "station": "alchemy_table", "level": 1, "inputs": {"resonant_crystal": 20, "prism_plate": 4}, "output": "effigy_lyrathis", "count": 1, "seconds": 5, "blueprint": "effigy_lyrathis", "biome": "crystal"},
     {"id": "effigy_vulkarn", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 15, "ember_essence": 5, "trophy_obsidian_heart": 1}, "output": "effigy_vulkarn", "count": 1, "seconds": 5, "blueprint": "effigy_vulkarn"},
     {"id": "effigy_skaldrith", "station": "alchemy_table", "level": 1, "inputs": {"lichen": 15, "frost_essence": 5, "trophy_troll_marrow": 1}, "output": "effigy_skaldrith", "count": 1, "seconds": 5, "blueprint": "effigy_skaldrith"},
     {"id": "effigy_obsidian_warden", "station": "alchemy_table", "level": 1, "inputs": {"sulfur_crystal": 5, "obsidian": 10}, "output": "effigy_obsidian_warden", "count": 1, "seconds": 5, "blueprint": "effigy_obsidian_warden"},

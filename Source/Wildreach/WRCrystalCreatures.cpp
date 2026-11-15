@@ -4,6 +4,7 @@
 #include "WRArcanePath.h"
 #include "WRCrystalTypes.h"
 #include "WRCrystalWorld.h"
+#include "WRCrystalThings.h"
 #include "Wildreach.h"
 #include "WRAttackRows.h"
 #include "WRCharacterBase.h"
@@ -140,6 +141,8 @@ bool UWRCrystalBody::IsCrystalKind(FName CreatureId)
 void UWRCrystalBody::Attach(AWRCreature* Creature)
 {
 	if (!Creature || !Creature->HasAuthority() || Cast<AWRBoss>(Creature) || !IsCrystalKind(Creature->CreatureId) || Get(Creature)) return;
+	// The Twins' double and Lyrathis's copies wear their boss's body (UWRCrystalBossBody), not a creature's.
+	if (Creature->CreatureId == TEXT("mirrored_twin_double") || Creature->CreatureId == TEXT("lyrathis_copy")) return;
 	UWRCrystalBody* B = NewObject<UWRCrystalBody>(Creature, TEXT("CrystalBody"));
 	B->RegisterComponent();
 	for (float& H : B->LegHP) H = CcT(TEXT("spindleglass.legHealth"), 120.f);
@@ -745,6 +748,12 @@ void FWRCrystalAI::Resolved(AWRCreature* Self, AWRCharacterBase* Victim, FName R
 
 float FWRCrystalAI::Incoming(AWRCreature* Self, const FWRHit& Hit, float Damage)
 {
+	// The Twins' double and Lyrathis's copies are hard light: a blade passes through in a ripple; nothing lands.
+	if (Self && (Self->CreatureId == TEXT("mirrored_twin_double") || Self->CreatureId == TEXT("lyrathis_copy")))
+	{
+		if (Damage > 0.f) WRFx::Broadcast(Self, TEXT("crystal.double_pass"), !Hit.ImpactPoint.IsZero() ? Hit.ImpactPoint : Self->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("crystal.boss.double_pass"));
+		return 0.f;
+	}
 	UWRCrystalBody* B = UWRCrystalBody::Get(Self);
 	if (!B || Damage <= 0.f) return Damage;
 	if (B->Has(WRCrystalFlag::Rolled)) Damage *= CcT(TEXT("druseback.rolledTaken"), 0.3f);
@@ -994,6 +1003,39 @@ void UWRCrystalWorld::StepQuietRoad()
 			if (!QuietFrom.Contains(Name)) { QuietFrom.Add(Name, e); QuietSpoiled.Remove(Name); }
 		}
 	}
+}
+
+// ================================================================================================ the Lumenhorn's bellow on order
+
+bool FWRCrystalAI::Bellow(AWRCreature* Self, AActor* By)
+{
+	UWRCrystalBody* B = UWRCrystalBody::Get(Self);
+	if (!B || !Self || !Self->HasAuthority() || Self->CreatureId != TEXT("lumenhorn") || !Self->IsAlive()) return false;
+	const double Now = CcNow(Self);
+	if (Now < B->NextBellowAt)
+	{
+		CzCrTell(By, TEXT("Its breath isn't back for another bellow yet"));
+		return false;
+	}
+	B->NextBellowAt = Now + CcT(TEXT("lumenhorn.bellowEvery"), 20.f);
+	Self->PlaySwing(EWRSwingKind::Heavy, 1.0f);
+	WRFx::Broadcast(Self, TEXT("crystal.bellow"), Self->GetActorLocation() + FVector(0, 0, 200.f), Self->GetActorRotation(), 1.f, TEXT("crystal.bellow"));
+	const FVector At = Self->GetActorLocation();
+	const float R = WRCrystal::NoiseRadius(TEXT("bellow"));
+	WRCrystal::Emit(Self, At, R, Self, TEXT("bellow"));
+	// The crystals in reach stay flared for 20 s: the light renewed as it would fade.
+	if (AWRCrystalState* S = AWRCrystalState::Get(Self))
+	{
+		TWeakObjectPtr<AWRCrystalState> WeakS(S);
+		const float Hold = CcT(TEXT("lumenhorn.flareSeconds"), 20.f), Every = WRTune(TEXT("crystalWorld.light.fade"), 6.f) * 0.8f;
+		for (float T = Every; T < Hold; T += Every)
+		{
+			FTimerHandle H;
+			Self->GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([WeakS, At, R]() { if (AWRCrystalState* St = WeakS.Get()) St->MulticastNoise(At, R, 1.f); }), T, false);
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("CRYSTAL a Lumenhorn bellows on order"));
+	return true;
 }
 
 // ================================================================================================ path magic (Prismback)

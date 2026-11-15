@@ -977,7 +977,27 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		// The whistle (H, or hold Interact with nothing in front): every tame of yours in earshot takes the order. You
 		// whistle for everyone near to hear; each tame that heard answers with its own call, a beat apart.
 		const FString Order = Arg(1);
-		static const TSet<FString> Allowed = { TEXT("follow"), TEXT("stay"), TEXT("passive"), TEXT("aggressive"), TEXT("siege") };
+		static const TSet<FString> Allowed = { TEXT("follow"), TEXT("stay"), TEXT("passive"), TEXT("aggressive"), TEXT("siege"), TEXT("call") };
+		if (Order == TEXT("call"))
+		{
+			// Call: a tame's own call on order (a Lumenhorn's Bellow, crystal 2.12.1): the one you ride, or those in earshot.
+			int32 Called = 0;
+			if (AWRCreature* Mount = Cast<AWRCreature>(GetPawn())) Called += FWRCrystalAI::Bellow(Mount, Mount) ? 1 : 0;
+			if (Called == 0)
+			{
+				WRSound::Broadcast(GetPawn(), TEXT("tame.whistle"));
+				for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+				{
+					if (It->IsAlive() && It->TamedBy == PS->GetPlayerName() && FVector::Dist(It->GetActorLocation(), GetPawn()->GetActorLocation()) < WRTune(TEXT("taming.whistleRange"), 3000.f))
+					{
+						Called += FWRCrystalAI::Bellow(*It, GetPawn()) ? 1 : 0;
+					}
+				}
+			}
+			OutResult = Called > 0 ? FString(TEXT("The call goes up")) : FString(TEXT("None of your tames in earshot has a call to give"));
+			ClientNotify(OutResult);
+			return true;
+		}
 		if (Order == TEXT("siege"))
 		{
 			// Break that: every biting tame in earshot goes for the building under your crosshair (WRRaiding).

@@ -122,4 +122,7 @@ struct WILDREACH_API FWRCrystalAI
 	static void StopPathTame(class AWRPlayerController* Player);
 	/** The owning machine: this player has a hand on a Prismback (E's release must tell the server). */
 	static bool PathTameNear(const class APlayerController* Player);
+	/** Server: a tamed Lumenhorn's Bellow on order (the whistle's Call, or its rider's): a 40 m noise that calls every
+	 *  Echobat hearing it and holds every crystal in range lit for 20 s (crystal 2.12.1). True when it bellowed. */
+	static bool Bellow(AWRCreature* Lumenhorn, AActor* By);
 };
