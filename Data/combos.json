@@ -47,6 +47,10 @@
       "at50": { "id": "red_lightning", "name": "Red lightning", "kind": "passive", "text": "Chain lightning causes bleed on every target", "grants": ["Combo.RedLightning"], "requires": "lightning.chain_lightning",
         "numbers": { "bleed": 35 } },
       "requiresAbility": "lightning.chain_lightning"
-    }
+    },
+    {"paths": ["fire", "void"], "wheel": "neighbours", "at25": {"id": "black_flame", "name": "Black flame", "kind": "passive", "text": "Your burns bite through armour: +10% burn damage on armoured foes", "grants": ["Combo.BlackFlame"]}, "at50": {"id": "void_furnace", "name": "Void furnace", "kind": "passive", "text": "Void you gain also builds Heat; at full Heat void abilities cost half the max HP", "grants": ["Combo.VoidFurnace"]}},
+    {"paths": ["lightning", "void"], "at25": {"id": "dark_lightning", "name": "Dark lightning", "kind": "passive", "text": "Your lightning ignores 30% of armour", "grants": ["Combo.DarkLightning"]}, "at50": {"id": "singularity_spark", "name": "Singularity spark", "kind": "passive", "text": "Black hole crackles: a 20-damage bolt to a foe inside every 0.5 s", "grants": ["Combo.SingularitySpark"], "requires": "void.black_hole"}},
+    {"paths": ["frost", "void"], "at25": {"id": "frozen_blink", "name": "Frozen blink", "kind": "passive", "text": "Blinking freezes the spot you left: a 2.5 m frost patch for 4 s", "grants": ["Combo.FrozenBlink"], "requires": "void.blink"}, "at50": {"id": "ice_maw", "name": "Ice maw", "kind": "passive", "text": "Consume works on any frozen foe that isn't a boss, at any health", "grants": ["Combo.IceMaw"], "requires": "void.consume"}},
+    {"paths": ["blood", "void"], "at25": {"id": "void_leech", "name": "Void leech", "kind": "passive", "text": "30% of your lifesteal healing wins back max HP first", "grants": ["Combo.VoidLeech"]}, "at50": {"id": "abyssal_hunger", "name": "Abyssal hunger", "kind": "passive", "text": "Consume also heals a quarter of your max HP", "grants": ["Combo.AbyssalHunger"], "requires": "void.consume"}}
   ]
 }

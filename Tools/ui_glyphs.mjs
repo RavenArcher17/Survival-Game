@@ -172,6 +172,35 @@ for (const [id, g] of Object.entries(blood)) glyphs.push({ id: "path_" + id, kin
 for (const [id, g] of Object.entries(fire)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(frost)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(lightning)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
+// Void (cooks/biome-void.md 2.17): the tear (a lens standing on its point) is the path's mark; the Devour nodes draw the
+// four-petal maw, the Hollow nodes the body that isn't there.
+const tear = (cx, top, h, w) => `M${f2(cx)} ${f2(top)}c${f2(w * 0.5)} ${f2(h * 0.25)} ${f2(w * 0.5)} ${f2(h * 0.75)} 0 ${f2(h)}c${f2(-w * 0.5)} ${f2(-h * 0.25)} ${f2(-w * 0.5)} ${f2(-h * 0.75)} 0 ${f2(-h)}z`;
+const maw = (cx, cy, r) => { let d = ""; for (let i = 0; i < 4; i++) { const a = (i * 90 + 45) * Math.PI / 180, b = a + 0.62, c2 = a - 0.62; d += `M${f2(cx + Math.cos(b) * r)} ${f2(cy + Math.sin(b) * r)}L${f2(cx + Math.cos(a) * r * 0.32)} ${f2(cy + Math.sin(a) * r * 0.32)}L${f2(cx + Math.cos(c2) * r)} ${f2(cy + Math.sin(c2) * r)}z`; } return d; };
+const voidp = {
+	void_bolt: { a: tear(14, 3, 14, 6), s: "M2.5 20.5l4-4M5.5 22l3-3", b: circ(19.5, 4.5, 1.3) },
+	void_tolerance: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: tear(12, 11, 9, 4) },
+	unravel_chance: { a: "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", c: tear(12, 8.6, 6.8, 2.8) },
+	null_strike: { b: sword, t: circ(17.5, 16.5, 3.6), a: tear(17.5, 13.6, 5.8, 2.6) },
+	void_rift: { a: tear(12, 2.5, 15, 6), b: el(12, 19.5, 8.5, 2.2) },
+	abyssal_power: { a: tear(12, 2, 20, 10), c: "M11.1 9h1.8v7h-1.8zM8.5 11.6h7v1.8h-7z" },
+	collapse: { s: "M2.5 2.5l5 5M21.5 2.5l-5 5M2.5 21.5l5-5M21.5 21.5l-5-5", t: "M5.5 7.5h2v-2M18.5 7.5h-2v-2M5.5 16.5h2v2M18.5 16.5h-2v2", a: circ(12, 12, 3.2) },
+	dark_matter: { a: "M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z", c: tear(12, 7, 10, 4.4) },
+	event_horizon: { t: circ(12, 12, 9.5), a: circ(12, 12, 4.2), s: "M12 2.5v3.2M21.5 12h-3.2M12 21.5v-3.2M2.5 12h3.2" },
+	black_hole: { a: circ(12, 12, 4.6), t: "M12 3.2a8.8 8.8 0 0 1 8.8 8.8M20.2 15.2A8.8 8.8 0 0 1 8.8 20.2M3.8 8.8A8.8 8.8 0 0 1 12 3.2", b: circ(19, 19.5, 1.2) },
+	blink: { a: tear(18, 5, 14, 5.6), t: "M3 15.5c2.5-5 7-7 11.5-6.5", s: "M3 19h2.5M7 19h2" },
+	fade: { a: tear(12, 3, 16, 7), t: "M3 6h3M2 12h4M3 18h3M18 6h3M18 12h4M18 18h3" },
+	phase: { a: circ(12, 5.5, 2.8) + "M7 21l1.2-8.5c.3-1.6 1.6-2.7 3.8-2.7s3.5 1.1 3.8 2.7L17 21z", c: "M4 13h16v1.6H4zM4 16.6h16v1.6H4z" },
+	shadow_step: { a: circ(15.5, 5.5, 2.5) + "M11.5 21l1-7.5c.3-1.4 1.4-2.4 3-2.4s2.7 1 3 2.4l1 7.5z", t: "M2.5 13c2-3 4.5-4 7-3.5", b: tear(5, 15, 7, 3) },
+	unseen: { s: "M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", a: circ(12, 12, 2.6), t: "M4 20L20 4" },
+	nowhere: { b: circ(12, 3.5, 1.2) + circ(18, 6, 1.1) + circ(20.5, 12, 1.2) + circ(18, 18, 1.1) + circ(12, 20.5, 1.2) + circ(6, 18, 1.1) + circ(3.5, 12, 1.2) + circ(6, 6, 1.1), a: tear(12, 6.5, 11, 5) },
+	consume: { a: maw(12, 12, 9.5), c: circ(12, 12, 1.6) },
+	gluttony: { a: "M5 9h14l-1.5 9a3 3 0 0 1-3 2.5h-5a3 3 0 0 1-3-2.5z", b: tear(12, 1.5, 6, 3) },
+	sacrifice: { a: "M12 21s-8-4.8-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.2-8 11-8 11z", c: tear(12, 7.5, 9, 3.6) },
+	feed: { a: "M5 9h14l-1.5 9a3 3 0 0 1-3 2.5h-5a3 3 0 0 1-3-2.5z", c: "M11.1 11h1.8v6h-1.8zM9 13.1h6v1.8H9z", b: maw(12, 4.2, 3.4) },
+	insatiable: { a: maw(10.5, 12.5, 8), t: "M19 3v6M16 6h6" },
+	maw_of_the_void: { a: maw(12, 12, 10.5), s: "M2 21.5h20", c: circ(12, 12, 2.2) },
+};
+for (const [id, g] of Object.entries(voidp)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
 // ---------- single-colour marks (tinted in the UI)
@@ -200,6 +229,7 @@ const masks = {
 	mouse_right: [S("M12 2.5a6 6 0 0 1 6 6v7a6 6 0 0 1-12 0v-7a6 6 0 0 1 6-6zM6 10h12M12 2.5V10", 1.6), F("M12 2.8a5.7 5.7 0 0 1 5.7 5.7V10H12z")],
 	ring: [S(circ(12, 12, 10.5), 1.2)],
 	blood_drop: [F(drop(12, 13, 1))],
+	void_eye: [S("M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", 1.9), F(circ(12, 12, 4.2))],
 };
 // Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
 const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
@@ -220,7 +250,7 @@ Object.assign(masks, {
 	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
 	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
 });
-const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
+const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
 // ---------- full colour

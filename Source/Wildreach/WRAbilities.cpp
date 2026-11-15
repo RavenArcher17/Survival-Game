@@ -1,4 +1,6 @@
 #include "WRAbilities.h"
+#include "WRVoidPath.h"
+#include "WRAbilitiesVoid.h"
 #include "WRSwampSystems.h"
 #include "WRAbilitiesLightning.h"
 #include "WRLightningPath.h"
@@ -1540,7 +1542,8 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	const float Distance = T.Num(Key + TEXT("distance"), bBackstep ? 250.f : 500.f);
 	const float TravelTime = FMath::Max(0.05f, T.Num(Key + TEXT("travel"), bBackstep ? 0.25f : 0.46f) / Quick);
 	const float IStart = T.Num(Key + TEXT("iStart"), 0.03f) / Quick;
-	const float IEnd = T.Num(Key + TEXT("iEnd"), bBackstep ? 0.13f : 0.46f) / Quick;
+	// Fade (the Void path): a little longer untouchable on every dodge.
+	const float IEnd = T.Num(Key + TEXT("iEnd"), bBackstep ? 0.13f : 0.46f) / Quick + WRVoidPath::FadeSeconds(Character);
 	const float Recovery = T.Num(Key + TEXT("recovery"), bBackstep ? 0.22f : 0.27f) / Quick;
 	CostOverride = bBackstep ? T.Num(TEXT("stamina.backstep"), 8.f) : T.Num(TEXT("stamina.dodge"), 12.f);
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -2504,7 +2507,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		// Lightning (WRLightningPath.cpp): Conductive, Afterimage, Rapid fire, Discharge.
 		TEXT("conductive"), TEXT("afterimage"), TEXT("rapid_fire"), TEXT("discharge"),
 		// Blood (WRBloodPath.cpp): Clotting, Misfortune, Contagion, Ruin, Blood frenzy, Feast.
-		TEXT("clotting"), TEXT("misfortune"), TEXT("contagion"), TEXT("ruin"), TEXT("blood_frenzy"), TEXT("feast") };
+		TEXT("clotting"), TEXT("misfortune"), TEXT("contagion"), TEXT("ruin"), TEXT("blood_frenzy"), TEXT("feast"),
+		// Void (WRVoidPath.cpp): Event horizon, Feed.
+		TEXT("event_horizon"), TEXT("feed") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2563,6 +2568,22 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("doom")) return UWRGA_Doom::StaticClass();
 		if (NodeId == TEXT("leech_strike")) return UWRGA_LeechStrike::StaticClass();
 		if (NodeId == TEXT("sanguine_lord")) return UWRGA_SanguineLord::StaticClass();
+	}
+	else if (PathId == TEXT("void"))
+	{
+		// The Void path (WRAbilitiesVoid.cpp, cooks/biome-void.md 2.17).
+		if (NodeId == TEXT("void_bolt")) return UWRGA_VoidBolt::StaticClass();
+		if (NodeId == TEXT("null_strike")) return UWRGA_NullStrike::StaticClass();
+		if (NodeId == TEXT("void_rift")) return UWRGA_VoidRift::StaticClass();
+		if (NodeId == TEXT("collapse")) return UWRGA_Collapse::StaticClass();
+		if (NodeId == TEXT("black_hole")) return UWRGA_BlackHole::StaticClass();
+		if (NodeId == TEXT("blink")) return UWRGA_VoidBlink::StaticClass();
+		if (NodeId == TEXT("phase")) return UWRGA_Phase::StaticClass();
+		if (NodeId == TEXT("shadow_step")) return UWRGA_ShadowStep::StaticClass();
+		if (NodeId == TEXT("nowhere")) return UWRGA_Nowhere::StaticClass();
+		if (NodeId == TEXT("consume")) return UWRGA_Consume::StaticClass();
+		if (NodeId == TEXT("sacrifice")) return UWRGA_Sacrifice::StaticClass();
+		if (NodeId == TEXT("maw_of_the_void")) return UWRGA_MawOfTheVoid::StaticClass();
 	}
 	return nullptr;
 }

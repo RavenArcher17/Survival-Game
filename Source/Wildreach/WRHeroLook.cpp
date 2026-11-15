@@ -2,6 +2,7 @@
 // Ascendant inlay, the body-hide masks under it, and the path marks on the skin, eyes and hair.
 // Everything here is data (Data/player_art.json "looks", "armorLooks", "elements", "paths"); the code only applies it.
 #include "WRCharacter.h"
+#include "WRVoidPath.h"
 #include "WRInventory.h"
 #include "Wildreach.h"
 #include "WRPathComponent.h"
@@ -604,6 +605,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, bStrikeTell ? 0x5717u : 0u);
 	Sig = HashCombine(Sig, WREndgameLook::LookSig(this));   // prestige gold threads, a raid mark on the seams
 	Sig = HashCombine(Sig, WRBlood::LookSig(this));         // Blood: veins with Spilled, Sanguine lord, the flush, the pulse
+	Sig = HashCombine(Sig, WRVoidPath::LookSig(this));      // Void: the bar and the band move the greying within its stage
 	if (!bForce && Sig == PathMarkSig)
 	{
 		return;
@@ -733,6 +735,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	}
 	// Blood & curse (cooks/biome-swamp.md 2.18): its stages and live parts over what the row drew (WRBloodPath.cpp).
 	WRBlood::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);
+	WRVoidPath::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 
 	// Blood: sharper canines from strength 0.6 (main, or the sub path's share).
 	bool bFangs = false;

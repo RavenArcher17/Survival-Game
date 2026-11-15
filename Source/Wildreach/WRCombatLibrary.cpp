@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRVoidPath.h"
 #include "WRDeeds.h"
 #include "WRWarHall.h"
 #include "WRStormBosses.h"
@@ -443,6 +444,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Target->CombatTarget = Attacker;
 	}
 
+	// Phase / Nowhere (the Void path): the blow (a grab too) passes through.
+	if (WRVoidPath::PassesThrough(Target, Hit))
+	{
+		return Done(EWRHitResult::Dodged);
+	}
 	// --- I-frames, and blows that pass under a jump ---
 	if (!Hit.bDamageOverTime && Defended(WRTags::State_Invulnerable))
 	{
@@ -637,6 +643,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 		// Blood: Sanguine power on Blood spells, Ruin on a cursed body (from everyone), Ice veins' armour.
 		Damage *= WRBlood::DamageScale(Attacker, Target, Hit);
+		// Void: the bar's power, Abyssal power, Gluttony, Sacrifice, Dark matter, Nowhere's crit (WRVoidPath.cpp).
+		Damage *= WRVoidPath::DamageScale(Attacker, Target, Hit);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
 			Damage *= 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);
@@ -795,7 +803,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (!Hit.bDamageOverTime && Target->ArmorValue > 0.f)
 	{
 		// Rune of Hollowing: the attacker ignores a share of it.
-		const float Pen = FMath::Clamp(UWRInventoryComponent::GearStatFor(Attacker, TEXT("armorPen")), 0.f, 1.f);
+		// Null strike, Dark lightning and an Unravelled target take more of it away (WRVoidPath).
+		const float Pen = FMath::Clamp(UWRInventoryComponent::GearStatFor(Attacker, TEXT("armorPen")) + WRVoidPath::ArmourPen(Attacker, Target, Hit), 0.f, 1.f);
 		Damage *= 100.f / (100.f + Target->ArmorValue * (1.f - Pen));
 	}
 	// Player against player: its own multipliers (combat.md 2.20, ER patch 1.07): global, the weapon class, Wildbrands
@@ -978,7 +987,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (bWasUnaware) Stance *= 1.f + WRTune(TEXT("combat.stealth.stance"), 0.2f);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rimed)) Stance *= WRTune(TEXT("status.defs.frost.rimedStance"), 1.5f);
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
-		Stance *= WRPortals::StanceScale(Target);   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
+		Stance *= WRPortals::StanceScale(Target);
+		Stance *= WRVoidPath::StanceScale(Target);   // Unravelled: +15% stance taken   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
 		Stance *= WRWarHall::StanceScale(Target);   // a raid champion slipping on its melted footing
 		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
 		Stance *= FWRSwampBoss::StanceTaken(Target, Hit, Stance);   // the Swamp: Maw's open belly, Vharra convulsing
@@ -1086,6 +1096,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRLightning::AfterHit(Target, Hit, Damage);
 		// The Blood path's (WRBloodPath.cpp): Bleed chance, Red lightning, a Doom bolt's mark, the garnet splash.
 		WRBlood::AfterHit(Target, Hit, Damage);
+		// The Void path's (WRVoidPath.cpp): Unravel chance.
+		WRVoidPath::AfterHit(Target, Hit, Damage);
 	}
 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.
@@ -1171,6 +1183,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 		// Blood: Feast heals the killer, Contagion passes a dying body's curse on (WRBloodPath.cpp).
 		WRBlood::OnKill(Target, Hit);
+		// Void: Feed wins back max health on a kill (WRVoidPath.cpp).
+		WRVoidPath::OnKill(Target, Hit);
 		Target->Die(Hit.Instigator);
 	}
 	// A fire blow, a fire spell's touch (not a burn's tick): marsh gas near it lights (WRSwampSystems; cheap when none).

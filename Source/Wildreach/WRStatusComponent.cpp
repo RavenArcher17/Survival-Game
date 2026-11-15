@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRVoidPath.h"
 #include "WRArtifacts.h"
 #include "WRFarm.h"
 #include "WRSurvival.h"
@@ -837,6 +838,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRLightning::TickOwner(Owner, DeltaTime);
 		// The Blood path's Spilled bar: the rally window, Clotting's regrowth.
 		WRBlood::TickOwner(Owner, DeltaTime);
+		// The Void path's bar: its decay after a quiet 4 s (WRVoidPath.cpp).
+		WRVoidPath::TickOwner(Owner, DeltaTime);
 	}
 }
 

@@ -1113,6 +1113,10 @@ private:
 						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Spilled", "Spilled"), WRPathLook::Color(TEXT("blood")), WRPathLook::Icon(TEXT("blood")),
 							[this]() { const AActor* B = Body(); return B ? UWRBloodPath::Spilled(B) : 0.f; },
 							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("blood")); })]
+						// Void (the Void path, cooks/biome-void.md 2.17.1): black-violet with a violet edge, never "Corruption".
+						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Void", "Void"), WRPathLook::Color(TEXT("void")), WRPathLook::Icon(TEXT("void")),
+							[A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetVoid() / FMath::Max(1.f, X->GetMaxVoid()) : 0.f; },
+							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("void")); })]
 				]
 				+ SVerticalBox::Slot().AutoHeight()[Conditions()]
 			]

@@ -52,6 +52,20 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
   every 10 s, void essence). Dens on the land by zone with day and night tables (wasteland.json `spawns`), a Riftmaw
   in every large rift, the Hush on the Gauntlet Road at night. Voices are the nearest existing families pitched (the
   fused recordings are a later sound pass); beds for the land and each zone.
+- **The Void path** (`Data/paths/void.json`, `WRVoidPath.*`, `WRAbilitiesVoid.*`; biome-void 2.17): the Void bar (HUD ring,
+  never called Corruption) filled by every void ability and draining 5/s after a quiet 4 s; under your tolerance (20,
+  +10 a Void tolerance rank) abilities are free, past it they cost their max HP into the grey band; the self-cost
+  limit (75% of max HP) refuses with a dry crack; +0.3% void damage a point. Empty vessel (root: Void x0.7, costs
+  x0.75, rifts pass you). Twelve abilities: Void bolt, Null strike (ignores 30% armour), Void rift (`AWRVoidField`),
+  Collapse (pull and crush), Black hole (pull 600 cm/s for 4 s, bosses slowed, then 80), Blink (i-frames the whole
+  travel), Phase (blows and grabs pass through), Shadow step (behind the lock target), Nowhere (untargetable 3 s, the
+  next hit crits), Consume (the finisher under 25%, Void -20, 10% of the band back; bosses only stance-broken),
+  Sacrifice (10 max HP for +30% damage), Maw of the void (`AWRVoidMaw`: four black-glass petals rise and close; foes
+  under 30% are eaten). Passives: Unravel chance (Unravelled: armour -20%, stance +15%), Abyssal power, Dark matter,
+  Event horizon (your rifts swallow enemy projectiles), Fade (dodges and blinks), Unseen, Gluttony, Feed, Insatiable.
+  Combos with the paths that exist: Black flame, Void furnace, Dark lightning, Singularity spark, Frozen blink, Ice
+  maw, Void leech, Abyssal hunger (`Data/combos.json`). Body change: the bar and the band move the greying within its
+  stage. Node glyphs drawn by `Tools/ui_glyphs.mjs`.
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
   palette ahead of it).
 

@@ -1,0 +1,212 @@
+{
+  "id": "void",
+  "name": "Void",
+  "biome": "wasteland",
+  "starter": "void_bolt",
+  "color": "7B4FD6",
+  "icon": "voidglass",
+  "glyph": "void_eye",
+  "resource": {
+    "id": "void",
+    "name": "Void"
+  },
+  "rootPassive": {
+    "id": "empty_vessel",
+    "name": "Empty vessel",
+    "text": "Void builds 30% slower and costs a quarter less max HP; rifts don't drain you at all."
+  },
+  "trunk": [
+    {
+      "id": "void_bolt",
+      "name": "Void bolt",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic void spell"
+    },
+    {
+      "id": "void_tolerance",
+      "name": "Void tolerance",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Use more void abilities before they cost max HP"
+    },
+    {
+      "id": "unravel_chance",
+      "name": "Unravel chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Void hits may unravel a foe's defences"
+    },
+    {
+      "id": "null_strike",
+      "name": "Null strike",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic void weapon art: ignores 30% of armour"
+    }
+  ],
+  "branches": [
+    {
+      "id": "abyss",
+      "name": "Abyss",
+      "nodes": [
+        {
+          "id": "void_rift",
+          "name": "Void rift",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a small rift that damages enemies inside",
+          "gate": 0
+        },
+        {
+          "id": "abyssal_power",
+          "name": "Abyssal power",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More void damage",
+          "gate": 5
+        },
+        {
+          "id": "collapse",
+          "name": "Collapse",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spell: an implosion that pulls enemies together",
+          "gate": 10
+        },
+        {
+          "id": "dark_matter",
+          "name": "Dark matter",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "More damage against shields and armour",
+          "gate": 14
+        },
+        {
+          "id": "event_horizon",
+          "name": "Event horizon",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Your rifts swallow enemy projectiles",
+          "gate": 17
+        },
+        {
+          "id": "black_hole",
+          "name": "Black hole",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "A black hole that drags in and crushes enemies",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "hollow",
+      "name": "Hollow",
+      "nodes": [
+        {
+          "id": "blink",
+          "name": "Blink",
+          "kind": "ability",
+          "cost": 5,
+          "text": "A short teleport, untouchable on the way",
+          "gate": 0
+        },
+        {
+          "id": "fade",
+          "name": "Fade",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "Longer invincibility on dodges and blinks",
+          "gate": 5
+        },
+        {
+          "id": "phase",
+          "name": "Phase",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Briefly pass through attacks (grabs too)",
+          "gate": 10
+        },
+        {
+          "id": "shadow_step",
+          "name": "Shadow step",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Blink behind the enemy you're locked on to",
+          "gate": 14
+        },
+        {
+          "id": "unseen",
+          "name": "Unseen",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Enemies lose track of you after a blink",
+          "gate": 17
+        },
+        {
+          "id": "nowhere",
+          "name": "Nowhere",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "Vanish: untargetable for 3 s, and your next hit is critical",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "devour",
+      "name": "Devour",
+      "nodes": [
+        {
+          "id": "consume",
+          "name": "Consume",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Finisher: eat a weakened enemy and win back max HP",
+          "gate": 0
+        },
+        {
+          "id": "gluttony",
+          "name": "Gluttony",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More damage for every point of max HP the Void has taken",
+          "gate": 5
+        },
+        {
+          "id": "sacrifice",
+          "name": "Sacrifice",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spend max HP for 10 s of +30% damage",
+          "gate": 10
+        },
+        {
+          "id": "feed",
+          "name": "Feed",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Kills win back some max HP",
+          "gate": 14
+        },
+        {
+          "id": "insatiable",
+          "name": "Insatiable",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Consume works on stronger enemies",
+          "gate": 17
+        },
+        {
+          "id": "maw_of_the_void",
+          "name": "Maw of the void",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "A giant maw devours everything in front of you",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

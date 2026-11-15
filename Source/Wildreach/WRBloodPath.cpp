@@ -1,4 +1,5 @@
 #include "WRBloodPath.h"
+#include "WRVoidPath.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -265,6 +266,12 @@ void UWRBloodPath::Heal(AWRCharacterBase* Who, float Amount, bool bLifesteal, co
 	if (!A || !Who->HasAuthority() || !Who->IsAlive() || Amount <= 0.f)
 	{
 		return;
+	}
+	// Void leech (Blood + Void 25): a share of lifesteal wins back max HP the Void took first.
+	if (bLifesteal)
+	{
+		Amount = WRVoidPath::LeechHeal(Who, Amount);
+		if (Amount <= 0.f) return;
 	}
 	Amount *= Who->Status->HealingTakenScale();
 	float Gain = 0.f;

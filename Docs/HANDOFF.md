@@ -290,7 +290,8 @@ things: `WRLandThings.*` (`land ...` commands); rifts and MaxHealthLost: `WRVoid
 new file in `Data/lands/` plus its biome in `world.liveBiomes`. Its gathering, keepsakes and thrown things:
 `WRVoidWorld.*` (wasteland.json `resources`, tuning `voidWorld`); its creatures and dens: `WRVoidCreatures.*` (the
 Swamp's hook pattern, wasteland.json `spawns`, tuning `voidCreatures`). Shrine and master rows with `"land"` are placed
-on that land's height function (`WRLand::PlaceOn`).
+on that land's height function (`WRLand::PlaceOn`). The Void path: rules `WRVoidPath.*` (tuning `voidPath`, spells.<void
+spell>, nodeEffects.void.*), abilities `WRAbilitiesVoid.*` (pay through `WRVoidPath::Pay`; registry in WRAbilities.cpp).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
