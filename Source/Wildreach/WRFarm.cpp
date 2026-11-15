@@ -604,7 +604,7 @@ FString FWRFarm::Plant(AWRBuildPiece* Plot, AWRPlayerController* Player, FName S
 	if (!CanGrowAt(*Crop, Plot, Player, Why)) return Why;
 	const int32 Need = FMath::RoundToInt(Tune(TEXT("farm.seedsPerPlot"), 9.f));
 	const int32 Have = PS->GetInventory()->CountOf(Seed);
-	if (Have < Need) return FString::Printf(TEXT("Need %d %s to plant a plot (you have %d)"), Need, *ItemName(Seed), Have);
+	if (Have < Need) return FString::Printf(TEXT("Need %d %s to plant a plot (you have %d)"), Need, *WRFarmDetail::ItemName(Seed), Have);
 	PS->GetInventory()->RemoveItem(Seed, Need);
 	Plot->CropId = Crop->Id;
 	Plot->LastCrop = Crop->Id;
@@ -663,7 +663,7 @@ namespace WRFarmDetail
 		{
 			for (const FWRCropDef& C : FWRFarmDefs::Get().Crops())
 			{
-				if (C.bRare && C.Biome == Crop->Biome && C.Id != Crop->Id) { Give(C.Seed, 1); Extra += FString::Printf(TEXT(", a %s"), *ItemName(C.Seed).ToLower()); break; }
+				if (C.bRare && C.Biome == Crop->Biome && C.Id != Crop->Id) { Give(C.Seed, 1); Extra += FString::Printf(TEXT(", a %s"), *WRFarmDetail::ItemName(C.Seed).ToLower()); break; }
 			}
 		}
 		if (FMath::FRand() < UWRLifeSkillsComponent::StatFor(PS, TEXT("goldenCrop")))
@@ -703,7 +703,7 @@ namespace WRFarmDetail
 		{
 			if (AWRCharacter* Hero = Cast<AWRCharacter>(Body)) Hero->MulticastBodyOneShot(TEXT("pickup"));
 		}
-		const FString Said = FString::Printf(TEXT("Harvested %d %s, %d seeds%s%s"), Got, *ItemName(Crop->Produce).ToLower(), bReplant ? Seeds - Need : Seeds, *Extra, bReplant ? TEXT(" (replanted)") : TEXT(""));
+		const FString Said = FString::Printf(TEXT("Harvested %d %s, %d seeds%s%s"), Got, *WRFarmDetail::ItemName(Crop->Produce).ToLower(), bReplant ? Seeds - Need : Seeds, *Extra, bReplant ? TEXT(" (replanted)") : TEXT(""));
 		UE_LOG(LogWildreach, Log, TEXT("FARM %s harvested %s: %s"), *PS->GetPlayerName(), *Crop->Id.ToString(), *Said);
 		Plot->CropId = bReplant ? Crop->Id : NAME_None;
 		Plot->bPlanted = bReplant;
@@ -726,7 +726,7 @@ namespace WRFarmDetail
 			if (S.IsEmpty()) continue;
 			const FName Id = S.ItemId;
 			const int32 Moved = FWRInventoryRules::MoveFrom(S, PS->GetInventory()->GetSlotsMutable(), S.Count);
-			if (Moved > 0) { Collected += Moved; What.AddUnique(ItemName(Id).ToLower()); }
+			if (Moved > 0) { Collected += Moved; What.AddUnique(WRFarmDetail::ItemName(Id).ToLower()); }
 		}
 		if (Collected == 0) return Empty;
 		UWRLifeSkillsComponent::Award(PS, Skill, XPKey, XP, Collected);
@@ -805,7 +805,7 @@ FString FWRFarm::Interact(AWRBuildPiece* Piece, AWRPlayerController* Player)
 					Piece->OnRep_Farm();
 					UWRLifeSkillsComponent::Award(PS, TEXT("farming"), TEXT("fertilise"), 3.f);
 					WRFx::Broadcast(Piece, TEXT("gather.fiber"), Piece->GetActorLocation() + FVector(0.f, 0.f, 25.f), FRotator::ZeroRotator, 1.f, TEXT("farm.plant"));
-					return FString::Printf(TEXT("Fertilised with %s: +25%% at harvest"), *ItemName(F).ToLower());
+					return FString::Printf(TEXT("Fertilised with %s: +25%% at harvest"), *WRFarmDetail::ItemName(F).ToLower());
 				}
 			}
 		}
@@ -931,7 +931,7 @@ FString FWRFarm::UseItem(UWRInventoryComponent* Inventory, int32 SlotIndex)
 	if (FWRFarmDefs::Get().CropForSeed(Item))
 	{
 		AWRBuildPiece* Plot = Nearest(TEXT("crop"));
-		if (!Plot) return FString::Printf(TEXT("Stand by an empty crop plot to plant %s"), *ItemName(Item).ToLower());
+		if (!Plot) return FString::Printf(TEXT("Stand by an empty crop plot to plant %s"), *WRFarmDetail::ItemName(Item).ToLower());
 		return Plant(Plot, PC, Item);
 	}
 	if (Item == TEXT("recipe_scrap"))
@@ -946,7 +946,7 @@ FString FWRFarm::UseItem(UWRInventoryComponent* Inventory, int32 SlotIndex)
 		const FWRDishDef* D = Unknown[FMath::RandRange(0, Unknown.Num() - 1)];
 		Food->Hinted.Add(D->Id);
 		Inventory->RemoveItem(Item, 1);
-		return FString::Printf(TEXT("A recipe scrap: %s, from %s at the %s"), *ItemName(D->Id), *FWRFarmDefs::Get().PatternText(*D, false), D->Station == TEXT("oven") ? TEXT("oven") : TEXT("cooking pot"));
+		return FString::Printf(TEXT("A recipe scrap: %s, from %s at the %s"), *WRFarmDetail::ItemName(D->Id), *FWRFarmDefs::Get().PatternText(*D, false), D->Station == TEXT("oven") ? TEXT("oven") : TEXT("cooking pot"));
 	}
 	return FString();
 }
@@ -1018,7 +1018,7 @@ FString FWRFarm::Cook(AWRPlayerController* Player, AWRStation* Station, const TA
 	{
 		if (!Bag.IsValidIndex(S) || Bag[S].IsEmpty() || Take.FindRef(S) >= Bag[S].Count) return TEXT("that ingredient isn't in your bag any more");
 		const FName Group = FWRFarmDefs::Get().GroupOf(Bag[S].ItemId);
-		if (Group.IsNone() && Bag[S].ItemId != TEXT("golden_crop")) return FString::Printf(TEXT("%s isn't food"), *ItemName(Bag[S].ItemId));
+		if (Group.IsNone() && Bag[S].ItemId != TEXT("golden_crop")) return FString::Printf(TEXT("%s isn't food"), *WRFarmDetail::ItemName(Bag[S].ItemId));
 		Take.FindOrAdd(S)++;
 		Items.Add(Bag[S].ItemId);
 		Fresh += FWRSpoil::FreshOf(Bag[S], FWRSpoil::ServerNow);
@@ -1052,7 +1052,7 @@ FString FWRFarm::Cook(AWRPlayerController* Player, AWRStation* Station, const TA
 		if (Food && Food->Discover(Dish->Id))
 		{
 			UWRLifeSkillsComponent::Award(PS, TEXT("cooking"), TEXT("discover"), 100.f);
-			Said = FString::Printf(TEXT("New recipe: %s! %s"), *ItemName(Dish->Id), *Queued);
+			Said = FString::Printf(TEXT("New recipe: %s! %s"), *WRFarmDetail::ItemName(Dish->Id), *Queued);
 			UE_LOG(LogWildreach, Log, TEXT("COOK %s discovered %s"), *PS->GetPlayerName(), *Dish->Id.ToString());
 		}
 	}
@@ -1070,7 +1070,7 @@ FString FWRFarm::CookKnown(AWRPlayerController* Player, AWRStation* Station, FNa
 	UWRFoodComponent* Food = UWRFoodComponent::For(PS);
 	if (!PS || !Dish || !Food || !Food->Known.Contains(DishId)) return TEXT("you don't know that dish yet");
 	const TArray<int32> Slots = PickIngredients(PS->GetInventory()->GetSlots(), *Dish);
-	if (Slots.Num() == 0) return FString::Printf(TEXT("Not enough for %s: %s"), *ItemName(DishId), *FWRFarmDefs::Get().PatternText(*Dish, false));
+	if (Slots.Num() == 0) return FString::Printf(TEXT("Not enough for %s: %s"), *WRFarmDetail::ItemName(DishId), *FWRFarmDefs::Get().PatternText(*Dish, false));
 	return Cook(Player, Station, Slots);
 }
 
