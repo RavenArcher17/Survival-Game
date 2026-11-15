@@ -167,6 +167,48 @@ const blood = {
 	sanguine_lord: { a: "M3 19l1.8-9 4.6 4 2.6-7 2.6 7 4.6-4L21 19z", b: "M3 20.5h18v2H3z", c: drop(12, 15.2, 0.28) },
 };
 
+// Nature (cooks/biome-forest.md 2.17): a leaf is the path's mark; thorns for the Thorn branch, blooms and sprouts for
+// Grove and Bloom.
+const rot = (cx, cy, x, y, a) => { const c = Math.cos(a), s = Math.sin(a); return [f2(cx + x * c - y * s), f2(cy + x * s + y * c)]; };
+// A leaf of length len and width w centred on (cx, cy), its tip pointing at angle deg (0 = up), its midrib cut out.
+const leaf = (cx, cy, len, w, deg) => {
+	const a = (deg || 0) * Math.PI / 180, h = len / 2;
+	const P = (x, y) => rot(cx, cy, x, y, a).join(" ");
+	return `M${P(0, -h)}C${P(w * 0.62, -h * 0.55)} ${P(w * 0.6, h * 0.45)} ${P(0, h)}C${P(-w * 0.6, h * 0.45)} ${P(-w * 0.62, -h * 0.55)} ${P(0, -h)}z`;
+};
+const midrib = (cx, cy, len, deg) => { const a = (deg || 0) * Math.PI / 180, h = len / 2; return `M${rot(cx, cy, 0, -h * 0.75, a).join(" ")}L${rot(cx, cy, 0, h * 0.95, a).join(" ")}`; };
+// A curved thorn: base centred at (cx, cy), width w, length len, pointing at deg (0 = up), hooked a little clockwise.
+const thornG = (cx, cy, len, w, deg) => {
+	const a = (deg || 0) * Math.PI / 180;
+	const P = (x, y) => rot(cx, cy, x, y, a).join(" ");
+	return `M${P(-w / 2, 0)}Q${P(-w * 0.2, -len * 0.6)} ${P(w * 0.35, -len)}Q${P(w * 0.15, -len * 0.45)} ${P(w / 2, 0)}z`;
+};
+const flower = (cx, cy, r) => { let d = ""; for (let i = 0; i < 5; i++) { const a = i * 72 * Math.PI / 180; d += circ(f2(cx + Math.sin(a) * r), f2(cy - Math.cos(a) * r), f2(r * 0.72)); } return d; };
+const nature = {
+	thorn_shot: { a: thornG(13, 19, 15, 5.5, 40), s: "M2.5 21.5l3-3M2.5 16l2-2", b: circ(20, 4.5, 1.2) },
+	growth_capacity: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: leaf(12, 15.4, 7.4, 4.6, 20), c: midrib(12, 15.4, 7.4, 20) },
+	entangle_chance: { a: "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", c: leaf(12, 12, 5.6, 3.6, 30) },
+	briar_strike: { b: sword, a: thornG(15.5, 13.5, 5, 2.4, 45) + thornG(11.5, 17.5, 5, 2.4, 45) + thornG(19.5, 9.5, 4.5, 2.2, 45) },
+	regrowth: { t: "M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.5v4h-4", a: leaf(12, 12.5, 9, 6, 25), c: midrib(12, 12.5, 9, 25) },
+	lifebloom: { a: flower(12, 10.5, 4), c: circ(12, 10.5, 2), t: "M12 16.5v6M12 20c-1.5-1.5-3.5-2-5-1.5" },
+	sanctuary: { a: "M2.5 17.5a9.5 3.5 0 1 0 19 0 9.5 3.5 0 1 0-19 0z", b: leaf(8, 8.5, 6.5, 4, -25) + leaf(16, 7, 7.5, 4.6, 25) + "M11.1 2h1.8v6.5h-1.8zM8.75 4.35h6.5v1.8h-6.5z" },
+	sap: { a: drop(11, 13, 0.85), b: leaf(19, 6, 6, 3.8, 35), c: "M8 13.5a3 3 0 0 0 3 3" },
+	purify: { a: drop(12, 12.5, 0.9), c: "M7.8 13.2l1.3-1.3 2.2 2.2 4.2-4.2 1.3 1.3-5.5 5.5z", b: circ(4, 5, 1.1) + circ(20, 4, 1.3) },
+	world_tree: { a: circ(12, 8, 5.5) + circ(6.5, 11, 3.8) + circ(17.5, 11, 3.8), b: "M10.6 13.5h2.8V20h-2.8z", t: "M4 21.5c2.5-1.5 5-2 8-2s5.5.5 8 2M12 19.5l-3 2M12 19.5l3 2" },
+	vine_lash: { s: "M3 20c3-1 3.5-5 6.5-6S14 16 16.5 12 19 6 21.5 4", a: leaf(8, 10.5, 5.5, 3.6, -40) + leaf(16.5, 17, 5.5, 3.6, 120) + leaf(18.5, 7.5, 5, 3.2, -20) },
+	barbs: { a: thornG(6, 20, 9, 4, 20) + thornG(12.5, 20, 12, 4.6, 15) + thornG(19, 20, 8, 3.6, 25), b: drop(18.5, 6.5, 0.38) },
+	root_snare: { t: "M12 3v6M12 9c-3 1-5 3-6 6M12 9c3 1 5 3 6 6M12 9v6M9 12c-2.5.5-5 0-6.5-1.5M15 12c2.5.5 5 0 6.5-1.5", a: "M2.5 18.5a9.5 3 0 1 0 19 0 9.5 3 0 1 0-19 0z" },
+	thorned_skin: { b: "M12 2.5l8 3V11c0 5.5-3.5 9-8 10.5-4.5-1.5-8-5-8-10.5V5.5z", a: thornG(12, 4, 4, 2.6, 0) + thornG(19, 8, 4, 2.6, 70) + thornG(5, 8, 4, 2.6, -70) + thornG(17, 17, 4, 2.6, 130) + thornG(7, 17, 4, 2.6, -130) },
+	briar_spread: { t: circ(12, 12, 9.5), a: thornG(12, 9, 6.5, 3, 0) + thornG(15, 13.5, 6.5, 3, 120) + thornG(9, 13.5, 6.5, 3, -120) },
+	strangling_vines: { s: "M6 20c0-3 12-2 12-5S6 13 6 10s12-2 12-5S9 2.5 8 2.5", a: leaf(18.5, 19.5, 5, 3.2, 110) + leaf(5, 6.5, 5, 3.2, -60) },
+	sprout_turret: { a: el(12, 7.5, 5.5, 3.6) + "M11 10.5h2V18h-2z", b: circ(19.5, 5, 1.1) + circ(22, 9.5, 0.9), t: "M4.5 21.5c1.5-2.5 4.5-3.5 7.5-3.5s6 1 7.5 3.5" },
+	deep_roots: { a: leaf(9, 5.5, 6, 3.8, -35) + leaf(15, 5.5, 6, 3.8, 35) + "M11.1 7h1.8v5.5h-1.8z", t: "M12 12.5v9M12 15c-2 .5-4.5 2-6 5M12 15c2 .5 4.5 2 6 5M12 18c-1 1-2 2.5-2.5 3.5M12 18c1 1 2 2.5 2.5 3.5" },
+	pollen: { a: flower(10, 13, 3.6), c: circ(10, 13, 1.7), b: circ(18, 5, 1.3) + circ(20.5, 9.5, 1) + circ(15, 3.5, 0.9) + circ(19.5, 15.5, 1.1) + circ(4, 4.5, 1) },
+	overgrowth: { a: leaf(6.5, 9, 7, 4.4, -30) + leaf(12, 7, 8, 5, 10) + leaf(17.5, 9.5, 7, 4.4, 40), t: "M3 21h18M6.5 13v8M12 12v9M17.5 13v8" },
+	fertile: { t: "M7 3h10M7 21h10M8 3c0 4.6 3.4 6 3.4 9S8 16.4 8 21M16 3c0 4.6-3.4 6-3.4 9s3.4 4.4 3.4 9", a: leaf(12, 15.8, 5, 3.2, 0) },
+	ancient_guardian: { a: circ(12, 5, 3.6) + circ(8.5, 6.5, 2.4) + circ(15.5, 6.5, 2.4) + "M8.5 9.5h7l1 6h-1.8l-.7 6.5h-1.6l-.4-4h-1l-.4 4H9.1l-.7-6.5H6.5zM8.5 10l-4 5.5 1.3 1 3.4-3.6zM15.5 10l4 5.5-1.3 1-3.4-3.6z", c: circ(10.8, 11.8, 0.7) + circ(13.2, 11.8, 0.7) },
+};
+
 const glyphs = [];
 for (const [id, g] of Object.entries(blood)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(fire)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
@@ -201,6 +243,7 @@ const voidp = {
 	maw_of_the_void: { a: maw(12, 12, 10.5), s: "M2 21.5h20", c: circ(12, 12, 2.2) },
 };
 for (const [id, g] of Object.entries(voidp)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
+for (const [id, g] of Object.entries(nature)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
 // ---------- single-colour marks (tinted in the UI)
@@ -230,6 +273,7 @@ const masks = {
 	ring: [S(circ(12, 12, 10.5), 1.2)],
 	blood_drop: [F(drop(12, 13, 1))],
 	void_eye: [S("M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", 1.9), F(circ(12, 12, 4.2))],
+	leaf: [F(leaf(12, 12.5, 19, 12, 30)), CUT(S(midrib(12, 12.5, 19, 30), 1.3))],
 };
 // Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
 const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
@@ -250,7 +294,7 @@ Object.assign(masks, {
 	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
 	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
 });
-const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
+const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
 // ---------- full colour

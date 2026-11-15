@@ -5,6 +5,7 @@
 #include "WRCharacter.h"
 #include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
+#include "WRForestHazards.h"
 #include "WRSurvival.h"
 #include "WRWeapons.h"
 #include "WRSound.h"
@@ -543,7 +544,9 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 		// (The fire pot is modelled in code: the projectile builds it from "code:firepot".)
 		// (So are the Swamp's salt pouch and stormglass jar: "code:saltpouch", "code:stormjar", WRSwampSystems.)
 		// (And the Wasteland's throwing stone and anchor salt bag: "code:riftstone", "code:anchorsalt", WRVoidWorld.)
-		const bool bSwampThrown = Launcher.RangedKind == TEXT("saltpouch") || Launcher.RangedKind == TEXT("stormjar") || WRVoidWorld::IsThrownKind(Launcher.RangedKind);
+		// (And the Ancient forest's Bootlace blight jar and smoke pot: "code:blightjar", "code:smokepot", WRForestHazards.)
+		const bool bSwampThrown = Launcher.RangedKind == TEXT("saltpouch") || Launcher.RangedKind == TEXT("stormjar")
+			|| Launcher.RangedKind == TEXT("blightjar") || Launcher.RangedKind == TEXT("smokepot") || WRVoidWorld::IsThrownKind(Launcher.RangedKind);
 		const FString Model = Launcher.RangedKind == TEXT("firepot") ? FString(TEXT("code:firepot"))
 			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;

@@ -28,7 +28,29 @@ struct WILDREACH_API FWRLandZone
 	FName Region;
 	FName Bed;
 	TSharedPtr<FJsonObject> Decor;
+	/** A heightfield land's zone (the Ancient forest): its letter in the land's zone grid, and specks of other colours
+	 *  scattered through it (wildflowers in the meadow, moss in the leaf litter) by SpeckAmount at SpeckScale m. */
+	TCHAR Letter = 0;
+	TArray<FLinearColor> Speck;
+	float SpeckAmount = 0.f, SpeckScale = 5.f;
 	bool Contains(const FVector2D& M) const;
+};
+
+/** A heightfield land's surface class (written per sample beside its heights): river bed, gravel bank, sand, a road... */
+struct WILDREACH_API FWRLandSurface
+{
+	uint8 Class = 0;
+	FLinearColor Color = FLinearColor::Gray;
+	float Rough = 0.9f;
+	TArray<FLinearColor> Speck;
+	float SpeckAmount = 0.f, SpeckScale = 4.f;
+};
+
+/** A wash of colour over a band of the map (the frost on the tundra neck's ferns): y from Y0 to Y1 m, patchy by noise. */
+struct WILDREACH_API FWRLandBand
+{
+	float Y0 = 0.f, Y1 = 0.f, Amount = 0.f, NoiseM = 30.f;
+	FLinearColor Color = FLinearColor::White;
 };
 
 /** One shaping term of the ground (map metres): hole, gorge, ravine, flatten, road. */
@@ -64,6 +86,56 @@ struct WILDREACH_API FWRLandDef
 	float SlopeFrom = 30.f, SlopeTo = 44.f;
 	FBox2D MapBox = FBox2D(ForceInit);
 	TSharedPtr<FJsonObject> Json;
+
+	// ---- A heightfield land (cooks/build-biome-forest.md 2.1-2.3: the Ancient forest). Its ground is a grid of samples
+	// read from a file beside the land's json ("heightfield": file, x0, y0, step, samples, unitsPerMetre, offset,
+	// surface), bilinear between them, instead of the crest-and-coast function; its colour comes from a zone-letter grid
+	// ("zoneGrid") and the per-sample surface classes. The wasteland's function path is untouched.
+	bool bHeightfield = false;
+	FVector2D HfOrigin = FVector2D::ZeroVector;   // map metres of sample (0, 0)
+	float HfStep = 4.f;
+	int32 HfN = 0;
+	float HfUnits = 16.f, HfOffset = 32768.f;
+	TArray<uint16> HfHeights;
+	TArray<uint8> HfSurface;                       // per sample: 0 the zone's ground, HfHidden no ground at all
+	static constexpr uint8 HfHidden = 255;
+	/** Map metres: north of this the ground is another land's (the island's landscape ends at y +2,016). */
+	float OwnFromY = -1.0e9f;
+	FVector2D GridOrigin = FVector2D::ZeroVector;
+	float GridCell = 16.f;
+	int32 GridW = 0, GridH = 0;
+	TArray<FString> GridRows;
+	float ZoneBlend = 45.f;
+	TArray<FWRLandSurface> Surfaces;
+	TArray<FWRLandBand> Bands;
+	FLinearColor LedgeColor = FLinearColor::Transparent;
+	/** Where bodies are rightly under the ground (no rescue): zone-grid letters, and ways [x1, y1, x2, y2, r] (m). */
+	FString UndergroundLetters;
+	TArray<FVector4f> UndergroundWays;
+	TArray<float> UndergroundRadii;
+	TArray<FVector2D> BuildFirst;
+
+	/** Heightfield: the sample at (I, J) clamped to the grid, metres. */
+	float HfSample(int32 I, int32 J) const
+	{
+		I = FMath::Clamp(I, 0, HfN - 1);
+		J = FMath::Clamp(J, 0, HfN - 1);
+		return (float(HfHeights[J * HfN + I]) - HfOffset) / HfUnits;
+	}
+	uint8 HfSurfaceAt(int32 I, int32 J) const
+	{
+		return HfSurface.Num() == HfHeights.Num() ? HfSurface[FMath::Clamp(J, 0, HfN - 1) * HfN + FMath::Clamp(I, 0, HfN - 1)] : 0;
+	}
+	/** Heightfield: bilinear height (m) at a map point (clamped to the grid's edge). */
+	float HfHeight(const FVector2D& M) const;
+	/** Heightfield: no ground of this land here (another land's own ground covers it). */
+	bool HfHiddenAt(const FVector2D& M) const;
+	/** The zone-grid letter at a map point (0 outside the grid). */
+	TCHAR GridLetter(const FVector2D& M) const;
+	/** Heightfield: the colour (linear) and roughness of sample (I, J), its normal N. */
+	FLinearColor HfGround(int32 I, int32 J, const FVector& N, float& OutRough) const;
+	/** A body here is rightly under the ground (a heightfield land's underground letters and ways). */
+	bool IsUnderground(const FVector2D& M) const;
 
 	FVector ToWorld(const FVector2D& M, float Zm) const
 	{
@@ -107,13 +179,17 @@ namespace WRLand
 	WILDREACH_API const FWRLandDef* At(const FVector& World);
 	/** That land's biome, or None. */
 	WILDREACH_API FName BiomeAt(const FVector& World);
-	/** Inside one of a live land's holes (the Great Rift) and below its lip: no ground-rescue there, the black is the floor. */
+	/** Inside one of a live land's holes (the Great Rift) and below its lip: no ground-rescue there, the black is the floor.
+	 *  Also true where a heightfield land says a body is rightly under its ground (the forest's Hollow Root, its squeezes). */
 	WILDREACH_API bool InHole(const FVector& World);
 	/** A live land's ground under one of its map points (metres), in game cm: rows placed on a land ("land" + "at" in
 	 *  its map metres: shrines, masters, dens) stand on the height function, never a trace (chunks may still be building). */
 	WILDREACH_API bool PlaceOn(FName LandId, const FVector2D& MapM, FVector& OutWorld);
 	/** The ground height (game cm) under a game point inside a live land (outside every land, or over a hole: Fallback). */
 	WILDREACH_API float GroundZAt(const FVector& World, float Fallback);
+	/** A live heightfield land's own ground height (game cm) under a point (built or not: the samples); false outside
+	 *  every such land or where it builds none (the island's strip). */
+	WILDREACH_API bool GroundUnder(const FVector& World, float& OutZ);
 	/** The sub-zone at a game point (None outside every land). */
 	WILDREACH_API FName ZoneAt(const FVector& World);
 	/** sRGB array [r,g,b] -> linear. */
@@ -176,6 +252,11 @@ public:
 	void AddMover(const FWRLandMover& M) { Movers.Add(M); }
 	/** The server's clock as every machine reads it (movers and pulses are on it). */
 	double ServerTime() const;
+	/** The ground chunk under this point exists (its collision may still be cooking for a frame or two). */
+	bool IsGroundBuiltAt(const FVector& World) const;
+	/** Server, at load: a land's "camps" (PlayerStarts tagged for its path's biome, a safe zone each, the starter
+	 *  stations at one of them), only what the map doesn't already have. The ground is a function, so no wait. */
+	static void SpawnCamps(UWorld* World, const FWRLandDef& Def);
 
 protected:
 	virtual void BeginPlay() override;
@@ -183,8 +264,15 @@ protected:
 private:
 	void QueueChunks();
 	bool BuildChunk(const FIntPoint& Cell);
+	bool BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync = true);
 	void BuildHoles();
+	/** Rain on a heightfield land: its ground's Wet look (M_LandGround's Wet scalar) eased in and out. */
+	void StepWet(float DeltaSeconds);
 	TArray<FIntPoint> Queue;
+	TSet<FIntPoint> BuiltCells;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> GroundMID;
+	float Wet = 0.f;
+	float WetCheck = 0.f;
 	int32 Built = 0;
 	bool bGroundDone = false;
 	bool bSitesDone = false;

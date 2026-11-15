@@ -8,6 +8,9 @@
 #include "WRLightningPath.h"
 #include "WRAbilitiesBlood.h"
 #include "WRBloodPath.h"
+#include "WRAbilitiesNature.h"   // the Nature path's abilities (ClassForNode)
+#include "WRForestBosses.h"      // the forest arenas' things a swing can hit (rope anchors, knots, combs, amber hearts)
+#include "WRSurvival.h"          // a torch in the off hand (a fire blow on the forest's things)
 #include "WRDeeds.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
@@ -36,6 +39,7 @@
 #include "WRWeapons.h"
 #include "WRLag.h"
 #include "WRCombatRules.h"
+#include "WRForestHazards.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionMoveToForce.h"
@@ -1009,6 +1013,11 @@ void UWRGA_Melee::Sweep()
 		}
 	}
 
+	// A fire blade swept through thornbrake burns a lane where it went (the Ancient forest; cheap with none near).
+	if (Character->Weapon.Element == TEXT("fire"))
+	{
+		WRForestHazards::FireLanded(Character->GetWorld(), End - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight() * 0.5f));
+	}
 	for (const FHitResult& HitResult : Hits)
 	{
 		// A fold's things take blows too: an egg clutch, a frost bolt, a chute's rope, an icicle (once a swing).
@@ -1016,6 +1025,22 @@ void UWRGA_Melee::Sweep()
 		{
 			HitThisSwing.Add(Thing);
 			WRPortals::HitThing(Thing, Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character->Weapon.Element == TEXT("fire"));
+			continue;
+		}
+		// The forest's boss arenas (WRForestBosses): a Bower walkway's rope anchor, a Root Knot, a brood comb, an amber
+		// heart, the root hand's wrist (once a swing; a torch in the off hand makes it a fire blow).
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
+			&& FWRForestBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
+				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
+		{
+			HitThisSwing.Add(Thing);
+			continue;
+		}
+		// The Ancient forest's things: a widowmaker limb in reach, a wasp nest (any blow stirs it), once a swing.
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && WRForestHazards::IsHazardThing(Thing))
+		{
+			HitThisSwing.Add(Thing);
+			WRForestHazards::HitThing(Thing, Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character->Weapon.Element == TEXT("fire"), HitResult.ImpactPoint);
 			continue;
 		}
 		// A siege ladder: wood, so any blow hurts it fully.
@@ -2526,7 +2551,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		// Blood (WRBloodPath.cpp): Clotting, Misfortune, Contagion, Ruin, Blood frenzy, Feast.
 		TEXT("clotting"), TEXT("misfortune"), TEXT("contagion"), TEXT("ruin"), TEXT("blood_frenzy"), TEXT("feast"),
 		// Void (WRVoidPath.cpp): Event horizon, Feed.
-		TEXT("event_horizon"), TEXT("feed") };
+		TEXT("event_horizon"), TEXT("feed"),
+		// Nature (WRNaturePath.cpp, WRPlantSummon.cpp): Purify, Thorned skin, Pollen, Overgrowth.
+		TEXT("purify"), TEXT("thorned_skin"), TEXT("pollen"), TEXT("overgrowth") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2601,6 +2628,20 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("consume")) return UWRGA_Consume::StaticClass();
 		if (NodeId == TEXT("sacrifice")) return UWRGA_Sacrifice::StaticClass();
 		if (NodeId == TEXT("maw_of_the_void")) return UWRGA_MawOfTheVoid::StaticClass();
+	}
+	else if (PathId == TEXT("nature"))
+	{
+		// The Nature path (WRAbilitiesNature.cpp, cooks/biome-forest.md 2.17).
+		if (NodeId == TEXT("thorn_shot")) return UWRGA_ThornShot::StaticClass();
+		if (NodeId == TEXT("briar_strike")) return UWRGA_BriarStrike::StaticClass();
+		if (NodeId == TEXT("regrowth")) return UWRGA_Regrowth::StaticClass();
+		if (NodeId == TEXT("sanctuary")) return UWRGA_Sanctuary::StaticClass();
+		if (NodeId == TEXT("world_tree")) return UWRGA_WorldTree::StaticClass();
+		if (NodeId == TEXT("vine_lash")) return UWRGA_VineLash::StaticClass();
+		if (NodeId == TEXT("root_snare")) return UWRGA_RootSnare::StaticClass();
+		if (NodeId == TEXT("strangling_vines")) return UWRGA_StranglingVines::StaticClass();
+		if (NodeId == TEXT("sprout_turret")) return UWRGA_SproutTurret::StaticClass();
+		if (NodeId == TEXT("ancient_guardian")) return UWRGA_AncientGuardian::StaticClass();
 	}
 	return nullptr;
 }

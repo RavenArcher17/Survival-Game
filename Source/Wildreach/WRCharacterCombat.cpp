@@ -5,6 +5,7 @@
 #include "WRCameraBoom.h"
 #include "WRCreature.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
 #include "WRGameplayTags.h"
 #include "WRPlayerController.h"
 #include "WRStatusComponent.h"
@@ -48,6 +49,12 @@ void AWRCharacter::ServerMashFrozen_Implementation()
 	if (WRSwampGrip::IsHeld(this))
 	{
 		WRSwampGrip::Mash(this);
+		return;
+	}
+	// In a Mossmaul's hug or a Rootcoil's coils (WRForestCreatures): the same.
+	if (WRForestGrip::IsHeld(this))
+	{
+		WRForestGrip::Mash(this);
 		return;
 	}
 	Status->MashFrozen();

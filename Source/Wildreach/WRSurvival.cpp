@@ -258,6 +258,7 @@ void FWRWeatherDefs::Load()
 			W.Minutes = Pair(K, TEXT("minutes"), FVector2D(10.f, 20.f));
 			K->TryGetBoolField(TEXT("dayOnly"), W.bDayOnly);
 			K->TryGetBoolField(TEXT("nightOnly"), W.bNightOnly);
+			W.Hours = Pair(K, TEXT("hours"), FVector2D(-1.f, -1.f));
 			const TSharedPtr<FJsonObject>* E = nullptr;
 			if (K->TryGetObjectField(TEXT("effects"), E))
 			{
@@ -439,6 +440,9 @@ void UWRWeatherSubsystem::Roll(FName Biome, float At)
 	for (const FWRWeatherKind& K : Row->Kinds)
 	{
 		if ((K.bDayOnly && bNight) || (K.bNightOnly && !bNight)) continue;
+		// An hours window (the forest's Morning mist, 05:00-10:00): it can only start inside it.
+		const float HourNow = AWRGameState::HourIn(this);
+		if (K.Hours.X >= 0.f && (HourNow < K.Hours.X || HourNow >= K.Hours.Y)) continue;
 		if (Pick < K.Chance)
 		{
 			const FWRWeatherDefs& D = FWRWeatherDefs::Get();
@@ -446,6 +450,12 @@ void UWRWeatherSubsystem::Roll(FName Biome, float At)
 			Slot->WarnAt = At;
 			Slot->StartAt = At + D.WarnSeconds;
 			Slot->EndAt = Slot->StartAt + FMath::FRandRange(K.Minutes.X, K.Minutes.Y) * 60.f;
+			if (K.Hours.X >= 0.f)
+			{
+				// ...and it's gone by the window's end (game hours as real seconds: clock.dayMinutes a day).
+				const float SecondsPerHour = WRTune(TEXT("clock.dayMinutes"), 60.f) * 60.f / 24.f;
+				Slot->EndAt = FMath::Min(Slot->EndAt, Slot->StartAt + FMath::Max(60.f, (K.Hours.Y - HourNow) * SecondsPerHour - D.WarnSeconds));
+			}
 			GS->ForceNetUpdate();
 			UE_LOG(LogWildreach, Log, TEXT("WEATHER %s: %s in %.0f s for %.1f min"), *Biome.ToString(), *K.Id.ToString(), D.WarnSeconds, (Slot->EndAt - Slot->StartAt) / 60.f);
 			return;

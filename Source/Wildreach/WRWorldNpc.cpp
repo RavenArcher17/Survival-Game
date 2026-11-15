@@ -5,6 +5,8 @@
 #include "WRWorldSystems.h"
 #include "WRStormWorld.h"
 #include "WRSwampSystems.h"
+#include "WRForestHazards.h"
+#include "WRForestWorld.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCreature.h"
@@ -320,6 +322,11 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	// The Swamp's things (WRSwampSystems): boardwalk gaps, the bosses' broken square, caches, the key cage, the trapdoor,
 	// the Coven's ladders, flue, bell, eggs and gate, wild plants, the Murkjaw blood rite.
 	if (WRSwamp::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Ancient forest's things (WRForestHazards, WRForestHollow): a wasp nest to rob, the Hollow Root's doors and roots,
+	// the secrets (the bell, the barred door, the eel trap, the seed jars).
+	if (WRForestHazards::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Ancient forest's world (WRForestWorld): the Canopy Lift, the offering stones.
+	if (UWRForestWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -368,6 +375,8 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 		}
 	}
 	if (WRSwamp::ClientInteract(PC)) return true;
+	if (WRForestHazards::ClientInteract(PC)) return true;
+	if (UWRForestWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (AWRShrine* S = Cast<AWRShrine>(N.Actor))

@@ -22,6 +22,7 @@ struct FWRFishDef
 	FName Rarity;             // common / uncommon / rare / legendary
 	float KgMin = 0.5f, KgMax = 2.f;
 	float Fight = 0.4f;       // 0..1: how hard and often it surges
+	FName Hook;               // a hook it takes to hold it (fish.json "hook"): without one in the bag its fight strains the line harder
 };
 
 /** The fish table and the rules for which one bites (pure, so the numbers live in data). */
@@ -43,6 +44,9 @@ public:
 	float XpFor(FName Rarity, bool bFirstLegend) const;
 	/** A legend's trophy item (trophy_<fish id>), given on its first catch. */
 	static FName TrophyItem(FName Fish) { return FName(*(TEXT("trophy_") + Fish.ToString())); }
+	/** Special hooks in the bag (fish.json "hooks": the forest's Sturgeon hook): how much they raise the rare and legendary
+	 *  bites in this biome's water (added to Pick's RareBoost). */
+	float HookBoost(const class UWRInventoryComponent* Inv, FName Biome, FName Water) const;
 
 private:
 	FWRFishRegistry();
@@ -50,6 +54,8 @@ private:
 	TArray<TTuple<FName, int32, int32, float>> TreasureTable;   // item, min, max, weight
 	TMap<FName, FName> Lures;
 	TMap<FName, float> Xp;
+	struct FHook { FName Biome; TArray<FName> Waters; float RareBoost = 0.f; };
+	TMap<FName, FHook> Hooks;
 };
 
 UENUM()
@@ -145,6 +151,7 @@ private:
 	const FWRFishDef* Fish = nullptr;
 	float FishKg = 0.f;
 	float FishFight = 0.4f;
+	float HookStrain = 1.f;       // x the line's strain: a fish that needs a hook the angler hasn't got (FWRFishDef::Hook)
 	double DoneAt = 0.0;
 
 	// Client state

@@ -1,6 +1,8 @@
 // Farming and food (FULL-GAME 6.2; showcase-notes cooks/build-farming.md). See WRFarm.h for the shape of it.
 
 #include "WRFarm.h"
+#include "WRForestCreatures.h"
+#include "WRForestHazards.h"
 #include "WRBuilding.h"
 #include "WRCharacter.h"
 #include "WRCharacterBase.h"
@@ -576,7 +578,8 @@ float FWRFarm::GrowthRate(const AWRBuildPiece* Plot, EWRFarmStop& Why, uint8& Fl
 		Flags |= WRFarmFlag::Watered;
 		Rate /= Plot->bPlanterWaterWise ? Tune(TEXT("farm.waterWiseTime"), 0.5f) : Tune(TEXT("farm.wateredTime"), 0.67f);
 	}
-	if (Farm && Farm->HasHiveNear(Plot->GetActorLocation(), Tune(TEXT("farm.hive.pollinateRange"), 2000.f)))
+	// A working hive near, or a tamed Glimmerfinch flock within 20 m (WRForestCreatures): pollinated.
+	if (Farm && (Farm->HasHiveNear(Plot->GetActorLocation(), Tune(TEXT("farm.hive.pollinateRange"), 2000.f)) || FWRForestAI::FinchPollinates(World, Plot->GetActorLocation())))
 	{
 		Flags |= WRFarmFlag::Pollinated;
 		Rate /= Tune(TEXT("farm.hive.pollinateTime"), 0.85f);
@@ -586,6 +589,8 @@ float FWRFarm::GrowthRate(const AWRBuildPiece* Plot, EWRFarmStop& Why, uint8& Fl
 		Flags |= WRFarmFlag::Companion;
 		Rate /= Tune(TEXT("farm.companionTime"), 0.9f);
 	}
+	// The Ancient forest: its Rain +25% on open plots, the Bloom x2 (cooks/biome-forest.md 2.9, 2.10).
+	Rate *= WRForestHazards::CropScale(World, At, !Roof && !bCovered && !bUnderground);
 	return Rate;
 }
 

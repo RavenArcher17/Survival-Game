@@ -11,6 +11,7 @@
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
 #include "WRSurvival.h"
 #include "WRFarm.h"
 #include "WRSound.h"
@@ -239,6 +240,13 @@ void AWRPlayerController::WRInteract()
 	// A knocked-out Murkjaw and a Blood walker: E is the blood rite first (the server runs it through Feed), then the
 	// taming menu once it's done (WRSwampCreatures).
 	if (FString RiteVerb; Wild && Wild->IsUnconscious() && FWRSwampAI::RitePrompt(Wild, GetPawn(), RiteVerb))
+	{
+		ServerCommand(TEXT("interact"));
+		return;
+	}
+	// A Mossmaul open to the Nature path's calm (WRForestCreatures): E held is the hand on its moss (the server runs it
+	// through Feed; letting go early sends "world fpathtame", a tap feeds it as usual).
+	if (FString CalmVerb; Wild && FWRForestAI::PathTamePrompt(Wild, GetPawn(), CalmVerb))
 	{
 		ServerCommand(TEXT("interact"));
 		return;
@@ -758,6 +766,12 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	{
 		return true;
 	}
+	// The forest's path-magic calm let go (WRForestCreatures): "world fpathtame".
+	if (Cmd == TEXT("world") && Arg(1) == TEXT("fpathtame"))
+	{
+		FWRForestAI::StopPathTame(this);
+		return true;
+	}
 	// World systems (WRWorldSystems): world kindle / travel / take / hand / trade / msg / rate / summon / open.
 	if (Cmd == TEXT("world"))
 	{
@@ -977,6 +991,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 				continue;
 			}
 			Tame->Order(this, Order);
+			FWRForestAI::Whistled(Tame, Me);   // a Glimmerfinch flock lifts over the nearest ripe plant or hive
 			if (Order == TEXT("follow") && Tame->IsAsleep()) Tame->SetAsleep(false);   // a whistle wakes them
 			++Count;
 			FTimerHandle Answer;

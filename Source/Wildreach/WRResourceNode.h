@@ -78,6 +78,14 @@ public:
 	/** Server: a running drill stands on this vein (WRMachine): it never runs out while drilled. */
 	bool bDrilled = false;
 
+	/** Server, optional (a land's own nodes, WRForestWorld): may this gatherer take from it now (the right tool in hand)?
+	 *  False: the swing does nothing (the hook tells them why). */
+	TFunction<bool(AWRCharacterBase*)> CanHarvest;
+	/** Server, optional: a multiplier on this hit's yield for this gatherer (a tame beside them, an event's plenty). */
+	TFunction<float(AWRCharacterBase*)> YieldScale;
+	/** Server, optional: after a hit gave its share (wax with the honey, a seed, a quest deed, a glow). */
+	TFunction<void(AWRCharacterBase*)> OnHarvested;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:

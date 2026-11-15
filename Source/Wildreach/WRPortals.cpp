@@ -4,6 +4,7 @@
 // chests in WRPortalThings.cpp, the bosses' arenas in WRPortalBosses.cpp, the screens in WRUIPortals.cpp.
 
 #include "WRPortals.h"
+#include "WRForestTypes.h"
 #include "WRPortalsInternal.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
@@ -84,7 +85,10 @@ namespace WRPortalsSys
 			{ TEXT("tundra.lowland"), TEXT("gloomhowl") }, { TEXT("tundra.midland"), TEXT("frostantler") }, { TEXT("tundra.highland"), TEXT("rimeclaw") },
 			{ TEXT("storm_peaks.lowland"), TEXT("voltfang") }, { TEXT("storm_peaks.midland"), TEXT("voltfang") }, { TEXT("storm_peaks.highland"), TEXT("voltfang") },
 			// The Swamp's walkers (cooks/biome-swamp.md 2.12): the coast's Mudhulks, the domes' Bogsnouts, the Crown foot's Bogstalkers.
-			{ TEXT("swamp.lowland"), TEXT("mudhulk") }, { TEXT("swamp.midland"), TEXT("bogsnout") }, { TEXT("swamp.highland"), TEXT("bogstalker") } };
+			{ TEXT("swamp.lowland"), TEXT("mudhulk") }, { TEXT("swamp.midland"), TEXT("bogsnout") }, { TEXT("swamp.highland"), TEXT("bogstalker") },
+			// The Ancient forest's walkers (cooks/biome-forest.md 2.12): the meadows' Trufflers, the groves' Thornlynx, the
+			// Elder Canopy's Mossmauls (its portals stay land:false until a forest fold kit exists, like Storm's).
+			{ TEXT("forest.lowland"), TEXT("truffler") }, { TEXT("forest.midland"), TEXT("thornlynx") }, { TEXT("forest.highland"), TEXT("mossmaul") } };
 		const FName* F = M.Find(Biome.ToString() + TEXT(".") + Band.ToString());
 		return F ? *F : NAME_None;
 	}
@@ -882,7 +886,8 @@ bool UWRPortalSystem::SpotOk(FName Biome, const FVector& At, int32 Rank, FString
 	const float Keep = WRPortals::Num(TEXT("slots.keepFrom"), 15000.f);
 	const auto Fail = [Why](const TCHAR* S) { if (Why) *Why = S; return false; };
 	// The ridge between the lands is where the passes run: never a portal on it.
-	if (At.Y > WRTune(TEXT("world.islandNorthEdge"), -201600.f) && FMath::Abs(At.X - WRTune(TEXT("sky.biomeCentre"), 0.f)) < 20000.f) return Fail(TEXT("pass"));
+	// (The island's ridge only: south of the island's edge the same x is the forest's floor, no pass runs there.)
+	if (At.Y > WRTune(TEXT("world.islandNorthEdge"), -201600.f) && At.Y < WRTune(TEXT("world.islandSouthEdge"), 201600.f) && FMath::Abs(At.X - WRTune(TEXT("sky.biomeCentre"), 0.f)) < 20000.f) return Fail(TEXT("pass"));
 	for (TActorIterator<AWRClaimTotem> It(World); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < Keep + It->Radius) return Fail(TEXT("claim"));
 	for (TActorIterator<AWRShrine> It(World); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < Keep) return Fail(TEXT("shrine"));
 	for (TActorIterator<AWRVillage> It(World); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < Keep + It->Ring) return Fail(TEXT("village"));
@@ -914,10 +919,14 @@ bool UWRPortalSystem::FindSpot(FName Biome, int32 Rank, FVector& OutAt, float& O
 		// Storm peaks: anywhere in its landscape's frame (north of the island); the island's lands: their side of it.
 		// The Swamp: anywhere in its landscape's frame (Data/swamp.json), kept to its own ground by WRBiome::At below.
 		const FWRSwampData& SwampD = FWRSwampData::Get();
+		// The Ancient forest: anywhere in its frame (Data/forest.json), its own ground by WRBiome::At below.
+		const FWRForestData& ForestD = FWRForestData::Get();
 		const FVector2D P = Biome == TEXT("swamp") ? FVector2D(FMath::FRandRange(SwampD.FrameMin.X, SwampD.FrameMax.X), FMath::FRandRange(SwampD.FrameMin.Y, SwampD.FrameMax.Y))
+			: Biome == TEXT("forest") ? FVector2D(FMath::FRandRange(ForestD.FrameMin.X, ForestD.FrameMax.X), FMath::FRandRange(ForestD.FrameMin.Y, ForestD.FrameMax.Y))
 			: Biome == TEXT("storm_peaks") ? FVector2D(FMath::FRandRange(-290000.f, 100000.f), FMath::FRandRange(-580000.f, -205000.f))
 			: FVector2D(Side * FMath::FRandRange(10000.f, 260000.f), FMath::FRandRange(-200000.f, 200000.f));
 		if (Biome == TEXT("swamp") && (!SwampD.bLoaded || SwampD.BaseWaterAt(FVector(P, 0.f)) != EWRSwampWater::Dry)) continue;
+		if (Biome == TEXT("forest") && !WRForest::Contains(FVector(P, 0.f))) continue;
 		if (!WRWildlife::CanStand(As, P)) continue;
 		const FVector Probe(P, 0.f);
 		if (WRBiome::At(World, Probe) != Biome || !SpotOk(Biome, Probe, Rank, nullptr)) continue;

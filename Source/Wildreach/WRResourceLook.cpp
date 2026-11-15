@@ -1,4 +1,6 @@
 #include "WRResourceLook.h"
+#include "WRForestTypes.h"
+#include "WRTreeKit.h"
 #include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -106,6 +108,9 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	const bool bTundra = At.X > 0.f;  // the ridge runs down the island's middle (world X 0): ash west, snow east
 	// Storm peaks, north of the island (cooks/build-biome-lightning.md): grey granite rock, mountain pine.
 	const bool bStorm = At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f);
+	// The Ancient forest, south of the island (cooks/build-biome-forest.md 2.4): its wood is oak and beech from the
+	// forest's own tree kit (WRTreeKit), its stone a grey boulder gone green with moss.
+	const bool bForest = WRForest::Contains(At);
 	const uint32 Seed = GetTypeHash(FIntVector(FMath::FloorToInt(At.X / 50.f), FMath::FloorToInt(At.Y / 50.f), 0));
 	FRandomStream Rand(Seed);
 
@@ -144,6 +149,10 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			{ TEXT("CharTreeC"), TEXT("char_tree_c_textured") }, { TEXT("CharTreeD"), TEXT("char_tree_d_textured") } };
 		static const TCHAR* Pine[][2] = { { TEXT("PineB"), TEXT("pine_b_textured") }, { TEXT("PineC"), TEXT("pine_c_textured") }, { TEXT("FirA"), TEXT("fir_a_textured") } };
 		Main = (bTundra || bStorm) ? LoadMesh(Prop(Pine[Seed % 3][0], Pine[Seed % 3][1])) : LoadMesh(Prop(Char[Seed % 4][0], Char[Seed % 4][1]));
+		if (bForest)
+		{
+			if (UStaticMesh* Broadleaf = WRTreeKit::Mesh(Node, Seed % 3 ? FName(TEXT("oak")) : FName(TEXT("beech")), int32(Seed % 4))) Main = Broadleaf;
+		}
 	}
 	else if (Item == TEXT("greywood"))
 	{
@@ -212,7 +221,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	if (Item == TEXT("wood"))
 	{
 		// A standing tree like the island's own (the node's random yaw turns it); the hidden trunk collider is the target.
-		Place(Fit(Main, FVector(0.f, 0.f, bStorm ? 760.f : bTundra ? 950.f : 720.f), 30.f));
+		Place(Fit(Main, FVector(0.f, 0.f, bForest ? 1100.f : bStorm ? 760.f : bTundra ? 950.f : 720.f), 30.f));
 		Bits->SetStaticMesh(nullptr);
 	}
 	else if (Item == TEXT("stone") || bOre)
@@ -265,7 +274,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		}
 		else
 		{
-			Tint(RockMaterial(Node, bStorm ? GraniteTint : bTundra ? FrostTint : BasaltTint));
+			Tint(RockMaterial(Node, bForest ? FLinearColor(0.3f, 0.34f, 0.26f) : bStorm ? GraniteTint : bTundra ? FrostTint : BasaltTint));
 			Bits->SetStaticMesh(nullptr);
 		}
 	}

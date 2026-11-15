@@ -1,6 +1,7 @@
 """The journal's map picture (Data/UI/map.png) over every land on L_Island: the Old Island's picture kept pixel for pixel,
 the Swamp east of Storm peaks (its zones and water looks), Storm peaks drawn north of it from its heightmap in the same style (navy sea, a pale shore glow, shaded relief tinted by
-the land, contours every 50 m). 4 m per pixel; the square's world corner and size go to tuning ui.mapMin / ui.mapSize
+the land, contours every 50 m), and the Ancient forest south of it (Tools/terrain/forest.mjs: the same relief, tinted by
+its sub-zones, its rivers in blue). 4 m per pixel; the square's world corner and size go to tuning ui.mapMin / ui.mapSize
 (WRUIMap reads them). Run after Tools/terrain/storm_peaks.mjs:  python -I Tools/terrain/world_map.py
 (The island-only picture is kept as Art/Terrain/island_map.png the first time this runs.)"""
 import json
@@ -75,6 +76,17 @@ if SWP:
                 east = max(east, Z['x0'] + (i + 1) * Z['cell'] + 80)
                 break
     SIZE = max(SIZE, int((east - MIN) / PX) + 1)
+# The Ancient forest (Tools/terrain/forest.mjs) south of the island: the square grows south (and so east, it stays square)
+# to its south edge and a margin of sea; the corner stays put, so every pixel already drawn keeps its place.
+FOR = None
+try:
+    FOR = json.load(open(os.path.join(ROOT, 'Data', 'forest.json'), encoding='utf-8'))
+    FORRAW = open(os.path.join(ROOT, 'Art', 'Terrain', 'forest_height.r16'), 'rb').read()
+except OSError:
+    FOR = None
+if FOR:
+    FF = FOR['frame']
+    SIZE = max(SIZE, int((FF['y0'] + (FF['samples'] - 1) * FF['step'] + 40 - MIN) / PX) + 1)
 SEA = (24, 36, 46)
 out = Image.new('RGBA', (SIZE, SIZE), SEA + (255,))
 H = [[None] * SIZE for _ in range(SIZE)]
@@ -172,5 +184,68 @@ if SWP:
             if v is None or v < 0.6 or (ih is not None and ih > v):
                 continue
             pix[px, py] = SW_TINT['f'] + (255,)
+# The Ancient forest: everything south of the island picture, and its neck where it rises out of the island picture's sea.
+if FOR:
+    import numpy as np
+    from PIL import ImageDraw
+    FF = FOR['frame']; FZ = FOR['zones']; FN = FF['samples']
+    fh = (np.frombuffer(FORRAW, dtype='<u2').reshape(FN, FN).astype(np.float32) - 32768) / FF['unitsPerMetre']
+    ih = (np.frombuffer(open(os.path.join(ROOT, 'Art', 'Terrain', 'island_height.r16'), 'rb').read(), dtype='<u2')
+          .reshape(4033, 4033).astype(np.float32) - 32768) / 32
+    # The pixels the forest's frame covers (one pixel of border for the slopes).
+    p0x = max(0, int((FF['x0'] - MIN) / PX) - 1); p1x = min(SIZE, int((FF['x0'] + (FN - 1) * FF['step'] - MIN) / PX) + 2)
+    p0y = max(0, int((FF['y0'] - MIN) / PX) - 1); p1y = min(SIZE, int((FF['y0'] + (FN - 1) * FF['step'] - MIN) / PX) + 2)
+    X, Y = np.meshgrid(MIN + (np.arange(p0x, p1x) + 0.5) * PX, MIN + (np.arange(p0y, p1y) + 0.5) * PX)
+    fi = np.rint((X - FF['x0']) / FF['step']).astype(int); fj = np.rint((Y - FF['y0']) / FF['step']).astype(int)
+    inside = (fi >= 0) & (fj >= 0) & (fi < FN) & (fj < FN)
+    V = np.where(inside, fh[np.clip(fj, 0, FN - 1), np.clip(fi, 0, FN - 1)], 0.0)
+    ii = np.rint(X + 2016).astype(int); ij = np.rint(Y + 2016).astype(int)
+    IH = np.where((ii >= 0) & (ij >= 0) & (ii < 4033) & (ij < 4033), ih[np.clip(ij, 0, 4032), np.clip(ii, 0, 4032)], -50.0)
+    landF = inside & (V >= 1.0)
+
+    def nb(a, dy, dx):   # each pixel's neighbour (the pixel itself at the edge)
+        b = np.pad(a, 1, mode='edge')
+        return b[1 + dy:1 + dy + a.shape[0], 1 + dx:1 + dx + a.shape[1]]
+    # Hillshade from the north-west, as Storm peaks'.
+    dzdx = (nb(V, 0, 1) - nb(V, 0, -1)) / (2 * PX)
+    dzdy = (nb(V, 1, 0) - nb(V, -1, 0)) / (2 * PX)
+    shade = np.clip(0.95 + (-dzdx * 0.6 - dzdy * 0.6) * 0.8, 0.35, 1.3)
+    # The sub-zone tints ('h', the Hollow Root, drawn as the bark woods around it; land on a sea cell as meadow).
+    FO_TINT = {'1': (127, 163, 74), '2': (78, 122, 58), '3': (94, 140, 49), '4': (88, 78, 52), '5': (58, 82, 34), 's': (96, 92, 88), 'h': (88, 78, 52)}
+    zi = np.floor((X - FZ['x0']) / FZ['cell']).astype(int); zj = np.floor((Y - FZ['y0']) / FZ['cell']).astype(int)
+    zgrid = np.array([[ord(c) for c in r] for r in FZ['rows']], dtype=np.int32)
+    zl = np.where((zi >= 0) & (zj >= 0) & (zi < FZ['width']) & (zj < FZ['height']),
+                  zgrid[np.clip(zj, 0, FZ['height'] - 1), np.clip(zi, 0, FZ['width'] - 1)], ord('~'))
+    base = np.zeros(X.shape + (3,), np.float32) + np.array(FO_TINT['1'], np.float32)
+    for k, col in FO_TINT.items():
+        base[zl == ord(k)] = col
+    rgb = np.minimum(255, np.floor(base * shade[..., None]))
+    # Contours every 50 m (every 250 m a heavier one).
+    lo = np.minimum(nb(V, 0, -1), nb(V, -1, 0))
+    lo = np.where(lo < 1.0, V, lo)
+    cross = np.floor(lo / 50) != np.floor(V / 50)
+    heavy = np.floor(lo / 250) != np.floor(V / 250)
+    rgb = np.where((cross & heavy)[..., None], np.floor(rgb * 0.78), np.where(cross[..., None], np.floor(rgb * 0.9), rgb))
+    # The rivers in blue at their width (the Hollow Root's underground pool isn't on the map).
+    rl = Image.new('L', (p1x - p0x, p1y - p0y), 0)
+    rd = ImageDraw.Draw(rl)
+    for r in FOR['rivers']:
+        if r['kind'] == 'pool':
+            continue
+        pts = [((q[0] - MIN) / PX - 0.5 - p0x, (q[1] - MIN) / PX - 0.5 - p0y) for q in r['pts']]
+        for k in range(len(pts) - 1):
+            rd.line([pts[k], pts[k + 1]], fill=255, width=max(1, int(round(r['widths'][k] / PX))))
+    rgb[(np.array(rl) > 0) & landF] = (70, 120, 160)
+    # A pale glow along the new coast, as Storm peaks'.
+    gl = np.array(Image.fromarray((landF * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(5)), np.float32) / 255.0 * 0.35
+    sea = np.array(SEA, np.float32)
+    final = np.where(landF[..., None], rgb, np.floor(sea + (120 - sea) * gl[..., None]))
+    PY, PXa = np.meshgrid(np.arange(p0y, p1y), np.arange(p0x, p1x), indexing='ij')
+    south = PY >= K + island.height                     # below the island picture: all the forest's
+    neck = ~south & landF & (V > IH)                    # over the island picture's sea, where the forest is the higher
+    put = (south | neck) & (PY >= 1) & (PY < SIZE - 1) & (PXa >= 1) & (PXa < SIZE - 1)
+    cur = np.array(out.crop((p0x, p0y, p1x, p1y)).convert('RGB'), np.float32)
+    cur[put] = final[put]
+    out.paste(Image.fromarray(cur.astype(np.uint8), 'RGB').convert('RGBA'), (p0x, p0y))
 out.save(UI_MAP, optimize=True)
 print(f'map.png {SIZE} px from {MIN:.0f} m: ui.mapMin {MIN * 100:.0f}, ui.mapSize {SIZE * PX * 100:.0f}')

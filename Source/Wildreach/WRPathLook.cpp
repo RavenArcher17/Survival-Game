@@ -71,6 +71,7 @@ namespace WRPathLook
 		const FWRPathDef* Def = FWRPathRegistry::Get().Find(Path);
 		if (!Def) return FString();
 		if (Def->Biome == TEXT("tundra")) return TEXT("Tundra");
+		if (Def->Biome == TEXT("forest")) return TEXT("Ancient forest");   // the Nature path's land (cooks/biome-forest.md)
 		FString S = Def->Biome.ToString().Replace(TEXT("_"), TEXT(" "));
 		if (S.Len() > 0) S[0] = FChar::ToUpper(S[0]);
 		return S;

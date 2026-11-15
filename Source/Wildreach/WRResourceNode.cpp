@@ -3,6 +3,7 @@
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSwampCreatures.h"
+#include "WRForestHazards.h"
 #include "WRResourceLook.h"
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
@@ -144,6 +145,7 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 	float Raw = PerHit * (bHeavy ? 2 : 1) * WRTune(TEXT("server.gatherMultiplier"), 1.f) * (Tool ? Tool->Yield : 1.f);
 	Raw *= FWRTaming::GatherScale(Gatherer);   // Lodestar: a utility tame beside you (cooks/build-taming.md 2.2)
 	Raw *= WRWorld::GatherScale(Gatherer, ItemId, Gatherer->GetActorLocation());   // a biome event's plenty (world.json events)
+	Raw *= WRForestHazards::GatherScale(Gatherer, ItemId, Gatherer->GetActorLocation());   // the forest's morning-mist resin (+50%)
 	Raw *= UWRSwampBody::GatherMult(Gatherer, ItemId);   // a tame Bogsnout within 15 m: bloodmoss x2 (creatures.json gatherBoost)
 	if (bOre) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("miningYield"));
 	if (bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodYield")) + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodExtra"));
@@ -272,6 +274,11 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	{
 		return;
 	}
+	// A land's own rule for its node (the forest's heartwood wants an axe, its thorns a blade: WRForestWorld).
+	if (CanHarvest && !CanHarvest(Gatherer))
+	{
+		return;
+	}
 	// Vein breaker / Clean cut (life-skill perks): a vein or tree down to its last third gives the rest in this blow.
 	const bool bWoodNode = ItemId == TEXT("wood");
 	const float Break = UWRLifeSkillsComponent::StatFor(Gatherer, bWoodNode ? TEXT("treeBreak") : TEXT("veinBreak"));
@@ -281,7 +288,11 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 		Blows = HitsLeft;
 		HitsLeft = 1;
 	}
-	FWRGathering::Gather(Gatherer, ItemId, PerHit * Blows, bHeavy, FString::Printf(TEXT("%s (%d hits left%s)"), *GetName(), HitsLeft - 1, Blows > 1 ? TEXT(", broke all at once") : TEXT("")));
+	FWRGathering::Gather(Gatherer, ItemId, PerHit * Blows * (YieldScale ? FMath::Max(0.f, YieldScale(Gatherer)) : 1.f), bHeavy, FString::Printf(TEXT("%s (%d hits left%s)"), *GetName(), HitsLeft - 1, Blows > 1 ? TEXT(", broke all at once") : TEXT("")));
+	if (OnHarvested)
+	{
+		OnHarvested(Gatherer);
+	}
 	{
 		// Wood chips, stone (and ore) chips with dust, or plant bits, toward the gatherer.
 		const FName Kind = FWRGathering::ToolKindFor(ItemId);

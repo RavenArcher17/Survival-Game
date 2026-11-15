@@ -134,6 +134,10 @@ namespace WRMapTab
 	};
 	FMapState& State() { static FMapState S; return S; }
 
+	/** A vision's places flashing on the map until a real time (WRUIMap::Flash: the Thrumming Root). */
+	struct FMapFlash { TArray<FVector> Where; FString Name; double From = 0.0, Until = 0.0; };
+	FMapFlash& MapFlash() { static FMapFlash F; return F; }
+
 	/** The waypoint (WRUIMap::GetWaypoint): where, and the world it belongs to. */
 	struct FWaypoint { TWeakObjectPtr<const UWorld> World; FVector Where = FVector::ZeroVector; bool bSet = false; };
 	FWaypoint& Waypoint() { static FWaypoint W; return W; }
@@ -148,7 +152,9 @@ namespace WRMapTab
 		case ECat::Boss: return M.Kind == TEXT("boss") ? FCatLook{ Hex(TEXT("EC6A48")), Hex(TEXT("3A1208")), Hex(TEXT("EC6A48")), TEXT("skull"), 34.f, false }
 			: FCatLook{ Hex(TEXT("EAB95A")), FLinearColor(0.025f, 0.012f, 0.002f, 0.94f), Hex(TEXT("EAB95A")), TEXT("skull"), 24.f, false };
 		case ECat::Pass: return { WRUI::Ink3, FLinearColor(0.01f, 0.01f, 0.012f, 0.9f), WRUI::Ink2, TEXT("mountain"), 22.f, false };
-		case ECat::Shrine: return M.Kind == TEXT("village") ? FCatLook{ Hex(TEXT("E8C27A")), FLinearColor(0.02f, 0.014f, 0.004f, 0.94f), Hex(TEXT("E8C27A")), TEXT("house"), 26.f, false }
+		case ECat::Shrine: return M.Kind == TEXT("vision")   // a Thrumming Root vision (WRUIMap::Flash): sap green
+			? FCatLook{ Hex(TEXT("8FE07A")), FLinearColor(0.006f, 0.03f, 0.008f, 0.94f), Hex(TEXT("C8F5A8")), TEXT("flame"), 30.f, false }
+			: M.Kind == TEXT("village") ? FCatLook{ Hex(TEXT("E8C27A")), FLinearColor(0.02f, 0.014f, 0.004f, 0.94f), Hex(TEXT("E8C27A")), TEXT("house"), 26.f, false }
 			: M.bMine ? FCatLook{ Hex(TEXT("FF9B45")), FLinearColor(0.03f, 0.012f, 0.002f, 0.94f), Hex(TEXT("FFB065")), TEXT("flame"), 24.f, false }
 			: FCatLook{ Hex(TEXT("9DB8D8")), FLinearColor(0.01f, 0.012f, 0.02f, 0.94f), Hex(TEXT("9DB8D8")), TEXT("flame"), 22.f, false };
 		case ECat::Base: return { WRUI::Brass, FLinearColor(0.02f, 0.012f, 0.004f, 0.94f), WRUI::Brass, TEXT("house"), 24.f, false };
@@ -273,6 +279,24 @@ namespace WRMapTab
 			M.Name = It->GetPlayerState()->GetPlayerName();
 			M.World = It->GetActorLocation();
 			M.Actor = *It;
+		}
+		// A vision (WRUIMap::Flash): its places pulse for its seconds, then they're gone (the map never keeps them).
+		{
+			const FMapFlash& Fl = MapFlash();
+			const double T = FPlatformTime::Seconds();
+			if (T < Fl.Until)
+			{
+				for (int32 i = 0; i < Fl.Where.Num(); ++i)
+				{
+					FMarker& M = Out.AddDefaulted_GetRef();
+					M.Key = FString::Printf(TEXT("vision:%d"), i);
+					M.Cat = ECat::Shrine;
+					M.Kind = TEXT("vision");
+					M.Name = Fl.Name;
+					M.World = Fl.Where[i];
+					M.Alpha = 0.55f + 0.45f * FMath::Abs(FMath::Sin(float(T - Fl.From) * 4.f));
+				}
+			}
 		}
 		// Remember what's yours; keep showing it out of range, and forget it only when you're close enough that it
 		// would replicate and it doesn't (it's gone).
@@ -1260,6 +1284,22 @@ void WRUIMap::ClearWaypoint()
 {
 	if (WRMapTab::Waypoint().bSet) UE_LOG(LogWildreach, Log, TEXT("WAYPOINT cleared"));
 	WRMapTab::Waypoint() = WRMapTab::FWaypoint();
+}
+
+void WRUIMap::Flash(const TArray<FVector>& Where, const FString& Name, float Seconds)
+{
+	WRMapTab::FMapFlash& F = WRMapTab::MapFlash();
+	F.Where = Where;
+	F.Name = Name;
+	F.From = FPlatformTime::Seconds();
+	F.Until = F.From + FMath::Max(0.5f, Seconds);
+	if (Where.Num() == 0) return;
+	// Centre the view on the vision, close enough in that the places read as a group.
+	FVector2D Sum = FVector2D::ZeroVector;
+	for (const FVector& P : Where) Sum += FVector2D(P.X, P.Y);
+	WRMapTab::FMapState& S = WRMapTab::State();
+	S.Centre = Sum / float(Where.Num());
+	S.Zoom = FMath::Min(S.ZoomLimit, FMath::Max(S.Zoom, 4.f));
 }
 
 TSharedRef<SWidget> WRUIMap::MakeWakeMap(const FWakeMapArgs& Args)

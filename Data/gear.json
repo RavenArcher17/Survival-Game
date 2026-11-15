@@ -329,6 +329,21 @@
         "set": "heartwood_lodge"
       },
       {
+        "id": "bp_world_root_maul",
+        "boss": "sylvaroth",
+        "recipes": [
+          "world_root_maul"
+        ],
+        "kind": "boss weapon"
+      },
+      {
+        "id": "bp_heartwood_longbow",
+        "recipes": [
+          "heartwood_longbow"
+        ],
+        "kind": "recipe"
+      },
+      {
         "id": "bp_cloud_spire_decor",
         "boss": "aeolith",
         "kind": "set decor",

@@ -2,6 +2,7 @@
 #include "WRVoidCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
 #include "WRSwampBosses.h"
 #include "WRRaiding.h"
 #include "WRDeeds.h"
@@ -1297,6 +1298,8 @@ void AWRCreature::BeginPlay()
 	UWRSwampBody::Attach(this);
 	// A Corrupted wasteland creature's body state and look (WRVoidCreatures).
 	UWRVoidBody::Attach(this);
+	// An Ancient forest creature's body state and look (WRForestCreatures).
+	UWRForestBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -1528,7 +1531,8 @@ bool AWRCreature::TryPathMagic(const FWRHit& Hit)
 	const FWRCreatureDef* Def = GetDef();
 	const AWRCharacterBase* Attacker = Cast<AWRCharacterBase>(Hit.Instigator);
 	const APlayerState* PS = Attacker ? Attacker->GetPlayerState() : nullptr;
-	if (!HasAuthority() || IsTamed() || !Def || !PS || !Def->CanTameBy(TEXT("path_magic")) || Hit.PathId.IsNone() || Hit.PathId != Def->Element)
+	// (The Mossmaul's path magic is the Nature path's hold-Interact calm, not an element hit: WRForestCreatures.)
+	if (!HasAuthority() || IsTamed() || !Def || !PS || !Def->CanTameBy(TEXT("path_magic")) || Hit.PathId.IsNone() || Hit.PathId != Def->Element || FWRForestAI::OwnsPathMagic(this))
 	{
 		return false;
 	}
@@ -1558,6 +1562,11 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	if (FString Rite; FWRSwampAI::Feed(this, Player, Rite))
 	{
 		return Rite;
+	}
+	// The Mossmaul's path-magic calm (WRForestCreatures): a Nature walker's hand on its moss, held 4 s.
+	if (FString Calm; FWRForestAI::TryPathTame(this, Player, Calm))
+	{
+		return Calm;
 	}
 	const bool bKnockout = Def->CanTameBy(TEXT("knockout_feed")) && IsUnconscious();
 	const bool bOffer = Def->CanTameBy(TEXT("offer_food")) && !AggroTarget.IsValid();
@@ -2240,6 +2249,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRStormAI::Died(this, Killer);   // a Storm peaks creature's chance drops (storm essence)
 	FWRSwampAI::Died(this, Killer);   // a Swamp creature lets go of what it held; the Red Tide's extra sacs
 	FWRVoidAI::Died(this, Killer);    // a void creature lets go; a Riftborn's void essence
+	FWRForestAI::Died(this, Killer);   // a forest creature lets go; chance drops; a Mossmaul's larder; a sign for the finches
 	const bool bBody = BecomeBody(Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
@@ -2530,7 +2540,8 @@ void AWRCreatureAI::UpdateSleep(AWRCreature* Self)
 		return;
 	}
 	const bool bNight = AWRGameState::IsNightIn(Self);
-	const bool bBedtime = (Def->Activity == TEXT("diurnal") && bNight) || (Def->Activity == TEXT("nocturnal") && !bNight);
+	// A hibernating den-sleeper (WRForestHollow) is always at its bedtime; a hit or a target still wakes it (bBusy).
+	const bool bBedtime = Self->bHibernating || (Def->Activity == TEXT("diurnal") && bNight) || (Def->Activity == TEXT("nocturnal") && !bNight);
 	const bool bBusy = Self->GetAggroTarget() || Self->IsFleeing() || Self->IsEating() || Self->HuntTarget.IsValid() || Self->WasWokenRecently();
 	Self->SetAsleep(bBedtime && !bBusy);
 }
@@ -2791,6 +2802,12 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	}
 	// The Wasteland's (a Riftmaw in its tear, a blink on its way, a latch, a catch, the Hush listening): WRVoidCreatures.
 	if (FWRVoidAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	// The Ancient forest creatures' own moments (a perch over a trail, a log at rest, a hold, a heat ball, a raid, a
+	// larder, the roar and the bugle, hovering, a cornered butt): WRForestCreatures.
+	if (FWRForestAI::TickWild(this, Self, DeltaSeconds))
 	{
 		return;
 	}
@@ -3223,6 +3240,11 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// A forest tame's own work: a Glimmerfinch flock's sweep, a Hiveback at its hive, a Truffler digging (WRForestCreatures).
+	if (FWRForestAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	// Sent at a building ("Break that"): bite it down, then the next piece of the same owner beside it.
 	if (Self->SiegePiece.IsValid() || RaidBiteLandsAt >= 0.0)
 	{
@@ -3522,6 +3544,11 @@ bool AWRCreatureSpawner::IsLyingUp() const
 	}
 	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
 	const bool bNightTable = WRWorld::IsNightTable(this, Def ? Def->Biome : NAME_None);
+	// The Ancient forest's rain (cooks/biome-forest.md 2.9): its night hunters are out by day while it falls.
+	if (Shift == 2 && !bNightTable && FWRForestAI::OutInRain(this, CreatureId, GetActorLocation()))
+	{
+		return false;
+	}
 	// A day kind that sleeps where it stands (diurnal herds: the sneak-tame window) stays in view asleep.
 	return Shift == 2 ? !bNightTable : (bNightTable && !(Def && Def->Activity == TEXT("diurnal")));
 }

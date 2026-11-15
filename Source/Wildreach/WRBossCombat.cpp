@@ -7,6 +7,7 @@
 #include "WRVoidBosses.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
+#include "WRForestBosses.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWarHall.h"
@@ -165,7 +166,7 @@ int32 AWRBoss::ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBa
 		{
 			continue;
 		}
-		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target))
+		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target) || !FWRForestBoss::Allowed(this, A, Target))
 		{
 			continue;   // a Storm peaks boss's rule (bleed blocks the charge, underground moves, the eye)
 		}
@@ -255,6 +256,7 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	FWRStormBoss::AttackStarted(this, Attack, Target);
 	FWRSwampBoss::AttackStarted(this, Attack, Target);
 	FWRVoidBoss::AttackStarted(this, Attack, Target);
+	FWRForestBoss::AttackStarted(this, Attack, Target);   // the forest's tells: the stump torn up, the bulging line, the root hand's ring
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s winds up %s at %s%s"), *GetDisplayLabel(), *Attack.Id.ToString(), *Target->GetName(), Hold > 0.f ? TEXT(" (held)") : TEXT(""));
 }
 
@@ -283,7 +285,7 @@ void AWRBoss::BeginStrike()
 	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, bAirborne ? 0.f : GetSimpleCollisionHalfHeight());
 	const FString Id = Attack.Id.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s strikes"), *GetDisplayLabel(), *Id);
-	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack))
+	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack) || FWRForestBoss::BeginStrike(this, Attack))
 	{
 		return;   // a Storm peaks move (strikes, rings, the bone drop, the eye bolt...)
 	}
@@ -425,6 +427,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 	FWRStormBoss::ModifyHit(this, Attack, Hit);
 	FWRSwampBoss::ModifyHit(this, Attack, Hit);
 	FWRVoidBoss::ModifyHit(this, Attack, Hit);
+	FWRForestBoss::ModifyHit(this, Attack, Hit);
 	const FName AttackId = Attack.Id;
 	const float Knockback = Attack.bRow ? Attack.Row.Knockback : 0.f;
 	const bool bFreezingBreath = Phase >= 3 && IsWyrm() && AttackId.ToString().Contains(TEXT("breath"));
@@ -442,6 +445,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 		FWRStormBoss::HitLanded(Self, Victim, AttackId, Landed);
 		FWRSwampBoss::HitLanded(Self, Victim, AttackId, Landed);
 		FWRVoidBoss::HitLanded(Self, Victim, AttackId, Landed);
+		FWRForestBoss::HitLanded(Self, Victim, AttackId, Landed);   // Gnarl's grasp holds, the antler toss throws
 		if (AttackId == TEXT("tongs_grab"))
 		{
 			if (Landed == EWRHitResult::Parried)
@@ -494,7 +498,7 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 	{
 		return;  // the lob does it
 	}
-	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds))
+	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds) || FWRForestBoss::TickStrike(this, Attack, DeltaSeconds))
 	{
 		return;
 	}
@@ -557,7 +561,7 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 				// Into stone at full tilt: stunned, the weak point open (combat.md 2.17.4).
 				UE_LOG(LogWildreach, Log, TEXT("BOSS %s crashes into %s"), *GetDisplayLabel(), *GetNameSafe(What));
 				FWRStormBoss::WallStun(this, Stun);
-				FWRStormBoss::WallStun(this, Stun);
+				FWRForestBoss::WallStun(this, Stun);   // the Hornwarden into a trunk or a standing stone
 				WRFx::Broadcast(this, TEXT("stomp"), Blocked.ImpactPoint, FRotator::ZeroRotator, 1.6f, TEXT("stomp"));
 				EndStrike();
 				Current = INDEX_NONE;
@@ -720,6 +724,7 @@ void AWRBoss::EndStrike()
 	FWRStormBoss::EndStrike(this, Attack);
 	FWRSwampBoss::EndStrike(this, Attack);
 	FWRVoidBoss::EndStrike(this, Attack);
+	FWRForestBoss::EndStrike(this, Attack);
 	if (!bThrown)
 	{
 		Aftermath(Attack, Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight()));
@@ -782,6 +787,7 @@ void AWRBoss::TickAttack(float DeltaSeconds)
 	{
 		FWRStormBoss::TickWindup(this, Attack, DeltaSeconds);   // a dive's climb and fold, a bolt's aim lock
 		FWRSwampBoss::TickWindup(this, Attack, DeltaSeconds);   // the hex bolt's aim lock
+		FWRForestBoss::TickWindup(this, Attack, DeltaSeconds);  // the queen over her comb, the root hand's ring held
 		// Tracking through the first part of the wind-up, then committed (a late step aside still works).
 		AWRCharacterBase* Target = AttackTarget.Get();
 		const float Track = Attack.bRow ? Attack.Row.TrackUntil : 0.5f;
@@ -823,6 +829,7 @@ void AWRBoss::OnPartBroken(const FWRCreatureDef::FBodyPoint& Part, AActor* By)
 	WRPortals::OnBossPart(this, Part.Id, Part.OnBreak);
 	FWRStormBoss::PartBroken(this, Part, By);
 	FWRSwampBoss::PartBroken(this, Part, By);
+	FWRForestBoss::PartBroken(this, Part, By);
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (Part.OnBreak == TEXT("noHammer"))
 	{
@@ -932,7 +939,7 @@ void AWRBoss::SpawnRunbackStone()
 {
 	// A shrine-stone 40-60 m out from the arena toward the way in (the island's middle, where the passes are), on
 	// ground about level with the arena floor and clear of rock: the run back is the way you came.
-	if (FWRStormBoss::PlaceRunback(this) || FWRSwampBoss::PlaceRunback(this))
+	if (FWRStormBoss::PlaceRunback(this) || FWRSwampBoss::PlaceRunback(this) || FWRForestBoss::PlaceRunback(this))
 	{
 		return;   // the Storm peaks arenas' stones stand where the land says (storm_peaks.json arenas)
 	}

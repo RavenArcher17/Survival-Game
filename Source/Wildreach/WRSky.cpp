@@ -5,6 +5,8 @@
 #include "WRGameState.h"
 #include "WRSea.h"
 #include "WRSwampTypes.h"
+#include "WRForestTypes.h"
+#include "WRFx.h"
 #include "WRTuning.h"
 #include "Dom/JsonObject.h"
 #include "Camera/CameraActor.h"
@@ -235,6 +237,7 @@ void AWRSky::FindMapLights()
 			C->SetMobility(EComponentMobility::Movable);
 			Sun = C;
 			SunLux = C->Intensity;
+			SunScatterBase = C->VolumetricScatteringIntensity;
 		}
 	}
 	for (TActorIterator<ASkyLight> It(GetWorld()); It && !SkyLight.IsValid(); ++It)
@@ -295,7 +298,10 @@ void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
 			bSheltered = GetWorld()->LineTraceSingleByChannel(Hit, View, View + FVector(0.f, 0.f, T.Num(TEXT("sky.shelterHeight"), 2500.f)), ECC_Visibility, Query);
 		}
 	}
-	const float DayEV = bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : T.Num(TEXT("sky.dayMinEV100"), -2.f);
+	// Overcast over the Elder Canopy: the eye may not open up as far as under a sunlit canopy, so the deep wood reads
+	// near-dark by day and the foxfire shows (cooks/biome-forest.md 2.9).
+	const float DayEV = FMath::Lerp(bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : T.Num(TEXT("sky.dayMinEV100"), -2.f),
+		T.Num(TEXT("sky.forestOvercastMinEV100"), 0.5f), ForestDark);
 	const float Target = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), DayEV, Daylight);
 	// Eased, so stepping under a branch or through a doorway doesn't pump the exposure.
 	FloorEV = FloorEV < -50.f || DeltaSeconds <= 0.f ? Target : FMath::FInterpTo(FloorEV, Target, DeltaSeconds, 1.5f);
@@ -338,7 +344,8 @@ void AWRSky::Apply(bool bForce)
 	const float SunUp = FMath::SmoothStep(-4.f, 3.f, SunElevation);
 	if (UDirectionalLightComponent* S = Sun.Get())
 	{
-		S->SetIntensity(SunLux * SunUp * (1.f - WeatherSkyDim * WeatherAmount));
+		// (Overcast over the Elder Canopy takes most of what's left under the leaves: ForestDark, cooks/biome-forest.md 2.9.)
+		S->SetIntensity(SunLux * SunUp * (1.f - WeatherSkyDim * WeatherAmount) * (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastSunDim"), 0.6f)));
 		S->SetVisibility(SunUp > 0.f);
 	}
 	const float MoonLux = T.Num(TEXT("sky.moonLux"), 0.5f) * FMath::SmoothStep(-2.f, 10.f, MoonElevation) * (1.f - SunUp);
@@ -398,6 +405,34 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	const float SwampTarget = WRSwampSky::Share(View, T.Num(TEXT("swampWorld.sky.blendRing"), 6000.f));
 	WRSwampSky::Air = WRSwampSky::Air < 0.f ? SwampTarget : FMath::FInterpTo(WRSwampSky::Air, SwampTarget, DeltaSeconds, 1.2f);
 	const float SW = WRSwampSky::Air;
+	// The Ancient forest's air south of the island (cooks/biome-forest.md 2.1; build plan 2.4): green-gold light and a
+	// soft haze on its own ground, and under the trees the canopy closes the light down (0 at the coast, 0.4 in the
+	// streams and the villages, 0.75 in the old growth, 0.9 in the Elder Canopy: green dusk at noon), eased so a step
+	// into a clearing opens the light over a second or two instead of snapping.
+	const float ForestTarget = WRForest::Contains(View) ? 1.f : 0.f;
+	ForestAir = ForestAir < 0.f ? ForestTarget : FMath::FInterpTo(ForestAir, ForestTarget, DeltaSeconds, T.Num(TEXT("sky.forestBlendSpeed"), 0.7f));
+	ForestCanopy = FMath::FInterpTo(ForestCanopy, ForestTarget > 0.f ? WRForest::Canopy(View) : 0.f, DeltaSeconds, T.Num(TEXT("sky.forestCanopySpeed"), 1.2f));
+	const float FA = ForestAir, CN = ForestCanopy * ForestAir;
+	{
+		// The forest's weather looks (cooks/biome-forest.md 2.9). Clear (no weather): green light shafts through the gaps
+		// in the old growth (canopy 0.75) and the Elder Canopy (0.9) while the sun stands high enough to reach the floor.
+		// Overcast: the Elder Canopy goes from its green dusk to near-dark by day (the foxfire shows: UWRForestWorld).
+		float ClearTarget = 0.f, DarkTarget = 0.f;
+		if (FA > 0.f)
+		{
+			const FWRWeatherNow* FW = UWRWeatherSubsystem::For(this, FName(TEXT("forest")));
+			const float WNow = UWRWeatherSubsystem::Now(this);
+			const bool bWeather = FW && (FW->IsOn(WNow) || FW->IsComing(WNow));
+			const float Str = !bWeather ? 0.f : FW->IsComing(WNow) ? FW->Approach(WNow) * 0.45f : FW->Strength(WNow);
+			const float Old = FMath::GetMappedRangeValueClamped(FVector2f(T.Num(TEXT("sky.forestShaftCanopyFrom"), 0.5f), 0.75f), FVector2f(0.f, 1.f), ForestCanopy);
+			const float Elder = FMath::GetMappedRangeValueClamped(FVector2f(T.Num(TEXT("sky.forestDarkCanopyFrom"), 0.78f), 0.9f), FVector2f(0.f, 1.f), ForestCanopy);
+			const float SunHigh = FMath::SmoothStep(T.Num(TEXT("sky.forestShaftSunFrom"), 8.f), T.Num(TEXT("sky.forestShaftSunFull"), 25.f), SunElevation);
+			ClearTarget = FA * Old * SunHigh * (1.f - Str);
+			if (bWeather && FW->Kind == TEXT("overcast")) DarkTarget = FA * Elder * Str * Daylight;
+		}
+		ForestClear = FMath::FInterpTo(ForestClear, ClearTarget, DeltaSeconds, 0.5f);
+		ForestDark = FMath::FInterpTo(ForestDark, DarkTarget, DeltaSeconds, 0.35f);
+	}
 	{
 		// Fog and Miasma lift the knee fog into a wall (cook 2.9); Miasma turns it oxblood.
 		float RaiseTarget = 0.f, MiasmaTarget = 0.f;
@@ -477,6 +512,29 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			const float Calm = FMath::Lerp(T.Num(TEXT("swampWorld.sky.kneeNight"), 0.6f), 1.f, Daylight);
 			F->SetSecondFogDensity(SW * Calm * T.Num(TEXT("swampWorld.sky.kneeDensity"), 0.35f) * (1.f + WRSwampSky::Raise * T.Num(TEXT("swampWorld.sky.raisedMult"), 1.5f)));
 		}
+		if (FA > 0.001f)
+		{
+			// The forest's haze: a soft green-gold over the meadows, deepening to moss-green under a closed canopy and
+			// thicker there (the far trunks fade into it); the weather's own colour still wins while it blows.
+			const FLinearColor ForestDay = FMath::Lerp(SRGB(TEXT("sky.forestFogColor"), FColor(176, 186, 140)), SRGB(TEXT("sky.forestCanopyFogColor"), FColor(66, 86, 54)), CN)
+				* (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastFogDim"), 0.6f));
+			const FLinearColor ForestHaze = FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), ForestDay * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
+			F->SetFogInscatteringColor(FMath::Lerp(FMath::Lerp(Haze, Storm, WeatherAmount), FMath::Lerp(ForestHaze, Storm, WeatherAmount), FA));
+			const float ForestDensity = T.Num(TEXT("sky.forestFogDensity"), 0.02f) + CN * T.Num(TEXT("sky.forestCanopyFog"), 0.04f);
+			F->SetFogDensity(FMath::Lerp(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount), FMath::Max(ForestDensity, WeatherFogDensity * WeatherAmount), FA));
+		}
+	}
+	// Under the canopy the open sky's light is mostly leaves away: the sky light dims with the cover (the sun's own light
+	// is the trees' shadows' job). Only touched when the value moves, so the rest of the world never pays for it.
+	if (USkyLightComponent* SkyL = SkyLight.Get(); SkyL && (FA > 0.f || ForestSkySet >= 0.f))
+	{
+		const float Want = SkyIntensity * FMath::Lerp(T.Num(TEXT("sky.nightSkyLight"), 3.f), 1.f, Daylight) * (1.f - CN * T.Num(TEXT("sky.forestCanopyDim"), 0.6f))
+			* (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastDim"), 0.7f));
+		if (FMath::Abs(Want - SkyL->Intensity) > 0.005f * FMath::Max(SkyIntensity, 0.01f))
+		{
+			SkyL->SetIntensity(Want);
+			ForestSkySet = FA > 0.f ? Want : -1.f;
+		}
 	}
 
 	// Valley mist: local fog volumes sitting in the island's hollows (Data/valley_fog.json), thickest around dawn, a
@@ -503,9 +561,11 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	}
 
 	// Light shafts: screen-space god rays around a low sun (they're what dawn and dusk look like through trees).
+	// Under a clear sky in the forest's old growth the same rays stand all day, green-gold (cooks/biome-forest.md 2.9).
 	if (UDirectionalLightComponent* S = Sun.Get())
 	{
-		const bool bShafts = Low > 0.02f;
+		const float Green = ForestClear > 0.02f ? ForestClear : 0.f;
+		const bool bShafts = Low > 0.02f || Green > 0.f;
 		if (bShafts != bShaftsOn)
 		{
 			bShaftsOn = bShafts;
@@ -513,11 +573,57 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			S->SetEnableLightShaftOcclusion(bShafts);
 			S->SetBloomThreshold(T.Num(TEXT("sky.shaftThreshold"), 2.f));
 			S->SetOcclusionMaskDarkness(T.Num(TEXT("sky.shaftDarkness"), 0.6f));
-			S->SetBloomTint(SRGB(TEXT("sky.shaftTint"), FColor(255, 210, 160)).ToFColor(true));
 		}
 		if (bShafts)
 		{
-			S->SetBloomScale(Low * T.Num(TEXT("sky.shaftBloom"), 0.4f));
+			S->SetBloomScale(FMath::Max(Low * T.Num(TEXT("sky.shaftBloom"), 0.4f), Green * T.Num(TEXT("sky.forestShaftBloom"), 0.5f)));
+			const FLinearColor Tint = FMath::Lerp(SRGB(TEXT("sky.shaftTint"), FColor(255, 210, 160)), SRGB(TEXT("sky.forestShaftTint"), FColor(200, 236, 150)), Green);
+			S->SetBloomTint(Tint.ToFColor(true));
+		}
+
+		// The shafts themselves: volumetric fog scattering the sun, so every gap in the canopy throws a beam through the
+		// haze (the trees' shadows cut it). Volumetric fog is costly, so it's on only while the shafts are (unless the map
+		// keeps it on anyway: sky.volumetricFog).
+		const bool bVolumetric = Green > 0.05f && T.Num(TEXT("sky.forestShaftVolumetric"), 1.f) > 0.f;
+		UExponentialHeightFogComponent* F = Fog.Get();
+		if (F && bVolumetric != bForestVolumetric)
+		{
+			bForestVolumetric = bVolumetric;
+			F->SetVolumetricFog(bVolumetric || T.Num(TEXT("sky.volumetricFog"), 0.f) > 0.f);
+			if (!bVolumetric) S->SetVolumetricScatteringIntensity(SunScatterBase);
+		}
+		if (F && bVolumetric)
+		{
+			F->SetVolumetricFogScatteringDistribution(T.Num(TEXT("sky.forestShaftForward"), 0.75f));
+			F->SetVolumetricFogAlbedo(SRGB(TEXT("sky.forestShaftAlbedo"), FColor(214, 240, 170)).ToFColor(true));
+			F->SetVolumetricFogExtinctionScale(T.Num(TEXT("sky.forestShaftExtinction"), 1.5f));
+			F->SetVolumetricFogDistance(T.Num(TEXT("sky.forestShaftDistance"), 9000.f));
+			S->SetVolumetricScatteringIntensity(SunScatterBase * (1.f + Green * T.Num(TEXT("sky.forestShaftScatter"), 3.f)));
+		}
+
+		// And round the viewer: soft beams slanting down the sun's line and motes drifting in them (Data/fx.json
+		// forest.light_shafts), laid in the world where they spawn so you walk through them. Hysteresis so a cloud
+		// edge doesn't start and stop it.
+		const bool bWantFx = ShaftFx ? Green > 0.35f : Green > 0.5f;
+		if (bWantFx && !ShaftFx)
+		{
+			ShaftFx = WRFx::Attach(GetRootComponent(), TEXT("forest.light_shafts"));
+		}
+		else if (!bWantFx && ShaftFx)
+		{
+			WRFx::Stop(ShaftFx);
+			ShaftFx = nullptr;
+		}
+		if (ShaftFx)
+		{
+			// X down the light's line (from the sun toward the ground), centred a little ahead of the camera.
+			const FVector LightDir = LastSunDir.IsNearlyZero() ? FVector(0.f, 0.f, -1.f) : -LastSunDir;
+			FVector Ahead = FVector::ZeroVector;
+			if (const APlayerController* PC = GetWorld()->GetFirstPlayerController(); PC && PC->PlayerCameraManager)
+			{
+				Ahead = PC->PlayerCameraManager->GetCameraRotation().Vector().GetSafeNormal2D() * T.Num(TEXT("sky.forestShaftAhead"), 800.f);
+			}
+			ShaftFx->SetWorldLocationAndRotation(View + Ahead, LightDir.Rotation());
 		}
 	}
 
@@ -536,6 +642,15 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		Vec(TEXT("sky.stormGain"), FVector(0.97f, 0.98f, 1.03f)), SA);
 	const FVector SwampGain = FMath::Lerp(Gain, Vec(TEXT("swampWorld.sky.gain"), FVector(0.97f, 1.0f, 0.95f)), SW);
 	P.ColorGain = FVector4(SwampGain.X, SwampGain.Y, SwampGain.Z, 1.f);
+	if (FA > 0.f)
+	{
+		// The forest's grade: warm green-gold light, full colour (its meadows are the brightest ground in the world).
+		P.WhiteTemp = FMath::Lerp(P.WhiteTemp, T.Num(TEXT("sky.forestWhiteTemp"), 5800.f), FA);
+		const float FSat = FMath::Lerp(Sat, T.Num(TEXT("sky.forestSaturation"), 1.02f), FA);
+		P.ColorSaturation = FVector4(FSat, FSat, FSat, 1.f);
+		const FVector FGain = FMath::Lerp(SwampGain, Vec(TEXT("sky.forestGain"), FVector(0.98f, 1.02f, 0.94f)), FA);
+		P.ColorGain = FVector4(FGain.X, FGain.Y, FGain.Z, 1.f);
+	}
 	const FVector Lift = Vec(TEXT("sky.shadowLift"), FVector(0.004f, 0.005f, 0.008f)) * FMath::Lerp(T.Num(TEXT("sky.nightShadowLift"), 2.f), 1.f, Daylight);
 	P.ColorOffsetShadows = FVector4(Lift.X, Lift.Y, Lift.Z, 0.f);
 	P.VignetteIntensity = T.Num(TEXT("sky.vignette"), 0.3f);

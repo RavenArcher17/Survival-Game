@@ -207,6 +207,10 @@ private:
 	float SampleCoast();
 	float CaveFactor() const;
 	float LavaFactor() const;
+	/** The Ancient forest's listener state (UpdateAmbient): its air, sub-zone beds, the Great Falls, the Hollow Root. */
+	void UpdateForest(float DeltaTime);
+	/** The phase of the engaged Sylvaroth near the listener (its music turns with it); 1 when there is none. */
+	int32 ForestBossPhaseNow() const;
 	EMusic WantedMusic();
 	void StartMusic(EMusic Which);
 	bool StepStream(FStream& S, float DeltaTime, float Gain);
@@ -267,6 +271,20 @@ private:
 	double NextCaveScan = 0.0;
 	TArray<TWeakObjectPtr<AActor>> Caves;
 	double NextSpot = 0.0;
+	/** The Ancient forest (cooks/biome-forest.md 2.2, 2.16, 3.4): how far into its air (eased), each sub-zone's bed
+	 *  weight ('1'..'5' as the zone letters, eased; [6] = the Hollow Root, where the open-air beds give way), and the Great
+	 *  Falls' roar by distance. */
+	float Forest = 0.f;
+	float ForestZone[7] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	float ForestFalls = 0.f;
+	/** Music layers over whatever plays in the forest (music.pools layer.bloom / layer.wild_hunt). */
+	TArray<FStream> BloomLayer;
+	TArray<FStream> WildHuntLayer;
+	/** Sylvaroth's phase its music was picked for (boss.sylvaroth.p<n>), and when a seen phase change is acted on (a short
+	 *  wait, so a second phase-music switch elsewhere never restarts the same piece twice). */
+	int32 ForestMusicPhase = 1;
+	double ForestPhaseSwitchAt = 0.0;
+	double NextForestPhaseCheck = 0.0;
 
 	// Music
 	EMusic Mode = EMusic::None;

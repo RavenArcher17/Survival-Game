@@ -25,6 +25,12 @@ namespace WRCombatRules
 		{
 			return false;
 		}
+		// Roots or a bola round the feet (Status.Rooted: the Nature path's Entangled): no roll; turning, attacks, casts
+		// and the guard still work.
+		if (Act == EAct::Dodge && Who->HasTag(WRTags::Status_Rooted))
+		{
+			return false;
+		}
 		// A blocked blow's push-back: the guard stays up, nothing else starts.
 		if (Who->HasTag(WRTags::State_BlockStun) && Act != EAct::Guard)
 		{

@@ -259,6 +259,9 @@ public:
 	// A raider makes for the nearest piece of the claim it came for and bites it, and turns on anyone who comes near as
 	// any hunter does. It never sleeps and never goes after prey; told to leave, it walks away from the base.
 	bool bRaider = false;
+	/** Server: it lies in a den through day and night (the Hollow Root's Mossmaul, WRForestHollow.cpp): asleep whatever
+	 *  its activity says, until something hurts it or it finds a target (then it's awake as any sleeper woken). */
+	bool bHibernating = false;
 	/** A tame sent at a building ("Break that": FWRRaiding::OrderTamesToBreak): it bites it, then the next piece of the
 	 *  same owner within raiding.tames.nextCm, until told otherwise (Come / Stay) or it's attacked. */
 	TWeakObjectPtr<class AWRBuildPiece> SiegePiece;
@@ -604,6 +607,7 @@ class WILDREACH_API AWRCreatureAI : public AAIController
 	friend struct FWRSwampAI;
 	friend struct FWRSwampBoss;
 	friend struct FWRVoidAI;
+	friend struct FWRForestAI;   // the Ancient forest's creatures (WRForestCreatures): drops, grabs, heat balls, bugles
 
 public:
 	AWRCreatureAI();

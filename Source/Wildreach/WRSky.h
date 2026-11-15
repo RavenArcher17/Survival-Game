@@ -90,6 +90,19 @@ private:
 	float Biome = -1.f;
 	/** 0..1: how far into Storm peaks' air the camera is (north of the island). */
 	float StormAir = -1.f;
+	/** 0..1: how far into the Ancient forest's air the camera is (south of the island), and the canopy over it (0 coast ..
+	 *  0.9 Elder Canopy, WRForest::Canopy), both eased; the sky light last set for it (set only when it changes). */
+	float ForestAir = -1.f;
+	float ForestCanopy = 0.f;
+	float ForestSkySet = -1.f;
+	/** The forest's own weather looks at the camera (cooks/biome-forest.md 2.9), eased 0..1: Clear's green light shafts
+	 *  under the old growth and the Elder Canopy by day (volumetric scattering on the sun, shaft bloom, drifting motes
+	 *  and beams round the view: ShaftFx), and Overcast closing the Elder Canopy from dusk to near-dark. */
+	float ForestClear = 0.f;
+	float ForestDark = 0.f;
+	bool bForestVolumetric = false;
+	float SunScatterBase = 1.f;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShaftFx;
 	/** The weather at the camera (WRSurvival): how far in it is (eased; the 60 s approach brings the far fog in first)
 	 *  and its look (weather.json look: fog density and colour, how much it dims the sun). */
 	float WeatherAmount = 0.f;

@@ -27,7 +27,7 @@
     {"id": "sandfather", "name": "the Sandfather", "biome": "desert", "water": "shallow", "time": "night", "rarity": "legendary", "kgMin": 60, "kgMax": 95, "fight": 1.0, "item": "fish_sandfather", "look": {"back": [120, 100, 70], "belly": [210, 195, 160], "fins": [150, 110, 60]}},
     {"id": "brook_trout", "name": "Brook trout", "biome": "forest", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.4, "kgMax": 2.2, "fight": 0.4, "item": "fish_brook_trout"},
     {"id": "silver_salmon", "name": "Silver salmon", "biome": "forest", "water": "shallow", "time": "day", "rarity": "rare", "kgMin": 3.0, "kgMax": 9.0, "fight": 0.7, "item": "fish_silver_salmon"},
-    {"id": "grandfather_sturgeon", "name": "Grandfather Sturgeon", "biome": "forest", "water": "shallow", "time": "day", "rarity": "legendary", "kgMin": 80, "kgMax": 140, "fight": 1.0, "item": "fish_grandfather_sturgeon", "look": {"back": [80, 85, 70], "belly": [200, 195, 180], "fins": [100, 95, 80]}},
+    {"id": "grandfather_sturgeon", "name": "Grandfather Sturgeon", "biome": "forest", "water": "shallow", "time": "day", "rarity": "legendary", "kgMin": 80, "kgMax": 140, "fight": 1.0, "item": "fish_grandfather_sturgeon", "hook": "sturgeon_hook", "look": {"back": [80, 85, 70], "belly": [200, 195, 180], "fins": [100, 95, 80]}},
     {"id": "cloud_minnow", "name": "Cloud minnow", "biome": "sky_islands", "water": "shallow", "time": "any", "rarity": "common", "kgMin": 0.1, "kgMax": 0.5, "fight": 0.3, "item": "fish_cloud_minnow"},
     {"id": "skyfin", "name": "Skyfin", "biome": "sky_islands", "water": "shallow", "time": "day", "rarity": "rare", "kgMin": 0.8, "kgMax": 2.4, "fight": 0.75, "item": "fish_skyfin"},
     {"id": "aethercarp", "name": "the Aethercarp", "biome": "sky_islands", "water": "shallow", "time": "day", "rarity": "legendary", "kgMin": 30, "kgMax": 55, "fight": 1.0, "item": "fish_aethercarp", "look": {"back": [200, 220, 240], "belly": [250, 250, 255], "fins": [150, 190, 240]}},
@@ -61,6 +61,8 @@
     { "item": "gem_onyx", "min": 1, "max": 1, "weight": 3 },
     { "item": "recipe_scrap", "min": 1, "max": 1, "weight": 12 }
   ],
+  "_hooks": "Special hooks in the bag (WRFishing): in their biome's water (any listed) the rare and legendary bites x(1 + rareBoost) more, on top of perks and lures. A fish row's \"hook\" is the one that holds it: without it in the bag its fight strains the line fishing.hooklessStrain x harder. The Sturgeon hook is the forest's (cooks/biome-forest.md F-S2: fishing line +1 tier for the legendary fish). First drafts.",
+  "hooks": {"sturgeon_hook": {"biome": "forest", "water": ["shallow"], "rareBoost": 1.5}},
   "lures": {"volcanic": "ember_lure", "tundra": "rime_lure", "storm_peaks": "gale_lure", "desert": "sun_lure", "forest": "grub_lure", "sky_islands": "cloud_lure", "crystal": "prism_lure", "swamp": "mire_lure", "ocean": "tide_lure", "graveyard": "grave_lure", "fungal": "spore_lure", "wasteland": "void_lure"},
   "xp": {"common": 20, "uncommon": 35, "rare": 60, "legendary": 100, "legendaryFirst": 500}
 }

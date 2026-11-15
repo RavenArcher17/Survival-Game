@@ -36,4 +36,10 @@ namespace WRUIMap
 	WILDREACH_API bool GetWaypoint(const UWorld* World, FVector& OutWhere);
 	WILDREACH_API void SetWaypoint(const UWorld* World, const FVector& Where);
 	WILDREACH_API void ClearWaypoint();
+
+	/**
+	 * A vision on the map (the Hollow Root's Thrumming Root: the four heart-trees, cooks/biome-forest.md 2.5): these
+	 * places flash on this client's journal map for Seconds, pulsing green, and the map centres on them. Client only.
+	 */
+	WILDREACH_API void Flash(const TArray<FVector>& Where, const FString& Name, float Seconds);
 }

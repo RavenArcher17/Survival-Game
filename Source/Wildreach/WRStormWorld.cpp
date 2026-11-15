@@ -63,7 +63,7 @@ namespace WRStormLook
 	const FLinearColor RopeTan = FLinearColor(FColor(156, 132, 96));
 	const FLinearColor Rust = FLinearColor(FColor(154, 74, 36));
 	const FLinearColor BoneWhite = FLinearColor(FColor(216, 210, 196));
-	const FLinearColor Char = FLinearColor(0.012f, 0.011f, 0.01f);
+	const FLinearColor CharBlack = FLinearColor(0.012f, 0.011f, 0.01f);
 
 	FSurf Stone(const FLinearColor& C, float Rough = 0.9f) { return FSurf::Stone(C, Rough); }
 	FSurf Green() { FSurf S = FSurf::Steel(Verdigris * 0.55f, 0.62f); S.Metal = 0.45f; S.Pattern = WRLookPattern::Mottle; return S; }
@@ -183,7 +183,7 @@ namespace WRStormLook
 		TArray<FB> Stack;
 		for (int32 i = 0; i < 5; ++i) Stack.Add({ FVector2D(Centre), 72.f * i + Seed * 13.f, Reach * 0.32f, 0 });
 		int32 Guard = 0;
-		const FSurf Burn = Glow > 0.f ? FSurf::Lit(Violet * 0.5f, Glow) : Stone(Char, 0.98f);
+		const FSurf Burn = Glow > 0.f ? FSurf::Lit(Violet * 0.5f, Glow) : Stone(CharBlack, 0.98f);
 		while (Stack.Num() && ++Guard < 160)
 		{
 			const FB B = Stack.Pop();
@@ -216,7 +216,7 @@ namespace WRStormLook
 		K.Add(Stone(Granite * 0.8f), FVector(40.f, 170.f, 26.f), P(D * 0.5f + 6.f, 0, 236.f), R);                             // lintel
 		ThunderMark(K, P(D * 0.5f + 20.f, 0, 236.f), R.Vector(), 9.f);
 		K.Add(Wood(0.8f), FVector(8.f, 110.f, 220.f), P(D * 0.5f + 2.f, 0, 110.f), FRotator(0.f, Yaw + 25.f, 0.f));           // the door, ajar
-		K.Add(Stone(Char, 0.98f), FVector(34.f, 60.f, 70.f), P(0, W * 0.5f, 190.f), R);                                       // window
+		K.Add(Stone(CharBlack, 0.98f), FVector(34.f, 60.f, 70.f), P(0, W * 0.5f, 190.f), R);                                       // window
 		if (bRoof)
 		{
 			for (int32 i = 0; i < 5; ++i) K.Add(Wood(), FVector(D + 120.f, 16.f, 16.f), P(20.f, -W * 0.5f + W * i / 4.f, H + 8.f), FRotator(-8.f, Yaw, 0.f));
@@ -255,7 +255,7 @@ namespace WRStormLook
 		for (int32 r = 0; r < 4; ++r) K.Add(Stone(Slate * 0.7f), FVector(480.f - r * 110.f, 480.f - r * 110.f, 24.f), P(0, 0, 300.f + r * 22.f), R);
 		K.Add(FSurf::Cloth(FLinearColor(0.07f, 0.09f, 0.05f)), FVector(160.f, 160.f, 30.f), P(0, 0, 395.f), R);
 		// Inside: the niche in the back wall with its thunderstone (an old polished axe-head), a hearth stone.
-		K.Add(Stone(Char), FVector(30.f, 50.f, 40.f), P(-200.f, 0, 120.f), R);
+		K.Add(Stone(CharBlack), FVector(30.f, 50.f, 40.f), P(-200.f, 0, 120.f), R);
 		K.Add(Stone(FLinearColor(0.05f, 0.05f, 0.06f), 0.3f), FVector(18.f, 10.f, 26.f), P(-198.f, 0, 116.f), FRotator(0.f, Yaw, 20.f));
 		K.Add(Stone(Slate * 0.6f), FVector(120.f, 120.f, 10.f), P(-40.f, 0, 4.f), R);
 		Block(Owner, P(0, 0, 170.f) - Owner->GetActorLocation() + Owner->GetActorLocation(), FVector(10.f), R);   // keeps the actor's bounds sane
@@ -671,7 +671,7 @@ void AWRStormScenery::Build()
 	const int32 Seed = int32(GetTypeHash(GetActorLocation().ToString()) % 997u);
 	UMaterialInstanceDynamic* SlateRock = bServer ? nullptr : RockMat(this, Slate * 1.6f);
 	UMaterialInstanceDynamic* GraniteRock = bServer ? nullptr : RockMat(this, Granite * 1.2f);
-	UMaterialInstanceDynamic* CharRock = bServer ? nullptr : RockMat(this, Char * 6.f);
+	UMaterialInstanceDynamic* CharRock = bServer ? nullptr : RockMat(this, CharBlack * 6.f);
 	const FName Kd = Kind;
 
 	if (Kd == TEXT("bell_rod"))
@@ -751,7 +751,7 @@ void AWRStormScenery::Build()
 		K.Add(FSurf::Cloth(FLinearColor(0.16f, 0.1f, 0.06f)), FVector(260.f, 320.f, 4.f), L + FVector(-75.f, 0, 112.f), FRotator(56.f, 0.f, 0.f));
 		K.Add(FSurf::Cloth(FLinearColor(0.12f, 0.12f, 0.15f)), FVector(70.f, 190.f, 12.f), L + FVector(-60.f, 0, 6.f));
 		for (int32 i = 0; i < 9; ++i) K.Add(Stone(Slate), FVector(24.f, 18.f, 14.f), L + FVector(260.f, 0, 6.f) + FRotator(0.f, 40.f * i, 0.f).Vector() * 55.f, FRotator(0.f, 40.f * i, 0.f));
-		K.Add(Stone(Char), FVector(60.f, 60.f, 5.f), L + FVector(260.f, 0, 3.f));
+		K.Add(Stone(CharBlack), FVector(60.f, 60.f, 5.f), L + FVector(260.f, 0, 3.f));
 		for (int32 i = 0; i < 3; ++i) K.Disc(Rope(), L + FVector(40.f, -120.f + i * 70.f, 14.f), FVector::UpVector, 60.f, 22.f);
 		if (!bServer) NightLights.Add(Light(this, L + FVector(260.f, 0, 60.f), FLinearColor(1.f, 0.55f, 0.25f), 3500.f, 900.f));
 	}
@@ -904,7 +904,7 @@ void AWRStormScenery::Build()
 		// L10: the ruined storm mill: stone tower, sails torn, its copper rod still standing and melted at the tip.
 		const float Z = G(0, 0);
 		for (int32 c = 0; c < 10; ++c) K.Hex(Stone(Slate * (0.9f + 0.05f * (c % 3))), 0, 0, Z - 40.f + c * 130.f, Z + 90.f + c * 130.f, 430.f - c * 9.f, c * 7.f);
-		K.Add(Stone(Char), FVector(30.f, 140.f, 220.f), FVector(420.f, 0, Z + 110.f));
+		K.Add(Stone(CharBlack), FVector(30.f, 140.f, 220.f), FVector(420.f, 0, Z + 110.f));
 		K.Add(Wood(0.8f), FVector(14.f, 120.f, 200.f), FVector(430.f, 30.f, Z + 100.f), FRotator(0.f, 30.f, 0.f));
 		K.Add(Wood(0.6f), FVector(700.f, 700.f, 220.f), FVector(0, 0, Z + 1360.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
 		const FVector Hub(400.f, 0, Z + 1250.f);
@@ -971,7 +971,7 @@ void AWRStormScenery::Build()
 			// A sea-chest of burnt bell clappers outside the door.
 			const FVector C = At(380.f, 120.f, 30.f);
 			K.Add(Wood(0.7f), FVector(110.f, 60.f, 60.f), C);
-			for (int32 i = 0; i < 4; ++i) K.Rod(Stone(Char), C + FVector(-40.f + 25.f * i, 0, 30.f), C + FVector(-40.f + 25.f * i, 30.f, 80.f), 10.f);
+			for (int32 i = 0; i < 4; ++i) K.Rod(Stone(CharBlack), C + FVector(-40.f + 25.f * i, 0, 30.f), C + FVector(-40.f + 25.f * i, 30.f, 80.f), 10.f);
 		}
 		if (!bServer) NightLights.Add(Light(this, FVector(-150.f, 0, G(0, 0) + 140.f), FLinearColor(1.f, 0.6f, 0.3f), 1200.f, 700.f));
 	}
@@ -1061,7 +1061,7 @@ void AWRStormScenery::Build()
 		}
 		const FVector Oven = Base + FVector(0, 420.f, 0);
 		for (int32 r = 0; r < 5; ++r) K.Hex(Stone(Slate * 0.9f), Oven.X, Oven.Y, Oven.Z + r * 35.f, Oven.Z + (r + 1) * 35.f, 140.f - r * 22.f, r * 20.f);
-		K.Add(Stone(Char), FVector(40.f, 60.f, 50.f), Oven + FVector(120.f, 0, 40.f));
+		K.Add(Stone(CharBlack), FVector(40.f, 60.f, 50.f), Oven + FVector(120.f, 0, 40.f));
 		const FVector Drum = Base + FVector(260.f, -420.f, 0);
 		for (const float Y : { -70.f, 70.f }) K.Add(Wood(0.8f), FVector(30.f, 20.f, 140.f), Drum + FVector(0, Y, 70.f));
 		K.Disc(Wood(0.9f), Drum + FVector(0, 0, 120.f), FVector(0, 1, 0), 70.f, 130.f);
@@ -1127,7 +1127,7 @@ void AWRStormScenery::Build()
 	{
 		// A 30 m leech-drake skeleton burnt black in the gut, a Lichtenberg scorch fanning from it, rods driven through
 		// its ribs into the stone.
-		const FSurf Burnt = Stone(Char * 1.6f, 0.85f);
+		const FSurf Burnt = Stone(CharBlack * 1.6f, 0.85f);
 		FVector Prev = At(-1500.f, 0, 40.f);
 		for (int32 v = 0; v < 30; ++v)
 		{
@@ -1240,7 +1240,7 @@ void AWRStormScenery::Build()
 		{
 			const FVector P = At(-400.f + 400.f * i, 250.f);
 			RodLook(K, P, 500.f, 8.f);
-			for (int32 s = 0; s < 3; ++s) K.Add(Stone(Char * 2.f), FVector(60.f - 12.f * s, 55.f - 10.f * s, 36.f), P + FVector(150.f, 0, 18.f + 36.f * s), FRotator(0.f, s * 41.f, 0.f));
+			for (int32 s = 0; s < 3; ++s) K.Add(Stone(CharBlack * 2.f), FVector(60.f - 12.f * s, 55.f - 10.f * s, 36.f), P + FVector(150.f, 0, 18.f + 36.f * s), FRotator(0.f, s * 41.f, 0.f));
 			K.Disc(FSurf::Stone(FLinearColor(0.06f, 0.06f, 0.06f), 0.98f), At(-400.f + 400.f * i, -100.f, 1.f), FVector::UpVector, 380.f, 3.f);
 		}
 	}
@@ -1255,7 +1255,7 @@ void AWRStormScenery::Build()
 		K.Add(Stone(Granite * 0.62f), FVector(180.f, 640.f, 110.f), P(0, 0, 660.f), Face);
 		ThunderMark(K, P(-92.f, -160.f, 660.f), -Face.Vector(), 26.f);
 		ThunderMark(K, P(-92.f, 160.f, 660.f), -Face.Vector(), 26.f);
-		K.Add(Stone(Char), FVector(40.f, 430.f, 600.f), P(60.f, 0, 300.f), Face);
+		K.Add(Stone(CharBlack), FVector(40.f, 430.f, 600.f), P(60.f, 0, 300.f), Face);
 		K.Add(BronzeS(), FVector(14.f, 210.f, 580.f), P(-40.f, -110.f, 292.f), FRotator(0.f, Face.Yaw - 50.f, 0.f));
 		K.Add(BronzeS(), FVector(14.f, 210.f, 580.f), P(-10.f, 105.f, 292.f), Face);
 		Block(this, P(40.f, 0, 340.f), FVector(80.f, 340.f, 360.f), Face);
@@ -1306,7 +1306,7 @@ void AWRStormScenery::Build()
 		// The Rodwardens' hidden smelter: a stone bloomery with its bellows pit, a slag heap gone green, moulds for rods.
 		const FVector B = At(0, 0);
 		for (int32 r = 0; r < 6; ++r) K.Hex(Stone(Slate * 0.8f), B.X, B.Y, B.Z + r * 40.f, B.Z + (r + 1) * 40.f, 110.f - r * 10.f, r * 15.f);
-		K.Add(Stone(Char), FVector(40.f, 50.f, 60.f), B + FVector(110.f, 0, 50.f));
+		K.Add(Stone(CharBlack), FVector(40.f, 50.f, 60.f), B + FVector(110.f, 0, 50.f));
 		for (int32 i = 0; i < 9; ++i) K.Add(FSurf::Stone(Verdigris * 0.35f, 0.7f), FVector(50.f, 40.f, 26.f), B + FVector(-200.f + 30.f * i, 150.f + 20.f * (i % 3), 13.f + 12.f * (i % 2)), FRotator(0.f, i * 37.f, 10.f));
 		for (int32 m = 0; m < 3; ++m) K.Add(Stone(Granite * 0.5f), FVector(220.f, 30.f, 16.f), B + FVector(0, -200.f - 40.f * m, 8.f));
 		K.Add(Wood(0.6f), FVector(90.f, 70.f, 30.f), B + FVector(170.f, -90.f, 15.f));
@@ -1395,10 +1395,10 @@ void AWRStormScenery::Build()
 		const FVector B = At(0, 0);
 		for (const float S : { -1.f, 1.f })
 		{
-			K.Rod(Stone(Char * 2.f, 0.9f), B + FVector(0, S * 14.f, -20.f), B + FVector(S * 40.f, S * 60.f, 520.f + 120.f * (S > 0)), 26.f);
+			K.Rod(Stone(CharBlack * 2.f, 0.9f), B + FVector(0, S * 14.f, -20.f), B + FVector(S * 40.f, S * 60.f, 520.f + 120.f * (S > 0)), 26.f);
 			K.Rod(FSurf::Glaze(FLinearColor(0.4f, 0.2f, 0.03f), 0.2f), B + FVector(0, S * 2.f, 120.f), B + FVector(0, S * 2.f, 40.f), 4.f);
 		}
-		for (int32 i = 0; i < 8; ++i) K.Add(Stone(Char), FVector(30.f, 14.f, 12.f), B + FRotator(0.f, i * 45.f, 0.f).Vector() * 80.f + FVector(0, 0, 4.f), FRotator(0.f, i * 45.f, 0.f));
+		for (int32 i = 0; i < 8; ++i) K.Add(Stone(CharBlack), FVector(30.f, 14.f, 12.f), B + FRotator(0.f, i * 45.f, 0.f).Vector() * 80.f + FVector(0, 0, 4.f), FRotator(0.f, i * 45.f, 0.f));
 		Block(this, B + FVector(0, 0, 300.f), FVector(40.f, 40.f, 300.f));
 	}
 	else if (Kd == TEXT("goatherd"))

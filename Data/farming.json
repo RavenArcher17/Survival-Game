@@ -33,7 +33,7 @@
     {"species": "puffram", "products": [{"item": "wool", "every": 1200, "shear": true}], "feed": ["stormrye", "meadow_oats", "black_rye", "ashen_grain"]},
     {"species": "sandhen", "products": [{"item": "egg", "every": 600}], "feed": ["prickly_pear", "seeds"]},
     {"species": "fernsheep", "products": [{"item": "wool", "every": 1200, "shear": true}, {"item": "milk", "every": 600}], "feed": ["meadow_oats", "crop"]},
-    {"species": "dappledoe", "products": [{"item": "shed_antler", "every": 1800, "gentle": false}], "feed": ["meadow_oats", "idunn_apple"]},
+    {"species": "dappledoe", "products": [{"item": "elk_antler", "every": 1800, "gentle": false}], "feed": ["meadow_oats", "idunn_apple"]},
     {"species": "puffwing", "products": [{"item": "glider_feather", "every": 1200, "shear": true}], "feed": ["windflax_seeds"]},
     {"species": "chimecrab", "products": [{"item": "crystal_dust", "every": 900, "gentle": false}], "feed": ["raw_meat", "fish"]},
     {"species": "reedfowl", "products": [{"item": "egg", "every": 600}], "feed": ["bog_rice"]},

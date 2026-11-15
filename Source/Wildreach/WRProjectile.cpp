@@ -3,6 +3,8 @@
 #include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
 #include "WRSwampBosses.h"
+#include "WRForestBosses.h"
+#include "WRForestHazards.h"
 #include "WRRaiding.h"
 #include "WRRaidLook.h"
 #include "WRToolMesh.h"
@@ -214,7 +216,9 @@ void AWRProjectile::OnRep_Model()
 		CodeModel = NewObject<UProceduralMeshComponent>(this, TEXT("ThrownModel"));
 		CodeModel->SetupAttachment(GetRootComponent());
 		CodeModel->RegisterComponent();
-		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel))
+		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
+		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
+			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -295,6 +299,8 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		const bool bFireShot = Hit.Element == WRTags::Element_Fire;
 		AWRCharacterBase* By = const_cast<AWRCharacterBase*>(Caster);
 		if (OtherActor) WRPortals::HitThing(OtherActor, By, Hit.Damage, bFireShot);
+		// The forest's boss arenas: an arrow cuts a Bower rope anchor, splits a brood comb, bites a Root Knot or an amber heart.
+		if (OtherActor && OtherComp) FWRForestBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
 		if (SplashRadius > 0.f || bFireShot)
 		{
 			const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
@@ -302,6 +308,20 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 			{
 				if (*It != OtherActor && FVector::Dist(It->GetActorLocation(), At) < FMath::Max(SplashRadius, 150.f) + 100.f) WRPortals::HitThing(*It, By, Hit.Damage, bFireShot);
 			}
+		}
+	}
+	// The Ancient forest's things: an arrow brings a widowmaker limb down or stirs a wasp nest; fire landing (a fire
+	// bolt, a fire pot) burns a lane through thornbrake and the barred door's bark (WRForestHazards).
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		AWRCharacterBase* By = const_cast<AWRCharacterBase*>(Caster);
+		if (OtherActor && WRForestHazards::IsHazardThing(OtherActor)) WRForestHazards::HitThing(OtherActor, By, Hit.Damage, Hit.Element == WRTags::Element_Fire, At);
+		if (Hit.Element == WRTags::Element_Fire || Kind == TEXT("firepot")) WRForestHazards::FireLanded(GetWorld(), At);
+		// The forest's thrown jars break where they land, ballistic (never homing): blight, smoke.
+		if (WRForestHazards::ThrownLanded(GetWorld(), Kind, At, By))
+		{
+			Destroy();
+			return;
 		}
 	}
 	// The Swamp's thrown things break where they land: salt bursts, a stormglass jar shocks the water (WRSwampSystems).
@@ -368,7 +388,7 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		Hit.Origin = GetActorLocation() - GetVelocity().GetSafeNormal() * 100.f;
 		Hit.bProjectile = true;  // never parried (COMBAT-AND-LESSONS 1.3)
 		UWRCombatLibrary::ApplyHit(Target, Hit);
-		if (Kind == TEXT("bola"))
+		if (Kind == TEXT("bola") && !FWRForestBoss::BolaHold(Target))   // the Hornwarden: a bola holds him like a snare
 		{
 			ApplyBola(Target);
 		}

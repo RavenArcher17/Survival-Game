@@ -51,6 +51,37 @@
     {"paths": ["fire", "void"], "wheel": "neighbours", "at25": {"id": "black_flame", "name": "Black flame", "kind": "passive", "text": "Your burns bite through armour: +10% burn damage on armoured foes", "grants": ["Combo.BlackFlame"]}, "at50": {"id": "void_furnace", "name": "Void furnace", "kind": "passive", "text": "Void you gain also builds Heat; at full Heat void abilities cost half the max HP", "grants": ["Combo.VoidFurnace"]}},
     {"paths": ["lightning", "void"], "at25": {"id": "dark_lightning", "name": "Dark lightning", "kind": "passive", "text": "Your lightning ignores 30% of armour", "grants": ["Combo.DarkLightning"]}, "at50": {"id": "singularity_spark", "name": "Singularity spark", "kind": "passive", "text": "Black hole crackles: a 20-damage bolt to a foe inside every 0.5 s", "grants": ["Combo.SingularitySpark"], "requires": "void.black_hole"}},
     {"paths": ["frost", "void"], "at25": {"id": "frozen_blink", "name": "Frozen blink", "kind": "passive", "text": "Blinking freezes the spot you left: a 2.5 m frost patch for 4 s", "grants": ["Combo.FrozenBlink"], "requires": "void.blink"}, "at50": {"id": "ice_maw", "name": "Ice maw", "kind": "passive", "text": "Consume works on any frozen foe that isn't a boss, at any health", "grants": ["Combo.IceMaw"], "requires": "void.consume"}},
-    {"paths": ["blood", "void"], "at25": {"id": "void_leech", "name": "Void leech", "kind": "passive", "text": "30% of your lifesteal healing wins back max HP first", "grants": ["Combo.VoidLeech"]}, "at50": {"id": "abyssal_hunger", "name": "Abyssal hunger", "kind": "passive", "text": "Consume also heals a quarter of your max HP", "grants": ["Combo.AbyssalHunger"], "requires": "void.consume"}}
+    {"paths": ["blood", "void"], "at25": {"id": "void_leech", "name": "Void leech", "kind": "passive", "text": "30% of your lifesteal healing wins back max HP first", "grants": ["Combo.VoidLeech"]}, "at50": {"id": "abyssal_hunger", "name": "Abyssal hunger", "kind": "passive", "text": "Consume also heals a quarter of your max HP", "grants": ["Combo.AbyssalHunger"], "requires": "void.consume"}},
+    {
+      "paths": ["fire", "nature"],
+      "at25": { "id": "smoulder_roots", "name": "Smoulder roots", "kind": "passive", "text": "Entangled enemies take burn buildup the moment roots wrap them", "grants": ["Combo.SmoulderRoots"],
+        "numbers": { "burn": 40 } },
+      "at50": { "id": "forest_fire", "name": "Forest fire", "kind": "passive", "text": "Your plants explode when they die", "grants": ["Combo.ForestFire"],
+        "numbers": { "radius": 300, "damage": 30, "burn": 50 } },
+      "requiresAbility": null
+    },
+    {
+      "paths": ["frost", "nature"],
+      "at25": { "id": "evergreen", "name": "Evergreen", "kind": "passive", "text": "Snow and ice count as Normal ground for Growth, and your plants don't wither there", "grants": ["Combo.Evergreen"] },
+      "at50": { "id": "frozen_grove", "name": "Frozen grove", "kind": "passive", "text": "Allies in your Sanctuary or under your World tree stand firmer and resist frostbite", "grants": ["Combo.FrozenGrove"],
+        "numbers": { "poise": 15, "frostbiteTaken": 0.5 } },
+      "requiresAbility": null
+    },
+    {
+      "paths": ["lightning", "nature"],
+      "at25": { "id": "quickening", "name": "Quickening", "kind": "passive", "text": "Each shock you cause near your plants makes them fire faster for a while", "grants": ["Combo.Quickening"],
+        "numbers": { "radius": 1000, "fireRate": 0.3, "seconds": 5 } },
+      "at50": { "id": "living_conductor", "name": "Living conductor", "kind": "passive", "text": "Turret thorns may chain lightning to a second enemy", "grants": ["Combo.LivingConductor"],
+        "numbers": { "chance": 0.2, "damage": 10, "shock": 15, "radius": 400 } },
+      "requiresAbility": null
+    },
+    {
+      "paths": ["nature", "blood"],
+      "at25": { "id": "red_sap", "name": "Red sap", "kind": "passive", "text": "Healing others heals you for part of it", "grants": ["Combo.RedSap"],
+        "numbers": { "share": 0.3 } },
+      "at50": { "id": "thorn_feast", "name": "Thorn feast", "kind": "passive", "text": "Each bleed from your Nature hits heals your plants", "grants": ["Combo.ThornFeast"],
+        "numbers": { "heal": 0.2 } },
+      "requiresAbility": null
+    }
   ]
 }

@@ -8,6 +8,7 @@
 #include "WRSound.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
+#include "WRForestTypes.h"
 #include "WRCharacter.h"
 #include "WRCharacterBase.h"
 #include "WRCreature.h"
@@ -102,6 +103,8 @@ void UWRAudioDirector::Duck(float Amount, float Seconds)
 	const double Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0;
 	// In the Swamp the score never drops more than 4 dB under a moment (cooks/biome-swamp.md 2.16: always audible).
 	if (Swamp > 0.5f) Amount = FMath::Min(Amount, Tune(TEXT("music.swampDuckMax"), 0.37f));
+	// The forest's score is always there too: it dips at most 4 dB (cooks/biome-forest.md 2.16).
+	if (Forest > 0.5f) Amount = FMath::Min(Amount, Tune(TEXT("music.forestDuckMax"), 0.37f));
 	DuckTarget = FMath::Min(DuckTarget, 1.f - FMath::Clamp(Amount, 0.f, 1.f));
 	DuckUntil = FMath::Max(DuckUntil, Now + Seconds);
 }
@@ -235,8 +238,8 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 	const float Out = 1.f - Cave;
 	// The island's beds give way to Storm peaks' across the Ash Sound and the neck, and to the Swamp's east of the Crown.
 	const float Isl = FMath::Max(0.f, 1.f - Storm - Swamp);
-	const float Volc = (1.f - Tundra) * Isl;
-	const float TundraW = Tundra * Isl;
+	const float Volc = (1.f - Tundra) * Isl * (1.f - Forest);
+	const float TundraW = Tundra * Isl * (1.f - Forest);
 	const float Night = 1.f - Daylight;
 	static const FName Volcanic(TEXT("volcanic")), TundraL(TEXT("tundra")), CoastL(TEXT("coast")), Day(TEXT("day")), NightL(TEXT("night")),
 		VolcanicDay(TEXT("volcanic.day")), VolcanicNight(TEXT("volcanic.night")), TundraDay(TEXT("tundra.day")), TundraNight(TEXT("tundra.night")),
@@ -244,7 +247,7 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 	if (Layer == Volcanic) return Out * Volc;
 	if (Layer == TundraL) return Out * TundraW;
 	if (Layer == CoastL) return Out * Coast;
-	if (Layer == Day) return Out * Daylight;
+	if (Layer == Day) return Out * Daylight * (1.f - Forest);   // the forest sings its own birds (forest.day)
 	if (Layer == NightL) return Out * Night;
 	if (Layer == VolcanicDay) return Out * Volc * Daylight;
 	if (Layer == VolcanicNight) return Out * Volc * Night;
@@ -291,6 +294,28 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 		if (Layer == BleedL) return OutS * SwampBleed;
 		if (Layer == TideL) return OutS * SwampTide;
 		if (Layer == CovenL) return SwampCoven;
+	}
+	// The Ancient forest's beds (layer forest.<zone> / forest.meadows.day / forest.streams.night / forest.day / forest.night
+	// / forest.falls_near / forest.hollow; cooks/biome-forest.md 2.2, 3.4). Birdsong thins as the canopy closes (full in
+	// F1-F3, further off in F4, sparse in F5); the owls are loudest in the deep wood. Down in the Hollow Root the open air
+	// gives way to its own bed.
+	static const FName ForestDay(TEXT("forest.day")), ForestNight(TEXT("forest.night")), Meadows(TEXT("forest.meadows")),
+		MeadowsDay(TEXT("forest.meadows.day")), StreamsL(TEXT("forest.streams")), StreamsNight(TEXT("forest.streams.night")),
+		Villages(TEXT("forest.villages")), Oldgrowth(TEXT("forest.oldgrowth")), CanopyL(TEXT("forest.canopy")),
+		ForestHollow(TEXT("forest.hollow")), FallsNear(TEXT("forest.falls_near"));
+	{
+		const float OutF = Out * (1.f - ForestZone[6]);
+		if (Layer == ForestDay) return OutF * Daylight * (ForestZone[1] + ForestZone[2] + ForestZone[3] + 0.6f * ForestZone[4] + 0.3f * ForestZone[5]);
+		if (Layer == ForestNight) return OutF * Night * (0.7f * (ForestZone[1] + ForestZone[2] + ForestZone[3]) + ForestZone[4] + ForestZone[5]);
+		if (Layer == Meadows) return OutF * ForestZone[1];
+		if (Layer == MeadowsDay) return OutF * ForestZone[1] * Daylight;   // skylarks and bees over the hay
+		if (Layer == StreamsL) return OutF * ForestZone[2];
+		if (Layer == StreamsNight) return OutF * ForestZone[2] * Night;   // frogs along the Alder after dark
+		if (Layer == Villages) return OutF * ForestZone[3];
+		if (Layer == Oldgrowth) return OutF * ForestZone[4];
+		if (Layer == CanopyL) return OutF * ForestZone[5];
+		if (Layer == FallsNear) return OutF * ForestFalls;
+		if (Layer == ForestHollow) return ForestZone[6];
 	}
 	if (Layer == Always) return 1.f;
 	// Weather beds ("weather.<kind>", WRSurvival): rising over the 60 s warning, full while it blows, muffled in a cave.
@@ -373,6 +398,8 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		}
 		Rodfield = Storm * (1.f - Smooth(Tune(TEXT("ambient.rodfieldNear"), 12000.f), Tune(TEXT("ambient.rodfieldFar"), 25000.f), FVector::Dist2D(Listener, FVector(-115000.f, -315000.f, 0.f))));
 	}
+	// The Ancient forest lies south of the island: its air, its sub-zones, the Great Falls, the Hollow Root.
+	UpdateForest(DeltaTime);
 	if (Now >= NextCaveScan)
 	{
 		NextCaveScan = Now + 5.0;
@@ -592,6 +619,13 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(BossId);
 			if (Def && Def->Role.Contains(TEXT("mini"))) Try.Add(FName(*FString::Printf(TEXT("mini.%s"), *Land.ToString())));
 		}
+		if (Which == EMusic::Boss && BossId == TEXT("sylvaroth"))
+		{
+			// Sylvaroth's three phases each have their piece (boss.sylvaroth.p1-p3, cooks/biome-forest.md 2.16): the phase
+			// it's in now comes first.
+			ForestMusicPhase = ForestBossPhaseNow();
+			Try.Insert(FName(*FString::Printf(TEXT("boss.sylvaroth.p%d"), ForestMusicPhase)), 0);
+		}
 		if (Which == EMusic::Explore)
 		{
 			const TCHAR Z = WRStorm::ZoneAt(World, Listener);
@@ -611,6 +645,24 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 				{
 					const TCHAR SZ = FWRSwampData::Get().ZoneAt(Listener);
 					Try.Add(SZ == TEXT('1') || SZ == TEXT('2') ? FName(TEXT("explore.swamp.a")) : SZ == TEXT('5') ? FName(TEXT("explore.swamp.c")) : FName(TEXT("explore.swamp.b")));
+				}
+			}
+			// The Ancient forest (cooks/biome-forest.md 2.16): the Hollow Root's cue down there, the newcomer village's and
+			// the camps' warm pieces, then explore A (F1 Meadows, F2 Streams), B (F3 Villages, F4 Old-Growth) or C (F5 the
+			// Elder Canopy) by day; night has its own pool (night.forest).
+			if (Land == TEXT("forest"))
+			{
+				if (ForestZone[6] > 0.5f) Try.Add(TEXT("sub.hollow_root"));
+				const FWRForestData& FD = FWRForestData::Get();
+				if (FD.VillageRadius > 0.f && !FD.Village.IsZero() && FVector::Dist2D(FD.Village, Listener) < FD.VillageRadius) Try.Add(TEXT("village.forest"));
+				for (const FWRForestData::FSite& S : FD.Sites)
+				{
+					if (S.Kind == TEXT("camp") && FVector::Dist2D(S.At, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(TEXT("camp.forest")); break; }
+				}
+				if (PoolName == TEXT("explore"))
+				{
+					const TCHAR FZ = WRForest::ZoneAt(World, Listener);
+					Try.Add(FZ == TEXT('3') || FZ == TEXT('4') ? FName(TEXT("explore.forest.b")) : FZ == TEXT('5') || FZ == TEXT('s') ? FName(TEXT("explore.forest.c")) : FName(TEXT("explore.forest.a")));
 				}
 			}
 		}
@@ -673,6 +725,7 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 			NextExploreAt = Now + (bAfterFight ? FMath::FRandRange(Tune(TEXT("music.afterCombatGap.min"), 40.f), Tune(TEXT("music.afterCombatGap.max"), 90.f))
 				: FMath::FRandRange(Tune(TEXT("music.firstGap.min"), 25.f), Tune(TEXT("music.firstGap.max"), 50.f)));
 			if (Swamp > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.swampGap.min"), 3.f), Tune(TEXT("music.swampGap.max"), 10.f));
+			if (Forest > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.forestGap.min"), 3.f), Tune(TEXT("music.forestGap.max"), 10.f));
 			if (!ForcedMode.IsNone()) NextExploreAt = Now;
 		}
 		else
@@ -711,6 +764,8 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 				NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.gap.min"), 120.f), Tune(TEXT("music.gap.max"), 300.f));
 				// The Swamp's score is always there (cooks/biome-swamp.md 2.16): only a breath between pieces.
 				if (Swamp > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.swampGap.min"), 3.f), Tune(TEXT("music.swampGap.max"), 10.f));
+				// The forest's too (cooks/biome-forest.md 2.16: no planned silences).
+				if (Forest > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.forestGap.min"), 3.f), Tune(TEXT("music.forestGap.max"), 10.f));
 			}
 		}
 	}
@@ -730,6 +785,54 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 	{
 		const AWRSwampState* State = Swamp > 0.f ? AWRSwampState::Get(World) : nullptr;
 		StepMusicLayer(RedTideLayer, State && State->RedTide != EWRRedTide::None && Swamp > 0.5f, TEXT("layer.red_tide"), DeltaTime, Gain);
+	}
+	// The Ancient forest's layers over whatever plays (cooks/biome-forest.md 2.16): the Bloom's celesta, flute and fuller
+	// birdsong; while the Wild Hunt rides (the Bloom's night) its galloping drums and horn take the Bloom's place.
+	{
+		const bool bHere = Forest > 0.5f;
+		const bool bHunt = bHere && WRForest::WildHuntActive(World);
+		StepMusicLayer(WildHuntLayer, bHunt, TEXT("layer.wild_hunt"), DeltaTime, Gain);
+		StepMusicLayer(BloomLayer, bHere && !bHunt && WRForest::Bloom(World), TEXT("layer.bloom"), DeltaTime, Gain);
+	}
+	// Sylvaroth turned a phase and its music hasn't followed yet (boss.sylvaroth.p<n>): after a short wait (another
+	// phase-music switch may already be on it) the old phase's piece fades as the new one comes in.
+	if (Mode == EMusic::Boss && BossId == TEXT("sylvaroth"))
+	{
+		if (Now >= NextForestPhaseCheck)
+		{
+			NextForestPhaseCheck = Now + 0.5;
+			const int32 P = ForestBossPhaseNow();
+			if (P == ForestMusicPhase)
+			{
+				ForestPhaseSwitchAt = 0.0;
+			}
+			else if (ForestPhaseSwitchAt <= 0.0)
+			{
+				ForestPhaseSwitchAt = Now + 0.6;
+			}
+			else if (Now >= ForestPhaseSwitchAt)
+			{
+				ForestPhaseSwitchAt = 0.0;
+				const TArray<FWRMusicTrack>* PhasePool = UWRAudioSubsystem::Get(World)->GetMusicPool(FName(*FString::Printf(TEXT("boss.sylvaroth.p%d"), P)));
+				if (PhasePool && PhasePool->Num() > 0)
+				{
+					for (FStream& S : Music)
+					{
+						S.Target = 0.f;
+						S.FadeSeconds = Tune(TEXT("music.combatFadeOut"), 3.f);
+					}
+					StartMusic(EMusic::Boss);   // picks the new phase's piece and remembers the phase
+				}
+				else
+				{
+					ForestMusicPhase = P;
+				}
+			}
+		}
+	}
+	else
+	{
+		ForestPhaseSwitchAt = 0.0;
 	}
 	for (int32 i = Music.Num() - 1; i >= 0; --i)
 	{
@@ -765,6 +868,78 @@ void UWRAudioDirector::StepMusicLayer(TArray<FStream>& Layer, bool bWant, FName 
 		if (!bWant) { Layer[i].Target = 0.f; Layer[i].FadeSeconds = Tune(TEXT("music.fadeOut"), 4.f) * 2.f; }
 		if (StepStream(Layer[i], DeltaTime, Gain)) Layer.RemoveAt(i);
 	}
+}
+
+// ---------------------------------------------------------------- the Ancient forest
+
+void UWRAudioDirector::UpdateForest(float DeltaTime)
+{
+	// Where the listener is in the forest (cooks/biome-forest.md 2.2): its air eased over a few seconds as you cross the
+	// neck or the Pine Sound, each sub-zone's bed eased over 3 s (they blend 60-120 m in the land itself), the Great
+	// Falls' roar rising within 250 m of the scarp, and the Hollow Root's rooms under the old growth.
+	UWorld* World = GetWorld();
+	const bool bIn = WRForest::Contains(Listener);
+	Forest = FMath::FInterpConstantTo(Forest, bIn ? 1.f : 0.f, DeltaTime, 1.f / FMath::Max(Tune(TEXT("ambient.forestFade"), 4.f), 0.1f));
+	if (!bIn && Forest <= 0.f && ForestZone[6] <= 0.f)
+	{
+		for (float& W : ForestZone) W = 0.f;
+		ForestFalls = 0.f;
+		return;
+	}
+	const FWRForestData& D = FWRForestData::Get();
+	TCHAR Z = bIn ? WRForest::ZoneAt(World, Listener) : TCHAR(0);
+	if (Z == TEXT('s')) Z = TEXT('5');   // the Spine's face rises straight out of the Elder Canopy
+	if (Z == TEXT('~')) Z = TEXT('1');   // wading off the meadow coast or the Pine Sound
+	// The Hollow Root: its grid cells, or inside one of its rooms (with a margin, so its bed is up as you come down a way in).
+	bool bHollow = Z == TEXT('h');
+	if (bIn && !bHollow)
+	{
+		const float Margin = Tune(TEXT("ambient.forestHollowMargin"), 600.f);
+		for (const FWRForestData::FRoom& R : D.Hollow)
+		{
+			const FVector L = FRotator(0.f, R.Yaw, 0.f).UnrotateVector(Listener - R.At);
+			if (FMath::Abs(L.X) <= R.Half.X + Margin && FMath::Abs(L.Y) <= R.Half.Y + Margin && FMath::Abs(L.Z - R.Half.Z) <= R.Half.Z + Margin) { bHollow = true; break; }
+		}
+	}
+	for (int32 i = 1; i <= 5; ++i)
+	{
+		ForestZone[i] = FMath::FInterpConstantTo(ForestZone[i], (!bHollow && Z == TCHAR('0' + i)) ? Forest : 0.f, DeltaTime, 1.f / 3.f);
+	}
+	ForestZone[6] = FMath::FInterpConstantTo(ForestZone[6], bIn && bHollow ? 1.f : 0.f, DeltaTime, 1.f / 1.5f);
+	// The Great Falls: the Alder drops 45 m off the basalt scarp at (+300, +2,650) m. Distance to the falling water (lip to
+	// plunge pool) of the land's fall nearest that point; full roar within 60 m, gone at 250 m.
+	const FVector GreatAt(Tune(TEXT("ambient.forestFallsX"), 30000.f), Tune(TEXT("ambient.forestFallsY"), 265000.f), 0.f);
+	float Dist = FVector::Dist2D(Listener, GreatAt);
+	const FWRForestData::FFall* Great = nullptr;
+	for (const FWRForestData::FFall& F : D.Falls)
+	{
+		if (!Great || FVector::Dist2D(F.Top, GreatAt) < FVector::Dist2D(Great->Top, GreatAt)) Great = &F;
+	}
+	if (Great && FVector::Dist2D(Great->Top, GreatAt) < 20000.f)
+	{
+		Dist = FVector::Dist(Listener, FMath::ClosestPointOnSegment(Listener, Great->Top, Great->Bottom));
+	}
+	ForestFalls = Forest * (1.f - Smooth(Tune(TEXT("ambient.forestFallsNear"), 6000.f), Tune(TEXT("ambient.forestFallsFar"), 25000.f), Dist));
+}
+
+int32 UWRAudioDirector::ForestBossPhaseNow() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return 1;
+	}
+	const float Range = Tune(TEXT("music.bossRange"), 4500.f);
+	int32 Phase = 1;
+	float Best = FMath::Square(Range);
+	for (TActorIterator<AWRBoss> It(World); It; ++It)
+	{
+		const AWRBoss* B = *It;
+		if (B->CreatureId != TEXT("sylvaroth") || !B->bEngaged || !B->IsAlive()) continue;
+		const float D2 = FVector::DistSquared(B->GetActorLocation(), Listener);
+		if (D2 < Best) { Best = D2; Phase = FMath::Clamp(B->Phase, 1, 3); }
+	}
+	return Phase;
 }
 
 // ---------------------------------------------------------------- bodies
@@ -881,6 +1056,8 @@ FString UWRAudioDirector::Describe() const
 	if (DuckLevel < 0.99f) Out += FString::Printf(TEXT(" duck %.2f"), DuckLevel);
 	Out += FString::Printf(TEXT(" | at %.0f,%.0f,%.0f tundra %.2f day %.2f coast %.2f cave %.2f lava %.2f high %.2f | beds"), Listener.X, Listener.Y, Listener.Z,
 		Tundra, Daylight, Coast, Cave, Lava, High);
+	if (Forest > 0.f || ForestZone[6] > 0.f) Out += FString::Printf(TEXT(" forest %.2f zones %.2f/%.2f/%.2f/%.2f/%.2f hollow %.2f falls %.2f"), Forest,
+		ForestZone[1], ForestZone[2], ForestZone[3], ForestZone[4], ForestZone[5], ForestZone[6], ForestFalls);
 	if (Swamp > 0.f || SwampCoven > 0.f) Out += FString::Printf(TEXT(" swamp %.2f falls %.2f coven %.2f bleed %.2f tide %.2f"), Swamp, SwampFalls, SwampCoven, SwampBleed, SwampTide);
 	for (const TPair<FName, FStream>& B : Beds)
 	{

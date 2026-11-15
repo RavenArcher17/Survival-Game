@@ -9,6 +9,8 @@
 #include "WRSocial.h"
 #include "WRWorldDressing.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
+#include "WRForestHazards.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -57,6 +59,7 @@
 #include "GroomBindingAsset.h"
 #include "PoseSearch/PoseSearchDatabase.h"
 #include "Animation/AnimInstance.h"
+#include "ProceduralMeshComponent.h"
 
 AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -391,6 +394,10 @@ void AWRCharacter::ApplyViewMode()
 	ShieldMesh->SetOwnerNoSee(bFirstPerson);  // it would fill the first-person view; the sword stays
 	HaloCrest->SetOwnerNoSee(bFirstPerson);
 	Canines->SetOwnerNoSee(bFirstPerson);
+	if (HeadPiece)
+	{
+		HeadPiece->SetOwnerNoSee(bFirstPerson);  // a crown or circlet (WRHeroLook.cpp), like the Head slot
+	}
 	bEyeInit = false;
 
 	// First person: body yaw follows the camera. Third person: body turns toward movement.
@@ -935,6 +942,11 @@ void AWRCharacter::TickBodyAnim()
 		{
 			In.UpperLoop = BodyClip(TEXT("block"));  // shield up, legs walking, strafing or backing off
 		}
+		else if (WRForestHazards::Shielding(this))
+		{
+			// Pushing through thornbrake: forearms up in front of the face, legs still wading on (cooks/biome-forest.md 2.8).
+			In.UpperLoop = BodyClip(TEXT("block"));
+		}
 	}
 	In.bTurnInPlace = !bDead && !bBusy && In.bGrounded && !In.FullLoop;
 
@@ -1185,7 +1197,7 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 {
 	// In a swamp creature's jaws or mouth (the Murkjaw's death roll, the Bogstalker's gulp): every press fights the hold
 	// (-0.15 s each, WRSwampCreatures); nothing else can start in there.
-	if (WRSwampGrip::IsHeld(this))
+	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this))
 	{
 		ServerMashFrozen();
 		return;
@@ -1383,6 +1395,11 @@ void AWRCharacter::NoteCritPromptSeen(const AWRCharacterBase* Target)
 bool AWRCharacter::CanJumpInternal_Implementation() const
 {
 	if (!Super::CanJumpInternal_Implementation())
+	{
+		return false;
+	}
+	// Held by roots (Status.Rooted: Entangled, a bola): no jump.
+	if (HasTag(WRTags::Status_Rooted))
 	{
 		return false;
 	}
@@ -1698,7 +1715,7 @@ void AWRCharacter::InputJump()
 {
 	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
 	// Held in a swamp creature's jaws or mouth: the jump button mashes too.
-	if (WRSwampGrip::IsHeld(this))
+	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this))
 	{
 		ServerMashFrozen();
 		return;

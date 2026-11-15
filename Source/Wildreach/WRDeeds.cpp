@@ -15,6 +15,7 @@
 #include "WRGameplayTags.h"
 #include "WRGameState.h"
 #include "WRInventory.h"
+#include "WRNaturePath.h"   // Element.Nature (the Nature path's element)
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
 #include "WRPlayerController.h"
@@ -42,6 +43,7 @@ namespace WRDeedsData
 		if (Tag == WRTags::Element_Fire) return TEXT("fire");
 		if (Tag == WRTags::Element_Frost) return TEXT("frost");
 		if (Tag == WRTags::Element_Lightning) return TEXT("lightning");
+		if (Tag == WRNature::Element_Nature) return TEXT("nature");
 		return NAME_None;
 	}
 	AWRPlayerController* ControllerOf(const AWRPlayerState* PS) { return PS ? Cast<AWRPlayerController>(PS->GetOwner()) : nullptr; }

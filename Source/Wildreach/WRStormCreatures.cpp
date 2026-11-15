@@ -2,6 +2,7 @@
 #include "WRStormCreatures.h"
 #include "WRStormBosses.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
 #include "WRCreature.h"
 #include "WRBoss.h"
 #include "WRAttackRows.h"
@@ -1938,6 +1939,12 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWRSwampBody::Get(this))
 	{
 		FWRSwampAI::Damaged(this, Hit, Damage);
+	}
+	// An Ancient forest creature: a held survivor struck free, a lynx knocked off its trunk, a log woken, the bugle owed,
+	// a bee swatted off, the herd defending (WRForestCreatures).
+	if (HasAuthority() && UWRForestBody::Get(this))
+	{
+		FWRForestAI::Damaged(this, Hit, Damage);
 	}
 }
 

@@ -389,11 +389,13 @@ const out = {
 };
 console.log("hazard cells", "lava", hazards.lava.length / 3, "ice", hazards.ice.length / 3, "| lava grid points", lavaRows.reduce((n, r) => n + r[2], 0), "visible", lavaVisible.size);
 // Storm peaks' dressing lives in the same file (one dressing file per map): keep what Tools/terrain/storm_peaks.mjs
-// wrote (its instance kinds and its POIs) when the island's is regenerated.
+// wrote (its instance kinds and its POIs) when the island's is regenerated. The Ancient forest's too (Tools/terrain/forest.mjs:
+// every forest_ kind, and the POIs marked forest) and the Swamp's (Tools/terrain/swamp.mjs: every swamp_ kind, its POIs).
 try {
 	const old = JSON.parse(fs.readFileSync(path.join(root, "Data/island_dressing.json"), "utf8"));
-	for (const k of ["storm_pine", "granite_rock", "slate_scree", "storm_shrub"]) if (old.instances && old.instances[k]) { out.instances[k] = old.instances[k]; if (old.counts) out.counts[k] = old.counts[k]; }
-	out.pois = [...out.pois, ...(old.pois || []).filter(p => p.storm)];
+	const kept = ["storm_pine", "granite_rock", "slate_scree", "storm_shrub", ...Object.keys(old.instances || {}).filter(k => k.startsWith("forest_") || k.startsWith("swamp_"))];
+	for (const k of kept) if (old.instances && old.instances[k]) { out.instances[k] = old.instances[k]; if (old.counts) out.counts[k] = old.counts[k]; }
+	out.pois = [...out.pois, ...(old.pois || []).filter(p => p.storm || p.forest || p.swamp || p.biome === "swamp")];
 } catch {}
 fs.writeFileSync(path.join(root, "Data/island_dressing.json"), JSON.stringify(out));
 console.log("caves", caves.length, JSON.stringify(caves.map(c => [c.biome, Math.round(c.mx), Math.round(c.my)])));

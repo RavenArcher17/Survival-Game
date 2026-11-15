@@ -427,6 +427,236 @@ Ogg Vorbis by the build script.
 | Hornbills - Red-billed Hornbills; Duet Calling | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/874260/ | amb/swamp_mangroves, creature/mirestrider_death (x2), creature/mirestrider_idle (x3) |
 | Hippopotamus Sounds | JobInThe444 (freesound) | CC0 1.0 | https://freesound.org/people/JobInThe444/sounds/876412/ | creature/mudhulk_aggro (x3) |
 
+## Audio: the Ancient forest (2026-11-14)
+
+The Ancient forest's music, creature voices, hazard, place and boss sounds, the Nature path's sounds and ambient beds
+(`Tools/audio/build_forest_audio.py`, sources in `Tools/audio/sources_forest.py`). All real recordings and real
+compositions, no AI generation and no synthesis. The music is **Kevin MacLeod (incompetech.com), CC-BY 4.0**: every piece
+must stay credited wherever the game is distributed, as "<Title>" Kevin MacLeod (incompetech.com), Licensed under
+Creative Commons: By Attribution 4.0, http://creativecommons.org/licenses/by/4.0/. The recordings are from Freesound:
+CC0 except the 8 rows marked CC-BY (aguasonic's elephant_seals_point_reyes_05jan2008_05; Hyperionn's Elk 7; minkowski's fs-rippingbark; EminYILDIRIM's Lynx Cat; naturenotesuk's Red Deer Stag Bellowing; Sabacky's Ripping and Tearing Roots; mokasza's elephant growls; DeqstersLab's Birch bark tearing, patting, rubbing (raw)), which must stay credited too. Calls were cut, layered
+(three or more real animal calls plus a material recording per creature), re-pitched, loudness-matched and encoded as
+Ogg Vorbis by the build script.
+
+| Source | Author | Licence | Page | Used for (Data/Audio/...) |
+| --- | --- | --- | --- | --- |
+| Morning | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN2300003 | music/forest_explore_a |
+| Ascending the Vale | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600064 | music/forest_explore_a2 |
+| Skye Cuillin | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100346 | music/forest_explore_b |
+| Decline | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300016 | music/forest_explore_b2 |
+| Night Vigil | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900047 | music/forest_explore_c |
+| Frozen Star | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100356 | music/forest_explore_c2 |
+| Evening Fall (Harp) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100236 | music/forest_night_a |
+| Enchanted Journey | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100799 | music/forest_night_b |
+| Celtic Impulse | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100297 | music/forest_combat |
+| Achaidh Cheide | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100340 | music/forest_combat_b |
+| Lord of the Land | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400022 | music/forest_mini |
+| Dragon and Toast | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100251 | music/forest_old_gnarl |
+| Darkest Child | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100783 | music/forest_bramblequeen |
+| The Chamber | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100400 | music/forest_grey_matron |
+| Ancient Rite | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900048 | music/forest_sylvaroth_p1 |
+| Final Count | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100657 | music/forest_sylvaroth_p2 |
+| Minima | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200053 | music/forest_sylvaroth_p3 |
+| Arcadia | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100326 | music/forest_hollow_root |
+| Canon in D for Two Renaissance Harps | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN2000014 | music/forest_camp |
+| Village Consort | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700007 | music/forest_village |
+| Dentaneosuchus Hunt | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN2500003 | music/forest_wild_hunt |
+| elephant_seals_point_reyes_05jan2008_05.mp3 | aguasonic (freesound) | CC-BY 4.0 | https://freesound.org/people/aguasonic/sounds/52204/ | creature/mossmaul_aggro (x3), creature/mossmaul_death (x2), creature/mossmaul_signature (x2), world/forest_mossmaul_roar_big (x2) |
+| wood_lumber_stabs.wav | vibe_crc (freesound) | CC0 1.0 | https://freesound.org/people/vibe_crc/sounds/59884/ | creature/elderelk_attack (x3), creature/elderelk_signature (x2), creature/hornwarden_attack (x4) |
+| Hunt Horn.mp3 | Countrychap999 (freesound) | CC0 1.0 | https://freesound.org/people/Countrychap999/sounds/69206/ | music/forest_wild_hunt, world/forest_hunt_horn (x3) |
+| carpenter bee.wav | cognito perceptu (freesound) | CC0 1.0 | https://freesound.org/people/cognito perceptu/sounds/95050/ | creature/hiveback_aggro (x3), creature/hiveback_death (x2), creature/hiveback_hurt (x3) |
+| wind in trees.wav | chimerical (freesound) | CC0 1.0 | https://freesound.org/people/chimerical/sounds/104282/ | creature/sylvaroth_idle (x3), creature/sylvaroth_tell (x2) |
+| 110714_wren.wav | Andy_Gardner (freesound) | CC0 1.0 | https://freesound.org/people/Andy_Gardner/sounds/125423/ | amb/forest_day |
+| Slow Creaking Stereo.wav | harveyism (freesound) | CC0 1.0 | https://freesound.org/people/harveyism/sounds/130364/ | creature/rootcoil_death (x2), world/forest_log_breath (x2) |
+| A tree is creaking in the patagonian forest of Argentina in a deep creaky sound. (Argentina, Tierra del Fuego). | felix.blume (freesound) | CC0 1.0 | https://freesound.org/people/felix.blume/sounds/140047/ | amb/forest_oldgrowth, creature/old_gnarl_aggro (x3) |
+| Two pigs by the river, grunting and squealing. Iruya, Northwest Argentina. | MatiasEzcurra (freesound) | CC0 1.0 | https://freesound.org/people/MatiasEzcurra/sounds/147240/ | creature/truffler_hurt (x3) |
+| hunting-horn-bass.wav | nanoPlink (freesound) | CC0 1.0 | https://freesound.org/people/nanoPlink/sounds/148645/ | music/forest_wild_hunt, world/forest_hunt_horn (x3) |
+| Falling branch.wav | marcolo91 (freesound) | CC0 1.0 | https://freesound.org/people/marcolo91/sounds/153156/ | world/forest_widow_fall (x3) |
+| Wasps.wav | deleted_user_2104797 (freesound) | CC0 1.0 | https://freesound.org/people/deleted_user_2104797/sounds/164486/ | world/forest_wasp_swarm (x2) |
+| LowWhalesong.wav | RebekahDay (freesound) | CC0 1.0 | https://freesound.org/people/RebekahDay/sounds/171945/ | creature/sylvaroth_aggro (x3), creature/sylvaroth_death (x2), creature/sylvaroth_idle (x3), creature/sylvaroth_signature (x2), creature/sylvaroth_tell (x2) |
+| Tongue Click.wav | SaundKlyp (freesound) | CC0 1.0 | https://freesound.org/people/SaundKlyp/sounds/175678/ | creature/mossmaul_signature (x2), creature/mossmaul_tell (x2) |
+| Water Dripping in Cave.wav | Sclolex (freesound) | CC0 1.0 | https://freesound.org/people/Sclolex/sounds/177958/ | amb/forest_hollow |
+| Wood Crack 2 | utsuru (freesound) | CC0 1.0 | https://freesound.org/people/utsuru/sounds/183452/ | creature/old_gnarl_attack (x4), creature/old_gnarl_hurt (x3), creature/sylvaroth_attack (x4), world/forest_elder_crack (x2) |
+| Angry Ram | ReadeOnly (freesound) | CC0 1.0 | https://freesound.org/people/ReadeOnly/sounds/186921/ | creature/fernsheep_aggro (x3), creature/fernsheep_attack (x3), creature/fernsheep_tell (x2) |
+| Blowgun | pfranzen (freesound) | CC0 1.0 | https://freesound.org/people/pfranzen/sounds/187707/ | spell/nature_thorn (x3), spell/nature_turret_shot (x3) |
+| Wind in the Trees | willstepp (freesound) | CC0 1.0 | https://freesound.org/people/willstepp/sounds/188288/ | amb/forest_villages |
+| HUMMING BIRDS (7-15-2013).mp3 | tubbers (freesound) | CC0 1.0 | https://freesound.org/people/tubbers/sounds/194772/ | creature/glimmerfinch_attack (x3), creature/glimmerfinch_signature (x2) |
+| Baby goat bleating | jsbarrett (freesound) | CC0 1.0 | https://freesound.org/people/jsbarrett/sounds/200333/ | creature/dappledoe_death (x2), creature/dappledoe_hurt (x3), creature/fernsheep_aggro (x3), creature/fernsheep_hurt (x3), creature/fernsheep_signature (x2) |
+| bees or wasps hum buzz in tree by the sea.wav | martian (freesound) | CC0 1.0 | https://freesound.org/people/martian/sounds/201502/ | world/forest_wasp_hum_loop |
+| Bumblebee.wav | sinewave1kHz (freesound) | CC0 1.0 | https://freesound.org/people/sinewave1kHz/sounds/202993/ | creature/hiveback_death (x2), creature/hiveback_idle (x3), creature/hiveback_signature (x2), creature/hiveback_tell (x2) |
+| barkingroedeer.wav | raoul_slayer (freesound) | CC0 1.0 | https://freesound.org/people/raoul_slayer/sounds/203593/ | creature/dappledoe_aggro (x3), creature/dappledoe_hurt (x3), creature/dappledoe_signature (x2), creature/dappledoe_tell (x2) |
+| sheep bleat outdoors | Yuval (freesound) | CC0 1.0 | https://freesound.org/people/Yuval/sounds/210511/ | creature/fernsheep_hurt (x3), creature/fernsheep_idle (x3), creature/fernsheep_signature (x2) |
+| earth rumble.wav | Reitanna (freesound) | CC0 1.0 | https://freesound.org/people/Reitanna/sounds/217657/ | creature/sylvaroth_aggro (x3), creature/sylvaroth_death (x2), creature/sylvaroth_idle (x3), creature/sylvaroth_signature (x2), spell/nature_guardian_rise (x2), spell/nature_guardian_slam (x3), spell/nature_rooted (x2), world/forest_root_pulse (x2), world/forest_uproot (x2) |
+| whoosh past mic | TimBahrij (freesound) | CC0 1.0 | https://freesound.org/people/TimBahrij/sounds/234915/ | spell/nature_pollen (x2) |
+| Southend Distant Church Bells 1 .wav | Cheeseheadburger (freesound) | CC0 1.0 | https://freesound.org/people/Cheeseheadburger/sounds/244517/ | amb/forest_villages |
+| Cloth Flapping in Wind | PhilllChabbb (freesound) | CC0 1.0 | https://freesound.org/people/PhilllChabbb/sounds/245839/ | creature/hornwarden_death (x2), creature/hornwarden_idle (x3), creature/hornwarden_signature (x2), creature/hornwarden_tell (x2) |
+| SLOW HEARTBEAT | daandraait (freesound) | CC0 1.0 | https://freesound.org/people/daandraait/sounds/249716/ | amb/forest_hollow, music/forest_hollow_root, world/forest_root_pulse (x2) |
+| Elk 7.wav | Hyperionn (freesound) | CC-BY 4.0 | https://freesound.org/people/Hyperionn/sounds/250191/ | creature/elderelk_aggro (x3), creature/elderelk_signature (x2), creature/elderelk_tell (x2), creature/hornwarden_aggro (x3), creature/hornwarden_signature (x2) |
+| bees in meadow close to a hive.wav | inalchemy (freesound) | CC0 1.0 | https://freesound.org/people/inalchemy/sounds/260787/ | amb/forest_meadows_day, spell/nature_pollen_loop |
+| Tiger Roar | lauramellis (freesound) | CC0 1.0 | https://freesound.org/people/lauramellis/sounds/263115/ | creature/grey_matron_death (x2), creature/thornlynx_death (x2) |
+| Bells_distant_in_town.wav | ivolipa (freesound) | CC0 1.0 | https://freesound.org/people/ivolipa/sounds/266525/ | amb/forest_villages |
+| baby lamb calling his mother .WAV | EduFigueres (freesound) | CC0 1.0 | https://freesound.org/people/EduFigueres/sounds/266689/ | creature/fernsheep_hurt (x3), creature/fernsheep_signature (x2) |
+| Cicadas | dethrok (freesound) | CC0 1.0 | https://freesound.org/people/dethrok/sounds/272169/ | creature/bramblequeen_aggro (x3), creature/bramblequeen_death (x2), creature/bramblequeen_hurt (x3), creature/bramblequeen_tell (x2) |
+| skylark.wav | Andy_Gardner (freesound) | CC0 1.0 | https://freesound.org/people/Andy_Gardner/sounds/277149/ | amb/forest_meadows_day |
+| Honey Bees Buzzing | kiwimana (freesound) | CC0 1.0 | https://freesound.org/people/kiwimana/sounds/341639/ | world/forest_heat_ball (x2) |
+| Animal Heavy Breathing | bevibeldesign (freesound) | CC0 1.0 | https://freesound.org/people/bevibeldesign/sounds/350414/ | creature/mossmaul_signature (x2), creature/mossmaul_tell (x2), creature/rootcoil_death (x2), creature/rootcoil_idle (x3), creature/rootcoil_signature (x2), world/forest_log_breath (x2) |
+| singing bowl.MP3 | macdaddyno1 (freesound) | CC0 1.0 | https://freesound.org/people/macdaddyno1/sounds/352611/ | spell/nature_purify (x2), spell/nature_world_tree (x2), world/forest_bloom_warn, world/forest_offering (x2) |
+| splitting an old tree trunk, close up, one single crack, H6.wav | Bini_trns (freesound) | CC0 1.0 | https://freesound.org/people/Bini_trns/sounds/354104/ | creature/old_gnarl_aggro (x3), creature/old_gnarl_attack (x4), creature/sylvaroth_attack (x4), creature/sylvaroth_hurt (x3), world/forest_bark_strip (x3), world/forest_elder_crack (x2), world/forest_uproot (x2), world/forest_widow_crack (x3) |
+| horncall_strauss1_Eflatmajor.wav | TaranP (freesound) | CC0 1.0 | https://freesound.org/people/TaranP/sounds/361684/ | music/forest_wild_hunt |
+| Hit Wood Hollow | alegemaate (freesound) | CC0 1.0 | https://freesound.org/people/alegemaate/sounds/364704/ | world/forest_leafpit_drum (x3) |
+| Goldfinches.wav | BeeProductive (freesound) | CC0 1.0 | https://freesound.org/people/BeeProductive/sounds/377064/ | creature/glimmerfinch_death (x2), creature/glimmerfinch_idle (x3), creature/glimmerfinch_signature (x2) |
+| Digging a Hole and Shovelling Soil/Dirt 2 | Ali_6868 (freesound) | CC0 1.0 | https://freesound.org/people/Ali_6868/sounds/384362/ | world/forest_dig (x3) |
+| Huff 2 | _stubb (freesound) | CC0 1.0 | https://freesound.org/people/_stubb/sounds/389631/ | creature/mossmaul_signature (x2), creature/mossmaul_tell (x2) |
+| wasp_buzzing_around.wav | KevinHilt (freesound) | CC0 1.0 | https://freesound.org/people/KevinHilt/sounds/392458/ | creature/bramblequeen_hurt (x3), creature/bramblewasp_attack (x3), creature/bramblewasp_death (x2), creature/bramblewasp_hurt (x3), creature/bramblewasp_idle (x3), creature/bramblewasp_signature (x2), creature/bramblewasp_tell (x2), world/forest_scout_mark (x3) |
+| wind chimes - single 04.wav | Anthousai (freesound) | CC0 1.0 | https://freesound.org/people/Anthousai/sounds/398496/ | spell/nature_heal (x3), spell/nature_pollen_loop, world/forest_offering (x2) |
+| Tempelhof Skylark | Veridiansunrise (freesound) | CC0 1.0 | https://freesound.org/people/Veridiansunrise/sounds/399221/ | amb/forest_meadows_day |
+| Hummingbird Chirps | cpolcyn (freesound) | CC0 1.0 | https://freesound.org/people/cpolcyn/sounds/399440/ | creature/glimmerfinch_attack (x3), creature/glimmerfinch_death (x2), creature/glimmerfinch_signature (x2) |
+| fs-rippingbark.wav | minkowski (freesound) | CC-BY 3.0 | https://freesound.org/people/minkowski/sounds/417910/ | creature/rootcoil_death (x2), creature/rootcoil_tell (x2), world/forest_bark_strip (x3) |
+| SFXFallingLeaves.wav | WakuWakuWakuWaku (freesound) | CC0 1.0 | https://freesound.org/people/WakuWakuWakuWaku/sounds/422963/ | creature/grey_matron_signature (x2), creature/mossmaul_signature (x2), creature/thornlynx_idle (x3), creature/thornlynx_signature (x2), world/forest_leafpit_fall (x2), world/forest_mossmaul_roar_big (x2), world/forest_walkway_fall (x3) |
+| wild boar squeak field recording with tascam dr-70d & Rode NTG4+ | Garuda1982 (freesound) | CC0 1.0 | https://freesound.org/people/Garuda1982/sounds/425241/ | creature/truffler_aggro (x3), creature/truffler_death (x2), creature/truffler_hurt (x3), creature/truffler_tell (x2) |
+| Footsteps in Crunchy Fall Leaves_1.wav | mrh4hn (freesound) | CC0 1.0 | https://freesound.org/people/mrh4hn/sounds/426616/ | creature/dappledoe_attack (x3), creature/dappledoe_idle (x3), creature/dappledoe_signature (x2), world/forest_leafpit_drum (x3) |
+| sheep bleat sound | Garuda1982 (freesound) | CC0 1.0 | https://freesound.org/people/Garuda1982/sounds/428103/ | creature/fernsheep_death (x2), creature/fernsheep_idle (x3), creature/fernsheep_signature (x2) |
+| Great Spotted Woodpecker | naturenotesuk (freesound) | CC0 1.0 | https://freesound.org/people/naturenotesuk/sounds/428146/ | amb/forest_day, amb/forest_oldgrowth |
+| Wasp Buzzing Building Nest (Sceliphron) | alexanderweidner (freesound) | CC0 1.0 | https://freesound.org/people/alexanderweidner/sounds/435589/ | world/forest_wasp_hum_loop |
+| Flooded river.wav | deleted_user_8803593 (freesound) | CC0 1.0 | https://freesound.org/people/deleted_user_8803593/sounds/436576/ | world/forest_spate_loop |
+| Wind chimes 1 | giddster (freesound) | CC0 1.0 | https://freesound.org/people/giddster/sounds/437337/ | music/forest_bloom, spell/nature_heal (x3), spell/nature_pollen (x2), spell/nature_pollen_loop, world/forest_bloom_warn, world/forest_offering (x2) |
+| Rustling leaves | giddster (freesound) | CC0 1.0 | https://freesound.org/people/giddster/sounds/437356/ | spell/nature_cast (x3), spell/nature_entangle (x3), spell/nature_purify (x2) |
+| Rustling foliage.WAV | DDT197 (freesound) | CC0 1.0 | https://freesound.org/people/DDT197/sounds/445788/ | creature/elderelk_death (x2), creature/elderelk_idle (x3) |
+| sheep bells tinkling nearby evening country rural on offmic Mallorca, Spain.flac | kyles (freesound) | CC0 1.0 | https://freesound.org/people/kyles/sounds/450370/ | amb/forest_villages |
+| branch breaking forest twig snap crunch.wav | kyles (freesound) | CC0 1.0 | https://freesound.org/people/kyles/sounds/452570/ | world/forest_thorn_scrape (x3) |
+| river small brook stream with rolling splashy good detail.flac | kyles (freesound) | CC0 1.0 | https://freesound.org/people/kyles/sounds/454155/ | amb/forest_streams |
+| TOLLING BELL | SamuelGremaud (freesound) | CC0 1.0 | https://freesound.org/people/SamuelGremaud/sounds/454855/ | world/forest_bell (x3) |
+| Cat Growl into Hiss.aif | Wrenasmir (freesound) | CC0 1.0 | https://freesound.org/people/Wrenasmir/sounds/455495/ | creature/grey_matron_aggro (x3), creature/grey_matron_tell (x2), creature/thornlynx_aggro (x3), creature/thornlynx_tell (x2) |
+| Bumblebee | Breviceps (freesound) | CC0 1.0 | https://freesound.org/people/Breviceps/sounds/466795/ | creature/hiveback_attack (x3) |
+| Small Bird Flying.wav | XfiXy8 (freesound) | CC0 1.0 | https://freesound.org/people/XfiXy8/sounds/467294/ | creature/glimmerfinch_aggro (x3), creature/glimmerfinch_death (x2), creature/glimmerfinch_idle (x3) |
+| R14-05-Horses Gallop By.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/479742/ | music/forest_wild_hunt, world/forest_hunt_hooves (x3) |
+| R22-44-Tree Falls and Hits Ground.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/486263/ | world/forest_elder_fall (x3) |
+| Moose_Elk.mp3 | gleith (freesound) | CC0 1.0 | https://freesound.org/people/gleith/sounds/486554/ | creature/elderelk_attack (x3), creature/elderelk_death (x2), creature/elderelk_hurt (x3), creature/elderelk_idle (x3), creature/hornwarden_death (x2), creature/hornwarden_idle (x3) |
+| TearingPaper11 | falcospizaetus (freesound) | CC0 1.0 | https://freesound.org/people/falcospizaetus/sounds/489968/ | world/forest_comb_break (x3) |
+| Rope Sliding.wav | cmilo1269 (freesound) | CC0 1.0 | https://freesound.org/people/cmilo1269/sounds/491960/ | world/forest_anchor_cut (x2) |
+| Big Tree Fall in Forest | Kinoton (freesound) | CC0 1.0 | https://freesound.org/people/Kinoton/sounds/494071/ | world/forest_elder_fall (x3) |
+| Tiger Growl | peenois (freesound) | CC0 1.0 | https://freesound.org/people/peenois/sounds/496131/ | creature/grey_matron_attack (x4), creature/thornlynx_aggro (x3), creature/thornlynx_attack (x3), creature/thornlynx_signature (x2) |
+| Cracking wood 2 | JappeHallunken (freesound) | CC0 1.0 | https://freesound.org/people/JappeHallunken/sounds/501303/ | creature/old_gnarl_hurt (x3), creature/sylvaroth_attack (x4) |
+| timber tree falling 1 | matt_beer (freesound) | CC0 1.0 | https://freesound.org/people/matt_beer/sounds/515313/ | world/forest_elder_fall (x3) |
+| Wind in the grass | waweee (freesound) | CC0 1.0 | https://freesound.org/people/waweee/sounds/517995/ | amb/forest_meadows |
+| splitting logs | Nivatius (freesound) | CC0 1.0 | https://freesound.org/people/Nivatius/sounds/519567/ | creature/old_gnarl_attack (x4) |
+| Bison bellowing - Yellowstone National Park | Nivatius (freesound) | CC0 1.0 | https://freesound.org/people/Nivatius/sounds/519594/ | creature/burlbeast_aggro (x3), creature/burlbeast_death (x2), creature/burlbeast_signature (x2), creature/burlbeast_tell (x2) |
+| Grizzly Bear growl eating | Nivatius (freesound) | CC0 1.0 | https://freesound.org/people/Nivatius/sounds/519599/ | creature/mossmaul_attack (x3), creature/mossmaul_idle (x3) |
+| running grizzly.mp3 | Nivatius (freesound) | CC0 1.0 | https://freesound.org/people/Nivatius/sounds/519600/ | creature/mossmaul_hurt (x3) |
+| Wood Break.boaay | BOAAY (freesound) | CC0 1.0 | https://freesound.org/people/BOAAY/sounds/520720/ | world/forest_knot_break (x3) |
+| Forest, close up of trees rustling in the wind.wav | Anya_Media (freesound) | CC0 1.0 | https://freesound.org/people/Anya_Media/sounds/523389/ | amb/forest_canopy, creature/old_gnarl_death (x2), creature/old_gnarl_idle (x3), creature/old_gnarl_tell (x2), world/forest_canopy_rustle (x3) |
+| Fingers Rustling Through Plant.wav | Sonoticai (freesound) | CC0 1.0 | https://freesound.org/people/Sonoticai/sounds/523776/ | spell/nature_cast (x3), spell/nature_entangle (x3), spell/nature_pollen_loop, world/forest_vine_creep (x2) |
+| Alligator Growls 02.wav | D.jones (freesound) | CC0 1.0 | https://freesound.org/people/D.jones/sounds/527844/ | creature/rootcoil_aggro (x3), creature/rootcoil_death (x2) |
+| Hamble River in the summer 1 | richwise (freesound) | CC0 1.0 | https://freesound.org/people/richwise/sounds/530205/ | amb/forest_streams |
+| Snake hissing.mp3 | schreibsel (freesound) | CC0 1.0 | https://freesound.org/people/schreibsel/sounds/540162/ | creature/rootcoil_aggro (x3), creature/rootcoil_hurt (x3) |
+| cut rope.wav | zepurple (freesound) | CC0 1.0 | https://freesound.org/people/zepurple/sounds/540266/ | world/forest_anchor_cut (x2) |
+| Chirping Hummingbird | karinalarasart (freesound) | CC0 1.0 | https://freesound.org/people/karinalarasart/sounds/541223/ | creature/glimmerfinch_aggro (x3), creature/glimmerfinch_hurt (x3), creature/glimmerfinch_signature (x2) |
+| thick paper bag rustle crunch crinkle.wav | rsellick (freesound) | CC0 1.0 | https://freesound.org/people/rsellick/sounds/545532/ | creature/bramblequeen_attack (x4), creature/bramblequeen_death (x2), creature/bramblequeen_idle (x3) |
+| Rope under tension.WAV | gear_clinkz (freesound) | CC0 1.0 | https://freesound.org/people/gear_clinkz/sounds/547862/ | spell/nature_entangle (x3), world/forest_anchor_cut (x2), world/forest_lift_creak_loop |
+| FXSaSc Wood Tree Trunk Impact Ground Forest 5 Variants | Profispiesser (freesound) | CC0 1.0 | https://freesound.org/people/Profispiesser/sounds/550918/ | spell/nature_guardian_slam (x3) |
+| Snake Hiss | xoiziox (freesound) | CC0 1.0 | https://freesound.org/people/xoiziox/sounds/553374/ | creature/rootcoil_aggro (x3), creature/rootcoil_hurt (x3) |
+| Fox scream in the forest | nielstii (freesound) | CC0 1.0 | https://freesound.org/people/nielstii/sounds/554308/ | creature/grey_matron_hurt (x3) |
+| Hollow Wood Knocking | Yellow434 (freesound) | CC0 1.0 | https://freesound.org/people/Yellow434/sounds/554916/ | creature/burlbeast_attack (x3), creature/burlbeast_idle (x3), creature/burlbeast_signature (x2), world/forest_leafpit_drum (x3) |
+| Siseo Hiss | Podcapocalipsis (freesound) | CC0 1.0 | https://freesound.org/people/Podcapocalipsis/sounds/560773/ | creature/rootcoil_hurt (x3), creature/rootcoil_idle (x3), creature/rootcoil_signature (x2), creature/rootcoil_tell (x2) |
+| Wind in forest with creaking tree | Cinetony (freesound) | CC0 1.0 | https://freesound.org/people/Cinetony/sounds/563571/ | amb/forest_oldgrowth |
+| Ambiance_Fire_Bushes_Loop_Stereo.wav | Nox_Sound (freesound) | CC0 1.0 | https://freesound.org/people/Nox_Sound/sounds/564621/ | world/forest_thorn_burn (x2) |
+| Deer barking.m4a | Spamanator (freesound) | CC0 1.0 | https://freesound.org/people/Spamanator/sounds/569926/ | creature/dappledoe_attack (x3) |
+| Grasshopper wing clicks snaps hot BADLANDS AB 190818.flac | TRP (freesound) | CC0 1.0 | https://freesound.org/people/TRP/sounds/573935/ | creature/bramblequeen_attack (x4), creature/bramblequeen_signature (x2), creature/bramblewasp_aggro (x3), creature/bramblewasp_attack (x3), world/forest_scout_mark (x3) |
+| 65 - Galloping horse Caballo galopando | GiordanoFabricio (freesound) | CC0 1.0 | https://freesound.org/people/GiordanoFabricio/sounds/574317/ | world/forest_hunt_hooves (x3) |
+| large leaves rustle in the wind sound effect | Garuda1982 (freesound) | CC0 1.0 | https://freesound.org/people/Garuda1982/sounds/575645/ | world/forest_canopy_rustle (x3) |
+| Single Goat Bleating 2x | Kinoton (freesound) | CC0 1.0 | https://freesound.org/people/Kinoton/sounds/581240/ | creature/fernsheep_aggro (x3), creature/fernsheep_death (x2), creature/fernsheep_signature (x2) |
+| Horses running final.wav | C-V (freesound) | CC0 1.0 | https://freesound.org/people/C-V/sounds/583261/ | world/forest_hunt_hooves (x3) |
+| Fabric Rustles.wav | Kawgrim (freesound) | CC0 1.0 | https://freesound.org/people/Kawgrim/sounds/584866/ | creature/fernsheep_attack (x3), creature/fernsheep_idle (x3) |
+| Mountain River, Large 001.wav | Auxide_Audio (freesound) | CC0 1.0 | https://freesound.org/people/Auxide_Audio/sounds/588180/ | world/forest_spate_loop |
+| Pulling roots.wav | Elandre01 (freesound) | CC0 1.0 | https://freesound.org/people/Elandre01/sounds/594401/ | creature/old_gnarl_signature (x2), spell/nature_rooted (x2), world/forest_knot_break (x3) |
+| Sheep in a farm, sheep herd bleating in a shed (Spain) | nomadas (freesound) | CC0 1.0 | https://freesound.org/people/nomadas/sounds/609160/ | amb/forest_villages, creature/fernsheep_idle (x3), creature/fernsheep_signature (x2) |
+| Wooden Log Hit 9 | deadrobotmusic (freesound) | CC0 1.0 | https://freesound.org/people/deadrobotmusic/sounds/610007/ | creature/burlbeast_attack (x3), creature/burlbeast_death (x2) |
+| mg_SeedPods.wav | Michel1980 (freesound) | CC0 1.0 | https://freesound.org/people/Michel1980/sounds/610143/ | spell/nature_turret_shot (x3), world/forest_seed_pod (x3) |
+| Lynx Cat | EminYILDIRIM (freesound) | CC-BY 4.0 | https://freesound.org/people/EminYILDIRIM/sounds/611192/ | creature/thornlynx_hurt (x3) |
+| Dawn chorus.wav | Synge101 (freesound) | CC0 1.0 | https://freesound.org/people/Synge101/sounds/611453/ | music/forest_bloom, world/forest_bloom_warn |
+| Big Lion Roar | _justMonke_ (freesound) | CC0 1.0 | https://freesound.org/people/_justMonke_/sounds/611721/ | creature/mossmaul_aggro (x3), creature/mossmaul_death (x2), creature/mossmaul_signature (x2), world/forest_mossmaul_roar_big (x2) |
+| whip and crack sound | JayRom01 (freesound) | CC0 1.0 | https://freesound.org/people/JayRom01/sounds/615761/ | spell/nature_thorn (x3), spell/nature_vine_lash (x3) |
+| 210831 American Goldfinch, songs calls, urban residential, TORONTO 11am.wav | TRP (freesound) | CC0 1.0 | https://freesound.org/people/TRP/sounds/616983/ | creature/glimmerfinch_idle (x3), creature/glimmerfinch_signature (x2) |
+| Pig_Breath_And_Grunt_02.flac | wwstudioswastaken (freesound) | CC0 1.0 | https://freesound.org/people/wwstudioswastaken/sounds/620079/ | creature/truffler_attack (x3), creature/truffler_idle (x3), creature/truffler_signature (x2) |
+| creak of bold trees.wav | Oleh.Ibrahimov (freesound) | CC0 1.0 | https://freesound.org/people/Oleh.Ibrahimov/sounds/620759/ | creature/old_gnarl_aggro (x3), creature/old_gnarl_death (x2), creature/old_gnarl_hurt (x3), creature/old_gnarl_idle (x3), creature/old_gnarl_tell (x2), creature/sylvaroth_hurt (x3), spell/nature_world_tree (x2) |
+| Wasps.wav | Brsjak (freesound) | CC0 1.0 | https://freesound.org/people/Brsjak/sounds/623134/ | world/forest_wasp_swarm (x2) |
+| Frelon dans daf.aif | nicotep (freesound) | CC0 1.0 | https://freesound.org/people/nicotep/sounds/623758/ | creature/bramblequeen_aggro (x3), creature/bramblequeen_death (x2), creature/bramblequeen_idle (x3), creature/bramblequeen_signature (x2), creature/bramblequeen_tell (x2), creature/bramblewasp_aggro (x3), creature/bramblewasp_tell (x2) |
+| Hidden waterfall.WAV | BassmanJourney (freesound) | CC0 1.0 | https://freesound.org/people/BassmanJourney/sounds/632107/ | amb/forest_falls, world/forest_falls (x2) |
+| Fox Screams | Soundburst (freesound) | CC0 1.0 | https://freesound.org/people/Soundburst/sounds/634005/ | creature/grey_matron_aggro (x3), creature/grey_matron_death (x2), creature/grey_matron_signature (x2), creature/thornlynx_death (x2), creature/thornlynx_hurt (x3), world/forest_kit_scream (x3) |
+| summer meadow with wind | Garuda1982 (freesound) | CC0 1.0 | https://freesound.org/people/Garuda1982/sounds/639459/ | amb/forest_meadows |
+| Bee_Hive_Close_up.wav | gokalp_gonen (freesound) | CC0 1.0 | https://freesound.org/people/gokalp_gonen/sounds/640514/ | creature/hiveback_signature (x2), creature/hiveback_tell (x2), world/forest_heat_ball (x2) |
+| paper-crunch.wav | studio-cill (freesound) | CC0 1.0 | https://freesound.org/people/studio-cill/sounds/644045/ | world/forest_comb_break (x3) |
+| Plant Growing | IENBA (freesound) | CC0 1.0 | https://freesound.org/people/IENBA/sounds/648958/ | spell/nature_cast (x3), spell/nature_world_tree (x2), world/forest_bark_regrow (x2), world/forest_line_regrow (x2), world/forest_vine_creep (x2) |
+| Waterfall_Meraner_Höhenweg_01_160922.wav | datapopstar2 (freesound) | CC0 1.0 | https://freesound.org/people/datapopstar2/sounds/650699/ | amb/forest_falls, world/forest_falls (x2) |
+| Deer rut - Brame Cerf .wav | L.Finck (freesound) | CC0 1.0 | https://freesound.org/people/L.Finck/sounds/653532/ | creature/elderelk_hurt (x3), creature/hornwarden_attack (x4), creature/hornwarden_hurt (x3) |
+| Deer rut - Brame Cerf 02.wav | L.Finck (freesound) | CC0 1.0 | https://freesound.org/people/L.Finck/sounds/653533/ | creature/dappledoe_aggro (x3), creature/dappledoe_death (x2), creature/elderelk_hurt (x3), creature/hornwarden_attack (x4), creature/hornwarden_hurt (x3) |
+| temple_bell_002.wav | tec_studio (freesound) | CC0 1.0 | https://freesound.org/people/tec_studio/sounds/668647/ | world/forest_bell (x3) |
+| SFX_wood_cracking.wav | EricsSoundschmiede (freesound) | CC0 1.0 | https://freesound.org/people/EricsSoundschmiede/sounds/669457/ | creature/old_gnarl_aggro (x3), creature/old_gnarl_attack (x4), creature/old_gnarl_signature (x2), creature/sylvaroth_attack (x4), creature/sylvaroth_hurt (x3), spell/nature_guardian_rise (x2), world/forest_bark_strip (x3), world/forest_uproot (x2), world/forest_widow_crack (x3) |
+| S27-21 Alligator hiss twice.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/675513/ | creature/rootcoil_attack (x3) |
+| S37-15 Wooden building collapses quickly.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/675900/ | world/forest_knot_break (x3), world/forest_walkway_fall (x3) |
+| S10-19 Falling wooden beam; big interior crash; house collapses; long.wav | craigsmith (freesound) | CC0 1.0 | https://freesound.org/people/craigsmith/sounds/675967/ | world/forest_walkway_fall (x3) |
+| Fox Scream Mating Call | drewtait (freesound) | CC0 1.0 | https://freesound.org/people/drewtait/sounds/676376/ | creature/grey_matron_aggro (x3), creature/grey_matron_hurt (x3), world/forest_kit_scream (x3) |
+| xuebaobizui.mp3 | messo1997 (freesound) | CC0 1.0 | https://freesound.org/people/messo1997/sounds/683661/ | creature/grey_matron_idle (x3), creature/thornlynx_idle (x3) |
+| Frogs at Night - Lots of Them.wav | Traviow (freesound) | CC0 1.0 | https://freesound.org/people/Traviow/sounds/687212/ | amb/forest_streams_night |
+| falling branches.wav | wniebelski (freesound) | CC0 1.0 | https://freesound.org/people/wniebelski/sounds/695978/ | world/forest_widow_fall (x3) |
+| Digging Into Soft Soil with Small Trowell.wav | dhallcomposer (freesound) | CC0 1.0 | https://freesound.org/people/dhallcomposer/sounds/696531/ | creature/truffler_attack (x3), creature/truffler_idle (x3), creature/truffler_signature (x2), world/forest_dig (x3) |
+| Deer_Bark_5_s | ferventtorpor (freesound) | CC0 1.0 | https://freesound.org/people/ferventtorpor/sounds/696776/ | creature/dappledoe_attack (x3) |
+| Northern California Crickets | ellie.vanderlip (freesound) | CC0 1.0 | https://freesound.org/people/ellie.vanderlip/sounds/704381/ | amb/forest_night |
+| the rush in the trees | 37735i6 (freesound) | CC0 1.0 | https://freesound.org/people/37735i6/sounds/706661/ | amb/forest_canopy |
+| Breaking Twigs | L.i.Z.e.L.l.E_+ (freesound) | CC0 1.0 | https://freesound.org/people/L.i.Z.e.L.l.E_+/sounds/707868/ | world/forest_leafpit_fall (x2), world/forest_thorn_burn (x2), world/forest_thorn_scrape (x3) |
+| Roe Deer calls Forest of Saou | Sacha.Julien (freesound) | CC0 1.0 | https://freesound.org/people/Sacha.Julien/sounds/724578/ | creature/dappledoe_idle (x3) |
+| Blackbird song, solo, Good quality, Forest South of France | Sacha.Julien (freesound) | CC0 1.0 | https://freesound.org/people/Sacha.Julien/sounds/725332/ | amb/forest_day, music/forest_bloom |
+| Tree creaks | Sacha.Julien (freesound) | CC0 1.0 | https://freesound.org/people/Sacha.Julien/sounds/726217/ | amb/forest_canopy, creature/rootcoil_attack (x3), creature/rootcoil_idle (x3), creature/rootcoil_signature (x2), world/forest_elder_crack (x2), world/forest_widow_crack (x3) |
+| Creaking02 | LudPos (freesound) | CC0 1.0 | https://freesound.org/people/LudPos/sounds/726921/ | amb/forest_canopy, world/forest_bark_regrow (x2), world/forest_line_regrow (x2) |
+| paper_rustling_03 | Spaghetto87 (freesound) | CC0 1.0 | https://freesound.org/people/Spaghetto87/sounds/731484/ | creature/bramblewasp_idle (x3), creature/bramblewasp_signature (x2) |
+| Dried branches | Vrymaa (freesound) | CC0 1.0 | https://freesound.org/people/Vrymaa/sounds/734627/ | world/forest_leafpit_fall (x2), world/forest_thorn_burn (x2) |
+| Ice - Fracture, roots or growing plants | Vrymaa (freesound) | CC0 1.0 | https://freesound.org/people/Vrymaa/sounds/735401/ | spell/nature_heal (x3), world/forest_line_regrow (x2) |
+| Tawny owl hooting | Patrick_Corra (freesound) | CC0 1.0 | https://freesound.org/people/Patrick_Corra/sounds/745208/ | amb/forest_night |
+| Red Deer Stag Bellowing | naturenotesuk (freesound) | CC-BY 4.0 | https://freesound.org/people/naturenotesuk/sounds/757773/ | creature/elderelk_aggro (x3), creature/elderelk_death (x2), creature/elderelk_signature (x2), creature/hornwarden_aggro (x3), creature/hornwarden_death (x2), creature/hornwarden_signature (x2), creature/hornwarden_tell (x2), creature/sylvaroth_aggro (x3) |
+| Bear Angry Growl | celldroid (freesound) | CC0 1.0 | https://freesound.org/people/celldroid/sounds/763026/ | creature/mossmaul_aggro (x3), creature/mossmaul_attack (x3), creature/mossmaul_hurt (x3) |
+| VEGEMisc-Ext._Bush Rustle_JvZ_OwSFX | Joshua_van_Zyl (freesound) | CC0 1.0 | https://freesound.org/people/Joshua_van_Zyl/sounds/764900/ | world/forest_seed_pod (x3), world/forest_thorn_scrape (x3) |
+| Wild Boar Growling Sound Effect | Mastersoundboy2005 (freesound) | CC0 1.0 | https://freesound.org/people/Mastersoundboy2005/sounds/764944/ | creature/truffler_aggro (x3), creature/truffler_death (x2), creature/truffler_signature (x2) |
+| Ripping and Tearing Roots | Sabacky (freesound) | CC-BY 4.0 | https://freesound.org/people/Sabacky/sounds/774142/ | creature/old_gnarl_death (x2), creature/old_gnarl_signature (x2), creature/sylvaroth_death (x2), creature/sylvaroth_signature (x2), spell/nature_guardian_rise (x2), spell/nature_rooted (x2), world/forest_knot_break (x3), world/forest_uproot (x2) |
+| Hornet's larvae in nest | YannSauvin (freesound) | CC0 1.0 | https://freesound.org/people/YannSauvin/sounds/779173/ | world/forest_comb_break (x3) |
+| Song Thrush | richwise (freesound) | CC0 1.0 | https://freesound.org/people/richwise/sounds/785669/ | amb/forest_day, music/forest_bloom |
+| Wooden Structure Breaking | modusmogulus (freesound) | CC0 1.0 | https://freesound.org/people/modusmogulus/sounds/794523/ | world/forest_knot_break (x3), world/forest_walkway_fall (x3) |
+| SWSH_Swish Of Heavy Stick.Artificial 1_EM | newlocknew (freesound) | CC0 1.0 | https://freesound.org/people/newlocknew/sounds/794818/ | spell/nature_thorn (x3), spell/nature_thorned_skin (x3), spell/nature_vine_lash (x3) |
+| A swarm of wasps | liambratchford (freesound) | CC0 1.0 | https://freesound.org/people/liambratchford/sounds/798671/ | creature/bramblewasp_signature (x2), world/forest_wasp_swarm (x2) |
+| 20250312_Collserola_Goldfinch | bitlab_coop (freesound) | CC0 1.0 | https://freesound.org/people/bitlab_coop/sounds/803350/ | creature/glimmerfinch_idle (x3), creature/glimmerfinch_signature (x2), creature/glimmerfinch_tell (x2) |
+| Brushing cat - MS RAW | Sadiquecat (freesound) | CC0 1.0 | https://freesound.org/people/Sadiquecat/sounds/807199/ | creature/hiveback_attack (x3), creature/hiveback_death (x2), creature/hiveback_idle (x3) |
+| Night forest 3 | rozhkovkirill (freesound) | CC0 1.0 | https://freesound.org/people/rozhkovkirill/sounds/808690/ | amb/forest_night |
+| elephant growls | mokasza (freesound) | CC-BY 4.0 | https://freesound.org/people/mokasza/sounds/810176/ | creature/old_gnarl_aggro (x3) |
+| few frogs at night | bruno.auzet (freesound) | CC0 1.0 | https://freesound.org/people/bruno.auzet/sounds/810907/ | amb/forest_streams_night |
+| wild boars bassing by | bruno.auzet (freesound) | CC0 1.0 | https://freesound.org/people/bruno.auzet/sounds/810908/ | creature/truffler_attack (x3) |
+| cave dripping water | mentos987 (freesound) | CC0 1.0 | https://freesound.org/people/mentos987/sounds/818888/ | amb/forest_hollow |
+| Night in the Serengeti with elephant rumble | zachrau (freesound) | CC0 1.0 | https://freesound.org/people/zachrau/sounds/818986/ | creature/old_gnarl_aggro (x3), creature/old_gnarl_death (x2), creature/old_gnarl_idle (x3), creature/old_gnarl_tell (x2), creature/sylvaroth_aggro (x3), creature/sylvaroth_death (x2), creature/sylvaroth_idle (x3), creature/sylvaroth_signature (x2), creature/sylvaroth_tell (x2) |
+| 250910_22h43 Gergueil D104 - Brame | Sadiquecat (freesound) | CC0 1.0 | https://freesound.org/people/Sadiquecat/sounds/826421/ | creature/elderelk_aggro (x3), creature/elderelk_signature (x2), creature/elderelk_tell (x2), creature/hornwarden_aggro (x3), creature/hornwarden_signature (x2) |
+| Bovines - Cattle; Loud Bellow from Hereford Bull | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/827111/ | creature/burlbeast_hurt (x3) |
+| Dog Climbing Clawing Up a Tree | qubodup (freesound) | CC0 1.0 | https://freesound.org/people/qubodup/sounds/827322/ | creature/grey_matron_attack (x4) |
+| Clawing or Scratching at wood | Wigglesworth (freesound) | CC0 1.0 | https://freesound.org/people/Wigglesworth/sounds/830466/ | creature/grey_matron_attack (x4), creature/grey_matron_idle (x3), creature/grey_matron_tell (x2), creature/mossmaul_attack (x3), creature/thornlynx_attack (x3) |
+| Yak grunts | ali.g (freesound) | CC0 1.0 | https://freesound.org/people/ali.g/sounds/834331/ | creature/burlbeast_death (x2), creature/burlbeast_hurt (x3), creature/burlbeast_idle (x3) |
+| Wild Cats - Siberian Lynx, Huff | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/844316/ | creature/thornlynx_idle (x3) |
+| Morning Forest with Birds | RyanKingArt (freesound) | CC0 1.0 | https://freesound.org/people/RyanKingArt/sounds/844605/ | amb/forest_day |
+| WOODOthr_Peel-Pine-Bark-Crisp-Crunch_Dakenber_H1e-32b | Dakenber (freesound) | CC0 1.0 | https://freesound.org/people/Dakenber/sounds/846049/ | spell/nature_thorned_skin (x3), world/forest_bark_strip (x3) |
+| Insects - Bee; Honeybee, Buzz, Close Perspective | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/846433/ | creature/hiveback_aggro (x3) |
+| Birch bark tearing, patting, rubbing (raw) | DeqstersLab (freesound) | CC-BY 4.0 | https://freesound.org/people/DeqstersLab/sounds/847211/ | world/forest_bark_regrow (x2), world/forest_bark_strip (x3) |
+| Lobo Marino Grunendo - Growling Sea Lion | Diim_1 (freesound) | CC0 1.0 | https://freesound.org/people/Diim_1/sounds/849186/ | creature/mossmaul_hurt (x3) |
+| A body falling to the ground, with leaf crush | Wigglesworth (freesound) | CC0 1.0 | https://freesound.org/people/Wigglesworth/sounds/853591/ | creature/thornlynx_signature (x2), world/forest_leafpit_fall (x2), world/forest_widow_fall (x3) |
+| Vegetation, grass, moss, foliage, handling, rustling, bushes, light_footsteps | Oldome (freesound) | CC0 1.0 | https://freesound.org/people/Oldome/sounds/853612/ | creature/mossmaul_death (x2), creature/mossmaul_idle (x3), creature/mossmaul_tell (x2), creature/thornlynx_idle (x3), world/forest_thorn_scrape (x3) |
+| The song of an Eurasian Wren | hoshisato (freesound) | CC0 1.0 | https://freesound.org/people/hoshisato/sounds/853671/ | amb/forest_day |
+| Wasp Buzzing 02 | loganzsound (freesound) | CC0 1.0 | https://freesound.org/people/loganzsound/sounds/856766/ | creature/bramblewasp_death (x2), creature/bramblewasp_hurt (x3), world/forest_scout_mark (x3) |
+| Church Bell — Bb4 | bassimat (freesound) | CC0 1.0 | https://freesound.org/people/bassimat/sounds/857937/ | world/forest_bell (x3) |
+| 26.07.04- Creaky Playground Swing - Rope Friction 1 | Valerie-Vivegnis (freesound) | CC0 1.0 | https://freesound.org/people/Valerie-Vivegnis/sounds/862995/ | spell/nature_entangle (x3), world/forest_lift_creak_loop |
+| Swine - Warthog; Sniffing with Grunt, Close Perspective | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/864329/ | creature/truffler_idle (x3), creature/truffler_signature (x2) |
+| 26.07.17- Wind in Tree Leaves | Valerie-Vivegnis (freesound) | CC0 1.0 | https://freesound.org/people/Valerie-Vivegnis/sounds/865353/ | world/forest_canopy_rustle (x3) |
+| Goats - Two Billies Sparring; Headbutt, Horns Clanking | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/866683/ | creature/elderelk_aggro (x3), creature/elderelk_attack (x3), creature/hornwarden_attack (x4) |
+| Tawny Owl Calling at Night – 02:30, Estonia | inspire153 (freesound) | CC0 1.0 | https://freesound.org/people/inspire153/sounds/867131/ | amb/forest_night |
+| Bovines - American Bison; Nasal Huffs, Close Perspective | TheKingOfGeeks360 (freesound) | CC0 1.0 | https://freesound.org/people/TheKingOfGeeks360/sounds/867549/ | creature/burlbeast_aggro (x3), creature/burlbeast_hurt (x3) |
+| Tall dead tree splintering then falling to ground with crashing Impact | ozymandias37 (freesound) | CC0 1.0 | https://freesound.org/people/ozymandias37/sounds/869103/ | creature/sylvaroth_attack (x4), creature/sylvaroth_death (x2), creature/sylvaroth_signature (x2) |
+| Paper Tear | cb9382 (freesound) | CC0 1.0 | https://freesound.org/people/cb9382/sounds/870033/ | world/forest_comb_break (x3) |
+| Digging in stoney dirt | innov8_Music (freesound) | CC0 1.0 | https://freesound.org/people/innov8_Music/sounds/871629/ | world/forest_dig (x3) |
+| Bison | timpet55 (freesound) | CC0 1.0 | https://freesound.org/people/timpet55/sounds/873888/ | creature/burlbeast_attack (x3) |
+
 ## Animation
 
 | What | Files in the repo | Source | Author | Licence |

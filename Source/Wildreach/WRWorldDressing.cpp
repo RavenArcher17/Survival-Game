@@ -14,6 +14,9 @@
 #include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "WRFx.h"
+#include "WRForestHazards.h"   // the forest's no-felling rule round its giants (HarvestInFront)
+#include "WRTreeKit.h"         // the forest's trees, ferns and boulders (forest_* kinds)
+#include "WRLand.h"            // a cave on a runtime land (the forest's) finds its floor on the land's chunks
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Dom/JsonObject.h"
@@ -300,6 +303,38 @@ static const FWRHarvestSpec HarvestSpecs[] = {
 	{ TEXT("swamp_deadcypress"), TEXT("tree"), TEXT("cypress_log"), 32.f }, { TEXT("swamp_knees"), TEXT("tree"), TEXT("wood"), 45.f },
 	{ TEXT("swamp_reeds"), TEXT("shrub"), TEXT("fiber"), 60.f }, { TEXT("swamp_pitcher"), TEXT("shrub"), TEXT("fiber"), 40.f },
 	{ TEXT("swamp_shrub"), TEXT("shrub"), TEXT("fiber"), 55.f }, { TEXT("swamp_bones"), TEXT("rock"), TEXT("bone"), 70.f },
+	// The Ancient forest (Tools/terrain/forest_dressing.mjs; cooks/biome-forest.md 2.7): every living tree gives wood (oak,
+	// beech, lime, alder, ash, holly, hazel rods, saplings, the tundra neck's pines, the newcomers' old stumps), ferns and
+	// bramble fibre, mossy boulders stone. Radii are WRTreeKit's trunks at their reference height (times the instance's
+	// scale). The giants and dead snags are listed so a swing finds them, but group "giant" never gives: the axe bounces
+	// ("The roots hold it.", HarvestInFront). Appended last so the older kinds keep their ledger keys.
+	{ TEXT("forest_oak"), TEXT("tree"), TEXT("wood"), 55.f }, { TEXT("forest_beech"), TEXT("tree"), TEXT("wood"), 45.f },
+	{ TEXT("forest_lime"), TEXT("tree"), TEXT("wood"), 42.f }, { TEXT("forest_alder"), TEXT("tree"), TEXT("wood"), 22.f },
+	{ TEXT("forest_alder_lean"), TEXT("tree"), TEXT("wood"), 22.f }, { TEXT("forest_ash"), TEXT("tree"), TEXT("wood"), 35.f },
+	{ TEXT("forest_holly"), TEXT("tree"), TEXT("wood"), 30.f }, { TEXT("forest_hazel"), TEXT("tree"), TEXT("wood"), 60.f },
+	{ TEXT("forest_sapling"), TEXT("tree"), TEXT("wood"), 14.f }, { TEXT("forest_pine"), TEXT("tree"), TEXT("wood"), 30.f },
+	{ TEXT("forest_stump"), TEXT("tree"), TEXT("wood"), 50.f }, { TEXT("forest_fern"), TEXT("shrub"), TEXT("fiber"), 40.f },
+	{ TEXT("forest_bramble"), TEXT("shrub"), TEXT("fiber"), 60.f }, { TEXT("forest_rock"), TEXT("rock"), TEXT("stone"), 110.f },
+	{ TEXT("forest_giant"), TEXT("giant"), TEXT("wood"), 300.f }, { TEXT("forest_dead"), TEXT("giant"), TEXT("wood"), 220.f },
+};
+
+// The Ancient forest's dressing kinds, drawn from the code-built tree kit (WRTreeKit; no forest pack on this PC, no
+// engine shapes): species, the kit variants the kind takes turns across (instance i draws FirstVariant + i % Variants,
+// the same on every machine), cull distance (cm before world.decorationDistanceScale; 0 = never culled), and whether
+// its trunk blocks (the kit's collider capsules, as hidden instanced cylinders; leaves, ferns, hazel rods and saplings
+// are walked through). The giants are never culled and always cast shadows: from the island's south coast and the
+// meadows they are the skyline (DC 2.1 "trunks are the skyline", plan R11/R13), 800 triangles each at that range.
+struct FWRForestDressKind { const TCHAR* Kind; const TCHAR* Species; int32 FirstVariant; int32 Variants; float Cull; bool bCollide; bool bShadow; };
+static const FWRForestDressKind ForestDressKinds[] = {
+	{ TEXT("forest_oak"), TEXT("oak"), 0, 4, 26000.f, true, true }, { TEXT("forest_beech"), TEXT("beech"), 0, 4, 26000.f, true, true },
+	{ TEXT("forest_lime"), TEXT("lime"), 0, 4, 26000.f, true, true }, { TEXT("forest_ash"), TEXT("ash"), 0, 4, 26000.f, true, true },
+	// WRTreeKit's alder variants 2 and 3 lean over +X; the generator yaws them toward the water (DC 2.2).
+	{ TEXT("forest_alder"), TEXT("alder"), 0, 2, 26000.f, true, true }, { TEXT("forest_alder_lean"), TEXT("alder"), 2, 2, 26000.f, true, true },
+	{ TEXT("forest_holly"), TEXT("holly"), 0, 4, 14000.f, true, true }, { TEXT("forest_hazel"), TEXT("hazel"), 0, 4, 14000.f, false, true },
+	{ TEXT("forest_sapling"), TEXT("sapling"), 0, 4, 10000.f, false, false }, { TEXT("forest_stump"), TEXT("stump"), 0, 4, 10000.f, true, false },
+	{ TEXT("forest_fern"), TEXT("fern"), 0, 4, 4000.f, false, false }, { TEXT("forest_bramble"), TEXT("bramble"), 0, 4, 7000.f, false, false },
+	{ TEXT("forest_rock"), TEXT("boulder"), 0, 4, 16000.f, true, true },
+	{ TEXT("forest_giant"), TEXT("giant"), 0, 4, 0.f, true, true }, { TEXT("forest_dead"), TEXT("dead_giant"), 0, 4, 0.f, true, true },
 };
 
 AWRDressing::AWRDressing()
@@ -500,6 +535,9 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
 	// machine in the same order, so a ledger key means the same decoration everywhere.
 	Harvestables.Reset();
+	// The forest's land is built at runtime (WRLand) only while it's live (world.liveBiomes): until then its trees would
+	// stand over the sea, so none of its kinds are built or gatherable (their kinds still hold their ledger slots).
+	const bool bForestLive = WRBiome::IsLive(TEXT("forest"));
 	for (const FWRHarvestSpec& Spec : HarvestSpecs)
 	{
 		FHarvestKind& HK = Harvestables.AddDefaulted_GetRef();
@@ -508,7 +546,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		HK.Item = FName(Spec.Item);
 		HK.Radius = Spec.Radius;
 		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
-		if (!Instances->TryGetArrayField(Spec.Kind, Arr))
+		if ((!bForestLive && HK.Kind.StartsWith(TEXT("forest_"))) || !Instances->TryGetArrayField(Spec.Kind, Arr))
 		{
 			continue;
 		}
@@ -632,6 +670,165 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			}
 		}
 		Total += Count;
+	}
+
+	// The Ancient forest (Tools/terrain/forest_dressing.mjs; cooks/build-biome-forest.md 2.5-2.6): each kind drawn from the
+	// tree kit, one instanced part per species variant (instance i is variant FirstVariant + i % Variants), its trunk
+	// collision one hidden instanced cylinder part per kit collider capsule (engine Cylinder: 100 cm tall, 50 cm radius,
+	// centred), placed by each instance's yaw and scale. The server builds only the collision (no looks there).
+	if (bForestLive)
+	{
+		// Wraps a kit collider capsule (mesh space, reference size) for one placed instance: a cylinder from A to B whose
+		// ends overlap by half a radius each, the radius scaling with the tree.
+		const auto CapsuleAt = [](const FWRTreeCollider& C, const FTransform& T) -> FTransform
+		{
+			const float S = float(T.GetScale3D().X);
+			const FVector A = T.TransformPosition(C.A), B = T.TransformPosition(C.B);
+			const float Rad = C.Radius * S;
+			const FVector Axis = B - A;
+			const float Len = float(Axis.Size());
+			const FRotator Rot = Len > 1.f ? FRotationMatrix::MakeFromZ(Axis).Rotator() : FRotator::ZeroRotator;
+			return FTransform(Rot, (A + B) * 0.5f, FVector(Rad / 50.f, Rad / 50.f, (Len + Rad) / 100.f));
+		};
+		int32 ForestCount = 0;
+		for (const FWRForestDressKind& FK : ForestDressKinds)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			if (!Instances->TryGetArrayField(FK.Kind, Arr) || Arr->Num() < 5)
+			{
+				continue;
+			}
+			const int32 Count = Arr->Num() / 5;
+			FHarvestKind* HK = HarvestKind(FK.Kind);
+			const FName Species(FK.Species);
+			// A giant's trunk or a boulder is a wall to the camera too; slimmer trunks let it through (camera.blockMinExtent).
+			const bool bBlockCamera = Species == TEXT("giant") || Species == TEXT("dead_giant") || Species == TEXT("boulder");
+			for (int32 v = 0; v < FK.Variants; ++v)
+			{
+				const int32 Variant = FK.FirstVariant + v;
+				TArray<FTransform> Placed;
+				Placed.Reserve(Count / FK.Variants + 1);
+				for (int32 i = v; i < Count; i += FK.Variants)
+				{
+					const float S = float((*Arr)[i * 5 + 4]->AsNumber());
+					const float Yaw = float((*Arr)[i * 5 + 3]->AsNumber());
+					const FVector Ground((*Arr)[i * 5]->AsNumber(), (*Arr)[i * 5 + 1]->AsNumber(), (*Arr)[i * 5 + 2]->AsNumber());
+					Placed.Emplace(FRotator(0.f, Yaw, 0.f), Ground, FVector(S));
+				}
+				if (!bServer)
+				{
+					if (UStaticMesh* Mesh = WRTreeKit::Mesh(this, Species, Variant))
+					{
+						UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(Mesh, false, FK.Cull);
+						Part->SetCastShadow(FK.bShadow);
+						Part->AddInstances(Placed, false, true);
+						if (HK)
+						{
+							HK->Parts.Add({ Part, FK.Variants, v });
+						}
+					}
+				}
+				if (!FK.bCollide)
+				{
+					continue;
+				}
+				for (const FWRTreeCollider& C : WRTreeKit::Colliders(Species, Variant))
+				{
+					TArray<FTransform> Caps;
+					Caps.Reserve(Placed.Num());
+					for (const FTransform& T : Placed)
+					{
+						Caps.Add(CapsuleAt(C, T));
+					}
+					UHierarchicalInstancedStaticMeshComponent* Shape = MakePart(Cyl, FLinearColor::Black, true, FK.Cull > 0.f ? FK.Cull : 30000.f);
+					Shape->SetHiddenInGame(true);  // the kit's trunk is what you see; this is only what you bump into
+					Shape->SetCastShadow(false);
+					if (!bBlockCamera)
+					{
+						Shape->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+					}
+					Shape->AddInstances(Caps, false, true);
+					if (HK)
+					{
+						HK->Parts.Add({ Shape, FK.Variants, v });
+					}
+				}
+			}
+			ForestCount += Count;
+		}
+		// The tundra neck's pines (DC 2.2: "pines and snow patches mix into alder" north of y +2,500): the island's pine
+		// meshes without their snow, fitted to 10 m (the generator's scale = height / 10 m). Without the pack they draw as
+		// the kit's upright alders (narrow dark crowns), never as engine shapes. A hidden trunk cylinder blocks.
+		const TArray<TSharedPtr<FJsonValue>>* PineArr = nullptr;
+		if (Instances->TryGetArrayField(TEXT("forest_pine"), PineArr) && PineArr->Num() >= 5)
+		{
+			const int32 Count = PineArr->Num() / 5;
+			FHarvestKind* HK = HarvestKind(TEXT("forest_pine"));
+			if (!bServer)
+			{
+				TArray<UStaticMesh*> Meshes;
+				TArray<float> Fits;
+				for (const FString& Path : { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")), Prop(TEXT("FirA"), TEXT("fir_a_textured")) })
+				{
+					if (UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *Path))
+					{
+						Meshes.Add(M);
+						Fits.Add(1000.f / FMath::Max(1.f, float(M->GetBoundingBox().GetSize().Z)));
+					}
+				}
+				const bool bPack = Meshes.Num() > 0;
+				if (!bPack)
+				{
+					for (int32 Variant = 0; Variant < 2; ++Variant)
+					{
+						if (UStaticMesh* M = WRTreeKit::Mesh(this, TEXT("alder"), Variant))
+						{
+							Meshes.Add(M);
+							Fits.Add(1000.f / FMath::Max(1.f, WRTreeKit::ReferenceHeight(TEXT("alder"))));
+						}
+					}
+				}
+				for (int32 m = 0; m < Meshes.Num(); ++m)
+				{
+					const float MinZ = bPack ? float(Meshes[m]->GetBoundingBox().Min.Z) : 0.f;
+					TArray<FTransform> Placed;
+					for (int32 i = m; i < Count; i += Meshes.Num())
+					{
+						const float S = float((*PineArr)[i * 5 + 4]->AsNumber()) * Fits[m];
+						const float Yaw = float((*PineArr)[i * 5 + 3]->AsNumber());
+						const FVector Ground((*PineArr)[i * 5]->AsNumber(), (*PineArr)[i * 5 + 1]->AsNumber(), (*PineArr)[i * 5 + 2]->AsNumber());
+						Placed.Emplace(FRotator(0.f, Yaw, 0.f), Ground + FVector(0.f, 0.f, -MinZ * S), FVector(S));
+					}
+					UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(Meshes[m], false, 24000.f);
+					Part->SetCastShadow(true);
+					Part->AddInstances(Placed, false, true);
+					if (HK)
+					{
+						HK->Parts.Add({ Part, Meshes.Num(), m });
+					}
+				}
+			}
+			TArray<FTransform> Trunks;
+			Trunks.Reserve(Count);
+			for (int32 i = 0; i < Count; ++i)
+			{
+				const float S = float((*PineArr)[i * 5 + 4]->AsNumber());
+				const FVector Ground((*PineArr)[i * 5]->AsNumber(), (*PineArr)[i * 5 + 1]->AsNumber(), (*PineArr)[i * 5 + 2]->AsNumber());
+				Trunks.Emplace(FRotator::ZeroRotator, Ground + FVector(0.f, 0.f, 300.f * S), FVector(0.6f * S, 0.6f * S, 6.f * S));
+			}
+			UHierarchicalInstancedStaticMeshComponent* Shape = MakePart(Cyl, FLinearColor::Black, true, 24000.f);
+			Shape->SetHiddenInGame(true);
+			Shape->SetCastShadow(false);
+			Shape->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+			Shape->AddInstances(Trunks, false, true);
+			if (HK)
+			{
+				HK->Parts.Add({ Shape, 1, 0 });
+			}
+			ForestCount += Count;
+		}
+		Total += ForestCount;
+		UE_LOG(LogWildreach, Log, TEXT("DRESSING forest: %d trees, ferns and rocks from the tree kit"), ForestCount);
 	}
 	UE_LOG(LogWildreach, Log, TEXT("DRESSING built %d decorations (%s)"), Total, bServer ? TEXT("collision only") : TEXT("full"));
 }
@@ -975,6 +1172,19 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 		return false;
 	}
 	const FHarvestKind& HK = Harvestables[BestKind];
+	// The Ancient forest (cooks/biome-forest.md 2.7): no felling within 60 m of a giant's or a heart-tree's root crown.
+	// The axe bounces off ("The roots hold it."); the blow is spent and the tree takes no hit.
+	if (HK.Group == TEXT("tree") && WRForestHazards::RefuseFelling(Who, HK.Ground[BestIndex]))
+	{
+		return true;
+	}
+	// The forest's standing giants and dead snags (group "giant", forest_dressing.mjs) never give anything: a giant's base
+	// is always inside its own 60 m, so this is the same bounce and line; the blow is spent either way.
+	if (HK.Group == TEXT("giant"))
+	{
+		WRForestHazards::RefuseFelling(Who, HK.Ground[BestIndex]);
+		return true;
+	}
 	const FString Tune = TEXT("gathering.") + HK.Group;
 	const int32 Key = (BestKind << KeyShift) | BestIndex;
 	// Clean cut / Vein breaker (life-skill perks): a tree or rock down to its last third gives the rest in this blow.
@@ -1051,7 +1261,8 @@ bool AWRDressing::FindNearest(const FVector& From, const FString& Group, float R
 	for (int32 k = 0; k < Harvestables.Num(); ++k)
 	{
 		const FHarvestKind& HK = Harvestables[k];
-		if (!Group.IsEmpty() && HK.Group != Group)
+		// "Any" never means the forest's giants: nothing can be gathered from them (prompts and gather bots skip them).
+		if (Group.IsEmpty() ? HK.Group == TEXT("giant") : HK.Group != Group)
 		{
 			continue;
 		}
@@ -1265,11 +1476,18 @@ void AWRCave::BuildShell()
 		// The Swamp's karst (cooks/biome-swamp.md 2.6): wet grey limestone, the Peat Cellar's walls dark peat.
 		const bool bSwampRock = Biome == TEXT("swamp");
 		const FLinearColor SwampTint = Theme == TEXT("peat_cellar") ? FLinearColor(0.07f, 0.05f, 0.038f) : FLinearColor(0.19f, 0.18f, 0.15f);
+		// The Ancient forest's caves (cooks/biome-forest.md 2.6): mossy grey sandstone under the meadows and the falls,
+		// the Root-Mine and the Sinkroot dark root-shot earth, the Foxfire Cellar near-black rotten wood and soil.
+		const bool bForestRock = Biome == TEXT("forest");
+		const FLinearColor ForestTint = Theme == TEXT("badger_sett") ? FLinearColor(0.3f, 0.25f, 0.16f)
+			: Theme == TEXT("foxfire_cellar") ? FLinearColor(0.05f, 0.045f, 0.035f)
+			: (Theme == TEXT("root_mine") || Theme == TEXT("sinkroot")) ? FLinearColor(0.09f, 0.075f, 0.055f) : FLinearColor(0.16f, 0.17f, 0.14f);
 		MID->SetVectorParameterValue(RockMat ? TEXT("Tint") : TEXT("Color"),
-			bSwampRock ? SwampTint : bStorm ? StormTint : bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
+			bForestRock ? ForestTint : bSwampRock ? SwampTint : bStorm ? StormTint : bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
 		Rock->SetMaterial(0, MID);
 	}
-	Glow->SetLightColor(Biome == TEXT("swamp") ? FLinearColor(0.75f, 0.85f, 0.25f) : Biome == TEXT("storm_peaks") ? FLinearColor(0.62f, 0.55f, 1.f) : bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
+	// The forest's caves glow foxfire green (the mycelium on the walls; the Alder Grotto's glowworms read the same).
+	Glow->SetLightColor(Biome == TEXT("forest") ? FLinearColor(FColor(127, 224, 122)) : Biome == TEXT("swamp") ? FLinearColor(0.75f, 0.85f, 0.25f) : Biome == TEXT("storm_peaks") ? FLinearColor(0.62f, 0.55f, 1.f) : bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
 	// Enough light in the chamber to find the ore by (it was black inside: 1200 over a 16 m reach).
 	Glow->SetIntensity(WRTune(TEXT("caves.glowIntensity"), 8000.f));
 	Glow->SetAttenuationRadius(WRTune(TEXT("caves.glowRadius"), 2400.f) * GetActorScale3D().X);
@@ -1362,8 +1580,9 @@ void AWRCave::SpawnContents()
 		const FVector Top = GetActorTransform().TransformPosition(FVector(-300.f, 0.f, 650.f));
 		FHitResult Ground;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCave), false, this);
+		// (A runtime land's chunks are its ground too: the forest's caves stand on WRLand.)
 		const bool bGround = GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0, 0, 2000), ECC_WorldStatic, Query)
-			&& Cast<ULandscapeHeightfieldCollisionComponent>(Ground.GetComponent());
+			&& (Cast<ULandscapeHeightfieldCollisionComponent>(Ground.GetComponent()) || Cast<AWRLand>(Ground.GetActor()));
 		if (!bGround && ++ContentTries < 60)
 		{
 			GetWorldTimerManager().SetTimer(ContentTimer, this, &AWRCave::SpawnContents, 1.f, false);
@@ -1406,6 +1625,20 @@ void AWRCave::SpawnContents()
 		else if (Theme == TEXT("gullet")) Ores = { { TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("iron_ore"), FVector(0, -650, 0) }, { TEXT("iron_ore"), FVector(-700, 0, 0) } };
 		else Ores = { { TEXT("copper_ore"), FVector(-550, -550, 0) }, { TEXT("tin_ore"), FVector(-550, 550, 0) }, { TEXT("copper_ore"), FVector(0, -650, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
 	}
+	// The Ancient forest's caves (cooks/biome-forest.md 2.6), deeper is better: C1 the Badger Sett copper and tin (the
+	// newcomers' first, a sandy sett), C2 the Alder Grotto copper, tin and one iron behind the falls, C3 the Root-Mine iron
+	// x3 and its gem pocket (a stone face at the collapsed shaft: 6 hits, a gem most times), C4 the Foxfire Cellar tin and
+	// iron x2 (its rhizomorph is UWRForestWorld's), C5 the Sinkroot iron x4 with the forest's best gem odds. Clay where
+	// it's wet; no sulfur, no lichen.
+	const bool bForestCave = Biome == TEXT("forest");
+	if (bForestCave)
+	{
+		if (Theme == TEXT("badger_sett")) Ores = { { TEXT("copper_ore"), FVector(-550, -550, 0) }, { TEXT("tin_ore"), FVector(-550, 550, 0) }, { TEXT("copper_ore"), FVector(0, -650, 0) } };
+		else if (Theme == TEXT("alder_grotto")) Ores = { { TEXT("copper_ore"), FVector(-550, -550, 0) }, { TEXT("tin_ore"), FVector(-550, 550, 0) }, { TEXT("iron_ore"), FVector(-700, 0, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
+		else if (Theme == TEXT("root_mine")) Ores = { { TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("iron_ore"), FVector(0, -650, 0) }, { TEXT("stone"), FVector(-720, 260, 0) } };
+		else if (Theme == TEXT("foxfire_cellar")) Ores = { { TEXT("tin_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("iron_ore"), FVector(0, -650, 0) } };
+		else Ores = { { TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("iron_ore"), FVector(0, -650, 0) }, { TEXT("iron_ore"), FVector(-700, 0, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
+	}
 	// Star iron (cooks/build-crafting.md 2.1, ores by depth band 4): the highland caves' deepest chamber, back past the
 	// iron, 2.8 m clear of the other veins.
 	if (GetActorLocation().Z >= WRTune(TEXT("caves.starIronMinZ"), 20000.f))
@@ -1419,6 +1652,13 @@ void AWRCave::SpawnContents()
 		{
 			Node->ItemId = Ore.Key;
 			Node->GemChance = (Biome == TEXT("swamp") && Theme == TEXT("gullet")) ? WRTune(TEXT("swampWorld.gulletGemChance"), 0.2f) : WRTune(TEXT("caves.gemChance"), 0.12f);
+			if (bForestCave && Theme == TEXT("sinkroot")) Node->GemChance = WRTune(TEXT("forestWorld.sinkrootGemChance"), 0.2f);
+			if (bForestCave && Ore.Key == TEXT("stone"))
+			{
+				// The Root-Mine's gem pocket: a pick and six blows (cooks/biome-forest.md 2.6 C3).
+				Node->Hits = int32(WRTune(TEXT("forestWorld.gemPocketHits"), 6.f));
+				Node->GemChance = WRTune(TEXT("forestWorld.gemPocketChance"), 0.5f);
+			}
 			Node->FinishSpawning(T);
 			UE_LOG(LogWildreach, Verbose, TEXT("CAVE %s: %s at %s (%.0f cm over the cave's origin)"), *GetName(), *Ore.Key.ToString(), *T.GetLocation().ToCompactString(), T.GetLocation().Z - GetActorLocation().Z);
 		}
@@ -1427,7 +1667,7 @@ void AWRCave::SpawnContents()
 	// danger is the Coilburrows and the dark.
 	const bool bStormCave = Biome == TEXT("storm_peaks");
 	const bool bSwampCave = Biome == TEXT("swamp");
-	if (!bStormCave && !bSwampCave)
+	if (!bStormCave && !bSwampCave && !bForestCave)
 	{
 		AWRHazard::Spawn(GetWorld(), nullptr, Floor(FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
 			WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")));
@@ -1454,6 +1694,32 @@ void AWRCave::SpawnContents()
 			}
 		}
 		UE_LOG(LogWildreach, Log, TEXT("CAVE %s (swamp, %s) at %s: %d ore nodes, %d packs"), *GetName(), *Theme.ToString(), *GetActorLocation().ToCompactString(), Ores.Num(), Pack.Num());
+		return;
+	}
+	// The Ancient forest's caves (cooks/biome-forest.md 2.6): no gas, no ice; their danger is what lives in them. The
+	// Badger Sett's Trufflers (a sounder dens there), one Rootcoil in the Alder Grotto, a Mossmaul in the Root-Mine,
+	// two Rootcoils in the Foxfire Cellar, a Mossmaul and two Rootcoils at the Sinkroot's bottom.
+	if (bForestCave)
+	{
+		TArray<TPair<FName, int32>> ForestPack;
+		if (Theme == TEXT("badger_sett")) ForestPack = { { TEXT("truffler"), 3 } };
+		else if (Theme == TEXT("alder_grotto")) ForestPack = { { TEXT("rootcoil"), 1 } };
+		else if (Theme == TEXT("root_mine")) ForestPack = { { TEXT("mossmaul"), 1 } };
+		else if (Theme == TEXT("foxfire_cellar")) ForestPack = { { TEXT("rootcoil"), 2 } };
+		else ForestPack = { { TEXT("mossmaul"), 1 }, { TEXT("rootcoil"), 2 } };
+		for (int32 p = 0; p < ForestPack.Num(); ++p)
+		{
+			const FTransform PackAt(FRotator::ZeroRotator, Floor(FVector(-350.f + 450.f * p, p % 2 ? 320.f : -260.f, 0.f)));
+			if (AWRCreatureSpawner* Spawner = GetWorld()->SpawnActorDeferred<AWRCreatureSpawner>(AWRCreatureSpawner::StaticClass(), PackAt, this))
+			{
+				Spawner->CreatureId = ForestPack[p].Key;
+				Spawner->Count = ForestPack[p].Value;
+				Spawner->Radius = 350.f;
+				Spawner->RespawnSeconds = WRTune(TEXT("forestWorld.caveRespawnSeconds"), 480.f);
+				Spawner->FinishSpawning(PackAt);
+			}
+		}
+		UE_LOG(LogWildreach, Log, TEXT("CAVE %s (forest, %s) at %s: %d ore nodes, %d packs"), *GetName(), *Theme.ToString(), *GetActorLocation().ToCompactString(), Ores.Num(), ForestPack.Num());
 		return;
 	}
 	// A burrower colony (Kilnmites nest here and mine ore once tamed; Glacimaws lurk under the ice).

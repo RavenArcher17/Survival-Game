@@ -387,7 +387,17 @@
     {"id": "nullwing_bow", "station": "workbench", "level": 4, "inputs": {"nullwing_bone": 3, "greywood": 4, "voidstrider_filament": 2}, "output": "nullwing_bow", "count": 1, "seconds": 8, "quality": true, "biome": "wasteland"},
     {"id": "voidglass_dagger", "station": "forge", "level": 4, "inputs": {"voidglass": 3, "steel_ingot": 2, "hollowfang_hide": 1}, "output": "voidglass_dagger", "count": 1, "seconds": 8, "quality": true, "biome": "wasteland"},
     {"id": "beacon_lantern", "station": "workbench", "level": 3, "inputs": {"voidglass": 2, "bronze_ingot": 3, "tallow": 2}, "output": "beacon_lantern", "count": 1, "seconds": 6, "biome": "wasteland"},
-    {"id": "gnawer_arrow", "station": "workbench", "level": 2, "inputs": {"gnawer_incisor": 1, "greywood": 1}, "output": "gnawer_arrow", "count": 4, "seconds": 4, "biome": "wasteland"}
+    {"id": "gnawer_arrow", "station": "workbench", "level": 2, "inputs": {"gnawer_incisor": 1, "greywood": 1}, "output": "gnawer_arrow", "count": 4, "seconds": 4, "biome": "wasteland"},
+    {"id": "heartwood_shavings", "station": "hand", "level": 1, "inputs": {"heartwood": 1}, "output": "heartwood_shavings", "count": 4, "seconds": 2, "biome": "forest"},
+    {"id": "smoke_pot", "station": "workbench", "level": 1, "inputs": {"clay": 1, "fiber": 5}, "output": "smoke_pot", "count": 1, "seconds": 3, "biome": "forest"},
+    {"id": "thorned_arrow", "station": "workbench", "level": 1, "inputs": {"wood": 1, "thorns": 2}, "output": "thorned_arrow", "count": 10, "seconds": 4, "biome": "forest"},
+    {"id": "snare_stake", "station": "workbench", "level": 2, "inputs": {"heartwood": 1, "rope": 2}, "output": "snare_stake", "count": 1, "seconds": 3, "biome": "forest"},
+    {"id": "briar_balm", "station": "alchemy_table", "level": 1, "inputs": {"thorns": 4, "resin": 1, "animal_fat": 1}, "output": "briar_balm", "count": 1, "seconds": 4, "blueprint": "quest_briar_balm", "biome": "forest"},
+    {"id": "bootlace_blight", "station": "alchemy_table", "level": 2, "inputs": {"bootlace_rhizomorph": 2, "clay": 1, "animal_fat": 1}, "output": "bootlace_blight", "count": 1, "seconds": 5, "blueprint": "quest_bootlace_blight", "biome": "forest"},
+    {"id": "foxfire_lantern", "station": "workbench", "level": 2, "inputs": {"foxfire_wood": 3, "resin": 2, "copper_ingot": 1}, "output": "foxfire_lantern", "count": 1, "seconds": 5, "blueprint": "quest_foxfire_lantern", "biome": "forest"},
+    {"id": "briarproof_leathers", "station": "armorer", "level": 2, "inputs": {"hide": 8, "resin": 2}, "output": "briarproof_leathers", "count": 1, "seconds": 6, "quality": true, "blueprint": "quest_briarproof_leathers", "biome": "forest"},
+    {"id": "heartwood_longbow", "station": "workbench", "level": 3, "inputs": {"heartwood": 4, "resin": 1, "hide": 1, "iron_ingot": 1}, "output": "heartwood_longbow", "count": 1, "seconds": 6, "quality": true, "blueprint": "bp_heartwood_longbow", "biome": "forest"},
+    {"id": "world_root_maul", "station": "forge", "level": 4, "inputs": {"steel_ingot": 6, "heartwood": 6, "verdant_essence": 6}, "output": "world_root_maul", "count": 1, "seconds": 12, "quality": true, "blueprint": "bp_world_root_maul", "biome": "forest"}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

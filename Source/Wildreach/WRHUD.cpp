@@ -212,6 +212,11 @@ void AWRHUD::DrawHUD()
 	{
 		DrawBar(TEXT("Charge"), A->GetCharge(), A->GetMaxCharge(), FLinearColor(FColor(0xB9, 0xA7, 0xFF)), X, Y); Y += BarSpacing;
 	}
+	// Growth (the Nature path, -oldui): moss green #5E8C31.
+	if (Paths && Paths->IsActivePath(TEXT("nature")))
+	{
+		DrawBar(TEXT("Growth"), A->GetGrowth(), A->GetMaxGrowth(), FLinearColor(FColor(0x5E, 0x8C, 0x31)), X, Y); Y += BarSpacing;
+	}
 	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
 	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 

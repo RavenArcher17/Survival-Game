@@ -283,6 +283,18 @@ void AWRGameMode::RescueUnderground()
 				break;
 			}
 		}
+		// A runtime land's ground (WRLand: procedural-mesh chunks, not a landscape, so the trace above can't tell): its
+		// height is a function, so anyone well under it fell through (a chunk whose collision was still cooking). The
+		// places a body rightly stands under it (the forest's Hollow Root, its squeezes) were skipped by InHole above.
+		float LandZ = 0.f;
+		if (!bRescued && WRLand::GroundUnder(L, LandZ) && LandZ > L.Z + Need)
+		{
+			const float Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			C->TeleportTo(FVector(L.X, L.Y, LandZ + Half + 30.f), C->GetActorRotation(), false, true);
+			C->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+			UE_LOG(LogWildreach, Warning, TEXT("RESCUE %s was %.0f m under a land's ground at %s: put back on top"), *C->GetName(), (LandZ - L.Z) / 100.f, *L.ToString());
+			bRescued = true;
+		}
 		if (!bRescued && L.Z < VoidZ)
 		{
 			C->TeleportTo(FVector(L.X, L.Y, VoidZ), C->GetActorRotation(), false, true);

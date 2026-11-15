@@ -44,6 +44,7 @@
 #include "WRReport.h"
 #include "WRRaids.h"
 #include "WRUIFlow.h"
+#include "WRForestCreatures.h"
 #include "Kismet/GameplayStatics.h"
 #include "WorldPartition/WorldPartitionStreamingSource.h"
 
@@ -313,6 +314,11 @@ void AWRPlayerController::InteractReleased()
 	{
 		UI->TameKey(false);
 		UI->DoorKey(false, nullptr);
+	}
+	// A hand on a Mossmaul's moss (the Nature path's calm, WRForestCreatures): letting go stops it (a tap feeds instead).
+	if (FWRForestAI::PathTameNear(this))
+	{
+		ServerCommand(TEXT("world fpathtame"));
 	}
 }
 

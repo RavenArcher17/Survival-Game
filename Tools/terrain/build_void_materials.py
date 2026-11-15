@@ -7,7 +7,7 @@ Shares the graph helpers of Tools/make_build_materials.py (read from it, up to i
                 (set per point from its sub-zone, rift rings, slope), vertex alpha its gloss (1 = voidglass, 0 = ash).
                 Detail from the MW auto-material's rock / dirt textures projected from the world on three axes and
                 taken as brightness only, so the land keeps the palette law (grey land, black glass) and still reads
-                as real ground up close.
+                as real ground up close. Parameter: Wet (0..1, default 0): rain on the ground (darker, glossier).
   M_VoidTear    the inside of a rift: unlit black-violet (#2B1840) with star points that sit in screen space (so the
                 tear looks deeper than the thing it's cut in), a violet rim at grazing angles (#7B4FD6), a slow breath.
                 Parameters: Glow (overall), Stars (0..1), Rim (colour).
@@ -88,6 +88,12 @@ base = mul(rgb, add(bright, k=0.25))
 # glass reads smooth: less detail on it
 base = lerp(base, mul(rgb, k=1.0), mul(gloss, k=0.7))
 rough = sat(add(unary(unreal.MaterialExpressionOneMinus, gloss), mul(add(detail, k=-0.45), k=0.18)))
+# Wet (0..1, default 0 so the wasteland's look is unchanged): rain on a land's ground (WRLand StepWet, the Ancient
+# forest's Rain): darker and glossier on the faces that catch it (up-facing), cliffs less so.
+wet = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Wet", default_value=0.0)
+wet_up = mul(wet, sat(add(mul(nz, k=1.4), k=-0.25)))
+base = lerp(base, mul(base, k=0.58), wet_up)
+rough = lerp(rough, const(0.22), mul(wet_up, k=0.85))
 spec = lerp(const(0.35), const(0.65), gloss)
 mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
 mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)

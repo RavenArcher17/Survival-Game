@@ -1,0 +1,212 @@
+{
+  "id": "nature",
+  "name": "Nature",
+  "biome": "forest",
+  "starter": "thorn_shot",
+  "color": "5E8C31",
+  "icon": "heartwood",
+  "glyph": "leaf",
+  "resource": {
+    "id": "growth",
+    "name": "Growth"
+  },
+  "rootPassive": {
+    "id": "rooted",
+    "name": "Rooted",
+    "text": "Standing still slowly heals you."
+  },
+  "trunk": [
+    {
+      "id": "thorn_shot",
+      "name": "Thorn shot",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic nature spell"
+    },
+    {
+      "id": "growth_capacity",
+      "name": "Growth capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Growth bar"
+    },
+    {
+      "id": "entangle_chance",
+      "name": "Entangle chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Higher chance to root enemies briefly"
+    },
+    {
+      "id": "briar_strike",
+      "name": "Briar strike",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic nature weapon art"
+    }
+  ],
+  "branches": [
+    {
+      "id": "grove",
+      "name": "Grove",
+      "nodes": [
+        {
+          "id": "regrowth",
+          "name": "Regrowth",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: heal over time",
+          "gate": 0
+        },
+        {
+          "id": "lifebloom",
+          "name": "Lifebloom",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "Stronger healing",
+          "gate": 5
+        },
+        {
+          "id": "sanctuary",
+          "name": "Sanctuary",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spell: a zone that heals allies inside",
+          "gate": 10
+        },
+        {
+          "id": "sap",
+          "name": "Sap",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Growth regenerates faster",
+          "gate": 14
+        },
+        {
+          "id": "purify",
+          "name": "Purify",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Healing also removes poison and rot",
+          "gate": 17
+        },
+        {
+          "id": "world_tree",
+          "name": "World tree",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "Summon a tree that heals and shields allies",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "thorn",
+      "name": "Thorn",
+      "nodes": [
+        {
+          "id": "vine_lash",
+          "name": "Vine lash",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Whip-like weapon art",
+          "gate": 0
+        },
+        {
+          "id": "barbs",
+          "name": "Barbs",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More bleed damage",
+          "gate": 5
+        },
+        {
+          "id": "root_snare",
+          "name": "Root snare",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spell: hold enemies in place",
+          "gate": 10
+        },
+        {
+          "id": "thorned_skin",
+          "name": "Thorned skin",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Attackers take damage",
+          "gate": 14
+        },
+        {
+          "id": "briar_spread",
+          "name": "Briar spread",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Larger root areas",
+          "gate": 17
+        },
+        {
+          "id": "strangling_vines",
+          "name": "Strangling vines",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "Vines hold and crush a large enemy",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "bloom",
+      "name": "Bloom",
+      "nodes": [
+        {
+          "id": "sprout_turret",
+          "name": "Sprout turret",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Plant a living turret that shoots thorns",
+          "gate": 0
+        },
+        {
+          "id": "deep_roots",
+          "name": "Deep roots",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More plant health",
+          "gate": 5
+        },
+        {
+          "id": "pollen",
+          "name": "Pollen",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Your plants slow nearby enemies",
+          "gate": 10
+        },
+        {
+          "id": "overgrowth",
+          "name": "Overgrowth",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Plant one extra summon at a time",
+          "gate": 13
+        },
+        {
+          "id": "fertile",
+          "name": "Fertile",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Plants last longer",
+          "gate": 17
+        },
+        {
+          "id": "ancient_guardian",
+          "name": "Ancient guardian",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "Summon a walking tree guardian",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

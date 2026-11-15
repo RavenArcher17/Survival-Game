@@ -71,6 +71,7 @@ FWRFishRegistry::FWRFishRegistry()
 		if (O->TryGetNumberField(TEXT("kgMin"), N)) D.KgMin = N;
 		if (O->TryGetNumberField(TEXT("kgMax"), N)) D.KgMax = N;
 		if (O->TryGetNumberField(TEXT("fight"), N)) D.Fight = FMath::Clamp(static_cast<float>(N), 0.f, 1.f);
+		if (O->TryGetStringField(TEXT("hook"), S)) D.Hook = FName(*S);
 		Fish.Add(D);
 	}
 	const TArray<TSharedPtr<FJsonValue>>* Treasure = nullptr;
@@ -95,7 +96,26 @@ FWRFishRegistry::FWRFishRegistry()
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& X : (*XpObj)->Values) Xp.Add(FName(*X.Key), float(X.Value->AsNumber()));
 	}
-	UE_LOG(LogWildreach, Log, TEXT("Loaded %d fish, %d treasures, %d biome baits"), Fish.Num(), TreasureTable.Num(), Lures.Num());
+	// Special hooks (the Grovekin's Sturgeon hook from the Alder Grotto, cooks/biome-forest.md F-S2): in the bag, its
+	// biome's water gives up its rare and legendary fish more often (a fish row's "hook" also needs it to hold).
+	const TSharedPtr<FJsonObject>* HookObj = nullptr;
+	if (Root->TryGetObjectField(TEXT("hooks"), HookObj))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& H : (*HookObj)->Values)
+		{
+			const TSharedPtr<FJsonObject> O = H.Value->AsObject();
+			if (!O.IsValid()) continue;
+			FHook Def;
+			FString B;
+			Def.Biome = O->TryGetStringField(TEXT("biome"), B) ? FName(*B) : FName(TEXT("any"));
+			const TArray<TSharedPtr<FJsonValue>>* Waters = nullptr;
+			if (O->TryGetArrayField(TEXT("water"), Waters)) for (const TSharedPtr<FJsonValue>& W : *Waters) Def.Waters.Add(FName(*W->AsString()));
+			double Boost = 0.0;
+			if (O->TryGetNumberField(TEXT("rareBoost"), Boost)) Def.RareBoost = static_cast<float>(Boost);
+			Hooks.Add(FName(*H.Key), Def);
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("Loaded %d fish, %d treasures, %d biome baits, %d hooks"), Fish.Num(), TreasureTable.Num(), Lures.Num(), Hooks.Num());
 }
 
 const FWRFishDef* FWRFishRegistry::Find(FName Id) const
@@ -129,6 +149,18 @@ const FWRFishDef* FWRFishRegistry::Pick(FName Biome, FName Water, bool bNight, f
 		if (Roll <= 0.f) return P.Key;
 	}
 	return Pool.Num() > 0 ? Pool.Last().Key : nullptr;
+}
+
+float FWRFishRegistry::HookBoost(const UWRInventoryComponent* Inv, FName Biome, FName Water) const
+{
+	float Boost = 0.f;
+	if (!Inv) return Boost;
+	for (const TPair<FName, FHook>& H : Hooks)
+	{
+		if ((H.Value.Biome != TEXT("any") && H.Value.Biome != Biome) || (H.Value.Waters.Num() > 0 && !H.Value.Waters.Contains(Water))) continue;
+		if (Inv->CountOf(H.Key) > 0) Boost += H.Value.RareBoost;
+	}
+	return Boost;
 }
 
 float FWRFishRegistry::XpFor(FName Rarity, bool bFirstLegend) const
@@ -278,7 +310,8 @@ FName AWRBobber::WaterHere() const
 
 const FWRFishDef* AWRBobber::ChooseFish() const
 {
-	const float Rare = UWRLifeSkillsComponent::StatFor(Angler, TEXT("rareFish")) + (Lure.IsNone() ? 0.f : WRTune(TEXT("fishing.lureRareBoost"), 2.f));
+	const float Rare = UWRLifeSkillsComponent::StatFor(Angler, TEXT("rareFish")) + (Lure.IsNone() ? 0.f : WRTune(TEXT("fishing.lureRareBoost"), 2.f))
+		+ FWRFishRegistry::Get().HookBoost(UWRInventoryComponent::FindFor(Angler), BiomeHere(), WaterHere());
 	// A legend bites only with Legend catch and this biome's bait on, once a real day each (cooks/build-farming.md 2.7).
 	const bool bLegend = UWRLifeSkillsComponent::StatFor(Angler, TEXT("legendCatch")) > 0.f && !Lure.IsNone();
 	const FWRFishDef* Got = FWRFishRegistry::Get().Pick(BiomeHere(), WaterHere(), AWRGameState::IsNightIn(this), Rare, bLegend, FMath::FRand());
@@ -334,6 +367,20 @@ void AWRBobber::Press()
 		FishKg = FMath::Lerp(Fish->KgMin, Fish->KgMax, FMath::Square(FMath::FRand()));   // big ones are rarer
 		const float Size = Fish->KgMax > Fish->KgMin ? (FishKg - Fish->KgMin) / (Fish->KgMax - Fish->KgMin) : 0.5f;
 		FishFight = FMath::Clamp(Fish->Fight * (0.75f + 0.5f * Size), 0.05f, 1.f);
+		// A fish that takes a special hook (Grandfather Sturgeon: the Sturgeon hook) strains an ordinary line far harder:
+		// it can still be landed with care, but the hook is what holds it.
+		HookStrain = 1.f;
+		if (!Fish->Hook.IsNone())
+		{
+			const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Angler);
+			if (!Inv || Inv->CountOf(Fish->Hook) <= 0)
+			{
+				HookStrain = WRTune(TEXT("fishing.hooklessStrain"), 1.8f);
+				const FWRItemDef* HookDef = FWRItemRegistry::Get().Find(Fish->Hook);
+				Notify(FString::Printf(TEXT("Something huge has the line. Your hook won't hold it long: ease off when it runs%s"),
+					HookDef ? *FString::Printf(TEXT(" (a %s would)"), *HookDef->Name.ToLower()) : TEXT("")));
+			}
+		}
 		WRFx::Broadcast(this, TEXT("fish.splash"), FloatAt, FRotator::ZeroRotator, 0.8f, TEXT("fish.hook"));
 		UE_LOG(LogWildreach, Log, TEXT("FISH %s hooked a %s (%.1f kg, fight %.2f)"), *Angler->GetName(), *Fish->Name, FishKg, FishFight);
 		break;
@@ -544,7 +591,7 @@ void AWRBobber::ServerTick(float Dt)
 		if (bReeling)
 		{
 			LineCm -= T.Num(TEXT("fishing.reelSpeed"), 260.f) * (bSurge ? 0.2f : 1.f) * Dt;
-			TensionF += (bSurge ? T.Num(TEXT("fishing.tensionSurge"), 1.25f) : T.Num(TEXT("fishing.tensionReel"), 0.12f)) * (0.55f + FishFight) * Dt;
+			TensionF += (bSurge ? T.Num(TEXT("fishing.tensionSurge"), 1.25f) : T.Num(TEXT("fishing.tensionReel"), 0.12f)) * (0.55f + FishFight) * HookStrain * Dt;
 		}
 		else
 		{

@@ -76,6 +76,11 @@ namespace WRPathsTab
 			// Garnet and oxblood (#7A0A14, cooks/biome-swamp.md 2.18: never crimson), lit toward a warm rose.
 			return { WRPathLook::Color(Path), Hex(TEXT("2A0509")), Hex(TEXT("B23A4A")), Hex(TEXT("F2C6CC")), Hex(TEXT("A8323F")), Hex(TEXT("F6D8DC")) };
 		}
+		if (Path == TEXT("nature"))
+		{
+			// Moss green (#5E8C31, cooks/biome-forest.md 2.17), lit toward the young-leaf gold-green of the World tree's crown.
+			return { WRPathLook::Color(Path), Hex(TEXT("17260C")), Hex(TEXT("7DB043")), Hex(TEXT("DCEFB8")), Hex(TEXT("6FA23A")), Hex(TEXT("E6F4CC")) };
+		}
 		return { WRUI::Ember, Hex(TEXT("45190A")), Hex(TEXT("EC7A34")), Hex(TEXT("FFCF86")), Hex(TEXT("E5843A")), Hex(TEXT("FFD7A0")) };
 	}
 

@@ -298,6 +298,14 @@ the Rift Storm: `WRVoidHazards.*` (one replicated `AWRVoidState` per land; the e
 Unmade Place and the Descent lift: `WRVoidUnmade.*` (E prompts through `WRLandThings`: `land lift`, `land winch`,
 `land keep`). In these files keep file-scope helper names prefixed (unity builds join files).
 
+Also since 0.7.1 (in progress): **the Ancient forest, a heightfield land** (cooks/biome-forest.md, plan
+cooks/build-biome-forest.md). Its ground is `Data/lands/forest.json` + `forest_ground.bin` from
+`node Tools/terrain/forest.mjs` (also writes `Data/forest.json`, the places contract read by `FWRForestData`), then
+`forest_walk.mjs` (after `storm_walk.mjs`), `forest_dressing.mjs` (trees into `island_dressing.json`), `sea_mask.mjs`
+and `world_map.py`. Code: `WRForest*` (world, scenery, hazards, Hollow Root, creatures, bosses, arenas),
+`WRTreeKit`, `WRNaturePath`/`WRAbilitiesNature`/`WRPlantSummon`. Numbers: tuning `forest`, `forestWorld`, `hazards`,
+`creatureAI._forest`, `tame.forest`, `bosses.forest` and `bosses.<id>`. Dev: `world fhaz ...`, `world forest ...`.
+
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
   never its own file in the world folder. Schema changes are a new `Data/db/migrations/NNNN_*.sql`. One server per world

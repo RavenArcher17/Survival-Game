@@ -27,6 +27,7 @@
 #include "WRFarm.h"
 #include "WRCharacterMovementComponent.h"
 #include "WRWorldDressing.h"
+#include "WRInventory.h"   // the rider's worn gear (the Huntsman's crown: mount sprint stamina)
 #include "Wildreach.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -657,6 +658,15 @@ bool AWRCreature::MountStaminaRates(float& OutDrain, float& OutRegen) const
 	OutRegen = T(TEXT("mount.regen"), 25.f) * (TameHasNode(TEXT("courser")) ? 1.5f : 1.f);
 	const FWRCreatureDef* Def = GetDef();
 	if (Def && Def->Id == TEXT("palestrider")) OutDrain = 0.f;   // never tires (FULL-GAME 3.2 graveyard)
+	// The rider's gear: the Huntsman's crown (cooks/biome-forest.md 2.19, the Wild Hunt's drop, worn on the head) -20%
+	// sprint stamina; anything else that carries the stat (a ring, a talisman, a set) counts too.
+	float RiderGear = UWRInventoryComponent::GearStatFor(Rider.Get(), TEXT("mountSprintStamina"));
+	if (const UWRInventoryComponent* RiderInv = UWRInventoryComponent::FindFor(Rider.Get()))
+	{
+		const FWRItemStack& Head = RiderInv->GetEquipped(EWREquipSlot::Head);
+		if (const FWRItemDef* HeadDef = Head.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(Head.ItemId)) RiderGear += HeadDef->Worn.FindRef(TEXT("mountSprintStamina"));
+	}
+	OutDrain *= FMath::Max(0.f, 1.f + RiderGear);
 	return true;
 }
 

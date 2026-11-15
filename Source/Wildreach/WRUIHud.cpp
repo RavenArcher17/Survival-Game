@@ -13,6 +13,7 @@
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
 #include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -34,6 +35,7 @@
 #include "WRPathLook.h"
 #include "WRLightningPath.h"
 #include "WRBloodPath.h"
+#include "WRNaturePath.h"   // the Growth gauge (the Nature path)
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -823,6 +825,8 @@ private:
 		{
 			// The Murkjaw blood rite for a Blood walker (WRSwampCreatures), before the usual taming.
 			if (FString RiteVerb; FWRSwampAI::RitePrompt(Wild, S, RiteVerb)) { OutTarget = Wild->GetDisplayLabel(); return RiteVerb; }
+			// The Mossmaul's path-magic calm for a Nature walker (WRForestCreatures), before the usual taming.
+			if (FString CalmVerb; FWRForestAI::PathTamePrompt(Wild, S, CalmVerb)) { OutTarget = Wild->GetDisplayLabel(); return CalmVerb; }
 			if (Wild->IsUnconscious()) { OutTarget = Wild->GetDisplayLabel(); return TEXT("Tame"); }
 		}
 		if (const AActor* Use = P->FindUseTarget())
@@ -1068,6 +1072,51 @@ private:
 		return FMath::Lerp(Violet, FLinearColor::White, Crackle * Crackle);
 	}
 
+	/** The Growth ring (the Nature path, cooks/biome-forest.md 2.17): moss green #5E8C31, flashing pale when a press was
+	 *  refused for Growth (no dead button), with the ground the sampler read beside its label: Lush (a bright leaf),
+	 *  Normal (a dry leaf), Barren (bare rock): the rate it regrows at, readable at a glance. */
+	TSharedRef<SWidget> GrowthGauge()
+	{
+		const auto Growth = [this]() { const AWRCharacterBase* B = Body(); return B ? 100.f * WRNature::GrowthFraction(B) : 0.f; };
+		const auto Ground = [this]() { const AWRCharacterBase* B = Body(); return B ? WRNature::GroundOf(B) : WRNature::EGround::Normal; };
+		return SNew(SHorizontalBox).Visibility_Lambda([this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("nature")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+			+ SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SOverlay)
+				+ SOverlay::Slot()[SNew(SWRRing).Color_Lambda([this]()
+				{
+					const FLinearColor Moss = WRPathLook::Color(TEXT("nature"));
+					const AWRCharacterBase* B = Body();
+					const float F = B ? WRNature::RefusedFlash(B) : 0.f;
+					return F > 0.f ? FMath::Lerp(Moss, FLinearColor(FColor(245, 240, 230)), F) : Moss;
+				}).Fraction_Lambda([Growth]() { return Growth() / 100.f; })]
+				+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[SNew(SBox).WidthOverride(18.f * U).HeightOverride(18.f * U)[SNew(SImage).Image(WRUI::Icon(WRPathLook::Icon(TEXT("nature"))))]]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(7.f * U, 0.f, 0.f, 0.f)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([Growth]() { return FText::AsNumber(FMath::RoundToInt(Growth())); }), WRUI::Body(13, 800), WRUI::Ink)]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("Growth", "Growth"), WRUI::Body(11, 500), WRUI::Ink3)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4.f * U, 0.f, 0.f, 0.f)
+					[
+						SNew(SBox).WidthOverride(11.f * U).HeightOverride(11.f * U)
+						[
+							SNew(SImage)
+							.Image_Lambda([Ground]() { return WRUI::Image(Ground() == WRNature::EGround::Barren ? FName(TEXT("Glyphs/mountain")) : FName(TEXT("Glyphs/leaf"))); })
+							.ColorAndOpacity_Lambda([Ground]()
+							{
+								const WRNature::EGround G = Ground();
+								return FSlateColor(G == WRNature::EGround::Lush ? FLinearColor(FColor(0x8F, 0xC8, 0x4A)) : G == WRNature::EGround::Normal ? FLinearColor(FColor(0xA8, 0x9C, 0x6A)) : FLinearColor(FColor(0x8A, 0x84, 0x78)));
+							})
+						]
+					]
+				]
+			];
+	}
+
 	TSharedRef<SWidget> Vitals()
 	{
 		const auto A = [this]() { return Attr(); };
@@ -1117,6 +1166,8 @@ private:
 						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Void", "Void"), WRPathLook::Color(TEXT("void")), WRPathLook::Icon(TEXT("void")),
 							[A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetVoid() / FMath::Max(1.f, X->GetMaxVoid()) : 0.f; },
 							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("void")); })]
+						// Growth (the Nature path): moss green, the ground it regrows by beside the label.
+						+ SHorizontalBox::Slot().FillWidth(1.f)[GrowthGauge()]
 				]
 				+ SVerticalBox::Slot().AutoHeight()[Conditions()]
 			]

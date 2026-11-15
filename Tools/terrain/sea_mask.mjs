@@ -1,7 +1,8 @@
 // Where the sea is: a 4 m grid over every landscape on L_Island (the Old Island, 4033 samples 1 m apart centred on the
-// origin, and Storm peaks north of it, Tools/terrain/storm_peaks.mjs), "sea" where the open ocean reaches (flood-filled
-// in from the edge through ground below landAbove), everything else land. Where both landscapes cover a point the higher
-// one is the ground (the north-west neck lies over the island's sea floor). The sea (AWRSea) is drawn only over sea cells,
+// origin, Storm peaks north of it, Tools/terrain/storm_peaks.mjs, the Swamp east of that, Tools/terrain/swamp.mjs, and
+// the Ancient forest south of the island, Tools/terrain/forest.mjs), "sea" where the open ocean reaches (flood-filled
+// in from the edge through ground below landAbove), everything else land. Where landscapes overlap the highest one is
+// the ground (the necks lie over the island's sea floor). The forest's sea is ordinary ocean. The sea (AWRSea) is drawn only over sea cells,
 // so it never shows through land where the far terrain isn't streamed in. Writes Data/sea_mask.json, rows of run lengths
 // (sea, land, sea, ...). The water you swim in (UWRWaterSubsystem) is built on the same cells, on the map named here.
 // Re-run after the terrain changes:  node Tools/terrain/sea_mask.mjs
@@ -50,15 +51,28 @@ const swampZone = (xm, ym) => {
 	const i = Math.floor((xm - SZ.x0) / SZ.cell), j = Math.floor((ym - SZ.y0) / SZ.cell);
 	return i < 0 || j < 0 || i >= SZ.width || j >= SZ.height ? '~' : SZ.rows[j][i];
 };
+// The Ancient forest (Tools/terrain/forest.mjs) south of the island: ordinary ground and ocean, no inland water rule.
+let forest = null, FF = null;
+try {
+	forest = fs.readFileSync(path.join(root, 'Art', 'Terrain', 'forest_height.r16'));
+	FF = JSON.parse(fs.readFileSync(path.join(root, 'Data', 'forest.json'), 'utf8')).frame;
+} catch { forest = null; }
+const forestH = (xm, ym) => {
+	if (!forest) return null;
+	const i = Math.round((xm - FF.x0) / FF.step), j = Math.round((ym - FF.y0) / FF.step);
+	if (i < 0 || j < 0 || i >= FF.samples || j >= FF.samples) return null;
+	return (forest.readUInt16LE((j * FF.samples + i) * 2) - 32768) / FF.unitsPerMetre;
+};
 // The grid covers every landscape (metres).
 const frames = [[-HALF_M, -HALF_M, HALF_M, HALF_M]];
 if (storm) frames.push([SF.x0, SF.y0, SF.x0 + (SF.samples - 1) * SF.step, SF.y0 + (SF.samples - 1) * SF.step]);
 if (swamp) frames.push([WF.x0, WF.y0, WF.x0 + (WF.samples - 1) * WF.step, WF.y0 + (WF.samples - 1) * WF.step]);
+if (forest) frames.push([FF.x0, FF.y0, FF.x0 + (FF.samples - 1) * FF.step, FF.y0 + (FF.samples - 1) * FF.step]);
 const MINX = Math.min(...frames.map(f => f[0])), MINY = Math.min(...frames.map(f => f[1]));
-const MAXX = Math.max(...frames.map(f => f[2])), MAXY = HALF_M;
+const MAXX = Math.max(...frames.map(f => f[2])), MAXY = forest ? Math.max(HALF_M, FF.y0 + (FF.samples - 1) * FF.step) : HALF_M;   // south to the forest's edge
 const W = Math.floor((MAXX - MINX) / CELL), N = Math.floor((MAXY - MINY) / CELL);
 const ground = (xm, ym) => {
-	const v = [islandH(xm, ym), stormH(xm, ym), swampH(xm, ym)].filter(h => h !== null);
+	const v = [islandH(xm, ym), stormH(xm, ym), swampH(xm, ym), forestH(xm, ym)].filter(h => h !== null);
 	return v.length ? Math.max(...v) : -50;
 };
 const SWAMP_SURFACE = 0.6, SWAMP_LAND_ABOVE = 0.9;

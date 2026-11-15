@@ -1,6 +1,7 @@
 #include "WRInventory.h"
 #include "WRStormTypes.h"
 #include "WRSwampSystems.h"
+#include "WRForestWorld.h"
 #include "WRVoid.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
@@ -35,6 +36,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "EngineUtils.h"
 
 // ---------------------------------------------------------------- registry
 
@@ -957,6 +959,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		// Opens a portal of its rank in its land, in front of you (WRPortals).
 		return WRPortals::UseKey(Cast<AWRPlayerState>(GetOwner()), Def->Id);
 	}
+	// The Ancient forest's placed things (WRForestWorld): a snare stake set where you stand.
+	{
+		const FString Forest = UWRForestWorld::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id);
+		if (!Forest.IsEmpty()) return Forest;
+	}
 	if (Def->Category == TEXT("raid"))
 	{
 		// Raid tools (WRRaiding): a petard or mining charge pressed on, a siege ladder stood up, the code breaker.
@@ -1108,6 +1115,26 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 		}
 		if (!D->BuffId.IsNone()) WRStorm::GrantBuff(C, D->BuffId, D->BuffMinutes * 60.f);
 		WRFx::BroadcastOn(C, TEXT("potion.heal"), NAME_None, 1.f, NAME_None, 0.5f);
+		// The Verdant core socketed (Sylvaroth's part, cooks/biome-forest.md 2.14): the potion heals your tames near you
+		// too, by its share of what it healed you.
+		const float TameShare = D->Heal > 0.f ? UWRInventoryComponent::GearStatFor(C, TEXT("potionTameHeal")) : 0.f;
+		if (TameShare > 0.f)
+		{
+			const FString TameOwnerName = WRWorld::PlayerOf(C);
+			const float Reach = WRTune(TEXT("forestWorld.verdantCoreRange"), 1500.f);
+			for (TActorIterator<AWRCreature> It(C->GetWorld()); It && !TameOwnerName.IsEmpty(); ++It)
+			{
+				AWRCreature* Tame = *It;
+				if (!Tame->IsAlive() || !Tame->IsTamed() || Tame->GetTameOwner() != TameOwnerName || FVector::Dist(Tame->GetActorLocation(), C->GetActorLocation()) > Reach) continue;
+				UAbilitySystemComponent* TameASC = Tame->GetAbilitySystemComponent();
+				const UWRAttributeSet* TameAttr = Tame->GetAttributes();
+				if (!TameASC || !TameAttr) continue;
+				// Its share of the potion as you drank it (your Potency perk counts; your own rot or folds don't).
+				const float TameHeal = D->Heal * (1.f + UWRLifeSkillsComponent::StatFor(Self->GetOwner(), TEXT("potionPotency"))) * TameShare;
+				TameASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(TameAttr->GetMaxHealth(), TameAttr->GetHealth() + TameHeal));
+				WRFx::BroadcastOn(Tame, TEXT("potion.heal"), NAME_None, 1.f, NAME_None, 0.5f);
+			}
+		}
 	}), T.Num(TEXT("potions.healAt"), 0.5f) * Drink / FMath::Max(0.1f, DrinkSeconds), false);
 	UE_LOG(LogWildreach, Log, TEXT("ITEM %s drinks %s (%d left)"), *Character->GetName(), *Id.ToString(), CountOf(Id));
 	return FString::Printf(TEXT("Drinking %s"), *Name);

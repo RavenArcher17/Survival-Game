@@ -6,6 +6,7 @@
 #include "WRWarHall.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
+#include "WRForestBosses.h"
 #include "WRSwampSystems.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -29,6 +30,9 @@
 #include "WRWeapons.h"
 #include "WRLag.h"
 #include "WRLightningPath.h"
+#include "WRNaturePath.h"
+#include "WRForestTypes.h"
+#include "WRForestHazards.h"
 #include "WRBloodPath.h"
 #include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
@@ -121,6 +125,13 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	if (Element == WRTags::Element_Lightning)
 	{
 		WRLightning::GainCharge(Who, Amount);
+		return;
+	}
+	// Growth (the Nature path) regrows by the ground; what feeds it otherwise (an offering stone, a Rune of the Grave
+	// kill) goes through its own gain rules (WRNaturePath.cpp).
+	if (Element == WRNature::Element_Nature)
+	{
+		WRForest::GrantGrowth(Who, Amount);
 		return;
 	}
 	UAbilitySystemComponent* ASC = Who->GetAbilitySystemComponent();
@@ -638,6 +649,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f + HeatBonus(Attacker->GetAttributes()->GetHeat(), Attacker->GetAttributes()->GetMaxHeat());
 		}
+		// Nature: allies under a World tree's crown take 20% less (WRNaturePath.cpp).
+		Damage *= WRNature::DamageTakenScale(Target, Hit);
 		// Lightning: high Charge, Overcharge, Conductive on soaked bodies, a Charged weapon's released Charge.
 		if (Hit.Element == WRTags::Element_Lightning && Attacker)
 		{
@@ -867,6 +880,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		Target->OnDamageTaken(Hit, Damage);
 		Target->Status->NotifyHurt();
+		// The forest: a blow on the Hornwarden's herd from a survivor or a tame enrages him (WRForestBosses.cpp).
+		FWRForestBoss::AnyDamage(Target, Hit, Damage);
 		WRArtifacts::OnHitLanded(Target, Hit, Damage);
 	}
 	// One lifesteal pipeline (WRBloodPath.cpp, cooks/biome-swamp.md 2.17): Bloodthirst, Lifesteal, Leech strike, Sanguine
@@ -905,6 +920,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	{
 		Target->Status->ClearStatus(WRTags::Status_Frostbite);
 	}
+	// The Nature path (WRNaturePath.cpp): Thorned skin bites back on the same contact frame; any damage resets Rooted.
+	WRNature::AfterDamage(Target, Hit, Damage, Result == EWRHitResult::Hit);
 	// Combat tag (combat.md 2.20): hitting or being hit by a player (or their tame) holds both in the fight a while.
 	if (bPvP)
 	{
@@ -922,7 +939,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const float MoveArmour = Target->IsSwinging() && Target->Swing.HyperarmorMult > 0.f ? Target->Swing.HyperarmorMult : WRTune(TEXT("poise.hyperarmor.heavy"), 1.5f);
 		const float Armour = bHyper ? MoveArmour : 1.f;
 		// A raised guard braces the body against what gets round it (Obsidian heart talisman: guardPoise).
-		const float GuardPoise = TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) ? UWRInventoryComponent::GearStatFor(Target, TEXT("guardPoise")) : 0.f;
+		// Frozen grove (Frost + Nature): allies in that survivor's Sanctuary or under their World tree stand +15 firmer.
+		const float GuardPoise = (TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) ? UWRInventoryComponent::GearStatFor(Target, TEXT("guardPoise")) : 0.f)
+			+ WRNature::BonusPoise(Target);
 		const float Left = (TargetAttr->GetPoise() + GuardPoise) * Armour - PoiseDamage;
 		Target->Status->NotifyPoiseDamaged();
 		// A creature with hyperarmor on its own attacks (big bodies, bosses) keeps swinging through it.
@@ -995,6 +1014,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);
 		Stance *= FWRVoidBoss::StanceTaken(Target, Hit, Stance);   // the Wasteland: an open core, the Mother's strain, eating, a failed Mimic   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
 		Stance *= FWRSwampBoss::StanceTaken(Target, Hit, Stance);   // the Swamp: Maw's open belly, Vharra convulsing
+		Stance *= FWRForestBoss::StanceTaken(Target, Hit, Stance);  // the forest: the Hornwarden held by roots x2
 		if (AWRCreature* Body = Cast<AWRCreature>(Target))
 		{
 			if (Hit.PhysType == 2 && Body->IsNearLockPoint(Hit.ImpactPoint, TEXT("head"), WRTune(TEXT("stance.headRadius"), 70.f)))
@@ -1062,6 +1082,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const float GearBuild = Hit.bMelee ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("buildupDealt")) : 0.f;
 		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f) * (1.f + GearBuild)
 			* WRPortals::BuildupScale(Attacker, Target);   // a fold's Venomous; the Rime-Witch's freeze in brazier light
+		// A Nature blow's bleed is remembered as it goes on (Barbs and Thorn feast read it when it bursts).
+		WRNature::NoteBuildups(Target, Hit);
 		const auto DealtBy = [Attacker](int32 Id) { return 1.f + UWRInventoryComponent::GearStatFor(Attacker, FName(*(FString(TEXT("buildupDealt.")) + WRStatus::Name(Id).ToString()))); };
 		// The Swamp's coatings and charms (WRSwampSystems): thinblood oil's bleed on a blade, the Coven ring's +5% curse.
 		FWRHit Coated = Hit;
@@ -1091,6 +1113,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		}
 		if (Target->IsAlive()) Target->Status->AddBuildup(WRTags::Element_Fire, Burn, Attacker);
 		if (Target->IsAlive()) Target->Status->AddBuildup(WRTags::Element_Frost, Frost, Attacker);
+	}
+	// The Nature path's procs on a landed blow (WRNaturePath.cpp): Entangle chance, Briar strike's roots on a lowland creature.
+	if (Result == EWRHitResult::Hit)
+	{
+		WRNature::AfterHit(Target, Hit, Damage);
 	}
 	// The Lightning path's procs on a landed blow (WRLightningPath.cpp): the violet flash, Shock chance, Static strike's
 	// arc, Charged weapon's shock, Thunder god's bolt, Plasma.
@@ -1183,6 +1210,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			if (Main == TEXT("fire")) GainResource(Attacker, WRTags::Element_Fire, Feed);
 			else if (Main == TEXT("frost")) GainResource(Attacker, WRTags::Element_Frost, Feed);
 			else if (Main == TEXT("lightning")) GainResource(Attacker, WRTags::Element_Lightning, Feed);
+			else if (Main == TEXT("nature")) GainResource(Attacker, WRNature::Element_Nature, Feed);
 		}
 		// Blood: Feast heals the killer, Contagion passes a dying body's curse on (WRBloodPath.cpp).
 		WRBlood::OnKill(Target, Hit);
@@ -1199,6 +1227,12 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Result == EWRHitResult::Hit && Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime)
 	{
 		AWRVoidState::FireAt(Target, Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight()));
+	}
+	// The same touch in the Ancient forest: thornbrake round the one it struck burns open (WRForestHazards; cheap when
+	// there's none near).
+	if (Result == EWRHitResult::Hit && Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime)
+	{
+		WRForestHazards::FireLanded(Target->GetWorld(), Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight()));
 	}
 	return Done(Result);
 }

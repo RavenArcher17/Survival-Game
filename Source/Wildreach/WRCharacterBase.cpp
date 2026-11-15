@@ -17,7 +17,10 @@
 #include "WRLightningPath.h"
 #include "WRSwampSystems.h"
 #include "WRSwampCreatures.h"
+#include "WRForestCreatures.h"
 #include "WRSwampBosses.h"
+#include "WRNaturePath.h"
+#include "WRForestHazards.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -144,10 +147,16 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	if (HasTag(WRSwampTags::Quag)) Slow *= WRTune(TEXT("swampHazards.quag.runMultiplier"), 0.5f);
 	// Swamp leeches on you: you still act, at x0.85 (both machines read the replicated latch; WRSwampCreatures).
 	Slow *= WRSwampGrip::MoveScale(this);
+	// Held in a forest creature's hug or coils (no moving), Hivebacks clinging in a heat ball (-10% each): WRForestCreatures.
+	Slow *= WRForestGrip::MoveScale(this);
 	// Wading the Mother's Throat's risen flood (Vharra's Sinking): x0.75 (both machines read the replicated flood).
 	Slow *= FWRSwampBoss::WadeScale(this);
+	// Pushing through the Ancient forest's thornbrake without a pass: run x0.5 (the server sets the tag 0.6 s after
+	// contact; both machines read the replicated tag, cooks/biome-forest.md 2.8).
+	Slow *= WRForestHazards::MoveScale(this);
 	// The Lightning path: Swift and high Charge (both machines read them: the owner predicts with the same numbers).
-	return Slow * SpeedBoost * Load * WRLightning::MoveSpeedScale(this);
+	// The Nature path: an enemy's Pollen haze (both machines see the plants), an Entangle's boss slow (server bodies).
+	return Slow * SpeedBoost * Load * WRLightning::MoveSpeedScale(this) * WRNature::MoveSpeedScale(this);
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)
@@ -167,6 +176,8 @@ void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPo
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), 0.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), 0.f);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetChargeAttribute(), 0.f);
+	// Growth (the Nature path) is a spender: you wake with a full bar (resources.growth.startFull).
+	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetGrowthAttribute(), WRTune(TEXT("resources.growth.startFull"), 1.f) > 0.f && GetAttributes() ? GetAttributes()->GetMaxGrowth() : 0.f);
 	// Stance (creatures and bosses: COMBAT-AND-LESSONS 1.4), by its tier or its own number.
 	const float Stance = UWRCombatLibrary::MaxStanceFor(this);
 	AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetMaxStanceAttribute(), Stance);

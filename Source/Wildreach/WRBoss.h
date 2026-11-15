@@ -183,6 +183,8 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	friend struct FWRStormBoss;
 	friend struct FWRSwampBoss;
 	friend struct FWRVoidBoss;
+	// The Ancient forest's bosses (WRForestBosses: Old Gnarl, the Bramblequeen, the Grey Matron, the Hornwarden, Sylvaroth).
+	friend struct FWRForestBoss;
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

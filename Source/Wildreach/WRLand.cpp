@@ -11,6 +11,11 @@
 #include "WRVoid.h"
 #include "WRTuning.h"
 #include "WRFarm.h"
+#include "WRSocial.h"
+#include "WRCrafting.h"
+#include "WRSurvival.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/World.h"
@@ -94,6 +99,130 @@ namespace
 			}
 		}
 		return Lands;
+	}
+}
+
+// A heightfield land's parsing (the Ancient forest, cooks/build-biome-forest.md 2.1-2.3): its samples file, zone grid,
+// surface classes, colour bands and underground places. Named apart from the anonymous helpers above (unity builds).
+namespace WRLandHfImpl
+{
+	void LSpeck(const TSharedPtr<FJsonObject>& O, TArray<FLinearColor>& OutColours, float& OutAmount, float& OutScale)
+	{
+		const TSharedPtr<FJsonObject>* S = nullptr;
+		if (!O.IsValid() || !O->TryGetObjectField(TEXT("speck"), S)) return;
+		const TArray<TSharedPtr<FJsonValue>>* Cols = nullptr;
+		if ((*S)->TryGetArrayField(TEXT("colors"), Cols))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Cols)
+			{
+				const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+				if (V->TryGetArray(A) && A->Num() >= 3) OutColours.Add(FLinearColor(FColor(uint8((*A)[0]->AsNumber()), uint8((*A)[1]->AsNumber()), uint8((*A)[2]->AsNumber()))));
+			}
+		}
+		OutAmount = LNum(*S, TEXT("amount"), 0.f);
+		OutScale = FMath::Max(0.5f, LNum(*S, TEXT("scale"), 5.f));
+	}
+
+	void ParseHeightfield(FWRLandDef& D, const TSharedPtr<FJsonObject>& J, const TSharedPtr<FJsonObject>& Hf)
+	{
+		FString File;
+		if (!Hf->TryGetStringField(TEXT("file"), File)) return;
+		TArray<uint8> Bytes;
+		const FString Path = FPaths::Combine(FWRTuning::DataDir(), TEXT("lands"), File);
+		if (!FFileHelper::LoadFileToArray(Bytes, *Path))
+		{
+			UE_LOG(LogWildreach, Error, TEXT("LAND %s: its heightfield %s is missing"), *D.Id.ToString(), *Path);
+			return;
+		}
+		D.HfOrigin = FVector2D(LNum(Hf, TEXT("x0"), 0.f), LNum(Hf, TEXT("y0"), 0.f));
+		D.HfStep = FMath::Max(0.5f, LNum(Hf, TEXT("step"), 4.f));
+		D.HfN = int32(LNum(Hf, TEXT("samples"), 0.f));
+		D.HfUnits = FMath::Max(1.f, LNum(Hf, TEXT("unitsPerMetre"), 16.f));
+		D.HfOffset = LNum(Hf, TEXT("offset"), 32768.f);
+		const int64 Count = int64(D.HfN) * D.HfN;
+		bool bSurface = false;
+		Hf->TryGetBoolField(TEXT("surface"), bSurface);
+		if (D.HfN < 2 || Bytes.Num() < Count * 2 + (bSurface ? Count : 0))
+		{
+			UE_LOG(LogWildreach, Error, TEXT("LAND %s: %s holds %d bytes, not %d samples"), *D.Id.ToString(), *File, Bytes.Num(), D.HfN);
+			D.HfN = 0;
+			return;
+		}
+		// Little-endian uint16 heights row by row (the file is written that way on every platform we ship).
+		D.HfHeights.SetNumUninitialized(int32(Count));
+		for (int64 k = 0; k < Count; ++k) D.HfHeights[int32(k)] = uint16(Bytes[int32(k * 2)]) | (uint16(Bytes[int32(k * 2 + 1)]) << 8);
+		if (bSurface) D.HfSurface = TArray<uint8>(Bytes.GetData() + Count * 2, int32(Count));
+		D.bHeightfield = true;
+		const float Span = (D.HfN - 1) * D.HfStep;
+		D.MapBox = FBox2D(D.HfOrigin, D.HfOrigin + FVector2D(Span, Span));
+		D.OwnFromY = LNum(J, TEXT("ownFromY"), -1.0e9f);
+		const TSharedPtr<FJsonObject>* G = nullptr;
+		if (J->TryGetObjectField(TEXT("zoneGrid"), G))
+		{
+			D.GridOrigin = FVector2D(LNum(*G, TEXT("x0"), D.HfOrigin.X), LNum(*G, TEXT("y0"), D.HfOrigin.Y));
+			D.GridCell = FMath::Max(1.f, LNum(*G, TEXT("cell"), 16.f));
+			D.GridW = int32(LNum(*G, TEXT("width"), 0.f));
+			D.GridH = int32(LNum(*G, TEXT("height"), 0.f));
+			const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+			if ((*G)->TryGetArrayField(TEXT("rows"), Rows)) for (const TSharedPtr<FJsonValue>& V : *Rows) D.GridRows.Add(V->AsString());
+			D.GridH = FMath::Min(D.GridH, D.GridRows.Num());
+		}
+		D.ZoneBlend = LNum(J, TEXT("zoneBlend"), 45.f);
+		const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+		if (J->TryGetArrayField(TEXT("surfaces"), A))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *A)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				if (!O.IsValid()) continue;
+				FWRLandSurface& S = D.Surfaces.AddDefaulted_GetRef();
+				S.Class = uint8(LNum(O, TEXT("class"), 0.f));
+				S.Color = WRLand::Colour(O, TEXT("color"), FColor(128, 120, 100));
+				S.Rough = LNum(O, TEXT("rough"), 0.9f);
+				LSpeck(O, S.Speck, S.SpeckAmount, S.SpeckScale);
+			}
+		}
+		if (J->TryGetArrayField(TEXT("bands"), A))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *A)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				if (!O.IsValid()) continue;
+				FWRLandBand& B = D.Bands.AddDefaulted_GetRef();
+				B.Y0 = LNum(O, TEXT("y0"), 0.f);
+				B.Y1 = LNum(O, TEXT("y1"), 0.f);
+				B.Amount = LNum(O, TEXT("amount"), 0.f);
+				B.NoiseM = FMath::Max(1.f, LNum(O, TEXT("noise"), 30.f));
+				B.Color = WRLand::Colour(O, TEXT("color"), FColor::White);
+			}
+		}
+		const TSharedPtr<FJsonObject>* SR = nullptr;
+		if (J->TryGetObjectField(TEXT("slopeRock"), SR) && (*SR)->HasField(TEXT("ledge"))) D.LedgeColor = WRLand::Colour(*SR, TEXT("ledge"), FColor(78, 107, 42));
+		const TSharedPtr<FJsonObject>* U = nullptr;
+		if (J->TryGetObjectField(TEXT("underground"), U))
+		{
+			(*U)->TryGetStringField(TEXT("letters"), D.UndergroundLetters);
+			if ((*U)->TryGetArrayField(TEXT("ways"), A))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *A)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* W = nullptr;
+					if (V->TryGetArray(W) && W->Num() >= 5)
+					{
+						D.UndergroundWays.Add(FVector4f(float((*W)[0]->AsNumber()), float((*W)[1]->AsNumber()), float((*W)[2]->AsNumber()), float((*W)[3]->AsNumber())));
+						D.UndergroundRadii.Add(float((*W)[4]->AsNumber()));
+					}
+				}
+			}
+		}
+		D.BuildFirst = LLine(J, TEXT("buildFirst"));
+		UE_LOG(LogWildreach, Log, TEXT("LAND %s: heightfield %d x %d at %.0f m from (%.0f, %.0f)"), *D.Id.ToString(), D.HfN, D.HfN, D.HfStep, D.HfOrigin.X, D.HfOrigin.Y);
+	}
+
+	/** A colour picked out of a speck list by noise (wildflowers: mostly the first, now and then the others). */
+	FLinearColor SpeckPick(const TArray<FLinearColor>& Colours, float N01)
+	{
+		return Colours[FMath::Clamp(int32(N01 * Colours.Num()), 0, Colours.Num() - 1)];
 	}
 }
 
@@ -217,8 +346,11 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			if (Z->TryGetStringField(TEXT("bed"), Str)) Zone.Bed = FName(*Str);
 			const TSharedPtr<FJsonObject>* D = nullptr;
 			if (Z->TryGetObjectField(TEXT("decor"), D)) Zone.Decor = *D;
+			if (Z->TryGetStringField(TEXT("letter"), Str) && Str.Len() > 0) Zone.Letter = Str[0];
+			WRLandHfImpl::LSpeck(Z, Zone.Speck, Zone.SpeckAmount, Zone.SpeckScale);
 		}
 	}
+	if (J->TryGetObjectField(TEXT("heightfield"), N)) WRLandHfImpl::ParseHeightfield(*this, J, *N);
 	// Features last: their levels read the base ground (crest + noise + coast) at their own points.
 	if (J->TryGetArrayField(TEXT("features"), A))
 	{
@@ -280,12 +412,16 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			Fe.Depth = LNum(C, TEXT("depth"), 5.f);
 		}
 	}
+	if (bHeightfield) return HfN > 1 && HfHeights.Num() == HfN * HfN;
 	return Coast.Num() >= 3 && HeightCurve.Num() >= 2;
 }
 
 bool FWRLandDef::Contains(const FVector& W, float MarginM) const
 {
 	const FVector2D M = ToMap(W);
+	// A heightfield land is exactly its frame (no margin: the island's landscape meets it), and only south of where
+	// another land's ground ends (the overlap strip under the island's south shore stays the island's).
+	if (bHeightfield) return MapBox.IsInside(M) && M.Y >= OwnFromY;
 	return M.X >= MapBox.Min.X - MarginM && M.X <= MapBox.Max.X + MarginM && M.Y >= MapBox.Min.Y - MarginM && M.Y <= MapBox.Max.Y + MarginM;
 }
 
@@ -313,6 +449,7 @@ float FWRLandDef::CoastDistance(const FVector2D& M) const
 
 float FWRLandDef::BaseHeight(const FVector2D& M) const
 {
+	if (bHeightfield) return HfHeight(M);
 	// The Spine: height by distance from its crest, eased between the curve's keys.
 	const float D = Crest.Num() >= 2 ? WRLand::DistToPolyline(M, Crest) : 1000.f;
 	float H = HeightCurve.Last().Y;
@@ -399,6 +536,12 @@ const FWRLandFeature* FWRLandDef::Feature(FName FeatureId) const
 
 const FWRLandZone* FWRLandDef::ZoneAt(const FVector2D& M) const
 {
+	if (bHeightfield)
+	{
+		const TCHAR L = GridLetter(M);
+		for (const FWRLandZone& Z : Zones) if (Z.Letter == L) return &Z;
+		return Zones.Num() ? &Zones.Last() : nullptr;
+	}
 	for (const FWRLandZone& Z : Zones) if (Z.Contains(M)) return &Z;
 	return Zones.Num() ? &Zones.Last() : nullptr;
 }
@@ -487,6 +630,149 @@ FLinearColor FWRLandDef::Ground(const FVector2D& M, const FVector& N, float& Out
 	return C;
 }
 
+// ================================================================================================ a heightfield land
+
+float FWRLandDef::HfHeight(const FVector2D& M) const
+{
+	if (HfN < 2) return SeaFloor;
+	const float FX = (M.X - HfOrigin.X) / HfStep, FY = (M.Y - HfOrigin.Y) / HfStep;
+	const int32 I = FMath::Clamp(FMath::FloorToInt(FX), 0, HfN - 2), J = FMath::Clamp(FMath::FloorToInt(FY), 0, HfN - 2);
+	const float TX = FMath::Clamp(FX - I, 0.f, 1.f), TY = FMath::Clamp(FY - J, 0.f, 1.f);
+	return FMath::Lerp(FMath::Lerp(HfSample(I, J), HfSample(I + 1, J), TX), FMath::Lerp(HfSample(I, J + 1), HfSample(I + 1, J + 1), TX), TY);
+}
+
+bool FWRLandDef::HfHiddenAt(const FVector2D& M) const
+{
+	if (!bHeightfield || HfSurface.Num() != HfHeights.Num()) return false;
+	const int32 I = FMath::RoundToInt((M.X - HfOrigin.X) / HfStep), J = FMath::RoundToInt((M.Y - HfOrigin.Y) / HfStep);
+	if (I < 0 || J < 0 || I >= HfN || J >= HfN) return true;
+	return HfSurface[J * HfN + I] == HfHidden;
+}
+
+TCHAR FWRLandDef::GridLetter(const FVector2D& M) const
+{
+	const int32 I = FMath::FloorToInt((M.X - GridOrigin.X) / GridCell), J = FMath::FloorToInt((M.Y - GridOrigin.Y) / GridCell);
+	if (I < 0 || J < 0 || J >= GridH || I >= GridW || I >= GridRows[J].Len()) return 0;
+	return GridRows[J][I];
+}
+
+bool FWRLandDef::IsUnderground(const FVector2D& M) const
+{
+	if (!bHeightfield) return false;
+	const TCHAR L = GridLetter(M);
+	int32 Found = INDEX_NONE;
+	if (L && UndergroundLetters.FindChar(L, Found)) return true;
+	for (int32 i = 0; i < UndergroundWays.Num() && i < UndergroundRadii.Num(); ++i)
+	{
+		const FVector4f& W = UndergroundWays[i];
+		if (WRLand::DistToSegment(M, FVector2D(W.X, W.Y), FVector2D(W.Z, W.W)) <= UndergroundRadii[i]) return true;
+	}
+	return false;
+}
+
+FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& OutRough) const
+{
+	// The ground tells the zone (cooks/biome-forest.md 2.1-2.2; build plan 2.3): each sub-zone's own ground in patches of
+	// its second colour, specks (wildflowers in the meadow, moss in the litter), blended across the zone grid's edges over
+	// zoneBlend m (nine samples on a ring the noise turns, so the blend is ragged too), then the sample's surface (the
+	// river's stones and gravel, sand and dunes, roads and trails, the Hollow Root's floor), the frost band, the sea floor
+	// under the water, and rock on the steep ground with moss on the Spine's ledges.
+	const FVector2D M = HfOrigin + FVector2D(float(I), float(J)) * HfStep;
+	const float H = HfSample(I, J);
+	const float Patch = Smooth(-0.15f, 0.35f, Noise(M / 34.f + FVector2D(5.3f, 2.9f)) + Noise(M / 9.f) * 0.3f);
+	const auto ZoneColour = [&](const FWRLandZone& Z, float& OutR) -> FLinearColor
+	{
+		FLinearColor C = FMath::Lerp(Z.Ground, Z.GroundAlt, Patch);
+		OutR = Z.Rough;
+		if (Z.Speck.Num() && Z.SpeckAmount > 0.f)
+		{
+			const float S = Noise(M / Z.SpeckScale + FVector2D(31.7f, 4.1f)) * 0.75f + Noise(M / (Z.SpeckScale * 0.37f) + FVector2D(2.2f, 17.3f)) * 0.45f;
+			const float W = Smooth(1.f - 2.2f * Z.SpeckAmount, 1.f - 1.4f * Z.SpeckAmount, S * 0.5f + 0.5f);
+			if (W > 0.f) C = FMath::Lerp(C, WRLandHfImpl::SpeckPick(Z.Speck, Noise(M / 23.f + FVector2D(9.f, 9.f)) * 0.5f + 0.5f), W * 0.8f);
+		}
+		return C;
+	};
+	FLinearColor Sum(0.f, 0.f, 0.f, 0.f);
+	float RSum = 0.f, WSum = 0.f, SpineW = 0.f;
+	const float Turn = Noise(M / 41.f + FVector2D(1.3f, 8.8f)) * PI;
+	for (int32 k = 0; k < 9; ++k)
+	{
+		FVector2D P = M;
+		float W = 2.f;
+		if (k > 0)
+		{
+			const float A = Turn + (k - 1) * (PI / 4.f);
+			const float R = ZoneBlend * (0.55f + 0.45f * (Noise(M / 13.f + FVector2D(float(k) * 3.1f, 1.f)) * 0.5f + 0.5f));
+			P = M + FVector2D(FMath::Cos(A), FMath::Sin(A)) * R;
+			W = 1.f;
+		}
+		const TCHAR L = GridLetter(P);
+		const FWRLandZone* Z = nullptr;
+		for (const FWRLandZone& Q : Zones) if (Q.Letter == L) { Z = &Q; break; }
+		if (!Z) continue;
+		float R = 0.9f;
+		Sum += ZoneColour(*Z, R) * W;
+		RSum += R * W;
+		WSum += W;
+		if (L == TEXT('s')) SpineW += W;
+	}
+	FLinearColor C = WSum > 0.f ? Sum / WSum : FLinearColor(FColor(90, 96, 70));
+	OutRough = WSum > 0.f ? RSum / WSum : 0.9f;
+	SpineW = WSum > 0.f ? SpineW / WSum : 0.f;
+	// The sample's surface, softened where its neighbours are something else (a road's edge, a beach's back).
+	const uint8 Cls = HfSurfaceAt(I, J);
+	if (Cls != 0 && Cls != HfHidden)
+	{
+		for (const FWRLandSurface& S : Surfaces)
+		{
+			if (S.Class != Cls) continue;
+			int32 Same = 0;
+			Same += HfSurfaceAt(I + 1, J) == Cls; Same += HfSurfaceAt(I - 1, J) == Cls; Same += HfSurfaceAt(I, J + 1) == Cls; Same += HfSurfaceAt(I, J - 1) == Cls;
+			FLinearColor SC = S.Color * (0.9f + 0.2f * (Noise(M / 6.f + FVector2D(4.f, 0.f)) * 0.5f + 0.5f));
+			if (S.Speck.Num() && S.SpeckAmount > 0.f)
+			{
+				const float SN = Noise(M / S.SpeckScale + FVector2D(12.f, 3.f)) * 0.5f + 0.5f;
+				SC = FMath::Lerp(SC, WRLandHfImpl::SpeckPick(S.Speck, Noise(M / 17.f) * 0.5f + 0.5f), Smooth(1.f - S.SpeckAmount, 1.f - S.SpeckAmount * 0.5f, SN) * 0.7f);
+			}
+			const float W = 0.5f + 0.4f * (Same / 4.f);
+			C = FMath::Lerp(C, SC, W);
+			OutRough = FMath::Lerp(OutRough, S.Rough, W);
+			break;
+		}
+	}
+	// Colour bands (the frost on the tundra neck's ferns), patchy, never on the water's own ground.
+	for (const FWRLandBand& B : Bands)
+	{
+		if (H < 0.5f || Cls == 1 || Cls == 2) continue;
+		const float In = Smooth(B.Y0, B.Y0 + 50.f, M.Y) * (1.f - Smooth(B.Y1 - 70.f, B.Y1, M.Y));
+		if (In <= 0.f) continue;
+		C = FMath::Lerp(C, B.Color, In * B.Amount * Smooth(-0.2f, 0.4f, Noise(M / B.NoiseM + FVector2D(13.f, 7.f))));
+	}
+	// Under the sea the ground darkens and smooths toward the sea zone's floor.
+	if (H < 0.f)
+	{
+		for (const FWRLandZone& Q : Zones)
+		{
+			if (Q.Letter != TEXT('~')) continue;
+			const float S = Smooth(0.f, 4.f, -H);
+			C = FMath::Lerp(C, Q.Ground * (0.8f + 0.2f * Patch), S);
+			OutRough = FMath::Lerp(OutRough, Q.Rough, S);
+			break;
+		}
+	}
+	// Steep ground is bare rock (basalt on the Spine's face); its ledges keep a mat of moss.
+	const float Slope = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Nrm.Z, -1.f, 1.f)));
+	const float Rock = Smooth(SlopeFrom, SlopeTo, Slope);
+	if (LedgeColor.A > 0.f && SpineW > 0.f)
+	{
+		const float Ledge = SpineW * (1.f - Rock) * Smooth(8.f, SlopeFrom, Slope) * Smooth(-0.3f, 0.3f, Noise(M / 5.f + FVector2D(6.f, 6.f)));
+		C = FMath::Lerp(C, LedgeColor, Ledge * 0.8f);
+	}
+	C = FMath::Lerp(C, SlopeRock * (0.85f + 0.3f * (Noise(M / 7.f) * 0.5f + 0.5f)), Rock);
+	OutRough = FMath::Lerp(OutRough, 0.86f, Rock);
+	return C;
+}
+
 // ================================================================================================ the registry
 
 const TArray<FWRLandDef>& WRLand::All()
@@ -548,8 +834,20 @@ bool WRLand::InHole(const FVector& World)
 	const FWRLandDef* D = At(World);
 	if (!D) return false;
 	const FVector2D M = D->ToMap(World);
+	if (D->IsUnderground(M)) return true;
 	const FWRLandFeature* H = D->HoleAt(M, 2.f);
 	return H && World.Z < D->ToWorld(M, H->Levels[0]).Z + 200.f;
+}
+
+bool WRLand::GroundUnder(const FVector& World, float& OutZ)
+{
+	const FWRLandDef* D = At(World);
+	if (!D) return false;
+	const FVector2D M = D->ToMap(World);
+	// Heightfield lands only (the forest): the wasteland's ground keeps its own rules, unchanged.
+	if (!D->bHeightfield || D->HfHiddenAt(M)) return false;
+	OutZ = D->ToWorld(M, D->Height(M)).Z;
+	return true;
 }
 
 // ================================================================================================ the subsystem
@@ -579,6 +877,8 @@ void UWRLandSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		Land->FinishSpawning(FTransform(Def.Origin));
 		Lands.Add(Land);
 		UE_LOG(LogWildreach, Log, TEXT("LAND %s (%s) building at %s"), *Def.Id.ToString(), *Def.Biome.ToString(), *Def.Origin.ToCompactString());
+		// Its camps (PlayerStarts, safe zones, starter stations): before the game mode picks anyone's start this frame.
+		if (InWorld.GetNetMode() != NM_Client) AWRLand::SpawnCamps(&InWorld, Def);
 	}
 	// The server's live things (the crossings, rifts, machines): replicated, so only it spawns them.
 	if (InWorld.GetNetMode() != NM_Client && Lands.Num()) WRLandThings::Start(&InWorld);
@@ -624,7 +924,37 @@ void AWRLand::BeginPlay()
 	TearMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_VoidTear.M_VoidTear"));
 	LightMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_VoidLight.M_VoidLight"));
 	if (!GroundMat) UE_LOG(LogWildreach, Error, TEXT("LAND %s: /Game/Terrain/M_LandGround is missing (Tools/terrain/build_void_materials.py)"), *LandId.ToString());
+	const FWRLandDef* D = Def();
+	if (D && D->bHeightfield && GroundMat && GetNetMode() != NM_DedicatedServer)
+	{
+		// One instance for the whole land so rain can wet all of it at once (StepWet).
+		GroundMID = UMaterialInstanceDynamic::Create(GroundMat, this);
+		GroundMID->SetScalarParameterValue(TEXT("Wet"), 0.f);
+	}
 	QueueChunks();
+	// A heightfield land's camps are where new players of its path first stand, and the game mode places them right
+	// after this (before the land's first tick): their chunks are built now, collision cooked at once, so nobody spawns
+	// over nothing. The rest comes in over the next frames, nearest the camps first.
+	if (D && D->bHeightfield && D->BuildFirst.Num())
+	{
+		const float Span = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep)) * D->HfStep;
+		TSet<FIntPoint> Now;
+		for (const FVector2D& P : D->BuildFirst)
+		{
+			for (int32 dy = -1; dy <= 1; ++dy) for (int32 dx = -1; dx <= 1; ++dx)
+			{
+				// The camp's cell and any neighbour within 70 m of it (its safe zone and stations reach 40 m).
+				const FVector2D Q = P + FVector2D(dx, dy) * 70.f;
+				Now.Add(FIntPoint(FMath::FloorToInt((Q.X - D->HfOrigin.X) / Span), FMath::FloorToInt((Q.Y - D->HfOrigin.Y) / Span)));
+			}
+		}
+		int32 Made = 0;
+		for (const FIntPoint& Cell : Now)
+		{
+			if (Queue.Remove(Cell) > 0 && BuildHeightfieldChunk(Cell, false)) ++Made;
+		}
+		UE_LOG(LogWildreach, Log, TEXT("LAND %s: %d chunks round its camps built at load"), *LandId.ToString(), Made);
+	}
 }
 
 float AWRLand::GroundZ(const FVector& World) const
@@ -637,6 +967,27 @@ void AWRLand::QueueChunks()
 {
 	const FWRLandDef* D = Def();
 	if (!D) return;
+	if (D->bHeightfield)
+	{
+		// The heightfield's own grid: chunks of Chunk m (whole samples), the last row and column what's left.
+		const int32 Q = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep));
+		const int32 NC = FMath::DivideAndRoundUp(D->HfN - 1, Q);
+		for (int32 y = 0; y < NC; ++y) for (int32 x = 0; x < NC; ++x) Queue.Add(FIntPoint(x, y));
+		// Nearest a camp first (else the land's middle): where players arrive comes in before the far sea floor.
+		const float Span = Q * D->HfStep;
+		TArray<FVector2D> First = D->BuildFirst;
+		if (First.Num() == 0) First.Add(D->MapBox.GetCenter());
+		const FVector2D O = D->HfOrigin;
+		const auto Dist = [&](const FIntPoint& Cl)
+		{
+			const FVector2D Cc = O + FVector2D(Cl.X + 0.5f, Cl.Y + 0.5f) * Span;
+			float Best = TNumericLimits<float>::Max();
+			for (const FVector2D& P : First) Best = FMath::Min(Best, float(FVector2D::DistSquared(Cc, P)));
+			return Best;
+		};
+		Queue.Sort([&](const FIntPoint& A, const FIntPoint& B) { return Dist(A) > Dist(B); });
+		return;
+	}
 	const FBox2D Box(D->MapBox.Min - FVector2D(D->CoastSea), D->MapBox.Max + FVector2D(D->CoastSea));
 	const int32 NX = FMath::CeilToInt((Box.Max.X - Box.Min.X) / D->Chunk);
 	const int32 NY = FMath::CeilToInt((Box.Max.Y - Box.Min.Y) / D->Chunk);
@@ -660,7 +1011,9 @@ void AWRLand::Tick(float DeltaSeconds)
 	{
 		for (int32 n = 0; n < D->ChunksPerFrame && Queue.Num(); ++n)
 		{
-			BuildChunk(Queue.Pop(EAllowShrinking::No));
+			const FIntPoint Cell = Queue.Pop(EAllowShrinking::No);
+			if (D->bHeightfield) BuildHeightfieldChunk(Cell);
+			else BuildChunk(Cell);
 		}
 		if (Queue.Num() == 0)
 		{
@@ -670,9 +1023,13 @@ void AWRLand::Tick(float DeltaSeconds)
 		}
 		return;
 	}
+	StepWet(DeltaSeconds);
 	if (!bSitesDone)
 	{
 		bSitesDone = true;
+		// A heightfield land's places are its own world's (the Ancient forest: UWRForestWorld builds them from
+		// Data/forest.json); the land file's pois and kit are the function lands'.
+		if (D->bHeightfield) return;
 		WRLandSites::Build(this);
 		// The server's rifts sit on the places just made (the kit pass's rift rings among them).
 		if (GetNetMode() != NM_Client) WRVoid::SpawnRifts(GetWorld(), LandId);
@@ -782,9 +1139,214 @@ bool AWRLand::BuildChunk(const FIntPoint& Cell)
 	if (GroundMat) Mesh->SetMaterial(0, GroundMat);
 	Mesh->RegisterComponent();
 	Chunks.Add(Mesh);
+	BuiltCells.Add(Cell);
 	++Built;
 	return true;
 }
+
+bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
+{
+	// One chunk of a heightfield land: its samples as vertices (so the ground is exactly the file's, every machine the
+	// same), normals from the neighbouring samples, colours from the zone grid and the sample's surface, and no triangle
+	// with a corner where the land has no ground (the strip under the island's own landscape).
+	const FWRLandDef& D = *Def();
+	const int32 Q = FMath::Max(1, FMath::RoundToInt(D.Chunk / D.HfStep));
+	const int32 I0 = Cell.X * Q, J0 = Cell.Y * Q;
+	const int32 NI = FMath::Min(Q, D.HfN - 1 - I0), NJ = FMath::Min(Q, D.HfN - 1 - J0);
+	if (NI <= 0 || NJ <= 0) return false;
+	const bool bSurface = D.HfSurface.Num() == D.HfHeights.Num();
+	float Top = -1e6f;
+	bool bAny = false;
+	for (int32 j = 0; j <= NJ; ++j)
+	{
+		for (int32 i = 0; i <= NI; ++i)
+		{
+			Top = FMath::Max(Top, D.HfSample(I0 + i, J0 + j));
+			bAny |= !bSurface || D.HfSurface[(J0 + j) * D.HfN + (I0 + i)] != FWRLandDef::HfHidden;
+		}
+	}
+	// All of it the island's, or open sea floor the sea covers: nothing to build.
+	if (!bAny || Top < D.SeaFloor + 1.5f) return false;
+	const int32 VX = NI + 1, VY = NJ + 1;
+	const bool bLook = GetNetMode() != NM_DedicatedServer;
+	TArray<FVector> Verts;
+	TArray<FVector> Normals;
+	TArray<FLinearColor> Colours;
+	TArray<FVector2D> UV;
+	TArray<FProcMeshTangent> Tangents;
+	TArray<int32> Tris;
+	TArray<uint8> Gone;
+	Verts.Reserve(VX * VY);
+	Normals.Reserve(VX * VY);
+	Colours.Reserve(VX * VY);
+	UV.Reserve(VX * VY);
+	Tangents.Reserve(VX * VY);
+	Gone.Reserve(VX * VY);
+	for (int32 j = 0; j < VY; ++j)
+	{
+		for (int32 i = 0; i < VX; ++i)
+		{
+			const int32 SI = I0 + i, SJ = J0 + j;
+			const FVector2D M = D.HfOrigin + FVector2D(float(SI), float(SJ)) * D.HfStep;
+			const float Z = D.HfSample(SI, SJ);
+			const float DX = D.HfSample(SI + 1, SJ) - D.HfSample(SI - 1, SJ);
+			const float DY = D.HfSample(SI, SJ + 1) - D.HfSample(SI, SJ - 1);
+			const FVector Nrm = FVector(-DX, -DY, 2.f * D.HfStep).GetSafeNormal();
+			// The colour is looks only: a dedicated server builds the shape (collision) and skips it.
+			float Rough = 0.9f;
+			FLinearColor C = bLook ? D.HfGround(SI, SJ, Nrm, Rough) : FLinearColor::White;
+			C.A = 1.f - Rough;
+			Verts.Add(D.ToWorld(M, Z) - D.Origin);
+			Normals.Add(Nrm);
+			Colours.Add(C);
+			UV.Add(M / 4.f);
+			Tangents.Add(FProcMeshTangent(FVector(1.f, 0.f, 0.f), false));
+			Gone.Add(bSurface && D.HfSurface[SJ * D.HfN + SI] == FWRLandDef::HfHidden ? 1 : 0);
+		}
+	}
+	Tris.Reserve(NI * NJ * 6);
+	for (int32 j = 0; j < NJ; ++j)
+	{
+		for (int32 i = 0; i < NI; ++i)
+		{
+			const int32 A = j * VX + i, B = A + 1, C = A + VX, E = C + 1;
+			if (Gone[A] || Gone[B] || Gone[C] || Gone[E]) continue;
+			Tris.Append({ A, C, E, A, E, B });
+		}
+	}
+	if (Tris.Num() == 0) return false;
+	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
+	Mesh->SetupAttachment(RootComponent);
+	Mesh->bUseAsyncCooking = bAsync;
+	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
+	Mesh->SetCollisionObjectType(ECC_WorldStatic);
+	Mesh->SetCanEverAffectNavigation(false);
+	Mesh->LDMaxDrawDistance = D.DrawDistance;
+	Mesh->SetCachedMaxDrawDistance(D.DrawDistance);
+	Mesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Colours, Tangents, true);
+	if (GroundMID) Mesh->SetMaterial(0, GroundMID);
+	else if (GroundMat) Mesh->SetMaterial(0, GroundMat);
+	Mesh->RegisterComponent();
+	Chunks.Add(Mesh);
+	BuiltCells.Add(Cell);
+	++Built;
+	return true;
+}
+
+bool AWRLand::IsGroundBuiltAt(const FVector& World) const
+{
+	const FWRLandDef* D = Def();
+	if (!D) return false;
+	const FVector2D M = D->ToMap(World);
+	if (D->bHeightfield)
+	{
+		const float Span = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep)) * D->HfStep;
+		return BuiltCells.Contains(FIntPoint(FMath::FloorToInt((M.X - D->HfOrigin.X) / Span), FMath::FloorToInt((M.Y - D->HfOrigin.Y) / Span)));
+	}
+	const FVector2D Min = D->MapBox.Min - FVector2D(D->CoastSea);
+	return BuiltCells.Contains(FIntPoint(FMath::FloorToInt((M.X - Min.X) / D->Chunk), FMath::FloorToInt((M.Y - Min.Y) / D->Chunk)));
+}
+
+void AWRLand::StepWet(float DeltaSeconds)
+{
+	// Rain soaks the ground (darker, glossier) over ~20 s and it dries over a minute after: the land's weather row's kind
+	// that waters crops (Rain) at its strength. Looks only, so no server work.
+	if (!GroundMID) return;
+	WetCheck -= DeltaSeconds;
+	if (WetCheck > 0.f) return;
+	const float Step = 0.5f;
+	WetCheck = Step;
+	const FWRLandDef* D = Def();
+	float Want = 0.f;
+	if (const FWRWeatherNow* W = D ? UWRWeatherSubsystem::For(this, D->Biome) : nullptr)
+	{
+		const FWRWeatherKind* K = FWRWeatherDefs::Get().Kind(D->Biome, W->Kind);
+		if (K && K->bWatersCrops) Want = W->Strength(UWRWeatherSubsystem::Now(this));
+	}
+	const float Secs = Want > Wet ? WRTune(TEXT("world.landWetIn"), 20.f) : WRTune(TEXT("world.landDryOut"), 60.f);
+	const float Next = FMath::FInterpConstantTo(Wet, Want, Step, 1.f / FMath::Max(Secs, 0.1f));
+	if (Next != Wet)
+	{
+		Wet = Next;
+		GroundMID->SetScalarParameterValue(TEXT("Wet"), Wet);
+	}
+}
+
+void AWRLand::SpawnCamps(UWorld* World, const FWRLandDef& D)
+{
+	// The land's camps (world-map: three per land, the middle one with the starter stations): a PlayerStart tagged with
+	// the biome its path starts in (WRGameMode::ChoosePlayerStart and WRBeds pick a new player's camp by it), a safe zone
+	// round each (safeRadius m), and the forge, armourer, alchemy table and workbench a short walk inland of the middle
+	// one, facing the camp. Only what the map does not already hold is made (a map with them placed keeps its own).
+	const TSharedPtr<FJsonObject> C = D.Section(TEXT("camps"));
+	if (!World || World->GetNetMode() == NM_Client || !C.IsValid()) return;
+	FString TagStr = D.Biome.ToString();
+	C->TryGetStringField(TEXT("tag"), TagStr);
+	const FName Tag(*TagStr);
+	const float SafeR = LNum(C, TEXT("safeRadius"), 40.f) * 100.f;
+	const int32 StationsAt = int32(LNum(C, TEXT("stationsAt"), 1.f));
+	const float BackM = LNum(C, TEXT("stationsBack"), 25.f);
+	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+	if (!C->TryGetArrayField(TEXT("list"), List)) return;
+	bool bHaveStart = false;
+	for (TActorIterator<APlayerStart> It(World); It; ++It) bHaveStart |= It->PlayerStartTag == Tag;
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	int32 Made = 0;
+	for (int32 c = 0; c < List->Num(); ++c)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Row = nullptr;
+		if (!(*List)[c]->TryGetArray(Row) || Row->Num() < 2) continue;
+		const FVector2D M((*Row)[0]->AsNumber(), (*Row)[1]->AsNumber());
+		const float Yaw = Row->Num() >= 3 ? float((*Row)[2]->AsNumber()) : 0.f;   // toward the sea the camp looks out on
+		const FVector Camp = D.GroundPoint(M);
+		if (!bHaveStart)
+		{
+			// A capsule's height over the camp's ground, facing inland (the forest the newcomer walks into).
+			const FTransform T(FRotator(0.f, Yaw + 180.f, 0.f), Camp + FVector(0.f, 0.f, WRTune(TEXT("world.landStartLift"), 200.f)));
+			if (APlayerStart* S = World->SpawnActor<APlayerStart>(APlayerStart::StaticClass(), T, P))
+			{
+				S->PlayerStartTag = Tag;
+				++Made;
+			}
+		}
+		bool bSafe = false;
+		for (TActorIterator<AWRSafeZone> It(World); It; ++It) bSafe |= FVector::Dist2D(It->GetActorLocation(), Camp) < SafeR;
+		if (!bSafe)
+		{
+			if (AWRSafeZone* Z = World->SpawnActor<AWRSafeZone>(AWRSafeZone::StaticClass(), FTransform(Camp + FVector(0.f, 0.f, 100.f)), P))
+			{
+				Z->Radius = SafeR;
+				++Made;
+			}
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Kinds = nullptr;
+		if (c == StationsAt && C->TryGetArrayField(TEXT("stations"), Kinds) && Kinds->Num())
+		{
+			bool bStations = false;
+			for (TActorIterator<AWRStation> It(World); It; ++It) bStations |= FVector::Dist2D(It->GetActorLocation(), Camp) < SafeR;
+			if (!bStations)
+			{
+				const FVector2D Sea(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw)));
+				const FVector2D Side(-Sea.Y, Sea.X);
+				for (int32 k = 0; k < Kinds->Num(); ++k)
+				{
+					// In a row across, BackM inland of the camp's middle, 8 m apart, each facing the camp.
+					const FVector2D Spot = M - Sea * BackM + Side * ((k - (Kinds->Num() - 1) * 0.5f) * 8.f);
+					const FTransform T(FRotator(0.f, Yaw, 0.f), D.GroundPoint(Spot) + FVector(0.f, 0.f, 40.f));
+					if (AWRStation* St = World->SpawnActorDeferred<AWRStation>(AWRStation::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+					{
+						St->StationType = FName(*(*Kinds)[k]->AsString());
+						St->FinishSpawning(T);
+						++Made;
+					}
+				}
+			}
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("LAND %s camps: %s; made %d start(s) / safe zone(s) / station(s)"), *D.Id.ToString(), bHaveStart ? TEXT("starts already in the map") : TEXT("no starts in the map"), Made);
+}
+
 
 void AWRLand::BuildHoles()
 {

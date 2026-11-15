@@ -2843,6 +2843,22 @@
         "HideFur": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Snowhide_Fur.MI_Snowhide_Fur",
         "Hide_Dark": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Snowhide_Dark.MI_Snowhide_Dark"
       }
+    },
+    "huntsmans_crown": {
+      "_why": "The Wild Hunt's leader's crown (cooks/biome-forest.md 2.19): no skinned piece; WRHeroLook.cpp models it (antler beam and ivy, eight tines, the Hunt's banner rags behind). place: the band's half-length rx and half-width ry round the skull over the hair, its back tilt degrees higher, its centre lift cm over the head bone and forward cm ahead (placeF for a woman's head).",
+      "tier": 1,
+      "hidesHair": false,
+      "headPiece": "huntsmans_crown",
+      "place": {"rx": 11.0, "ry": 9.2, "tilt": 9, "lift": 10.0, "forward": 1.5},
+      "placeF": {"rx": 10.4, "ry": 8.7, "tilt": 9, "lift": 9.5, "forward": 1.5}
+    },
+    "heartwood_circlet": {
+      "_why": "The circlet from the barred door's table (F-S4): no skinned piece; WRHeroLook.cpp models it (three braided heartwood strands, a resin bead at the brow). place as huntsmans_crown.",
+      "tier": 1,
+      "hidesHair": false,
+      "headPiece": "heartwood_circlet",
+      "place": {"rx": 10.6, "ry": 8.9, "tilt": 7, "lift": 9.0, "forward": 1.5},
+      "placeF": {"rx": 10.0, "ry": 8.4, "tilt": 7, "lift": 8.5, "forward": 1.5}
     }
   },
   "_looks": "cook hero-look-2: the worn armour picks a look (armorLooks); 4 visual slots per build; hide = body-hide masks (skin under the piece is clipped); hidesHair = the Head piece hides the hair groom; materials = slot-name swaps.",
@@ -2916,7 +2932,9 @@
     "hollowplate_ascendant_armor": {
       "look": "hollowplate",
       "ascendant": true
-    }
+    },
+    "huntsmans_crown": "huntsmans_crown",
+    "heartwood_circlet": "heartwood_circlet"
   },
   "_armorLooks": "item id -> look. The steel biome set items and their starsteel (Ascendant, tier 6) versions arrive with the crafting cook under these ids.",
   "ascendantCrest": {
@@ -3227,9 +3245,9 @@
         "SkinLight": 0.0,
         "NailDark": 0.0,
         "AlbedoTint": [
-          0.3,
-          0.2,
-          0.12
+          0.33,
+          0.31,
+          0.27
         ],
         "Pan": [
           0,
@@ -3245,6 +3263,11 @@
             0.75,
             1.35,
             0.55
+          ],
+          "Melanosis Ring Color": [
+            0.5,
+            1.1,
+            0.3
           ]
         }
       },
@@ -3255,6 +3278,37 @@
             0.8,
             0.25
           ]
+        }
+      },
+      "look": {
+        "_comment": "cooks/biome-forest.md 2.18 (WRNature::ApplyLook): fine young-beech bark (silver-grey, soft; the G mask reveals knuckles, then elbows and knees, then shoulders and collarbones by strength). Stages (share of 100 points): irisRimFrom the leaf-green rim, irisHalfFrom half the iris, irisFullFrom all of it; warmFrom the sun-kissed skin (warmth: less desaturation, a little light). With another path: fire's ember lines follow the bark (mixFireBark on its G), frost's rime forms along the bark edges (mixFrostBark), blood's garnet threads run under the bark (mixBloodBark). rootedTint is in tuning passives.rootedTint.",
+        "irisRimFrom": 0.3,
+        "irisHalfFrom": 0.6,
+        "irisFullFrom": 1.0,
+        "warmFrom": 0.6,
+        "warmth": 0.05,
+        "warmLight": 0.02,
+        "iris": [
+          0.7,
+          1.4,
+          0.45
+        ],
+        "rim": [
+          0.5,
+          1.1,
+          0.3
+        ],
+        "mixFireBark": 0.6,
+        "mixFrostBark": 0.5,
+        "mixBloodBark": 0.35,
+        "templeBud": {
+          "_comment": "The leaf buds at the temples (WRNature::ApplyTempleBuds): from (share of 100 points, main path) they grow in over 5 points; placed off the head bone's reference pose by forward / side / up cm in the body's own frame; size x the modelled ~1.6 cm bud.",
+          "bone": "head",
+          "from": 1.0,
+          "forward": 7.5,
+          "side": 6.6,
+          "up": 9.5,
+          "size": 1.0
         }
       }
     },

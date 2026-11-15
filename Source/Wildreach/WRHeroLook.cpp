@@ -12,6 +12,7 @@
 #include "WRTuning.h"
 #include "WREndgameLook.h"
 #include "WRBloodPath.h"
+#include "WRNaturePath.h"   // the Nature body change (cooks/biome-forest.md 2.18)
 #include "Components/LODSyncComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -22,6 +23,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GroomComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "ProceduralMeshComponent.h"
+#include "WRToolMesh.h"
 
 namespace WRHeroLookImpl
 {
@@ -73,6 +76,241 @@ namespace WRHeroLookImpl
 	}
 }
 using namespace WRHeroLookImpl;
+
+// Code-modelled head pieces (a look row's "headPiece" in player_art.json): one runtime mesh each in M_HeldTool (vertex
+// colour = surface, alpha = roughness), on the head bone. Space: X toward the face, Y right, Z up; the origin is the
+// band's centre at the brow. The band is an oval round the skull over the hair (Rx, Ry cm), its back riding Tilt degrees
+// higher the way a crown sits on the back of the head.
+namespace WRHeroHeadPieceImpl
+{
+	FLinearColor Lin(uint8 R, uint8 G, uint8 B) { return FLinearColor(FColor(R, G, B)); }
+
+	struct FBand
+	{
+		float Rx = 11.f, Ry = 9.2f, Tilt = 9.f;
+		/** The band's point at angle A (0 = the brow, +PI/2 = the right temple), Z cm up off it. */
+		FVector At(float A, float Z = 0.f) const
+		{
+			const float X = FMath::Cos(A) * Rx;
+			return FVector(X, FMath::Sin(A) * Ry, Z - X * FMath::Tan(FMath::DegreesToRadians(Tilt)));
+		}
+		/** Straight out from the skull there (level). */
+		FVector Out(float A) const { return FVector(FMath::Cos(A) / Rx, FMath::Sin(A) / Ry, 0.f).GetSafeNormal(); }
+		/** Along the band toward a larger A. */
+		FVector Along(float A) const { return (At(A + 0.01f) - At(A - 0.01f)).GetSafeNormal(); }
+	};
+
+	/** A thin flat length (a rag, a leaf) from P0 to P1: Across its width, Normal its face; a closed section so both
+	 *  faces show and it has an edge. */
+	void Slab(FWRToolMesh& M, const FVector& P0, const FVector& P1, const FVector& Across, const FVector& Normal, float W0, float W1, float Thick, const FLinearColor& C, float Rough)
+	{
+		const auto Section = [&Across, &Normal, Thick](const FVector& P, float W)
+		{
+			const FVector A = Across * (FMath::Max(0.05f, W) * 0.5f), N = Normal * (Thick * 0.5f);
+			return TArray<FVector>{ P - A - N, P + A - N, P + A + N, P - A + N };
+		};
+		M.Loft({ Section(P0, W0), Section(P1, W1) }, C, Rough, true);
+	}
+
+	/** A flat strip along Spine (each piece reaching a hair into the next so a bend shows no crack), Widths per point. */
+	void Strip(FWRToolMesh& M, const TArray<FVector>& Spine, const TArray<float>& Widths, const FVector& Across, float Thick, const FLinearColor& C, float Rough)
+	{
+		for (int32 i = 0; i + 1 < Spine.Num() && i + 1 < Widths.Num(); ++i)
+		{
+			const FVector Dir = (Spine[i + 1] - Spine[i]).GetSafeNormal();
+			const FVector Side = (Across - Dir * FVector::DotProduct(Across, Dir)).GetSafeNormal();
+			Slab(M, Spine[i], Spine[i + 1] + Dir * 0.12f, Side, FVector::CrossProduct(Dir, Side), Widths[i], Widths[i + 1], Thick, C, Rough);
+		}
+	}
+
+	/** An ivy leaf off the band: a short stalk, a broad base, a pointed tip, curling a little away from the head. */
+	void Leaf(FWRToolMesh& M, const FVector& Base, const FVector& Dir, const FVector& Face, float Len, float Width, const FLinearColor& C)
+	{
+		const FVector Side = FVector::CrossProduct(Face, Dir).GetSafeNormal();
+		Strip(M, { Base, Base + Dir * (Len * 0.18f), Base + Dir * (Len * 0.45f) + Face * (Len * 0.06f), Base + Dir * (Len * 0.75f) + Face * (Len * 0.1f), Base + Dir * Len + Face * (Len * 0.07f) },
+			{ 0.1f, Width * 0.9f, Width, Width * 0.55f, 0.05f }, Side, 0.12f, C, 0.5f);
+	}
+
+	/** A tapering round length through Pts (an antler tine), its colour running C0 -> C1 base to tip. */
+	void Rod(FWRToolMesh& M, const TArray<FVector>& Pts, float R0, float R1, const FLinearColor& C0, const FLinearColor& C1, float Rough, float Seed)
+	{
+		const int32 N = Pts.Num() - 1;
+		for (int32 i = 0; i < N; ++i)
+		{
+			const FVector D = Pts[i + 1] - Pts[i];
+			const float L = D.Size();
+			if (L < 0.01f) continue;
+			const FVector Dir = D / L;
+			const float RA = FMath::Lerp(R0, R1, float(i) / N), RB = FMath::Lerp(R0, R1, float(i + 1) / N);
+			const float Back = FMath::Min(RA * 0.6f, L * 0.3f);
+			M.Lathe(Pts[i] - Dir * Back, Dir, L + Back, { FVector(0.f, RA, RA), FVector(1.f, RB, RB) }, 7, FMath::Lerp(C0, C1, (i + 0.5f) / N), Rough, 0.f, Seed + i);
+		}
+	}
+
+	/** A round bead (a true sphere: the rings spaced by the angle). */
+	void Ball(FWRToolMesh& M, const FVector& Centre, float R, const FLinearColor& C, float Rough)
+	{
+		TArray<FVector> P;
+		for (int32 i = 0; i <= 8; ++i)
+		{
+			const float A = PI * i / 8.f;
+			const float Rr = FMath::Max(0.02f, R * FMath::Sin(A));
+			P.Add(FVector((1.f - FMath::Cos(A)) * 0.5f, Rr, Rr));
+		}
+		M.Lathe(Centre - FVector(0.f, 0.f, R), FVector::UpVector, 2.f * R, P, 12, C, Rough);
+	}
+
+	/** A small closed loop of Radius round Axis at Centre (an antler's burr, a bezel). */
+	TArray<FVector> Loop(const FVector& Centre, const FVector& Axis, float Radius, int32 N)
+	{
+		const FVector U = FVector::CrossProduct(Axis, FMath::Abs(Axis.Z) > 0.9f ? FVector::XAxisVector : FVector::UpVector).GetSafeNormal();
+		const FVector V = FVector::CrossProduct(Axis, U);
+		TArray<FVector> Points;
+		for (int32 i = 0; i < N; ++i)
+		{
+			const float A = 2.f * PI * i / N;
+			Points.Add(Centre + (U * FMath::Cos(A) + V * FMath::Sin(A)) * Radius);
+		}
+		return Points;
+	}
+
+	/** The Huntsman's crown (cooks/biome-forest.md 2.19, the Wild Hunt's leader's): a ring of polished antler beam bound
+	 *  with a living ivy vine, eight antler tines rising round it (the tallest pair forked, the brow pair leaning forward,
+	 *  each with its rough burr at the root), ivy leaves along the band, and three banner rags of the Hunt (a faded red,
+	 *  a moss green, an undyed linen) knotted on at the back and hanging down behind. */
+	void HuntsmansCrown(FWRToolMesh& M, const FBand& B)
+	{
+		const FLinearColor Beam = Lin(150, 124, 92), AntlerDark = Lin(106, 84, 60), AntlerPale = Lin(226, 214, 190), BurrC = Lin(88, 70, 50);
+		const FLinearColor Vine = Lin(70, 62, 36), Ivy = Lin(46, 90, 34), IvyDark = Lin(34, 66, 28);
+		const FVector Up = FVector::UpVector;
+		TArray<FVector> Ring, Helix;
+		for (int32 i = 0; i < 48; ++i) Ring.Add(B.At(2.f * PI * i / 48.f));
+		M.Tube(Ring, 0.8f, 8, Beam, 0.55f, true);
+		// The vine: nine turns round the beam, closing on itself.
+		for (int32 i = 0; i < 180; ++i)
+		{
+			const float A = 2.f * PI * i / 180.f, Turn = A * 9.f;
+			Helix.Add(B.At(A) + (B.Out(A) * FMath::Cos(Turn) + Up * FMath::Sin(Turn)) * 0.95f);
+		}
+		M.Tube(Helix, 0.24f, 5, Vine, 0.8f, true);
+		// The tines, a mirrored pair at each of four places round the band: angle from the brow (deg), length, lean out
+		// (deg), the fork's length (0: none).
+		struct FTine { float Deg, Len, Lean, Fork; };
+		static const FTine Tines[] = { { 24.f, 7.5f, 30.f, 0.f }, { 60.f, 13.f, 20.f, 5.f }, { 102.f, 11.f, 16.f, 0.f }, { 144.f, 7.f, 24.f, 0.f } };
+		int32 Seed = 1;
+		for (const FTine& Tine : Tines)
+		{
+			for (const float S : { 1.f, -1.f })
+			{
+				const float A = S * FMath::DegreesToRadians(Tine.Deg);
+				const FVector Out = B.Out(A), Along = B.Along(A);
+				const float Lean = FMath::DegreesToRadians(Tine.Lean);
+				// The brow pair lean forward over the face a little (the brow tines of a stag's head).
+				const FVector Dir0 = (Up * FMath::Cos(Lean) + Out * FMath::Sin(Lean) + (Tine.Deg < 40.f ? FVector(0.25f, 0.f, 0.f) : FVector::ZeroVector)).GetSafeNormal();
+				const FVector P0 = B.At(A, 0.3f) + Out * 0.3f;
+				const FVector P1 = P0 + Dir0 * (Tine.Len * 0.4f);
+				const FVector P2 = P1 + (Dir0 + Up * 0.6f - Out * 0.25f).GetSafeNormal() * (Tine.Len * 0.35f);
+				const FVector P3 = P2 + (Up - Out * 0.35f + Along * (S * 0.15f)).GetSafeNormal() * (Tine.Len * 0.25f);
+				Rod(M, { P0, P1, P2, P3 }, 0.85f, 0.12f, AntlerDark, AntlerPale, 0.5f, float(Seed++));
+				// The burr: the rough ring of bone where an antler grows from the pedicle.
+				M.Tube(Loop(P0 + Dir0 * 0.35f, Dir0, 1.05f, 10), 0.28f, 5, BurrC, 0.9f, true);
+				if (Tine.Fork > 0.f)
+				{
+					const FVector F0 = FMath::Lerp(P1, P2, 0.4f);
+					const FVector FDir = (Out * 0.8f + Up * 0.6f + Along * (S * 0.2f)).GetSafeNormal();
+					Rod(M, { F0, F0 + FDir * (Tine.Fork * 0.6f), F0 + (FDir + Up * 0.5f).GetSafeNormal() * Tine.Fork }, 0.5f, 0.1f, AntlerDark, AntlerPale, 0.5f, float(Seed++));
+				}
+			}
+		}
+		// Ivy along the band, alternate leaves on the vine leaning up and along it.
+		for (int32 i = 0; i < 16; ++i)
+		{
+			const float A = 2.f * PI * (i + 0.5f) / 16.f;
+			const float Side = i % 2 ? 1.f : -1.f;
+			const FVector Out = B.Out(A);
+			const FVector Dir = (B.Along(A) * (0.75f * Side) + Up * 0.45f + Out * 0.2f).GetSafeNormal();
+			Leaf(M, B.At(A, 0.35f * Side) + Out * 1.0f, Dir, Out, 2.4f + 0.5f * (i % 3), 1.9f, i % 3 ? Ivy : IvyDark);
+		}
+		// The Hunt's banner rags, knotted on at the back of the band and hanging down behind the head.
+		struct FRag { float Deg, Len, Width; FLinearColor C; };
+		const FRag Rags[] = { { 160.f, 17.f, 3.2f, Lin(122, 44, 34) }, { 180.f, 22.f, 3.6f, Lin(64, 84, 50) }, { 200.f, 13.f, 3.f, Lin(168, 154, 128) } };
+		for (int32 r = 0; r < 3; ++r)
+		{
+			const float A = FMath::DegreesToRadians(Rags[r].Deg);
+			const FVector Out = B.Out(A);
+			const FVector Top = B.At(A, -0.2f) + Out * 1.0f;
+			TArray<FVector> Spine = { Top, Top + Out * 1.2f - Up * 3.f };
+			TArray<float> Widths = { Rags[r].Width * 0.7f, Rags[r].Width };
+			for (int32 k = 1; k <= 4; ++k)
+			{
+				// It hangs straight with a slight sway in the cloth (no two alike).
+				Spine.Add(Spine.Last() - Up * ((Rags[r].Len - 3.f) / 4.f) + Out * (0.35f * FMath::Sin(1.7f * k + r)));
+				Widths.Add(Rags[r].Width * (k < 4 ? 1.f - 0.06f * k : 0.6f));
+			}
+			Strip(M, Spine, Widths, B.Along(A), 0.18f, Rags[r].C, 0.95f);
+			Ball(M, Top + Out * 0.2f, 0.85f, Rags[r].C * 0.8f, 0.95f);   // the knot
+		}
+	}
+
+	/** The Heartwood circlet (F-S4, from the barred door's table): three thin strands of heartwood braided into a band,
+	 *  polished by a hand long gone, a drop of amber resin set at the brow in a little cup of the strands, and a cord
+	 *  binding at each temple where the braid was joined. */
+	void HeartwoodCirclet(FWRToolMesh& M, const FBand& B)
+	{
+		const FLinearColor Wood[3] = { Lin(122, 62, 24), Lin(154, 84, 38), Lin(96, 46, 18) };
+		const FVector Up = FVector::UpVector;
+		for (int32 k = 0; k < 3; ++k)
+		{
+			TArray<FVector> Strand;
+			for (int32 i = 0; i < 144; ++i)
+			{
+				const float A = 2.f * PI * i / 144.f, Turn = A * 16.f + k * 2.f * PI / 3.f;
+				Strand.Add(B.At(A) + (B.Out(A) * FMath::Cos(Turn) + Up * FMath::Sin(Turn)) * 0.36f);
+			}
+			M.Tube(Strand, 0.3f, 6, Wood[k], 0.38f, true);
+		}
+		const FVector Out0 = B.Out(0.f);
+		const FVector Bead = B.At(0.f, 0.15f) + Out0 * 0.95f;
+		Ball(M, Bead, 0.85f, Lin(232, 150, 40), 0.12f);
+		M.Tube(Loop(Bead - Out0 * 0.3f, Out0, 0.82f, 12), 0.17f, 5, Wood[2], 0.4f, true);
+		for (const float S : { 1.f, -1.f })
+		{
+			TArray<FVector> Cord;
+			for (int32 j = 0; j <= 40; ++j)
+			{
+				const float A = S * PI * 0.5f + (j / 40.f - 0.5f) * 0.24f, Turn = j / 40.f * 5.f * 2.f * PI;
+				Cord.Add(B.At(A) + (B.Out(A) * FMath::Cos(Turn) + Up * FMath::Sin(Turn)) * 0.58f);
+			}
+			M.Tube(Cord, 0.11f, 4, Lin(58, 38, 22), 0.9f);
+		}
+	}
+
+	/** Builds the piece by its id; false for one this file doesn't know. */
+	bool Build(FName Id, const FBand& B, FWRToolMesh& M)
+	{
+		if (Id == TEXT("huntsmans_crown")) HuntsmansCrown(M, B);
+		else if (Id == TEXT("heartwood_circlet")) HeartwoodCirclet(M, B);
+		else return false;
+		return true;
+	}
+
+	/** Where a piece sits in the head bone's frame: the band's centre Lift cm over the bone and Forward cm ahead of it,
+	 *  upright and facing the way the body faces, worked out in the mesh's reference pose (the head is level there). */
+	FTransform OnHead(const USkeletalMeshComponent* BodyComp, FName Bone, float Lift, float Forward)
+	{
+		const USkeletalMesh* Mesh = BodyComp ? BodyComp->GetSkeletalMeshAsset() : nullptr;
+		if (!Mesh) return FTransform::Identity;
+		const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+		const int32 Index = Ref.FindBoneIndex(Bone);
+		if (Index == INDEX_NONE) return FTransform::Identity;
+		FTransform HeadCS = FTransform::Identity;
+		for (int32 b = Index; b != INDEX_NONE; b = Ref.GetParentIndex(b)) HeadCS = HeadCS * Ref.GetRefBonePose()[b];
+		// The actor's frame (X forward, Z up) seen from the body component (turned to fit the mesh's own facing).
+		const FQuat Upright = BodyComp->GetRelativeRotation().Quaternion().Inverse();
+		const FVector At = HeadCS.GetLocation() + Upright.RotateVector(FVector(Forward, 0.f, Lift));
+		return FTransform(Upright, At).GetRelativeTransform(HeadCS);
+	}
+}
 
 // ---------------------------------------------------------------------------------------------------- server: what's worn
 
@@ -326,6 +564,75 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 		{
 			MID->SetVectorParameterValue(TEXT("InlayColor"), PathColor);
 			MID->SetScalarParameterValue(TEXT("InlayNits"), float(InlayNits));
+		}
+	}
+
+	// A code-modelled head piece (the look row's "headPiece": the Huntsman's crown, the Heartwood circlet) sat on the head
+	// bone at real scale over the hair, its band sized and placed by the row's "place" (a woman's head by "placeF").
+	// Hide-helmet takes it off like a helm; first person hides it from its wearer (ApplyViewMode), its shadow stays.
+	{
+		FString PieceId;
+		if (SlotLook[0].IsValid() && !bHeadOff)
+		{
+			SlotLook[0]->TryGetStringField(TEXT("headPiece"), PieceId);
+		}
+		const FName HeadBoneName(TEXT("head"));
+		const bool bPiece = !PieceId.IsEmpty() && Body->DoesSocketExist(HeadBoneName);
+		if (bPiece)
+		{
+			const TSharedPtr<FJsonObject> Place = Obj(SlotLook[0], bFemale && Obj(SlotLook[0], TEXT("placeF")).IsValid() ? TEXT("placeF") : TEXT("place"));
+			double Rx = 11.0, Ry = 9.2, Tilt = 9.0, Lift = 10.0, Forward = 1.5;
+			if (Place.IsValid())
+			{
+				Place->TryGetNumberField(TEXT("rx"), Rx);
+				Place->TryGetNumberField(TEXT("ry"), Ry);
+				Place->TryGetNumberField(TEXT("tilt"), Tilt);
+				Place->TryGetNumberField(TEXT("lift"), Lift);
+				Place->TryGetNumberField(TEXT("forward"), Forward);
+			}
+			// Rebuilt only when the piece (or the head it's sized for) changes.
+			const FName PieceKey(*FString::Printf(TEXT("%s_%s"), *PieceId, bFemale ? TEXT("f") : TEXT("m")));
+			bool bReady = HeadPiece != nullptr && HeadPieceShown == PieceKey;
+			if (!bReady)
+			{
+				WRHeroHeadPieceImpl::FBand Band;
+				Band.Rx = float(Rx);
+				Band.Ry = float(Ry);
+				Band.Tilt = float(Tilt);
+				FWRToolMesh PieceMesh;
+				if (WRHeroHeadPieceImpl::Build(FName(*PieceId), Band, PieceMesh))
+				{
+					if (!HeadPiece)
+					{
+						HeadPiece = NewObject<UProceduralMeshComponent>(this, TEXT("HeadPiece"));
+						HeadPiece->SetupAttachment(Body, HeadBoneName);
+						HeadPiece->SetCanEverAffectNavigation(false);
+						HeadPiece->bCastHiddenShadow = true;
+						HeadPiece->RegisterComponent();
+					}
+					PieceMesh.ApplyTo(HeadPiece);
+					HeadPieceShown = PieceKey;
+					bReady = true;
+				}
+				else
+				{
+					UE_LOG(LogWildreach, Warning, TEXT("Player art: no head piece '%s' to model"), *PieceId);
+				}
+			}
+			if (bReady)
+			{
+				HeadPiece->SetRelativeTransform(WRHeroHeadPieceImpl::OnHead(Body, HeadBoneName, float(Lift), float(Forward)));
+				HeadPiece->SetOwnerNoSee(bFirstPerson);
+				HeadPiece->SetVisibility(true);
+			}
+			else if (HeadPiece)
+			{
+				HeadPiece->SetVisibility(false);
+			}
+		}
+		else if (HeadPiece)
+		{
+			HeadPiece->SetVisibility(false);
 		}
 	}
 
@@ -606,6 +913,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, WREndgameLook::LookSig(this));   // prestige gold threads, a raid mark on the seams
 	Sig = HashCombine(Sig, WRBlood::LookSig(this));         // Blood: veins with Spilled, Sanguine lord, the flush, the pulse
 	Sig = HashCombine(Sig, WRVoidPath::LookSig(this));      // Void: the bar and the band move the greying within its stage
+	Sig = HashCombine(Sig, WRNature::LookSig(this));        // Nature: Rooted's green tint on the bark while it heals
 	if (!bForce && Sig == PathMarkSig)
 	{
 		return;
@@ -736,6 +1044,10 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	// Blood & curse (cooks/biome-swamp.md 2.18): its stages and live parts over what the row drew (WRBloodPath.cpp).
 	WRBlood::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 	WRVoidPath::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
+	// Nature (cooks/biome-forest.md 2.18): the bark's stages, the iris going leaf-green, the sun-warm skin, the mixed looks
+	// with Fire / Frost / Blood, and Rooted's green tint while it heals (WRNaturePath.cpp). After Blood's, so its garnet
+	// threads can follow the bark.
+	WRNature::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 
 	// Blood: sharper canines from strength 0.6 (main, or the sub path's share).
 	bool bFangs = false;
@@ -756,6 +1068,8 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 		Canines->SetStaticMesh(Fangs);
 	}
 	Canines->SetVisibility(Fangs != nullptr && Face->IsVisible());
+	// Nature: the small leaf buds at the temples from strength 1.0 (cooks/biome-forest.md 2.18), hidden with the face.
+	WRNature::ApplyTempleBuds(this, Body, Face->IsVisible(), PathMarks.Main, MainS);
 
 	// The worn armour's seams carry the main path's colour (hero.md 2.5).
 	if (OutfitMIDs.Num() > 0)

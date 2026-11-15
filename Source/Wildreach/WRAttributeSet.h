@@ -42,6 +42,9 @@ public:
 	/** The Lightning path's Charge (cooks/biome-lightning.md 2.18.2): a builder that fills fast and empties fast. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Charge) FGameplayAttributeData Charge;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxCharge) FGameplayAttributeData MaxCharge;
+	/** The Nature path's Growth (cooks/biome-forest.md 2.17): a spender that regrows by the ground around you. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Growth) FGameplayAttributeData Growth;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxGrowth) FGameplayAttributeData MaxGrowth;
 	/** Max health taken by the Void (cooks/biome-void.md 2.8, 2.17): rift zones, Gnawer latches, Vorhollow's bite and your
 	 *  own void abilities. Health can't rise past MaxHealth - MaxHealthLost (the grey band); Rest gives it all back. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHealthLost) FGameplayAttributeData MaxHealthLost;
@@ -69,6 +72,8 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxChill)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Charge)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxCharge)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Growth)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxGrowth)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHealthLost)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Void)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxVoid)
@@ -94,6 +99,8 @@ private:
 	UFUNCTION() void OnRep_MaxChill(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Charge(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxCharge(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Growth(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxGrowth(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxHealthLost(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Void(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxVoid(const FGameplayAttributeData& Old);

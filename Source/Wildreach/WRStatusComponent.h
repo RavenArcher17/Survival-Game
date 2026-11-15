@@ -57,6 +57,8 @@ public:
 	float Threshold(int32 Id) const;
 	/** Ends a status and empties its meter (cures, fire on frostbite). */
 	void CureStatus(int32 Id);
+	/** Takes Amount off a status's meter without ending a running status (the Nature path's Purify). */
+	void ReduceBuildup(int32 Id, float Amount);
 
 	/** Players: a button press while Frozen breaks free sooner (status.defs.frost.mashSeconds per press). */
 	void MashFrozen();

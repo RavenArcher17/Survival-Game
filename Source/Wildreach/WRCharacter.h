@@ -246,6 +246,10 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> OutfitMIDs;
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> Canines;  // Blood path (hero.md 2.6)
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<USkeletalMeshComponent> HaloCrest; // Ascendant
+	/** A code-modelled head piece on the head bone (a look row's "headPiece": the Huntsman's crown, the Heartwood circlet;
+	 *  WRHeroLook.cpp), made the first time one is worn; the piece it shows. */
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> HeadPiece;
+	FName HeadPieceShown;
 	TMap<FName, float> FaceHairParams;    // the face's hair colour (hairMelanin, hairRedness) on the shared plugin grooms
 	TMap<FName, float> EyeDefaults;       // the eye/hair material's own values, so marks blend from them
 	TMap<FName, FLinearColor> EyeDefaultColors;

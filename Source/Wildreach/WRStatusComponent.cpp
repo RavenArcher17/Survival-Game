@@ -16,6 +16,7 @@
 #include "WRCreature.h"
 #include "WRBoss.h"
 #include "WRSwampBosses.h"
+#include "WRNaturePath.h"
 #include "WRCrafting.h"
 #include "WRFx.h"
 #include "WRSound.h"
@@ -292,6 +293,9 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 		Amount *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Owner, FName(*(FString(TEXT("buildupTaken.")) + WRStatus::Name(Id).ToString()))));
 		if (Amount <= 0.f) return;
 	}
+	// Frozen grove (Frost + Nature): an ally in that survivor's Sanctuary or under their World tree takes frostbite x0.5.
+	Amount *= WRNature::BuildupTakenScale(Owner, Id);
+	if (Amount <= 0.f) return;
 	SinceBuildup = 0.f;
 	const float Value = GetMeter(Id) + Amount;
 	const float Need = Threshold(Id);
@@ -412,6 +416,8 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		const float Burst = (MaxHP * Def(Bleed, TEXT("burstPct"), 0.12f) + Def(Bleed, TEXT("burstFlat"), 15.f)) * (bBoss ? Def(Bleed, TEXT("bossScale"), 0.7f) : 1.f)
 			* WRBlood::BleedBurstScale(Source, Owner);
 		ApplyStatus(WRTags::Status_Bleeding, Def(Bleed, TEXT("markSeconds"), 6.f));
+		// The Nature path (WRNaturePath.cpp): Barbs bursts a Nature-caused bleed harder; Thorn feast feeds your plants.
+		WRNature::OnBleedBurst(Owner, Source, Burst);
 		StatusHit(Source, Burst, WRTags::Element_Physical);
 		break;
 	}
@@ -445,6 +451,8 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		}
 		// Brittle shock (Frost + Lightning combo): a shock on a frozen body shatters it.
 		WRLightning::OnShockProc(Owner, Source);
+		// Quickening (Lightning + Nature combo): a shock near your plants makes them fire faster.
+		WRNature::OnShockProc(Owner, Source);
 		if (!Owner->IsAlive())
 		{
 			break;
@@ -505,6 +513,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), Attr->GetHeat() - Attr->GetMaxHeat() * Loss);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), Attr->GetChill() - Attr->GetMaxChill() * Loss);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChargeAttribute(), Attr->GetCharge() - Attr->GetMaxCharge() * Loss);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetGrowthAttribute(), Attr->GetGrowth() - Attr->GetMaxGrowth() * Loss);   // the Nature path's Growth
 		// Lingering hex lengthens it; the Blood path remembers who cursed it (Misfortune, Contagion, Ruin's sigil).
 		ApplyStatus(WRTags::Status_Curse, WRBlood::CurseSeconds(Owner, Source, Def(Curse, TEXT("seconds"), 15.f)));
 		break;
@@ -526,6 +535,17 @@ void UWRStatusComponent::CureStatus(int32 Id)
 		ClearStatus(Tag);
 	}
 	SetMeter(Id, 0.f);
+	PublishMeters();
+}
+
+void UWRStatusComponent::ReduceBuildup(int32 Id, float Amount)
+{
+	const AWRCharacterBase* Owner = GetOwnerCharacter();
+	if (!Owner || !Owner->HasAuthority() || Id < 0 || Id >= WRStatus::Count || Amount <= 0.f || GetMeter(Id) <= 0.f)
+	{
+		return;
+	}
+	SetMeter(Id, GetMeter(Id) - Amount);
 	PublishMeters();
 }
 
@@ -840,6 +860,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRBlood::TickOwner(Owner, DeltaTime);
 		// The Void path's bar: its decay after a quiet 4 s (WRVoidPath.cpp).
 		WRVoidPath::TickOwner(Owner, DeltaTime);
+		// Growth (the Nature path) regrows by the ground around you; Rooted heals a survivor standing still (WRNaturePath.cpp).
+		WRNature::TickOwner(Owner, DeltaTime);
 	}
 }
 

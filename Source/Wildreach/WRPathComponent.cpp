@@ -15,6 +15,7 @@
 #include "WRLifeSkills.h"
 #include "WRCombatLibrary.h"
 #include "WRCombos.h"
+#include "WRNaturePath.h"
 #include "Misc/CommandLine.h"
 #include "Net/UnrealNetwork.h"
 
@@ -577,6 +578,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		// Grounded (cooks/biome-lightning.md 2.18.3): no stun or stagger from lightning; storm strikes deal half.
 		GrantedTags.AddTag(WRTags::Passive_Grounded);
 	}
+	else if (MainPath == TEXT("nature"))
+	{
+		// Rooted (cooks/biome-forest.md 2.17): standing still slowly heals (WRNaturePath.cpp).
+		GrantedTags.AddTag(WRNature::Passive_Rooted);
+	}
 	// Path combos for the main / sub pair (Data/combos.json: Thaw, Balance, Plasma, Meltdown, Brittle shock, Blizzard storm).
 	for (const FGameplayTag& Tag : FWRComboRegistry::Get().TagsFor(*this))
 	{
@@ -600,6 +606,16 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		(WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("frost")));
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChargeAttribute(),
 		(WRTune(TEXT("resources.chargeMax"), 100.f) + WRTune(TEXT("resources.chargeCapacityPerRank"), 15.f) * RankIn(TEXT("lightning"), TEXT("charge_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("lightning")));
+	// Growth (the Nature path): 100 + 10 a rank of Growth capacity (nodeEffects nature.growth_capacity maxGrowth); a
+	// bigger bar keeps how full it was.
+	{
+		const float OldMax = FMath::Max(1.f, Attr->GetMaxGrowth());
+		const float Share = FMath::Clamp(Attr->GetGrowth() / OldMax, 0.f, 1.f);
+		const float NewMax = (WRTune(TEXT("resources.growth.max"), 100.f) + (IsActivePath(TEXT("nature")) ? FMath::Max(0.f, Stat(Character, TEXT("maxGrowth"))) : 0.f))
+			* WRDeeds::PrestigeResource(GetOwner(), TEXT("nature"));
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxGrowthAttribute(), NewMax);
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetGrowthAttribute(), NewMax * Share);
+	}
 
 	// Tempered: more poise.
 	// Reinforced (armorcraft perk) adds to the path nodes' poise.

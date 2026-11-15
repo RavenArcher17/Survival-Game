@@ -48,6 +48,9 @@ struct FWRWeatherKind
 	float Chance = 0.f;
 	FVector2D Minutes = FVector2D(10.f, 20.f);
 	bool bDayOnly = false, bNightOnly = false;
+	/** Only starts between these game hours, and is gone by the second (the Ancient forest's Morning mist, 05:00-10:00:
+	 *  weather.json "hours"). X < 0: any hour. */
+	FVector2D Hours = FVector2D(-1.f, -1.f);
 
 	// Effects (only on players it reaches: outdoors, not countered).
 	float Vision = 0.f;              // metres of visibility (the look); 0 = unchanged

@@ -5,8 +5,11 @@
 
 #include "WRWorldSystems.h"
 #include "WRLand.h"
+#include "WRForestTypes.h"
 #include "WRStormWorld.h"
 #include "WRSwampSystems.h"
+#include "WRForestHazards.h"
+#include "WRForestWorld.h"
 #include "WRSwampBosses.h"
 #include "WRDeeds.h"
 #include "Wildreach.h"
@@ -911,6 +914,9 @@ void UWRWorldSystems::PlaceShrines()
 		Row->TryGetBoolField(TEXT("swamp"), bSwampRow);
 		FVector2D SwampAt = FVector2D::ZeroVector;
 		float SwampYaw = 0.f;
+		bool bForestRow = false;
+		Row->TryGetBoolField(TEXT("forest"), bForestRow);
+		float ForestYaw = 0.f;
 		const FName OnLand(*WStrOf(Row, TEXT("land")));
 		if (!OnLand.IsNone())
 		{
@@ -925,6 +931,12 @@ void UWRWorldSystems::PlaceShrines()
 			// The Swamp's five take their places from Data/swamp.json shrines (WRSwampSystems), steps toward the nearest camp.
 			if (!WRSwamp::ShrinePlace(Id, SwampAt, SwampYaw) || !WSettle(World, SwampAt, Ground)) continue;
 			Face = FRotator(0.f, SwampYaw, 0.f);
+		}
+		else if (bForestRow && WRForestShape::ShrineSpot(World, Id, Ground, ForestYaw))
+		{
+			// The Ancient forest's five stand where Data/forest.json puts them, on what they stand on (WRForestWorld): the
+			// Falls Shrine on the fishing platform, the Canopy Shrine on its deck 30 m up, the rest on the ground.
+			Face = FRotator(0.f, ForestYaw, 0.f);
 		}
 		else if (bGreat && !Row->HasField(TEXT("at")))
 		{
@@ -1745,8 +1757,15 @@ void UWRWorldSystems::DropMeteor(FName Biome)
 	{
 		// Anywhere on a land in the game: the island, or (once it's live) Storm peaks' frame to the north.
 		const bool bNorth = WRBiome::IsLive(TEXT("storm_peaks")) && FMath::FRand() < WRWorld::Num(TEXT("events.starfall.northShare"), 0.35f);
-		const FVector2D At = bNorth ? FVector2D(FMath::FRandRange(-260000.f, 60000.f), FMath::FRandRange(-560000.f, -230000.f))
+		FVector2D At = bNorth ? FVector2D(FMath::FRandRange(-260000.f, 60000.f), FMath::FRandRange(-560000.f, -230000.f))
 			: FVector2D(FMath::FRandRange(-180000.f, 180000.f), FMath::FRandRange(-180000.f, 180000.f));
+		// The Ancient forest's star falls on its own frame south of the island (Data/forest.json; its ground below).
+		if (Biome == TEXT("forest"))
+		{
+			const FWRForestData& FD = FWRForestData::Get();
+			if (!FD.bLoaded) return;
+			At = FVector2D(FMath::FRandRange(FD.FrameMin.X, FD.FrameMax.X), FMath::FRandRange(WRTune(TEXT("world.islandSouthEdge"), 201600.f), FD.FrameMax.Y));
+		}
 		if (!(Mid.IsNone() ? false : WRWildlife::CanStand(Mid, At)) && !(High.IsNone() ? false : WRWildlife::CanStand(High, At))) continue;
 		bool bNear = false;
 		for (const FWRPoi& P : FWRPoi::All) bNear |= FVector::Dist2D(P.Location, FVector(At, 0.f)) < Clear && P.Kind != TEXT("cave");
@@ -2378,6 +2397,16 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	{
 		// The Swamp's things (WRSwampSystems): world swamp use / plank / rite / boss ...
 		return WRSwamp::Command(PC, Args);
+	}
+	if (Verb == TEXT("fhaz"))
+	{
+		// The Ancient forest's hazards and secrets (WRForestHazards, WRForestHollow): world fhaz use / secret x y z.
+		return WRForestHazards::Command(PC, Args);
+	}
+	if (Verb == TEXT("forest"))
+	{
+		// The Ancient forest's world (WRForestWorld): world forest lift / offer.
+		return UWRForestWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("plank"))
 	{

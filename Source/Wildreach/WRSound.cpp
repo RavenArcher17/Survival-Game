@@ -842,6 +842,11 @@ void WRSound::Voice(AActor* Actor, FName Kind, float VolumeScale)
 	{
 		return;
 	}
+	// A plant (the Nature path's summons, actor tag "Plant") has no voice: its hits sound as wood, its death as a creak.
+	if (Actor->ActorHasTag(TEXT("Plant")))
+	{
+		return;
+	}
 	const FString K = Kind.ToString();
 	if (const AWRCreature* C = Cast<AWRCreature>(Actor))
 	{
