@@ -56,6 +56,46 @@ of the coast shows yet; underwater play is live everywhere water is.
   New items: pearl, sea-glass, driftwood, oyster, urchin, clam meat, Tidefowl egg, kelp ash, bronze scrap and sheet, iron
   nails, gold leaf, glass, the worn harpoon, the Sluice key, eight lore keepsakes, four recipe scraps; recipes glass
   (kelp glass), bronze from scrap, iron from nails. The `ocean` row in `world.json biomes`.
+## Unreleased: the Fungal caverns (the Spore land)
+
+Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and plan in showcase-notes
+cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
+not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveBiomes`.
+
+- **Fungal (1): the land, the caverns and their places** (fungal 2.1-2.6, 2.20; plan 2.0-2.6). `node
+  Tools/terrain/fungal.mjs` writes `Data/lands/fungal.json` + `fungal_ground.bin` (0.97 MB: the Sinkhole Rim, a karst
+  plateau of limestone pavement cut by grykes on the Hollow Cape's west half, sea cliffs west and north, the Desert's
+  north strip of dunes, the Spine's foot rising to meet the Sky land's ground) and `Data/fungal.json` (the caverns, every
+  place, kit POI, resource node, cloud, lure-line hall, springcap, cap-fall, foul-air volume, Breath vent, den, arena and
+  secret: read by `FWRFungalData`, `WRFungalTypes.*`). The land is priority 1 over the Sky land's west downs and the
+  Flue's outer crown (`cuts`: the boxes' edges lie on both grids and the samples there are the Sky's own heights, so the
+  grounds meet edge to edge; the Sky keeps a stepped ring about 300 m round the Flue's shaft, which buries its wall).
+  The caverns (57 halls on three levels, 70 tubes, 7 shafts: the Spore Gardens' daylit dolines, the Glow-moss Halls with
+  the 400 m Starfall Hall, the Mycelium Webs' chasms, the Flooded Grottos, the Heart Grotto's ten rooms round the Heart
+  chamber, and the river passage into the Flue) are one signed-distance union meshed by surface nets
+  (`AWRFungalCaves`), drawn in the new `M_FungalGlow` (`Tools/terrain/build_fungal_materials.py`, with `M_FungalVeil`;
+  two small uassets): the rock's colour by sub-zone in its vertex colours and its glow (moss carpets, starthread
+  ceilings, amber fissures, the teal waterline, the city's membrane) in their alpha. The glow follows the surface clock
+  (0.35 at noon, 1.0 at midnight) through shared material instances (`UWRFungalWorld`). The Sky lane's Flue wall leaves
+  out the one panel the river's mouth chamber covers (`WRFungal::FlueMouth`); the mesher treats the shaft as air and
+  drops the skin that would double its wall. 120 POIs (35 surface, 85 under), every tube within 125 m of a place
+  (alcoves). Scenery in code on the forest's FBuild with the kit `WRFungalLook.h` (lathed caps of every species with
+  glowing gills, rhizomorph cables with their twist, bracket shelves you climb, the summited Deepfarmers in their four
+  poses with the stalk from the skull, knocker idols, glow-cap rings, cap-houses, log beds, granaries, drying racks, jars,
+  kites): the three camps on their sinkhole rims with wrecks in the coves and a gully up from each, the Ancestor Cap
+  (90 m, its gills lit, the Breath rising from fissures round its foot), the Kneeling Titan, the Ring of Caps, the Fall
+  Field and the Kitewright champion, the descents (the Garden Doline's spiral path with cap-terraces, the Brood
+  Doline's rope stair on bronze pins, the Springcap Shaft's shelves, the Long Stair's worn treads and knocker idols, the
+  Sea Cave, the Great Doline's ledge spiral), S1-S8, C1-C17, the False Sky (about 6,000 beaded starthreads and its milky
+  way, the dark star's shelf stair), the Shoestring Bridge (a walkable 3 m cable), the Drowned Granary's nine silos and
+  rope bridges, the Sand Falls with the caravan and the ledge behind the middle fall, the Heart Grotto's city (the
+  Lantern Street's roofs of the summited, the Market of Hands, the Feeding Hall, the Elders' Tower, the Last House),
+  the Heart chamber's terraces, pool and gate frames, and the plateau's juniper, boulders and foxfire deadwood. The
+  caverns' lakes, river and flooded crawls are swimmable water volumes. `WRBiome::IsUnderground` is true in the caverns
+  (no building, no rescue, dark), the sky light fades under rock (not on a doline's open floor), and the Sky islands'
+  air over the cape stays the Sky's biome. The Spore Crossing (a longboat) rows from the island's north shore to North
+  Tip's cove. Numbers: tuning `fungalWorld`. No diving exists yet, so the moat and the two sumps are flooded crawls you
+  wade (LATER-COOKS). Compiled; not played.
 
 ## Unreleased: the Crystal caves (the Arcane land)
 

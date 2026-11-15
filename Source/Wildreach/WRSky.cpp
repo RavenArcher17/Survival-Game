@@ -9,6 +9,7 @@
 #include "WRForestTypes.h"
 #include "WRGraveTypes.h"
 #include "WRCrystalTypes.h"
+#include "WRFungalTypes.h"
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRTuning.h"
@@ -425,7 +426,7 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	// Under the Crystal caves' rock the open sky is gone (crystal 2.8 full dark): the sky light fades out within a second
 	// or two of going in, so only carried light, tames and crystals woken by sound light the caves (the caves' rock is
 	// procedural mesh, which the sky light's occlusion can't see).
-	CrystalCave = FMath::FInterpTo(CrystalCave, WRCrystal::InCave(View) ? 1.f : 0.f, DeltaSeconds, T.Num(TEXT("crystalWorld.sky.caveFadeSpeed"), 1.5f));
+	CrystalCave = FMath::FInterpTo(CrystalCave, WRCrystal::InCave(View) || WRFungal::UnderRock(View) ? 1.f : 0.f, DeltaSeconds, T.Num(TEXT("crystalWorld.sky.caveFadeSpeed"), 1.5f));
 	// The Graveyard's air west of the Spine (cooks/biome-graveyard.md 2.7): a bruise-violet haze by day that never quite
 	// clears, a sickly yellow-green rim on the dusk instead of gold, and its two mists: Ground mist pooled knee-deep over
 	// the graves by day, Corpse fog standing chest-high at night (the second fog layer, its floor at your feet).

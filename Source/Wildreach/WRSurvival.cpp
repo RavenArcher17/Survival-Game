@@ -6,6 +6,7 @@
 #include "WRGraveEvents.h"
 #include "WRCrystalTypes.h"
 #include "WRCrystalHazards.h"
+#include "WRFungalTypes.h"
 #include "WRGraveTypes.h"
 #include "WRSwampSystems.h"
 #include "WRStormTypes.h"
@@ -62,6 +63,9 @@ FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 	// A war-hall is both its lands: the west half the first's, the east half the second's (WRWarHall).
 	const FName Hall = WRWarHall::BiomeAt(WorldContext, Pos);
 	if (!Hall.IsNone()) return Hall;
+	// The Sky islands over the Fungal caverns' plateau (the Spore Scar hangs over the Great Doline): the air 300 m over
+	// the cape's ground is the Sky's, not the land's under it (WRFungal::SkyAbove).
+	if (WRFungal::SkyAbove(Pos)) return WRSkyIsles::Biome();
 	// A runtime land (Data/lands: the Corrupted wasteland) is its own biome wherever it sits (WRLand).
 	const FName Land = WRLand::BiomeAt(Pos);
 	if (!Land.IsNone()) return Land;
@@ -112,6 +116,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	}
 	// And the Crystal caves (WRCrystalTypes): every hall, tube, passage and shaft under the plateau and the Spine.
 	if (WRCrystal::InCave(Pos))
+	{
+		return true;
+	}
+	// And the Fungal caverns (WRFungalTypes): every hall, doline floor, chasm, grotto, tube and shaft under the cape.
+	if (WRFungal::InCave(Pos))
 	{
 		return true;
 	}

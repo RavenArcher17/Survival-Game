@@ -404,6 +404,19 @@ The bosses are `WRCrystalBosses.*` (hooks `FWRCrystalBoss` beside the Graveyard'
 water reflection via `M_MirrorWater`) and `WRCrystalLyrathis.cpp` (her beam `AWRPrismBeam`, dome, copies, phase 3, the
 turntables' look). A move that needs the room is in the hooks; numbers in tuning `bosses.<id>`. Not built: composed
 music (stand-in pools marked `_standin`).
+Also since 0.7.1 (in progress, live): **the Fungal caverns** (cooks/biome-fungal.md, plan cooks/build-biome-fungal.md).
+`node Tools/terrain/fungal.mjs` writes `Data/lands/fungal.json` + `fungal_ground.bin` (real metres, priority 1 with
+`cuts` over the Sky land's west downs: it reads `sky_ground.bin` so the seam samples are the Sky's own; rerun it if the
+Sky land's ground changes) and `Data/fungal.json` (read by `FWRFungalData`, `WRFungalTypes.cpp`). The caverns are the
+Crystal lane's design as a fungal twin (`FWRFungalData::Air`, `AWRFungalCaves` surface nets; hall kinds hall / doline /
+chasm / grotto / dome, tubes tube / crawl / stair). The rock and every glowing thing use `M_FungalGlow` (vertex alpha =
+glow) through `UWRFungalWorld`'s shared instances (`GlowMID`, `VeilMID`, and the rock's own), driven by the surface
+clock and `BeatAmount` / `BeatRate` (the bloom and the Sporefall). Scenery: `WRFungalScenery.cpp` (surface, dispatch)
+and `WRFungalSceneryCaves.cpp` (halls by zone, sites, the city), kit `WRFungalLook.h` (`FFg` = FBuild + a glow mesh + a
+veil mesh). The Flue junction: `WRSkyParts::Flue` skips the wall panel at `WRFungal::FlueMouth`, and the caverns' mesher
+unions the shaft's air (radius `flue.r`) and drops its duplicate skin. Things in the caverns stand at their hall's local
+z 0 (never `FBuild::G`, which traces to the plateau); walls and ceilings come from the air (`FgWall`). Numbers: tuning
+`fungalWorld`.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
