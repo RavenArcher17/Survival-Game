@@ -467,11 +467,9 @@ namespace WRLandSitesImpl
 	}
 }
 
-using namespace WRLandSitesImpl;
-
 // ================================================================================================ the places
 
-namespace
+namespace WRLandSitesImpl
 {
 	FTransform SiteFrame(AWRLand* Land, const TSharedPtr<FJsonObject>& P)
 	{
@@ -1552,6 +1550,7 @@ namespace
 
 void WRLandSites::Build(AWRLand* Land)
 {
+	using namespace WRLandSitesImpl;
 	if (!Land || !Land->Def()) return;
 	const FWRLandDef& D = *Land->Def();
 	const bool bDraw = Land->GetNetMode() != NM_DedicatedServer;

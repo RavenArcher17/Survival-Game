@@ -49,6 +49,13 @@
 #include "PhysicsEngine/BodySetup.h"
 #include "TimerManager.h"
 
+// Unity builds can put WRSwampScenery.cpp (its palette names at file scope through `using namespace WRSwampLook`) ahead of
+// this file; its own same-named surfaces are local on purpose, so the shadowing warning is off for this file only.
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4459)
+#endif
+
 namespace WRSwampVharraLocal
 {
 	FName VhQueenId() { static const FName N(TEXT("vharra")); return N; }
@@ -3807,3 +3814,7 @@ void UWRSwampBossBody::PlaceTrunk(float DeltaTime)
 	TrunkPts = P;
 	LashNow = L->LashDeg;
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

@@ -33,13 +33,13 @@ namespace
 		double V = 0.0;
 		return O.IsValid() && O->TryGetNumberField(Key, V) ? float(V) : Fallback;
 	}
-	const float Reach = 650.f;
+	const float CrossReach = 650.f;
 
 	AWRCrossing* CrossingNear(const UWorld* World, const FVector& At)
 	{
 		for (TActorIterator<AWRCrossing> It(World); It; ++It)
 		{
-			if (It->bReady && FVector::Dist(It->GetActorLocation(), At) < Reach) return *It;
+			if (It->bReady && FVector::Dist(It->GetActorLocation(), At) < CrossReach) return *It;
 		}
 		return nullptr;
 	}

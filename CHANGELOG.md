@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased: the Corrupted wasteland (the Void land) — in progress
+
+Aaron (lane build-biome-void: requirement ledger, research and plan in showcase-notes cooks/build-biome-void.md, building
+cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the testers test, F8).
+
+- **A runtime land** (`WRLand.*`, `Data/lands/wasteland.json`): the Wasteland's ground is a pure function of the
+  world-map's metres (base from the Spine crest, coast falloff, noise, then data features: the Great Rift's hole, the
+  viaduct ravine, the Glass Sea flat, the Severance gorge, cave hollows), built as 200 m procedural-mesh chunks with
+  collision on every machine (time-sliced, nothing in the map, no LFS). It sits 9 km south of the island until the
+  12-wedge map exists (`origin` / `mapCentre` move it whole). `WRBiome::At` answers `wasteland` inside it; the
+  biome is in `world.liveBiomes`, so its crops, fish, pieces, sets and recipes are live. Five sub-zones V1-V5 with
+  their own ground colours, decoration and beds. Materials `M_LandGround`, `M_VoidTear`, `M_VoidLight`
+  (`Tools/terrain/build_void_materials.py`, commandlet).
+- **Its places** (`WRLandSites.cpp`): the 10 landmarks (the Great Rift column, the Throat, the Hanging Wood, the Hollow
+  Colossus, the Hollow Fort, the Unravelling Viaduct, the Ash-cast cage, the Broken Knee, the Glass Sea, the Black
+  Beacon), 3 camps, 4 caves, the story sites, the four Gauntlet stations' yards, the Descent, kit POIs by a seeded
+  150 m / 125 m pass and decoration between them; every place with its night light. Floating things move on the
+  server clock (`FWRLandMover`), never snapping.
+- **The Grey Crossing** (`WRLandThings.*`): a longboat at the island's south shore and one at Lantern Cove; hold E to
+  row across (`land cross`).
+- **The Void's cost** (`WRVoid.*`): `MaxHealthLost` (health can't rise past MaxHealth - MaxHealthLost: the grey hatched
+  band at the right of the health bar; Rest gives it back), `Void` / `MaxVoid` for the path. **Rifts** (`AWRRift`):
+  a tear with a drain zone (nullward / Hollowplate / anchor salt cut it), a pull computed the same on server and
+  owner (no correction), a touch that burns through `ApplyHit`, a pulse (1 s silence, then the floating stones drop),
+  a voidglass ring. Timed brews (`items.json use.brew`). Numbers: tuning `void`.
+- **Dead calm** (weather `deadcalm`, 30%): no wind and no beds, your footsteps doubled, the music fades out over 8 s
+  (half in a fight). Grey wind is now 10%.
+- Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
+  palette ahead of it).
+
 ## Unreleased: the Swamp (the Mire), the Blood land, and the Blood & curse path
 
 Aaron (lanes build-biome-swamp + build-biome-swamp-finish: requirement ledger, research and plan in showcase-notes

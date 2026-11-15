@@ -282,6 +282,13 @@ route the swamp's interacts (`world swamp ...`). Creatures `WRSwampCreatures.*` 
 Numbers: tuning `swampWorld`, `swampHazards`, `redTide`, `swampCreatures`, `swampBosses`, `swampVharra`, `blood`.
 Dev: `world swamp dev coven | dig | candle`, `swampboss vharra ...`.
 
+Also since 0.7.1 (in progress): **the Corrupted wasteland, a runtime land** (cooks/biome-void.md, plan
+cooks/build-biome-void.md). Unlike Storm peaks and the Swamp it is not a landscape: `WRLand.*` builds its ground from
+`Data/lands/wasteland.json` (a pure height function + data features, procedural-mesh chunks on every machine), 9 km
+south of the island (move it with `origin` / `mapCentre`). Places: `WRLandSites.cpp`; boats, lift and other live
+things: `WRLandThings.*` (`land ...` commands); rifts and MaxHealthLost: `WRVoid.*` (tuning `void`). A new land is a
+new file in `Data/lands/` plus its biome in `world.liveBiomes`.
+
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
   never its own file in the world folder. Schema changes are a new `Data/db/migrations/NNNN_*.sql`. One server per world
