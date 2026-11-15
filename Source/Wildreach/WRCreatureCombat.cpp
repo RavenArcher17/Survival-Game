@@ -3,6 +3,7 @@
 // punish windows, combos, packs that flank, surround and breathe with no attack token; lock points and breakable parts;
 // fighting from the saddle and being thrown off it.
 #include "WRCreature.h"
+#include "WRVoidCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampBosses.h"
 #include "WRSwampCreatures.h"
@@ -468,6 +469,7 @@ float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRStormAI::Incoming(this, Hit, Damage);   // Galvara's cores: arrows and spells x1.5
 	Damage = FWRSwampBoss::CreatureIncoming(this, Hit, Damage);   // the Hex-Warden's totems: x2 from fire
 	Damage = FWRSwampAI::Incoming(this, Hit, Damage);   // a Murkjaw's belly as it rolls or rears, a Slimeshell in its shell
+	Damage = FWRVoidAI::Incoming(this, Hit, Damage);    // nothing reaches a Riftmaw in its tear
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -621,6 +623,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // a Swamp creature's own rule (only from water, only flanking, only grounded, once a fight, forced only)
 		}
+		if (!FWRVoidAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // a void creature's own rule (the rift burst and the retreat are forced, the Hush rises only when it can't hear you)
+		}
 		const float W = Dist < Close ? R.WClose : Dist < Mid ? R.WMid : R.WFar;
 		if (W > 0.f)
 		{
@@ -675,6 +681,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	Self->MulticastTell(R->Glint, R->TellBone, TEXT("voice"));
 	FWRStormAI::RowStarted(this, Self, *R, Target);
 	FWRSwampAI::RowStarted(this, Self, *R, Target);
+	FWRVoidAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -749,6 +756,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 	}
 	FWRStormAI::ModifyHit(Self, Hit, R);   // shock is lightning; a tame Raiju's storm bonus, a tame's shock bites
 	FWRSwampAI::ModifyHit(Self, Hit, R);   // a hexed beast's curse; the Miasma's worse cry
+	FWRVoidAI::ModifyHit(Self, Hit, R);    // void bites; a Riftborn's curse
 	UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *RowId.ToString(), *Victim->GetName());
 	const float Knockback = R->Knockback;
 	TWeakObjectPtr<AWRCreature> WeakSelf(Self);
@@ -762,6 +770,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 		{
 			// A Swamp creature's catches (the latch, the death roll, the tongue's pull, the gulp) come out of the result.
 			FWRSwampAI::Resolved(S, V, HitRowId, Result);
+			FWRVoidAI::Resolved(S, V, HitRowId, Result);
 		}
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{
@@ -794,6 +803,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	if (FWRSwampAI::StrikeRow(this, Self, *R, Target))
 	{
 		return;  // a Swamp move (the cry, the tongue, the flop, a spit, the call, the clatter, the puff, the surge, a dive)
+	}
+	if (FWRVoidAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // a void move (a blink, a latch, a trail, the rise, the scream, the rift's burst and retreat, void spit)
 	}
 	if (M == TEXT("lunge") || M == TEXT("pounce"))
 	{
@@ -1133,7 +1146,7 @@ void AWRCreatureAI::TickRowFight(AWRCreature* Self, AWRCharacterBase* Target, fl
 	const FVector Goal = bInPlace ? Target->GetActorLocation() : Spot;
 	FVector Dir = (Goal - Self->GetActorLocation()).GetSafeNormal2D();
 	const float Stop = Self->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius() + (Def ? FMath::Min(Def->AttackRange * 0.5f, 120.f) : 80.f);
-	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered) && !FWRStormAI::Grounded(Self) && !FWRSwampAI::Grounded(Self))
+	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered) && !FWRStormAI::Grounded(Self) && !FWRSwampAI::Grounded(Self) && !FWRVoidAI::Grounded(Self))
 	{
 		const float WantZ = Target->GetActorLocation().Z + (Dist > 700.f ? 450.f : 0.f);
 		Self->GetCharacterMovement()->SetMovementMode(MOVE_Flying);

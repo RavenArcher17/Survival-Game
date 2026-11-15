@@ -4,6 +4,7 @@
 // Road's even grade). Every machine computes the same ground, so nothing about it is sent or saved; it is built in
 // time-sliced chunks so no frame hitches.
 #include "WRLand.h"
+#include "WRVoidWorld.h"
 #include "Wildreach.h"
 #include "WRLandSites.h"
 #include "WRLandThings.h"
@@ -498,6 +499,23 @@ FName WRLand::BiomeAt(const FVector& World)
 	return D ? D->Biome : NAME_None;
 }
 
+bool WRLand::PlaceOn(FName LandId, const FVector2D& MapM, FVector& OutWorld)
+{
+	const FWRLandDef* D = Find(LandId);
+	if (!D || !IsLive(*D)) return false;
+	OutWorld = D->GroundPoint(MapM);
+	return true;
+}
+
+float WRLand::GroundZAt(const FVector& World, float Fallback)
+{
+	const FWRLandDef* D = At(World);
+	if (!D) return Fallback;
+	const FVector2D M = D->ToMap(World);
+	if (D->HoleAt(M)) return Fallback;
+	return D->Origin.Z + D->Height(M) * 100.f;
+}
+
 FName WRLand::ZoneAt(const FVector& World)
 {
 	const FWRLandDef* D = At(World);
@@ -638,6 +656,9 @@ void AWRLand::Tick(float DeltaSeconds)
 		WRLandSites::Build(this);
 		// The server's rifts sit on the places just made (the kit pass's rift rings among them).
 		if (GetNetMode() != NM_Client) WRVoid::SpawnRifts(GetWorld(), LandId);
+		// Its gathering, keepsakes and the rest of the land's live things (WRVoidWorld; the server's nodes, every
+		// machine's looks).
+		WRVoidWorld::LandReady(this);
 		return;
 	}
 	// The floating things: each one's place from the server's clock (never set from a previous frame).

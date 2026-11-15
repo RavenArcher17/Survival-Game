@@ -1,4 +1,5 @@
 #include "WRResourceNode.h"
+#include "WRVoidWorld.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
 #include "WRSwampCreatures.h"
@@ -63,8 +64,8 @@ const FWRToolDef* FWRGathering::FindTool(FName ItemId)
 FName FWRGathering::ToolKindFor(FName ItemId)
 {
 	const FString Id = ItemId.ToString();
-	if (ItemId == TEXT("wood")) return TEXT("hatchet");
-	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur")) || ItemId == TEXT("saltpetre")) return TEXT("pick");
+	if (ItemId == TEXT("wood") || ItemId == TEXT("greywood")) return TEXT("hatchet");
+	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur")) || ItemId == TEXT("saltpetre") || ItemId == TEXT("voidglass")) return TEXT("pick");
 	return NAME_None;
 }
 
@@ -303,6 +304,8 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 	{
 		HitsLeft = Hits + 1;
 	}
+	// The Wasteland's own (WRVoidWorld): ring voidglass counts for Maren's quest; a pulled mandrake screams.
+	WRVoidWorld::Harvested(this, Gatherer, HitsLeft <= 1);
 	if (--HitsLeft <= 0)
 	{
 		bDepleted = true;

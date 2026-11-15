@@ -303,6 +303,8 @@ public:
 	 *  couched spear above mounted.couchSpeed). */
 	UFUNCTION(Server, Reliable) void ServerRideAttack(bool bHeavy, bool bHeld);
 	UFUNCTION(Server, Reliable) void ServerRideAttackRelease();
+	/** A ridden Voidstrider's blink (Dodge while mounted; WRVoidCreatures). */
+	UFUNCTION(Server, Reliable) void ServerRideBlink();
 
 	// --- Lock points and parts (combat.md 2.10, 2.15) ---
 	int32 NumLockPoints() const;
@@ -601,6 +603,7 @@ class WILDREACH_API AWRCreatureAI : public AAIController
 	friend struct FWRStormBoss;
 	friend struct FWRSwampAI;
 	friend struct FWRSwampBoss;
+	friend struct FWRVoidAI;
 
 public:
 	AWRCreatureAI();

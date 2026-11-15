@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRVoidCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
 #include "WRSwampBosses.h"
@@ -1294,6 +1295,8 @@ void AWRCreature::BeginPlay()
 	UWRStormBody::Attach(this);
 	// A Swamp creature's body state and look (WRSwampCreatures).
 	UWRSwampBody::Attach(this);
+	// A Corrupted wasteland creature's body state and look (WRVoidCreatures).
+	UWRVoidBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -2016,7 +2019,18 @@ void AWRCreature::RideJumpReleased()
 
 void AWRCreature::RideDivePressed()
 {
+	// A Voidstrider blinks 5 m ahead instead (biome-void 2.12.1: Dodge while mounted).
+	if (FWRVoidAI::WantsRideBlink(this))
+	{
+		ServerRideBlink();
+		return;
+	}
 	bDiveHeld = true;
+}
+
+void AWRCreature::ServerRideBlink_Implementation()
+{
+	FWRVoidAI::RideBlink(this);
 }
 
 void AWRCreature::RideDiveReleased()
@@ -2225,6 +2239,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	// A wild kill stays down to be butchered (its loot comes off the body, hit by hit); tames still go the old way.
 	FWRStormAI::Died(this, Killer);   // a Storm peaks creature's chance drops (storm essence)
 	FWRSwampAI::Died(this, Killer);   // a Swamp creature lets go of what it held; the Red Tide's extra sacs
+	FWRVoidAI::Died(this, Killer);    // a void creature lets go; a Riftborn's void essence
 	const bool bBody = BecomeBody(Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
@@ -2771,6 +2786,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	// The Swamp creatures' own moments (an ambush under the duckweed, a hold, a latch, a forced next row, the murder over
 	// the dying, the yawn, the flash, a cornered peck, the shallows' stab): WRSwampCreatures.
 	if (FWRSwampAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	// The Wasteland's (a Riftmaw in its tear, a blink on its way, a latch, a catch, the Hush listening): WRVoidCreatures.
+	if (FWRVoidAI::TickWild(this, Self, DeltaSeconds))
 	{
 		return;
 	}

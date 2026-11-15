@@ -27,6 +27,31 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
   a voidglass ring. Timed brews (`items.json use.brew`). Numbers: tuning `void`.
 - **Dead calm** (weather `deadcalm`, 30%): no wind and no beds, your footsteps doubled, the music fades out over 8 s
   (half in a fight). Grey wind is now 10%.
+- **Its gathering and things** (`WRVoidWorld.*`, wasteland.json `resources`): greywood from the Withered Forest's
+  standing dead (hatchet), grey salt pans on the Grey Strand, wild ashen grain in V1's clearings, the Quire's six
+  mandrakes (a 0.9 s shiver, then a 12 m scream that staggers you without wax ear plugs), star iron in the Hollow
+  Ground's meteor bowl, twenty voidglass nodes on the Glass Sea; node looks for voidglass (a fused black sheet with
+  standing shards), greywood, salt pans, grain and mandrake. Keepsakes at nine story sites (the lore items, E to take).
+  Thrown things: a throwing stone floats in a rift zone (Maren's first quest counts three different rifts), an anchor
+  salt bag bursts in a 3 m cloud the bosses will listen for. Items: greywood, grey salt, anchor salt (eat: rift drain
+  x0.5, 5 min), curse-resist draught, void essence, the creatures' parts, the Gnashblade, Hushfinger spear, Nullwing
+  bow, voidglass dagger, Beacon lantern, Gnawer arrows, milk, ten lore items; their recipes.
+- **Shrines and Maren Vey**: five shrines on the land (the Shrine of the Edge at the Quiet Rift, Greywood, the Strand,
+  Severance West, the East Gate) with their guards and a Wasteland dais (ash, thrown stones, voidglass splinters);
+  rows on a runtime land carry `"land"` and stand on its height function. Maren Vey at the Great Shrine and her six
+  quests (event / bring / kill kinds).
+- **The nine creatures** (`WRVoidCreatures.*`, creatures.json / attacks.json): the Hollowfang (Barghest rig: eye pits,
+  black glass teeth, the blink with its shudder, reversed breath and the ripple where it lands), the Riftmaw (lies in a
+  large rift, bursts out of the rift nearest you, goes back after three attacks or at a quarter health, stranded and
+  slowed 30 m from any rift, the four-jaw catch), the Nullwing (torn membranes showing the void, the laid void trail
+  `AWRVoidTrail`, dive and grounding, void spit that never homes), the Gnawer (latches and eats 3 max health a second;
+  a roll or a swing shakes every one off), the Hush (blind: hunts by noise, rises to listen, the scream that breaks a
+  drink or cast, the lift), the Voidstrider (drifting filament mane, blink kick; ridden, Dodge blinks 5 m every 8 s),
+  the Riftback, the Driftmote (hovers, pulses faster near rifts when tame), the Withergoat. Riftborn variants (15% in
+  V4-V5, 5% elsewhere: desaturated, black-violet eyes, shards on the spine, +25% health, curse 15 on every blow, a blink
+  every 10 s, void essence). Dens on the land by zone with day and night tables (wasteland.json `spawns`), a Riftmaw
+  in every large rift, the Hush on the Gauntlet Road at night. Voices are the nearest existing families pitched (the
+  fused recordings are a later sound pass); beds for the land and each zone.
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
   palette ahead of it).
 

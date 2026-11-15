@@ -287,7 +287,10 @@ cooks/build-biome-void.md). Unlike Storm peaks and the Swamp it is not a landsca
 `Data/lands/wasteland.json` (a pure height function + data features, procedural-mesh chunks on every machine), 9 km
 south of the island (move it with `origin` / `mapCentre`). Places: `WRLandSites.cpp`; boats, lift and other live
 things: `WRLandThings.*` (`land ...` commands); rifts and MaxHealthLost: `WRVoid.*` (tuning `void`). A new land is a
-new file in `Data/lands/` plus its biome in `world.liveBiomes`.
+new file in `Data/lands/` plus its biome in `world.liveBiomes`. Its gathering, keepsakes and thrown things:
+`WRVoidWorld.*` (wasteland.json `resources`, tuning `voidWorld`); its creatures and dens: `WRVoidCreatures.*` (the
+Swamp's hook pattern, wasteland.json `spawns`, tuning `voidCreatures`). Shrine and master rows with `"land"` are placed
+on that land's height function (`WRLand::PlaceOn`).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

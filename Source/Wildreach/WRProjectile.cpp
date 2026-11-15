@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
 #include "WRSwampBosses.h"
 #include "WRRaiding.h"
@@ -212,7 +213,7 @@ void AWRProjectile::OnRep_Model()
 		CodeModel = NewObject<UProceduralMeshComponent>(this, TEXT("ThrownModel"));
 		CodeModel->SetupAttachment(GetRootComponent());
 		CodeModel->RegisterComponent();
-		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel))
+		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -307,6 +308,14 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	{
 		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
 		WRSwamp::ThrownLanded(this, Kind, At, OtherActor, const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
+	// The Wasteland's thrown things: a stone floats in a rift zone, salt bursts in a cloud (WRVoidWorld).
+	if (WRVoidWorld::IsThrownKind(Kind))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		WRVoidWorld::ThrownLanded(this, Kind, At, OtherActor, const_cast<AWRCharacterBase*>(Caster));
 		Destroy();
 		return;
 	}

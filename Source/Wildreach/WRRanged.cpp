@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
 #include "WRSurvival.h"
 #include "WRWeapons.h"
@@ -541,7 +542,8 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	{
 		// (The fire pot is modelled in code: the projectile builds it from "code:firepot".)
 		// (So are the Swamp's salt pouch and stormglass jar: "code:saltpouch", "code:stormjar", WRSwampSystems.)
-		const bool bSwampThrown = Launcher.RangedKind == TEXT("saltpouch") || Launcher.RangedKind == TEXT("stormjar");
+		// (And the Wasteland's throwing stone and anchor salt bag: "code:riftstone", "code:anchorsalt", WRVoidWorld.)
+		const bool bSwampThrown = Launcher.RangedKind == TEXT("saltpouch") || Launcher.RangedKind == TEXT("stormjar") || WRVoidWorld::IsThrownKind(Launcher.RangedKind);
 		const FString Model = Launcher.RangedKind == TEXT("firepot") ? FString(TEXT("code:firepot"))
 			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;

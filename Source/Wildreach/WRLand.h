@@ -109,6 +109,11 @@ namespace WRLand
 	WILDREACH_API FName BiomeAt(const FVector& World);
 	/** Inside one of a live land's holes (the Great Rift) and below its lip: no ground-rescue there, the black is the floor. */
 	WILDREACH_API bool InHole(const FVector& World);
+	/** A live land's ground under one of its map points (metres), in game cm: rows placed on a land ("land" + "at" in
+	 *  its map metres: shrines, masters, dens) stand on the height function, never a trace (chunks may still be building). */
+	WILDREACH_API bool PlaceOn(FName LandId, const FVector2D& MapM, FVector& OutWorld);
+	/** The ground height (game cm) under a game point inside a live land (outside every land, or over a hole: Fallback). */
+	WILDREACH_API float GroundZAt(const FVector& World, float Fallback);
 	/** The sub-zone at a game point (None outside every land). */
 	WILDREACH_API FName ZoneAt(const FVector& World);
 	/** sRGB array [r,g,b] -> linear. */

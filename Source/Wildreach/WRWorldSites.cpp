@@ -5,6 +5,7 @@
 // steps, walls), and everything that glows reads at night.
 
 #include "WRWorldSystems.h"
+#include "WRLand.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
 #include "WRFarm.h"
@@ -113,6 +114,9 @@ namespace WRSiteLook
 	{
 		const FTransform T = Owner->GetActorTransform();
 		const FVector W = T.TransformPosition(FVector(Local, 0.f));
+		// On a runtime land (the Wasteland) the ground is its height function: its chunks may not have collision yet.
+		const float LandZ = WRLand::GroundZAt(W, TNumericLimits<float>::Lowest());
+		if (LandZ > TNumericLimits<float>::Lowest()) return T.InverseTransformPosition(FVector(W.X, W.Y, LandZ)).Z;
 		FHitResult Hit;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRSiteGround), false, Owner);
 		if (Owner->GetWorld()->LineTraceSingleByChannel(Hit, W + FVector(0, 0, 1500), W - FVector(0, 0, 3000), ECC_WorldStatic, Q) && Cast<APawn>(Hit.GetActor()) == nullptr)
@@ -446,6 +450,26 @@ void AWRShrine::BuildLook()
 			K.Spike(FSurf::Wood(FLinearColor(0.07f, 0.06f, 0.05f)), At + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) - 10.f), FVector::UpVector, 22.f + 10.f * (i % 3), 50.f + 20.f * (i % 4));
 		}
 	}
+	else if (Biome == TEXT("wasteland"))
+	{
+		// The Wasteland's dais foot (biome-void 2.11): grey ash drifted against it, a ring of thrown stones left by the
+		// newcomers who came to count rifts, and black voidglass splinters fused where an old tear once touched.
+		const FSurf Glass = FSurf::Glaze(FLinearColor(0.004f, 0.0035f, 0.006f), 0.12f);
+		const FSurf Ash = FSurf::Stone(FLinearColor(FColor(154, 149, 140)), 0.97f);
+		for (int32 i = 0; i < 14; ++i)
+		{
+			const float A = 360.f / 14.f * i + 9.f * K.Jit(FVector(i, 3, 0), 1);
+			const FVector At = FRotator(0.f, A, 0.f).Vector() * (R + 70.f + 40.f * K.Rand(FVector(A, 1, 0), 2));
+			K.Add(Ash, FVector(16.f, 13.f, 10.f), At + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) + 4.f), FRotator(0.f, A * 3.f, 0.f));
+		}
+		for (int32 i = 0; i < 7; ++i)
+		{
+			const float A = 51.f * i + 20.f;
+			const FVector At = FRotator(0.f, A, 0.f).Vector() * (R + 30.f + 50.f * K.Rand(FVector(A, 0, 0), 4));
+			K.Spike(Glass, At + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) - 4.f), FVector(0.25f * FMath::Cos(A), 0.25f * FMath::Sin(A), 1.f).GetSafeNormal(), 6.f + 3.f * (i % 3), 26.f + 14.f * (i % 4));
+			K.Add(Ash, FVector(90.f, 46.f, 5.f), At + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) + 1.f), FRotator(0.f, A, 0.f));
+		}
+	}
 	else if (Biome == TEXT("storm_peaks"))
 	{
 		// Thunder marks (six-petal rosettes) cut into flat stones laid at the dais foot.
@@ -530,10 +554,12 @@ void AWRShrine::OnRep_Fire()
 		const bool bStorm = Biome == TEXT("storm_peaks");
 		// The Swamp's fires burn low and dark red (the Coven's braziers: cook 2.11).
 		const bool bSwamp = Biome == TEXT("swamp");
+		// The Wasteland's braziers burn small and pale under the rifts' glow (biome-void 2.11: a black iron bowl).
+		const bool bVoid = Biome == TEXT("wasteland");
 		Fire = WRFx::Attach(RootComponent, bStorm ? FName(TEXT("shrine.storm")) : FName(TEXT("shrine.fire")), NAME_None, (bGreat ? 2.4f : 1.9f) * (bSwamp ? WRTune(TEXT("swampWorld.shrineFireScale"), 0.65f) : 1.f));
 		if (Fire) Fire->SetRelativeLocation(BowlLocation() - GetActorLocation() + (bStorm ? FVector(0, 0, 680.f) : FVector::ZeroVector));
-		FireLight = SiteLight(this, RootComponent, BowlLocation() - GetActorLocation() + FVector(0, 0, 80.f), bSwamp ? FLinearColor(0.85f, 0.16f, 0.07f) : FLinearColor(1.f, 0.55f, 0.2f),
-			WRTune(TEXT("world.shrineLight"), 9000.f) * (bSwamp ? 0.6f : 1.f), bGreat ? 2600.f : 2000.f);
+		FireLight = SiteLight(this, RootComponent, BowlLocation() - GetActorLocation() + FVector(0, 0, 80.f), bSwamp ? FLinearColor(0.85f, 0.16f, 0.07f) : bVoid ? FLinearColor(1.f, 0.72f, 0.5f) : FLinearColor(1.f, 0.55f, 0.2f),
+			WRTune(TEXT("world.shrineLight"), 9000.f) * (bSwamp ? 0.6f : bVoid ? 0.75f : 1.f), bGreat ? 2600.f : 2000.f);
 	}
 	else if (!bBurning && Fire)
 	{

@@ -123,7 +123,7 @@
     { "id": "K4", "kind": "cave", "name": "the Hollow Ground", "at": [400, 5000], "yaw": 0, "variant": 3 },
 
     { "id": "S1", "kind": "graves_row", "name": "Graves that stop", "at": [-1900, 4640], "face": [-1900, 5000], "lore": "lore_unfinished_row" },
-    { "id": "S2", "kind": "first_hut", "name": "The first hut", "at": [-2300, 4800], "face": [-2290, 4810] },
+    { "id": "S2", "lore": "lore_seat_tally", "kind": "first_hut", "name": "The first hut", "at": [-2300, 4800], "face": [-2290, 4810] },
     { "id": "S3", "kind": "burned_stand", "name": "The burned stand", "at": [-1500, 5050], "r": 100 },
     { "id": "S4", "kind": "goat_shelter", "name": "Goatherd's shelter", "at": [-2600, 4700], "face": [-2600, 4900] },
     { "id": "S5", "kind": "kill_scene", "name": "Hollowfang kill", "at": [-1100, 4700], "prey": "withergoat", "hunter": "hollowfang" },
@@ -134,7 +134,7 @@
     { "id": "S11", "kind": "drowned_procession", "name": "The drowned procession", "at": [-600, 6250], "face": [-600, 6500], "secret": "X-3" },
     { "id": "S12", "kind": "seated_listeners", "name": "The seated listeners", "at": [-1050, 5330], "face": [-1050, 5320] },
     { "id": "S13", "kind": "alms_court", "name": "Alms court", "at": [-1850, 5750], "face": [-1850, 5700] },
-    { "id": "S14", "kind": "tuning_hall", "name": "The tuning hall", "at": [-1300, 5850], "face": [-1300, 5800], "secret": "X-1" },
+    { "id": "S14", "lore": "lore_cantors_breath_stone", "kind": "tuning_hall", "name": "The tuning hall", "at": [-1300, 5850], "face": [-1300, 5800], "secret": "X-1" },
     { "id": "S15", "kind": "choir_benches", "name": "Children's choir benches", "at": [-2000, 5350], "face": [-2000, 5300], "lore": "lore_childs_whistle" },
     { "id": "S17", "kind": "marrow_cache", "name": "The Marrow cache", "at": [-200, 5780], "secret": "X-4" },
     { "id": "S18", "kind": "offering_row", "name": "Rift offering row", "at": [100, 4950], "face": [100, 4950] },
@@ -147,11 +147,11 @@
     { "id": "S25", "kind": "station_pens", "name": "The Rift Pens", "at": [-300, 5250], "face": [-550, 5500], "station": 2, "boss": "mother_of_rifts" },
     { "id": "S26", "kind": "station_alms", "name": "The Alms House", "at": [-20, 5100], "face": [-300, 5250], "station": 3, "boss": "starving_one" },
     { "id": "S27", "kind": "station_gate", "name": "The Null Gate", "at": [120, 5330], "face": [-20, 5100], "station": 4, "boss": "null_warden" },
-    { "id": "S28", "kind": "last_choir", "name": "The last choir", "at": [140, 5600], "face": [300, 5600] },
+    { "id": "S28", "lore": "lore_choir_seat", "kind": "last_choir", "name": "The last choir", "at": [140, 5600], "face": [300, 5600] },
     { "id": "S29", "kind": "war_rack", "name": "Hollow Fort war rack", "at": [740, 5440], "face": [1500, 5440] },
     { "id": "S30", "kind": "cage_watchers", "name": "The cage's watchers", "at": [860, 5385], "face": [880, 5385], "lore": "lore_cantors_name_stone" },
     { "id": "X5", "kind": "descent_lift", "name": "The Descent lift", "at": [300, 5436], "face": [300, 5600], "secret": "X-5" },
-    { "id": "X6", "kind": "silent_bell", "name": "The silent bell", "at": [-1500, 5700], "secret": "X-6" },
+    { "id": "X6", "lore": "lore_clappers_knot", "kind": "silent_bell", "name": "The silent bell", "at": [-1500, 5700], "secret": "X-6" },
     { "id": "D1", "kind": "descent_stair", "name": "The Choir's Descent", "at": [300, 5440], "face": [300, 5600] }
   ],
 
@@ -182,5 +182,8 @@
       { "id": "U7", "kind": "u_reliquary", "at": [180, 5600], "depth": 150 },
       { "id": "U8", "kind": "u_last_note", "at": [420, 5750], "depth": 158 }
     ]
-  }
+  },
+  "resources": {"_comment": "Where the land's gathering is (cooks/build-biome-void.md 3b; biome-void 2.6-2.7). Server-placed resource nodes (WRVoidWorld): zone passes are a seeded grid (step m) kept to density, clear of places by gap m; kit: on every kit POI of that kind; at: fixed map points; disc: count spread in a disc. hits / perHit / respawn s (1 game hour = 150 s).", "greywood": {"item": "greywood", "zone": "V1", "step": 45, "density": 0.32, "gap": 30, "hits": 6, "perHit": 2, "respawn": 1800}, "ashen_grain": {"item": "ashen_grain", "zone": "V1", "step": 110, "density": 0.28, "gap": 40, "clearing": true, "hits": 3, "perHit": 2, "respawn": 3600}, "grey_salt": {"item": "grey_salt", "kit": "salt_pan", "per": 4, "spread": 9, "hits": 4, "perHit": 1, "respawn": 300}, "mandrake": {"item": "mandrake", "at": [[-1735, 5420], [-1665, 5480], [-1830, 5735], [-1870, 5770], [-1320, 5835], [-1280, 5870]], "hits": 1, "perHit": 1, "respawn": 3600}, "star_iron": {"item": "star_iron_ore", "at": [[432, 5062], [446, 5071], [421, 5078]], "hits": 6, "perHit": 1, "respawn": 3600}, "glass_sea": {"item": "voidglass", "disc": [600, 5900], "r": 130, "count": 20, "hits": 4, "perHit": 3, "respawn": 900}},
+  "mandrake": {"_comment": "A pulled mandrake (biome-void 2.7): a shiver, then a scream that staggers everyone in reach without wax ear plugs.", "shiver": 0.9, "radius": 12, "stagger": 0.8},
+  "spawns": {"_comment": "biome-void 2.12.3: the dens (WRVoidCreatures UWRVoidLife). Each zone gets dens seeded denGap m apart, away from the places; each den rolls a day kind and a night kind by these weights (the same kind: out at all hours). riftborn: % of a zone's creatures that come Riftborn (15 in V4-V5, 5 elsewhere). Riftmaws lie in every large rift; the Hush walks the Gauntlet Road at night (one a segment). activation cm: a den comes out while a player is that near; respawn s. The Graveyard's Riftborn Gravehounds wait for the Graveyard (Riftborn Hollowfangs hold their place on the north edge).", "denGap": 170, "activation": 12000, "respawn": 600, "zones": {"V1": {"dens": 16, "riftborn": 5, "day": {"withergoat": 40, "gnawer": 25, "driftmote": 15, "voidstrider": 10, "hollowfang": 10}, "night": {"hollowfang": 50, "gnawer": 25, "hush": 10, "withergoat": 15}}, "V2": {"dens": 10, "riftborn": 5, "day": {"withergoat": 30, "riftback": 25, "gnawer": 25, "driftmote": 20}, "night": {"gnawer": 35, "withergoat": 25, "hollowfang": 15, "driftmote": 25}}, "V3": {"dens": 14, "riftborn": 5, "day": {"nullwing": 30, "gnawer": 25, "hollowfang": 20, "withergoat": 15, "driftmote": 10}, "night": {"hollowfang": 35, "hush": 20, "gnawer": 25, "nullwing": 20}}, "V4": {"dens": 16, "riftborn": 15, "day": {"hollowfang": 50, "nullwing": 25, "voidstrider": 15, "riftback": 10}, "night": {"hollowfang": 65, "hush": 25, "nullwing": 10}}, "V5": {"dens": 8, "riftborn": 15, "day": {"hollowfang": 100}, "night": {"hollowfang": 100}}}}
 }

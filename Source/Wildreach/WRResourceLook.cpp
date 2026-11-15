@@ -120,6 +120,11 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("sulfur_crystal")) Body = FVector2D(110.f, 280.f);
 	else if (Item == TEXT("lichen")) Body = FVector2D(150.f, 240.f);
 	else if (Item == TEXT("stormglass")) Body = FVector2D(140.f, 220.f);
+	// The Corrupted wasteland's (cooks/build-biome-void.md 3b): a dead pine, a glass sheet, a salt pan, grain, a root.
+	else if (Item == TEXT("greywood")) Body = FVector2D(90.f, 420.f);
+	else if (Item == TEXT("voidglass")) Body = FVector2D(170.f, 230.f);
+	else if (Item == TEXT("grey_salt")) Body = FVector2D(260.f, 220.f);
+	else if (Item == TEXT("ashen_grain") || Item == TEXT("mandrake")) Body = FVector2D(120.f, 230.f);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
@@ -139,6 +144,17 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			{ TEXT("CharTreeC"), TEXT("char_tree_c_textured") }, { TEXT("CharTreeD"), TEXT("char_tree_d_textured") } };
 		static const TCHAR* Pine[][2] = { { TEXT("PineB"), TEXT("pine_b_textured") }, { TEXT("PineC"), TEXT("pine_c_textured") }, { TEXT("FirA"), TEXT("fir_a_textured") } };
 		Main = (bTundra || bStorm) ? LoadMesh(Prop(Pine[Seed % 3][0], Pine[Seed % 3][1])) : LoadMesh(Prop(Char[Seed % 4][0], Char[Seed % 4][1]));
+	}
+	else if (Item == TEXT("greywood"))
+	{
+		// The Withered Forest's standing dead (Chernobyl's Red Forest: grey pines that never rot): the char trees, bare.
+		static const TCHAR* Char[][2] = { { TEXT("CharTreeA"), TEXT("char_tree_a_textured") }, { TEXT("CharTreeB"), TEXT("char_tree_b_textured") },
+			{ TEXT("CharTreeC"), TEXT("char_tree_c_textured") }, { TEXT("CharTreeD"), TEXT("char_tree_d_textured") } };
+		Main = LoadMesh(Prop(Char[Seed % 4][0], Char[Seed % 4][1]));
+	}
+	else if (Item == TEXT("ashen_grain") || Item == TEXT("mandrake"))
+	{
+		Main = LoadMesh(Shrub(Item == TEXT("mandrake") ? TEXT("B") : (Seed % 2 ? TEXT("D") : TEXT("C"))));
 	}
 	else if (Item == TEXT("berries") || Item == TEXT("fiber"))
 	{
@@ -273,6 +289,93 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
 			const FVector Centre = Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f));
 			Bit(Centre, Q.Rotator() + FRotator(0.f, 0.f, 0.f), FVector(W, W * 0.85f, Len));
+		}
+	}
+	else if (Item == TEXT("greywood"))
+	{
+		// A withered pine: the dead tree's bark bleached to silver-grey (#A39E95), standing in its own litter; a few
+		// broken limbs lie round its foot. Tinted, not swapped: the bark's grain still shows through.
+		Place(Fit(Main, FVector(0.f, 0.f, 820.f + 260.f * Rand.FRand()), 30.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(163, 158, 149)) * 1.6f));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(154, 149, 140)) * 1.4f));
+		for (int32 k = 0; k < 4; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(110.f, 220.f), Len = Rand.FRandRange(90.f, 170.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 6.f), FRotator(88.f, FMath::RadiansToDegrees(A) + Rand.FRandRange(-40.f, 40.f), 0.f), FVector(9.f, 8.f, Len));
+		}
+	}
+	else if (Item == TEXT("voidglass"))
+	{
+		// Rift-ring voidglass (biome-void 2.6): a black fused-glass sheet poured over the ground where the tear touched, with
+		// 5-9 shards standing up out of it, leaning away from the rift like frozen splashes; their broken edges catch a
+		// faint violet. The sheet is near-black and glossy (#0B0A10), so it reads as wet glass beside the grey dust.
+		Place(Fit(Main, FVector(210.f, 180.f, 34.f), 18.f, FRotator(Rand.FRandRange(-3.f, 3.f), 0.f, Rand.FRandRange(-3.f, 3.f))));
+		Tint(RockMaterial(Node, FLinearColor(0.012f, 0.011f, 0.016f)));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(0.03f, 0.022f, 0.06f)));
+		const int32 N = 5 + int32(Seed % 5);
+		for (int32 k = 0; k < N; ++k)
+		{
+			const float A = (k + Rand.FRandRange(-0.35f, 0.35f)) * 2.f * PI / N;
+			const float Lean = Rand.FRandRange(12.f, 48.f);
+			const float Len = Rand.FRandRange(45.f, 135.f);
+			const float W = Len * Rand.FRandRange(0.16f, 0.26f);
+			const FVector Foot(FMath::Cos(A) * Rand.FRandRange(10.f, 70.f), FMath::Sin(A) * Rand.FRandRange(10.f, 60.f), 14.f);
+			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
+			Bit(Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f)), Q.Rotator(), FVector(W, W * 0.55f, Len));
+		}
+	}
+	else if (Item == TEXT("grey_salt"))
+	{
+		// A Grey Strand salt pan (biome-void 2.4): a shallow rimmed crust of grey-white salt on black sand, raked into
+		// low cones along one side, a crust that cracks into plates where it's dried.
+		Place(Fit(Main, FVector(300.f, 250.f, 22.f), 14.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(44, 44, 48)) * 0.6f));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(236, 234, 228)) * 2.6f));
+		for (int32 k = 0; k < 14; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(0.f, 95.f), S = Rand.FRandRange(42.f, 70.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D * 0.8f, 10.f), FRotator(Rand.FRandRange(-3.f, 3.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(S, S * 0.8f, 5.f));
+		}
+		for (int32 k = 0; k < 3; ++k)
+		{
+			const float S = Rand.FRandRange(34.f, 48.f);
+			Bit(FVector(-70.f + 70.f * k, 120.f, 16.f), FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(S, S, S * 0.7f));
+		}
+	}
+	else if (Item == TEXT("ashen_grain") || Item == TEXT("mandrake"))
+	{
+		const bool bMandrake = Item == TEXT("mandrake");
+		// Ashen grain: a wild stand of grey grain in a forest clearing, its heads pale ash. Mandrake: a low rosette of
+		// dark leaves with the forked root's shoulders showing at the soil (it screams when pulled: WRVoidWorld).
+		Place(Fit(Main, FVector(0.f, 0.f, bMandrake ? 140.f : 260.f), 8.f));
+		Look->SetCastShadow(false);
+		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
+		{
+			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
+			{
+				MID->SetVectorParameterValue(TEXT("Color"), bMandrake ? FLinearColor(0.035f, 0.05f, 0.03f) : FLinearColor(0.16f, 0.155f, 0.145f));
+				MID->SetVectorParameterValue(TEXT("Snow Color"), bMandrake ? FLinearColor(0.05f, 0.04f, 0.05f) : FLinearColor(0.34f, 0.33f, 0.31f));
+				Look->SetMaterial(Slot, MID);
+			}
+		}
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, bMandrake ? FLinearColor(0.75f, 0.6f, 0.45f) : FLinearColor(1.1f, 1.08f, 1.0f)));
+		if (bMandrake)
+		{
+			// The root's two shoulders breaking the soil, pale and wrinkled.
+			Bit(FVector(-8.f, 0.f, 4.f), FRotator(20.f, 0.f, 10.f), FVector(16.f, 14.f, 20.f));
+			Bit(FVector(9.f, 4.f, 3.f), FRotator(-18.f, 0.f, -8.f), FVector(13.f, 12.f, 17.f));
+		}
+		else
+		{
+			for (int32 k = 0; k < 16; ++k)
+			{
+				const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(0.f, 45.f);
+				Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, Rand.FRandRange(75.f, 105.f)), FRotator(Rand.FRandRange(-15.f, 15.f), 0.f, Rand.FRandRange(-15.f, 15.f)), FVector(4.f, 4.f, 14.f));
+			}
 		}
 	}
 	else if (Item == TEXT("stormglass"))

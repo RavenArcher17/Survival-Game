@@ -4,6 +4,7 @@
 // WRUIWorld.cpp.
 
 #include "WRWorldSystems.h"
+#include "WRLand.h"
 #include "WRStormWorld.h"
 #include "WRSwampSystems.h"
 #include "WRSwampBosses.h"
@@ -910,7 +911,16 @@ void UWRWorldSystems::PlaceShrines()
 		Row->TryGetBoolField(TEXT("swamp"), bSwampRow);
 		FVector2D SwampAt = FVector2D::ZeroVector;
 		float SwampYaw = 0.f;
-		if (bSwampRow)
+		const FName OnLand(*WStrOf(Row, TEXT("land")));
+		if (!OnLand.IsNone())
+		{
+			// A runtime land's shrine (the Wasteland's five): "at" is in the land's own map metres, the ground its height
+			// function (the land's chunks may still be building, so never a trace).
+			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
+			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Ground)) continue;
+			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
+		}
+		else if (bSwampRow)
 		{
 			// The Swamp's five take their places from Data/swamp.json shrines (WRSwampSystems), steps toward the nearest camp.
 			if (!WRSwamp::ShrinePlace(Id, SwampAt, SwampYaw) || !WSettle(World, SwampAt, Ground)) continue;
@@ -969,7 +979,17 @@ void UWRWorldSystems::PlaceMasters()
 		if (!Village && !Row->HasField(TEXT("at")) && !bSwampPlace) continue;
 		FVector Spot;
 		FRotator Face;
-		if (bSwampPlace)
+		const FName OnLand(*WStrOf(Row, TEXT("land")));
+		bool bLandPlace = false;
+		if (!OnLand.IsNone())
+		{
+			// On a runtime land (Maren Vey at the Shrine of the Edge): the land's map metres on its height function.
+			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
+			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Spot)) continue;
+			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
+			bLandPlace = true;
+		}
+		else if (bSwampPlace)
 		{
 			Spot = SwampSpot;
 			Face = FRotator(0.f, SwampYaw, 0.f);
@@ -986,7 +1006,7 @@ void UWRWorldSystems::PlaceMasters()
 			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
 		}
 		FVector Ground;
-		if (WSettle(World, FVector2D(Spot), Ground)) Spot = Ground;
+		if (!bLandPlace && WSettle(World, FVector2D(Spot), Ground)) Spot = Ground;
 		AWRWorldNpc* N = World->SpawnActorDeferred<AWRWorldNpc>(AWRWorldNpc::StaticClass(), FTransform(Face, Spot + FVector(0.f, 0.f, 100.f)), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (!N) continue;
 		N->NpcRole = TEXT("master");

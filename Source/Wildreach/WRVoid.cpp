@@ -203,6 +203,7 @@ void WRVoid::SpawnRifts(UWorld* World, FName LandId)
 			if (AWRResourceNode* Node = World->SpawnActorDeferred<AWRResourceNode>(AWRResourceNode::StaticClass(), NT, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 			{
 				Node->ItemId = TEXT("voidglass");
+				Node->Tags.Add(TEXT("rift_ring"));   // Maren's "What the edge gives" counts these (WRVoidWorld::Harvested)
 				Node->Hits = int32(VT(TEXT("ring.hits"), 4.f));
 				Node->PerHit = FMath::RoundToInt(VT(TEXT("ring.perHit"), 0.6f) + VRand(Id, n, 83));
 				Node->RespawnSeconds = VT(TEXT("ring.respawnSeconds"), 900.f);

@@ -4,6 +4,7 @@
 // you push off and comes back as you step ashore at the other end. Server authority: the server places both ends,
 // checks reach, moves the rower; clients draw the landings from the replicated state.
 #include "WRLandThings.h"
+#include "WRVoidWorld.h"
 #include "WRLand.h"
 #include "Wildreach.h"
 #include "WRBuildLook.h"
@@ -251,7 +252,7 @@ bool WRLandThings::Prompt(const AWRPlayerController* PC, FString& OutTarget, FSt
 		OutVerb = C->PromptVerb();
 		return true;
 	}
-	return false;
+	return WRVoidWorld::Prompt(PC, OutTarget, OutVerb);
 }
 
 bool WRLandThings::ClientInteract(AWRPlayerController* PC)
@@ -273,7 +274,7 @@ bool WRLandThings::ClientInteract(AWRPlayerController* PC)
 		}, Fade * 0.6f + 1.4f, false);
 		return true;
 	}
-	return false;
+	return WRVoidWorld::ClientInteract(PC);
 }
 
 FString WRLandThings::Command(AWRPlayerController* PC, const TArray<FString>& Args)
@@ -307,5 +308,5 @@ FString WRLandThings::Command(AWRPlayerController* PC, const TArray<FString>& Ar
 		UE_LOG(LogWildreach, Log, TEXT("LAND %s crosses to the %s end"), *Me->GetName(), To->bLandEnd ? TEXT("land") : TEXT("island"));
 		return To->bLandEnd ? FString::Printf(TEXT("You row across the Broken Race to %s."), D ? *D->Name : TEXT("the far shore")) : FString(TEXT("You row back across the Broken Race."));
 	}
-	return FString();
+	return WRVoidWorld::Command(PC, Args);
 }
