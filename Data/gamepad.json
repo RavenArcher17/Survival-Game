@@ -81,6 +81,13 @@
       { "verb": "LockOn", "does": "Lock on / let go" },
       { "verb": "View", "does": "First / third person" }
     ] },
+    { "title": "In the water", "rows": [
+      { "verb": "Move", "does": "Swim; under the surface you swim where you look" },
+      { "verb": "Dodge", "does": "Tap: kick away (under the surface: any way, 3D); hold: dive down" },
+      { "verb": "Jump", "does": "Rise (hold: surface fast); with neither held you hold your depth" },
+      { "verb": "Sprint", "does": "Fast stroke (hold; costs stamina)" },
+      { "verb": "Interact", "does": "Gather tidecoral and clams under water; tie a harpoon line to a mooring stone" }
+    ] },
     { "title": "Fighting", "rows": [
       { "verb": "Light", "does": "Light attack; fire a ranged weapon" },
       { "verb": "Heavy", "does": "Heavy attack" },

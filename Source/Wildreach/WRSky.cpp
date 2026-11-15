@@ -1,4 +1,5 @@
 #include "WRSky.h"
+#include "WRUnderwater.h"
 #include "WRSurvival.h"
 #include "WRInventory.h"
 #include "Wildreach.h"
@@ -585,6 +586,8 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			bGraveFogSet = false;
 		}
 	}
+	// Under water (cooks/biome-ocean.md 2.1, 2.6): the murk closes in round the local head, blue-green, by depth band.
+	if (UExponentialHeightFogComponent* F = Fog.Get()) WRUnderwater::ApplyFog(F, GetWorld(), DeltaSeconds);
 	// Under the canopy the open sky's light is mostly leaves away: the sky light dims with the cover (the sun's own light
 	// is the trees' shadows' job). Only touched when the value moves, so the rest of the world never pays for it.
 	if (USkyLightComponent* SkyL = SkyLight.Get(); SkyL && (FA > 0.f || CrystalCave > 0.001f || ForestSkySet >= 0.f))

@@ -28,6 +28,15 @@ public:
 	bool bAttackRoot = false;
 
 	bool IsSprinting() const;
+	/** Underwater (cooks/build-biome-ocean.md 2.7): Dive held sinks, Rise (Jump) held rises, neither holds your depth.
+	 *  Both ride the saved move's two spare engine bits (FLAG_Reserved_1 / _2), so the server replays them exactly. */
+	bool bWantsToDive = false;
+	bool bWantsToRise = false;
+	/** Swimming with the capsule wholly under the surface. */
+	bool IsUnderwater() const;
+	/** cm of water over the feet (0 out of water): wading. */
+	float WadeDepth() const;
+	virtual void PhysSwimming(float DeltaTime, int32 Iterations) override;
 
 	/** Custom movement modes (MOVE_Custom + this). */
 	static constexpr uint8 CMOVE_Ladder = 1;
@@ -63,6 +72,8 @@ public:
 	uint8 bSavedAttackSlow : 1;
 	uint8 bSavedBlockSlow : 1;
 	uint8 bSavedAttackRoot : 1;
+	uint8 bSavedDive : 1;
+	uint8 bSavedRise : 1;
 
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;

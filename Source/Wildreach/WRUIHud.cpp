@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRUnderwater.h"
 #include "WRWindPath.h"     // the Momentum gauge (the Wind path)
 #include "WRStormTypes.h"
 #include "WRSurvival.h"
@@ -333,6 +334,7 @@ public:
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[ClockPlate()]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 150.f * U)[TamingPanel()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 0.f, 0.f, 0.f)[Crosshair()]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[BreathArc()]   // under water: breath and depth (WRUnderwater)
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 150.f * U)[WRUIEndgame::MakeToast(PC)]   // a deed earned (WRUIEndgame)
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 250.f * U)[CentreNotice()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 330.f * U)[Prompt()]
@@ -716,6 +718,54 @@ private:
 		})
 		[
 			Marks
+		];
+	}
+
+	// ---------------------------------------------------------------- under water (cooks/biome-ocean.md 2.6)
+	const UWRDiveComponent* DiveOf() const { return UWRDiveComponent::Of(Survivor()); }
+	/** A thin sea-green arc round the crosshair, only under water: the breath left (it pulses below a quarter), and the
+	 *  depth in metres beside it below 10 m, coral orange past your crushing depth. Gills: depth only. */
+	TSharedRef<SWidget> BreathArc()
+	{
+		const float D = WRTune(TEXT("ui.breathArc"), 68.f) * U;
+		return SNew(SBox).WidthOverride(D * 3.f).HeightOverride(D).Visibility_Lambda([this]()
+		{
+			const UWRDiveComponent* Dv = DiveOf();
+			return Dv && Dv->IsUnder() && !Covered() ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+		})
+		[
+			SNew(SOverlay)
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(D).HeightOverride(D).Visibility_Lambda([this]() { const UWRDiveComponent* Dv = DiveOf(); return Dv && !Dv->HasNoBreathLimit() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				[
+					SNew(SWRRing).Diameter(D).Thickness(3.f * U)
+					.Fraction_Lambda([this]() { const UWRDiveComponent* Dv = DiveOf(); return Dv && Dv->GetMaxBreath() > 0.f ? Dv->GetBreath() / Dv->GetMaxBreath() : 1.f; })
+					.Color_Lambda([this]()
+					{
+						const UWRDiveComponent* Dv = DiveOf();
+						const float F = Dv && Dv->GetMaxBreath() > 0.f ? Dv->GetBreath() / Dv->GetMaxBreath() : 1.f;
+						const FLinearColor Sea = FLinearColor(FColor(0x1E, 0x8C, 0x86));
+						if (F > WRTune(TEXT("underwater.breath.lowFraction"), 0.25f)) return Sea;
+						// The pulse: brighter and paler on the beat.
+						const float Beat = 0.5f + 0.5f * FMath::Sin(FPlatformTime::Seconds() * 2.0 * PI * 1.6);
+						return FMath::Lerp(Sea, FLinearColor(FColor(0xBF, 0xF2, 0xEC)), Beat);
+					})
+				]
+			]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Center)
+			[
+				SNew(SBox).WidthOverride(D * 1.2f).Visibility_Lambda([this]() { const UWRDiveComponent* Dv = DiveOf(); return Dv && Dv->GetDepth() > WRTune(TEXT("ui.depthFrom"), 1000.f) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				[
+					SNew(STextBlock).Font(WRUI::Body(13, 700)).ShadowOffset(FVector2D(1.f, 1.f)).ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.7f))
+					.Text_Lambda([this]() { const UWRDiveComponent* Dv = DiveOf(); return FText::FromString(FString::Printf(TEXT("%d m"), Dv ? FMath::RoundToInt(Dv->GetDepth() / 100.f) : 0)); })
+					.ColorAndOpacity_Lambda([this]()
+					{
+						const UWRDiveComponent* Dv = DiveOf();
+						return Dv && Dv->GetDepth() > Dv->GetCrushDepth() ? FSlateColor(FLinearColor(FColor(0xE0, 0x7A, 0x4F))) : FSlateColor(FLinearColor(FColor(0xD8, 0xF0, 0xEC)));
+					})
+				]
+			]
 		];
 	}
 

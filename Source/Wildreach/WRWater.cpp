@@ -1,4 +1,5 @@
 #include "WRWater.h"
+#include "WRTide.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -268,14 +269,17 @@ float UWRWaterSubsystem::DepthAt(const FVector& Point) const
 		return 0.f;
 	}
 	// The ground under the surface here: the landscape, a rock, a foundation built in the shallows.
-	const float FloorZ = WRTune(TEXT("water.floor"), -1500.f);
+	// The Ocean's water is deeper and rises and falls with the tide (WRTide): its surface and floor there.
+	const bool bTide = WRTide::Weight(FVector2D(Point.X, Point.Y)) > 0.f;
+	const float FloorZ = bTide ? WRTune(TEXT("tide.floor"), -11000.f) : WRTune(TEXT("water.floor"), -1500.f);
+	const float Surf = bTide ? WRTide::SurfaceAt(this, Point) : SurfaceZ;
 	FHitResult Hit;
 	const FCollisionQueryParams Query(SCENE_QUERY_STAT(WRWaterDepth), false);
-	if (!GetWorld()->LineTraceSingleByObjectType(Hit, FVector(Point.X, Point.Y, SurfaceZ + 300.f), FVector(Point.X, Point.Y, FloorZ), FCollisionObjectQueryParams(ECC_WorldStatic), Query))
+	if (!GetWorld()->LineTraceSingleByObjectType(Hit, FVector(Point.X, Point.Y, Surf + 300.f), FVector(Point.X, Point.Y, FloorZ), FCollisionObjectQueryParams(ECC_WorldStatic), Query))
 	{
-		return SurfaceZ - FloorZ;
+		return Surf - FloorZ;
 	}
-	return FMath::Max(0.f, static_cast<float>(SurfaceZ - Hit.ImpactPoint.Z));
+	return FMath::Max(0.f, static_cast<float>(Surf - Hit.ImpactPoint.Z));
 }
 
 bool UWRWaterSubsystem::IsInWater(const ACharacter* Character)
@@ -306,7 +310,7 @@ bool UWRWaterSubsystem::CanDrink(const ACharacter* Character) const
 	// At the edge: feet no higher above the surface than you can reach down, and open water within arm's reach.
 	const FVector Here = Character->GetActorLocation();
 	const float Feet = Here.Z - Character->GetSimpleCollisionHalfHeight();
-	if (Feet > SurfaceZ + WRTune(TEXT("water.drinkReach"), 80.f))
+	if (Feet > WRTide::SurfaceAt(this, Here) + WRTune(TEXT("water.drinkReach"), 80.f))
 	{
 		return false;
 	}
@@ -369,7 +373,7 @@ FVector UWRWaterSubsystem::KeepOutOfDeepWater(const ACharacter* Creature, const 
 	}
 	const FVector Here = Creature->GetActorLocation();
 	const float Half = Creature->GetSimpleCollisionHalfHeight();
-	if (Here.Z - Half > SurfaceZ + 150.f || (!IsSeaAt(Here + Direction.GetSafeNormal2D() * 1000.f) && !IsSeaAt(Here)))
+	if (Here.Z - Half > WRTide::SurfaceAt(this, Here) + 150.f || (!IsSeaAt(Here + Direction.GetSafeNormal2D() * 1000.f) && !IsSeaAt(Here)))
 	{
 		return Direction;   // well above the sea, or nowhere near it: most of the island, no trace
 	}
@@ -485,7 +489,9 @@ void UWRWaterSubsystem::Tick(float DeltaTime)
 	{
 		ACharacter* C = *It;
 		const FVector At = C->GetActorLocation();
-		if (FVector::DistSquared(At, Me->GetActorLocation()) > FMath::Square(Range) || At.Z > SurfaceZ + 400.f)
+		const float Surf = WRTide::SurfaceAt(this, At);
+		// Near the surface only: a diver deep under makes no stroke you'd hear up top.
+		if (FVector::DistSquared(At, Me->GetActorLocation()) > FMath::Square(Range) || At.Z > Surf + 400.f || At.Z < Surf - 300.f)
 		{
 			Swimmers.Remove(C);
 			continue;
@@ -493,7 +499,7 @@ void UWRWaterSubsystem::Tick(float DeltaTime)
 		const UCharacterMovementComponent* Move = C->GetCharacterMovement();
 		const bool bSwimming = Move && Move->IsSwimming();
 		FSwimmer& S = Swimmers.FindOrAdd(C);
-		const FVector Surface(At.X, At.Y, SurfaceZ);
+		const FVector Surface(At.X, At.Y, Surf);
 		if (bSwimming && !S.bSwimming)
 		{
 			WRSound::PlayAt(C, TEXT("water.splash"), Surface, FMath::Clamp(static_cast<float>(-C->GetVelocity().Z) / 600.f, 0.6f, 1.6f));

@@ -1,4 +1,5 @@
 #include "WRResourceLook.h"
+#include "WROceanTypes.h"
 #include "WRCrystalTypes.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
@@ -147,6 +148,10 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("selenite")) Body = FVector2D(150.f, 220.f);
 	else if (Item == TEXT("crystal_dust") || Item == TEXT("ochre")) Body = FVector2D(220.f, 200.f);
 	else if (Item == TEXT("candle_rhubarb") || Item == TEXT("glowmelon")) Body = FVector2D(130.f, 230.f);
+	// The Ocean's (cooks/build-biome-ocean.md 2.5): tidecoral, sea kelp, sea grapes, oysters, urchins, salt, sea-glass,
+	// driftwood, kelp ash, bronze scrap, the caves' topaz (WROceanNodes.cpp models them).
+	const bool bOceanNode = WROcean::IsNodeItem(Item) && WROcean::Contains(At);
+	if (bOceanNode) Body = WROcean::NodeBody(Item);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
@@ -349,6 +354,13 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(110.f, 220.f), Len = Rand.FRandRange(90.f, 170.f);
 			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 6.f), FRotator(88.f, FMath::RadiansToDegrees(A) + Rand.FRandRange(-40.f, 40.f), 0.f), FVector(9.f, 8.f, Len));
 		}
+	}
+	else if (bOceanNode)
+	{
+		// The look is the Ocean's own code model; nothing of the boulder shows.
+		Look->SetStaticMesh(nullptr);
+		Bits->SetStaticMesh(nullptr);
+		WROcean::NodeLook(Node, Item, Seed);
 	}
 	else if (Item == TEXT("resonant_crystal") || Item == TEXT("gem_amethyst") || Item == TEXT("selenite") || Item == TEXT("doubling_spar"))
 	{

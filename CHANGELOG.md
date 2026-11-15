@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased: the Ocean & reefs (the Tide land)
+
+Aaron (lane build-biome-ocean: requirement ledger R1-R54, build research and plan in showcase-notes
+cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; compiled (editor target) after each; not
+played here (Aaron and the testers test, F8). Not live until `ocean` joins `world.liveBiomes` (a later piece), so nothing
+of the coast shows yet; underwater play is live everywhere water is.
+
+- **Ocean (1): diving, breath and depth (every water), the tide, the coast's land and its places.**
+  **Underwater play** (`WRUnderwater.*`, numbers in tuning `underwater`): a new rebindable **Dive** (Left Ctrl; on a pad,
+  hold Dodge) sinks you, Jump rises (hold: surface fast), neither holds your depth; under the surface you swim where you
+  look. Dive / Rise ride the saved move's two spare engine bits, so they are predicted and the server agrees
+  (`UWRCharacterMovementComponent::PhysSwimming`: neutral buoyancy wholly under). 300 cm/s, fast stroke 450; Gills x1.25;
+  worn `swimSpeed` gear. The Dodge in the water is a 400 cm 3D **kick-dodge** (i-frames 0.2 s, 14 stamina) under the
+  surface, a 250 cm surface roll on it; a tap kicks, a hold dives. **Wading** 60-140 cm: run x0.85, no sprint over 110 cm.
+  **Breath and depth** (`UWRDiveComponent` on every survivor; server-run, owner-replicated): 30 s + 0.6 s a Swimming level,
+  Diver x1.5, helm / Reefmail's four / Deepbreath x2, the Diver's draught's 90 s floor, the pearl ring's +5 s; refills in
+  3 s at the surface or in an air pocket (any non-water volume over the water); out of breath 10 a second through
+  `ApplyHit`, no floor; below 25 m (40 helm / Pressure, 80 Gills, none Abyss diver) 5 a second. The HUD draws a thin
+  sea-green arc round the crosshair under water (pulsing below a quarter, with a heartbeat), the depth beside it past 10 m
+  (coral orange past your limit), the screen's edges darken with each tick; a pressure hum past 20 m, an ear-pop at 25 m,
+  a gasp coming up. **Under-water rules**: thrust weapons full speed, others x0.8 (Gills none), no charged heavies for
+  greatswords / hammers / axes, guard stamina x1.2, bows won't draw, crossbows half range, bolts x0.6 (Tide's 1), fire x0.3
+  and no burn, lightning spreads 4 m through the same water (`WRUnderwater::SpreadLightning`), only `underwater`
+  Wildbrands (Flurry, Skaldrith's soul art, Static strike flagged); the camera comes in to 2.5 m; the sky's fog becomes
+  the water's murk round your head (40 / 25 / 12 m by band; halved in Sea fog) with a blue grade. F1 page: "In the water".
+  **The tide** (`WRTide.*`, tuning `tide`): highs 00:00 / 12:00, lows 06:00 / 18:00, +-1.2 m, plus the King Tide's -6 m
+  (`AWROceanState`, replicated); local to the B2 coast's box with a 300 m ramp; every machine works it out from the clock.
+  The swimmable tide water is a set of water + air volumes over the box (`AWRTideWater`, priority over the still sea)
+  that follow the level; the drawn sea's tiles there are re-placed (`AWRSea::SetRegionOffset`; its squares 32 m over the
+  box). `UWRWaterSubsystem`'s depth, drinking and the creatures' wading read the tide (`WRTide::SurfaceAt`).
+  **The land** (`node Tools/terrain/ocean.mjs` -> `Data/lands/ocean.json` + `ocean_ground.bin`, a 5 m heightfield): the
+  strait between the Sky's Chain Cliffs and the Storm crown / Swamp estuary: the Spine's east face and Saltgate's 60 m
+  saddle, the Salt Terraces' six benches, the Pound's basin and the Sluiceway, the Blowhole Shelf with its raised beach,
+  the White Strand's beach, dunes and bars with rip gaps, the Gate Inlet's salt marsh, the kelp shelf to 25 m, the reef
+  crest, the slope, the Blue Wall to 70 m and the open floor; the sea floor is drawn and coloured by depth, so the water
+  reads its depth; three camps above the Tsunami Line. The cook's y is squeezed into this world (`Y()` in the script).
+  **The places** (`Data/ocean.json`, `FWROceanData` in `WROceanTypes.cpp`; built in code on every machine by
+  `UWROceanWorld` / `AWROceanScenery`: `WROceanScenery.cpp`, `WROceanSites.cpp`, kit `WROceanLook.h`): the eight
+  landmarks (the Pound's ring wall with its gates, stairs, towers and mirror plinths; the Drowned Colossus; the Beacon
+  Stack with its stair, causeway and clan-lit fire; the Spouting Horn and its ledge stack; the Dyke Head with the empty
+  key-hook and the vault door; the Long Dyke's eleven stumps and wall top at -1 m; the leaning Reef Lighthouse; the Bell
+  Tower), 27 hand sites, 146 kit POIs (a POI within 241 m of anywhere), five caves (the Saltkin Mine's adit, the Blowhole
+  Grotto, the Pearl Cave's outcrop, Siren's Hollow's headland, Lazarus Deep in the Blue Wall), the Drowned Hall's eight
+  rooms (the bell that swings, the sand that slumps at the Low Gate), the nine tsunami stones on the 6 m contour, and the
+  decoration rule in 250 m cells (sea-grass, driftwood, tamarisk, terrace walls, barnacle bands, kelp to the surface,
+  coral, clams, urchins, mangroves). Moving parts glide on every machine from the clock and `AWROceanState` (the Tide
+  Clock's float, the drowned bell, the Low Gate's sand, the Pound's sluice leaves, the beacon's fire).
+  **What you take** (server): 495 nodes from `ocean.json resources` (tuning `oceanWorld.nodes`): tidecoral breaks off
+  only under the water and whitens 10 s after the tide leaves it in air (`UWROceanCoralLife`), the wild sea kelp and sea
+  grapes give their seeds, x3 in the King Tide; 224 giant clams opened by hand (clam meat, a pearl 2%, x5 with your
+  Pearldiver near); keepsakes, the Sluice key, the drowned bell's rope, the nine stones to read, the Beacon Stack's fire
+  (4 wood, for your clan), the Tidefowl burrows; caches at the larder, the fallen span, the market, the Impaled Ship, the
+  barque, the Whale Fall and in every castaway hull, drowned house and sunk barrel (`AWROceanSpot`, `world ocean spot`).
+  New items: pearl, sea-glass, driftwood, oyster, urchin, clam meat, Tidefowl egg, kelp ash, bronze scrap and sheet, iron
+  nails, gold leaf, glass, the worn harpoon, the Sluice key, eight lore keepsakes, four recipe scraps; recipes glass
+  (kelp glass), bronze from scrap, iron from nails. The `ocean` row in `world.json biomes`.
+
 ## Unreleased: the Crystal caves (the Arcane land)
 
 Aaron (lane build-biome-crystal: requirement ledger R1-R50, build research and plan in showcase-notes

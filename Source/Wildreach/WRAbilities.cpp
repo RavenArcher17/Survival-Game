@@ -29,6 +29,7 @@
 #include "WRAttributeSet.h"
 #include "WRCharacterBase.h"
 #include "WRCharacterMovementComponent.h"
+#include "WRUnderwater.h"
 #include "WRCombatLibrary.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
@@ -589,6 +590,11 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		const float Frenzy = WRBlood::SwingScale(Character);
 		Windup *= Frenzy;
 		Recovery *= Frenzy;
+		// Under water (cooks/biome-ocean.md 2.6): every class but the thrust ones swings through the water's drag.
+		const float Drag = WRUnderwater::MeleeRate(Character, Class.Id);
+		Windup /= Drag;
+		Active /= Drag;
+		Recovery /= Drag;
 	}
 	else if (!ArtKey.IsEmpty())
 	{
@@ -666,7 +672,7 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 
 	// A heavy (or a chargeable Wildbrand) whose button is still held charges (combat.md 2.4.2): the coil holds at its
 	// top, hyperarmored, until release or the cap. A quick release is the plain swing.
-	const bool bChargeableHeavy = Move && MoveId == TEXT("heavy") && Class.Move(TEXT("charged")) && !Character->IsCreature();
+	const bool bChargeableHeavy = Move && MoveId == TEXT("heavy") && Class.Move(TEXT("charged")) && !Character->IsCreature() && WRUnderwater::CanChargeHeavy(Character, Class.Id);
 	const bool bChargeableArt = !ArtKey.IsEmpty() && !bThisFollowUp && T.Num(WildbrandKey() + TEXT(".charge.max"), 0.f) > 0.f;
 	const FGameplayAbilitySpec* Spec = GetCurrentAbilitySpec();
 	const bool bHeld = Spec && Spec->InputPressed;
@@ -947,6 +953,13 @@ bool UWRGA_Melee::WildbrandFits(const AWRCharacterBase* Who, FName Node, FString
 	if (Who->HasTag(WRTags::State_Mounted) && !(Row->HasField(TEXT("mounted")) && Row->GetBoolField(TEXT("mounted"))))
 	{
 		OutWhy = TEXT("not while riding");
+		return false;
+	}
+	// Under water only the Wildbrands flagged for it (cooks/biome-ocean.md 2.6: Wave cut, Harpoon throw, the thrust
+	// ones, Static strike), unless Gills lets you fight freely.
+	if (WRUnderwater::IsUnder(Who) && !WRUnderwater::HasGills(Who) && !(Row->HasField(TEXT("underwater")) && Row->GetBoolField(TEXT("underwater"))))
+	{
+		OutWhy = TEXT("not under water");
 		return false;
 	}
 	// A ranged Wildbrand (Wind arrow): its fits are the ranged slot's kinds (bow, crossbow), and it's drawn through it.
@@ -1648,6 +1661,39 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		After(TravelTime + Tw.Num(TEXT("spells.airDash.recovery"), 0.15f), [this]() { EndSelf(); });
 		return;
 	}
+	if (Character && Character->GetCharacterMovement()->IsSwimming())
+	{
+		// In the water (cooks/biome-ocean.md 2.6): under the surface a kick-dodge, a 400 cm burst along the stick in 3D
+		// (back with none), i-frames 0.2 s, 14 stamina; at the surface a short surface roll (250 cm, flat). Perfect-dodge
+		// rules as on land (DodgeStartedAt). Root motion keeps it predicted.
+		const FWRTuning& Tu = FWRTuning::Get();
+		UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(Character->GetCharacterMovement());
+		const bool bUnder = Move && Move->IsUnderwater();
+		CostOverride = Tu.Num(TEXT("underwater.kickDodge.stamina"), 14.f);
+		if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+			return;
+		}
+		FVector Dir = bUnder ? Character->GetCharacterMovement()->GetCurrentAcceleration().GetSafeNormal() : Character->GetCharacterMovement()->GetCurrentAcceleration().GetSafeNormal2D();
+		if (Dir.IsNearlyZero()) Dir = -Character->GetActorForwardVector().GetSafeNormal2D();
+		const float Distance = bUnder ? Tu.Num(TEXT("underwater.kickDodge.distance"), 400.f) : Tu.Num(TEXT("underwater.surfaceDodge"), 250.f);
+		const float TravelTime = FMath::Max(0.05f, Tu.Num(TEXT("underwater.kickDodge.seconds"), 0.3f));
+		const float IEnd = Tu.Num(TEXT("underwater.kickDodge.iframes"), 0.2f) + WRVoidPath::FadeSeconds(Character);
+		if (IsServer())
+		{
+			Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
+			WRFx::Broadcast(Character, bUnder ? TEXT("ocean.kick") : TEXT("ocean.surface_roll"), Character->GetActorLocation(), (-Dir).Rotation(), 1.f, bUnder ? TEXT("ocean.kick") : TEXT("water.stroke"));
+		}
+		bWasBackstep = false;
+		Travel = UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(this, TEXT("KickDodge"), Dir, Distance / TravelTime, TravelTime, false, nullptr,
+			ERootMotionFinishVelocityMode::ClampVelocity, FVector::ZeroVector, Character->GetCharacterMovement()->GetMaxSpeed(), false);
+		if (Travel) Travel->ReadyForActivation();
+		After(0.02f, [this]() { SetInvulnerable(true); });
+		After(IEnd, [this]() { SetInvulnerable(false); });
+		After(FMath::Max(TravelTime, IEnd) + Tu.Num(TEXT("underwater.kickDodge.recovery"), 0.2f), [this]() { EndSelf(); });
+		return;
+	}
 	if (!Character || Character->GetCharacterMovement()->IsFalling())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -2203,7 +2249,8 @@ void UWRGA_Spell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 			return;
 		}
 		const FWRTuning& T = FWRTuning::Get();
-		const float Speed = T.Num(SpellKey + TEXT(".speed"), 2600.f);
+		// Under water every bolt but Tide's slows to x0.6 (cooks/biome-ocean.md 2.6).
+		const float Speed = T.Num(SpellKey + TEXT(".speed"), 2600.f) * WRUnderwater::BoltSpeedMult(Caster, PathId);
 		// At what you've locked on to, ahead of where it's going; otherwise through the crosshair.
 		AWRCharacterBase* Lock = WRSpellAim::Locked(Caster);
 		const FVector Chest = Caster->GetActorLocation() + FVector(0.f, 0.f, 40.f);

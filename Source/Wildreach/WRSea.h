@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "ProceduralMeshComponent.h"
 #include "WRSea.generated.h"
 
 class FJsonObject;
@@ -45,6 +46,9 @@ struct WILDREACH_API FWRSeaRules
 	 * MaxCells; squares that are all land are left out, and neighbours differ by at most one size (so no cracks).
 	 */
 	static TArray<FWRSeaLeaf> BuildLeaves(const FWRSeaMask& Mask, int32 RootCells, float Falloff, int32 MaxCells);
+	/** The same, with detail boxes (mask cells: Min, Max) where open-sea squares are never wider than DetailCells: the
+	 *  runtime lands' coasts out on the open sea (the Ocean's tide box), so their water is fine enough to rise and fall. */
+	static TArray<FWRSeaLeaf> BuildLeaves(const FWRSeaMask& Mask, int32 RootCells, float Falloff, int32 MaxCells, const TArray<FIntRect>& Detail, int32 DetailCells);
 	/** Where the quadtree starts, in mask cells (its -X -Y corner). */
 	static int32 RootStart(const FWRSeaMask& Mask, int32 RootCells) { return Mask.Width / 2 - RootCells / 2; }
 };
@@ -67,6 +71,10 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	/** Set one of the sea material's numbers now (console wr.SeaParam, look checks). */
 	void SetMaterialScalar(FName Name, float Value);
+	/** The Ocean's tide (WRTide): lift the vertices over the tide box by Cm x their weight (1 in the box, 0 past its
+	 *  ramp) and push the changed tiles to the GPU. Called every couple of seconds by UWRTideSubsystem. */
+	void SetRegionOffset(float Cm);
+	static AWRSea* Find(const UWorld* World);
 
 protected:
 	virtual void BeginPlay() override;
@@ -77,6 +85,18 @@ private:
 	void ApplyLook(float Daylight);
 
 	UPROPERTY(Transient) TArray<TObjectPtr<UProceduralMeshComponent>> Tiles;
+	/** Tiles with vertices under the tide's weight: their resting vertices, each vertex's weight, normals, UVs. */
+	struct FTideTile
+	{
+		int32 Tile = 0;
+		TArray<FVector> Rest;
+		TArray<float> Weight;
+		TArray<FVector> Normals;
+		TArray<FVector2D> UVs;
+		TArray<FProcMeshTangent> Tangents;
+	};
+	TArray<FTideTile> TideTiles;
+	float TideApplied = 0.f;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> Material;
 	UPROPERTY(Transient) TObjectPtr<UMaterialParameterCollection> Globals;
 	/** Material parameters that dim at night, with their daytime values (tuning sea.dim). */

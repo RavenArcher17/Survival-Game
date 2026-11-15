@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRUnderwater.h"
 #include "WRCrystalTypes.h"
 #include "WRWindPath.h"
 #include "WRSkyAir.h"
@@ -628,7 +629,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const bool bBossBlow = Attacker && StanceKind(Attacker) != TEXT("normal");
 		const float StaminaDamage = Hit.StaminaDamage >= 0.f ? Hit.StaminaDamage
 			: Damage * (bBossBlow ? WRTune(TEXT("defense.bossStaminaDamage"), 1.6f) : WRTune(TEXT("defense.creatureStaminaDamage"), 1.2f));
-		const float Cost = GuardStaminaCost(StaminaDamage, Guard.Boost) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")))
+		const float Cost = GuardStaminaCost(StaminaDamage, Guard.Boost) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina"))) * WRUnderwater::GuardStaminaMult(Target)
 			* (WRArtifacts::Has(Target, TEXT("block_cost")) ? WRArtifacts::RuleNum(Target, TEXT("block_cost"), TEXT("scale"), 2.f) : 1.f);   // Glass Guard
 		// Chip: what the guard doesn't stop of this kind of damage gets through.
 		const bool bElemental = Hit.Element.IsValid() && Hit.Element != WRTags::Element_Physical;
@@ -683,6 +684,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRNecro::DamageScale(Attacker, Target, Hit);
 		// Arcane: Focus, Mark chance on the marked, an ally's Rune circle (WRArcanePath.cpp).
 		Damage *= WRArcane::DamageScale(Attacker, Target, Hit);
+		// Under water fire fizzles (cooks/biome-ocean.md 2.6): x0.3 on a body in the water, and no burn (below).
+		if (Hit.Element == WRTags::Element_Fire) Damage *= WRUnderwater::FireMult(Target);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
 			Damage *= 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);
@@ -1141,6 +1144,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			if (!Target->IsAlive()) break;
 		}
 		float Burn = (Hit.BurnBuildup + Hit.Buildups.FindRef(TEXT("burn"))) * BuildScale * DealtBy(WRStatus::Burn);
+		if (WRUnderwater::IsUnder(Target)) Burn = 0.f;   // nothing burns under water
 		// Wisp crown talisman: your spells' burn +5%.
 		if (Hit.bSpell || (!Hit.bMelee && !Hit.PathId.IsNone())) Burn *= 1.f + UWRInventoryComponent::GearStatFor(Attacker, TEXT("spellBurn"));
 		// Ignite chance: any fire hit can set the target burning outright.
@@ -1179,6 +1183,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRNecro::AfterHit(Target, Hit, Damage);
 		// The Arcane path's (WRArcanePath.cpp): Inscribe's rune, Mana burn's drain.
 		WRArcane::AfterHit(Target, Hit, Damage);
+	}
+	// Lightning in water spreads to everyone in the same water near the struck (cooks/biome-ocean.md 2.6).
+	if (Result == EWRHitResult::Hit && Target->IsAlive() && Hit.Element == WRTags::Element_Lightning)
+	{
+		WRUnderwater::SpreadLightning(Target, Hit);
 	}
 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.

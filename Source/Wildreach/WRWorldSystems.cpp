@@ -4,6 +4,7 @@
 // WRUIWorld.cpp.
 
 #include "WRWorldSystems.h"
+#include "WROceanWorld.h"
 #include "WRLand.h"
 #include "WRForestTypes.h"
 #include "WRStormWorld.h"
@@ -2483,6 +2484,11 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 			return FString();
 		}
 		return UWRSkyWorld::Command(PC, Args);
+	}
+	if (Verb == TEXT("ocean"))
+	{
+		// The Ocean's world (WROceanWorld): world ocean spot.
+		return UWROceanWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("crystal"))
 	{

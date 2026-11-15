@@ -18,7 +18,8 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Right"), TEXT("Move right"), Movement, EKeys::D);
 	Add(TEXT("Jump"), TEXT("Jump"), Movement, EKeys::SpaceBar);
 	Add(TEXT("Sprint"), TEXT("Sprint"), Movement, EKeys::LeftShift);
-	Add(TEXT("Dodge"), TEXT("Dodge roll"), Movement, EKeys::C);
+	Add(TEXT("Dodge"), TEXT("Dodge roll (in the water: tap to kick, hold to dive)"), Movement, EKeys::C);
+	Add(TEXT("Dive"), TEXT("Dive (hold, in the water; Jump rises)"), Movement, EKeys::LeftControl);
 	Add(TEXT("LockOn"), TEXT("Lock on"), Movement, EKeys::Tab);
 	Add(TEXT("View"), TEXT("First / third person"), Movement, EKeys::V);
 	Add(TEXT("Light"), TEXT("Light attack / fire"), Combat, EKeys::LeftMouseButton);

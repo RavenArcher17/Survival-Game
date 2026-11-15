@@ -3,6 +3,8 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRUnderwater.h"
+#include "WRPlayerController.h"
 #include "WRWindPath.h"
 #include "WRVoidWorld.h"
 #include "WRSwampSystems.h"
@@ -314,7 +316,9 @@ void AWRCharacter::ApplyAimRotation()
 void AWRCharacter::TickAimCamera(float DeltaSeconds)
 {
 	AimBlend = FMath::FInterpTo(AimBlend, IsAimingRanged() ? 1.f : 0.f, DeltaSeconds, 10.f);
-	ThirdPersonBoom->TargetArmLength = FMath::Lerp(420.f, WRTune(TEXT("ranged.aimArmLength"), 170.f), AimBlend);
+	// Under water the camera comes in close (cooks/biome-ocean.md 2.6: 250 cm), eased, so murk and kelp don't fill it.
+	UnderwaterBlend = FMath::FInterpTo(UnderwaterBlend, WRUnderwater::IsUnder(this) ? 1.f : 0.f, DeltaSeconds, 3.f);
+	ThirdPersonBoom->TargetArmLength = FMath::Lerp(FMath::Lerp(420.f, WRTune(TEXT("underwater.cameraArm"), 250.f), UnderwaterBlend), WRTune(TEXT("ranged.aimArmLength"), 170.f), AimBlend);
 	ThirdPersonBoom->SocketOffset = FMath::Lerp(FVector(0.f, 75.f, 85.f), FVector(0.f, 60.f, 70.f), AimBlend);
 	float Fov = FMath::Lerp(90.f, WRTune(TEXT("ranged.aimFov"), 60.f), AimBlend);
 	// Sprinting widens the view a little (eased in and out; not while aiming).
@@ -447,6 +451,14 @@ void AWRCharacter::ServerFireRanged_Implementation(FVector_NetQuantize AimPoint,
 		return;
 	}
 	const bool bThrow = Gun->IsThrowable();
+	// Under water (cooks/biome-ocean.md 2.6): a bow won't draw; a crossbow's bolt carries half as far; thrown spears and
+	// harpoons fly as ever.
+	if (WRUnderwater::IsUnder(this) && Gun->RangedKind == TEXT("bow"))
+	{
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(GetController())) PC->ClientNotify(TEXT("Your bow won't draw under water"));
+		NextShotAt = Now + 0.6;
+		return;
+	}
 	FName Ammo;
 	if (!bThrow)
 	{
@@ -564,7 +576,8 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;
 		const FString MeshAlong = Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->MeshAlong : Launcher.MeshAlong;
-		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed * WRWind::ProjectileSpeedScale(this) * (Ammo ? Ammo->AmmoSpeedMult : 1.f), Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
+		const float WaterMult = WRUnderwater::IsUnder(this) && Launcher.RangedKind == TEXT("crossbow") ? WRTune(TEXT("underwater.crossbowRange"), 0.5f) : 1.f;
+		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed * WaterMult * WRWind::ProjectileSpeedScale(this) * (Ammo ? Ammo->AmmoSpeedMult : 1.f), Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
 			Launcher.IsThrowable() && Launcher.RangedKind == TEXT("spear") ? Launcher.Id : NAME_None);
 		// Through bodies: the ammo's own pierce (items.json) and Piercing gale's one (the Wind path).
 		Projectile->PierceLeft = WRWind::ShotPierce(this, AmmoId);

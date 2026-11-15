@@ -1,4 +1,5 @@
 #include "WRSea.h"
+#include "WRTide.h"
 #include "Wildreach.h"
 #include "WRGameState.h"
 #include "WRSky.h"
@@ -119,6 +120,11 @@ namespace WRSeaDetail
 
 TArray<FWRSeaLeaf> FWRSeaRules::BuildLeaves(const FWRSeaMask& Mask, int32 RootCells, float Falloff, int32 MaxCells)
 {
+	return BuildLeaves(Mask, RootCells, Falloff, MaxCells, TArray<FIntRect>(), MaxCells);
+}
+
+TArray<FWRSeaLeaf> FWRSeaRules::BuildLeaves(const FWRSeaMask& Mask, int32 RootCells, float Falloff, int32 MaxCells, const TArray<FIntRect>& Detail, int32 DetailCells)
+{
 	using namespace WRSeaDetail;
 	const int32 Start = RootStart(Mask, RootCells);
 	const auto Desired = [Falloff, MaxCells](float D)
@@ -140,6 +146,14 @@ TArray<FWRSeaLeaf> FWRSeaRules::BuildLeaves(const FWRSeaMask& Mask, int32 RootCe
 			const int32 NX = N.X >= Mask.Width ? N.X : N.X + N.Size <= 0 ? N.X + N.Size - 1 : FMath::Clamp(0, N.X, N.X + N.Size - 1);
 			const int32 NY = N.Y >= Mask.Height ? N.Y : N.Y + N.Size <= 0 ? N.Y + N.Size - 1 : FMath::Clamp(0, N.Y, N.Y + N.Size - 1);
 			bSplit = N.Size > Desired(Mask.DistanceAt(NX, NY));
+			// A runtime land's coast out here (the Ocean): never coarser than DetailCells over it.
+			if (!bSplit && N.Size > DetailCells)
+			{
+				for (const FIntRect& R : Detail)
+				{
+					if (N.X < R.Max.X && N.X + N.Size > R.Min.X && N.Y < R.Max.Y && N.Y + N.Size > R.Min.Y) { bSplit = true; break; }
+				}
+			}
 		}
 		else if (N.Size > 64)
 		{
@@ -344,7 +358,18 @@ bool AWRSea::BuildMesh()
 	const FWRTuning& T = FWRTuning::Get();
 	const int32 MaxCells = static_cast<int32>(FMath::RoundUpToPowerOfTwo(static_cast<uint32>(FMath::Max(1.f, T.Num(TEXT("sea.maxSquare"), 409600.f) / Mask.Cell))));
 	const int32 RootCells = static_cast<int32>(FMath::RoundUpToPowerOfTwo(static_cast<uint32>(FMath::Max(1.f, T.Num(TEXT("sea.extent"), 6553600.f) / Mask.Cell))));
-	const TArray<FWRSeaLeaf> Leaves = FWRSeaRules::BuildLeaves(Mask, RootCells, T.Num(TEXT("sea.falloff"), 6.f), MaxCells);
+	// The Ocean's tide box and its ramp (WRTide): fine squares there so the water can rise and fall with the tide.
+	TArray<FIntRect> Detail;
+	FBox2D TideBox(ForceInit);
+	float TideRamp = 0.f;
+	if (WRTide::Active() && WRTide::Box(TideBox, TideRamp))
+	{
+		const FBox2D Grown = TideBox.ExpandBy(TideRamp + 2.f * Mask.Cell);
+		Detail.Add(FIntRect(FMath::FloorToInt((Grown.Min.X - Mask.Origin.X) / Mask.Cell), FMath::FloorToInt((Grown.Min.Y - Mask.Origin.Y) / Mask.Cell),
+			FMath::CeilToInt((Grown.Max.X - Mask.Origin.X) / Mask.Cell), FMath::CeilToInt((Grown.Max.Y - Mask.Origin.Y) / Mask.Cell)));
+	}
+	const int32 DetailCells = static_cast<int32>(FMath::RoundUpToPowerOfTwo(static_cast<uint32>(FMath::Max(1.f, T.Num(TEXT("tide.seaSquare"), 3200.f) / Mask.Cell))));
+	const TArray<FWRSeaLeaf> Leaves = FWRSeaRules::BuildLeaves(Mask, RootCells, T.Num(TEXT("sea.falloff"), 6.f), MaxCells, Detail, DetailCells);
 	const int32 Start = FWRSeaRules::RootStart(Mask, RootCells);
 	const TSet<FWRSeaLeaf> Set(Leaves);
 	const float Level = T.Num(TEXT("sea.level"), -20.f);
@@ -434,10 +459,54 @@ bool AWRSea::BuildMesh()
 		Mesh->RegisterComponent();
 		Mesh->CreateMeshSection(0, Tile.Verts, Tile.Tris, Normals, UVs, TArray<FColor>(), Tangents, false);
 		Mesh->SetMaterial(0, Material);
-		Tiles.Add(Mesh);
+		const int32 TileIndex = Tiles.Add(Mesh);
+		// Under the tide's weight anywhere: keep what it takes to re-place this tile's vertices as the water moves.
+		if (Detail.Num() > 0)
+		{
+			FTideTile TT;
+			bool bAny = false;
+			TT.Weight.Reserve(Tile.Verts.Num());
+			for (const FVector& V : Tile.Verts)
+			{
+				const float W = WRTide::Weight(FVector2D(V.X, V.Y));
+				bAny |= W > 0.f;
+				TT.Weight.Add(W);
+			}
+			if (bAny)
+			{
+				TT.Tile = TileIndex;
+				TT.Rest = Tile.Verts;
+				TT.Normals = Normals;
+				TT.UVs = UVs;
+				TT.Tangents = Tangents;
+				TideTiles.Add(MoveTemp(TT));
+			}
+		}
 	}
 	UE_LOG(LogWildreach, Log, TEXT("SEA mesh: %d squares, %d triangles in %d tiles, %.0f ms"), Leaves.Num(), Triangles, Tiles.Num(), (FPlatformTime::Seconds() - Began) * 1000.0);
 	return true;
+}
+
+AWRSea* AWRSea::Find(const UWorld* World)
+{
+	if (!World) return nullptr;
+	for (TActorIterator<AWRSea> It(World); It; ++It) return *It;
+	return nullptr;
+}
+
+void AWRSea::SetRegionOffset(float Cm)
+{
+	if (TideTiles.Num() == 0 || FMath::Abs(Cm - TideApplied) < 0.5f) return;
+	TideApplied = Cm;
+	TArray<FVector> Verts;
+	for (const FTideTile& TT : TideTiles)
+	{
+		UProceduralMeshComponent* Mesh = Tiles.IsValidIndex(TT.Tile) ? Tiles[TT.Tile].Get() : nullptr;
+		if (!Mesh) continue;
+		Verts = TT.Rest;
+		for (int32 i = 0; i < Verts.Num(); ++i) Verts[i].Z += Cm * TT.Weight[i];
+		Mesh->UpdateMeshSection(0, Verts, TT.Normals, TT.UVs, TArray<FColor>(), TT.Tangents);
+	}
 }
 
 void AWRSea::Tick(float DeltaSeconds)

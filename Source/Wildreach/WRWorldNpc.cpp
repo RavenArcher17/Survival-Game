@@ -3,6 +3,7 @@
 // client's side of the world systems: what E does near a world thing, the prompt, and opening their screens.
 
 #include "WRWorldSystems.h"
+#include "WROceanWorld.h"
 #include "WRStormWorld.h"
 #include "WRSwampSystems.h"
 #include "WRForestHazards.h"
@@ -342,6 +343,8 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	if (UWRSkyArenas::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Crystal caves' spots (WRCrystalThings): the halls' keystone chimes, the keepsakes, the found things.
 	if (UWRCrystalWorld::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Ocean's spots (WROceanWorld): keepsakes, clams, the tsunami stones, the drowned bell, the Sluice key, the beacon.
+	if (UWROceanWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -397,6 +400,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 	if (UWRSkyArenas::ClientInteract(PC)) return true;
 	if (UWRSkyWorld::ClientInteract(PC)) return true;
 	if (UWRCrystalWorld::ClientInteract(PC)) return true;
+	if (UWROceanWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (AWRShrine* S = Cast<AWRShrine>(N.Actor))

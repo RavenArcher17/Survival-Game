@@ -3,6 +3,7 @@
 // reads what WRFx::ShowHit recorded on this machine.
 
 #include "WRFx.h"
+#include "WRUnderwater.h"
 #include "WRGameplayTags.h"
 #include "WRCharacterBase.h"
 #include "WRFxSystem.h"
@@ -157,6 +158,23 @@ public:
 				// Rings of darkness thinning toward the middle: a soft vignette out of plain boxes.
 				const float In = (b + 1) / float(Bands) * 0.22f;
 				const FLinearColor C(0.01f, 0.012f, 0.015f, A / Bands * 1.6f);
+				const FVector2D H(Size.X, Size.Y * In * 0.5f), V(Size.X * In * 0.5f, Size.Y);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(H, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(H, FSlateLayoutTransform(FVector2D(0.f, Size.Y - H.Y))), WRUI::White(), ESlateDrawEffect::None, C);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(V, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
+				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(V, FSlateLayoutTransform(FVector2D(Size.X - V.X, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
+			}
+		}
+
+		// Drowning or crushed (cooks/biome-ocean.md 2.6): the edges of the view darken with each tick, fading over a second.
+		if (const UWRDiveComponent* Dive = UWRDiveComponent::Of(P->GetPawn()); Dive && Dive->IsUnder() && Dive->SinceHurt() < 1.0f)
+		{
+			const float A = WRTune(TEXT("underwater.hurtVignette"), 0.55f) * (1.f - Dive->SinceHurt());
+			const int32 Bands = 6;
+			for (int32 b = 0; b < Bands; ++b)
+			{
+				const float In = (b + 1) / float(Bands) * 0.3f;
+				const FLinearColor C(0.0f, 0.02f, 0.04f, A / Bands * 1.6f);
 				const FVector2D H(Size.X, Size.Y * In * 0.5f), V(Size.X * In * 0.5f, Size.Y);
 				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(H, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, C);
 				FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(H, FSlateLayoutTransform(FVector2D(0.f, Size.Y - H.Y))), WRUI::White(), ESlateDrawEffect::None, C);

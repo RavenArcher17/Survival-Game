@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRUnderwater.h"
 #include "WRGraveBosses.h"
 #include "WRSkyBosses.h"
 #include "WRWarHall.h"
@@ -145,6 +146,7 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	Canines->SetVisibility(false);
 	Canines->SetCastShadow(false);
 	LODSync = CreateDefaultSubobject<ULODSyncComponent>(TEXT("LODSync"));
+	Dive = CreateDefaultSubobject<UWRDiveComponent>(TEXT("Dive"));
 
 	ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
 	ShieldMesh->SetupAttachment(Body);
@@ -193,6 +195,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		if (IsLocallyControlled())
 		{
 			TickAimCamera(DeltaSeconds);
+			TickDiveInput();
 			FWRRaiding::TickThrowArc(this, DeltaSeconds);   // a fire pot's arc while you aim it
 			TickCombatCamera(DeltaSeconds);
 			TickFirstPersonCamera(DeltaSeconds);
@@ -1514,6 +1517,7 @@ void AWRCharacter::BuildInput()
 	LookAction = MakeAction(EInputActionValueType::Axis2D);
 	PadLookAction = MakeAction(EInputActionValueType::Axis2D);
 	JumpAction = MakeAction(EInputActionValueType::Boolean);
+	DiveAction = MakeAction(EInputActionValueType::Boolean);
 	SprintAction = MakeAction(EInputActionValueType::Boolean);
 	ToggleViewAction = MakeAction(EInputActionValueType::Boolean);
 
@@ -1549,6 +1553,7 @@ void AWRCharacter::MapKeys()
 	Map(MoveAction, TEXT("Right"));
 	MappingContext->MapKey(LookAction, EKeys::Mouse2D);
 	Map(JumpAction, TEXT("Jump"));
+	Map(DiveAction, TEXT("Dive"));
 	Map(SprintAction, TEXT("Sprint"));
 	Map(ToggleViewAction, TEXT("View"));
 	Map(SwapWeaponAction, TEXT("SwapRanged"));
@@ -1647,7 +1652,9 @@ void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		Input->BindAction(PadLookAction, ETriggerEvent::Triggered, this, &AWRCharacter::PadLook);
 		Input->BindAction(PadLookAction, ETriggerEvent::Completed, this, &AWRCharacter::PadLook);
 		Input->BindAction(JumpAction, ETriggerEvent::Started, this, &AWRCharacter::InputJump);
-		Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		Input->BindAction(JumpAction, ETriggerEvent::Completed, this, &AWRCharacter::InputJumpReleased);
+		Input->BindAction(DiveAction, ETriggerEvent::Started, this, &AWRCharacter::InputDive);
+		Input->BindAction(DiveAction, ETriggerEvent::Completed, this, &AWRCharacter::InputDiveReleased);
 		Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AWRCharacter::InputSprint);
 		Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AWRCharacter::StopSprint);
 		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AWRCharacter::InputView);
@@ -1671,6 +1678,17 @@ void AWRCharacter::Move(const FInputActionValue& Value)
 	}
 	const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
 	const FRotationMatrix YawMatrix(YawRotation);
+	// Under the surface you swim where you look (cooks/biome-ocean.md 2.6): forward carries the camera's pitch (eased off
+	// near straight up or down, so the body never flips); strafing stays level.
+	const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
+	if (Move && Move->IsUnderwater())
+	{
+		const float MaxPitch = WRTune(TEXT("underwater.maxSwimPitch"), 70.f);
+		const FRotator Look(FMath::Clamp(FRotator::NormalizeAxis(Controller->GetControlRotation().Pitch), -MaxPitch, MaxPitch), YawRotation.Yaw, 0.f);
+		AddMovementInput(Look.Vector(), Axis.Y);
+		AddMovementInput(YawMatrix.GetUnitAxis(EAxis::Y), Axis.X);
+		return;
+	}
 	AddMovementInput(YawMatrix.GetUnitAxis(EAxis::X), Axis.Y);
 	AddMovementInput(YawMatrix.GetUnitAxis(EAxis::Y), Axis.X);
 }
@@ -1703,12 +1721,29 @@ void AWRCharacter::PadLook(const FInputActionValue& Value)
 void AWRCharacter::InputPressed(EWRAbilityInput Input)
 {
 	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
+	// Swimming, the Dodge button waits to see if it's a tap (the kick-dodge) or a hold (dive).
+	if (Input == EWRAbilityInput::Dodge && GetCharacterMovement()->IsSwimming())
+	{
+		DodgeHeldSince = GetWorld()->GetTimeSeconds();
+		return;
+	}
 	HeldInputs.Add(Input);
 	PressAbilityInput(Input);
 }
 
 void AWRCharacter::InputReleased(EWRAbilityInput Input)
 {
+	if (Input == EWRAbilityInput::Dodge && DodgeHeldSince >= 0.0)
+	{
+		const bool bTap = GetWorld()->GetTimeSeconds() - DodgeHeldSince < WRTune(TEXT("underwater.dodgeHoldSeconds"), 0.25f);
+		DodgeHeldSince = -1.0;
+		if (bTap)
+		{
+			PressAbilityInput(EWRAbilityInput::Dodge);
+			ReleaseAbilityInput(EWRAbilityInput::Dodge);
+		}
+		return;
+	}
 	// Only a press this body took is let go (one dropped by a menu already was; one the gate stopped never began).
 	if (HeldInputs.Remove(Input) == 0) return;
 	ReleaseAbilityInput(Input);
@@ -1724,7 +1759,50 @@ void AWRCharacter::InputJump()
 		ServerMashFrozen();
 		return;
 	}
+	// In the water Jump is Rise (held: surface fast); at the surface it still climbs out where the engine allows.
+	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement()); Move && Move->IsSwimming())
+	{
+		Move->bWantsToRise = true;
+	}
 	Jump();
+}
+
+void AWRCharacter::InputJumpReleased()
+{
+	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement())) Move->bWantsToRise = false;
+	StopJumping();
+}
+
+void AWRCharacter::InputDive()
+{
+	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
+	bDiveKey = true;
+}
+
+void AWRCharacter::InputDiveReleased()
+{
+	bDiveKey = false;
+}
+
+void AWRCharacter::TickDiveInput()
+{
+	UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
+	if (!Move) return;
+	const bool bSwimming = Move->IsSwimming();
+	// The Dodge button held past dodgeHoldSeconds in the water dives too (the pad's B); a quick tap is the kick-dodge.
+	const bool bHeldDodge = DodgeHeldSince >= 0.0 && GetWorld()->GetTimeSeconds() - DodgeHeldSince >= WRTune(TEXT("underwater.dodgeHoldSeconds"), 0.25f);
+	Move->bWantsToDive = bSwimming && (bDiveKey || bHeldDodge) && !Move->bWantsToRise;
+	if (!bSwimming)
+	{
+		Move->bWantsToRise = false;
+		if (DodgeHeldSince >= 0.0)
+		{
+			// Climbed out mid-hold: the press was never a dive, so it's the dodge it would have been.
+			DodgeHeldSince = -1.0;
+			PressAbilityInput(EWRAbilityInput::Dodge);
+			ReleaseAbilityInput(EWRAbilityInput::Dodge);
+		}
+	}
 }
 
 void AWRCharacter::InputSprint()
@@ -1742,6 +1820,9 @@ void AWRCharacter::DropHeldInputs()
 	const TArray<EWRAbilityInput> Held = HeldInputs.Array();
 	HeldInputs.Reset();
 	BufferedInput = EWRAbilityInput::None;  // a press waiting in the buffer goes with them (COMBAT-AND-LESSONS 1.16)
+	DodgeHeldSince = -1.0;
+	bDiveKey = false;
+	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement())) { Move->bWantsToDive = false; Move->bWantsToRise = false; }
 	for (const EWRAbilityInput Input : Held) ReleaseAbilityInput(Input);
 	StopSprint();
 	StopJumping();

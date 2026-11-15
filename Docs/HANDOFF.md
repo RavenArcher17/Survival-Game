@@ -333,6 +333,20 @@ The Blood Moon is `UWRGraveEvents` (world.json events.bloodmoon is scheduled by 
 `UWRGraveEvents::Sign / Rising / On` are what the rest asks). The Graveyard's ambient beds are `land.graveyard[.night]`
 and `zone.G1..G4 / zone.neck` rows; its music pools `<pool>.graveyard` and `boss.nhal`.
 
+Also since 0.7.1 (in progress, not live yet): **the Ocean & reefs** (cooks/biome-ocean.md, plan
+cooks/build-biome-ocean.md), the strait between the Sky's Chain Cliffs and the Storm crown. `node Tools/terrain/ocean.mjs`
+writes `Data/lands/ocean.json` + `ocean_ground.bin` (heightfield, sea floor drawn) and `Data/ocean.json` (landmarks,
+sites, kit, decor, caves, the Drowned Hall, nodes, spots, caches, hazards, arenas; read by `FWROceanData`,
+`WROceanTypes.cpp`). The cook's coordinates are world-map's: the script's `Y()` squeezes them into this world, so keep
+writing cook numbers there. Scenery: `WROceanScenery.cpp` / `WROceanSites.cpp` on the forest's FBuild, kit
+`WROceanLook.h` (helpers `Oc*`), node looks `WROceanNodes.cpp`; `UWROceanWorld` builds and runs it (`world ocean spot`).
+**Underwater play is game-wide** (`WRUnderwater.*`): "under" = the head is inside the highest-priority physics volume
+there and it's water, so any new water (a flood, a cistern) only has to be a water volume (an air pocket is a non-water
+volume of higher priority); breath and depth are `UWRDiveComponent`; Dive / Rise are the saved move's FLAG_Reserved_1 /
+_2 (all four custom bits were taken). **The tide** (`WRTide.*`) is a pure function of the game clock plus
+`AWROceanState`'s King Tide; anything that asks "where is the water's surface here" calls `WRTide::SurfaceAt` (the still
+sea elsewhere).
+
 Also since 0.7.1 (in progress): **the Sky islands, over the Hollow Cape north of the Storm peaks** (cooks/biome-sky.md,
 plan cooks/build-biome-sky.md). One generator: `node Tools/terrain/sky.mjs` writes the cape's ground
 (`Data/lands/sky.json` + `sky_ground.bin`: the Windward Cliffs, the downs, the Flue's crown, three camps) and

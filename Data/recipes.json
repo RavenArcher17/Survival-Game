@@ -433,7 +433,10 @@
     {"id": "grind_levistone_barnacle", "station": "grinder", "level": 1, "inputs": {"levistone_barnacle": 2}, "output": "levistone", "count": 1, "seconds": 5, "biome": "sky_islands"},
     {"id": "break_worked_granite", "station": "grinder", "level": 1, "inputs": {"worked_granite": 1}, "output": "stone", "count": 4, "seconds": 4, "biome": "sky_islands"},
     {"id": "unpick_skysilk_weave", "station": "loom", "level": 1, "inputs": {"scrap_skysilk_weave": 1}, "output": "skysilk", "count": 3, "seconds": 6, "biome": "sky_islands"},
-    {"id": "skysilk_from_spar", "station": "workbench", "level": 1, "inputs": {"glider_spar": 1}, "output": "cloudpine", "count": 2, "seconds": 3, "biome": "sky_islands"}
+    {"id": "skysilk_from_spar", "station": "workbench", "level": 1, "inputs": {"glider_spar": 1}, "output": "cloudpine", "count": 2, "seconds": 3, "biome": "sky_islands"},
+    {"id": "kelp_glass", "station": "forge", "level": 1, "inputs": {"sea_glass": 3, "kelp_ash": 1}, "output": "glass", "count": 2, "seconds": 4, "blueprint": "bp_kelp_glass", "biome": "ocean"},
+    {"id": "bronze_ingot_scrap", "station": "forge", "level": 1, "inputs": {"bronze_scrap": 4}, "output": "bronze_ingot", "count": 1, "seconds": 3, "biome": "ocean"},
+    {"id": "iron_ingot_nails", "station": "forge", "level": 2, "inputs": {"iron_nails": 4}, "output": "iron_ingot", "count": 1, "seconds": 3, "biome": "ocean"}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

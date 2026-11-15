@@ -187,6 +187,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TArray<TObjectPtr<UGroomComponent>> Grooms;
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TArray<TObjectPtr<class USkeletalMeshComponent>> Outfit;
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<ULODSyncComponent> LODSync;
+	/** Breath and depth (WRUnderwater). */
+	UPROPERTY(VisibleAnywhere, Category="Water") TObjectPtr<class UWRDiveComponent> Dive;
 	/** Shield strapped to the body's left forearm (player_art.json "shieldMesh"). */
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> ShieldMesh;
 	/** The ranged weapon in hand while it's out. */
@@ -404,6 +406,16 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UInputAction> LookAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> PadLookAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> JumpAction;
+	/** Underwater (cooks/build-biome-ocean.md 2.7): the Dive key (held), and the Dodge button held while swimming. */
+	UPROPERTY(Transient) TObjectPtr<UInputAction> DiveAction;
+	void InputDive();
+	void InputDiveReleased();
+	void InputJumpReleased();
+	/** Swimming: when the Dodge press began (a tap kicks, a hold dives), or < 0. */
+	double DodgeHeldSince = -1.0;
+	float UnderwaterBlend = 0.f;
+	bool bDiveKey = false;
+	void TickDiveInput();
 	UPROPERTY(Transient) TObjectPtr<UInputAction> SprintAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> ToggleViewAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> SwapWeaponAction;
