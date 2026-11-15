@@ -457,7 +457,23 @@ void UWRGraveWorld::SpawnServerActors()
 	for (const FWRGraveData::FNode& N : List(TEXT("soulstone"))) { Node(TEXT("soulstone"), TEXT("soulstone"), N.At); ++Made; }
 	for (const FWRGraveData::FNode& N : List(TEXT("bone"))) { Node(TEXT("bone"), TEXT("bone"), N.At); ++Made; }
 	for (const FWRGraveData::FNode& N : List(TEXT("limestone"))) { Node(TEXT("limestone"), TEXT("limestone"), N.At); ++Made; }
-	for (const FWRGraveData::FNode& N : List(TEXT("mortsafe"))) { Node(TEXT("mortsafe"), TEXT("grave_iron"), N.At, 90.f); ++Made; }
+	for (const FWRGraveData::FNode& N : List(TEXT("mortsafe")))
+	{
+		// Breaking a mortsafe open counts for Morwen's "Iron for the dead" (GY 2.11 quest 3).
+		AWRResourceNode* Cage = Node(TEXT("mortsafe"), TEXT("grave_iron"), N.At, 90.f);
+		if (Cage)
+		{
+			TWeakObjectPtr<AWRResourceNode> Weak(Cage);
+			Cage->OnHarvested = [Weak](AWRCharacterBase* Who)
+			{
+				const AWRResourceNode* C = Weak.Get();
+				AWRPlayerState* PS = Who ? Who->GetPlayerState<AWRPlayerState>() : nullptr;
+				if (!C || !PS || C->GetHitsLeft() > 1) return;
+				if (UWRWorldSystems* WS = C->GetWorld()->GetSubsystem<UWRWorldSystems>()) WS->QuestEvent(PS, TEXT("event"), TEXT("mortsafe_broken"), 1);
+			};
+		}
+		++Made;
+	}
 	for (const FWRGraveData::FNode& N : List(TEXT("rye"))) { Node(TEXT("rye"), TEXT("black_rye"), N.At); ++Made; }
 	for (const FWRGraveData::FNode& N : List(TEXT("asphodel"))) { Node(TEXT("asphodel"), TEXT("asphodel"), N.At); ++Made; }
 	// Below: soulstone grave seams, silver veins, wax nests, the Starfall Pit's star iron: a few nodes round each room's
@@ -500,7 +516,7 @@ void UWRGraveWorld::SpawnServerActors()
 	{
 		if (R.Kind == TEXT("family_vault")) SpawnCache(R.At + FRotator(0.f, R.Yaw, 0.f).RotateVector(FVector(-R.W * 0.5f + 140.f, 0.f, 50.f)), R.Yaw, TEXT("A family's grave goods"), { { TEXT("silver_ingot"), 2 }, { TEXT("bone"), 6 }, { TEXT("wax"), 2 } }, TEXT("Rings, a comb, a lantern: what a family laid by its own."), Tn(TEXT("graveyardWorld.vaultRefillHours"), 96.f));
 		if (R.Kind == TEXT("niche_corridor")) SpawnCache(R.At + FRotator(0.f, R.Yaw, 0.f).RotateVector(FVector(R.W * 0.5f - 120.f, 0.f, 40.f)), R.Yaw + 180.f, TEXT("A niche's offerings"), { { TEXT("soulstone_dust"), 3 }, { TEXT("wax"), 3 } }, TEXT("Offerings pushed into an empty niche: wax, coins gone green, soulstone dust."), Tn(TEXT("graveyardWorld.nicheRefillHours"), 48.f));
-		if (R.Kind == TEXT("watchers_vault")) SpawnCache(R.At + FRotator(0.f, R.Yaw, 0.f).RotateVector(FVector(-R.W * 0.5f + 120.f, R.L * 0.5f - 120.f, 40.f)), R.Yaw, TEXT("A spent ration crate"), { { TEXT("hardtack"), 2 }, { TEXT("wax"), 2 } }, TEXT("The watchers' last crate. Two tins left, both opened."), Tn(TEXT("graveyardWorld.vaultRefillHours"), 96.f));
+		if (R.Kind == TEXT("watchers_vault")) SpawnCache(R.At + FRotator(0.f, R.Yaw, 0.f).RotateVector(FVector(-R.W * 0.5f + 120.f, R.L * 0.5f - 120.f, 40.f)), R.Yaw, TEXT("A spent ration crate"), { { TEXT("mourners_bread"), 2 }, { TEXT("wax"), 2 } }, TEXT("The watchers' last crate. Two tins left, both opened."), Tn(TEXT("graveyardWorld.vaultRefillHours"), 96.f));
 	}
 
 	// ---- spots: keepsakes, digs, lanterns, the seventh name, the drowned bell (GY 2.6, 2.20) ----
@@ -583,6 +599,51 @@ void UWRGraveWorld::Tick(float DeltaTime)
 	StepState();
 	if (World->GetNetMode() == NM_Client) return;
 	StepServer(DeltaTime);
+	StepMorwen(DeltaTime);
+}
+
+void UWRGraveWorld::StepMorwen(float Dt)
+{
+	// Morwen keeps the lights (GY 2.11): by day she trims wicks at the Lychgate Chapel's lantern rack (world.json "at");
+	// at dusk she takes a lantern to the Row of the Named and stands by its dark tōrō; through the night she sits inside
+	// her chapel by the candles; at dawn she sits on the lychgate step. She moves only when no one is near either spot
+	// (nobody sees her blink across the fields), else she waits.
+	MorwenClock -= Dt;
+	if (MorwenClock > 0.f) return;
+	MorwenClock = 5.f;
+	UWorld* World = GetWorld();
+	const float Hour = AWRGameState::HourIn(World);
+	const int32 Phase = Hour >= WRTune(TEXT("graveyardWorld.morwen.dusk"), 17.5f) && Hour < WRTune(TEXT("graveyardWorld.morwen.night"), 21.5f) ? 1
+		: (Hour >= WRTune(TEXT("graveyardWorld.morwen.night"), 21.5f) || Hour < WRTune(TEXT("graveyardWorld.morwen.dawn"), 5.f)) ? 2
+		: Hour < WRTune(TEXT("graveyardWorld.morwen.day"), 7.5f) ? 3 : 0;
+	if (Phase == MorwenPhase) return;
+	AWRWorldNpc* Morwen = nullptr;
+	for (TActorIterator<AWRWorldNpc> It(World); It; ++It) if (It->NpcRole == TEXT("master") && It->NpcId == TEXT("morwen")) Morwen = *It;
+	if (!Morwen) return;
+	const FWRGraveData& D = FWRGraveData::Get();
+	const FWRGraveData::FSite* Lych = D.FindSite(TEXT("H1"));
+	const FWRGraveData::FSite* Row = D.FindSite(TEXT("H2"));
+	if (!Lych || !Row) return;
+	if (MorwenHome.IsZero()) { MorwenHome = Morwen->GetActorLocation(); MorwenHomeFace = Morwen->GetActorRotation(); }
+	FVector Spot = MorwenHome;
+	FRotator Face = MorwenHomeFace;
+	if (Phase == 1) { Spot = Row->At + FRotator(0.f, Row->Yaw, 0.f).RotateVector(FVector(0.f, -1000.f, 0.f)); Face = FRotator(0.f, Row->Yaw + 90.f, 0.f); }
+	else if (Phase == 2) { Spot = Lych->At + FRotator(0.f, Lych->Yaw, 0.f).RotateVector(FVector(-300.f, 0.f, 0.f)); Face = FRotator(0.f, Lych->Yaw + 180.f, 0.f); }
+	else if (Phase == 3) { Spot = Lych->At + FRotator(0.f, Lych->Yaw, 0.f).RotateVector(FVector(-1600.f, 120.f, 0.f)); Face = FRotator(0.f, Lych->Yaw + 180.f, 0.f); }
+	float Z = 0.f;
+	if (WRLand::GroundUnder(Spot, Z)) Spot.Z = Z;
+	const float Unseen = WRTune(TEXT("graveyardWorld.morwen.unseen"), 6000.f);
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APawn* P = It->Get() ? It->Get()->GetPawn() : nullptr;
+		if (P && (FVector::Dist(P->GetActorLocation(), Morwen->GetActorLocation()) < Unseen || FVector::Dist(P->GetActorLocation(), Spot) < Unseen)) return;
+	}
+	MorwenPhase = Phase;
+	Morwen->SetActorLocation(Spot + FVector(0, 0, 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+	Morwen->SetActorRotation(Face);
+	Morwen->WorkAt = Spot;
+	Morwen->WorkFacing = Face;
+	UE_LOG(LogWildreach, Log, TEXT("GRAVEYARD Morwen goes to %s"), Phase == 0 ? TEXT("the lantern rack") : Phase == 1 ? TEXT("the Row of the Named") : Phase == 2 ? TEXT("her chapel") : TEXT("the lychgate step"));
 }
 
 void UWRGraveWorld::StepState()

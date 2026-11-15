@@ -51,6 +51,8 @@ struct FWRItemDef
 	float Weight = 0.f;
 	// Consumables
 	float Heal = 0.f;
+	/** Corruption added (negative: taken away) when drunk or eaten (the Graveyard's Cleansing draught: -60). */
+	float UseCorruption = 0.f;
 	float Hunger = 0.f;
 	float Thirst = 0.f;
 	float UseCooldown = 0.f;

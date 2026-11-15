@@ -46,6 +46,19 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   (S3: the Stair burns gold for a game day), the seventh name (S4), the drowned bell's chamber (S5), the Row's five dark
   tōrō. Survival gains `SnuffTorch` / `HoldsLantern` and the light registry `BrightestNear` (for the draughts and the
   Wraithmoth).
+- **Items, recipes, the world's rows** (piece 2): 46 Graveyard items (soulstone and its dust, yew logs, limestone,
+  quicklime, grave iron, silver, wax, the creatures' parts, grave essence, Nhal's core, trophy head and part, the
+  heartwood stake, lime pot, grave lantern, Mourning ring, Yew longbow and its blueprint, palp-spine arrows, the Sexton's
+  pick, moth-dust tonic, Asphodel draught, Cleansing draught (items can now take corruption away: `use.corruption`),
+  the Mourner's Scythe and its blueprint (Nhal's boss weapon in gear.json), the chisel, seven lore items) and their
+  recipes; quicklime burns in the charcoal kiln (a lime kiln and a charcoal kiln are the same draw kiln); the tōrō
+  lantern building piece (a light that needs no fuel, modelled in `WRBuildLook`). Node looks for soulstone on its bone
+  bed, bone heaps, limestone, mortsafe cages, black rye, asphodel, wax nests, silver ore, young yews. world.json: the
+  Graveyard biome row, its five shrines (the Great Shrine of the Lantern at the Lychgate Chapel; the Seven Names, the
+  Lime Kilns, the Foot of the Stair; the Watchers' Vault on its catacomb room's floor, guards kept in the room: a shrine
+  row's new `room`), Morwen the Lantern-keeper and her six quests (light the Row's tōrō, the first raise, break six
+  mortsafes, the grave under the yew, the Ossuary ledger, the Gravedigger). Morwen keeps hours: the lantern rack by
+  day, the Row of the Named at dusk, her chapel at night, the lychgate step at dawn (moves when nobody's watching).
 
 ## Unreleased: the Ancient forest (the Nature land)
 

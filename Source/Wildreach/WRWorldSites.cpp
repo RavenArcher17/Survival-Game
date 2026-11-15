@@ -4,6 +4,7 @@
 // uses, in its biome's stone: nothing is an engine shape left bare. Collision is fitted to what's drawn (dais tiers,
 // steps, walls), and everything that glows reads at night.
 
+#include "WRGraveTypes.h"
 #include "WRWorldSystems.h"
 #include "WRLand.h"
 #include "WRStormTypes.h"
@@ -691,11 +692,13 @@ void AWRShrine::StepGuards()
 						{
 							// In a loose ring round the dais, facing out: the place they hold.
 							const float A = 360.f * n / 7.f + FMath::FRandRange(-15.f, 15.f);
-							const float Dist = FMath::FRandRange(WRWorld::Num(TEXT("shrines.guardRingMin"), 1500.f), WRWorld::Num(TEXT("shrines.guardRingMax"), 2500.f));
+							// A shrine under the ground (the Graveyard's Watchers' Vault) keeps its guards in its room.
+							const bool bUnder = WRGrave::InCatacombs(GetActorLocation() + FVector(0, 0, 100.f));
+							const float Dist = bUnder ? FMath::FRandRange(250.f, 480.f) : FMath::FRandRange(WRWorld::Num(TEXT("shrines.guardRingMin"), 1500.f), WRWorld::Num(TEXT("shrines.guardRingMax"), 2500.f));
 							const FVector P = GetActorLocation() + FRotator(0.f, A, 0.f).Vector() * Dist;
 							FHitResult G;
 							FCollisionQueryParams Q(SCENE_QUERY_STAT(WRGuard), false, this);
-							if (!GetWorld()->LineTraceSingleByChannel(G, P + FVector(0, 0, 5000), P - FVector(0, 0, 8000), ECC_WorldStatic, Q)) continue;
+							if (!GetWorld()->LineTraceSingleByChannel(G, P + FVector(0, 0, bUnder ? 200.f : 5000.f), P - FVector(0, 0, bUnder ? 600.f : 8000.f), ECC_WorldStatic, Q)) continue;
 							if (AWRCreature* C = AWRCreature::SpawnCreature(GetWorld(), Def->Id, G.ImpactPoint + FVector(0.f, 0.f, Def->HalfHeight + 30.f), FRotator(0.f, A, 0.f)))
 							{
 								C->SetHome(GetActorLocation());

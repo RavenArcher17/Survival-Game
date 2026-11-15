@@ -289,6 +289,14 @@
     "legendaryFromRank": 4,
     "list": [
       {
+        "id": "bp_mourners_scythe",
+        "boss": "nhal",
+        "recipes": [
+          "mourners_scythe"
+        ],
+        "kind": "boss weapon"
+      },
+      {
         "id": "bp_cinderbrand",
         "boss": "vulkarn",
         "recipes": [

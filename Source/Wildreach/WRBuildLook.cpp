@@ -1,4 +1,5 @@
 #include "WRBuildLook.h"
+#include "WRBuildLookKit.h"
 #include "WRSwampSystems.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
@@ -976,6 +977,24 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 	{
 		B.Box(EWRLookMat::Wood, FVector(-3.f, -3.f, 0.f), FVector(3.f, 3.f, 142.f));
 		B.Box(EWRLookMat::Cloth, FVector(-6.f, -6.f, 132.f), FVector(6.f, 6.f, 152.f));   // pitch-soaked wrapping
+	}
+	else if (Def.Id == TEXT("toro_lantern"))
+	{
+		// The Lantern Mourners' stone lantern (cooks/biome-graveyard.md 3.1 pieces): a kasuga tōrō 1.7 m, hex base,
+		// pillar, platform, the fire box with its four posts and the grave-light inside, the broad roof with its turned-up
+		// corners, the jewel finial. Its light needs no fuel (lights.toro_lantern).
+		WRLookKit::FKit Kt(PieceToWorld, Out);
+		const WRLookKit::FSurf St = WRLookKit::FSurf::Stone(FLinearColor(FColor(138, 133, 128)) * 0.55f, 0.9f);
+		const WRLookKit::FSurf Lit = WRLookKit::FSurf::Lit(FLinearColor(FColor(159, 227, 192)) * 0.6f, 4.f);
+		Kt.Hex(St, 0.f, 0.f, 0.f, 26.f, 36.f);
+		Kt.Add(St, FVector(22.f, 22.f, 66.f), FVector(0.f, 0.f, 59.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		Kt.Hex(St, 0.f, 0.f, 92.f, 104.f, 27.f, 30.f);
+		for (int32 c = 0; c < 4; ++c) Kt.Add(St, FVector(8.f, 8.f, 36.f), FVector(c % 2 ? 17.f : -17.f, c < 2 ? -17.f : 17.f, 122.f));
+		Kt.Add(Lit, FVector(26.f, 26.f, 28.f), FVector(0.f, 0.f, 122.f));
+		Kt.Add(St, FVector(82.f, 82.f, 11.f), FVector(0.f, 0.f, 146.f));
+		Kt.Add(St, FVector(58.f, 58.f, 12.f), FVector(0.f, 0.f, 156.f));
+		for (int32 c = 0; c < 4; ++c) Kt.Add(St, FVector(14.f, 14.f, 9.f), FVector(c % 2 ? 39.f : -39.f, c < 2 ? -39.f : 39.f, 154.f), FRotator(10.f, 45.f + 90.f * c, 0.f));
+		Kt.Spike(St, FVector(0.f, 0.f, 162.f), FVector::UpVector, 14.f, 16.f);
 	}
 	else if (Def.Id == TEXT("brazier"))
 	{

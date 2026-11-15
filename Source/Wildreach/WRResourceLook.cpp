@@ -130,6 +130,15 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("voidglass")) Body = FVector2D(170.f, 230.f);
 	else if (Item == TEXT("grey_salt")) Body = FVector2D(260.f, 220.f);
 	else if (Item == TEXT("ashen_grain") || Item == TEXT("mandrake")) Body = FVector2D(120.f, 230.f);
+	// The Graveyard's (cooks/build-biome-graveyard.md 2.9): soulstone on its bone bed, a bone heap, limestone, a
+	// mortsafe over its grave (broken for grave iron), rye and asphodel stands, a wax nest, a young churchyard yew.
+	else if (Item == TEXT("soulstone")) Body = FVector2D(160.f, 220.f);
+	else if (Item == TEXT("bone")) Body = FVector2D(180.f, 200.f);
+	else if (Item == TEXT("limestone")) Body = FVector2D(200.f, 260.f);
+	else if (Item == TEXT("grave_iron")) Body = FVector2D(170.f, 240.f);
+	else if (Item == TEXT("black_rye") || Item == TEXT("asphodel")) Body = FVector2D(120.f, 230.f);
+	else if (Item == TEXT("wax")) Body = FVector2D(140.f, 220.f);
+	else if (Item == TEXT("yew_log")) Body = FVector2D(110.f, 420.f);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
@@ -164,6 +173,19 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("ashen_grain") || Item == TEXT("mandrake"))
 	{
 		Main = LoadMesh(Shrub(Item == TEXT("mandrake") ? TEXT("B") : (Seed % 2 ? TEXT("D") : TEXT("C"))));
+	}
+	else if (Item == TEXT("black_rye") || Item == TEXT("asphodel"))
+	{
+		Main = LoadMesh(Shrub(Item == TEXT("asphodel") ? TEXT("B") : (Seed % 2 ? TEXT("D") : TEXT("C"))));
+	}
+	else if (Item == TEXT("yew_log"))
+	{
+		Main = WRTreeKit::Mesh(Node, TEXT("yew"), int32(Seed % 4));
+		if (!Main) Main = Boulder;
+	}
+	else if (Item == TEXT("wax"))
+	{
+		Main = Sphere;
 	}
 	else if (Item == TEXT("berries") || Item == TEXT("fiber"))
 	{
@@ -239,6 +261,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			else if (Item == TEXT("rock_salt")) { RockTint = FLinearColor(0.5f, 0.34f, 0.34f); Lump = FLinearColor(2.8f, 2.0f, 2.0f); Lump2 = Lump; }
 			// Meteoric iron: near-black blue rock with pale silver-blue lumps that catch the lamp light.
 			else if (Item == TEXT("star_iron_ore")) { RockTint = FLinearColor(0.12f, 0.13f, 0.17f); Lump = FLinearColor(2.2f, 2.4f, 2.9f); Lump2 = FLinearColor(1.2f, 1.5f, 2.4f); }
+			// Silver (the Ossuary's veins): pale limestone with bright grey-white metal lumps.
+			else if (Item == TEXT("silver_ore")) { RockTint = FLinearColor(0.5f, 0.49f, 0.46f); Lump = FLinearColor(3.0f, 3.05f, 3.2f); Lump2 = FLinearColor(2.2f, 2.25f, 2.4f); }
 			Tint(RockMaterial(Node, RockTint));
 			Bits->SetStaticMesh(Shard);
 			Bits->SetMaterial(0, RockMaterial(Node, Lump));
@@ -505,6 +529,110 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 				Look->SetMaterial(Slot, MID);
 			}
 		}
+	}
+	else if (Item == TEXT("soulstone"))
+	{
+		// A slumped grave's bone bed crusted with soulstone (GY 2.7; vivianite on buried bone): pale bones in dark wet
+		// grave soil, clear crystals standing out of them with a pale-green glow (over 1: the rock texture is dark).
+		Place(Fit(Main, FVector(190.f, 160.f, 40.f), 16.f, FRotator(Rand.FRandRange(-5.f, 5.f), 0.f, Rand.FRandRange(-5.f, 5.f))));
+		Tint(RockMaterial(Node, FLinearColor(FColor(59, 53, 48)) * 0.9f));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(1.5f, 3.2f, 2.5f)));
+		for (int32 k = 0; k < 13; ++k)
+		{
+			const float A = (k + Rand.FRandRange(-0.4f, 0.4f)) * 2.f * PI / 13.f;
+			const float Len = Rand.FRandRange(18.f, 52.f), W = Len * Rand.FRandRange(0.22f, 0.32f);
+			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Rand.FRandRange(5.f, 40.f)));
+			Bit(FVector(FMath::Cos(A) * Rand.FRandRange(10.f, 70.f), FMath::Sin(A) * Rand.FRandRange(10.f, 60.f), 26.f) + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f)), Q.Rotator(), FVector(W, W, Len));
+		}
+	}
+	else if (Item == TEXT("bone"))
+	{
+		// A heap of old bones (the Bone Pits' overflow, the Risen's leavings): a low bone-white mound, long bones on top.
+		Place(Fit(Main, FVector(200.f, 170.f, 60.f), 20.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(217, 207, 184)) * 1.5f));
+		Bits->SetStaticMesh(Cylinder);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(225, 216, 196)) * 1.8f));
+		for (int32 k = 0; k < 14; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(0.f, 70.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 34.f - D * 0.3f), FRotator(Rand.FRandRange(70.f, 95.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(6.f, 6.f, Rand.FRandRange(30.f, 48.f)));
+		}
+	}
+	else if (Item == TEXT("limestone"))
+	{
+		// White quarry stone at the Spine's foot: a pale block-jointed boulder, flakes at its foot.
+		Place(Fit(Main, FVector(240.f, 200.f, 160.f), 35.f, FRotator(Rand.FRandRange(-6.f, 6.f), 0.f, Rand.FRandRange(-6.f, 6.f))));
+		Tint(RockMaterial(Node, FLinearColor(FColor(180, 175, 164)) * 1.7f));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(220, 215, 204)) * 1.9f));
+		for (int32 k = 0; k < 6; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(110.f, 170.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 6.f), FRotator(Rand.FRandRange(-10.f, 10.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(30.f, 22.f, 10.f));
+		}
+	}
+	else if (Item == TEXT("grave_iron"))
+	{
+		// A mortsafe (GY 2.7; the resurrection men's iron cages): bars at 10 cm round a 1.9 x 0.8 x 1.1 m cage over a grave
+		// slab, crossed straps over its lid. Break it for its grave iron (the node's yaw lays it along the row).
+		Place(Fit(Main, FVector(200.f, 90.f, 16.f), 8.f));
+		Tint(RockMaterial(Node, FLinearColor(0.32f, 0.31f, 0.3f)));
+		Bits->SetStaticMesh(Cylinder);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(0.05f, 0.045f, 0.04f)));
+		const float Lx = 190.f, Ly = 80.f, Hz = 110.f;
+		for (float X = -Lx * 0.5f; X <= Lx * 0.5f + 1.f; X += 10.f) for (const float Y : { -Ly * 0.5f, Ly * 0.5f }) Bit(FVector(X, Y, Hz * 0.5f), FRotator::ZeroRotator, FVector(2.5f, 2.5f, Hz));
+		for (float Y = -Ly * 0.5f + 10.f; Y < Ly * 0.5f; Y += 10.f) for (const float X : { -Lx * 0.5f, Lx * 0.5f }) Bit(FVector(X, Y, Hz * 0.5f), FRotator::ZeroRotator, FVector(2.5f, 2.5f, Hz));
+		for (const float Z : { 4.f, Hz })
+		{
+			for (const float Y : { -Ly * 0.5f, Ly * 0.5f }) Bit(FVector(0.f, Y, Z), FRotator(90.f, 0.f, 0.f), FVector(5.f, 5.f, Lx));
+			for (const float X : { -Lx * 0.5f, Lx * 0.5f }) Bit(FVector(X, 0.f, Z), FRotator(0.f, 0.f, 90.f), FVector(5.f, 5.f, Ly));
+		}
+		Bit(FVector(0.f, 0.f, Hz + 3.f), FRotator(90.f, 23.f, 0.f), FVector(6.f, 3.f, Lx));
+		Bit(FVector(0.f, 0.f, Hz + 3.f), FRotator(90.f, -23.f, 0.f), FVector(6.f, 3.f, Lx));
+	}
+	else if (Item == TEXT("black_rye") || Item == TEXT("asphodel"))
+	{
+		// Black rye gone to ergot in the burned cottage's field (dark stems, black spurs in the heads); asphodel, the
+		// pale lily of the meadows: grey-green leaves and white flower spikes.
+		const bool bAsph = Item == TEXT("asphodel");
+		Place(Fit(Main, FVector(0.f, 0.f, bAsph ? 160.f : 250.f), 8.f));
+		Look->SetCastShadow(false);
+		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
+		{
+			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
+			{
+				MID->SetVectorParameterValue(TEXT("Color"), bAsph ? FLinearColor(0.08f, 0.1f, 0.07f) : FLinearColor(0.07f, 0.06f, 0.05f));
+				MID->SetVectorParameterValue(TEXT("Snow Color"), bAsph ? FLinearColor(0.16f, 0.17f, 0.14f) : FLinearColor(0.12f, 0.1f, 0.07f));
+				Look->SetMaterial(Slot, MID);
+			}
+		}
+		Bits->SetStaticMesh(Sphere);
+		Bits->SetMaterial(0, RockMaterial(Node, bAsph ? FLinearColor(3.f, 2.95f, 2.8f) : FLinearColor(0.05f, 0.045f, 0.04f)));
+		for (int32 k = 0; k < (bAsph ? 9 : 16); ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(0.f, 40.f);
+			for (int32 f = 0; f < (bAsph ? 5 : 1); ++f) Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, (bAsph ? 70.f : 85.f) + f * 7.f + Rand.FRandRange(0.f, 20.f)), FRotator::ZeroRotator, bAsph ? FVector(5.f) : FVector(3.f, 3.f, 9.f));
+		}
+	}
+	else if (Item == TEXT("wax"))
+	{
+		// A Wickbeetle nest: domed white wax crusted on the stone, wax cells clustered round it.
+		Place(Fit(Main, FVector(150.f, 130.f, 70.f), 20.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(232, 221, 176)) * 2.2f));
+		Bits->SetStaticMesh(Sphere);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(240, 230, 190)) * 2.4f));
+		for (int32 k = 0; k < 12; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(50.f, 90.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, Rand.FRandRange(4.f, 30.f)), FRotator::ZeroRotator, FVector(Rand.FRandRange(14.f, 26.f)));
+		}
+	}
+	else if (Item == TEXT("yew_log"))
+	{
+		// A young churchyard yew (the tree kit's yew): cut it for yew logs; it grows back over two game days.
+		Place(Fit(Main, FVector(0.f, 0.f, 900.f + 300.f * Rand.FRand()), 30.f));
+		Bits->SetStaticMesh(nullptr);
 	}
 	else
 	{

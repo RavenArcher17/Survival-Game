@@ -174,6 +174,7 @@ private:
 	void StepLights(float Dt);
 	void StepServer(float Dt);
 	void StepState();
+	void StepMorwen(float Dt);
 	TArray<FPiece> Pieces;
 	int32 PiecesBuilt = 0;
 	bool bQueued = false;
@@ -189,4 +190,8 @@ private:
 	TArray<float> AllNearPower;
 	float LightClock = 0.f;
 	float ServerClock = 0.f;
+	float MorwenClock = 0.f;
+	int32 MorwenPhase = 0;
+	FVector MorwenHome = FVector::ZeroVector;
+	FRotator MorwenHomeFace = FRotator::ZeroRotator;
 };

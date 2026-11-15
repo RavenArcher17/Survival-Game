@@ -397,7 +397,20 @@
     {"id": "foxfire_lantern", "station": "workbench", "level": 2, "inputs": {"foxfire_wood": 3, "resin": 2, "copper_ingot": 1}, "output": "foxfire_lantern", "count": 1, "seconds": 5, "blueprint": "quest_foxfire_lantern", "biome": "forest"},
     {"id": "briarproof_leathers", "station": "armorer", "level": 2, "inputs": {"hide": 8, "resin": 2}, "output": "briarproof_leathers", "count": 1, "seconds": 6, "quality": true, "blueprint": "quest_briarproof_leathers", "biome": "forest"},
     {"id": "heartwood_longbow", "station": "workbench", "level": 3, "inputs": {"heartwood": 4, "resin": 1, "hide": 1, "iron_ingot": 1}, "output": "heartwood_longbow", "count": 1, "seconds": 6, "quality": true, "blueprint": "bp_heartwood_longbow", "biome": "forest"},
-    {"id": "world_root_maul", "station": "forge", "level": 4, "inputs": {"steel_ingot": 6, "heartwood": 6, "verdant_essence": 6}, "output": "world_root_maul", "count": 1, "seconds": 12, "quality": true, "blueprint": "bp_world_root_maul", "biome": "forest"}
+    {"id": "world_root_maul", "station": "forge", "level": 4, "inputs": {"steel_ingot": 6, "heartwood": 6, "verdant_essence": 6}, "output": "world_root_maul", "count": 1, "seconds": 12, "quality": true, "blueprint": "bp_world_root_maul", "biome": "forest"},
+    {"id": "grind_soulstone", "station": "grinder", "level": 1, "inputs": {"soulstone": 1}, "output": "soulstone_dust", "count": 4, "seconds": 6, "biome": "graveyard"},
+    {"id": "burn_quicklime", "station": "charcoal_kiln", "level": 1, "inputs": {"limestone": 4, "charcoal": 2}, "output": "quicklime", "count": 2, "seconds": 20, "biome": "graveyard"},
+    {"id": "forge_grave_iron", "station": "forge", "level": 3, "inputs": {"grave_iron": 2}, "output": "iron_ingot", "count": 1, "seconds": 4, "biome": "graveyard"},
+    {"id": "silver_ingot", "station": "forge", "level": 3, "inputs": {"silver_ore": 2}, "output": "silver_ingot", "count": 1, "seconds": 4, "biome": "graveyard"},
+    {"id": "heartwood_stake", "station": "workbench", "level": 3, "inputs": {"heartwood": 1, "iron_ingot": 1}, "output": "heartwood_stake", "count": 2, "seconds": 4, "blueprint": "quest_heartwood_stake", "biome": "graveyard"},
+    {"id": "lime_pot", "station": "workbench", "level": 2, "inputs": {"quicklime": 2, "clay": 1}, "output": "lime_pot", "count": 1, "seconds": 3, "blueprint": "quest_lime_pot", "biome": "graveyard"},
+    {"id": "grave_lantern", "station": "workbench", "level": 3, "inputs": {"silver_ingot": 2, "wax": 2, "soulstone": 1}, "output": "grave_lantern", "count": 1, "seconds": 6, "biome": "graveyard"},
+    {"id": "yew_longbow", "station": "workbench", "level": 3, "inputs": {"yew_log": 4, "horsehair": 2, "linen": 1}, "output": "yew_longbow", "count": 1, "seconds": 6, "quality": true, "blueprint": "bp_yew_longbow", "biome": "graveyard"},
+    {"id": "palp_spine_arrow", "station": "workbench", "level": 2, "inputs": {"palp_spine": 2, "wood": 2, "feathers": 2}, "output": "palp_spine_arrow", "count": 10, "seconds": 3, "biome": "graveyard"},
+    {"id": "moth_dust_tonic", "station": "alchemy_table", "level": 2, "inputs": {"wraithmoth_scale": 2, "waterskin": 1}, "output": "moth_dust_tonic", "count": 1, "seconds": 4, "biome": "graveyard"},
+    {"id": "decay_resist_potion", "station": "alchemy_table", "level": 3, "inputs": {"asphodel": 1, "soulstone": 1}, "output": "decay_resist_potion", "count": 1, "seconds": 5, "biome": "graveyard"},
+    {"id": "cleansing_draught", "station": "alchemy_table", "level": 2, "inputs": {"asphodel": 2, "wax": 1, "soulstone_dust": 1}, "output": "cleansing_draught", "count": 1, "seconds": 5, "biome": "graveyard"},
+    {"id": "mourners_scythe", "station": "forge", "level": 4, "inputs": {"steel_ingot": 6, "soulstone": 6, "yew_log": 4, "grave_essence": 6}, "output": "mourners_scythe", "count": 1, "seconds": 12, "quality": true, "blueprint": "bp_mourners_scythe", "biome": "graveyard"}
   ],
   "quality": {
     "_comment": "Base odds (crude/common/fine/masterwork) shift toward better quality with crafting skill and Hearth level.",

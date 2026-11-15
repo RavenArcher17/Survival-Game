@@ -73,6 +73,7 @@ FWRItemRegistry::FWRItemRegistry()
 			if (O->TryGetObjectField(TEXT("use"), Use))
 			{
 				(*Use)->TryGetNumberField(TEXT("heal"), D.Heal);
+				(*Use)->TryGetNumberField(TEXT("corruption"), D.UseCorruption);
 				(*Use)->TryGetNumberField(TEXT("hunger"), D.Hunger);
 				(*Use)->TryGetNumberField(TEXT("thirst"), D.Thirst);
 				(*Use)->TryGetNumberField(TEXT("cooldown"), D.UseCooldown);
@@ -1257,6 +1258,10 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	if (Def->Brew.Num() > 0)
 	{
 		if (AWRPlayerController* BrewPC = Cast<AWRPlayerController>(Character->GetController())) BrewPC->ClientNotify(WRVoid::Brew(Character, *Def));
+	}
+	if (Def->UseCorruption != 0.f)
+	{
+		if (UWRSurvivalComponent* Surv = UWRSurvivalComponent::For(Character)) Surv->AddCorruption(Def->UseCorruption);
 	}
 	if (Def->Heal > 0.f)
 	{

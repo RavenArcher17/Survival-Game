@@ -85,6 +85,8 @@ public:
 	TFunction<float(AWRCharacterBase*)> YieldScale;
 	/** Server, optional: after a hit gave its share (wax with the honey, a seed, a quest deed, a glow). */
 	TFunction<void(AWRCharacterBase*)> OnHarvested;
+	/** Blows left before it's spent (OnHarvested sees the count before this blow is taken off). */
+	int32 GetHitsLeft() const { return HitsLeft; }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

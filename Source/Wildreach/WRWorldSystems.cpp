@@ -11,6 +11,7 @@
 #include "WRForestHazards.h"
 #include "WRForestWorld.h"
 #include "WRGraveWorld.h"
+#include "WRGraveTypes.h"
 #include "WRSwampBosses.h"
 #include "WRDeeds.h"
 #include "Wildreach.h"
@@ -926,6 +927,14 @@ void UWRWorldSystems::PlaceShrines()
 			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
 			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Ground)) continue;
 			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
+			// Under the ground: a shrine in a catacomb room stands on the room's floor (the Graveyard's Watchers' Vault).
+			const FString Room = WStrOf(Row, TEXT("room"));
+			if (!Room.IsEmpty())
+			{
+				const FWRGraveData::FRoom* R = FWRGraveData::Get().FindRoom(FName(*Room));
+				if (!R) continue;
+				Ground = R->At + FVector(0.f, 0.f, 5.f);
+			}
 		}
 		else if (bSwampRow)
 		{
