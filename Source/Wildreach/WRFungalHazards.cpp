@@ -1,6 +1,7 @@
 // The Fungal caverns' hazards (see WRFungalHazards.h; cooks/biome-fungal.md 2.8-2.10; cooks/build-biome-fungal.md 2.8).
 
 #include "WRFungalHazards.h"
+#include "WRFungalCreatures.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRCombatLibrary.h"
@@ -174,7 +175,8 @@ float WRFungal::MoveScale(const AActor* Who)
 	const AWRCharacterBase* C = Cast<AWRCharacterBase>(Who);
 	if (!C) return 1.f;
 	// Foul air: heavy breathing, no sprint (the movement's sprint needs the multiplier at 1).
-	return C->HasTag(WRFungalTags::FoulAir) ? WRTune(TEXT("hazards.fungal.foulAir.move"), 0.97f) : 1.f;
+	// Latched Mycomites: x0.9 each (WRFungalCreatures).
+	return (C->HasTag(WRFungalTags::FoulAir) ? WRTune(TEXT("hazards.fungal.foulAir.move"), 0.97f) : 1.f) * FWRFungalAI::MoveScale(C);
 }
 
 float WRFungal::SporeTaken(const AWRCharacterBase* Who)
@@ -192,6 +194,17 @@ float WRFungal::SporeTaken(const AWRCharacterBase* Who)
 	// A filter mask, Sporeweave's four pieces (passSpores).
 	if (UWRInventoryComponent::GearStatFor(Who, TEXT("passSpores")) > 0.f) return 0.f;
 	float M = 1.f;
+	// A Shroomback's garden: riding one or within 3 m of one, its spores crowd out the cloud's (x0.5).
+	for (const TWeakObjectPtr<UWRFungalBody>& B : UWRFungalBody::All())
+	{
+		const AActor* S = B.IsValid() ? B->GetOwner() : nullptr;
+		const AWRCreature* Sc = Cast<AWRCreature>(S);
+		if (Sc && Sc->CreatureId == TEXT("shroomback") && Sc->IsAlive() && (Sc->GetRider() == Who || FVector::Dist(S->GetActorLocation(), Who->GetActorLocation()) < Sc->GetSimpleCollisionRadius() + WRTune(TEXT("fungalLife.shroomback.gardenReach"), 300.f)))
+		{
+			M *= WRTune(TEXT("fungalLife.shroomback.gardenSpores"), 0.5f);
+			break;
+		}
+	}
 	if (WRStorm::HasBuff(Who, TEXT("spore_wad"))) M *= WRTune(TEXT("hazards.fungal.cloud.wadMult"), 0.3f);
 	return M;
 }

@@ -42,6 +42,7 @@
     {"species": "tidefowl", "products": [{"item": "egg", "every": 600}], "feed": ["fish_scraps"]},
     {"species": "ripplefin", "products": [{"item": "raw_fish", "every": 900, "gentle": false}], "feed": ["cut_bait"]},
     {"species": "mournhare", "products": [{"item": "fur", "every": 1200, "shear": true}], "feed": ["crop"]},
+    {"species": "shroomback", "products": [{"item": "oyster_cap", "every": 600, "gentle": true}], "feed": ["deepcap", "compost"]},
     {"species": "capling", "products": [{"item": "capling_flesh", "every": 900, "gentle": false}], "feed": ["compost"]},
     {"species": "puffball", "products": [{"item": "spore_sac", "every": 1200, "gentle": false}], "feed": ["compost"]},
     {"species": "withergoat", "products": [{"item": "milk", "every": 600}, {"item": "hide", "every": 1800, "shear": true}], "feed": ["ashen_grain"]}

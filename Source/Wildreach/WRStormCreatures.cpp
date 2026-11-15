@@ -2,6 +2,7 @@
 #include "WRStormCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRFungalCreatures.h"
 #include "WRSkyCreatures.h"
 #include "WROceanCreatures.h"
 #include "WRStormBosses.h"
@@ -1959,6 +1960,12 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWRCrystalBody::Get(this))
 	{
 		FWRCrystalAI::Damaged(this, Hit, Damage);
+	}
+	// A Fungal creature: the Sporestalker's spore shake, the Shroomback's garden puff and tuck, a Glowgrub's flash,
+	// a Capling's puff (WRFungalCreatures).
+	if (HasAuthority() && UWRFungalBody::Get(this))
+	{
+		FWRFungalAI::Damaged(this, Hit, Damage);
 	}
 	// A Sky creature: a held survivor struck free, the Undertow broken at the mouth, a roost woken, the herd defending (WRSkyCreatures).
 	if (HasAuthority() && UWRSkyBody::Get(this))

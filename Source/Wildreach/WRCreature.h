@@ -616,6 +616,7 @@ class WILDREACH_API AWRCreatureAI : public AAIController
 	friend struct FWRCrystalAI;  // the Crystal caves' creatures (WRCrystalCreatures): hearing hunters, plates, legs, rolls
 	friend struct FWRGraveAI;    // the Graveyard's creatures (WRGraveCreatures): buried hounds, ceiling drops, light dives, holds
 	friend struct FWROceanAI;    // the Ocean's creatures (WROceanCreatures): holes, the drag, the breach, buried crabs, herds
+	friend struct FWRFungalAI;   // the Fungal caverns' creatures (WRFungalCreatures): ceiling drops, the mound, latches, the net, the leap
 	friend struct FWRSkyAI;      // the Sky islands' creatures (WRSkyCreatures): soaring rings, stoops, the Undertow, holds, drift
 
 public:

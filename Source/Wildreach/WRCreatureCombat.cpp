@@ -6,6 +6,7 @@
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRFungalCreatures.h"
 #include "WRSkyIsleTypes.h"
 #include "WRSkyAir.h"
 #include "WRSkyCreatures.h"
@@ -482,6 +483,7 @@ float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRGraveAI::Incoming(this, Hit, Damage);   // a buried hound, the Tombback's slab, the Risen and necrotic magic
 	Damage = FWRSkyAI::Incoming(this, Hit, Damage);   // grounded after a stoop: open
 	Damage = FWROceanAI::Incoming(this, Hit, Damage); // a Spinecrab's guard and flip, a stranded Reefjaw, a pool-bound one
+	Damage = FWRFungalAI::Incoming(this, Hit, Damage);   // the Rotmaw's lure and belly, a tucked Shroomback, a mite knocked off, a Puffball and fire   // grounded after a stoop: open
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -655,6 +657,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // an Ocean creature's rule (the breach at the surface, the surf lunge on the wet sand, the hole)
 		}
+		if (!FWRFungalAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // a Fungal creature's own rule (the openers only from a ceiling or a mound, the latch's four)
+		}
 		if (!FWRGraveAI::RowAllowed(this, Self, R, Target, bReading))
 		{
 			continue;  // a Graveyard creature's own rule (the Rising, the howl once, the drop from a ceiling, the dark, the downed)
@@ -718,6 +724,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	FWRGraveAI::RowStarted(this, Self, *R, Target);
 	FWRSkyAI::RowStarted(this, Self, *R, Target);
 	FWROceanAI::RowStarted(this, Self, *R, Target);
+	FWRFungalAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -815,6 +822,8 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 			// A Graveyard creature's (the whip's find, the palp snatch, the tear-drinker, the dive's snuffed torch).
 			FWRGraveAI::Resolved(S, V, HitRowId, Result);
 			FWRCrystalAI::Resolved(S, V, HitRowId, Result);
+			// A Fungal creature's (the latch, the lure snap's hold, the tongue's pull).
+			FWRFungalAI::Resolved(S, V, HitRowId, Result);
 			// A Sky creature's (the impale, the smother, the meat theft, the lash's sting, the cornered Puffwing's run).
 			FWRSkyAI::Resolved(S, V, HitRowId, Result);
 			FWROceanAI::Resolved(S, V, HitRowId, Result);   // the drag, the second jaw, the snatch, the club's pop
@@ -870,6 +879,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	if (FWROceanAI::StrikeRow(this, Self, *R, Target))
 	{
 		return;  // an Ocean move (the breach up the column, the shock pulse, the sand burst, the mob call, the flare)
+	}
+	if (FWRFungalAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // a Fungal move (a ceiling drop, the stalk volley, the web net, the croak, the leap, the rot belch)
 	}
 	if (FWRSkyAI::StrikeRow(this, Self, *R, Target))
 	{
