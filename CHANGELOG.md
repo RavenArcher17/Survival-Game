@@ -27,6 +27,19 @@ and the testers test, F8).
     Controls), Names over players Always / Near / Off, **Show my helmet** (the server changes your look now and the
     next join carries it in `?Look=`), Show hints (moved from Video).
   - Each page's Reset puts only that page back.
+- **UI (2): the HUD's modes, the compass switch, nameplates.** Why: the HUD was always fully up (Horizon's Dynamic
+  HUD / Ghost of Tsushima's "light HUD": let the world breathe, come back the instant it matters); names over heads
+  started at the bar's left edge and the knocked-out line said "E" on a pad.
+  - **Fade** (the default): the level and clock plates, compass, vitals, hotbar, ability keys and tame card fade over
+    0.8 s once all has been calm for 6 s and come back in 0.1 s on any change: hurt or tired, a path resource moving,
+    a status building or on you, hungry or thirsty under 25, locked on, aiming, a boss, a raid, a screen or wheel,
+    build mode, riding, the bag or hotbar changing (tuning `ui.hud`). Prompts, notices, pickups, chat, the crosshair,
+    boss bars and hazard lines never fade. **Minimal**: no plates or compass; the vitals only while something is
+    happening to them; the hotbar for 4 s after it changes. **Full**: as before. (`SWRHud::TickHudMode`.)
+  - **Compass** off hides the strip; the boss bar keeps its place.
+  - **Nameplates** (`AWRHUD::DrawWorldBars`, `DrawCentred`): every line centred over the head; other players' names
+    follow Names over players (Always out to 80 m, the name alone past the 25 m bar range; Near 40 m; Off), tuning
+    `ui.names`; the knocked-out line shows the device's own button for Interact.
 
 ## Unreleased: the Desert / Sun & sand
 

@@ -331,10 +331,10 @@ public:
 			SNew(SOverlay)
 			+ SOverlay::Slot()[WRFx::MakeHudOverlay(PC)]   // damage numbers, hit marker, parry flash (under the panels)
 			+ SOverlay::Slot()[SleepCover()]               // asleep: the view dims, a bar fills (WRSurvival)
-			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[LevelPlate()]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[SAssignNew(FadeLevel, SBox).Visibility_Lambda([this]() { return PlateVisibility(); })[LevelPlate()]]
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(24.f * U, 104.f * U)[RaidTracker()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 18.f * U)[CompassAndBoss()]
-			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[ClockPlate()]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 20.f * U)[SAssignNew(FadeClock, SBox).Visibility_Lambda([this]() { return PlateVisibility(); })[ClockPlate()]]
 			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(24.f * U, 150.f * U)[TamingPanel()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).Padding(0.f, 0.f, 0.f, 0.f)[Crosshair()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[BreathArc()]   // under water: breath and depth (WRUnderwater)
@@ -344,15 +344,86 @@ public:
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 175.f * U)[Pickups()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 150.f * U)[HazardLine()]
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(26.f * U, 0.f, 0.f, 210.f * U)[ChatLines()]
-			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(24.f * U)[Vitals()]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 24.f * U)[HotbarArea()]
-			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 24.f * U, 24.f * U)[AbilityPlate()]
-			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 24.f * U, 140.f * U)[TameCard()]
+			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(24.f * U)[SAssignNew(FadeVitals, SBox)[Vitals()]]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 24.f * U)[SAssignNew(FadeHotbar, SBox)[HotbarArea()]]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 24.f * U, 24.f * U)[SAssignNew(FadeAbility, SBox).Visibility_Lambda([this]() { return PlateVisibility(); })[AbilityPlate()]]
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 24.f * U, 140.f * U)[SAssignNew(FadeTame, SBox).Visibility_Lambda([this]() { return PlateVisibility(); })[TameCard()]]
 		];
+	}
+
+	// ---------------------------------------------------------------- HUD modes (Settings > Interface, cookpass-ui 3.2)
+	// Full: as built. Fade: the plates, compass, vitals and hotbar fade when all has been calm for ui.hud.fadeAfter s
+	// and come straight back on any change. Minimal: no plates or compass; the vitals only while something is happening
+	// to them, the hotbar for ui.hud.hotbarSeconds after it changes. Prompts, notices, pickups, chat, the crosshair,
+	// boss bars and hazard lines never fade: each already shows only when it has something to say.
+	void TickHudMode(const float Delta)
+	{
+		const FWRKeyBindings& K = FWRKeyBindings::Get();
+		const int32 Mode = K.PrefInt(TEXT("HudMode"));
+		bool bVital = false, bAny = false, bHotbar = false;
+		if (const UWRAttributeSet* A = Attr())
+		{
+			// Hurt, tired, a path resource moving, a status building or on you, hungry or thirsty: the bars matter.
+			// Against the effective max: a drained max (the Void, a curse) is a settled state, not something happening.
+			bVital |= A->GetHealth() < A->GetEffectiveMaxHealth() * 0.99f || A->GetStamina() < A->GetMaxStamina() * 0.99f;
+			bVital |= A->GetShield() > 0.f;
+			bVital |= A->GetHunger() < 25.f || A->GetThirst() < 25.f;
+			const float PathSig = A->GetHeat() + A->GetChill() + A->GetCharge() + A->GetMomentum() + A->GetVoid() + A->GetMana() + A->GetSpores() + A->GetFlow();
+			bVital |= FMath::Abs(PathSig - LastPathSig) > 0.25f;
+			LastPathSig = PathSig;
+		}
+		if (const AWRCharacterBase* B = Body())
+		{
+			for (int32 i = 0; i < B->BuildupPct.Num(); ++i) bVital |= B->BuildupPct[i] > 0;
+		}
+		bVital |= !StatusLine().IsEmpty();
+		bAny |= bVital;
+		// Fighting, aiming, a boss, a raid, a screen or wheel, building, riding: everything shows.
+		const AWRCharacter* Me = Survivor();
+		bAny |= (PC.IsValid() && PC->GetLockTarget()) || (Me && Me->IsAimingRanged()) || EngagedBoss() != nullptr || WheelOpen() || BuildMode();
+		bAny |= PC.IsValid() && PC->GetPawn() && !Me;   // riding a tame: the pawn is the creature
+		{
+			FRaidLine L;
+			bAny |= RaidLine(L);
+		}
+		const FWRPlayerUI* X = UI();
+		const bool bScreen = X && X->IsScreenOpen();
+		bAny |= bScreen != bLastScreen;
+		bLastScreen = bScreen;
+		// The bag or the hotbar changed (a pickup, a craft, a new slot chosen).
+		const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+		const float Carry = PS && PS->GetInventory() ? PS->GetInventory()->GetCarryWeight() : 0.f;
+		const int32 HotSig = X ? X->GetHotbarSelected() * 31 + X->GetPadBelt() : 0;
+		bHotbar = !FMath::IsNearlyEqual(Carry, LastCarry, 0.001f) || HotSig != LastHotSig;
+		LastCarry = Carry;
+		LastHotSig = HotSig;
+		bAny |= bHotbar;
+
+		CalmAll = bAny ? 0.f : CalmAll + Delta;
+		CalmVitals = bVital ? 0.f : CalmVitals + Delta;
+		CalmHotbar = bHotbar ? 0.f : CalmHotbar + Delta;
+		const float After = WRTune(TEXT("ui.hud.fadeAfter"), 6.f);
+		const float HotbarAfter = WRTune(TEXT("ui.hud.hotbarSeconds"), 4.f);
+		const float In = FMath::Max(0.01f, WRTune(TEXT("ui.hud.fadeIn"), 0.1f)), Out = FMath::Max(0.01f, WRTune(TEXT("ui.hud.fadeOut"), 0.8f));
+		const auto Ease = [Delta, In, Out](float& Alpha, bool bShow) { Alpha = bShow ? FMath::Min(1.f, Alpha + Delta / In) : FMath::Max(0.f, Alpha - Delta / Out); };
+		Ease(AlphaPlates, Mode == 0 || CalmAll < After);
+		Ease(AlphaVitals, Mode == 0 || (Mode == 1 ? CalmAll < After : CalmVitals < After * 0.5f));
+		Ease(AlphaHotbar, Mode == 0 || (Mode == 1 ? CalmAll < After : CalmHotbar < HotbarAfter));
+		for (const TSharedPtr<SWidget>& W : { FadeLevel, FadeClock, FadeCompass, FadeAbility, FadeTame }) if (W.IsValid()) W->SetRenderOpacity(AlphaPlates);
+		if (FadeVitals.IsValid()) FadeVitals->SetRenderOpacity(AlphaVitals);
+		if (FadeHotbar.IsValid()) FadeHotbar->SetRenderOpacity(AlphaHotbar);
 	}
 
 private:
 	TWeakObjectPtr<AWRPlayerController> PC;
+	TSharedPtr<SWidget> FadeLevel, FadeClock, FadeCompass, FadeVitals, FadeHotbar, FadeAbility, FadeTame;
+	float AlphaPlates = 1.f, AlphaVitals = 1.f, AlphaHotbar = 1.f;
+	float CalmAll = 0.f, CalmVitals = 0.f, CalmHotbar = 0.f;
+	float LastPathSig = 0.f, LastCarry = 0.f;
+	int32 LastHotSig = 0;
+	bool bLastScreen = false;
+	/** The Minimal HUD has no plates (level, clock, ability keys, tame card). */
+	EVisibility PlateVisibility() const { return FWRKeyBindings::Get().PrefInt(TEXT("HudMode")) == 2 ? EVisibility::Collapsed : EVisibility::SelfHitTestInvisible; }
 
 	AWRCharacter* Survivor() const { return PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr; }
 	AWRCharacterBase* Body() const { return PC.IsValid() ? Cast<AWRCharacterBase>(PC->GetPawn()) : nullptr; }
@@ -483,9 +554,17 @@ private:
 		return SNew(SVerticalBox).Visibility_Lambda([this]() { return Survivor() && !BuildMode() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				SNew(SOverlay)
-				+ SOverlay::Slot()[SNew(SBox).WidthOverride(560.f * U).HeightOverride(46.f * U)[SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(0.f)[SNullWidget::NullWidget]]]
-				+ SOverlay::Slot()[SNew(SWRCompass).PC(PC)]
+				// The compass: off in Settings > Interface, and in the Minimal HUD (the boss bar under it keeps its place).
+				SAssignNew(FadeCompass, SBox).Visibility_Lambda([this]()
+				{
+					const FWRKeyBindings& K = FWRKeyBindings::Get();
+					return K.PrefOn(TEXT("Compass")) && K.PrefInt(TEXT("HudMode")) != 2 ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+				})
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()[SNew(SBox).WidthOverride(560.f * U).HeightOverride(46.f * U)[SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(0.f)[SNullWidget::NullWidget]]]
+					+ SOverlay::Slot()[SNew(SWRCompass).PC(PC)]
+				]
 			]
 			// In a portal's fold: which fold, its modifiers, the close count once it's won (WRPortals). Your artifact
 			// level beside it while it's on (grey while player damage has paused it).
@@ -830,6 +909,7 @@ private:
 	{
 		SCompoundWidget::Tick(Geo, Time, Delta);
 		UpdateCrosshair();
+		TickHudMode(Delta);
 		if (NoticeBox.IsValid())
 		{
 			float A = 0.f;
