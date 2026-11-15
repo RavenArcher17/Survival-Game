@@ -47,6 +47,8 @@ The HUD's Full / Fade / Minimal modes are `SWRHud::TickHudMode` (WRUIHud.cpp): a
 lists there; anything that asks for action (prompts, notices, boss bars) stays out of them.
 Network failures go to the main menu's card (`SWRMainMenu::NoteFailure`, plain lines, Rejoin for a joined game);
 a crashed run's report is offered once on the next start (`WRReport::PendingCrash`, stamps in `Saved/Wildreach`).
+Text boxes need nothing for the pad: A over one opens the pad keyboard (`WRUIPadKeyboard.cpp`); a screen that
+wants its own Done / Cancel calls `WRPadKeyboard::Open` with a target (the chat line does).
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.

@@ -62,6 +62,19 @@ and the testers test, F8).
   - **Quick notes** under the F8 note (tuning `report.chips`): "Just happened", "Happens every time", "Hit didn't
     land", "Got hit by nothing", "Can't move", "Fell through", "Too hard", "Too easy", "Looks wrong", "Sounds wrong",
     "Music stopped", "Love this"; one press adds the line, again takes it out.
+- **UI (4): the pad keyboard, chat on a pad.** Why: no text box could be typed on a controller (the chat, the report
+  note, the menu's name and address, world and tame names), and the chat had no pad button at all.
+  - **`SWRPadKeyboard`** (new `WRUIPadKeyboard.cpp`): a stone panel with a preview line (blinking caret) over a QWERTY
+    grid: digits, letters, ' - . ? (Shift: ! @ # $ % & * ( ) = and " _ , :), then Shift / Space / Delete / Done. Pad:
+    the D-pad (repeating) or the cursor picks a key, A types, X deletes, Y spaces, LT shifts (twice within 0.4 s locks,
+    tuning `ui.padKeyboard.lockSeconds`), RT or Menu is Done, B cancels; the mouse clicks keys; touching the real
+    keyboard steps it aside. It docks at the bottom, or at the top for a box low on the screen.
+  - **Every text box, no screen code:** A over any editable text on a pad opens it on that box (`WRPadInput`); Done
+    writes the text back and presses Enter on a one-line box (so a name is taken, a chat line sends); Cancel leaves it.
+  - **Chat on a pad:** Settings (in game) has **Chat** (a speech-bubble icon): it opens the chat line with the
+    keyboard up on it; Done sends to everyone, B closes the line. The F1 page says where.
+  - `Data/gamepad.json` **reserves** D-pad up hold (the ping / quick-chat wheel) and View hold (the player list) for the
+    multiplayer cook, so nothing else claims them.
 
 ## Unreleased: the Desert / Sun & sand
 

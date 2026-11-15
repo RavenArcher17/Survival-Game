@@ -34,6 +34,12 @@
     "TabNext": "Gamepad_RightShoulder"
   },
 
+  "reserved": {
+    "_comment": "Holds kept free for systems their own cooks build (the multiplayer cook, LATER-COOKS 2026-11-14): nothing else may claim them. D-pad up stays the quick slot's tap.",
+    "DPadUpHold": "the ping / quick-chat wheel",
+    "ViewHold": "the player list (View's tap stays the report)"
+  },
+
   "prompts": {
     "Light": "Light",
     "Heavy": "Heavy",
@@ -100,7 +106,7 @@
       { "verb": "Interact", "does": "Use, gather, open, talk to your tame (hold: orders, a door's keypad; with nothing in front, the whistle to every tame in earshot)" },
       { "verb": "UseBelt", "does": "Use the chosen belt item (drink, eat, a potion; a weapon or tool goes in hand)" },
       { "verb": "BeltNext", "does": "Choose the next belt item" },
-      { "verb": "Journal", "does": "Menus: inventory, crafting, build, paths, skills, map, clan, settings" },
+      { "verb": "Journal", "does": "Menus: inventory, crafting, build, paths, skills, map, clan, settings (Chat is on the settings page)" },
       { "verb": "Report", "does": "Report a problem (screenshot and note)" }
     ] },
     { "title": "Building (placing a piece)", "rows": [
@@ -113,7 +119,7 @@
     { "title": "In menus", "rows": [
       { "button": "Left stick", "does": "Move the pointer (slower over buttons)" },
       { "button": "D-pad", "does": "Jump to the next button that way" },
-      { "verb": "MenuClick", "does": "Click; hold and move to drag" },
+      { "verb": "MenuClick", "does": "Click; hold and move to drag. On a text box: the pad keyboard (X delete, Y space, LT shift, RT done, B cancel)" },
       { "verb": "MenuSecond", "does": "Second click (use, unequip, split)" },
       { "verb": "MenuBack", "does": "Back / close" },
       { "verb": "TabPrev", "does": "Previous page" },

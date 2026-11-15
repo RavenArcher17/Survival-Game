@@ -1,6 +1,7 @@
 #include "WRMainMenu.h"
 #include "Engine/NetDriver.h"
 #include "WRReport.h"
+#include "WRUIPadKeyboard.h"
 #include "WRIdentity.h"
 #include "WRPadInput.h"
 #include "Wildreach.h"
@@ -88,6 +89,8 @@ void SWRChatBox::Construct(const FArguments& InArgs)
 
 void SWRChatBox::OnCommitted(const FText& Text, ETextCommit::Type How)
 {
+	// The pad keyboard over the line: its Done presses Enter here; anything else waits for it.
+	if (How != ETextCommit::OnEnter && WRPadKeyboard::IsOpen()) return;
 	if (How == ETextCommit::OnEnter && !Text.IsEmpty())
 	{
 		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Owner.Get()))
@@ -111,6 +114,23 @@ void SWRChatBox::Open(APlayerController* PC)
 	Mode.SetWidgetToFocus(Widget->Box);
 	PC->SetInputMode(Mode);
 	FSlateApplication::Get().SetKeyboardFocus(Widget->Box);
+	// Opened on a pad (Settings > Chat): the keyboard comes up on the line at once; cancelling it closes the line.
+	if (WRInput::UsingPad())
+	{
+		WRPadKeyboard::FTarget Target;
+		Target.Hint = NSLOCTEXT("WRUI", "ChatPadHint", "Say something to everyone");
+		Target.MaxLength = 200;
+		Target.bDockTop = true;   // the chat line sits low on the left
+		const TWeakObjectPtr<APlayerController> Weak(PC);
+		Target.OnDone = [Weak](const FText& Text)
+		{
+			AWRPlayerController* W = Cast<AWRPlayerController>(Weak.Get());
+			if (W && !Text.IsEmptyOrWhitespace()) W->ServerChat(Text.ToString().Left(200));
+			Close();
+		};
+		Target.OnCancel = []() { Close(); };
+		WRPadKeyboard::Open(MoveTemp(Target));
+	}
 }
 
 void SWRChatBox::Close()

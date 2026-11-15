@@ -158,6 +158,12 @@ int32 SWRLineIcon::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const F
 		Line(Closed({ V(3.f, 8.f), V(8.f, 8.f), V(9.5f, 5.f), V(14.5f, 5.f), V(16.f, 8.f), V(21.f, 8.f), V(21.f, 19.f), V(3.f, 19.f) }), C, 1.8f);
 		Circle(12.f, 13.5f, 3.6f, A, 1.8f);
 		break;
+	case EWRIcon::Chat:
+		// A speech bubble with its tail bottom-left and two lines of talk (the accent).
+		Line(Closed({ V(3.f, 5.f), V(21.f, 5.f), V(21.f, 16.f), V(10.f, 16.f), V(5.f, 20.f), V(6.f, 16.f), V(3.f, 16.f) }), C, 1.8f);
+		Line({ V(7.f, 9.f), V(17.f, 9.f) }, A, 1.8f);
+		Line({ V(7.f, 12.5f), V(14.f, 12.5f) }, A, 1.8f);
+		break;
 	case EWRIcon::Layout:
 		// A screen frame with the HUD's corners: a bar top-left and a strip along the bottom.
 		Line(Closed({ V(3.f, 4.f), V(21.f, 4.f), V(21.f, 20.f), V(3.f, 20.f) }), C, 1.8f);
@@ -2258,6 +2264,8 @@ namespace WRSettingsUI
 			if (bInGame)
 			{
 				Nav->AddSlot().AutoHeight().Padding(10.f * U, 8.f * U, 10.f * U, 4.f * U)[HLine(WRUI::Alpha(WRUI::Brass2, 0.5f))];
+				// Chat: the keyboard's T / Enter have no pad button, so the pad's way to talk is here (the pad keyboard opens on it).
+				Add(SNew(SWRNavItem, nullptr, [this]() { OpenChat(); }).Icon(EWRIcon::Chat).Accent(WRUI::Brass).Text(LOCTEXT("ChatNav", "Chat")));
 				// Both ask once first (the strip over the footer), saying whether you're in a safe zone.
 				Add(SNew(SWRNavItem, [this]() { return Confirm == 1; }, [this]() { Confirm = 1; }).Icon(EWRIcon::Exit).Text(LOCTEXT("BackToMenu", "Main menu")));
 				Add(SNew(SWRNavItem, [this]() { return Confirm == 2; }, [this]() { Confirm = 2; }).Icon(EWRIcon::Power).Accent(WRUI::Bad).Text(LOCTEXT("Quit", "Quit")));
@@ -2482,6 +2490,16 @@ namespace WRSettingsUI
 			P->SetMenu(EWRMenu::None);
 			FTimerHandle Handle;
 			P->GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(P, [P]() { P->ReturnToMenu(); }), 0.15f, false);
+		}
+
+		void OpenChat()
+		{
+			AWRPlayerController* P = Cast<AWRPlayerController>(PC.Get());
+			if (!P) return;
+			// As Main menu: close the window first, then open the line a moment later (the window hands input back as it goes).
+			P->SetMenu(EWRMenu::None);
+			FTimerHandle Handle;
+			P->GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(P, [P]() { SWRChatBox::Open(P); }), 0.15f, false);
 		}
 
 		void Quit()

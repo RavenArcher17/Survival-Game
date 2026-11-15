@@ -8,6 +8,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerUI.h"
 #include "WRReport.h"
+#include "WRUIPadKeyboard.h"
 #include "WRTuning.h"
 #include "WRUIWidgets.h"
 #include "Dom/JsonObject.h"
@@ -498,7 +499,8 @@ public:
 		if (RepeatKey.IsValid() && FPlatformTime::Seconds() >= RepeatAt)
 		{
 			RepeatAt = FPlatformTime::Seconds() + WRTune(TEXT("pad.repeatSeconds"), 0.11f);
-			if (!WRPadDetail::RunHandler(DVerb(RepeatKey))) DPad(App, RepeatKey);
+			if (WRPadKeyboard::IsOpen()) WRPadKeyboard::Move(RepeatKey);   // the keyboard's keys, not the page under it
+			else if (!WRPadDetail::RunHandler(DVerb(RepeatKey))) DPad(App, RepeatKey);
 		}
 	}
 
@@ -512,6 +514,8 @@ public:
 		if (!K.IsGamepadKey())
 		{
 			WRInput::NoteDevice(EWRDevice::KeyboardMouse);
+			// Typing on a real keyboard: the pad keyboard steps aside and the box takes the keys.
+			if (WRPadKeyboard::IsOpen()) Queue.Add([]() { WRPadKeyboard::Close(false); });
 			if (WRPadDetail::GKeyCapture || E.IsRepeat()) return false;
 			const FWRKeyBindings& Keys = FWRKeyBindings::Get();
 			if (K == Keys.Key(TEXT("Report")))
@@ -528,6 +532,19 @@ public:
 		}
 
 		WRInput::NoteDevice(EWRDevice::Gamepad);
+		// The pad keyboard takes every pad button while it's up (A types, X deletes, B cancels...).
+		if (WRPadKeyboard::IsOpen())
+		{
+			Eaten.Add(K);
+			if (E.IsRepeat()) return true;
+			Queue.Add([K]() { WRPadKeyboard::PadButton(K); });
+			if (K == EKeys::Gamepad_DPad_Left || K == EKeys::Gamepad_DPad_Right || K == EKeys::Gamepad_DPad_Up || K == EKeys::Gamepad_DPad_Down)
+			{
+				RepeatKey = K;
+				RepeatAt = FPlatformTime::Seconds() + WRTune(TEXT("pad.repeatDelay"), 0.35f);
+			}
+			return true;
+		}
 		if (K == L.Key(TEXT("Report")))
 		{
 			Eaten.Add(K);
@@ -569,7 +586,25 @@ public:
 		if (Verb.IsNone()) return true;
 		// An open page (the report, the controls) may want the button first.
 		if (Verb != TEXT("MenuClick") && Verb != TEXT("MenuSecond") && WRPadDetail::RunHandler(Verb)) return true;
-		if (Verb == TEXT("MenuClick")) Click(App, EKeys::LeftMouseButton, true);
+		if (Verb == TEXT("MenuClick"))
+		{
+			Click(App, EKeys::LeftMouseButton, true);
+			// A text box under the cursor: the pad keyboard opens on it (every screen's boxes, with no code of their own).
+			if (TSharedPtr<FSlateUser> User = App.GetCursorUser())
+			{
+				const FWidgetPath Path = App.LocateWindowUnderMouse(User->GetCursorPosition(), App.GetInteractiveTopLevelWindows());
+				for (int32 i = Path.Widgets.Num() - 1; i >= 0; --i)
+				{
+					const TSharedRef<SWidget> Wd = Path.Widgets[i].Widget;
+					if (WRPadKeyboard::IsEditable(Wd.Get()))
+					{
+						const TWeakPtr<SWidget> Weak = Wd;
+						Queue.Add([Weak]() { if (const TSharedPtr<SWidget> T = Weak.Pin()) WRPadKeyboard::OpenOn(T.ToSharedRef()); });
+						break;
+					}
+				}
+			}
+		}
 		else if (Verb == TEXT("MenuSecond")) Click(App, EKeys::RightMouseButton, true);
 		else if (Verb == TEXT("MenuBack") || Verb == TEXT("MenuClose"))
 		{
@@ -657,7 +692,7 @@ private:
 
 	static bool CursorMode(const APlayerController* PC)
 	{
-		return WRReport::IsOpen() || WRControlsPage::IsOpen() || (PC && PC->bShowMouseCursor);
+		return WRReport::IsOpen() || WRControlsPage::IsOpen() || WRPadKeyboard::IsOpen() || (PC && PC->bShowMouseCursor);
 	}
 
 	void MoveCursor(FSlateApplication& App, const FVector2D& NewPos)

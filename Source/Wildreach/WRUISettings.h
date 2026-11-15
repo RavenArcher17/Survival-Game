@@ -11,7 +11,7 @@ struct FWRWorldSettings;
 enum class EWRIcon : uint8
 {
 	Gear, Flag, FlagFilled, Keyboard, Monitor, Play, Exit, Power, Join, Chevron, Info, Clock, Download, Bulb,
-	Flame, Snowflake, Warning, Lock, Close, Speaker, Camera, Layout,
+	Flame, Snowflake, Warning, Lock, Close, Speaker, Camera, Layout, Chat,
 };
 
 class WILDREACH_API SWRLineIcon : public SLeafWidget
