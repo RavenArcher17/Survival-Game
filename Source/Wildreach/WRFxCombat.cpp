@@ -372,7 +372,7 @@ void UWRFxCameraModifier::AddFovPunch(float Degrees, float Seconds)
 	// The bigger punch wins; it restarts from full.
 	if (Degrees >= FovPunch * FMath::Square(1.f - FMath::Clamp(FovAge / FMath::Max(0.01f, FovSeconds), 0.f, 1.f)))
 	{
-		FovPunch = Degrees;
+		FovPunch = Degrees * FMath::Clamp(FWRKeyBindings::Get().Pref(TEXT("Shake")) / 100.f, 0.f, 1.f);   // the shake setting tames the punch too
 		FovSeconds = FMath::Max(0.05f, Seconds);
 		FovAge = 0.f;
 	}
@@ -481,7 +481,9 @@ void WRFx::Shake(const UObject* WorldContext, float Strength, const FVector& Epi
 
 void UWRFxCameraModifier::AddTrauma(float Amount)
 {
-	Trauma = FMath::Min(1.f, Trauma + Amount);
+	// Settings > Camera > Camera shake (0-100 %): scales every jolt; 0 keeps the view still.
+	const float Scale = FMath::Clamp(FWRKeyBindings::Get().Pref(TEXT("Shake")) / 100.f, 0.f, 1.f);
+	Trauma = FMath::Min(1.f, Trauma + Amount * Scale);
 }
 
 bool UWRFxCameraModifier::ModifyCamera(float DeltaTime, FMinimalViewInfo& InOutPOV)

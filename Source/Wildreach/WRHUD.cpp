@@ -1,4 +1,7 @@
 #include "WRHUD.h"
+#include "WRTuning.h"
+#include "WRPadInput.h"
+#include "WRKeyBindings.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
 #include "GameFramework/PlayerState.h"
@@ -425,13 +428,33 @@ void AWRHUD::DrawBar(const FString& Label, float Value, float Max, const FLinear
 	DrawText(FString::Printf(TEXT("%.0f"), Value), FLinearColor(1.f, 1.f, 1.f, 0.8f), X + 74.f + Width, Y - 1.f);
 }
 
+void AWRHUD::DrawCentred(const FString& Text, const FLinearColor& Color, float CentreX, float Y, float Scale)
+{
+	float W = 0.f, H = 0.f;
+	GetTextSize(Text, W, H, nullptr, Scale);
+	DrawText(Text, Color, CentreX - W * 0.5f, Y, nullptr, Scale);
+}
+
 void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 {
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
 		const AWRCharacterBase* Other = *It;
 		const UWRAttributeSet* A = Other->GetAttributes();
-		if (Other == Self || !A || Other->IsHidden() || FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation()) > 2500.f)
+		if (Other == Self || !A || Other->IsHidden())
+		{
+			continue;
+		}
+		// Bars within ui.names.barCm; other players' names by Settings > Interface > Names over players: Always (out to
+		// farCm, the name alone past the bar range), Near (nearCm), Off (no name; the bar still shows close by).
+		const float Dist = FVector::Dist(Other->GetActorLocation(), Self->GetActorLocation());
+		const bool bPlayer = Other->GetPlayerState() != nullptr;
+		const int32 NamesMode = FWRKeyBindings::Get().PrefInt(TEXT("Names"));
+		const float BarRange = WRTune(TEXT("ui.names.barCm"), 2500.f);
+		const float NameRange = !bPlayer ? BarRange : NamesMode == 0 ? WRTune(TEXT("ui.names.farCm"), 8000.f) : NamesMode == 1 ? WRTune(TEXT("ui.names.nearCm"), 4000.f) : 0.f;
+		const bool bBar = Dist <= BarRange;
+		const bool bName = Dist <= NameRange;
+		if (!bBar && !bName)
 		{
 			continue;
 		}
@@ -449,19 +472,23 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 			const FVector Low = Project(Other->GetActorLocation() + FVector(0.f, 0.f, 40.f), true);
 			if (Low.Z > 0.f)
 			{
-				DrawText(FString::Printf(TEXT("%s (body)"), *Other->GetDisplayLabel()), FLinearColor(0.9f, 0.82f, 0.68f), Low.X - W * 0.5f, Low.Y - 30.f, nullptr, 0.9f);
-				DrawText(FString::Printf(TEXT("hit to harvest: %d left"), Body->GetBodyHitsLeft()), FLinearColor(0.75f, 0.7f, 0.62f), Low.X - W * 0.5f, Low.Y - 13.f, nullptr, 0.75f);
+				DrawCentred(FString::Printf(TEXT("%s (body)"), *Other->GetDisplayLabel()), FLinearColor(0.9f, 0.82f, 0.68f), Low.X, Low.Y - 30.f, 0.9f);
+				DrawCentred(FString::Printf(TEXT("hit to harvest: %d left"), Body->GetBodyHitsLeft()), FLinearColor(0.75f, 0.7f, 0.62f), Low.X, Low.Y - 13.f, 0.75f);
 			}
 			continue;
 		}
 		// A survivor's worn title on a smaller line in pale brass under the name (WRDeeds).
 		const UWRDeedsComponent* Deeds = Other->GetPlayerState() ? UWRDeedsComponent::For(Other->GetPlayerState()) : nullptr;
-		if (Deeds && !Deeds->ActiveTitle.IsEmpty())
+		if (bName && Deeds && !Deeds->ActiveTitle.IsEmpty())
 		{
-			DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 45.f, nullptr, 0.9f);
-			DrawText(Deeds->ActiveTitle, FLinearColor(0.86f, 0.74f, 0.5f), BX, Screen.Y - 29.f, nullptr, 0.72f);
+			DrawCentred(Other->GetDisplayLabel(), FLinearColor::White, Screen.X, Screen.Y - 45.f, 0.9f);
+			DrawCentred(Deeds->ActiveTitle, FLinearColor(0.86f, 0.74f, 0.5f), Screen.X, Screen.Y - 29.f, 0.72f);
 		}
-		else DrawText(Other->GetDisplayLabel(), FLinearColor::White, BX, Screen.Y - 30.f, nullptr, 0.9f);
+		else if (bName) DrawCentred(Other->GetDisplayLabel(), FLinearColor::White, Screen.X, Screen.Y - 30.f, 0.9f);
+		if (!bBar)
+		{
+			continue;   // a far player's name alone
+		}
 		// Gnomon Eye (artifact): no enemy health bars; names and statuses still show.
 		if (!(PlayerOwner.Get() && WRArtifacts::Has(PlayerOwner->PlayerState.Get(), TEXT("no_enemy_bars")) && !Other->GetPlayerState()))
 		{
@@ -489,7 +516,10 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 				DrawRect(FLinearColor(0.3f, 0.9f, 0.35f), BX, Screen.Y + 7.f, W * FMath::Clamp(Creature->TameProgress, 0.f, 1.f), 3.f);
 				if (Creature->IsUnconscious())
 				{
-					DrawText(FString::Printf(TEXT("knocked out - E to tame (%.0f%%)"), Creature->TameProgress * 100.f), FLinearColor(0.8f, 0.7f, 1.f), BX, Screen.Y + 12.f, nullptr, 0.8f);
+					// The device's own button (a pad shows its button; a rebound key shows the new key).
+					const FString Key = WRInput::ActionKey(TEXT("Interact")).ToString();
+					DrawCentred(Key.IsEmpty() ? FString::Printf(TEXT("knocked out: tame it (%.0f%%)"), Creature->TameProgress * 100.f)
+						: FString::Printf(TEXT("knocked out: %s to tame (%.0f%%)"), *Key, Creature->TameProgress * 100.f), FLinearColor(0.8f, 0.7f, 1.f), Screen.X, Screen.Y + 12.f, 0.8f);
 				}
 			}
 		}

@@ -55,4 +55,15 @@ namespace WRReport
 	/** Send the open draft with a kind (0-7) and note, then close the panel. */
 	WILDREACH_API void Send(int32 Kind, const FString& Note);
 	WILDREACH_API const TArray<FString>& Kinds();
+
+	/**
+	 * The crash card (cookpass-ui 3.3). At start (InstallLog) the game reads Saved/Wildreach/session (when the last run
+	 * started) and Saved/Wildreach/clean_exit (written on a normal quit): a run that never wrote clean_exit and left a
+	 * crash folder in Saved/Crashes newer than its start crashed. PendingCrash is that folder ("" when none, or once it
+	 * was answered); SendCrash posts it through the outbox (its error and call stack, the last lines of its log, this
+	 * machine's version and GPU); DismissCrash answers "Not now". Either way it never asks about that crash again.
+	 */
+	WILDREACH_API FString PendingCrash();
+	WILDREACH_API void SendCrash();
+	WILDREACH_API void DismissCrash();
 }

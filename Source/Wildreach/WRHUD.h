@@ -21,6 +21,8 @@ public:
 private:
 	void DrawBar(const FString& Label, float Value, float Max, const FLinearColor& Color, float X, float Y, float Width = 220.f);
 	void DrawWorldBars(const AWRCharacterBase* Self);
+	/** Canvas text centred on CentreX (nameplates over heads). */
+	void DrawCentred(const FString& Text, const FLinearColor& Color, float CentreX, float Y, float Scale);
 	/** The nearest knocked-out wild creature: torpor (and when it wakes), progress, effectiveness, food, what it needs. */
 	void DrawTamingPanel(const AWRCharacterBase* Self);
 	/** The old text list for the open menu (with -oldui, or a menu the new UI has no screen for yet). */

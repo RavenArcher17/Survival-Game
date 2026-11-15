@@ -1733,7 +1733,7 @@ void AWRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		Input->BindAction(DiveAction, ETriggerEvent::Started, this, &AWRCharacter::InputDive);
 		Input->BindAction(DiveAction, ETriggerEvent::Completed, this, &AWRCharacter::InputDiveReleased);
 		Input->BindAction(SprintAction, ETriggerEvent::Started, this, &AWRCharacter::InputSprint);
-		Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AWRCharacter::StopSprint);
+		Input->BindAction(SprintAction, ETriggerEvent::Completed, this, &AWRCharacter::InputSprintReleased);
 		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &AWRCharacter::InputView);
 		Input->BindAction(SwapWeaponAction, ETriggerEvent::Started, this, &AWRCharacter::ToggleWeaponSet);
 		Input->BindAction(AmmoNextAction, ETriggerEvent::Started, this, &AWRCharacter::AmmoNext);
@@ -1804,6 +1804,20 @@ void AWRCharacter::InputPressed(EWRAbilityInput Input)
 		DodgeHeldSince = GetWorld()->GetTimeSeconds();
 		return;
 	}
+	// Guard / aim as a toggle (Settings > Look and controller): the press that finds it up lets it go; the verb is
+	// decided at the press (a ranged weapon out = aim). The first press is a real press: the parry window opens.
+	if (Input == EWRAbilityInput::Block)
+	{
+		const bool bToggle = FWRKeyBindings::Get().PrefOn(IsRangedOut() ? TEXT("AimToggle") : TEXT("GuardToggle"));
+		if (bBlockToggled && HeldInputs.Contains(Input))
+		{
+			bBlockToggled = false;
+			HeldInputs.Remove(Input);
+			ReleaseAbilityInput(Input);
+			return;
+		}
+		bBlockToggled = bToggle;
+	}
 	HeldInputs.Add(Input);
 	PressAbilityInput(Input);
 }
@@ -1821,6 +1835,8 @@ void AWRCharacter::InputReleased(EWRAbilityInput Input)
 		}
 		return;
 	}
+	// A toggled guard / aim stays up when the button comes back (the next press lets it go).
+	if (Input == EWRAbilityInput::Block && bBlockToggled && HeldInputs.Contains(Input)) return;
 	// Only a press this body took is let go (one dropped by a menu already was; one the gate stopped never began).
 	if (HeldInputs.Remove(Input) == 0) return;
 	ReleaseAbilityInput(Input);
@@ -1884,7 +1900,41 @@ void AWRCharacter::TickDiveInput()
 
 void AWRCharacter::InputSprint()
 {
-	if (WRInput::AllowPress(Cast<APlayerController>(Controller))) StartSprint();
+	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
+	// Toggle (XAG 107 / cookpass-ui 3.1): a press starts the sprint, the next press (or stopping) ends it.
+	if (FWRKeyBindings::Get().PrefOn(TEXT("SprintToggle")))
+	{
+		if (bSprintToggled)
+		{
+			StopSprint();
+			return;
+		}
+		StartSprint();
+		bSprintToggled = true;
+		SprintStillSeconds = 0.f;
+		return;
+	}
+	StartSprint();
+}
+
+void AWRCharacter::InputSprintReleased()
+{
+	if (bSprintToggled) return;   // a toggled sprint ignores the key coming up
+	StopSprint();
+}
+
+void AWRCharacter::TickSprintToggle(float DeltaSeconds)
+{
+	if (!bSprintToggled || !IsLocallyControlled()) return;
+	const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
+	if (!Move || !Move->bWantsToSprint)
+	{
+		bSprintToggled = false;
+		return;
+	}
+	// Standing still for a moment ends it, as the toggles in other games do: you don't set off sprinting next time.
+	SprintStillSeconds = GetVelocity().Size2D() < WRTune(TEXT("ui.toggle.sprintStopSpeed"), 50.f) ? SprintStillSeconds + DeltaSeconds : 0.f;
+	if (SprintStillSeconds >= WRTune(TEXT("ui.toggle.sprintStopSeconds"), 0.25f)) StopSprint();
 }
 
 void AWRCharacter::InputView()
@@ -1896,6 +1946,7 @@ void AWRCharacter::DropHeldInputs()
 {
 	const TArray<EWRAbilityInput> Held = HeldInputs.Array();
 	HeldInputs.Reset();
+	bBlockToggled = false;
 	BufferedInput = EWRAbilityInput::None;  // a press waiting in the buffer goes with them (COMBAT-AND-LESSONS 1.16)
 	DodgeHeldSince = -1.0;
 	bDiveKey = false;
@@ -1912,5 +1963,6 @@ void AWRCharacter::StartSprint()
 
 void AWRCharacter::StopSprint()
 {
+	bSprintToggled = false;
 	CastChecked<UWRCharacterMovementComponent>(GetCharacterMovement())->bWantsToSprint = false;
 }

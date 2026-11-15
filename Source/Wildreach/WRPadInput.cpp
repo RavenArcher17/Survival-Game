@@ -8,6 +8,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerUI.h"
 #include "WRReport.h"
+#include "WRUIPadKeyboard.h"
 #include "WRTuning.h"
 #include "WRUIWidgets.h"
 #include "Dom/JsonObject.h"
@@ -187,7 +188,10 @@ void WRInput::MouseLook(APawn* Pawn, FVector2D Delta)
 {
 	if (!Pawn) return;
 	const FWRKeyBindings& K = FWRKeyBindings::Get();
-	const float S = K.MouseSensitivity() * WRTune(TEXT("look.mouseScale"), 1.f);
+	// Aiming a ranged weapon the view turns slower (Settings > Look and controller > Aim sensitivity).
+	const AWRCharacter* Aimer = Cast<AWRCharacter>(Pawn);
+	const float Aim = Aimer && Aimer->IsAimingRanged() ? K.Pref(TEXT("MouseAimSens")) : 1.f;
+	const float S = K.MouseSensitivity() * Aim * WRTune(TEXT("look.mouseScale"), 1.f);
 	if (AWRPlayerController* Locked = Cast<AWRPlayerController>(Pawn->GetController()); Locked && Locked->GetLockTarget())
 	{
 		Locked->MouseFlick(Delta);
@@ -200,14 +204,20 @@ void WRInput::PadLook(APawn* Pawn, FVector2D Stick, float Dt)
 {
 	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (!PC) return;
+	const FWRKeyBindings& K = FWRKeyBindings::Get();
 	const float Mag = Stick.Size();
-	const float Dead = WRTune(TEXT("look.padDeadZone"), 0.15f);
+	// Dead zone and response curve are the player's (Settings > Look and controller); the curves' exponents are tuning.
+	const float Dead = K.Pref(TEXT("PadDeadZone"));
 	if (Mag <= Dead) return;
 	const float N = FMath::Clamp((Mag - Dead) / FMath::Max(0.01f, 1.f - Dead), 0.f, 1.f);
-	const FVector2D Dir = Stick / Mag * FMath::Pow(N, WRTune(TEXT("look.padCurve"), 1.8f));
-	const FWRKeyBindings& K = FWRKeyBindings::Get();
-	const float S = K.PadSensitivity() * Dt;
-	const float Yaw = Dir.X * WRTune(TEXT("look.padYawDegrees"), 230.f) * S;
+	static const TCHAR* Curves[] = { TEXT("look.padCurveLinear"), TEXT("look.padCurve"), TEXT("look.padCurvePrecise") };
+	static const float CurveFallback[] = { 1.f, 1.8f, 2.5f };
+	const int32 C = FMath::Clamp(K.PrefInt(TEXT("PadCurve")), 0, 2);
+	const FVector2D Dir = Stick / Mag * FMath::Pow(N, WRTune(Curves[C], CurveFallback[C]));
+	const AWRCharacter* Aimer = Cast<AWRCharacter>(Pawn);
+	const float Aim = Aimer && Aimer->IsAimingRanged() ? K.Pref(TEXT("PadAimSens")) : 1.f;
+	const float S = K.PadSensitivity() * Aim * Dt;
+	const float Yaw = (K.PrefOn(TEXT("InvertPadX")) ? -Dir.X : Dir.X) * WRTune(TEXT("look.padYawDegrees"), 230.f) * S;
 	float Pitch = Dir.Y * WRTune(TEXT("look.padPitchDegrees"), 150.f) * S;
 	if (K.InvertPad()) Pitch = -Pitch;
 	// AddYaw/PitchInput multiply by the controller's legacy input scales (DefaultInput.ini): divide them out so these are degrees.
@@ -224,8 +234,8 @@ void WRInput::Rumble(UWorld* World, float Strength, float Seconds)
 	if (!World || !FWRKeyBindings::Get().PadRumble() || !UsingPad() || Strength <= 0.f || Seconds <= 0.f) return;
 	APlayerController* PC = World->GetFirstPlayerController();
 	if (!PC || !PC->IsLocalController()) return;
-	const float S = FMath::Clamp(Strength, 0.f, 1.f);
-	PC->PlayDynamicForceFeedback(S, Seconds, true, S > 0.5f, true, true);
+	const float S = FMath::Clamp(Strength, 0.f, 1.f) * FWRKeyBindings::Get().RumbleScale();
+	PC->PlayDynamicForceFeedback(S, Seconds, true, Strength > 0.5f, true, true);
 }
 
 void WRInput::RumbleLight(UWorld* World, float Strength, float Seconds)
@@ -233,7 +243,7 @@ void WRInput::RumbleLight(UWorld* World, float Strength, float Seconds)
 	if (!World || !FWRKeyBindings::Get().PadRumble() || !UsingPad() || Strength <= 0.f || Seconds <= 0.f) return;
 	APlayerController* PC = World->GetFirstPlayerController();
 	if (!PC || !PC->IsLocalController()) return;
-	PC->PlayDynamicForceFeedback(FMath::Clamp(Strength, 0.f, 1.f), Seconds, false, true, false, true);
+	PC->PlayDynamicForceFeedback(FMath::Clamp(Strength, 0.f, 1.f) * FWRKeyBindings::Get().RumbleScale(), Seconds, false, true, false, true);
 }
 
 void WRInput::Transition(APlayerController* PC, const TCHAR* Why)
@@ -489,7 +499,8 @@ public:
 		if (RepeatKey.IsValid() && FPlatformTime::Seconds() >= RepeatAt)
 		{
 			RepeatAt = FPlatformTime::Seconds() + WRTune(TEXT("pad.repeatSeconds"), 0.11f);
-			if (!WRPadDetail::RunHandler(DVerb(RepeatKey))) DPad(App, RepeatKey);
+			if (WRPadKeyboard::IsOpen()) WRPadKeyboard::Move(RepeatKey);   // the keyboard's keys, not the page under it
+			else if (!WRPadDetail::RunHandler(DVerb(RepeatKey))) DPad(App, RepeatKey);
 		}
 	}
 
@@ -503,6 +514,8 @@ public:
 		if (!K.IsGamepadKey())
 		{
 			WRInput::NoteDevice(EWRDevice::KeyboardMouse);
+			// Typing on a real keyboard: the pad keyboard steps aside and the box takes the keys.
+			if (WRPadKeyboard::IsOpen()) Queue.Add([]() { WRPadKeyboard::Close(false); });
 			if (WRPadDetail::GKeyCapture || E.IsRepeat()) return false;
 			const FWRKeyBindings& Keys = FWRKeyBindings::Get();
 			if (K == Keys.Key(TEXT("Report")))
@@ -519,6 +532,19 @@ public:
 		}
 
 		WRInput::NoteDevice(EWRDevice::Gamepad);
+		// The pad keyboard takes every pad button while it's up (A types, X deletes, B cancels...).
+		if (WRPadKeyboard::IsOpen())
+		{
+			Eaten.Add(K);
+			if (E.IsRepeat()) return true;
+			Queue.Add([K]() { WRPadKeyboard::PadButton(K); });
+			if (K == EKeys::Gamepad_DPad_Left || K == EKeys::Gamepad_DPad_Right || K == EKeys::Gamepad_DPad_Up || K == EKeys::Gamepad_DPad_Down)
+			{
+				RepeatKey = K;
+				RepeatAt = FPlatformTime::Seconds() + WRTune(TEXT("pad.repeatDelay"), 0.35f);
+			}
+			return true;
+		}
 		if (K == L.Key(TEXT("Report")))
 		{
 			Eaten.Add(K);
@@ -560,7 +586,25 @@ public:
 		if (Verb.IsNone()) return true;
 		// An open page (the report, the controls) may want the button first.
 		if (Verb != TEXT("MenuClick") && Verb != TEXT("MenuSecond") && WRPadDetail::RunHandler(Verb)) return true;
-		if (Verb == TEXT("MenuClick")) Click(App, EKeys::LeftMouseButton, true);
+		if (Verb == TEXT("MenuClick"))
+		{
+			Click(App, EKeys::LeftMouseButton, true);
+			// A text box under the cursor: the pad keyboard opens on it (every screen's boxes, with no code of their own).
+			if (TSharedPtr<FSlateUser> User = App.GetCursorUser())
+			{
+				const FWidgetPath Path = App.LocateWindowUnderMouse(User->GetCursorPosition(), App.GetInteractiveTopLevelWindows());
+				for (int32 i = Path.Widgets.Num() - 1; i >= 0; --i)
+				{
+					const TSharedRef<SWidget> Wd = Path.Widgets[i].Widget;
+					if (WRPadKeyboard::IsEditable(Wd.Get()))
+					{
+						const TWeakPtr<SWidget> Weak = Wd;
+						Queue.Add([Weak]() { if (const TSharedPtr<SWidget> T = Weak.Pin()) WRPadKeyboard::OpenOn(T.ToSharedRef()); });
+						break;
+					}
+				}
+			}
+		}
 		else if (Verb == TEXT("MenuSecond")) Click(App, EKeys::RightMouseButton, true);
 		else if (Verb == TEXT("MenuBack") || Verb == TEXT("MenuClose"))
 		{
@@ -648,7 +692,7 @@ private:
 
 	static bool CursorMode(const APlayerController* PC)
 	{
-		return WRReport::IsOpen() || WRControlsPage::IsOpen() || (PC && PC->bShowMouseCursor);
+		return WRReport::IsOpen() || WRControlsPage::IsOpen() || WRPadKeyboard::IsOpen() || (PC && PC->bShowMouseCursor);
 	}
 
 	void MoveCursor(FSlateApplication& App, const FVector2D& NewPos)

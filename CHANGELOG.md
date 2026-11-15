@@ -1,5 +1,81 @@
 # Changelog
 
+## Unreleased: the UI cook pass (settings, HUD, menus, controls)
+
+Aaron (lane cookpass-ui: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-ui.md; a cook
+pass on the built screens and the ui-controls cook's open rounds). Compiled (editor target); not played here (Aaron
+and the testers test, F8).
+
+- **UI (1): Camera, Interface and the rest of Look and controller.** Why: the field of view, shake and blur were fixed
+  (motion sickness: TLOU2 / XAG), every hold was a hold (XAG 107), the pad's dead zone and curve were tuning-only, and
+  crosshair / damage numbers / hints were filed under Controls and Video.
+  - Player prefs are one table in `FWRKeyBindings` (`Pref(id)` / `SetPref` / `ResetPage`, saved as `Pref.<id>` in
+    `[Wildreach.Keys]`, only when not the default).
+  - **Look and controller**: aiming sensitivity (mouse x0.70, pad x0.60, applied while a ranged weapon is aimed),
+    invert left / right, stick dead zone 0.05-0.35, response Linear / Standard / Precise (exponents tuning
+    `look.padCurveLinear / padCurve / padCurvePrecise`), vibration Off / 25 / 50 / 75 / 100 %, and **Hold or toggle**
+    for Sprint, Guard and Aim. A toggled sprint ends on the next press, when you stop (0.25 s under 50 cm/s, tuning
+    `ui.toggle`), on a menu or when stamina drops it; a toggled guard / aim: the first press is a real press (the parry
+    window opens), the next lets go, as do a menu, death, a mount or swapping weapon set.
+  - **Camera** (new page): field of view third person 70-100 and first person 75-110 (default 90 both, the combat
+    camera's; a bow's aim zoom keeps its 60 / 90 share of whatever you pick), camera shake 0-100 % (scales the trauma
+    and the FOV punch), motion blur Off / Low / High (`r.MotionBlur.Amount` 0 / 0.25 / 0.5), shoulder Right / Left /
+    Centre (eased across).
+  - **Interface** (new page): Setup Desk / Couch (Couch = text and HUD at 115 %, tuning `ui.couchScale`), Text and
+    menus 85-130 % (the engine's application scale: every screen), HUD 75-130 % (a scaler over the HUD only), HUD mode
+    Full / Fade / Minimal and Compass (the HUD reads them from UI (2)), Crosshair and Damage numbers (moved from
+    Controls), Names over players Always / Near / Off, **Show my helmet** (the server changes your look now and the
+    next join carries it in `?Look=`), Show hints (moved from Video).
+  - Each page's Reset puts only that page back.
+- **UI (2): the HUD's modes, the compass switch, nameplates.** Why: the HUD was always fully up (Horizon's Dynamic
+  HUD / Ghost of Tsushima's "light HUD": let the world breathe, come back the instant it matters); names over heads
+  started at the bar's left edge and the knocked-out line said "E" on a pad.
+  - **Fade** (the default): the level and clock plates, compass, vitals, hotbar, ability keys and tame card fade over
+    0.8 s once all has been calm for 6 s and come back in 0.1 s on any change: hurt or tired, a path resource moving,
+    a status building or on you, hungry or thirsty under 25, locked on, aiming, a boss, a raid, a screen or wheel,
+    build mode, riding, the bag or hotbar changing (tuning `ui.hud`). Prompts, notices, pickups, chat, the crosshair,
+    boss bars and hazard lines never fade. **Minimal**: no plates or compass; the vitals only while something is
+    happening to them; the hotbar for 4 s after it changes. **Full**: as before. (`SWRHud::TickHudMode`.)
+  - **Compass** off hides the strip; the boss bar keeps its place.
+  - **Nameplates** (`AWRHUD::DrawWorldBars`, `DrawCentred`): every line centred over the head; other players' names
+    follow Names over players (Always out to 80 m, the name alone past the 25 m bar range; Near 40 m; Off), tuning
+    `ui.names`; the knocked-out line shows the device's own button for Interact.
+- **UI (3): leaving asks once, the Disconnected card with Rejoin, the crash card, quick notes on F8.** Why: Main menu
+  and Quit left at once (a slip of the pad lost a fight outside a safe zone); a dropped join showed the engine's raw
+  text ("Disconnected: ConnectionLost") with no way back in; a crash was never reported unless the tester remembered;
+  a pad player had to type every report.
+  - **Leave / Quit** (the settings window in game): a strip over the footer asks "Leave this world?" / "Quit
+    Wildreach?" and says whether you're in a safe zone (and, for a host with others in, that everyone goes back to
+    their menu). Stay / Leave; Esc or B is Stay.
+  - **Disconnected card** on the main menu (`SWRMainMenu::MakeCard`, `NoteFailure`): a plain line for each failure
+    (the connection lost, the host stopped answering, the host didn't let us in and its reason, another version,
+    files that don't match, the network couldn't start, the address unreachable), and **Rejoin** when this game was
+    joined to the host: it travels to the same address with your name, path and look; a try that doesn't get in
+    counts down 10 s to the next ("Try 2 of 6 didn't get in. Trying again in 7 s.") up to 6 tries in 60 s, then says
+    the host isn't answering (tuning `ui.rejoin`). Stop trying / Close; Esc or B closes; while it shows the pad's
+    D-pad stays inside it.
+  - **Crash card** (`WRReport::PendingCrash / SendCrash / DismissCrash`): each run stamps `Saved/Wildreach/session`
+    and a normal quit stamps `clean_exit`; a run that didn't quit cleanly and left a folder in `Saved/Crashes` makes
+    the menu ask once: Send the crash report (its error message and call stack from `CrashContext.runtime-xml`, the
+    last 40 log lines (tuning `report.crashLogLines`), version, GPU, OS; saved in `Saved/Reports` and sent through
+    the outbox like any report) or Not now. Never in the editor.
+  - **Quick notes** under the F8 note (tuning `report.chips`): "Just happened", "Happens every time", "Hit didn't
+    land", "Got hit by nothing", "Can't move", "Fell through", "Too hard", "Too easy", "Looks wrong", "Sounds wrong",
+    "Music stopped", "Love this"; one press adds the line, again takes it out.
+- **UI (4): the pad keyboard, chat on a pad.** Why: no text box could be typed on a controller (the chat, the report
+  note, the menu's name and address, world and tame names), and the chat had no pad button at all.
+  - **`SWRPadKeyboard`** (new `WRUIPadKeyboard.cpp`): a stone panel with a preview line (blinking caret) over a QWERTY
+    grid: digits, letters, ' - . ? (Shift: ! @ # $ % & * ( ) = and " _ , :), then Shift / Space / Delete / Done. Pad:
+    the D-pad (repeating) or the cursor picks a key, A types, X deletes, Y spaces, LT shifts (twice within 0.4 s locks,
+    tuning `ui.padKeyboard.lockSeconds`), RT or Menu is Done, B cancels; the mouse clicks keys; touching the real
+    keyboard steps it aside. It docks at the bottom, or at the top for a box low on the screen.
+  - **Every text box, no screen code:** A over any editable text on a pad opens it on that box (`WRPadInput`); Done
+    writes the text back and presses Enter on a one-line box (so a name is taken, a chat line sends); Cancel leaves it.
+  - **Chat on a pad:** Settings (in game) has **Chat** (a speech-bubble icon): it opens the chat line with the
+    keyboard up on it; Done sends to everyone, B closes the line. The F1 page says where.
+  - `Data/gamepad.json` **reserves** D-pad up hold (the ping / quick-chat wheel) and View hold (the player list) for the
+    multiplayer cook, so nothing else claims them.
+
 ## Unreleased: the Desert / Sun & sand
 
 Aaron (lane build-biome-desert: requirement ledger R1-R52, build research and plan in showcase-notes

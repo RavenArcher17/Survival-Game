@@ -2,6 +2,9 @@
 // report (context, sending, saving, the host) is WRReport.cpp.
 
 #include "WRReport.h"
+#include "WRTuning.h"
+#include "Dom/JsonObject.h"
+#include "Widgets/Layout/SWrapBox.h"
 #include "WRPadInput.h"
 #include "WRSound.h"
 #include "WRUIStyle.h"
@@ -28,8 +31,10 @@ namespace WRReportUI
 	class SWRReportKind : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SWRReportKind) {}
+		SLATE_BEGIN_ARGS(SWRReportKind) : _Small(false) {}
 			SLATE_ARGUMENT(FText, Text)
+			/** A quick-note chip: lower, smaller text. */
+			SLATE_ARGUMENT(bool, Small)
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs, TFunction<bool()> InOn, TFunction<void()> InPick)
 		{
@@ -37,12 +42,12 @@ namespace WRReportUI
 			Pick = MoveTemp(InPick);
 			ChildSlot
 			[
-				SNew(SBox).HeightOverride(36.f * U)
+				SNew(SBox).HeightOverride((InArgs._Small ? 28.f : 36.f) * U)
 				[
-					SNew(SBorder).Padding(FMargin(10.f * U, 0.f)).HAlign(HAlign_Center).VAlign(VAlign_Center)
+					SNew(SBorder).Padding(FMargin((InArgs._Small ? 8.f : 10.f) * U, 0.f)).HAlign(HAlign_Center).VAlign(VAlign_Center)
 					.BorderImage_Lambda([this]() { return On() ? WRUI::Box(FColor(0x4D, 0x39, 0x20), 4.f, WRUI::Brass, 1.f) : WRUI::Box(IsHovered() ? FLinearColor(1.f, 1.f, 1.f, 0.07f) : FLinearColor(0.f, 0.f, 0.f, 0.35f), 4.f, WRUI::Brass2, 1.f); })
 					[
-						WRUI::Text(InArgs._Text, WRUI::Body(14, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(On() ? WRUI::Ink : IsHovered() ? WRUI::Ink2 : WRUI::Ink3); }))
+						WRUI::Text(InArgs._Text, WRUI::Body(InArgs._Small ? 12 : 14, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(On() ? WRUI::Ink : IsHovered() ? WRUI::Ink2 : WRUI::Ink3); }))
 					]
 				]
 			];
@@ -136,12 +141,14 @@ namespace WRReportUI
 									+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 6.f * U)[WRUI::Text(LOCTEXT("Note", "Your note"), WRUI::Caps(13), WRUI::Ink2)]
 									+ SVerticalBox::Slot().FillHeight(1.f)
 									[
-										SNew(SBox).MinDesiredHeight(130.f * U)
+										SNew(SBox).MinDesiredHeight(96.f * U)
 										[
 											SAssignNew(Box, SMultiLineEditableTextBox).Style(&Field).Font(WRUI::Body(15, 500)).AutoWrapText(true)
 											.HintText(LOCTEXT("Hint", "What happened, and what did you expect?"))
 										]
 									]
+									// Quick notes: one press adds a line (again takes it out), so a report needs no typing.
+									+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[Chips()]
 								]
 							]
 							+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 16.f * U, 0.f, 0.f)
@@ -191,6 +198,55 @@ namespace WRReportUI
 		TSharedPtr<WRReport::FDraft> Draft;
 		TSharedPtr<SMultiLineEditableTextBox> Box;
 		int32 Kind = 0;
+
+		/** The quick notes from tuning report.chips (cookpass-ui 3.3), else the cook's twelve. */
+		static TArray<FString> ChipTexts()
+		{
+			TArray<FString> Out;
+			if (const TSharedPtr<FJsonObject> R = FWRTuning::Get().Object(TEXT("report")))
+			{
+				R->TryGetStringArrayField(TEXT("chips"), Out);
+			}
+			if (Out.Num() == 0)
+			{
+				Out = { TEXT("Just happened"), TEXT("Happens every time"), TEXT("Hit didn't land"), TEXT("Got hit by nothing"), TEXT("Can't move"), TEXT("Fell through"),
+					TEXT("Too hard"), TEXT("Too easy"), TEXT("Looks wrong"), TEXT("Sounds wrong"), TEXT("Music stopped"), TEXT("Love this") };
+			}
+			return Out;
+		}
+
+		TArray<FString> NoteLines() const
+		{
+			TArray<FString> Lines;
+			if (Box.IsValid()) Box->GetText().ToString().ParseIntoArrayLines(Lines, false);
+			return Lines;
+		}
+
+		void ToggleChip(const FString& Chip)
+		{
+			TArray<FString> Lines = NoteLines();
+			if (Lines.Remove(Chip) == 0)
+			{
+				// Typed text first, then the quick notes under it (no empty lines left behind).
+				while (Lines.Num() > 0 && Lines.Last().TrimStartAndEnd().IsEmpty()) Lines.Pop();
+				Lines.Add(Chip);
+			}
+			if (Box.IsValid()) Box->SetText(FText::FromString(FString::Join(Lines, TEXT("\n"))));
+		}
+
+		TSharedRef<SWidget> Chips()
+		{
+			TSharedRef<SWrapBox> Wrap = SNew(SWrapBox).UseAllottedSize(true).InnerSlotPadding(FVector2D(4.f * U, 4.f * U));
+			for (const FString& Chip : ChipTexts())
+			{
+				Wrap->AddSlot()
+				[
+					SNew(SWRReportKind, [this, Chip]() { return NoteLines().Contains(Chip); }, [this, Chip]() { ToggleChip(Chip); })
+					.Text(FText::FromString(Chip)).Small(true)
+				];
+			}
+			return Wrap;
+		}
 
 		void Step(int32 Dir)
 		{
