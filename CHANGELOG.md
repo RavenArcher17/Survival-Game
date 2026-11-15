@@ -5,6 +5,14 @@
 Aaron (lane cookpass-taming: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-taming.md;
 a cook pass on build-taming's work). Compiled (editor target); not played here (Aaron and the testers test, F8).
 
+- **Taming (2): every land's barding works; the seat's ease holds on a client.** The land barding sets that came live
+  with their lands promised passes nothing gave: now Stormweave grounds storm strikes, Heartguard walks thornbrake,
+  Skysilk ignores gusts, Wardcloth crosses ward fields, Mirehide wades bleedwater, Reefmail takes its mount to 40 m,
+  Gravecloth halves corruption and Hollowplate halves rift drain, for the mount and the rider on it (one hook: a mount's
+  barding answers the hazards' own gear checks, tuning `tame.bardingPass`). A fallen tame's collar goes to its owner's
+  bag when they're on (else an owner-only bag that lasts the 72 h, and a Souls death no longer takes it). The ease onto
+  and off the saddle now catches the move whichever arrives first on a client (the attachment or the jump), and a
+  gallop isn't mistaken for a jump.
 - **Taming (1): riding, names, the stable, the way back.** **The rider sits**: a seated pose over the idle (hips flexed
   72 degrees, the thighs opened round the mount's back by its width, the shins hanging under the knees, feet level, the
   torso upright at a walk and leaning 22 degrees at a gallop, the hands together over the pommel on the reins, let go

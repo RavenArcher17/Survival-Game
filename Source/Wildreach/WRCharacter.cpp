@@ -1048,16 +1048,33 @@ void AWRCharacter::TickBodyAnim()
 		bSeatBoneInit = false;
 		SeatBob = FMath::FInterpTo(SeatBob, 0.f, Dt, 8.f);
 	}
-	AActor* NowParent = bSeated ? SeatMount : nullptr;
+	// Getting on or off: the attachment and the move to the seat (or to the ground) can reach this machine a frame apart,
+	// so any jump of the body within half a second of it attaching to or leaving a creature is eased out from where it was
+	// (a jump across the world is a teleport, not a mount).
+	const double SeatNow = GetWorld()->GetTimeSeconds();
+	AActor* NowParent = SeatMount;
 	if (NowParent != SeatParent.Get())
 	{
-		// On or off this frame: the body starts where it was (a jump across the world is a teleport, not a dismount).
-		const FVector From = bSeatHasLast ? SeatLastAt - GetActorLocation() : FVector::ZeroVector;
-		SeatEaseFrom = From.Size() < 1500.f ? From : FVector::ZeroVector;
-		SeatEaseT = 0.f;
+		SeatChangedAt = SeatNow;
 		SeatEaseSeconds = FMath::Max(0.05f, WRTune(NowParent ? TEXT("tame.mountEase.onSeconds") : TEXT("tame.mountEase.offSeconds"), NowParent ? 0.45f : 0.35f));
-		WRSound::PlayAt(this, NowParent ? TEXT("mount.on") : TEXT("mount.off"), GetActorLocation());
 		SeatParent = NowParent;
+	}
+	// The jump: on the same mount both frames, how far it moved on its back (its gallop isn't a jump); otherwise in the world.
+	FVector Jump = bSeatHasLast ? SeatLastAt - GetActorLocation() : FVector::ZeroVector;
+	if (SeatMount && SeatLastParent.Get() == SeatMount)
+	{
+		const FTransform Mt = SeatMount->GetActorTransform();
+		Jump = Mt.TransformVectorNoScale(SeatLastRel - Mt.InverseTransformPositionNoScale(GetActorLocation()));
+	}
+	if (SeatNow - SeatChangedAt < 0.5 && Jump.Size() > 30.f && Jump.Size() < 1500.f)
+	{
+		SeatEaseFrom = SeatEaseWorld + Jump;
+		SeatEaseT = 0.f;
+	}
+	if (bSeated != bWasSeated)
+	{
+		WRSound::PlayAt(this, bSeated ? TEXT("mount.on") : TEXT("mount.off"), GetActorLocation());
+		bWasSeated = bSeated;
 	}
 	FVector EaseWorld = FVector::ZeroVector;
 	if (SeatEaseT < 1.f)
@@ -1066,7 +1083,10 @@ void AWRCharacter::TickBodyAnim()
 		const float Smooth = SeatEaseT * SeatEaseT * (3.f - 2.f * SeatEaseT);
 		EaseWorld = SeatEaseFrom * (1.f - Smooth) + FVector(0.f, 0.f, WRTune(TEXT("tame.mountEase.arc"), 30.f) * FMath::Sin(SeatEaseT * PI));
 	}
+	SeatEaseWorld = EaseWorld;
 	SeatLastAt = GetActorLocation();
+	SeatLastParent = SeatMount;
+	SeatLastRel = SeatMount ? SeatMount->GetActorTransform().InverseTransformPositionNoScale(GetActorLocation()) : FVector::ZeroVector;
 	bSeatHasLast = true;
 	const FVector EaseLocal = GetActorTransform().InverseTransformVectorNoScale(EaseWorld);
 	const bool bOffset = !FMath::IsNearlyZero(SwimLift, 0.05f) || !EaseLocal.IsNearlyZero(0.05f) || !FMath::IsNearlyZero(SeatBob, 0.05f);

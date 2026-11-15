@@ -293,6 +293,11 @@ private:
 	float SeatBoneAvg = 0.f, SeatBob = 0.f;
 	bool bSeatBoneInit = false;
 	bool bBodyOffset = false;      // the body is off its base (swimming, seated, easing): put back when done
+	bool bWasSeated = false;       // seated last frame (the leather creak on and off)
+	double SeatChangedAt = -10.0;  // when it last got on or off something (the jumps near it are eased)
+	FVector SeatEaseWorld = FVector::ZeroVector;   // last frame's eased offset (a second jump continues from it)
+	TWeakObjectPtr<AActor> SeatLastParent;          // what it rode last frame, and where it sat on it then
+	FVector SeatLastRel = FVector::ZeroVector;
 	float SwumCm = 0.f;            // server: distance swum since the last swimming XP
 	FVector LastSwimAt = FVector::ZeroVector;
 	float SwimCheck = 0.f;

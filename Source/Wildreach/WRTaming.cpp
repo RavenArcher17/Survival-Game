@@ -2273,9 +2273,21 @@ void FWRTaming::TameDied(AWRCreature* Tame)
 	Token.Sockets = { FName(*(TEXT("fallen:") + Id)), FName(*(TEXT("name:") + F.Name.Left(40))), FName(*(TEXT("species:") + Def->Id.ToString())),
 		FName(*FString::Printf(TEXT("died:%lld"), F.DiedUnix)), FName(*(TEXT("owner:") + F.Owner.Left(40))) };
 	if (F.bRevived) Token.Sockets.Add(FName(TEXT("revived:1")));
-	AWRLootBag::Spill(World, Tame->GetActorLocation() - FVector(0.f, 0.f, Tame->GetSimpleCollisionHalfHeight()) + FVector(0.f, 0.f, 20.f), Tame->TamedBy, { Token });
-	Notify(World, Tame->TamedBy, F.bRevived ? FString::Printf(TEXT("%s has died. Its collar fell where it lay"), *Label(Tame))
-		: FString::Printf(TEXT("%s has died. Its collar fell where it lay: a Dadeni draught at your Hearth within %.0f h can bring it back"), *Label(Tame), T(TEXT("revive.hours"), 72.f)));
+	// The bond carries it home: into its owner's bag if they're on and have room; else where it fell, theirs alone to pick
+	// up, for as long as it can still be brought back (a raider's lucky find is never your tame's way back).
+	bool bHome = false;
+	if (UWRInventoryComponent* OwnerBag = UWRInventoryComponent::FindFor(PlayerNamed(World, Tame->TamedBy))) bHome = OwnerBag->AddInstance(Token);
+	if (!bHome)
+	{
+		if (AWRLootBag* Bag = AWRLootBag::Spill(World, Tame->GetActorLocation() - FVector(0.f, 0.f, Tame->GetSimpleCollisionHalfHeight()) + FVector(0.f, 0.f, 20.f), Tame->TamedBy, { Token }))
+		{
+			Bag->bOwnerOnly = true;
+			Bag->SetLifeSpan(T(TEXT("revive.hours"), 72.f) * 3600.f);
+		}
+	}
+	const FString Where = bHome ? TEXT("Its collar is in your bag") : TEXT("Its collar fell where it lay");
+	Notify(World, Tame->TamedBy, F.bRevived ? FString::Printf(TEXT("%s has died. %s"), *Label(Tame), *Where)
+		: FString::Printf(TEXT("%s has died. %s: a Dadeni draught at your Hearth within %.0f h can bring it back"), *Label(Tame), *Where, T(TEXT("revive.hours"), 72.f)));
 }
 
 namespace WRTameToken
@@ -2451,4 +2463,37 @@ bool AWRCreature::SaddleBoneLocation(FVector& Out) const
 	if (SaddleBoneCache.IsNone() || !Skel || !Skel->IsVisible()) return false;
 	Out = Skel->GetBoneLocation(SaddleBoneCache);
 	return true;
+}
+
+// ---------------------------------------------------------------- the lands' barding
+
+namespace WRTameBarding
+{
+	/** The mount Who is (a tame) or sits on; a player state / controller means its pawn (the mount while riding). */
+	const AWRCreature* MountOf(const AActor* Who)
+	{
+		if (const APlayerState* PS = Cast<APlayerState>(Who)) Who = PS->GetPawn();
+		else if (const AController* C = Cast<AController>(Who)) Who = C->GetPawn();
+		if (const AWRCreature* Self = Cast<AWRCreature>(Who)) return Self->IsTamed() ? Self : nullptr;
+		const AWRCreature* Under = Who ? Cast<AWRCreature>(Who->GetAttachParentActor()) : nullptr;
+		return Under && Under->IsTamed() && Under->GetRider() == Who ? Under : nullptr;
+	}
+}
+
+bool FWRTaming::BardingPass(const AActor* Who, FName Hazard)
+{
+	const AWRCreature* Mount = WRTameBarding::MountOf(Who);
+	const FWRTackDef* Bard = Mount ? Tack(Mount->TameRep.Barding.ItemId) : nullptr;
+	return Bard && !Hazard.IsNone() && Bard->Hazard == Hazard;
+}
+
+float FWRTaming::BardingStat(const AActor* Who, FName Stat)
+{
+	const AWRCreature* Mount = WRTameBarding::MountOf(Who);
+	const FWRTackDef* Bard = Mount ? Tack(Mount->TameRep.Barding.ItemId) : nullptr;
+	if (!Bard || Bard->Hazard.IsNone()) return 0.f;
+	const TSharedPtr<FJsonObject> Map = FWRTuning::Get().Object(TEXT("tame.bardingPass"));
+	const TArray<TSharedPtr<FJsonValue>>* Row = nullptr;
+	if (!Map.IsValid() || !Map->TryGetArrayField(Stat.ToString(), Row) || Row->Num() < 2) return 0.f;
+	return FName(*(*Row)[0]->AsString()) == Bard->Hazard ? float((*Row)[1]->AsNumber()) : 0.f;
 }

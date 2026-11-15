@@ -661,7 +661,8 @@ float UWRInventoryComponent::GearStatFor(const AActor* Who, FName Stat)
 	if (const APlayerState* PS = Cast<APlayerState>(Who)) Inv = PS->FindComponentByClass<UWRInventoryComponent>();
 	else if (const AController* C = Cast<AController>(Who)) Inv = C->PlayerState ? C->PlayerState->FindComponentByClass<UWRInventoryComponent>() : nullptr;
 	else Inv = FindFor(Who);
-	return Inv ? Inv->GearStat(Stat) : 0.f;
+	// A mount's land barding counts for it and its rider (Mirehide through bleedwater, Reefmail's depth: WRTaming).
+	return (Inv ? Inv->GearStat(Stat) : 0.f) + FWRTaming::BardingStat(Who, Stat);
 }
 
 void UWRInventoryComponent::WearArmour(float Amount)

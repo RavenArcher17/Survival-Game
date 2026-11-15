@@ -214,6 +214,11 @@ struct WILDREACH_API FWRTaming
 	static void Sense(AWRCreature* Tame);
 	/** A tame of this owner within Range with the node (by id), or null. */
 	static AWRCreature* TameWithNode(const UWorld* World, const FString& Owner, FName Node, const FVector& Near, float Range);
+	/** Its land's barding carries a mount (and its rider) past that land's hazard (items.json tack.hazard:
+	 *  cooks/cookpass-taming.md L11). Who: the mount, its rider, or their player state / controller. */
+	static bool BardingPass(const AActor* Who, FName Hazard);
+	/** GearStatFor's share from a mount's barding (tuning tame.bardingPass: stat -> [hazard, value]). */
+	static float BardingStat(const AActor* Who, FName Stat);
 	/** A tame's save line and its load. */
 	static TSharedRef<FJsonObject> SaveTame(const AWRCreature* Tame);
 	static void LoadTame(AWRCreature* Tame, const TSharedPtr<FJsonObject>& O);

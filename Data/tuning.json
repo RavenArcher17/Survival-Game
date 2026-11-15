@@ -796,6 +796,7 @@
     "stable": { "perPlayer": 10, "perClaim": 3, "storeRange": 2000, "walkSeconds": 12, "gateOut": 360, "gateReach": 250, "callSeconds": 5 },
     "revive": { "hours": 72, "hearthRange": 800 },
     "soulbond": { "seconds": 60, "wakeHealth": 0.25 },
+    "bardingPass": { "_comment": "A land barding's pass (items.json tack.hazard) as the gear stat its land's hazard reads, for the mount and its rider: stat: [hazard, value]. Storm (strikes) and thorns are read straight from the hazard (WRStorm::ResistsStrikes, WRForest::PassesThornbrake); lava and ice through the Resist tags.", "passBleedwater": ["bleedwater", 1], "passGusts": ["gusts", 1], "passSpores": ["spores", 1], "passWards": ["wards", 1], "passDepth": ["depth", 4000], "corruptionRate": ["corruption", -0.5], "riftDrain": ["rifts", -0.5] },
     "mountEase": { "onSeconds": 0.45, "offSeconds": 0.35, "arc": 30, "clear": 60, "maxWading": 60 },
     "seat": { "hipFlex": 72, "spreadMin": 16, "spreadMax": 34, "spreadPerCm": 0.22, "kneeBend": 76, "footLevel": -4, "pelvisDrop": 8, "leanWalk": 4, "leanGallop": 22, "gallopSpeed": 1100,
       "armForward": 28, "armIn": 10, "elbowBend": 64, "bobMax": 25, "bobFollow": 12, "riderLift": 14 },

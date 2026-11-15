@@ -224,8 +224,8 @@ Open, as of 0.7.1:
   for their items (rows in `machines.json`).
 - **Taming on the island is two lands**: the Windmane (first flying mount) is in creatures.json but never spawns (its Sky
   islands aren't on the map) and wears the Griffon pack body only for testing flight (`WRSpawn windmane`, `WRTameDev
-  now`); it needs its own four-winged sky-stag body. Ten lands' barding is hidden with its land, and only the lava and
-  slick-ice passes are wired (the others' hazards don't exist yet). The Floeback's body is modelled in code, not
+  now`); it needs its own four-winged sky-stag body. Every live land's barding pass is wired (cookpass-taming: `FWRTaming::BardingPass /
+  BardingStat`); the desert's Dunewrap waits for its land. The Floeback's body is modelled in code, not
   sculpted art. Saddle seats per species (`seat`, `back`) are first fits to eyeball. Pen-born farm young still grow on
   the farm's clock, not the baby system. The stable, names, the Dadeni revive and Soulbond are built (cookpass-taming);
   not built: the bone altar's permanent undead tames (necro raising by ritual), each species' own whistle-answer call

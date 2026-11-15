@@ -339,7 +339,8 @@ void AWRLootBag::ApplyDeathPenalty(AWRCharacterBase* Died, AWRPlayerState* PS)
 	{
 		for (TActorIterator<AWRLootBag> It(Died->GetWorld()); It; ++It)
 		{
-			if (It->OwnerName == Who && It->bOwnerOnly)
+			// (A fallen tame's collar isn't your souls: it waits for you; cooks/cookpass-taming.md 3.10.)
+			if (It->OwnerName == Who && It->bOwnerOnly && !It->Items.ContainsByPredicate([](const FWRItemStack& S) { return S.ItemId == TEXT("bond_token"); }))
 			{
 				UE_LOG(LogWildreach, Log, TEXT("DEATH %s's unrecovered souls bag is lost"), *Who);
 				It->Destroy();

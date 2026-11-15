@@ -3,6 +3,7 @@
 // (storm.*): nothing in this file decides where a thing goes, only how it is built and how it behaves.
 
 #include "WRStormWorld.h"
+#include "WRTaming.h"
 #include "Wildreach.h"
 #include "WRBuildLook.h"
 #include "WRBuildLookKit.h"
@@ -532,6 +533,8 @@ bool WRStorm::HasBuff(const AActor* Who, FName Id)
 
 bool WRStorm::ResistsStrikes(const AActor* Actor)
 {
+	// Stormweave barding grounds a mount and the rider on it (cooks/cookpass-taming.md L11).
+	if (FWRTaming::BardingPass(Actor, TEXT("storm"))) return true;
 	const AWRCreature* C = Cast<AWRCreature>(Actor);
 	const FWRCreatureDef* Def = C ? C->GetDef() : nullptr;
 	return Def && (Def->Resists.Contains(TEXT("strike")) || Def->Biome == WRStormDetail::StormBiome());
