@@ -1,6 +1,8 @@
 #include "WRMainMenu.h"
 #include "Engine/NetDriver.h"
 #include "WRReport.h"
+#include "Components/PointLightComponent.h"
+#include "WRCharacter.h"
 #include "WRUIPadKeyboard.h"
 #include "WRIdentity.h"
 #include "WRPadInput.h"
@@ -252,7 +254,7 @@ namespace WRMenuUI
 	{
 	public:
 		SLATE_BEGIN_ARGS(SWRChoice) : _Kind(0) {}
-			SLATE_ARGUMENT(FText, Text)
+			SLATE_ATTRIBUTE(FText, Text)
 			SLATE_ARGUMENT(int32, Kind)
 			SLATE_ARGUMENT(FName, Path)
 			SLATE_EVENT(FOnClicked, OnClicked)
@@ -421,6 +423,7 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot()[SNew(SWRGradientFill).Horizontal(false).Colors({ WRUI::Alpha(Night, 0.55f), WRUI::Alpha(Night, 0.f), WRUI::Alpha(Night, 0.f), WRUI::Alpha(Night, 0.65f) }).Stops({ 0.f, 0.3f, 0.62f, 1.f })]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(72.f * U, 44.f * U, 0.f, 0.f)[MakeTitle()]
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(72.f * U, 226.f * U, 0.f, 0.f)[MakePanel()]
+		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(572.f * U, 226.f * U, 0.f, 0.f)[MakeLookPanel()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 44.f * U, 48.f * U, 0.f)[MakeTip()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 48.f * U, 40.f * U)[MakeUpdate()]
 		+ SOverlay::Slot()[MakeCard()]
@@ -643,6 +646,27 @@ TSharedRef<SWidget> SWRMainMenu::MakePanel()
 							SNew(SWRChoice, [this]() { return Body.IsNone(); }).Text(NSLOCTEXT("WRUI", "Male", "Male")).OnClicked(this, &SWRMainMenu::OnPickBody, FName()),
 							SNew(SWRChoice, [this]() { return Body == TEXT("f"); }).Text(NSLOCTEXT("WRUI", "Female", "Female")).OnClicked(this, &SWRMainMenu::OnPickBody, FName(TEXT("f")))))
 					]
+					// Look: the face and build on one line; Change opens the picker beside the panel.
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 11.f * U, 0.f, 0.f)
+					[
+						FieldRow(NSLOCTEXT("WRUI", "LookRow", "Look"),
+							SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.5f), 5.f, FLinearColor::Black, 1.f)).Padding(3.f * U)
+							[
+								SNew(SHorizontalBox)
+								+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(10.f * U, 0.f)
+								[
+									WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return LookSummary(); }), WRUI::Body(14, 700), WRUI::Ink)
+								]
+								+ SHorizontalBox::Slot().AutoWidth()
+								[
+									SNew(SBox).WidthOverride(110.f * U)
+									[
+										SNew(SWRChoice, [this]() { return bLookOpen; }).Text(NSLOCTEXT("WRUI", "LookChange", "Change"))
+										.OnClicked_Lambda([this]() { bLookOpen = !bLookOpen; if (bLookOpen) ApplyPreview(); else EndFraming(); return FReply::Handled(); })
+									]
+								]
+							])
+					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 11.f * U, 0.f, 0.f)
 					[
 						FieldRow(NSLOCTEXT("WRUI", "Path", "Path"), MakePathPicker())
@@ -799,6 +823,11 @@ void SWRMainMenu::Tick(const FGeometry& Geo, const double Time, const float Delt
 		if (bCardNav) WRInput::AddNavRoot(CardPanel.ToSharedRef(), 100);
 		else WRInput::RemoveNavRoot(CardPanel);
 	}
+	// The look picker frames the survivor while it's open.
+	if (bLookOpen)
+	{
+		FrameSurvivor(Delta);
+	}
 	// The card's countdown to the next Rejoin try.
 	if (CardKind == 1 && NextRejoinAt > 0.0 && FPlatformTime::Seconds() >= NextRejoinAt)
 	{
@@ -891,7 +920,166 @@ void SWRMainMenu::SetLook(int32 Face, int32 Build, bool bHideHelmet)
 FReply SWRMainMenu::OnPickBody(FName InBody)
 {
 	Body = InBody;
+	// The other body has its own faces: keep the index inside its list, and show it on the survivor if looking.
+	LookFace = FMath::Clamp(LookFace, 0, FMath::Max(0, FaceNames().Num() - 1));
+	SetLook(LookFace, LookBuild, bLookHideHelmet);
+	if (bLookOpen) ApplyPreview();
 	return FReply::Handled();
+}
+
+TArray<FString> SWRMainMenu::FaceNames() const
+{
+	TArray<FString> Out;
+	const TSharedPtr<FJsonObject> Art = FWRTuning::LoadDataFile(TEXT("player_art.json"));
+	const TSharedPtr<FJsonObject>* Hero = nullptr;
+	const TSharedPtr<FJsonObject>* Sex = nullptr;
+	const TArray<TSharedPtr<FJsonValue>>* Faces = nullptr;
+	if (Art.IsValid() && Art->TryGetObjectField(TEXT("hero"), Hero) && (*Hero)->TryGetObjectField(Body == TEXT("f") ? TEXT("f") : TEXT("m"), Sex) && (*Sex)->TryGetArrayField(TEXT("faces"), Faces))
+	{
+		for (const TSharedPtr<FJsonValue>& F : *Faces)
+		{
+			FString Name;
+			const TSharedPtr<FJsonObject>* O = nullptr;
+			if (F.IsValid() && F->TryGetObject(O)) (*O)->TryGetStringField(TEXT("name"), Name);
+			Out.Add(Name.IsEmpty() ? FString::Printf(TEXT("Face %d"), Out.Num() + 1) : Name);
+		}
+	}
+	if (Out.Num() == 0) Out.Add(TEXT("Face 1"));
+	return Out;
+}
+
+FText SWRMainMenu::LookSummary() const
+{
+	const TArray<FString> Faces = FaceNames();
+	static const TCHAR* BuildsM[] = { TEXT("Lean"), TEXT("Athletic"), TEXT("Strong") };
+	static const TCHAR* BuildsF[] = { TEXT("Slim"), TEXT("Athletic"), TEXT("Curvy") };
+	const int32 B = FMath::Clamp(LookBuild, 0, 2);
+	return FText::FromString(FString::Printf(TEXT("%s  ·  %s"), *Faces[FMath::Clamp(LookFace, 0, Faces.Num() - 1)], Body == TEXT("f") ? BuildsF[B] : BuildsM[B]));
+}
+
+TSharedRef<SWidget> SWRMainMenu::MakeLookPanel()
+{
+	using namespace WRMenuUI;
+	GetLook(LookFace, LookBuild, bLookHideHelmet);
+	const auto Section = [](const FText& T) { return WRUI::Text(T, Spaced(WRUI::Caps(12), 80), WRUI::Ink2); };
+	// The faces: one choice each, by name (up to the art's count for either body: player_art.json has six each).
+	TSharedRef<SVerticalBox> FaceList = SNew(SVerticalBox);
+	for (int32 i = 0; i < 12; ++i)
+	{
+		FaceList->AddSlot().AutoHeight().Padding(0.f, i > 0 ? 4.f * U : 0.f, 0.f, 0.f)
+		[
+			SNew(SBox).Visibility_Lambda([this, i]() { return i < FaceNames().Num() ? EVisibility::Visible : EVisibility::Collapsed; })
+			[
+				SNew(SWRChoice, [this, i]() { return LookFace == i; })
+				.Text_Lambda([this, i]() { const TArray<FString> N = FaceNames(); return FText::FromString(N.IsValidIndex(i) ? N[i] : FString()); })
+				.OnClicked_Lambda([this, i]() { LookFace = i; SetLook(LookFace, LookBuild, bLookHideHelmet); ApplyPreview(); return FReply::Handled(); })
+			]
+		];
+	}
+	const auto BuildChoice = [this](int32 B, const FText& M, const FText& F)
+	{
+		return SNew(SWRChoice, [this, B]() { return LookBuild == B; })
+			.Text_Lambda([this, M, F]() { return Body == TEXT("f") ? F : M; })
+			.OnClicked_Lambda([this, B]() { LookBuild = B; SetLook(LookFace, LookBuild, bLookHideHelmet); ApplyPreview(); return FReply::Handled(); });
+	};
+	return SNew(SBox).WidthOverride(330.f * U).Visibility_Lambda([this]() { return bLookOpen ? EVisibility::Visible : EVisibility::Collapsed; })
+	[
+		SNew(SWRPanel).Kind(EWRPanel::Leather).Rivets(true).Padding(FMargin(20.f * U, 16.f * U))
+		[
+			SNew(SVerticalBox)
+			+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(NSLOCTEXT("WRUI", "LookTitle", "Your look"), Spaced(WRUI::Title(14), 60), WRUI::Ink, true)]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)
+			[
+				WRUI::Text(NSLOCTEXT("WRUI", "LookSub", "Shown on your survivor behind the menu. Change it any time here."), WRUI::Body(12, 500), WRUI::Ink3, false, true)
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 6.f * U)[Section(NSLOCTEXT("WRUI", "LookFace", "Face"))]
+			+ SVerticalBox::Slot().AutoHeight()[FaceList]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 6.f * U)[Section(NSLOCTEXT("WRUI", "LookBuild", "Build"))]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 2.f * U, 0.f)[BuildChoice(0, NSLOCTEXT("WRUI", "BuildLean", "Lean"), NSLOCTEXT("WRUI", "BuildSlim", "Slim"))]
+				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(2.f * U, 0.f)[BuildChoice(1, NSLOCTEXT("WRUI", "BuildAthletic", "Athletic"), NSLOCTEXT("WRUI", "BuildAthletic", "Athletic"))]
+				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(2.f * U, 0.f, 0.f, 0.f)[BuildChoice(2, NSLOCTEXT("WRUI", "BuildStrong", "Strong"), NSLOCTEXT("WRUI", "BuildCurvy", "Curvy"))]
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 6.f * U)[Section(NSLOCTEXT("WRUI", "LookHelmet", "Helmet"))]
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				ChoicePair(
+					SNew(SWRChoice, [this]() { return !bLookHideHelmet; }).Text(NSLOCTEXT("WRUI", "HelmetShown", "Shown"))
+					.OnClicked_Lambda([this]() { bLookHideHelmet = false; SetLook(LookFace, LookBuild, false); ApplyPreview(); return FReply::Handled(); }),
+					SNew(SWRChoice, [this]() { return bLookHideHelmet; }).Text(NSLOCTEXT("WRUI", "HelmetHidden", "Hidden"))
+					.OnClicked_Lambda([this]() { bLookHideHelmet = true; SetLook(LookFace, LookBuild, true); ApplyPreview(); return FReply::Handled(); }))
+			]
+			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 16.f * U, 0.f, 0.f)
+			[
+				SNew(SWRButton).Primary(true).FontSize(13).MinHeight(42.f * U).Text(NSLOCTEXT("WRUI", "LookDone", "Done"))
+				.OnClicked_Lambda([this]() { bLookOpen = false; EndFraming(); return FReply::Handled(); })
+			]
+		]
+	];
+}
+
+void SWRMainMenu::ApplyPreview()
+{
+	APlayerController* PC = Owner.Get();
+	if (AWRCharacter* Me = PC ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr)
+	{
+		Me->PreviewLook(Body, uint8(FMath::Clamp(LookFace, 0, 255)), uint8(FMath::Clamp(LookBuild, 0, 255)), bLookHideHelmet);
+	}
+}
+
+void SWRMainMenu::FrameSurvivor(float DeltaTime)
+{
+	APlayerController* PC = Owner.Get();
+	ACameraActor* Cam = Backdrop.Get();
+	const APawn* Me = PC ? PC->GetPawn() : nullptr;
+	if (!Cam || !Me) return;
+	// A portrait framing: chest-high, a little off the face's line, the camera kept out of rock by testing a few angles.
+	const FVector Target = Me->GetActorLocation() + FVector(0.f, 0.f, WRTune(TEXT("flow.lookCamera.height"), 45.f));
+	const float Dist = WRTune(TEXT("flow.lookCamera.distance"), 300.f);
+	const float Yaw0 = Me->GetActorRotation().Yaw + WRTune(TEXT("flow.lookCamera.yaw"), 20.f);
+	FVector Best = Target + FRotator(-6.f, Yaw0, 0.f).Vector() * Dist;
+	for (const float Turn : { 0.f, -40.f, 40.f, -80.f, 80.f, 180.f })
+	{
+		const FVector Try = Target + FRotator(-6.f, Yaw0 + Turn, 0.f).Vector() * Dist;
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRLookCamera), false, Me);
+		if (!Me->GetWorld()->LineTraceSingleByChannel(Hit, Target, Try, ECC_Camera, Q))
+		{
+			Best = Try;
+			break;
+		}
+	}
+	const FRotator Look = (Target - Best).Rotation();
+	// Eased toward the framing so opening the picker glides rather than cuts.
+	const float Alpha = FMath::Clamp(DeltaTime * 4.f, 0.f, 1.f);
+	Cam->SetActorLocationAndRotation(FMath::Lerp(Cam->GetActorLocation(), Best, Alpha), FMath::RInterpTo(Cam->GetActorRotation(), Look, DeltaTime, 4.f));
+	Cam->GetCameraComponent()->SetFieldOfView(WRTune(TEXT("flow.lookCamera.fov"), 40.f));
+	// A soft warm key light beside the camera, so the face reads at night too.
+	if (!LookLight.IsValid())
+	{
+		UPointLightComponent* L = NewObject<UPointLightComponent>(Cam);
+		L->SetupAttachment(Cam->GetRootComponent());
+		L->SetRelativeLocation(FVector(0.f, -120.f, 80.f));
+		L->SetIntensityUnits(ELightUnits::Candelas);
+		L->SetIntensity(WRTune(TEXT("flow.lookCamera.light"), 120.f));
+		L->SetAttenuationRadius(WRTune(TEXT("flow.lookCamera.lightRadius"), 900.f));
+		L->SetLightColor(FLinearColor(1.f, 0.88f, 0.74f));
+		L->SetCastShadows(false);
+		L->RegisterComponent();
+		LookLight = L;
+	}
+}
+
+void SWRMainMenu::EndFraming()
+{
+	if (UPointLightComponent* L = LookLight.Get()) L->DestroyComponent();
+	LookLight.Reset();
+	if (APlayerController* PC = Owner.Get())
+	{
+		ShowBackdrop(PC, true);   // back to the island view
+	}
 }
 
 FString SWRMainMenu::Options() const
