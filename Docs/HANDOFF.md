@@ -360,6 +360,10 @@ POIs to `island_dressing.json` (dressing.mjs keeps them). The caves are one sign
 meshed by surface nets in `AWRCrystalCaves`, so what you see, stand on and what `WRCrystal::InCave` answers agree.
 Crystal linings glow through `M_CrystalGlow` (`Tools/terrain/build_crystal_materials.py`, a commandlet). Scenery:
 `WRCrystalScenery*.cpp` on the forest's FBuild with the kit `WRCrystalLook.h`; built by `UWRCrystalWorld`.
+The live half is `WRCrystalThings.*`: `WRCrystal::Emit` is the one noise entry (call it from anything new that makes
+a sound in the caves: the server hears it on `UWRCrystalWorld::OnNoise`, every machine's crystals light from it), the
+keystone chimes and keepsakes are `AWRCrystalSpot` (E: `world crystal spot`), `AWRCrystalState` replicates the halls'
+keystone light. Numbers: tuning `crystalWorld` (noise radii, light, nodes, Saga's night place).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

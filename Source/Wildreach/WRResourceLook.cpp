@@ -1,4 +1,5 @@
 #include "WRResourceLook.h"
+#include "WRCrystalTypes.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
 #include "WRResourceNode.h"
@@ -139,6 +140,13 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("black_rye") || Item == TEXT("asphodel")) Body = FVector2D(120.f, 230.f);
 	else if (Item == TEXT("wax")) Body = FVector2D(140.f, 220.f);
 	else if (Item == TEXT("yew_log")) Body = FVector2D(110.f, 420.f);
+	// The Crystal caves' (cooks/build-biome-crystal.md 2.7): a resonant cluster on its rind, an amethyst druse, selenite
+	// stubs, doubling spar, a dust drift, an ochre floor, the dark-grown crops.
+	else if (Item == TEXT("resonant_crystal")) Body = FVector2D(200.f, 300.f);
+	else if (Item == TEXT("gem_amethyst") || Item == TEXT("doubling_spar")) Body = FVector2D(140.f, 200.f);
+	else if (Item == TEXT("selenite")) Body = FVector2D(150.f, 220.f);
+	else if (Item == TEXT("crystal_dust") || Item == TEXT("ochre")) Body = FVector2D(220.f, 200.f);
+	else if (Item == TEXT("candle_rhubarb") || Item == TEXT("glowmelon")) Body = FVector2D(130.f, 230.f);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
@@ -186,6 +194,10 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	else if (Item == TEXT("wax"))
 	{
 		Main = Sphere;
+	}
+	else if (Item == TEXT("candle_rhubarb") || Item == TEXT("glowmelon"))
+	{
+		Main = LoadMesh(Shrub(Item == TEXT("glowmelon") ? TEXT("A") : TEXT("D")));
 	}
 	else if (Item == TEXT("berries") || Item == TEXT("fiber"))
 	{
@@ -336,6 +348,72 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		{
 			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(110.f, 220.f), Len = Rand.FRandRange(90.f, 170.f);
 			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 6.f), FRotator(88.f, FMath::RadiansToDegrees(A) + Rand.FRandRange(-40.f, 40.f), 0.f), FVector(9.f, 8.f, Len));
+		}
+	}
+	else if (Item == TEXT("resonant_crystal") || Item == TEXT("gem_amethyst") || Item == TEXT("selenite") || Item == TEXT("doubling_spar"))
+	{
+		// The rind the crystal grows from (a geode wall's basalt and agate, crystal 2.6) and the crystal itself, modelled
+		// point by point in M_CrystalGlow so it lights by sound with its hall (WRCrystal::NodeLook).
+		const bool bBig = Item == TEXT("resonant_crystal");
+		Place(Fit(Main, FVector(bBig ? 210.f : 140.f, bBig ? 180.f : 120.f, bBig ? 60.f : 40.f), 20.f, FRotator(Rand.FRandRange(-5.f, 5.f), 0.f, Rand.FRandRange(-5.f, 5.f))));
+		Tint(RockMaterial(Node, Item == TEXT("selenite") ? FLinearColor(FColor(64, 60, 58)) * 0.6f : FLinearColor(FColor(28, 28, 32)) * 0.7f));
+		Bits->SetStaticMesh(Shard);
+		// Agate bands where the rind broke: cream and rust chips round the foot.
+		Bits->SetMaterial(0, RockMaterial(Node, (Seed % 2 ? FLinearColor(FColor(230, 216, 192)) : FLinearColor(FColor(168, 90, 58))) * 1.6f));
+		for (int32 k = 0; k < 5; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(bBig ? 90.f : 60.f, bBig ? 130.f : 80.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 8.f), FRotator(Rand.FRandRange(-20.f, 20.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(22.f, 14.f, 9.f));
+		}
+		WRCrystal::NodeLook(Node, Item, Seed);
+	}
+	else if (Item == TEXT("crystal_dust"))
+	{
+		// A dust drift under a lining (crystal 2.7): lilac-white powder heaped against the wall, fallen points in it.
+		Place(Fit(Main, FVector(260.f, 200.f, 34.f), 12.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(216, 208, 255)) * 2.4f));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(150, 110, 210)) * 1.8f));
+		for (int32 k = 0; k < 8; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(10.f, 100.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D * 0.8f, 12.f), FRotator(Rand.FRandRange(60.f, 90.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(5.f, 5.f, Rand.FRandRange(14.f, 30.f)));
+		}
+	}
+	else if (Item == TEXT("ochre"))
+	{
+		// An ochre floor in a lava tube (crystal 2.7): red earth over the black glaze, scraped into ridges.
+		Place(Fit(Main, FVector(280.f, 220.f, 22.f), 12.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(150, 64, 36)) * 1.5f));
+		Bits->SetStaticMesh(Shard);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(178, 86, 48)) * 1.7f));
+		for (int32 k = 0; k < 6; ++k) Bit(FVector(-100.f + k * 40.f, Rand.FRandRange(-30.f, 30.f), 10.f), FRotator(0.f, Rand.FRandRange(-15.f, 15.f), 0.f), FVector(16.f, 120.f, 8.f));
+	}
+	else if (Item == TEXT("candle_rhubarb"))
+	{
+		// Candle rhubarb (survival-crafting: grown in the dark): forced stalks, crimson, with small pale-yellow leaves
+		// that never greened, standing up out of the Wax Fields' dark soil.
+		Place(Fit(Main, FVector(120.f, 120.f, 70.f), 4.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(214, 206, 120)) * 1.6f));
+		Bits->SetStaticMesh(Cylinder);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(176, 30, 52)) * 1.9f));
+		for (int32 k = 0; k < 11; ++k)
+		{
+			const float A = k * 2.f * PI / 11.f + Rand.FRandRange(-0.2f, 0.2f), H = Rand.FRandRange(50.f, 95.f);
+			Bit(FVector(FMath::Cos(A) * 12.f, FMath::Sin(A) * 12.f, H * 0.5f), FRotator(FMath::Cos(A) * 9.f, 0.f, FMath::Sin(A) * 9.f), FVector(4.f, 4.f, H));
+		}
+	}
+	else if (Item == TEXT("glowmelon"))
+	{
+		// Glowmelons in the Steam Baths' warm dark: pale green rinds on a sprawling vine, lit faintly from inside.
+		Place(Fit(Main, FVector(150.f, 150.f, 50.f), 4.f));
+		Tint(RockMaterial(Node, FLinearColor(FColor(70, 96, 64))));
+		Bits->SetStaticMesh(Sphere);
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(FColor(170, 236, 170)) * 3.f));
+		for (int32 k = 0; k < 4; ++k)
+		{
+			const float A = k * 1.57f + Rand.FRandRange(-0.4f, 0.4f), D = Rand.FRandRange(30.f, 60.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 14.f), FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(34.f, 28.f, 26.f));
 		}
 	}
 	else if (Item == TEXT("voidglass"))

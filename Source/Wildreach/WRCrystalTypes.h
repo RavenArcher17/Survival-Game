@@ -160,4 +160,14 @@ namespace WRCrystal
 	/** The sub-zone: C1 the Basalt Mouths (surface), the Severance, C2 Geode Halls, C3 Crystal Forests, C4 Echo
 	 *  Tunnels, C5 Ward Chambers, V the Silent Vault; None off the land. */
 	WILDREACH_API FName ZoneAt(const FVector& Pos);
+
+	// The noise model (WRCrystalThings.cpp; crystal 2.1: sound makes light; radii in tuning crystalWorld.noise).
+	/** Server: a noise here (its radius cm, who made it, its kind). Nothing outside the Crystal land. */
+	WILDREACH_API void Emit(const UObject* WorldContext, const FVector& At, float Radius, AActor* Instigator, FName Kind);
+	/** A kind's radius (walk, run, sprint, roll, land, hitCreature, hitCrystal, cast, bellow, chime, stone, arrow...). */
+	WILDREACH_API float NoiseRadius(FName Kind);
+	/** How far this character's footsteps carry right now (0: still, crouched, in the air or the water). */
+	WILDREACH_API float StepRadius(const AActor* Who);
+	/** The crystal cluster of a node (resonant crystal, amethyst, selenite, doubling spar) in M_CrystalGlow. */
+	WILDREACH_API void NodeLook(AActor* Node, FName Item, uint32 Seed);
 }

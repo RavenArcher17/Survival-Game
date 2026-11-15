@@ -131,6 +131,15 @@ void UWRCrystalWorld::Tick(float DeltaTime)
 		if (!bSceneryDone) return;
 	}
 	if (World->GetNetMode() != NM_DedicatedServer) StepLights(DeltaTime);
+	// The live half (WRCrystalThings.cpp): the server's nodes, chimes and keepsakes once, its hearing, Saga's day and
+	// night; every machine with a view lights the crystals.
+	if (World->GetNetMode() != NM_Client)
+	{
+		if (!bServerDone) { bServerDone = true; SpawnServerActors(); }
+		StepServerNoise(DeltaTime);
+		StepVenn(DeltaTime);
+	}
+	if (World->GetNetMode() != NM_DedicatedServer) StepLight(DeltaTime);
 }
 
 void UWRCrystalWorld::StepLights(float Dt)

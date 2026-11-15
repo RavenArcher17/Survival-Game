@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRCrystalWorld.h"
 #include "WRWindPath.h"
 #include "WRVoidHazards.h"
 #include "WRVoidWorld.h"
@@ -314,6 +315,19 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 				if (*It != OtherActor && FVector::Dist(It->GetActorLocation(), At) < FMath::Max(SplashRadius, 150.f) + 100.f) WRPortals::HitThing(*It, By, Hit.Damage, bFireShot);
 			}
 		}
+	}
+	// The Crystal caves (WRCrystalThings): an arrow, a bolt or a thrown stone landing is a noise (a Glassleg bow's arrows
+	// half one), and one that lands on a hall's keystone chime strikes it. A spell bolt rings like a cast.
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		AWRCharacterBase* By = const_cast<AWRCharacterBase*>(Caster);
+		bool bQuiet = false;
+		if (const UWRInventoryComponent* Inv = By ? UWRInventoryComponent::FindFor(By) : nullptr)
+		{
+			const FName Bow = Inv->GetEquipped(EWREquipSlot::Ranged).ItemId;
+			bQuiet = !Bow.IsNone() && FWRTuning::Get().Str(TEXT("crystalWorld.quietBows"), TEXT("glassleg_bow")).Contains(Bow.ToString());
+		}
+		UWRCrystalWorld::ProjectileLanded(this, At, By, Kind, bQuiet);
 	}
 	// The Ancient forest's things: an arrow brings a widowmaker limb down or stirs a wasp nest; fire landing (a fire
 	// bolt, a fire pot) burns a lane through thornbrake and the barred door's bark (WRForestHazards).

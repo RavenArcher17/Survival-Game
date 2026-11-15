@@ -688,11 +688,23 @@ float UWRInventoryComponent::GemStat(FName Stat) const
 	{
 		Total += W->Innate.FindRef(Stat);
 	}
+	// Runes in the sockets work at more than full with the Carver's Chisel worn (worn runePower: +25%, crystal 2.19.2).
+	float RuneScale = -1.f;
 	for (const FName& Gem : EquippedWeapon.Sockets)
 	{
 		if (const FWRItemDef* Def = FWRItemRegistry::Get().Find(Gem))
 		{
-			Total += Def->GemStats.FindRef(Stat);
+			float V = Def->GemStats.FindRef(Stat);
+			if (V != 0.f && Def->Category == TEXT("rune"))
+			{
+				if (RuneScale < 0.f)
+				{
+					const FWRItemDef* T = EquippedTalisman.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedTalisman.ItemId);
+					RuneScale = 1.f + (T ? T->Worn.FindRef(TEXT("runePower")) : 0.f);
+				}
+				V *= RuneScale;
+			}
+			Total += V;
 		}
 	}
 	return Total;

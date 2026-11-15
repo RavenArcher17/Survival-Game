@@ -1341,7 +1341,8 @@ void UWRSurvivalComponent::TickLight(AWRCharacterBase* Pawn, float DeltaTime)
 		else if (FWRItemStack* Slot = Inv->GetEquippedMutable(EWREquipSlot::Light))
 		{
 			// Burn time is the item's durability, in seconds; rain makes a torch burn faster (a lantern's flame is shut in).
-			Slot->Durability = FMath::Max(0.f, Slot->Durability - DeltaTime * (Kind == TEXT("torch") ? WBurn : 1.f));
+			// A light that needs no fuel (lights.<id>.noFuel: the Lumen lantern's antler shard) never burns down.
+			if (!LightFlag(LightItem, TEXT("noFuel"))) Slot->Durability = FMath::Max(0.f, Slot->Durability - DeltaTime * (Kind == TEXT("torch") ? WBurn : 1.f));
 			if (Slot->Durability <= 0.f)
 			{
 				const FName Fuel = FName(*FWRTuning::Get().Str(FString::Printf(TEXT("lights.%s.fuel"), *LightItem.ToString()), FString()));

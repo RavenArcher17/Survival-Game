@@ -10,9 +10,19 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "WRForestWorld.h"
+#include "WRCrystalThings.h"
+#include "WRResourceNode.h"
+#include "Components/PointLightComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "WRCrystalWorld.generated.h"
 
 class AWRCrystalCaves;
+class AWRCrystalState;
+class AWRCrystalSpot;
+class AWRCharacterBase;
+class AWRPlayerController;
+class AWRResourceNode;
+class UMaterialInstanceDynamic;
 class UPointLightComponent;
 
 /** One place of the Crystal caves, modelled in code at real scale on the forest's FBuild (the kit: WRCrystalLook.h).
@@ -50,7 +60,67 @@ public:
 	bool IsBuilt() const { return bActive && bSceneryDone; }
 	AWRCrystalCaves* Caves() const { return CavesActor.Get(); }
 
+	// ---- the noise model and the light (WRCrystalThings.cpp; crystal 2.1) ----
+	/** Server: every noise heard in the Crystal caves (where, its radius cm, who made it, its kind: step, land, hit,
+	 *  cast, roll, chime, crystal, pick, land_shot, bellow...). Echobats, chandeliers, the Vault door listen. */
+	TMulticastDelegate<void(const FVector&, float, AActor*, FName)> OnNoise;
+	/** Every machine: light the crystals round a noise (Key: the same key moves its own ring: a walker's steps). */
+	void Light(const FVector& At, float Radius, float Strength, const void* Key);
+	/** A crystal outside the halls' linings that lights with them (a node's cluster, an outcrop). */
+	void RegisterGlow(UMaterialInstanceDynamic* MID, const FVector& At);
+	/** Server: a hall's keystone chime struck (lit 20 game minutes, the chime's noise, Saga's quest count). */
+	void StrikeKeystone(int32 Hall, AWRCharacterBase* By, AWRCrystalSpot* Spot);
+	/** Server: an arrow, bolt or stone came down here (its noise; a keystone chime it lands on rings). */
+	static void ProjectileLanded(const UObject* WorldContext, const FVector& At, AActor* By, FName Kind, bool bQuiet);
+	/** The signature resource's yield multiplier now (the plenty after rain, the Resonance). */
+	float SignatureScale() const;
+	/** The Resonance's multiplier on resonant crystal and its glow on every lining (WRCrystalEvents sets them). */
+	float ResonanceYield = 1.f;
+	float ResonanceGlow = 0.f;
+	AWRCrystalState* GetState() const { return State.Get(); }
+	const TArray<TWeakObjectPtr<AWRResourceNode>>& GetNodes() const { return Nodes; }
+	AWRCrystalSpot* SpotNear(const FVector& At) const;
+	/** Every machine: a spot came into this world (its BeginPlay), so the E prompt can find it. */
+	void AddSpot(AWRCrystalSpot* Spot) { Spots.AddUnique(Spot); }
+	/** E at a crystal spot (the interaction chain in WRWorldNpc, the command in WRWorldSystems: world crystal spot). */
+	static bool Prompt(const AWRPlayerController* PC, FString& OutTarget, FString& OutVerb);
+	static bool ClientInteract(AWRPlayerController* PC);
+	static FString Command(AWRPlayerController* PC, const TArray<FString>& Args);
+
 private:
+	struct FRing
+	{
+		FVector At = FVector::ZeroVector;
+		float Radius = 0.f;
+		float Strength = 0.f;
+		float Age = 0.f;        // 0..1 over the fade
+		const void* Key = nullptr;
+		float Now() const { return Strength * FMath::Max(0.f, 1.f - Age); }
+	};
+	struct FGlow { TWeakObjectPtr<UMaterialInstanceDynamic> MID; FVector At; int32 Hall = -1; };
+	void SpawnServerActors();
+	void StepLight(float Dt);
+	void StepServerNoise(float Dt);
+	void StepVenn(float Dt);
+	/** Per hall (FWRCrystalData::Halls index), then one loose set for the surface: up to four rings each. */
+	TArray<TArray<FRing>> HallRings;
+	TArray<float> HallLit;
+	TArray<FGlow> ExtraGlows;
+	/** The halls' lights (owned by the caves actor), made the first time the view comes near. */
+	TMap<int32, TArray<TWeakObjectPtr<UPointLightComponent>>> HallLights;
+	TWeakObjectPtr<AWRCrystalState> State;
+	TArray<TWeakObjectPtr<AWRCrystalSpot>> Spots;
+	TArray<TWeakObjectPtr<AWRResourceNode>> Nodes;
+	TMap<TWeakObjectPtr<AActor>, double> FallStart;
+	bool bServerDone = false;
+	float StepClock = 0.f;
+	float ServerStepClock = 0.f;
+	float VennClock = 0.f;
+	int32 VennPhase = 0;
+	FVector VennHome = FVector::ZeroVector;
+	FRotator VennFace = FRotator::ZeroRotator;
+	mutable double RainSeenAt = -1.0;
+
 	struct FPiece
 	{
 		FName Kind, Id;

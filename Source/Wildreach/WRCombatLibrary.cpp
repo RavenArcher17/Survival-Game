@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRCrystalTypes.h"
 #include "WRWindPath.h"
 #include "WRSkyAir.h"
 #include "WRVoidHazards.h"
@@ -461,6 +462,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			return Done(EWRHitResult::Ignored);
 		}
 		Target->NotifyAttackedBy(Attacker);
+		// A blow landing is a 12 m noise in the Crystal caves (crystal 2.1).
+		WRCrystal::Emit(Target, Target->GetActorLocation(), WRCrystal::NoiseRadius(TEXT("hitCreature")), Attacker, TEXT("hit"));
 		// Remember who's fighting whom (tames help their owner).
 		Attacker->CombatTarget = Target;
 		Target->CombatTarget = Attacker;

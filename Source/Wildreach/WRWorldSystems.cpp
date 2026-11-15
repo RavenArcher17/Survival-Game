@@ -13,6 +13,7 @@
 #include "WRGraveWorld.h"
 #include "WRSkyWorld.h"
 #include "WRGraveTypes.h"
+#include "WRCrystalWorld.h"
 #include "WRSwampBosses.h"
 #include "WRDeeds.h"
 #include "Wildreach.h"
@@ -928,6 +929,14 @@ void UWRWorldSystems::PlaceShrines()
 			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
 			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Ground)) continue;
 			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
+			// Under the ground with a floor height (map metres; the Crystal caves' halls): it stands on that floor, not the
+			// plateau above it.
+			if (Row->HasField(TEXT("floor")))
+			{
+				const FWRLandDef* LD = WRLand::Find(OnLand);
+				if (!LD) continue;
+				Ground = LD->ToWorld(FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), WNumOf(Row, TEXT("floor"), 0.f));
+			}
 			// Under the ground: a shrine in a catacomb room stands on the room's floor (the Graveyard's Watchers' Vault).
 			const FString Room = WStrOf(Row, TEXT("room"));
 			if (!Room.IsEmpty())
@@ -1009,6 +1018,11 @@ void UWRWorldSystems::PlaceMasters()
 			// On a runtime land (Maren Vey at the Shrine of the Edge): the land's map metres on its height function.
 			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
 			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Spot)) continue;
+			// Under the ground (Saga Venn on the Great Hexafoil's floor): the row's floor height, map metres.
+			if (Row->HasField(TEXT("floor")))
+			{
+				if (const FWRLandDef* LD = WRLand::Find(OnLand)) Spot = LD->ToWorld(FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), WNumOf(Row, TEXT("floor"), 0.f));
+			}
 			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
 			bLandPlace = true;
 		}
@@ -2418,6 +2432,11 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	{
 		// The Sky's world (WRSkyWorld): world sky shard | lift | line | spot.
 		return UWRSkyWorld::Command(PC, Args);
+	}
+	if (Verb == TEXT("crystal"))
+	{
+		// The Crystal caves (WRCrystalThings): world crystal spot.
+		return UWRCrystalWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("grave"))
 	{

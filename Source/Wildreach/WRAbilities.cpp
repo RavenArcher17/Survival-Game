@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRCrystalTypes.h"
 #include "WRInventory.h"
 #include "WRWindPath.h"          // Sky lord's swings and dodge
 #include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
@@ -256,6 +257,8 @@ bool UWRGameplayAbility::CommitAbility(const FGameplayAbilitySpecHandle Handle, 
 			// Artifacts: Blood-price (every Wildbrand and spell costs health), Wardcarver's Chime (spells ring out).
 			WRArtifacts::OnAbilityUsed(Hero, IsA<UWRGA_Spell>() || IsA<UWRGA_AreaSpell>());
 		}
+		// A path ability is a 10 m noise in the Crystal caves (crystal 2.1).
+		if (AActor* Avatar = GetAvatarActorFromActorInfo()) WRCrystal::Emit(Avatar, Avatar->GetActorLocation(), WRCrystal::NoiseRadius(TEXT("cast")), Avatar, TEXT("cast"));
 	}
 	return true;
 }
@@ -1672,6 +1675,8 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
 		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
 		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), bBackstep ? 0.7f : 1.f);  // (the dodge sound is the audio director's)
+		// In the Crystal caves a roll is an 8 m noise (crystal 2.1): the crystals light and the hunters hear it.
+		WRCrystal::Emit(Character, Feet, WRCrystal::NoiseRadius(TEXT("roll")), Character, TEXT("roll"));
 		// Vanish (sneaking perk): the roll breaks the sight of the creatures on you, for a moment.
 		const float Vanish = UWRLifeSkillsComponent::StatFor(Character, TEXT("vanish"));
 		if (Vanish > 0.f && !bOverloaded)

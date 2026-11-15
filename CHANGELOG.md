@@ -7,6 +7,30 @@ cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in piece
 not played here (Aaron tests). Hidden until it's whole: `crystal` is not in `world.liveBiomes`, so nothing below is
 built in a running game yet.
 
+- **Crystal (2): the gathering, sound makes light, the keystone chimes, the rows.** The noise model
+  (`WRCrystalThings.cpp`, radii in tuning `crystalWorld.noise`): every blow that lands (12 m), path ability (10 m), roll
+  (8 m), landing from a jump (6 m), strike on crystal (20 m), keystone chime (25 m), arrow or thrown stone landing (6 / 15
+  m; a Glassleg bow's arrows half) is heard by the server (`UWRCrystalWorld::OnNoise`, for the listeners to come) and sent
+  to every machine as one unreliable message (`AWRCrystalState::MulticastNoise`); footsteps (walk 4 / run 8 / sprint 15
+  m, crouched silent; a big creature louder) are sampled on the server for the listeners and worked out on each machine
+  for the light. Each hall's lining carries four rings of noise (`M_CrystalGlow` RingA..D / RingS, fading over 6 s) and
+  up to three point lights at its densest clusters that follow them; the drip song lifts the upper Geode Halls' resting
+  glow in rain. **Keystone chimes** in every hall that has one: E (or an arrow landing on the bar) strikes it, the hall
+  holds lit 20 game minutes (`HallLitUntil`, replicated). **The gathering**: 50 resonant crystal nodes plus dust,
+  selenite, doubling spar, amethyst, saltpetre, ochre, wax, copper, tin, iron, coal seams (charcoal), silver, star iron,
+  gem clusters, wild candle rhubarb and glowmelon (their seeds come with them), from `Data/crystal.json resources`;
+  resonant crystal is **picked on the ring** (a strike while the last one still rings, 1.2 s, gives one more, a brighter
+  shimmer and note), +50% for 20 min after rain; every crystal is modelled point by point in `M_CrystalGlow`
+  (`WRCrystal::NodeLook`) so it lights with its hall. The seven lore keepsakes at their sites, the Wardcarver compass at
+  the Dropped Hammer, the Runes of the Prism, Warding and Doubling in the Ward Chambers' sealed rooms (once each per
+  survivor), the three chime caches. **Rows**: 37 items (materials, creature parts, amethyst, the four found runes,
+  attuning chalk, ward fork, silver bait, the Lumen lantern (no fuel: `lights.<id>.noFuel`), the Glassleg bow, the
+  Prismglass Spear and its blueprint, the compass, the Carver's Chisel (runes in the sockets at 125%: `GemStat`), Venn's
+  ring, the seven lore items); 7 recipes (the ward charm, attuning chalk, silver bait and wax earplugs from wax are Saga's
+  to teach); the biome row, five shrines (two on cave floors: shrine and master rows take a `floor` height now), **Saga
+  Venn** at the Great Hexafoil (by day carving, at night at the hexafoil's edge with her fork) and her six quests; the
+  sea fog (10%) in the weather; fx and sound rows (stand-ins pitched from the wisp's chimes and the swamp's bells).
+
 - **Crystal (1): the land, the caves' rock and what stands on it.** `node Tools/terrain/crystal.mjs` writes the
   plateau (`Data/lands/crystal.json` + `crystal_ground.bin`, 4 m samples: columnar basalt tilting from the Spine's foot
   to 80-100 m black sea cliffs, the three geo coves, four descents, ten collapsed domes, the Organ's eleven vents, the

@@ -41,7 +41,8 @@
     ]},
     { "biome": "crystal", "name": "Crystal caves", "underground": true, "kinds": [
       {"id": "overcast", "name": "Overcast", "chance": 0.2, "minutes": [8, 15], "coming": "Overcast coming", "does": "Grey skies: dimmer light.", "look": {"fogDensity": 0.035, "fogColor": [160, 164, 170], "skyDim": 0.3, "glyph": "weather_overcast"}},
-      {"id": "rain", "name": "Rain", "chance": 0.3, "minutes": [8, 15], "coming": "Rain coming", "does": "Rain: torches burn faster; a roof keeps it off.", "effects": {"watersCrops": true, "burnMult": 1.5}, "counters": {"roofWithin": 1500}, "look": {"fogDensity": 0.06, "fogColor": [150, 158, 168], "skyDim": 0.35, "glyph": "weather_rain"}}
+      {"id": "rain", "name": "Rain", "chance": 0.3, "minutes": [8, 15], "coming": "Rain coming", "does": "Rain: drips sing in the upper geode halls (the crystals glow brighter, the bats hear less); resonant crystal yields more after.", "effects": {"watersCrops": true, "burnMult": 1.5}, "counters": {"roofWithin": 1500}, "look": {"fogDensity": 0.06, "fogColor": [150, 158, 168], "skyDim": 0.35, "glyph": "weather_rain"}},
+      {"id": "fog", "name": "Fog", "chance": 0.1, "minutes": [8, 15], "coming": "Fog coming", "does": "Sea fog over the plateau: the chime arches ring in the damp. Underground it changes nothing.", "effects": {"vision": 70, "aggroMult": 0.7, "aggroCreatures": ["*"]}, "look": {"fogDensity": 0.3, "fogColor": [190, 194, 198], "skyDim": 0.2, "glyph": "weather_fog"}}
     ]},
     { "biome": "swamp", "name": "Swamp", "kinds": [
       {"id": "overcast", "name": "Overcast", "chance": 0.2, "minutes": [8, 15], "coming": "Overcast coming", "does": "Grey skies: flat light; the falls' red reads strongest.", "look": {"fogDensity": 0.035, "fogColor": [160, 164, 170], "skyDim": 0.3, "glyph": "weather_overcast"}},
