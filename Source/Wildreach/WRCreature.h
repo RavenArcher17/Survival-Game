@@ -422,6 +422,31 @@ public:
 	void RefreshTameLook();
 	/** Called by the base's stamina regen: a ridden mount's own sprint drain and regen. */
 	virtual bool MountStaminaRates(float& OutDrain, float& OutRegen) const override;
+	/** Its name (its owner's, else its species'): the label, the card, the riding line, notifications. */
+	FString TameName() const;
+	/** Server: who asked to release it and until when (a second Release in time does it: cooks/cookpass-taming.md 3.3). */
+	FString ReleaseArmedBy;
+	double ReleaseArmedUntil = 0.0;
+	/** Server: the player who rode it last (Call your mount). Saved. */
+	FString LastRider;
+	/** Server: called to its rider (it runs to CallTo's side; cleared when it gets there or is ordered). */
+	TWeakObjectPtr<AActor> CallTo;
+	double CallUntil = 0.0;
+	/** Server: a soulbound fall's end (it wakes at tame.soulbond.wakeHealth). */
+	double SoulDownUntil = 0.0;
+	/** Server: brought back once by a Dadeni draught (a second death is for good). Saved. */
+	bool bRevivedOnce = false;
+	/** Server: where a rider getting off stands (clear ground beside it: cooks/cookpass-taming.md 3.7). */
+	FVector DismountSpot(const AWRCharacter* Who) const;
+	/** Every machine: where the bone its saddle rides on is now (the seated rider follows its rise and fall). */
+	bool SaddleBoneLocation(FVector& Out) const;
+	mutable FName SaddleBoneCache;
+	mutable bool bSaddleBoneLooked = false;
+	/** Server: when a rift last drained its max health (it mends once clear of them: cooks/cookpass-taming.md L13). */
+	double RiftDrainedAt = -1000.0;
+	/** Every machine: the courting / cuddle head dip's weight (eased), and whether the pose lift carries it now. */
+	float NuzzleWeight = 0.f;
+	bool bNuzzleLifted = false;
 
 	FWROnCreatureDied OnCreatureDied;
 	/** Spawner that owns this creature (nests aggro its pack). */

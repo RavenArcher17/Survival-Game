@@ -430,6 +430,39 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("clavicle_r")), FQuat(FVector::UpVector, FMath::DegreesToRadians(2.f * A)));
 	}
 
+	// Seated on a mount (cooks/cookpass-taming.md 3.6; a rider's seat): the hips flexed so the thighs reach forward over
+	// the saddle, opened round the mount's back; the shins hanging back under the knees (heels under the hips); the feet
+	// level in the stirrups; the torso leaning with the gait (upright at a walk, forward at a gallop); the hands carried
+	// together low over the pommel on the reins, let go while a swing or a cast plays on the upper body.
+	if (Hero.Seat > 0.01f)
+	{
+		const float W = Hero.Seat;
+		for (int32 LegSide = 0; LegSide < 2; ++LegSide)
+		{
+			const float Out = LegSide == 0 ? -1.f : 1.f;   // left opens toward -Side, right toward +Side
+			const FQuat Flex(Side, FMath::DegreesToRadians(-Hero.HipFlex * W));
+			const FQuat Spread(Forward, FMath::DegreesToRadians(Out * Hero.SeatSpread * W));
+			const FVector Hinge = Spread.RotateVector(Side);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, LegSide == 0 ? TEXT("thigh_l") : TEXT("thigh_r")), Spread * Flex);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, LegSide == 0 ? TEXT("calf_l") : TEXT("calf_r")), FQuat(Hinge, FMath::DegreesToRadians(Hero.KneeBend * W)));
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, LegSide == 0 ? TEXT("foot_l") : TEXT("foot_r")), FQuat(Hinge, FMath::DegreesToRadians(Hero.FootLevel * W)));
+		}
+		TwistSpine(Pose, Hero.SeatLeanDeg * W, Side);
+		const float A = W * Hero.SeatArms;
+		if (A > 0.01f)
+		{
+			for (int32 ArmSide = 0; ArmSide < 2; ++ArmSide)
+			{
+				const float In = ArmSide == 0 ? 1.f : -1.f;   // the left arm comes in toward +Side, the right toward -Side
+				const FQuat Lift(Side, FMath::DegreesToRadians(-Hero.ArmForward * A));
+				const FQuat Inward(Forward, FMath::DegreesToRadians(In * Hero.ArmIn * A));
+				const FVector Elbow = Inward.RotateVector(Side);
+				WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, ArmSide == 0 ? TEXT("upperarm_l") : TEXT("upperarm_r")), Inward * Lift);
+				WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, ArmSide == 0 ? TEXT("lowerarm_l") : TEXT("lowerarm_r")), FQuat(Elbow, FMath::DegreesToRadians(-Hero.ElbowBend * A)));
+			}
+		}
+	}
+
 	// Aim pitch over the upper spine: the chest, arms and weapon point where you look (first person, aiming).
 	if (Hero.AimPitchAlpha > 0.01f)
 	{
@@ -681,9 +714,21 @@ void UWRHeroAnimInstance::PostStep(float DeltaSeconds, FWRAnimFrame& Frame)
 	Hero.bRetargetBones = bRetargetBones;
 	Hero.AimPitch = HeroInput.AimPitch;
 	Hero.AimPitchAlpha = HeroInput.AimPitchAlpha;
+	// The rider's seat (cooks/cookpass-taming.md 3.6): numbers from tuning tame.seat; the hands let go of the reins while
+	// a one-shot (a swing, a cast) has the upper body.
+	Hero.Seat = HeroInput.Seat;
+	Hero.SeatSpread = HeroInput.SeatSpread;
+	Hero.SeatLeanDeg = FMath::Lerp(T.Num(TEXT("tame.seat.leanWalk"), 4.f), T.Num(TEXT("tame.seat.leanGallop"), 22.f), FMath::Clamp(HeroInput.SeatLean, 0.f, 1.f));
+	Hero.SeatArms = 1.f - FMath::Clamp(FMath::Max(Frame.UpperShotAlpha, Frame.FullShotAlpha), 0.f, 1.f);
+	Hero.HipFlex = T.Num(TEXT("tame.seat.hipFlex"), 72.f);
+	Hero.KneeBend = T.Num(TEXT("tame.seat.kneeBend"), 76.f);
+	Hero.FootLevel = T.Num(TEXT("tame.seat.footLevel"), -4.f);
+	Hero.ArmForward = T.Num(TEXT("tame.seat.armForward"), 28.f);
+	Hero.ArmIn = T.Num(TEXT("tame.seat.armIn"), 10.f);
+	Hero.ElbowBend = T.Num(TEXT("tame.seat.elbowBend"), 64.f);
 
 	// The female stance, only standing with nothing else on the body.
-	const bool bStand = bFemale && Move == EWRHeroMove::Idle && Hero.Speed < 20.f && Frame.UpperShotAlpha < 0.01f && Frame.FullShotAlpha < 0.01f
+	const bool bStand = bFemale && HeroInput.Seat < 0.01f && Move == EWRHeroMove::Idle && Hero.Speed < 20.f && Frame.UpperShotAlpha < 0.01f && Frame.FullShotAlpha < 0.01f
 		&& Frame.FullLoopAlpha < 0.01f && Frame.UpperLoopAlpha < 0.01f;
 	StanceWeight = FMath::FInterpConstantTo(StanceWeight, bStand ? 1.f : 0.f, DeltaSeconds, 2.5f);
 	Hero.FemaleStance = StanceWeight;

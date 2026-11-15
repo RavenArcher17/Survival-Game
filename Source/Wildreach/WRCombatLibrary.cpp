@@ -914,6 +914,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	Damage *= WRSporePath::TakenScale(Target, Hit);
 	// Arcane shields (WRArcanePath.cpp): the shield's HP layer takes it first (Reflect, Absorb, Mana burn x2).
 	Damage = WRArcane::Incoming(Target, Hit, Damage);
+	// Soulbond (cooks/cookpass-taming.md 3.10): its owner's one soulbound tame goes down instead of dying.
+	Damage = FWRTaming::SoulbondIncoming(Target, Damage);
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
 	const bool bWeak = BeforeModify > 0.f && Damage > BeforeModify * 1.05f;
 

@@ -2,6 +2,7 @@
 // See WRForestHazards.h. Placement comes from Data/forest.json (FWRForestData), numbers from tuning hazards.*.
 
 #include "WRForestHazards.h"
+#include "WRTaming.h"
 #include "Wildreach.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
@@ -240,6 +241,8 @@ bool WRForest::PassesThornbrake(const AActor* Who)
 		const FWRCreatureDef* Def = Mount->GetDef();
 		if (Def && Def->Resists.Contains(TEXT("thornbrake"))) return true;
 	}
+	// Heartguard barding on the mount carries its rider through too (cooks/cookpass-taming.md L11).
+	if (FWRTaming::BardingPass(Who, TEXT("thorns"))) return true;
 	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Who))
 	{
 		// Briarproof leathers in the chest slot (survival-crafting KEPT), the Heartguard set at 4 pieces.

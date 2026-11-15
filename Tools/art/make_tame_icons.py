@@ -102,6 +102,40 @@ def rope(name):
     done(im, name)
 
 
+def bond_token(name):
+    # A fallen tame's collar (cooks/cookpass-taming.md 3.10): a braided leather band in a loop, its brass buckle at the
+    # left, the name plate riveted on at the front (bottom) with an engraved line for the name.
+    im, d = canvas()
+    leather, dark, brass = (128, 82, 44), (82, 50, 26), (214, 168, 74)
+    d.ellipse((22 * S, 26 * S, 106 * S, 98 * S), outline=INK, width=17 * S)
+    d.ellipse((22 * S, 26 * S, 106 * S, 98 * S), outline=rgb(leather), width=11 * S)
+    for k in range(18):
+        a = 2 * math.pi * k / 18
+        x, y = 64 + math.cos(a) * 42, 62 + math.sin(a) * 36
+        d.line([P(x - math.sin(a) * 3, y + math.cos(a) * 3), P(x + math.sin(a) * 3, y - math.cos(a) * 3)], fill=rgb(dark), width=2 * S)
+    poly(d, [(16, 54), (32, 54), (32, 72), (16, 72)], rgb(brass))
+    d.line([P(24, 56), P(24, 70)], fill=INK, width=3 * S)
+    poly(d, [(46, 90), (82, 90), (80, 112), (48, 112)], rgb(brass))
+    d.line([P(54, 101), P(74, 101)], fill=shade(brass, 0.5), width=2 * S)
+    rivets(d, [(51, 95), (77, 95)], (120, 90, 40))
+    d.arc((30 * S, 30 * S, 70 * S, 70 * S), 200, 250, fill=HI, width=4 * S)
+    done(im, name)
+
+
+def dadeni_draught(name):
+    # The Dadeni draught: a squat dark-green glass flask, wax-sealed, a pale gold light swirling in it.
+    im, d = canvas()
+    glass, liquid, wax = (44, 74, 58), (238, 214, 140), (150, 40, 34)
+    ell(d, 64 * S, 78 * S, 34 * S, 32 * S, rgb(glass))
+    poly(d, [(54, 26), (74, 26), (72, 50), (56, 50)], rgb(glass))
+    ell(d, 64 * S, 84 * S, 26 * S, 22 * S, rgb(liquid), outline=None, width=0)
+    d.arc((44 * S, 66 * S, 84 * S, 100 * S), 160, 340, fill=shade(liquid, 0.7), width=3 * S)
+    d.arc((50 * S, 72 * S, 78 * S, 94 * S), 0, 200, fill=(255, 250, 225, 255), width=2 * S)
+    poly(d, [(50, 16), (78, 16), (76, 28), (52, 28)], rgb(wax))
+    d.arc((38 * S, 52 * S, 70 * S, 84 * S), 200, 250, fill=HI, width=4 * S)
+    done(im, name)
+
+
 def main():
     saddle('saddle_hide', (120, 78, 40), (150, 132, 100))
     saddle('saddle_bronze', (88, 48, 22), (40, 56, 104), (200, 140, 60))
@@ -121,6 +155,8 @@ def main():
         c = colours.get(cid, [0.7, 0.65, 0.55])
         egg('fertile_' + cid, [v * 255 for v in c])
     rope('rope')
+    bond_token('bond_token')
+    dadeni_draught('dadeni_draught')
 
 
 if __name__ == '__main__':

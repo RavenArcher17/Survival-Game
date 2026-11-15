@@ -41,6 +41,7 @@
     {"id": "bronze_armor", "station": "armorer", "level": 2, "inputs": {"bronze_ingot": 2, "hide": 1}, "output": "bronze_armor", "count": 1, "seconds": 5, "quality": true},
     {"id": "iron_armor", "station": "armorer", "level": 3, "inputs": {"iron_ingot": 2, "hide": 1}, "output": "iron_armor", "count": 1, "seconds": 5, "quality": true},
 
+    { "id": "dadeni_draught", "station": "alchemy_table", "level": 5, "inputs": { "asphodel": 2, "soulstone": 1, "healing_potion": 2 }, "output": "dadeni_draught", "count": 1, "seconds": 8 },
     { "id": "minor_healing_potion", "station": "alchemy_table", "level": 1, "inputs": { "berries": 3, "fiber": 1 }, "output": "minor_healing_potion", "count": 1, "seconds": 2 },
     { "id": "healing_potion", "station": "alchemy_table", "level": 2, "inputs": { "minor_healing_potion": 2, "sulfur_crystal": 1, "lichen": 1 }, "output": "healing_potion", "count": 1, "seconds": 3 },
     { "id": "antidote", "station": "alchemy_table", "level": 2, "inputs": { "berries": 2, "lichen": 2 }, "output": "antidote", "count": 1, "seconds": 2 },
@@ -295,7 +296,7 @@
     {"id": "talisman_tyrant_plate", "station": "armorer", "level": 2, "inputs": {"trophy_tyrant_plate": 1, "resonant_crystal": 2}, "output": "talisman_tyrant_plate", "count": 1, "seconds": 6, "biome": "crystal"},
     {"id": "talisman_troll_marrow", "station": "armorer", "level": 2, "inputs": {"trophy_troll_marrow": 1, "lichen": 2}, "output": "talisman_troll_marrow", "count": 1, "seconds": 6, "biome": "tundra"},
     {"id": "talisman_stalker_fang", "station": "armorer", "level": 2, "inputs": {"trophy_stalker_fang": 1, "lichen": 2}, "output": "talisman_stalker_fang", "count": 1, "seconds": 6, "biome": "tundra"},
-    {"id": "talisman_old_tusk", "station": "armorer", "level": 2, "inputs": {"trophy_old_tusk": 1, "lichen": 2}, "output": "talisman_old_tusk", "count": 1, "seconds": 6, "biome": "tundra", "waitsFor": "hauler tames that carry loads (taming lane)"},
+    {"id": "talisman_old_tusk", "station": "armorer", "level": 2, "inputs": {"trophy_old_tusk": 1, "lichen": 2}, "output": "talisman_old_tusk", "count": 1, "seconds": 6, "biome": "tundra"},
     {"id": "talisman_maw_tooth", "station": "armorer", "level": 2, "inputs": {"trophy_maw_tooth": 1, "bloodmoss": 2}, "output": "talisman_maw_tooth", "count": 1, "seconds": 6, "biome": "swamp"},
     {"id": "talisman_hex_mask", "station": "armorer", "level": 2, "inputs": {"trophy_hex_mask": 1, "bloodmoss": 2}, "output": "talisman_hex_mask", "count": 1, "seconds": 6, "biome": "swamp"},
     {"id": "talisman_bloat_sac", "station": "armorer", "level": 2, "inputs": {"trophy_bloat_sac": 1, "bloodmoss": 2}, "output": "talisman_bloat_sac", "count": 1, "seconds": 6, "biome": "swamp"},

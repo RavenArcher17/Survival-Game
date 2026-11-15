@@ -91,7 +91,7 @@
         "25": [ {"id": "calm_presence", "name": "Calm presence", "text": "Wild creatures notice you later", "stat": "aggroRadius", "value": -0.2}, {"id": "strong_knockout", "name": "Strong knockout", "text": "Creatures go down faster", "stat": "torporDealt", "value": 0.3} ],
         "50": [ {"id": "bonded", "name": "Bonded", "text": "One more active tame", "stat": "extraTames", "value": 1}, {"id": "saddle_master", "name": "Saddle master", "text": "Saddles you fit guard your mounts 25% better", "stat": "saddleValue", "value": 0.25} ],
         "75": [ {"id": "breeder", "name": "Breeder", "text": "Your tames' young mutate half again as often", "stat": "mutationOdds", "value": 0.5}, {"id": "pack_leader", "name": "Pack leader", "text": "Your tames within 20 m hit 20% harder", "stat": "packLeader", "value": 0.2} ],
-        "100": [ {"id": "beast_lord", "name": "Beast lord", "text": "One more active tame", "stat": "extraTames", "value": 1}, {"id": "soulbond", "name": "Soulbond", "text": "One chosen tame can't die permanently", "waitsFor": "permanent tame death"} ] } },
+        "100": [ {"id": "beast_lord", "name": "Beast lord", "text": "One more active tame", "stat": "extraTames", "value": 1}, {"id": "soulbond", "name": "Soulbond", "text": "One chosen tame (its card: Soulbind) falls for 60 s at the end instead of dying", "stat": "soulbond", "value": 1} ] } },
     { "id": "swimming", "name": "Swimming", "group": "Exploration", "levelsBy": "Swimming (distance swum)",
       "everyLevel": {"text": "Swim faster", "stat": "swimSpeed", "perLevel": 0.004},
       "perks": {

@@ -744,6 +744,11 @@
       {"sprite": "ring", "blend": "add", "count": 1, "flat": true, "life": [0.8,0.8], "size": [50,50], "grow": 4, "lift": 6, "intensity": 2.2, "colors": [[1,0.85,0.5,0.95], [1,0.7,0.3,0]]},
       {"sprite": "dot", "blend": "add", "count": 36, "radius": 60, "ring": true, "life": [0.9,1.6], "size": [3,5], "speed": [80,170], "dir": [0,0,1], "spread": 15, "gravity": -0.25, "turbulence": 120, "intensity": 6, "colors": [[1,0.9,0.6,1], [1,0.7,0.3,0]]}
     ]},
+    "tame.revive": { "_comment": "a fallen tame back beside the Hearth (cooks/cookpass-taming.md 3.10): a pale-gold column, motes rising from where it stands, a ring on the ground", "light": {"color": [1,0.88,0.6], "intensity": 6000, "radius": 600, "seconds": 1.6, "lift": 100}, "layers": [
+      {"sprite": "ring", "blend": "add", "count": 1, "flat": true, "life": [1.2,1.2], "size": [60,60], "grow": 3, "lift": 4, "intensity": 2.4, "colors": [[1,0.9,0.6,0.95], [1,0.75,0.4,0]]},
+      {"sprite": "glow", "blend": "add", "count": 10, "radius": 30, "life": [1.2,1.8], "size": [30,60], "speed": [120,220], "dir": [0,0,1], "spread": 6, "gravity": -0.1, "intensity": 2.5, "colors": [[1,0.92,0.7,0.8], [1,0.85,0.55,0]]},
+      {"sprite": "dot", "blend": "add", "count": 48, "radius": 70, "ring": true, "life": [1.2,2.2], "size": [3,5], "speed": [60,160], "dir": [0,0,1], "spread": 12, "gravity": -0.3, "turbulence": 80, "intensity": 6, "colors": [[1,0.95,0.75,1], [1,0.8,0.45,0]]}
+    ]},
     "tame.heart": { "layers": [
       {"sprite": "glow", "blend": "add", "count": 5, "radius": 25, "life": [1.1,1.6], "size": [9,14], "speed": [25,55], "dir": [0,0,1], "spread": 25, "gravity": -0.15, "turbulence": 40, "intensity": 3, "colors": [[1,0.45,0.5,0.95], [1,0.6,0.7,0]]},
       {"sprite": "dot", "blend": "add", "count": 14, "radius": 30, "life": [0.7,1.2], "size": [2,3.5], "speed": [40,90], "dir": [0,0,1], "spread": 35, "gravity": -0.2, "intensity": 4, "colors": [[1,0.75,0.8,1], [1,0.6,0.7,0]]}

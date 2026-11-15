@@ -44,6 +44,7 @@
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRWater.h"
+#include "WRMachine.h"
 #include "WRWildlife.h"
 #include "WRAttackRows.h"
 #include "AbilitySystemComponent.h"
@@ -696,6 +697,26 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 		Skel->VisibilityBasedAnimTickOption = WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.footstepRange"), 3000.f))
 			? EVisibilityBasedAnimTickOption::AlwaysTickPose : EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 		bFeetInRange = (Anim->GetCreatureLegs().Num() > 0 || Anim->GetCreatureSpine().Num() > 0) && WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.creatureFeet.range"), 6000.f));
+	}
+	// Courting and cuddling (cooks/cookpass-taming.md 3.11): while a pair's mating bar fills they stand face to face and
+	// dip their heads to each other in turn (his on the beat, hers on the off-beat); a baby being cuddled nuzzles into
+	// its tamer. Drawn on every machine from the replicated state as a head dip over its own clips (the pose lift).
+	const bool bNuzzle = bAlive && IsTamed() && (TameRep.MateBar > 0.f || TameRep.bCuddled) && In.Speed < 40.f;
+	NuzzleWeight = FMath::FInterpTo(NuzzleWeight, bNuzzle ? 1.f : 0.f, DeltaSeconds, 3.f);
+	if (NuzzleWeight > 0.01f || bNuzzleLifted)
+	{
+		const FWRCreatureDef* Def = GetDef();
+		TArray<TPair<FName, float>> Lift = Def ? Def->PoseLift : TArray<TPair<FName, float>>();
+		const FName Head = HeadBone();
+		if (NuzzleWeight > 0.01f && !Head.IsNone())
+		{
+			const float Beat = WRTune(TEXT("tame.breed.nuzzleBeat"), 2.f);
+			const float Phase = float(GetWorld()->GetTimeSeconds()) * PI / FMath::Max(0.2f, Beat) + (TameRep.Sex == 2 ? PI : 0.f);
+			const float Dip = WRTune(TEXT("tame.breed.nuzzleDip"), 22.f) * FMath::Max(0.f, FMath::Sin(Phase)) * NuzzleWeight;
+			Lift.Add({ Head, -Dip });
+		}
+		Anim->SetPoseLift(Lift);
+		bNuzzleLifted = NuzzleWeight > 0.01f;
 	}
 	TickCreatureFeet(DeltaSeconds);
 }
@@ -1381,7 +1402,11 @@ FString AWRCreature::GetDisplayLabel() const
 	const FWRCreatureDef* Def = GetDef();
 	// Its level (cooks/build-taming.md 2.1): wild level, plus its bond once tamed; a baby says so.
 	const int32 Level = TameRep.WildLevel + (IsTamed() ? TameRep.Bond : 0);
-	const FString Name = (Def ? Def->Name : GetName()) + (IsTamed() && IsBaby() ? TEXT(" (baby)") : TEXT("")) + (Level > 0 ? FString::Printf(TEXT(" · Lv %d"), Level) : FString());
+	// A named tame: "Ember · Cinderfang · Lv 24" (its owner's name in front for everyone else's eyes; cooks/cookpass-taming.md 3.4).
+	const FString Species = Def ? Def->Name : GetName();
+	const FString Called = IsTamed() && !TameRep.Name.IsEmpty() ? TameRep.Name + TEXT(" · ") + Species : Species;
+	const FString Name = Called + (IsTamed() && IsBaby() ? TEXT(" (baby)") : TEXT("")) + (Level > 0 ? FString::Printf(TEXT(" · Lv %d"), Level) : FString())
+		+ (IsTamed() && TameRep.bSoulDown ? TEXT(" (down)") : TEXT(""));
 	return IsTamed() ? FString::Printf(TEXT("%s's %s"), *TamedBy, *Name) : bAsleep ? Name + TEXT(" (asleep)") : Name;
 }
 
@@ -1835,12 +1860,26 @@ FString AWRCreature::Order(AWRPlayerController* Player, const FString& Command)
 		return TEXT("Going for it");
 	}
 	SiegePiece = nullptr;   // any other order calls it off
+	CallTo = nullptr;       // and a call
+	if (Command != TEXT("release")) ReleaseArmedBy.Reset();
 	if (Command == TEXT("follow")) { TameOrder = EWRTameOrder::Follow; return TEXT("Following"); }
 	if (Command == TEXT("stay")) { TameOrder = EWRTameOrder::Stay; Home = GetActorLocation(); return TEXT("Staying"); }
 	if (Command == TEXT("aggressive")) { bTameAggressive = true; return TEXT("Will fight your enemies"); }
 	if (Command == TEXT("passive")) { bTameAggressive = false; AggroTarget = nullptr; return TEXT("Won't fight"); }
 	if (Command == TEXT("release"))
 	{
+		// A second Release within tame.releaseConfirmSeconds does it (cooks/cookpass-taming.md 3.3): one mis-flick of the
+		// wheel never loses a tame.
+		const double Now = GetWorld()->GetTimeSeconds();
+		if (ReleaseArmedBy != PS->GetPlayerName() || Now > ReleaseArmedUntil)
+		{
+			ReleaseArmedBy = PS->GetPlayerName();
+			ReleaseArmedUntil = Now + WRTune(TEXT("tame.releaseConfirmSeconds"), 5.f);
+			return FString::Printf(TEXT("Release %s for good? Pick Release again within %.0f s (its saddle, barding and packs drop)"), *TameName(), WRTune(TEXT("tame.releaseConfirmSeconds"), 5.f));
+		}
+		ReleaseArmedBy.Reset();
+		TameRep.bSoulbound = false;
+		TameRep.Name.Reset();
 		if (Rider.IsValid()) Dismount();
 		DropTack();
 		TameRep.Bond = 0;
@@ -1875,6 +1914,8 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 		return TEXT("Too young to ride: let it grow up");
 	}
 	Rider = NewRider;
+	CallTo = nullptr;
+	if (const APlayerState* RiderPS = NewRider->GetPlayerState()) LastRider = RiderPS->GetPlayerName();
 	// Mounted (combat.md 2.19): no guard, parry or drink in the saddle; only mounted Wildbrands and bolt / lance spells.
 	NewRider->Status->ApplyStatus(WRTags::State_Mounted, 1.0e7f);
 	NewRider->GetAbilitySystemComponent()->CancelAllAbilities();
@@ -1882,7 +1923,9 @@ FString AWRCreature::Ride(AWRCharacter* NewRider)
 	NewRider->GetCharacterMovement()->DisableMovement();
 	NewRider->AttachToActor(this, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	// On its saddle's seat (creatures.json seat: forward x radius, up x half height), the rider's hips just above it.
-	NewRider->SetActorRelativeLocation(FVector(Def->SeatFwd * Def->Radius, 0.f, Def->SeatUp * Def->HalfHeight + WRTune(TEXT("tame.mount.riderLift"), 60.f)));
+	// The rider sits (WRHeroAnimInstance's seat, cooks/cookpass-taming.md 3.6): the hips a hand above the seat; every
+	// machine eases the body up onto it from where it stood (AWRCharacter's seat ease), so this snap is never seen.
+	NewRider->SetActorRelativeLocation(FVector(Def->SeatFwd * Def->Radius, 0.f, Def->SeatUp * Def->HalfHeight + WRTune(TEXT("tame.seat.riderLift"), 14.f)));
 	if (AController* AI = GetController())
 	{
 		AI->UnPossess();
@@ -1904,6 +1947,37 @@ void AWRCreature::ServerDismount_Implementation()
 	Dismount();
 }
 
+FVector AWRCreature::DismountSpot(const AWRCharacter* Who) const
+{
+	UWorld* World = GetWorld();
+	const float RiderRadius = Who ? Who->GetSimpleCollisionRadius() : 34.f;
+	const float RiderHalf = Who ? Who->GetSimpleCollisionHalfHeight() : 90.f;
+	const float Clear = WRTune(TEXT("tame.mountEase.clear"), 60.f);
+	const float Reach = GetSimpleCollisionRadius() + RiderRadius + Clear;
+	const FVector Feet = GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(WRDismount), false, this);
+	Params.AddIgnoredActor(Who);
+	const FCollisionShape Body = FCollisionShape::MakeCapsule(RiderRadius, RiderHalf);
+	for (const FVector& Dir : { -GetActorRightVector(), GetActorRightVector(), -GetActorForwardVector(), GetActorForwardVector() })
+	{
+		const FVector Probe = Feet + Dir * Reach;
+		// Ground within 150 cm under the spot (a step down is fine; a cliff edge isn't).
+		FHitResult Ground;
+		if (!World->LineTraceSingleByChannel(Ground, Probe + FVector(0.f, 0.f, 120.f), Probe - FVector(0.f, 0.f, 150.f), ECC_Visibility, Params)) continue;
+		const FVector Stand = Ground.ImpactPoint + FVector(0.f, 0.f, RiderHalf + 5.f);
+		// Room for a standing body there, and a clear line to it from its back (not through a wall).
+		if (World->OverlapBlockingTestByChannel(Stand, FQuat::Identity, ECC_Pawn, Body, Params)) continue;
+		FHitResult Wall;
+		if (World->LineTraceSingleByChannel(Wall, GetActorLocation(), Stand, ECC_Visibility, Params)) continue;
+		if (FWRMachines::LavaNear(Stand, 150.f)) continue;
+		// (Off a swimming mount at sea the water is where you get off: you swim on.)
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this); Water && GetMountKind() != TEXT("swim") && Water->DepthAt(Stand - FVector(0.f, 0.f, RiderHalf)) > WRTune(TEXT("tame.mountEase.maxWading"), 60.f)) continue;
+		return Stand;
+	}
+	// Nowhere beside it: straight up off its back (the rider drops back down on its far side or onto it).
+	return GetActorLocation() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() + RiderHalf + 20.f);
+}
+
 void AWRCreature::Dismount()
 {
 	AWRCharacter* Character = Rider.Get();
@@ -1917,7 +1991,10 @@ void AWRCreature::Dismount()
 	Character->Status->ClearStatus(WRTags::State_Mounted);
 	Character->SetCombatTag(WRTags::State_Attacking, false);
 	Character->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	Character->SetActorLocation(GetActorLocation() + GetActorRightVector() * (GetSimpleCollisionRadius() + 80.f) + FVector(0.f, 0.f, 50.f));
+	// Down onto clear ground beside it (cooks/cookpass-taming.md 3.7): the near side, the far side, behind, in front, the
+	// first spot a standing body fits with ground under it that isn't lava or deep water; none (a ledge, a corridor):
+	// straight up off its back. Every machine eases the body down from the seat, so the move reads as getting off.
+	Character->SetActorLocation(DismountSpot(Character));
 	Character->SetActorEnableCollision(true);
 	Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	if (PC)
@@ -1945,15 +2022,19 @@ void AWRCreature::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		RideLookAction->ValueType = EInputActionValueType::Axis2D;
 		RideJumpAction = NewObject<UInputAction>(this);
 		RideDismountAction = NewObject<UInputAction>(this);
-		RideMapping->MapKey(RideMoveAction, EKeys::W).Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
-		FEnhancedActionKeyMapping& Back = RideMapping->MapKey(RideMoveAction, EKeys::S);
+		// The keyboard as the player bound it (Controls page, FWRKeyBindings), the defaults if a binding is missing
+		// (cooks/cookpass-taming.md 3.2): a rebound player rides with their own keys.
+		const FWRKeyBindings& Bound = FWRKeyBindings::Get();
+		const auto BoundKey = [&Bound](const TCHAR* Action, const FKey& Default) { const FKey K = Bound.Key(Action); return K.IsValid() ? K : Default; };
+		RideMapping->MapKey(RideMoveAction, BoundKey(TEXT("Forward"), EKeys::W)).Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
+		FEnhancedActionKeyMapping& Back = RideMapping->MapKey(RideMoveAction, BoundKey(TEXT("Back"), EKeys::S));
 		Back.Modifiers.Add(NewObject<UInputModifierSwizzleAxis>(this));
 		Back.Modifiers.Add(NewObject<UInputModifierNegate>(this));
-		RideMapping->MapKey(RideMoveAction, EKeys::A).Modifiers.Add(NewObject<UInputModifierNegate>(this));
-		RideMapping->MapKey(RideMoveAction, EKeys::D);
+		RideMapping->MapKey(RideMoveAction, BoundKey(TEXT("Left"), EKeys::A)).Modifiers.Add(NewObject<UInputModifierNegate>(this));
+		RideMapping->MapKey(RideMoveAction, BoundKey(TEXT("Right"), EKeys::D));
 		RideMapping->MapKey(RideLookAction, EKeys::Mouse2D);
-		RideMapping->MapKey(RideJumpAction, EKeys::SpaceBar);
-		RideMapping->MapKey(RideDismountAction, EKeys::E);
+		RideMapping->MapKey(RideJumpAction, BoundKey(TEXT("Jump"), EKeys::SpaceBar));
+		RideMapping->MapKey(RideDismountAction, BoundKey(TEXT("Interact"), EKeys::E));
 		// The pad: left stick rides, right stick looks, A jumps, X (use) gets off, as on foot.
 		RidePadLookAction = NewObject<UInputAction>(this);
 		RidePadLookAction->ValueType = EInputActionValueType::Axis2D;
@@ -2285,6 +2366,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	if (IsTamed())
 	{
 		DropTack();
+		FWRTaming::TameDied(this);   // its bond token falls (cooks/cookpass-taming.md 3.10)
 	}
 	// A wild kill stays down to be butchered (its loot comes off the body, hit by hit); tames still go the old way.
 	FWRStormAI::Died(this, Killer);   // a Storm peaks creature's chance drops (storm essence)
@@ -3263,6 +3345,36 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 {
 	Self->SpeedBoost = 1.f;
 	Self->SetAsleep(false);
+	// A soulbound tame down from a fall lies still till it wakes (cooks/cookpass-taming.md 3.10).
+	if (Self->TameRep.bSoulDown)
+	{
+		Self->SetAggroTarget(nullptr);
+		return;
+	}
+	// Called (cooks/cookpass-taming.md 3.8, 3.9): to its rider's side at a run, or into a stable's gate.
+	if (AActor* CallTo = Self->CallTo.Get(); CallTo && GetWorld()->GetTimeSeconds() < Self->CallUntil && !Self->GetRider())
+	{
+		const AWRBuildPiece* Stable = Cast<AWRBuildPiece>(CallTo);
+		const FVector Goal = Stable ? FWRTaming::StableGate(Stable) : CallTo->GetActorLocation() + CallTo->GetActorRightVector() * WRTune(TEXT("tame.call.side"), 300.f);
+		const FVector To = Goal - Self->GetActorLocation();
+		UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(Self->GetCharacterMovement());
+		if (To.Size2D() > (Stable ? 60.f : WRTune(TEXT("tame.call.stop"), 120.f)))
+		{
+			const bool bRun = To.Size2D() > WRTune(TEXT("tame.call.runFrom"), 2000.f);
+			if (Move) Move->bWantsToSprint = bRun;
+			// Easing in over the last few metres (it brakes, not stops dead).
+			Self->AddMovementInput(To.GetSafeNormal2D(), FMath::Clamp(To.Size2D() / 600.f, 0.35f, 1.f));
+			return;
+		}
+		if (Move) Move->bWantsToSprint = false;
+		if (!Stable)
+		{
+			// Arrived: stand alongside, facing the way its rider faces.
+			Self->SetActorRotation(FRotator(0.f, CallTo->GetActorRotation().Yaw, 0.f));
+			Self->CallTo = nullptr;
+		}
+		return;
+	}
 	if (SpecialPhase != 0)
 	{
 		TickSpecial(Self, DeltaSeconds);
@@ -3357,6 +3469,7 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 		const float Close = Self->GetSimpleCollisionRadius() + Mate->GetSimpleCollisionRadius() + 60.f;
 		if (ToMate.Size2D() > Close) Self->AddMovementInput(ToMate.GetSafeNormal2D(), 0.45f);
 		else Self->SetActorRotation(FMath::RInterpTo(Self->GetActorRotation(), FRotator(0.f, ToMate.Rotation().Yaw, 0.f), DeltaSeconds, 3.f));
+		// (Face to face, heads dipping to each other in turn: the nuzzle every machine draws from TameRep.MateBar.)
 		return;
 	}
 	const FVector Goal = Self->TameOrder == EWRTameOrder::Follow && OwnerBody ? OwnerBody->GetActorLocation() : Self->GetHome();

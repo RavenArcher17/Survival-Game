@@ -50,6 +50,8 @@ struct WILDREACH_API FWRTameGenes
 	bool bValid = false;
 	/** Bred or hatched from a bred egg: its stats aren't held to the wild +-10% (mutations push past it). */
 	bool bBred = false;
+	/** Its parents as the card shows them ("Ember, Cinderfang Lv 24"; empty for the wild-born). */
+	FString Father, Mother;
 
 	int32 Level() const;
 	/** Random wild genes for a level. */
@@ -109,6 +111,16 @@ struct FWRTameRep
 	UPROPERTY() bool bNoFly = false;
 	/** Its stat multipliers as they stand (for the card): one per stat. */
 	UPROPERTY() TArray<float> Mults;
+	/** The name its owner gave it (empty: its species' name; cooks/cookpass-taming.md 3.4) and its parents' labels. */
+	UPROPERTY() FString Name;
+	UPROPERTY() FString Father;
+	UPROPERTY() FString Mother;
+	/** Its owner's Soulbond (one tame a player: at 0 it goes down for tame.soulbond.seconds instead of dying). */
+	UPROPERTY() bool bSoulbound = false;
+	/** Down from a soulbound fall (every machine: the card and the label say so). */
+	UPROPERTY() bool bSoulDown = false;
+	/** Being cuddled right now (every machine: the baby nuzzles; cooks/cookpass-taming.md 3.11). */
+	UPROPERTY() bool bCuddled = false;
 	bool IsBaby() const { return Growth < 0.999f; }
 	bool HasNode(int32 Index) const { return (Nodes & (1 << Index)) != 0; }
 };
@@ -188,6 +200,9 @@ struct WILDREACH_API FWRTaming
 	static float StanceTaken(const AWRCharacterBase* Target, float Stance);
 	/** Steady seat: does this blow fail to throw the rider? */
 	static bool KeepsSeat(const AWRCreature* Mount, const FWRHit& Hit, float Damage);
+	/** A tame keeps its own element in every land (cooks/cookpass-taming.md 3.1): a plain blow of its (no element, no
+	 *  build-up of its own) takes its element's tag and status build-up from tuning tame.element.<element>. */
+	static void ElementHit(const AWRCreature* Tame, FWRHit& Hit);
 
 	// --- other systems ---
 	/** Forager: what didn't fit in a player's bag goes into their forager hauler's packs within reach. Returns what's left. */
@@ -199,6 +214,11 @@ struct WILDREACH_API FWRTaming
 	static void Sense(AWRCreature* Tame);
 	/** A tame of this owner within Range with the node (by id), or null. */
 	static AWRCreature* TameWithNode(const UWorld* World, const FString& Owner, FName Node, const FVector& Near, float Range);
+	/** Its land's barding carries a mount (and its rider) past that land's hazard (items.json tack.hazard:
+	 *  cooks/cookpass-taming.md L11). Who: the mount, its rider, or their player state / controller. */
+	static bool BardingPass(const AActor* Who, FName Hazard);
+	/** GearStatFor's share from a mount's barding (tuning tame.bardingPass: stat -> [hazard, value]). */
+	static float BardingStat(const AActor* Who, FName Stat);
 	/** A tame's save line and its load. */
 	static TSharedRef<FJsonObject> SaveTame(const AWRCreature* Tame);
 	static void LoadTame(AWRCreature* Tame, const TSharedPtr<FJsonObject>& O);
@@ -212,6 +232,35 @@ struct WILDREACH_API FWRTaming
 	static FString CardCommand(AWRPlayerController* Player, AWRCreature* Tame, const TArray<FString>& Args);
 	/** Hatch a creature from genes for an owner at a place (tamed, baby). */
 	static AWRCreature* Hatch(UWorld* World, FName Species, const FWRTameGenes& Genes, const FString& Owner, const FVector& At, float Growth);
+
+	// --- names, the stable, the bond token, Soulbond, calling a mount (cooks/cookpass-taming.md 3.3-3.10) ---
+	/** A name as the server takes it: 1..tame.name.maxLength letters, spaces, ' and -, trimmed. False: Why says the rule. */
+	static bool CleanName(const FString& In, FString& Out, FString& Why);
+	/** A tame's label for others' lines: "Ember (Cinderfang)" or "Cinderfang". */
+	static FString Label(const AWRCreature* Tame);
+	/** Server: a stable's commands ("store <x> <y> <z>" a tame of yours standing there, "out <index>"). */
+	static FString StableCommand(AWRPlayerController* Player, AWRBuildPiece* Piece, const TArray<FString>& Args);
+	/** A stable's tames in the piece's save, and out at its gate when it's torn down. */
+	static void StableToJson(const AWRBuildPiece* Piece, const TSharedRef<FJsonObject>& O);
+	static void StableFromJson(AWRBuildPiece* Piece, const TSharedPtr<FJsonObject>& O);
+	static void StableDestroyed(AWRBuildPiece* Piece);
+	/** Where a stable's tames walk in and out (in front of its middle stall's half door, on the ground). */
+	static FVector StableGate(const AWRBuildPiece* Piece);
+	/** A whole tame's save line (species, owner, orders and everything SaveTame keeps) and the tame back from one. */
+	static TSharedRef<FJsonObject> WholeTame(const AWRCreature* Tame);
+	static AWRCreature* RespawnTame(UWorld* World, const TSharedPtr<FJsonObject>& O, const FVector& Feet, float Yaw);
+	/** How many tames this player keeps in this stable. */
+	static int32 StabledBy(const AWRBuildPiece* Piece, const FString& Player);
+	/** Server: a tame died for good: its bond token falls (the fallen ledger keeps it 72 h for the Dadeni draught). */
+	static void TameDied(AWRCreature* Tame);
+	/** Server: "use" a bond token from the bag (beside your Hearth with a Dadeni draught: it comes back). */
+	static FString UseBondToken(APlayerState* Player, int32 BagSlot);
+	/** A bond token's tooltip line (whose, how long its spirit stays). */
+	static FString TokenLine(const FWRItemStack& Stack);
+	/** Inside ApplyHit: a soulbound tame isn't killed: the blow takes it to 1 and it goes down (and stays down). */
+	static float SoulbondIncoming(AWRCharacterBase* Target, float Damage);
+	/** Server: the whistle's "Call your mount": your last-ridden (else nearest saddled) mount comes to you. */
+	static FString CallMount(AWRPlayerController* Player);
 };
 
 /**
@@ -264,6 +313,20 @@ public:
 	void NoteHit(AWRCharacterBase* Attacker, AWRCharacterBase* Target);
 	int32 OthersOn(const AWRCharacterBase* Attacker, const AWRCharacterBase* Target, float Window) const;
 	TArray<AWRCreature*> TamesOn(const AWRCharacterBase* Target, float Window) const;
+
+	/** The fallen ledger (bond tokens: cooks/cookpass-taming.md 3.10): a dead tame's save line by its token id. */
+	struct FFallen { FString Owner; FName Species; FString Name; int64 DiedUnix = 0; FString Json; bool bRevived = false; };
+	TMap<FString, FFallen> Fallen;
+	/** The world save's "fallenTames". */
+	TSharedRef<FJsonObject> FallenToJson() const;
+	void FallenFromJson(const TSharedPtr<FJsonObject>& O);
+	/** A stable calling a tame out (5 s, then it walks out of the gate). */
+	struct FCallOut { TWeakObjectPtr<AWRBuildPiece> Stable; int32 Index = -1; FString Owner; double At = 0.0; };
+	TArray<FCallOut> CallOuts;
+	/** Tames walking into a stable to be stored (they vanish at the door). */
+	struct FGoingIn { TWeakObjectPtr<AWRCreature> Tame; TWeakObjectPtr<AWRBuildPiece> Stable; double Until = 0.0; };
+	TArray<FGoingIn> GoingIn;
+	void TickStables(float Dt);
 
 private:
 	void TickPairs(float Dt);

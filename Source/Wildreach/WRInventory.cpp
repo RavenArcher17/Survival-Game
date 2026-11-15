@@ -661,7 +661,8 @@ float UWRInventoryComponent::GearStatFor(const AActor* Who, FName Stat)
 	if (const APlayerState* PS = Cast<APlayerState>(Who)) Inv = PS->FindComponentByClass<UWRInventoryComponent>();
 	else if (const AController* C = Cast<AController>(Who)) Inv = C->PlayerState ? C->PlayerState->FindComponentByClass<UWRInventoryComponent>() : nullptr;
 	else Inv = FindFor(Who);
-	return Inv ? Inv->GearStat(Stat) : 0.f;
+	// A mount's land barding counts for it and its rider (Mirehide through bleedwater, Reefmail's depth: WRTaming).
+	return (Inv ? Inv->GearStat(Stat) : 0.f) + FWRTaming::BardingStat(Who, Stat);
 }
 
 void UWRInventoryComponent::WearArmour(float Amount)
@@ -1019,6 +1020,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		// Raid tools (WRRaiding): a petard or mining charge pressed on, a siege ladder stood up, the code breaker.
 		return FWRRaiding::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id);
+	}
+	if (Def->Id == TEXT("bond_token"))
+	{
+		// A fallen tame's collar: at your Hearth with a Dadeni draught it comes back (cooks/cookpass-taming.md 3.10).
+		return FWRTaming::UseBondToken(Cast<APlayerState>(GetOwner()), SlotIndex);
 	}
 	if (Def->Category == TEXT("blueprint"))
 	{

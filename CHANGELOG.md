@@ -53,6 +53,51 @@ creatures).
   at the plaza and the Spring. Server state replicated on `AWRDesertState`; everything that moves is a function of it and
   the clock. New items: sunglass, nitre, acacia log, palm fibre, red ochre, gold flakes, bat guano, radiant essence, the
   rubbing, the sun-disc key, 12 lore pieces. Tuning `desertWorld`; world.json `biomes.desert`.
+## Unreleased: the taming cook pass (taming, mounts, breeding)
+
+Aaron (lane cookpass-taming: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-taming.md;
+a cook pass on build-taming's work). Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **Taming (3): the Tusker talisman, tames in the rifts.** The Tusker ivory talisman's +15% carry is live on your
+  haulers (its recipe no longer waits). Tames from other lands lose max health in a Wasteland rift zone as their riders
+  do (the Wasteland's own don't; Hollowplate halves it) and mend 5% of it a minute once 30 s clear of the rifts (tuning
+  `tame.riftMend`); a tame the rift empties is Unmade (its collar falls).
+- **Taming (2): every land's barding works; the seat's ease holds on a client.** The land barding sets that came live
+  with their lands promised passes nothing gave: now Stormweave grounds storm strikes, Heartguard walks thornbrake,
+  Skysilk ignores gusts, Wardcloth crosses ward fields, Mirehide wades bleedwater, Reefmail takes its mount to 40 m,
+  Gravecloth halves corruption and Hollowplate halves rift drain, for the mount and the rider on it (one hook: a mount's
+  barding answers the hazards' own gear checks, tuning `tame.bardingPass`). A fallen tame's collar goes to its owner's
+  bag when they're on (else an owner-only bag that lasts the 72 h, and a Souls death no longer takes it). The ease onto
+  and off the saddle now catches the move whichever arrives first on a client (the attachment or the jump), and a
+  gallop isn't mistaken for a jump.
+- **Taming (1): riding, names, the stable, the way back.** **The rider sits**: a seated pose over the idle (hips flexed
+  72 degrees, the thighs opened round the mount's back by its width, the shins hanging under the knees, feet level, the
+  torso upright at a walk and leaning 22 degrees at a gallop, the hands together over the pommel on the reins, let go
+  while a swing or a cast plays) and the body rides the saddle bone's rise and fall, where before the rider stood
+  upright on the saddle (tuning `tame.seat`). **Getting on and off** eases the body up onto the seat from where you
+  stood and down beside it over an arc (0.45 / 0.35 s, a leather creak each way) instead of snapping, and you get off
+  onto clear ground: the near side, the far side, behind or in front, never into a wall, off a ledge, into lava or deep
+  water (off a swimming mount at sea you swim on). **Ride keys follow your bindings** (they were fixed to WASD, Space and
+  E). **Call your mount**: the whistle wheel's new wedge; the mount you rode last (else your nearest saddled one)
+  answers with its call and runs to your side from up to 300 m (+5 m a bond level), slowing as it comes and stopping
+  alongside facing your way; a flyer lands first; not from a stall, not through rock. **Names**: Rename on the card
+  (type one, or Suggest from `Data/tame_names.json` by its role: the pad's way, no typing); the name shows over it
+  ("Ember · Cinderfang · Lv 24"), on the card, while riding and in every line about it. **Release asks twice** (a
+  second Release within 5 s) so a wheel flick never loses a tame. **Every land's element**: a tame's plain bites carry
+  its own element and build-up in every land now (shock, soak, decay, mark, bleed, curse, rot, poison; a wind tame hits
+  stamina), not only fire and frost (tuning `tame.element`). **Courting**: a pair filling their mating bar dip their
+  heads to each other in turn, and a cuddled baby nuzzles. **The tame card has tabs** (Overview, Skills, Gear, Family,
+  Packs; click them or LB / RB): its stats as real numbers (health, stamina, a bite's damage, kg carried, m/s, torpor)
+  beside the points and multiplier, and its parents by name and level. **The stable** (farm, Hearth 3: wood 40, stone 30,
+  hide 6, iron 4): three stalls on a stone sill under a shingle roof with a ridge vent, half doors on strap hinges, hay
+  racks and troughs, a hitching rail clear of the gate. Put a tame of yours within 20 m in a stall (it walks in through
+  the middle door) and call it out (5 s, it comes out of the gate); 10 of yours a stable, 3 stables a claim; stabled
+  tames don't eat, age or count on your tame limit; torn down, it lets every tame out. **The bond token**: a tame that
+  dies drops its collar (a braided band with its name plate); a **Dadeni draught** (alchemy table 5: asphodel 2,
+  soulstone 1, healing potion 2) and the collar at your Hearth within 72 h bring it back whole (bond, skills, genes,
+  name; once). **Soulbond** (Taming 100) is live: Soulbind one tame on its card and at the end it falls for 60 s and
+  gets up at a quarter health instead of dying. New icons (collar, draught: 9 KB each, PIL). Not built: the bone altar's
+  undead tames, species' own answer calls, riding clips (the seat is a procedural pose).
 
 ## Unreleased: the Ocean & reefs (the Tide land)
 

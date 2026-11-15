@@ -357,6 +357,8 @@ void AWRGameMode::SaveWorld()
 		}
 	}
 	Root->SetArrayField(TEXT("tames"), Tames);
+	// The fallen ledger: dead tames whose collars can still be brought back (cooks/cookpass-taming.md 3.10).
+	if (const UWRTamingSubsystem* TameSub = UWRTamingSubsystem::Get(GetWorld())) Root->SetObjectField(TEXT("fallenTames"), TameSub->FallenToJson());
 	// Eggs your tames laid that nobody has picked up yet (cooks/build-taming.md 2.6).
 	TArray<TSharedPtr<FJsonValue>> Eggs;
 	for (TActorIterator<AWRLaidEgg> It(GetWorld()); It; ++It)
@@ -486,6 +488,8 @@ void AWRGameMode::LoadWorld()
 			}
 		}
 	}
+	const TSharedPtr<FJsonObject>* FallenObj = nullptr;
+	if (UWRTamingSubsystem* TameSub = UWRTamingSubsystem::Get(GetWorld()); TameSub && Root->TryGetObjectField(TEXT("fallenTames"), FallenObj)) TameSub->FallenFromJson(*FallenObj);
 	const TArray<TSharedPtr<FJsonValue>>* Eggs = nullptr;
 	if (Root->TryGetArrayField(TEXT("laidEggs"), Eggs))
 	{

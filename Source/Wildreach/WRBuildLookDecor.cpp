@@ -111,6 +111,7 @@ namespace WRBuildLookDecorDetail
 			else if (A == TEXT("lantern")) Lantern();
 			else if (A == TEXT("fireplace")) Fireplace();
 			else if (A == TEXT("incubator")) Incubator();
+			else if (A == TEXT("stable")) Stable();
 			else if (A == TEXT("cauldron")) Cauldron();
 			else if (A == TEXT("bath")) Bath();
 			else if (A == TEXT("fountain")) Fountain();
@@ -744,6 +745,133 @@ namespace WRBuildLookDecorDetail
 				Add(Brass, FVector(2.f, 5.f, 3.f), FVector(-4.f + FMath::Cos(A) * 10.f, FMath::Sin(A) * 10.f, 132.f), FRotator(0.f, FMath::RadiansToDegrees(A), 0.f));
 			}
 			Add(Wicker, FVector(14.f, 14.f, 8.f), FVector(-4.f, 0.f, 137.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);   // the vent's cap
+		}
+
+		void Stable()
+		{
+			// A three-stall stable (cooks/cookpass-taming.md 3.9.1), facing +X: tames walk out of the middle stall's half
+			// door to the gate (FWRTaming::StableGate, tame.stable.gateOut cm out). 760 wide (Y) by 440 deep (X).
+			// The stone sill course carries every post off the wet ground; the posts carry the top plates; the plates carry
+			// the rafters; the rafters the ridge beam and the shingle courses. Plank partitions stop at the posts.
+			const FSurf Sill = FSurf::Stone(FLinearColor(0.3f, 0.29f, 0.27f));
+			const FSurf Timber = FSurf::Wood(FLinearColor(0.3f, 0.2f, 0.11f));
+			const FSurf Plank = FSurf::Wood(FLinearColor(0.42f, 0.3f, 0.17f));
+			const FSurf Shingle = FSurf::Wood(FLinearColor(0.25f, 0.2f, 0.15f));
+			const FSurf Straw = FSurf::Cloth(FLinearColor(0.5f, 0.4f, 0.18f));
+			const float HalfW = 380.f, HalfD = 220.f, Top = 265.f, Ridge = 385.f;
+			// Sill: a course of dressed stones front and back, and under the end walls and the stall partitions.
+			for (int32 i = 0; i < 16; ++i)
+			{
+				const float Y0 = -HalfW + i * (2.f * HalfW / 16.f);
+				for (const float X : { -HalfD, HalfD - 30.f })
+				{
+					Box(Sill, FVector(X, Y0 + 1.f, 0.f), FVector(X + 30.f, Y0 + 2.f * HalfW / 16.f - 1.f, 21.f + Jit(FVector(X, Y0, 0.f), 3) * 1.5f));
+				}
+			}
+			for (const float Y : { -HalfW, -127.f, 97.f, HalfW - 30.f }) Box(Sill, FVector(-HalfD + 30.f, Y, 0.f), FVector(HalfD - 30.f, Y + 30.f, 20.f));
+			// Posts at the four partition lines, front and back, standing on the sill.
+			const float PostY[] = { -HalfW + 15.f, -112.f, 112.f, HalfW - 15.f };
+			for (const float Y : PostY) for (const float X : { -HalfD + 15.f, HalfD - 15.f }) Box(Timber, FVector(X - 12.f, Y - 12.f, 20.f), FVector(X + 12.f, Y + 12.f, Top));
+			// Top plates front and back on the posts, tie beams across on the plates at each post line.
+			for (const float X : { -HalfD + 15.f, HalfD - 15.f }) Box(Timber, FVector(X - 14.f, -HalfW, Top), FVector(X + 14.f, HalfW, Top + 18.f));
+			for (const float Y : PostY) Box(Timber, FVector(-HalfD, Y - 10.f, Top + 18.f), FVector(HalfD, Y + 10.f, Top + 34.f));
+			// The back wall: vertical boards between the corner posts on the sill, a batten across them.
+			const float BackRun = 2.f * HalfW - 56.f;
+			for (int32 b = 0; b < 30; ++b)
+			{
+				const float Y = -HalfW + 28.f + b * (BackRun / 30.f);
+				Box(Plank, FVector(-HalfD + 4.f, Y, 22.f), FVector(-HalfD + 10.f, Y + BackRun / 30.f - 1.5f, Top));
+			}
+			Box(Timber, FVector(-HalfD + 10.f, -HalfW + 27.f, 120.f), FVector(-HalfD + 16.f, HalfW - 27.f, 132.f));
+			// The two end walls, the same boards running front to back between the posts.
+			const float EndRun = 2.f * HalfD - 54.f;
+			for (const float Y : { -HalfW + 4.f, HalfW - 10.f })
+			{
+				for (int32 b = 0; b < 15; ++b)
+				{
+					const float X = -HalfD + 27.f + b * (EndRun / 15.f);
+					Box(Plank, FVector(X, Y, 22.f), FVector(X + EndRun / 15.f - 1.5f, Y + 6.f, Top));
+				}
+			}
+			// The two stall partitions: horizontal planks to 160 cm (a tame sees its neighbour over them), stopping at the posts.
+			for (const float Y : { -112.f, 112.f }) for (int32 r = 0; r < 6; ++r)
+			{
+				Box(Plank, FVector(-HalfD + 27.f, Y - 3.f, 22.f + r * 23.f), FVector(HalfD - 27.f, Y + 3.f, 22.f + r * 23.f + 21.f));
+			}
+			// Each stall: straw on the floor, a hay rack high on the back wall (slats raked out, hay behind them), a trough below.
+			const float StallY[] = { -246.f, 0.f, 246.f };
+			for (const float Y : StallY)
+			{
+				Box(Straw, FVector(-HalfD + 12.f, Y - 100.f, 20.f), FVector(HalfD - 30.f, Y + 100.f, 25.f));
+				for (int32 k = 0; k < 9; ++k)
+				{
+					const FVector A(-HalfD + 60.f + Rand(FVector(Y, k, 1.f), 7) * 300.f, Y - 85.f + Rand(FVector(Y, k, 2.f), 9) * 170.f, 26.f);
+					Rod(Straw, A, A + FVector(Jit(A, 11) * 22.f, Jit(A, 13) * 22.f, 1.f), 1.6f);
+				}
+				// Hay rack: a top rail held out from the wall by the slats, each slat pegged to the wall below it.
+				Rod(Timber, FVector(-HalfD + 50.f, Y - 70.f, 205.f), FVector(-HalfD + 50.f, Y + 70.f, 205.f), 6.f, true);
+				for (int32 s = 0; s < 8; ++s)
+				{
+					const float SY = Y - 66.f + s * (132.f / 7.f);
+					Rod(Timber, FVector(-HalfD + 12.f, SY, 150.f), FVector(-HalfD + 50.f, SY, 205.f), 3.f, true);
+				}
+				Add(Straw, FVector(26.f, 128.f, 30.f), FVector(-HalfD + 26.f, Y, 186.f), FRotator(-35.f, 0.f, 0.f));
+				// Trough: a plank box on two legs against the back wall, water in it.
+				Box(Plank, FVector(-HalfD + 12.f, Y - 60.f, 62.f), FVector(-HalfD + 52.f, Y + 60.f, 66.f));
+				Box(Plank, FVector(-HalfD + 48.f, Y - 60.f, 62.f), FVector(-HalfD + 52.f, Y + 60.f, 92.f));
+				for (const float E : { -60.f, 56.f }) Box(Plank, FVector(-HalfD + 12.f, Y + E, 62.f), FVector(-HalfD + 52.f, Y + E + 4.f, 92.f));
+				Box(Water, FVector(-HalfD + 14.f, Y - 56.f, 66.f), FVector(-HalfD + 48.f, Y + 56.f, 84.f));
+				for (const float LY : { Y - 50.f, Y + 50.f }) Box(Timber, FVector(-HalfD + 40.f, LY - 4.f, 20.f), FVector(-HalfD + 48.f, LY + 4.f, 62.f));
+				// The half door between its posts: boards on two ledges and a Z brace, hung on two iron strap hinges from the
+				// left post, an iron latch at the right.
+				const float D0 = Y - 98.f, D1 = Y + 98.f, DX = HalfD - 15.f;
+				for (int32 b = 0; b < 8; ++b) Box(Plank, FVector(DX - 3.f, D0 + b * 24.5f + 0.5f, 26.f), FVector(DX + 3.f, D0 + (b + 1) * 24.5f - 0.5f, 140.f));
+				Box(Timber, FVector(DX + 3.f, D0, 36.f), FVector(DX + 7.f, D1, 48.f));
+				Box(Timber, FVector(DX + 3.f, D0, 118.f), FVector(DX + 7.f, D1, 130.f));
+				Add(Timber, FVector(4.f, 216.f, 10.f), FVector(DX + 5.f, Y, 83.f), FRotator(0.f, 0.f, 20.f));
+				for (const float HZ : { 42.f, 124.f }) Box(Iron, FVector(DX + 7.f, D0 - 4.f, HZ - 2.5f), FVector(DX + 8.5f, D0 + 60.f, HZ + 2.5f));
+				Box(Iron, FVector(DX + 7.f, D1 - 18.f, 96.f), FVector(DX + 10.f, D1 + 6.f, 100.f));
+			}
+			// Rafters from the plates up to the ridge beam, nine pairs along it.
+			const float FrontX = HalfD - 15.f, BackX = -HalfD + 15.f;
+			for (int32 r = 0; r < 9; ++r)
+			{
+				const float Y = -HalfW + 10.f + r * ((2.f * HalfW - 20.f) / 8.f);
+				Rod(Timber, FVector(FrontX + 30.f, Y, Top + 12.f), FVector(0.f, Y, Ridge), 10.f, true);
+				Rod(Timber, FVector(BackX - 30.f, Y, Top + 12.f), FVector(0.f, Y, Ridge), 10.f, true);
+			}
+			Box(Timber, FVector(-9.f, -HalfW - 20.f, Ridge - 6.f), FVector(9.f, HalfW + 20.f, Ridge + 12.f));
+			// Shingles: overlapping courses on both slopes over the rafters, each course a row of split boards, a little jitter.
+			const float Run = HalfD + 15.f, Rise = Ridge - Top;
+			const float Slope = FMath::RadiansToDegrees(FMath::Atan2(Rise, Run));
+			const float Board = (2.f * HalfW + 40.f) / 16.f;
+			for (int32 Side = 0; Side < 2; ++Side)
+			{
+				const float Sx = Side == 0 ? 1.f : -1.f;
+				for (int32 c = 0; c < 7; ++c)
+				{
+					const float T0 = (c + 0.5f) / 7.f;
+					const FVector Mid(Sx * Run * (1.f - T0), 0.f, Top + 20.f + Rise * T0);
+					for (int32 k = 0; k < 16; ++k)
+					{
+						const float Y = -HalfW - 20.f + (k + 0.5f) * Board + (c % 2) * 12.f;
+						if (Y + Board * 0.5f > HalfW + 32.f) continue;
+						Add(Shingle, FVector(Run / 7.f * 1.25f, Board - 2.f, 3.f), Mid + FVector(0.f, Y, Jit(FVector(c, k, Side), 21) * 0.8f),
+							FRotator(Sx * Slope, 0.f, Jit(FVector(k, c, Side), 23) * 1.5f));
+					}
+				}
+			}
+			// The ridge vent: a raised cap on short blocks along the ridge (the stalls' warm air out, the rain kept off).
+			for (int32 v = 0; v < 6; ++v) Box(Timber, FVector(-6.f, -200.f + v * 80.f, Ridge + 12.f), FVector(6.f, -190.f + v * 80.f, Ridge + 28.f));
+			Box(Shingle, FVector(-30.f, -215.f, Ridge + 28.f), FVector(30.f, 215.f, Ridge + 33.f));
+			// The hitching rail in front of the left stall (clear of the middle gate): two posts, a rail, an iron ring on it.
+			for (const float Y : { -330.f, -170.f }) Box(Timber, FVector(HalfD + 70.f, Y - 7.f, 0.f), FVector(HalfD + 84.f, Y + 7.f, 105.f));
+			Rod(Timber, FVector(HalfD + 77.f, -340.f, 98.f), FVector(HalfD + 77.f, -160.f, 98.f), 9.f);
+			for (int32 k = 0; k < 10; ++k)
+			{
+				const float A0 = k * 2.f * PI / 10.f, A1 = (k + 1) * 2.f * PI / 10.f;
+				Rod(Iron, FVector(HalfD + 77.f, -250.f + FMath::Cos(A0) * 7.f, 84.f + FMath::Sin(A0) * 7.f), FVector(HalfD + 77.f, -250.f + FMath::Cos(A1) * 7.f, 84.f + FMath::Sin(A1) * 7.f), 1.6f);
+			}
 		}
 
 		void Cauldron()
