@@ -439,7 +439,9 @@ fungal spot`), the live steps and the Sporefall `WRFungalEvents.cpp`. Creatures 
 that holds a survivor should answer `FWRFungalAI::Mash`'s chain the same way (`WRCharacterCombat.cpp`). Bosses are
 `WRFungalBosses.*` / `WRFungalBossLook.cpp` (`FWRFungalBoss` beside `FWRCrystalBoss` in the boss machine; arena things are
 `AWRFungalBossProp`; Mycelorn's clouds are its own (`Maker`), so anything that pushes a cloud through `AWRSporeCloud::Push`
-can choke it).
+can choke it). The Spore path is `WRSporePath.*` (rules, Spores, planted Spores on `UWRSporeHost`, summons, combos,
+the Sporestalker's calm) and `WRAbilitiesSpore.*`; Detonate is granted free with Spore cloud in
+`UWRPathComponent::RefreshQuickSlots`; anything new that plants Spores calls `WRSporePath::Plant`.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

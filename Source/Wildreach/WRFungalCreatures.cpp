@@ -491,6 +491,15 @@ void UWRFungalBody::BuildLook()
 		}
 		Part(NAME_None, FVector::ZeroVector, M, false);
 	}
+	else if (Id == TEXT("fungal_behemoth"))
+	{
+		// The Spore path's giant: a cap for a back (umber, cyan gills under its rim), its shoulders furred with hyphae.
+		FWRToolMesh M, G;
+		FkCap(M, FVector(-R * 0.3f, 0.f, 0.f), R * 1.4f, R * 0.8f, Umber * 0.7f, Cyan, 0.f, 0.f, FVector(-0.6f, 0.f, 0.8f).GetSafeNormal());
+		for (int32 k = 0; k < 24; ++k) { const float A = k * 2.f * PI / 24.f; FkStalk(G, FVector(-R * 0.3f, 0.f, 0.f) + FVector(-0.6f, 0.f, 0.8f).GetSafeNormal() * 4.f, FVector(-R * 0.3f, 0.f, 0.f) + FVector(FMath::Cos(A) * 0.6f, FMath::Sin(A), FMath::Cos(A) * 0.45f).GetSafeNormal() * R * 1.3f, 3.f, 1.5f, Cyan, 0.9f); }
+		Part(BoneLike(TEXT("spine2")), FVector::ZeroVector, M, false);
+		Part(BoneLike(TEXT("spine2")), FVector::ZeroVector, G, true);
+	}
 	else if (Id == TEXT("puffball"))
 	{
 		// No rig shows: a pale sac 1.2 m across floating over its capsule, trailing sticky threads with cyan tips (a

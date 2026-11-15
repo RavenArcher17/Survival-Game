@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRSporePath.h"
 #include "WRTidePath.h"
 #include "WRUnderwater.h"
 #include "WRWindPath.h"     // the Momentum gauge (the Wind path)
@@ -883,6 +884,8 @@ private:
 			if (FString RiteVerb; FWRSwampAI::RitePrompt(Wild, S, RiteVerb)) { OutTarget = Wild->GetDisplayLabel(); return RiteVerb; }
 			// The Mossmaul's path-magic calm for a Nature walker (WRForestCreatures), before the usual taming.
 			if (FString CalmVerb; FWRForestAI::PathTamePrompt(Wild, S, CalmVerb)) { OutTarget = Wild->GetDisplayLabel(); return CalmVerb; }
+			// The Sporestalker's calm for a Spore walker (WRSporePath).
+			if (FString SporeVerb; WRSporePath::PathTamePrompt(Wild, S, SporeVerb)) { OutTarget = Wild->GetDisplayLabel(); return SporeVerb; }
 			// The Prismback's ward for an Arcane walker (WRCrystalCreatures).
 			if (FString WardVerb; FWRCrystalAI::PathTamePrompt(Wild, S, WardVerb)) { OutTarget = Wild->GetDisplayLabel(); return WardVerb; }
 			// The Reefjaw's calm for a Tide walker, a sleeping Wavecharger's egg (WROceanCreatures).
@@ -1275,6 +1278,18 @@ private:
 							SNew(SWRBar).Height(4.f * U).Color(FLinearColor(FColor(0xB8, 0xA0, 0xF0)))
 							.Fraction_Lambda([A]() { const UWRAttributeSet* X = A(); return X ? FMath::Clamp(X->GetShield() / FMath::Max(1.f, X->GetMaxHealth()), 0.f, 1.f) : 0.f; })
 						]
+					]
+				]
+				// Spores (the Spore path, cooks/biome-fungal.md 2.17): bioluminescent cyan #39E6C2 under your health; it flashes
+				// and shakes when a press is refused for Spores (no floor).
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SBox).Visibility_Lambda([this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("spore")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+					[
+						VitalRow(LOCTEXT("Spores", "Spores"), FLinearColor(FColor(0x39, 0xE6, 0xC2)), 10.f * U,
+							[A, this]() { const UWRAttributeSet* X = A(); return X ? X->GetSpores() : 0.f; },
+							[A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxSpores() : 1.f; },
+							[this]() { return WRSporePath::RefusedFlash(Body()); })
 					]
 				]
 				// Flow (the Tide path, cooks/biome-ocean.md 2.17): sea-green #1E8C86 under your health; it ripples brighter while

@@ -81,6 +81,11 @@ namespace WRPathsTab
 			// Moss green (#5E8C31, cooks/biome-forest.md 2.17), lit toward the young-leaf gold-green of the World tree's crown.
 			return { WRPathLook::Color(Path), Hex(TEXT("17260C")), Hex(TEXT("7DB043")), Hex(TEXT("DCEFB8")), Hex(TEXT("6FA23A")), Hex(TEXT("E6F4CC")) };
 		}
+		if (Path == TEXT("spore"))
+		{
+			// Bioluminescent cyan (#39E6C2, cooks/biome-fungal.md 2.17), lit toward a deepcap's pale glow over umber.
+			return { WRPathLook::Color(Path), Hex(TEXT("0C2420")), Hex(TEXT("2FC6A6")), Hex(TEXT("D2F8EE")), Hex(TEXT("39E6C2")), Hex(TEXT("E0FBF4")) };
+		}
 		if (Path == TEXT("tide"))
 		{
 			// Sea-green (#1E8C86, cooks/biome-ocean.md 2.18; hero.md's Tide colour), lit toward the Noctiluca surf's pale aqua.

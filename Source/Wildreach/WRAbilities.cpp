@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRAbilitiesSpore.h"
 #include "WRAbilitiesTide.h"
 #include "WRTidePath.h"
 #include "WRCrystalTypes.h"
@@ -2867,6 +2868,18 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("rune_trap")) return UWRGA_RuneTrap::StaticClass();
 		if (NodeId == TEXT("inscribe")) return UWRGA_Inscribe::StaticClass();
 		if (NodeId == TEXT("rune_circle")) return UWRGA_RuneCircle::StaticClass();
+	}
+	else if (PathId == TEXT("spore"))
+	{
+		// The Spore path (WRAbilitiesSpore.cpp, cooks/biome-fungal.md 2.17).
+		if (NodeId == TEXT("spore_cloud")) return UWRGA_SporeCloud::StaticClass();
+		if (NodeId == TEXT("detonate")) return UWRGA_Detonate::StaticClass();
+		if (NodeId == TEXT("infect_strike")) return UWRGA_InfectStrike::StaticClass();
+		if (NodeId == TEXT("blight")) return UWRGA_Blight::StaticClass();
+		if (NodeId == TEXT("sporeling")) return UWRGA_Sporeling::StaticClass();
+		if (NodeId == TEXT("fungal_behemoth")) return UWRGA_FungalBehemoth::StaticClass();
+		if (NodeId == TEXT("spore_armor")) return UWRGA_SporeArmor::StaticClass();
+		if (NodeId == TEXT("living_colony")) return UWRGA_LivingColony::StaticClass();
 	}
 	else if (PathId == TEXT("tide"))
 	{

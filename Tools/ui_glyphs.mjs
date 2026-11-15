@@ -309,6 +309,40 @@ const tidep = {
 };
 for (const [id, g] of Object.entries(tidep)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.6, sw: 1.8 });
 
+// Spore (cooks/biome-fungal.md 2.17): puffs and caps, the planted nodules and their bursts, the colony, the coat.
+const capShape = (cx, cy, w, h) => `M${f2(cx - w)} ${f2(cy)}a${f2(w)} ${f2(h)} 0 0 1 ${f2(2 * w)} 0z`;
+const stem = (cx, cy, w, h) => `M${f2(cx - w)} ${f2(cy)}h${f2(2 * w)}v${f2(h)}h${f2(-2 * w)}z`;
+const shroom = (cx, cy, w, h) => capShape(cx, cy, w, h) + stem(cx, cy, w * 0.28, h * 0.9);
+const puffs = circ(8, 12, 4) + circ(13, 9, 4.6) + circ(16.5, 14, 3.6) + circ(11, 15, 3);
+const rays = (cx, cy, r0, r1, n) => { let d = ""; for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; d += `M${f2(cx + Math.cos(a) * r0)} ${f2(cy + Math.sin(a) * r0)}L${f2(cx + Math.cos(a) * r1)} ${f2(cy + Math.sin(a) * r1)}`; } return d; };
+const body = "M12 2.5a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM8.2 9h7.6l1.4 6.4-2.2.4-.9-3.6-.5 9.3h-2.2L11.9 16l-.5 5.5H9.2l-.5-9.3-.9 3.6-2.2-.4z";
+const sporep = {
+	spore_cloud: { a: puffs, s: "M4 20.5h16" },
+	detonate: { a: circ(12, 12, 3.2), s: rays(12, 12, 5.4, 10, 8) },
+	spore_capacity: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: circ(10, 15, 1.6) + circ(14, 16.5, 1.4) + circ(12, 12.5, 1.2) },
+	rot_chance: { a: tdrop(12, 12, 4.6), s: "M4 21l3-3M17 7l3-3" },
+	infect_strike: { b: sword, a: circ(17, 13, 2) + circ(19.5, 17, 1.5) + circ(14.5, 18, 1.4) },
+	decay: { a: circ(12, 11, 7), c: circ(9.5, 9.5, 1.6) + circ(14.5, 12, 1.3) + circ(11, 14.5, 1.1) },
+	corrode: { t: "M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z", a: circ(10, 10, 1.6) + circ(14, 13, 1.3) + circ(11, 16, 1.1) },
+	blight: { a: puffs, s: "M2.5 5l3 2M21.5 5l-3 2M2.5 20l3-2M21.5 20l-3-2" },
+	lingering: { t: "M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9s10 3 10 9", a: circ(12, 17.5, 1.6) },
+	burst: { a: circ(12, 12, 2.6) + circ(5, 6, 1.4) + circ(19, 7, 1.2) + circ(18, 18, 1.4) + circ(5.5, 18, 1.2), s: rays(12, 12, 4.4, 7.4, 6) },
+	pandemic: { a: circ(5, 17, 2.6) + circ(12, 6, 2.6) + circ(19, 17, 2.6), s: "M6.6 15l4-7M13.4 8l4 7M7.6 17h8.8" },
+	sporeling: { a: shroom(12, 12, 7.5, 6.5), s: "M10 18.5l-2 3M14 18.5l2 3" },
+	swarm: { a: shroom(6, 13, 4, 3.6) + shroom(18, 13, 4, 3.6) + shroom(12, 8, 4, 3.6) },
+	host: { a: "M2.5 19.5h19v2h-19z" + shroom(12, 13, 5.5, 5), s: "M5 18c2-1 4-1 6 0" },
+	hive_mind: { t: "M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", a: circ(12, 12, 3) },
+	thick_spores: { a: shroom(10, 13, 7.5, 7), s: "M19 3v6M16 6h6" },
+	fungal_behemoth: { a: body, s: "M5 8a7 4 0 0 1 14 0" },
+	spore_armor: { a: "M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z", c: circ(10, 9, 1.4) + circ(14, 11.5, 1.4) + circ(11, 15, 1.3) },
+	regrowth_spores: { a: "M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z", s: circ(5, 5, 1) + circ(19, 19, 1) },
+	toxic_blood: { a: tdrop(12, 12, 4.8), c: circ(12, 15, 1.6) },
+	adrenal: { a: "M13 2L6 13h5l-1 9 8-12h-5z" },
+	bloom_body: { a: body, c: circ(10.6, 11, 0.9) + circ(13.4, 12.5, 0.9) + circ(12, 4.4, 0.7) },
+	living_colony: { a: body, s: circ(12, 12, 10.4) },
+};
+for (const [id, g] of Object.entries(sporep)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.6, sw: 1.8 });
+
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
 // ---------- single-colour marks (tinted in the UI)
@@ -343,6 +377,8 @@ const masks = {
 	hexafoil: [S(hexf(12, 12, 9.4), 1.5), F(circ(12, 12, 1.4))],
 	// The Tide path's mark (cooks/biome-ocean.md 2.17): a cresting wave over a swell.
 	tide_wave: [F("M2 15.5c3-1 4.5-6.5 9-7 3.4-.4 5 2 4 3.8-1 1.6-3.4 1-3.2-.7 2.6 0 4.2-3.6 2.4-6-2-2.6-7.6-1.6-10.6 3.2C2.6 11 2 13.2 2 15.5z"), S("M2 19.5q2.5-2 5 0t5 0 5 0 5 0", 1.6)],
+	// The Spore path's mark (cooks/biome-fungal.md 2.17): a deepcap's puff of spores.
+	spore_puff: [F(circ(12, 13.5, 6.2)), F(circ(5.5, 6.5, 2.4) + circ(18.5, 5.5, 2) + circ(19.5, 15.5, 1.6) + circ(4.5, 17.5, 1.8) + circ(12, 3.5, 1.4))],
 };
 // Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
 const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
@@ -363,7 +399,7 @@ Object.assign(masks, {
 	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
 	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
 });
-const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, hexafoil: 48, tide_wave: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
+const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, hexafoil: 48, tide_wave: 48, spore_puff: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
 // ---------- full colour

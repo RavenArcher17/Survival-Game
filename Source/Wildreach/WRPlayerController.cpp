@@ -1,4 +1,5 @@
 #include "WRPlayerController.h"
+#include "WRSporePath.h"
 #include "WRCrystalCreatures.h"
 #include "WROceanCreatures.h"
 #include "WRDeeds.h"
@@ -326,6 +327,11 @@ void AWRPlayerController::InteractReleased()
 	if (FWRCrystalAI::PathTameNear(this))
 	{
 		ServerCommand(TEXT("world cpathtame"));
+	}
+	// A hand on a Sporestalker's crest (the Spore path's calm, WRSporePath): the same.
+	if (WRSporePath::PathTameNear(this))
+	{
+		ServerCommand(TEXT("world spathtame"));
 	}
 	// A hand on a Reefjaw's snout (the Tide path's calm) or in a sleeping Wavecharger's pouch (WROceanCreatures): the same.
 	if (FWROceanAI::PathTameNear(this))

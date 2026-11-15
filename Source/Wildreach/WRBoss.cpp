@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRSporePath.h"
 #include "WRCrystalBosses.h"
 #include "WRFungalBosses.h"
 #include "WRVoidHazards.h"
@@ -565,7 +566,7 @@ void AWRBoss::UpdateParticipants()
 	// Each tame counts as an extra player.
 	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
 	{
-		if (It->IsTamed() && It->IsAlive() && Players.Contains(It->TamedBy) && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
+		if (It->IsTamed() && It->IsAlive() && !WRSporePath::IsSummon(*It) && Players.Contains(It->TamedBy) && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
 		{
 			++Count;
 		}

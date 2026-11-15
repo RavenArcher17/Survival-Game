@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRSporePath.h"
 #include "WRNecroPath.h"
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
@@ -1598,6 +1599,11 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	{
 		return Ward;
 	}
+	// The Sporestalker's calm (the Spore path, WRSporePath): a Spore walker's hand on its crest, held 4 s.
+	if (FString Calm; WRSporePath::TryPathTame(this, Player, Calm))
+	{
+		return Calm;
+	}
 	// The Reefjaw's path-magic calm (the Tide path, WROceanCreatures), the Wavecharger's egg out of a sleeping male's pouch.
 	if (FString Calm; FWROceanAI::TryPathTame(this, Player, Calm) || FWROceanAI::TryStealEgg(this, Player, Calm))
 	{
@@ -1759,7 +1765,7 @@ int32 AWRCreature::CountTames(const UWorld* World, const FString& PlayerName)
 	int32 N = 0;
 	for (TActorIterator<AWRCreature> It(World); It; ++It)
 	{
-		N += It->TamedBy == PlayerName && It->IsAlive() && !WRNecro::IsRaised(*It) ? 1 : 0;   // a raised minion is never a tame
+		N += It->TamedBy == PlayerName && It->IsAlive() && !WRNecro::IsRaised(*It) && !WRSporePath::IsSummon(*It) ? 1 : 0;   // a raised minion is never a tame
 	}
 	return N;
 }
@@ -2292,7 +2298,8 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRSkyAI::Died(this, Killer);      // a Sky creature lets go; a Sailbell pops in fire or deflates and stings 60 s
 	FWROceanAI::Died(this, Killer);    // a sea creature lets go; a Gullraider drops what it stole; the blood cloud
 	// The Risen leave no body (GY 2.12.4): their bones go straight to the killer.
-	const bool bRaisedMinion = WRNecro::IsRaised(this);
+	const bool bRaisedMinion = WRNecro::IsRaised(this) || WRSporePath::IsSummon(this) || CreatureId == TEXT("sporeling");   // a Spore summon, a boss's sporeling: no body
+	WRSporePath::CreatureDied(this, Killer);   // Host's sporeling, Endless colony, Fungal puppets
 	const bool bBody = !FWRGraveAI::NoBody(this) && !bRaisedMinion && BecomeBody(Killer);
 	// Necromancy: the body's clock for raising starts; a raised minion goes to bones (no loot, no body).
 	WRNecro::CreatureDied(this, Killer);
