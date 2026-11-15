@@ -822,7 +822,13 @@
 			"boss.vharra.p3": [{"file": "music/swamp_vharra_p3", "volume": 0.9}],
 			"sub.sunken_coven": [{"file": "music/swamp_sunken_coven", "volume": 0.8}],
 			"camp.swamp": [{"file": "music/swamp_camp", "volume": 0.75}],
-			"layer.red_tide": [{"file": "music/swamp_red_tide", "volume": 0.55}]
+			"layer.red_tide": [{"file": "music/swamp_red_tide", "volume": 0.55}],
+			"explore.wasteland": [{"file": "music/storm_hollow_spire", "volume": 0.75}, {"file": "music/swamp_sunken_coven", "volume": 0.75}],
+			"night.wasteland": [{"file": "music/night_cathedral", "volume": 0.7}],
+			"combat.wasteland": [{"file": "music/swamp_combat", "volume": 0.85}],
+			"mini.wasteland": [{"file": "music/swamp_mini", "volume": 0.85}],
+			"camp.wasteland": [{"file": "music/storm_camp", "volume": 0.75}],
+			"boss.vorhollow": [{"file": "music/boss", "volume": 0.9}]
 		}
 	}
 }

@@ -122,6 +122,9 @@ public:
 	double GapeUntil = 0.0;
 	double TrailUntil = 0.0;
 	double NextVoiceAt = 0.0;
+	bool bRolledRiftborn = false;
+	/** Server: the Riftborn roll (its den's share), once. */
+	static void RollRiftborn(AWRCreature* C, UWRVoidBody* Body);
 
 private:
 	void BuildLook();

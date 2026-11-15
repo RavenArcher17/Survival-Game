@@ -199,17 +199,11 @@ void UWRVoidBody::AttachLook(AWRCreature* Boss)
 	Boss->AddInstanceComponent(Body);
 }
 
-void UWRVoidBody::BeginPlay()
+void UWRVoidBody::RollRiftborn(AWRCreature* C, UWRVoidBody* Body)
 {
-	Super::BeginPlay();
-	Live.RemoveAll([](const TWeakObjectPtr<UWRVoidBody>& B) { return !B.IsValid(); });
-	Live.Add(this);
-	AWRCreature* C = Cast<AWRCreature>(GetOwner());
-	if (!C || !C->HasAuthority()) return;
-	const double T = VcNow(this);
-	NextListenAt = T + FMath::FRandRange(0.f, 0.5f);
-	NextRiftbornBlinkAt = T + VcT(TEXT("riftborn.blinkCooldown"), 10.f);
-	// Riftborn (biome-void 2.12.5): the den's share (its spawner's "riftborn:<pct>" tag) or forced ("riftborn:100").
+	if (!C || !Body || C->IsA<AWRBoss>()) return;
+	UWRVoidBody* Self = Body;
+	// The den's share (its spawner's "riftborn:<pct>" tag) or forced ("riftborn:100").
 	float Share = VcT(TEXT("riftborn.elsewhere"), 5.f);
 	if (const AWRCreatureSpawner* Sp = C->Spawner.Get())
 	{
@@ -219,9 +213,10 @@ void UWRVoidBody::BeginPlay()
 			if (S.StartsWith(TEXT("riftborn:"))) Share = FCString::Atof(*S.Mid(9));
 		}
 	}
-	if (!C->IsTamed() && FMath::FRand() * 100.f < Share)
+	// (A storm wave's Riftborn come flagged already: they take the same numbers.)
+	if (Self->IsRiftborn() || (!C->IsTamed() && FMath::FRand() * 100.f < Share))
 	{
-		Set(WRVoidFlag::Riftborn, true);
+		Self->Set(WRVoidFlag::Riftborn, true);
 		// One tier up: highland numbers x the riftborn health multiplier.
 		if (UWRAttributeSet* A = C->GetAttributes())
 		{
@@ -234,6 +229,18 @@ void UWRVoidBody::BeginPlay()
 		}
 		C->Weapon.FlatDamage *= VcT(TEXT("riftborn.damageMult"), 1.2f);
 	}
+}
+
+void UWRVoidBody::BeginPlay()
+{
+	Super::BeginPlay();
+	Live.RemoveAll([](const TWeakObjectPtr<UWRVoidBody>& B) { return !B.IsValid(); });
+	Live.Add(this);
+	AWRCreature* C = Cast<AWRCreature>(GetOwner());
+	if (!C || !C->HasAuthority()) return;
+	const double T = VcNow(this);
+	NextListenAt = T + FMath::FRandRange(0.f, 0.5f);
+	NextRiftbornBlinkAt = T + VcT(TEXT("riftborn.blinkCooldown"), 10.f);
 	// A Riftmaw lies in the large rift it was found by.
 	if (C->CreatureId == TEXT("riftmaw"))
 	{
@@ -1491,6 +1498,12 @@ void FWRVoidAI::RideBlink(AWRCreature* Self)
 
 void FWRVoidAI::TickBody(AWRCreature* Self, UWRVoidBody* Body, float DeltaTime)
 {
+	if (!Body->bRolledRiftborn)
+	{
+		// Riftborn (biome-void 2.12.5): rolled once its den has set itself on it (a spawner's "riftborn:<pct>" tag).
+		Body->bRolledRiftborn = true;
+		UWRVoidBody::RollRiftborn(Self, Body);
+	}
 	const double Now = VcNow(Self);
 	const double SNow = VcServerNow(Self);
 	// A planned blink lands on its clock.

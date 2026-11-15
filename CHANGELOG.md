@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased: the Corrupted wasteland (the Void land) — in progress
+## Unreleased: the Corrupted wasteland (the Void land)
 
 Aaron (lane build-biome-void: requirement ledger, research and plan in showcase-notes cooks/build-biome-void.md, building
 cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the testers test, F8).
@@ -107,6 +107,15 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
   timber drum on an iron axle in two bearing blocks, a ratchet wheel and pawl, two cranks, a jib with its sheave, the
   rope to a basket cage of iron straps; mended with rope 10 and iron 4 (5 s); E on the crank (or in the cage) moves
   the cage 1.2 m/s, the drum winding the rope, the pawl clicking every 20 cm and holding wherever you let go.
+- Music: the land's own pools (`explore.wasteland`, `night.wasteland`, `combat.wasteland`, `mini.wasteland`,
+  `camp.wasteland`, `boss.vorhollow`) point at the nearest existing drones and the stock boss track until the
+  Wasteland's composed cues exist; Dead calm's planned silence works over them. Riftborn now roll after their den has
+  set itself on them (so V4-V5's 15% applies), and a storm wave's Riftborn take the same numbers.
+- Not in this build (later cooks): the Riftback's pocket into the Rift chest network (needs a remote container
+  screen), the Riftback shield (shields aren't items yet), the fused creature calls and composed cues, Graveyard
+  Riftborn and the Arcane <-> Void invasions (their lands don't exist), the null field's half refund, floating keels to
+  mine, the Sea Throat seam, the Driftmote sensing caches / crust / seeds (it senses rifts), creatures fleeing litter
+  fire.
 - Unity-build hygiene: every new file's file-scope helpers carry a prefix (Vc / Vb / Vh / Vp / Vw / Va / Um), so no
   unity grouping can make them collide or hide another file's names.
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
