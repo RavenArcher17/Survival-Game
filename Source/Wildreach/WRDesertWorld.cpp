@@ -112,6 +112,7 @@ void AWRDesertState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AWRDesertState, bVaultOpen);
 	DOREPLIFETIME(AWRDesertState, VaultOpenAt);
 	DOREPLIFETIME(AWRDesertState, SignalAt);
+	DOREPLIFETIME(AWRDesertState, bLongNoon);
 }
 
 AWRDesertState* AWRDesertState::Get(const UObject* WorldContext)

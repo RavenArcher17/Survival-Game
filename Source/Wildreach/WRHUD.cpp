@@ -235,6 +235,10 @@ void AWRHUD::DrawHUD()
 	{
 		DrawBar(TEXT("Flow"), A->GetFlow(), A->GetMaxFlow(), FLinearColor(FColor(0x1E, 0x8C, 0x86)), X, Y); Y += BarSpacing;
 	}
+	if (Paths && Paths->IsActivePath(TEXT("sun")))
+	{
+		DrawBar(TEXT("Radiance"), A->GetRadiance(), A->GetMaxRadiance(), FLinearColor(FColor(0xE8, 0xB2, 0x30)), X, Y); Y += BarSpacing;
+	}
 	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
 	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 

@@ -57,6 +57,9 @@ public:
 	/** The Tide path's Flow (cooks/biome-ocean.md 2.17): builds while you move and dodge, drains when you stand still. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Flow) FGameplayAttributeData Flow;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxFlow) FGameplayAttributeData MaxFlow;
+	/** The Sun & sand path's Radiance (cooks/biome-desert.md 2.17): fills in daylight, drains at night (WRSunPath). */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Radiance) FGameplayAttributeData Radiance;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxRadiance) FGameplayAttributeData MaxRadiance;
 	/** The Spore path's Spores (cooks/biome-fungal.md 2.17): a spender that refills, faster in a spore cloud. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Spores) FGameplayAttributeData Spores;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxSpores) FGameplayAttributeData MaxSpores;
@@ -101,6 +104,8 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxMana)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Flow)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxFlow)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Radiance)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxRadiance)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Spores)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxSpores)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Shield)
@@ -140,6 +145,8 @@ private:
 	UFUNCTION() void OnRep_MaxMana(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Flow(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxFlow(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Radiance(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxRadiance(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Spores(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxSpores(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Shield(const FGameplayAttributeData& Old);

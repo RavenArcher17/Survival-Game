@@ -1,4 +1,7 @@
 #include "WRAbilitiesNature.h"
+#include "WRSunPath.h"
+#include "WRCombatLibrary.h"
+#include "WRCombos.h"
 #include "WRGraveBosses.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -808,6 +811,22 @@ void AWRNatureField::Tick(float DeltaSeconds)
 			if (WRNature::Heal(By, Who, Each, true, bFirst) > 0.f)
 			{
 				WRFx::BroadcastOn(Who, TEXT("nature.heal"), NAME_None, 0.7f, NAME_None);
+			}
+		}
+		// Sun garden (Sun + Nature 50): the healing zone blinds the enemies inside it (10 a second).
+		if (By && By->HasTag(WRSun::Combo_SunGarden))
+		{
+			for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
+			{
+				if (!It->IsAlive() || !By->IsHostileTo(*It) || FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) >= Radius + It->GetSimpleCollisionRadius()) continue;
+				FWRHit Glare;
+				Glare.Instigator = By;
+				Glare.PathId = TEXT("sun");
+				Glare.bSpell = true;
+				Glare.bDamageOverTime = true;
+				Glare.Buildups.Add(TEXT("blind"), FWRComboRegistry::Get().Num(TEXT("sun_garden"), TEXT("blindPerSecond"), 10.f));
+				Glare.Origin = GetActorLocation();
+				UWRCombatLibrary::ApplyHit(*It, Glare);
 			}
 		}
 		break;

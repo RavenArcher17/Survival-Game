@@ -2,6 +2,7 @@
 #include "WROceanHazards.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
+#include "WRSunPath.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
 #include "WRArcanePath.h"
@@ -908,6 +909,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRArcane::TickOwner(Owner, DeltaTime);
 		// Flow (the Tide path): builds while you move and dodge, drains when you stand (WRTidePath.cpp).
 		WRTidePath::TickOwner(Owner, DeltaTime);
+		// Radiance (the Sun & sand path): fills in daylight under the open sky, drains at night (WRSunPath.cpp).
+		WRSun::TickOwner(Owner, DeltaTime);
 		// Spores (the Spore path): the refill, Regrowth, the Living colony's aura, Pandemic, the summons (WRSporePath.cpp).
 		WRSporePath::TickOwner(Owner, DeltaTime);
 	}

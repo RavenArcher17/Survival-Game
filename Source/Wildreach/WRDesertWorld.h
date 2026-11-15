@@ -44,6 +44,9 @@ public:
 	/** The Sun-Vault's door slid open (the gallery's beam reached its lock). */
 	UPROPERTY(Replicated) bool bVaultOpen = false;
 	UPROPERTY(Replicated) float VaultOpenAt = -100.f;
+	/** The Long Noon (cook 2.10): the desert's sky held at noon (WRDesertEvents sets it; the sky, Radiance and the
+	 *  creatures read it on every machine). */
+	UPROPERTY(Replicated) bool bLongNoon = false;
 	/** The Lookout's bronze signal mirror flashed Saltgate (secret X3) today: the server time of the flash. */
 	UPROPERTY(Replicated) float SignalAt = -100.f;
 

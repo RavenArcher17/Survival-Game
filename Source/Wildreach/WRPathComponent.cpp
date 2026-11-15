@@ -1,6 +1,7 @@
 #include "WRPathComponent.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
+#include "WRSunPath.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
 #include "WRArcanePath.h"
@@ -604,6 +605,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	{
 		// Gills (cooks/biome-ocean.md 2.17): breathe and fight freely under water (WRUnderwater, WRTidePath.cpp).
 		GrantedTags.AddTag(WRTidePath::Passive_Gills);
+	}
+	else if (MainPath == TEXT("sun"))
+	{
+		// Sandwalker (cooks/biome-desert.md 2.17): no soft-sand slow, no sandstorm slow, 60 m sight in storms, no sinking.
+		GrantedTags.AddTag(WRSun::Passive_Sandwalker);
 	}
 	else if (MainPath == TEXT("arcane"))
 	{

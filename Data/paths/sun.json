@@ -1,0 +1,213 @@
+{
+  "_comment": "The Sun & sand path (cooks/biome-desert.md 2.17; cooks/build-biome-desert.md 2.16). Resource Radiance fills in daylight under the open sky and drains at night (tuning sun.radiance); the root passive Sandwalker (main path only) makes soft sand, sandstorms and quicksand nothing to you. Abilities are UWRGameplayAbility subclasses in WRAbilitiesSun.* registered under sun in UWRAbilityRegistry::ClassForNode; numbers in tuning spells.<key>, wildbrands.<node>, nodeEffects sun.*, sun.*.",
+  "id": "sun",
+  "name": "Sun & sand",
+  "biome": "desert",
+  "starter": "sunbeam",
+  "color": "E8B230",
+  "icon": "sunstone",
+  "glyph": "sun_disc",
+  "resource": {
+    "id": "radiance",
+    "name": "Radiance"
+  },
+  "rootPassive": {
+    "id": "sandwalker",
+    "name": "Sandwalker",
+    "text": "No movement penalty in sand or sandstorms. Soft sand and storms never slow you, you see 60 m in a sandstorm, and quicksand never takes you."
+  },
+  "trunk": [
+    {
+      "id": "sunbeam",
+      "name": "Sunbeam",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic light spell"
+    },
+    {
+      "id": "radiance_capacity",
+      "name": "Radiance capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Radiance bar"
+    },
+    {
+      "id": "blind_chance",
+      "name": "Blind chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Higher chance to blind enemies"
+    },
+    {
+      "id": "sun_strike",
+      "name": "Sun strike",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic light weapon art"
+    }
+  ],
+  "branches": [
+    {
+      "id": "radiant",
+      "name": "Radiant",
+      "nodes": [
+        {
+          "id": "solar_flare",
+          "name": "Solar flare",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 0,
+          "text": "Spell: a flash that blinds everything nearby"
+        },
+        {
+          "id": "brilliance",
+          "name": "Brilliance",
+          "kind": "stat",
+          "ranks": 5,
+          "gate": 5,
+          "text": "More light damage"
+        },
+        {
+          "id": "searing_light",
+          "name": "Searing light",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 10,
+          "text": "Blinded enemies take more damage"
+        },
+        {
+          "id": "beacon",
+          "name": "Beacon",
+          "kind": "ability",
+          "cost": 4,
+          "gate": 13,
+          "text": "Spell: a light zone that hurts undead and void creatures"
+        },
+        {
+          "id": "dawn",
+          "name": "Dawn",
+          "kind": "stat",
+          "cost": 3,
+          "gate": 17,
+          "text": "Radiance drains less at night"
+        },
+        {
+          "id": "sunburst",
+          "name": "Sunburst",
+          "kind": "capstone",
+          "cost": 10,
+          "gate": 20,
+          "text": "Capstone: call down a column of sunlight"
+        }
+      ]
+    },
+    {
+      "id": "dune",
+      "name": "Dune",
+      "nodes": [
+        {
+          "id": "sandstorm",
+          "name": "Sandstorm",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 0,
+          "text": "Spell: a storm that blinds and slows"
+        },
+        {
+          "id": "shifting_sands",
+          "name": "Shifting sands",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 5,
+          "text": "Bigger storms"
+        },
+        {
+          "id": "burrow",
+          "name": "Burrow",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 8,
+          "text": "Dive under sand to dodge and move"
+        },
+        {
+          "id": "quicksand",
+          "name": "Quicksand",
+          "kind": "ability",
+          "cost": 4,
+          "gate": 13,
+          "text": "Spell: a trap that sinks enemies"
+        },
+        {
+          "id": "scour",
+          "name": "Scour",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 17,
+          "text": "Storms deal damage over time"
+        },
+        {
+          "id": "deserts_wrath",
+          "name": "Desert's wrath",
+          "kind": "capstone",
+          "cost": 10,
+          "gate": 20,
+          "text": "Capstone: a giant sand vortex"
+        }
+      ]
+    },
+    {
+      "id": "solar_blade",
+      "name": "Solar blade",
+      "nodes": [
+        {
+          "id": "blazing_arc",
+          "name": "Blazing arc",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 0,
+          "text": "Wide sun-infused weapon art"
+        },
+        {
+          "id": "sun_forged",
+          "name": "Sun-forged",
+          "kind": "stat",
+          "ranks": 5,
+          "gate": 5,
+          "text": "More weapon art damage"
+        },
+        {
+          "id": "gleam",
+          "name": "Gleam",
+          "kind": "stat",
+          "cost": 3,
+          "gate": 10,
+          "text": "Parries blind the attacker"
+        },
+        {
+          "id": "zenith",
+          "name": "Zenith",
+          "kind": "stat",
+          "cost": 4,
+          "gate": 13,
+          "text": "Bonus damage at full Radiance"
+        },
+        {
+          "id": "heat_shimmer",
+          "name": "Heat shimmer",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 17,
+          "text": "Longer dodges"
+        },
+        {
+          "id": "noon_strike",
+          "name": "Noon strike",
+          "kind": "capstone",
+          "cost": 10,
+          "gate": 20,
+          "text": "Capstone: an overhead blow that calls down sunlight"
+        }
+      ]
+    }
+  ]
+}

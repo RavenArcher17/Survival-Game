@@ -4,6 +4,7 @@
 #include "WRCharacter.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
+#include "WRSunPath.h"
 #include "WRWindPath.h"     // the Wind body change (cooks/biome-sky.md 2.18.5)
 #include "WRNecroPath.h"
 #include "WRArcanePath.h"
@@ -923,6 +924,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, WRNecro::LookSig(this));         // Necromancy: Lich form's full ash, a raise's pupil flare
 	Sig = HashCombine(Sig, WRArcane::LookSig(this));        // Arcane: a shield's facets lift the rune lines
 	Sig = HashCombine(Sig, WRTidePath::LookSig(this));
+	Sig = HashCombine(Sig, WRSun::LookSig(this));           // Sun: the flecks' stored glow at night by Radiance, Zenith
 	Sig = HashCombine(Sig, WRSporePath::LookSig(this));     // Spore: the freckles glow in the dark, blaze in Living colony      // Tide: Flow brightens the sheen; the glow under water
 	if (!bForce && Sig == PathMarkSig)
 	{
@@ -1068,6 +1070,8 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	// resting glow (WRArcanePath.cpp).
 	WRArcane::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 	WRTidePath::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
+	// Sun (cooks/biome-desert.md 2.18): the stages are the player_art row; the flecks glow at night by Radiance (WRSunPath.cpp).
+	WRSun::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 	WRSporePath::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 
 	// Blood: sharper canines from strength 0.6 (main, or the sub path's share).

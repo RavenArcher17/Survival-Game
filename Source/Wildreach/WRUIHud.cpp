@@ -5,6 +5,7 @@
 #include "WRWarHall.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
+#include "WRSunPath.h"
 #include "WRUnderwater.h"
 #include "WRWindPath.h"     // the Momentum gauge (the Wind path)
 #include "WRStormTypes.h"
@@ -1302,6 +1303,18 @@ private:
 							[A, this]() { const UWRAttributeSet* X = A(); return X ? X->GetFlow() : 0.f; },
 							[A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxFlow() : 1.f; },
 							[this]() { return FMath::Max(WRTidePath::RefusedFlash(Body()), WRTidePath::FillingGlow(Body()) * 0.35f); })
+					]
+				]
+				// Radiance (the Sun & sand path, cooks/biome-desert.md 2.17): Sun gold #E8B230 under your health; it brightens while
+				// it fills, its edge dims at night while it drains, and it flashes when a press is refused for Radiance.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SBox).Visibility_Lambda([this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("sun")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+					[
+						VitalRow(LOCTEXT("Radiance", "Radiance"), FLinearColor(FColor(0xE8, 0xB2, 0x30)), 10.f * U,
+							[A, this]() { const UWRAttributeSet* X = A(); return X ? X->GetRadiance() : 0.f; },
+							[A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxRadiance() : 1.f; },
+							[this]() { return FMath::Max(WRSun::RefusedFlash(Body()), WRSun::FillingGlow(Body()) * 0.35f); })
 					]
 				]
 				// Mana (the Arcane path, 2.17): violet #7A3FD1 under your health while the path is yours; it flashes and

@@ -9,7 +9,8 @@
 #include "WROceanBosses.h"
 #include "WRInventory.h"
 #include "WRWindPath.h"          // Sky lord's swings and dodge
-#include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
+#include "WRAbilitiesWind.h"
+#include "WRAbilitiesSun.h"      // the Sun & sand path's abilities (ClassForNode)     // the Wind path's abilities (ClassForNode)
 #include "WRVoidBosses.h"
 #include "WRSound.h"
 #include "WRVoidPath.h"
@@ -1777,11 +1778,12 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	bWasBackstep = bBackstep;
 	// Light step (frost node): the same roll, quicker (its frames shrink with it).
 	const float Quick = 1.f + UWRPathComponent::Stat(Character, TEXT("dodgeSpeed"));
-	const float Distance = T.Num(Key + TEXT("distance"), bBackstep ? 250.f : 500.f);
+	// Heat shimmer (the Sun path): +12% roll distance and +0.03 s i-frames a rank (nodeEffects sun.heat_shimmer).
+	const float Distance = T.Num(Key + TEXT("distance"), bBackstep ? 250.f : 500.f) * (1.f + FMath::Max(0.f, UWRPathComponent::Stat(Character, TEXT("rollDistance"))));
 	const float TravelTime = FMath::Max(0.05f, T.Num(Key + TEXT("travel"), bBackstep ? 0.25f : 0.46f) / Quick);
 	const float IStart = T.Num(Key + TEXT("iStart"), 0.03f) / Quick;
 	// Fade (the Void path): a little longer untouchable on every dodge.
-	const float IEnd = T.Num(Key + TEXT("iEnd"), bBackstep ? 0.13f : 0.46f) / Quick + WRVoidPath::FadeSeconds(Character);
+	const float IEnd = T.Num(Key + TEXT("iEnd"), bBackstep ? 0.13f : 0.46f) / Quick + WRVoidPath::FadeSeconds(Character) + FMath::Max(0.f, UWRPathComponent::Stat(Character, TEXT("rollIFrames")));
 	const float Recovery = T.Num(Key + TEXT("recovery"), bBackstep ? 0.22f : 0.27f) / Quick;
 	CostOverride = bBackstep ? T.Num(TEXT("stamina.backstep"), 8.f) : T.Num(TEXT("stamina.dodge"), 12.f);
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
@@ -2903,6 +2905,21 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("cleanse")) return UWRGA_Cleanse::StaticClass();
 		if (NodeId == TEXT("tidal_shield")) return UWRGA_TidalShield::StaticClass();
 		if (NodeId == TEXT("high_tide")) return UWRGA_HighTide::StaticClass();
+	}
+	else if (PathId == TEXT("sun"))
+	{
+		// The Sun & sand path (WRAbilitiesSun.cpp, cooks/biome-desert.md 2.17).
+		if (NodeId == TEXT("sunbeam")) return UWRGA_Sunbeam::StaticClass();
+		if (NodeId == TEXT("sun_strike")) return UWRGA_SunStrike::StaticClass();
+		if (NodeId == TEXT("solar_flare")) return UWRGA_SolarFlare::StaticClass();
+		if (NodeId == TEXT("beacon")) return UWRGA_SunBeacon::StaticClass();
+		if (NodeId == TEXT("sunburst")) return UWRGA_Sunburst::StaticClass();
+		if (NodeId == TEXT("sandstorm")) return UWRGA_Sandstorm::StaticClass();
+		if (NodeId == TEXT("burrow")) return UWRGA_Burrow::StaticClass();
+		if (NodeId == TEXT("quicksand")) return UWRGA_Quicksand::StaticClass();
+		if (NodeId == TEXT("deserts_wrath")) return UWRGA_DesertsWrath::StaticClass();
+		if (NodeId == TEXT("blazing_arc")) return UWRGA_BlazingArc::StaticClass();
+		if (NodeId == TEXT("noon_strike")) return UWRGA_NoonStrike::StaticClass();
 	}
 	else if (PathId == TEXT("necromancy"))
 	{

@@ -7,6 +7,31 @@ cooks/build-biome-desert.md, building cooks/biome-desert.md). Landing in pieces;
 played here (Aaron and the testers test, F8). Not live until `desert` joins `world.liveBiomes` (Desert (3), with its
 creatures).
 
+- **Desert (2): the Sun & sand path** (cooks/biome-desert.md 2.17-2.18; plan build-biome-desert.md 2.16).
+  `Data/paths/sun.json` (trunk Sunbeam, Radiance capacity, Blind chance, Sun strike; Radiant, Dune and Solar blade, 100
+  points). **Radiance** (`WRAttributeSet` Radiance / MaxRadiance, `WRSunPath`): 100 + 10 a capacity rank; by day +2.5 a
+  second exposed to the sky (a 30 m trace straight up: roofs and overhangs are shade), half in shade, +3 a landed melee
+  hit, +5 a kill; overcast x0.6, heat wave x1.2, a sandstorm or the belt 0, the Long Noon x1.5 with no drain; at night no
+  sky fill and a 1.5 a second drain (Dawn x0.3), refilled 0.5 a second within 6 m of a sunstone lamp, your Beacon or your
+  tamed Gildback, half the day rate in Dunewrap's four pieces; underground counts as night. The HUD's Sun-gold bar
+  (#E8B230) flashes on a refused press and brightens while it fills. **Sandwalker** (root, main path) is the tag
+  `Passive.Sandwalker` the movement and hazards read. **Eleven abilities** (`WRAbilitiesSun`, ClassForNode "sun"):
+  Sunbeam (a light bolt, blind 30, homes on creatures only), Solar flare (6 m flash, blind 80), Beacon (a 5 m pool of light
+  10 s that burns undead and void creatures and is a lamp for your Radiance), Sunburst (a gold column the party sees 1 s
+  before it lands, 70 and blind 100), Sandstorm (7 m on you for 8 s: blind 10 a second, slow, Scour's damage, Solar
+  storm's strikes), Desert's wrath (a 10 m vortex pulling at 2 m/s, bosses never), Quicksand (a 3 m pool that roots the
+  lowland and midland 2 s, slows everything; Frozen sand's frost), Burrow (8 m under any land's sand, untouchable and
+  unseen, a fin of sand over you, a burst where you come up; "needs sand" elsewhere), Sun strike, Blazing arc (220
+  degrees, 3.8 m, charged 5 m) and Noon strike (its column falls on the struck point 0.9 s later) as Wildbrands. Fields
+  are `AWRSunField`, columns `AWRSunColumn` (replicated; every hit through ApplyHit). **Passives**: Blind chance, Brilliance,
+  Searing light (and its gold sparks), Sun-forged, Zenith (+15% at 90% Radiance), Gleam (a parry blinds 100, bosses 60:
+  the white starburst), Heat shimmer (the roll's distance and i-frames), Scour, Shifting sands, Dawn. **Combos**
+  (combos.json): Desert heat, Supernova (both bars full: a blinding fireball, 90 s), Thunderflash, Solar storm, Sun garden
+  (Sanctuary blinds enemies), Frozen sand, Sun and snow (a shatter on a blinded enemy flashes), Dry blood, Scarab swarm
+  (Corpse explosion lets out biting scarabs); Desert bloom, Desert graves and Sacrifice to the sun are listed but not built
+  (the raise-from-sand and the quick-slot action need their own work). **The body**: the skin's Sun stage (the hero
+  lane's pattern) plus the flecks' stored glow at night by Radiance and the full-Radiance warm glow. Proc fx and sounds
+  as rows (`sun.*`, stand-in sounds).
 - **Desert (1): the land and its places** (cooks/biome-desert.md 2.1-2.7; plan build-biome-desert.md 2.1-2.7).
   `node Tools/terrain/desert.mjs` writes `Data/lands/desert.json` + `desert_ground.bin` (a 4 m heightfield land, 711
   samples, priority 2) and `Data/desert.json` (read by `FWRDesertData`, `WRDesertTypes.cpp`). Where it sits: belt B2 west

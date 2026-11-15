@@ -358,6 +358,11 @@ hazards and the sand-swimmers all read it. Scenery: `WRDesertScenery.cpp` (landm
 Hourhold) / `WRDesertSites.cpp` (sites, kit) on the forest's FBuild with the kit `WRDesertLook.h` (`Ds*`); node looks
 `WRDesertNodes.cpp` (asked first in `WRResourceLook`); `UWRDesertWorld` builds and runs it (`world desert spot`);
 `AWRDesertState` replicates the Lee Door, the Dig, the Mirror Gallery and the Sun-Vault. Numbers: tuning `desertWorld`.
+The Sun & sand path is `WRSunPath` (Radiance, Sandwalker = `Passive.Sandwalker`, the passives the combat code asks
+about: `ScaleBuildups`, `DamageScale`, `AfterHit`, `OnParry`; `WRSun::Exposed` is the one "under the open sky" test,
+`WRSun::SandUnder` the one "sand underfoot" test for any land) and `WRAbilitiesSun` (its abilities, `AWRSunField` the
+beacon / storms / quicksand, `AWRSunColumn` the light columns). Numbers: tuning `sun.radiance`, `sun.path`,
+`spells.<key>`, `wildbrands.<node>`, `nodeEffects sun.*`.
 
 Also since 0.7.1 (live from Ocean (4)): **the Ocean & reefs** (cooks/biome-ocean.md, plan
 cooks/build-biome-ocean.md), the strait between the Sky's Chain Cliffs and the Storm crown. `node Tools/terrain/ocean.mjs`

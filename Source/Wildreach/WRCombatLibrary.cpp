@@ -1,6 +1,8 @@
 #include "WRCombatLibrary.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
+#include "WRSunPath.h"
+#include "WRCombos.h"
 #include "WRUnderwater.h"
 #include "WRCrystalTypes.h"
 #include "WRFungalHazards.h"
@@ -129,6 +131,11 @@ void UWRCombatLibrary::GainResource(AWRCharacterBase* Who, const FGameplayTag& E
 	if (!Who || !Who->HasAuthority() || Amount <= 0.f)
 	{
 		return;
+	}
+	// Desert heat (Fire + Sun 25): Heat builds a quarter faster in sunlight under the open sky.
+	if (Element == WRTags::Element_Fire && Who->HasTag(WRSun::Combo_DesertHeat) && WRSun::Daylight(Who) && WRSun::Exposed(Who))
+	{
+		Amount *= FWRComboRegistry::Get().Num(TEXT("desert_heat"), TEXT("heatGain"), 1.25f);
 	}
 	// Charge (the Lightning path) has its own gain rules (Recharge, its prestige): WRLightningPath.cpp.
 	if (Element == WRTags::Element_Lightning)
@@ -612,6 +619,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		if (bStanceBroke) Attacker->ParriesTaken = 0;
 		// Discharge (lightning node): a parry releases a doubled shock.
 		WRLightning::OnGuard(Target, Attacker, true);
+		// Gleam (the Sun path): the parry throws the sun into the attacker's eyes.
+		WRSun::OnParry(Target, Attacker);
 		uint16 Flags = WRFx::HitFlagsFor(Hit, false, false, false, false, false);
 		if (bStanceBroke) Flags |= WRFx::Hit_StanceBreak;
 		Target->ReportHit(0.f, EWRHitResult::Parried, Flags, Hit.Instigator, Hit.Origin);
@@ -691,6 +700,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRSporePath::DamageScale(Attacker, Target, Hit);
 		// Arcane: Focus, Mark chance on the marked, an ally's Rune circle (WRArcanePath.cpp).
 		Damage *= WRArcane::DamageScale(Attacker, Target, Hit);
+		// Sun: Brilliance, Sun-forged, Zenith, Searing light on the blinded, Dry blood (WRSunPath.cpp).
+		Damage *= WRSun::DamageScale(Attacker, Target, Hit);
 		// Under water fire fizzles (cooks/biome-ocean.md 2.6): x0.3 on a body in the water, and no burn (below).
 		if (Hit.Element == WRTags::Element_Fire) Damage *= WRUnderwater::FireMult(Target);
 		if (Hit.SwimTargetMult != 1.f && Target->GetCharacterMovement() && Target->GetCharacterMovement()->IsSwimming()) Damage *= Hit.SwimTargetMult;
@@ -825,6 +836,17 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 					* (1.f + UWRPathComponent::Stat(Attacker, TEXT("shatterDamage")));
 				Target->Status->ClearStatus(WRTags::Status_Frozen);
 				UE_LOG(LogWildreach, Log, TEXT("COMBAT shatter on %s (chill spent %.0f%%)"), *Target->GetName(), ChillFraction * 100.f);
+				// Sun and snow (Sun + Frost 50): shattering a blinded enemy throws a blinding flash round it.
+				if (Attacker->HasTag(WRSun::Combo_SunAndSnow) && Target->HasTag(WRTags::Status_Blind))
+				{
+					const float FR = FWRComboRegistry::Get().Num(TEXT("sun_and_snow"), TEXT("radius"), 500.f);
+					WRFx::Broadcast(Target, TEXT("sun.flare"), Target->GetActorLocation(), FRotator::ZeroRotator, FR / 600.f, TEXT("sun.flare"));
+					for (TActorIterator<AWRCharacterBase> It(Target->GetWorld()); It; ++It)
+					{
+						if (*It == Target || !It->IsAlive() || !Attacker->IsHostileTo(*It) || !It->Status || FVector::Dist(It->GetActorLocation(), Target->GetActorLocation()) > FR) continue;
+						It->Status->AddStatusBuildup(WRStatus::FromName(TEXT("blind")), FWRComboRegistry::Get().Num(TEXT("sun_and_snow"), TEXT("blind"), 80.f), Attacker, 0.f);
+					}
+				}
 				// Cold return: shatters refund some Chill.
 				if (UWRPathComponent::HasNode(Attacker, TEXT("frost"), TEXT("cold_return")))
 				{
@@ -1148,6 +1170,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRArcane::ScaleBuildups(Attacker, Coated);
 		// Soak chance's soak on every hit and on weapon hits (WRTidePath.cpp).
 		WRTidePath::ScaleBuildups(Attacker, Coated);
+		// Blind chance's extra blind and its +5 on weapon hits, Thunderflash, the crit-blind gear (WRSunPath.cpp).
+		WRSun::ScaleBuildups(Attacker, Coated);
 		// Rot chance's extra rot and its +5 on weapon hits; Plague wind (WRSporePath.cpp).
 		WRSporePath::ScaleBuildups(Attacker, Coated);
 		// A bloomed beast's bite carries the Sporefall's poison (fungal 2.10: +20).
@@ -1204,6 +1228,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRArcane::AfterHit(Target, Hit, Damage);
 		// The Tide path's (WRTidePath.cpp): Flow for a hit on the move, Live water, Flash freeze, Shark harpoon, Depths.
 		WRTidePath::AfterHit(Target, Hit, Damage);
+		// The Sun path's (WRSunPath.cpp): Radiance for a melee hit and a kill, the blind proc's flash, Searing light's sparks.
+		WRSun::AfterHit(Target, Hit, Damage);
 		// The Spore path's (WRSporePath.cpp): Infect strike's plants, the summons' bites, Toxic blood, the combos.
 		WRSporePath::AfterHit(Target, Hit, Damage);
 		// The Fungal caverns (WRFungalHazards): fire and frost in a spore cloud, loud work under the Webs' ceilings.

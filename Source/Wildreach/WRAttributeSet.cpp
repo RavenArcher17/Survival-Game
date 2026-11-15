@@ -28,6 +28,8 @@ UWRAttributeSet::UWRAttributeSet()
 	InitMaxMana(100.f);
 	InitFlow(0.f);
 	InitMaxFlow(100.f);
+	InitRadiance(0.f);
+	InitMaxRadiance(100.f);
 	InitSpores(100.f);
 	InitMaxSpores(100.f);
 	InitShield(0.f);
@@ -81,6 +83,8 @@ void UWRAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	WR_REP_OWNER(MaxMana);
 	WR_REP_OWNER(Flow);
 	WR_REP_OWNER(MaxFlow);
+	WR_REP_OWNER(Radiance);
+	WR_REP_OWNER(MaxRadiance);
 	WR_REP_OWNER(Spores);
 	WR_REP_OWNER(MaxSpores);
 	WR_REP_OWNER(Shield);
@@ -109,6 +113,7 @@ void UWRAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute
 	else if (Attribute == GetSoulsAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxSouls());
 	else if (Attribute == GetManaAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxMana());
 	else if (Attribute == GetFlowAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxFlow());
+	else if (Attribute == GetRadianceAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxRadiance());
 	else if (Attribute == GetSporesAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxSpores());
 	else if (Attribute == GetShieldAttribute()) NewValue = FMath::Max(0.f, NewValue);
 	else if (Attribute == GetHungerAttribute() || Attribute == GetThirstAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, 100.f);
@@ -143,6 +148,8 @@ WR_ONREP(Mana)
 WR_ONREP(MaxMana)
 WR_ONREP(Flow)
 WR_ONREP(MaxFlow)
+WR_ONREP(Radiance)
+WR_ONREP(MaxRadiance)
 WR_ONREP(Spores)
 WR_ONREP(MaxSpores)
 WR_ONREP(Shield)

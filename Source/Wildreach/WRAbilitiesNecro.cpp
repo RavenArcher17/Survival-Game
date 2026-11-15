@@ -1,6 +1,7 @@
 // The Necromancy path's abilities (see WRAbilitiesNecro.h; cooks/biome-graveyard.md 2.17).
 
 #include "WRAbilitiesNecro.h"
+#include "WRSunPath.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -324,6 +325,43 @@ void UWRGA_CorpseExplosion::CastNecro(AWRCharacterBase* Caster)
 		// Funeral pyre (Fire + Necromancy 50): the blast burns.
 		if (bPyre) Hit.Buildups.Add(TEXT("burn"), FWRComboRegistry::Get().Num(TEXT("funeral_pyre"), TEXT("burn"), 60.f));
 		UWRCombatLibrary::ApplyHit(Who, Hit);
+	}
+	// Scarab swarm (Sun + Necromancy 50): the burst lets out biting scarabs that run to the nearest enemies (6 of them,
+	// 8 a bite, 4 s): a swarm of gold-green beetles boiling out of the blast, each bite a hit.
+	if (Caster->HasTag(WRSun::Combo_ScarabSwarm))
+	{
+		const int32 N = int32(FWRComboRegistry::Get().Num(TEXT("scarab_swarm"), TEXT("scarabs"), 6.f));
+		const float Bite = FWRComboRegistry::Get().Num(TEXT("scarab_swarm"), TEXT("bite"), 8.f);
+		const float Secs = FWRComboRegistry::Get().Num(TEXT("scarab_swarm"), TEXT("seconds"), 4.f);
+		WRFx::Broadcast(Caster, TEXT("necro.scarab_swarm"), At, FRotator::ZeroRotator, Radius / 300.f, TEXT("necro.scarab_swarm"));
+		TArray<TWeakObjectPtr<AWRCharacterBase>> Prey;
+		for (TActorIterator<AWRCharacterBase> It(Caster->GetWorld()); It; ++It)
+		{
+			if (It->IsAlive() && Caster->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), At) < Radius * 2.5f) Prey.Add(*It);
+		}
+		Prey.Sort([At](const TWeakObjectPtr<AWRCharacterBase>& A, const TWeakObjectPtr<AWRCharacterBase>& B) { return FVector::DistSquared(A->GetActorLocation(), At) < FVector::DistSquared(B->GetActorLocation(), At); });
+		TWeakObjectPtr<AWRCharacterBase> WC(Caster);
+		for (int32 s = 0; s < N && Prey.Num() > 0; ++s)
+		{
+			TWeakObjectPtr<AWRCharacterBase> T = Prey[s % Prey.Num()];
+			for (float t = 0.5f; t <= Secs; t += 1.f)
+			{
+				FTimerHandle H;
+				Caster->GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([WC, T, Bite]()
+				{
+					if (!WC.IsValid() || !T.IsValid() || !T->IsAlive()) return;
+					FWRHit B;
+					B.Instigator = WC.Get();
+					B.Damage = Bite;
+					B.PathId = TEXT("necromancy");
+					B.bDamageOverTime = true;
+					B.Origin = T->GetActorLocation();
+					B.ImpactPoint = T->GetActorLocation();
+					WRFx::Broadcast(T.Get(), TEXT("necro.scarab_bite"), T->GetActorLocation(), FRotator::ZeroRotator, 0.6f);
+					UWRCombatLibrary::ApplyHit(T.Get(), B);
+				}), t + 0.07f * s, false);
+			}
+		}
 	}
 }
 
