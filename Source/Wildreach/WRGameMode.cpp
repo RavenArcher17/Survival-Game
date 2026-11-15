@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRLand.h"
 #include "WRStore.h"
 #include "WRIdentity.h"
 #include "WRRaiding.h"
@@ -262,6 +263,8 @@ void AWRGameMode::RescueUnderground()
 			continue;
 		}
 		const FVector L = C->GetActorLocation();
+		// Inside a land's hole (the Great Rift) the black is the floor: no rescue, the land's own rule ends the fall.
+		if (WRLand::InHole(L)) continue;
 		const float Need = UWRWaterSubsystem::IsInWater(C) ? SwimMargin : Margin;
 		TArray<FHitResult> Hits;
 		const FCollisionQueryParams Query(SCENE_QUERY_STAT(WRUnderground), false, C);

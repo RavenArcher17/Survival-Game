@@ -62,7 +62,7 @@ namespace WREndgameLookImpl
 		return false;
 	}
 	/** Plinth top (the collar's rim), piece space. */
-	constexpr float TopZ = 182.f;
+	constexpr float PlinthTopZ = 182.f;
 
 	void Sigil(FKit& K, const FSurf& S, FName Id, const FVector& Centre, const FVector& Right, const FVector& Up, const FVector& Out, float Cell, float Depth)
 	{
@@ -116,8 +116,8 @@ void WREndgameLook::BuildMonument(AWRBuildPiece* Piece, const FWRPieceDef& Def, 
 	Sigil(K, Dark, Boss, FVector(0.f, -53.f, 100.f), FVector(-1.f, 0.f, 0.f), FVector(0.f, 0.f, 1.f), FVector(0.f, 1.f, 0.f), 6.f, 1.4f);
 	const FMonumentTune T = MonumentTune(Boss);
 	// The bronze collar the neck sits in (a turned ring with a verdigris bead).
-	K.Add(Bronze, FVector(T.Collar, T.Collar, 10.f), FVector(0.f, 0.f, TopZ - 5.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
-	K.Add(Verdigris, FVector(T.Collar + 4.f, T.Collar + 4.f, 2.f), FVector(0.f, 0.f, TopZ - 9.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+	K.Add(Bronze, FVector(T.Collar, T.Collar, 10.f), FVector(0.f, 0.f, PlinthTopZ - 5.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+	K.Add(Verdigris, FVector(T.Collar + 4.f, T.Collar + 4.f, 2.f), FVector(0.f, 0.f, PlinthTopZ - 9.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 	// The plaque: a bronze tabula ansata in the niche, its two dovetail ears pinned to the stone.
 	K.Box(Bronze, FVector(53.f, -26.f, 74.f), FVector(55.f, 26.f, 104.f));
 	for (const float S : { -1.f, 1.f })
@@ -159,7 +159,7 @@ void WREndgameLook::BuildMonument(AWRBuildPiece* Piece, const FWRPieceDef& Def, 
 			const FVector Scaled = Rot.RotateVector(HeadCS.GetLocation() * T.Scale);
 			Head->SetRelativeScale3D(FVector(T.Scale));
 			Head->SetRelativeRotation(Rot);
-			Head->SetRelativeLocation(FVector(0.f, 0.f, TopZ + T.Lift) - Scaled);
+			Head->SetRelativeLocation(FVector(0.f, 0.f, PlinthTopZ + T.Lift) - Scaled);
 		}
 		else
 		{

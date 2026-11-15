@@ -3,6 +3,7 @@
 
 #include "WRDeeds.h"
 #include "WRWarHall.h"
+#include "WRLandThings.h"
 #include "WRPlayerController.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
@@ -216,6 +217,11 @@ void AWRPlayerController::WRInteract()
 	// The endgame: a war-hall's gate (its card), a record tablet (its board), a boss altar (its pages: path, Return,
 	// Forge soul), a monument's plaque (WRWarHall, WRDeeds).
 	if (UI && (WRWarHall::ClientInteract(this) || WRDeeds::ClientInteract(this)))
+	{
+		return;
+	}
+	// A runtime land's things: the Grey Crossing's boats, the Descent lift, the Null Gate's winch (WRLandThings).
+	if (WRLandThings::ClientInteract(this))
 	{
 		return;
 	}
@@ -770,6 +776,13 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	if (Cmd == TEXT("deeds"))
 	{
 		OutResult = WRDeeds::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
+	// Runtime lands (WRLandThings): land cross / crank / repair / winch.
+	if (Cmd == TEXT("land"))
+	{
+		OutResult = WRLandThings::Command(this, Args);
 		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
 		return true;
 	}
