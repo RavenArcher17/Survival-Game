@@ -1,5 +1,6 @@
 #include "WRStatusComponent.h"
 #include "WROceanHazards.h"
+#include "WRSporePath.h"
 #include "WRTidePath.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
@@ -282,6 +283,9 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 	{
 		return;
 	}
+	// The Spore path: Immune system takes no poison or rot, Bloom body x0.9 a rank (WRSporePath.cpp).
+	Amount *= WRSporePath::BuildupTakenScale(Owner, Id);
+	if (Amount <= 0.f) return;
 	// Decay: the Asphodel draught (a timed brew, decayBuildup -0.5) slows it (Gravecloth's is its set's buildupTaken.decay).
 	if (Id == WRStatus::Decay)
 	{
@@ -450,7 +454,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 	case WRStatus::Rot:
 		RotSource = Source;
 		RotTick = 0.f;
-		ApplyStatus(WRTags::Status_Rot, Def(Rot, TEXT("seconds"), 20.f));
+		ApplyStatus(WRTags::Status_Rot, Def(Rot, TEXT("seconds"), 20.f) * WRSporePath::RotSecondsScale(Source));   // Lingering +20% a rank
 		break;
 	case WRStatus::Shock:
 	{
@@ -717,7 +721,7 @@ void UWRStatusComponent::TickStatuses(float DeltaTime)
 		while (RotTick >= 1.f && Owner->IsAlive())
 		{
 			RotTick -= 1.f;
-			StatusHit(RotSource.Get(), MaxHP * Def(Rot, TEXT("pctPerSecond"), 0.008f) + Def(Rot, TEXT("flatPerSecond"), 4.f), WRTags::Element_Physical);
+			StatusHit(RotSource.Get(), (MaxHP * Def(Rot, TEXT("pctPerSecond"), 0.008f) + Def(Rot, TEXT("flatPerSecond"), 4.f)) * WRSporePath::RotDamageScale(RotSource.Get()), WRTags::Element_Physical);   // Decay +8% a rank
 		}
 	}
 	if (!Owner->IsAlive())
@@ -904,6 +908,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRArcane::TickOwner(Owner, DeltaTime);
 		// Flow (the Tide path): builds while you move and dodge, drains when you stand (WRTidePath.cpp).
 		WRTidePath::TickOwner(Owner, DeltaTime);
+		// Spores (the Spore path): the refill, Regrowth, the Living colony's aura, Pandemic, the summons (WRSporePath.cpp).
+		WRSporePath::TickOwner(Owner, DeltaTime);
 	}
 }
 

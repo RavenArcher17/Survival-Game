@@ -227,6 +227,10 @@ void AWRHUD::DrawHUD()
 	{
 		DrawBar(TEXT("Mana"), A->GetMana(), A->GetMaxMana(), FLinearColor(FColor(0x7A, 0x3F, 0xD1)), X, Y); Y += BarSpacing;
 	}
+	if (Paths && Paths->IsActivePath(TEXT("spore")))
+	{
+		DrawBar(TEXT("Spores"), A->GetSpores(), A->GetMaxSpores(), FLinearColor(FColor(0x39, 0xE6, 0xC2)), X, Y); Y += BarSpacing;
+	}
 	if (Paths && Paths->IsActivePath(TEXT("tide")))
 	{
 		DrawBar(TEXT("Flow"), A->GetFlow(), A->GetMaxFlow(), FLinearColor(FColor(0x1E, 0x8C, 0x86)), X, Y); Y += BarSpacing;

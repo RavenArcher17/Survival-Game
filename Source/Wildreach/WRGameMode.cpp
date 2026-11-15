@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRSporePath.h"
 #include "WRNecroPath.h"
 #include "WRLand.h"
 #include "WRStore.h"
@@ -340,7 +341,7 @@ void AWRGameMode::SaveWorld()
 	TArray<TSharedPtr<FJsonValue>> Tames;
 	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
 	{
-		if (It->IsTamed() && It->IsAlive() && !WRNecro::IsRaised(*It))   // a raised minion is never saved
+		if (It->IsTamed() && It->IsAlive() && !WRNecro::IsRaised(*It) && !WRSporePath::IsSummon(*It))   // a raised minion is never saved
 		{
 			const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 			O->SetStringField(TEXT("id"), It->CreatureId.ToString());

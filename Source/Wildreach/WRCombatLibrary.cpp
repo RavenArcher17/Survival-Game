@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRSporePath.h"
 #include "WRTidePath.h"
 #include "WRUnderwater.h"
 #include "WRCrystalTypes.h"
@@ -686,6 +687,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRWind::DamageScale(Attacker, Target, Hit);
 		// Necromancy: the Graveyard's corruption buff, Necrotic power, Final harvest on bosses, a minion's scale (WRNecroPath.cpp).
 		Damage *= WRNecro::DamageScale(Attacker, Target, Hit);
+		// Spore: Corrode on the rotting, Hive mind on your target, the colony combos (WRSporePath.cpp).
+		Damage *= WRSporePath::DamageScale(Attacker, Target, Hit);
 		// Arcane: Focus, Mark chance on the marked, an ally's Rune circle (WRArcanePath.cpp).
 		Damage *= WRArcane::DamageScale(Attacker, Target, Hit);
 		// Under water fire fizzles (cooks/biome-ocean.md 2.6): x0.3 on a body in the water, and no burn (below).
@@ -907,6 +910,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	Damage = Target->ModifyIncomingDamage(Hit, Damage);
 	// Necromancy (WRNecroPath.cpp): Soul shield, Shared pain, and Deathless (once per Rest a killing blow leaves 1 HP).
 	Damage = WRNecro::Incoming(Target, Hit, Damage);
+	// Spore armor (-15%); a colony's sporelings in fire or frost (WRSporePath.cpp).
+	Damage *= WRSporePath::TakenScale(Target, Hit);
 	// Arcane shields (WRArcanePath.cpp): the shield's HP layer takes it first (Reflect, Absorb, Mana burn x2).
 	Damage = WRArcane::Incoming(Target, Hit, Damage);
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
@@ -1141,6 +1146,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRArcane::ScaleBuildups(Attacker, Coated);
 		// Soak chance's soak on every hit and on weapon hits (WRTidePath.cpp).
 		WRTidePath::ScaleBuildups(Attacker, Coated);
+		// Rot chance's extra rot and its +5 on weapon hits; Plague wind (WRSporePath.cpp).
+		WRSporePath::ScaleBuildups(Attacker, Coated);
 		// A bloomed beast's bite carries the Sporefall's poison (fungal 2.10: +20).
 		if (Attacker && Attacker->HasTag(WRFungalTags::Bloomed)) Coated.Buildups.FindOrAdd(TEXT("poison")) += WRTune(TEXT("fungalEvents.sporefall.bloomPoison"), 20.f);
 		for (const TPair<FName, float>& B : Coated.Buildups)
@@ -1195,6 +1202,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRArcane::AfterHit(Target, Hit, Damage);
 		// The Tide path's (WRTidePath.cpp): Flow for a hit on the move, Live water, Flash freeze, Shark harpoon, Depths.
 		WRTidePath::AfterHit(Target, Hit, Damage);
+		// The Spore path's (WRSporePath.cpp): Infect strike's plants, the summons' bites, Toxic blood, the combos.
+		WRSporePath::AfterHit(Target, Hit, Damage);
 		// The Fungal caverns (WRFungalHazards): fire and frost in a spore cloud, loud work under the Webs' ceilings.
 		WRFungal::OnHit(Target, Hit);
 	}

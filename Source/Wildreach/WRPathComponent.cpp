@@ -1,4 +1,5 @@
 #include "WRPathComponent.h"
+#include "WRSporePath.h"
 #include "WRTidePath.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
@@ -368,7 +369,9 @@ void UWRPathComponent::RefreshQuickSlots()
 		}
 		for (const FWRPathNodeDef& Node : Def->Nodes)
 		{
-			if (Node.Kind != EWRNodeKind::Stat && P->GetRank(Node.Id) > 0 && UWRAbilityRegistry::ClassForNode(PathId, Node.Id))
+			// Detonate comes free with Spore cloud (its own quick slot, cooks/biome-fungal.md 2.17).
+			const bool bFree = PathId == TEXT("spore") && Node.Id == TEXT("detonate") && P->GetRank(TEXT("spore_cloud")) > 0;
+			if (Node.Kind != EWRNodeKind::Stat && (P->GetRank(Node.Id) > 0 || bFree) && UWRAbilityRegistry::ClassForNode(PathId, Node.Id))
 			{
 				Owned.Add(FName(*FString::Printf(TEXT("%s.%s"), *PathId.ToString(), *Node.Id.ToString())));
 			}
@@ -591,6 +594,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	{
 		// Featherfall (cooks/biome-sky.md 2.18.3): no fall damage from any height; gliders at half the stamina.
 		GrantedTags.AddTag(WRWind::Passive_Featherfall);
+	}
+	else if (MainPath == TEXT("spore"))
+	{
+		// Immune system (cooks/biome-fungal.md 2.17): immune to poison and rot; spore clouds harmless (WRSporePath.cpp).
+		GrantedTags.AddTag(WRSporePath::Passive_Immune);
 	}
 	else if (MainPath == TEXT("tide"))
 	{

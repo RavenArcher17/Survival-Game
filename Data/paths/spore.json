@@ -1,0 +1,64 @@
+{
+  "_comment": "The Spore path (cooks/biome-fungal.md 2.17; cooks/build-biome-fungal.md 2.17). Resource Spores: a spender bar (100, +20 a Spore capacity rank) that refills 5 a second (x2 standing in any spore cloud) and +3 for every planted Spore you detonate. Spells and Wildbrands plant Spores on enemies (cyan nodules, 20 s, up to 10 a target, +1 a capacity rank; 5 on players); Detonate (free with Spore cloud, its own quick slot) bursts every one you've planted within 20 m. The root passive Immune system (main path only): immune to poison and rot, so spore clouds are harmless. Abilities are UWRGameplayAbility subclasses in WRAbilitiesSpore.* registered under spore in UWRAbilityRegistry::ClassForNode; the rules are WRSporePath.*; numbers in tuning spores, sporePath, spells.<key>, wildbrands.infect_strike.",
+  "id": "spore",
+  "name": "Spore",
+  "biome": "fungal",
+  "starter": "spore_cloud",
+  "color": "39E6C2",
+  "icon": "deepcap",
+  "glyph": "spore_puff",
+  "resource": {
+    "id": "spores",
+    "name": "Spores"
+  },
+  "rootPassive": {
+    "id": "immune_system",
+    "name": "Immune system",
+    "text": "Immune to poison and rot. Spore clouds are harmless to you."
+  },
+  "trunk": [
+    { "id": "spore_cloud", "name": "Spore cloud", "kind": "ability", "cost": 3, "text": "Basic spell: plant Spores on enemies in a cloud" },
+    { "id": "detonate", "name": "Detonate", "kind": "ability", "cost": 0, "text": "Free with Spore cloud: burst every Spore you've planted within 20 m (8 and rot 10 each)" },
+    { "id": "spore_capacity", "name": "Spore capacity", "kind": "stat", "ranks": 3, "text": "Hold more Spores" },
+    { "id": "rot_chance", "name": "Rot chance", "kind": "stat", "ranks": 2, "text": "Higher chance to inflict rot" },
+    { "id": "infect_strike", "name": "Infect strike", "kind": "ability", "cost": 2, "text": "Weapon art that plants Spores" }
+  ],
+  "branches": [
+    {
+      "id": "rot",
+      "name": "Rot",
+      "nodes": [
+        { "id": "decay", "name": "Decay", "kind": "stat", "ranks": 5, "gate": 0, "text": "More rot damage" },
+        { "id": "corrode", "name": "Corrode", "kind": "stat", "cost": 4, "gate": 5, "text": "Rot lowers enemy armor" },
+        { "id": "blight", "name": "Blight", "kind": "ability", "cost": 5, "gate": 10, "text": "Spell: a spreading rot cloud" },
+        { "id": "lingering", "name": "Lingering", "kind": "stat", "ranks": 3, "gate": 14, "text": "Rot lasts longer" },
+        { "id": "burst", "name": "Burst", "kind": "stat", "cost": 3, "gate": 17, "text": "Detonating Spores spreads rot" },
+        { "id": "pandemic", "name": "Pandemic", "kind": "capstone", "cost": 10, "gate": 20, "text": "Capstone: rot jumps between all nearby enemies" }
+      ]
+    },
+    {
+      "id": "colony",
+      "name": "Colony",
+      "nodes": [
+        { "id": "sporeling", "name": "Sporeling", "kind": "ability", "cost": 5, "gate": 0, "text": "Summon a small spore creature" },
+        { "id": "swarm", "name": "Swarm", "kind": "stat", "ranks": 5, "gate": 5, "text": "More sporelings at once" },
+        { "id": "host", "name": "Host", "kind": "stat", "cost": 4, "gate": 10, "text": "Enemies killed by Spores spawn sporelings" },
+        { "id": "hive_mind", "name": "Hive mind", "kind": "stat", "cost": 3, "gate": 14, "text": "Sporelings attack your target" },
+        { "id": "thick_spores", "name": "Thick spores", "kind": "stat", "ranks": 3, "gate": 17, "text": "More sporeling health" },
+        { "id": "fungal_behemoth", "name": "Fungal behemoth", "kind": "capstone", "cost": 10, "gate": 20, "text": "Capstone: summon a giant spore creature" }
+      ]
+    },
+    {
+      "id": "symbiote",
+      "name": "Symbiote",
+      "nodes": [
+        { "id": "spore_armor", "name": "Spore armor", "kind": "ability", "cost": 5, "gate": 0, "text": "A spore coat that reduces damage" },
+        { "id": "regrowth_spores", "name": "Regrowth spores", "kind": "stat", "ranks": 5, "gate": 5, "text": "Regenerate HP while carrying Spores" },
+        { "id": "toxic_blood", "name": "Toxic blood", "kind": "stat", "cost": 3, "gate": 10, "text": "Attackers get Spores planted on them" },
+        { "id": "adrenal", "name": "Adrenal", "kind": "stat", "cost": 4, "gate": 14, "text": "Detonating Spores restores stamina" },
+        { "id": "bloom_body", "name": "Bloom body", "kind": "stat", "ranks": 3, "gate": 17, "text": "Resist more status effects" },
+        { "id": "living_colony", "name": "Living colony", "kind": "capstone", "cost": 10, "gate": 20, "text": "Capstone: become a walking spore cloud that infects enemies and heals you" }
+      ]
+    }
+  ]
+}
