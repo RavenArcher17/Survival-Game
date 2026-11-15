@@ -145,6 +145,36 @@ Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and pl
 cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
 not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveBiomes`.
 
+- **Fungal (5): the bosses** (fungal 2.13-2.14; plan 2.13-2.14). Rows in `creatures.json` and `attacks.json` (39
+  moves from the cook's tables), numbers in tuning `bosses.<id>`. `WRFungalBosses.*` (`FWRFungalBoss`, hooked beside
+  the Crystal caves' in `WRBoss.cpp` / `WRBossCombat.cpp`; `UWRFungalArenas` places them when a survivor is within 300 m)
+  and `WRFungalBossLook.cpp` (the arena things and the bodies, built in code). **The Sporemother** (Kilnmite rig x5.2:
+  the translucent abdomen with its glowing eggs, the cap crown, the spear hypostome) in the Brood Doline: six wall sacs
+  (`AWRFungalBossProp` sac, 150 HP, any fire kills one) hatch 3 Mycomites every 25 s, each burnt sac staggers her; the
+  Egg toss lobs two sacs that hatch 1.5 s after landing (duds once every sac has burnt); the Brood press pins you 2.5 s
+  with four mites latched (150 on her abdomen frees you); her Spore vent is a real cloud: light it with her in it for 200
+  and a 3 s stagger. **The Rot King** (Rimeshell rig x5.6: the 3 m crown of black caps dripping slurry, the bronze hooks)
+  in the Steeping Vats: the full vats and the pools he spills (crown slam 6 m, Rot spread 8 m, the Shell spin spreads
+  them) heal him 1.5% a second and rot you; frost freezes a pool 15 s, frostbite stops his healing 12 s, a wind hit dries
+  his crown 10 s (no new pools); the Rot belch's five ticks; the Engulf (150 on his head frees you). **The Weaver**
+  (Kilnmite rig x2.6, eight 4.5 m banded legs, mirror eyes, the constellation abdomen) walks her 1.8 km loop of the Webs
+  at night, rests 4 min at the False Sky and sleeps hanging there by day; she webs where she settles (a sheet every 10 s,
+  up to six): x1.6 on web, x0.6 off it and no Starfall drop; fire burns web (a flashed cloud all inside it), wind tears 8
+  m (`WRFungal::Wind`, the Gale flask); the Web volley's three nets, the Starfall drop out of the dark with its thread
+  tell, the Cocoon (fire frees you; else hauled up and dropped 6 m); she eats Glowgrubs and Caplings and kills
+  Sporestalkers she meets. **Mycelorn** (all code: the 24 m amber stipe round a titan's ribs, the summited host, the torn
+  veil, the 36 m cap, its gills lit or dark, a hundred swaying tendrils and twelve bone-clubbed ones, the Heart-seed beating
+  35 a minute): rooted in phase 1 (Club slam, Lash x3, Gill spores that leave clouds, the Spore mortar's pods, the
+  Sporeling wave, the Engulf with its five bursting Spores, the Summit call on the furthest tame from 80%); the **choke**
+  (its own cloud pushed onto it by wind in the last 2 s: 4 s stagger, stance open, the cloud spent); four **Draught gates**
+  (plugs of 600 HP, fire x2: broken, a 12 m lane pushes every cloud in it 15 m for 10 s; they regrow in 45 s); its gills
+  (1,500: torn, no breath 30 s); weak to Wind x1.5. The Sinking Root at 50%; phase 2 it travels the veins (the shortest
+  path lit, `FWRFungalData::VeinNodes/Edges`) to a fairy ring and erupts (into its own cloud: a 5 s choke), Root lash
+  line, Erupt-spin-slam, twelve mound pods exhaling its clouds every 20 s (burnable); hidden phase 3 the Whole Cavern
+  every 8 s (lines web a third of the floor, the walls exhale, cap-falls over three of you, the elders puff), the
+  Heart-seed shown (x1.25), Lash x4. Run-back stones, summoning stones on the caverns' floors, the Spore path altar on
+  the south terrace, the Hive spore part (a kill bursts in a 4 m cloud your party breathes unharmed). 14 new `fx.json`
+  rows. Compiled; not played.
 - **Fungal (4): the ten creatures and the Sporelings** (fungal 2.12; plan 2.12). Rows in `creatures.json` (biome
   `fungal`, element spore, resists spore_cloud / foul_air; rigs borrowed and recoloured through `M_CreatureTint`):
   **Sporestalker** (Rimeclaw rig), **Rotmaw** (Rimeshell x2.6), **Mycomite** (Kilnmite x0.5, 25 HP swarm),

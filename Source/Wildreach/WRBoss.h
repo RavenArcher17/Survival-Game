@@ -190,6 +190,8 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	friend struct FWRSkyBoss;     // the Sky islands' bosses (WRSkyBosses: Kyrra, the Bridge Sentinel, Old Gulper, Aeolith)
 	// The Crystal caves' (WRCrystalBosses: the Mirrored Twins, the Echo Warden, the Geode Tyrant, Lyrathis).
 	friend struct FWRCrystalBoss;
+	// The Fungal caverns' (WRFungalBosses: the Sporemother, the Rot King, the Weaver, Mycelorn).
+	friend struct FWRFungalBoss;
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

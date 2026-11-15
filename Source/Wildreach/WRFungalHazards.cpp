@@ -2,6 +2,7 @@
 
 #include "WRFungalHazards.h"
 #include "WRFungalCreatures.h"
+#include "WRFungalBosses.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
 #include "WRCombatLibrary.h"
@@ -176,7 +177,8 @@ float WRFungal::MoveScale(const AActor* Who)
 	if (!C) return 1.f;
 	// Foul air: heavy breathing, no sprint (the movement's sprint needs the multiplier at 1).
 	// Latched Mycomites: x0.9 each (WRFungalCreatures).
-	return (C->HasTag(WRFungalTags::FoulAir) ? WRTune(TEXT("hazards.fungal.foulAir.move"), 0.97f) : 1.f) * FWRFungalAI::MoveScale(C);
+	// The Weaver: x1.6 on her web, x0.6 off it (WRFungalBosses).
+	return (C->HasTag(WRFungalTags::FoulAir) ? WRTune(TEXT("hazards.fungal.foulAir.move"), 0.97f) : 1.f) * FWRFungalAI::MoveScale(C) * FWRFungalBoss::MoveScale(C);
 }
 
 float WRFungal::SporeTaken(const AWRCharacterBase* Who)
@@ -236,6 +238,8 @@ void WRFungal::Wind(AActor* By, const FVector& Origin, const FVector& Dir, float
 		AWRFungalSpot* S = W.Get();
 		if (S && In(S->GetActorLocation(), 400.f)) S->Wind(By);
 	}
+	// The Weaver's web sheets tear (WRFungalBosses).
+	FWRFungalBoss::Wind(By, Origin, Dir, Range, Cone, bStrong);
 }
 
 void WRFungal::FireAt(AActor* By, const FVector& At, float Radius)
@@ -249,12 +253,16 @@ void WRFungal::FireAt(AActor* By, const FVector& At, float Radius)
 		AWRFungalSpot* S = W.Get();
 		if (S && FVector::Dist(S->GetActorLocation(), At) < FMath::Max(Radius, 400.f) + S->Width * 0.5f) S->Fire(By);
 	}
+	// The bosses' things: sacs, pods and webs burn, a plug takes it double, a cocoon lets go (WRFungalBosses).
+	FWRFungalBoss::FireAt(By, At, Radius);
 }
 
 void WRFungal::FrostAt(AActor* By, const FVector& At)
 {
 	if (!By || !By->HasAuthority() || !WRFungal::Live()) return;
 	if (AWRSporeCloud* C = AWRSporeCloud::At(By, At, 100.f)) C->Settle(By);
+	// A rot pool freezes (the Rot King's counter, WRFungalBosses).
+	FWRFungalBoss::FrostAt(By, At);
 }
 
 void WRFungal::OnHit(AWRCharacterBase* Target, const FWRHit& Hit)
@@ -490,6 +498,8 @@ void AWRSporeCloud::Flash()
 	for (AWRCharacterBase* Who : In) FhHit(Who, By, FhT(TEXT("hazards.fungal.cloud.flashDamage"), 40.f), WRTags::Element_Fire, FhT(TEXT("hazards.fungal.cloud.flashBurn"), 40.f), 2, C);
 	for (const TWeakObjectPtr<AWRLureLines>& W : LineSets()) if (AWRLureLines* L = W.Get()) L->CutNear(C, RadiusNow(), TEXT("fire"));
 	for (const TWeakObjectPtr<AWRFungalSpot>& W : Spots()) if (AWRFungalSpot* S = W.Get()) if (Contains(S->GetActorLocation(), S->Width)) S->Fire(By);
+	// Webs and sacs in it burn; the Sporemother's own vent lit on her (WRFungalBosses).
+	FWRFungalBoss::CloudFlashed(this, In);
 	State = 2;
 	StateAt = WRFungal::Now(this);
 	UpdateLook();
