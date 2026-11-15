@@ -310,6 +310,14 @@
         "from": "the Wind Rose (the Great Shrine of the Still Pool)"
       },
       {
+        "id": "bp_prismglass_spear",
+        "boss": "lyrathis",
+        "recipes": [
+          "prismglass_spear"
+        ],
+        "kind": "boss weapon"
+      },
+      {
         "id": "bp_mourners_scythe",
         "boss": "nhal",
         "recipes": [

@@ -362,6 +362,16 @@ void WRWorld::OnKilled(AWRCharacterBase* Victim, AActor* Killer)
 		if (bBurning) Sys->QuestEvent(PS, TEXT("kill.burning"), C->CreatureId);
 		if (bSlowed) Sys->QuestEvent(PS, TEXT("kill.slowed"), C->CreatureId);
 	}
+	// A boss is beaten by everyone who fought it (the loot rule's share: Saga Venn's "Two of one"), not only the blow.
+	if (const AWRBoss* Boss = Cast<AWRBoss>(C))
+	{
+		const float Needed = Boss->GetAttributes() ? Boss->GetAttributes()->GetMaxHealth() * WRTune(TEXT("bosses.lootDamageFraction"), 0.1f) : 0.f;
+		for (const TPair<FString, float>& L : Boss->Ledger)
+		{
+			if (L.Key == Who || L.Value < Needed) continue;
+			if (AWRPlayerState* Other = WStateOf(L.Key, Victim->GetWorld())) Sys->QuestEvent(Other, TEXT("kill"), C->CreatureId);
+		}
+	}
 	// The Swamp's quest deeds (Ruslana: a Murkjaw dead on land, a cursed kill, the Bloat beaten with salt): WRSwampSystems.
 	WRSwamp::OnKilled(Victim, Killer, PS);
 }
@@ -2099,7 +2109,16 @@ void UWRWorldSystems::EndInvasion(bool bWon)
 		const float Need = TotalHealth * WNumOf(Root, TEXT("lootFraction"), 0.1f);
 		const FName ToPath(*WStrOf(WRWorld::Biome(Inv.To), TEXT("path")));
 		const FName Faction(*WStrOf(WRWorld::Biome(Inv.To), TEXT("faction")));
-		const TMap<FName, int32> Pays = WCountsOf(WChild(Root, TEXT("pays")));
+		// A pair may name its own pay (the Severance: both sides' essences, crystal 2.22); else the shared list.
+		TMap<FName, int32> Pays = WCountsOf(WChild(Root, TEXT("pays")));
+		if (const TArray<TSharedPtr<FJsonValue>>* Pairs = WArr(Root, TEXT("pairs")))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Pairs)
+			{
+				const TSharedPtr<FJsonObject> Pair = V->AsObject();
+				if (Pair.IsValid() && FName(*WStrOf(Pair, TEXT("from"))) == Inv.From && FName(*WStrOf(Pair, TEXT("to"))) == Inv.To && WChild(Pair, TEXT("pays")).IsValid()) Pays = WCountsOf(WChild(Pair, TEXT("pays")));
+			}
+		}
 		const int32 XP = int32(WNumOf(Root, TEXT("xp"), 2000.f));
 		for (const auto& KV : InvasionLedger)
 		{

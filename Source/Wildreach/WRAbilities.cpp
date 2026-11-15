@@ -16,6 +16,7 @@
 #include "WRAbilitiesNature.h"   // the Nature path's abilities (ClassForNode)
 #include "WRAbilitiesNecro.h"    // the Necromancy path's abilities (ClassForNode)
 #include "WRAbilitiesArcane.h"   // the Arcane path's abilities (ClassForNode)
+#include "WRCrystalBosses.h"      // the Crystal arenas' machines a swing can strike (chimes, turntables, the lens)
 #include "WRArcanePath.h"        // the Prismglass spear's light-lines
 #include "WRGraveBosses.h"       // the Graveyard arenas' things (the Belfry rope, egg sacs, the chandelier chain)
 #include "WRForestBosses.h"      // the forest arenas' things a swing can hit (rope anchors, knots, combs, amber hearts)
@@ -1110,6 +1111,14 @@ void UWRGA_Melee::Sweep()
 		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
 			&& FWRGraveBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
 				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
+		{
+			HitThisSwing.Add(Thing);
+			continue;
+		}
+		// The Crystal caves' boss machines (WRCrystalBosses): a chime stone (it rings), a turntable's hand-plate (the prism
+		// comes round 45 degrees), the Spar Lens while it flares, a Glint lance standing in the floor.
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
+			&& FWRCrystalBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), false))
 		{
 			HitThisSwing.Add(Thing);
 			continue;

@@ -961,7 +961,7 @@ const TArray<TPair<FName, FText>>& FWRPlayerUI::WhistleOrders()
 		{ TEXT("follow"), LOCTEXT("WhistleFollow", "Come / follow") },
 		{ TEXT("stay"), LOCTEXT("WhistleStay", "Stay") },
 		{ TEXT("siege"), LOCTEXT("WhistleSiege", "Break that") },
-		{ NAME_None, FText::GetEmpty() },
+		{ TEXT("call"), LOCTEXT("WhistleCall", "Call (a Lumenhorn bellows)") },
 		{ NAME_None, FText::GetEmpty() },
 		{ NAME_None, FText::GetEmpty() },
 		{ TEXT("passive"), LOCTEXT("WhistlePassive", "Passive") },

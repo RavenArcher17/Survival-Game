@@ -4,6 +4,7 @@
 // by range band, a transition attack at the phase change, breakable parts, a tame-punishing move, the roaming minis
 // (Cinderhorn among his basalt pillars, Old Tusker on the snow flats), shrine-stones and the first-kill drop.
 #include "WRBoss.h"
+#include "WRCrystalBosses.h"
 #include "WRVoidBosses.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
@@ -167,7 +168,7 @@ int32 AWRBoss::ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBa
 		{
 			continue;
 		}
-		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target) || !FWRForestBoss::Allowed(this, A, Target) || !FWRGraveBoss::Allowed(this, A, Target))
+		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target) || !FWRForestBoss::Allowed(this, A, Target) || !FWRGraveBoss::Allowed(this, A, Target) || !FWRCrystalBoss::Allowed(this, A, Target))
 		{
 			continue;   // a Storm peaks boss's rule (bleed blocks the charge, underground moves, the eye)
 		}
@@ -257,7 +258,8 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	FWRStormBoss::AttackStarted(this, Attack, Target);
 	FWRSwampBoss::AttackStarted(this, Attack, Target);
 	FWRVoidBoss::AttackStarted(this, Attack, Target);
-	FWRGraveBoss::AttackStarted(this, Attack, Target);   // the Graveyard's: the rope wrapped, the dust from the ceiling, the floor cracking
+	FWRGraveBoss::AttackStarted(this, Attack, Target);
+	FWRCrystalBoss::AttackStarted(this, Attack, Target);   // the Crystal caves': the double's swing, the guide thread, the noise point   // the Graveyard's: the rope wrapped, the dust from the ceiling, the floor cracking
 	FWRForestBoss::AttackStarted(this, Attack, Target);   // the forest's tells: the stump torn up, the bulging line, the root hand's ring
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s winds up %s at %s%s"), *GetDisplayLabel(), *Attack.Id.ToString(), *Target->GetName(), Hold > 0.f ? TEXT(" (held)") : TEXT(""));
 }
@@ -287,7 +289,7 @@ void AWRBoss::BeginStrike()
 	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, bAirborne ? 0.f : GetSimpleCollisionHalfHeight());
 	const FString Id = Attack.Id.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s strikes"), *GetDisplayLabel(), *Id);
-	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack) || FWRForestBoss::BeginStrike(this, Attack) || FWRGraveBoss::BeginStrike(this, Attack))
+	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack) || FWRForestBoss::BeginStrike(this, Attack) || FWRGraveBoss::BeginStrike(this, Attack) || FWRCrystalBoss::BeginStrike(this, Attack))
 	{
 		return;   // a Storm peaks move (strikes, rings, the bone drop, the eye bolt...)
 	}
@@ -431,6 +433,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 	FWRVoidBoss::ModifyHit(this, Attack, Hit);
 	FWRForestBoss::ModifyHit(this, Attack, Hit);
 	FWRGraveBoss::ModifyHit(this, Attack, Hit);
+	FWRCrystalBoss::ModifyHit(this, Attack, Hit);
 	const FName AttackId = Attack.Id;
 	const float Knockback = Attack.bRow ? Attack.Row.Knockback : 0.f;
 	const bool bFreezingBreath = Phase >= 3 && IsWyrm() && AttackId.ToString().Contains(TEXT("breath"));
@@ -448,7 +451,8 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 		FWRStormBoss::HitLanded(Self, Victim, AttackId, Landed);
 		FWRSwampBoss::HitLanded(Self, Victim, AttackId, Landed);
 		FWRVoidBoss::HitLanded(Self, Victim, AttackId, Landed);
-		FWRGraveBoss::HitLanded(Self, Victim, AttackId, Landed);   // the Knell, the palps, the ribcage, the cage, the Shroud hold
+		FWRGraveBoss::HitLanded(Self, Victim, AttackId, Landed);
+		FWRCrystalBoss::HitLanded(Self, Victim, AttackId, Landed);   // the Warden's ring after a blow, Lyrathis's grasp   // the Knell, the palps, the ribcage, the cage, the Shroud hold
 		FWRForestBoss::HitLanded(Self, Victim, AttackId, Landed);   // Gnarl's grasp holds, the antler toss throws
 		if (AttackId == TEXT("tongs_grab"))
 		{
@@ -502,7 +506,7 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 	{
 		return;  // the lob does it
 	}
-	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds) || FWRForestBoss::TickStrike(this, Attack, DeltaSeconds) || FWRGraveBoss::TickStrike(this, Attack, DeltaSeconds))
+	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds) || FWRForestBoss::TickStrike(this, Attack, DeltaSeconds) || FWRGraveBoss::TickStrike(this, Attack, DeltaSeconds) || FWRCrystalBoss::TickStrike(this, Attack, DeltaSeconds))
 	{
 		return;
 	}
@@ -730,6 +734,7 @@ void AWRBoss::EndStrike()
 	FWRVoidBoss::EndStrike(this, Attack);
 	FWRForestBoss::EndStrike(this, Attack);
 	FWRGraveBoss::EndStrike(this, Attack);
+	FWRCrystalBoss::EndStrike(this, Attack);
 	if (!bThrown)
 	{
 		Aftermath(Attack, Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight()));
@@ -944,7 +949,7 @@ void AWRBoss::SpawnRunbackStone()
 {
 	// A shrine-stone 40-60 m out from the arena toward the way in (the island's middle, where the passes are), on
 	// ground about level with the arena floor and clear of rock: the run back is the way you came.
-	if (FWRStormBoss::PlaceRunback(this) || FWRSwampBoss::PlaceRunback(this) || FWRForestBoss::PlaceRunback(this) || FWRGraveBoss::PlaceRunback(this))
+	if (FWRStormBoss::PlaceRunback(this) || FWRSwampBoss::PlaceRunback(this) || FWRForestBoss::PlaceRunback(this) || FWRGraveBoss::PlaceRunback(this) || FWRCrystalBoss::PlaceRunback(this))
 	{
 		return;   // the Storm peaks arenas' stones stand where the land says (storm_peaks.json arenas)
 	}

@@ -14,6 +14,8 @@ Shares the graph helpers of Tools/make_build_materials.py (read from it, up to i
                  light. Parameters: GlowColor, GlowScale, Rest, Lit, RingA..RingD, RingS.
   M_ArcaneWard   hard light: shield films, Aegis, runes, the Twins' double, Lyrathis's beams and dome (additive, a
                  fresnel rim, vertex colour x Color x Glow; Face, Rim).
+  M_MirrorWater  the Archive of Wards' still water: the real knight's mirrored pose drawn only where the visible surface
+                 is the floor (scene depth turned back into a height); Tex, Tint, FloorZ, Strength.
 """
 import os
 import unreal
@@ -105,6 +107,44 @@ shimmer = add(mul(noise(append2(mul(wx, k=1.0 / 90.0), add(mul(wz, k=1.0 / 70.0)
 lines = add(mul(alpha, k=2.0), k=0.4)
 amount = mul(mul(mul(add(fres, face), lines), shimmer), glow)
 mel.connect_material_property(mul(mul(rgb, colour), amount), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+mel.recompile_material(mat)
+eal.save_loaded_asset(mat)
+unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")
+
+
+# ================================================================ M_MirrorWater
+# The Archive of Wards' still water (cooks/biome-crystal.md 2.13.1; build-biome-crystal.md P2.2 2): only the real knight
+# has a reflection. His pose is copied onto a mesh mirrored under the floor and drawn with this: translucent, unlit,
+# drawn over the scene (no depth test) but only where the surface you see along that pixel is the floor itself (the
+# scene's depth turned back into a height and compared with FloorZ), and only below it. So the reflection shows in the
+# water and nowhere else: not through a pillar, not over the knight, not on a survivor standing in front of it.
+# Parameters: Tex (the knight's colour map), Tint, FloorZ (cm, world), Strength (how strongly the water mirrors).
+begin("/Game/Terrain/M_MirrorWater")
+mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+mat.set_editor_property("two_sided", True)
+mat.set_editor_property("disable_depth_test", True)
+mat.set_editor_property("used_with_skeletal_mesh", True)
+tex = expr(unreal.MaterialExpressionTextureSampleParameter2D, parameter_name="Tex")
+tex.set_editor_property("texture", unreal.load_asset("/Engine/EngineResources/WhiteSquareTexture"))
+tint = vparam("Tint", (0.42, 0.36, 0.6, 1.0))
+floor_z = sparam("FloorZ", 0.0)
+strength = sparam("Strength", 0.55)
+cam = expr(unreal.MaterialExpressionCameraPositionWS)
+wp = expr(unreal.MaterialExpressionWorldPosition)
+scene_d = expr(unreal.MaterialExpressionSceneDepth)
+pixel_d = expr(unreal.MaterialExpressionPixelDepth)
+cam_z = mask(cam, "b")
+wp_z = mask(wp, "b")
+ratio = op(unreal.MaterialExpressionDivide, scene_d, op(unreal.MaterialExpressionMax, pixel_d, None, const_b=1.0))
+scene_z = add(cam_z, mul(sub(wp_z, cam_z), ratio))
+on_floor = sat(sub(const(1.0), mul(unary(unreal.MaterialExpressionAbs, sub(scene_z, floor_z)), k=1.0 / 10.0)))
+behind = sat(mul(sub(pixel_d, scene_d), k=0.2))
+# Deeper in the water the image darkens (the black basalt under it), and it trembles faintly.
+depth_fade = sat(sub(const(1.0), mul(sub(floor_z, wp_z), k=1.0 / 900.0)))
+opacity = mul(mul(mul(on_floor, behind), depth_fade), strength)
+mel.connect_material_property(mul(mask(tex, "r", "g", "b"), tint), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+mel.connect_material_property(opacity, "", unreal.MaterialProperty.MP_OPACITY)
 mel.recompile_material(mat)
 eal.save_loaded_asset(mat)
 unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")
