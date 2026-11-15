@@ -56,6 +56,10 @@ public:
 	static bool IsNewerVersion(const FString& Tag, const FString& Than);
 	/** Remember why a join or game ended badly (a different version than the host's...) to show when the menu comes back. */
 	static void WatchNetworkFailures();
+	/** The look picked for the next join ([Wildreach.Menu] Look = <face>.<build>[.h], the ?Look= option): face index,
+	 *  build index (0 lean, 1 athletic, 2 strong) and whether the helmet is hidden. Defaults 0, 1, shown. */
+	static void GetLook(int32& Face, int32& Build, bool& bHideHelmet);
+	static void SetLook(int32 Face, int32 Build, bool bHideHelmet);
 	/** The carved WILDREACH title and its tagline (the menu and the loading screen show it). */
 	static TSharedRef<SWidget> MakeTitle();
 

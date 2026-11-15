@@ -187,7 +187,10 @@ void WRInput::MouseLook(APawn* Pawn, FVector2D Delta)
 {
 	if (!Pawn) return;
 	const FWRKeyBindings& K = FWRKeyBindings::Get();
-	const float S = K.MouseSensitivity() * WRTune(TEXT("look.mouseScale"), 1.f);
+	// Aiming a ranged weapon the view turns slower (Settings > Look and controller > Aim sensitivity).
+	const AWRCharacter* Aimer = Cast<AWRCharacter>(Pawn);
+	const float Aim = Aimer && Aimer->IsAimingRanged() ? K.Pref(TEXT("MouseAimSens")) : 1.f;
+	const float S = K.MouseSensitivity() * Aim * WRTune(TEXT("look.mouseScale"), 1.f);
 	if (AWRPlayerController* Locked = Cast<AWRPlayerController>(Pawn->GetController()); Locked && Locked->GetLockTarget())
 	{
 		Locked->MouseFlick(Delta);
@@ -200,14 +203,20 @@ void WRInput::PadLook(APawn* Pawn, FVector2D Stick, float Dt)
 {
 	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (!PC) return;
+	const FWRKeyBindings& K = FWRKeyBindings::Get();
 	const float Mag = Stick.Size();
-	const float Dead = WRTune(TEXT("look.padDeadZone"), 0.15f);
+	// Dead zone and response curve are the player's (Settings > Look and controller); the curves' exponents are tuning.
+	const float Dead = K.Pref(TEXT("PadDeadZone"));
 	if (Mag <= Dead) return;
 	const float N = FMath::Clamp((Mag - Dead) / FMath::Max(0.01f, 1.f - Dead), 0.f, 1.f);
-	const FVector2D Dir = Stick / Mag * FMath::Pow(N, WRTune(TEXT("look.padCurve"), 1.8f));
-	const FWRKeyBindings& K = FWRKeyBindings::Get();
-	const float S = K.PadSensitivity() * Dt;
-	const float Yaw = Dir.X * WRTune(TEXT("look.padYawDegrees"), 230.f) * S;
+	static const TCHAR* Curves[] = { TEXT("look.padCurveLinear"), TEXT("look.padCurve"), TEXT("look.padCurvePrecise") };
+	static const float CurveFallback[] = { 1.f, 1.8f, 2.5f };
+	const int32 C = FMath::Clamp(K.PrefInt(TEXT("PadCurve")), 0, 2);
+	const FVector2D Dir = Stick / Mag * FMath::Pow(N, WRTune(Curves[C], CurveFallback[C]));
+	const AWRCharacter* Aimer = Cast<AWRCharacter>(Pawn);
+	const float Aim = Aimer && Aimer->IsAimingRanged() ? K.Pref(TEXT("PadAimSens")) : 1.f;
+	const float S = K.PadSensitivity() * Aim * Dt;
+	const float Yaw = (K.PrefOn(TEXT("InvertPadX")) ? -Dir.X : Dir.X) * WRTune(TEXT("look.padYawDegrees"), 230.f) * S;
 	float Pitch = Dir.Y * WRTune(TEXT("look.padPitchDegrees"), 150.f) * S;
 	if (K.InvertPad()) Pitch = -Pitch;
 	// AddYaw/PitchInput multiply by the controller's legacy input scales (DefaultInput.ini): divide them out so these are degrees.
@@ -224,8 +233,8 @@ void WRInput::Rumble(UWorld* World, float Strength, float Seconds)
 	if (!World || !FWRKeyBindings::Get().PadRumble() || !UsingPad() || Strength <= 0.f || Seconds <= 0.f) return;
 	APlayerController* PC = World->GetFirstPlayerController();
 	if (!PC || !PC->IsLocalController()) return;
-	const float S = FMath::Clamp(Strength, 0.f, 1.f);
-	PC->PlayDynamicForceFeedback(S, Seconds, true, S > 0.5f, true, true);
+	const float S = FMath::Clamp(Strength, 0.f, 1.f) * FWRKeyBindings::Get().RumbleScale();
+	PC->PlayDynamicForceFeedback(S, Seconds, true, Strength > 0.5f, true, true);
 }
 
 void WRInput::RumbleLight(UWorld* World, float Strength, float Seconds)
@@ -233,7 +242,7 @@ void WRInput::RumbleLight(UWorld* World, float Strength, float Seconds)
 	if (!World || !FWRKeyBindings::Get().PadRumble() || !UsingPad() || Strength <= 0.f || Seconds <= 0.f) return;
 	APlayerController* PC = World->GetFirstPlayerController();
 	if (!PC || !PC->IsLocalController()) return;
-	PC->PlayDynamicForceFeedback(FMath::Clamp(Strength, 0.f, 1.f), Seconds, false, true, false, true);
+	PC->PlayDynamicForceFeedback(FMath::Clamp(Strength, 0.f, 1.f) * FWRKeyBindings::Get().RumbleScale(), Seconds, false, true, false, true);
 }
 
 void WRInput::Transition(APlayerController* PC, const TCHAR* Why)

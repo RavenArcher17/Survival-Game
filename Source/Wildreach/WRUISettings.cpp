@@ -21,6 +21,7 @@
 #include "WRUIFlow.h"   // the Game section's "Show hints"
 #include "WRGameMode.h"
 #include "WRWorlds.h"
+#include "WRCharacter.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -150,6 +151,17 @@ int32 SWRLineIcon::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const F
 		break;
 	case EWRIcon::Play:
 		Fill({ V(8.f, 5.f), V(19.f, 12.f), V(8.f, 19.f) }, C);
+		break;
+	case EWRIcon::Camera:
+		// A camera body with its viewfinder hump and a lens ring (the accent), as the settings' Camera page.
+		Line(Closed({ V(3.f, 8.f), V(8.f, 8.f), V(9.5f, 5.f), V(14.5f, 5.f), V(16.f, 8.f), V(21.f, 8.f), V(21.f, 19.f), V(3.f, 19.f) }), C, 1.8f);
+		Circle(12.f, 13.5f, 3.6f, A, 1.8f);
+		break;
+	case EWRIcon::Layout:
+		// A screen frame with the HUD's corners: a bar top-left and a strip along the bottom.
+		Line(Closed({ V(3.f, 4.f), V(21.f, 4.f), V(21.f, 20.f), V(3.f, 20.f) }), C, 1.8f);
+		Line({ V(6.f, 7.5f), V(12.f, 7.5f) }, A, 2.2f);
+		Line({ V(8.f, 16.5f), V(16.f, 16.5f) }, A, 2.2f);
 		break;
 	case EWRIcon::Exit:
 		Line({ V(11.f, 3.5f), V(5.f, 3.5f), V(5.f, 20.5f), V(11.f, 20.5f) }, C, 2.f);
@@ -874,16 +886,6 @@ namespace WRSettingsUI
 					SettingRow(LOCTEXT("CastRelease", "Cast on release (skip the tap)"), LOCTEXT("CastReleaseSub", "Letting go of the wheel on an ability casts it right away."),
 						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().CastOnRelease(); }, []() { FWRKeyBindings::Get().SetCastOnRelease(!FWRKeyBindings::Get().CastOnRelease()); }))
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
-				[
-					SettingRow(LOCTEXT("CrosshairRow", "Crosshair"), LOCTEXT("CrosshairRowSub", "Where spells and shots go. Off: only while aiming, placing or in first person."),
-						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().ShowCrosshair(); }, []() { FWRKeyBindings::Get().SetShowCrosshair(!FWRKeyBindings::Get().ShowCrosshair()); }))
-				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
-				[
-					SettingRow(LOCTEXT("DamageNumbersRow", "Damage numbers"), LOCTEXT("DamageNumbersRowSub", "How much each blow did, beside what you hit."),
-						SNew(SWRSwitch, []() { return FWRKeyBindings::Get().DamageNumbers(); }, []() { FWRKeyBindings::Get().SetDamageNumbers(!FWRKeyBindings::Get().DamageNumbers()); }))
-				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
 				[
 					SNew(SHorizontalBox).Visibility_Lambda(NotWheel(true))
@@ -1433,9 +1435,52 @@ namespace WRSettingsUI
 
 	// ------------------------------------------------------------ video page
 
+	// ------------------------------------------------------------ preference rows (cookpass-ui)
+
+	/** A stepper on a numeric pref (FWRKeyBindings::Pref): StepBy is the change per arrow, Format draws the value. */
+	TSharedRef<SWidget> PrefStepper(FName Id, float StepBy, TFunction<FText(float)> Format, float Width = 110.f)
+	{
+		return Stepper([Id, Format]() { return Format(FWRKeyBindings::Get().Pref(Id)); },
+			[Id, StepBy](int32 Dir)
+			{
+				FWRKeyBindings& K = FWRKeyBindings::Get();
+				// Rounded to the step so repeated presses never drift (0.1 + 0.1 + 0.1...).
+				K.SetPref(Id, FMath::RoundToFloat((K.Pref(Id) + Dir * StepBy) / StepBy) * StepBy);
+			}, Width);
+	}
+	TSharedRef<SWidget> PrefSegments(FName Id, const TArray<FText>& Options)
+	{
+		return Segmented(Options, [Id]() { return FWRKeyBindings::Get().PrefInt(Id); }, [Id](int32 i) { FWRKeyBindings::Get().SetPref(Id, float(i)); });
+	}
+	TSharedRef<SWidget> PrefSwitch(FName Id)
+	{
+		return SNew(SWRSwitch, [Id]() { return FWRKeyBindings::Get().PrefOn(Id); }, [Id]() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetPref(Id, K.PrefOn(Id) ? 0.f : 1.f); });
+	}
+	FText PrefPercent(float V) { return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(V))); }
+	FText PrefDegrees(float V) { return FText::FromString(FString::Printf(TEXT("%d°"), FMath::RoundToInt(V))); }
+	FText PrefTimes(float V) { return FText::FromString(FString::Printf(TEXT("%.2f×"), V)); }
+	/** A row on a page: the gap above it and the row. */
+	void AddPrefRow(const TSharedRef<SVerticalBox>& List, TSharedRef<SWidget> Row, float Gap = 6.f)
+	{
+		List->AddSlot().AutoHeight().Padding(0.f, Gap * U, 0.f, 0.f)[Row];
+	}
+	TSharedRef<SWidget> PrefColumns(TSharedRef<SWidget> Left, TSharedRef<SWidget> Right)
+	{
+		return SNew(SScrollBox).ScrollBarStyle(&ScrollStyle()).ScrollBarThickness(FVector2D(5.f, 5.f))
+			+ SScrollBox::Slot().Padding(FMargin(0.f, 0.f, 10.f * U, 0.f))
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Top)[Left]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Top).Padding(24.f * U, 0.f, 0.f, 0.f)[Right]
+			];
+	}
+
 	// ------------------------------------------------------------ look and controller page
 
-	/** Mouse and controller look (sensitivity, invert), the pad's button names and rumble, and the controls page. */
+	/**
+	 * Mouse and controller look (sensitivity, aim sensitivity, invert, the pad's dead zone and response), the pad's
+	 * button names and vibration strength, hold or toggle for sprint / guard / aim, and the controls page.
+	 */
 	class SWRLookPage : public SCompoundWidget
 	{
 	public:
@@ -1446,67 +1491,202 @@ namespace WRSettingsUI
 		{
 			const auto Sens = [](float V) { return FText::FromString(FString::Printf(TEXT("%.1f"), V)); };
 			const auto Step = [](float V, int32 Dir) { return FMath::Clamp(FMath::RoundToFloat((V + Dir * 0.1f) * 10.f) / 10.f, 0.1f, 4.f); };
-			ChildSlot
+			const TArray<FText> HoldToggle = { LOCTEXT("Hold", "Hold"), LOCTEXT("Toggle", "Toggle") };
+
+			TSharedRef<SVerticalBox> Left = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("MouseHead", "Mouse"))];
+			AddPrefRow(Left, SettingRow(LOCTEXT("MouseSens", "Mouse sensitivity"), LOCTEXT("MouseSensSub", "How far the view turns for a move of the mouse (1.0 is the standard)"),
+				Stepper([Sens]() { return Sens(FWRKeyBindings::Get().MouseSensitivity()); }, [Step](int32 Dir) { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetMouseSensitivity(Step(K.MouseSensitivity(), Dir)); }, 90.f)), 10.f);
+			AddPrefRow(Left, SettingRow(LOCTEXT("MouseAim", "Aiming sensitivity"), LOCTEXT("MouseAimSub", "Times the above while you aim a bow, crossbow or throw"),
+				PrefStepper(TEXT("MouseAimSens"), 0.05f, [](float V) { return PrefTimes(V); }, 90.f)));
+			AddPrefRow(Left, SettingRow(LOCTEXT("InvertMouse", "Invert mouse"), LOCTEXT("InvertMouseSub", "Mouse forward looks down"),
+				SNew(SWRSwitch, []() { return FWRKeyBindings::Get().InvertMouse(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetInvertMouse(!K.InvertMouse()); })));
+
+			Left->AddSlot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Heading(LOCTEXT("HoldHead", "Hold or toggle"))];
+			AddPrefRow(Left, SettingRow(LOCTEXT("SprintMode", "Sprint"), LOCTEXT("SprintModeSub", "Toggle: press once to run, again (or stop) to walk"),
+				PrefSegments(TEXT("SprintToggle"), HoldToggle)), 10.f);
+			AddPrefRow(Left, SettingRow(LOCTEXT("GuardMode", "Guard"), LOCTEXT("GuardModeSub", "Toggle: the first press parries and raises your guard, the next lowers it"),
+				PrefSegments(TEXT("GuardToggle"), HoldToggle)));
+			AddPrefRow(Left, SettingRow(LOCTEXT("AimMode", "Aim"), LOCTEXT("AimModeSub", "With a ranged weapon out. Toggle: press to draw, again to let go"),
+				PrefSegments(TEXT("AimToggle"), HoldToggle)));
+			Left->AddSlot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)
 			[
-				SNew(SScrollBox)
-				+ SScrollBox::Slot()
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()
 				[
-					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("MouseHead", "Mouse"))]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+					SNew(SBox).WidthOverride(240.f * U)
 					[
-						SettingRow(LOCTEXT("MouseSens", "Mouse sensitivity"), LOCTEXT("MouseSensSub", "How far the view turns for a move of the mouse (1.0 is the standard)"),
-							Stepper([Sens]() { return Sens(FWRKeyBindings::Get().MouseSensitivity()); }, [Step](int32 Dir) { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetMouseSensitivity(Step(K.MouseSensitivity(), Dir)); }, 90.f))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
-					[
-						SettingRow(LOCTEXT("InvertMouse", "Invert mouse"), LOCTEXT("InvertMouseSub", "Mouse forward looks down"),
-							SNew(SWRSwitch, []() { return FWRKeyBindings::Get().InvertMouse(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetInvertMouse(!K.InvertMouse()); }))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Heading(LOCTEXT("PadHead", "Controller"))]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
-					[
-						SettingRow(LOCTEXT("PadSens", "Look speed"), LOCTEXT("PadSensSub", "How fast the right stick turns the view (1.0 is the standard)"),
-							Stepper([Sens]() { return Sens(FWRKeyBindings::Get().PadSensitivity()); }, [Step](int32 Dir) { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetPadSensitivity(Step(K.PadSensitivity(), Dir)); }, 90.f))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
-					[
-						SettingRow(LOCTEXT("InvertPad", "Invert look"), LOCTEXT("InvertPadSub", "Right stick up looks down"),
-							SNew(SWRSwitch, []() { return FWRKeyBindings::Get().InvertPad(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetInvertPad(!K.InvertPad()); }))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
-					[
-						SettingRow(LOCTEXT("PadNames", "Button names"), LOCTEXT("PadNamesSub", "How prompts and the controls page name the buttons"),
-							Segmented({ LOCTEXT("Xbox", "Xbox (A, B, LB)"), LOCTEXT("PlayStation", "PlayStation (Cross, L1)") },
-								[]() { return FWRKeyBindings::Get().PadLabels(); }, [](int32 i) { FWRKeyBindings::Get().SetPadLabels(i); }))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
-					[
-						SettingRow(LOCTEXT("Rumble", "Vibration"), LOCTEXT("RumbleSub", "The controller shakes when you land or take a blow"),
-							SNew(SWRSwitch, []() { return FWRKeyBindings::Get().PadRumble(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetPadRumble(!K.PadRumble()); }))
-					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)
-					[
-						SNew(SHorizontalBox)
-						+ SHorizontalBox::Slot().AutoWidth()
-						[
-							SNew(SBox).WidthOverride(260.f * U)
-							[
-								SNew(SWRButton).Text(LOCTEXT("ShowControls", "Show all the controls")).OnClicked_Lambda([]() { WRControlsPage::Toggle(); return FReply::Handled(); })
-							]
-						]
-						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(14.f * U, 0.f, 0.f, 0.f)
-						[
-							Muted(TAttribute<FText>::CreateLambda([]()
-							{
-								return FText::Format(LOCTEXT("ControlsWhere", "Every key and button. {0} opens it anywhere; on a controller, {1} in any menu."),
-									WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Help"))), WRInput::PadButton(TEXT("MenuControls")));
-							}), 12, true)
-						]
+						SNew(SWRButton).Text(LOCTEXT("ShowControls", "Show all the controls")).OnClicked_Lambda([]() { WRControlsPage::Toggle(); return FReply::Handled(); })
 					]
 				]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(14.f * U, 0.f, 0.f, 0.f)
+				[
+					Muted(TAttribute<FText>::CreateLambda([]()
+					{
+						return FText::Format(LOCTEXT("ControlsWhere", "Every key and button. {0} opens it anywhere; on a controller, {1} in any menu."),
+							WRUI::KeyName(FWRKeyBindings::Get().Key(TEXT("Help"))), WRInput::PadButton(TEXT("MenuControls")));
+					}), 12, true)
+				]
 			];
+
+			TSharedRef<SVerticalBox> Right = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("PadHead", "Controller"))];
+			AddPrefRow(Right, SettingRow(LOCTEXT("PadSens", "Look speed"), LOCTEXT("PadSensSub", "How fast the right stick turns the view (1.0 is the standard)"),
+				Stepper([Sens]() { return Sens(FWRKeyBindings::Get().PadSensitivity()); }, [Step](int32 Dir) { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetPadSensitivity(Step(K.PadSensitivity(), Dir)); }, 90.f)), 10.f);
+			AddPrefRow(Right, SettingRow(LOCTEXT("PadAim", "Aiming speed"), LOCTEXT("PadAimSub", "Times the look speed while you aim"),
+				PrefStepper(TEXT("PadAimSens"), 0.05f, [](float V) { return PrefTimes(V); }, 90.f)));
+			AddPrefRow(Right, SettingRow(LOCTEXT("InvertPad", "Invert up and down"), LOCTEXT("InvertPadSub", "Right stick up looks down"),
+				SNew(SWRSwitch, []() { return FWRKeyBindings::Get().InvertPad(); }, []() { FWRKeyBindings& K = FWRKeyBindings::Get(); K.SetInvertPad(!K.InvertPad()); })));
+			AddPrefRow(Right, SettingRow(LOCTEXT("InvertPadX", "Invert left and right"), LOCTEXT("InvertPadXSub", "Right stick right looks left"), PrefSwitch(TEXT("InvertPadX"))));
+			AddPrefRow(Right, SettingRow(LOCTEXT("DeadZone", "Stick dead zone"), LOCTEXT("DeadZoneSub", "Raise it if the view drifts on its own (a worn stick)"),
+				PrefStepper(TEXT("PadDeadZone"), 0.01f, [](float V) { return FText::FromString(FString::Printf(TEXT("%.2f"), V)); }, 90.f)));
+			AddPrefRow(Right, SettingRow(LOCTEXT("Curve", "Response"), LOCTEXT("CurveSub", "Linear: quick turns. Precise: fine aim on small tilts"),
+				PrefSegments(TEXT("PadCurve"), { LOCTEXT("CurveLinear", "Linear"), LOCTEXT("CurveStandard", "Standard"), LOCTEXT("CurvePrecise", "Precise") })));
+			AddPrefRow(Right, SettingRow(LOCTEXT("PadNames", "Button names"), LOCTEXT("PadNamesSub", "How prompts and the controls page name the buttons"),
+				Segmented({ LOCTEXT("Xbox", "Xbox (A, B, LB)"), LOCTEXT("PlayStation", "PlayStation (Cross, L1)") },
+					[]() { return FWRKeyBindings::Get().PadLabels(); }, [](int32 i) { FWRKeyBindings::Get().SetPadLabels(i); })));
+			AddPrefRow(Right, SettingRow(LOCTEXT("Rumble", "Vibration"), LOCTEXT("RumbleSub", "How hard the controller shakes when you land or take a blow"),
+				Segmented({ LOCTEXT("RumbleOff", "Off"), FText::FromString(TEXT("25%")), FText::FromString(TEXT("50%")), FText::FromString(TEXT("75%")), FText::FromString(TEXT("100%")) },
+					[]() { const FWRKeyBindings& K = FWRKeyBindings::Get(); return K.PadRumble() ? FMath::Clamp(FMath::RoundToInt(K.Pref(TEXT("Rumble")) / 25.f), 0, 4) : 0; },
+					[](int32 i)
+					{
+						FWRKeyBindings& K = FWRKeyBindings::Get();
+						K.SetPadRumble(i > 0);
+						K.SetPref(TEXT("Rumble"), i * 25.f);
+						// Feel the new strength at once (a pad in use only).
+						if (i > 0 && GEngine && GEngine->GameViewport) WRInput::Rumble(GEngine->GameViewport->GetWorld(), 0.5f, 0.15f);
+					})));
+
+			ChildSlot[PrefColumns(Left, Right)];
 		}
+	};
+
+	// ------------------------------------------------------------ camera page
+
+	/** Field of view for each view, camera shake, motion blur and the shoulder the camera sits over (TLOU2 / XAG). */
+	class SWRCameraPage : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRCameraPage) {}
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			TSharedRef<SVerticalBox> Left = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("ViewHead", "View"))];
+			AddPrefRow(Left, SettingRow(LOCTEXT("FovThird", "Field of view, third person"), LOCTEXT("FovThirdSub", "How wide you see over the shoulder (70 to 100)"),
+				PrefStepper(TEXT("FovThird"), 1.f, [](float V) { return PrefDegrees(V); }, 80.f)), 10.f);
+			AddPrefRow(Left, SettingRow(LOCTEXT("FovFirst", "Field of view, first person"), LOCTEXT("FovFirstSub", "Wider eases motion sickness for many (75 to 110)"),
+				PrefStepper(TEXT("FovFirst"), 1.f, [](float V) { return PrefDegrees(V); }, 80.f)));
+			AddPrefRow(Left, SettingRow(LOCTEXT("Side", "Shoulder"), LOCTEXT("SideSub", "Which side of you the third-person camera sits"),
+				PrefSegments(TEXT("CameraSide"), { LOCTEXT("SideRight", "Right"), LOCTEXT("SideLeft", "Left"), LOCTEXT("SideCentre", "Centre") })));
+			Left->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
+			[
+				Muted(LOCTEXT("FovHint", "Aiming a bow zooms in by the same share of whatever view you pick."), 12, true)
+			];
+
+			TSharedRef<SVerticalBox> Right = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("ComfortHead", "Comfort"))];
+			AddPrefRow(Right, SettingRow(LOCTEXT("Shake", "Camera shake"), LOCTEXT("ShakeSub", "The jolt of heavy blows, falls and quakes; 0% keeps the view still"),
+				PrefStepper(TEXT("Shake"), 10.f, [](float V) { return PrefPercent(V); }, 80.f)), 10.f);
+			AddPrefRow(Right, SettingRow(LOCTEXT("Blur", "Motion blur"), LOCTEXT("BlurSub", "Smears fast turns; off is sharper and easier on the eyes"),
+				PrefSegments(TEXT("MotionBlur"), { LOCTEXT("BlurOff", "Off"), LOCTEXT("BlurLow", "Low"), LOCTEXT("BlurHigh", "High") })));
+
+			ChildSlot[PrefColumns(Left, Right)];
+		}
+	};
+
+	// ------------------------------------------------------------ interface page
+
+	/** Desk / Couch (text and HUD size), the HUD's mode and what it shows, names over players, the helmet and hints. */
+	class SWRInterfacePage : public SCompoundWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SWRInterfacePage) {}
+			SLATE_ARGUMENT(TWeakObjectPtr<APlayerController>, PC)
+		SLATE_END_ARGS()
+
+		void Construct(const FArguments& InArgs)
+		{
+			PC = InArgs._PC;
+			TSharedRef<SVerticalBox> Left = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("SizeHead", "Size"))];
+			AddPrefRow(Left, SettingRow(LOCTEXT("Setup", "Setup"), LOCTEXT("SetupSub", "Desk: at a monitor. Couch: a TV across the room"),
+				Segmented({ LOCTEXT("Desk", "Desk"), LOCTEXT("Couch", "Couch") }, []() { return SetupIndex(); },
+					[](int32 i)
+					{
+						const float Size = i == 1 ? WRTune(TEXT("ui.couchScale"), 115.f) : 100.f;
+						FWRKeyBindings& K = FWRKeyBindings::Get();
+						K.SetPref(TEXT("UiScale"), Size);
+						K.SetPref(TEXT("HudScale"), Size);
+					})), 10.f);
+			Left->AddSlot().AutoHeight().Padding(14.f * U, 4.f * U, 0.f, 0.f)
+			[
+				Muted(TAttribute<FText>::CreateLambda([]() { return SetupIndex() < 0 ? LOCTEXT("SetupCustom", "Custom: your own sizes below.") : FText::GetEmpty(); }), 12)
+			];
+			AddPrefRow(Left, SettingRow(LOCTEXT("UiScale", "Text and menus"), LOCTEXT("UiScaleSub", "The size of every screen, the main menu too"),
+				PrefStepper(TEXT("UiScale"), 5.f, [](float V) { return PrefPercent(V); }, 80.f)));
+			AddPrefRow(Left, SettingRow(LOCTEXT("HudScale", "HUD"), LOCTEXT("HudScaleSub", "The size of the bars, compass and hotbar in play"),
+				PrefStepper(TEXT("HudScale"), 5.f, [](float V) { return PrefPercent(V); }, 80.f)));
+
+			Left->AddSlot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Heading(LOCTEXT("HudHead", "In play"))];
+			AddPrefRow(Left, SettingRow(LOCTEXT("HudMode", "HUD"), FText::GetEmpty(),
+				PrefSegments(TEXT("HudMode"), { LOCTEXT("HudFull", "Full"), LOCTEXT("HudFade", "Fade"), LOCTEXT("HudMinimal", "Minimal") })), 10.f);
+			Left->AddSlot().AutoHeight().Padding(14.f * U, 4.f * U, 0.f, 0.f)
+			[
+				Muted(TAttribute<FText>::CreateLambda([]()
+				{
+					switch (FWRKeyBindings::Get().PrefInt(TEXT("HudMode")))
+					{
+					case 0: return LOCTEXT("HudFullSub", "Full: everything stays up all the time.");
+					case 2: return LOCTEXT("HudMinimalSub", "Minimal: your bars only while something is happening to them; no compass or plates.");
+					default: return LOCTEXT("HudFadeSub", "Fade: when all is calm for a few seconds the bars and plates fade away; any hit, cost or change brings them straight back.");
+					}
+				}), 12, true)
+			];
+			AddPrefRow(Left, SettingRow(LOCTEXT("CompassRow", "Compass"), LOCTEXT("CompassRowSub", "The strip along the top with places and markers"), PrefSwitch(TEXT("Compass"))));
+			AddPrefRow(Left, SettingRow(LOCTEXT("CrosshairRow", "Crosshair"), LOCTEXT("CrosshairRowSub", "Where spells and shots go. Off: only while aiming, placing or in first person."),
+				SNew(SWRSwitch, []() { return FWRKeyBindings::Get().ShowCrosshair(); }, []() { FWRKeyBindings::Get().SetShowCrosshair(!FWRKeyBindings::Get().ShowCrosshair()); })));
+			AddPrefRow(Left, SettingRow(LOCTEXT("DamageNumbersRow", "Damage numbers"), LOCTEXT("DamageNumbersRowSub", "How much each blow did, beside what you hit."),
+				SNew(SWRSwitch, []() { return FWRKeyBindings::Get().DamageNumbers(); }, []() { FWRKeyBindings::Get().SetDamageNumbers(!FWRKeyBindings::Get().DamageNumbers()); })));
+
+			TSharedRef<SVerticalBox> Right = SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight()[Heading(LOCTEXT("OthersHead", "Others and you"))];
+			AddPrefRow(Right, SettingRow(LOCTEXT("Names", "Names over players"), LOCTEXT("NamesSub", "Near: within 40 m. In a fight their health shows either way"),
+				PrefSegments(TEXT("Names"), { LOCTEXT("NamesAlways", "Always"), LOCTEXT("NamesNear", "Near"), LOCTEXT("NamesOff", "Off") })), 10.f);
+			AddPrefRow(Right, SettingRow(LOCTEXT("Helmet", "Show my helmet"), LOCTEXT("HelmetSub", "Off: your face shows; the helmet still protects you"),
+				SNew(SWRSwitch, []() { int32 F, B; bool bHide; SWRMainMenu::GetLook(F, B, bHide); return !bHide; },
+					[this]()
+					{
+						int32 F, B;
+						bool bHide;
+						SWRMainMenu::GetLook(F, B, bHide);
+						SWRMainMenu::SetLook(F, B, !bHide);   // the next join carries it (?Look=<face>.<build>.h)
+						// In a world: the server changes the look for everyone now.
+						if (AWRCharacter* Me = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr) Me->ServerSetHideHelmet(!bHide);
+					})));
+			AddPrefRow(Right, SettingRow(LOCTEXT("ShowHints", "Show hints"), LOCTEXT("ShowHintsSub", "One-time tips with your keys, the first time you meet something"),
+				SNew(SWRSwitch, []() { return FWRFlow::HintsEnabled(); }, []() { FWRFlow::SetHintsEnabled(!FWRFlow::HintsEnabled()); })));
+
+			ChildSlot[PrefColumns(Left, Right)];
+		}
+
+		/** Desk (0) when both sizes are 100 %, Couch (1) at the couch size, else Custom (-1, no segment lit). */
+		static int32 SetupIndex()
+		{
+			const FWRKeyBindings& K = FWRKeyBindings::Get();
+			const float Ui = K.Pref(TEXT("UiScale")), Hud = K.Pref(TEXT("HudScale")), Couch = WRTune(TEXT("ui.couchScale"), 115.f);
+			if (FMath::IsNearlyEqual(Ui, 100.f) && FMath::IsNearlyEqual(Hud, 100.f)) return 0;
+			if (FMath::IsNearlyEqual(Ui, Couch) && FMath::IsNearlyEqual(Hud, Couch)) return 1;
+			return -1;
+		}
+
+		/** The page's footer button: interface prefs, crosshair, damage numbers and hints back to their defaults. */
+		static void ResetPage()
+		{
+			FWRKeyBindings& K = FWRKeyBindings::Get();
+			K.ResetPage(TEXT("interface"));
+			K.SetShowCrosshair(true);
+			K.SetDamageNumbers(false);
+			FWRFlow::SetHintsEnabled(true);
+		}
+
+	private:
+		TWeakObjectPtr<APlayerController> PC;
 	};
 
 	class SWRVideoPage : public SCompoundWidget
@@ -1613,14 +1793,7 @@ namespace WRSettingsUI
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 				[
-					Muted(LOCTEXT("VideoHint", "Changes apply straight away and are kept for next time. Auto-detect picks quality levels for this computer."), 12, true)
-				]
-				// ---- Game: first-session hints (WRUIFlow keeps which ones each player has seen). Added by the polish pass.
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 26.f * U, 0.f, 0.f)[Heading(LOCTEXT("GameHeading", "Game"))]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
-				[
-					SettingRow(LOCTEXT("ShowHints", "Show hints"), LOCTEXT("ShowHintsSub", "One-time tips with your keys, the first time you meet something"),
-						SNew(SWRSwitch, []() { return FWRFlow::HintsEnabled(); }, []() { FWRFlow::SetHintsEnabled(!FWRFlow::HintsEnabled()); }), 52.f)
+					Muted(LOCTEXT("VideoHint", "Changes apply straight away and are kept for next time. Auto-detect picks quality levels for this computer. Motion blur and the field of view are on the Camera page; text and HUD size on Interface."), 12, true)
 				];
 
 			ChildSlot
@@ -2072,6 +2245,8 @@ namespace WRSettingsUI
 			}
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("controls"); }, [this]() { ShowPage(TEXT("controls")); }).Icon(EWRIcon::Keyboard).Text(LOCTEXT("Controls", "Controls")), bInGame ? 4.f : 0.f);
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("look"); }, [this]() { ShowPage(TEXT("look")); }).Icon(EWRIcon::Join).Text(LOCTEXT("LookNav", "Look and controller")));
+			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("camera"); }, [this]() { ShowPage(TEXT("camera")); }).Icon(EWRIcon::Camera).Accent(WRUI::Brass).Text(LOCTEXT("CameraNav", "Camera")));
+			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("interface"); }, [this]() { ShowPage(TEXT("interface")); }).Icon(EWRIcon::Layout).Accent(WRUI::Brass).Text(LOCTEXT("InterfaceNav", "Interface")));
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("audio"); }, [this]() { ShowPage(TEXT("audio")); }).Icon(EWRIcon::Speaker).Text(LOCTEXT("Audio", "Audio")));
 			Add(SNew(SWRNavItem, [this]() { return Page == TEXT("video"); }, [this]() { ShowPage(TEXT("video")); }).Icon(EWRIcon::Monitor).Text(LOCTEXT("Video", "Video")));
 			// The host's: this game is the server, and it's running a world.
@@ -2169,6 +2344,16 @@ namespace WRSettingsUI
 				Controls.Reset();
 				Content->SetContent(SNew(SWRLookPage));
 			}
+			else if (Page == TEXT("camera"))
+			{
+				Controls.Reset();
+				Content->SetContent(SNew(SWRCameraPage));
+			}
+			else if (Page == TEXT("interface"))
+			{
+				Controls.Reset();
+				Content->SetContent(SNew(SWRInterfacePage).PC(PC));
+			}
 			else
 			{
 				Page = TEXT("controls");
@@ -2224,7 +2409,7 @@ namespace WRSettingsUI
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(14.f * U, 0.f)[WRUI::Text(FText::FromString(TEXT("›")), WRUI::Body(20, 500), WRUI::Ink3)]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 				[
-					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("world") ? LOCTEXT("WorldPageTitle", "This world") : Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : Page == TEXT("look") ? LOCTEXT("LookNav", "Look and controller") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
+					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Page == TEXT("world") ? LOCTEXT("WorldPageTitle", "This world") : Page == TEXT("video") ? LOCTEXT("Video", "Video") : Page == TEXT("audio") ? LOCTEXT("Audio", "Audio") : Page == TEXT("look") ? LOCTEXT("LookNav", "Look and controller") : Page == TEXT("camera") ? LOCTEXT("CameraNav", "Camera") : Page == TEXT("interface") ? LOCTEXT("InterfaceNav", "Interface") : LOCTEXT("Controls", "Controls"); }), Spaced(WRUI::Title(16), 60), WRUI::Ink2, true)
 				]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[Muted(LOCTEXT("Close", "Close"), 12)]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 14.f * U, 0.f)[SNew(SWRKeyCap).FontSize(11).Text(LOCTEXT("EscKey", "Esc"))]
@@ -2285,6 +2470,15 @@ namespace WRSettingsUI
 								{
 									WRSound::ResetVolumes();
 								}
+								else if (Page == TEXT("look") || Page == TEXT("camera"))
+								{
+									// This page's own prefs (keys and sensitivities stay; the Controls page resets those).
+									FWRKeyBindings::Get().ResetPage(Page);
+								}
+								else if (Page == TEXT("interface"))
+								{
+									SWRInterfacePage::ResetPage();
+								}
 								else if (Controls.IsValid())
 								{
 									Controls->ResetAll();
@@ -2310,12 +2504,12 @@ namespace WRSettingsUI
 #if !UE_BUILD_SHIPPING
 	// Testing and screenshots (the bot runs console commands): WRSettings video | controls | listen [action] | key <key> | cancel | scroll <offset>.
 	static FAutoConsoleCommand GSettingsCommand(TEXT("WRSettings"),
-		TEXT("Testing: drive the open settings window. WRSettings video|audio|controls, WRSettings listen [action] (default: the last ability), WRSettings key <key name>, WRSettings cancel, WRSettings scroll <offset>"),
+		TEXT("Testing: drive the open settings window. WRSettings video|audio|controls|look|camera|interface, WRSettings listen [action] (default: the last ability), WRSettings key <key name>, WRSettings cancel, WRSettings scroll <offset>"),
 		FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args)
 		{
 			const TSharedPtr<SWRSettings> W = GLiveSettings.Pin();
 			if (!W.IsValid() || Args.Num() == 0) return;
-			if (Args[0] == TEXT("video") || Args[0] == TEXT("controls") || Args[0] == TEXT("audio"))
+			if (Args[0] == TEXT("video") || Args[0] == TEXT("controls") || Args[0] == TEXT("audio") || Args[0] == TEXT("look") || Args[0] == TEXT("camera") || Args[0] == TEXT("interface"))
 			{
 				W->ShowPage(FName(*Args[0]));
 				return;

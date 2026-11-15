@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased: the UI cook pass (settings, HUD, menus, controls)
+
+Aaron (lane cookpass-ui: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-ui.md; a cook
+pass on the built screens and the ui-controls cook's open rounds). Compiled (editor target); not played here (Aaron
+and the testers test, F8).
+
+- **UI (1): Camera, Interface and the rest of Look and controller.** Why: the field of view, shake and blur were fixed
+  (motion sickness: TLOU2 / XAG), every hold was a hold (XAG 107), the pad's dead zone and curve were tuning-only, and
+  crosshair / damage numbers / hints were filed under Controls and Video.
+  - Player prefs are one table in `FWRKeyBindings` (`Pref(id)` / `SetPref` / `ResetPage`, saved as `Pref.<id>` in
+    `[Wildreach.Keys]`, only when not the default).
+  - **Look and controller**: aiming sensitivity (mouse x0.70, pad x0.60, applied while a ranged weapon is aimed),
+    invert left / right, stick dead zone 0.05-0.35, response Linear / Standard / Precise (exponents tuning
+    `look.padCurveLinear / padCurve / padCurvePrecise`), vibration Off / 25 / 50 / 75 / 100 %, and **Hold or toggle**
+    for Sprint, Guard and Aim. A toggled sprint ends on the next press, when you stop (0.25 s under 50 cm/s, tuning
+    `ui.toggle`), on a menu or when stamina drops it; a toggled guard / aim: the first press is a real press (the parry
+    window opens), the next lets go, as do a menu, death, a mount or swapping weapon set.
+  - **Camera** (new page): field of view third person 70-100 and first person 75-110 (default 90 both, the combat
+    camera's; a bow's aim zoom keeps its 60 / 90 share of whatever you pick), camera shake 0-100 % (scales the trauma
+    and the FOV punch), motion blur Off / Low / High (`r.MotionBlur.Amount` 0 / 0.25 / 0.5), shoulder Right / Left /
+    Centre (eased across).
+  - **Interface** (new page): Setup Desk / Couch (Couch = text and HUD at 115 %, tuning `ui.couchScale`), Text and
+    menus 85-130 % (the engine's application scale: every screen), HUD 75-130 % (a scaler over the HUD only), HUD mode
+    Full / Fade / Minimal and Compass (the HUD reads them from UI (2)), Crosshair and Damage numbers (moved from
+    Controls), Names over players Always / Near / Off, **Show my helmet** (the server changes your look now and the
+    next join carries it in `?Look=`), Show hints (moved from Video).
+  - Each page's Reset puts only that page back.
+
 ## Unreleased: the Desert / Sun & sand
 
 Aaron (lane build-biome-desert: requirement ledger R1-R52, build research and plan in showcase-notes

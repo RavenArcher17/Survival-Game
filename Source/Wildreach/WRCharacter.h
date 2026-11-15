@@ -320,6 +320,12 @@ private:
 	void AttachHeld(UStaticMeshComponent* Comp, class UStaticMesh* Model, const struct FWRItemDef& Def);
 	void ApplyAimRotation();
 	void TickAimCamera(float DeltaSeconds);
+	/** A toggled sprint ends when you stop (Settings > Look and controller > Sprint: Toggle). */
+	void TickSprintToggle(float DeltaSeconds);
+	float CameraSideBlend = 1.f;   // owner camera: +1 right shoulder, -1 left, 0 centred (eased to the setting)
+	bool bSprintToggled = false;   // sprint was switched on by a toggle press (not held)
+	float SprintStillSeconds = 0.f;
+	bool bBlockToggled = false;    // guard / aim was switched on by a toggle press: the release is ignored
 	FName RangedAnimGroup() const;  // bow / rifle (crossbow, blowgun) / throw
 	void LaunchProjectile(const struct FWRItemDef& Launcher, FName AmmoId, const FVector& Dir, float LauncherMult = 1.f);
 	UFUNCTION(Server, Reliable) void ServerSetRangedMode(bool bOn);
@@ -392,6 +398,7 @@ private:
 	void InputReleased(EWRAbilityInput Input);
 	void InputJump();
 	void InputSprint();
+	void InputSprintReleased();
 	void InputView();
 	TSet<EWRAbilityInput> HeldInputs;
 	bool bPadFlickReady = true;

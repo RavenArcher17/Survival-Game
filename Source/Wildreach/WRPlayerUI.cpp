@@ -26,6 +26,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Widgets/Layout/SDPIScaler.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
@@ -47,7 +48,12 @@ FWRPlayerUI::FWRPlayerUI(AWRPlayerController* InPC) : PC(InPC)
 	{
 		if (GEngine && GEngine->GameViewport)
 		{
-			HudWidget = (*Hud)(InPC);
+			// HUD size (Settings > Interface): a scaler over the HUD only; the interface size (the engine's application
+			// scale) multiplies it with every screen.
+			HudWidget = SNew(SDPIScaler).DPIScale_Lambda([]() { return FMath::Clamp(FWRKeyBindings::Get().Pref(TEXT("HudScale")) / 100.f, 0.5f, 2.f); })
+				[
+					(*Hud)(InPC)
+				];
 			GEngine->GameViewport->AddViewportWidgetContent(HudWidget.ToSharedRef(), 10);
 		}
 	}

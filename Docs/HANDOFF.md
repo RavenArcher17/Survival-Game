@@ -38,6 +38,11 @@ and, from a client, in the host's `Saved/Reports`), **full controller support** 
 one input processor in `WRPadInput.cpp`, so a new screen needs nothing for the pad as long as its clickable pieces
 show the hand cursor or are buttons / slots), the **F1 controls page**, and **look sensitivity / invert**. New prompt
 rule: show a key with `WRInput::ActionKey(<action>)`, not `WRUI::KeyName(...Key(...))`, so pads see their buttons.
+Also since 0.7.1: **the UI cook pass** (cooks/cookpass-ui.md in showcase-notes): player prefs beyond keys are one table
+in `FWRKeyBindings` (`Pref` / `SetPref`, ids listed in WRKeyBindings.h): read them where they act, never copy them.
+Settings has Camera (FOV per view, shake, blur, shoulder) and Interface (Desk / Couch, text and HUD size, HUD mode,
+compass, names, helmet, crosshair, damage numbers, hints) pages; Look and controller has aim speeds, dead zone,
+response, vibration strength and hold / toggle for sprint, guard and aim (`AWRCharacter::InputSprint`, `InputPressed`).
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.

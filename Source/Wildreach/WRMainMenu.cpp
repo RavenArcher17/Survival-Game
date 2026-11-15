@@ -675,6 +675,27 @@ FReply SWRMainMenu::OnPickPath(FName InPath)
 	return FReply::Handled();
 }
 
+void SWRMainMenu::GetLook(int32& Face, int32& Build, bool& bHideHelmet)
+{
+	Face = 0;
+	Build = 1;
+	bHideHelmet = false;
+	FString Look;
+	GConfig->GetString(MenuSection, TEXT("Look"), Look, GGameUserSettingsIni);
+	TArray<FString> Parts;
+	Look.ParseIntoArray(Parts, TEXT("."));
+	if (Parts.Num() >= 1) Face = FMath::Clamp(FCString::Atoi(*Parts[0]), 0, 31);
+	if (Parts.Num() >= 2) Build = FMath::Clamp(FCString::Atoi(*Parts[1]), 0, 7);
+	bHideHelmet = Parts.Num() >= 3 && Parts[2].Contains(TEXT("h"));
+}
+
+void SWRMainMenu::SetLook(int32 Face, int32 Build, bool bHideHelmet)
+{
+	const FString Look = FString::Printf(TEXT("%d.%d%s"), FMath::Clamp(Face, 0, 31), FMath::Clamp(Build, 0, 7), bHideHelmet ? TEXT(".h") : TEXT(""));
+	GConfig->SetString(MenuSection, TEXT("Look"), *Look, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+}
+
 FReply SWRMainMenu::OnPickBody(FName InBody)
 {
 	Body = InBody;

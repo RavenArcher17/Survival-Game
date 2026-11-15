@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRKeyBindings.h"
 #include "WRAbilitiesTide.h"
 #include "WROceanBosses.h"
 #include "WRFx.h"
@@ -108,6 +109,13 @@ void AWRCharacter::SetRangedItem(FName ItemId)
 
 void AWRCharacter::ToggleWeaponSet()
 {
+	// A toggled guard / aim belongs to the weapon it was raised with: swapping lets it go.
+	if (bBlockToggled && HeldInputs.Contains(EWRAbilityInput::Block))
+	{
+		bBlockToggled = false;
+		HeldInputs.Remove(EWRAbilityInput::Block);
+		ReleaseAbilityInput(EWRAbilityInput::Block);
+	}
 	SetRangedMode(!bRangedMode);
 }
 
@@ -326,17 +334,28 @@ void AWRCharacter::TickAimCamera(float DeltaSeconds)
 	// Under water the camera comes in close (cooks/biome-ocean.md 2.6: 250 cm), eased, so murk and kelp don't fill it.
 	UnderwaterBlend = FMath::FInterpTo(UnderwaterBlend, WRUnderwater::IsUnder(this) ? 1.f : 0.f, DeltaSeconds, 3.f);
 	ThirdPersonBoom->TargetArmLength = FMath::Lerp(FMath::Lerp(420.f, WRTune(TEXT("underwater.cameraArm"), 250.f), UnderwaterBlend), WRTune(TEXT("ranged.aimArmLength"), 170.f), AimBlend);
-	ThirdPersonBoom->SocketOffset = FMath::Lerp(FVector(0.f, 75.f, 85.f), FVector(0.f, 60.f, 70.f), AimBlend);
-	float Fov = FMath::Lerp(90.f, WRTune(TEXT("ranged.aimFov"), 60.f), AimBlend);
+	// The shoulder the camera sits over (Settings > Camera): right, left or centred behind the head; eased, so a change
+	// in the menu slides the view across rather than cutting.
+	const FWRKeyBindings& Prefs = FWRKeyBindings::Get();
+	const int32 SideChoice = Prefs.PrefInt(TEXT("CameraSide"));
+	const float SideTarget = SideChoice == 1 ? -1.f : SideChoice == 2 ? 0.f : 1.f;
+	CameraSideBlend = FMath::FInterpTo(CameraSideBlend, SideTarget, DeltaSeconds, 6.f);
+	ThirdPersonBoom->SocketOffset = FMath::Lerp(FVector(0.f, 75.f * CameraSideBlend, 85.f), FVector(0.f, 60.f * CameraSideBlend, 70.f), AimBlend);
+	// Field of view per view (Settings > Camera; the combat camera was tuned at 90): aiming zooms by the same ratio
+	// whatever the base, so a wide-FOV player's bow still zooms 60 / 90 of their view.
+	const float AimRatio = WRTune(TEXT("ranged.aimFov"), 60.f) / 90.f;
+	const float BaseThird = Prefs.Pref(TEXT("FovThird")), BaseFirst = Prefs.Pref(TEXT("FovFirst"));
+	float Widen = 0.f;
 	// Sprinting widens the view a little (eased in and out; not while aiming).
 	if (UWRCameraBoom* Boom = Cast<UWRCameraBoom>(ThirdPersonBoom.Get()))
 	{
 		const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
 		const bool bSprinting = Move && Move->IsSprinting() && GetVelocity().Size2D() > Move->MaxWalkSpeed * 1.1f;
-		Fov += Boom->TickSprintWiden(bSprinting, DeltaSeconds) * (1.f - AimBlend);
+		Widen = Boom->TickSprintWiden(bSprinting, DeltaSeconds) * (1.f - AimBlend);
 	}
-	ThirdPersonCamera->SetFieldOfView(Fov);
-	FirstPersonCamera->SetFieldOfView(Fov);
+	ThirdPersonCamera->SetFieldOfView(FMath::Lerp(BaseThird, BaseThird * AimRatio, AimBlend) + Widen);
+	FirstPersonCamera->SetFieldOfView(FMath::Lerp(BaseFirst, BaseFirst * AimRatio, AimBlend) + Widen);
+	TickSprintToggle(DeltaSeconds);
 }
 
 void AWRCharacter::CycleAmmo(int32 Dir)

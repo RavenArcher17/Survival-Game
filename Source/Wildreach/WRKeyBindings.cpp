@@ -1,7 +1,42 @@
 #include "WRKeyBindings.h"
 #include "Misc/ConfigCacheIni.h"
+#include "HAL/IConsoleManager.h"
+#include "Engine/UserInterfaceSettings.h"
 
 static const TCHAR* KeySection = TEXT("Wildreach.Keys");
+
+namespace WRKeyPrefs
+{
+	/** The preference table (cookpass-ui 3.1): id, default, range, the settings page it sits on. */
+	struct FDef { const TCHAR* Id; float Default; float Min; float Max; const TCHAR* Page; };
+	static const FDef Defs[] = {
+		{ TEXT("MouseAimSens"), 0.7f, 0.2f, 1.5f, TEXT("look") },
+		{ TEXT("PadAimSens"), 0.6f, 0.2f, 1.5f, TEXT("look") },
+		{ TEXT("InvertPadX"), 0.f, 0.f, 1.f, TEXT("look") },
+		{ TEXT("PadDeadZone"), 0.15f, 0.05f, 0.35f, TEXT("look") },
+		{ TEXT("PadCurve"), 1.f, 0.f, 2.f, TEXT("look") },
+		{ TEXT("Rumble"), 100.f, 0.f, 100.f, TEXT("look") },
+		{ TEXT("SprintToggle"), 0.f, 0.f, 1.f, TEXT("look") },
+		{ TEXT("GuardToggle"), 0.f, 0.f, 1.f, TEXT("look") },
+		{ TEXT("AimToggle"), 0.f, 0.f, 1.f, TEXT("look") },
+		{ TEXT("FovThird"), 90.f, 70.f, 100.f, TEXT("camera") },
+		{ TEXT("FovFirst"), 90.f, 75.f, 110.f, TEXT("camera") },
+		{ TEXT("Shake"), 100.f, 0.f, 100.f, TEXT("camera") },
+		{ TEXT("MotionBlur"), 0.f, 0.f, 2.f, TEXT("camera") },
+		{ TEXT("CameraSide"), 0.f, 0.f, 2.f, TEXT("camera") },
+		{ TEXT("UiScale"), 100.f, 85.f, 130.f, TEXT("interface") },
+		{ TEXT("HudScale"), 100.f, 75.f, 130.f, TEXT("interface") },
+		{ TEXT("HudMode"), 1.f, 0.f, 2.f, TEXT("interface") },
+		{ TEXT("Compass"), 1.f, 0.f, 1.f, TEXT("interface") },
+		{ TEXT("Names"), 1.f, 0.f, 2.f, TEXT("interface") },
+	};
+
+	static const FDef* Find(FName Id)
+	{
+		for (const FDef& D : Defs) if (Id == D.Id) return &D;
+		return nullptr;
+	}
+}
 
 FWRKeyBindings& FWRKeyBindings::Get()
 {
@@ -170,6 +205,56 @@ void FWRKeyBindings::SetInvertPad(bool b) { bInvertPad = b; Save(); OnChanged.Br
 void FWRKeyBindings::SetPadLabels(int32 Set) { PadLabelSet = FMath::Clamp(Set, 0, 1); Save(); OnChanged.Broadcast(); }
 void FWRKeyBindings::SetPadRumble(bool b) { bPadRumble = b; Save(); OnChanged.Broadcast(); }
 
+float FWRKeyBindings::Pref(FName Id) const
+{
+	if (const float* V = Prefs.Find(Id)) return *V;
+	const WRKeyPrefs::FDef* D = WRKeyPrefs::Find(Id);
+	return D ? D->Default : 0.f;
+}
+
+void FWRKeyBindings::SetPref(FName Id, float Value)
+{
+	const WRKeyPrefs::FDef* D = WRKeyPrefs::Find(Id);
+	if (!D) return;
+	const float V = FMath::Clamp(Value, D->Min, D->Max);
+	if (Id == TEXT("Rumble") && V > 0.f) bPadRumble = true;   // the old on/off switch is folded into the strength
+	Prefs.Add(Id, V);
+	Save();
+	ApplyEnginePrefs();
+	OnChanged.Broadcast();
+}
+
+void FWRKeyBindings::ResetPage(FName Page)
+{
+	for (const WRKeyPrefs::FDef& D : WRKeyPrefs::Defs)
+	{
+		if (Page == D.Page) Prefs.Remove(D.Id);
+	}
+	if (Page == TEXT("look")) bPadRumble = true;
+	Save();
+	ApplyEnginePrefs();
+	OnChanged.Broadcast();
+}
+
+void FWRKeyBindings::ApplyEnginePrefs() const
+{
+	// Interface size: the engine's application scale multiplies the DPI scale of every screen in the game window (the
+	// main menu included). Not in the editor: it would resize the editor's own play-in-editor viewport UI.
+	if (!GIsEditor)
+	{
+		if (UUserInterfaceSettings* UI = GetMutableDefault<UUserInterfaceSettings>())
+		{
+			UI->ApplicationScale = Pref(TEXT("UiScale")) / 100.f;
+		}
+	}
+	// Motion blur: the amount overrides whatever the post-process volumes or the quality level ask for.
+	if (IConsoleVariable* Blur = IConsoleManager::Get().FindConsoleVariable(TEXT("r.MotionBlur.Amount")))
+	{
+		static const float Amounts[] = { 0.f, 0.25f, 0.5f };
+		Blur->Set(Amounts[FMath::Clamp(PrefInt(TEXT("MotionBlur")), 0, 2)], ECVF_SetByGameSetting);
+	}
+}
+
 void FWRKeyBindings::Load()
 {
 	for (FWRActionKey& A : List)
@@ -195,6 +280,15 @@ void FWRKeyBindings::Load()
 	MouseSens = FMath::Clamp(MouseSens, 0.1f, 4.f);
 	PadSens = FMath::Clamp(PadSens, 0.1f, 4.f);
 	PadLabelSet = FMath::Clamp(PadLabelSet, 0, 1);
+	for (const WRKeyPrefs::FDef& D : WRKeyPrefs::Defs)
+	{
+		float V = D.Default;
+		if (GConfig->GetFloat(KeySection, *(FString(TEXT("Pref.")) + D.Id), V, GGameUserSettingsIni))
+		{
+			Prefs.Add(D.Id, FMath::Clamp(V, D.Min, D.Max));
+		}
+	}
+	ApplyEnginePrefs();
 }
 
 void FWRKeyBindings::Save() const
@@ -221,5 +315,12 @@ void FWRKeyBindings::Save() const
 	GConfig->SetBool(KeySection, TEXT("InvertPad"), bInvertPad, GGameUserSettingsIni);
 	GConfig->SetInt(KeySection, TEXT("PadLabels"), PadLabelSet, GGameUserSettingsIni);
 	GConfig->SetBool(KeySection, TEXT("PadRumble"), bPadRumble, GGameUserSettingsIni);
+	for (const WRKeyPrefs::FDef& D : WRKeyPrefs::Defs)
+	{
+		const FString Key = FString(TEXT("Pref.")) + D.Id;
+		const float* V = Prefs.Find(D.Id);
+		if (V && !FMath::IsNearlyEqual(*V, D.Default)) GConfig->SetFloat(KeySection, *Key, *V, GGameUserSettingsIni);
+		else GConfig->RemoveKey(KeySection, *Key, GGameUserSettingsIni);
+	}
 	GConfig->Flush(false, GGameUserSettingsIni);
 }
