@@ -425,6 +425,9 @@ TCHAR FWRGraveData::ZoneAt(const FVector& Pos) const
 
 FName WRGrave::Biome() { return WRGraveTypesImpl::GBiome; }
 
+float WRGraveSky::BloodMoon = 0.f;
+float WRGraveSky::Corruption = 0.f;
+
 bool WRGrave::Live()
 {
 	return WRBiome::IsLive(WRGraveTypesImpl::GBiome);

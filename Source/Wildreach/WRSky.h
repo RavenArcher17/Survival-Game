@@ -95,6 +95,14 @@ private:
 	float ForestAir = -1.f;
 	float ForestCanopy = 0.f;
 	float ForestSkySet = -1.f;
+	/** 0..1: how far into the Graveyard's air the camera is (eased), its mist layer's height (knee for Ground mist,
+	 *  chest for Corpse fog) and whether the second fog layer was last set by it (so leaving it clears the layer). */
+	float GraveAir = -1.f;
+	float GraveMistTop = 0.f;
+	float GraveMist = 0.f;
+	bool bGraveFogSet = false;
+	/** World seconds of the next whisper while the local survivor's Corruption reads 75+ on the Graveyard. */
+	double NextWhisperAt = 0.0;
 	/** The forest's own weather looks at the camera (cooks/biome-forest.md 2.9), eased 0..1: Clear's green light shafts
 	 *  under the old growth and the Elder Canopy by day (volumetric scattering on the sun, shaft bloom, drifting motes
 	 *  and beams round the view: ShaftFx), and Overcast closing the Elder Canopy from dusk to near-dark. */

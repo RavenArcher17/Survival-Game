@@ -46,6 +46,8 @@ namespace WRGraveFlag
 		Silent   = 1 << 7,   // a Gloamcrow at a crow funeral (perched, silent)
 		Burying  = 1 << 8,   // a Tombback sitting on a kill it buried
 		Sweeping = 1 << 9,   // a Cryptstalker's whips fanned out
+		Riftborn = 1 << 10,  // came back from the south's rifts changed (GY 2.12: Gravehound, Wraithmoth, Tombback south
+		                     // of the neck): desaturated hide, black-violet eyes and voidglass on the spine, +25% HP, curse
 	};
 }
 
@@ -68,6 +70,9 @@ public:
 	static bool IsRisen(FName CreatureId);
 	/** Server: the component on a new Graveyard creature (AWRCreature::BeginPlay); also on a raised body. */
 	static void Attach(AWRCreature* Creature);
+	/** Server, once at spawn: the Graveyard's Riftborn roll (graveyardLife.riftborn: its share of Gravehounds,
+	 *  Wraithmoths and Tombbacks south of fromY; +25% health, curse on every blow). */
+	void RollRiftborn(AWRCreature* C);
 	static TArray<TWeakObjectPtr<UWRGraveBody>> Live;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Flags) uint16 Flags = 0;
@@ -108,6 +113,8 @@ private:
 	void BoneSeg(FName A, FName B, float Radius, const FLinearColor& Col, int32 Kind = 0);
 
 	FName LookFor;
+	/** The flags the look was built for (Raised, Riftborn): a change rebuilds it. */
+	uint16 LookFlags = 0;
 	struct FGroup { TWeakObjectPtr<USceneComponent> Frame; int32 Kind = 0; FRotator BaseRot = FRotator::ZeroRotator; float Phase = 0.f; };
 	TArray<FGroup> Groups;
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> LookComps;

@@ -149,7 +149,26 @@ void UWRGraveBody::Set(uint16 Flag, bool bOn)
 
 void UWRGraveBody::OnRep_Flags()
 {
+	if (LookFlags != (Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn))) LookTries = 0;   // raised or Riftborn: rebuild
 	ApplyBuriedLook();
+}
+
+void UWRGraveBody::RollRiftborn(AWRCreature* C)
+{
+	// The rifts in the south (the wasteland's edge past the neck) send some of the Graveyard's own back changed: one tier
+	// up in health and their every blow carries curse. Only the three the cook names, only south of fromY.
+	static const TSet<FName> Kinds = { FName(TEXT("gravehound")), FName(TEXT("wraithmoth")), FName(TEXT("tombback")) };
+	if (!Kinds.Contains(C->CreatureId) || C->GetActorLocation().Y < GcT(TEXT("riftborn.fromY"), 445000.f)) return;
+	if (FMath::FRand() * 100.f >= GcT(TEXT("riftborn.share"), 15.f)) return;
+	Set(WRGraveFlag::Riftborn, true);
+	if (UWRAttributeSet* A = C->GetAttributes())
+	{
+		if (UAbilitySystemComponent* ASC = C->GetAbilitySystemComponent())
+		{
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxHealthAttribute(), A->GetMaxHealth() * GcT(TEXT("riftborn.healthMult"), 1.25f));
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetMaxHealth());
+		}
+	}
 }
 
 void UWRGraveBody::BeginPlay()
@@ -159,6 +178,7 @@ void UWRGraveBody::BeginPlay()
 	Live.Add(this);
 	AWRCreature* C = Cast<AWRCreature>(GetOwner());
 	if (!C || !C->HasAuthority() || C->IsTamed()) return;
+	RollRiftborn(C);
 	// After its spawner sets it on the ground: a Gravehound lies down in the grave soil by day; a Cryptstalker in the
 	// catacombs goes up its room's ceiling.
 	TWeakObjectPtr<AWRCreature> WeakC(C);
@@ -284,9 +304,11 @@ void UWRGraveBody::BuildLook()
 	if (!Def || !Body || !Body->GetSkeletalMeshAsset()) return;
 	ClearLook();
 	LookFor = C->CreatureId;
+	LookFlags = Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn);
 	const TSharedPtr<FJsonObject> Look = GcLook(C->CreatureId);
 	const FName K = GcKind(C->CreatureId);
 	const bool bRaised = Has(WRGraveFlag::Raised);
+	const bool bRift = Has(WRGraveFlag::Riftborn);
 
 	// The palette over the rig's own texture (M_CreatureTint); a raised body's hide goes grey (GY 2.17).
 	TintMats.Reset();
@@ -313,8 +335,8 @@ void UWRGraveBody::BuildLook()
 			if (UTexture* T = Pick->TryGetStringField(TEXT("tex"), Path) ? LoadObject<UTexture>(nullptr, *Path) : nullptr) M->SetTextureParameterValue(TEXT("BaseColorTex"), T);
 			if (UTexture* T = LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineMaterials/DefaultNormal.DefaultNormal"))) M->SetTextureParameterValue(TEXT("NormalTex"), T);
 			if (UTexture* T = LoadObject<UTexture>(nullptr, TEXT("/Engine/EngineResources/Black.Black"))) M->SetTextureParameterValue(TEXT("GlowTex"), T);
-			M->SetScalarParameterValue(TEXT("Desaturation"), bRaised ? 0.85f : GcNum(Pick, TEXT("desat"), 1.f));
-			M->SetScalarParameterValue(TEXT("Brightness"), GcNum(Pick, TEXT("bright"), 1.f) * (bRaised ? 0.85f : 1.f));
+			M->SetScalarParameterValue(TEXT("Desaturation"), bRaised ? 0.85f : bRift ? FMath::Max(GcNum(Pick, TEXT("desat"), 1.f), GcT(TEXT("riftborn.desat"), 0.7f)) : GcNum(Pick, TEXT("desat"), 1.f));
+			M->SetScalarParameterValue(TEXT("Brightness"), GcNum(Pick, TEXT("bright"), 1.f) * (bRaised ? 0.85f : bRift ? GcT(TEXT("riftborn.bright"), 0.8f) : 1.f));
 			M->SetScalarParameterValue(TEXT("TwoTone"), GcNum(Pick, TEXT("twoTone"), 0.f));
 			M->SetScalarParameterValue(TEXT("LightFrom"), GcNum(Pick, TEXT("lightFrom"), 0.f));
 			M->SetScalarParameterValue(TEXT("Roughness"), GcNum(Pick, TEXT("rough"), 0.75f));
@@ -366,6 +388,23 @@ void UWRGraveBody::BuildLook()
 		{
 			for (int32 t = 0; t < 7; ++t) Kit.Add(Thread, FVector(2.f, 2.f, Rad * (0.3f + 0.1f * (t % 3))), FVector((t - 3) * Rad * 0.15f, (t % 2 ? 1.f : -1.f) * Rad * 0.3f, HH * 0.2f), FRotator(20.f * t, 30.f * t, 60.f), EWRLookMesh::Cylinder);
 		}), GThreads);
+	}
+	// A Riftborn: voidglass shards grown out along its spine and black-violet glints where its eyes catch the light.
+	if (bRift)
+	{
+		const FSurf Voidglass = FSurf::Glass(FLinearColor(FColor(26, 12, 40)), 0.6f);
+		AddGroup(SpineBone, Spine, Yaw, Blocks([&](FKit& Kit)
+		{
+			for (int32 s = 0; s < 6; ++s)
+			{
+				const float X = (s - 2.5f) * Rad * 0.28f;
+				Kit.Add(Voidglass, FVector(Rad * 0.08f, Rad * 0.08f, Rad * (0.22f + 0.08f * (s % 3))), FVector(X, (s % 2 ? 1.f : -1.f) * Rad * 0.06f, HH * 0.45f), FRotator(-15.f + 8.f * s, 0.f, (s % 2 ? 14.f : -14.f)), EWRLookMesh::Cone);
+			}
+		}), GStatic);
+		AddGroup(HeadBone, Head, Yaw, Blocks([&](FKit& Kit)
+		{
+			for (int32 e = -1; e <= 1; e += 2) Kit.Add(FSurf::Lit(FLinearColor(FColor(70, 20, 110)), 4.f), FVector(Rad * 0.07f), FVector(Rad * 0.2f, e * Rad * 0.12f, Rad * 0.06f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		}), GEyes);
 	}
 
 	if (K == TEXT("gravehound"))
@@ -707,7 +746,7 @@ void UWRGraveBody::TickLook(float DeltaTime)
 	AWRCreature* C = Cast<AWRCreature>(GetOwner());
 	USkeletalMeshComponent* Body = Skel();
 	if (!C || !Body) return;
-	if (LookFor != C->CreatureId || (Groups.Num() == 0 && !bMeshHidden))
+	if (LookFor != C->CreatureId || (Groups.Num() == 0 && !bMeshHidden) || LookFlags != (Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn)))
 	{
 		// The rig and its materials arrive a frame or two after the creature (OnRep): try for a few seconds.
 		if (LookTries < 40 && Body->GetSkeletalMeshAsset()) { ++LookTries; BuildLook(); }
@@ -1107,6 +1146,8 @@ void FWRGraveAI::ModifyHit(const AWRCreature* Self, FWRHit& Hit, const FWRAttack
 	// Necromancer's (its element is necromancy: Final harvest and the minion bonuses read it).
 	const UWRGraveBody* Body = UWRGraveBody::Get(Self);
 	if (Body && Body->Has(WRGraveFlag::Raised)) Hit.PathId = TEXT("necromancy");
+	// A Riftborn's every blow carries curse.
+	if (Body && Body->Has(WRGraveFlag::Riftborn)) Hit.Buildups.FindOrAdd(TEXT("curse")) += GcT(TEXT("riftborn.curse"), 15.f);
 }
 
 float FWRGraveAI::Incoming(const AWRCreature* Self, const FWRHit& Hit, float Damage)

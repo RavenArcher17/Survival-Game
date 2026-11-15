@@ -134,6 +134,16 @@ namespace WRGrave
 	WILDREACH_API bool Live();
 }
 
+/** What the sky draws over the Graveyard (every machine that draws): the Blood Moon's 0..1 (eased in and out by the
+ *  event, WRGraveEvents) brings back the moon the Graveyard otherwise never has, red. */
+namespace WRGraveSky
+{
+	WILDREACH_API extern float BloodMoon;
+	/** The local survivor's Corruption (0..100) while on the Graveyard's land (0 elsewhere): how the land reads it
+	 *  (the sky: colour drains from 50 and whispers start at 75; the lights: the tōrō flicker at 100). */
+	WILDREACH_API extern float Corruption;
+}
+
 /** The Chapel of Nhal's layout (local cm, the chapel's actor at its site point, +X east toward the apse; GY 2.14): the
  *  scenery (WRGraveScenery) and the boss (WRGraveBosses) both build from these, so the tombs and pillars meet. */
 namespace WRGraveChapel

@@ -107,7 +107,7 @@ void AWRUnmadePlace::Build()
 	if (!UmRift(D, C, R, Lip)) return;
 	LipZ = D.Origin.Z + Lip * 100.f;
 	Centre = D.ToWorld(C, Lip);
-	const TSharedPtr<FJsonObject> U = D.Section(TEXT("unmade"));
+	const TSharedPtr<FJsonObject> UmSec = D.Section(TEXT("unmade"));
 	const bool bDraw = GetNetMode() != NM_DedicatedServer;
 	UMaterialInterface* Stone = WRFoldLook::RockMat(this, UmDolo * 0.4f);
 	UMaterialInterface* Dark = WRFoldLook::RockMat(this, FLinearColor(0.05f, 0.048f, 0.046f));
@@ -139,7 +139,7 @@ void AWRUnmadePlace::Build()
 	}
 	// The floating stones and the eight places.
 	const TArray<TSharedPtr<FJsonValue>>* L = nullptr;
-	if (!U->TryGetArrayField(TEXT("pois"), L)) return;
+	if (!UmSec->TryGetArrayField(TEXT("pois"), L)) return;
 	TMap<FString, FVector> Place;
 	for (const TSharedPtr<FJsonValue>& V : *L)
 	{

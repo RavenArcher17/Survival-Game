@@ -667,7 +667,7 @@ void UWRGraveWorld::StepLights(float Dt)
 	// graveyardWorld.nearLamps road tōrō within nearLampRange (the far ones read by their glowing boxes alone).
 	LightClock -= Dt;
 	if (LightClock > 0.f) return;
-	LightClock = 0.5f;
+	LightClock = WRGraveSky::Corruption >= 99.5f ? 0.12f : 0.5f;
 	UWorld* World = GetWorld();
 	const bool bNight = AWRGameState::IsNightIn(World);
 	// Under the ground it is always night (the catacombs' candles and grave-light burn all day).
@@ -718,7 +718,9 @@ void UWRGraveWorld::StepLights(float Dt)
 		UPointLightComponent* L = AllNear[Near[n].Value].Get();
 		const bool bOn = n < Budget;
 		if (L->IsVisible() != bOn) L->SetVisibility(bOn);
-		if (bOn) L->SetIntensity(AllNearPower[Near[n].Value]);
+		// At Corruption 100 the tōrō gutter for you alone (WRGraveSky::Corruption is this machine's survivor's).
+		const float Gutter = WRGraveSky::Corruption >= 99.5f ? FMath::FRandRange(0.12f, 1.f) : 1.f;
+		if (bOn) L->SetIntensity(AllNearPower[Near[n].Value] * Gutter);
 	}
 }
 

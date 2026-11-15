@@ -80,6 +80,20 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   (`graveyard_g1..g4`); the walk map grows over the Graveyard (`Tools/terrain/graveyard_walk.mjs`); a den in most
   catacomb rooms by level. New hooks: `OnDamageTaken`, the mash press, stamina regen (the dust, the moth-dust tonic's
   brew), decay buildup (the Asphodel draught).
+- **Hazards, weather, the air** (piece 4; `WRGraveHazards.*`, tuning `hazards.graveyard`, `graveyardWorld.sky`,
+  `graveyardWorld.corruption`, `graveyardLife.riftborn`): each with a tell of at least 0.9 s. Grave subsidence: a turf
+  lid over each of the 44 pits; stand on one and the turf cracks for 1 s (dust, a crunch from below), then it drops you
+  3 m; half the pits wake 2-3 Gravehounds in the dark under you; the turf grows back once the pit is empty; dark
+  fresh-turned soil marks the risky ground and a tamed Gloamcrow screams as its owner nears one. Lime pits: 0.9 s of
+  hiss and steam, then 8 a second (twice in Drizzle) and armour wear (the Graveyard's creatures stay out). Crypt
+  draughts: every 8-15 s in a draught room a 1.2 s rising whistle, then the gust puts held torches out (lanterns burn
+  on). weather.json: Ground mist (by day, knee-deep), Drizzle (new: lime boils, torches burn faster, crops watered),
+  Overcast, Corpse fog (night, chest-high, lights 0.7 as far). The sky (`WRSky`): a bruise-violet haze, a yellow-green
+  dusk rim, a cool washed grade, the mist as a second fog layer at your feet, and no moon over the Graveyard (the
+  Blood Moon brings it back red: `WRGraveSky::BloodMoon`). Corruption reads on the land: from 50 the colour drains and the
+  edges close, from 75 whispers behind you, at 100 the tōrō gutter. Graveyard Riftborn: 15% of Gravehounds,
+  Wraithmoths and Tombbacks south of the neck's line come back changed (voidglass on the spine, black-violet eyes,
+  +25% health, curse on every blow). (`WRVoidUnmade.cpp`: a local renamed for a unity-build name clash.)
 
 ## Unreleased: the Ancient forest (the Nature land)
 

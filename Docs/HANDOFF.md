@@ -314,6 +314,8 @@ re-run it after a forest re-run. Lands overlap now: a land's `priority` and `cut
 is where. Then `node Tools/terrain/graveyard_walk.mjs` (after `forest_walk.mjs`) grows the wildlife walk map over it.
 Code: `WRGrave*` (types, world, scenery, catacombs, creatures). Numbers: tuning `graveyardWorld`, `graveyardLife`.
 Dev: `world grave ...`. The Risen are skeletons built on the Mixamo rigs' bones (look.hideMesh): their clips drive them.
+Hazards (subsidence lids, lime, draughts) are `UWRGraveHazards` (server, numbers in tuning `hazards.graveyard`); the
+sky's Graveyard air and its moonless nights are in `WRSky` (`graveyardWorld.sky`); the Blood Moon sets `WRGraveSky::BloodMoon`.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

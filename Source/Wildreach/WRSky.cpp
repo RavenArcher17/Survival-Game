@@ -6,7 +6,9 @@
 #include "WRSea.h"
 #include "WRSwampTypes.h"
 #include "WRForestTypes.h"
+#include "WRGraveTypes.h"
 #include "WRFx.h"
+#include "WRSound.h"
 #include "WRTuning.h"
 #include "Dom/JsonObject.h"
 #include "Camera/CameraActor.h"
@@ -348,9 +350,14 @@ void AWRSky::Apply(bool bForce)
 		S->SetIntensity(SunLux * SunUp * (1.f - WeatherSkyDim * WeatherAmount) * (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastSunDim"), 0.6f)));
 		S->SetVisibility(SunUp > 0.f);
 	}
-	const float MoonLux = T.Num(TEXT("sky.moonLux"), 0.5f) * FMath::SmoothStep(-2.f, 10.f, MoonElevation) * (1.f - SunUp);
+	// The Graveyard has no moon (cooks/biome-graveyard.md 2.7: moonless nights, only the lanterns), unless the Blood Moon
+	// is up: then it comes back red and brighter than any island night.
+	const float GraveMoonless = FMath::Max(GraveAir, 0.f) * (1.f - WRGraveSky::BloodMoon);
+	const float MoonLux = T.Num(TEXT("sky.moonLux"), 0.5f) * FMath::SmoothStep(-2.f, 10.f, MoonElevation) * (1.f - SunUp)
+		* (1.f - GraveMoonless) * (1.f + WRGraveSky::BloodMoon * T.Num(TEXT("graveyardWorld.sky.bloodMoonLux"), 0.6f));
 	Moon->SetIntensity(MoonLux);
 	Moon->SetVisibility(MoonLux > 0.f);
+	Moon->SetLightColor(FMath::Lerp(FLinearColor::White, WRSkyDetail::SRGB(TEXT("graveyardWorld.sky.bloodMoonColor"), FColor(200, 40, 30)), WRGraveSky::BloodMoon));
 	// Night: the sky light (it captures the dark sky) is lifted so shapes still read, and exposure may only brighten
 	// so far. (The fog's colour and density are ApplyAtmosphere's.)
 	if (USkyLightComponent* Sky = SkyLight.Get())
@@ -413,6 +420,27 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	ForestAir = ForestAir < 0.f ? ForestTarget : FMath::FInterpTo(ForestAir, ForestTarget, DeltaSeconds, T.Num(TEXT("sky.forestBlendSpeed"), 0.7f));
 	ForestCanopy = FMath::FInterpTo(ForestCanopy, ForestTarget > 0.f ? WRForest::Canopy(View) : 0.f, DeltaSeconds, T.Num(TEXT("sky.forestCanopySpeed"), 1.2f));
 	const float FA = ForestAir, CN = ForestCanopy * ForestAir;
+	// The Graveyard's air west of the Spine (cooks/biome-graveyard.md 2.7): a bruise-violet haze by day that never quite
+	// clears, a sickly yellow-green rim on the dusk instead of gold, and its two mists: Ground mist pooled knee-deep over
+	// the graves by day, Corpse fog standing chest-high at night (the second fog layer, its floor at your feet).
+	const float GraveTarget = WRGrave::Contains(View) ? 1.f : 0.f;
+	GraveAir = GraveAir < 0.f ? GraveTarget : FMath::FInterpTo(GraveAir, GraveTarget, DeltaSeconds, T.Num(TEXT("graveyardWorld.sky.blendSpeed"), 0.7f));
+	const float GA = GraveAir;
+	{
+		float MistTarget = 0.f, TopTarget = GraveMistTop;
+		if (GA > 0.f)
+		{
+			if (const FWRWeatherNow* W = UWRWeatherSubsystem::For(this, WRGrave::Biome()))
+			{
+				const float Now = UWRWeatherSubsystem::Now(this);
+				const float Str = W->IsComing(Now) ? W->Approach(Now) * 0.45f : W->Strength(Now);
+				if (W->Kind == TEXT("groundmist")) { MistTarget = Str; TopTarget = T.Num(TEXT("graveyardWorld.sky.kneeTop"), 60.f); }
+				if (W->Kind == TEXT("corpsefog")) { MistTarget = Str; TopTarget = T.Num(TEXT("graveyardWorld.sky.chestTop"), 150.f); }
+			}
+		}
+		GraveMist = FMath::FInterpTo(GraveMist, MistTarget * GA, DeltaSeconds, 0.5f);
+		GraveMistTop = MistTarget > 0.f ? TopTarget : GraveMistTop;
+	}
 	{
 		// The forest's weather looks (cooks/biome-forest.md 2.9). Clear (no weather): green light shafts through the gaps
 		// in the old growth (canopy 0.75) and the Elder Canopy (0.9) while the sun stands high enough to reach the floor.
@@ -522,6 +550,34 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			F->SetFogInscatteringColor(FMath::Lerp(FMath::Lerp(Haze, Storm, WeatherAmount), FMath::Lerp(ForestHaze, Storm, WeatherAmount), FA));
 			const float ForestDensity = T.Num(TEXT("sky.forestFogDensity"), 0.02f) + CN * T.Num(TEXT("sky.forestCanopyFog"), 0.04f);
 			F->SetFogDensity(FMath::Lerp(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount), FMath::Max(ForestDensity, WeatherFogDensity * WeatherAmount), FA));
+		}
+		if (GA > 0.001f)
+		{
+			// The Graveyard's haze: bruise-violet grey by day, a touch thicker than the island's; the weather's own colour
+			// still wins while it blows. Toward a low sun the glow is yellow-green, not gold.
+			const FLinearColor GraveHaze = FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), SRGB(TEXT("graveyardWorld.sky.fogColor"), FColor(124, 112, 132)) * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
+			F->SetFogInscatteringColor(FMath::Lerp(F->FogInscatteringLuminance, FMath::Lerp(GraveHaze, Storm, WeatherAmount), GA));
+			const float GraveDensity = T.Num(TEXT("graveyardWorld.sky.fogDensity"), 0.032f);
+			F->SetFogDensity(FMath::Lerp(F->FogDensity, FMath::Max(GraveDensity, WeatherFogDensity * WeatherAmount), GA));
+			F->SetDirectionalInscatteringColor(FMath::Lerp(SRGB(TEXT("sky.sunGlowColor"), FColor(255, 150, 80)), SRGB(TEXT("graveyardWorld.sky.duskColor"), FColor(196, 204, 92)), GA)
+				* (Low * T.Num(TEXT("sky.sunGlow"), 0.6f)));
+		}
+		if (GraveMist > 0.001f && !WRSwamp::IsLive())
+		{
+			// The mist layer: its floor at the survivor's feet, thick under its top and gone a little above it.
+			const APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+			const APawn* Me = LocalPC ? LocalPC->GetPawn() : nullptr;
+			const float Feet = Me ? Me->GetActorLocation().Z - Me->GetSimpleCollisionHalfHeight() : View.Z - 170.f;
+			const float Top = FMath::Max(40.f, GraveMistTop);
+			F->SetSecondFogHeightOffset(Feet + Top * 0.35f - F->GetComponentLocation().Z);
+			F->SetSecondFogHeightFalloff(T.Num(TEXT("graveyardWorld.sky.mistFalloff"), 2.6f) * 250.f / Top);
+			F->SetSecondFogDensity(GraveMist * T.Num(TEXT("graveyardWorld.sky.mistDensity"), 0.4f));
+			bGraveFogSet = true;
+		}
+		else if (bGraveFogSet && !WRSwamp::IsLive())
+		{
+			F->SetSecondFogDensity(0.f);
+			bGraveFogSet = false;
 		}
 	}
 	// Under the canopy the open sky's light is mostly leaves away: the sky light dims with the cover (the sun's own light
@@ -654,6 +710,39 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	const FVector Lift = Vec(TEXT("sky.shadowLift"), FVector(0.004f, 0.005f, 0.008f)) * FMath::Lerp(T.Num(TEXT("sky.nightShadowLift"), 2.f), 1.f, Daylight);
 	P.ColorOffsetShadows = FVector4(Lift.X, Lift.Y, Lift.Z, 0.f);
 	P.VignetteIntensity = T.Num(TEXT("sky.vignette"), 0.3f);
+	{
+		// The Graveyard's grade (cooks/biome-graveyard.md 2.7): cool, washed-out colour, a faint violet in the gain.
+		// Its Corruption reads in the picture (2.15): from 50 the colour drains out (grey by 100) and the edges close in;
+		// from 75 something whispers just behind you now and then; at 100 the tōrō flicker (UWRGraveWorld::StepLights).
+		float Corr = 0.f;
+		if (GA > 0.001f)
+		{
+			P.WhiteTemp = FMath::Lerp(P.WhiteTemp, T.Num(TEXT("graveyardWorld.sky.whiteTemp"), 6700.f), GA);
+			const float GSat = FMath::Lerp(P.ColorSaturation.X, T.Num(TEXT("graveyardWorld.sky.saturation"), 0.82f), GA);
+			P.ColorSaturation = FVector4(GSat, GSat, GSat, 1.f);
+			const FVector GG = FMath::Lerp(FVector(P.ColorGain.X, P.ColorGain.Y, P.ColorGain.Z), Vec(TEXT("graveyardWorld.sky.gain"), FVector(0.98f, 0.96f, 1.02f)), GA);
+			P.ColorGain = FVector4(GG.X, GG.Y, GG.Z, 1.f);
+			APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+			if (const UWRSurvivalComponent* S = LocalPC ? UWRSurvivalComponent::For(LocalPC->GetPawn()) : nullptr) Corr = S->GetCorruption() * GA;
+			const float Drain = FMath::GetMappedRangeValueClamped(FVector2f(50.f, 100.f), FVector2f(0.f, 1.f), Corr);
+			const float DSat = P.ColorSaturation.X * (1.f - Drain * T.Num(TEXT("graveyardWorld.corruption.drain"), 0.7f));
+			P.ColorSaturation = FVector4(DSat, DSat, DSat, 1.f);
+			P.VignetteIntensity += Drain * T.Num(TEXT("graveyardWorld.corruption.vignette"), 0.35f);
+			const double Now = GetWorld()->GetTimeSeconds();
+			if (Corr >= 75.f && Now >= NextWhisperAt)
+			{
+				if (NextWhisperAt > 0.0)
+				{
+					FVector Eye; FRotator EyeRot(0.f);
+					LocalPC->GetPlayerViewPoint(Eye, EyeRot);
+					const FVector Behind = View - FRotator(0.f, EyeRot.Yaw, 0.f).Vector() * 250.f + FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f).Vector() * 120.f;
+					WRSound::PlayAt(this, TEXT("grave.whisper"), Behind, FMath::GetMappedRangeValueClamped(FVector2f(75.f, 100.f), FVector2f(0.6f, 1.f), Corr));
+				}
+				NextWhisperAt = Now + FMath::FRandRange(T.Num(TEXT("graveyardWorld.corruption.whisperMin"), 14.f), T.Num(TEXT("graveyardWorld.corruption.whisperMax"), 30.f));
+			}
+		}
+		WRGraveSky::Corruption = Corr;
+	}
 }
 
 void AWRSky::StartFrameStats(float Seconds)
