@@ -629,6 +629,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const float StaminaDamage = Hit.StaminaDamage >= 0.f ? Hit.StaminaDamage
 			: Damage * (bBossBlow ? WRTune(TEXT("defense.bossStaminaDamage"), 1.6f) : WRTune(TEXT("defense.creatureStaminaDamage"), 1.2f));
 		const float Cost = GuardStaminaCost(StaminaDamage, Guard.Boost) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Target, TEXT("blockStamina")))
+			* (WRArcane::Walks(Target) ? 1.f : FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Target, TEXT("blockStaminaNonArcane"))))   // the Tyrant plate
 			* (WRArtifacts::Has(Target, TEXT("block_cost")) ? WRArtifacts::RuleNum(Target, TEXT("block_cost"), TEXT("scale"), 2.f) : 1.f);   // Glass Guard
 		// Chip: what the guard doesn't stop of this kind of damage gets through.
 		const bool bElemental = Hit.Element.IsValid() && Hit.Element != WRTags::Element_Physical;

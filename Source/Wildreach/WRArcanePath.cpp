@@ -72,6 +72,8 @@ namespace WRArcaneImpl
 		int32 Absorb = 0;
 	};
 	TMap<TWeakObjectPtr<AWRCharacterBase>, FArShield>& ArShields() { static TMap<TWeakObjectPtr<AWRCharacterBase>, FArShield> M; return M; }
+	/** The Twin shard talisman: when each wearer last dodged (a blow landed within the window echoes once). */
+	TMap<TWeakObjectPtr<const AActor>, double>& ArDodgedAt() { static TMap<TWeakObjectPtr<const AActor>, double> M; return M; }
 
 	void ArSetAttr(AWRCharacterBase* Who, const FGameplayAttribute& Attr, float V)
 	{
@@ -273,6 +275,12 @@ void WRArcane::DropShield(AWRCharacterBase* Target, bool bBroken)
 
 void WRArcane::TickShields(UWorld* World, float Dt)
 {
+	// The Twin shard talisman: note who is dodging (its echo waits on their next blow).
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const AWRCharacterBase* C = It->Get() ? Cast<AWRCharacterBase>(It->Get()->GetPawn()) : nullptr;
+		if (C && C->HasTag(WRTags::State_Dodging) && UWRInventoryComponent::GearStatFor(C, TEXT("dodgeEcho")) > 0.f) ArDodgedAt().Add(C, World->GetTimeSeconds());
+	}
 	// Every shield's clock (survivors and tames alike), and Mana flame's burn: a shield on someone burning near a
 	// survivor with Fire + Arcane 25 loses 15 a second.
 	const double T = World ? World->GetTimeSeconds() : 0.0;
@@ -419,6 +427,23 @@ void WRArcane::AfterHit(AWRCharacterBase* Target, const FWRHit& Hit, float Damag
 		Rune.ImpactPoint = Hit.ImpactPoint;
 		Rune.Impact = 0;
 		UWRCombatLibrary::ApplyHit(Target, Rune);
+	}
+	// The Twin shard talisman (the Mirrored Twins' lens): the first blow you land after a dodge lands twice, the second
+	// at 40%, half a breath later.
+	if (const double* At = ArDodgedAt().Find(By); At && By->GetWorld()->GetTimeSeconds() - *At <= WRTune(TEXT("crystalLife.twinShardWindow"), 1.5f))
+	{
+		ArDodgedAt().Remove(By);
+		const float Share = UWRInventoryComponent::GearStatFor(By, TEXT("dodgeEcho"));
+		FWRHit Echo = Hit;
+		Echo.Damage = Damage * Share;
+		Echo.bReaction = true;
+		Echo.Buildups.Reset();
+		TWeakObjectPtr<AWRCharacterBase> WeakT(Target);
+		FTimerHandle H;
+		By->GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([WeakT, Echo]()
+		{
+			if (AWRCharacterBase* T = WeakT.Get(); T && T->IsAlive()) { UWRCombatLibrary::ApplyHit(T, Echo); WRFx::Broadcast(T, TEXT("crystal.double_pass"), T->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("crystal.boss.double_pass")); }
+		}), 0.12f, false);
 	}
 	// Mana burn on a survivor: each spell hit drains 8 of their path resource.
 	if (Hit.bSpell && Target->GetPlayerState() && Rank(By, TEXT("mana_burn")) > 0)

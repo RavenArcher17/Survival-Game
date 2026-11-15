@@ -8,6 +8,12 @@ not played here (Aaron tests). Live from Crystal (4): `crystal` is in `world.liv
 (5); the four bosses from Crystal (6). Not built yet: the composed music (stand-ins play), the two crystal shields (no
 shield items exist in the game yet), the Prismglass spear's Soul art.
 
+- **Crystal (6b): the three trophy talismans do what the cook says** (crystal 2.13): the Twin shard (`dodgeEcho` 0.4:
+  the first blow you land within 1.5 s of a dodge lands again at 40%, `WRArcane::AfterHit`), the Warden's tuning fork
+  (`quietSteps` 0.5: your steps, rolls and landings make half the noise, `WRCrystal::Emit`), the Tyrant plate
+  (`shieldBonus` 0.2 on Barrier and Aegis; `blockStaminaNonArcane` -0.1 on your guard's stamina if you don't walk the
+  Arcane path). They carried older stand-in stats. Compiled; not played.
+
 - **Crystal (6): the four bosses and their arenas' machines** (cooks/biome-crystal.md 2.13-2.14; plan
   build-biome-crystal.md Part 2 P2.3-P2.7). `WRCrystalBosses.*` (`FWRCrystalBoss`, a friend of `AWRBoss` called beside
   the Graveyard's hooks; `UWRCrystalArenas` places them once the caves are built near a survivor), `WRCrystalBossLook.cpp`

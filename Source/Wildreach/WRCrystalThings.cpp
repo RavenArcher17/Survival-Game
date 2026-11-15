@@ -118,6 +118,8 @@ void WRCrystal::Emit(const UObject* WorldContext, const FVector& At, float Radiu
 	if (const AWRCharacterBase* C = Cast<AWRCharacterBase>(Instigator); C && C->GetPlayerState())
 	{
 		Radius *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(C, TEXT("noiseMult")));
+		// The Warden's tuning fork (talisman): your steps, rolls and landings make half the noise.
+		if (Kind == TEXT("step") || Kind == TEXT("roll") || Kind == TEXT("land")) Radius *= FMath::Max(0.f, 1.f - UWRInventoryComponent::GearStatFor(C, TEXT("quietSteps")));
 		if (Radius <= 1.f) return;
 	}
 	W->OnNoise.Broadcast(At, Radius, Instigator, Kind);

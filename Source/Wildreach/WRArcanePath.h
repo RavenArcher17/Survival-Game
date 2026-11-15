@@ -69,7 +69,8 @@ namespace WRArcane
 	WILDREACH_API void GiveShield(AWRCharacterBase* Target, float Amount, float Seconds, AWRCharacterBase* Source);
 	/** Server: the shield is gone (spent, expired, burnt off). bBroken: it shattered (a sound and a burst). */
 	WILDREACH_API void DropShield(AWRCharacterBase* Target, bool bBroken);
-	/** Server, every tick (UWRArcaneWorld): every shield's clock, Mana flame's burn on burning shields. */
+	/** Server, every tick (UWRArcaneWorld): every shield's clock, Mana flame's burn on burning shields; who just dodged
+	 *  (the Twin shard talisman's echo). */
 	void TickShields(UWorld* World, float Dt);
 	/** Hardened ward's scale for Who's shields (x1.2 a rank) and the Tyrant plate talisman's. */
 	WILDREACH_API float ShieldScale(const AActor* Who);
