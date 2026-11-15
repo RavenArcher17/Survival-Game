@@ -148,6 +148,7 @@ FWRItemRegistry::FWRItemRegistry()
 				R->TryGetNumberField(TEXT("gravity"), D.ProjectileGravity);
 				R->TryGetNumberField(TEXT("reload"), D.Reload);
 				R->TryGetNumberField(TEXT("torpor"), D.TorporMult);
+				R->TryGetNumberField(TEXT("knockback"), D.Knockback);
 				R->TryGetStringField(TEXT("mesh"), D.HeldMesh);
 				if (R->TryGetStringField(TEXT("socket"), Str)) D.HeldSocket = FName(*Str);
 				if (R->TryGetStringField(TEXT("along"), Str)) D.HeldAlong = FName(*Str);
@@ -166,6 +167,12 @@ FWRItemRegistry::FWRItemRegistry()
 				if ((*AmmoObj)->TryGetStringField(TEXT("kind"), Str)) D.AmmoOf = FName(*Str);
 				(*AmmoObj)->TryGetNumberField(TEXT("damage"), D.AmmoDamage);
 				(*AmmoObj)->TryGetNumberField(TEXT("torpor"), D.AmmoTorpor);
+				(*AmmoObj)->TryGetNumberField(TEXT("knockback"), D.Knockback);
+				(*AmmoObj)->TryGetNumberField(TEXT("speedMult"), D.AmmoSpeedMult);
+				(*AmmoObj)->TryGetNumberField(TEXT("sneakMult"), D.AmmoSneakMult);
+				double Silent = 0.0;
+				(*AmmoObj)->TryGetNumberField(TEXT("silent"), Silent);
+				D.bAmmoSilent = Silent > 0.0;
 				(*AmmoObj)->TryGetStringField(TEXT("mesh"), D.ProjectileMesh);
 				(*AmmoObj)->TryGetStringField(TEXT("meshAlong"), D.MeshAlong);
 			}
@@ -967,6 +974,26 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 		// The Heron's draught: its screen opens on your machine (pick the path to forget, hold Forget; WRDeeds).
 		if (AWRPlayerController* PC = Cast<AWRPlayerController>(GetOwner()->GetOwner())) PC->ClientOpenWorldScreen(TEXT("respec"), nullptr);
 		return TEXT("Choose the path the heron takes");
+	}
+	if (Stack.ItemId == TEXT("glider_repair_kit"))
+	{
+		// The glider mending kit (Yara's second): the most worn glider in the bag back to full (cooks/biome-sky.md 2.13).
+		FWRItemStack* Worst = nullptr;
+		float WorstFrac = 1.f;
+		for (FWRItemStack& G : Slots)
+		{
+			const FWRItemDef* GD = G.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(G.ItemId);
+			if (!GD || GD->MaxDurability <= 0.f || (G.ItemId != TEXT("crude_glider") && G.ItemId != TEXT("levistone_glider"))) continue;
+			const float Frac = G.Durability / GD->MaxDurability;
+			if (Frac < WorstFrac) { WorstFrac = Frac; Worst = &G; }
+		}
+		if (!Worst) return TEXT("No worn glider in your bag");
+		const FWRItemDef* GD = FWRItemRegistry::Get().Find(Worst->ItemId);
+		Worst->Durability = GD->MaxDurability;
+		const FString Mended = GD->Name;
+		RemoveItem(Stack.ItemId, 1);
+		WRSound::Broadcast(GetPawnCharacter(), TEXT("craft.done"));
+		return FString::Printf(TEXT("%s mended"), *Mended);
 	}
 	if (Def->Category == TEXT("effigy"))
 	{

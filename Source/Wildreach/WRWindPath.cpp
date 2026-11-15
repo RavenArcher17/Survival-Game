@@ -2,6 +2,7 @@
 // body. See WRWindPath.h. The abilities are in WRAbilitiesWind.cpp.
 
 #include "WRWindPath.h"
+#include "WRInventory.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -353,6 +354,8 @@ void WRWind::GainMomentum(AWRCharacterBase* Who, float Amount)
 	{
 		return;
 	}
+	// The Wind Mask of Aeolith: Momentum +20% (cooks/biome-sky.md 2.11).
+	Amount *= 1.f + UWRInventoryComponent::GearStatFor(Who, TEXT("momentumGain"));
 	Who->GetAbilitySystemComponent()->SetNumericAttributeBase(UWRAttributeSet::GetMomentumAttribute(), FMath::Min(A->GetMaxMomentum(), A->GetMomentum() + Amount));
 	WiOwners().FindOrAdd(Who).SinceGain = 0.f;
 }

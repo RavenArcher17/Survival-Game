@@ -36,6 +36,9 @@ struct FWRBlueprintDef
 	FName Boss;
 	FString Kind;
 	TArray<FName> Recipes;
+	/** A blueprint found in the world rather than dropped by a boss ("from": the Updraft lift's in the Lift Station's
+	 *  winch house, cooks/biome-sky.md H5): where it lies, for the Build bar's line. */
+	FString From;
 };
 
 class WILDREACH_API FWRGear

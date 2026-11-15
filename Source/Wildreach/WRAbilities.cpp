@@ -564,7 +564,8 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Recovery = Move->Recovery;
 		bHyperarmor = Move->bHyperarmor;
 		Variant = uint8(FMath::Clamp(Move->Clip, 0, 7));
-		CostOverride = Move->Stamina;
+		// The Kitewright glaive is 30% lighter: each swing 10% less stamina (its innate swingStamina).
+		CostOverride = Move->Stamina * FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Character, TEXT("swingStamina")));
 		bJumpSwing = Move->Context == TEXT("air");
 		// Rapid fire (lightning node): at high Charge light and heavy swings play faster (the same on the owner and server).
 		const float Rate = WRLightning::SwingRate(Character);
@@ -1010,6 +1011,8 @@ void UWRGA_Melee::Sweep()
 	{
 		Reach = RowNow->Reach;  // a spear's longer lunge
 	}
+	// The Kitewright glaive's leaping cut: +2 m from the air (its innate airReach, cooks/biome-sky.md 2.17).
+	if (bJumpSwing && !Character->IsCreature()) Reach += UWRInventoryComponent::GearStatFor(Character, TEXT("airReach"));
 	float Radius = Character->IsCreature() ? T.Num(TEXT("weapon.sweepRadius"), 45.f) : Class.SweepRadius;
 	if (bJumpSwing && bHeavy)
 	{

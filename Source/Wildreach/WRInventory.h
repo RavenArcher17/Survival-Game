@@ -87,6 +87,12 @@ struct FWRItemDef
 	float AmmoDamage = 0.f;
 	float AmmoTorpor = 0.f;
 	FString ProjectileMesh;
+	/** The Sky's shots (cooks/biome-sky.md 2.17): what it throws its mark back (cm, Gale arrows / Galespine's own),
+	 *  x its flight speed, silent in flight (Hush arrows: the mark doesn't learn where it came from), x on an unaware mark. */
+	float Knockback = 0.f;
+	float AmmoSpeedMult = 1.f;
+	bool bAmmoSilent = false;
+	float AmmoSneakMult = 1.f;
 	bool IsRanged() const { return !RangedKind.IsNone(); }
 	bool IsThrowable() const { return IsRanged() && AmmoKind.IsNone(); }
 	// Gems / boss parts / runes: stat -> amount (in a weapon's socket)

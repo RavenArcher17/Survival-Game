@@ -2351,7 +2351,7 @@ bool AWRCreature::HasLostSightOf(const AActor* Who) const
 AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 {
 	const FWRCreatureDef* Def = Self->GetDef();
-	if (!Def || Def->Behavior != TEXT("aggressive"))
+	if (!Def || (Def->Behavior != TEXT("aggressive") && !Self->bGuardAggressive))
 	{
 		return nullptr;
 	}

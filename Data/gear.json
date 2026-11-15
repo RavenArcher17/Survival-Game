@@ -289,6 +289,27 @@
     "legendaryFromRank": 4,
     "list": [
       {
+        "id": "bp_galespine",
+        "boss": "aeolith",
+        "recipes": [
+          "galespine"
+        ],
+        "kind": "boss weapon"
+      },
+      {
+        "id": "bp_updraft_lift",
+        "kind": "piece",
+        "from": "the Lift Station's winch house (Chainfoot, Sky islands)"
+      },
+      {
+        "id": "bp_gale_arrow",
+        "kind": "found",
+        "recipes": [
+          "gale_arrow"
+        ],
+        "from": "the Wind Rose (the Great Shrine of the Still Pool)"
+      },
+      {
         "id": "bp_mourners_scythe",
         "boss": "nhal",
         "recipes": [

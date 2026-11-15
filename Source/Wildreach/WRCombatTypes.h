@@ -99,6 +99,10 @@ struct FWRHit
 	UPROPERTY() bool bReaction = false;
 	/** Where the blow landed on the body (world), for head strikes and breakable parts; zero = the body's centre. */
 	UPROPERTY() FVector ImpactPoint = FVector::ZeroVector;
+	/** x on a mark that hadn't noticed the attacker (Hush arrows' sneak hits, cooks/biome-sky.md 2.17). */
+	float UnawareMult = 1.f;
+	/** A silent shot: an unaware mark takes the blow without learning who loosed it (Hush arrows). */
+	bool bQuiet = false;
 };
 
 /** Weapon the character currently swings. Damage = base x metal x quality x (1 + upgrade x 5%). */

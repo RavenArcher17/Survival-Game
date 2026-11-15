@@ -208,6 +208,29 @@ namespace WRMapTab
 			M.bMine = It->bLit && !It->bHeld;
 			M.Actor = *It;
 		}
+		// A place a master showed you on your map for a finished quest (world.json quests: "mark" [x, y, z] map metres,
+		// "markName"): Yara Kesh shows you the Lid Gate (cooks/biome-sky.md 2.13).
+		if (QLog)
+		{
+			const TSharedPtr<FJsonObject> Quests = WRWorld::Obj(TEXT("quests"));
+			for (const FWRQuestRep& Q : QLog->Quests)
+			{
+				const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+				if (!Quests.IsValid() || !Quests->TryGetArrayField(Q.Master.ToString(), Rows)) continue;
+				for (int32 i = 0; i < Q.Index && i < Rows->Num(); ++i)
+				{
+					const TSharedPtr<FJsonObject> R = (*Rows)[i]->AsObject();
+					const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
+					if (!R.IsValid() || !R->TryGetArrayField(TEXT("mark"), At) || At->Num() < 3) continue;
+					FMarker& M = Out.AddDefaulted_GetRef();
+					M.Key = FString::Printf(TEXT("mark:%s:%d"), *Q.Master.ToString(), i);
+					M.Cat = ECat::Boss;
+					M.Kind = TEXT("mark");
+					R->TryGetStringField(TEXT("markName"), M.Name);
+					M.World = FVector((*At)[0]->AsNumber(), (*At)[1]->AsNumber(), (*At)[2]->AsNumber()) * 100.0;
+				}
+			}
+		}
 		const FString Me = PS->GetPlayerName();
 		for (TActorIterator<AWRHearth> It(World); It; ++It)
 		{

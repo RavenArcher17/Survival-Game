@@ -55,6 +55,19 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "TimerManager.h"
+#include "WRSkyIsleTypes.h"
+
+/** A row placed on a Sky island ("island": id, "at" in map metres): the island's top there (cooks/build-biome-sky.md 2.15). */
+static bool WSkyIslandSpot(const TSharedPtr<FJsonObject>& Row, double X, double Y, FVector& Out)
+{
+	FString Island;
+	if (!Row.IsValid() || !Row->TryGetStringField(TEXT("island"), Island) || Island.IsEmpty()) return false;
+	const FWRSkyIsleData::FIsland* I = FWRSkyIsleData::Get().FindIsland(FName(*Island));
+	if (!I) return false;
+	Out = FVector(X * 100.0, Y * 100.0, 0.0);
+	Out.Z = I->TopZ(Out);
+	return true;
+}
 
 namespace WRWorldImpl
 {
@@ -927,7 +940,10 @@ void UWRWorldSystems::PlaceShrines()
 			// A runtime land's shrine (the Wasteland's five): "at" is in the land's own map metres, the ground its height
 			// function (the land's chunks may still be building, so never a trace).
 			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
-			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Ground)) continue;
+			if (!AtArr || AtArr->Num() < 2) continue;
+			// On a Sky island (the land's map metres, the island's top: cooks/build-biome-sky.md 2.15).
+			if (!WSkyIslandSpot(Row, (*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber(), Ground)
+				&& !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Ground)) continue;
 			Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
 			// Under the ground with a floor height (map metres; the Crystal caves' halls): it stands on that floor, not the
 			// plateau above it.
@@ -1017,7 +1033,9 @@ void UWRWorldSystems::PlaceMasters()
 		{
 			// On a runtime land (Maren Vey at the Shrine of the Edge): the land's map metres on its height function.
 			const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
-			if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Spot)) continue;
+			if (!AtArr || AtArr->Num() < 2) continue;
+			if (!WSkyIslandSpot(Row, (*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber(), Spot)
+				&& !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Spot)) continue;
 			// Under the ground (Saga Venn on the Great Hexafoil's floor): the row's floor height, map metres.
 			if (Row->HasField(TEXT("floor")))
 			{
@@ -2302,7 +2320,26 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 		if (!Q.bTaken) return TEXT("Take the task first");
 		const FString Type = WStrOf(Row, TEXT("type"));
 		const int32 Need = int32(WNumOf(Row, TEXT("count"), 1.f));
-		if (Type == TEXT("bring") || Type == TEXT("show"))
+		if ((Type == TEXT("bring") || Type == TEXT("show")) && Row->HasField(TEXT("need")))
+		{
+			// Several things at once ("need": item -> count; "a|b" takes either: a trophy or the talisman made of it).
+			// Yara Kesh's first and last (cooks/biome-sky.md 2.13).
+			TArray<TPair<FName, int32>> Take;
+			for (const auto& KV : Row->GetObjectField(TEXT("need"))->Values)
+			{
+				const int32 Want = int32(KV.Value->AsNumber());
+				TArray<FString> Alts;
+				FString(*KV.Key).ParseIntoArray(Alts, TEXT("|"));
+				if (Alts.Num() == 0) continue;
+				FName Have;
+				for (const FString& A : Alts) if (PS->GetInventory()->CountOf(FName(*A)) >= Want) { Have = FName(*A); break; }
+				if (Have.IsNone()) return FString::Printf(TEXT("Bring %s x%d (you have %d)"), *WRWorld::ItemName(FName(*Alts[0])), Want, PS->GetInventory()->CountOf(FName(*Alts[0])));
+				Take.Emplace(Have, Want);
+			}
+			if (Type == TEXT("bring")) for (const auto& T : Take) PS->GetInventory()->RemoveItem(T.Key, T.Value);
+			Q.Progress = Need;
+		}
+		else if (Type == TEXT("bring") || Type == TEXT("show"))
 		{
 			const FName Item(*WStrOf(Row, TEXT("item")));
 			if (PS->GetInventory()->CountOf(Item) < Need) return FString::Printf(TEXT("Bring %s x%d (you have %d)"), *WRWorld::ItemName(Item), Need, PS->GetInventory()->CountOf(Item));

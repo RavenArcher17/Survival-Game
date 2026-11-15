@@ -257,6 +257,7 @@ FString FWRBuildSets::BlueprintSource(FName Blueprint)
 {
 	const FWRBlueprintDef* Bp = FWRGear::Get().FindBlueprint(Blueprint);
 	if (!Bp) return TEXT("a major boss");
+	if (!Bp->From.IsEmpty()) return Bp->From;
 	const FWRCreatureDef* Boss = FWRCreatureRegistry::Get().Find(Bp->Boss);
 	if (Boss) return Boss->Name;
 	FString S = Bp->Boss.ToString();

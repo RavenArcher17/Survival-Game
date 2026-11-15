@@ -141,6 +141,32 @@ played here (Aaron and the testers test, F8). This first piece is the land, the 
   high Momentum in a fight). Projectiles gain `PierceLeft` / `OnStruck` / `ContinuePast` (the ammo `pierce` field now
   works), modelled shots keep their trail (the fire pot's fuse sparks show now). Tuning `resources.momentum`, `spells.*`,
   `wildbrands.*`, `nodeEffects`, `passives.wind`, `knockback`; 19 fx and 23 sound rows (existing audio files).
+- **What the Sky gives and asks** (piece 3; `Data/items.json`, `recipes.json`, `world.json`, `weather.json`, `gear.json`;
+  cooks/biome-sky.md 2.6, 2.13-2.17): 50 items (cloudpine, Skysilk, levistone cores, every creature's and boss's drops,
+  the boss core and Gale plume, crude and levistone gliders, the glider mending kit, anchor boots, the Featherdown
+  draught, Gale and Hush arrows, the Kitewright glaive, the Sailbell lantern, the spore pot, Galespine, the Wind Mask of
+  Aeolith and its talisman, the Kitewright's last kite, eggs, seven lore pieces) and 16 recipes; the Skysilk set to the
+  cook's totals (steel 6, levistone 8, feathers 12, linen 8) with Skysilk woven in. **Gale arrows** fly 10% faster and
+  throw what they hit back 4 m (Galespine 2.5 m) through the Wind path's knock (brace, anchor boots, the edge credit);
+  **Hush arrows** are silent (an unaware mark doesn't learn who shot it) and hit an unaware one x1.15; the **glider
+  mending kit** mends the most worn glider in the bag; the **Kitewright glaive** is 10% lighter a swing and reaches 2 m
+  further from the air. The trophy talismans do what the cook says: the Harrier plume +15% on flying and airborne
+  targets, the Sentinel eye +15 poise standing still or braced, Gulper's pearl -20% glide stamina; the Wind Mask
+  +20% Momentum and no glide stamina in a wind over 10 m/s. A Gale's gust blows a torch out in the Sky (the Sailbell
+  lantern, violet 12 m on sting oil, never goes out). A piece can need a found blueprint (`gear.json` kind "piece" /
+  "found", with "from"): the Updraft lift needs the Lift Station's plan; the Wind Rose's Gale arrow plan teaches the
+  same recipe Yara's fifth does.
+- **The Sky's world rows**: the biome (`world.json biomes.sky_islands`: path Wind, levistone, gale essence), five shrines
+  on their islands (the Great Shrine of the Still Pool with no guard; Gardens: a Gallowshrike pack and a Sailbell bloom;
+  Toll: two Galeharriers and a Windmane herd gone aggressive while it's dark (`aggressive` guards); Rose: a Skyray and a
+  Gallowshrike pair; Barrow: two Hushwings), placed on the island's top (`WSkyIslandSpot`). **Yara Kesh** at her open
+  workshop and her seven quests: Feathers and stone (bring several things at once: quests' `need`), First flight (glide
+  First Isle -> Terrace Isle without touching ground or riding), Read the wind (three columns ridden to their tops),
+  Silk, The bridges (Toll Shrine lit, then Tollgate -> Brink without a lift or mount), The first kite (she marks the Lid
+  Gate on your map: quests' `mark`), Grounded (show the three mini trophies, or their talismans). The deeds are counted
+  in `WRSkyAir` (`StepDeeds`). The Turning Wind's event row (every 72 h, one game day, levistone x3); the Wind -> Spore
+  invasion through the Flue (dormant until the Fungal caverns are live; Kyrra leads). Weather to the cook's table: Clear
+  45, Overcast 10, Rain 10, Cloud fog 15 (40 m), Gale 20.
 
 ## Unreleased: the Graveyard (the Necromancy land)
 

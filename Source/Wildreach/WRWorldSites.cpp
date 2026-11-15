@@ -704,6 +704,9 @@ void AWRShrine::StepGuards()
 							if (AWRCreature* C = AWRCreature::SpawnCreature(GetWorld(), Def->Id, G.ImpactPoint + FVector(0.f, 0.f, Def->HalfHeight + 30.f), FRotator(0.f, A, 0.f)))
 							{
 								C->SetHome(GetActorLocation());
+								// Gone aggressive while the shrine is dark (the Toll Shrine's Windmane herd).
+								const TArray<TSharedPtr<FJsonValue>>* Angry = nullptr;
+								if (Row->TryGetArrayField(TEXT("aggressive"), Angry)) for (const auto& Aid : *Angry) if (FName(*Aid->AsString()) == Def->Id) C->bGuardAggressive = true;
 								Guards.Add(C);
 							}
 						}

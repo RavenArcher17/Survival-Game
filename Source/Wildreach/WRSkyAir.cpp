@@ -4,6 +4,9 @@
 #include "WRSkyAir.h"
 #include "Wildreach.h"
 #include "WRSkyIsleTypes.h"
+#include "WRSkyWorld.h"
+#include "WRWorldSystems.h"
+#include "WRPlayerState.h"
 #include "WRCharacter.h"
 #include "WRCharacterBase.h"
 #include "WRCharacterMovementComponent.h"
@@ -102,7 +105,12 @@ bool WRSkyAir::GlideParams(const ACharacter* Who, FWRGlideParams& Out)
 	Out.StaminaPerSecond *= WRWind::GliderStaminaScale(Survivor);
 	Out.Sink *= WRWind::GlideSinkScale(Survivor);
 	// The Kitewright's last kite (the Bonebell's echo): glider stamina -20%.
+	// The Kitewright's last kite and Gulper's pearl: -20% each.
 	if (Inv) Out.StaminaPerSecond *= FMath::Max(0.f, 1.f + Inv->GearStat(TEXT("glideStamina")));
+	// The Wind Mask of Aeolith: no stamina at all in a wind over 10 m/s (cooks/biome-sky.md 2.11; a Gale).
+	if (Inv && Inv->GearStat(TEXT("glideStaminaWindy")) > 0.f && WRSkyIsles::Contains(Survivor->GetActorLocation())
+		&& WRTune(TEXT("glide.windSpeed"), 800.f) * WRSkyIsles::WindStrength(Survivor) > WRTune(TEXT("glide.windyAbove"), 1000.f))
+		Out.StaminaPerSecond = 0.f;
 	return true;
 }
 
@@ -569,6 +577,7 @@ void UWRSkyAirSubsystem::StepFalls(float Dt)
 		else F.bInLift = false;
 		F.bWasGliding = bGlide;
 		const bool bHeld = !M || bGlide || M->IsSwimming() || M->IsFlying() || M->MovementMode == MOVE_Custom || C->GetAttachParentActor() != nullptr;
+		if (Survivor && bSky) StepDeeds(Survivor, M && M->IsMovingOnGround() && !bHeld, bGlide, C->GetAttachParentActor() != nullptr || (M && M->MovementMode == MOVE_Custom && !bGlide));
 		if (bHeld)
 		{
 			F.TopZ = Z;
@@ -594,6 +603,43 @@ void UWRSkyAirSubsystem::StepFalls(float Dt)
 		}
 		F.TopZ = Z;
 	}
+}
+
+void UWRSkyAirSubsystem::StepDeeds(AWRCharacter* Who, bool bStanding, bool bGlide, bool bHeld)
+{
+	// Yara Kesh's quests counted where they happen (cooks/biome-sky.md 2.13; world.json quests.yara: first_flight,
+	// updraft_top, broken_way). A mount, a lift's cage or a line spoils a clean flight or crossing.
+	UWRWorldSystems* Sys = Who->GetWorld()->GetSubsystem<UWRWorldSystems>();
+	AWRPlayerState* PS = Who->GetPlayerState<AWRPlayerState>();
+	if (!Sys || !PS) return;
+	FDeeds& D = Deeds.FindOrAdd(Who);
+	const FVector P = Who->GetActorLocation();
+	const FWRSkyIsleData& Data = FWRSkyIsleData::Get();
+	if (bHeld) { D.bClean = false; D.bCrossing = false; }
+	if (bGlide)
+	{
+		// Read the wind: a column ridden to its top (the top 30 m of it, inside its radius).
+		for (int32 i = 0; i < Data.Updrafts.Num(); ++i)
+		{
+			const FWRSkyIsleData::FUpdraft& U = Data.Updrafts[i];
+			if (D.Tops.Contains(i) || FVector2D::Distance(FVector2D(P), U.At) > U.Radius || P.Z < U.Top - WRTune(TEXT("skyWorld.quests.topBand"), 3000.f)) continue;
+			D.Tops.Add(i);
+			Sys->QuestEvent(PS, TEXT("updraft_top"), NAME_None);
+		}
+	}
+	if (!bStanding) return;
+	const FWRSkyIsleData::FIsland* I = Data.IslandAt(P, 0.f, 400.f, 400.f);
+	const FName Here = I ? I->Id : FName(TEXT("ground"));
+	if (Here == D.Stood) { D.bClean = true; return; }
+	// First flight: off the First Isle and onto Terrace Isle without touching ground between.
+	if (D.Stood == TEXT("first_isle") && Here == TEXT("terrace_isle") && D.bClean) Sys->QuestEvent(PS, TEXT("first_flight"), NAME_None);
+	// The Broken Way: Tollgate (with the Toll Shrine lit) to Brink on your own feet, wings or rope.
+	const AWRSkyState* St = AWRSkyState::Get(Who);
+	if (Here == TEXT("tollgate")) D.bCrossing = St && St->bTollLit;
+	else if (Here == TEXT("brink") && D.bCrossing) { D.bCrossing = false; Sys->QuestEvent(PS, TEXT("broken_way"), NAME_None); }
+	else if (Here == TEXT("ground") || (I && I->Zone != '3')) D.bCrossing = false;
+	D.Stood = Here;
+	D.bClean = true;
 }
 
 void UWRSkyAirSubsystem::Landed(ACharacter* Who, FFall& F, float Drop)

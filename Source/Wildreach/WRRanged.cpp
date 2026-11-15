@@ -519,6 +519,8 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult * LauncherMult;
 	// An arrow's own status (items.json ammo: the Murkjaw-tooth arrow's bleed 25): WRSwampSystems reads it.
 	if (Ammo) WRSwamp::AddAmmoBuildups(Ammo->Id, Hit);
+	// Hush arrows: silent, sneak hits x1.15 (cooks/biome-sky.md 2.17).
+	if (Ammo) { Hit.UnawareMult = Ammo->AmmoSneakMult; Hit.bQuiet = Ammo->bAmmoSilent; }
 	const FVector Chest = GetActorLocation() + FVector(0.f, 0.f, 55.f);
 	const FVector Muzzle = Chest + Dir * 45.f;
 
@@ -556,10 +558,23 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;
 		const FString MeshAlong = Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->MeshAlong : Launcher.MeshAlong;
-		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed * WRWind::ProjectileSpeedScale(this), Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
+		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed * WRWind::ProjectileSpeedScale(this) * (Ammo ? Ammo->AmmoSpeedMult : 1.f), Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,
 			Launcher.IsThrowable() && Launcher.RangedKind == TEXT("spear") ? Launcher.Id : NAME_None);
 		// Through bodies: the ammo's own pierce (items.json) and Piercing gale's one (the Wind path).
 		Projectile->PierceLeft = WRWind::ShotPierce(this, AmmoId);
+		// Gale arrows and Galespine throw what they strike back along the shot (cooks/biome-sky.md 2.17, 2.11): the
+		// knockback hit property through the Wind path's one knock (WRSkyAir::Push: brace, anchor boots, edge credit).
+		const float Knock = FMath::Max(Launcher.Knockback, Ammo ? Ammo->Knockback : 0.f);
+		if (Knock > 0.f)
+		{
+			TWeakObjectPtr<AWRCharacter> WeakSelf(this);
+			const FVector KnockDir = Dir.GetSafeNormal2D();
+			Projectile->OnStruck = [WeakSelf, KnockDir, Knock](AWRCharacterBase* Struck, EWRHitResult Result)
+			{
+				if (!Struck || !Struck->IsAlive() || (Result != EWRHitResult::Hit && Result != EWRHitResult::GuardBroken)) return;
+				WRWind::Knock(WeakSelf.Get(), Struck, KnockDir, Knock, WRTune(TEXT("ranged.knockSeconds"), 0.35f), TEXT("arrow"));
+			};
+		}
 	}
 }
 

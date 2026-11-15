@@ -170,6 +170,7 @@ FWRGear::FWRGear()
 				FString Str;
 				if (O->TryGetStringField(TEXT("boss"), Str)) B.Boss = FName(*Str);
 				O->TryGetStringField(TEXT("kind"), B.Kind);
+				O->TryGetStringField(TEXT("from"), B.From);
 				const TArray<TSharedPtr<FJsonValue>>* Recipes = nullptr;
 				if (O->TryGetArrayField(TEXT("recipes"), Recipes))
 				{
@@ -389,9 +390,16 @@ FString FWRBlueprints::Learn(UWRInventoryComponent* Inv, int32 SlotIndex)
 		return FString::Printf(TEXT("You already know %s: hand the blueprint to a clan mate"), *What);
 	}
 	PS->KnownBlueprints.Add(Bp->Id);
+	// A found blueprint teaches the same recipe a master's quest does (the Wind Rose's Gale arrows = Yara's fifth).
+	if (Bp->Kind == TEXT("found")) for (const FName& R : Bp->Recipes) PS->KnownBlueprints.AddUnique(FName(*(TEXT("quest_") + R.ToString())));
 	if (--Stack.Count <= 0) Stack = FWRItemStack();
 	WRSound::Broadcast(PS->GetPawn(), TEXT("blueprint.learn"));
 	UE_LOG(LogWildreach, Log, TEXT("BLUEPRINT %s learned %s"), *PS->GetPlayerName(), *Bp->Id.ToString());
+	if (Bp->Kind == TEXT("piece"))
+	{
+		// A machine's blueprint found in the world (the Updraft lift): it opens in the Build bar.
+		return FString::Printf(TEXT("You learned %s: it's in the Build bar"), *Def->Name.Replace(TEXT("Blueprint: "), TEXT("")));
+	}
 	if (Bp->Kind == TEXT("set decor"))
 	{
 		// A biome set's furnishings (cooks/build-building.md 2.4): they open in the Build bar.
@@ -429,7 +437,7 @@ FName FWRBlueprints::PortalDrop(const AWRPlayerState* PS, int32 Rank)
 	TArray<FName> Pool;
 	for (const FWRBlueprintDef& B : G.AllBlueprints())
 	{
-		if (B.Kind == TEXT("set decor")) continue;   // a set's furnishings come from its land's major boss only
+		if (B.Kind == TEXT("set decor") || B.Kind == TEXT("piece") || B.Kind == TEXT("found")) continue;   // a set's furnishings come from its land's major boss only; a found piece's lies where it lies
 		const bool bLegendary = B.Kind == TEXT("legendary");
 		if (bLegendary && Rank < G.LegendaryFromRank) continue;
 		if (PS && PS->KnownBlueprints.Contains(B.Id)) continue;

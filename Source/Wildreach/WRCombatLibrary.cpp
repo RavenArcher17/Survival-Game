@@ -461,12 +461,16 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			return Done(EWRHitResult::Ignored);
 		}
-		Target->NotifyAttackedBy(Attacker);
+		// A silent shot (Hush arrows) on an unaware mark: it takes the blow without learning who loosed it.
+		if (!(Hit.bQuiet && bWasUnaware))
+		{
+			Target->NotifyAttackedBy(Attacker);
+			Target->CombatTarget = Attacker;
+		}
 		// A blow landing is a 12 m noise in the Crystal caves (crystal 2.1).
 		WRCrystal::Emit(Target, Target->GetActorLocation(), WRCrystal::NoiseRadius(TEXT("hitCreature")), Attacker, TEXT("hit"));
 		// Remember who's fighting whom (tames help their owner).
 		Attacker->CombatTarget = Target;
-		Target->CombatTarget = Attacker;
 	}
 
 	// Phase / Nowhere (the Void path): the blow (a grab too) passes through.
@@ -755,6 +759,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		// Life-skill perks on the attacker (WRCombatPerks below): backstab, water fighter, pack leader; assassin crits.
 		bool bPerkCrit = false;
 		Damage *= WRCombatPerks::DamageScale(Attacker, Target, bWasUnaware, bPerkCrit);
+		if (bWasUnaware) Damage *= Hit.UnawareMult;   // Hush arrows' sneak hits (cooks/biome-sky.md 2.17)
 		if (!Hit.bCritical && ((Hit.bMelee && FMath::FRand() < UWRPathComponent::Stat(Attacker, TEXT("critChance")) + (Attacker ? Attacker->Weapon.GemCrit : 0.f) + BrittleCrit) || bPerkCrit))
 		{
 			Damage *= 1.5f + UWRInventoryComponent::GearStatFor(Attacker, TEXT("critDamage"));   // Rune of Clear Sight
@@ -772,6 +777,9 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			if (Hit.PhysType == 2 && bArmoured) Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("strikeVsArmored"));
 			if (Target->GetCharacterMovement() && Target->GetCharacterMovement()->IsSwimming()) Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("vsSwimming"));
 			if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rot)) Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("vsRotting"));
+			// The Harrier plume: flying and airborne targets (cooks/biome-sky.md 2.10).
+			if (Target->GetCharacterMovement() && (Target->GetCharacterMovement()->IsFlying() || Target->GetCharacterMovement()->IsFalling()))
+				Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("vsAirborne"));
 			Damage *= 1.f + Gear;
 		}
 		// Spells hurt a Tyrant plate's wearer less.
@@ -960,7 +968,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const float Armour = bHyper ? MoveArmour : 1.f;
 		// A raised guard braces the body against what gets round it (Obsidian heart talisman: guardPoise).
 		// Frozen grove (Frost + Nature): allies in that survivor's Sanctuary or under their World tree stand +15 firmer.
+		// The Sentinel eye: +15 standing still or braced (crouched or guarding; cooks/biome-sky.md 2.10).
+		const bool bSteady = TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) || Target->GetVelocity().SizeSquared2D() < 400.f
+			|| (Target->GetCharacterMovement() && Target->GetCharacterMovement()->IsCrouching());
 		const float GuardPoise = (TargetASC->HasMatchingGameplayTag(WRTags::State_Blocking) ? UWRInventoryComponent::GearStatFor(Target, TEXT("guardPoise")) : 0.f)
+			+ (bSteady ? UWRInventoryComponent::GearStatFor(Target, TEXT("stillPoise")) : 0.f)
 			+ WRNature::BonusPoise(Target);
 		const float Left = (TargetAttr->GetPoise() + GuardPoise) * Armour - PoiseDamage;
 		Target->Status->NotifyPoiseDamaged();

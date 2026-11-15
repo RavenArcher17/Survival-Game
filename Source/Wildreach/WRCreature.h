@@ -354,6 +354,9 @@ public:
 	UPROPERTY(ReplicatedUsing=OnRep_Tamed) FString TamedBy;
 	UPROPERTY(Replicated) EWRTameOrder TameOrder = EWRTameOrder::Follow;
 	UPROPERTY(Replicated) bool bTameAggressive = true;
+	/** Server: a neutral creature set on a dark shrine's guard turned hostile (world.json shrines "aggressive": the
+	 *  Toll Shrine's Windmane herd, cooks/biome-sky.md 2.13): it picks targets like an aggressive one. */
+	bool bGuardAggressive = false;
 	UPROPERTY(Replicated) float Torpor = 0.f;
 	UPROPERTY(Replicated) float MaxTorpor = 100.f;
 	UPROPERTY(Replicated) float TameProgress = 0.f;

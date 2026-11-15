@@ -115,6 +115,12 @@ public:
 private:
 	struct FFall { float TopZ = 0.f; bool bAir = false; float GlideClosedAt = -100.f; float GlideClosedZ = 0.f; bool bWasGliding = false; bool bInLift = false; float AirSince = 0.f; };
 	TMap<TWeakObjectPtr<ACharacter>, FFall> Falls;
+	/** Yara Kesh's deeds (cooks/biome-sky.md 2.13): the island last stood on and whether the air since has been clean
+	 *  (First flight: no ground, no mount), the columns ridden to their tops (Read the wind), the Broken Way's crossing
+	 *  (from Tollgate with the Toll Shrine lit to Brink, no lift, no mount). */
+	struct FDeeds { FName Stood; bool bClean = false; TSet<int32> Tops; bool bCrossing = false; };
+	TMap<TWeakObjectPtr<ACharacter>, FDeeds> Deeds;
+	void StepDeeds(class AWRCharacter* Who, bool bStanding, bool bGlide, bool bHeld);
 	float WearClock = 0.f;
 	float LookClock = 0.f;
 	void StepFalls(float Dt);

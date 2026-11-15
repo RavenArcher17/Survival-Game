@@ -44,6 +44,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "WRSkyIsleTypes.h"
+#include "WRSkyAir.h"
 
 FWROnRest UWRSurvivalComponent::OnRest;
 
@@ -1336,6 +1337,15 @@ void UWRSurvivalComponent::TickLight(AWRCharacterBase* Pawn, float DeltaTime)
 			// Water puts a flame out (it stays in the slot: light it again on land).
 			SetLightOn(false);
 			Notify(Kind == TEXT("torch") ? TEXT("Your torch hissed out in the water") : TEXT("Your lantern drowned out in the water"));
+			WRSound::Broadcast(Pawn, TEXT("light.douse"));
+		}
+		else if (Kind == TEXT("torch") && !bSheltered && WRSkyIsles::Contains(Pawn->GetActorLocation())
+			&& [&]() { const WRSkyAir::FGust G = WRSkyAir::GustAt(Pawn, Pawn->GetActorLocation(), true); return G.bOn && G.Phase >= 0.f && G.Lane < 0 && !G.bRotor; }())
+		{
+			// A Gale's gust snuffs a torch in the Sky (a lantern's flame is shut in; the Sailbell lantern never goes out:
+			// cooks/biome-sky.md 2.17). It stays in the slot: light it again in the lee.
+			SetLightOn(false);
+			Notify(TEXT("The gale blew your torch out"));
 			WRSound::Broadcast(Pawn, TEXT("light.douse"));
 		}
 		else if (FWRItemStack* Slot = Inv->GetEquippedMutable(EWREquipSlot::Light))
