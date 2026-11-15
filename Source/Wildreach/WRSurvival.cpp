@@ -7,6 +7,7 @@
 #include "WRCrystalTypes.h"
 #include "WRCrystalHazards.h"
 #include "WRFungalTypes.h"
+#include "WRFungalHazards.h"
 #include "WRGraveTypes.h"
 #include "WRSwampSystems.h"
 #include "WRStormTypes.h"
@@ -1487,6 +1488,8 @@ float UWRSurvivalComponent::StaminaRegenMult() const
 	float M = WRegen;
 	if (IsRested()) M *= WRTune(TEXT("rested.staminaRegen"), 1.2f);
 	if (CorruptionStep() >= 2 && !MatchesCorruption()) M *= WRTune(TEXT("corruption.staminaRegen"), 0.85f);
+	// Foul air (the Fungal caverns' air bells): heavy breathing, stamina back at half.
+	if (const AWRCharacterBase* P = GetPawnCharacter(); P && P->HasTag(WRFungalTags::FoulAir)) M *= WRTune(TEXT("hazards.fungal.foulAir.staminaRegen"), 0.5f);
 	return M;
 }
 

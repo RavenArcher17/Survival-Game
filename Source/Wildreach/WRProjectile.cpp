@@ -5,6 +5,7 @@
 #include "WRBoss.h"
 #include "WRCrystalWorld.h"
 #include "WRCrystalHazards.h"
+#include "WRFungalHazards.h"
 #include "WRWindPath.h"
 #include "WRVoidHazards.h"
 #include "WRVoidWorld.h"
@@ -230,7 +231,8 @@ void AWRProjectile::OnRep_Model()
 		CodeModel->RegisterComponent();
 		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
 		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
-			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel) || WROcean::BuildThrownModel(ModelPath, CodeModel))
+			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel) || WROcean::BuildThrownModel(ModelPath, CodeModel)
+			|| WRFungal::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -363,6 +365,21 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	{
 		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
 		FWRSkyBoss::SporeLanded(GetWorld(), At, const_cast<AWRCharacterBase*>(Caster));
+		// A real cloud where it breaks (fungal 2.19: 6 m for 12 s): flash it with fire, push it onto Mycelorn.
+		AWRSporeCloud::Spawn(GetWorld(), At + FVector(0.f, 0.f, 120.f), WRTune(TEXT("hazards.fungal.sporePot.radius"), 600.f), TEXT("pot"), WRTune(TEXT("hazards.fungal.sporePot.seconds"), 12.f), const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
+	// The Gale flask (fungal 2.19): a 6 m gust for a second: clouds 12 m, webs 12 m.
+	if (Kind == TEXT("galeflask"))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		AWRCharacterBase* By = const_cast<AWRCharacterBase*>(Caster);
+		WRFx::Broadcast(this, TEXT("fungal.galeFlask"), At, FRotator::ZeroRotator, 1.f, TEXT("fungal.gale_flask"));
+		if (By)
+		{
+			for (int32 k = 0; k < 6; ++k) WRFungal::Wind(By, At, FRotator(0.f, 60.f * k, 0.f).Vector(), WRTune(TEXT("hazards.fungal.galeFlask.radius"), 600.f), 70.f, true);
+		}
 		Destroy();
 		return;
 	}
@@ -392,6 +409,7 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	// Fire landing near marsh gas lights it (a fire bolt's impact, a fire pot's burst): WRSwampSystems.
 	if (Hit.Element == WRTags::Element_Fire || Kind == TEXT("firepot"))
 	{
+		if (Caster) WRFungal::FireAt(const_cast<AWRCharacterBase*>(Caster), HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation(), Kind == TEXT("firepot") ? 500.f : 300.f);
 		WRSwamp::FireAt(this, HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation(), const_cast<AWRCharacterBase*>(Caster));
 		AWRVoidState::FireAt(this, HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation());
 	}

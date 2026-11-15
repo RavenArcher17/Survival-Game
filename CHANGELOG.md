@@ -94,6 +94,30 @@ Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and pl
 cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
 not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveBiomes`.
 
+- **Fungal (3): the hazards and the Sporefall** (fungal 2.8-2.10, 2.21; plan 2.8-2.10). `WRFungalHazards.*`:
+  **spore clouds** (`AWRSporeCloud`, replicated pockets 6-20 m: 12 poison a second after a 0.9 s grace, rot too after 10 s
+  without a 3 s break, through the status component; the Immune system, a filter mask or Sporeweave 4 pass, the spore wad
+  takes x0.3, the caverns' own creatures ignore them; **wind** moves them 6 m (a wind spell or the Gale flask 15 m) eased
+  over 0.8 s, **fire** (a fire blow, a fire bolt's impact, a burning body, a torch or a flame lantern carried in) flashes
+  them after a 0.9 s whoomp for 40 + burn 40 to all inside, gone 2 game hours, **frost** settles them as spore snow;
+  the Spore bloom swells the caverns' own half again; rain lays the surface's down). **Lure lines** (`AWRLureLines`:
+  the Lure Gallery's, the False Sky's low lines over its routes, the web pockets'; beaded glowing threads; a brush twangs
+  0.9 s, then grips 2 s, then reels you 3 m up; a light swing cuts 1.5 m, fire burns 3 m, wind tears 8 m; crouch passes
+  under; cut lines regrow in a game hour). **Springcaps** (`AWRSpringcap`: creak 0.6 s, jump for 9 m with 20 degrees of
+  aim, a 6 m drop fires it, a blow throws its rider sideways, 20 s to recharge, its cap squashing and springing back).
+  **Cap-falls** (`AWRCapFall`: loud work within 15 m sets a Webs ceiling knocking, the dust shaft its last second, 70 and
+  a knockdown in 3 m, a Knocker idol nearby gives a second more). **Foul air** (no sprint, stamina regen x0.5, 3 a second
+  after 20 s, fire spells gutter out). **The Breath vents** on the Fall Field (`AWRBreathVent`: the bronze flap on its pin
+  lifts on each exhale; the plume is a cloud column up the shaft; the Sky lane's Aeolith ring now reads the same clock,
+  30 s in the Sporefall). **Doors and secrets** (`AWRFungalSpot`, E: the Sealed Gate's web burns 3 s or tears in wind,
+  the mole wall a tame Truffle mole digs, the fifth tunnel a mole knocks and a pick breaks, the Ring of Caps' altar
+  slides at midnight for a toad tame, the Heart Gate opens from inside, the Seed Vault in the Sporefall). The glow paste's
+  cold light, the gold Breath, the **Sporefall** (`WRFungalEvents.cpp`: the 35-a-minute beat, flush patches with their
+  clouds over the cape, the Desert strip and the three seeded sky islands, deepcaps on the dead in them, bloomed beasts
+  with a cap on the back whose bites carry poison 20 and who burst on death), Spore drift on the surface, the
+  invasions' marks, Ilmari's day and night, the Lure Gallery walk for his quest, the Gale flask (thrown) and the spore
+  pot's real cloud. 34 fx rows. Numbers: tuning `hazards.fungal`, `fungalEvents`. Compiled; not played.
+
 - **Fungal (2): the caverns' things, the master and his road** (fungal 2.4, 2.7, 2.9, 2.11, 2.19-2.21). Items (47:
   glow-moss, amadou, spore sac, capling cap, the creatures' parts, spore essence, the queen's jelly / king's slurry /
   star-thread extras, Mycelorn's core, the Hive spore part, the Heart-seed husk trophy, the filter mask (head:

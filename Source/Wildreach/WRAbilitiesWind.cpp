@@ -2,6 +2,7 @@
 // (Momentum, knockback, passives, combos) are in WRWindPath.cpp.
 
 #include "WRAbilitiesWind.h"
+#include "WRFungalHazards.h"
 #include "Wildreach.h"
 #include "WRAbilitiesLightning.h"
 #include "WRAttributeSet.h"
@@ -301,6 +302,9 @@ void UWRGA_WindSpell::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		{
 			WRWind::PayMomentum(C, Cost, bFreeInSkyLord);
 			CastWind(C, Scale);
+			// The Fungal caverns (fungal 2.8): a wind spell moves spore clouds along its gust (15 m: a spell is a strong
+			// gust), tears lure lines and the web sheets (WRFungalHazards).
+			WRFungal::Wind(C, C->GetActorLocation() + FVector(0.f, 0.f, 50.f), C->GetBaseAimRotation().Vector(), Spell(TEXT("range"), 900.f), Spell(TEXT("cone"), 60.f), true);
 		}
 		CastBoth(C, Scale);
 	});

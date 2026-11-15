@@ -1,6 +1,8 @@
 // The Sky islands' bosses and arenas (see WRSkyBosses.h; cooks/biome-sky.md 2.10-2.11, build-biome-sky.md 2.12-2.13).
 
 #include "WRSkyBosses.h"
+#include "WRFungalHazards.h"
+#include "WRFungalTypes.h"
 #include "Wildreach.h"
 #include "WRAltar.h"
 #include "WRArtifacts.h"
@@ -167,7 +169,9 @@ FVector AWRSkyRing::PlatformAt(int32 i, float Now) const
 int32 AWRSkyRing::PlumeNow(float Now, float& OutPhase) const
 {
 	// One of three vents every 40 s (30 in the Sporefall: tuning plumeEverySporefall when the Fungal lane's event runs).
-	const float Every = SbAeo(TEXT("plumeEvery"), 40.f);
+	// The Fungal caverns' Breath vents run the same rotation on the same clock (WRFungal::VentEvery: 30 s in the
+	// Sporefall); while the caverns aren't live, the ring's own number.
+	const float Every = WRFungal::Live() ? WRFungal::VentEvery(this) : SbAeo(TEXT("plumeEvery"), 40.f);
 	const float T = FMath::Fmod(Now, Every);
 	const float Tell = SbAeo(TEXT("plumeTell"), 1.f), Live = SbAeo(TEXT("plumeSeconds"), 6.f);
 	const float Start = Every - Tell;

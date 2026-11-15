@@ -2,6 +2,7 @@
 #include "WRTidePath.h"
 #include "WRUnderwater.h"
 #include "WRCrystalTypes.h"
+#include "WRFungalHazards.h"
 #include "WRWindPath.h"
 #include "WRSkyAir.h"
 #include "WRVoidHazards.h"
@@ -1139,6 +1140,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRArcane::ScaleBuildups(Attacker, Coated);
 		// Soak chance's soak on every hit and on weapon hits (WRTidePath.cpp).
 		WRTidePath::ScaleBuildups(Attacker, Coated);
+		// A bloomed beast's bite carries the Sporefall's poison (fungal 2.10: +20).
+		if (Attacker && Attacker->HasTag(WRFungalTags::Bloomed)) Coated.Buildups.FindOrAdd(TEXT("poison")) += WRTune(TEXT("fungalEvents.sporefall.bloomPoison"), 20.f);
 		for (const TPair<FName, float>& B : Coated.Buildups)
 		{
 			const int32 Id = WRStatus::FromName(B.Key);
@@ -1191,6 +1194,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRArcane::AfterHit(Target, Hit, Damage);
 		// The Tide path's (WRTidePath.cpp): Flow for a hit on the move, Live water, Flash freeze, Shark harpoon, Depths.
 		WRTidePath::AfterHit(Target, Hit, Damage);
+		// The Fungal caverns (WRFungalHazards): fire and frost in a spore cloud, loud work under the Webs' ceilings.
+		WRFungal::OnHit(Target, Hit);
 	}
 	// Lightning in water spreads to everyone in the same water near the struck (cooks/biome-ocean.md 2.6).
 	if (Result == EWRHitResult::Hit && Target->IsAlive() && Hit.Element == WRTags::Element_Lightning)
