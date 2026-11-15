@@ -1874,6 +1874,8 @@ namespace WRTreeKitImpl
 		// The Graveyard's trees (cooks/biome-graveyard.md 2.1, 2.3; build-biome-graveyard.md 2.5).
 		{ TEXT("yew"), 1500.f, 70.f, EBudget::Broad }, { TEXT("great_yew"), 2600.f, 450.f, EBudget::Giant }, { TEXT("hawthorn"), 600.f, 14.f, EBudget::Broad },
 		{ TEXT("dead_elm"), 1700.f, 40.f, EBudget::Broad },
+		// The Sky islands' wind trees (cooks/biome-sky.md 2.1, 3.5; build-biome-sky.md 2.4): flag trees leaning downwind.
+		{ TEXT("cloud_cedar"), 1400.f, 38.f, EBudget::Broad }, { TEXT("juniper"), 380.f, 12.f, EBudget::Shrub },
 	};
 
 	static const FSpeciesInfo& InfoFor(FName Species)
@@ -2019,6 +2021,31 @@ namespace WRTreeKitImpl
 			P.Branches = 11; P.BranchAngle = 72.f; P.Arch = 0.04f; P.TipDrop = 0.04f; P.Kink = 0.28f; P.Secondaries = 2;
 			P.Flare = 1.2f; P.FlareH = 0.05f; P.Roots = 0; P.TrunkSides = 8.f; P.LimbSides = 5.f; P.TwigSides = 3.f; P.Rings = 7;
 			P.LeafSize = 95.f; P.Fill = 64; P.Lean = Rs.R(10.f, 17.f); P.bLeanX = true;
+			Standing(K, P, Rs, 0);
+		}
+		else if (S == TEXT("cloud_cedar"))
+		{
+			// A cedar on an island lip in constant wind (Cedrus libani grown as a krummholz flag tree): a short thick
+			// red-brown bole, flat tiered pads of blue-green needles held level, the whole tree pushed along +X (the
+			// scenery yaws it downwind, west), the windward side bare.
+			K.Barks.Add(MakeBark(0x6B5442, 0x3A2A20, 0x6E7A5E, 0.82f, 0.35f, 40.f, 0.08f, 18.f, 0.5f));
+			Leaves(LeafHolly, 0x22382E, 0x4E6E5A, 0.66f);
+			P.BoleTop = 0.32f; P.Forks = Variant % 2 ? 2 : 0; P.ForkSpread = 0.35f; P.CrownBase = 0.28f; P.CrownTop = 1.f; P.CrownR = 0.5f; P.Shape = 5;
+			P.Branches = 15; P.BranchAngle = 84.f; P.Arch = 0.02f; P.TipDrop = 0.03f; P.Kink = 0.14f; P.Secondaries = 2;
+			P.Flare = 1.35f; P.FlareH = 0.06f; P.Roots = 3; P.TrunkSides = 12.f; P.LimbSides = 6.f; P.TwigSides = 3.f; P.Rings = 8;
+			P.LeafSize = 170.f; P.Fill = 150; P.PadUp = 0.2f; P.Lean = Rs.R(12.f, 30.f); P.bLeanX = true;
+			Standing(K, P, Rs, 0);
+		}
+		else if (S == TEXT("juniper"))
+		{
+			// A common juniper on the exposed rock (Juniperus communis, the prostrate form): several stems from one root,
+			// a low cone of grey-green needles pressed downwind.
+			K.Barks.Add(MakeBark(0x7A6A58, 0x4A3E32, 0x6E7A5E, 0.7f, 0.3f, 30.f, 0.f, 6.f, 0.4f));
+			Leaves(LeafHolly, 0x2E4A3E, 0x6A8A6A, 0.7f);
+			P.BoleTop = 0.1f; P.Forks = 3; P.ForkSpread = 0.7f; P.CrownBase = 0.08f; P.CrownR = 0.55f; P.Shape = 3;
+			P.Branches = 12; P.BranchAngle = 70.f; P.Arch = 0.04f; P.Kink = 0.2f; P.Secondaries = 2;
+			P.Flare = 1.1f; P.FlareH = 0.04f; P.Roots = 0; P.TrunkSides = 7.f; P.LimbSides = 5.f; P.TwigSides = 3.f; P.Rings = 6;
+			P.LeafSize = 80.f; P.Fill = 90; P.Lean = Rs.R(15.f, 32.f); P.bLeanX = true;
 			Standing(K, P, Rs, 0);
 		}
 		else if (S == TEXT("dead_elm"))

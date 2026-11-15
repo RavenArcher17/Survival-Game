@@ -73,6 +73,9 @@ class WILDREACH_API AWRCharacter : public AWRCharacterBase
 	GENERATED_BODY()
 
 public:
+	/** The glider every machine draws on the back (WRSkyAir): 0 none, 1 crude, 2 levistone, 3 the wind's (Path Glide or
+	 *  Skysilk). The server sets it from the bag and the path; spread or folded follows the replicated movement mode. */
+	UPROPERTY(Replicated) uint8 GliderKind = 0;
 	/** This machine: the storm picked this body (cooks/biome-lightning.md 2.5): the hair lifts on the path marks' lift
 	 *  channel and flickers for Seconds, whatever path it's on (WRStormWorld's pre-tell). */
 	void StrikePreTell(float Seconds);

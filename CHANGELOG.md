@@ -1,5 +1,84 @@
 # Changelog
 
+## Unreleased: the Sky islands (the Wind land)
+
+Aaron (lane build-biome-sky: requirement ledger R1-R62, build research and plan in showcase-notes
+cooks/build-biome-sky.md, building cooks/biome-sky.md). Landing in pieces; compiled (editor target) after each; not
+played here (Aaron and the testers test, F8). This first piece is the land, the air and everything standing in it.
+
+- **Where it is** (`Data/lands/sky.json` + `sky_ground.bin`, `Data/sky.json`, both from `node Tools/terrain/sky.mjs`,
+  parsed by `FWRSkyIsleData` in `WRSkyIsleTypes.cpp`): the Hollow Cape north of the Storm peaks. The Windward Cliffs on
+  the east coast (turf to the lip, a 75-85 degree granite face, a shingle-and-shard apron at the sea; tops 150-320 m),
+  the downs west to the Flue's crown (a volcanic dome to its rim at 700 m; the throat is a hole in the ground and a
+  48-sided shaft down to the cavern floor at -40 m, fungus shelves low, bird ledges high, a cyan spore glow; the shaft
+  flares under the rim's turf so there is no slit beside it), the Chain Cliffs to the south and three camps on the cliff
+  tops with PlayerStarts (Wind), safe zones and stations. `WRBiome::At` answers `sky_islands` over the cape and the air
+  over the north-east sea at any altitude (`WRSkyIsles::Contains`, asked before the Storm peaks' catch-all);
+  `world.liveBiomes` gains `sky_islands`; windmills there turn on the Sky's own wind.
+- **The 44 islands** (SKY 2.2: the Lift Steps, the Cloud Gardens, the Ruined Sky-bridges, the Floating Shrines, the
+  Undercloud's six) built in code on every machine (`WRSkyIsland.cpp`): a domed turf top (the Kitewrights' terraces with
+  walkable 35-degree risers, the rain lagoon's 12 m basin, still pools, the Kitefield's hill, the Drowned Garden's
+  30-degree tilt), a sheer rim of strata 8-25 m, a rock root tapering 1.5-3x the radius (never reaching the ground under
+  it), the levistone keel's crystal beards (pale glass by day, cyan cores at night, a dim keel light under the big ones),
+  spore crust and its glow under the islands nearest the Flue; collision everywhere (walking off the lip is a real
+  fall); the Weeping Isle's three caves (a chain-railed stair cut down the rim to two of them, the third behind the
+  middle fall on a 2 m ledge; tunnels and chambers with their levistone cores). Lagoon and pools are swimmable.
+  Islands decorated by rule: wind-sculpted cloud cedars and junipers (new tree-kit species, leaning downwind),
+  wind-combed grass and flax, boulders at the rim, levistone glints in it, lung ta wind-poles every 150 m round each lip
+  whose streamers turn downwind and flap (three times as fast in a gust's tell).
+- **The places** (`WRSkyScenery*.cpp`, `WRSkySites.cpp`, kit `WRSkyLook.h`): the Paper Titan kneeling on Titan's Crown
+  with Kitewright spears through it; the Great Kite (60 m) on its 300 m line with 12 lanterns, always streaming downwind
+  (the world's weathervane, turning with the wind); the Ring's lenticular cap and spore column; the Chain Cliffs' anchor
+  stones and snapped chains; bridges: stone decks on chains between toll towers, plank spans, broken stubs with chains
+  hanging into the drop, the Fallen Span's half hanging 120 m straight down from Span North and swinging on a 22 s
+  pendulum (lanterns on it once the Toll Shrine is lit), the Sentinel's deck slab by slab (its five weak sections
+  cracked), chain walks (the Wheel's chain, the Lid Gate's walk to the Ring); waterfalls thrown off the lips that break
+  into strands and mist all the way down; the Undercloud's cloud bank with the Mistlarks' gap. Hand sites H1-H16 and
+  U1-U8 each built round their idea (the Shard Fall's upside-down house, the Lift Wreck's two skeletons, the Larder Tree,
+  the Feather Rookery, the Lift Station, the Cloud Garden, the Silk-House and its loom, the Kite Field's death-kites and
+  the newcomer's shirt-kite still flying, Gulper's Bight's bone ring and skiff, the Toll House's bowls, the Harrier's
+  Eyrie, the Glider Graves, the Wind Wheel's hub turning on its tower and its fallen vanes, the Spore Scar's masked
+  gardeners, the Serpent Door's temple, the Kite Graveyard, the Bone Tubes, the Bonebell, the Hushwing Roost, the
+  Gardener's Grave, the First Kite, the Newcomer's Kite, the Keel Vault), the shrine settings (Yara's open workshop and
+  the Wind Rose at the Great Shrine), the camps, and the 48 kit places.
+- **What you use there** (`UWRSkyWorld`, server-authoritative, replicated): three Kitewright lifts (headframe on the
+  island's lip, 3.2 m sheave, cage on twin chains, a counterweight on the far fall, winches at both stages; E cranks the
+  whole rise in 40 s eased at each end while you stay at the winch or in the cage, the pawl holds it if you leave, E
+  mid-way reverses; the cage's floor and rails carry riders; positions from the server time, nothing snaps); levistone
+  that floats up 1 m when struck and hangs 3 s for you to grab (walk into it or E) before it drifts off on the wind;
+  the Last Kite's line, the Winch Isle chain ladder and the Keel Vault's chain (E to take hold, climb 3 m/s, Jump to let
+  go); the sinking stones (W2: land on one and its keel flickers, dust and a groan for 1 s, then it dips, sinks 4 m/s for
+  6 s, holds and rises back over 20 s, carrying whoever's on it); gossamer drifts (E 4 s for 2-4 Skysilk, x2 in Rain,
+  back a game day each); nodes for levistone shards and keels, the caves' cores, iron and tin, the cliff-top copper,
+  cloudpine, wild Windflax and Cloudberry (seeds), Puffwing feathers; caches (the round houses, the Lift Wreck, the
+  newcomer's pack, the loom, the eyrie, the Wheelwright's chest, the Spore Scar's satchel, the bone tubes, the sixth
+  frame, the Newcomer's Kite, the Keel Vault, the pearl lagoon's sunken skiff); vistas (the Kite Field, the anchor drum,
+  the First Kite, the lung ta stones) that pay XP and name what you can see; the Bonebell (struck in the Turning Wind:
+  the Kitewright's last kite, once each); the Wind Rose (at noon, on the wind the Great Kite points away from); the
+  Toll House's copper (wakes the Sentinel); the Lift Station's blueprint; keepsakes; the Glider Graves' message stone.
+- **The air, game-wide** (`WRSkyAir`): **fall damage** for every survivor everywhere (combat SPEC: none under 6 m, max
+  health x (h - 6) / 12 to 18 m, lethal beyond; x the gear stat fallDamage, x0.5 under the Featherdown draught; none with
+  Featherfall; the Kite String artifact keeps its own rule), through `ApplyHit`; creatures that fall 18 m die, credited
+  to whoever hit or pushed them in the last 6 s (`NoteHit` from `ApplyHit`); bosses and the Sky-born (resist "fall")
+  don't. **Gliding**: a predicted movement mode (`CMOVE_Glide`): Jump while falling with 2 m of air under you opens the
+  best glider in the bag (or the Wind path's Path Glide, or Skysilk's four pieces for 6 s); steer with move input, the
+  glider's forward / sink / stamina (none in an updraft) / drift on the wind; Jump, landing, a hit, a stagger, or running
+  out of stamina or durability closes it; a glider wears a second a second. The glider shows on every survivor's back
+  (`UWRGliderLook`: a crude wing of spars and stitched hide, a levistone wing of cloudpine, skysilk panels and floating
+  stones; folded as a strapped roll, eased open over 0.25 s, banking into turns; its cloth's flap by speed). **Updrafts**
+  (`WRSkyIsles::LiftAt`): the Flue (+12 m/s to 1,300 m), ridge lift over the Windward Cliffs only while the wind blows
+  onto them, island columns, the Undercloud's gap and columns. **Gusts** as pure functions of the server time (no
+  corrections): 43 gust lanes on bridges, lips and the cliff ridge on their own steady 8-15 s beats, a Gale's gusts
+  every 4-8 s above 300 m by 40 m cell, lee rotors' down-gusts at W1 lips; 1,200 cm/s for 0.8 s; brace (crouch or guard)
+  x0.5, anchor boots / Skysilk 4 / a roll / riding none; gliders shoved by rotors and sunk by downbursts. Every other push
+  goes through `WRSkyAir::Push`. Anchor boots and any armour piece's own `worn` stat now count (`GearStat`).
+- **The Turning Wind's machinery** (the event's rows come with the world piece): the wind swings 180 degrees over two
+  minutes on every machine; the two free small islands drift 40-120 m at 1 m/s and hold, carrying what stands on them;
+  six cloud bridges form from their ends in, fray grey 1 s before each section fades at the end; 20 shard falls.
+- New hooks: `AWRResourceNode::Divert` (a land's own yield in place of the bag), `WRSkyAir::NoteHit` in `ApplyHit`, the
+  glide drain in `UWRStatusComponent`, `AWRCharacter::GliderKind` (replicated), the Toll Shrine's kindle, the Sky's
+  E prompts and `world sky ...`.
+
 ## Unreleased: the Graveyard (the Necromancy land)
 
 Aaron (lane build-biome-graveyard: requirement ledger R1-R61, build research and plan in showcase-notes

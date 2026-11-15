@@ -133,6 +133,9 @@ FWRItemRegistry::FWRItemRegistry()
 				}
 				(*Equip)->TryGetNumberField(TEXT("durability"), D.MaxDurability);
 			}
+			// A glider (WRSkyAir): its seconds of glide are its durability, mended at a workbench like a tool.
+			const TSharedPtr<FJsonObject>* GliderObj = nullptr;
+			if (O->TryGetObjectField(TEXT("glider"), GliderObj)) (*GliderObj)->TryGetNumberField(TEXT("durability"), D.MaxDurability);
 			const TSharedPtr<FJsonObject>* Ranged = nullptr;
 			if (O->TryGetObjectField(TEXT("ranged"), Ranged))
 			{
@@ -620,6 +623,8 @@ float UWRInventoryComponent::GearStat(FName Stat) const
 	{
 		const FWRItemStack& S = GetEquipped(Slot);
 		const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		// A piece's own worn stat while it holds (the anchor boots' passGusts: cooks/biome-sky.md 2.17).
+		if (D && (S.Durability > 0.f || D->MaxDurability <= 0.f)) Total += D->Worn.FindRef(Stat);
 		if (!D || D->Set.IsNone() || Seen.Contains(D->Set)) continue;
 		Seen.Add(D->Set);
 		const FWRSetDef* SetDef = FWRGear::Get().FindSet(D->Set);

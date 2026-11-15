@@ -85,6 +85,8 @@ public:
 	TFunction<float(AWRCharacterBase*)> YieldScale;
 	/** Server, optional: after a hit gave its share (wax with the honey, a seed, a quest deed, a glow). */
 	TFunction<void(AWRCharacterBase*)> OnHarvested;
+	/** A land's own yield in place of the bag (the Sky's levistone floats up loose for 3 s: WRSkyWorld). */
+	TFunction<void(AWRCharacterBase*, bool)> Divert;
 	/** Blows left before it's spent (OnHarvested sees the count before this blow is taken off). */
 	int32 GetHitsLeft() const { return HitsLeft; }
 

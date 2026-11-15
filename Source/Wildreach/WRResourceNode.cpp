@@ -65,7 +65,9 @@ const FWRToolDef* FWRGathering::FindTool(FName ItemId)
 FName FWRGathering::ToolKindFor(FName ItemId)
 {
 	const FString Id = ItemId.ToString();
-	if (ItemId == TEXT("wood") || ItemId == TEXT("greywood") || ItemId == TEXT("yew_log")) return TEXT("hatchet");
+	if (ItemId == TEXT("wood") || ItemId == TEXT("greywood") || ItemId == TEXT("yew_log") || ItemId == TEXT("cloudpine")) return TEXT("hatchet");
+	// The Sky's levistone (shards, keels, cores: cooks/biome-sky.md 2.6) is mined.
+	if (ItemId == TEXT("levistone") || ItemId == TEXT("levistone_core")) return TEXT("pick");
 	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur")) || ItemId == TEXT("saltpetre") || ItemId == TEXT("voidglass")) return TEXT("pick");
 	// The Graveyard's (cooks/biome-graveyard.md 2.7): soulstone off its bone beds, limestone, mortsafes broken for grave iron.
 	if (ItemId == TEXT("soulstone") || ItemId == TEXT("limestone") || ItemId == TEXT("grave_iron")) return TEXT("pick");
@@ -290,7 +292,8 @@ void AWRResourceNode::Harvest(AWRCharacterBase* Gatherer, bool bHeavy)
 		Blows = HitsLeft;
 		HitsLeft = 1;
 	}
-	FWRGathering::Gather(Gatherer, ItemId, PerHit * Blows * (YieldScale ? FMath::Max(0.f, YieldScale(Gatherer)) : 1.f), bHeavy, FString::Printf(TEXT("%s (%d hits left%s)"), *GetName(), HitsLeft - 1, Blows > 1 ? TEXT(", broke all at once") : TEXT("")));
+	if (Divert) Divert(Gatherer, bHeavy);
+	else FWRGathering::Gather(Gatherer, ItemId, PerHit * Blows * (YieldScale ? FMath::Max(0.f, YieldScale(Gatherer)) : 1.f), bHeavy, FString::Printf(TEXT("%s (%d hits left%s)"), *GetName(), HitsLeft - 1, Blows > 1 ? TEXT(", broke all at once") : TEXT("")));
 	if (OnHarvested)
 	{
 		OnHarvested(Gatherer);

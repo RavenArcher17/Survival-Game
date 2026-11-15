@@ -9,6 +9,7 @@
 #include "WRForestWorld.h"
 #include "WRGraveWorld.h"
 #include "WRGraveBosses.h"
+#include "WRSkyWorld.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCreature.h"
@@ -333,6 +334,8 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	if (UWRGraveWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Graveyard's boss fights (WRGraveBosses): dig a buried friend out, pull a tame up, drive a stake into a tomb.
 	if (UWRGraveArenas::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Sky's things (WRSkyWorld): a floating shard, a Kitewright lift, a line to climb, a drift, a bell, a vista.
+	if (UWRSkyWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -385,6 +388,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 	if (UWRForestWorld::ClientInteract(PC)) return true;
 	if (UWRGraveArenas::ClientInteract(PC)) return true;
 	if (UWRGraveWorld::ClientInteract(PC)) return true;
+	if (UWRSkyWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (AWRShrine* S = Cast<AWRShrine>(N.Actor))

@@ -503,7 +503,8 @@ void WRStorm::GrantBuff(AActor* Who, FName Id, float Seconds)
 	WRStormDetail::Buffs().FindOrAdd(Who).Add(Id, Who->GetWorld()->GetTimeSeconds() + Seconds);
 	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Who->GetInstigatorController()))
 	{
-		PC->ClientNotify(FString::Printf(TEXT("%s for %d minutes"), Id == TEXT("grounding") ? TEXT("Grounded: no strike will stun you")
+		PC->ClientNotify(FString::Printf(TEXT("%s for %d minutes"), Id == TEXT("featherdown") ? TEXT("Featherdown: falls hurt half as much")
+			: Id == TEXT("grounding") ? TEXT("Grounded: no strike will stun you")
 			: Id == TEXT("curse_ward") ? TEXT("Warded: curse builds at half") : TEXT("Warded: shock builds at half"), FMath::RoundToInt(Seconds / 60.f)));
 	}
 }

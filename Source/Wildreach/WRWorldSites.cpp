@@ -5,6 +5,7 @@
 // steps, walls), and everything that glows reads at night.
 
 #include "WRGraveTypes.h"
+#include "WRSkyWorld.h"
 #include "WRWorldSystems.h"
 #include "WRLand.h"
 #include "WRStormTypes.h"
@@ -793,6 +794,8 @@ void AWRShrine::FinishKindle()
 		Each->ClientNotify(FString::Printf(TEXT("%s %s: %s"), *DisplayName, bFirst ? TEXT("kindled") : TEXT("rekindled"), *Got));
 	}
 	UE_LOG(LogWildreach, Log, TEXT("SHRINE %s kindled by %s (%s)"), *ShrineId.ToString(), *PS->GetPlayerName(), bFirst ? TEXT("first") : TEXT("again"));
+	// The Toll Shrine lit: lanterns on the Fallen Span's hanging deck for good (cooks/biome-sky.md L3).
+	if (ShrineId == TEXT("sky_toll")) if (UWRSkyWorld* SW = UWRSkyWorld::Get(this)) SW->SetTollLit();
 	if (PC) WRSound::PlayUI(PC, TEXT("discover"));
 }
 

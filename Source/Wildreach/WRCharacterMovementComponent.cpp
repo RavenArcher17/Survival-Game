@@ -13,6 +13,8 @@
 #include "WRTuning.h"
 #include "WRGameplayTags.h"
 #include "WRLifeSkills.h"
+#include "WRSkyAir.h"
+#include "WRSkyIsleTypes.h"
 
 bool UWRCharacterMovementComponent::IsSprinting() const
 {
@@ -38,6 +40,11 @@ void UWRCharacterMovementComponent::BeginPlay()
 
 float UWRCharacterMovementComponent::GetMaxSpeed() const
 {
+	if (IsGliding())
+	{
+		FWRGlideParams P;
+		return WRSkyAir::GlideParams(CharacterOwner, P) ? P.Forward * 1.5f : 1000.f;
+	}
 	if (IsOnLadder())
 	{
 		return WRTune(TEXT("raiding.ladder.climbSpeed"), 180.f);
@@ -109,7 +116,44 @@ uint8 FSavedMove_WR::GetCompressedFlags() const
 void UWRCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
-	if (IsOnLadder() || !CharacterOwner || !(IsMovingOnGround() || IsFalling()))
+	if (IsOnLadder() || !CharacterOwner || !(IsMovingOnGround() || IsFalling() || IsGliding()))
+	{
+		return;
+	}
+	// The Sky's air (WRSkyAir): gusts on their lanes, a Gale's gusts, a lee rotor's down-gust. Pure functions of the
+	// server time and where you stand, so the server and the owning client push the same and it never corrects. Survivors
+	// on both machines; creatures on the server only (their clients just watch).
+	const bool bOwnerOrServer = CharacterOwner->GetPlayerState() ? CharacterOwner->GetLocalRole() != ROLE_SimulatedProxy : CharacterOwner->HasAuthority();
+	if (bOwnerOrServer && WRSkyIsles::Contains(UpdatedComponent->GetComponentLocation()))
+	{
+		const FVector Push = WRSkyAir::WindPushAt(CharacterOwner, UpdatedComponent->GetComponentLocation(), IsMovingOnGround());
+		if (!Push.IsNearlyZero())
+		{
+			FHitResult PushHit;
+			SafeMoveUpdatedComponent(Push * DeltaSeconds, UpdatedComponent->GetComponentQuat(), true, PushHit);
+			if (PushHit.IsValidBlockingHit()) SlideAlongSurface(Push * DeltaSeconds, 1.f - PushHit.Time, PushHit.Normal, PushHit, true);
+		}
+	}
+	// Open a glide: Jump pressed while already falling (not the press that jumped), 2 m of air under the feet.
+	if (IsFalling() && CharacterOwner->GetPlayerState() && CharacterOwner->bPressedJump && !CharacterOwner->bWasJumping)
+	{
+		FWRGlideParams Glide;
+		if (WRSkyAir::GlideParams(CharacterOwner, Glide))
+		{
+			const float Half = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			const FVector Feet = UpdatedComponent->GetComponentLocation() - FVector(0.f, 0.f, Half);
+			FHitResult Under;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRGlideOpen), false, CharacterOwner);
+			const float Need = WRTune(TEXT("glide.openAbove"), 200.f);
+			if (!GetWorld()->LineTraceSingleByChannel(Under, Feet, Feet - FVector(0.f, 0.f, Need), ECC_Visibility, Q))
+			{
+				GlideTime = 0.f;
+				SetMovementMode(MOVE_Custom, CMOVE_Glide);
+				return;
+			}
+		}
+	}
+	if (IsGliding())
 	{
 		return;
 	}
@@ -146,6 +190,11 @@ void UWRCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 
 void UWRCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterations)
 {
+	if (CustomMovementMode == CMOVE_Glide)
+	{
+		PhysGlide(DeltaTime, Iterations);
+		return;
+	}
 	if (CustomMovementMode != CMOVE_Ladder)
 	{
 		Super::PhysCustom(DeltaTime, Iterations);
@@ -252,4 +301,69 @@ void FSavedMove_WR::PrepMoveFor(ACharacter* C)
 FSavedMovePtr FNetworkPredictionData_Client_WR::AllocateNewMove()
 {
 	return FSavedMovePtr(new FSavedMove_WR());
+}
+
+void UWRCharacterMovementComponent::PhysGlide(float DeltaTime, int32 Iterations)
+{
+	if (DeltaTime < MIN_TICK_TIME || !CharacterOwner)
+	{
+		return;
+	}
+	FWRGlideParams G;
+	const AWRCharacterBase* Who = Cast<AWRCharacterBase>(CharacterOwner);
+	const UWRAttributeSet* Attr = Who ? Who->GetAttributes() : nullptr;
+	GlideTime += DeltaTime;
+	const FVector Loc = UpdatedComponent->GetComponentLocation();
+	const float Lift = WRSkyIsles::LiftAt(GetWorld(), Loc);
+	// Close: no glider any more (torn, dropped), Skysilk's seconds up, out of stamina outside a column, a stagger or a
+	// freeze, or Jump pressed again (not the press that opened it).
+	const bool bWantsClose = !WRSkyAir::GlideParams(CharacterOwner, G)
+		|| (G.MaxSeconds > 0.f && GlideTime > G.MaxSeconds)
+		|| (G.StaminaPerSecond > 0.f && Lift <= 50.f && Attr && Attr->GetStamina() <= 0.f)
+		|| (Who && (Who->HasTag(WRTags::Status_Staggered) || Who->HasTag(WRTags::Status_Frozen)))
+		|| (CharacterOwner->bPressedJump && GlideTime > WRTune(TEXT("glide.closeGuard"), 0.25f));
+	if (bWantsClose)
+	{
+		CharacterOwner->bPressedJump = false;
+		SetMovementMode(MOVE_Falling);
+		StartNewPhysics(DeltaTime, Iterations);
+		return;
+	}
+	// Heading: the move input steers (the camera's frame, as on foot), turning at the glider's rate; speed eases to its
+	// forward speed (a push or a dive's extra speed bleeds off, a slow entry picks up).
+	FVector2D H(Velocity.X, Velocity.Y);
+	FVector2D Dir = H.SizeSquared() > 100.f ? H.GetSafeNormal() : FVector2D(UpdatedComponent->GetForwardVector());
+	const FVector Accel = GetCurrentAcceleration();
+	if (Accel.SizeSquared2D() > 1.f)
+	{
+		const FVector2D Want = FVector2D(Accel).GetSafeNormal();
+		const float Cur = FMath::Atan2(Dir.Y, Dir.X), Tgt = FMath::Atan2(Want.Y, Want.X);
+		const float Delta = FMath::FindDeltaAngleRadians(Cur, Tgt);
+		const float Step = FMath::DegreesToRadians(G.TurnRate) * DeltaTime;
+		const float A = Cur + FMath::Clamp(Delta, -Step, Step);
+		Dir = FVector2D(FMath::Cos(A), FMath::Sin(A));
+	}
+	const float Speed = FMath::FInterpTo(H.Size(), G.Forward, DeltaTime, WRTune(TEXT("glide.speedEase"), 1.6f));
+	// Drift on the Sky's wind (x0.15 crude, x0.1 levistone), the rotors' shove, the sink and the lift.
+	FVector Shove = FVector::ZeroVector;
+	const float ExtraSink = WRSkyIsles::SinkAt(GetWorld(), Loc, Shove);
+	const FVector2D Wind = WRSkyIsles::Contains(Loc) ? WRSkyIsles::WindDir(GetWorld()) * WRTune(TEXT("glide.windSpeed"), 800.f) * WRSkyIsles::WindStrength(GetWorld()) * G.Drift : FVector2D::ZeroVector;
+	const float WantZ = -G.Sink - ExtraSink + Lift;
+	const float Vz = FMath::FInterpTo(Velocity.Z, WantZ, DeltaTime, WRTune(TEXT("glide.verticalEase"), 2.5f));
+	const FVector2D Horizontal = Dir * Speed;
+	Velocity = FVector(Horizontal.X, Horizontal.Y, Vz);
+	const FVector Move = (Velocity + FVector(Wind.X, Wind.Y, 0.f) + Shove) * DeltaTime;
+	const FQuat Face = FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.f).Quaternion();
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Move, FQuat::Slerp(UpdatedComponent->GetComponentQuat(), Face, FMath::Min(1.f, 8.f * DeltaTime)), true, Hit);
+	if (Hit.IsValidBlockingHit())
+	{
+		// Touching down on walkable ground ends the glide (the cloth folds as you land).
+		if (IsValidLandingSpot(UpdatedComponent->GetComponentLocation(), Hit))
+		{
+			ProcessLanded(Hit, DeltaTime * (1.f - Hit.Time), Iterations);
+			return;
+		}
+		SlideAlongSurface(Move, 1.f - Hit.Time, Hit.Normal, Hit, true);
+	}
 }

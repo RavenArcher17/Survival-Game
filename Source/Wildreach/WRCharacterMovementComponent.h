@@ -36,6 +36,15 @@ public:
 	 *  like walking. */
 	bool IsOnLadder() const { return MovementMode == MOVE_Custom && CustomMovementMode == CMOVE_Ladder; }
 	TWeakObjectPtr<class AWRSiegeLadder> Ladder;
+	/** Gliding (WRSkyAir, cooks/build-biome-sky.md 2.6): Jump while falling with 2 m of air under you and a glider in
+	 *  the bag (or the Wind path's Path Glide, or Skysilk's four pieces) opens it; Jump again, landing, a hit, running out
+	 *  of stamina or durability closes it. Decided from the same input and state on the predicting client and the
+	 *  server, so it's predicted like walking. */
+	static constexpr uint8 CMOVE_Glide = 2;
+	bool IsGliding() const { return MovementMode == MOVE_Custom && CustomMovementMode == CMOVE_Glide; }
+	/** Seconds this glide has carried you (Skysilk's 6 s limit; the reopen guard). */
+	float GlideTime = 0.f;
+	void PhysGlide(float DeltaTime, int32 Iterations);
 
 	virtual void BeginPlay() override;
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;

@@ -1,5 +1,6 @@
 #include "WRStatusComponent.h"
 #include "WRNecroPath.h"
+#include "WRSkyAir.h"
 #include "WRGraveCreatures.h"
 #include "WRVoid.h"
 #include "WRVoidPath.h"
@@ -798,7 +799,17 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	const float DrainPerSecond = bMountRates ? MountDrain : bFastStroke
 		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina"))) * (Survival ? Survival->SwimStaminaMult() : 1.f)
 		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f);
-	if (bSprintDraining && DrainPerSecond > 0.f)
+	// Gliding (WRSkyAir): its own stamina a second (none in an updraft); no regen while it carries you.
+	const float GlideDrain = WRSkyAir::GlideDrain(Owner);
+	if (GlideDrain >= 0.f)
+	{
+		if (GlideDrain > 0.f)
+		{
+			ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), FMath::Max(0.f, Attr->GetStamina() - GlideDrain * DeltaTime));
+		}
+		SinceStaminaUse = 0.f;
+	}
+	else if (bSprintDraining && DrainPerSecond > 0.f)
 	{
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() - DrainPerSecond * DeltaTime);
 		SinceStaminaUse = 0.f;

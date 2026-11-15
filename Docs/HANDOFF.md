@@ -333,6 +333,21 @@ The Blood Moon is `UWRGraveEvents` (world.json events.bloodmoon is scheduled by 
 `UWRGraveEvents::Sign / Rising / On` are what the rest asks). The Graveyard's ambient beds are `land.graveyard[.night]`
 and `zone.G1..G4 / zone.neck` rows; its music pools `<pool>.graveyard` and `boss.nhal`.
 
+Also since 0.7.1 (in progress): **the Sky islands, over the Hollow Cape north of the Storm peaks** (cooks/biome-sky.md,
+plan cooks/build-biome-sky.md). One generator: `node Tools/terrain/sky.mjs` writes the cape's ground
+(`Data/lands/sky.json` + `sky_ground.bin`: the Windward Cliffs, the downs, the Flue's crown, three camps) and
+`Data/sky.json` (44 islands with their shape rows, sites, kit, lifts, bridges, updrafts, gust lanes, hazards, the
+Undercloud, resources, the flyers' graph, arenas, the Turning Wind's splines), read by `FWRSkyIsleData`
+(`WRSkyIsleTypes`); it prints the island rules (>= 40 m, <= 220 m apart, every island glide-reachable). The Sky's code
+name space is `WRSkyIsles` (`WRSky` is the renderer's sky actor). Islands are built in code (`WRSkyIsland.cpp`: domed
+top, rim, root, keel crystals, caves) on every machine; places in `WRSkyScenery*.cpp` / `WRSkySites.cpp` on the forest's
+FBuild with the Sky's kit `WRSkyLook.h`; `UWRSkyWorld` runs it (lifts, stones, shards, lines, spots, caches). **Air is
+game-wide** (`WRSkyAir`): fall damage for everyone (tuning `fall`), gliding is the movement component's `CMOVE_Glide`
+(tuning `glide`), every push in the Sky goes through `WRSkyAir::Push` and gust lanes / Gale / rotors are pure functions
+of the server time (`WindPushAt`), so they predict. Numbers: tuning `skyWorld`, `glide`, `fall`, `hazards.sky`.
+Dev: `world sky ...`. Building the editor target while another project's editor has Live Coding open needs UBT's
+`-NoHotReloadFromIDE` (the Live Coding check keys on the shared engine's UnrealEditor.exe).
+
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
   never its own file in the world folder. Schema changes are a new `Data/db/migrations/NNNN_*.sql`. One server per world

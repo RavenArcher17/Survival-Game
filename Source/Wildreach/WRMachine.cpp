@@ -3,6 +3,7 @@
 // FWRMachineRep (WRMachineLook.cpp turns the parts, WRUIMachine.cpp is the screen).
 
 #include "WRMachine.h"
+#include "WRSkyIsleTypes.h"
 #include "WRTurret.h"
 #include "WRMachineLook.h"
 #include "WRBuilding.h"
@@ -316,6 +317,8 @@ float FWRMachines::WindAt(const UObject* WorldContext, const FVector& At, float&
 	const float Veer = FMath::Max(60.f, R(TEXT("wind.veerSeconds"), 5400.f));
 	OutYaw = FMath::Fmod(360.f * static_cast<float>(FMath::Fmod(T, Veer)) / Veer + 25.f * FMath::Sin(2.f * PI * t / 600.f), 360.f);
 	const FName Biome = WRBiome::At(WorldContext, At);
+	// The Sky islands keep their own wind: the prevailing east wind, swung by the Turning Wind (WRSkyIsleTypes).
+	if (Biome == WRSkyIsles::Biome()) OutYaw = FMath::Fmod(WRSkyIsles::WindYaw(WorldContext) + 360.f, 360.f);
 	const FString Biomes = FString::Printf(TEXT("wind.biomes.%s"), *Biome.ToString());
 	Strength *= R(*Biomes, 1.f);
 	if (const FWRWeatherKind* Kind = UWRWeatherSubsystem::ActiveKind(WorldContext, Biome))

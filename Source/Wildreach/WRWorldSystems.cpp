@@ -11,6 +11,7 @@
 #include "WRForestHazards.h"
 #include "WRForestWorld.h"
 #include "WRGraveWorld.h"
+#include "WRSkyWorld.h"
 #include "WRGraveTypes.h"
 #include "WRSwampBosses.h"
 #include "WRDeeds.h"
@@ -2412,6 +2413,11 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	{
 		// The Ancient forest's hazards and secrets (WRForestHazards, WRForestHollow): world fhaz use / secret x y z.
 		return WRForestHazards::Command(PC, Args);
+	}
+	if (Verb == TEXT("sky"))
+	{
+		// The Sky's world (WRSkyWorld): world sky shard | lift | line | spot.
+		return UWRSkyWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("grave"))
 	{

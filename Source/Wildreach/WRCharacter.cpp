@@ -256,6 +256,7 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRCharacter, bRangedMode);
 	DOREPLIFETIME(AWRCharacter, bAiming);
 	DOREPLIFETIME(AWRCharacter, SelectedAmmo);
+	DOREPLIFETIME(AWRCharacter, GliderKind);
 	DOREPLIFETIME(AWRCharacter, MeleeItem);
 	DOREPLIFETIME_CONDITION(AWRCharacter, ReplicatedAccel, COND_SimulatedOnly);
 }

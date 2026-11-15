@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRSkyAir.h"
 #include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "WRVoidPath.h"
@@ -884,6 +885,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Damage > 0.f)
 	{
 		Target->OnDamageTaken(Hit, Damage);
+		// The Sky's edge credit (whoever hit it in the last 6 s gets its fall) and a hit closing a glider (WRSkyAir).
+		WRSkyAir::NoteHit(Target, Hit.Instigator);
 		Target->Status->NotifyHurt();
 		// The forest: a blow on the Hornwarden's herd from a survivor or a tame enrages him (WRForestBosses.cpp).
 		FWRForestBoss::AnyDamage(Target, Hit, Damage);

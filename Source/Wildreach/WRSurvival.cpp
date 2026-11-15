@@ -42,6 +42,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "WRSkyIsleTypes.h"
 
 FWROnRest UWRSurvivalComponent::OnRest;
 
@@ -65,6 +66,9 @@ FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 	// Ash Sound, the neck north of the island's edge) once the land is live; the island's own ground stays the island's.
 	// The Swamp (cooks/build-biome-swamp.md 2.1, 2.10) is checked first: east of the Crown's east-face line and the
 	// Rime Sound frost-bog neck; the cliff face itself stays Storm peaks'.
+	// The Sky islands (cooks/build-biome-sky.md 2.1): the air over the Hollow Cape and the north-east sea, any altitude
+	// (the cape's ground is its runtime land, answered above). North of the Storm peaks' frame, so asked before them.
+	if (WRSkyIsles::Contains(Pos)) return WRSkyIsles::Biome();
 	static const FName Swamp(TEXT("swamp"));
 	if (WRSwamp::Contains(Pos)) return Swamp;
 	static const FName Storm(TEXT("storm_peaks"));
@@ -1153,7 +1157,7 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 		}
 		// Gusts: a whistle, then a shove along the storm's wind (one direction per storm, from when it was announced).
 		const FWRWeatherNow* W = UWRWeatherSubsystem::For(this, BiomeHere);
-		if (K->bGust && W && !bCountered && !bSheltered && At.Z >= K->GustMinZ)
+		if (K->bGust && W && !bCountered && !bSheltered && At.Z >= K->GustMinZ && BiomeHere != WRSkyIsles::Biome())   // the Sky's Gale gusts are WRSkyAir's (lanes, cells, tells)
 		{
 			if (NextGustAt < 0.f)
 			{
