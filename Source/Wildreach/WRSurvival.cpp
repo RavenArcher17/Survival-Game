@@ -3,6 +3,8 @@
 // and Data/weather.json.
 #include "WRSurvival.h"
 #include "WRNecroPath.h"
+#include "WRGraveEvents.h"
+#include "WRGraveTypes.h"
 #include "WRSwampSystems.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
@@ -1415,7 +1417,9 @@ void UWRSurvivalComponent::TickCorruption(AWRCharacterBase* Pawn, float DeltaTim
 		UWRLightSubsystem* Lights = UWRLightSubsystem::Get(this);
 		const bool bDark = AWRGameState::IsNightIn(this) || WRBiome::IsUnderground(this, At) || FWRBiomeHazards::KindAt(At) == TEXT("rift");
 		float Per = bDark ? T.Num(TEXT("corruption.buildNightSeconds"), 6.f) : T.Num(TEXT("corruption.buildDaySeconds"), 15.f);
-		float Rate = 1.f / FMath::Max(0.5f, Per) * WCorruption;
+		// The Blood Moon's Rising: corruption builds twice as fast on the Graveyard (WRGraveEvents).
+		const float BloodMoonMult = UWRGraveEvents::Rising(this) && WRGrave::Contains(Pawn->GetActorLocation()) ? WRTune(TEXT("graveyardEvents.bloodMoon.corruptionMult"), 2.f) : 1.f;
+		float Rate = 1.f / FMath::Max(0.5f, Per) * WCorruption * BloodMoonMult;
 		if (Lights && Lights->IsWarded(At)) Rate = 0.f;
 		else if (Lights && Lights->IsHalving(At)) Rate *= 0.5f;
 		// Gravecloth (four pieces) and the Bell clapper talisman slow it (Data/gear.json corruptionRate).

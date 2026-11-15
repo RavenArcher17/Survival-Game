@@ -764,6 +764,8 @@ bool FWRGraveBoss::TickIdle(AWRBoss* Boss, float DeltaSeconds, bool& bSkipWake)
 	FWRGraveBossState& St = GbS(Boss);
 	if (!St.bBegun) Begin(Boss);
 	if (St.Kind != TEXT("gravedigger")) return false;
+	// Leading the Graveyard's invasion through Rootgrave (world.json invasions): the raid brain has him.
+	if (Boss->bRaider) return false;
 	bSkipWake = false;
 	return TickDigger(Boss, St, DeltaSeconds);
 }

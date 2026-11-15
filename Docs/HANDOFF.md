@@ -329,6 +329,9 @@ death) and `WRAbilitiesNecro.*` (ClassForNode "necromancy"). A raised minion is 
 the `Status.Necro.Raised` tag: `CountTames`, the world save and the death loot skip it. Not built yet: the bone altar's
 permanent undead tames, Jolt of life / Blood bond / Rot and bloom, the Necromancy node icons (the path screen shows
 the nodes without their glyphs).
+The Blood Moon is `UWRGraveEvents` (world.json events.bloodmoon is scheduled by the world systems like the Bloom;
+`UWRGraveEvents::Sign / Rising / On` are what the rest asks). The Graveyard's ambient beds are `land.graveyard[.night]`
+and `zone.G1..G4 / zone.neck` rows; its music pools `<pool>.graveyard` and `boss.nhal`.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

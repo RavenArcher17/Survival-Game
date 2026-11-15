@@ -155,6 +155,21 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   built (their text says so). Raising through walls (raiding.paths.necromancy): a body you can't see within 12 m rises at
   3x the Souls. The body change is the hero's player_art row (paths.necromancy); Lich form shows the full ash look at any
   point count and each raise flares the pupil ring.
+- **The Blood Moon, the invasion, the Graveyard's sound** (piece 7; `WRGraveEvents.*`, world.json `events.bloodmoon` and
+  `invasions`, tuning `graveyardEvents.bloodMoon`, sounds.json beds and music pools): the Blood Moon comes about every
+  3 real days for one game day (the Biome events setting). Its sign: the red moon rises over the chapel and the
+  rust-red sky with it (`WRGraveSky::BloodMoon`, eased on every machine), the Belfry and the chapel tower toll once. The
+  Rising (20:00-05:00): corpse fog forced, corruption x2 on the land, processions of 4-8 Risen behind a lantern-bearer
+  form on the procession roads (one every 150 m where a survivor is within 400 m) and walk the road, or toward the
+  brightest light within 600 m, standing vigil at a camp's safe-zone edge; one destroyed forms again 6 minutes later;
+  the Bell-Ringer tolls every 15 s and the Gravedigger digs two more graves (piece 5); Necromancers' Souls x2 and raises
+  two at a time. Dawn: every procession Risen falls into a bone pile (bone, and half the time soulstone). The Graveyard
+  -> Forest invasion is filled (the Gravedigger leads 6 Gravehounds, Wraithmoths, a Cryptstalker and 4 Risen mourners
+  through Rootgrave; his night round waits while he raids). Ambient beds for the land (wind, night) and G1-G4 and the
+  neck; music pools explore / night / combat / mini .graveyard and boss.nhal. Beds and pools play existing recordings as
+  stand-ins (`_standin`); the Graveyard's composed score (54 BPM, F minor, organ and choir, the bell on F) is a later
+  cook. Not built: the processions' claim raids, the Mourning's x3 seams, the invasion signs (the Lantern Line lighting
+  itself, moss along the forest's road), the forest invasion's sealed band.
 
 ## Unreleased: the Ancient forest (the Nature land)
 

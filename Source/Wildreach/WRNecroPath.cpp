@@ -12,6 +12,7 @@
 #include "WRFx.h"
 #include "WRGameplayTags.h"
 #include "WRGraveCreatures.h"
+#include "WRGraveEvents.h"
 #include "WRGraveTypes.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
@@ -611,6 +612,8 @@ void WRNecro::OnKill(AWRCharacterBase* Target, const FWRHit& Hit)
 		const bool bHand = N == Killer || (When && T - *When <= NcT(TEXT("creditSeconds"), 10.f));
 		if (!bHand) continue;
 		float Amount = Base * (1.f + NcT(TEXT("harvestPerRank"), 0.2f) * NcRank(N, TEXT("harvest")));
+		// The Blood Moon's Rising: Souls twice over on the Graveyard.
+		if (UWRGraveEvents::Rising(N) && WRGrave::Contains(N->GetActorLocation())) Amount *= NcT(TEXT("bloodMoonSouls"), 2.f);
 		if (bMarked) Amount += NcRank(N, TEXT("death_mark"));
 		GainSouls(N, Amount, NcChest(Target), bReaped && N == Killer);
 	}

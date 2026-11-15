@@ -9,6 +9,8 @@
 #include "WRCombos.h"
 #include "WRCreature.h"
 #include "WRFx.h"
+#include "WRGraveEvents.h"
+#include "WRGraveTypes.h"
 #include "WRGameplayTags.h"
 #include "WRNecroPath.h"
 #include "WRPathComponent.h"
@@ -248,7 +250,9 @@ void UWRGA_RaiseDead::CastNecro(AWRCharacterBase* Caster)
 		Refund(Caster, TEXT("No body there fresh enough to raise"));
 		return;
 	}
-	const int32 N = WRNecro::MinionCap(Caster) > int32(WRTune(TEXT("necromancy.minionCap"), 3.f)) && UWRPathComponent::HasNode(Caster, TEXT("necromancy"), TEXT("second_wave")) ? 2 : 1;
+	int32 N = WRNecro::MinionCap(Caster) > int32(WRTune(TEXT("necromancy.minionCap"), 3.f)) && UWRPathComponent::HasNode(Caster, TEXT("necromancy"), TEXT("second_wave")) ? 2 : 1;
+	// The Blood Moon's Rising: raises come two at a time on the Graveyard.
+	if (UWRGraveEvents::Rising(Caster) && WRGrave::Contains(Caster->GetActorLocation())) N *= int32(WRTune(TEXT("necromancy.bloodMoonRaises"), 2.f));
 	// A body behind a wall (inside someone's base): raising through walls is a raider's tool (tuning
 	// raiding.paths.necromancy): within its reach, at its Soul cost multiple; where the server turns it off, only bodies
 	// you can see rise.

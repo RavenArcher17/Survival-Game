@@ -1041,7 +1041,14 @@
 			{"id": "forest.oldgrowth", "file": "amb/forest_oldgrowth", "volume": 0.6, "layer": "forest.oldgrowth"},
 			{"id": "forest.canopy", "file": "amb/forest_canopy", "volume": 0.6, "layer": "forest.canopy"},
 			{"id": "forest.hollow", "file": "amb/forest_hollow", "volume": 0.75, "layer": "forest.hollow"},
-			{"id": "forest.falls_near", "file": "amb/forest_falls", "volume": 0.9, "layer": "forest.falls_near"}
+			{"id": "forest.falls_near", "file": "amb/forest_falls", "volume": 0.9, "layer": "forest.falls_near"},
+			{"id": "graveyard.air", "file": "amb/high_wind", "volume": 0.22, "layer": "land.graveyard", "_standin": true, "_comment": "The downs' wind over the graves (stand-in: high_wind)."},
+			{"id": "graveyard.night", "file": "amb/night_insects", "volume": 0.16, "layer": "land.graveyard.night", "_standin": true, "_comment": "Night on the Graveyard: thin insects, the wind dropping (stand-in)."},
+			{"id": "graveyard.g1", "file": "amb/forest_meadows", "volume": 0.14, "layer": "zone.G1", "_standin": true, "_comment": "G1 the Grave Fields: open grass (stand-in)."},
+			{"id": "graveyard.g2", "file": "amb/storm_shrines", "volume": 0.2, "layer": "zone.G2", "_standin": true, "_comment": "G2 the Mausoleum Rows: stone streets, hollow air (stand-in)."},
+			{"id": "graveyard.g3", "file": "amb/swamp_bones", "volume": 0.28, "layer": "zone.G3", "_standin": true, "_comment": "G3 the Bone Pits: bone rattle in the wind (stand-in)."},
+			{"id": "graveyard.g4", "file": "amb/storm_cliffs", "volume": 0.22, "layer": "zone.G4", "_standin": true, "_comment": "G4 the Chapel Heights: high, open (stand-in)."},
+			{"id": "graveyard.neck", "file": "amb/coast_surf", "volume": 0.28, "layer": "zone.neck", "_standin": true, "_comment": "The south-west neck between two shores (stand-in)."}
 		]
 	},
 	"music": {
@@ -1123,7 +1130,12 @@
 			"camp.forest": [{"file": "music/forest_camp", "volume": 0.75}],
 			"village.forest": [{"file": "music/forest_village", "volume": 0.75}],
 			"layer.bloom": [{"file": "music/forest_bloom", "volume": 0.55}],
-			"layer.wild_hunt": [{"file": "music/forest_wild_hunt", "volume": 0.6}]
+			"layer.wild_hunt": [{"file": "music/forest_wild_hunt", "volume": 0.6}],
+			"explore.graveyard": [{"file": "music/night_cathedral", "volume": 0.7, "_standin": true}, {"file": "music/explore_winds", "volume": 0.7, "_standin": true}],
+			"night.graveyard": [{"file": "music/night_moon", "volume": 0.7, "_standin": true}, {"file": "music/night_cathedral", "volume": 0.7, "_standin": true}],
+			"combat.graveyard": [{"file": "music/combat", "volume": 0.8, "_standin": true}],
+			"mini.graveyard": [{"file": "music/storm_mini", "volume": 0.8, "_standin": true}],
+			"boss.nhal": [{"file": "music/storm_boss_b", "volume": 0.85, "_standin": true}]
 		}
 	}
 }
