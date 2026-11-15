@@ -3,6 +3,7 @@
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRSkyCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -1307,6 +1308,8 @@ void AWRCreature::BeginPlay()
 	UWRGraveBody::Attach(this);
 	// A Crystal caves creature's body state and look (WRCrystalCreatures).
 	UWRCrystalBody::Attach(this);
+	// A Sky islands creature's body state and look (WRSkyCreatures).
+	UWRSkyBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -2265,6 +2268,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRForestAI::Died(this, Killer);   // a forest creature lets go; chance drops; a Mossmaul's larder; a sign for the finches
 	FWRCrystalAI::Died(this, Killer);  // a Geodemite bursts; a hearing hunter stops listening
 	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
+	FWRSkyAI::Died(this, Killer);      // a Sky creature lets go; a Sailbell pops in fire or deflates and stings 60 s
 	// The Risen leave no body (GY 2.12.4): their bones go straight to the killer.
 	const bool bRaisedMinion = WRNecro::IsRaised(this);
 	const bool bBody = !FWRGraveAI::NoBody(this) && !bRaisedMinion && BecomeBody(Killer);
@@ -2833,6 +2837,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// The Sky's (a ring over its home node, a stoop on its line, grounded after, a hold, a parachute, a bloom's drift).
+	if (FWRSkyAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	// The Ancient forest creatures' own moments (a perch over a trail, a log at rest, a hold, a heat ball, a raid, a
 	// larder, the roar and the bugle, hovering, a cornered butt): WRForestCreatures.
 	if (FWRForestAI::TickWild(this, Self, DeltaSeconds))
@@ -3274,6 +3283,11 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 	if (FWRCrystalAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	// A tame Mistlark circling the nearest column (WRSkyCreatures).
+	if (FWRSkyAI::TickTame(this, Self, DeltaSeconds))
 	{
 		return;
 	}

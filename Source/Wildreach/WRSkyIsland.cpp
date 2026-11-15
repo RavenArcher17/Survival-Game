@@ -61,42 +61,42 @@ namespace WRSkyIslandImpl
 	{
 		const float Nz = N2(W.X / 900.f, W.Y / 900.f, I.Seed) * 0.5f + 0.5f;
 		const float Fine = N2(W.X / 140.f, W.Y / 140.f, I.Seed + 7) * 0.5f + 0.5f;
-		FLinearColor Turf = FMath::Lerp(SRGB(0x8F, 0xA7, 0x7A), SRGB(0x9D, 0xB5, 0x9A), Nz);     // wind-combed silver-green
+		FLinearColor Turf = FMath::Lerp(SkSRGB(0x8F, 0xA7, 0x7A), SkSRGB(0x9D, 0xB5, 0x9A), Nz);     // wind-combed silver-green
 		float Rough = 0.9f;
 		switch (I.Zone)
 		{
-		case '2': Turf = FMath::Lerp(SRGB(0x86, 0xA8, 0x6A), SRGB(0xB9, 0xA5, 0x5A), Nz * 0.45f); break;   // moss gold
-		case '3': Turf = FMath::Lerp(SRGB(0x8E, 0x9A, 0x78), SRGB(0xB7, 0xB3, 0xAA), 0.35f + 0.4f * Nz); break;  // thin grass on granite
-		case '4': Turf = FMath::Lerp(SRGB(0x9A, 0xAE, 0x8A), SRGB(0xD8, 0xD6, 0xCC), 0.25f * Nz); break;   // cold, short
-		case '5': Turf = FMath::Lerp(SRGB(0x6E, 0x7A, 0x66), SRGB(0x7E, 0x86, 0x7E), Nz); Rough = 0.6f; break; // wet grey
+		case '2': Turf = FMath::Lerp(SkSRGB(0x86, 0xA8, 0x6A), SkSRGB(0xB9, 0xA5, 0x5A), Nz * 0.45f); break;   // moss gold
+		case '3': Turf = FMath::Lerp(SkSRGB(0x8E, 0x9A, 0x78), SkSRGB(0xB7, 0xB3, 0xAA), 0.35f + 0.4f * Nz); break;  // thin grass on granite
+		case '4': Turf = FMath::Lerp(SkSRGB(0x9A, 0xAE, 0x8A), SkSRGB(0xD8, 0xD6, 0xCC), 0.25f * Nz); break;   // cold, short
+		case '5': Turf = FMath::Lerp(SkSRGB(0x6E, 0x7A, 0x66), SkSRGB(0x7E, 0x86, 0x7E), Nz); Rough = 0.6f; break; // wet grey
 		default: break;
 		}
 		FLinearColor Col = Turf;
-		if (I.Kind == TEXT("rock")) Col = FMath::Lerp(SRGB(0xB7, 0xB3, 0xAA), Turf, 0.35f * Fine);
+		if (I.Kind == TEXT("rock")) Col = FMath::Lerp(SkSRGB(0xB7, 0xB3, 0xAA), Turf, 0.35f * Fine);
 		if (I.Kind == TEXT("temple"))
 		{
 			// White paving in 1.8 m slabs with dark joints, grass in the cracks toward the rim.
 			const float Jx = FMath::Abs(FMath::Fmod(W.X + 100000.f, 180.f) - 90.f), Jy = FMath::Abs(FMath::Fmod(W.Y + 100000.f, 180.f) - 90.f);
 			const bool bJoint = Jx > 85.f || Jy > 85.f;
-			Col = Rho < 0.82f ? (bJoint ? SRGB(0x8E, 0x8A, 0x80) : FMath::Lerp(SRGB(0xF0, 0xED, 0xE6), SRGB(0xD8, 0xD3, 0xC8), Fine)) : FMath::Lerp(Turf, SRGB(0xE9, 0xE4, 0xD8), 0.4f * Fine);
+			Col = Rho < 0.82f ? (bJoint ? SkSRGB(0x8E, 0x8A, 0x80) : FMath::Lerp(SkSRGB(0xF0, 0xED, 0xE6), SkSRGB(0xD8, 0xD3, 0xC8), Fine)) : FMath::Lerp(Turf, SkSRGB(0xE9, 0xE4, 0xD8), 0.4f * Fine);
 			Rough = 0.75f;
 		}
 		if (I.Kind == TEXT("garden") || I.Terraces > 0)
 		{
 			// Old beds gone wild: flax-blue drifts and cloudberry amber in rows along the terraces.
 			const float Row = FMath::Abs(FMath::Sin(Rho * 40.f));
-			if (Row > 0.86f) Col = FMath::Lerp(Col, SRGB(0x6F, 0x8F, 0xC9), 0.55f * Nz);
-			else if (Row < 0.12f && Fine > 0.6f) Col = FMath::Lerp(Col, SRGB(0xE0, 0xA0, 0x40), 0.45f);
+			if (Row > 0.86f) Col = FMath::Lerp(Col, SkSRGB(0x6F, 0x8F, 0xC9), 0.55f * Nz);
+			else if (Row < 0.12f && Fine > 0.6f) Col = FMath::Lerp(Col, SkSRGB(0xE0, 0xA0, 0x40), 0.45f);
 		}
-		if (I.bLagoon && Rho > 0.62f && Rho < 0.8f) Col = FMath::Lerp(Col, SRGB(0xE8, 0xE2, 0xD8), 0.75f);   // the bone-white ring
+		if (I.bLagoon && Rho > 0.62f && Rho < 0.8f) Col = FMath::Lerp(Col, SkSRGB(0xE8, 0xE2, 0xD8), 0.75f);   // the bone-white ring
 		// Bare granite through the turf where it's steep and at the lip (the turf overhangs it).
 		const float Rock = FMath::Clamp((Slope - 0.45f) * 2.5f, 0.f, 1.f) + FMath::Clamp((Rho - 0.95f) * 12.f, 0.f, 0.6f);
-		Col = FMath::Lerp(Col, RimColour(I.Zone, Fine), FMath::Clamp(Rock, 0.f, 1.f));
+		Col = FMath::Lerp(Col, SkRimColour(I.Zone, Fine), FMath::Clamp(Rock, 0.f, 1.f));
 		if (bNearFlue || I.bSpore)
 		{
 			// The spore crust: grey over everything nearest the Flue, cyan specks.
-			Col = FMath::Lerp(Col, SRGB(0x8A, 0x8A, 0x80), I.bSpore ? 0.7f : 0.3f);
-			if (Fine > 0.93f) Col = SRGB(0x39, 0xE6, 0xC2) * 0.6f;
+			Col = FMath::Lerp(Col, SkSRGB(0x8A, 0x8A, 0x80), I.bSpore ? 0.7f : 0.3f);
+			if (Fine > 0.93f) Col = SkSRGB(0x39, 0xE6, 0xC2) * 0.6f;
 		}
 		Col.A = 1.f - Rough;
 		return Col;
@@ -208,12 +208,12 @@ void AWRSkyScenery::BuildIsland()
 			const FVector W = WorldOf(L) + FVector(0, 0, C0.Z + Zr);
 			// Colour: the zone's rock, darker and bluer with depth (the keel shows through), spore-grey near the Flue.
 			const float Fine = N2(W.X / 120.f, W.Z / 120.f, I.Seed + 3) * 0.5f + 0.5f;
-			FLinearColor Col = RimColour(I.Zone, Fine);
+			FLinearColor Col = SkRimColour(I.Zone, Fine);
 			if (!bRim)
 			{
 				Col *= FMath::Lerp(1.f, 0.72f, Tr);
-				if (Tr > 0.55f) Col = FMath::Lerp(Col, SRGB(0xA9, 0xC4, 0xD9) * 0.75f, FMath::Clamp((Tr - 0.55f) * 2.f, 0.f, 0.7f) * (0.5f + 0.5f * Fine));
-				if (bNearFlue || I.bSpore) Col = FMath::Lerp(Col, SRGB(0x8A, 0x8A, 0x80), (I.bSpore ? 0.75f : 0.45f) * (1.f - Tr * 0.4f));
+				if (Tr > 0.55f) Col = FMath::Lerp(Col, SkSRGB(0xA9, 0xC4, 0xD9) * 0.75f, FMath::Clamp((Tr - 0.55f) * 2.f, 0.f, 0.7f) * (0.5f + 0.5f * Fine));
+				if (bNearFlue || I.bSpore) Col = FMath::Lerp(Col, SkSRGB(0x8A, 0x8A, 0x80), (I.bSpore ? 0.75f : 0.45f) * (1.f - Tr * 0.4f));
 			}
 			Col.A = bRim ? 0.12f : 0.1f;
 			Row.Add(Rim.Add(FVector(L.X, L.Y, Zr), FVector(Dir.X, Dir.Y, bRim ? 0.f : -0.45f).GetSafeNormal(), Col, W));
@@ -245,7 +245,7 @@ void AWRSkyScenery::BuildIsland()
 		FVector Mid = FVector::ZeroVector;
 		for (int32 Ix : Last) Mid += Rim.V[Ix];
 		Mid /= Last.Num();
-		const int32 Tip = Rim.Add(Mid - FVector(0, 0, 300.f), -FVector::UpVector, SRGB(0xA9, 0xC4, 0xD9) * 0.7f, Xf.TransformPosition(Mid));
+		const int32 Tip = Rim.Add(Mid - FVector(0, 0, 300.f), -FVector::UpVector, SkSRGB(0xA9, 0xC4, 0xD9) * 0.7f, Xf.TransformPosition(Mid));
 		for (int32 s = 0; s < NS; ++s) Rim.T.Append({ Last[s], Tip, Last[(s + 1) % NS] });
 	}
 
@@ -277,17 +277,17 @@ void AWRSkyScenery::BuildIsland()
 		const float Len = (I.Beard > 0.f ? 600.f + I.Beard * 0.3f * B.Rand(k * 5 + 4) : 250.f + 650.f * B.Rand(k * 5 + 4)) * (0.6f + 0.4f * (1.f - Tr));
 		const FVector Dir = FVector(FMath::Cos(A) * 0.35f, FMath::Sin(A) * 0.35f, -1.f).GetSafeNormal();
 		const float Diam = Len * (0.16f + 0.08f * B.Rand(k * 7 + 5));
-		B.K.Spike(Levistone(0.6f), Base - Dir * Diam * 0.4f, Dir, Diam, Len);
-		B.N.Spike(LiftGlow(6.f), Base - Dir * Diam * 0.2f, Dir, Diam * 0.55f, Len * 1.03f);
+		B.K.Spike(SkLevistone(0.6f), Base - Dir * Diam * 0.4f, Dir, Diam, Len);
+		B.N.Spike(SkLiftGlow(6.f), Base - Dir * Diam * 0.2f, Dir, Diam * 0.55f, Len * 1.03f);
 		// Little ones round the big ones (a beard, not a spike).
 		for (int32 j = 0; j < 2; ++j)
 		{
 			const FVector Side = FVector(FMath::Cos(A + 1.7f * (j ? 1 : -1)), FMath::Sin(A + 1.7f * (j ? 1 : -1)), 0.f) * Diam * 0.6f;
-			B.K.Spike(Levistone(0.5f), Base + Side, (Dir + Side.GetSafeNormal() * 0.3f).GetSafeNormal(), Diam * 0.45f, Len * 0.45f);
+			B.K.Spike(SkLevistone(0.5f), Base + Side, (Dir + Side.GetSafeNormal() * 0.3f).GetSafeNormal(), Diam * 0.45f, Len * 0.45f);
 		}
 	}
 	// A dim cyan light under the bigger islands at night, so the keels throw a glow on their own undersides.
-	if (R > 7000.f) B.Lamp(FVector(TipOff, -RimH - Depth * 0.7f), SRGB(0xCF, 0xE9, 0xFF), 3500.f + R * 0.15f, R * 1.4f);
+	if (R > 7000.f) B.Lamp(FVector(TipOff, -RimH - Depth * 0.7f), SkSRGB(0xCF, 0xE9, 0xFF), 3500.f + R * 0.15f, R * 1.4f);
 	// Spore crust's cyan glow under the islands nearest the Flue (the Deepfarmers' mycelium).
 	if (bNearFlue || I.bSpore)
 	{
@@ -297,8 +297,8 @@ void AWRSkyScenery::BuildIsland()
 			const float Tr = 0.1f + 0.4f * B.Rand(k * 11 + 4);
 			const float Out = I.EdgeRadius(A) * FMath::Pow(1.f - Tr, 0.8f);
 			const FVector P = FVector(FVector2D(FMath::Cos(A), FMath::Sin(A)) * Out * 0.98f, -RimH - Depth * Tr);
-			B.Ball(P, 90.f + 110.f * B.Rand(k), SRGB(0x8A, 0x8A, 0x80) * 0.55f, 0.95f, 0.4f);
-			B.N.Add(WRSkyLook::SporeGlow(4.f), FVector(90.f, 70.f, 24.f), P + FVector(FMath::Cos(A), FMath::Sin(A), 0.f) * 40.f, FRotator(0.f, FMath::RadiansToDegrees(A), 0.f), EWRLookMesh::Cylinder);
+			B.Ball(P, 90.f + 110.f * B.Rand(k), SkSRGB(0x8A, 0x8A, 0x80) * 0.55f, 0.95f, 0.4f);
+			B.N.Add(WRSkyLook::SkSporeGlow(4.f), FVector(90.f, 70.f, 24.f), P + FVector(FMath::Cos(A), FMath::Sin(A), 0.f) * 40.f, FRotator(0.f, FMath::RadiansToDegrees(A), 0.f), EWRLookMesh::Cylinder);
 		}
 	}
 
@@ -307,7 +307,7 @@ void AWRSkyScenery::BuildIsland()
 	{
 		const float WZ = I.WaterZ() - WRSkyIsles::DriftOf(I.Index).Z - C0.Z;
 		const float WR = I.bLagoon ? I.RMin() * 0.74f : I.RMin() * 0.26f;
-		B.K.Disc(WRSkyLook::LagoonWater(), FVector(0, 0, WZ - 3.f), FVector::UpVector, WR * 2.f, 6.f);
+		B.K.Disc(WRSkyLook::SkLagoonWater(), FVector(0, 0, WZ - 3.f), FVector::UpVector, WR * 2.f, 6.f);
 		{
 			// The swimmable water is every machine's (the movement it gives is predicted).
 			FActorSpawnParameters SP;
@@ -348,16 +348,16 @@ void AWRSkyScenery::BuildIsland()
 			const FVector P1 = FMath::Lerp(TopLip, Mouth + FVector(Side * 160.f, 0.f), T1) + FVector(Out * 90.f, 0.f);
 			const FVector Mid = (P0 + P1) * 0.5f;
 			const float W = bSecret ? 200.f : 160.f;
-			B.K.Add(RimStone(I.Zone, 0.9f), FVector(FVector::Dist2D(P0, P1) + 20.f, W, 40.f), Mid - FVector(0, 0, 20.f), FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(P1.Y - P0.Y, P1.X - P0.X)), 0.f));
+			B.K.Add(SkRimStone(I.Zone, 0.9f), FVector(FVector::Dist2D(P0, P1) + 20.f, W, 40.f), Mid - FVector(0, 0, 20.f), FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(P1.Y - P0.Y, P1.X - P0.X)), 0.f));
 			B.Box(Mid - FVector(0, 0, 20.f), FVector(FVector::Dist2D(P0, P1) * 0.5f + 10.f, W * 0.5f, 20.f), FRotator(FMath::RadiansToDegrees(FMath::Atan2(P1.Z - P0.Z, FVector::Dist2D(P0, P1))) * -1.f, FMath::RadiansToDegrees(FMath::Atan2(P1.Y - P0.Y, P1.X - P0.X)), 0.f));
 			// A chain handrail on iron pins on the drop side (Kitewright work; the secret ledge has none).
 			if (!bSecret && st % 4 == 0)
 			{
 				const FVector Pin = Mid + FVector(Out * (W * 0.5f - 10.f), 0.f);
-				B.K.Rod(WRSkyLook::ChainIron(), Pin, Pin + FVector(0, 0, 100.f), 5.f);
+				B.K.Rod(WRSkyLook::SkChainIron(), Pin, Pin + FVector(0, 0, 100.f), 5.f);
 				const float T2 = FMath::Min(1.f, float(st + 4) / Steps);
 				const FVector Pin2 = FMath::Lerp(TopLip, Mouth + FVector(Side * 160.f, 0.f), T2) + FVector(Out * (90.f + W * 0.5f - 10.f), 0.f);
-				B.Line(Pin + FVector(0, 0, 95.f), Pin2 + FVector(0, 0, 95.f), 2.2f, 18.f, WRSkyLook::ChainC());
+				B.Line(Pin + FVector(0, 0, 95.f), Pin2 + FVector(0, 0, 95.f), 2.2f, 18.f, WRSkyLook::SkChainC());
 			}
 		}
 		// The tunnel and the chamber: floor, walls, ceiling (rock blocks with collision), dripping, dark.
@@ -368,14 +368,14 @@ void AWRSkyScenery::BuildIsland()
 			const FVector P(Out * D0, FloorZ);
 			const FRotator Rot(0.f, FMath::RadiansToDegrees(A), 0.f);
 			const float Wob = 40.f * N2(float(t), float(S.Cave), I.Seed);
-			B.K.Add(RimStone(I.Zone, 0.65f), FVector(270.f, 560.f, 60.f), P - FVector(0, 0, 30.f), Rot);
+			B.K.Add(SkRimStone(I.Zone, 0.65f), FVector(270.f, 560.f, 60.f), P - FVector(0, 0, 30.f), Rot);
 			B.Box(P - FVector(0, 0, 30.f), FVector(140.f, 280.f, 30.f), Rot);
 			for (int32 sd = -1; sd <= 1; sd += 2)
 			{
-				B.K.Add(RimStone(I.Zone, 0.55f), FVector(270.f, 80.f, 520.f), P + FVector(Side * (300.f + Wob) * sd, 250.f), Rot);
+				B.K.Add(SkRimStone(I.Zone, 0.55f), FVector(270.f, 80.f, 520.f), P + FVector(Side * (300.f + Wob) * sd, 250.f), Rot);
 				B.Box(P + FVector(Side * (300.f + Wob) * sd, 250.f), FVector(140.f, 40.f, 260.f), Rot);
 			}
-			B.K.Add(RimStone(I.Zone, 0.5f), FVector(270.f, 640.f, 80.f), P + FVector(0, 0, 500.f + Wob), Rot);
+			B.K.Add(SkRimStone(I.Zone, 0.5f), FVector(270.f, 640.f, 80.f), P + FVector(0, 0, 500.f + Wob), Rot);
 			B.Box(P + FVector(0, 0, 500.f + Wob), FVector(140.f, 320.f, 40.f), Rot);
 		}
 		const FVector Ch(Out * (Edge - TunnelLen - 900.f), FloorZ);
@@ -386,22 +386,22 @@ void AWRSkyScenery::BuildIsland()
 			// Leave the side the tunnel comes in by open.
 			if (FVector2D::DotProduct(Wd, Out) > 0.93f) continue;
 			const FVector P = Ch + FVector(Wd * 950.f, 300.f);
-			B.K.Add(RimStone(I.Zone, 0.5f), FVector(80.f, 460.f, 700.f), P, FRotator(0.f, FMath::RadiansToDegrees(Wa), 0.f));
+			B.K.Add(SkRimStone(I.Zone, 0.5f), FVector(80.f, 460.f, 700.f), P, FRotator(0.f, FMath::RadiansToDegrees(Wa), 0.f));
 			B.Box(P, FVector(40.f, 230.f, 350.f), FRotator(0.f, FMath::RadiansToDegrees(Wa), 0.f));
 		}
-		B.K.Disc(RimStone(I.Zone, 0.6f), Ch - FVector(0, 0, 30.f), FVector::UpVector, 2000.f, 60.f);
+		B.K.Disc(SkRimStone(I.Zone, 0.6f), Ch - FVector(0, 0, 30.f), FVector::UpVector, 2000.f, 60.f);
 		B.Box(Ch - FVector(0, 0, 30.f), FVector(980.f, 980.f, 30.f));
-		B.K.Disc(RimStone(I.Zone, 0.45f), Ch + FVector(0, 0, 680.f), FVector::UpVector, 2000.f, 80.f);
+		B.K.Disc(SkRimStone(I.Zone, 0.45f), Ch + FVector(0, 0, 680.f), FVector::UpVector, 2000.f, 80.f);
 		B.Box(Ch + FVector(0, 0, 680.f), FVector(980.f, 980.f, 40.f));
 		// Its levistone cores glow from the walls; a drip loop; the third cave's Hushwing nest (SKY 2.8).
 		for (int32 c = 0; c < 6; ++c)
 		{
 			const float Wa = A + PI + (c - 2.5f) * 0.55f;
 			const FVector P = Ch + FVector(FVector2D(FMath::Cos(Wa), FMath::Sin(Wa)) * 900.f, 120.f + 260.f * B.Rand(c + 40));
-			B.K.Spike(Levistone(0.8f), P, FVector(-FMath::Cos(Wa), -FMath::Sin(Wa), 0.3f).GetSafeNormal(), 60.f, 160.f);
-			B.N.Spike(LiftGlow(5.f), P, FVector(-FMath::Cos(Wa), -FMath::Sin(Wa), 0.3f).GetSafeNormal(), 34.f, 168.f);
+			B.K.Spike(SkLevistone(0.8f), P, FVector(-FMath::Cos(Wa), -FMath::Sin(Wa), 0.3f).GetSafeNormal(), 60.f, 160.f);
+			B.N.Spike(SkLiftGlow(5.f), P, FVector(-FMath::Cos(Wa), -FMath::Sin(Wa), 0.3f).GetSafeNormal(), 34.f, 168.f);
 		}
-		B.Lamp(Ch + FVector(0, 0, 250.f), SRGB(0xCF, 0xE9, 0xFF), 900.f, 1600.f);
+		B.Lamp(Ch + FVector(0, 0, 250.f), SkSRGB(0xCF, 0xE9, 0xFF), 900.f, 1600.f);
 		B.Loop(TEXT("sky.caveDrip"), Ch + FVector(0, 0, 600.f));
 		if (bSecret)
 		{

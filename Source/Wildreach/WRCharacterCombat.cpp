@@ -3,6 +3,7 @@
 #include "WRCharacter.h"
 #include "WRGraveBosses.h"
 #include "WRGraveCreatures.h"
+#include "WRSkyCreatures.h"
 #include "Wildreach.h"
 #include "WRCameraBoom.h"
 #include "WRCreature.h"
@@ -65,6 +66,12 @@ void AWRCharacter::ServerMashFrozen_Implementation()
 	if (FWRGraveAI::HolderOf(this))
 	{
 		FWRGraveAI::Mash(this);
+		return;
+	}
+	// Pinned on a Gallowshrike's thorn or wrapped in a Hushwing's wings (WRSkyCreatures).
+	if (FWRSkyAI::HolderOf(this))
+	{
+		FWRSkyAI::Mash(this);
 		return;
 	}
 	Status->MashFrozen();

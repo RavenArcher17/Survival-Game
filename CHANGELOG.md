@@ -258,6 +258,37 @@ played here (Aaron and the testers test, F8). This first piece is the land, the 
   in `WRSkyAir` (`StepDeeds`). The Turning Wind's event row (every 72 h, one game day, levistone x3); the Wind -> Spore
   invasion through the Flue (dormant until the Fungal caverns are live; Kyrra leads). Weather to the cook's table: Clear
   45, Overcast 10, Rain 10, Cloud fog 15 (40 m), Gale 20.
+- **The nine creatures** (piece 4; `WRSkyCreatures.*`, `WRSkyCreatureAI.cpp`, `WRSkyBeast.*`; rows in `creatures.json`,
+  `attacks.json`, tuning `skyLife`; cooks/biome-sky.md 2.9): the **Galeharrier** (the Griffon rig at 2.8 m: double crest
+  tipped teal that flares before the stoop, black hood with a white face-ring, yellow feet with black talons), the
+  **Skyray** (a 9 m manta built in code: charcoal flecked back, a belly blotched black in its own pattern, mouth slot and
+  gill slits, horn-lobes rolled into spirals that unroll for the Undertow, a barbed whip tail, a violet rim that glows
+  at night; its wings move in a travelling wave root to tip, it banks and pitches, dies belly-up), the **Windmane** (now
+  its own: the Frostantler rig with four feathered wings, fore and hind beating out of phase in flight and folded on
+  the ground, a streaming silver mane, dark antler tips; 200/32/55, flies 1,600), the **Cloudback** (a 7 m whale in code
+  floating 2 m up on its glowing barnacle hump, throat grooves, a fluke beating up and down, a jaw that drops), the
+  **Mistlark** (flocks circling the updraft columns, roosting at night), the **Puffwing** (soft wings, red shield, blue
+  breast; it parachutes off edges and walks home later), the **Gallowshrike** (bandit mask, hooked beak, short black
+  wings, dagger claws), the **Hushwing** (frogmouth gape that splits, a pale facial disc, amber eyes; sleeps in the
+  Undercloud roost and the third cave by day, hunts above 700 m at night and by day in Cloud fog) and the **Sailbell**
+  (a code-built gas float, violet crest-sail and a 12 m curtain of fourteen beaded strands hanging like chains, swaying
+  down their length, sweeping out in the Lash). Every attack row from the cook (34) with its tells; the stoop climbs to
+  its fold point and comes down a locked line at 36 m/s (grounded after, or hanging on its wings over open air); the
+  Undertow pulls 500 cm/s in its 15 m cone through `WRSkyAir::Push` (a 30-stance blow to the mouth breaks it); the
+  belly-flop rises 15 m, its shadow grows, an impact ring; the impale pins you to the nearest thorn or kite stake (bleed
+  60, mash) or throws you 4 m; the smother wraps you 3 s (allies' 60 stance frees you); the takeoff gust rings out and
+  it comes back down with a charge; the spout throws whoever's on the Cloudback 6 m up; the Hushwing's swoop starts only
+  on your screen or within 8 m; the Galeharrier picks a gliding survivor first and steals raw meat; the meat theft, the
+  rattle (once a fight, 50 m), the hop-glide across gaps (Gallowshrikes never walk off an island; other ground creatures
+  watch from the lip). The curtain stings anything passing under it; a Sailbell killed by fire pops, any other death
+  leaves its curtain stinging 60 s. Creature knockback in the Sky goes through `WRSkyAir::Push` (brace, anchor boots,
+  the edge credit). **Populations** on the islands (`UWRSkyLife`, tuning `skyLife.populations`: soaring pairs over the
+  Lift Steps and the bridges, rays off the lips, the Mane Ledges' herd, pods over the lagoon, flocks per column, roosts,
+  blooms across the gaps) kept while someone's near and refilled out of sight; the beats: Mistlarks scatter on a gust's
+  tell, Skyrays breach at dusk in a Gale, the Windmanes fly to graze Flax Isle at dawn and back. Windmane nests on the
+  two ledges with their clutch (E 2 s takes an egg; the herd within 60 m comes for you). Shrine guards now spawn. 11 fx
+  rows, 38 sound rows and 8 creature voices (stand-ins from the nearest families: the Sky's own recordings are the audio
+  cook's), covering every sound the Sky's earlier pieces call too.
 
 ## Unreleased: the Graveyard (the Necromancy land)
 

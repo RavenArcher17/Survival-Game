@@ -1,6 +1,7 @@
 // The Sky's world (see WRSkyWorld.h; cooks/build-biome-sky.md 2.2-2.10, 2.15-2.16).
 
 #include "WRSkyWorld.h"
+#include "WRSkyCreatures.h"
 #include "Wildreach.h"
 #include "WRSkyIsleTypes.h"
 #include "WRSkyLook.h"
@@ -243,6 +244,8 @@ void AWRSkySpot::Finish()
 	DoneBy.Add(Who, GameHours(this));
 	UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(P);
 	TArray<FString> Got;
+	// An egg out of a Windmane nest: the herd comes for the thief (WRSkyCreatures).
+	if (Kind == TEXT("nest")) if (UWRSkyLife* L = UWRSkyLife::Get(this)) L->EggTaken(GetActorLocation(), P);
 	for (const TPair<FName, int32>& G : Gives)
 	{
 		int32 N = G.Value;
@@ -418,33 +421,33 @@ void AWRSkyLift::BuildLook()
 		// Stages: the foot's timber deck on the cliff top, the top's deck out over the lip.
 		for (const FVector& St : { FVector(0, 0, 0), Top })
 		{
-			B.K.Add(Plank(0.85f), FVector(520.f, 420.f, 20.f), St + FVector(-150.f, 0, -10.f), FRotator::ZeroRotator);
+			B.K.Add(SkPlank(0.85f), FVector(520.f, 420.f, 20.f), St + FVector(-150.f, 0, -10.f), FRotator::ZeroRotator);
 			B.Box(St + FVector(-150.f, 0, -10.f), FVector(260.f, 210.f, 10.f));
-			for (int32 c = 0; c < 4; ++c) B.K.Rod(Cedar(0.8f), St + FVector(-150.f + (c % 2 ? 250.f : -250.f), (c / 2 ? 200.f : -200.f), -10.f), St + FVector(-150.f + (c % 2 ? 250.f : -250.f), (c / 2 ? 200.f : -200.f), -350.f), 14.f);
+			for (int32 c = 0; c < 4; ++c) B.K.Rod(SkCedar(0.8f), St + FVector(-150.f + (c % 2 ? 250.f : -250.f), (c / 2 ? 200.f : -200.f), -10.f), St + FVector(-150.f + (c % 2 ? 250.f : -250.f), (c / 2 ? 200.f : -200.f), -350.f), 14.f);
 			// The gate rail round the stage's open edge (the cage's side open).
-			B.K.Rod(Cedar(0.85f), St + FVector(-400.f, -200.f, 100.f), St + FVector(-400.f, 200.f, 100.f), 8.f);
+			B.K.Rod(SkCedar(0.85f), St + FVector(-400.f, -200.f, 100.f), St + FVector(-400.f, 200.f, 100.f), 8.f);
 		}
 		// The headframe: A-frames either side of the cage shaft.
 		for (int32 e = -1; e <= 1; e += 2)
 		{
 			const FVector Y(0, 220.f * e, 0);
-			B.K.Rod(Cedar(0.85f), Top + Y + FVector(-260.f, 0, 0), Top + Y + FVector(0, 0, 900.f), 26.f, true);
-			B.K.Rod(Cedar(0.85f), Top + Y + FVector(260.f, 0, 0), Top + Y + FVector(0, 0, 900.f), 26.f, true);
-			B.K.Rod(Cedar(0.8f), Top + Y + FVector(-160.f, 0, 350.f), Top + Y + FVector(160.f, 0, 350.f), 16.f, true);
+			B.K.Rod(SkCedar(0.85f), Top + Y + FVector(-260.f, 0, 0), Top + Y + FVector(0, 0, 900.f), 26.f, true);
+			B.K.Rod(SkCedar(0.85f), Top + Y + FVector(260.f, 0, 0), Top + Y + FVector(0, 0, 900.f), 26.f, true);
+			B.K.Rod(SkCedar(0.8f), Top + Y + FVector(-160.f, 0, 350.f), Top + Y + FVector(160.f, 0, 350.f), 16.f, true);
 			B.Box(Top + Y + FVector(0, 0, 450.f), FVector(30.f, 20.f, 450.f));
 		}
-		B.K.Rod(Cedar(0.9f), Top + FVector(0, -260.f, 900.f), Top + FVector(0, 260.f, 900.f), 34.f, true);
+		B.K.Rod(SkCedar(0.9f), Top + FVector(0, -260.f, 900.f), Top + FVector(0, 260.f, 900.f), 34.f, true);
 		// The winch beside the frame: drum, spokes, a crank handle, the pawl on its ratchet.
 		const FVector Wn = Top + FVector(-420.f, 300.f, 0.f);
-		B.K.Add(Cedar(0.85f), FVector(120.f, 120.f, 160.f), Wn + FVector(0, 0, 90.f), FRotator(0.f, 0.f, 90.f), EWRLookMesh::Cylinder);
-		for (int32 e = -1; e <= 1; e += 2) B.K.Add(Cedar(0.75f), FVector(30.f, 160.f, 140.f), Wn + FVector(0, 90.f * e, 70.f), FRotator::ZeroRotator);
-		B.K.Disc(RustIron(), Wn + FVector(0, 96.f, 90.f), FVector(0, 1, 0), 140.f, 10.f);
+		B.K.Add(SkCedar(0.85f), FVector(120.f, 120.f, 160.f), Wn + FVector(0, 0, 90.f), FRotator(0.f, 0.f, 90.f), EWRLookMesh::Cylinder);
+		for (int32 e = -1; e <= 1; e += 2) B.K.Add(SkCedar(0.75f), FVector(30.f, 160.f, 140.f), Wn + FVector(0, 90.f * e, 70.f), FRotator::ZeroRotator);
+		B.K.Disc(SkRustIron(), Wn + FVector(0, 96.f, 90.f), FVector(0, 1, 0), 140.f, 10.f);
 		B.Box(Wn + FVector(0, 0, 80.f), FVector(70.f, 100.f, 80.f));
 		const FVector WnF = FVector(-420.f, 300.f, 0.f);
-		B.K.Add(Cedar(0.85f), FVector(120.f, 120.f, 160.f), WnF + FVector(0, 0, 90.f), FRotator(0.f, 0.f, 90.f), EWRLookMesh::Cylinder);
+		B.K.Add(SkCedar(0.85f), FVector(120.f, 120.f, 160.f), WnF + FVector(0, 0, 90.f), FRotator(0.f, 0.f, 90.f), EWRLookMesh::Cylinder);
 		B.Box(WnF + FVector(0, 0, 80.f), FVector(70.f, 100.f, 80.f));
 		// The brazier on the headframe's top (L6's night read).
-		Brazier(B, Top + FVector(-200.f, -320.f, 0.f), 3200.f);
+		SkBrazier(B, Top + FVector(-200.f, -320.f, 0.f), 3200.f);
 		B.Finish();
 		Frame->SetOwner(this);
 	}
@@ -465,18 +468,18 @@ void AWRSkyLift::BuildLook()
 	};
 	Blocks(Cage, [](WRLookKit::FKit& K)
 	{
-		for (int32 c = 0; c < 4; ++c) K.Rod(RustIron(), FVector((c % 2 ? 120.f : -120.f), (c / 2 ? 120.f : -120.f), 0), FVector((c % 2 ? 120.f : -120.f), (c / 2 ? 120.f : -120.f), 260.f), 8.f, true);
+		for (int32 c = 0; c < 4; ++c) K.Rod(SkRustIron(), FVector((c % 2 ? 120.f : -120.f), (c / 2 ? 120.f : -120.f), 0), FVector((c % 2 ? 120.f : -120.f), (c / 2 ? 120.f : -120.f), 260.f), 8.f, true);
 		for (int32 r = 0; r < 4; ++r)
 		{
 			const float Z = r < 2 ? 100.f + r * 10.f : 255.f;
-			K.Rod(RustIron(), FVector(-120, -120, Z), FVector(120, -120, Z), 5.f);
-			K.Rod(RustIron(), FVector(-120, 120, Z), FVector(120, 120, Z), 5.f);
-			K.Rod(RustIron(), FVector(120, -120, Z), FVector(120, 120, Z), 5.f);
-			if (r != 0) K.Rod(RustIron(), FVector(-120, -120, Z), FVector(-120, 120, Z), 5.f);
+			K.Rod(SkRustIron(), FVector(-120, -120, Z), FVector(120, -120, Z), 5.f);
+			K.Rod(SkRustIron(), FVector(-120, 120, Z), FVector(120, 120, Z), 5.f);
+			K.Rod(SkRustIron(), FVector(120, -120, Z), FVector(120, 120, Z), 5.f);
+			if (r != 0) K.Rod(SkRustIron(), FVector(-120, -120, Z), FVector(-120, 120, Z), 5.f);
 		}
-		K.Add(Plank(0.85f), FVector(240.f, 240.f, 10.f), FVector(0, 0, 0), FRotator::ZeroRotator);
-		K.Rod(RustIron(), FVector(0, 0, 260.f), FVector(0, 0, 300.f), 10.f);
-		K.Add(LampGlow(5.f), FVector(20.f, 20.f, 30.f), FVector(110.f, 110.f, 230.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		K.Add(SkPlank(0.85f), FVector(240.f, 240.f, 10.f), FVector(0, 0, 0), FRotator::ZeroRotator);
+		K.Rod(SkRustIron(), FVector(0, 0, 260.f), FVector(0, 0, 300.f), 10.f);
+		K.Add(SkLampGlow(5.f), FVector(20.f, 20.f, 30.f), FVector(110.f, 110.f, 230.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 	});
 	// The cage's collision: floor and the three rails (the open side is the gate onto each stage).
 	for (const FVector& Bx : { FVector(0, 0, 0) })
@@ -499,20 +502,20 @@ void AWRSkyLift::BuildLook()
 	}
 	Blocks(Weight, [](WRLookKit::FKit& K)
 	{
-		K.Add(CliffGranite(0.9f), FVector(200.f, 150.f, 200.f), FVector(0, 0, -120.f), FRotator::ZeroRotator);
-		for (int32 b = 0; b < 3; ++b) K.Add(RustIron(), FVector(212.f, 162.f, 14.f), FVector(0, 0, -200.f + b * 80.f), FRotator::ZeroRotator);
-		K.Rod(RustIron(), FVector(0, 0, -20.f), FVector(0, 0, 40.f), 10.f);
+		K.Add(SkCliffGranite(0.9f), FVector(200.f, 150.f, 200.f), FVector(0, 0, -120.f), FRotator::ZeroRotator);
+		for (int32 b = 0; b < 3; ++b) K.Add(SkRustIron(), FVector(212.f, 162.f, 14.f), FVector(0, 0, -200.f + b * 80.f), FRotator::ZeroRotator);
+		K.Rod(SkRustIron(), FVector(0, 0, -20.f), FVector(0, 0, 40.f), 10.f);
 	});
 	Blocks(Sheave, [](WRLookKit::FKit& K)
 	{
-		K.Disc(RustIron(), FVector::ZeroVector, FVector(0, 1, 0), 320.f, 14.f);
-		for (int32 s = 0; s < 8; ++s) { const float A = s * PI / 4.f; K.Rod(RustIron(), FVector::ZeroVector, FVector(FMath::Cos(A) * 150.f, 0, FMath::Sin(A) * 150.f), 8.f); }
-		K.Add(Bronze(), FVector(40.f, 60.f, 40.f), FVector::ZeroVector, FRotator(0.f, 0.f, 90.f), EWRLookMesh::Cylinder);
+		K.Disc(SkRustIron(), FVector::ZeroVector, FVector(0, 1, 0), 320.f, 14.f);
+		for (int32 s = 0; s < 8; ++s) { const float A = s * PI / 4.f; K.Rod(SkRustIron(), FVector::ZeroVector, FVector(FMath::Cos(A) * 150.f, 0, FMath::Sin(A) * 150.f), 8.f); }
+		K.Add(SkBronze(), FVector(40.f, 60.f, 40.f), FVector::ZeroVector, FRotator(0.f, 0.f, 90.f), EWRLookMesh::Cylinder);
 	});
 	Blocks(Crank, [](WRLookKit::FKit& K)
 	{
-		K.Rod(RustIron(), FVector(0, 0, 0), FVector(0, 0, 60.f), 6.f);
-		K.Rod(Cedar(0.9f), FVector(0, 0, 60.f), FVector(0, 30.f, 60.f), 7.f);
+		K.Rod(SkRustIron(), FVector(0, 0, 0), FVector(0, 0, 60.f), 6.f);
+		K.Rod(SkCedar(0.9f), FVector(0, 0, 60.f), FVector(0, 30.f, 60.f), 7.f);
 	});
 	// The chains: from the sheave down to the cage's top, and its far fall to the counterweight (rebuilt as they run).
 	if (!bServer)
@@ -547,8 +550,8 @@ void AWRSkyLift::Place(float Pos)
 		const FVector Sh(0, 0, Rise + 900.f);
 		for (int32 e = -1; e <= 1; e += 2)
 		{
-			M.Tube({ Sh + FVector(-150.f, 20.f * e, 0), FVector(0, 20.f * e, CageZ + 300.f) }, 3.5f, 6, ChainC(), 0.7f);
-			M.Tube({ Sh + FVector(150.f, 20.f * e, 0), FVector(260.f, 20.f * e, Rise - CageZ + 440.f) }, 3.5f, 6, ChainC(), 0.7f);
+			M.Tube({ Sh + FVector(-150.f, 20.f * e, 0), FVector(0, 20.f * e, CageZ + 300.f) }, 3.5f, 6, SkChainC(), 0.7f);
+			M.Tube({ Sh + FVector(150.f, 20.f * e, 0), FVector(260.f, 20.f * e, Rise - CageZ + 440.f) }, 3.5f, 6, SkChainC(), 0.7f);
 		}
 		M.ApplyTo(CageChains);
 	}
@@ -645,13 +648,13 @@ void AWRSkyShard::BeginPlay()
 	for (int32 c = 0; c < FMath::Clamp(Count, 1, 6); ++c)
 	{
 		const FVector D = FVector(FMath::Cos(c * 2.1f) * 0.4f, FMath::Sin(c * 2.1f) * 0.4f, 1.f).GetSafeNormal();
-		K.Spike(LiftGlow(3.f), FVector(FMath::Cos(c * 2.1f) * 10.f, FMath::Sin(c * 2.1f) * 10.f, -10.f), D, 10.f, 30.f + 6.f * c);
-		K.Spike(LiftGlow(3.f), FVector(FMath::Cos(c * 2.1f) * 10.f, FMath::Sin(c * 2.1f) * 10.f, -10.f), -D, 8.f, 14.f);
+		K.Spike(SkLiftGlow(3.f), FVector(FMath::Cos(c * 2.1f) * 10.f, FMath::Sin(c * 2.1f) * 10.f, -10.f), D, 10.f, 30.f + 6.f * c);
+		K.Spike(SkLiftGlow(3.f), FVector(FMath::Cos(c * 2.1f) * 10.f, FMath::Sin(c * 2.1f) * 10.f, -10.f), -D, 8.f, 14.f);
 	}
 	FWRBuildLook::Spawn(this, Look, Bl, FLinearColor::Black, false);
 	Glow = NewObject<UPointLightComponent>(this);
 	Glow->SetupAttachment(Look);
-	Glow->SetLightColor(SRGB(0xCF, 0xE9, 0xFF));
+	Glow->SetLightColor(SkSRGB(0xCF, 0xE9, 0xFF));
 	Glow->SetIntensity(1800.f);
 	Glow->SetAttenuationRadius(500.f);
 	Glow->SetCastShadows(false);
@@ -766,7 +769,7 @@ void AWRSkyLine::BuildLook()
 	TArray<FVector> Pts;
 	const int32 N = FMath::Clamp(int32(FVector::Dist(A, B) / 300.f), 8, 120);
 	for (int32 i = 0; i <= N; ++i) Pts.Add(PointAt(float(i) / N) - GetActorLocation());
-	M.Tube(Pts, 3.f, 6, ChainC(), 0.7f);
+	M.Tube(Pts, 3.f, 6, SkChainC(), 0.7f);
 	TArray<FVector> Spiral;
 	for (int32 i = 0; i <= N * 4; ++i)
 	{
@@ -774,7 +777,7 @@ void AWRSkyLine::BuildLook()
 		const FVector P = PointAt(T) - GetActorLocation();
 		Spiral.Add(P + FVector(FMath::Cos(i * 1.3f) * 4.f, FMath::Sin(i * 1.3f) * 4.f, 0.f));
 	}
-	M.Tube(Spiral, 1.2f, 4, SRGB(0xE8, 0xEE, 0xF2) * 0.6f, 0.9f);
+	M.Tube(Spiral, 1.2f, 4, SkSRGB(0xE8, 0xEE, 0xF2) * 0.6f, 0.9f);
 	UProceduralMeshComponent* P = NewObject<UProceduralMeshComponent>(this);
 	P->SetupAttachment(GetRootComponent());
 	P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -894,12 +897,12 @@ void AWRSkyStones::BuildLook()
 		if (bServer) continue;
 		TArray<FWRLookBlock> Bl, Gl;
 		WRLookKit::FKit K(P->GetComponentTransform(), Bl), KG(G->GetComponentTransform(), Gl);
-		K.Add(Limestone(0.85f), FVector(S.Size * 0.85f, S.Size * 0.72f, 80.f), FVector(0, 0, -40.f), FRotator(0.f, k * 37.f, 0.f), EWRLookMesh::Cylinder);
+		K.Add(SkLimestone(0.85f), FVector(S.Size * 0.85f, S.Size * 0.72f, 80.f), FVector(0, 0, -40.f), FRotator(0.f, k * 37.f, 0.f), EWRLookMesh::Cylinder);
 		for (int32 c = 0; c < 5; ++c)
 		{
 			const FVector Dir = FVector(FMath::Cos(c * 1.3f) * 0.4f, FMath::Sin(c * 1.3f) * 0.4f, -1.f).GetSafeNormal();
-			K.Spike(Levistone(0.5f), FVector(FMath::Cos(c * 1.3f) * S.Size * 0.15f, FMath::Sin(c * 1.3f) * S.Size * 0.15f, -70.f), Dir, S.Size * 0.12f, S.Size * 0.35f);
-			KG.Spike(LiftGlow(5.f), FVector(FMath::Cos(c * 1.3f) * S.Size * 0.15f, FMath::Sin(c * 1.3f) * S.Size * 0.15f, -70.f), Dir, S.Size * 0.07f, S.Size * 0.36f);
+			K.Spike(SkLevistone(0.5f), FVector(FMath::Cos(c * 1.3f) * S.Size * 0.15f, FMath::Sin(c * 1.3f) * S.Size * 0.15f, -70.f), Dir, S.Size * 0.12f, S.Size * 0.35f);
+			KG.Spike(SkLiftGlow(5.f), FVector(FMath::Cos(c * 1.3f) * S.Size * 0.15f, FMath::Sin(c * 1.3f) * S.Size * 0.15f, -70.f), Dir, S.Size * 0.07f, S.Size * 0.36f);
 		}
 		FWRBuildLook::Spawn(this, P, Bl, FLinearColor::Black, false);
 		FWRBuildLook::Spawn(this, G, Gl, FLinearColor::Black, false);
@@ -1014,8 +1017,8 @@ void AWRSkyEventLook::BuildLook()
 				const float Len = FVector::Dist(P0, P1);
 				for (int32 p = 0; p < 4; ++p)
 				{
-					K.Add(FSurf::Lit(SRGB(0xF4, 0xF6, 0xF8) * 0.7f, 1.2f), FVector(Len * 0.4f, Cb.Width * (0.7f + 0.2f * (p % 2)), 80.f), FVector((p - 1.5f) * Len * 0.25f, 0, 10.f + 10.f * (p % 2)), FRotator(0.f, p * 20.f, 0.f), EWRLookMesh::Cylinder);
-					KF.Add(FSurf::Lit(SRGB(0x9A, 0x9E, 0xA4) * 0.5f, 0.3f), FVector(Len * 0.4f, Cb.Width * 0.6f, 70.f), FVector((p - 1.5f) * Len * 0.25f, 0, 6.f), FRotator(0.f, p * 20.f, 0.f), EWRLookMesh::Cylinder);
+					K.Add(FSurf::Lit(SkSRGB(0xF4, 0xF6, 0xF8) * 0.7f, 1.2f), FVector(Len * 0.4f, Cb.Width * (0.7f + 0.2f * (p % 2)), 80.f), FVector((p - 1.5f) * Len * 0.25f, 0, 10.f + 10.f * (p % 2)), FRotator(0.f, p * 20.f, 0.f), EWRLookMesh::Cylinder);
+					KF.Add(FSurf::Lit(SkSRGB(0x9A, 0x9E, 0xA4) * 0.5f, 0.3f), FVector(Len * 0.4f, Cb.Width * 0.6f, 70.f), FVector((p - 1.5f) * Len * 0.25f, 0, 6.f), FRotator(0.f, p * 20.f, 0.f), EWRLookMesh::Cylinder);
 				}
 				FWRBuildLook::Spawn(this, Lk, Bl, FLinearColor::Black, false);
 				FWRBuildLook::Spawn(this, Fr, Fl, FLinearColor::Black, false);
@@ -1291,7 +1294,7 @@ void UWRSkyWorld::SpawnServerActors()
 	};
 	const auto List = [&](const TCHAR* Key) -> const TArray<FWRSkyIsleData::FNode>& { static const TArray<FWRSkyIsleData::FNode> None; const TArray<FWRSkyIsleData::FNode>* L = D.Resources.Find(FName(Key)); return L ? *L : None; };
 	const auto Drifts = [&](FName Island) { return D.Drift.ContainsByPredicate([Island](const FWRSkyIsleData::FDrift& Dr) { return Dr.Island == Island; }); };
-	// Levistone (the signature, never farmable): struck loose it floats up 1 m and hangs 3 s; grab it or it's gone.
+	// SkLevistone (the signature, never farmable): struck loose it floats up 1 m and hangs 3 s; grab it or it's gone.
 	const auto Levi = [this](AWRResourceNode* N, int32 PerShard)
 	{
 		if (!N) return;
@@ -1454,6 +1457,17 @@ void UWRSkyWorld::SpawnServerActors()
 		S->Xp = int32(Tn(TEXT("skyWorld.xp.firstKite"), 1500.f));
 		S->Gives.Add(TEXT("serpent_anchor_rubbing"), 1);
 		S->Quest = TEXT("first_kite");
+	}
+	// The Windmanes' ledge nests (SKY 2.9: steal an egg; the herd defends it together): an egg on each, back a game day.
+	for (const FWRSkyIsleData::FSite& S : D.Kit)
+	{
+		if (S.Kind != TEXT("mane_ledge")) continue;
+		if (AWRSkySpot* N = SpawnSpot(TEXT("nest"), S.Id, S.At + FVector(0, 0, 50.f), TEXT("A Windmane nest"), TEXT("Take the egg"), Tn(TEXT("skyWorld.nestSeconds"), 2.f)))
+		{
+			N->Gives.Add(TEXT("egg_windmane"), 1);
+			N->RespawnHours = Tn(TEXT("skyWorld.nestRespawnHours"), 24.f);
+			N->Reach = 350.f;
+		}
 	}
 	for (const FWRSkyIsleData::FSite& S : D.Kit)
 	{

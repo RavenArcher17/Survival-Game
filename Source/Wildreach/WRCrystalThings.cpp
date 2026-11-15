@@ -40,32 +40,32 @@ namespace WRCrystalThingsImpl
 	float CtTn(const TCHAR* Key, float Def) { return WRTune(Key, Def); }
 	float CtTn(const FString& Key, float Def) { return WRTune(*Key, Def); }
 
-	AWRPlayerController* CtControllerOf(const AActor* Pawn)
+	AWRPlayerController* CzControllerOf(const AActor* Pawn)
 	{
 		const APawn* P = Cast<APawn>(Pawn);
 		return P ? Cast<AWRPlayerController>(P->GetController()) : nullptr;
 	}
 	void CtTell(const AActor* Pawn, const FString& Text)
 	{
-		if (AWRPlayerController* PC = CtControllerOf(Pawn)) PC->ClientNotify(Text);
+		if (AWRPlayerController* PC = CzControllerOf(Pawn)) PC->ClientNotify(Text);
 	}
-	double CtGameHours(const UObject* Ctx)
+	double CzGameHours(const UObject* Ctx)
 	{
 		const AWRGameState* GS = AWRGameState::Get(Ctx);
 		return GS ? GS->GetTotalHours() : 0.0;
 	}
-	FString CtItemName(FName Id)
+	FString CzItemName(FName Id)
 	{
 		const FWRItemDef* D = FWRItemRegistry::Get().Find(Id);
 		return D ? D->Name : Id.ToString();
 	}
 	/** How brightly a noise of this radius lights the crystals round it (crystal 2.1: louder is brighter and wider). */
-	float CtStrengthFor(float Radius)
+	float CzStrengthFor(float Radius)
 	{
 		return CtTn(TEXT("crystalWorld.light.strength"), 1.6f) * FMath::Sqrt(FMath::Clamp(Radius / 2000.f, 0.05f, 2.f));
 	}
 	/** Raining on the Crystal caves' surface now (the drip song, crystal 2.9). */
-	bool CtRaining(const UObject* Ctx)
+	bool CzRaining(const UObject* Ctx)
 	{
 		const AWRGameState* GS = AWRGameState::Get(Ctx);
 		const UWorld* W = Ctx ? Ctx->GetWorld() : nullptr;
@@ -77,7 +77,7 @@ namespace WRCrystalThingsImpl
 
 	/** One quartz point (the real habit): a six-sided prism from Root along Dir, its six-faced pyramid tip. Vertex alpha
 	 *  is how much of it glows in M_CrystalGlow (0.3 at the root to 1 at the tip). */
-	void CtPoint(FWRToolMesh& M, const FVector& Root, const FVector& Dir, float Len, float Thick, const FLinearColor& Base, const FLinearColor& Mid, const FLinearColor& Tip, float Turn)
+	void CzPoint(FWRToolMesh& M, const FVector& Root, const FVector& Dir, float Len, float Thick, const FLinearColor& Base, const FLinearColor& Mid, const FLinearColor& Tip, float Turn)
 	{
 		FVector AY, AZ;
 		Dir.FindBestAxisVectors(AY, AZ);
@@ -122,7 +122,7 @@ void WRCrystal::Emit(const UObject* WorldContext, const FVector& At, float Radiu
 	}
 	W->OnNoise.Broadcast(At, Radius, Instigator, Kind);
 	if (Kind == TEXT("step")) return;
-	if (AWRCrystalState* S = AWRCrystalState::Get(World)) S->MulticastNoise(At, Radius, CtStrengthFor(Radius));
+	if (AWRCrystalState* S = AWRCrystalState::Get(World)) S->MulticastNoise(At, Radius, CzStrengthFor(Radius));
 }
 
 float WRCrystal::NoiseRadius(FName Kind)
@@ -177,7 +177,7 @@ void AWRCrystalState::MulticastNoise_Implementation(FVector_NetQuantize At, floa
 
 bool AWRCrystalState::IsHallLit(int32 Hall) const
 {
-	return HallLitUntil.IsValidIndex(Hall) && HallLitUntil[Hall] > CtGameHours(this);
+	return HallLitUntil.IsValidIndex(Hall) && HallLitUntil[Hall] > CzGameHours(this);
 }
 
 // ================================================================================================ AWRCrystalSpot
@@ -254,7 +254,7 @@ void AWRCrystalSpot::BeginPlay()
 			const FRotator Open(0.f, 0.f, Side * 28.f);
 			const FVector Root = Open.RotateVector(FVector(FMath::Cos(A) * R * Rng.FRandRange(0.2f, 0.85f), Side * 10.f, FMath::Sin(A) * R * 0.75f * Rng.FRandRange(0.2f, 0.9f))) + FVector(0, 0, 6.f);
 			const FVector Dir = Open.RotateVector(FVector(Rng.FRandRange(-0.3f, 0.3f), -Side, Rng.FRandRange(-0.2f, 0.4f))).GetSafeNormal();
-			WRCrystalThingsImpl::CtPoint(Pts, Root, Dir, Rng.FRandRange(10.f, 26.f), 7.f, FLinearColor(FColor(74, 40, 120)), FLinearColor(FColor(150, 110, 220)), FLinearColor(FColor(214, 196, 255)), Rng.FRandRange(0.f, PI));
+			WRCrystalThingsImpl::CzPoint(Pts, Root, Dir, Rng.FRandRange(10.f, 26.f), 7.f, FLinearColor(FColor(74, 40, 120)), FLinearColor(FColor(150, 110, 220)), FLinearColor(FColor(214, 196, 255)), Rng.FRandRange(0.f, PI));
 		}
 		UProceduralMeshComponent* Druse = NewObject<UProceduralMeshComponent>(this, TEXT("GeodeDruse"));
 		Druse->SetupAttachment(RootComponent);
@@ -292,7 +292,7 @@ FString AWRCrystalSpot::Use(AWRPlayerController* PC)
 	for (const TPair<FName, int32>& G : Gives)
 	{
 		const int32 Added = Inv->AddItem(G.Key, G.Value);
-		if (Added > 0) Got += FString::Printf(TEXT("%s%s x%d"), Got.IsEmpty() ? TEXT("") : TEXT(", "), *CtItemName(G.Key), Added);
+		if (Added > 0) Got += FString::Printf(TEXT("%s%s x%d"), Got.IsEmpty() ? TEXT("") : TEXT(", "), *CzItemName(G.Key), Added);
 	}
 	if (Got.IsEmpty()) return TEXT("Your bag is full");
 	DoneBy.Add(Name);
@@ -324,7 +324,7 @@ void UWRCrystalWorld::StrikeKeystone(int32 HallIndex, AWRCharacterBase* By, AWRC
 	const FWRCrystalData& D = FWRCrystalData::Get();
 	if (!World || !S || !D.Halls.IsValidIndex(HallIndex)) return;
 	if (S->HallLitUntil.Num() < D.Halls.Num()) S->HallLitUntil.SetNumZeroed(D.Halls.Num());
-	const float Now = float(CtGameHours(World));
+	const float Now = float(CzGameHours(World));
 	const bool bWasLit = S->HallLitUntil[HallIndex] > Now;
 	// The hall holds lit for 20 game minutes (crystal 2.1); striking it again while lit starts the 20 over.
 	S->HallLitUntil[HallIndex] = Now + CtTn(TEXT("crystalWorld.light.keystoneMinutes"), 20.f) / 60.f;
@@ -419,7 +419,7 @@ void UWRCrystalWorld::StepLight(float Dt)
 			if (R <= 0.f) continue;
 			const FVector Feet = It->GetActorLocation() - FVector(0.f, 0.f, It->GetSimpleCollisionHalfHeight());
 			if (!WRCrystal::InCave(Feet + FVector(0.f, 0.f, 60.f)) && !WRCrystal::Contains(Feet)) continue;
-			Light(Feet, R, CtStrengthFor(R) * CtTn(TEXT("crystalWorld.light.stepScale"), 0.6f), *It);
+			Light(Feet, R, CzStrengthFor(R) * CtTn(TEXT("crystalWorld.light.stepScale"), 0.6f), *It);
 		}
 	}
 	// The halls near the view: their rings, their rest (the drip song in rain lifts the Geode Halls'), their keystone
@@ -428,7 +428,7 @@ void UWRCrystalWorld::StepLight(float Dt)
 	const AWRCrystalState* S = State.IsValid() ? State.Get() : AWRCrystalState::Get(World);
 	if (S && !State.IsValid()) State = const_cast<AWRCrystalState*>(S);
 	const float Rest = CtTn(TEXT("crystalWorld.glow.rest"), 0.15f);
-	const bool bRain = CtRaining(World);
+	const bool bRain = CzRaining(World);
 	const float LitLevel = CtTn(TEXT("crystalWorld.light.keystoneLit"), 2.f);
 	const float Range = CtTn(TEXT("crystalWorld.light.hallRange"), 16000.f);
 	if (HallLit.Num() != D.Halls.Num()) HallLit.SetNumZeroed(D.Halls.Num());
@@ -753,7 +753,7 @@ void UWRCrystalWorld::SpawnServerActors()
 		const FVector Off(CtTn(FString::Printf(TEXT("crystalWorld.keepsakeAt.%s.x"), *L.Site.ToString()), 250.f), CtTn(FString::Printf(TEXT("crystalWorld.keepsakeAt.%s.y"), *L.Site.ToString()), 0.f), 40.f);
 		FVector At = Site->At + FRotator(0.f, Site->Yaw, 0.f).RotateVector(Off);
 		if (!Site->bCave) { float Z = 0.f; if (WRLand::GroundUnder(At + FVector(0.f, 0.f, 3000.f), Z)) At.Z = Z + 40.f; }
-		if (AWRCrystalSpot* Sp = MakeSpot(TEXT("keepsake"), L.Item, At, CtItemName(L.Item), TEXT("Take")))
+		if (AWRCrystalSpot* Sp = MakeSpot(TEXT("keepsake"), L.Item, At, CzItemName(L.Item), TEXT("Take")))
 		{
 			Sp->Gives.Add(L.Item, 1);
 		}
@@ -762,7 +762,7 @@ void UWRCrystalWorld::SpawnServerActors()
 	// in the Ward Chambers' sealed rooms, each behind its ward (once per survivor) ----
 	const auto Find = [&](FName Id, const FVector& At, FName Item, const FString& Lore)
 	{
-		if (AWRCrystalSpot* Sp = MakeSpot(TEXT("find"), Id, At, CtItemName(Item), TEXT("Take")))
+		if (AWRCrystalSpot* Sp = MakeSpot(TEXT("find"), Id, At, CzItemName(Item), TEXT("Take")))
 		{
 			Sp->Gives.Add(Item, 1);
 			Sp->Lore = Lore;
@@ -828,7 +828,7 @@ float UWRCrystalWorld::SignatureScale() const
 	float M = 1.f;
 	if (UWorld* World = GetWorld())
 	{
-		if (CtRaining(World)) RainSeenAt = World->GetTimeSeconds();
+		if (CzRaining(World)) RainSeenAt = World->GetTimeSeconds();
 		if (RainSeenAt > 0.0 && World->GetTimeSeconds() - RainSeenAt < CtTn(TEXT("crystalWorld.plentySeconds"), 1200.f)) M *= CtTn(TEXT("crystalWorld.plentyYield"), 1.5f);
 	}
 	return M * ResonanceYield;
@@ -926,7 +926,7 @@ void WRCrystal::NodeLook(AActor* Node, FName Item, uint32 Seed)
 		const FVector Dir = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean)).RotateVector(FVector::UpVector);
 		const float Len = (i == 0 ? LenHi : Rng.FRandRange(LenLo, LenHi * 0.8f));
 		const FVector Root(FMath::Cos(A) * Rng.FRandRange(0.f, 35.f), FMath::Sin(A) * Rng.FRandRange(0.f, 35.f), Up - 10.f);
-		WRCrystalThingsImpl::CtPoint(M, Root, Dir, Len, Len * Thick, Base, Mid, Tip, Rng.FRandRange(0.f, PI));
+		WRCrystalThingsImpl::CzPoint(M, Root, Dir, Len, Len * Thick, Base, Mid, Tip, Rng.FRandRange(0.f, PI));
 	}
 	M.ApplyTo(P);
 	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_CrystalGlow.M_CrystalGlow"));
