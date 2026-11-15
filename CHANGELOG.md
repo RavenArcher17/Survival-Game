@@ -40,6 +40,28 @@ and the testers test, F8).
   - **Nameplates** (`AWRHUD::DrawWorldBars`, `DrawCentred`): every line centred over the head; other players' names
     follow Names over players (Always out to 80 m, the name alone past the 25 m bar range; Near 40 m; Off), tuning
     `ui.names`; the knocked-out line shows the device's own button for Interact.
+- **UI (3): leaving asks once, the Disconnected card with Rejoin, the crash card, quick notes on F8.** Why: Main menu
+  and Quit left at once (a slip of the pad lost a fight outside a safe zone); a dropped join showed the engine's raw
+  text ("Disconnected: ConnectionLost") with no way back in; a crash was never reported unless the tester remembered;
+  a pad player had to type every report.
+  - **Leave / Quit** (the settings window in game): a strip over the footer asks "Leave this world?" / "Quit
+    Wildreach?" and says whether you're in a safe zone (and, for a host with others in, that everyone goes back to
+    their menu). Stay / Leave; Esc or B is Stay.
+  - **Disconnected card** on the main menu (`SWRMainMenu::MakeCard`, `NoteFailure`): a plain line for each failure
+    (the connection lost, the host stopped answering, the host didn't let us in and its reason, another version,
+    files that don't match, the network couldn't start, the address unreachable), and **Rejoin** when this game was
+    joined to the host: it travels to the same address with your name, path and look; a try that doesn't get in
+    counts down 10 s to the next ("Try 2 of 6 didn't get in. Trying again in 7 s.") up to 6 tries in 60 s, then says
+    the host isn't answering (tuning `ui.rejoin`). Stop trying / Close; Esc or B closes; while it shows the pad's
+    D-pad stays inside it.
+  - **Crash card** (`WRReport::PendingCrash / SendCrash / DismissCrash`): each run stamps `Saved/Wildreach/session`
+    and a normal quit stamps `clean_exit`; a run that didn't quit cleanly and left a folder in `Saved/Crashes` makes
+    the menu ask once: Send the crash report (its error message and call stack from `CrashContext.runtime-xml`, the
+    last 40 log lines (tuning `report.crashLogLines`), version, GPU, OS; saved in `Saved/Reports` and sent through
+    the outbox like any report) or Not now. Never in the editor.
+  - **Quick notes** under the F8 note (tuning `report.chips`): "Just happened", "Happens every time", "Hit didn't
+    land", "Got hit by nothing", "Can't move", "Fell through", "Too hard", "Too easy", "Looks wrong", "Sounds wrong",
+    "Music stopped", "Love this"; one press adds the line, again takes it out.
 
 ## Unreleased: the Desert / Sun & sand
 

@@ -569,7 +569,9 @@
     "couchScale": 115,
     "toggle": { "sprintStopSpeed": 50, "sprintStopSeconds": 0.25 },
     "hud": { "fadeAfter": 6.0, "fadeOut": 0.8, "fadeIn": 0.1, "hotbarSeconds": 4.0 },
-    "names": { "nearCm": 4000, "farCm": 8000, "barCm": 2500 } },
+    "names": { "nearCm": 4000, "farCm": 8000, "barCm": 2500 },
+    "_rejoin": "The main menu's Disconnected card: Rejoin tries the same host up to tries times within windowSeconds, everySeconds apart (counting down on the card).",
+    "rejoin": { "tries": 6, "windowSeconds": 60, "everySeconds": 10 } },
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },
   "flow": { "_comment": "The moments between play (WRUIFlow): the death screen and its fades; the Loading the island cover, held until World Partition has streamed streamRadius cm around you (at most streamMaxSeconds), shown after a jump of teleportCm or more; screens ease in over screenInSeconds; notices queue (each up noticeSeconds, at least noticeMinSeconds when others wait); banners, toasts and hints; discovery radii by place kind (cm); menuCamera is the main menu backdrop (cm, degrees). placeholder",
@@ -690,6 +692,9 @@
   "report": {
     "_comment": "Report a problem (F8 / View on a pad): where reports go, the picture's size, retries and the trip from a client to the host.",
     "endpoint": "https://freedom35studios.pages.dev/api/feedback", "game": "wildreach",
+    "chips": ["Just happened", "Happens every time", "Hit didn't land", "Got hit by nothing", "Can't move", "Fell through", "Too hard", "Too easy", "Looks wrong", "Sounds wrong", "Music stopped", "Love this"],
+    "_chips": "chips: the quick notes under the F8 panel's note box (one press adds the line, again takes it out). crashLogLines: how many of a crashed run's last log lines go with its crash report (the main menu's crash card).",
+    "crashLogLines": 40,
     "shotMaxWidth": 1280, "shotMaxBytes": 330000, "contextMaxChars": 3900, "retrySeconds": 30,
     "forwardChunkBytes": 8192, "forwardBytesPerTick": 8192, "hostMinSeconds": 10
   },

@@ -481,6 +481,72 @@ namespace WRReportDetail
 	}
 }
 
+namespace WRReportCrash
+{
+	FString CrashDir;   // the last run's crash folder, until answered
+	FString StampDir() { return FPaths::ProjectSavedDir() / TEXT("Wildreach"); }
+	FString SessionFile() { return StampDir() / TEXT("session"); }
+	FString CleanFile() { return StampDir() / TEXT("clean_exit"); }
+	const TCHAR* Section = TEXT("Wildreach.Report");
+
+	/** The text between <Tag> and </Tag> in the crash context (empty when it isn't there). */
+	FString Between(const FString& Xml, const TCHAR* Tag)
+	{
+		const FString Open = FString::Printf(TEXT("<%s>"), Tag), Close = FString::Printf(TEXT("</%s>"), Tag);
+		const int32 A = Xml.Find(Open);
+		if (A == INDEX_NONE) return FString();
+		const int32 B = Xml.Find(Close, ESearchCase::CaseSensitive, ESearchDir::FromStart, A);
+		return B == INDEX_NONE ? FString() : Xml.Mid(A + Open.Len(), B - A - Open.Len()).TrimStartAndEnd();
+	}
+
+	/** Once at start, in the game only (the editor's play sessions aren't runs of the game). */
+	void CheckLastRun()
+	{
+		if (GIsEditor) return;
+		IFileManager& FM = IFileManager::Get();
+		FM.MakeDirectory(*StampDir(), true);
+		const FDateTime LastStart = FM.GetTimeStamp(*SessionFile());
+		const FDateTime CleanAt = FM.GetTimeStamp(*CleanFile());
+		const bool bHadRun = LastStart != FDateTime::MinValue();
+		const bool bClean = CleanAt != FDateTime::MinValue() && CleanAt >= LastStart;
+		if (bHadRun && !bClean)
+		{
+			// The newest crash folder made after that run began and not answered before.
+			FString Seen;
+			GConfig->GetString(Section, TEXT("LastCrashSeen"), Seen, GGameUserSettingsIni);
+			const FString CrashRoot = FPaths::ProjectSavedDir() / TEXT("Crashes");
+			TArray<FString> Dirs;
+			FM.FindFiles(Dirs, *(CrashRoot / TEXT("*")), false, true);
+			FDateTime Best = LastStart;
+			for (const FString& D : Dirs)
+			{
+				const FDateTime T = FM.GetTimeStamp(*(CrashRoot / D));
+				if (T > Best && D != Seen)
+				{
+					Best = T;
+					CrashDir = CrashRoot / D;
+				}
+			}
+			if (!CrashDir.IsEmpty()) UE_LOG(LogWildreach, Log, TEXT("REPORT the last run crashed: %s"), *CrashDir);
+		}
+		// This run starts now; a normal quit stamps clean_exit.
+		FM.Delete(*CleanFile(), false, true, true);
+		FFileHelper::SaveStringToFile(FDateTime::UtcNow().ToIso8601(), *SessionFile());
+		FCoreDelegates::OnPreExit.AddLambda([]()
+		{
+			if (!GIsCriticalError) FFileHelper::SaveStringToFile(FDateTime::UtcNow().ToIso8601(), *CleanFile());
+		});
+	}
+
+	void Answer()
+	{
+		if (CrashDir.IsEmpty()) return;
+		GConfig->SetString(Section, TEXT("LastCrashSeen"), *FPaths::GetCleanFilename(CrashDir), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+		CrashDir.Empty();
+	}
+}
+
 void WRReport::InstallLog()
 {
 	using namespace WRReportDetail;
@@ -488,6 +554,70 @@ void WRReport::InstallLog()
 	Device = new FRingDevice();
 	GLog->AddOutputDevice(Device);
 	FCoreDelegates::OnPreExit.AddLambda([]() { if (GLog && Device) GLog->RemoveOutputDevice(Device); });
+	WRReportCrash::CheckLastRun();
+}
+
+FString WRReport::PendingCrash() { return WRReportCrash::CrashDir; }
+
+void WRReport::DismissCrash()
+{
+	UE_LOG(LogWildreach, Log, TEXT("REPORT crash card: not now"));
+	WRReportCrash::Answer();
+}
+
+void WRReport::SendCrash()
+{
+	using namespace WRReportDetail;
+	const FString Dir = WRReportCrash::CrashDir;
+	if (Dir.IsEmpty()) return;
+	IFileManager& FM = IFileManager::Get();
+	// What crashed and where: the crash context's message and call stack, and the end of the log it kept.
+	FString Xml;
+	FFileHelper::LoadFileToString(Xml, *(Dir / TEXT("CrashContext.runtime-xml")));
+	const FString Error = WRReportCrash::Between(Xml, TEXT("ErrorMessage")).Left(600);
+	const FString Stack = WRReportCrash::Between(Xml, TEXT("CallStack")).Left(1200);
+	TArray<FString> Logs;
+	FM.FindFiles(Logs, *(Dir / TEXT("*.log")), true, false);
+	FString Tail;
+	if (Logs.Num() > 0)
+	{
+		TArray<FString> Lines;
+		FFileHelper::LoadFileToStringArray(Lines, *(Dir / Logs[0]));
+		const int32 Keep = static_cast<int32>(WRTune(TEXT("report.crashLogLines"), 40.f));
+		for (int32 i = FMath::Max(0, Lines.Num() - Keep); i < Lines.Num(); ++i) Tail += Lines[i].Left(200) + TEXT("\n");
+		Tail = Tail.Right(1200);
+	}
+	const FString Stamp = FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H-%M-%S"));
+	const FString Name = FString::Printf(TEXT("%s_crash_%s"), *Stamp, *Safe(FPaths::GetCleanFilename(Dir)));
+	const FString Body = FString::Printf(TEXT("[Crash] Wildreach closed unexpectedly on the last run. %s"), Error.IsEmpty() ? TEXT("(no message)") : *Error.Left(300));
+	TSharedRef<FJsonObject> Context = MakeShared<FJsonObject>();
+	Context->SetStringField(TEXT("build"), SWRMainMenu::GameVersion());
+	Context->SetStringField(TEXT("category"), TEXT("Crash"));
+	Context->SetStringField(TEXT("crashFolder"), FPaths::GetCleanFilename(Dir));
+	Context->SetStringField(TEXT("error"), Error);
+	Context->SetStringField(TEXT("callstack"), Stack);
+	Context->SetStringField(TEXT("logTail"), Tail);
+	Context->SetStringField(TEXT("gpu"), GRHIAdapterName);
+	Context->SetStringField(TEXT("os"), FPlatformMisc::GetOSVersion());
+	// The full copy on this machine, then the inbox through the outbox (the context trimmed to what it takes).
+	TSharedRef<FJsonObject> Full = MakeShared<FJsonObject>();
+	Full->SetStringField(TEXT("game"), TEXT("wildreach"));
+	Full->SetStringField(TEXT("category"), TEXT("Crash"));
+	Full->SetStringField(TEXT("body"), Body);
+	Full->SetObjectField(TEXT("context"), Context);
+	FM.MakeDirectory(*ReportsDir(), true);
+	FFileHelper::SaveStringToFile(ToPrettyJson(Full), *(ReportsDir() / (Name + TEXT(".json"))), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	TSharedRef<FJsonObject> Post = MakeShared<FJsonObject>();
+	Post->SetStringField(TEXT("game"), FWRTuning::Get().Str(TEXT("report.game"), TEXT("wildreach")));
+	Post->SetStringField(TEXT("body"), Body);
+	Post->SetStringField(TEXT("category"), TEXT("Bug"));
+	Post->SetStringField(TEXT("label"), TEXT("bug"));
+	Post->SetObjectField(TEXT("context"), Context);   // already inside the inbox's ~4000 characters (the parts are cut above)
+	FM.MakeDirectory(*OutboxDir(), true);
+	FFileHelper::SaveStringToFile(ToJson(Post), *(OutboxDir() / (Name + TEXT(".json"))), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	NextOutbox = 0.0;
+	UE_LOG(LogWildreach, Log, TEXT("REPORT crash report queued: %s"), *Name);
+	WRReportCrash::Answer();
 }
 
 void WRReport::Event(const TCHAR* Kind, const FString& Text)

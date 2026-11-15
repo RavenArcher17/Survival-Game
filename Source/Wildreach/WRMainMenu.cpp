@@ -1,4 +1,6 @@
 #include "WRMainMenu.h"
+#include "Engine/NetDriver.h"
+#include "WRReport.h"
 #include "WRIdentity.h"
 #include "WRPadInput.h"
 #include "Wildreach.h"
@@ -50,6 +52,15 @@ TWeakObjectPtr<ACameraActor> SWRMainMenu::Backdrop;
 TSharedPtr<SWidget> SWRChatBox::Instance;
 FString SWRMainMenu::LatestVersion;
 FString SWRMainMenu::LastFailure;
+int32 SWRMainMenu::CardKind = 0;
+FString SWRMainMenu::CardTitle;
+bool SWRMainMenu::bCanRejoin = false;
+int32 SWRMainMenu::RejoinTries = 0;
+double SWRMainMenu::RejoinFirstAt = 0.0;
+double SWRMainMenu::LastRejoinAt = -1000.0;
+double SWRMainMenu::NextRejoinAt = 0.0;
+double SWRMainMenu::LastFailAt = -1000.0;
+bool SWRMainMenu::bJoining = false;
 
 static const TCHAR* ReleasesPage = TEXT("https://github.com/RavenArcher17/Survival-Game/releases/latest");
 
@@ -356,12 +367,26 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 	FString SavedBody;
 	GConfig->GetString(MenuSection, TEXT("Body"), SavedBody, GGameUserSettingsIni);
 	Body = SavedBody.IsEmpty() ? NAME_None : FName(*SavedBody);
-	Status = FText::FromString(LastFailure);
-	if (!LastFailure.IsEmpty())
+	// A failure is shown on the card; with none, a crash on the last run asks once to be sent.
+	if (CardKind == 0 && !WRReport::PendingCrash().IsEmpty())
 	{
-		UE_LOG(LogWildreach, Log, TEXT("MENU shows: %s"), *LastFailure);
-		LastFailure.Empty();
+		CardKind = 2;
+		CardTitle = TEXT("Wildreach closed unexpectedly");
 	}
+	if (CardKind != 0)
+	{
+		UE_LOG(LogWildreach, Log, TEXT("MENU card: %s: %s"), *CardTitle, *LastFailure);
+	}
+	// On a pad, B closes the card (the D-pad reaches its buttons through the pad's navigation).
+	WRInput::PushPadHandler(this, [this](FName Verb)
+	{
+		if (CardKind != 0 && Verb == TEXT("MenuBack"))
+		{
+			CloseCard();
+			return true;
+		}
+		return false;
+	});
 	SAssignNew(NameBox, SEditableTextBox).Style(&FieldStyle(false)).Text(FText::FromString(Name)).Font(WRUI::Body(15, 700))
 		.HintText(NSLOCTEXT("WRUI", "NameHint", "Your character is saved under this name"));
 	SAssignNew(AddressBox, SEditableTextBox).Style(&FieldStyle(true)).Text(FText::FromString(Address)).Font(Spaced(WRUI::Body(16, 700), 30))
@@ -378,8 +403,142 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(72.f * U, 226.f * U, 0.f, 0.f)[MakePanel()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 44.f * U, 48.f * U, 0.f)[MakeTip()]
 		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 48.f * U, 40.f * U)[MakeUpdate()]
+		+ SOverlay::Slot()[MakeCard()]
 		+ SOverlay::Slot()[SAssignNew(SettingsHost, SBox)]
 	];
+}
+
+SWRMainMenu::~SWRMainMenu()
+{
+	WRInput::PopPadHandler(this);
+	if (bCardNav) WRInput::RemoveNavRoot(CardPanel);
+}
+
+FReply SWRMainMenu::OnKeyDown(const FGeometry& Geo, const FKeyEvent& E)
+{
+	if (CardKind != 0 && E.GetKey() == EKeys::Escape)
+	{
+		CloseCard();
+		return FReply::Handled();
+	}
+	return FReply::Unhandled();
+}
+
+TSharedRef<SWidget> SWRMainMenu::MakeCard()
+{
+	using namespace WRMenuUI;
+	const auto Max = []() { return FMath::Max(1, static_cast<int32>(WRTune(TEXT("ui.rejoin.tries"), 6.f))); };
+	return SNew(SOverlay).Visibility_Lambda([]() { return CardKind != 0 ? EVisibility::Visible : EVisibility::Collapsed; })
+		// The menu behind dims and can't be clicked while the card asks.
+		+ SOverlay::Slot()[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.55f))]
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+		[
+			SAssignNew(CardPanel, SBox).WidthOverride(600.f * U)
+			[
+				SNew(SWRPanel).Kind(EWRPanel::Stone).Rivets(true).BrassTrim(true).Padding(FMargin(30.f * U, 24.f * U))
+				[
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
+						[
+							SNew(SWRLineIcon).Icon(EWRIcon::Warning).Size(26.f * U).Color(WRUI::Warn).Accent(WRUI::Warn)
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([]() { return FText::FromString(CardTitle); }), Spaced(WRUI::Title(20), 40), WRUI::Ink, true)
+						]
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([]()
+						{
+							return CardKind == 2 ? NSLOCTEXT("WRUI", "CrashLine", "It crashed last time. Sending the crash report helps us fix it: it holds what went wrong and the last lines of the game's log, nothing else.")
+								: FText::FromString(LastFailure);
+						}), WRUI::Body(15, 500), WRUI::Ink2, false, true)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([Max]()
+						{
+							if (CardKind != 1 || NextRejoinAt <= 0.0) return FText::GetEmpty();
+							const int32 Left = FMath::Max(0, FMath::CeilToInt(NextRejoinAt - FPlatformTime::Seconds()));
+							return FText::Format(NSLOCTEXT("WRUI", "RejoinCount", "Try {0} of {1} didn't get in. Trying again in {2} s."), RejoinTries, Max(), Left);
+						}), WRUI::Body(13, 700), WRUI::Brass, false, true)
+					]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 20.f * U, 0.f, 0.f)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f)[SNullWidget::NullWidget]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 10.f * U, 0.f)
+						[
+							SNew(SBox).MinDesiredWidth(150.f * U)
+							[
+								SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U)
+								.Text_Lambda([]() { return CardKind == 2 ? NSLOCTEXT("WRUI", "NotNow", "Not now") : NextRejoinAt > 0.0 ? NSLOCTEXT("WRUI", "StopTrying", "Stop trying") : NSLOCTEXT("WRUI", "CloseCard", "Close"); })
+								.OnClicked_Lambda([this]() { CloseCard(); return FReply::Handled(); })
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							SNew(SBox).MinDesiredWidth(190.f * U).Visibility_Lambda([]() { return CardKind == 2 || (CardKind == 1 && bCanRejoin) ? EVisibility::Visible : EVisibility::Collapsed; })
+							[
+								SNew(SWRButton).Primary(true).FontSize(13).MinHeight(44.f * U)
+								.Text_Lambda([]() { return CardKind == 2 ? NSLOCTEXT("WRUI", "SendCrash", "Send the crash report") : NextRejoinAt > 0.0 ? NSLOCTEXT("WRUI", "RejoinNow", "Try now") : NSLOCTEXT("WRUI", "Rejoin", "Rejoin"); })
+								.OnClicked_Lambda([this]()
+								{
+									if (CardKind == 2)
+									{
+										WRReport::SendCrash();
+										CardKind = 0;
+										Status = NSLOCTEXT("WRUI", "CrashSent", "Crash report sent. Thank you.");
+									}
+									else
+									{
+										Rejoin();
+									}
+									return FReply::Handled();
+								})
+							]
+						]
+					]
+				]
+			]
+		];
+}
+
+void SWRMainMenu::CloseCard()
+{
+	if (CardKind == 2) WRReport::DismissCrash();
+	CardKind = 0;
+	NextRejoinAt = 0.0;
+	bCanRejoin = false;
+	LastFailure.Empty();
+}
+
+void SWRMainMenu::Rejoin()
+{
+	APlayerController* PC = Owner.Get();
+	FString Address;
+	GConfig->GetString(MenuSection, TEXT("Address"), Address, GGameUserSettingsIni);
+	if (!PC || Address.IsEmpty())
+	{
+		CloseCard();
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	if (RejoinTries == 0) RejoinFirstAt = Now;
+	++RejoinTries;
+	LastRejoinAt = Now;
+	NextRejoinAt = 0.0;
+	CardKind = 0;
+	LastFailure.Empty();
+	bJoining = true;
+	const FString Url = Address + Options();
+	UE_LOG(LogWildreach, Log, TEXT("MENU rejoin %d: %s"), RejoinTries, *Url);
+	Close();
+	PC->ClientTravel(Url, TRAVEL_Absolute);
 }
 
 TSharedRef<SWidget> SWRMainMenu::MakeTitle()
@@ -613,6 +772,19 @@ void SWRMainMenu::Tick(const FGeometry& Geo, const double Time, const float Delt
 			ShowBackdrop(PC, true);
 		}
 	}
+	// While the card shows, the pad's D-pad moves between its buttons only (not the menu dimmed behind it).
+	if ((CardKind != 0) != bCardNav && CardPanel.IsValid())
+	{
+		bCardNav = CardKind != 0;
+		if (bCardNav) WRInput::AddNavRoot(CardPanel.ToSharedRef(), 100);
+		else WRInput::RemoveNavRoot(CardPanel);
+	}
+	// The card's countdown to the next Rejoin try.
+	if (CardKind == 1 && NextRejoinAt > 0.0 && FPlatformTime::Seconds() >= NextRejoinAt)
+	{
+		Rejoin();
+		return;
+	}
 	// A new tip now and then.
 	if (NextTip == 0.0)
 	{
@@ -744,6 +916,7 @@ FReply SWRMainMenu::OnHost()
 
 void SWRMainMenu::HostWorld(const FString& WorldId)
 {
+	bJoining = false;   // hosting: a failure from here on isn't a join to retry
 	APlayerController* PC = Owner.Get();
 	if (!PC)
 	{
@@ -768,6 +941,8 @@ FReply SWRMainMenu::OnJoin()
 		return FReply::Handled();
 	}
 	Remember();
+	bJoining = true;
+	RejoinTries = 0;
 	UE_LOG(LogWildreach, Log, TEXT("MENU join: %s%s"), *Address, *Options());
 	Close();
 	PC->ClientTravel(Address + Options(), TRAVEL_Absolute);
@@ -891,6 +1066,34 @@ void SWRMainMenu::CheckForUpdate()
 	Request->ProcessRequest();
 }
 
+void SWRMainMenu::NoteFailure(const FString& Title, const FString& Line, bool bRejoin)
+{
+	const double Now = FPlatformTime::Seconds();
+	// A new trouble long after the last Rejoin press starts its own count.
+	if (Now - LastRejoinAt > WRTune(TEXT("ui.rejoin.windowSeconds"), 60.f) + 30.f) RejoinTries = 0;
+	LastFailAt = Now;
+	CardKind = 1;
+	CardTitle = Title;
+	LastFailure = Line;
+	bCanRejoin = bRejoin;
+	NextRejoinAt = 0.0;
+	if (RejoinTries > 0 && bRejoin)
+	{
+		// A Rejoin didn't get in: count down to the next try, until the tries or the window run out.
+		const int32 Max = static_cast<int32>(WRTune(TEXT("ui.rejoin.tries"), 6.f));
+		if (RejoinTries < Max && Now - RejoinFirstAt < WRTune(TEXT("ui.rejoin.windowSeconds"), 60.f))
+		{
+			NextRejoinAt = Now + WRTune(TEXT("ui.rejoin.everySeconds"), 10.f);
+		}
+		else
+		{
+			LastFailure = TEXT("The host isn't answering. Try again later, or ask them to check their game is still hosting.");
+			bCanRejoin = false;
+			RejoinTries = 0;
+		}
+	}
+}
+
 void SWRMainMenu::WatchNetworkFailures()
 {
 	static bool bWatching = false;
@@ -899,22 +1102,55 @@ void SWRMainMenu::WatchNetworkFailures()
 		return;
 	}
 	bWatching = true;
-	GEngine->OnNetworkFailure().AddLambda([](UWorld*, UNetDriver*, ENetworkFailure::Type Type, const FString& Error)
+	GEngine->OnNetworkFailure().AddLambda([](UWorld*, UNetDriver* Driver, ENetworkFailure::Type Type, const FString& Error)
 	{
-		if (Type == ENetworkFailure::OutdatedClient || Type == ENetworkFailure::OutdatedServer)
-		{
-			LastFailure = FString::Printf(TEXT("Couldn't join: the host has a different version of Wildreach (you have %s). Everyone needs the same one: start Wildreach from its shortcut to update."), *GameVersion());
-		}
-		else if (LastFailure.IsEmpty())
-		{
-			LastFailure = FString::Printf(TEXT("Disconnected: %s"), Error.IsEmpty() ? ENetworkFailure::ToString(Type) : *Error);
-		}
 		UE_LOG(LogWildreach, Log, TEXT("MENU network failure %s: %s"), ENetworkFailure::ToString(Type), *Error);
+		// One failure often comes as several calls (the driver, then the travel): the first plain line stands.
+		const double Now = FPlatformTime::Seconds();
+		const bool bVersion = Type == ENetworkFailure::OutdatedClient || Type == ENetworkFailure::OutdatedServer;
+		if (CardKind == 1 && Now - LastFailAt < 2.0 && !bVersion) return;
+		const bool bClient = Driver && Driver->ServerConnection != nullptr;
+		FString Line;
+		bool bRejoin = bClient;
+		switch (Type)
+		{
+		case ENetworkFailure::OutdatedClient:
+		case ENetworkFailure::OutdatedServer:
+			Line = FString::Printf(TEXT("The host has a different version of Wildreach (you have %s). Everyone needs the same one: start Wildreach from its shortcut to update."), *GameVersion());
+			bRejoin = false;
+			break;
+		case ENetworkFailure::ConnectionLost:
+			Line = TEXT("Lost the connection to the host. Their game may have closed, or the network dropped.");
+			break;
+		case ENetworkFailure::ConnectionTimeout:
+			Line = TEXT("The host stopped answering.");
+			break;
+		case ENetworkFailure::FailureReceived:
+		case ENetworkFailure::PendingConnectionFailure:
+			Line = Error.IsEmpty() ? FString(TEXT("The host didn't let us in.")) : FString::Printf(TEXT("The host didn't let us in: %s"), *Error.Left(160));
+			break;
+		case ENetworkFailure::NetDriverAlreadyExists:
+		case ENetworkFailure::NetDriverCreateFailure:
+		case ENetworkFailure::NetDriverListenFailure:
+			Line = TEXT("Couldn't start the network connection. Close other copies of Wildreach and try again.");
+			bRejoin = false;
+			break;
+		case ENetworkFailure::NetGuidMismatch:
+		case ENetworkFailure::NetChecksumMismatch:
+			Line = TEXT("Your game's files don't match the host's. Update Wildreach from its shortcut, both of you.");
+			bRejoin = false;
+			break;
+		default:
+			Line = Error.IsEmpty() ? FString(TEXT("Disconnected from the host.")) : FString::Printf(TEXT("Disconnected: %s"), *Error.Left(160));
+			break;
+		}
+		NoteFailure(bClient ? TEXT("Disconnected") : TEXT("Couldn't connect"), Line, bRejoin);
 	});
 	GEngine->OnTravelFailure().AddLambda([](UWorld*, ETravelFailure::Type Type, const FString& Error)
 	{
-		LastFailure = FString::Printf(TEXT("Couldn't connect: %s"), Error.IsEmpty() ? ETravelFailure::ToString(Type) : *Error);
 		UE_LOG(LogWildreach, Log, TEXT("MENU travel failure %s: %s"), ETravelFailure::ToString(Type), *Error);
+		if (CardKind == 1 && FPlatformTime::Seconds() - LastFailAt < 2.0) return;
+		NoteFailure(TEXT("Couldn't connect"), Error.IsEmpty() ? FString(TEXT("Couldn't reach that host. Check the address, and that their game is hosting.")) : FString::Printf(TEXT("Couldn't reach that host: %s"), *Error.Left(160)), bJoining);
 	});
 }
 

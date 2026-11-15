@@ -39,7 +39,10 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+	virtual ~SWRMainMenu() override;
 	virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override;
+	/** Esc closes the card over the menu (a disconnect, a crash). */
+	virtual FReply OnKeyDown(const FGeometry& Geo, const FKeyEvent& E) override;
 	/** Open() focuses the menu (UI-only input). */
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 
@@ -56,6 +59,8 @@ public:
 	static bool IsNewerVersion(const FString& Tag, const FString& Than);
 	/** Remember why a join or game ended badly (a different version than the host's...) to show when the menu comes back. */
 	static void WatchNetworkFailures();
+	/** A failure for the card: its title, the plain line, whether Rejoin can help. */
+	static void NoteFailure(const FString& Title, const FString& Line, bool bRejoin);
 	/** The look picked for the next join ([Wildreach.Menu] Look = <face>.<build>[.h], the ?Look= option): face index,
 	 *  build index (0 lean, 1 athletic, 2 strong) and whether the helmet is hidden. Defaults 0, 1, shown. */
 	static void GetLook(int32& Face, int32& Build, bool& bHideHelmet);
@@ -83,6 +88,27 @@ private:
 	TSharedRef<SWidget> MakePanel();
 	TSharedRef<SWidget> MakeTip();
 	TSharedRef<SWidget> MakeUpdate();
+
+	/**
+	 * The card over the menu (cookpass-ui 3.3): after a network failure (a plain line for what happened and, when this
+	 * game was joined to a host, Rejoin: it tries the same address again up to ui.rejoin.tries times within
+	 * ui.rejoin.windowSeconds, counting down between tries) or after a crash on the last run (send its report, or not now).
+	 * Mouse, keys (Esc closes) and pad (the D-pad reaches its buttons, B closes).
+	 */
+	TSharedRef<SWidget> MakeCard();
+	void CloseCard();
+	void Rejoin();
+	static int32 CardKind;        // 0 none, 1 a network failure, 2 a crash on the last run
+	static FString CardTitle;
+	static bool bCanRejoin;
+	static int32 RejoinTries;     // tries in this run of Rejoin presses / countdowns
+	static double RejoinFirstAt;
+	static double LastRejoinAt;
+	static double NextRejoinAt;   // > 0: a countdown to the next try
+	static double LastFailAt;
+	static bool bJoining;         // the last thing the menu did was join a host (so a travel failure can be rejoined)
+	TSharedPtr<SWidget> CardPanel;   // the card itself: the pad's D-pad navigates inside it while it shows
+	bool bCardNav = false;
 
 	TWeakObjectPtr<APlayerController> Owner;
 	TSharedPtr<SEditableTextBox> NameBox;

@@ -22,6 +22,7 @@
 #include "WRGameMode.h"
 #include "WRWorlds.h"
 #include "WRCharacter.h"
+#include "WRSocial.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -2257,8 +2258,9 @@ namespace WRSettingsUI
 			if (bInGame)
 			{
 				Nav->AddSlot().AutoHeight().Padding(10.f * U, 8.f * U, 10.f * U, 4.f * U)[HLine(WRUI::Alpha(WRUI::Brass2, 0.5f))];
-				Add(SNew(SWRNavItem, nullptr, [this]() { BackToMenu(); }).Icon(EWRIcon::Exit).Text(LOCTEXT("BackToMenu", "Main menu")));
-				Add(SNew(SWRNavItem, nullptr, [this]() { Quit(); }).Icon(EWRIcon::Power).Accent(WRUI::Bad).Text(LOCTEXT("Quit", "Quit")));
+				// Both ask once first (the strip over the footer), saying whether you're in a safe zone.
+				Add(SNew(SWRNavItem, [this]() { return Confirm == 1; }, [this]() { Confirm = 1; }).Icon(EWRIcon::Exit).Text(LOCTEXT("BackToMenu", "Main menu")));
+				Add(SNew(SWRNavItem, [this]() { return Confirm == 2; }, [this]() { Confirm = 2; }).Icon(EWRIcon::Power).Accent(WRUI::Bad).Text(LOCTEXT("Quit", "Quit")));
 			}
 			Nav->AddSlot().FillHeight(1.f)[SNullWidget::NullWidget];
 			Nav->AddSlot().AutoHeight().Padding(14.f * U, 8.f * U)[Muted(FText::FromString(TEXT("Wildreach ") + SWRMainMenu::GameVersion()), 11)];
@@ -2288,18 +2290,43 @@ namespace WRSettingsUI
 								]
 								+ SHorizontalBox::Slot().FillWidth(1.f).Padding(24.f * U, 0.f, 0.f, 0.f)[SAssignNew(Content, SBox)]
 							]
-							+ SVerticalBox::Slot().AutoHeight().Padding(24.f * U, 0.f)[Footer()]
+							+ SVerticalBox::Slot().AutoHeight().Padding(24.f * U, 0.f)
+							[
+								SNew(SWidgetSwitcher).WidgetIndex_Lambda([this]() { return Confirm > 0 ? 1 : 0; })
+								+ SWidgetSwitcher::Slot()[Footer()]
+								+ SWidgetSwitcher::Slot()[ConfirmStrip()]
+							]
 						]
 					]
 				]
 			];
 			ShowPage(TEXT("controls"));
+			// On a pad, B on the leave / quit strip means Stay (without it, B would close the whole window).
+			WRInput::PushPadHandler(this, [this](FName Verb)
+			{
+				if (Confirm > 0 && Verb == TEXT("MenuBack"))
+				{
+					Confirm = 0;
+					return true;
+				}
+				return false;
+			});
+		}
+
+		virtual ~SWRSettings() override
+		{
+			WRInput::PopPadHandler(this);
 		}
 
 		virtual bool SupportsKeyboardFocus() const override { return true; }
 
 		virtual FReply OnKeyDown(const FGeometry& Geo, const FKeyEvent& E) override
 		{
+			if (Confirm > 0 && E.GetKey() == EKeys::Escape)
+			{
+				Confirm = 0;
+				return FReply::Handled();
+			}
 			// In game Esc reaches the controller (it closes the menu); the main menu ignores game input, so close here.
 			if (E.GetKey() == EKeys::Escape && !bInGame)
 			{
@@ -2372,9 +2399,76 @@ namespace WRSettingsUI
 		TSharedPtr<SBox> Content;
 		TSharedPtr<SWRControlsPage> Controls;
 		TSharedPtr<SWRWorldPage> World;
+		int32 Confirm = 0;   // the leave strip: 0 none, 1 main menu, 2 quit
+
+		/** "You're in a safe zone" / "not": where the body stays for the moment a player leaves (the server's rule). */
+		FText LeaveLine() const
+		{
+			const APlayerController* P = PC.Get();
+			const APawn* Pawn = P ? P->GetPawn() : nullptr;
+			const bool bSafe = Pawn && FWRSocialRules::IsInSafeZone(Pawn->GetWorld(), Pawn->GetActorLocation());
+			FText Line = bSafe ? LOCTEXT("LeaveSafe", "You're in a safe zone.") : LOCTEXT("LeaveUnsafe", "You're not in a safe zone: your body stays in the world for a moment.");
+			// The host's world goes with them.
+			if (P && P->GetNetMode() == NM_ListenServer && P->GetWorld() && P->GetWorld()->GetNumPlayerControllers() > 1)
+			{
+				Line = FText::Format(LOCTEXT("LeaveHost", "{0} You're the host: everyone in your world goes back to their menu."), Line);
+			}
+			return Line;
+		}
+
+		TSharedRef<SWidget> ConfirmStrip()
+		{
+			return SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[HLine(WRUI::Alpha(WRUI::Brass2, 0.45f))]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SBox).HeightOverride(76.f * U)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
+						[
+							SNew(SWRLineIcon).Icon(EWRIcon::Warning).Size(22.f * U).Color(WRUI::Warn).Accent(WRUI::Warn)
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()
+							[
+								WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Confirm == 2 ? LOCTEXT("QuitAsk", "Quit Wildreach?") : LOCTEXT("LeaveAsk", "Leave this world?"); }), WRUI::Body(15, 800), WRUI::Ink)
+							]
+							+ SVerticalBox::Slot().AutoHeight()[Muted(TAttribute<FText>::CreateLambda([this]() { return LeaveLine(); }), 12, true)]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.f * U, 0.f, 10.f * U, 0.f)
+						[
+							SNew(SBox).MinDesiredWidth(120.f * U)
+							[
+								SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U).Text(LOCTEXT("Stay", "Stay"))
+								.OnClicked_Lambda([this]() { Confirm = 0; return FReply::Handled(); })
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							SNew(SBox).MinDesiredWidth(150.f * U)
+							[
+								SNew(SWRButton).Primary(true).FontSize(13).MinHeight(44.f * U)
+								.Text_Lambda([this]() { return Confirm == 2 ? LOCTEXT("QuitYes", "Quit") : LOCTEXT("LeaveYes", "Leave"); })
+								.OnClicked_Lambda([this]()
+								{
+									const int32 What = Confirm;
+									Confirm = 0;
+									if (What == 2) Quit();
+									else BackToMenu();
+									return FReply::Handled();
+								})
+							]
+						]
+					]
+				];
+		}
 
 		void Close()
 		{
+			Confirm = 0;
 			if (Controls.IsValid()) Controls->CancelAll();
 			OnClose.ExecuteIfBound();
 		}

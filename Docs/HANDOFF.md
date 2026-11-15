@@ -45,6 +45,8 @@ compass, names, helmet, crosshair, damage numbers, hints) pages; Look and contro
 response, vibration strength and hold / toggle for sprint, guard and aim (`AWRCharacter::InputSprint`, `InputPressed`).
 The HUD's Full / Fade / Minimal modes are `SWRHud::TickHudMode` (WRUIHud.cpp): a new HUD panel that should fade joins its
 lists there; anything that asks for action (prompts, notices, boss bars) stays out of them.
+Network failures go to the main menu's card (`SWRMainMenu::NoteFailure`, plain lines, Rejoin for a joined game);
+a crashed run's report is offered once on the next start (`WRReport::PendingCrash`, stamps in `Saved/Wildreach`).
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.
