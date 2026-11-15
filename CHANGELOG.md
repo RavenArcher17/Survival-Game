@@ -131,6 +131,12 @@ and the testers test, F8).
     complete: <its bonus>", and that set's pieces on the inventory doll flash brass for 1.6 s (tuning
     `ui.setComplete`). Client-side from the replicated equipment (`FWRPlayerUI::TickSetComplete`); joining in full
     armour is no moment. The tracked recipe's check moved to the same per-frame tick.
+- **UI (11): the Necromancy path's node glyphs.** Why: the Paths screen showed the Necromancy tree's 22 nodes without
+  icons (LATER-COOKS, build-biome-graveyard).
+  - 22 duo glyphs drawn in `Tools/ui_glyphs.mjs` like every path's (`node Tools/ui_glyphs.mjs path_<id> ...` renders
+    only the ones named): a skull is the path's mark with its eyes the accent, souls are wisps (a drop with two eyes),
+    the Reaper branch draws the scythe, the Lich the crown; capacity / chance / ability shapes follow the other
+    paths' (the flask, the four-point star, the sword, the burst). 44 PNGs, 45 KB (Git LFS).
 
 ## Unreleased: the Desert / Sun & sand
 

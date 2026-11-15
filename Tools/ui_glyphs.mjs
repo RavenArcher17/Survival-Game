@@ -343,6 +343,40 @@ const sporep = {
 };
 for (const [id, g] of Object.entries(sporep)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.6, sw: 1.8 });
 
+// Necromancy (cooks/biome-graveyard.md 2.17; cookpass-ui, LATER-COOKS build-biome-graveyard): a skull is the path's
+// mark, its eyes the accent (cut from the bone); souls are wisps (a drop with two eyes); the Reaper draws the scythe,
+// the Lich the crown. Same 24-unit duo glyphs as every path (a primary bone, b / c / t the accent).
+const skullP = (cx, cy, k) => `M${f2(cx)} ${f2(cy - 8 * k)}c${f2(-5 * k)} 0 ${f2(-8 * k)} ${f2(3.5 * k)} ${f2(-8 * k)} ${f2(8 * k)} 0 ${f2(3 * k)} ${f2(1.5 * k)} ${f2(4.5 * k)} ${f2(3 * k)} ${f2(5.5 * k)}V${f2(cy + 9 * k)}h${f2(10 * k)}v${f2(-3.5 * k)}c${f2(1.5 * k)} ${f2(-1 * k)} ${f2(3 * k)} ${f2(-2.5 * k)} ${f2(3 * k)} ${f2(-5.5 * k)} 0 ${f2(-4.5 * k)} ${f2(-3 * k)} ${f2(-8 * k)} ${f2(-8 * k)} ${f2(-8 * k)}z`;
+const skullEyes = (cx, cy, k) => circ(f2(cx - 3 * k), f2(cy + 0.5 * k), f2(1.9 * k)) + circ(f2(cx + 3 * k), f2(cy + 0.5 * k), f2(1.9 * k));
+const wispEyes = (cx, cy, k) => circ(f2(cx - 1.6 * k), f2(cy + 1.2 * k), f2(0.9 * k)) + circ(f2(cx + 1.6 * k), f2(cy + 1.2 * k), f2(0.9 * k));
+const scytheBlade = "M14 4c3.5-.2 6.5 1.2 8 4-2.8-1.3-5.6-1.5-8.6-.7z";
+const heartP = (cx, cy, k) => `M${f2(cx)} ${f2(cy + 4.5 * k)}s${f2(-4 * k)} ${f2(-2.4 * k)} ${f2(-4 * k)} ${f2(-5.5 * k)}a${f2(2.25 * k)} ${f2(2.25 * k)} 0 0 1 ${f2(4 * k)} ${f2(-1.4 * k)} ${f2(2.25 * k)} ${f2(2.25 * k)} 0 0 1 ${f2(4 * k)} ${f2(1.4 * k)}c0 ${f2(3.1 * k)} ${f2(-4 * k)} ${f2(5.5 * k)} ${f2(-4 * k)} ${f2(5.5 * k)}z`;
+const necrop = {
+	raise_dead: { a: skullP(12, 9.5, 0.7), c: skullEyes(12, 9.5, 0.7), t: "M3 21h18M8.5 21l1.2-2.6M15.5 21l-1.2-2.6M12 21v-1.4" },
+	soul_capacity: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: drop(12, 16.2, 0.42), c: wispEyes(12, 16.2, 0.42) },
+	wither_chance: { a: "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", c: skullP(12, 11.9, 0.3) },
+	grave_strike: { b: sword, a: skullP(18, 15.5, 0.42), c: skullEyes(18, 15.5, 0.42) },
+	second_wave: { a: skullP(8, 9.5, 0.5) + skullP(16, 12.5, 0.5), c: skullEyes(8, 9.5, 0.5) + skullEyes(16, 12.5, 0.5), t: "M2.5 21.5h19" },
+	restless_dead: { a: skullP(10.5, 10.5, 0.7), c: skullEyes(10.5, 10.5, 0.7), b: heartP(19, 17, 0.75) },
+	dead_march: { s: "M2.5 7l4.5 5-4.5 5M7.5 7l4.5 5-4.5 5", a: skullP(17.5, 11.5, 0.55), c: skullEyes(17.5, 11.5, 0.55) },
+	corpse_explosion: { a: "M12 2l2 5.5 5-3-2.4 5.3L22 12l-5.4 2.2 2.4 5.3-5-3L12 22l-2-5.5-5 3 2.4-5.3L2 12l5.4-2.2L5 4.5l5 3z", c: skullP(12, 11.8, 0.33) },
+	shared_pain: { a: skullP(6, 11.5, 0.45), c: skullEyes(6, 11.5, 0.45), s: "M10.5 12h3.5", t: "M10.5 9.5l3.5 2.5-3.5 2.5", b: heartP(18.5, 12, 0.95) },
+	army_of_the_dead: { a: skullP(12, 7.5, 0.55) + skullP(5.5, 12.5, 0.42) + skullP(18.5, 12.5, 0.42), c: skullEyes(12, 7.5, 0.55) + skullEyes(5.5, 12.5, 0.42) + skullEyes(18.5, 12.5, 0.42), t: "M2 21.5h20M6 21.5v-3M12 21.5v-4M18 21.5v-3" },
+	scythe_sweep: { s: "M4 21.5L14 4", a: scytheBlade, t: "M3.5 13a9 9 0 0 1 5.8-7.6M2.5 17.5a12 12 0 0 1 1.2-3" },
+	harvest: { s: "M4 21.5L14 4", a: scytheBlade, b: drop(18.5, 16.5, 0.45) + drop(13.5, 20, 0.28) },
+	soul_siphon: { a: "M12 21s-8-4.8-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.2-8 11-8 11z", c: skullP(12, 11.4, 0.32) },
+	death_mark: { t: circ(12, 12, 9.5) + "M12 1v3M12 20v3M1 12h3M20 12h3", a: skullP(12, 11.5, 0.5), c: skullEyes(12, 11.5, 0.5) },
+	reaping_stride: { s: "M2.5 7l4.5 5-4.5 5M7.5 7l4.5 5-4.5 5", a: drop(17.5, 13, 0.62), c: wispEyes(17.5, 13, 0.62) },
+	final_harvest: { a: skullP(8.5, 13, 0.62), c: skullEyes(8.5, 13, 0.62), t: "M14 21.5L19 3", b: "M19 3c-3.2 0-6 1.3-7.5 3.8 2.6-1 5.2-1.1 7.9-.4z" },
+	shadow_bolt: { a: drop(13, 12.5, 0.85), c: wispEyes(13, 12.5, 0.85), s: "M2.5 20.5l4-4M5.5 22l3-3" },
+	necrotic_power: { a: skullP(11, 12, 0.8), c: skullEyes(11, 12, 0.8), b: "M18.1 1.5h1.8V8h-1.8zM15.75 3.85h6.5v1.8h-6.5z" },
+	curse_of_weakness: { a: skullP(10, 11, 0.62), c: skullEyes(10, 11, 0.62), t: "M19.5 4v14M16.5 15l3 3.5 3-3.5" },
+	soul_shield: { a: "M12 2.5l8 3V11c0 5.5-3.5 9-8 10.5-4.5-1.5-8-5-8-10.5V5.5z", c: drop(12, 12.6, 0.48) },
+	life_drain: { a: skullP(6.5, 8.5, 0.45), c: skullEyes(6.5, 8.5, 0.45), t: "M9.5 12c1.5 1 1.2 2.4 2.7 3.3s2.8.2 3.8 1.4", b: heartP(18, 18.2, 0.85) },
+	lich_form: { a: skullP(12, 13.5, 0.62) + "M6.5 7.2l1.4-4.6 2.4 2.7L12 2l1.7 3.3 2.4-2.7 1.4 4.6z", c: skullEyes(12, 13.5, 0.62) },
+};
+for (const [id, g] of Object.entries(necrop)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
+
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
 // ---------- single-colour marks (tinted in the UI)
