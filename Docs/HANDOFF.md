@@ -54,6 +54,8 @@ Map pins are client-side per world (`WRUIMap::GetPins`, `Saved/Wildreach/Pins`);
 command (not built: the map table cook).
 The pad's D-pad right: a tap is the next ability, a hold the item wheel (`FWRPlayerUI::ItemWheelKey`, the wheel's mode 3).
 The tracked recipe is `FWRPlayerUI::SetTrackedRecipe / TickTracked` and the HUD's `TrackedCard`.
+The fill-in map is `UWRMapRevealComponent` (PlayerState, server-side grid, `mapReveal` in the player save); a new map
+marker for a place (not yours) should check `IsRevealed` in `WRUIMap` Gather like the camps and caves do.
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.
