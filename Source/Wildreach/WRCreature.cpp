@@ -8,6 +8,7 @@
 #include "WRFungalHazards.h"
 #include "WRSkyCreatures.h"
 #include "WROceanCreatures.h"
+#include "WRDesertCreatures.h"
 #include "WROceanHazards.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
@@ -1346,6 +1347,8 @@ void AWRCreature::BeginPlay()
 	UWRSkyBody::Attach(this);
 	// An Ocean creature's body state and code-built look (WROceanCreatures).
 	UWROceanBody::Attach(this);
+	// A desert creature's body state and look (WRDesertCreatures): the Dunejaw's dive, the grip, the false head...
+	UWRDesertBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -1633,6 +1636,11 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	if (FString Calm; FWROceanAI::TryPathTame(this, Player, Calm) || FWROceanAI::TryStealEgg(this, Player, Calm))
 	{
 		return Calm;
+	}
+	// A wild Wellfrog in its clay: squeezed for a drink, and it lives (WRDesertCreatures).
+	if (FString Drink; FWRDesertAI::TrySqueeze(this, Player, Drink))
+	{
+		return Drink;
 	}
 	const bool bKnockout = Def->CanTameBy(TEXT("knockout_feed")) && IsUnconscious();
 	const bool bOffer = Def->CanTameBy(TEXT("offer_food")) && !AggroTarget.IsValid();
@@ -2379,6 +2387,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
 	FWRSkyAI::Died(this, Killer);      // a Sky creature lets go; a Sailbell pops in fire or deflates and stings 60 s
 	FWROceanAI::Died(this, Killer);    // a sea creature lets go; a Gullraider drops what it stole; the blood cloud
+	FWRDesertAI::Died(this, Killer);   // a Glasstail lets go; the kites come to circle the kill
 	// The Risen leave no body (GY 2.12.4): their bones go straight to the killer.
 	const bool bRaisedMinion = WRNecro::IsRaised(this) || WRSporePath::IsSummon(this) || CreatureId == TEXT("sporeling");   // a Spore summon, a boss's sporeling: no body
 	WRSporePath::CreatureDied(this, Killer);   // Host's sporeling, Endless colony, Fungal puppets
@@ -2963,6 +2972,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// The Desert's (the fin under the soft sand, the night ambush, the kite's circle, the bask, the herds' night).
+	if (FWRDesertAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	// The Ancient forest creatures' own moments (a perch over a trail, a log at rest, a hold, a heat ball, a raid, a
 	// larder, the roar and the bugle, hovering, a cornered butt): WRForestCreatures.
 	if (FWRForestAI::TickWild(this, Self, DeltaSeconds))
@@ -3448,6 +3462,10 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 	if (FWROceanAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	if (FWRDesertAI::TickTame(this, Self, DeltaSeconds))
 	{
 		return;
 	}

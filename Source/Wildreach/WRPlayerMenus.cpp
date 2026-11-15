@@ -8,6 +8,7 @@
 #include "WRPlayerController.h"
 #include "WRCrystalCreatures.h"
 #include "WROceanCreatures.h"
+#include "WRDesertCreatures.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -267,7 +268,7 @@ void AWRPlayerController::WRInteract()
 		return;
 	}
 	// A Reefjaw open to the Tide path's calm, a sleeping Wavecharger's pouch (WROceanCreatures): held E too.
-	if (FString OceanVerb; Wild && (FWROceanAI::PathTamePrompt(Wild, GetPawn(), OceanVerb) || FWROceanAI::EggPrompt(Wild, GetPawn(), OceanVerb)))
+	if (FString OceanVerb; Wild && (FWROceanAI::PathTamePrompt(Wild, GetPawn(), OceanVerb) || FWROceanAI::EggPrompt(Wild, GetPawn(), OceanVerb) || FWRDesertAI::SqueezePrompt(Wild, GetPawn(), OceanVerb)))
 	{
 		ServerCommand(TEXT("interact"));
 		return;

@@ -379,6 +379,7 @@ about: `ScaleBuildups`, `DamageScale`, `AfterHit`, `OnParry`; `WRSun::Exposed` i
 `WRSun::SandUnder` the one "sand underfoot" test for any land) and `WRAbilitiesSun` (its abilities, `AWRSunField` the
 beacon / storms / quicksand, `AWRSunColumn` the light columns). Numbers: tuning `sun.radiance`, `sun.path`,
 `spells.<key>`, `wildbrands.<node>`, `nodeEffects sun.*`.
+The Desert's creatures are `WRDesertCreatures` (`FWRDesertAI` hooks friend of `AWRCreatureAI`, like `FWROceanAI`; `UWRDesertBody` holds each one's server state and multicasts its moments; `UWRDesertLife` keeps the populations by sub-zone from tuning `desertLife.tables`) and `WRDesertBeast.cpp` (the code-built bodies). Numbers: tuning `desertLife.*`; attacks in `attacks.json`.
 
 Also since 0.7.1 (live from Ocean (4)): **the Ocean & reefs** (cooks/biome-ocean.md, plan
 cooks/build-biome-ocean.md), the strait between the Sky's Chain Cliffs and the Storm crown. `node Tools/terrain/ocean.mjs`

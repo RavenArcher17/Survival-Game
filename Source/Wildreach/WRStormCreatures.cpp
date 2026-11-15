@@ -5,6 +5,7 @@
 #include "WRFungalCreatures.h"
 #include "WRSkyCreatures.h"
 #include "WROceanCreatures.h"
+#include "WRDesertCreatures.h"
 #include "WRStormBosses.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -1976,6 +1977,10 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWROceanBody::Get(this))
 	{
 		FWROceanAI::Damaged(this, Hit, Damage);
+	}
+	if (HasAuthority() && UWRDesertBody::Get(this))
+	{
+		FWRDesertAI::Damaged(this, Hit, Damage);
 	}
 }
 

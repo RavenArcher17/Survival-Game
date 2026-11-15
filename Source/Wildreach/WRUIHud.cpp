@@ -45,6 +45,7 @@
 #include "WRArcanePath.h"
 #include "WRCrystalCreatures.h"  // the Mana bar and the shield film (the Arcane path)
 #include "WROceanCreatures.h"
+#include "WRDesertCreatures.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -1077,6 +1078,8 @@ private:
 			if (FString WardVerb; FWRCrystalAI::PathTamePrompt(Wild, S, WardVerb)) { OutTarget = Wild->GetDisplayLabel(); return WardVerb; }
 			// The Reefjaw's calm for a Tide walker, a sleeping Wavecharger's egg (WROceanCreatures).
 			if (FString OceanVerb; FWROceanAI::PathTamePrompt(Wild, S, OceanVerb) || FWROceanAI::EggPrompt(Wild, S, OceanVerb)) { OutTarget = Wild->GetDisplayLabel(); return OceanVerb; }
+			// A wild Wellfrog in its clay (WRDesertCreatures): squeeze it for a drink.
+			if (FString DesertVerb; FWRDesertAI::SqueezePrompt(Wild, S, DesertVerb)) { OutTarget = Wild->GetDisplayLabel(); return DesertVerb; }
 			if (Wild->IsUnconscious()) { OutTarget = Wild->GetDisplayLabel(); return TEXT("Tame"); }
 		}
 		if (const AActor* Use = P->FindUseTarget())
