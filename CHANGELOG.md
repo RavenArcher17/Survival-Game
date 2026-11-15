@@ -137,6 +137,10 @@ and the testers test, F8).
     only the ones named): a skull is the path's mark with its eyes the accent, souls are wisps (a drop with two eyes),
     the Reaper branch draws the scythe, the Lich the crown; capacity / chance / ability shapes follow the other
     paths' (the flask, the four-point star, the sword, the burst). 44 PNGs, 45 KB (Git LFS).
+- **UI (12): read-through fixes.** The map's fog texture is rooted for the run instead of held by a function-static
+  strong pointer (that one would have been released after the garbage collector at quit: a crash on exit). The crash
+  check runs on whichever asks first, the log's install or the main menu's card, so the card can't miss a crash when
+  the menu opens before the player's UI.
 
 ## Unreleased: the Desert / Sun & sand
 

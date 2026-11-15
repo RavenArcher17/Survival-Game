@@ -484,6 +484,7 @@ namespace WRReportDetail
 namespace WRReportCrash
 {
 	FString CrashDir;   // the last run's crash folder, until answered
+	bool bChecked = false;
 	FString StampDir() { return FPaths::ProjectSavedDir() / TEXT("Wildreach"); }
 	FString SessionFile() { return StampDir() / TEXT("session"); }
 	FString CleanFile() { return StampDir() / TEXT("clean_exit"); }
@@ -502,7 +503,9 @@ namespace WRReportCrash
 	/** Once at start, in the game only (the editor's play sessions aren't runs of the game). */
 	void CheckLastRun()
 	{
-		if (GIsEditor) return;
+		// Once a run, whichever asks first (the log's install or the main menu's crash card).
+		if (bChecked || GIsEditor) return;
+		bChecked = true;
 		IFileManager& FM = IFileManager::Get();
 		FM.MakeDirectory(*StampDir(), true);
 		const FDateTime LastStart = FM.GetTimeStamp(*SessionFile());
@@ -557,7 +560,11 @@ void WRReport::InstallLog()
 	WRReportCrash::CheckLastRun();
 }
 
-FString WRReport::PendingCrash() { return WRReportCrash::CrashDir; }
+FString WRReport::PendingCrash()
+{
+	WRReportCrash::CheckLastRun();
+	return WRReportCrash::CrashDir;
+}
 
 void WRReport::DismissCrash()
 {

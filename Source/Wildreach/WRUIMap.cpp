@@ -10,7 +10,6 @@
 // So pixel centre px + 0.5 sits at world X = 400 px - 201600 cm: the picture spans X, Y in [-201800, 201800] cm.
 
 #include "WRUIMap.h"
-#include "UObject/StrongObjectPtr.h"
 #include "Engine/Texture2D.h"
 #include "WRMapReveal.h"
 #include "Styling/CoreStyle.h"
@@ -249,7 +248,8 @@ namespace WRMapTab
 	 *  cells across with a share of alpha for each cell seen, so the bilinear filter feathers the edge. */
 	struct FRevealFog
 	{
-		TStrongObjectPtr<UTexture2D> Tex;
+		// Rooted while the game runs (a function-static strong pointer would be torn down after the GC at exit).
+		TWeakObjectPtr<UTexture2D> Tex;
 		FSlateBrush Brush;
 		int32 Version = -1;
 		int32 Width = 0;
@@ -271,8 +271,11 @@ namespace WRMapTab
 		{
 			if (bNew)
 			{
-				F.Tex.Reset(UTexture2D::CreateTransient(W, W, PF_B8G8R8A8));
-				if (!F.Tex.IsValid()) return nullptr;
+				if (UTexture2D* Old = F.Tex.Get()) Old->RemoveFromRoot();
+				UTexture2D* NewTex = UTexture2D::CreateTransient(W, W, PF_B8G8R8A8);
+				if (!NewTex) return nullptr;
+				NewTex->AddToRoot();
+				F.Tex = NewTex;
 				F.Tex->Filter = TF_Bilinear;
 				F.Tex->SRGB = true;
 				F.Tex->AddressX = TA_Clamp;
