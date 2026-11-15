@@ -1599,15 +1599,41 @@ private:
 				// A fixed height: the button's leather tile would otherwise ask for its texture's 256.
 				SNew(SBox).HeightOverride(52.f * U)
 				[
-					SNew(SWRButton).Primary(true).FontSize(14).MinHeight(52.f * U)
-					.Text_Lambda([this, Key]() { return ActionLabel(Key); })
-					.IsEnabled_Lambda([this, Key]() { const FEntry* X = Find(Key); return X && MaxQuantity(*X) > 0; })
-					.OnClicked_Lambda([this, Key]() { DoAction(Key); return FReply::Handled(); })
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f)
+					[
+						SNew(SWRButton).Primary(true).FontSize(14).MinHeight(52.f * U)
+						.Text_Lambda([this, Key]() { return ActionLabel(Key); })
+						.IsEnabled_Lambda([this, Key]() { const FEntry* X = Find(Key); return X && MaxQuantity(*X) > 0; })
+						.OnClicked_Lambda([this, Key]() { DoAction(Key); return FReply::Handled(); })
+					]
+					// Track: the recipe's list on the HUD while you gather (one at a time; again untracks).
+					+ SHorizontalBox::Slot().AutoWidth().Padding(8.f * U, 0.f, 0.f, 0.f)
+					[
+						SNew(SBox).WidthOverride(118.f * U).Visibility(bRecipe ? EVisibility::Visible : EVisibility::Collapsed)
+						[
+							SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(52.f * U)
+							.Text_Lambda([this, Key]() { return IsTracked(Key) ? LOCTEXT("Tracking", "Tracking") : LOCTEXT("Track", "Track"); })
+							.OnClicked_Lambda([this, Key]()
+							{
+								FWRPlayerUI* X = PC.IsValid() ? PC->GetUI() : nullptr;
+								const FEntry* E = Find(Key);
+								if (X && E && E->Recipe) X->SetTrackedRecipe(IsTracked(Key) ? NAME_None : E->Recipe->Id);
+								return FReply::Handled();
+							})
+						]
+					]
 				]
 			];
 	}
 
 	const FEntry* Find(const FString& Key) const { return Entries.FindByPredicate([&Key](const FEntry& E) { return E.Key == Key; }); }
+	bool IsTracked(const FString& Key) const
+	{
+		const FEntry* E = Find(Key);
+		const FWRPlayerUI* X = PC.IsValid() ? PC->GetUI() : nullptr;
+		return E && E->Recipe && X && X->GetTrackedRecipe() == E->Recipe->Id;
+	}
 
 	TSharedRef<SWidget> InfuseRow(const FEntry& E, FName El)
 	{

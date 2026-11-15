@@ -50,6 +50,10 @@ a crashed run's report is offered once on the next start (`WRReport::PendingCras
 Text boxes need nothing for the pad: A over one opens the pad keyboard (`WRUIPadKeyboard.cpp`); a screen that
 wants its own Done / Cancel calls `WRPadKeyboard::Open` with a target (the chat line does).
 The main menu's look picker previews on the menu world's own survivor (`AWRCharacter::PreviewLook`, standalone only).
+Map pins are client-side per world (`WRUIMap::GetPins`, `Saved/Wildreach/Pins`); sharing them with a clan would be a server
+command (not built: the map table cook).
+The pad's D-pad right: a tap is the next ability, a hold the item wheel (`FWRPlayerUI::ItemWheelKey`, the wheel's mode 3).
+The tracked recipe is `FWRPlayerUI::SetTrackedRecipe / TickTracked` and the HUD's `TrackedCard`.
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.

@@ -86,6 +86,30 @@ and the testers test, F8).
     body too). Done (or Change again) goes back to the island view. Tuning `flow.lookCamera`.
   - Picks are saved to `[Wildreach.Menu] Look` and travel with Host and Join (`?Look=<face>.<build>[.h]`); switching
     the body keeps the face inside its list. The settings' Show my helmet and this panel are the same value.
+- **UI (6): map pins.** Why: the map held one waypoint; players mark ore, dens, loot and camps (Valheim's pins).
+  - Right-click on the journal map (X on a pad) opens a small card beside the spot: a name (24 letters, optional; the
+    pad keyboard on a pad), the six marks (Camp, Ore, Danger, Creature, Loot, Flag, drawn in code), Waypoint here,
+    Cancel. Picking a mark pins the spot. On a pin the card renames it, changes its mark (Save), removes it, or sets
+    the waypoint there. Right-click on your waypoint still clears it. B or Esc closes the card.
+  - Pins draw as brass-rimmed badges with their mark, the name under them once zoomed in (or hovered); the compass
+    shows pins within 400 m as small badges, with the name and distance when you face one.
+  - Up to 30 a world (tuning `ui.pins`), this PC's own, saved in `Saved/Wildreach/Pins/<world>.json` (the host's world
+    id, or the address a client joined), so each world keeps its own.
+- **UI (7): the pad's item wheel.** Why: on a controller the only way to the hotbar's tools, weapons and torch was
+  stepping the belt (ui-controls 2.13; Enshrouded / BotW hold a D-pad direction for a radial).
+  - **Hold D-pad right** (0.4 s, tuning `ui.itemWheel.holdSeconds`): the wheel opens with your eight hotbar items, each
+    wedge its icon and name; the centre shows the one under the stick (its icon, durability or how many, "In hand" or
+    its hotbar slot). Release on one takes it in hand (`UseHotbar`), in the middle cancels. The world keeps running;
+    held inputs drop on open and close like every wheel.
+  - A **tap** stays the next ability (the next ammo while aiming), now on the release (`FWRPlayerUI::ItemWheelKey`).
+  - The F1 page says so.
+- **UI (8): track a recipe.** Why: gathering for a recipe meant reopening the crafting tab to see what was still
+  missing (Grounded / Subnautica pin one recipe's list to the HUD).
+  - A **Track** button beside Craft on a recipe's details (again: untrack); one recipe at a time.
+  - The HUD shows a **Tracking** card under the clock: the output's icon and name, then each ingredient with its icon,
+    "have / need" from your bag, green once there's enough. It clears itself (with a line) once the item lands in
+    your bag, and goes with a recipe that leaves the data. Never fades (you asked for it); not in build mode or under
+    a screen. This PC's own (`[Wildreach.UI] Tracked`).
 
 ## Unreleased: the Desert / Sun & sand
 
