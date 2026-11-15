@@ -580,6 +580,7 @@
     "_itemWheel": "The pad's item wheel: D-pad right held this long opens the eight hotbar items (a quicker tap is the next ability).",
     "itemWheel": { "holdSeconds": 0.4 },
     "_reveal": "The fill-in map (WRMapReveal): each player's grid of cellCm cells over the map picture; every tickSeconds the cells within radiusCm of the body are seen, a found shrine inks shrineCm around it; changed tiles go to the client tilesPerTick a frame; the journal map redraws its fog at most every redrawSeconds, fogColor at fogAlpha over unseen land (the coast shows faintly through). Camps, caves, passes, mini-bosses and villages show once seen; major bosses always.",
+    "setComplete": { "glowSeconds": 1.6 },
     "reveal": { "cellCm": 800, "radiusCm": 15000, "shrineCm": 60000, "tickSeconds": 1.0, "tilesPerTick": 4, "redrawSeconds": 1.0, "fogColor": "2A241C", "fogAlpha": 0.86 } },
   "husbandry": { "produceSeconds": 600 },
   "death": { "bagMinutes": 30 },

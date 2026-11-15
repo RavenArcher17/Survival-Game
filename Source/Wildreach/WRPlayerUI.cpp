@@ -8,6 +8,7 @@
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
 #include "WRInventory.h"
+#include "WRGear.h"
 #include "WRCrafting.h"
 #include "WRKeyBindings.h"
 #include "WRMainMenu.h"
@@ -103,6 +104,8 @@ void FWRPlayerUI::Tick(float DeltaTime)
 	if (!bWheelsLoaded) LoadWheels();
 	AutoFillHotbar();
 	SyncScreen();
+	TickTracked();       // the tracked recipe clears once made
+	TickSetComplete();   // a worn set reaching its full bonus
 
 	const double Now = FPlatformTime::Seconds();
 	// A wheel key held past a tap opens its wheel; the cursor appears in the middle to pick with.
@@ -984,6 +987,41 @@ void FWRPlayerUI::TickTracked()
 		NoteNotice(TEXT("Tracked recipe made"));
 	}
 	else TrackedOutBaseline = FMath::Min(TrackedOutBaseline, Have);   // used some up: count from the new low
+}
+
+void FWRPlayerUI::TickSetComplete()
+{
+	AWRPlayerController* P = PC.Get();
+	const AWRPlayerState* PS = P ? P->GetPlayerState<AWRPlayerState>() : nullptr;
+	const UWRInventoryComponent* Inv = PS ? PS->GetInventory() : nullptr;
+	if (!Inv) return;
+	TMap<FName, int32> Now;
+	for (const EWREquipSlot Slot : WRGearSlots::Armour)
+	{
+		const FWRItemStack& S = Inv->GetEquipped(Slot);
+		const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		if (D && !D->Set.IsNone() && !Now.Contains(D->Set)) Now.Add(D->Set, Inv->SetPieces(D->Set));
+	}
+	if (bSetsSeeded)
+	{
+		for (const TPair<FName, int32>& It : Now)
+		{
+			const FWRSetDef* Set = FWRGear::Get().FindSet(It.Key);
+			if (!Set || Set->Bonuses.Num() == 0) continue;
+			const FWRSetBonus& Last = Set->Bonuses.Last();   // fewest first: the last is the full set
+			const int32* Before = LastSetPieces.Find(It.Key);
+			if (It.Value >= Last.Pieces && (!Before || *Before < Last.Pieces))
+			{
+				SetCompleteId = It.Key;
+				SetCompleteAt = FPlatformTime::Seconds();
+				WRSound::PlayUI(P, TEXT("gear.setComplete"));
+				P->ShowLocalNotice(FString::Printf(TEXT("%s complete: %s"), *Set->Name, *Last.Text));
+				UE_LOG(LogWildreach, Log, TEXT("SET complete %s"), *It.Key.ToString());
+			}
+		}
+	}
+	bSetsSeeded = true;
+	LastSetPieces = MoveTemp(Now);
 }
 
 void FWRPlayerUI::ItemWheelKey(bool bDown)

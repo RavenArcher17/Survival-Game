@@ -888,6 +888,18 @@ namespace WRInvTab
 			if (!S) return FWRSlotView();
 			FWRSlotView V = WRInv::StackView(*S);
 			V.bSelected = SelKind == EWRSlotKind::Equipment && SelIndex == e && !V.ItemId.IsNone();
+			// A set just completed: its pieces on the doll flash brass a few times (the set-complete moment).
+			if (const FWRPlayerUI* X = PC.IsValid() ? PC->GetUI() : nullptr)
+			{
+				double Since = 0.0;
+				const FName Done = X->GetSetCompleteId(Since);
+				const FWRItemDef* D = DefOf(S);
+				const double Age = FPlatformTime::Seconds() - Since;
+				if (D && !Done.IsNone() && D->Set == Done && Age < WRTune(TEXT("ui.setComplete.glowSeconds"), 1.6f))
+				{
+					V.bSelected = FMath::FloorToInt(Age * 5.0) % 2 == 0;
+				}
+			}
 			return V;
 		}
 

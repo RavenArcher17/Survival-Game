@@ -124,6 +124,13 @@ and the testers test, F8).
     volcano, glacier or spire is seen from afar). Your Hearths, claims, beds, tames and pins show as before.
   - Numbers in tuning `ui.reveal`. **Players who already played start with a blank map** around where they stand
     (nothing was recorded before this).
+- **UI (10): the set-complete moment.** Why: putting on the last piece of a biome set did nothing you could see or hear
+  (LATER-COOKS, build-crafting).
+  - The frame a worn set reaches its last bonus (gear.json sets: the 4-piece), a chime (new sounds.json row
+    `gear.setComplete`: the unlock and discovery chimes pitched down to a fuller ring), the centre line "<Set>
+    complete: <its bonus>", and that set's pieces on the inventory doll flash brass for 1.6 s (tuning
+    `ui.setComplete`). Client-side from the replicated equipment (`FWRPlayerUI::TickSetComplete`); joining in full
+    armour is no moment. The tracked recipe's check moved to the same per-frame tick.
 
 ## Unreleased: the Desert / Sun & sand
 
