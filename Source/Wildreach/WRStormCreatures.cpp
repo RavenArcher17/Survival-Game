@@ -1,6 +1,7 @@
 // The Storm peaks creatures (cooks/biome-lightning.md 2.9; cooks/build-biome-lightning.md 1.3, 2.6). See WRStormCreatures.h.
 #include "WRStormCreatures.h"
 #include "WRGraveCreatures.h"
+#include "WRCrystalCreatures.h"
 #include "WRStormBosses.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -1951,6 +1952,11 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWRGraveBody::Get(this))
 	{
 		FWRGraveAI::Damaged(this, Hit, Damage);
+	}
+	// A Crystal creature: the Chimecrab's shell rings, the Lumenhorns bellow, a Druseback curls, a Prismback turns its plates.
+	if (HasAuthority() && UWRCrystalBody::Get(this))
+	{
+		FWRCrystalAI::Damaged(this, Hit, Damage);
 	}
 }
 

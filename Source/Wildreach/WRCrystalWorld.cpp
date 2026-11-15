@@ -138,6 +138,7 @@ void UWRCrystalWorld::Tick(float DeltaTime)
 		if (!bServerDone) { bServerDone = true; SpawnServerActors(); SpawnHazards(); }
 		StepServerNoise(DeltaTime);
 		StepPools(DeltaTime);
+		StepDens(DeltaTime);
 		StepVenn(DeltaTime);
 	}
 	StepResonance(DeltaTime);

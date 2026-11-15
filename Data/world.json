@@ -150,12 +150,12 @@
       {"id": "count_the_bones", "title": "Count the bones", "task": "Bring Morwen the Ossuary ledger from the Sorting Room, down in the Ossuary.", "type": "bring", "item": "lore_ossuary_ledger", "count": 1, "xp": 3000, "recipes": ["bone_altar"]},
       {"id": "the_one_who_digs", "title_reward": "Lantern-keeper", "title": "The one who digs", "task": "Kill the Gravedigger on his night walk (by day he sleeps against the Watch House door).", "type": "kill", "creature": "gravedigger", "count": 1, "xp": 5000, "recipes": ["heartwood_stake"], "items": {"heartwood_stake": 4}}
     ],
+    "_saga_venn_later": [{"id": "two_of_one", "title": "Two of one", "task": "Beat the Mirrored Twins in the Archive of Wards.", "type": "kill", "creature": "mirrored_twins", "count": 1, "xp": 3000, "items": {"doubling_spar": 2}}],
     "saga_venn": [
       {"id": "listen_first", "title": "Listen first", "task": "Strike the keystone chime in three different halls (the bronze chime under each hall's biggest cluster) and watch the hall light.", "type": "event", "event": "keystone_struck", "count": 3, "xp": 1000, "recipes": ["attuning_chalk"]},
       {"id": "on_the_ring", "title": "On the ring", "task": "Mine resonant crystal on the ring 8 times: strike a node again while it still rings (within a breath of the last strike) and it gives one more.", "type": "event", "event": "ring_mined", "count": 8, "xp": 1500, "recipes": ["ward_charm"]},
       {"id": "drop_the_door", "title": "Drop the door", "task": "Drop three ward fields by hitting their lead keystone plates (an arrow, a thrown stone or a spell), not by walking through them attuned.", "type": "event", "event": "ward_dropped", "count": 3, "xp": 2000, "items": {"ward_fork": 1}},
       {"id": "the_quiet_road", "title": "The quiet road", "task": "Cross the Organ, the long lava tube under the plateau, from one end to the other without an Echobat ever coming for you.", "type": "event", "event": "quiet_road", "count": 1, "xp": 2500, "recipes": ["wax_earplugs_wax", "silver_bait"]},
-      {"id": "two_of_one", "title": "Two of one", "task": "Beat the Mirrored Twins in the Archive of Wards.", "type": "kill", "creature": "mirrored_twins", "count": 1, "xp": 3000, "items": {"doubling_spar": 2}},
       {"id": "what_the_vault_keeps", "title_reward": "Quiet-keeper", "title": "What the Vault keeps", "task": "Open the Silent Vault beyond the Echo Warden's hall and bring Saga the Carver's Chisel to touch (you keep it).", "type": "show", "item": "carvers_chisel", "count": 1, "xp": 5000, "items": {"venns_ring": 1}}
     ],
     "maren": [

@@ -84,6 +84,8 @@ public:
 	AWRCrystalState* GetState() const { return State.Get(); }
 	const TArray<TWeakObjectPtr<AWRResourceNode>>& GetNodes() const { return Nodes; }
 	AWRCrystalSpot* SpotNear(const FVector& At) const;
+	/** Server: an Echobat came for this survivor (Saga's "quiet road" across the Organ is spoiled for this crossing). */
+	void QuietRoadSpoiled(AActor* Who);
 	/** Every machine: a spot came into this world (its BeginPlay), so the E prompt can find it. */
 	void AddSpot(AWRCrystalSpot* Spot) { Spots.AddUnique(Spot); }
 	/** E at a crystal spot (the interaction chain in WRWorldNpc, the command in WRWorldSystems: world crystal spot). */
@@ -107,6 +109,9 @@ private:
 	 *  Resonance (every machine: its glow, swell and peals; the server: the peals' work). */
 	void SpawnHazards();
 	void StepPools(float Dt);
+	/** WRCrystalCreatures.cpp: the dens by sub-zone with their day and night tables (crystal 2.12.3), near survivors. */
+	void StepDens(float Dt);
+	void StepQuietRoad();
 	void StepResonance(float Dt);
 	void Peal(int32 Index, const FVector& Source, float Speed);
 	void StepLight(float Dt);
@@ -131,6 +136,12 @@ private:
 	FRotator VennFace = FRotator::ZeroRotator;
 	mutable double RainSeenAt = -1.0;
 	float PoolClock = 0.f;
+	struct FDen { FVector At = FVector::ZeroVector; FName Zone; bool bCave = false; float Spread = 600.f; TArray<TWeakObjectPtr<class AWRCreature>> Alive; double NextAt = 0.0; bool bNight = false; };
+	TArray<FDen> Dens;
+	float DenClock = 0.f;
+	/** Saga's quiet road: who is crossing the Organ, from which end (0 / 1), and whether a bat has come for them. */
+	TMap<FString, int32> QuietFrom;
+	TSet<FString> QuietSpoiled;
 	float ChimeClock = 0.f;
 	int32 PealsDone = 0;
 	int32 PealHeard = -1;

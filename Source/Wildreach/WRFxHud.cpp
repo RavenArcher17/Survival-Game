@@ -165,6 +165,12 @@ public:
 			}
 		}
 
+		// A Prismback's glare (crystal 2.12.2): the whole view whites out to status.defs.glare.white for its second.
+		if (const AWRCharacterBase* Me = Cast<AWRCharacterBase>(P->GetPawn()); Me && Me->HasTag(WRTags::Status_Glare))
+		{
+			FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(Size, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, FLinearColor(0.96f, 0.95f, 1.f, WRTune(TEXT("status.defs.glare.white"), 0.4f)));
+		}
+
 		// Damage numbers, oldest first so new ones draw on top.
 		for (const UWRFxSubsystem::FHudHit& H : Fx->HudHits)
 		{

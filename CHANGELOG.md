@@ -7,6 +7,32 @@ cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in piece
 not played here (Aaron tests). Hidden until it's whole: `crystal` is not in `world.liveBiomes`, so nothing below is
 built in a running game yet.
 
+- **Crystal (4): the nine creatures, and the Crystal caves go live** (`crystal` joins `world.liveBiomes`). Rows in
+  `creatures.json` / `attacks.json` (24 attack rows from biome-crystal 2.12.2, mark on bites and claws) on borrowed rigs
+  with the cook's palette (`M_CreatureTint`): Prismback (Magmaw), Spindleglass (Kilnmite core), Echobat (Mountain
+  Dragon), Geodemite (Kilnmite), Lumenhorn (Frostantler, a mount), Druseback (Rimeshell, widened), Gemsniffer
+  (Pumicehog), Alicanto (Ashstrider), Chimecrab (Kilnmite). `WRCrystalCreatures.*`: `UWRCrystalBody` (replicated flags,
+  broken legs, the latched victim) builds every silhouette part point by point in `M_CrystalGlow` (so they light by
+  sound): the Prismback's four rows of mirror-plates, the Spindleglass's body hung 3 m up on eight selenite-banded legs
+  whose feet stay planted and step on an arc when the body has moved 1.6 m past them (neighbours never lift together),
+  the Echobat's ears and leaf-nose, the Geodemite's honeypot, the Lumenhorn's palmate spread and 15 m rider light, the
+  Druseback's split-geode segments, the Gemsniffer's brow gem, the Alicanto's glowing wing fans and light, the
+  Chimecrab's geode shell. `FWRCrystalAI` (friend of the creature AI, called beside the Graveyard's hooks): Echobats
+  hunt only what they hear (`OnNoise`; x0.7 in the upper halls in rain) and go deaf 30 s as a Resonance peal passes;
+  a Spindleglass feels only steps, rolls and landings within 8 m (its body clouds pink-grey), spears only what is
+  under its span, and its legs break (120 each, strike x1.3): a broken leg falls ringing (a 12 m noise), 3 broken it
+  collapses, 5 it crawls; a Prismback turns its plated flank to a shot or a cast for 3 s and throws projectiles back
+  (x0.8 through `ApplyHit`), its Glare needs a light within 15 m and whites out your view and drops your lock 1 s
+  (`Status.Crystal.Glare`, not Blind); Geodemites latch (mark 10 a second, at most four, a hit shakes one off) and
+  burst in shards when they die; a Druseback struck at impact 4+ curls 4 s (damage x0.3); the Lumenhorn herd bellows
+  when hit (a 40 m noise); a Chimecrab's shell rings; the Alicanto dims and runs for the nearest drop edge when it sees
+  you following; tamed, a Gemsniffer points and scratches toward gems, crystal and caches within 20 m and an Alicanto
+  leads to the richest ore within 40 m while you stand still. **Dens** (`UWRCrystalWorld::StepDens`, tables in tuning
+  `crystalLife.dens`, biome-crystal 2.12.3): every hall a den of its sub-zone, the dome rims and sites the plateau's,
+  day and night tables (underground nights 22-04), filled near survivors and emptied when none is near. Saga's "quiet
+  road" is tracked across the Organ. The Void's creature rows that were in `creatures.json` three times are now once.
+  Saga's fifth quest (the Mirrored Twins) waits in `_saga_venn_later` until the Twins are built.
+
 - **Crystal (3): the hazards, the Silent Vault, the Resonance** (`WRCrystalHazards.*`, numbers in tuning
   `hazards.crystal` and `crystalEvents.resonance`). **Ward fields** (34, `AWRWardField`): a sheet across each doorway,
   only its edges shimmering; an unattuned character within 3 m brings up the tell on every machine over 0.9 s (the

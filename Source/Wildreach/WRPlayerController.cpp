@@ -943,7 +943,7 @@ void AWRPlayerController::ToggleLockOn()
 {
 	// Blinded: nothing to lock on to (combat.md 2.11).
 	const AWRCharacterBase* Me = Cast<AWRCharacterBase>(GetPawn());
-	if (!LockTarget.IsValid() && Me && Me->HasTag(WRTags::Status_Blind))
+	if (!LockTarget.IsValid() && Me && (Me->HasTag(WRTags::Status_Blind) || Me->HasTag(WRTags::Status_Glare)))
 	{
 		return;
 	}
@@ -1036,7 +1036,7 @@ void AWRPlayerController::UpdateLockOn(float DeltaTime)
 			return;
 		}
 	}
-	if (Me && Me->HasTag(WRTags::Status_Blind))
+	if (Me && (Me->HasTag(WRTags::Status_Blind) || Me->HasTag(WRTags::Status_Glare)))
 	{
 		UE_LOG(LogWildreach, Log, TEXT("LOCK lost: blinded"));
 		SetLockTarget(nullptr);

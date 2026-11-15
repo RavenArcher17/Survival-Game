@@ -5,6 +5,7 @@
 #include "WRCreature.h"
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
+#include "WRCrystalCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampBosses.h"
 #include "WRSwampCreatures.h"
@@ -473,6 +474,7 @@ float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRSwampAI::Incoming(this, Hit, Damage);   // a Murkjaw's belly as it rolls or rears, a Slimeshell in its shell
 	Damage = FWRVoidAI::Incoming(this, Hit, Damage);    // nothing reaches a Riftmaw in its tear
 	Damage = FWRForestAI::Incoming(this, Hit, Damage);  // a reared Mossmaul's belly, a Burlbeast's bark plates, bees on wasps
+	Damage = FWRCrystalAI::Incoming(this, Hit, Damage);  // a Prismback's plates throw a shot back, a rolled Druseback, a Spindleglass's legs
 	Damage = FWRGraveAI::Incoming(this, Hit, Damage);   // a buried hound, the Tombback's slab, the Risen and necrotic magic
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
@@ -635,6 +637,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // a forest creature's own rule (from a perch, from rest, below 40%, at its hive, cornered, forced only)
 		}
+		if (!FWRCrystalAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // a Crystal creature's own rule (the glare needs a light, a spear needs you under its span)
+		}
 		if (!FWRGraveAI::RowAllowed(this, Self, R, Target, bReading))
 		{
 			continue;  // a Graveyard creature's own rule (the Rising, the howl once, the drop from a ceiling, the dark, the downed)
@@ -792,6 +798,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 			FWRForestAI::Resolved(S, V, HitRowId, Result);
 			// A Graveyard creature's (the whip's find, the palp snatch, the tear-drinker, the dive's snuffed torch).
 			FWRGraveAI::Resolved(S, V, HitRowId, Result);
+			FWRCrystalAI::Resolved(S, V, HitRowId, Result);
 		}
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{

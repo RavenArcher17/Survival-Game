@@ -533,6 +533,7 @@ void UWRCrystalWorld::StepServerNoise(float Dt)
 		if (R > 0.f) WRCrystal::Emit(World, Feet, R, C, TEXT("step"));
 	}
 	for (auto It = FallStart.CreateIterator(); It; ++It) if (!It.Key().IsValid()) It.RemoveCurrent();
+	StepQuietRoad();
 }
 
 void UWRCrystalWorld::ProjectileLanded(const UObject* WorldContext, const FVector& At, AActor* By, FName Kind, bool bQuiet)

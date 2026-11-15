@@ -68,7 +68,8 @@ namespace WRTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Water);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Void);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Element_Arcane);    // the Crystal caves' (cooks/biome-crystal.md): ward fields, its creatures, the Arcane path
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Attuned);    // attuning chalk on the forearms: wards hurt half and don't throw (crystal 2.7)      // the Wasteland's (cooks/biome-void.md): its tears, creatures and path
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Attuned);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Status_Glare);      // a Prismback's glare in your eyes: the view whites out, the lock drops (crystal 2.12.2; not Blind)    // attuning chalk on the forearms: wards hurt half and don't throw (crystal 2.7)      // the Wasteland's (cooks/biome-void.md): its tears, creatures and path
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Path_Fire);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Path_Frost);

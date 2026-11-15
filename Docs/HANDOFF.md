@@ -353,7 +353,7 @@ Path Glide hooks (`CanPathGlide`, `PathGlideStats`, `PathGlideTick`, `GliderStam
 `OnEnteredUpdraft`). Yara Kesh's quest deeds (first_flight, updraft_top, broken_way) are counted in
 `UWRSkyAirSubsystem::StepDeeds`; quests can `need` several items (`"a|b"` takes either) and `mark` a place on the map
 once done. Found blueprints (`gear.json` kind "piece" / "found" with "from") never drop from portals.
-Also since 0.7.1 (in progress, hidden: `crystal` is not in `world.liveBiomes` yet): **the Crystal caves**
+Also since 0.7.1 (in progress, live): **the Crystal caves**
 (cooks/biome-crystal.md, plan cooks/build-biome-crystal.md). `node Tools/terrain/crystal.mjs` writes
 `Data/lands/crystal.json` + `crystal_ground.bin` (the plateau, on the Wasteland's frame so the Severance runs through
 both; `Tools/terrain/wasteland_ground.mjs` is the JS port of the Wasteland's ground it meets) and `Data/crystal.json`
@@ -369,6 +369,10 @@ keystone light. Numbers: tuning `crystalWorld` (noise radii, light, nodes, Saga'
 Hazards are `WRCrystalHazards.*` (ward fields + keystones, chandeliers, thin floors, the Silent Vault's door
 `AWRSilentDoor` (the hidden-vault door is `AWRVaultDoor`, a different thing), scalding pools, the Resonance); they hear
 noises through `OnNoise` and the creatures will listen to `OnPeal`. Numbers: tuning `hazards.crystal`, `crystalEvents`.
+The creatures are `WRCrystalCreatures.*` (`UWRCrystalBody` looks and state, `FWRCrystalAI` hooks beside the
+Graveyard's in `WRCreature*.cpp` / `WRStormCreatures.cpp`, the dens and the quiet road); numbers in tuning
+`crystalLife`. Not built: the four bosses, the Arcane path (Saga's quest XP waits for it; her Twins quest is parked in
+`world.json quests._saga_venn_later`), composed music.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
