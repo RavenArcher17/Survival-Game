@@ -6,6 +6,8 @@
 #include "CoreMinimal.h"
 
 class FJsonObject;
+class AActor;
+class UProceduralMeshComponent;
 
 struct WILDREACH_API FWROceanData
 {
@@ -124,5 +126,9 @@ namespace WROcean
 	 *  height cm), and the look modelled on the node (every drawing machine). */
 	WILDREACH_API bool IsNodeItem(FName Item);
 	WILDREACH_API FVector2D NodeBody(FName Item);
-	WILDREACH_API void NodeLook(class AActor* Node, FName Item, uint32 Seed);
+	WILDREACH_API void NodeLook(AActor* Node, FName Item, uint32 Seed);
+	/** A thrown thing of the coast modelled in code (WRProjectile's "code:" models): the harpoon (ash shaft, bronze toggle
+	 *  head, a coil of line at the butt), the chain-hook harpoon (Leviathan's hook), Thalassor's spout bomb, Old Barnacle's
+	 *  barrel and anchor, the Sunstone flare. Along +X. */
+	WILDREACH_API bool BuildThrownModel(const FString& ModelPath, UProceduralMeshComponent* Comp);
 }

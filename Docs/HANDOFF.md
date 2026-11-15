@@ -346,6 +346,9 @@ volume of higher priority); breath and depth are `UWRDiveComponent`; Dive / Rise
 _2 (all four custom bits were taken). **The tide** (`WRTide.*`) is a pure function of the game clock plus
 `AWROceanState`'s King Tide; anything that asks "where is the water's surface here" calls `WRTide::SurfaceAt` (the still
 sea elsewhere).
+The Tide path is `WRTidePath` (Flow, Gills = `Passive.Gills`, passives, combos, look; named so because `WRTide` is the
+sea's tide) and `WRAbilitiesTide` (its abilities, `AWRHarpoonLine` the shared harpoon line any thrown harpoon can use:
+`Make`, `TieTo` a mooring stone, `AddPull`, `On(body)`; `AWRTideWave` the travelling waves, `AWRTideField` the whirlpools).
 
 Also since 0.7.1 (in progress): **the Sky islands, over the Hollow Cape north of the Storm peaks** (cooks/biome-sky.md,
 plan cooks/build-biome-sky.md). One generator: `node Tools/terrain/sky.mjs` writes the cape's ground

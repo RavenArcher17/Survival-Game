@@ -1,4 +1,5 @@
 #include "WRPathComponent.h"
+#include "WRTidePath.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
 #include "WRArcanePath.h"
@@ -590,6 +591,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	{
 		// Featherfall (cooks/biome-sky.md 2.18.3): no fall damage from any height; gliders at half the stamina.
 		GrantedTags.AddTag(WRWind::Passive_Featherfall);
+	}
+	else if (MainPath == TEXT("tide"))
+	{
+		// Gills (cooks/biome-ocean.md 2.17): breathe and fight freely under water (WRUnderwater, WRTidePath.cpp).
+		GrantedTags.AddTag(WRTidePath::Passive_Gills);
 	}
 	else if (MainPath == TEXT("arcane"))
 	{

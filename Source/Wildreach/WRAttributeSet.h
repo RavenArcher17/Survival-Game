@@ -54,6 +54,9 @@ public:
 	/** The Arcane path's Mana (cooks/biome-crystal.md 2.17): a steady pool, refilling 6 a second at all times. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Mana) FGameplayAttributeData Mana;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxMana) FGameplayAttributeData MaxMana;
+	/** The Tide path's Flow (cooks/biome-ocean.md 2.17): builds while you move and dodge, drains when you stand still. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Flow) FGameplayAttributeData Flow;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxFlow) FGameplayAttributeData MaxFlow;
 	/** An Arcane shield's HP layer (Barrier, Aegis's wearer, Moon tide): taken after guard, before Health; the bigger one
 	 *  wins, never stacked. MaxShield is what the shield was raised at (the HUD's film). */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Shield) FGameplayAttributeData Shield;
@@ -93,6 +96,8 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxSouls)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Mana)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxMana)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Flow)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxFlow)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Shield)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxShield)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHealthLost)
@@ -128,6 +133,8 @@ private:
 	UFUNCTION() void OnRep_MaxSouls(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Mana(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxMana(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Flow(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxFlow(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Shield(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxShield(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxHealthLost(const FGameplayAttributeData& Old);

@@ -26,6 +26,8 @@ UWRAttributeSet::UWRAttributeSet()
 	InitMaxSouls(20.f);
 	InitMana(0.f);
 	InitMaxMana(100.f);
+	InitFlow(0.f);
+	InitMaxFlow(100.f);
 	InitShield(0.f);
 	InitMaxShield(0.f);
 	InitMaxHealthLost(0.f);
@@ -75,6 +77,8 @@ void UWRAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	WR_REP_OWNER(MaxSouls);
 	WR_REP_OWNER(Mana);
 	WR_REP_OWNER(MaxMana);
+	WR_REP_OWNER(Flow);
+	WR_REP_OWNER(MaxFlow);
 	WR_REP_OWNER(Shield);
 	WR_REP_OWNER(MaxShield);
 }
@@ -100,6 +104,7 @@ void UWRAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute
 	else if (Attribute == GetMomentumAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxMomentum());
 	else if (Attribute == GetSoulsAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxSouls());
 	else if (Attribute == GetManaAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxMana());
+	else if (Attribute == GetFlowAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, GetMaxFlow());
 	else if (Attribute == GetShieldAttribute()) NewValue = FMath::Max(0.f, NewValue);
 	else if (Attribute == GetHungerAttribute() || Attribute == GetThirstAttribute()) NewValue = FMath::Clamp(NewValue, 0.f, 100.f);
 	else if (Attribute == GetBurnBuildupAttribute() || Attribute == GetFrostBuildupAttribute()) NewValue = FMath::Max(0.f, NewValue);
@@ -131,6 +136,8 @@ WR_ONREP(Souls)
 WR_ONREP(MaxSouls)
 WR_ONREP(Mana)
 WR_ONREP(MaxMana)
+WR_ONREP(Flow)
+WR_ONREP(MaxFlow)
 WR_ONREP(Shield)
 WR_ONREP(MaxShield)
 WR_ONREP(BurnBuildup)

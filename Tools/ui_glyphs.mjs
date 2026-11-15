@@ -277,6 +277,38 @@ const arcanep = {
 };
 for (const [id, g] of Object.entries(arcanep)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.6, sw: 1.8 });
 for (const [id, g] of Object.entries(nature)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
+// Tide (cooks/biome-ocean.md 2.17): waves, the harpoon and its line, the whirlpool's spiral, the healing swell.
+const wave = (y, amp, x0 = 2, x1 = 22) => { let d = "M" + x0 + " " + y; const n = 4, w = (x1 - x0) / n; for (let i = 0; i < n; i++) d += "q" + f2(w / 4) + " " + f2(i % 2 ? amp : -amp) + " " + f2(w / 2) + " 0t" + f2(w / 2) + " 0"; return d; };
+const crest = "M2 17c3-1 4.5-6 9-6.5 3.4-.4 5 2 4 3.8-1 1.6-3.4 1-3.2-.7 2.6 0 4.2-3.6 2.4-6-2-2.6-7.6-1.6-10.6 3.2C2.6 13 2 15 2 17z";
+const spiral = (cx, cy, r) => { let d = ""; for (let i = 0; i <= 40; i++) { const t = i / 40, a = t * Math.PI * 4.5, rr = r * (1 - t * 0.9); d += (i ? "L" : "M") + f2(cx + Math.cos(a) * rr) + " " + f2(cy + Math.sin(a) * rr); } return d; };
+const harpoon = "M3 21L16.6 7.4l-1.6-1.6 6.5-3.3-3.3 6.5-1.6-1.6L3 21zM14.2 5.2l1.4-3 1.4 1.4zM18.8 9.8l3-1.4-1.4-1.4z";
+const tdrop = (cx, cy, r) => `M${f2(cx)} ${f2(cy - r * 1.7)}c${f2(r * 0.6)} ${f2(r * 0.9)} ${f2(r)} ${f2(r * 1.3)} ${f2(r)} ${f2(r * 1.9)}a${f2(r)} ${f2(r)} 0 1 1 ${f2(-2 * r)} 0c0 ${f2(-r * 0.6)} ${f2(r * 0.4)} ${f2(-r)} ${f2(r)} ${f2(-r * 1.9)}z`;
+const tidep = {
+	water_bolt: { a: tdrop(13, 11, 4.2), s: "M2.5 21.5l5-5M5 22l3-3M2 19l3-3" },
+	flow_capacity: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: wave(15.5, 1.6, 6.5, 17.5) + "v4h-11z" },
+	soak_chance: { a: tdrop(8, 10, 3.4) + tdrop(16.5, 14, 2.6), s: "M3 21h18" },
+	wave_cut: { b: sword, s: wave(19, 1.8, 2, 22) },
+	riptide_pull: { s: "M21 6c-6 0-9 3-9 6s3 6 9 6", a: "M3 12l5-3.2v6.4z", t: wave(4, 1, 6, 18) },
+	drag: { s: "M21 7c-6 0-9 2.5-9 5s3 5 9 5", a: "M2.5 12l4-2.6v5.2zM8 12l3.4-2.2v4.4z" },
+	drowning: { a: circ(12, 7.5, 4.6), t: wave(15.5, 1.4) + wave(20, 1.4), c: circ(14, 5.5, 1.2) },
+	whirlpool: { t: spiral(12, 12, 9.4) },
+	heavy_water: { a: tdrop(12, 11, 5.2), s: "M5 21h14M8 18.5h8" },
+	maelstrom: { t: spiral(12, 12, 10.2), a: circ(12, 12, 1.6), s: "M2 4l3 2M22 4l-3 2M2 20l3-2M22 20l-3-2" },
+	harpoon_throw: { a: harpoon },
+	barbed_tip: { a: harpoon, s: "M18.5 2.5l3 3M15 1.5l1 2" },
+	quick_reel: { t: circ(9, 15, 5.4) + circ(9, 15, 2), s: "M14 10l7.5-7.5", a: "M19 2.5h3v3z" },
+	anchor: { t: circ(12, 4.5, 2.2), s: "M12 6.7V21M7.5 10.5h9M3.5 14.5c0 4 3.8 6.5 8.5 6.5s8.5-2.5 8.5-6.5", a: "M2 14.5l3-2.2v4.4zM22 14.5l-3-2.2v4.4z" },
+	tow: { s: "M3 20L19 4", t: "M19 4l-4 .6M19 4l-.6 4", a: circ(5, 18, 2.6) + "M2 22l2.4-.8-1.6-1.6z" },
+	leviathans_hook: { a: "M15 2.5h3v8.5a6 6 0 0 1-12 0V8.5l-2.5 2.6L3 7.5l4.5-1v4.6a3.2 3.2 0 0 0 6.4 0z", t: "M16.5 2.5V1" },
+	healing_wave: { a: crest, b: "M17.4 4.4h1.8v1.8H21v1.8h-1.8v1.8h-1.8V8h-1.8V6.2h1.8z" },
+	mending_tide: { t: wave(9, 1.6) + wave(15, 1.6), a: "M11 18h2v2h2v2h-2v2h-2v-2H9v-2h2z" },
+	cleanse: { a: tdrop(12, 12, 5), c: "M9.6 12.2l1.8 1.8 3.4-3.6", s: "M3 5l1.5 1.5M21 5l-1.5 1.5" },
+	tidal_shield: { a: "M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z", c: wave(11.5, 1.4, 6.5, 17.5) + "v2.6h-11z" },
+	current: { s: "M2.5 8h12M5 12h14.5M2.5 16h12", a: "M14.5 8l3-2v4zM19.5 12l3-2v4zM14.5 16l3-2v4z" },
+	high_tide: { a: "M1.5 20c2.5-.5 4-8 9.5-10.5C16.8 7 21 9.8 21.4 12.4c.4 2.4-2.6 3.4-4 1.6 2.4-.4 2.4-3.6-.4-4.2-3.6-.8-6.4 4-8 9.2z", t: "M1.5 22h21" },
+};
+for (const [id, g] of Object.entries(tidep)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.6, sw: 1.8 });
+
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
 // ---------- single-colour marks (tinted in the UI)
@@ -309,6 +341,8 @@ const masks = {
 	leaf: [F(leaf(12, 12.5, 19, 12, 30)), CUT(S(midrib(12, 12.5, 19, 30), 1.3))],
 	// The Arcane path's mark (cooks/biome-crystal.md 2.17): the Wardcarvers' hexafoil.
 	hexafoil: [S(hexf(12, 12, 9.4), 1.5), F(circ(12, 12, 1.4))],
+	// The Tide path's mark (cooks/biome-ocean.md 2.17): a cresting wave over a swell.
+	tide_wave: [F("M2 15.5c3-1 4.5-6.5 9-7 3.4-.4 5 2 4 3.8-1 1.6-3.4 1-3.2-.7 2.6 0 4.2-3.6 2.4-6-2-2.6-7.6-1.6-10.6 3.2C2.6 11 2 13.2 2 15.5z"), S("M2 19.5q2.5-2 5 0t5 0 5 0 5 0", 1.6)],
 };
 // Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
 const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
@@ -329,7 +363,7 @@ Object.assign(masks, {
 	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
 	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
 });
-const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, hexafoil: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
+const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, hexafoil: 48, tide_wave: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
 // ---------- full colour

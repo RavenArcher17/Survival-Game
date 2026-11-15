@@ -192,3 +192,49 @@ void WROcean::NodeLook(AActor* Node, FName Item, uint32 Seed)
 	}
 	M.ApplyTo(P);
 }
+
+bool WROcean::BuildThrownModel(const FString& ModelPath, UProceduralMeshComponent* Comp)
+{
+	using namespace WROceanNodesImpl;
+	if (!Comp) return false;
+	FWRToolMesh M;
+	if (ModelPath == TEXT("code:harpoon") || ModelPath == TEXT("code:harpoon_chain"))
+	{
+		const bool bChain = ModelPath == TEXT("code:harpoon_chain");
+		// Ash shaft 2 m (its tip at the actor), a bronze toggle head with its barb, a coil of line or chain at the butt.
+		M.Lathe(FVector(-200.f, 0, 0), FVector(1, 0, 0), 175.f, { FVector(0.f, 2.6f, 2.6f), FVector(1.f, 2.2f, 2.2f) }, 8, S(0x9C, 0x84, 0x60), 0.7f);
+		M.Lathe(FVector(-25.f, 0, 0), FVector(1, 0, 0), 25.f, { FVector(0.f, 3.f, 3.f), FVector(0.6f, 4.f, 2.f), FVector(1.f, 0.4f, 0.4f) }, 6, bChain ? S(0x3A, 0x34, 0x30, 0.55f) : S(0x8C, 0x6A, 0x3A), 0.4f);
+		Branch(M, FVector(-14.f, 0, 0), FVector(-30.f, 0, 9.f), 1.6f, 0.4f, bChain ? S(0x3A, 0x34, 0x30, 0.55f) : S(0x8C, 0x6A, 0x3A));
+		for (int32 r = 0; r < 4; ++r) M.Lathe(FVector(-195.f + r * 3.f, 0, 0), FVector(1, 0, 0), 3.f, { FVector(0.f, 4.5f, 4.5f), FVector(1.f, 4.5f, 4.5f) }, 8, bChain ? S(0x3A, 0x34, 0x30, 0.55f) : S(0x9C, 0x84, 0x60, 0.5f), 0.9f);
+	}
+	else if (ModelPath == TEXT("code:spout"))
+	{
+		// A ball of thrown sea-water (Thalassor's spout): foam-white over blue, a wake behind.
+		Blob(M, FVector::ZeroVector, 40.f, S(0x9E, 0xD8, 0xE0, 0.7f), 1.f, 10);
+		Blob(M, FVector(-30.f, 0, 0), 26.f, S(0xF0, 0xF4, 0xF4, 0.8f), 0.8f, 8);
+	}
+	else if (ModelPath == TEXT("code:barrel"))
+	{
+		// A barnacled cask out of Old Barnacle's hull (hoops, staves).
+		M.Lathe(FVector(-50.f, 0, 0), FVector(1, 0, 0), 100.f, { FVector(0.f, 30.f, 30.f), FVector(0.5f, 38.f, 38.f), FVector(1.f, 30.f, 30.f) }, 12, S(0x6E, 0x54, 0x3A, 0.5f), 0.85f);
+		for (int32 h = 0; h < 3; ++h) M.Lathe(FVector(-42.f + h * 40.f, 0, 0), FVector(1, 0, 0), 6.f, { FVector(0.f, 34.f + (h == 1 ? 4.f : 0.f), 34.f + (h == 1 ? 4.f : 0.f)), FVector(1.f, 34.f + (h == 1 ? 4.f : 0.f), 34.f + (h == 1 ? 4.f : 0.f)) }, 12, S(0x3A, 0x30, 0x28, 0.5f), 0.6f);
+		for (int32 b = 0; b < 6; ++b) Blob(M, FVector(-20.f + b * 8.f, FMath::Cos(float(b)) * 36.f, FMath::Sin(float(b)) * 36.f), 5.f, S(0xD8, 0xD0, 0xBE), 0.6f, 6);
+	}
+	else if (ModelPath == TEXT("code:anchor"))
+	{
+		M.Lathe(FVector(-80.f, 0, 0), FVector(1, 0, 0), 160.f, { FVector(0.f, 8.f, 8.f), FVector(1.f, 8.f, 8.f) }, 8, S(0x6A, 0x3A, 0x22, 0.5f), 0.85f);
+		Branch(M, FVector(80.f, 0, 0), FVector(40.f, 60.f, 0.f), 7.f, 4.f, S(0x6A, 0x3A, 0x22, 0.5f));
+		Branch(M, FVector(80.f, 0, 0), FVector(40.f, -60.f, 0.f), 7.f, 4.f, S(0x6A, 0x3A, 0x22, 0.5f));
+		Branch(M, FVector(-70.f, 0, -50.f), FVector(-70.f, 0, 50.f), 5.f, 5.f, S(0x6A, 0x3A, 0x22, 0.5f));
+	}
+	else if (ModelPath == TEXT("code:sunflare"))
+	{
+		// The Sunstone flare: a glass bulb round a sunstone, kelp-ash fuse.
+		Blob(M, FVector::ZeroVector, 8.f, S(0xE8, 0xE4, 0xC8, 0.7f), 1.f, 10);
+		Blob(M, FVector::ZeroVector, 5.f, S(0xFF, 0xC8, 0x40, 1.f), 1.f, 8);
+		Branch(M, FVector(-8.f, 0, 0), FVector(-14.f, 0, 4.f), 1.f, 0.6f, S(0x24, 0x22, 0x20, 0.5f));
+	}
+	else return false;
+	M.ApplyTo(Comp);
+	return true;
+}

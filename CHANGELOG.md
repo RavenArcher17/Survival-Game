@@ -7,6 +7,38 @@ cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; c
 played here (Aaron and the testers test, F8). Not live until `ocean` joins `world.liveBiomes` (a later piece), so nothing
 of the coast shows yet; underwater play is live everywhere water is.
 
+- **Ocean (2): the Tide path** (cooks/biome-ocean.md 2.17-2.18; plan build-biome-ocean.md 2.16). `Data/paths/tide.json`
+  (22 nodes: trunk Water bolt / Flow capacity / Soak chance / Wave cut; Undertow, Harpooner and Tidecaller branches; root
+  passive Gills), numbers in tuning `tide.flow`, `tide.path`, `tide.combos`, `spells.<key>`, `wildbrands.wave_cut` /
+  `harpoon_throw`, `nodeEffects tide.*`, `passives.anchor` / `tow` / `leviathansHook`. **Flow** is a new owner-replicated
+  attribute (`Flow` / `MaxFlow`): 100 + 15 a capacity rank; +5 a second moving over 300 cm/s on the ground, +8 sprinting,
+  swimming or on a swim mount (Gills x1.5 in water), +10 a dodge or kick-dodge, +15 a perfect dodge (the water ribbon),
+  +4 a weapon hit while moving; after 1.5 s under 150 cm/s it drains 8 a second (a rooted cast holds it). A sea-green bar
+  under your health that ripples while it fills and flashes when a press is refused (and the `-oldui` bar; Mana's was
+  missing there too and is added). **Gills** (main path): no breath limit, crush only past 80 m, x1.25 under water, every
+  weapon at full speed and charged heavies under water, Flow x1.5 in water. **Abilities** (`WRAbilitiesTide.*`, under
+  `tide` in `ClassForNode`): Water bolt (full speed under water, homes on creatures), Riptide pull (a 30 degree cone pulls
+  5 m, +1 m a Drag rank, the highland half way at Drag 3, never bosses, lowland stagger as they arrive), Whirlpool (holds
+  lowland / midland, slows the highland, soaks), Maelstrom (a 10 m vortex dragging everything to the eye at 3 m/s, x2 at
+  the centre, bosses only soaked), Harpoon throw (a spear on a line, `AWRHarpoonLine`: press again within 1.5 s to reel
+  small bodies in; held: Anchor pins the highland 3 s / slows a mini; Tow pulls you to a big body or to any wall, rock or
+  hull the harpoon struck within 18 m, i-frames on the last 0.2 s; Leviathan's hook makes it a chain that drags a boss 3
+  m with 60 stance and a 1.2 s stagger, once each 30 s), Healing wave (a 6 m wave rolling 12 m that heals every ally it
+  passes and passes enemies harmlessly), High tide (a 10 m wave: heals 60, knocks lowland / midland 6 m, staggers the
+  highland, 40 stance on bosses), Cleanse (every status and buildup off the ally under your crosshair), Tidal shield (35
+  HP on the shared shield layer; it bursts when broken, soaking attackers within 2 m), Wave cut (the Wildbrand). The line
+  is a sagging cable drawn on every machine that pulls straight when reeled, glows sea-green when anchored or tied, and
+  is a chain with the hook; it breaks past 27 m or at 600 pull. Passives: Soak chance (+10% soak, +6 soak on weapon hits a
+  rank), Drowning (soaked survivors lose 6 stamina a second; soaked creatures regain no stance and take +15% stance),
+  Heavy water (a deeper soak slow and +1 s a rank, on creatures), Barbed tip, Quick reel (`<node>_cooldown` node effects
+  now shorten any ability's cooldown), Mending tide, Current (+6/12/18% speed tags, so the owner predicts them). **Combos**
+  (combos.json): Hot spring, Boiling sea, Live water, Thunder tide, Rain, Swamp guardian, Flash freeze, Frozen maelstrom,
+  Life tide, Shark harpoon, Tidal dead, Depths. **The body**: Flow brightens the sheen; at full strength it glows faintly
+  under water and the gills flutter (`WRTidePath::ApplyLook`; the skin's own Underwater switch opens them). Paths screen
+  colours for Tide (and Arcane's, which fell back to Fire's), deeds count water hits as Tide's (and arcane as Arcane's).
+  Node glyphs for all 22 nodes and the path's wave mark (`Tools/ui_glyphs.mjs`, 45 PNGs). The harpoon is modelled in code
+  (`code:harpoon` / `code:harpoon_chain`); a modelled shot striking the world now calls its `OnLanded`.
+
 - **Ocean (1): diving, breath and depth (every water), the tide, the coast's land and its places.**
   **Underwater play** (`WRUnderwater.*`, numbers in tuning `underwater`): a new rebindable **Dive** (Left Ctrl; on a pad,
   hold Dodge) sinks you, Jump rises (hold: surface fast), neither holds your depth; under the surface you swim where you

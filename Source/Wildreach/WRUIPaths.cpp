@@ -81,6 +81,16 @@ namespace WRPathsTab
 			// Moss green (#5E8C31, cooks/biome-forest.md 2.17), lit toward the young-leaf gold-green of the World tree's crown.
 			return { WRPathLook::Color(Path), Hex(TEXT("17260C")), Hex(TEXT("7DB043")), Hex(TEXT("DCEFB8")), Hex(TEXT("6FA23A")), Hex(TEXT("E6F4CC")) };
 		}
+		if (Path == TEXT("tide"))
+		{
+			// Sea-green (#1E8C86, cooks/biome-ocean.md 2.18; hero.md's Tide colour), lit toward the Noctiluca surf's pale aqua.
+			return { WRPathLook::Color(Path), Hex(TEXT("0A2624")), Hex(TEXT("2FA89F")), Hex(TEXT("CDEFEA")), Hex(TEXT("3AB5AB")), Hex(TEXT("DDF6F2")) };
+		}
+		if (Path == TEXT("arcane"))
+		{
+			// Violet (#7A3FD1, cooks/biome-crystal.md 2.18), lit toward the pale lilac of a lit lining.
+			return { WRPathLook::Color(Path), Hex(TEXT("1E0E38")), Hex(TEXT("9A6AE0")), Hex(TEXT("E8DCFF")), Hex(TEXT("8F5FD8")), Hex(TEXT("F0E8FF")) };
+		}
 		if (Path == TEXT("wind"))
 		{
 			// Pale teal (#9FD6CF, cooks/biome-sky.md 2.18.2), lit toward the white of a gust's crest.

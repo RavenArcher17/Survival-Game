@@ -1,4 +1,6 @@
 #include "WRAbilities.h"
+#include "WRAbilitiesTide.h"
+#include "WRTidePath.h"
 #include "WRCrystalTypes.h"
 #include "WRCrystalHazards.h"
 #include "WRInventory.h"
@@ -223,7 +225,12 @@ void UWRGameplayAbility::ApplyCost(const FGameplayAbilitySpecHandle Handle, cons
 
 float UWRGameplayAbility::GetCooldownSeconds() const
 {
-	const float Seconds = CooldownKey.IsEmpty() ? CooldownFallback : FWRTuning::Get().Num(CooldownKey, CooldownFallback);
+	float Seconds = CooldownKey.IsEmpty() ? CooldownFallback : FWRTuning::Get().Num(CooldownKey, CooldownFallback);
+	// A node's own cooldown change (nodeEffects "<node>_cooldown": the Tide's Quick reel takes 1 s a rank off the harpoon).
+	if (const AActor* Who = CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr; Who && !NodeId.IsNone())
+	{
+		Seconds = FMath::Max(0.5f, Seconds + UWRPathComponent::Stat(Who, FName(*(NodeId.ToString() + TEXT("_cooldown")))));
+	}
 	// Rapid fire (lightning node): at high Charge path spells come back sooner (not Wildbrands; the CDO has no avatar).
 	const AActor* Avatar = CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr;
 	return Avatar && !PathId.IsNone() && !IsA<UWRGA_Melee>() ? Seconds * WRLightning::SpellCooldownScale(Avatar) : Seconds;
@@ -1692,6 +1699,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		if (IsServer())
 		{
 			Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
+			WRTidePath::OnDodge(Character, false);
 			WRFx::Broadcast(Character, bUnder ? TEXT("ocean.kick") : TEXT("ocean.surface_roll"), Character->GetActorLocation(), (-Dir).Rotation(), 1.f, bUnder ? TEXT("ocean.kick") : TEXT("water.stroke"));
 		}
 		bWasBackstep = false;
@@ -1755,6 +1763,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	{
 		// Back-dated to the press for a remote player: the perfect dodge is judged from when it really began.
 		Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
+		WRTidePath::OnDodge(Character, false);   // the Tide path's Flow: +10 a dodge
 		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
 		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), bBackstep ? 0.7f : 1.f);  // (the dodge sound is the audio director's)
 		// In the Crystal caves a roll is an 8 m noise (crystal 2.1): the crystals light and the hunters hear it.
@@ -2718,7 +2727,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		// Wind (WRWindPath.cpp, WRSkyAir): Glide, Eye of the storm, Lingering gale, Piercing gale, Tailwind shot.
 		TEXT("wind_glide"), TEXT("eye_of_the_storm"), TEXT("lingering_gale"), TEXT("piercing_gale"), TEXT("tailwind_shot"),
 		// Arcane (WRArcanePath.cpp, WRAbilitiesArcane.cpp): Reflect, Ward allies, Echo, Mana burn, Rune link.
-		TEXT("reflect"), TEXT("ward_allies"), TEXT("echo"), TEXT("mana_burn"), TEXT("rune_link") };
+		TEXT("reflect"), TEXT("ward_allies"), TEXT("echo"), TEXT("mana_burn"), TEXT("rune_link"),
+		// Tide (WRTidePath.cpp, WRAbilitiesTide.cpp): Drowning, Anchor, Tow, Leviathan's hook (the harpoon's reel reads them).
+		TEXT("drowning"), TEXT("anchor"), TEXT("tow"), TEXT("leviathans_hook") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2834,6 +2845,20 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("rune_trap")) return UWRGA_RuneTrap::StaticClass();
 		if (NodeId == TEXT("inscribe")) return UWRGA_Inscribe::StaticClass();
 		if (NodeId == TEXT("rune_circle")) return UWRGA_RuneCircle::StaticClass();
+	}
+	else if (PathId == TEXT("tide"))
+	{
+		// The Tide path (WRAbilitiesTide.cpp, cooks/biome-ocean.md 2.17).
+		if (NodeId == TEXT("water_bolt")) return UWRGA_WaterBolt::StaticClass();
+		if (NodeId == TEXT("wave_cut")) return UWRGA_WaveCut::StaticClass();
+		if (NodeId == TEXT("riptide_pull")) return UWRGA_RiptidePull::StaticClass();
+		if (NodeId == TEXT("whirlpool")) return UWRGA_Whirlpool::StaticClass();
+		if (NodeId == TEXT("maelstrom")) return UWRGA_Maelstrom::StaticClass();
+		if (NodeId == TEXT("harpoon_throw")) return UWRGA_HarpoonThrow::StaticClass();
+		if (NodeId == TEXT("healing_wave")) return UWRGA_HealingWave::StaticClass();
+		if (NodeId == TEXT("cleanse")) return UWRGA_Cleanse::StaticClass();
+		if (NodeId == TEXT("tidal_shield")) return UWRGA_TidalShield::StaticClass();
+		if (NodeId == TEXT("high_tide")) return UWRGA_HighTide::StaticClass();
 	}
 	else if (PathId == TEXT("necromancy"))
 	{

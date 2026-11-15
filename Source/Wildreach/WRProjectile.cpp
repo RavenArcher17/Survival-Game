@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WROceanTypes.h"
 #include "WRSkyBosses.h"
 #include "WRCrystalBosses.h"
 #include "WRBoss.h"
@@ -229,7 +230,7 @@ void AWRProjectile::OnRep_Model()
 		CodeModel->RegisterComponent();
 		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
 		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
-			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel))
+			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel) || WROcean::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -507,6 +508,8 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 				UE_LOG(LogWildreach, Log, TEXT("RANGED %s landed; left to pick up"), *PickupItem.ToString());
 			}
 		}
+		// A modelled shot that struck the world (a harpoon in a cliff: the Tide's Tow grapples to it).
+		if (OnLanded) OnLanded(HitResult.ImpactPoint);
 		return;
 	}
 	// Explosive bolt: fire bolts burst on impact.

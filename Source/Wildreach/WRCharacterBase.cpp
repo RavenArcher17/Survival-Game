@@ -1,4 +1,5 @@
 #include "WRCharacterBase.h"
+#include "WRTidePath.h"
 #include "WRWindPath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
@@ -157,7 +158,8 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	Slow *= WRForestHazards::MoveScale(this);
 	// The Lightning path: Swift and high Charge (both machines read them: the owner predicts with the same numbers).
 	// The Nature path: an enemy's Pollen haze (both machines see the plants), an Entangle's boss slow (server bodies).
-	return Slow * SpeedBoost * Load * WRLightning::MoveSpeedScale(this) * WRNature::MoveSpeedScale(this);
+	// The Tide path: an ally's Current (+6/12/18%), Heavy water's deeper soak on creatures (WRTidePath.cpp).
+	return Slow * SpeedBoost * Load * WRLightning::MoveSpeedScale(this) * WRNature::MoveSpeedScale(this) * WRTidePath::MoveSpeedScale(this);
 }
 
 void AWRCharacterBase::InitVitals(float MaxHealth, float MaxStamina, float MaxPoise)

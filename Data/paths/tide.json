@@ -1,0 +1,213 @@
+{
+  "_comment": "The Tide path (cooks/biome-ocean.md 2.17; cooks/build-biome-ocean.md 2.16). Resource Flow builds while you move and dodge and drains when you stand still (tuning tide.flow); the root passive Gills (main path only) lets you breathe and fight freely under water. Abilities are UWRGameplayAbility subclasses in WRAbilitiesTide.* registered under tide in UWRAbilityRegistry::ClassForNode; numbers in tuning spells.<key>, wildbrands.<node>, nodeEffects tide.*, tide.*.",
+  "id": "tide",
+  "name": "Tide",
+  "biome": "ocean",
+  "starter": "water_bolt",
+  "color": "1E8C86",
+  "icon": "tidecoral",
+  "glyph": "tide_wave",
+  "resource": {
+    "id": "flow",
+    "name": "Flow"
+  },
+  "rootPassive": {
+    "id": "gills",
+    "name": "Gills",
+    "text": "Breathe and fight freely underwater. No breath limit, the deep doesn't crush you short of 80 m, every weapon swings at full speed under the surface, you swim a quarter faster and Flow builds half again as fast in water."
+  },
+  "trunk": [
+    {
+      "id": "water_bolt",
+      "name": "Water bolt",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic water spell"
+    },
+    {
+      "id": "flow_capacity",
+      "name": "Flow capacity",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "Larger Flow bar"
+    },
+    {
+      "id": "soak_chance",
+      "name": "Soak chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Higher chance to soak enemies, slowing them"
+    },
+    {
+      "id": "wave_cut",
+      "name": "Wave cut",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic water weapon art"
+    }
+  ],
+  "branches": [
+    {
+      "id": "undertow",
+      "name": "Undertow",
+      "nodes": [
+        {
+          "id": "riptide_pull",
+          "name": "Riptide pull",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 0,
+          "text": "Spell: pull enemies toward you"
+        },
+        {
+          "id": "drag",
+          "name": "Drag",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 5,
+          "text": "Stronger pulls"
+        },
+        {
+          "id": "drowning",
+          "name": "Drowning",
+          "kind": "stat",
+          "cost": 4,
+          "gate": 8,
+          "text": "Soaked enemies lose stamina"
+        },
+        {
+          "id": "whirlpool",
+          "name": "Whirlpool",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 12,
+          "text": "Spell: a whirlpool that holds enemies"
+        },
+        {
+          "id": "heavy_water",
+          "name": "Heavy water",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 17,
+          "text": "Stronger soak slows"
+        },
+        {
+          "id": "maelstrom",
+          "name": "Maelstrom",
+          "kind": "capstone",
+          "cost": 10,
+          "gate": 20,
+          "text": "Capstone: a huge whirlpool drags everything in"
+        }
+      ]
+    },
+    {
+      "id": "harpooner",
+      "name": "Harpooner",
+      "nodes": [
+        {
+          "id": "harpoon_throw",
+          "name": "Harpoon throw",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 0,
+          "text": "Weapon art: spear an enemy and reel it in"
+        },
+        {
+          "id": "barbed_tip",
+          "name": "Barbed tip",
+          "kind": "stat",
+          "ranks": 5,
+          "gate": 5,
+          "text": "More harpoon damage and bleed"
+        },
+        {
+          "id": "quick_reel",
+          "name": "Quick reel",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 10,
+          "text": "Faster harpoon recovery"
+        },
+        {
+          "id": "anchor",
+          "name": "Anchor",
+          "kind": "stat",
+          "cost": 4,
+          "gate": 13,
+          "text": "Pin large enemies in place"
+        },
+        {
+          "id": "tow",
+          "name": "Tow",
+          "kind": "stat",
+          "cost": 3,
+          "gate": 17,
+          "text": "Pull yourself to enemies or walls"
+        },
+        {
+          "id": "leviathans_hook",
+          "name": "Leviathan's hook",
+          "kind": "capstone",
+          "cost": 10,
+          "gate": 20,
+          "text": "Capstone: drag even bosses, staggering them"
+        }
+      ]
+    },
+    {
+      "id": "tidecaller",
+      "name": "Tidecaller",
+      "nodes": [
+        {
+          "id": "healing_wave",
+          "name": "Healing wave",
+          "kind": "ability",
+          "cost": 5,
+          "gate": 0,
+          "text": "Spell: a wave that heals allies"
+        },
+        {
+          "id": "mending_tide",
+          "name": "Mending tide",
+          "kind": "stat",
+          "ranks": 5,
+          "gate": 5,
+          "text": "Stronger healing"
+        },
+        {
+          "id": "cleanse",
+          "name": "Cleanse",
+          "kind": "ability",
+          "cost": 3,
+          "gate": 10,
+          "text": "Remove status effects from allies"
+        },
+        {
+          "id": "tidal_shield",
+          "name": "Tidal shield",
+          "kind": "ability",
+          "cost": 4,
+          "gate": 13,
+          "text": "Spell: a water shield on an ally"
+        },
+        {
+          "id": "current",
+          "name": "Current",
+          "kind": "stat",
+          "ranks": 3,
+          "gate": 17,
+          "text": "Allies in your waves move faster"
+        },
+        {
+          "id": "high_tide",
+          "name": "High tide",
+          "kind": "capstone",
+          "cost": 10,
+          "gate": 20,
+          "text": "Capstone: a great wave heals allies and knocks enemies back"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRTidePath.h"
 #include "WRUnderwater.h"
 #include "WRCrystalTypes.h"
 #include "WRWindPath.h"
@@ -492,6 +493,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			Event.Instigator = Attacker;
 			Event.Target = Target;
 			TargetASC->HandleGameplayEvent(WRTags::Event_PerfectDodge, &Event);
+			WRTidePath::OnDodge(Target, true);   // the Tide path: +15 Flow and the water ribbon
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT %s perfect dodge of %s"), *Target->GetName(), *GetNameSafe(Attacker));
 			// Frozen moment: a perfect dodge freezes everything close to you (once every few seconds).
 			static TMap<TWeakObjectPtr<AActor>, double> LastFrozenMoment;
@@ -1047,6 +1049,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 				+ (Move && Move->IsSprinting() ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("sprintStance")) : 0.f);
 		}
 		if (bWasUnaware) Stance *= 1.f + WRTune(TEXT("combat.stealth.stance"), 0.2f);
+		Stance *= WRTidePath::StanceTakenScale(Target);   // Drowning: a soaked creature takes +15%
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Rimed)) Stance *= WRTune(TEXT("status.defs.frost.rimedStance"), 1.5f);
 		if (const AWRBoss* Open = Cast<AWRBoss>(Target); Open && Now < Open->StanceOpenUntil) Stance *= WRTune(TEXT("bosses.old_tusker.wallowStance"), 1.5f);
 		Stance *= WRPortals::StanceScale(Target);
@@ -1134,6 +1137,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRNecro::ScaleBuildups(Attacker, Coated);
 		// Mark chance's extra mark, Frost missile's frost (WRArcanePath.cpp).
 		WRArcane::ScaleBuildups(Attacker, Coated);
+		// Soak chance's soak on every hit and on weapon hits (WRTidePath.cpp).
+		WRTidePath::ScaleBuildups(Attacker, Coated);
 		for (const TPair<FName, float>& B : Coated.Buildups)
 		{
 			const int32 Id = WRStatus::FromName(B.Key);
@@ -1184,6 +1189,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRNecro::AfterHit(Target, Hit, Damage);
 		// The Arcane path's (WRArcanePath.cpp): Inscribe's rune, Mana burn's drain.
 		WRArcane::AfterHit(Target, Hit, Damage);
+		// The Tide path's (WRTidePath.cpp): Flow for a hit on the move, Live water, Flash freeze, Shark harpoon, Depths.
+		WRTidePath::AfterHit(Target, Hit, Damage);
 	}
 	// Lightning in water spreads to everyone in the same water near the struck (cooks/biome-ocean.md 2.6).
 	if (Result == EWRHitResult::Hit && Target->IsAlive() && Hit.Element == WRTags::Element_Lightning)

@@ -222,6 +222,15 @@ void AWRHUD::DrawHUD()
 	{
 		DrawBar(TEXT("Momentum"), A->GetMomentum(), A->GetMaxMomentum(), FLinearColor(FColor(0x9F, 0xD6, 0xCF)), X, Y); Y += BarSpacing;
 	}
+	// Mana (the Arcane path) violet #7A3FD1; Flow (the Tide path) sea-green #1E8C86 (-oldui).
+	if (Paths && Paths->IsActivePath(TEXT("arcane")))
+	{
+		DrawBar(TEXT("Mana"), A->GetMana(), A->GetMaxMana(), FLinearColor(FColor(0x7A, 0x3F, 0xD1)), X, Y); Y += BarSpacing;
+	}
+	if (Paths && Paths->IsActivePath(TEXT("tide")))
+	{
+		DrawBar(TEXT("Flow"), A->GetFlow(), A->GetMaxFlow(), FLinearColor(FColor(0x1E, 0x8C, 0x86)), X, Y); Y += BarSpacing;
+	}
 	DrawBar(TEXT("Hunger"), A->GetHunger(), 100.f, FLinearColor(0.85f, 0.55f, 0.15f), X, Y, 110.f); Y += BarSpacing;
 	DrawBar(TEXT("Thirst"), A->GetThirst(), 100.f, FLinearColor(0.2f, 0.5f, 0.9f), X, Y, 110.f); Y += BarSpacing;
 

@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRTidePath.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
 #include "WRArcanePath.h"
@@ -490,7 +491,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 	}
 	case WRStatus::Soak:
 		SoakDryFor = 0.f;
-		ApplyStatus(WRTags::Status_Soak, Def(Soak, TEXT("seconds"), 10.f));
+		ApplyStatus(WRTags::Status_Soak, Def(Soak, TEXT("seconds"), 10.f) + WRTidePath::SoakExtraSeconds(Source));   // Heavy water +1 s a rank
 		break;
 	case WRStatus::Blind:
 	{
@@ -864,7 +865,7 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		&& SinceStanceDamage >= Attr->GetMaxStance() / FMath::Max(1.f, WRTune(TEXT("stance.regenDelayDivisor"), 13.f)))
 	{
 		const bool bLow = Attr->GetMaxHealth() > 0.f && Attr->GetHealth() < Attr->GetMaxHealth() * 0.5f;
-		const float Rate = WRTune(TEXT("stance.regenPerSecond"), 13.f) * (bLow ? WRTune(TEXT("stance.lowHealthRegen"), 0.5f) : 1.f);
+		const float Rate = WRTune(TEXT("stance.regenPerSecond"), 13.f) * (bLow ? WRTune(TEXT("stance.lowHealthRegen"), 0.5f) : 1.f) * WRTidePath::StanceRegenScale(Owner);   // Drowning
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStanceAttribute(), Attr->GetStance() + Rate * DeltaTime);
 		if (Attr->GetStance() >= Attr->GetMaxStance())
 		{
@@ -897,6 +898,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRNecro::TickOwner(Owner, DeltaTime);
 		// Mana (the Arcane path): its capacity and steady regen (WRArcanePath.cpp).
 		WRArcane::TickOwner(Owner, DeltaTime);
+		// Flow (the Tide path): builds while you move and dodge, drains when you stand (WRTidePath.cpp).
+		WRTidePath::TickOwner(Owner, DeltaTime);
 	}
 }
 

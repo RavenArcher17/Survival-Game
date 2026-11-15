@@ -46,6 +46,8 @@ namespace WRDeedsData
 		if (Tag == WRTags::Element_Lightning) return TEXT("lightning");
 		if (Tag == WRNature::Element_Nature) return TEXT("nature");
 		if (Tag == WRWind::Element_Wind) return TEXT("wind");
+		if (Tag == WRTags::Element_Water) return TEXT("tide");
+		if (Tag == WRTags::Element_Arcane) return TEXT("arcane");
 		return NAME_None;
 	}
 	AWRPlayerController* ControllerOf(const AWRPlayerState* PS) { return PS ? Cast<AWRPlayerController>(PS->GetOwner()) : nullptr; }

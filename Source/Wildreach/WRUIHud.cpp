@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRTidePath.h"
 #include "WRUnderwater.h"
 #include "WRWindPath.h"     // the Momentum gauge (the Wind path)
 #include "WRStormTypes.h"
@@ -1271,6 +1272,18 @@ private:
 							SNew(SWRBar).Height(4.f * U).Color(FLinearColor(FColor(0xB8, 0xA0, 0xF0)))
 							.Fraction_Lambda([A]() { const UWRAttributeSet* X = A(); return X ? FMath::Clamp(X->GetShield() / FMath::Max(1.f, X->GetMaxHealth()), 0.f, 1.f) : 0.f; })
 						]
+					]
+				]
+				// Flow (the Tide path, cooks/biome-ocean.md 2.17): sea-green #1E8C86 under your health; it ripples brighter while
+				// it fills, dims while it drains (you're standing still), and flashes when a press is refused for Flow.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SBox).Visibility_Lambda([this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("tide")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+					[
+						VitalRow(LOCTEXT("Flow", "Flow"), FLinearColor(FColor(0x1E, 0x8C, 0x86)), 10.f * U,
+							[A, this]() { const UWRAttributeSet* X = A(); return X ? X->GetFlow() : 0.f; },
+							[A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxFlow() : 1.f; },
+							[this]() { return FMath::Max(WRTidePath::RefusedFlash(Body()), WRTidePath::FillingGlow(Body()) * 0.35f); })
 					]
 				]
 				// Mana (the Arcane path, 2.17): violet #7A3FD1 under your health while the path is yours; it flashes and
