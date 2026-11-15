@@ -129,6 +129,15 @@ void FWRPlayerUI::Tick(float DeltaTime)
 		CentreMouse();
 	}
 	if (bTameWheel && !bDebugWheel) UpdateWheelHover(TameHover, 8);
+	// D-pad right held: the item wheel (nothing else open; the tap waits for the release).
+	if (bItemKeyDown && !bItemWheel && OpenWheel < 0 && !bTameWheel && !ScreenWidget.IsValid() && Now - ItemDownAt > WRTune(TEXT("ui.itemWheel.holdSeconds"), 0.4f))
+	{
+		bItemWheel = true;
+		ItemHover = -1;
+		CentreMouse();
+		WRSound::PlayUI(nullptr, TEXT("ui.click"));
+	}
+	if (bItemWheel) UpdateWheelHover(ItemHover, 8);
 	if (bDoorKeyDown && Now - DoorDownAt > WRTune(TEXT("ui.doorHoldSeconds"), 0.35f))
 	{
 		// Held on your own code-lock door: its keypad, to set or remove the code.
@@ -258,7 +267,7 @@ void FWRPlayerUI::UpdateInputMode()
 	AWRPlayerController* P = PC.Get();
 	// Menus want the cursor and stop the camera; the build bar only while no piece is being placed.
 	const bool bMenu = ScreenWidget.IsValid() && !(ScreenName == TEXT("build") && P->IsPlacing());
-	const bool bWheel = OpenWheel >= 0 || bTameWheel;
+	const bool bWheel = OpenWheel >= 0 || bTameWheel || bItemWheel;
 	// The death screen while it offers places to wake.
 	const bool bDeath = Flow && Flow->WantsCursor();
 	const bool bWant = bMenu || bWheel || bDeath;
@@ -295,7 +304,7 @@ void FWRPlayerUI::UpdateIsolation()
 	// keep the survivor walking under it.
 	AWRPlayerController* P = PC.Get();
 	const bool bBusy = bScreenCursor || WRReport::IsOpen() || WRControlsPage::IsOpen() || SWRChatBox::IsOpen() || SWRMainMenu::IsOpen();
-	const bool bWheel = OpenWheel >= 0 || bTameWheel;
+	const bool bWheel = OpenWheel >= 0 || bTameWheel || bItemWheel;
 	const bool bPlacing = P->IsPlacing();
 	APawn* Pawn = P->GetPawn();
 	if (bBusy != bWasBusy)
@@ -935,6 +944,32 @@ void FWRPlayerUI::WheelKey(int32 Wheel, bool bDown)
 		return;
 	}
 	CastAbility(GetWheelAbility(Wheel, WheelPicked[Wheel]));
+}
+
+void FWRPlayerUI::ItemWheelKey(bool bDown)
+{
+	if (bDown)
+	{
+		bItemKeyDown = true;
+		ItemDownAt = FPlatformTime::Seconds();
+		return;
+	}
+	if (!bItemKeyDown) return;
+	bItemKeyDown = false;
+	if (bItemWheel)
+	{
+		// Released over an item: it goes in hand (an empty wedge or the middle: nothing).
+		const int32 Pick = ItemHover;
+		bItemWheel = false;
+		ItemHover = -1;
+		UpdateInputMode();
+		if (Pick >= 0 && !GetHotbarItem(Pick).IsNone()) UseHotbar(Pick);
+		return;
+	}
+	// A tap: the next ability, or the next ammo while aiming (as before the wheel).
+	AWRPlayerController* P = PC.Get();
+	if (AWRCharacter* C = P ? Cast<AWRCharacter>(P->GetPawn()) : nullptr; C && C->IsAimingRanged()) C->CycleAmmo(1);
+	else PadQuickStep(1);
 }
 
 void FWRPlayerUI::UpdateWheelHover(int32& OutHover, int32 Count) const

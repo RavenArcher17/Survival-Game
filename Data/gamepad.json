@@ -99,7 +99,7 @@
       { "verb": "Heavy", "does": "Heavy attack" },
       { "verb": "Block", "does": "Block (hold); aim a ranged weapon" },
       { "verb": "QuickFire", "does": "Use the chosen ability" },
-      { "verb": "QuickNext", "does": "Next ability (ammo while aiming)" },
+      { "verb": "QuickNext", "does": "Next ability (ammo while aiming); hold: the item wheel (your eight hotbar items, release on one to take it in hand)" },
       { "verb": "QuickPrev", "does": "Previous ability (ammo while aiming)" }
     ] },
     { "title": "Items and the world", "rows": [

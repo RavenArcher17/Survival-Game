@@ -3,6 +3,7 @@
 // a release or click picks; this widget only draws it (and turns a click into a pick for the tame wheel).
 
 #include "WRPlayerUI.h"
+#include "WRInventory.h"
 #include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -51,7 +52,13 @@ public:
 						+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, i]() { return WRUI::Box(IsLit(i) ? WRUI::Ember * 0.45f : FLinearColor(0.08f, 0.08f, 0.09f), 22.f * U, IsLit(i) ? WRUI::Brass : WRUI::Brass2, IsLit(i) ? 2.f : 1.f); })]
 						+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 						[
-							WRUI::Text(TAttribute<FText>::CreateLambda([this, i]() { return Glyph(i); }), WRUI::Title(17), TAttribute<FSlateColor>::CreateLambda([this, i]() { return FSlateColor(Empty(i) ? WRUI::Ink3 : IsLit(i) ? WRUI::Ink : GlyphColor(i)); }))
+							WRUI::Text(TAttribute<FText>::CreateLambda([this, i]() { return Mode() == 3 ? FText::GetEmpty() : Glyph(i); }), WRUI::Title(17), TAttribute<FSlateColor>::CreateLambda([this, i]() { return FSlateColor(Empty(i) ? WRUI::Ink3 : IsLit(i) ? WRUI::Ink : GlyphColor(i)); }))
+						]
+						// The item wheel: the item's own icon in the disc.
+						+ SOverlay::Slot().Padding(5.f * U)
+						[
+							SNew(SImage).Visibility_Lambda([this, i]() { return Mode() == 3 && !Empty(i) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+							.Image_Lambda([this, i]() { return WRUI::Icon(ItemAt(i)); })
 						]
 					]
 				]
@@ -112,10 +119,15 @@ private:
 	TWeakObjectPtr<AWRPlayerController> PC;
 
 	FWRPlayerUI* UI() const { return PC.IsValid() ? PC->GetUI() : nullptr; }
-	/** 0 closed, 1 an ability wheel, 2 the tame wheel. */
-	int32 Mode() const { const FWRPlayerUI* X = UI(); return !X ? 0 : X->GetOpenWheel() >= 0 ? 1 : X->IsTameWheelOpen() ? 2 : 0; }
+	/** 0 closed, 1 an ability wheel, 2 the tame wheel, 3 the pad's item wheel. */
+	int32 Mode() const { const FWRPlayerUI* X = UI(); return !X ? 0 : X->GetOpenWheel() >= 0 ? 1 : X->IsTameWheelOpen() ? 2 : X->IsItemWheelOpen() ? 3 : 0; }
 	int32 Wheel() const { const FWRPlayerUI* X = UI(); return X ? X->GetOpenWheel() : -1; }
-	int32 Hover() const { const FWRPlayerUI* X = UI(); return !X ? -1 : Mode() == 1 ? X->GetWheelHover() : Mode() == 2 ? X->GetTameHover() : -1; }
+	int32 Hover() const { const FWRPlayerUI* X = UI(); return !X ? -1 : Mode() == 1 ? X->GetWheelHover() : Mode() == 2 ? X->GetTameHover() : Mode() == 3 ? X->GetItemHover() : -1; }
+	/** The item wheel's wedge i: hotbar slot i's item (None: empty). */
+	FName ItemAt(int32 i) const { const FWRPlayerUI* X = UI(); return X ? X->GetHotbarItem(i) : NAME_None; }
+	const FWRItemDef* ItemDefAt(int32 i) const { const FName Id = ItemAt(i); return Id.IsNone() ? nullptr : FWRItemRegistry::Get().Find(Id); }
+	/** Hover, else the slot in hand. */
+	int32 ItemShown() const { const FWRPlayerUI* X = UI(); return Hover() >= 0 ? Hover() : X ? X->GetHotbarSelected() : 0; }
 	bool IsLit(int32 i) const { return Hover() == i && !Empty(i); }
 	/** The tame wheel is the whistle's: orders for every tame of yours in earshot. */
 	bool Whistle() const { const FWRPlayerUI* X = UI(); return Mode() == 2 && X && X->IsWhistleWheel(); }
@@ -131,6 +143,7 @@ private:
 	}
 	bool Empty(int32 i) const
 	{
+		if (Mode() == 3) return ItemDefAt(i) == nullptr;
 		if (Mode() == 2) return Orders()[i].Key.IsNone() || (Whistle() && Earshot() == 0);   // no one to whistle to: every wedge dims
 		TArray<FWRCastable> S;
 		return Ability(i, S) == nullptr;
@@ -138,6 +151,7 @@ private:
 	bool IsDanger(int32 i) const { return Mode() == 2 && Orders()[i].Key == TEXT("release"); }
 	FText Label(int32 i) const
 	{
+		if (Mode() == 3) { const FWRItemDef* D = ItemDefAt(i); return D ? FText::FromString(D->Name) : LOCTEXT("EmptyItem", "Empty"); }
 		if (Mode() == 2) return Orders()[i].Value;
 		TArray<FWRCastable> S;
 		const FWRCastable* C = Ability(i, S);
@@ -169,11 +183,11 @@ private:
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)
 			[
-				SNew(SWRKeyCap).FontSize(13).Text_Lambda([this]() { return WRInput::ActionKey(Whistle() && !WRInput::UsingPad() ? TEXT("Whistle") : Mode() == 2 ? TEXT("Interact") : Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1")); })
+				SNew(SWRKeyCap).FontSize(13).Text_Lambda([this]() { return Mode() == 3 ? WRInput::PadButton(TEXT("QuickNext")) : WRInput::ActionKey(Whistle() && !WRInput::UsingPad() ? TEXT("Whistle") : Mode() == 2 ? TEXT("Interact") : Wheel() == 1 ? TEXT("Wheel2") : TEXT("Wheel1")); })
 			]
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 			[
-				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Whistle() ? LOCTEXT("WhistleOrders", "Whistle") : Mode() == 2 ? LOCTEXT("TameOrders", "Tame orders") : Wheel() == 1 ? LOCTEXT("Wheel2", "Ability wheel 2") : LOCTEXT("Wheel1", "Ability wheel 1"); }), WRUI::Title(17), WRUI::Ink)
+				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Mode() == 3 ? LOCTEXT("ItemWheel", "Items") : Whistle() ? LOCTEXT("WhistleOrders", "Whistle") : Mode() == 2 ? LOCTEXT("TameOrders", "Tame orders") : Wheel() == 1 ? LOCTEXT("Wheel2", "Ability wheel 2") : LOCTEXT("Wheel1", "Ability wheel 1"); }), WRUI::Title(17), WRUI::Ink)
 			]
 		];
 	}
@@ -184,11 +198,18 @@ private:
 			// The ability under the mouse (or the one picked), what it costs, what it does.
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
-				SNew(SBox).WidthOverride(76.f * U).HeightOverride(76.f * U).Visibility_Lambda([this]() { return Mode() == 2 ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				SNew(SBox).WidthOverride(76.f * U).HeightOverride(76.f * U).Visibility_Lambda([this]() { return Mode() == 2 || (Mode() == 3 && ItemDefAt(ItemShown())) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 				[
 					SNew(SOverlay)
 					+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(FLinearColor(0.1f, 0.1f, 0.11f), 38.f * U, WRUI::Brass, 2.f))]
-					+ SOverlay::Slot().Padding(4.f)[SNew(SImage).Image_Lambda([this]() { const AWRCreature* T = Tame(); const FSlateBrush* B = T ? WRUI::Portrait(T->CreatureId) : nullptr; return B ? B : WRUI::Icon(TEXT("kibble")); })]
+					// The tame's portrait, or the item's icon on the item wheel.
+					+ SOverlay::Slot().Padding(6.f)[SNew(SImage).Image_Lambda([this]()
+					{
+						if (Mode() == 3) return WRUI::Icon(ItemAt(ItemShown()));
+						const AWRCreature* T = Tame();
+						const FSlateBrush* B = T ? WRUI::Portrait(T->CreatureId) : nullptr;
+						return B ? B : WRUI::Icon(TEXT("kibble"));
+					})]
 				]
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 6.f * U, 0.f, 0.f)
@@ -204,7 +225,7 @@ private:
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 4.f * U, 0.f, 0.f)
 			[
-				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return CentreSub(); }), WRUI::Body(13, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Mode() == 2 ? WRUI::Good : WRUI::Ember); }))
+				WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return CentreSub(); }), WRUI::Body(13, 700), TAttribute<FSlateColor>::CreateLambda([this]() { return FSlateColor(Mode() == 2 ? WRUI::Good : Mode() == 3 ? WRUI::Ink2 : WRUI::Ember); }))
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 8.f * U, 0.f, 0.f)
 			[
@@ -226,6 +247,7 @@ private:
 	}
 	FText CentreTitle() const
 	{
+		if (Mode() == 3) { const FWRItemDef* D = ItemDefAt(ItemShown()); return D ? FText::FromString(D->Name) : LOCTEXT("NoItem", "Nothing here"); }
 		if (Whistle())
 		{
 			const int32 N = Earshot();
@@ -240,6 +262,15 @@ private:
 	}
 	FText CentreSub() const
 	{
+		if (Mode() == 3)
+		{
+			// How many, or how worn (the hotbar slot's own reading).
+			const FWRPlayerUI* X = UI();
+			if (!X || ItemDefAt(ItemShown()) == nullptr) return FText::GetEmpty();
+			const FWRSlotView V = X->HotbarView(ItemShown());
+			if (V.Durability >= 0.f) return FText::Format(LOCTEXT("ItemWorn", "Durability {0}%"), FMath::RoundToInt(V.Durability * 100.f));
+			return V.Count > 1 ? FText::Format(LOCTEXT("ItemCount", "{0} in your bag"), V.Count) : FText::GetEmpty();
+		}
 		if (Whistle())
 		{
 			return FText::Format(LOCTEXT("WhistleRange", "Earshot {0} m"), FMath::RoundToInt(WRTune(TEXT("taming.whistleRange"), 3000.f) / 100.f));
@@ -257,6 +288,12 @@ private:
 	}
 	FText CentreBody() const
 	{
+		if (Mode() == 3)
+		{
+			const FWRPlayerUI* X = UI();
+			if (ItemDefAt(ItemShown()) == nullptr) return LOCTEXT("ItemEmptyBody", "Put items on the hotbar in your inventory: they come up here.");
+			return X && X->HotbarView(ItemShown()).bSelected ? LOCTEXT("ItemInHand", "In hand") : FText::Format(LOCTEXT("ItemSlot", "Hotbar slot {0}"), ItemShown() + 1);
+		}
 		if (Whistle())
 		{
 			// Who hears it: the nearest few by name.
@@ -286,6 +323,7 @@ private:
 		[
 			WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 			{
+				if (Mode() == 3) return LOCTEXT("ItemRelease", "Release on an item to take it in hand  ·  in the middle to cancel");
 				if (Whistle())
 				{
 					return Earshot() == 0 ? LOCTEXT("WhistleClose", "Release to close") : LOCTEXT("WhistleRelease", "Release on an order  ·  tap to call them to you");

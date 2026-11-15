@@ -203,7 +203,9 @@ void AWRPlayerController::BindKeys()
 	PadPress(TEXT("QuickFire"), [this]() { if (UI) UI->PadQuickFire(); });
 	BindLambda(Pad.Key(TEXT("QuickFire")), IE_Released, [this]() { if (UI) UI->ReleaseQuickSlot(); });
 	PadPress(TEXT("QuickPrev"), [this]() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAimingRanged()) C->CycleAmmo(-1); else if (UI) UI->PadQuickStep(-1); });
-	PadPress(TEXT("QuickNext"), [this]() { if (AWRCharacter* C = Cast<AWRCharacter>(GetPawn()); C && C->IsAimingRanged()) C->CycleAmmo(1); else if (UI) UI->PadQuickStep(1); });
+	// D-pad right: a tap is the next ability (ammo while aiming), a hold the item wheel (FWRPlayerUI::ItemWheelKey).
+	PadPress(TEXT("QuickNext"), [this]() { if (UI) UI->ItemWheelKey(true); });
+	BindLambda(Pad.Key(TEXT("QuickNext")), IE_Released, [this]() { if (UI) UI->ItemWheelKey(false); });
 	// D-pad down: a tap steps the belt, a hold two-hands the weapon (combat.md 2.1: a hold is its own verb, never a chord).
 	BindLambda(Pad.Key(TEXT("BeltNext")), IE_Pressed, [this]() { if (WRInput::AllowPress(this)) BeginTwoHandHold(true); });
 	BindLambda(Pad.Key(TEXT("BeltNext")), IE_Released, [this]() { EndTwoHandHold(true); });

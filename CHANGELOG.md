@@ -95,6 +95,14 @@ and the testers test, F8).
     shows pins within 400 m as small badges, with the name and distance when you face one.
   - Up to 30 a world (tuning `ui.pins`), this PC's own, saved in `Saved/Wildreach/Pins/<world>.json` (the host's world
     id, or the address a client joined), so each world keeps its own.
+- **UI (7): the pad's item wheel.** Why: on a controller the only way to the hotbar's tools, weapons and torch was
+  stepping the belt (ui-controls 2.13; Enshrouded / BotW hold a D-pad direction for a radial).
+  - **Hold D-pad right** (0.4 s, tuning `ui.itemWheel.holdSeconds`): the wheel opens with your eight hotbar items, each
+    wedge its icon and name; the centre shows the one under the stick (its icon, durability or how many, "In hand" or
+    its hotbar slot). Release on one takes it in hand (`UseHotbar`), in the middle cancels. The world keeps running;
+    held inputs drop on open and close like every wheel.
+  - A **tap** stays the next ability (the next ammo while aiming), now on the release (`FWRPlayerUI::ItemWheelKey`).
+  - The F1 page says so.
 
 ## Unreleased: the Desert / Sun & sand
 

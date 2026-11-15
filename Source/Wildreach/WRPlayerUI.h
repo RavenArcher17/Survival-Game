@@ -135,7 +135,15 @@ public:
 	bool WantsCursor() const { return bScreenWantsCursor; }
 	/** A screen (or the death screen's choices), not just a wheel, wants the cursor. */
 	bool WantsScreenCursor() const { return bScreenCursor; }
-	bool IsWheelOpen() const { return OpenWheel >= 0 || bTameWheel; }
+	bool IsWheelOpen() const { return OpenWheel >= 0 || bTameWheel || bItemWheel; }
+	/**
+	 * The pad's item wheel (cookpass-ui 3.7, ui-controls 2.13): D-pad right held past ui.itemWheel.holdSeconds opens the
+	 * eight hotbar items on the wheel; releasing over one takes it in hand (UseHotbar), in the middle cancels. A tap is
+	 * still the next ability (the next ammo while aiming).
+	 */
+	void ItemWheelKey(bool bDown);
+	bool IsItemWheelOpen() const { return bItemWheel; }
+	int32 GetItemHover() const { return ItemHover; }
 	/** Menu on the pad: the journal at the page last used. */
 	void PadOpenMenus();
 	/** LB / RB in a menu: the previous / next of Inventory, Crafting, Build, Paths, Skills, Map, Clan, Settings. */
@@ -194,6 +202,10 @@ private:
 	int32 WheelPicked[2] = { 0, 0 };
 	bool bWheelsLoaded = false;
 	int32 OpenWheel = -1;
+	bool bItemKeyDown = false;
+	double ItemDownAt = 0.0;
+	bool bItemWheel = false;
+	int32 ItemHover = -1;
 	int32 WheelHover = -1;
 	int32 WheelDownKey = -1;
 	double WheelDownAt = 0.0;
