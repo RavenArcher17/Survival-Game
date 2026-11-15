@@ -1,0 +1,44 @@
+{
+  "id": "arcane",
+  "name": "Arcane",
+  "biome": "crystal",
+  "starter": "arcane_missile",
+  "color": "7A3FD1",
+  "icon": "resonant_crystal",
+  "glyph": "hexafoil",
+  "_comment": "cooks/biome-crystal.md 2.17 (nodes SPEC from the skill tree; numbers in tuning arcane.*, spells.<key>, wildbrands.<node>). Mana is a steady pool: 100 + 15 a Mana capacity rank, 6 a second at all times (Deep well x1.5, main path). Shields are one HP layer after guard (the bigger wins); Reflect throws reflectable shots back. Code: WRArcanePath (Mana, shields, Reflect, the passives, combos, the look), WRAbilitiesArcane (the nine abilities, runes, the Aegis dome, the Rune circle).",
+  "resource": { "id": "mana", "name": "Mana" },
+  "rootPassive": { "id": "deep_well", "name": "Deep well", "text": "Faster Mana regeneration (x1.5)." },
+  "trunk": [
+    { "id": "arcane_missile", "name": "Arcane missile", "kind": "ability", "cost": 3, "text": "Basic arcane spell" },
+    { "id": "mana_capacity", "name": "Mana capacity", "kind": "stat", "ranks": 3, "text": "Larger Mana pool" },
+    { "id": "mark_chance", "name": "Mark chance", "kind": "stat", "ranks": 2, "text": "Higher chance to mark enemies; marked enemies take more spell damage" },
+    { "id": "runic_strike", "name": "Runic strike", "kind": "ability", "cost": 2, "text": "Basic arcane weapon art" }
+  ],
+  "branches": [
+    { "id": "ward", "name": "Ward", "nodes": [
+      { "id": "barrier", "name": "Barrier", "kind": "ability", "cost": 5, "text": "Spell: a shield on yourself", "gate": 0 },
+      { "id": "hardened_ward", "name": "Hardened ward", "kind": "stat", "ranks": 5, "text": "Stronger shields", "gate": 5 },
+      { "id": "reflect", "name": "Reflect", "kind": "ability", "cost": 4, "text": "Shields reflect projectiles", "gate": 10 },
+      { "id": "ward_allies", "name": "Ward allies", "kind": "ability", "cost": 3, "text": "Barrier can target allies", "gate": 14 },
+      { "id": "absorb", "name": "Absorb", "kind": "stat", "ranks": 3, "text": "Shields refund Mana when hit", "gate": 17 },
+      { "id": "aegis", "name": "Aegis", "kind": "capstone", "cost": 10, "text": "Capstone: a dome that blocks all projectiles", "gate": 20 }
+    ] },
+    { "id": "sorcery", "name": "Sorcery", "nodes": [
+      { "id": "arcane_blast", "name": "Arcane blast", "kind": "ability", "cost": 5, "text": "Spell: a heavy burst of arcane force", "gate": 0 },
+      { "id": "focus", "name": "Focus", "kind": "stat", "ranks": 5, "text": "More spell damage", "gate": 5 },
+      { "id": "echo", "name": "Echo", "kind": "ability", "cost": 4, "text": "Chance to cast a spell twice", "gate": 10 },
+      { "id": "quick_cast", "name": "Quick cast", "kind": "stat", "ranks": 3, "text": "Faster casting", "gate": 14 },
+      { "id": "mana_burn", "name": "Mana burn", "kind": "ability", "cost": 3, "text": "Spells break enemy shields faster", "gate": 17 },
+      { "id": "starfall", "name": "Starfall", "kind": "capstone", "cost": 10, "text": "Capstone: rain arcane stars over an area", "gate": 20 }
+    ] },
+    { "id": "rune", "name": "Rune", "nodes": [
+      { "id": "rune_trap", "name": "Rune trap", "kind": "ability", "cost": 5, "text": "Spell: a ground rune that explodes", "gate": 0 },
+      { "id": "inscribe", "name": "Inscribe", "kind": "ability", "cost": 5, "text": "Rune on your weapon adds arcane damage", "gate": 5 },
+      { "id": "glyph_power", "name": "Glyph power", "kind": "stat", "ranks": 4, "text": "Stronger runes", "gate": 10 },
+      { "id": "rune_link", "name": "Rune link", "kind": "ability", "cost": 3, "text": "Nearby runes link and damage enemies between them", "gate": 14 },
+      { "id": "lasting_runes", "name": "Lasting runes", "kind": "stat", "ranks": 3, "text": "Runes last longer", "gate": 17 },
+      { "id": "rune_circle", "name": "Rune circle", "kind": "capstone", "cost": 10, "text": "Capstone: a great circle that buffs allies and weakens enemies inside", "gate": 20 }
+    ] }
+  ]
+}

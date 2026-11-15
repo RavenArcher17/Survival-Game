@@ -243,6 +243,39 @@ const voidp = {
 	maw_of_the_void: { a: maw(12, 12, 10.5), s: "M2 21.5h20", c: circ(12, 12, 2.2) },
 };
 for (const [id, g] of Object.entries(voidp)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
+// Arcane (cooks/biome-crystal.md 2.17): the hexafoil (six circles on a seventh's rim, one compass setting: the
+// Wardcarvers' mark) is the path's mark; Ward nodes draw the shield, Sorcery the cut crystal and its light, Rune the
+// rosette on the ground.
+const hexf = (cx, cy, r) => { let d = circ(cx, cy, r); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; d += circ(f2(cx + Math.cos(a) * r / 2), f2(cy + Math.sin(a) * r / 2), f2(r / 2)); } return d; };
+const hexa = (cx, cy, r) => { let d = ""; for (let i = 0; i < 6; i++) { const a = (i * 60 + 30) * Math.PI / 180; d += (i ? "L" : "M") + f2(cx + Math.cos(a) * r) + " " + f2(cy + Math.sin(a) * r); } return d + "z"; };
+const gem = (cx, top, h, w) => `M${f2(cx)} ${f2(top)}l${f2(w / 2)} ${f2(h * 0.3)}l${f2(-w / 2)} ${f2(h * 0.7)}l${f2(-w / 2)} ${f2(-h * 0.7)}z`;
+const ward = "M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z";
+const star = (cx, cy, r) => { let d = ""; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, rr = i % 2 ? r * 0.42 : r; d += (i ? "L" : "M") + f2(cx + Math.cos(a) * rr) + " " + f2(cy + Math.sin(a) * rr); } return d + "z"; };
+const arcanep = {
+	arcane_missile: { a: "M20.5 3.5l-1.6 7.2-8.6 8.6-5.6-5.6 8.6-8.6z", c: hexa(14.4, 9.6, 1.8), s: "M2.5 21.5l4-4M6 22l2.5-2.5M2 18l2.5-2.5" },
+	mana_capacity: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: gem(12, 10.8, 9, 6) },
+	mark_chance: { t: hexf(12, 12, 6.4), a: circ(12, 12, 1.5), s: "M12 1.5v2.6M12 19.9v2.6M1.5 12h2.6M19.9 12h2.6" },
+	runic_strike: { b: sword, t: hexf(17.5, 16.5, 3.8) },
+	barrier: { a: ward, c: hexa(12, 11.5, 3.6) },
+	hardened_ward: { a: ward, c: "M12 5.4l5.4 2v4.1c0 3.5-2.3 6-5.4 7-3.1-1-5.4-3.5-5.4-7V7.4z", b: hexa(12, 11.5, 2.4) },
+	reflect: { a: "M12 2.5l8 3v6c0 5-3.4 8.6-8 10z", t: "M2.5 5l7.5 6.5M10 11.5L3 18", b: "M2 16.2l1.6 2.6 2.6-1.4z" },
+	ward_allies: { a: circ(7, 6.5, 2.6) + "M2.5 17c0-3.2 2-5.6 4.5-5.6s4.5 2.4 4.5 5.6z", b: "M16.5 6l5 1.9v3.8c0 3.2-2.1 5.4-5 6.3-2.9-.9-5-3.1-5-6.3V7.9z", t: "M2.5 21h19" },
+	absorb: { a: ward, c: gem(12, 6.5, 10, 6), s: "M1.5 4l3 2M22.5 4l-3 2" },
+	aegis: { a: "M2.5 18.5a9.5 9.5 0 0 1 19 0z", c: star(12, 13.5, 4.6), t: "M1.5 21h21" },
+	arcane_blast: { a: "M12 2l2 5.5 5-3-2.4 5.3L22 12l-5.4 2.2 2.4 5.3-5-3L12 22l-2-5.5-5 3 2.4-5.3L2 12l5.4-2.2L5 4.5l5 3z", c: hexa(12, 12, 3.2) },
+	focus: { t: circ(10.5, 10.5, 7), s: "M15.6 15.6l5.9 5.9", a: gem(10.5, 6, 9, 5.6) },
+	echo: { a: gem(9, 3, 16, 9), t: "M15 3l4.5 4.8-4.5 11.2-4.5-11.2z" },
+	quick_cast: { t: "M7 3h10M7 21h10M8 3c0 4.6 3.4 6 3.4 9S8 16.4 8 21M16 3c0 4.6-3.4 6-3.4 9s3.4 4.4 3.4 9", a: gem(12, 13, 7, 4) },
+	mana_burn: { a: fl(12, 3, 0.8), c: gem(12, 11.5, 7, 4.4), b: hexa(19.5, 4.5, 1.6) },
+	starfall: { a: star(15, 8, 6), b: star(6, 17, 3.4) + star(19, 19, 2.6), s: "M2.5 2.5l4.5 4.5M9 2l2.5 2.5M2 9l2.5 2.5" },
+	rune_trap: { a: el(12, 18, 9.5, 3.2), t: hexf(12, 9, 5.4), b: circ(12, 9, 1.2) },
+	inscribe: { b: sword, t: "M7.5 16.5l2-2M10.5 13.5l2-2M13.5 10.5l2-2", a: hexa(18.5, 5.5, 2.2) },
+	glyph_power: { t: hexf(12, 12, 6.6), a: circ(12, 12, 2), s: "M3 3l2.4 2.4M21 3l-2.4 2.4M3 21l2.4-2.4M21 21l-2.4-2.4" },
+	rune_link: { t: hexf(5.8, 12, 3.8) + hexf(18.2, 12, 3.8), a: "M9.6 11.2h4.8v1.6H9.6z" },
+	lasting_runes: { t: "M7 3h10M7 21h10M8 3c0 4.6 3.4 6 3.4 9S8 16.4 8 21M16 3c0 4.6-3.4 6-3.4 9s3.4 4.4 3.4 9", a: hexa(12, 15.8, 2.6) },
+	rune_circle: { t: circ(12, 12, 9.6) + hexf(12, 12, 4), b: circ(12, 2.4, 1.3) + circ(21.6, 12, 1.3) + circ(12, 21.6, 1.3) + circ(2.4, 12, 1.3), a: circ(12, 12, 1.2) },
+};
+for (const [id, g] of Object.entries(arcanep)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.6, sw: 1.8 });
 for (const [id, g] of Object.entries(nature)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(skills)) glyphs.push({ id, kind: "duo", px: 64, g, tw: 2.2, sw: 2 });
 
@@ -274,6 +307,8 @@ const masks = {
 	blood_drop: [F(drop(12, 13, 1))],
 	void_eye: [S("M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", 1.9), F(circ(12, 12, 4.2))],
 	leaf: [F(leaf(12, 12.5, 19, 12, 30)), CUT(S(midrib(12, 12.5, 19, 30), 1.3))],
+	// The Arcane path's mark (cooks/biome-crystal.md 2.17): the Wardcarvers' hexafoil.
+	hexafoil: [S(hexf(12, 12, 9.4), 1.5), F(circ(12, 12, 1.4))],
 };
 // Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
 const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
@@ -294,7 +329,7 @@ Object.assign(masks, {
 	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
 	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
 });
-const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
+const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, void_eye: 48, leaf: 48, hexafoil: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
 // ---------- full colour

@@ -12,6 +12,8 @@ Shares the graph helpers of Tools/make_build_materials.py (read from it, up to i
                  noise lights a sphere round it falling off with distance (WRCrystalWorld pushes the noises in and
                  fades their strengths over 6 s). Rest is the resting glow, Lit a struck keystone chime's whole-hall
                  light. Parameters: GlowColor, GlowScale, Rest, Lit, RingA..RingD, RingS.
+  M_ArcaneWard   hard light: shield films, Aegis, runes, the Twins' double, Lyrathis's beams and dome (additive, a
+                 fresnel rim, vertex colour x Color x Glow; Face, Rim).
 """
 import os
 import unreal
@@ -69,6 +71,40 @@ mel.connect_material_property(mul(rgb, k=0.55), "", unreal.MaterialProperty.MP_B
 mel.connect_material_property(const(0.08), "", unreal.MaterialProperty.MP_ROUGHNESS)
 mel.connect_material_property(const(0.9), "", unreal.MaterialProperty.MP_SPECULAR)
 mel.set_base_material_usage(mat, unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)
+mel.recompile_material(mat)
+eal.save_loaded_asset(mat)
+unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")
+
+
+# ================================================================ M_ArcaneWard
+# Hard light (cooks/build-biome-crystal.md P2.4-P2.9): an Arcane shield's film, Aegis's dome, a rune's lines, the Twins'
+# double's sheen, Lyrathis's beams and her Prism ward. Unlit, additive, two-sided: brightest at the silhouette (a fresnel
+# rim: the edge of a shell of light) with a faint face so you see through it to what it guards; vertex colour tints it
+# (the facets' and the stave's lines are painted brighter in the vertex alpha), and a slow shimmer crawls over it.
+# Parameters: Color, Glow, Face (the face's share of the rim), Rim (the fresnel exponent).
+def append2(a, b):
+    return op(unreal.MaterialExpressionAppendVector, a, b)
+
+
+begin("/Game/Terrain/M_ArcaneWard")
+mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+mat.set_editor_property("two_sided", True)
+vc = expr(unreal.MaterialExpressionVertexColor)
+rgb = mask(vc, "r", "g", "b")
+alpha = pin(vc, "A")
+colour = vparam("Color", (0.48, 0.25, 0.82, 1.0))
+glow = sparam("Glow", 1.0)
+face = sparam("Face", 0.18)
+rim_exp = sparam("Rim", 2.5)
+fres = expr(unreal.MaterialExpressionFresnel, base_reflect_fraction=0.0)
+link(rim_exp, fres, "ExponentIn")
+t = expr(unreal.MaterialExpressionTime)
+wx, wy, wz = world_xyz()
+shimmer = add(mul(noise(append2(mul(wx, k=1.0 / 90.0), add(mul(wz, k=1.0 / 70.0), mul(t, k=0.35)))), k=0.35), k=0.8)
+lines = add(mul(alpha, k=2.0), k=0.4)
+amount = mul(mul(mul(add(fres, face), lines), shimmer), glow)
+mel.connect_material_property(mul(mul(rgb, colour), amount), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 mel.recompile_material(mat)
 eal.save_loaded_asset(mat)
 unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")

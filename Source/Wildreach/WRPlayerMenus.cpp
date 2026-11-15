@@ -5,6 +5,7 @@
 #include "WRWarHall.h"
 #include "WRLandThings.h"
 #include "WRPlayerController.h"
+#include "WRCrystalCreatures.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -247,6 +248,12 @@ void AWRPlayerController::WRInteract()
 	// A Mossmaul open to the Nature path's calm (WRForestCreatures): E held is the hand on its moss (the server runs it
 	// through Feed; letting go early sends "world fpathtame", a tap feeds it as usual).
 	if (FString CalmVerb; Wild && FWRForestAI::PathTamePrompt(Wild, GetPawn(), CalmVerb))
+	{
+		ServerCommand(TEXT("interact"));
+		return;
+	}
+	// A Prismback open to the Arcane path's ward (WRCrystalCreatures): the same held E ("world cpathtame" on release).
+	if (FString WardVerb; Wild && FWRCrystalAI::PathTamePrompt(Wild, GetPawn(), WardVerb))
 	{
 		ServerCommand(TEXT("interact"));
 		return;
@@ -770,6 +777,12 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	if (Cmd == TEXT("world") && Arg(1) == TEXT("fpathtame"))
 	{
 		FWRForestAI::StopPathTame(this);
+		return true;
+	}
+	// The Prismback's path-magic ward let go (WRCrystalCreatures): "world cpathtame".
+	if (Cmd == TEXT("world") && Arg(1) == TEXT("cpathtame"))
+	{
+		FWRCrystalAI::StopPathTame(this);
 		return true;
 	}
 	// World systems (WRWorldSystems): world kindle / travel / take / hand / trade / msg / rate / summon / open.

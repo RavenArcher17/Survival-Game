@@ -1,11 +1,15 @@
 // The Crystal caves' creatures (see WRCrystalCreatures.h; cooks/biome-crystal.md 2.12, 2.12.4).
 
 #include "WRCrystalCreatures.h"
+#include "WRArcanePath.h"
 #include "WRCrystalTypes.h"
 #include "WRCrystalWorld.h"
 #include "Wildreach.h"
 #include "WRAttackRows.h"
 #include "WRCharacterBase.h"
+#include "WRCharacter.h"
+#include "WRPlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "WRCombatLibrary.h"
 #include "WRCreature.h"
 #include "WRBoss.h"
@@ -32,6 +36,11 @@
 namespace WRCrystalCrImpl
 {
 	float CcT(const TCHAR* Key, float Def) { return WRTune(*FString::Printf(TEXT("crystalLife.%s"), Key), Def); }
+	void CzCrTell(const AActor* Pawn, const FString& Text)
+	{
+		const APawn* P = Cast<APawn>(Pawn);
+		if (AWRPlayerController* PC = P ? Cast<AWRPlayerController>(P->GetController()) : nullptr) PC->ClientNotify(Text);
+	}
 	double CcNow(const UObject* Ctx) { const UWorld* W = Ctx ? Ctx->GetWorld() : nullptr; return W ? W->GetTimeSeconds() : 0.0; }
 	int32 CcBit(uint8 F) { for (int32 i = 0; i < 8; ++i) if (F == (1 << i)) return i; return 0; }
 	AWRCharacterBase* CcOwnerOf(const AWRCreature* Self)
@@ -114,6 +123,7 @@ void UWRCrystalBody::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(UWRCrystalBody, Flags);
 	DOREPLIFETIME(UWRCrystalBody, LegsBroken);
 	DOREPLIFETIME(UWRCrystalBody, LatchedOn);
+	DOREPLIFETIME(UWRCrystalBody, PathTamer);
 }
 
 UWRCrystalBody* UWRCrystalBody::Get(const AActor* Actor)
@@ -541,6 +551,46 @@ bool FWRCrystalAI::TickWild(AWRCreatureAI* AI, AWRCreature* Self, float DeltaSec
 		Self->GetCharacterMovement()->StopMovementImmediately();
 		return true;
 	}
+	// A path-magic ward under way (crystal 2.12.1): it lies still under the hand; the hand held 4 s finishes it.
+	if (!B->PathTamer.IsEmpty())
+	{
+		AWRCharacter* Tamer = nullptr;
+		for (FConstPlayerControllerIterator It = Self->GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (It->Get() && It->Get()->PlayerState && It->Get()->PlayerState->GetPlayerName() == B->PathTamer) Tamer = Cast<AWRCharacter>(It->Get()->GetPawn());
+		}
+		FString Broke;
+		const float Reach = Self->GetSimpleCollisionRadius() + WRTune(TEXT("arcane.pathMagic.reach"), 400.f) + 100.f;
+		if (!Tamer || !Self->IsAlive() || Self->IsTamed()) Broke = TEXT("The ward breaks");
+		else if (FVector::Dist2D(Tamer->GetActorLocation(), Self->GetActorLocation()) > Reach || FVector::Dist2D(Tamer->GetActorLocation(), B->HandAt) > 150.f) Broke = TEXT("You moved: the ward breaks");
+		else if (Tamer->IsSwinging() || Tamer->HasTag(WRTags::State_Dodging)) Broke = TEXT("The ward breaks");
+		else if (!Self->IsUnconscious() && Self->GetHealthFraction() >= WRTune(TEXT("arcane.pathMagic.below"), 0.3f)) Broke = TEXT("It's too strong: the ward breaks");
+		if (!Broke.IsEmpty())
+		{
+			B->PathTamer.Empty();
+			CzCrTell(Tamer, Broke);
+			return false;
+		}
+		Self->SetAggroTarget(nullptr);
+		Self->GetCharacterMovement()->StopMovementImmediately();
+		if (Now - B->PathTameStart >= WRTune(TEXT("arcane.pathMagic.holdSeconds"), 4.f))
+		{
+			B->PathTamer.Empty();
+			if (!WRArcane::SpendMana(Tamer, WRTune(TEXT("arcane.pathMagic.mana"), 30.f)))
+			{
+				CzCrTell(Tamer, FString::Printf(TEXT("You haven't the Mana (%.0f) to finish the ward"), WRTune(TEXT("arcane.pathMagic.mana"), 30.f)));
+				return true;
+			}
+			// A full narcotic dose: under, and kept under; taming goes on as knockout and feed.
+			Self->AddTorpor(Self->MaxTorpor * 2.f);
+			Self->Torpor = Self->MaxTorpor;
+			WRArcane::GiveShield(Self, WRTune(TEXT("spells.barrier.shield"), 30.f) * WRArcane::ShieldScale(Tamer), WRTune(TEXT("spells.barrier.seconds"), 8.f), Tamer);
+			WRFx::Broadcast(Self, TEXT("arcane.path_magic"), Self->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("arcane.path_magic"));
+			CzCrTell(Tamer, FString::Printf(TEXT("A Barrier wraps the %s and its plates go still: feed it to finish the tame"), *Self->GetDef()->Name));
+			UE_LOG(LogWildreach, Log, TEXT("CRYSTAL path-magic ward done on %s by %s"), *Self->GetName(), *Tamer->GetName());
+		}
+		return true;
+	}
 	// Deaf (a Resonance peal): it drops to roost and its clicks stop; a hunt it was on is forgotten.
 	if (B->Has(WRCrystalFlag::Deaf))
 	{
@@ -944,4 +994,90 @@ void UWRCrystalWorld::StepQuietRoad()
 			if (!QuietFrom.Contains(Name)) { QuietFrom.Add(Name, e); QuietSpoiled.Remove(Name); }
 		}
 	}
+}
+
+// ================================================================================================ path magic (Prismback)
+
+
+bool FWRCrystalAI::PathTamePrompt(const AWRCreature* Self, const AActor* Who, FString& OutVerb)
+{
+	const UWRCrystalBody* B = UWRCrystalBody::Get(Self);
+	const FWRCreatureDef* Def = Self ? Self->GetDef() : nullptr;
+	if (!B || !Def || !Who || Self->CreatureId != TEXT("prismback") || Self->IsTamed() || !Self->IsAlive() || !Def->CanTameBy(TEXT("path_magic")))
+	{
+		return false;
+	}
+	const APawn* P = Cast<APawn>(Who);
+	const FString Me = P && P->GetPlayerState() ? P->GetPlayerState()->GetPlayerName() : FString();
+	if (!B->PathTamer.IsEmpty())
+	{
+		if (B->PathTamer != Me) return false;
+		OutVerb = TEXT("Hold still: a Barrier is closing round it");
+		return true;
+	}
+	if ((!Self->IsUnconscious() && Self->GetHealthFraction() >= WRTune(TEXT("arcane.pathMagic.below"), 0.3f))
+		|| WRArcane::PointsIn(Who) < FMath::RoundToInt(WRTune(TEXT("arcane.pathMagic.points"), 10.f))
+		|| !WRArcane::HasMana(Who, WRTune(TEXT("arcane.pathMagic.mana"), 30.f)))
+	{
+		return false;
+	}
+	OutVerb = FString::Printf(TEXT("Hold: ward it (%.0f s, %.0f Mana)"), WRTune(TEXT("arcane.pathMagic.holdSeconds"), 4.f), WRTune(TEXT("arcane.pathMagic.mana"), 30.f));
+	return true;
+}
+
+bool FWRCrystalAI::TryPathTame(AWRCreature* Wild, AWRPlayerController* Player, FString& OutResult)
+{
+	UWRCrystalBody* B = UWRCrystalBody::Get(Wild);
+	AWRCharacter* Who = Player ? Cast<AWRCharacter>(Player->GetPawn()) : nullptr;
+	FString Verb;
+	if (!B || !Who || !Wild->HasAuthority() || !PathTamePrompt(Wild, Who, Verb))
+	{
+		return false;
+	}
+	const FString Me = Player->PlayerState ? Player->PlayerState->GetPlayerName() : FString();
+	if (B->PathTamer == Me)
+	{
+		OutResult = Verb;
+		return true;
+	}
+	if (FVector::Dist2D(Who->GetActorLocation(), Wild->GetActorLocation()) > Wild->GetSimpleCollisionRadius() + WRTune(TEXT("arcane.pathMagic.reach"), 400.f))
+	{
+		OutResult = TEXT("Get your hand on its plates");
+		return true;
+	}
+	B->PathTamer = Me;
+	B->PathTameStart = CcNow(Wild);
+	B->HandAt = Who->GetActorLocation();
+	Wild->SetAggroTarget(nullptr);
+	WRFx::BroadcastOn(Who, TEXT("arcane.cast"), TEXT("hand"), 1.2f, TEXT("arcane.barrier"), WRTune(TEXT("arcane.pathMagic.holdSeconds"), 4.f));
+	OutResult = FString::Printf(TEXT("Hold E: draw a Barrier round it (%.0f s)"), WRTune(TEXT("arcane.pathMagic.holdSeconds"), 4.f));
+	return true;
+}
+
+void FWRCrystalAI::StopPathTame(AWRPlayerController* Player)
+{
+	const FString Me = Player && Player->PlayerState ? Player->PlayerState->GetPlayerName() : FString();
+	if (Me.IsEmpty() || !Player->GetWorld()) return;
+	for (TActorIterator<AWRCreature> It(Player->GetWorld()); It; ++It)
+	{
+		UWRCrystalBody* B = UWRCrystalBody::Get(*It);
+		if (!B || B->PathTamer != Me) continue;
+		const double Held = CcNow(*It) - B->PathTameStart;
+		B->PathTamer.Empty();
+		Player->ClientNotify(Held < 0.35 ? It->Feed(Player) : FString(TEXT("You let go: the ward fades")));
+		return;
+	}
+}
+
+bool FWRCrystalAI::PathTameNear(const APlayerController* Player)
+{
+	const APawn* Pawn = Player ? Player->GetPawn() : nullptr;
+	const FString Me = Player && Player->PlayerState ? Player->PlayerState->GetPlayerName() : FString();
+	if (Me.IsEmpty() || !Pawn) return false;
+	for (TActorIterator<AWRCreature> It(Pawn->GetWorld()); It; ++It)
+	{
+		const UWRCrystalBody* B = UWRCrystalBody::Get(*It);
+		if (B && B->PathTamer == Me && FVector::Dist(It->GetActorLocation(), Pawn->GetActorLocation()) < 1500.f) return true;
+	}
+	return false;
 }

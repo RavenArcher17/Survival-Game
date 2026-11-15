@@ -371,8 +371,12 @@ Hazards are `WRCrystalHazards.*` (ward fields + keystones, chandeliers, thin flo
 noises through `OnNoise` and the creatures will listen to `OnPeal`. Numbers: tuning `hazards.crystal`, `crystalEvents`.
 The creatures are `WRCrystalCreatures.*` (`UWRCrystalBody` looks and state, `FWRCrystalAI` hooks beside the
 Graveyard's in `WRCreature*.cpp` / `WRStormCreatures.cpp`, the dens and the quiet road); numbers in tuning
-`crystalLife`. Not built: the four bosses, the Arcane path (Saga's quest XP waits for it; her Twins quest is parked in
-`world.json quests._saga_venn_later`), composed music.
+`crystalLife`. The Arcane path is `WRArcanePath.*` (Mana, shields, Reflect, passives, combos, the look) and
+`WRAbilitiesArcane.*` (nine abilities, `AWRArcaneField` runes / Aegis / Rune circle, `UWRArcaneWorld` for the shields'
+clocks and films); shields are a shared layer (`WRArcane::GiveShield`, taken in `ApplyHit` after guard): anything new
+that shields should use it. `WRArcane::Reflect` throws a projectile back (set `FWRHit::bReflectable` on straight shots).
+Hard light (shields, runes, beams) uses `/Game/Terrain/M_ArcaneWard`. Numbers: tuning `arcane`, `spells.*`.
+Not built: the four bosses (Saga's Twins quest is parked in `world.json quests._saga_venn_later`), composed music.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

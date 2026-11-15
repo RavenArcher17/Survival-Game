@@ -51,6 +51,13 @@ public:
 	/** The Necromancy path's Souls (cooks/biome-graveyard.md 2.17): collected from kills, spent to raise and empower the dead. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Souls) FGameplayAttributeData Souls;
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxSouls) FGameplayAttributeData MaxSouls;
+	/** The Arcane path's Mana (cooks/biome-crystal.md 2.17): a steady pool, refilling 6 a second at all times. */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Mana) FGameplayAttributeData Mana;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxMana) FGameplayAttributeData MaxMana;
+	/** An Arcane shield's HP layer (Barrier, Aegis's wearer, Moon tide): taken after guard, before Health; the bigger one
+	 *  wins, never stacked. MaxShield is what the shield was raised at (the HUD's film). */
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_Shield) FGameplayAttributeData Shield;
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxShield) FGameplayAttributeData MaxShield;
 	/** Max health taken by the Void (cooks/biome-void.md 2.8, 2.17): rift zones, Gnawer latches, Vorhollow's bite and your
 	 *  own void abilities. Health can't rise past MaxHealth - MaxHealthLost (the grey band); Rest gives it all back. */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_MaxHealthLost) FGameplayAttributeData MaxHealthLost;
@@ -84,6 +91,10 @@ public:
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxMomentum)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Souls)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxSouls)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Mana)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxMana)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Shield)
+	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxShield)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxHealthLost)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, Void)
 	WR_ATTRIBUTE_ACCESSORS(UWRAttributeSet, MaxVoid)
@@ -115,6 +126,10 @@ private:
 	UFUNCTION() void OnRep_MaxMomentum(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Souls(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxSouls(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Mana(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxMana(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_Shield(const FGameplayAttributeData& Old);
+	UFUNCTION() void OnRep_MaxShield(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxHealthLost(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_Void(const FGameplayAttributeData& Old);
 	UFUNCTION() void OnRep_MaxVoid(const FGameplayAttributeData& Old);

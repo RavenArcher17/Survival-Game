@@ -62,6 +62,11 @@ public:
 	/** Spindleglass: which of its eight legs are broken (they never regrow in its life). */
 	UPROPERTY(ReplicatedUsing=OnRep_Flags) uint8 LegsBroken = 0;
 	UPROPERTY(Replicated) TObjectPtr<AActor> LatchedOn;
+	/** A Prismback being warded by an Arcane walker's path magic (crystal 2.12.1): who, since when, where their hand
+	 *  went on (moving off it breaks the ward). Replicated so the prompt shows on the warder's machine. */
+	UPROPERTY(Replicated) FString PathTamer;
+	double PathTameStart = 0.0;
+	FVector HandAt = FVector::ZeroVector;
 	bool Has(uint8 F) const { return (Flags & F) != 0; }
 	/** The looks that follow the flags and the broken legs, now (the server after it changes them). */
 	void Refresh() { OnRep_Flags(); }
@@ -106,4 +111,15 @@ struct WILDREACH_API FWRCrystalAI
 	static void Died(AWRCreature* Self, AActor* Killer);
 	/** Server: a noise the creature may hear (an Echobat hears everything; a Spindleglass only steps, rolls, landings). */
 	static void Heard(AWRCreature* Self, const FVector& At, float Radius, AActor* By, FName Kind);
+
+	// --- The Prismback's path magic (crystal 2.12.1): an Arcane walker with 10+ points holds Interact 4 s with 30 Mana
+	// on a Prismback knocked out or under 30%: a Barrier wraps it, a full narcotic dose; taming goes on as knockout and feed.
+	/** Every machine: the prompt for Who at Self (false: not open to it). */
+	static bool PathTamePrompt(const AWRCreature* Self, const AActor* Who, FString& OutVerb);
+	/** Server, E pressed (through AWRCreature::Feed): the hand goes on. True when it handled the press. */
+	static bool TryPathTame(AWRCreature* Wild, class AWRPlayerController* Player, FString& OutResult);
+	/** Server: E let go early ("world cpathtame"): the ward stops (a tap feeds it as usual). */
+	static void StopPathTame(class AWRPlayerController* Player);
+	/** The owning machine: this player has a hand on a Prismback (E's release must tell the server). */
+	static bool PathTameNear(const class APlayerController* Player);
 };

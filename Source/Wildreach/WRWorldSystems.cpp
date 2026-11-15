@@ -2351,7 +2351,13 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 		const FName Path(*([&]() { FString P; for (const auto& V : *WArr(WRWorld::Data(), TEXT("masters"))) if (WStrOf(V->AsObject(), TEXT("id")) == Master.ToString()) P = WStrOf(V->AsObject(), TEXT("path")); return P; })());
 		const int32 XP = int32(WNumOf(Row, TEXT("xp"), 0.f));
 		TArray<FString> Got;
-		if (XP > 0 && !Path.IsNone()) { PS->GetPaths()->AwardXP(Path, XP); Got.Add(FString::Printf(TEXT("+%d %s XP"), XP, *Path.ToString())); }
+		// A master's quests pay their own path (Saga Venn's into the Arcane path); a survivor who doesn't walk it is paid
+		// the shrine way: a share into each path they do walk (world.json questOtherPathShare), never lost.
+		if (XP > 0 && !Path.IsNone())
+		{
+			const FString Paid = WPayPathXP(PS, Path, XP, FMath::Max(1, FMath::RoundToInt(XP * WNumOf(WRWorld::Data(), TEXT("questOtherPathShare"), 0.5f))));
+			if (!Paid.IsEmpty()) Got.Add(Paid);
+		}
 		for (const auto& KV : WCountsOf(WChild(Row, TEXT("items")))) { PS->GetInventory()->AddItem(KV.Key, KV.Value); Got.Add(FString::Printf(TEXT("%s x%d"), *WRWorld::ItemName(KV.Key), KV.Value)); }
 		if (const TArray<TSharedPtr<FJsonValue>>* Rec = WArr(Row, TEXT("recipes")))
 		{

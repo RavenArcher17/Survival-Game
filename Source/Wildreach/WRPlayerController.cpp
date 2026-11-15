@@ -1,4 +1,5 @@
 #include "WRPlayerController.h"
+#include "WRCrystalCreatures.h"
 #include "WRDeeds.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
@@ -319,6 +320,11 @@ void AWRPlayerController::InteractReleased()
 	if (FWRForestAI::PathTameNear(this))
 	{
 		ServerCommand(TEXT("world fpathtame"));
+	}
+	// A hand on a Prismback's plates (the Arcane path's ward, WRCrystalCreatures): the same.
+	if (FWRCrystalAI::PathTameNear(this))
+	{
+		ServerCommand(TEXT("world cpathtame"));
 	}
 }
 

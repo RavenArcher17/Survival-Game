@@ -103,6 +103,10 @@ struct FWRHit
 	float UnawareMult = 1.f;
 	/** A silent shot: an unaware mark takes the blow without learning who loosed it (Hush arrows). */
 	bool bQuiet = false;
+	/** A reflectable projectile (cooks/biome-crystal.md 2.12, 2.17: bolts, arrows, spits, shards, lances; never lobs,
+	 *  beams or siege): a Prismback's plates, the Geode Tyrant, the Twins' Ward guard and an Arcane Reflect shield throw
+	 *  it back along its line. Set where the shot is made (AWRProjectile::Init, bows, wind arrows). */
+	bool bReflectable = false;
 };
 
 /** Weapon the character currently swings. Damage = base x metal x quality x (1 + upgrade x 5%). */

@@ -521,6 +521,12 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	if (Ammo) WRSwamp::AddAmmoBuildups(Ammo->Id, Hit);
 	// Hush arrows: silent, sneak hits x1.15 (cooks/biome-sky.md 2.17).
 	if (Ammo) { Hit.UnawareMult = Ammo->AmmoSneakMult; Hit.bQuiet = Ammo->bAmmoSilent; }
+	// Arrows, bolts, darts and thrown spears fly straight enough to be thrown back by a reflector (crystal 2.12); bolas
+	// and pots are lobs.
+	{
+		const FString K = Launcher.RangedKind.ToString();
+		Hit.bReflectable = K.Contains(TEXT("arrow")) || K.Contains(TEXT("bolt")) || K.Contains(TEXT("dart")) || K.Contains(TEXT("javelin")) || K.Contains(TEXT("spear"));
+	}
 	const FVector Chest = GetActorLocation() + FVector(0.f, 0.f, 55.f);
 	const FVector Muzzle = Chest + Dir * 45.f;
 

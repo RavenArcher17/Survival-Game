@@ -189,7 +189,9 @@ namespace WRWindAbil
 		AWRProjectile* P = C->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), From, Velocity.Rotation(), Params);
 		if (P)
 		{
-			P->InitPhysical(Hit, Velocity, Gravity, Model, Along, Kind, NAME_None);
+			FWRHit Shot = Hit;
+			Shot.bReflectable = true;   // a wind arrow flies straight: a reflector can send it back (crystal 2.12)
+			P->InitPhysical(Shot, Velocity, Gravity, Model, Along, Kind, NAME_None);
 		}
 		return P;
 	}

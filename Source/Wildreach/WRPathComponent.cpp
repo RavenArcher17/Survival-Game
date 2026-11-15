@@ -1,6 +1,7 @@
 #include "WRPathComponent.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
+#include "WRArcanePath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
 #include "WRSurvival.h"
@@ -589,6 +590,11 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 	{
 		// Featherfall (cooks/biome-sky.md 2.18.3): no fall damage from any height; gliders at half the stamina.
 		GrantedTags.AddTag(WRWind::Passive_Featherfall);
+	}
+	else if (MainPath == TEXT("arcane"))
+	{
+		// Deep well (cooks/biome-crystal.md 2.17): Mana regenerates x1.5 (WRArcanePath.cpp).
+		GrantedTags.AddTag(WRArcane::Passive_DeepWell);
 	}
 	else if (MainPath == TEXT("necromancy"))
 	{

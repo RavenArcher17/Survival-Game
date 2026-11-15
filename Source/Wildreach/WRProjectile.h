@@ -40,6 +40,9 @@ public:
 	TFunction<void(class AWRCharacterBase*, EWRHitResult)> OnStruck;
 	/** Server: a trail on a shot (WRFx, e.g. wind.arrow_trail); replicates to every machine (with a model or without). */
 	void SetTrail(FName Fx) { TrailFx = Fx; OnRep_Fx(); }
+	/** The blow it carries and what it is (the Arcane path's Aegis stops it, a catapult stone breaks the dome). */
+	const FWRHit& GetHit() const { return Hit; }
+	FName GetKind() const { return Kind; }
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

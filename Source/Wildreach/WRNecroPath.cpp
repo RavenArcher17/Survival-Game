@@ -1,6 +1,7 @@
 // The Necromancy path's rules (see WRNecroPath.h; cooks/biome-graveyard.md 2.17-2.18, build-biome-graveyard.md 2.18).
 
 #include "WRNecroPath.h"
+#include "WRArcanePath.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBloodPath.h"
@@ -371,6 +372,8 @@ AWRCreature* WRNecro::Raise(AWRCharacterBase* Owner, AWRCreature* Body, float Se
 	if (!Owner || !Owner->HasAuthority() || !Body || !Owner->GetPlayerState()) return nullptr;
 	const FWRCreatureDef* Def = Body->GetDef();
 	if (!Def) return nullptr;
+	// Bound dead (Arcane + Necromancy 25, Data/combos.json): raised minions last twice as long.
+	if (Owner->HasTag(WRArcane::Combo_BoundDead)) Seconds *= FWRComboRegistry::Get().Num(TEXT("bound_dead"), TEXT("duration"), 2.f);
 	// At the cap the oldest capped minion goes to bones first (the newest raise always stands).
 	if (!bIgnoreCap)
 	{

@@ -4,6 +4,7 @@
 #include "WRCharacter.h"
 #include "WRWindPath.h"     // the Wind body change (cooks/biome-sky.md 2.18.5)
 #include "WRNecroPath.h"
+#include "WRArcanePath.h"
 #include "WRVoidPath.h"
 #include "WRInventory.h"
 #include "Wildreach.h"
@@ -918,6 +919,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	Sig = HashCombine(Sig, WRNature::LookSig(this));        // Nature: Rooted's green tint on the bark while it heals
 	Sig = HashCombine(Sig, WRWind::LookSig(this));          // Wind: the spirals race and the hair streams at high Momentum in a fight
 	Sig = HashCombine(Sig, WRNecro::LookSig(this));         // Necromancy: Lich form's full ash, a raise's pupil flare
+	Sig = HashCombine(Sig, WRArcane::LookSig(this));        // Arcane: a shield's facets lift the rune lines
 	if (!bForce && Sig == PathMarkSig)
 	{
 		return;
@@ -1058,6 +1060,9 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	// Necromancy (cooks/biome-graveyard.md 2.18): the stages are the player_art row; Lich form shows the full ash at any
 	// point count and a raise flares the pupil ring (WRNecroPath.cpp).
 	WRNecro::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);
+	// Arcane (cooks/biome-crystal.md 2.18): the stages are the player_art row; a shield holding lifts the lines to their
+	// resting glow (WRArcanePath.cpp).
+	WRArcane::ApplyLook(this, SkinMIDs, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 
 	// Blood: sharper canines from strength 0.6 (main, or the sub path's share).
 	bool bFangs = false;

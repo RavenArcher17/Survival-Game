@@ -4,9 +4,44 @@
 
 Aaron (lane build-biome-crystal: requirement ledger R1-R50, build research and plan in showcase-notes
 cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in pieces; compiled (editor target) after each;
-not played here (Aaron tests). Live from Crystal (4): `crystal` is in `world.liveBiomes`. Not built yet: the four
-bosses (the Mirrored Twins, the Echo Warden, the Geode Tyrant, Lyrathis) and their arenas' machines, the Arcane path,
-the composed music, the two crystal shields (no shield items exist in the game yet).
+not played here (Aaron tests). Live from Crystal (4): `crystal` is in `world.liveBiomes`; the Arcane path from Crystal
+(5). Not built yet: the four bosses (the Mirrored Twins, the Echo Warden, the Geode Tyrant, Lyrathis) and their arenas'
+machines, the composed music, the two crystal shields (no shield items exist in the game yet).
+
+- **Crystal (5): the Arcane path** (cooks/biome-crystal.md 2.17-2.18; plan build-biome-crystal.md Part 2 P2.9).
+  `Data/paths/arcane.json` (22 nodes: trunk Arcane missile / Mana capacity / Mark chance / Runic strike; Ward, Sorcery and
+  Rune branches; root passive Deep well), numbers in tuning `arcane.*`, `spells.<key>`, `wildbrands.runic_strike`.
+  **Mana** is a new attribute (owner-replicated): 100 + 15 a Mana capacity rank, refilling 6 a second in and out of a
+  fight (Deep well x1.5 on the main path; Venn's ring's `manaRegen`; nothing in the Silent Vault); a violet bar under
+  your health that flashes and shakes when a press is refused. **Shields** are a new shared layer (`Shield` /
+  `MaxShield` attributes, `WRArcane::Incoming` after guard in `ApplyHit`): the bigger shield wins, never stacked; while
+  one holds no status builds (`UWRStatusComponent::AddStatusBuildup`); Absorb gives the caster Mana back; Mana burn eats
+  shields twice as fast; a faceted violet film is drawn round anyone shielded on every machine (`UWRArcaneWorld`, from a
+  replicated tag) and a thin violet film runs along the top of your health bar. **Reflect** throws a reflectable shot
+  back along its line at x0.8 as a real bolt that never homes (`WRArcane::Reflect`, shared with the bosses); hits now
+  carry `bReflectable` (spell bolts, spits, bows and wind arrows; never lobs, beams or siege). Abilities
+  (`WRAbilitiesArcane.*`, registered under `arcane` in `ClassForNode`): Arcane missile, Runic strike (Wildbrand), Barrier
+  (yourself, or with Ward allies the ally or tame nearest your crosshair within 15 m in sight), Arcane blast (chargeable
+  to x1.5), Rune trap (a visible hexafoil on the ground, at most three, never inside someone else's claim; Rune link
+  joins your runes within 8 m with violet threads that bite whatever crosses them), Inscribe (+8 arcane a weapon blow
+  for 30 s), Aegis (a faceted dome with the eight-armed stave that stops every shot crossing it from outside, bounces
+  them back with Reflect, and is broken by a catapult stone), Starfall (12 stars, each landing point glinting 1.2 s
+  first), Rune circle (allies inside +15% damage, enemies inside mark 10 a second). Passives: Mark chance, Focus, Echo
+  (20%: the spell again 0.6 s later, free, at the same aim), Quick cast, Hardened ward, Glyph power, Lasting runes.
+  **Combos** (combos.json): Mana flame, Meteor storm, Quick mind, Mana wings, Frost missile, Frozen rune, Blood magic,
+  Blood star, Mana sap, Faerie ring, Bound dead (raised minions last twice as long); Ball lightning, Rune volley and
+  Phylactery are shown only (not built yet). **The body** (2.18): the `player_art.json paths.arcane` row (rosettes, the
+  2 s cast pulse) plus, at full strength, a soft crystal chime and a fingertip trace on every cast; a shield lifts the
+  rune lines to their resting glow. The hard light of shields, runes and Aegis is a new material `M_ArcaneWard`
+  (additive, a fresnel rim; `Tools/terrain/build_crystal_materials.py`, 24 KB). Node glyphs for all 22 nodes and the
+  path's hexafoil mark (`Tools/ui_glyphs.mjs`, 45 PNGs, about 40 KB). **The Prismglass spear**: a charged heavy throws
+  two more thrust-lines of light 15 degrees either side as the point goes home (40% of the blow, Mark 25 each).
+  **The Prismback's path magic**: an Arcane walker with 10+ points holds E 4 s with 30 Mana on a Prismback knocked out
+  or under 30%: a Barrier wraps it (a full narcotic dose; taming goes on as knockout and feed); arcane hits no longer
+  calm it the generic way. **Quest pay**: a master's quest XP goes to their path if you walk it, else half of it to each
+  path you do walk (`world.json questOtherPathShare`), so Saga Venn's XP is never silently lost. **Fixed**: the caves'
+  passages with no middle points (the Prism Hall's West Door, the Lens Grinder's door, the Silent Vault's rooms) were
+  generated with no air (a NaN point in `crystal.mjs tube()`); regenerated. Compiled (editor target); not played.
 
 - **Crystal (4): the nine creatures, and the Crystal caves go live** (`crystal` joins `world.liveBiomes`). Rows in
   `creatures.json` / `attacks.json` (24 attack rows from biome-crystal 2.12.2, mark on bites and claws) on borrowed rigs

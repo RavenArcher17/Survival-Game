@@ -275,7 +275,10 @@ const into = (id, toward, inset = 0.72) => {
 // pts: [x, y, floor] control points; densified below on a Catmull-Rom curve every 3 m.
 const TUBES = [];
 const tube = (id, kind, zone, ends, mids, size, extra = {}) => {
-	const a = typeof ends[0] === 'string' ? into(ends[0], mids[0] || ends[1]) : ends[0];
+	// With no middle points the first end aims at the second (a hall's centre when it is a hall: a bare id there gave a
+	// NaN point, and the West Door, the Lens Grinder's door and the Vault's own doors had no passage).
+	const toward = mids[0] || (typeof ends[1] === 'string' ? [hallById(ends[1]).x, hallById(ends[1]).y, hallById(ends[1]).floor] : ends[1]);
+	const a = typeof ends[0] === 'string' ? into(ends[0], toward) : ends[0];
 	const b = typeof ends[1] === 'string' ? into(ends[1], mids.length ? mids[mids.length - 1] : a) : ends[1];
 	TUBES.push({ id, kind, zone, ctrl: [a, ...mids, b], ...size, ...extra });
 };

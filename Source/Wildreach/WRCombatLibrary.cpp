@@ -38,6 +38,7 @@
 #include "WRForestHazards.h"
 #include "WRBloodPath.h"
 #include "WRNecroPath.h"
+#include "WRArcanePath.h"
 #include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
@@ -680,6 +681,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Damage *= WRWind::DamageScale(Attacker, Target, Hit);
 		// Necromancy: the Graveyard's corruption buff, Necrotic power, Final harvest on bosses, a minion's scale (WRNecroPath.cpp).
 		Damage *= WRNecro::DamageScale(Attacker, Target, Hit);
+		// Arcane: Focus, Mark chance on the marked, an ally's Rune circle (WRArcanePath.cpp).
+		Damage *= WRArcane::DamageScale(Attacker, Target, Hit);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
 			Damage *= 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);
@@ -896,6 +899,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	Damage = Target->ModifyIncomingDamage(Hit, Damage);
 	// Necromancy (WRNecroPath.cpp): Soul shield, Shared pain, and Deathless (once per Rest a killing blow leaves 1 HP).
 	Damage = WRNecro::Incoming(Target, Hit, Damage);
+	// Arcane shields (WRArcanePath.cpp): the shield's HP layer takes it first (Reflect, Absorb, Mana burn x2).
+	Damage = WRArcane::Incoming(Target, Hit, Damage);
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
 	const bool bWeak = BeforeModify > 0.f && Damage > BeforeModify * 1.05f;
 
@@ -1123,6 +1128,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRSwamp::ScaleBuildups(Attacker, Coated);
 		// Necromancy's Wither chance (decay on every weapon hit), an ash wraith's burn, a frozen legion's frost.
 		WRNecro::ScaleBuildups(Attacker, Coated);
+		// Mark chance's extra mark, Frost missile's frost (WRArcanePath.cpp).
+		WRArcane::ScaleBuildups(Attacker, Coated);
 		for (const TPair<FName, float>& B : Coated.Buildups)
 		{
 			const int32 Id = WRStatus::FromName(B.Key);
@@ -1170,6 +1177,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Result == EWRHitResult::Hit && Attacker)
 	{
 		WRNecro::AfterHit(Target, Hit, Damage);
+		// The Arcane path's (WRArcanePath.cpp): Inscribe's rune, Mana burn's drain.
+		WRArcane::AfterHit(Target, Hit, Damage);
 	}
 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.

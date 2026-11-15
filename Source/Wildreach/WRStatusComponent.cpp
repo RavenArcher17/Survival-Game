@@ -1,6 +1,7 @@
 #include "WRStatusComponent.h"
 #include "WRWindPath.h"
 #include "WRNecroPath.h"
+#include "WRArcanePath.h"
 #include "WRSkyAir.h"
 #include "WRGraveCreatures.h"
 #include "WRVoid.h"
@@ -271,6 +272,11 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 {
 	AWRCharacterBase* Owner = GetOwnerCharacter();
 	if (!Owner || !Owner->HasAuthority() || Amount <= 0.f || Id < 0 || Id >= WRStatus::Count || !Owner->IsAlive())
+	{
+		return;
+	}
+	// An Arcane shield holds: nothing builds while it does (cooks/biome-crystal.md 2.17).
+	if (WRArcane::BlocksBuildup(Owner))
 	{
 		return;
 	}
@@ -889,6 +895,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		WRWind::TickOwner(Owner, DeltaTime);
 		// Souls (the Necromancy path): their cap by Soul capacity, the raised minions' upkeep (WRNecroPath.cpp).
 		WRNecro::TickOwner(Owner, DeltaTime);
+		// Mana (the Arcane path): its capacity and steady regen (WRArcanePath.cpp).
+		WRArcane::TickOwner(Owner, DeltaTime);
 	}
 }
 

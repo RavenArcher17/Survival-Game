@@ -1538,8 +1538,9 @@ bool AWRCreature::TryPathMagic(const FWRHit& Hit)
 	const FWRCreatureDef* Def = GetDef();
 	const AWRCharacterBase* Attacker = Cast<AWRCharacterBase>(Hit.Instigator);
 	const APlayerState* PS = Attacker ? Attacker->GetPlayerState() : nullptr;
-	// (The Mossmaul's path magic is the Nature path's hold-Interact calm, not an element hit: WRForestCreatures.)
-	if (!HasAuthority() || IsTamed() || !Def || !PS || !Def->CanTameBy(TEXT("path_magic")) || Hit.PathId.IsNone() || Hit.PathId != Def->Element || FWRForestAI::OwnsPathMagic(this))
+	// (The Mossmaul's path magic is the Nature path's hold-Interact calm, not an element hit: WRForestCreatures; the
+	// Prismback's the Arcane path's held ward, WRCrystalCreatures.)
+	if (!HasAuthority() || IsTamed() || !Def || !PS || !Def->CanTameBy(TEXT("path_magic")) || Hit.PathId.IsNone() || Hit.PathId != Def->Element || FWRForestAI::OwnsPathMagic(this) || CreatureId == TEXT("prismback"))
 	{
 		return false;
 	}
@@ -1574,6 +1575,11 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	if (FString Calm; FWRForestAI::TryPathTame(this, Player, Calm))
 	{
 		return Calm;
+	}
+	// The Prismback's path-magic ward (WRCrystalCreatures): an Arcane walker's hand on its plates, held 4 s.
+	if (FString Ward; FWRCrystalAI::TryPathTame(this, Player, Ward))
+	{
+		return Ward;
 	}
 	const bool bKnockout = Def->CanTameBy(TEXT("knockout_feed")) && IsUnconscious();
 	const bool bOffer = Def->CanTameBy(TEXT("offer_food")) && !AggroTarget.IsValid();

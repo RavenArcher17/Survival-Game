@@ -38,6 +38,8 @@
 #include "WRBloodPath.h"
 #include "WRNaturePath.h"
 #include "WRNecroPath.h"   // the Growth gauge (the Nature path)
+#include "WRArcanePath.h"
+#include "WRCrystalCreatures.h"  // the Mana bar and the shield film (the Arcane path)
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -829,6 +831,8 @@ private:
 			if (FString RiteVerb; FWRSwampAI::RitePrompt(Wild, S, RiteVerb)) { OutTarget = Wild->GetDisplayLabel(); return RiteVerb; }
 			// The Mossmaul's path-magic calm for a Nature walker (WRForestCreatures), before the usual taming.
 			if (FString CalmVerb; FWRForestAI::PathTamePrompt(Wild, S, CalmVerb)) { OutTarget = Wild->GetDisplayLabel(); return CalmVerb; }
+			// The Prismback's ward for an Arcane walker (WRCrystalCreatures).
+			if (FString WardVerb; FWRCrystalAI::PathTamePrompt(Wild, S, WardVerb)) { OutTarget = Wild->GetDisplayLabel(); return WardVerb; }
 			if (Wild->IsUnconscious()) { OutTarget = Wild->GetDisplayLabel(); return TEXT("Tame"); }
 		}
 		if (const AActor* Use = P->FindUseTarget())
@@ -1207,6 +1211,25 @@ private:
 					+ SOverlay::Slot().VAlign(VAlign_Center).Padding(62.f * U, 0.f, 74.f * U, 0.f)
 					[
 						SNew(SBox).HeightOverride(16.f * U)[WRBlood::MakeSpilledOverlay([this]() { return static_cast<const AActor*>(Body()); })]
+					]
+					// An Arcane shield (cooks/biome-crystal.md 2.17): a violet film along the top of the health bar, as long as
+					// the shield's HP against your max health, shrinking as it takes blows.
+					+ SOverlay::Slot().VAlign(VAlign_Top).Padding(62.f * U, 0.f, 74.f * U, 0.f)
+					[
+						SNew(SBox).HeightOverride(4.f * U).Visibility_Lambda([A]() { const UWRAttributeSet* X = A(); return X && X->GetShield() > 0.f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						[
+							SNew(SWRBar).Height(4.f * U).Color(FLinearColor(FColor(0xB8, 0xA0, 0xF0)))
+							.Fraction_Lambda([A]() { const UWRAttributeSet* X = A(); return X ? FMath::Clamp(X->GetShield() / FMath::Max(1.f, X->GetMaxHealth()), 0.f, 1.f) : 0.f; })
+						]
+					]
+				]
+				// Mana (the Arcane path, 2.17): violet #7A3FD1 under your health while the path is yours; it flashes and
+				// shakes when a press is refused for Mana.
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SBox).Visibility_Lambda([this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("arcane")) ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+					[
+						VitalRow(LOCTEXT("Mana", "Mana"), FLinearColor(FColor(0x7A, 0x3F, 0xD1)), 10.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMana() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxMana() : 1.f; }, [this]() { return WRArcane::RefusedFlash(Body()); })
 					]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)[SNew(SWRStatusMeters).Who_Lambda([this]() { return Cast<AWRCharacterBase>(Body()); })]

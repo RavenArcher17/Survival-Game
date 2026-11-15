@@ -123,6 +123,9 @@ void AWRProjectile::OnRep_Fx()
 void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& Color)
 {
 	Hit = InHit;
+	// A bolt, a spit or a shard flying straight: a reflector can send it back (cooks/biome-crystal.md 2.12). A shot that
+	// was itself thrown back never bounces again.
+	Hit.bReflectable = !InHit.bReaction;
 	TintColor = Color;
 	Movement->Velocity = GetActorForwardVector() * Speed;
 	TrailFx = InHit.Element == WRTags::Element_Fire ? FName(TEXT("fire.bolt")) : InHit.Element == WRTags::Element_Frost ? FName(TEXT("frost.shard"))

@@ -15,6 +15,8 @@
 #include "WRBloodPath.h"
 #include "WRAbilitiesNature.h"   // the Nature path's abilities (ClassForNode)
 #include "WRAbilitiesNecro.h"    // the Necromancy path's abilities (ClassForNode)
+#include "WRAbilitiesArcane.h"   // the Arcane path's abilities (ClassForNode)
+#include "WRArcanePath.h"        // the Prismglass spear's light-lines
 #include "WRGraveBosses.h"       // the Graveyard arenas' things (the Belfry rope, egg sacs, the chandelier chain)
 #include "WRForestBosses.h"      // the forest arenas' things a swing can hit (rope anchors, knots, combs, amber hearts)
 #include "WRSurvival.h"          // a torch in the off hand (a fire blow on the forest's things)
@@ -759,6 +761,17 @@ void UWRGA_Melee::OnChargeReleased(float /*TimeHeld*/)
 		WRFx::BroadcastOn(Character, TEXT("charge.full"), TEXT("weapon"), 1.f, TEXT("charge.full"), 0.3f);
 	}
 	StartSwing(Charged->Windup, Charged->Active, Charged->Recovery, true, uint8(FMath::Clamp(Charged->Clip, 0, 7)), false);
+	// The Prismglass spear (Lyrathis's, cooks/biome-crystal.md 2.19.2): a charged thrust throws two more thrust-lines of
+	// light 15 degrees either side of the real one as the point goes home; light hits build Mark (WRArcanePath.cpp).
+	if (IsServer() && Held >= Min)
+	{
+		const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Character);
+		if (Inv && Inv->GetEquipped(EWREquipSlot::Weapon).ItemId == TEXT("prismglass_spear"))
+		{
+			const float Blow = UWRCombatLibrary::WeaponDamage(Character->Weapon, true) * Charged->Damage * ChargeFactor;
+			After(Charged->Windup, [this, Blow]() { if (AWRCharacterBase* C = GetCharacter(); C && C->IsAlive()) WRArcane::PrismLines(C, Blow); });
+		}
+	}
 }
 
 void UWRGA_Melee::StartSwing(float Windup, float Active, float Recovery, bool bHyperarmor, uint8 Variant, bool bStepping)
@@ -2647,7 +2660,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		// Necromancy (WRNecroPath.cpp): Second wave, Shared pain, Soul siphon, Reaping stride, Final harvest.
 		TEXT("second_wave"), TEXT("shared_pain"), TEXT("soul_siphon"), TEXT("reaping_stride"), TEXT("final_harvest"),
 		// Wind (WRWindPath.cpp, WRSkyAir): Glide, Eye of the storm, Lingering gale, Piercing gale, Tailwind shot.
-		TEXT("wind_glide"), TEXT("eye_of_the_storm"), TEXT("lingering_gale"), TEXT("piercing_gale"), TEXT("tailwind_shot") };
+		TEXT("wind_glide"), TEXT("eye_of_the_storm"), TEXT("lingering_gale"), TEXT("piercing_gale"), TEXT("tailwind_shot"),
+		// Arcane (WRArcanePath.cpp, WRAbilitiesArcane.cpp): Reflect, Ward allies, Echo, Mana burn, Rune link.
+		TEXT("reflect"), TEXT("ward_allies"), TEXT("echo"), TEXT("mana_burn"), TEXT("rune_link") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2750,6 +2765,19 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("tornado")) return UWRGA_Tornado::StaticClass();
 		if (NodeId == TEXT("wind_arrow")) return UWRGA_WindArrow::StaticClass();
 		if (NodeId == TEXT("storm_volley")) return UWRGA_StormVolley::StaticClass();
+	}
+	else if (PathId == TEXT("arcane"))
+	{
+		// The Arcane path (WRAbilitiesArcane.cpp, cooks/biome-crystal.md 2.17).
+		if (NodeId == TEXT("arcane_missile")) return UWRGA_ArcaneMissile::StaticClass();
+		if (NodeId == TEXT("runic_strike")) return UWRGA_RunicStrike::StaticClass();
+		if (NodeId == TEXT("barrier")) return UWRGA_Barrier::StaticClass();
+		if (NodeId == TEXT("aegis")) return UWRGA_Aegis::StaticClass();
+		if (NodeId == TEXT("arcane_blast")) return UWRGA_ArcaneBlast::StaticClass();
+		if (NodeId == TEXT("starfall")) return UWRGA_Starfall::StaticClass();
+		if (NodeId == TEXT("rune_trap")) return UWRGA_RuneTrap::StaticClass();
+		if (NodeId == TEXT("inscribe")) return UWRGA_Inscribe::StaticClass();
+		if (NodeId == TEXT("rune_circle")) return UWRGA_RuneCircle::StaticClass();
 	}
 	else if (PathId == TEXT("necromancy"))
 	{
