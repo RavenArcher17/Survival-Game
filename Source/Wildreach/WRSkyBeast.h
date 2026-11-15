@@ -59,6 +59,11 @@ private:
 	void BuildRay();
 	void BuildWhale();
 	void BuildBell();
+	void BuildSerpent();
+	/** Serpent: the spine's point and frame Dist cm behind the head along the path the head has flown (world). */
+	void SpineAt(float Dist, FVector& OutAt, FQuat& OutFrame) const;
+	void RecordTrail();
+	FVector PlaceSerpent(const FV& V) const;
 	void Pose(float Dt);
 	FVector Place(const FV& V) const;
 	/** Tentacle joint positions for one strand (bell), recomputed each pose. */
@@ -91,6 +96,13 @@ private:
 	TArray<FVector> StrandRoot;
 	TArray<float> StrandPhase;
 	FVector Trail = FVector::ZeroVector;
+	/** Serpent: where the head has been (world, newest first) and the head's own frame this pose. */
+	TArray<FVector> Path;
+	FTransform HeadXf;
+	float Sac = 0.f, Hood = 0.f, Grey = 0.f, Roll360 = 0.f, LastGrey = 0.f;
+	TArray<FColor> BaseColors;
+	static constexpr float SerpentLength = 6000.f;
+	static constexpr int32 SerpentSegs = 60;
 	static constexpr int32 StrandJointsN = 24;
 	bool bBuilt = false;
 };

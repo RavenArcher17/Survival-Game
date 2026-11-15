@@ -63,7 +63,7 @@ namespace WRSkyCrLook
 	}
 	FLinearColor ScHex(const TCHAR* S) { return FLinearColor(FColor::FromHex(S)); }
 	/** Groups that move (TickLook): fore-wing, hind-wing, crest, mane, soft wing (Puffwing), shrike wing, gape, disc. */
-	enum EScGroup : int32 { SkGStatic = 0, SkGWingF = 1, SkGWingH = 2, SkGCrest = 3, SkGMane = 4, SkGSoftWing = 5, SkGShrikeWing = 6, SkGGape = 7, SkGDisc = 8, SkGTail = 9 };
+	enum EScGroup : int32 { SkGStatic = 0, SkGWingF = 1, SkGWingH = 2, SkGCrest = 3, SkGMane = 4, SkGSoftWing = 5, SkGShrikeWing = 6, SkGGape = 7, SkGDisc = 8, SkGTail = 9, SkGVanes = 10 };
 }
 using namespace WRSkyCrLook;
 
@@ -90,13 +90,14 @@ UWRSkyBody* UWRSkyBody::Get(const AActor* Actor)
 
 bool UWRSkyBody::IsSkyKind(FName CreatureId)
 {
+	// The nine and the four bosses (the bosses' brains are WRSkyBosses; the body here carries their look and flags).
 	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId);
-	return Def && Def->Biome == TEXT("sky_islands") && Def->Archetype != TEXT("boss");
+	return Def && Def->Biome == TEXT("sky_islands");
 }
 
 void UWRSkyBody::Attach(AWRCreature* Creature)
 {
-	if (!Creature || !Creature->HasAuthority() || !IsSkyKind(Creature->CreatureId) || Get(Creature) || Creature->IsA<AWRBoss>()) return;
+	if (!Creature || !Creature->HasAuthority() || !IsSkyKind(Creature->CreatureId) || Get(Creature)) return;
 	UWRSkyBody* Body = NewObject<UWRSkyBody>(Creature, TEXT("SkyBody"));
 	Body->Seed = FMath::Rand();
 	// A bloom's bells come in two hands (the man o' war): left-handed drift left of the wind, right-handed right.
@@ -161,7 +162,7 @@ void UWRSkyBody::TickComponent(float DeltaTime, ELevelTick TickType, FActorCompo
 	Clock += DeltaTime;
 	AWRCreature* C = Cast<AWRCreature>(GetOwner());
 	if (!C) return;
-	if (C->HasAuthority()) FWRSkyAI::TickBody(C, this, DeltaTime);
+	if (C->HasAuthority() && !C->IsA<AWRBoss>()) FWRSkyAI::TickBody(C, this, DeltaTime);
 	if (GetNetMode() != NM_DedicatedServer) TickLook(DeltaTime);
 }
 
@@ -208,14 +209,18 @@ void UWRSkyBody::BuildLook()
 	if (!Def) return;
 
 	// The bodies no rig has: built in code, the capsule's placeholder hidden.
-	if (!Def->ProcBody.IsNone() && (Def->ProcBody == TEXT("ray") || Def->ProcBody == TEXT("whale") || Def->ProcBody == TEXT("bell")))
+	if (!Def->ProcBody.IsNone() && (Def->ProcBody == TEXT("ray") || Def->ProcBody == TEXT("whale") || Def->ProcBody == TEXT("bell") || Def->ProcBody == TEXT("serpent")))
 	{
 		if (!Beast)
 		{
+			// Old Gulper is a Cloudback x3.14, scarred (creatures.json look beastScale / scar).
+			const TSharedPtr<FJsonObject> BLook = ScLook(C->CreatureId);
+			bool bScar = false;
+			if (BLook.IsValid()) BLook->TryGetBoolField(TEXT("scar"), bScar);
 			Beast = NewObject<UWRSkyBeast>(C, TEXT("SkyBeast"));
 			Beast->SetupAttachment(C->GetRootComponent());
 			Beast->RegisterComponent();
-			Beast->Init(C, Def->ProcBody, 1.f, Seed, false);
+			Beast->Init(C, Def->ProcBody, ScNum(BLook, TEXT("beastScale"), 1.f), Seed, bScar);
 			// The whale's belly sits 2 m over what it floats above; the ray and the bell ride the capsule's middle.
 			for (UActorComponent* Comp : C->GetComponents())
 			{
@@ -301,8 +306,56 @@ void UWRSkyBody::BuildLook()
 	const float Rad = Def->Radius, HH = Def->HalfHeight;
 	FVector Head = C->GetActorLocation() + Fwd * Rad;
 	const FName HeadBone = BoneAt(TEXT("head"), Head);
-	const FName K = C->CreatureId;
+	// A boss on a creature's look (Kyrra is a Galeharrier grown old): the look's kind, and its own extras after.
+	FName K = C->CreatureId;
+	{
+		FString LK;
+		if (Look.IsValid() && Look->TryGetStringField(TEXT("kind"), LK)) K = FName(*LK);
+	}
 	const auto S = [](const TCHAR* H, float Dim = 0.62f) { return FSurf::Cloth(ScHex(H) * Dim); };
+	if (C->CreatureId == TEXT("kyrra"))
+	{
+		// Her crest white with age; one talon a stump bound in old Kitewright chain (links wound round the stump).
+		TArray<FName> Feet = BonesWith(TEXT("foot"));
+		if (Feet.Num())
+		{
+			const FVector P = Body->GetBoneLocation(Feet[0]);
+			AddGroup(Feet[0], P, Yaw, Blocks([&](FKit& Kit)
+			{
+				Kit.Add(FSurf::Glaze(ScHex(TEXT("D9B23A")) * 0.5f, 0.6f), FVector(Rad * 0.18f, Rad * 0.16f, Rad * 0.12f), FVector::ZeroVector);
+				for (int32 l = 0; l < 7; ++l)
+				{
+					const float A = l * 0.9f;
+					Kit.Add(FSurf::Steel(ScHex(TEXT("5C4A3C")) * 0.5f, 0.75f), FVector(Rad * 0.08f, Rad * 0.03f, Rad * 0.05f), FVector(FMath::Cos(A) * Rad * 0.1f, FMath::Sin(A) * Rad * 0.1f, -Rad * 0.02f + l * Rad * 0.015f), FRotator(0.f, FMath::RadiansToDegrees(A) + 90.f, l % 2 ? 90.f : 0.f));
+				}
+				// The broken end of the chain trailing.
+				for (int32 l = 0; l < 4; ++l) Kit.Add(FSurf::Steel(ScHex(TEXT("5C4A3C")) * 0.5f, 0.75f), FVector(Rad * 0.08f, Rad * 0.03f, Rad * 0.05f), FVector(-Rad * (0.1f + 0.07f * l), 0.f, -Rad * (0.06f + 0.05f * l)), FRotator(30.f, 0.f, l % 2 ? 90.f : 0.f));
+			}), SkGStatic);
+		}
+	}
+	else if (C->CreatureId == TEXT("bridge_sentinel"))
+	{
+		// The halo of eight stone wind-vanes behind its head, on a granite ring: they turn as it walks and sing (its
+		// harp chord); they stop and point down before the Vane slam, spin up to a whine for the Vane spin.
+		FVector Hd = Head;
+		const FName HdB = HeadBone;
+		AddGroup(HdB, Hd - Fwd * Rad * 0.45f + FVector(0, 0, HH * 0.12f), FRotator(0.f, Yaw.Yaw, 0.f), Blocks([&](FKit& Kit)
+		{
+			const FSurf Gran = FSurf::Stone(ScHex(TEXT("E2DED6")) * 0.62f, 0.85f);
+			for (int32 r = 0; r < 16; ++r)
+			{
+				const float A = r * PI / 8.f;
+				Kit.Add(Gran, FVector(14.f, 24.f, 22.f), FVector(0.f, FMath::Cos(A) * 110.f, FMath::Sin(A) * 110.f), FRotator(0.f, 0.f, FMath::RadiansToDegrees(A)));
+			}
+			for (int32 v = 0; v < 8; ++v)
+			{
+				const float A = v * PI / 4.f;
+				const FVector Dir(0.f, FMath::Cos(A), FMath::Sin(A));
+				Kit.Add(Gran, FVector(6.f, 22.f, 90.f), Dir * 165.f, FRotator(0.f, 0.f, FMath::RadiansToDegrees(A) - 90.f));
+				Kit.Add(FSurf::Stone(ScHex(TEXT("9A958C")) * 0.55f, 0.9f), FVector(8.f, 30.f, 8.f), Dir * 112.f, FRotator(0.f, 0.f, FMath::RadiansToDegrees(A) - 90.f));
+			}
+		}), SkGVanes);
+	}
 
 	if (K == TEXT("galeharrier"))
 	{
@@ -559,6 +612,13 @@ void UWRSkyBody::TickLook(float DeltaTime)
 		{
 			// The facial disc flashes white as it strikes: the head swells a touch on the swoop.
 			F->SetRelativeScale3D(FMath::VInterpTo(F->GetRelativeScale3D(), G.BaseScale * (Has(WRSkyFlag::Stoop) ? 1.12f : 1.f), DeltaTime, 10.f));
+		}
+		else if (G.Kind == SkGVanes)
+		{
+			// The halo turns with its walk; stopped and pointed down for the slam (Hood); whining fast for the spin (Flap).
+			const float Rate = Has(WRSkyFlag::Hood) ? 0.f : Has(WRSkyFlag::Flap) ? 720.f : 25.f + Speed * 0.15f;
+			G.Phase += DeltaTime * Rate;
+			F->SetRelativeRotation(G.BaseRot + FRotator(0.f, 0.f, Has(WRSkyFlag::Hood) ? 0.f : FMath::Fmod(G.Phase, 360.f)));
 		}
 		else if (G.Kind == SkGTail)
 		{

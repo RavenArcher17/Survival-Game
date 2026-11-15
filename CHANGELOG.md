@@ -343,6 +343,57 @@ played here (Aaron and the testers test, F8). This first piece is the land, the 
   two ledges with their clutch (E 2 s takes an egg; the herd within 60 m comes for you). Shrine guards now spawn. 11 fx
   rows, 38 sound rows and 8 creature voices (stand-ins from the nearest families: the Sky's own recordings are the audio
   cook's), covering every sound the Sky's earlier pieces call too.
+- **The bosses** (piece 5; `WRSkyBosses.*`, Aeolith's body in `WRSkyBeast`; rows in `creatures.json`, `attacks.json`,
+  tuning `bosses.kyrra / bridge_sentinel / old_gulper / aeolith`; cooks/biome-sky.md 2.10-2.11). **Kyrra, the Tempest
+  Harrier** (the Galeharrier grown to 9 m: white with age, a chain bound round her talon stump) flies her loop over the
+  bridges at 16 m/s and lands every 6 min on the widest island on her way for 60 s; the Tempest stoop (the built dive:
+  down on where you stood, a 4 m dust ring, grounded 1.6 s), the snatch (20 m up in 3 s and dropped: 120 stance on her
+  frees you), the three-talon combo, the gale wing (12 m, the edge kills), the screech (two Galeharriers, once); arrows
+  to her wings count twice: a broken wing grounds her 10 s (x1.25), both and she fights on foot. **The Bridge Sentinel**
+  (6 m of white granite, its halo of eight stone vanes turning as it walks, stopping before the slam, whining up for the
+  spin) kneels on the standing bridge till the Toll House's copper is taken or it's struck; its Vane slam on one of the
+  five weak sections breaks the deck under it (every machine: the slabs are their own parts now, the open ones hidden and
+  without collision, `AWRSkyState::DeckOpen`) and it falls 35 m to Winch Isle (a quarter of its health, kneeling 10 s);
+  the deck throw leaves a hole for 2 game hours; the grab hurls you 12 m sideways; the vane spin rings out every 0.25 s.
+  **Old Gulper** (the Cloudback x3.14, scarred, a reef of glowing barnacles) floats 4 m over the Bight; the Inhale pulls
+  500 cm/s in its 20 m cone and swallows whoever reaches the mouth (4 s inside, then spat 15 m any way); fire in its
+  mouth while it inhales chokes it onto the lagoon 10 s with its mouth open (x1.5), twice in a minute cracks the hump (no
+  barnacle levistone); the barnacle shed's five shadows, the belch only after a swallow. **Aeolith, the Sky Serpent**: a
+  60 m serpent built in code whose body lies along the path its head has flown (its coils are real), one pair of 34 m
+  feathered wings that beat and spread like a hood on the tells, the bone wind-mask with its vents, a jaw that drops,
+  the red throat sac that swells before every breath (glowing at night), quetzal plumes down its back and a 6 m tail fan;
+  spore-sick grey spreads over it when weighted. **The Serpent's Ring** (`AWRSkyRing`): eight white platforms with jade
+  inlay, their wind-stones (they stop the breath and the quills) and braziers lit at night, chains between them; the
+  Flue's three vents breathe a cyan plume every 40 s (a 1 s tell). Phase 1: tail sweep, the gale breath (25 m cone, push
+  15 m/s through `WRSkyAir::Push`, blocked behind a wind-stone; the empty sac after opens the chest x1.3), the coil
+  combo, the Crosswind dive through the centre (through a live plume it takes +150 spore), the feather volley (12 quills
+  at 14 m/s, never homing), the tame-punishing snatch. The Gale Crown throws shots aside until a stance break, a broken
+  wing or spore-weighting knocks it off 20 s. 400 spore (plumes, spore pots, the Spore path) weighs it down onto the
+  nearest platform 8 s (x1.25). The Unbinding at 50% snaps the chains: the platforms drift (gaps 4-14 m on a 20 s cycle,
+  the ring turning, every position a pure function of the server time) and updraft columns stand in the gaps (anyone
+  stepping in is thrown up and across). Phase 2 adds the Updraft Inhale (lifted 8 m and held, then the tail lash), the
+  Downburst, the spiral combo and the held gale (it swings to where most of you are). The hidden Last Circle (25%, with
+  artifacts): it never lands, makes a low pass every 20 s (a wing-roar 1.2 s before; E within 4 m grabs its back, E
+  again runs to the next crest vent, Jump lets go), three crest vents of 900 each are its only body damage (8% and a
+  stagger each), a barrel roll every 12 s (Guard at 30 stamina a second holds you on, else you're thrown), all three
+  broken it crashes 10 s onto the largest platform, the vents regrow at half once. The Wind altar in the Lid Gate's
+  temple, run-back stones by the arenas (Kyrra roams: none), the spore pot (thrown: a cyan cloud, +150 on Aeolith), boss
+  knockback in the Sky through `WRSkyAir::Push`; a boss over an edge flies back onto the nearest island in 3 s. Drops:
+  Aeolith's core, gale essence, plumes, the Gale plume part, the Wind Mask (first kill), Galespine and the Cloud spire
+  furnishings as its blueprints; the minis' trophies. 5 fx, 14 sound rows and 4 voices (stand-ins).
+- **The Sky's sound** (piece 6): the ambient director treats the islands as the Sky's land (beds by sub-zone: the
+  cliffs' surf far below, the gardens' falls, the bridges' chains, the shrines' hollow air over the Flue's roar, the
+  Undercloud's close fog and kite cloth, the Flue's breath; day and night layers); music pools for the Sky (explore,
+  night, combat, mini, camps, Aeolith's three phases), the Undercloud's own piece inside the bank, and the Turning
+  Wind's layer over whatever plays while its sign and the event run. All stand-ins from the built library (no Sky
+  recordings or F-Lydian score exist yet: that's the audio cook's).
+- **Not finished yet (later cooks):** the Sky's own recordings and its F-Lydian score (every Sky sound and pool is a
+  marked stand-in); the Sky's portal fold kit (portals.json `sky` stays `land: false`, so no Sky portals open); the
+  Spore -> Wind invasion's Sky side waits for the Fungal caverns (Wind -> Spore is in, dormant till Fungal is live);
+  tame uses beyond the shared systems (the Skyray carries one rider, not two; the Hushwing's night guard and the
+  Gallowshrike's thorn guard use the shared guard behaviour; the Sailbell fence works through its curtain);
+  a Hushwing taking a Windmane foal (no wild foals yet); the Last Circle's riders move vent to vent with E rather than
+  running free along the spine; boss soul forging (Aeolith's soul) is the souls cook's.
 
 ## Unreleased: the Graveyard (the Necromancy land)
 

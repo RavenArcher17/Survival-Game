@@ -559,7 +559,7 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 		// (And the Wasteland's throwing stone and anchor salt bag: "code:riftstone", "code:anchorsalt", WRVoidWorld.)
 		// (And the Ancient forest's Bootlace blight jar and smoke pot: "code:blightjar", "code:smokepot", WRForestHazards.)
 		const bool bSwampThrown = Launcher.RangedKind == TEXT("saltpouch") || Launcher.RangedKind == TEXT("stormjar")
-			|| Launcher.RangedKind == TEXT("blightjar") || Launcher.RangedKind == TEXT("smokepot") || Launcher.RangedKind == TEXT("limepot") || WRVoidWorld::IsThrownKind(Launcher.RangedKind);
+			|| Launcher.RangedKind == TEXT("blightjar") || Launcher.RangedKind == TEXT("smokepot") || Launcher.RangedKind == TEXT("limepot") || Launcher.RangedKind == TEXT("sporepot") || WRVoidWorld::IsThrownKind(Launcher.RangedKind);
 		const FString Model = Launcher.RangedKind == TEXT("firepot") ? FString(TEXT("code:firepot"))
 			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;

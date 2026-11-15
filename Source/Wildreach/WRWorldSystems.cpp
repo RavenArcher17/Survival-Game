@@ -56,6 +56,7 @@
 #include "Serialization/JsonWriter.h"
 #include "TimerManager.h"
 #include "WRSkyIsleTypes.h"
+#include "WRSkyBosses.h"
 
 /** A row placed on a Sky island ("island": id, "at" in map metres): the island's top there (cooks/build-biome-sky.md 2.15). */
 static bool WSkyIslandSpot(const TSharedPtr<FJsonObject>& Row, double X, double Y, FVector& Out)
@@ -2492,7 +2493,14 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	}
 	if (Verb == TEXT("sky"))
 	{
-		// The Sky's world (WRSkyWorld): world sky shard | lift | line | spot.
+		// The Sky's world (WRSkyWorld): world sky shard | lift | line | spot; the Last Circle: world sky boss grab | shift.
+		if (Args.Num() > 2 && Args[2] == TEXT("boss"))
+		{
+			TArray<FString> Sub(Args);
+			Sub.RemoveAt(0);
+			if (UWRSkyArenas* A = UWRSkyArenas::Get(PC)) return A->Command(PC, Sub);
+			return FString();
+		}
 		return UWRSkyWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("crystal"))

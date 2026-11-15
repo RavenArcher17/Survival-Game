@@ -4,6 +4,9 @@
 #include "WRSwampTypes.h"
 #include "WRWorldDressing.h"
 #include "WRLand.h"
+#include "WRSkyIsleTypes.h"
+#include "WRSkyWorld.h"
+#include "GameFramework/GameStateBase.h"
 #include "WRPortals.h"
 #include "WRSurvival.h"
 #include "WRSound.h"
@@ -422,6 +425,13 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		const FWRLandDef* LD = WRLand::At(Listener);
 		LandBiome = LD ? LD->Biome : NAME_None;
 		LandZone = WRLand::ZoneAt(Listener);
+		// The Sky (cooks/biome-sky.md 2.12): over the islands as on the cape, its own beds by sub-zone (zone.W1..W5).
+		if (WRSkyIsles::Contains(Listener))
+		{
+			LandBiome = WRSkyIsles::Biome();
+			const TCHAR Z = WRSkyIsles::ZoneAt(Listener);
+			LandZone = Z >= TEXT('1') && Z <= TEXT('5') ? FName(*FString::Printf(TEXT("W%c"), Z)) : FName(TEXT("Wf"));
+		}
 		float Want = 0.f;
 		if (LD)
 		{
@@ -669,6 +679,8 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 				}
 			}
 		}
+		// The Sky: inside the Undercloud its own intimate piece (sub.undercloud, cooks/biome-sky.md 2.12), not in a fight.
+		if (Land == WRSkyIsles::Biome() && PoolName != TEXT("combat") && WRSkyIsles::InUndercloud(Listener)) Try.Add(TEXT("sub.undercloud"));
 		Try.Add(FName(*FString::Printf(TEXT("%s.%s"), *PoolName.ToString(), *Land.ToString())));
 		for (const FName& T : Try)
 		{
@@ -796,6 +808,12 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		const bool bHunt = bHere && WRForest::WildHuntActive(World);
 		StepMusicLayer(WildHuntLayer, bHunt, TEXT("layer.wild_hunt"), DeltaTime, Gain);
 		StepMusicLayer(BloomLayer, bHere && !bHunt && WRForest::Bloom(World), TEXT("layer.bloom"), DeltaTime, Gain);
+	}
+	// The Turning Wind: its canon over whatever plays in the Sky (the theme against itself backwards; biome-sky 2.12).
+	{
+		const AWRSkyState* SkyS = AWRSkyState::Get(World);
+		const float SkyNow = World->GetGameState() ? World->GetGameState()->GetServerWorldTimeSeconds() : 0.f;
+		StepMusicLayer(TurningWindLayer, SkyS && SkyS->SignNow(SkyNow) && WRSkyIsles::Contains(Listener), TEXT("layer.turning_wind"), DeltaTime, Gain);
 	}
 	// Sylvaroth turned a phase and its music hasn't followed yet (boss.sylvaroth.p<n>): after a short wait (another
 	// phase-music switch may already be on it) the old phase's piece fades as the new one comes in.

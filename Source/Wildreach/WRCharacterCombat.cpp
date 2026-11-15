@@ -4,6 +4,7 @@
 #include "WRGraveBosses.h"
 #include "WRGraveCreatures.h"
 #include "WRSkyCreatures.h"
+#include "WRSkyBosses.h"
 #include "Wildreach.h"
 #include "WRCameraBoom.h"
 #include "WRCreature.h"
@@ -62,6 +63,8 @@ void AWRCharacter::ServerMashFrozen_Implementation()
 	}
 	// Held by a Graveyard boss (the Knell, the palps, the ribcage, the Shroud) or buried by the Gravedigger.
 	if (FWRGraveBoss::Mash(this)) return;
+	// Carried in a snatch, swallowed by Old Gulper, or riding Aeolith (a rider's Jump lets go): WRSkyBosses.
+	if (FWRSkyBoss::Mash(this)) return;
 	// In a Cryptstalker's palps or under a Wraithmoth drinking (WRGraveCreatures).
 	if (FWRGraveAI::HolderOf(this))
 	{

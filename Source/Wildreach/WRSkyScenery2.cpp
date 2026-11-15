@@ -279,7 +279,7 @@ void WRSkyParts::Bridge(FCtx& C)
 			const bool bBroken = bStub && i >= N - 2;
 			const FVector Tip = bBroken ? FVector(0, 0, -60.f * (i - N + 3)) : FVector::ZeroVector;
 			const FSurf S = bStone ? SkRimStone(Zone, 0.9f + 0.15f * C.Rand(i)) : SkPlank(0.85f + 0.25f * C.Rand(i));
-			if (bSentinel && A->GetNetMode() != NM_DedicatedServer)
+			if (bSentinel)
 			{
 				// The Sentinel's deck: each slab its own part so a broken one can go (WRSkyBosses); weak slabs (5
 				// sections) are cracked, darker, with fresh chips under them.
@@ -308,7 +308,6 @@ void WRSkyParts::Bridge(FCtx& C)
 				}
 				continue;
 			}
-			if (bSentinel) { WRSkyPartsImpl::Slab(C, S, A0, A1, W, 50.f); continue; }
 			WRSkyPartsImpl::Slab(C, S, A0 + Tip * 0.5f, A1 + Tip, bStone ? W : W - 20.f, bStone ? 45.f : 8.f);
 			// Plank decks: a gap between boards, the cross-ties underneath on the chains.
 			if (!bStone && i % 3 == 0) C.B.K.Rod(SkCedar(0.8f), A0 - Side * W * 0.55f - FVector(0, 0, 14.f), A0 + Side * W * 0.55f - FVector(0, 0, 14.f), 8.f, true);

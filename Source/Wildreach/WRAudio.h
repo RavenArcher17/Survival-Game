@@ -279,6 +279,7 @@ private:
 	float ForestFalls = 0.f;
 	/** Music layers over whatever plays in the forest (music.pools layer.bloom / layer.wild_hunt). */
 	TArray<FStream> BloomLayer;
+	TArray<FStream> TurningWindLayer;
 	TArray<FStream> WildHuntLayer;
 	/** Sylvaroth's phase its music was picked for (boss.sylvaroth.p<n>), and when a seen phase change is acted on (a short
 	 *  wait, so a second phase-music switch elsewhere never restarts the same piece twice). */
