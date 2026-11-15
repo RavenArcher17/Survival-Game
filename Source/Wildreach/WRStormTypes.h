@@ -73,6 +73,8 @@ namespace WRStorm
 	/** Server: a drink's timed protection (items.json use.buff): grounding, shock_ward. */
 	WILDREACH_API void GrantBuff(AActor* Who, FName Id, float Seconds);
 	WILDREACH_API bool HasBuff(const AActor* Who, FName Id);
+	/** Server: ends the timed buff Who took last (a potion's ward, tar, oil). Its id, or None if none was running. */
+	WILDREACH_API FName TakeOneBuff(AActor* Who);
 
 	/** Lightning resistance tag for creatures of this land ("resists": ["strike", "shock"]). */
 	WILDREACH_API bool ResistsStrikes(const AActor* Actor);

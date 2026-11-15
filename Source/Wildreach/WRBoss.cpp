@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRVoidBosses.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
 #include "WRRaiding.h"
@@ -424,6 +425,7 @@ void AWRBoss::BeginPlay()
 	}
 	FWRStormBoss::Begin(this);
 	FWRSwampBoss::Begin(this);   // the Swamp: Mother Maw, the Hex-Warden, the Bloat, Vharra
+	FWRVoidBoss::Begin(this);    // the Wasteland: the four stations, the Echo, Vorhollow
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s ready (%s, %.0f hp solo)"), *GetDisplayLabel(), bMajor ? TEXT("major") : TEXT("mini"), SoloHealth);
 }
 
@@ -433,6 +435,7 @@ void AWRBoss::EndPlay(const EEndPlayReason::Type Reason)
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();
 	FWRStormBoss::EndPlay(this);
 	FWRSwampBoss::EndPlay(this);
+	FWRVoidBoss::EndPlay(this);
 	Super::EndPlay(Reason);
 }
 
@@ -659,6 +662,7 @@ void AWRBoss::SetPhase(int32 NewPhase)
 	}
 	FWRStormBoss::PhaseChanged(this, Phase);
 	FWRSwampBoss::PhaseChanged(this, Phase);
+	FWRVoidBoss::PhaseChanged(this, Phase);
 }
 
 void AWRBoss::SetAirborne(bool bAir)
@@ -741,12 +745,13 @@ float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	const FWRCreatureDef* Def = GetDef();
 	// Weak to the opposite element.
 	const FGameplayTag Weak = BossElement() == WRTags::Element_Fire ? WRTags::Element_Frost : WRTags::Element_Fire;
-	if (Hit.Element == Weak && !FWRStormBoss::OwnWeakness(this) && !FWRSwampBoss::OwnWeakness(this))
+	if (Hit.Element == Weak && !FWRStormBoss::OwnWeakness(this) && !FWRSwampBoss::OwnWeakness(this) && !FWRVoidBoss::OwnWeakness(this))
 	{
 		Damage *= WRTune(TEXT("bosses.weaknessMultiplier"), 1.5f);
 	}
 	Damage = FWRStormBoss::Incoming(this, Hit, Damage);   // Storm peaks: weak to Blood and curse; stuck, dropped, cursed
 	Damage = FWRSwampBoss::Incoming(this, Hit, Damage);   // the Swamp: weak to Lightning; Maw's open belly, the Warden's crows
+	Damage = FWRVoidBoss::Incoming(this, Hit, Damage);    // the Wasteland: the Unravelled's pieces and core, Vorhollow's shell
 	if (CreatureId == TEXT("obsidian_warden") && ShellHealth > 0.f && !Hit.bDamageOverTime)
 	{
 		// The shell soaks most of it. Chilled shells crack faster.
@@ -811,7 +816,8 @@ void AWRBoss::OnDamageTaken(const FWRHit& Hit, float Damage)
 		RevealedUntil = Now + Tune(TEXT("revealSeconds"), 6.f);
 	}
 	FWRStormBoss::Damaged(this, Hit, Damage);   // the bell's and the star nose's own health
-	FWRSwampBoss::Damaged(this, Hit, Damage);   // the Bloat's veins, an ally freeing a grabbed friend, the Warden's fifth hit
+	FWRSwampBoss::Damaged(this, Hit, Damage);
+	FWRVoidBoss::Damaged(this, Hit, Damage);   // the Unravelled unravels; the Echo hears your path   // the Bloat's veins, an ally freeing a grabbed friend, the Warden's fifth hit
 	// Phases by health; never during a stance break or a crit (COMBAT-AND-LESSONS 1.4): the crit always finishes first
 	// and the change plays after it (CheckPhase in Tick).
 	CheckPhase();
@@ -945,7 +951,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	if (!bEngaged)
 	{
 		bool bSkipWake = false;
-		if (!FWRStormBoss::TickIdle(this, DeltaSeconds, bSkipWake) && !FWRSwampBoss::TickIdle(this, DeltaSeconds, bSkipWake))
+		if (!FWRStormBoss::TickIdle(this, DeltaSeconds, bSkipWake) && !FWRSwampBoss::TickIdle(this, DeltaSeconds, bSkipWake) && !FWRVoidBoss::TickIdle(this, DeltaSeconds))
 		{
 			TickRoam(DeltaSeconds);
 		}
@@ -1148,7 +1154,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 
 	// The Storm peaks bosses' own counterplay (WRStormBosses): Galvara's cores and drop, Coilback underground, Kharvox's
 	// Charge, flight, called strikes, the eye and the bone drop's climb.
-	if (FWRStormBoss::Tick(this, DeltaSeconds) || FWRSwampBoss::Tick(this, DeltaSeconds))   // (the Swamp's: grabs, the nest, the crows, the burst)
+	if (FWRStormBoss::Tick(this, DeltaSeconds) || FWRSwampBoss::Tick(this, DeltaSeconds) || FWRVoidBoss::Tick(this, DeltaSeconds))   // (the Swamp's: grabs, the nest, the crows, the burst)
 	{
 		return;
 	}
@@ -1308,6 +1314,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 	FirstKillDrops();
 	FWRStormBoss::Died(this);
 	FWRSwampBoss::Died(this);
+	FWRVoidBoss::Died(this);
 	// Artifacts: a major's drop, the first one at your fourth great kill, geis records (WRArtifacts).
 	WRArtifacts::OnBossKilled(this);
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();

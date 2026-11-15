@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRVoidBosses.h"
 #include "WRVoidPath.h"
 #include "WRDeeds.h"
 #include "WRWarHall.h"
@@ -990,7 +991,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Stance *= WRPortals::StanceScale(Target);
 		Stance *= WRVoidPath::StanceScale(Target);   // Unravelled: +15% stance taken   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
 		Stance *= WRWarHall::StanceScale(Target);   // a raid champion slipping on its melted footing
-		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
+		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);
+		Stance *= FWRVoidBoss::StanceTaken(Target, Hit, Stance);   // the Wasteland: an open core, the Mother's strain, eating, a failed Mimic   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
 		Stance *= FWRSwampBoss::StanceTaken(Target, Hit, Stance);   // the Swamp: Maw's open belly, Vharra convulsing
 		if (AWRCreature* Body = Cast<AWRCreature>(Target))
 		{

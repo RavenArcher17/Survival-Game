@@ -25,6 +25,8 @@ namespace WRVoid
 	WILDREACH_API float RiftDrainMult(const AWRCharacterBase* Who);
 	/** A timed brew's stat on a player (anchor salt: riftDrain -0.5 for 5 min), or 0. */
 	WILDREACH_API float BrewStat(const AActor* Who, FName Stat);
+	/** Server: ends Who's running brew (anchor salt...). True if one was running. */
+	WILDREACH_API bool TakeBrew(const AActor* Who);
 	/** Server: start an item's brew (items.json use.brew + use.minutes) on the drinker. Returns its line for the player. */
 	WILDREACH_API FString Brew(AWRCharacterBase* Who, const FWRItemDef& Def);
 	/** The rift pull at a point (cm/s), the same on every machine: toward the nearest tear inside its pull radius. */

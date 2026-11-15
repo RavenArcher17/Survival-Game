@@ -1,6 +1,7 @@
 // The Corrupted wasteland's creatures (see WRVoidCreatures.h). cooks/biome-void.md 2.12; numbers in tuning "voidCreatures"
 // and in their rows (Data/attacks.json), the dens in Data/lands/wasteland.json "spawns".
 #include "WRVoidCreatures.h"
+#include "WRVoidBosses.h"
 #include "WRVoid.h"
 #include "WRVoidWorld.h"
 #include "WRLand.h"
@@ -164,6 +165,7 @@ void UWRVoidBody::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(UWRVoidBody, Holding);
 	DOREPLIFETIME(UWRVoidBody, BlinkTo);
 	DOREPLIFETIME(UWRVoidBody, BlinkAt);
+	DOREPLIFETIME(UWRVoidBody, Stacks);
 }
 
 UWRVoidBody* UWRVoidBody::Get(const AActor* Actor)
@@ -186,6 +188,14 @@ void UWRVoidBody::Attach(AWRCreature* Creature)
 	UWRVoidBody* Body = NewObject<UWRVoidBody>(Creature, TEXT("VoidBody"));
 	Body->RegisterComponent();
 	Creature->AddInstanceComponent(Body);
+}
+
+void UWRVoidBody::AttachLook(AWRCreature* Boss)
+{
+	if (!Boss || !Boss->HasAuthority() || Get(Boss)) return;
+	UWRVoidBody* Body = NewObject<UWRVoidBody>(Boss, TEXT("VoidBody"));
+	Body->RegisterComponent();
+	Boss->AddInstanceComponent(Body);
 }
 
 void UWRVoidBody::BeginPlay()
@@ -452,7 +462,168 @@ void UWRVoidBody::BuildLook()
 	const FSurf VoidLit = FSurf::Lit(VcHex(TEXT("#2B1840")), 3.f);
 	const FSurf EdgeLit = FSurf::Lit(VcHex(TEXT("#7B4FD6")), 2.5f);
 
-	if (K == TEXT("hollowfang"))
+	// A helper body drawn wholly in code (a brood rift, the Void heart): its rig stays hidden.
+	bool bHideMesh = false;
+	if (Look.IsValid()) Look->TryGetBoolField(TEXT("hideMesh"), bHideMesh);
+	if (bHideMesh) Body->SetVisibility(false, false);
+	if (K == TEXT("brood_rift"))
+	{
+		// A small tear standing on its point in the pen: a lens of black-violet with a lit violet rim, grit drifting in.
+		AddGroup(NAME_None, C->GetActorLocation(), Yaw, Blocks([&](FKit& Kit)
+		{
+			for (int32 i = -6; i <= 6; ++i)
+			{
+				const float T = i / 6.f;
+				const float W = 70.f * FMath::Sqrt(FMath::Max(0.f, 1.f - T * T)) + 2.f;
+				Kit.Add(FSurf::Lit(VcHex(TEXT("#1A0E26")), 0.6f), FVector(6.f, W, 26.f), FVector(0.f, 0.f, T * 150.f));
+				Kit.Add(EdgeLit, FVector(4.f, 3.f, 26.f), FVector(0.f, W * 0.5f + 1.f, T * 150.f));
+				Kit.Add(EdgeLit, FVector(4.f, 3.f, 26.f), FVector(0.f, -W * 0.5f - 1.f, T * 150.f));
+			}
+		}), GrpRows);
+	}
+	else if (K == TEXT("void_heart"))
+	{
+		// The Void heart on its cords: a black glossy mass the size of a cart, violet in its folds, cords up into the dark.
+		AddGroup(NAME_None, C->GetActorLocation(), Yaw, Blocks([&](FKit& Kit)
+		{
+			for (int32 i = 0; i < 9; ++i)
+			{
+				const float A = i * 0.7f;
+				Kit.Add(Glass, FVector(140.f - 8.f * i, 120.f - 6.f * i, 150.f - 9.f * i), FVector(FMath::Cos(A) * 30.f, FMath::Sin(A) * 30.f, 10.f * (i % 3)), FRotator(10.f * i, 40.f * i, 0.f), EWRLookMesh::Cylinder);
+			}
+			for (int32 f = 0; f < 6; ++f) Kit.Add(EdgeLit, FVector(4.f, 4.f, 120.f), FVector(FMath::Cos(f * 1.05f) * 70.f, FMath::Sin(f * 1.05f) * 70.f, 0.f), FRotator(0.f, 0.f, 15.f));
+			for (int32 c = 0; c < 4; ++c) Kit.Rod(FSurf::Stone(VcHex(TEXT("#3A3438")), 0.8f), FVector(FMath::Cos(c * 1.57f) * 60.f, FMath::Sin(c * 1.57f) * 60.f, 90.f), FVector(FMath::Cos(c * 1.57f) * 300.f, FMath::Sin(c * 1.57f) * 300.f, 1300.f), 8.f);
+		}), GrpRows);
+		Glow = NewObject<UPointLightComponent>(C);
+		Glow->SetupAttachment(Body);
+		Glow->SetIntensity(3000.f);
+		Glow->SetAttenuationRadius(1600.f);
+		Glow->SetLightColor(VcHex(TEXT("#7B4FD6")));
+		Glow->RegisterComponent();
+	}
+	else if (K == TEXT("unravelled"))
+	{
+		// The fist-sized voidglass heart in the open ribs (it hangs alone, lit, while the pieces are apart), the 3 m iron
+		// tuning-staff with two tines, the open singing mouth.
+		FVector Chest = C->GetActorLocation() + FVector(0, 0, H * 0.4f);
+		const FName ChestBone = BoneAt(TEXT("spine2"), Chest);
+		AddGroup(ChestBone, Chest + Fwd * Rad * 0.3f, Yaw, Blocks([&](FKit& Kit)
+		{
+			Kit.Add(FSurf::Lit(VcHex(TEXT("#2B1840")), 4.f), FVector(22.f), FVector::ZeroVector, FRotator(35.f, 20.f, 10.f));
+			Kit.Add(EdgeLit, FVector(26.f, 4.f, 4.f), FVector::ZeroVector, FRotator(0.f, 45.f, 0.f));
+		}), GrpEyes);
+		FVector Hand = C->GetActorLocation();
+		const FName HandBone = BoneAt(TEXT("righthand"), Hand);
+		if (!HandBone.IsNone())
+		{
+			AddGroup(HandBone, Hand, Yaw, Blocks([&](FKit& Kit)
+			{
+				const FSurf IronS = FSurf::Steel(VcHex(TEXT("#2A2826")), 0.6f);
+				Kit.Rod(IronS, FVector(0.f, 0.f, -120.f), FVector(0.f, 0.f, 180.f), 8.f);
+				Kit.Rod(IronS, FVector(0.f, -20.f, 180.f), FVector(0.f, -20.f, 250.f), 5.f);
+				Kit.Rod(IronS, FVector(0.f, 20.f, 180.f), FVector(0.f, 20.f, 250.f), 5.f);
+				Kit.Rod(IronS, FVector(0.f, -20.f, 180.f), FVector(0.f, 20.f, 180.f), 6.f);
+			}), GrpStatic);
+		}
+	}
+	else if (K == TEXT("null_warden"))
+	{
+		// The closed helm shaped like a bell, its open bell-mouth below (the crit goes through it); the 2 m black bronze bell
+		// on its chain in his left hand.
+		AddGroup(HeadBone, Head + FVector(0, 0, H * 0.06f), Yaw, Blocks([&](FKit& Kit)
+		{
+			const FSurf Bronze = FSurf::Steel(VcHex(TEXT("#1E1712")), 0.45f);
+			Kit.Add(Bronze, FVector(H * 0.3f, H * 0.3f, H * 0.32f), FVector(0.f, 0.f, H * 0.04f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			Kit.Add(Bronze, FVector(H * 0.36f, H * 0.36f, H * 0.06f), FVector(0.f, 0.f, -H * 0.13f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			Kit.Add(EdgeLit, FVector(H * 0.02f, H * 0.22f, H * 0.02f), FVector(H * 0.15f, 0.f, 0.f));
+		}), GrpStatic);
+		FVector LHand = C->GetActorLocation();
+		const FName LBone = BoneAt(TEXT("lefthand"), LHand);
+		if (!LBone.IsNone())
+		{
+			AddGroup(LBone, LHand, Yaw, Blocks([&](FKit& Kit)
+			{
+				const FSurf Bronze = FSurf::Steel(VcHex(TEXT("#1E1712")), 0.45f);
+				const FSurf IronS = FSurf::Steel(VcHex(TEXT("#2A2826")), 0.6f);
+				Kit.Rod(IronS, FVector::ZeroVector, FVector(0.f, 0.f, -90.f), 4.f);
+				Kit.Add(Bronze, FVector(160.f, 160.f, 180.f), FVector(0.f, 0.f, -190.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
+				Kit.Add(Bronze, FVector(170.f, 170.f, 20.f), FVector(0.f, 0.f, -280.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			}), GrpStatic);
+		}
+	}
+	else if (K == TEXT("starving_one"))
+	{
+		// The jaw unhinged down to its chest: a long gaping lower jaw of grey bone and a row of worn teeth.
+		AddGroup(HeadBone, Head, Yaw, Blocks([&](FKit& Kit)
+		{
+			const FSurf BoneS = FSurf::Stone(VcHex(TEXT("#B8B0A0")), 0.7f);
+			Kit.Add(BoneS, FVector(Snout * 0.9f, H * 0.18f, H * 0.04f), FVector(Snout * 0.3f, 0.f, -H * 0.28f), FRotator(-35.f, 0.f, 0.f));
+			for (int32 t = 0; t < 8; ++t) Kit.Spike(BoneS, FVector(Snout * (0.05f + 0.08f * t), (t % 2 ? 1.f : -1.f) * H * 0.06f, -H * 0.2f - t * H * 0.03f), FVector(0.f, 0.f, 1.f), H * 0.02f, H * 0.05f);
+		}), GrpJaw);
+	}
+	else if (K == TEXT("echo"))
+	{
+		// The 4 m tail of mirror-black plumes raised like a lyre: what you see at night, catching the rifts' light.
+		FVector Hip = C->GetActorLocation();
+		const FName HipBone = BoneAt(TEXT("pelvis"), Hip).IsNone() ? BoneAt(TEXT("hips"), Hip) : C->FindBone(TEXT("pelvis"));
+		AddGroup(HipBone, Hip - Fwd * Rad * 0.6f, Yaw, Blocks([&](FKit& Kit)
+		{
+			const FSurf Plume = FSurf::Glaze(VcHex(TEXT("#0A0A0E")), 0.05f);
+			for (int32 p = 0; p < 16; ++p)
+			{
+				const float A = FMath::DegreesToRadians(-70.f + 140.f * p / 15.f);
+				const FVector Dir(-FMath::Cos(A) * 0.4f, FMath::Sin(A), FMath::Cos(A));
+				Kit.Rod(Plume, FVector::ZeroVector, Dir.GetSafeNormal() * 400.f, 6.f);
+				Kit.Add(Plume, FVector(30.f, 4.f, 90.f), Dir.GetSafeNormal() * 360.f, Dir.GetSafeNormal().Rotation() + FRotator(-90.f, 0.f, 0.f));
+				Kit.Add(EdgeLit, FVector(2.f, 2.f, 40.f), Dir.GetSafeNormal() * 395.f, Dir.GetSafeNormal().Rotation() + FRotator(-90.f, 0.f, 0.f));
+			}
+		}), GrpHoles);
+	}
+	else if (K == TEXT("vorhollow"))
+	{
+		// The 4 m hole straight through its chest showing a lensed starfield, its rib ends polished like glass; voidglass
+		// spines down the back; the 1.8 m voidglass hooks on its long middle fingers.
+		FVector Chest = C->GetActorLocation() + FVector(0, 0, H * 0.3f);
+		const FName ChestBone = BoneAt(TEXT("spine2"), Chest);
+		AddGroup(ChestBone, Chest, Yaw, Blocks([&](FKit& Kit)
+		{
+			Kit.Disc(FSurf::Lit(VcHex(TEXT("#08060C")), 0.f), FVector::ZeroVector, FVector(1.f, 0.f, 0.f), 380.f, 20.f);
+			for (int32 s = 0; s < 40; ++s) Kit.Disc(FSurf::Lit(VcHex(TEXT("#E8E4FF")), 8.f), FVector(12.f, FMath::Sin(s * 2.4f) * 160.f, FMath::Cos(s * 1.7f) * 160.f), FVector(1.f, 0.f, 0.f), 4.f + (s % 3), 1.f);
+			for (int32 r = 0; r < 10; ++r)
+			{
+				const float A = 2.f * PI * r / 10.f;
+				Kit.Spike(Glass, FVector(0.f, FMath::Cos(A) * 200.f, FMath::Sin(A) * 200.f), FVector(0.3f, -FMath::Cos(A), -FMath::Sin(A)).GetSafeNormal(), 20.f, 60.f);
+			}
+			Kit.Disc(EdgeLit, FVector(-4.f, 0.f, 0.f), FVector(1.f, 0.f, 0.f), 420.f, 6.f);
+		}), GrpEyes);
+		for (const TPair<FName, FVector>& Sp : BonesWith(TEXT("spine")))
+		{
+			AddGroup(Sp.Key, Sp.Value + FVector(0, 0, H * 0.25f), Yaw, Blocks([&](FKit& Kit)
+			{
+				Kit.Spike(Glass, FVector::ZeroVector, FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), H * 0.05f, H * 0.18f);
+				Kit.Spike(EdgeLit, FVector(1.f, 0.f, 0.f), FVector(-0.3f, 0.f, 1.f).GetSafeNormal(), H * 0.012f, H * 0.16f);
+			}), GrpStatic);
+		}
+		for (const TCHAR* Hand : { TEXT("l-hand"), TEXT("r-hand") })
+		{
+			FVector At = C->GetActorLocation();
+			const FName B = BoneAt(Hand, At);
+			if (B.IsNone()) continue;
+			AddGroup(B, At, Yaw, Blocks([&](FKit& Kit)
+			{
+				FVector P(0.f, 0.f, 0.f);
+				for (int32 s = 0; s < 5; ++s)
+				{
+					const float A = FMath::DegreesToRadians(20.f * s);
+					const FVector Q = P + FVector(FMath::Cos(A) * 36.f, 0.f, -FMath::Sin(A) * 36.f);
+					Kit.Rod(Glass, P, Q, 18.f - 3.f * s);
+					P = Q;
+				}
+				Kit.Spike(EdgeLit, P, FVector(0.3f, 0.f, -1.f).GetSafeNormal(), 4.f, 30.f);
+			}), GrpStatic);
+		}
+	}
+	else if (K == TEXT("hollowfang"))
 	{
 		// The eyeless skull: two deep black-violet pits where eyes would be; black glass teeth past the lips, upper and
 		// lower, the canines longest; an ash ridge of vertebrae standing proud down the spine.
@@ -728,6 +899,7 @@ void UWRVoidBody::TickLook(float DeltaTime)
 	{
 		bMeshBaseSaved = true;
 		MeshBase = Body->GetRelativeLocation();
+		MeshScale0 = Body->GetRelativeScale3D();
 	}
 	const double SNow = VcServerNow(this);
 	RiseAlpha = FMath::FInterpTo(RiseAlpha, Has(WRVoidFlag::Risen) || Has(WRVoidFlag::Screaming) ? 1.f : 0.f, DeltaTime, 6.f);
@@ -755,6 +927,19 @@ void UWRVoidBody::TickLook(float DeltaTime)
 		}
 	}
 	if (VcKind(C->CreatureId) == TEXT("nullwing")) SetGroupGlow(GrpHoles, Has(WRVoidFlag::Trail) ? 6.f : 1.2f);
+	if (C->CreatureId == TEXT("starving_one") && bMeshBaseSaved)
+	{
+		const float Want = 1.f + WRTune(TEXT("bosses.starving_one.sizePer"), 0.1f) * Stacks;
+		Hover = FMath::FInterpTo(Hover <= 0.f ? 1.f : Hover, Want, DeltaTime, 2.f);
+		Body->SetRelativeScale3D(FVector(Hover) * (MeshScale0.IsZero() ? FVector(1.f) : MeshScale0));
+	}
+	if (C->CreatureId == TEXT("unravelled"))
+	{
+		// Apart: the rig gone to a whirl of dust; the core alone lit (Gape) as it reforms.
+		const bool bApart = Has(WRVoidFlag::Drifting);
+		if (Body->IsVisible() == bApart) Body->SetVisibility(!bApart, false);
+		SetGroupGlow(GrpEyes, Has(WRVoidFlag::Gape) ? 12.f : 3.f);
+	}
 	// The Driftmote floats on the voidglass grit in its bell (the floating rule): its body hovers and bobs; drifting off it
 	// rises high. Its light breathes; a tame one pulses toward the nearest rift (0.5 Hz at 30 m, 3 Hz at 3 m).
 	if (VcKind(C->CreatureId) == TEXT("driftmote") && bMeshBaseSaved)
@@ -1188,6 +1373,29 @@ float FWRVoidAI::Incoming(const AWRCreature* Self, const FWRHit& Hit, float Dama
 	const UWRVoidBody* B = UWRVoidBody::Get(Self);
 	if (!B) return Damage;
 	if (B->Has(WRVoidFlag::InRift)) return 0.f;   // inside the tear: nothing reaches it
+	if (Self->CreatureId == TEXT("void_heart"))
+	{
+		// The heart shares Vorhollow's health: every hit on it counts x1.5 there, and the heart itself never falls.
+		for (TActorIterator<AWRBoss> It(Self->GetWorld()); It; ++It)
+		{
+			if (It->CreatureId != TEXT("vorhollow") || !It->IsAlive()) continue;
+			UAbilitySystemComponent* ASC = It->GetAbilitySystemComponent();
+			const UWRAttributeSet* A = It->GetAttributes();
+			if (!ASC || !A) break;
+			const float Share = WRTune(TEXT("bosses.vorhollow.heartShare"), 1.5f) * Damage;
+			if (A->GetHealth() - Share <= 1.f)
+			{
+				FWRHit Kill = Hit;
+				Kill.Damage = A->GetHealth() + 10.f;
+				Kill.bUnblockable = true;
+				UWRCombatLibrary::ApplyHit(*It, Kill);
+			}
+			else ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() - Share);
+			WRFx::Broadcast(Self, TEXT("hit.void"), Self->GetActorLocation(), FRotator::ZeroRotator, 2.f, TEXT("void.heart.beat"));
+			break;
+		}
+		return 0.f;
+	}
 	// Void on void: its own element barely marks it.
 	if (Hit.Element == WRTags::Element_Void) Damage *= VcT(TEXT("voidOnVoid"), 0.5f);
 	return Damage;
@@ -1207,6 +1415,7 @@ void FWRVoidAI::Died(AWRCreature* Self, AActor* Killer)
 {
 	UWRVoidBody* B = UWRVoidBody::Get(Self);
 	if (!B) return;
+	FWRVoidBoss::HelperDied(Self);
 	if (B->HeldBody.IsValid()) Release(Self, B, false);
 	if (B->LatchedOn.IsValid()) Unlatch(Self, B, false);
 	if (B->Has(WRVoidFlag::InRift))

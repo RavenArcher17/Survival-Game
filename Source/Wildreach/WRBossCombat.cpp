@@ -4,6 +4,7 @@
 // by range band, a transition attack at the phase change, breakable parts, a tame-punishing move, the roaming minis
 // (Cinderhorn among his basalt pillars, Old Tusker on the snow flats), shrine-stones and the first-kill drop.
 #include "WRBoss.h"
+#include "WRVoidBosses.h"
 #include "WRStormBosses.h"
 #include "WRSwampBosses.h"
 #include "WRPortals.h"
@@ -164,7 +165,7 @@ int32 AWRBoss::ChooseAttack(AWRCharacterBase* Target, float Dist, AWRCharacterBa
 		{
 			continue;
 		}
-		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target))
+		if (!FWRStormBoss::Allowed(this, A, Target) || !FWRSwampBoss::Allowed(this, A, Target) || !FWRVoidBoss::Allowed(this, A, Target))
 		{
 			continue;   // a Storm peaks boss's rule (bleed blocks the charge, underground moves, the eye)
 		}
@@ -253,6 +254,7 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	PlaySwing(EWRSwingKind::Heavy, Attack.Windup + Hold + 0.2f);
 	FWRStormBoss::AttackStarted(this, Attack, Target);
 	FWRSwampBoss::AttackStarted(this, Attack, Target);
+	FWRVoidBoss::AttackStarted(this, Attack, Target);
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s winds up %s at %s%s"), *GetDisplayLabel(), *Attack.Id.ToString(), *Target->GetName(), Hold > 0.f ? TEXT(" (held)") : TEXT(""));
 }
 
@@ -281,7 +283,7 @@ void AWRBoss::BeginStrike()
 	const FVector Floor = GetActorLocation() - FVector(0.f, 0.f, bAirborne ? 0.f : GetSimpleCollisionHalfHeight());
 	const FString Id = Attack.Id.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s %s strikes"), *GetDisplayLabel(), *Id);
-	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack))
+	if (FWRStormBoss::BeginStrike(this, Attack) || FWRSwampBoss::BeginStrike(this, Attack) || FWRVoidBoss::BeginStrike(this, Attack))
 	{
 		return;   // a Storm peaks move (strikes, rings, the bone drop, the eye bolt...)
 	}
@@ -422,6 +424,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 	}
 	FWRStormBoss::ModifyHit(this, Attack, Hit);
 	FWRSwampBoss::ModifyHit(this, Attack, Hit);
+	FWRVoidBoss::ModifyHit(this, Attack, Hit);
 	const FName AttackId = Attack.Id;
 	const float Knockback = Attack.bRow ? Attack.Row.Knockback : 0.f;
 	const bool bFreezingBreath = Phase >= 3 && IsWyrm() && AttackId.ToString().Contains(TEXT("breath"));
@@ -438,6 +441,7 @@ void AWRBoss::StrikeHit(AWRCharacterBase* Who)
 		}
 		FWRStormBoss::HitLanded(Self, Victim, AttackId, Landed);
 		FWRSwampBoss::HitLanded(Self, Victim, AttackId, Landed);
+		FWRVoidBoss::HitLanded(Self, Victim, AttackId, Landed);
 		if (AttackId == TEXT("tongs_grab"))
 		{
 			if (Landed == EWRHitResult::Parried)
@@ -490,7 +494,7 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 	{
 		return;  // the lob does it
 	}
-	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds))
+	if (FWRStormBoss::TickStrike(this, Attack, DeltaSeconds) || FWRSwampBoss::TickStrike(this, Attack, DeltaSeconds) || FWRVoidBoss::TickStrike(this, Attack, DeltaSeconds))
 	{
 		return;
 	}
@@ -715,6 +719,7 @@ void AWRBoss::EndStrike()
 	const double Now = GetWorld()->GetTimeSeconds();
 	FWRStormBoss::EndStrike(this, Attack);
 	FWRSwampBoss::EndStrike(this, Attack);
+	FWRVoidBoss::EndStrike(this, Attack);
 	if (!bThrown)
 	{
 		Aftermath(Attack, Attack.Shape == EWRBossShape::TargetCircle ? AttackPoint : GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight()));

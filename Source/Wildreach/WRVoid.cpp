@@ -124,6 +124,14 @@ FString WRVoid::Brew(AWRCharacterBase* Who, const FWRItemDef& Def)
 	return FString::Printf(TEXT("%s: %d min"), *Def.Name, FMath::RoundToInt(Def.BrewMinutes));
 }
 
+bool WRVoid::TakeBrew(const AActor* Who)
+{
+	FBrew* B = Brews().Find(Who);
+	if (!B || !Who || !Who->GetWorld() || WorldNow(Who->GetWorld()) >= B->Until) return false;
+	Brews().Remove(Who);
+	return true;
+}
+
 float WRVoid::RiftDrainMult(const AWRCharacterBase* Who)
 {
 	if (!Who) return 1.f;

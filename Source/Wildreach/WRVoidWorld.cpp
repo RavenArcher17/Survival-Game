@@ -1,5 +1,6 @@
 // The Corrupted wasteland's world things (see WRVoidWorld.h): its gathering, keepsakes, thrown things and Maren's deeds.
 #include "WRVoidWorld.h"
+#include "WRVoidBosses.h"
 #include "Wildreach.h"
 #include "WRBuildLook.h"
 #include "WRBuildLookKit.h"
@@ -264,6 +265,8 @@ void WRVoidWorld::LandReady(AWRLand* Land)
 	const int32 N = SpawnResources(Land);
 	// Its dens (WRVoidCreatures): day and night tables per zone, the Riftmaws in the large rifts, the Hush on the road.
 	UWRVoidLife::PlaceDens(Land);
+	// Its bosses' arenas, the Null Gate and Vorhollow's stage (WRVoidBosses).
+	FWRVoidBoss::PlaceArenas(Land);
 	UE_LOG(LogWildreach, Log, TEXT("VOID %s: %d resource nodes, %d keepsakes"), *Land->LandId.ToString(), N, Keepsakes().Num());
 }
 

@@ -291,7 +291,9 @@ new file in `Data/lands/` plus its biome in `world.liveBiomes`. Its gathering, k
 `WRVoidWorld.*` (wasteland.json `resources`, tuning `voidWorld`); its creatures and dens: `WRVoidCreatures.*` (the
 Swamp's hook pattern, wasteland.json `spawns`, tuning `voidCreatures`). Shrine and master rows with `"land"` are placed
 on that land's height function (`WRLand::PlaceOn`). The Void path: rules `WRVoidPath.*` (tuning `voidPath`, spells.<void
-spell>, nodeEffects.void.*), abilities `WRAbilitiesVoid.*` (pay through `WRVoidPath::Pay`; registry in WRAbilities.cpp).
+spell>, nodeEffects.void.*), abilities `WRAbilitiesVoid.*` (pay through `WRVoidPath::Pay`; registry in WRAbilities.cpp). Its bosses:
+`WRVoidBosses.*` (FWRVoidBoss hooks beside the Storm / Swamp ones in WRBoss*.cpp; arenas from wasteland.json `bosses`;
+the Null Gate and Vorhollow's stage are actors whose motion is a function of their replicated clocks).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,

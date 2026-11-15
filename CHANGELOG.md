@@ -66,6 +66,28 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
   Combos with the paths that exist: Black flame, Void furnace, Dark lightning, Singularity spark, Frozen blink, Ice
   maw, Void leech, Abyssal hunger (`Data/combos.json`). Body change: the bar and the band move the greying within its
   stage. Node glyphs drawn by `Tools/ui_glyphs.mjs`.
+- **The bosses** (`WRVoidBosses.*`, creatures.json / attacks.json / tuning `bosses.<id>`, wasteland.json `bosses`):
+  the four Gauntlet stations and the Echo (3,000 HP minis, 4 h respawn) and Vorhollow (12,000). The Unravelled (body
+  hits x0.3; past 300 damage or a heavy blow it unravels into a whirling column, travels 8-15 m, its core hangs alone
+  0.6 s at x3 / stance x4, then the Reform slam). The Mother of Rifts (opens brood rifts in her six pens: Gnawer swarms
+  or a Hollowfang every 15 s, up to 4; a brood rift is a 400 HP body or closes to thrown anchor salt; all closed: 4 s
+  stun, stance x2). The Starving One (each blow that lands eats a buff and it grows: +10% size and damage, +5% speed,
+  5 stacks; food on the ground within 15 m draws it to eat 2.5 s, stance x2, a stack off). The Null Warden (his 12 m
+  null field fizzles spells and drops projectiles; the bell's toll strips a buff and stamina; his death drops his key
+  into the Null Gate's lock: `AWRNullGate`, a portcullis on two chains over pulleys to counterweights in stone shafts,
+  rising over 6 s; a crank winch on the bridge side, hold E 8 s). The Echo (walks a 2.4 km loop by night, rests on the
+  Glass Sea by day; its Mimic casts back the last path ability that hit it, never homing; three different ones in a
+  row and it fails: stunned 2 s). Vorhollow on the Choir's last stage (`AWRVorhollowStage`: a 72 m island of seven
+  pieces with collision on its keels over the Great Rift, four chains to anchor stones, the 124 m chain bridge, six
+  voice pillars): Hook rake into the slam, the Lamprey lunge (swallowed: 15% of max HP into the band, dropped out
+  behind it), Inhale (a pull that pillars block), the Rift beam (a sweeping beam pillars shade), Tail flail,
+  Nullstones, the Hollow (a shell at 80/60/40%: x0.2, ringing pillars wear it 150/s, void heals it, 20 s then a beam);
+  the Gnashing transition snaps the chains one by one and splits the island, whose pieces then orbit on the server
+  clock (easing apart, gaps breathing, the two smallest falling away and rising again; anchor salt wards a piece);
+  Rift dive, the twin beam with its pause, the P2 combo; hidden phase 3 with artifacts: the Gullet (a pull into its
+  chest, a chamber with the Void heart sharing its health x1.5, crushing ribs every 20 s with safe alcoves, a cough
+  every 30 s). Falling into the black past the void floor is Unmade. Looks drawn over stand-in rigs (the core, the
+  bell helm and bell, the unhinged jaw, the plume tail, the chest hole and its starfield, the hooks and spines).
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
   palette ahead of it).
 

@@ -764,7 +764,9 @@
     {"id": "lore_choir_seat", "name": "Choir seat 1 of 200", "category": "lore", "stack": 1, "weight": 0.1, "biome": "wasteland", "note": "A brass seat plate, number one. Polished by use, the way a step is."},
     {"id": "lore_last_note", "name": "The last note", "category": "lore", "stack": 1, "weight": 0.1, "biome": "wasteland", "note": "A stone that hums when you hold it still. It's the note the Choir stopped on, still sounding."},
     {"id": "marens_lantern", "name": "Maren's lantern", "category": "light", "stack": 1, "weight": 1.2, "biome": "wasteland", "equip": {"slot": "light", "durability": 5400}, "note": "The lantern from Maren's bedroll, its glass smoked grey on one side. 12 m of light from a tallow; corruption builds at half while it burns."},
-    {"id": "milk", "name": "Milk", "category": "food", "stack": 10, "weight": 0.5, "keeps": 120, "use": {"hunger": 6, "thirst": 20}, "note": "Fresh from a farm animal: drink it, or cook with it."}
+    {"id": "milk", "name": "Milk", "category": "food", "stack": 10, "weight": 0.5, "keeps": 120, "use": {"hunger": 6, "thirst": 20}, "note": "Fresh from a farm animal: drink it, or cook with it."},
+    {"id": "core_vorhollow", "name": "Vorhollow's core", "category": "core", "stack": 5, "weight": 2.0, "biome": "wasteland"},
+    {"id": "trophy_vorhollow_head", "name": "Head of Vorhollow", "category": "trophy", "stack": 1, "weight": 4.0, "biome": "wasteland", "note": "Vorhollow's first-kill trophy: its four jaw-petals closed round the lamprey ring. Mount it at home."}
   ],
   "startingKit": [
     { "id": "minor_healing_potion", "count": 3 },

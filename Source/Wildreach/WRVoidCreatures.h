@@ -75,6 +75,8 @@ public:
 	static bool IsVoidKind(FName CreatureId);
 	/** Server: the component on a new void creature (AWRCreature::BeginPlay). */
 	static void Attach(AWRCreature* Creature);
+	/** Server: the look-only component on a Wasteland boss (WRVoidBosses: its palette and parts; the boss machine fights). */
+	static void AttachLook(AWRCreature* Boss);
 	/** This machine's void bodies (latches and catches are looked up here, not in a world sweep). */
 	static TArray<TWeakObjectPtr<UWRVoidBody>> Live;
 
@@ -84,6 +86,8 @@ public:
 	/** Where a planned blink lands, and the server time it does (every machine draws the ripple there until then). */
 	UPROPERTY(Replicated) FVector_NetQuantize BlinkTo;
 	UPROPERTY(Replicated) double BlinkAt = 0.0;
+	/** The Starving One's growth (each stack +10% size, drawn by every machine). */
+	UPROPERTY(Replicated) uint8 Stacks = 0;
 
 	bool Has(uint16 Flag) const { return (Flags & Flag) != 0; }
 	void Set(uint16 Flag, bool bOn) { Flags = bOn ? uint16(Flags | Flag) : uint16(Flags & ~Flag); }
@@ -138,6 +142,7 @@ private:
 	double RippleShownFor = -1.0;
 	float Clock = 0.f, Hover = 0.f, PulseClock = 0.f, RiseAlpha = 0.f, GapeAlpha = 0.f;
 	FVector MeshBase = FVector::ZeroVector;
+	FVector MeshScale0 = FVector::ZeroVector;
 	bool bMeshBaseSaved = false;
 	int32 LookTries = 0;
 	bool bPawnIgnored = false;

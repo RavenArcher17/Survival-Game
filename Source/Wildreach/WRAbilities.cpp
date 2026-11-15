@@ -1,4 +1,6 @@
 #include "WRAbilities.h"
+#include "WRVoidBosses.h"
+#include "WRSound.h"
 #include "WRVoidPath.h"
 #include "WRAbilitiesVoid.h"
 #include "WRSwampSystems.h"
@@ -112,6 +114,21 @@ bool UWRGameplayAbility::IsServer() const
 
 bool UWRGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
 {
+	// The Null Warden's field: a spell cast inside it fizzles in a puff of grey dust (melee and Wildbrands still work).
+	if (!PathId.IsNone() && PathId != TEXT("soul") && !IsA<UWRGA_Melee>())
+	{
+		const AActor* Who = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+		if (Who && FWRVoidBoss::InNullField(Who->GetWorld(), Who->GetActorLocation()))
+		{
+			if (const APawn* P = Cast<APawn>(Who); P && P->IsLocallyControlled())
+			{
+				WRFx::SpawnAt(Who, TEXT("dust.cloud"), Who->GetActorLocation(), FRotator::ZeroRotator, 0.5f);
+				WRSound::PlayUI(Who, TEXT("void.fizzle"));
+				if (AWRPlayerController* PC = Cast<AWRPlayerController>(P->GetController())) PC->ShowLocalNotice(TEXT("The null field: your spell fizzles"));
+			}
+			return false;
+		}
+	}
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
 	{
 		return false;

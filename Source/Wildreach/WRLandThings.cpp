@@ -4,6 +4,7 @@
 // you push off and comes back as you step ashore at the other end. Server authority: the server places both ends,
 // checks reach, moves the rower; clients draw the landings from the replicated state.
 #include "WRLandThings.h"
+#include "WRVoidBosses.h"
 #include "WRVoidWorld.h"
 #include "WRLand.h"
 #include "Wildreach.h"
@@ -252,6 +253,12 @@ bool WRLandThings::Prompt(const AWRPlayerController* PC, FString& OutTarget, FSt
 		OutVerb = C->PromptVerb();
 		return true;
 	}
+	if (const AWRNullGate* G = AWRNullGate::Find(PC->GetWorld()); G && G->CrankNear(Me->GetActorLocation()) && G->Openness() < 0.99f)
+	{
+		OutTarget = TEXT("The Null Gate's winch");
+		OutVerb = TEXT("Hold E: crank the gate up (8 s)");
+		return true;
+	}
 	return WRVoidWorld::Prompt(PC, OutTarget, OutVerb);
 }
 
@@ -272,6 +279,11 @@ bool WRLandThings::ClientInteract(AWRPlayerController* PC)
 		{
 			if (Weak.IsValid() && Weak->PlayerCameraManager) Weak->PlayerCameraManager->StartCameraFade(1.f, 0.f, Fade, FLinearColor::Black, true, false);
 		}, Fade * 0.6f + 1.4f, false);
+		return true;
+	}
+	if (const AWRNullGate* G = AWRNullGate::Find(PC->GetWorld()); G && G->CrankNear(Me->GetActorLocation()) && G->Openness() < 0.99f)
+	{
+		PC->SendCommand(TEXT("land winch"));
 		return true;
 	}
 	return WRVoidWorld::ClientInteract(PC);
@@ -307,6 +319,13 @@ FString WRLandThings::Command(AWRPlayerController* PC, const TArray<FString>& Ar
 		}, Fade * 0.6f + 0.1f, false);
 		UE_LOG(LogWildreach, Log, TEXT("LAND %s crosses to the %s end"), *Me->GetName(), To->bLandEnd ? TEXT("land") : TEXT("island"));
 		return To->bLandEnd ? FString::Printf(TEXT("You row across the Broken Race to %s."), D ? *D->Name : TEXT("the far shore")) : FString(TEXT("You row back across the Broken Race."));
+	}
+	if (Verb == TEXT("winch"))
+	{
+		AWRNullGate* G = AWRNullGate::Find(PC->GetWorld());
+		if (!G || !G->CrankNear(Me->GetActorLocation())) return TEXT("Too far from the winch.");
+		G->Crank(PC);
+		return TEXT("You set your back to the crank. Keep at it.");
 	}
 	return WRVoidWorld::Command(PC, Args);
 }

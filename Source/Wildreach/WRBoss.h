@@ -182,6 +182,7 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	// The Storm peaks bosses' own mechanics drive this machine (WRStormBosses).
 	friend struct FWRStormBoss;
 	friend struct FWRSwampBoss;
+	friend struct FWRVoidBoss;
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

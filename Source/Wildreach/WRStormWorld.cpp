@@ -503,8 +503,22 @@ void WRStorm::GrantBuff(AActor* Who, FName Id, float Seconds)
 	WRStormDetail::Buffs().FindOrAdd(Who).Add(Id, Who->GetWorld()->GetTimeSeconds() + Seconds);
 	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Who->GetInstigatorController()))
 	{
-		PC->ClientNotify(FString::Printf(TEXT("%s for %d minutes"), Id == TEXT("grounding") ? TEXT("Grounded: no strike will stun you") : TEXT("Warded: shock builds at half"), FMath::RoundToInt(Seconds / 60.f)));
+		PC->ClientNotify(FString::Printf(TEXT("%s for %d minutes"), Id == TEXT("grounding") ? TEXT("Grounded: no strike will stun you")
+			: Id == TEXT("curse_ward") ? TEXT("Warded: curse builds at half") : TEXT("Warded: shock builds at half"), FMath::RoundToInt(Seconds / 60.f)));
 	}
+}
+
+FName WRStorm::TakeOneBuff(AActor* Who)
+{
+	if (!Who || !Who->GetWorld()) return NAME_None;
+	TMap<FName, double>* M = WRStormDetail::Buffs().Find(Who);
+	if (!M) return NAME_None;
+	// The newest still running goes first (the Starving One eats what you took last).
+	FName Best;
+	double BestUntil = Who->GetWorld()->GetTimeSeconds();
+	for (const TPair<FName, double>& KV : *M) if (KV.Value > BestUntil) { BestUntil = KV.Value; Best = KV.Key; }
+	if (!Best.IsNone()) M->Remove(Best);
+	return Best;
 }
 
 bool WRStorm::HasBuff(const AActor* Who, FName Id)
