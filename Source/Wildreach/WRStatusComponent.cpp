@@ -1,4 +1,6 @@
 #include "WRStatusComponent.h"
+#include "WRGraveCreatures.h"
+#include "WRVoid.h"
 #include "WRVoidPath.h"
 #include "WRArtifacts.h"
 #include "WRFarm.h"
@@ -268,6 +270,11 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 	if (!Owner || !Owner->HasAuthority() || Amount <= 0.f || Id < 0 || Id >= WRStatus::Count || !Owner->IsAlive())
 	{
 		return;
+	}
+	// Decay: the Asphodel draught (a timed brew, decayBuildup -0.5) slows it (Gravecloth's is its set's buildupTaken.decay).
+	if (Id == WRStatus::Decay)
+	{
+		Amount *= FMath::Max(0.f, 1.f + WRVoid::BrewStat(Owner, TEXT("decayBuildup")));
 	}
 	// Soaked: fire takes half, lightning half again (the reactions table, status.defs.soak).
 	if (HasStatus(WRTags::Status_Soak))
@@ -820,6 +827,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 		}
 		// Bellows Lung (x0.7) and Undertow Pearl (only while moving): artifacts.
 		Regen *= WRArtifacts::StaminaRegenScale(Owner);
+		// A Wraithmoth's scale dust (x0.6 for 6 s) and the moth-dust tonic (+15%: a timed brew).
+		Regen *= FWRGraveAI::StaminaRegenScale(Owner) * (1.f + WRVoid::BrewStat(Owner, TEXT("staminaRegen")));
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), Attr->GetStamina() + Regen * DeltaTime);
 	}
 

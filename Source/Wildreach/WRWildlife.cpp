@@ -19,6 +19,7 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "WRForestTypes.h"
+#include "WRGraveTypes.h"
 #include "Serialization/JsonWriter.h"
 
 // The new lands north of the Old Island share the walk map: the Swamp (east of the Crown's face line and the Rime Sound
@@ -36,6 +37,15 @@ namespace WRSwampWild
 			return Z >= TEXT('1') && Z <= TEXT('5') ? Z : TCHAR(0);
 		}
 		if (WRForest::Contains(P)) return 0;
+		// The Graveyard, west of the Spine (cooks/build-biome-graveyard.md 2.14): its sub-zones G1-G4 ('1'-'4'), the neck
+		// ('n', G2's kinds) and Rootgrave ('r', G4's); the Spine's face, the catacombs and the sea are nobody's.
+		if (Land == TEXT("graveyard"))
+		{
+			if (!WRGrave::Contains(P)) return 0;
+			const TCHAR Z = FWRGraveData::Get().ZoneAt(P);
+			return (Z >= TEXT('1') && Z <= TEXT('4')) || Z == TEXT('n') || Z == TEXT('r') ? Z : TCHAR(0);
+		}
+		if (WRGrave::Contains(P)) return 0;
 		if (Land == TEXT("swamp"))
 		{
 			if (!WRSwamp::Contains(P)) return 0;
@@ -134,7 +144,7 @@ namespace WRWildlifeImpl
 
 		/** A cell north of the Old Island's frame: the continent's new land (Storm peaks), not the island. */
 		// The forest south of the island counts too (a "new land" cell: island kinds stay off it, forest kinds keep to it).
-		static bool IsNorthLand(const FVector2D& At) { return At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f) || WRSwamp::Contains(FVector(At, 0.f)) || WRForest::Contains(FVector(At, 0.f)); }
+		static bool IsNorthLand(const FVector2D& At) { return At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f) || WRSwamp::Contains(FVector(At, 0.f)) || WRForest::Contains(FVector(At, 0.f)) || WRGrave::Contains(FVector(At, 0.f)); }
 
 		const FRange& RangeOf(const FWRCreatureDef& Def)
 		{
@@ -173,7 +183,7 @@ namespace WRWildlifeImpl
 				else
 				{
 					// A new land's kind lives anywhere on its own land; its spawn regions choose the sub-zones.
-					const TCHAR Z = WRSwampWild::NorthZone(At, bSwampKind ? FName(TEXT("swamp")) : Def.Biome == TEXT("forest") ? FName(TEXT("forest")) : FName(TEXT("storm_peaks")));
+					const TCHAR Z = WRSwampWild::NorthZone(At, bSwampKind ? FName(TEXT("swamp")) : Def.Biome == TEXT("forest") ? FName(TEXT("forest")) : Def.Biome == TEXT("graveyard") ? FName(TEXT("graveyard")) : FName(TEXT("storm_peaks")));
 					if (!IsNorthLand(At) || Z == 0 || Z == TCHAR('e')) continue;
 				}
 				if (Camps.ContainsByPredicate([&At, GapSq](const FVector2D& Camp) { return FVector2D::DistSquared(Camp, At) < GapSq; }))
@@ -710,7 +720,7 @@ namespace WRWildlifeImpl
 		if (R.Side != TEXT("volcanic") && R.Side != TEXT("tundra"))
 		{
 			if (!FWalkMap::IsNorthLand(At)) return false;
-			const TCHAR Z = WRSwampWild::NorthZone(At, R.Side == TEXT("swamp") || R.Side == TEXT("forest") ? R.Side : FName(TEXT("storm_peaks")));
+			const TCHAR Z = WRSwampWild::NorthZone(At, R.Side == TEXT("swamp") || R.Side == TEXT("forest") || R.Side == TEXT("graveyard") ? R.Side : FName(TEXT("storm_peaks")));
 			if (Z == 0 || (!R.Zones.IsEmpty() && !R.Zones.Contains(FString::Chr(Z)))) return false;
 			return !R.Area.bIsValid || R.Area.IsInside(At);
 		}
@@ -1019,7 +1029,7 @@ FName WRWildlife::RaidersAt(const FVector2D& At, TArray<TPair<FName, float>>& Ou
 			// A north land's region: in it (its zones) or not at all.
 			FString Zones;
 			O->TryGetStringField(TEXT("zones"), Zones);
-			const TCHAR Z = WRSwampWild::NorthZone(At, Side == TEXT("swamp") || Side == TEXT("forest") ? FName(*Side) : FName(TEXT("storm_peaks")));
+			const TCHAR Z = WRSwampWild::NorthZone(At, Side == TEXT("swamp") || Side == TEXT("forest") || Side == TEXT("graveyard") ? FName(*Side) : FName(TEXT("storm_peaks")));
 			if (Z == 0 || (!Zones.IsEmpty() && !Zones.Contains(FString::Chr(Z)))) continue;
 			Best = O;
 			BestGap = 0.0;

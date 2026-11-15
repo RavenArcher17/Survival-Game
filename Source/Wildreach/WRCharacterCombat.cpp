@@ -1,6 +1,7 @@
 // The hero in a fight beyond the core (cooks/build-combat-full.md 2.6, 2.19): two-handing, breaking out of a freeze,
 // framing giants and the camera at walls (CAL 1.15).
 #include "WRCharacter.h"
+#include "WRGraveCreatures.h"
 #include "Wildreach.h"
 #include "WRCameraBoom.h"
 #include "WRCreature.h"
@@ -55,6 +56,12 @@ void AWRCharacter::ServerMashFrozen_Implementation()
 	if (WRForestGrip::IsHeld(this))
 	{
 		WRForestGrip::Mash(this);
+		return;
+	}
+	// In a Cryptstalker's palps or under a Wraithmoth drinking (WRGraveCreatures).
+	if (FWRGraveAI::HolderOf(this))
+	{
+		FWRGraveAI::Mash(this);
 		return;
 	}
 	Status->MashFrozen();

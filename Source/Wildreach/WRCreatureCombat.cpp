@@ -4,6 +4,7 @@
 // fighting from the saddle and being thrown off it.
 #include "WRCreature.h"
 #include "WRVoidCreatures.h"
+#include "WRGraveCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampBosses.h"
 #include "WRSwampCreatures.h"
@@ -472,6 +473,7 @@ float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRSwampAI::Incoming(this, Hit, Damage);   // a Murkjaw's belly as it rolls or rears, a Slimeshell in its shell
 	Damage = FWRVoidAI::Incoming(this, Hit, Damage);    // nothing reaches a Riftmaw in its tear
 	Damage = FWRForestAI::Incoming(this, Hit, Damage);  // a reared Mossmaul's belly, a Burlbeast's bark plates, bees on wasps
+	Damage = FWRGraveAI::Incoming(this, Hit, Damage);   // a buried hound, the Tombback's slab, the Risen and necrotic magic
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -633,6 +635,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // a forest creature's own rule (from a perch, from rest, below 40%, at its hive, cornered, forced only)
 		}
+		if (!FWRGraveAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // a Graveyard creature's own rule (the Rising, the howl once, the drop from a ceiling, the dark, the downed)
+		}
 		const float W = Dist < Close ? R.WClose : Dist < Mid ? R.WMid : R.WFar;
 		if (W > 0.f)
 		{
@@ -689,6 +695,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	FWRSwampAI::RowStarted(this, Self, *R, Target);
 	FWRVoidAI::RowStarted(this, Self, *R, Target);
 	FWRForestAI::RowStarted(this, Self, *R, Target);
+	FWRGraveAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -765,6 +772,7 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 	FWRSwampAI::ModifyHit(Self, Hit, R);   // a hexed beast's curse; the Miasma's worse cry
 	FWRVoidAI::ModifyHit(Self, Hit, R);    // void bites; a Riftborn's curse
 	FWRForestAI::ModifyHit(Self, Hit, R);  // a Thornlynx's bite straight off its drop
+	FWRGraveAI::ModifyHit(Self, Hit, R);   // a raised body's blows are its Necromancer's
 	UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *RowId.ToString(), *Victim->GetName());
 	const float Knockback = R->Knockback;
 	TWeakObjectPtr<AWRCreature> WeakSelf(Self);
@@ -782,6 +790,8 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 			// A forest creature's catches (the Maul hug, the Constrict) and the follow-ups that come only when its opener
 			// landed (drop -> bite, log strike -> constrict).
 			FWRForestAI::Resolved(S, V, HitRowId, Result);
+			// A Graveyard creature's (the whip's find, the palp snatch, the tear-drinker, the dive's snuffed torch).
+			FWRGraveAI::Resolved(S, V, HitRowId, Result);
 		}
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{
@@ -823,6 +833,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	if (FWRForestAI::StrikeRow(this, Self, *R, Target))
 	{
 		return;  // a forest move (the roar, the canopy drop, the tree escape, the body slam, the scout mark, the heat ball, the bugle)
+	}
+	if (FWRGraveAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // a Graveyard move (the Cryptstalker's drop off its ceiling)
 	}
 	if (M == TEXT("lunge") || M == TEXT("pounce"))
 	{

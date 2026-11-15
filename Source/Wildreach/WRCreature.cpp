@@ -1,5 +1,6 @@
 #include "WRCreature.h"
 #include "WRVoidCreatures.h"
+#include "WRGraveCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -1300,6 +1301,8 @@ void AWRCreature::BeginPlay()
 	UWRVoidBody::Attach(this);
 	// An Ancient forest creature's body state and look (WRForestCreatures).
 	UWRForestBody::Attach(this);
+	// A Graveyard creature's body state and look (WRGraveCreatures).
+	UWRGraveBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -2250,7 +2253,9 @@ void AWRCreature::OnDeath(AActor* Killer)
 	FWRSwampAI::Died(this, Killer);   // a Swamp creature lets go of what it held; the Red Tide's extra sacs
 	FWRVoidAI::Died(this, Killer);    // a void creature lets go; a Riftborn's void essence
 	FWRForestAI::Died(this, Killer);   // a forest creature lets go; chance drops; a Mossmaul's larder; a sign for the finches
-	const bool bBody = BecomeBody(Killer);
+	FWRGraveAI::Died(this, Killer);    // a Graveyard creature lets go; the Risen fall to bone; the crows come
+	// The Risen leave no body (GY 2.12.4): their bones go straight to the killer.
+	const bool bBody = !FWRGraveAI::NoBody(this) && BecomeBody(Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
 		if (const FWRCreatureDef* Def = GetDef())
@@ -2805,6 +2810,11 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// The Graveyard's (a buried hound, a stalker on its ceiling, a held grab, a moth down, a crow at a funeral).
+	if (FWRGraveAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	// The Ancient forest creatures' own moments (a perch over a trail, a log at rest, a hold, a heat ball, a raid, a
 	// larder, the roar and the bugle, hovering, a cornered butt): WRForestCreatures.
 	if (FWRForestAI::TickWild(this, Self, DeltaSeconds))
@@ -3241,6 +3251,10 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 	// A forest tame's own work: a Glimmerfinch flock's sweep, a Hiveback at its hive, a Truffler digging (WRForestCreatures).
+	if (FWRGraveAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	if (FWRForestAI::TickTame(this, Self, DeltaSeconds))
 	{
 		return;

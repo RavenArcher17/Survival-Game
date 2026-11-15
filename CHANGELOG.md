@@ -59,6 +59,27 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   row's new `room`), Morwen the Lantern-keeper and her six quests (light the Row's tōrō, the first raise, break six
   mortsafes, the grave under the yew, the Ossuary ledger, the Gravedigger). Morwen keeps hours: the lantern rack by
   day, the Row of the Named at dusk, her chapel at night, the lychgate step at dawn (moves when nobody's watching).
+- **The creatures** (piece 3; `WRGraveCreatures.*`, rows in creatures / attacks / spawn_regions, tuning
+  `graveyardLife`): the nine on stand-in rigs from our packs with the cook's palette over their textures and their
+  silhouettes modelled on their bones: the Gravehound (Barghest: bone-pale skull face, knuckled spine ridge, ribs,
+  soul-green eyes; it sleeps buried in grave soil by day under a mound with two eyes in the dirt, wakes when you come
+  near at night, comes up with the Rising, its Grim howl raises every buried hound within 40 m, and in Corpse fog packs
+  rise out of the mist round you in the fields and the Bone Pits), the Cryptstalker (the six-legged Kilnmite rig made
+  flat and wide, 5 m whips that sway and fan out on the whip sweep, spined palps; in the dark it goes only for what its
+  whips touched; in the catacombs it hangs from the ceiling and drops; the palp snatch pins you 2 s, an ally's 150
+  damage or mashing frees you), the Wraithmoth (death's-head mark, violet underwing, proboscis; it flies at the
+  brightest light within 30 m, its dive puts out a held torch and leaves it grounded 1.4 s, an arrow brings it down, its
+  dust chills your stamina regen, on a downed survivor it lands and drinks with your view darkened), the Palestrider
+  (the slender Ashstrider rig: bone face, torn black mane; it screams and the herd turns; ridden it never tires), the
+  Tombback (grave slab on its back: frontal blows on the stone x0.3, its belly x1.3 while it rears; it goes to fresh
+  kills and sits on them), the Gloamcrow (grey hood, silver eyes; crows gather silent over a death, then mob the
+  killer), the Mournhare, the Wickbeetle (wax dome, a real candle-yellow light), the Marrowgoat (horns, a bone in its
+  mouth, a long white coat). The Risen (mourner, hound, bearer) are real animated skeletons: the Mixamo / Barghest rigs'
+  own clips drive modelled bones, grave wrappings, iron bands, a lit lantern-pole or a coffin; they fall to bones (no
+  corpse; their bone and a chance of soulstone dust go to the killer). Spawn regions G1-G4 day and night
+  (`graveyard_g1..g4`); the walk map grows over the Graveyard (`Tools/terrain/graveyard_walk.mjs`); a den in most
+  catacomb rooms by level. New hooks: `OnDamageTaken`, the mash press, stamina regen (the dust, the moth-dust tonic's
+  brew), decay buildup (the Asphodel draught).
 
 ## Unreleased: the Ancient forest (the Nature land)
 

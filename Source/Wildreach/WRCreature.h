@@ -608,6 +608,7 @@ class WILDREACH_API AWRCreatureAI : public AAIController
 	friend struct FWRSwampBoss;
 	friend struct FWRVoidAI;
 	friend struct FWRForestAI;   // the Ancient forest's creatures (WRForestCreatures): drops, grabs, heat balls, bugles
+	friend struct FWRGraveAI;    // the Graveyard's creatures (WRGraveCreatures): buried hounds, ceiling drops, light dives, holds
 
 public:
 	AWRCreatureAI();

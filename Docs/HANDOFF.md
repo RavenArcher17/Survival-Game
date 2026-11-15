@@ -311,7 +311,9 @@ plan cooks/build-biome-graveyard.md). Its ground and places are one generator: `
 writes `Data/lands/graveyard.json` + `graveyard_ground.bin` and `Data/graveyard.json` (read by `FWRGraveData`); it reads
 the forest's `forest_ground.bin` (the Spine's west face and the Rootgrave seam) and `Art/Terrain/island_height.r16`, so
 re-run it after a forest re-run. Lands overlap now: a land's `priority` and `cuts` rows (WRLand) decide whose ground
-is where. Code: `WRGrave*` (types, world, scenery, catacombs). Numbers: tuning `graveyardWorld`. Dev: `world grave ...`.
+is where. Then `node Tools/terrain/graveyard_walk.mjs` (after `forest_walk.mjs`) grows the wildlife walk map over it.
+Code: `WRGrave*` (types, world, scenery, catacombs, creatures). Numbers: tuning `graveyardWorld`, `graveyardLife`.
+Dev: `world grave ...`. The Risen are skeletons built on the Mixamo rigs' bones (look.hideMesh): their clips drive them.
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
