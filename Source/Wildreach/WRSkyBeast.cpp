@@ -34,6 +34,11 @@ namespace WRSkyBeastImpl
 	enum : uint8 { WHull = 0, WJaw = 1, WFinL = 2, WFinR = 3, WFluke = 4, WThroat = 5, WBarnacle = 6 };
 	// Bell parts.
 	enum : uint8 { BFloat = 0, BCrest = 1, BStrand = 2, BBead = 3 };
+	// Serpent parts: the body ring (A = 0 neck .. 1 tail), the head (skull, mask), the jaw, the throat sac, wings, plumes,
+	// the tail fan, the eyes.
+	enum : uint8 { SBody = 0, SHead = 1, SJaw = 2, SSac = 3, SWingL = 4, SWingR = 5, SPlume = 6, SFan = 7, SEye = 8 };
+	/** Its girth (radius cm) at t (0 the neck behind the head .. 1 the tail's tip): thickest at the chest (2.2 m across). */
+	float BeSerpentR(float T) { return T < 0.12f ? FMath::Lerp(85.f, 110.f, T / 0.12f) : T < 0.25f ? 110.f : FMath::Lerp(110.f, 14.f, FMath::Pow((T - 0.25f) / 0.75f, 0.9f)); }
 
 	// The ray's outline: its half-width at t (0 the tail root .. 1 the nose), and where its back sweeps.
 	constexpr float RayNose = 230.f, RayRear = -200.f, RaySpan = 450.f;
@@ -116,11 +121,21 @@ void UWRSkyBeast::Init(AWRCreature* InOwner, FName InKind, float InScale, int32 
 	if (Kind == TEXT("ray")) BuildRay();
 	else if (Kind == TEXT("whale")) BuildWhale();
 	else if (Kind == TEXT("bell")) BuildBell();
+	else if (Kind == TEXT("serpent"))
+	{
+		// Drawn in the world's frame: the body lies along the path the head flew, not along the actor.
+		SetUsingAbsoluteLocation(true);
+		SetUsingAbsoluteRotation(true);
+		SetUsingAbsoluteScale(true);
+		SetWorldTransform(FTransform::Identity);
+		if (InOwner) { Path.Reset(); Path.Add(InOwner->GetActorLocation()); }
+		BuildSerpent();
+	}
 	SetMaterial(0, FWRToolMesh::Material());
 	if (UMaterialInterface* G = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Creatures/M_Glow.M_Glow")))
 	{
 		GlowMat = UMaterialInstanceDynamic::Create(G, this);
-		const FLinearColor Col = Kind == TEXT("whale") ? FLinearColor(FColor(127, 230, 255)) : FLinearColor(FColor(150, 100, 255));
+		const FLinearColor Col = Kind == TEXT("whale") ? FLinearColor(FColor(127, 230, 255)) : Kind == TEXT("serpent") ? FLinearColor(FColor(0xB2, 0x3A, 0x2A)) : FLinearColor(FColor(150, 100, 255));
 		GlowMat->SetVectorParameterValue(TEXT("Color"), Col);
 		GlowMat->SetScalarParameterValue(TEXT("Glow"), 0.4f);
 		SetMaterial(1, GlowMat);
@@ -476,6 +491,291 @@ void UWRSkyBeast::BuildBell()
 	}
 }
 
+// ================================================================================================ Aeolith
+
+void UWRSkyBeast::BuildSerpent()
+{
+	const FColor Jade = BeC(TEXT("2F8F7A"), 0.45f), JadeDeep = BeC(TEXT("23705F"), 0.45f), Ivory = BeC(TEXT("E9E4D8"), 0.5f), Bone = BeC(TEXT("D8D2C4"), 0.7f);
+	const FColor Gold = BeC(TEXT("C9A04A"), 0.35f), Feather = BeC(TEXT("EDE8DC"), 0.6f), Dark = BeC(TEXT("101010"), 0.3f), Amber = BeC(TEXT("E0A030"), 0.15f), Mouth = BeC(TEXT("5A1A1E"), 0.5f);
+	// The body: rings along the spine, jade above fading to the ivory belly, a row of darker scales down the back.
+	const int32 Sides = 12;
+	for (int32 i = 0; i < SerpentSegs; ++i)
+	{
+		const float T = float(i) / (SerpentSegs - 1);
+		const float R = BeSerpentR(T);
+		for (int32 k = 0; k < Sides; ++k)
+		{
+			const float Ang = 2.f * PI * k / Sides;
+			const float Sz = FMath::Sin(Ang);
+			const FColor Col = Sz < -0.35f ? Ivory : (Sz > 0.9f && i % 2 == 0) ? JadeDeep : Jade;
+			Add(Body, FVector(0.f, FMath::Cos(Ang) * R, Sz * R * 0.92f), SBody, T, Ang, Col);
+		}
+	}
+	for (int32 i = 0; i + 1 < SerpentSegs; ++i) for (int32 k = 0; k < Sides; ++k)
+	{
+		const int32 A = i * Sides + k, B = i * Sides + (k + 1) % Sides;
+		Quad(Body, A, B, B + Sides, A + Sides);
+	}
+	// The head (its own frame: the actor's): a long skull, the bone wind-mask over the snout (a duck-billed plate with
+	// two flared nostril vents), amber eyes with slit pupils, the jaw (hinged at the back, opens on the Gape).
+	{
+		const int32 NS = 12, NR = 10;
+		const int32 B0 = Body.Rest.Num();
+		for (int32 i = 0; i < NS; ++i)
+		{
+			const float S = float(i) / (NS - 1);
+			const float X = FMath::Lerp(-160.f, 340.f, S);
+			const float W = FMath::Lerp(95.f, 40.f, FMath::Pow(S, 1.3f)) * (S < 0.15f ? FMath::Lerp(0.9f, 1.f, S / 0.15f) : 1.f);
+			const float Hh = FMath::Lerp(85.f, 28.f, FMath::Pow(S, 1.1f));
+			for (int32 k = 0; k < NR; ++k)
+			{
+				const float Ang = 2.f * PI * k / NR;
+				const float Sz = FMath::Sin(Ang);
+				const bool bJaw = Sz < -0.2f && S > 0.12f;
+				const FColor Col = Sz > 0.2f && S > 0.62f ? Bone : (Sz < -0.35f ? Ivory : Jade);
+				Add(Body, FVector(X, FMath::Cos(Ang) * W, Sz * Hh + (Sz > 0.f ? 10.f : 0.f)), bJaw ? SJaw : SHead, S, Ang, Col);
+			}
+		}
+		for (int32 i = 0; i + 1 < NS; ++i) for (int32 k = 0; k < NR; ++k)
+		{
+			const int32 A = B0 + i * NR + k, B = B0 + i * NR + (k + 1) % NR;
+			Quad(Body, A, B, B + NR, A + NR);
+		}
+		// The mouth's lining (seen open) and a row of hooked needle teeth along the jaw's edge.
+		const int32 M0 = Body.Rest.Num();
+		for (int32 i = 0; i < 6; ++i) for (int32 j = 0; j < 3; ++j)
+		{
+			const float S = float(i) / 5.f;
+			Add(Body, FVector(FMath::Lerp(-40.f, 320.f, S), (j - 1) * FMath::Lerp(70.f, 30.f, S), -6.f), SJaw, 0.2f + S * 0.8f, float(j), Mouth);
+		}
+		for (int32 i = 0; i < 5; ++i) for (int32 j = 0; j < 2; ++j)
+		{
+			const int32 A = M0 + i * 3 + j, B = A + 1, D = A + 3, Cc = D + 1;
+			Quad(Body, A, B, Cc, D);
+			Quad(Body, A, D, Cc, B);
+		}
+		for (int32 t = 0; t < 14; ++t)
+		{
+			const float X = FMath::Lerp(0.f, 300.f, t / 13.f);
+			const float Yy = (t % 2 ? 1.f : -1.f) * FMath::Lerp(62.f, 30.f, t / 13.f);
+			const int32 T0 = Body.Rest.Num();
+			Add(Body, FVector(X, Yy, -6.f), SJaw, 0.5f, 0.f, Feather);
+			Add(Body, FVector(X + 10.f, Yy, -6.f), SJaw, 0.5f, 0.f, Feather);
+			Add(Body, FVector(X - 4.f, Yy * 0.95f, 16.f), SJaw, 0.5f, 0.f, Feather);
+			Body.Tris.Append({ T0, T0 + 1, T0 + 2, T0, T0 + 2, T0 + 1 });
+		}
+		// The nostril vents on the mask and the eyes.
+		for (const float Sd : { -1.f, 1.f })
+		{
+			const int32 V0 = Body.Rest.Num();
+			const FVector N0(300.f, Sd * 22.f, 34.f);
+			Add(Body, N0, SHead, 1.f, 0.f, Dark);
+			Add(Body, N0 + FVector(30.f, Sd * 10.f, 6.f), SHead, 1.f, 0.f, Dark);
+			Add(Body, N0 + FVector(10.f, Sd * 16.f, 18.f), SHead, 1.f, 0.f, Bone);
+			Body.Tris.Append({ V0, V0 + 1, V0 + 2, V0, V0 + 2, V0 + 1 });
+			const int32 E0 = Body.Rest.Num();
+			const FVector Ey(150.f, Sd * 66.f, 46.f);
+			Add(Body, Ey + FVector(-18.f, 0, -10.f), SEye, 0.f, 0.f, Amber);
+			Add(Body, Ey + FVector(18.f, 0, -10.f), SEye, 0.f, 0.f, Amber);
+			Add(Body, Ey + FVector(18.f, Sd * 4.f, 10.f), SEye, 0.f, 0.f, Amber);
+			Add(Body, Ey + FVector(-18.f, Sd * 4.f, 10.f), SEye, 0.f, 0.f, Amber);
+			Add(Body, Ey + FVector(-2.f, Sd * 6.f, -12.f), SEye, 0.f, 0.f, Dark);
+			Add(Body, Ey + FVector(2.f, Sd * 6.f, -12.f), SEye, 0.f, 0.f, Dark);
+			Add(Body, Ey + FVector(2.f, Sd * 6.f, 12.f), SEye, 0.f, 0.f, Dark);
+			Add(Body, Ey + FVector(-2.f, Sd * 6.f, 12.f), SEye, 0.f, 0.f, Dark);
+			Quad(Body, E0, E0 + 1, E0 + 2, E0 + 3); Quad(Body, E0, E0 + 3, E0 + 2, E0 + 1);
+			Quad(Body, E0 + 4, E0 + 5, E0 + 6, E0 + 7); Quad(Body, E0 + 4, E0 + 7, E0 + 6, E0 + 5);
+		}
+	}
+	// The throat sac (glow: dull red, brighter at night): a pouch under the throat that swells to twice the head.
+	{
+		const int32 NS = 8, NR = 10;
+		const int32 B0 = Glow.Rest.Num();
+		for (int32 i = 0; i < NS; ++i)
+		{
+			const float S = float(i) / (NS - 1);
+			const float R = 70.f * FMath::Sin(PI * S);
+			for (int32 k = 0; k < NR; ++k)
+			{
+				const float Ang = 2.f * PI * k / NR;
+				Add(Glow, FVector(FMath::Lerp(-120.f, 120.f, S), FMath::Cos(Ang) * R, FMath::Sin(Ang) * R * 0.8f), SSac, S, Ang, FColor::White);
+			}
+		}
+		for (int32 i = 0; i + 1 < NS; ++i) for (int32 k = 0; k < NR; ++k)
+		{
+			const int32 A = B0 + i * NR + k, B = B0 + i * NR + (k + 1) % NR;
+			Quad(Glow, A, B, B + NR, A + NR);
+		}
+	}
+	// The wings: one pair 34 m across set just behind the head, ivory feathers tipped jade and gold, barred.
+	for (int32 Wg = 0; Wg < 2; ++Wg)
+	{
+		const float Sd = Wg == 0 ? -1.f : 1.f;
+		const int32 NL = 10, NW = 6;
+		const int32 B0 = Body.Rest.Num();
+		for (int32 i = 0; i < NL; ++i)
+		{
+			const float U = float(i) / (NL - 1);   // root .. tip
+			const float Span = 1700.f * U;
+			const float Chord = FMath::Lerp(650.f, 260.f, FMath::Pow(U, 1.4f));
+			for (int32 j = 0; j < NW; ++j)
+			{
+				const float V = float(j) / (NW - 1);   // leading .. trailing edge
+				const FColor Col = V > 0.75f ? ((i % 2) ? Gold : BeC(TEXT("5FA890"), 0.5f)) : (V > 0.45f && (i + j) % 2 ? BeC(TEXT("CFC8B8"), 0.6f) : Feather);
+				Add(Body, FVector(-V * Chord - U * 220.f, Sd * (90.f + Span), 40.f - 30.f * V), Wg == 0 ? SWingL : SWingR, U, V, Col);
+			}
+		}
+		for (int32 i = 0; i + 1 < NL; ++i) for (int32 j = 0; j + 1 < NW; ++j)
+		{
+			const int32 A = B0 + i * NW + j, B = A + 1, D = A + NW, Cc = D + 1;
+			Quad(Body, A, B, Cc, D);
+			Quad(Body, A, D, Cc, B);
+		}
+	}
+	// Quetzal plumes along the spine (longest at the neck), and the 6 m tail fan.
+	for (int32 p = 0; p < 22; ++p)
+	{
+		const float T = 0.02f + 0.9f * p / 21.f;
+		const float L = FMath::Lerp(300.f, 70.f, FMath::Pow(T, 0.6f));
+		const int32 B0 = Body.Rest.Num();
+		const FColor Tip = (p % 2) ? Gold : BeC(TEXT("2F8F7A"), 0.5f);
+		Add(Body, FVector(0.f, -10.f, 0.f), SPlume, T, 0.f, Feather);
+		Add(Body, FVector(0.f, 10.f, 0.f), SPlume, T, 0.f, Feather);
+		Add(Body, FVector(-L * 0.8f, 16.f, L * 0.55f), SPlume, T, 1.f, Tip);
+		Add(Body, FVector(-L * 0.8f, -16.f, L * 0.55f), SPlume, T, 1.f, Tip);
+		Quad(Body, B0, B0 + 1, B0 + 2, B0 + 3);
+		Quad(Body, B0, B0 + 3, B0 + 2, B0 + 1);
+	}
+	for (int32 f = 0; f < 9; ++f)
+	{
+		const float Ang = FMath::DegreesToRadians(-50.f + 12.5f * f);
+		const int32 B0 = Body.Rest.Num();
+		const FVector Dir(-FMath::Cos(Ang), FMath::Sin(Ang), 0.f);
+		const FVector Side(FMath::Sin(Ang), FMath::Cos(Ang), 0.f);
+		for (int32 s = 0; s < 5; ++s)
+		{
+			const float L = 600.f * s / 4.f;
+			const float W = 30.f + 30.f * FMath::Sin(PI * s / 4.f);
+			const FColor Col = s == 4 ? Gold : (s == 3 ? BeC(TEXT("2F8F7A"), 0.5f) : Feather);
+			Add(Body, Dir * L + Side * W, SFan, 1.f, float(f), Col);
+			Add(Body, Dir * L - Side * W, SFan, 1.f, float(f), Col);
+		}
+		for (int32 s = 0; s < 4; ++s)
+		{
+			const int32 A = B0 + s * 2;
+			Quad(Body, A, A + 1, A + 3, A + 2);
+			Quad(Body, A, A + 2, A + 3, A + 1);
+		}
+	}
+}
+
+void UWRSkyBeast::RecordTrail()
+{
+	const AWRCreature* Cr = Creature.Get();
+	if (!Cr) return;
+	const FVector Head = Cr->GetActorLocation();
+	if (Path.Num() == 0 || FVector::Dist(Path[0], Head) > 60.f) Path.Insert(Head, 0);
+	// Keep a little more than the body's length of path.
+	float L = 0.f;
+	for (int32 i = 1; i < Path.Num(); ++i)
+	{
+		L += FVector::Dist(Path[i - 1], Path[i]);
+		if (L > SerpentLength * Scale + 1500.f) { Path.SetNum(i + 1); break; }
+	}
+}
+
+void UWRSkyBeast::SpineAt(float Dist, FVector& OutAt, FQuat& OutFrame) const
+{
+	// Behind the head along the flown path; where the path runs out (a fresh spawn), straight back from its end.
+	const AWRCreature* Cr = Creature.Get();
+	const FVector Head = Cr ? Cr->GetActorLocation() : FVector::ZeroVector;
+	FVector Dir = Cr ? Cr->GetActorForwardVector() : FVector(1, 0, 0);
+	FVector Prev = Head;
+	float Walked = 0.f;
+	FVector At = Head - Dir * Dist;
+	bool bFound = false;
+	for (int32 i = 0; i < Path.Num(); ++i)
+	{
+		const FVector P = Path[i];
+		const float Seg = FVector::Dist(Prev, P);
+		if (Seg > 0.1f)
+		{
+			Dir = (Prev - P).GetSafeNormal();
+			if (Walked + Seg >= Dist)
+			{
+				At = FMath::Lerp(Prev, P, (Dist - Walked) / Seg);
+				bFound = true;
+				break;
+			}
+		}
+		Walked += Seg;
+		Prev = P;
+	}
+	if (!bFound) At = Prev - Dir * (Dist - Walked);
+	// A slow travelling wave down the body (its coils breathe), and the barrel roll's twist.
+	const float T = Dist / FMath::Max(1.f, SerpentLength * Scale);
+	FVector Side = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal();
+	if (Side.IsNearlyZero()) Side = FVector::RightVector;
+	At += Side * FMath::Sin(2.f * PI * (0.35f * Time - 2.2f * T)) * 60.f * Scale * T;
+	const FVector Up0 = FVector::CrossProduct(Dir, Side).GetSafeNormal();
+	const FVector Up = FQuat(Dir, FMath::DegreesToRadians(Roll360 * (1.f - T * 0.5f))).RotateVector(Up0.IsNearlyZero() ? FVector::UpVector : Up0);
+	OutAt = At;
+	OutFrame = FRotationMatrix::MakeFromXZ(Dir.IsNearlyZero() ? FVector::XAxisVector : Dir, Up).ToQuat();
+}
+
+FVector UWRSkyBeast::PlaceSerpent(const FV& V) const
+{
+	const float L = SerpentLength * Scale;
+	if (V.Part == SBody || V.Part == SPlume)
+	{
+		// Body rings and the plumes on them ride the spine; the neck starts just behind the skull.
+		const float Dist = 140.f * Scale + V.A * (L - 140.f * Scale);
+		FVector At; FQuat Fr;
+		SpineAt(Dist, At, Fr);
+		FVector Off = V.Rest * Scale;
+		if (V.Part == SPlume)
+		{
+			// Standing up out of the top of the ring, swaying.
+			const float R = BeSerpentR(V.A) * Scale;
+			Off = FVector(V.Rest.X * Scale, V.Rest.Y * Scale + V.B * 20.f * Scale * FMath::Sin(Time * 2.f + V.A * 9.f), V.Rest.Z * Scale + R * 0.9f);
+		}
+		return At + Fr.RotateVector(Off);
+	}
+	if (V.Part == SFan)
+	{
+		FVector At; FQuat Fr;
+		SpineAt(L, At, Fr);
+		const FVector Off = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(8.f * FMath::Sin(Time * 1.6f))).RotateVector(V.Rest * Scale);
+		return At + Fr.RotateVector(Off);
+	}
+	if (V.Part == SWingL || V.Part == SWingR)
+	{
+		// The wings ride the frame 3 m behind the head; they beat (deeper climbing) and spread forward like a hood on a tell.
+		FVector At; FQuat Fr;
+		SpineAt(300.f * Scale, At, Fr);
+		const float Sd = V.Part == SWingL ? -1.f : 1.f;
+		const FVector Root(0.f, Sd * 90.f * Scale, 40.f * Scale);
+		FVector Off = V.Rest * Scale - Root;
+		const float Beat = (1.f - Hood) * WaveAmp * FMath::Sin(2.f * PI * Clock) * (0.4f + 0.6f * V.A);
+		Off = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(Sd * (Beat - 10.f + Hood * 25.f))).RotateVector(Off);
+		Off = FQuat(FVector::UpVector, FMath::DegreesToRadians(-Sd * Hood * 55.f)).RotateVector(Off);
+		return At + Fr.RotateVector(Root + Off);
+	}
+	// The head and its parts in the head's own frame (the actor's).
+	FVector P = V.Rest;
+	if (V.Part == SJaw)
+	{
+		const FVector Hinge(-60.f, 0.f, -10.f);
+		P = Hinge + FQuat(FVector::YAxisVector, FMath::DegreesToRadians(Jaw * 70.f)).RotateVector(P - Hinge);
+	}
+	else if (V.Part == SSac)
+	{
+		// Under the throat, swelling to twice the head's size before a breath.
+		P = FVector(-40.f, 0.f, -90.f) + V.Rest * (0.8f + 1.3f * Sac);
+	}
+	return HeadXf.TransformPosition(P * Scale);
+}
+
 // ================================================================================================ the pose
 
 void UWRSkyBeast::StrandJoints(int32 Strand, TArray<FVector>& Out) const
@@ -613,7 +913,7 @@ void UWRSkyBeast::Pose(float Dt)
 		Pitch = FMath::FInterpTo(Pitch, SB && SB->Has(WRSkyFlag::Breach) ? 60.f : WantPitch, Dt, 2.f);
 		const float WantRoll = Kind == TEXT("whale") ? 6.f * FMath::Sin(Time * 0.35f) + Bank * 20.f : Bank * 28.f;
 		Roll = FMath::FInterpTo(Roll, WantRoll, Dt, 1.5f);
-		SetRelativeRotation(FRotator(Pitch, 0.f, Roll + Dead * 170.f));
+		if (Kind != TEXT("serpent")) SetRelativeRotation(FRotator(Pitch, 0.f, Roll + Dead * 170.f));
 	}
 	// The glow comes up at night (and in the Undercloud's fog, where it's always dim).
 	if (GlowMat && Cr)
@@ -622,6 +922,32 @@ void UWRSkyBeast::Pose(float Dt)
 		const float Want = (bNight ? BeTn(TEXT("glowNight"), 6.f) : BeTn(TEXT("glowDay"), 0.5f)) * (1.f - Dead);
 		GlowNow = FMath::FInterpTo(GlowNow, Want, Dt, 0.5f);
 		GlowMat->SetScalarParameterValue(TEXT("Glow"), GlowNow);
+	}
+	// Aeolith: its path recorded, the head's frame, the sac, the hood, the spore-grey, the barrel roll.
+	if (Kind == TEXT("serpent") && Cr)
+	{
+		RecordTrail();
+		HeadXf = Cr->GetActorTransform();
+		HeadXf.SetScale3D(FVector(1.f));
+		Sac = FMath::FInterpTo(Sac, SB && SB->Has(WRSkyFlag::Lobes) ? 1.f : 0.f, Dt, 2.f);
+		Hood = FMath::FInterpTo(Hood, SB && SB->Has(WRSkyFlag::Hood) ? 1.f : 0.f, Dt, 3.f);
+		Grey = FMath::FInterpTo(Grey, SB && SB->Has(WRSkyFlag::Deflated) ? 1.f : 0.f, Dt, 0.8f);
+		Roll360 = SB && SB->Has(WRSkyFlag::Breach) ? FMath::Fmod(Roll360 + Dt * 180.f, 360.f) : FMath::FInterpTo(Roll360 > 180.f ? Roll360 - 360.f : Roll360, 0.f, Dt, 3.f);
+		WaveAmp = FMath::FInterpTo(WaveAmp, bAlive ? FMath::Lerp(18.f, 42.f, FMath::Clamp(Speed / 2400.f + (Vel.Z > 200.f ? 0.5f : 0.f), 0.f, 1.f)) : 0.f, Dt, 2.f);
+		WaveFreq = FMath::Lerp(0.25f, 0.7f, FMath::Clamp(Speed / 2400.f, 0.f, 1.f));
+		// Spore-sick: grey spreads over the feathers and scales.
+		const FColor GreyC = FWRToolMesh::Pack(FLinearColor(FColor(0x8A, 0x8A, 0x80)), 0.8f);
+		if (FMath::Abs(Grey - LastGrey) > 0.05f)
+		{
+			LastGrey = Grey;
+			if (BaseColors.Num() != Body.Colors.Num()) BaseColors = Body.Colors;
+			for (int32 i = 0; i < Body.Colors.Num(); ++i)
+			{
+				const FV& V = Body.Rest[i];
+				const bool bGreys = (V.Part == SBody && V.A < Grey * 1.2f) || V.Part == SWingL || V.Part == SWingR || V.Part == SPlume || V.Part == SFan;
+				Body.Colors[i] = bGreys && Grey > 0.1f ? FColor(uint8(FMath::Lerp(float(BaseColors[i].R), float(GreyC.R), Grey)), uint8(FMath::Lerp(float(BaseColors[i].G), float(GreyC.G), Grey)), uint8(FMath::Lerp(float(BaseColors[i].B), float(GreyC.B), Grey)), BaseColors[i].A) : BaseColors[i];
+			}
+		}
 	}
 	// Place every vertex.
 	TArray<FVector> Joints;
@@ -650,7 +976,7 @@ void UWRSkyBeast::Pose(float Dt)
 				S->Verts[i] = (V.Rest + FVector(0, 0, Wave)) * Scale;
 				continue;
 			}
-			S->Verts[i] = Place(V);
+			S->Verts[i] = Kind == TEXT("serpent") ? PlaceSerpent(V) : Place(V);
 		}
 		// Flat-ish shading: normals from the faces around each vertex.
 		S->Normals.Init(FVector::ZeroVector, S->Verts.Num());
@@ -678,6 +1004,7 @@ void UWRSkyBeast::Commit(bool bCreate)
 
 FVector UWRSkyBeast::MouthWorld() const
 {
+	if (Kind == TEXT("serpent")) return HeadXf.TransformPosition(FVector(330.f, 0.f, 0.f) * Scale);
 	const FVector Local = Kind == TEXT("ray") ? FVector(RayNose, 0.f, -10.f) : Kind == TEXT("whale") ? FVector(WhaleNose, 0.f, -BeWhaleR(0.9f) * 0.3f) : FVector::ZeroVector;
 	return GetComponentTransform().TransformPosition(Local * Scale);
 }

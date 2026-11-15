@@ -85,6 +85,7 @@ void AWRSkyState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRSkyState, TurnSignAt);
+	DOREPLIFETIME(AWRSkyState, DeckOpen);
 	DOREPLIFETIME(AWRSkyState, TurnStartAt);
 	DOREPLIFETIME(AWRSkyState, TurnEndAt);
 	DOREPLIFETIME(AWRSkyState, bTollLit);
@@ -100,6 +101,22 @@ AWRSkyState* AWRSkyState::Get(const UObject* WorldContext)
 	if (!World) return nullptr;
 	for (TActorIterator<AWRSkyState> It(const_cast<UWorld*>(World)); It; ++It) return *It;
 	return nullptr;
+}
+
+void AWRSkyState::OnRep_Deck()
+{
+	// The deck's open slabs: hidden, no collision (the scenery built each slab as its own part).
+	for (TActorIterator<AWRSkyScenery> It(GetWorld()); It; ++It)
+	{
+		for (int32 i = 0; i < It->Slabs.Num(); ++i)
+		{
+			UStaticMeshComponent* M = It->Slabs[i];
+			if (!M) continue;
+			const bool bOpen = DeckOpen.IsValidIndex(i) && DeckOpen[i] != 0;
+			M->SetVisibility(!bOpen);
+			M->SetCollisionEnabled(bOpen ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+		}
+	}
 }
 
 float AWRSkyState::TurnAmount(float NowS) const

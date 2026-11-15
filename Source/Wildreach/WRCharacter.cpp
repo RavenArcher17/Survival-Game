@@ -1,5 +1,6 @@
 #include "WRCharacter.h"
 #include "WRGraveBosses.h"
+#include "WRSkyBosses.h"
 #include "WRWarHall.h"
 #include "WRRaiding.h"
 #include "WRLifeSkills.h"
@@ -1199,7 +1200,7 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 {
 	// In a swamp creature's jaws or mouth (the Murkjaw's death roll, the Bogstalker's gulp): every press fights the hold
 	// (-0.15 s each, WRSwampCreatures); nothing else can start in there.
-	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this))
+	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this))
 	{
 		ServerMashFrozen();
 		return;
@@ -1717,7 +1718,8 @@ void AWRCharacter::InputJump()
 {
 	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
 	// Held in a swamp creature's jaws or mouth: the jump button mashes too.
-	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this))
+	// Riding Aeolith's back (the Last Circle): Jump lets go.
+	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this) || FWRSkyBoss::IsRiding(this))
 	{
 		ServerMashFrozen();
 		return;

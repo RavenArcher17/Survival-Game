@@ -10,6 +10,7 @@
 #include "WRGraveWorld.h"
 #include "WRGraveBosses.h"
 #include "WRSkyWorld.h"
+#include "WRSkyBosses.h"
 #include "WRCrystalWorld.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -337,6 +338,8 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	if (UWRGraveArenas::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Sky's things (WRSkyWorld): a floating shard, a Kitewright lift, a line to climb, a drift, a bell, a vista.
 	if (UWRSkyWorld::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Last Circle (WRSkyBosses): grab Aeolith's back on a low pass; run the crest to the next vent.
+	if (UWRSkyArenas::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Crystal caves' spots (WRCrystalThings): the halls' keystone chimes, the keepsakes, the found things.
 	if (UWRCrystalWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
@@ -391,6 +394,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 	if (UWRForestWorld::ClientInteract(PC)) return true;
 	if (UWRGraveArenas::ClientInteract(PC)) return true;
 	if (UWRGraveWorld::ClientInteract(PC)) return true;
+	if (UWRSkyArenas::ClientInteract(PC)) return true;
 	if (UWRSkyWorld::ClientInteract(PC)) return true;
 	if (UWRCrystalWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);

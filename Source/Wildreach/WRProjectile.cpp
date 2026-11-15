@@ -1,4 +1,5 @@
 #include "WRProjectile.h"
+#include "WRSkyBosses.h"
 #include "WRCrystalWorld.h"
 #include "WRCrystalHazards.h"
 #include "WRWindPath.h"
@@ -226,7 +227,7 @@ void AWRProjectile::OnRep_Model()
 		CodeModel->RegisterComponent();
 		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
 		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
-			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel))
+			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -352,6 +353,14 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 	}
 	// The Graveyard's lime pot breaks where it lands: a quicklime splash (WRGraveHazards; on the Ossuary Lord's pile it
 	// stops the grave-light knitting the bones).
+	// The Sky's spore pot breaks where it lands: a cyan cloud; on Aeolith it weighs the wings (WRSkyBosses).
+	if (Kind == TEXT("sporepot"))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		FWRSkyBoss::SporeLanded(GetWorld(), At, const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
 	if (Kind == TEXT("limepot"))
 	{
 		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();

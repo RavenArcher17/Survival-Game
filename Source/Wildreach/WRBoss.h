@@ -187,6 +187,7 @@ class WILDREACH_API AWRBoss : public AWRCreature
 	friend struct FWRForestBoss;
 	// The Graveyard's (WRGraveBosses: the Bell-Ringer, the Crypt Mother, the Ossuary Lord, the Gravedigger, Nhal).
 	friend struct FWRGraveBoss;
+	friend struct FWRSkyBoss;     // the Sky islands' bosses (WRSkyBosses: Kyrra, the Bridge Sentinel, Old Gulper, Aeolith)
 
 public:
 	AWRBoss(const FObjectInitializer& ObjectInitializer);

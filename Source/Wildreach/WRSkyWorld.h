@@ -86,6 +86,12 @@ public:
 	/** The Flue's spore plume: which vent and when it last breathed (WRSkyBosses; every machine draws the column). */
 	UPROPERTY(Replicated) float PlumeAt = -1000.f;
 	UPROPERTY(Replicated) int32 PlumeVent = 0;
+	/** The Sentinel's deck: per slab, 1 while it's open (a weak section given way, a stone pried up for a throw). Every
+	 *  machine hides the open slabs and takes their collision away (WRSkyBosses). */
+	UPROPERTY(ReplicatedUsing=OnRep_Deck) TArray<uint8> DeckOpen;
+	UFUNCTION() void OnRep_Deck();
+	/** Server: game hours each open slab closes again (the masons' work: 2 game hours). */
+	TArray<double> DeckCloseAt;
 
 	/** 0..1: how far the wind has swung (eased over 120 s each way); every machine. */
 	float TurnAmount(float Now) const;

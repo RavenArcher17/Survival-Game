@@ -358,6 +358,10 @@ The Sky's creatures: `UWRSkyBody` (flags + look; the Skyray, Cloudback and Sailb
 `OnDamageTaken`), `UWRSkyLife` spawns them on the islands itself (tuning `skyLife.populations`; the generic wildlife
 can't stand things on floating islands). Helpers in these files carry prefixes (`Sl*`, `Be*`, `Sk*`) so the unity
 blobs never see two `Tn`s.
+The Sky's bosses: `FWRSkyBoss` hooks beside the Graveyard's in AWRBoss / WRBossCombat; `UWRSkyArenas` places their
+spawners, the Ring (`AWRSkyRing`: positions a pure function of the server time and `UnboundAt`) and the Wind altar;
+the Sentinel's deck holes are `AWRSkyState::DeckOpen` (every machine hides those slabs); riders on Aeolith are attached
+to it (`FWRSkyBoss::IsRiding`; Jump lets go through the mash path).
 Also since 0.7.1 (in progress, live): **the Crystal caves**
 (cooks/biome-crystal.md, plan cooks/build-biome-crystal.md). `node Tools/terrain/crystal.mjs` writes
 `Data/lands/crystal.json` + `crystal_ground.bin` (the plateau, on the Wasteland's frame so the Severance runs through
