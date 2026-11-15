@@ -6,6 +6,9 @@
 #include "WRVoidCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRSkyIsleTypes.h"
+#include "WRSkyAir.h"
+#include "WRSkyCreatures.h"
 #include "WRStormCreatures.h"
 #include "WRSwampBosses.h"
 #include "WRSwampCreatures.h"
@@ -476,6 +479,7 @@ float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRForestAI::Incoming(this, Hit, Damage);  // a reared Mossmaul's belly, a Burlbeast's bark plates, bees on wasps
 	Damage = FWRCrystalAI::Incoming(this, Hit, Damage);  // a Prismback's plates throw a shot back, a rolled Druseback, a Spindleglass's legs
 	Damage = FWRGraveAI::Incoming(this, Hit, Damage);   // a buried hound, the Tombback's slab, the Risen and necrotic magic
+	Damage = FWRSkyAI::Incoming(this, Hit, Damage);   // grounded after a stoop: open
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -641,6 +645,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // a Crystal creature's own rule (the glare needs a light, a spear needs you under its span)
 		}
+		if (!FWRSkyAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;
+		}
 		if (!FWRGraveAI::RowAllowed(this, Self, R, Target, bReading))
 		{
 			continue;  // a Graveyard creature's own rule (the Rising, the howl once, the drop from a ceiling, the dark, the downed)
@@ -702,6 +710,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	FWRVoidAI::RowStarted(this, Self, *R, Target);
 	FWRForestAI::RowStarted(this, Self, *R, Target);
 	FWRGraveAI::RowStarted(this, Self, *R, Target);
+	FWRSkyAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -799,13 +808,18 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 			// A Graveyard creature's (the whip's find, the palp snatch, the tear-drinker, the dive's snuffed torch).
 			FWRGraveAI::Resolved(S, V, HitRowId, Result);
 			FWRCrystalAI::Resolved(S, V, HitRowId, Result);
+			// A Sky creature's (the impale, the smother, the meat theft, the lash's sting, the cornered Puffwing's run).
+			FWRSkyAI::Resolved(S, V, HitRowId, Result);
 		}
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{
 			// Gale Feather (artifact): thrown twice as far.
 			const float K = Knockback * WRArtifacts::KnockScale(V);
 			const FVector Push = (V->GetActorLocation() - S->GetActorLocation()).GetSafeNormal2D() * K + FVector(0.f, 0.f, K * 0.35f);
-			V->LaunchCharacter(Push, true, true);
+			// In the Sky every push goes through the one entry (brace halves it, anchor boots stop it, the edge credit
+			// is the creature's: cooks/biome-sky.md 2.5); elsewhere the plain launch.
+			if (WRSkyIsles::Contains(V->GetActorLocation())) WRSkyAir::Push(V, Push, WRTune(TEXT("creatureAI.knockSeconds"), 0.4f), TEXT("knockback"), S);
+			else V->LaunchCharacter(Push, true, true);
 		}
 	});
 	FWRStormAI::AfterRowHit(Self, Victim, *R);
@@ -844,6 +858,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	if (FWRGraveAI::StrikeRow(this, Self, *R, Target))
 	{
 		return;  // a Graveyard move (the Cryptstalker's drop off its ceiling)
+	}
+	if (FWRSkyAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // a Sky move (the stoop's locked line, the Undertow, the belly-flop, the takeoff gust, the spout, the lash, the rattle, the hop-glide)
 	}
 	if (M == TEXT("lunge") || M == TEXT("pounce"))
 	{
@@ -1009,6 +1027,7 @@ void AWRCreatureAI::TickRow(AWRCreature* Self, float DeltaSeconds)
 		const float BodyR = Self->GetSimpleCollisionRadius();
 		// A Swamp strike's own moves the shapes below don't cover (the cry's cone, the tongue, the flurry, the flop's ring).
 		FWRSwampAI::TickStrike(this, Self, *R, DeltaSeconds);
+		FWRSkyAI::TickStrike(this, Self, *R, DeltaSeconds);   // the Undertow's pull, the belly-flop's landing, the glide's end
 		if (M == TEXT("bite") || M == TEXT("claw") || M == TEXT("sweep") || M == TEXT("kick") || M == TEXT("buffet") || M == TEXT("snap"))
 		{
 			// Damage only while the jaw, claw or hoof really travels: bodies inside its reach and arc (a kick: behind it).

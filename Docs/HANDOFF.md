@@ -353,6 +353,11 @@ Path Glide hooks (`CanPathGlide`, `PathGlideStats`, `PathGlideTick`, `GliderStam
 `OnEnteredUpdraft`). Yara Kesh's quest deeds (first_flight, updraft_top, broken_way) are counted in
 `UWRSkyAirSubsystem::StepDeeds`; quests can `need` several items (`"a|b"` takes either) and `mark` a place on the map
 once done. Found blueprints (`gear.json` kind "piece" / "found" with "from") never drop from portals.
+The Sky's creatures: `UWRSkyBody` (flags + look; the Skyray, Cloudback and Sailbell are `UWRSkyBeast` code bodies),
+`FWRSkyAI` hooks in AWRCreatureAI (TickWild/RowAllowed/RowStarted/StrikeRow/TickStrike/Resolved, `Damaged` from
+`OnDamageTaken`), `UWRSkyLife` spawns them on the islands itself (tuning `skyLife.populations`; the generic wildlife
+can't stand things on floating islands). Helpers in these files carry prefixes (`Sl*`, `Be*`, `Sk*`) so the unity
+blobs never see two `Tn`s.
 Also since 0.7.1 (in progress, live): **the Crystal caves**
 (cooks/biome-crystal.md, plan cooks/build-biome-crystal.md). `node Tools/terrain/crystal.mjs` writes
 `Data/lands/crystal.json` + `crystal_ground.bin` (the plateau, on the Wasteland's frame so the Severance runs through

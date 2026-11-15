@@ -2,6 +2,7 @@
 #include "WRStormCreatures.h"
 #include "WRGraveCreatures.h"
 #include "WRCrystalCreatures.h"
+#include "WRSkyCreatures.h"
 #include "WRStormBosses.h"
 #include "WRSwampCreatures.h"
 #include "WRForestCreatures.h"
@@ -1957,6 +1958,11 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWRCrystalBody::Get(this))
 	{
 		FWRCrystalAI::Damaged(this, Hit, Damage);
+	}
+	// A Sky creature: a held survivor struck free, the Undertow broken at the mouth, a roost woken, the herd defending (WRSkyCreatures).
+	if (HasAuthority() && UWRSkyBody::Get(this))
+	{
+		FWRSkyAI::Damaged(this, Hit, Damage);
 	}
 }
 

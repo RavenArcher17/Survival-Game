@@ -1,6 +1,7 @@
 // The Sky's world (see WRSkyWorld.h; cooks/build-biome-sky.md 2.2-2.10, 2.15-2.16).
 
 #include "WRSkyWorld.h"
+#include "WRSkyCreatures.h"
 #include "Wildreach.h"
 #include "WRSkyIsleTypes.h"
 #include "WRSkyLook.h"
@@ -243,6 +244,8 @@ void AWRSkySpot::Finish()
 	DoneBy.Add(Who, GameHours(this));
 	UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(P);
 	TArray<FString> Got;
+	// An egg out of a Windmane nest: the herd comes for the thief (WRSkyCreatures).
+	if (Kind == TEXT("nest")) if (UWRSkyLife* L = UWRSkyLife::Get(this)) L->EggTaken(GetActorLocation(), P);
 	for (const TPair<FName, int32>& G : Gives)
 	{
 		int32 N = G.Value;
@@ -1454,6 +1457,17 @@ void UWRSkyWorld::SpawnServerActors()
 		S->Xp = int32(Tn(TEXT("skyWorld.xp.firstKite"), 1500.f));
 		S->Gives.Add(TEXT("serpent_anchor_rubbing"), 1);
 		S->Quest = TEXT("first_kite");
+	}
+	// The Windmanes' ledge nests (SKY 2.9: steal an egg; the herd defends it together): an egg on each, back a game day.
+	for (const FWRSkyIsleData::FSite& S : D.Kit)
+	{
+		if (S.Kind != TEXT("mane_ledge")) continue;
+		if (AWRSkySpot* N = SpawnSpot(TEXT("nest"), S.Id, S.At + FVector(0, 0, 50.f), TEXT("A Windmane nest"), TEXT("Take the egg"), Tn(TEXT("skyWorld.nestSeconds"), 2.f)))
+		{
+			N->Gives.Add(TEXT("egg_windmane"), 1);
+			N->RespawnHours = Tn(TEXT("skyWorld.nestRespawnHours"), 24.f);
+			N->Reach = 350.f;
+		}
 	}
 	for (const FWRSkyIsleData::FSite& S : D.Kit)
 	{

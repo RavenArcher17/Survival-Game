@@ -829,6 +829,14 @@ bool WRSkyParts::Site(FCtx& C)
 		const FVector L0 = C.At(0, 0);
 		C.B.K.Disc(FSurf::Cloth(SRGB(0xC8, 0xC4, 0xB0) * 0.5f), L0 + FVector(0, 0, 10.f), FVector::UpVector, 340.f, 22.f);
 		for (int32 h = 0; h < 10; ++h) C.B.K.Add(FSurf::Cloth(SRGB(0xE0, 0xE2, 0xE6) * 0.6f), FVector(60.f, 2.f, 2.f), L0 + FVector(C.Rand(h) * 260.f - 130.f, C.Rand(h + 5) * 260.f - 130.f, 24.f), FRotator(0.f, C.Rand(h + 7) * 180.f, 0.f));
+		// The clutch: two pale speckled eggs the size of a head, lying in the scrape (the herd's; the nest spot's egg).
+		for (int32 e = 0; e < 2; ++e)
+		{
+			const FVector E0 = L0 + FVector(e ? 30.f : -24.f, e ? -12.f : 16.f, 30.f);
+			const float Prof[6] = { 0.55f, 0.85f, 1.f, 0.95f, 0.75f, 0.4f };
+			for (int32 r = 0; r < 6; ++r) C.B.K.Disc(FSurf::Glaze(SRGB(0xE9, 0xE6, 0xDC) * 0.62f, 0.45f), E0 + FVector(0, 0, r * 7.f), FVector(e ? 0.25f : -0.2f, 0.1f, 1.f), 34.f * Prof[r], 7.5f);
+			for (int32 sp = 0; sp < 7; ++sp) C.B.K.Add(FSurf::Cloth(SRGB(0x7A, 0x76, 0x70) * 0.5f), FVector(3.f, 3.f, 1.f), E0 + FVector(FMath::Cos(sp * 0.9f) * 15.f, FMath::Sin(sp * 0.9f) * 15.f, 10.f + sp * 3.f));
+		}
 		return true;
 	}
 	if (K == TEXT("fall_pool"))
