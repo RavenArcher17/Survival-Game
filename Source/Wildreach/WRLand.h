@@ -114,6 +114,15 @@ struct WILDREACH_API FWRLandDef
 	TArray<FVector4f> UndergroundWays;
 	TArray<float> UndergroundRadii;
 	TArray<FVector2D> BuildFirst;
+	/** Where two lands both have ground at a point, the higher priority's is the ground there (the Graveyard's 1 over the
+	 *  forest's west face of the Spine). */
+	int32 Priority = 0;
+	/** Boxes (map metres) of another land's ground this land replaces while it is live (the Graveyard cuts the forest's
+	 *  Rootgrave plug): that land drops its triangles inside, and its lookups answer this land there. */
+	struct FCut { FName Land; FBox2D Box = FBox2D(ForceInit); };
+	TArray<FCut> Cuts;
+	/** A live land cuts this land's ground here (WRLand "cuts"). */
+	bool CutAt(const FVector2D& M) const;
 
 	/** Heightfield: the sample at (I, J) clamped to the grid, metres. */
 	float HfSample(int32 I, int32 J) const

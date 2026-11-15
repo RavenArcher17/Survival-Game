@@ -10,6 +10,7 @@
 #include "WRSwampSystems.h"
 #include "WRForestHazards.h"
 #include "WRForestWorld.h"
+#include "WRGraveWorld.h"
 #include "WRSwampBosses.h"
 #include "WRDeeds.h"
 #include "Wildreach.h"
@@ -2402,6 +2403,11 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	{
 		// The Ancient forest's hazards and secrets (WRForestHazards, WRForestHollow): world fhaz use / secret x y z.
 		return WRForestHazards::Command(PC, Args);
+	}
+	if (Verb == TEXT("grave"))
+	{
+		// The Graveyard's world (WRGraveWorld): world grave spot <name>.
+		return UWRGraveWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("forest"))
 	{

@@ -7,6 +7,7 @@
 #include "Wildreach.h"
 #include "WRFarm.h"
 #include "WRForestHollow.h"
+#include "WRLand.h"
 #include "WRTuning.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -295,6 +296,9 @@ bool WRForest::Contains(const FVector& Pos)
 	if (!Live()) return false;
 	const FWRForestData& D = FWRForestData::Get();
 	if (!InLand(D, Pos)) return false;
+	// Where another live land's ground is the ground (the Graveyard over the Spine's west face, the Rootgrave pass it
+	// opens), that land's biome is the place, not the forest's.
+	if (const FWRLandDef* L = WRLand::At(Pos); L && L->Biome != FName(TEXT("forest"))) return false;
 	const TCHAR Z = D.ZoneAt(Pos);
 	return Z != 0 && Z != TEXT('~');
 }

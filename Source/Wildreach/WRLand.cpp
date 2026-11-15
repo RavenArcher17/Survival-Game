@@ -310,6 +310,19 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 	CoastBeach = LNum(J, TEXT("coastBeach"), 90.f);
 	CoastSea = LNum(J, TEXT("coastSea"), 140.f);
 	SeaFloor = LNum(J, TEXT("seaFloor"), -12.f);
+	Priority = int32(LNum(J, TEXT("priority"), 0.f));
+	if (J->TryGetArrayField(TEXT("cuts"), A))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *A)
+		{
+			const TSharedPtr<FJsonObject> O = V->AsObject();
+			const TArray<TSharedPtr<FJsonValue>>* B = nullptr;
+			if (!O.IsValid() || !O->TryGetArrayField(TEXT("box"), B) || B->Num() < 4) continue;
+			FCut& Cut = Cuts.AddDefaulted_GetRef();
+			Cut.Land = FName(*O->GetStringField(TEXT("land")));
+			Cut.Box = FBox2D(FVector2D((*B)[0]->AsNumber(), (*B)[1]->AsNumber()), FVector2D((*B)[2]->AsNumber(), (*B)[3]->AsNumber()));
+		}
+	}
 	for (const FVector2D& P : Coast) MapBox += P;
 	if (J->TryGetObjectField(TEXT("slopeRock"), N))
 	{
@@ -641,8 +654,24 @@ float FWRLandDef::HfHeight(const FVector2D& M) const
 	return FMath::Lerp(FMath::Lerp(HfSample(I, J), HfSample(I + 1, J), TX), FMath::Lerp(HfSample(I, J + 1), HfSample(I + 1, J + 1), TX), TY);
 }
 
+bool FWRLandDef::CutAt(const FVector2D& M) const
+{
+	// Another live land replaces this land's ground inside one of its cut boxes (strictly inside: the box's edge ring
+	// stays this land's, so the two grounds share those samples). Map metres are the same frame on both lands.
+	for (const FWRLandDef& Other : WRLand::All())
+	{
+		if (Other.Id == Id || Other.Cuts.Num() == 0 || !WRLand::IsLive(Other)) continue;
+		for (const FCut& C : Other.Cuts)
+		{
+			if (C.Land == Id && M.X > C.Box.Min.X && M.X < C.Box.Max.X && M.Y > C.Box.Min.Y && M.Y < C.Box.Max.Y) return true;
+		}
+	}
+	return false;
+}
+
 bool FWRLandDef::HfHiddenAt(const FVector2D& M) const
 {
+	if (CutAt(M)) return true;
 	if (!bHeightfield || HfSurface.Num() != HfHeights.Num()) return false;
 	const int32 I = FMath::RoundToInt((M.X - HfOrigin.X) / HfStep), J = FMath::RoundToInt((M.Y - HfOrigin.Y) / HfStep);
 	if (I < 0 || J < 0 || I >= HfN || J >= HfN) return true;
@@ -792,11 +821,21 @@ const FWRLandDef* WRLand::Find(FName Id)
 
 const FWRLandDef* WRLand::At(const FVector& World)
 {
+	// Lands may overlap (the Graveyard over the forest's west face of the Spine, the pass it cuts open): the land whose
+	// ground is there wins, the higher priority on a tie; a land with no ground there is only the answer if none has.
+	const FWRLandDef* Best = nullptr;
+	bool bBestGround = false;
 	for (const FWRLandDef& D : Registry())
 	{
-		if (D.Contains(World) && IsLive(D)) return &D;
+		if (!D.Contains(World) || !IsLive(D)) continue;
+		const bool bGround = !D.HfHiddenAt(D.ToMap(World));
+		if (!Best || (bGround && !bBestGround) || (bGround == bBestGround && D.Priority > Best->Priority))
+		{
+			Best = &D;
+			bBestGround = bGround;
+		}
 	}
-	return nullptr;
+	return Best;
 }
 
 FName WRLand::BiomeAt(const FVector& World)
@@ -1155,6 +1194,17 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 	const int32 NI = FMath::Min(Q, D.HfN - 1 - I0), NJ = FMath::Min(Q, D.HfN - 1 - J0);
 	if (NI <= 0 || NJ <= 0) return false;
 	const bool bSurface = D.HfSurface.Num() == D.HfHeights.Num();
+	// Another live land cuts part of this one (the Graveyard opening Rootgrave in the forest's ground): test only chunks
+	// that touch a cut box.
+	bool bCuts = false;
+	{
+		const FBox2D ChunkBox(D.HfOrigin + FVector2D(float(I0), float(J0)) * D.HfStep, D.HfOrigin + FVector2D(float(I0 + NI), float(J0 + NJ)) * D.HfStep);
+		for (const FWRLandDef& Other : WRLand::All())
+		{
+			if (Other.Id == D.Id || !WRLand::IsLive(Other)) continue;
+			for (const FWRLandDef::FCut& C : Other.Cuts) bCuts |= C.Land == D.Id && C.Box.Intersect(ChunkBox);
+		}
+	}
 	float Top = -1e6f;
 	bool bAny = false;
 	for (int32 j = 0; j <= NJ; ++j)
@@ -1201,7 +1251,7 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 			Colours.Add(C);
 			UV.Add(M / 4.f);
 			Tangents.Add(FProcMeshTangent(FVector(1.f, 0.f, 0.f), false));
-			Gone.Add(bSurface && D.HfSurface[SJ * D.HfN + SI] == FWRLandDef::HfHidden ? 1 : 0);
+			Gone.Add((bSurface && D.HfSurface[SJ * D.HfN + SI] == FWRLandDef::HfHidden) || (bCuts && D.CutAt(M)) ? 1 : 0);
 		}
 	}
 	Tris.Reserve(NI * NJ * 6);

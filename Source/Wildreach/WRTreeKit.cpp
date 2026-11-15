@@ -1871,6 +1871,9 @@ namespace WRTreeKitImpl
 		{ TEXT("nurse_log"), 5000.f, 180.f, EBudget::Giant }, { TEXT("fern"), 120.f, 40.f, EBudget::Fern }, { TEXT("bramble"), 180.f, 60.f, EBudget::Shrub },
 		{ TEXT("foxfire_log"), 800.f, 40.f, EBudget::Shrub }, { TEXT("root_arch"), 1200.f, 60.f, EBudget::Shrub }, { TEXT("root_mat"), 3000.f, 40.f, EBudget::Giant },
 		{ TEXT("buttress_root"), 600.f, 80.f, EBudget::Shrub }, { TEXT("hermit_oak"), 2800.f, 120.f, EBudget::Giant }, { TEXT("boulder"), 150.f, 110.f, EBudget::Shrub },
+		// The Graveyard's trees (cooks/biome-graveyard.md 2.1, 2.3; build-biome-graveyard.md 2.5).
+		{ TEXT("yew"), 1500.f, 70.f, EBudget::Broad }, { TEXT("great_yew"), 2600.f, 450.f, EBudget::Giant }, { TEXT("hawthorn"), 600.f, 14.f, EBudget::Broad },
+		{ TEXT("dead_elm"), 1700.f, 40.f, EBudget::Broad },
 	};
 
 	static const FSpeciesInfo& InfoFor(FName Species)
@@ -1983,6 +1986,49 @@ namespace WRTreeKitImpl
 			P.BoleTop = 0.42f; P.LeaderTop = 0.8f; P.CrownBase = 0.38f; P.CrownR = 0.27f; P.Shape = 4;
 			P.Branches = 10; P.BranchAngle = 40.f; P.Arch = 0.15f; P.TipDrop = 0.12f; P.Secondaries = 3; P.Flare = 1.3f; P.FlareH = 0.05f; P.Roots = 3;
 			P.TrunkSides = 12.f; P.Rings = 10; P.LeafSize = 230.f; P.Fill = 90;
+			Standing(K, P, Rs, 0);
+		}
+		else if (S == TEXT("yew") || S == TEXT("great_yew"))
+		{
+			// The churchyard yew (Taxus baccata): a short fluted bole of red-brown flaking bark splitting into several
+			// leaders low down, a broad dense dome of near-black needles reaching almost to the ground, the tips
+			// drooping. The Great Yew (biome-graveyard L2) is thousands of years old: 9 m across, hollow, its east side
+			// split open into a room you can stand a camp in (the crack at +X).
+			const bool bGreat = S == TEXT("great_yew");
+			K.Barks.Add(MakeBark(0x7A4A34, 0x3A2218, 0x4F5B3A, 0.78f, 0.25f, 50.f, 0.06f, 26.f, 0.62f));
+			Leaves(LeafHolly, 0x141E18, 0x2A3A28, 0.62f);
+			P.BoleTop = 0.14f; P.Forks = bGreat ? 4 : 3; P.ForkSpread = 0.62f; P.CrownBase = 0.07f; P.CrownTop = 1.f; P.CrownR = bGreat ? 0.6f : 0.5f; P.Shape = 1;
+			P.Branches = bGreat ? 28 : 18; P.BranchAngle = 72.f; P.Arch = 0.06f; P.TipDrop = -0.16f; P.Kink = 0.12f; P.Secondaries = 3;
+			P.Flare = 1.5f; P.FlareH = 0.08f; P.Roots = bGreat ? 7 : 4; P.TrunkSides = bGreat ? 28.f : 18.f; P.LimbSides = 7.f; P.Rings = 8;
+			P.LeafSize = bGreat ? 420.f : 150.f; P.Fill = bGreat ? 380 : 240; P.Lean = Rs.R(0.f, 2.f);
+			if (bGreat)
+			{
+				P.CrackHalf = FMath::DegreesToRadians(17.f); P.CrackTop = 520.f; P.CrackCore = P.R * 0.6f; P.Lean = 0.f;
+				K.Barks[0].MossPatch = 0.18f;
+				K.Anchors.Add(TEXT("door"), FVector(P.R, 0.f, 0.f));
+			}
+			Standing(K, P, Rs, 0);
+		}
+		else if (S == TEXT("hawthorn"))
+		{
+			// A field hawthorn on the downs (Crataegus monogyna): a short twisted grey stem, a wind-sculpted crown of
+			// small dark leaves pushed one way. Leans along +X: the scenery yaws them downwind (east, away from the sea).
+			K.Barks.Add(MakeBark(0x6A645A, 0x3E3A34, 0x8A8F6E, 0.85f, 0.6f, 30.f, 0.18f, 12.f, 0.4f));
+			Leaves(LeafHazel, 0x26341C, 0x4E5E30, 0.72f);
+			P.BoleTop = 0.24f; P.Forks = 2; P.ForkSpread = 0.4f; P.CrownBase = 0.3f; P.CrownR = 0.42f; P.Shape = 1;
+			P.Branches = 11; P.BranchAngle = 72.f; P.Arch = 0.04f; P.TipDrop = 0.04f; P.Kink = 0.28f; P.Secondaries = 2;
+			P.Flare = 1.2f; P.FlareH = 0.05f; P.Roots = 0; P.TrunkSides = 8.f; P.LimbSides = 5.f; P.TwigSides = 3.f; P.Rings = 7;
+			P.LeafSize = 95.f; P.Fill = 64; P.Lean = Rs.R(10.f, 17.f); P.bLeanX = true;
+			Standing(K, P, Rs, 0);
+		}
+		else if (S == TEXT("dead_elm"))
+		{
+			// An elm the disease took (Ulmus minor): a tall grey snag, its bark shed in plates, the upswept limbs bare.
+			K.Barks.Add(MakeBark(0x7A766C, 0x4A463E, 0x6E7A5E, 0.9f, 0.3f, 80.f, 0.12f, 14.f, 0.5f));
+			P.bDead = true;
+			P.BoleTop = 0.48f; P.LeaderTop = 0.86f; P.Broken = Variant == 3 ? 0.7f : 0.f; P.Jag = 120.f;
+			P.CrownBase = 0.42f; P.CrownR = 0.26f; P.Shape = 4; P.Branches = 12; P.BranchAngle = 38.f; P.Arch = 0.2f; P.BranchR = 0.36f; P.Secondaries = 3;
+			P.Flare = 1.3f; P.FlareH = 0.05f; P.Roots = 3; P.TrunkSides = 12.f; P.LimbSides = 6.f; P.Rings = 10;
 			Standing(K, P, Rs, 0);
 		}
 		else if (S == TEXT("holly"))

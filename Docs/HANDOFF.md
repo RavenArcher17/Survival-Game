@@ -306,6 +306,13 @@ and `world_map.py`. Code: `WRForest*` (world, scenery, hazards, Hollow Root, cre
 `WRTreeKit`, `WRNaturePath`/`WRAbilitiesNature`/`WRPlantSummon`. Numbers: tuning `forest`, `forestWorld`, `hazards`,
 `creatureAI._forest`, `tame.forest`, `bosses.forest` and `bosses.<id>`. Dev: `world fhaz ...`, `world forest ...`.
 
+Also since 0.7.1 (in progress): **the Graveyard, a heightfield land west of the Spine** (cooks/biome-graveyard.md,
+plan cooks/build-biome-graveyard.md). Its ground and places are one generator: `node Tools/terrain/graveyard.mjs`
+writes `Data/lands/graveyard.json` + `graveyard_ground.bin` and `Data/graveyard.json` (read by `FWRGraveData`); it reads
+the forest's `forest_ground.bin` (the Spine's west face and the Rootgrave seam) and `Art/Terrain/island_height.r16`, so
+re-run it after a forest re-run. Lands overlap now: a land's `priority` and `cuts` rows (WRLand) decide whose ground
+is where. Code: `WRGrave*` (types, world, scenery, catacombs). Numbers: tuning `graveyardWorld`. Dev: `world grave ...`.
+
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
   never its own file in the world folder. Schema changes are a new `Data/db/migrations/NNNN_*.sql`. One server per world

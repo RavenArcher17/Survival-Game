@@ -200,6 +200,9 @@ public:
 	bool IsWarded(const FVector& Pos);
 	/** Near a light that halves corruption (a glowing creature, a lit lantern). */
 	bool IsHalving(const FVector& Pos);
+	/** The brightest light within Range of Pos (by its reach, nearer first on a tie): what a light-drawn hunter flies at
+	 *  (the Graveyard's Wraithmoth, cooks/biome-graveyard.md 2.12.2). Null when none. */
+	AActor* BrightestNear(const FVector& Pos, float Range, float* OutRadius = nullptr);
 
 private:
 	struct FSource { TWeakObjectPtr<AActor> Actor; float Radius = 0.f; bool bWard = false; bool bHalves = false; };
@@ -268,6 +271,11 @@ public:
 	void OnLightSlotChanged();
 	/** Server: light it / put it out (the L key; the bag's use). "" when nothing to say. */
 	FString ToggleLight();
+	/** Server: a gust or a blow puts out a held torch (lights.<id>.kind torch; lanterns and grave-light burn on). Returns
+	 *  true when one went out. The Graveyard's crypt draughts and the Wraithmoth's dive (cooks/biome-graveyard.md 2.8). */
+	bool SnuffTorch();
+	/** The held light is a lantern (lights.<id>.kind lantern): draughts and rain can't put it out. */
+	bool HoldsLantern() const;
 
 	// --- corruption
 	float GetCorruption() const { return Corruption; }

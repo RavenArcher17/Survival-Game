@@ -65,8 +65,10 @@ const FWRToolDef* FWRGathering::FindTool(FName ItemId)
 FName FWRGathering::ToolKindFor(FName ItemId)
 {
 	const FString Id = ItemId.ToString();
-	if (ItemId == TEXT("wood") || ItemId == TEXT("greywood")) return TEXT("hatchet");
+	if (ItemId == TEXT("wood") || ItemId == TEXT("greywood") || ItemId == TEXT("yew_log")) return TEXT("hatchet");
 	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur")) || ItemId == TEXT("saltpetre") || ItemId == TEXT("voidglass")) return TEXT("pick");
+	// The Graveyard's (cooks/biome-graveyard.md 2.7): soulstone off its bone beds, limestone, mortsafes broken for grave iron.
+	if (ItemId == TEXT("soulstone") || ItemId == TEXT("limestone") || ItemId == TEXT("grave_iron")) return TEXT("pick");
 	return NAME_None;
 }
 

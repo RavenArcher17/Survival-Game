@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased: the Graveyard (the Necromancy land)
+
+Aaron (lane build-biome-graveyard: requirement ledger R1-R61, build research and plan in showcase-notes
+cooks/build-biome-graveyard.md, building cooks/biome-graveyard.md). Landing in pieces; compiled (editor target) after
+each; not played here (Aaron and the testers test, F8). This first piece is the land and everything standing on it.
+
+- **The land** (`Data/lands/graveyard.json` + `graveyard_ground.bin`, from `node Tools/terrain/graveyard.mjs`, which also
+  writes `Data/graveyard.json`, the places contract read by `FWRGraveData` in `WRGraveTypes.cpp`): a heightfield land
+  at its real map metres west of the Spine (B5 Rootlands), on the forest's 4 m grid. Rolling chalk downs from the
+  Spine's foot (Chapel Heights, 150-215 m) down to white chalk sea cliffs (35-60 m) on the west coast; three coombes
+  (dry valleys) run down to shingle coves, each with a camp and its castaway wreck; the Great Yew's hill; a chalk
+  stream through the ford vale to the sea; the Lantern Pond; the Bone Pits; lime pits; 44 subsidence pits in the grave
+  fields (lids come with the hazards piece). The south-west neck runs north to the island's own shore (the island's
+  ground wins there). Sub-zones G1-G4 by a domain-warped grid, the Volcanic border's ash and the Void border's grey as
+  bands, chalk paths worn white. `world.liveBiomes` gains `graveyard`.
+- **Rootgrave opens**: the forest's rockfall plug stays in the forest's file but a land's new `cuts` row drops the
+  forest's triangles in the pass's box while the Graveyard is live (`WRLand` chunk build), and the Graveyard's samples
+  make the pass floor, meeting the forest's on the box's edge ring exactly. Lands may now overlap: `WRLand::At` picks the
+  land whose ground is there (a new `priority` breaks ties), and `WRForest::Contains` / the forest's ground trace
+  answer the land that's actually under a point.
+- **What stands on it** (`WRGraveWorld.*`, `WRGraveScenery*.cpp`, kit `WRGraveLook.h` on the forest's FBuild): the five
+  landmarks (the roofless Chapel of Nhal with its 12 bays, transept, apse lantern rack, altar, broken leaning tower and
+  rib arches; the Great Yew with its walk-in hollow and the ring of lifted headstones; the 35 m Belfry in its walled
+  yard; the 40 m Bone Giant slumped against the Spine with roots through its ribs and lantern-poles through its bones;
+  the Lantern Stair climbing the Spine to its break), the 13 hand sites (the Lychgate Chapel with its lychgate and
+  lantern rack, the Row of the Named, the Dog Graves, the Ford of Washing, Smith's Row, the Seven Names, the Broken
+  Procession, the Watch House and its tally, the Lime Kilns, Where the Rows End, the Lantern Pond, the Root-Split Tombs,
+  the Foot of the Stair), 57 kit POIs by the 150 m / 125 m rule, 16 grave fields of ~7,000 headstones in four styles
+  (8% leaning, 5% fallen, kerbs, a tōrō every 6th, slag stones on the smiths', heartwood-staked graves on the chapel
+  road), dry-stone walls, 300 tōrō along every road whose grave-light reads as dotted green lines at night (the nearest
+  28 cast real light), hawthorns and dead elms (new tree-kit species with the yew and the Great Yew), the chalk stream.
+- **The catacombs**: 96 rooms and 98 galleries on three levels (L1 the Crypt Gates, L2 the Ossuary at 46 m, L3 the Old
+  Quarry at 12 m), every floor above the sea and every ceiling under chalk (the generator checks); six crypt mouths
+  with stairs down, two subsidence holes with ropes, the Draught Stair and the Quarry Stair (spirals), the chapel crypt
+  house (opens after Nhal's first kill). The twelve hand rooms each built round their idea (the lit Niches of the
+  Unnamed, the Watchers' Vault, the Skull Wall of the Wheel, the Chandelier Hall, the Bone River, the Sorting Room, the
+  Starfall Pit, the Brood Gallery, the Three Cisterns with the drowned bell, the Quarry Face, the Chapel Crypt) and
+  kit rooms off the galleries. `WRBiome::IsUnderground` knows them (dark, no building); the land's `underground.ways`
+  keep the game mode's rescue off them.
+- **Gathering and finds** (server): soulstone outcrops and grave seams, bone piles, limestone, mortsafes (grave iron),
+  wild black rye and asphodel, silver veins, wax nests, star iron in the Starfall Pit, young yews (yew logs);
+  caches (the smith's anvil, the lime barrows, the family vaults, the niches, the Watchers' crate); spots you use with E
+  (`AWRGraveSpot`): keepsakes, digs (S1 under the Yew, S2 the one full grave, three cenotaphs), the Stair's last lantern
+  (S3: the Stair burns gold for a game day), the seventh name (S4), the drowned bell's chamber (S5), the Row's five dark
+  tōrō. Survival gains `SnuffTorch` / `HoldsLantern` and the light registry `BrightestNear` (for the draughts and the
+  Wraithmoth).
+
 ## Unreleased: the Ancient forest (the Nature land)
 
 Aaron (lane build-biome-forest: requirement ledger R1-R56, research, plan and per-track build notes in showcase-notes

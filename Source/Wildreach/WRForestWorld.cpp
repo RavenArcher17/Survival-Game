@@ -359,6 +359,9 @@ float WRForestShape::GroundZ(const UWorld* World, const FVector& At, float Up, f
 		if (bTake) return float(Hit.ImpactPoint.Z);
 		Q.AddIgnoredActor(A);
 	}
+	// No hit (the chunk isn't built yet): the height function of whichever land's ground is there (the Graveyard's
+	// pieces stand on the Graveyard's samples, not the forest's).
+	if (const FWRLandDef* D = WRLand::At(At)) return float(D->ToWorld(D->ToMap(At), D->Height(D->ToMap(At))).Z);
 	return L ? L->GroundZ(At) : Fallback;
 }
 

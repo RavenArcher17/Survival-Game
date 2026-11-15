@@ -29,6 +29,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRSound.h"
+#include "WRGraveTypes.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
@@ -91,6 +92,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	}
 	// And the Sunken Coven under the Mire's peat mat (WRSwampSystems): dark but for the toads, no sky, no building.
 	if (WRSwamp::InCoven(Pos))
+	{
+		return true;
+	}
+	// And the Graveyard's catacombs (WRGraveTypes): the crypt stairs, the rooms and the galleries under the grave fields.
+	if (WRGrave::InCatacombs(Pos))
 	{
 		return true;
 	}
@@ -718,6 +724,28 @@ void UWRLightSubsystem::Refresh()
 	}
 }
 
+AActor* UWRLightSubsystem::BrightestNear(const FVector& Pos, float Range, float* OutRadius)
+{
+	Refresh();
+	AActor* Best = nullptr;
+	float BestR = 0.f, BestD = TNumericLimits<float>::Max();
+	for (const FSource& S : Sources)
+	{
+		AActor* A = S.Actor.Get();
+		if (!A || S.Radius <= 0.f) continue;
+		const float D = float(FVector::Dist(A->GetActorLocation(), Pos));
+		if (D > Range) continue;
+		if (S.Radius > BestR + 1.f || (FMath::IsNearlyEqual(S.Radius, BestR, 1.f) && D < BestD))
+		{
+			Best = A;
+			BestR = S.Radius;
+			BestD = D;
+		}
+	}
+	if (OutRadius) *OutRadius = BestR;
+	return Best;
+}
+
 bool UWRLightSubsystem::Any(const FVector& Pos, TFunctionRef<bool(const FSource&)> Want)
 {
 	Refresh();
@@ -1193,6 +1221,19 @@ void UWRSurvivalComponent::SetLightOn(bool bOn)
 			ASC->CancelAbilities(&Guard);
 		}
 	}
+}
+
+bool UWRSurvivalComponent::SnuffTorch()
+{
+	if (!IsLightOn() || !GetOwner() || !GetOwner()->HasAuthority()) return false;
+	if (FWRTuning::Get().Str(FString::Printf(TEXT("lights.%s.kind"), *LightItem.ToString()), TEXT("torch")) != TEXT("torch")) return false;
+	SetLightOn(false);
+	return true;
+}
+
+bool UWRSurvivalComponent::HoldsLantern() const
+{
+	return IsLightOn() && FWRTuning::Get().Str(FString::Printf(TEXT("lights.%s.kind"), *LightItem.ToString()), TEXT("torch")) == TEXT("lantern");
 }
 
 void UWRSurvivalComponent::OnLightSlotChanged()

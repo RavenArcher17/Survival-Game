@@ -7,6 +7,7 @@
 #include "WRSwampSystems.h"
 #include "WRForestHazards.h"
 #include "WRForestWorld.h"
+#include "WRGraveWorld.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCreature.h"
@@ -327,6 +328,8 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	if (WRForestHazards::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Ancient forest's world (WRForestWorld): the Canopy Lift, the offering stones.
 	if (UWRForestWorld::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Graveyard's spots (WRGraveWorld): keepsakes, digs, the Stair's last lantern, the seventh name, the drowned bell.
+	if (UWRGraveWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -377,6 +380,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 	if (WRSwamp::ClientInteract(PC)) return true;
 	if (WRForestHazards::ClientInteract(PC)) return true;
 	if (UWRForestWorld::ClientInteract(PC)) return true;
+	if (UWRGraveWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (AWRShrine* S = Cast<AWRShrine>(N.Actor))
