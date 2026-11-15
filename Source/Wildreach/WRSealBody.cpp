@@ -6,7 +6,7 @@
 namespace WRSealDetail
 {
 	constexpr float TailX = -150.f, NoseX = 168.f, RMax = 38.f;
-	constexpr int32 Rings = 30, Around = 20;
+	constexpr int32 SealRings = 30, Around = 20;
 
 	FColor Pack(const FLinearColor& C, float Rough)
 	{
@@ -131,9 +131,9 @@ void UWRSealBody::Build()
 		OutN = FVector(0.f, S / W, Zc / H).GetSafeNormal();
 	};
 	int32 Base = Rest.Num();
-	for (int32 r = 0; r < Rings; ++r)
+	for (int32 r = 0; r < SealRings; ++r)
 	{
-		const float T = r / float(Rings - 1);
+		const float T = r / float(SealRings - 1);
 		for (int32 a = 0; a <= Around; ++a)
 		{
 			const float A = 2.f * PI * a / Around;
@@ -143,7 +143,7 @@ void UWRSealBody::Build()
 			Add(T, FVector(0.f, Y, Z), N, Pack(Coat(T, A), 0.62f), FVector2D(T * 6.f, a / float(Around)));
 		}
 	}
-	for (int32 r = 0; r + 1 < Rings; ++r)
+	for (int32 r = 0; r + 1 < SealRings; ++r)
 	{
 		for (int32 a = 0; a < Around; ++a)
 		{
@@ -154,9 +154,9 @@ void UWRSealBody::Build()
 		}
 	}
 	// Caps: the nose's tip and the tail root.
-	for (const int32 r : { 0, Rings - 1 })
+	for (const int32 r : { 0, SealRings - 1 })
 	{
-		const float T = r / float(Rings - 1);
+		const float T = r / float(SealRings - 1);
 		const int32 Tip = Add(T, FVector(r == 0 ? -6.f : 4.f, 0.f, 0.f), FVector(r == 0 ? -1.f : 1.f, 0.f, 0.f), Pack(Coat(T, 0.f) * 0.7f, 0.5f), FVector2D(T * 6.f, 0.5f));
 		for (int32 a = 0; a < Around; ++a)
 		{

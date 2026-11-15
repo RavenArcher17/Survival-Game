@@ -22,7 +22,8 @@ built in a running game yet.
   geos and wrecks, the Prism Crown, the Hollowed Giantess, the Split Geode, the descents' stairs, vents, domes, chime
   stones, the surface sites, the halls' and tubes' furniture, the plateau's columns and grass by cell. `FWRToolMesh`'s
   `Tri` / `Pack` are public (the crystal kit builds facets with them). `dressing.mjs` keeps the crystal and graveyard
-  POIs when the island is regenerated.
+  POIs when the island is regenerated. `WRSealBody.cpp`'s `Rings` constant is `SealRings` (it clashed with a local in
+  `WRSkyAir.cpp` once the unity build regrouped).
 ## Unreleased: the Sky islands (the Wind land)
 
 Aaron (lane build-biome-sky: requirement ledger R1-R62, build research and plan in showcase-notes
