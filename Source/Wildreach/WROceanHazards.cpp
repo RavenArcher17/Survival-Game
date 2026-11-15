@@ -38,25 +38,25 @@ namespace WROceanHzImpl
 {
 	float HzTn(const TCHAR* Key, float Fallback) { return FWRTuning::Get().Num(FString::Printf(TEXT("oceanHazards.%s"), Key), Fallback); }
 	float KtTn(const TCHAR* Key, float Fallback) { return FWRTuning::Get().Num(FString::Printf(TEXT("tide.kingTide.%s"), Key), Fallback); }
-	float Hash(int32 I, int32 Salt) { return FMath::Frac(FMath::Sin(float(I) * 12.9898f + float(Salt) * 78.233f) * 43758.5453f); }
-	void Tell(const AActor* Who, const FString& Text)
+	float HzHash(int32 I, int32 Salt) { return FMath::Frac(FMath::Sin(float(I) * 12.9898f + float(Salt) * 78.233f) * 43758.5453f); }
+	void HzTell(const AActor* Who, const FString& Text)
 	{
 		const APawn* P = Cast<APawn>(Who);
 		if (AWRPlayerController* PC = P ? Cast<AWRPlayerController>(P->GetController()) : nullptr) PC->ClientNotify(Text);
 	}
-	void QuestEvent(const AActor* Pawn, FName Type, FName What, int32 Count = 1)
+	void HzQuest(const AActor* Pawn, FName Type, FName What, int32 Count = 1)
 	{
 		const APawn* P = Cast<APawn>(Pawn);
 		AWRPlayerState* PS = P ? P->GetPlayerState<AWRPlayerState>() : nullptr;
 		UWRWorldSystems* WS = Pawn ? Pawn->GetWorld()->GetSubsystem<UWRWorldSystems>() : nullptr;
 		if (PS && WS) WS->QuestEvent(PS, Type, What, Count);
 	}
-	FString NameOf(const AActor* Who)
+	FString HzName(const AActor* Who)
 	{
 		const APawn* P = Cast<APawn>(Who);
 		return P && P->GetPlayerState() ? P->GetPlayerState()->GetPlayerName() : FString();
 	}
-	void EnvHit(AWRCharacterBase* V, float Damage, const FVector& Origin, const TMap<FName, float>& Buildups = {})
+	void HzHit(AWRCharacterBase* V, float Damage, const FVector& Origin, const TMap<FName, float>& Buildups = {})
 	{
 		FWRHit Hit;
 		Hit.Instigator = nullptr;
@@ -67,9 +67,9 @@ namespace WROceanHzImpl
 		for (const TPair<FName, float>& B : Buildups) Hit.Buildups.Add(B.Key, B.Value);
 		UWRCombatLibrary::ApplyHit(V, Hit);
 	}
-	bool Live(const UWorld* W) { return W && WROcean::Live(); }
+	bool HzLive(const UWorld* W) { return W && WROcean::Live(); }
 	/** Every survivor and creature alive in the world (the hazards don't care which). */
-	template <typename F> void EachBody(UWorld* W, F&& Fn)
+	template <typename F> void HzEachBody(UWorld* W, F&& Fn)
 	{
 		for (TActorIterator<AWRCharacterBase> It(W); It; ++It) if (It->IsAlive()) Fn(*It);
 	}
@@ -95,7 +95,7 @@ TStatId UWROceanHazards::GetStatId() const
 
 bool UWROceanHazards::IsTickable() const
 {
-	return Live(GetWorld());
+	return HzLive(GetWorld());
 }
 
 double UWROceanHazards::ServerNow() const
@@ -180,10 +180,10 @@ void UWROceanHazards::Setup()
 		{
 			FMan M;
 			M.Base = D.Fleets[f].At;
-			const float A = Hash(m, f * 31 + 1) * 2.f * PI;
-			const float R = FMath::Sqrt(Hash(m, f * 31 + 2)) * HzTn(TEXT("manowar.spread"), 4000.f);
+			const float A = HzHash(m, f * 31 + 1) * 2.f * PI;
+			const float R = FMath::Sqrt(HzHash(m, f * 31 + 2)) * HzTn(TEXT("manowar.spread"), 4000.f);
 			M.Offset = FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, 0.f);
-			M.Phase = Hash(m, f * 31 + 3) * 2.f * PI;
+			M.Phase = HzHash(m, f * 31 + 3) * 2.f * PI;
 			M.Fleet = f;
 			Men.Add(M);
 		}
@@ -295,7 +295,7 @@ void UWROceanHazards::StepRips(float Dt)
 		FRipTrack* Was = InRips.Find(C);
 		if (bIn)
 		{
-			if (!Was) Tell(C, TEXT("The water's pulling you out to sea. Don't fight it: swim along the shore"));
+			if (!Was) HzTell(C, TEXT("The water's pulling you out to sea. Don't fight it: swim along the shore"));
 			InRips.Add(C, { I, Along, Across });
 			continue;
 		}
@@ -308,8 +308,8 @@ void UWROceanHazards::StepRips(float Dt)
 			const float NowAcross = C->GetActorLocation().Y - R.At.Y;
 			if (NowAlong > 0.f && NowAlong < R.Length && FMath::Abs(NowAcross) >= R.Width * 0.5f)
 			{
-				QuestEvent(C, TEXT("event"), TEXT("rip_escape"));
-				Tell(C, TEXT("Out of the rip, sideways. That's the way."));
+				HzQuest(C, TEXT("event"), TEXT("rip_escape"));
+				HzTell(C, TEXT("Out of the rip, sideways. That's the way."));
 			}
 		}
 		InRips.Remove(C);
@@ -330,8 +330,8 @@ void UWROceanHazards::StepBlowholes()
 	{
 		const FWROceanData::FBlowhole& B = D.Blowholes[i];
 		if (!bLive || bKingLow) { BlowNext[i] = -1.0; BlowTold[i] = false; continue; }
-		const float Every = FMath::Lerp(HzTn(TEXT("blowhole.everyMin"), 9.f), HzTn(TEXT("blowhole.everyMax"), 16.f), Hash(i, 7));
-		if (BlowNext[i] < 0.0) { BlowNext[i] = T + Every * Hash(i, 9) + 1.0; BlowTold[i] = false; }
+		const float Every = FMath::Lerp(HzTn(TEXT("blowhole.everyMin"), 9.f), HzTn(TEXT("blowhole.everyMax"), 16.f), HzHash(i, 7));
+		if (BlowNext[i] < 0.0) { BlowNext[i] = T + Every * HzHash(i, 9) + 1.0; BlowTold[i] = false; }
 		const float TellSecs = HzTn(TEXT("blowhole.tell"), 1.0f);
 		// Nobody within 120 m: it still breathes, unseen (no effects sent).
 		bool bNear = false;
@@ -353,7 +353,7 @@ void UWROceanHazards::StepBlowholes()
 		const float H = B.bHorn ? HzTn(TEXT("blowhole.hornHeight"), 4000.f) : HzTn(TEXT("blowhole.height"), 600.f);
 		WRFx::Broadcast(World, B.bHorn ? FName(TEXT("ocean.horn_column")) : FName(TEXT("ocean.blowhole_column")), B.At, FRotator::ZeroRotator, H / 600.f, TEXT("ocean.blowhole_burst"));
 		const float R = B.bHorn ? HzTn(TEXT("blowhole.hornRadius"), 400.f) : HzTn(TEXT("blowhole.radius"), 200.f);
-		EachBody(World, [&](AWRCharacterBase* V)
+		HzEachBody(World, [&](AWRCharacterBase* V)
 		{
 			const FVector Feet = V->GetActorLocation() - FVector(0, 0, V->GetSimpleCollisionHalfHeight());
 			if (FVector::Dist2D(Feet, B.At) > R + V->GetSimpleCollisionRadius() || Feet.Z < B.At.Z - 150.f || Feet.Z > B.At.Z + H) return;
@@ -371,9 +371,9 @@ void UWROceanHazards::StepBlowholes()
 				const float Fall = FMath::Sqrt(FMath::Max(0.f, 2.f * (Up - (B.Ledge.Z - B.At.Z)) / 980.f));
 				Vel += FVector(Over / FMath::Max(0.5f, Rise + Fall), 0.f);
 			}
-			if (!bRide) EnvHit(V, HzTn(TEXT("blowhole.damage"), 40.f), B.At);
+			if (!bRide) HzHit(V, HzTn(TEXT("blowhole.damage"), 40.f), B.At);
 			V->LaunchCharacter(Vel, true, true);
-			if (bRide) Tell(V, B.bHorn ? TEXT("The Horn throws you high over the shelf") : TEXT("You ride the spout"));
+			if (bRide) HzTell(V, B.bHorn ? TEXT("The Horn throws you high over the shelf") : TEXT("You ride the spout"));
 		});
 	}
 }
@@ -391,8 +391,8 @@ void UWROceanHazards::StepSurges()
 		const FWROceanData::FSurge& C = D.Surges[i];
 		const FVector Dir = FRotator(0.f, C.Yaw, 0.f).Vector();
 		if (!bLive) { SurgeStart[i] = -1.0; SurgeNext[i] = -1.0; continue; }
-		const float Every = HzTn(TEXT("surge.every"), 14.f) + 4.f * Hash(i, 13);
-		if (SurgeNext[i] < 0.0) SurgeNext[i] = T + Every * Hash(i, 17) + 1.0;
+		const float Every = HzTn(TEXT("surge.every"), 14.f) + 4.f * HzHash(i, 13);
+		if (SurgeNext[i] < 0.0) SurgeNext[i] = T + Every * HzHash(i, 17) + 1.0;
 		if (SurgeStart[i] < 0.0 && T >= SurgeNext[i] - 1.0)
 		{
 			// The tell: the channel's mouth heaves white and a low roar rolls up it (1 s).
@@ -406,7 +406,7 @@ void UWROceanHazards::StepSurges()
 		if (Run > C.Length) { SurgeStart[i] = -1.0; continue; }
 		if (FMath::Fmod(float(T - SurgeStart[i]), 0.5f) < 0.06f) WRFx::Broadcast(World, TEXT("ocean.surge_wave"), C.At + Dir * Run, Dir.Rotation(), 1.f, NAME_None);
 		const FVector Front = C.At + Dir * Run;
-		EachBody(World, [&](AWRCharacterBase* V)
+		HzEachBody(World, [&](AWRCharacterBase* V)
 		{
 			if (UWROceanBody::Get(V) || SurgeHit[i].Contains(V)) return;
 			const FVector Rel = V->GetActorLocation() - Front;
@@ -414,7 +414,7 @@ void UWROceanHazards::StepSurges()
 			const float Across = FVector::CrossProduct(Dir, Rel).Z;
 			if (FMath::Abs(Along) > 200.f || FMath::Abs(Across) > HzTn(TEXT("surge.halfWidth"), 300.f) || FMath::Abs(Rel.Z) > 400.f) return;
 			SurgeHit[i].Add(V);
-			EnvHit(V, HzTn(TEXT("surge.damage"), 30.f), Front);
+			HzHit(V, HzTn(TEXT("surge.damage"), 30.f), Front);
 			if (V->Status) V->Status->Stagger(HzTn(TEXT("surge.knockdown"), 1.0f));
 			// Dragged 6 m back down the channel, out to sea.
 			WRSkyAir::Push(V, -Dir * HzTn(TEXT("surge.drag"), 600.f) / 0.5f, 0.5f, TEXT("surge"), nullptr);
@@ -437,7 +437,7 @@ void UWROceanHazards::StepFleets()
 			if (P && FVector::Dist2D(P->GetActorLocation(), M) < 3000.f) bNear = true;
 		}
 		if (!bNear) continue;
-		EachBody(World, [&](AWRCharacterBase* V)
+		HzEachBody(World, [&](AWRCharacterBase* V)
 		{
 			if (UWROceanBody::Get(V)) return;
 			const FVector P = V->GetActorLocation();
@@ -449,7 +449,7 @@ void UWROceanHazards::StepFleets()
 			float K = 1.f;
 			if (const AWRCreature* Mount = Cast<AWRCreature>(V->GetAttachParentActor()); Mount && Mount->GetRider() == V) K = HzTn(TEXT("manowar.mountMult"), 0.5f);
 			if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(V); Inv && Inv->SetPieces(TEXT("reefmail")) >= 2) K = FMath::Min(K, HzTn(TEXT("manowar.reefmailMult"), 0.5f));
-			EnvHit(V, HzTn(TEXT("manowar.damage"), 25.f) * K, M, { { TEXT("poison"), HzTn(TEXT("manowar.poison"), 50.f) * K } });
+			HzHit(V, HzTn(TEXT("manowar.damage"), 25.f) * K, M, { { TEXT("poison"), HzTn(TEXT("manowar.poison"), 50.f) * K } });
 			WRFx::Broadcast(V, TEXT("ocean.manowar_sting"), P, FRotator::ZeroRotator, 1.f, TEXT("ocean.manowar_sting"));
 		});
 	}
@@ -628,7 +628,7 @@ void UWROceanHazards::BoreHit(double T)
 	{
 		for (int32 k = 0; k < 6; ++k) WRFx::Broadcast(World, TEXT("ocean.bore"), FVector(FrontX, FMath::Lerp(-790000.f, -580000.f, (k + 0.5f) / 6.f), WRTide::MeanZ()), FRotator(0.f, 180.f, 0.f), 4.f, NAME_None);
 	}
-	EachBody(World, [&](AWRCharacterBase* V)
+	HzEachBody(World, [&](AWRCharacterBase* V)
 	{
 		const FVector P = V->GetActorLocation();
 		if (!WROcean::Contains(P) || UWROceanBody::Get(V)) return;
@@ -636,17 +636,17 @@ void UWROceanHazards::BoreHit(double T)
 		// Above the line: safe (Hae-won's fifth asks you to stand there when it comes).
 		if (Feet >= Line)
 		{
-			if (V->GetPlayerState() && FMath::Abs(P.X - FrontX) < 6000.f && !LineStood.Contains(NameOf(V)))
+			if (V->GetPlayerState() && FMath::Abs(P.X - FrontX) < 6000.f && !LineStood.Contains(HzName(V)))
 			{
-				LineStood.Add(NameOf(V));
-				QuestEvent(V, TEXT("event"), TEXT("stones_say"));
-				Tell(V, TEXT("The sea comes in under you and stops at the stones"));
+				LineStood.Add(HzName(V));
+				HzQuest(V, TEXT("event"), TEXT("stones_say"));
+				HzTell(V, TEXT("The sea comes in under you and stops at the stones"));
 			}
 			return;
 		}
 		if (FMath::Abs(P.X - FrontX) > 300.f || BoreHitSet.Contains(V)) return;
 		BoreHitSet.Add(V);
-		EnvHit(V, KtTn(TEXT("boreDamage"), 80.f), FVector(FrontX, P.Y, P.Z), { { TEXT("soak"), 100.f } });
+		HzHit(V, KtTn(TEXT("boreDamage"), 80.f), FVector(FrontX, P.Y, P.Z), { { TEXT("soak"), 100.f } });
 		WRSkyAir::Push(V, FVector(-KtTn(TEXT("boreCarry"), 2000.f) / 1.0f, 0.f, 100.f), 1.0f, TEXT("bore"), nullptr);
 	});
 	// Pieces below the line in its path: 200 once.
