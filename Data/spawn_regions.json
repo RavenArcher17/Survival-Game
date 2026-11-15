@@ -20,7 +20,8 @@
     "glacimaw": 300,
     "rimeclaw": 350,
     "floeback": 450,
-    "voltfang": 500, "thunderhorn": 650, "stormkite": 450, "raiju": 300, "cragstrider": 500, "galeback": 700, "coilburrow": 300, "rodcrest": 300, "puffram": 450
+    "voltfang": 500, "thunderhorn": 650, "stormkite": 450, "raiju": 300, "cragstrider": 500, "galeback": 700, "coilburrow": 300, "rodcrest": 300, "puffram": 450,
+    "murkjaw": 350, "murkjaw_young": 300, "gorgeleech": 350, "hexcrow": 500, "bogstalker": 450, "mirestrider": 650, "mudhulk": 700, "bogsnout": 350, "lanterntoad": 250, "reedfowl": 450, "slimeshell": 300, "latch_leech": 150
   },
   "regions": [
     {
@@ -143,8 +144,14 @@
     {"id":"storm_lowland","name":"Storm peaks lowland","side":"storm_peaks","band":"lowland","zones":"12","target":60,"creatures":{"puffram":12,"rodcrest":8},"night":{"puffram":10,"rodcrest":6}},
     {"id":"storm_midland_passes","name":"Storm peaks passes and cliff paths","side":"storm_peaks","band":"midland","zones":"12","target":55,"creatures":{"galeback":8,"voltfang":6,"coilburrow":5,"cragstrider":4,"stormkite":3},"raiders":{"voltfang":2},"night":{"voltfang":10,"galeback":6,"coilburrow":5,"cragstrider":4,"stormkite":3},"storm":{"voltfang":8,"galeback":6,"stormkite":4}},
     {"id":"storm_midland_gorges","name":"Storm peaks bridges and crags","side":"storm_peaks","band":"midland","zones":"34","target":40,"creatures":{"stormkite":8,"cragstrider":6,"coilburrow":2},"raiders":{"stormkite":1,"voltfang":1},"night":{"voltfang":8,"stormkite":6,"cragstrider":6},"storm":{"stormkite":8,"voltfang":4}},
-    {"id":"storm_highland","name":"Storm peaks heights","side":"storm_peaks","band":"highland","zones":"245","target":14,"creatures":{"thunderhorn":6},"raiders":{"thunderhorn":1},"night":{"thunderhorn":6},"storm":{"thunderhorn":4,"raiju":3}}
+    {"id":"storm_highland","name":"Storm peaks heights","side":"storm_peaks","band":"highland","zones":"245","target":14,"creatures":{"thunderhorn":6},"raiders":{"thunderhorn":1},"night":{"thunderhorn":6},"storm":{"thunderhorn":4,"raiju":3}},
+    {"id":"swamp_m1","name":"Swamp, the Reed Flats","side":"swamp","band":"lowland","zones":"1","target":34,"creatures":{"reedfowl":16,"slimeshell":10,"bogsnout":10,"mudhulk":6,"gorgeleech":3},"night":{"lanterntoad":14,"gorgeleech":8,"bogsnout":6,"murkjaw_young":2},"raiders":{"gorgeleech":1}},
+    {"id":"swamp_m2","name":"Swamp, the Mangrove Thickets","side":"swamp","band":"midland","zones":"2","target":26,"creatures":{"mirestrider":8,"reedfowl":8,"murkjaw":4,"hexcrow":4},"night":{"murkjaw":8,"gorgeleech":8,"lanterntoad":6},"raiders":{"murkjaw":1,"hexcrow":1}},
+    {"id":"swamp_m3","name":"Swamp, the Rotting Boardwalks","side":"swamp","band":"midland","zones":"3","target":28,"creatures":{"mirestrider":10,"mudhulk":8,"hexcrow":8,"bogstalker":4},"night":{"bogstalker":10,"gorgeleech":10,"lanterntoad":8,"hexcrow":3},"raiders":{"bogstalker":1,"hexcrow":1}},
+    {"id":"swamp_m4","name":"Swamp, the Murk Pools","side":"swamp","band":"highland","zones":"4","target":24,"creatures":{"bogstalker":8,"gorgeleech":8,"slimeshell":6,"murkjaw":6},"night":{"gorgeleech":14,"murkjaw":10,"bogstalker":6,"lanterntoad":8},"raiders":{"murkjaw":1,"gorgeleech":2}},
+    {"id":"swamp_m5","name":"Swamp, the Bone Mounds","side":"swamp","band":"highland","zones":"5","target":20,"creatures":{"hexcrow":12,"murkjaw":6,"gorgeleech":6},"night":{"murkjaw":10,"gorgeleech":10,"hexcrow":4},"raiders":{"hexcrow":2,"murkjaw":1}}
   ],
+  "_swamp": "Swamp regions (cooks/biome-swamp.md 2.12.3): side swamp, zones = the swamp sub-zone letters (Data/swamp.json zones: 1 Reed Flats, 2 Mangrove Thickets, 3 Rotting Boardwalks, 4 Murk Pools, 5 Bone Mounds), day table creatures, night table night. murkjaw_young comes out on M1 nights and keeps to the channel mouths (WRSwampCreatures). Hexcrows are diurnal: in a night table they roost (asleep, a noise wakes them).",
   "_storm": "Storm peaks regions (cooks/biome-lightning.md 2.9 Where): side storm_peaks, zones = the Storm peaks sub-zone letters they live in (storm_peaks.json zones: 1 Wind Passes, 2 Cliff Paths, 3 Rope Bridges, 4 Struck Crags, 5 Cliff Shrines), storm = the table while a Thunderstorm is on (the Raiju only comes then).",
   "_night": "night: the region's table after dusk (cooks/build-world-systems.md 2.9, fire-frost 3.3.7 / 3.4.7). A kind only in creatures (the day table) lies up at night; a kind only in night lies up by day (its pack isn't brought out near players); a kind in both is out at all hours. New packs roll from the table of the hour. A whiteout runs the night table by day (world.json events)."
 }

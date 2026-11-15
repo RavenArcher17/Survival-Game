@@ -71,6 +71,11 @@ namespace WRPathsTab
 			// Violet-white (#B9A7FF, the path's trim colour: cooks/biome-lightning.md 2.18.2).
 			return { WRPathLook::Color(Path), Hex(TEXT("251B4A")), Hex(TEXT("A592F2")), Hex(TEXT("E6E0FF")), Hex(TEXT("9C8AEC")), Hex(TEXT("EEEAFF")) };
 		}
+		if (Path == TEXT("blood"))
+		{
+			// Garnet and oxblood (#7A0A14, cooks/biome-swamp.md 2.18: never crimson), lit toward a warm rose.
+			return { WRPathLook::Color(Path), Hex(TEXT("2A0509")), Hex(TEXT("B23A4A")), Hex(TEXT("F2C6CC")), Hex(TEXT("A8323F")), Hex(TEXT("F6D8DC")) };
+		}
 		return { WRUI::Ember, Hex(TEXT("45190A")), Hex(TEXT("EC7A34")), Hex(TEXT("FFCF86")), Hex(TEXT("E5843A")), Hex(TEXT("FFD7A0")) };
 	}
 
@@ -1238,6 +1243,11 @@ private:
 			if (!ResKey.IsEmpty() && Val(*ResKey, V))
 			{
 				Rows.Add(StatRow(WRPathLook::Glyph(Model->Path), C.Main, FText::Format(LOCTEXT("BuildsRes", "Builds {0}"), FText::FromString(ResName)), FText::FromString(TEXT("+") + Num(V)), C.Main, false));
+			}
+			// The Blood path pays in HP (spells.<key>.hpCost): what a cast takes from your health into the Spilled bar.
+			if (Val(TEXT("hpCost"), V) && V > 0.f)
+			{
+				Rows.Add(StatRow(WRPathLook::Glyph(Model->Path), C.Main, LOCTEXT("CostsHp", "Costs HP"), FText::FromString(Num(V)), C.Main, false));
 			}
 			const UWRGameplayAbility* CDO = Cast<UWRGameplayAbility>(Class->GetDefaultObject());
 			if (CDO && CDO->GetCooldownSeconds() > 0.f)

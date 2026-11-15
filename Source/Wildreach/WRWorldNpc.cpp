@@ -4,6 +4,7 @@
 
 #include "WRWorldSystems.h"
 #include "WRStormWorld.h"
+#include "WRSwampSystems.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCreature.h"
@@ -316,6 +317,9 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 			return true;
 		}
 	}
+	// The Swamp's things (WRSwampSystems): boardwalk gaps, the bosses' broken square, caches, the key cage, the trapdoor,
+	// the Coven's ladders, flue, bell, eggs and gate, wild plants, the Murkjaw blood rite.
+	if (WRSwamp::Prompt(PC, OutTarget, OutVerb)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (const AWRShrine* S = Cast<AWRShrine>(N.Actor))
@@ -363,6 +367,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 			return true;
 		}
 	}
+	if (WRSwamp::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;
 	if (AWRShrine* S = Cast<AWRShrine>(N.Actor))

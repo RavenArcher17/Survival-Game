@@ -9,6 +9,7 @@
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
+#include "WRSwampCreatures.h"
 #include "WRSurvival.h"
 #include "WRFarm.h"
 #include "WRSound.h"
@@ -229,6 +230,13 @@ void AWRPlayerController::WRInteract()
 		return;
 	}
 	const FWRCreatureDef* WildDef = Wild ? Wild->GetDef() : nullptr;
+	// A knocked-out Murkjaw and a Blood walker: E is the blood rite first (the server runs it through Feed), then the
+	// taming menu once it's done (WRSwampCreatures).
+	if (FString RiteVerb; Wild && Wild->IsUnconscious() && FWRSwampAI::RitePrompt(Wild, GetPawn(), RiteVerb))
+	{
+		ServerCommand(TEXT("interact"));
+		return;
+	}
 	if (WildDef && Wild->IsUnconscious() && WildDef->CanTameBy(TEXT("knockout_feed")))
 	{
 		Menu = EWRMenu::Taming;

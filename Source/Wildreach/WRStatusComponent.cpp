@@ -14,10 +14,12 @@
 #include "WRInventory.h"
 #include "WRCreature.h"
 #include "WRBoss.h"
+#include "WRSwampBosses.h"
 #include "WRCrafting.h"
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRLightningPath.h"
+#include "WRBloodPath.h"
 #include "WRStormTypes.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -246,7 +248,7 @@ float UWRStatusComponent::Threshold(int32 Id) const
 		}
 	}
 	// Each proc raises it (ER: Malenia's bleed 421, 519, 809...), until the fight's been over a while.
-	return Base * FMath::Pow(T.Num(TEXT("status.procGrowth"), 1.3f), Id >= 0 && Id < WRStatus::Count ? Procs[Id] : 0);
+	return Base * FMath::Pow(T.Num(TEXT("status.procGrowth"), 1.3f), Id >= 0 && Id < WRStatus::Count ? Procs[Id] : 0) * FWRSwampBoss::BuildupThresholdScale(Owner, Id);   // the Swamp: bleed builds on Vharra at x0.5
 }
 
 void UWRStatusComponent::AddBuildup(const FGameplayTag& Element, float Amount, AWRCharacterBase* Source)
@@ -339,7 +341,9 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 	case WRStatus::Burn:
 	{
 		BurnSource = Source;
-		ApplyStatus(WRTags::Status_Burn, Def(Burn, TEXT("seconds"), WRTune(TEXT("status.burnSeconds"), 6.f)) + UWRPathComponent::Stat(Source, TEXT("burnDuration")));
+		// Hex flame (Fire + Blood combo): a cursed body burns longer.
+		ApplyStatus(WRTags::Status_Burn, Def(Burn, TEXT("seconds"), WRTune(TEXT("status.burnSeconds"), 6.f)) + UWRPathComponent::Stat(Source, TEXT("burnDuration"))
+			+ WRBlood::BurnSecondsBonus(Owner, Source));
 		// Spreading flames: the burn jumps to the nearest enemy that isn't already burning.
 		if (Source && UWRPathComponent::HasNode(Source, TEXT("fire"), TEXT("spreading_flames")))
 		{
@@ -398,7 +402,9 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 	case WRStatus::Bleed:
 	{
 		// Hemorrhage: 12% of max health + 15 at once (bosses x0.7).
-		const float Burst = (MaxHP * Def(Bleed, TEXT("burstPct"), 0.12f) + Def(Bleed, TEXT("burstFlat"), 15.f)) * (bBoss ? Def(Bleed, TEXT("bossScale"), 0.7f) : 1.f);
+		// Hemorrhage (blood node): the burst of a bleed its source set off is bigger.
+		const float Burst = (MaxHP * Def(Bleed, TEXT("burstPct"), 0.12f) + Def(Bleed, TEXT("burstFlat"), 15.f)) * (bBoss ? Def(Bleed, TEXT("bossScale"), 0.7f) : 1.f)
+			* WRBlood::BleedBurstScale(Source, Owner);
 		ApplyStatus(WRTags::Status_Bleeding, Def(Bleed, TEXT("markSeconds"), 6.f));
 		StatusHit(Source, Burst, WRTags::Element_Physical);
 		break;
@@ -493,7 +499,8 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHeatAttribute(), Attr->GetHeat() - Attr->GetMaxHeat() * Loss);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChillAttribute(), Attr->GetChill() - Attr->GetMaxChill() * Loss);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetChargeAttribute(), Attr->GetCharge() - Attr->GetMaxCharge() * Loss);
-		ApplyStatus(WRTags::Status_Curse, Def(Curse, TEXT("seconds"), 15.f));
+		// Lingering hex lengthens it; the Blood path remembers who cursed it (Misfortune, Contagion, Ruin's sigil).
+		ApplyStatus(WRTags::Status_Curse, WRBlood::CurseSeconds(Owner, Source, Def(Curse, TEXT("seconds"), 15.f)));
 		break;
 	}
 	default:
@@ -823,6 +830,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	if (Owner->GetPlayerState())
 	{
 		WRLightning::TickOwner(Owner, DeltaTime);
+		// The Blood path's Spilled bar: the rally window, Clotting's regrowth.
+		WRBlood::TickOwner(Owner, DeltaTime);
 	}
 }
 

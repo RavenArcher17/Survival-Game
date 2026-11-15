@@ -83,6 +83,17 @@ public:
 
 	static constexpr int32 NumQuickSlots = 8;
 
+	// --- The Blood path's Spilled bar (WRBloodPath.cpp; cooks/biome-swamp.md 2.17). Replicated to everyone: the owner's HUD
+	// draws the garnet segment, every machine darkens the veins with it. Times are the server's world time. ---
+	/** HP spent on Blood abilities that lifesteal can still win back. */
+	UPROPERTY(Replicated) float BloodSpilled = 0.f;
+	/** When the rally window ends (what's left in Spilled is lost then). */
+	UPROPERTY(Replicated) float BloodWindowEnd = 0.f;
+	/** Bumped by every lifesteal heal: the body's 0.3 s flush on every machine. */
+	UPROPERTY(Replicated) uint8 BloodStealSerial = 0;
+	/** Fighting until (dealt or took a blow lately): the heartbeat pulse below a quarter of health. */
+	UPROPERTY(Replicated) float BloodFightUntil = 0.f;
+
 private:
 	FWRPathProgress& FindOrAddProgress(FName PathId);
 	void RefreshQuickSlots();

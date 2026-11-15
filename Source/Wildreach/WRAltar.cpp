@@ -2,6 +2,7 @@
 #include "Wildreach.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
+#include "WRPathLook.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "Components/StaticMeshComponent.h"
@@ -45,7 +46,8 @@ void AWRBossAltar::BeginPlay()
 	Super::BeginPlay();
 	if (UMaterialInstanceDynamic* Mat = Flame->CreateAndSetMaterialInstanceDynamic(0))
 	{
-		Mat->SetVectorParameterValue(TEXT("Color"), PathId == TEXT("fire") ? FLinearColor(1.f, 0.35f, 0.05f) : FLinearColor(0.5f, 0.85f, 1.f));
+		// Fire and Frost keep their flames; any other path's altar (Lightning, Blood at Vharra's) burns in its own colour.
+		Mat->SetVectorParameterValue(TEXT("Color"), PathId == TEXT("fire") ? FLinearColor(1.f, 0.35f, 0.05f) : PathId == TEXT("frost") ? FLinearColor(0.5f, 0.85f, 1.f) : WRPathLook::Color(PathId));
 	}
 }
 

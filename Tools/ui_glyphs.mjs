@@ -139,7 +139,36 @@ const lightning = {
 	thunder_god: { a: "M3 19l1.8-9 4.6 4 2.6-7 2.6 7 4.6-4L21 19z", b: "M3 20.5h18v2H3z", c: bolt(12, 15, 0.26) },
 };
 
+// Blood & curse (cooks/biome-swamp.md 2.17): a drop of blood is the path's mark; the Hex nodes draw the curse's eye.
+const f2 = (v) => Math.round(v * 100) / 100;
+const drop = (cx, cy, k) => `M${f2(cx)} ${f2(cy - 9 * k)}c${f2(3.5 * k)} ${f2(4.5 * k)} ${f2(6 * k)} ${f2(7.5 * k)} ${f2(6 * k)} ${f2(10.5 * k)}a${f2(6 * k)} ${f2(6 * k)} 0 0 1 ${f2(-12 * k)} 0c0 ${f2(-3 * k)} ${f2(2.5 * k)} ${f2(-6 * k)} ${f2(6 * k)} ${f2(-10.5 * k)}z`;
+const blood = {
+	blood_bolt: { a: drop(13, 12.5, 0.85), s: "M2.5 20.5l4-4M5.5 22l3-3", b: circ(19.5, 4.5, 1.3) },
+	blood_reserve: { t: "M9.5 3h5M10.5 3v5.6a6.5 6.5 0 1 0 3 0V3", a: drop(12, 16.2, 0.4) },
+	bleed_chance: { a: "M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z", c: drop(12, 12.6, 0.32) },
+	crimson_slash: { b: sword, a: drop(18.5, 16, 0.42) },
+	blood_spear: { s: "M3 21L16 8", a: "M14.5 5.5L21 3l-2.5 6.5-2.4.4-1.9-1.9z", b: drop(6.5, 17.5, 0.3) },
+	sanguine_power: { a: drop(12, 12.5, 0.9), c: "M11.1 10h1.8v7h-1.8zM8.5 12.6h7v1.8h-7z" },
+	blood_boil: { a: drop(12, 14, 0.62), b: circ(5, 7, 1.6) + circ(19, 6, 1.3) + circ(18, 19, 1.4) + circ(5.5, 19, 1.1) },
+	clotting: { a: drop(12, 12, 0.85), c: "M7.8 13.2l1.3-1.3 2.2 2.2 4.2-4.2 1.3 1.3-5.5 5.5z" },
+	transfusion: { s: "M8 12h8.5", t: "M14 8.5l3.5 3.5-3.5 3.5", a: drop(4.5, 12.5, 0.42) + drop(20, 12.5, 0.42) },
+	crimson_tide: { s: "M2.5 7c2 0 2.5-1.5 4.75-1.5S9.75 7 12 7s2.5-1.5 4.75-1.5S19.25 7 21.5 7", a: "M2.5 13c2 0 2.5-1.5 4.75-1.5S9.75 13 12 13s2.5-1.5 4.75-1.5S19.25 13 21.5 13V21H2.5z" },
+	hex_of_weakness: { a: "M2.5 12c2.5-4 5.8-6 9.5-6s7 2 9.5 6c-2.5 4-5.8 6-9.5 6s-7-2-9.5-6z", c: circ(12, 12, 2.6) },
+	lingering_hex: { t: "M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 3.5v4h-4", a: "M6.5 12.5c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3c-1.3 2-3.2 3-5.5 3s-4.2-1-5.5-3z", c: circ(12, 12.5, 1.2) },
+	misfortune: { s: "M2.5 12h8", t: "M13.5 9l1.5 6M16.5 8.5l1.5 7", a: "M19 8.5l3 3.5-3 3.5z" },
+	doom: { a: "M12 3c-5 0-8 3.5-8 8 0 3 1.5 4.5 3 5.5V20h10v-3.5c1.5-1 3-2.5 3-5.5 0-4.5-3-8-8-8z", c: circ(9, 11, 1.9) + circ(15, 11, 1.9) },
+	contagion: { s: "M6 18l6-11.5 6 11.5", a: circ(6, 18, 2.4) + circ(18, 18, 2.4), b: circ(12, 6, 2.6) },
+	ruin: { t: circ(12, 12, 9.5), a: "M12 5l2 5h5l-4 3.2 1.6 5L12 15l-4.6 3.2 1.6-5L5 10h5z" },
+	leech_strike: { b: sword, a: drop(18, 8, 0.42), t: "M14.5 13.5c2 1 3 2.8 3 5" },
+	lifesteal: { a: "M12 21s-8-4.8-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6.2-8 11-8 11z", c: drop(12, 12, 0.36) },
+	blood_frenzy: { s: "M3 7l5 5-5 5M8.5 7l5 5-5 5", a: drop(18, 12.8, 0.52) },
+	hemorrhage: { a: drop(9, 10, 0.58), b: drop(17, 15.5, 0.45) + circ(14, 21.5, 1.1) },
+	feast: { a: "M5 9h14l-1.5 9a3 3 0 0 1-3 2.5h-5a3 3 0 0 1-3-2.5z", b: drop(12, 4.6, 0.32) },
+	sanguine_lord: { a: "M3 19l1.8-9 4.6 4 2.6-7 2.6 7 4.6-4L21 19z", b: "M3 20.5h18v2H3z", c: drop(12, 15.2, 0.28) },
+};
+
 const glyphs = [];
+for (const [id, g] of Object.entries(blood)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(fire)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(frost)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
 for (const [id, g] of Object.entries(lightning)) glyphs.push({ id: "path_" + id, kind: "duo", px: 64, g, tw: 1.8, sw: 1.8 });
@@ -170,6 +199,7 @@ const masks = {
 	mouse_wheel: [S("M12 2.5a6 6 0 0 1 6 6v7a6 6 0 0 1-12 0v-7a6 6 0 0 1 6-6zM6 10h4.6M13.4 10H18", 1.6), F("M12 5a1.4 1.4 0 0 1 1.4 1.4v2.7a1.4 1.4 0 0 1-2.8 0V6.4A1.4 1.4 0 0 1 12 5z")],
 	mouse_right: [S("M12 2.5a6 6 0 0 1 6 6v7a6 6 0 0 1-12 0v-7a6 6 0 0 1 6-6zM6 10h12M12 2.5V10", 1.6), F("M12 2.8a5.7 5.7 0 0 1 5.7 5.7V10H12z")],
 	ring: [S(circ(12, 12, 10.5), 1.2)],
+	blood_drop: [F(drop(12, 13, 1))],
 };
 // Survival (WRSurvival): Rested, unlit, corruption and each weather on the HUD and its toasts.
 const cloud = (dx, dy, k) => `M${6 * k + dx} ${14 * k + dy}a${4 * k} ${4 * k} 0 0 1 ${0.5 * k} ${-8 * k}a${5.5 * k} ${5.5 * k} 0 0 1 ${10.5 * k} ${1.5 * k}a${3.3 * k} ${3.3 * k} 0 0 1 ${1 * k} ${6.5 * k}z`;
@@ -190,7 +220,7 @@ Object.assign(masks, {
 	weather_wind: [S("M3 7h9.5a2.6 2.6 0 1 0-2.6-2.6M3 11.5h15a3 3 0 1 1-3 3M3 16h6.5M12 19.5h5", 2)],
 	weather_overcast: [F(cloud(-2.5, -3, 0.9)), F(cloud(3.5, 2.5, 0.85))],
 });
-const maskPx = { flame: 48, snowflake: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
+const maskPx = { flame: 48, snowflake: 48, blood_drop: 48, lock: 32, check: 32, plus: 32, diamond: 32, diamond_line: 32, ring: 96, mouse_left: 40, mouse_wheel: 40, mouse_right: 40 };
 for (const [id, ops] of Object.entries(masks)) glyphs.push({ id: id, kind: "mask", px: maskPx[id] || 40, ops });
 
 // ---------- full colour

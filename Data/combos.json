@@ -23,6 +23,30 @@
       "at50": { "id": "blizzard_storm", "name": "Blizzard storm", "kind": "passive", "text": "Lightning strikes inside your blizzard", "grants": ["Combo.BlizzardStorm"], "requires": "frost.blizzard",
         "numbers": { "every": 1.5, "damage": 25, "shock": 40, "tell": 1.0, "radius": 250 } },
       "requiresAbility": "frost.blizzard"
+    },
+    {
+      "paths": ["fire", "blood"],
+      "at25": { "id": "hex_flame", "name": "Hex flame", "kind": "passive", "text": "Cursed enemies burn longer", "grants": ["Combo.HexFlame"],
+        "numbers": { "burnSeconds": 1.5 } },
+      "at50": { "id": "burning_lifesteal", "name": "Burning lifesteal", "kind": "passive", "text": "Burn damage heals you for a small share of it", "grants": ["Combo.BurningLifesteal"],
+        "numbers": { "share": 0.10 } },
+      "requiresAbility": null
+    },
+    {
+      "paths": ["frost", "blood"], "wheel": "neighbors",
+      "at25": { "id": "cold_blooded", "name": "Cold blooded", "kind": "passive", "text": "Spending HP fills Chill", "grants": ["Combo.ColdBlooded"],
+        "numbers": { "chillPerHp": 1.5 } },
+      "at50": { "id": "ice_veins", "name": "Ice veins", "kind": "passive", "text": "Lifesteal grants ice armor", "grants": ["Combo.IceVeins"],
+        "numbers": { "seconds": 4, "damageTaken": 0.85, "cooldown": 6 } },
+      "requiresAbility": null
+    },
+    {
+      "paths": ["lightning", "blood"], "wheel": "opposites",
+      "at25": { "id": "adrenaline", "name": "Adrenaline", "kind": "passive", "text": "Spending HP fills Charge", "grants": ["Combo.Adrenaline"],
+        "numbers": { "chargePerHp": 2.0 } },
+      "at50": { "id": "red_lightning", "name": "Red lightning", "kind": "passive", "text": "Chain lightning causes bleed on every target", "grants": ["Combo.RedLightning"], "requires": "lightning.chain_lightning",
+        "numbers": { "bleed": 35 } },
+      "requiresAbility": "lightning.chain_lightning"
     }
   ]
 }

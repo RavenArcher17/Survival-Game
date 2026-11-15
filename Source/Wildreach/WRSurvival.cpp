@@ -2,7 +2,9 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRSwampSystems.h"
 #include "WRStormTypes.h"
+#include "WRSwampTypes.h"
 #include "WRFarm.h"
 #include "WRWarHall.h"
 #include "WRPortals.h"
@@ -53,6 +55,10 @@ FName WRBiome::At(const UObject* WorldContext, const FVector& Pos)
 	if (!Hall.IsNone()) return Hall;
 	// Storm peaks (cooks/build-biome-lightning.md 2.4): everything north of the Old Island's frame (its landscape, the
 	// Ash Sound, the neck north of the island's edge) once the land is live; the island's own ground stays the island's.
+	// The Swamp (cooks/build-biome-swamp.md 2.1, 2.10) is checked first: east of the Crown's east-face line and the
+	// Rime Sound frost-bog neck; the cliff face itself stays Storm peaks'.
+	static const FName Swamp(TEXT("swamp"));
+	if (WRSwamp::Contains(Pos)) return Swamp;
 	static const FName Storm(TEXT("storm_peaks"));
 	if (WRBiome::IsLive(Storm))
 	{
@@ -76,6 +82,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	}
 	// So is a war-hall: a vaulted hall under the pass (no building, no bombs, no sky).
 	if (WRWarHall::HallAt(WorldContext, Pos))
+	{
+		return true;
+	}
+	// And the Sunken Coven under the Mire's peat mat (WRSwampSystems): dark but for the toads, no sky, no building.
+	if (WRSwamp::InCoven(Pos))
 	{
 		return true;
 	}

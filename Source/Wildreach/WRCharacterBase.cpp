@@ -15,6 +15,9 @@
 #include "WRFx.h"
 #include "WRCombatLibrary.h"
 #include "WRLightningPath.h"
+#include "WRSwampSystems.h"
+#include "WRSwampCreatures.h"
+#include "WRSwampBosses.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -137,6 +140,12 @@ float AWRCharacterBase::GetSpeedMultiplier() const
 	if (IsCreature()) Slow *= WRPortals::CreaturePace(this);
 	// A blizzard's deep snow in the open (WRSurvival sets the tag; both machines read it).
 	if (HasTag(WRTags::Weather_DeepSnow)) Slow *= WRTune(TEXT("weather.deepSnowRun"), 0.85f);
+	// The Swamp's quag (WRSwampSystems sets the tag on the server; both machines read it): run x0.5, sunk or not.
+	if (HasTag(WRSwampTags::Quag)) Slow *= WRTune(TEXT("swampHazards.quag.runMultiplier"), 0.5f);
+	// Swamp leeches on you: you still act, at x0.85 (both machines read the replicated latch; WRSwampCreatures).
+	Slow *= WRSwampGrip::MoveScale(this);
+	// Wading the Mother's Throat's risen flood (Vharra's Sinking): x0.75 (both machines read the replicated flood).
+	Slow *= FWRSwampBoss::WadeScale(this);
 	// The Lightning path: Swift and high Charge (both machines read them: the owner predicts with the same numbers).
 	return Slow * SpeedBoost * Load * WRLightning::MoveSpeedScale(this);
 }

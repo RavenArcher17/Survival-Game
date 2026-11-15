@@ -599,6 +599,8 @@ class WILDREACH_API AWRCreatureAI : public AAIController
 	// The Storm peaks creatures' and bosses' own moves run through its row machine (WRStormCreatures / WRStormBosses).
 	friend struct FWRStormAI;
 	friend struct FWRStormBoss;
+	friend struct FWRSwampAI;
+	friend struct FWRSwampBoss;
 
 public:
 	AWRCreatureAI();

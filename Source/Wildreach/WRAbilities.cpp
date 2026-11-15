@@ -1,6 +1,9 @@
 #include "WRAbilities.h"
+#include "WRSwampSystems.h"
 #include "WRAbilitiesLightning.h"
 #include "WRLightningPath.h"
+#include "WRAbilitiesBlood.h"
+#include "WRBloodPath.h"
 #include "WRDeeds.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
@@ -524,6 +527,10 @@ void UWRGA_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Windup /= Rate;
 		Active /= Rate;
 		Recovery /= Rate;
+		// Blood frenzy (blood node): below half health windups and recoveries x0.9, below a quarter x0.82.
+		const float Frenzy = WRBlood::SwingScale(Character);
+		Windup *= Frenzy;
+		Recovery *= Frenzy;
 	}
 	else if (!ArtKey.IsEmpty())
 	{
@@ -1513,13 +1520,15 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 	{
 		const FVector Move = bBackstep ? -Character->GetActorForwardVector().GetSafeNormal2D() : Input;
 		const FVector Away = Character->CombatTarget.IsValid() ? (Character->GetActorLocation() - Character->CombatTarget->GetActorLocation()).GetSafeNormal2D() : -Character->GetActorForwardVector().GetSafeNormal2D();
-		const bool bNoRoll = !bBackstep && WRArtifacts::Has(Character, TEXT("no_roll"));
+		// Sunk to the knee in the Swamp's quag (WRSwampSystems): no roll until you're out; a backstep or a jump still work.
+		const bool bSunk = !bBackstep && Character->HasTag(WRSwampTags::Sunk);
+		const bool bNoRoll = (!bBackstep && WRArtifacts::Has(Character, TEXT("no_roll"))) || bSunk;
 		const bool bNoRetreat = WRArtifacts::Has(Character, TEXT("never_turn_back")) && FVector::DotProduct(Move, Away) > 0.5f;
 		if (bNoRoll || bNoRetreat)
 		{
 			if (AWRPlayerController* PC = Character->IsLocallyControlled() ? Cast<AWRPlayerController>(Character->GetController()) : nullptr)
 			{
-				PC->ShowLocalNotice(bNoRoll ? TEXT("Wyrm's Stillness: you may not roll") : TEXT("Your geis: you may not turn back"));
+				PC->ShowLocalNotice(bSunk ? TEXT("Sunk to the knee: step back or jump out") : bNoRoll ? TEXT("Wyrm's Stillness: you may not roll") : TEXT("Your geis: you may not turn back"));
 			}
 			EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 			return;
@@ -2493,7 +2502,9 @@ bool UWRAbilityRegistry::IsBuilt(FName PathId, FName NodeId)
 		TEXT("spreading_flames"), TEXT("fuel_the_fire"), TEXT("wildfire"), TEXT("explosive_bolt"), TEXT("searing_parry"),
 		TEXT("brittle"), TEXT("cold_return"), TEXT("chain_shatter"), TEXT("cold_riposte"), TEXT("frozen_moment"), TEXT("overheat"), TEXT("whiteout"),
 		// Lightning (WRLightningPath.cpp): Conductive, Afterimage, Rapid fire, Discharge.
-		TEXT("conductive"), TEXT("afterimage"), TEXT("rapid_fire"), TEXT("discharge") };
+		TEXT("conductive"), TEXT("afterimage"), TEXT("rapid_fire"), TEXT("discharge"),
+		// Blood (WRBloodPath.cpp): Clotting, Misfortune, Contagion, Ruin, Blood frenzy, Feast.
+		TEXT("clotting"), TEXT("misfortune"), TEXT("contagion"), TEXT("ruin"), TEXT("blood_frenzy"), TEXT("feast") };
 	return ClassForNode(PathId, NodeId) != nullptr || Passives.Contains(NodeId);
 }
 
@@ -2538,6 +2549,20 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("charged_weapon")) return UWRGA_ChargedWeapon::StaticClass();
 		if (NodeId == TEXT("static_field")) return UWRGA_StaticField::StaticClass();
 		if (NodeId == TEXT("thunder_god")) return UWRGA_ThunderGod::StaticClass();
+	}
+	else if (PathId == TEXT("blood"))
+	{
+		// The Blood & curse path (WRAbilitiesBlood.cpp, cooks/biome-swamp.md 2.17).
+		if (NodeId == TEXT("blood_bolt")) return UWRGA_BloodBolt::StaticClass();
+		if (NodeId == TEXT("crimson_slash")) return UWRGA_CrimsonSlash::StaticClass();
+		if (NodeId == TEXT("blood_spear")) return UWRGA_BloodSpear::StaticClass();
+		if (NodeId == TEXT("blood_boil")) return UWRGA_BloodBoil::StaticClass();
+		if (NodeId == TEXT("transfusion")) return UWRGA_Transfusion::StaticClass();
+		if (NodeId == TEXT("crimson_tide")) return UWRGA_CrimsonTide::StaticClass();
+		if (NodeId == TEXT("hex_of_weakness")) return UWRGA_HexOfWeakness::StaticClass();
+		if (NodeId == TEXT("doom")) return UWRGA_Doom::StaticClass();
+		if (NodeId == TEXT("leech_strike")) return UWRGA_LeechStrike::StaticClass();
+		if (NodeId == TEXT("sanguine_lord")) return UWRGA_SanguineLord::StaticClass();
 	}
 	return nullptr;
 }

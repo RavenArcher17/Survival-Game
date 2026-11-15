@@ -3,6 +3,7 @@
 // slower, facing the crosshair) and left mouse fires along the crosshair. The server spends the ammo, keeps the
 // weapon's reload, and launches a real projectile (WRProjectile) with drop.
 #include "WRCharacter.h"
+#include "WRSwampSystems.h"
 #include "WRSurvival.h"
 #include "WRWeapons.h"
 #include "WRSound.h"
@@ -509,6 +510,8 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	Hit.PoiseDamage = Hit.Damage * WRTune(TEXT("ranged.poisePerDamage"), 0.4f);
 	Hit.Element = WRTags::Element_Physical;
 	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult * LauncherMult;
+	// An arrow's own status (items.json ammo: the Murkjaw-tooth arrow's bleed 25): WRSwampSystems reads it.
+	if (Ammo) WRSwamp::AddAmmoBuildups(Ammo->Id, Hit);
 	const FVector Chest = GetActorLocation() + FVector(0.f, 0.f, 55.f);
 	const FVector Muzzle = Chest + Dir * 45.f;
 
@@ -537,7 +540,10 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	if (AWRProjectile* Projectile = GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), Muzzle, Dir.Rotation(), Params))
 	{
 		// (The fire pot is modelled in code: the projectile builds it from "code:firepot".)
+		// (So are the Swamp's salt pouch and stormglass jar: "code:saltpouch", "code:stormjar", WRSwampSystems.)
+		const bool bSwampThrown = Launcher.RangedKind == TEXT("saltpouch") || Launcher.RangedKind == TEXT("stormjar");
 		const FString Model = Launcher.RangedKind == TEXT("firepot") ? FString(TEXT("code:firepot"))
+			: bSwampThrown ? FString(TEXT("code:")) + Launcher.RangedKind.ToString()
 			: Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->ProjectileMesh : Launcher.HeldMesh;
 		const FString MeshAlong = Ammo && !Ammo->ProjectileMesh.IsEmpty() ? Ammo->MeshAlong : Launcher.MeshAlong;
 		Projectile->InitPhysical(Hit, Dir * Launcher.ProjectileSpeed, Launcher.ProjectileGravity, Model, MeshAlong, Launcher.RangedKind,

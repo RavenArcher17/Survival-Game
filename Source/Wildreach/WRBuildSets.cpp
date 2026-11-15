@@ -2,6 +2,7 @@
 // 6.4; survival-crafting 2.17). Data/building_sets.json is expanded into ordinary pieces here.
 
 #include "WRBuildSets.h"
+#include "WRSwampSystems.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
 #include "WRCreature.h"
@@ -279,6 +280,11 @@ FString FWRBuildSets::PlaceCheck(const UObject* WorldContext, const FWRPieceDef&
 	if (Def.Needs == TEXT("vent") && !FWRMachines::LavaNear(Location, WRTune(TEXT("building.ventReach"), 800.f)))
 	{
 		return TEXT("a hot spring bath sits on a volcanic vent (lava within 8 m) or a hot spring");
+	}
+	// A stilt foundation's posts reach 2 m of water and a metre of mud (WRSwampSystems).
+	if (const FString Stilt = WRSwamp::StiltCheck(WorldContext, Def.Id, Location); !Stilt.IsEmpty())
+	{
+		return Stilt;
 	}
 	return FString();
 }

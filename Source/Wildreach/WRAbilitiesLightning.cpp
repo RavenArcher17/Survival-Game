@@ -7,10 +7,12 @@
 #include "WRFx.h"
 #include "WRGameplayTags.h"
 #include "WRLightningPath.h"
+#include "WRBloodPath.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "WRProjectile.h"
 #include "WRStatusComponent.h"
+#include "WRSwampBosses.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionConstantForce.h"
@@ -273,6 +275,8 @@ void UWRGA_ChainLightning::CastLightning(AWRCharacterBase* Caster)
 		return;
 	}
 	const float Damage = Spell(TEXT("damage"), 20.f), Shock = Spell(TEXT("shockBuildup"), 30.f);
+	// Red lightning (Lightning + Blood combo): every body this cast's chain hits may bleed (WRBloodPath.cpp).
+	const WRBlood::FChainScope RedLightning(Caster);
 	WRLightning::Ribbon(Caster, Hand, First->GetActorLocation() + FVector(0.f, 0.f, 30.f), true);
 	WRLightning::Zap(Caster, First, Damage, Shock, Caster->GetActorLocation(), true, false);
 	// Then it jumps: spells.chainLightning.jumps + one a rank of Arc, to the nearest enemy it hasn't hit within jumpRadius.
@@ -770,6 +774,13 @@ void AWRLightningField::Tick(float DeltaSeconds)
 			WRLightning::CallBolt(By, Pick->GetActorLocation() - FVector(0.f, 0.f, Pick->GetSimpleCollisionHalfHeight()), StrikeDamage, StrikeShock, Tell, StrikeRadius);
 		}
 		return;
+	}
+	// Laid in the Mother's Throat it runs into the water, a second's worth at a time (the rods, Vharra: WRSwampVharra.cpp).
+	Clock += DeltaSeconds;
+	if (Clock >= 1.f)
+	{
+		Clock -= 1.f;
+		FWRSwampBoss::LightningAt(GetWorld(), GetActorLocation(), Dps, By, false);
 	}
 	// Static field: what stands in it takes its damage and shock every frame (damage over time: no guard, no hit-stop).
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)

@@ -31,6 +31,10 @@ void UWRPathComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(UWRPathComponent, SubPath);
 	DOREPLIFETIME_CONDITION(UWRPathComponent, Progress, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRPathComponent, QuickSlots, COND_OwnerOnly);
+	DOREPLIFETIME(UWRPathComponent, BloodSpilled);
+	DOREPLIFETIME(UWRPathComponent, BloodWindowEnd);
+	DOREPLIFETIME(UWRPathComponent, BloodStealSerial);
+	DOREPLIFETIME(UWRPathComponent, BloodFightUntil);
 }
 
 UWRPathComponent* UWRPathComponent::FindFor(const AActor* Character)
@@ -604,7 +608,9 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 
 	const int32 Level = GetCharacterLevel();
 	const float HealthRatio = Attr->GetMaxHealth() > 0.f ? Attr->GetHealth() / Attr->GetMaxHealth() : 1.f;
-	const float MaxHealth = FWRPathRules::LevelStat(WRTune(TEXT("player.health"), 100.f), WRTune(TEXT("player.healthAtLevel50"), 250.f), Level);
+	// Blood reserve (Blood path): +8 max HP a rank (nodeEffects blood.blood_reserve maxHealth).
+	const float MaxHealth = FWRPathRules::LevelStat(WRTune(TEXT("player.health"), 100.f), WRTune(TEXT("player.healthAtLevel50"), 250.f), Level)
+		+ FMath::Max(0.f, Stat(Character, TEXT("maxHealth")));
 	// Corruption at 75 takes some max stamina while it lasts (WRSurvival).
 	const UWRSurvivalComponent* Survival = UWRSurvivalComponent::For(GetOwner());
 	const float MaxStamina = FWRPathRules::LevelStat(WRTune(TEXT("player.stamina"), 100.f), WRTune(TEXT("player.staminaAtLevel50"), 150.f), Level)

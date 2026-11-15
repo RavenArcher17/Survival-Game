@@ -2,6 +2,8 @@
 #include "WRDeeds.h"
 #include "WRWarHall.h"
 #include "WRStormBosses.h"
+#include "WRSwampBosses.h"
+#include "WRSwampSystems.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
@@ -24,6 +26,7 @@
 #include "WRWeapons.h"
 #include "WRLag.h"
 #include "WRLightningPath.h"
+#include "WRBloodPath.h"
 #include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
@@ -492,6 +495,12 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			}
 		}
 	}
+	// Misfortune (blood node): a cursed body's blow visibly whiffs on its contact frame (WRBloodPath.cpp).
+	if (WRBlood::Whiffs(Target, Hit))
+	{
+		Target->ReportHit(0.f, EWRHitResult::Dodged, WRFx::HitFlagsFor(Hit, false, false, false, false, false), Hit.Instigator, Hit.Origin);
+		return Done(EWRHitResult::Dodged);
+	}
 
 	float Damage = Hit.Damage;
 	float PoiseDamage = Hit.PoiseDamage;
@@ -626,6 +635,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= WRLightning::DamageScale(Attacker, Target, Hit);
 		}
+		// Blood: Sanguine power on Blood spells, Ruin on a cursed body (from everyone), Ice veins' armour.
+		Damage *= WRBlood::DamageScale(Attacker, Target, Hit);
 		if (TargetASC->HasMatchingGameplayTag(WRTags::Status_Frostbite))
 		{
 			Damage *= 1.f + WRTune(TEXT("status.frostbiteDamageTakenBonus"), 0.15f);
@@ -847,18 +858,16 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Target->Status->NotifyHurt();
 		WRArtifacts::OnHitLanded(Target, Hit, Damage);
 	}
-	// Worn gear on the blow (cooks/build-crafting.md 2.5-2.7): lifesteal (Rune of Thirst, Mirehide), stamina on a hit
-	// (Rune of the Tide), and what comes back at the attacker (Rune of Thorns on melee, Twin shard on projectiles).
+	// One lifesteal pipeline (WRBloodPath.cpp, cooks/biome-swamp.md 2.17): Bloodthirst, Lifesteal, Leech strike, Sanguine
+	// lord, worn lifesteal (Rune of Thirst, Mirehide, the Mire-witch's ring), Burning lifesteal; x0.5 on players; it goes
+	// through the Spilled bar first. Doom's tally of what a marked body takes.
+	WRBlood::AfterDamage(Target, Hit, Damage, Result == EWRHitResult::Hit);
+	// Worn gear on the blow (cooks/build-crafting.md 2.5-2.7): stamina on a hit (Rune of the Tide), and what comes back at
+	// the attacker (Rune of Thorns on melee, Twin shard on projectiles).
 	if (Damage > 0.f && !Hit.bDamageOverTime && !Hit.bReaction && Result == EWRHitResult::Hit)
 	{
 		if (Attacker && Attacker->IsAlive() && Attacker->GetPlayerState() && AttackerASC && Attacker->GetAttributes())
 		{
-			const float Steal = UWRInventoryComponent::GearStatFor(Attacker, TEXT("lifesteal"));
-			if (Steal > 0.f)
-			{
-				const UWRAttributeSet* AA = Attacker->GetAttributes();
-				AttackerASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(AA->GetMaxHealth(), AA->GetHealth() + Damage * Steal * Attacker->Status->HealingTakenScale()));
-			}
 			const float Breath = Hit.bMelee ? UWRInventoryComponent::GearStatFor(Attacker, TEXT("staminaOnHit")) : 0.f;
 			if (Breath > 0.f)
 			{
@@ -972,6 +981,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		Stance *= WRPortals::StanceScale(Target);   // a fold boss's arena: the Alpha's ice plates, the Mould-Born hardened
 		Stance *= WRWarHall::StanceScale(Target);   // a raid champion slipping on its melted footing
 		Stance *= FWRStormBoss::StanceTaken(Target, Hit, Stance);   // Storm peaks: the Bellwether stuck x2, freeing the bone drop
+		Stance *= FWRSwampBoss::StanceTaken(Target, Hit, Stance);   // the Swamp: Maw's open belly, Vharra convulsing
 		if (AWRCreature* Body = Cast<AWRCreature>(Target))
 		{
 			if (Hit.PhysType == 2 && Body->IsNearLockPoint(Hit.ImpactPoint, TEXT("head"), WRTune(TEXT("stance.headRadius"), 70.f)))
@@ -1040,7 +1050,10 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		const float BuildScale = (bWasUnaware ? 1.f + WRTune(TEXT("combat.stealth.buildup"), 0.2f) : 1.f) * (bPvP ? WRTune(TEXT("pvp.buildup"), 0.7f) : 1.f) * (1.f + GearBuild)
 			* WRPortals::BuildupScale(Attacker, Target);   // a fold's Venomous; the Rime-Witch's freeze in brazier light
 		const auto DealtBy = [Attacker](int32 Id) { return 1.f + UWRInventoryComponent::GearStatFor(Attacker, FName(*(FString(TEXT("buildupDealt.")) + WRStatus::Name(Id).ToString()))); };
-		for (const TPair<FName, float>& B : Hit.Buildups)
+		// The Swamp's coatings and charms (WRSwampSystems): thinblood oil's bleed on a blade, the Coven ring's +5% curse.
+		FWRHit Coated = Hit;
+		WRSwamp::ScaleBuildups(Attacker, Coated);
+		for (const TPair<FName, float>& B : Coated.Buildups)
 		{
 			const int32 Id = WRStatus::FromName(B.Key);
 			if (Id == WRStatus::Burn || Id == WRStatus::Frost || Id >= WRStatus::Count)
@@ -1071,6 +1084,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	if (Result == EWRHitResult::Hit && Attacker && !Hit.bDamageOverTime)
 	{
 		WRLightning::AfterHit(Target, Hit, Damage);
+		// The Blood path's (WRBloodPath.cpp): Bleed chance, Red lightning, a Doom bolt's mark, the garnet splash.
+		WRBlood::AfterHit(Target, Hit, Damage);
 	}
 
 	// Unhorsed (combat.md 2.19): a big blow on a ridden mount (impact 4+), or one that staggers it, throws the rider.
@@ -1154,7 +1169,14 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			else if (Main == TEXT("frost")) GainResource(Attacker, WRTags::Element_Frost, Feed);
 			else if (Main == TEXT("lightning")) GainResource(Attacker, WRTags::Element_Lightning, Feed);
 		}
+		// Blood: Feast heals the killer, Contagion passes a dying body's curse on (WRBloodPath.cpp).
+		WRBlood::OnKill(Target, Hit);
 		Target->Die(Hit.Instigator);
+	}
+	// A fire blow, a fire spell's touch (not a burn's tick): marsh gas near it lights (WRSwampSystems; cheap when none).
+	if (Result == EWRHitResult::Hit && Hit.Element == WRTags::Element_Fire && !Hit.bDamageOverTime && WRSwamp::IsLive())
+	{
+		WRSwamp::FireAt(Target, Target->GetActorLocation(), Attacker);
 	}
 	return Done(Result);
 }

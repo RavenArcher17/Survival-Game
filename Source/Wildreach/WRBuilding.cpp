@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRSwampSystems.h"
 #include "WRCreature.h"
 #include "WRRaiding.h"
 #include "WRTaming.h"
@@ -1140,7 +1141,9 @@ int32 AWRBuildPiece::SupportAt(UWorld* World, FName PieceId, const FTransform& A
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRSupport), false, Ignore);
 		const FVector Top = Location + FVector(0, 0, 60 + WRTune(TEXT("building.foundationSink"), 60.f));
 		FHitResult H;
-		for (int32 Try = 0; Try < 4 && World->LineTraceSingleByChannel(H, Top, Location - FVector(0, 0, 160), ECC_WorldStatic, Query); ++Try)
+		// (A stilt foundation's footing is its posts, down to the bottom under the water: WRSwampSystems.)
+		const float Below = WRSwamp::GroundReach(Def->Id, 160.f);
+		for (int32 Try = 0; Try < 4 && World->LineTraceSingleByChannel(H, Top, Location - FVector(0, 0, Below), ECC_WorldStatic, Query); ++Try)
 		{
 			if (H.GetActor() && !H.GetActor()->IsA<AWRBuildPiece>())
 			{

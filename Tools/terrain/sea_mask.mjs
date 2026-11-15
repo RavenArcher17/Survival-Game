@@ -31,14 +31,37 @@ const stormH = (xm, ym) => {
 	if (i < 0 || j < 0 || i >= SF.samples || j >= SF.samples) return null;
 	return (storm.readUInt16LE((j * SF.samples + i) * 2) - 32768) / SF.unitsPerMetre;
 };
-// The grid covers both landscapes (metres).
-const MINX = storm ? Math.min(-HALF_M, SF.x0) : -HALF_M, MINY = storm ? Math.min(-HALF_M, SF.y0) : -HALF_M;
-const MAXX = storm ? Math.max(HALF_M, SF.x0 + (SF.samples - 1) * SF.step) : HALF_M, MAXY = HALF_M;
+// The Swamp (Tools/terrain/swamp.mjs, cooks/build-biome-swamp.md 2.2): east of Storm peaks. Its water stands at the sea's
+// own level, so every hollow of its land below the surface is water too (seeded below), not only where the ocean reaches.
+let swamp = null, WF = null, SZ = null;
+try {
+	swamp = fs.readFileSync(path.join(root, 'Art', 'Terrain', 'swamp_height.r16'));
+	const sj = JSON.parse(fs.readFileSync(path.join(root, 'Data', 'swamp.json'), 'utf8'));
+	WF = sj.frame; SZ = sj.zones;
+} catch { swamp = null; }
+const swampH = (xm, ym) => {
+	if (!swamp) return null;
+	const i = Math.round((xm - WF.x0) / WF.step), j = Math.round((ym - WF.y0) / WF.step);
+	if (i < 0 || j < 0 || i >= WF.samples || j >= WF.samples) return null;
+	return (swamp.readUInt16LE((j * WF.samples + i) * 2) - 32768) / WF.unitsPerMetre;
+};
+const swampZone = (xm, ym) => {
+	if (!SZ) return '~';
+	const i = Math.floor((xm - SZ.x0) / SZ.cell), j = Math.floor((ym - SZ.y0) / SZ.cell);
+	return i < 0 || j < 0 || i >= SZ.width || j >= SZ.height ? '~' : SZ.rows[j][i];
+};
+// The grid covers every landscape (metres).
+const frames = [[-HALF_M, -HALF_M, HALF_M, HALF_M]];
+if (storm) frames.push([SF.x0, SF.y0, SF.x0 + (SF.samples - 1) * SF.step, SF.y0 + (SF.samples - 1) * SF.step]);
+if (swamp) frames.push([WF.x0, WF.y0, WF.x0 + (WF.samples - 1) * WF.step, WF.y0 + (WF.samples - 1) * WF.step]);
+const MINX = Math.min(...frames.map(f => f[0])), MINY = Math.min(...frames.map(f => f[1]));
+const MAXX = Math.max(...frames.map(f => f[2])), MAXY = HALF_M;
 const W = Math.floor((MAXX - MINX) / CELL), N = Math.floor((MAXY - MINY) / CELL);
 const ground = (xm, ym) => {
-	const a = islandH(xm, ym), b = stormH(xm, ym);
-	return a === null ? (b === null ? -50 : b) : b === null ? a : Math.max(a, b);
+	const v = [islandH(xm, ym), stormH(xm, ym), swampH(xm, ym)].filter(h => h !== null);
+	return v.length ? Math.max(...v) : -50;
 };
+const SWAMP_SURFACE = 0.6, SWAMP_LAND_ABOVE = 0.9;
 // Lowest ground in each cell.
 const low = new Float32Array(W * N);
 for (let j = 0; j < N; j++) {
@@ -54,17 +77,22 @@ const queue = [];
 const border = [];
 for (let k = 0; k < W; k++) border.push([k, 0], [k, N - 1]);
 for (let k = 0; k < N; k++) border.push([0, k], [W - 1, k]);
+const inSwamp = new Uint8Array(W * N);
+for (let j = 0; j < N; j++) for (let i = 0; i < W; i++) if (swampZone(MINX + (i + 0.5) * CELL, MINY + (j + 0.5) * CELL) !== '~') inSwamp[j * W + i] = 1;
+const landAbove = c => inSwamp[c] ? SWAMP_LAND_ABOVE : LAND_ABOVE;
 for (const [i, j] of border) {
 	const c = j * W + i;
-	if (!sea[c] && low[c] < LAND_ABOVE) { sea[c] = 1; queue.push(c); }
+	if (!sea[c] && low[c] < landAbove(c)) { sea[c] = 1; queue.push(c); }
 }
+// The swamp's inland waters: every swamp cell whose lowest point is under the surface.
+for (let c = 0; c < W * N; c++) if (inSwamp[c] && !sea[c] && low[c] < SWAMP_SURFACE) { sea[c] = 1; queue.push(c); }
 for (let q = 0; q < queue.length; q++) {
 	const c = queue[q], i = c % W, j = (c / W) | 0;
 	for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
 		const a = i + di, b = j + dj;
 		if (a < 0 || b < 0 || a >= W || b >= N) continue;
 		const d = b * W + a;
-		if (!sea[d] && low[d] < LAND_ABOVE) { sea[d] = 1; queue.push(d); }
+		if (!sea[d] && low[d] < landAbove(d)) { sea[d] = 1; queue.push(d); }
 	}
 }
 // Rows of run lengths, starting with a (possibly empty) sea run.

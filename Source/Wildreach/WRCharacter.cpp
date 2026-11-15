@@ -8,6 +8,7 @@
 #include "WRCameraBoom.h"
 #include "WRSocial.h"
 #include "WRWorldDressing.h"
+#include "WRSwampCreatures.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
 #include "WRAttributeSet.h"
@@ -1182,6 +1183,13 @@ void AWRCharacter::ToggleView()
 
 void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 {
+	// In a swamp creature's jaws or mouth (the Murkjaw's death roll, the Bogstalker's gulp): every press fights the hold
+	// (-0.15 s each, WRSwampCreatures); nothing else can start in there.
+	if (WRSwampGrip::IsHeld(this))
+	{
+		ServerMashFrozen();
+		return;
+	}
 	// In build mode the attack buttons place / rotate / cancel instead.
 	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())
 	{
@@ -1688,7 +1696,14 @@ void AWRCharacter::InputReleased(EWRAbilityInput Input)
 
 void AWRCharacter::InputJump()
 {
-	if (WRInput::AllowPress(Cast<APlayerController>(Controller))) Jump();
+	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
+	// Held in a swamp creature's jaws or mouth: the jump button mashes too.
+	if (WRSwampGrip::IsHeld(this))
+	{
+		ServerMashFrozen();
+		return;
+	}
+	Jump();
 }
 
 void AWRCharacter::InputSprint()

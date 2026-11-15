@@ -1,4 +1,6 @@
 #include "WRProjectile.h"
+#include "WRSwampSystems.h"
+#include "WRSwampBosses.h"
 #include "WRRaiding.h"
 #include "WRRaidLook.h"
 #include "WRToolMesh.h"
@@ -203,6 +205,19 @@ void AWRProjectile::OnRep_Model()
 		OnRep_Fx();
 		return;
 	}
+	if (ModelPath.StartsWith(TEXT("code:")))
+	{
+		// The Swamp's thrown things (WRSwampSystems): the salt pouch, the stormglass jar, modelled in code.
+		if (GetNetMode() == NM_DedicatedServer || CodeModel) return;
+		CodeModel = NewObject<UProceduralMeshComponent>(this, TEXT("ThrownModel"));
+		CodeModel->SetupAttachment(GetRootComponent());
+		CodeModel->RegisterComponent();
+		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel))
+		{
+			Mesh->SetVisibility(false);
+		}
+		return;
+	}
 	UStaticMesh* Model = ModelPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *ModelPath);
 	if (!Model)
 	{
@@ -265,6 +280,14 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(OtherActor);
 	const AWRCharacterBase* Caster = Cast<AWRCharacterBase>(Hit.Instigator);
+	// A lightning bolt landing in the Mother's Throat: on a Rodwarden rod, into the water, at someone wading it (Vharra
+	// herself counts it as her blow lands: WRSwampVharra.cpp). Nothing happens anywhere else.
+	if (Hit.Element == WRTags::Element_Lightning && !(Cast<AWRBoss>(Target) && FWRSwampBoss::IsVharra(Target)))
+	{
+		const FVector Landed = Target ? Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight())
+			: HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		FWRSwampBoss::LightningAt(GetWorld(), Landed, Hit.Damage, Hit.Instigator, false);
+	}
 	// A fold's things: an arrow or a bolt drops an icicle, cuts a chute's rope, cracks a frost bolt (fire melts too).
 	{
 		const bool bFireShot = Hit.Element == WRTags::Element_Fire;
@@ -278,6 +301,19 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 				if (*It != OtherActor && FVector::Dist(It->GetActorLocation(), At) < FMath::Max(SplashRadius, 150.f) + 100.f) WRPortals::HitThing(*It, By, Hit.Damage, bFireShot);
 			}
 		}
+	}
+	// The Swamp's thrown things break where they land: salt bursts, a stormglass jar shocks the water (WRSwampSystems).
+	if (Kind == TEXT("saltpouch") || Kind == TEXT("stormjar"))
+	{
+		const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();
+		WRSwamp::ThrownLanded(this, Kind, At, OtherActor, const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
+	// Fire landing near marsh gas lights it (a fire bolt's impact, a fire pot's burst): WRSwampSystems.
+	if (Hit.Element == WRTags::Element_Fire || Kind == TEXT("firepot"))
+	{
+		WRSwamp::FireAt(this, HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation(), const_cast<AWRCharacterBase*>(Caster));
 	}
 	// A thrown fire pot breaks wherever it lands: shards, fire, burning ground (WRRaiding).
 	if (Kind == TEXT("firepot"))

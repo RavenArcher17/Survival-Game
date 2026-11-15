@@ -211,6 +211,10 @@ private:
 	void StartMusic(EMusic Which);
 	bool StepStream(FStream& S, float DeltaTime, float Gain);
 	float Tune(const TCHAR* Key, float Fallback) const;
+	/** The swamp's listener state (UpdateAmbient). */
+	void UpdateSwamp(float DeltaTime);
+	/** A music layer over whatever plays (the Great Storm's drums, the Red Tide's pulse): fades in while wanted. */
+	void StepMusicLayer(TArray<FStream>& Layer, bool bWant, FName Pool, float DeltaTime, float Gain);
 
 	bool bStarted = false;
 	FDelegateHandle HitHandle;
@@ -239,6 +243,20 @@ private:
 	float Storm = 0.f;
 	float StormZone[7] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 	float Rodfield = 0.f;
+	/** The Swamp (cooks/biome-swamp.md 2.2, 2.16): how far into its air (eased), each sub-zone's bed weight (M1..M5 as
+	 *  '1'..'5', eased), the falls' roar by distance to the Weeping Wall, the Sunken Coven, bleedwater round you, the
+	 *  Red Tide. */
+	float Swamp = 0.f;
+	float SwampZone[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	float SwampFalls = 0.f;
+	float SwampCoven = 0.f;
+	float SwampBleed = 0.f;
+	float SwampTide = 0.f;
+	/** The Red Tide's pulse layer over whatever plays (music.pools layer.red_tide). */
+	TArray<FStream> RedTideLayer;
+	/** The engaged boss's phase, and the phase its music was picked for (boss.<id>.p<n> pools). */
+	int32 BossPhase = 1;
+	int32 MusicPhase = 1;
 	/** The Great Storm's war-drum layer over whatever plays (music.pools layer.great_storm). */
 	float Daylight = 1.f;
 	float High = 0.f;

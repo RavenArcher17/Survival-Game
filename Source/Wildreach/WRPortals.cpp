@@ -25,6 +25,7 @@
 #include "WRSocial.h"
 #include "WRSound.h"
 #include "WRSurvival.h"
+#include "WRSwampTypes.h"
 #include "WRTuning.h"
 #include "WRWildlife.h"
 #include "WRWorlds.h"
@@ -81,7 +82,9 @@ namespace WRPortalsSys
 		static const TMap<FString, FName> M = {
 			{ TEXT("volcanic.lowland"), TEXT("cinderfang") }, { TEXT("volcanic.midland"), TEXT("basaltback") }, { TEXT("volcanic.highland"), TEXT("magmaw") },
 			{ TEXT("tundra.lowland"), TEXT("gloomhowl") }, { TEXT("tundra.midland"), TEXT("frostantler") }, { TEXT("tundra.highland"), TEXT("rimeclaw") },
-			{ TEXT("storm_peaks.lowland"), TEXT("voltfang") }, { TEXT("storm_peaks.midland"), TEXT("voltfang") }, { TEXT("storm_peaks.highland"), TEXT("voltfang") } };
+			{ TEXT("storm_peaks.lowland"), TEXT("voltfang") }, { TEXT("storm_peaks.midland"), TEXT("voltfang") }, { TEXT("storm_peaks.highland"), TEXT("voltfang") },
+			// The Swamp's walkers (cooks/biome-swamp.md 2.12): the coast's Mudhulks, the domes' Bogsnouts, the Crown foot's Bogstalkers.
+			{ TEXT("swamp.lowland"), TEXT("mudhulk") }, { TEXT("swamp.midland"), TEXT("bogsnout") }, { TEXT("swamp.highland"), TEXT("bogstalker") } };
 		const FName* F = M.Find(Biome.ToString() + TEXT(".") + Band.ToString());
 		return F ? *F : NAME_None;
 	}
@@ -909,8 +912,12 @@ bool UWRPortalSystem::FindSpot(FName Biome, int32 Rank, FVector& OutAt, float& O
 		// A point on the island on this side (the walk map's cells are 1 km wide at most: sample anywhere and ask it).
 		const float Side = Biome == TEXT("volcanic") ? -1.f : 1.f;
 		// Storm peaks: anywhere in its landscape's frame (north of the island); the island's lands: their side of it.
-		const FVector2D P = Biome == TEXT("storm_peaks") ? FVector2D(FMath::FRandRange(-290000.f, 100000.f), FMath::FRandRange(-580000.f, -205000.f))
+		// The Swamp: anywhere in its landscape's frame (Data/swamp.json), kept to its own ground by WRBiome::At below.
+		const FWRSwampData& SwampD = FWRSwampData::Get();
+		const FVector2D P = Biome == TEXT("swamp") ? FVector2D(FMath::FRandRange(SwampD.FrameMin.X, SwampD.FrameMax.X), FMath::FRandRange(SwampD.FrameMin.Y, SwampD.FrameMax.Y))
+			: Biome == TEXT("storm_peaks") ? FVector2D(FMath::FRandRange(-290000.f, 100000.f), FMath::FRandRange(-580000.f, -205000.f))
 			: FVector2D(Side * FMath::FRandRange(10000.f, 260000.f), FMath::FRandRange(-200000.f, 200000.f));
+		if (Biome == TEXT("swamp") && (!SwampD.bLoaded || SwampD.BaseWaterAt(FVector(P, 0.f)) != EWRSwampWater::Dry)) continue;
 		if (!WRWildlife::CanStand(As, P)) continue;
 		const FVector Probe(P, 0.f);
 		if (WRBiome::At(World, Probe) != Biome || !SpotOk(Biome, Probe, Rank, nullptr)) continue;
@@ -918,7 +925,9 @@ bool UWRPortalSystem::FindSpot(FName Biome, int32 Rank, FVector& OutAt, float& O
 		FHitResult Hit;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRPortalSpot), false);
 		if (!World->LineTraceSingleByChannel(Hit, FVector(P, 200000.f), FVector(P, -20000.f), ECC_WorldStatic, Q) || Cast<APawn>(Hit.GetActor())) continue;
-		if (Hit.ImpactPoint.Z < WRTune(TEXT("sea.level"), -20.f) + 200.f || Hit.ImpactNormal.Z < Slope) continue;
+		if ((Biome != TEXT("swamp") && Hit.ImpactPoint.Z < WRTune(TEXT("sea.level"), -20.f) + 200.f) || Hit.ImpactNormal.Z < Slope) continue;
+		// The swamp's dry ground stands only a metre or two over its water: clear the drawn surface instead.
+		if (Biome == TEXT("swamp") && Hit.ImpactPoint.Z < SwampD.SeaZ + WRTune(TEXT("swampWorld.portalDryLift"), 50.f)) continue;
 		OutAt = Hit.ImpactPoint;
 		OutYaw = FMath::FRandRange(0.f, 360.f);
 		return true;

@@ -4,6 +4,7 @@
 #include "Wildreach.h"
 #include "WRCameraBoom.h"
 #include "WRCreature.h"
+#include "WRSwampCreatures.h"
 #include "WRGameplayTags.h"
 #include "WRPlayerController.h"
 #include "WRStatusComponent.h"
@@ -43,6 +44,12 @@ void AWRCharacter::OnRep_TwoHanded()
 
 void AWRCharacter::ServerMashFrozen_Implementation()
 {
+	// Held in a swamp creature's jaws or mouth: the press shortens the hold (WRSwampCreatures); else the ice.
+	if (WRSwampGrip::IsHeld(this))
+	{
+		WRSwampGrip::Mash(this);
+		return;
+	}
 	Status->MashFrozen();
 }
 

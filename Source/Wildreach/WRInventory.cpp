@@ -1,5 +1,6 @@
 #include "WRInventory.h"
 #include "WRStormTypes.h"
+#include "WRSwampSystems.h"
 #include "WRRaiding.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -1095,6 +1096,8 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 		for (const FName& Cure : D->Cures)
 		{
 			C->Status->CureStatus(WRStatus::FromName(Cure));
+			// A bloodmoss poultice closing a bleed the Mire's water opened (Ruslana's second quest: WRSwampSystems).
+			if (WRStatus::FromName(Cure) == WRStatus::Bleed) WRSwamp::OnBleedCured(C);
 		}
 		if (!D->BuffId.IsNone()) WRStorm::GrantBuff(C, D->BuffId, D->BuffMinutes * 60.f);
 		WRFx::BroadcastOn(C, TEXT("potion.heal"), NAME_None, 1.f, NAME_None, 0.5f);

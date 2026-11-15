@@ -1,5 +1,6 @@
 #include "WRAudio.h"
 #include "WRStormTypes.h"
+#include "WRSwampTypes.h"
 #include "WRWorldDressing.h"
 #include "WRPortals.h"
 #include "WRSurvival.h"
@@ -98,6 +99,8 @@ float UWRAudioDirector::Tune(const TCHAR* Key, float Fallback) const
 void UWRAudioDirector::Duck(float Amount, float Seconds)
 {
 	const double Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0;
+	// In the Swamp the score never drops more than 4 dB under a moment (cooks/biome-swamp.md 2.16: always audible).
+	if (Swamp > 0.5f) Amount = FMath::Min(Amount, Tune(TEXT("music.swampDuckMax"), 0.37f));
 	DuckTarget = FMath::Min(DuckTarget, 1.f - FMath::Clamp(Amount, 0.f, 1.f));
 	DuckUntil = FMath::Max(DuckUntil, Now + Seconds);
 }
@@ -229,8 +232,8 @@ float UWRAudioDirector::SampleCoast()
 float UWRAudioDirector::LayerWeight(FName Layer) const
 {
 	const float Out = 1.f - Cave;
-	// The island's beds give way to Storm peaks' across the Ash Sound and the neck.
-	const float Isl = 1.f - Storm;
+	// The island's beds give way to Storm peaks' across the Ash Sound and the neck, and to the Swamp's east of the Crown.
+	const float Isl = FMath::Max(0.f, 1.f - Storm - Swamp);
 	const float Volc = (1.f - Tundra) * Isl;
 	const float TundraW = Tundra * Isl;
 	const float Night = 1.f - Daylight;
@@ -264,6 +267,30 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 	if (Layer == Shrines) return Out * StormZone[5];
 	if (Layer == RodfieldL) return Out * Rodfield;
 	if (Layer == HollowL) return 0.f;   // the Hollow Spire isn't on the map yet
+	// The Swamp's beds (layer swamp / swamp.day|night / swamp.<zone> / swamp.falls / swamp.bleedwater / swamp.coven /
+	// swamp.red_tide; cooks/biome-swamp.md 2.2, 3.4). Down in the Sunken Coven the land's open air gives way to its own bed.
+	static const FName SwampL(TEXT("swamp")), SwampDay(TEXT("swamp.day")), SwampNight(TEXT("swamp.night")),
+		Reeds(TEXT("swamp.reeds")), ReedsNight(TEXT("swamp.reeds.night")), Mangroves(TEXT("swamp.mangroves")),
+		Boardwalks(TEXT("swamp.boardwalks")), Pools(TEXT("swamp.pools")), PoolsNight(TEXT("swamp.pools.night")),
+		Bones(TEXT("swamp.bones")), FallsL(TEXT("swamp.falls")), BleedL(TEXT("swamp.bleedwater")), CovenL(TEXT("swamp.coven")),
+		TideL(TEXT("swamp.red_tide"));
+	{
+		const float OutS = Out * (1.f - SwampCoven);
+		if (Layer == SwampL) return OutS * Swamp;
+		if (Layer == SwampDay) return OutS * Swamp * Daylight;
+		if (Layer == SwampNight) return OutS * Swamp * Night;
+		if (Layer == Reeds) return OutS * SwampZone[1];
+		if (Layer == ReedsNight) return OutS * SwampZone[1] * Night;   // the frog chorus from dusk
+		if (Layer == Mangroves) return OutS * SwampZone[2];
+		if (Layer == Boardwalks) return OutS * SwampZone[3];
+		if (Layer == Pools) return OutS * SwampZone[4];
+		if (Layer == PoolsNight) return OutS * SwampZone[4] * Night;
+		if (Layer == Bones) return OutS * SwampZone[5];
+		if (Layer == FallsL) return OutS * SwampFalls;
+		if (Layer == BleedL) return OutS * SwampBleed;
+		if (Layer == TideL) return OutS * SwampTide;
+		if (Layer == CovenL) return SwampCoven;
+	}
 	if (Layer == Always) return 1.f;
 	// Weather beds ("weather.<kind>", WRSurvival): rising over the 60 s warning, full while it blows, muffled in a cave.
 	// Music is never touched by weather (it keeps playing; survival-crafting 2.4).
@@ -317,6 +344,9 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 	// Storm peaks: its air north of the island, its sub-zones' beds eased over 3 s as you cross (they blend 60-120 m in
 	// the land itself), the Rodfield's aeolian wind-song within 250 m of the rods.
 	Storm = FMath::SmoothStep(0.f, 1.f, float((WRTune(TEXT("world.islandNorthEdge"), -201600.f) + Tune(TEXT("ambient.stormBlendFrom"), 10000.f) - Listener.Y) / Tune(TEXT("ambient.stormBlend"), 30000.f)));
+	// The Swamp lies north of the island too (east of the Crown): its air takes over from the peaks' there.
+	UpdateSwamp(DeltaTime);
+	Storm *= 1.f - Swamp;
 	{
 		const TCHAR Z = WRStorm::ZoneAt(World, Listener);
 		for (int32 i = 1; i <= 6; ++i)
@@ -401,6 +431,61 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 	}
 }
 
+void UWRAudioDirector::UpdateSwamp(float DeltaTime)
+{
+	// Where the listener is in the Swamp (cooks/biome-swamp.md 2.2): its air eased over a few seconds as you cross the
+	// 60-120 m blend, each sub-zone's bed eased over 3 s, the five red falls' roar rising toward the Weeping Wall, the
+	// Sunken Coven's rooms, bleedwater round you (the leeches' low hum), the Red Tide's boil in M3-M5.
+	UWorld* World = GetWorld();
+	const FWRSwampData& D = FWRSwampData::Get();
+	const bool bLive = WRSwamp::IsLive();
+	const bool bIn = bLive && WRSwamp::Contains(Listener);
+	Swamp = FMath::FInterpConstantTo(Swamp, bIn ? 1.f : 0.f, DeltaTime, 1.f / FMath::Max(Tune(TEXT("ambient.swampFade"), 4.f), 0.1f));
+	TCHAR Z = bIn ? D.ZoneAt(Listener) : TEXT('~');
+	if (Z == TEXT('f')) Z = TEXT('4');   // the frost border is Murk Pools' cypress bog, iced
+	for (int32 i = 1; i <= 5; ++i)
+	{
+		SwampZone[i] = FMath::FInterpConstantTo(SwampZone[i], Z == TCHAR('0' + i) ? Swamp : 0.f, DeltaTime, 1.f / 3.f);
+	}
+	if (!bLive && Swamp <= 0.f && SwampCoven <= 0.f)
+	{
+		SwampFalls = SwampBleed = SwampTide = 0.f;
+		return;
+	}
+	float Fall = 0.f;
+	for (const FWRSwampData::FFall& F : D.Falls)
+	{
+		Fall = FMath::Max(Fall, 1.f - Smooth(Tune(TEXT("ambient.swampFallsNear"), 6000.f), Tune(TEXT("ambient.swampFallsFar"), 60000.f), FVector::Dist2D(F.Top, Listener)));
+	}
+	SwampFalls = Swamp * Fall;
+	bool bCoven = false;
+	const float Margin = Tune(TEXT("ambient.swampCovenMargin"), 600.f);
+	for (const FWRSwampData::FRoom& R : D.CovenRooms)
+	{
+		const FVector Half = R.Size * 0.5f + FVector(Margin);
+		const FVector Off = (Listener - R.At).GetAbs();
+		if (Off.X <= Half.X && Off.Y <= Half.Y && Off.Z <= Half.Z) { bCoven = true; break; }
+	}
+	SwampCoven = FMath::FInterpConstantTo(SwampCoven, bLive && bCoven ? 1.f : 0.f, DeltaTime, 1.f / 1.5f);
+	const AWRSwampState* State = bLive ? AWRSwampState::Get(World) : nullptr;
+	const bool bTide = State && State->IsTide();
+	// Bleedwater under you and round you (12 m): the water grid as drawn, plus the tide's turned murk in M3-M5.
+	int32 Bleed = 0;
+	const float R12 = Tune(TEXT("ambient.swampBleedReach"), 1200.f);
+	const FVector Probe[5] = { Listener, Listener + FVector(R12, 0, 0), Listener - FVector(R12, 0, 0), Listener + FVector(0, R12, 0), Listener - FVector(0, R12, 0) };
+	for (const FVector& P : Probe)
+	{
+		const EWRSwampWater W = bIn ? D.BaseWaterAt(P) : EWRSwampWater::Dry;
+		const TCHAR PZ = D.ZoneAt(P);
+		if (W == EWRSwampWater::Bleedwater || (bTide && (W == EWRSwampWater::Murk || W == EWRSwampWater::Duckweed) && (PZ == TEXT('3') || PZ == TEXT('4') || PZ == TEXT('5')))) ++Bleed;
+	}
+	SwampBleed = FMath::FInterpConstantTo(SwampBleed, Swamp * Bleed / 5.f, DeltaTime, 0.5f);
+	// The Red Tide: the leech boil over the turned water (M3-M5), a faint one elsewhere in the swamp; half while it warns.
+	const float TideOn = !State ? 0.f : State->RedTide == EWRRedTide::Tide ? 1.f : State->RedTide == EWRRedTide::Warning ? 0.4f : 0.f;
+	const float TideZone = (Z == TEXT('3') || Z == TEXT('4') || Z == TEXT('5')) ? 1.f : 0.3f;
+	SwampTide = FMath::FInterpConstantTo(SwampTide, Swamp * TideOn * TideZone, DeltaTime, 0.25f);
+}
+
 // ---------------------------------------------------------------- music
 
 UWRAudioDirector::EMusic UWRAudioDirector::WantedMusic()
@@ -434,7 +519,7 @@ UWRAudioDirector::EMusic UWRAudioDirector::WantedMusic()
 				if (const AWRBoss* B = Cast<AWRBoss>(C))
 				{
 					// As the HUD's boss bar: an engaged boss close by.
-					if (B->bEngaged && D2 < FMath::Square(BossRange)) { bBoss = true; BossId = B->CreatureId; }
+					if (B->bEngaged && D2 < FMath::Square(BossRange)) { bBoss = true; BossId = B->CreatureId; BossPhase = B->Phase; }
 					continue;
 				}
 				const AActor* Target = C->GetAggroRep();
@@ -468,6 +553,9 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 		TArray<FName> Try;
 		if (Which == EMusic::Boss && !BossId.IsNone())
 		{
+			// A boss with music per phase (boss.<id>.p<n>: Vharra's march, flood and blood) plays the phase it's in.
+			Try.Add(FName(*FString::Printf(TEXT("boss.%s.p%d"), *BossId.ToString(), BossPhase)));
+			MusicPhase = BossPhase;
 			Try.Add(FName(*FString::Printf(TEXT("boss.%s"), *BossId.ToString())));
 			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(BossId);
 			if (Def && Def->Role.Contains(TEXT("mini"))) Try.Add(FName(*FString::Printf(TEXT("mini.%s"), *Land.ToString())));
@@ -478,6 +566,21 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 			if (Z == TCHAR('5')) Try.Add(TEXT("sub.monastery"));
 			for (const FWRPoi& P : FWRPoi::All) if (P.Kind == TEXT("camp") && FVector::Dist2D(P.Location, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(FName(*FString::Printf(TEXT("camp.%s"), *Land.ToString()))); break; }
 			if (FVector::Dist2D(Listener, FVector(-30000.f, -490000.f, 0.f)) < Tune(TEXT("music.stormgutRange"), 60000.f) && Listener.X > -70000.f) Try.Add(TEXT("pass.stormgut"));
+			// The Swamp (cooks/biome-swamp.md 2.16): the Sunken Coven, its camps, then explore A (Reed Flats, Mangroves),
+			// B (Boardwalks, Murk Pools) or C (Bone Mounds) by day; night has its own pool.
+			if (Land == TEXT("swamp"))
+			{
+				if (SwampCoven > 0.5f) Try.Add(TEXT("sub.sunken_coven"));
+				for (const FVector& C : FWRSwampData::Get().Camps)
+				{
+					if (FVector::Dist2D(C, Listener) < Tune(TEXT("music.campRange"), 6000.f)) { Try.Add(TEXT("camp.swamp")); break; }
+				}
+				if (PoolName == TEXT("explore"))
+				{
+					const TCHAR SZ = FWRSwampData::Get().ZoneAt(Listener);
+					Try.Add(SZ == TEXT('1') || SZ == TEXT('2') ? FName(TEXT("explore.swamp.a")) : SZ == TEXT('5') ? FName(TEXT("explore.swamp.c")) : FName(TEXT("explore.swamp.b")));
+				}
+			}
 		}
 		Try.Add(FName(*FString::Printf(TEXT("%s.%s"), *PoolName.ToString(), *Land.ToString())));
 		for (const FName& T : Try)
@@ -537,6 +640,7 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 			const bool bAfterFight = Was == EMusic::Combat || Was == EMusic::Boss;
 			NextExploreAt = Now + (bAfterFight ? FMath::FRandRange(Tune(TEXT("music.afterCombatGap.min"), 40.f), Tune(TEXT("music.afterCombatGap.max"), 90.f))
 				: FMath::FRandRange(Tune(TEXT("music.firstGap.min"), 25.f), Tune(TEXT("music.firstGap.max"), 50.f)));
+			if (Swamp > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.swampGap.min"), 3.f), Tune(TEXT("music.swampGap.max"), 10.f));
 			if (!ForcedMode.IsNone()) NextExploreAt = Now;
 		}
 		else
@@ -545,6 +649,18 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		}
 		UE_LOG(LogWildreach, Log, TEXT("MUSIC mode %d -> %d"), static_cast<int32>(Was), static_cast<int32>(Want));
 	}
+	else if (Mode == EMusic::Boss && BossPhase != MusicPhase && !BossId.IsNone()
+		&& UWRAudioSubsystem::Get(World)->GetMusicPool(FName(*FString::Printf(TEXT("boss.%s.p%d"), *BossId.ToString(), BossPhase))))
+	{
+		// The boss turned a phase and has music for it: the old phase's piece fades as the new one comes in.
+		for (FStream& S : Music)
+		{
+			S.Target = 0.f;
+			S.FadeSeconds = Tune(TEXT("music.combatFadeOut"), 3.f);
+		}
+		StartMusic(EMusic::Boss);
+	}
+	MusicPhase = Mode == EMusic::Boss ? MusicPhase : BossPhase;
 	if (Mode == EMusic::Explore)
 	{
 		FStream* Current = Music.Num() > 0 && Music.Last().Target > 0.f ? &Music.Last() : nullptr;
@@ -561,6 +677,8 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 				Current->Target = 0.f;
 				Current->FadeSeconds = Tune(TEXT("music.fadeOut"), 4.f);
 				NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.gap.min"), 120.f), Tune(TEXT("music.gap.max"), 300.f));
+				// The Swamp's score is always there (cooks/biome-swamp.md 2.16): only a breath between pieces.
+				if (Swamp > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.swampGap.min"), 3.f), Tune(TEXT("music.swampGap.max"), 10.f));
 			}
 		}
 	}
@@ -573,30 +691,11 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 	DuckLevel = FMath::FInterpTo(DuckLevel, DuckTarget, DeltaTime, DuckTarget < DuckLevel ? 10.f : 1.2f);
 	const float Gain = WRSound::CategoryGain(TEXT("music")) * DuckLevel;
 	// The Great Storm: war drums and choir over whatever plays while it rages round you (DC 2.15).
+	StepMusicLayer(GreatStormLayer, WRStorm::GreatStorm(World) && WRBiome::At(World, Listener) == TEXT("storm_peaks"), TEXT("layer.great_storm"), DeltaTime, Gain);
+	// The Red Tide: a sub-bass pulse and a second, faster heartbeat over whatever plays in the swamp (cooks/biome-swamp.md 2.16).
 	{
-		const bool bWant = WRStorm::GreatStorm(World) && WRBiome::At(World, Listener) == TEXT("storm_peaks");
-		if (bWant && GreatStormLayer.Num() == 0)
-		{
-			if (const TArray<FWRMusicTrack>* L = UWRAudioSubsystem::Get(World)->GetMusicPool(TEXT("layer.great_storm")); L && L->Num() > 0)
-			{
-				FStream S;
-				S.Comp = UWRAudioSubsystem::Get(World)->CreateStream(World, (*L)[0].File, true);
-				if (S.Comp.IsValid())
-				{
-					Held.Add(S.Comp.Get());
-					S.File = (*L)[0].File;
-					S.Base = (*L)[0].Volume;
-					S.Target = 1.f;
-					S.FadeSeconds = Tune(TEXT("music.fadeIn"), 4.f);
-					GreatStormLayer.Add(S);
-				}
-			}
-		}
-		for (int32 i = GreatStormLayer.Num() - 1; i >= 0; --i)
-		{
-			if (!bWant) { GreatStormLayer[i].Target = 0.f; GreatStormLayer[i].FadeSeconds = Tune(TEXT("music.fadeOut"), 4.f) * 2.f; }
-			if (StepStream(GreatStormLayer[i], DeltaTime, Gain)) GreatStormLayer.RemoveAt(i);
-		}
+		const AWRSwampState* State = Swamp > 0.f ? AWRSwampState::Get(World) : nullptr;
+		StepMusicLayer(RedTideLayer, State && State->RedTide != EWRRedTide::None && Swamp > 0.5f, TEXT("layer.red_tide"), DeltaTime, Gain);
 	}
 	for (int32 i = Music.Num() - 1; i >= 0; --i)
 	{
@@ -604,6 +703,33 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 		{
 			Music.RemoveAt(i);
 		}
+	}
+}
+
+void UWRAudioDirector::StepMusicLayer(TArray<FStream>& Layer, bool bWant, FName Pool, float DeltaTime, float Gain)
+{
+	UWorld* World = GetWorld();
+	if (bWant && Layer.Num() == 0)
+	{
+		if (const TArray<FWRMusicTrack>* L = UWRAudioSubsystem::Get(World)->GetMusicPool(Pool); L && L->Num() > 0)
+		{
+			FStream S;
+			S.Comp = UWRAudioSubsystem::Get(World)->CreateStream(World, (*L)[0].File, true);
+			if (S.Comp.IsValid())
+			{
+				Held.Add(S.Comp.Get());
+				S.File = (*L)[0].File;
+				S.Base = (*L)[0].Volume;
+				S.Target = 1.f;
+				S.FadeSeconds = Tune(TEXT("music.fadeIn"), 4.f);
+				Layer.Add(S);
+			}
+		}
+	}
+	for (int32 i = Layer.Num() - 1; i >= 0; --i)
+	{
+		if (!bWant) { Layer[i].Target = 0.f; Layer[i].FadeSeconds = Tune(TEXT("music.fadeOut"), 4.f) * 2.f; }
+		if (StepStream(Layer[i], DeltaTime, Gain)) Layer.RemoveAt(i);
 	}
 }
 
@@ -721,6 +847,7 @@ FString UWRAudioDirector::Describe() const
 	if (DuckLevel < 0.99f) Out += FString::Printf(TEXT(" duck %.2f"), DuckLevel);
 	Out += FString::Printf(TEXT(" | at %.0f,%.0f,%.0f tundra %.2f day %.2f coast %.2f cave %.2f lava %.2f high %.2f | beds"), Listener.X, Listener.Y, Listener.Z,
 		Tundra, Daylight, Coast, Cave, Lava, High);
+	if (Swamp > 0.f || SwampCoven > 0.f) Out += FString::Printf(TEXT(" swamp %.2f falls %.2f coven %.2f bleed %.2f tide %.2f"), Swamp, SwampFalls, SwampCoven, SwampBleed, SwampTide);
 	for (const TPair<FName, FStream>& B : Beds)
 	{
 		if (B.Value.Comp.IsValid()) Out += FString::Printf(TEXT(" %s@%.2f"), *B.Key.ToString(), B.Value.Gain);

@@ -294,6 +294,12 @@ static const FWRHarvestSpec HarvestSpecs[] = {
 	// Storm peaks (Tools/terrain/storm_peaks.mjs): wind-bent mountain pine and krummholz, granite boulders, alpine scrub.
 	{ TEXT("storm_pine"), TEXT("tree"), TEXT("wood"), 26.f }, { TEXT("granite_rock"), TEXT("rock"), TEXT("stone"), 100.f },
 	{ TEXT("storm_shrub"), TEXT("shrub"), TEXT("fiber"), 50.f },
+	// The Swamp (Tools/terrain/swamp.mjs; cooks/biome-swamp.md 2.7): bald cypress and dead cypress give cypress logs (rot-
+	// proof wood), red mangrove and cypress knees wood, reeds, pitcher plants and the scrub fibre, bone piles bone.
+	{ TEXT("swamp_cypress"), TEXT("tree"), TEXT("cypress_log"), 34.f }, { TEXT("swamp_mangrove"), TEXT("tree"), TEXT("wood"), 28.f },
+	{ TEXT("swamp_deadcypress"), TEXT("tree"), TEXT("cypress_log"), 32.f }, { TEXT("swamp_knees"), TEXT("tree"), TEXT("wood"), 45.f },
+	{ TEXT("swamp_reeds"), TEXT("shrub"), TEXT("fiber"), 60.f }, { TEXT("swamp_pitcher"), TEXT("shrub"), TEXT("fiber"), 40.f },
+	{ TEXT("swamp_shrub"), TEXT("shrub"), TEXT("fiber"), 55.f }, { TEXT("swamp_bones"), TEXT("rock"), TEXT("bone"), 70.f },
 };
 
 AWRDressing::AWRDressing()
@@ -342,7 +348,10 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	static const TCHAR* Cube = TEXT("/Engine/BasicShapes/Cube.Cube");
 
 	// One part of a decoration: mesh, colour, size (engine shapes are 100 units), offset above the ground.
-	struct FPart { const TCHAR* Mesh; FLinearColor Color; FVector Size; float Lift; bool bCollision; float Cull; FVector Tilt; };
+	// Offset (cm, turned with the instance's yaw) and Rot place a part off the instance's middle (a mangrove's prop roots,
+	// a reed clump's stems); bWithArt keeps a part drawn over an art mesh (Spanish moss hung on a cypress).
+	struct FPart { const TCHAR* Mesh; FLinearColor Color; FVector Size; float Lift; bool bCollision; float Cull; FVector Tilt;
+	               FVector Offset = FVector::ZeroVector; FRotator Rot = FRotator::ZeroRotator; bool bWithArt = false; };
 	const TMap<FString, TArray<FPart>> Kinds = {
 		{ TEXT("char_tree"), { { Cyl, FLinearColor(0.02f, 0.015f, 0.012f), FVector(40, 40, 520), 240, true, 24000, FVector::ZeroVector },
 		                       { Cone, FLinearColor(0.03f, 0.025f, 0.02f), FVector(180, 180, 260), 520, false, 24000, FVector::ZeroVector } } },
@@ -361,6 +370,71 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("granite_rock"), { { Sphere, FLinearColor(0.2f, 0.2f, 0.21f), FVector(240, 210, 150), 30, true, 24000, FVector(8, 0, 0) } } },
 		{ TEXT("slate_scree"), { { Sphere, FLinearColor(0.05f, 0.055f, 0.065f), FVector(380, 320, 220), 40, false, 30000, FVector(10, 0, 0) } } },
 		{ TEXT("storm_shrub"), { { Sphere, FLinearColor(0.12f, 0.15f, 0.1f), FVector(100, 100, 50), 12, false, 12000, FVector::ZeroVector } } },
+		// The Swamp (cooks/biome-swamp.md 2.2): bald cypress on its flared buttress with the flat feathery crown in tiers and
+		// grey Spanish moss hanging off it (drawn over the art tree too); dead cypress weathered grey, limbs snapped and
+		// reaching up; red mangrove on its arching prop roots; reed clumps with cattails; pitcher plants, red-veined, lids
+		// hooded; cypress knees standing out of the mud; bone piles (long bones, ribs, a skull); the low moss-grey scrub.
+		{ TEXT("swamp_cypress"), {
+			{ Cyl, FLinearColor(0.145f, 0.127f, 0.098f), FVector(70, 70, 1500), 700, true, 30000, FVector::ZeroVector },
+			{ Cone, FLinearColor(0.13f, 0.115f, 0.09f), FVector(260, 260, 300), 120, false, 30000, FVector::ZeroVector },
+			{ Sphere, FLinearColor(0.027f, 0.07f, 0.027f), FVector(1100, 1100, 160), 1500, false, 30000, FVector::ZeroVector },
+			{ Sphere, FLinearColor(0.024f, 0.063f, 0.024f), FVector(800, 800, 140), 1300, false, 30000, FVector::ZeroVector, FVector(250, -150, 0) },
+			{ Sphere, FLinearColor(0.03f, 0.077f, 0.03f), FVector(700, 700, 130), 1650, false, 30000, FVector::ZeroVector, FVector(-200, 180, 0) },
+			{ Cyl, FLinearColor(0.25f, 0.28f, 0.19f), FVector(40, 40, 320), 1280, false, 20000, FVector::ZeroVector, FVector(380, 0, 0), FRotator::ZeroRotator, true },
+			{ Cyl, FLinearColor(0.23f, 0.26f, 0.18f), FVector(34, 34, 260), 1220, false, 20000, FVector::ZeroVector, FVector(-300, 240, 0), FRotator::ZeroRotator, true },
+			{ Cyl, FLinearColor(0.25f, 0.28f, 0.19f), FVector(36, 36, 300), 1350, false, 20000, FVector::ZeroVector, FVector(80, -380, 0), FRotator::ZeroRotator, true },
+			{ Cyl, FLinearColor(0.22f, 0.25f, 0.17f), FVector(30, 30, 220), 1450, false, 20000, FVector::ZeroVector, FVector(-120, -160, 0), FRotator::ZeroRotator, true } } },
+		{ TEXT("swamp_deadcypress"), {
+			{ Cyl, FLinearColor(0.188f, 0.175f, 0.15f), FVector(80, 80, 1800), 880, true, 30000, FVector::ZeroVector },
+			{ Cone, FLinearColor(0.17f, 0.16f, 0.135f), FVector(280, 280, 320), 140, false, 30000, FVector::ZeroVector },
+			{ Cyl, FLinearColor(0.18f, 0.168f, 0.145f), FVector(26, 26, 500), 1250, false, 30000, FVector::ZeroVector, FVector(-177, 0, 0), FRotator(45, 0, 0) },
+			{ Cyl, FLinearColor(0.18f, 0.168f, 0.145f), FVector(22, 22, 420), 1420, false, 30000, FVector::ZeroVector, FVector(0, -150, 0), FRotator(45, 90, 0) },
+			{ Cyl, FLinearColor(0.18f, 0.168f, 0.145f), FVector(24, 24, 460), 1100, false, 30000, FVector::ZeroVector, FVector(163, 0, 0), FRotator(45, 180, 0) },
+			{ Cyl, FLinearColor(0.18f, 0.168f, 0.145f), FVector(18, 18, 340), 1600, false, 30000, FVector::ZeroVector, FVector(0, 120, 0), FRotator(45, 270, 0) },
+			{ Cone, FLinearColor(0.2f, 0.186f, 0.16f), FVector(60, 60, 120), 1820, false, 30000, FVector::ZeroVector, FVector::ZeroVector, FRotator(8, 30, 0) } } },
+		{ TEXT("swamp_mangrove"), {
+			{ Cyl, FLinearColor(0.107f, 0.042f, 0.023f), FVector(46, 46, 520), 520, true, 24000, FVector::ZeroVector },
+			{ Cyl, FLinearColor(0.096f, 0.038f, 0.021f), FVector(16, 16, 300), 150, false, 24000, FVector::ZeroVector, FVector(110, 0, 0), FRotator(40, 0, 0) },
+			{ Cyl, FLinearColor(0.096f, 0.038f, 0.021f), FVector(15, 15, 300), 150, false, 24000, FVector::ZeroVector, FVector(55, 95, 0), FRotator(40, 60, 0) },
+			{ Cyl, FLinearColor(0.096f, 0.038f, 0.021f), FVector(16, 16, 300), 150, false, 24000, FVector::ZeroVector, FVector(-55, 95, 0), FRotator(40, 120, 0) },
+			{ Cyl, FLinearColor(0.096f, 0.038f, 0.021f), FVector(14, 14, 300), 150, false, 24000, FVector::ZeroVector, FVector(-110, 0, 0), FRotator(40, 180, 0) },
+			{ Cyl, FLinearColor(0.096f, 0.038f, 0.021f), FVector(16, 16, 300), 150, false, 24000, FVector::ZeroVector, FVector(-55, -95, 0), FRotator(40, 240, 0) },
+			{ Cyl, FLinearColor(0.096f, 0.038f, 0.021f), FVector(15, 15, 300), 150, false, 24000, FVector::ZeroVector, FVector(55, -95, 0), FRotator(40, 300, 0) },
+			{ Sphere, FLinearColor(0.027f, 0.07f, 0.027f), FVector(800, 800, 320), 820, false, 24000, FVector::ZeroVector },
+			{ Sphere, FLinearColor(0.023f, 0.06f, 0.023f), FVector(600, 600, 260), 760, false, 24000, FVector::ZeroVector, FVector(200, 150, 0) } } },
+		{ TEXT("swamp_reeds"), {
+			{ Cyl, FLinearColor(0.456f, 0.323f, 0.102f), FVector(5, 5, 240), 110, false, 9000, FVector::ZeroVector },
+			{ Cyl, FLinearColor(0.41f, 0.29f, 0.09f), FVector(5, 5, 220), 100, false, 9000, FVector::ZeroVector, FVector(30, 10, 0), FRotator(6, 20, 0) },
+			{ Cyl, FLinearColor(0.48f, 0.34f, 0.11f), FVector(4, 4, 250), 115, false, 9000, FVector::ZeroVector, FVector(-25, 20, 0), FRotator(5, 140, 0) },
+			{ Cyl, FLinearColor(0.43f, 0.3f, 0.095f), FVector(5, 5, 200), 90, false, 9000, FVector::ZeroVector, FVector(15, -30, 0), FRotator(7, 250, 0) },
+			{ Cyl, FLinearColor(0.456f, 0.323f, 0.102f), FVector(4, 4, 230), 105, false, 9000, FVector::ZeroVector, FVector(-30, -20, 0), FRotator(4, 300, 0) },
+			{ Cyl, FLinearColor(0.4f, 0.28f, 0.09f), FVector(5, 5, 210), 95, false, 9000, FVector::ZeroVector, FVector(40, -5, 0), FRotator(8, 70, 0) },
+			{ Cyl, FLinearColor(0.47f, 0.33f, 0.1f), FVector(4, 4, 245), 112, false, 9000, FVector::ZeroVector, FVector(-5, 35, 0), FRotator(5, 200, 0) },
+			{ Cyl, FLinearColor(0.08f, 0.04f, 0.02f), FVector(9, 9, 32), 228, false, 9000, FVector::ZeroVector },
+			{ Cyl, FLinearColor(0.08f, 0.04f, 0.02f), FVector(9, 9, 30), 238, false, 9000, FVector::ZeroVector, FVector(-28, 22, 0), FRotator(5, 140, 0) },
+			{ Cyl, FLinearColor(0.08f, 0.04f, 0.02f), FVector(8, 8, 28), 200, false, 9000, FVector::ZeroVector, FVector(41, -5, 0), FRotator(8, 70, 0) } } },
+		{ TEXT("swamp_pitcher"), {
+			{ Cyl, FLinearColor(0.117f, 0.188f, 0.032f), FVector(14, 14, 60), 28, false, 8000, FVector::ZeroVector, FVector::ZeroVector, FRotator(8, 0, 0) },
+			{ Cyl, FLinearColor(0.15f, 0.12f, 0.03f), FVector(12, 12, 52), 24, false, 8000, FVector::ZeroVector, FVector(22, 10, 0), FRotator(14, 160, 0) },
+			{ Cyl, FLinearColor(0.13f, 0.16f, 0.03f), FVector(13, 13, 66), 31, false, 8000, FVector::ZeroVector, FVector(-18, 16, 0), FRotator(12, 60, 0) },
+			{ Cyl, FLinearColor(0.17f, 0.09f, 0.03f), FVector(11, 11, 48), 22, false, 8000, FVector::ZeroVector, FVector(6, -22, 0), FRotator(16, 280, 0) },
+			{ Cyl, FLinearColor(0.195f, 0.003f, 0.007f), FVector(20, 18, 3), 60, false, 8000, FVector::ZeroVector, FVector(-4, 0, 0), FRotator(20, 0, 0) },
+			{ Cyl, FLinearColor(0.195f, 0.003f, 0.007f), FVector(18, 16, 3), 50, false, 8000, FVector::ZeroVector, FVector(26, 12, 0), FRotator(24, 160, 0) },
+			{ Cyl, FLinearColor(0.195f, 0.003f, 0.007f), FVector(19, 17, 3), 66, false, 8000, FVector::ZeroVector, FVector(-22, 18, 0), FRotator(22, 60, 0) } } },
+		{ TEXT("swamp_knees"), {
+			{ Cone, FLinearColor(0.145f, 0.127f, 0.098f), FVector(44, 44, 80), 30, false, 12000, FVector::ZeroVector },
+			{ Cone, FLinearColor(0.13f, 0.115f, 0.09f), FVector(36, 36, 60), 22, false, 12000, FVector::ZeroVector, FVector(70, 30, 0) },
+			{ Cone, FLinearColor(0.15f, 0.13f, 0.1f), FVector(40, 40, 95), 36, false, 12000, FVector::ZeroVector, FVector(-50, 60, 0) },
+			{ Cone, FLinearColor(0.12f, 0.105f, 0.08f), FVector(30, 30, 50), 18, false, 12000, FVector::ZeroVector, FVector(20, -70, 0) } } },
+		{ TEXT("swamp_bones"), {
+			{ Cyl, FLinearColor(0.672f, 0.61f, 0.479f), FVector(9, 9, 70), 6, false, 9000, FVector::ZeroVector, FVector::ZeroVector, FRotator(90, 10, 0) },
+			{ Cyl, FLinearColor(0.6f, 0.55f, 0.43f), FVector(8, 8, 60), 7, false, 9000, FVector::ZeroVector, FVector(20, 25, 0), FRotator(90, 70, 0) },
+			{ Cyl, FLinearColor(0.65f, 0.59f, 0.46f), FVector(10, 10, 80), 8, false, 9000, FVector::ZeroVector, FVector(-25, -15, 0), FRotator(88, 130, 0) },
+			{ Cyl, FLinearColor(0.55f, 0.5f, 0.39f), FVector(5, 5, 50), 12, false, 9000, FVector::ZeroVector, FVector(-10, 30, 0), FRotator(70, 200, 30) },
+			{ Cyl, FLinearColor(0.55f, 0.5f, 0.39f), FVector(5, 5, 48), 13, false, 9000, FVector::ZeroVector, FVector(0, 38, 0), FRotator(70, 210, 30) },
+			{ Cyl, FLinearColor(0.55f, 0.5f, 0.39f), FVector(5, 5, 46), 12, false, 9000, FVector::ZeroVector, FVector(10, 46, 0), FRotator(70, 220, 30) },
+			{ Sphere, FLinearColor(0.7f, 0.64f, 0.5f), FVector(22, 18, 20), 10, false, 9000, FVector::ZeroVector, FVector(30, -30, 0) } } },
+		{ TEXT("swamp_shrub"), { { Sphere, FLinearColor(0.16f, 0.19f, 0.12f), FVector(130, 130, 70), 15, false, 12000, FVector::ZeroVector } } },
 	};
 	// Real meshes from the art packs / AI props replace the shapes above where we have them.
 	// Size is what each mesh is fitted to (cm, before the instance's own scale): all three axes for rocks, so they keep
@@ -415,6 +489,13 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("storm_shrub"), { Shrubs, FVector(0, 0, 200), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.42f, 0.45f, 0.38f) } },
 			{ { TEXT("Amount Min"), 0.f }, { TEXT("Amount Max"), WRTune(TEXT("world.stormCoatMax"), 0.6f) } } } },
+		// The Swamp: the island's conifers stand in for bald cypress (a deciduous conifer; its moss is the shapes' above),
+		// the scrub coated moss grey-green.
+		{ TEXT("swamp_cypress"), { { Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("FirA"), TEXT("fir_a_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")) },
+			FVector(0, 0, 1500), 25, false, 30000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		{ TEXT("swamp_shrub"), { Shrubs, FVector(0, 0, 220), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Snow Color"), FLinearColor(0.25f, 0.28f, 0.19f) } },
+			{ { TEXT("Amount Min"), WRTune(TEXT("world.swampCoatMin"), 0.3f) }, { TEXT("Amount Max"), WRTune(TEXT("world.swampCoatMax"), 0.9f) } } } },
 	};
 	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
 	// machine in the same order, so a ledger key means the same decoration everywhere.
@@ -513,7 +594,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		const bool bArt = A && BuildArt(Kind.Key, *A, *Arr, HK);
 		for (const FPart& Part : Kind.Value)
 		{
-			if (bArt && !(A->bShapeCollision && Part.bCollision))
+			if (bArt && !Part.bWithArt && !(A->bShapeCollision && Part.bCollision))
 			{
 				continue;  // drawn by the art mesh
 			}
@@ -529,8 +610,9 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				const float Yaw = (*Arr)[i * 5 + 3]->AsNumber();
 				const FVector Ground((*Arr)[i * 5]->AsNumber(), (*Arr)[i * 5 + 1]->AsNumber(), (*Arr)[i * 5 + 2]->AsNumber());
 				// Small per-instance tilt for rocks, from the yaw so every machine agrees.
-				const FRotator Rot(Part.Tilt.X * FMath::Sin(Yaw), Yaw, Part.Tilt.Z * FMath::Cos(Yaw * 1.7f));
-				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, Part.Lift * S - 20.f), Part.Size / 100.f * S);
+				const FQuat YawQ = FRotator(0.f, Yaw, 0.f).Quaternion();
+				const FRotator Rot = Part.Rot.IsZero() ? FRotator(Part.Tilt.X * FMath::Sin(Yaw), Yaw, Part.Tilt.Z * FMath::Cos(Yaw * 1.7f)) : (YawQ * Part.Rot.Quaternion()).Rotator();
+				Transforms.Emplace(Rot, Ground + YawQ.RotateVector(Part.Offset * S) + FVector(0.f, 0.f, Part.Lift * S - 20.f), Part.Size / 100.f * S);
 			}
 			UHierarchicalInstancedStaticMeshComponent* Shape = MakePart(Part.Mesh, Part.Color, Part.bCollision, Part.Cull);
 			{
@@ -538,7 +620,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				Algo::Sort(Extents);
 				if (Extents[1] < WRTune(TEXT("camera.blockMinExtent"), 160.f)) Shape->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 			}
-			if (bArt)
+			if (bArt && !Part.bWithArt)
 			{
 				Shape->SetHiddenInGame(true);  // invisible collision under an art mesh
 				Shape->SetCastShadow(false);
@@ -1180,11 +1262,14 @@ void AWRCave::BuildShell()
 		// Storm peaks: slate, pink rock salt in the Halite Cave (cooks/biome-lightning.md 2.4 #18-20).
 		const bool bStorm = Biome == TEXT("storm_peaks");
 		const FLinearColor StormTint = Theme == TEXT("halite") ? FLinearColor(0.62f, 0.42f, 0.42f) : FLinearColor(0.11f, 0.125f, 0.15f);
+		// The Swamp's karst (cooks/biome-swamp.md 2.6): wet grey limestone, the Peat Cellar's walls dark peat.
+		const bool bSwampRock = Biome == TEXT("swamp");
+		const FLinearColor SwampTint = Theme == TEXT("peat_cellar") ? FLinearColor(0.07f, 0.05f, 0.038f) : FLinearColor(0.19f, 0.18f, 0.15f);
 		MID->SetVectorParameterValue(RockMat ? TEXT("Tint") : TEXT("Color"),
-			bStorm ? StormTint : bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
+			bSwampRock ? SwampTint : bStorm ? StormTint : bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
 		Rock->SetMaterial(0, MID);
 	}
-	Glow->SetLightColor(Biome == TEXT("storm_peaks") ? FLinearColor(0.62f, 0.55f, 1.f) : bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
+	Glow->SetLightColor(Biome == TEXT("swamp") ? FLinearColor(0.75f, 0.85f, 0.25f) : Biome == TEXT("storm_peaks") ? FLinearColor(0.62f, 0.55f, 1.f) : bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
 	// Enough light in the chamber to find the ore by (it was black inside: 1200 over a 16 m reach).
 	Glow->SetIntensity(WRTune(TEXT("caves.glowIntensity"), 8000.f));
 	Glow->SetAttenuationRadius(WRTune(TEXT("caves.glowRadius"), 2400.f) * GetActorScale3D().X);
@@ -1311,6 +1396,16 @@ void AWRCave::SpawnContents()
 		if (Theme == TEXT("adit")) Ores[1].Key = TEXT("iron_ore");
 		if (Theme == TEXT("grotto")) Ores[0].Key = TEXT("tin_ore");
 	}
+	// The Swamp's karst caves (cooks/biome-swamp.md 2.6): Reedmouth copper and tin (the newcomers' first), the Eel Hole
+	// copper, the Peat Cellar tin and one iron out in the chamber (its peat-sealed back gallery, x < -600, is UWRSwampWorld's),
+	// the Gullet iron x4 with the swamp's best gem odds. No sulfur, no lichen; clay banks in the wet ones.
+	if (Biome == TEXT("swamp"))
+	{
+		if (Theme == TEXT("eel_hole")) Ores = { { TEXT("copper_ore"), FVector(-550, -550, 0) }, { TEXT("copper_ore"), FVector(-550, 550, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
+		else if (Theme == TEXT("peat_cellar")) Ores = { { TEXT("tin_ore"), FVector(250, -620, 0) }, { TEXT("iron_ore"), FVector(250, 620, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
+		else if (Theme == TEXT("gullet")) Ores = { { TEXT("iron_ore"), FVector(-550, -550, 0) }, { TEXT("iron_ore"), FVector(-550, 550, 0) }, { TEXT("iron_ore"), FVector(0, -650, 0) }, { TEXT("iron_ore"), FVector(-700, 0, 0) } };
+		else Ores = { { TEXT("copper_ore"), FVector(-550, -550, 0) }, { TEXT("tin_ore"), FVector(-550, 550, 0) }, { TEXT("copper_ore"), FVector(0, -650, 0) }, { TEXT("clay"), FVector(600, -380, 0) } };
+	}
 	// Star iron (cooks/build-crafting.md 2.1, ores by depth band 4): the highland caves' deepest chamber, back past the
 	// iron, 2.8 m clear of the other veins.
 	if (GetActorLocation().Z >= WRTune(TEXT("caves.starIronMinZ"), 20000.f))
@@ -1323,7 +1418,7 @@ void AWRCave::SpawnContents()
 		if (AWRResourceNode* Node = GetWorld()->SpawnActorDeferred<AWRResourceNode>(AWRResourceNode::StaticClass(), T, this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 		{
 			Node->ItemId = Ore.Key;
-			Node->GemChance = WRTune(TEXT("caves.gemChance"), 0.12f);
+			Node->GemChance = (Biome == TEXT("swamp") && Theme == TEXT("gullet")) ? WRTune(TEXT("swampWorld.gulletGemChance"), 0.2f) : WRTune(TEXT("caves.gemChance"), 0.12f);
 			Node->FinishSpawning(T);
 			UE_LOG(LogWildreach, Verbose, TEXT("CAVE %s: %s at %s (%.0f cm over the cave's origin)"), *GetName(), *Ore.Key.ToString(), *T.GetLocation().ToCompactString(), T.GetLocation().Z - GetActorLocation().Z);
 		}
@@ -1331,10 +1426,35 @@ void AWRCave::SpawnContents()
 	// Cave hazard: burning sulfur gas (volcanic) or slick ice (tundra). Permanent. Storm peaks' caves have none: their
 	// danger is the Coilburrows and the dark.
 	const bool bStormCave = Biome == TEXT("storm_peaks");
-	if (!bStormCave)
+	const bool bSwampCave = Biome == TEXT("swamp");
+	if (!bStormCave && !bSwampCave)
 	{
 		AWRHazard::Spawn(GetWorld(), nullptr, Floor(FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
 			WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")));
+	}
+	// The Swamp's caves (cooks/biome-swamp.md 2.6): Reedmouth's Lanterntoads and Slimeshells, the Eel Hole's leeches, the
+	// Peat Cellar's Bogstalkers and leeches, the Gullet's leeches and the Murkjaw in its sump.
+	if (bSwampCave)
+	{
+		TArray<TPair<FName, int32>> Pack;
+		if (Theme == TEXT("eel_hole")) Pack = { { TEXT("gorgeleech"), 3 } };
+		else if (Theme == TEXT("peat_cellar")) Pack = { { TEXT("bogstalker"), 2 }, { TEXT("gorgeleech"), 2 } };
+		else if (Theme == TEXT("gullet")) Pack = { { TEXT("gorgeleech"), 4 }, { TEXT("murkjaw"), 1 } };
+		else Pack = { { TEXT("lanterntoad"), 4 }, { TEXT("slimeshell"), 3 } };
+		for (int32 p = 0; p < Pack.Num(); ++p)
+		{
+			const FTransform PackAt(FRotator::ZeroRotator, Floor(FVector(-300.f + 500.f * p, p % 2 ? 300.f : -200.f, 0.f)));
+			if (AWRCreatureSpawner* Spawner = GetWorld()->SpawnActorDeferred<AWRCreatureSpawner>(AWRCreatureSpawner::StaticClass(), PackAt, this))
+			{
+				Spawner->CreatureId = Pack[p].Key;
+				Spawner->Count = Pack[p].Value;
+				Spawner->Radius = 350.f;
+				Spawner->RespawnSeconds = WRTune(TEXT("swampWorld.caveRespawnSeconds"), 420.f);
+				Spawner->FinishSpawning(PackAt);
+			}
+		}
+		UE_LOG(LogWildreach, Log, TEXT("CAVE %s (swamp, %s) at %s: %d ore nodes, %d packs"), *GetName(), *Theme.ToString(), *GetActorLocation().ToCompactString(), Ores.Num(), Pack.Num());
+		return;
 	}
 	// A burrower colony (Kilnmites nest here and mine ore once tamed; Glacimaws lurk under the ice).
 	const FTransform SpawnAt(FRotator::ZeroRotator, Floor(FVector(-300, 0, 0)));

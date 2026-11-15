@@ -1,5 +1,6 @@
 #include "WRWildlife.h"
 #include "WRStormTypes.h"
+#include "WRSwampTypes.h"
 #include "WRWorldSystems.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
@@ -18,6 +19,31 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+
+// The new lands north of the Old Island share the walk map: the Swamp (east of the Crown's face line and the Rime Sound
+// neck: cooks/build-biome-swamp.md 2.1) and Storm peaks (the rest). A land's sub-zone letter at a cell, or 0 off it.
+namespace WRSwampWild
+{
+	TCHAR NorthZone(const FVector2D& At, FName Land)
+	{
+		const FVector P(At, 0.f);
+		if (Land == TEXT("swamp"))
+		{
+			if (!WRSwamp::Contains(P)) return 0;
+			const TCHAR Z = FWRSwampData::Get().ZoneAt(P);
+			return Z == TEXT('~') ? 0 : Z;
+		}
+		if (WRSwamp::Contains(P)) return 0;
+		return WRStorm::ZoneAt(nullptr, P);
+	}
+
+	/** Swamp water (murk, duckweed, bleedwater, quag, brackish) a swamp creature may wade or swim in. */
+	bool SwampWater(const FVector2D& At)
+	{
+		const FVector P(At, 0.f);
+		return WRSwamp::Contains(P) && FWRSwampData::Get().BaseWaterAt(P) != EWRSwampWater::Dry;
+	}
+}
 
 namespace WRWildlifeImpl
 {
@@ -98,7 +124,7 @@ namespace WRWildlifeImpl
 		}
 
 		/** A cell north of the Old Island's frame: the continent's new land (Storm peaks), not the island. */
-		static bool IsNorthLand(const FVector2D& At) { return At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f); }
+		static bool IsNorthLand(const FVector2D& At) { return At.Y < WRTune(TEXT("world.islandNorthEdge"), -201600.f) || WRSwamp::Contains(FVector(At, 0.f)); }
 
 		const FRange& RangeOf(const FWRCreatureDef& Def)
 		{
@@ -115,10 +141,12 @@ namespace WRWildlifeImpl
 			const FVector2D Band = BandOf ? *BandOf : FVector2D(0.0, 1.0e7);
 			const float* GapOf = CampGaps.Find(Def.Behavior);
 			const double GapSq = FMath::Square(GapOf ? *GapOf : 16000.f);
+			const bool bSwampKind = Def.Biome == TEXT("swamp");
 			for (int32 i = 0; i < Cells.Num(); ++i)
 			{
 				const TCHAR C = Cells[i];
-				if (C == TEXT('~') || C == TEXT('x') || (C == TEXT('#') && !bFlyer))
+				// Swamp kinds wade and swim the swamp's own water (its murk, channels and pools), never the open sea.
+				if ((C == TEXT('~') && !(bSwampKind && WRSwampWild::SwampWater(Centre(i)))) || C == TEXT('x') || (C == TEXT('#') && !bFlyer))
 				{
 					continue;
 				}
@@ -135,7 +163,8 @@ namespace WRWildlifeImpl
 				else
 				{
 					// A new land's kind lives anywhere on its own land; its spawn regions choose the sub-zones.
-					if (!IsNorthLand(At) || WRStorm::ZoneAt(nullptr, FVector(At, 0.f)) == 0 || WRStorm::ZoneAt(nullptr, FVector(At, 0.f)) == TCHAR('e')) continue;
+					const TCHAR Z = WRSwampWild::NorthZone(At, bSwampKind ? FName(TEXT("swamp")) : FName(TEXT("storm_peaks")));
+					if (!IsNorthLand(At) || Z == 0 || Z == TCHAR('e')) continue;
 				}
 				if (Camps.ContainsByPredicate([&At, GapSq](const FVector2D& Camp) { return FVector2D::DistSquared(Camp, At) < GapSq; }))
 				{
@@ -671,7 +700,7 @@ namespace WRWildlifeImpl
 		if (R.Side != TEXT("volcanic") && R.Side != TEXT("tundra"))
 		{
 			if (!FWalkMap::IsNorthLand(At)) return false;
-			const TCHAR Z = WRStorm::ZoneAt(nullptr, FVector(At, 0.f));
+			const TCHAR Z = WRSwampWild::NorthZone(At, R.Side == TEXT("swamp") ? R.Side : FName(TEXT("storm_peaks")));
 			if (Z == 0 || (!R.Zones.IsEmpty() && !R.Zones.Contains(FString::Chr(Z)))) return false;
 			return !R.Area.bIsValid || R.Area.IsInside(At);
 		}
@@ -980,7 +1009,7 @@ FName WRWildlife::RaidersAt(const FVector2D& At, TArray<TPair<FName, float>>& Ou
 			// A north land's region: in it (its zones) or not at all.
 			FString Zones;
 			O->TryGetStringField(TEXT("zones"), Zones);
-			const TCHAR Z = WRStorm::ZoneAt(nullptr, FVector(At, 0.f));
+			const TCHAR Z = WRSwampWild::NorthZone(At, Side == TEXT("swamp") ? FName(TEXT("swamp")) : FName(TEXT("storm_peaks")));
 			if (Z == 0 || (!Zones.IsEmpty() && !Zones.Contains(FString::Chr(Z)))) continue;
 			Best = O;
 			BestGap = 0.0;

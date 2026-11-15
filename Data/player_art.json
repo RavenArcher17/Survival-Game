@@ -3481,7 +3481,7 @@
         ],
         "Pattern": "/Game/Wildreach/Characters/Hero/Materials/PathTex/T_PathPattern_Blood.T_PathPattern_Blood"
       },
-      "caninesFrom": 0.6,
+      "caninesFrom": 0.43,
       "canineMesh": "/Game/Wildreach/Characters/Hero/Materials/SM_Canines.SM_Canines",
       "eye": {
         "scalar": {

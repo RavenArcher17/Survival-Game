@@ -6,6 +6,7 @@
 
 #include "WRWorldSystems.h"
 #include "WRStormTypes.h"
+#include "WRSwampTypes.h"
 #include "WRFarm.h"
 #include "WRPathComponent.h"
 #include "Wildreach.h"
@@ -145,6 +146,157 @@ namespace WRSiteLook
 
 using namespace WRSiteLook;
 
+// The Swamp's five shrines (cooks/biome-swamp.md 2.11): the Coven's own fire-places, each its own thing on the common
+// dais. Palette: bone, bronze gone brown, cypress black, garnet bloodmoss; the fire burns low and dark red.
+namespace WRSwampShrine
+{
+	/** 0 Tithe Mound (bronze bowl), 1 Salt Cross, 2 Root altar, 3 Cage brazier, 4 Falls (bone brazier). */
+	int32 Variant(FName Id)
+	{
+		const FString S = Id.ToString();
+		return S.Contains(TEXT("tithe")) ? 0 : S.Contains(TEXT("salt")) ? 1 : S.Contains(TEXT("root")) ? 2 : S.Contains(TEXT("cage")) ? 3 : 4;
+	}
+
+	void Build(FKit& K, int32 V, float R, float BowlZ, const TFunctionRef<float(const FVector2D&)>& Ground)
+	{
+		const FSurf Bone = FSurf::Stone(FLinearColor(FColor(214, 205, 184)) * 0.62f, 0.8f);
+		const FSurf BoneOld = FSurf::Stone(FLinearColor(FColor(180, 168, 140)) * 0.5f, 0.85f);
+		const FSurf Bronze = FSurf::Steel(FLinearColor(FColor(110, 78, 40)) * 0.55f, 0.55f);
+		const FSurf Iron = FSurf::Steel(FLinearColor(FColor(138, 59, 30)) * 0.18f, 0.75f);   // rust #8A3B1E gone dark
+		const FSurf Cypress = FSurf::Wood(FLinearColor(0.03f, 0.026f, 0.022f));
+		const FSurf Drift = FSurf::Wood(FLinearColor(FColor(170, 160, 140)) * 0.45f);
+		const FSurf Salt = FSurf::Glaze(FLinearColor(FColor(230, 225, 211)) * 0.8f, 0.6f);
+		const FSurf RootS = FSurf::Wood(FLinearColor(FColor(92, 58, 42)) * 0.45f);
+		const FSurf Moss = FSurf::Cloth(FLinearColor(FColor(122, 10, 20)) * 0.5f);            // bloodmoss garnet #7A0A14
+		const FSurf Cord = FSurf::Cloth(FLinearColor(0.12f, 0.1f, 0.07f));
+		const auto At = [&](float X, float Y, float Lift = 0.f) { return FVector(X, Y, Ground(FVector2D(X, Y)) + Lift); };
+		// Every swamp shrine: bone slabs laid round the dais foot and garnet bloodmoss creeping up its lowest tier.
+		for (int32 i = 0; i < 14; ++i)
+		{
+			const float A = 25.7f * i + 8.f;
+			const float Ca = FMath::Cos(FMath::DegreesToRadians(A)), Sa = FMath::Sin(FMath::DegreesToRadians(A));
+			if (FMath::Abs(Sa) < 0.35f && Ca > 0.f) continue;   // the steps
+			const FVector P = At(Ca * (R + 70.f), Sa * (R + 70.f), 3.f);
+			K.Add(BoneOld.Dim(0.9f + 0.2f * K.Rand(P, 2)), FVector(60.f, 34.f, 6.f), P, FRotator(0.f, A + 90.f, 2.f * K.Jit(P, 3)));
+			K.Add(Moss, FVector(40.f + 30.f * K.Rand(P, 4), 30.f, 8.f), P + FVector(0, 0, 4.f) - FVector(Ca, Sa, 0.f) * 50.f, FRotator(0.f, A, 0.f), EWRLookMesh::Cylinder);
+		}
+		// Two bone lanterns flank the steps (lit with the shrine).
+		for (const float Sd : { -1.f, 1.f })
+		{
+			const FVector B = At(R + 150.f, Sd * 170.f);
+			K.Rod(Bone, B - FVector(0, 0, 30.f), B + FVector(0, 0, 190.f), 9.f);
+			K.Rod(Bone, B + FVector(0, 0, 180.f), B + FVector(28.f, 0, 196.f), 5.f);
+			for (int32 r = 0; r < 6; ++r) K.Rod(Bone, B + FVector(28.f, 0, 150.f) + FRotator(0.f, 60.f * r, 0.f).Vector() * 11.f, B + FVector(28.f, 0, 186.f) + FRotator(0.f, 60.f * r, 0.f).Vector() * 6.f, 2.f);
+			K.Add(FSurf::Lit(FLinearColor(0.9f, 0.32f, 0.12f), 0.5f), FVector(10.f, 10.f, 18.f), B + FVector(28.f, 0, 164.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		}
+		if (V == 0)
+		{
+			// The Tithe Mound's Great Shrine: the iron bowl lined with a broad bronze tithe bowl, worn green-brown, its
+			// rim notched where the Coven's cups rested; a stone channel runs from it off the back of the dais and down
+			// the mound toward the Throat (2.20: every basin drains toward her). A ring of fetish posts round the mound.
+			K.Disc(Bronze, FVector(0, 0, BowlZ + 2.f), FVector::UpVector, 150.f, 10.f);
+			for (int32 i = 0; i < 12; ++i) K.Add(Bronze.Dim(0.8f), FVector(10.f, 8.f, 6.f), FVector(0, 0, BowlZ + 9.f) + FRotator(0.f, 30.f * i, 0.f).Vector() * 72.f, FRotator(0.f, 30.f * i, 0.f));
+			for (int32 c = 0; c < 8; ++c)
+			{
+				const FVector P0 = At(-R * 0.5f - c * 110.f, 0.f, 6.f);
+				K.Add(FSurf::Stone(FLinearColor(0.08f, 0.075f, 0.07f), 0.9f), FVector(112.f, 40.f, 14.f), P0, FRotator(-3.f, 0.f, 0.f));
+				K.Add(FSurf::Glaze(FLinearColor(FColor(74, 10, 15)) * 0.4f, 0.3f), FVector(108.f, 14.f, 2.f), P0 + FVector(0, 0, 7.f), FRotator(-3.f, 0.f, 0.f));
+			}
+			for (int32 i = 0; i < 8; ++i)
+			{
+				const float A = 45.f * i + 22.5f;
+				const FVector P = At(FMath::Cos(FMath::DegreesToRadians(A)) * (R + 520.f), FMath::Sin(FMath::DegreesToRadians(A)) * (R + 520.f));
+				K.Rod(Bone, P - FVector(0, 0, 40.f), P + FVector(0, 0, 230.f), 8.f);
+				K.Add(Bone, FVector(22.f, 14.f, 16.f), P + FVector(0, 0, 240.f), FRotator(0.f, A + 180.f, 0.f));   // the crow skull
+				K.Spike(BoneOld, P + FVector(0, 0, 240.f) + FRotator(0.f, A + 180.f, 0.f).Vector() * 10.f, FRotator(-10.f, A + 180.f, 0.f).Vector(), 7.f, 22.f);
+			}
+		}
+		else if (V == 1)
+		{
+			// The Salt Cross: a driftwood cross behind the bowl, bleached and furred with salt where the spray dried on
+			// it, lashed at the crossing; salt cakes heaped on the dais foot (the Bloat's counter, offered here).
+			const FVector B(-R * 0.62f, 0.f, 70.f);
+			K.Rod(Drift, B - FVector(0, 0, 40.f), B + FVector(0, 0, 420.f), 26.f);
+			K.Rod(Drift, B + FVector(0, -150.f, 300.f), B + FVector(4.f, 150.f, 312.f), 20.f);
+			for (int32 w = 0; w < 5; ++w) K.Rod(Cord, B + FVector(14.f, -20.f, 296.f + w * 5.f), B + FVector(14.f, 20.f, 310.f - w * 5.f), 2.f);
+			for (int32 i = 0; i < 16; ++i)
+			{
+				const float T = K.Rand(FVector(i, 0, 0), 5);
+				const bool bArm = i % 3 == 0;
+				const FVector P = bArm ? B + FVector(14.f, FMath::Lerp(-140.f, 140.f, T), 306.f) : B + FVector(14.f, 0.f, FMath::Lerp(20.f, 400.f, T));
+				K.Add(Salt, FVector(8.f, 22.f + 14.f * T, 14.f + 10.f * T), P, FRotator(0.f, 0.f, 30.f * K.Jit(P, 6)), EWRLookMesh::Cylinder);
+			}
+			for (int32 i = 0; i < 7; ++i) K.Add(Salt.Dim(0.95f), FVector(34.f, 26.f, 14.f), At(R + 40.f, -R * 0.6f + 28.f * i, 7.f + 14.f * (i % 2)), FRotator(0.f, 20.f * i, 0.f));
+		}
+		else if (V == 2)
+		{
+			// The Root altar: prop roots of the Cathedral's mangrove spring from the mud round the dais and arch over the
+			// bowl, meeting in a knot 6 m up; the front stays open for the steps.
+			const FVector Knot(0.f, 0.f, 620.f);
+			for (int32 r = 0; r < 6; ++r)
+			{
+				const float A = 60.f * r + 30.f;
+				if (FMath::Abs(FMath::FindDeltaAngleDegrees(A, 0.f)) < 25.f) continue;
+				const FVector Foot = At(FMath::Cos(FMath::DegreesToRadians(A)) * (R + 260.f), FMath::Sin(FMath::DegreesToRadians(A)) * (R + 260.f), -30.f);
+				FVector Prev = Foot;
+				for (int32 s = 1; s <= 8; ++s)
+				{
+					const float T = s / 8.f;
+					const FVector P = FMath::Lerp(Foot, Knot, T) + FVector(0, 0, FMath::Sin(T * PI) * 260.f);
+					K.Rod(RootS.Dim(0.9f + 0.15f * K.Rand(P, r)), Prev, P, FMath::Lerp(46.f, 26.f, T));
+					Prev = P;
+				}
+			}
+			K.Add(RootS, FVector(110.f, 110.f, 90.f), Knot, FRotator(0.f, 20.f, 0.f), EWRLookMesh::Cylinder);
+			for (int32 i = 0; i < 9; ++i) K.Spike(RootS.Dim(0.8f), At(FMath::Cos(i * 0.7f) * (R + 120.f + 40.f * (i % 3)), FMath::Sin(i * 0.7f) * (R + 120.f + 40.f * (i % 3))), FVector::UpVector, 8.f, 30.f + 12.f * (i % 4));
+		}
+		else if (V == 3)
+		{
+			// The Cage brazier: the fire burns inside an iron gibbet cage hung from a gallows of two cypress posts and a
+			// beam, its chain wound round the beam; the cage's foot rests in the bowl.
+			const float CZ0 = BowlZ - 10.f, CZ1 = BowlZ + 210.f;
+			for (int32 b = 0; b < 10; ++b)
+			{
+				const FVector O = FRotator(0.f, 36.f * b, 0.f).Vector() * 74.f;
+				K.Rod(Iron, FVector(O.X, O.Y, CZ0), FVector(O.X * 0.9f, O.Y * 0.9f, CZ1), 4.f);
+			}
+			for (const float Z : { CZ0, CZ0 + 110.f, CZ1 }) K.Disc(Iron, FVector(0, 0, Z), FVector::UpVector, Z == CZ1 ? 136.f : 150.f, 4.f);
+			K.Add(Iron, FVector(130.f, 130.f, 40.f), FVector(0, 0, CZ1 + 18.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			const float BeamZ = CZ1 + 260.f;
+			for (const float Y : { -260.f, 260.f }) K.Rod(Cypress, At(0.f, Y, -60.f), FVector(0.f, Y, BeamZ + 20.f), 24.f);
+			K.Rod(Cypress, FVector(0.f, -300.f, BeamZ), FVector(0.f, 300.f, BeamZ), 22.f);
+			for (int32 l = 0; l < 8; ++l) K.Rod(Iron, FVector(0, 0, CZ1 + 40.f + l * 26.f), FVector(0, 0, CZ1 + 62.f + l * 26.f), 3.f);
+			for (int32 w = 0; w < 4; ++w) K.Disc(Iron, FVector(0.f, -12.f + 8.f * w, BeamZ), FVector::RightVector, 30.f, 3.f);
+		}
+		else
+		{
+			// The Falls shrine: the bowl ringed by a ribcage of bones arching over it (a Mudhulk's, by the size), its skull
+			// at the front looking out at the falls; the bones sweat in the mist.
+			for (int32 r = 0; r < 7; ++r)
+			{
+				const float Y = -150.f + r * 50.f;
+				for (const float Sd : { -1.f, 1.f })
+				{
+					FVector Prev(Sd * 120.f, Y, 80.f);
+					for (int32 s = 1; s <= 5; ++s)
+					{
+						const float A = s / 5.f * 150.f;
+						const FVector P(Sd * (120.f * FMath::Cos(FMath::DegreesToRadians(A * 0.5f))), Y, 80.f + 260.f * FMath::Sin(FMath::DegreesToRadians(A * 0.6f)));
+						K.Rod(Bone, Prev, P, 11.f);
+						Prev = P;
+					}
+				}
+			}
+			K.Rod(Bone, FVector(0.f, -200.f, 330.f), FVector(0.f, 200.f, 330.f), 18.f);   // the spine over the ribs
+			const FVector Skull(R * 0.55f, 0.f, 110.f);
+			K.Add(Bone, FVector(110.f, 80.f, 70.f), Skull, FRotator(-8.f, 0.f, 0.f), EWRLookMesh::Cylinder);
+			K.Add(Bone, FVector(90.f, 60.f, 22.f), Skull + FVector(60.f, 0.f, -26.f), FRotator(-8.f, 0.f, 0.f));
+			for (const float Sd : { -1.f, 1.f }) K.Disc(FSurf::Stone(FLinearColor(0.01f, 0.01f, 0.01f)), Skull + FVector(44.f, Sd * 22.f, 12.f), FVector::ForwardVector, 20.f, 4.f);
+			for (const float Sd : { -1.f, 1.f }) K.Spike(BoneOld, Skull + FVector(-20.f, Sd * 40.f, 30.f), FVector(-0.6f, Sd * 0.5f, 0.6f), 16.f, 70.f);
+		}
+	}
+}
+
 // ================================================================================================ AWRShrine
 
 AWRShrine::AWRShrine()
@@ -278,8 +430,23 @@ void AWRShrine::BuildLook()
 			K.Rod(Verd, FVector(0, 0, BowlZ + 300.f), FVector(0, 0, BowlZ) + Rot.Vector() * 58.f, 2.5f);
 		}
 	}
+	// The Swamp's five: each its own brazier and dressing (cook 2.11).
+	if (Biome == TEXT("swamp"))
+	{
+		WRSwampShrine::Build(K, WRSwampShrine::Variant(ShrineId), R, BowlZ, [this](const FVector2D& L) { return SiteGroundZ(this, L); });
+	}
 	// Biome dressing at the dais foot.
-	if (Biome == TEXT("storm_peaks"))
+	if (Biome == TEXT("swamp"))
+	{
+		// Cypress knees standing out of the mud round the dais (the swamp's own cairns).
+		for (int32 i = 0; i < 7; ++i)
+		{
+			const float A = 51.f * i + 70.f;
+			const FVector At = FRotator(0.f, A, 0.f).Vector() * (R + 260.f + 60.f * K.Rand(FVector(A, 0, 0), 7));
+			K.Spike(FSurf::Wood(FLinearColor(0.07f, 0.06f, 0.05f)), At + FVector(0, 0, SiteGroundZ(this, FVector2D(At)) - 10.f), FVector::UpVector, 22.f + 10.f * (i % 3), 50.f + 20.f * (i % 4));
+		}
+	}
+	else if (Biome == TEXT("storm_peaks"))
 	{
 		// Thunder marks (six-petal rosettes) cut into flat stones laid at the dais foot.
 		for (int32 i = 0; i < 6; ++i)
@@ -334,7 +501,16 @@ void AWRShrine::BuildLook()
 		SiteRock(this, RootComponent, i + 3, FVector(70.f * Sc, 46.f * Sc, H), At + FVector(0, 0, SiteGroundZ(this, FVector2D(At))), FRotator(4.f * FMath::Sin(i * 1.7f), A, 3.f * FMath::Cos(i * 2.3f)), RockMat, true, 18.f);
 		Runes.Add(SiteLight(this, RootComponent, At - Out * 60.f + FVector(0, 0, H * 0.55f), FLinearColor(0.6f, 0.75f, 1.f), 450.f, 260.f));
 	}
-	if (!bFrost)
+	if (Biome == TEXT("swamp"))
+	{
+		// Bone lanterns by the steps: dark until the shrine is lit (cook 2.1 night lights).
+		for (const float Sd : { -1.f, 1.f })
+		{
+			UPointLightComponent* L = SiteLight(this, RootComponent, FVector(R + 178.f, Sd * 170.f, SiteGroundZ(this, FVector2D(R + 178.f, Sd * 170.f)) + 164.f), FLinearColor(1.f, 0.42f, 0.16f), 0.f, 900.f);
+			if (L) L->ComponentTags.Add(TEXT("swamp_lantern"));
+		}
+	}
+	else if (!bFrost)
 	{
 		for (int32 i = 0; i < 4; ++i)
 		{
@@ -352,9 +528,12 @@ void AWRShrine::OnRep_Fire()
 	if (bBurning && !Fire)
 	{
 		const bool bStorm = Biome == TEXT("storm_peaks");
-		Fire = WRFx::Attach(RootComponent, bStorm ? FName(TEXT("shrine.storm")) : FName(TEXT("shrine.fire")), NAME_None, bGreat ? 2.4f : 1.9f);
+		// The Swamp's fires burn low and dark red (the Coven's braziers: cook 2.11).
+		const bool bSwamp = Biome == TEXT("swamp");
+		Fire = WRFx::Attach(RootComponent, bStorm ? FName(TEXT("shrine.storm")) : FName(TEXT("shrine.fire")), NAME_None, (bGreat ? 2.4f : 1.9f) * (bSwamp ? WRTune(TEXT("swampWorld.shrineFireScale"), 0.65f) : 1.f));
 		if (Fire) Fire->SetRelativeLocation(BowlLocation() - GetActorLocation() + (bStorm ? FVector(0, 0, 680.f) : FVector::ZeroVector));
-		FireLight = SiteLight(this, RootComponent, BowlLocation() - GetActorLocation() + FVector(0, 0, 80.f), FLinearColor(1.f, 0.55f, 0.2f), WRTune(TEXT("world.shrineLight"), 9000.f), bGreat ? 2600.f : 2000.f);
+		FireLight = SiteLight(this, RootComponent, BowlLocation() - GetActorLocation() + FVector(0, 0, 80.f), bSwamp ? FLinearColor(0.85f, 0.16f, 0.07f) : FLinearColor(1.f, 0.55f, 0.2f),
+			WRTune(TEXT("world.shrineLight"), 9000.f) * (bSwamp ? 0.6f : 1.f), bGreat ? 2600.f : 2000.f);
 	}
 	else if (!bBurning && Fire)
 	{
@@ -364,6 +543,11 @@ void AWRShrine::OnRep_Fire()
 	}
 	// The runes glow brighter on a dark shrine: the cold silhouette you find at night.
 	for (UPointLightComponent* L : Runes) if (L) L->SetIntensity(bBurning ? 220.f : 650.f);
+	for (UActorComponent* C : GetComponents())
+	{
+		UPointLightComponent* L = Cast<UPointLightComponent>(C);
+		if (L && L->ComponentHasTag(TEXT("swamp_lantern"))) L->SetIntensity(bBurning ? WRTune(TEXT("swampWorld.boneLantern"), 1800.f) : 0.f);
+	}
 }
 
 FString AWRShrine::StartKindle(AWRPlayerController* PC)
@@ -492,6 +676,32 @@ void AWRShrine::StepGuards()
 								Guards.Add(C);
 							}
 						}
+					}
+				}
+			}
+			// The Swamp's shrines: their guards are named in Data/swamp.json (shrines[].guard) when world.json has none.
+			if (Guards.Num() == 0 && Biome == TEXT("swamp"))
+			{
+				const FWRSwampData& SD = FWRSwampData::Get();
+				const FWRSwampData::FShrine* Mine = nullptr;
+				for (const FWRSwampData::FShrine& Sh : SD.Shrines)
+				{
+					if (Sh.Id == ShrineId || (!Mine && FVector::Dist2D(Sh.At, GetActorLocation()) < WRTune(TEXT("swampWorld.shrineMatch"), 6000.f))) Mine = &Sh;
+				}
+				for (int32 n = 0; Mine && n < Mine->Guard.Num(); ++n)
+				{
+					const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Mine->Guard[n]);
+					if (!Def) continue;
+					const float A = 360.f * n / FMath::Max(1, Mine->Guard.Num()) + FMath::FRandRange(-15.f, 15.f);
+					const float Dist = FMath::FRandRange(WRWorld::Num(TEXT("shrines.guardRingMin"), 1500.f), WRWorld::Num(TEXT("shrines.guardRingMax"), 2500.f));
+					const FVector P = GetActorLocation() + FRotator(0.f, A, 0.f).Vector() * Dist;
+					FHitResult G;
+					FCollisionQueryParams Q(SCENE_QUERY_STAT(WRSwampGuard), false, this);
+					if (!GetWorld()->LineTraceSingleByChannel(G, P + FVector(0, 0, 5000), P - FVector(0, 0, 8000), ECC_WorldStatic, Q)) continue;
+					if (AWRCreature* C = AWRCreature::SpawnCreature(GetWorld(), Def->Id, G.ImpactPoint + FVector(0.f, 0.f, Def->HalfHeight + 30.f), FRotator(0.f, A, 0.f)))
+					{
+						C->SetHome(GetActorLocation());
+						Guards.Add(C);
 					}
 				}
 			}

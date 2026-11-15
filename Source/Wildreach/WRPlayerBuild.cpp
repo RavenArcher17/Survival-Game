@@ -2,6 +2,7 @@
 // code locks and demolish.
 
 #include "WRPlayerController.h"
+#include "WRSwampSystems.h"
 #include "WRFarm.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
@@ -565,6 +566,8 @@ void AWRPlayerController::UpdatePlacement()
 				&& !Cast<AWRBuildPiece>(Ground.GetActor()))
 			{
 				BaseZ = Ground.ImpactPoint.Z - WRTune(TEXT("building.foundationSink"), 60.f);
+				// A stilt foundation over water stands its deck clear of the surface on its posts (WRSwampSystems).
+				BaseZ = WRSwamp::StiltBaseZ(this, Def->Id, Ground.ImpactPoint, BaseZ);
 			}
 		}
 		// Stairs and roofs rise away from you until you turn them; which end of a gable is high is the rotate key's alone
@@ -602,8 +605,8 @@ void AWRPlayerController::UpdatePlacement()
 		}
 		else if (bFreeStructure && Def->Shape == TEXT("foundation") && bHit && !Cast<AWRBuildPiece>(Hit.GetActor()))
 		{
-			// Snap off: where you aim, a foundation sunk into the ground as on the grid.
-			PlaceLoc.Z -= WRTune(TEXT("building.foundationSink"), 60.f);
+			// Snap off: where you aim, a foundation sunk into the ground as on the grid (a stilt one stands over water).
+			PlaceLoc.Z = WRSwamp::StiltBaseZ(this, Def->Id, PlaceLoc, PlaceLoc.Z - WRTune(TEXT("building.foundationSink"), 60.f));
 		}
 		// A drive shaft, gearbox or belt: its end snaps onto a machine's stub near it, in line (cooks/build-machinery.md 2.0).
 		if (FWRMachines::SnapPlacement(this, *Def, PlaceLoc, PlaceYaw))

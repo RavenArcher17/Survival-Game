@@ -1,4 +1,5 @@
 #include "WRBuildLook.h"
+#include "WRSwampSystems.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -916,6 +917,9 @@ TArray<FWRLookBlock> FWRBuildLook::Blocks(const FWRPieceDef& Def, const FTransfo
 	const FName K = Def.Kind;
 	const bool bStone = Def.Material == TEXT("stone");
 	const float Len = S == TEXT("palisade") || S == TEXT("gate") ? 440.f : 420.f;
+	// The Swamp's two pieces (WRSwampSystems): the bog-iron bloomery and the stilt foundation.
+	if (Def.Id == TEXT("bloomery")) { WRSwamp::BloomeryBlocks(PieceToWorld, Out); return Out; }
+	if (Def.Id == TEXT("stilt_foundation")) { WRSwamp::StiltFoundationBlocks(PieceToWorld, Out); return Out; }
 	// Metal, the biome sets and every tier's beams (WRBuildLookSets), modelled furniture (WRBuildLookDecor).
 	if (!Def.Tier.IsNone() && Def.Arch.IsNone())
 	{

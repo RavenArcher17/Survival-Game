@@ -62,7 +62,7 @@ namespace WRStormLook
 	const FLinearColor Timber = FLinearColor(FColor(90, 70, 54));
 	const FLinearColor RopeTan = FLinearColor(FColor(156, 132, 96));
 	const FLinearColor Rust = FLinearColor(FColor(154, 74, 36));
-	const FLinearColor Bone = FLinearColor(FColor(216, 210, 196));
+	const FLinearColor BoneWhite = FLinearColor(FColor(216, 210, 196));
 	const FLinearColor Char = FLinearColor(0.012f, 0.011f, 0.01f);
 
 	FSurf Stone(const FLinearColor& C, float Rough = 0.9f) { return FSurf::Stone(C, Rough); }
@@ -74,7 +74,7 @@ namespace WRStormLook
 	FSurf Rope() { return FSurf::Cloth(RopeTan * 0.5f); }
 	FSurf Glass(float Glow = 0.f) { return FSurf::Glass(FLinearColor(0.42f, 0.46f, 0.55f), Glow); }
 	FSurf Lime() { return FSurf::Stone(Whitewash * 0.85f, 0.94f); }
-	FSurf BoneS() { return FSurf::Stone(Bone * 0.7f, 0.8f); }
+	FSurf BoneS() { return FSurf::Stone(BoneWhite * 0.7f, 0.8f); }
 
 	UStaticMesh* RockMesh(int32 i)
 	{
@@ -1075,7 +1075,7 @@ void AWRStormScenery::Build()
 				const float A = s * 20.f;
 				K.Rod(s % 4 ? Wood(0.6f) : CopperBright(), C + FRotator(0.f, A, 0.f).Vector() * 70.f + FVector(0, 0, 10.f), C + FRotator(0.f, A + 60.f, 0.f).Vector() * 70.f + FVector(0, 0, 22.f), 4.f);
 			}
-			for (int32 e = 0; e < 3; ++e) K.Add(FSurf::Stone(Bone * 0.9f, 0.5f), FVector(14.f, 10.f, 6.f), C + FVector(-20.f + 18.f * e, 8.f * e, 14.f), FRotator(0.f, e * 50.f, 30.f));
+			for (int32 e = 0; e < 3; ++e) K.Add(FSurf::Stone(BoneWhite * 0.9f, 0.5f), FVector(14.f, 10.f, 6.f), C + FVector(-20.f + 18.f * e, 8.f * e, 14.f), FRotator(0.f, e * 50.f, 30.f));
 		}
 	}
 	else if (Kd == TEXT("fort"))

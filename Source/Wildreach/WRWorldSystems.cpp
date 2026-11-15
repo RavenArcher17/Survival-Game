@@ -5,6 +5,8 @@
 
 #include "WRWorldSystems.h"
 #include "WRStormWorld.h"
+#include "WRSwampSystems.h"
+#include "WRSwampBosses.h"
 #include "WRDeeds.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
@@ -339,6 +341,8 @@ void WRWorld::OnKilled(AWRCharacterBase* Victim, AActor* Killer)
 		if (bBurning) Sys->QuestEvent(PS, TEXT("kill.burning"), C->CreatureId);
 		if (bSlowed) Sys->QuestEvent(PS, TEXT("kill.slowed"), C->CreatureId);
 	}
+	// The Swamp's quest deeds (Ruslana: a Murkjaw dead on land, a cursed kill, the Bloat beaten with salt): WRSwampSystems.
+	WRSwamp::OnKilled(Victim, Killer, PS);
 }
 
 void WRWorld::OnTamed(AWRCreature* Creature, const FString& Player)
@@ -902,7 +906,17 @@ void UWRWorldSystems::PlaceShrines()
 		Row->TryGetBoolField(TEXT("great"), bGreat);
 		FVector Ground;
 		FRotator Face = FRotator::ZeroRotator;
-		if (bGreat && !Row->HasField(TEXT("at")))
+		bool bSwampRow = false;
+		Row->TryGetBoolField(TEXT("swamp"), bSwampRow);
+		FVector2D SwampAt = FVector2D::ZeroVector;
+		float SwampYaw = 0.f;
+		if (bSwampRow)
+		{
+			// The Swamp's five take their places from Data/swamp.json shrines (WRSwampSystems), steps toward the nearest camp.
+			if (!WRSwamp::ShrinePlace(Id, SwampAt, SwampYaw) || !WSettle(World, SwampAt, Ground)) continue;
+			Face = FRotator(0.f, SwampYaw, 0.f);
+		}
+		else if (bGreat && !Row->HasField(TEXT("at")))
 		{
 			const TWeakObjectPtr<AWRVillage>* Vg = Villages.Find(FName(*WStrOf(Row, TEXT("village"))));
 			if (!Vg || !Vg->IsValid()) continue;
@@ -948,10 +962,19 @@ void UWRWorldSystems::PlaceMasters()
 		if (!OwnBiome.IsNone() && !WRBiome::IsLive(OwnBiome)) continue;
 		const TWeakObjectPtr<AWRVillage>* Vg = Villages.Find(FName(*WStrOf(Row, TEXT("village"))));
 		const AWRVillage* Village = Vg && Vg->IsValid() ? Vg->Get() : nullptr;
-		if (!Village && !Row->HasField(TEXT("at"))) continue;
+		FVector SwampSpot = FVector::ZeroVector;
+		float SwampYaw = 0.f;
+		// Ruslana (swampDay / swampNight): her day place at the Tithe Mound; WRSwampSystems moves her at dusk and dawn.
+		const bool bSwampPlace = WRSwamp::MasterPlace(Row, SwampSpot, SwampYaw);
+		if (!Village && !Row->HasField(TEXT("at")) && !bSwampPlace) continue;
 		FVector Spot;
 		FRotator Face;
-		if (Village)
+		if (bSwampPlace)
+		{
+			Spot = SwampSpot;
+			Face = FRotator(0.f, SwampYaw, 0.f);
+		}
+		else if (Village)
 		{
 			const FVector2D Off = WMetres(Row->TryGetField(TEXT("offset"))) / 100.f;   // the row is in cm (beside the shrine), not metres
 			Spot = Village->GetActorTransform().TransformPosition(FVector(Off.X, Off.Y, 0.f));
@@ -1783,12 +1806,24 @@ bool UWRWorldSystems::StartInvasion(int32 PairIndex, bool bNow)
 	const FVector2D ToC = WMetres(WRWorld::Biome(To)->TryGetField(TEXT("centre")));
 	const float Inset = WNumOf(Root, TEXT("passInset"), 150.f) * 100.f;
 	FVector A, D;
-	if (!WSettle(World, FVector2D(Pass->Location) + FVector2D(FMath::Sign(FromC.X), 0.f) * Inset, A) || !WSettle(World, FVector2D(Pass->Location) + FVector2D(FMath::Sign(ToC.X), 0.f) * Inset, D)) return false;
+	// A pair that names its own pass (Stormgut between Storm peaks and the Swamp): its mouths, metres, each side's own.
+	FString PassName = Pass->Name;
+	if (const TSharedPtr<FJsonObject> Mouths = WChild(Pair, TEXT("mouths")))
+	{
+		const FVector2D MA = WMetres(Mouths->TryGetField(From.ToString())), MD = WMetres(Mouths->TryGetField(To.ToString()));
+		if (!MA.IsZero() && !MD.IsZero())
+		{
+			if (!WSettle(World, MA, A) || !WSettle(World, MD, D)) return false;
+			PassName = WStrOf(Pair, TEXT("passName"), PassName);
+		}
+		else if (!WSettle(World, FVector2D(Pass->Location) + FVector2D(FMath::Sign(FromC.X), 0.f) * Inset, A) || !WSettle(World, FVector2D(Pass->Location) + FVector2D(FMath::Sign(ToC.X), 0.f) * Inset, D)) return false;
+	}
+	else if (!WSettle(World, FVector2D(Pass->Location) + FVector2D(FMath::Sign(FromC.X), 0.f) * Inset, A) || !WSettle(World, FVector2D(Pass->Location) + FVector2D(FMath::Sign(ToC.X), 0.f) * Inset, D)) return false;
 	FInvasion N;
 	N.bOn = true;
 	N.From = From;
 	N.To = To;
-	N.Pass = Pass->Name;
+	N.Pass = PassName;
 	N.AttackMouth = A;
 	N.DefendMouth = D;
 	// What they march on: the nearest claim or lesser shrine within reach of the pass's far mouth.
@@ -1827,7 +1862,7 @@ bool UWRWorldSystems::StartInvasion(int32 PairIndex, bool bNow)
 	InvasionLedger.Reset();
 	Invaders.Reset();
 	const FString FromName = WStrOf(WRWorld::Biome(From), TEXT("name"), From.ToString());
-	const FString Msg = FString::Printf(TEXT("Invasion: %s is coming through the %s"), *FromName, *Pass->Name.ToLower());
+	const FString Msg = FString::Printf(TEXT("Invasion: %s is coming through the %s"), *FromName, *PassName.ToLower());
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
 		AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
@@ -1835,7 +1870,7 @@ bool UWRWorldSystems::StartInvasion(int32 PairIndex, bool bNow)
 		PC->ClientRaid(Inv.Kinds.Num() ? Inv.Kinds[0].Key : NAME_None, FString::Printf(TEXT("%s invades"), *FromName), Msg, 0);
 		WRSound::PlayUI(PC, TEXT("world.invasion"));
 	}
-	UE_LOG(LogWildreach, Log, TEXT("INVASION %s -> %s through %s, %d kinds, target %s"), *From.ToString(), *To.ToString(), *Pass->Name, Inv.Kinds.Num(), *Inv.Target.ToCompactString());
+	UE_LOG(LogWildreach, Log, TEXT("INVASION %s -> %s through %s, %d kinds, target %s"), *From.ToString(), *To.ToString(), *PassName, Inv.Kinds.Num(), *Inv.Target.ToCompactString());
 	return true;
 }
 
@@ -1890,7 +1925,13 @@ void UWRWorldSystems::StepInvasion(float Dt)
 		// The roaming mini leaves its loop to lead them (its own body if it's out; otherwise it rises at the head).
 		AWRCreature* Leader = nullptr;
 		for (TActorIterator<AWRCreature> It(World); It; ++It) if (It->CreatureId == Inv.Leader && It->IsAlive()) Leader = *It;
-		if (Leader)
+		// The Bloat leaves its loop by its own road (WRSwampBosses: it walks out through Stormgut to the target, the pack
+		// behind it); it counts as an invader for the ledger and the end.
+		if (Inv.Leader == TEXT("bloat") && FWRSwampBoss::LeadInvasion(World, Inv.Target))
+		{
+			if (AWRBoss* Bloat = FWRSwampBoss::Bloat(World)) Invaders.Add(Bloat);
+		}
+		else if (Leader)
 		{
 			Leader->TeleportTo(Inv.AttackMouth + FVector(0.f, 0.f, Leader->GetSimpleCollisionHalfHeight() + 60.f), Facing);
 			Leader->bRaider = true;
@@ -1994,6 +2035,8 @@ void UWRWorldSystems::EndInvasion(bool bWon)
 	{
 		WTellBiome(World, Inv.To, TEXT("The invaders go back through the pass"), NAME_None);
 	}
+	// The Bloat goes home along its own road (WRSwampBosses).
+	if (Inv.Leader == TEXT("bloat")) FWRSwampBoss::EndInvasion(World);
 	for (const TWeakObjectPtr<AWRCreature>& W : Invaders)
 	{
 		AWRCreature* C = W.Get();
@@ -2310,6 +2353,11 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 		for (TActorIterator<AWRSummoningStone> It(PC->GetWorld()); It; ++It) if (It->BossId == FName(*Arg(2))) S = *It;
 		if (!S || !Near(S, 500.f)) return TEXT("No summoning stone here");
 		return S->Offer(PC);
+	}
+	if (Verb == TEXT("swamp"))
+	{
+		// The Swamp's things (WRSwampSystems): world swamp use / plank / rite / boss ...
+		return WRSwamp::Command(PC, Args);
 	}
 	if (Verb == TEXT("plank"))
 	{

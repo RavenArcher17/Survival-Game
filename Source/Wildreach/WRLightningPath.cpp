@@ -13,6 +13,7 @@
 #include "WRStatusComponent.h"
 #include "WRStormTypes.h"
 #include "WRSurvival.h"
+#include "WRSwampBosses.h"
 #include "WRTuning.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/World.h"
@@ -244,7 +245,12 @@ void WRLightning::Zap(AWRCharacterBase* By, AWRCharacterBase* Target, float Dama
 	Hit.Impact = 1;
 	Hit.Origin = Origin;
 	Hit.ImpactPoint = Target->GetActorLocation();
+	const FVector Feet = Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight());
+	UWorld* ZapWorld = Target->GetWorld();
 	UWRCombatLibrary::ApplyHit(Target, Hit);
+	// The Mother's Throat: lightning on a body standing in her water is lightning in the water (the rods, Vharra's
+	// convulse: WRSwampVharra.cpp). Nothing happens anywhere else.
+	FWRSwampBoss::LightningAt(ZapWorld, Feet, Damage, By, false);
 }
 
 void WRLightning::Ribbon(const UObject* WorldContext, const FVector& A, const FVector& B, bool bSound)

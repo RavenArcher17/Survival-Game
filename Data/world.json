@@ -5,7 +5,8 @@
     "_comment": "Per biome: its path, signature resource, essence, faction, the crater / glacier the event centres on, and the waymark round its summoning stones.",
     "volcanic": { "name": "Volcanic", "path": "fire", "signature": "sulfur_crystal", "essence": "ember_essence", "faction": "forgebound", "centre": [-786, 0], "waymark": "cairn", "rock": [30, 27, 25], "rockAlt": [52, 44, 38], "accent": [217, 194, 74], "glow": [255, 140, 60] },
     "tundra": { "name": "Frozen tundra", "path": "frost", "signature": "lichen", "essence": "frost_essence", "faction": "rimekin", "centre": [804, 0], "waymark": "inuksuk", "rock": [185, 196, 206], "rockAlt": [140, 152, 166], "accent": [198, 40, 40], "glow": [150, 200, 255] },
-    "storm_peaks": { "name": "Storm peaks", "path": "lightning", "signature": "stormglass", "essence": "storm_essence", "faction": "", "centre": [-1300, -3300], "waymark": "rod", "rock": [62, 70, 80], "rockAlt": [138, 141, 145], "accent": [78, 154, 132], "glow": [185, 167, 255] }
+    "storm_peaks": { "name": "Storm peaks", "path": "lightning", "signature": "stormglass", "essence": "storm_essence", "faction": "", "centre": [-1300, -3300], "waymark": "rod", "rock": [62, 70, 80], "rockAlt": [138, 141, 145], "accent": [78, 154, 132], "glow": [185, 167, 255] },
+    "swamp": {"name": "Swamp", "path": "blood", "signature": "bloodmoss", "essence": "blood_essence", "faction": "", "centre": [1700, -3600], "waymark": "fetish", "rock": [58, 52, 44], "rockAlt": [96, 84, 66], "accent": [122, 10, 20], "glow": [138, 59, 30]}
   },
 
   "shrines": {
@@ -25,7 +26,12 @@
       { "id": "windgap", "name": "Windgap Shrine", "biome": "storm_peaks", "at": [-2300, -4300], "yaw": 200, "guards": { "voltfang": 7 } },
       { "id": "stormgut_mouth", "name": "Stormgut Mouth Shrine", "biome": "storm_peaks", "at": [-650, -4880], "yaw": 270, "guards": { "thunderhorn": 2, "stormkite": 1 } },
       { "id": "glass_scar", "name": "Glass Scar Shrine", "biome": "storm_peaks", "at": [-1020, -2700], "yaw": 160, "guards": { "thunderhorn": 2 }, "stormGuards": { "raiju": 1 } },
-      { "id": "hanging", "name": "Hanging Shrine", "biome": "storm_peaks", "at": [-800, -3420], "yaw": 180, "guards": { "voltfang": 4 } }
+      { "id": "hanging", "name": "Hanging Shrine", "biome": "storm_peaks", "at": [-800, -3420], "yaw": 180, "guards": { "voltfang": 4 } },
+      {"id": "tithe_mound", "name": "Great Shrine of the Tithe Mound", "biome": "swamp", "great": true, "swamp": true, "at": [2167.2, -3720], "yaw": -8, "_why": "Low bone mound, a stone tithe basin, a ring of 7 fetish posts; the brazier a bronze bowl of bloodmoss oil burning low and dark red. Placed from Data/swamp.json shrines (WRSwampSystems)."},
+      {"id": "salt_cross", "name": "Salt Cross Shrine", "biome": "swamp", "swamp": true, "at": [2762.2, -3250], "yaw": 96, "guards": {"bogsnout": 3, "gorgeleech": 2}, "_why": "A cross of salt-crusted driftwood on a reed island (M1)."},
+      {"id": "root_shrine", "name": "Root Shrine", "biome": "swamp", "swamp": true, "at": [1921.7, -4950], "yaw": 14, "guards": {"murkjaw": 1, "hexcrow": 3}, "_why": "A root-altar at the channel crossroads under the Mangrove Cathedral (M2)."},
+      {"id": "cage_shrine", "name": "Cage Shrine", "biome": "swamp", "swamp": true, "at": [1722.4, -2940], "yaw": 11, "guards": {"bogstalker": 2}, "_why": "A brazier inside an iron cage at the Hanging Cypress's foot (M4)."},
+      {"id": "falls_shrine", "name": "Falls Shrine", "biome": "swamp", "swamp": true, "at": [842.3, -3840], "yaw": 1, "guards": {"gorgeleech": 4, "hexcrow": 2}, "_why": "A bone brazier under the spray of the Weeping Wall's middle fall (M5)."}
     ],
     "guardRange": 12000, "guardRingMin": 1500, "guardRingMax": 2500,
     "kindleSeconds": 3.0, "kindleMove": 150, "interactRange": 450,
@@ -41,7 +47,8 @@
       "lines": { "first": "Quiet. You walk like a herd.", "offer": "There's something you could learn.", "waiting": "Not yet. Go.", "done": "Better.", "all": "The ice will carry you now." } },
     { "id": "vesna", "name": "Vesna Groza", "path": "lightning", "biome": "storm_peaks", "at": [-1865, -3255], "yaw": 250, "sex": "f", "face": 3, "build": 1, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "lightning", "", "lightning"], "work": "chop", "workEvery": 3.4, "workSound": "world.anvil_soft", "workFx": "storm.piton_sparks", "lineSound": "world.chime",
       "_why": "The path master of Lightning (cooks/biome-lightning.md 2.13): a climber struck on the Crown who came down alive, a Lichtenberg fern from her left shoulder to her jaw. By day she sharpens pitons at her lean-to in Strikerock's split beside the Great Shrine; the tap of the work loop is the file on the piton.",
-      "lines": { "first": "Hair standing up yet? It will. Stay low on the Crown.", "offer": "Want to learn to live up there? Ha. Then listen.", "waiting": "Still here? The sky won't wait for you.", "done": "Good. You came back down.", "all": "You've the storm in you now. Go up and bring it down." } }
+      "lines": { "first": "Hair standing up yet? It will. Stay low on the Crown.", "offer": "Want to learn to live up there? Ha. Then listen.", "waiting": "Still here? The sky won't wait for you.", "done": "Good. You came back down.", "all": "You've the storm in you now. Go up and bring it down." } },
+    {"id": "ruslana", "name": "Ruslana", "path": "blood", "biome": "swamp", "swampDay": "tithe_mound", "swampNight": "walking_house", "sex": "f", "face": 2, "build": 1, "armor": ["", "hide_armor", "", "hide_legs"], "elements": ["", "blood", "", "blood"], "work": "chop", "workEvery": 3.0, "workSound": "world.anvil_soft", "workFx": "", "lineSound": "world.chime", "_why": "The Mire-witch, path master of Blood & curse (cooks/biome-swamp.md 2.11): a newcomer who washed ashore and taught herself the Coven's craft from its bones and books. Early 30s, tall, striking: black hair in a long rope braid threaded with crow feathers and bone beads, sharp cheekbones, dark-lined grey eyes, lips and fingertips stained garnet with bloodmoss dye; a fitted black-green leather bodice laced at the front over an open-collared undershirt, bare shoulders under a crow-feather mantle, a split wrap skirt over tall waders, a belt of bottles and bone charms. Confident, amused, dangerous. By day at the Tithe Mound grinding bloodmoss, by night at the Walking House (WRSwampSystems moves her).", "lines": {"first": "You smell of the coast. That'll change.", "offer": "Want the Mire's craft? It costs a little blood. Everything here does.", "waiting": "Still dry? The water won't wait.", "done": "There. The Mire took its share and you're still standing.", "all": "You bleed like one of them now. Go and feed her nothing."}}
   ],
 
   "quests": {
@@ -82,6 +89,14 @@
       { "id": "below_the_strike", "title": "The Unlearning: below the strike", "task": "Live through 3 more strikes' warnings above 600 m.", "type": "event", "event": "pretell", "count": 3, "xp": 2000, "arc": "unlearning" },
       { "id": "roc_knew", "title": "The Unlearning: what the roc knew", "task": "Show Vesna Kharvox's core.", "type": "show", "item": "core_kharvox", "count": 1, "xp": 3000, "arc": "unlearning" },
       { "id": "herons_cup_storm", "title": "The Unlearning: the heron's cup", "task": "Bring Vesna 5 ember essence: the draught is lit by the other fire.", "type": "bring", "item": "ember_essence", "count": 5, "xp": 3000, "items": { "heron_draught": 1 }, "title_reward": "Unlearned", "arc": "unlearning" }
+    ],
+    "ruslana": [
+      {"id": "red_moss", "title": "Red moss", "task": "Bring Ruslana 10 bloodmoss: it grows on the domes and round every bleedwater pool.", "type": "bring", "item": "bloodmoss", "count": 10, "xp": 1000, "recipes": ["bloodmoss_poultice", "sealed_waders"]},
+      {"id": "what_the_water_wants", "title": "What the water wants", "task": "Wade bleedwater until it opens you up, then close the wound with a bloodmoss poultice.", "type": "event", "event": "bleed_cured", "count": 1, "xp": 1500, "recipes": ["leech_tar"]},
+      {"id": "duckweed_rule", "title": "The duckweed rule", "task": "Kill a Murkjaw on land: it has to die out of the water.", "type": "event", "event": "murkjaw_on_land", "count": 1, "xp": 2000, "recipes": ["murkjaw_arrow"]},
+      {"id": "hex_returned", "title": "A hex returned", "task": "Curse your prey, then kill 3 creatures while the curse is on them.", "type": "event", "event": "cursed_kill", "count": 3, "xp": 2500, "recipes": ["hex_ward_charm"]},
+      {"id": "coven_key", "title": "The Coven key", "task": "Take the key from the skeleton in the Hanging Cypress's cage and open the trapdoor in the Walking House floor.", "type": "event", "event": "coven_cellar", "count": 1, "xp": 3000, "doneLine": "Mind the ladder. Thirty metres, and nobody's oiled it in a long while."},
+      {"id": "salt_for_the_bloat", "title_reward": "Salt-thrower", "title": "Salt for the Bloat", "task": "Beat The Bloat, and throw salt on it at least once in the fight.", "type": "event", "event": "bloat_salted", "count": 1, "xp": 5000, "items": {"mire_witch_ring": 1}}
     ],
     "standing": 150, "greetRange": 600, "greetEvery": 90, "talkRange": 400, "sneakNear": 500, "sneakAway": 3000
   },
@@ -156,18 +171,20 @@
       "title": "Starfall", "warn": "Stars are falling", "landText": "A star fell to the {dir}" },
     "great_storm": { "biome": "storm_peaks", "everyHours": 72, "weather": "thunderstorm", "end": 3600, "signatureScale": 3,
       "_why": "cooks/biome-lightning.md 2.15: the Front (0-10 min), the Storm (10-50: strikes everywhere with the same tells, faster above 600 m; Raiju arrive in strikes; ball lightning on the Crags and the Cliff Shrines), the Clearing (50-60). Strikes never in claims or spawn camps. After: fulgurite x3 wherever strikes fell, the Glass Scar glows 2 game hours (WRStormWorld.cpp).",
-      "title": "The Great Storm", "warn": "A black wall rises over the Crown: every rod in the peaks is humming", "startText": "The Great Storm: lightning will fall everywhere in the peaks. Get low, get under rock, or ground yourself", "endText": "The storm breaks. Steam off the rock, and fresh stormglass wherever it struck" }
+      "title": "The Great Storm", "warn": "A black wall rises over the Crown: every rod in the peaks is humming", "startText": "The Great Storm: lightning will fall everywhere in the peaks. Get low, get under rock, or ground yourself", "endText": "The storm breaks. Steam off the rock, and fresh stormglass wherever it struck" },
+    "red_tide": {"biome": "swamp", "everyHours": 72, "end": 3600, "endGameDays": 1, "_why": "cooks/biome-swamp.md 2.10: one game day about every 3 real days (Biome events setting). Warning 5 min: the falls run oxblood, the Throat's mist doubles, the crows take off, the Coven pillar burns red. M3-M5 murk turns bleedwater with the leech boil; M1/M2 brackish stay clean; camps safe. WRSwampSystems.cpp drives AWRSwampState.", "title": "The Red Tide", "warn": "The falls are running dark red, and every crow in the Mire is in the air", "startText": "The Red Tide: the pools inland have turned to blood. Keep to the coast, or wade at your own cost", "endText": "The tide ebbs. The murk runs black again"}
   },
 
   "invasions": {
     "_comment": "Setting invasions: off / rare / normal / frequent = per pair per real week. Pairs list both ways; pass mouths are found from the island's 'pass' points (the attacking side's mouth = passInset metres into the attacker's land).",
     "perWeek": { "rare": 1, "normal": 2, "frequent": 4 },
     "warnSeconds": 300, "holdSeconds": 1800, "targetRange": 150000, "passInset": 150, "count": [8, 14], "lootFraction": 0.1, "xp": 2000,
-    "pays": { "ember_essence": 3, "frost_essence": 3, "storm_essence": 3 },
+    "pays": { "ember_essence": 3, "frost_essence": 3, "storm_essence": 3, "blood_essence": 3 },
     "pairs": [
       { "from": "tundra", "to": "volcanic", "leader": "old_tusker", "day": { "woolly_drudge": 4, "frostantler": 4, "rimeclaw": 1 }, "night": { "gloomhowl": 8, "rimeclaw": 2 } },
       { "from": "volcanic", "to": "tundra", "leader": "cinderhorn", "day": { "cinderfang": 6, "scorchwing": 3, "magmaw": 1 }, "night": { "cinderfang": 8, "magmaw": 1 } },
-      { "from": "storm_peaks", "to": "swamp", "leader": "bellwether", "bringsWeather": "thunderstorm", "day": { "thunderhorn": 5, "stormkite": 4 }, "night": { "voltfang": 10 } }
+      { "from": "storm_peaks", "to": "swamp", "leader": "bellwether", "mouths": { "storm_peaks": [-480, -4900], "swamp": [830, -4900] }, "passName": "Stormgut", "bringsWeather": "thunderstorm", "day": { "thunderhorn": 5, "stormkite": 4 }, "night": { "voltfang": 10 } },
+      {"from": "swamp", "to": "storm_peaks", "leader": "bloat", "mouths": {"swamp": [830, -4900], "storm_peaks": [-480, -4900]}, "passName": "Stormgut", "puddles": true, "day": {"bogstalker": 5, "mudhulk": 3, "hexcrow": 3, "murkjaw": 1}, "night": {"gorgeleech": 8, "hexcrow": 3, "murkjaw": 1}}
     ]
   },
 

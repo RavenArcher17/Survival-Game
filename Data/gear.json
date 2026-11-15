@@ -353,6 +353,12 @@
         "set": "stilt_house"
       },
       {
+        "id": "bp_coven_decor",
+        "boss": "vharra",
+        "kind": "set decor",
+        "set": "stilt_house"
+      },
+      {
         "id": "bp_coral_keep_decor",
         "boss": "thalassor",
         "kind": "set decor",

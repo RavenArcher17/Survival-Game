@@ -1,5 +1,7 @@
 #include "WRCreature.h"
 #include "WRStormCreatures.h"
+#include "WRSwampCreatures.h"
+#include "WRSwampBosses.h"
 #include "WRRaiding.h"
 #include "WRDeeds.h"
 #include "WRArtifacts.h"
@@ -1223,7 +1225,13 @@ void AWRCreature::AddMovementInput(FVector WorldDirection, float ScaleValue, boo
 	// Wades in the shallows but never walks off into the sea (on the server, and a rider's client so it predicts the same).
 	// (A swimmer, the Floeback, is at home in it.)
 	const FWRCreatureDef* MoveDef = GetDef();
-	if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying() && !(MoveDef && MoveDef->SwimSpeed > 0.f))
+	// A swamp wader (Mudhulk 2.5 m, Mirestrider 1.4 m) walks the bottom up to its own depth instead (WRSwampCreatures).
+	FVector Waded;
+	if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying() && FWRSwampAI::Wade(this, WorldDirection, Waded))
+	{
+		WorldDirection = Waded;
+	}
+	else if ((HasAuthority() || IsLocallyControlled()) && !GetCharacterMovement()->IsFlying() && !(MoveDef && MoveDef->SwimSpeed > 0.f))
 	{
 		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
 		{
@@ -1284,6 +1292,8 @@ void AWRCreature::BeginPlay()
 	}
 	// A Storm peaks creature's body state and look (WRStormCreatures).
 	UWRStormBody::Attach(this);
+	// A Swamp creature's body state and look (WRSwampCreatures).
+	UWRSwampBody::Attach(this);
 }
 
 void AWRCreature::FollowPack(const FVector2D& PackAt, const FVector2D& Heading)
@@ -1540,6 +1550,11 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	if (!PS || !Def || !HasAuthority() || IsTamed())
 	{
 		return TEXT("can't feed that");
+	}
+	// The Murkjaw blood rite (WRSwampCreatures): a Blood walker bleeds into its jaws first; after it, it's fed as usual.
+	if (FString Rite; FWRSwampAI::Feed(this, Player, Rite))
+	{
+		return Rite;
 	}
 	const bool bKnockout = Def->CanTameBy(TEXT("knockout_feed")) && IsUnconscious();
 	const bool bOffer = Def->CanTameBy(TEXT("offer_food")) && !AggroTarget.IsValid();
@@ -2061,7 +2076,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 		TickRider(DeltaSeconds);
 	}
 	// Out of its depth in the sea (WRWater): it swims for the shallows, whatever its brain wants.
-	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming() && !(Def && Def->SwimSpeed > 0.f))
+	if (!Rider.IsValid() && !IsUnconscious() && GetCharacterMovement()->IsSwimming() && !(Def && Def->SwimSpeed > 0.f) && !FWRSwampAI::WithinWade(this))
 	{
 		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this))
 		{
@@ -2209,6 +2224,7 @@ void AWRCreature::OnDeath(AActor* Killer)
 	}
 	// A wild kill stays down to be butchered (its loot comes off the body, hit by hit); tames still go the old way.
 	FWRStormAI::Died(this, Killer);   // a Storm peaks creature's chance drops (storm essence)
+	FWRSwampAI::Died(this, Killer);   // a Swamp creature lets go of what it held; the Red Tide's extra sacs
 	const bool bBody = BecomeBody(Killer);
 	if (UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Killer))
 	{
@@ -2319,6 +2335,8 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 			continue;   // (Vanish: a dodge broke its sight of you for a moment)
 		}
 		float Aggro = Def->AggroRadius;
+		// A hexed beast (the Hex-Warden's Red Tide walk) notices you from further (x1.3).
+		Aggro *= FWRSwampBoss::HexAggroScale(Self);
 		// Shadow / Ghost (sneaking perks): in the dark you're noticed later, and standing still not at all.
 		if (It->GetPlayerState() && AWRGameState::IsNightIn(Self))
 		{
@@ -2750,6 +2768,12 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	{
 		return;
 	}
+	// The Swamp creatures' own moments (an ambush under the duckweed, a hold, a latch, a forced next row, the murder over
+	// the dying, the yawn, the flash, a cornered peck, the shallows' stab): WRSwampCreatures.
+	if (FWRSwampAI::TickWild(this, Self, DeltaSeconds))
+	{
+		return;
+	}
 	if (Self->bRaidLeaving)
 	{
 		// The raid is over: away from the base at a trot, fighting no one (WRRaids takes it away out of sight).
@@ -3171,6 +3195,11 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	}
 	// A Stormkite out scouting for its owner (WRStormCreatures).
 	if (FWRStormAI::TickTame(this, Self, DeltaSeconds))
+	{
+		return;
+	}
+	// A Lanterntoad riding its owner's shoulder pouch while they swim (WRSwampCreatures).
+	if (FWRSwampAI::TickTame(this, Self, DeltaSeconds))
 	{
 		return;
 	}

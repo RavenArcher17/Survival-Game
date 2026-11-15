@@ -4,6 +4,8 @@
 // fighting from the saddle and being thrown off it.
 #include "WRCreature.h"
 #include "WRStormCreatures.h"
+#include "WRSwampBosses.h"
+#include "WRSwampCreatures.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "GameFramework/GameStateBase.h"
@@ -449,7 +451,10 @@ void AWRCreature::MulticastTell_Implementation(uint8 Glint, FName BoneHint, FNam
 	{
 		if (Sound == TEXT("voice"))
 		{
-			WRSound::Voice(this, TEXT("attack"));
+			// A body with its own tell call (the Swamp's: cook biome-swamp 2.15, rising over the bed) plays it at the
+			// wind-up's start; the rest use their attack call.
+			const bool bOwnTell = UWRSwampBody::IsSwampKind(CreatureId) || WRSound::Has(FName(*FString::Printf(TEXT("creature.%s.tell"), *CreatureId.ToString())));
+			WRSound::Voice(this, bOwnTell ? TEXT("tell") : TEXT("attack"));
 		}
 		else
 		{
@@ -461,6 +466,8 @@ void AWRCreature::MulticastTell_Implementation(uint8 Glint, FName BoneHint, FNam
 float AWRCreature::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 {
 	Damage = FWRStormAI::Incoming(this, Hit, Damage);   // Galvara's cores: arrows and spells x1.5
+	Damage = FWRSwampBoss::CreatureIncoming(this, Hit, Damage);   // the Hex-Warden's totems: x2 from fire
+	Damage = FWRSwampAI::Incoming(this, Hit, Damage);   // a Murkjaw's belly as it rolls or rears, a Slimeshell in its shell
 	// A tame's tack (cooks/build-taming.md 2.3): the saddle and barding take their share; ridden bareback it takes
 	// more; its imprinter beside it hardens it.
 	if (IsTamed() && !Hit.bDamageOverTime)
@@ -610,6 +617,10 @@ FName AWRCreatureAI::PickRow(AWRCreature* Self, AWRCharacterBase* Target, bool b
 		{
 			continue;  // a Storm peaks creature's own rule (charged, grounded, by a wall, from the flank)
 		}
+		if (!FWRSwampAI::RowAllowed(this, Self, R, Target, bReading))
+		{
+			continue;  // a Swamp creature's own rule (only from water, only flanking, only grounded, once a fight, forced only)
+		}
 		const float W = Dist < Close ? R.WClose : Dist < Mid ? R.WMid : R.WFar;
 		if (W > 0.f)
 		{
@@ -663,6 +674,7 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	// The tell: its voice and a small glint on the attacking part (white blockable, crimson unblockable).
 	Self->MulticastTell(R->Glint, R->TellBone, TEXT("voice"));
 	FWRStormAI::RowStarted(this, Self, *R, Target);
+	FWRSwampAI::RowStarted(this, Self, *R, Target);
 	if (R->Motion == TEXT("burst"))
 	{
 		// The ground gives it away: snow, ash or dirt heaving where it will come up.
@@ -736,14 +748,21 @@ void AWRCreatureAI::RowHit(AWRCreature* Self, AWRCharacterBase* Victim)
 		else if (Self->Weapon.Element == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Build; }
 	}
 	FWRStormAI::ModifyHit(Self, Hit, R);   // shock is lightning; a tame Raiju's storm bonus, a tame's shock bites
+	FWRSwampAI::ModifyHit(Self, Hit, R);   // a hexed beast's curse; the Miasma's worse cry
 	UE_LOG(LogWildreach, Log, TEXT("AI %s %s hits %s"), *Self->GetName(), *RowId.ToString(), *Victim->GetName());
 	const float Knockback = R->Knockback;
 	TWeakObjectPtr<AWRCreature> WeakSelf(Self);
 	TWeakObjectPtr<AWRCharacterBase> WeakVictim(Victim);
-	UWRCombatLibrary::ApplyHit(Victim, Hit, [WeakSelf, WeakVictim, Knockback](EWRHitResult Result)
+	const FName HitRowId = RowId;
+	UWRCombatLibrary::ApplyHit(Victim, Hit, [WeakSelf, WeakVictim, Knockback, HitRowId](EWRHitResult Result)
 	{
 		AWRCreature* S = WeakSelf.Get();
 		AWRCharacterBase* V = WeakVictim.Get();
+		if (S && V)
+		{
+			// A Swamp creature's catches (the latch, the death roll, the tongue's pull, the gulp) come out of the result.
+			FWRSwampAI::Resolved(S, V, HitRowId, Result);
+		}
 		if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 		{
 			// Gale Feather (artifact): thrown twice as far.
@@ -771,6 +790,10 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	if (FWRStormAI::StrikeRow(this, Self, *R, Target))
 	{
 		return;  // a Storm peaks move (discharge, darts, a kite's dive, a rebound off the rock)
+	}
+	if (FWRSwampAI::StrikeRow(this, Self, *R, Target))
+	{
+		return;  // a Swamp move (the cry, the tongue, the flop, a spit, the call, the clatter, the puff, the surge, a dive)
 	}
 	if (M == TEXT("lunge") || M == TEXT("pounce"))
 	{
@@ -934,6 +957,8 @@ void AWRCreatureAI::TickRow(AWRCreature* Self, float DeltaSeconds)
 	if (RowPhase == 3)
 	{
 		const float BodyR = Self->GetSimpleCollisionRadius();
+		// A Swamp strike's own moves the shapes below don't cover (the cry's cone, the tongue, the flurry, the flop's ring).
+		FWRSwampAI::TickStrike(this, Self, *R, DeltaSeconds);
 		if (M == TEXT("bite") || M == TEXT("claw") || M == TEXT("sweep") || M == TEXT("kick") || M == TEXT("buffet") || M == TEXT("snap"))
 		{
 			// Damage only while the jaw, claw or hoof really travels: bodies inside its reach and arc (a kick: behind it).
@@ -1108,7 +1133,7 @@ void AWRCreatureAI::TickRowFight(AWRCreature* Self, AWRCharacterBase* Target, fl
 	const FVector Goal = bInPlace ? Target->GetActorLocation() : Spot;
 	FVector Dir = (Goal - Self->GetActorLocation()).GetSafeNormal2D();
 	const float Stop = Self->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius() + (Def ? FMath::Min(Def->AttackRange * 0.5f, 120.f) : 80.f);
-	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered) && !FWRStormAI::Grounded(Self))
+	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered) && !FWRStormAI::Grounded(Self) && !FWRSwampAI::Grounded(Self))
 	{
 		const float WantZ = Target->GetActorLocation().Z + (Dist > 700.f ? 450.f : 0.f);
 		Self->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
@@ -1321,6 +1346,7 @@ void AWRCreature::TickRider(float DeltaSeconds)
 			if (Mount->Weapon.Element == TEXT("fire")) Hit.BurnBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
 			else if (Mount->Weapon.Element == TEXT("frost")) Hit.FrostBuildup = WRTune(TEXT("tame.element.buildup"), 12.f);
 			FWRStormAI::ModifyHit(Mount, Hit, nullptr);   // a Voltfang's shock bites from under its rider
+			FWRSwampAI::ModifyHit(Mount, Hit, nullptr);   // a hexed mount's bites carry the hex
 			UWRCombatLibrary::ApplyHit(Victim, Hit);
 		}), 0.45f, false);
 	}

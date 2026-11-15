@@ -1,6 +1,7 @@
 // The Storm peaks creatures (cooks/biome-lightning.md 2.9; cooks/build-biome-lightning.md 1.3, 2.6). See WRStormCreatures.h.
 #include "WRStormCreatures.h"
 #include "WRStormBosses.h"
+#include "WRSwampCreatures.h"
 #include "WRCreature.h"
 #include "WRBoss.h"
 #include "WRAttackRows.h"
@@ -1932,6 +1933,11 @@ void AWRCreature::OnDamageTaken(const FWRHit& Hit, float Damage)
 	if (HasAuthority() && UWRStormBody::Get(this))
 	{
 		FWRStormAI::Damaged(this, Hit, Damage);
+	}
+	// A Swamp creature: freeing a held survivor, a leech knocked off, the clatter, the shell, the cry choked off.
+	if (HasAuthority() && UWRSwampBody::Get(this))
+	{
+		FWRSwampAI::Damaged(this, Hit, Damage);
 	}
 }
 

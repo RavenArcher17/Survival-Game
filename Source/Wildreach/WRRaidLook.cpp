@@ -6,14 +6,14 @@
 
 namespace WRRaidLookDetail
 {
-	const FLinearColor Bronze(0.30f, 0.19f, 0.075f);      // cast bronze, aged (bell, petard)
+	const FLinearColor BellBronze(0.30f, 0.19f, 0.075f);      // cast bronze, aged (bell, petard)
 	const FLinearColor BronzeDark(0.09f, 0.055f, 0.025f); // the inside of a bell
 	const FLinearColor Iron(0.055f, 0.055f, 0.06f);
 	const FLinearColor Oak(0.12f, 0.075f, 0.04f);         // oiled oak (plank, yoke)
 	const FLinearColor Ash(0.40f, 0.30f, 0.18f);          // ash (ladder rails and rungs)
 	const FLinearColor Terracotta(0.36f, 0.13f, 0.06f);
 	const FLinearColor Cloth(0.42f, 0.36f, 0.26f);
-	const FLinearColor Char(0.03f, 0.025f, 0.02f);
+	const FLinearColor CharBlack(0.03f, 0.025f, 0.02f);
 	const FLinearColor Hide(0.25f, 0.16f, 0.09f);
 	const FLinearColor ClayPlug(0.33f, 0.27f, 0.21f);
 	const FLinearColor Match(0.36f, 0.31f, 0.21f);         // slow match: hemp cord soaked in saltpetre
@@ -117,7 +117,7 @@ FWRToolMesh Bell()
 	const TArray<FVector2D> Inner = {
 		{ 0.04f, 3.6f }, { 0.08f, 5.3f }, { 0.15f, 6.4f }, { 0.27f, 6.7f }, { 0.43f, 6.6f }, { 0.59f, 7.2f },
 		{ 0.73f, 8.5f }, { 0.85f, 10.2f }, { 0.93f, 11.6f }, { 1.00f, 12.6f } };
-	Shell(M, FVector(0.f, 0.f, Top), -FVector::ZAxisVector, L, Outer, Inner, 28, Bronze, BronzeDark, 0.35f);
+	Shell(M, FVector(0.f, 0.f, Top), -FVector::ZAxisVector, L, Outer, Inner, 28, BellBronze, BronzeDark, 0.35f);
 	// Two cast mouldings (wires) round the shoulder and above the sound bow.
 	TArray<FVector> Ring1, Ring2;
 	for (int32 i = 0; i < 28; ++i)
@@ -126,8 +126,8 @@ FWRToolMesh Bell()
 		Ring1.Add(FVector(FMath::Cos(A) * 7.65f, FMath::Sin(A) * 7.65f, Top - 0.12f * L));
 		Ring2.Add(FVector(FMath::Cos(A) * 11.2f, FMath::Sin(A) * 11.2f, Top - 0.80f * L));
 	}
-	M.Tube(Ring1, 0.35f, 6, Bronze, 0.3f, true);
-	M.Tube(Ring2, 0.35f, 6, Bronze, 0.3f, true);
+	M.Tube(Ring1, 0.35f, 6, BellBronze, 0.3f, true);
+	M.Tube(Ring2, 0.35f, 6, BellBronze, 0.3f, true);
 	// The crown's cast loop (the canon) up into the yoke.
 	TArray<FVector> Canon;
 	for (int32 i = 0; i <= 10; ++i)
@@ -135,7 +135,7 @@ FWRToolMesh Bell()
 		const float A = PI * i / 10.f;
 		Canon.Add(FVector(FMath::Cos(A) * 2.6f, 0.f, Top + FMath::Sin(A) * 3.2f));
 	}
-	M.Tube(Canon, 0.9f, 8, Bronze, 0.35f);
+	M.Tube(Canon, 0.9f, 8, BellBronze, 0.35f);
 	// The oak yoke the canon is bolted into, and the iron pin through it (the pivot, at the origin, along Y).
 	Beam(M, FVector(0.f, -9.f, -1.5f), FVector(0.f, 9.f, -1.5f), FVector::XAxisVector, 7.f, 7.f, Oak, 0.7f);
 	M.Lathe(FVector(0.f, -13.f, 0.f), FVector::YAxisVector, 26.f, { FVector(0.f, 1.f, 1.f), FVector(1.f, 1.f, 1.f) }, 10, Iron, 0.5f);
@@ -206,7 +206,7 @@ FWRToolMesh Petard()
 	// The petard: a squat bell, 28 cm across the mouth, 30 cm long, a cast ring round its middle, a domed base.
 	M.Lathe(FVector(6.f, 0.f, 0.f), FVector::XAxisVector, 30.f,
 		{ FVector(0.f, 14.f, 14.f), FVector(0.06f, 15.f, 15.f), FVector(0.1f, 13.6f, 13.6f), FVector(0.4f, 12.2f, 12.2f), FVector(0.45f, 13.f, 13.f),
-		  FVector(0.5f, 12.f, 12.f), FVector(0.8f, 10.8f, 10.8f), FVector(0.92f, 8.f, 8.f), FVector(1.f, 3.f, 3.f) }, 24, Bronze, 0.4f);
+		  FVector(0.5f, 12.f, 12.f), FVector(0.8f, 10.8f, 10.8f), FVector(0.92f, 8.f, 8.f), FVector(1.f, 3.f, 3.f) }, 24, BellBronze, 0.4f);
 	// Its flange bolts through the plank.
 	for (int32 i = 0; i < 6; ++i)
 	{
@@ -214,7 +214,7 @@ FWRToolMesh Petard()
 		M.Lathe(FVector(7.2f, FMath::Cos(A) * 16.f, FMath::Sin(A) * 16.f), FVector::XAxisVector, 1.2f, { FVector(0.f, 1.2f, 1.2f), FVector(1.f, 0.9f, 0.9f) }, 6, Iron, 0.5f);
 	}
 	// The touch-hole boss on top, near the base.
-	M.Lathe(FVector(30.f, 0.f, 10.5f), FVector::ZAxisVector, 2.6f, { FVector(0.f, 2.2f, 2.2f), FVector(1.f, 1.6f, 1.6f) }, 10, Bronze, 0.4f);
+	M.Lathe(FVector(30.f, 0.f, 10.5f), FVector::ZAxisVector, 2.6f, { FVector(0.f, 2.2f, 2.2f), FVector(1.f, 1.6f, 1.6f) }, 10, BellBronze, 0.4f);
 	// The slow match: a coil on a nail in the plank's corner, the cord running to the touch hole.
 	TArray<FVector> Coil;
 	for (int32 i = 0; i <= 36; ++i)
@@ -300,7 +300,7 @@ FWRToolMesh FirePot()
 	for (int32 i = 0; i < 10; ++i) { const float A = 2.f * PI * i / 10.f; Tie.Add(FVector(5.2f, FMath::Cos(A) * 2.75f, FMath::Sin(A) * 2.75f)); }
 	M.Tube(Tie, 0.3f, 5, Match, 0.9f, true);
 	M.Lathe(FVector(7.8f, 0.f, 0.f), FVector::XAxisVector, 4.5f, { FVector(0.f, 0.8f, 0.6f), FVector(0.7f, 0.7f, 0.5f), FVector(1.f, 0.4f, 0.3f) }, 6, Cloth, 0.95f, 0.6f, 5.f);
-	M.Lathe(FVector(11.4f, 0.f, 0.f), FVector::XAxisVector, 1.f, { FVector(0.f, 0.55f, 0.45f), FVector(1.f, 0.2f, 0.2f) }, 6, Char, 1.f);
+	M.Lathe(FVector(11.4f, 0.f, 0.f), FVector::XAxisVector, 1.f, { FVector(0.f, 0.55f, 0.45f), FVector(1.f, 0.2f, 0.2f) }, 6, CharBlack, 1.f);
 	return M;
 }
 }

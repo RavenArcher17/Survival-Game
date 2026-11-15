@@ -1,0 +1,212 @@
+{
+  "id": "blood",
+  "name": "Blood & curse",
+  "biome": "swamp",
+  "starter": "blood_bolt",
+  "color": "7A0A14",
+  "icon": "bloodmoss",
+  "glyph": "blood_drop",
+  "resource": {
+    "id": "blood",
+    "name": "Blood"
+  },
+  "rootPassive": {
+    "id": "bloodthirst",
+    "name": "Bloodthirst",
+    "text": "Lifesteal increases as your HP drops."
+  },
+  "trunk": [
+    {
+      "id": "blood_bolt",
+      "name": "Blood bolt",
+      "kind": "ability",
+      "cost": 3,
+      "text": "Basic blood spell, paid with HP"
+    },
+    {
+      "id": "blood_reserve",
+      "name": "Blood reserve",
+      "kind": "stat",
+      "ranks": 3,
+      "text": "More max HP"
+    },
+    {
+      "id": "bleed_chance",
+      "name": "Bleed chance",
+      "kind": "stat",
+      "ranks": 2,
+      "text": "Higher chance to cause bleed"
+    },
+    {
+      "id": "crimson_slash",
+      "name": "Crimson slash",
+      "kind": "ability",
+      "cost": 2,
+      "text": "Basic blood weapon art"
+    }
+  ],
+  "branches": [
+    {
+      "id": "hemomancy",
+      "name": "Hemomancy",
+      "nodes": [
+        {
+          "id": "blood_spear",
+          "name": "Blood spear",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a piercing spear of blood",
+          "gate": 0
+        },
+        {
+          "id": "sanguine_power",
+          "name": "Sanguine power",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More blood spell damage",
+          "gate": 5
+        },
+        {
+          "id": "blood_boil",
+          "name": "Blood boil",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Spell: bleeds on enemies burst for damage",
+          "gate": 10
+        },
+        {
+          "id": "clotting",
+          "name": "Clotting",
+          "kind": "ability",
+          "cost": 3,
+          "text": "HP spent on spells regrows faster",
+          "gate": 14
+        },
+        {
+          "id": "transfusion",
+          "name": "Transfusion",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Spell: heal an ally with your own HP",
+          "gate": 17
+        },
+        {
+          "id": "crimson_tide",
+          "name": "Crimson tide",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "a huge wave of blood",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "hex",
+      "name": "Hex",
+      "nodes": [
+        {
+          "id": "hex_of_weakness",
+          "name": "Hex of weakness",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: cursed enemies deal less damage",
+          "gate": 0
+        },
+        {
+          "id": "lingering_hex",
+          "name": "Lingering hex",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "Curses last longer",
+          "gate": 5
+        },
+        {
+          "id": "misfortune",
+          "name": "Misfortune",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Cursed enemies miss more often",
+          "gate": 8
+        },
+        {
+          "id": "doom",
+          "name": "Doom",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Spell: a delayed curse that deals heavy damage",
+          "gate": 12
+        },
+        {
+          "id": "contagion",
+          "name": "Contagion",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Curses spread when the target dies",
+          "gate": 17
+        },
+        {
+          "id": "ruin",
+          "name": "Ruin",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "cursed enemies take greatly increased damage from everyone",
+          "gate": 20
+        }
+      ]
+    },
+    {
+      "id": "vampiric",
+      "name": "Vampiric",
+      "nodes": [
+        {
+          "id": "leech_strike",
+          "name": "Leech strike",
+          "kind": "ability",
+          "cost": 5,
+          "text": "Weapon art that heals you",
+          "gate": 0
+        },
+        {
+          "id": "lifesteal",
+          "name": "Lifesteal",
+          "kind": "stat",
+          "ranks": 5,
+          "text": "More healing from hits",
+          "gate": 5
+        },
+        {
+          "id": "blood_frenzy",
+          "name": "Blood frenzy",
+          "kind": "ability",
+          "cost": 4,
+          "text": "Faster attacks at low HP",
+          "gate": 10
+        },
+        {
+          "id": "hemorrhage",
+          "name": "Hemorrhage",
+          "kind": "stat",
+          "ranks": 3,
+          "text": "More bleed damage",
+          "gate": 14
+        },
+        {
+          "id": "feast",
+          "name": "Feast",
+          "kind": "ability",
+          "cost": 3,
+          "text": "Finishing blows heal a large amount",
+          "gate": 17
+        },
+        {
+          "id": "sanguine_lord",
+          "name": "Sanguine lord",
+          "kind": "capstone",
+          "cost": 10,
+          "text": "for a short time, all damage you deal heals you",
+          "gate": 20
+        }
+      ]
+    }
+  ]
+}

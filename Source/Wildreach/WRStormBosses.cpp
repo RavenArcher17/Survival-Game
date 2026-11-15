@@ -329,7 +329,7 @@ void AWRStormProp::Build()
 	FSurf Verd = FSurf::Steel(Hex(TEXT("#4E9A84")), 0.6f);
 	Verd.Metal = 0.35f;
 	const FSurf Granite = FSurf::Stone(Hex(TEXT("#8A8D91")));
-	const FSurf Bone = FSurf::Stone(Hex(TEXT("#D8D2C4")), 0.75f);
+	const FSurf BoneSurf = FSurf::Stone(Hex(TEXT("#D8D2C4")), 0.75f);
 	const FSurf Pine = FSurf::Wood(Hex(TEXT("#5A4128")));
 	const FSurf Bronze = FSurf::Steel(Hex(TEXT("#8C6A3A")), 0.45f);
 	TArray<FWRLookBlock> Blocks, Glow;
@@ -398,7 +398,7 @@ void AWRStormProp::Build()
 		{
 			const FVector P(Kit.Jit(FVector(float(i)), 1) * 230.f, Kit.Jit(FVector(float(i)), 2) * 160.f, 48.f);
 			const FVector D = FRotator(0.f, Kit.Rand(P, 3) * 360.f, 0.f).Vector();
-			Kit.Rod(Bone.Dim(0.85f + 0.15f * Kit.Rand(P, 4)), P - D * (15.f + 25.f * Kit.Rand(P, 5)), P + D * (15.f + 25.f * Kit.Rand(P, 5)), 6.f + 6.f * Kit.Rand(P, 6));
+			Kit.Rod(BoneSurf.Dim(0.85f + 0.15f * Kit.Rand(P, 4)), P - D * (15.f + 25.f * Kit.Rand(P, 5)), P + D * (15.f + 25.f * Kit.Rand(P, 5)), 6.f + 6.f * Kit.Rand(P, 6));
 		}
 		for (int32 i = 0; i < 6; ++i)
 		{

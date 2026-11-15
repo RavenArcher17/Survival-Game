@@ -11,6 +11,7 @@
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
+#include "WRSwampCreatures.h"
 #include "WRPadInput.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
@@ -31,6 +32,7 @@
 #include "WRPathTypes.h"
 #include "WRPathLook.h"
 #include "WRLightningPath.h"
+#include "WRBloodPath.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRFarm.h"
@@ -816,6 +818,8 @@ private:
 		}
 		if (const AWRCreature* Wild = P->FindNearbyCreature(false, 400.f))
 		{
+			// The Murkjaw blood rite for a Blood walker (WRSwampCreatures), before the usual taming.
+			if (FString RiteVerb; FWRSwampAI::RitePrompt(Wild, S, RiteVerb)) { OutTarget = Wild->GetDisplayLabel(); return RiteVerb; }
 			if (Wild->IsUnconscious()) { OutTarget = Wild->GetDisplayLabel(); return TEXT("Tame"); }
 		}
 		if (const AActor* Use = P->FindUseTarget())
@@ -1073,7 +1077,17 @@ private:
 				[
 					WRUI::Text(TAttribute<FText>::CreateLambda([this]() { const AWRCreature* M = PC.IsValid() ? Cast<AWRCreature>(PC->GetPawn()) : nullptr; return M ? FText::Format(LOCTEXT("Riding", "Riding {0}  ·  {1} to dismount"), FText::FromString(M->GetDisplayLabel()), WRInput::ActionKey(TEXT("Interact"))) : FText::GetEmpty(); }), WRUI::Body(13, 700), WRUI::Brass)
 				]
-				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; })]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()[VitalRow(LOCTEXT("Health", "Health"), WRUI::Hp, 16.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHealth() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxHealth() : 1.f; })]
+					// The Blood path's Spilled bar (cooks/biome-swamp.md 2.17): the garnet segment after your health for the HP your
+					// Blood abilities spent, its far edge the rally window, over the bar's own track (VitalRow's label / number widths).
+					+ SOverlay::Slot().VAlign(VAlign_Center).Padding(62.f * U, 0.f, 74.f * U, 0.f)
+					[
+						SNew(SBox).HeightOverride(16.f * U)[WRBlood::MakeSpilledOverlay([this]() { return static_cast<const AActor*>(Body()); })]
+					]
+				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f * U)[SNew(SWRStatusMeters).Who_Lambda([this]() { return Cast<AWRCharacterBase>(Body()); })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Stamina", "Stamina"), WRUI::Stamina, 14.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetStamina() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxStamina() : 1.f; }, [this]() { return StaminaRefusal(); })]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[VitalRow(LOCTEXT("Poise", "Poise"), WRUI::Poise, 6.f * U, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetPoise() : 0.f; }, [A]() { const UWRAttributeSet* X = A(); return X ? X->GetMaxPoise() : 1.f; })]
@@ -1091,6 +1105,10 @@ private:
 						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Charge", "Charge"), TAttribute<FLinearColor>::CreateLambda([this]() { return ChargeColor(); }), WRPathLook::Icon(TEXT("lightning")),
 							[A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetCharge() / FMath::Max(1.f, X->GetMaxCharge()) : 0.f; },
 							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("lightning")); })]
+						// Blood (the Blood path): the HP spent and still winnable back (the Spilled bar on the health row).
+						+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Spilled", "Spilled"), WRPathLook::Color(TEXT("blood")), WRPathLook::Icon(TEXT("blood")),
+							[this]() { const AActor* B = Body(); return B ? UWRBloodPath::Spilled(B) : 0.f; },
+							[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("blood")); })]
 				]
 				+ SVerticalBox::Slot().AutoHeight()[Conditions()]
 			]
@@ -1364,9 +1382,16 @@ private:
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
 			[
 				SNew(SBox).WidthOverride(Size).HeightOverride(Size)
+				// A Blood ability you can't pay (HP at or under its cost) greys out; pressed anyway, it shakes (no dead button).
+				.RenderTransform_Lambda([this, Wheel]()
+				{
+					const float F = BloodShort(Wheel) ? WRBlood::RefusedShake(Body()) : 0.f;
+					const float Px = F > 0.f ? WRTune(TEXT("stamina.refuseShake"), 3.f) * U * F * FMath::Sin(float(WRUIMotion::Now()) * 2.f * PI * 22.f) : 0.f;
+					return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(Px, 0.f)));
+				})
 				[
 					SNew(SOverlay)
-					+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, Wheel, Size]() { return WRUI::Box(AbilityName(Wheel).IsEmpty() ? FLinearColor(0.1f, 0.1f, 0.11f) : PathColor() * 0.3f, Size * 0.5f, Wheel == 0 ? WRUI::Brass : WRUI::Brass2, 2.f); })]
+					+ SOverlay::Slot()[SNew(SImage).Image_Lambda([this, Wheel, Size]() { return WRUI::Box(AbilityName(Wheel).IsEmpty() || BloodShort(Wheel) ? FLinearColor(0.1f, 0.1f, 0.11f) : PathColor() * 0.3f, Size * 0.5f, Wheel == 0 ? WRUI::Brass : WRUI::Brass2, 2.f); })]
 					+ SOverlay::Slot()[SNew(SWRRing).Diameter(Size).Thickness(4.f * U).Color(FLinearColor(0.f, 0.f, 0.f, 0.75f)).Fraction_Lambda([this, Wheel]() { return CooldownFraction(Wheel); })]
 					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
 					[
@@ -1390,7 +1415,28 @@ private:
 		if (!X) return FString();
 		const TArray<FWRCastable> All = X->GetCastables();
 		const FWRCastable* C = X->FindCastable(X->GetWheelAbility(Wheel, X->GetWheelPicked(Wheel)), All);
-		return !C ? FString() : C->Blocked.IsEmpty() ? C->Name.ToString() : FString::Printf(TEXT("%s  (%s)"), *C->Name.ToString(), *C->Blocked);
+		if (!C) return FString();
+		FString Why = C->Blocked;
+		// A Blood ability you can't pay now says what it needs (cooks/biome-swamp.md 2.17: the slot greys and shakes).
+		if (Why.IsEmpty() && C->Path == TEXT("blood"))
+		{
+			FString NodeStr = C->NodeId.ToString(), PathStr, Rest;
+			if (NodeStr.Split(TEXT("."), &PathStr, &Rest)) NodeStr = Rest;
+			WRBlood::SlotShort(Body(), C->Path, FName(*NodeStr), Why);
+		}
+		return Why.IsEmpty() ? C->Name.ToString() : FString::Printf(TEXT("%s  (%s)"), *C->Name.ToString(), *Why);
+	}
+	/** The wheel's picked ability is a Blood one its owner can't pay right now (HP <= its cost). */
+	bool BloodShort(int32 Wheel) const
+	{
+		const FWRPlayerUI* X = UI();
+		if (!X) return false;
+		const TArray<FWRCastable> All = X->GetCastables();
+		const FWRCastable* C = X->FindCastable(X->GetWheelAbility(Wheel, X->GetWheelPicked(Wheel)), All);
+		if (!C || C->Path != TEXT("blood")) return false;
+		FString NodeStr = C->NodeId.ToString(), PathStr, Rest, Why;
+		if (NodeStr.Split(TEXT("."), &PathStr, &Rest)) NodeStr = Rest;
+		return WRBlood::SlotShort(Body(), C->Path, FName(*NodeStr), Why);
 	}
 	float Cooldown(int32 Wheel) const
 	{

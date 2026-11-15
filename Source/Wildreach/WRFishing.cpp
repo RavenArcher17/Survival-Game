@@ -24,6 +24,7 @@
 #include "WRTuning.h"
 #include "WRUIStyle.h"
 #include "WRWater.h"
+#include "WRSwampSystems.h"
 #include "AbilitySystemComponent.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
@@ -222,13 +223,16 @@ AWRBobber* AWRBobber::CastFrom(AWRCharacter* Who, float Charge)
 	const FVector Dir = FRotator(0.f, Who->GetBaseAimRotation().Yaw, 0.f).Vector();
 	const float Dist = FMath::Lerp(T.Num(TEXT("fishing.castMin"), 400.f), T.Num(TEXT("fishing.castMax"), 1800.f), FMath::Clamp(Charge, 0.f, 1.f));
 	FVector Land = Who->GetActorLocation() + Dir * Dist;
-	if (!Water || !Water->HasWater() || Water->DepthAt(Land) < T.Num(TEXT("fishing.minDepth"), 60.f))
+	// The Sunken Coven's flooded chapel (the Old Gar's water, WRSwampSystems): its own surface, high over the sea's.
+	float ChapelZ = 0.f, ChapelDepth = 0.f;
+	const bool bChapel = WRSwamp::CovenPool(Land, ChapelZ, ChapelDepth) && ChapelDepth >= T.Num(TEXT("fishing.minDepth"), 60.f);
+	if (!bChapel && (!Water || !Water->HasWater() || Water->DepthAt(Land) < T.Num(TEXT("fishing.minDepth"), 60.f)))
 	{
 		if (PC) PC->ClientNotify(TEXT("No water there: cast into the sea, a river or a lake"));
 		WRSound::Broadcast(Who, TEXT("swing.light"));
 		return nullptr;
 	}
-	Land.Z = Water->GetSurfaceZ();
+	Land.Z = bChapel ? ChapelZ : Water->GetSurfaceZ();
 	FActorSpawnParameters Params;
 	Params.Owner = Who;   // the angler's connection gets the tension and the line's length
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -252,7 +256,7 @@ AWRBobber* AWRBobber::CastFrom(AWRCharacter* Who, float Charge)
 	WRSound::Broadcast(Who, TEXT("fish.cast"));
 	Who->MulticastBodyOneShot(TEXT("throw"));
 	UE_LOG(LogWildreach, Log, TEXT("FISH %s cast %.0f cm into %s %s water (%.0f cm deep)%s"), *Who->GetName(), Dist, *B->BiomeHere().ToString(), *B->WaterHere().ToString(),
-		Water->DepthAt(Land), B->bBaited ? TEXT(", baited") : TEXT(""));
+		bChapel ? ChapelDepth : Water->DepthAt(Land), B->bBaited ? TEXT(", baited") : TEXT(""));
 	return B;
 }
 
@@ -263,6 +267,9 @@ FName AWRBobber::BiomeHere() const
 
 FName AWRBobber::WaterHere() const
 {
+	// The Old Gar's chapel pool in the Sunken Coven (fish.json water "chapel").
+	float ChapelZ = 0.f, ChapelDepth = 0.f;
+	if (WRSwamp::CovenPool(GetActorLocation(), ChapelZ, ChapelDepth)) return TEXT("chapel");
 	const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this);
 	const float Depth = Water ? Water->DepthAt(GetActorLocation()) : 0.f;
 	if (Depth >= WRTune(TEXT("fishing.deepDepth"), 700.f) && UWRLifeSkillsComponent::StatFor(Angler, TEXT("deepLine")) > 0.f) return TEXT("deep");
@@ -555,11 +562,13 @@ void AWRBobber::ServerTick(float Dt)
 		const float SwayCm = (bSurge ? T.Num(TEXT("fishing.surgeSway"), 160.f) : 40.f) * Sway * FMath::Sin(static_cast<float>(Now) * (bSurge ? 3.1f : 1.3f));
 		const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(this);
 		FVector At = Angler->GetActorLocation() + CastDir * FMath::Max(0.f, LineCm) + Across * SwayCm;
-		At.Z = Water ? Water->GetSurfaceZ() : At.Z;
+		float ChapelZ = 0.f, ChapelDepth = 0.f;
+		const bool bChapel = WRSwamp::CovenPool(FloatAt, ChapelZ, ChapelDepth);
+		At.Z = bChapel ? ChapelZ : Water ? Water->GetSurfaceZ() : At.Z;
 		FloatAt = At;
 		SetActorLocation(At);
-		// Close in, or dragged into the shallows at your feet: landed.
-		if (LineCm <= T.Num(TEXT("fishing.landCm"), 170.f) || (Water && Water->DepthAt(At) < 25.f && LineCm < 600.f))
+		// Close in, or dragged into the shallows at your feet: landed (the chapel's ledge: close in only).
+		if (LineCm <= T.Num(TEXT("fishing.landCm"), 170.f) || (!bChapel && Water && Water->DepthAt(At) < 25.f && LineCm < 600.f))
 		{
 			Land();
 		}

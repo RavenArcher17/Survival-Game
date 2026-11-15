@@ -10,6 +10,7 @@
 #include "WRSound.h"
 #include "WRTuning.h"
 #include "WREndgameLook.h"
+#include "WRBloodPath.h"
 #include "Components/LODSyncComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -602,6 +603,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	const bool bStrikeTell = StrikeTellUntil > Now;
 	Sig = HashCombine(Sig, bStrikeTell ? 0x5717u : 0u);
 	Sig = HashCombine(Sig, WREndgameLook::LookSig(this));   // prestige gold threads, a raid mark on the seams
+	Sig = HashCombine(Sig, WRBlood::LookSig(this));         // Blood: veins with Spilled, Sanguine lord, the flush, the pulse
 	if (!bForce && Sig == PathMarkSig)
 	{
 		return;
@@ -729,6 +731,8 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 		// reads on their own body, so they know it at once).
 		if (bStrikeTell) MID->SetScalarParameterValue(TEXT("PathLift"), WRTune(TEXT("storm.preTellHairLift"), 1.5f));
 	}
+	// Blood & curse (cooks/biome-swamp.md 2.18): its stages and live parts over what the row drew (WRBloodPath.cpp).
+	WRBlood::ApplyLook(this, SkinMIDs, EyeMIDs, EyeDefaultColors, PathMarks.Main, MainS, PathMarks.Sub, SubS);
 
 	// Blood: sharper canines from strength 0.6 (main, or the sub path's share).
 	bool bFangs = false;

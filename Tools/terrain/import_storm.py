@@ -48,7 +48,11 @@ for a in actors.get_all_level_actors():
     label = a.get_actor_label()
     # The old landscape's streaming proxies too: every proxy whose corner lies north of the island's frame is Storm
     # peaks' (the island's start at y = -201600 cm).
-    is_storm_proxy = isinstance(a, unreal.LandscapeStreamingProxy) and not isinstance(a, unreal.Landscape) and a.get_actor_location().y < -201600.0 - 1.0
+    # Only Storm peaks' own proxies: they sit on its 504 m grid from its corner (the Swamp's landscape, north of the
+    # island too, has its own grid: import_swamp.py).
+    loc = a.get_actor_location()
+    on_grid = abs(((loc.x - F["x0"] * 100.0) + 1.0) % 50400.0 - 1.0) < 2.0 and loc.x < (F["x0"] + (SIZE - 1) * STEP) * 100.0
+    is_storm_proxy = isinstance(a, unreal.LandscapeStreamingProxy) and not isinstance(a, unreal.Landscape) and loc.y < -201600.0 - 1.0 and on_grid
     if label.startswith("Storm_") or label.startswith("Landscape_StormPeaks") or is_storm_proxy:
         actors.destroy_actor(a)
         gone += 1

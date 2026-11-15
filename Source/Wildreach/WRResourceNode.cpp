@@ -1,6 +1,7 @@
 #include "WRResourceNode.h"
 #include "WRWorldSystems.h"
 #include "WRTaming.h"
+#include "WRSwampCreatures.h"
 #include "WRResourceLook.h"
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
@@ -142,6 +143,7 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 	float Raw = PerHit * (bHeavy ? 2 : 1) * WRTune(TEXT("server.gatherMultiplier"), 1.f) * (Tool ? Tool->Yield : 1.f);
 	Raw *= FWRTaming::GatherScale(Gatherer);   // Lodestar: a utility tame beside you (cooks/build-taming.md 2.2)
 	Raw *= WRWorld::GatherScale(Gatherer, ItemId, Gatherer->GetActorLocation());   // a biome event's plenty (world.json events)
+	Raw *= UWRSwampBody::GatherMult(Gatherer, ItemId);   // a tame Bogsnout within 15 m: bloodmoss x2 (creatures.json gatherBoost)
 	if (bOre) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("miningYield"));
 	if (bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodYield")) + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("woodExtra"));
 	if (!bOre && !bWood) Raw *= 1.f + UWRLifeSkillsComponent::StatFor(Gatherer, TEXT("herbExtra"));

@@ -324,3 +324,57 @@ if want("storm"):
     normal = lerp(lerp(lerp(lerp(lerp(grass_n, stones_n, mid), stones_n, high), sand_n, sandy), snow_n, snowy), rock_n, rock_a)
     rough = lerp(lerp(None, None, snowy, const_a=0.9, const_b=0.72), None, wet, const_b=0.35)
     finish(base, normal, rough)
+
+# ================================================================ M_SwampAuto (the Swamp landscape)
+# cooks/build-biome-swamp.md 2.2, cooks/biome-swamp.md 2.2 palettes. By height (world Z cm; the water surface draws at
+# +60), slope and region (world X/Y cm): black wet peat mud at the waterline (glossy), olive moss and mud on the low
+# ground with garnet bloodmoss patches (#7A1E22, never crimson), reed-gold flats toward the coast (east), pale bone on
+# the Bone Mounds' slopes (west, north of y -3,400 m), hoarfrost on the frozen bog (south of y -2,500 m), wet slate
+# talus under the Crown with the Weeping Wall's iron-red stain. Rain darkens and glosses it (parameter Wet 0..1).
+if want("swamp"):
+    begin("/Game/Terrain/M_SwampAuto")
+    wp, uv_top, uv_rock = world_uvs(600.0)
+    z = mask(wp, "b")
+    wx, wy = mask(wp, "r"), mask(wp, "g")
+    xy = mask(wp, "r", "g")
+    uv = mul(xy, k=1.0 / 350.0)
+    uv_stone = mul(xy, k=1.0 / 500.0)
+    uv_macro = mul(xy, k=1.0 / 7000.0)
+    scalar_p = lambda name, v: expr(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=v)
+
+    def ramp(src, lo, hi):
+        return sat(op(unreal.MaterialExpressionDivide, op(unreal.MaterialExpressionSubtract, src, const_b=lo), const_b=hi - lo))
+
+    normal_z = mask(expr(unreal.MaterialExpressionVertexNormalWS), "b")
+    rock_a = sat(mul(op(unreal.MaterialExpressionSubtract, None, normal_z, const_a=0.8), k=8.0))   # talus and the cliff foot
+    var = mask(sample("Extra/TEX_MWAM_Variation_msk", uv_macro), "r")
+    var2 = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(xy, k=1.0 / 1900.0)), "r")
+    mudline = sat(op(unreal.MaterialExpressionSubtract, None, ramp(z, 80.0, 118.0), const_a=1.0))      # 1 at the waterline
+    reeds = ramp(wx, 245000.0, 275000.0)                                                                    # the coast band
+    bones = mul(mul(sat(op(unreal.MaterialExpressionSubtract, None, ramp(wx, 140000.0, 175000.0), const_a=1.0)),
+                    sat(op(unreal.MaterialExpressionSubtract, None, ramp(wy, -345000.0, -330000.0), const_a=1.0))), ramp(z, 260.0, 420.0))
+    frost = ramp(wy, -255000.0, -240000.0)
+    bloodmoss = mul(sat(mul(op(unreal.MaterialExpressionSubtract, var2, const_b=0.6), k=6.0)), sat(op(unreal.MaterialExpressionSubtract, None, reeds, const_a=1.0)))
+    iron = mul(mul(sat(op(unreal.MaterialExpressionSubtract, None, ramp(wx, 110000.0, 130000.0), const_a=1.0)),
+                   mul(ramp(wy, -435000.0, -425000.0), sat(op(unreal.MaterialExpressionSubtract, None, ramp(wy, -352000.0, -342000.0), const_a=1.0)))), rock_a)
+
+    grass, grass_n = sample("Ground/TEX_MWAM_Grass_col", uv), sample("Ground/TEX_MWAM_Grass_nrm", uv)
+    dirt, dirt_n = sample("Ground/TEX_MWAM_Dirt_col", uv), sample("Ground/TEX_MWAM_Dirt_nrm", uv)
+    stones, stones_n = sample("Ground/TEX_MWAM_Stones_col", uv_stone), sample("Ground/TEX_MWAM_Stones_nrm", uv_stone)
+    snow, snow_n = sample("Ground/TEX_MWAM_Snow_col", uv), sample("Ground/TEX_MWAM_Snow_nrm", uv)
+    rock, rock_n = sample("Ground/TEX_MWAM_Rock_col", uv_rock), sample("Ground/TEX_MWAM_Rock_nrm", uv_rock)
+
+    tint = lambda layer, rgb: mul(layer, const3(rgb))
+    moss = lerp(tint(grass, (0.27, 0.31, 0.17)), tint(dirt, (0.22, 0.19, 0.15)), sat(mul(op(unreal.MaterialExpressionSubtract, var, const_b=0.55), k=4.0)))
+    ground = lerp(moss, tint(grass, (0.62, 0.52, 0.29)), reeds)                       # reed gold #B49A5A on the flats
+    ground = lerp(ground, tint(grass, (0.42, 0.07, 0.08)), mul(bloodmoss, k=0.85))     # garnet bloodmoss
+    ground = lerp(ground, tint(stones, (0.82, 0.79, 0.7)), bones)                      # bone #D6CDB8
+    ground = lerp(ground, tint(dirt, (0.13, 0.11, 0.09)), mudline)                     # black peat mud at the water
+    ground = lerp(ground, tint(snow, (0.86, 0.9, 0.94)), mul(frost, k=0.7))            # hoarfrost on the frozen bog
+    cliff = lerp(tint(rock, (0.16, 0.17, 0.19)), tint(rock, (0.6, 0.23, 0.13)), iron)   # wet slate; rust-red under the falls
+    base = mul(lerp(ground, cliff, rock_a), lerp(None, None, var, const_a=0.85, const_b=1.1))
+    wet = scalar_p("Wet", 0.0)
+    base = mul(base, lerp(None, None, wet, const_a=1.0, const_b=0.6))
+    normal = lerp(lerp(lerp(lerp(grass_n, dirt_n, mudline), stones_n, bones), snow_n, mul(frost, k=0.7)), rock_n, rock_a)
+    rough = lerp(lerp(None, None, mudline, const_a=0.88, const_b=0.3), None, wet, const_b=0.3)
+    finish(base, normal, rough)

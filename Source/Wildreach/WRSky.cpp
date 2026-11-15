@@ -4,6 +4,7 @@
 #include "Wildreach.h"
 #include "WRGameState.h"
 #include "WRSea.h"
+#include "WRSwampTypes.h"
 #include "WRTuning.h"
 #include "Dom/JsonObject.h"
 #include "Camera/CameraActor.h"
@@ -21,6 +22,30 @@
 #include "HAL/IConsoleManager.h"
 #include "Engine/GameViewportClient.h"
 #include "UnrealClient.h"
+
+// The Swamp's air (cooks/biome-swamp.md 2.1 read rules; build-biome-swamp.md 1.1 Blighttown lesson: the fog is a sky
+// parameter, never volumes): flat, grey-green, low light, and knee fog held at 0-2.5 m over the water on calm days (the
+// height fog's second layer), raised only by the Fog and Miasma weathers. Blended by how much of a 60 m ring round the
+// camera is swamp. Numbers: tuning swampWorld.sky.
+namespace WRSwampSky
+{
+	float Air = -1.f;
+	float Raise = 0.f;
+	float Miasma = 0.f;
+
+	/** 0..1: the share of the camera's spot and a ring round it inside the swamp. */
+	float Share(const FVector& View, float Ring)
+	{
+		if (!WRSwamp::IsLive()) return 0.f;
+		int32 In = WRSwamp::Contains(View) ? 2 : 0;
+		for (int32 i = 0; i < 8; ++i)
+		{
+			const float A = i * PI * 0.25f;
+			if (WRSwamp::Contains(View + FVector(FMath::Cos(A) * Ring, FMath::Sin(A) * Ring, 0.f))) ++In;
+		}
+		return In / 10.f;
+	}
+}
 
 // ---------------------------------------------------------------- rules
 
@@ -369,6 +394,26 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	const float StormTarget = FMath::SmoothStep(0.f, 1.f, float((T.Num(TEXT("world.islandNorthEdge"), -201600.f) + T.Num(TEXT("sky.stormBlendFrom"), 15000.f) - View.Y) / T.Num(TEXT("sky.stormBlendWidth"), 40000.f)));
 	StormAir = StormAir < 0.f ? StormTarget : FMath::FInterpTo(StormAir, StormTarget, DeltaSeconds, 1.5f);
 	const float SA = StormAir;
+	// The Swamp blends over Storm peaks' air where it lies (its frame is inside the north lands).
+	const float SwampTarget = WRSwampSky::Share(View, T.Num(TEXT("swampWorld.sky.blendRing"), 6000.f));
+	WRSwampSky::Air = WRSwampSky::Air < 0.f ? SwampTarget : FMath::FInterpTo(WRSwampSky::Air, SwampTarget, DeltaSeconds, 1.2f);
+	const float SW = WRSwampSky::Air;
+	{
+		// Fog and Miasma lift the knee fog into a wall (cook 2.9); Miasma turns it oxblood.
+		float RaiseTarget = 0.f, MiasmaTarget = 0.f;
+		if (SW > 0.f)
+		{
+			if (const FWRWeatherNow* W = UWRWeatherSubsystem::For(this, FName(TEXT("swamp"))))
+			{
+				const float Now = UWRWeatherSubsystem::Now(this);
+				const float Str = W->IsComing(Now) ? W->Approach(Now) * 0.45f : W->Strength(Now);
+				if (W->Kind == TEXT("fog") || W->Kind == TEXT("miasma")) RaiseTarget = Str;
+				if (W->Kind == TEXT("miasma")) MiasmaTarget = Str;
+			}
+		}
+		WRSwampSky::Raise = FMath::FInterpTo(WRSwampSky::Raise, RaiseTarget, DeltaSeconds, 0.5f);
+		WRSwampSky::Miasma = FMath::FInterpTo(WRSwampSky::Miasma, MiasmaTarget, DeltaSeconds, 0.5f);
+	}
 	const float Low = FWRSkyRules::LowSun(SunElevation, T.Num(TEXT("sky.goldenHourBelow"), 18.f));
 
 	// Weather (WRSurvival, Data/weather.json): the biome's weather at the camera thickens and tints the haze. Over the
@@ -413,6 +458,25 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		// Toward a low sun the haze glows warm: the dawn and dusk glare across a valley.
 		F->SetDirectionalInscatteringExponent(T.Num(TEXT("sky.sunGlowExponent"), 6.f));
 		F->SetDirectionalInscatteringColor(SRGB(TEXT("sky.sunGlowColor"), FColor(255, 150, 80)) * (Low * T.Num(TEXT("sky.sunGlow"), 0.6f)));
+		if (WRSwamp::IsLive())
+		{
+			// The swamp's haze over whatever the land's was: grey-green by day (moss and still water), denser; the
+			// weather's own colour still wins while it blows (Fog's grey-green, Miasma's oxblood: weather.json).
+			const FLinearColor SwampDay = FMath::Lerp(SRGB(TEXT("swampWorld.sky.fogColor"), FColor(138, 144, 126)), SRGB(TEXT("swampWorld.sky.miasmaColor"), FColor(74, 10, 15)), WRSwampSky::Miasma);
+			const FLinearColor SwampHaze = FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), SwampDay * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
+			const FLinearColor Weather = FMath::Lerp(SwampHaze, WeatherFogColor * FMath::Lerp(T.Num(TEXT("sky.weatherNightFog"), 0.06f), T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight), WeatherAmount * (1.f - WRSwampSky::Miasma));
+			F->SetFogInscatteringColor(FMath::Lerp(FMath::Lerp(Haze, Storm, WeatherAmount), Weather, SW));
+			const float SwampDensity = T.Num(TEXT("swampWorld.sky.fogDensity"), 0.03f);
+			F->SetFogDensity(FMath::Lerp(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount), FMath::Max(SwampDensity, WeatherFogDensity * WeatherAmount), SW));
+			// Knee fog: the second layer, its floor at the water, thick under kneeTop and gone by a man's chest; Fog and
+			// Miasma lift its top to raisedTop. Off outside the swamp (density 0).
+			const float Water = FWRSwampData::Get().SeaZ;
+			const float Top = FMath::Lerp(T.Num(TEXT("swampWorld.sky.kneeTop"), 250.f), T.Num(TEXT("swampWorld.sky.raisedTop"), 2500.f), WRSwampSky::Raise);
+			F->SetSecondFogHeightOffset(Water + Top * 0.35f - F->GetComponentLocation().Z);
+			F->SetSecondFogHeightFalloff(T.Num(TEXT("swampWorld.sky.kneeFalloff"), 2.6f) * 250.f / FMath::Max(50.f, Top));
+			const float Calm = FMath::Lerp(T.Num(TEXT("swampWorld.sky.kneeNight"), 0.6f), 1.f, Daylight);
+			F->SetSecondFogDensity(SW * Calm * T.Num(TEXT("swampWorld.sky.kneeDensity"), 0.35f) * (1.f + WRSwampSky::Raise * T.Num(TEXT("swampWorld.sky.raisedMult"), 1.5f)));
+		}
 	}
 
 	// Valley mist: local fog volumes sitting in the island's hollows (Data/valley_fog.json), thickest around dawn, a
@@ -460,14 +524,18 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	// The grade: warm and a touch desaturated in the ash, cool on the snow; a faint shadow lift so night and caves
 	// never go to flat black; vignette kept light.
 	FPostProcessSettings& P = Exposure->Settings;
-	P.WhiteTemp = FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicWhiteTemp"), 7000.f), T.Num(TEXT("sky.tundraWhiteTemp"), 5900.f), B), T.Num(TEXT("sky.stormWhiteTemp"), 6200.f), SA);
-	const float Sat = FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicSaturation"), 0.94f), T.Num(TEXT("sky.tundraSaturation"), 0.97f), B), T.Num(TEXT("sky.stormSaturation"), 0.9f), SA);
+	P.WhiteTemp = FMath::Lerp(FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicWhiteTemp"), 7000.f), T.Num(TEXT("sky.tundraWhiteTemp"), 5900.f), B), T.Num(TEXT("sky.stormWhiteTemp"), 6200.f), SA),
+		T.Num(TEXT("swampWorld.sky.whiteTemp"), 6000.f), SW);
+	// The swamp's light is flat: less saturation and contrast, a grey-green gain (cook 2.1 "flat light").
+	const float Sat = FMath::Lerp(FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicSaturation"), 0.94f), T.Num(TEXT("sky.tundraSaturation"), 0.97f), B), T.Num(TEXT("sky.stormSaturation"), 0.9f), SA),
+		T.Num(TEXT("swampWorld.sky.saturation"), 0.86f), SW);
 	P.ColorSaturation = FVector4(Sat, Sat, Sat, 1.f);
-	const float Contrast = T.Num(TEXT("sky.contrast"), 1.04f);
+	const float Contrast = FMath::Lerp(T.Num(TEXT("sky.contrast"), 1.04f), T.Num(TEXT("swampWorld.sky.contrast"), 0.96f), SW);
 	P.ColorContrast = FVector4(Contrast, Contrast, Contrast, 1.f);
 	const FVector Gain = FMath::Lerp(FMath::Lerp(Vec(TEXT("sky.volcanicGain"), FVector(1.03f, 1.f, 0.95f)), Vec(TEXT("sky.tundraGain"), FVector(0.96f, 0.99f, 1.04f)), B),
 		Vec(TEXT("sky.stormGain"), FVector(0.97f, 0.98f, 1.03f)), SA);
-	P.ColorGain = FVector4(Gain.X, Gain.Y, Gain.Z, 1.f);
+	const FVector SwampGain = FMath::Lerp(Gain, Vec(TEXT("swampWorld.sky.gain"), FVector(0.97f, 1.0f, 0.95f)), SW);
+	P.ColorGain = FVector4(SwampGain.X, SwampGain.Y, SwampGain.Z, 1.f);
 	const FVector Lift = Vec(TEXT("sky.shadowLift"), FVector(0.004f, 0.005f, 0.008f)) * FMath::Lerp(T.Num(TEXT("sky.nightShadowLift"), 2.f), 1.f, Daylight);
 	P.ColorOffsetShadows = FVector4(Lift.X, Lift.Y, Lift.Z, 0.f);
 	P.VignetteIntensity = T.Num(TEXT("sky.vignette"), 0.3f);

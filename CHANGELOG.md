@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased: the Swamp (the Mire), the Blood land, and the Blood & curse path
+
+Aaron (lanes build-biome-swamp + build-biome-swamp-finish: requirement ledger, research and plan in showcase-notes
+cooks/build-biome-swamp.md, building cooks/biome-swamp.md). Built to compile (editor, adaptive and full unity); not
+played here (Aaron and the testers test, F8).
+
+- **The land.** A third landscape (`Landscape_Swamp`, 3,780 m square at 2 m) east of the Crown under its east face,
+  joined to Storm peaks at the cliff foot and Stormgut's east mouth, to the island's tundra by the Rime Sound frozen-bog
+  neck, and to the sea by the mangrove estuary in the north. `Tools/terrain/swamp.mjs` (keeps every cook distance from
+  the cliff foot read off the storm heightmap), material `M_SwampAuto`, imported by `Tools/terrain/build_swamp.ps1`
+  (3 camps with PlayerStarts tagged `swamp`, safe zones, starter stations). Five sub-zones (Reed Flats, Mangrove
+  Thickets, Rotting Boardwalks, Murk Pools, Bone Mounds); the swamp's hollows are the sea's own water; four water looks
+  (murk, duckweed, bleedwater, quag) drawn over a water-kind grid that the server reads too.
+- **What stands on it** (`WRSwampWorld.cpp`, `WRSwampScenery.cpp`, all from `Data/swamp.json`): 7 landmarks (the Weeping
+  Wall's five rust-red falls, Mother's Throat, the Bled Roc, the Walking House on its bird legs, the Hanging Cypress
+  with its cages and the Coven key, the Mangrove Cathedral, the Corpse-Candle Mere), 24 hand sites, 76 kit POIs + 42
+  fetish-post waymarks, 4 karst caves (the Eel Hole floods on the tide, the Peat Cellar digs through), boardwalks on
+  posts sunk in the mud with rotten planks that creak 0.9 s and break, mendable with 2 wood (hold 4 game days), night
+  lights, bald cypress / mangrove / reeds / pitcher plants / knees / bone piles you can harvest; bloodmoss, bog iron (3:1
+  at the new bloomery), peat, salt, clay.
+- **Hazards and events** (`WRSwampSystems.cpp`): bleedwater (bleed buildup while wading, edge tell, passes: sealed
+  waders, swamp mounts, Mirehide 4, leech tar), quag (half speed, sink after 3 s still: no roll), marsh gas that any
+  fire lights vent to vent, leech boils, the swamp's five weathers incl. Miasma, the Red Tide (5 min warning, M3-M5 turn
+  to bleedwater, leech packs, the Bloat on the causeway, the Hex-Warden's night walk, the Reliquary opens), the Sunken
+  Coven under the Deep Pool (ten rooms, four ways in, the Old Gar, chimes, the bell), secrets M-S1..M-S5, five shrines,
+  Ruslana the Mire-witch with six quests, Blood <-> Lightning invasions through Stormgut, the stilt foundation piece.
+- **Creatures** (`WRSwampCreatures.cpp`, now hooked into the creature code like Storm's): Murkjaw (death roll, blood
+  rite taming), Gorgeleech and latch leeches, Hexcrow, Bogstalker (tongue + gulp), Mirestrider (mount, passes quag and
+  bleedwater), Mudhulk (hauler), Bogsnout (finds, bloodmoss x2), Lanterntoad (light, shoulder pouch), Reedfowl,
+  Slimeshell; day/night tables per sub-zone; living-world beats; voices from real recordings.
+- **Bosses**: Mother Maw (`WRSwampBosses.cpp`: nest, boardwalk counter, nest fire, young), the Hex-Warden (four totems,
+  mask break), the Bloat (roaming 3.5 km route, gorge meter, salt/fire/frost counters, veins), and Vharra
+  (`WRSwampVharra.cpp`: the Throat, six lightning rods, the flood, three phases incl. the hidden third, the Blood altar).
+- **The Blood & curse path** (`Data/paths/blood.json`, `WRBloodPath.*`, `WRAbilitiesBlood.*`): 22 nodes, the Spilled bar
+  (HP costs, rally, no floor), Bloodthirst, passives, combos with Fire/Frost/Lightning, the body change (veins, lips,
+  canines, iris, pulse, lifesteal flush, Sanguine lord glow).
+- **Audio**: 18 Kevin MacLeod pieces (explore A/B/C, night, combat, mini, bosses with Vharra's three phases, Sunken
+  Coven, Red Tide layer, camp), 14 beds, 14 creature voice sets, hazard and Blood sounds (`Docs/CREDITS.md`).
+- Not finished: creature bodies are retinted rigs with code-built parts (no sculpts); bald cypress uses the island's
+  pine meshes and mangrove/reeds/knees are drawn shapes until swamp art exists; the Three-Jaw Glaive blueprint waits for
+  the boss-weapon cook; swamp portal folds stay off (`portals.json land: false`); the Coven pillar red in the tide warning
+  waits for the Ring pillars; vein reach by stage needs a new hero mask channel.
+
 ## Unreleased: Storm peaks, the Lightning land (the first land off the Old Island) and the Lightning path
 
 Aaron (lane build-biome-lightning: requirement ledger, research and plan in showcase-notes cooks/build-biome-lightning.md,
