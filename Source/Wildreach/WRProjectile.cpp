@@ -6,6 +6,7 @@
 #include "WRCrystalWorld.h"
 #include "WRCrystalHazards.h"
 #include "WRFungalHazards.h"
+#include "WRFungalBosses.h"
 #include "WRWindPath.h"
 #include "WRVoidHazards.h"
 #include "WRVoidWorld.h"
@@ -319,6 +320,8 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		if (OtherActor && OtherComp) FWRGraveBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
 		// The Crystal caves': an arrow or a bolt rings a chime stone, turns a prism's hand-plate, cracks the flaring lens.
 		if (OtherActor && OtherComp && Hit.Instigator != nullptr && !Cast<AWRBoss>(Hit.Instigator)) FWRCrystalBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, true);
+		// The Fungal caverns': an arrow bursts a wall egg sac, chips a Draught plug, a fire arrow burns a web.
+		if (OtherActor && OtherComp && Hit.Instigator != nullptr && !Cast<AWRBoss>(Hit.Instigator)) FWRFungalBoss::HitThing(OtherActor, OtherComp, By, Hit.Damage, bFireShot);
 		if (SplashRadius > 0.f || bFireShot)
 		{
 			const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation();

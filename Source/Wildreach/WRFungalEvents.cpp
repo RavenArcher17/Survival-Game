@@ -4,6 +4,8 @@
 // flush, bloomed beasts, deepcaps on the surface, the Seed Vault, the vents' faster breath), the invasions' marks, Ilmari
 // Kask's day and night, and Ilmari's Cold light walk through the Lure Gallery.
 
+#include "GameFramework/PlayerState.h"
+#include "WRInventory.h"
 #include "WRFungalWorld.h"
 #include "WRFungalHazards.h"
 #include "WRFungalCaves.h"
@@ -511,6 +513,35 @@ void WRFungal::CreatureDied(AWRCreature* Self, AActor* Killer)
 		AWRSporeCloud::Spawn(Self->GetWorld(), Self->GetActorLocation() + FVector(0.f, 0.f, 80.f), WRTune(TEXT("fungalEvents.sporefall.bloomBurst"), 400.f), TEXT("creature"), WRTune(TEXT("fungalEvents.sporefall.bloomBurstSeconds"), 6.f), nullptr);
 		WRFx::Broadcast(Self, TEXT("fungal.bloomBurst"), Self->GetActorLocation() + FVector(0.f, 0.f, 80.f), FRotator::ZeroRotator, 1.f, TEXT("fungal.bloom_burst"));
 	}
+	// Mycelorn's part, the Hive spore (fungal 2.14): what its wearer kills bursts in a 4 m cloud for 4 s (poison 40 on
+	// the burst); the wearer and their party breathe it unharmed (a path cloud spares them). Once every 2 s.
+	AWRCharacterBase* By = Cast<AWRCharacterBase>(Killer);
+	if (const AWRCreature* Tame = Cast<AWRCreature>(Killer); Tame && Tame->IsTamed() && Tame->GetWorld())
+	{
+		for (FConstPlayerControllerIterator It = Tame->GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (It->Get() && It->Get()->PlayerState && It->Get()->PlayerState->GetPlayerName() == Tame->TamedBy) By = Cast<AWRCharacterBase>(It->Get()->GetPawn());
+		}
+	}
+	if (By && UWRInventoryComponent::GearStatFor(By, TEXT("hiveSpore")) > 0.f)
+	{
+		static TMap<TWeakObjectPtr<AActor>, double> Last;
+		const double Now = Self->GetWorld()->GetTimeSeconds();
+		if (Now - Last.FindRef(By) >= WRTune(TEXT("hazards.fungal.hiveSpore.every"), 2.f))
+		{
+			Last.Add(By, Now);
+			const FVector At = Self->GetActorLocation();
+			const float R = WRTune(TEXT("hazards.fungal.hiveSpore.radius"), 400.f);
+			AWRSporeCloud::Spawn(Self->GetWorld(), At + FVector(0.f, 0.f, 80.f), R, TEXT("path"), WRTune(TEXT("hazards.fungal.hiveSpore.seconds"), 4.f), By);
+			WRFx::Broadcast(Self, TEXT("fungal.bloomBurst"), At, FRotator::ZeroRotator, 1.f, TEXT("fungal.bloom_burst"));
+			for (TActorIterator<AWRCharacterBase> It(Self->GetWorld()); It; ++It)
+			{
+				if (*It == Self || !It->IsAlive() || !It->Status || !By->IsHostileTo(*It) || FVector::Dist(It->GetActorLocation(), At) > R + It->GetSimpleCollisionRadius()) continue;
+				const float Taken = WRFungal::SporeTaken(*It);
+				if (Taken > 0.f) It->Status->AddStatusBuildup(WRStatus::Poison, WRTune(TEXT("hazards.fungal.hiveSpore.poison"), 40.f) * Taken, By);
+			}
+		}
+	}
 }
 
 bool WRFungal::BuildThrownModel(const FString& ModelPath, UProceduralMeshComponent* Mesh)
@@ -524,6 +555,18 @@ bool WRFungal::BuildThrownModel(const FString& ModelPath, UProceduralMeshCompone
 		M.Lathe(FVector(3.f, 0.f, 0.f), FVector::ForwardVector, 6.f, { FVector(0.f, 5.4f, 5.4f), FVector(1.f, 0.f, 0.f) }, 8, FLinearColor(FColor(57, 230, 194)) * 0.8f, 0.3f);
 		M.ApplyTo(Mesh);
 		Mesh->SetWorldScale3D(FVector(2.f));
+		return true;
+	}
+	if (ModelPath == TEXT("code:eggsac") || ModelPath == TEXT("code:sporepod"))
+	{
+		// The Sporemother's egg sac (cyan, the eggs dark inside) or Mycelorn's spore pod (a cream puffball, cyan pores).
+		const bool bEgg = ModelPath == TEXT("code:eggsac");
+		FWRToolMesh M;
+		TArray<FVector> Prof;
+		for (int32 k = 0; k <= 8; ++k) { const float T = k / 8.f; const float S = FMath::Sin(T * PI) * (bEgg ? 34.f : 45.f); Prof.Add(FVector(T, S, S)); }
+		M.Lathe(FVector(-35.f, 0.f, 0.f), FVector::ForwardVector, 70.f, Prof, 12, bEgg ? FLinearColor(FColor(57, 230, 194)) * 0.75f : FLinearColor(FColor(237, 230, 214)) * 0.65f, 0.3f);
+		for (int32 i = 0; i < 6; ++i) { const float A = i * PI / 3.f; M.Lathe(FVector(FMath::Cos(A) * 8.f, FMath::Sin(A) * 30.f, FMath::Cos(A * 1.7f) * 26.f), FVector::UpVector, 8.f, { FVector(0.f, 5.f, 5.f), FVector(1.f, 0.f, 0.f) }, 6, bEgg ? FLinearColor(FColor(20, 40, 36)) * 0.6f : FLinearColor(FColor(57, 230, 194)) * 0.8f, 0.3f); }
+		M.ApplyTo(Mesh);
 		return true;
 	}
 	if (ModelPath == TEXT("code:webnet"))

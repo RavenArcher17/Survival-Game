@@ -4,6 +4,7 @@
 #include "WRCrystalTypes.h"
 #include "WRCrystalHazards.h"
 #include "WRFungalHazards.h"
+#include "WRFungalBosses.h"
 #include "WRInventory.h"
 #include "WRWindPath.h"          // Sky lord's swings and dodge
 #include "WRAbilitiesWind.h"     // the Wind path's abilities (ClassForNode)
@@ -1152,6 +1153,14 @@ void UWRGA_Melee::Sweep()
 		// comes round 45 degrees), the Spar Lens while it flares, a Glint lance standing in the floor.
 		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
 			&& FWRCrystalBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), false))
+		{
+			HitThisSwing.Add(Thing);
+			continue;
+		}
+		// The Fungal caverns' boss things (WRFungalBosses): a wall egg sac, a Draught gate's plug, a mound pod, a web sheet.
+		if (AActor* Thing = HitResult.GetActor(); Thing && !HitThisSwing.Contains(Thing) && HitResult.GetComponent()
+			&& FWRFungalBoss::HitThing(Thing, HitResult.GetComponent(), Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f),
+				Character->Weapon.Element == TEXT("fire") || UWRSurvivalComponent::HoldsTorch(Character)))
 		{
 			HitThisSwing.Add(Thing);
 			continue;

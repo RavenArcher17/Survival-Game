@@ -1,5 +1,6 @@
 #include "WRBoss.h"
 #include "WRCrystalBosses.h"
+#include "WRFungalBosses.h"
 #include "WRVoidHazards.h"
 #include "WRVoidBosses.h"
 #include "WRStormBosses.h"
@@ -435,7 +436,8 @@ void AWRBoss::BeginPlay()
 	FWRVoidBoss::Begin(this);    // the Wasteland: the four stations, the Echo, Vorhollow
 	FWRGraveBoss::Begin(this);
 	FWRSkyBoss::Begin(this);     // the Sky: Kyrra's loop, the Sentinel kneeling, Gulper afloat, Aeolith round the Flue   // the Graveyard: the Bell-Ringer, the Crypt Mother, the Ossuary Lord, the Gravedigger, Nhal
-	FWRCrystalBoss::Begin(this);   // the Crystal caves: the Twins, the Echo Warden, the Geode Tyrant, Lyrathis   // the Graveyard: the Bell-Ringer, the Crypt Mother, the Ossuary Lord, the Gravedigger, Nhal
+	FWRCrystalBoss::Begin(this);
+	FWRFungalBoss::Begin(this);    // the Fungal caverns: the Sporemother, the Rot King, the Weaver, Mycelorn   // the Crystal caves: the Twins, the Echo Warden, the Geode Tyrant, Lyrathis   // the Graveyard: the Bell-Ringer, the Crypt Mother, the Ossuary Lord, the Gravedigger, Nhal
 	FWRForestBoss::Begin(this);  // the Ancient forest: Old Gnarl, the Bramblequeen, the Grey Matron, the Hornwarden, Sylvaroth
 	UE_LOG(LogWildreach, Log, TEXT("BOSS %s ready (%s, %.0f hp solo)"), *GetDisplayLabel(), bMajor ? TEXT("major") : TEXT("mini"), SoloHealth);
 }
@@ -451,6 +453,7 @@ void AWRBoss::EndPlay(const EEndPlayReason::Type Reason)
 	FWRGraveBoss::EndPlay(this);
 	FWRSkyBoss::EndPlay(this);
 	FWRCrystalBoss::EndPlay(this);
+	FWRFungalBoss::EndPlay(this);
 	Super::EndPlay(Reason);
 }
 
@@ -634,6 +637,7 @@ void AWRBoss::ResetFight()
 	FWRGraveBoss::Reset(this);
 	FWRSkyBoss::Reset(this);
 	FWRCrystalBoss::Reset(this);
+	FWRFungalBoss::Reset(this);
 }
 
 void AWRBoss::OnRep_Phase()
@@ -686,6 +690,7 @@ void AWRBoss::SetPhase(int32 NewPhase)
 	FWRGraveBoss::PhaseChanged(this, Phase);
 	FWRSkyBoss::PhaseChanged(this, Phase);
 	FWRCrystalBoss::PhaseChanged(this, Phase);
+	FWRFungalBoss::PhaseChanged(this, Phase);
 }
 
 void AWRBoss::SetAirborne(bool bAir)
@@ -768,7 +773,7 @@ float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	const FWRCreatureDef* Def = GetDef();
 	// Weak to the opposite element.
 	const FGameplayTag Weak = BossElement() == WRTags::Element_Fire ? WRTags::Element_Frost : WRTags::Element_Fire;
-	if (Hit.Element == Weak && !FWRStormBoss::OwnWeakness(this) && !FWRSwampBoss::OwnWeakness(this) && !FWRVoidBoss::OwnWeakness(this) && !FWRForestBoss::OwnWeakness(this) && !FWRGraveBoss::OwnWeakness(this) && !FWRSkyBoss::OwnWeakness(this) && !FWRCrystalBoss::OwnWeakness(this))
+	if (Hit.Element == Weak && !FWRStormBoss::OwnWeakness(this) && !FWRSwampBoss::OwnWeakness(this) && !FWRVoidBoss::OwnWeakness(this) && !FWRForestBoss::OwnWeakness(this) && !FWRGraveBoss::OwnWeakness(this) && !FWRSkyBoss::OwnWeakness(this) && !FWRCrystalBoss::OwnWeakness(this) && !FWRFungalBoss::OwnWeakness(this))
 	{
 		Damage *= WRTune(TEXT("bosses.weaknessMultiplier"), 1.5f);
 	}
@@ -777,7 +782,8 @@ float AWRBoss::ModifyIncomingDamage(const FWRHit& Hit, float Damage)
 	Damage = FWRVoidBoss::Incoming(this, Hit, Damage);    // the Wasteland: the Unravelled's pieces and core, Vorhollow's shell
 	Damage = FWRGraveBoss::Incoming(this, Hit, Damage);
 	Damage = FWRSkyBoss::Incoming(this, Hit, Damage);   // the Sky: the Crown, the choke, the vents, spore weakness   // the Graveyard: the pile's keystones, the lantern, the cage door, Nhal's Nature weakness
-	Damage = FWRCrystalBoss::Incoming(this, Hit, Damage);   // the Crystal caves: the flaring lens, plates, the dome   // the Graveyard: the pile's keystones, the lantern, the cage door, Nhal's Nature weakness
+	Damage = FWRCrystalBoss::Incoming(this, Hit, Damage);
+	Damage = FWRFungalBoss::Incoming(this, Hit, Damage);   // the Fungal caverns: a hold freed, the Rot King dried, Mycelorn's wind weakness, gills, Heart-seed   // the Crystal caves: the flaring lens, plates, the dome   // the Graveyard: the pile's keystones, the lantern, the cage door, Nhal's Nature weakness
 	Damage = FWRForestBoss::Incoming(this, Hit, Damage);  // the forest: Gnarl's bark plates, the queen's poison, the antlers, Sylvaroth's Necromancy
 	if (CreatureId == TEXT("obsidian_warden") && ShellHealth > 0.f && !Hit.bDamageOverTime)
 	{
@@ -848,6 +854,7 @@ void AWRBoss::OnDamageTaken(const FWRHit& Hit, float Damage)
 	FWRGraveBoss::Damaged(this, Hit, Damage);
 	FWRSkyBoss::Damaged(this, Hit, Damage);
 	FWRCrystalBoss::Damaged(this, Hit, Damage);
+	FWRFungalBoss::Damaged(this, Hit, Damage);
 	FWRForestBoss::Damaged(this, Hit, Damage);  // pale wood's double burn, an ally freeing a friend from Gnarl's grasp
 	// Phases by health; never during a stance break or a crit (COMBAT-AND-LESSONS 1.4): the crit always finishes first
 	// and the change plays after it (CheckPhase in Tick).
@@ -986,7 +993,8 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 			&& !FWRForestBoss::TickIdle(this, DeltaSeconds, bSkipWake)
 			&& !FWRGraveBoss::TickIdle(this, DeltaSeconds, bSkipWake)
 			&& !FWRSkyBoss::TickIdle(this, DeltaSeconds, bSkipWake)
-			&& !FWRCrystalBoss::TickIdle(this, DeltaSeconds, bSkipWake))   // the Graveyard: the Gravedigger's sleep and night round   // the forest: the Hornwarden's loop, the Matron's canopy, Sylvaroth rooted
+			&& !FWRCrystalBoss::TickIdle(this, DeltaSeconds, bSkipWake)
+			&& !FWRFungalBoss::TickIdle(this, DeltaSeconds, bSkipWake))   // the Graveyard: the Gravedigger's sleep and night round   // the forest: the Hornwarden's loop, the Matron's canopy, Sylvaroth rooted
 		{
 			TickRoam(DeltaSeconds);
 		}
@@ -1193,7 +1201,8 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 		|| FWRForestBoss::Tick(this, DeltaSeconds)
 		|| FWRGraveBoss::Tick(this, DeltaSeconds)
 		|| FWRSkyBoss::Tick(this, DeltaSeconds)
-		|| FWRCrystalBoss::Tick(this, DeltaSeconds))   // (the forest's: plates, combs, walkways, the herd and the roots, the lines)
+		|| FWRCrystalBoss::Tick(this, DeltaSeconds)
+		|| FWRFungalBoss::Tick(this, DeltaSeconds))   // (the forest's: plates, combs, walkways, the herd and the roots, the lines)
 	{
 		return;
 	}
@@ -1338,7 +1347,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 		{
 			// AL 5+: now and then it comes Scarred (its effect x1.5).
 			const bool bScarred = WRArtifacts::RollScarred(PS);
-			const FName Part = FWRCrystalBoss::BossPart(this, bScarred, FWRSkyBoss::BossPart(this, bScarred, FWRGraveBoss::BossPart(this, bScarred, FWRForestBoss::BossPart(this, bScarred, FWRSwampBoss::BossPart(this, bScarred, FWRStormBoss::BossPart(this, bScarred, CreatureId == TEXT("vulkarn") ? FName(bScarred ? TEXT("part_giants_ember_scarred") : TEXT("part_giants_ember")) : FName(bScarred ? TEXT("part_wyrm_scale_scarred") : TEXT("part_wyrm_scale"))))))));
+			const FName Part = FWRFungalBoss::BossPart(this, bScarred, FWRCrystalBoss::BossPart(this, bScarred, FWRSkyBoss::BossPart(this, bScarred, FWRGraveBoss::BossPart(this, bScarred, FWRForestBoss::BossPart(this, bScarred, FWRSwampBoss::BossPart(this, bScarred, FWRStormBoss::BossPart(this, bScarred, CreatureId == TEXT("vulkarn") ? FName(bScarred ? TEXT("part_giants_ember_scarred") : TEXT("part_giants_ember")) : FName(bScarred ? TEXT("part_wyrm_scale_scarred") : TEXT("part_wyrm_scale")))))))));
 			PS->GetInventory()->AddItem(Part, 1);
 			Got += Part.ToString();
 		}
@@ -1358,6 +1367,7 @@ void AWRBoss::OnDeath(AActor* Killer)
 	FWRGraveBoss::Died(this);
 	FWRSkyBoss::Died(this);
 	FWRCrystalBoss::Died(this);
+	FWRFungalBoss::Died(this);
 	// Artifacts: a major's drop, the first one at your fourth great kill, geis records (WRArtifacts).
 	WRArtifacts::OnBossKilled(this);
 	for (const TWeakObjectPtr<AWRCreature>& W : Wisps) if (W.IsValid()) W->Destroy();

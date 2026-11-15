@@ -436,7 +436,10 @@ hit already calls `WRFungal::OnHit`, every melee swing `WRFungal::Swing`), doors
 fungal spot`), the live steps and the Sporefall `WRFungalEvents.cpp`. Creatures are `WRFungalCreatures.*`
 (`UWRFungalBody` on every `fungal` creature, `FWRFungalAI` hooked beside the Crystal / Grave ones; the dens are
 `UWRFungalWorld::StepDens` over `Data/fungal.json` dens and `denTables`; numbers in tuning `fungalLife`). A new grab
-that holds a survivor should answer `FWRFungalAI::Mash`'s chain the same way (`WRCharacterCombat.cpp`).
+that holds a survivor should answer `FWRFungalAI::Mash`'s chain the same way (`WRCharacterCombat.cpp`). Bosses are
+`WRFungalBosses.*` / `WRFungalBossLook.cpp` (`FWRFungalBoss` beside `FWRCrystalBoss` in the boss machine; arena things are
+`AWRFungalBossProp`; Mycelorn's clouds are its own (`Maker`), so anything that pushes a cloud through `AWRSporeCloud::Push`
+can choke it).
 
 - **The world store is SQLite** (since build-server-raids): `Saved/Worlds/<id>/world.db`, through `WRStore`
   (`ReadDoc / WriteDoc`, `ReadCharacter / WriteCharacter`): a new system that saves per world adds a document kind there,
