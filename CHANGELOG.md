@@ -327,6 +327,19 @@ played here (Aaron and the testers test, F8). This first piece is the land, the 
   knockback in the Sky through `WRSkyAir::Push`; a boss over an edge flies back onto the nearest island in 3 s. Drops:
   Aeolith's core, gale essence, plumes, the Gale plume part, the Wind Mask (first kill), Galespine and the Cloud spire
   furnishings as its blueprints; the minis' trophies. 5 fx, 14 sound rows and 4 voices (stand-ins).
+- **The Sky's sound** (piece 6): the ambient director treats the islands as the Sky's land (beds by sub-zone: the
+  cliffs' surf far below, the gardens' falls, the bridges' chains, the shrines' hollow air over the Flue's roar, the
+  Undercloud's close fog and kite cloth, the Flue's breath; day and night layers); music pools for the Sky (explore,
+  night, combat, mini, camps, Aeolith's three phases), the Undercloud's own piece inside the bank, and the Turning
+  Wind's layer over whatever plays while its sign and the event run. All stand-ins from the built library (no Sky
+  recordings or F-Lydian score exist yet: that's the audio cook's).
+- **Not finished yet (later cooks):** the Sky's own recordings and its F-Lydian score (every Sky sound and pool is a
+  marked stand-in); the Sky's portal fold kit (portals.json `sky` stays `land: false`, so no Sky portals open); the
+  Spore -> Wind invasion's Sky side waits for the Fungal caverns (Wind -> Spore is in, dormant till Fungal is live);
+  tame uses beyond the shared systems (the Skyray carries one rider, not two; the Hushwing's night guard and the
+  Gallowshrike's thorn guard use the shared guard behaviour; the Sailbell fence works through its curtain);
+  a Hushwing taking a Windmane foal (no wild foals yet); the Last Circle's riders move vent to vent with E rather than
+  running free along the spine; boss soul forging (Aeolith's soul) is the souls cook's.
 
 ## Unreleased: the Graveyard (the Necromancy land)
 
