@@ -66,6 +66,8 @@ FName FWRGathering::ToolKindFor(FName ItemId)
 {
 	const FString Id = ItemId.ToString();
 	if (ItemId == TEXT("wood") || ItemId == TEXT("greywood") || ItemId == TEXT("yew_log") || ItemId == TEXT("cloudpine")) return TEXT("hatchet");
+	// The Fungal caverns' rhizomorph cables are cut with an axe (cooks/biome-fungal.md 2.7: axe, 4 hits).
+	if (ItemId == TEXT("bootlace_rhizomorph")) return TEXT("hatchet");
 	// The Sky's levistone (shards, keels, cores: cooks/biome-sky.md 2.6) is mined.
 	if (ItemId == TEXT("levistone") || ItemId == TEXT("levistone_core")) return TEXT("pick");
 	if (ItemId == TEXT("stone") || Id.EndsWith(TEXT("_ore")) || Id.StartsWith(TEXT("sulfur")) || ItemId == TEXT("saltpetre") || ItemId == TEXT("voidglass")) return TEXT("pick");

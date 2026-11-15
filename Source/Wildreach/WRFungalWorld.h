@@ -62,7 +62,18 @@ public:
 	float BeatAmount = 0.f;
 	float BeatRate = 1.f;
 
+	/** The signature resource's yield multiplier now (the Sporefall's x3 on deepcap). */
+	float SignatureScale() const;
+	/** The Sporefall is on (WRFungalEvents sets it). */
+	bool bSporefall = false;
+	const TArray<TWeakObjectPtr<class AWRResourceNode>>& GetNodes() const { return Nodes; }
+
 private:
+	/** WRFungalThings.cpp: the server's nodes, caches and keepsakes, once the scenery is built. */
+	void SpawnServerActors();
+	bool bServerDone = false;
+	TArray<TWeakObjectPtr<class AWRResourceNode>> Nodes;
+	TArray<TWeakObjectPtr<class AWRWorldCache>> Caches;
 	void BuildScenery();
 	void StepBuild();
 	void StepLights(float Dt);
