@@ -333,6 +333,18 @@ The Blood Moon is `UWRGraveEvents` (world.json events.bloodmoon is scheduled by 
 `UWRGraveEvents::Sign / Rising / On` are what the rest asks). The Graveyard's ambient beds are `land.graveyard[.night]`
 and `zone.G1..G4 / zone.neck` rows; its music pools `<pool>.graveyard` and `boss.nhal`.
 
+Also since 0.7.1 (in progress; not live until Desert (3)): **the Desert / Sun & sand** (cooks/biome-desert.md, plan
+cooks/build-biome-desert.md). `node Tools/terrain/desert.mjs` writes `Data/lands/desert.json` + `desert_ground.bin`
+(priority 2: `cuts` take the Fungal strip's beach south of y -7,800 and the Ocean's west sea west of x -280; it reads
+`fungal_ground.bin`, `ocean_ground.bin` and `Art/Terrain/storm_height.r16` for its seams, so re-run it after any of those
+change) and `Data/desert.json` (read by `FWRDesertData`, `WRDesertTypes.cpp`). The cook's coordinates go through the
+script's `X()` / `Y()`: keep writing cook numbers there. **The surface class under a point is the desert's rules**
+(`WRDesert::SurfaceAt`, `EWRDesertSurf`): soft sand, slipfaces, quicksand, brine, wet sand, hardpan... the movement, the
+hazards and the sand-swimmers all read it. Scenery: `WRDesertScenery.cpp` (landmarks, shrines, camps, caves, the
+Hourhold) / `WRDesertSites.cpp` (sites, kit) on the forest's FBuild with the kit `WRDesertLook.h` (`Ds*`); node looks
+`WRDesertNodes.cpp` (asked first in `WRResourceLook`); `UWRDesertWorld` builds and runs it (`world desert spot`);
+`AWRDesertState` replicates the Lee Door, the Dig, the Mirror Gallery and the Sun-Vault. Numbers: tuning `desertWorld`.
+
 Also since 0.7.1 (live from Ocean (4)): **the Ocean & reefs** (cooks/biome-ocean.md, plan
 cooks/build-biome-ocean.md), the strait between the Sky's Chain Cliffs and the Storm crown. `node Tools/terrain/ocean.mjs`
 writes `Data/lands/ocean.json` + `ocean_ground.bin` (heightfield, sea floor drawn) and `Data/ocean.json` (landmarks,

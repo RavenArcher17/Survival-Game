@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased: the Desert / Sun & sand
+
+Aaron (lane build-biome-desert: requirement ledger R1-R52, build research and plan in showcase-notes
+cooks/build-biome-desert.md, building cooks/biome-desert.md). Landing in pieces; compiled (editor target) after each; not
+played here (Aaron and the testers test, F8). Not live until `desert` joins `world.liveBiomes` (Desert (3), with its
+creatures).
+
+- **Desert (1): the land and its places** (cooks/biome-desert.md 2.1-2.7; plan build-biome-desert.md 2.1-2.7).
+  `node Tools/terrain/desert.mjs` writes `Data/lands/desert.json` + `desert_ground.bin` (a 4 m heightfield land, 711
+  samples, priority 2) and `Data/desert.json` (read by `FWRDesertData`, `WRDesertTypes.cpp`). Where it sits: belt B2 west
+  of the Spine, between the Fungal plateau (this land cuts its south strip's beach and sea below y -7,800; the seam row is
+  the Fungal's own heights), the Storm land's north coast (hidden south of y -5,652, its row the Storm's heights) and the
+  Ocean land's Spine (this land cuts the Ocean's west sea west of x -280; the Spine face and Saltgate's floor are its
+  seam); the cook's coordinates go through the Ocean's own `Y()` and an `X()` that puts the cook's Spine foot on this
+  world's. **The ground is the language** (cook 1.3): every rule reads a surface class written per sample (soft sand
+  rippled gold, slipfaces on the west lee of every crescent dune, hardpan white with polygon cracks, wet sand on the shore,
+  sabkha salt with 30 brine patches, 16 quicksand pockets at the Mother Dune's foot, the wadi bed and the oases, oasis
+  clay, wadi gravel, red rock mesas with slot canyons, the Glass Canyon's glass, the Wall's scoured pavement and drifts).
+  **Five sub-zones**: D1 the Wreck Strand (beach, sea-grass dunes, sabkha), D2 the Erg (barchans 15-30 m: 11-degree east
+  backs, 32-degree west slipfaces, horns downwind; the 140 m star Mother Dune with three razor arms), D3 Oasis Reach and
+  the White Pan (the dry river's wadi falling from the Pan to the sea; the Pan a flat basin at 26 m, the dry lake the
+  river died in), D4 the Red Canyons (two mesa levels 60-95 m, slot canyons, the two flood wadis from the Storm rib's river
+  gaps: the west one to the sea, the east one into the main wadi, ledges and rope points every 40 m), D5 the Haboob Wall
+  (scoured pavement rising to the Fungal dunes). **Eleven landmarks + the Leviathan Ribs**, code-built at real scale on the
+  forest's FBuild with the Desert's kit (`WRDesertLook.h`, `Ds*`): the Haboob Wall (300 m of billowing dust along the D5
+  line with lightning inside, `desert.haboob*` fx), Ahrumet's Gnomon and the Sundial Plaza (the kerb half drowned in drift,
+  radial joints, the hour ring, the bronze meridian strip to the throne, a 30 m basalt obelisk with its bronze-lined
+  sighting hole and gold pyramidion), the Broken Sun Gate (two 22 m battered pylons with torus and cavetto and winged sun
+  discs, the fallen lintel, the court and colonnade stumps, the Great Shrine's dais), the Mother Dune's ventifacts, the
+  Whale Road (nine whales of 20-40 m), the Keelyard (twelve sun-barques stood on end), the Tall Wreck (a 32 m
+  three-master heeled 30 degrees on a crest), the Fallen Hour (a 12 m head on its side, ropes and tow-sledges), the
+  Needles (34 hoodoos to 80 m, kite nests, two rope bridges), the Glass Canyon, the Sevenfold Wells (a qanat tower whose
+  bucket wheel turns, channels to seven pools, a garden wall with four gates, 40 palms) and the Saltkin serpent's 90 m
+  skeleton at Saltgate's mouth. **35 hand sites** S1-S35 each built as the cook's table says (no actors, the story by
+  placement). **Kit POIs** (wrecks, caravans, gnomon stelae on the old roads, ruins, outcrops, creature set-pieces, seeps,
+  slot overhangs, bones): the cook's counts per sub-zone, the 125 m route rule along the wadi road, the Avenue, the caravan
+  routes and the stelae road, and a fill so no ground is over 176 m from a place. **Decoration** in 250 m cells:
+  sea-grass, driftwood, shells, saltbush, date palms along the wadi, reeds, umbrella thorns, prickly pear, red rocks,
+  pavement pebbles, hoodoo stubs. **Four caves** (the Nitre Caves, the Qanat's shaft and half-flooded tunnel, Ssarrok's
+  Hollow, the Sieve Throats down 40 m) and **the Hourhold**: 20 rooms 14-60 m under the Erg joined by dressed galleries
+  (the Hall of Hours' 24 pillars and its light shafts that follow the real sun, the Cistern Below, the Barque Dock's 30 m
+  sun-barque, the Ushabti Hall's 200 figures, the Weighing Room's balance, the Mirror Gallery's four mirrors on pivots and
+  the Sun-Vault's sliding door, the Drowned Stair, the Seventh Vault, the Collapse, the Workshop of Faces, the Lens Forge,
+  the Spring) and its three ways in: the Lee Door (its sand slumps away for 3 game hours after every Sandstorm block),
+  the Jaw under the Fallen Hour, the Dig (hold E 4 s with a pick or shovel; once for the server). **What you take**: 384
+  nodes (60 sunstone on sun-facing rock and the Pan's cracks, glowing at night with the day's stored sun; sunglass, rock
+  salt, nitre, copper, tin and iron in the caves and the Hourhold, clay, red ochre, gold flakes, acacias, date palms that
+  give palm fibre, prickly pear; the wild crops give their seeds), 25 spots and 13 caches from the sites (lore, the lens
+  recipe's two holders, the blue hands' rubbing, the Gallery's mirrors), the kit's chests, the seven tilted stelae's
+  caches (hidden until the Long Noon), 43 Scarab digger mounds (hidden until a tamed Scarab finds them), run-back stones
+  at the plaza and the Spring. Server state replicated on `AWRDesertState`; everything that moves is a function of it and
+  the clock. New items: sunglass, nitre, acacia log, palm fibre, red ochre, gold flakes, bat guano, radiant essence, the
+  rubbing, the sun-disc key, 12 lore pieces. Tuning `desertWorld`; world.json `biomes.desert`.
+
 ## Unreleased: the Ocean & reefs (the Tide land)
 
 Aaron (lane build-biome-ocean: requirement ledger R1-R54, build research and plan in showcase-notes

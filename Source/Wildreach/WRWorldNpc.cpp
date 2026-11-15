@@ -5,6 +5,7 @@
 #include "WRWorldSystems.h"
 #include "WRFungalWorld.h"
 #include "WROceanWorld.h"
+#include "WRDesertWorld.h"
 #include "WRStormWorld.h"
 #include "WRSwampSystems.h"
 #include "WRForestHazards.h"
@@ -346,6 +347,8 @@ bool WRWorld::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString&
 	if (UWRCrystalWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Ocean's spots (WROceanWorld): keepsakes, clams, the tsunami stones, the drowned bell, the Sluice key, the beacon.
 	if (UWROceanWorld::Prompt(PC, OutTarget, OutVerb)) return true;
+	// The Desert's spots (WRDesertWorld): keepsakes, the lens holders, the Hands Wall, the Mirror Gallery, the Dig.
+	if (UWRDesertWorld::Prompt(PC, OutTarget, OutVerb)) return true;
 	// The Fungal caverns' doors and secrets (WRFungalSpots): the Sealed Gate's web, the mole wall, the fifth tunnel, the
 	// ring's altar, the Heart Gate, the Seed Vault.
 	if (UWRFungalWorld::Prompt(PC, OutTarget, OutVerb)) return true;
@@ -405,6 +408,7 @@ bool WRWorld::ClientInteract(AWRPlayerController* PC)
 	if (UWRSkyWorld::ClientInteract(PC)) return true;
 	if (UWRCrystalWorld::ClientInteract(PC)) return true;
 	if (UWROceanWorld::ClientInteract(PC)) return true;
+	if (UWRDesertWorld::ClientInteract(PC)) return true;
 	if (UWRFungalWorld::ClientInteract(PC)) return true;
 	const WRNpcDetail::FNear N = WRNpcDetail::Nearest(PC);
 	if (!N.Actor) return false;

@@ -2,6 +2,7 @@
 #include "WROceanTypes.h"
 #include "WRCrystalTypes.h"
 #include "WRFungalTypes.h"
+#include "WRDesertTypes.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
 #include "WRResourceNode.h"
@@ -160,6 +161,10 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	// driftwood, kelp ash, bronze scrap, the caves' topaz (WROceanNodes.cpp models them).
 	const bool bOceanNode = WROcean::IsNodeItem(Item) && WROcean::Contains(At);
 	if (bOceanNode) Body = WROcean::NodeBody(Item);
+	// The Desert's (cooks/build-biome-desert.md 2.5): sunstone, sunglass, rock salt, nitre, clay, red ochre, gold flakes,
+	// the umbrella thorns, date palms and prickly pear (WRDesertNodes.cpp models them).
+	const bool bDesertNode = WRDesert::IsNodeItem(Item) && WRDesert::Contains(At);
+	if (bDesertNode) Body = WRDesert::NodeBody(Item);
 	UStaticMesh* Cylinder = LoadMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Sphere = LoadMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (!Cylinder || !Sphere || WRTune(TEXT("world.nodeLooks"), 1.f) <= 0.f)  // nodeLooks 0: the old cones (comparisons)
@@ -237,6 +242,8 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	}
 	// The Fungal caverns' nodes are modelled in code (WRFungal::NodeLook): nothing of the pack look below.
 	if (WRFungal::NodeLook(Node, Item, Seed)) return;
+	// The Desert's nodes are modelled in code too (WRDesert::NodeLook).
+	if (bDesertNode) { WRDesert::NodeLook(Node, Item, Seed); return; }
 
 	UStaticMeshComponent* Look = Part<UStaticMeshComponent>(Node, Collider, TEXT("WRLook"));
 	UInstancedStaticMeshComponent* Bits = Part<UInstancedStaticMeshComponent>(Node, Collider, TEXT("WRLookBits"));

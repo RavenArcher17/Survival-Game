@@ -6,6 +6,7 @@
 #include "WRWorldSystems.h"
 #include "WRFungalWorld.h"
 #include "WROceanWorld.h"
+#include "WRDesertWorld.h"
 #include "WRLand.h"
 #include "WRForestTypes.h"
 #include "WRStormWorld.h"
@@ -2510,6 +2511,11 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	{
 		// The Ocean's world (WROceanWorld): world ocean spot.
 		return UWROceanWorld::Command(PC, Args);
+	}
+	if (Verb == TEXT("desert"))
+	{
+		// The Desert's world (WRDesertWorld): world desert spot.
+		return UWRDesertWorld::Command(PC, Args);
 	}
 	if (Verb == TEXT("fungal"))
 	{

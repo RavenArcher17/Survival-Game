@@ -1,5 +1,6 @@
 #include "WRProjectile.h"
 #include "WROceanTypes.h"
+#include "WRDesertTypes.h"
 #include "WRSkyBosses.h"
 #include "WRCrystalBosses.h"
 #include "WRBoss.h"
@@ -232,7 +233,7 @@ void AWRProjectile::OnRep_Model()
 		CodeModel->RegisterComponent();
 		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
 		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
-			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel) || WROcean::BuildThrownModel(ModelPath, CodeModel)
+			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel) || WROcean::BuildThrownModel(ModelPath, CodeModel) || WRDesert::BuildThrownModel(ModelPath, CodeModel)
 			|| WRFungal::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
