@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: shipping 0.8.0 (the boot check, build.json, packaging on any engine folder)
+
+Lane ship-7. Compiled (editor target); the packaged build was launched and its log read before release (below).
+
+- **0.8.0** (`Config/DefaultGame.ini`, `Docs/release-notes/v0.8.0.md`): everything since 0.7.1, the full game.
+- **The boot check markers.** Why: the Freedom35 site publishes a download only with a boot proof
+  (`tools/bootcheck-pc.mjs` launches the packaged game with `-F35Boot` and reads its log). The main menu logs
+  `F35READY menu` when it opens (`SWRMainMenu::Open`); the loading cover logs `F35READY play` when it lifts on a hosted
+  or joined world with the survivor possessed (`FWRFlow::TickCover`). With `-F35Boot` only, the menu plays on by itself
+  after `flow.bootCheckMenuSeconds` (4): the last played world when the PC has one (Continue, logged
+  `F35BOOT continue`), else a new PvE world "Boot check" (New Game, `F35BOOT new`). Without the switch nothing changes.
+- **build.json beside the packaged game** (`Tools/package.ps1`). Why: F8 reports already carry it (`WRReport.cpp`)
+  but nothing wrote it. Version, config, full commit id, whether the tree had uncommitted changes, when it was built,
+  and what's in it counted from the data (lands, paths, creatures, items, recipes, build pieces).
+- **`-Engine <UE_5.8 folder>`** on `Tools/package.ps1` and `Tools/make_installer.ps1` (default unchanged: the launcher
+  folder), for a PC whose engine lives elsewhere.
+- **README.txt beside the game** no longer says anyone can use the console: since the god mode lane the test commands
+  need a verified tester in packaged builds.
+
 ## Unreleased: the performance cook pass (Medium on an 8 GB card, the shader cache, loading)
 
 Research, requirement ledger and plan: showcase-notes cooks/cookpass-performance.md. Compiled (editor target); not

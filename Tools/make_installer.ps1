@@ -4,8 +4,8 @@
 # WildreachUpdater.exe, which the shortcuts start: it installs newer releases from GitHub by itself. Publish a
 # release tagged v<version> (e.g. v0.2.0) with Wildreach-Setup.exe attached and every installed copy picks it up,
 # fetching only the parts of that Setup it doesn't already have (installer\WildreachPack.cs).
-#   make_installer.ps1 [-Build C:\Dev\WildreachBuild] [-Version 0.2.0] [-Out <setup.exe>]
-param([string]$Build = 'C:\Dev\WildreachBuild', [string]$Version = '', [string]$Out = '')
+#   make_installer.ps1 [-Build C:\Dev\WildreachBuild] [-Version 0.2.0] [-Out <setup.exe>] [-Engine <UE_5.8 folder>]
+param([string]$Build = 'C:\Dev\WildreachBuild', [string]$Version = '', [string]$Out = '', [string]$Engine = 'C:\Program Files\Epic Games\UE_5.8')
 $ErrorActionPreference = 'Stop'
 $game = Join-Path $Build 'Windows'
 $work = Join-Path $Build 'installer'
@@ -23,7 +23,7 @@ if (-not $Version) {
 
 # Microsoft's VC++ runtime installer (ships with UE) so Setup can install it on PCs that lack it.
 New-Item -ItemType Directory -Force (Join-Path $game 'Redist'), $work | Out-Null
-Copy-Item 'C:\Program Files\Epic Games\UE_5.8\Engine\Extras\Redist\en-us\vc_redist.x64.exe' (Join-Path $game 'Redist') -Force
+Copy-Item (Join-Path $Engine 'Engine\Extras\Redist\en-us\vc_redist.x64.exe') (Join-Path $game 'Redist') -Force
 
 # The updater and the version it compares against (no BOM: it's read as plain text).
 [System.IO.File]::WriteAllText((Join-Path $game 'version.txt'), $Version)

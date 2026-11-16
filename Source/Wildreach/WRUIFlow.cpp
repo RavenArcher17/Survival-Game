@@ -1179,6 +1179,11 @@ void FWRFlow::TickCover(float Dt)
 	if (bReleasing && BlackTarget <= 0.f && Black <= 0.001f)
 	{
 		Black = 0.f;
+		// The site's PC boot check reads this: a hosted or joined world is in view and playable (WRMainMenu.cpp).
+		if (Cover == ECover::Loading && P && P->GetPawn() && P->GetNetMode() != NM_Standalone && !SWRMainMenu::IsOpen())
+		{
+			UE_LOG(LogWildreach, Display, TEXT("F35READY play"));
+		}
 		Cover = ECover::None;
 		bReleasing = false;
 		bBack = false;

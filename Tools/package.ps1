@@ -3,10 +3,11 @@
 # A packaged dedicated server needs the source engine (Tools\build_engine.ps1); see the README.
 #   package.ps1                    -> C:\Dev\WildreachBuild\Windows (Development: dev console stays on for playtests)
 #   package.ps1 -Config Shipping
+#   package.ps1 -Engine <folder>   the UE_5.8 folder, when the engine isn't in the launcher's default place
 #   package.ps1 -SkipEditorBuild   the editor is already built: cook with it as it is. (Another project's editor or -game run
 #                                  on this engine has a Live Coding session, and UnrealBuildTool won't build the editor then.)
-param([ValidateSet('Development', 'Shipping')] [string]$Config = 'Development', [string]$Out = 'C:\Dev\WildreachBuild', [switch]$SkipEditorBuild)
-$uat = 'C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\RunUAT.bat'
+param([ValidateSet('Development', 'Shipping')] [string]$Config = 'Development', [string]$Out = 'C:\Dev\WildreachBuild', [switch]$SkipEditorBuild, [string]$Engine = 'C:\Program Files\Epic Games\UE_5.8')
+$uat = Join-Path $Engine 'Engine\Build\BatchFiles\RunUAT.bat'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
 $log = Join-Path $Out 'package.log'
@@ -25,6 +26,22 @@ Copy-Item (Join-Path $root 'Data') $game -Recurse -Force
 # Third-party credits ship with the game (some sounds are CC-BY, which asks for attribution where the work is used).
 Copy-Item (Join-Path $root 'Docs\CREDITS.md') (Join-Path $Out 'Windows\CREDITS.md') -Force
 $version = ((Get-Content (Join-Path $root 'Config\DefaultGame.ini') | Where-Object { $_ -match '^ProjectVersion=' } | Select-Object -First 1) -replace '^ProjectVersion=', '').Trim()
+# build.json beside the game: what this package is (F8 reports carry it, WRReport.cpp) and what's in it, counted from the data.
+$commit = (& git -C $root rev-parse HEAD 2>$null)
+$dirty = [bool](& git -C $root status --porcelain --untracked-files=no 2>$null)
+function Count-Rows($file, $key) { try { return @((Get-Content -Raw -Encoding utf8 (Join-Path $root "Data\$file") | ConvertFrom-Json).$key).Count } catch { return 0 } }
+$lands = @('fire (L_Island)', 'frost (L_Island)', 'lightning (storm_peaks)', 'swamp') + @(Get-ChildItem (Join-Path $root 'Data\lands') -Filter *.json | ForEach-Object { $_.BaseName })
+$info = [ordered]@{
+	game = 'Wildreach'; version = $version; config = $Config; commit = "$commit"; uncommittedChanges = $dirty
+	builtAt = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'); map = '/Game/Maps/L_Island'
+	features = [ordered]@{
+		lands = $lands
+		paths = @(Get-ChildItem (Join-Path $root 'Data\paths') -Filter *.json | ForEach-Object { $_.BaseName })
+		creatures = (Count-Rows 'creatures.json' 'creatures'); items = (Count-Rows 'items.json' 'items')
+		recipes = (Count-Rows 'recipes.json' 'recipes'); buildPieces = (Count-Rows 'pieces.json' 'pieces')
+	}
+}
+$info | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $Out 'Windows\build.json')
 @"
 WILDREACH $version
 
@@ -46,10 +63,10 @@ WILDREACH $version
    and shows what you get back (half its cost), click. X or Esc stops.
    Tab locks on to what's nearest the crosshair: your spells lead it and curve toward it.
 
-CONSOLE (playtest builds)
+CONSOLE (testers)
 The `` key (left of 1, under Esc) opens the console; type a command and press Enter, Tab completes.
-In this playtest build ANYONE in the game can use these (they act on the host's world), so
-play with people you trust. A few handy ones:
+These test commands work only for the studio's testers (signed in with their Freedom35 account);
+the game refuses them for everyone else. A few handy ones:
    WRGive <item> <count>        e.g. WRGive wood 100, WRGive copper_ingot 10 (ids: Wildreach\Data\items.json)
    WRTeleport <x> <y>           centimetres, e.g. WRTeleport -131200 -51600 (Volcanic camp 3)
    WRHour <0-24>                set the time of day, e.g. WRHour 22 for night

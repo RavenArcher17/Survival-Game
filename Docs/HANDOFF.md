@@ -26,7 +26,7 @@ Raven writes them in Claude Docs. Copies as of 2026-11-08 are in `Docs/design/` 
 one file per tab). Raven keeps editing the live ones, so the copies go stale: ask Raven for a fresh export before a
 big piece of work. The build plan's "Where it stands" table says what's built.
 
-## Where the game stands (v0.7.1)
+## Where the game stands (v0.8.0, the full game: all 12 lands)
 
 Every system in the First playable tier is built and has a bot test: biomes, both paths, levelling, combat, six
 bosses, enemies and wildlife regions, taming, survival, crafting (with time and station queues), building (with
@@ -738,6 +738,11 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
 5. Test the installer on a copy, never the build folder: `Wildreach-Setup.exe --silent --nolaunch --noshortcuts --dir
    C:\Dev\WildreachTest`, then start that copy's `Wildreach.exe` and play a little (host a world, open the menus). The
    first start of a game in a new folder brings up a Windows Firewall prompt; answer it yourself.
+   The boot check does the first part with nobody at the keys: start that copy with `-F35Boot -log -windowed` (or the
+   site's `node tools/bootcheck-pc.mjs wildreach --game-dir <copy>`). Its log must show `F35READY menu`, then
+   `F35BOOT new` and `F35READY play`; start it again the same way for `F35BOOT continue` and a second `F35READY play`.
+   An engine outside `C:\Program Files\Epic Games\UE_5.8`: pass `-Engine <its UE_5.8 folder>` to both scripts.
+   `build.json` beside the game names the commit it was packaged from.
 6. Commit (by name) and push. Then publish:
    `gh release create v<ver> C:\Dev\WildreachBuild<N>\Wildreach-Setup.exe --repo RavenArcher17/Survival-Game
    --target <full 40-character commit id> --latest --title "Wildreach <ver>: <what's new>" --notes-file

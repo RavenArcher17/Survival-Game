@@ -38,6 +38,19 @@
 #include "Widgets/Images/SImage.h"
 #include "Widgets/SOverlay.h"
 #include "Fonts/FontMeasure.h"
+#include "Containers/Ticker.h"
+#include "WRWorlds.h"
+
+// The Freedom35 site's PC boot check (tools/bootcheck-pc.mjs) launches the packaged game with -F35Boot and reads the
+// log for "F35READY menu" (the main menu is up) and "F35READY play" (FWRFlow, the loading cover lifts in a hosted or
+// joined world). With the switch the menu plays on by itself after a moment: the last played world (Continue) when
+// this PC has one, else a new one (New Game). Without it nothing changes.
+namespace WRMenuBootCheck
+{
+	static double FirstTick = -1.0;
+	static bool bDone = false;
+	static bool Wanted() { return FParse::Param(FCommandLine::Get(), TEXT("F35Boot")); }
+}
 #include "Rendering/SlateRenderer.h"
 #include "HAL/IConsoleManager.h"
 #include "Widgets/SBoxPanel.h"
@@ -898,6 +911,28 @@ TSharedRef<SWidget> SWRMainMenu::MakeUpdate()
 void SWRMainMenu::Tick(const FGeometry& Geo, const double Time, const float Delta)
 {
 	SCompoundWidget::Tick(Geo, Time, Delta);
+	if (!WRMenuBootCheck::bDone && WRMenuBootCheck::Wanted())
+	{
+		if (WRMenuBootCheck::FirstTick < 0.0) WRMenuBootCheck::FirstTick = Time;
+		if (Time - WRMenuBootCheck::FirstTick > WRTune(TEXT("flow.bootCheckMenuSeconds"), 4.f))
+		{
+			WRMenuBootCheck::bDone = true;
+			// Hosting closes this widget: do it on the next engine tick, not inside its own Tick.
+			const TWeakPtr<SWRMainMenu> Weak = SharedThis(this);
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Weak](float)
+			{
+				const TSharedPtr<SWRMainMenu> Menu = Weak.Pin();
+				if (!Menu) return false;
+				const TArray<FWRWorldInfo> Worlds = WRWorlds::List();
+				FString Id = Worlds.Num() ? Worlds[0].Id : FString();
+				const bool bContinue = !Id.IsEmpty();
+				if (!bContinue) Id = WRWorlds::Create(TEXT("Boot check"), WRWorlds::PresetSettings(TEXT("pve")));
+				UE_LOG(LogWildreach, Display, TEXT("F35BOOT %s world '%s'"), bContinue ? TEXT("continue") : TEXT("new"), *Id);
+				if (!Id.IsEmpty()) Menu->HostWorld(Id);
+				return false;
+			}));
+		}
+	}
 	// The body is possessed after the menu opens (and takes the view): keep the backdrop camera and the body still.
 	if (APlayerController* PC = Owner.Get())
 	{
@@ -1506,6 +1541,7 @@ void SWRMainMenu::Open(APlayerController* PC)
 	}
 	Instance = SNew(SWRMainMenu).Owner(PC);
 	GEngine->GameViewport->AddViewportWidgetContent(Instance.ToSharedRef(), 100);
+	UE_LOG(LogWildreach, Display, TEXT("F35READY menu"));
 	FInputModeUIOnly Mode;
 	Mode.SetWidgetToFocus(Instance);
 	PC->SetInputMode(Mode);
