@@ -58,6 +58,14 @@ The fill-in map is `UWRMapRevealComponent` (PlayerState, server-side grid, `mapR
 marker for a place (not yours) should check `IsRevealed` in `WRUIMap` Gather like the camps and caves do.
 A worn set's full bonus plays the set-complete moment (`FWRPlayerUI::TickSetComplete`, sounds.json `gear.setComplete`).
 Path node glyphs come from `Tools/ui_glyphs.mjs` (Necromancy's added): run it with the ids you add so the rest stay as they are.
+Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
+`music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
+bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);
+a boss's fall plays `music.sting.boss_fall` and a planned hush. Reverb comes from sounds.json `spaces`, picked in
+`UWRAudioDirector::SpaceNow` (add a new hall or cave there). Spot sounds and sleep breaths are rows (`ambient.spots`,
+`creature.<size>.sleep`); tells can `rise`. Captions: give an event row a `caption` (and `danger`), or a creature call kind
+a `captionDefaults` entry; the HUD draws them (`WRUICaptions.cpp`). The master limiter / Night compressor is
+`UWRAudioSubsystem::ApplyDynamics`.
 Also since 0.7.1: **the Fire and Frost world cook pass** (showcase-notes cooks/cookpass-world.md). The Old Island's places
 are data: `Data/island_places.json` is made by `node Tools/terrain/island_places.mjs` (hand places in metres settled onto
 dry ground off the heightmap, the two waymark roads, the hazard spots, and ~180 kit POIs dealt so no route goes 250 m

@@ -282,6 +282,7 @@ void AWRCharacterBase::MulticastHit_Implementation(float Damage, EWRHitResult Re
 	HitFlagsShown = FxFlags;
 	HitOriginShown = !FVector(Origin).IsNearlyZero() ? FVector(Origin) : Source ? Source->GetActorLocation() : GetActorLocation();
 	HitDamageShown = Damage;
+	HitSourceShown = Source;
 	OnHitVisual(Result);
 	OnHitShown.Broadcast(this, Damage, Result);
 	// Impact, hit sound, hit-stop, shake, hit marker and damage number (nothing on a dedicated server).

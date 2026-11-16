@@ -12,6 +12,7 @@
 #include "WRSurvival.h"
 #include "WRLandThings.h"
 #include "WRUIEndgame.h"
+#include "WRUICaptions.h"
 #include "WRPlayerUI.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
@@ -374,6 +375,7 @@ public:
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 150.f * U)[WRUIEndgame::MakeToast(PC)]   // a deed earned (WRUIEndgame)
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Top).Padding(0.f, 250.f * U)[CentreNotice()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 330.f * U)[Prompt()]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 384.f * U)[WRUICaptions::Make(PC)]   // sound captions (cookpass-audio 4.9)
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 175.f * U)[Pickups()]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 0.f, 150.f * U)[HazardLine()]
 			+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(26.f * U, 0.f, 0.f, 210.f * U)[ChatLines()]

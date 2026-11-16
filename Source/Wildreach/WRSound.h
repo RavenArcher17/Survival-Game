@@ -62,3 +62,28 @@ namespace WRSound
 	/** Final gain for a category: player setting x master x the table's mix trim. */
 	WILDREACH_API float CategoryGain(FName Category);
 }
+
+/**
+ * Sound captions (cookpass-audio 4.9; TLOU2 / Fortnite): a sound event with a "caption" row shown as a line with a
+ * direction arrow while it is heard. Settings > Audio > Sound captions: Off / Important (danger only) / All (pref
+ * "Captions"). Never for the local player's own sounds or 2D sounds. The HUD draws them (WRUICaptions.cpp).
+ */
+namespace WRSoundCaptions
+{
+	struct FLine
+	{
+		FString Text;
+		FVector Where = FVector::ZeroVector;
+		TWeakObjectPtr<const AActor> Source;   // follows it while shown
+		float Radius = 2500.f;
+		bool bDanger = false;
+		double Time = 0.0;                     // real time it was (last) heard
+		int32 Count = 1;
+	};
+	/** 0 off, 1 important, 2 all. */
+	WILDREACH_API int32 Mode();
+	/** The lines now heard, oldest first (expired ones dropped). */
+	WILDREACH_API const TArray<FLine>& Lines();
+	/** A sound with a caption was heard (WRSound's player calls it). */
+	WILDREACH_API void Push(const FString& Text, bool bDanger, const FVector& Where, const AActor* Source, float Radius);
+}

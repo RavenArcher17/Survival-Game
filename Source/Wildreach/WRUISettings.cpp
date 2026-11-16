@@ -1408,7 +1408,7 @@ namespace WRSettingsUI
 			struct FRow { const TCHAR* Category; FText Name; FText Sub; };
 			const FRow Rows[] = {
 				{ TEXT("master"), LOCTEXT("MasterVolume", "Master volume"), LOCTEXT("MasterVolumeSub", "Everything at once") },
-				{ TEXT("music"), LOCTEXT("MusicVolume", "Music"), LOCTEXT("MusicVolumeSub", "The menu theme, a tune now and then while you explore, fights and bosses") },
+				{ TEXT("music"), LOCTEXT("MusicVolume", "Music"), LOCTEXT("MusicVolumeSub", "The menu theme and each land's exploring, night, fight and boss pieces") },
 				{ TEXT("effects"), LOCTEXT("EffectsVolume", "Effects"), LOCTEXT("EffectsVolumeSub", "Footsteps, combat, creatures, spells, gathering and building") },
 				{ TEXT("ambient"), LOCTEXT("AmbientVolume", "Ambience"), LOCTEXT("AmbientVolumeSub", "Wind, surf, birds and insects, caves and lava") },
 				{ TEXT("ui"), LOCTEXT("UIVolume", "Interface"), LOCTEXT("UIVolumeSub", "Menus, buttons and the bag") },
@@ -1432,9 +1432,24 @@ namespace WRSettingsUI
 						], Category == TEXT("master") ? 56.f : 52.f)
 				];
 			}
+			// Hearing (cookpass-audio 4.4, 4.9): captions with a direction for every sound that matters, and a narrow mix
+			// for quiet rooms. Segmented rows: a click, or the pad's cursor and A.
+			List->AddSlot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Heading(LOCTEXT("HearingHead", "Hearing"))];
+			List->AddSlot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+			[
+				SettingRow(LOCTEXT("Captions", "Sound captions"), LOCTEXT("CaptionsSub", "Words for the sounds around you, with an arrow to where they come from. Important: only danger (wind-ups, hazards, attacks)"),
+					Segmented({ LOCTEXT("CaptionsOff", "Off"), LOCTEXT("CaptionsImportant", "Important"), LOCTEXT("CaptionsAll", "All") },
+						[]() { return FWRKeyBindings::Get().PrefInt(TEXT("Captions")); }, [](int32 i) { FWRKeyBindings::Get().SetPref(TEXT("Captions"), float(i)); }))
+			];
+			List->AddSlot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+			[
+				SettingRow(LOCTEXT("AudioRange", "Dynamic range"), LOCTEXT("AudioRangeSub", "Night: quiet sounds lifted, loud ones held down, for late play or small speakers"),
+					Segmented({ LOCTEXT("RangeWide", "Wide"), LOCTEXT("RangeNight", "Night") },
+						[]() { return FWRKeyBindings::Get().PrefInt(TEXT("AudioRange")); }, [](int32 i) { FWRKeyBindings::Get().SetPref(TEXT("AudioRange"), float(i)); }))
+			];
 			List->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 			[
-				Muted(LOCTEXT("AudioHint", "Changes apply straight away and are kept for next time. Music stays quiet most of the time while you explore."), 12, true)
+				Muted(LOCTEXT("AudioHint", "Changes apply straight away and are kept for next time. Music plays through the whole game and dips at most 4 dB under the biggest moments."), 12, true)
 			];
 			ChildSlot[List];
 		}

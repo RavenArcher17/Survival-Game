@@ -29,6 +29,10 @@
 #include "WRMainMenu.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
+#include "WRWorldSystems.h"
+#include "WRBuilding.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/ReverbEffect.h"
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -81,6 +85,8 @@ void UWRAudioDirector::Deinitialize()
 	Beds.Empty();
 	Music.Empty();
 	Held.Empty();
+	if (!Space.IsNone() && GetWorld()) UGameplayStatics::DeactivateReverbEffect(GetWorld(), TEXT("WRSpace"));
+	Space = NAME_None;
 	bStarted = false;
 	Super::Deinitialize();
 }
@@ -113,10 +119,9 @@ float UWRAudioDirector::Tune(const TCHAR* Key, float Fallback) const
 void UWRAudioDirector::Duck(float Amount, float Seconds)
 {
 	const double Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0;
-	// In the Swamp the score never drops more than 4 dB under a moment (cooks/biome-swamp.md 2.16: always audible).
-	if (Swamp > 0.5f) Amount = FMath::Min(Amount, Tune(TEXT("music.swampDuckMax"), 0.37f));
-	// The forest's score is always there too: it dips at most 4 dB (cooks/biome-forest.md 2.16).
-	if (Forest > 0.5f) Amount = FMath::Min(Amount, Tune(TEXT("music.forestDuckMax"), 0.37f));
+	// The score is always audible: no moment takes it down more than 4 dB, anywhere (FULL-GAME 3.3, fire-frost 3.5-3.6;
+	// cookpass-audio 4.1.2).
+	Amount = FMath::Min(Amount, Tune(TEXT("music.duckMax"), 0.37f));
 	DuckTarget = FMath::Min(DuckTarget, 1.f - FMath::Clamp(Amount, 0.f, 1.f));
 	DuckUntil = FMath::Max(DuckUntil, Now + Seconds);
 }
@@ -135,7 +140,10 @@ void UWRAudioDirector::Tick(float DeltaTime)
 	{
 		return;
 	}
+	Audio->StepRises();
+	Audio->ApplyDynamics(World);
 	UpdateAmbient(DeltaTime);
+	UpdateSpace();
 	UpdateMusic(DeltaTime);
 	WatchBodies();
 	// With logging on, the mixer's state every 10 s (day/night and biome changes show in the log).
@@ -554,16 +562,8 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		}
 	}
 
-	// Spot sounds: an owl now and then at night, somewhere off in the dark.
-	if (Now >= NextSpot)
-	{
-		NextSpot = Now + FMath::FRandRange(Tune(TEXT("ambient.owlEvery.min"), 25.f), Tune(TEXT("ambient.owlEvery.max"), 70.f));
-		if (LayerWeight(TEXT("night")) > 0.6f && !SWRMainMenu::IsOpen())
-		{
-			const float A = FMath::FRandRange(0.f, 2.f * PI);
-			WRSound::PlayAt(World, TEXT("amb.owl"), Listener + FVector(FMath::Cos(A), FMath::Sin(A), 0.3f) * FMath::FRandRange(2500.f, 5000.f));
-		}
-	}
+	// Spot sounds (ambient.spots): the owls at night, the crater's breath, the lake ice singing...
+	UpdateSpots(Now);
 }
 
 void UWRAudioDirector::UpdateSwamp(float DeltaTime)
@@ -644,23 +644,33 @@ UWRAudioDirector::EMusic UWRAudioDirector::WantedMusic()
 		const AActor* Mount = Me ? Me->GetAttachParentActor() : nullptr;
 		const float Range = Tune(TEXT("music.combatRange"), 5000.f);
 		const float BossRange = Tune(TEXT("music.bossRange"), 4500.f);
+		float Threat = 0.f;
+		bool bAny = false;
 		if (Me)
 		{
 			for (TActorIterator<AWRCreature> It(World); It; ++It)
 			{
-				const AWRCreature* C = *It;
+				AWRCreature* C = *It;
 				if (!C->IsAlive() || C->IsTamed() || C->IsUnconscious()) continue;
 				const float D2 = FVector::DistSquared(C->GetActorLocation(), Me->GetActorLocation());
-				if (const AWRBoss* B = Cast<AWRBoss>(C))
+				if (AWRBoss* B = Cast<AWRBoss>(C))
 				{
-					// As the HUD's boss bar: an engaged boss close by.
-					if (B->bEngaged && D2 < FMath::Square(BossRange)) { bBoss = true; BossId = B->CreatureId; BossPhase = B->Phase; }
+					// As the HUD's boss bar: an engaged boss close by. The music follows it (its fall: the stinger and the hush).
+					if (B->bEngaged && D2 < FMath::Square(BossRange)) { bBoss = true; BossId = B->CreatureId; BossPhase = B->Phase; MusicBoss = B; }
 					continue;
 				}
 				const AActor* Target = C->GetAggroRep();
-				if (Target && (Target == Me || Target == Mount) && D2 < FMath::Square(Range)) bEngaged = true;
+				if (Target && (Target == Me || Target == Mount) && D2 < FMath::Square(Range))
+				{
+					// A fight worth the music (BotW): a lone critter isn't, a wolf is (cookpass-audio 4.1.3).
+					Threat += ThreatOf(C);
+					bAny = true;
+				}
 			}
 		}
+		bEngaged = Threat >= Tune(TEXT("music.combatThreat"), 1.f)
+			|| (bAny && Now - HitAt < Tune(TEXT("music.hitHold"), 4.f))
+			|| Now - PlayerHitAt < Tune(TEXT("music.pvpHold"), 10.f);
 	}
 	if (bBoss)
 	{
@@ -701,6 +711,17 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 			// it's in now comes first.
 			ForestMusicPhase = ForestBossPhaseNow();
 			Try.Insert(FName(*FString::Printf(TEXT("boss.sylvaroth.p%d"), ForestMusicPhase)), 0);
+		}
+		// Fire and Frost (cooks/fire-frost.md 3.6): the hidden tubes' own cues (the Kiln Roads, the Blue Below), then the
+		// sub-zone C pieces (V4 the Solfatara; T4 the Ice Shelves and T5 the Glacier Plateau), then the land's pools.
+		if ((Which == EMusic::Explore) && (Land == TEXT("volcanic") || Land == TEXT("tundra")))
+		{
+			if (!Tube.IsNone()) Try.Add(FName(*FString::Printf(TEXT("sub.%s"), *Tube.ToString())));
+			if (PoolName == TEXT("explore"))
+			{
+				if (IsleZone == TEXT("V4")) Try.Add(TEXT("explore.volcanic.c"));
+				if (IsleZone == TEXT("T4") || IsleZone == TEXT("T5")) Try.Add(TEXT("explore.tundra.c"));
+			}
 		}
 		if (Which == EMusic::Explore)
 		{
@@ -817,6 +838,9 @@ void UWRAudioDirector::StartMusic(EMusic Which)
 	Held.Add(S.Comp.Get());
 	S.File = Track.File;
 	S.Base = Track.Volume;
+	S.Bpm = Track.Bpm;
+	S.Beats = Track.Beats;
+	S.Lead = Track.Lead;
 	S.Gain = 0.f;
 	S.Target = 1.f;
 	S.FadeSeconds = Which == EMusic::Combat || Which == EMusic::Boss ? Tune(TEXT("music.combatFadeIn"), 1.2f) : Tune(TEXT("music.fadeIn"), 4.f);
@@ -830,64 +854,101 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 {
 	UWorld* World = GetWorld();
 	const double Now = World->GetRealTimeSeconds();
-	const EMusic Want = WantedMusic();
-	if (Want != Mode)
+	// The bar clock: each piece's own time heard (a paused game pauses the music too).
 	{
-		const EMusic Was = Mode;
-		Mode = Want;
-		for (FStream& S : Music)
+		const double RealDt = LastRealTime > 0.0 ? FMath::Clamp(Now - LastRealTime, 0.0, 0.5) : 0.0;
+		LastRealTime = Now;
+		if (!World->IsPaused())
 		{
-			S.Target = 0.f;
-			S.FadeSeconds = Tune(Was == EMusic::Combat || Was == EMusic::Boss ? TEXT("music.combatFadeOut") : TEXT("music.fadeOut"), 4.f);
+			for (FStream& S : Music) S.Played += RealDt;
 		}
-		if (Want == EMusic::Explore)
-		{
-			// After a fight, a little quiet before the next tune; at the start, a while to take in the island.
-			const bool bAfterFight = Was == EMusic::Combat || Was == EMusic::Boss;
-			NextExploreAt = Now + (bAfterFight ? FMath::FRandRange(Tune(TEXT("music.afterCombatGap.min"), 40.f), Tune(TEXT("music.afterCombatGap.max"), 90.f))
-				: FMath::FRandRange(Tune(TEXT("music.firstGap.min"), 25.f), Tune(TEXT("music.firstGap.max"), 50.f)));
-			if (Swamp > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.swampGap.min"), 3.f), Tune(TEXT("music.swampGap.max"), 10.f));
-			if (Forest > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.forestGap.min"), 3.f), Tune(TEXT("music.forestGap.max"), 10.f));
-			if (!ForcedMode.IsNone()) NextExploreAt = Now;
-		}
-		else
-		{
-			StartMusic(Want);
-		}
-		UE_LOG(LogWildreach, Log, TEXT("MUSIC mode %d -> %d"), static_cast<int32>(Was), static_cast<int32>(Want));
 	}
-	else if (Mode == EMusic::Boss && BossPhase != MusicPhase && !BossId.IsNone()
+	// Dead (or between lives): the music dips by the cap and no new piece starts until you're back.
+	const APawn* DeadPawn = MyPawn.Get();
+	const AWRCharacterBase* DeadBody = Cast<AWRCharacterBase>(DeadPawn);
+	const bool bDead = !SWRMainMenu::IsOpen() && (!DeadPawn || (DeadBody && !DeadBody->IsAlive()));
+	DeadDip = FMath::FInterpConstantTo(DeadDip, bDead ? 1.f - Tune(TEXT("music.duckMax"), 0.37f) : 1.f, DeltaTime, 0.5f);
+
+	// A change of mode waits for the playing piece's beat (into a fight) or bar line (anything else): cookpass-audio 4.1.4.
+	const EMusic Want = WantedMusic();
+	if (Want == Mode)
+	{
+		bPending = false;
+	}
+	else
+	{
+		if (!bPending || PendingMode != Want)
+		{
+			bPending = true;
+			PendingMode = Want;
+			float Wait = 0.f;
+			const FStream* Cur = Music.Num() > 0 && Music.Last().Target > 0.f ? &Music.Last() : nullptr;
+			if (Cur && Mode != EMusic::Menu && Want != EMusic::Menu && ForcedMode.IsNone())
+			{
+				Wait = NextBoundary(*Cur, !(Want == EMusic::Combat || Want == EMusic::Boss));
+			}
+			PendingAt = Now + Wait;
+		}
+		if (Now >= PendingAt)
+		{
+			bPending = false;
+			SwitchMode(Want, Now);
+		}
+	}
+	if (Mode == EMusic::Boss && BossPhase != MusicPhase && !BossId.IsNone()
 		&& UWRAudioSubsystem::Get(World)->GetMusicPool(FName(*FString::Printf(TEXT("boss.%s.p%d"), *BossId.ToString(), BossPhase))))
 	{
-		// The boss turned a phase and has music for it: the old phase's piece fades as the new one comes in.
-		for (FStream& S : Music)
+		// The boss turned a phase and has music for it: on the old piece's next bar line the old phase's piece fades as
+		// the new one comes in (fire-frost 3.6: boss sections resequence on the bar).
+		if (PhaseSwitchAt <= 0.0)
 		{
-			S.Target = 0.f;
-			S.FadeSeconds = Tune(TEXT("music.combatFadeOut"), 3.f);
+			const FStream* Cur = Music.Num() > 0 && Music.Last().Target > 0.f ? &Music.Last() : nullptr;
+			PhaseSwitchAt = Now + (Cur ? NextBoundary(*Cur, true) : 0.f);
 		}
-		StartMusic(EMusic::Boss);
+		if (Now >= PhaseSwitchAt)
+		{
+			PhaseSwitchAt = 0.0;
+			for (FStream& S : Music)
+			{
+				S.Target = 0.f;
+				S.FadeSeconds = Tune(TEXT("music.combatFadeOut"), 3.f);
+			}
+			StartMusic(EMusic::Boss);
+		}
+	}
+	else
+	{
+		PhaseSwitchAt = 0.0;
 	}
 	MusicPhase = Mode == EMusic::Boss ? MusicPhase : BossPhase;
+	// Fades waiting for their bar line.
+	for (FStream& S : Music)
+	{
+		if (S.FadeAt > 0.0 && Now >= S.FadeAt)
+		{
+			S.FadeAt = 0.0;
+			S.Target = 0.f;
+		}
+	}
 	if (Mode == EMusic::Explore)
 	{
 		FStream* Current = Music.Num() > 0 && Music.Last().Target > 0.f ? &Music.Last() : nullptr;
-		if (!Current && Now >= NextExploreAt)
+		if (!Current && Now >= NextExploreAt && Now >= HushUntil && !bDead)
 		{
 			StartMusic(EMusic::Explore);
 		}
-		else if (Current)
+		else if (Current && Current->FadeAt <= 0.0)
 		{
 			const bool bOver = !Current->Comp.IsValid() || !Current->Comp->IsPlaying();
-			if (bOver || Now - Current->StartedAt > Tune(TEXT("music.exploreMaxSeconds"), 200.f))
+			if (bOver || Now - Current->StartedAt > Tune(TEXT("music.exploreMaxSeconds"), 240.f))
 			{
-				// Sparse, not constant: the tune ends (or fades after a while), then quiet for a few minutes.
-				Current->Target = 0.f;
+				// The piece ends (or, a long one, on a bar line after a while), then a breath and the next: the score is
+				// always there (FULL-GAME 3.3: no engine silences; music.gap is a breath of a few seconds).
+				if (bOver) Current->Target = 0.f;
+				else FadeOnBar(*Current, Tune(TEXT("music.fadeOut"), 4.f));
 				Current->FadeSeconds = Tune(TEXT("music.fadeOut"), 4.f);
-				NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.gap.min"), 120.f), Tune(TEXT("music.gap.max"), 300.f));
-				// The Swamp's score is always there (cooks/biome-swamp.md 2.16): only a breath between pieces.
-				if (Swamp > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.swampGap.min"), 3.f), Tune(TEXT("music.swampGap.max"), 10.f));
-				// The forest's too (cooks/biome-forest.md 2.16: no planned silences).
-				if (Forest > 0.5f) NextExploreAt = Now + FMath::FRandRange(Tune(TEXT("music.forestGap.min"), 3.f), Tune(TEXT("music.forestGap.max"), 10.f));
+				const double From = Current->FadeAt > 0.0 ? Current->FadeAt : Now;
+				NextExploreAt = From + FMath::FRandRange(Tune(TEXT("music.gap.min"), 4.f), Tune(TEXT("music.gap.max"), 10.f));
 			}
 		}
 	}
@@ -900,7 +961,20 @@ void UWRAudioDirector::UpdateMusic(float DeltaTime)
 	DuckLevel = FMath::FInterpTo(DuckLevel, DuckTarget, DeltaTime, DuckTarget < DuckLevel ? 10.f : 1.2f);
 	// The planned silence takes the music too (8 s out, 8 s back); a fight inside it keeps half (biome-void 2.9, 2.16).
 	const float Silence = Mode == EMusic::Combat || Mode == EMusic::Boss ? Hush * 0.5f : Hush;
-	const float Gain = WRSound::CategoryGain(TEXT("music")) * DuckLevel * (1.f - Silence);
+	const float Gain = WRSound::CategoryGain(TEXT("music")) * DuckLevel * DeadDip * (1.f - Silence);
+	// Fire and Frost's events (cooks/fire-frost.md 3.6): the Eruption's war drums and the Whiteout's low pulse over whatever
+	// plays in their land, from the warning (five minutes ahead) to the end.
+	{
+		const AWRWorldState* WS = AWRWorldState::Get(World);
+		const FName HereLand = WRBiome::At(World, Listener);
+		const auto EventOn = [WS, &HereLand](const TCHAR* Id)
+		{
+			const FWRWorldEventRep* E = WS ? WS->Event(FName(Id)) : nullptr;
+			return E && E->Stage <= 1 && E->Biome == HereLand;
+		};
+		StepMusicLayer(EruptionLayer, EventOn(TEXT("eruption")), TEXT("layer.eruption"), DeltaTime, Gain);
+		StepMusicLayer(WhiteoutLayer, EventOn(TEXT("whiteout")), TEXT("layer.whiteout"), DeltaTime, Gain);
+	}
 	// The Great Storm: war drums and choir over whatever plays while it rages round you (DC 2.15).
 	StepMusicLayer(GreatStormLayer, WRStorm::GreatStorm(World) && WRBiome::At(World, Listener) == TEXT("storm_peaks"), TEXT("layer.great_storm"), DeltaTime, Gain);
 	// The Red Tide: a sub-bass pulse and a second, faster heartbeat over whatever plays in the swamp (cooks/biome-swamp.md 2.16).
@@ -1090,6 +1164,22 @@ int32 UWRAudioDirector::ForestBossPhaseNow() const
 void UWRAudioDirector::OnHitShown(const AActor* Target, float Damage, EWRHitResult Result)
 {
 	const AWRCharacterBase* C = Cast<AWRCharacterBase>(Target);
+	if (C && C->GetWorld() == GetWorld() && Result != EWRHitResult::Ignored && GetWorld())
+	{
+		// The music's view of a fight (cookpass-audio 4.1.3): a blow on you, and any blow between you and another player.
+		const double Now = GetWorld()->GetRealTimeSeconds();
+		const APawn* Me = MyPawn.Get();
+		const AActor* Source = C->HitSourceShown.Get();
+		if (Me && C == Me)
+		{
+			HitAt = Now;
+			if (Source && Source != Me && Source->IsA<AWRCharacter>()) PlayerHitAt = Now;
+		}
+		else if (Me && Source == Me && C->IsA<AWRCharacter>())
+		{
+			PlayerHitAt = Now;
+		}
+	}
 	if (Result != EWRHitResult::Hit || !C || C->GetWorld() != GetWorld() || !C->IsAlive())
 	{
 		return;   // a block or parry has its own clang (the hit site plays it); the dead get a death call instead
@@ -1180,6 +1270,23 @@ void UWRAudioDirector::WatchBodies()
 					QueueAnswer(Creature, Now);
 				}
 			}
+			// Asleep: a slow breath now and then, heard only close (cookpass-audio 4.8): small animals breathe fast, big
+			// ones slow. creature.<size>.sleep (or the species' or family's own row).
+			if (Creature->bAsleep && !Creature->IsUnconscious() && D2 < FMath::Square(Tune(TEXT("ambient.sleepRange"), 1200.f)))
+			{
+				if (Now >= B->NextBreath)
+				{
+					if (B->NextBreath > 0.0) WRSound::Voice(Creature, TEXT("sleep"));
+					const FWRCreatureDef* SDef = Creature->GetDef();
+					const float SizeCm = SDef ? FMath::Max(SDef->Radius, SDef->HalfHeight * 0.8f) : 50.f;
+					const float Every = SizeCm < 35.f ? Tune(TEXT("ambient.sleepEvery.small"), 2.2f) : SizeCm < 70.f ? Tune(TEXT("ambient.sleepEvery.medium"), 3.4f) : Tune(TEXT("ambient.sleepEvery.large"), 5.5f);
+					B->NextBreath = Now + Every * FMath::FRandRange(0.8f, 1.2f);
+				}
+			}
+			else
+			{
+				B->NextBreath = 0.0;
+			}
 			// Its mood's calls (cookpass-creatures 3.4): the alarm when it turns wary of someone (not too often), a cry as
 			// it bolts.
 			const uint8 Mood = Creature->MoodRep;
@@ -1266,6 +1373,9 @@ FString UWRAudioDirector::Describe() const
 		Out += FString::Printf(TEXT(" (next in %.0fs)"), NextExploreAt - GetWorld()->GetRealTimeSeconds());
 	}
 	if (DuckLevel < 0.99f) Out += FString::Printf(TEXT(" duck %.2f"), DuckLevel);
+	if (bPending && GetWorld()) Out += FString::Printf(TEXT(" (change in %.1fs)"), PendingAt - GetWorld()->GetRealTimeSeconds());
+	if (!Space.IsNone()) Out += FString::Printf(TEXT(" space %s"), *Space.ToString());
+	if (!Tube.IsNone()) Out += FString::Printf(TEXT(" tube %s"), *Tube.ToString());
 	Out += FString::Printf(TEXT(" | at %.0f,%.0f,%.0f tundra %.2f day %.2f coast %.2f cave %.2f lava %.2f high %.2f | beds"), Listener.X, Listener.Y, Listener.Z,
 		Tundra, Daylight, Coast, Cave, Lava, High);
 	if (Forest > 0.f || ForestZone[6] > 0.f) Out += FString::Printf(TEXT(" forest %.2f zones %.2f/%.2f/%.2f/%.2f/%.2f hollow %.2f falls %.2f"), Forest,
@@ -1276,4 +1386,256 @@ FString UWRAudioDirector::Describe() const
 		if (B.Value.Comp.IsValid()) Out += FString::Printf(TEXT(" %s@%.2f"), *B.Key.ToString(), B.Value.Gain);
 	}
 	return Out;
+}
+
+// ---------------------------------------------------------------- the bar clock, mode switches, threat (cookpass-audio 4.1)
+
+float UWRAudioDirector::NextBoundary(const FStream& S, bool bBar) const
+{
+	if (S.Bpm <= 1.f)
+	{
+		return 0.f;
+	}
+	const double Unit = 60.0 / S.Bpm * (bBar ? FMath::Max(1, S.Beats) : 1);
+	const double T = S.Played - S.Lead;
+	double Wait = T < 0.0 ? -T : Unit - FMath::Fmod(T, Unit);
+	if (Wait < 0.04 || Wait > Unit - 0.001) Wait = 0.0;   // right on it
+	return FMath::Min(static_cast<float>(Wait), Tune(TEXT("music.syncMax"), 4.f));
+}
+
+void UWRAudioDirector::FadeOnBar(FStream& S, float Seconds)
+{
+	S.FadeSeconds = Seconds;
+	const float Wait = NextBoundary(S, true);
+	if (Wait <= 0.f || !GetWorld())
+	{
+		S.Target = 0.f;
+		S.FadeAt = 0.0;
+		return;
+	}
+	S.FadeAt = GetWorld()->GetRealTimeSeconds() + Wait;
+}
+
+void UWRAudioDirector::SwitchMode(EMusic Want, double Now)
+{
+	UWorld* World = GetWorld();
+	const EMusic Was = Mode;
+	Mode = Want;
+	const bool bIntoFight = Want == EMusic::Combat || Want == EMusic::Boss;
+	// The boss the music followed has fallen (not just walked off): Dark Souls' breath, MH's cadence.
+	const bool bFell = Was == EMusic::Boss && Want != EMusic::Boss && MusicBoss.IsValid() && !MusicBoss->IsAlive();
+	for (FStream& S : Music)
+	{
+		S.Target = 0.f;
+		S.FadeAt = 0.0;
+		// We're on its beat (into a fight: the old piece releases under the stinger) or its bar line (anything else).
+		S.FadeSeconds = bIntoFight ? Tune(TEXT("music.releaseIntoFight"), 2.f)
+			: bFell ? Tune(TEXT("music.bossFallRelease"), 2.f)
+			: Tune(Was == EMusic::Combat || Was == EMusic::Boss ? TEXT("music.combatFadeOut") : TEXT("music.fadeOut"), 4.f);
+	}
+	if (Want == EMusic::Explore)
+	{
+		// After a fight, a breath; at the start, a breath to take in the island (no engine silences: FULL-GAME 3.3).
+		const bool bAfterFight = Was == EMusic::Combat || Was == EMusic::Boss;
+		NextExploreAt = Now + (bAfterFight ? FMath::FRandRange(Tune(TEXT("music.afterCombatGap.min"), 4.f), Tune(TEXT("music.afterCombatGap.max"), 9.f))
+			: FMath::FRandRange(Tune(TEXT("music.firstGap.min"), 3.f), Tune(TEXT("music.firstGap.max"), 8.f)));
+		if (bFell)
+		{
+			// The boss's piece ends, its cadence plays, and the land holds its breath before its own music comes back: the
+			// one engine silence left, planned (cookpass-audio 4.1.6).
+			WRSound::PlayUI(World, TEXT("music.sting.boss_fall"));
+			HushUntil = Now + Tune(TEXT("music.bossHush"), 12.f);
+			NextExploreAt = FMath::Max(NextExploreAt, HushUntil);
+		}
+		if (!ForcedMode.IsNone()) NextExploreAt = Now;
+	}
+	else
+	{
+		StartMusic(Want);
+		if (Want == EMusic::Combat && Was != EMusic::Boss)
+		{
+			// The entry hit hides the change (RDR2): the land's own drum, else the shared one.
+			const FName Land = WRBiome::At(World, Listener);
+			const FName Own(*FString::Printf(TEXT("music.sting.combat.%s"), *Land.ToString()));
+			WRSound::PlayUI(World, WRSound::Has(Own) ? Own : FName(TEXT("music.sting.combat")));
+		}
+	}
+	if (Want != EMusic::Boss && !bFell) MusicBoss.Reset();
+	UE_LOG(LogWildreach, Log, TEXT("MUSIC mode %d -> %d%s"), static_cast<int32>(Was), static_cast<int32>(Want), bFell ? TEXT(" (the boss fell)") : TEXT(""));
+}
+
+float UWRAudioDirector::ThreatOf(const AWRCreature* C) const
+{
+	const FWRCreatureDef* Def = C ? C->GetDef() : nullptr;
+	if (!Def)
+	{
+		return Tune(TEXT("music.threat.medium"), 1.f);
+	}
+	if (Def->Role.Contains(TEXT("boss")) || Def->Tier == TEXT("boss")) return Tune(TEXT("music.threat.mini"), 3.f);
+	if (Def->Archetype == TEXT("critter")) return Tune(TEXT("music.threat.critter"), 0.25f);
+	const float SizeCm = FMath::Max(Def->Radius, Def->HalfHeight * 0.8f);
+	return SizeCm < 35.f ? Tune(TEXT("music.threat.small"), 0.5f) : SizeCm < 70.f ? Tune(TEXT("music.threat.medium"), 1.f) : Tune(TEXT("music.threat.large"), 1.5f);
+}
+
+FName UWRAudioDirector::TubeAt() const
+{
+	// The hidden sub-biomes (world.json hidden): a rock-roofed tube along its route; inside it within music.tubeReach of
+	// the route and not far above or below it.
+	const float Reach = Tune(TEXT("music.tubeReach"), 450.f);
+	for (const TWeakObjectPtr<AActor>& Weak : Tubes)
+	{
+		const AWRHiddenTube* T = Cast<AWRHiddenTube>(Weak.Get());
+		if (!T || T->Route.Num() < 2) continue;
+		for (int32 i = 0; i + 1 < T->Route.Num(); ++i)
+		{
+			const FVector P = FMath::ClosestPointOnSegment(Listener, T->Route[i], T->Route[i + 1]);
+			if (FVector::Dist2D(P, Listener) < Reach && FMath::Abs(Listener.Z - P.Z) < Tune(TEXT("music.tubeHeight"), 900.f))
+			{
+				return T->TubeId;
+			}
+		}
+	}
+	return NAME_None;
+}
+
+// ---------------------------------------------------------------- spaces (cookpass-audio 4.3)
+
+bool UWRAudioDirector::UnderBuiltRoof() const
+{
+	// A built room: a piece overhead within 6 m and walls (built pieces) on at least three of four sides within 6 m.
+	const UWorld* World = GetWorld();
+	const APawn* Me = MyPawn.Get();
+	if (!World || !Me)
+	{
+		return false;
+	}
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(WRRoom), false, Me);
+	const FVector Head = Listener + FVector(0.f, 0.f, 60.f);
+	const float Reach = Tune(TEXT("ambient.roomReach"), 600.f);
+	FHitResult Hit;
+	if (!World->LineTraceSingleByChannel(Hit, Head, Head + FVector(0.f, 0.f, Reach), ECC_Visibility, Q) || !Cast<AWRBuildPiece>(Hit.GetActor()))
+	{
+		return false;
+	}
+	int32 Walls = 0;
+	const FVector Dirs[4] = { FVector(1.f, 0.f, 0.f), FVector(-1.f, 0.f, 0.f), FVector(0.f, 1.f, 0.f), FVector(0.f, -1.f, 0.f) };
+	for (const FVector& D : Dirs)
+	{
+		if (World->LineTraceSingleByChannel(Hit, Head, Head + D * Reach, ECC_Visibility, Q) && Cast<AWRBuildPiece>(Hit.GetActor())) ++Walls;
+	}
+	return Walls >= 3;
+}
+
+FName UWRAudioDirector::SpaceNow() const
+{
+	// Highest first (the table order in cooks/cookpass-audio.md 4.3): water, the dead vault, the named halls, the
+	// caverns, the tubes, a fold, a cave, a built room; open air has none.
+	if (UnderBlend > 0.5f) return TEXT("underwater");
+	if (WRCrystal::Live() && WRCrystal::InVault(Listener)) return TEXT("vault");
+	if (WROcean::Live() && WROcean::InHall(Listener)) return TEXT("drowned_hall");
+	if (SwampCoven > 0.5f) return TEXT("coven");
+	if (ForestZone[6] > 0.5f) return TEXT("hollow_root");
+	if (WRFungal::Live() && WRFungal::InCave(Listener))
+	{
+		return FungalZone == TEXT("F3") ? FName(TEXT("fungal_hall")) : FungalZone == TEXT("F4") ? FName(TEXT("fungal_web")) : FName(TEXT("fungal_cave"));
+	}
+	if (WRCrystal::Live() && WRCrystal::InCave(Listener)) return TEXT("crystal");
+	if (!Tube.IsNone()) return TEXT("tube");
+	if (!WRPortals::FoldBiome(GetWorld(), Listener).IsNone()) return TEXT("fold");
+	if (Cave > 0.5f) return TEXT("cave");
+	if (bRoof) return TEXT("room");
+	return NAME_None;
+}
+
+void UWRAudioDirector::UpdateSpace()
+{
+	UWorld* World = GetWorld();
+	UWRAudioSubsystem* Audio = UWRAudioSubsystem::Get(World);
+	if (!World || !Audio)
+	{
+		return;
+	}
+	const double Now = World->GetRealTimeSeconds();
+	if (Now >= NextTubeScan)
+	{
+		NextTubeScan = Now + 5.0;
+		Tubes.Reset();
+		for (TActorIterator<AWRHiddenTube> It(World); It; ++It) Tubes.Add(*It);
+	}
+	Tube = TubeAt();
+	if (Now >= NextRoofCheck)
+	{
+		NextRoofCheck = Now + 0.5;
+		bRoof = UnderBuiltRoof();
+	}
+	const FName Want = SWRMainMenu::IsOpen() ? NAME_None : SpaceNow();
+	if (Want == Space)
+	{
+		return;
+	}
+	Space = Want;
+	const FWRSpaceDef* Def = Space.IsNone() ? nullptr : Audio->FindSpace(Space);
+	UReverbEffect* Effect = Def && !Def->bDry ? Audio->SpaceEffect(Space) : nullptr;
+	if (Effect)
+	{
+		UGameplayStatics::ActivateReverbEffect(World, Effect, TEXT("WRSpace"), 1.f, FMath::Clamp(Def->Wet, 0.f, 1.f), Def->Fade);
+	}
+	else
+	{
+		UGameplayStatics::DeactivateReverbEffect(World, TEXT("WRSpace"));
+	}
+	if (Audio->IsLogging()) Audio->Log(FString::Printf(TEXT("space %s"), Space.IsNone() ? TEXT("open air") : *Space.ToString()));
+}
+
+// ---------------------------------------------------------------- spot sounds (cookpass-audio 4.6)
+
+void UWRAudioDirector::UpdateSpots(double Now)
+{
+	UWorld* World = GetWorld();
+	const UWRAudioSubsystem* Audio = UWRAudioSubsystem::Get(World);
+	if (!Audio || SWRMainMenu::IsOpen() || Hush > 0.5f)
+	{
+		return;
+	}
+	for (const FWRAmbientSpot& Spot : Audio->GetSpots())
+	{
+		double& Next = SpotNext.FindOrAdd(Spot.Id, 0.0);
+		if (Next <= 0.0)
+		{
+			// First seen: somewhere in its first interval, so spots don't all fire together on arrival.
+			Next = Now + FMath::FRandRange(Spot.Every.X * 0.3f, Spot.Every.Y);
+			continue;
+		}
+		if (Now < Next)
+		{
+			continue;
+		}
+		Next = Now + FMath::FRandRange(Spot.Every.X, FMath::Max(Spot.Every.X, Spot.Every.Y));
+		float W = 0.f;
+		for (const FName& L : Spot.Layers) W = FMath::Max(W, LayerWeight(L));
+		if (Spot.DayNight == 1) W *= Daylight;
+		if (Spot.DayNight == 2) W *= 1.f - Daylight;
+		if (W < Spot.Min)
+		{
+			continue;
+		}
+		FVector Where;
+		if (Spot.bAt)
+		{
+			// From its place (the crater itself): only within reach, on the ground there plus its height.
+			const FVector Place(Spot.At.X * 100.f, Spot.At.Y * 100.f, Listener.Z);
+			if (FVector::Dist2D(Place, Listener) > Spot.Reach * 100.f) continue;
+			FHitResult Hit;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRSpot), false);
+			const float Ground = World->LineTraceSingleByChannel(Hit, Place + FVector(0.f, 0.f, 60000.f), Place - FVector(0.f, 0.f, 60000.f), ECC_WorldStatic, Q) ? Hit.ImpactPoint.Z : Listener.Z;
+			Where = FVector(Place.X, Place.Y, Ground + FMath::FRandRange(Spot.Up.X, Spot.Up.Y) * 100.f);
+		}
+		else
+		{
+			const float A = FMath::FRandRange(0.f, 2.f * PI);
+			const float D = FMath::FRandRange(Spot.Dist.X, FMath::Max(Spot.Dist.X, Spot.Dist.Y)) * 100.f;
+			Where = Listener + FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, FMath::FRandRange(Spot.Up.X, Spot.Up.Y) * 100.f);
+		}
+		WRSound::PlayAt(World, Spot.Event, Where);
+	}
 }

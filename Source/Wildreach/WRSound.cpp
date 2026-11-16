@@ -10,6 +10,7 @@
 #include "WRBoss.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
+#include "WRKeyBindings.h"
 #include "Async/ParallelFor.h"
 #include "AudioMixerBlueprintLibrary.h"
 #include "AudioDevice.h"
@@ -34,6 +35,8 @@
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundGenerator.h"
+#include "Sound/ReverbEffect.h"
+#include "SubmixEffects/AudioMixerSubmixEffectDynamicsProcessor.h"
 
 // Helpers live in a named namespace: unity builds join this file with others.
 namespace WRSoundDetail
@@ -362,8 +365,63 @@ bool UWRAudioSubsystem::EnsureLoaded()
 			E.MinGap = JsonNum(O, TEXT("minGap"), JsonNum(Defaults, TEXT("minGap"), 0.05f));
 			E.MaxVoices = FMath::RoundToInt(JsonNum(O, TEXT("maxVoices"), JsonNum(Defaults, TEXT("maxVoices"), 6.f)));
 			E.Duck = JsonNum(O, TEXT("duck"), 0.f);
+			const TArray<TSharedPtr<FJsonValue>>* Rise = nullptr;
+			if (O->TryGetArrayField(TEXT("rise"), Rise) && Rise->Num() >= 3)
+			{
+				E.Rise = FVector((*Rise)[0]->AsNumber(), (*Rise)[1]->AsNumber(), FMath::Max(0.05, (*Rise)[2]->AsNumber()));
+			}
+			O->TryGetStringField(TEXT("caption"), E.Caption);
+			O->TryGetBoolField(TEXT("danger"), E.bDanger);
 			for (const FString& F : E.Files) ShortFiles.Add(F);
 			Events.Add(E.Name, E);
+		}
+	}
+
+	// Default captions for creature calls by kind (creature.<anything>.<kind> with no caption of its own): ["text", danger].
+	const TSharedPtr<FJsonObject>* CapObj = nullptr;
+	if (Root->TryGetObjectField(TEXT("captionDefaults"), CapObj))
+	{
+		for (TPair<FName, FWRSoundEvent>& Pair : Events)
+		{
+			FWRSoundEvent& E = Pair.Value;
+			const FString Name = Pair.Key.ToString();
+			if (!E.Caption.IsEmpty() || !Name.StartsWith(TEXT("creature."))) continue;
+			const FString Kind = FPaths::GetExtension(Name);   // the part after the last dot
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			if ((*CapObj)->TryGetArrayField(Kind, Arr) && Arr->Num() >= 1)
+			{
+				E.Caption = (*Arr)[0]->AsString();
+				E.bDanger = Arr->Num() > 1 && (*Arr)[1]->AsBool();
+			}
+		}
+	}
+
+	// Reverb spaces (cookpass-audio 4.3).
+	const TSharedPtr<FJsonObject>* SpacesObj = nullptr;
+	if (Root->TryGetObjectField(TEXT("spaces"), SpacesObj))
+	{
+		for (const auto& Pair : (*SpacesObj)->Values)
+		{
+			const FString Key(*Pair.Key);
+			if (Key.StartsWith(TEXT("_")) || Pair.Value->Type != EJson::Object) continue;
+			const TSharedPtr<FJsonObject> O = Pair.Value->AsObject();
+			FWRSpaceDef D;
+			D.Id = FName(*Key);
+			D.Decay = JsonNum(O, TEXT("decay"), D.Decay);
+			D.Density = JsonNum(O, TEXT("density"), D.Density);
+			D.Diffusion = JsonNum(O, TEXT("diffusion"), D.Diffusion);
+			D.Gain = JsonNum(O, TEXT("gain"), D.Gain);
+			D.GainHF = JsonNum(O, TEXT("gainHF"), D.GainHF);
+			D.DecayHFRatio = JsonNum(O, TEXT("decayHF"), D.DecayHFRatio);
+			D.ReflectionsGain = JsonNum(O, TEXT("reflections"), D.ReflectionsGain);
+			D.ReflectionsDelay = JsonNum(O, TEXT("reflectionsDelay"), D.ReflectionsDelay);
+			D.LateGain = JsonNum(O, TEXT("late"), D.LateGain);
+			D.LateDelay = JsonNum(O, TEXT("lateDelay"), D.LateDelay);
+			D.AirAbsorptionHF = JsonNum(O, TEXT("air"), D.AirAbsorptionHF);
+			D.Wet = JsonNum(O, TEXT("wet"), D.Wet);
+			D.Fade = JsonNum(O, TEXT("fade"), D.Fade);
+			O->TryGetBoolField(TEXT("dry"), D.bDry);
+			Spaces.Add(D.Id, D);
 		}
 	}
 
@@ -400,7 +458,7 @@ bool UWRAudioSubsystem::EnsureLoaded()
 		}
 	}
 	// Ambient beds and music: numbers into Settings ("ambient.x" / "music.x"), files stream.
-	for (const TCHAR* Section : { TEXT("ambient"), TEXT("music") })
+	for (const TCHAR* Section : { TEXT("ambient"), TEXT("music"), TEXT("dynamics") })
 	{
 		const TSharedPtr<FJsonObject>* S = nullptr;
 		if (!Root->TryGetObjectField(Section, S)) continue;
@@ -434,6 +492,43 @@ bool UWRAudioSubsystem::EnsureLoaded()
 					Beds.Add(Bed);
 				}
 			}
+			// Spot sounds (cookpass-audio 4.6).
+			const TArray<TSharedPtr<FJsonValue>>* SpotList = nullptr;
+			if ((*S)->TryGetArrayField(TEXT("spots"), SpotList))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *SpotList)
+				{
+					const TSharedPtr<FJsonObject> O = V->AsObject();
+					if (!O.IsValid()) continue;
+					FWRAmbientSpot Spot;
+					Spot.Id = FName(*O->GetStringField(TEXT("id")));
+					Spot.Event = FName(*O->GetStringField(TEXT("event")));
+					const TArray<TSharedPtr<FJsonValue>>* Layers = nullptr;
+					if (O->TryGetArrayField(TEXT("layers"), Layers))
+					{
+						for (const TSharedPtr<FJsonValue>& L : *Layers) Spot.Layers.Add(FName(*L->AsString()));
+					}
+					FString When;
+					if (O->TryGetStringField(TEXT("when"), When)) Spot.DayNight = When == TEXT("day") ? 1 : When == TEXT("night") ? 2 : 0;
+					Spot.Min = JsonNum(O, TEXT("min"), Spot.Min);
+					const auto Range = [&O](const TCHAR* Field, FVector2D& Out)
+					{
+						const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+						if (O->TryGetArrayField(Field, A) && A->Num() >= 2) Out = FVector2D((*A)[0]->AsNumber(), (*A)[1]->AsNumber());
+					};
+					Range(TEXT("every"), Spot.Every);
+					Range(TEXT("dist"), Spot.Dist);
+					Range(TEXT("up"), Spot.Up);
+					const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
+					if (O->TryGetArrayField(TEXT("at"), At) && At->Num() >= 2)
+					{
+						Spot.bAt = true;
+						Spot.At = FVector2D((*At)[0]->AsNumber(), (*At)[1]->AsNumber());
+					}
+					Spot.Reach = JsonNum(O, TEXT("reach"), Spot.Reach);
+					if (!Spot.Event.IsNone() && Spot.Layers.Num() > 0) Spots.Add(Spot);
+				}
+			}
 		}
 		else
 		{
@@ -447,7 +542,13 @@ bool UWRAudioSubsystem::EnsureLoaded()
 					{
 						const TSharedPtr<FJsonObject> O = V->AsObject();
 						if (!O.IsValid()) continue;
-						Pool.Add({ O->GetStringField(TEXT("file")), JsonNum(O, TEXT("volume"), 1.f) });
+						FWRMusicTrack T;
+						T.File = O->GetStringField(TEXT("file"));
+						T.Volume = JsonNum(O, TEXT("volume"), 1.f);
+						T.Bpm = JsonNum(O, TEXT("bpm"), 0.f);
+						T.Beats = FMath::Max(1, FMath::RoundToInt(JsonNum(O, TEXT("beats"), 4.f)));
+						T.Lead = JsonNum(O, TEXT("lead"), 0.f);
+						Pool.Add(T);
 					}
 				}
 			}
@@ -475,8 +576,8 @@ bool UWRAudioSubsystem::EnsureLoaded()
 		Bytes += Decoded[i]->Pcm.Num() * sizeof(int16);
 	}
 	bLoaded = true;
-	UE_LOG(LogWildreach, Log, TEXT("AUDIO table: %d events, %d sounds (%.1f MB decoded), %d ambient beds, %d music pools, in %.0f ms"),
-		Events.Num(), Sounds.Num(), Bytes / (1024.0 * 1024.0), Beds.Num(), MusicPools.Num(), (FPlatformTime::Seconds() - Start) * 1000.0);
+	UE_LOG(LogWildreach, Log, TEXT("AUDIO table: %d events, %d sounds (%.1f MB decoded), %d ambient beds, %d spots, %d spaces, %d music pools, in %.0f ms"),
+		Events.Num(), Sounds.Num(), Bytes / (1024.0 * 1024.0), Beds.Num(), Spots.Num(), Spaces.Num(), MusicPools.Num(), (FPlatformTime::Seconds() - Start) * 1000.0);
 	return true;
 }
 
@@ -617,6 +718,14 @@ USoundAttenuation* UWRAudioSubsystem::AttenuationFor(float Radius)
 	// Right on top of the listener a sound isn't panned hard to one ear.
 	S.NonSpatializedRadiusStart = 150.f;
 	S.NonSpatializedRadiusEnd = 50.f;
+	// The space's reverb (cookpass-audio 4.3): a little near, more far off, as in a real room or cave. Open air has no
+	// reverb active, so outdoors this sends to nothing.
+	S.bEnableReverbSend = true;
+	S.ReverbSendMethod = EReverbSendMethod::Linear;
+	S.ReverbWetLevelMin = 0.25f;
+	S.ReverbWetLevelMax = 0.6f;
+	S.ReverbDistanceMin = S.AttenuationShapeExtents.X;
+	S.ReverbDistanceMax = Radius;
 	Attenuations.Add(Key, A);
 	return A;
 }
@@ -733,6 +842,37 @@ UAudioComponent* UWRAudioSubsystem::Play(const FPlay& P)
 	}
 	Played.FindOrAdd(P.Event)++;
 	Playing.Add(Comp);
+	// A tell that rises toward its strike (cookpass-audio 4.5).
+	if (E->Rise.Z > 0.f)
+	{
+		Comp->SetPitchMultiplier(Pitch * E->Rise.X);
+		Rising.Add({ Comp, Now, E->Rise, Pitch });
+	}
+	// Its caption, for a sound heard from somewhere else (never the local player's own, never 2D).
+	if (!b2D && !E->Caption.IsEmpty() && WRSoundCaptions::Mode() > 0)
+	{
+		const APlayerController* CPC = World->GetFirstPlayerController();
+		const APawn* Me = CPC ? CPC->GetPawn() : nullptr;
+		if (!Follow || (Follow != Me && Follow != (Me ? Me->GetAttachParentActor() : nullptr)))
+		{
+			FString Text = E->Caption;
+			if (Text.Contains(TEXT("{who}")))
+			{
+				FString Who = TEXT("Something");
+				if (const AWRCreature* C = Cast<AWRCreature>(Follow))
+				{
+					const FWRCreatureDef* Def = C->GetDef();
+					if (Def && !Def->Name.IsEmpty()) Who = Def->Name;
+				}
+				else if (Follow && Follow->IsA<AWRCharacter>())
+				{
+					Who = TEXT("Someone");
+				}
+				Text.ReplaceInline(TEXT("{who}"), *Who);
+			}
+			WRSoundCaptions::Push(Text, E->bDanger, Where, Follow, E->Radius);
+		}
+	}
 	if (E->Duck > 0.f)
 	{
 		if (UWRAudioDirector* D = UWRAudioDirector::Get(World))
@@ -1051,6 +1191,175 @@ void WRSound::Footstep(AActor* Actor, float VolumeScale)
 	const float Half = Character ? Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
 	// Per actor: two feet of one body don't hold each other back as much as a stampede would.
 	PlayEvent(Actor, Event, Actor->GetActorLocation() - FVector(0.f, 0.f, Half), Actor, false, VolumeScale, Pitch);
+}
+
+// ---------------------------------------------------------------- spaces, rising tells, dynamics (cookpass-audio)
+
+UReverbEffect* UWRAudioSubsystem::SpaceEffect(FName Id)
+{
+	if (TObjectPtr<UReverbEffect>* Found = SpaceEffects.Find(Id))
+	{
+		return *Found;
+	}
+	const FWRSpaceDef* D = Spaces.Find(Id);
+	if (!D || D->bDry)
+	{
+		return nullptr;
+	}
+	UReverbEffect* R = NewObject<UReverbEffect>(this);
+	R->Density = FMath::Clamp(D->Density, 0.f, 1.f);
+	R->Diffusion = FMath::Clamp(D->Diffusion, 0.f, 1.f);
+	R->Gain = FMath::Clamp(D->Gain, 0.f, 0.99f);
+	R->GainHF = FMath::Clamp(D->GainHF, 0.f, 1.f);
+	R->DecayTime = FMath::Clamp(D->Decay, 0.1f, 20.f);
+	R->DecayHFRatio = FMath::Clamp(D->DecayHFRatio, 0.1f, 2.f);
+	R->ReflectionsGain = FMath::Clamp(D->ReflectionsGain, 0.f, 3.16f);
+	R->ReflectionsDelay = FMath::Clamp(D->ReflectionsDelay, 0.f, 0.3f);
+	R->LateGain = FMath::Clamp(D->LateGain, 0.f, 10.f);
+	R->LateDelay = FMath::Clamp(D->LateDelay, 0.f, 0.1f);
+	R->AirAbsorptionGainHF = FMath::Clamp(D->AirAbsorptionHF, 0.892f, 1.f);
+	SpaceEffects.Add(Id, R);
+	return R;
+}
+
+void UWRAudioSubsystem::StepRises()
+{
+	if (Rising.Num() == 0)
+	{
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	for (int32 i = Rising.Num() - 1; i >= 0; --i)
+	{
+		FRising& R = Rising[i];
+		UAudioComponent* C = R.Comp.Get();
+		const float T = FMath::Clamp(static_cast<float>((Now - R.Start) / R.Rise.Z), 0.f, 1.f);
+		if (C && C->IsPlaying())
+		{
+			// Eased in: the last part of the tell climbs fastest, so the ear hears the strike coming.
+			C->SetPitchMultiplier(FMath::Clamp(R.BasePitch * FMath::Lerp(static_cast<float>(R.Rise.X), static_cast<float>(R.Rise.Y), T * T), 0.3f, 2.5f));
+		}
+		if (!C || !C->IsPlaying() || T >= 1.f)
+		{
+			Rising.RemoveAtSwap(i);
+		}
+	}
+}
+
+void UWRAudioSubsystem::ApplyDynamics(const UObject* WorldContext)
+{
+	UWorld* World = WorldOf(WorldContext);
+	if (!CanPlayIn(World) || !EnsureLoaded())
+	{
+		return;
+	}
+	const int32 Mode = FMath::Clamp(FWRKeyBindings::Get().PrefInt(TEXT("AudioRange")), 0, 1);
+	if (!bDynamicsAdded)
+	{
+		// The master chain (CAL L13): the player's volumes are per-sound gains ahead of it; Night's compressor, then a
+		// limiter at -1 dB that should rarely act. The presets live as long as the game instance.
+		NightPreset = NewObject<USubmixEffectDynamicsProcessorPreset>(this);
+		LimiterPreset = NewObject<USubmixEffectDynamicsProcessorPreset>(this);
+		FSubmixEffectDynamicsProcessorSettings L;
+		L.DynamicsProcessorType = ESubmixEffectDynamicsProcessorType::Limiter;
+		L.PeakMode = ESubmixEffectDynamicsPeakMode::Peak;
+		L.ThresholdDb = Tune(TEXT("dynamics.limiterDb"), -1.f);
+		L.LookAheadMsec = 5.f;
+		L.AttackTimeMsec = 1.f;
+		L.ReleaseTimeMsec = 120.f;
+		L.KneeBandwidthDb = 0.f;
+		L.bBypass = false;
+		LimiterPreset->SetSettings(L);
+		UAudioMixerBlueprintLibrary::AddMasterSubmixEffect(World, NightPreset);
+		UAudioMixerBlueprintLibrary::AddMasterSubmixEffect(World, LimiterPreset);
+		bDynamicsAdded = true;
+	}
+	if (Mode == DynamicsMode)
+	{
+		return;
+	}
+	DynamicsMode = Mode;
+	FSubmixEffectDynamicsProcessorSettings N;
+	N.DynamicsProcessorType = ESubmixEffectDynamicsProcessorType::Compressor;
+	N.PeakMode = ESubmixEffectDynamicsPeakMode::RootMeanSquared;
+	N.ThresholdDb = Tune(TEXT("dynamics.nightThresholdDb"), -26.f);
+	N.Ratio = Tune(TEXT("dynamics.nightRatio"), 3.f);
+	N.KneeBandwidthDb = 6.f;
+	N.AttackTimeMsec = 15.f;
+	N.ReleaseTimeMsec = 250.f;
+	N.LookAheadMsec = 3.f;
+	N.OutputGainDb = Tune(TEXT("dynamics.nightMakeupDb"), 7.f);
+	N.bBypass = Mode == 0;   // Wide: the compressor stands aside
+	NightPreset->SetSettings(N);
+	if (SoundLogLevel() > 0)
+	{
+		Log(FString::Printf(TEXT("dynamics %s"), Mode == 1 ? TEXT("night") : TEXT("wide")));
+	}
+}
+
+// ---------------------------------------------------------------- captions (cookpass-audio 4.9)
+
+namespace WRSoundCaptionsDetail
+{
+	static TArray<WRSoundCaptions::FLine>& Store()
+	{
+		static TArray<WRSoundCaptions::FLine> L;
+		return L;
+	}
+}
+
+int32 WRSoundCaptions::Mode()
+{
+	return FMath::Clamp(FWRKeyBindings::Get().PrefInt(TEXT("Captions")), 0, 2);
+}
+
+const TArray<WRSoundCaptions::FLine>& WRSoundCaptions::Lines()
+{
+	TArray<FLine>& L = WRSoundCaptionsDetail::Store();
+	const double Now = FPlatformTime::Seconds();
+	const float Hold = WRTune(TEXT("ui.captions.seconds"), 3.f);
+	L.RemoveAll([Now, Hold](const FLine& Line) { return Now - Line.Time > Hold; });
+	if (Mode() == 0) L.Reset();
+	return L;
+}
+
+void WRSoundCaptions::Push(const FString& Text, bool bDanger, const FVector& Where, const AActor* Source, float Radius)
+{
+	const int32 M = Mode();
+	if (M == 0 || (M == 1 && !bDanger) || Text.IsEmpty())
+	{
+		return;
+	}
+	TArray<FLine>& L = WRSoundCaptionsDetail::Store();
+	const double Now = FPlatformTime::Seconds();
+	for (FLine& Line : L)
+	{
+		// The same thing heard again: one line, counted (a pack's snarls, a stampede's steps).
+		if (Line.Text == Text)
+		{
+			if (Now - Line.Time > 0.25) ++Line.Count;
+			Line.Time = Now;
+			Line.Where = Where;
+			Line.Source = Source;
+			Line.bDanger |= bDanger;
+			return;
+		}
+	}
+	FLine New;
+	New.Text = Text;
+	New.Where = Where;
+	New.Source = Source;
+	New.Radius = Radius;
+	New.bDanger = bDanger;
+	New.Time = Now;
+	L.Add(New);
+	const int32 MaxLines = FMath::Max(1, FMath::RoundToInt(WRTune(TEXT("ui.captions.lines"), 4.f)));
+	while (L.Num() > MaxLines)
+	{
+		// The oldest calm line goes first; dangers stay while there's room.
+		int32 Drop = L.IndexOfByPredicate([](const FLine& X) { return !X.bDanger; });
+		L.RemoveAt(Drop == INDEX_NONE ? 0 : Drop);
+	}
 }
 
 // ---------------------------------------------------------------- volumes

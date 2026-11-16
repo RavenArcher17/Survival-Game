@@ -60,7 +60,13 @@ struct FWRSoundEvent
 	FName Category = TEXT("effects");
 	float MinGap = 0.05f;         // seconds before the same event can play again (per actor, or per spot for PlayAt)
 	int32 MaxVoices = 6;          // at most this many at once
-	float Duck = 0.f;             // music dips to (1 - Duck) while this plays (big moments)
+	float Duck = 0.f;             // music dips to (1 - Duck) while this plays (big moments; capped at music.duckMax)
+	/** A tell that rises in pitch while it plays (cookpass-audio 4.5: CAL "sound before sight"): from, to, seconds. */
+	FVector Rise = FVector::ZeroVector;
+	/** Sound captions (cookpass-audio 4.9): the line shown ("{who} snarls"; {who} = the creature's name), and whether it's
+	 *  a danger (shown when captions are on Important). Empty: no caption. */
+	FString Caption;
+	bool bDanger = false;
 	int32 LastVariant = -1;
 };
 
@@ -76,6 +82,39 @@ struct FWRMusicTrack
 {
 	FString File;
 	float Volume = 1.f;
+	/** Its tempo and metre, so changes land on its beat or bar line (cookpass-audio 4.1.4); 0 = no sync. Lead: seconds
+	 *  of the file before its first downbeat. */
+	float Bpm = 0.f;
+	int32 Beats = 4;
+	float Lead = 0.f;
+};
+
+/** A space's reverb (sounds.json "spaces", cookpass-audio 4.3): UReverbEffect numbers, how wet and how fast it comes in. */
+struct FWRSpaceDef
+{
+	FName Id;
+	float Decay = 1.5f, Density = 1.f, Diffusion = 1.f, Gain = 0.4f, GainHF = 0.6f, DecayHFRatio = 0.8f;
+	float ReflectionsGain = 0.3f, ReflectionsDelay = 0.01f, LateGain = 1.f, LateDelay = 0.02f, AirAbsorptionHF = 0.994f;
+	float Wet = 0.5f;
+	float Fade = 0.8f;
+	bool bDry = false;   // a space where sound dies (the Silent Vault): reverb off
+};
+
+/** A spot sound (sounds.json ambient.spots, cookpass-audio 4.6): a one-shot placed round the listener now and then while
+ *  its layer is up, or from a fixed place within reach. */
+struct FWRAmbientSpot
+{
+	FName Id;
+	FName Event;
+	TArray<FName> Layers;         // any of them (their weight is the max)
+	int32 DayNight = 0;           // 1 = by day only, 2 = by night only
+	float Min = 0.5f;             // the layer weight it needs
+	FVector2D Every = FVector2D(30.f, 70.f);
+	FVector2D Dist = FVector2D(25.f, 50.f);   // metres
+	FVector2D Up = FVector2D(0.f, 5.f);       // metres over the listener
+	bool bAt = false;
+	FVector2D At = FVector2D::ZeroVector;     // metres (island x east, y south)
+	float Reach = 900.f;                      // metres from At it's heard
 };
 
 /**
@@ -117,6 +156,15 @@ public:
 	float StreamSeconds(const FString& File) const;
 
 	const TArray<FWRAmbientBed>& GetBeds() const { return Beds; }
+	const TArray<FWRAmbientSpot>& GetSpots() const { return Spots; }
+	const FWRSpaceDef* FindSpace(FName Id) const { return Spaces.Find(Id); }
+	/** The runtime reverb object of a space (made once from its row). */
+	class UReverbEffect* SpaceEffect(FName Id);
+	/** Moves the pitch of rising tells (FWRSoundEvent::Rise); the director calls it every tick. */
+	void StepRises();
+	/** The master dynamics (cookpass-audio 4.4): a limiter always, and Night's compressor ahead of it when the player's
+	 *  Dynamic range setting is Night. Safe to call again when the setting changes. */
+	void ApplyDynamics(const UObject* WorldContext);
 	const TArray<FWRMusicTrack>* GetMusicPool(FName Pool) const { return MusicPools.Find(Pool); }
 	float Tune(FName Key, float Fallback) const;
 	/** Per-creature voice settings: family and pitch ("creatures" in the table). */
@@ -147,10 +195,19 @@ private:
 	struct FVoiceFallback { FName Kind; float Pitch = 1.f; float Volume = 1.f; };
 	TMap<FName, FVoiceFallback> VoiceFallbacks;
 	TSet<FName> Unknown;                  // unknown events already logged
+	TMap<FName, FWRSpaceDef> Spaces;
+	TArray<FWRAmbientSpot> Spots;
+	struct FRising { TWeakObjectPtr<UAudioComponent> Comp; double Start = 0.0; FVector Rise; float BasePitch = 1.f; };
+	TArray<FRising> Rising;
+	bool bDynamicsAdded = false;
+	int32 DynamicsMode = -1;
 
 	UPROPERTY(Transient) TMap<FString, TObjectPtr<UWRPcmSound>> Sounds;
 	UPROPERTY(Transient) TMap<FString, TObjectPtr<UWRPcmSound>> LoopSounds;
 	UPROPERTY(Transient) TMap<int32, TObjectPtr<USoundAttenuation>> Attenuations;
+	UPROPERTY(Transient) TMap<FName, TObjectPtr<class UReverbEffect>> SpaceEffects;
+	UPROPERTY(Transient) TObjectPtr<class USubmixEffectDynamicsProcessorPreset> NightPreset;
+	UPROPERTY(Transient) TObjectPtr<class USubmixEffectDynamicsProcessorPreset> LimiterPreset;
 
 	TMap<FName, TArray<TWeakObjectPtr<UAudioComponent>>> Voices;
 	TMap<uint32, double> LastPlayed;
@@ -201,7 +258,30 @@ private:
 		float Target = 0.f;
 		float FadeSeconds = 2.f;
 		double StartedAt = 0.0;
+		/** Seconds of it heard so far (paused time not counted: the bar clock), and its tempo (FWRMusicTrack). */
+		double Played = 0.0;
+		float Bpm = 0.f;
+		int32 Beats = 4;
+		float Lead = 0.f;
+		/** Real time it starts its fade (on a bar line); 0 = none pending. */
+		double FadeAt = 0.0;
 	};
+	/** Seconds from now to this stream's next beat (bBar: bar line), capped at music.syncMax; 0 when it has no tempo. */
+	float NextBoundary(const FStream& S, bool bBar) const;
+	/** Starts the stream's fade on its next bar line (or now when it has no tempo). */
+	void FadeOnBar(FStream& S, float Seconds);
+	/** Switches the music mode now (the pending change's moment arrived). */
+	void SwitchMode(EMusic Want, double Now);
+	/** How much of a fight the creatures on the listener make (cookpass-audio 4.1.3). */
+	float ThreatOf(const class AWRCreature* C) const;
+	/** The hidden tube (Kiln Roads, Blue Below) the listener is inside; None outside. */
+	FName TubeAt() const;
+	/** The reverb space the listener is in (sounds.json spaces; cookpass-audio 4.3), applied when it changes. */
+	void UpdateSpace();
+	FName SpaceNow() const;
+	bool UnderBuiltRoof() const;
+	/** Spot sounds (ambient.spots). */
+	void UpdateSpots(double Now);
 
 	void UpdateListener();
 	void UpdateAmbient(float DeltaTime);
@@ -308,8 +388,34 @@ private:
 	double ForestPhaseSwitchAt = 0.0;
 	double NextForestPhaseCheck = 0.0;
 
+	// Spaces and spots
+	FName Space;
+	double NextRoofCheck = 0.0;
+	bool bRoof = false;
+	double NextTubeScan = 0.0;
+	TArray<TWeakObjectPtr<AActor>> Tubes;
+	FName Tube;
+	TMap<FName, double> SpotNext;
+	double LastRealTime = 0.0;
+
 	// Music
 	EMusic Mode = EMusic::None;
+	/** A change waiting for the playing piece's beat or bar (cookpass-audio 4.1.4). */
+	EMusic PendingMode = EMusic::None;
+	bool bPending = false;
+	double PendingAt = 0.0;
+	/** A boss phase change waiting for its bar. */
+	double PhaseSwitchAt = 0.0;
+	/** The boss the music followed (its fall plays the stinger and the hush), and the hush's end. */
+	TWeakObjectPtr<class AWRBoss> MusicBoss;
+	double HushUntil = 0.0;
+	/** The listener's last blow taken from a player (PvP: a fight for the music) and from anything. */
+	double PlayerHitAt = -100.0;
+	double HitAt = -100.0;
+	/** Dead: the music dips (at most the cap) and no new piece starts. */
+	float DeadDip = 1.f;
+	TArray<FStream> EruptionLayer;
+	TArray<FStream> WhiteoutLayer;
 	FName ForcedMode;
 	TArray<FStream> Music;        // the current track last; older ones fading out
 	double NextExploreAt = 0.0;
@@ -338,6 +444,7 @@ private:
 		double Seen = 0.0;
 		uint8 Mood = 0;            // the creature's mood when last watched (alert / flee calls on the change)
 		double NextAlert = 0.0;
+		double NextBreath = 0.0;   // asleep: its next breath (cookpass-audio 4.8)
 	};
 	TMap<TWeakObjectPtr<AActor>, FBody> Bodies;
 	/** Packmates answering a contact call (cookpass-creatures 3.4): who and when. */

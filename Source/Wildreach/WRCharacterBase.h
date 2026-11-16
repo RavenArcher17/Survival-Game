@@ -158,6 +158,8 @@ public:
 	/** Where the hit being shown came from and how hard it was (set before OnHitVisual; a creature's flinch). */
 	FVector HitOriginShown = FVector::ZeroVector;
 	float HitDamageShown = 0.f;
+	/** Who dealt the hit being shown (set before OnHitShown; the music reads a player's blow as a fight: cookpass-audio 4.1). */
+	TWeakObjectPtr<AActor> HitSourceShown;
 
 	/** Server: a sound event on this character for everyone nearby (WRSound::Broadcast: eating, equipping...). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastSound(FName Event);

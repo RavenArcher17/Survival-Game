@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased: the audio cook pass (all sound and music)
+
+Aaron (lane cookpass-audio: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-audio.md).
+Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **Audio (1): the music director.** Why: the island played 2-5 minute silences between tunes (FULL-GAME 3.3: music is
+  always audible), any critter that turned on you started battle music, every change cut on whatever frame it came, a
+  boss's fall faded into a minute of nothing, and boss.intro ducked the score 16 dB (the rule is 4 dB at most).
+  - Always audible: `music.gap` / `firstGap` / `afterCombatGap` are breaths of a few seconds everywhere (the swamp and
+    forest special cases folded into the one rule); planned silences (Dead calm, the Silent Vault, the Fall Field) stay.
+  - Every duck capped at 4 dB (`music.duckMax`, `UWRAudioDirector::Duck`); dead or between lives the music dips by the
+    cap and waits.
+  - Threat-gated combat music (BotW): creatures on you add a weight by size and role (`music.threat.*`, a critter 0.25,
+    a mini 3); combat music from `music.combatThreat` 1.0, or a blow taken while hunted, or any blow between you and
+    another player (`AWRCharacterBase::HitSourceShown`, set by the hit multicast).
+  - On the beat and the bar (Hades): pool rows may carry `bpm` / `beats` / `lead`; the director keeps each piece's own
+    play time (paused time not counted) and holds a change until the piece's next beat (into a fight, with a drum-hit
+    entry stinger `music.sting.combat[.<land>]`) or next bar line (out of a fight, the next explore piece, a boss's
+    phase), capped at `music.syncMax`.
+  - A boss's fall: its piece ends on the bar, `music.sting.boss_fall` plays and the land holds a 12 s planned hush
+    (`music.bossHush`) before its own music returns (Dark Souls / Monster Hunter).
+  - Fire and Frost places: `sub.kiln_roads` / `sub.blue_below` inside the hidden tubes (`AWRHiddenTube` route within
+    `music.tubeReach`), `explore.volcanic.c` in V4 and `explore.tundra.c` in T4 / T5, and the Eruption / Whiteout
+    event layers (`layer.eruption`, `layer.whiteout`) from the event's five-minute warning to its end.
+- **Audio (2): spaces, mix, tells, spots, sleep.**
+  - Reverb by where you are (TLOU2 / Valheim): sounds.json `spaces` (underwater, the Silent Vault dry, the Drowned
+    Hall, the Coven, the Hollow Root, the Fungal halls / webs / caves, the Crystal caves, the hidden tubes, portal folds,
+    caves, a built room under your own roof), applied with `ActivateReverbEffect` (`UWRAudioDirector::UpdateSpace`);
+    3D sounds send to it more the farther they are, music / beds / UI stay dry; open air has none.
+  - The master chain (CAL L13): a limiter at -1 dB always and, with Settings > Audio > Dynamic range on Night, a
+    compressor with make-up gain ahead of it (`UWRAudioSubsystem::ApplyDynamics`, sounds.json `dynamics`).
+  - Tells rise toward the strike (CAL "sound before sight"): event rows may carry `rise: [from, to, seconds]`
+    (`creature.windup` and the Fire / Frost hazard tells), `creature.windup` 3 dB up over the bed.
+  - Spot sounds are rows (`ambient.spots`: layers, day / night, every, distance, height, or from a fixed place within
+    reach); the night owl is the first row.
+  - Sleeping creatures breathe (`creature.<size>.sleep`, heard within `ambient.sleepRange`, slower the bigger the body).
+- **Audio (3): sound captions.** Settings > Audio > Sound captions: Off / Important / All. sounds.json rows carry
+  `caption` ("{who} snarls") and `danger`; creature calls get theirs by kind from `captionDefaults`. The HUD shows up to
+  four lines bottom centre with an arrow toward the sound (`WRUICaptions.cpp`), merged when repeated ("x2"), dimmer
+  when far; never for your own sounds. The audio page's hint and music line now say what the music does.
+
 ## Unreleased: the creature cook pass (look, animation, voice, behaviour of every built creature and boss)
 
 Aaron (lane cookpass-creatures: requirement ledger, research, grades and plan in showcase-notes

@@ -29,6 +29,8 @@ namespace WRKeyPrefs
 		{ TEXT("HudMode"), 1.f, 0.f, 2.f, TEXT("interface") },
 		{ TEXT("Compass"), 1.f, 0.f, 1.f, TEXT("interface") },
 		{ TEXT("Names"), 1.f, 0.f, 2.f, TEXT("interface") },
+		{ TEXT("Captions"), 0.f, 0.f, 2.f, TEXT("audio") },     // sound captions: off, important, all (cookpass-audio 4.9)
+		{ TEXT("AudioRange"), 0.f, 0.f, 1.f, TEXT("audio") },   // dynamic range: wide, night (cookpass-audio 4.4)
 	};
 
 	static const FDef* Find(FName Id)
