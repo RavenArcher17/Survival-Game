@@ -159,6 +159,21 @@ void AWRCreature::SetMood(EWRCreatureMood Mood, AActor* Watch)
 		return;
 	}
 	MoodSetAt = GetWorld()->GetTimeSeconds();
+	// Penned (cooks/cookpass-survival.md 3.6; Stardew's animals read at a glance): any idle mood becomes the pen's: hungry
+	// at an empty trough; at a full one a graze of 4 s in every 16 (each animal on its own beat), else its own.
+	if (MoodSetAt < PennedUntil && Mood <= EWRCreatureMood::Preen)
+	{
+		if (bPenHungry)
+		{
+			Mood = EWRCreatureMood::Hungry;
+			Watch = nullptr;
+		}
+		else if (Mood == EWRCreatureMood::Calm)
+		{
+			const double Beat = FMath::Fmod(MoodSetAt + (GetUniqueID() % 97) * 0.37, double(WRTune(TEXT("farm.pen.grazeEvery"), 16.f)));
+			if (Beat < WRTune(TEXT("farm.pen.grazeSeconds"), 4.f)) Mood = EWRCreatureMood::Graze;
+		}
+	}
 	if (MoodRep != static_cast<uint8>(Mood)) MoodRep = static_cast<uint8>(Mood);
 	if (WatchRep != Watch) WatchRep = Watch;
 }
@@ -269,7 +284,7 @@ FVector AWRCreature::BodyLookAt(bool& bOutHave, float& OutSpeed)
 		}
 	}
 	if (Mood == EWRCreatureMood::Flee || Mood == EWRCreatureMood::Eat || Mood == EWRCreatureMood::Graze || Mood == EWRCreatureMood::Sniff
-		|| Mood == EWRCreatureMood::Preen)
+		|| Mood == EWRCreatureMood::Preen || Mood == EWRCreatureMood::Hungry)
 	{
 		return FVector::ZeroVector;   // the mood's own pose leads the head
 	}
@@ -448,6 +463,12 @@ void AWRCreature::TickCreatureBody(float DeltaSeconds)
 		break;
 	case EWRCreatureMood::Flee:
 		DipGoal = Since < 0.6f ? 0.f : T.Num(TEXT("anim.beat.fleeLift"), 4.f);
+		break;
+	case EWRCreatureMood::Hungry:
+		// Head hung low and still over the empty trough, the shoulders sagging, a slow listless sway; no chewing.
+		DipGoal = -T.Num(TEXT("anim.beat.hungryDip"), 30.f);
+		SpineGoal = -T.Num(TEXT("anim.beat.hungrySag"), 5.f);
+		Sway = FMath::Sin(Time * 2.f * PI * T.Num(TEXT("anim.beat.hungrySwayHz"), 0.25f)) * T.Num(TEXT("anim.beat.hungrySway"), 2.f);
 		break;
 	case EWRCreatureMood::Eat:
 		DipGoal = -T.Num(TEXT("anim.beat.eatDip"), 45.f);

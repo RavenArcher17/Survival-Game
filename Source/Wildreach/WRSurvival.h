@@ -277,6 +277,13 @@ public:
 	/** The held light is a lantern (lights.<id>.kind lantern): draughts and rain can't put it out. */
 	bool HoldsLantern() const;
 
+	// --- wet (cooks/cookpass-survival.md 3.7; world-map W1): rain on you outdoors or the water you're in soaks you;
+	// it dries over wet.drySeconds, fast by a warding fire. Fire hurts less, a burn builds slower, frost and shock faster.
+	bool IsWet() const;
+	static bool IsWet(const AActor* Character);
+	/** Seconds until you're dry (0 when dry). Any machine (the owner's copy). */
+	float WetSecondsLeft() const;
+
 	// --- corruption
 	float GetCorruption() const { return Corruption; }
 	/** 0-4: the steps of corruption.steps passed. */
@@ -347,6 +354,8 @@ private:
 
 	// Corruption (owner).
 	UPROPERTY(Replicated) float Corruption = 0.f;
+	/** Weather time (UWRWeatherSubsystem::Now) when you're dry again. */
+	UPROPERTY(Replicated) float WetUntil = 0.f;
 	/** The corrupt biome it last built in: its path is the one that gains from it. */
 	UPROPERTY(Replicated) FName CorruptionFrom;
 	int32 LastCorruptionStep = 0;

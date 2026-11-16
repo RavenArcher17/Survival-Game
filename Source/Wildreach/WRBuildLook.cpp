@@ -591,12 +591,22 @@ namespace WRBuildLookDetail
 				L.Rot = FRotationMatrix::MakeFromZ(Leg.GetSafeNormal()).Rotator();
 			}
 			B.Add(EWRLookMat::Stone, FVector(8.f, 8.f, 6.f), FVector(0.f, 0.f, 128.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);   // the ring at the apex
-			for (int32 c = 0; c < 6; ++c) B.Add(EWRLookMat::Stone, FVector(2.f, c % 2 ? 4.f : 2.f, 7.f), FVector(0.f, 0.f, 122.f - c * 7.f), FRotator(0.f, c % 2 ? 90.f : 0.f, 0.f), Iron);
+			// The chain from the apex ring down to the bail's crown (cooks/cookpass-survival.md 3.8: the pot hangs from the
+			// tripod by chain and bail, the lid free to lift on its steam under the bail's arch).
+			for (int32 c = 0; c < 3; ++c) B.Add(EWRLookMat::Stone, FVector(2.f, c % 2 ? 4.f : 2.f, 7.f), FVector(0.f, 0.f, 122.f - c * 7.f), FRotator(0.f, c % 2 ? 90.f : 0.f, 0.f), Iron);
 			B.Add(EWRLookMat::Cloth, FVector(46.f, 46.f, 24.f), FVector(0.f, 0.f, 70.f), FRotator::ZeroRotator, 1.f, EWRLookMesh::Cylinder);       // the pot
 			B.Add(EWRLookMat::Cloth, FVector(50.f, 50.f, 3.f), FVector(0.f, 0.f, 82.f), FRotator::ZeroRotator, 0.8f, EWRLookMesh::Cylinder);       // its rim
-			B.Add(EWRLookMat::Cloth, FVector(42.f, 42.f, 4.f), FVector(0.f, 0.f, 85.f), FRotator::ZeroRotator, 0.7f, EWRLookMesh::Cylinder);       // the lid
-			B.Add(EWRLookMat::Stone, FVector(5.f, 5.f, 4.f), FVector(0.f, 0.f, 89.f), FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);        // its knob
-			B.Add(EWRLookMat::Stone, FVector(52.f, 2.f, 2.f), FVector(0.f, 0.f, 92.f), FRotator::ZeroRotator, Iron);                               // the bail
+			for (const float X : { -25.f, 25.f }) B.Add(EWRLookMat::Stone, FVector(4.f, 3.f, 5.f), FVector(X, 0.f, 82.f), FRotator::ZeroRotator, Iron);   // the ears the bail hooks into
+			// The bail: an iron arch from ear to ear, its crown at 104 cm under the chain (the lid lives on the station:
+			// AWRStation's kitchen show sits it on the rim and lifts it on the boil).
+			for (int32 k = 0; k < 8; ++k)
+			{
+				const float A0 = PI * k / 8.f, A1 = PI * (k + 1) / 8.f;
+				const FVector P0(-25.f * FMath::Cos(A0), 0.f, 84.f + 20.f * FMath::Sin(A0));
+				const FVector P1(-25.f * FMath::Cos(A1), 0.f, 84.f + 20.f * FMath::Sin(A1));
+				FWRLookBlock& Seg = B.Add(EWRLookMat::Stone, FVector(1.8f, 1.8f, (P1 - P0).Size() + 0.6f), (P0 + P1) * 0.5f, FRotator::ZeroRotator, Iron, EWRLookMesh::Cylinder);
+				Seg.Rot = FRotationMatrix::MakeFromZ((P1 - P0).GetSafeNormal()).Rotator();
+			}
 			return true;
 		}
 		if (Id == TEXT("oven"))

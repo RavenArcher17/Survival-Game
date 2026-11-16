@@ -189,6 +189,10 @@ public:
 	/** Client: the plants / products / water drawn on it (WRFarmLook) and what they were drawn for. */
 	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> FarmMesh;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> WaterSurface;
+	/** Client: a crop plot's nine plants, one each so they lean from their own base in the wind (cooks/cookpass-survival.md
+	 *  3.5; FWRFarmLook::TickSway), and where each stands in the plot. */
+	UPROPERTY(Transient) TArray<TObjectPtr<class UProceduralMeshComponent>> PlantMeshes;
+	TArray<FVector> PlantBases;
 	uint32 FarmLookKey = 0;
 	UFUNCTION() void OnRep_Farm();
 	/** Machines (WRMachine, cooks/build-machinery.md): what every machine draws and the screen reads; a conveyor's

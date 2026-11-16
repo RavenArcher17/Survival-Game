@@ -766,6 +766,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		{
 			Damage *= 1.f - WRTune(TEXT("status.defs.curse.damageDealt"), 0.15f);
 		}
+		// Fire on a body wet from rain or the water (cooks/cookpass-survival.md 3.7): it takes less.
+		if (Hit.Element == WRTags::Element_Fire && UWRSurvivalComponent::IsWet(Target))
+		{
+			Damage *= WRTune(TEXT("wet.fireDamage"), 0.8f);
+		}
 		// Lightning on a soaked body: +25% and a chance of a free shock (the reactions table).
 		if (Hit.Element == WRTags::Element_Lightning && TargetASC->HasMatchingGameplayTag(WRTags::Status_Soak))
 		{

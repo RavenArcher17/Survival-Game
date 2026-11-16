@@ -24,6 +24,9 @@ struct WILDREACH_API FWRFarmLook
 	static void Refresh(AWRBuildPiece* Piece);
 	/** One plant of a crop at this growth (0..1), standing at Base turned Yaw, into Mesh. Seed varies it. */
 	static void Plant(FWRToolMesh& Mesh, const FWRCropDef& Crop, float Growth, const FVector& Base, float Yaw, float Seed);
+	/** Crops in the wind (cooks/cookpass-survival.md 3.5), on machines that draw: every plot near the camera leans its
+	 *  plants from their bases along the wind, a gust rolling across the plot, harder in a storm. */
+	static void TickSway(UWorld* World, float DeltaSeconds);
 	/** A fish on its side along +X (nose at +X), Length cm, in its colours (back, belly, fins). */
 	static void Fish(FWRToolMesh& Mesh, const FVector& Centre, float Length, const FLinearColor& Back, const FLinearColor& Belly, const FLinearColor& Fins);
 };

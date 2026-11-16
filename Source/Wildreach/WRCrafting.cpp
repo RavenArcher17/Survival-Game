@@ -440,6 +440,8 @@ void AWRStation::OnRep_Type()
 		Visual = nullptr;
 	}
 	LookType = StationType;
+	// A kitchen shows its work where it's drawn (WRKitchenShow.cpp): its tick runs there for it.
+	if (GetNetMode() != NM_DedicatedServer && IsKitchenShow()) SetActorTickEnabled(true);
 	const FWRPieceDef* Def = FWRBuildLook::StationDef(StationType);
 	Visual = Def ? FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift) : nullptr;
 	Mesh->SetVisibility(Visual == nullptr);
@@ -716,13 +718,19 @@ float AWRStation::JobProgress() const
 void AWRStation::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// A kitchen shows its work on machines that draw (WRKitchenShow.cpp); it keeps ticking there.
+	const bool bShow = GetNetMode() != NM_DedicatedServer && IsKitchenShow();
+	if (bShow)
+	{
+		TickKitchenShow(DeltaSeconds);
+	}
 	if (!HasAuthority())
 	{
-		SetActorTickEnabled(false);
+		if (!bShow) SetActorTickEnabled(false);
 		return;
 	}
 	AdvanceQueue();
-	if (Queue.Num() == 0) SetActorTickEnabled(false);
+	if (Queue.Num() == 0 && !bShow) SetActorTickEnabled(false);
 }
 
 void AWRStation::AdvanceQueue()

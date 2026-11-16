@@ -149,7 +149,11 @@ use like a potion (`UWRInventoryComponent::StartConsume`, `State.Drinking`), wha
 as whatever its id's words or category say. An item that leaves something when used or crafted with names it in
 `items.json "returns"`; an empty container names its full kind in `"fills"` (filled at water by `UWRWaterSubsystem::DrinkHere`,
 which a well and a running channel call too). The hero's procedural arm layers (seat, torch carry, eating, sleep breath)
-live in `FWRHeroAnimProxy::PostLayers` and give way to one-shot clips.
+live in `FWRHeroAnimProxy::PostLayers` and give way to one-shot clips. Kitchen stations tick on drawing machines for their
+show (`WRKitchenShow.cpp`); the cooking pot's lid is the station's, not the piece's blocks. A crop plot's plants are nine
+components (`PlantMeshes`) so they can sway; new crop looks still go through `FWRFarmLook::Plant` at the origin. Penned
+animals' idle moods are the pen's (`AWRCreature::PennedUntil / bPenHungry`, read in `SetMood`). Wet is the survival
+component's (`IsWet`), read by `ApplyHit` and `AddStatusBuildup`.
 
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light

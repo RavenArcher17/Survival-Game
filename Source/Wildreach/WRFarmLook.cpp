@@ -3,6 +3,10 @@
 // rebuilt only when what they show changes (a stage, the fruit colouring in, water, a product collected).
 
 #include "WRFarmLook.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
+#include "WRSurvival.h"
 #include "WRFarm.h"
 #include "WRBuilding.h"
 #include "WRToolMesh.h"
@@ -400,7 +404,10 @@ void FWRFarmLook::Refresh(AWRBuildPiece* P)
 			P->WaterSurface->RegisterComponent();
 			P->WaterSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			P->WaterSurface->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
-			if (UMaterialInterface* Glass = LoadObject<UMaterialInterface>(nullptr, *FWRTuning::Get().Str(TEXT("farm.glassMaterial"), TEXT("/Game/Terrain/M_Ice.M_Ice")))) P->WaterSurface->SetMaterial(0, Glass);
+			// Clear crown glass (M_WindowGlass, Tools/terrain/build_glass_material.py); the ice if it's missing.
+			UMaterialInterface* Glass = LoadObject<UMaterialInterface>(nullptr, *FWRTuning::Get().Str(TEXT("farm.glassMaterial"), TEXT("/Game/Wildreach/Materials/M_WindowGlass.M_WindowGlass")));
+			if (!Glass) Glass = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Ice.M_Ice"));
+			if (Glass) P->WaterSurface->SetMaterial(0, Glass);
 			P->WaterSurface->SetCastShadow(false);
 			if (Def->Shape == TEXT("roof"))
 			{
@@ -452,6 +459,18 @@ void FWRFarmLook::Refresh(AWRBuildPiece* P)
 		}
 		const FWRCropDef* Crop = FWRFarmDefs::Get().Crop(P->CropId);
 		const float G = P->Growth8 / 255.f;
+		// Each plant is its own mesh, built about its own base, so it can lean from where its stem meets the soil
+		// (TickSway); the soil, the wet and the mulch stay in the plot's mesh.
+		P->PlantBases.SetNum(9);
+		while (P->PlantMeshes.Num() < 9)
+		{
+			UProceduralMeshComponent* Pm = NewObject<UProceduralMeshComponent>(P);
+			Pm->SetupAttachment(P->GetRootComponent());
+			Pm->RegisterComponent();
+			Pm->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Pm->SetCanEverAffectNavigation(false);
+			P->PlantMeshes.Add(Pm);
+		}
 		for (int32 i = 0; i < 9; ++i)
 		{
 			const int32 X = i % 3 - 1, Y = i / 3 - 1;
@@ -460,7 +479,21 @@ void FWRFarmLook::Refresh(AWRBuildPiece* P)
 			{
 				M.Lathe(Base - FVector(0, 0, 0.5f), FVector::UpVector, 1.6f, { FVector(0, 18.f, 18.f), FVector(1, 14.f, 14.f) }, 10, FLinearColor(0.05f, 0.03f, 0.015f), 0.95f);
 			}
-			if (Crop) Plant(M, *Crop, G, Base, H(Seed, i + 100) * 360.f, Seed + i);
+			P->PlantBases[i] = Base;
+			UProceduralMeshComponent* Pm = P->PlantMeshes[i];
+			if (Crop)
+			{
+				FWRToolMesh One;
+				Plant(One, *Crop, G, FVector::ZeroVector, H(Seed, i + 100) * 360.f, Seed + i);
+				One.ApplyTo(Pm);
+				Pm->SetRelativeLocationAndRotation(Base, FRotator::ZeroRotator);
+				Pm->SetVisibility(true);
+			}
+			else
+			{
+				Pm->ClearAllMeshSections();
+				Pm->SetVisibility(false);
+			}
 		}
 	}
 	else if (K == TEXT("pen"))
@@ -573,5 +606,78 @@ void FWRFarmLook::Refresh(AWRBuildPiece* P)
 			P->WaterSurface->SetRelativeScale3D(FVector(3.96f, 0.44f, 1.f));
 		}
 		P->WaterSurface->SetVisibility((P->FarmFlags & WRFarmFlag::Watered) != 0);
+	}
+}
+
+void FWRFarmLook::TickSway(UWorld* World, float DeltaSeconds)
+{
+	// Crops in the wind (cooks/cookpass-survival.md 3.5): each plant leans from its base along the wind, by its growth (a
+	// sprout hardly moves, a ripe head nods), a main wave and a slower second one, the phase from where it stands along
+	// the wind so a gust rolls across the plot; a thunderstorm, blizzard or gale on the land sways it harder. Only plots
+	// near the camera move; the list is refreshed once a second.
+	struct FList { TArray<TWeakObjectPtr<AWRBuildPiece>> Near; double ListedAt = -10.0; };
+	static TMap<TWeakObjectPtr<UWorld>, FList> Lists;   // one per world (a play-in-editor session runs several)
+	if (!World || World->GetNetMode() == NM_DedicatedServer) return;
+	if (Lists.Num() > 8)
+	{
+		for (auto It = Lists.CreateIterator(); It; ++It) if (!It->Key.IsValid()) It.RemoveCurrent();
+	}
+	FList& L = Lists.FindOrAdd(World);
+	TArray<TWeakObjectPtr<AWRBuildPiece>>& Near = L.Near;
+	double& ListedAt = L.ListedAt;
+	const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(World, 0);
+	if (!Cam) return;
+	const FWRTuning& T = FWRTuning::Get();
+	const double Now = World->GetTimeSeconds();
+	const FVector View = Cam->GetCameraLocation();
+	const float Range = T.Num(TEXT("farm.sway.range"), 3000.f);
+	if (Now - ListedAt > 1.0 || Now < ListedAt)
+	{
+		ListedAt = Now;
+		Near.Reset();
+		for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
+		{
+			const FWRPieceDef* D = It->bGhost ? nullptr : It->GetDef();
+			if (D && D->Kind == TEXT("crop") && !It->CropId.IsNone() && It->PlantMeshes.Num() == 9
+				&& FVector::DistSquared(It->GetActorLocation(), View) < Range * Range) Near.Add(*It);
+		}
+	}
+	if (Near.Num() == 0) return;
+	// The prevailing wind (farm.sway.windYaw), and a storm on the land the camera is in.
+	const FVector Wind = FRotator(0.f, T.Num(TEXT("farm.sway.windYaw"), 70.f), 0.f).Vector();
+	float Storm = 0.f;
+	float Strength = 0.f;
+	if (const FWRWeatherKind* Kind = UWRWeatherSubsystem::ActiveKind(World, WRBiome::At(World, View), &Strength))
+	{
+		if (Kind->bGust || Kind->bStrikes || Kind->RunMult < 1.f) Storm = Strength;
+	}
+	const float Calm = T.Num(TEXT("farm.sway.calm"), 2.5f) * (1.f + T.Num(TEXT("farm.sway.storm"), 2.f) * Storm);
+	const float Hz = T.Num(TEXT("farm.sway.hz"), 0.6f) * (1.f + 0.6f * Storm);
+	const float SlowHz = T.Num(TEXT("farm.sway.slowHz"), 0.17f);
+	const float Wave = FMath::Max(50.f, T.Num(TEXT("farm.sway.waveCm"), 400.f));
+	const float Time = static_cast<float>(FMath::Fmod(Now, 3600.0));
+	for (const TWeakObjectPtr<AWRBuildPiece>& W : Near)
+	{
+		AWRBuildPiece* P = W.Get();
+		if (!P || P->PlantMeshes.Num() != 9 || P->PlantBases.Num() != 9) continue;
+		const float Growth = FMath::Clamp(P->Growth8 / 255.f, 0.15f, 1.f);
+		const FTransform Xf = P->GetActorTransform();
+		const FVector LocalWind = Xf.InverseTransformVectorNoScale(Wind).GetSafeNormal2D();
+		// A turn about this axis tips the top downwind.
+		const FVector Axis = FVector::CrossProduct(FVector::UpVector, LocalWind).GetSafeNormal();
+		for (int32 i = 0; i < 9; ++i)
+		{
+			UProceduralMeshComponent* Pm = P->PlantMeshes[i];
+			if (!Pm || !Pm->IsVisible()) continue;
+			const FVector WorldBase = Xf.TransformPosition(P->PlantBases[i]);
+			const float Along = static_cast<float>(FVector::DotProduct(FVector(WorldBase.X, WorldBase.Y, 0.f), Wind) / Wave);
+			const float Main = FMath::Sin(2.f * PI * (Hz * Time - Along));
+			const float Slow = FMath::Sin(2.f * PI * (SlowHz * Time - Along * 0.3f) + i * 0.7f);
+			// Leaning downwind with the gusts (back toward upright between them), a little side to side.
+			const float Lean = Calm * Growth * (0.55f + 0.45f * Main + 0.3f * Slow);
+			const FQuat Q(Axis, FMath::DegreesToRadians(Lean));
+			const FQuat Side(LocalWind, FMath::DegreesToRadians(Calm * Growth * 0.25f * Slow));
+			Pm->SetRelativeRotation(Side * Q);
+		}
 	}
 }

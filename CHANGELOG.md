@@ -36,6 +36,31 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   body on the bed) and a torch hung by the knee (LATER-COOKS 134, 139). The held lying pose now breathes (the chest rising
   at `rest.breathHz` 0.22) with the head turned to one side; a lit torch is carried with the left arm raised (tuning
   `lights.carry`), lowered for swings, aiming, guarding, swimming and riding. A real lie-down clip is still wanted.
+- **Survival (5): the kitchen shows its work.** Why: the spit stayed bare while meat cooked, the pot never steamed, the
+  smokehouse and oven never smoked and a finished dish waited invisibly (G4, LATER-COOKS 140; Valheim's cooking station).
+  `AWRStation::TickKitchenShow` (`WRKitchenShow.cpp`, every machine that draws, from the replicated queue and tray): the
+  meat, fish or skewer being cooked hangs skewered on the campfire's spit, turning (`farm.show.spitTurn`) and browning from
+  raw to cooked in eight shades as the job runs; what's done waits on a flat river stone beside the fire ring (the oven's on
+  its hearth slab by the mouth); the pot's copper lid sits on the rim under a new arched iron bail (the chain now hangs
+  from the tripod to the bail's crown) and chatters up on its steam while it cooks, steam leaving at its edge
+  (`fx kitchen.steam`) over a simmer (`cook.bubble`); a working smokehouse breathes smoke from its ridge vent and an oven
+  from its chimney (`fx kitchen.smoke`). Only within `farm.show.range` 40 m of the camera; no server cost.
+- **Survival (6): crops move in the wind.** Why: plants stood rigid in a calm or a thunderstorm (G5). Each of a plot's nine
+  plants is its own mesh about its base (`AWRBuildPiece::PlantMeshes`); `FWRFarmLook::TickSway` leans them downwind by their
+  growth, a gust rolling across the plot by position, a slow second wave, harder in a thunderstorm, blizzard or gale
+  (tuning `farm.sway`); only plots within 30 m of the camera move.
+- **Survival (7): a pen reads at a glance.** Why: a penned animal at an empty trough looked exactly like a fed one
+  (LATER-COOKS 140; Stardew's animals). New creature mood `Hungry` (head hung low, shoulders sagging, a slow listless sway);
+  `TickPen` marks its animals each pass and `AWRCreature::SetMood` turns their idle mood into the pen's: hungry at an empty
+  trough, a 4 s graze in every 16 at a full one (`farm.pen.grazeEvery / grazeSeconds`).
+- **Survival (8): wet.** Why: rain and swimming did nothing to you (LATER-COOKS 135, world-map W1). Open rain or the water
+  you're in makes you Wet until `wet.drySeconds` 60 after (8 s by a warding fire); while wet, fire damage x0.8 (`ApplyHit`),
+  a burn builds x0.7, frostbite x1.15, shock x1.2 (`AddStatusBuildup`); the HUD's conditions show "Wet · dry in 0:42" with
+  what it does. No temperature meter (Raven's rule): it's a short condition with a clear counter (a roof, a fire).
+- **Survival (9): greenhouse glass.** Why: the glazing wore the ice material (LATER-COOKS 140). `M_WindowGlass`
+  (`Tools/terrain/build_glass_material.py`, `/Game/Wildreach/Materials`): old crown glass, a faint green-grey cast rippling
+  across the pane, nearly clear face-on and mirror-bright toward grazing angles, smooth with a sharp glint; tuning
+  `farm.glassMaterial` (ice if it's missing).
 - **Music check (Aaron 11-15):** nothing in the game shows the music or asks you to play to it (no staff, notes, beat
   markers or rhythm prompts exist); the soundtrack's smooth switching stays as it is.
 

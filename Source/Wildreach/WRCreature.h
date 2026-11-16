@@ -170,6 +170,7 @@ enum class EWRCreatureMood : uint8
 	Threat,   // its display before the first charge: head low, eyes on its target
 	Flee,     // running for it
 	Eat,      // over a kill
+	Hungry,   // a penned animal at an empty trough: head hung low, listless (cooks/cookpass-survival.md 3.6)
 };
 
 UENUM()
@@ -283,6 +284,10 @@ public:
 	/** Server: its mood unless it was set again within the stale time (biome hooks that take the brain's turn). */
 	void TickMoodStale();
 	double MoodSetAt = 0.0;
+	/** Server: penned (WRFarm TickPen marks it each second): until then its idle mood follows the trough: hungry at an
+	 *  empty one, a graze now and then at a full one (cooks/cookpass-survival.md 3.6). */
+	double PennedUntil = 0.0;
+	bool bPenHungry = false;
 	/** Server: the wary stare (cookpass-creatures 3.2): who it watches and until when (held a moment after they leave). */
 	TWeakObjectPtr<AActor> WaryOf;
 	double WaryUntil = 0.0;

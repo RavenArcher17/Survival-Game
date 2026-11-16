@@ -1700,6 +1700,15 @@ private:
 					[this]() { const UWRFoodComponent* F = Food(); return FText::FromString(FString::Printf(TEXT("Sated · %s"), *Clock(F ? F->SatedSecondsLeft() : 0.f))); },
 					[]() { return FText::FromString(TEXT("A good meal: hunger holds still")); })
 			]
+			// Wet from rain or the water (cooks/cookpass-survival.md 3.7): what it does, and how long until you're dry.
+			+ SVerticalBox::Slot().AutoHeight()
+			[
+				Condition([this]() { const UWRSurvivalComponent* S = Surv(); return S && S->IsWet(); },
+					[]() { return FName(TEXT("weather_rain")); },
+					[]() { return FLinearColor(FColor(120, 176, 214)); },
+					[this]() { const UWRSurvivalComponent* S = Surv(); return FText::FromString(FString::Printf(TEXT("Wet · dry in %s"), *Clock(S ? S->WetSecondsLeft() : 0.f))); },
+					[]() { return FText::FromString(TEXT("Fire hurts less and burns slower; frost and shock bite harder. A fire dries you fast")); })
+			]
 			// The weather where you are: coming (with the count), or on, and whether you're beating it.
 			+ SVerticalBox::Slot().AutoHeight()
 			[

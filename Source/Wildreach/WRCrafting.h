@@ -291,4 +291,22 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Visual;
 	FName LookType;
 	FName FitType;   // the station type its collision box was fitted to (FWRBuildLook::FitCollision)
+
+	// The kitchen at work (cooks/cookpass-survival.md 3.4; WRKitchenShow.cpp), on machines that draw: the meat or fish on
+	// a campfire's spit browning as it cooks, what's done waiting on a hearth stone, the pot's lid lifting on its steam,
+	// smoke from a working smokehouse's vent and oven's chimney.
+	bool IsKitchenShow() const;
+	void TickKitchenShow(float DeltaSeconds);
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowSpit;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowTray;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowLid;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShowFx;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShowFxRun;
+	UPROPERTY(Transient) TObjectPtr<class UAudioComponent> ShowLoop;
+	FName ShowSpitFor;
+	int32 ShowSpitShade = -1;
+	FName ShowTrayFor;
+	int32 ShowTrayCount = -1;
+	float ShowSpitAngle = 0.f;
+	bool bShowWorking = false;
 };

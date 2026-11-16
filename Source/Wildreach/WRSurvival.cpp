@@ -2,6 +2,7 @@
 // showcase-notes cooks/build-survival.md). Numbers: tuning rest / rested / comfort / darkness / lights / corruption,
 // and Data/weather.json.
 #include "WRSurvival.h"
+#include "WRWater.h"
 #include "WRNecroPath.h"
 #include "WRGraveEvents.h"
 #include "WRCrystalTypes.h"
@@ -812,6 +813,7 @@ void UWRSurvivalComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, ComfortHere, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, bUnlit, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, Corruption, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, WetUntil, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, CorruptionFrom, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, WeatherBiome, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UWRSurvivalComponent, BiomeHere, COND_OwnerOnly);
@@ -1126,6 +1128,16 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 {
 	WThirst = WRegen = WRun = WBurn = WSwim = WCorruption = 1.f;
 	const FVector At = Pawn->GetActorLocation();
+	// Wet from the water you're in; drying fast by a warding fire (a campfire, a brazier, a Hearth).
+	if (UWRWaterSubsystem::IsInWater(Cast<ACharacter>(Pawn)))
+	{
+		WetUntil = Now + WRTune(TEXT("wet.drySeconds"), 60.f);
+	}
+	else if (WetUntil > Now)
+	{
+		UWRLightSubsystem* WarmLights = UWRLightSubsystem::Get(this);
+		if (WarmLights && WarmLights->IsWarded(At)) WetUntil = FMath::Min(WetUntil, Now + WRTune(TEXT("wet.fireSeconds"), 8.f));
+	}
 	BiomeHere = WRBiome::At(this, At);
 	const FWRWeatherKind* K = UWRWeatherSubsystem::ActiveKind(this, BiomeHere);
 	bSheltered = WRBiome::IsUnderground(this, At) || (K && K->RoofWithin > 0.f && WRBiome::IsCovered(this, At, K->RoofWithin, Pawn));
@@ -1172,6 +1184,11 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 		if (!bSheltered)
 		{
 			WBurn = K->BurnMult;
+		}
+		// And you (cooks/cookpass-survival.md 3.7): wet under open rain, whatever you wear.
+		if (K->bWatersCrops && !bSheltered)
+		{
+			WetUntil = Now + WRTune(TEXT("wet.drySeconds"), 60.f);
 		}
 		// Gusts: a whistle, then a shove along the storm's wind (one direction per storm, from when it was announced).
 		const FWRWeatherNow* W = UWRWeatherSubsystem::For(this, BiomeHere);
@@ -1592,4 +1609,20 @@ void UWRSurvivalComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 	bool bOn = true;
 	Json->TryGetBoolField(TEXT("lightOn"), bOn);
 	bLoadedLightOff = !bOn;
+}
+
+bool UWRSurvivalComponent::IsWet() const
+{
+	return WetUntil > UWRWeatherSubsystem::Now(this);
+}
+
+float UWRSurvivalComponent::WetSecondsLeft() const
+{
+	return FMath::Max(0.f, WetUntil - UWRWeatherSubsystem::Now(this));
+}
+
+bool UWRSurvivalComponent::IsWet(const AActor* Character)
+{
+	const UWRSurvivalComponent* S = For(Character);
+	return S && S->IsWet();
 }

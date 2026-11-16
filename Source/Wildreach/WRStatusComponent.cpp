@@ -301,6 +301,13 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 		if (Id == WRStatus::Shock) Amount *= WRStatus::Def(WRStatus::Soak, TEXT("shockBuildup"), 1.5f);
 		if (Id == WRStatus::Frost) Amount *= WRStatus::Def(WRStatus::Soak, TEXT("frostBuildup"), 1.5f);
 	}
+	// Wet from rain or the water (cooks/cookpass-survival.md 3.7): a burn takes slower, frost and shock faster.
+	if (UWRSurvivalComponent::IsWet(GetOwner()))
+	{
+		if (Id == WRStatus::Burn) Amount *= WRTune(TEXT("wet.burnBuildup"), 0.7f);
+		if (Id == WRStatus::Frost) Amount *= WRTune(TEXT("wet.frostBuildup"), 1.15f);
+		if (Id == WRStatus::Shock) Amount *= WRTune(TEXT("wet.shockBuildup"), 1.2f);
+	}
 	// The shock-resist potion (Storm peaks): shock builds slower while it lasts.
 	if (Id == WRStatus::Shock && WRStorm::HasBuff(GetOwner(), TEXT("shock_ward")))
 	{

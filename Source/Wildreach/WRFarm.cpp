@@ -1,6 +1,7 @@
 // Farming and food (FULL-GAME 6.2; showcase-notes cooks/build-farming.md). See WRFarm.h for the shape of it.
 
 #include "WRFarm.h"
+#include "WRFarmLook.h"
 #include "WRForestCreatures.h"
 #include "WRForestHazards.h"
 #include "WRBuilding.h"
@@ -1241,6 +1242,8 @@ void UWRFarmSubsystem::Tick(float DeltaTime)
 		return;
 	}
 	FWRSpoil::DisplayNow = FWRSpoil::NowFor(World);
+	// Crops in the wind, where they're drawn (cooks/cookpass-survival.md 3.5).
+	FWRFarmLook::TickSway(World, DeltaTime);
 	if (World->GetNetMode() == NM_Client)
 	{
 		return;
@@ -1502,6 +1505,14 @@ void UWRFarmSubsystem::TickPen(AWRBuildPiece* Pen, float Dt)
 	for (const FWRItemStack& S : Pen->Storage) bShelfFull &= !S.IsEmpty();
 	TMap<FName, int32> Herd;
 	int32 Counted = 0;
+	// The animals read their trough (cooks/cookpass-survival.md 3.6): AWRCreature::SetMood turns their idle mood into
+	// the pen's (hungry at an empty trough, a graze now and then at a full one); refreshed every pass.
+	for (AWRCreature* A : Animals)
+	{
+		A->PennedUntil = World->GetTimeSeconds() + 2.5;
+		A->bPenHungry = Pen->Feed <= 0;
+		if (A->GetMood() <= EWRCreatureMood::Preen || A->GetMood() == EWRCreatureMood::Hungry) A->SetMood(EWRCreatureMood::Calm);
+	}
 	for (AWRCreature* A : Animals)
 	{
 		const FWRAnimalDef* Def = FWRFarmDefs::Get().Animal(A->CreatureId);
