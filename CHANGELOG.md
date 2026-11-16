@@ -17,6 +17,17 @@ cooks/cookpass-building.md. Compiled (editor target) after each part; not played
   takes the bag first, then the nearest chest). New piece: the **lean-to** (wood 10, fiber 8: two forked uprights, a
   lashed ridge pole, five rafters dug in, seven rows of conifer boughs laid bottom-up, a wind-block log; you crawl in under
   its sloped roof, and it counts as a roof for a bedroll's rest and comfort). Tested by compiling.
+- **Part B, every path raids.** Why: only Fire/Frost spells and bolts touched buildings, so the raid table's lightning
+  x1.5 on metal, spore x1.5 on wood, void x1.25 and arcane x1.25 on stone did nothing for area casts. Thunderclap, Arcane
+  blast, every Starfall star, Corpse explosion, Collapse, Maw of the void, the Sunburst column and each second of Blight's
+  rot now hit the buildings in them too (`FWRRaiding::SplashPieces`: spell share x the path's multiplier, never your own
+  or your clan's, nothing on PvE worlds, the claim's bell rings). Blood boil (it bursts inside wounds) and the healing /
+  pulling water fields stay off walls by design. Tested by compiling.
+- **Part C, the body on a ladder, and hot springs.** Why: a climber hung in the idle pose on a siege ladder; the bath
+  could only go by lava though the tundra has the Steam Ground. Now the climber goes hand over hand: one hand reaches a
+  rung while the other foot steps up, one cycle every two rungs, timed by height so it stops when you stop (tuning
+  `anim.climb`); the same pose layer has push / crank / aim poses for siege crews (used by part D). The hot spring bath
+  also stands inside a hot spring (the Steam Ground, `building.hotSpringKinds`). Tested by compiling.
 ## Unreleased: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
 
 Aaron (lane cookpass-survival: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-survival.md).

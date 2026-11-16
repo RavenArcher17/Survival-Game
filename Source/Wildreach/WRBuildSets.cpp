@@ -264,6 +264,42 @@ FString FWRBuildSets::BlueprintSource(FName Blueprint)
 	return S.Left(1).ToUpper() + S.Mid(1);
 }
 
+// The tundra's hot springs (cookpass-building 3.4): the places in island_places.json whose kind is in
+// building.hotSpringKinds (the Steam Ground), each a circle of its "clear" metres round its "at".
+namespace WRBuildSetsHot
+{
+	bool InHotSpring(const FVector& Location)
+	{
+		struct FSpring { FVector2D At; float R; };
+		static TArray<FSpring> Springs;
+		static bool bRead = false;
+		if (!bRead)
+		{
+			bRead = true;
+			TArray<FString> Kinds;
+			FWRTuning::Get().Str(TEXT("building.hotSpringKinds"), TEXT("steam_ground,hot_spring")).ParseIntoArray(Kinds, TEXT(","), true);
+			for (FString& K : Kinds) K.TrimStartAndEndInline();
+			const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(TEXT("island_places.json"));
+			const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+			if (File.IsValid() && File->TryGetArrayField(TEXT("places"), Rows))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *Rows)
+				{
+					const TSharedPtr<FJsonObject> R = V.IsValid() ? V->AsObject() : nullptr;
+					FString Kind;
+					const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
+					double Clear = 20.0;
+					if (!R.IsValid() || !R->TryGetStringField(TEXT("kind"), Kind) || !Kinds.Contains(Kind) || !R->TryGetArrayField(TEXT("at"), At) || At->Num() < 2) continue;
+					R->TryGetNumberField(TEXT("clear"), Clear);
+					Springs.Add({ FVector2D((*At)[0]->AsNumber() * 100.0, (*At)[1]->AsNumber() * 100.0), float(Clear * 100.0) });
+				}
+			}
+		}
+		for (const FSpring& S : Springs) if (FVector2D::DistSquared(FVector2D(Location), S.At) <= S.R * S.R) return true;
+		return false;
+	}
+}
+
 FString FWRBuildSets::PlaceCheck(const UObject* WorldContext, const FWRPieceDef& Def, const FVector& Location, const AActor* Builder)
 {
 	using namespace WRBuildSetsDetail;
@@ -278,7 +314,7 @@ FString FWRBuildSets::PlaceCheck(const UObject* WorldContext, const FWRPieceDef&
 	{
 		return TEXT("no building underground: bases stand on the surface");
 	}
-	if (Def.Needs == TEXT("vent") && !FWRMachines::LavaNear(Location, WRTune(TEXT("building.ventReach"), 800.f)))
+	if (Def.Needs == TEXT("vent") && !FWRMachines::LavaNear(Location, WRTune(TEXT("building.ventReach"), 800.f)) && !WRBuildSetsHot::InHotSpring(Location))
 	{
 		return TEXT("a hot spring bath sits on a volcanic vent (lava within 8 m) or a hot spring");
 	}

@@ -291,6 +291,9 @@ private:
 	// Riding (cooks/cookpass-taming.md 3.6, 3.7): the seated pose's weight, the body eased onto / off the saddle from
 	// where it stood (a world offset that dies away), and the saddle bone's rise and fall the body follows.
 	float SeatBlend = 0.f;
+	/** The ladder's climbing pose and a siege post's working pose, eased in and out (cookpass-building 3.5). */
+	float ClimbBlend = 0.f;
+	float CrewBlend = 0.f;
 	TWeakObjectPtr<AActor> SeatParent;
 	FVector SeatEaseFrom = FVector::ZeroVector;
 	float SeatEaseT = 1.f, SeatEaseSeconds = 0.45f;

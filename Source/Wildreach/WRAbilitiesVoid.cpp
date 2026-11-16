@@ -1,5 +1,6 @@
 // The Void path's abilities (see WRAbilitiesVoid.h; cooks/biome-void.md 2.17).
 #include "WRAbilitiesVoid.h"
+#include "WRRaiding.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
@@ -292,10 +293,12 @@ void UWRGA_Collapse::CastVoid(AWRCharacterBase* Caster)
 	TWeakObjectPtr<AWRCharacterBase> WeakCaster(Caster);
 	const float Damage = Spell(TEXT("damage"), 30.f);
 	FTimerHandle H;
-	Caster->GetWorldTimerManager().SetTimer(H, [WeakCaster, Pulled, Damage, this]()
+	Caster->GetWorldTimerManager().SetTimer(H, [WeakCaster, Pulled, Damage, Radius, this]()
 	{
 		AWRCharacterBase* C = WeakCaster.Get();
 		if (!C) return;
+		// Path raiding (cookpass-building 3.7): the implosion crushes the buildings in it too (void x1.25 on all).
+		FWRRaiding::SplashPieces(C->GetWorld(), C->GetActorLocation(), Radius, Damage, EWRRaidSource::Spell, C, FWRRaiding::Responsible(C), TEXT("void"));
 		for (const TWeakObjectPtr<AWRCharacterBase>& W : Pulled)
 		{
 			AWRCharacterBase* V = W.Get();
@@ -367,6 +370,8 @@ void UWRGA_MawOfTheVoid::CastVoid(AWRCharacterBase* Caster)
 			if (bEat) WRVoid::RestoreMaxHealth(C, EatRestore);
 		}
 		WRSound::PlayAt(C, TEXT("void.maw.close"), From + Face.Vector() * Range * 0.5f);
+		// The petals close on whatever stands in the cone, buildings too (its middle and half its reach).
+		FWRRaiding::SplashPieces(C->GetWorld(), From + Face.Vector() * Range * 0.5f, Range * 0.5f, Damage, EWRRaidSource::Spell, C, FWRRaiding::Responsible(C), TEXT("void"));
 	}, Close, false);
 }
 

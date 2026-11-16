@@ -1,4 +1,5 @@
 #include "WRAbilitiesSun.h"
+#include "WRRaiding.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
@@ -743,6 +744,8 @@ void AWRSunColumn::Tick(float DeltaSeconds)
 	AWRCharacterBase* C = Caster.Get();
 	WRFx::Broadcast(this, TEXT("sun.column"), GetActorLocation(), FRotator::ZeroRotator, Radius / 600.f, TEXT("sun.column"));
 	if (!C) return;
+	// Path raiding (cookpass-building 3.7): the column of sun scorches the buildings it falls on.
+	FWRRaiding::SplashPieces(GetWorld(), GetActorLocation(), Radius, Damage, EWRRaidSource::Spell, C, FWRRaiding::Responsible(C), TEXT("sun"));
 	for (AWRCharacterBase* Who : SnHostilesNear(C, GetActorLocation(), Radius))
 	{
 		FWRHit Hit = SnBase(C, Damage, Blind);

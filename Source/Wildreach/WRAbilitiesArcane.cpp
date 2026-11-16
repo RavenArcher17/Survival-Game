@@ -5,6 +5,7 @@
 // a star's landing point glints 1.2 s before it lands, a rune is a hexafoil on the ground anyone can see.
 
 #include "WRAbilitiesArcane.h"
+#include "WRRaiding.h"
 #include "Wildreach.h"
 #include "WRArcanePath.h"
 #include "WRAttributeSet.h"
@@ -475,6 +476,8 @@ void UWRGA_ArcaneBlast::CastArcane(AWRCharacterBase* Caster, float Ch, bool /*bE
 	const float Radius = Spell(TEXT("radius"), 300.f);
 	WRFx::Broadcast(Caster, TEXT("arcane.blast"), AimPoint, FRotator::ZeroRotator, Radius / 150.f, TEXT("arcane.blast"));
 	WRCrystal::Emit(Caster, AimPoint, WRCrystal::NoiseRadius(TEXT("cast")) * 1.5f, Caster, TEXT("cast"));
+	// Path raiding (cookpass-building 3.7): the blast hits the buildings in it too (arcane x1.25 on stone).
+	FWRRaiding::SplashPieces(Caster->GetWorld(), AimPoint, Radius, Spell(TEXT("damage"), 32.f) * Ch, EWRRaidSource::Spell, Caster, FWRRaiding::Responsible(Caster), PathId);
 	for (TActorIterator<AWRCharacterBase> It(Caster->GetWorld()); It; ++It)
 	{
 		AWRCharacterBase* Who = *It;
@@ -636,6 +639,7 @@ void UWRGA_Starfall::CastArcane(AWRCharacterBase* Caster, float /*Charge*/, bool
 			AWRCharacterBase* C = Weak.Get();
 			if (!C) return;
 			WRFx::Broadcast(C, Burn > 0.f ? TEXT("arcane.meteor") : TEXT("arcane.star"), At, FRotator::ZeroRotator, StarRadius / 120.f, TEXT("arcane.star_land"));
+			FWRRaiding::SplashPieces(C->GetWorld(), At, StarRadius, StarDamage, EWRRaidSource::Spell, C, FWRRaiding::Responsible(C), TEXT("arcane"));
 			for (TActorIterator<AWRCharacterBase> It(C->GetWorld()); It; ++It)
 			{
 				AWRCharacterBase* Who = *It;
