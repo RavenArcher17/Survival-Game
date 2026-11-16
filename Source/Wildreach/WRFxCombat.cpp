@@ -19,6 +19,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerUI.h"
 #include "WRKeyBindings.h"
+#include "WRAttributeSet.h"
 
 uint16 WRFx::HitFlagsFor(const FWRHit& Hit, bool bCrit, bool bRiposte, bool bWeak, bool bShatter, bool bArmored)
 {
@@ -29,14 +30,14 @@ uint16 WRFx::HitFlagsFor(const FWRHit& Hit, bool bCrit, bool bRiposte, bool bWea
 	if (bWeak) F |= Hit_Weak;
 	if (bShatter) F |= Hit_Shatter;
 	if (Hit.bMelee) F |= Hit_Melee;
-	if (Hit.bDamageOverTime) F |= Hit_Dot;
+	if (Hit.bDamageOverTime && !Hit.bBurst) F |= Hit_Dot;
 	if (Hit.Element == WRTags::Element_Fire) F |= Hit_Fire;
 	if (Hit.Element == WRTags::Element_Frost) F |= Hit_Frost;
 	if (bArmored) F |= Hit_Armored;
 	// How it lands: the move's tier (crits always crit-tier; old callers' heavy blows count as heavy).
 	EWRHitTier Tier = Hit.Tier;
 	if (Hit.bCritical || bRiposte) Tier = EWRHitTier::Crit;
-	else if (Tier == EWRHitTier::Light && (Hit.bHeavy || Hit.bWeaponArt || bShatter)) Tier = EWRHitTier::Heavy;
+	else if (Tier == EWRHitTier::Light && (Hit.bHeavy || Hit.bWeaponArt || bShatter || Hit.bBurst)) Tier = EWRHitTier::Heavy;
 	return WithTier(F, Tier);
 }
 
@@ -172,7 +173,9 @@ void WRFx::ShowHit(AActor* Target, AActor* Source, float Damage, EWRHitResult Re
 		WRSound::PlayAt(Target, bArmour ? TEXT("hit.armor") : Impact == TEXT("hit.ice") ? TEXT("frost.impact") : Impact == TEXT("hit.dust") ? TEXT("hit.dust") : TEXT("hit.flesh"),
 			Point, bHeavy ? 1.25f : 1.f);
 		// Every connected blow freezes both bodies a beat by its tier, the victim shaking along it, flashing white.
-		WRFx::HitStopEx(Target, Source, Stop, Deep, ShakeCm, -Toward);
+		// Only a blade in the body stops its wielder (Monster Hunter, Elden Ring): an archer, a caster or a turret far off
+		// keeps moving when its shot lands (cookpass-combat 3.8).
+		WRFx::HitStopEx(Target, (Flags & Hit_Melee) ? Source : nullptr, Stop, Deep, ShakeCm, -Toward);
 		Fx->Flash(Target, T.Num(FString::Printf(TEXT("fx.flash.%s"), Tier == EWRHitTier::BossKill ? TEXT("crit") : TierKey), 0.07f), false);
 		Feel(Weight);
 		break;
@@ -197,6 +200,27 @@ void WRFx::ShowHit(AActor* Target, AActor* Source, float Damage, EWRHitResult Re
 			}
 		}
 	}
+	// Where you were hit from (cookpass-combat 3.7): a dark-red edge on that side, by the blow's share of your health; a tick
+	// pulses the whole edge faintly.
+	if (bOnMe && Damage > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
+	{
+		const AWRCharacterBase* Hurt = Cast<AWRCharacterBase>(Target);
+		const float MaxHp = Hurt && Hurt->GetAttributes() ? FMath::Max(1.f, Hurt->GetAttributes()->GetMaxHealth()) : 100.f;
+		const FWRTuning& HT = FWRTuning::Get();
+		const bool bTick = (Flags & Hit_Dot) != 0;
+		const float Strength = bTick ? HT.Num(TEXT("fx.hud.hurtTick"), 0.18f)
+			: FMath::Min(HT.Num(TEXT("fx.hud.hurtMax"), 0.85f), HT.Num(TEXT("fx.hud.hurtBase"), 0.25f) + HT.Num(TEXT("fx.hud.hurtScale"), 3.f) * Damage / MaxHp);
+		const double HurtNow = Target->GetWorld()->GetTimeSeconds();
+		// A tick never covers a fresh blow's edge.
+		const float Left = Fx->HurtStrength * FMath::Max(0.f, 1.f - float(HurtNow - Fx->HurtTime) / HT.Num(TEXT("fx.hud.hurtSeconds"), 0.6f));
+		if (!bTick || Left < Strength)
+		{
+			Fx->HurtTime = HurtNow;
+			Fx->HurtStrength = Strength;
+			Fx->bHurtTick = bTick;
+			Fx->HurtFrom = Origin.IsNearlyZero() ? Target->GetActorLocation() : Origin;
+		}
+	}
 	Fx->AddHudHit(Target, Point, Damage, Result, Flags, bMine, bOnMe);
 }
 
@@ -208,6 +232,18 @@ void UWRFxSubsystem::AddHudHit(AActor* Target, const FVector& Point, float Damag
 		MarkerTime = Now;
 		MarkerFlags = Flags;
 		MarkerResult = Result;
+	}
+	// Your running damage on one body while your blows keep landing (cookpass-combat 3.3, Elden Ring's boss number): the
+	// boss bar and the enemy bars show it, whatever the damage-number setting.
+	if (bMine && Damage > 0.f && !(Flags & WRFx::Hit_Dot) && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken || Result == EWRHitResult::Blocked))
+	{
+		if (TallyTarget.Get() != Target || Now - TallyTime > WRTune(TEXT("fx.hud.tallySeconds"), 2.5f))
+		{
+			Tally = 0.f;
+		}
+		TallyTarget = Target;
+		Tally += Damage;
+		TallyTime = Now;
 	}
 	// Damage numbers only when they're turned on (Settings, off by default: combat.md 2.14), and no number for a parry,
 	// a dodge or a guard that took it all (no hit words, COMBAT-AND-LESSONS L6).
@@ -279,7 +315,8 @@ void WRFx::HitStopEx(AActor* Victim, AActor* Attacker, float Seconds, float Dela
 				Found->Mesh = Mesh;
 				Found->Start = Start;
 			}
-			Found->Until = FMath::Max(Found->Until, Until);
+			// However many blows extend it, one freeze never runs past 0.3 s from its start (L1; cookpass-combat 3.8).
+			Found->Until = FMath::Min(FMath::Max(Found->Until, Until), Found->Start + 0.3);
 			Found->Seconds = FMath::Max(0.f, float(Found->Until - Found->Start));
 			Found->CatchUpUntil = Found->Until + CatchUp;
 			// Only the body actually struck shakes, and only its root mesh (the pieces attached to it go with it); not a

@@ -693,6 +693,7 @@ bool FWRSkyBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 			FWRHit Hit = SbHit(Boss, Boss->GetAttributes()->GetMaxHealth() * SbT(Boss, TEXT("fallDamage"), 0.25f), true);
 			Hit.Instigator = nullptr;
 			Hit.bDamageOverTime = true;
+			Hit.bBurst = true;
 			UWRCombatLibrary::ApplyHit(Boss, Hit);
 			UWRCombatLibrary::BreakStance(Boss, SbT(Boss, TEXT("kneelSeconds"), 10.f), nullptr);
 			S.KneelUntil = T + SbT(Boss, TEXT("kneelSeconds"), 10.f);

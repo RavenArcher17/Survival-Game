@@ -926,6 +926,7 @@ void WRNature::OnBleedBurst(AWRCharacterBase* Owner, AWRCharacterBase* Source, f
 		Barb.Damage = Extra;
 		Barb.Element = WRTags::Element_Physical;
 		Barb.bDamageOverTime = true;
+		Barb.bBurst = true;
 		Barb.bReaction = true;
 		Barb.Origin = Owner->GetActorLocation();
 		UWRCombatLibrary::ApplyHit(Owner, Barb);

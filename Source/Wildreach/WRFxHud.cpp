@@ -11,8 +11,11 @@
 #include "WRPlayerUI.h"
 #include "WRTuning.h"
 #include "WRUIStyle.h"
+#include "WRUIWidgets.h"
 #include "WRPerkHud.h"
 #include "WRFishing.h"
+#include "WRKeyBindings.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
@@ -189,6 +192,42 @@ public:
 			FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(Size, FSlateLayoutTransform(FVector2D(0.f, 0.f))), WRUI::White(), ESlateDrawEffect::None, FLinearColor(0.96f, 0.95f, 1.f, WRTune(TEXT("status.defs.glare.white"), 0.4f)));
 		}
 
+		// Hurt (cooks/cookpass-combat.md 3.7): a dark-red edge on the side the blow came from (the bottom for behind), by its
+		// share of your health, fading over hurtSeconds; a tick pulses every edge faintly. Off with Camera shake at 0 (the
+		// one comfort switch for screen motion and flashes).
+		{
+			const float HurtLen = FMath::Max(0.05f, WRTune(TEXT("fx.hud.hurtSeconds"), 0.6f));
+			const float HurtAge = static_cast<float>(Now - Fx->HurtTime);
+			const APawn* Me = P->GetPawn();
+			if (Me && HurtAge >= 0.f && HurtAge < HurtLen && FWRKeyBindings::Get().Pref(TEXT("Shake")) > 0.f && P->PlayerCameraManager)
+			{
+				const float Fade = 1.f - HurtAge / HurtLen;
+				const float A = Fx->HurtStrength * Fade * Fade;
+				// The blow's bearing from the view: 0 ahead (top edge), 90 right, 180 behind (bottom), -90 left.
+				const float Bearing = FMath::FindDeltaAngleDegrees(P->PlayerCameraManager->GetCameraRotation().Yaw, (Fx->HurtFrom - Me->GetActorLocation()).Rotation().Yaw);
+				const float EdgeAngle[4] = { 0.f, 90.f, 180.f, -90.f };   // top, right, bottom, left
+				const FLinearColor Blood = FLinearColor(FColor(0x7A, 0x0A, 0x14));
+				const float Depth = WRTune(TEXT("fx.hud.hurtDepth"), 0.18f);
+				const int32 Bands = 6;
+				for (int32 e = 0; e < 4; ++e)
+				{
+					const float W = Fx->bHurtTick || (Fx->HurtFrom - Me->GetActorLocation()).SizeSquared2D() < 1.f ? 1.f
+						: FMath::Max(0.f, FMath::Cos(FMath::DegreesToRadians(FMath::FindDeltaAngleDegrees(EdgeAngle[e], Bearing))));
+					if (W * A < 0.01f) continue;
+					for (int32 b = 0; b < Bands; ++b)
+					{
+						// Thickest at the border, gone Depth of the way in.
+						const float In = (b + 1) / float(Bands) * Depth;
+						const FLinearColor C(Blood.R, Blood.G, Blood.B, A * W / Bands * 1.7f);
+						const bool bHorizontal = e == 0 || e == 2;
+						const FVector2D BandSize = bHorizontal ? FVector2D(Size.X, Size.Y * In) : FVector2D(Size.X * In * (Size.Y / FMath::Max(1.f, Size.X)), Size.Y);
+						const FVector2D At = e == 0 ? FVector2D(0.f, 0.f) : e == 2 ? FVector2D(0.f, Size.Y - BandSize.Y) : e == 1 ? FVector2D(Size.X - BandSize.X, 0.f) : FVector2D(0.f, 0.f);
+						FSlateDrawElement::MakeBox(Out, Layer, Geo.ToPaintGeometry(BandSize, FSlateLayoutTransform(At)), WRUI::White(), ESlateDrawEffect::None, C);
+					}
+				}
+			}
+		}
+
 		// Damage numbers, oldest first so new ones draw on top.
 		for (const UWRFxSubsystem::FHudHit& H : Fx->HudHits)
 		{
@@ -237,25 +276,23 @@ public:
 		// Fishing: the cast's charge ring, the line's tension arc, what the button does now (WRFishing).
 		Layer = AWRBobber::PaintHud(P, Geo, Out, Layer, Size, VX, VY);
 
-		// What you've locked on to: four gold corners around it, sized to it.
-		if (const AWRCharacterBase* Lock = P->GetLockTarget())
+		// What you've locked on to (cookpass-combat 3.4, Elden Ring's mark): a small warm dot on the very point the camera
+		// holds (a big body's head, chest or wing), and a ring closing onto it whenever the lock lands or moves to another
+		// point, so every change shows. Gold-white: it's yours.
+		if (P->GetLockTarget())
 		{
-			const FVector At = Lock->GetActorLocation();
-			FVector2D Middle, Top;
-			if (P->ProjectWorldLocationToScreen(At, Middle, true) && P->ProjectWorldLocationToScreen(At + FVector(0.f, 0.f, Lock->GetSimpleCollisionHalfHeight()), Top, true))
+			FVector2D Mark;
+			if (P->ProjectWorldLocationToScreen(P->GetLockAimLocation(), Mark, true))
 			{
-				const FVector2D C(Middle.X * Size.X / VX, Middle.Y * Size.Y / VY);
-				const float R = FMath::Clamp(static_cast<float>(FMath::Abs(Middle.Y - Top.Y)) * Size.Y / VY * 1.25f, 18.f, 150.f);
-				const float L = FMath::Max(7.f, R * 0.35f);
-				for (int32 k = 0; k < 4; ++k)
-				{
-					const FVector2D S2(k == 0 || k == 3 ? -1.f : 1.f, k < 2 ? -1.f : 1.f);
-					const TArray<FVector2D> Corner = { C + FVector2D(S2.X * R, S2.Y * (R - L)), C + FVector2D(S2.X * R, S2.Y * R), C + FVector2D(S2.X * (R - L), S2.Y * R) };
-					TArray<FVector2D> Under;
-					for (const FVector2D& V : Corner) Under.Add(V + FVector2D(1.f, 1.f));
-					FSlateDrawElement::MakeLines(Out, Layer + 2, Geo.ToPaintGeometry(), Under, ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.f, 0.6f), true, 3.f);
-					FSlateDrawElement::MakeLines(Out, Layer + 3, Geo.ToPaintGeometry(), Corner, ESlateDrawEffect::None, FLinearColor(1.f, 0.78f, 0.25f, 0.95f), true, 2.f);
-				}
+				const FVector2D C(Mark.X * Size.X / VX, Mark.Y * Size.Y / VY);
+				const FLinearColor Warm = FLinearColor(FColor(0xFF, 0xE9, 0xB0));
+				const float Dot = 6.f;
+				WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(FVector2D(Dot + 2.f, Dot + 2.f), FSlateLayoutTransform(C - FVector2D(Dot * 0.5f + 1.f))), WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.7f), Dot * 0.5f + 1.f));
+				WRUI::DrawBox(Out, Layer + 3, Geo.ToPaintGeometry(FVector2D(Dot, Dot), FSlateLayoutTransform(C - FVector2D(Dot * 0.5f))), WRUI::Box(Warm, Dot * 0.5f));
+				const float Ease = FMath::Clamp(P->GetLockAge() / 0.18f, 0.f, 1.f);
+				const float Ring = FMath::Lerp(22.f, 10.f, 1.f - FMath::Square(1.f - Ease));
+				const float RingA = 0.95f - 0.45f * Ease;
+				WRUI::DrawBox(Out, Layer + 3, Geo.ToPaintGeometry(FVector2D(Ring * 2.f, Ring * 2.f), FSlateLayoutTransform(C - FVector2D(Ring))), WRUI::Box(FLinearColor::Transparent, Ring, FLinearColor(Warm.R, Warm.G, Warm.B, RingA), 1.5f));
 			}
 		}
 

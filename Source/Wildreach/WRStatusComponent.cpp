@@ -336,7 +336,7 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 	Proc(Id, Source, HitDamage);
 }
 
-void UWRStatusComponent::StatusHit(AWRCharacterBase* Source, float Damage, const FGameplayTag& Element)
+void UWRStatusComponent::StatusHit(AWRCharacterBase* Source, float Damage, const FGameplayTag& Element, bool bBurst)
 {
 	AWRCharacterBase* Owner = GetOwnerCharacter();
 	if (!Owner || Damage <= 0.f)
@@ -348,6 +348,7 @@ void UWRStatusComponent::StatusHit(AWRCharacterBase* Source, float Damage, const
 	Tick.Damage = Damage;
 	Tick.Element = Element.IsValid() ? Element : WRTags::Element_Physical;
 	Tick.bDamageOverTime = true;
+	Tick.bBurst = bBurst;   // a proc's burst lands like a blow (cookpass-combat 3.6)
 	Tick.Origin = Owner->GetActorLocation();
 	UWRCombatLibrary::ApplyHit(Owner, Tick);
 }
@@ -424,7 +425,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		// Frostbite: a burst of cold (8% of max health + 20, bosses 4%), +damage taken, slowed, and (players) slower
 		// stamina; it can't proc again while it lasts (the next fill freezes instead).
 		const float Pct = bBoss ? Def(Frost, TEXT("bossBurstPct"), 0.04f) : Def(Frost, TEXT("burstPct"), 0.08f);
-		StatusHit(Source, MaxHP * Pct + Def(Frost, TEXT("burstFlat"), 20.f), WRTags::Element_Frost);
+		StatusHit(Source, MaxHP * Pct + Def(Frost, TEXT("burstFlat"), 20.f), WRTags::Element_Frost, true);
 		if (!Owner->IsAlive())
 		{
 			break;
@@ -445,7 +446,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 		ApplyStatus(WRTags::Status_Bleeding, Def(Bleed, TEXT("markSeconds"), 6.f));
 		// The Nature path (WRNaturePath.cpp): Barbs bursts a Nature-caused bleed harder; Thorn feast feeds your plants.
 		WRNature::OnBleedBurst(Owner, Source, Burst);
-		StatusHit(Source, Burst, WRTags::Element_Physical);
+		StatusHit(Source, Burst, WRTags::Element_Physical, true);
 		break;
 	}
 	case WRStatus::Poison:
@@ -493,7 +494,7 @@ void UWRStatusComponent::Proc(int32 Id, AWRCharacterBase* Source, float HitDamag
 				&& FVector::Dist(It->GetActorLocation(), Owner->GetActorLocation()) < Def(Shock, TEXT("chainRadius"), 400.f))
 			{
 				--Left;
-				It->Status->StatusHit(Source, Chain, WRTags::Element_Lightning);
+				It->Status->StatusHit(Source, Chain, WRTags::Element_Lightning, true);
 				WRFx::Broadcast(Owner, TEXT("status.shock"), It->GetActorLocation(), (It->GetActorLocation() - Owner->GetActorLocation()).Rotation(), 0.6f);
 			}
 		}

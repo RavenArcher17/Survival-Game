@@ -677,6 +677,7 @@ void UWRSkyAirSubsystem::Landed(ACharacter* Who, FFall& F, float Drop)
 	if (Share >= 1.f && Mult >= 1.f) Hit.Damage = 1.0e7f;
 	Hit.bUnblockable = true;
 	Hit.bDamageOverTime = true;
+	Hit.bBurst = true;   // the ground meeting you: a blow's whole stack
 	Hit.Origin = Who->GetActorLocation() + FVector(0, 0, 100.f);
 	UWRCombatLibrary::ApplyHit(Base, Hit);
 	WRSound::Broadcast(Who, Meters >= Kill * 0.75f ? TEXT("sky.fall_heavy") : TEXT("sky.fall_land"));

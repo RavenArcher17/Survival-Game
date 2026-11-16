@@ -71,6 +71,7 @@
 #include "Widgets/SLeafWidget.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+#include "WRFxSystem.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
@@ -631,17 +632,27 @@ private:
 				SNew(SBox).WidthOverride(640.f * U).Visibility_Lambda([this]() { return EngagedBoss() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 				[
 					SNew(SVerticalBox)
-					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)
+					+ SVerticalBox::Slot().AutoHeight()
 					[
-						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
-						{
-							const AWRBoss* B = EngagedBoss();
-							return B ? FText::FromString(FString::Printf(TEXT("%s   ·   phase %d%s"), *B->GetDisplayLabel(), B->Phase, B->Participants > 1 ? *FString::Printf(TEXT("   ·   %d fighters"), B->Participants) : TEXT(""))) : FText::GetEmpty();
-						}), WRUI::Title(17), WRUI::Ink, true)
+						// The name centred; your running damage at the right while your blows keep landing (cookpass-combat 3.3).
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f)[SNullWidget::NullWidget]
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+							{
+								const AWRBoss* B = EngagedBoss();
+								return B ? FText::FromString(FString::Printf(TEXT("%s   ·   phase %d%s"), *B->GetDisplayLabel(), B->Phase, B->Participants > 1 ? *FString::Printf(TEXT("   ·   %d fighters"), B->Participants) : TEXT(""))) : FText::GetEmpty();
+							}), WRUI::Title(17), WRUI::Ink, true)
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Bottom)
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return BossTally(); }), WRUI::Body(14, 700), WRUI::Ink2)
+						]
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
 					[
-						SNew(SWRBar).Height(16.f * U).Color(FLinearColor(0.72f, 0.12f, 0.08f)).Fraction_Lambda([this]()
+						SNew(SWRBar).Height(16.f * U).Trail(true).Color(FLinearColor(0.72f, 0.12f, 0.08f)).Fraction_Lambda([this]()
 						{
 							const AWRBoss* B = EngagedBoss();
 							const UWRAttributeSet* A = B ? B->GetAttributes() : nullptr;
@@ -657,6 +668,18 @@ private:
 					]
 				]
 			];
+	}
+
+	FText BossTally() const
+	{
+		// Your blows on the engaged boss while they keep landing (UWRFxSubsystem::Tally, fx.hud.tallySeconds).
+		const AWRBoss* B = EngagedBoss();
+		const UWRFxSubsystem* Fx = B ? UWRFxSubsystem::Get(B) : nullptr;
+		if (!Fx || Fx->TallyTarget.Get() != B || Fx->Tally < 1.f || B->GetWorld()->GetTimeSeconds() - Fx->TallyTime > WRTune(TEXT("fx.hud.tallySeconds"), 2.5f))
+		{
+			return FText::GetEmpty();
+		}
+		return FText::AsNumber(FMath::RoundToInt(Fx->Tally));
 	}
 
 	const AWRBoss* EngagedBoss() const
@@ -1284,7 +1307,7 @@ private:
 				return TOptional<FSlateRenderTransform>(FSlateRenderTransform(FVector2D(Px, 0.f)));
 			})
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(62.f * U)[WRUI::Text(Label, WRUI::Caps(12), WRUI::Ink2)]]
-			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(SWRBar).Height(Height)
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SNew(SWRBar).Height(Height).Trail(true)
 				.Color_Lambda([Color, Flash]() { return Flash ? FMath::Lerp(Color, FLinearColor(FColor(245, 240, 230)), Flash()) : Color; })
 				.Fraction_Lambda([Value, Max]() { return FMath::Max(0.f, Value()) / FMath::Max(1.f, Max()); })
 				.Lost_Lambda([Lost, Max]() { return Lost ? FMath::Max(0.f, Lost()) / FMath::Max(1.f, Max()) : 0.f; })]

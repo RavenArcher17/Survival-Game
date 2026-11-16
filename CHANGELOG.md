@@ -27,6 +27,28 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   jump attacks and Wildbrands carry through.
 - **Combat (3): the clip you see.** Why: a swing next to a tree or node played a chop even with a wolf in front (G6). The
   chop / gather clip now plays only with no enemy within 4 m ahead.
+- **Combat (4): every blow at its weight.** Why: spells, arrows, lucky crits, biome creature specials and turrets all
+  landed as light blows (0.06 s stop, a 0.07 s flash, no FOV punch), and one-off bursts (frostbite, hemorrhage, shock
+  arcs, the giant's-ember wave, barbs, falls) were treated as ticks with no stack at all (grades G7, G8).
+  - `ApplyHit`: a blow of impact 3+ or that takes a fifth of the body's health (`fx.heavyShare`) lands heavy; a random /
+    gem crit lands crit tier. A drawn and aimed shot is heavy (`WRRanged.cpp`).
+  - `FWRHit::bBurst`: a burst keeps a tick's rules (no guard, i-frames or poise) but gets a heavy blow's whole stack.
+- **Combat (5): hitstop and camera.** Why: a shot landing froze its archer 30 m away, chained hits stretched one freeze
+  past 0.3 s, and camera trauma was squared twice so anything under a crit moved the view 0.01-0.04 degrees (G10-G12).
+  Only a melee blow freezes its wielder; a freeze is capped at 0.3 s from its start; `fx.trauma` 0.17 + 0.45 w^2
+  (light 0.11 degrees, heavy 0.27, crit 0.96).
+- **Combat (6): you feel where you were hit.** Why: no direction cue and no hurt read at all with packs attacking freely
+  from behind (G9; God of War's off-screen arcs, Ghost of Tsushima's edge). A dark-red edge (#7A0A14) on the side the
+  blow came from (the bottom for behind), by its share of your health, fading over 0.6 s; ticks pulse every edge
+  faintly (`fx.hud.hurt*`; off with Camera shake at 0).
+- **Combat (7): the size of a blow on the bars.** Why: bars jumped straight to the new value and nothing showed your
+  damage on a boss (G3, G4; Elden Ring's chunk and boss number). `SWRBar` `.Trail`: the lost part stays as a pale chunk
+  0.5 s, then drains (`ui.bar`) on every vital row and the boss bar; the canvas enemy bars too. Your running damage sits
+  at the boss bar's right (and the enemy bar's end) while your blows keep landing (`fx.hud.tallySeconds` 2.5 s), always
+  on.
+- **Combat (8): the lock mark.** Why: gold corners framed the body's middle while the camera held a lock point, so
+  flicking from a head to a wing showed nothing (G5). A small warm dot on the exact point held, with a ring closing onto
+  it whenever the lock lands or moves (`AWRPlayerController::GetLockAimLocation`).
 
 ## Unreleased: the audio cook pass (all sound and music)
 

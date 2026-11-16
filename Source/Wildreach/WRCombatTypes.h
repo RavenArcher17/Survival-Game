@@ -58,6 +58,9 @@ struct FWRHit
 	UPROPERTY() bool bWeaponArt = false;
 	/** Status ticks (burn) skip block/parry/riposte/resource gain. */
 	UPROPERTY() bool bDamageOverTime = false;
+	/** A one-off burst under a tick's rules (a frostbite / hemorrhage burst, a shock arc, a fall): no guard, i-frames or
+	 *  poise, but it lands with a heavy blow's whole hit stack (cooks/cookpass-combat.md 3.6). */
+	UPROPERTY() bool bBurst = false;
 	/** Extra knockout torpor (tranq arrows, bolts, darts). */
 	UPROPERTY() float Torpor = 0.f;
 	UPROPERTY() FVector Origin = FVector::ZeroVector;

@@ -90,6 +90,10 @@ public:
 	void ReturnToMenu();
 
 	AWRCharacterBase* GetLockTarget() const { return LockTarget.Get(); }
+	/** Where the lock aims (the lock point of a big body, else just over its middle): the lock mark sits there. */
+	FVector GetLockAimLocation() const;
+	/** Seconds since the lock landed or moved to another point (the mark's ring eases in over the first moments). */
+	float GetLockAge() const { return LockAge; }
 	/** The pad's right stick flicked while locked on: the lock moves to the nearest target that way on screen. */
 	void FlickLock(FVector2D Stick);
 	/** A fast sideways mouse sweep while locked on (WRInput::MouseLook). */

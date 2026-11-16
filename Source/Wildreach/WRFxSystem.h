@@ -278,6 +278,15 @@ public:
 	uint16 MarkerFlags = 0;
 	EWRHitResult MarkerResult = EWRHitResult::Hit;
 	double ParryFlashTime = -100.0;
+	/** The last blow on you (cookpass-combat 3.7): when, how hard (0..1 of the edge), where it came from, a tick or a blow. */
+	double HurtTime = -100.0;
+	float HurtStrength = 0.f;
+	FVector HurtFrom = FVector::ZeroVector;
+	bool bHurtTick = false;
+	/** Your boss tally (cookpass-combat 3.3): your blows on one body while they keep landing. */
+	TWeakObjectPtr<AActor> TallyTarget;
+	float Tally = 0.f;
+	double TallyTime = -100.0;
 	void AddHudHit(AActor* Target, const FVector& Point, float Damage, EWRHitResult Result, uint16 Flags, bool bMine, bool bOnMe);
 
 	/** Stats for `WR.FxStats` and the benchmark. */

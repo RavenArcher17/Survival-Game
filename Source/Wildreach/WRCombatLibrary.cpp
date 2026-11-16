@@ -1051,6 +1051,7 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 						Wave.Element = WRTags::Element_Fire;
 						Wave.BurnBuildup = 30.f;
 						Wave.bDamageOverTime = true;
+						Wave.bBurst = true;
 						ApplyHit(*It, Wave);
 					}
 				}
@@ -1284,6 +1285,19 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		bJudged ? TEXT(" (judged at the player's view)") : TEXT(""), bStanceBroke ? TEXT(" STANCE BROKEN") : TEXT(""));
 
 	uint16 Flags = WRFx::HitFlagsFor(Hit, bCrit, bRiposte, bWeak, bShatter, Target->ArmorValue > 0.f);
+	// Every blow at its weight (cooks/cookpass-combat.md 3.6): a hard-hitting blow (impact 3+, a big spell, a fall), or one
+	// that takes a fifth of the body's health, lands heavy; a lucky crit lands as a crit. Ticks stay ticks.
+	if (!Hit.bDamageOverTime)
+	{
+		if (WRFx::TierOf(Flags) == EWRHitTier::Light && (Hit.Impact >= 3 || Damage >= TargetAttr->GetMaxHealth() * WRTune(TEXT("fx.heavyShare"), 0.2f)))
+		{
+			Flags = WRFx::WithTier(Flags, EWRHitTier::Heavy);
+		}
+		if (bCrit && uint8(WRFx::TierOf(Flags)) < uint8(EWRHitTier::Crit))
+		{
+			Flags = WRFx::WithTier(Flags, EWRHitTier::Crit);
+		}
+	}
 	if (bStanceBroke) Flags |= WRFx::Hit_StanceBreak;
 	if (Hit.bCritical) Reaction = 3;  // a crit's victim always recoils
 	Flags = WRFx::WithReaction(Flags, Reaction);

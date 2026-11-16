@@ -110,6 +110,8 @@ public:
 		SLATE_ATTRIBUTE(FLinearColor, Color)
 		/** A share at the bar's right end lost for now (the Void's grey hatched band: max health it took until you rest). */
 		SLATE_ATTRIBUTE(float, Lost)
+		/** A drop leaves the lost part as a pale chunk that holds, then drains (cookpass-combat 3.3; Elden Ring's bars). */
+		SLATE_ARGUMENT(bool, Trail)
 	SLATE_END_ARGS()
 	void Construct(const FArguments& InArgs);
 	virtual int32 OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override;
@@ -122,6 +124,12 @@ private:
 	mutable float LastLost = 0.f;
 	mutable double GrewAt = -10.0;
 	float Height = 14.f;
+	/** The trail: on, the chunk's top, when the last drop came, the fill last painted and when. */
+	bool bTrail = false;
+	mutable float TrailTop = -1.f;
+	mutable double TrailDropAt = -10.0;
+	mutable float TrailLastF = -1.f;
+	mutable double TrailPaintedAt = 0.0;
 };
 
 /** A keycap showing a key ("E", "LMB", "F1"). */

@@ -121,7 +121,9 @@ whichever machine judges the blow (a dedicated server loads the body mesh and cl
 puts the class's `weapons.json blade` row in that frame; world things (nodes, buildings, fold things, arena pieces) still use
 the reach tube. A chain light into a wall recoils (`CheckRecoil`, tuning `combat.recoil`). New rule: a new weapon class needs a
 `blade` row (two points in the fist's frame and a radius), and a new hero swing clip needs its `trace` window in
-`anim_windows.json`, or its blade path is wrong.
+`anim_windows.json`, or its blade path is wrong. A one-off burst under a tick's rules sets `FWRHit::bBurst` so it gets the full hit stack;
+the tier rises by itself for impact 3+ or a fifth of the body's health. A bar that should show what a blow took uses
+`SWRBar` `.Trail(true)`; your running damage on a body is `UWRFxSubsystem::Tally`.
 
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light

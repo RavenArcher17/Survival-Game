@@ -1021,6 +1021,17 @@ void AWRPlayerController::MouseFlick(FVector2D Delta)
 	FlickLock(FVector2D(FMath::Sign(Delta.X), 0.f));
 }
 
+FVector AWRPlayerController::GetLockAimLocation() const
+{
+	const AWRCharacterBase* Target = LockTarget.Get();
+	if (!Target)
+	{
+		return FVector::ZeroVector;
+	}
+	const AWRCreature* Body = Cast<AWRCreature>(Target);
+	return Body && Body->NumLockPoints() > 0 ? Body->LockPointLocation(FMath::Clamp(LockPoint, 0, Body->NumLockPoints() - 1)) : Target->GetActorLocation() + FVector(0.f, 0.f, 30.f);
+}
+
 void AWRPlayerController::WRLockOn()
 {
 	ToggleLockOn();
@@ -1064,8 +1075,7 @@ void AWRPlayerController::UpdateLockOn(float DeltaTime)
 	}
 	const FVector Eye = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : Self->GetActorLocation();
 	// Aim at the lock point (a big body's head, chest, a wing), not the feet; at a giant the view tips up a little more.
-	const AWRCreature* Body = Cast<AWRCreature>(Target);
-	const FVector AimAt = Body && Body->NumLockPoints() > 0 ? Body->LockPointLocation(FMath::Clamp(LockPoint, 0, Body->NumLockPoints() - 1)) : Target->GetActorLocation() + FVector(0.f, 0.f, 30.f);
+	const FVector AimAt = GetLockAimLocation();
 	FRotator Desired = (AimAt - Eye).Rotation();
 	if (Me && Target->GetSimpleCollisionHalfHeight() > Me->GetSimpleCollisionHalfHeight() * WRTune(TEXT("camera.giantRatio"), 3.f))
 	{

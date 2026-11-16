@@ -555,6 +555,8 @@ void AWRCharacter::LaunchProjectile(const FWRItemDef& Launcher, FName AmmoId, co
 	Hit.Damage = (Launcher.RangedDamage * LauncherMult + (Ammo ? Ammo->AmmoDamage : 0.f)) * WRWind::ProjectileDamageScale(this);   // Crosswind
 	Hit.PoiseDamage = Hit.Damage * WRTune(TEXT("ranged.poisePerDamage"), 0.4f);
 	Hit.Element = WRTags::Element_Physical;
+	// A drawn and aimed shot lands with a heavy blow's weight (hit-stop, flash, shake: cookpass-combat 3.6); a hip shot light.
+	if (bAiming) Hit.Tier = EWRHitTier::Heavy;
 	Hit.Torpor = (Ammo ? Ammo->AmmoTorpor : 0.f) * Launcher.TorporMult * LauncherMult;
 	// An arrow's own status (items.json ammo: the Murkjaw-tooth arrow's bleed 25): WRSwampSystems reads it.
 	if (Ammo) WRSwamp::AddAmmoBuildups(Ammo->Id, Hit);

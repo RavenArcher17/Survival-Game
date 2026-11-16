@@ -28,6 +28,9 @@ private:
 	/** The old text list for the open menu (with -oldui, or a menu the new UI has no screen for yet). */
 	void DrawMenuPanel(const class AWRPlayerController* PC);
 	void DrawDamageNumbers(float DeltaTime);
+	/** An enemy bar's trailing chunk (cookpass-combat 3.3): its top, its last fill, when it last dropped, last drawn. */
+	struct FBarTrail { float Top = -1.f; float Last = -1.f; double DropAt = -10.0; double Seen = 0.0; };
+	TMap<TWeakObjectPtr<const AActor>, FBarTrail> BarTrails;
 	void OnHitShown(const AActor* Target, float Damage, EWRHitResult Result);
 
 	struct FFloatingText

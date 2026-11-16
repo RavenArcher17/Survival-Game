@@ -1,4 +1,5 @@
 #include "WRUIWidgets.h"
+#include "WRTuning.h"
 #include "WRUIStyle.h"
 #include "WRSound.h"
 #include "Rendering/DrawElements.h"
@@ -268,6 +269,7 @@ void SWRBar::Construct(const FArguments& InArgs)
 	Color = InArgs._Color;
 	Height = InArgs._Height;
 	Lost = InArgs._Lost;
+	bTrail = InArgs._Trail;
 }
 
 int32 SWRBar::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlateRect& Cull, FSlateWindowElementList& Out, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const
@@ -276,6 +278,34 @@ int32 SWRBar::OnPaint(const FPaintArgs& Args, const FGeometry& Geo, const FSlate
 	const float R = FMath::Min(3.f, Size.Y * 0.5f);
 	WRUI::DrawBox(Out, Layer, Geo.ToPaintGeometry(), WRUI::Box(FLinearColor(0.035f, 0.037f, 0.043f, 0.95f), R, FLinearColor(0.f, 0.f, 0.f, 1.f), 1.f));
 	const float F = FMath::Clamp(Fraction.Get(), 0.f, 1.f);
+	// The trail (cookpass-combat 3.3): a drop leaves the lost share standing as a pale chunk for trailHold s (more blows in
+	// that time add to it), then it drains at trailDrain bar-widths a second; a rise shows at once and clears it.
+	if (bTrail)
+	{
+		const double Now = FPlatformTime::Seconds();
+		const float Dt = TrailPaintedAt > 0.0 ? FMath::Clamp(float(Now - TrailPaintedAt), 0.f, 0.1f) : 0.f;
+		TrailPaintedAt = Now;
+		if (TrailLastF < 0.f || F >= TrailLastF + 0.0005f)
+		{
+			TrailTop = F;
+		}
+		else if (F < TrailLastF - 0.0005f)
+		{
+			TrailTop = FMath::Max(TrailTop, TrailLastF);
+			TrailDropAt = Now;
+		}
+		TrailLastF = F;
+		if (Now - TrailDropAt > WRTune(TEXT("ui.bar.trailHold"), 0.5f))
+		{
+			TrailTop = FMath::Max(F, TrailTop - WRTune(TEXT("ui.bar.trailDrain"), 1.2f) * Dt);
+		}
+		if (TrailTop > F + 0.001f)
+		{
+			const FLinearColor C = FMath::Lerp(Color.Get(), FLinearColor(FColor(250, 236, 214)), 0.65f);
+			const float X0 = 1.f + (Size.X - 2.f) * F, W = (Size.X - 2.f) * (TrailTop - F);
+			WRUI::DrawBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(FMath::Max(1.f, W), Size.Y - 2.f), FSlateLayoutTransform(FVector2D(X0, 1.f))), WRUI::Box(FLinearColor(C.R, C.G, C.B, 0.85f), FMath::Max(0.f, R - 1.f)));
+		}
+	}
 	if (F > 0.f)
 	{
 		const FVector2D FillSize(FMath::Max(2.f, (Size.X - 2.f) * F), Size.Y - 2.f);

@@ -29,6 +29,7 @@
 #include "AbilitySystemComponent.h"
 #include "Engine/Canvas.h"
 #include "EngineUtils.h"
+#include "WRFxSystem.h"
 
 namespace
 {
@@ -493,7 +494,31 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 		if (!(PlayerOwner.Get() && WRArtifacts::Has(PlayerOwner->PlayerState.Get(), TEXT("no_enemy_bars")) && !Other->GetPlayerState()))
 		{
 			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, Screen.Y - 12.f, W, 6.f);
-			DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f), 6.f);
+			const float Fill = FMath::Clamp(A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()), 0.f, 1.f);
+			// What a blow took stays as a pale chunk, holds, then drains (cookpass-combat 3.3); a heal clears it.
+			{
+				const double Now = GetWorld()->GetTimeSeconds();
+				if (BarTrails.Num() > 64)
+				{
+					// Bodies long gone or out of sight for 4 s drop their trail.
+					for (auto Tri = BarTrails.CreateIterator(); Tri; ++Tri) if (!Tri.Key().IsValid() || Now - Tri.Value().Seen > 4.0) Tri.RemoveCurrent();
+				}
+				FBarTrail& Tr = BarTrails.FindOrAdd(Other);
+				const float Dt = Tr.Seen > 0.0 ? FMath::Clamp(float(Now - Tr.Seen), 0.f, 0.1f) : 0.f;
+				Tr.Seen = Now;
+				if (Tr.Last < 0.f || Fill >= Tr.Last + 0.0005f) Tr.Top = Fill;
+				else if (Fill < Tr.Last - 0.0005f) { Tr.Top = FMath::Max(Tr.Top, Tr.Last); Tr.DropAt = Now; }
+				Tr.Last = Fill;
+				if (Now - Tr.DropAt > WRTune(TEXT("ui.bar.trailHold"), 0.5f)) Tr.Top = FMath::Max(Fill, Tr.Top - WRTune(TEXT("ui.bar.trailDrain"), 1.2f) * Dt);
+				if (Tr.Top > Fill + 0.001f) DrawRect(FLinearColor(0.95f, 0.78f, 0.7f, 0.85f), BX + W * Fill, Screen.Y - 12.f, W * (Tr.Top - Fill), 6.f);
+			}
+			DrawRect(FLinearColor(0.85f, 0.15f, 0.15f), BX, Screen.Y - 12.f, W * Fill, 6.f);
+			// Your running damage on it at the bar's right end while your blows keep landing.
+			if (const UWRFxSubsystem* Fx = UWRFxSubsystem::Get(this); Fx && Fx->TallyTarget.Get() == Other && Fx->Tally >= 1.f
+				&& GetWorld()->GetTimeSeconds() - Fx->TallyTime <= WRTune(TEXT("fx.hud.tallySeconds"), 2.5f))
+			{
+				DrawText(FString::FromInt(FMath::RoundToInt(Fx->Tally)), FLinearColor(0.92f, 0.88f, 0.8f), BX + W + 5.f, Screen.Y - 17.f, nullptr, 0.8f);
+			}
 		}
 		// Buildup meters under the health bar: one thin row per status filling, in its colour (combat.md 2.11; bleed a
 		// dark red, never the crimson of an unblockable blow).

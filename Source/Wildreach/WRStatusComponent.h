@@ -94,7 +94,7 @@ private:
 	float GetMeter(int32 Id) const;
 	void PublishMeters();
 	/** A damage-over-time or burst hit of a status (no guard, no parry). */
-	void StatusHit(AWRCharacterBase* Source, float Damage, const FGameplayTag& Element);
+	void StatusHit(AWRCharacterBase* Source, float Damage, const FGameplayTag& Element, bool bBurst = false);
 public:
 	/** Give back the max health Decay took (the fight's end, a Rest: WRSurvival). */
 	void RestoreDecay();
