@@ -43,6 +43,9 @@ Lane ship-7. Compiled (editor target); the packaged build was launched and its l
     under the reference: an assertion in a packaged build); the same in `WRUIMap.cpp`'s map glyph lines. Both copy first.
   - 13 s in: `WRDeedsAchieve.cpp` walked an array inside a JSON object that was a temporary, already freed (an access
     violation). The file is held while it's read. A scan found no other.
+  - The crystal caves' thin floors made their glowing cracks, then attached them to the crust after they were
+    registered (an engine ensure in every run, and the cracks stayed floating when the crust gave way). They're made
+    on the crust now, so they go with it (`WRCrystalHazards.cpp`).
 - **Ten materials that never compiled now do.** Why: the cook logged "Failed to compile Material ... Default Material
   will be used in game" for every tree (`M_TreeKit`, `M_TreeKitLeaf`, `M_TreeKitGlow`), the borrowed lands' ground
   (`M_LandGround`), held tools (`M_HeldTool`), tames' looks (`M_TameMorph`), fungal glow and veil, and the hero's armour

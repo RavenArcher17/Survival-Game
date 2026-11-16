@@ -622,10 +622,10 @@ void AWRThinFloor::BuildLook()
 			P = Next;
 		}
 	}
-	UProceduralMeshComponent* Cracks = CzMesh(this, nullptr, TEXT("ThinCracks"));
+	// Made on the crust (attaching after it's registered is refused, and the cracks stayed behind when the crust gave way).
+	UProceduralMeshComponent* Cracks = CzMesh(this, Crust, TEXT("ThinCracks"));
 	K.ApplyTo(Cracks);
 	if (UMaterialInstanceDynamic* G = CzGlowMID(this, FLinearColor(0.62f, 0.42f, 1.f), 0.6f)) Cracks->SetMaterial(0, G);
-	Cracks->SetupAttachment(Crust);
 	FWRToolMesh Rm;
 	for (int32 k = 0; k < 28; ++k)
 	{
