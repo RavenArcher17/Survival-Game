@@ -2,6 +2,7 @@
 // host. WRReport.h has the overview; the panel is WRUIReport.cpp.
 
 #include "WRReport.h"
+#include "WRUIFit.h"
 #include "WRGod.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -461,7 +462,7 @@ namespace WRReportDetail
 			Draft->bPaused = UGameplayStatics::SetGamePaused(World, true);
 		}
 		TSharedPtr<SWidget> Focus;
-		Panel = WRReportUI::Make(Focus);
+		Panel = WRUI::Fit(WRReportUI::Make(Focus));
 		GEngine->GameViewport->AddViewportWidgetContent(Panel.ToSharedRef(), 1000);
 		WRInput::AddNavRoot(Panel.ToSharedRef(), 1000);
 		WRInput::BeginOverlay(Focus);

@@ -119,6 +119,13 @@ private:
 	TSharedRef<SWidget> MakePanel();
 	TSharedRef<SWidget> MakeTip();
 	TSharedRef<SWidget> MakeUpdate();
+	/** The layout's measured parts (wild-hotfix-menus 3.3/3.4): the stage is the free space right of the panels, where the
+	 *  look picker frames the survivor; the tip shows only when it fits beside the title. */
+	TSharedPtr<class SBox> TitleBox, TipBox, Stage, UpdateBox;
+	bool bTipFits = true;
+	double NextFrameLog = 0.0;
+	/** The stage as a share of the viewport (0-1), measured each tick while the look picker is open. */
+	bool StageRect(FVector2D& OutMin, FVector2D& OutMax) const;
 
 	/**
 	 * The card over the menu (cookpass-ui 3.3): after a network failure (a plain line for what happened and, when this

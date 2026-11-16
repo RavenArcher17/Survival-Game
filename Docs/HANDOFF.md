@@ -817,6 +817,12 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
 - **Unity builds**: Unreal joins `.cpp` files into one, and adding a file reshuffles them. A local with the same name as
   a global or member elsewhere then breaks the build (C4459 / C4458 / C4456 are errors here). Keep file helpers in
   named namespaces, and don't reuse short global names.
+- **Screen sizes**: the UI lays out on a canvas at least 1760 x 1080 logical px (`UWRDPIScalingRule`, `WRUIFit.h`), and
+  every viewport root sits in an `SWRFit` (`WRUI::Fit(...)`) so nothing runs off a small screen. A new full-screen
+  widget added with `AddViewportWidgetContent` goes in one too; place things by flow (boxes, anchors), never by fixed
+  offsets from the top left. Keep any window under 1728 x 1000 logical px.
+- **Update now** must never open a web page: it starts `WildreachUpdater.exe` (beside the game, up from the exe, or the
+  installed copy's) or downloads the release's Setup and runs it with `--update --wait <pid> --dir <folder>`.
 - **Full-screen UI widgets must be `SelfHitTestInvisible`**, or an empty layer eats every click (0.4.0 shipped with no
   menu taking a click). Only tests that click for real (`menus`, `base`, `clan`...) catch it.
 - **Anything loaded by path** (creature art, dressing meshes) must be under a `DirectoriesToAlwaysCook` entry in

@@ -1,6 +1,7 @@
 // The pad keyboard (cookpass-ui 3.4): see WRUIPadKeyboard.h.
 
 #include "WRUIPadKeyboard.h"
+#include "WRUIFit.h"
 #include "Wildreach.h"
 #include "WRPadInput.h"
 #include "WRSound.h"
@@ -271,9 +272,9 @@ void WRPadKeyboard::Open(FTarget Target)
 	const bool bTop = Target.bDockTop;
 	TSharedRef<SWRPadKbPanel> Panel = SNew(SWRPadKbPanel, MoveTemp(Target));
 	GPanel = Panel;
-	GHost = SNew(SOverlay)
+	GHost = WRUI::Fit(SNew(SOverlay)
 		+ SOverlay::Slot()[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.35f))]
-		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(bTop ? VAlign_Top : VAlign_Bottom).Padding(0.f, 36.f * WRUI::U)[Panel];
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(bTop ? VAlign_Top : VAlign_Bottom).Padding(0.f, 36.f * WRUI::U)[Panel]);
 	GEngine->GameViewport->AddViewportWidgetContent(GHost.ToSharedRef(), 3000);
 	WRInput::AddNavRoot(Panel, 3000);
 	UE_LOG(LogWildreach, Log, TEXT("PADKB open"));

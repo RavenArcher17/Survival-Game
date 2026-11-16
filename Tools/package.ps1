@@ -26,6 +26,14 @@ Copy-Item (Join-Path $root 'Data') $game -Recurse -Force
 # Third-party credits ship with the game (some sounds are CC-BY, which asks for attribution where the work is used).
 Copy-Item (Join-Path $root 'Docs\CREDITS.md') (Join-Path $Out 'Windows\CREDITS.md') -Force
 $version = ((Get-Content (Join-Path $root 'Config\DefaultGame.ini') | Where-Object { $_ -match '^ProjectVersion=' } | Select-Object -First 1) -replace '^ProjectVersion=', '').Trim()
+# Every package carries its updater and version.txt (0.8.1: a build run from here, not installed, had none, so the main
+# menu's Update now had nothing to start). make_installer.ps1 builds the same two again for the Setup.
+$csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+$fx = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319'
+[System.IO.File]::WriteAllText((Join-Path $Out 'Windows\version.txt'), $version)
+& $csc /nologo /target:winexe /optimize /platform:x64 "/out:$(Join-Path $Out 'Windows\WildreachUpdater.exe')" `
+	"/r:$fx\System.Windows.Forms.dll" "/r:$fx\System.Drawing.dll" (Join-Path $PSScriptRoot 'installer\WildreachUpdater.cs') (Join-Path $PSScriptRoot 'installer\WildreachPack.cs')
+if ($LASTEXITCODE -ne 0) { "[$(Get-Date -Format 'HH:mm:ss')] FAILED: csc (updater) exit $LASTEXITCODE"; exit 1 }
 # build.json beside the game: what this package is (F8 reports carry it, WRReport.cpp) and what's in it, counted from the data.
 $commit = (& git -C $root rev-parse HEAD 2>$null)
 $dirty = [bool](& git -C $root status --porcelain --untracked-files=no 2>$null)

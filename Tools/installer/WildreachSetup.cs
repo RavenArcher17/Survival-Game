@@ -7,6 +7,8 @@
 //   Wildreach-Setup.exe                         normal install
 //   Wildreach-Setup.exe --silent --dir <path> --nolaunch [--noshortcuts]   (used by the tests)
 //   Wildreach-Setup.exe --silent --update --dir <path> --nolaunch          (used by the updater: shortcuts left as they are)
+//   Wildreach-Setup.exe --update --wait <pid> --dir <path>                 (the game's Update now with no updater beside it:
+//                                                                           waits for the game to close, installs, starts it)
 using System;
 using System.Diagnostics;
 using System.Drawing;
@@ -27,6 +29,14 @@ static class WildreachSetup
 		int dirArg = Array.IndexOf(args, "--dir");
 		string dir = dirArg >= 0 && dirArg + 1 < args.Length ? args[dirArg + 1]
 			: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Wildreach");
+		// The game's Update now, when no updater sits beside it, runs the release's Setup with its own process id: wait
+		// for it to close (its files are in use until then).
+		int waitArg = Array.IndexOf(args, "--wait"), waitPid;
+		if (waitArg >= 0 && waitArg + 1 < args.Length && int.TryParse(args[waitArg + 1], out waitPid) && waitPid > 0)
+		{
+			try { Process.GetProcessById(waitPid).WaitForExit(60000); } catch { }
+			Thread.Sleep(500);
+		}
 		if (silent)
 		{
 			try { Install(dir, null, null, !noLaunch, shortcuts); return 0; }

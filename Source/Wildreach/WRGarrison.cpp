@@ -31,7 +31,7 @@ namespace WRGarrisonDetail
 {
 	float Tn(const TCHAR* Key, float Def) { return WRTune(*(FString(TEXT("strongholds.garrison.")) + Key), Def); }
 
-	float Num(const TSharedPtr<FJsonObject>& O, const TCHAR* Key, float Def)
+	float GarrisonNum(const TSharedPtr<FJsonObject>& O, const TCHAR* Key, float Def)
 	{
 		double V = Def;
 		return O.IsValid() && O->TryGetNumberField(Key, V) ? float(V) : Def;
@@ -67,18 +67,18 @@ namespace WRGarrisonDetail
 		M.Id = FName(*Str(O, TEXT("id")));
 		const FString Shape = Str(O, TEXT("shape"));
 		if (!Shape.IsEmpty()) M.Shape = FName(*Shape);
-		M.Range = Num(O, TEXT("range"), M.Range);
-		M.Size = Num(O, TEXT("size"), M.Size);
-		M.Windup = Num(O, TEXT("windup"), M.Windup);
-		M.Hold = Num(O, TEXT("hold"), 0.f);
-		M.Active = Num(O, TEXT("active"), M.Active);
-		M.Punish = Num(O, TEXT("punish"), M.Punish);
-		M.Damage = Num(O, TEXT("dmg"), M.Damage);
-		M.Poise = Num(O, TEXT("poise"), M.Poise);
-		M.Impact = uint8(FMath::Clamp(int32(Num(O, TEXT("impact"), 3.f)), 1, 5));
+		M.Range = GarrisonNum(O, TEXT("range"), M.Range);
+		M.Size = GarrisonNum(O, TEXT("size"), M.Size);
+		M.Windup = GarrisonNum(O, TEXT("windup"), M.Windup);
+		M.Hold = GarrisonNum(O, TEXT("hold"), 0.f);
+		M.Active = GarrisonNum(O, TEXT("active"), M.Active);
+		M.Punish = GarrisonNum(O, TEXT("punish"), M.Punish);
+		M.Damage = GarrisonNum(O, TEXT("dmg"), M.Damage);
+		M.Poise = GarrisonNum(O, TEXT("poise"), M.Poise);
+		M.Impact = uint8(FMath::Clamp(int32(GarrisonNum(O, TEXT("impact"), 3.f)), 1, 5));
 		const FString El = Str(O, TEXT("element"));
 		if (!El.IsEmpty()) M.Element = FName(*El);
-		M.Buildup = Num(O, TEXT("buildup"), 0.f);
+		M.Buildup = GarrisonNum(O, TEXT("buildup"), 0.f);
 		M.bUnblockable = Flag(O, TEXT("unblockable"));
 		M.bParryable = Flag(O, TEXT("parryable"));
 		M.bLow = Flag(O, TEXT("low"));
@@ -87,24 +87,24 @@ namespace WRGarrisonDetail
 		M.bTransition = Flag(O, TEXT("transition"));
 		M.bTamePunish = Flag(O, TEXT("tamePunish"));
 		M.bLunge = Flag(O, TEXT("lunge"));
-		M.Phase = int32(Num(O, TEXT("phase"), 1.f));
-		M.MaxPhase = int32(Num(O, TEXT("maxPhase"), 9.f));
-		M.Cooldown = Num(O, TEXT("cooldown"), M.Cooldown);
+		M.Phase = int32(GarrisonNum(O, TEXT("phase"), 1.f));
+		M.MaxPhase = int32(GarrisonNum(O, TEXT("maxPhase"), 9.f));
+		M.Cooldown = GarrisonNum(O, TEXT("cooldown"), M.Cooldown);
 		const TSharedPtr<FJsonObject>* W = nullptr;
 		if (O->TryGetObjectField(TEXT("weights"), W))
 		{
-			M.WClose = Num(*W, TEXT("close"), 0.f);
-			M.WMid = Num(*W, TEXT("mid"), 0.f);
-			M.WFar = Num(*W, TEXT("far"), 0.f);
+			M.WClose = GarrisonNum(*W, TEXT("close"), 0.f);
+			M.WMid = GarrisonNum(*W, TEXT("mid"), 0.f);
+			M.WFar = GarrisonNum(*W, TEXT("far"), 0.f);
 		}
 		const FString Clip = Str(O, TEXT("clip"));
 		if (!Clip.IsEmpty()) M.Clip = FName(*Clip);
-		M.ProjectileSpeed = Num(O, TEXT("speed"), M.ProjectileSpeed);
-		M.Repeats = FMath::Max(1, int32(Num(O, TEXT("repeats"), 1.f)));
-		M.Gap = Num(O, TEXT("gap"), M.Gap);
-		M.HoldOn = int32(Num(O, TEXT("holdOn"), 1.f));
-		M.HazardSeconds = Num(O, TEXT("hazard"), 0.f);
-		M.HazardRadius = Num(O, TEXT("hazardRadius"), M.HazardRadius);
+		M.ProjectileSpeed = GarrisonNum(O, TEXT("speed"), M.ProjectileSpeed);
+		M.Repeats = FMath::Max(1, int32(GarrisonNum(O, TEXT("repeats"), 1.f)));
+		M.Gap = GarrisonNum(O, TEXT("gap"), M.Gap);
+		M.HoldOn = int32(GarrisonNum(O, TEXT("holdOn"), 1.f));
+		M.HazardSeconds = GarrisonNum(O, TEXT("hazard"), 0.f);
+		M.HazardRadius = GarrisonNum(O, TEXT("hazardRadius"), M.HazardRadius);
 		const FString Sound = Str(O, TEXT("sound"));
 		if (!Sound.IsEmpty()) M.Sound = FName(*Sound);
 		const FString Fx = Str(O, TEXT("fx"));
@@ -154,31 +154,31 @@ const FWRGarrisonData& FWRGarrisonData::Get()
 				R.Id = FName(*E.Key);
 				R.Title = Str(O, TEXT("title"));
 				R.Tier = FName(*Str(O, TEXT("tier")));
-				R.Health = Num(O, TEXT("health"), R.Health);
-				R.Stamina = Num(O, TEXT("stamina"), R.Stamina);
-				R.Poise = Num(O, TEXT("poise"), R.Poise);
-				R.Armor = Num(O, TEXT("armor"), R.Armor);
-				R.Sight = Num(O, TEXT("sight"), R.Sight);
-				R.Cone = Num(O, TEXT("cone"), R.Cone);
-				R.Hear = Num(O, TEXT("hear"), R.Hear);
-				R.Leash = Num(O, TEXT("leash"), R.Leash);
-				R.WalkSpeed = Num(O, TEXT("walk"), R.WalkSpeed);
-				R.RunSpeed = Num(O, TEXT("run"), R.RunSpeed);
-				R.Guard = Num(O, TEXT("guard"), R.Guard);
-				R.GuardShield = Num(O, TEXT("guardShield"), R.Guard);
-				R.Dodge = Num(O, TEXT("dodge"), R.Dodge);
-				R.Heavy = Num(O, TEXT("heavy"), R.Heavy);
-				R.Charged = Num(O, TEXT("charged"), R.Charged);
-				R.ChainMax = FMath::Max(1, int32(Num(O, TEXT("chain"), 3.f)));
-				R.KickAfter = Num(O, TEXT("kickAfter"), 0.f);
-				R.ShotDamage = Num(O, TEXT("shot"), 0.f);
-				R.DrawSeconds = FMath::Max(0.9f, Num(O, TEXT("draw"), R.DrawSeconds));   // CAL 1.13: >= 0.9 s of warning
-				R.Reload = Num(O, TEXT("reload"), R.Reload);
-				R.KeepMin = FMath::Max(400.f, Num(O, TEXT("keepMin"), R.KeepMin));      // nothing loosed inside 4 m
-				R.KeepMax = Num(O, TEXT("keepMax"), R.KeepMax);
-				R.HornSeconds = Num(O, TEXT("horn"), 0.f);
+				R.Health = GarrisonNum(O, TEXT("health"), R.Health);
+				R.Stamina = GarrisonNum(O, TEXT("stamina"), R.Stamina);
+				R.Poise = GarrisonNum(O, TEXT("poise"), R.Poise);
+				R.Armor = GarrisonNum(O, TEXT("armor"), R.Armor);
+				R.Sight = GarrisonNum(O, TEXT("sight"), R.Sight);
+				R.Cone = GarrisonNum(O, TEXT("cone"), R.Cone);
+				R.Hear = GarrisonNum(O, TEXT("hear"), R.Hear);
+				R.Leash = GarrisonNum(O, TEXT("leash"), R.Leash);
+				R.WalkSpeed = GarrisonNum(O, TEXT("walk"), R.WalkSpeed);
+				R.RunSpeed = GarrisonNum(O, TEXT("run"), R.RunSpeed);
+				R.Guard = GarrisonNum(O, TEXT("guard"), R.Guard);
+				R.GuardShield = GarrisonNum(O, TEXT("guardShield"), R.Guard);
+				R.Dodge = GarrisonNum(O, TEXT("dodge"), R.Dodge);
+				R.Heavy = GarrisonNum(O, TEXT("heavy"), R.Heavy);
+				R.Charged = GarrisonNum(O, TEXT("charged"), R.Charged);
+				R.ChainMax = FMath::Max(1, int32(GarrisonNum(O, TEXT("chain"), 3.f)));
+				R.KickAfter = GarrisonNum(O, TEXT("kickAfter"), 0.f);
+				R.ShotDamage = GarrisonNum(O, TEXT("shot"), 0.f);
+				R.DrawSeconds = FMath::Max(0.9f, GarrisonNum(O, TEXT("draw"), R.DrawSeconds));   // CAL 1.13: >= 0.9 s of warning
+				R.Reload = GarrisonNum(O, TEXT("reload"), R.Reload);
+				R.KeepMin = FMath::Max(400.f, GarrisonNum(O, TEXT("keepMin"), R.KeepMin));      // nothing loosed inside 4 m
+				R.KeepMax = GarrisonNum(O, TEXT("keepMax"), R.KeepMax);
+				R.HornSeconds = GarrisonNum(O, TEXT("horn"), 0.f);
 				R.Loot = Loot(O, TEXT("loot"));
-				R.RareChance = Num(O, TEXT("rare"), 0.f);
+				R.RareChance = GarrisonNum(O, TEXT("rare"), 0.f);
 				const FString Rare = Str(O, TEXT("rareItem"));
 				if (!Rare.IsEmpty()) R.RareItem = FName(*Rare);
 				D.Ranks.Add(R.Id, R);
@@ -194,13 +194,13 @@ const FWRGarrisonData& FWRGarrisonData::Get()
 				W.Id = FName(*E.Key);
 				W.Name = Str(O, TEXT("name"));
 				W.Element = FName(*Str(O, TEXT("element")));
-				W.Health = Num(O, TEXT("health"), W.Health);
-				W.Poise = Num(O, TEXT("poise"), W.Poise);
-				W.Armor = Num(O, TEXT("armor"), W.Armor);
-				W.PerFighter = Num(O, TEXT("perFighter"), W.PerFighter);
-				W.Phase2At = Num(O, TEXT("phase2At"), W.Phase2At);
-				W.Phase2Speed = Num(O, TEXT("phase2Speed"), W.Phase2Speed);
-				W.ResetSeconds = Num(O, TEXT("resetSeconds"), W.ResetSeconds);
+				W.Health = GarrisonNum(O, TEXT("health"), W.Health);
+				W.Poise = GarrisonNum(O, TEXT("poise"), W.Poise);
+				W.Armor = GarrisonNum(O, TEXT("armor"), W.Armor);
+				W.PerFighter = GarrisonNum(O, TEXT("perFighter"), W.PerFighter);
+				W.Phase2At = GarrisonNum(O, TEXT("phase2At"), W.Phase2At);
+				W.Phase2Speed = GarrisonNum(O, TEXT("phase2Speed"), W.Phase2Speed);
+				W.ResetSeconds = GarrisonNum(O, TEXT("resetSeconds"), W.ResetSeconds);
 				W.FirstKill = FName(*Str(O, TEXT("firstKill")));
 				W.Loot = Loot(O, TEXT("loot"));
 				const TArray<TSharedPtr<FJsonValue>>* Moves = nullptr;

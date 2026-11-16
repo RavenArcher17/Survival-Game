@@ -1,4 +1,5 @@
 #include "WRMainMenu.h"
+#include "WRUIFit.h"
 #include "Engine/NetDriver.h"
 #include "WRReport.h"
 #include "Components/PointLightComponent.h"
@@ -22,7 +23,10 @@
 #include "WRPathTypes.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Engine/LocalPlayer.h"
 #include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/Engine.h"
@@ -64,6 +68,138 @@ namespace WRMenuBootCheck
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "HAL/FileManager.h"
+
+// Update now (wild-hotfix-menus, Aaron 11-16: "clicking to install the update should close the client, or restart it so
+// it can apply the new version"; 0.8.0 opened the GitHub page when no updater sat beside the game). It never opens a web
+// page: Update now -> "Updating..." on the banner -> the game closes -> the updater (or the release's own Setup) installs
+// over this folder, saves kept -> the new version starts by itself.
+namespace WRMenuUpdate
+{
+	static bool bBusy = false;
+	static FText Line;
+	static TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> Request;
+	static TSharedPtr<FArchive> File;
+
+	/** This game's folder (where Wildreach.exe and its launcher live), no trailing slash, Windows slashes. */
+	static FString GameFolder()
+	{
+		FString Dir = FPaths::ConvertRelativePathToFull(FPaths::RootDir());
+		FPaths::NormalizeDirectoryName(Dir);
+		FPaths::MakePlatformFilename(Dir);
+		return Dir;
+	}
+
+	/**
+	 * The updater for this copy: beside the game (the shortcut's own; packaged builds carry one since 0.8.1), then each
+	 * folder up from the running exe (Wildreach\Binaries\Win64), then the installer's folder (an installed copy on this PC:
+	 * a build run from anywhere else still updates and starts the copy players use).
+	 */
+	static FString FindUpdater()
+	{
+		TArray<FString> Tries;
+		Tries.Add(FPaths::Combine(FPaths::RootDir(), TEXT("WildreachUpdater.exe")));
+		FString Up = FPaths::ConvertRelativePathToFull(FPlatformProcess::BaseDir());
+		for (int32 i = 0; i < 4 && !Up.IsEmpty(); ++i)
+		{
+			FPaths::NormalizeDirectoryName(Up);
+			Tries.Add(FPaths::Combine(Up, TEXT("WildreachUpdater.exe")));
+			Up = FPaths::GetPath(Up);
+		}
+		const FString Local = FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA"));
+		if (!Local.IsEmpty()) Tries.Add(FPaths::Combine(Local, TEXT("Programs"), TEXT("Wildreach"), TEXT("WildreachUpdater.exe")));
+		for (const FString& Try : Tries)
+		{
+			const FString Full = FPaths::ConvertRelativePathToFull(Try);
+			if (FPaths::FileExists(Full)) return Full;
+		}
+		return FString();
+	}
+
+	/** A moment for "Updating..." to show, then the game closes so the update can replace it. */
+	static void QuitSoon(TWeakObjectPtr<APlayerController> PC)
+	{
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([PC](float)
+		{
+			UE_LOG(LogWildreach, Log, TEXT("MENU update: closing so the update can install"));
+			if (APlayerController* P = PC.Get()) UKismetSystemLibrary::QuitGame(P, P, EQuitPreference::Quit, false);
+			else FPlatformMisc::RequestExit(false, TEXT("WRMenuUpdate"));
+			return false;
+		}), WRTune(TEXT("ui.updateCloseSeconds"), 1.2f));
+	}
+
+	static void Fail(const FText& Why)
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("MENU update failed: %s"), *Why.ToString());
+		bBusy = false;
+		Line = Why;
+		Request.Reset();
+		if (File.IsValid()) { File->Close(); File.Reset(); }
+	}
+
+	static FText UpdatingLine(const FString& Version)
+	{
+		return FText::Format(NSLOCTEXT("WRUI", "Updating", "Updating to {0}: Wildreach closes, installs it and starts again (your saves are kept)"), FText::FromString(Version));
+	}
+
+	/**
+	 * No updater anywhere: fetch the release's Wildreach-Setup.exe (the small download program when the release is in
+	 * parts, which brings the rest), start it on this folder with this game's id to wait for, and close.
+	 */
+	static void DownloadSetup(const FString& Version, TWeakObjectPtr<APlayerController> PC)
+	{
+		const FString Url = FString::Printf(TEXT("https://github.com/RavenArcher17/Survival-Game/releases/download/v%s/Wildreach-Setup.exe"), *Version);
+		const FString Dir = FPaths::Combine(FPlatformProcess::UserTempDir(), TEXT("Wildreach-Update"));
+		IFileManager::Get().MakeDirectory(*Dir, true);
+		const FString Setup = FPaths::ConvertRelativePathToFull(FPaths::Combine(Dir, FString::Printf(TEXT("Wildreach-Setup-v%s-game.exe"), *Version)));
+		File = MakeShareable(IFileManager::Get().CreateFileWriter(*Setup));
+		if (!File.IsValid())
+		{
+			Fail(NSLOCTEXT("WRUI", "UpdateNoTemp", "Couldn't write the update to the temp folder. Start Wildreach from its shortcut to update."));
+			return;
+		}
+		Line = FText::Format(NSLOCTEXT("WRUI", "UpdateFetching", "Downloading Wildreach {0}..."), FText::FromString(Version));
+		Request = FHttpModule::Get().CreateRequest();
+		Request->SetURL(Url);
+		Request->SetVerb(TEXT("GET"));
+		Request->SetHeader(TEXT("User-Agent"), TEXT("Wildreach"));
+		Request->SetTimeout(300.f);
+		Request->SetResponseBodyReceiveStream(File.ToSharedRef());
+		Request->OnRequestProgress64().BindLambda([Version](FHttpRequestPtr Req, uint64, uint64 Got)
+		{
+			const FHttpResponsePtr R = Req.IsValid() ? Req->GetResponse() : nullptr;
+			const int64 Total = R.IsValid() ? int64(R->GetContentLength()) : 0;
+			Line = Total > 0
+				? FText::Format(NSLOCTEXT("WRUI", "UpdateFetchingPct", "Downloading Wildreach {0}... {1}%"), FText::FromString(Version), FText::AsNumber(FMath::Clamp<int64>(int64(Got) * 100 / Total, 0, 100)))
+				: FText::Format(NSLOCTEXT("WRUI", "UpdateFetching", "Downloading Wildreach {0}..."), FText::FromString(Version));
+		});
+		Request->OnProcessRequestComplete().BindLambda([Setup, Version, PC](FHttpRequestPtr, FHttpResponsePtr Response, bool bConnected)
+		{
+			if (File.IsValid()) { File->Close(); File.Reset(); }
+			Request.Reset();
+			const int32 Code = Response.IsValid() ? Response->GetResponseCode() : 0;
+			const int64 Size = IFileManager::Get().FileSize(*Setup);
+			UE_LOG(LogWildreach, Log, TEXT("MENU update: downloaded the release's Setup (%d, %lld bytes) to %s"), Code, Size, *Setup);
+			if (!bConnected || Code != 200 || Size < 1024)
+			{
+				Fail(NSLOCTEXT("WRUI", "UpdateNoDownload", "Couldn't download the update (offline?). Try again, or start Wildreach from its shortcut."));
+				return;
+			}
+			const FString Args = FString::Printf(TEXT("--update --wait %u --dir \"%s\""), FPlatformProcess::GetCurrentProcessId(), *GameFolder());
+			FProcHandle Proc = FPlatformProcess::CreateProc(*Setup, *Args, true, false, false, nullptr, 0, *FPaths::GetPath(Setup), nullptr);
+			UE_LOG(LogWildreach, Log, TEXT("MENU update: %s %s (%s)"), *Setup, *Args, Proc.IsValid() ? TEXT("started") : TEXT("couldn't start"));
+			if (!Proc.IsValid())
+			{
+				Fail(NSLOCTEXT("WRUI", "UpdateNoStart", "Couldn't start the update. Start Wildreach from its shortcut to update."));
+				return;
+			}
+			FPlatformProcess::CloseProc(Proc);
+			Line = UpdatingLine(Version);
+			QuitSoon(PC);
+		});
+		if (!Request->ProcessRequest()) Fail(NSLOCTEXT("WRUI", "UpdateNoDownload", "Couldn't download the update (offline?). Try again, or start Wildreach from its shortcut."));
+	}
+}
 
 TSharedPtr<SWidget> SWRMainMenu::Instance;
 TWeakObjectPtr<ACameraActor> SWRMainMenu::Backdrop;
@@ -86,8 +222,6 @@ double SWRMainMenu::LeaveAt = -1000.0;
 bool SWRMainMenu::bNeedPassword = false;
 FString SWRMainMenu::TypedPassword;
 FString SWRMainMenu::PasswordAddress;
-
-static const TCHAR* ReleasesPage = TEXT("https://github.com/RavenArcher17/Survival-Game/releases/latest");
 
 // From the start (a join straight from the command line fails before any menu opens), in a game, not a server.
 static FDelayedAutoRegisterHelper GWatchNetworkFailures(EDelayedRegisterRunPhase::EndOfEngineInit, []()
@@ -343,10 +477,13 @@ namespace WRMenuUI
 	class SWRChoice : public SCompoundWidget
 	{
 	public:
-		SLATE_BEGIN_ARGS(SWRChoice) : _Kind(0) {}
+		SLATE_BEGIN_ARGS(SWRChoice) : _Kind(0), _Height(34.f), _FontSize(14) {}
 			SLATE_ATTRIBUTE(FText, Text)
 			SLATE_ARGUMENT(int32, Kind)
 			SLATE_ARGUMENT(FName, Path)
+			/** Mockup px (x U); the 12-path grid uses a shorter row. */
+			SLATE_ARGUMENT(float, Height)
+			SLATE_ARGUMENT(int32, FontSize)
 			SLATE_EVENT(FOnClicked, OnClicked)
 		SLATE_END_ARGS()
 		void Construct(const FArguments& InArgs, TFunction<bool()> InSelected)
@@ -354,6 +491,8 @@ namespace WRMenuUI
 			Selected = MoveTemp(InSelected);
 			Kind = InArgs._Kind;
 			Path = InArgs._Path;
+			Height = InArgs._Height;
+			FontSize = InArgs._FontSize;
 			if (!Path.IsNone())
 			{
 				ConstructPath(InArgs);
@@ -370,7 +509,7 @@ namespace WRMenuUI
 			}
 			Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
 			[
-				WRUI::Text(InArgs._Text, WRUI::Body(14, 700), TAttribute<FSlateColor>::CreateLambda([this]()
+				WRUI::Text(InArgs._Text, WRUI::Body(FontSize, 700), TAttribute<FSlateColor>::CreateLambda([this]()
 				{
 					if (!Selected()) return FSlateColor(IsHovered() ? WRUI::Ink2 : WRUI::Ink3);
 					return FSlateColor(Kind == 1 ? Hex(TEXT("FFDCC2")) : Kind == 2 ? Hex(TEXT("D8EEFC")) : WRUI::Ink);
@@ -380,7 +519,7 @@ namespace WRMenuUI
 			[
 				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).OnClicked(InArgs._OnClicked)
 				[
-					SNew(SBox).HeightOverride(34.f * U)
+					SNew(SBox).HeightOverride(Height * U)
 					[
 						SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center)
 						.BorderImage_Lambda([this]()
@@ -411,7 +550,7 @@ namespace WRMenuUI
 			];
 			Row->AddSlot().AutoWidth().VAlign(VAlign_Center)
 			[
-				WRUI::Text(InArgs._Text, WRUI::Body(14, 700), TAttribute<FSlateColor>::CreateLambda([this, Light]()
+				WRUI::Text(InArgs._Text, WRUI::Body(FontSize, 700), TAttribute<FSlateColor>::CreateLambda([this, Light]()
 				{
 					if (!Selected()) return FSlateColor(IsHovered() ? WRUI::Ink2 : WRUI::Ink3);
 					return FSlateColor(Light);
@@ -421,7 +560,7 @@ namespace WRMenuUI
 			[
 				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand).OnClicked(InArgs._OnClicked)
 				[
-					SNew(SBox).HeightOverride(34.f * U)
+					SNew(SBox).HeightOverride(Height * U)
 					[
 						SNew(SBorder).HAlign(HAlign_Center).VAlign(VAlign_Center)
 						.BorderImage_Lambda([this, C, Fill]()
@@ -437,6 +576,8 @@ namespace WRMenuUI
 		TFunction<bool()> Selected;
 		int32 Kind = 0;
 		FName Path;
+		float Height = 34.f;
+		int32 FontSize = 14;
 	};
 
 	TSharedRef<SWidget> ChoicePair(TSharedRef<SWidget> A, TSharedRef<SWidget> B)
@@ -511,13 +652,42 @@ void SWRMainMenu::Construct(const FArguments& InArgs)
 		SNew(SOverlay)
 		+ SOverlay::Slot()[SNew(SWRGradientFill).Colors({ WRUI::Alpha(Night, 0.92f), WRUI::Alpha(Night, 0.72f), WRUI::Alpha(Night, 0.12f), WRUI::Alpha(Night, 0.1f), WRUI::Alpha(Night, 0.6f) }).Stops({ 0.f, 0.3f, 0.52f, 0.72f, 1.f })]
 		+ SOverlay::Slot()[SNew(SWRGradientFill).Horizontal(false).Colors({ WRUI::Alpha(Night, 0.55f), WRUI::Alpha(Night, 0.f), WRUI::Alpha(Night, 0.f), WRUI::Alpha(Night, 0.65f) }).Stops({ 0.f, 0.3f, 0.62f, 1.f })]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(72.f * U, 44.f * U, 0.f, 0.f)[MakeTitle()]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(72.f * U, 226.f * U, 0.f, 0.f)[MakePanel()]
-		+ SOverlay::Slot().HAlign(HAlign_Left).VAlign(VAlign_Top).Padding(572.f * U, 226.f * U, 0.f, 0.f)[MakeLookPanel()]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Top).Padding(0.f, 44.f * U, 48.f * U, 0.f)[MakeTip()]
-		+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 48.f * U, 40.f * U)[MakeUpdate()]
-		+ SOverlay::Slot()[MakeCard()]
-		+ SOverlay::Slot()[SAssignNew(SettingsHost, SBox)]
+		// Laid out by flow, not by fixed offsets (cooks/wild-hotfix-menus.md 3.3): the title row (the tip at its right),
+		// then the character panel, the look picker beside it while open, and the stage: the free space the survivor is
+		// framed into. All in a fit (WRUIFit.h), so a big interface size or a small window shrinks it rather than
+		// pushing Host / Join / Settings / Quit off the screen.
+		+ SOverlay::Slot()
+		[
+			WRUI::Fit(SNew(SOverlay)
+			+ SOverlay::Slot().Padding(72.f * U, 40.f * U, 48.f * U, 32.f * U)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)[SAssignNew(TitleBox, SBox)[MakeTitle()]]
+					+ SHorizontalBox::Slot().FillWidth(1.f)[SNullWidget::NullWidget]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.f, 4.f * U, 0.f, 0.f)
+					[
+						SAssignNew(TipBox, SBox).Visibility_Lambda([this]() { return bTipFits && !bLookOpen ? EVisibility::SelfHitTestInvisible : EVisibility::Hidden; })[MakeTip()]
+					]
+				]
+				+ SVerticalBox::Slot().FillHeight(1.f).Padding(0.f, 22.f * U, 0.f, 0.f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)[MakePanel()]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top)[MakeLookPanel()]
+					+ SHorizontalBox::Slot().FillWidth(1.f)[SAssignNew(Stage, SBox)]
+				]
+			]
+			// While the look picker is open the stage is the survivor's: the update banner waits until Done.
+			+ SOverlay::Slot().HAlign(HAlign_Right).VAlign(VAlign_Bottom).Padding(0.f, 0.f, 48.f * U, 32.f * U)
+			[
+				SAssignNew(UpdateBox, SBox).Visibility_Lambda([this]() { return bLookOpen ? EVisibility::Collapsed : EVisibility::SelfHitTestInvisible; })[MakeUpdate()]
+			])
+		]
+		+ SOverlay::Slot()[WRUI::Fit(MakeCard())]
+		+ SOverlay::Slot()[WRUI::Fit(SAssignNew(SettingsHost, SBox))]
 	];
 }
 
@@ -784,7 +954,12 @@ TSharedRef<SWidget> SWRMainMenu::MakePanel()
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRLineIcon).Icon(EWRIcon::Info).Size(15.f * U).Color(WRUI::Brass)]
 						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
 						[
-							WRUI::Text(NSLOCTEXT("WRUI", "PathInfo", "Your main path sets where you spawn"), WRUI::Body(12, 500), WRUI::Ink2, false, true)
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+							{
+								const FString Land = WRPathLook::BiomeName(Path);
+								return Land.IsEmpty() ? NSLOCTEXT("WRUI", "PathInfo", "Your main path sets where you spawn")
+									: FText::Format(NSLOCTEXT("WRUI", "PathWake", "Your main path sets where you wake: {0}"), FText::FromString(Land));
+							}), WRUI::Body(12, 500), WRUI::Ink2, false, true)
 						]
 					]
 				]
@@ -826,14 +1001,22 @@ TSharedRef<SWidget> SWRMainMenu::MakePanel()
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.f, 1.f * U, 7.f * U, 0.f)[SNew(SWRLineIcon).Icon(EWRIcon::Warning).Size(14.f * U).Color(WRUI::Warn)]
 				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Status; }), WRUI::Body(13, 700), WRUI::Warn, false, true)]
 			]
+			// Settings and Quit share a row (12 paths made the panel too tall for a 1080 canvas: wild-hotfix-menus 3.3).
 			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 			[
-				SNew(SWRMenuButton).Icon(EWRIcon::Gear).IconColor(WRUI::Brass).Text(NSLOCTEXT("WRUI", "SettingsButton", "Settings"))
-				.OnClicked_Lambda([]() { ShowSettings(true); return FReply::Handled(); })
-			]
-			+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
-			[
-				SNew(SWRMenuButton).Ghost(true).Icon(EWRIcon::Power).IconColor(WRUI::Ink2).IconAccent(WRUI::Bad).Text(NSLOCTEXT("WRUI", "QuitButton", "Quit")).OnClicked(this, &SWRMainMenu::OnQuit)
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.f)
+				[
+					SNew(SWRMenuButton).Icon(EWRIcon::Gear).IconColor(WRUI::Brass).Text(NSLOCTEXT("WRUI", "SettingsButton", "Settings"))
+					.OnClicked_Lambda([]() { ShowSettings(true); return FReply::Handled(); })
+				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(8.f * U, 0.f, 0.f, 0.f)
+				[
+					SNew(SBox).WidthOverride(150.f * U)
+					[
+						SNew(SWRMenuButton).Ghost(true).Icon(EWRIcon::Power).IconColor(WRUI::Ink2).IconAccent(WRUI::Bad).Text(NSLOCTEXT("WRUI", "QuitButton", "Quit")).OnClicked(this, &SWRMainMenu::OnQuit)
+					]
+				]
 			]
 		]
 	];
@@ -891,12 +1074,15 @@ TSharedRef<SWidget> SWRMainMenu::MakeUpdate()
 							]
 							+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 2.f * U, 0.f, 0.f)
 							[
-								WRUI::Text(NSLOCTEXT("WRUI", "UpdateSub", "A new version is ready to install"), WRUI::Body(12, 500), WRUI::Ink3, false, true)
+								// While it updates, what it's doing (Updating..., the download's progress, or why it couldn't).
+								WRUI::Text(TAttribute<FText>::CreateLambda([]() { return WRMenuUpdate::Line.IsEmpty() ? NSLOCTEXT("WRUI", "UpdateSub", "A new version is ready to install") : WRMenuUpdate::Line; }),
+									WRUI::Body(12, 500), TAttribute<FSlateColor>::CreateLambda([]() { return FSlateColor(WRMenuUpdate::Line.IsEmpty() ? WRUI::Ink3 : WRUI::Ink2); }), false, true)
 							]
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(12.f * U, 0.f, 0.f, 0.f)
 						[
-							SNew(SWRButton).Primary(true).FontSize(12).MinHeight(40.f * U).Text(NSLOCTEXT("WRUI", "UpdateNow", "Update now")).OnClicked(this, &SWRMainMenu::OnUpdate)
+							SNew(SWRButton).Primary(true).FontSize(12).MinHeight(40.f * U).IsEnabled_Lambda([]() { return !WRMenuUpdate::bBusy; })
+							.Text_Lambda([]() { return WRMenuUpdate::bBusy ? NSLOCTEXT("WRUI", "UpdatingButton", "Updating...") : NSLOCTEXT("WRUI", "UpdateNow", "Update now"); }).OnClicked(this, &SWRMainMenu::OnUpdate)
 						]
 					]
 				]
@@ -952,7 +1138,14 @@ void SWRMainMenu::Tick(const FGeometry& Geo, const double Time, const float Delt
 		if (bCardNav) WRInput::AddNavRoot(CardPanel.ToSharedRef(), 100);
 		else WRInput::RemoveNavRoot(CardPanel);
 	}
-	// The look picker frames the survivor while it's open.
+	// The tip shows only where it fits beside the title (a 4:3 or small window has no room for both on one line).
+	if (TitleBox.IsValid() && TipBox.IsValid())
+	{
+		const float Have = Geo.GetLocalSize().X;
+		const float Need = (72.f + 48.f + 24.f) * WRUI::U + TitleBox->GetDesiredSize().X + TipBox->GetDesiredSize().X;
+		bTipFits = Need <= Have;
+	}
+	// The look picker frames the survivor while it's open, into the stage (the space the panels leave).
 	if (bLookOpen)
 	{
 		FrameSurvivor(Delta);
@@ -1000,23 +1193,44 @@ TSharedRef<SWidget> SWRMainMenu::MakePathPicker()
 	using namespace WRMenuUI;
 	// Every path in Data/paths (the path's biome is where you spawn: its PlayerStarts carry the biome's tag), built from
 	// the registry so a new path shows the day its file lands: two side by side, more in a column.
-	TArray<TSharedRef<SWidget>> Choices;
-	for (const FWRPathDef& D : FWRPathRegistry::Get().All())
+	const TArray<FWRPathDef>& Defs = FWRPathRegistry::Get().All();
+	if (Defs.Num() == 2)
 	{
-		const FName Id = D.Id;
-		const FText Label = FText::FromString(FString::Printf(TEXT("%s · %s"), *WRPathLook::Name(Id), *WRPathLook::BiomeName(Id)));
-		Choices.Add(SNew(SWRChoice, [this, Id]() { return Path == Id; }).Path(Id).Text(Label).OnClicked(this, &SWRMainMenu::OnPickPath, Id));
+		TArray<TSharedRef<SWidget>> Pair;
+		for (const FWRPathDef& D : Defs)
+		{
+			const FName Id = D.Id;
+			const FText Label = FText::FromString(FString::Printf(TEXT("%s · %s"), *WRPathLook::Name(Id), *WRPathLook::BiomeName(Id)));
+			Pair.Add(SNew(SWRChoice, [this, Id]() { return Path == Id; }).Path(Id).Text(Label).OnClicked(this, &SWRMainMenu::OnPickPath, Id));
+		}
+		return ChoicePair(Pair[0], Pair[1]);
 	}
-	if (Choices.Num() == 2)
+	// More: a grid of three across (glyph + the path's name; the line under it says the land), so twelve paths take
+	// four short rows instead of a column taller than the screen (wild-hotfix-menus 3.3). The pad's D-pad moves through
+	// it by position like the rest of the menu.
+	const int32 Cols = FMath::Max(1, static_cast<int32>(WRTune(TEXT("ui.menuPathColumns"), 3.f)));
+	TSharedRef<SVerticalBox> Grid = SNew(SVerticalBox);
+	TSharedPtr<SHorizontalBox> Row;
+	for (int32 i = 0; i < Defs.Num(); ++i)
 	{
-		return ChoicePair(Choices[0], Choices[1]);
+		if (i % Cols == 0)
+		{
+			Row = SNew(SHorizontalBox);
+			Grid->AddSlot().AutoHeight().Padding(0.f, i > 0 ? 3.f * U : 0.f, 0.f, 0.f)[Row.ToSharedRef()];
+		}
+		const FName Id = Defs[i].Id;
+		Row->AddSlot().FillWidth(1.f).Padding(i % Cols > 0 ? 3.f * U : 0.f, 0.f, 0.f, 0.f)
+		[
+			SNew(SWRChoice, [this, Id]() { return Path == Id; }).Path(Id).Height(30.f).FontSize(13)
+			.Text(FText::FromString(WRPathLook::Name(Id))).OnClicked(this, &SWRMainMenu::OnPickPath, Id)
+		];
 	}
-	TSharedRef<SVerticalBox> Column = SNew(SVerticalBox);
-	for (int32 i = 0; i < Choices.Num(); ++i)
+	// A short last row keeps its cells the grid's width.
+	for (int32 i = Defs.Num(); Row.IsValid() && i % Cols != 0; ++i)
 	{
-		Column->AddSlot().AutoHeight().Padding(0.f, i > 0 ? 3.f * U : 0.f, 0.f, 0.f)[Choices[i]];
+		Row->AddSlot().FillWidth(1.f).Padding(3.f * U, 0.f, 0.f, 0.f)[SNullWidget::NullWidget];
 	}
-	return SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.5f), 5.f, FLinearColor::Black, 1.f)).Padding(3.f * U)[Column];
+	return SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.5f), 5.f, FLinearColor::Black, 1.f)).Padding(3.f * U)[Grid];
 }
 
 FReply SWRMainMenu::OnPickPath(FName InPath)
@@ -1111,7 +1325,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeLookPanel()
 			.Text_Lambda([this, M, F]() { return Body == TEXT("f") ? F : M; })
 			.OnClicked_Lambda([this, B]() { LookBuild = B; SetLook(LookFace, LookBuild, bLookHideHelmet); ApplyPreview(); return FReply::Handled(); });
 	};
-	return SNew(SBox).WidthOverride(330.f * U).Visibility_Lambda([this]() { return bLookOpen ? EVisibility::Visible : EVisibility::Collapsed; })
+	return SNew(SBox).Padding(FMargin(20.f * U, 0.f, 0.f, 0.f)).WidthOverride(350.f * U).Visibility_Lambda([this]() { return bLookOpen ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 	[
 		SNew(SWRPanel).Kind(EWRPanel::Leather).Rivets(true).Padding(FMargin(20.f * U, 16.f * U))
 		[
@@ -1158,20 +1372,73 @@ void SWRMainMenu::ApplyPreview()
 	}
 }
 
+bool SWRMainMenu::StageRect(FVector2D& OutMin, FVector2D& OutMax) const
+{
+	if (!Stage.IsValid()) return false;
+	const FGeometry& Root = GetTickSpaceGeometry();
+	const FVector2D RootPos = Root.GetAbsolutePosition(), RootSize = Root.GetAbsoluteSize();
+	const FGeometry& G = Stage->GetTickSpaceGeometry();
+	if (RootSize.X < 1.f || RootSize.Y < 1.f || G.GetAbsoluteSize().X < 1.f || G.GetAbsoluteSize().Y < 1.f) return false;
+	FVector2D Min = G.GetAbsolutePosition(), Max = Min + G.GetAbsoluteSize();
+	// The update banner sits over the stage's bottom right when a new version is out: keep the survivor above it.
+	if (UpdateBox.IsValid() && UpdateBox->GetVisibility().IsVisible() && !LatestVersion.IsEmpty())
+	{
+		const FGeometry& UG = UpdateBox->GetTickSpaceGeometry();
+		const FVector2D UMin = UG.GetAbsolutePosition();
+		if (UMin.X < Max.X && UMin.Y > Min.Y + 0.4f * (Max.Y - Min.Y)) Max.Y = FMath::Min(Max.Y, UMin.Y);
+	}
+	OutMin = (Min - RootPos) / RootSize;
+	OutMax = (Max - RootPos) / RootSize;
+	// Breathing room inside the stage.
+	const FVector2D Inset = (OutMax - OutMin) * WRTune(TEXT("flow.lookCamera.stageInset"), 0.04f);
+	OutMin += Inset;
+	OutMax -= Inset;
+	return OutMax.X - OutMin.X > 0.05f && OutMax.Y - OutMin.Y > 0.2f;
+}
+
 void SWRMainMenu::FrameSurvivor(float DeltaTime)
 {
 	APlayerController* PC = Owner.Get();
 	ACameraActor* Cam = Backdrop.Get();
-	const APawn* Me = PC ? PC->GetPawn() : nullptr;
+	const ACharacter* Me = PC ? Cast<ACharacter>(PC->GetPawn()) : nullptr;
 	if (!Cam || !Me) return;
-	// A portrait framing: chest-high, a little off the face's line, the camera kept out of rock by testing a few angles.
-	const FVector Target = Me->GetActorLocation() + FVector(0.f, 0.f, WRTune(TEXT("flow.lookCamera.height"), 45.f));
-	const float Dist = WRTune(TEXT("flow.lookCamera.distance"), 300.f);
+	// A full-length portrait framed into the stage, the free space right of the panels (wild-hotfix-menus 3.4; how
+	// Baldur's Gate 3 and Monster Hunter frame their creators): never behind a panel, whatever the screen's shape.
+	const float Fov = WRTune(TEXT("flow.lookCamera.fov"), 40.f);
+	const FVector2D VpSize = GetTickSpaceGeometry().GetAbsoluteSize();
+	const float Aspect = VpSize.Y > 1.f ? FMath::Max(0.3f, static_cast<float>(VpSize.X / VpSize.Y)) : 16.f / 9.f;
+	// The lens: which axis keeps the FOV is the local player's choice (the game keeps the vertical one, measured on the
+	// camera's own 16:9, so a 4:3 screen sees less to the sides rather than more above and below).
+	const UCameraComponent* Lens = Cam->GetCameraComponent();
+	const float TanF = FMath::Tan(FMath::DegreesToRadians(Fov * 0.5f));
+	EAspectRatioAxisConstraint Axis = AspectRatio_MaintainXFOV;
+	if (const ULocalPlayer* LP = PC->GetLocalPlayer()) Axis = LP->AspectRatioAxisConstraint;
+	if (Lens && Lens->bOverrideAspectRatioAxisConstraint) Axis = Lens->AspectRatioAxisConstraint;
+	const bool bKeepY = Axis == AspectRatio_MaintainYFOV || (Axis == AspectRatio_MajorAxisFOV && Aspect < 1.f);
+	const float LensAspect = Lens && Lens->AspectRatio > 0.1f ? Lens->AspectRatio : 16.f / 9.f;
+	const float TanV = bKeepY ? TanF / LensAspect : TanF / Aspect;
+	const float TanH = TanV * Aspect;
+	FVector2D SMin(0.62f, 0.12f), SMax(0.96f, 0.94f);   // until the stage has been measured
+	StageRect(SMin, SMax);
+	const FVector2D Centre = (SMin + SMax) * 0.5f, Span = SMax - SMin;
+	// Feet to crown with head and foot room, centred on the stage.
+	const float BodyH = WRTune(TEXT("flow.lookCamera.bodyHeight"), 185.f);
+	const float HeadRoom = WRTune(TEXT("flow.lookCamera.headRoom"), 0.1f), FootRoom = WRTune(TEXT("flow.lookCamera.footRoom"), 0.06f);
+	// The feet are where the mesh stands (its root), not the capsule's bottom; a scaled body is taller.
+	// (The survivor's body stands on the capsule's bottom: AWRCharacter sets it there.)
+	const float Feet = Me->GetActorLocation().Z - (Me->GetCapsuleComponent() ? Me->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 90.f);
+	const float Height = BodyH;
+	const float FrameH = Height * (1.f + HeadRoom + FootRoom);
+	const FVector Target(Me->GetActorLocation().X, Me->GetActorLocation().Y, Feet - FootRoom * Height + FrameH * 0.5f);
+	const float ByHeight = FrameH / (2.f * FMath::Max(0.05f, static_cast<float>(Span.Y)) * TanV);
+	const float ByWidth = Height * 0.45f / (2.f * FMath::Max(0.05f, static_cast<float>(Span.X)) * TanH);
+	const float Dist = FMath::Clamp(FMath::Max(ByHeight, ByWidth), WRTune(TEXT("flow.lookCamera.minDistance"), 180.f), WRTune(TEXT("flow.lookCamera.maxDistance"), 900.f));
+	// In front of the survivor a little off the face's line; the camera kept out of rock by testing a few angles.
 	const float Yaw0 = Me->GetActorRotation().Yaw + WRTune(TEXT("flow.lookCamera.yaw"), 20.f);
-	FVector Best = Target + FRotator(-6.f, Yaw0, 0.f).Vector() * Dist;
+	FVector Best = Target + FRotator(-4.f, Yaw0, 0.f).Vector() * Dist;   // (a touch below the middle: a hero's eye line)
 	for (const float Turn : { 0.f, -40.f, 40.f, -80.f, 80.f, 180.f })
 	{
-		const FVector Try = Target + FRotator(-6.f, Yaw0 + Turn, 0.f).Vector() * Dist;
+		const FVector Try = Target + FRotator(-4.f, Yaw0 + Turn, 0.f).Vector() * Dist;
 		FHitResult Hit;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRLookCamera), false, Me);
 		if (!Me->GetWorld()->LineTraceSingleByChannel(Hit, Target, Try, ECC_Camera, Q))
@@ -1180,11 +1447,28 @@ void SWRMainMenu::FrameSurvivor(float DeltaTime)
 			break;
 		}
 	}
-	const FRotator Look = (Target - Best).Rotation();
+	// Turned so the survivor lands on the stage's centre: a point at angle a off the view axis shows at tan(a) / tan(fov/2).
+	const float Nx = 2.f * static_cast<float>(Centre.X) - 1.f, Ny = 1.f - 2.f * static_cast<float>(Centre.Y);
+	FRotator Look = (Target - Best).Rotation();
+	Look.Yaw -= FMath::RadiansToDegrees(FMath::Atan(Nx * TanH));
+	Look.Pitch -= FMath::RadiansToDegrees(FMath::Atan(Ny * TanV));
 	// Eased toward the framing so opening the picker glides rather than cuts.
 	const float Alpha = FMath::Clamp(DeltaTime * 4.f, 0.f, 1.f);
 	Cam->SetActorLocationAndRotation(FMath::Lerp(Cam->GetActorLocation(), Best, Alpha), FMath::RInterpTo(Cam->GetActorRotation(), Look, DeltaTime, 4.f));
-	Cam->GetCameraComponent()->SetFieldOfView(WRTune(TEXT("flow.lookCamera.fov"), 40.f));
+	Cam->GetCameraComponent()->SetFieldOfView(Fov);
+	// (Verbose: where the head and feet land on the screen, to check the framing against the stage.)
+	if (UE_LOG_ACTIVE(LogWildreach, Verbose) && FPlatformTime::Seconds() >= NextFrameLog)
+	{
+		NextFrameLog = FPlatformTime::Seconds() + 2.0;
+		FVector2D HeadPx, FeetPx;
+		const bool bH = PC->ProjectWorldLocationToScreen(FVector(Target.X, Target.Y, Feet + Height), HeadPx);
+		const bool bF = PC->ProjectWorldLocationToScreen(FVector(Target.X, Target.Y, Feet), FeetPx);
+		int32 VX = 0, VY = 0;
+		PC->GetViewportSize(VX, VY);
+		UE_LOG(LogWildreach, Verbose, TEXT("MENU look framing: stage %.2f,%.2f-%.2f,%.2f aspect %.2f dist %.0f feet %.0f height %.0f | cam fov %.1f at %s | head %d %.0f,%.0f feet %d %.0f,%.0f of %dx%d"),
+			SMin.X, SMin.Y, SMax.X, SMax.Y, Aspect, Dist, Feet, Height, PC->PlayerCameraManager ? PC->PlayerCameraManager->GetFOVAngle() : -1.f,
+			*Cam->GetActorLocation().ToCompactString(), bH, HeadPx.X, HeadPx.Y, bF, FeetPx.X, FeetPx.Y, VX, VY);
+	}
 	// A soft warm key light beside the camera, so the face reads at night too.
 	if (!LookLight.IsValid())
 	{
@@ -1301,12 +1585,15 @@ FReply SWRMainMenu::OnQuit()
 
 FReply SWRMainMenu::OnUpdate()
 {
-	// The updater beside Wildreach.exe waits for this game to close, installs the new release and starts it.
-	const FString Updater = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::RootDir(), TEXT("WildreachUpdater.exe")));
-	if (!FPaths::FileExists(Updater))
+	if (WRMenuUpdate::bBusy || LatestVersion.IsEmpty()) return FReply::Handled();
+	WRMenuUpdate::bBusy = true;
+	const TWeakObjectPtr<APlayerController> PC = Owner;
+	// The updater waits for this game to close, installs the new release over its own folder and starts it.
+	const FString Updater = WRMenuUpdate::FindUpdater();
+	if (Updater.IsEmpty())
 	{
-		FPlatformProcess::LaunchURL(ReleasesPage, nullptr, nullptr);
-		Status = FText::FromString(TEXT("Opened the download page: run the new Wildreach-Setup.exe (your saves are kept)"));
+		UE_LOG(LogWildreach, Log, TEXT("MENU update: no WildreachUpdater.exe for this copy (%s): fetching the release's Setup"), *WRMenuUpdate::GameFolder());
+		WRMenuUpdate::DownloadSetup(LatestVersion, PC);
 		return FReply::Handled();
 	}
 	const FString Args = FString::Printf(TEXT("--update --wait %u"), FPlatformProcess::GetCurrentProcessId());
@@ -1314,11 +1601,14 @@ FReply SWRMainMenu::OnUpdate()
 	UE_LOG(LogWildreach, Log, TEXT("MENU update: %s %s (%s)"), *Updater, *Args, Proc.IsValid() ? TEXT("started") : TEXT("couldn't start"));
 	if (!Proc.IsValid())
 	{
-		Status = FText::FromString(TEXT("Couldn't start the updater: download the new version from GitHub"));
+		// The updater is there but won't start (a virus scanner holding it, say): the release's Setup does the same job.
+		WRMenuUpdate::DownloadSetup(LatestVersion, PC);
 		return FReply::Handled();
 	}
 	FPlatformProcess::CloseProc(Proc);
-	return OnQuit();
+	WRMenuUpdate::Line = WRMenuUpdate::UpdatingLine(LatestVersion);
+	WRMenuUpdate::QuitSoon(PC);
+	return FReply::Handled();
 }
 
 FString SWRMainMenu::GameVersion()

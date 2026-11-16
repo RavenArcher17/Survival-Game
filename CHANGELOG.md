@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Every screen fits every screen; Update now never opens a web page (lane wild-hotfix-menus; cooks/wild-hotfix-menus.md in showcase-notes)
+
+Why: Aaron 11-16 on the laptop with 0.8.0 (2560x1600 16:10 at high Windows scaling): "I can't even start the game,
+the character covers up the character preview, and the continue button is off the screen." And at the desktop:
+"I clicked to install [the update]. But then it opened the git repo. This is wrong."
+
+- **The interface canvas keeps its width** (`WRUIFit.h`, `Config/DefaultEngine.ini` UserInterfaceSettings): the stock
+  rule scaled by height only, so a 16:10 screen laid out on 1728 x 1080 and a 4:3 one on 1440 x 1080, narrower than
+  the biggest windows (the journal is 1728 wide). The game's own rule `UWRDPIScalingRule` keeps a canvas at least
+  1760 x 1080 (`ui.canvas`): 16:9 and 21:9 are unchanged, 16:10 is 1760 x 1100, 4:3 1760 x 1320. Windows' display
+  scaling never multiplies it (the window is in real pixels; written out as `bAllowHighDPIInGameMode=False`).
+- **Nothing runs off the screen**: `SWRFit` ("fit, down only", edges kept) wraps every viewport root: each screen, the
+  HUD (outside its HUD-size scaler), the wheel, the death / loading covers and moments, the main menu's layout, card and
+  settings, the controls page, the F8 report, the pad keyboard. A screen bigger than the space (a big interface size,
+  an odd window) is laid out bigger and drawn smaller, never larger; corner pieces stay in their corners.
+- **The main menu is laid out by flow, not fixed offsets**: title row (the tip at its right, hidden when it can't fit),
+  then the character panel, the look picker beside it, and the stage. The 12 paths are a 3-across grid (four short rows
+  instead of a column of twelve that pushed Host / Join / Settings / Quit below the screen); the line under them names
+  the land you wake in; Settings and Quit share a row. The look picker frames the survivor full length **into the stage**
+  (the measured free space right of the panels, above the update banner), so no panel ever covers the body.
+- **Update now**: finds the updater beside the game, up from the running exe, or in the installed copy's folder; says
+  "Updating to 0.8.1: Wildreach closes, installs it and starts again (your saves are kept)", closes the game, and the
+  updater installs and starts the new version. With no updater anywhere it downloads the release's
+  `Wildreach-Setup.exe` itself (progress on the banner), starts it with `--update --wait <game pid> --dir <this folder>`
+  and closes; the Setup now waits for that process before installing. It never opens a web page. Every package now
+  carries `WildreachUpdater.exe` and `version.txt` (`Tools/package.ps1`), not only the installed copy.
+- Settings' section list is 234 wide (was 200: "Look and controller" was cut). A unity-build clash in `WRGarrison.cpp`
+  (`Num`) renamed.
+
+Compiled (editor target, no warnings). Checked in the packaged 0.8.1 (see the release notes and the lane's proof).
+
 ### 100 players on a server (lane build-wild-100players; cooks/build-wild-100players.md in showcase-notes)
 
 Compiled (editor target, no warnings); not played or load-tested here (Aaron tests). No map or asset change.

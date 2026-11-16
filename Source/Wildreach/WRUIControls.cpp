@@ -4,6 +4,7 @@
 // "page" (button names in the set chosen in Settings: Xbox or PlayStation).
 
 #include "WRPadInput.h"
+#include "WRUIFit.h"
 #include "WRGod.h"
 #include "Wildreach.h"
 #include "WRKeyBindings.h"
@@ -259,6 +260,7 @@ namespace WRControlsUI
 	};
 
 	TSharedPtr<SWidget> Open;
+	TSharedPtr<SWidget> OpenPanel;
 }
 
 bool WRControlsPage::IsOpen() { return WRControlsUI::Open.IsValid(); }
@@ -272,8 +274,10 @@ void WRControlsPage::Toggle()
 	}
 	if (!GEngine || !GEngine->GameViewport) return;
 	TSharedRef<WRControlsUI::SWRControlsPanel> Panel = SNew(WRControlsUI::SWRControlsPanel);
-	WRControlsUI::Open = Panel;
-	GEngine->GameViewport->AddViewportWidgetContent(Panel, 900);
+	// The page in a fit (WRUIFit.h); focus and the pad's nav stay on the page itself.
+	WRControlsUI::Open = WRUI::Fit(Panel);
+	WRControlsUI::OpenPanel = Panel;
+	GEngine->GameViewport->AddViewportWidgetContent(WRControlsUI::Open.ToSharedRef(), 900);
 	WRInput::AddNavRoot(Panel, 900);
 	WRInput::BeginOverlay(Panel);
 	WRSound::PlayUI(nullptr, TEXT("ui.open"));
@@ -283,10 +287,11 @@ void WRControlsPage::Toggle()
 void WRControlsPage::Close()
 {
 	if (!WRControlsUI::Open.IsValid()) return;
-	const TSharedPtr<SWidget> Panel = WRControlsUI::Open;
+	const TSharedPtr<SWidget> Host = WRControlsUI::Open;
+	WRInput::RemoveNavRoot(WRControlsUI::OpenPanel);
 	WRControlsUI::Open.Reset();
-	WRInput::RemoveNavRoot(Panel);
-	if (GEngine && GEngine->GameViewport) GEngine->GameViewport->RemoveViewportWidgetContent(Panel.ToSharedRef());
+	WRControlsUI::OpenPanel.Reset();
+	if (GEngine && GEngine->GameViewport) GEngine->GameViewport->RemoveViewportWidgetContent(Host.ToSharedRef());
 	WRInput::EndOverlay();
 	WRSound::PlayUI(nullptr, TEXT("ui.close"));
 }

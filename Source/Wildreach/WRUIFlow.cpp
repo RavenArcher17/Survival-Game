@@ -3,6 +3,7 @@
 // Sizes are 1080p units (the mockups' px x 1.2), as in the rest of the stone-and-leather UI.
 
 #include "WRUIFlow.h"
+#include "WRUIFit.h"
 #include "WRPadInput.h"
 #include "Wildreach.h"
 #include "WRBeds.h"
@@ -1002,8 +1003,9 @@ void FWRFlow::Tick(float DeltaTime)
 	if (!CoverWidget.IsValid())
 	{
 		// Made here rather than in the constructor: the widgets hold a weak pointer to this.
-		CoverWidget = SNew(SWRFlowCover).Flow(AsShared());
-		MomentsWidget = SNew(SWRFlowMoments).Flow(AsShared()).PC(P);
+		// Each in a fit (WRUIFit.h): nothing on them runs off a small screen or a big interface size.
+		CoverWidget = WRUI::Fit(SNew(SWRFlowCover).Flow(AsShared()));
+		MomentsWidget = WRUI::Fit(SNew(SWRFlowMoments).Flow(AsShared()).PC(P));
 		GEngine->GameViewport->AddViewportWidgetContent(MomentsWidget.ToSharedRef(), 30);
 		GEngine->GameViewport->AddViewportWidgetContent(CoverWidget.ToSharedRef(), 60);
 	}

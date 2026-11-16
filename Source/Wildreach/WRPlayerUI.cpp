@@ -31,6 +31,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Widgets/Layout/SDPIScaler.h"
+#include "WRUIFit.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
@@ -54,9 +55,13 @@ FWRPlayerUI::FWRPlayerUI(AWRPlayerController* InPC) : PC(InPC)
 		{
 			// HUD size (Settings > Interface): a scaler over the HUD only; the interface size (the engine's application
 			// scale) multiplies it with every screen.
-			HudWidget = SNew(SDPIScaler).DPIScale_Lambda([]() { return FMath::Clamp(FWRKeyBindings::Get().Pref(TEXT("HudScale")) / 100.f, 0.5f, 2.f); })
+			// Outside it, the fit (WRUIFit.h): a HUD size that would run off a small screen shrinks to fit instead.
+			HudWidget = SNew(SWRFit)
 				[
-					(*Hud)(InPC)
+					SNew(SDPIScaler).DPIScale_Lambda([]() { return FMath::Clamp(FWRKeyBindings::Get().Pref(TEXT("HudScale")) / 100.f, 0.5f, 2.f); })
+					[
+						(*Hud)(InPC)
+					]
 				];
 			GEngine->GameViewport->AddViewportWidgetContent(HudWidget.ToSharedRef(), 10);
 		}
@@ -65,7 +70,7 @@ FWRPlayerUI::FWRPlayerUI(AWRPlayerController* InPC) : PC(InPC)
 	{
 		if (GEngine && GEngine->GameViewport)
 		{
-			WheelWidget = (*Wheel)(InPC);
+			WheelWidget = WRUI::Fit((*Wheel)(InPC));
 			GEngine->GameViewport->AddViewportWidgetContent(WheelWidget.ToSharedRef(), 40);
 		}
 	}
@@ -249,7 +254,7 @@ void FWRPlayerUI::ShowScreen(FName Name)
 	ScreenName = Name;
 	// Screens ease in (a short fade and rise); the build bar is a strip, so it only fades.
 	const bool bBar = Name == TEXT("build");
-	ScreenHost = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, bBar ? 0.f : WRTune(TEXT("flow.screenRise"), 14.f)))[ScreenWidget.ToSharedRef()];
+	ScreenHost = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, bBar ? 0.f : WRTune(TEXT("flow.screenRise"), 14.f)))[WRUI::Fit(ScreenWidget.ToSharedRef())];
 	// The testers' god panel sits over the death and loading covers (Z 60), so "Revive where I fell" can be reached dead.
 	const int32 Z = Name == TEXT("god") ? 65 : 20;
 	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), Z);
