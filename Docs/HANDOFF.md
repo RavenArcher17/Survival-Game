@@ -67,7 +67,7 @@ a boss's fall plays `music.sting.boss_fall` and a planned hush. Reverb comes fro
 a `captionDefaults` entry; the HUD draws them (`WRUICaptions.cpp`). The master limiter / Night compressor is
 `UWRAudioSubsystem::ApplyDynamics`.
 Fire and Frost have their own music sets (`explore/night/combat/mini/camp.volcanic|tundra`, `boss.vulkarn|skaldrith.p1-3`,
-`sub.kiln_roads|blue_below`, `layer.eruption|whiteout`); the other new lands have their own explore / night / combat, their
+`sub.kilnroads|bluebelow` (`sub.<tube id>`), `layer.eruption|whiteout`); the other new lands have their own explore / night / combat, their
 boss pools are still marked stand-ins. Sources and the build: `Tools/audio/sources_cookpass.py`, `build_cookpass_audio.py`.
 Also since 0.7.1: **the Fire and Frost world cook pass** (showcase-notes cooks/cookpass-world.md). The Old Island's places
 are data: `Data/island_places.json` is made by `node Tools/terrain/island_places.mjs` (hand places in metres settled onto

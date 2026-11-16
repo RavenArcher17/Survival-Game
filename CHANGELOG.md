@@ -71,7 +71,7 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
     phase), capped at `music.syncMax`.
   - A boss's fall: its piece ends on the bar, `music.sting.boss_fall` plays and the land holds a 12 s planned hush
     (`music.bossHush`) before its own music returns (Dark Souls / Monster Hunter).
-  - Fire and Frost places: `sub.kiln_roads` / `sub.blue_below` inside the hidden tubes (`AWRHiddenTube` route within
+  - Fire and Frost places: `sub.kilnroads` / `sub.bluebelow` (`sub.<tube id>`) inside the hidden tubes (`AWRHiddenTube` route within
     `music.tubeReach`), `explore.volcanic.c` in V4 and `explore.tundra.c` in T4 / T5, and the Eruption / Whiteout
     event layers (`layer.eruption`, `layer.whiteout`) from the event's five-minute warning to its end.
 - **Audio (2): spaces, mix, tells, spots, sleep.**
