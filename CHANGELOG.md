@@ -28,6 +28,33 @@ cooks/cookpass-building.md. Compiled (editor target) after each part; not played
   rung while the other foot steps up, one cycle every two rungs, timed by height so it stops when you stop (tuning
   `anim.climb`); the same pose layer has push / crank / aim poses for siege crews (used by part D). The hot spring bath
   also stands inside a hot spring (the Steam Ground, `building.hotSpringKinds`). Tested by compiling.
+- **Part D, siege engines.** Why: FULL-GAME 7's "explosives, raid tools, siege weapons" row and biome-crystal 2.21.5 had
+  no siege engines, so stone and metal bases could only be blown with charges and haulers had no ram to push. Three
+  engines, each an item you stand in front of you (workbench at Hearth 4) and crew at its posts (Interact; the stick,
+  Attack, Block and Dodge work the engine; on a pad the same buttons), every part modelled and moving on its mechanism
+  (`WRSiegeLook.cpp`; real rams, trebuchets and ballistae measured, cooks/cookpass-building.md 1.3):
+  - **Battering ram** (steel plate 6, heartwood 10, hide 8, rope 4; 2,000 HP, wet-hide roof 800): a heartwood log with a
+    steel cap hung on two parallel chains from the ridge of a wheeled shed (solid plank wheels on iron axles in bearing
+    blocks, rafters, lapped hides); two at the rear handles (or one with a harnessed hauler, Block) push it at 1 m/s, its
+    wheels turning by the ground covered and its body pitching to them; hold Attack to draw the log back 35 deg on its
+    chains, let go and it swings as a damped pendulum: 250 at a full draw to a door or gate at the bottom of the arc
+    (walls refuse), and it bounces back off what it hits. Blows from above land on the roof first.
+  - **Trebuchet** (wood 60, steel plate 6, rope 10; 1,500 HP): base timbers, a turntable on rollers, two A-frame towers,
+    a 7.5 m arm on an iron axle, a hinged box of stones, a sling on a release pin, a winch with capstan wheels and a
+    ratchet whose pawl clicks every tooth. The winch crew holds Attack 10 s to wind the arm down; the aimer turns it
+    (10 deg/s), sets the pin (20 / 40 / 60 m), loads a siege stone (workbench: 25 stone) and throws: the weight falls,
+    the arm swings up past upright and rocks back, the sling whips round and lets go at the pin's angle. The stone's
+    whole flight is drawn for everyone within 150 m while it's cocked and loaded and in flight; it never homes. 500 to the
+    piece it hits, half to others in its 2 m footprint, 80 to anyone under it (ApplyHit; the crew's clan spared); a stone
+    breaks an Aegis dome.
+  - **Ballista** (steel plate 8, wood 30; 800 HP; any world): a steel bow on a stock on a swivelling yoke over a tripod.
+    Look to aim (it follows at 60 / 30 deg/s), hold Attack to draw with the windlass (2 s, a bolt goes in the groove),
+    let go: a red aim line for 0.9 s that everyone sees, then a straight bolt at 60 m/s, never homing, 220 (players
+    take the PvP share); Aegis stops it.
+  Engines are broken by weapons (a quarter), charges, fire pots, spells, stones; they leave a third of their materials;
+  the owner packs one up (Dodge twice, at 90% health); unattended for two hours one falls apart; they're saved with the
+  world. Siege engineer (Engineering 100) is live: engines you build hit 20% harder. The ladder climber and the crews
+  use part C's poses (push, crank with the crank's real angle, aim). Tested by compiling.
 ## Unreleased: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
 
 Aaron (lane cookpass-survival: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-survival.md).

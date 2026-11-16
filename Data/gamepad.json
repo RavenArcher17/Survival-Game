@@ -126,6 +126,14 @@
       { "verb": "BuildDemolish", "does": "Demolish instead / stop demolishing" },
       { "verb": "BuildCancel", "does": "Put the piece away" }
     ] },
+    { "title": "On a siege engine's post", "rows": [
+      { "verb": "Interact", "does": "Take the nearest free post / step off it" },
+      { "verb": "Move", "does": "Ram: push and turn it. Trebuchet lever: turn it, forward / back sets the pin (20 / 40 / 60 m)" },
+      { "verb": "Look", "does": "Ballista: aim the stock" },
+      { "verb": "Heavy", "does": "Hold: draw the ram's log / wind the winch / draw the ballista; let go to swing or loose. Lever: load, then throw" },
+      { "verb": "Block", "does": "Ram: harness your hauler (or let it out)" },
+      { "verb": "Dodge", "does": "Twice: pack the engine up (yours, nearly whole)" }
+    ] },
     { "title": "In menus", "rows": [
       { "button": "Left stick", "does": "Move the pointer (slower over buttons)" },
       { "button": "D-pad", "does": "Jump to the next button that way" },

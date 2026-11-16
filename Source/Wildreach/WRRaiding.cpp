@@ -1,6 +1,7 @@
 // Player raiding: one damage rule for every player-side source, the raid tools, the raid bell and the raid record
 // (WRRaiding.h; cooks/build-server-raids.md 2.3 to 2.7, 2.10, 2.11).
 #include "WRRaiding.h"
+#include "WRSiege.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
@@ -60,6 +61,8 @@ namespace WRRaidingImpl
 		case EWRRaidSource::FirePot: return TEXT("firepot");
 		case EWRRaidSource::Spell: return TEXT("spell");
 		case EWRRaidSource::Tame: return TEXT("tame");
+		case EWRRaidSource::Ram: return TEXT("ram");
+		case EWRRaidSource::Siege: return TEXT("siege");
 		default: return TEXT("fire");
 		}
 	}
@@ -404,6 +407,8 @@ int32 FWRRaiding::SplashPieces(UWorld* World, const FVector& At, float Radius, f
 	{
 		if (IsValid(P) && !P->IsActorBeingDestroyed()) DamagePiece(P, Amount, Source, Causer, Raider, PathId);
 	}
+	// Siege engines in the same reach take it too (their own shares: siege.take.<source>).
+	FWRSiege::Splash(World, At, Radius, Amount, Source, Causer, Raider);
 	return Hit.Num();
 }
 
@@ -968,6 +973,8 @@ void AWRRaidCharge::Explode()
 	{
 		if (IsValid(P) && !P->IsActorBeingDestroyed()) FWRRaiding::DamagePiece(P, Amount(P) * Share, EWRRaidSource::Blast, this, Placer, NAME_None);
 	}
+	// A siege engine in the blast takes the charge's wood number (they're timber).
+	FWRSiege::Splash(World, At, Radius, Num(TEXT("charge.wood"), 800.f) * Share, EWRRaidSource::Blast, this, Placer);
 	// Silent charges (a stealth perk): the same blast, heard over a much shorter reach.
 	const bool bQuiet = PlacerBody.IsValid() && UWRLifeSkillsComponent::StatFor(PlacerBody.Get(), TEXT("silentCharges")) > 0.f;
 	WRFx::Broadcast(this, TEXT("raid.blast"), At, GetActorRotation(), 1.f, bQuiet ? FName(TEXT("raid.blast_quiet")) : FName(TEXT("raid.blast")));

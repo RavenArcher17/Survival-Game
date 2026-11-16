@@ -1,4 +1,5 @@
 #include "WRAbilities.h"
+#include "WRSiege.h"
 #include "WRDesertHazards.h"
 #include "WRAbilitiesSpore.h"
 #include "WRAbilitiesTide.h"
@@ -1200,6 +1201,18 @@ void UWRGA_Melee::Sweep()
 			WRForestHazards::HitThing(Thing, Character, UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character->Weapon.Element == TEXT("fire"), HitResult.ImpactPoint);
 			continue;
 		}
+		// A siege engine: its timbers take a quarter of a blow (WRSiege siege.take.weapon); once a swing.
+		if (AWRSiegeEngine* Engine = Cast<AWRSiegeEngine>(HitResult.GetActor()))
+		{
+			if (!HitThisSwing.Contains(Engine))
+			{
+				HitThisSwing.Add(Engine);
+				const FVector At = HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : Engine->GetActorLocation();
+				WRFx::Broadcast(Character, TEXT("gather.wood"), At, (Start - At).GetSafeNormal().Rotation(), bHeavy ? 1.3f : 1.f, TEXT("gather.wood"));
+				Engine->TakeHit(UWRCombatLibrary::WeaponDamage(Character->Weapon, bHeavy) * (bHeavy ? 1.5f : 1.f), Character, EWRRaidSource::Weapon, FWRRaiding::Responsible(Character), At.Z > Engine->GetActorLocation().Z + 170.f);
+			}
+			continue;
+		}
 		// A siege ladder: wood, so any blow hurts it fully.
 		if (AWRSiegeLadder* Ladder = Cast<AWRSiegeLadder>(HitResult.GetActor()))
 		{
@@ -1536,7 +1549,7 @@ bool UWRGA_Melee::CheckRecoil(AWRCharacterBase* Character, float F0, float F1)
 	const AActor* What = Wall.GetActor();
 	const AActor* Owner = What ? What->GetOwner() : nullptr;
 	if (What && (Cast<APawn>(What) || Cast<AWRDressing>(What) || Cast<AWRResourceNode>(What) || Cast<AWRBuildPiece>(What) || Cast<AWRBuildPiece>(Owner)
-		|| Cast<AWRFoldThing>(What) || Cast<AWRFoldThing>(Owner) || Cast<AWRBossProp>(What) || Cast<AWRSiegeLadder>(What) || WRForestHazards::IsHazardThing(What)))
+		|| Cast<AWRFoldThing>(What) || Cast<AWRFoldThing>(Owner) || Cast<AWRBossProp>(What) || Cast<AWRSiegeLadder>(What) || Cast<AWRSiegeEngine>(What) || WRForestHazards::IsHazardThing(What)))
 	{
 		return false;
 	}

@@ -1,4 +1,6 @@
 #include "WRProjectile.h"
+#include "WRSiegeLook.h"
+#include "WRSiege.h"
 #include "WRDesertHazards.h"
 #include "WROceanTypes.h"
 #include "WRDesertTypes.h"
@@ -247,7 +249,7 @@ void AWRProjectile::OnRep_Model()
 		// (And the Ancient forest's: the Bootlace blight jar, the smoke pot: WRForestHazards.)
 		if (WRSwamp::BuildThrownModel(ModelPath, CodeModel) || WRVoidWorld::BuildThrownModel(ModelPath, CodeModel)
 			|| WRForestHazards::BuildThrownModel(ModelPath, CodeModel) || UWRGraveHazards::BuildThrownModel(ModelPath, CodeModel) || FWRSkyBoss::BuildThrownModel(ModelPath, CodeModel) || WROcean::BuildThrownModel(ModelPath, CodeModel) || WRDesert::BuildThrownModel(ModelPath, CodeModel)
-			|| WRFungal::BuildThrownModel(ModelPath, CodeModel))
+			|| WRFungal::BuildThrownModel(ModelPath, CodeModel) || WRSiegeLook::BuildThrownModel(ModelPath, CodeModel))
 		{
 			Mesh->SetVisibility(false);
 		}
@@ -305,6 +307,11 @@ void AWRProjectile::OnRep_Color()
 	}
 }
 
+void AWRProjectile::IgnoreActor(AActor* A)
+{
+	if (Collision && A) Collision->IgnoreActorWhenMoving(A, true);
+}
+
 void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& HitResult)
 {
 	if (!HasAuthority() || bSpent)
@@ -315,6 +322,19 @@ void AWRProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 
 	AWRCharacterBase* Target = Cast<AWRCharacterBase>(OtherActor);
 	const AWRCharacterBase* Caster = Cast<AWRCharacterBase>(Hit.Instigator);
+	// A trebuchet's stone comes down (WRSiege): buildings, engines and everyone in its footprint.
+	if (Kind == TEXT("trebuchet"))
+	{
+		FWRSiege::StoneLanded(this, HitResult.bBlockingHit ? FVector(HitResult.ImpactPoint) : GetActorLocation(), OtherActor, const_cast<AWRCharacterBase*>(Caster));
+		Destroy();
+		return;
+	}
+	// A shot into a siege engine: its timbers take it (the engine's own shares by what hit it).
+	if (AWRSiegeEngine* Engine = Cast<AWRSiegeEngine>(OtherActor); Engine && Caster)
+	{
+		Engine->TakeHit(Hit.Damage, this, ModelPath.IsEmpty() ? EWRRaidSource::Spell : Kind == TEXT("firepot") ? EWRRaidSource::FirePot : EWRRaidSource::Weapon,
+			FWRRaiding::Responsible(Caster), HitResult.ImpactPoint.Z > Engine->GetActorLocation().Z + 170.f);
+	}
 	// A lightning bolt landing in the Mother's Throat: on a Rodwarden rod, into the water, at someone wading it (Vharra
 	// herself counts it as her blow lands: WRSwampVharra.cpp). Nothing happens anywhere else.
 	if (Hit.Element == WRTags::Element_Lightning && !(Cast<AWRBoss>(Target) && FWRSwampBoss::IsVharra(Target)))

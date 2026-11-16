@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
 #include "WRSunPath.h"
@@ -1079,6 +1080,8 @@ private:
 			if (WRWarHall::Prompt(P, EndTarget, EndVerb)) { OutTarget = EndTarget; return EndVerb; }
 			// A runtime land's boats, lift and winch (WRLandThings).
 			if (WRLandThings::Prompt(P, EndTarget, EndVerb)) { OutTarget = EndTarget; return EndVerb; }
+			// A siege engine's posts (WRSiege): what this post does, or which post you'd take.
+			if (FWRSiege::Prompt(P, EndTarget, EndVerb)) { OutTarget = EndTarget; return EndVerb; }
 		}
 		// A boss altar opens its pages (its path, Return, Forge soul: WRDeeds).
 		if (const AWRBossAltar* Altar = P->FindNearbyAltar()) { OutTarget = TEXT("Boss altar"); return P->GetUI() ? FString(TEXT("Path  ·  Return  ·  Forge soul")) : Altar->GetPrompt(P).Replace(TEXT("E: "), TEXT("")); }

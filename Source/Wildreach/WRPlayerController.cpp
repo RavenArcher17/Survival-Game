@@ -1,4 +1,5 @@
 #include "WRPlayerController.h"
+#include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRCrystalCreatures.h"
 #include "WROceanCreatures.h"
@@ -244,6 +245,12 @@ void AWRPlayerController::InteractPressed()
 {
 	// (Menus keep E: it closes a chest or a station's screen.) Just after leaving a mode, the press that left it doesn't act.
 	if (Menu == EWRMenu::None && !WRInput::AllowPress(this)) return;
+	// On a siege engine's post, E steps off it (WRSiege), whatever else is near.
+	if (Menu == EWRMenu::None && FWRSiege::CrewingOf(GetPawn()))
+	{
+		ServerCommand(TEXT("siege leave"));
+		return;
+	}
 	if (UI && Menu == EWRMenu::None)
 	{
 		// Your own tame in front of you: hold for the order wheel, tap for the usual (see FWRPlayerUI::TameKey).

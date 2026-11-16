@@ -608,14 +608,20 @@ the fused calls and the cook's 70 BPM cues are the audio cook's), the beds and t
   and the game starts binding EOS ids at once (device-id login, no Epic account needed by players).
 - **Player raiding** (`WRRaiding`): every player-side source that hurts a building goes through
   `FWRRaiding::DamagePiece` (it rings the claim's bell and keeps the raid record); creature raids still bite through
-  `TakeBuildDamage`. Raid tools are items of category `raid`. Siege engines (ram, catapult, ballista: biome-crystal
-  2.21.5), haulers pushing rams and necromancers raising the dead through walls aren't built (no siege engines, no
-  Necromancy tree yet); the Necromancy numbers wait in `tuning.json raiding.paths.necromancy`. The ladder has no climb
+  `TakeBuildDamage`. Raid tools are items of category `raid`. **Siege engines** (since cookpass-building:
+  `WRSiege.cpp`, models in `WRSiegeLook.cpp`, tuning `siege`): items of category `siege` (`battering_ram`, `trebuchet`,
+  `ballista`; ammo `siege_stone`, `ballista_bolt`) stood in front of you by `FWRSiege::UseItem`; `AWRSiegeEngine` holds
+  the crew (attached at their posts, movement off on both ends), replicates `FWRSiegeRep` (state + the server time it
+  began) and every machine works out the pendulum log, the falling counterweight, the sling, the windlass from it; the
+  stone is an `AWRProjectile` of kind `trebuchet` (`FWRSiege::StoneLanded`), the bolt kind `ballista`; damage to pieces
+  through `DamagePiece` (sources `Ram` / `Siege`), to engines through `AWRSiegeEngine::TakeHit` (melee, shots,
+  `SplashPieces` blasts); saved in the world store's `siege` document; a harnessed hauler (`AWRCreature::HarnessedTo`)
+  walks behind its ram. Necromancers raise the dead through walls since build-biome-graveyard (`WRAbilitiesNecro.cpp`). The ladder has no climb
   clip; the climbing pose is built in `WRHeroAnimInstance` (hand over hand in time with the rungs, tuning `anim.climb`).
   Every path's area blasts hit buildings through `FWRRaiding::SplashPieces` (Thunderclap, Arcane blast, Starfall,
   Corpse explosion, Collapse, Maw of the void, the Sunburst column, Blight's rot), so `raiding.paths` multipliers apply. The code breaker waits for the Crystal caves (resonant crystal).
 - **Bounties** stay a setting only (nothing reads it) until the PvP pass. **52 perks** wait for their systems
-  (`waitsFor` in `Data/lifeskills.json`: diving, bees, siege weapons, timed brews...; Siege-proof and Silent charges are live since build-server-raids; Breeder, Rare finder, Saddle master and
+  (`waitsFor` in `Data/lifeskills.json`: diving, bees, timed brews...; Siege engineer is live since cookpass-building; Siege-proof and Silent charges are live since build-server-raids; Breeder, Rare finder, Saddle master and
   Creature armorer are live since build-taming; Decorator, Turret tech,
   Master builder and Ancient wood are live since build-building).
 - **F8 pictures from the game don't reach the web inbox yet**: the feedback endpoint keeps screenshots (and context over

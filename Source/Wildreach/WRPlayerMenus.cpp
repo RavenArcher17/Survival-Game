@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRDeeds.h"
+#include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRWarHall.h"
 #include "WRLandThings.h"
@@ -227,6 +228,11 @@ void AWRPlayerController::WRInteract()
 	}
 	// A runtime land's things: the Grey Crossing's boats, the Descent lift, the Null Gate's winch (WRLandThings).
 	if (WRLandThings::ClientInteract(this))
+	{
+		return;
+	}
+	// A siege engine's post: take it, or step off the one you're on (WRSiege).
+	if (FWRSiege::ClientInteract(this))
 	{
 		return;
 	}
@@ -838,6 +844,13 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 	if (Cmd == TEXT("deeds"))
 	{
 		OutResult = WRDeeds::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
+	// Siege engines (WRSiege): siege take / leave / move / act / aim / pack / harness.
+	if (Cmd == TEXT("siege"))
+	{
+		OutResult = FWRSiege::Command(this, Args);
 		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
 		return true;
 	}

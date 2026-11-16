@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRSiege.h"
 #include "WRMapReveal.h"
 #include "WRSporePath.h"
 #include "WRNecroPath.h"
@@ -174,6 +175,7 @@ void AWRGameMode::BeginPlay()
 	Super::BeginPlay();
 	LoadWorld();
 	FWRRaiding::Load(GetWorld());
+	FWRSiege::Load(GetWorld());
 	WRWildlife::Start(GetWorld());
 	WRRaids::Start(GetWorld());
 	// The endgame: achievements' census, the kill-time boards and their tablets, the war-halls (WRDeeds, WRRecords, WRWarHall).
@@ -386,6 +388,7 @@ void AWRGameMode::SaveWorld()
 	FJsonSerializer::Serialize(Root, Writer);
 	WRStore::WriteDoc(TEXT("world"), Text);
 	FWRRaiding::Save();
+	FWRSiege::Save(GetWorld());
 	UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
 	WRWildlife::Save(GetWorld());
 }
