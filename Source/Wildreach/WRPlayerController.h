@@ -241,6 +241,13 @@ public:
 	double GetNoticeTime() const { return NoticeTime; }
 
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
+	/** The host is closing the world (cooks/cookpass-multiplayer.md 3.4): this client's card will say so, not "lost". */
+	UFUNCTION(Client, Reliable) void ClientHostClosing();
+	/** Kicked or banned: the reason goes on the main menu's card. */
+	virtual void ClientWasKicked_Implementation(const FText& KickReason) override;
+	/** Server, the listen host leaving: tells everyone else the world is closing and saves them all; true if anyone
+	 *  else was here (leave a moment later, so the word reaches them first). */
+	bool AnnounceHostClosing();
 	/** The testers' god mode (WRGod, cooks/build-godmode.md): the server's nonce at login; a tester's proof for it (from the
 	 *  Freedom35 site); the Travel page's list of places. */
 	UFUNCTION(Client, Reliable) void ClientGodChallenge(const FString& Nonce);

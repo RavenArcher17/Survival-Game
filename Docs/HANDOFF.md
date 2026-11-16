@@ -68,6 +68,11 @@ leaving times noted in `AWRGameMode::Logout`); a claim keeps its state in `AWRCl
 `TakeBuildDamage`, which applies it; don't check `IsAnyoneOnline` for protection anywhere else.
 Chat lines carry their channel at the start (`/g /l /c /w name /r`, parsed in `ServerChat`); `ClientChat(From, Line,
 WRChat::EChannel)` delivers one. A system line from the world uses channel `WRChat::System`.
+Who may join is `WRAccess` (`access.json` per world: cap, salted password hash, admins, bans); `PreLogin` calls
+`WRAccess::Refuse`, whose reasons start `WR|` or `PASSWORD|` so the main menu's card can show them (and a password box).
+Roles are `AWRPlayerState::AccessRole` (2 host, 1 admin), refreshed by `WRAccess::RefreshRoles`; admin actions are the
+`admin kick|ban|unban|op|deop` server command. Leaving reasons for the card: `SWRMainMenu::NoteLeaving` (kicks, the host
+closing: `AWRPlayerController::AnnounceHostClosing`).
 Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

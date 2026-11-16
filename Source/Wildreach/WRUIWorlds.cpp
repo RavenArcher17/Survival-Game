@@ -9,6 +9,7 @@
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRWorlds.h"
+#include "WRAccess.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Images/SImage.h"
@@ -340,7 +341,7 @@ namespace WRWorldsUI
 		}
 
 	private:
-		enum class EMode : uint8 { List, New, Rename, ConfirmDelete };
+		enum class EMode : uint8 { List, New, Rename, ConfirmDelete, Hosting };
 		EMode Mode = EMode::List;
 		TFunction<void(const FString&)> OnPlay;
 		FSimpleDelegate OnClose;
@@ -354,6 +355,10 @@ namespace WRWorldsUI
 		TSharedPtr<SBox> Body;
 		TSharedPtr<SBox> Footer;
 		TSharedPtr<SEditableTextBox> NameBox;
+		/** The Hosting page's copy of the world's access.json (cooks/cookpass-multiplayer.md 3.4) and its password box. */
+		TSharedPtr<FWRAccess> HostAccess;
+		TSharedPtr<SEditableTextBox> PassBox;
+		FText HostNote;
 
 		/** One Esc in a text box goes back (left alone, the first only clears its selection). */
 		FReply OnTextBoxKey(const FGeometry& Geo, const FKeyEvent& E)
@@ -454,6 +459,7 @@ namespace WRWorldsUI
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Delete", "Delete"), false, [this]() { AskDelete(); }, HasPick)]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Rename", "Rename"), false, [this]() { StartRename(); }, HasPick)]
+				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Hosting", "Hosting"), false, [this]() { ShowHosting(); }, HasPick)]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("NewWorld", "New world"), false, [this]() { ShowNew(); })]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Play", "Play"), true, [this]() { Play(SelectedId); }, HasPick, 150.f)]);
 		}
@@ -498,6 +504,168 @@ namespace WRWorldsUI
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Label(LOCTEXT("WorldsHere", "Worlds on this PC"))]
 					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)[Muted(LOCTEXT("WorldsHint", "Friends join the world you host by your IP · UDP 7777"), 12)]
+				]
+				+ SVerticalBox::Slot().FillHeight(1.f)
+				[
+					SNew(SBorder).BorderImage(InsetBrush()).Padding(FMargin(10.f * U, 10.f * U, 6.f * U, 2.f * U))
+					[
+						SNew(SScrollBox).ScrollBarThickness(FVector2D(5.f, 5.f))
+						+ SScrollBox::Slot().Padding(FMargin(0.f, 0.f, 6.f * U, 0.f))[Rows]
+					]
+				]);
+		}
+
+		// ------------------------------------------------------------ hosting: players, password, admins, bans
+
+		/** One row of the Hosting page: what it is and what it means on the left, its controls on the right. */
+		static TSharedRef<SWidget> HostRow(const FText& Title, const TAttribute<FText>& Sub, TSharedRef<SWidget> Controls)
+		{
+			return SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.22f), 4.f, FLinearColor(0.f, 0.f, 0.f, 0.6f), 1.f)).Padding(FMargin(18.f * U, 14.f * U))
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(0.f, 0.f, 16.f * U, 0.f)
+					[
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(Title, Spaced(WRUI::Title(15), 40), WRUI::Ink)]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)[WRUI::Text(Sub, WRUI::Body(13, 500), WRUI::Ink2, false, true)]
+					]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Controls]
+				];
+		}
+
+		void ShowHosting()
+		{
+			if (!SelectedWorld()) return;
+			Mode = EMode::Hosting;
+			Status = FText::GetEmpty();
+			HostNote = FText::GetEmpty();
+			HostAccess = MakeShared<FWRAccess>(WRAccess::Read(SelectedId));
+			HostAccess->MaxPlayers = FMath::Clamp(HostAccess->MaxPlayers, WRAccess::MinPlayers(), WRAccess::MaxPlayersLimit(false));
+			RebuildHosting();
+			SetFooter(
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).MinDesiredWidth(110.f * U)[SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U).Text(LOCTEXT("HostBack", "Back")).OnClicked_Lambda([this]() { ShowList(); return FReply::Handled(); })]]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(16.f * U, 0.f, 0.f, 0.f)[Muted(TAttribute<FText>::CreateLambda([this]() { return HostNote.IsEmpty() ? LOCTEXT("HostUnsaved", "Back leaves it as it was; Save keeps your changes.") : HostNote; }), 13, true)],
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("HostSave", "Save"), true, [this]() { SaveHosting(); }, nullptr, 150.f)]);
+		}
+
+		void SaveHosting()
+		{
+			if (!HostAccess.IsValid()) return;
+			// A password typed but not set yet goes in too: Save means what the page shows.
+			if (PassBox.IsValid() && !PassBox->GetText().IsEmpty()) WRAccess::SetPassword(*HostAccess, PassBox->GetText().ToString());
+			if (!WRAccess::Write(SelectedId, *HostAccess))
+			{
+				HostNote = LOCTEXT("HostSaveFailed", "Couldn't save: is the world's folder read-only?");
+				return;
+			}
+			UE_LOG(LogWildreach, Log, TEXT("WORLDS hosting '%s': %d players, %s, %d admins, %d bans"), *SelectedId, HostAccess->MaxPlayers,
+				HostAccess->HasPassword() ? TEXT("password") : TEXT("open"), HostAccess->Admins.Num(), HostAccess->Bans.Num());
+			ShowList();
+			Status = LOCTEXT("HostSaved", "Hosting saved: it applies the next time you host this world.");
+		}
+
+		void RebuildHosting()
+		{
+			const FWRWorldInfo* W = SelectedWorld();
+			if (!W || !HostAccess.IsValid()) return;
+			const TSharedPtr<FWRAccess> A = HostAccess;
+			TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+			// Players: the most at once, you included.
+			Rows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)
+			[
+				HostRow(LOCTEXT("HostPlayers", "Players"), LOCTEXT("HostPlayersSub", "The most who can be in this world at once, you included. Tuned for 4 to 8."),
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(48.f * U)[SNew(SWRButton).Ghost(true).FontSize(16).MinHeight(40.f * U).Text(FText::FromString(TEXT("\u2212")))
+						.OnClicked_Lambda([A]() { A->MaxPlayers = FMath::Max(WRAccess::MinPlayers(), A->MaxPlayers - 1); return FReply::Handled(); })]]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(64.f * U).HAlign(HAlign_Center)
+						[WRUI::Text(TAttribute<FText>::CreateLambda([A]() { return FText::AsNumber(A->MaxPlayers); }), WRUI::Title(20), WRUI::Ink)]]
+					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(48.f * U)[SNew(SWRButton).Ghost(true).FontSize(16).MinHeight(40.f * U).Text(FText::FromString(TEXT("+")))
+						.OnClicked_Lambda([A]() { A->MaxPlayers = FMath::Min(WRAccess::MaxPlayersLimit(false), A->MaxPlayers + 1); return FReply::Handled(); })]])
+			];
+			// Password: set, change or remove (only its salted hash is kept).
+			Rows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)
+			[
+				HostRow(LOCTEXT("HostPassword", "Password"), TAttribute<FText>::CreateLambda([A]()
+					{
+						return A->HasPassword() ? LOCTEXT("HostPassOn", "Set: friends type it when they join. Only a scrambled copy is kept, so a new one replaces it.")
+							: LOCTEXT("HostPassOff", "None: anyone with your address can join.");
+					}),
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+					[
+						SNew(SBox).WidthOverride(220.f * U)
+						[
+							SAssignNew(PassBox, SEditableTextBox).Style(&FieldStyle()).Font(WRUI::Body(15, 700)).IsPassword(true)
+							.HintText_Lambda([A]() { return A->HasPassword() ? LOCTEXT("HostPassNewHint", "A new password") : LOCTEXT("HostPassHint", "A password"); })
+							.OnKeyDownHandler(this, &SWRWorldChooser::OnTextBoxKey)
+						]
+					]
+					+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("HostPassSet", "Set"), true, [this, A]()
+						{
+							if (!PassBox.IsValid() || PassBox->GetText().IsEmpty()) return;
+							WRAccess::SetPassword(*A, PassBox->GetText().ToString());
+							PassBox->SetText(FText::GetEmpty());
+							HostNote = LOCTEXT("HostPassSetNote", "Password set. Save to keep it.");
+						}, [this]() { return PassBox.IsValid() && !PassBox->GetText().IsEmpty(); })]
+					+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("HostPassClear", "Remove"), false, [this, A]()
+						{
+							WRAccess::SetPassword(*A, FString());
+							HostNote = LOCTEXT("HostPassClearNote", "Password removed. Save to keep it that way.");
+						}, [A]() { return A->HasPassword(); })])
+			];
+			// Admins: kick and ban too (made from the Clan tab while you play); removed here.
+			TSharedRef<SVerticalBox> AdminList = SNew(SVerticalBox);
+			for (const FString& Name : A->Admins)
+			{
+				AdminList->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f * U)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[SNew(SBox).MinDesiredWidth(160.f * U)[WRUI::Text(FText::FromString(Name), WRUI::Body(15, 700), WRUI::Ink)]]
+					+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("HostAdminRemove", "Remove"), false, [this, A, Name]()
+						{
+							A->Admins.Remove(Name);
+							HostNote = FText::Format(LOCTEXT("HostAdminRemoved", "{0} won't be an admin once you save."), FText::FromString(Name));
+							RebuildHosting();
+						})]
+				];
+			}
+			Rows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)
+			[
+				HostRow(LOCTEXT("HostAdmins", "Admins"), A->Admins.Num() == 0 ? LOCTEXT("HostAdminsNone", "Only you. While you play, Make admin on a player's row in the Clan tab (O) lets them kick and ban too.")
+					: LOCTEXT("HostAdminsSome", "They can kick and ban players (not you)."), AdminList)
+			];
+			// Bans: who's kept out, and for how long.
+			TSharedRef<SVerticalBox> BanList = SNew(SVerticalBox);
+			for (const FWRBan& Ban : A->Bans)
+			{
+				const FString Name = Ban.Name;
+				BanList->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f * U)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SBox).MinDesiredWidth(140.f * U)[WRUI::Text(FText::FromString(Name), WRUI::Body(15, 700), WRUI::Ink)]]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[SNew(SWRChip).FontSize(11).Color(WRUI::Bad).Text(FText::FromString(WRAccess::BanLeft(Ban)))]
+					+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("HostUnban", "Unban"), false, [this, A, Name]()
+						{
+							A->Bans.RemoveAll([&Name](const FWRBan& B) { return B.Name == Name; });
+							HostNote = FText::Format(LOCTEXT("HostUnbanned", "{0} may come back once you save."), FText::FromString(Name));
+							RebuildHosting();
+						})]
+				];
+			}
+			Rows->AddSlot().AutoHeight()
+			[
+				HostRow(LOCTEXT("HostBans", "Bans"), A->Bans.Num() == 0 ? LOCTEXT("HostBansNone", "Nobody is banned. Ban from a player's row in the Clan tab (O).")
+					: LOCTEXT("HostBansSome", "Kept out by their name and their address."), BanList)
+			];
+			Body->SetContent(
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(2.f * U, 0.f, 0.f, 10.f * U)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Label(FText::Format(LOCTEXT("HostingWorld", "Hosting {0}"), FText::FromString(W->Name)))]
+					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)[Muted(LOCTEXT("HostingHint", "Friends join by your IP · UDP 7777"), 12)]
 				]
 				+ SVerticalBox::Slot().FillHeight(1.f)
 				[

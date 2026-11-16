@@ -34,6 +34,26 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
   (`chat.colors`, sRGB): "[Nearby] Mira: ...", "[Clan] Mira: ...", "Mira whispers: ...", "To Mira: ...". The server
   keeps a line a second (5 at once) per player, and refuses with a reason: not in a clan, nobody by that name, nobody
   near enough to hear. 50 lines are kept. Tested by compiling.
+- **Part D: who may come in, and who runs the world.** Why: a world had no password, no player cap, no admin, no
+  kick and no ban (`PreLogin` checked only the name's key). When the host left, everyone read "Lost the connection",
+  and nobody was told who came or went. Now:
+  - **`Saved/Worlds/<id>/access.json`** (`WRAccess`, written whole then swapped in): the player cap (2 to 16 on a
+    listen world, default 8, `net.listen*`), a **password** (kept as a salted hash; the joiner's game sends a hash,
+    never what was typed), admins and bans. `AWRGameMode::PreLogin` refuses, in order, a banned name or address
+    ("Banned from this world (21 h left)"), a full world ("World full (8/8)") and a missing or wrong password. Three
+    wrong passwords from one address in 60 s lock it out for the rest of that minute. The engine's own cap is set to match.
+  - **The Hosting page** in Choose a world (a new Hosting button): players with − / +, password Set / Remove, admins
+    (Remove) and bans (Unban), then Save.
+  - **Joining:** when a world asks for its password, the Disconnected card shows a password box and Join (Enter
+    works; on a pad A opens the keyboard). The password is kept only for this run, for Rejoin. A refusal reads as the
+    world said it, and only a ban has no Rejoin.
+  - **The players list** (the Clan tab's right column): each player's live ping (green / amber / red), Host and Admin
+    chips, and for the host or an admin **Kick**, **Ban** (24 h / For good / Cancel), plus **Make admin / Remove
+    admin** for the host, and a **Banned** list with Unban (`admin ...` commands, all checked on the server: nobody
+    kicks the host, admins can't remove admins). A kicked or banned player's card says so and by whom.
+  - **Arrivals:** everyone else reads "Mira washed ashore" (new to the world), "Mira is back" or "Mira left".
+  - **The host leaving** (Main menu or Quit) with others here tells each of them first and saves everyone. Their card
+    reads "The host closed the world. Everything was saved", with no Rejoin. Tested by compiling.
 
 ## Unreleased: building and raids cook pass (cookpass-building)
 

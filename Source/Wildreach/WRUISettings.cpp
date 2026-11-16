@@ -2523,9 +2523,17 @@ namespace WRSettingsUI
 
 		void Quit()
 		{
-			// As the main menu quits.
+			// As the main menu quits. A host with others here tells them the world closed (and saves them) first.
 			if (APlayerController* P = PC.Get())
 			{
+				AWRPlayerController* W = Cast<AWRPlayerController>(P);
+				if (W && W->AnnounceHostClosing())
+				{
+					FTimerHandle Handle;
+					W->GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(W, [W]() { UKismetSystemLibrary::QuitGame(W, W, EQuitPreference::Quit, false); }),
+						FMath::Max(0.1f, WRTune(TEXT("access.hostCloseDelay"), 0.5f)), false);
+					return;
+				}
 				UKismetSystemLibrary::QuitGame(P, P, EQuitPreference::Quit, false);
 			}
 		}

@@ -117,8 +117,13 @@
 
   "net": {
     "_comment": "Server rewind (COMBAT-AND-LESSONS 1.17; cooks/build-combat-core.md 3.4): every character's body is kept for history s at sampleHz. A player's swing and crit are judged against bodies where that player saw them (its ping / 2 + interpSeconds, at most rewindMax). A creature's or boss's blow on a remote player waits up to its ping + interp (at most rewindMax) for the defence it pressed when it saw the blow.",
-    "rewindMax": 0.25, "interpSeconds": 0.1, "history": 1.0, "sampleHz": 30
+    "rewindMax": 0.25, "interpSeconds": 0.1, "history": 1.0, "sampleHz": 30,
+    "_players": "How many can be in a world at once (WRAccess; cooks/cookpass-multiplayer.md 3.4): a listen world's host sets listenMinPlayers..listenMaxPlayers on the Hosting page (listenDefaultPlayers until then), a dedicated server up to dedicatedMaxPlayers.",
+    "listenMinPlayers": 2, "listenMaxPlayers": 16, "listenDefaultPlayers": 8, "dedicatedMaxPlayers": 100
   },
+
+  "access": { "_comment": "Who may come into a world (WRAccess, access.json; cooks/cookpass-multiplayer.md 3.4): passwordTries wrong passwords from one address within passwordWindowSeconds lock it out until the window passes; hostCloseDelay: seconds between telling everyone the host is closing the world and closing it; the players list's ping colours (good under pingGoodMs, fair under pingFairMs).",
+    "passwordTries": 3, "passwordWindowSeconds": 60, "hostCloseDelay": 0.5, "pingGoodMs": 80, "pingFairMs": 160 },
 
   "paths": {
     "pointXpBase": 100, "pointXpPerPoint": 10,

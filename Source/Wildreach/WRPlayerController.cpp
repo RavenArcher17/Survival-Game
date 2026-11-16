@@ -230,7 +230,7 @@ void AWRPlayerController::ClientChat_Implementation(const FString& From, const F
 	case WRChat::Clan: Line = FString::Printf(TEXT("[Clan] %s: %s"), *From, *Message); break;
 	case WRChat::Whisper: Line = FString::Printf(TEXT("%s whispers: %s"), *From, *Message); break;
 	case WRChat::WhisperSent: Line = FString::Printf(TEXT("To %s: %s"), *From, *Message); break;
-	default: Line = FString::Printf(TEXT("%s: %s"), *From, *Message); break;
+	default: Line = From.IsEmpty() ? Message : FString::Printf(TEXT("%s: %s"), *From, *Message); break;
 	}
 	Chat.Add({ Line, GetWorld()->GetTimeSeconds(), Channel });
 	const int32 Keep = FMath::Max(8, FMath::RoundToInt(WRTune(TEXT("chat.history"), 50.f)));
@@ -250,7 +250,54 @@ void AWRPlayerController::ReturnToMenu()
 		SWRMainMenu::Open(this);
 		return;
 	}
+	// The host leaving closes the world for everyone: they're told it closed and was saved, a moment before it goes.
+	if (AnnounceHostClosing())
+	{
+		FTimerHandle Handle;
+		GetWorldTimerManager().SetTimer(Handle, FTimerDelegate::CreateWeakLambda(this, [this]() { UGameplayStatics::OpenLevel(this, TEXT("/Game/Maps/L_Island"), true); }),
+			FMath::Max(0.1f, WRTune(TEXT("access.hostCloseDelay"), 0.5f)), false);
+		return;
+	}
 	UGameplayStatics::OpenLevel(this, TEXT("/Game/Maps/L_Island"), true);
+}
+
+bool AWRPlayerController::AnnounceHostClosing()
+{
+	if (GetNetMode() != NM_ListenServer || !IsLocalController() || !GetWorld())
+	{
+		return false;
+	}
+	int32 Told = 0;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
+		if (Other && Other != this && !Other->IsLocalController())
+		{
+			Other->ClientHostClosing();
+			++Told;
+		}
+	}
+	if (Told > 0)
+	{
+		if (AWRGameMode* GM = GetWorld()->GetAuthGameMode<AWRGameMode>())
+		{
+			GM->SaveAllPlayers(false);
+			GM->SaveWorld();
+		}
+		UE_LOG(LogWildreach, Log, TEXT("HOST closing the world: told %d player(s), everyone saved"), Told);
+	}
+	return Told > 0;
+}
+
+void AWRPlayerController::ClientHostClosing_Implementation()
+{
+	SWRMainMenu::NoteLeaving(TEXT("The world closed"), TEXT("The host closed the world. Everything was saved: join again when they host it."));
+}
+
+void AWRPlayerController::ClientWasKicked_Implementation(const FText& KickReason)
+{
+	const FString Why = KickReason.ToString();
+	SWRMainMenu::NoteLeaving(Why.StartsWith(TEXT("Banned")) ? TEXT("Banned") : TEXT("Kicked"), Why.IsEmpty() ? FString(TEXT("The host removed you from the world.")) : Why);
 }
 
 void AWRPlayerController::SetupInputComponent()
