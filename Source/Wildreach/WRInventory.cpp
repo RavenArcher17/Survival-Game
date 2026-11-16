@@ -70,6 +70,10 @@ FWRItemRegistry::FWRItemRegistry()
 			if (O->TryGetStringField(TEXT("class"), ClassId)) D.WeaponClass = FName(*ClassId);
 			O->TryGetNumberField(TEXT("keeps"), D.KeepsMinutes);
 			O->TryGetStringField(TEXT("note"), D.Note);
+			FString ReturnsId;
+			if (O->TryGetStringField(TEXT("returns"), ReturnsId)) D.Returns = FName(*ReturnsId);
+			FString FillsId;
+			if (O->TryGetStringField(TEXT("fills"), FillsId)) D.Fills = FName(*FillsId);
 			const TSharedPtr<FJsonObject>* Use = nullptr;
 			if (O->TryGetObjectField(TEXT("use"), Use))
 			{
@@ -1131,7 +1135,8 @@ FString UWRInventoryComponent::StartDrink(const FWRItemDef& Def)
 	Character->Status->ApplyStatus(WRTags::State_Drinking, Drink);
 	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
 	{
-		Hero->MulticastBodyOneShot(TEXT("drink"));
+		// The bottle in the off hand to the lips, the head tipped back (cooks/cookpass-survival.md 3.1).
+		Hero->MulticastConsume(Def.Id, Drink, true);
 	}
 	WRSound::Broadcast(Character, TEXT("potion"));
 	const FName Id = Def.Id;
@@ -1307,43 +1312,121 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 	{
 		return StartDrink(*Def);
 	}
+	// Food and drink are a committed use with the food in the hand (cooks/cookpass-survival.md 3.1).
+	if (Def->Category == TEXT("food") || Def->Category == TEXT("drink"))
+	{
+		return StartConsume(StackIndex, Value);
+	}
 
-	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
-	const UWRAttributeSet* A = Character->GetAttributes();
+	// Anything else usable (a tool with a use) lands at once.
+	const FWRItemDef Used = *Def;
+	if (--Slots[StackIndex].Count <= 0) Slots[StackIndex] = FWRItemStack();
+	ApplyConsumable(Character, Used, Value);
+	UE_LOG(LogWildreach, Log, TEXT("ITEM %s used %s (%d left)"), *Character->GetName(), *Used.Id.ToString(), CountOf(Used.Id));
+	return FString::Printf(TEXT("Used %s"), *Used.Name);
+}
+
+FString UWRInventoryComponent::StartConsume(int32 SlotIndex, float Value)
+{
+	// The potion's frame (CAL 1.10; StartDrink): no eating while riding, staggered, frozen, rolling or already using
+	// something; the swing or cast under way is called off; State.Drinking holds guard, roll and swing for the use and
+	// slows the walk (creatures that read item use read it); the food is taken as it starts and its worth lands at the
+	// swallow if the use is still going: a stagger, a freeze or death before then loses it.
+	AWRCharacterBase* Character = GetPawnCharacter();
+	if (!Character || !Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].IsEmpty())
+	{
+		return TEXT("can't eat now");
+	}
+	const FWRItemDef* Def = FWRItemRegistry::Get().Find(Slots[SlotIndex].ItemId);
+	if (!Def)
+	{
+		return TEXT("unknown item");
+	}
+	const bool bDrink = Def->Category == TEXT("drink") || (Def->Thirst > Def->Hunger && Def->Hunger <= 0.f);
+	if (Character->HasTag(WRTags::State_Drinking))
+	{
+		return bDrink ? TEXT("already drinking") : TEXT("already eating");
+	}
+	if (Character->HasTag(WRTags::State_Mounted))
+	{
+		return TEXT("not while riding");
+	}
+	if (Character->HasTag(WRTags::Status_Staggered) || Character->HasTag(WRTags::Status_Frozen) || Character->HasTag(WRTags::State_Dodging))
+	{
+		return bDrink ? TEXT("can't drink now") : TEXT("can't eat now");
+	}
+	const FWRTuning& T = FWRTuning::Get();
+	const FString Key = bDrink ? TEXT("food.drink.") : TEXT("food.eat.");
+	const float Seconds = FMath::Max(0.3f, T.Num(Key + TEXT("seconds"), bDrink ? 1.1f : 1.5f));
+	const float LandsAt = FMath::Clamp(T.Num(Key + TEXT("landsAt"), bDrink ? 0.75f : 0.77f), 0.05f, 0.98f) * Seconds;
+	Character->GetAbilitySystemComponent()->CancelAbilities();
+	Character->Status->ApplyStatus(WRTags::State_Drinking, Seconds);
+	const FWRItemDef Item = *Def;
+	if (--Slots[SlotIndex].Count <= 0) Slots[SlotIndex] = FWRItemStack();
+	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
+	{
+		Hero->MulticastConsume(Item.Id, Seconds, bDrink);
+	}
+	if (bDrink) WRSound::Broadcast(Character, TEXT("drink"));
+
+	TWeakObjectPtr<UWRInventoryComponent> WeakThis(this);
+	const FName Id = Item.Id;
+	FTimerHandle Lands;
+	GetWorld()->GetTimerManager().SetTimer(Lands, FTimerDelegate::CreateWeakLambda(this, [WeakThis, Id, Value, bDrink]()
+	{
+		UWRInventoryComponent* Self = WeakThis.Get();
+		AWRCharacterBase* C = Self ? Self->GetPawnCharacter() : nullptr;
+		const FWRItemDef* D = FWRItemRegistry::Get().Find(Id);
+		if (!C || !D || !C->IsAlive() || !C->HasTag(WRTags::State_Drinking))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("ITEM %s's %s was lost (interrupted)"), *GetNameSafe(C), *Id.ToString());
+			return;
+		}
+		WRSound::Broadcast(C, TEXT("eat.swallow"));
+		Self->ApplyConsumable(C, *D, Value);
+		UE_LOG(LogWildreach, Log, TEXT("ITEM %s %s %s (%d left)"), *C->GetName(), bDrink ? TEXT("drank") : TEXT("ate"), *Id.ToString(), Self->CountOf(Id));
+	}), LandsAt, false);
+	return bDrink ? FString::Printf(TEXT("Drinking %s"), *Item.Name) : FString::Printf(TEXT("Eating %s"), *Item.Name);
+}
+
+void UWRInventoryComponent::ApplyConsumable(AWRCharacterBase* Character, const FWRItemDef& Def, float Value)
+{
+	UAbilitySystemComponent* ASC = Character ? Character->GetAbilitySystemComponent() : nullptr;
+	const UWRAttributeSet* A = Character ? Character->GetAttributes() : nullptr;
+	if (!ASC || !A)
+	{
+		return;
+	}
 	// A timed brew (anchor salt, the curse-resist draught: WRVoid).
-	if (Def->Brew.Num() > 0)
+	if (Def.Brew.Num() > 0)
 	{
-		if (AWRPlayerController* BrewPC = Cast<AWRPlayerController>(Character->GetController())) BrewPC->ClientNotify(WRVoid::Brew(Character, *Def));
+		if (AWRPlayerController* BrewPC = Cast<AWRPlayerController>(Character->GetController())) BrewPC->ClientNotify(WRVoid::Brew(Character, Def));
 	}
-	if (Def->UseCorruption != 0.f)
+	if (Def.UseCorruption != 0.f)
 	{
-		if (UWRSurvivalComponent* Surv = UWRSurvivalComponent::For(Character)) Surv->AddCorruption(Def->UseCorruption);
+		if (UWRSurvivalComponent* Surv = UWRSurvivalComponent::For(Character)) Surv->AddCorruption(Def.UseCorruption);
 	}
-	if (Def->Heal > 0.f)
+	if (Def.Heal > 0.f)
 	{
-		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + WRArtifacts::HealFilter(Character, Def->Heal * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionPotency"))), false));
+		ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetHealth() + WRArtifacts::HealFilter(Character, Def.Heal * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionPotency"))), false));
 	}
-	if (Def->bCleanse || (Def->Category == TEXT("potion") && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCleanse")) > 0.f))
+	if (Def.bCleanse || (Def.Category == TEXT("potion") && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCleanse")) > 0.f))
 	{
 		Character->Status->ClearStatus(WRTags::Status_Burn);
 		Character->Status->ClearStatus(WRTags::Status_Frostbite);
 		Character->Status->ClearStatus(WRTags::Status_Slowed);
 	}
-	if (Def->Category == TEXT("potion"))
-	{
-		PotionReadyAt = Now + Def->UseCooldown * FMath::Max(0.2f, 1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("potionCooldown")));
-	}
-	const float Food = Def->Hunger * Value * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("foodValue")));
-	const float Drink = (Def->Thirst + (Def->Hunger > 0.f && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("mealsQuench")) > 0.f ? Def->Hunger * 0.5f : 0.f)) * Value;
+	const float Food = Def.Hunger * Value * (1.f + UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("foodValue")));
+	const float Drink = (Def.Thirst + (Def.Hunger > 0.f && UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("mealsQuench")) > 0.f ? Def.Hunger * 0.5f : 0.f)) * Value;
 	// Sated (cooks/build-farming.md 2.8): hunger holds still for the dish's minutes.
-	if (Def->SatedMinutes > 0.f)
+	if (Def.SatedMinutes > 0.f)
 	{
-		UWRFoodComponent::Sate(GetOwner(), Def->SatedMinutes * Value);
+		UWRFoodComponent::Sate(GetOwner(), Def.SatedMinutes * Value);
 	}
 	if (Food > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetHungerAttribute(), A->GetHunger() + Food);
 	if (Drink > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetThirstAttribute(), A->GetThirst() + Drink);
 	// Shared meal (cooking perk): a meal feeds your clan mates close by too, at a share of its worth.
-	const float Share = Def->Category != TEXT("potion") && Food > 0.f ? UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("sharedMeal")) : 0.f;
+	const float Share = Def.Category != TEXT("potion") && Food > 0.f ? UWRLifeSkillsComponent::StatFor(GetOwner(), TEXT("sharedMeal")) : 0.f;
 	const APlayerState* MyPS = Character->GetPlayerState();
 	if (Share > 0.f && MyPS)
 	{
@@ -1367,19 +1450,18 @@ FString UWRInventoryComponent::UseCategory(FName Category)
 			}
 		}
 	}
-
-	const FName Used = Def->Id;
-	WRSound::Broadcast(Character, Def->Category == TEXT("potion") ? FName(TEXT("potion")) : Def->Thirst > Def->Hunger ? FName(TEXT("drink")) : FName(TEXT("eat")));
-	if (Slots.IsValidIndex(StackIndex) && Slots[StackIndex].ItemId == Used)
+	// What it leaves (a drunk waterskin's empty skin: cooks/cookpass-survival.md 3.2), into the bag.
+	if (!Def.Returns.IsNone() && FWRItemRegistry::Get().Find(Def.Returns) && AddItem(Def.Returns, 1) > 0)
 	{
-		if (--Slots[StackIndex].Count <= 0) Slots[StackIndex] = FWRItemStack();
+		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Character->GetController()))
+		{
+			PC->ClientNotify(TEXT("No room in your bag: the empty skin is left behind"));
+		}
 	}
-	else
+	if (Def.Category != TEXT("food") && Def.Category != TEXT("drink"))
 	{
-		RemoveItem(Used, 1);
+		WRSound::Broadcast(Character, Def.Category == TEXT("potion") ? FName(TEXT("potion")) : Def.Thirst > Def.Hunger ? FName(TEXT("drink")) : FName(TEXT("eat")));
 	}
-	UE_LOG(LogWildreach, Log, TEXT("ITEM %s used %s (%d left)"), *Character->GetName(), *Used.ToString(), CountOf(Used));
-	return FString::Printf(TEXT("Used %s"), *Def->Name);
 }
 
 // ---------------------------------------------------------------- persistence

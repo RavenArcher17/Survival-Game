@@ -773,6 +773,15 @@ FString FWRFarm::Interact(AWRBuildPiece* Piece, AWRPlayerController* Player)
 		return FString::Printf(TEXT("%s's %s"), *Piece->OwnerName, *Def->Name.ToLower());
 	}
 	UWRInventoryComponent* Inv = PS->GetInventory();
+	// A well or a running channel is fresh water: drink, or fill your empty skins (cooks/cookpass-survival.md 3.2).
+	if (K == TEXT("well") || (K == TEXT("channel") && (Piece->FarmFlags & WRFarmFlag::Watered)))
+	{
+		if (UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(Player))
+		{
+			const FString Said = Water->DrinkHere(Player, K == TEXT("well") ? TEXT("well water") : TEXT("channel water"));
+			if (!Said.IsEmpty()) return Said;
+		}
+	}
 	if (K == TEXT("crop"))
 	{
 		if (Piece->CropId.IsNone())
@@ -1042,11 +1051,15 @@ FString FWRFarm::Cook(AWRPlayerController* Player, AWRStation* Station, const TA
 	{
 		return Queued.RightChop(1);   // the pot's queue is full: nothing taken
 	}
+	TArray<TPair<FName, int32>> Back;   // what the ingredients leave (a waterskin's empty skin: items.json "returns")
 	for (const TPair<int32, int32>& T : Take)
 	{
+		const FWRItemDef* InDef = FWRItemRegistry::Get().Find(Bag[T.Key].ItemId);
+		if (InDef && !InDef->Returns.IsNone() && FWRItemRegistry::Get().Find(InDef->Returns)) Back.Add({ InDef->Returns, T.Value });
 		Bag[T.Key].Count -= T.Value;
 		if (Bag[T.Key].Count <= 0) Bag[T.Key] = FWRItemStack();
 	}
+	for (const TPair<FName, int32>& B : Back) PS->GetInventory()->AddItem(B.Key, B.Value);
 	WRSound::Broadcast(Player->GetPawn(), TEXT("cook.sizzle"));
 	FString Said = Queued;
 	if (Dish)

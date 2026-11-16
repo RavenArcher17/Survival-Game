@@ -1,4 +1,5 @@
 #include "WRStatusComponent.h"
+#include "WRPlayerController.h"
 #include "WRDesertHazards.h"
 #include "WROceanHazards.h"
 #include "WRSporePath.h"
@@ -941,6 +942,41 @@ void UWRStatusComponent::TickSurvival(float DeltaTime)
 
 	// Empty first halves stamina regen (TickRegen); after the grace period health slowly drains.
 	const float Grace = WRTune(TEXT("survival.deprivedHealthGraceSeconds"), 120.f);
+	// The body warns before it harms (cooks/cookpass-survival.md 3.3; Don't Starve's "I'm hungry", Subnautica's warnings
+	// before damage): getting low, empty (with how long before it hurts), and the health starting to go. Each said once
+	// per crossing; climbing back over the line by food.warn.rewarn re-arms it.
+	if (AWRPlayerController* NeedPC = Cast<AWRPlayerController>(Owner->GetController()))
+	{
+		const float WarnBelow = WRTune(TEXT("food.warn.warnBelow"), 25.f);
+		const float Rewarn = WRTune(TEXT("food.warn.rewarn"), 5.f);
+		const auto Warn = [&](int32 Need, float Value, float EmptyFor)
+		{
+			uint8& Said = NeedWarned[Need];
+			const bool bHunger = Need == 0;
+			if (Value > WarnBelow + Rewarn) Said = 0;
+			else if (Value > 0.5f) Said &= 1;
+			if (EmptyFor <= 0.f) Said &= 3;
+			if (Value <= WarnBelow && Value > 0.f && !(Said & 1))
+			{
+				Said |= 1;
+				NeedPC->ClientNotify(bHunger ? TEXT("You're getting hungry") : TEXT("You're getting thirsty"));
+			}
+			if (Value <= 0.f && !(Said & 2))
+			{
+				Said |= 3;
+				const int32 Minutes = FMath::Max(1, FMath::RoundToInt(Grace / 60.f));
+				NeedPC->ClientNotify(bHunger ? FString::Printf(TEXT("Starving: eat within %d minutes or you start losing health"), Minutes)
+					: FString::Printf(TEXT("Parched: drink within %d minutes or you start losing health"), Minutes));
+			}
+			if (EmptyFor > Grace && !(Said & 4))
+			{
+				Said |= 7;
+				NeedPC->ClientNotify(bHunger ? TEXT("You're losing health to hunger: eat something") : TEXT("You're losing health to thirst: drink something"));
+			}
+		};
+		Warn(0, Attr->GetHunger(), HungerEmptyFor);
+		Warn(1, Attr->GetThirst(), ThirstEmptyFor);
+	}
 	const int32 Deprivations = (HungerEmptyFor > Grace ? 1 : 0) + (ThirstEmptyFor > Grace ? 1 : 0);
 	if (Deprivations > 0)
 	{

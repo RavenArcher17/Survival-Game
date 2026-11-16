@@ -75,6 +75,19 @@
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
+namespace WRUIHudDetail
+{
+	/** A survival meter's colour, pulsing (alpha 0.55..1 at food.warn.pulseHz) while it's empty. */
+	inline FLinearColor EmptyPulse(const FLinearColor& Base, bool bEmpty)
+	{
+		if (!bEmpty) return Base;
+		const float P = 0.5f + 0.5f * FMath::Sin(float(FPlatformTime::Seconds()) * 2.f * PI * WRTune(TEXT("food.warn.pulseHz"), 1.4f));
+		FLinearColor C = Base;
+		C.A = FMath::Lerp(0.55f, 1.f, P);
+		return C;
+	}
+}
+
 namespace
 {
 	using WRUI::U;
@@ -1162,7 +1175,9 @@ private:
 						return TEXT("Growing");
 					}
 					if (Def->Kind == TEXT("pen")) return TEXT("Feed · collect");
-					if (Def->Kind == TEXT("well") || Def->Kind == TEXT("channel")) return TEXT("Water");
+					// A well or a running channel is fresh water: E drinks, or fills your empty skins (cooks/cookpass-survival.md 3.2).
+					if (Def->Kind == TEXT("well") || (Def->Kind == TEXT("channel") && (Piece->FarmFlags & WRFarmFlag::Watered))) return UWRWaterSubsystem::WaterVerb(Cast<ACharacter>(P->GetPawn()));
+					if (Def->Kind == TEXT("channel")) return TEXT("Dry");
 					return TEXT("Collect");
 				}
 				if (Def->Kind == TEXT("bed")) return TEXT("Sleep · set respawn");
@@ -1171,7 +1186,7 @@ private:
 		}
 		if (const AWRHearth* Hearth = P->FindNearbyHearth()) { OutTarget = FString::Printf(TEXT("Hearth · tech level %d"), Hearth->GetTechLevel()); return TEXT("Hearth"); }
 		// In the water or at its edge (WRWater), as the server decides it: E drinks.
-		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(P); Water && Water->CanDrink(S)) { OutTarget = TEXT("Sea water"); return TEXT("Drink"); }
+		if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(P); Water && Water->CanDrink(S)) { OutTarget = TEXT("Sea water"); return UWRWaterSubsystem::WaterVerb(S); }
 		return FString();
 	}
 
@@ -1550,8 +1565,9 @@ private:
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(SHorizontalBox).Visibility_Lambda([this]() { return Survivor() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
-					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Food", "Food"), WRUI::Hunger, TEXT("cooked_meat"), [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHunger() : 0.f; })]
-					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Water", "Water"), WRUI::Thirst, TEXT("waterskin"), [A]() { const UWRAttributeSet* X = A(); return X ? X->GetThirst() : 0.f; })]
+					// An empty meter's ring pulses (cooks/cookpass-survival.md 3.3: the body warns before it harms).
+					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Food", "Food"), TAttribute<FLinearColor>::CreateLambda([A]() { const UWRAttributeSet* X = A(); return WRUIHudDetail::EmptyPulse(WRUI::Hunger, X && X->GetHunger() <= 0.f); }), TEXT("cooked_meat"), [A]() { const UWRAttributeSet* X = A(); return X ? X->GetHunger() : 0.f; })]
+					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Water", "Water"), TAttribute<FLinearColor>::CreateLambda([A]() { const UWRAttributeSet* X = A(); return WRUIHudDetail::EmptyPulse(WRUI::Thirst, X && X->GetThirst() <= 0.f); }), TEXT("waterskin"), [A]() { const UWRAttributeSet* X = A(); return X ? X->GetThirst() : 0.f; })]
 					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Heat", "Heat"), WRUI::Ember, TEXT("ember_essence"), [A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetHeat() / FMath::Max(1.f, X->GetMaxHeat()) : 0.f; },
 						[this]() { const UWRPathComponent* P = PathComp(); return P && P->IsActivePath(TEXT("fire")); })]
 					+ SHorizontalBox::Slot().FillWidth(1.f)[Gauge(LOCTEXT("Chill", "Chill"), WRUI::Frost, TEXT("frost_essence"), [A]() { const UWRAttributeSet* X = A(); return X ? 100.f * X->GetChill() / FMath::Max(1.f, X->GetMaxChill()) : 0.f; },

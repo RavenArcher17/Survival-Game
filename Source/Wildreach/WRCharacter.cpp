@@ -210,6 +210,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 		TickGuardEdge();
 	}
 	TickSurvivalLook(DeltaSeconds);
+	TickConsumeLook(DeltaSeconds);
 	if (IsLocallyControlled())
 	{
 		TickInputBuffer();
@@ -1009,6 +1010,7 @@ void AWRCharacter::TickBodyAnim()
 	const bool bSeated = !bDead && SeatMount && SeatMount->GetRider() == this;
 	SeatBlend = FMath::FInterpConstantTo(SeatBlend, bSeated ? 1.f : 0.f, Dt, 1.f / FMath::Max(0.05f, WRTune(TEXT("tame.mountEase.onSeconds"), 0.45f)));
 	H.Seat = SeatBlend;
+	FillConsumeInput(H);
 	if (bSeated)
 	{
 		const FWRCreatureDef* MountDef = SeatMount->GetDef();

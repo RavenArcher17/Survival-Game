@@ -74,6 +74,16 @@ struct FWRHeroAnimInput
 	float Seat = 0.f;                            // 0..1 seated on a mount (cooks/cookpass-taming.md 3.6)
 	float SeatSpread = 22.f;                     // degrees each thigh opens round the mount's back
 	float SeatLean = 0.f;                        // 0 at a walk .. 1 at a gallop (the torso leans forward)
+	// Eating or drinking (cooks/cookpass-survival.md 3.1): the off hand to the mouth (0..1), a bite pushing in (0..1),
+	// a drink's pull with the head tipped back.
+	float Consume = 0.f;
+	float ConsumeBite = 0.f;
+	bool bConsumeDrink = false;
+	// Lying asleep on a bed (3.7): 0..1, and the breath (0..1 over a breath).
+	float Sleep = 0.f;
+	float Breath = 0.f;
+	// The lit torch carried at the chest in the off hand (3.7): 0..1.
+	float TorchCarry = 0.f;
 };
 
 /** What the proxy needs for the motion matching, handed over each frame. */
@@ -98,6 +108,12 @@ struct FWRHeroFrame
 	// tame.seat, read on the game thread).
 	float Seat = 0.f, SeatSpread = 22.f, SeatLeanDeg = 4.f, SeatArms = 0.f;
 	float HipFlex = 72.f, KneeBend = 76.f, FootLevel = -4.f, ArmForward = 28.f, ArmIn = 10.f, ElbowBend = 64.f;
+	// The hand to the mouth (cooks/cookpass-survival.md 3.1; tuning food.pose), lying asleep and the torch carry (3.7).
+	float Consume = 0.f, ConsumeBite = 0.f, ConsumeArms = 1.f;
+	bool bConsumeDrink = false;
+	float EatArmForward = 58.f, EatArmIn = 26.f, EatElbowBend = 128.f, EatBiteDip = 6.f, EatDrinkTilt = 22.f, EatDrinkLift = 10.f;
+	float Sleep = 0.f, Breath = 0.f;
+	float TorchCarry = 0.f, TorchArmForward = 32.f, TorchElbowBend = 70.f, TorchArmOut = 8.f;
 	struct FShotNotify { const UAnimSequenceBase* Clip = nullptr; float From = 0.f, Delta = 0.f, Weight = 1.f; };
 	TArray<FShotNotify> ShotNotifies;
 };

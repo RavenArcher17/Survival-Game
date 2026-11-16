@@ -397,7 +397,7 @@ void AWRHUD::DrawHUD()
 		}
 		else if (const UWRWaterSubsystem* Water = UWRWaterSubsystem::Get(PC); Water && Water->CanDrink(Cast<ACharacter>(PC->GetPawn())))
 		{
-			const FString Prompt = TEXT("E: drink (sea water)");
+			const FString Prompt = FString::Printf(TEXT("E: %s (sea water)"), *UWRWaterSubsystem::WaterVerb(Cast<ACharacter>(PC->GetPawn())).ToLower());
 			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.5f), Canvas->ClipX * 0.5f - Prompt.Len() * 3.5f, Canvas->ClipY * 0.62f, nullptr, 1.2f);
 		}
 		if (const AWRBossAltar* Altar = PC->FindNearbyAltar())

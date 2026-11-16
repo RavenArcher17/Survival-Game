@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
+
+Aaron (lane cookpass-survival: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-survival.md).
+Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **Survival (1): eating and drinking are a committed use, with the food in your hand.** Why: food was eaten instantly from
+  the bag with only a sound, mid-swing, mid-roll, invisible to everyone (grade G1); potions played the spell-cast clip with
+  no bottle (G6). Elden Ring's flask and Monster Hunter's two bites make using an item a decision you can see.
+  - `UWRInventoryComponent::StartConsume` (food and drink): the potion's frame: refused riding, staggered, frozen or rolling;
+    `State.Drinking` for `food.eat.seconds` 1.5 / `food.drink.seconds` 1.1 (no guard, roll or swing, slow walk; creatures
+    that read item use read it); taken as it starts, its worth (hunger, water, Sated, brew, the shared meal) lands at the
+    swallow (`landsAt`), lost if a stagger, freeze or death comes first. `ApplyConsumable` holds what eating gives.
+  - `AWRCharacter::MulticastConsume` (`WRHeldFood.cpp`): the food itself in the left hand, modelled in code from
+    `Data/food_look.json` (`FWRFoodLook::Build`: a roast haunch on its bone, a fish in its own colours, a full wooden bowl,
+    a scored loaf / flatbread / lidded pie, a handful of berries, a fruit or root, a skewer, a dried strip, an egg, a cake,
+    a mushroom, the stitched waterskin, a clay jar, a corked potion vial); the hero's left arm brings it to the mouth
+    (`FWRHeroAnimProxy::PostLayers`, tuning `food.pose`): two bites with the head dipping to meet them, or a long pull with
+    the head tipped back; a shield or torch in that hand is set out of sight meanwhile. Recorded bites, chews and a
+    swallow (Freesound CC0: Anthousai, stevielematt, Stasser; `Tools/audio/build_survival_audio.py`).
+- **Survival (2): the waterskin fills at water.** Why: it was a one-use item made from hide; the spec's first hour fills it
+  at the river (G2; Conan Exiles' skins, Green Hell's bottle). Drinking a waterskin leaves an `empty_waterskin`
+  (`items.json "returns"`); the workbench makes an empty one; recipes and the cooking pot that use a waterskin as water
+  give the skin back. At the sea's edge, a well or a running irrigation channel, E drinks while you're thirsty and, once
+  you've drunk your fill, fills every empty skin you carry (`UWRWaterSubsystem::DrinkHere`, `items.json "fills"`, a kneel,
+  `water.fill` glugging from asagatov's CC0 recording); the prompt says which ("Drink" / "Fill 3 waterskins"). The eel-skin
+  waterskin works the same. New icons for the empty and eel skins (`Tools/art/make_waterskin_icons.py`).
+- **Survival (3): the body warns before it harms.** Why: hunger and thirst ran down silently and the two-minute grace before
+  health drains was invisible (G3; Red Dead's growl, Don't Starve's "I'm hungry", Subnautica's warnings). Notices at 25
+  ("You're getting hungry"), at empty ("Starving: eat within 2 minutes or you start losing health") and when health starts
+  going, once per crossing (`UWRStatusComponent::TickSurvival`, tuning `food.warn`); under 20 your own stomach growls and
+  your dry throat swallows every 45-75 s, heard only by you (`AWRCharacter::TickBodyNeeds`, Freesound CC0: Breviceps,
+  UnderASpell, Stasser); an empty meter's ring pulses on the HUD.
+- **Survival (4): a sleeper breathes; a torch is carried at the chest.** Why: a sleeper held the death clip's last frame (a
+  body on the bed) and a torch hung by the knee (LATER-COOKS 134, 139). The held lying pose now breathes (the chest rising
+  at `rest.breathHz` 0.22) with the head turned to one side; a lit torch is carried with the left arm raised (tuning
+  `lights.carry`), lowered for swings, aiming, guarding, swimming and riding. A real lie-down clip is still wanted.
+- **Music check (Aaron 11-15):** nothing in the game shows the music or asks you to play to it (no staff, notes, beat
+  markers or rhythm prompts exist); the soundtrack's smooth switching stays as it is.
+
 ## Unreleased: the combat cook pass (the blade's real path, hit feel, bars, tells, fronts, projectiles)
 
 Aaron (lane cookpass-combat: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-combat.md).

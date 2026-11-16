@@ -69,6 +69,14 @@ public:
 	/** E at the water, on the server: a gulp of Water (validated here), the sound for everyone. Empty when this player
 	 *  isn't at the water (the caller goes on to "nothing to interact with"). */
 	FString Drink(AWRPlayerController* Player);
+	/** Drinking from any water the caller found (the sea's edge here, a well, a running channel: cooks/cookpass-survival.md
+	 *  3.2): a gulp while you're thirsty; once you've drunk your fill, every empty skin you carry (items.json "fills") is
+	 *  filled with a kneel. Server. Water names the water ("sea water", "well water"). */
+	FString DrinkHere(AWRPlayerController* Player, const FString& Water);
+	/** How many empty skins this character carries (any machine: the owner's bag). */
+	static int32 EmptySkins(const ACharacter* Character);
+	/** What E does at water for this character: "Drink" or "Fill 3 waterskins" (any machine). */
+	static FString WaterVerb(const ACharacter* Character);
 	/** A creature's step (server and a rider's client): Direction, or zero when it would take it into water deeper
 	 *  than it wades. A creature already that deep may still head for shallower water. */
 	FVector KeepOutOfDeepWater(const ACharacter* Creature, const FVector& Direction) const;

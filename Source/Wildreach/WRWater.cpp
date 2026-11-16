@@ -3,6 +3,7 @@
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
+#include "WRInventory.h"
 #include "WRPlayerController.h"
 #include "WRSound.h"
 #include "WRTuning.h"
@@ -336,21 +337,77 @@ FString UWRWaterSubsystem::Drink(AWRPlayerController* Player)
 	{
 		return TEXT("The sea is too salty to drink");
 	}
-	UAbilitySystemComponent* ASC = Survivor->GetAbilitySystemComponent();
-	const UWRAttributeSet* A = Survivor->GetAttributes();
-	if (!ASC || !A)
+	return DrinkHere(Player, TEXT("sea water"));
+}
+
+int32 UWRWaterSubsystem::EmptySkins(const ACharacter* Character)
+{
+	const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Character);
+	if (!Inv) return 0;
+	int32 N = 0;
+	for (const FWRItemStack& S : Inv->GetSlots())
+	{
+		const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+		if (D && !D->Fills.IsNone()) N += S.Count;
+	}
+	return N;
+}
+
+FString UWRWaterSubsystem::WaterVerb(const ACharacter* Character)
+{
+	const AWRCharacterBase* C = Cast<AWRCharacterBase>(Character);
+	const UWRAttributeSet* A = C ? C->GetAttributes() : nullptr;
+	const int32 Skins = EmptySkins(Character);
+	if (A && A->GetThirst() >= 99.5f && Skins > 0)
+	{
+		return Skins == 1 ? FString(TEXT("Fill your waterskin")) : FString::Printf(TEXT("Fill %d waterskins"), Skins);
+	}
+	return TEXT("Drink");
+}
+
+FString UWRWaterSubsystem::DrinkHere(AWRPlayerController* Player, const FString& Water)
+{
+	AWRCharacter* Survivor = Player ? Cast<AWRCharacter>(Player->GetPawn()) : nullptr;
+	UAbilitySystemComponent* ASC = Survivor ? Survivor->GetAbilitySystemComponent() : nullptr;
+	const UWRAttributeSet* A = Survivor ? Survivor->GetAttributes() : nullptr;
+	UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Survivor);
+	if (!Survivor || !Survivor->IsAlive() || !ASC || !A)
 	{
 		return FString();
-	}
-	if (A->GetThirst() >= 99.5f)
-	{
-		return TEXT("You're not thirsty");
 	}
 	const double Now = GetWorld()->GetTimeSeconds();
 	double& Next = NextDrink.FindOrAdd(Player);
 	if (Now < Next)
 	{
 		return TEXT("Still drinking");
+	}
+	// Drunk your fill: the empty skins you carry are filled here (Conan's skins, Green Hell's bottle at the river): a
+	// kneel, the skin held under until it stops glugging. Each empty kind turns into its full kind in place.
+	if (A->GetThirst() >= 99.5f)
+	{
+		int32 Filled = 0;
+		if (Inv)
+		{
+			for (FWRItemStack& S : Inv->GetSlotsMutable())
+			{
+				const FWRItemDef* D = S.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(S.ItemId);
+				if (!D || D->Fills.IsNone() || !FWRItemRegistry::Get().Find(D->Fills)) continue;
+				Filled += S.Count;
+				S.ItemId = D->Fills;
+			}
+		}
+		if (Filled == 0)
+		{
+			return TEXT("You're not thirsty");
+		}
+		Next = Now + WRTune(TEXT("water.fillSeconds"), 1.4f);
+		WRSound::Broadcast(Survivor, TEXT("water.fill"));
+		if (!Survivor->GetCharacterMovement()->IsSwimming())
+		{
+			Survivor->MulticastBodyOneShot(TEXT("pickup"));
+		}
+		UE_LOG(LogWildreach, Log, TEXT("WATER %s fills %d skins with %s"), *Survivor->GetName(), Filled, *Water);
+		return Filled == 1 ? FString::Printf(TEXT("Filled your waterskin with %s"), *Water) : FString::Printf(TEXT("Filled %d waterskins with %s"), Filled, *Water);
 	}
 	Next = Now + WRTune(TEXT("water.drinkSeconds"), 1.2f);
 	const float Before = A->GetThirst();
@@ -361,8 +418,9 @@ FString UWRWaterSubsystem::Drink(AWRPlayerController* Player)
 	{
 		Survivor->MulticastBodyOneShot(TEXT("pickup"));   // kneels and scoops it up (a swimmer just drinks)
 	}
-	UE_LOG(LogWildreach, Log, TEXT("WATER %s drinks: Water %.0f -> %.0f"), *Survivor->GetName(), Before, A->GetThirst());
-	return FString::Printf(TEXT("You drink sea water (Water %.0f)"), A->GetThirst());
+	UE_LOG(LogWildreach, Log, TEXT("WATER %s drinks %s: Water %.0f -> %.0f"), *Survivor->GetName(), *Water, Before, A->GetThirst());
+	return FString::Printf(TEXT("You drink %s (Water %.0f)%s"), *Water, A->GetThirst(),
+		A->GetThirst() >= 99.5f && EmptySkins(Survivor) > 0 ? TEXT(": E again fills your skins") : TEXT(""));
 }
 
 FVector UWRWaterSubsystem::KeepOutOfDeepWater(const ACharacter* Creature, const FVector& Direction) const

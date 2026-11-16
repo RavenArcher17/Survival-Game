@@ -463,6 +463,57 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 		}
 	}
 
+	// The lit torch carried in the off hand (cooks/cookpass-survival.md 3.7; BotW's torch carry): the left upper arm
+	// lifted forward and a little out, the elbow bent so the flame rides at chest height ahead of the body, clear of the
+	// thigh (the torch itself is held upright at the hand: AWRCharacter::TickSurvivalLook). Gives way to a one-shot on
+	// the upper body (a swing, a cast) and to eating.
+	{
+		const float A = Hero.TorchCarry * Hero.ConsumeArms * (1.f - FMath::Clamp(Hero.Consume, 0.f, 1.f));
+		if (A > 0.01f)
+		{
+			const FQuat Lift(Side, FMath::DegreesToRadians(-Hero.TorchArmForward * A));
+			const FQuat Outward(Forward, FMath::DegreesToRadians(-Hero.TorchArmOut * A));
+			const FVector Elbow = Outward.RotateVector(Side);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("upperarm_l")), Outward * Lift);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("lowerarm_l")), FQuat(Elbow, FMath::DegreesToRadians(-Hero.TorchElbowBend * A)));
+		}
+	}
+
+	// Eating or drinking (cooks/cookpass-survival.md 3.1; Monster Hunter's two bites, Elden Ring's committed use): the
+	// left upper arm lifts forward and in across the chest and the elbow folds, so the hand and the food in it come to
+	// the mouth; at each bite the hand pushes in and the head dips to meet it; a drink lifts the hand higher and tips the
+	// head back for the pull. Eased in and out by the owner (AWRCharacter::FillConsumeInput); a one-shot on the upper body
+	// (a real drink clip) takes over.
+	if (Hero.Consume > 0.01f)
+	{
+		const float W = Hero.Consume * Hero.ConsumeArms;
+		const float Bite = FMath::Clamp(Hero.ConsumeBite, 0.f, 1.f);
+		if (W > 0.01f)
+		{
+			const float Fwd = Hero.EatArmForward + (Hero.bConsumeDrink ? Hero.EatDrinkLift : 0.f) + Bite * 6.f;
+			const FQuat Lift(Side, FMath::DegreesToRadians(-Fwd * W));
+			const FQuat Inward(Forward, FMath::DegreesToRadians(Hero.EatArmIn * W));   // the left arm comes in toward +Side (as the reins)
+			const FVector Elbow = Inward.RotateVector(Side);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("upperarm_l")), Inward * Lift);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("lowerarm_l")), FQuat(Elbow, FMath::DegreesToRadians(-(Hero.EatElbowBend + Bite * 8.f) * W)));
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("hand_l")), FQuat(Forward, FMath::DegreesToRadians(-20.f * W)));   // the wrist turns the food to the lips
+		}
+		// The head: dips into a bite, or tips back for a drink (over the neck and the head, 40 / 60).
+		const float HeadDeg = Hero.bConsumeDrink ? -Hero.EatDrinkTilt * Hero.Consume : Hero.EatBiteDip * Bite * Hero.Consume;
+		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("neck_01")), FQuat(Side, FMath::DegreesToRadians(HeadDeg * 0.4f)));
+		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("head")), FQuat(Side, FMath::DegreesToRadians(HeadDeg * 0.6f)));
+	}
+
+	// Asleep on the bed (cooks/cookpass-survival.md 3.7): the held lying pose breathes (the chest rises and falls about
+	// 1.2 cm, a slow 0.22 Hz breath) and the head rests turned a little to one side, so a sleeper never reads as a body.
+	if (Hero.Sleep > 0.01f)
+	{
+		const float Breath = FMath::Sin(Hero.Breath * 2.f * PI);
+		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("spine_04")), FQuat(Side, FMath::DegreesToRadians(-1.6f * Breath * Hero.Sleep)));
+		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("spine_05")), FQuat(Side, FMath::DegreesToRadians(1.0f * Breath * Hero.Sleep)));
+		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("head")), FQuat(FVector::UpVector, FMath::DegreesToRadians(15.f * Hero.Sleep)));
+	}
+
 	// Aim pitch over the upper spine: the chest, arms and weapon point where you look (first person, aiming).
 	if (Hero.AimPitchAlpha > 0.01f)
 	{
@@ -726,6 +777,23 @@ void UWRHeroAnimInstance::PostStep(float DeltaSeconds, FWRAnimFrame& Frame)
 	Hero.ArmForward = T.Num(TEXT("tame.seat.armForward"), 28.f);
 	Hero.ArmIn = T.Num(TEXT("tame.seat.armIn"), 10.f);
 	Hero.ElbowBend = T.Num(TEXT("tame.seat.elbowBend"), 64.f);
+	// Eating and drinking, sleeping, the torch carry (cooks/cookpass-survival.md 3.1, 3.7; tuning food.pose, lights.carry).
+	Hero.Consume = HeroInput.Consume;
+	Hero.ConsumeBite = HeroInput.ConsumeBite;
+	Hero.bConsumeDrink = HeroInput.bConsumeDrink;
+	Hero.ConsumeArms = 1.f - FMath::Clamp(FMath::Max(Frame.UpperShotAlpha, HeroInput.Sleep > 0.01f ? 0.f : Frame.FullShotAlpha), 0.f, 1.f);
+	Hero.EatArmForward = T.Num(TEXT("food.pose.armForward"), 58.f);
+	Hero.EatArmIn = T.Num(TEXT("food.pose.armIn"), 26.f);
+	Hero.EatElbowBend = T.Num(TEXT("food.pose.elbowBend"), 128.f);
+	Hero.EatBiteDip = T.Num(TEXT("food.pose.biteDip"), 6.f);
+	Hero.EatDrinkTilt = T.Num(TEXT("food.pose.drinkTilt"), 22.f);
+	Hero.EatDrinkLift = T.Num(TEXT("food.pose.drinkLift"), 10.f);
+	Hero.Sleep = HeroInput.Sleep;
+	Hero.Breath = HeroInput.Breath;
+	Hero.TorchCarry = HeroInput.TorchCarry;
+	Hero.TorchArmForward = T.Num(TEXT("lights.carry.armForward"), 32.f);
+	Hero.TorchElbowBend = T.Num(TEXT("lights.carry.elbowBend"), 70.f);
+	Hero.TorchArmOut = T.Num(TEXT("lights.carry.armOut"), 8.f);
 
 	// The female stance, only standing with nothing else on the body.
 	const bool bStand = bFemale && HeroInput.Seat < 0.01f && Move == EWRHeroMove::Idle && Hero.Speed < 20.f && Frame.UpperShotAlpha < 0.01f && Frame.FullShotAlpha < 0.01f

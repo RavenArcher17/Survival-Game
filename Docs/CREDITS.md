@@ -797,6 +797,20 @@ which must stay credited too. Cut, layered, re-pitched, loudness-matched and enc
 | Mules - Mule Breaths, Close Perspective | TheKingOfGeeks360 | CC0 1.0 | https://freesound.org/s/832102/ | creature/sleep_large_1, creature/sleep_large_2, creature/sleep_large_3 |
 | rumbling_ice | aerror | CC0 1.0 | https://freesound.org/s/847807/ | amb/ff_t3 |
 
+## Audio: the survival cook pass (2026-11-15)
+
+Recordings from Freesound, licence read off each sound's page; the HQ previews cut and levelled by
+`Tools/audio/build_survival_audio.py` (cooks/cookpass-survival.md 3.1-3.3).
+
+| Sound | By | Licence | Source | Used as |
+|---|---|---|---|---|
+| Growling stomach / Stomach rumbles | Breviceps (freesound) | CC0 1.0 | https://freesound.org/people/Breviceps/sounds/447911/ | voice/body_stomach_1 |
+| Stomach Groaning | UnderASpell (freesound) | CC0 1.0 | https://freesound.org/people/UnderASpell/sounds/696025/ | voice/body_stomach_2, _3 |
+| Swallow male | Stasser (freesound) | CC0 1.0 | https://freesound.org/people/Stasser/sounds/679737/ | voice/body_dry_1, _2; item/swallow_1, _2 |
+| Filling up a water bottle | asagatov (freesound) | CC0 1.0 | https://freesound.org/people/asagatov/sounds/323003/ | item/fill_1, _2 |
+| apple - bite & chew | Anthousai (freesound) | CC0 1.0 | https://freesound.org/people/Anthousai/sounds/398757/ | item/eat_bite_1, _2 |
+| CHEWING_04_44100 | stevielematt (freesound) | CC0 1.0 | https://freesound.org/people/stevielematt/sounds/707808/ | item/eat_chew_1, _2, _3 |
+
 ## Animation
 
 | What | Files in the repo | Source | Author | Licence |

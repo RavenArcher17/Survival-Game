@@ -80,7 +80,7 @@
     {"id": "barding_hollowplate", "station": "armorer", "level": 5, "inputs": {"steel_plate": 10, "voidstone_block": 10, "hide": 6}, "output": "barding_hollowplate", "count": 1, "seconds": 8, "quality": true, "biome": "wasteland"},
     { "id": "ember_lure", "station": "workbench", "level": 1, "inputs": { "sulfur_crystal": 1, "fiber": 2, "raw_meat": 1 }, "output": "ember_lure", "count": 3, "seconds": 3, "needsPerk": "baitMaker", "needsText": "Lures need the Bait maker perk (fishing 50)" },
     { "id": "rime_lure", "station": "workbench", "level": 1, "inputs": { "lichen": 2, "fiber": 2, "raw_meat": 1 }, "output": "rime_lure", "count": 3, "seconds": 3, "needsPerk": "baitMaker", "needsText": "Lures need the Bait maker perk (fishing 50)" },
-    { "id": "waterskin", "station": "workbench", "level": 1, "inputs": { "hide": 1 }, "output": "waterskin", "count": 1, "seconds": 2 },
+    { "id": "empty_waterskin", "station": "workbench", "level": 1, "inputs": { "hide": 1 }, "output": "empty_waterskin", "count": 1, "seconds": 2 },
     {"id": "cooked_meat", "station": "campfire", "level": 1, "inputs": {"raw_meat": 1, "wood": 1}, "output": "cooked_meat", "count": 1, "seconds": 15},
     {"id": "roast_snow_turnip", "station": "campfire", "level": 1, "inputs": {"snow_turnip": 1, "wood": 1}, "output": "roast_vegetable", "count": 1, "seconds": 15, "biome": "tundra"},
     {"id": "roast_candle_rhubarb", "station": "campfire", "level": 1, "inputs": {"candle_rhubarb": 1, "wood": 1}, "output": "roast_vegetable", "count": 1, "seconds": 15, "biome": "crystal"},
@@ -473,7 +473,7 @@
     {"id": "beeswax_plugs", "station": "alchemy_table", "level": 1, "inputs": {"wax": 2, "fiber": 1}, "output": "beeswax_plugs", "count": 1, "seconds": 3, "biome": "ocean"},
     {"id": "sunstone_flare", "station": "alchemy_table", "level": 2, "inputs": {"sunstone": 1, "glass": 1, "kelp_ash": 1}, "output": "sunstone_flare", "count": 2, "seconds": 5, "biome": "ocean"},
     {"id": "shark_tooth_arrow", "station": "workbench", "level": 2, "inputs": {"shark_tooth": 1, "wood": 1, "feathers": 1}, "output": "shark_tooth_arrow", "count": 4, "seconds": 2, "biome": "ocean", "blueprint": "quest_shark_tooth_arrow"},
-    {"id": "eel_waterskin", "station": "workbench", "level": 1, "inputs": {"eel_skin": 1, "fiber": 2}, "output": "eel_waterskin", "count": 1, "seconds": 3, "biome": "ocean"},
+    {"id": "eel_waterskin", "station": "workbench", "level": 1, "inputs": {"eel_skin": 1, "fiber": 2}, "output": "empty_eel_waterskin", "count": 1, "seconds": 3, "biome": "ocean"},
     {"id": "pearl_ring", "station": "forge", "level": 2, "inputs": {"bronze_ingot": 1, "pearl": 1}, "output": "pearl_ring", "count": 1, "seconds": 6, "biome": "ocean"},
     {"id": "diving_helm", "station": "armorer", "level": 3, "inputs": {"tidecoral": 4, "copper_ingot": 6, "glass": 1}, "output": "diving_helm", "count": 1, "seconds": 8, "biome": "ocean"}
   ],

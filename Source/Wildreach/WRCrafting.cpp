@@ -1090,7 +1090,14 @@ void FWRCrafting::TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recip
 {
 	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
 	if (!PS) return;
-	for (const TPair<FName, int32>& In : InputsFor(Recipe, Element, Times, MaterialDiscount(Player, Recipe))) PS->GetInventory()->RemoveItem(In.Key, In.Value);
+	for (const TPair<FName, int32>& In : InputsFor(Recipe, Element, Times, MaterialDiscount(Player, Recipe)))
+	{
+		PS->GetInventory()->RemoveItem(In.Key, In.Value);
+		// What an input leaves behind comes back (a waterskin's water goes in, the empty skin stays yours: items.json
+		// "returns", cooks/cookpass-survival.md 3.2).
+		const FWRItemDef* InDef = FWRItemRegistry::Get().Find(In.Key);
+		if (InDef && !InDef->Returns.IsNone() && FWRItemRegistry::Get().Find(InDef->Returns)) PS->GetInventory()->AddItem(InDef->Returns, In.Value);
+	}
 }
 
 FWRCrafterHand FWRCrafting::HandOf(AWRPlayerController* Player, const FWRRecipe& Recipe, FName StationType)

@@ -132,6 +132,15 @@ shot gives at least `creatureAI.minWarning` from its tell. Bespoke boss moves fo
 area hits into fronts, real bodies or warned moments); a ground mark only ever shows under something really falling, from
 the moment it falls. No summon counts toward a boss's health (`UpdateParticipants`).
 
+Also since 0.7.1: **the survival cook pass** (cooks/cookpass-survival.md in showcase-notes). Food and drink are a committed
+use like a potion (`UWRInventoryComponent::StartConsume`, `State.Drinking`), what eating gives is one function
+(`ApplyConsumable`), and every machine shows the item in the left hand going to the mouth (`AWRCharacter::MulticastConsume`,
+`WRHeldFood.cpp`). New rule: a new food, drink or potion gets a row in `Data/food_look.json` (shape and colour) or it's held
+as whatever its id's words or category say. An item that leaves something when used or crafted with names it in
+`items.json "returns"`; an empty container names its full kind in `"fills"` (filled at water by `UWRWaterSubsystem::DrinkHere`,
+which a well and a running channel call too). The hero's procedural arm layers (seat, torch carry, eating, sleep breath)
+live in `FWRHeroAnimProxy::PostLayers` and give way to one-shot clips.
+
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light
 (`EWREquipSlot::Light`, `EquippedLight`); `UWRWeatherSubsystem` rolls `Data/weather.json` per biome into

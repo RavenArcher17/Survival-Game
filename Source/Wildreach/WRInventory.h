@@ -115,6 +115,11 @@ struct FWRItemDef
 	 *  minutes eating it holds hunger off (use.sated: hunger doesn't drain; never a stat buff). */
 	float KeepsMinutes = 0.f;
 	float SatedMinutes = 0.f;
+	/** What using it leaves in the bag (items.json "returns": a drunk waterskin gives its empty skin back;
+	 *  cooks/cookpass-survival.md 3.2). */
+	FName Returns;
+	/** An empty container's full kind (items.json "fills": an empty waterskin fills to a waterskin at water). */
+	FName Fills;
 	bool Perishes() const { return KeepsMinutes > 0.f; }
 
 	/** Statuses a drink ends (use.cures: bleed, shock, blind, curse, burn, frostbite, poison, rot). */
@@ -273,6 +278,13 @@ public:
 	FString UseCategory(FName Category);
 	/** Server: a potion or cure starts going down (committed; the heal lands part way: combat.md 2.16). */
 	FString StartDrink(const FWRItemDef& Def);
+	/** Food and drink (cooks/cookpass-survival.md 3.1): committed like a potion (State.Drinking for food.eat.seconds /
+	 *  food.drink.seconds), taken as it starts, its worth (Value: freshness x a golden dish's) landing at the swallow
+	 *  if nothing stopped it; every machine sees the hand bring it to the mouth (AWRCharacter::MulticastConsume). */
+	FString StartConsume(int32 SlotIndex, float Value);
+	/** What eating or drinking Def gives (hunger, water, Sated, a brew, corruption, a heal, the shared meal, the empty
+	 *  skin back): the moment it's swallowed. */
+	void ApplyConsumable(AWRCharacterBase* Character, const FWRItemDef& Def, float Value);
 	/** Torpor darts and creature eggs. */
 	FString UseTamingItem(const struct FWRItemDef& Def);
 	/** Use / equip / socket the item in a slot. Returns a message. */

@@ -112,6 +112,9 @@ public:
 
 	/** Everyone: play a one-shot body clip from Data/player_art.json (e.g. "pickup" when looting). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastBodyOneShot(FName Key);
+	/** Everyone: eating or drinking Item for Seconds (cooks/cookpass-survival.md 3.1): the off hand brings it to the
+	 *  mouth (two bites, or a long pull with the head back), the food itself in the hand (WRHeldFood.cpp). */
+	UFUNCTION(NetMulticast, Unreliable) void MulticastConsume(FName Item, float Seconds, bool bDrink);
 	/** Fishing (WRFishing): a rod is in the weapon hand. */
 	bool IsHoldingRod() const;
 	/** This machine: how long the cast has been wound up (0 when it isn't), for the HUD's charge ring. */
@@ -360,6 +363,25 @@ private:
 	double LightLookCheckedAt = -10.0;
 	void UpdateHeldLightLook();
 	void TickSurvivalLook(float DeltaSeconds);
+	// --- Eating and drinking on the body (WRHeldFood.cpp; cooks/cookpass-survival.md 3.1): what's in the off hand, when
+	// it started and how long it lasts; the shield or torch in that hand is set out of sight meanwhile.
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> FoodMesh;
+	FName ConsumeItem;
+	double ConsumeStart = -10.0;
+	float ConsumeSeconds = 0.f;
+	bool bConsumeDrink = false;
+	bool bOffHandStowed = false;
+	int32 ConsumeBitesPlayed = 0;
+	void TickConsumeLook(float DeltaSeconds);
+	void FillConsumeInput(struct FWRHeroAnimInput& H);
+	FName FoodMeshFor;
+	float TorchCarryBlend = 0.f;
+	// The owner's body (cooks/cookpass-survival.md 3.3): when the stomach next growls and the dry throat next swallows.
+	double NextStomachAt = -1.0;
+	double NextDryAt = -1.0;
+	void TickBodyNeeds();
+	/** 0..1 how far into the current use (-1: none). */
+	float ConsumeFraction() const;
 	/** Owner: a move or jump while asleep gets you up (the server checks it too). */
 	UFUNCTION(Server, Reliable) void ServerWakeUp();
 public:

@@ -128,6 +128,9 @@ private:
 	float SinceBuildup = 10.f;
 	float HungerEmptyFor = 0.f;
 	float ThirstEmptyFor = 0.f;
+	/** The notices already given for hunger [0] and thirst [1] (cooks/cookpass-survival.md 3.3): bit 1 getting low, 2
+	 *  empty (the grace), 4 losing health. Re-armed when the meter climbs back over the line. */
+	uint8 NeedWarned[2] = { 0, 0 };
 	float PublishClock = 0.f;
 	bool bSprintDraining = false;
 };
