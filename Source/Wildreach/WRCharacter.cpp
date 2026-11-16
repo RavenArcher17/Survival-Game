@@ -1304,6 +1304,15 @@ void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 	// In build mode the attack buttons place / rotate / cancel instead.
 	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())
 	{
+		// On a pad (ui-controls 2.1): RT places, LB / RB turn the piece (held: they keep turning); B puts it away.
+		if (WRInput::UsingPad() && !PC->IsDemolishing())
+		{
+			if (Input == EWRAbilityInput::Heavy) PC->ConfirmPlacement();
+			else if (Input == EWRAbilityInput::Light) PC->PadTurn(1);
+			else if (Input == EWRAbilityInput::Block) PC->PadTurn(-1);
+			return;
+		}
+		if (WRInput::UsingPad() && Input == EWRAbilityInput::Heavy) { PC->ConfirmPlacement(); return; }   // demolish: RT takes it down
 		if (Input == EWRAbilityInput::Light) PC->ConfirmPlacement();
 		else if (Input == EWRAbilityInput::Heavy) PC->RotatePlacement();
 		else if (Input == EWRAbilityInput::Block) PC->CancelPlacement();
@@ -1574,12 +1583,11 @@ void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)
 		ServerFishInput(false);
 		return;
 	}
-	if (Input == EWRAbilityInput::Heavy)
+	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())
 	{
-		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Controller); PC && PC->IsPlacing())
-		{
-			PC->RotatePlacementEnd();
-		}
+		if (Input == EWRAbilityInput::Heavy) PC->RotatePlacementEnd();
+		if (Input == EWRAbilityInput::Light) PC->PadTurnEnd(1);
+		if (Input == EWRAbilityInput::Block) PC->PadTurnEnd(-1);
 	}
 	if (Input == EWRAbilityInput::Block && bAiming)
 	{

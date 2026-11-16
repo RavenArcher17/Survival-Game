@@ -92,6 +92,7 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Report"), TEXT("Report a problem"), Menus, EKeys::F8);
 	Add(TEXT("Snap"), TEXT("Building: snap on / off"), Menus, EKeys::F);
 	Add(TEXT("Demolish"), TEXT("Building: demolish mode"), Menus, EKeys::X);
+	Add(TEXT("BuildCopy"), TEXT("Building: copy the piece you aim at"), Menus, EKeys::MiddleMouseButton);
 	Add(TEXT("BackToMenu"), TEXT("Leave to the main menu"), Menus, EKeys::F10);
 	// The testers' god mode panel (WRGod): a key only a verified tester sees, or that does anything.
 	Add(TEXT("GodMode"), TEXT("God mode (testers)"), Menus, EKeys::F9);

@@ -43,6 +43,8 @@ namespace WRPadDetail
 		{ TEXT("Move"), TEXT("Gamepad_Left2D") }, { TEXT("Look"), TEXT("Gamepad_Right2D") },
 		{ TEXT("BuildSnap"), TEXT("Gamepad_DPad_Down") }, { TEXT("BuildDemolish"), TEXT("Gamepad_FaceButton_Top") },
 		{ TEXT("BuildCancel"), TEXT("Gamepad_FaceButton_Right") },
+		{ TEXT("BuildPrev"), TEXT("Gamepad_DPad_Left") }, { TEXT("BuildNext"), TEXT("Gamepad_DPad_Right") },
+		{ TEXT("BuildCategory"), TEXT("Gamepad_DPad_Up") }, { TEXT("BuildCopy"), TEXT("Gamepad_FaceButton_Left") },
 		{ TEXT("MenuClick"), TEXT("Gamepad_FaceButton_Bottom") }, { TEXT("MenuSecond"), TEXT("Gamepad_FaceButton_Left") },
 		{ TEXT("MenuBack"), TEXT("Gamepad_FaceButton_Right") }, { TEXT("MenuControls"), TEXT("Gamepad_FaceButton_Top") },
 		{ TEXT("MenuClose"), TEXT("Gamepad_Special_Right") }, { TEXT("TabPrev"), TEXT("Gamepad_LeftShoulder") },
@@ -568,6 +570,11 @@ public:
 				if (K == L.Key(TEXT("BuildCancel"))) { Eaten.Add(K); Queue.Add([this]() { SendKey(EKeys::Escape); }); return true; }
 				if (K == L.Key(TEXT("BuildDemolish"))) { Eaten.Add(K); TWeakObjectPtr<AWRPlayerController> WW(W); Queue.Add([WW]() { if (WW.IsValid()) WW->ToggleDemolish(); }); return true; }
 				if (K == L.Key(TEXT("BuildSnap"))) { Eaten.Add(K); TWeakObjectPtr<AWRPlayerController> WW(W); Queue.Add([WW]() { if (WW.IsValid()) WW->CycleSnap(); }); return true; }
+				// The pad's build mode (cookpass-building 3.1): D-pad left / right pieces, up the next category, X copy.
+				if (K == L.Key(TEXT("BuildPrev"))) { Eaten.Add(K); TWeakObjectPtr<AWRPlayerController> WW(W); Queue.Add([WW]() { if (WW.IsValid()) WW->CycleBuildPiece(-1); }); return true; }
+				if (K == L.Key(TEXT("BuildNext"))) { Eaten.Add(K); TWeakObjectPtr<AWRPlayerController> WW(W); Queue.Add([WW]() { if (WW.IsValid()) WW->CycleBuildPiece(1); }); return true; }
+				if (K == L.Key(TEXT("BuildCategory"))) { Eaten.Add(K); TWeakObjectPtr<AWRPlayerController> WW(W); Queue.Add([WW]() { if (WW.IsValid()) WW->CycleBuildTab(); }); return true; }
+				if (K == L.Key(TEXT("BuildCopy"))) { Eaten.Add(K); TWeakObjectPtr<AWRPlayerController> WW(W); Queue.Add([WW]() { if (WW.IsValid()) WW->CopyAimedPiece(); }); return true; }
 			}
 			if (K == L.Key(TEXT("Journal")) && W && W->GetUI() && !E.IsRepeat())
 			{

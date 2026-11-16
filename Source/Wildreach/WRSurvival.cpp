@@ -172,7 +172,8 @@ bool WRBiome::IsUnderBuiltRoof(const UObject* WorldContext, const FVector& Pos, 
 		if (Piece && !Piece->bGhost && Piece != Ignore)
 		{
 			const FWRPieceDef* Def = Piece->GetDef();
-			if (Def && (Def->Shape == TEXT("roof") || Def->Shape == TEXT("floor") || Def->Shape == TEXT("foundation") || Def->Shape == TEXT("gable")))
+			// (A lean-to's bough roof counts: the first night's shelter, cookpass-building 3.3.)
+			if (Def && (Def->Shape == TEXT("roof") || Def->Shape == TEXT("floor") || Def->Shape == TEXT("foundation") || Def->Shape == TEXT("gable") || Def->Kind == TEXT("shelter")))
 			{
 				return true;
 			}

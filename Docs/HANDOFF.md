@@ -208,6 +208,16 @@ their slope in the place command (`p<deg>`) and the save (`pitch`). Turrets are 
 server brain, model and aim line in `WRMachineLook.cpp`, ammo rows in `machines.json` `turrets`). Rules: no base piece in
 a cave (`FWRBuildSets::PlaceCheck`), weapon / tool hits on pieces scaled by `materialDamage`.
 
+Since cookpass-building (cooks/cookpass-building.md): **the build mode on a pad** is RT place, LB / RB turn (held:
+repeats, tuning `building.padTurnStep / padRepeat`), D-pad left / right the piece, up the category, X copy (gamepad.json
+verbs `BuildPrev / BuildNext / BuildCategory / BuildCopy`, read in `WRPadInput.cpp` while placing; the attack buttons in
+`AWRCharacter` placing branch). **Copy** (`AWRPlayerController::CopyAimedPiece`, key `BuildCopy`, middle mouse). The bar's
+tab lists live in `WRUIBuild.cpp` behind `WRBuildBar.h` (`Step`, `NextTab`, `OpeningTab`: Survival = pieces.json
+`"starter": true` until you own a claim, then the last tab, `GameUserSettings [Wildreach.Build] LastTab`); the chip's
+short words are `ShortWhy` (the long reason under it). **Building from storage**: `WRBuildStock` (chests you may open,
+inside the claim you stand in, within `building.storageReachCm`) counts on the bar and the ghost and pays on the server
+(the bag first). The **lean-to** (`lean_to`, kind `shelter`, arch `lean_to`) is a roof for `WRBiome::IsUnderBuiltRoof`.
+
 Also since 0.7.1: **taming past the tame** (`WRTaming.cpp`, `WRTameLook.cpp`, `WRSealBody.cpp`, `WRUITameCard.cpp`,
 `WRUIIncubator.cpp`, `Data/tame_trees.json`, tuning `tame`, cooks/build-taming.md): every creature carries genes
 (`FWRTameGenes`: points in six stats, mutations per line, morphs, sex) rolled at spawn by its band, and every machine

@@ -24,6 +24,10 @@
     "BuildCancel": "Gamepad_FaceButton_Right",
     "BuildDemolish": "Gamepad_FaceButton_Top",
     "BuildSnap": "Gamepad_DPad_Down",
+    "BuildPrev": "Gamepad_DPad_Left",
+    "BuildNext": "Gamepad_DPad_Right",
+    "BuildCategory": "Gamepad_DPad_Up",
+    "BuildCopy": "Gamepad_FaceButton_Left",
 
     "MenuClick": "Gamepad_FaceButton_Bottom",
     "MenuSecond": "Gamepad_FaceButton_Left",
@@ -54,6 +58,7 @@
     "HotbarPrev": "BeltNext",
     "Snap": "BuildSnap",
     "Demolish": "BuildDemolish",
+    "BuildCopy": "BuildCopy",
     "Build": "BuildCancel",
     "Report": "Report"
   },
@@ -110,8 +115,13 @@
       { "verb": "Report", "does": "Report a problem (screenshot and note)" }
     ] },
     { "title": "Building (placing a piece)", "rows": [
-      { "verb": "Light", "does": "Place it" },
-      { "verb": "Heavy", "does": "Turn it (hold to spin)" },
+      { "verb": "Heavy", "does": "Place it (demolishing: take it down)" },
+      { "verb": "Block", "does": "Turn it left (hold to keep turning)" },
+      { "verb": "Light", "does": "Turn it right (hold to keep turning)" },
+      { "verb": "BuildPrev", "does": "Previous piece in the category" },
+      { "verb": "BuildNext", "does": "Next piece in the category" },
+      { "verb": "BuildCategory", "does": "Next category" },
+      { "verb": "BuildCopy", "does": "Copy the piece you aim at, turned as it is" },
       { "verb": "BuildSnap", "does": "Snap: grid, fine grid, free" },
       { "verb": "BuildDemolish", "does": "Demolish instead / stop demolishing" },
       { "verb": "BuildCancel", "does": "Put the piece away" }

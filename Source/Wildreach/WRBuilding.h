@@ -62,6 +62,8 @@ struct FWRPieceDef
 	float FreeLength = 0.f;
 	FName Blueprint;
 	FName Needs;
+	/** pieces.json "starter": also on the build bar's Survival tab, the first-night pieces (cookpass-building 3.2). */
+	bool bStarter = false;
 	/** Freeform structural pieces (beams, posts, braces): placed at any angle, carry support from their ends. */
 	bool IsBeam() const { return Kind == TEXT("beam"); }
 	/** Anything that takes part in support (snapped structure and beams). */

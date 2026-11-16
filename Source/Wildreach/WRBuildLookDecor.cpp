@@ -90,7 +90,8 @@ namespace WRBuildLookDecorDetail
 		void Build()
 		{
 			const FName A = Arch;
-			if (A == TEXT("throne")) Throne();
+			if (A == TEXT("lean_to")) LeanTo();
+			else if (A == TEXT("throne")) Throne();
 			else if (A == TEXT("bench")) Bench();
 			else if (A == TEXT("stool")) Stool();
 			else if (A == TEXT("table")) Table();
@@ -980,6 +981,62 @@ namespace WRBuildLookDecorDetail
 		}
 
 		// ---------------------------------------------------------------- beds
+
+		void LeanTo()
+		{
+			// The first night's roof (cookpass-building 3.3): a bushcraft lean-to, open toward +X. Two forked uprights
+			// (170 cm, 240 apart) dug into the ground carry a ridge pole lashed into their forks; five rafter poles run
+			// from the ridge down to the ground 200 cm behind (about 40 deg), their butts dug in; conifer boughs are laid
+			// over the rafters in rows from the bottom up, each row over the one below, so rain runs off; a log lies
+			// along the back foot as a wind block. A bedroll fits under it. Every pole meets what it rests on.
+			const FSurf Pole = FSurf::Wood(FLinearColor(0.23f, 0.15f, 0.08f));
+			const FSurf Bark = FSurf::Wood(FLinearColor(0.15f, 0.1f, 0.06f));
+			const FSurf Lash = FSurf::Cloth(FLinearColor(0.42f, 0.36f, 0.22f));
+			const FSurf BoughA = FSurf::Cloth(FLinearColor(0.045f, 0.11f, 0.04f));
+			const FSurf BoughB = FSurf::Cloth(FLinearColor(0.065f, 0.14f, 0.05f));
+			const FSurf BoughOld = FSurf::Cloth(FLinearColor(0.16f, 0.13f, 0.06f));
+			const float FrontX = 60.f, BackX = -140.f, RidgeZ = 165.f, HalfY = 120.f;
+			// Uprights: dug in 10 cm, a fork of two short limbs at the top cradling the ridge pole.
+			for (const float Y : { -HalfY, HalfY })
+			{
+				Rod(Bark, FVector(FrontX, Y, -10.f), FVector(FrontX + Jit(FVector(Y, 1.f, 0.f), 3) * 2.f, Y, RidgeZ - 12.f), 11.f);
+				Rod(Bark, FVector(FrontX, Y, RidgeZ - 14.f), FVector(FrontX + 9.f, Y, RidgeZ + 10.f), 6.f);
+				Rod(Bark, FVector(FrontX, Y, RidgeZ - 14.f), FVector(FrontX - 9.f, Y, RidgeZ + 10.f), 6.f);
+				// Fiber lashing wound round the fork and the pole (three turns).
+				for (int32 t = 0; t < 3; ++t) Disc(Lash, FVector(FrontX, Y + (t - 1) * 3.f, RidgeZ), FVector(0.f, 1.f, 0.f), 15.f, 2.f);
+			}
+			// The ridge pole across the forks, a little past each.
+			Rod(Pole, FVector(FrontX, -HalfY - 18.f, RidgeZ), FVector(FrontX, HalfY + 18.f, RidgeZ), 9.f);
+			// Rafters: from on top of the ridge down to the ground behind, butts 8 cm into it.
+			const FVector Down = FVector(BackX - FrontX, 0.f, -RidgeZ - 8.f);
+			for (const float Y : { -110.f, -55.f, 0.f, 55.f, 110.f })
+			{
+				const FVector Top(FrontX + 6.f, Y, RidgeZ + 7.f);
+				Rod(Pole, Top, Top + Down + FVector(0.f, Jit(FVector(Y, 2.f, 0.f), 5) * 4.f, 0.f), 6.f);
+				Disc(Lash, FVector(FrontX + 2.f, Y, RidgeZ + 4.f), FVector(1.f, 0.f, 0.5f), 12.f, 2.f);
+			}
+			// Boughs: seven rows down the slope, laid from the ground up (the higher row's butts over the lower row's tips).
+			const float SlopeDeg = FMath::RadiansToDegrees(FMath::Atan2(RidgeZ, FrontX - BackX));
+			const FVector Ridge(FrontX + 4.f, 0.f, RidgeZ + 12.f), Foot(BackX + 6.f, 0.f, 6.f);
+			const FVector Normal = FVector(-FMath::Sin(FMath::DegreesToRadians(SlopeDeg)), 0.f, FMath::Cos(FMath::DegreesToRadians(SlopeDeg)));
+			for (int32 Row = 0; Row < 7; ++Row)
+			{
+				const float T = 1.f - (Row + 0.5f) / 7.f;   // Row 0 lies at the foot
+				for (int32 k = 0; k < 9; ++k)
+				{
+					const float Y = -132.f + k * 33.f + Jit(FVector(Row, k, 3.f), 7) * 6.f;
+					const FVector C = FMath::Lerp(Ridge, Foot, T) + FVector(0.f, Y, 0.f) + Normal * (2.f + Row * 0.6f);
+					const FSurf& S = Rand(FVector(Row, k, 4.f), 9) < 0.12f ? BoughOld : (k + Row) % 2 ? BoughA : BoughB;
+					Add(S, FVector(58.f + Rand(FVector(Row, k, 5.f), 11) * 12.f, 30.f, 4.f), C,
+						FRotator(SlopeDeg + Jit(FVector(Row, k, 6.f), 13) * 4.f, Jit(FVector(Row, k, 7.f), 15) * 12.f, Jit(FVector(Row, k, 8.f), 17) * 6.f));
+					// The spray's tip: needles thinning to a point past the block.
+					const FVector Along = FRotator(SlopeDeg, 0.f, 0.f).Vector();
+					Add(S, FVector(18.f, 18.f, 3.f), C - Along * 32.f, FRotator(SlopeDeg, 45.f, 0.f));
+				}
+			}
+			// The wind-block log along the back foot, on the ground.
+			Rod(Bark, FVector(BackX - 6.f, -HalfY - 20.f, 11.f), FVector(BackX - 6.f, HalfY + 20.f, 12.f), 22.f);
+		}
 
 		void Bed()
 		{

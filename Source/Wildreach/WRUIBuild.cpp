@@ -12,6 +12,9 @@
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRBuilding.h"
+#include "WRBuildBar.h"
+#include "Wildreach.h"
+#include "WRMachine.h"
 #include "WRBuildSets.h"
 #include "WRSurvival.h"
 #include "WRGear.h"
@@ -26,6 +29,7 @@
 #include "WRTuning.h"
 #include "Algo/StableSort.h"
 #include "EngineUtils.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/SlateRenderer.h"
@@ -89,6 +93,8 @@ namespace WRBuildUI
 	const TArray<FTab>& Tabs()
 	{
 		static const TArray<FTab> List = {
+			// The first night's pieces (pieces.json "starter"), first for a new survivor (cookpass-building 3.2).
+			{ TEXT("survival"), LOCTEXT("TabSurvival", "Survival") },
 			{ TEXT("foundations"), LOCTEXT("TabFoundations", "Foundations") },
 			{ TEXT("walls"), LOCTEXT("TabWalls", "Walls") },
 			{ TEXT("floors"), LOCTEXT("TabFloors", "Floors & roofs") },
@@ -133,6 +139,85 @@ namespace WRBuildUI
 		if (K == TEXT("light")) return TEXT("light");
 		return TEXT("decor");
 	}
+
+	/** On this tab? Survival holds the starter pieces (they keep their own tab too). */
+	bool InTabId(const FWRPieceDef& D, FName T)
+	{
+		const FName Own = TabOf(D);
+		if (Own.IsNone()) return false;
+		return T == TEXT("survival") ? D.bStarter : Own == T;
+	}
+
+	/** A tab's pieces in pieces.json order, kept together by shape (wood and stone foundations, then pillars); the
+	 *  structure tabs run material by material (wood, stone, metal, then each biome set): a page is a material. */
+	TArray<const FWRPieceDef*> PiecesInTab(FName T)
+	{
+		TArray<const FWRPieceDef*> Out;
+		TArray<FName> Shapes;
+		for (const FWRPieceDef& D : FWRBuildRegistry::Get().All())
+		{
+			if (!InTabId(D, T)) continue;
+			Out.Add(&D);
+			Shapes.AddUnique(D.Shape.IsNone() ? D.Id : D.Shape);
+		}
+		const bool bStructure = T == TEXT("foundations") || T == TEXT("walls") || T == TEXT("floors") || T == TEXT("doors") || T == TEXT("stairs") || T == TEXT("beams");
+		const auto TierRank = [](const FWRPieceDef* D)
+		{
+			if (D->Material == TEXT("wood") || D->Material.IsNone()) return 0;
+			if (D->Material == TEXT("stone")) return 1;
+			const int32 i = FWRBuildSets::Get().All().IndexOfByPredicate([D](const FWRTierDef& Tier) { return Tier.Id == D->Material; });
+			return i == INDEX_NONE ? 99 : 2 + i;
+		};
+		Algo::StableSortBy(Out, [&Shapes, &TierRank, bStructure](const FWRPieceDef* D) { return (bStructure ? TierRank(D) * 100 : 0) + Shapes.IndexOfByKey(D->Shape.IsNone() ? D->Id : D->Shape); });
+		return Out;
+	}
+
+	/** The chip over the ghost: why it won't go, in one to four words (ui-controls 2.11); the full reason goes under it. */
+	FString ShortWhy(const FString& Why)
+	{
+		const FString L = Why.ToLower();
+		if (L.IsEmpty()) return TEXT("It won't go here");
+		if (L.StartsWith(TEXT("aim at the ground"))) return TEXT("Aim at the ground");
+		if (L.StartsWith(TEXT("aim at a piece"))) return TEXT("Aim at your piece");
+		if (L.StartsWith(TEXT("need ")))
+		{
+			// "need 3 wood" -> "Missing 3 Wood" (the item's name).
+			TArray<FString> W;
+			Why.ParseIntoArray(W, TEXT(" "), true);
+			if (W.Num() >= 3)
+			{
+				const FName Item(*Why.RightChop(W[0].Len() + W[1].Len() + 2).TrimStartAndEnd());
+				const FWRItemDef* Def = FWRItemRegistry::Get().Find(Item);
+				return FString::Printf(TEXT("Missing %s %s"), *W[1], Def ? *Def->Name : *Item.ToString().Replace(TEXT("_"), TEXT(" ")));
+			}
+			return TEXT("Missing materials");
+		}
+		if (L.Contains(TEXT("support"))) return TEXT("Needs support");
+		if (L.Contains(TEXT("underground"))) return TEXT("Not underground");
+		if (L.Contains(TEXT("steep"))) return TEXT("Too steep");
+		if (L.Contains(TEXT("too far"))) return TEXT("Too far");
+		if (L.Contains(TEXT("blueprint"))) return TEXT("Needs its blueprint");
+		if (L.Contains(TEXT("not yours"))) return TEXT("Not yours");
+		if (L.Contains(TEXT("safe zone"))) return TEXT("Safe zone");
+		if (L.Contains(TEXT("claim")))
+		{
+			return L.Contains(TEXT("'s")) ? FString(TEXT("Someone's claim")) : FString(TEXT("Outside your claim"));
+		}
+		if (L.Contains(TEXT("hearth"))) return TEXT("Needs a Hearth");
+		if (L.Contains(TEXT("vent")) || L.Contains(TEXT("hot spring"))) return TEXT("Needs a vent");
+		if (L.Contains(TEXT("water"))) return TEXT("Needs water");
+		if (L.Contains(TEXT("already there")) || L.Contains(TEXT("overlaps")) || L.Contains(TEXT("blocked")) || L.Contains(TEXT("in the way")) || L.Contains(TEXT("opening"))) return TEXT("Blocked");
+		// Anything else: its first four words.
+		TArray<FString> W;
+		Why.ParseIntoArray(W, TEXT(" "), true);
+		FString Out;
+		for (int32 i = 0; i < FMath::Min(4, W.Num()); ++i) Out += (i ? TEXT(" ") : TEXT("")) + W[i];
+		Out.RemoveFromEnd(TEXT(":"));
+		Out.RemoveFromEnd(TEXT(","));
+		if (Out.Len() > 0) Out[0] = FChar::ToUpper(Out[0]);
+		return Out;
+	}
+
 
 	FString ItemName(FName Id)
 	{
@@ -518,12 +603,15 @@ public:
 	void Construct(const FArguments& InArgs)
 	{
 		PC = InArgs._PC;
+		// Survival while you have no claim; after that the tab you used last (cookpass-building 3.2).
+		Tab = WRBuildBar::OpeningTab(PC.Get());
 		if (const FWRPieceDef* D = PC.IsValid() ? FWRBuildRegistry::Get().Find(PC->GetPlacingPiece()) : nullptr)
 		{
-			Tab = TabOf(*D);
+			if (!InTabId(*D, Tab)) Tab = TabOf(*D);
 			Picked = D->Id;
 			ShowPicked();
 		}
+		if (PC.IsValid()) PC->SetBuildTab(Tab);
 		ChildSlot
 		[
 			SNew(SOverlay).Visibility(EVisibility::SelfHitTestInvisible)
@@ -544,9 +632,17 @@ public:
 		// While placing, the bar follows the piece in hand.
 		if (const FWRPieceDef* D = FWRBuildRegistry::Get().Find(PC->GetPlacingPiece()); D && D->Id != Picked)
 		{
+			// (A piece picked on the Survival tab stays there; the pad's D-pad up moves the controller's tab.)
 			Picked = D->Id;
-			Tab = TabOf(*D);
+			const FName Want = InTabId(*D, PC->GetBuildTab()) ? PC->GetBuildTab() : InTabId(*D, Tab) ? Tab : TabOf(*D);
+			if (Want != Tab) SetTab(Want);
 			ShowPicked();
+			bDirty = true;
+		}
+		else if (PC->GetBuildTab() != Tab && !PC->GetBuildTab().IsNone())
+		{
+			Tab = PC->GetBuildTab();
+			Page = 0;
 			bDirty = true;
 		}
 		const uint32 Hash = BagHash();
@@ -583,7 +679,19 @@ private:
 		return PS ? PS->GetInventory() : nullptr;
 	}
 	/** What the bag can pay with (planks pay for wood one for one). */
-	int32 Have(FName Item) const { return FWRMachines::CanPay(Inv(), Item); }
+	int32 Have(FName Item) const { return FWRMachines::CanPay(Inv(), Item) + InChests(Item); }
+	/** What your chests near you in your claim hold toward a cost (building from storage, cookpass-building 3.2). */
+	int32 InChests(FName Item) const
+	{
+		const APawn* P = PC.IsValid() ? PC->GetPawn() : nullptr;
+		return P ? WRBuildStock::InChests(P->GetWorld(), Me(), P->GetActorLocation(), Item) : 0;
+	}
+	void SetTab(FName Id)
+	{
+		Tab = Id;
+		if (PC.IsValid()) PC->SetBuildTab(Id);
+		WRBuildBar::RememberTab(Id);
+	}
 	FString Me() const { const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr; return PS ? PS->GetPlayerName() : FString(); }
 
 	uint32 BagHash() const
@@ -592,6 +700,17 @@ private:
 		if (const UWRInventoryComponent* I = Inv())
 		{
 			for (const FWRItemStack& S : I->GetSlots()) H = HashCombine(H, HashCombine(GetTypeHash(S.ItemId), GetTypeHash(S.Count)));
+		}
+		// The chests that pay too (a clanmate filling one changes the cards).
+		if (const APawn* P = PC.IsValid() ? PC->GetPawn() : nullptr)
+		{
+			const float Reach = WRTune(TEXT("building.storageReachCm"), 2000.f);
+			for (TActorIterator<AWRBuildPiece> It(P->GetWorld()); It; ++It)
+			{
+				const FWRPieceDef* D = It->GetDef();
+				if (!D || D->Kind != TEXT("chest") || It->bGhost || FVector::DistSquared(It->GetActorLocation(), P->GetActorLocation()) > Reach * Reach) continue;
+				for (const FWRItemStack& S : It->Storage) H = HashCombine(H, HashCombine(GetTypeHash(S.ItemId), GetTypeHash(S.Count)));
+			}
 		}
 		return H;
 	}
@@ -607,29 +726,8 @@ private:
 		for (const TPair<FName, int32>& C : D.Cost) Out.Add({ C.Key, FMath::Max(1, FMath::CeilToInt(C.Value * Mult)) });
 		return Out;
 	}
-	/** The open tab's pieces in pieces.json order, kept together by shape (wood and stone foundations, then pillars). */
-	TArray<const FWRPieceDef*> InTab() const
-	{
-		TArray<const FWRPieceDef*> Out;
-		TArray<FName> Shapes;
-		for (const FWRPieceDef& D : FWRBuildRegistry::Get().All())
-		{
-			if (TabOf(D) != Tab) continue;
-			Out.Add(&D);
-			Shapes.AddUnique(D.Shape.IsNone() ? D.Id : D.Shape);
-		}
-		// Structure tabs run material by material (wood, stone, metal, then each biome set): a page is a material.
-		const bool bStructure = Tab == TEXT("foundations") || Tab == TEXT("walls") || Tab == TEXT("floors") || Tab == TEXT("doors") || Tab == TEXT("stairs") || Tab == TEXT("beams");
-		const auto TierRank = [](const FWRPieceDef* D)
-		{
-			if (D->Material == TEXT("wood") || D->Material.IsNone()) return 0;
-			if (D->Material == TEXT("stone")) return 1;
-			const int32 i = FWRBuildSets::Get().All().IndexOfByPredicate([D](const FWRTierDef& T) { return T.Id == D->Material; });
-			return i == INDEX_NONE ? 99 : 2 + i;
-		};
-		Algo::StableSortBy(Out, [&Shapes, &TierRank, bStructure](const FWRPieceDef* D) { return (bStructure ? TierRank(D) * 100 : 0) + Shapes.IndexOfByKey(D->Shape.IsNone() ? D->Id : D->Shape); });
-		return Out;
-	}
+	/** The open tab's pieces (PiecesInTab). */
+	TArray<const FWRPieceDef*> InTab() const { return PiecesInTab(Tab); }
 	int32 Pages() const { return FMath::Max(1, FMath::DivideAndRoundUp(InTab().Num(), PerPage)); }
 	/** Turn the card row to the page holding the picked piece. */
 	void ShowPicked()
@@ -687,13 +785,13 @@ private:
 		TabStrip->ClearChildren();
 		for (const FTab& T : Tabs())
 		{
-			if (!FWRBuildRegistry::Get().All().ContainsByPredicate([&T](const FWRPieceDef& D) { return TabOf(D) == T.Id; })) continue;
+			if (!FWRBuildRegistry::Get().All().ContainsByPredicate([&T](const FWRPieceDef& D) { return InTabId(D, T.Id); })) continue;
 			const FName Id = T.Id;
 			const bool bOn = Tab == Id;
 			TabStrip->AddSlot().AutoWidth().VAlign(VAlign_Fill)
 			[
 				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
-				.OnClicked_Lambda([this, Id]() { if (Tab != Id) Page = 0; Tab = Id; Hovered = NAME_None; bDirty = true; return FReply::Handled(); })
+				.OnClicked_Lambda([this, Id]() { if (Tab != Id) Page = 0; SetTab(Id); Hovered = NAME_None; bDirty = true; return FReply::Handled(); })
 				[
 					SNew(SBox).HeightOverride(44.f * U)   // the strip's height (the scale box sizes the strip by what it holds)
 					[
@@ -879,7 +977,7 @@ private:
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[SNew(SBox).WidthOverride(22.f * U).HeightOverride(22.f * U)[SNew(SImage).Image(WRUI::Icon(Cost[0].Key))]]
 				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::FromString(FString::Printf(TEXT("%d %s"), Cost[0].Value, *ItemName(Cost[0].Key))), WRUI::Body(13, 800), H >= Cost[0].Value ? WRUI::Ink : WRUI::Bad)]
-				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(5.f * U, 0.f, 0.f, 0.f)[WRUI::Text(FText::FromString(FString::Printf(TEXT("· you have %d"), H)), WRUI::Body(12, 500), H >= Cost[0].Value ? WRUI::Ink3 : WRUI::Bad)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(5.f * U, 0.f, 0.f, 0.f)[WRUI::Text(FText::FromString(InChests(Cost[0].Key) > 0 ? FString::Printf(TEXT("· you have %d (%d in chests)"), H, InChests(Cost[0].Key)) : FString::Printf(TEXT("· you have %d"), H)), WRUI::Body(12, 500), H >= Cost[0].Value ? WRUI::Ink3 : WRUI::Bad)]
 			];
 		}
 		else
@@ -1262,10 +1360,7 @@ private:
 		const FWRPieceDef* D = FWRBuildRegistry::Get().Find(PC->GetPlacingPiece());
 		if (!PC->IsPlacementValid())
 		{
-			FString Why = PC->GetPlacementWhy();
-			if (Why.IsEmpty()) Why = TEXT("It won't go here");
-			Why[0] = FChar::ToUpper(Why[0]);
-			return Why;
+			return ShortWhy(PC->GetPlacementWhy());
 		}
 		if (!D)
 		{
@@ -1278,7 +1373,15 @@ private:
 
 	FString ChipCost() const
 	{
-		if (!PC.IsValid() || !PC->IsPlacementValid()) return FString();
+		if (!PC.IsValid()) return FString();
+		if (!PC->IsPlacementValid())
+		{
+			// Under the short chip: the whole reason, when it says more than the chip.
+			FString Why = PC->GetPlacementWhy();
+			if (Why.IsEmpty() || ShortWhy(Why).Equals(Why, ESearchCase::IgnoreCase)) return FString();
+			Why[0] = FChar::ToUpper(Why[0]);
+			return Why;
+		}
 		const FWRPieceDef* D = FWRBuildRegistry::Get().Find(PC->GetPlacingPiece());
 		if (D)
 		{
@@ -1303,7 +1406,7 @@ private:
 		[
 			WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return Mode() == 1 ? LOCTEXT("KPlacing", "Placing") : Mode() == 2 ? LOCTEXT("KDemolish", "Demolishing") : LOCTEXT("KBuilding", "Building"); }), WRUI::Caps(12), WRUI::Ink2)
 		];
-		for (int32 Row = 0; Row < 7; ++Row)
+		for (int32 Row = 0; Row < 8; ++Row)
 		{
 			Rows->AddSlot().AutoHeight().Padding(0.f, 5.f * U, 0.f, 0.f)
 			[
@@ -1347,7 +1450,19 @@ private:
 		struct FLine { FText Key; FText Label; bool bSnap; };
 		const auto K = [this](const TCHAR* Action) { return WRInput::ActionKey(FName(Action)); };
 		TArray<FLine> Lines;
-		if (M == 1)
+		if (M == 1 && WRInput::UsingPad())
+		{
+			// The pad's build mode (ui-controls 2.1): RT place, LB / RB turn, D-pad pieces and categories, X copy.
+			const auto P = [](const TCHAR* Verb) { return WRInput::PadButton(FName(Verb)); };
+			Lines.Add({ P(TEXT("Heavy")), LOCTEXT("PKPlace", "Place"), false });
+			Lines.Add({ FText::Format(LOCTEXT("PKTurnKeys", "{0} / {1}"), P(TEXT("Block")), P(TEXT("Light"))), LOCTEXT("PKTurn", "Turn (hold to keep turning)"), false });
+			Lines.Add({ FText::Format(LOCTEXT("PKPieceKeys", "{0} / {1}"), P(TEXT("BuildPrev")), P(TEXT("BuildNext"))), LOCTEXT("PKPiece", "Previous / next piece"), false });
+			Lines.Add({ P(TEXT("BuildCategory")), LOCTEXT("PKCategory", "Next category"), false });
+			Lines.Add({ P(TEXT("BuildCopy")), LOCTEXT("PKCopy", "Copy the piece you aim at"), false });
+			Lines.Add({ P(TEXT("BuildSnap")), LOCTEXT("KSnap", "Snap"), true });
+			Lines.Add({ P(TEXT("BuildCancel")), LOCTEXT("PKAway", "Put it away (again: leave)"), false });
+		}
+		else if (M == 1)
 		{
 			Lines.Add({ K(TEXT("Light")), LOCTEXT("KPlace", "Place"), false });
 			Lines.Add({ K(TEXT("Heavy")), Step >= 180.f ? LOCTEXT("KFlip", "Flip it") : Step >= 90.f ? LOCTEXT("KRotate90", "Rotate 90°") : Step > 0.f ? LOCTEXT("KRotate45", "Rotate 45°") : LOCTEXT("KTurnHold", "Turn, hold to spin"), false });
@@ -1355,6 +1470,7 @@ private:
 			Lines.Add({ K(TEXT("Block")), LOCTEXT("KCancel", "Cancel"), false });
 			Lines.Add({ K(TEXT("Snap")), LOCTEXT("KSnap", "Snap"), true });
 			Lines.Add({ K(TEXT("Demolish")), LOCTEXT("KDemolishInstead", "Demolish instead"), false });
+			Lines.Add({ K(TEXT("BuildCopy")), LOCTEXT("KCopy", "Copy the piece you aim at"), false });
 			Lines.Add({ K(TEXT("Build")), LOCTEXT("KLeave", "Leave build mode"), false });
 		}
 		else if (M == 2)
@@ -1379,6 +1495,151 @@ private:
 };
 
 	WR_REGISTER_SCREEN("build", [](AWRPlayerController* PC) -> TSharedRef<SWidget> { return SNew(SWRBuildBar).PC(PC); });
+}
+
+// ---------------------------------------------------------------- the bar's lists for the controller (WRBuildBar.h)
+
+FName WRBuildBar::TabOf(const FWRPieceDef& D) { return WRBuildUI::TabOf(D); }
+
+bool WRBuildBar::InTab(const FWRPieceDef& D, FName Tab) { return WRBuildUI::InTabId(D, Tab); }
+
+bool WRBuildBar::CanPick(const AWRPlayerController* PC, const FWRPieceDef& D, FString* OutWhy)
+{
+	if (WRBuildUI::TabOf(D).IsNone())
+	{
+		if (OutWhy) *OutWhy = TEXT("You can't build that here yet");
+		return false;
+	}
+	if (!D.Blueprint.IsNone() && !FWRBlueprints::Knows(PC, D.Blueprint))
+	{
+		if (OutWhy) *OutWhy = FString::Printf(TEXT("You don't know its blueprint (%s drops it)"), *FWRBuildSets::BlueprintSource(D.Blueprint));
+		return false;
+	}
+	return true;
+}
+
+FName WRBuildBar::Step(const AWRPlayerController* PC, FName Tab, FName Current, int32 Dir)
+{
+	TArray<const FWRPieceDef*> List = WRBuildUI::PiecesInTab(Tab);
+	List.RemoveAll([PC](const FWRPieceDef* D) { return !CanPick(PC, *D); });
+	if (List.Num() == 0) return NAME_None;
+	const int32 At = List.IndexOfByPredicate([Current](const FWRPieceDef* D) { return D->Id == Current; });
+	if (At == INDEX_NONE) return Dir >= 0 ? List[0]->Id : List.Last()->Id;
+	return List[(At + (Dir >= 0 ? 1 : -1) + List.Num()) % List.Num()]->Id;
+}
+
+FName WRBuildBar::NextTab(const AWRPlayerController* PC, FName Tab, FName& OutFirst)
+{
+	const TArray<WRBuildUI::FTab>& Tabs = WRBuildUI::Tabs();
+	const int32 At = Tabs.IndexOfByPredicate([Tab](const WRBuildUI::FTab& T) { return T.Id == Tab; });
+	for (int32 k = 1; k <= Tabs.Num(); ++k)
+	{
+		const FName Next = Tabs[(FMath::Max(0, At) + k) % Tabs.Num()].Id;
+		OutFirst = Step(PC, Next, NAME_None, 1);
+		if (!OutFirst.IsNone()) return Next;
+	}
+	OutFirst = NAME_None;
+	return Tab;
+}
+
+FName WRBuildBar::OpeningTab(const AWRPlayerController* PC)
+{
+	const APlayerState* PS = PC ? PC->PlayerState.Get() : nullptr;
+	bool bClaim = false;
+	if (PS && PC->GetWorld())
+	{
+		for (TActorIterator<AWRClaimTotem> It(PC->GetWorld()); It; ++It)
+		{
+			if (It->OwnerName == PS->GetPlayerName()) { bClaim = true; break; }
+		}
+	}
+	if (!bClaim) return TEXT("survival");
+	FString Last;
+	if (GConfig && GConfig->GetString(TEXT("Wildreach.Build"), TEXT("LastTab"), Last, GGameUserSettingsIni) && !Last.IsEmpty()
+		&& WRBuildUI::Tabs().ContainsByPredicate([&Last](const WRBuildUI::FTab& T) { return T.Id == FName(*Last); }))
+	{
+		return FName(*Last);
+	}
+	return TEXT("foundations");
+}
+
+void WRBuildBar::RememberTab(FName Tab)
+{
+	if (!GConfig || Tab.IsNone()) return;
+	GConfig->SetString(TEXT("Wildreach.Build"), TEXT("LastTab"), *Tab.ToString(), GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+// ---------------------------------------------------------------- building from storage (WRBuildStock)
+
+namespace WRBuildStockDetail
+{
+	/** Chests that pay for Player standing at At: chests (not ghosts) Player may open, inside the claim At stands in,
+	 *  within building.storageReachCm, nearest first. */
+	TArray<AWRBuildPiece*> Chests(const UWorld* World, const FString& Player, const FVector& At)
+	{
+		TArray<AWRBuildPiece*> Out;
+		if (!World || Player.IsEmpty()) return Out;
+		const AWRClaimTotem* Claim = AWRClaimTotem::FindAt(World, At);
+		if (!Claim || !FWRSocialRules::CanShare(Claim->OwnerName, Player)) return Out;
+		const float Reach = WRTune(TEXT("building.storageReachCm"), 2000.f);
+		for (TActorIterator<AWRBuildPiece> It(World); It; ++It)
+		{
+			const FWRPieceDef* D = It->GetDef();
+			if (!D || D->Kind != TEXT("chest") || It->bGhost || It->Storage.Num() == 0) continue;
+			if (FVector::DistSquared(It->GetActorLocation(), At) > Reach * Reach) continue;
+			if (AWRClaimTotem::FindAt(World, It->GetActorLocation()) != Claim || !It->CanAccess(Player)) continue;
+			Out.Add(*It);
+		}
+		Out.Sort([At](const AWRBuildPiece& A, const AWRBuildPiece& B) { return FVector::DistSquared(A.GetActorLocation(), At) < FVector::DistSquared(B.GetActorLocation(), At); });
+		return Out;
+	}
+	int32 CountIn(const TArray<FWRItemStack>& Stacks, FName Item)
+	{
+		int32 N = 0;
+		for (const FWRItemStack& S : Stacks) if (S.ItemId == Item) N += S.Count;
+		return N;
+	}
+	int32 TakeFrom(TArray<FWRItemStack>& Stacks, FName Item, int32 Count)
+	{
+		int32 Took = 0;
+		for (int32 i = Stacks.Num() - 1; i >= 0 && Took < Count; --i)
+		{
+			if (Stacks[i].ItemId != Item) continue;
+			const int32 N = FMath::Min(Stacks[i].Count, Count - Took);
+			Stacks[i].Count -= N;
+			Took += N;
+			if (Stacks[i].Count <= 0) Stacks.RemoveAt(i);
+		}
+		return Took;
+	}
+}
+
+int32 WRBuildStock::InChests(const UWorld* World, const FString& Player, const FVector& At, FName Item)
+{
+	int32 N = 0;
+	for (const AWRBuildPiece* C : WRBuildStockDetail::Chests(World, Player, At))
+	{
+		N += WRBuildStockDetail::CountIn(C->Storage, Item) + (Item == TEXT("wood") ? WRBuildStockDetail::CountIn(C->Storage, TEXT("planks")) : 0);
+	}
+	return N;
+}
+
+void WRBuildStock::Pay(UWorld* World, const FString& Player, const FVector& At, UWRInventoryComponent* Bag, FName Item, int32 Count)
+{
+	// The bag first (planks before wood: they were sawn for building), then each chest nearest first.
+	const int32 FromBag = FMath::Min(Count, FWRMachines::CanPay(Bag, Item));
+	FWRMachines::Pay(Bag, Item, FromBag);
+	int32 Left = Count - FromBag;
+	for (AWRBuildPiece* C : WRBuildStockDetail::Chests(World, Player, At))
+	{
+		if (Left <= 0) break;
+		if (Item == TEXT("wood")) Left -= WRBuildStockDetail::TakeFrom(C->Storage, TEXT("planks"), Left);
+		if (Left > 0) Left -= WRBuildStockDetail::TakeFrom(C->Storage, Item, Left);
+		C->OnRep_Farm();
+		C->ForceNetUpdate();
+	}
+	if (Left > 0) UE_LOG(LogWildreach, Warning, TEXT("BUILD %s paid %d %s short (storage changed)"), *Player, Left, *Item.ToString());
 }
 
 #undef LOCTEXT_NAMESPACE
