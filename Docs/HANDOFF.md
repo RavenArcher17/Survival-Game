@@ -746,7 +746,7 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
    together). Write `Docs/release-notes/v<ver>.md` (copy the last one's layout) and the `CHANGELOG.md` entry.
 3. Run the whole suite; rerun failures alone.
    The PC that packages needs the Electric Dreams forest kit (`Tools\check_setup.ps1` says PASS for it): without it the
-   package ships the Ancient forest's tree-kit look. `Toolsrt\electric_dreams_forest.ps1 -From <an Electric Dreams
+   package ships the Ancient forest's tree-kit look. `Tools\art\electric_dreams_forest.ps1 -From <an Electric Dreams
    project>` copies it in (the project: Fab, "Electric Dreams Environment", Create Project in the launcher), then run
    the commandlet the script names (caps its textures at 2K).
 4. Package into a **new** folder (a running packaged game locks its folder):
