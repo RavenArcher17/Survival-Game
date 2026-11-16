@@ -657,6 +657,146 @@ Ogg Vorbis by the build script.
 | Digging in stoney dirt | innov8_Music (freesound) | CC0 1.0 | https://freesound.org/people/innov8_Music/sounds/871629/ | world/forest_dig (x3) |
 | Bison | timpet55 (freesound) | CC0 1.0 | https://freesound.org/people/timpet55/sounds/873888/ | creature/burlbeast_attack (x3) |
 
+## Audio: the audio cook pass (2026-11-15)
+
+The Fire and Frost music sets and the other lands' own explore / night / combat pieces, the combat-entry and boss-fall
+stingers, the ten Fire / Frost sub-zone beds, the sixteen Fire / Frost hazard sounds, the spot sounds, the sleep breaths
+and the creature families' alarm / bolt calls (`Tools/audio/build_cookpass_audio.py`, sources in
+`Tools/audio/sources_cookpass.py`). All real recordings and real compositions with real instruments, no AI generation
+and no synthesis. The music is **Kevin MacLeod (incompetech.com), CC-BY 4.0**: every piece must stay credited wherever
+the game is distributed, as "<Title>" Kevin MacLeod (incompetech.com), Licensed under Creative Commons: By Attribution
+4.0, http://creativecommons.org/licenses/by/4.0/. The recordings are from Freesound: CC0 except the rows marked CC-BY 4.0,
+which must stay credited too. Cut, layered, re-pitched, loudness-matched and encoded as Ogg Vorbis by the build script.
+
+| Source | Author | Licence | Page | Used for (Data/Audio/...) |
+| --- | --- | --- | --- | --- |
+| Death of Kings | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100876 | music/sting_boss_fall_1, music/vol_explore_a |
+| Steel Rods | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200052 | music/vol_explore_b |
+| Drums of the Deep | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400021 | music/vol_explore_c |
+| Mary Celeste | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1500016 | music/vol_night_a |
+| Oppressive Gloom | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100885 | music/vol_night_b |
+| The Descent | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200094 | music/vol_combat |
+| Colossus | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100358 | music/vol_mini |
+| Industrial Revolution | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100811 | music/vol_boss_p1 |
+| Death and Axes | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700049 | music/vol_boss_p2 |
+| Stoneworld Battle | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100352 | music/vol_boss_p3 |
+| Tenebrous Brothers Carnival - Act Three | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100642 | music/vol_kiln_roads |
+| StompDance | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100828 | music/vol_eruption |
+| Peaceful Desolation | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200017 | music/vol_camp |
+| Wounded | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100586 | music/tun_explore_a |
+| For Originz | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100700 | music/tun_explore_b |
+| Frost Waltz | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100516 | music/tun_explore_c |
+| At Rest | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100748 | music/tun_night_a |
+| Blue Feather | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100524 | music/tun_night_b |
+| Gloom Horizon | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100813 | music/tun_combat |
+| The Snow Queen | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100872 | music/tun_mini |
+| The Escalation | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400041 | music/tun_boss_p1 |
+| Hero Down | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100880 | music/tun_boss_p2 |
+| Darkling | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700050 | music/tun_boss_p3 |
+| Relent | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100777 | music/tun_blue_below |
+| Spirit of the Girl | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700057 | music/tun_whiteout |
+| Water Lily | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400035 | music/tun_camp |
+| Hidden Wonders | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700006 | music/des_explore_a |
+| Opium | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100371 | music/des_explore_b |
+| Nightdreams | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700054 | music/des_night |
+| Return of the Mummy | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700046 | music/des_combat |
+| Curse of the Scarab | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600014 | music/des_mini |
+| Halls of the Undead | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100355 | music/grave_explore_a |
+| Rites | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100722 | music/grave_explore_b |
+| Agnus Dei X | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100679 | music/grave_night |
+| Grim Idol | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700043 | music/grave_combat |
+| Nightmare Machine | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700048 | music/grave_mini |
+| Tenebrous Brothers Carnival - Mermaid | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100671 | music/crys_explore_a |
+| The Other Side of the Door | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100744 | music/crys_explore_b |
+| Gone Beyond | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100752 | music/crys_night |
+| Serpentine Trek | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100428 | music/crys_combat |
+| Angevin B | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200111 | music/sky_explore_a |
+| Willow and the Light | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100591 | music/sky_explore_b |
+| Unpromised | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100603 | music/sky_night |
+| Journey To Ascend | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN2200001 | music/sky_combat |
+| Finding Movement | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100693 | music/sea_explore_a |
+| Myst | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100448 | music/sea_explore_b |
+| Plaint | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300009 | music/sea_night |
+| Crossing the Chasm | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700026 | music/sea_combat |
+| Confused State | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100453 | music/fun_explore |
+| Vulcan | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100525 | music/fun_night |
+| Ignosi | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100450 | music/fun_combat |
+| This House | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1500055 | music/void_explore |
+| Colorless Aura | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400008 | music/void_night |
+| Unlight | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100878 | music/void_combat |
+| factory explosion steam burst.wav | kokuya | CC0 1.0 | https://freesound.org/s/18405/ | world/ff_fumarole_1, world/ff_fumarole_2 |
+| Thin ice on lake.wav | juskiddink | CC-BY 4.0 | https://freesound.org/s/66930/ | world/ff_ice_creak_1, world/ff_ice_creak_2 |
+| growl6.wav | lendrick | CC0 1.0 | https://freesound.org/s/77637/ | creature/beast_alert_1, creature/beast_alert_2 |
+| steam_burst.wav | pengo_au | CC0 1.0 | https://freesound.org/s/90143/ | world/ff_fumarole_1, world/ff_fumarole_2 |
+| svalbard_recherche_glacier_20060904.wav | jeo | CC-BY 4.0 | https://freesound.org/s/103116/ | amb/ff_ice_groan_1, amb/ff_ice_groan_2, amb/ff_ice_groan_3 |
+| avl05.wav | blaukreuz | CC0 1.0 | https://freesound.org/s/162674/ | world/ff_bridge_creak_1, world/ff_bridge_creak_2, world/ff_bridge_fall_1, world/ff_bridge_fall_2, world/ff_serac_tell_1, world/ff_serac_tell_2 |
+| Birds_flapping 1.wav | deleted_user_2104797 | CC0 1.0 | https://freesound.org/s/164477/ | creature/flyer_flee_1, creature/flyer_flee_2 |
+| WalkingWinteronIceandSnowJanuary2013.wav | kvgarlic | CC0 1.0 | https://freesound.org/s/173190/ | world/ff_bridge_creak_1, world/ff_bridge_creak_2 |
+| howling_wind.wav | juryduty | CC0 1.0 | https://freesound.org/s/185070/ | amb/ff_t5 |
+| Steam/hiss | wubitog | CC0 1.0 | https://freesound.org/s/234782/ | world/ff_fumarole_tell_1, world/ff_fumarole_tell_2 |
+| fire-whoosh.wav | hnhnh | CC0 1.0 | https://freesound.org/s/244926/ | world/ff_bellows_1, world/ff_bellows_2 |
+| Basic Fire Whoosh 2 | LookIMadeAThing | CC0 1.0 | https://freesound.org/s/260555/ | world/ff_bellows_1, world/ff_bellows_2 |
+| Ice Crack 1 | j_p_higgins | CC0 1.0 | https://freesound.org/s/262635/ | amb/ff_crust_crack_1, amb/ff_crust_crack_2, amb/ff_crust_crack_3, world/ff_ice_crack_1, world/ff_ice_crack_2, world/ff_ice_crack_3 |
+| Red Spouter Fumarole | bretberger | CC-BY 4.0 | https://freesound.org/s/262671/ | amb/ff_v4, world/ff_fumarole_tell_1, world/ff_fumarole_tell_2 |
+| Islanti, geysir purkautuu, turistit / Iceland, geyser erupting twice, tourists reacting, talking, walking | YleArkisto | CC-BY 4.0 | https://freesound.org/s/263879/ | world/ff_geyser_1, world/ff_geyser_2 |
+| glacierCalving.mp3 | CCCanary | CC0 1.0 | https://freesound.org/s/271008/ | world/ff_serac_fall_1, world/ff_serac_fall_2 |
+| Horse Breathing.wav | metaepitome | CC0 1.0 | https://freesound.org/s/275388/ | creature/sleep_large_1, creature/sleep_large_2, creature/sleep_large_3 |
+| Single Dog Bark | kwahmah_02 | CC0 1.0 | https://freesound.org/s/277058/ | creature/canine_alert_1, creature/canine_alert_2 |
+| rat-squeak.wav | toefur | CC0 1.0 | https://freesound.org/s/288941/ | creature/critter_flee_1, creature/critter_flee_2 |
+| Chicken Single Alarm Call | Rudmer_Rotteveel | CC0 1.0 | https://freesound.org/s/316920/ | creature/flyer_alert_1, creature/flyer_alert_2, creature/flyer_alert_3 |
+| Frame drum_oneshot_RAW_13.wav | cabled_mess | CC0 1.0 | https://freesound.org/s/345636/ | music/sting_combat_tundra_1 |
+| raven x3 | nielstii | CC0 1.0 | https://freesound.org/s/346318/ | amb/ff_raven_1, amb/ff_raven_2, amb/ff_raven_3 |
+| Crackle #1.wav | abstraktgeneriert | CC0 1.0 | https://freesound.org/s/348942/ | amb/ff_crust_crack_1, amb/ff_crust_crack_2, amb/ff_crust_crack_3 |
+| Howling wolves | Kingcornz | CC0 1.0 | https://freesound.org/s/378334/ | amb/ff_howl_far_1, amb/ff_howl_far_2 |
+| Wind5.mp3 | vandale | CC0 1.0 | https://freesound.org/s/379472/ | world/ff_gust_howl_1, world/ff_gust_howl_2 |
+| Torch - Ignite flame on soft | ldezem | CC0 1.0 | https://freesound.org/s/386385/ | world/ff_cup_light_1 |
+| Rock Tumble 2.wav | _stubb | CC0 1.0 | https://freesound.org/s/389618/ | amb/ff_rockfall_1, amb/ff_rockfall_2, amb/ff_rockfall_3 |
+| Growl 7 | _stubb | CC0 1.0 | https://freesound.org/s/389638/ | creature/beast_alert_1, creature/beast_alert_2 |
+| growl 9.wav | _stubb | CC0 1.0 | https://freesound.org/s/389653/ | creature/beast_flee_1 |
+| Buzzing Insect Short.mp3 | FunWithSound | CC0 1.0 | https://freesound.org/s/390733/ | creature/bug_flee_1 |
+| Cricket Chirp | Sojan | CC0 1.0 | https://freesound.org/s/400663/ | creature/bug_alert_1, creature/bug_alert_2 |
+| Mud Volcano Field - Salton Sea | RTB45 | CC0 1.0 | https://freesound.org/s/415608/ | amb/ff_v2 |
+| Mud Volcanos - Salton Sea | RTB45 | CC0 1.0 | https://freesound.org/s/415609/ | amb/ff_v4 |
+| Ice Break With Hand.wav | Lynx_5969 | CC0 1.0 | https://freesound.org/s/422669/ | world/ff_ice_break_1, world/ff_ice_break_2 |
+| Soil Slide | NeoSpica | CC0 1.0 | https://freesound.org/s/426174/ | world/ff_bridge_fall_1, world/ff_bridge_fall_2 |
+| Rocks Falling.wav | MTJohnson | CC0 1.0 | https://freesound.org/s/426318/ | amb/ff_rockfall_1, amb/ff_rockfall_2, amb/ff_rockfall_3 |
+| Guineapig | RICHERlandTV | CC0 1.0 | https://freesound.org/s/435748/ | creature/critter_flee_1, creature/critter_flee_2 |
+| G38-16-Four Horse Snorts.wav | craigsmith | CC0 1.0 | https://freesound.org/s/437111/ | creature/herd_alert_1, creature/herd_alert_2, creature/herd_alert_3 |
+| forest wind blow snow of tree trickle like rain stick cool mono.flac | kyles | CC0 1.0 | https://freesound.org/s/452094/ | world/ff_bridge_reform_1 |
+| branch break snap crunch nice.wav | kyles | CC0 1.0 | https://freesound.org/s/452109/ | amb/ff_frost_crack_1, amb/ff_frost_crack_2 |
+| wind strong winter gusty alley balcony blowing prickly snow powder +debris flapping, some wood chimes Montreal, Canada sorry I know it&#x27;s long.flac | kyles | CC0 1.0 | https://freesound.org/s/454372/ | amb/ff_t1 |
+| Hot Bubbling Mud | Breviceps | CC0 1.0 | https://freesound.org/s/456806/ | amb/ff_mudpot_1, amb/ff_mudpot_2, amb/ff_mudpot_3, world/ff_geyser_tell_1, world/ff_geyser_tell_2 |
+| Avalanche Hit | Breviceps | CC0 1.0 | https://freesound.org/s/457528/ | world/ff_serac_fall_1, world/ff_serac_fall_2 |
+| 22_Lobo_aullando.wav | JoseAgudelo | CC0 1.0 | https://freesound.org/s/472402/ | amb/ff_howl_far_1, amb/ff_howl_far_2 |
+| Horse(snort)_3.wav | o_ciz | CC0 1.0 | https://freesound.org/s/475483/ | creature/herd_alert_1, creature/herd_alert_2, creature/herd_alert_3 |
+| taiko.wav | Anuj_Shrestha1 | CC0 1.0 | https://freesound.org/s/486140/ | music/sting_combat_volcanic_1, music/sting_combat_volcanic_2 |
+| taiko2.wav | Anuj_Shrestha1 | CC0 1.0 | https://freesound.org/s/486141/ | music/sting_combat_volcanic_1, music/sting_combat_volcanic_2 |
+| CrowOrRaven2.wav | iwanPlays | CC0 1.0 | https://freesound.org/s/512780/ |  |
+| KB_SleepingCat_Short.wav | KaBlazik_Samples | CC0 1.0 | https://freesound.org/s/561004/ | creature/sleep_small_1, creature/sleep_small_2, creature/sleep_small_3 |
+| Wind in forest with creaking tree | Cinetony | CC0 1.0 | https://freesound.org/s/563571/ | amb/ff_t2 |
+| Bricks/Stones/Rocks/Gravel Falling | iwanPlays | CC0 1.0 | https://freesound.org/s/567249/ | amb/ff_rockfall_1, amb/ff_rockfall_2, amb/ff_rockfall_3 |
+| Timpani 4.wav | Sorinious_Genious | CC0 1.0 | https://freesound.org/s/573282/ | music/sting_combat_1 |
+| Frozen lake freezing again | toban | CC0 1.0 | https://freesound.org/s/613571/ | amb/ff_t3, world/ff_ice_refreeze_1 |
+| melting ice folgefonna glacier.wav | frodeims | CC0 1.0 | https://freesound.org/s/615896/ | amb/ff_ice_groan_1, amb/ff_ice_groan_2, amb/ff_ice_groan_3, amb/ff_t4 |
+| single bark - small to medium dog | haulaway | CC0 1.0 | https://freesound.org/s/630648/ | creature/canine_alert_1, creature/canine_alert_2 |
+| Ground Squirrel First Chirp | burgersmoke | CC0 1.0 | https://freesound.org/s/640992/ | creature/critter_alert_1, creature/critter_alert_2 |
+| Volcano Mount Yasur, Tanna Island, from the bottom | felix.blume | CC0 1.0 | https://freesound.org/s/663040/ | amb/ff_crater_chuff_1, amb/ff_crater_chuff_2, amb/ff_crater_chuff_3, amb/ff_v5 |
+| cracking_ice.mp3 | sunflora | CC0 1.0 | https://freesound.org/s/665084/ | world/ff_ice_crack_1, world/ff_ice_crack_2, world/ff_ice_crack_3 |
+| Ice Breaking 5 | giwake | CC0 1.0 | https://freesound.org/s/666482/ | world/ff_ice_break_1, world/ff_ice_break_2 |
+| bah bala oveja/baa bleat sheep.WAV | SergioJbs | CC0 1.0 | https://freesound.org/s/669872/ | creature/herd_flee_1, creature/herd_flee_2 |
+| mini Goat Baa | satoristudios3 | CC0 1.0 | https://freesound.org/s/677218/ | creature/herd_flee_1, creature/herd_flee_2 |
+| Looping Gentle Wind Ambience on an Open Desert Plain.wav | dhallcomposer | CC0 1.0 | https://freesound.org/s/697217/ | amb/ff_v1 |
+| Snoring dog | alexdecastro | CC0 1.0 | https://freesound.org/s/709430/ | creature/sleep_medium_1, creature/sleep_medium_2, creature/sleep_medium_3 |
+| Raven Croak or Crow Caw | fudgealtoid | CC0 1.0 | https://freesound.org/s/716962/ | amb/ff_raven_1, amb/ff_raven_2, amb/ff_raven_3 |
+| Ice - Lake fractures | Vrymaa | CC0 1.0 | https://freesound.org/s/737896/ | amb/ff_lake_ice_1, amb/ff_lake_ice_2, amb/ff_lake_ice_3, world/ff_serac_tell_1, world/ff_serac_tell_2 |
+| WindGust | phuonglamb | CC0 1.0 | https://freesound.org/s/738085/ | world/ff_gust_howl_1, world/ff_gust_howl_2 |
+| ice cracking | getwecked | CC0 1.0 | https://freesound.org/s/764657/ | amb/ff_crust_crack_1, amb/ff_crust_crack_2, amb/ff_crust_crack_3, world/ff_ice_crack_1, world/ff_ice_crack_2, world/ff_ice_crack_3 |
+| Strong wind in an antenna, slight whistle, squalls sometimes | felix.blume | CC0 1.0 | https://freesound.org/s/779944/ | amb/ff_v3 |
+| Bird Freaking Out | qubodup | CC0 1.0 | https://freesound.org/s/812026/ | creature/flyer_alert_1, creature/flyer_alert_2, creature/flyer_alert_3 |
+| Dog Long Greeting Yelp | qubodup | CC0 1.0 | https://freesound.org/s/827539/ | creature/canine_flee_1, creature/canine_flee_2 |
+| Mules - Mule Breaths, Close Perspective | TheKingOfGeeks360 | CC0 1.0 | https://freesound.org/s/832102/ | creature/sleep_large_1, creature/sleep_large_2, creature/sleep_large_3 |
+| rumbling_ice | aerror | CC0 1.0 | https://freesound.org/s/847807/ | amb/ff_t3 |
+
 ## Animation
 
 | What | Files in the repo | Source | Author | Licence |
@@ -691,6 +831,7 @@ The ocean material is `M_Ocean` from the **WaterMaterials** pack (`Content/Water
 standard Fab licence for use in a game). The game uses it through its own instance `Content/Sea/MI_Ocean` (in git),
 which is cooked with the game (`DirectoriesToAlwaysCook` `/Game/Sea`), so the packaged game carries the parts of
 the pack it needs.
+
 
 ### Building pieces, sky and camera
 

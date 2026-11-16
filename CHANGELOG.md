@@ -90,6 +90,23 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   `caption` ("{who} snarls") and `danger`; creature calls get theirs by kind from `captionDefaults`. The HUD shows up to
   four lines bottom centre with an arrow toward the sound (`WRUICaptions.cpp`), merged when repeated ("x2"), dimmer
   when far; never for your own sounds. The audio page's hint and music line now say what the music does.
+- **Audio (4): the music, beds and recordings.** Why: Fire and Frost (the core lands) had 8 shared CC0 tracks, one
+  of them a synth chiptune (Aaron: real instruments only), and every other new land borrowed another's music; the ten
+  Fire / Frost sub-zone beds and sixteen hazard sounds were pitched stand-ins (LATER-COOKS).
+  - 54 Kevin MacLeod pieces (CC-BY 4.0), picked from incompetech's catalogue by tempo, instruments and feel with every
+    piece listing synths, electric instruments, drum kit or guitar filtered out: the Volcanic set (explore A / B, V4's
+    C, night A / B, combat, mini, Vulkarn P1-P3, the Kiln Roads, the Eruption layer, camp) and the Tundra set (the
+    same, Skaldrith P1-P3, the Blue Below, the Whiteout layer), and each borrowed land's own explore / night / combat
+    (Desert and Graveyard also a mini). Every pool row carries its `bpm`. The generic `combat` / `boss` pools and the
+    Vorhollow / Aeolith P3 rows no longer play the synth tracks (the last two stay marked stand-ins for their cooks' cues).
+  - Real recordings (Freesound, 66 CC0 + 6 CC-BY 4.0): the ten sub-zone beds (a desert plain's wind, slowed mud
+    volcanoes, wind in an antenna, a Yellowstone fumarole over mud pots, Yasur from the crater floor, blowing winter
+    snow, a creaking forest, a lake freezing, a glacier melting, a howling wind), the sixteen ff.* hazards, nine spot
+    sounds (the crater's chuff from the crater itself, scree, crust ticks, mud pots, ravens, singing lake ice, frost-
+    cracking pines, glacier groans, a far howl), sleep breaths per size, the six families' alarm and bolt calls, the
+    taiko / frame drum / timpani entry stingers and the boss-fall chord.
+  - `Tools/audio/sources_cookpass.py` + `build_cookpass_audio.py` (music -18 LUFS, calm -21, boss -16, layers -24;
+    beds -23; effects -16), credits in Docs/CREDITS.md. New files: 157 OGG, ~98 MB (LFS).
 
 ## Unreleased: the creature cook pass (look, animation, voice, behaviour of every built creature and boss)
 
