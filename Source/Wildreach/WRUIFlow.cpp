@@ -36,6 +36,7 @@
 #include "WRUIWidgets.h"
 #include "WRUIWindowKit.h"
 #include "WRWorldDressing.h"
+#include "WRIslandPlaces.h"
 #include "Brushes/SlateDynamicImageBrush.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
@@ -1332,6 +1333,7 @@ void FWRFlow::TickMoments()
 	{
 		NextSlowCheck = Now + 0.5;
 		CheckDiscoveries(At);
+		CheckZones(At);
 		CheckHearths(At);
 		if (Survivor && Survivor->IsAlive()) CheckHints(At);
 		// The bag's marker goes once you're there and the bag isn't (picked up, or taken).
@@ -1421,6 +1423,14 @@ void FWRFlow::CheckDiscoveries(const FVector& At)
 			B.Sub = LOCTEXT("FoundPassSub", "A way over the ridge between the volcanic west and the frozen east.");
 			B.Glyph = TEXT("mountain");
 		}
+		else if (Poi.Kind == TEXT("landmark"))
+		{
+			// The Fire and Frost landmarks (WRIslandPlaces): the place's own line from the places file.
+			B.Over = LOCTEXT("FoundLandmark", "Discovered  ·  landmark");
+			const FString Line = WRIsle::LandmarkLine(Poi.Name);
+			B.Sub = Line.IsEmpty() ? FText::GetEmpty() : FText::FromString(Line);
+			B.Glyph = TEXT("mountain");
+		}
 		else if (bBoss || bMini)
 		{
 			B.Over = bBoss ? LOCTEXT("FoundBoss", "Discovered  ·  boss lair") : LOCTEXT("FoundMini", "Discovered  ·  mini-boss lair");
@@ -1437,6 +1447,26 @@ void FWRFlow::CheckDiscoveries(const FVector& At)
 		WRFx::SpawnAt(P, TEXT("discover"), At);
 		return;   // one at a time
 	}
+}
+
+void FWRFlow::CheckZones(const FVector& At)
+{
+	const FName Zone = WRIsle::ZoneAt(At);
+	if (Zone == LastZone) return;
+	LastZone = Zone;
+	if (Zone.IsNone()) return;
+	// Not on every step across a line: a zone's name shows again only after a while away.
+	const double Now = WRUIMotion::Now();
+	const double* Last = ZoneShownAt.Find(Zone);
+	if (Last && Now - *Last < WRTune(TEXT("places.zoneBannerGap"), 120.f)) return;
+	ZoneShownAt.Add(Zone, Now);
+	FBanner B;
+	B.Kind = FBanner::EKind::Discover;
+	B.Over = FText::FromString(WRIsle::ZoneBiome(Zone) == TEXT("volcanic") ? TEXT("The Volcanic") : TEXT("The Frozen tundra"));
+	B.Title = FText::FromString(WRIsle::ZoneName(Zone));
+	B.Accent = WRIsle::ZoneColour(Zone);
+	B.Seconds = WRTune(TEXT("places.zoneBannerSeconds"), 3.5f);
+	ShowBanner(B);
 }
 
 void FWRFlow::CheckBosses(const FVector& At)

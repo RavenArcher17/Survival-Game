@@ -1,4 +1,5 @@
 #include "WRAudio.h"
+#include "WRIslandPlaces.h"
 #include "WRCrystalTypes.h"
 #include "WRFungalTypes.h"
 #include "WRUnderwater.h"
@@ -268,6 +269,11 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 	if (Layer == LavaL) return Out * Lava;
 	if (Layer == HighL) return Out * High;
 	if (Layer == Wind) return Out * FMath::Max(TundraW, High);
+	// The Fire and Frost sub-zones' own beds (cooks/cookpass-world.md 3.2: layer ffzone.<V1..T5>), over the island's.
+	{
+		const FString LZ = Layer.ToString();
+		if (LZ.StartsWith(TEXT("ffzone."))) return FName(*LZ.RightChop(7)) == IsleZone ? Out * Isl * (1.f - Forest) : 0.f;
+	}
 	// Storm peaks' beds (Data/Audio/sounds.json ambient: layer storm_peaks / storm_peaks.day|night / storm.<zone>).
 	static const FName StormL(TEXT("storm_peaks")), StormDay(TEXT("storm_peaks.day")), StormNight(TEXT("storm_peaks.night")),
 		Passes(TEXT("storm.passes")), Cliffs(TEXT("storm.cliffs")), Bridges(TEXT("storm.bridges")), Crags(TEXT("storm.crags")),
@@ -462,6 +468,7 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		const FWRLandDef* LD = WRLand::At(Listener);
 		LandBiome = LD ? LD->Biome : NAME_None;
 		LandZone = WRLand::ZoneAt(Listener);
+		IsleZone = LD ? NAME_None : WRIsle::ZoneAt(Listener);
 		// The Sky (cooks/biome-sky.md 2.12): over the islands as on the cape, its own beds by sub-zone (zone.W1..W5).
 		if (WRSkyIsles::Contains(Listener))
 		{

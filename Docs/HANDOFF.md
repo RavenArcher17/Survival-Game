@@ -58,6 +58,16 @@ The fill-in map is `UWRMapRevealComponent` (PlayerState, server-side grid, `mapR
 marker for a place (not yours) should check `IsRevealed` in `WRUIMap` Gather like the camps and caves do.
 A worn set's full bonus plays the set-complete moment (`FWRPlayerUI::TickSetComplete`, sounds.json `gear.setComplete`).
 Path node glyphs come from `Tools/ui_glyphs.mjs` (Necromancy's added): run it with the ids you add so the rest stay as they are.
+Also since 0.7.1: **the Fire and Frost world cook pass** (showcase-notes cooks/cookpass-world.md). The Old Island's places
+are data: `Data/island_places.json` is made by `node Tools/terrain/island_places.mjs` (hand places in metres settled onto
+dry ground off the heightmap, the two waymark roads, the hazard spots, and ~180 kit POIs dealt so no route goes 250 m
+without a place). Re-run it when the island or `world.json`'s villages / shrines move. `UWRIslandPlaces`
+(WRIslandPlaces.cpp) builds every place on every machine once the ground under it streams in (no map change, no
+replication); the looks are `WRIslandPlacesLook.cpp` (Volcanic), `WRIslandPlacesLook2.cpp` (Tundra) and
+`WRIslandPlacesKit.cpp`; a new kind is a builder there and a row in the tool. Sub-zones (V1-V5, T1-T5) are
+`WRIsle::ZoneAt`: their beds are `ambient.beds` layer `ffzone.<id>` and their names show on entering (`FWRFlow::CheckZones`).
+Landmarks join `FWRPoi::All` as kind `landmark`. The micro-hazards (`WRIslandHazards.cpp`, tuning `hazards.ff`) run on the
+server's clock; only thin ice and snow bridges replicate (`AWRIsleState`).
 Also since 0.7.1: **the MetaHuman hero** (M1 Ash / F1 Wren from the hero lab, `Content/Wildreach/Characters/Hero`)
 with **motion-matched locomotion** (`UWRHeroAnimInstance`), retargeted action clips with combat windows, sockets and
 full-body first person on the head bone; the Mixamo survivor is gone. How it's put together is under "Art" below.

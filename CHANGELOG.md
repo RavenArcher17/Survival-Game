@@ -1,5 +1,58 @@
 # Changelog
 
+## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
+
+Aaron (lane cookpass-world: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-world.md; the
+world parts of cooks/fire-frost.md 3.1-3.6). Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **World (1): the places.** Why: the Old Island had 20 POIs on its two sides (one every ~300 m against the bar's
+  150-250 m), no named sub-zones and no environmental story (grades B3-B5 in the doc).
+  - `Data/island_places.json` from `Tools/terrain/island_places.mjs`: 10 sub-zones, 15 landmarks, 26 story sites, the
+    Slag-Cairn and Inuksuk roads (24 waymarks), 177 kit POIs (13 kinds, 150 m apart, every walkable spot within 125 m
+    of a place) and the hazard spots. Positions are settled on dry, gentle ground off the heightmap, clear of arenas,
+    shrines, villages, camps and caves.
+  - Built at runtime on every machine (`UWRIslandPlaces`, the dressing's pattern; `L_Island` untouched), each place
+    once the ground under it has streamed in, a few a frame. Composed from the look kit and the packs' rocks and trees at
+    full scale, with collision where you walk or are stopped.
+  - Volcanic landmarks: the crater's permanent plume and night glow; the Bellows Stacks (three hornito chimneys that
+    breathe fire in turn on the server clock, smith vent arches at their feet); the Fallen Smith (a 50 m forge giant
+    split by frost, Rime spearheads in his skull, his hammer's haft the walkable bridge over the lava river); Glasswall
+    (an obsidian cliff with the Mirror Room ledge a geyser lifts you to); the Blue Fire (sulfur vents burning blue at
+    night, the miners' condensing pipe); the Slag Light (a beacon tower with an outside stair that burns once the Kipuka
+    shrine is kindled); the Ash Pine Kipuka (living pines, green scrub and glowmoths); the Wisp Spire.
+  - Tundra landmarks: the Tusk Gate on Rimehold's road; the Great Inuksuk pointing at the glacier; the Frozen Whaler
+    (a clinker longboat locked in a serac, lantern in the crow's nest); the Weeping Seracs; the Fox Circle Pingo; the Pale
+    Pines (no light at all); the Ice Arch over Grimjaw's den (walkable).
+  - Story sites tell the old war without words: the Plough Trench on Cinderhorn's loop, the Miners' Grave and Camp, the
+    Charred Caravan (blades pointing at the pass), the Tree-Mold Field, the Crater Stair, the Warden's Quarry, the Shard
+    Field, the Ridge Watch, the Kilnmite Hill, the Acid Pool, the Steam Ground on both sides of the south pass, Old
+    Tusker's Wallow on his loop, the Tusk Midden, the Sledge Wreck Line, the Ice-Fishing Camp, the Drowned Sledge, the
+    Pale Hunter's Camp (boots facing out, prints turning to claws), the Hunter's Blind, the Fallen Giant Pine, the
+    Glacimaw Boneyard, the Wyrm Claw Scars, the Watch Cairn, the Moulin of Voices, the Crevasse Maze.
+  - Waymark roads: slag cairns and inuksuit whose ember cups / lamp bowls light for you as you pass at night (10 min).
+  - Night: every place has a lamp, a fire or a skyline shape; lamps ease up after dusk on the clock.
+  - Sub-zones: `WRIsle::ZoneAt`; entering one shows its name (`FWRFlow::CheckZones`, not again within 2 min); each has
+    its own bed (`ambient.beds` layer `ffzone.<id>`, made from the existing recordings and marked `_standin`).
+  - Landmarks join the fill-in map and get a discovery banner with their line (`FWRPoi` kind `landmark`).
+- **World (2): micro-hazards** (`WRIslandHazards.cpp`, tuning `hazards.ff`). Why: each side had one hazard (B8).
+  Every one has at least 0.9 s of sound and a visual tell, deals its blow through `ApplyHit` on the server, and runs on
+  the server's clock (nothing replicated) except the two that react to people.
+  - Fumaroles (V4 fields, the Bellows' arches, the Steam Ground, every other sulfur vent): 1 s hiss and huff, then a 4 m
+    column, 35 and a knock-up. Geysers (the Solfatara, and Glasswall's, which leans you onto its ledge): 1 s gurgle,
+    then 16 m/s up. The acid pool: 6 a second and armour wear while you wade. Serac falls at the Weeping Seracs: 1.2 s
+    crack and snow dust, then 60 in 4 m. Katabatic gusts round the glacier bowl: 1 s howl and snow streaming downhill,
+    then a downhill shove (crouch or ice resistance halves it; `WRSkyAir::Push`).
+  - Thin ice (8 dark patches on the lakes, ringed by pressure ridges): three cracks when 300+ weight stands on it, it
+    breaks at 1.2 s (or at once under a heavy landing); inside, icy water builds frost 25 a second and you climb its
+    rim; it refreezes 90 s after it empties. Snow bridges in the Crevasse Maze drop 0.9 s after the creak and drift
+    shut after 30 s; the Rime-folk's pole line has ice bridges that hold. Both replicate through `AWRIsleState`.
+- **World (3): lava and the volcanic scrub.** Lava `hazards.lavaDps` 8 -> 20 and burn 12 -> 20 a second (an unprotected
+  survivor dies in about 4 s). The volcanic `ember_shrub` draws the charred-tree meshes at shrub size (a dead, ash-grey
+  scrub) instead of the green GV shrub; the old ash coat hung the GPU, and this needs no new material.
+- **Not done in this pass** (cooks/cookpass-world.md section 7): rivers, the steaming ford and the lava-fall need a
+  terrain rebuild; the crevasses are serac lanes on the heightfield (no landscape holes); thin ice opens onto drawn icy
+  water (no water body under the lakes); every new sound row and bed is a stand-in from existing recordings.
+
 ## Unreleased: the UI cook pass (settings, HUD, menus, controls)
 
 Aaron (lane cookpass-ui: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-ui.md; a cook

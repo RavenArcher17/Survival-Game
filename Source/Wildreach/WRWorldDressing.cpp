@@ -502,16 +502,15 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
 		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
 		// Fitted heights are the meshes' bounds, about twice their leafy part: 260 cm makes a bush of a metre or so.
-		// Ash-dusted and frosted. The GV leaves are green whatever their tint and saturation settings (the "volcanic shrubs
-		// green" note, more visible now there are many more); what recolours them is their "snow" coat, Snow Color laid
-		// over a random share of each plant, between Amount Min and Max (0..1 by default). Dark ash in the volcanic west, white
-		// in the tundra. Raising the least share (tuning world.ashCoatMin 0.85 greys nearly every volcanic shrub) looks
-		// better, but it hangs the GPU (DXGI_ERROR_DEVICE_HUNG in the virtual shadow maps' Nanite NodeAndClusterCull): 4 of 4
-		// benchmark runs in 0.4, and again in 0.7 after the 0.5.0 tessellation fix 2 of 3, while the same day's 5 runs
-		// without it were all clean. Left at the pack's 0: greying them needs another way than this coat.
-		{ TEXT("ember_shrub"), { Shrubs, FVector(0, 0, 260), 5, false, 12000, FVector::ZeroVector, true, nullptr,
-			{ { TEXT("Color"), FLinearColor(0.05f, 0.04f, 0.035f) }, { TEXT("Snow Color"), FLinearColor(0.06f, 0.05f, 0.045f) } },
-			{ { TEXT("Amount Min"), WRTune(TEXT("world.ashCoatMin"), 0.f) }, { TEXT("Amount Max"), WRTune(TEXT("world.ashCoatMax"), 1.f) } } } },
+		// The volcanic west's scrub is dead (cooks/cookpass-world.md 3.7, G22): the GV leaves stayed green whatever their
+		// tint, and greying them with their "snow" coat (world.ashCoatMin) hung the GPU in the virtual shadow maps' Nanite
+		// cull (4 of 4 benchmark runs in 0.4, 2 of 3 in 0.7). So ember_shrub draws the charred-tree meshes at shrub size
+		// instead: a leafless burnt scrub about 2 m (world.deadScrubHeight), in its own textures (no coat, no new material).
+		// Green is kept where it's real: the Ash Pine Kipuka grows its own shrubs and pines (WRIslandPlacesLook.cpp). Still
+		// a fibre harvest.
+		{ TEXT("ember_shrub"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")),
+		    Prop(TEXT("CharTreeC"), TEXT("char_tree_c_textured")), Prop(TEXT("CharTreeD"), TEXT("char_tree_d_textured")) },
+			FVector(0, 0, WRTune(TEXT("world.deadScrubHeight"), 200.f)), 8, false, 12000, FVector(6, 0, 8), true, nullptr, {}, {} } },
 		{ TEXT("snow_shrub"), { Shrubs, FVector(0, 0, 240), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.95f, 0.97f, 1.f) } },
 			{ { TEXT("Amount Min"), WRTune(TEXT("world.frostCoatMin"), 0.f) }, { TEXT("Amount Max"), 1.f } } } },

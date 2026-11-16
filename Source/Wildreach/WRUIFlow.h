@@ -117,6 +117,8 @@ private:
 
 	void CheckLevel(const class UWRPathComponent* Paths);
 	void CheckDiscoveries(const FVector& At);
+	/** Crossing into a Fire / Frost sub-zone shows its name (WRIsle; cooks/cookpass-world.md 3.2). */
+	void CheckZones(const FVector& At);
 	void CheckBosses(const FVector& At);
 	void CheckTames(const FVector& At);
 	void CheckHearths(const FVector& At);
@@ -190,6 +192,9 @@ private:
 	// memory (per player name)
 	FString MemoryFor;
 	TSet<FString> Found;
+	/** The sub-zone you were last in, and when each zone's name last showed (not again within places.zoneBannerGap s). */
+	FName LastZone;
+	TMap<FName, double> ZoneShownAt;
 	TSet<FName> Seen;
 
 	// tests

@@ -245,6 +245,8 @@ private:
 	/** A runtime land the listener stands in (WRLand), its sub-zone, and how far a planned silence (Dead calm) has fallen. */
 	FName LandBiome;
 	FName LandZone;
+	/** The Fire / Frost sub-zone the listener stands in (WRIsle::ZoneAt): its bed (layer ffzone.<zone>) over the island's. */
+	FName IsleZone;
 	float Hush = 0.f;
 	/** The Fungal caverns (cooks/biome-fungal.md 2.16): the zone the listener is in (F1 on the plateau, F2-F5 and HG under
 	 *  it), the Flue's roar on the Fall Field, and when the Fall Field was stepped onto (its 20 s planned silence). */
