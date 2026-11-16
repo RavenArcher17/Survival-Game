@@ -573,6 +573,9 @@ private:
 	FRotator SkelBaseRotation = FRotator::ZeroRotator;
 	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> TelegraphGlow;
 	UPROPERTY(Transient) TObjectPtr<class UMeshComponent> TelegraphMesh;
+	/** The overlay the wind-up glow covers (a portal boss's colouring, a tame's mutations, a raised body's grey): put
+	 *  back when the glow ends. */
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInterface> TelegraphCovered;
 	/** nightGlow: its override materials as dynamic instances, their GlowStrength following the dark (0 by day and dead). */
 	void TickNightGlow();
 	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> NightGlowMats;

@@ -955,6 +955,8 @@ void AWRCreature::StartTelegraph(EWRSwingKind Kind, float Duration)
 		const FColor C(uint8(WRTune(TEXT("telegraph.color.r"), 255.f)), uint8(WRTune(TEXT("telegraph.color.g"), 60.f)), uint8(WRTune(TEXT("telegraph.color.b"), 20.f)));
 		TelegraphGlow->SetVectorParameterValue(TEXT("Color"), FLinearColor(C));
 		TelegraphGlow->SetScalarParameterValue(TEXT("Wash"), WRTune(TEXT("telegraph.wash"), 0.35f));
+		UMaterialInterface* Covered = GlowOn->GetOverlayMaterial();
+		TelegraphCovered = Covered != TelegraphGlow ? Covered : nullptr;
 		GlowOn->SetOverlayMaterial(TelegraphGlow);
 		TelegraphMesh = GlowOn;
 	}
@@ -1029,8 +1031,11 @@ void AWRCreature::EndTelegraph()
 {
 	if (TelegraphMesh)
 	{
-		TelegraphMesh->SetOverlayMaterial(nullptr);
+		// Back to what the glow covered (its own colouring, a tame's mutations), not to nothing: clearing it wiped those
+		// looks after a creature's first attack.
+		TelegraphMesh->SetOverlayMaterial(TelegraphCovered);
 		TelegraphMesh = nullptr;
+		TelegraphCovered = nullptr;
 	}
 	if (bTelegraphPosed)
 	{

@@ -56,6 +56,13 @@ cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron a
     the hippo's box head, the elk's head carrying its antlers...). Applied over every clip in
     `FWRAnimProxy::ApplyCreatureShape`; legs never change (the feet stay planted).
   - A ridden mount's head follows its rider's view whichever pawn the controller drives.
+- **Creatures (6): looks that stay.** Why (found in the read-through): the wind-up glow cleared the mesh's overlay when
+  it ended, so the 13 creatures coloured by an overlay (portal bosses and minis on shared rigs) and every mutated tame
+  lost that look after their first attack; and a raised minion of a kind with no palette row (LATER-COOKS
+  build-biome-graveyard) kept its living hide.
+  - `StartTelegraph` keeps the overlay it covers (`TelegraphCovered`) and `EndTelegraph` puts it back.
+  - A raised body with no palette of its own gets a bone-grey wash over its hide (`UWRGraveBody::BuildLook`, tuning
+    `necromancy.raisedLook`), so every raised minion reads as dead; its threads and eyes still glow over it.
 
 ## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 

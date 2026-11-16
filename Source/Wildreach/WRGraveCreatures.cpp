@@ -302,6 +302,11 @@ void UWRGraveBody::BoneSeg(FName A, FName B, float Radius, const FLinearColor& C
 
 void UWRGraveBody::ClearLook()
 {
+	if (RaisedGrey)
+	{
+		if (USkeletalMeshComponent* Body = Skel(); Body && Body->GetOverlayMaterial() == RaisedGrey) Body->SetOverlayMaterial(nullptr);
+		RaisedGrey = nullptr;
+	}
 	for (USceneComponent* Comp : LookComps) if (Comp) Comp->DestroyComponent();
 	LookComps.Reset();
 	Groups.Reset();
@@ -399,6 +404,23 @@ void UWRGraveBody::BuildLook()
 	// A raised body (Necromancy): grave-light threads in its wounds, pale-green eyes (GY 2.17).
 	if (bRaised)
 	{
+		// A body with no palette row of its own (a Fire or Frost creature, a pack rig) keeps its living hide under the
+		// tint pass: a bone-grey wash over it instead (the tame-morph overlay, pale and darkened; tuning necromancy.raisedLook),
+		// so every raised minion reads as dead (cooks/cookpass-creatures.md, LATER-COOKS build-biome-graveyard).
+		if (TintMats.Num() == 0 && !Body->GetOverlayMaterial())
+		{
+			if (UMaterialInterface* Morph = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Creatures/M_TameMorph.M_TameMorph")))
+			{
+				RaisedGrey = UMaterialInstanceDynamic::Create(Morph, this);
+				const FWRTuning& T = FWRTuning::Get();
+				RaisedGrey->SetVectorParameterValue(TEXT("Tint"), FLinearColor(FColor(uint8(T.Num(TEXT("necromancy.raisedLook.r"), 184.f)), uint8(T.Num(TEXT("necromancy.raisedLook.g"), 178.f)), uint8(T.Num(TEXT("necromancy.raisedLook.b"), 162.f)))));
+				RaisedGrey->SetScalarParameterValue(TEXT("Pale"), T.Num(TEXT("necromancy.raisedLook.pale"), 0.7f));
+				RaisedGrey->SetScalarParameterValue(TEXT("Dark"), T.Num(TEXT("necromancy.raisedLook.dark"), 0.25f));
+				RaisedGrey->SetScalarParameterValue(TEXT("Bands"), 0.f);
+				RaisedGrey->SetScalarParameterValue(TEXT("GlowLine"), 0.f);
+				Body->SetOverlayMaterial(RaisedGrey);
+			}
+		}
 		// An ash wraith's threads burn ember-orange with sparks of ash on its back; an ice minion's are pale blue under a
 		// crust of rime.
 		const bool bAsh = Has(WRGraveFlag::Ash), bIce = Has(WRGraveFlag::Ice);

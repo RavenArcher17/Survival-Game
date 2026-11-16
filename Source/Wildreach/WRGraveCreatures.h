@@ -124,6 +124,8 @@ private:
 	TArray<FGroup> Groups;
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> LookComps;
 	UPROPERTY(Transient) TArray<TObjectPtr<UMaterialInstanceDynamic>> TintMats;
+	/** A raised body with no palette row of its own: the bone-grey wash laid over its hide (cookpass-creatures). */
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> RaisedGrey;
 	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> Glow;
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> Mound;
 	float Clock = 0.f;
