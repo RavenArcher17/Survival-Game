@@ -412,6 +412,24 @@ namespace WRIsleV
 		// A smiths' beacon on the west headland: four tapering drums of dressed basalt, a spiral stair of cantilevered
 		// steps outside, the top course fallen. Its fire-basket burns once the Kipuka's shrine is kindled.
 		const float G0 = S.Gz(0, 0) - 40.f;
+		// It stands on the headland's very edge (island_places.mjs: the tip with the most sea round it), where the rock falls
+		// away seaward: a battered footing of rough basalt from the lowest ground under the tower up to its first course,
+		// as lighthouses on rock are built, so no course hangs over air.
+		{
+			float Low = G0;
+			for (int32 k = 0; k < 16; ++k)
+			{
+				const FVector D = FRotator(0.f, 22.5f * k, 0.f).Vector() * 340.f;
+				Low = FMath::Min(Low, S.Gz(D.X, D.Y));
+			}
+			if (Low < G0)
+			{
+				const float Bottom = Low - 80.f, TopZ = G0 + 5.f;
+				S.K.Add(P.Dark.Dim(0.9f), FVector(700.f, 700.f, TopZ - Bottom), FVector(0, 0, (TopZ + Bottom) * 0.5f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+				S.K.Add(P.Dark.Dim(0.8f), FVector(780.f, 780.f, FMath::Min(120.f, TopZ - Bottom)), FVector(0, 0, Bottom + FMath::Min(60.f, (TopZ - Bottom) * 0.5f)), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+				S.Solid(FVector(0, 0, (TopZ + Bottom) * 0.5f), FVector(245.f, 245.f, (TopZ - Bottom) * 0.5f));
+			}
+		}
 		const int32 Courses = 30;
 		const float CourseH = 55.f;
 		for (int32 c = 0; c < Courses; ++c)

@@ -17,6 +17,28 @@ Compiled (editor target); not played here (Aaron tests).
   (never mistaken for your brass ones, Valheim's shared-pin rule), "Kara · Den" when zoomed in or hovered, and the same
   badges on the compass. Right-click one (pad X) for its card: Waypoint here, or **Copy to my pins**. Leaving a clan takes
   theirs off your map at once. Tuning: `ui.pins.sendSeconds`.
+- **The Fire and Frost places that were moved to "the nearest ground" are placed by what they are** (Aaron: "they need a
+  redesign so they are placed with clear intention instead of just placed wherever the nearest land is"). Why: where a
+  fire-frost.md spot was sea or cliff on the built island, the last pass took the flattest ground within a radius,
+  whatever it was. `Tools/terrain/island_places.mjs` now has site rules: each place is searched for round its design
+  spot by the landform its story needs, scored, faced by the rule, and its reason is written in its row (`why`):
+  - **The Slag Light** on the west headland's tip, the most open sea round it, at the water's edge (a battered basalt
+    footing under it where the rock falls away seaward, `WRIslandPlacesLook.cpp`); its doc spot is open sea.
+  - **The Acid Pool** in a closed pan on the Solfatara's floor (its doc spot is the ridge face); **the Miners' Grave**
+    on the line from the Blue Fire's pits to the nearest shore (they died running for it), bodies facing the sea;
+    **the Miners' Camp** on the flat lower ground below the pits, facing them.
+  - **The Ridge Watch** and **the Watch Cairn**: the crest on each side of the Spine with an unbroken sight line from the
+    tower to the north pass, 250-800 m off (the doc spots are cliffs), facing it.
+  - **The Charred Caravan** on the Slag-Cairn road (wagons burn where they travel), guards facing the pass;
+    **the Shard Field** on the apron under the steepest obsidian face, spread downhill.
+  - **The Fox Circle Pingo** on flat permafrost lowland; **the Tusk Midden** banked against a slope; **the Sledge Wreck
+    Line** 60-160 m in from the coast, pointing at it; **the Ice-Fishing Camp** on lake ice a short walk from shore;
+    **the Drowned Sledge** under lake ice, its dogs pointing at the nearest thin ice; **the Moulin** in the shelf's
+    meltwater low; **the Glacimaw Boneyard** on the flattest snow disc; **the Fallen Giant Pine** across a real
+    ravine, bank to bank, its root plate on the higher bank.
+  - Each keeps its own clear radius off every place before it; a rule that finds nothing falls back to the spot the last
+    pass settled (the tool says so; none do now). The places pinned by bosses, villages and loops keep their spots,
+    with their reason in the row.
 
 ## 0.8.0 (2026-11-16): shipping it (the boot check, the Setup in parts, a packaged game that starts, ten materials that compile)
 

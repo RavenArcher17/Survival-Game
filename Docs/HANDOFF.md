@@ -100,8 +100,11 @@ Fire and Frost have their own music sets (`explore/night/combat/mini/camp.volcan
 `sub.kilnroads|bluebelow` (`sub.<tube id>`), `layer.eruption|whiteout`); the other new lands have their own explore / night / combat, their
 boss pools are still marked stand-ins. Sources and the build: `Tools/audio/sources_cookpass.py`, `build_cookpass_audio.py`.
 Also since 0.7.1: **the Fire and Frost world cook pass** (showcase-notes cooks/cookpass-world.md). The Old Island's places
-are data: `Data/island_places.json` is made by `node Tools/terrain/island_places.mjs` (hand places in metres settled onto
-dry ground off the heightmap, the two waymark roads, the hazard spots, and ~180 kit POIs dealt so no route goes 250 m
+are data: `Data/island_places.json` is made by `node Tools/terrain/island_places.mjs` (hand places in metres; since
+answers 11-16 the ones whose fire-frost.md spot didn't fit the island are found by the landform their story needs, the
+tool's "site rules": `headland`, `hollow`, `overlook` (sight line), `onRoad`, `apron`, `lowland`, `bank`, `nearCoast`,
+`onLakeIce`, `iceLow`, `flatDisc`, `ravine`, `fleeing`, `below`; every row carries `why`. A new place picks a rule, not a
+settle radius. The rest of the file: the two waymark roads, the hazard spots, and ~180 kit POIs dealt so no route goes 250 m
 without a place). Re-run it when the island or `world.json`'s villages / shrines move. `UWRIslandPlaces`
 (WRIslandPlaces.cpp) builds every place on every machine once the ground under it streams in (no map change, no
 replication); the looks are `WRIslandPlacesLook.cpp` (Volcanic), `WRIslandPlacesLook2.cpp` (Tundra) and
