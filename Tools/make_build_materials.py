@@ -97,7 +97,7 @@ def mask(src, *chans):
     if isinstance(src, unreal.MaterialExpressionVertexColor) and "a" in chans:
         if len(chans) != 1:
             raise RuntimeError("vertex colour alpha goes alone (its main output has no alpha)")
-        e = expr(unreal.MaterialExpressionComponentMask, r=True)
+        e = expr(unreal.MaterialExpressionComponentMask, r=True, g=False, b=False, a=False)
         link(src, e, "", "A")
         return e
     e = expr(unreal.MaterialExpressionComponentMask, r="r" in chans, g="g" in chans, b="b" in chans, a="a" in chans)

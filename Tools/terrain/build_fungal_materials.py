@@ -32,7 +32,7 @@ def vparam(name, rgba):
 def pin(src, out):
     if isinstance(src, unreal.MaterialExpressionVertexColor):
         # Its main output is RGB only (UE 5.8): each channel from its own output.
-        e = expr(unreal.MaterialExpressionComponentMask, r=True)
+        e = expr(unreal.MaterialExpressionComponentMask, r=True, g=False, b=False, a=False)
         link(src, e, "", out)
         return e
     e = expr(unreal.MaterialExpressionComponentMask, r=out == "R", g=out == "G", b=out == "B", a=out == "A")
