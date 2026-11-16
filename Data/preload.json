@@ -1,6 +1,6 @@
 {
   "_comment": "Art the game loads by path the first time something appears, preloaded in the background at map start so that moment doesn't stall a frame (UWRPreloadSubsystem, Docs/PERFORMANCE.md). Every /Game/ path in the 'scan' files is preloaded (creatures' meshes, clips and materials, player bodies and held weapons), plus 'assets' (the caves, loaded when one comes within 250 m). preload_code.json is generated from the literal paths the C++ loads (node Tools/perf/scan_code_assets.mjs; re-run after adding one). Once the preload is in, every surface material it brought is drawn once behind the loading cover so its shaders compile there, not in play (UWRPerfWarmup, cooks/cookpass-performance.md).",
-  "scan": ["creatures.json", "player_art.json", "items.json", "preload_code.json"],
+  "scan": ["creatures.json", "player_art.json", "items.json", "preload_code.json", "forest_art.json"],
   "assets": [
     "/Game/Props/Caves/CaveA/cave_a.cave_a",
     "/Game/Props/Caves/CaveB/cave_b.cave_b",

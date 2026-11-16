@@ -104,6 +104,11 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	/** Build from the "instances" object of a dressing file. */
 	void Build(const TSharedPtr<class FJsonObject>& Instances);
+	/** The Ancient forest's ground layer (Data/forest_ground.json, forest_dressing.mjs; cooks/wild-answers-1116.md 4.1):
+	 *  leaf litter in the hollows, moss at every rock, stump, giant and log, wood anemone and young elder in the light,
+	 *  drawn with the Electric Dreams scans (WRForestArt) and laid on the ground's slope. Looks only: clients, not the
+	 *  server; nothing without the kit. */
+	void BuildForestGround();
 	/** Lava and ice surfaces (clients only: the server just needs the cells). */
 	void BuildHazardVisuals();
 	/** The lava flow's surface: a sheet over the landscape from FWRBiomeHazards::Flow(), in chunks (each culls alone). */

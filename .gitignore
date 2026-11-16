@@ -37,3 +37,8 @@ Plugins/*/Intermediate/
 /Content/MWLandscapeAutoMaterial/
 /Content/Atmospheric_Skybox/
 /Content/Materials_Bundle_Vol1/
+# Epic's Electric Dreams forest kit (Fab sample, ~1.9 GB of it): Tools/art/electric_dreams_forest.ps1 copies it in.
+/Content/Megascans/
+/Content/MSPresets/
+/Content/Custom/
+/Content/PhysicalMaterials/

@@ -16,6 +16,7 @@
 #include "WRFx.h"
 #include "WRForestHazards.h"   // the forest's no-felling rule round its giants (HarvestInFront)
 #include "WRTreeKit.h"         // the forest's trees, ferns and boulders (forest_* kinds)
+#include "WRForestArt.h"       // the forest drawn with the Electric Dreams scans (Data/forest_art.json)
 #include "WRLand.h"            // a cave on a runtime land (the forest's) finds its floor on the land's chunks
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -242,6 +243,7 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		if (AWRDressing* Built = InWorld.SpawnActor<AWRDressing>(AWRDressing::StaticClass(), FTransform::Identity, Params))
 		{
 			Built->Build(*Instances);
+			Built->BuildForestGround();
 			Built->BuildHazardVisuals();
 			Dressing = Built;
 			// What's been gathered away replicates through the ledger (the server's; a client may already have it).
@@ -702,6 +704,94 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			const FName Species(FK.Species);
 			// A giant's trunk or a boulder is a wall to the camera too; slimmer trunks let it through (camera.blockMinExtent).
 			const bool bBlockCamera = Species == TEXT("giant") || Species == TEXT("dead_giant") || Species == TEXT("boulder");
+			// Electric Dreams scans for this kind (WRForestArt, Data/forest_art.json; Aaron 11-16 "do the better forest"):
+			// instance i draws scan i % N, fitted to the height the generator gave it, and collides on that scan's measured
+			// capsules. The collision is the data's, so a server and a PC without the kit build the same walls; a PC without
+			// the kit draws the tree-kit look over them.
+			if (const WRForestArt::FKind* Scan = WRForestArt::Find(FK.Kind))
+			{
+				const int32 NArt = Scan->Meshes.Num();
+				const float KitH = WRTreeKit::ReferenceHeight(Species);
+				TArray<UStaticMesh*> Scans;
+				bool bAnyScan = false;
+				if (!bServer)
+				{
+					for (const WRForestArt::FMesh& M : Scan->Meshes)
+					{
+						UStaticMesh* SM = LoadObject<UStaticMesh>(nullptr, *M.Path);
+						Scans.Add(SM);
+						bAnyScan |= SM != nullptr;
+					}
+				}
+				for (int32 v = 0; v < NArt; ++v)
+				{
+					const WRForestArt::FMesh& M = Scan->Meshes[v];
+					TArray<FTransform> Drawn, KitLook;
+					Drawn.Reserve(Count / NArt + 1);
+					for (int32 i = v; i < Count; i += NArt)
+					{
+						const float S = float((*Arr)[i * 5 + 4]->AsNumber());
+						const float Yaw = float((*Arr)[i * 5 + 3]->AsNumber());
+						const FVector Ground((*Arr)[i * 5]->AsNumber(), (*Arr)[i * 5 + 1]->AsNumber(), (*Arr)[i * 5 + 2]->AsNumber());
+						Drawn.Add(WRForestArt::Place(*Scan, M, Ground, Yaw, S, KitH));
+						if (!bServer && !bAnyScan) KitLook.Emplace(FRotator(0.f, Yaw, 0.f), Ground, FVector(S));
+					}
+					if (!bServer)
+					{
+						UHierarchicalInstancedStaticMeshComponent* Part = nullptr;
+						if (UStaticMesh* SM = Scans.IsValidIndex(v) ? Scans[v] : nullptr)
+						{
+							Part = MakeMeshPart(SM, false, Scan->Cull > 0.f ? Scan->Cull : FK.Cull);
+							for (const TPair<int32, FString>& Mat : M.Materials)
+							{
+								if (UMaterialInterface* MI = LoadObject<UMaterialInterface>(nullptr, *Mat.Value)) Part->SetMaterial(Mat.Key, MI);
+							}
+							Part->SetCastShadow(Scan->bShadow);
+							Part->AddInstances(Drawn, false, true);
+						}
+						else if (!bAnyScan)
+						{
+							if (UStaticMesh* KitMesh = WRTreeKit::Mesh(this, Species, FK.FirstVariant + v % FMath::Max(1, FK.Variants)))
+							{
+								Part = MakeMeshPart(KitMesh, false, FK.Cull);
+								Part->SetCastShadow(FK.bShadow);
+								Part->AddInstances(KitLook, false, true);
+							}
+						}
+						if (Part && HK)
+						{
+							HK->Parts.Add({ Part, NArt, v });
+						}
+					}
+					if (!FK.bCollide)
+					{
+						continue;
+					}
+					for (const FWRTreeCollider& C : M.Colliders)
+					{
+						TArray<FTransform> Caps;
+						Caps.Reserve(Drawn.Num());
+						for (const FTransform& T : Drawn)
+						{
+							Caps.Add(CapsuleAt(C, T));
+						}
+						UHierarchicalInstancedStaticMeshComponent* Shape = MakePart(Cyl, FLinearColor::Black, true, FK.Cull > 0.f ? FK.Cull : 30000.f);
+						Shape->SetHiddenInGame(true);
+						Shape->SetCastShadow(false);
+						if (!bBlockCamera)
+						{
+							Shape->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+						}
+						Shape->AddInstances(Caps, false, true);
+						if (HK)
+						{
+							HK->Parts.Add({ Shape, NArt, v });
+						}
+					}
+				}
+				ForestCount += Count;
+				continue;
+			}
 			for (int32 v = 0; v < FK.Variants; ++v)
 			{
 				const int32 Variant = FK.FirstVariant + v;
@@ -827,9 +917,65 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			ForestCount += Count;
 		}
 		Total += ForestCount;
-		UE_LOG(LogWildreach, Log, TEXT("DRESSING forest: %d trees, ferns and rocks from the tree kit"), ForestCount);
+		UE_LOG(LogWildreach, Log, TEXT("DRESSING forest: %d trees, ferns and rocks (Electric Dreams scans where Data/forest_art.json has a kind, else the tree kit)"), ForestCount);
 	}
 	UE_LOG(LogWildreach, Log, TEXT("DRESSING built %d decorations (%s)"), Total, bServer ? TEXT("collision only") : TEXT("full"));
+}
+
+void AWRDressing::BuildForestGround()
+{
+	if (GetWorld()->GetNetMode() == NM_DedicatedServer || !WRBiome::IsLive(TEXT("forest")))
+	{
+		return;
+	}
+	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(TEXT("forest_ground.json"));
+	const TSharedPtr<FJsonObject>* Kinds = nullptr;
+	if (!File.IsValid() || !File->TryGetObjectField(TEXT("kinds"), Kinds))
+	{
+		return;
+	}
+	// Each row: x, y, z (cm), yaw (deg), scale, then the ground's normal x and y (x 1000; z is what's left of a unit).
+	constexpr int32 Stride = 7;
+	int32 Drawn = 0;
+	for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Kinds)->Values)
+	{
+		const WRForestArt::FKind* Art = WRForestArt::Find(KV.Key);
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Art || !KV.Value.IsValid() || !KV.Value->TryGetArray(Arr) || Arr->Num() < Stride)
+		{
+			continue;
+		}
+		const int32 Count = Arr->Num() / Stride, N = Art->Meshes.Num();
+		for (int32 v = 0; v < N; ++v)
+		{
+			const WRForestArt::FMesh& M = Art->Meshes[v];
+			UStaticMesh* SM = LoadObject<UStaticMesh>(nullptr, *M.Path);
+			if (!SM)
+			{
+				continue;   // no kit on this PC: the ground layer is the scans' alone
+			}
+			TArray<FTransform> Placed;
+			Placed.Reserve(Count / N + 1);
+			for (int32 i = v; i < Count; i += N)
+			{
+				const int32 b = i * Stride;
+				const FVector Ground((*Arr)[b]->AsNumber(), (*Arr)[b + 1]->AsNumber(), (*Arr)[b + 2]->AsNumber());
+				const float Nx = float((*Arr)[b + 5]->AsNumber()) / 1000.f, Ny = float((*Arr)[b + 6]->AsNumber()) / 1000.f;
+				const FVector Normal(Nx, Ny, FMath::Sqrt(FMath::Max(0.05f, 1.f - Nx * Nx - Ny * Ny)));
+				Placed.Add(WRForestArt::Place(*Art, M, Ground, float((*Arr)[b + 3]->AsNumber()), float((*Arr)[b + 4]->AsNumber()), 100.f, Normal));
+			}
+			UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(SM, false, Art->Cull);
+			for (const TPair<int32, FString>& Mat : M.Materials)
+			{
+				if (UMaterialInterface* MI = LoadObject<UMaterialInterface>(nullptr, *Mat.Value)) Part->SetMaterial(Mat.Key, MI);
+			}
+			Part->SetCastShadow(Art->bShadow);
+			Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Part->AddInstances(Placed, false, true);
+			Drawn += Placed.Num();
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("DRESSING forest ground: %d litter, moss and ground-cover pieces"), Drawn);
 }
 
 void AWRDressing::BuildHazardVisuals()

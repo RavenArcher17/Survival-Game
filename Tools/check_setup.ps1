@@ -65,6 +65,12 @@ foreach ($p in $packs.Keys) {
 	Check "art pack Content\$p ($n assets)" ($n -gt 0) `
 		"Add $($packs[$p]) from Fab to this project so it lands in Content\$p (exact name), or copy that folder from Raven."
 }
+# The Electric Dreams forest kit (Data/forest_art.json): optional, the Ancient forest draws its tree-kit look without it,
+# but a package built without it ships that look instead of the scans.
+$edList = (Get-Content (Join-Path $root 'Tools\art\electric_dreams_forest.json') -Raw | ConvertFrom-Json).packages
+$edHave = @($edList | Where-Object { Test-Path (Join-Path $root ('Content\' + $_.Substring(6).Replace('/', '\') + '.uasset')) }).Count
+if ($edHave -eq $edList.Count) { Write-Host "PASS  Electric Dreams forest kit ($edHave packages)" -ForegroundColor Green }
+else { Note "Electric Dreams forest kit: $edHave of $($edList.Count) packages. The forest draws its tree kit without them; to add them: Tools\art\electric_dreams_forest.ps1 -From <an Electric Dreams project> (README in the script), then its commandlet." }
 
 # Packaging crashes cooking these four Barghest pack files (no skeleton); the game never uses them.
 $bad = @('SK_BARGHEST_MANE', 'SK_BARGHEST_TAIL', 'BARGHEST_MANE_Anim', 'BARGHEST_TAIL_Anim') | ForEach-Object {

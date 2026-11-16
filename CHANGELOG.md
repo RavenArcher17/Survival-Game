@@ -39,6 +39,31 @@ Compiled (editor target); not played here (Aaron tests).
   - Each keeps its own clear radius off every place before it; a rule that finds nothing falls back to the spot the last
     pass settled (the tool says so; none do now). The places pinned by bosses, villages and loops keep their spots,
     with their reason in the row.
+- **The Ancient forest is drawn with Epic's Electric Dreams scans** (Aaron: "Yes do the better forest"). Why: the pack
+  wasn't on the desktop for 11-15's forest ground pass; it is on the laptop, so the forest now uses it, with Electric
+  Dreams' and Trails' lessons (cooks/wild-answers-1116.md 2.2):
+  - **The canopy**: oak, beech, lime and ash are the pack's eight European hornbeam scans (Nanite, wind), each "species"
+    a set of crown shapes chosen by their measured spread (oak the broadest, ash the narrowest) and its own leaf colour
+    from the hornbeam's colour variations (oak deep green, beech yellow-green, lime warm, ash plain): one real
+    oak-hornbeam wood with species tone steps (Kingdom Come 2's Bohemian woods, Tsushima's tint). Each is scaled to the
+    height the generator gave it, at most 1.75x the scan (real hornbeams reach 25-30 m; leaves stay leaf-sized).
+  - **Saplings** are the hornbeam saplings, **ferns** the lady and male fern scans, **boulders** the mossy and lichened
+    forest boulders pressed 15% into the ground (Electric Dreams' embed).
+  - **A ground layer** (new, `Data/forest_ground.json`, ~80,000 pieces laid on the slope): moss tufts round the foot of
+    every boulder, stump and giant and along both flanks of every fallen log (the contact line hidden, as Electric
+    Dreams does), leaf-litter patches under the canopy, thickest in hollows and never on a trail, and wood anemone,
+    herbs and young elder at the light gaps' rims, along the streams and in drifts on the old groves' floor.
+  - Every tree still gives wood, every fern fiber, every boulder stone; felling hides the right scan. Collision is the
+    capsules measured off each scan (`Data/forest_art.json`: trunk centre and radius from its vertices, a boulder's
+    capsule along its long axis), read by the server and every client from the data, so a PC without the kit (and a
+    dedicated server) agrees; without the kit a kind draws its old tree-kit look.
+  - The kit is 190 packages (1.6 GB) of the ~35 GB sample, copied with their paths by
+    `Tools/art/electric_dreams_forest.ps1` (git-ignored like the Fab packs; `Tools/check_setup.ps1` reports it), textures
+    capped at 2K by `Tools/art/electric_dreams_forest.py`, cooked from `/Game/Megascans`, preloaded and shader-warmed
+    behind the loading cover (`Data/preload.json` scans `forest_art.json`).
+  - Still the tree kit's: the giants and landmark trees (designed shapes), the alders leaning over the streams, holly,
+    hazel and bramble (the pack has no scan of those species at those sizes; its elder is 0.5-1.2 m, used as ground
+    cover).
 
 ## 0.8.0 (2026-11-16): shipping it (the boot check, the Setup in parts, a packaged game that starts, ten materials that compile)
 

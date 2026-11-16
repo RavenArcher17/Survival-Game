@@ -5,7 +5,8 @@
 //                                  walkways, the Hollow Root, the village and camps
 //   Art/Terrain/forest_height.r16  the ground (2 m samples from the frame's x0/y0, value = 32768 + metres * 16)
 //   Art/Terrain/island_height.r16  only to leave the strip under the Old Island's own ground alone
-// and writes the forest_* instance kinds into Data/island_dressing.json (the map's one dressing file), each
+// and writes the forest_* instance kinds into Data/island_dressing.json (the map's one dressing file), the ground layer
+// (moss, leaf litter, ground cover: section 8) into Data/forest_ground.json, and each kind's rows
 // [x cm, y cm, z cm, yaw deg, scale] where scale = the wanted height over the species' reference height in
 // Source/Wildreach/WRTreeKit.cpp (drawn and harvested by AWRDressing, Source/Wildreach/WRWorldDressing.cpp).
 // Re-running it is safe (and needed after Tools/terrain/forest.mjs): every forest_* row is removed first and the rest
@@ -480,6 +481,121 @@ for (let y = Y0; y < Y0 + (N - 1) * STEP; y += 16) for (let x = X0; x < X0 + (N 
 		if (!ground(fx, fy, 'N', 0.95)) continue;
 		put('forest_fern', fx, fy, RR(0.8, 1.6), RR(0, 360), 0, 0.05);
 	}
+}
+
+// 8. The ground layer (cooks/wild-answers-1116.md 4.1; Aaron 11-16 "do the better forest"): what covers the soil in a
+//    real old wood and in Electric Dreams' (no landscape grass: litter, moss and low plants, clustered round what
+//    feeds them, never an even carpet), drawn with the Electric Dreams scans (Data/forest_art.json) by AWRDressing::
+//    BuildForestGround and written to Data/forest_ground.json. It draws from its own random stream, so the trees above
+//    (and every saved harvest index) stay exactly as they were.
+//    - Moss: a band of tufts round the foot of every boulder, stump and standing giant, along both flanks of every
+//      fallen log, and on the stream banks (moss is where shade, wood and water meet the ground: Electric Dreams hides
+//      every contact line this way).
+//    - Leaf litter: patches under the broadleaf canopy, thickest where leaves collect: hollows (lower than the ground
+//      6 m round), the lee of trunks; thin in the meadows; never on a trail (trodden bare, the Trails look bible).
+//    - Ground cover: wood anemone, herbs and young elder at the light gaps' rims and along the streams, in clusters.
+let gseed = 77713;
+const G2 = () => { gseed = (gseed * 48271) % 2147483647; return gseed / 2147483647; };
+const GR = (a, b) => a + (b - a) * G2();
+const ground2 = { forest_moss: [], forest_leaves: [], forest_cover: [] };
+function lay(kind, x, y, scale, sinkM = 0.02) {
+	const nx = -(hAt(x + 1, y) - hAt(x - 1, y)) / 2, ny = -(hAt(x, y + 1) - hAt(x, y - 1)) / 2, n = Math.hypot(nx, ny, 1);
+	ground2[kind].push(Math.round(x * 100), Math.round(y * 100), Math.round((hAt(x, y) - sinkM) * 100), Math.round(G2() * 360), +scale.toFixed(2),
+		Math.round(nx / n * 1000), Math.round(ny / n * 1000));
+}
+// What a piece of the ground layer may lie on: the forest's living ground, off the routes, the water and the places
+// (the ferns' keep-outs: a place's floor stays its own), not on a cliff.
+const layable = (x, y, maxSlope = 0.9) => ground(x, y, 'N', maxSlope);
+// Contact moss goes right up to what it grows on (a giant's or a log's own keep-out is where it belongs), but never onto
+// a route, into the water or off the land.
+const contactOk = (x, y) => !underIsland(x, y) && LIVING.has(zoneAt(x, y)) && hAt(x, y) >= 0.8 && routeAt(x, y) >= 0.4 && riverAt(x, y) >= 0.2 && slopeAt(x, y) <= 1.2;
+// A ring of moss tufts round a foot of radius r (m): n tufts, pressed against it.
+function mossRing(x, y, r, n, s0, s1) {
+	for (let q = 0; q < n; q++) {
+		const a = (q / n + GR(-0.35, 0.35) / n) * 2 * Math.PI, rr = r * GR(0.85, 1.12);
+		const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+		if (contactOk(px, py)) lay('forest_moss', px, py, GR(s0, s1), 0.03);
+	}
+}
+// The rocks, stumps and giants as placed above (flat [x, y, z, yaw, scale] in cm).
+const each = (kind, fn) => { const a = out[kind]; for (let i = 0; i < a.length; i += 5) fn(a[i] / 100, a[i + 1] / 100, a[i + 4]); };
+// A boulder's foot is the scan it draws (instance k draws scan k % N, Data/forest_art.json, fitted to its height at most
+// maxFit x the scan): the ring hugs that rock, not the height the generator asked for.
+let artRock = null;
+try { artRock = JSON.parse(fs.readFileSync(path.join(root, 'Data', 'forest_art.json'), 'utf8')).kinds.forest_rock; } catch { artRock = null; }
+{
+	const a = out.forest_rock;
+	for (let i = 0, k = 0; i < a.length; i += 5, k++) {
+		const x = a[i] / 100, y = a[i + 1] / 100, s = a[i + 4], hM = s * REF.boulder / 100;
+		let r = Math.max(0.5, hM * 0.85);
+		if (artRock && artRock.meshes.length) {
+			const m = artRock.meshes[k % artRock.meshes.length];
+			const fit = Math.min(s * REF.boulder / m.height, artRock.maxFit || 99);
+			r = Math.max(0.35, m.width * fit / 200 * 0.9);
+		}
+		mossRing(x, y, r, Math.round(6 + r * 3), 1.2, 2.4);
+	}
+}
+each('forest_stump', (x, y, s) => { const r = Math.max(0.35, s * 0.55); mossRing(x, y, r, 6, 1.0, 1.8); });
+for (const g of F.giants) if (g.kind === 'giant' || g.kind === 'dead') mossRing(g.x, g.y, g.r * GR(1.25, 1.6), Math.round(14 + g.r * 3), 1.4, 2.6);
+for (const l of F.fallen) {
+	const [ax, ay] = l.a, [bx, by] = l.b, len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len;
+	for (let d = 1; d < len; d += 1.4) for (const sd of [-1, 1]) {
+		const off = (l.r + GR(0.05, 0.4)) * sd, px = ax + ux * d - uy * off, py = ay + uy * d + ux * off;
+		if (G2() < 0.8 && contactOk(px, py)) lay('forest_moss', px, py, GR(1.2, 2.2), 0.03);
+	}
+}
+for (let y = Y0; y < Y0 + (N - 1) * STEP; y += 3) for (let x = X0; x < X0 + (N - 1) * STEP; x += 3) {
+	const px = x + GR(0, 3), py = y + GR(0, 3), wd = riverAt(px, py);
+	if (wd < 0.3 || wd > 2.5 || zoneAt(px, py) !== '2' || G2() > 0.25) continue;
+	for (let q = 0; q < 4; q++) { const qx = px + GR(-0.6, 0.6), qy = py + GR(-0.6, 0.6); if (layable(qx, qy, 1.1)) lay('forest_moss', qx, qy, GR(1.0, 2.0), 0.03); }
+}
+// Leaf litter: a 9 m grid; the zone's share, more in hollows, a patch or two (1-1.7 m scans) at each kept point.
+const LITTER = { '1': 0.04, '2': 0.12, '3': 0.3, '4': 0.34, '5': 0.4 };
+for (let y = Y0; y < Y0 + (N - 1) * STEP; y += 9) for (let x = X0; x < X0 + (N - 1) * STEP; x += 9) {
+	const px = x + GR(0, 9), py = y + GR(0, 9), z = zoneAt(px, py);
+	let p = LITTER[z] ?? 0;
+	if (p <= 0) continue;
+	let ring = 0;
+	for (let a = 0; a < 8; a++) ring += hAt(px + Math.cos(a * 45 * DEG) * 6, py + Math.sin(a * 45 * DEG) * 6) / 8;
+	const hollowM = ring - hAt(px, py);
+	if (hollowM > 0.12) p = Math.min(0.85, p + 0.45);
+	if (G2() > p || !layable(px, py, 0.6)) continue;
+	const n = hollowM > 0.12 ? 3 : 1 + (G2() < 0.4 ? 1 : 0);
+	for (let q = 0; q < n; q++) { const qx = px + GR(-1.4, 1.4), qy = py + GR(-1.4, 1.4); if (layable(qx, qy, 0.6)) lay('forest_leaves', qx, qy, GR(0.85, 1.35), 0.01); }
+}
+// Ground cover in the light: clusters every ~14 m round each gap's rim (inside it, where the sun reaches the floor),
+// and along F2's banks.
+for (const gp of gaps) {
+	const n = Math.max(3, Math.round(2 * Math.PI * gp.r / 14));
+	for (let q = 0; q < n; q++) {
+		const a = (q / n + GR(-0.3, 0.3) / n) * 2 * Math.PI, rr = gp.r * GR(0.6, 1.02);
+		const cx = gp.x + Math.cos(a) * rr, cy = gp.y + Math.sin(a) * rr;
+		const k = 4 + Math.floor(G2() * 4);
+		for (let j = 0; j < k; j++) { const qx = cx + GR(-1.8, 1.8), qy = cy + GR(-1.8, 1.8); if (layable(qx, qy, 0.7)) lay('forest_cover', qx, qy, GR(0.9, 1.5), 0.02); }
+	}
+}
+for (let y = Y0; y < Y0 + (N - 1) * STEP; y += 7) for (let x = X0; x < X0 + (N - 1) * STEP; x += 7) {
+	const px = x + GR(0, 7), py = y + GR(0, 7), wd = riverAt(px, py);
+	if (wd < 1 || wd > 6 || zoneAt(px, py) !== '2' || G2() > 0.15) continue;
+	for (let j = 0; j < 4; j++) { const qx = px + GR(-1.5, 1.5), qy = py + GR(-1.5, 1.5); if (layable(qx, qy, 0.8)) lay('forest_cover', qx, qy, GR(0.9, 1.4), 0.02); }
+}
+// Wood anemone and herb drifts on the floor of the beech-lime groves and the old oaks (F3, F4): ancient woodland's
+// spring carpet, in drifts of 5-8 where a 12 m cell takes one.
+for (let y = Y0; y < Y0 + (N - 1) * STEP; y += 12) for (let x = X0; x < X0 + (N - 1) * STEP; x += 12) {
+	const px = x + GR(0, 12), py = y + GR(0, 12), z = zoneAt(px, py);
+	if ((z !== '3' && z !== '4') || G2() > 0.09) continue;
+	const k = 5 + Math.floor(G2() * 4);
+	for (let j = 0; j < k; j++) { const qx = px + GR(-2.2, 2.2), qy = py + GR(-2.2, 2.2); if (layable(qx, qy, 0.6)) lay('forest_cover', qx, qy, GR(0.8, 1.3), 0.02); }
+}
+{
+	const gpath = path.join(root, 'Data', 'forest_ground.json');
+	const gcounts = Object.fromEntries(Object.entries(ground2).map(([k, v]) => [k, v.length / 7]));
+	fs.writeFileSync(gpath, JSON.stringify({
+		_comment: 'Generated by Tools/terrain/forest_dressing.mjs (section 8; edit the script, not this file; cooks/wild-answers-1116.md 4.1). The Ancient forest\'s ground layer: rows of [x cm, y cm, z cm, yaw deg, scale, normal x * 1000, normal y * 1000], drawn by AWRDressing::BuildForestGround with the Electric Dreams scans in Data/forest_art.json (instance i draws scan i % N, the scan\'s own size x scale, laid on the slope). Looks only, clients only.',
+		counts: gcounts, kinds: ground2,
+	}) + '\n');
+	console.log(JSON.stringify({ ground: gcounts, groundKB: Math.round(fs.statSync(gpath).size / 1024) }));
 }
 
 // ---------------------------------------------------------------- write (the forest's kinds only; the rest stays)

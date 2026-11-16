@@ -476,6 +476,15 @@ the Rift Storm: `WRVoidHazards.*` (one replicated `AWRVoidState` per land; the e
 Unmade Place and the Descent lift: `WRVoidUnmade.*` (E prompts through `WRLandThings`: `land lift`, `land winch`,
 `land keep`). In these files keep file-scope helper names prefixed (unity builds join files).
 
+The Ancient forest is drawn with Epic's Electric Dreams scans where `Data/forest_art.json` has a kind (answers 11-16):
+oak/beech/lime/ash are the eight hornbeam scans (leaf colour per "species"), saplings the hornbeam saplings, ferns,
+mossy boulders; plus a ground layer (`Data/forest_ground.json`: moss at every foot, leaf litter in the hollows, wood
+anemone and elder in the light), all from `WRForestArt` in `AWRDressing::Build` / `BuildForestGround`. Collision is the
+data's capsules (measured off the scans by `Tools/art/electric_dreams_forest.py`), so servers and PCs without the kit
+agree; without the kit a kind draws its tree-kit look. The kit is git-ignored like the Fab packs (`Content/Megascans`,
+`MSPresets`, `Custom`, `PhysicalMaterials`; list in `Tools/art/electric_dreams_forest.json`). Re-run
+`node Tools/terrain/forest_dressing.mjs` after `forest_art.json` changes (the moss rings hug the boulder each instance draws);
+its ground layer has its own random stream, so the trees (and saved harvests) never move.
 Also since 0.7.1 (in progress): **the Ancient forest, a heightfield land** (cooks/biome-forest.md, plan
 cooks/build-biome-forest.md). Its ground is `Data/lands/forest.json` + `forest_ground.bin` from
 `node Tools/terrain/forest.mjs` (also writes `Data/forest.json`, the places contract read by `FWRForestData`), then
@@ -736,6 +745,10 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
 2. Bump `ProjectVersion` in `Config/DefaultGame.ini` (it's also the network version: different versions can't play
    together). Write `Docs/release-notes/v<ver>.md` (copy the last one's layout) and the `CHANGELOG.md` entry.
 3. Run the whole suite; rerun failures alone.
+   The PC that packages needs the Electric Dreams forest kit (`Tools\check_setup.ps1` says PASS for it): without it the
+   package ships the Ancient forest's tree-kit look. `Toolsrt\electric_dreams_forest.ps1 -From <an Electric Dreams
+   project>` copies it in (the project: Fab, "Electric Dreams Environment", Create Project in the launcher), then run
+   the commandlet the script names (caps its textures at 2K).
 4. Package into a **new** folder (a running packaged game locks its folder):
    `Tools\package.ps1 -Out C:\Dev\WildreachBuild<N> -SkipEditorBuild`, then
    `Tools\make_installer.ps1 -Build C:\Dev\WildreachBuild<N>` (makes the whole
