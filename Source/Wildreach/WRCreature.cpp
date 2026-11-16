@@ -419,6 +419,8 @@ void AWRCreature::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRCreature, WakeIn);
 	DOREPLIFETIME(AWRCreature, bAsleep);
 	DOREPLIFETIME(AWRCreature, AggroRep);
+	DOREPLIFETIME(AWRCreature, MoodRep);
+	DOREPLIFETIME(AWRCreature, WatchRep);
 	DOREPLIFETIME(AWRCreature, Rider);
 	DOREPLIFETIME(AWRCreature, BodyHitsLeft);
 	DOREPLIFETIME(AWRCreature, TameRep);
@@ -654,6 +656,7 @@ void AWRCreature::SetupCreatureAnim(const FWRCreatureDef& Def)
 	}
 	OneShotUntil = 0.0;
 	LastYaw = GetActorRotation().Yaw;
+	SetupCreatureBody(Def);   // its body language (WRCreatureBody.cpp)
 	UE_LOG(LogWildreach, Verbose, TEXT("Creature anim %s: walk %.0f run %.0f cm/s (moves at %.0f), attacks from %s"), *Def.Id.ToString(),
 		Anim->LocoSpeed(TEXT("ground"), 0, 0.f), Anim->LocoSpeed(TEXT("ground"), 1, 0.f), Def.Speed, *Upper.ToString());
 }
@@ -719,6 +722,11 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 		}
 		Anim->SetPoseLift(Lift);
 		bNuzzleLifted = NuzzleWeight > 0.01f;
+	}
+	// Its body language (head aim, flinch, pant, slump, moods, row gestures) while its pose updates.
+	if (Skel->WasRecentlyRendered(0.5f) || Skel->VisibilityBasedAnimTickOption == EVisibilityBasedAnimTickOption::AlwaysTickPose)
+	{
+		TickCreatureBody(DeltaSeconds);
 	}
 	TickCreatureFeet(DeltaSeconds);
 }
@@ -1047,6 +1055,7 @@ void AWRCreature::TickNightGlow()
 void AWRCreature::OnHitVisual(EWRHitResult Result)
 {
 	if (SealBody) SealBody->Flinch();   // the Floeback's body built in code jerks from the blow
+	if (Result == EWRHitResult::Hit) KickFlinch();   // every landed blow moves the body away from it (WRCreatureBody.cpp)
 	// A flinch when the blow broke its poise (it shudders otherwise), unless it's mid-attack or broken (or dying: the
 	// death takes over).
 	UWRAnimInstance* Anim = CreatureAnim();
@@ -2198,6 +2207,7 @@ void AWRCreature::Tick(float DeltaSeconds)
 		TickStanceSlump(DeltaSeconds);
 		TickNightGlow();
 	}
+	if (HasAuthority()) TickMoodStale();
 	if (HasAuthority() && AggroRep != AggroTarget.Get())
 	{
 		AggroRep = AggroTarget.Get();   // sound only (WRAudioDirector): the AI keeps using AggroTarget

@@ -154,6 +154,21 @@ private:
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FWROnCreatureDied, AWRCreature*);
 
+/** What a wild creature is doing, as every machine draws it and calls it (cooks/cookpass-creatures.md 3.2): the server's
+ *  wild brain sets it (AWRCreature::SetMood), MoodRep carries it. */
+enum class EWRCreatureMood : uint8
+{
+	Calm,     // going about its day (no beat)
+	Graze,    // head down, chewing, a head-up check now and then
+	Sniff,    // nose to the ground, working a scent
+	Scan,     // looking round in held stops
+	Preen,    // head to its flank
+	Wary,     // staring at someone (WatchRep), still
+	Threat,   // its display before the first charge: head low, eyes on its target
+	Flee,     // running for it
+	Eat,      // over a kill
+};
+
 UENUM()
 enum class EWRTameOrder : uint8
 {
@@ -256,6 +271,19 @@ public:
 	/** Who it's after, for every machine (the server's AggroTarget, copied as it changes): aggro calls, combat music. */
 	AActor* GetAggroRep() const { return AggroRep; }
 	UPROPERTY(Replicated) TObjectPtr<AActor> AggroRep;
+	/** Its mood and who it's watching (cookpass-creatures 3.2): set by the server's wild brain; drawn and voiced on every
+	 *  machine. A mood not refreshed for creatureAI.mood.staleSeconds falls back to Calm. */
+	UPROPERTY(Replicated) uint8 MoodRep = 0;
+	UPROPERTY(Replicated) TObjectPtr<AActor> WatchRep;
+	void SetMood(EWRCreatureMood Mood, AActor* Watch = nullptr);
+	EWRCreatureMood GetMood() const { return static_cast<EWRCreatureMood>(MoodRep); }
+	/** Server: its mood unless it was set again within the stale time (biome hooks that take the brain's turn). */
+	void TickMoodStale();
+	double MoodSetAt = 0.0;
+	/** Every machine: an attack row's coil and release over its one attack clip (cookpass-creatures 3.3). */
+	UFUNCTION(NetMulticast, Unreliable) void MulticastRowGesture(FName Motion, float Windup, int8 Side);
+	/** This one's own voice (1 +- audio.voice.spread, seeded by its kind and where it came into the world). */
+	float GetVoicePitch() const;
 
 	// --- Raids (server; WRRaids) ---
 	// A raider makes for the nearest piece of the claim it came for and bites it, and turns on anyone who comes near as
@@ -548,6 +576,39 @@ private:
 	FName HeadBone() const;
 	bool bStanceBrokenShown = false;
 	float SlumpAlpha = 0.f;
+	// The body language (WRCreatureBody.cpp, cookpass-creatures 3.1): what it looks at, its flinch, pant, slump, the
+	// mood's and the row gesture's poses, drawn into the animation instance's Input.Body.
+	void SetupCreatureBody(const struct FWRCreatureDef& Def);
+	void TickCreatureBody(float DeltaSeconds);
+	void KickFlinch();
+	FVector BodyLookAt(bool& bOutHave, float& OutSpeed);
+	struct FWRBodyLanguage
+	{
+		float LookYaw = 0.f, LookPitch = 0.f, LookAlpha = 0.f;
+		float FlinchPos[3] = { 0.f, 0.f, 0.f }, FlinchVel[3] = { 0.f, 0.f, 0.f };  // spine yaw / pitch / roll spring
+		float Exertion = 0.f;
+		float PantPhase = 0.f;
+		float Slump = 0.f;
+		float MoodBlend = 0.f;            // eases each mood's pose in and out
+		EWRCreatureMood MoodShown = EWRCreatureMood::Calm;
+		double MoodSince = 0.0;
+		float Dip = 0.f, SpinePitch = 0.f, HeadRoll = 0.f, HeadYaw = 0.f;  // the eased mood pose
+		double GlanceUntil = 0.0, NextGlanceAt = 0.0;
+		TWeakObjectPtr<AActor> GlanceAt;
+		float ScanYaw = 0.f;
+		double NextScanAt = 0.0;
+		int32 ScanStep = 0;
+		double NextCheckAt = 0.0, CheckUntil = 0.0;  // a grazer's head-up
+		FName Gesture;
+		double GestureStart = -1.0;
+		float GestureWindup = 0.f;
+		int8 GestureSide = 1;
+		float Seed = 0.f;
+		float VoicePitch = 1.f;
+		FName Head;
+		bool bReady = false;
+	};
+	FWRBodyLanguage BodyLang;
 	FVector SlumpBaseLocation = FVector::ZeroVector;
 	FRotator SlumpBaseRotation = FRotator::ZeroRotator;
 	bool bSlumpBase = false;

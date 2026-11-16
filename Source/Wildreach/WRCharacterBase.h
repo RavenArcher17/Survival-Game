@@ -155,6 +155,9 @@ public:
 	float SwingRecoveryShown = -1.f;
 	/** The flags of the hit being shown (set before OnHitVisual): its reaction level (WRFx::ReactionOf). */
 	uint16 HitFlagsShown = 0;
+	/** Where the hit being shown came from and how hard it was (set before OnHitVisual; a creature's flinch). */
+	FVector HitOriginShown = FVector::ZeroVector;
+	float HitDamageShown = 0.f;
 
 	/** Server: a sound event on this character for everyone nearby (WRSound::Broadcast: eating, equipping...). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastSound(FName Event);

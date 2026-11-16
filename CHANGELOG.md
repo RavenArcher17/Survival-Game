@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: the creature cook pass (look, animation, voice, behaviour of every built creature and boss)
+
+Aaron (lane cookpass-creatures: requirement ledger, research, grades and plan in showcase-notes
+cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **Creatures (1): body language.** Why: no creature or boss ever turned its head to anything, most blows landed on a
+  statue (the hit clip plays only on a poise break; 22 bodies have none), a creature at 5% after a long chase looked as
+  it did at 100%, and the stance-break slump was an empty function (grades G1, G5, G6 in the doc; LATER-COOKS 120, 140).
+  - Head aim on every skinned creature and boss (`WRCreatureBody.cpp` `BodyLookAt`): its target; the one it's wary of;
+    a ridden mount where its rider looks; a tame's glance at its owner; a wild one's curious glance at a survivor close
+    by. Spread 60 / 40 over neck and head, clamped (70 yaw, +35 / -40 pitch), let go behind it, eased; an attack clip
+    keeps 35% of it, bosses 60%.
+  - A flinch on every landed blow (`KickFlinch`): the spine jerks away from the side struck, up from the front, down
+    from behind, settling on an underdamped spring; scaled by the blow's share of its health, bosses x0.35.
+  - Panting after running or fighting (faster in small bodies), a wounded head below 35% health, the stance-break
+    slump (neck down, back sagging, head tilted), a dozing head, a hungry tame's low head.
+  - `FWRAnimProxy::ApplyCreatureBody` / `ApplyCreatureShape` (WRAnimInstance.cpp); tuning `anim.look`, `flinch`,
+    `pant`, `wounded`, `slump`, `hungry`, `beat`, `sleepDip`.
+
 ## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 
 Aaron (lane cookpass-world: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-world.md; the

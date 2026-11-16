@@ -194,6 +194,14 @@ creature), the **courting / cuddle nuzzle** (a head dip through the pose lift), 
 Hearth) and **Soulbond** (`FWRTaming::SoulbondIncoming` inside `ApplyHit`; `TameRep.bSoulbound / bSoulDown`). The card
 has tabs (Overview, Skills, Gear, Family, Packs; LB / RB on a pad) with real stat values and its parents.
 
+The creature cook pass (cooks/cookpass-creatures.md in showcase-notes) added **body language** over every skinned
+creature's and boss's clips: `WRCreatureBody.cpp` fills `UWRAnimInstance::Input.Body` (head aim spread over the neck
+chain, dips, the spine's flinch / pant / slump / gestures) and `FWRAnimProxy::ApplyCreatureBody` draws it after the pose
+lifts, before the feet. The chains are found by bone name (`SetupCreatureBody`: the head and its "neck" parents, then
+"spine" / "chest"). Every landed blow kicks `KickFlinch` from `HitOriginShown` / `HitDamageShown` (set in `MulticastHit`).
+Numbers in tuning `anim.look / flinch / pant / wounded / slump / hungry / beat`. A creature that should look somewhere
+new gets a case in `AWRCreature::BodyLookAt`, not a new system.
+
 Also since 0.7.1: **world systems** (`WRWorldSystems.*`, `WRWorldSites.cpp`, `WRWorldNpc.cpp`, `WRUIWorld.cpp`,
 `Data/world.json`, cooks/build-world-systems.md): `UWRWorldSystems` (server world subsystem) places the villages, shrines,
 path masters, summoning stones and hidden tubes once their ground traces to land (every data position is settled at

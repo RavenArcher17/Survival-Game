@@ -507,6 +507,7 @@ bool FWRAnimProxy::Evaluate(FPoseContext& Output)
 			Output.Pose[Bone].SetRotation((Parent.Inverse() * Step * Parent * Local).GetNormalized());
 		}
 	}
+	ApplyCreatureShape(Output.Pose);
 	// Pose lifts: each bone turned nose-up about the body's side axis (in component space), its children following.
 	const FVector Side = FVector::CrossProduct(Frame.MeshForward, FVector::UpVector).GetSafeNormal();
 	for (const TPair<FName, float>& Lift : Frame.PoseLift)
@@ -524,11 +525,112 @@ bool FWRAnimProxy::Evaluate(FPoseContext& Output)
 		const FQuat Turn(Side, FMath::DegreesToRadians(Lift.Value));
 		Output.Pose[Bone].SetRotation((Parent.Inverse() * Turn * Parent * Output.Pose[Bone].GetRotation()).GetNormalized());
 	}
+	ApplyCreatureBody(Output.Pose);
 	PostLayers(Output);
 	PlantFeet(Output.Pose);
 	PlaceCreatureFeet(Output.Pose);
 	PlaceCreatureSpine(Output.Pose);
 	return true;
+}
+
+namespace WRCreatureBodyAnim
+{
+	/** Turns a bone by Degrees about Axis (component space) on top of its pose; its children follow. */
+	void TurnInComponent(FCompactPose& Pose, FCompactPoseBoneIndex Bone, const FVector& Axis, float Degrees)
+	{
+		if (FMath::Abs(Degrees) < 0.01f)
+		{
+			return;
+		}
+		const FBoneContainer& Bones = Pose.GetBoneContainer();
+		FQuat Parent = FQuat::Identity;
+		for (FCompactPoseBoneIndex P = Bones.GetParentBoneIndex(Bone); P.GetInt() != INDEX_NONE; P = Bones.GetParentBoneIndex(P))
+		{
+			Parent = Pose[P].GetRotation() * Parent;
+		}
+		const FQuat Turn(Axis, FMath::DegreesToRadians(Degrees));
+		Pose[Bone].SetRotation((Parent.Inverse() * Turn * Parent * Pose[Bone].GetRotation()).GetNormalized());
+	}
+}
+
+void FWRAnimProxy::ApplyCreatureShape(FCompactPose& Pose) const
+{
+	// Proportions first (every clip, every layer): a bone's own scale carries everything under it; its length moves it
+	// along its offset from its parent (a longer neck keeps its thickness).
+	const FBoneContainer& Bones = Pose.GetBoneContainer();
+	for (const FWRBoneShape& S : Frame.Shape)
+	{
+		const FCompactPoseBoneIndex Bone = WRAnimDetail::CompactBone(Bones, S.Bone);
+		if (Bone.GetInt() == INDEX_NONE)
+		{
+			continue;
+		}
+		if (!FMath::IsNearlyEqual(S.Scale, 1.f))
+		{
+			Pose[Bone].SetScale3D(Pose[Bone].GetScale3D() * S.Scale);
+		}
+		if (!FMath::IsNearlyEqual(S.Length, 1.f))
+		{
+			Pose[Bone].SetTranslation(Pose[Bone].GetTranslation() * S.Length);
+		}
+	}
+}
+
+void FWRAnimProxy::ApplyCreatureBody(FCompactPose& Pose) const
+{
+	// Body language over the clips (cookpass-creatures 3.1): the spine first (its terms shared evenly), then the neck and
+	// head (the aim 60% over the neck, 40% on the head; the head alone when there's no neck), all in component space so
+	// "up" is up whatever the clip does with each bone.
+	if (Frame.BodyNeck.Num() == 0)
+	{
+		return;
+	}
+	const FWRCreatureBodyInput& B = Frame.Body;
+	const FBoneContainer& Bones = Pose.GetBoneContainer();
+	const FVector Up = FVector::UpVector;
+	const FVector Fwd = Frame.MeshForward.GetSafeNormal();
+	const FVector Side = FVector::CrossProduct(Fwd, Up).GetSafeNormal();
+	if (Side.IsNearlyZero())
+	{
+		return;
+	}
+	using WRCreatureBodyAnim::TurnInComponent;
+	TArray<FCompactPoseBoneIndex, TInlineAllocator<6>> Spine;
+	for (const FName& Name : Frame.BodySpine)
+	{
+		const FCompactPoseBoneIndex Bone = WRAnimDetail::CompactBone(Bones, Name);
+		if (Bone.GetInt() != INDEX_NONE) Spine.Add(Bone);
+	}
+	if (Spine.Num() > 0)
+	{
+		const float Share = 1.f / Spine.Num();
+		for (const FCompactPoseBoneIndex Bone : Spine)
+		{
+			TurnInComponent(Pose, Bone, Up, B.SpineYaw * Share);
+			TurnInComponent(Pose, Bone, Side, B.SpinePitch * Share);
+			TurnInComponent(Pose, Bone, Fwd, B.SpineRoll * Share);
+		}
+	}
+	TArray<FCompactPoseBoneIndex, TInlineAllocator<6>> Neck;
+	for (const FName& Name : Frame.BodyNeck)
+	{
+		const FCompactPoseBoneIndex Bone = WRAnimDetail::CompactBone(Bones, Name);
+		if (Bone.GetInt() != INDEX_NONE) Neck.Add(Bone);
+	}
+	if (Neck.Num() == 0)
+	{
+		return;
+	}
+	const float Yaw = B.LookYaw * B.LookAlpha, Pitch = B.LookPitch * B.LookAlpha + B.NeckPitch;
+	const int32 NeckBones = Neck.Num() - 1;
+	for (int32 i = 0; i < Neck.Num(); ++i)
+	{
+		const bool bHead = i == Neck.Num() - 1;
+		const float Share = NeckBones == 0 ? 1.f : bHead ? 0.4f : 0.6f / NeckBones;
+		TurnInComponent(Pose, Neck[i], Up, Yaw * Share + (bHead ? B.HeadYaw : 0.f));
+		TurnInComponent(Pose, Neck[i], Side, Pitch * Share);
+		if (bHead) TurnInComponent(Pose, Neck[i], Fwd, B.HeadRoll);
+	}
 }
 
 void FWRAnimProxy::PlantFeet(FCompactPose& Pose) const
@@ -874,6 +976,10 @@ void UWRAnimInstance::ResetSetup()
 	CreatureLegs.Reset();
 	CreatureSpine.Reset();
 	PoseLift.Reset();
+	BodyNeck.Reset();
+	BodySpine.Reset();
+	Shape.Reset();
+	Input.Body = FWRCreatureBodyInput();
 	YawOffset = 0.f;
 	bHaveYaw = false;
 	bTurning = false;
@@ -1439,6 +1545,10 @@ void UWRAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Frame.MeshForward = MeshForward;
 	Frame.PoseLift = PoseLift;
 	Frame.TurnWeight = TurnWeight;
+	Frame.Body = Input.Body;
+	Frame.BodyNeck = BodyNeck;
+	Frame.BodySpine = BodySpine;
+	Frame.Shape = Shape;
 	if (CreatureLegs.Num() > 0)
 	{
 		const FWRTuning& T = FWRTuning::Get();

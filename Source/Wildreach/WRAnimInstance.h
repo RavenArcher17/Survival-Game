@@ -95,6 +95,27 @@ struct FWRCreatureSpine
 	float Alpha = 0.f;                 // 0..1: the body lies along that ground
 };
 
+/** A creature's body language over every clip (cooks/cookpass-creatures.md 3.1), degrees, filled by its owner each
+ *  tick: the head's aim spread over the neck (60%) and head (40%), the neck's dip / lift, the head's tilt, and the spine's
+ *  gesture / flinch / pant / slump spread evenly over the spine bones. Yaw + turns right, pitch + noses up, roll + lifts
+ *  the right side. */
+struct FWRCreatureBodyInput
+{
+	float LookYaw = 0.f, LookPitch = 0.f, LookAlpha = 0.f;
+	float NeckPitch = 0.f;
+	float HeadYaw = 0.f, HeadRoll = 0.f;
+	float SpineYaw = 0.f, SpinePitch = 0.f, SpineRoll = 0.f;
+};
+
+/** A bone's proportion (cookpass-creatures 3.5): its uniform scale (it and everything under it) and its length (its
+ *  offset from its parent x Length: a longer neck or tail without a thicker one). */
+struct FWRBoneShape
+{
+	FName Bone;
+	float Scale = 1.f;
+	float Length = 1.f;
+};
+
 /** Per-tick input from the owner. */
 struct FWRAnimInput
 {
@@ -114,6 +135,7 @@ struct FWRAnimInput
 	float FootLift[2] = { 0.f, 0.f };  // cm the ground under the left / right foot sits above the capsule's bottom (slopes)
 	FWRCreatureFeet Feet;              // creatures with SetCreatureLegs: the ground under every foot
 	FWRCreatureSpine Spine;            // creatures with SetCreatureSpine: the ground under every joint
+	FWRCreatureBodyInput Body;         // creatures with SetBodyChains: head aim, dips, the spine's gestures
 };
 
 /** A clip sample for the animation thread. */
@@ -152,6 +174,11 @@ struct FWRAnimFrame
 	FVector MeshForward = FVector::ForwardVector;
 	TArray<TPair<FName, float>> PoseLift;  // bones turned nose-up (degrees, about the body's side axis) over every clip
 	float TurnWeight = 0.f;   // a turn-in-place clip's share of the locomotion (the hero blends it over motion matching)
+	// Creatures' body language and proportions (cookpass-creatures 3.1, 3.5).
+	FWRCreatureBodyInput Body;
+	TArray<FName> BodyNeck;   // the neck bones root first, the head last
+	TArray<FName> BodySpine;  // the spine bones under the neck, root first
+	TArray<FWRBoneShape> Shape;
 };
 
 struct FWRAnimProxy : public FAnimInstanceProxy
@@ -170,6 +197,9 @@ protected:
 	/** After every layer and the lifts, before the feet are planted: a subclass's last touches (the hero's proportions,
 	 *  stance, aim). */
 	virtual void PostLayers(FPoseContext& Output) {}
+	/** A creature's proportions (Frame.Shape) and body language (Frame.Body over BodyNeck / BodySpine). */
+	void ApplyCreatureShape(FCompactPose& Pose) const;
+	void ApplyCreatureBody(FCompactPose& Pose) const;
 	/** Sample and blend a weighted list into Out; false if the list is empty. */
 	bool SampleBlend(const TArray<FWRAnimSample>& Samples, FPoseContext& Out) const;
 private:
@@ -223,6 +253,11 @@ public:
 	void SetMeshForward(const FVector& Forward) { MeshForward = Forward; }
 	/** Bones turned nose-up by these degrees on top of every clip, e.g. a bought mesh whose clips hang its head low. */
 	void SetPoseLift(const TArray<TPair<FName, float>>& Lift) { PoseLift = Lift; }
+	/** A creature's neck (root first, the head last) and the spine bones under it, for Input.Body (cookpass-creatures 3.1). */
+	void SetBodyChains(const TArray<FName>& Neck, const TArray<FName>& Spine) { BodyNeck = Neck; BodySpine = Spine; }
+	bool HasBodyChains() const { return BodyNeck.Num() > 0; }
+	/** A creature's proportions: bones scaled / lengthened over every clip (creatures.json shape). */
+	void SetShape(const TArray<FWRBoneShape>& In) { Shape = In; }
 
 	/** Play a clip once. Rate 0 keeps 1. Start skips into it, Delay holds its first frame first, bHold keeps the last
 	 *  frame until the layer gets something else. Returns its play time in seconds (Delay included). */
@@ -329,6 +364,8 @@ protected:  // (UWRHeroAnimInstance builds on these)
 	TArray<FName> CreatureSpine;
 	FVector MeshForward = FVector::ForwardVector;
 	TArray<TPair<FName, float>> PoseLift;
+	TArray<FName> BodyNeck, BodySpine;
+	TArray<FWRBoneShape> Shape;
 
 	// Turn in place
 	float YawOffset = 0.f;      // degrees the legs are behind the actor's facing
