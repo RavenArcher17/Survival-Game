@@ -73,6 +73,7 @@
 #include "WorldPartition/WorldPartition.h"
 #include "WorldPartition/WorldPartitionRuntimeCell.h"
 #include "WorldPartition/WorldPartitionSubsystem.h"
+#include "WRPerf.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
@@ -260,6 +261,16 @@ TSharedRef<SWidget> WRUIFlow::MakeLoadingScreen(const TAttribute<FText>& Status,
 class SWRFlowCover : public SCompoundWidget
 {
 public:
+	/** The cover's status line: what it is waiting for (the island, the art, the shaders: WRPerf::Stage). */
+	static TAttribute<FText> WaitLine(const TWeakPtr<FWRFlow>& W)
+	{
+		return TAttribute<FText>::CreateLambda([W]()
+		{
+			const TSharedPtr<FWRFlow> F = W.Pin();
+			return F && !F->GetWaitText().IsEmpty() ? F->GetWaitText() : LOCTEXT("LoadingIsland", "Loading the island…");
+		});
+	}
+
 	SLATE_BEGIN_ARGS(SWRFlowCover) {}
 		SLATE_ARGUMENT(TWeakPtr<FWRFlow>, Flow)
 	SLATE_END_ARGS()
@@ -281,8 +292,8 @@ public:
 			// (Only the death card's places to wake take clicks.)
 			SNew(SOverlay).Visibility_Lambda([Black]() { return Black() > 0.002f ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed; })
 			+ SOverlay::Slot()[SNew(SImage).Visibility(EVisibility::HitTestInvisible).Image(WRUI::White()).ColorAndOpacity_Lambda([Black]() { return FSlateColor(FLinearColor(0.f, 0.f, 0.f, Black())); })]
-			+ SOverlay::Slot()[Fade(ArtAlpha, WRUIFlow::MakeLoadingScreen(LOCTEXT("LoadingIsland", "Loading the island…"), true))]
-			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Fade(LineAlpha, StatusLine(LOCTEXT("LoadingIsland", "Loading the island…"), 18))]
+			+ SOverlay::Slot()[Fade(ArtAlpha, WRUIFlow::MakeLoadingScreen(WaitLine(W), true))]
+			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Fade(LineAlpha, StatusLine(WaitLine(W), 18))]
 			+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Fade(CardAlpha, DeathCard(), FVector2D(0.f, 18.f * U), true)]
 		];
 	}
@@ -356,7 +367,7 @@ private:
 		const TSharedPtr<FWRFlow> F = Flow.Pin();
 		const FWRDeathNote* N = Note();
 		if (!F || !N) return FText::GetEmpty();
-		if (F->IsBack()) return LOCTEXT("WakeLoading", "Loading the island…");
+		if (F->IsBack()) return F->GetWaitText().IsEmpty() ? LOCTEXT("WakeLoading", "Loading the island…") : F->GetWaitText();
 		if (F->IsWaking()) return LOCTEXT("Waking", "Waking…");
 		const float Left = F->GetRespawnLeft();
 		if (Left > 0.f) return FText::Format(LOCTEXT("WakeIn", "Wake in {0}"), FText::AsNumber(FMath::CeilToInt(Left)));
@@ -546,7 +557,7 @@ private:
 					[
 						SNew(SHorizontalBox).Visibility_Lambda([this]() { const TSharedPtr<FWRFlow> F = Flow.Pin(); return F && F->IsBack() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRSpinner).Size(20.f * U)]
-						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(LOCTEXT("WakeLoadingLine", "Loading the island…"), Spaced(WRUI::Title(16, 600), 60), WRUI::Ink, true)]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(SWRFlowCover::WaitLine(Flow), Spaced(WRUI::Title(16, 600), 60), WRUI::Ink, true)]
 					]
 					+ SVerticalBox::Slot().FillHeight(1.f)[SNullWidget::NullWidget]
 				]
@@ -967,6 +978,8 @@ void FWRFlow::StartIslandWait(const FVector& At)
 	bStreaming = true;
 	StreamStart = WRUIMotion::Now();
 	NextStreamCheck = 0.0;
+	WaitText = FText::GetEmpty();
+	IslandInAt = -1.0;
 	UE_LOG(LogWildreach, Log, TEXT("FLOW waiting for the island at %s"), *At.ToCompactString());
 }
 
@@ -1070,12 +1083,27 @@ void FWRFlow::Tick(float DeltaTime)
 	{
 		NextStreamCheck = Now + 0.1;
 		const float Waited = float(Now - StreamStart);
-		const bool bDone = IsIslandStreamed(FocusLocation());
-		const bool bTimedOut = Waited > WRFlowUI::Tune(TEXT("streamMaxSeconds"), 15.f);
+		// The island's cells around you, then the art the preload brings and the shaders it all needs
+		// (cooks/cookpass-performance.md 3.8): what isn't ready under the cover hitches in play.
+		const bool bIsland = IsIslandStreamed(FocusLocation());
+		const bool bPerf = WRPerf::Ready(P->GetWorld());
+		WaitText = WRPerf::Stage(P->GetWorld(), bIsland);
+		const bool bDone = bIsland && bPerf;
+		if (bIsland && IslandInAt < 0.0) IslandInAt = Now;
+		// The cells get flow.streamMaxSeconds as before. Once they're in, the art and shaders get perf.readyMaxSeconds
+		// on the world's first wait (joining, the menu: the first-launch compile) and perf.rewaitMaxSeconds after
+		// (a death or a jump: only what's new there, never a long hold over background compiles).
+		const float ReadyMax = WRTune(bWaitedBefore ? TEXT("perf.rewaitMaxSeconds") : TEXT("perf.readyMaxSeconds"), bWaitedBefore ? 4.f : 30.f);
+		const bool bTimedOut = bIsland
+			? Now - IslandInAt > ReadyMax
+			: Waited > WRFlowUI::Tune(TEXT("streamMaxSeconds"), 15.f);
 		if (bDone || bTimedOut)
 		{
 			bStreaming = false;
-			UE_LOG(LogWildreach, Log, TEXT("FLOW island %s after %.1f s at %s"), bDone ? TEXT("streamed in") : TEXT("still streaming (gave up waiting)"), Waited, *FocusLocation().ToCompactString());
+			bWaitedBefore = true;
+			UE_LOG(LogWildreach, Log, TEXT("FLOW island %s after %.1f s at %s"),
+				bDone ? TEXT("streamed in, art and shaders ready") : !bIsland ? TEXT("still streaming (gave up waiting)") : *FString::Printf(TEXT("in, %d shaders / art still coming (gave up waiting)"), WRPerf::ShadersPending()),
+				Waited, *FocusLocation().ToCompactString());
 			if (Cover == ECover::Loading || (Cover == ECover::Dying && bBack))
 			{
 				bReleasing = true;
@@ -1091,6 +1119,8 @@ void FWRFlow::Tick(float DeltaTime)
 	}
 	TickCover(float(FMath::Min(Now - LastTickAt, 0.1)));
 	LastTickAt = Now;
+	// Black: shaders compile fast and boosted, and the warm-up may draw (WRPerf).
+	WRPerf::NoteCovered(Cover != ECover::None && Black > 0.5f);
 	TickMoments();
 }
 
@@ -1299,6 +1329,27 @@ void FWRFlow::TickMoments()
 	const APawn* Pawn = P->GetPawn();
 	if (!Pawn || SWRMainMenu::IsOpen() || (Cover != ECover::None && Cover != ECover::Loading)) return;
 	LoadMemory();
+	// The first launch picked the graphics levels for this computer (WRPerf): say so once, and where to change them.
+	if (Cover == ECover::None)
+	{
+		const FText Picked = WRPerf::TakeFirstRunNote();
+		if (!Picked.IsEmpty())
+		{
+			FToast T;
+			T.Over = LOCTEXT("PerfOver", "Graphics");
+			T.Title = Picked;
+			const double Card = WRPerf::CardGB();
+			FNumberFormattingOptions O;
+			O.MaximumFractionalDigits = 0;
+			T.Sub = Card > 0.0
+				? FText::Format(LOCTEXT("PerfSubCard", "Measured on this {0} GB graphics card. Change it any time in Settings, Video."), FText::AsNumber(FMath::RoundToDouble(Card), &O))
+				: LOCTEXT("PerfSub", "Measured on this computer. Change it any time in Settings, Video.");
+			T.Icon = FName(TEXT("Glyphs/check"));
+			T.Accent = WRUI::Brass;
+			T.Seconds = 9.f;
+			ShowToast(T);
+		}
+	}
 	const FVector At = Pawn->GetActorLocation();
 	// Just arrived: replicated progress is still landing, so take it as the starting point rather than news.
 	const bool bSettled = AliveSince >= 0.0 && Now - AliveSince > WRFlowUI::Tune(TEXT("settleSeconds"), 3.f) && Cover == ECover::None;

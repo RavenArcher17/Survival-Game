@@ -40,6 +40,7 @@ public class Wildreach : ModuleRules
 		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			PublicSystemLibraries.Add("bcrypt.lib");
+			PublicSystemLibraries.Add("dxgi.lib");  // graphics memory in use and its budget (WRPerf: Video page, frame time readout)
 		}
 		// The testers' god mode (WRGodAuth): the Freedom35 site's Ed25519 proofs checked with the engine's OpenSSL.
 		AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");

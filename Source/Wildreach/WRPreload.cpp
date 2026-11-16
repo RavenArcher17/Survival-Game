@@ -111,6 +111,23 @@ void UWRPreloadSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	UE_LOG(LogWildreach, Log, TEXT("PRELOAD %d assets (Data/preload.json) requested"), Count);
 }
 
+bool UWRPreloadSubsystem::IsDone() const
+{
+	// No handle: turned off, nothing to load, or not begun yet (OnWorldBeginPlay asks for it at once, so a world that
+	// has begun play without one has nothing coming).
+	const UWorld* World = GetWorld();
+	if (!Handle.IsValid()) return World && World->HasBegunPlay();
+	return Handle->HasLoadCompleted() || Handle->WasCanceled();
+}
+
+void UWRPreloadSubsystem::GetLoaded(TArray<UObject*>& Out) const
+{
+	if (Handle.IsValid() && Handle->HasLoadCompleted())
+	{
+		Handle->GetLoadedAssets(Out);
+	}
+}
+
 void UWRPreloadSubsystem::Deinitialize()
 {
 	if (Handle.IsValid())

@@ -64,6 +64,8 @@ public:
 	/** The full loading layout (title, tip) rather than just a status line. */
 	bool ShowsLoadingArt() const { return Cover == ECover::Loading && bLoadingArt; }
 	bool IsWaitingForIsland() const { return bStreaming; }
+	/** What the cover is waiting for: the island, the art, or the shaders (WRPerf::Stage). */
+	const FText& GetWaitText() const { return WaitText; }
 
 	// --- moments
 	struct FBanner
@@ -161,6 +163,10 @@ private:
 	bool bStreaming = false;
 	double StreamStart = 0.0;
 	double NextStreamCheck = 0.0;
+	FText WaitText;
+	/** When this wait found the island's cells in (-1: not yet), and whether a wait has finished in this world before. */
+	double IslandInAt = -1.0;
+	bool bWaitedBefore = false;
 	bool bBagMarker = false;
 	double BagUntil = 0.0;
 

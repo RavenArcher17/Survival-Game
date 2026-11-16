@@ -42,6 +42,7 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
+#include "WRPerf.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
 
@@ -1764,6 +1765,12 @@ namespace WRSettingsUI
 							[Set](int32 V) { if (UGameUserSettings* S = VideoSettings()) { (S->*Set)(V); S->ApplySettings(false); } }), 42.f)
 				];
 			}
+			// Graphics memory, live as levels change (Resident Evil's and Doom Eternal's meter: on an 8 GB card the
+			// levels that fit are the ones to pick). Shown, not focused: the pad moves past it.
+			Quality->AddSlot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+			[
+				SettingRow(LOCTEXT("GpuMemory", "Graphics memory"), LOCTEXT("GpuMemorySub", "In use now, of what Windows gives the game"), MemoryMeter(), 52.f)
+			];
 
 			const TArray<FText> Modes = { LOCTEXT("Fullscreen", "Fullscreen"), LOCTEXT("Borderless", "Borderless"), LOCTEXT("Windowed", "Windowed") };
 			TSharedRef<SVerticalBox> Display = SNew(SVerticalBox)
@@ -1814,9 +1821,14 @@ namespace WRSettingsUI
 						SNew(SWRSwitch, []() { const UGameUserSettings* S = VideoSettings(); return S && S->IsVSyncEnabled(); },
 							[]() { if (UGameUserSettings* S = VideoSettings()) { S->SetVSyncEnabled(!S->IsVSyncEnabled()); S->ApplySettings(false); } }), 52.f)
 				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+				[
+					SettingRow(LOCTEXT("FrameTime", "Show frame time"), LOCTEXT("FrameTimeSub", "Frame rate, CPU and GPU time, graphics memory"),
+						SNew(SWRSwitch, []() { return WRPerf::OverlayOn(); }, []() { WRPerf::SetOverlay(!WRPerf::OverlayOn()); }), 52.f)
+				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 				[
-					Muted(LOCTEXT("VideoHint", "Changes apply straight away and are kept for next time. Auto-detect picks quality levels for this computer. Motion blur and the field of view are on the Camera page; text and HUD size on Interface."), 12, true)
+					Muted(LOCTEXT("VideoHint", "Changes apply straight away and are kept for next time. Auto-detect measures this computer and keeps within its graphics memory. Motion blur and the field of view are on the Camera page; text and HUD size on Interface."), 12, true)
 				];
 
 			ChildSlot
@@ -1825,6 +1837,54 @@ namespace WRSettingsUI
 				+ SHorizontalBox::Slot().FillWidth(1.f)[Display]
 				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(28.f * U, 0.f, 0.f, 0.f)[Quality]
 			];
+		}
+
+		/** The graphics memory meter: "5.2 of 7.6 GB" over a bar, brass, then warn and bad near the budget. */
+		static TSharedRef<SWidget> MemoryMeter()
+		{
+			const float W = 200.f * U;
+			const auto Share = []() { const WRPerf::FMemory M = WRPerf::Memory(); return M.IsKnown() ? float(FMath::Clamp(M.UsedGB / M.BudgetGB, 0.0, 1.0)) : 0.f; };
+			const auto Colour = [Share]()
+			{
+				const float S = Share();
+				if (S >= WRTune(TEXT("perf.overlay.memoryDanger"), 0.95f)) return WRUI::Bad;
+				if (S >= WRTune(TEXT("perf.overlay.memoryWarn"), 0.85f)) return WRUI::Warn;
+				return WRUI::Brass;
+			};
+			const float Warn = WRTune(TEXT("perf.overlay.memoryWarn"), 0.85f);
+			return SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([]()
+						{
+							const WRPerf::FMemory M = WRPerf::Memory();
+							if (!M.IsKnown()) return LOCTEXT("GpuMemoryUnknown", "Not reported on this computer");
+							FNumberFormattingOptions O;
+							O.MinimumFractionalDigits = 1;
+							O.MaximumFractionalDigits = 1;
+							return FText::Format(LOCTEXT("GpuMemoryOf", "{0} of {1} GB"), FText::AsNumber(M.UsedGB, &O), FText::AsNumber(M.BudgetGB, &O));
+						}), WRUI::Body(13, 700), TAttribute<FSlateColor>::CreateLambda([Colour]() { return FSlateColor(WRPerf::Memory().IsKnown() ? Colour() : WRUI::Ink3); }))
+				]
+				+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 4.f * U, 0.f, 0.f)
+				[
+					SNew(SBox).WidthOverride(W).HeightOverride(6.f * U).Visibility_Lambda([]() { return WRPerf::Memory().IsKnown() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+					[
+						SNew(SOverlay)
+						+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(WRUI::Rim, 3.f, WRUI::Edge, 1.f))]
+						+ SOverlay::Slot().HAlign(HAlign_Left)
+						[
+							SNew(SBox).WidthOverride_Lambda([W, Share]() { return FOptionalSize(FMath::Max(0.f, W * Share())); })
+							[
+								SNew(SImage).Image(WRUI::White()).ColorAndOpacity_Lambda([Colour]() { return FSlateColor(Colour()); })
+							]
+						]
+						// The line to stay under.
+						+ SOverlay::Slot().HAlign(HAlign_Left).Padding(FMargin(W * Warn, 0.f, 0.f, 0.f))
+						[
+							SNew(SBox).WidthOverride(1.5f * U)[SNew(SImage).Image(WRUI::White()).ColorAndOpacity(WRUI::Alpha(WRUI::Ink2, 0.7f))]
+						]
+					]
+				];
 		}
 
 		static void StepResolution(int32 Dir)
@@ -2599,11 +2659,8 @@ namespace WRSettingsUI
 								}
 								else if (Page == TEXT("video"))
 								{
-									if (UGameUserSettings* S = VideoSettings())
-									{
-										S->RunHardwareBenchmark();
-										S->ApplyHardwareBenchmarkResults();
-									}
+									// The same pick as the first launch: the benchmark, then the graphics-memory caps.
+									WRPerf::AutoPick();
 								}
 								else if (Page == TEXT("audio"))
 								{

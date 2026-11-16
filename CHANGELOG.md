@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased: the performance cook pass (Medium on an 8 GB card, the shader cache, loading)
+
+Research, requirement ledger and plan: showcase-notes cooks/cookpass-performance.md. Compiled (editor target); not
+played or measured here (Aaron tests; `Tools\benchmark.ps1` is the before/after measure).
+
+- **The first launch picks the graphics levels for this computer.** Why: the game started on Epic everywhere until the
+  player found Auto-detect, so an 8 GB card at 1440p started on settings it can't hold. As Fortnite, Lyra and Valorant
+  do: the first time the main menu is up, the hardware benchmark picks the levels, then the card's own memory caps
+  them (Fortnite's rule; `perf.vramTiers`: under 4.5 GB textures Low and shadows / GI / effects Medium, under 6.5 GB
+  textures Medium, under 8.5 GB textures High), and a toast says so once ("Graphics set to Medium for this computer ·
+  Measured on this 8 GB graphics card. Change it any time in Settings, Video."). Someone who already chose levels
+  keeps them; bots, `-unattended` tools and the editor never trigger it (`-wrnoautoperf` too). Auto-detect on the
+  Video page runs the same pick. Only the quality levels change: the window and resolution stay. `WRPerf::AutoPick`,
+  `UWRPerfSubsystem::TickFirstRun`.
+- **The texture pool is sized to the card.** Why: the engine's Medium pool is a fixed 600 MB whatever the card (a big
+  share of a 4 GB card, needlessly blurry on a 12 GB one), and on 8 GB cards it's running out of graphics memory that
+  stutters (The Last of Us Part I, Hogwarts Legacy), not shading. `r.Streaming.PoolSize` is now the card's memory x a
+  share per texture level, kept within a range (`perf.texturePool`): an 8 GB card gets 491 / 737 / 983 / 1228 MB at
+  Low / Medium / High / Epic. Re-applied when the texture level changes. Not in the editor's own process.
+- **Graphics memory on the Video page.** Why: Resident Evil's, Doom Eternal's and Forza's meters: on an 8 GB card the
+  levels that fit are the ones to pick. A "Graphics memory" row under the quality levels: "5.2 of 7.6 GB" (this game's
+  use of the budget Windows gives it, read from DXGI) over a bar that turns amber at 85% and red at 95%, with a mark at
+  the line to stay under, live as levels change. Display only: the pad moves past it.
+- **A frame time readout** for testing Medium: Video page "Show frame time" (mouse and pad, like every switch; kept
+  between runs) or `wr.perfoverlay`. A small glass strip at the top-left edge: fps and frame ms, CPU (game thread),
+  Draw (render thread) and GPU ms, with the slowest of the three in brass so the side holding the frame back reads at a
+  glance, graphics memory (amber / red near the budget), and "shaders N" while any are compiling.
+- **Shaders compile behind the cover, not in play.**
+  - Each player's machine now remembers the pipeline states a run had to compile on the spot and precompiles them at
+    the next launch (`r.ShaderPipelineCache.SaveUserCache=1`: the engine turns it on only in Shipping builds, and ours
+    are Development).
+  - Procedural meshes (most of the game's built-at-runtime look: 62 source files) have no PSO precaching, so the first
+    frame one drew a material compiled it in play. Now, once the world's preload is in, every surface material it
+    brought is drawn once on small boxes just ahead of the camera while the cover is black, for 6 rendered frames, then
+    they go (`UWRPerfWarmup`, Unity's shader warm-up). If the cover has already lifted it's skipped, never seen.
+  - Under a black cover shader compiling runs at the fast batch size and precache requests at the highest priority; in
+    play, the background batch size (`WRPerf::NoteCovered`, Lyra's loading screen does the same).
+  - The bundled cache is set up: the cook writes stable shader keys (`NeedsShaderStableKeys=true`) and
+    `Tools\perf\pso_cache.ps1 -Build <package>` expands a `-logPSO` recording into
+    `Build/Windows/PipelineCaches/*.spc` (un-ignored in `.gitignore`), which the next package bundles. Not recorded yet
+    (it needs a package and a play session: Docs/PERFORMANCE.md has the route).
+- **The loading cover waits for the art and the shaders.** Why: it lifted as soon as the island's cells were in, so the
+  first minute after joining was where the preload (6 s) and first shader compiles landed (Lies of P and Hi-Fi Rush,
+  praised for no stutter, finish both before the reveal). It now holds until the cells are in, the preload is done,
+  the warm-up has drawn and no shaders are compiling; the cells still get `flow.streamMaxSeconds` (15), the rest up to
+  `perf.readyMaxSeconds` (30) on joining and up to `perf.rewaitMaxSeconds` (4) after a death or a long jump. Its line says what it is waiting for: "Loading the island…", "Unpacking the island's
+  creatures and gear…", "Preparing shaders for this computer… 214" (the waking line on the death screen too). The main
+  menu is above the cover, so it can be used while this runs (Call of Duty's shader step).
+- **Art the code loads by path is preloaded too.** `Tools/perf/scan_code_assets.mjs` writes `Data/preload_code.json`
+  (44 paths: build, creature, effect and terrain materials, the caves, the trees and rocks the C++ loads by literal
+  path), and preload.json scans it, so those loads no longer stall the frame that first needs one. Re-run it after
+  adding a path.
+- **Music: checked, nothing on screen.** No UI shows music (every WRUI*, HUD and player UI file searched; the breath
+  ring's 1.6 Hz pulse is a heartbeat, not the music) and nothing asks you to play to it: `UWRAudioDirector` waits for a
+  beat or bar line only to switch pieces smoothly (`WRAudioDirector.cpp` 872-948).
+- Not done here: recording the bundled PSO cache (needs a package and a play session), and measuring the pass on an
+  8 GB card (`Tools\benchmark.ps1`).
+
 ## Unreleased: Aaron's answers to the 11-15 question cards (wild-answers-1115)
 
 Aaron answered the 20-card page wildreach-questions-1115 on 11-16. The cards' full text, the requirement ledger, the

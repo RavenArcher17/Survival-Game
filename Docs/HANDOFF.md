@@ -47,6 +47,13 @@ The HUD's Full / Fade / Minimal modes are `SWRHud::TickHudMode` (WRUIHud.cpp): a
 lists there; anything that asks for action (prompts, notices, boss bars) stays out of them.
 Network failures go to the main menu's card (`SWRMainMenu::NoteFailure`, plain lines, Rejoin for a joined game);
 a crashed run's report is offered once on the next start (`WRReport::PendingCrash`, stamps in `Saved/Wildreach`).
+Performance cook pass (cooks/cookpass-performance.md): `WRPerf.cpp` owns the player's machine: the first launch's
+quality pick (benchmark + graphics-memory caps, `perf.vramTiers`; Auto-detect is the same call), the texture pool sized
+to the card (`perf.texturePool`), the Video page's graphics memory meter and the frame time readout (`wr.perfoverlay`),
+and the shader warm-up (`UWRPerfWarmup`: every surface material the preload brings drawn once behind the black cover,
+because procedural meshes get no PSO precaching). The loading cover (`FWRFlow`) now waits for `WRPerf::Ready` (preload,
+warm-up, no shaders compiling) and shows `WRPerf::Stage`. A new `LoadObject(TEXT("/Game/..."))` path: re-run
+`node Tools/perf/scan_code_assets.mjs` so it's preloaded (and warmed, if a material).
 Text boxes need nothing for the pad: A over one opens the pad keyboard (`WRUIPadKeyboard.cpp`); a screen that
 wants its own Done / Cancel calls `WRPadKeyboard::Open` with a target (the chat line does).
 The main menu's look picker previews on the menu world's own survivor (`AWRCharacter::PreviewLook`, standalone only).
@@ -726,6 +733,8 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
 4. Package into a **new** folder (a running packaged game locks its folder):
    `Tools\package.ps1 -Out C:\Dev\WildreachBuild<N> -SkipEditorBuild`, then
    `Tools\make_installer.ps1 -Build C:\Dev\WildreachBuild<N>` (makes `Wildreach-Setup.exe` there, ~1.7 GB).
+   Before a big release, refresh the bundled shader cache first (Docs/PERFORMANCE.md "PSO cache": play the package
+   with `-logPSO`, `Tools\perf\pso_cache.ps1 -Build <it>`, commit the `.spc`, package again).
 5. Test the installer on a copy, never the build folder: `Wildreach-Setup.exe --silent --nolaunch --noshortcuts --dir
    C:\Dev\WildreachTest`, then start that copy's `Wildreach.exe` and play a little (host a world, open the menus). The
    first start of a game in a new folder brings up a Windows Firewall prompt; answer it yourself.

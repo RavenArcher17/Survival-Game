@@ -26,6 +26,10 @@ public:
 
 	/** Every object path the data asks to preload (only those whose package exists). */
 	static TArray<FSoftObjectPath> CollectPaths();
+	/** The background load has finished (or there was nothing to load / it's turned off). */
+	bool IsDone() const;
+	/** What it loaded (empty until IsDone). */
+	void GetLoaded(TArray<UObject*>& Out) const;
 
 private:
 	TSharedPtr<FStreamableHandle> Handle;

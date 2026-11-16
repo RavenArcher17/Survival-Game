@@ -2,7 +2,11 @@ Binaries/
 Intermediate/
 Saved/
 DerivedDataCache/
-Build/
+Build/*
+# ...except the bundled shader pipeline cache (Tools/perf/pso_cache.ps1 writes it; the cook bundles it).
+!Build/Windows/
+Build/Windows/*
+!Build/Windows/PipelineCaches/
 .vs/
 .vscode/
 .idea/
