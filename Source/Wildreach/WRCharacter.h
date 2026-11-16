@@ -441,6 +441,9 @@ private:
 	double DodgeHeldSince = -1.0;
 	float UnderwaterBlend = 0.f;
 	bool bDiveKey = false;
+	/** God flight (WRGod): Jump held rises, the Dodge button held sinks. */
+	bool bGodRise = false;
+	bool bGodSink = false;
 	void TickDiveInput();
 	UPROPERTY(Transient) TObjectPtr<UInputAction> SprintAction;
 	UPROPERTY(Transient) TObjectPtr<UInputAction> ToggleViewAction;

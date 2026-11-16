@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased: the testers' god mode (Aaron, Raven and Colin only)
+
+Aaron 11-15: "I need to have a god mode in Wildreach so I can test everything. This is something that should only be
+available to Aaron, Raven and Colin and just for testing." (lane build-godmode: research, requirement ledger and plan in
+showcase-notes cooks/build-godmode.md). Compiled (editor target); not played here (Aaron tests).
+
+- **Who** (`WRGodAuth`, `WRGod::Challenge / ReceiveProof`). Why: god powers must exist only for Freedom35's three
+  developers, decided by their Freedom35 accounts, never by a name, a PC, a file or a flag anyone could copy. At login
+  the server sends each connection a nonce (`ClientGodChallenge`); a tester's game reads the PC link Freedom35's
+  updater already keeps (`%LOCALAPPDATA%\Freedom35\pc-link.bin`, DPAPI, the same sign-in You're the Cupcake uses: no new
+  button or code) and asks the site (`POST /api/pc/tester`, freedom35-studios `_lib/testers.js`) for a proof: an Ed25519
+  signature over the account's opaque key, the tester's first name, a hash of this PC's identity token and that nonce,
+  10 minutes. The server checks it against the public key compiled into the game (the engine's OpenSSL) and marks the
+  player a tester (`UWRGodComponent::bTester`, replicated). The allow list is the site's `game_testers` table (Aaron,
+  Raven and Colin's two accounts; `node tools/testers.mjs` there). A game not run through Freedom35 asks nothing.
+- **Everyone else**: no panel, no key (the F9 row shows only to a tester), no pad stop, no badge; `god ...` commands are
+  refused and logged (`GOD refused ...`). **The old testing commands** (`tp`, `give`, `spawn`, `hour`, every
+  `<system> dev ...`; `WRGod::IsDevCommand`) now need a verified tester in a packaged game too (until now any player's
+  console could run them); editor runs and the test scripts are unchanged.
+- **The powers** (`WRGod::Run`, every one a server command that re-checks the flag): invulnerable (blows land, no
+  health lost, death refused: `ApplyHit`, `AWRCharacterBase::Die`), endless vitals (stamina, all eleven path bars,
+  hunger, thirst; corruption and build-ups empty), one-hit kill, fly (camera pitch, Jump rises, Dive / B sinks, Sprint
+  doubles, speed x0.5-10) and pass through walls, unseen (`PickTarget`, the bosses' pick and wake), heal, clear
+  statuses, revive where you fell, kill everything within 40 m (as your kills), travel to any land, boss arena, shrine,
+  village, camp, portal, cave, pass, landmark, hidden tube or player (built by the server from the world's data) or your
+  map waypoint, spawn any of the 207 creatures and bosses (x1-10, tamed to you), any item in any amount, an armour set
+  (or its Ascendant), any recipe's result or materials, every blueprint, a builder's kit, the Hearth's tech level, any
+  path as main / subclass with points / max / unlearn, life skill levels, the hour, each land's weather, every event and
+  invasion, freeze every creature's mind, quest steps (back, complete, reset, finish) and every shrine found;
+  hitboxes and aggro lines on your screen. Seasons aren't in the game (Dream tier), so nothing shows for them.
+- **The panel** (`WRUIGod.cpp`, F9; the pad's last journal page): the stone window, seven pages (Self, Travel,
+  Creatures, Items, Progress, World, Quests), search boxes and chips, every piece a button for the pad. **The badge**: a
+  GOD tab on the left edge over every screen listing what's on; others see "GOD · <name>" over a tester's head.
+- **Just for testing**: using anything marks the character a test character for good, and world changes mark the world
+  (`Saved/Worlds/<world>/tested.json`, `UWRGodWorld`): no achievements (`Unlock`) and no kill-time records
+  (`WRRecords::Note`) from a test character. Public worlds (a dedicated server not on a `god.privatePresets` preset,
+  unless started with `-wrtestworld`) refuse god and testing commands. F8 reports carry `godMode` in their context.
+  Numbers in `tuning.json god`.
+
 ## Unreleased: the combat cook pass (the blade's real path, hit feel, bars, tells, fronts, projectiles)
 
 Aaron (lane cookpass-combat: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-combat.md).

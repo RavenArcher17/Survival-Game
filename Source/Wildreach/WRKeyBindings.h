@@ -11,6 +11,8 @@ struct FWRActionKey
 	FName Group;   // Movement, Combat, Items, Menus, Abilities
 	FKey Default;
 	FKey Key;
+	/** Shown in the controls pages only to a verified tester (the god mode's key, WRGod). */
+	bool bTesterOnly = false;
 };
 
 /** How path abilities are cast (Settings > Controls). */

@@ -1,4 +1,5 @@
 #include "WRHUD.h"
+#include "WRGod.h"
 #include "WRTuning.h"
 #include "WRPadInput.h"
 #include "WRKeyBindings.h"
@@ -480,6 +481,12 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 		}
 		// A survivor's worn title on a smaller line in pale brass under the name (WRDeeds).
 		const UWRDeedsComponent* Deeds = Other->GetPlayerState() ? UWRDeedsComponent::For(Other->GetPlayerState()) : nullptr;
+		// A tester with god mode on (WRGod): "GOD" in red-gold over the name, so nobody takes it for normal play.
+		if (const UWRGodComponent* God = bName && bPlayer ? UWRGodComponent::For(Other) : nullptr; God && God->AnyOn())
+		{
+			const bool bTitled = Deeds && !Deeds->ActiveTitle.IsEmpty();
+			DrawCentred(FString::Printf(TEXT("GOD  ·  %s"), *God->Label), FLinearColor(1.f, 0.42f, 0.18f), Screen.X, Screen.Y - (bTitled ? 62.f : 46.f), 0.72f);
+		}
 		if (bName && Deeds && !Deeds->ActiveTitle.IsEmpty())
 		{
 			DrawCentred(Other->GetDisplayLabel(), FLinearColor::White, Screen.X, Screen.Y - 45.f, 0.9f);

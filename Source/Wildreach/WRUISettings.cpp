@@ -6,6 +6,7 @@
 // Key changes save as they're made (FWRKeyBindings saves on every change), so there is no Apply step.
 
 #include "WRUISettings.h"
+#include "WRGod.h"
 #include "WRTuning.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
@@ -1187,7 +1188,7 @@ namespace WRSettingsUI
 				List->AddSlot().AutoHeight()[GroupHeader(G.Value)];
 				for (const FWRActionKey& A : FWRKeyBindings::Get().Actions())
 				{
-					if (A.Group != G.Key) continue;
+					if (A.Group != G.Key || (A.bTesterOnly && !WRGod::IsThisMachineTester())) continue;
 					const FString Id = A.Id.ToString();
 					// The wheel keys sit with the abilities; hotbar 2-8 and "previous" share a row with their first.
 					if (Id == TEXT("Wheel1") || Id == TEXT("Wheel2") || Id == TEXT("HotbarPrev") || (Id.StartsWith(TEXT("Hotbar")) && Id != TEXT("Hotbar1") && Id != TEXT("HotbarNext"))) continue;

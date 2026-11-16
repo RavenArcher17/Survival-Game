@@ -1,4 +1,5 @@
 #include "WRCharacterBase.h"
+#include "WRGod.h"
 #include "WRDesertHazards.h"
 #include "WRTidePath.h"
 #include "WRFungalHazards.h"
@@ -228,6 +229,12 @@ void AWRCharacterBase::Die(AActor* Killer)
 {
 	if (!HasAuthority() || HasTag(WRTags::State_Dead) || !AbilitySystem)
 	{
+		return;
+	}
+	// An invulnerable tester (WRGod) doesn't die of anything: whatever took the health is given back.
+	if (WRGod::IsInvulnerable(this))
+	{
+		if (const UWRAttributeSet* A = GetAttributes()) AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), A->GetEffectiveMaxHealth());
 		return;
 	}
 	WRWorld::OnKilled(this, Killer);   // quests (a kill with its status still on), before anything clears

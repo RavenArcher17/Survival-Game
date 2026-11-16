@@ -2,6 +2,7 @@
 // host. WRReport.h has the overview; the panel is WRUIReport.cpp.
 
 #include "WRReport.h"
+#include "WRGod.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -213,6 +214,9 @@ namespace WRReportDetail
 			}
 			C->SetObjectField(TEXT("player"), P);
 		}
+		// A tester's session (the god mode, WRGod): who, what's on, and whether the character / world is marked tested,
+		// so a report from it is never read as normal play.
+		if (const TSharedPtr<FJsonObject> God = WRGod::ReportContext(PC)) C->SetObjectField(TEXT("godMode"), God);
 
 		TSharedRef<FJsonObject> In = MakeShared<FJsonObject>();
 		const FWRKeyBindings& K = FWRKeyBindings::Get();

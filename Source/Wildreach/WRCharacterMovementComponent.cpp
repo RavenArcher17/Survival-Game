@@ -1,4 +1,5 @@
 #include "WRCharacterMovementComponent.h"
+#include "WRGod.h"
 #include "WROceanHazards.h"
 #include "WRVoid.h"
 #include "WRRaiding.h"
@@ -44,6 +45,11 @@ void UWRCharacterMovementComponent::BeginPlay()
 
 float UWRCharacterMovementComponent::GetMaxSpeed() const
 {
+	// A tester's god flight (WRGod; the speed replicates, so both machines agree): Sprint doubles it.
+	if (MovementMode == MOVE_Flying)
+	{
+		if (const float God = WRGod::FlySpeed(CharacterOwner); God > 0.f) return IsSprinting() ? God * 2.f : God;
+	}
 	if (IsGliding())
 	{
 		FWRGlideParams P;

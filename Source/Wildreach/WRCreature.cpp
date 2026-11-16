@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRGod.h"
 #include "WRSporePath.h"
 #include "WRNecroPath.h"
 #include "WRVoidCreatures.h"
@@ -2542,6 +2543,10 @@ AActor* AWRCreatureAI::PickTarget(AWRCreature* Self) const
 		{
 			continue;
 		}
+		if (WRGod::IsUnseen(*It))
+		{
+			continue;   // a tester's Unseen (WRGod)
+		}
 		if (FWRSocialRules::IsInSafeZone(GetWorld(), It->GetActorLocation()) || Self->HasLostSightOf(*It))
 		{
 			continue;   // (Vanish: a dodge broke its sight of you for a moment)
@@ -2597,6 +2602,15 @@ void AWRCreatureAI::Tick(float DeltaSeconds)
 		{
 			EndRow(Self, true);
 		}
+		return;
+	}
+	// The testers' god mode froze every mind (WRGod): it stands where it is, mid-step, until it's let go.
+	if (WRGod::IsAIFrozen(GetWorld()))
+	{
+		if (SpecialPhase != 0) EndSpecial(Self);
+		if (RowPhase != 0) EndRow(Self, true);
+		StopMovement();
+		Self->GetCharacterMovement()->StopMovementImmediately();
 		return;
 	}
 	if (Self->IsTestControlled())

@@ -9,6 +9,7 @@
 #include "WRPathComponent.h"
 #include "WRSurvival.h"
 #include "WRFarm.h"
+#include "WRGod.h"
 #include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -31,6 +32,7 @@ AWRPlayerState::AWRPlayerState()
 	Artifacts = CreateDefaultSubobject<UWRArtifactComponent>(TEXT("Artifacts"));
 	Deeds = CreateDefaultSubobject<UWRDeedsComponent>(TEXT("Deeds"));
 	LifeSkills = CreateDefaultSubobject<UWRLifeSkillsComponent>(TEXT("LifeSkills"));
+	God = CreateDefaultSubobject<UWRGodComponent>(TEXT("God"));
 }
 
 void AWRPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

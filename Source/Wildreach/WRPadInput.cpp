@@ -1,6 +1,7 @@
 // Controller support, the device in use and held-input isolation (WRPadInput.h has the overview).
 
 #include "WRPadInput.h"
+#include "WRGod.h"
 #include "Wildreach.h"
 #include "WRCharacter.h"
 #include "WRKeyBindings.h"
@@ -526,6 +527,13 @@ public:
 			if (K == Keys.Key(TEXT("Help")) && !WRReport::IsOpen())
 			{
 				Queue.Add([]() { WRControlsPage::Toggle(); });
+				return true;
+			}
+			// The testers' god mode panel (F9): only for a verified tester; for anyone else the key is just a key.
+			if (K == Keys.Key(TEXT("GodMode")) && W && WRGod::IsLocalTester(W) && !WRReport::IsOpen())
+			{
+				const TWeakObjectPtr<AWRPlayerController> Weak(W);
+				Queue.Add([Weak]() { if (AWRPlayerController* P = Weak.Get()) P->ToggleGod(); });
 				return true;
 			}
 			return false;

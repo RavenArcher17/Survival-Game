@@ -1136,6 +1136,33 @@ void AWRPlayerController::WRStarve() { ServerCommand(TEXT("starve")); }
 
 void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 {
+	// The testers' god mode (WRGod): "god ..." re-checks the tester flag every time; the old testing commands need a
+	// verified tester too in a packaged game (editor runs and the test scripts keep them as before). Refused: logged.
+	{
+		TArray<FString> Args;
+		Command.ParseIntoArrayWS(Args);
+		if (Args.Num() > 0 && Args[0] == TEXT("god"))
+		{
+			WRGod::Run(this, Args);
+			return;
+		}
+#if !WITH_EDITOR
+		if (WRGod::IsDevCommand(Args))
+		{
+			const FString Why = WRGod::Block(this);
+			if (!Why.IsEmpty())
+			{
+				UE_LOG(LogWildreach, Warning, TEXT("GOD refused '%s' from %s: %s"), *Command, PlayerState ? *PlayerState->GetPlayerName() : TEXT("?"), *Why);
+				return;
+			}
+			if (UWRGodWorld* GodWorld = UWRGodWorld::Get(this))
+			{
+				const UWRGodComponent* God = UWRGodComponent::For(this);
+				GodWorld->Mark(PlayerState ? PlayerState->GetPlayerName() : FString(), God ? God->Label : FString(), true);
+			}
+		}
+#endif
+	}
 #if UE_BUILD_SHIPPING
 	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
 	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
@@ -1143,6 +1170,7 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("whistle "), TEXT("hearthfeed"), TEXT("hearthrepair"),
 		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("clearcode"), TEXT("light"),
 		TEXT("world "), TEXT("mon "), TEXT("moverclock "), TEXT("mput "), TEXT("mtake"), TEXT("mrepair "), TEXT("mlink "), TEXT("msend ") };  // chat is its own RPC
+	// (god commands were taken above, each checked against the tester flag.)
 	bool bAllowed = false;
 	for (const TCHAR* Prefix : GameplayCommands)
 	{
@@ -1154,6 +1182,28 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 	}
 #endif
 	RunServerCommand(Command);
+}
+
+void AWRPlayerController::ClientGodChallenge_Implementation(const FString& Nonce)
+{
+	WRGod::OnChallenge(this, Nonce);
+}
+
+void AWRPlayerController::ServerGodProof_Implementation(const FString& Proof)
+{
+	WRGod::ReceiveProof(this, Proof.Left(2000));
+}
+
+void AWRPlayerController::ClientGodPlaces_Implementation(const TArray<FWRGodPlace>& Places)
+{
+	WRGod::ReceivePlaces(this, Places);
+}
+
+void AWRPlayerController::ToggleGod()
+{
+	// No god mode for anyone the server hasn't verified: the key, the pad stop and the screen don't exist for them.
+	if (!UI || !WRGod::IsLocalTester(this)) return;
+	OpenJournal(EWRMenu::God);
 }
 
 void AWRPlayerController::RunServerCommand(const FString& Command)

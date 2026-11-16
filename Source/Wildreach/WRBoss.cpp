@@ -1,4 +1,5 @@
 #include "WRBoss.h"
+#include "WRGod.h"
 #include "WRSporePath.h"
 #include "WRCrystalBosses.h"
 #include "WRFungalBosses.h"
@@ -752,7 +753,8 @@ AWRCharacterBase* AWRBoss::PickBossTarget() const
 	float BestDist = TNumericLimits<float>::Max();
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)
 	{
-		if (*It == this || !It->IsAlive() || !IsHostileTo(*It) || It->GetAttachParentActor() || FVector::Dist2D(It->GetActorLocation(), GetHome()) > ChaseRadius)
+		if (*It == this || !It->IsAlive() || !IsHostileTo(*It) || It->GetAttachParentActor() || FVector::Dist2D(It->GetActorLocation(), GetHome()) > ChaseRadius
+			|| WRGod::IsUnseen(*It))
 		{
 			continue;
 		}
@@ -965,6 +967,12 @@ void AWRBoss::Tick(float DeltaSeconds)
 			TickTestControl(DeltaSeconds);
 			return;
 		}
+		// The testers' god mode froze every mind (WRGod): it holds where it stands.
+		if (WRGod::IsAIFrozen(GetWorld()))
+		{
+			GetCharacterMovement()->StopMovementImmediately();
+			return;
+		}
 		CheckPhase();
 		// The arena's furniture once the ground under it has streamed in (Trails T9: nothing spawns over no ground).
 		if (!bFurnished && GetWorld()->GetTimeSeconds() >= NextFurnishTry)
@@ -1045,7 +1053,7 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 		{
 			// (Only someone it may fight: past its chase range they'd just stand it there until it reset again.)
 			if (It->IsAlive() && FVector::Dist(It->GetActorLocation(), GetActorLocation()) < Def->AggroRadius
-				&& FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
+				&& FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius && !WRGod::IsUnseen(*It))
 			{
 				Engage();
 				break;

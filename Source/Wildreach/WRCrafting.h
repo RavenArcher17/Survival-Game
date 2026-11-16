@@ -42,6 +42,7 @@ class WILDREACH_API FWRRecipeRegistry
 public:
 	static FWRRecipeRegistry& Get();
 	const FWRRecipe* Find(FName Id) const;
+	const TArray<FWRRecipe>& All() const { return Recipes; }
 	TArray<const FWRRecipe*> ForStation(FName Station) const;
 	/** Recipe that makes this item (for repair costs). */
 	const FWRRecipe* ForOutput(FName ItemId) const;

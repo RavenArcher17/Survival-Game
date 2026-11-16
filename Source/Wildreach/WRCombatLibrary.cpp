@@ -1,4 +1,5 @@
 #include "WRCombatLibrary.h"
+#include "WRGod.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
 #include "WRSunPath.h"
@@ -940,6 +941,11 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	Damage = FWRTaming::SoulbondIncoming(Target, Damage);
 	// A target that takes more than it was dealt is weak to it (bosses and the opposite element).
 	const bool bWeak = BeforeModify > 0.f && Damage > BeforeModify * 1.05f;
+
+	// The testers' god mode (WRGod): a one-hit tester's blow that got this far takes the whole of it; an invulnerable
+	// tester takes nothing (the blow still lands: guard, stagger, sparks and sounds as ever).
+	if (Attacker && Attacker != Target && WRGod::OneHitKill(Attacker)) Damage = FMath::Max(Damage, TargetAttr->GetHealth() + 1.f);
+	if (WRGod::IsInvulnerable(Target)) Damage = 0.f;
 
 	// --- Apply (a blow that takes it to zero kills it: nothing holds health at 1, COMBAT-AND-LESSONS L5) ---
 	const float NewHealth = TargetAttr->GetHealth() - Damage;

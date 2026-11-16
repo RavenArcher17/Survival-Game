@@ -4,6 +4,7 @@
 // "page" (button names in the set chosen in Settings: Xbox or PlayStation).
 
 #include "WRPadInput.h"
+#include "WRGod.h"
 #include "Wildreach.h"
 #include "WRKeyBindings.h"
 #include "WRSound.h"
@@ -190,7 +191,7 @@ namespace WRControlsUI
 				}
 				for (const FWRActionKey& A : FWRKeyBindings::Get().Actions())
 				{
-					if (A.Group != G.Id) continue;
+					if (A.Group != G.Id || (A.bTesterOnly && !WRGod::IsThisMachineTester())) continue;
 					const FString Id = A.Id.ToString();
 					if (Id.StartsWith(TEXT("Hotbar")) && Id != TEXT("Hotbar1") && Id != TEXT("HotbarNext") && Id != TEXT("HotbarPrev")) continue;
 					const FName ActionId = A.Id;

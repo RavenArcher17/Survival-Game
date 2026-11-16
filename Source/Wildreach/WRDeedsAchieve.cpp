@@ -4,6 +4,7 @@
 // Hearths, building sets, monuments, workshops, tames, machine chains, turret lines), the events that come once (a
 // boss solo or deathless, a portal cleared, a raid won), and the boss's drops (souls, trophy heads, the Heron's draught).
 #include "WRDeeds.h"
+#include "WRGod.h"
 #include "WRDeedsInternal.h"
 #include "Wildreach.h"
 #include "WRArtifacts.h"
@@ -97,6 +98,12 @@ namespace WRDeedsAch
 		UWRDeedsComponent* D = UWRDeedsComponent::For(PS);
 		const FName Id(*DStr(Row, TEXT("id")));
 		if (!D || Id.IsNone() || D->Achieved.Contains(Id)) return;
+		// A test character (it used the testers' god mode, WRGod) earns no achievements, ever.
+		if (WRGod::IsTestedCharacter(PS))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("DEEDS %s would have achieved %s: held back (a test character)"), *PS->GetPlayerName(), *Id.ToString());
+			return;
+		}
 		D->Achieved.Add(Id);
 		D->bDirty = true;
 		const FString Title = DStr(Row, TEXT("title"));
