@@ -1,4 +1,5 @@
 #include "WRSignificance.h"
+#include "WRNet.h"
 #include "Wildreach.h"
 #include "WRBoss.h"
 #include "WRCreature.h"
@@ -98,10 +99,18 @@ void UWRSignificanceSubsystem::ApplyRate(AWRCreature* Creature, bool bFar, float
 	}
 	// Nobody it could be sent to is near, so the replication pass needn't look at it every frame; it's back to the
 	// usual rate well before a player comes within the 150 m it replicates within.
-	const float NetRate = bFar ? NetRateFar : Creature->GetClass()->GetDefaultObject<AActor>()->GetNetUpdateFrequency();
+	// A tame standing still at its base with nothing to do has nothing to say 20 times a second either:
+	// net.creatureIdleHz until it moves, is hit or takes a target (ARK's idle-base load: 100 players' tames;
+	// cooks/build-wild-100players.md 3.4). Wild ones near players keep their rate, so a lunge is never late. Its row's
+	// own rate otherwise (WRNet budgets).
+	const bool bIdle = !bFar && Creature->IsTamed() && Creature->IsAlive() && !(Brain && Brain->IsPlayerController()) && Creature->GetVelocity().SizeSquared() < FMath::Square(5.f)
+		&& Creature->SinceHit() > WRTune(TEXT("net.creatureIdleAfterHitSeconds"), 10.f) && !Creature->GetAggroTarget();
+	const float NetRate = bFar ? NetRateFar : bIdle ? FMath::Min(WRNet::BaseRate(Creature), FMath::Max(1.f, WRTune(TEXT("net.creatureIdleHz"), 4.f))) : WRNet::BaseRate(Creature);
 	if (Creature->GetIsReplicated() && NetRate > 0.f && !FMath::IsNearlyEqual(Creature->GetNetUpdateFrequency(), NetRate))
 	{
+		const bool bFaster = NetRate > Creature->GetNetUpdateFrequency();
 		Creature->SetNetUpdateFrequency(NetRate);
+		if (bFaster) Creature->ForceNetUpdate();   // its first step out of idle goes now, not at the slow rate's next turn
 	}
 }
 

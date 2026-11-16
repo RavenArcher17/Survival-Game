@@ -37,6 +37,8 @@ public class Wildreach : ModuleRules
 
 		// The world store (WRStore): SQLite through the engine's SQLiteCore plugin; the identity key's random bytes (WRIdentity).
 		PrivateDependencyModuleNames.Add("SQLiteCore");
+		// 100 players on a dedicated server: the Replication Graph (WRNetGraph; cooks/build-wild-100players.md 3.2).
+		PrivateDependencyModuleNames.Add("ReplicationGraph");
 		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			PublicSystemLibraries.Add("bcrypt.lib");

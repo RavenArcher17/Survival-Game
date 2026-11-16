@@ -133,6 +133,9 @@ private:
 	static FString CardTitle;
 	static bool bCanRejoin;
 	static int32 RejoinTries;     // tries in this run of Rejoin presses / countdowns
+	/** The world was full and the card holds a place in its queue (cooks/build-wild-100players.md 3.6): it asks again
+	 *  every net.queue.retrySeconds with no limit, until it gets in or the player leaves the queue. */
+	static bool bQueued;
 	static double RejoinFirstAt;
 	static double LastRejoinAt;
 	static double NextRejoinAt;   // > 0: a countdown to the next try

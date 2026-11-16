@@ -45,6 +45,13 @@ public:
 	/** Each biome's weather (UWRWeatherSubsystem rolls it on the server; every machine draws and hears it). */
 	UPROPERTY(Replicated) TArray<FWRWeatherNow> Weather;
 
+	/** How many may play here at once (WRAccess::Cap; 0 when this game runs no world), whether it's a dedicated
+	 *  server, and how many wait in its queue: the players list's header and the host's cap stepper
+	 *  (cooks/build-wild-100players.md 3.7). Set by WRAccess::Publish. */
+	UPROPERTY(Replicated) int32 PlayerCap = 0;
+	UPROPERTY(Replicated) bool bDedicatedWorld = false;
+	UPROPERTY(Replicated) int32 Waiting = 0;
+
 	/** The world's game state, or null (e.g. before it exists). */
 	static const AWRGameState* Get(const UObject* WorldContext);
 	/** Convenience for code that only needs the time: 12 / false when there's no game state yet. */

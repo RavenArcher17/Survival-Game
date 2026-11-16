@@ -47,6 +47,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/LocalPlayer.h"
 #include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -89,10 +90,10 @@ void AWRGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 	// Who may come in (cooks/cookpass-multiplayer.md 3.4): access.json's cap, password, admins and bans. The engine's own
 	// cap is the same number (PreLogin refuses first, with the reason).
 	WRAccess::LoadCurrent();
-	if (GameSession && !WRWorlds::Current().IsEmpty())
-	{
-		GameSession->MaxPlayers = FMath::Clamp(WRAccess::Current().MaxPlayers, WRAccess::MinPlayers(), WRAccess::MaxPlayersLimit(IsRunningDedicatedServer()));
-	}
+	// The cap (cooks/build-wild-100players.md 3.1): -MaxPlayers= / ?MaxPlayers= for this run, else access.json's, else
+	// 100 on a dedicated server and 8 on a listen world; the engine's own cap leaves room for the admins' slots.
+	WRAccess::ReadCapOverride(Options);
+	WRAccess::Publish(GetWorld());
 	UE_LOG(LogWildreach, Log, TEXT("WORLD %s"), Id.IsEmpty() ? TEXT("none (the menu's island: nothing is loaded or saved)") : *FString::Printf(TEXT("'%s' (Saved/Worlds/%s), preset %s"), *Id, *Id, *FWRTuning::Get().GetPreset()));
 }
 
@@ -122,15 +123,40 @@ void AWRGameMode::PreLogin(const FString& Options, const FString& Address, const
 			return;
 		}
 	}
+	const FString Name = UGameplayStatics::ParseOption(Options, TEXT("WRName")).Left(24);
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (ErrorMessage.IsEmpty())
+	{
+		FString Type, Id;
+		WRGameModeIdentity::Platform(UniqueId, Type, Id);
+		ErrorMessage = WRIdentity::Check(Name, UGameplayStatics::ParseOption(Options, TEXT("WRKey")).Left(64), Type, Id);
+	}
+	// Turned away after all: the slot WRAccess held for them goes back.
 	if (!ErrorMessage.IsEmpty())
 	{
-		return;
+		WRAccess::Arrived(Name);
 	}
-	FString Type, Id;
-	WRGameModeIdentity::Platform(UniqueId, Type, Id);
+}
+
+APlayerController* AWRGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
 	const FString Name = UGameplayStatics::ParseOption(Options, TEXT("WRName")).Left(24);
-	ErrorMessage = WRIdentity::Check(Name, UGameplayStatics::ParseOption(Options, TEXT("WRKey")).Left(64), Type, Id);
+	// A joiner (not a listen host's own player) whose held slot lapsed while they loaded, into a world that filled
+	// meanwhile, goes back to the queue rather than past the cap (cooks/build-wild-100players.md 3.6).
+	if (NewPlayer && !NewPlayer->IsA<ULocalPlayer>())
+	{
+		ErrorMessage = WRAccess::CheckArrival(Name, GetNumPlayers());
+		if (!ErrorMessage.IsEmpty())
+		{
+			return nullptr;
+		}
+	}
+	APlayerController* PC = Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId, ErrorMessage);
+	if (PC)
+	{
+		WRAccess::Arrived(Name);
+	}
+	return PC;
 }
 
 FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
@@ -221,8 +247,12 @@ void AWRGameMode::BeginPlay()
 		GetWorldTimerManager().SetTimer(RaidTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { WRRaids::Step(GetWorld()); }),
 			FMath::Max(0.25f, WRTune(TEXT("raid.stepSeconds"), 2.f)), true);
 	}
-	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveAllPlayers(true); }), 10.f, true);
-	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SaveWorld(); WRStore::Tick(); }), 60.f, true);
+	// Saves spread out (cooks/build-wild-100players.md 3.8): a few players every second, the world in slices.
+	GetWorldTimerManager().SetTimer(AutosaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { AutosaveStep(); }), 1.f, true);
+	GetWorldTimerManager().SetTimer(WorldSaveTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { BeginSlicedWorldSave(); WRStore::Tick(); }), 60.f, true);
+	// The cap and the queue on the game state (the players list), and the engine's cap, kept current.
+	WRAccess::Publish(GetWorld());
+	GetWorldTimerManager().SetTimer(AccessTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { WRAccess::Publish(GetWorld()); }), 2.f, true);
 	// Player raiding: code breakers at work, the raid record kept (WRRaiding).
 	GetWorldTimerManager().SetTimer(RaidingTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { FWRRaiding::Step(GetWorld()); }), 1.f, true);
 	GetWorldTimerManager().SetTimer(UndergroundTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { RescueUnderground(); }), 1.f, true);
@@ -360,24 +390,86 @@ FString AWRGameMode::WorldSavePath() const
 	return Dir.IsEmpty() ? FString() : FPaths::Combine(Dir, TEXT("world.json"));
 }
 
+bool AWRGameMode::ShouldSavePiece(const AWRBuildPiece* Piece)
+{
+	// (A stronghold's pieces are its own: they're rebuilt from Data/strongholds.json and its "strongholds" document.)
+	return Piece && !Piece->bGhost && !Piece->IsActorBeingDestroyed() && !FWRStrongholds::IsHoldPiece(Piece);
+}
+
 void AWRGameMode::SaveWorld()
 {
 	if (WorldSavePath().IsEmpty())
 	{
 		return;
 	}
-	CountPlayTime();
-	// A death's belongings wait through a clean restart (cooks/cookpass-multiplayer.md 3.5).
-	AWRLootBag::SaveNow(GetWorld(), true);
+	// Whole, now: a sliced save in flight is dropped (this one has everything it would have).
+	bSliceSaving = false;
+	SliceList.Reset();
+	SlicePieces.Reset();
 	TArray<TSharedPtr<FJsonValue>> Pieces;
 	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
 	{
-		// (A stronghold's pieces are its own: they're rebuilt from Data/strongholds.json and its "strongholds" document.)
-		if (!It->bGhost && !It->IsActorBeingDestroyed() && !FWRStrongholds::IsHoldPiece(*It))
+		if (ShouldSavePiece(*It))
 		{
 			Pieces.Add(MakeShared<FJsonValueObject>(It->ToJson()));
 		}
 	}
+	FinishWorldSave(MoveTemp(Pieces));
+}
+
+void AWRGameMode::BeginSlicedWorldSave()
+{
+	if (WorldSavePath().IsEmpty() || bSliceSaving)
+	{
+		return;
+	}
+	bSliceSaving = true;
+	SliceCursor = 0;
+	SliceList.Reset();
+	SlicePieces.Reset();
+	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
+	{
+		SliceList.Add(*It);
+	}
+	SlicePieces.Reserve(SliceList.Num());
+	StepSlicedWorldSave();
+}
+
+void AWRGameMode::StepSlicedWorldSave()
+{
+	if (!bSliceSaving)
+	{
+		return;
+	}
+	// A piece gone since the list was taken is skipped; one placed since goes into the next save.
+	const int32 PerFrame = FMath::Max(50, FMath::RoundToInt(WRTune(TEXT("net.save.piecesPerFrame"), 1500.f)));
+	int32 Done = 0;
+	while (SliceCursor < SliceList.Num() && Done < PerFrame)
+	{
+		const AWRBuildPiece* Piece = SliceList[SliceCursor++].Get();
+		if (ShouldSavePiece(Piece))
+		{
+			SlicePieces.Add(MakeShared<FJsonValueObject>(Piece->ToJson()));
+			++Done;
+		}
+	}
+	if (SliceCursor < SliceList.Num())
+	{
+		GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]() { StepSlicedWorldSave(); }));
+		return;
+	}
+	bSliceSaving = false;
+	SliceList.Reset();
+	FinishWorldSave(MoveTemp(SlicePieces));
+	SlicePieces.Reset();
+}
+
+void AWRGameMode::FinishWorldSave(TArray<TSharedPtr<FJsonValue>>&& Pieces)
+{
+	CountPlayTime();
+	// A death's belongings wait through a clean restart (cooks/cookpass-multiplayer.md 3.5).
+	AWRLootBag::SaveNow(GetWorld(), true);
+	const int32 NumPieces = Pieces.Num();
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("version"), 1);
 	Root->SetArrayField(TEXT("pieces"), Pieces);
@@ -427,7 +519,7 @@ void AWRGameMode::SaveWorld()
 	FWRRaiding::Save();
 	FWRSiege::Save(GetWorld());
 	UWRStrongholdSubsystem::Save(GetWorld());
-	UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
+	UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), NumPieces);
 	WRWildlife::Save(GetWorld());
 }
 
@@ -697,6 +789,24 @@ void AWRGameMode::LoadPlayer(AWRPlayerState* PS)
 	}
 }
 
+void AWRGameMode::AutosaveStep()
+{
+	if (!GameState || GameState->PlayerArray.Num() == 0)
+	{
+		return;
+	}
+	// Each player every playerEverySeconds as before, but a share of them each second: at 100 that's 10 a second,
+	// not 100 in one frame.
+	const TArray<TObjectPtr<APlayerState>>& All = GameState->PlayerArray;
+	const int32 Every = FMath::Max(1, FMath::RoundToInt(WRTune(TEXT("net.save.playerEverySeconds"), 10.f)));
+	const int32 Count = FMath::Min(All.Num(), FMath::DivideAndRoundUp(All.Num(), Every));
+	for (int32 i = 0; i < Count; ++i)
+	{
+		AutosaveCursor = AutosaveCursor % All.Num();
+		SavePlayer(Cast<AWRPlayerState>(All[AutosaveCursor++]));
+	}
+}
+
 void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
 {
 	if (!GameState)
@@ -714,6 +824,30 @@ void AWRGameMode::SaveAllPlayers(bool bOnlyDirty)
 	}
 }
 
+namespace WRGameModeArrivals
+{
+	/**
+	 * "Mira is back / left" (cooks/cookpass-multiplayer.md 3.4): to everyone in a small world; past
+	 * net.arrivalsToAllUpTo players only to her clan and the world's admins, or 100 players' comings and goings
+	 * would be all the chat there is (cooks/build-wild-100players.md 3.7).
+	 */
+	void Tell(UWorld* World, const AWRPlayerState* Who, const FString& Line, const AController* Except)
+	{
+		const AGameStateBase* GS = World ? World->GetGameState() : nullptr;
+		if (!GS) return;
+		const bool bAll = GS->PlayerArray.Num() <= FMath::RoundToInt(WRTune(TEXT("net.arrivalsToAllUpTo"), 24.f));
+		const FString Clan = Who ? Who->ClanName : FString();
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
+			if (!Other || Other == Except) continue;
+			const AWRPlayerState* OtherPS = Other->GetPlayerState<AWRPlayerState>();
+			const bool bTheirs = OtherPS && (OtherPS->AccessRole > 0 || (!Clan.IsEmpty() && OtherPS->ClanName == Clan));
+			if (bAll || bTheirs) Other->ClientChat(FString(), Line, WRChat::System);
+		}
+	}
+}
+
 void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
@@ -726,12 +860,9 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 	if (PS && !WRWorlds::Current().IsEmpty())
 	{
 		const FString Line = PS->bNewToWorld ? FString::Printf(TEXT("%s washed ashore"), *PS->GetPlayerName()) : FString::Printf(TEXT("%s is back"), *PS->GetPlayerName());
-		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-		{
-			AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
-			if (Other && Other != NewPlayer) Other->ClientChat(FString(), Line, WRChat::System);
-		}
+		WRGameModeArrivals::Tell(GetWorld(), PS, Line, NewPlayer);
 	}
+	WRAccess::Publish(GetWorld());
 	WRBeds::Refresh(PS);
 	FWRRaiding::PlayerJoined(Cast<AWRPlayerController>(NewPlayer));
 	// The testers' god mode: this connection's nonce; a tester's game answers with the Freedom35 site's proof (WRGod).
@@ -750,16 +881,13 @@ void AWRGameMode::Logout(AController* Exiting)
 		// The others hear it (not while the whole world is closing).
 		if (!GetWorld()->bIsTearingDown && !WRWorlds::Current().IsEmpty())
 		{
-			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-			{
-				AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
-				if (Other && Other != Exiting) Other->ClientChat(FString(), FString::Printf(TEXT("%s left"), *LeftPS->GetPlayerName()), WRChat::System);
-			}
+			WRGameModeArrivals::Tell(GetWorld(), Cast<AWRPlayerState>(LeftPS), FString::Printf(TEXT("%s left"), *LeftPS->GetPlayerName()), Exiting);
 		}
 	}
 	WRStore::Flush(false);   // a leaving character is committed now, not at the next batch
 	Super::Logout(Exiting);
 	CountPlayTime(Exiting);
+	if (!GetWorld()->bIsTearingDown) WRAccess::Publish(GetWorld());
 }
 
 AActor* AWRGameMode::ChoosePlayerStart_Implementation(AController* Player)

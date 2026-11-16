@@ -98,6 +98,31 @@ that picks their modelled look (`WRLootLook`); a death's bags are saved in the w
 Wake points: beds, the player's clan's unbroken Hearths (`WRBeds` HearthsFor / SpotByHearth; kind "hearth"), camps,
 shrine-stones. A claim's name is its totem piece's `CustomName` (`AWRClaimTotem::ClaimName`). A world's backups can be
 restored from the menu (`WRStore::RestoreBackup`), never while it runs.
+**100 players on a server** (lane build-wild-100players; cooks/build-wild-100players.md in showcase-notes): a dedicated
+server's cap defaults to 100 (`net.dedicatedDefaultPlayers`; `-MaxPlayers=N` for one run; `admin cap N` or the host's
+stepper on the Clan tab while it runs, saved with `capSet` in access.json); listen worlds stay 2-16. Dedicated servers
+run the Replication Graph (`UWRReplicationGraph`, `WRNetGraph.cpp`, made by `WRNet::InstallGraphFactory`;
+`net.graph.mode` dedicated/always/off, `-wrrepgraph=on|off`): a 100 m grid, always-relevant list, per-connection
+owner-only actors, and a people node (your own player state every frame, people within 150 m every frame, the rest
+every 2 s; portal fold rosters). Rules for new code: an actor's route is read on the replication frame after it spawns,
+so set `bAlwaysRelevant` / cull distance during spawn or `BeginPlay`; change a cull distance later with `WRNet::SetCull`
+(rate changes through `SetNetUpdateFrequency` reach the graph by themselves); don't override `IsNetRelevantFor` (the
+graph doesn't call it: add a node). Per-class budgets are `net.classes` rows (`WRNet::BudgetFor/ApplyBudget`).
+Build pieces, loot bags, resource nodes, rubble and laid eggs **doze** (`DORM_DormantAll`): the server's watcher
+(`UWRNetSubsystem`) compares their replicated fields every 0.25 s and wakes them on a change, so writing a field is
+enough; call `WRNet::Wake(Actor)` where a change must show this frame (doors, damage do) and `WRNet::KeepAwake(Actor,
+bool)` for a stretch of per-frame change (a tracking turret). Server effects (`WRFx::Broadcast/BroadcastOn`) go to the
+players within `net.fxHearM` (`AWRPlayerController::ClientFxAt/On`), not to everyone. A full world queues joiners
+(`WRAccess::Refuse` answers `QUEUE|pos|waiting|playing|cap`; the menu card keeps the place and asks every 8 s); a slot
+is held for a joiner while they load (`net.queue.holdSeconds`), admins skip the queue into 2 extra slots. Autosave
+saves a share of the players each second; the 60 s world save is sliced (`net.save.piecesPerFrame`); shutdown and the
+admin's save are whole (`SaveWorld`). The server logs `NET <players>, <clients>, graph routes N actors, N dozing (N
+woke this minute), frame N ms` once a minute: that's the line to read on a full server.
+**Limits (not measured: no agent tests):** ~2.5 MB/s (20 Mbit/s) up from the server at 100 typical, up to 10 MB/s in a
+crowd (each client is capped at 100 KB/s): 100 needs a rented or wired box, not a home line. A dedicated server still
+runs as the editor binary with `-server` (`Source/WildreachServer.Target.cs` is ready for a source-built engine). All
+100 in one 150 m fight sends every player state every frame to everyone and saturates the clients' 100 KB/s. Creature
+brains aren't capped in total: 100 players spread out wake more wildlife sites.
 Also in 0.8.0: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

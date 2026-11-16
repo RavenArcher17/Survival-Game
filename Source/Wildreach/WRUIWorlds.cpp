@@ -581,11 +581,11 @@ namespace WRWorldsUI
 				HostRow(LOCTEXT("HostPlayers", "Players"), LOCTEXT("HostPlayersSub", "The most who can be in this world at once, you included. Tuned for 4 to 8."),
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(48.f * U)[SNew(SWRButton).Ghost(true).FontSize(16).MinHeight(40.f * U).Text(FText::FromString(TEXT("\u2212")))
-						.OnClicked_Lambda([A]() { A->MaxPlayers = FMath::Max(WRAccess::MinPlayers(), A->MaxPlayers - 1); return FReply::Handled(); })]]
+						.OnClicked_Lambda([A]() { A->MaxPlayers = FMath::Max(WRAccess::MinPlayers(), A->MaxPlayers - 1); A->bCapSet = true; return FReply::Handled(); })]]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).WidthOverride(64.f * U).HAlign(HAlign_Center)
 						[WRUI::Text(TAttribute<FText>::CreateLambda([A]() { return FText::AsNumber(A->MaxPlayers); }), WRUI::Title(20), WRUI::Ink)]]
 					+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(48.f * U)[SNew(SWRButton).Ghost(true).FontSize(16).MinHeight(40.f * U).Text(FText::FromString(TEXT("+")))
-						.OnClicked_Lambda([A]() { A->MaxPlayers = FMath::Min(WRAccess::MaxPlayersLimit(false), A->MaxPlayers + 1); return FReply::Handled(); })]])
+						.OnClicked_Lambda([A]() { A->MaxPlayers = FMath::Min(WRAccess::MaxPlayersLimit(false), A->MaxPlayers + 1); A->bCapSet = true; return FReply::Handled(); })]])
 			];
 			// Password: set, change or remove (only its salted hash is kept).
 			Rows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)

@@ -17,6 +17,8 @@ public:
 	/** Refuses a join whose name belongs to someone else on this world (WRIdentity: the name's key or platform account). */
 	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal) override;
+	/** A joiner whose held slot lapsed while they loaded, into a world that has filled meanwhile, waits in the queue (WRAccess). */
+	virtual APlayerController* Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -37,11 +39,17 @@ public:
 	void SavePlayer(class AWRPlayerState* PS);
 	void LoadPlayer(class AWRPlayerState* PS);
 	void SaveAllPlayers(bool bOnlyDirty);
+	/** The autosave's turn (every second): the players whose turn it is, round robin, so each is saved every
+	 *  net.save.playerEverySeconds and never all in one frame (cooks/build-wild-100players.md 3.8). */
+	void AutosaveStep();
 	/** "" when this game runs no world (the menu's island). */
 	static FString PlayerSavePath(const FString& PlayerName);
 
-	/** Everything players have built in this world, in Saved/Worlds/<world>/world.json (also counts its play time). */
+	/** Everything players have built in this world, in Saved/Worlds/<world>/world.json (also counts its play time).
+	 *  Now, whole (shutdown, the admin's save, a sliced save in flight is dropped for this one). */
 	void SaveWorld();
+	/** The periodic save, sliced: net.save.piecesPerFrame pieces a frame into JSON, then the rest and the write. */
+	void BeginSlicedWorldSave();
 	void LoadWorld();
 	FString WorldSavePath() const;
 
@@ -65,6 +73,18 @@ private:
 	FTimerHandle RaidTimer;
 	FTimerHandle RaidingTimer;
 	FTimerHandle RoamingBossTimer;
+	FTimerHandle AccessTimer;
+	/** The autosave's place in the player list. */
+	int32 AutosaveCursor = 0;
+	/** The sliced world save in flight. */
+	bool bSliceSaving = false;
+	int32 SliceCursor = 0;
+	TArray<TWeakObjectPtr<class AWRBuildPiece>> SliceList;
+	TArray<TSharedPtr<class FJsonValue>> SlicePieces;
+	void StepSlicedWorldSave();
+	/** Tames, eggs, the clock and the other documents with these pieces, then the write. */
+	void FinishWorldSave(TArray<TSharedPtr<class FJsonValue>>&& Pieces);
+	static bool ShouldSavePiece(const class AWRBuildPiece* Piece);
 	/** The roaming minis: when each may come out again, and which have been out this session. */
 	void StepRoamingBosses();
 	TMap<FName, double> RoamingBossBack;

@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### 100 players on a server (lane build-wild-100players; cooks/build-wild-100players.md in showcase-notes)
+
+Compiled (editor target, no warnings); not played or load-tested here (Aaron tests). No map or asset change.
+
+- **A dedicated server takes up to 100 players.** Why: Aaron 11-16 (after talking to Raven): "Up to 100 players at a
+  time in a server." The default cap on a dedicated server is 100 (was 32); `-MaxPlayers=N` sets it for one run, and
+  the host (or a Freedom35 moderator) changes it while the world runs with `admin cap N` or the - / + on the Clan tab
+  (lower than the players in sends nobody away: new joins wait). Old access.json files that only held the old default
+  come up at 100. Listen worlds stay 2-16 (default 8): a home PC uploads to everyone and draws its own game.
+- **Replication built for 100** (research in the cook doc: Fortnite's Replication Graph, Rust's network grid, ARK's and
+  Conan's per-actor relevancy and save freezes, DayZ's login queue). Dedicated servers run a **Replication Graph**: a
+  100 m grid, so each player's connection only looks at the cells near them; the always-relevant things (game and
+  world states, Hearths, claim totems) in one list; and a **people node**: your own player state every frame, people
+  within 150 m every frame (their health bars), everyone else's every 2 s (the players list). The 100 Hz player
+  state to 100 players every frame was the wall. Listen servers keep the engine's own replication (`net.graph.mode`,
+  `-wrrepgraph=on|off`).
+- **Budgets per kind of thing, as data** (`net.classes`): players 60 Hz out to 250 m, creatures 20 Hz / 150 m, bosses
+  300 m, projectiles 30 Hz / 200 m, siege engines, the garrison. **Build pieces, loot bags, resource nodes, rubble and
+  eggs doze**: sent once, then nothing until one of their fields changes (the server's watcher looks at each every
+  0.25 s); doors and blows go out the same frame, a tracking turret stays awake while its head turns. **Idle tames**
+  at a base drop to 4 updates a second until they move, are hit or take a target.
+- **Effects only reach the players near them** (200 m): every spark used to go to every player on the map.
+- **A full world has a queue.** The joiner's card says "You're 3rd in the queue (5 waiting; 100 of 100 playing). Your
+  place is kept while this card is open." and asks again every 8 s, with Leave the queue / Try now (mouse, keys, pad).
+  A freed slot goes to the first in line; a place lapses after 30 s without a try; at most 200 wait. A slot is held for
+  each joiner while they load, so a crowd arriving at once can't push 99 past 100. The world's admins skip the queue
+  into 2 extra places.
+- **The players list at 100** (Clan tab, right): "Players in this game 37 / 100" (and how many wait, for the host and
+  admins), a search box (name or clan), Everyone / My clan / Staff, your clanmates first, then the host and admins,
+  then by name, in its own scroll; someone coming or going redraws only the list. "Clanmates share" moved to the left.
+  Past 24 players, "Mira is back / left" goes only to her clan and the admins.
+- **Saves don't hitch at 100**: the autosave saves a tenth of the players each second (each still every 10 s; it used
+  to save everyone in one frame), and the minute's world save turns 1,500 pieces a frame into its document.
+- The server logs one `NET` line a minute (players, routed actors, dozing, woken, frame time) to measure a full server.
+- Not finished: nothing was measured (no load test); the limits are estimates written in HANDOFF (about 20 Mbit/s up
+  at 100, a rented box rather than a home line). A packaged dedicated server still needs Unreal built from source
+  (`Source/WildreachServer.Target.cs` added for it); today a dedicated server runs as the editor with `-server`.
+
 ### The NPC strongholds as Elden Ring forts, with a garrison in three tiers (lane build-wild-strongholds; cooks/build-wild-strongholds.md in showcase-notes)
 
 Compiled (editor target); not played here (Aaron tests). The fort layout data was regenerated

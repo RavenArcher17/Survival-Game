@@ -121,7 +121,28 @@
     "_comment": "Server rewind (COMBAT-AND-LESSONS 1.17; cooks/build-combat-core.md 3.4): every character's body is kept for history s at sampleHz. A player's swing and crit are judged against bodies where that player saw them (its ping / 2 + interpSeconds, at most rewindMax). A creature's or boss's blow on a remote player waits up to its ping + interp (at most rewindMax) for the defence it pressed when it saw the blow.",
     "rewindMax": 0.25, "interpSeconds": 0.1, "history": 1.0, "sampleHz": 30,
     "_players": "How many can be in a world at once (WRAccess; cooks/cookpass-multiplayer.md 3.4): a listen world's host sets listenMinPlayers..listenMaxPlayers on the Hosting page (listenDefaultPlayers until then), a dedicated server up to dedicatedMaxPlayers (dedicatedDefaultPlayers until its access.json says).",
-    "listenMinPlayers": 2, "listenMaxPlayers": 16, "listenDefaultPlayers": 8, "dedicatedDefaultPlayers": 32, "dedicatedMaxPlayers": 100
+    "listenMinPlayers": 2, "listenMaxPlayers": 16, "listenDefaultPlayers": 8, "dedicatedDefaultPlayers": 100, "dedicatedMaxPlayers": 100,
+    "_scale": "100 players on a server (cooks/build-wild-100players.md). graph: the Replication Graph (WRNetGraph): mode dedicated (dedicated servers only; the default), always, off (-wrrepgraph=on|off on the server's command line wins); cellM its grid cells; biasM how far from the origin the grid starts; peopleNearM other players' states every frame when their body is this near you, else each one every farPeopleSeconds. classes: per-class budgets (WRNet; a row matches the class and its subclasses, the nearest wins; a field left out, or a value the instance set in code, is kept): hz NetUpdateFrequency, minHz, cullM net cull distance, priority, doze = dormant between changes (the watcher looks at each one every doze.checkSeconds, at most doze.perFrame a frame, and wakes it when a replicated field changed). creatureIdleHz: a creature standing still with no target, not hit for creatureIdleAfterHitSeconds. fxHearM: server effects go to the players this near. arrivalsToAllUpTo: 'X is back / left' goes to everyone up to this many players, above it to their clan and the admins. queue: a full world's waiting line (WRAccess): holdSeconds a slot is held for a joiner while they load in, staleSeconds a waiting place is kept between tries, retrySeconds how often the joiner's game tries, maxWaiting the longest line, adminSlots how many admins may come in past the cap. save: playerEverySeconds each player's autosave (spread round robin), piecesPerFrame the sliced world save.",
+    "graph": { "mode": "dedicated", "cellM": 100, "biasM": 60000, "peopleNearM": 150, "farPeopleSeconds": 2.0 },
+    "classes": {
+      "WRCharacter":   { "hz": 60, "cullM": 250, "priority": 3 },
+      "WRGarrison":    { "hz": 20, "cullM": 250, "priority": 2 },
+      "WRCreature":    { "hz": 20, "cullM": 150, "priority": 2 },
+      "WRBoss":        { "hz": 30, "cullM": 300, "priority": 3 },
+      "WRProjectile":  { "hz": 30, "cullM": 200, "priority": 2 },
+      "WRSiegeEngine": { "hz": 10, "cullM": 250, "priority": 2 },
+      "WRBuildPiece":  { "hz": 10, "cullM": 300, "priority": 1, "doze": true },
+      "WRLootBag":     { "hz": 5, "cullM": 120, "priority": 1, "doze": true },
+      "WRResourceNode":{ "hz": 5, "cullM": 200, "priority": 1, "doze": true },
+      "WRRubble":      { "hz": 2, "cullM": 120, "priority": 1, "doze": true },
+      "WRLaidEgg":     { "hz": 2, "cullM": 80, "priority": 1, "doze": true }
+    },
+    "doze": { "checkSeconds": 0.25, "perFrame": 600 },
+    "creatureIdleHz": 4, "creatureIdleAfterHitSeconds": 10,
+    "fxHearM": 200,
+    "arrivalsToAllUpTo": 24,
+    "queue": { "holdSeconds": 120, "staleSeconds": 30, "retrySeconds": 8, "maxWaiting": 200, "adminSlots": 2 },
+    "save": { "playerEverySeconds": 10, "piecesPerFrame": 1500 }
   },
 
   "claims": { "_comment": "Land claims (cooks/cookpass-multiplayer.md 3.7): totems stand at least two full-upgrade radii plus gapCm apart (claims never nest or grow into a neighbour); a claim's name is up to nameLength letters.",

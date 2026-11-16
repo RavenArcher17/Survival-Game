@@ -6,6 +6,10 @@
 #include "WRPlayerState.h"
 #include "WRTuning.h"
 #include "WRWorlds.h"
+#include "WRGameState.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Dom/JsonObject.h"
 #include "Engine/World.h"
 #include "GameFramework/GameModeBase.h"
@@ -51,6 +55,37 @@ namespace WRAccessDetail
 		return A;
 	}
 
+	/** A full world's waiting line (cooks/build-wild-100players.md 3.6), in order; a place lasts net.queue.staleSeconds
+	 *  between tries. */
+	struct FWaiter { FString Key; double LastSeen = 0.0; };
+	TArray<FWaiter>& Queue() { static TArray<FWaiter> Q; return Q; }
+	/** Slots held for joiners who passed PreLogin and are loading in (key -> FPlatformTime it lapses). */
+	TMap<FString, double>& Held() { static TMap<FString, double> H; return H; }
+	/** -MaxPlayers= / ?MaxPlayers= for this run (0: none). */
+	int32& CapOverride() { static int32 C = 0; return C; }
+
+	/** Who a joiner is for the queue: their name, else their address. */
+	FString KeyOf(const FString& Name, const FString& Ip) { return Name.IsEmpty() ? Ip : Name.ToLower(); }
+
+	void Prune(double Clock)
+	{
+		for (auto It = Held().CreateIterator(); It; ++It)
+		{
+			if (It->Value <= Clock) It.RemoveCurrent();
+		}
+		const double Stale = WRTune(TEXT("net.queue.staleSeconds"), 30.f);
+		Queue().RemoveAll([Clock, Stale](const FWaiter& W) { return Clock - W.LastSeen > Stale; });
+	}
+
+	int32 AdminSlots() { return FMath::Max(0, FMath::RoundToInt(WRTune(TEXT("net.queue.adminSlots"), 2.f))); }
+
+	FString Ordinal(int32 N)
+	{
+		const int32 Tens = N % 100;
+		const TCHAR* Suffix = (Tens >= 11 && Tens <= 13) ? TEXT("th") : N % 10 == 1 ? TEXT("st") : N % 10 == 2 ? TEXT("nd") : N % 10 == 3 ? TEXT("rd") : TEXT("th");
+		return FString::Printf(TEXT("%d%s"), N, Suffix);
+	}
+
 	AWRPlayerController* FindPlayer(UWorld* World, const FString& Name)
 	{
 		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
@@ -90,7 +125,11 @@ FWRAccess WRAccess::Read(const FString& WorldId)
 		return A;
 	}
 	double Max = A.MaxPlayers;
-	if (O->TryGetNumberField(TEXT("maxPlayers"), Max)) A.MaxPlayers = FMath::RoundToInt(Max);
+	O->TryGetBoolField(TEXT("capSet"), A.bCapSet);
+	// A cap nobody chose (written with the rest when an admin banned someone, before build-wild-100players) is the old
+	// default, not a choice: a dedicated world uses today's default instead. A listen world's file only ever had the
+	// Hosting page's number in it.
+	if (O->TryGetNumberField(TEXT("maxPlayers"), Max) && (A.bCapSet || !IsRunningDedicatedServer())) A.MaxPlayers = FMath::RoundToInt(Max);
 	O->TryGetStringField(TEXT("passSalt"), A.PassSalt);
 	O->TryGetStringField(TEXT("passHash"), A.PassHash);
 	O->TryGetStringArrayField(TEXT("admins"), A.Admins);
@@ -119,6 +158,7 @@ bool WRAccess::Write(const FString& WorldId, const FWRAccess& A)
 	if (Path.IsEmpty()) return false;
 	const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
 	O->SetNumberField(TEXT("maxPlayers"), A.MaxPlayers);
+	O->SetBoolField(TEXT("capSet"), A.bCapSet);
 	if (A.HasPassword())
 	{
 		O->SetStringField(TEXT("passSalt"), A.PassSalt);
@@ -175,6 +215,8 @@ void WRAccess::LoadCurrent()
 {
 	WRAccessDetail::CurrentStore() = Read(WRWorlds::Current());
 	WRAccessDetail::Tries().Reset();
+	WRAccessDetail::Queue().Reset();
+	WRAccessDetail::Held().Reset();
 }
 
 void WRAccess::SaveCurrent()
@@ -206,16 +248,52 @@ FString WRAccess::Refuse(const FString& Name, const FString& Wire, const FString
 			return FString::Printf(TEXT("WR|Banned from this world (%s)."), *BanLeft(B));
 		}
 	}
-	const int32 Max = FMath::Clamp(A.MaxPlayers, MinPlayers(), MaxPlayersLimit(IsRunningDedicatedServer()));
-	if (NumPlayers >= Max)
+	// Full (cooks/build-wild-100players.md 3.6): who's in counts the slots held for joiners still loading, so a crowd
+	// arriving at once can't push 99 to 109. When a slot frees, it's the first in the queue's; the rest are told where
+	// they stand and their game tries again. Admins come in past the cap, into net.queue.adminSlots.
+	const int32 Max = Cap();
+	const double Clock = FPlatformTime::Seconds();
+	WRAccessDetail::Prune(Clock);
+	const FString Key = WRAccessDetail::KeyOf(Name, Ip);
+	TArray<WRAccessDetail::FWaiter>& Line = WRAccessDetail::Queue();
+	const bool bHeld = WRAccessDetail::Held().Contains(Key);
+	const int32 In = NumPlayers + WRAccessDetail::Held().Num() - (bHeld ? 1 : 0);
+	const bool bAdmin = !Name.IsEmpty() && A.IsAdmin(Name);
+	int32 Pos = Line.IndexOfByPredicate([&Key](const WRAccessDetail::FWaiter& W) { return W.Key == Key; });
+	if (bAdmin)
 	{
-		UE_LOG(LogWildreach, Log, TEXT("ACCESS refused %s: full (%d/%d)"), *Name, NumPlayers, Max);
-		return FString::Printf(TEXT("WR|World full (%d/%d). Try again when someone leaves."), NumPlayers, Max);
+		if (In >= Max + WRAccessDetail::AdminSlots())
+		{
+			UE_LOG(LogWildreach, Log, TEXT("ACCESS refused %s: full even for admins (%d/%d)"), *Name, In, Max);
+			return FString::Printf(TEXT("WR|World full (%d/%d), and the admins' places are taken too. Try again in a moment."), FMath::Min(In, Max), Max);
+		}
+	}
+	else if (!bHeld)
+	{
+		const int32 Free = Max - In;
+		// In only with a free slot, and only if nobody is waiting ahead (positions 1..Free take the free slots).
+		if (Free <= 0 || (Line.Num() > 0 && (Pos == INDEX_NONE || Pos >= Free)))
+		{
+			if (Pos == INDEX_NONE)
+			{
+				if (Line.Num() >= FMath::RoundToInt(WRTune(TEXT("net.queue.maxWaiting"), 200.f)))
+				{
+					UE_LOG(LogWildreach, Log, TEXT("ACCESS refused %s: full, queue full (%d)"), *Name, Line.Num());
+					return FString::Printf(TEXT("WR|World full (%d/%d), and its queue is full too (%d waiting). Try again later."), FMath::Min(In, Max), Max, Line.Num());
+				}
+				Pos = Line.Add({ Key, Clock });
+			}
+			else
+			{
+				Line[Pos].LastSeen = Clock;
+			}
+			UE_LOG(LogWildreach, Log, TEXT("ACCESS %s waits: %s in the queue (%d waiting, %d/%d)"), *Name, *WRAccessDetail::Ordinal(Pos + 1), Line.Num(), In, Max);
+			return FString::Printf(TEXT("QUEUE|%d|%d|%d|%d"), Pos + 1, Line.Num(), FMath::Min(In, Max), Max);
+		}
 	}
 	if (A.HasPassword())
 	{
 		TArray<double>& Mine = WRAccessDetail::Tries().FindOrAdd(Ip);
-		const double Clock = FPlatformTime::Seconds();
 		const double Window = WRTune(TEXT("access.passwordWindowSeconds"), 60.f);
 		Mine.RemoveAll([Clock, Window](double T) { return Clock - T > Window; });
 		if (Mine.Num() >= FMath::RoundToInt(WRTune(TEXT("access.passwordTries"), 3.f)))
@@ -234,7 +312,76 @@ FString WRAccess::Refuse(const FString& Name, const FString& Wire, const FString
 			return TEXT("PASSWORD|Wrong password.");
 		}
 	}
+	// In: their place in the line is done with, and a slot is theirs while they load (net.queue.holdSeconds).
+	if (Pos != INDEX_NONE) Line.RemoveAt(Pos);
+	WRAccessDetail::Held().Add(Key, Clock + FMath::Max(10.f, WRTune(TEXT("net.queue.holdSeconds"), 120.f)));
 	return FString();
+}
+
+int32 WRAccess::Cap()
+{
+	const FWRAccess& A = Current();
+	const bool bDedicated = IsRunningDedicatedServer();
+	int32 Want = WRAccessDetail::CapOverride();
+	if (Want <= 0)
+	{
+		Want = A.bCapSet || !bDedicated ? A.MaxPlayers : FMath::RoundToInt(WRTune(TEXT("net.dedicatedDefaultPlayers"), 100.f));
+	}
+	return FMath::Clamp(Want, MinPlayers(), MaxPlayersLimit(bDedicated));
+}
+
+void WRAccess::ReadCapOverride(const FString& Options)
+{
+	int32 N = 0;
+	const FString FromUrl = UGameplayStatics::ParseOption(Options, TEXT("MaxPlayers"));
+	if (!FromUrl.IsEmpty()) N = FCString::Atoi(*FromUrl);
+	int32 FromLine = 0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("-MaxPlayers="), FromLine) && FromLine > 0) N = FromLine;
+	WRAccessDetail::CapOverride() = FMath::Max(0, N);
+	if (N > 0) UE_LOG(LogWildreach, Log, TEXT("ACCESS cap %d from the command line (this run)"), Cap());
+}
+
+void WRAccess::Publish(UWorld* World)
+{
+	if (!World) return;
+	WRAccessDetail::Prune(FPlatformTime::Seconds());
+	AGameModeBase* GM = World->GetAuthGameMode();
+	if (GM && GM->GameSession && !WRWorlds::Current().IsEmpty())
+	{
+		// The engine refuses only past the admins' slots: below that our PreLogin decides, with its reasons.
+		GM->GameSession->MaxPlayers = Cap() + WRAccessDetail::AdminSlots();
+	}
+	if (AWRGameState* GS = World->GetGameState<AWRGameState>())
+	{
+		GS->PlayerCap = WRWorlds::Current().IsEmpty() ? 0 : Cap();
+		GS->bDedicatedWorld = IsRunningDedicatedServer();
+		GS->Waiting = WRAccessDetail::Queue().Num();
+	}
+}
+
+void WRAccess::Arrived(const FString& Name)
+{
+	WRAccessDetail::Held().Remove(Name.ToLower());
+}
+
+FString WRAccess::CheckArrival(const FString& Name, int32 NumPlayers)
+{
+	if (WRWorlds::Current().IsEmpty()) return FString();
+	WRAccessDetail::Prune(FPlatformTime::Seconds());
+	if (WRAccessDetail::Held().Contains(Name.ToLower())) return FString();
+	// Their held slot ran out while they loaded (over net.queue.holdSeconds): in if there's still room for them.
+	const bool bAdmin = !Name.IsEmpty() && Current().IsAdmin(Name);
+	const int32 Room = Cap() + (bAdmin ? WRAccessDetail::AdminSlots() : 0) - (NumPlayers + WRAccessDetail::Held().Num());
+	if (Room > 0 && (WRAccessDetail::Queue().Num() == 0 || bAdmin)) return FString();
+	UE_LOG(LogWildreach, Log, TEXT("ACCESS refused %s at login: their slot lapsed and the world is full"), *Name);
+	const int32 Behind = WRAccessDetail::Queue().Num() + 1;
+	return FString::Printf(TEXT("QUEUE|%d|%d|%d|%d"), Behind, Behind, FMath::Min(NumPlayers, Cap()), Cap());
+}
+
+int32 WRAccess::Waiting()
+{
+	WRAccessDetail::Prune(FPlatformTime::Seconds());
+	return WRAccessDetail::Queue().Num();
 }
 
 uint8 WRAccess::RoleOf(const APlayerController* PC)
@@ -272,6 +419,25 @@ FString WRAccess::Command(APlayerController* By, const TArray<FString>& Args)
 	const FString Name = Args.IsValidIndex(2) ? Args[2] : FString();
 	const FString Me = By->PlayerState ? By->PlayerState->GetPlayerName() : FString();
 	FWRAccess& A = Current();
+	// The cap, while the world runs (the host or a Freedom35 moderator; cooks/build-wild-100players.md 3.1). Lower
+	// than the players in kicks nobody: new joins wait in the queue until it's under.
+	if (Act == TEXT("cap"))
+	{
+		if (Role < 2) return TEXT("Only the host sets how many can play");
+		const bool bDedicated = IsRunningDedicatedServer();
+		const int32 Want = FCString::Atoi(*Name);
+		if (Want <= 0) return FString::Printf(TEXT("admin cap <%d-%d>"), MinPlayers(), MaxPlayersLimit(bDedicated));
+		A.MaxPlayers = FMath::Clamp(Want, MinPlayers(), MaxPlayersLimit(bDedicated));
+		A.bCapSet = true;
+		WRAccessDetail::CapOverride() = 0;
+		SaveCurrent();
+		Publish(World);
+		UE_LOG(LogWildreach, Log, TEXT("ACCESS %s set the cap to %d"), *Me, A.MaxPlayers);
+		const int32 Playing = World->GetAuthGameMode() ? World->GetAuthGameMode()->GetNumPlayers() : 0;
+		return Playing > A.MaxPlayers
+			? FString::Printf(TEXT("Up to %d players now. %d are playing: nobody is sent away, new joins wait until there's room."), A.MaxPlayers, Playing)
+			: FString::Printf(TEXT("Up to %d players now"), A.MaxPlayers);
+	}
 	if (Name.IsEmpty()) return TEXT("Who?");
 	if (Act == TEXT("unban"))
 	{
@@ -296,7 +462,7 @@ FString WRAccess::Command(APlayerController* By, const TArray<FString>& Args)
 		}
 		return Act == TEXT("op") ? FString::Printf(TEXT("%s is an admin now"), *Name) : FString::Printf(TEXT("%s is no longer an admin"), *Name);
 	}
-	if (Act != TEXT("kick") && Act != TEXT("ban")) return TEXT("admin kick|ban|unban|op|deop <name> [hours]");
+	if (Act != TEXT("kick") && Act != TEXT("ban")) return TEXT("admin kick|ban|unban|op|deop <name> [hours], admin cap <players>");
 	AWRPlayerController* Target = WRAccessDetail::FindPlayer(World, Name);
 	if (!Target) return FString::Printf(TEXT("Nobody called %s is here"), *Name);
 	if (Target == By) return Act == TEXT("ban") ? TEXT("You can't ban yourself") : TEXT("You can't kick yourself");

@@ -21,6 +21,8 @@
 #include "Materials/MaterialInterface.h"
 #include "Misc/App.h"
 #include "Net/UnrealNetwork.h"
+#include "WRPlayerController.h"
+#include "GameFramework/PlayerController.h"
 
 namespace WRFxDetail
 {
@@ -149,6 +151,24 @@ namespace WRFxDetail
 	}
 }
 
+namespace WRFxDetail
+{
+	/** Server: the players whose view is within net.fxHearM of a place (their body, else what they're watching). */
+	TArray<AWRPlayerController*, TInlineAllocator<16>> Near(UWorld* World, const FVector& At)
+	{
+		TArray<AWRPlayerController*, TInlineAllocator<16>> Out;
+		const double RangeSq = FMath::Square(double(WRTune(TEXT("net.fxHearM"), 200.f)) * 100.0);
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
+			if (!PC) continue;
+			const AActor* View = PC->GetPawnOrSpectator();
+			if (!View) View = PC->GetViewTarget();
+			if (!View || FVector::DistSquared(View->GetActorLocation(), At) <= RangeSq) Out.Add(PC);
+		}
+		return Out;
+	}
+}
 using namespace WRFxDetail;
 
 // ---------------------------------------------------------------- relay and pool actors
@@ -217,14 +237,9 @@ void UWRFxSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	const ENetMode Mode = InWorld.GetNetMode();
-	if (Mode != NM_Client)
-	{
-		// The server's voice for effects only it sees happen (WRFx::Broadcast).
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		Params.ObjectFlags |= RF_Transient;
-		Relay = InWorld.SpawnActor<AWRFxRelay>(AWRFxRelay::StaticClass(), FTransform::Identity, Params);
-	}
+	// (The server's effects used to go out through an always-relevant relay to every client on the map; since
+	// build-wild-100players each goes only to the players near it: WRFx::Broadcast. The relay class stays for old saves'
+	// sake but isn't spawned.)
 	bActive = Mode != NM_DedicatedServer && !IsRunningDedicatedServer() && FApp::CanEverRender() && !IsRunningCommandlet();
 	if (!bActive)
 	{
@@ -979,37 +994,53 @@ void WRFx::Stop(USceneComponent* Fx)
 
 void WRFx::Broadcast(const UObject* WorldContext, FName Effect, const FVector& Location, const FRotator& Rotation, float Scale, FName Sound, float Seconds)
 {
-	const UWorld* World = WorldContext && GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
+	UWorld* World = WorldContext && GEngine ? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull) : nullptr;
 	if (!World || World->GetNetMode() == NM_Client)
 	{
 		return;  // clients show their own effects with SpawnAt; only the server speaks for everyone
 	}
-	const UWRFxSubsystem* Fx = World->GetSubsystem<UWRFxSubsystem>();
-	if (AWRFxRelay* Relay = Fx ? Fx->GetRelay() : nullptr)
-	{
-		Relay->MulticastAt(Effect, Location, Rotation, Scale, Seconds, Sound);
-	}
-	else
+	if (World->GetNetMode() == NM_Standalone)
 	{
 		WRFxDetail::Receive(WorldContext, Effect, Location, Rotation, Scale, Seconds, Sound, nullptr, NAME_None);
+		return;
+	}
+	// Only to the players who could see or hear it (net.fxHearM): at 100 players a map-wide multicast of every spark
+	// would be most of the traffic (cooks/build-wild-100players.md 3.4). A listen host's own game is one of them.
+	for (AWRPlayerController* PC : WRFxDetail::Near(World, Location))
+	{
+		PC->ClientFxAt(Effect, Location, Rotation, Scale, Seconds, Sound);
 	}
 }
 
 void WRFx::BroadcastOn(AActor* Target, FName Effect, FName Socket, float Scale, FName Sound, float Seconds)
 {
-	const UWorld* World = Target ? Target->GetWorld() : nullptr;
+	UWorld* World = Target ? Target->GetWorld() : nullptr;
 	if (!World || World->GetNetMode() == NM_Client)
 	{
 		return;
 	}
-	const UWRFxSubsystem* Fx = World->GetSubsystem<UWRFxSubsystem>();
-	if (AWRFxRelay* Relay = Fx ? Fx->GetRelay() : nullptr)
-	{
-		Relay->MulticastOn(Effect, Target, Socket, Scale, Seconds, Sound);
-	}
-	else
+	if (World->GetNetMode() == NM_Standalone)
 	{
 		WRFxDetail::Receive(Target, Effect, Target->GetActorLocation(), FRotator::ZeroRotator, Scale, Seconds, Sound, Target, Socket);
+		return;
+	}
+	for (AWRPlayerController* PC : WRFxDetail::Near(World, Target->GetActorLocation()))
+	{
+		PC->ClientFxOn(Effect, Target, Socket, Scale, Seconds, Sound);
+	}
+}
+
+// The per-player deliveries (WRFx::Broadcast / BroadcastOn): the effect as the relay's multicast used to play it.
+void AWRPlayerController::ClientFxAt_Implementation(FName Effect, FVector_NetQuantize Location, FRotator Rotation, float Scale, float Seconds, FName Sound)
+{
+	WRFxDetail::Receive(this, Effect, Location, Rotation, Scale, Seconds, Sound, nullptr, NAME_None);
+}
+
+void AWRPlayerController::ClientFxOn_Implementation(FName Effect, AActor* Target, FName Socket, float Scale, float Seconds, FName Sound)
+{
+	if (Target)   // (not replicated to this player: nothing to put it on)
+	{
+		WRFxDetail::Receive(this, Effect, Target->GetActorLocation(), FRotator::ZeroRotator, Scale, Seconds, Sound, Target, Socket);
 	}
 }
 

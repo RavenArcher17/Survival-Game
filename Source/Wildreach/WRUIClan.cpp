@@ -9,6 +9,8 @@
 #include "WRUIWidgets.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
+#include "WRGameState.h"
+#include "WRAccess.h"
 #include "WRTuning.h"
 #include "Wildreach.h"
 #include "Engine/Engine.h"
@@ -156,6 +158,11 @@ namespace WRClanTab
 		void Construct(const FArguments& InArgs)
 		{
 			PC = InArgs._PC;
+			// The players list's search (cooks/build-wild-100players.md 3.7): one box for the tab's life, so typing
+			// isn't lost when someone joins and the list redraws. A name or a clan; the pad's keyboard opens on it.
+			SAssignNew(SearchBox, SEditableTextBox).Font(WRUI::Body(14, 600))
+				.HintText(LOCTEXT("ClanSearchHint", "Find a player or clan"))
+				.OnTextChanged_Lambda([this](const FText& Text) { Search = Text.ToString().TrimStartAndEnd(); });
 			ChildSlot[SAssignNew(Content, SBox)];
 			Rebuild();
 		}
@@ -169,12 +176,26 @@ namespace WRClanTab
 				Rebuild();
 				WRUI::MeasureNow(*Content, Geo.Scale);   // (this is inside Slate's paint: see MeasureNow)
 			}
+			else if (ListHashNow() != ListHash && ListBox.IsValid())
+			{
+				// Someone came, went, changed clan or role, or the search changed: only the list redraws (its scroll
+				// position and the search box stay).
+				RebuildList();
+				WRUI::MeasureNow(*ListBox, Geo.Scale);
+			}
 		}
 
 	private:
 		TWeakObjectPtr<AWRPlayerController> PC;
 		TSharedPtr<SBox> Content;
 		uint32 LastHash = 0;
+		/** The players list (cooks/build-wild-100players.md 3.7): its own box, redrawn alone when people come and go. */
+		TSharedPtr<SBox> ListBox;
+		uint32 ListHash = 0;
+		TSharedPtr<SEditableTextBox> SearchBox;
+		FString Search;
+		/** 0 everyone, 1 my clan, 2 staff (host and admins). */
+		int32 Filter = 0;
 		bool bConfirmLeave = false;
 		/** The player whose Ban asks how long (24 h / for good / cancel), "" none. */
 		FString BanAsk;
@@ -223,7 +244,8 @@ namespace WRClanTab
 
 		uint32 StateHash() const
 		{
-			uint32 H = HashCombine(GetTypeHash(bConfirmLeave), GetTypeHash(BanAsk));
+			// (The filter's buttons show which is on, so a change redraws the tab; Ban's question is the list's.)
+			uint32 H = HashCombine(GetTypeHash(bConfirmLeave), GetTypeHash(Filter) + 17);
 			if (const AWRPlayerState* S = PS())
 			{
 				H = HashCombine(H, GetTypeHash(S->AccessRole));
@@ -233,8 +255,30 @@ namespace WRClanTab
 				for (const FString& X : S->ClanInvited) H = HashCombine(H, GetTypeHash(X) + 1);
 				for (const FString& X : S->ClanInvitesToMe) H = HashCombine(H, GetTypeHash(X) + 2);
 			}
-			for (const TPair<FString, FString>& O : Others()) H = HashCombine(H, HashCombine(GetTypeHash(O.Key), GetTypeHash(O.Value)));
-			for (const AWRPlayerState* W : OtherStates()) H = HashCombine(H, GetTypeHash(W->AccessRole) + 7);
+			// (Who else is here goes in ListHashNow: their comings and goings redraw only the list.) Your clan's
+			// members online or not show on the left.
+			if (const AWRPlayerState* S = PS())
+			{
+				TSet<FString> Here;
+				for (const AWRPlayerState* W : OtherStates()) Here.Add(W->GetPlayerName());
+				const FString Mine = Me();
+				for (const FString& X : S->ClanMembers) H = HashCombine(H, GetTypeHash(X == Mine || Here.Contains(X)) + 11);
+			}
+			return H;
+		}
+
+		/** What the players list shows: everyone else (name, clan, role), Ban's question, the search and the filter. */
+		uint32 ListHashNow() const
+		{
+			uint32 H = HashCombine(GetTypeHash(BanAsk), HashCombine(GetTypeHash(Search), GetTypeHash(Filter)));
+			for (const AWRPlayerState* W : OtherStates())
+			{
+				H = HashCombine(H, HashCombine(GetTypeHash(W->GetPlayerName()), HashCombine(GetTypeHash(W->ClanName), GetTypeHash(W->AccessRole) + 7)));
+			}
+			if (const AWRPlayerState* S = PS())
+			{
+				for (const FString& X : S->ClanInvited) H = HashCombine(H, GetTypeHash(X) + 13);
+			}
 			return H;
 		}
 
@@ -254,14 +298,15 @@ namespace WRClanTab
 				]
 				+ SHorizontalBox::Slot().AutoWidth()
 				[
-					SNew(SBox).WidthOverride(540.f * U)
+					SNew(SBox).WidthOverride(560.f * U)
 					[
 						SNew(SWRPanel).Kind(EWRPanel::Inset).Padding(FMargin(22.f * U, 18.f * U))
 						[
-							SNew(SScrollBox) + SScrollBox::Slot()[Right()]
+							Right()
 						]
 					]
 				]);
+			RebuildList();
 		}
 
 		// ---------------------------------------------------------------- pieces
@@ -399,6 +444,23 @@ namespace WRClanTab
 						+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("ClanLeaveNo", "Stay"), false, [this]() { bConfirmLeave = false; })]);
 				Col->AddSlot().AutoHeight().Padding(0.f, 22.f * U, 0.f, 0.f)[Leave];
 			}
+			// What it's for (here since build-wild-100players: the right column is the players list's).
+			Col->AddSlot().AutoHeight().Padding(0.f, 28.f * U, 0.f, 10.f * U)[Heading(LOCTEXT("ClanSharesHead", "Clanmates share"))];
+			static const TCHAR* const Lines[] = {
+				TEXT("Bases: build in each other's claims; open each other's chests and doors, code locks too; use each other's stations; repair and feed the Hearth"),
+				TEXT("Beds: wake at a clanmate's bed after you die"),
+				TEXT("No fighting: clanmates can't hurt each other, and your tames leave them be"),
+				TEXT("Raids: a raid on your claim warns all of you, and comes while any of you is home"),
+			};
+			for (const TCHAR* L : Lines)
+			{
+				Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.f, 6.f * U, 10.f * U, 0.f)[SNew(SBox).WidthOverride(6.f * U).HeightOverride(6.f * U)[SNew(SImage).Image(WRUI::Box(WRUI::Brass, 3.f * U))]]
+					+ SHorizontalBox::Slot().FillWidth(1.f)[WRUI::Text(FText::FromString(L), WRUI::Body(13, 500), WRUI::Ink2, false, true)]
+				];
+			}
 			return Col;
 		}
 
@@ -410,14 +472,48 @@ namespace WRClanTab
 			const AWRPlayerState* S = PS();
 			if (!S) return Col;
 			const bool bLead = IsLeader();
-			Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)[Heading(LOCTEXT("ClanHereHead", "Players in this game"))];
-			const TArray<TPair<FString, FString>> Here = Others();
-			if (Here.Num() == 0)
-			{
-				Col->AddSlot().AutoHeight()[WRUI::Text(LOCTEXT("ClanNobody", "Nobody else is here. Friends join with your IP from the main menu (and the world's password, if it has one)."), WRUI::Body(13, 500), WRUI::Ink3, false, true)];
-			}
-			// Who runs the world (cooks/cookpass-multiplayer.md 3.4): the host and admins kick and ban from these rows.
 			const uint8 MyRole = S->AccessRole;
+			const TWeakObjectPtr<AWRPlayerController> WeakPC = PC;
+			// Header: how many are here of how many may be, who's waiting (the host and admins see it), and the host's
+			// cap stepper on a dedicated world (cooks/build-wild-100players.md 3.7). Live: no redraw for a number.
+			auto GameState = [WeakPC]() -> const AWRGameState* { return WeakPC.IsValid() && WeakPC->GetWorld() ? WeakPC->GetWorld()->GetGameState<AWRGameState>() : nullptr; };
+			TSharedRef<SHorizontalBox> Head = SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[Heading(LOCTEXT("ClanHereHead", "Players in this game"))]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([GameState, MyRole]()
+					{
+						const AWRGameState* GS = GameState();
+						if (!GS) return FText::GetEmpty();
+						const int32 Here = GS->PlayerArray.Num();
+						FString Line = GS->PlayerCap > 0 ? FString::Printf(TEXT("%d / %d"), Here, GS->PlayerCap) : FString::FromInt(Here);
+						if (MyRole > 0 && GS->Waiting > 0) Line += FString::Printf(TEXT("  \u00B7  %d waiting"), GS->Waiting);
+						return FText::FromString(Line);
+					}), WRUI::Title(15), WRUI::Ink)
+				];
+			if (MyRole == 2)
+			{
+				// The host's cap, on a dedicated world (a listen world's is set on its Hosting page before it opens).
+				auto Step = [this, GameState](int32 By)
+				{
+					const AWRGameState* GS = GameState();
+					if (!GS || GS->PlayerCap <= 0) return;
+					const int32 Want = FMath::Clamp(GS->PlayerCap + By, WRAccess::MinPlayers(), WRAccess::MaxPlayersLimit(GS->bDedicatedWorld));
+					if (Want != GS->PlayerCap) Send(FString::Printf(TEXT("admin cap %d"), Want));
+				};
+				Head->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(10.f * U, 0.f, 0.f, 0.f)
+				[
+					SNew(SBox).Visibility_Lambda([GameState]() { const AWRGameState* GS = GameState(); return GS && GS->bDedicatedWorld && GS->PlayerCap > 0 ? EVisibility::Visible : EVisibility::Collapsed; })
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)[WRUI::Text(LOCTEXT("ClanCap", "Cap"), WRUI::Caps(11), WRUI::Ink3)]
+						+ SHorizontalBox::Slot().AutoWidth()[SNew(SBox).WidthOverride(40.f * U)[Button(FText::FromString(TEXT("\u2212")), false, [Step]() { Step(-1); })]]
+						+ SHorizontalBox::Slot().AutoWidth().Padding(4.f * U, 0.f, 0.f, 0.f)[SNew(SBox).WidthOverride(40.f * U)[Button(FText::FromString(TEXT("+")), false, [Step]() { Step(1); })]]
+					]
+				];
+			}
+			Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)[Head];
+			// Who runs the world (cooks/cookpass-multiplayer.md 3.4): the host and admins kick and ban from these rows.
 			if (MyRole > 0)
 			{
 				Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)
@@ -426,15 +522,104 @@ namespace WRClanTab
 						: LOCTEXT("ClanYouAdmin", "You're an admin of this world: kick or ban from a player's row."), WRUI::Body(13, 500), WRUI::Brass, false, true)
 				];
 			}
-			for (const TPair<FString, FString>& O : Here)
+			// Find: the search box and Everyone / My clan / Staff.
+			auto FilterButton = [this](const FText& Text, int32 Which)
 			{
-				const FString Name = O.Key;
-				const AWRPlayerState* Them = StateOf(Name);
-				const uint8 TheirRole = Them ? Them->AccessRole : 0;
+				return SNew(SBox).Padding(FMargin(6.f * U, 0.f, 0.f, 0.f))
+					[
+						SNew(SWRButton).FontSize(11).MinHeight(32.f * U).Text(Text).Primary(Filter == Which).Ghost(Filter != Which)
+						.OnClicked_Lambda([this, Which]() { Filter = Which; return FReply::Handled(); })
+					];
+			};
+			Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)
+			[
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[SearchBox.ToSharedRef()]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[FilterButton(LOCTEXT("ClanFilterAll", "Everyone"), 0)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[FilterButton(LOCTEXT("ClanFilterClan", "My clan"), 1)]
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[FilterButton(LOCTEXT("ClanFilterStaff", "Staff"), 2)]
+			];
+			// The list (and, for admins, who's banned), in its own scroll filling the column.
+			Col->AddSlot().FillHeight(1.f)
+			[
+				SNew(SScrollBox)
+				+ SScrollBox::Slot()[SAssignNew(ListBox, SBox)]
+			];
+			if (bLead)
+			{
+				Col->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.f, 10.f * U, 0.f, 0.f)
+				[
+					SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(36.f * U).Text(LOCTEXT("ClanInviteByName", "Invite by name"))
+					.OnClicked_Lambda([this]()
+					{
+						SWRClanNameBox::Open(PC.Get(), LOCTEXT("ClanInviteTitle", "Invite a player"), LOCTEXT("ClanInviteHint", "Their name, as they play"),
+							LOCTEXT("ClanInviteNote", "They can accept it later, when they're on"), LOCTEXT("ClanInviteGo", "Invite"), TEXT("clan invite"), true);
+						return FReply::Handled();
+					})
+				];
+			}
+			else if (!S->ClanName.IsEmpty())
+			{
+				Col->AddSlot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
+				[
+					WRUI::Text(FText::FromString(FString::Printf(TEXT("%s invites new members."), *S->ClanLeader)), WRUI::Body(13, 500), WRUI::Ink3, false, true)
+				];
+			}
+			return Col;
+		}
+
+		/** The players list's rows: the filter and search applied; your clanmates first, then the host and admins,
+		 *  then everyone by name. */
+		void RebuildList()
+		{
+			ListHash = ListHashNow();
+			if (!ListBox.IsValid()) return;
+			TSharedRef<SVerticalBox> Col = SNew(SVerticalBox);
+			const AWRPlayerState* S = PS();
+			if (!S)
+			{
+				ListBox->SetContent(Col);
+				return;
+			}
+			const bool bLead = IsLeader();
+			const uint8 MyRole = S->AccessRole;
+			TArray<const AWRPlayerState*> All = OtherStates();
+			const int32 Total = All.Num();
+			const FString Needle = Search.ToLower();
+			All.RemoveAll([&](const AWRPlayerState* W)
+			{
+				if (Filter == 1 && (S->ClanName.IsEmpty() || W->ClanName != S->ClanName)) return true;
+				if (Filter == 2 && W->AccessRole == 0) return true;
+				return !Needle.IsEmpty() && !W->GetPlayerName().ToLower().Contains(Needle) && !W->ClanName.ToLower().Contains(Needle);
+			});
+			const FString MyClan = S->ClanName;
+			All.Sort([&MyClan](const AWRPlayerState& A, const AWRPlayerState& B)
+			{
+				const int32 RankA = (!MyClan.IsEmpty() && A.ClanName == MyClan) ? 0 : A.AccessRole > 0 ? 1 : 2;
+				const int32 RankB = (!MyClan.IsEmpty() && B.ClanName == MyClan) ? 0 : B.AccessRole > 0 ? 1 : 2;
+				if (RankA != RankB) return RankA < RankB;
+				return A.GetPlayerName() < B.GetPlayerName();
+			});
+			if (Total == 0)
+			{
+				Col->AddSlot().AutoHeight()[WRUI::Text(LOCTEXT("ClanNobody", "Nobody else is here. Friends join with your IP from the main menu (and the world's password, if it has one)."), WRUI::Body(13, 500), WRUI::Ink3, false, true)];
+			}
+			else if (All.Num() != Total)
+			{
+				Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					WRUI::Text(All.Num() == 0 ? LOCTEXT("ClanNoMatch", "Nobody here matches.") : FText::Format(LOCTEXT("ClanShowing", "Showing {0} of {1}"), All.Num(), Total), WRUI::Body(12, 600), WRUI::Ink3)
+				];
+			}
+			for (const AWRPlayerState* Them : All)
+			{
+				const FString Name = Them->GetPlayerName();
+				const FString TheirClan = Them->ClanName;
+				const uint8 TheirRole = Them->AccessRole;
 				TArray<TPair<FText, FLinearColor>> Chips;
 				if (TheirRole == 2) Chips.Add({ LOCTEXT("ClanHostChip", "Host"), WRUI::Brass });
 				else if (TheirRole == 1) Chips.Add({ LOCTEXT("ClanAdminChip", "Admin"), WRUI::Brass });
-				if (!O.Value.IsEmpty()) Chips.Add({ FText::FromString(O.Value == S->ClanName ? FString(TEXT("your clan")) : O.Value), O.Value == S->ClanName ? WRUI::Good : WRUI::Ink2 });
+				if (!TheirClan.IsEmpty()) Chips.Add({ FText::FromString(TheirClan == S->ClanName ? FString(TEXT("your clan")) : TheirClan), TheirClan == S->ClanName ? WRUI::Good : WRUI::Ink2 });
 				TSharedRef<SHorizontalBox> Buttons = SNew(SHorizontalBox);
 				// Its ping, live: green under 80 ms, amber under 160, red past that.
 				const TWeakObjectPtr<const AWRPlayerState> WeakThem(Them);
@@ -458,7 +643,7 @@ namespace WRClanTab
 				}
 				else
 				{
-					if (bLead && O.Value.IsEmpty())
+					if (bLead && TheirClan.IsEmpty())
 					{
 						Buttons->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)
 						[
@@ -494,44 +679,7 @@ namespace WRClanTab
 					];
 				}
 			}
-			if (bLead)
-			{
-				Col->AddSlot().AutoHeight().HAlign(HAlign_Left).Padding(0.f, 6.f * U, 0.f, 0.f)
-				[
-					SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(36.f * U).Text(LOCTEXT("ClanInviteByName", "Invite by name"))
-					.OnClicked_Lambda([this]()
-					{
-						SWRClanNameBox::Open(PC.Get(), LOCTEXT("ClanInviteTitle", "Invite a player"), LOCTEXT("ClanInviteHint", "Their name, as they play"),
-							LOCTEXT("ClanInviteNote", "They can accept it later, when they're on"), LOCTEXT("ClanInviteGo", "Invite"), TEXT("clan invite"), true);
-						return FReply::Handled();
-					})
-				];
-			}
-			else if (!S->ClanName.IsEmpty())
-			{
-				Col->AddSlot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
-				[
-					WRUI::Text(FText::FromString(FString::Printf(TEXT("%s invites new members."), *S->ClanLeader)), WRUI::Body(13, 500), WRUI::Ink3, false, true)
-				];
-			}
-			// What it's for.
-			Col->AddSlot().AutoHeight().Padding(0.f, 28.f * U, 0.f, 10.f * U)[Heading(LOCTEXT("ClanSharesHead", "Clanmates share"))];
-			static const TCHAR* const Lines[] = {
-				TEXT("Bases: build in each other's claims; open each other's chests and doors, code locks too; use each other's stations; repair and feed the Hearth"),
-				TEXT("Beds: wake at a clanmate's bed after you die"),
-				TEXT("No fighting: clanmates can't hurt each other, and your tames leave them be"),
-				TEXT("Raids: a raid on your claim warns all of you, and comes while any of you is home"),
-			};
-			for (const TCHAR* L : Lines)
-			{
-				Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
-				[
-					SNew(SHorizontalBox)
-					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Top).Padding(0.f, 6.f * U, 10.f * U, 0.f)[SNew(SBox).WidthOverride(6.f * U).HeightOverride(6.f * U)[SNew(SImage).Image(WRUI::Box(WRUI::Brass, 3.f * U))]]
-					+ SHorizontalBox::Slot().FillWidth(1.f)[WRUI::Text(FText::FromString(L), WRUI::Body(13, 500), WRUI::Ink2, false, true)]
-				];
-			}
-			return Col;
+			ListBox->SetContent(Col);
 		}
 	};
 }

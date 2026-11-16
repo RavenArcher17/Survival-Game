@@ -21,6 +21,7 @@
 		{ "Name": "HairStrands", "Enabled": true },
 		{ "Name": "RigLogic", "Enabled": true },
 		{ "Name": "MetaHumanCharacter", "Enabled": true },
-		{ "Name": "SQLiteCore", "Enabled": true }
+		{ "Name": "SQLiteCore", "Enabled": true },
+		{ "Name": "ReplicationGraph", "Enabled": true }
 	]
 }

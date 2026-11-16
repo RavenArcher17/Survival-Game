@@ -37,6 +37,7 @@
 #include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "WREndgameLook.h"
+#include "WRNet.h"
 
 // ---------------------------------------------------------------- registry
 
@@ -701,7 +702,7 @@ bool AWRBuildPiece::SwingFor(const APawn* By, bool bNewOpen, FString& OutWhy)
 	}
 	bOpen = bNewOpen;
 	OnRep_Door();
-	ForceNetUpdate();
+	WRNet::Wake(this);   // a dozing door swings for everyone now, not at the watcher's next look (cooks/build-wild-100players.md 3.3)
 	return true;
 }
 
@@ -717,7 +718,7 @@ void AWRBuildPiece::SetOpen(bool bNewOpen)
 	}
 	bOpen = bNewOpen;
 	OnRep_Door();
-	ForceNetUpdate();
+	WRNet::Wake(this);   // a dozing door swings for everyone now, not at the watcher's next look (cooks/build-wild-100players.md 3.3)
 }
 
 void AWRBuildPiece::SpawnChild()
@@ -1286,6 +1287,7 @@ void AWRBuildPiece::TakeBuildDamage(float Amount, AActor* DamageSource)
 	}
 	Health -= Amount;
 	LastDamagedAt = GetWorld()->GetTimeSeconds();
+	WRNet::Wake(this);   // the blow's health goes out this frame (pieces doze between changes)
 	if (AWRHearth* Hearth = Cast<AWRHearth>(ChildActor.Get()))
 	{
 		// A Hearth breaks and stays: its stations stop until it's repaired (E on it, Repair), and its cores are never

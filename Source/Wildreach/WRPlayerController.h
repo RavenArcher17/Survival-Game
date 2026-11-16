@@ -418,6 +418,9 @@ public:
 	 */
 	UFUNCTION(Server, Reliable) void ServerChat(const FString& Message);
 	UFUNCTION(Client, Reliable) void ClientChat(const FString& From, const FString& Message, uint8 Channel);
+	/** A server effect near this player (WRFx::Broadcast / BroadcastOn: only the players within net.fxHearM get it). */
+	UFUNCTION(Client, Reliable) void ClientFxAt(FName Effect, FVector_NetQuantize Location, FRotator Rotation, float Scale, float Seconds, FName Sound);
+	UFUNCTION(Client, Reliable) void ClientFxOn(FName Effect, AActor* Target, FName Socket, float Scale, float Seconds, FName Sound);
 	struct FChatLine { FString Text; double Time; uint8 Channel = 0; };
 	const TArray<FChatLine>& GetChat() const { return Chat; }
 	/** The colour a channel's lines are drawn in (sRGB from tuning chat.colors). */

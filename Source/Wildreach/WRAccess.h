@@ -29,6 +29,9 @@ struct FWRBan
 struct FWRAccess
 {
 	int32 MaxPlayers = 8;
+	/** The host chose maxPlayers (the Hosting page, admin cap): until then a dedicated world uses the default
+	 *  (cooks/build-wild-100players.md 3.1: worlds saved with the old default of 32 come up at 100). */
+	bool bCapSet = false;
 	FString PassSalt;
 	FString PassHash;
 	TArray<FString> Admins;
@@ -51,14 +54,33 @@ namespace WRAccess
 	WILDREACH_API int32 MinPlayers();
 	WILDREACH_API int32 MaxPlayersLimit(bool bDedicated);
 
+	/**
+	 * Server: the running world's cap (cooks/build-wild-100players.md 3.1): -MaxPlayers=N on the command line or
+	 * ?MaxPlayers=N on the URL, else access.json (when its host chose one), else the default (100 dedicated, 8 listen);
+	 * clamped to MinPlayers..MaxPlayersLimit.
+	 */
+	WILDREACH_API int32 Cap();
+	/** Server, InitGame: the command line's / URL's cap, if any. */
+	WILDREACH_API void ReadCapOverride(const FString& Options);
+	/** Server: the engine's own cap (Cap + the admins' slots) and the game state's numbers, after any change. */
+	WILDREACH_API void Publish(UWorld* World);
+	/** Server, PostLogin: the slot held for this joiner while they loaded is theirs now. */
+	WILDREACH_API void Arrived(const FString& Name);
+	/** Server, Login: may this player come in now (they held a slot, or there's room)? "" yes, else the refusal. */
+	WILDREACH_API FString CheckArrival(const FString& Name, int32 NumPlayers);
+	/** Waiting in the queue now (stale places dropped). */
+	WILDREACH_API int32 Waiting();
+
 	/** Server: the running world's access (loaded at InitGame), and saving it. */
 	WILDREACH_API FWRAccess& Current();
 	WILDREACH_API void LoadCurrent();
 	WILDREACH_API void SaveCurrent();
 
 	/**
-	 * Server, PreLogin: "" lets the join in; else the reason the joiner reads. Refusals start "WR|" (the menu shows the
-	 * rest as it is) or "PASSWORD|" (the menu asks for the password). Order: banned, full, password.
+	 * Server, PreLogin: "" lets the join in (and holds a slot for them while they load); else the reason the joiner
+	 * reads. Refusals start "WR|" (the menu shows the rest as it is), "PASSWORD|" (the menu asks for the password) or
+	 * "QUEUE|pos|waiting|playing|cap" (a full world: the menu keeps their place, trying again every
+	 * net.queue.retrySeconds). Order: banned, full (the queue; admins skip it into net.queue.adminSlots), password.
 	 */
 	WILDREACH_API FString Refuse(const FString& Name, const FString& Wire, const FString& Address, int32 NumPlayers);
 

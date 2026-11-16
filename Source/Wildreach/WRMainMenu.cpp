@@ -74,6 +74,7 @@ int32 SWRMainMenu::CardKind = 0;
 FString SWRMainMenu::CardTitle;
 bool SWRMainMenu::bCanRejoin = false;
 int32 SWRMainMenu::RejoinTries = 0;
+bool SWRMainMenu::bQueued = false;
 double SWRMainMenu::RejoinFirstAt = 0.0;
 double SWRMainMenu::LastRejoinAt = -1000.0;
 double SWRMainMenu::NextRejoinAt = 0.0;
@@ -576,6 +577,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeCard()
 						{
 							if (CardKind != 1 || NextRejoinAt <= 0.0) return FText::GetEmpty();
 							const int32 Left = FMath::Max(0, FMath::CeilToInt(NextRejoinAt - FPlatformTime::Seconds()));
+							if (bQueued) return FText::Format(NSLOCTEXT("WRUI", "QueueCount", "Asking again in {0} s."), Left);
 							return FText::Format(NSLOCTEXT("WRUI", "RejoinCount", "Try {0} of {1} didn't get in. Trying again in {2} s."), RejoinTries, Max(), Left);
 						}), WRUI::Body(13, 700), WRUI::Brass, false, true)
 					]
@@ -598,7 +600,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeCard()
 							SNew(SBox).MinDesiredWidth(150.f * U)
 							[
 								SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U)
-								.Text_Lambda([]() { return CardKind == 2 ? NSLOCTEXT("WRUI", "NotNow", "Not now") : NextRejoinAt > 0.0 ? NSLOCTEXT("WRUI", "StopTrying", "Stop trying") : NSLOCTEXT("WRUI", "CloseCard", "Close"); })
+								.Text_Lambda([]() { return CardKind == 2 ? NSLOCTEXT("WRUI", "NotNow", "Not now") : bQueued ? NSLOCTEXT("WRUI", "LeaveQueue", "Leave the queue") : NextRejoinAt > 0.0 ? NSLOCTEXT("WRUI", "StopTrying", "Stop trying") : NSLOCTEXT("WRUI", "CloseCard", "Close"); })
 								.OnClicked_Lambda([this]() { CloseCard(); return FReply::Handled(); })
 							]
 						]
@@ -641,6 +643,7 @@ void SWRMainMenu::CloseCard()
 	NextRejoinAt = 0.0;
 	bCanRejoin = false;
 	bNeedPassword = false;
+	bQueued = false;
 	LastFailure.Empty();
 }
 
@@ -1479,6 +1482,28 @@ void SWRMainMenu::WatchNetworkFailures()
 		FString Line;
 		bool bRejoin = bClient;
 		bNeedPassword = false;
+		// A full world's queue (WRAccess::Refuse, cooks/build-wild-100players.md 3.6): "QUEUE|pos|waiting|playing|cap".
+		// The card keeps the place: it tries again every net.queue.retrySeconds, with no limit, until it gets in or
+		// the player leaves the queue.
+		if ((Type == ENetworkFailure::FailureReceived || Type == ENetworkFailure::PendingConnectionFailure) && Error.StartsWith(TEXT("QUEUE|")))
+		{
+			TArray<FString> Parts;
+			Error.ParseIntoArray(Parts, TEXT("|"), false);
+			const int32 Pos = Parts.IsValidIndex(1) ? FCString::Atoi(*Parts[1]) : 0;
+			const int32 Count = Parts.IsValidIndex(2) ? FCString::Atoi(*Parts[2]) : 0;
+			const int32 Playing = Parts.IsValidIndex(3) ? FCString::Atoi(*Parts[3]) : 0;
+			const int32 Cap = Parts.IsValidIndex(4) ? FCString::Atoi(*Parts[4]) : 0;
+			const int32 Tens = Pos % 100;
+			const TCHAR* Suffix = (Tens >= 11 && Tens <= 13) ? TEXT("th") : Pos % 10 == 1 ? TEXT("st") : Pos % 10 == 2 ? TEXT("nd") : Pos % 10 == 3 ? TEXT("rd") : TEXT("th");
+			const FString Where = Pos <= 1 ? FString(TEXT("You're next in the queue")) : FString::Printf(TEXT("You're %d%s in the queue"), Pos, Suffix);
+			RejoinTries = 0;   // (a queue isn't a host that's down: no limit on tries)
+			NoteFailure(TEXT("World full"), FString::Printf(TEXT("%s (%d waiting; %d of %d playing). Your place is kept while this card is open."), *Where, FMath::Max(Count, Pos), Playing, Cap), true);
+			bQueued = true;
+			bNeedPassword = false;
+			NextRejoinAt = FPlatformTime::Seconds() + FMath::Max(3.f, WRTune(TEXT("net.queue.retrySeconds"), 8.f));
+			return;
+		}
+		bQueued = false;
 		// The world's own refusals (WRAccess::Refuse): "PASSWORD|..." asks for the password, "WR|..." reads as it is.
 		if ((Type == ENetworkFailure::FailureReceived || Type == ENetworkFailure::PendingConnectionFailure) && (Error.StartsWith(TEXT("PASSWORD|")) || Error.StartsWith(TEXT("WR|"))))
 		{

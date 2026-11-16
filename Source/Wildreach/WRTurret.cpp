@@ -2,6 +2,7 @@
 // line every machine draws live in WRMachineLook (Turret, EWRMotion::TurretYaw / TurretPitch).
 
 #include "WRTurret.h"
+#include "WRNet.h"
 #include "WRStronghold.h"
 #include "WRBuilding.h"
 #include "WRCharacterBase.h"
@@ -272,6 +273,7 @@ void UWRTurretSubsystem::Tick(float DeltaTime)
 		{
 			// Unpowered, switched off or empty: it holds where it was and says why on its screen (state NoPower / NoAmmo).
 			R.bTracking = false;
+			WRNet::KeepAwake(P, false);   // dozes again: nothing it does now changes by the frame
 			B.TellLeft = -1.f;
 			B.Target = nullptr;
 			continue;
@@ -294,10 +296,12 @@ void UWRTurretSubsystem::Tick(float DeltaTime)
 		if (!T)
 		{
 			R.bTracking = false;
+			WRNet::KeepAwake(P, false);   // dozes again: nothing it does now changes by the frame
 			B.TellLeft = -1.f;
 			continue;
 		}
 		R.bTracking = true;
+		WRNet::KeepAwake(P, true);   // its head turns every frame while it tracks: awake, not woken by the watcher 4 times a second
 		// Where to point: the shot's lead on a moving target (a cone just at it), in the piece's own frame.
 		const FVector Muzzle = FWRTurretGeom::Muzzle(P, R.Yaw, R.Pitch);
 		const FVector Pivot = P->GetActorTransform().TransformPositionNoScale(FVector(0.f, 0.f, FWRTurretGeom::TrunnionZ));
