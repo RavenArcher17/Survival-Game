@@ -18,6 +18,10 @@
   "beds": { "_comment": "Beds and bedrolls (WRBeds): a bed you just woke at rests restSeconds before you can wake there again; a bedroll is used up when you wake on it (bedrollSingleUse 1). placeholder",
     "restSeconds": 60, "bedrollSingleUse": 1 },
 
+  "chat": { "_comment": "Chat channels (cooks/cookpass-multiplayer.md 3.3, AWRPlayerController::ServerChat): /g everyone, /l nearby (within localRangeCm), /c your clan, /w name a whisper, /r a reply. At most perSecond lines a second per player, burst at once; maxLength characters; history lines kept (the HUD shows the last 6 for 25 s). colors: each channel's lines (sRGB hex).",
+    "localRangeCm": 4000, "perSecond": 1, "burst": 5, "maxLength": 200, "history": 50,
+    "colors": { "global": "D9EBFA", "local": "D6C8B0", "clan": "8CD678", "whisper": "CDACE8", "system": "E2BE76" } },
+
   "door": { "_comment": "Hinged doors and gates (cooks/cookpass-multiplayer.md 3.1, AWRBuildPiece::OnRep_Door / Tick): the leaf turns about its hinge to openDeg over swingSeconds (gates gateSwingSeconds: a heavier leaf), away from whoever opens it; open it eases out past the stop by openBounceDeg and settles back; shut it eases into the frame and rebounds latchBounceDeg over latchBounceSeconds as the latch drops. Refused while a body stands in the swing.",
     "openDeg": 90, "swingSeconds": 0.9, "gateSwingSeconds": 1.6, "openBounceDeg": 3, "latchBounceDeg": 1.5, "latchBounceSeconds": 0.12 },
 

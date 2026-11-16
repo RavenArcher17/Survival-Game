@@ -18,8 +18,18 @@ public:
 	static void Close();
 	static bool IsOpen() { return Instance.IsValid(); }
 
+	/** Tab in the line: the next channel (cooks/cookpass-multiplayer.md 3.3). */
+	virtual FReply OnPreviewKeyDown(const FGeometry& Geo, const FKeyEvent& Key) override;
+
 private:
 	void OnCommitted(const FText& Text, ETextCommit::Type How);
+	/** The channel the chip shows (WRChat::EChannel: everyone, nearby, clan), kept between lines; the next one. */
+	static uint8 Channel;
+	void NextChannel();
+	bool InClan() const;
+	/** The line as sent: the chip's channel in front, unless it starts with its own (/w name, /r, /g...). */
+	FString WithChannel(const FString& Text) const;
+	static FText ChannelName(uint8 InChannel);
 	TWeakObjectPtr<APlayerController> Owner;
 	TSharedPtr<SEditableTextBox> Box;
 	static TSharedPtr<SWidget> Instance;

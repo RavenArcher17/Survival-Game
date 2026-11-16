@@ -1047,7 +1047,7 @@ void UWRPortalSystem::Announce(const FString& Line, FName Sound)
 	PsForPlayers(GetWorld(), [&](AWRPlayerController* PC)
 	{
 		PC->ClientNotify(Line);
-		PC->ClientChat(TEXT("The land"), Line);
+		PC->ClientChat(TEXT("The land"), Line, 4);
 		if (!Sound.IsNone()) WRSound::PlayUI(PC, Sound);
 	});
 }

@@ -8,6 +8,7 @@
 #include "WRPadInput.h"
 #include "Wildreach.h"
 #include "WRPlayerController.h"
+#include "WRPlayerState.h"
 #include "WRPlayerUI.h"
 #include "WRKeyBindings.h"
 #include "WRUISettings.h"
@@ -76,28 +77,94 @@ static FDelayedAutoRegisterHelper GWatchNetworkFailures(EDelayedRegisterRunPhase
 	}
 });
 
+uint8 SWRChatBox::Channel = 0;
+
+FText SWRChatBox::ChannelName(uint8 InChannel)
+{
+	switch (InChannel)
+	{
+	case WRChat::Local: return NSLOCTEXT("WRUI", "ChatNearby", "Nearby");
+	case WRChat::Clan: return NSLOCTEXT("WRUI", "ChatClan", "Clan");
+	default: return NSLOCTEXT("WRUI", "ChatEveryone", "Everyone");
+	}
+}
+
+bool SWRChatBox::InClan() const
+{
+	const APlayerController* PC = Owner.Get();
+	const AWRPlayerState* PS = PC ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+	return PS && !PS->ClanName.IsEmpty();
+}
+
+void SWRChatBox::NextChannel()
+{
+	// Everyone, nearby, your clan (only while you have one), round again.
+	Channel = Channel == WRChat::Global ? WRChat::Local : Channel == WRChat::Local && InClan() ? WRChat::Clan : WRChat::Global;
+}
+
+FString SWRChatBox::WithChannel(const FString& Text) const
+{
+	const FString Line = Text.Left(200);
+	if (Line.StartsWith(TEXT("/")))
+	{
+		return Line;   // its own channel: /w name, /r, /g, /l, /c
+	}
+	const uint8 Use = Channel == WRChat::Clan && !InClan() ? WRChat::Global : Channel;
+	return Use == WRChat::Local ? TEXT("/l ") + Line : Use == WRChat::Clan ? TEXT("/c ") + Line : Line;
+}
+
 void SWRChatBox::Construct(const FArguments& InArgs)
 {
 	Owner = InArgs._Owner;
+	if (Channel == WRChat::Clan && !InClan()) Channel = WRChat::Global;
 	ChildSlot.HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(FMargin(20.f, 0.f, 0.f, 240.f))
 	[
-		SNew(SBox).WidthOverride(520.f)
+		SNew(SBox).WidthOverride(620.f)
 		[
-			SAssignNew(Box, SEditableTextBox).HintText(FText::FromString(TEXT("Say something (Enter to send, Esc to cancel)")))
-			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 13)).OnTextCommitted(this, &SWRChatBox::OnCommitted)
+			SNew(SHorizontalBox)
+			// The channel chip: click it (or Tab) for the next; its colour is the channel's lines' colour.
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(SBox).WidthOverride(96.f)
+				[
+					SNew(SWRButton).Ghost(true).FontSize(12).MinHeight(30.f)
+					.Text_Lambda([]() { return ChannelName(Channel); })
+					.OnClicked_Lambda([this]() { NextChannel(); if (Box.IsValid()) FSlateApplication::Get().SetKeyboardFocus(Box, EFocusCause::SetDirectly); return FReply::Handled(); })
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SAssignNew(Box, SEditableTextBox)
+				.HintText_Lambda([]()
+				{
+					return FText::Format(NSLOCTEXT("WRUI", "ChatHint", "To {0}: Enter sends, Tab changes, /w name whispers, Esc cancels"), ChannelName(Channel));
+				})
+				.ForegroundColor_Lambda([]() { return FSlateColor(AWRPlayerController::ChatColor(Channel)); })
+				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 13)).OnTextCommitted(this, &SWRChatBox::OnCommitted)
+			]
 		]
 	];
+}
+
+FReply SWRChatBox::OnPreviewKeyDown(const FGeometry& Geo, const FKeyEvent& Key)
+{
+	if (Key.GetKey() == EKeys::Tab)
+	{
+		NextChannel();
+		return FReply::Handled();
+	}
+	return SCompoundWidget::OnPreviewKeyDown(Geo, Key);
 }
 
 void SWRChatBox::OnCommitted(const FText& Text, ETextCommit::Type How)
 {
 	// The pad keyboard over the line: its Done presses Enter here; anything else waits for it.
 	if (How != ETextCommit::OnEnter && WRPadKeyboard::IsOpen()) return;
-	if (How == ETextCommit::OnEnter && !Text.IsEmpty())
+	if (How == ETextCommit::OnEnter && !Text.IsEmptyOrWhitespace())
 	{
 		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Owner.Get()))
 		{
-			PC->ServerChat(Text.ToString().Left(200));
+			PC->ServerChat(WithChannel(Text.ToString()));
 		}
 	}
 	Close();
@@ -116,18 +183,20 @@ void SWRChatBox::Open(APlayerController* PC)
 	Mode.SetWidgetToFocus(Widget->Box);
 	PC->SetInputMode(Mode);
 	FSlateApplication::Get().SetKeyboardFocus(Widget->Box);
-	// Opened on a pad (Settings > Chat): the keyboard comes up on the line at once; cancelling it closes the line.
+	// Opened on a pad (Settings > Chat): the keyboard comes up on the line at once; cancelling it closes the line. The
+	// channel is the one last used; typed /c, /l, /g, /w name pick another.
 	if (WRInput::UsingPad())
 	{
 		WRPadKeyboard::FTarget Target;
-		Target.Hint = NSLOCTEXT("WRUI", "ChatPadHint", "Say something to everyone");
+		Target.Hint = FText::Format(NSLOCTEXT("WRUI", "ChatPadHint2", "To {0} (/g everyone, /l nearby, /c clan, /w name)"), ChannelName(Channel));
 		Target.MaxLength = 200;
 		Target.bDockTop = true;   // the chat line sits low on the left
-		const TWeakObjectPtr<APlayerController> Weak(PC);
-		Target.OnDone = [Weak](const FText& Text)
+		const TWeakPtr<SWRChatBox> WeakBox = Widget;
+		Target.OnDone = [WeakBox](const FText& Text)
 		{
-			AWRPlayerController* W = Cast<AWRPlayerController>(Weak.Get());
-			if (W && !Text.IsEmptyOrWhitespace()) W->ServerChat(Text.ToString().Left(200));
+			const TSharedPtr<SWRChatBox> B = WeakBox.Pin();
+			AWRPlayerController* W = B.IsValid() ? Cast<AWRPlayerController>(B->Owner.Get()) : nullptr;
+			if (W && !Text.IsEmptyOrWhitespace()) W->ServerChat(B->WithChannel(Text.ToString()));
 			Close();
 		};
 		Target.OnCancel = []() { Close(); };

@@ -94,31 +94,149 @@ void AWRPlayerController::OpenChat()
 
 void AWRPlayerController::ServerChat_Implementation(const FString& Message)
 {
-	const FString Clean = Message.Left(200).TrimStartAndEnd();
+	FString Clean = Message.Left(260).TrimStartAndEnd();
 	const FString From = PlayerState ? PlayerState->GetPlayerName() : TEXT("?");
 	if (Clean.IsEmpty())
 	{
 		return;
 	}
-	UE_LOG(LogWildreach, Log, TEXT("CHAT %s: %s"), *From, *Clean);
+	// The channel, from the line's start (the chat box puts the one its chip shows; anyone can type them).
+	uint8 Channel = WRChat::Global;
+	FString Target;
+	if (Clean.StartsWith(TEXT("/")))
+	{
+		FString Cmd, Rest;
+		if (!Clean.Split(TEXT(" "), &Cmd, &Rest)) { Cmd = Clean; Rest.Reset(); }
+		Cmd = Cmd.ToLower();
+		Rest.TrimStartAndEndInline();
+		if (Cmd == TEXT("/g") || Cmd == TEXT("/all")) Channel = WRChat::Global;
+		else if (Cmd == TEXT("/l") || Cmd == TEXT("/local") || Cmd == TEXT("/near")) Channel = WRChat::Local;
+		else if (Cmd == TEXT("/c") || Cmd == TEXT("/clan")) Channel = WRChat::Clan;
+		else if (Cmd == TEXT("/w") || Cmd == TEXT("/whisper") || Cmd == TEXT("/msg"))
+		{
+			Channel = WRChat::Whisper;
+			if (!Rest.Split(TEXT(" "), &Target, &Rest)) { Target = Rest; Rest.Reset(); }
+		}
+		else if (Cmd == TEXT("/r") || Cmd == TEXT("/reply"))
+		{
+			Channel = WRChat::Whisper;
+			Target = LastWhisperFrom;
+			if (Target.IsEmpty())
+			{
+				ClientNotify(TEXT("Nobody has whispered to you yet"));
+				return;
+			}
+		}
+		else
+		{
+			ClientNotify(TEXT("Chat: /g everyone, /l nearby, /c your clan, /w name to whisper, /r to reply"));
+			return;
+		}
+		Clean = Rest.TrimStartAndEnd();
+	}
+	Clean = Clean.Left(FMath::RoundToInt(WRTune(TEXT("chat.maxLength"), 200.f)));
+	if (Clean.IsEmpty())
+	{
+		return;
+	}
+	// The allowance: chat.perSecond, chat.burst at once (a flood reaches nobody).
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float Burst = FMath::Max(1.f, WRTune(TEXT("chat.burst"), 5.f));
+	if (ChatTokens < 0.f) ChatTokens = Burst;
+	ChatTokens = FMath::Min(Burst, ChatTokens + float(Now - ChatTokensAt) * WRTune(TEXT("chat.perSecond"), 1.f));
+	ChatTokensAt = Now;
+	if (ChatTokens < 1.f)
+	{
+		ClientNotify(TEXT("Slow down: chat is limited to a line a second"));
+		return;
+	}
+	ChatTokens -= 1.f;
+	const FString Channels[] = { TEXT("all"), TEXT("near"), TEXT("clan"), TEXT("whisper"), TEXT("system"), TEXT("whisper") };
+	UE_LOG(LogWildreach, Log, TEXT("CHAT [%s%s] %s: %s"), *Channels[Channel], Target.IsEmpty() ? TEXT("") : *(TEXT(" ") + Target), *From, *Clean);
 	// A worn title goes before the name: "‹Ember-sworn› Aaron: ..." (WRDeeds).
 	const UWRDeedsComponent* Deeds = UWRDeedsComponent::For(PlayerState);
 	const FString Shown = Deeds && !Deeds->ActiveTitle.IsEmpty() ? FString::Printf(TEXT("\u2039%s\u203A %s"), *Deeds->ActiveTitle, *From) : From;
+	const AWRPlayerState* MyPS = GetPlayerState<AWRPlayerState>();
+	if (Channel == WRChat::Clan && (!MyPS || MyPS->ClanName.IsEmpty()))
+	{
+		ClientNotify(TEXT("You're not in a clan: /g speaks to everyone"));
+		return;
+	}
+	if (Channel == WRChat::Whisper)
+	{
+		AWRPlayerController* To = nullptr;
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It && !To; ++It)
+		{
+			AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
+			if (PC && PC->PlayerState && PC->PlayerState->GetPlayerName().Equals(Target, ESearchCase::IgnoreCase)) To = PC;
+		}
+		if (!To)
+		{
+			ClientNotify(FString::Printf(TEXT("Nobody called %s is here"), *Target));
+			return;
+		}
+		if (To == this)
+		{
+			ClientNotify(TEXT("Whispering to yourself?"));
+			return;
+		}
+		To->LastWhisperFrom = From;
+		To->ClientChat(Shown, Clean, WRChat::Whisper);
+		ClientChat(To->PlayerState->GetPlayerName(), Clean, WRChat::WhisperSent);
+		return;
+	}
+	const APawn* Me = GetPawn();
+	const FVector Here = Me ? Me->GetActorLocation() : (PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : FVector::ZeroVector);
+	const float Range = WRTune(TEXT("chat.localRangeCm"), 4000.f);
+	int32 Heard = 0;
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
-		if (AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get()))
+		AWRPlayerController* PC = Cast<AWRPlayerController>(It->Get());
+		if (!PC) continue;
+		if (Channel == WRChat::Local && PC != this)
 		{
-			PC->ClientChat(Shown, Clean);
+			const APawn* Them = PC->GetPawn();
+			if (!Them || FVector::Dist(Them->GetActorLocation(), Here) > Range) continue;
 		}
+		if (Channel == WRChat::Clan)
+		{
+			const AWRPlayerState* Their = PC->GetPlayerState<AWRPlayerState>();
+			if (!Their || Their->ClanName != MyPS->ClanName) continue;
+		}
+		PC->ClientChat(Shown, Clean, Channel);
+		Heard += PC != this ? 1 : 0;
+	}
+	if (Channel == WRChat::Local && Heard == 0)
+	{
+		ClientNotify(TEXT("Nobody is near enough to hear you"));
 	}
 }
 
-void AWRPlayerController::ClientChat_Implementation(const FString& From, const FString& Message)
+FLinearColor AWRPlayerController::ChatColor(uint8 Channel)
 {
-	Chat.Add({ FString::Printf(TEXT("%s: %s"), *From, *Message), GetWorld()->GetTimeSeconds() });
-	if (Chat.Num() > 8) Chat.RemoveAt(0);
-	if (bBot) BotHeard.Add(Chat.Last().Text);   // (waitchat)
-	UE_LOG(LogWildreach, Log, TEXT("NOTICE chat %s: %s"), *From, *Message);
+	static const TCHAR* const Keys[] = { TEXT("global"), TEXT("local"), TEXT("clan"), TEXT("whisper"), TEXT("system"), TEXT("whisper") };
+	static const FColor Defaults[] = { FColor(217, 235, 250), FColor(214, 200, 176), FColor(140, 214, 120), FColor(205, 172, 232), FColor(226, 190, 118), FColor(205, 172, 232) };
+	const uint8 C = Channel < 6 ? Channel : 0;
+	const FString Hex = FWRTuning::Get().Str(FString::Printf(TEXT("chat.colors.%s"), Keys[C]), TEXT(""));
+	return FLinearColor(Hex.IsEmpty() ? Defaults[C] : FColor::FromHex(Hex));
+}
+
+void AWRPlayerController::ClientChat_Implementation(const FString& From, const FString& Message, uint8 Channel)
+{
+	FString Line;
+	switch (Channel)
+	{
+	case WRChat::Local: Line = FString::Printf(TEXT("[Nearby] %s: %s"), *From, *Message); break;
+	case WRChat::Clan: Line = FString::Printf(TEXT("[Clan] %s: %s"), *From, *Message); break;
+	case WRChat::Whisper: Line = FString::Printf(TEXT("%s whispers: %s"), *From, *Message); break;
+	case WRChat::WhisperSent: Line = FString::Printf(TEXT("To %s: %s"), *From, *Message); break;
+	default: Line = FString::Printf(TEXT("%s: %s"), *From, *Message); break;
+	}
+	Chat.Add({ Line, GetWorld()->GetTimeSeconds(), Channel });
+	const int32 Keep = FMath::Max(8, FMath::RoundToInt(WRTune(TEXT("chat.history"), 50.f)));
+	if (Chat.Num() > Keep) Chat.RemoveAt(0, Chat.Num() - Keep);
+	if (bBot) BotHeard.Add(FString::Printf(TEXT("%s: %s"), *From, *Message));   // (waitchat)
+	UE_LOG(LogWildreach, Log, TEXT("NOTICE chat %s"), *Line);
 }
 
 void AWRPlayerController::ReturnToMenu()

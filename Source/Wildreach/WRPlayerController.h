@@ -54,6 +54,12 @@ struct FWRMenuEntry
  * Lock-on targeting, developer commands (WR*), and a scripted test bot (-wrbot) used
  * by headless multiplayer tests.
  */
+/** Chat channels (AWRPlayerController::ServerChat; cooks/cookpass-multiplayer.md 3.3). WhisperSent: your own whisper, as you see it. */
+namespace WRChat
+{
+	enum EChannel : uint8 { Global = 0, Local = 1, Clan = 2, Whisper = 3, System = 4, WhisperSent = 5 };
+}
+
 UCLASS()
 class WILDREACH_API AWRPlayerController : public APlayerController
 {
@@ -393,11 +399,17 @@ public:
 	void OpenChat();
 	bool IsMapShown() const { return bShowMap; }
 
-	/** Chat: everyone on the server sees it. */
+	/**
+	 * Chat (cooks/cookpass-multiplayer.md 3.3): a line, its channel from its start: none or /g everyone, /l nearby
+	 * (chat.localRangeCm), /c your clan, /w <name> a whisper, /r a reply to the last whisper. The server sends it on with
+	 * its channel (WRChat::EChannel), at most chat.perSecond a second (chat.burst at once).
+	 */
 	UFUNCTION(Server, Reliable) void ServerChat(const FString& Message);
-	UFUNCTION(Client, Reliable) void ClientChat(const FString& From, const FString& Message);
-	struct FChatLine { FString Text; double Time; };
+	UFUNCTION(Client, Reliable) void ClientChat(const FString& From, const FString& Message, uint8 Channel);
+	struct FChatLine { FString Text; double Time; uint8 Channel = 0; };
 	const TArray<FChatLine>& GetChat() const { return Chat; }
+	/** The colour a channel's lines are drawn in (sRGB from tuning chat.colors). */
+	static FLinearColor ChatColor(uint8 Channel);
 private:
 	void MenuUp();
 	void MenuDown();
@@ -422,6 +434,10 @@ private:
 	EWRMenu Menu = EWRMenu::None;
 	bool bShowMap = false;
 	TArray<FChatLine> Chat;
+	/** Server: the chat allowance (tokens, refilled chat.perSecond up to chat.burst) and who last whispered to this player. */
+	float ChatTokens = -1.f;
+	double ChatTokensAt = 0.0;
+	FString LastWhisperFrom;
 	int32 MenuIndex = 0;
 	FName MenuElement;
 	TWeakObjectPtr<AWRStation> MenuStation;
