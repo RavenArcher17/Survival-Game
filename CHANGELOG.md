@@ -32,7 +32,7 @@ Lane ship-7. Compiled (editor target); the packaged build was launched and its l
     over parts (1 MB of 25 fetched, never touching `Wildreach-Setup.exe`), its whole download from parts, **0.7.1's
     real updater (built from the v0.7.1 tag) updating through the download program**, a fresh install through it, and a
     damaged part refused (8 of 8); `Tools/updatertest.ps1` still passes 44 of 44 (one-file releases unchanged).
-- **630 MB less to download:** `Config/DefaultGame.ini` never cooks `/MetaHumanAnimator` (MetaHuman Animator's
+- **630 MB less to download:** `Config/DefaultGame.ini` never cooks `/MetaHuman/GenericTracker` (MetaHuman Animator's
   face-tracking models, a capture tool: 530 MB) or `/NNEDenoiser` (the path tracer's denoiser: 98 MB); the game loads
   neither.
 - **README.txt beside the game** no longer says anyone can use the console: since the god mode lane the test commands
