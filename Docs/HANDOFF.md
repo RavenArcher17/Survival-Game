@@ -66,6 +66,8 @@ Offline raid protection is `FWRSocialRules::ProtectionFor(World, Owner, LastAtta
 leaving times noted in `AWRGameMode::Logout`); a claim keeps its state in `AWRClaimTotem::ProtectState` /
 `ProtectArmsAt` (updated each second) and its last attack in `LastAttackedUtc`. Damage to pieces goes through
 `TakeBuildDamage`, which applies it; don't check `IsAnyoneOnline` for protection anywhere else.
+Chat lines carry their channel at the start (`/g /l /c /w name /r`, parsed in `ServerChat`); `ClientChat(From, Line,
+WRChat::EChannel)` delivers one. A system line from the world uses channel `WRChat::System`.
 Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

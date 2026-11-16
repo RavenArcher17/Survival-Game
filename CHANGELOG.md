@@ -26,6 +26,14 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
   "Protected: 75% less damage while you're all away"). A raider hitting a protected claim is told so once a minute,
   "Protected (75%): its owners are away". Two new rows in the world settings (Protection arms after, Quiet time after
   an attack), and both keys are in every preset. Tested by compiling.
+- **Part C: chat channels.** Why: chat was one global channel with an 8-line memory and no limit: no clan talk, no
+  whisper, no talk to the people beside you, and a client could flood everyone. Now there are **Everyone**, **Nearby**
+  (40 m, `chat.localRangeCm`), **Clan** and **whispers** (`/w name`, `/r` replies), in `AWRPlayerController::ServerChat`
+  (the channel rides at the line's start, so the pad keyboard types them too). The chat line has a channel chip: click
+  it or press Tab for the next channel, which is remembered. Each channel's lines have their own colour on the HUD
+  (`chat.colors`, sRGB): "[Nearby] Mira: ...", "[Clan] Mira: ...", "Mira whispers: ...", "To Mira: ...". The server
+  keeps a line a second (5 at once) per player, and refuses with a reason: not in a clan, nobody by that name, nobody
+  near enough to hear. 50 lines are kept. Tested by compiling.
 
 ## Unreleased: building and raids cook pass (cookpass-building)
 
