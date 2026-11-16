@@ -15,6 +15,17 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
   says "Someone's in the way". It won't shut on a body in its swing or in the doorway ("Someone's in the doorway" /
   "Step back: you're in the door's way"). It collides when at rest, open or shut, never while it moves. Doors seen
   for the first time are drawn as they are. Tested by compiling.
+- **Part B: offline raid protection arms instead of switching on.** Why: protection started the instant the last
+  clanmate logged off, so logging out mid-raid shielded the base (ARK's lesson: its protection waits 15 min). Now a
+  claim is protected only once none of its owners is on, `server.offlineArmMinutes` (15) have passed since the last
+  of them left, and `server.offlineQuietMinutes` (10) since its last attack. It ends the moment one logs in
+  (`FWRSocialRules::ProtectionFor`). Leaving times come from this session or the account's last seen (now also written
+  on logout, `WRIdentity::NoteLeft`), never earlier than the world's start, so a restart isn't a free arm. Any hit from
+  outside the owners restarts the quiet time (the totem's `LastAttackedUtc`, saved). Upkeep decay is no longer reduced
+  by protection. The Claim tab says the live state ("Unprotected: one of you is home", "Arming: protected in 11 min",
+  "Protected: 75% less damage while you're all away"). A raider hitting a protected claim is told so once a minute,
+  "Protected (75%): its owners are away". Two new rows in the world settings (Protection arms after, Quiet time after
+  an attack), and both keys are in every preset. Tested by compiling.
 
 ## Unreleased: building and raids cook pass (cookpass-building)
 

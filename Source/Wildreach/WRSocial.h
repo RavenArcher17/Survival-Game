@@ -54,8 +54,24 @@ struct WILDREACH_API FWRSocialRules
 	static bool CanShare(const FString& Owner, const FString& Player);
 	/** Survivor vs survivor: PvP setting, clans, safe zones, PvP inside boss arenas. */
 	static bool PlayersCanFight(const AWRCharacterBase* A, const AWRCharacterBase* B);
-	/** Owner or a clanmate is connected (offline base protection). */
+	/** Owner or a clanmate is connected. */
 	static bool IsAnyoneOnline(const UWorld* World, const FString& Owner);
+
+	/**
+	 * Offline raid protection (cooks/cookpass-multiplayer.md 3.2; ARK's lesson): a base is protected only when none of its
+	 * owners (the owner and their clan) is on, server.offlineArmMinutes have passed since the last of them left, and
+	 * server.offlineQuietMinutes since it was last attacked (LastAttackedUtc, 0 = never). It ends the moment one logs in.
+	 * Returns the state (0 off on this world, 1 one of them is home, 2 arming, 3 protected) and, arming, when it arms.
+	 */
+	enum : uint8 { ProtectOff = 0, ProtectHome = 1, ProtectArming = 2, ProtectOn = 3 };
+	static uint8 ProtectionFor(const UWorld* World, const FString& Owner, int64 LastAttackedUtc, int64& OutArmsAtUtc);
+	/** Server: a player left / joined (their leaving time arms their bases; it's kept in their account too). */
+	static void NoteLeft(const FString& Player);
+	static void NoteJoined(const FString& Player);
+	/** When they last left (UTC seconds): this session's note, else their account's last seen, else when this world started. */
+	static int64 LastLeftUtc(const FString& Player);
+	/** Server, as a world starts: forget the last world's notes; leaving times count from now for anyone unknown. */
+	static void ResetSession();
 	static bool IsInSafeZone(const UWorld* World, const FVector& Location);
 	/** Server preset string setting (deathPenalty, raids). */
 	static FString Setting(const TCHAR* Key, const TCHAR* Fallback);

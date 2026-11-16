@@ -22,6 +22,8 @@ namespace WRIdentity
 	WILDREACH_API FString Check(const FString& Name, const FString& Token, const FString& Platform, const FString& PlatformId);
 	/** Server, once the player is in: claims or refreshes the name's account (token, platform id, last seen, address). */
 	WILDREACH_API void Bind(const FString& Name, const FString& Token, const FString& Platform, const FString& PlatformId, const FString& Address);
+	/** Server, as the player leaves: their account's last seen is now (offline raid protection arms from it). */
+	WILDREACH_API void NoteLeft(const FString& Name);
 
 	/** Lower-case hex SHA-256 of the text's UTF-8 bytes. */
 	WILDREACH_API FString Sha256Hex(const FString& Text);

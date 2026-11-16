@@ -2018,6 +2018,9 @@ namespace WRSettingsUI
 					[this]() { return Values->DeathPenalty == TEXT("gentle") ? 0 : 1; },
 					[this](int32 i) { Values->DeathPenalty = i == 0 ? TEXT("gentle") : TEXT("souls"); Changed(); }));
 			Range(LOCTEXT("RuleOffline", "Offline raid protection"), LOCTEXT("RuleOfflineSub", "Less damage to bases while their owners are away"), TEXT("offlineProtection"), 0.f, 1.f, 0.05f, Percent);
+			// When it arms (cooks/cookpass-multiplayer.md 3.2): logging off mid-raid mustn't shield a base at once.
+			Range(LOCTEXT("RuleOfflineArm", "Protection arms after"), LOCTEXT("RuleOfflineArmSub", "How long after the last owner leaves before it starts"), TEXT("offlineArmMinutes"), 0.f, 60.f, 5.f, Minutes);
+			Range(LOCTEXT("RuleOfflineQuiet", "Quiet time after an attack"), LOCTEXT("RuleOfflineQuietSub", "A base that was just attacked waits this long unattacked first"), TEXT("offlineQuietMinutes"), 0.f, 60.f, 5.f, Minutes);
 			Range(LOCTEXT("RuleClan", "Clan size limit"), LOCTEXT("RuleClanSub", "How many can share a clan"), TEXT("clanSizeLimit"), 0.f, 20.f, 1.f, Members);
 
 			Group(LOCTEXT("RulesSpeeds", "Speeds"), false);

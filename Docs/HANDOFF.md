@@ -62,6 +62,10 @@ Path node glyphs come from `Tools/ui_glyphs.mjs` (Necromancy's added): run it wi
 `bOpen` + `DoorSide` (`AWRBuildPiece::OnRep_Door` starts the swing, `Tick` runs only while it moves, `door.*` tuning);
 open or shut a door for a person with `SwingFor(Pawn, bOpen, Why)` (away from them, refused with a reason while a body
 is in the swing), and without one with `SetOpen` (blasts, build copy). Don't set `bOpen` directly.
+Offline raid protection is `FWRSocialRules::ProtectionFor(World, Owner, LastAttackedUtc)` (arming and quiet timers;
+leaving times noted in `AWRGameMode::Logout`); a claim keeps its state in `AWRClaimTotem::ProtectState` /
+`ProtectArmsAt` (updated each second) and its last attack in `LastAttackedUtc`. Damage to pieces goes through
+`TakeBuildDamage`, which applies it; don't check `IsAnyoneOnline` for protection anywhere else.
 Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

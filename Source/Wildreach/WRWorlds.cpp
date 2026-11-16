@@ -57,7 +57,7 @@ namespace WRWorldsFiles
 
 	/** Every number the settings screen has. Not bounties or craftMultiplier: nothing in the game reads them yet. */
 	const TCHAR* const RuleKeys[] = {
-		TEXT("pvp"), TEXT("pvpInBossArenas"), TEXT("offlineProtection"), TEXT("clanSizeLimit"),
+		TEXT("pvp"), TEXT("pvpInBossArenas"), TEXT("offlineProtection"), TEXT("offlineArmMinutes"), TEXT("offlineQuietMinutes"), TEXT("clanSizeLimit"),
 		TEXT("xpMultiplier"), TEXT("gatherMultiplier"), TEXT("tamingMultiplier"), TEXT("cropMultiplier"),
 		TEXT("dayMinutes"), TEXT("hungerMultiplier"), TEXT("creatureNumbers"), TEXT("creatureDifficulty"),
 		TEXT("upkeepMultiplier"), TEXT("bossRespawnHours"), TEXT("portalRuns"), TEXT("artifactSlots"),

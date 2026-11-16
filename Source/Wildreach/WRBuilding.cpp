@@ -1252,11 +1252,27 @@ void AWRBuildPiece::TakeBuildDamage(float Amount, AActor* DamageSource)
 	{
 		return;
 	}
-	// Offline base protection: less damage while the owner and their clan are all offline.
-	const float Protection = WRTune(TEXT("server.offlineProtection"), 0.f);
-	if (Protection > 0.f && !FWRSocialRules::IsAnyoneOnline(GetWorld(), OwnerName))
+	// Offline raid protection (cooks/cookpass-multiplayer.md 3.2): less damage only once it has armed, 15 min after the
+	// last of the owners left and 10 quiet minutes after the last attack, so logging off mid-raid shields nothing. A
+	// claim's upkeep decay (the totem's own damage) is never protected.
+	if (!Cast<AWRClaimTotem>(DamageSource))
 	{
-		Amount *= 1.f - FMath::Clamp(Protection, 0.f, 1.f);
+		const float Protection = FMath::Clamp(WRTune(TEXT("server.offlineProtection"), 0.f), 0.f, 1.f);
+		AWRClaimTotem* Claim = AWRClaimTotem::FindAt(GetWorld(), GetActorLocation());
+		if (Claim && !FWRSocialRules::CanShare(Claim->OwnerName, OwnerName)) Claim = nullptr;
+		bool bProtected = false;
+		if (Claim)
+		{
+			Claim->UpdateProtection();
+			bProtected = Claim->IsProtectedNow();
+		}
+		else
+		{
+			int64 ArmsAt = 0;
+			bProtected = FWRSocialRules::ProtectionFor(GetWorld(), OwnerName, 0, ArmsAt) == FWRSocialRules::ProtectOn;
+		}
+		if (bProtected) Amount *= 1.f - Protection;
+		if (Claim) Claim->NoteHit(DamageSource, bProtected ? Protection : 0.f);
 	}
 	Health -= Amount;
 	LastDamagedAt = GetWorld()->GetTimeSeconds();
@@ -1555,6 +1571,7 @@ TSharedRef<FJsonObject> AWRBuildPiece::ToJson() const
 	{
 		O->SetNumberField(TEXT("claimUpgrade"), Totem->UpgradeLevel);
 		if (Totem->NextRaidHours >= 0.0) O->SetNumberField(TEXT("nextRaid"), Totem->NextRaidHours);
+		if (Totem->LastAttackedUtc > 0) O->SetNumberField(TEXT("attackedAt"), double(Totem->LastAttackedUtc));
 		TArray<TSharedPtr<FJsonValue>> Upkeep;
 		for (const FWRItemStack& S : Totem->UpkeepStorage)
 		{
@@ -1685,6 +1702,8 @@ void AWRBuildPiece::FromJson(const TSharedPtr<FJsonObject>& O)
 		}
 		ReadStacks(O, TEXT("upkeep"), Totem->UpkeepStorage);
 		O->TryGetNumberField(TEXT("nextRaid"), Totem->NextRaidHours);
+		double AttackedAt = 0.0;
+		if (O->TryGetNumberField(TEXT("attackedAt"), AttackedAt)) Totem->LastAttackedUtc = int64(AttackedAt);
 	}
 }
 
@@ -1761,6 +1780,8 @@ void AWRClaimTotem::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRClaimTotem, bUnpaid);
 	DOREPLIFETIME(AWRClaimTotem, UpkeepStorage);
 	DOREPLIFETIME(AWRClaimTotem, BellRungAt);
+	DOREPLIFETIME(AWRClaimTotem, ProtectState);
+	DOREPLIFETIME(AWRClaimTotem, ProtectArmsAt);
 }
 
 AWRClaimTotem* AWRClaimTotem::FindAt(const UWorld* World, const FVector& Location)
@@ -1824,6 +1845,71 @@ TMap<FName, float> AWRClaimTotem::CurrentUpkeepPerHour() const
 	return PerHour;
 }
 
+namespace WRClaimProtect
+{
+	/** The player behind a hit (the pawn, or the pawn / controller that fired or placed it): their controller and name. */
+	AWRPlayerController* Attacker(AActor* Source, FString& OutName)
+	{
+		OutName.Reset();
+		for (int32 Hop = 0; Source && Hop < 4; ++Hop)
+		{
+			if (const APawn* P = Cast<APawn>(Source))
+			{
+				if (const APlayerState* PS = P->GetPlayerState()) { OutName = PS->GetPlayerName(); return Cast<AWRPlayerController>(P->GetController()); }
+			}
+			if (AWRPlayerController* PC = Cast<AWRPlayerController>(Source))
+			{
+				if (PC->PlayerState) OutName = PC->PlayerState->GetPlayerName();
+				return PC;
+			}
+			AActor* Next = Source->GetInstigator() ? static_cast<AActor*>(Source->GetInstigator()) : Source->GetOwner();
+			if (Next == Source) break;
+			Source = Next;
+		}
+		return nullptr;
+	}
+}
+
+void AWRClaimTotem::UpdateProtection()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	int64 ArmsAtUtc = 0;
+	const uint8 State = FWRSocialRules::ProtectionFor(GetWorld(), OwnerName, LastAttackedUtc, ArmsAtUtc);
+	float ArmsAt = 0.f;
+	if (State == FWRSocialRules::ProtectArming)
+	{
+		ArmsAt = float(GetWorld()->GetTimeSeconds() + double(ArmsAtUtc - FDateTime::UtcNow().ToUnixTimestamp()));
+	}
+	// Sent when it changes (the time only when it moves by more than a couple of seconds: it counts down on the client).
+	if (State != ProtectState) ProtectState = State;
+	if (FMath::Abs(ArmsAt - ProtectArmsAt) > 2.f) ProtectArmsAt = ArmsAt;
+}
+
+void AWRClaimTotem::NoteHit(AActor* Source, float Share)
+{
+	FString Who;
+	AWRPlayerController* PC = WRClaimProtect::Attacker(Source, Who);
+	if (!Who.IsEmpty() && FWRSocialRules::CanShare(OwnerName, Who))
+	{
+		return;   // its own people (their own fire, a misplaced charge): no attack
+	}
+	LastAttackedUtc = FDateTime::UtcNow().ToUnixTimestamp();
+	if (Share > 0.f && PC && !Who.IsEmpty())
+	{
+		// Raiders can always tell: once a minute each.
+		const double Now = GetWorld()->GetTimeSeconds();
+		double& Told = ToldProtected.FindOrAdd(Who, -1000.0);
+		if (Now - Told >= WRTune(TEXT("raid.protectedNoticeSeconds"), 60.f))
+		{
+			Told = Now;
+			PC->ClientNotify(FString::Printf(TEXT("Protected (%d%%): its owners are away"), FMath::RoundToInt(Share * 100.f)));
+		}
+	}
+}
+
 void AWRClaimTotem::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -1831,6 +1917,7 @@ void AWRClaimTotem::Tick(float DeltaSeconds)
 	{
 		return;
 	}
+	UpdateProtection();
 	MinuteClock += DeltaSeconds;
 	if (MinuteClock < 60.f)
 	{

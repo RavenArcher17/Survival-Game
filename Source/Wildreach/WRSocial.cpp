@@ -7,6 +7,7 @@
 #include "WRTuning.h"
 #include "WRWorlds.h"
 #include "WRStore.h"
+#include "WRIdentity.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
@@ -282,6 +283,86 @@ bool FWRSocialRules::IsAnyoneOnline(const UWorld* World, const FString& Owner)
 		if (P && CanShare(Owner, P->GetPlayerName())) return true;
 	}
 	return false;
+}
+
+namespace WRSocialProtect
+{
+	struct FSession
+	{
+		TMap<FString, int64> Left;
+		int64 StartedUtc = 0;
+	};
+	FSession& Session()
+	{
+		static FSession S;
+		if (S.StartedUtc == 0) S.StartedUtc = FDateTime::UtcNow().ToUnixTimestamp();
+		return S;
+	}
+}
+
+void FWRSocialRules::ResetSession()
+{
+	WRSocialProtect::Session().Left.Reset();
+	WRSocialProtect::Session().StartedUtc = FDateTime::UtcNow().ToUnixTimestamp();
+}
+
+void FWRSocialRules::NoteLeft(const FString& Player)
+{
+	if (Player.IsEmpty()) return;
+	WRSocialProtect::Session().Left.Add(Player.ToLower(), FDateTime::UtcNow().ToUnixTimestamp());
+	WRIdentity::NoteLeft(Player);
+}
+
+void FWRSocialRules::NoteJoined(const FString& Player)
+{
+	// Online now: IsAnyoneOnline covers them; their leaving time is set again when they go.
+	WRSocialProtect::Session().Left.Remove(Player.ToLower());
+}
+
+int64 FWRSocialRules::LastLeftUtc(const FString& Player)
+{
+	WRSocialProtect::FSession& S = WRSocialProtect::Session();
+	if (const int64* At = S.Left.Find(Player.ToLower()))
+	{
+		return *At;
+	}
+	// Not seen this session: their account's last seen (written as they join and leave), never before this world started
+	// (a restart doesn't hand out a free, instant arm: the clock starts at the restart for anyone the store can't place).
+	int64 At = S.StartedUtc;
+	WRStore::FAccount A;
+	if (WRStore::IsSql() && WRStore::ReadAccount(Player, A) && A.LastSeen > 0)
+	{
+		At = A.LastSeen;
+	}
+	S.Left.Add(Player.ToLower(), At);
+	return At;
+}
+
+uint8 FWRSocialRules::ProtectionFor(const UWorld* World, const FString& Owner, int64 LastAttackedUtc, int64& OutArmsAtUtc)
+{
+	OutArmsAtUtc = 0;
+	if (WRTune(TEXT("server.offlineProtection"), 0.f) <= 0.f || Owner.IsEmpty())
+	{
+		return ProtectOff;
+	}
+	if (IsAnyoneOnline(World, Owner))
+	{
+		return ProtectHome;
+	}
+	// The owner and everyone in their clan: armed from the last of them to leave.
+	TArray<FString> Owners;
+	const FString Clan = FWRClans::Get().ClanOf(Owner);
+	if (!Clan.IsEmpty()) Owners = FWRClans::Get().Members(Clan);
+	Owners.AddUnique(Owner);
+	int64 Last = 0;
+	for (const FString& Who : Owners) Last = FMath::Max(Last, LastLeftUtc(Who));
+	int64 ArmsAt = Last + int64(FMath::Max(0.f, WRTune(TEXT("server.offlineArmMinutes"), 15.f)) * 60.f);
+	if (LastAttackedUtc > 0)
+	{
+		ArmsAt = FMath::Max(ArmsAt, LastAttackedUtc + int64(FMath::Max(0.f, WRTune(TEXT("server.offlineQuietMinutes"), 10.f)) * 60.f));
+	}
+	OutArmsAtUtc = ArmsAt;
+	return FDateTime::UtcNow().ToUnixTimestamp() >= ArmsAt ? ProtectOn : ProtectArming;
 }
 
 // ---------------------------------------------------------------- safe zone

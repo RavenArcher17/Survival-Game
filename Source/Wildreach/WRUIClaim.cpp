@@ -854,8 +854,33 @@ namespace WRUIClaimScreen
 			const bool bPvp = WRTune(TEXT("server.pvp"), 1.f) > 0.f;
 			const float Protect = WRTune(TEXT("server.offlineProtection"), 0.f);
 			const int32 Decay = FMath::RoundToInt(FWRBuildRegistry::Get().DecayPerHourWhenUnpaid * 100.f);
-			FString Rule = bPvp ? TEXT("PvP is on on this server.") : TEXT("PvP is off on this server.");
-			Rule += Protect > 0.f ? FString::Printf(TEXT(" While you're all offline your pieces take %.0f%% less damage."), Protect * 100.f) : FString(TEXT(" Outsiders can still break your pieces."));
+			// The protection as it stands now (cooks/cookpass-multiplayer.md 3.2): it arms a while after the last of you
+			// leaves, and waits out a quiet time after an attack.
+			const TAttribute<FText> Rule = TAttribute<FText>::CreateLambda([this, bPvp, Protect]()
+			{
+				FString Line = bPvp ? TEXT("PvP is on on this server.") : TEXT("PvP is off on this server.");
+				const AWRClaimTotem* T = Totem.Get();
+				const int32 Pct = FMath::RoundToInt(Protect * 100.f);
+				const int32 Arm = FMath::RoundToInt(WRTune(TEXT("server.offlineArmMinutes"), 15.f));
+				if (Protect <= 0.f || !T)
+				{
+					Line += TEXT(" Outsiders can still break your pieces.");
+					return FText::FromString(Line);
+				}
+				const AGameStateBase* GS = T->GetWorld() ? T->GetWorld()->GetGameState() : nullptr;
+				const float Left = GS ? FMath::Max(0.f, T->ProtectArmsAt - float(GS->GetServerWorldTimeSeconds())) : 0.f;
+				const int32 Min = FMath::Max(1, FMath::CeilToInt(Left / 60.f));
+				switch (T->ProtectState)
+				{
+				case 3: Line += FString::Printf(TEXT(" Protected: %d%% less damage while you're all away."), Pct); break;
+				case 2:
+					Line += FString::Printf(TEXT(" Arming: protected in %d min (%d%% less damage; it arms %d min after the last of you leaves, and waits %d quiet min after an attack)."),
+						Min, Pct, Arm, FMath::RoundToInt(WRTune(TEXT("server.offlineQuietMinutes"), 10.f)));
+					break;
+				default: Line += FString::Printf(TEXT(" Unprotected: one of you is home. Once you're all away it arms after %d min (%d%% less damage)."), Arm, Pct); break;
+				}
+				return FText::FromString(Line);
+			});
 			return SNew(SVerticalBox)
 				+ SVerticalBox::Slot().AutoHeight().Padding(4.f * U, 0.f)
 				[
@@ -864,7 +889,7 @@ namespace WRUIClaimScreen
 					[
 						SNew(SBox).WidthOverride(16.f * U).HeightOverride(16.f * U)[SNew(SImage).Image(Circle(FLinearColor::Transparent, bPvp ? WRUI::Warn : WRUI::Good, 1.8f))]
 					]
-					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(Rule), WRUI::Body(14, 500), WRUI::Ink2, false, true)]
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(Rule, WRUI::Body(14, 500), WRUI::Ink2, false, true)]
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)
 				[

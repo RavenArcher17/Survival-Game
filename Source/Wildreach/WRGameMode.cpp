@@ -81,6 +81,8 @@ void AWRGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 	// The world store (SQLite, Saved/Worlds/<id>/world.db): opened before anything loads; brings in 0.7's JSON saves once.
 	WRStore::Open(GetWorld());
 	FWRClans::Get().Load();
+	// Offline raid protection counts owners' leaving times per world (cooks/cookpass-multiplayer.md 3.2).
+	FWRSocialRules::ResetSession();
 	UE_LOG(LogWildreach, Log, TEXT("WORLD %s"), Id.IsEmpty() ? TEXT("none (the menu's island: nothing is loaded or saved)") : *FString::Printf(TEXT("'%s' (Saved/Worlds/%s), preset %s"), *Id, *Id, *FWRTuning::Get().GetPreset()));
 }
 
@@ -682,6 +684,7 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 	CountPlayTime();
 	FWRClans::Get().RefreshPlayerStates(GetWorld());
 	AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (PS) FWRSocialRules::NoteJoined(PS->GetPlayerName());
 	WRBeds::Refresh(PS);
 	FWRRaiding::PlayerJoined(Cast<AWRPlayerController>(NewPlayer));
 	// The testers' god mode: this connection's nonce; a tester's game answers with the Freedom35 site's proof (WRGod).
@@ -694,6 +697,7 @@ void AWRGameMode::Logout(AController* Exiting)
 {
 	UE_LOG(LogWildreach, Log, TEXT("Player left: %s"), *GetNameSafe(Exiting));
 	SavePlayer(Exiting ? Exiting->GetPlayerState<AWRPlayerState>() : nullptr);
+	if (const APlayerState* LeftPS = Exiting ? Exiting->PlayerState.Get() : nullptr) FWRSocialRules::NoteLeft(LeftPS->GetPlayerName());
 	WRStore::Flush(false);   // a leaving character is committed now, not at the next batch
 	Super::Logout(Exiting);
 	CountPlayTime(Exiting);
