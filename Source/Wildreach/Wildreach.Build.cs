@@ -41,6 +41,8 @@ public class Wildreach : ModuleRules
 		{
 			PublicSystemLibraries.Add("bcrypt.lib");
 		}
+		// The testers' god mode (WRGodAuth): the Freedom35 site's Ed25519 proofs checked with the engine's OpenSSL.
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");
 
 		// Editor-only map-building helpers (UWREditorTerrainLibrary).
 		if (Target.bBuildEditor)

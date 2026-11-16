@@ -4,6 +4,7 @@
 // rounded head, the board's sigil carved in its head, its name and the three fastest cut into a sunk panel; a new
 // record regrinds the letters with a stone grind.
 #include "WRRecords.h"
+#include "WRGod.h"
 #include "WRDeeds.h"
 #include "WRDeedsInternal.h"
 #include "Wildreach.h"
@@ -195,6 +196,15 @@ void WRRecords::Start(UWorld* World)
 void WRRecords::Note(UWorld* World, FName Board, const TArray<FString>& Names, int32 Size, float Seconds, int32 AL)
 {
 	if (!World || Board.IsNone() || Names.Num() == 0 || Seconds <= 0.f) return;
+	// A kill a test character took part in (the testers' god mode, WRGod) goes on no board.
+	for (const FString& N : Names)
+	{
+		if (WRGod::IsTestedName(World, N))
+		{
+			UE_LOG(LogWildreach, Log, TEXT("RECORDS %s kill not noted: %s is a test character"), *Board.ToString(), *N);
+			return;
+		}
+	}
 	if (!Doc().IsValid()) Doc() = MakeShared<FJsonObject>();
 	const TSharedPtr<FJsonObject> B = BoardObj(Season(), Board);
 	B->SetNumberField(TEXT("kills"), DNum(B, TEXT("kills"), 0.f) + 1.f);

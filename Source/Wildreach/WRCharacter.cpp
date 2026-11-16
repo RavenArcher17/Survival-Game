@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRGod.h"
 #include "WROceanCreatures.h"
 #include "WRDesertCreatures.h"
 #include "WRDesertHazards.h"
@@ -1773,6 +1774,14 @@ void AWRCharacter::Move(const FInputActionValue& Value)
 	// Under the surface you swim where you look (cooks/biome-ocean.md 2.6): forward carries the camera's pitch (eased off
 	// near straight up or down, so the body never flips); strafing stays level.
 	const UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
+	// A tester flying (WRGod): forward goes where the camera looks, up or down; strafing stays level; Jump / Dive rise
+	// and sink (TickGodFlight).
+	if (WRGod::IsFlying(this) && GetCharacterMovement()->IsFlying())
+	{
+		AddMovementInput(Controller->GetControlRotation().Vector(), Axis.Y);
+		AddMovementInput(YawMatrix.GetUnitAxis(EAxis::Y), Axis.X);
+		return;
+	}
 	if (Move && Move->IsUnderwater())
 	{
 		const float MaxPitch = WRTune(TEXT("underwater.maxSwimPitch"), 70.f);
@@ -1813,6 +1822,12 @@ void AWRCharacter::PadLook(const FInputActionValue& Value)
 void AWRCharacter::InputPressed(EWRAbilityInput Input)
 {
 	if (!WRInput::AllowPress(Cast<APlayerController>(Controller))) return;
+	// God flight (WRGod): the Dodge button (the pad's B) held sinks instead of rolling in the air.
+	if (Input == EWRAbilityInput::Dodge && WRGod::IsFlying(this))
+	{
+		bGodSink = true;
+		return;
+	}
 	// Swimming, the Dodge button waits to see if it's a tap (the kick-dodge) or a hold (dive).
 	if (Input == EWRAbilityInput::Dodge && GetCharacterMovement()->IsSwimming())
 	{
@@ -1839,6 +1854,11 @@ void AWRCharacter::InputPressed(EWRAbilityInput Input)
 
 void AWRCharacter::InputReleased(EWRAbilityInput Input)
 {
+	if (Input == EWRAbilityInput::Dodge && bGodSink)
+	{
+		bGodSink = false;
+		return;
+	}
 	if (Input == EWRAbilityInput::Dodge && DodgeHeldSince >= 0.0)
 	{
 		const bool bTap = GetWorld()->GetTimeSeconds() - DodgeHeldSince < WRTune(TEXT("underwater.dodgeHoldSeconds"), 0.25f);
@@ -1867,6 +1887,12 @@ void AWRCharacter::InputJump()
 		ServerMashFrozen();
 		return;
 	}
+	// God flight (WRGod): Jump held rises.
+	if (WRGod::IsFlying(this))
+	{
+		bGodRise = true;
+		return;
+	}
 	// In the water Jump is Rise (held: surface fast); at the surface it still climbs out where the engine allows.
 	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement()); Move && Move->IsSwimming())
 	{
@@ -1877,6 +1903,7 @@ void AWRCharacter::InputJump()
 
 void AWRCharacter::InputJumpReleased()
 {
+	bGodRise = false;
 	if (UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement())) Move->bWantsToRise = false;
 	StopJumping();
 }
@@ -1896,6 +1923,14 @@ void AWRCharacter::TickDiveInput()
 {
 	UWRCharacterMovementComponent* Move = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
 	if (!Move) return;
+	// God flight (WRGod): Jump held rises, Dive (Ctrl) or the Dodge button held (the pad's B) sinks.
+	if (WRGod::IsFlying(this) && Move->IsFlying())
+	{
+		const float Up = (bGodRise ? 1.f : 0.f) - (bGodSink || bDiveKey ? 1.f : 0.f);
+		if (Up != 0.f) AddMovementInput(FVector::UpVector, Up);
+		return;
+	}
+	bGodRise = bGodSink = false;
 	const bool bSwimming = Move->IsSwimming();
 	// The Dodge button held past dodgeHoldSeconds in the water dives too (the pad's B); a quick tap is the kick-dodge.
 	const bool bHeldDodge = DodgeHeldSince >= 0.0 && GetWorld()->GetTimeSeconds() - DodgeHeldSince >= WRTune(TEXT("underwater.dodgeHoldSeconds"), 0.25f);

@@ -5,6 +5,7 @@
 #include "WRLand.h"
 #include "WRStore.h"
 #include "WRIdentity.h"
+#include "WRGod.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
@@ -137,6 +138,8 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 			WRGameModeIdentity::Platform(UniqueId, Type, Id);
 			WRIdentity::Bind(PS->GetPlayerName(), UGameplayStatics::ParseOption(Options, TEXT("WRKey")).Left(64), Type, Id, NewPlayerController->GetPlayerNetworkAddress());
 		}
+		// The key a tester's proof must be bound to (WRGod: the proof's bind is a hash of it).
+		if (UWRGodComponent* God = PS->GetGod()) God->JoinKey = UGameplayStatics::ParseOption(Options, TEXT("WRKey")).Left(64);
 		PS->GetPaths()->SetMainPath(FName(*Path));
 		const FString Body = UGameplayStatics::ParseOption(Options, TEXT("Body")).ToLower().Left(8);
 		PS->BodyStyle = Body.IsEmpty() ? NAME_None : FName(*Body);
@@ -678,6 +681,8 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 	AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
 	WRBeds::Refresh(PS);
 	FWRRaiding::PlayerJoined(Cast<AWRPlayerController>(NewPlayer));
+	// The testers' god mode: this connection's nonce; a tester's game answers with the Freedom35 site's proof (WRGod).
+	WRGod::Challenge(Cast<AWRPlayerController>(NewPlayer));
 	UE_LOG(LogWildreach, Log, TEXT("Player joined: %s main=%s (%d connected)"),
 		PS ? *PS->GetPlayerName() : TEXT("?"), PS ? *PS->GetPaths()->GetMainPath().ToString() : TEXT("?"), GetNumPlayers());
 }

@@ -1,4 +1,5 @@
 #include "WRPlayerUI.h"
+#include "WRGod.h"
 #include "WRDeeds.h"
 #include "Dom/JsonObject.h"
 #include "WRSurvival.h"
@@ -95,6 +96,7 @@ void FWRPlayerUI::Tick(float DeltaTime)
 	{
 		return;
 	}
+	WRGod::TickBadge(P);   // the "GOD" tab on the screen's edge while a tester has anything on
 	if (HudWidget.IsValid())
 	{
 		// The main menu draws over the island: no HUD under it.
@@ -207,6 +209,7 @@ void FWRPlayerUI::SyncScreen()
 	case EWRMenu::Quests: Want = TEXT("journal"); break;
 	case EWRMenu::Artifacts: Want = TEXT("journal"); break;
 	case EWRMenu::Deeds: Want = TEXT("journal"); break;
+	case EWRMenu::God: Want = WRGod::IsLocalTester(P) ? FName(TEXT("god")) : NAME_None; break;   // testers only (WRUIGod)
 	default: break;
 	}
 	if (!Want.IsNone() && !FWRScreens::Find(Want))
@@ -245,8 +248,10 @@ void FWRPlayerUI::ShowScreen(FName Name)
 	// Screens ease in (a short fade and rise); the build bar is a strip, so it only fades.
 	const bool bBar = Name == TEXT("build");
 	ScreenHost = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, bBar ? 0.f : WRTune(TEXT("flow.screenRise"), 14.f)))[ScreenWidget.ToSharedRef()];
-	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), 20);
-	WRInput::AddNavRoot(ScreenHost.ToSharedRef(), 20);
+	// The testers' god panel sits over the death and loading covers (Z 60), so "Revive where I fell" can be reached dead.
+	const int32 Z = Name == TEXT("god") ? 65 : 20;
+	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), Z);
+	WRInput::AddNavRoot(ScreenHost.ToSharedRef(), Z);
 	UE_LOG(LogWildreach, Log, TEXT("UI screen %s"), *Name.ToString());
 	WRReport::Event(TEXT("screen"), Name.ToString());
 }
@@ -359,15 +364,16 @@ void FWRPlayerUI::PadTab(int32 Dir)
 {
 	AWRPlayerController* P = PC.Get();
 	if (!P) return;
-	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Quests, EWRMenu::Artifacts, EWRMenu::Deeds, EWRMenu::Clan, EWRMenu::Settings };
-	const int32 N = UE_ARRAY_COUNT(Order);
+	// A verified tester's pad reaches the god mode panel as the last page (WRGod); nobody else has the stop.
+	static const EWRMenu Order[] = { EWRMenu::Inventory, EWRMenu::Craft, EWRMenu::Build, EWRMenu::Paths, EWRMenu::Skills, EWRMenu::Map, EWRMenu::Quests, EWRMenu::Artifacts, EWRMenu::Deeds, EWRMenu::Clan, EWRMenu::Settings, EWRMenu::God };
+	const int32 N = UE_ARRAY_COUNT(Order) - (WRGod::IsLocalTester(P) ? 0 : 1);
 	int32 At = INDEX_NONE;
 	for (int32 i = 0; i < N; ++i) if (Order[i] == P->GetMenu()) At = i;
 	if (At == INDEX_NONE || P->IsPlacing()) return;   // a station's screen, a chest, a keypad: LB / RB have no pages there
 	const EWRMenu Next = Order[((At + Dir) % N + N) % N];
 	// A crafting station's page stays that station's; the journal's Crafting page is crafting by hand or at the nearest.
 	P->SetMenu(Next);
-	PadLastTab = static_cast<uint8>(Next == EWRMenu::Settings || Next == EWRMenu::Build ? EWRMenu::Inventory : Next);
+	PadLastTab = static_cast<uint8>(Next == EWRMenu::Settings || Next == EWRMenu::Build || Next == EWRMenu::God ? EWRMenu::Inventory : Next);
 	WRSound::PlayUI(P, TEXT("ui.click"));
 }
 

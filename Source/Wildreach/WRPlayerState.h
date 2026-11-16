@@ -28,6 +28,7 @@ public:
 	class UWRSurvivalComponent* GetSurvival() const { return Survival; }
 	/** Dishes known and hinted, sated, crops and legends (WRFarm). */
 	class UWRFoodComponent* GetFood() const { return Food; }
+	class UWRGodComponent* GetGod() const { return God; }
 
 	/** Basic weapon abilities are granted once per player, not per pawn. */
 	bool bDefaultAbilitiesGranted = false;
@@ -91,4 +92,6 @@ private:
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRArtifactComponent> Artifacts;
 	/** The endgame's deeds: prestige marks, souls forged, achievements, titles, cosmetics (WRDeeds). */
 	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRDeedsComponent> Deeds;
+	/** The testers' god mode (WRGod): verified tester, powers on, the tested marks. */
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UWRGodComponent> God;
 };

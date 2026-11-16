@@ -92,6 +92,16 @@ bronze, iron now; the 12 steel biome sets and their Ascendant versions are mappe
 crafting cook), body-hide masks under every piece, and **path marks** on skin, eyes and hair on every machine
 (`player_art.json paths`), with Blood's canines and Lightning's crackle on cast.
 
+Also unreleased: **the testers' god mode** (cooks/build-godmode.md in showcase-notes). Only Aaron, Raven and Colin get
+it, by their Freedom35 accounts: the site's `game_testers` list (freedom35-studios `node tools/testers.mjs list | add |
+remove`, admin token) signs a per-connection proof (`POST /api/pc/tester`) that the server checks with the public key in
+`WRGodAuth.cpp` (rotating the site's `TESTER_SIGNING_KEY` needs that key slot filled and a new build first). The game
+must be run through Freedom35 (its updater's PC link) for the proof; editor runs keep the old testing commands open, a
+packaged game needs a verified tester for them (`WRGod::IsDevCommand` lists them: a new testing command goes there).
+A new god power is a verb in `WRGod::Run` and a row in `WRUIGod.cpp`; anything that rewards a player (a new achievement
+source, a leaderboard) must skip `WRGod::IsTestedCharacter`. Public worlds (dedicated, preset not in
+`tuning god.privatePresets`, no `-wrtestworld`) refuse it all.
+
 Also since 0.7.1: **the combat core** (COMBAT-AND-LESSONS C2-C5, cooks/build-combat-core.md): melee swings are move
 rows in `Data/weapons.json` (`FWRWeapons`), timed the same on the server, the owner and in the warped clip; one rule set
 for what can start when (`WRCombatRules`: combo and cancel windows, block stun, parry recovery) shared by the abilities

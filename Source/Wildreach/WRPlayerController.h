@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "WRFlowTypes.h"
+#include "WRGod.h"
 #include "WRPlayerController.generated.h"
 
 class AWRCharacterBase;
@@ -36,6 +37,7 @@ enum class EWRMenu : uint8
 	Quests,    // the journal's Quests tab (WRUIWorld)
 	Artifacts, // the journal's Artifacts tab: the belt, the pouch, geis records, the band (WRUIPortals)
 	Deeds,     // the journal's Deeds tab: achievements, records, titles, cosmetics, prestige marks (WRUIEndgame)
+	God,       // the testers' god mode panel (WRUIGod): only a verified tester ever opens it (WRGod)
 };
 
 class AWRBuildPiece;
@@ -221,6 +223,15 @@ public:
 	double GetNoticeTime() const { return NoticeTime; }
 
 	UFUNCTION(Client, Reliable) void ClientNotify(const FString& Message);
+	/** The testers' god mode (WRGod, cooks/build-godmode.md): the server's nonce at login; a tester's proof for it (from the
+	 *  Freedom35 site); the Travel page's list of places. */
+	UFUNCTION(Client, Reliable) void ClientGodChallenge(const FString& Nonce);
+	UFUNCTION(Server, Reliable) void ServerGodProof(const FString& Proof);
+	UFUNCTION(Client, Reliable) void ClientGodPlaces(const TArray<FWRGodPlace>& Places);
+	/** Server only (not an RPC): a command as the controller's own testing commands run it (the god commands' jump-starts). */
+	void RunDevCommand(const FString& Command) { RunServerCommand(Command); }
+	/** The god-mode panel open / shut (its key, the pad's page cycle): nothing at all unless this player is a verified tester. */
+	void ToggleGod();
 	/** World systems (WRWorldSystems.h): open one of their screens (shrine, talk, trade, msgwrite, msgread) about Target. */
 	UFUNCTION(Client, Reliable) void ClientOpenWorldScreen(FName Screen, AActor* Target);
 	/** An achievement earned (WRDeeds): its toast, top-centre for 3 s, queued. */

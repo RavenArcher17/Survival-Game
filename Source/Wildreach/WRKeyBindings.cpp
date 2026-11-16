@@ -1,4 +1,5 @@
 #include "WRKeyBindings.h"
+#include "WRGod.h"
 #include "Misc/ConfigCacheIni.h"
 #include "HAL/IConsoleManager.h"
 #include "Engine/UserInterfaceSettings.h"
@@ -92,6 +93,9 @@ FWRKeyBindings::FWRKeyBindings()
 	Add(TEXT("Snap"), TEXT("Building: snap on / off"), Menus, EKeys::F);
 	Add(TEXT("Demolish"), TEXT("Building: demolish mode"), Menus, EKeys::X);
 	Add(TEXT("BackToMenu"), TEXT("Leave to the main menu"), Menus, EKeys::F10);
+	// The testers' god mode panel (WRGod): a key only a verified tester sees, or that does anything.
+	Add(TEXT("GodMode"), TEXT("God mode (testers)"), Menus, EKeys::F9);
+	List.Last().bTesterOnly = true;
 	Load();
 }
 
@@ -116,6 +120,8 @@ FName FWRKeyBindings::WhoUses(const FKey& InKey, FName Except) const
 	if (!InKey.IsValid()) return NAME_None;
 	for (const FWRActionKey& A : List)
 	{
+		// A tester-only row (the god mode's key) doesn't exist for anyone else: it never clashes for them.
+		if (A.bTesterOnly && !WRGod::IsThisMachineTester()) continue;
 		if (A.Id != Except && A.Key == InKey) return A.Id;
 	}
 	return NAME_None;
