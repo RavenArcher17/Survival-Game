@@ -1011,6 +1011,15 @@ void AWRCharacter::TickBodyAnim()
 	const bool bSeated = !bDead && SeatMount && SeatMount->GetRider() == this;
 	SeatBlend = FMath::FInterpConstantTo(SeatBlend, bSeated ? 1.f : 0.f, Dt, 1.f / FMath::Max(0.05f, WRTune(TEXT("tame.mountEase.onSeconds"), 0.45f)));
 	H.Seat = SeatBlend;
+	// On a siege ladder (cookpass-building 3.5): the climbing pose eases in, its hands keeping time with the rungs (one
+	// cycle per two rungs of height climbed); every machine sees it from the replicated movement mode.
+	{
+		const UWRCharacterMovementComponent* WRMove = Cast<UWRCharacterMovementComponent>(GetCharacterMovement());
+		const bool bClimbing = !bDead && WRMove && WRMove->IsOnLadder();
+		ClimbBlend = FMath::FInterpConstantTo(ClimbBlend, bClimbing ? 1.f : 0.f, Dt, 1.f / FMath::Max(0.05f, WRTune(TEXT("anim.climb.easeSeconds"), 0.25f)));
+		H.Climb = ClimbBlend;
+		H.ClimbPhase = float(GetActorLocation().Z) / FMath::Max(1.f, 2.f * WRTune(TEXT("anim.climb.rungCm"), 30.f)) * 2.f * PI;
+	}
 	FillConsumeInput(H);
 	if (bSeated)
 	{

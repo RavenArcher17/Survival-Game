@@ -1,4 +1,5 @@
 #include "WRAbilitiesLightning.h"
+#include "WRRaiding.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
 #include "WRCharacter.h"
@@ -301,6 +302,8 @@ void UWRGA_Thunderclap::CastLightning(AWRCharacterBase* Caster)
 	WRFx::Broadcast(Caster, TEXT("lightning.thunderclap"), Feet, FRotator::ZeroRotator, Radius / 100.f, TEXT("storm.strike"));
 	WRFx::Shake(Caster, 0.3f, Feet, Radius * 3.f);
 	const float Damage = Spell(TEXT("damage"), 18.f);
+	// Path raiding (cookpass-building 3.7): the clap cracks the buildings round you too (lightning x1.5 on metal).
+	FWRRaiding::SplashPieces(Caster->GetWorld(), Feet, Radius, Damage, EWRRaidSource::Spell, Caster, FWRRaiding::Responsible(Caster), PathId);
 	TArray<AWRCharacterBase*> Caught;
 	for (TActorIterator<AWRCharacterBase> It(Caster->GetWorld()); It; ++It)
 	{

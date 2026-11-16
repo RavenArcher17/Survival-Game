@@ -1,6 +1,7 @@
 // The Spore path's abilities (see WRAbilitiesSpore.h; cooks/biome-fungal.md 2.17).
 
 #include "WRAbilitiesSpore.h"
+#include "WRRaiding.h"
 #include "WRSporePath.h"
 #include "WRFungalHazards.h"
 #include "Wildreach.h"
@@ -220,6 +221,8 @@ void UWRGA_Blight::CastSpore(AWRCharacterBase* Caster)
 			{
 				if (It->IsAlive() && It->Status && C->IsHostileTo(*It) && Cl->Contains(It->GetActorLocation(), It->GetSimpleCollisionRadius())) It->Status->AddStatusBuildup(WRStatus::Rot, Rot, C);
 			}
+			// Path raiding (cookpass-building 3.7): the blight rots the buildings it settles on (spore x1.5 on wood).
+			FWRRaiding::SplashPieces(C->GetWorld(), Cl->GetActorLocation(), Radius, Rot, EWRRaidSource::Spell, C, FWRRaiding::Responsible(C), TEXT("spore"));
 		}, t, false);
 	}
 }

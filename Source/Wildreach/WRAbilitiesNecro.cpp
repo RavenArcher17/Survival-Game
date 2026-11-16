@@ -1,6 +1,7 @@
 // The Necromancy path's abilities (see WRAbilitiesNecro.h; cooks/biome-graveyard.md 2.17).
 
 #include "WRAbilitiesNecro.h"
+#include "WRRaiding.h"
 #include "WRSunPath.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -313,6 +314,8 @@ void UWRGA_CorpseExplosion::CastNecro(AWRCharacterBase* Caster)
 	const float Radius = Spell(TEXT("radius"), 400.f);
 	const bool bPyre = Caster->HasTag(WRNecro::Combo_FuneralPyre);
 	WRNecro::Crumble(Best, true);
+	// Path raiding (cookpass-building 3.7): the burst hits the buildings round the body too (a minion sent to a wall).
+	FWRRaiding::SplashPieces(Caster->GetWorld(), At, Radius, Spell(TEXT("damage"), 40.f), EWRRaidSource::Spell, Caster, FWRRaiding::Responsible(Caster), PathId);
 	if (bPyre) WRFx::Broadcast(Caster, TEXT("necro.funeral_pyre"), At, FRotator::ZeroRotator, Radius / 200.f, TEXT("fire.impact"));
 	for (TActorIterator<AWRCharacterBase> It(Caster->GetWorld()); It; ++It)
 	{

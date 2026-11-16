@@ -514,6 +514,61 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("head")), FQuat(FVector::UpVector, FMath::DegreesToRadians(15.f * Hero.Sleep)));
 	}
 
+	// On a ladder (cookpass-building 3.5; no climb clip in the hero set, so the pose is built here): three points of
+	// contact, one hand reaching up a rung while the opposite foot steps up; one full cycle every two rungs (the phase
+	// comes from the body's height, so the hands keep time with the rungs and stop when the body stops). The chest leans
+	// in to the rails.
+	if (Hero.Climb > 0.01f)
+	{
+		const FWRTuning& Tn = FWRTuning::Get();
+		const float W = Hero.Climb;
+		const float ArmLow = Tn.Num(TEXT("anim.climb.armLow"), 95.f), ArmHigh = Tn.Num(TEXT("anim.climb.armHigh"), 150.f);
+		const float ElbowLow = Tn.Num(TEXT("anim.climb.elbowLow"), 85.f), ElbowHigh = Tn.Num(TEXT("anim.climb.elbowHigh"), 25.f);
+		const float ThighLow = Tn.Num(TEXT("anim.climb.thighLow"), 15.f), ThighHigh = Tn.Num(TEXT("anim.climb.thighHigh"), 72.f);
+		const float KneeLow = Tn.Num(TEXT("anim.climb.kneeLow"), 20.f), KneeHigh = Tn.Num(TEXT("anim.climb.kneeHigh"), 100.f);
+		for (int32 S = 0; S < 2; ++S)
+		{
+			// The left hand reaches while the right foot steps, and the other way round half a cycle later.
+			const float Reach = 0.5f + 0.5f * FMath::Sin(Hero.ClimbPhase + (S == 0 ? 0.f : PI));
+			const float Step = 1.f - Reach;
+			const float In = S == 0 ? 1.f : -1.f;
+			const FQuat Inward(Forward, FMath::DegreesToRadians(In * 12.f * W));
+			const FQuat Lift(Side, FMath::DegreesToRadians(-FMath::Lerp(ArmLow, ArmHigh, Reach) * W));
+			const FVector Elbow = Inward.RotateVector(Side);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("upperarm_l") : TEXT("upperarm_r")), Inward * Lift);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("lowerarm_l") : TEXT("lowerarm_r")), FQuat(Elbow, FMath::DegreesToRadians(-FMath::Lerp(ElbowLow, ElbowHigh, Reach) * W)));
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("thigh_l") : TEXT("thigh_r")), FQuat(Side, FMath::DegreesToRadians(-FMath::Lerp(ThighLow, ThighHigh, Step) * W)));
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("calf_l") : TEXT("calf_r")), FQuat(Side, FMath::DegreesToRadians(FMath::Lerp(KneeLow, KneeHigh, Step) * W)));
+		}
+		TwistSpine(Pose, Tn.Num(TEXT("anim.climb.lean"), 8.f) * W, Side);
+	}
+
+	// Working a siege engine's post (cookpass-building 3.5): leaning into a ram's handle with both arms out, turning a
+	// winch's or windlass's crank (the hands go round with the handle, half a turn apart), or holding a ballista's grips.
+	if (Hero.Crew > 0.01f)
+	{
+		const FWRTuning& Tn = FWRTuning::Get();
+		const float W = Hero.Crew;
+		const TCHAR* K = Hero.CrewKind == 0 ? TEXT("push") : Hero.CrewKind == 1 ? TEXT("crank") : TEXT("aim");
+		const float Lean = Tn.Num(*FString::Printf(TEXT("anim.crew.%s.lean"), K), Hero.CrewKind == 0 ? 28.f : Hero.CrewKind == 1 ? 12.f : 6.f);
+		const float Arm = Tn.Num(*FString::Printf(TEXT("anim.crew.%s.arm"), K), Hero.CrewKind == 0 ? 72.f : Hero.CrewKind == 1 ? 55.f : 50.f);
+		const float ElbowDeg = Tn.Num(*FString::Printf(TEXT("anim.crew.%s.elbow"), K), Hero.CrewKind == 0 ? 32.f : Hero.CrewKind == 1 ? 60.f : 70.f);
+		const float Swing = Hero.CrewKind == 1 ? Tn.Num(TEXT("anim.crew.crank.swing"), 18.f) : 0.f;
+		const float Bend = Hero.CrewKind == 1 ? Tn.Num(TEXT("anim.crew.crank.bend"), 35.f) : 0.f;
+		TwistSpine(Pose, Lean * W, Side);
+		for (int32 S = 0; S < 2; ++S)
+		{
+			const float In = S == 0 ? 1.f : -1.f;
+			const float Turn = Hero.CrewPhase + (S == 0 ? 0.f : PI);
+			const FQuat Inward(Forward, FMath::DegreesToRadians(In * 10.f * W));
+			// (Arms raised forward against the lean, so the hands stay at the handle's height.)
+			const FQuat Lift(Side, FMath::DegreesToRadians(-(Arm + Swing * FMath::Sin(Turn)) * W));
+			const FVector Hinge = Inward.RotateVector(Side);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("upperarm_l") : TEXT("upperarm_r")), Inward * Lift);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("lowerarm_l") : TEXT("lowerarm_r")), FQuat(Hinge, FMath::DegreesToRadians(-(ElbowDeg + Bend * (0.5f + 0.5f * FMath::Cos(Turn))) * W)));
+		}
+	}
+
 	// Aim pitch over the upper spine: the chest, arms and weapon point where you look (first person, aiming).
 	if (Hero.AimPitchAlpha > 0.01f)
 	{
@@ -777,6 +832,11 @@ void UWRHeroAnimInstance::PostStep(float DeltaSeconds, FWRAnimFrame& Frame)
 	Hero.ArmForward = T.Num(TEXT("tame.seat.armForward"), 28.f);
 	Hero.ArmIn = T.Num(TEXT("tame.seat.armIn"), 10.f);
 	Hero.ElbowBend = T.Num(TEXT("tame.seat.elbowBend"), 64.f);
+	Hero.Climb = HeroInput.Climb;
+	Hero.ClimbPhase = HeroInput.ClimbPhase;
+	Hero.Crew = HeroInput.Crew;
+	Hero.CrewKind = HeroInput.CrewKind;
+	Hero.CrewPhase = HeroInput.CrewPhase;
 	// Eating and drinking, sleeping, the torch carry (cooks/cookpass-survival.md 3.1, 3.7; tuning food.pose, lights.carry).
 	Hero.Consume = HeroInput.Consume;
 	Hero.ConsumeBite = HeroInput.ConsumeBite;

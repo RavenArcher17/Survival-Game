@@ -74,6 +74,11 @@ struct FWRHeroAnimInput
 	float Seat = 0.f;                            // 0..1 seated on a mount (cooks/cookpass-taming.md 3.6)
 	float SeatSpread = 22.f;                     // degrees each thigh opens round the mount's back
 	float SeatLean = 0.f;                        // 0 at a walk .. 1 at a gallop (the torso leans forward)
+	float Climb = 0.f;                           // 0..1 on a ladder (cookpass-building 3.5): hand over hand
+	float ClimbPhase = 0.f;                      // radians: one cycle per two rungs climbed (from the body's height)
+	float Crew = 0.f;                            // 0..1 working a siege engine's post
+	int32 CrewKind = 0;                          // 0 push (a ram's handle), 1 crank (winch, windlass), 2 aim (the gunner)
+	float CrewPhase = 0.f;                       // radians: the crank's angle
 	// Eating or drinking (cooks/cookpass-survival.md 3.1): the off hand to the mouth (0..1), a bite pushing in (0..1),
 	// a drink's pull with the head tipped back.
 	float Consume = 0.f;
@@ -108,6 +113,8 @@ struct FWRHeroFrame
 	// tame.seat, read on the game thread).
 	float Seat = 0.f, SeatSpread = 22.f, SeatLeanDeg = 4.f, SeatArms = 0.f;
 	float HipFlex = 72.f, KneeBend = 76.f, FootLevel = -4.f, ArmForward = 28.f, ArmIn = 10.f, ElbowBend = 64.f;
+	float Climb = 0.f, ClimbPhase = 0.f, Crew = 0.f, CrewPhase = 0.f;
+	int32 CrewKind = 0;
 	// The hand to the mouth (cooks/cookpass-survival.md 3.1; tuning food.pose), lying asleep and the torch carry (3.7).
 	float Consume = 0.f, ConsumeBite = 0.f, ConsumeArms = 1.f;
 	bool bConsumeDrink = false;

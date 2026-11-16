@@ -322,8 +322,8 @@ Open, as of 0.7.1:
 - **Volcanic shrubs stay green**: the ash-grey coat hung the GPU (VSM Nanite), so `ashCoatMin` stays 0.
 - **Building tiers 4 and 5 and the set decor** need a Hearth of 4 / 5 and the land's major boss: on the island metal
   waits for a fourth core, the Basalt hall and Rime lodge for a fifth, and their decor blueprints drop from Vulkarn and
-  Skaldrith; the other ten sets (structure, beams, decor) stay hidden until their land is live. Tundra hot springs
-  aren't on the map yet, so the hot spring bath goes only by lava. The other ten paths' element-turret essences wait
+  Skaldrith; the other ten sets (structure, beams, decor) stay hidden until their land is live. The hot spring bath
+  goes by lava or inside a hot spring (island_places.json kinds in `building.hotSpringKinds`: the tundra's Steam Ground). The other ten paths' element-turret essences wait
   for their items (rows in `machines.json`).
 - **Taming on the island is two lands**: the Windmane (first flying mount) is in creatures.json but never spawns (its Sky
   islands aren't on the map) and wears the Griffon pack body only for testing flight (`WRSpawn windmane`, `WRTameDev
@@ -611,7 +611,9 @@ the fused calls and the cook's 70 BPM cues are the audio cook's), the beds and t
   `TakeBuildDamage`. Raid tools are items of category `raid`. Siege engines (ram, catapult, ballista: biome-crystal
   2.21.5), haulers pushing rams and necromancers raising the dead through walls aren't built (no siege engines, no
   Necromancy tree yet); the Necromancy numbers wait in `tuning.json raiding.paths.necromancy`. The ladder has no climb
-  clip (the hero climbs in the idle pose). The code breaker waits for the Crystal caves (resonant crystal).
+  clip; the climbing pose is built in `WRHeroAnimInstance` (hand over hand in time with the rungs, tuning `anim.climb`).
+  Every path's area blasts hit buildings through `FWRRaiding::SplashPieces` (Thunderclap, Arcane blast, Starfall,
+  Corpse explosion, Collapse, Maw of the void, the Sunburst column, Blight's rot), so `raiding.paths` multipliers apply. The code breaker waits for the Crystal caves (resonant crystal).
 - **Bounties** stay a setting only (nothing reads it) until the PvP pass. **52 perks** wait for their systems
   (`waitsFor` in `Data/lifeskills.json`: diving, bees, siege weapons, timed brews...; Siege-proof and Silent charges are live since build-server-raids; Breeder, Rare finder, Saddle master and
   Creature armorer are live since build-taming; Decorator, Turret tech,
