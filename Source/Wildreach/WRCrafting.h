@@ -35,6 +35,8 @@ struct FWRRecipe
 	FString WaitsFor;
 	/** The life skill it trains when not its station's own (recipes.json "skill": gears train engineering). */
 	FName Skill;
+	/** By hand: how the hands work it (recipes.json "work": "knap" / "twist"; none: knap when stone is an input). */
+	FName Work;
 };
 
 class WILDREACH_API FWRRecipeRegistry
@@ -88,9 +90,12 @@ struct WILDREACH_API FWRCrafting
 	/** Recipes with station "hand": anywhere, no station needed (the crude tools). */
 	static FString CraftByHand(AWRPlayerController* Player, FName RecipeId);
 	/** Why this recipe can't be made Times over with this infusion from what the player carries (empty: it can). */
-	static FString Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times);
-	/** Takes the inputs (and the essence) for Times. Check Shortfall first. */
-	static void TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times);
+	static FString Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times, const AActor* StockAt = nullptr);
+	/** Takes the inputs (and the essence) for Times: the bag first, then (StockAt set) the player's chests near StockAt in
+	 *  their claim (cooks/cookpass-crafting.md 3.4). Check Shortfall first. */
+	static void TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times, const AActor* StockAt = nullptr);
+	/** How many of Item the player has for crafting here: the bag, plus their chests near StockAt (none: the bag). */
+	static int32 Have(const AWRPlayerController* Player, FName Item, const AActor* StockAt);
 	/** What the inputs (and essence) for Times are: a cancelled order's refund. */
 	static TArray<TPair<FName, int32>> InputsFor(const FWRRecipe& Recipe, FName Element, int32 Times, float Discount = 0.f);
 	/** Efficient smith / Efficient armorer (perks): the share of each material this player saves on this recipe (0..0.9). */
@@ -297,6 +302,45 @@ private:
 	// smoke from a working smokehouse's vent and oven's chimney.
 	bool IsKitchenShow() const;
 	void TickKitchenShow(float DeltaSeconds);
+
+public:
+	// ---- Hands-on work and the workshop at work (cooks/cookpass-crafting.md 3.2, 3.3; WRCraftWork.cpp, WRStationShow.cpp).
+	/** Server: who works it with their hands now (FWRCraftWork). */
+	TWeakObjectPtr<class AWRCharacter> Worker;
+	/** Every machine: the worker once they stand at its spot (the piece moves from the fire to the anvil). */
+	UPROPERTY(Replicated) TObjectPtr<class AWRCharacter> WorkerRep = nullptr;
+	/** A forge, armorer, workbench, alchemy table, charcoal kiln or bloomery: it shows its work where it's drawn. */
+	bool IsWorkShow() const;
+	/** Where the piece being worked lies now (world): on the anvil / block / bench / at the mortar, or in the forge's coals. */
+	FVector WorkPieceAt() const;
+	/** A worker's blow landed (their machine's look calls it): the hot piece flares. */
+	void OnWorkBeat() { FlareAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0; }
+
+private:
+	void TickWorkShow(float DeltaSeconds);
+	/** The forge's anvil and the alchemy table's trestle: their collision on every machine (the server walks into them
+	 *  too), their look where it's drawn. */
+	void BuildWorkFixtures();
+	UPROPERTY(Transient) TObjectPtr<class UBoxComponent> FixtureBox;
+	UPROPERTY(Transient) TObjectPtr<class UBoxComponent> FixtureBox2;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> FixtureMesh;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowPiece;
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> ShowPieceGlow;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowDone;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShowBed;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShowBedRun;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShowSmoke;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> ShowSmokeRun;
+	UPROPERTY(Transient) TObjectPtr<class UAudioComponent> ShowRoar;
+	FName FixtureFor;
+	FName ShowPieceFor;
+	bool bShowPieceHot = false;
+	FName ShowDoneFor;
+	int32 ShowDoneCount = -1;
+	int32 ShowDoneMade = -1;
+	bool bWorkShowOn = false;
+	double FlareAt = -10.0;
+	float GlowBase = -1.f;
 	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowSpit;
 	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowTray;
 	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> ShowLid;

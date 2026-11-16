@@ -5,11 +5,14 @@
 // panel did them. Every action is a server command checked there ("craft <id> <none|fire|frost>", "repair <slot>",
 // "upgrade <slot>"); a quantity of N sends N craft commands, each validated. The tab only reads replicated state.
 
+#include "WRBuildBar.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRBuilding.h"
 #include "WRCrafting.h"
+#include "WRCharacter.h"
+#include "WRCraftWork.h"
 #include "WRInventory.h"
 #include "WRGear.h"
 #include "GameFramework/GameStateBase.h"
@@ -489,7 +492,14 @@ private:
 		const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
 		return PS ? PS->GetLifeSkills() : nullptr;
 	}
-	int32 Have(FName Item) const { const UWRInventoryComponent* I = Inv(); return I ? I->CountOf(Item) : 0; }
+	int32 Have(FName Item) const { const UWRInventoryComponent* I = Inv(); return (I ? I->CountOf(Item) : 0) + InChests(Item); }
+	/** Your chests near the station (by hand: near you) inside your claim pay too (cooks/cookpass-crafting.md 3.4). */
+	int32 InChests(FName Item) const
+	{
+		const AActor* At = Station.IsValid() ? static_cast<const AActor*>(Station.Get()) : PC.IsValid() ? static_cast<const AActor*>(PC->GetPawn()) : nullptr;
+		const APlayerState* PS = PC.IsValid() ? PC->GetPlayerState<APlayerState>() : nullptr;
+		return At && PS ? WRBuildStock::InChestsExact(At->GetWorld(), PS->GetPlayerName(), At->GetActorLocation(), Item) : 0;
+	}
 	FName StationType() const { return Station.IsValid() ? Station->StationType : Hand; }
 	int32 Tier() const { return Station.IsValid() ? Station->GetTier() : 1; }
 	/** The station is Me's or their clan's (or nobody's), as the server's AWRStation::CanManage sees it from here: a clan
@@ -530,6 +540,11 @@ private:
 		if (const UWRLifeSkillsComponent* S = Skills())
 		{
 			for (const FWRSkillProgress& P : S->GetSkills()) H = HashCombine(H, HashCombine(GetTypeHash(P.Level), GetTypeHash(P.XP)));
+		}
+		// The hands' work (cooks/cookpass-crafting.md 3.1): a hand batch's item and count.
+		if (const AWRCharacter* Me = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr)
+		{
+			H = HashCombine(H, HashCombine(GetTypeHash(static_cast<uint8>(Me->Work.Kind)), HashCombine(GetTypeHash(Me->Work.Serial), GetTypeHash(Me->Work.Made))));
 		}
 		// The station's orders and tray (not how far along the one under way is: its bar follows that by itself).
 		if (const AWRStation* St = Station.Get())
@@ -717,7 +732,8 @@ private:
 	{
 		if (!E.Ready()) return 0;
 		if (E.Kind != FEntry::EKind::Recipe) return 1;
-		int32 N = FMath::Min(E.CanMake, 50);
+		// By hand a batch is worked one after another in the hands, up to craft.hand.maxBatch.
+		int32 N = FMath::Min(E.CanMake, E.Station == Hand ? FMath::RoundToInt(WRTune(TEXT("craft.hand.maxBatch"), 10.f)) : 50);
 		if (CanInfuse(E) && !Element.IsNone()) N = FMath::Min(N, Have(EssenceFor(Element)));
 		return N;
 	}
@@ -792,12 +808,57 @@ private:
 		QueueBox->SetContent(BuildQueue());
 	}
 
+	/** By hand (cooks/cookpass-crafting.md 3.1): what the hands are making, n of N with its bar, and Stop. */
+	TSharedRef<SWidget> BuildHandWork()
+	{
+		const AWRCharacter* Me = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr;
+		if (!Me || !Me->Work.IsHand())
+		{
+			return SNullWidget::NullWidget;
+		}
+		FWRSlotView View;
+		View.ItemId = Me->Work.Item;
+		const FText Of = Me->Work.Of > 1 ? FText::Format(LOCTEXT("HandOf", "{0} of {1}, by hand"), Me->Work.Made + 1, Me->Work.Of) : LOCTEXT("HandOne", "by hand");
+		return SNew(SBorder).BorderImage(WRUI::Box(WRUI::Alpha(WRUI::Brass, 0.1f), 5.f, WRUI::Brass2, 1.f)).Padding(FMargin(4.f * U, 4.f * U, 6.f * U, 4.f * U))
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[SNew(SWRSlot).Size(36.f * U).View(View)]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(FText::FromString(ItemName(Me->Work.Item)), WRUI::Body(12, 800), WRUI::Ink, true)]
+				+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(Of, WRUI::Body(11, 500), WRUI::Ink2)]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
+				[
+					SNew(SWRBar).Height(5.f * U).Color(WRUI::Brass).Fraction_Lambda([this]()
+					{
+						const AWRCharacter* C = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr;
+						if (!C || !C->Work.IsHand() || C->Work.Seconds <= 0.f || !C->GetWorld()) return 0.f;
+						return FMath::Clamp(static_cast<float>((C->GetWorld()->GetTimeSeconds() - C->WorkLookStart) / C->Work.Seconds), 0.f, 1.f);
+					})
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f * U, 0.f, 0.f, 0.f)
+			[
+				SNew(SBox).HeightOverride(28.f * U).Visibility(Me->Work.Of > Me->Work.Made + 1 ? EVisibility::SelfHitTestInvisible : EVisibility::Collapsed)
+				[
+					SNew(SWRButton).Ghost(true).FontSize(11).MinHeight(28.f * U).Text(LOCTEXT("HandStop", "Stop"))
+					.OnClicked_Lambda([this]() { if (PC.IsValid()) PC->SendCommand(TEXT("craftstop")); return FReply::Handled(); })
+				]
+			]
+		];
+	}
+
 	/** The station's orders, first under way with its bar, each with Cancel; then its tray and Take all. */
 	TSharedRef<SWidget> BuildQueue()
 	{
 		const AWRStation* St = Station.Get();
-		const bool bTray = St && St->Output.ContainsByPredicate([](const FWRItemStack& S) { return !S.IsEmpty(); });
-		if (!St || (St->Queue.Num() == 0 && !bTray))
+		if (!St)
+		{
+			return BuildHandWork();
+		}
+		const bool bTray = St->Output.ContainsByPredicate([](const FWRItemStack& S) { return !S.IsEmpty(); });
+		if (St->Queue.Num() == 0 && !bTray)
 		{
 			return SNullWidget::NullWidget;
 		}
@@ -833,6 +894,22 @@ private:
 				Words->AddSlot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
 				[
 					SNew(SWRBar).Height(5.f * U).Color(WRUI::Brass).Fraction_Lambda([this]() { return Station.IsValid() ? Station->JobProgress() : 0.f; })
+				];
+			}
+			if (i == 0 && bMine && FWRCraftWork::KindFor(St->StationType) != EWRWork::None)
+			{
+				// Your hands on your order (cooks/cookpass-crafting.md 3.3): working it now, or where to stand.
+				const int32 Pct = FMath::RoundToInt((WRTune(TEXT("craft.work.handsOn"), 1.25f) - 1.f) * 100.f);
+				const FName Type = St->StationType;
+				Words->AddSlot().AutoHeight().Padding(0.f, 2.f * U, 0.f, 0.f)
+				[
+					WRUI::Text(TAttribute<FText>::CreateLambda([this, Pct, Type]()
+					{
+						const AWRCharacter* Me = PC.IsValid() ? Cast<AWRCharacter>(PC->GetPawn()) : nullptr;
+						const bool bAt = Me && Me->Work.At == Station.Get() && Station.IsValid() && Station->WorkerRep == Me;
+						if (bAt) return FText::FromString(FString::Printf(TEXT("Your hands at it: +%d%%"), Pct));
+						return FText::FromString(FString::Printf(TEXT("Work it at %s: +%d%%"), Type == TEXT("forge") || Type == TEXT("armorer") ? TEXT("the anvil") : Type == TEXT("workbench") ? TEXT("the bench") : TEXT("the table"), Pct));
+					}), WRUI::Body(10, 700), WRUI::Brass2)
 				];
 			}
 			Orders->AddSlot().AutoWidth().Padding(0.f, 0.f, 8.f * U, 0.f)
@@ -1510,6 +1587,10 @@ private:
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRSlot).Size(30.f * U).View(Small)]
 					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[WRUI::Text(FText::FromString(ItemName(C.Key)), WRUI::Body(13, 700), WRUI::Ink)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+					[
+						WRUI::Text(FText::FromString(InChests(C.Key) > 0 ? FString::Printf(TEXT("%d in chests"), InChests(C.Key)) : FString()), WRUI::Body(11, 600), WRUI::Ink3)
+					]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[WRUI::Text(FText::FromString(FString::Printf(TEXT("%d / %d"), H, C.Value)), WRUI::Body(14, 800), H >= C.Value ? WRUI::Good : WRUI::Bad)]
 				]
 			];
@@ -1771,11 +1852,11 @@ private:
 			PC->SendCommand(E->Command);
 			return;
 		}
-		// At a station, one order of N (its queue makes them one after another); by hand, N crafts, each checked on its own.
+		// At a station, one order of N (its queue makes them one after another); by hand, a batch of N worked in the hands
+		// one after another (cooks/cookpass-crafting.md 3.1).
 		const FString Infuse = CanInfuse(*E) && !Element.IsNone() ? Element.ToString() : TEXT("none");
 		const int32 N = FMath::Clamp(Quantity, 1, MaxQuantity(*E));
-		if (E->Station != Hand) PC->SendCommand(FString::Printf(TEXT("%s %s %d"), *E->Command, *Infuse, N));
-		else for (int32 i = 0; i < N; ++i) PC->SendCommand(FString::Printf(TEXT("%s %s"), *E->Command, *Infuse));
+		PC->SendCommand(FString::Printf(TEXT("%s %s %d"), *E->Command, *Infuse, N));
 		Quantity = 1;
 	}
 

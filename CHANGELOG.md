@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)
+
+Aaron (lane cookpass-crafting: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-crafting.md).
+Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **Crafting by hand is a timed work in the hands.** Why: hand recipes were made instantly and invisibly, mid-swing and
+  mid-roll (grade G1; RDR2 crafts in Arthur's hands). Now each takes its recipe seconds (`craft.hand`), committed like
+  eating (`State.Drinking`: no guard, roll or swing, a slow walk), its inputs taken as it starts and given back if a
+  stagger, freeze or death interrupts it; an order of N is worked one after another, with a Stop button on the crafting
+  screen (`craftstop`). The hero knaps (a hammerstone on a flint core, two blows a second, a click and stone chips each)
+  or twists fibre between the hands; every machine sees it (`AWRCharacter::Work`, `FWRCraftWork`, `WRCraftWorkLook.cpp`,
+  the `Work` pose layer in `FWRHeroAnimProxy::PostLayers`).
+- **Your hands at the station.** Why: ordering at a station was a menu click; nobody ever worked anything (G3; Palworld's
+  work, Valheim's crafting motion). Order at a forge, armorer, workbench or alchemy table (or open its screen) with your
+  order first in its queue and the hero walks to its work spot (real locomotion, your stick takes over) and works it:
+  hand hammer and tongs at the forge's anvil (1.5 blows a second, a ring and sparks on each), a quicker planishing hammer
+  on the armorer's block, a plane along the board on the bench (shavings), a pestle round the mortar at the alchemy
+  table. While you work it the order runs x1.25 (`craft.work.handsOn`; the screen says "Your hands at it: +25%"); walking
+  off, a hit, a swing or someone else's order next ends it, and the station carries on by itself.
+- **The workshop shows its work.** Why: a forge glowed the same idle at noon as working at night, nothing lay on an
+  anvil or bench, finished goods waited invisibly, the alchemy "table" was a tray on the dirt and the forge had no anvil
+  (G2, G4, G5). Now (`WRStationShow.cpp`, measured on the station models): the forge has its **anvil on an oak stump**
+  a long step from the fire (collides, shown in the build ghost); its coals are **banked** idle (a low breathing glow),
+  **roar** at work (full light with a flicker, sparks off the bed, smoke from the flue); the **piece being made** (a blade
+  blank, a head, a spearhead, an ingot, a ring, a cog...) glows in the coals, or on the anvil under your hammer cooling
+  from orange to cherry red and flaring at each blow, and is quenched with a hiss and steam as each one finishes; finished
+  goods wait on the anvil, the armorer's block (plates, domes, cuffs, greaves, hide panels, talismans), the bench (tools,
+  arrows, boards) and the alchemy table (potions in their vials). The alchemy table now **stands on an oak trestle**
+  with a stone mortar and pestle on its front, steam and a simmer while it brews. The charcoal kiln and the bloomery
+  smoke while they burn.
+- **Crafting pulls from your chests.** Why: building already paid from your chests within 20 m in your claim; crafting
+  made you carry ore to the forge by hand (LATER-COOKS 17; Enshrouded's base chests). Recipes now count and take your
+  bag first, then your chests near the station (by hand: near you) in a claim you share (`WRBuildStock::InChestsExact /
+  TakeExact`, `FWRCrafting::Have`); each cost on the crafting screen says how many are in chests. Repair and upgrade
+  costs pay the same way.
+- Checked (no change needed): no music is shown or played to anywhere (Aaron 11-15); the set-complete moment
+  (LATER-COOKS 147) was already built (`gear.setComplete`, the doll's flash).
+- Data: `tuning craft.hand`, `craft.work`, `craft.show`, `farm.show.smoke.charcoal_kiln / bloomery`; `recipes.json "work"`
+  (knap / twist) overrides the hand kind; fx `forge.bed`, `craft.sparks`, `craft.chips`, `craft.shavings`,
+  `craft.quench`, `alchemy.steam`; sounds `craft.anvil`, `craft.tap`, `craft.knap`, `craft.plane`, `craft.grind`,
+  `craft.quench`, `forge.roar` (Freesound CC0 recordings cut by `Tools/audio/build_craft_audio.py`, credited in
+  `Docs/CREDITS.md`).
+
 ## Unreleased: building and raids cook pass (cookpass-building)
 
 Aaron 11-13: built features get the full cook pass. Research, grade, requirement ledger and plan in showcase-notes

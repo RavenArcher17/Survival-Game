@@ -10,6 +10,7 @@
 #include "WRBuildLook.h"
 #include "WRLifeSkills.h"
 #include "WRCrafting.h"
+#include "WRCraftWork.h"
 #include "WRInventory.h"
 #include "WRPlayerState.h"
 #include "WRGameplayTags.h"
@@ -1079,8 +1080,19 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 	}
 	else if (Cmd == TEXT("craft") && FWRRecipeRegistry::Get().Find(FName(*Arg(1))) && FWRRecipeRegistry::Get().Find(FName(*Arg(1)))->Station == TEXT("hand"))
 	{
-		// Crafting by hand from this menu (station recipes go on to the station in front of you).
-		OutResult = FWRCrafting::CraftByHand(this, FName(*Arg(1)));
+		// Crafting by hand from this menu (station recipes go on to the station in front of you): craft <recipe> [infuse]
+		// [times], a timed work in the hands, one after another (cooks/cookpass-crafting.md 3.1).
+		OutResult = FWRCraftWork::StartHand(this, FName(*Arg(1)), FMath::Max(1, FCString::Atoi(*Arg(3))));
+	}
+	else if (Cmd == TEXT("craftstop"))
+	{
+		OutResult = FWRCraftWork::StopHand(this);
+	}
+	else if (Cmd == TEXT("workat"))
+	{
+		// The station screen opened on a station whose first order is yours: work it with your hands.
+		AWRStation* At = FindNearbyStation();
+		OutResult = At ? FWRCraftWork::StartStation(this, At, true) : FString();
 	}
 	else if (Cmd == TEXT("claimdeposit") || Cmd == TEXT("claimupgrade"))
 	{

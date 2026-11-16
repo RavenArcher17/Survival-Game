@@ -1642,4 +1642,26 @@ void WRBuildStock::Pay(UWorld* World, const FString& Player, const FVector& At, 
 	if (Left > 0) UE_LOG(LogWildreach, Warning, TEXT("BUILD %s paid %d %s short (storage changed)"), *Player, Left, *Item.ToString());
 }
 
+int32 WRBuildStock::InChestsExact(const UWorld* World, const FString& Player, const FVector& At, FName Item)
+{
+	int32 N = 0;
+	for (const AWRBuildPiece* C : WRBuildStockDetail::Chests(World, Player, At)) N += WRBuildStockDetail::CountIn(C->Storage, Item);
+	return N;
+}
+
+int32 WRBuildStock::TakeExact(UWorld* World, const FString& Player, const FVector& At, FName Item, int32 Count)
+{
+	int32 Took = 0;
+	for (AWRBuildPiece* C : WRBuildStockDetail::Chests(World, Player, At))
+	{
+		if (Took >= Count) break;
+		const int32 N = WRBuildStockDetail::TakeFrom(C->Storage, Item, Count - Took);
+		if (N <= 0) continue;
+		Took += N;
+		C->OnRep_Farm();
+		C->ForceNetUpdate();
+	}
+	return Took;
+}
+
 #undef LOCTEXT_NAMESPACE

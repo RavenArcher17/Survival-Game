@@ -212,6 +212,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 	}
 	TickSurvivalLook(DeltaSeconds);
 	TickConsumeLook(DeltaSeconds);
+	TickWorkLook(DeltaSeconds);
 	if (IsLocallyControlled())
 	{
 		TickInputBuffer();
@@ -269,6 +270,7 @@ void AWRCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AWRCharacter, SelectedAmmo);
 	DOREPLIFETIME(AWRCharacter, GliderKind);
 	DOREPLIFETIME(AWRCharacter, MeleeItem);
+	DOREPLIFETIME(AWRCharacter, Work);
 	DOREPLIFETIME_CONDITION(AWRCharacter, ReplicatedAccel, COND_SimulatedOnly);
 }
 
@@ -1021,6 +1023,7 @@ void AWRCharacter::TickBodyAnim()
 		H.ClimbPhase = float(GetActorLocation().Z) / FMath::Max(1.f, 2.f * WRTune(TEXT("anim.climb.rungCm"), 30.f)) * 2.f * PI;
 	}
 	FillConsumeInput(H);
+	FillWorkInput(H);
 	if (bSeated)
 	{
 		const FWRCreatureDef* MountDef = SeatMount->GetDef();

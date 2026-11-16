@@ -1,6 +1,7 @@
 // AWRPlayerController: interaction, crafting and inventory menus, and the gameplay commands they send.
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
+#include "WRCraftWork.h"
 #include "WRDeeds.h"
 #include "WRSporePath.h"
 #include "WRWarHall.h"
@@ -342,6 +343,12 @@ void AWRPlayerController::WRInteract()
 		Menu = UI && FWRScreens::Find(TEXT("cook")) && FWRFarm::IsCookStation(Station->StationType, GetPawn()) ? EWRMenu::Cook : EWRMenu::Craft;
 		MenuStation = Station;
 		MenuIndex = 0;
+		// Your order first in its queue: the hero goes to work it (cooks/cookpass-crafting.md 3.3).
+		const APlayerState* MinePS = GetPlayerState<APlayerState>();
+		if (MinePS && Station->Queue.Num() > 0 && Station->Queue[0].Owner == MinePS->GetPlayerName() && FWRCraftWork::KindFor(Station->StationType) != EWRWork::None)
+		{
+			ServerCommand(TEXT("workat"));
+		}
 		return;
 	}
 	// The Hearth has its own screen in the new UI (feeding it cores is a button there). Its own piece is the usable

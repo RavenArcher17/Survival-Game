@@ -89,6 +89,10 @@ struct FWRHeroAnimInput
 	float Breath = 0.f;
 	// The lit torch carried at the chest in the off hand (3.7): 0..1.
 	float TorchCarry = 0.f;
+	// Hands-on crafting (cooks/cookpass-crafting.md 3.1, 3.3): 0..1, the kind (EWRWork as int) and the beat's cycle 0..1.
+	float Work = 0.f;
+	int32 WorkKind = 0;
+	float WorkPhase = 0.f;
 };
 
 /** What the proxy needs for the motion matching, handed over each frame. */
@@ -121,6 +125,8 @@ struct FWRHeroFrame
 	float EatArmForward = 58.f, EatArmIn = 26.f, EatElbowBend = 128.f, EatBiteDip = 6.f, EatDrinkTilt = 22.f, EatDrinkLift = 10.f;
 	float Sleep = 0.f, Breath = 0.f;
 	float TorchCarry = 0.f, TorchArmForward = 32.f, TorchElbowBend = 70.f, TorchArmOut = 8.f;
+	float Work = 0.f, WorkPhase = 0.f;
+	int32 WorkKind = 0;
 	struct FShotNotify { const UAnimSequenceBase* Clip = nullptr; float From = 0.f, Delta = 0.f, Weight = 1.f; };
 	TArray<FShotNotify> ShotNotifies;
 };

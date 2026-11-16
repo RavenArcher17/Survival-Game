@@ -1,4 +1,6 @@
 #include "WRCrafting.h"
+#include "WRBuildBar.h"
+#include "WRCraftWork.h"
 #include "WRTaming.h"
 #include "WRGear.h"
 #include "WRFishing.h"
@@ -74,6 +76,8 @@ FWRRecipeRegistry::FWRRecipeRegistry()
 			O->TryGetBoolField(TEXT("quality"), R.bQuality);
 			double Seconds = 0.0;
 			if (O->TryGetNumberField(TEXT("seconds"), Seconds)) R.Seconds = static_cast<float>(Seconds);
+			FString WorkKind;
+			if (O->TryGetStringField(TEXT("work"), WorkKind)) R.Work = FName(*WorkKind);
 			FString Needs;
 			if (O->TryGetStringField(TEXT("needsPerk"), Needs)) R.NeedsStat = FName(*Needs);
 			O->TryGetStringField(TEXT("needsText"), R.NeedsText);
@@ -399,6 +403,7 @@ void AWRStation::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AWRStation, Queue);
 	DOREPLIFETIME(AWRStation, Output);
 	DOREPLIFETIME(AWRStation, AppliedBoost);
+	DOREPLIFETIME(AWRStation, WorkerRep);
 }
 
 float AWRStation::SpeedHere() const
@@ -407,6 +412,8 @@ float AWRStation::SpeedHere() const
 	const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this);
 	float Speed = Machines && Piece ? Machines->StationBoost(Piece) : 1.f;
 	if (StationType == TEXT("lava_forge")) Speed *= WRTune(TEXT("craft.lavaForgeSpeed"), 2.f);
+	// Your own hands at it (cooks/cookpass-crafting.md 3.3; Palworld's work): the order runs faster while you work it.
+	if (FWRCraftWork::IsWorking(this)) Speed *= WRTune(TEXT("craft.work.handsOn"), 1.25f);
 	return FMath::Max(0.1f, Speed);
 }
 
@@ -428,8 +435,10 @@ void AWRStation::OnRep_Type()
 	if (FitType != StationType)
 	{
 		FitType = StationType;
-		if (const FWRPieceDef* FitDef = FWRBuildLook::StationDef(StationType)) FWRBuildLook::FitCollision(this, Mesh, *FitDef, -FWRBuildLook::ChildLift);
+		const float FitLift = StationType == TEXT("alchemy_table") ? WRTune(TEXT("craft.show.alchemy.tableTop"), 70.f) : 0.f;
+		if (const FWRPieceDef* FitDef = FWRBuildLook::StationDef(StationType)) FWRBuildLook::FitCollision(this, Mesh, *FitDef, -FWRBuildLook::ChildLift + FitLift);
 	}
+	BuildWorkFixtures();
 	if (Visual && Visual->GetStaticMesh() && LookType == StationType)
 	{
 		return;
@@ -441,9 +450,11 @@ void AWRStation::OnRep_Type()
 	}
 	LookType = StationType;
 	// A kitchen shows its work where it's drawn (WRKitchenShow.cpp): its tick runs there for it.
-	if (GetNetMode() != NM_DedicatedServer && IsKitchenShow()) SetActorTickEnabled(true);
+	if (GetNetMode() != NM_DedicatedServer && (IsKitchenShow() || IsWorkShow())) SetActorTickEnabled(true);
 	const FWRPieceDef* Def = FWRBuildLook::StationDef(StationType);
-	Visual = Def ? FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift) : nullptr;
+	// The alchemy table's tray stands on its trestle (cooks/cookpass-crafting.md 3.2): the prop sits on the table's top.
+	const float PropLift = StationType == TEXT("alchemy_table") ? WRTune(TEXT("craft.show.alchemy.tableTop"), 70.f) : 0.f;
+	Visual = Def ? FWRBuildLook::AttachProp(this, Mesh, *Def, -FWRBuildLook::ChildLift + PropLift) : nullptr;
 	Mesh->SetVisibility(Visual == nullptr);
 	// The kitchen's stations (campfire, cooking pot, oven, smokehouse, salting barrel, drying rack, compost bin) are
 	// drawn and collide as their build piece's own blocks (WRBuildLook FarmBlocks): no box of their own. The ones with
@@ -526,7 +537,7 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 		for (int32 i = 0; i < Times; ++i) Result = FWRCrafting::Make(Player, *R, StationType, GetTier(), Element);
 		return Result;
 	}
-	const FString Short = FWRCrafting::Shortfall(Player, *R, Element, Times);
+	const FString Short = FWRCrafting::Shortfall(Player, *R, Element, Times, this);
 	if (!Short.IsEmpty())
 	{
 		return Short;
@@ -552,7 +563,7 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	{
 		return FString::Printf(TEXT("The %s's queue is full: wait for an order to finish, or cancel one"), *WRCraftDetail::PlainName(StationType));
 	}
-	FWRCrafting::TakeInputs(Player, *R, Element, Times);
+	FWRCrafting::TakeInputs(Player, *R, Element, Times, this);
 	if (bOverclock)
 	{
 		Player->GetPlayerState<AWRPlayerState>()->GetInventory()->RemoveItem(TEXT("wood"), Times);
@@ -576,6 +587,8 @@ FString AWRStation::Craft(AWRPlayerController* Player, FName RecipeId, FName Ele
 	}
 	SetActorTickEnabled(true);
 	AdvanceQueue();
+	// Your hands on it, if it's yours to work now (cooks/cookpass-crafting.md 3.3).
+	FWRCraftWork::StartStation(Player, this, true);
 	const FWRItemDef* Out = FWRItemRegistry::Get().Find(R->Output);
 	const FString Name = Out ? Out->Name : R->Output.ToString();
 	UE_LOG(LogWildreach, Log, TEXT("CRAFT %s queued %d x %s at %s (%.1f s each; %d orders)"), *Who, Times, *R->Id.ToString(), *StationType.ToString(), Seconds, Queue.Num());
@@ -719,10 +732,11 @@ void AWRStation::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	// A kitchen shows its work on machines that draw (WRKitchenShow.cpp); it keeps ticking there.
-	const bool bShow = GetNetMode() != NM_DedicatedServer && IsKitchenShow();
+	const bool bShow = GetNetMode() != NM_DedicatedServer && (IsKitchenShow() || IsWorkShow());
 	if (bShow)
 	{
-		TickKitchenShow(DeltaSeconds);
+		if (IsKitchenShow()) TickKitchenShow(DeltaSeconds);
+		else TickWorkShow(DeltaSeconds);
 	}
 	if (!HasAuthority())
 	{
@@ -730,7 +744,8 @@ void AWRStation::Tick(float DeltaSeconds)
 		return;
 	}
 	AdvanceQueue();
-	if (Queue.Num() == 0 && !bShow) SetActorTickEnabled(false);
+	FWRCraftWork::TickStation(this);
+	if (Queue.Num() == 0 && !bShow && !Worker.IsValid()) SetActorTickEnabled(false);
 }
 
 void AWRStation::AdvanceQueue()
@@ -969,6 +984,15 @@ FString FWRCrafting::CraftByHand(AWRPlayerController* Player, FName RecipeId)
 
 namespace WRCraftDetail
 {
+	/** Takes Count of Item: the bag first, then the player's chests near At in their claim. */
+	void PayHere(AWRPlayerController* Player, UWRInventoryComponent* Inv, FName Item, int32 Count, const AActor* At)
+	{
+		const int32 FromBag = FMath::Min(Count, Inv->CountOf(Item));
+		if (FromBag > 0) Inv->RemoveItem(Item, FromBag);
+		const APlayerState* PS = Player ? Player->GetPlayerState<APlayerState>() : nullptr;
+		if (Count > FromBag && At && PS) WRBuildStock::TakeExact(At->GetWorld(), PS->GetPlayerName(), At->GetActorLocation(), Item, Count - FromBag);
+	}
+
 	FName EssenceFor(FName Element)
 	{
 		return Element == TEXT("fire") ? FName(TEXT("ember_essence")) : Element == TEXT("frost") ? FName(TEXT("frost_essence")) : NAME_None;
@@ -1002,7 +1026,15 @@ bool FWRCrafting::IsOpenTo(const AActor* Player, const FWRRecipe& Recipe)
 	return WRBiome::IsLive(Recipe.Biome) && Recipe.WaitsFor.IsEmpty() && (Recipe.Blueprint.IsNone() || FWRBlueprints::Knows(Player, Recipe.Blueprint));
 }
 
-FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times)
+int32 FWRCrafting::Have(const AWRPlayerController* Player, FName Item, const AActor* StockAt)
+{
+	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (!PS || !PS->GetInventory()) return 0;
+	const int32 Bag = PS->GetInventory()->CountOf(Item);
+	return StockAt ? Bag + WRBuildStock::InChestsExact(StockAt->GetWorld(), PS->GetPlayerName(), StockAt->GetActorLocation(), Item) : Bag;
+}
+
+FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times, const AActor* StockAt)
 {
 	const AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
 	if (!PS)
@@ -1022,14 +1054,14 @@ FString FWRCrafting::Shortfall(AWRPlayerController* Player, const FWRRecipe& Rec
 	for (const TPair<FName, int32>& In : Recipe.Inputs)
 	{
 		const int32 Need = DiscountedInput(In.Value, Discount) * Times;
-		if (Inv->CountOf(In.Key) < Need)
+		if (Have(Player, In.Key, StockAt) < Need)
 		{
 			const FWRItemDef* Def = FWRItemRegistry::Get().Find(In.Key);
 			return FString::Printf(TEXT("need %d %s"), Need, Def ? *Def->Name : *In.Key.ToString());
 		}
 	}
 	const FName Essence = WRCraftDetail::EssenceFor(Element);
-	if (!Essence.IsNone() && (!Recipe.bQuality || Inv->CountOf(Essence) < Times))
+	if (!Essence.IsNone() && (!Recipe.bQuality || Have(Player, Essence, StockAt) < Times))
 	{
 		return Recipe.bQuality ? FString::Printf(TEXT("need %d %s to infuse"), Times, *Essence.ToString()) : TEXT("only gear can be infused");
 	}
@@ -1094,13 +1126,20 @@ TArray<TPair<FName, int32>> FWRCrafting::InputsFor(const FWRRecipe& Recipe, FNam
 	return Out;
 }
 
-void FWRCrafting::TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times)
+void FWRCrafting::TakeInputs(AWRPlayerController* Player, const FWRRecipe& Recipe, FName Element, int32 Times, const AActor* StockAt)
 {
 	AWRPlayerState* PS = Player ? Player->GetPlayerState<AWRPlayerState>() : nullptr;
 	if (!PS) return;
 	for (const TPair<FName, int32>& In : InputsFor(Recipe, Element, Times, MaterialDiscount(Player, Recipe)))
 	{
-		PS->GetInventory()->RemoveItem(In.Key, In.Value);
+		// The bag first, then your chests near the station (nearest first).
+		const int32 FromBag = FMath::Min(In.Value, PS->GetInventory()->CountOf(In.Key));
+		if (FromBag > 0) PS->GetInventory()->RemoveItem(In.Key, FromBag);
+		if (In.Value > FromBag && StockAt)
+		{
+			const int32 Took = WRBuildStock::TakeExact(StockAt->GetWorld(), PS->GetPlayerName(), StockAt->GetActorLocation(), In.Key, In.Value - FromBag);
+			if (Took < In.Value - FromBag) UE_LOG(LogWildreach, Warning, TEXT("CRAFT %s paid %d %s short (storage changed)"), *PS->GetPlayerName(), In.Value - FromBag - Took, *In.Key.ToString());
+		}
 		// What an input leaves behind comes back (a waterskin's water goes in, the empty skin stays yours: items.json
 		// "returns", cooks/cookpass-survival.md 3.2).
 		const FWRItemDef* InDef = FWRItemRegistry::Get().Find(In.Key);
@@ -1254,15 +1293,13 @@ FString AWRStation::Repair(AWRPlayerController* Player, EWREquipSlot Slot)
 	{
 		for (const TPair<FName, int32>& In : R->Inputs)
 		{
-			if (Inv->CountOf(In.Key) < FMath::CeilToInt(In.Value * Fraction))
+			if (FWRCrafting::Have(Player, In.Key, this) < FMath::CeilToInt(In.Value * Fraction))
 			{
 				return FString::Printf(TEXT("need %d %s to repair"), FMath::CeilToInt(In.Value * Fraction), *In.Key.ToString());
 			}
 		}
-		for (const TPair<FName, int32>& In : R->Inputs)
-		{
-			Inv->RemoveItem(In.Key, FMath::CeilToInt(In.Value * Fraction));
-		}
+		// The bag first, then your chests near the station (cooks/cookpass-crafting.md 3.4).
+		for (const TPair<FName, int32>& In : R->Inputs) WRCraftDetail::PayHere(Player, Inv, In.Key, FMath::CeilToInt(In.Value * Fraction), this);
 	}
 	Item->Durability = Def->MaxDurability;
 	Inv->ApplyEquipment();
@@ -1301,11 +1338,11 @@ FString AWRStation::Upgrade(AWRPlayerController* Player, EWREquipSlot Slot)
 		return FString::Printf(TEXT("+%d is the cap at Hearth level %d"), Cap, GetTier());
 	}
 	const int32 Cost = FWRCraftingRules::UpgradeCost(Item->Upgrade);
-	if (Inv->CountOf(TEXT("upgrade_shard")) < Cost)
+	if (FWRCrafting::Have(Player, TEXT("upgrade_shard"), this) < Cost)
 	{
 		return FString::Printf(TEXT("need %d upgrade shards (mini-boss drops)"), Cost);
 	}
-	Inv->RemoveItem(TEXT("upgrade_shard"), Cost);
+	WRCraftDetail::PayHere(Player, Inv, TEXT("upgrade_shard"), Cost, this);
 	++Item->Upgrade;
 	Inv->ApplyEquipment();
 	UWRLifeSkillsComponent::Award(Player, WRGearSlots::IsArmour(Slot) ? FName(TEXT("armorcraft")) : FName(TEXT("smithing")), TEXT("upgrade"), 15.f);

@@ -504,6 +504,90 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 		WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("head")), FQuat(Side, FMath::DegreesToRadians(HeadDeg * 0.6f)));
 	}
 
+	// Working with the hands (cooks/cookpass-crafting.md 3.1, 3.3): no clip in the hero set, so the arms are posed here
+	// over the stance, on the beat's cycle. Knap: both forearms forward at the belly, the right hand bringing a hammerstone
+	// down on the core in the left. Twist: the hands together at the belly rolling fibre against each other. Forge: the
+	// left forearm forward and low on the tongs, the right arm raising the hand hammer high and bringing it down on the
+	// anvil, the back leaning into the blow. Armor: the same, a shorter quicker blow. Plane: both hands on the plane, the
+	// arms pushing it along the board and drawing it back, the body rocking with them. Pestle: the right hand grinding
+	// round the mortar, the left steadying it. Gives way to a one-shot on the upper body.
+	if (Hero.Work > 0.01f)
+	{
+		const FWRTuning& Tn = FWRTuning::Get();
+		const float W = Hero.Work * Hero.ConsumeArms;
+		const float P = FMath::Frac(Hero.WorkPhase);
+		const auto Arm = [&](int32 S, float Fwd, float In, float ElbowDeg)
+		{
+			const float Sgn = S == 0 ? 1.f : -1.f;   // the left arm comes in toward +Side, the right toward -Side
+			const FQuat Inward(Forward, FMath::DegreesToRadians(Sgn * In * W));
+			const FQuat Lift(Side, FMath::DegreesToRadians(-Fwd * W));
+			const FVector Hinge = Inward.RotateVector(Side);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("upperarm_l") : TEXT("upperarm_r")), Inward * Lift);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, S == 0 ? TEXT("lowerarm_l") : TEXT("lowerarm_r")), FQuat(Hinge, FMath::DegreesToRadians(-ElbowDeg * W)));
+		};
+		// A hammer's lift (0 down on the work .. 1 at the top): raised over most of the cycle, dropped fast onto the strike,
+		// a small rebound off the work.
+		const auto Hammer = [](float Phase, float Strike)
+		{
+			const float RaiseEnd = Strike * 0.82f;
+			if (Phase < RaiseEnd) { const float T = Phase / RaiseEnd; return T * T * (3.f - 2.f * T); }
+			if (Phase < Strike) { const float T = (Phase - RaiseEnd) / FMath::Max(0.01f, Strike - RaiseEnd); return 1.f - T * T; }
+			return 0.1f * FMath::Sin(PI * (Phase - Strike) / FMath::Max(0.01f, 1.f - Strike));
+		};
+		float Lean = 0.f;
+		switch (Hero.WorkKind)
+		{
+		case 1:   // knap
+		{
+			const float R = Hammer(P, Tn.Num(TEXT("craft.work.knap.strike"), 0.62f));
+			Arm(0, Tn.Num(TEXT("craft.work.knap.holdForward"), 40.f), 22.f, 100.f);
+			Arm(1, Tn.Num(TEXT("craft.work.knap.holdForward"), 40.f) + Tn.Num(TEXT("craft.work.knap.raise"), 24.f) * R, 16.f, 100.f + 16.f * R);
+			Lean = Tn.Num(TEXT("craft.work.knap.lean"), 12.f);
+			break;
+		}
+		case 2:   // twist
+		{
+			const float Roll = FMath::Sin(2.f * PI * P);
+			Arm(0, 40.f + 5.f * Roll, 26.f, 106.f);
+			Arm(1, 40.f - 5.f * Roll, 26.f, 106.f);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("hand_l")), FQuat(Forward, FMath::DegreesToRadians(24.f * Roll * W)));
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("hand_r")), FQuat(Forward, FMath::DegreesToRadians(-24.f * Roll * W)));
+			Lean = 8.f;
+			break;
+		}
+		case 3:   // forge
+		case 4:   // armor
+		{
+			const bool bForge = Hero.WorkKind == 3;
+			const TCHAR* K = bForge ? TEXT("forge") : TEXT("armor");
+			const float R = Hammer(P, Tn.Num(*FString::Printf(TEXT("craft.work.%s.strike"), K), 0.62f));
+			const float Raise = Tn.Num(*FString::Printf(TEXT("craft.work.%s.raise"), K), bForge ? 78.f : 48.f);
+			Arm(0, Tn.Num(TEXT("craft.work.tongs.forward"), 42.f), 12.f, Tn.Num(TEXT("craft.work.tongs.elbow"), 55.f));
+			Arm(1, 34.f + Raise * R, 8.f, 32.f + (bForge ? 80.f : 58.f) * R);
+			Lean = Tn.Num(*FString::Printf(TEXT("craft.work.%s.lean"), K), 10.f) + 5.f * (1.f - R);
+			break;
+		}
+		case 5:   // plane
+		{
+			const float Push = P < 0.5f ? FMath::SmoothStep(0.f, 1.f, P / 0.5f) : 1.f - FMath::SmoothStep(0.f, 1.f, (P - 0.5f) / 0.5f);
+			Arm(0, 44.f + 24.f * Push, 12.f, 86.f - 48.f * Push);
+			Arm(1, 44.f + 24.f * Push, 16.f, 86.f - 48.f * Push);
+			Lean = Tn.Num(TEXT("craft.work.plane.lean"), 14.f) + 10.f * Push;
+			break;
+		}
+		case 6:   // pestle
+		{
+			const float A = 2.f * PI * P;
+			Arm(0, 44.f, 20.f, 92.f);
+			Arm(1, 48.f + 6.f * FMath::Sin(A), 14.f + 8.f * FMath::Cos(A), 88.f);
+			Lean = Tn.Num(TEXT("craft.work.pestle.lean"), 16.f);
+			break;
+		}
+		default: break;
+		}
+		if (Lean != 0.f) TwistSpine(Pose, Lean * Hero.Work, Side);
+	}
+
 	// Asleep on the bed (cooks/cookpass-survival.md 3.7): the held lying pose breathes (the chest rises and falls about
 	// 1.2 cm, a slow 0.22 Hz breath) and the head rests turned a little to one side, so a sleeper never reads as a body.
 	if (Hero.Sleep > 0.01f)
@@ -838,6 +922,9 @@ void UWRHeroAnimInstance::PostStep(float DeltaSeconds, FWRAnimFrame& Frame)
 	Hero.CrewKind = HeroInput.CrewKind;
 	Hero.CrewPhase = HeroInput.CrewPhase;
 	// Eating and drinking, sleeping, the torch carry (cooks/cookpass-survival.md 3.1, 3.7; tuning food.pose, lights.carry).
+	Hero.Work = HeroInput.Work;
+	Hero.WorkKind = HeroInput.WorkKind;
+	Hero.WorkPhase = HeroInput.WorkPhase;
 	Hero.Consume = HeroInput.Consume;
 	Hero.ConsumeBite = HeroInput.ConsumeBite;
 	Hero.bConsumeDrink = HeroInput.bConsumeDrink;

@@ -42,4 +42,8 @@ namespace WRBuildStock
 	WILDREACH_API int32 InChests(const UWorld* World, const FString& Player, const FVector& At, FName Item);
 	/** Server: take Count of Item: the bag first (planks first for wood), then chests nearest first. */
 	WILDREACH_API void Pay(UWorld* World, const FString& Player, const FVector& At, UWRInventoryComponent* Bag, FName Item, int32 Count);
+	/** Crafting's count (cooks/cookpass-crafting.md 3.4): exactly Item in those chests (no planks for wood). */
+	WILDREACH_API int32 InChestsExact(const UWorld* World, const FString& Player, const FVector& At, FName Item);
+	/** Server: take up to Count of exactly Item from those chests, nearest first; returns how many were taken. */
+	WILDREACH_API int32 TakeExact(UWorld* World, const FString& Player, const FVector& At, FName Item, int32 Count);
 }

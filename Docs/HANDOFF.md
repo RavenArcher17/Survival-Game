@@ -155,6 +155,16 @@ components (`PlantMeshes`) so they can sway; new crop looks still go through `FW
 animals' idle moods are the pen's (`AWRCreature::PennedUntil / bPenHungry`, read in `SetMood`). Wet is the survival
 component's (`IsWet`), read by `ApplyHit` and `AddStatusBuildup`.
 
+Also since 0.7.1: **the crafting cook pass** (cooks/cookpass-crafting.md in showcase-notes). Hand recipes are a timed,
+committed work and the four crafting stations take the order's maker as a worker (`FWRCraftWork`, server; the replicated
+`AWRCharacter::Work` drives the body, held tools and beats on every machine, `WRCraftWorkLook.cpp`; the `Work` pose layer
+in `PostLayers`). A station's work spot, the piece's and the finished goods' spots are tuning (`craft.work.spot`,
+`craft.show`, station frame cm, measured on the fitted props); a new station with hands-on work needs a `KindFor` kind, a
+spot and its show spots. `AWRStation::SpeedHere` folds in the worker (x`craft.work.handsOn`). The forge's anvil and the
+alchemy table's trestle are station components with their own collision on every machine (`BuildWorkFixtures`); the
+alchemy prop now sits `craft.show.alchemy.tableTop` up. Crafting inputs count and take your nearby chests through
+`FWRCrafting::Shortfall / TakeInputs (StockAt)`; pass the station (or the crafter's pawn by hand) as StockAt.
+
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light
 (`EWREquipSlot::Light`, `EquippedLight`); `UWRWeatherSubsystem` rolls `Data/weather.json` per biome into

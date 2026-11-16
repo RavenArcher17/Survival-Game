@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "WRCharacterBase.h"
 #include "WRCombatTypes.h"
+#include "WRCraftWork.h"
 #include "WRCharacter.generated.h"
 
 class UCameraComponent;
@@ -388,6 +389,32 @@ private:
 	/** Owner: a move or jump while asleep gets you up (the server checks it too). */
 	UFUNCTION(Server, Reliable) void ServerWakeUp();
 public:
+	// --- Hands-on crafting (cooks/cookpass-crafting.md 3.1, 3.3; WRCraftWork.cpp server, WRCraftWorkLook.cpp body).
+	/** What the hero works now (none: nothing); set by the server, drawn on every machine. */
+	UPROPERTY(ReplicatedUsing=OnRep_Work) FWRWorkRep Work;
+	UFUNCTION() void OnRep_Work();
+	/** Server: the hand batch (recipe, how many still to start, the infusion) and the one in the hands. */
+	FName HandRecipe;
+	int32 HandLeft = 0;
+	FTimerHandle HandTimer;
+	/** Server: at the station's spot now, and when the station work began (the walk in has arriveSeconds). */
+	bool bWorkArrived = false;
+	double WorkSince = 0.0;
+	/** Server: what the work's piece of the hand batch took (given back if it's interrupted). */
+	TArray<TPair<FName, int32>> HandTaken;
+	/** Every machine: the beat's cycle (0..1), blend in and out, the beats played, the held tools. */
+	float WorkPhase = 0.f;
+	float WorkBlend = 0.f;
+	double WorkLookStart = 0.0;
+	uint8 WorkLookSerial = 255;
+	EWRWork WorkLookKind = EWRWork::None;
+	bool bWorkStowed = false;
+	bool bWorkApproachDone = false;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> WorkToolR;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> WorkToolL;
+	EWRWork WorkToolsFor = EWRWork::None;
+	void TickWorkLook(float DeltaSeconds);
+	void FillWorkInput(struct FWRHeroAnimInput& H);
 	/** Re-dress the hands (the shield comes off for a torch; the torch / lantern shows): WRSurvival's light changes. */
 	void RefreshHeldLook() { UpdateWeaponLook(); }
 	/** The Wind path's Wind arrow (WRAbilitiesWind.cpp), server: every machine plays the ranged weapon's shot and its

@@ -811,6 +811,24 @@ Recordings from Freesound, licence read off each sound's page; the HQ previews c
 | apple - bite & chew | Anthousai (freesound) | CC0 1.0 | https://freesound.org/people/Anthousai/sounds/398757/ | item/eat_bite_1, _2 |
 | CHEWING_04_44100 | stevielematt (freesound) | CC0 1.0 | https://freesound.org/people/stevielematt/sounds/707808/ | item/eat_chew_1, _2, _3 |
 
+## Audio: the crafting cook pass (2026-11-16)
+
+Recordings from Freesound, licence read off each sound's page; the HQ previews cut and levelled by
+`Tools/audio/build_craft_audio.py` (cooks/cookpass-crafting.md 3.1-3.3).
+
+| Sound | By | Licence | Source | Used as |
+|---|---|---|---|---|
+| forging blade | Artiom_Constantinov (freesound) | CC0 1.0 | https://freesound.org/s/856537/ | craft/anvil_1, _2, _3 |
+| Hammer hitting an anvil | draftcraft (freesound) | CC0 1.0 | https://freesound.org/s/434339/ | craft/anvil_4 |
+| tap hammer small piece of metal gentle hits | kyles (freesound) | CC0 1.0 | https://freesound.org/s/450874/ | craft/tap_1, _2, _3 |
+| Stone on Stone Hit | xtra1 (freesound) | CC0 1.0 | https://freesound.org/s/858891/ | craft/knap_1, _2 |
+| 9. Flint cutting 2 | mathiaslyhne1 (freesound) | CC0 1.0 | https://freesound.org/s/798163/ | craft/knap_3 |
+| hoblování dřeva | jandobes97 (freesound) | CC0 1.0 | https://freesound.org/s/379482/ | craft/plane_1, _2 |
+| Mortar and pestle | Fwughox_Official (freesound) | CC0 1.0 | https://freesound.org/s/749884/ | craft/grind_1, _2, _3 |
+| Hot metal in water | jokallset (freesound) | CC0 1.0 | https://freesound.org/s/395864/ | craft/quench_1 |
+| Gas Forge | SoundDesigner0101 (freesound) | CC0 1.0 | https://freesound.org/s/765947/ | craft/forge_roar |
+| Forge - Coal burning with fan on close | ldezem (freesound) | CC0 1.0 | https://freesound.org/s/386150/ | craft/forge_roar (layer) |
+
 ## Animation
 
 | What | Files in the repo | Source | Author | Licence |

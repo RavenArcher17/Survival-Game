@@ -731,6 +731,9 @@ void AWRBuildPiece::ApplyLook()
 		Parts.Add({ FVector(120, 76, 80), FVector(330, 260, 40) });     // the shelf
 	}
 	// Stations, the Hearth and the totem are child actors only the server spawns: the build-mode ghost previews their size.
+	// The forge's anvil on its stump and the alchemy table's trestle stand with them (cooks/cookpass-crafting.md 3.2).
+	else if (bGhost && Def->Id == TEXT("forge")) { Parts.Add({ FVector(116, 96, 126), FVector(0, 0, 63) }); Parts.Add({ FVector(64, 44, 76), FVector(0, 118, 38) }); }
+	else if (bGhost && Def->Id == TEXT("alchemy_table")) Parts.Add({ FVector(108, 98, 120), FVector(0, 0, 60) });
 	else if (bGhost && K == TEXT("station")) Parts.Add({ FVector(120, 80, 90), FVector(0, 0, 50) });
 	else if (bGhost && K == TEXT("hearth")) Parts.Add({ FVector(150, 150, 120), FVector(0, 0, 50) });
 	else if (bGhost && K == TEXT("totem")) Parts.Add({ FVector(40, 40, 250), FVector(0, 0, 50) });
