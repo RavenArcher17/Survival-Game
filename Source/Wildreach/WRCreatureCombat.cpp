@@ -722,6 +722,13 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 	Self->SetCombatTag(WRTags::State_Attacking, true);
 	// Its real clip, warped so the strike lands at wind-up + hold; the rear-back pose and the rising cue come with it.
 	Self->PlaySwing(WRRowFight::SwingFor(R->Motion), (R->Windup + R->Hold) / Pace);
+	// Its body's own shape for this motion over that one clip (cookpass-creatures 3.3): coiled over the wind-up, released
+	// at the strike. A sideways move coils away from the side its target stands on, so the blow sweeps across them.
+	{
+		const float Across = float(Self->GetActorTransform().InverseTransformVectorNoScale(Target->GetActorLocation() - Self->GetActorLocation()).Y);
+		const int8 Side = Across > 30.f ? -1 : Across < -30.f ? 1 : (FMath::RandBool() ? 1 : -1);
+		Self->MulticastRowGesture(R->Motion, (R->Windup + R->Hold) / Pace, Side);
+	}
 	// The tell: its voice and a small glint on the attacking part (white blockable, crimson unblockable).
 	Self->MulticastTell(R->Glint, R->TellBone, TEXT("voice"));
 	FWRStormAI::RowStarted(this, Self, *R, Target);

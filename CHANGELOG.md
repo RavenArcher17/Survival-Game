@@ -32,6 +32,12 @@ cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron a
   - The threat display: an aggressive creature turning on a survivor or tame from its calm holds 0.4-1.2 s by
     archetype (head low, shoulders down, a sway, its growl), cut short if you close to its reach or strike it.
   - Tuning `creatureAI.mood / beat / wary / threat`.
+- **Creatures (3): attack gestures.** Why: each creature has one attack clip, so its bite, sweep, kick and howl all
+  looked the same (grade G7; LATER-COOKS build-combat-full "distinct attack clips per row").
+  - `StartRow` sends `MulticastRowGesture(motion, wind-up, side)`; every machine coils the body for that motion over
+    the wind-up and releases it at the strike, over the clip (`WRCreatureBody.cpp`). 28 motions in tuning
+    `anim.gesture` (bite draws back and snaps, sweep coils away from its target and swings across, slam rears and comes
+    down, howl lifts the head, spit throws, charge drops the horns...). Real per-row clips are still an art job.
 
 ## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 
