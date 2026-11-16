@@ -190,6 +190,7 @@ namespace WRUIGodPanel
 		{
 			PC = InArgs._PC;
 			SAssignNew(Body, SVerticalBox);
+			SAssignNew(Head, SVerticalBox);
 			SearchStyle = FCoreStyle::Get().GetWidgetStyle<FEditableTextBoxStyle>("NormalEditableTextBox");
 			const FSlateBrush* Field = WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.55f), 5.f, WRUI::Brass2, 1.f);
 			SearchStyle.SetBackgroundImageNormal(*Field).SetBackgroundImageHovered(*Field).SetBackgroundImageFocused(*Field).SetBackgroundImageReadOnly(*Field);
@@ -233,7 +234,13 @@ namespace WRUIGodPanel
 				[
 					SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 16.f * U, 0.f)[SNew(SBox).WidthOverride(190.f * U)[Rail]]
-					+ SHorizontalBox::Slot().FillWidth(1.f)[SNew(SScrollBox) + SScrollBox::Slot()[Body.ToSharedRef()]]
+					+ SHorizontalBox::Slot().FillWidth(1.f)
+					[
+						// The page's search, chips and amounts stay put above its list (the list rebuilds as you type).
+						SNew(SVerticalBox)
+						+ SVerticalBox::Slot().AutoHeight()[Head.ToSharedRef()]
+						+ SVerticalBox::Slot().FillHeight(1.f)[SNew(SScrollBox) + SScrollBox::Slot()[Body.ToSharedRef()]]
+					]
 				];
 
 			ChildSlot
@@ -260,7 +267,7 @@ namespace WRUIGodPanel
 			{
 				NextCheck = Now + 0.25;
 				const uint32 K = Key();
-				if (K != LastKey) { Rebuild(); WRUI::MeasureNow(*Body, Geo.Scale); }
+				if (K != LastKey) { Rebuild(); WRUI::MeasureNow(*Head, Geo.Scale); WRUI::MeasureNow(*Body, Geo.Scale); }
 			}
 		}
 
@@ -269,6 +276,10 @@ namespace WRUIGodPanel
 	private:
 		TWeakObjectPtr<AWRPlayerController> PC;
 		TSharedPtr<SVerticalBox> Body;
+		/** The page's search / chips row (rebuilt only when the page or its choices change, never as you type). */
+		TSharedPtr<SVerticalBox> Head;
+		bool bHead = false;
+		uint32 LastHeadKey = 0;
 		FEditableTextBoxStyle SearchStyle;
 		EPage Page = EPage::Self;
 		EItems ItemsPage = EItems::Items;
@@ -320,10 +331,19 @@ namespace WRUIGodPanel
 				FText::FromString(PS ? PS->GetPlayerName() : FString(TEXT("this character"))));
 		}
 
+		/** What the head depends on: the page, and on Travel the kinds the list has. */
+		uint32 HeadKey() const
+		{
+			uint32 H = HashCombine(GetTypeHash(uint8(Page)), GetTypeHash(uint8(ItemsPage)));
+			const UWRGodComponent* G = God();
+			if (Page == EPage::Travel && G) H = HashCombine(H, GetTypeHash(G->PlacesSerial));
+			return H;
+		}
+
 		/** What the page shows depends on: rebuilt when it changes. */
 		uint32 Key() const
 		{
-			uint32 H = HashCombine(GetTypeHash(uint8(Page)), GetTypeHash(uint8(ItemsPage)));
+			uint32 H = HeadKey();
 			H = HashCombine(H, HashCombine(GetTypeHash(Search), HashCombine(GetTypeHash(Filter), GetTypeHash(Amount))));
 			const UWRGodComponent* G = God();
 			const AWRPlayerState* PS = State();
@@ -370,6 +390,10 @@ namespace WRUIGodPanel
 		void Rebuild()
 		{
 			LastKey = Key();
+			const uint32 HK = HeadKey();
+			bHead = HK != LastHeadKey || Head->NumSlots() == 0;
+			LastHeadKey = HK;
+			if (bHead) Head->ClearChildren();
 			Body->ClearChildren();
 			switch (Page)
 			{
@@ -398,7 +422,7 @@ namespace WRUIGodPanel
 		{
 			Body->AddSlot().AutoHeight()[Heading(LOCTEXT("HPowers", "POWERS"))];
 			Power(EWRGodFlag::Invulnerable, TEXT("invuln"), LOCTEXT("Invuln", "Invulnerable"), LOCTEXT("InvulnWhat", "Blows still land (guard, stagger, sparks, sounds) but take no health; nothing kills you."));
-			Power(EWRGodFlag::Vitals, TEXT("vitals"), LOCTEXT("Vitals", "Endless vitals"), LOCTEXT("VitalsWhat", "Stamina, every path's bar (Heat, Chill, Mana...), hunger and thirst stay full; corruption and status build-ups stay empty. Off to test running dry."));
+			Power(EWRGodFlag::Vitals, TEXT("vitals"), LOCTEXT("Vitals", "Endless vitals"), LOCTEXT("VitalsWhat", "Stamina, the path bars you spend (Mana, Growth, Souls, Spores...), hunger and thirst stay full; corruption and status build-ups stay empty. Heat, Chill and Charge still build as you fight. Off to test running dry."));
 			Power(EWRGodFlag::OneHit, TEXT("onehit"), LOCTEXT("OneHit", "One-hit kill"), LOCTEXT("OneHitWhat", "A blow of yours that lands takes the whole of the target's health (bosses and their phases too)."));
 			Power(EWRGodFlag::Fly, TEXT("fly"), LOCTEXT("Fly", "Fly"), FText::Format(LOCTEXT("FlyWhat", "Forward goes where you look; {0} rises, {1} or the Dodge button sinks; Sprint doubles the speed."),
 				WRInput::ActionKey(TEXT("Jump")), WRInput::ActionKey(TEXT("Dive"))));
@@ -452,7 +476,7 @@ namespace WRUIGodPanel
 		{
 			const UWRGodComponent* G = God();
 			if (G && G->Places.Num() == 0 && !bAskedPlaces) { Send(TEXT("places")); bAskedPlaces = true; }
-			Body->AddSlot().AutoHeight()
+			if (bHead) Head->AddSlot().AutoHeight()
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 8.f * U, 0.f)[SearchBox(LOCTEXT("TravelHint", "Search places..."))]
@@ -472,7 +496,7 @@ namespace WRUIGodPanel
 				if (G && !G->Places.ContainsByPredicate([Kind](const FWRGodPlace& P) { return P.Kind == Kind; })) continue;
 				Kinds->AddSlot()[Chip(KindWord(Kind), [this, Kind]() { return Filter == Kind; }, [this, Kind]() { Filter = Kind; })];
 			}
-			Body->AddSlot().AutoHeight().Padding(0.f, 8.f * U)[Kinds];
+			if (bHead) Head->AddSlot().AutoHeight().Padding(0.f, 8.f * U)[Kinds];
 			if (!G || G->Places.Num() == 0)
 			{
 				Body->AddSlot().AutoHeight()[Muted(LOCTEXT("PlacesWait", "Asking the server for the list..."))];
@@ -499,7 +523,7 @@ namespace WRUIGodPanel
 
 		void BuildCreatures()
 		{
-			Body->AddSlot().AutoHeight()
+			if (bHead) Head->AddSlot().AutoHeight()
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 14.f * U, 0.f)[SearchBox(LOCTEXT("CreatureHint", "Search creatures..."))]
@@ -516,7 +540,7 @@ namespace WRUIGodPanel
 				if (L.IsNone()) continue;
 				Chips->AddSlot()[Chip(FText::FromString(LandName(L)), [this, L]() { return Filter == L; }, [this, L]() { Filter = L; })];
 			}
-			Body->AddSlot().AutoHeight().Padding(0.f, 8.f * U)[Chips];
+			if (bHead) Head->AddSlot().AutoHeight().Padding(0.f, 8.f * U)[Chips];
 			TArray<const FWRCreatureDef*> Defs;
 			for (const FWRCreatureDef& D : FWRCreatureRegistry::Get().All())
 			{
@@ -556,7 +580,7 @@ namespace WRUIGodPanel
 				const EItems Id = S.Key;
 				Tabs->AddSlot().AutoWidth().Padding(0.f, 0.f, 6.f * U, 0.f)[Chip(S.Value, [this, Id]() { return ItemsPage == Id; }, [this, Id]() { if (ItemsPage != Id) { ItemsPage = Id; Search.Reset(); Filter = NAME_None; Amount = 1; } })];
 			}
-			Body->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[Tabs];
+			if (bHead) Head->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[Tabs];
 			switch (ItemsPage)
 			{
 			case EItems::Items: BuildItemList(); break;
@@ -568,7 +592,7 @@ namespace WRUIGodPanel
 
 		void BuildItemList()
 		{
-			Body->AddSlot().AutoHeight()
+			if (bHead) Head->AddSlot().AutoHeight()
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 14.f * U, 0.f)[SearchBox(LOCTEXT("ItemHint", "Search items..."))]
@@ -584,7 +608,7 @@ namespace WRUIGodPanel
 				const FName Cat = C.Key;
 				Chips->AddSlot()[Chip(FText::FromString(Cat.ToString().Replace(TEXT("_"), TEXT(" "))), [this, Cat]() { return Filter == Cat; }, [this, Cat]() { Filter = Cat; })];
 			}
-			Body->AddSlot().AutoHeight().Padding(0.f, 8.f * U)[Chips];
+			if (bHead) Head->AddSlot().AutoHeight().Padding(0.f, 8.f * U)[Chips];
 			const int32 Max = int32(WRTune(TEXT("god.listMax"), 60.f));
 			int32 Shown = 0, More = 0;
 			for (const FWRItemDef& D : FWRItemRegistry::Get().All())
@@ -627,7 +651,7 @@ namespace WRUIGodPanel
 
 		void BuildRecipes()
 		{
-			Body->AddSlot().AutoHeight()
+			if (bHead) Head->AddSlot().AutoHeight()
 			[
 				SNew(SHorizontalBox)
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 14.f * U, 0.f)[SearchBox(LOCTEXT("RecipeHint", "Search recipes..."))]
@@ -875,7 +899,7 @@ void WRGod::TickBadge(APlayerController* PC)
 	if (!Map.Contains(PC) && WRGod::IsLocalTester(PC))
 	{
 		const TSharedRef<SWidget> Badge = SNew(SGodBadge).PC(PC);
-		GEngine->GameViewport->AddViewportWidgetContent(Badge, 60);
+		GEngine->GameViewport->AddViewportWidgetContent(Badge, 70);   // over every screen and the death / loading covers
 		Map.Add(PC, Badge);
 	}
 }

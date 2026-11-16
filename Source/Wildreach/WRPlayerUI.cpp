@@ -248,8 +248,10 @@ void FWRPlayerUI::ShowScreen(FName Name)
 	// Screens ease in (a short fade and rise); the build bar is a strip, so it only fades.
 	const bool bBar = Name == TEXT("build");
 	ScreenHost = SNew(SWRAppear).Seconds(WRTune(TEXT("flow.screenInSeconds"), 0.15f)).Offset(FVector2D(0.f, bBar ? 0.f : WRTune(TEXT("flow.screenRise"), 14.f)))[ScreenWidget.ToSharedRef()];
-	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), 20);
-	WRInput::AddNavRoot(ScreenHost.ToSharedRef(), 20);
+	// The testers' god panel sits over the death and loading covers (Z 60), so "Revive where I fell" can be reached dead.
+	const int32 Z = Name == TEXT("god") ? 65 : 20;
+	GEngine->GameViewport->AddViewportWidgetContent(ScreenHost.ToSharedRef(), Z);
+	WRInput::AddNavRoot(ScreenHost.ToSharedRef(), Z);
 	UE_LOG(LogWildreach, Log, TEXT("UI screen %s"), *Name.ToString());
 	WRReport::Event(TEXT("screen"), Name.ToString());
 }

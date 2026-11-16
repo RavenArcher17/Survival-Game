@@ -20,7 +20,7 @@ showcase-notes cooks/build-godmode.md). Compiled (editor target); not played her
   `<system> dev ...`; `WRGod::IsDevCommand`) now need a verified tester in a packaged game too (until now any player's
   console could run them); editor runs and the test scripts are unchanged.
 - **The powers** (`WRGod::Run`, every one a server command that re-checks the flag): invulnerable (blows land, no
-  health lost, death refused: `ApplyHit`, `AWRCharacterBase::Die`), endless vitals (stamina, all eleven path bars,
+  health lost, death refused: `ApplyHit`, `AWRCharacterBase::Die`), endless vitals (stamina, the path bars abilities spend,
   hunger, thirst; corruption and build-ups empty), one-hit kill, fly (camera pitch, Jump rises, Dive / B sinks, Sprint
   doubles, speed x0.5-10) and pass through walls, unseen (`PickTarget`, the bosses' pick and wake), heal, clear
   statuses, revive where you fell, kill everything within 40 m (as your kills), travel to any land, boss arena, shrine,

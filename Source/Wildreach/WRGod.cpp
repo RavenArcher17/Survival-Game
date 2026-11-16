@@ -3,6 +3,7 @@
 #include "WRGod.h"
 #include "Wildreach.h"
 #include "WRGodAuth.h"
+#include "WRMainMenu.h"
 #include "WRIdentity.h"
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
@@ -144,6 +145,30 @@ namespace WRGodImpl
 				? FName(*P.Kind) : FName(TEXT("place"));
 			Add(P.Name, Kind, P.Location);
 		}
+		// The Old Island's named places that aren't landmarks (island_places.json; the landmarks came in through FWRPoi).
+		if (const TSharedPtr<FJsonObject> Isle = FWRTuning::LoadDataFile(TEXT("island_places.json")))
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+			if (Isle->TryGetArrayField(TEXT("places"), Rows))
+			{
+				for (const TSharedPtr<FJsonValue>& V : *Rows)
+				{
+					const TSharedPtr<FJsonObject> R = V->AsObject();
+					bool bOk = false;
+					const FVector2D At = Metres(R, TEXT("at"), bOk);
+					bool bLandmark = false;
+					if (R.IsValid()) R->TryGetBoolField(TEXT("landmark"), bLandmark);
+					if (bOk) Add(Str(R, TEXT("name")), bLandmark ? FName(TEXT("landmark")) : FName(TEXT("place")), FVector(At, 0.f));
+				}
+			}
+		}
+		// Every boss standing in the world: its home (an arena the map's data didn't name is still on the list).
+		for (TActorIterator<AWRBoss> It(World); It; ++It)
+		{
+			const FVector Home = It->GetHome();
+			const bool bListed = Out.ContainsByPredicate([&Home](const FWRGodPlace& P) { return P.Kind == TEXT("boss") && FVector::Dist2D(P.Where, Home) < 5000.f; });
+			if (!bListed) Add(It->GetDisplayLabel(), TEXT("boss"), Home);
+		}
 		// The hidden tubes (world.json hidden): their first room's end.
 		const TArray<TSharedPtr<FJsonValue>>* Hidden = nullptr;
 		if (const TSharedPtr<FJsonObject> Root = WRWorld::Obj(TEXT("")); Root.IsValid() && Root->TryGetArrayField(TEXT("hidden"), Hidden))
@@ -179,13 +204,12 @@ namespace WRGodImpl
 		return Out;
 	}
 
-	/** Every path bar and its max (the path resources): full under Endless vitals. */
+	/** Stamina and the path bars abilities spend (Mana, Growth, Momentum, Souls, Flow, Radiance, Spores, Void): full under
+	 *  Endless vitals. Heat, Chill and Charge are builders (they fill as you fight and nothing waits on them); pinned at
+	 *  full they'd fire their full-bar effects (Overheat's blast) on every gain, so they're left to the game. */
 	struct FBar { FGameplayAttribute (*Attr)(); float (UWRAttributeSet::*Max)() const; };
 	const FBar Bars[] = {
 		{ &UWRAttributeSet::GetStaminaAttribute, &UWRAttributeSet::GetMaxStamina },
-		{ &UWRAttributeSet::GetHeatAttribute, &UWRAttributeSet::GetMaxHeat },
-		{ &UWRAttributeSet::GetChillAttribute, &UWRAttributeSet::GetMaxChill },
-		{ &UWRAttributeSet::GetChargeAttribute, &UWRAttributeSet::GetMaxCharge },
 		{ &UWRAttributeSet::GetGrowthAttribute, &UWRAttributeSet::GetMaxGrowth },
 		{ &UWRAttributeSet::GetMomentumAttribute, &UWRAttributeSet::GetMaxMomentum },
 		{ &UWRAttributeSet::GetSoulsAttribute, &UWRAttributeSet::GetMaxSouls },
@@ -353,6 +377,8 @@ void UWRGodComponent::ServerTick()
 	AWRPlayerState* PS = Cast<AWRPlayerState>(GetOwner());
 	AWRCharacterBase* Body = PS ? PS->GetPawn<AWRCharacterBase>() : nullptr;
 	if (!Body || !Body->IsAlive()) return;
+	LastAlive = Body->GetActorLocation();
+	bHasLastAlive = true;
 	UAbilitySystemComponent* ASC = Body->GetAbilitySystemComponent();
 	const UWRAttributeSet* A = Body->GetAttributes();
 	if (!ASC || !A) return;
@@ -614,6 +640,7 @@ void WRGod::Challenge(AWRPlayerController* PC)
 
 void WRGod::OnChallenge(AWRPlayerController* PC, const FString& Nonce)
 {
+	if (SWRMainMenu::IsOpen()) return;   // the menu's own backdrop world: no god mode there, so nothing is asked
 	const TWeakObjectPtr<AWRPlayerController> Weak(PC);
 	WRGodAuth::RequestProof(Nonce, [Weak](const FString& Proof, const FString& Label)
 	{
@@ -724,8 +751,8 @@ void WRGod::Run(AWRPlayerController* PC, const TArray<FString>& Args)
 		if (Body && Body->IsAlive()) Result = TEXT("You're alive");
 		else if (GM)
 		{
-			const FVector Fell = Body ? Body->GetActorLocation() : FVector::ZeroVector;
-			const bool bHere = Body != nullptr;
+			const FVector Fell = Body ? Body->GetActorLocation() : G->LastAlive;
+			const bool bHere = Body != nullptr || G->bHasLastAlive;
 			PS->WakeReadyAt = World->GetTimeSeconds();
 			GM->Wake(PC);
 			if (APawn* Fresh = PC->GetPawn(); Fresh && bHere) Fresh->TeleportTo(Land(World, Fresh, Fell), Fresh->GetActorRotation());

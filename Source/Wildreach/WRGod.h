@@ -98,6 +98,9 @@ public:
 	/** The nonce sent to this connection (empty once a proof used it). */
 	FString Nonce;
 	int32 ProofTries = 0;
+	/** Where the tester last stood alive (Revive puts them back there). */
+	FVector LastAlive = FVector::ZeroVector;
+	bool bHasLastAlive = false;
 
 	/** Flying / noclip on the pawn of this machine, as the flags say (server, owner and other machines alike). */
 	void ApplyMovement();
