@@ -115,6 +115,14 @@ creature or boss move is a row in `attacks.json`, not code; a new status is a `s
 `UWRStatusComponent::Proc`; a new path's Wildbrand is a `wildbrands.<node>` row plus its `ClassForNode` line; anything
 that fires at players from a creature or boss never homes (`AWRProjectile::HomeOn` refuses).
 
+Also since 0.7.1: **the combat cook pass** (cooks/cookpass-combat.md in showcase-notes). A survivor's swing cuts with the
+drawn weapon's **real path**: `FWRBladePaths` (`WRBladePath.cpp`) samples the hero's light / heavy clips once per clip on
+whichever machine judges the blow (a dedicated server loads the body mesh and clips for this alone) and `UWRGA_Melee::Sweep`
+puts the class's `weapons.json blade` row in that frame; world things (nodes, buildings, fold things, arena pieces) still use
+the reach tube. A chain light into a wall recoils (`CheckRecoil`, tuning `combat.recoil`). New rule: a new weapon class needs a
+`blade` row (two points in the fist's frame and a radius), and a new hero swing clip needs its `trace` window in
+`anim_windows.json`, or its blade path is wrong.
+
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light
 (`EWREquipSlot::Light`, `EquippedLight`); `UWRWeatherSubsystem` rolls `Data/weather.json` per biome into

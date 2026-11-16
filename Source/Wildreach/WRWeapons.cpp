@@ -119,6 +119,19 @@ void FWRWeapons::Reload()
 			O->TryGetStringField(TEXT("name"), C.Name);
 			C.Reach = Num(O, TEXT("reach"), 220.f);
 			C.SweepRadius = Num(O, TEXT("sweepRadius"), 45.f);
+			const TSharedPtr<FJsonObject>* Blade = nullptr;
+			if (O->TryGetObjectField(TEXT("blade"), Blade))
+			{
+				const auto Point = [&Blade](const TCHAR* Key, FVector& Out)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+					if (!(*Blade)->TryGetArrayField(Key, A) || A->Num() < 3) return false;
+					Out = FVector((*A)[0]->AsNumber(), (*A)[1]->AsNumber(), (*A)[2]->AsNumber());
+					return true;
+				};
+				C.bBlade = Point(TEXT("from"), C.BladeFrom) && Point(TEXT("to"), C.BladeTo);
+				C.BladeRadius = Num(*Blade, TEXT("radius"), 24.f);
+			}
 			FString Hands;
 			if (O->TryGetStringField(TEXT("hands"), Hands)) C.Hands = FName(*Hands);
 			C.bGreat = Flag(O, TEXT("great"));

@@ -59,6 +59,7 @@
 #include "WRLag.h"
 #include "WRCombatRules.h"
 #include "WRForestHazards.h"
+#include "WRBladePath.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Abilities/Tasks/AbilityTask_ApplyRootMotionMoveToForce.h"
@@ -815,6 +816,11 @@ void UWRGA_Melee::StartSwing(float Windup, float Active, float Recovery, bool bH
 	const double Now = GetWorld()->GetTimeSeconds();
 	MoveActive = Active;
 	Character->PlaySwing(SwingKind, Windup + Active, Variant, Windup, Active, Recovery);
+	// The clip the body plays (WRCharacter::OnSwingVisual): its blade path judges what this swing cuts.
+	BladeKey = SwingKind == EWRSwingKind::Heavy || SwingKind == EWRSwingKind::WeaponArt ? FName(TEXT("heavy")) : FName(TEXT("light"));
+	BladeVariant = Variant;
+	BladeLastF = 0.f;
+	bRecoiled = false;
 	// The waist split: lights keep the legs walking, heavies root (COMBAT-AND-LESSONS C2). A jump swing keeps its arc.
 	if (bJumpSwing)
 	{
@@ -1055,12 +1061,22 @@ void UWRGA_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGam
 void UWRGA_Melee::Sweep()
 {
 	AWRCharacterBase* Character = GetCharacter();
-	if (!Character || !IsServer())
+	if (!Character || !IsServer() || bRecoiled)
 	{
-		return;
+		return;   // (a light that clanked off a wall cuts nothing more)
 	}
 	const FWRTuning& T = FWRTuning::Get();
 	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	// The strike's fraction now (0 at its first active frame, 1 at its last) and where the last sweep left off: the drawn
+	// blade's path between them judges the bodies (cooks/cookpass-combat.md 3.1).
+	const float BladeF1 = MoveActive > 0.f ? FMath::Clamp(1.f - float(ActiveEnd - GetWorld()->GetTimeSeconds()) / MoveActive, 0.f, 1.f) : 1.f;
+	const float BladeF0 = FMath::Min(BladeLastF, BladeF1);
+	BladeLastF = BladeF1;
+	TArray<AWRCharacterBase*> BladeTargets;
+	TMap<AWRCharacterBase*, FVector> BladePoints;
+	const bool bBladed = !bJumpSwing && !Character->IsCreature() && T.Num(TEXT("combat.blade.enabled"), 1.f) > 0.f
+		&& BladeSweep(Character, BladeF0, BladeF1, BladeTargets, BladePoints);
+	const int32 StruckBefore = HitThisSwing.Num();
 	float Reach = Character->IsCreature() ? T.Num(TEXT("weapon.reach"), 220.f) : Class.Reach;
 	// A creature bites from as far as it starts biting (its attackRange): a big one's jaws are well past a weapon's reach.
 	if (const AWRCreature* Creature = Cast<AWRCreature>(Character); Creature && Creature->GetDef())
@@ -1252,6 +1268,20 @@ void UWRGA_Melee::Sweep()
 		}
 	}
 
+	if (bBladed)
+	{
+		// The bodies are the ones the edge passed through. None yet, nothing else struck: a wall in its way is a recoil.
+		Targets = BladeTargets;
+		bool bCutBody = false;
+		for (const TWeakObjectPtr<AActor>& Was : HitThisSwing)
+		{
+			bCutBody |= Cast<AWRCharacterBase>(Was.Get()) != nullptr;
+		}
+		if (Targets.Num() == 0 && !bCutBody && HitThisSwing.Num() == StruckBefore && CheckRecoil(Character, BladeF0, BladeF1))
+		{
+			return;
+		}
+	}
 	const FWRMove* Move = bUsesMoves ? Class.Move(MoveId) : nullptr;
 	const FWRMove* Light = Class.Move(TEXT("light1"));
 	const FWRMove* Heavy = Class.Move(TEXT("heavy"));
@@ -1365,7 +1395,13 @@ void UWRGA_Melee::Sweep()
 			if (BlowElement == TEXT("fire")) { Hit.Element = WRTags::Element_Fire; Hit.BurnBuildup += Infused; }
 			else if (BlowElement == TEXT("frost")) { Hit.Element = WRTags::Element_Frost; Hit.FrostBuildup += Infused; }
 		}
-		// Where the blade meets the body: the nearer point of its capsule along the swing (head strikes, parts).
+		// Where the blade meets the body: where the drawn edge touched it, else the nearer point of its capsule along the
+		// reach tube (head strikes, parts, where the sparks fly).
+		if (const FVector* Edge = BladePoints.Find(Target))
+		{
+			Hit.ImpactPoint = *Edge;
+		}
+		else
 		{
 			FVector OnSwing, OnBody;
 			const float HH = Target->GetSimpleCollisionHalfHeight(), R = Target->GetSimpleCollisionRadius();
@@ -1385,6 +1421,140 @@ void UWRGA_Melee::Sweep()
 	{
 		HitThisSwing.Add(Dressing);
 	}
+}
+
+bool UWRGA_Melee::BladeSweep(AWRCharacterBase* Character, float F0, float F1, TArray<AWRCharacterBase*>& OutTargets, TMap<AWRCharacterBase*, FVector>& OutPoints)
+{
+	const AWRCharacter* Survivor = Cast<AWRCharacter>(Character);
+	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	if (!Survivor || !Class.bBlade || BladeKey.IsNone())
+	{
+		return false;
+	}
+	const FName Sex = Survivor->GetBodyStyle() == TEXT("f") ? FName(TEXT("f")) : FName(TEXT("m"));
+	const float HalfHeight = Character->GetSimpleCollisionHalfHeight();
+	FWRBladePaths& Paths = FWRBladePaths::Get();
+	FTransform A, B;
+	if (!Paths.FistAt(Sex, BladeKey, BladeVariant, F0, HalfHeight, A) || !Paths.FistAt(Sex, BladeKey, BladeVariant, F1, HalfHeight, B))
+	{
+		return false;
+	}
+	// The edge's places between the two fractions, close enough that the tip never jumps more than stepCm.
+	const FTransform Actor = Character->GetActorTransform();
+	const float StepCm = FMath::Max(5.f, WRTune(TEXT("combat.blade.stepCm"), 20.f));
+	const int32 Steps = FMath::Clamp(FMath::CeilToInt(FVector::Dist(A.TransformPosition(Class.BladeTo), B.TransformPosition(Class.BladeTo)) / StepCm), 1, 16);
+	TArray<TPair<FVector, FVector>> Edges;
+	for (int32 s = 0; s <= Steps; ++s)
+	{
+		FTransform Fist;
+		if (!Paths.FistAt(Sex, BladeKey, BladeVariant, FMath::Lerp(F0, F1, float(s) / float(Steps)), HalfHeight, Fist))
+		{
+			continue;
+		}
+		const FTransform World = Fist * Actor;
+		Edges.Emplace(World.TransformPosition(Class.BladeFrom), World.TransformPosition(Class.BladeTo));
+	}
+	// Bodies where its player saw them (server rewind, COMBAT-AND-LESSONS 1.17) for a remote survivor; the present else.
+	const bool bRewind = Character->IsPlayerControlled() && !Character->IsLocallyControlled();
+	UWRLagSubsystem* Lag = bRewind ? UWRLagSubsystem::Get(Character) : nullptr;
+	const double SeenAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::SeenDelay(Character);
+	const FVector Here = Character->GetActorLocation();
+	const float Far = Class.BladeTo.Size() + Class.BladeRadius + 900.f;
+	for (TActorIterator<AWRCharacterBase> It(Character->GetWorld()); It; ++It)
+	{
+		AWRCharacterBase* Who = *It;
+		if (Who == Character || !Who->IsAlive() || !Character->IsHostileTo(Who) || HitThisSwing.Contains(Who) || FVector::DistSquared(Who->GetActorLocation(), Here) > FMath::Square(Far))
+		{
+			continue;
+		}
+		FVector Centre;
+		float R = 40.f, HH = 90.f;
+		if (!Lag || !Lag->BodyAt(Who, SeenAt, Centre, R, HH))
+		{
+			Centre = Who->GetActorLocation();
+			Who->GetCapsuleComponent()->GetScaledCapsuleSize(R, HH);
+		}
+		const FVector Low = Centre - FVector(0.f, 0.f, FMath::Max(0.f, HH - R)), High = Centre + FVector(0.f, 0.f, FMath::Max(0.f, HH - R));
+		for (const TPair<FVector, FVector>& Edge : Edges)
+		{
+			FVector OnBlade, OnBody;
+			FMath::SegmentDistToSegmentSafe(Edge.Key, Edge.Value, Low, High, OnBlade, OnBody);
+			if (FVector::Dist(OnBlade, OnBody) <= Class.BladeRadius + R)
+			{
+				OutTargets.Add(Who);
+				// On the body's surface toward the edge: where the sparks and the blood come off.
+				OutPoints.Add(Who, OnBody + (OnBlade - OnBody).GetSafeNormal() * FMath::Min(R, FVector::Dist(OnBlade, OnBody)));
+				break;
+			}
+		}
+	}
+	return true;
+}
+
+bool UWRGA_Melee::CheckRecoil(AWRCharacterBase* Character, float F0, float F1)
+{
+	const FWRTuning& T = FWRTuning::Get();
+	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Character);
+	const FWRMove* Row = bUsesMoves ? Class.Move(MoveId) : nullptr;
+	// Only a chain light that isn't a thrust (cookpass-combat 3.2): heavies, charged, run / roll / jump attacks and
+	// Wildbrands are committed and carry through, a thrust slides along the stone.
+	if (T.Num(TEXT("combat.recoil.enabled"), 1.f) <= 0.f || !Row || Row->Tier != EWRHitTier::Light || Row->PhysType == 3 || bHeavy || bJumpSwing
+		|| !ArtKey.IsEmpty() || ChargeFactor > 1.f || !MoveId.ToString().StartsWith(TEXT("light")) || F0 >= T.Num(TEXT("combat.recoil.activeShare"), 0.7f))
+	{
+		return false;
+	}
+	const AWRCharacter* Survivor = Cast<AWRCharacter>(Character);
+	const FName Sex = Survivor && Survivor->GetBodyStyle() == TEXT("f") ? FName(TEXT("f")) : FName(TEXT("m"));
+	const float HalfHeight = Character->GetSimpleCollisionHalfHeight();
+	FTransform A, B;
+	if (!FWRBladePaths::Get().FistAt(Sex, BladeKey, BladeVariant, F0, HalfHeight, A) || !FWRBladePaths::Get().FistAt(Sex, BladeKey, BladeVariant, F1, HalfHeight, B))
+	{
+		return false;
+	}
+	// The tip's travel, and the edge's middle (a short blade in a wide room never reaches the wall with its middle).
+	const FTransform Actor = Character->GetActorTransform();
+	const FVector Mid = (Class.BladeFrom + Class.BladeTo) * 0.5f;
+	FHitResult Wall;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRRecoil), false, Character);
+	const FCollisionObjectQueryParams Static(ECC_WorldStatic);
+	const UWorld* World = Character->GetWorld();
+	bool bMet = false;
+	for (const FVector& Point : { Class.BladeTo, Mid })
+	{
+		if (World->SweepSingleByObjectType(Wall, (A * Actor).TransformPosition(Point), (B * Actor).TransformPosition(Point), FQuat::Identity, Static, FCollisionShape::MakeSphere(6.f), Query))
+		{
+			bMet = true;
+			break;
+		}
+	}
+	if (!bMet || FMath::Abs(Wall.ImpactNormal.Z) >= T.Num(TEXT("combat.recoil.wallNormalZ"), 0.55f))
+	{
+		return false;   // nothing, or the floor (a cut down into the ground follows through)
+	}
+	// Things a swing works on aren't walls: a node, the island's trees and rocks, a build piece, a fold's thing, an arena
+	// piece, a ladder, the forest's hazards, a body.
+	const AActor* What = Wall.GetActor();
+	const AActor* Owner = What ? What->GetOwner() : nullptr;
+	if (What && (Cast<APawn>(What) || Cast<AWRDressing>(What) || Cast<AWRResourceNode>(What) || Cast<AWRBuildPiece>(What) || Cast<AWRBuildPiece>(Owner)
+		|| Cast<AWRFoldThing>(What) || Cast<AWRFoldThing>(Owner) || Cast<AWRBossProp>(What) || Cast<AWRSiegeLadder>(What) || WRForestHazards::IsHazardThing(What)))
+	{
+		return false;
+	}
+	bRecoiled = true;
+	UE_LOG(LogWildreach, Log, TEXT("RECOIL %s %s off %s"), *Character->GetName(), *MoveId.ToString(), *GetNameSafe(What));
+	// Steel on stone: orange sparks thrown back off the face, the ringing clang over the block's knock.
+	WRFx::Broadcast(Character, TEXT("hit.recoil"), Wall.ImpactPoint, Wall.ImpactNormal.Rotation(), 1.f, TEXT("hit.recoil"));
+	WRFx::Broadcast(Character, TEXT("hit.dust"), Wall.ImpactPoint, Wall.ImpactNormal.Rotation(), 0.5f, TEXT("hit.block"));
+	if (AWRCharacter* Hero = Cast<AWRCharacter>(Character))
+	{
+		Hero->MulticastBodyOneShot(TEXT("recoil"));   // the hand jarred back (and the owner's pad)
+	}
+	// Held a beat: the swing ends, nothing new starts (the stamina spent stays spent; no damage).
+	if (UWRStatusComponent* Status = Character->FindComponentByClass<UWRStatusComponent>())
+	{
+		Status->Stagger(T.Num(TEXT("combat.recoil.seconds"), 0.35f));
+	}
+	return true;
 }
 
 UWRGA_LightAttack::UWRGA_LightAttack()

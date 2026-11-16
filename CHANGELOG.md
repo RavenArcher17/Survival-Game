@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased: the combat cook pass (the blade's real path, hit feel, bars, tells, fronts, projectiles)
+
+Aaron (lane cookpass-combat: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-combat.md).
+Compiled (editor target); not played here (Aaron and the testers test, F8).
+
+- **Combat (1): the blade's real path.** Why: a survivor's swing hit with a straight 45 cm tube from the body's middle for
+  its whole strike, so a slash that visibly passed a wolf at your side missed it, a body ahead was hit on the first
+  frame though the blade reached it last, and a spear's point or a hammer's head was no different from the haft (grade
+  G1; combat.md 2.4.3 had called for the blade path but it was never built). Elden Ring's blades hit along their animation.
+  - `FWRBladePaths` (`WRBladePath.cpp`) samples the hero's own light / heavy clip (16 poses across its strike frames,
+    `anim_windows.json` trace, the frames the clip warp fits onto the active window) for the weapon socket's fist frame,
+    on any machine that judges a blow (a dedicated server loads the body mesh and clips for it).
+  - `weapons.json blade` per class: the live part of the modelled weapon (sword 20-95 cm r24, dagger the seax, spear the
+    point only, axe / pick-hammer / great hammer the head only, greatsword 25-130 cm, scythe the curved blade off the
+    snath top, fists the knuckles).
+  - `UWRGA_Melee::BladeSweep`: each 30 ms sweep tests the edge from the last strike fraction to this one (the tip never
+    jumping more than `combat.blade.stepCm` 20 cm) against capsules, rewound for a remote survivor; the impact point is
+    where the edge touched (sparks, head strikes, parts). Jump attacks, creatures and world things keep the reach tube;
+    a clip with no usable path falls back to it and says so in the log.
+- **Combat (2): wall recoil.** Why: a light swing passed through stone; in Elden Ring and Dark Souls a swing clanks off a
+  wall and fighting in a corridor is a choice (G2). A chain light (not a thrust) whose blade meets a wall (not the floor,
+  not a node, tree, build piece, fold thing or arena piece) in the first 70% of its strike before touching a body stops:
+  orange sparks and grit off the face (`fx.json hit.recoil`), a ringing clang over the block's knock (`sounds.json
+  hit.recoil`), the hit clip and a pad knock, held 0.35 s (`combat.recoil`). No damage; heavies, charged, run, roll,
+  jump attacks and Wildbrands carry through.
+- **Combat (3): the clip you see.** Why: a swing next to a tree or node played a chop even with a wolf in front (G6). The
+  chop / gather clip now plays only with no enemy within 4 m ahead.
+
 ## Unreleased: the audio cook pass (all sound and music)
 
 Aaron (lane cookpass-audio: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-audio.md).

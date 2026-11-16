@@ -61,6 +61,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Components/LODSyncComponent.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "WRBladePath.h"
 #include "GroomComponent.h"
 #include "GroomAsset.h"
 #include "GroomBindingAsset.h"
@@ -742,30 +743,9 @@ void AWRCharacter::LoadBodyArt()
 
 FTransform AWRCharacter::FistFrame() const
 {
-	// In the weapon socket's own space: X out of the fist (index side), Y toward the fingers (the knuckles' way).
-	const USkeletalMesh* BodyAsset = Body->GetSkeletalMeshAsset();
-	const USkeletalMeshSocket* Socket = BodyAsset ? BodyAsset->FindSocket(WeaponSocket) : nullptr;
-	if (!Socket)
-	{
-		return FTransform::Identity;
-	}
-	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
-	const int32 Bone = Ref.FindBoneIndex(Socket->BoneName);
-	const FString Side = Socket->BoneName.ToString().Right(2);  // "_r" / "_l"
-	const int32 Finger = Ref.FindBoneIndex(FName(*(TEXT("middle_01") + Side)));
-	if (Bone == INDEX_NONE || Finger == INDEX_NONE)
-	{
-		return FTransform::Identity;
-	}
-	const FTransform SocketCS = Socket->GetSocketLocalTransform() * FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Bone);
-	const FVector Fingers = SocketCS.InverseTransformVectorNoScale(FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Finger).GetLocation()
-		- FAnimationRuntime::GetComponentSpaceTransformRefPose(Ref, Bone).GetLocation());
-	FVector Y = FVector::VectorPlaneProject(Fingers, FVector::XAxisVector).GetSafeNormal();
-	if (Y.IsNearlyZero())
-	{
-		Y = FVector::YAxisVector;
-	}
-	return FTransform(FQuat(FRotationMatrix::MakeFromXY(FVector::XAxisVector, Y)), FVector::ZeroVector);
+	// In the weapon socket's own space: X out of the fist (index side), Y toward the fingers (the knuckles' way). Shared
+	// with the blade path the server judges swings with (WRBladePath).
+	return FWRBladePaths::FistFrameOf(Body->GetSkeletalMeshAsset(), WeaponSocket);
 }
 
 UWRHeroAnimInstance* AWRCharacter::BodyAnimInstance() const
@@ -1153,7 +1133,19 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 		: (Kind == EWRSwingKind::Heavy || Kind == EWRSwingKind::WeaponArt) ? FName(TEXT("heavy")) : FName(TEXT("light"));
 	// A plain swing at a resource node right in front gathers instead: an overhead chop for wood, stone and ore, a crouch
 	// for plants. Purely visual (the swing's own hit does the harvesting), so every machine decides from what it sees.
-	if (Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy)
+	// With an enemy in front the swing is a fight swing, never a chop: the blow is judged on the clip you see
+	// (cookpass-combat 3.5: the server cuts with the light / heavy clip's blade path).
+	bool bFoeAhead = false;
+	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It && (Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy); ++It)
+	{
+		const FVector To = It->GetActorLocation() - GetActorLocation();
+		if (*It != this && It->IsAlive() && IsHostileTo(*It) && To.Size2D() < 400.f && FVector::DotProduct(To.GetSafeNormal2D(), GetActorForwardVector()) > 0.5f)
+		{
+			bFoeAhead = true;
+			break;
+		}
+	}
+	if ((Kind == EWRSwingKind::Light || Kind == EWRSwingKind::Heavy) && !bFoeAhead)
 	{
 		const FVector Here = GetActorLocation(), Forward = GetActorForwardVector();
 		bool bGathering = false;
@@ -1231,6 +1223,23 @@ void AWRCharacter::OnSwingVisual(EWRSwingKind Kind, float Duration)
 
 void AWRCharacter::MulticastBodyOneShot_Implementation(FName Key)
 {
+	// A light clanking off a wall (cookpass-combat 3.2) cuts the swing still playing: the hit clip, the hand jarred back,
+	// and the owner's pad knocks.
+	if (Key == TEXT("recoil"))
+	{
+		const float Seconds = WRTune(TEXT("combat.recoil.seconds"), 0.35f);
+		if (IsLocallyControlled())
+		{
+			WRInput::RumbleLight(GetWorld(), WRTune(TEXT("combat.recoil.rumble"), 0.5f), 0.12f);
+		}
+		if (GetNetMode() != NM_DedicatedServer && Body->IsVisible())
+		{
+			BodyAnim = NAME_None;
+			PlayBodyAnim(TEXT("hit"), false, 1.f, Seconds);
+			BodyOneShotUntil = GetWorld()->GetTimeSeconds() + Seconds;
+		}
+		return;
+	}
 	if (GetNetMode() == NM_DedicatedServer || !Body->IsVisible() || GetWorld()->GetTimeSeconds() < BodyOneShotUntil)
 	{
 		return;

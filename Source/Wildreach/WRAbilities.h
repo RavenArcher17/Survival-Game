@@ -151,6 +151,19 @@ private:
 	bool bJumpSwing = false;
 	double JumpActiveSince = 0.0;
 	double FollowUpFrom = -1.0, FollowUpUntil = -1.0;
+
+	// --- The blade's real path (cooks/cookpass-combat.md 3.1, 3.2) ---
+	/** The swing's clip set ("light" / "heavy") and variant, as the body plays it; the strike fraction last swept. */
+	FName BladeKey;
+	uint8 BladeVariant = 0;
+	float BladeLastF = 0.f;
+	/** A light that met a wall: its sweeps stop (nothing past the stone is cut). */
+	bool bRecoiled = false;
+	/** The bodies the drawn blade touches between strike fractions F0 and F1 (rewound for a remote survivor); where it
+	 *  touched each in OutPoints. False: no blade path for this swing (the reach tube judges it). */
+	bool BladeSweep(AWRCharacterBase* Character, float F0, float F1, TArray<AWRCharacterBase*>& OutTargets, TMap<AWRCharacterBase*, FVector>& OutPoints);
+	/** A light's blade into a wall between F0 and F1: the recoil (sparks, the clang, the hand jarred back). */
+	bool CheckRecoil(AWRCharacterBase* Character, float F0, float F1);
 };
 
 UCLASS() class WILDREACH_API UWRGA_LightAttack : public UWRGA_Melee { GENERATED_BODY() public: UWRGA_LightAttack(); };

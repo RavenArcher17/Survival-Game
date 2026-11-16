@@ -69,6 +69,12 @@ struct FWRWeaponClass
 	FString Name;
 	float Reach = 220.f;
 	float SweepRadius = 45.f;
+	/** The live part of the drawn weapon in the fist's frame (weapons.json blade, cm): what the clip's real path carries
+	 *  into a body (WRBladePath). bBlade false: the class has no row, its swings keep the reach tube. */
+	bool bBlade = false;
+	FVector BladeFrom = FVector::ZeroVector;
+	FVector BladeTo = FVector(90.f, 0.f, 0.f);
+	float BladeRadius = 24.f;
 	float CritBackstab = 2.3f;
 	float CritRiposte = 3.45f;
 	float CritStance = 3.f;

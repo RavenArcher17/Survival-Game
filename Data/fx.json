@@ -330,6 +330,11 @@
       {"sprite": "spark", "blend": "add", "count": 16, "life": [0.15,0.4], "size": [2.5,4], "speed": [500,1300], "dir": [1,0,0.3], "spread": 65, "gravity": 1, "drag": 2.5, "stretch": 0.03, "intensity": 8, "colors": [[1,0.88,0.55,1], [1,0.5,0.12,0]]},
       {"sprite": "glow", "blend": "add", "count": 1, "life": [0.09,0.09], "size": [55,55], "grow": 1.4, "intensity": 2.4, "follow": true, "colors": [[1,0.85,0.6,1], [1,0.6,0.3,0]]}
     ]},
+    "hit.recoil": { "_comment": "A light swing clanking off a wall (cooks/cookpass-combat.md 3.2): steel on stone, orange sparks thrown back off the face and a puff of grit.", "shake": "block", "light": {"color": [1,0.72,0.4], "intensity": 3000, "radius": 420, "seconds": 0.12}, "layers": [
+      {"sprite": "spark", "blend": "add", "count": 22, "life": [0.12,0.35], "size": [2,3.5], "speed": [600,1500], "dir": [1,0,0.2], "spread": 70, "gravity": 1.1, "drag": 2.2, "stretch": 0.035, "intensity": 9, "colors": [[1,0.85,0.5,1], [1,0.45,0.1,0]]},
+      {"sprite": "chip_stone", "blend": "lit", "count": 8, "life": [0.3,0.6], "size": [1.5,3], "speed": [200,500], "dir": [1,0,0.3], "spread": 60, "gravity": 1.0, "colors": [[0.55,0.52,0.48,1], [0.55,0.52,0.48,0]]},
+      {"sprite": "smoke2", "blend": "lit", "count": 3, "life": [0.4,0.7], "size": [18,34], "grow": 2, "speed": [40,120], "dir": [1,0,0.2], "spread": 50, "intensity": 0.3, "colors": [[0.7,0.66,0.6,0.5], [0.7,0.66,0.6,0]]}
+    ]},
     "hit.crit": { "layers": [
       {"sprite": "flare", "blend": "add", "count": 1, "life": [0.16,0.16], "size": [80,80], "grow": 1.5, "rot": [0,45], "intensity": 4, "colors": [[1,0.85,0.5,1], [1,0.6,0.25,0]]}
     ]},

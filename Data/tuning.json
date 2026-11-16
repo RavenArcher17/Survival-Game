@@ -59,6 +59,9 @@
   "combat": {
     "_full": "Full attack set (cooks/build-combat-full.md 2.2-2.4): charge (Heavy held: min s to count, full s for the charged row's whole damage, max s it lets go by itself), contextWindow s after a roll / backstep for the rolling / backstep light, runAttackSpeed cm/s for a running attack, jumpAttack (maxAir s the blade stays live in the air, landGrace s after landing, heavyRadius x its sweep), counterHit (on a body winding up: damage, pierceDamage, stance), stealth (an unaware target: stance, buildup), twoHand (a 1h weapon held in both: damage, lightStance, heavyStance), minArtWindup / minHeavyCoil (the coil rule).",
     "charge": { "min": 0.35, "full": 0.8, "max": 1.0 },
+    "_blade": "cooks/cookpass-combat.md 3.1-3.2. blade: a survivor's swing cuts with the drawn weapon's real path from its clip (weapons.json blade); stepCm = the most the tip moves between two tests. recoil: a chain light (not a thrust) whose blade meets a wall (a surface with |normal.z| under wallNormalZ) in the first activeShare of its strike, before touching a body, clanks off: the swing stops, the hero is held seconds.",
+    "blade": { "enabled": 1, "stepCm": 20 },
+    "recoil": { "enabled": 1, "seconds": 0.35, "wallNormalZ": 0.55, "activeShare": 0.7, "rumble": 0.5 },
     "contextWindow": 0.3, "runAttackSpeed": 450,
     "jumpAttack": { "maxAir": 1.2, "landGrace": 0.1, "heavyRadius": 1.25 },
     "counterHit": { "damage": 0.15, "pierceDamage": 0.3, "stance": 0.3 },
