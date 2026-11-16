@@ -348,6 +348,9 @@ AWRBuildPiece::AWRBuildPiece()
 	Main->SetupAttachment(RootComponent);
 	Leaf = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Leaf"));
 	Leaf->SetupAttachment(RootComponent);
+	// Doors tick only while their leaf swings (OnRep_Door turns it on, the swing's end off).
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	Light = CreateDefaultSubobject<UPointLightComponent>(TEXT("Light"));
 	Light->SetupAttachment(RootComponent);
 	Light->SetVisibility(false);
@@ -364,6 +367,7 @@ void AWRBuildPiece::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AWRBuildPiece, Health);
 	DOREPLIFETIME(AWRBuildPiece, MaxHealth);
 	DOREPLIFETIME(AWRBuildPiece, bOpen);
+	DOREPLIFETIME(AWRBuildPiece, DoorSide);
 	DOREPLIFETIME(AWRBuildPiece, bLocked);
 	DOREPLIFETIME(AWRBuildPiece, CropReadyAt);
 	DOREPLIFETIME(AWRBuildPiece, bPlanted);
@@ -506,15 +510,213 @@ void AWRBuildPiece::OnRep_Piece()
 
 void AWRBuildPiece::OnRep_Door()
 {
-	// The leaf swings 90 degrees about its hinge edge (the opening's -X side), clear of the doorway.
-	const FVector Size = Leaf->GetRelativeScale3D() * 100.f;
-	Leaf->SetRelativeLocationAndRotation(bOpen ? FVector(-Size.X * 0.5f, Size.X * 0.5f, Size.Z * 0.5f) : FVector(0.f, 0.f, Size.Z * 0.5f),
-		FRotator(0.f, bOpen ? 90.f : 0.f, 0.f));
-	Leaf->SetCollisionEnabled(bOpen || bGhost ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
-	if (HasActorBegunPlay() && !bGhost && GetWorld() && GetWorld()->GetTimeSeconds() - CreationTime > 1.0)
+	// The leaf turns about its hinge (the opening's -X jamb) to door.openDeg on its DoorSide, over door.swingSeconds:
+	// pushed open it slows into its stop and settles back off it; pushed shut it speeds into the frame and the latch
+	// drops (cooks/cookpass-multiplayer.md 3.1). Every machine turns it (the server too: the leaf collides at rest).
+	const float Target = bOpen ? float(DoorSide >= 0 ? 1 : -1) * WRTune(TEXT("door.openDeg"), 90.f) : 0.f;
+	const bool bFirstSight = !bDoorPosed || bGhost || !HasActorBegunPlay() || !GetWorld() || GetWorld()->GetTimeSeconds() - CreationTime < 1.0;
+	if (bFirstSight)
 	{
-		WRSound::PlayAt(this, bOpen ? FName(TEXT("door.open")) : FName(TEXT("door.close")), Leaf->GetComponentLocation());
+		// Drawn where it is: a door that comes into view already open doesn't swing for a newcomer.
+		DoorFrom = DoorTo = Target;
+		DoorT = 1.f;
+		bDoorShutting = false;
+		bDoorLatched = true;
+		PoseLeaf(Target);
+		bDoorPosed = true;
+		Leaf->SetCollisionEnabled(bGhost ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+		SetActorTickEnabled(false);
+		return;
 	}
+	if (FMath::IsNearlyEqual(Target, DoorTo) && (DoorT < 1.f || FMath::IsNearlyEqual(DoorAngle, Target)))
+	{
+		return;   // (bOpen and DoorSide arrive together: one swing)
+	}
+	const FWRPieceDef* Def = GetDef();
+	const float Full = Def && Def->Shape == TEXT("gate") ? WRTune(TEXT("door.gateSwingSeconds"), 1.6f) : WRTune(TEXT("door.swingSeconds"), 0.9f);
+	// Turned back mid-swing: from where it is, in the share of the time the way back takes.
+	DoorFrom = DoorAngle;
+	DoorTo = Target;
+	DoorT = 0.f;
+	DoorDur = FMath::Max(0.05f, Full * FMath::Clamp(FMath::Abs(DoorTo - DoorFrom) / FMath::Max(1.f, WRTune(TEXT("door.openDeg"), 90.f)), 0.25f, 1.f));
+	bDoorShutting = !bOpen;
+	bDoorLatched = false;
+	// It never shoves a body: no collision while it moves.
+	Leaf->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (bOpen)
+	{
+		WRSound::PlayAt(this, TEXT("door.open"), Leaf->GetComponentLocation());
+	}
+	SetActorTickEnabled(true);
+}
+
+void AWRBuildPiece::PoseLeaf(float Degrees)
+{
+	DoorAngle = Degrees;
+	const FVector Size = Leaf->GetRelativeScale3D() * 100.f;
+	const float Half = Size.X * 0.5f;
+	const float Rad = FMath::DegreesToRadians(Degrees);
+	// The leaf's centre swings round the hinge line at -Half on X.
+	Leaf->SetRelativeLocationAndRotation(FVector(-Half + FMath::Cos(Rad) * Half, FMath::Sin(Rad) * Half, Size.Z * 0.5f), FRotator(0.f, Degrees, 0.f));
+}
+
+void AWRBuildPiece::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!Leaf || Leaf->GetRelativeScale3D().X <= 0.f)
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+	const float OpenDeg = WRTune(TEXT("door.openDeg"), 90.f);
+	if (!bDoorShutting)
+	{
+		// Open: a push that slows (ease-out) a little past the stop, then settles back onto it over the last quarter.
+		DoorT = FMath::Min(1.f, DoorT + DeltaSeconds / DoorDur);
+		const float Sign = DoorTo >= DoorFrom ? 1.f : -1.f;
+		const float Over = FMath::IsNearlyZero(DoorTo) ? 0.f : WRTune(TEXT("door.openBounceDeg"), 3.f) * Sign;
+		const float Peak = DoorTo + Over;
+		const float Split = 0.75f;
+		float A;
+		if (DoorT < Split)
+		{
+			const float U = DoorT / Split;
+			A = FMath::Lerp(DoorFrom, Peak, 1.f - FMath::Pow(1.f - U, 3.f));
+		}
+		else
+		{
+			const float U = (DoorT - Split) / (1.f - Split);
+			A = FMath::Lerp(Peak, DoorTo, FMath::SmoothStep(0.f, 1.f, U));
+		}
+		PoseLeaf(A);
+		if (DoorT >= 1.f)
+		{
+			PoseLeaf(DoorTo);
+			Leaf->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			SetActorTickEnabled(false);
+		}
+		return;
+	}
+	if (!bDoorLatched)
+	{
+		// Shut: it speeds into the frame (ease-in); the latch drops as it meets it.
+		DoorT = FMath::Min(1.f, DoorT + DeltaSeconds / DoorDur);
+		PoseLeaf(FMath::Lerp(DoorFrom, 0.f, DoorT * DoorT));
+		if (DoorT >= 1.f)
+		{
+			bDoorLatched = true;
+			DoorT = 0.f;
+			Leaf->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			WRSound::PlayAt(this, TEXT("door.close"), Leaf->GetComponentLocation());
+		}
+		return;
+	}
+	// The rebound off the frame, dying away (back the way it came, never through the frame).
+	const float Len = FMath::Max(0.01f, WRTune(TEXT("door.latchBounceSeconds"), 0.12f));
+	DoorT = FMath::Min(1.f, DoorT + DeltaSeconds / Len);
+	const float Sign = DoorFrom >= 0.f ? 1.f : -1.f;
+	PoseLeaf(Sign * WRTune(TEXT("door.latchBounceDeg"), 1.5f) * FMath::Sin(PI * DoorT) * (1.f - DoorT) * FMath::Min(1.f, FMath::Abs(DoorFrom) / FMath::Max(1.f, OpenDeg)));
+	if (DoorT >= 1.f)
+	{
+		PoseLeaf(0.f);
+		SetActorTickEnabled(false);
+	}
+}
+
+const APawn* AWRBuildPiece::DoorSweepBlocker(int32 Side, const AActor* Ignore) const
+{
+	UWorld* World = GetWorld();
+	if (!World || !Leaf)
+	{
+		return nullptr;
+	}
+	const FVector Size = Leaf->GetRelativeScale3D() * 100.f;
+	const float W = Size.X;
+	const FTransform Frame = GetActorTransform();
+	for (TActorIterator<APawn> It(World); It; ++It)
+	{
+		const APawn* P = *It;
+		if (!P || P == Ignore || P->IsActorBeingDestroyed() || FVector::DistSquared(P->GetActorLocation(), GetActorLocation()) > FMath::Square(W + 400.f))
+		{
+			continue;
+		}
+		float R = 0.f, HalfH = 0.f;
+		P->GetSimpleCollisionCylinder(R, HalfH);
+		const FVector L = Frame.InverseTransformPosition(P->GetActorLocation());
+		if (L.Z + HalfH < -20.f || L.Z - HalfH > Size.Z + 20.f)
+		{
+			continue;   // above or below the leaf
+		}
+		// In the hinge's own space: X along the shut leaf from the hinge, Y out to a side.
+		const FVector2D Q(L.X + W * 0.5f, L.Y);
+		const float Slack = R * 0.8f;
+		if (Side == 0)
+		{
+			if (FMath::Abs(Q.Y) < R + Size.Y && Q.X > -Slack && Q.X < W + Slack) return P;
+			continue;
+		}
+		if (Q.Y * float(Side) > -Slack && Q.X > -Slack && Q.Size() < W + Slack)
+		{
+			return P;
+		}
+	}
+	return nullptr;
+}
+
+bool AWRBuildPiece::SwingFor(const APawn* By, bool bNewOpen, FString& OutWhy)
+{
+	if (bNewOpen == bOpen)
+	{
+		return true;
+	}
+	if (bNewOpen)
+	{
+		// Away from whoever opens it; the other way if a body stands there; not at all if both are taken.
+		int8 Side = 1;
+		if (By)
+		{
+			Side = GetActorTransform().InverseTransformPosition(By->GetActorLocation()).Y >= 0.f ? -1 : 1;
+		}
+		if (DoorSweepBlocker(Side, By))
+		{
+			if (DoorSweepBlocker(-Side, By))
+			{
+				OutWhy = TEXT("Someone's in the way");
+				return false;
+			}
+			Side = int8(-Side);
+		}
+		DoorSide = Side;
+	}
+	else
+	{
+		const APawn* In = DoorSweepBlocker(DoorSide, nullptr);
+		if (!In) In = DoorSweepBlocker(0, nullptr);
+		if (In)
+		{
+			OutWhy = In == By ? TEXT("Step back: you're in the door's way") : TEXT("Someone's in the doorway");
+			return false;
+		}
+	}
+	bOpen = bNewOpen;
+	OnRep_Door();
+	ForceNetUpdate();
+	return true;
+}
+
+void AWRBuildPiece::SetOpen(bool bNewOpen)
+{
+	if (bNewOpen == bOpen)
+	{
+		return;
+	}
+	if (bNewOpen)
+	{
+		DoorSide = DoorSweepBlocker(1, nullptr) && !DoorSweepBlocker(-1, nullptr) ? -1 : 1;
+	}
+	bOpen = bNewOpen;
+	OnRep_Door();
+	ForceNetUpdate();
 }
 
 void AWRBuildPiece::SpawnChild()
@@ -838,6 +1040,7 @@ void AWRBuildPiece::ApplyLook()
 	{
 		// The door leaf (swings open on its hinge, see OnRep_Door).
 		Configure(Leaf, { LeafSize, FVector(0.f, 0.f, LeafSize.Z * 0.5f) });
+		bDoorPosed = false;   // a new leaf (or the look applied again): drawn where it is, not swung
 		OnRep_Door();
 	}
 	else
@@ -1097,8 +1300,11 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 		{
 			return TEXT("Locked. Enter its code on the keypad (E)");
 		}
-		bOpen = !bOpen;
-		OnRep_Door();
+		FString Why;
+		if (!SwingFor(Player->GetPawn(), !bOpen, Why))
+		{
+			return Why;
+		}
 		return bOpen ? TEXT("Opened") : TEXT("Closed");
 	}
 	if (K == TEXT("bed"))

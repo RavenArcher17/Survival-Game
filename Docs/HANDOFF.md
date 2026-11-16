@@ -58,6 +58,10 @@ The fill-in map is `UWRMapRevealComponent` (PlayerState, server-side grid, `mapR
 marker for a place (not yours) should check `IsRevealed` in `WRUIMap` Gather like the camps and caves do.
 A worn set's full bonus plays the set-complete moment (`FWRPlayerUI::TickSetComplete`, sounds.json `gear.setComplete`).
 Path node glyphs come from `Tools/ui_glyphs.mjs` (Necromancy's added): run it with the ids you add so the rest stay as they are.
+**Multiplayer cook pass** (cooks/cookpass-multiplayer.md in showcase-notes): doors swing on their hinge from server-set
+`bOpen` + `DoorSide` (`AWRBuildPiece::OnRep_Door` starts the swing, `Tick` runs only while it moves, `door.*` tuning);
+open or shut a door for a person with `SwingFor(Pawn, bOpen, Why)` (away from them, refused with a reason while a body
+is in the swing), and without one with `SetOpen` (blasts, build copy). Don't set `bOpen` directly.
 Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

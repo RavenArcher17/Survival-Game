@@ -645,7 +645,9 @@ void FWRRaiding::Step(UWorld* World)
 		if (Left <= 0.f)
 		{
 			Door->UnlockedFor.AddUnique(PC->PlayerState->GetPlayerName());
-			Door->SetOpen(true);
+			// Away from the raider at it; a body in the way doesn't hold a broken lock shut.
+			FString Why;
+			if (!Door->SwingFor(PC->GetPawn(), true, Why)) Door->SetOpen(true);
 			Door->ForceNetUpdate();
 			if (UWRInventoryComponent* Bag = UWRInventoryComponent::FindFor(Who)) Bag->RemoveItem(TEXT("code_breaker"), 1);
 			NoteHit(Door, PC->PlayerState->GetPlayerName(), false, false);

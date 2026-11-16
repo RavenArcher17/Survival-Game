@@ -18,6 +18,9 @@
   "beds": { "_comment": "Beds and bedrolls (WRBeds): a bed you just woke at rests restSeconds before you can wake there again; a bedroll is used up when you wake on it (bedrollSingleUse 1). placeholder",
     "restSeconds": 60, "bedrollSingleUse": 1 },
 
+  "door": { "_comment": "Hinged doors and gates (cooks/cookpass-multiplayer.md 3.1, AWRBuildPiece::OnRep_Door / Tick): the leaf turns about its hinge to openDeg over swingSeconds (gates gateSwingSeconds: a heavier leaf), away from whoever opens it; open it eases out past the stop by openBounceDeg and settles back; shut it eases into the frame and rebounds latchBounceDeg over latchBounceSeconds as the latch drops. Refused while a body stands in the swing.",
+    "openDeg": 90, "swingSeconds": 0.9, "gateSwingSeconds": 1.6, "openBounceDeg": 3, "latchBounceDeg": 1.5, "latchBounceSeconds": 0.12 },
+
   "stamina": { "lightAttack": 10, "heavyAttack": 20, "dodge": 12, "backstep": 8, "jump": 8, "sprintPerSecond": 5, "spell": 12, "weaponArt": 18,
                "graceFloor": -20, "refuseFlashSeconds": 0.35, "refuseShake": 3,
                "_stamina": "COMBAT-AND-LESSONS 1.6: roll 12 at every load, backstep 8, jump 8. Melee costs come from Data/weapons.json moves. graceFloor: an action starts with any stamina left and may take it this far below zero (ER's last swing); nothing starts while it's below zero. A refused press flashes the stamina bar for refuseFlashSeconds and shakes it refuseShake px. A blocked hit costs the blow's staminaDamage x (1 - guard boost / 100) (weapons.json guard / offhands).",

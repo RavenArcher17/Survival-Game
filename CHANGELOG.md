@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: the multiplayer cook pass (cookpass-multiplayer)
+
+Aaron 11-13: built features get the full cook pass. The requirement ledger, research, grades and plan are in
+showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled after each part; nothing was played here (Aaron tests).
+
+- **Part A: doors swing on their hinges.** Why: the leaf jumped 90° in one frame (the BAR's "never snap"), always
+  to the same side even into the person opening it, it could be walked through when open, and the shutting sound
+  played on the press. Now the leaf turns about its hinge on every machine (`AWRBuildPiece::OnRep_Door` / `Tick`,
+  tuning `door`). Pushed open, it slows into its stop at 90°, a little past it, and settles back. Pushed shut, it
+  speeds into the frame, and the latch sound plays as it meets it, with a 1.5° rebound. A gate leaf takes 1.6 s, a
+  door 0.9 s. A door turned back mid-swing goes from where it is. It **swings away from whoever opens it** (the keypad
+  and the code breaker too). If someone stands on that side it swings the other way, and if both sides are taken it
+  says "Someone's in the way". It won't shut on a body in its swing or in the doorway ("Someone's in the doorway" /
+  "Step back: you're in the door's way"). It collides when at rest, open or shut, never while it moves. Doors seen
+  for the first time are drawn as they are. Tested by compiling.
+
 ## Unreleased: building and raids cook pass (cookpass-building)
 
 Aaron 11-13: built features get the full cook pass. Research, grade, requirement ledger and plan in showcase-notes
