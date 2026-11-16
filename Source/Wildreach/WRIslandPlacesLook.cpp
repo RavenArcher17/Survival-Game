@@ -11,10 +11,11 @@
 #include "Dom/JsonObject.h"
 
 using WRLookKit::FSurf;
-using WRIsleLook::Lin;
 
 namespace WRIsleV
 {
+	using WRIsleLook::Lin;
+
 	struct FPal
 	{
 		FSurf Basalt = FSurf::Stone(Lin(30, 27, 25), 0.9f);
@@ -887,33 +888,41 @@ namespace WRIsleV
 	}
 }
 
+namespace WRIsleV
+{
+	/** The dispatch, inside this file's namespace so its names win over any other file's in a unity build. */
+	bool BuildImpl(FWRIsleSite& S, const FString& Kind)
+	{
+		const FPal P;
+		const float Landmark = WRTune(TEXT("places.landmarkCull"), 500000.f), Site = WRTune(TEXT("places.siteCull"), 60000.f);
+		if (Kind == TEXT("crater_plume")) { CraterPlume(S); return true; }
+		if (Kind == TEXT("bellows_stacks")) { BellowsStacks(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("fallen_smith")) { FallenSmith(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("glasswall")) { Glasswall(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("blue_fire")) { BlueFire(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("slag_light")) { SlagLight(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("kipuka")) { Kipuka(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("wisp_spire")) { WispSpire(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("plough_trench")) { PloughTrench(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("miners_grave")) { MinersGrave(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("miners_camp")) { MinersCamp(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("charred_caravan")) { CharredCaravan(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("tree_molds")) { TreeMolds(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("crater_stair")) { CraterStair(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("wardens_quarry")) { WardensQuarry(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("shard_field")) { ShardField(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("ridge_watch")) { RidgeWatch(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("kilnmite_hill")) { KilnmiteHill(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("acid_pool")) { AcidPool(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("steam_ground")) { SteamGround(S, P, S.World.GetLocation().X > 0.f); S.Done(Site); return true; }
+		if (Kind == TEXT("slag_cairn")) { SlagCairn(S, P, 170.f + 30.f * S.R(FVector::ZeroVector, 3), true); S.Done(WRTune(TEXT("places.kitCull"), 40000.f)); return true; }
+		return false;
+	}
+}
+
 bool WRIsleLook::BuildVolcanic(FWRIsleSite& S, const FString& Kind)
 {
-	using namespace WRIsleV;
-	const FPal P;
-	const float Landmark = WRTune(TEXT("places.landmarkCull"), 500000.f), Site = WRTune(TEXT("places.siteCull"), 60000.f);
-	if (Kind == TEXT("crater_plume")) { CraterPlume(S); return true; }
-	if (Kind == TEXT("bellows_stacks")) { BellowsStacks(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("fallen_smith")) { FallenSmith(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("glasswall")) { Glasswall(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("blue_fire")) { BlueFire(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("slag_light")) { SlagLight(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("kipuka")) { Kipuka(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("wisp_spire")) { WispSpire(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("plough_trench")) { PloughTrench(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("miners_grave")) { MinersGrave(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("miners_camp")) { MinersCamp(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("charred_caravan")) { CharredCaravan(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("tree_molds")) { TreeMolds(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("crater_stair")) { CraterStair(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("wardens_quarry")) { WardensQuarry(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("shard_field")) { ShardField(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("ridge_watch")) { RidgeWatch(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("kilnmite_hill")) { KilnmiteHill(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("acid_pool")) { AcidPool(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("steam_ground")) { SteamGround(S, P, S.World.GetLocation().X > 0.f); S.Done(Site); return true; }
-	if (Kind == TEXT("slag_cairn")) { SlagCairn(S, P, 170.f + 30.f * S.R(FVector::ZeroVector, 3), true); S.Done(WRTune(TEXT("places.kitCull"), 40000.f)); return true; }
-	return false;
+	return WRIsleV::BuildImpl(S, Kind);
 }
 
 namespace WRIsleLook

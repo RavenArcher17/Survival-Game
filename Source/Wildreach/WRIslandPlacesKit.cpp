@@ -8,10 +8,11 @@
 #include "WRTuning.h"
 
 using WRLookKit::FSurf;
-using WRIsleLook::Lin;
 
 namespace WRIsleK
 {
+	using WRIsleLook::Lin;
+
 	struct FPal
 	{
 		FSurf Basalt = FSurf::Stone(Lin(30, 27, 25), 0.9f);
@@ -332,33 +333,41 @@ namespace WRIsleK
 	}
 }
 
+namespace WRIsleK
+{
+	/** The dispatch, inside this file's namespace so its names win over any other file's in a unity build. */
+	bool BuildImpl(FWRIsleSite& S, const FString& Kind)
+	{
+		const FPal P;
+		const float Cull = WRTune(TEXT("places.kitCull"), 40000.f);
+		if (Kind == TEXT("sulfur_vent")) SulfurVent(S, P);
+		else if (Kind == TEXT("hornito"))
+		{
+			// A spatter cone that spits embers in its turn (each on its own phase of the clock).
+			const float H = 300.f + 160.f * (S.Variant % 3);
+			WRIsleLook::VolcanicHornito(S, S.G(0, 0, -20.f), H, 160.f);
+			S.Breath(S.G(0, 0, H + 20.f), TEXT("ff.hornito.puff"), 7.f + 2.f * (S.Variant % 3), 9.f * S.R(FVector(S.Variant), 7), 1.2f, 1800.f, 700.f, Lin(255, 120, 40));
+		}
+		else if (Kind == TEXT("smith_grave")) SmithGrave(S, P);
+		else if (Kind == TEXT("giant_tool")) GiantTool(S, P);
+		else if (Kind == TEXT("glowmoth_roost")) GlowmothRoost(S, P);
+		else if (Kind == TEXT("basalt_ring")) BasaltRing(S, P);
+		else if (Kind == TEXT("miner_leanto")) MinerLeanto(S, P);
+		else if (Kind == TEXT("tent_ring")) TentRing(S, P);
+		else if (Kind == TEXT("erratic")) Erratic(S, P);
+		else if (Kind == TEXT("snowpuff_nest")) SnowpuffNest(S, P);
+		else if (Kind == TEXT("cache_pole")) CachePole(S, P);
+		else if (Kind == TEXT("frozen_carcass")) FrozenCarcass(S, P);
+		else if (Kind == TEXT("small_pingo")) SmallPingo(S, P);
+		else if (Kind == TEXT("fumarole")) FumaroleSpot(S, P);
+		else if (Kind == TEXT("geyser")) GeyserSpot(S, P);
+		else return false;
+		S.Done(Cull);
+		return true;
+	}
+}
+
 bool WRIsleLook::BuildKit(FWRIsleSite& S, const FString& Kind)
 {
-	using namespace WRIsleK;
-	const FPal P;
-	const float Cull = WRTune(TEXT("places.kitCull"), 40000.f);
-	if (Kind == TEXT("sulfur_vent")) SulfurVent(S, P);
-	else if (Kind == TEXT("hornito"))
-	{
-		// A spatter cone that spits embers in its turn (each on its own phase of the clock).
-		const float H = 300.f + 160.f * (S.Variant % 3);
-		VolcanicHornito(S, S.G(0, 0, -20.f), H, 160.f);
-		S.Breath(S.G(0, 0, H + 20.f), TEXT("ff.hornito.puff"), 7.f + 2.f * (S.Variant % 3), 9.f * S.R(FVector(S.Variant), 7), 1.2f, 1800.f, 700.f, Lin(255, 120, 40));
-	}
-	else if (Kind == TEXT("smith_grave")) SmithGrave(S, P);
-	else if (Kind == TEXT("giant_tool")) GiantTool(S, P);
-	else if (Kind == TEXT("glowmoth_roost")) GlowmothRoost(S, P);
-	else if (Kind == TEXT("basalt_ring")) BasaltRing(S, P);
-	else if (Kind == TEXT("miner_leanto")) MinerLeanto(S, P);
-	else if (Kind == TEXT("tent_ring")) TentRing(S, P);
-	else if (Kind == TEXT("erratic")) Erratic(S, P);
-	else if (Kind == TEXT("snowpuff_nest")) SnowpuffNest(S, P);
-	else if (Kind == TEXT("cache_pole")) CachePole(S, P);
-	else if (Kind == TEXT("frozen_carcass")) FrozenCarcass(S, P);
-	else if (Kind == TEXT("small_pingo")) SmallPingo(S, P);
-	else if (Kind == TEXT("fumarole")) FumaroleSpot(S, P);
-	else if (Kind == TEXT("geyser")) GeyserSpot(S, P);
-	else return false;
-	S.Done(Cull);
-	return true;
+	return WRIsleK::BuildImpl(S, Kind);
 }

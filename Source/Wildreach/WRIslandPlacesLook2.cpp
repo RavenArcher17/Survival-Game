@@ -11,10 +11,11 @@
 #include "Dom/JsonObject.h"
 
 using WRLookKit::FSurf;
-using WRIsleLook::Lin;
 
 namespace WRIsleT
 {
+	using WRIsleLook::Lin;
+
 	struct FPal
 	{
 		FSurf Snow = FSurf::Stone(Lin(238, 242, 245), 0.9f);
@@ -801,34 +802,42 @@ namespace WRIsleT
 	}
 }
 
+namespace WRIsleT
+{
+	/** The dispatch, inside this file's namespace so its names win over any other file's in a unity build. */
+	bool BuildImpl(FWRIsleSite& S, const FString& Kind)
+	{
+		const FPal P;
+		const float Landmark = WRTune(TEXT("places.landmarkCull"), 500000.f), Site = WRTune(TEXT("places.siteCull"), 60000.f);
+		if (Kind == TEXT("tusk_gate")) { TuskGate(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("great_inuksuk")) { GreatInuksuk(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("frozen_whaler")) { FrozenWhaler(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("weeping_seracs")) { WeepingSeracs(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("fox_pingo")) { FoxPingo(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("pale_pines")) { PalePines(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("ice_arch")) { IceArch(S, P); S.Done(Landmark); return true; }
+		if (Kind == TEXT("tusker_wallow")) { TuskerWallow(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("tusk_midden")) { TuskMidden(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("sledge_line")) { SledgeLine(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("fishing_camp")) { FishingCamp(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("drowned_sledge")) { DrownedSledge(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("hunter_camp")) { HunterCamp(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("hunters_blind")) { HuntersBlind(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("giant_pine")) { GiantPine(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("glacimaw_boneyard")) { GlacimawBoneyard(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("claw_scars")) { ClawScars(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("watch_cairn")) { WatchCairn(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("moulin")) { Moulin(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("crevasse_maze")) { CrevasseMaze(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("thin_ice")) { ThinIcePatch(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("inuksuk")) { Inuksuk(S, P, 170.f + 40.f * S.R(FVector::ZeroVector, 5), true); S.Done(WRTune(TEXT("places.kitCull"), 40000.f)); return true; }
+		return false;
+	}
+}
+
 bool WRIsleLook::BuildTundra(FWRIsleSite& S, const FString& Kind)
 {
-	using namespace WRIsleT;
-	const FPal P;
-	const float Landmark = WRTune(TEXT("places.landmarkCull"), 500000.f), Site = WRTune(TEXT("places.siteCull"), 60000.f);
-	if (Kind == TEXT("tusk_gate")) { TuskGate(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("great_inuksuk")) { GreatInuksuk(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("frozen_whaler")) { FrozenWhaler(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("weeping_seracs")) { WeepingSeracs(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("fox_pingo")) { FoxPingo(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("pale_pines")) { PalePines(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("ice_arch")) { IceArch(S, P); S.Done(Landmark); return true; }
-	if (Kind == TEXT("tusker_wallow")) { TuskerWallow(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("tusk_midden")) { TuskMidden(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("sledge_line")) { SledgeLine(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("fishing_camp")) { FishingCamp(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("drowned_sledge")) { DrownedSledge(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("hunter_camp")) { HunterCamp(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("hunters_blind")) { HuntersBlind(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("giant_pine")) { GiantPine(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("glacimaw_boneyard")) { GlacimawBoneyard(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("claw_scars")) { ClawScars(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("watch_cairn")) { WatchCairn(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("moulin")) { Moulin(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("crevasse_maze")) { CrevasseMaze(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("thin_ice")) { ThinIcePatch(S, P); S.Done(Site); return true; }
-	if (Kind == TEXT("inuksuk")) { Inuksuk(S, P, 170.f + 40.f * S.R(FVector::ZeroVector, 5), true); S.Done(WRTune(TEXT("places.kitCull"), 40000.f)); return true; }
-	return false;
+	return WRIsleT::BuildImpl(S, Kind);
 }
 
 namespace WRIsleLook

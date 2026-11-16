@@ -83,7 +83,6 @@ namespace WRIslePlacesImpl
 	}
 }
 using namespace WRIslePlacesImpl;
-using WRIsleLook::Lin;
 
 // ============================================================================================================ WRIsle
 
@@ -289,11 +288,15 @@ void FWRIsleSite::ShrineLight(const FVector& At, FName Shrine, float Intensity, 
 	if (!bDraw) return;
 	FWRIsleAnim& A = Sys->Anims.AddDefaulted_GetRef();
 	A.Kind = FWRIsleAnim::EKind::ShrineLight;
-	A.Light = WRFoldLook::Light(Owner, Root, At, Lin(255, 150, 70), 0.f, Radius);
+	A.Light = WRFoldLook::Light(Owner, Root, At, WRIsleLook::Lin(255, 150, 70), 0.f, Radius);
 	if (A.Light.IsValid()) A.Light->MaxDrawDistance = WRTune(TEXT("places.beaconDistance"), 400000.f);
 	A.At = ToWorld(At);
 	A.Name = Shrine;
 	A.Base = Intensity;
+	// Dark until the first check finds the shrine lit (Period: wanted 0/1, Phase: shown, Length: seconds to the next check).
+	A.Period = 0.f;
+	A.Phase = 0.f;
+	A.Length = 0.f;
 }
 
 void FWRIsleSite::Glowmoth(const FVector& At, float Phase)
@@ -301,7 +304,7 @@ void FWRIsleSite::Glowmoth(const FVector& At, float Phase)
 	if (!bDraw) return;
 	FWRIsleAnim& A = Sys->Anims.AddDefaulted_GetRef();
 	A.Kind = FWRIsleAnim::EKind::Glowmoth;
-	A.Light = WRFoldLook::Light(Owner, Root, At, Lin(214, 240, 190), 0.f, WRTune(TEXT("places.glowmothRadius"), 600.f));
+	A.Light = WRFoldLook::Light(Owner, Root, At, WRIsleLook::Lin(214, 240, 190), 0.f, WRTune(TEXT("places.glowmothRadius"), 600.f));
 	if (A.Light.IsValid()) A.Light->MaxDrawDistance = WRTune(TEXT("places.lightDistance"), 25000.f);
 	A.Base = WRTune(TEXT("places.glowmothLux"), 400.f);
 	A.Phase = Phase;
@@ -380,7 +383,7 @@ void FWRIsleSite::Done(float Cull)
 		return;
 	}
 	const int32 Before = Root->GetNumChildrenComponents();
-	FWRBuildLook::Spawn(Owner, Root, Blocks, Lin(163, 158, 149), false);
+	FWRBuildLook::Spawn(Owner, Root, Blocks, WRIsleLook::Lin(163, 158, 149), false);
 	for (int32 i = Before; i < Root->GetNumChildrenComponents(); ++i)
 	{
 		if (UInstancedStaticMeshComponent* I = Cast<UInstancedStaticMeshComponent>(Root->GetChildComponent(i)))
