@@ -128,7 +128,9 @@ the reach tube. A chain light into a wall recoils (`CheckRecoil`, tuning `combat
 the tier rises by itself for impact 3+ or a fifth of the body's health. A bar that should show what a blow took uses
 `SWRBar` `.Trail(true)`; your running damage on a body is `UWRFxSubsystem::Tally`. A blow that isn't a body (a shockwave, a split in the ground, a bore, a sweep) is an
 `AWRStrikeFront` (`Ring` / `Line` / `Arc` with the owner's hit callback), never an instant radius check; every enemy
-shot gives at least `creatureAI.minWarning` from its tell.
+shot gives at least `creatureAI.minWarning` from its tell. Bespoke boss moves follow the same rule (the cook pass turned every land's instant
+area hits into fronts, real bodies or warned moments); a ground mark only ever shows under something really falling, from
+the moment it falls. No summon counts toward a boss's health (`UpdateParticipants`).
 
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light

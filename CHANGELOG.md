@@ -95,6 +95,9 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   - Marks: the Grey Matron's leap lane is gone, her canopy shadow and Vharra's clot shadows show from the drop / spit,
     Kharvox's dive shadow is his body's size; Kharvox's eye bolt shows its leader 0.9 s (`boltLead`), its double 1.0 s
     apart; the Hex-Warden's bolt and Vharra's clots can be reflected.
+- **Combat (13): one rule for summons.** Why: the forest and fungal lanes asked the combat lane for one rule for every
+  summon and boss health (LATER-COOKS). No summon counts as a tame toward a boss's health: the Spore path's summons and
+  the Necromancy path's raised dead are left out of `AWRBoss::UpdateParticipants` (plants were never creatures).
 
 ## Unreleased: the audio cook pass (all sound and music)
 

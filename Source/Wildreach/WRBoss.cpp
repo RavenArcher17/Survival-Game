@@ -40,6 +40,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
+#include "WRNecroPath.h"
 
 /** Boss damage: the file's scale times the world's creature difficulty. */
 static float BossDamageScale()
@@ -569,10 +570,11 @@ void AWRBoss::UpdateParticipants()
 			++Count;
 		}
 	}
-	// Each tame counts as an extra player.
+	// Each tame counts as an extra player. Summons never do (one rule for all, cookpass-combat 3.14): the Spore path's
+	// sporelings and behemoth, the Necromancy path's raised dead (the Nature path's plants aren't creatures at all).
 	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
 	{
-		if (It->IsTamed() && It->IsAlive() && !WRSporePath::IsSummon(*It) && Players.Contains(It->TamedBy) && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
+		if (It->IsTamed() && It->IsAlive() && !WRSporePath::IsSummon(*It) && !WRNecro::IsRaised(*It) && Players.Contains(It->TamedBy) && FVector::Dist2D(It->GetActorLocation(), GetHome()) < ChaseRadius)
 		{
 			++Count;
 		}
