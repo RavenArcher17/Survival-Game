@@ -131,7 +131,10 @@ switch brings it all back for its design pass); **flint** comes away with mined 
 `FWRGathering::Gather`; Hush arrows and flint arrows use it); **levistone moss** floats beside every keel outcrop
 (AWRSkySpot Kind "moss", `WRSkyMoss.cpp`, `tuning skyWorld.moss`; the Cloudback's favourite food, `creatures.json
 foodValue`); **eating is the right hand's** (the weapon put away for the use, `WRHeldFood.cpp`; the pose in
-`WRHeroAnimInstance.cpp`), from the quick-use bar (the item card names the key). Question cards: every future card says in full sentences what the thing is, where it is in the game, what
+`WRHeroAnimInstance.cpp`), from the quick-use bar (the item card names the key); **siege engines pack up on a held Interact** (`FWRPlayerUI::SiegeKey`,
+server-timed) and **work on PvE worlds against the NPC strongholds** (`WRStronghold.cpp`, `Data/strongholds.json`, re-site
+with `node Tools/terrain/strongholds.mjs`; their pieces are owned by `@hold:<id>`: never saved with the world's pieces,
+always raidable, `FWRStrongholds::IsHoldPiece` is the test any new raid or piece rule needs). Question cards: every future card says in full sentences what the thing is, where it is in the game, what
 is built, what the other choice changes and why it is a question (Aaron 11-16, r-dunewrap).
 
 Also since 0.7.1: **the combat core** (COMBAT-AND-LESSONS C2-C5, cooks/build-combat-core.md): melee swings are move

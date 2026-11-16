@@ -1,4 +1,5 @@
 #include "WRPlayerUI.h"
+#include "WRSiege.h"
 #include "WRGod.h"
 #include "WRDeeds.h"
 #include "Dom/JsonObject.h"
@@ -144,6 +145,7 @@ void FWRPlayerUI::Tick(float DeltaTime)
 		WRSound::PlayUI(nullptr, TEXT("ui.click"));
 	}
 	if (bItemWheel) UpdateWheelHover(ItemHover, 8);
+	TickSiegeKey(Now);
 	if (bDoorKeyDown && Now - DoorDownAt > WRTune(TEXT("ui.doorHoldSeconds"), 0.35f))
 	{
 		// Held on your own code-lock door: its keypad, to set or remove the code.
@@ -1171,6 +1173,87 @@ void FWRPlayerUI::DoorKey(bool bDown, AWRBuildPiece* Door)
 	if (!bDoorKeyDown) return;   // the hold already opened the keypad
 	bDoorKeyDown = false;
 	if (AWRPlayerController* P = PC.Get()) P->InteractNow();   // a tap: open or shut it
+}
+
+void FWRPlayerUI::SiegeKey(bool bDown, AWRSiegeEngine* Engine)
+{
+	AWRPlayerController* P = PC.Get();
+	if (bDown)
+	{
+		bSiegeKeyDown = true;
+		bSiegePacking = false;
+		SiegeDownAt = FPlatformTime::Seconds();
+		SiegeKeyEngine = Engine;
+		SiegeFrom = P && P->GetPawn() ? P->GetPawn()->GetActorLocation() : FVector::ZeroVector;
+		return;
+	}
+	if (!bSiegeKeyDown) return;   // the hold already finished (packed, or refused)
+	bSiegeKeyDown = false;
+	if (bSiegePacking)
+	{
+		// Let go before it was done: nothing is packed.
+		bSiegePacking = false;
+		if (P) P->SendCommand(TEXT("siege packcancel"));
+		return;
+	}
+	// A tap: step off the post, or take one.
+	if (!P) return;
+	if (FWRSiege::CrewingOf(P->GetPawn())) P->SendCommand(TEXT("siege leave"));
+	else P->InteractNow();
+}
+
+void FWRPlayerUI::TickSiegeKey(double Now)
+{
+	AWRPlayerController* P = PC.Get();
+	if (!bSiegeKeyDown || !P) return;
+	AWRSiegeEngine* E = SiegeKeyEngine.Get();
+	const APawn* Me = P->GetPawn();
+	const double Held = Now - SiegeDownAt;
+	const float Tap = WRTune(TEXT("siege.packTapSeconds"), 0.3f), Hold = WRTune(TEXT("siege.packHoldSeconds"), 1.5f);
+	if (!E || !Me)
+	{
+		bSiegeKeyDown = false;
+		if (bSiegePacking) P->SendCommand(TEXT("siege packcancel"));
+		bSiegePacking = false;
+		return;
+	}
+	if (!bSiegePacking)
+	{
+		if (Held < Tap) return;
+		// The hold starts: say why not now, or begin it (the server times it too).
+		if (const FString Why = E->PackBlock(Me); !Why.IsEmpty())
+		{
+			P->ShowLocalNotice(Why);
+			bSiegeKeyDown = false;
+			return;
+		}
+		bSiegePacking = true;
+		P->SendCommand(TEXT("siege packbegin"));
+		WRSound::PlayUI(nullptr, TEXT("ui.click"));
+		return;
+	}
+	// Walking off or being knocked about ends it.
+	if (FVector::Dist2D(Me->GetActorLocation(), SiegeFrom) > WRTune(TEXT("siege.packMoveCm"), 150.f))
+	{
+		bSiegePacking = false;
+		bSiegeKeyDown = false;
+		P->SendCommand(TEXT("siege packcancel"));
+		P->ShowLocalNotice(TEXT("You moved: not packed"));
+		return;
+	}
+	if (Held >= Tap + Hold)
+	{
+		bSiegePacking = false;
+		bSiegeKeyDown = false;
+		P->SendCommand(TEXT("siege pack"));
+	}
+}
+
+float FWRPlayerUI::SiegePackFraction() const
+{
+	if (!bSiegeKeyDown || !bSiegePacking) return -1.f;
+	const float Tap = WRTune(TEXT("siege.packTapSeconds"), 0.3f), Hold = WRTune(TEXT("siege.packHoldSeconds"), 1.5f);
+	return FMath::Clamp(float((FPlatformTime::Seconds() - SiegeDownAt - Tap) / FMath::Max(0.1f, Hold)), 0.f, 1.f);
 }
 
 void FWRPlayerUI::PickTameOrder(int32 Pos)

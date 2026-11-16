@@ -5,6 +5,7 @@
 // through FWRRaiding::DamagePiece. Numbers: tuning.json "siege".
 
 #include "WRSiege.h"
+#include "WRPadInput.h"
 #include "WRSiegeLook.h"
 #include "WRToolMesh.h"
 #include "WRRaiding.h"
@@ -185,6 +186,7 @@ void AWRSiegeEngine::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AWRSiegeEngine, MaxHealth);
 	DOREPLIFETIME(AWRSiegeEngine, RoofHealth);
 	DOREPLIFETIME(AWRSiegeEngine, Rep);
+	DOREPLIFETIME(AWRSiegeEngine, LastHitAt);
 	DOREPLIFETIME(AWRSiegeEngine, Crew);
 	DOREPLIFETIME(AWRSiegeEngine, Hauler);
 }
@@ -296,6 +298,7 @@ void AWRSiegeEngine::TakeHit(float Amount, AActor* By, EWRRaidSource Source, con
 		return;
 	}
 	Health = FMath::Max(0.f, Health - Dealt);
+	LastHitAt = ServerNow();
 	ForceNetUpdate();
 	UE_LOG(LogWildreach, Log, TEXT("SIEGE %s hit by %s (%s) for %.0f: %.0f left"), *Kind.ToString(), *Raider, Key, Dealt, Health);
 	if (Health <= 0.f) Break(By);
@@ -478,29 +481,89 @@ void AWRSiegeEngine::ServerAct(AWRCharacter* Who, bool bDown)
 	}
 }
 
+FString AWRSiegeEngine::PackBlock(const AActor* Who) const
+{
+	// From what every machine has (owner, health, crew, the last blow): the prompt says it before you hold, and the
+	// server says the same if a hold is refused.
+	const APawn* P = Cast<APawn>(Who);
+	const APlayerState* PS = P ? P->GetPlayerState() : nullptr;
+	if (!PS) return TEXT("Not now");
+	const FString Me = PS->GetPlayerName();
+	bool bMine = OwnerName == Me;
+	if (!bMine && HasAuthority()) bMine = FWRSocialRules::CanShare(OwnerName, Me);
+	if (!bMine && !HasAuthority())
+	{
+		// A client knows clans from the player states (an offline owner's clan isn't known: then it's not yours to pack).
+		const AWRPlayerState* Mine = Cast<AWRPlayerState>(PS);
+		const AGameStateBase* GS = GetWorld() ? GetWorld()->GetGameState() : nullptr;
+		if (GS && Mine && !Mine->ClanName.IsEmpty())
+		{
+			for (const APlayerState* O : GS->PlayerArray)
+			{
+				const AWRPlayerState* WO = Cast<AWRPlayerState>(O);
+				if (WO && WO->GetPlayerName() == OwnerName && WO->ClanName == Mine->ClanName) bMine = true;
+			}
+		}
+	}
+	if (!bMine) return FString::Printf(TEXT("It's %s's to pack up"), *OwnerName);
+	const float Need = WRSiegeDetail::Tn(TEXT("packHealth"), 0.9f);
+	if (Health < MaxHealth * Need)
+	{
+		return FString::Printf(TEXT("Too damaged to pack up (%d%%, needs %d%%): it would come apart"), FMath::RoundToInt(100.f * Health / FMath::Max(1.f, MaxHealth)), FMath::RoundToInt(100.f * Need));
+	}
+	for (const AWRCharacter* C : Crew) if (C && C != Who) return TEXT("Someone else is on it");
+	if (ServerNow() - LastHitAt < WRSiegeDetail::Tn(TEXT("packQuietSeconds"), 5.f)) return TEXT("Under attack: not now");
+	return FString();
+}
+
+FString AWRSiegeEngine::ServerPackBegin(AWRCharacter* Who)
+{
+	if (!Who) return FString();
+	if (const FString Why = PackBlock(Who); !Why.IsEmpty()) return Why;
+	if (PostOf(Who) == INDEX_NONE && FVector::Dist2D(Who->GetActorLocation(), GetActorLocation()) > WRSiegeDetail::Tn(TEXT("packReachCm"), 350.f) + 400.f)
+	{
+		return TEXT("Too far from it");
+	}
+	PackBy = Who;
+	PackStartAt = ServerNow();
+	return FString();
+}
+
+void AWRSiegeEngine::ServerPackCancel(AWRCharacter* Who)
+{
+	if (PackBy.Get() == Who)
+	{
+		PackBy = nullptr;
+		PackStartAt = -100.f;
+	}
+}
+
 FString AWRSiegeEngine::ServerPack(AWRCharacter* Who)
 {
-	const FString Me = WRSiegeDetail::NameOf(Who);
-	if (!FWRSocialRules::CanShare(OwnerName, Me)) return TEXT("It isn't yours to pack up");
-	if (Health < MaxHealth * WRSiegeDetail::Tn(TEXT("packHealth"), 0.9f)) return TEXT("Too damaged to pack up: it would come apart");
-	for (const AWRCharacter* C : Crew) if (C && C != Who) return TEXT("Someone else is on it");
-	// Asked twice (a dodge pressed by reflex never packs a ram in the middle of a raid).
+	// The hold's end: it began here, it lasted, nothing hit the engine or the packer meanwhile, and they're still at it.
+	if (!Who || PackBy.Get() != Who) return TEXT("Hold Interact to pack it up");
 	const float Now = ServerNow();
-	if (Now - PackAskedAt > WRSiegeDetail::Tn(TEXT("packConfirmSeconds"), 2.f))
+	const float Began = PackStartAt;
+	PackBy = nullptr;
+	PackStartAt = -100.f;
+	if (Now - Began < WRSiegeDetail::Tn(TEXT("packHoldSeconds"), 1.5f) - 0.25f) return FString();   // let go early: nothing
+	if (LastHitAt >= Began) return TEXT("It was hit: not packed");
+	if (Who->HasTag(WRTags::Status_Staggered) || Who->HasTag(WRTags::State_CombatTagged)) return TEXT("In a fight: not packed");
+	if (PostOf(Who) == INDEX_NONE && FVector::Dist2D(Who->GetActorLocation(), GetActorLocation()) > WRSiegeDetail::Tn(TEXT("packReachCm"), 350.f) + 550.f)
 	{
-		PackAskedAt = Now;
-		return TEXT("Dodge again to pack it up");
+		return TEXT("You stepped away: not packed");
 	}
-	PackAskedAt = -100.f;
+	if (const FString Why = PackBlock(Who); !Why.IsEmpty()) return Why;
 	AWRPlayerState* PS = Who->GetPlayerState<AWRPlayerState>();
 	UWRInventoryComponent* Bag = PS ? PS->GetInventory() : nullptr;
 	if (!Bag) return TEXT("Not now");
-	ServerLeave(Who);
+	if (PostOf(Who) != INDEX_NONE) ServerLeave(Who);
 	Bag->AddItem(Kind, 1);
 	if (Rep.bLoaded) Bag->AddItem(IsTrebuchet() ? FName(TEXT("siege_stone")) : FName(TEXT("ballista_bolt")), 1);
 	WRFx::Broadcast(this, TEXT("hit.dust"), GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("siege.place"));
+	UE_LOG(LogWildreach, Log, TEXT("SIEGE %s packed up %s"), *WRSiegeDetail::NameOf(Who), *Kind.ToString());
 	Destroy();
-	return TEXT("Packed up");
+	return FString::Printf(TEXT("Packed up: the %s is in your bag"), IsRam() ? TEXT("battering ram") : IsTrebuchet() ? TEXT("trebuchet") : TEXT("ballista"));
 }
 
 FString AWRSiegeEngine::ServerHarness(AWRCharacter* Who)
@@ -1226,7 +1289,8 @@ FString FWRSiege::UseItem(AWRPlayerState* PS, FName ItemId)
 	if (!Who || !Who->IsAlive() || !Bag || Bag->CountOf(ItemId) <= 0) return TEXT("Not now");
 	UWorld* World = Who->GetWorld();
 	const bool bBallista = ItemId == TEXT("ballista");
-	if (!bBallista && WRTune(TEXT("server.pvp"), 0.f) <= 0.f) return TEXT("No raiding on this world (PvP is off)");
+	// Every world (Aaron 11-16, r-siege-pve): on a PvE world an engine can't touch players or their buildings, only the
+	// NPC strongholds (FWRRaiding::MayRaid), so it's for practising sieges there.
 	const FRotator Facing(0.f, Who->GetControlRotation().Yaw, 0.f);
 	FVector Half, Centre;
 	BoxOf(ItemId, Half, Centre);
@@ -1272,11 +1336,15 @@ bool FWRSiege::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString
 		OutTarget = On->PostName(Post);
 		OutTarget[0] = FChar::ToUpper(OutTarget[0]);
 		const FWRSiegeRep& R = On->Rep;
-		if (On->IsRam()) OutVerb = R.State == 1 ? TEXT("Let go to swing") : TEXT("Push  ·  Attack: draw the log  ·  Block: hauler  ·  E: step off");
-		else if (On->IsTrebuchet() && Post == 0) OutVerb = R.State == 2 ? TEXT("Cocked  ·  E: step off") : FString::Printf(TEXT("Hold Attack: wind (%d%%)  ·  E: step off"), FMath::RoundToInt(R.Wind * 100.f));
-		else if (On->IsTrebuchet()) OutVerb = FString::Printf(TEXT("Turn  ·  Pin %d m  ·  Attack: %s  ·  E: step off"), FMath::RoundToInt(WRSiegeDetail::Tn(FString::Printf(TEXT("trebuchet.range%d"), R.Range), 2000.f + 2000.f * R.Range) / 100.f),
-			!R.bLoaded ? TEXT("load a stone") : R.State == 2 ? TEXT("throw") : TEXT("wind it first"));
-		else OutVerb = R.State == 1 ? TEXT("Drawing...") : R.State == 2 ? TEXT("Let go to loose") : R.State == 3 ? TEXT("Loosing") : TEXT("Look to aim  ·  Hold Attack: draw  ·  E: step off");
+		// The step-off key names the device's own button; on your own engine the hold packs it up (r-packup).
+		const FString Key = WRInput::ActionKey(TEXT("Interact")).ToString();
+		const FString Why = On->PackBlock(Me);
+		const FString Off = Why.StartsWith(TEXT("It's ")) ? FString::Printf(TEXT("%s: step off"), *Key) : FString::Printf(TEXT("%s: step off  ·  hold: pack up"), *Key);
+		if (On->IsRam()) OutVerb = R.State == 1 ? FString(TEXT("Let go to swing")) : FString::Printf(TEXT("Push  ·  Attack: draw the log  ·  Block: hauler  ·  %s"), *Off);
+		else if (On->IsTrebuchet() && Post == 0) OutVerb = R.State == 2 ? FString::Printf(TEXT("Cocked  ·  %s"), *Off) : FString::Printf(TEXT("Hold Attack: wind (%d%%)  ·  %s"), FMath::RoundToInt(R.Wind * 100.f), *Off);
+		else if (On->IsTrebuchet()) OutVerb = FString::Printf(TEXT("Turn  ·  Pin %d m  ·  Attack: %s  ·  %s"), FMath::RoundToInt(WRSiegeDetail::Tn(FString::Printf(TEXT("trebuchet.range%d"), R.Range), 2000.f + 2000.f * R.Range) / 100.f),
+			!R.bLoaded ? TEXT("load a stone") : R.State == 2 ? TEXT("throw") : TEXT("wind it first"), *Off);
+		else OutVerb = R.State == 1 ? FString(TEXT("Drawing...")) : R.State == 2 ? FString(TEXT("Let go to loose")) : R.State == 3 ? FString(TEXT("Loosing")) : FString::Printf(TEXT("Look to aim  ·  Hold Attack: draw  ·  %s"), *Off);
 		return true;
 	}
 	const AWRSiegeEngine* E = NearOf(Me);
@@ -1284,6 +1352,10 @@ bool FWRSiege::Prompt(const AWRPlayerController* PC, FString& OutTarget, FString
 	const int32 Post = E->FreePostNear(Me->GetActorLocation());
 	OutTarget = FString::Printf(TEXT("%s (%s's, %d%%)"), E->IsRam() ? TEXT("Battering ram") : E->IsTrebuchet() ? TEXT("Trebuchet") : TEXT("Ballista"), *E->OwnerName, FMath::RoundToInt(100.f * E->Health / FMath::Max(1.f, E->MaxHealth)));
 	OutVerb = Post == INDEX_NONE ? TEXT("Every post is taken") : FString::Printf(TEXT("Take %s"), *E->PostName(Post));
+	// Your own: what the hold does, or why it can't now (said before you try).
+	const FString Why = E->PackBlock(Me);
+	if (Why.IsEmpty()) OutVerb += TEXT("  ·  Hold: pack up");
+	else if (!Why.StartsWith(TEXT("It's "))) OutVerb += FString::Printf(TEXT("  ·  %s"), *Why);
 	return true;
 }
 
@@ -1306,6 +1378,16 @@ FString FWRSiege::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	const FString Sub = Args.IsValidIndex(Off) ? Args[Off] : FString();
 	const auto Arg = [&Args, Off](int32 i) { return Args.IsValidIndex(Off + i) ? Args[Off + i] : FString(); };
 	AWRSiegeEngine* On = CrewingOf(Who);
+	// Packing up beside an engine (not on a post): the nearest one in reach.
+	if (!On && (Sub == TEXT("packbegin") || Sub == TEXT("pack") || Sub == TEXT("packcancel")))
+	{
+		AWRSiegeEngine* E = NearOf(Who, WRSiegeDetail::Tn(TEXT("packReachCm"), 350.f) + 200.f);
+		if (!E) return Sub == TEXT("packcancel") ? FString() : FString(TEXT("No siege engine in reach"));
+		if (Sub == TEXT("packbegin")) return E->ServerPackBegin(Who);
+		if (Sub == TEXT("pack")) return E->ServerPack(Who);
+		E->ServerPackCancel(Who);
+		return FString();
+	}
 	if (Sub == TEXT("take"))
 	{
 		if (On) return FString();
@@ -1321,7 +1403,9 @@ FString FWRSiege::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	if (Sub == TEXT("move")) { On->ServerMove(Who, FCString::Atoi(*Arg(1)), FCString::Atoi(*Arg(2))); return FString(); }
 	if (Sub == TEXT("act")) { On->ServerAct(Who, FCString::Atoi(*Arg(1)) != 0); return FString(); }
 	if (Sub == TEXT("aim")) { On->ServerAim(Who, FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2))); return FString(); }
+	if (Sub == TEXT("packbegin")) return On->ServerPackBegin(Who);
 	if (Sub == TEXT("pack")) return On->ServerPack(Who);
+	if (Sub == TEXT("packcancel")) { On->ServerPackCancel(Who); return FString(); }
 	if (Sub == TEXT("harness")) return On->ServerHarness(Who);
 	return FString();
 }
@@ -1368,6 +1452,8 @@ void FWRSiege::StoneLanded(AWRProjectile* Stone, const FVector& At, AActor* HitA
 		if (!It->IsAlive() || FVector::Dist(It->GetActorLocation(), At) > Radius + It->GetSimpleCollisionRadius() + It->GetSimpleCollisionHalfHeight() * 0.5f) continue;
 		const FString Them = NameOf(*It);
 		if (!Them.IsEmpty() && !Owner.IsEmpty() && FWRSocialRules::CanShare(Owner, Them)) continue;
+		// A PvE world: a stone never lands on a player (or a player's tame); the beasts in a stronghold's yard it does.
+		if (!Them.IsEmpty() && WRTune(TEXT("server.pvp"), 0.f) <= 0.f) continue;
 		FWRHit H = Stone->GetHit();
 		H.Damage = Tn(TEXT("trebuchet.people"), 80.f) * Mult;
 		H.Origin = At;
@@ -1526,10 +1612,6 @@ bool FWRSiege::CrewInput(AWRCharacter* Who, int32 Input, bool bDown)
 		if (bDown && On->IsRam()) PC->SendCommand(TEXT("siege harness"));
 		return true;
 	}
-	if (In == EWRAbilityInput::Dodge)
-	{
-		if (bDown) PC->SendCommand(TEXT("siege pack"));
-		return true;
-	}
+	// (Dodge no longer packs it up: that's a held Interact now, Aaron 11-16 r-packup.)
 	return true;   // no swings, casts or belt items from a post
 }

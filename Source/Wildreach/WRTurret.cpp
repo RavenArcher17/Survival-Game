@@ -2,6 +2,7 @@
 // line every machine draws live in WRMachineLook (Turret, EWRMotion::TurretYaw / TurretPitch).
 
 #include "WRTurret.h"
+#include "WRStronghold.h"
 #include "WRBuilding.h"
 #include "WRCharacterBase.h"
 #include "WRCombatLibrary.h"
@@ -94,6 +95,14 @@ namespace WRTurretDetail
 	bool Eligible(const AWRBuildPiece* Piece, const AWRCharacterBase* C)
 	{
 		if (!C || !C->IsAlive()) return false;
+		// A stronghold's turrets (WRStronghold) defend it from survivors and their tames on every world, never from the
+		// land's beasts in its yard; nobody in a safe zone.
+		if (FWRStrongholds::IsHoldPiece(Piece))
+		{
+			if (FWRSocialRules::IsInSafeZone(Piece->GetWorld(), C->GetActorLocation())) return false;
+			if (const AWRCreature* Cr = Cast<AWRCreature>(C)) return Cr->IsTamed();
+			return C->GetPlayerState() != nullptr;
+		}
 		if (const AWRCreature* Cr = Cast<AWRCreature>(C))
 		{
 			if (Cr->IsTamed()) return false;
@@ -248,11 +257,18 @@ void UWRTurretSubsystem::Tick(float DeltaTime)
 		if (!P || P->IsActorBeingDestroyed()) continue;
 		FBrain& B = Brains.FindOrAdd(P);
 		FWRTurretRep& R = P->Turret;
+		// A stronghold's turret winds itself and never runs dry (its garrison's stores; WRStronghold).
+		const bool bHold = FWRStrongholds::IsHoldPiece(P);
+		if (bHold && P->Mach.FuelLeft < 2.f)
+		{
+			P->Mach.Recipe = TEXT("crossbow_bolt");
+			P->Mach.FuelLeft = 99.f;
+		}
 		R.ShotsLeft = static_cast<uint8>(FMath::Clamp(FMath::FloorToInt(P->Mach.FuelLeft), 0, 255));
-		const float Speed = P->Machine.Speed100 / 100.f;
+		const float Speed = bHold ? 1.f : P->Machine.Speed100 / 100.f;
 		const FWRTurretAmmo* Ammo = Loaded(P, false);
 		if (Ammo) R.Element = Ammo->Element;
-		if (!P->Mach.bOn || Speed < 0.01f || !Ammo)
+		if ((!P->Mach.bOn && !bHold) || Speed < 0.01f || !Ammo)
 		{
 			// Unpowered, switched off or empty: it holds where it was and says why on its screen (state NoPower / NoAmmo).
 			R.bTracking = false;

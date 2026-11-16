@@ -1,4 +1,5 @@
 #include "WRGameMode.h"
+#include "WRStronghold.h"
 #include "WRSiege.h"
 #include "WRMapReveal.h"
 #include "WRSporePath.h"
@@ -208,6 +209,7 @@ void AWRGameMode::BeginPlay()
 	}
 	FWRRaiding::Load(GetWorld());
 	FWRSiege::Load(GetWorld());
+	UWRStrongholdSubsystem::Load(GetWorld());
 	WRWildlife::Start(GetWorld());
 	WRRaids::Start(GetWorld());
 	// The endgame: achievements' census, the kill-time boards and their tablets, the war-halls (WRDeeds, WRRecords, WRWarHall).
@@ -370,7 +372,8 @@ void AWRGameMode::SaveWorld()
 	TArray<TSharedPtr<FJsonValue>> Pieces;
 	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
 	{
-		if (!It->bGhost && !It->IsActorBeingDestroyed())
+		// (A stronghold's pieces are its own: they're rebuilt from Data/strongholds.json and its "strongholds" document.)
+		if (!It->bGhost && !It->IsActorBeingDestroyed() && !FWRStrongholds::IsHoldPiece(*It))
 		{
 			Pieces.Add(MakeShared<FJsonValueObject>(It->ToJson()));
 		}
@@ -423,6 +426,7 @@ void AWRGameMode::SaveWorld()
 	WRStore::WriteDoc(TEXT("world"), Text);
 	FWRRaiding::Save();
 	FWRSiege::Save(GetWorld());
+	UWRStrongholdSubsystem::Save(GetWorld());
 	UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
 	WRWildlife::Save(GetWorld());
 }

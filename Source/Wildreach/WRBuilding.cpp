@@ -1,4 +1,5 @@
 #include "WRBuilding.h"
+#include "WRStronghold.h"
 #include "WROceanTypes.h"
 #include "WRSwampSystems.h"
 #include "WRCreature.h"
@@ -1225,6 +1226,12 @@ void AWRBuildPiece::SetGhostGlow(const FLinearColor& Color, float Glow)
 
 bool AWRBuildPiece::CanAccess(const FString& PlayerName) const
 {
+	// A stronghold's pieces are nobody's; its war chest is everyone's once the keep is breached (WRStronghold).
+	if (FWRStrongholds::IsHoldOwner(OwnerName))
+	{
+		const FWRPieceDef* Def = GetDef();
+		return Def && Def->Kind == TEXT("chest") && !bLocked;
+	}
 	return CanPlayersShare(OwnerName, PlayerName);
 }
 
@@ -1313,6 +1320,12 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	const FString Who = PS->GetPlayerName();
 	const FName K = Def->Kind;
 
+	// A stronghold (WRStronghold): its gate and the keep's door are barred from inside; they come down, they don't open.
+	if (FWRStrongholds::IsHoldPiece(this))
+	{
+		if (K == TEXT("door")) return FString::Printf(TEXT("Barred from the inside: break it down (a ram, a charge, a trebuchet stone)"));
+		if (bLocked) return FString::Printf(TEXT("Barred: %s's war chest opens once its keep is breached"), *FWRStrongholds::DisplayName(OwnerName));
+	}
 	if (K == TEXT("door"))
 	{
 		if (bLocked && !CanAccess(Who) && !UnlockedFor.Contains(Who))
@@ -1469,7 +1482,8 @@ void AWRBuildPiece::RecomputeSupport(UWorld* World, const FVector& Around, float
 		{
 			if (FWRIntegrity::BeamGrounded(World, *Def, P->GetActorTransform(), P)) P->Support = FWRIntegrity::LengthSteps(*Def, P->GetActorTransform());
 		}
-		else if (SupportAt(World, P->PieceId, P->GetActorTransform(), P) == 0) P->Support = 0;
+		// (A stronghold stands as it was laid out: what rests on what is its own rule, WRStronghold.)
+		else if (FWRStrongholds::IsHoldPiece(P) || SupportAt(World, P->PieceId, P->GetActorTransform(), P) == 0) P->Support = 0;
 	}
 	// What each piece may bear on (pairs that touch), found once.
 	TArray<TArray<TPair<int32, int32>>> Links;
@@ -1805,6 +1819,15 @@ bool AWRClaimTotem::CanBuild(const UWorld* World, const FVector& Location, const
 	{
 		OutWhy = TEXT("no building in the safe zone");
 		return false;
+	}
+	// The NPC strongholds' ground (WRStronghold): nothing built in or against a fort.
+	if (World && World->GetSubsystem<UWRStrongholdSubsystem>())
+	{
+		if (const FString Why = FWRStrongholds::BuildBlock(Location); !Why.IsEmpty())
+		{
+			OutWhy = Why;
+			return false;
+		}
 	}
 	// The Drowned Hall (cooks/biome-ocean.md 2.5): a drowned town's halls, never anyone's base (no claims, no pieces).
 	if (WROcean::Live() && WROcean::InHall(Location))

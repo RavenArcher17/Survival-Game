@@ -100,6 +100,11 @@ public:
 
 	// --- Your own code-lock door: hold E for its keypad (set or remove the code), tap to open or shut it.
 	void DoorKey(bool bDown, class AWRBuildPiece* Door);
+	/** Interact at your own siege engine (Aaron 11-16, r-packup): a tap takes a post or steps off, a hold packs it up
+	 *  (siege.packTapSeconds, then siege.packHoldSeconds with the prompt's bar filling). */
+	void SiegeKey(bool bDown, class AWRSiegeEngine* Engine);
+	/** The pack-up hold's progress 0..1 (the prompt's bar), or -1 when there's none. */
+	float SiegePackFraction() const;
 
 	/** Short-lived "+3 Wood" lines (from the server's notices); more of the same item stacks onto its line. */
 	struct FPickup
@@ -248,6 +253,12 @@ private:
 	bool bDoorKeyDown = false;
 	double DoorDownAt = 0.0;
 	TWeakObjectPtr<class AWRBuildPiece> DoorKeyPiece;
+	bool bSiegeKeyDown = false;
+	bool bSiegePacking = false;
+	double SiegeDownAt = 0.0;
+	FVector SiegeFrom = FVector::ZeroVector;
+	TWeakObjectPtr<class AWRSiegeEngine> SiegeKeyEngine;
+	void TickSiegeKey(double Now);
 
 	TArray<FPickup> Pickups;
 	double PickupAddedAt = -100.0;

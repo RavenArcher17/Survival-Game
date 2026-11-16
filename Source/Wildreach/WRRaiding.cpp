@@ -1,6 +1,7 @@
 // Player raiding: one damage rule for every player-side source, the raid tools, the raid bell and the raid record
 // (WRRaiding.h; cooks/build-server-raids.md 2.3 to 2.7, 2.10, 2.11).
 #include "WRRaiding.h"
+#include "WRStronghold.h"
 #include "WRSiege.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
@@ -313,6 +314,11 @@ bool FWRRaiding::MayRaid(const AWRBuildPiece* Piece, const FString& Raider, FStr
 	if (!Piece || Piece->bGhost || Piece->IsActorBeingDestroyed() || Raider.IsEmpty())
 	{
 		return false;
+	}
+	// An NPC stronghold may be broken by anyone on any world, PvE included (Aaron 11-16, r-siege-pve: practising sieges).
+	if (FWRStrongholds::IsHoldPiece(Piece))
+	{
+		return !FWRStrongholds::IsHoldOwner(Raider);
 	}
 	if (Piece->CanAccess(Raider))
 	{

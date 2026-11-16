@@ -124,6 +124,9 @@ public:
 	void SyncGone(const TArray<int32>& Gone);
 	/** Server: one grew back (forget its hits). */
 	void GrewBack(int32 Key) { HitsTaken.Remove(Key); }
+	/** Every machine, once: take away every decoration standing within Radius of Centre (a stronghold's ground,
+	 *  WRStronghold): moved out of sight and out of the way, and its harvestables never come back or gather there. */
+	void ClearCircle(const FVector2D& Centre, float Radius);
 
 private:
 	UHierarchicalInstancedStaticMeshComponent* MakePart(const TCHAR* Mesh, const FLinearColor& Color, bool bCollision, float CullDistance);
@@ -151,6 +154,8 @@ private:
 	TMap<int32, TArray<FTransform>> Hidden;
 	/** Server: hits taken by standing decorations. */
 	TMap<int32, int32> HitsTaken;
+	/** Harvestables taken away for good by ClearCircle (never restored by the ledger, never gathered). */
+	TSet<int32> Cleared;
 	static constexpr float HarvestCell = 1000.f;
 	static constexpr int32 KeyShift = 20;
 };

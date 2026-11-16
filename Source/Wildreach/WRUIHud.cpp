@@ -3,6 +3,7 @@
 // Sizes are in 1080p units (the mockups' 1600x900 px x 1.2); Slate scales them to the screen.
 
 #include "WRWarHall.h"
+#include "WRStronghold.h"
 #include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
@@ -1146,6 +1147,17 @@ private:
 				const FWRPieceDef* Def = Piece->GetDef();
 				if (!Def) return FString();
 				OutTarget = Def->Name;
+				// A stronghold's (WRStronghold): its gates are barred, its war chest opens once the keep is breached.
+				if (FWRStrongholds::IsHoldPiece(Piece))
+				{
+					const FString Fort = FWRStrongholds::DisplayName(Piece->OwnerName);
+					if (Def->Kind == TEXT("door")) { OutTarget = FString::Printf(TEXT("%s · %s"), *Fort, *Def->Name); return TEXT("Barred: break it down"); }
+					if (Def->Kind == TEXT("chest"))
+					{
+						OutTarget = FString::Printf(TEXT("%s war chest"), *Fort);
+						return Piece->bLocked ? TEXT("Barred until the keep is breached") : TEXT("Open");
+					}
+				}
 				if (Def->Kind == TEXT("door"))
 				{
 					// A code-lock door: its keypad when it's locked to you; your own one also has its keypad on a hold.
@@ -1224,6 +1236,23 @@ private:
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { FString T; return FText::FromString(PromptText(T)); }), WRUI::Body(15, 700), WRUI::Ink)]
 					+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this]() { FString T; PromptText(T); return FText::FromString(T); }), WRUI::Body(12, 500), WRUI::Ink3)]
+					// A hold in progress (packing up a siege engine, r-packup): a brass bar fills under the words.
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 5.f * U, 0.f, 0.f)
+					[
+						SNew(SBox).HeightOverride(5.f * U).Visibility_Lambda([this]() { const FWRPlayerUI* X = UI(); return X && X->SiegePackFraction() >= 0.f ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+						[
+							SNew(SOverlay)
+							+ SOverlay::Slot()[SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.45f), 2.f * U))]
+							+ SOverlay::Slot()
+							[
+								SNew(SBox).HAlign(HAlign_Left)
+								.WidthOverride_Lambda([this]() { const FWRPlayerUI* X = UI(); return FOptionalSize(220.f * U * FMath::Max(0.f, X ? X->SiegePackFraction() : 0.f)); })
+								[
+									SNew(SBorder).BorderImage(WRUI::Box(WRUI::Brass, 2.f * U))
+								]
+							]
+						]
+					]
 				]
 			]
 		];

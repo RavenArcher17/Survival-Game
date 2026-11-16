@@ -1155,7 +1155,7 @@ bool AWRDressing::HarvestInFront(AWRCharacterBase* Who, float Reach, bool bHeavy
 					const float Gap = To.Size2D() - HK.Radius * HK.Scale[i];
 					// In reach, roughly at your feet (slopes), and in front unless you're standing in it.
 					if (Gap > BestGap || HK.Ground[i].Z < FeetZ - 200.f || HK.Ground[i].Z > FeetZ + 250.f
-						|| (Gap > 0.f && FVector::DotProduct(To.GetSafeNormal2D(), Forward) < 0.4f) || Hidden.Contains((k << KeyShift) | i))
+						|| (Gap > 0.f && FVector::DotProduct(To.GetSafeNormal2D(), Forward) < 0.4f) || Hidden.Contains((k << KeyShift) | i) || Cleared.Contains((k << KeyShift) | i))
 					{
 						continue;
 					}
@@ -1277,7 +1277,7 @@ bool AWRDressing::FindNearest(const FVector& From, const FString& Group, float R
 				for (int32 i : *InCell)
 				{
 					const float D = FVector::Dist2D(HK.Ground[i], From);
-					if (D < Best && FMath::Abs(HK.Ground[i].Z - From.Z) < 600.f && !Hidden.Contains((k << KeyShift) | i))
+					if (D < Best && FMath::Abs(HK.Ground[i].Z - From.Z) < 600.f && !Hidden.Contains((k << KeyShift) | i) && !Cleared.Contains((k << KeyShift) | i))
 					{
 						Best = D;
 						OutGround = HK.Ground[i];
@@ -1307,10 +1307,49 @@ void AWRDressing::SyncGone(const TArray<int32>& Gone)
 	}
 }
 
+void AWRDressing::ClearCircle(const FVector2D& Centre, float Radius)
+{
+	// The harvestables first (so the ledger never puts them back and nobody gathers a rock inside a wall).
+	int32 Keys = 0;
+	for (int32 k = 0; k < Harvestables.Num(); ++k)
+	{
+		const FHarvestKind& HK = Harvestables[k];
+		for (int32 i = 0; i < HK.Ground.Num(); ++i)
+		{
+			if (FVector2D::Distance(FVector2D(HK.Ground[i]), Centre) < Radius + HK.Radius * HK.Scale[i])
+			{
+				Cleared.Add((k << KeyShift) | i);
+				++Keys;
+			}
+		}
+	}
+	// Then every instance of every part whose base stands in the circle: moved far below the island (as a felled tree's).
+	int32 Moved = 0;
+	TArray<UHierarchicalInstancedStaticMeshComponent*> Parts;
+	GetComponents(Parts);
+	for (UHierarchicalInstancedStaticMeshComponent* Part : Parts)
+	{
+		bool bAny = false;
+		for (int32 n = 0; n < Part->GetInstanceCount(); ++n)
+		{
+			FTransform T;
+			if (!Part->GetInstanceTransform(n, T, true)) continue;
+			const float Reach = Part->GetStaticMesh() ? Part->GetStaticMesh()->GetBounds().SphereRadius * 0.4f * T.GetScale3D().GetMax() : 0.f;
+			if (T.GetLocation().Z < -500000.f || FVector2D::Distance(FVector2D(T.GetLocation()), Centre) > Radius + Reach) continue;
+			T.SetLocation(T.GetLocation() - FVector(0.f, 0.f, 1000000.f));
+			Part->UpdateInstanceTransform(n, T, true, false, true);
+			bAny = true;
+			++Moved;
+		}
+		if (bAny) Part->MarkRenderStateDirty();
+	}
+	UE_LOG(LogWildreach, Log, TEXT("DRESSING cleared %d decorations (%d harvestable) round (%.0f, %.0f) r %.0f"), Moved, Keys, Centre.X, Centre.Y, Radius);
+}
+
 void AWRDressing::SetGone(int32 Key, bool bGone)
 {
 	const int32 k = Key >> KeyShift, i = Key & ((1 << KeyShift) - 1);
-	if (!Harvestables.IsValidIndex(k) || !Harvestables[k].Ground.IsValidIndex(i) || bGone == Hidden.Contains(Key))
+	if (!Harvestables.IsValidIndex(k) || !Harvestables[k].Ground.IsValidIndex(i) || bGone == Hidden.Contains(Key) || Cleared.Contains(Key))
 	{
 		return;
 	}

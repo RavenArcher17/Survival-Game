@@ -420,11 +420,23 @@ void AWRPlayerController::InteractPressed()
 {
 	// (Menus keep E: it closes a chest or a station's screen.) Just after leaving a mode, the press that left it doesn't act.
 	if (Menu == EWRMenu::None && !WRInput::AllowPress(this)) return;
-	// On a siege engine's post, E steps off it (WRSiege), whatever else is near.
-	if (Menu == EWRMenu::None && FWRSiege::CrewingOf(GetPawn()))
+	// At a siege engine of yours (WRSiege; Aaron 11-16 r-packup): a tap takes a post or steps off it, a hold packs it up
+	// (FWRPlayerUI::SiegeKey). On someone else's: a tap as before (step off, or take a post).
+	if (Menu == EWRMenu::None)
 	{
-		ServerCommand(TEXT("siege leave"));
-		return;
+		AWRSiegeEngine* On = FWRSiege::CrewingOf(GetPawn());
+		AWRSiegeEngine* Near = On ? On : FWRSiege::NearOf(GetPawn(), WRTune(TEXT("siege.packReachCm"), 350.f));
+		const bool bMine = Near && PlayerState && (Near->OwnerName == PlayerState->GetPlayerName() || !Near->PackBlock(GetPawn()).StartsWith(TEXT("It's ")));
+		if (UI && Near && bMine)
+		{
+			UI->SiegeKey(true, Near);
+			return;
+		}
+		if (On)
+		{
+			ServerCommand(TEXT("siege leave"));
+			return;
+		}
 	}
 	if (UI && Menu == EWRMenu::None)
 	{
@@ -502,6 +514,7 @@ void AWRPlayerController::InteractReleased()
 	{
 		UI->TameKey(false);
 		UI->DoorKey(false, nullptr);
+		UI->SiegeKey(false, nullptr);
 	}
 	// A hand on a Mossmaul's moss (the Nature path's calm, WRForestCreatures): letting go stops it (a tap feeds instead).
 	if (FWRForestAI::PathTameNear(this))

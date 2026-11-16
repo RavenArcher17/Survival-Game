@@ -2,6 +2,7 @@
 // Menus are client-side state drawn by AWRHUD; every action is a server command validated there.
 
 #include "WRCraftWork.h"
+#include "WRStronghold.h"
 #include "WRDeeds.h"
 #include "WRSiege.h"
 #include "WRSporePath.h"
@@ -333,6 +334,12 @@ void AWRPlayerController::WRInteract()
 			// In a fight with a player (the combat tag, combat.md 2.20): no reaching into shared storage.
 			const AWRCharacterBase* Me = Cast<AWRCharacterBase>(GetPawn());
 			const APlayerState* MyPS = GetPlayerState<APlayerState>();
+			// A stronghold's war chest is barred until its keep is breached (WRStronghold).
+			if (FWRStrongholds::IsBarredChest(Piece))
+			{
+				ShowLocalNotice(FString::Printf(TEXT("Barred: %s's war chest opens once its keep is breached"), *FWRStrongholds::DisplayName(Piece->OwnerName)));
+				return;
+			}
 			if (Me && Me->HasTag(WRTags::State_CombatTagged) && MyPS && Piece->OwnerName != MyPS->GetPlayerName())
 			{
 				ShowLocalNotice(TEXT("In combat: not now"));

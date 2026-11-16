@@ -46,6 +46,37 @@ research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled
   are used with one press of their key, the pad's belt button or the item wheel, and are never equipped. The item card
   now says where: "Key 4 on your bar to eat it", on a pad "Belt slot 4: D-pad down picks it, Y to eat (or hold D-pad
   right: the item wheel)", or "Not on your bar: drag it onto a slot below".
+- **Packing up a siege engine is a held Interact.** Why: Aaron (r-packup): "Figure it out and make sure it's the best
+  cook it can be." Dodge twice was a dodge button doing a building job, easy to fire by reflex and invisible on a pad.
+  Research (Rust's pickup, ARK's and Conan's hold-E menus, Valheim's deconstruct, Fortnite's and Palworld's held
+  destructive actions; our own tap/hold Interact on tames and code-lock doors): now at your own (or your clan's) engine,
+  on a post or beside it, a tap of Interact still takes a post or steps off, and holding it 1.5 s packs it up, with a
+  brass bar filling under the prompt (`FWRPlayerUI::SiegeKey`, `siege.packHoldSeconds`). The prompt says it before you
+  try ("Take the left handle · Hold: pack up", or the reason: "Too damaged to pack up (62%, needs 90%)", "Someone else
+  is on it", "Under attack: not now"). The server times the hold itself (`siege packbegin` / `pack` / `packcancel`,
+  `AWRSiegeEngine::PackBlock`): letting go early, walking off, a hit on the engine since the hold began
+  (`LastHitAt`, replicated) or being staggered or in a fight packs nothing. Dodge on a post no longer packs. Same on
+  mouse and keyboard (E) and pad (X).
+- **Siege engines on PvE worlds, and NPC strongholds to practise on.** Why: Aaron (r-siege-pve): "Allow it to practice
+  siegeing on NPC strongholds." Every engine can now be built on any world. On a PvE world engines still never hurt
+  players, their tames or their buildings (a trebuchet stone skips players; `MayRaid` keeps the PvP rule for player
+  pieces), and players can't hurt engines; what they can break is a stronghold. Two forts stand on the Old Island
+  (`Data/strongholds.json`, sited by `Tools/terrain/strongholds.mjs` on the flattest open ground near their design
+  point, clear of camps, arenas, shrines, villages, places and kit, off lava and ice, with a gentle 40 m approach in
+  front of the gate for engines; every piece's ground height written from the heightmap):
+  **Emberwatch** on the Ash Plains (the Forge-wardens' watch, cinderfangs and a magmaw in its yard) and **Rimehold** on
+  the Snow Flats (the whalers' winter fort, gloomhowls and a rimeclaw). Each is built of the game's own pieces
+  (`WRStronghold.cpp`): a 16-segment palisade ring (11 m) with a barred gate, two gate towers with a **bolt turret on
+  each deck** (no power or bolts needed; it shoots survivors and their tames within its 30 m on every world, never the
+  beasts, so a trebuchet stands off at 40 m and a ram's crew gets under the walls), a stone keep on four foundations
+  with a reinforced door and a **war chest** inside. Gates and doors are barred ("break it down"); the chest opens
+  once the keep's door, a keep wall or its floor falls ("Emberwatch's keep is breached: its war chest is open", dust
+  and a crash). A tower falling brings its turret down; a foundation falling brings what stood on it down. The beasts
+  come back while it stands and nobody is near; once it has fallen and nobody has come within 150 m for 12 game hours
+  it stands again whole, its chest refilled. What is broken, when it fell and what's left in its chest are saved
+  (`strongholds` world document). Each fort is on the map and the discovery banner as a landmark, tells its story to
+  whoever first comes up to it, clears the island's trees and rocks off its ground on every machine
+  (`AWRDressing::ClearCircle`), and nobody may build within 15 m of it. Tuning `strongholds`, `siege._pack`.
 
 
 ## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)

@@ -105,7 +105,15 @@ public:
 	void ServerMove(AWRCharacter* Who, int32 Forward, int32 Right);
 	void ServerAct(AWRCharacter* Who, bool bDown);
 	void ServerAim(AWRCharacter* Who, float Yaw, float Pitch);
+	/** Packing up is a held Interact (Aaron 11-16, r-packup): the hold's start, then its end once packHoldSeconds have
+	 *  passed (server-timed); refused with a reason. */
+	FString ServerPackBegin(AWRCharacter* Who);
 	FString ServerPack(AWRCharacter* Who);
+	void ServerPackCancel(AWRCharacter* Who);
+	/** Why Who may not pack it up now (empty: they may). Every machine (the prompt), from replicated state. */
+	FString PackBlock(const AActor* Who) const;
+	/** Server time of the last blow it took (a hit since the hold began stops it). */
+	UPROPERTY(Replicated) float LastHitAt = -100.f;
 	FString ServerHarness(AWRCharacter* Who);
 
 	/** The trebuchet's stone path for its current aim and pin: where the sling lets go, its velocity, gravity (cm/s2). */
@@ -147,7 +155,8 @@ private:
 	float ReleaseAt = -1.f;
 	float LastCrewed = 0.f;
 	float WarnClock = 0.f;
-	float PackAskedAt = -100.f;
+	TWeakObjectPtr<AWRCharacter> PackBy;
+	float PackStartAt = -100.f;
 	TSet<TWeakObjectPtr<AActor>> StruckThisSwing;
 
 	// --- Every machine: the eased copy of where it stands, what the wheels and cranks have turned
