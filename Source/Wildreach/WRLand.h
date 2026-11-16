@@ -33,6 +33,9 @@ struct WILDREACH_API FWRLandZone
 	TCHAR Letter = 0;
 	TArray<FLinearColor> Speck;
 	float SpeckAmount = 0.f, SpeckScale = 5.f;
+	/** A layered ground's mix here ("layers": litter, moss, soil, grass, stones, sand; WRLand::LayerCount), or all 0. */
+	float Layers[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	bool bLayers = false;
 	bool Contains(const FVector2D& M) const;
 };
 
@@ -44,6 +47,8 @@ struct WILDREACH_API FWRLandSurface
 	float Rough = 0.9f;
 	TArray<FLinearColor> Speck;
 	float SpeckAmount = 0.f, SpeckScale = 4.f;
+	float Layers[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	bool bLayers = false;
 };
 
 /** A wash of colour over a band of the map (the frost on the tundra neck's ferns): y from Y0 to Y1 m, patchy by noise. */
@@ -143,6 +148,14 @@ struct WILDREACH_API FWRLandDef
 	TCHAR GridLetter(const FVector2D& M) const;
 	/** Heightfield: the colour (linear) and roughness of sample (I, J), its normal N. */
 	FLinearColor HfGround(int32 I, int32 J, const FVector& N, float& OutRough) const;
+	/** A layered ground (Aaron 11-16, r-forest-ground; cooks/wild-answers-1115.md 2.5): its own material ("groundMaterial",
+	 *  /Game/Terrain/M_ForestGround) reads each sample's mix of six textured layers from UV1-UV3; the vertex colour stays
+	 *  the sub-zone's tint. Empty: the plain vertex-colour ground. */
+	FString GroundMaterial;
+	bool bLayered = false;
+	/** Heightfield: the layer mix (litter, moss, soil, grass, stones, sand; sums to 1) of sample (I, J): its sub-zone's,
+	 *  blended across zone edges as the colour is, its surface's over it, damp moss by the water and in the hollows. */
+	void HfLayers(int32 I, int32 J, float Out[6]) const;
 	/** A body here is rightly under the ground (a heightfield land's underground letters and ways). */
 	bool IsUnderground(const FVector2D& M) const;
 

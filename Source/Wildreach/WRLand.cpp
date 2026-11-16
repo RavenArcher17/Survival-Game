@@ -106,6 +106,25 @@ namespace
 // surface classes, colour bands and underground places. Named apart from the anonymous helpers above (unity builds).
 namespace WRLandHfImpl
 {
+	/** "layers": { "litter": .., "moss": .., "soil": .., "grass": .., "stones": .., "sand": .. } into the six weights. */
+	bool LLayers(const TSharedPtr<FJsonObject>& O, float Out[6])
+	{
+		const TSharedPtr<FJsonObject>* L = nullptr;
+		if (!O.IsValid() || !O->TryGetObjectField(TEXT("layers"), L)) return false;
+		static const TCHAR* Names[6] = { TEXT("litter"), TEXT("moss"), TEXT("soil"), TEXT("grass"), TEXT("stones"), TEXT("sand") };
+		float Sum = 0.f;
+		for (int32 k = 0; k < 6; ++k)
+		{
+			double V = 0.0;
+			(*L)->TryGetNumberField(Names[k], V);
+			Out[k] = FMath::Max(0.f, float(V));
+			Sum += Out[k];
+		}
+		if (Sum <= 0.f) return false;
+		for (int32 k = 0; k < 6; ++k) Out[k] /= Sum;
+		return true;
+	}
+
 	void LSpeck(const TSharedPtr<FJsonObject>& O, TArray<FLinearColor>& OutColours, float& OutAmount, float& OutScale)
 	{
 		const TSharedPtr<FJsonObject>* S = nullptr;
@@ -180,6 +199,7 @@ namespace WRLandHfImpl
 				S.Color = WRLand::Colour(O, TEXT("color"), FColor(128, 120, 100));
 				S.Rough = LNum(O, TEXT("rough"), 0.9f);
 				LSpeck(O, S.Speck, S.SpeckAmount, S.SpeckScale);
+				S.bLayers = LLayers(O, S.Layers);
 			}
 		}
 		if (J->TryGetArrayField(TEXT("bands"), A))
@@ -361,8 +381,12 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			if (Z->TryGetObjectField(TEXT("decor"), D)) Zone.Decor = *D;
 			if (Z->TryGetStringField(TEXT("letter"), Str) && Str.Len() > 0) Zone.Letter = Str[0];
 			WRLandHfImpl::LSpeck(Z, Zone.Speck, Zone.SpeckAmount, Zone.SpeckScale);
+			Zone.bLayers = WRLandHfImpl::LLayers(Z, Zone.Layers);
 		}
 	}
+	J->TryGetStringField(TEXT("groundMaterial"), GroundMaterial);
+	for (const FWRLandZone& Z : Zones) bLayered |= Z.bLayers;
+	bLayered = bLayered && !GroundMaterial.IsEmpty();
 	if (J->TryGetObjectField(TEXT("heightfield"), N)) WRLandHfImpl::ParseHeightfield(*this, J, *N);
 	// Features last: their levels read the base ground (crest + noise + coast) at their own points.
 	if (J->TryGetArrayField(TEXT("features"), A))
@@ -802,6 +826,73 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 	return C;
 }
 
+void FWRLandDef::HfLayers(int32 I, int32 J, float Out[6]) const
+{
+	for (int32 k = 0; k < 6; ++k) Out[k] = 0.f;
+	const FVector2D M = HfOrigin + FVector2D(float(I), float(J)) * HfStep;
+	// The sub-zone's mix, blended across its edges on the same ragged ring of nine samples as its colour.
+	float WSum = 0.f;
+	const float Turn = Noise(M / 41.f + FVector2D(1.3f, 8.8f)) * PI;
+	for (int32 n = 0; n < 9; ++n)
+	{
+		FVector2D P = M;
+		float W = 2.f;
+		if (n > 0)
+		{
+			const float A = Turn + (n - 1) * (PI / 4.f);
+			const float R = ZoneBlend * (0.55f + 0.45f * (Noise(M / 13.f + FVector2D(float(n) * 3.1f, 1.f)) * 0.5f + 0.5f));
+			P = M + FVector2D(FMath::Cos(A), FMath::Sin(A)) * R;
+			W = 1.f;
+		}
+		const TCHAR L = GridLetter(P);
+		for (const FWRLandZone& Z : Zones)
+		{
+			if (Z.Letter != L || !Z.bLayers) continue;
+			for (int32 k = 0; k < 6; ++k) Out[k] += Z.Layers[k] * W;
+			WSum += W;
+			break;
+		}
+	}
+	if (WSum > 0.f) for (int32 k = 0; k < 6; ++k) Out[k] /= WSum;
+	else Out[0] = 1.f;
+	// Patches: within a zone the litter and the moss trade places by noise (a mossy hollow, a drift of leaves), so no
+	// stretch of floor is one even mix (Electric Dreams' clustering, never uniform cover).
+	const float Patch = Noise(M / 17.f + FVector2D(3.7f, 9.1f)) * 0.6f + Noise(M / 6.f + FVector2D(11.f, 2.f)) * 0.25f;
+	const float Shift = FMath::Clamp(Patch, -0.5f, 0.5f) * FMath::Min(Out[0], Out[1]) * 1.6f;
+	Out[0] = FMath::Max(0.f, Out[0] - Shift);
+	Out[1] = FMath::Max(0.f, Out[1] + Shift);
+	// The sample's surface over it (a river bed's stones, a trail's trodden soil), softened where its neighbours differ.
+	const uint8 Cls = HfSurfaceAt(I, J);
+	if (Cls != 0 && Cls != HfHidden)
+	{
+		for (const FWRLandSurface& S : Surfaces)
+		{
+			if (S.Class != Cls || !S.bLayers) continue;
+			int32 Same = 0;
+			Same += HfSurfaceAt(I + 1, J) == Cls; Same += HfSurfaceAt(I - 1, J) == Cls; Same += HfSurfaceAt(I, J + 1) == Cls; Same += HfSurfaceAt(I, J - 1) == Cls;
+			const float W = 0.5f + 0.5f * (Same / 4.f);
+			for (int32 k = 0; k < 6; ++k) Out[k] = FMath::Lerp(Out[k], S.Layers[k], W);
+			break;
+		}
+	}
+	// Damp ground beside water grows moss (a bank's edge; Trails' creek-bank strip).
+	if (Cls == 0)
+	{
+		int32 Wet = 0;
+		for (int32 dj = -2; dj <= 2; ++dj) for (int32 di = -2; di <= 2; ++di)
+		{
+			const uint8 C2 = HfSurfaceAt(I + di, J + dj);
+			Wet += (C2 == 1 || C2 == 2 || C2 == 5) ? 1 : 0;   // bed, bank, marsh
+		}
+		const float Damp = FMath::Clamp(Wet / 8.f, 0.f, 0.7f);
+		for (int32 k = 0; k < 6; ++k) Out[k] *= 1.f - Damp;
+		Out[1] += Damp;
+	}
+	float Sum = 0.f;
+	for (int32 k = 0; k < 6; ++k) Sum += Out[k];
+	if (Sum > 0.f) for (int32 k = 0; k < 6; ++k) Out[k] /= Sum;
+}
+
 // ================================================================================================ the registry
 
 const TArray<FWRLandDef>& WRLand::All()
@@ -960,6 +1051,12 @@ void AWRLand::BeginPlay()
 {
 	Super::BeginPlay();
 	GroundMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_LandGround.M_LandGround"));
+	// A layered land's own ground material (the Ancient forest's M_ForestGround); the plain one if it isn't built.
+	if (const FWRLandDef* LD = Def(); LD && !LD->GroundMaterial.IsEmpty())
+	{
+		if (UMaterialInterface* Own = LoadObject<UMaterialInterface>(nullptr, *LD->GroundMaterial)) GroundMat = Own;
+		else UE_LOG(LogWildreach, Warning, TEXT("LAND %s: %s is missing (Tools/terrain/build_forest_ground.py); the plain ground is used"), *LandId.ToString(), *LD->GroundMaterial);
+	}
 	TearMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_VoidTear.M_VoidTear"));
 	LightMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_VoidLight.M_VoidLight"));
 	if (!GroundMat) UE_LOG(LogWildreach, Error, TEXT("LAND %s: /Game/Terrain/M_LandGround is missing (Tools/terrain/build_void_materials.py)"), *LandId.ToString());
@@ -1223,6 +1320,8 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 	TArray<FVector> Normals;
 	TArray<FLinearColor> Colours;
 	TArray<FVector2D> UV;
+	TArray<FVector2D> UV1, UV2, UV3;   // a layered ground's mix (FWRLandDef::HfLayers)
+	const bool bLayers = bLook && D.bLayered;
 	TArray<FProcMeshTangent> Tangents;
 	TArray<int32> Tris;
 	TArray<uint8> Gone;
@@ -1250,6 +1349,14 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 			Normals.Add(Nrm);
 			Colours.Add(C);
 			UV.Add(M / 4.f);
+			if (bLayers)
+			{
+				float L[6];
+				D.HfLayers(SI, SJ, L);
+				UV1.Add(FVector2D(L[0], L[1]));
+				UV2.Add(FVector2D(L[2], L[3]));
+				UV3.Add(FVector2D(L[4], L[5]));
+			}
 			Tangents.Add(FProcMeshTangent(FVector(1.f, 0.f, 0.f), false));
 			Gone.Add((bSurface && D.HfSurface[SJ * D.HfN + SI] == FWRLandDef::HfHidden) || (bCuts && D.CutAt(M)) ? 1 : 0);
 		}
@@ -1273,7 +1380,8 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 	Mesh->SetCanEverAffectNavigation(false);
 	Mesh->LDMaxDrawDistance = D.DrawDistance;
 	Mesh->SetCachedMaxDrawDistance(D.DrawDistance);
-	Mesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Colours, Tangents, true);
+	if (bLayers) Mesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, UV1, UV2, UV3, Colours, Tangents, true);
+	else Mesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Colours, Tangents, true);
 	if (GroundMID) Mesh->SetMaterial(0, GroundMID);
 	else if (GroundMat) Mesh->SetMaterial(0, GroundMat);
 	Mesh->RegisterComponent();

@@ -77,6 +77,24 @@ research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled
   (`strongholds` world document). Each fort is on the map and the discovery banner as a landmark, tells its story to
   whoever first comes up to it, clears the island's trees and rocks off its ground on every machine
   (`AWRDressing::ClearCircle`), and nobody may build within 15 m of it. Tuning `strongholds`, `siege._pack`.
+- **The Ancient forest's ground is real forest floor.** Why: Aaron (r-forest-ground) switched from the flat-colour
+  runtime ground: "We already have the electric dreams env pack. Can't we use that to create an incredible forest biome?
+  Or take some lessons we learned from Trails?" The Electric Dreams pack is not on this PC (it was studied on the
+  laptop and removed; its lessons are in TrailsResume/ELECTRIC-DREAMS-NOTES.md), so its lessons and Trails' own forest
+  scans are used, on the runtime ground (a 64 MB landscape import can't cut the Hollow Root's openings and would cost
+  Raven's LFS for no visible gain: the card's "better ground texture" is the material). `M_ForestGround`
+  (`Tools/terrain/build_forest_ground.py`) mixes six textured layers per vertex: **leaf litter, forest soil and moss**
+  (Trails' CC0 ambientCG scans, 1K colour + height + normal, `Content/Terrain/Forest`) and the MW pack's **grass, stones
+  and sand**, **height-blended** so moss fills the litter's hollows and stones stand out of the sand at every border
+  (not an alpha fade), with a second litter scale and a 31 m wash so nothing tiles, MW rock on the steep ground
+  (33-47 degrees, side-projected), the sub-zone's palette kept as a gentle tint, and the land's rain (Wet). **Every
+  contact is hidden** the way Electric Dreams hides it with dirt and moss decals, but for every mesh at once: within
+  70 cm of a boulder, root, log or trunk (the global distance field) the ground goes to damp moss. The mix comes from
+  the data (`Tools/terrain/forest.mjs` zone and surface `layers`, e.g. Old-Growth Groves litter 62 / moss 28 / soil 10,
+  the Meadows grass 72, river beds stones 85, trails trodden soil 82; `FWRLandDef::HfLayers` blends them across sub-zone
+  edges like the colours, trades litter and moss in noise patches so no stretch is one even mix (Electric Dreams'
+  clustering), and grows moss on the damp ground beside water (Trails' creek-bank strip), into UV channels 1-3 of each
+  chunk). The heightfield is unchanged (`forest_ground.bin` byte-identical). Credits in `Docs/CREDITS.md`.
 
 
 ## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)

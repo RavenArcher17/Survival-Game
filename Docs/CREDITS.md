@@ -865,6 +865,14 @@ which is cooked with the game (`DirectoriesToAlwaysCook` `/Game/Sea`), so the pa
 the pack it needs.
 
 
+### The Ancient forest's ground (2026-11-16)
+
+`Content/Terrain/Forest/T_Forest{Litter,Soil,Moss}_{BCH,N}` (in git) come from photo-scanned ground materials on
+**ambientCG** (https://ambientcg.com, by Lennart Demes), licensed **CC0 1.0**: leaf litter is Ground053
+(https://ambientcg.com/view?id=Ground053), with the forest soil and moss ground sets alongside it, packed to 1K colour +
+height and normal maps by Trails of Appalachia's `terrain_surfaces.py` (Freedom35's own tool). Grass, stones, sand and
+rock in `M_ForestGround` are the **MWLandscapeAutoMaterial** Fab pack's (not in git, standard Fab licence).
+
 ### Building pieces, sky and camera
 
 Made from engine shapes and the project's own `M_BuildWood` / `M_BuildStone` materials (`Tools/make_build_materials.py`,
