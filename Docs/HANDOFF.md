@@ -57,8 +57,11 @@ warm-up, no shaders compiling) and shows `WRPerf::Stage`. A new `LoadObject(TEXT
 Text boxes need nothing for the pad: A over one opens the pad keyboard (`WRUIPadKeyboard.cpp`); a screen that
 wants its own Done / Cancel calls `WRPadKeyboard::Open` with a target (the chat line does).
 The main menu's look picker previews on the menu world's own survivor (`AWRCharacter::PreviewLook`, standalone only).
-Map pins are client-side per world (`WRUIMap::GetPins`, `Saved/Wildreach/Pins`); sharing them with a clan would be a server
-command (not built: the map table cook).
+Map pins live on each PC per world (`WRUIMap::GetPins`, `Saved/Wildreach/Pins`) and are shared with the clan
+(`WRClanPins`, Aaron 11-16): a changed list goes up (`ServerMapPins`, at most once a second), the server keeps everyone's
+in the world doc `map_pins` and sends each player their clanmates' (`ClientClanPins`) on a change, a join or a clan change
+(`FWRClans::RefreshPlayerStates` calls `WRClanPins::SendAll`). They show on the map and compass only with the legend's
+"Clan pins" ticked (off by default, `[Wildreach.Map] ShowClanPins` in GameUserSettings.ini).
 The pad's D-pad right: a tap is the next ability, a hold the item wheel (`FWRPlayerUI::ItemWheelKey`, the wheel's mode 3).
 The tracked recipe is `FWRPlayerUI::SetTrackedRecipe / TickTracked` and the HUD's `TrackedCard`.
 The fill-in map is `UWRMapRevealComponent` (PlayerState, server-side grid, `mapReveal` in the player save); a new map

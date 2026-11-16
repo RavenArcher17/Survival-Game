@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Answers 11-16 (lane build-wild-answers-1116; cooks/wild-answers-1116.md in showcase-notes)
+
+Compiled (editor target); not played here (Aaron tests).
+
+- **Map pins are shared with your clan; "Clan pins" on the map's legend shows theirs** (Aaron: "allow players to share
+  this info across clans, but players have an option to 'see clan pins' but only see their own by default"). Why: pins
+  were each PC's own file, so a clan couldn't mark a den or an ore field for each other (Rust's team markers, ARK's
+  tribe markers). Every pin you make goes to the server (`ServerMapPins`, at most once a second; it fills in who made it
+  and clamps the list), which keeps everyone's pins in the world's store (`map_pins`), so an offline clanmate's pins
+  still show, and sends each player their clanmates' pins when one changes, someone joins, or a clan gains or loses a
+  member (`WRClanPins.cpp`). On your map they stay hidden until you tick **Clan pins** on the legend (off by default,
+  kept between runs; its line says "join a clan to share" with no clan): a sage-ringed badge with the owner's initial
+  (never mistaken for your brass ones, Valheim's shared-pin rule), "Kara · Den" when zoomed in or hovered, and the same
+  badges on the compass. Right-click one (pad X) for its card: Waypoint here, or **Copy to my pins**. Leaving a clan takes
+  theirs off your map at once. Tuning: `ui.pins.sendSeconds`.
+
 ## 0.8.0 (2026-11-16): shipping it (the boot check, the Setup in parts, a packaged game that starts, ten materials that compile)
 
 Released 2026-11-16 as https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.8.0 (target ff115f9; every

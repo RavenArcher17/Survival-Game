@@ -8,6 +8,7 @@
 #include "WRWorlds.h"
 #include "WRStore.h"
 #include "WRIdentity.h"
+#include "WRClanPins.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -105,6 +106,8 @@ void FWRClans::RefreshPlayerStates(const UWorld* World) const
 	}
 	// Clanmates' beds are offered too: a clan change changes whose beds each player has.
 	WRBeds::RefreshAll(const_cast<UWorld*>(World));
+	// And their map pins (WRClanPins): someone joined, or a clan gained or lost a member.
+	WRClanPins::SendAll(const_cast<UWorld*>(World));
 }
 
 FString FWRClans::ClanOf(const FString& Player) const

@@ -25,6 +25,7 @@
 #include "WRSound.h"
 #include "WRPadInput.h"
 #include "WRWorlds.h"
+#include "WRClanPins.h"
 #include "GameFramework/GameStateBase.h"
 #include "WRTuning.h"
 #include "WRFarm.h"
@@ -176,6 +177,8 @@ namespace WRMapTab
 		if (P.Key == Key) return P.Pins;
 		P.Key = Key;
 		P.Pins.Reset();
+		// This world's pins go up to its server once loaded (shared with the clan: WRClanPins).
+		WRClanPins::NoteOwnChanged();
 		FString Json;
 		TSharedPtr<FJsonObject> Root;
 		if (FFileHelper::LoadFileToString(Json, *PinFile(Key)) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) && Root.IsValid())
@@ -217,10 +220,17 @@ namespace WRMapTab
 		FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Out));
 		IFileManager::Get().MakeDirectory(*FPaths::GetPath(PinFile(P.Key)), true);
 		FFileHelper::SaveStringToFile(Out, *PinFile(P.Key), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+		WRClanPins::NoteOwnChanged();
 	}
 
 	/** The pin card over the map: where it was asked (the view's local point), and for which pin (-1: a new one). */
-	struct FPinCard { bool bOpen = false; int32 Index = -1; FVector2D World = FVector2D::ZeroVector; FVector2D Local = FVector2D::ZeroVector; uint8 Glyph = 5; };
+	struct FPinCard
+	{
+		bool bOpen = false; int32 Index = -1; FVector2D World = FVector2D::ZeroVector; FVector2D Local = FVector2D::ZeroVector; uint8 Glyph = 5;
+		/** A clanmate's pin (read-only: Waypoint here, Copy to my pins): its index in WRClanPins::Clan, else -1. */
+		int32 Clan = -1;
+		FWRSharedPin ClanPin;
+	};
 	FPinCard& PinCard() { static FPinCard C; return C; }
 
 	/** A glyph as a widget (the card's buttons). */
@@ -648,6 +658,22 @@ namespace WRMapTab
 						break;
 					}
 				}
+				// Not one of yours: a clanmate's (when they're shown) opens its read-only card.
+				if (Card.Index < 0 && WRClanPins::ShowClan())
+				{
+					const TArray<FWRSharedPin>& Clan = WRClanPins::Clan(PC->GetWorld());
+					for (int32 i = 0; i < Clan.Num(); ++i)
+					{
+						if (FVector2D::Distance(ToLocal(FVector(Clan[i].Where, 0.f), Geo.GetLocalSize()), L) < 13.f * U)
+						{
+							Card.Clan = i;
+							Card.ClanPin = Clan[i];
+							Card.World = Clan[i].Where;
+							Card.Glyph = Clan[i].Glyph;
+							break;
+						}
+					}
+				}
 				WRSound::PlayUI(nullptr, TEXT("ui.click"));
 				return FReply::Handled();
 			}
@@ -939,6 +965,42 @@ namespace WRMapTab
 					}
 				}
 			}
+			// Clanmates' pins (WRClanPins), only with "Clan pins" ticked on the legend: a sage-ringed badge so they never read as
+			// yours (Valheim's shared pins), the owner's initial on its shoulder, "Name · label" once zoomed in or hovered.
+			if (!MarkersFn && PC.IsValid() && WRClanPins::ShowClan())
+			{
+				const TArray<FWRSharedPin>& Clan = WRClanPins::Clan(PC->GetWorld());
+				const FLinearColor Sage = Hex(TEXT("A9CDA0"));
+				for (int32 i = 0; i < Clan.Num(); ++i)
+				{
+					const FVector2D C = ToLocal(FVector(Clan[i].Where, 0.f), Size);
+					if (C.X < -30.f || C.Y < -30.f || C.X > Size.X + 30.f || C.Y > Size.Y + 30.f) continue;
+					const float D = 20.f * U;
+					const bool bHot = FVector2D::Distance(C, MouseLocal) < 13.f * U || (PinCard().bOpen && PinCard().Clan == i);
+					Box(L + 5, C - FVector2D(D * 0.5f + 1.f), FVector2D(D + 2.f), WRUI::Box(FLinearColor::Black, D * 0.5f + 1.f));
+					Box(L + 5, C - FVector2D(D * 0.5f), FVector2D(D), WRUI::Box(FLinearColor(0.02f, 0.045f, 0.03f, 0.95f), D * 0.5f, bHot ? Hex(TEXT("E4F2DD")) : Sage, bHot ? 2.f : 1.5f));
+					WRUIMap::DrawPinGlyph(Out, L + 6, Geo, C, D * 0.6f, Clan[i].Glyph, Hex(TEXT("D8ECD2")));
+					// The owner's initial in a small disc on the badge's upper right.
+					{
+						const FText Init = FText::FromString(Clan[i].Owner.Left(1).ToUpper());
+						const FSlateFontInfo IF = WRUI::Body(8, 800);
+						const FVector2D IS = Measure(Init, IF);
+						const float Dot = FMath::Max(IS.X, IS.Y) + 3.f;
+						const FVector2D At = C + FVector2D(D * 0.42f, -D * 0.42f);
+						Box(L + 6, At - FVector2D(Dot * 0.5f), FVector2D(Dot), WRUI::Box(Sage, Dot * 0.5f, FLinearColor::Black, 1.f));
+						Text(L + 7, Init, IF, At - IS * 0.5f, Hex(TEXT("10200F")), false);
+					}
+					if (S.Zoom >= 2.f || bHot)
+					{
+						const FSlateFontInfo F = WRUI::Body(11, 700);
+						const FText T = FText::FromString(FString::Printf(TEXT("%s · %s"), *Clan[i].Owner, *(Clan[i].Label.IsEmpty() ? WRUIMap::PinGlyphName(Clan[i].Glyph) : Clan[i].Label)));
+						const FVector2D TS = Measure(T, F);
+						const FVector2D Pos = C + FVector2D(-TS.X * 0.5f, D * 0.5f + 2.f);
+						Box(L + 6, Pos - FVector2D(5.f, 1.f), TS + FVector2D(10.f, 2.f), WRUI::Box(FLinearColor(0.02f, 0.04f, 0.03f, 0.72f), 3.f, WRUI::Alpha(Sage, 0.45f), 1.f));
+						Text(L + 6, T, F, Pos, Hex(TEXT("D8ECD2")), true);
+					}
+				}
+			}
 			// Your waypoint: a brass pin and how far it is.
 			FVector Way;
 			if (!MarkersFn && PC.IsValid() && WRUIMap::GetWaypoint(PC->GetWorld(), Way))
@@ -1135,21 +1197,24 @@ namespace WRMapTab
 						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 						{
 							const FPinCard& C = PinCard();
+							if (C.Clan >= 0) return FText::Format(LOCTEXT("PinClanTitle", "{0}'s pin · {1}"), FText::FromString(C.ClanPin.Owner),
+								FText::FromString(C.ClanPin.Label.IsEmpty() ? WRUIMap::PinGlyphName(C.ClanPin.Glyph) : C.ClanPin.Label));
 							if (C.Index < 0) return LOCTEXT("PinNew", "Mark this spot");
 							const TArray<WRUIMap::FPin>& Pins = PinsFor(PC.IsValid() ? PC->GetWorld() : nullptr);
 							return Pins.IsValidIndex(C.Index) ? FText::FromString(Pins[C.Index].Label.IsEmpty() ? WRUIMap::PinGlyphName(Pins[C.Index].Glyph) : Pins[C.Index].Label) : LOCTEXT("PinNew", "Mark this spot");
 						}), WRUI::Title(14), WRUI::Ink, true)
 					]
-					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[SNew(SBox).HeightOverride(36.f * U)[PinLabel.ToSharedRef()]]
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[SNew(SBox).HeightOverride(36.f * U).Visibility_Lambda([]() { return PinCard().Clan >= 0 ? EVisibility::Collapsed : EVisibility::Visible; })[PinLabel.ToSharedRef()]]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 4.f * U)
 					[
 						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 						{
+							if (PinCard().Clan >= 0) return LOCTEXT("PinClanNote", "Shared by your clan");
 							if (PinCard().Index >= 0) return LOCTEXT("PinChange", "Its mark");
 							return CanAddPin() ? LOCTEXT("PinPick", "Pick a mark to pin it") : FText::Format(LOCTEXT("PinFull", "{0} pins already: remove one first"), PinMax());
 						}), WRUI::Caps(11), WRUI::Ink2)
 					]
-					+ SVerticalBox::Slot().AutoHeight()[Glyphs]
+					+ SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda([]() { return PinCard().Clan >= 0 ? EVisibility::Collapsed : EVisibility::Visible; })[Glyphs]]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 10.f * U, 0.f, 0.f)
 					[
 						SNew(SHorizontalBox)
@@ -1165,9 +1230,17 @@ namespace WRMapTab
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.f).Padding(3.f * U, 0.f, 0.f, 0.f)
 						[
-							SNew(SWidgetSwitcher).WidgetIndex_Lambda([]() { return PinCard().Index >= 0 ? 1 : 0; })
+							SNew(SWidgetSwitcher).WidgetIndex_Lambda([]() { return PinCard().Clan >= 0 ? 2 : PinCard().Index >= 0 ? 1 : 0; })
 							+ SWidgetSwitcher::Slot()[SNew(SWRButton).Ghost(true).FontSize(12).Text(LOCTEXT("PinCancel", "Cancel")).OnClicked_Lambda([this]() { CloseCard(); return FReply::Handled(); })]
 							+ SWidgetSwitcher::Slot()[SNew(SWRButton).Ghost(true).FontSize(12).Text(LOCTEXT("PinRemove", "Remove")).OnClicked_Lambda([this]() { RemovePin(); return FReply::Handled(); })]
+							// A clanmate's pin: make it one of yours (it stays theirs too).
+							+ SWidgetSwitcher::Slot()
+							[
+								SNew(SWRButton).Ghost(true).FontSize(12).Text(LOCTEXT("PinCopy", "Copy to my pins"))
+								.IsEnabled_Lambda([this]() { return CanAddPin(); })
+								.ToolTipText_Lambda([this]() { return CanAddPin() ? FText::GetEmpty() : FText::Format(LOCTEXT("PinCopyFull", "{0} pins already: remove one first"), PinMax()); })
+								.OnClicked_Lambda([this]() { CopyClanPin(); return FReply::Handled(); })
+							]
 						]
 					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
@@ -1202,6 +1275,19 @@ namespace WRMapTab
 			Pin.Label = PinLabel.IsValid() ? PinLabel->GetText().ToString().TrimStartAndEnd().Left(PinLabelMax()) : FString();
 			SavePins();
 			UE_LOG(LogWildreach, Log, TEXT("PIN added %s at %.0f %.0f"), *WRUIMap::PinGlyphName(G), C.World.X, C.World.Y);
+			CloseCard();
+		}
+		void CopyClanPin()
+		{
+			FPinCard& C = PinCard();
+			if (!PC.IsValid() || C.Clan < 0 || !CanAddPin()) return;
+			TArray<WRUIMap::FPin>& Pins = PinsFor(PC->GetWorld());
+			WRUIMap::FPin& Pin = Pins.AddDefaulted_GetRef();
+			Pin.Where = C.ClanPin.Where;
+			Pin.Glyph = C.ClanPin.Glyph;
+			Pin.Label = (C.ClanPin.Label.IsEmpty() ? FString::Printf(TEXT("%s's %s"), *C.ClanPin.Owner, *WRUIMap::PinGlyphName(C.ClanPin.Glyph)) : C.ClanPin.Label).Left(PinLabelMax());
+			SavePins();
+			UE_LOG(LogWildreach, Log, TEXT("PIN copied from %s at %.0f %.0f"), *C.ClanPin.Owner, Pin.Where.X, Pin.Where.Y);
 			CloseCard();
 		}
 		void SaveCard()
@@ -1332,6 +1418,7 @@ namespace WRMapTab
 		{
 			SCompoundWidget::Tick(Geo, Time, Delta);
 			TickPinCard();
+			if (PC.IsValid()) WRUIMap::GetPins(PC->GetWorld());   // sends a changed pin list up while the journal hides the compass
 			// Look the picked marker up again now and then (tames move, a Hearth gains cores): the panel's distance and
 			// state lines read it live. The panel itself is rebuilt only when it shows something else (another pick, or
 			// the marker came or went). 0.4.1 rebuilt it twice a second, here inside Slate's paint, so each rebuild drew
@@ -1476,6 +1563,58 @@ namespace WRMapTab
 					]
 				];
 			}
+			// Clan pins (WRClanPins; Aaron 11-16): clanmates' pins on the map and the compass. Off by default, kept between
+			// runs; a click (or the pad's A on it) flips it like the rows above.
+			Rows->AddSlot().AutoHeight().Padding(0.f, 4.f * U, 0.f, 0.f)
+			[
+				SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
+				.ToolTipText(LOCTEXT("ClanPinsTip", "Show the pins your clanmates have made. Yours are shared with them either way."))
+				.OnClicked_Lambda([]() { WRClanPins::SetShowClan(!WRClanPins::ShowClan()); WRSound::PlayUI(nullptr, TEXT("ui.click")); return FReply::Handled(); })
+				[
+					SNew(SBox).HeightOverride(26.f * U)
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
+						[
+							SNew(SBox).WidthOverride(20.f * U).HeightOverride(20.f * U)
+							[
+								SNew(SOverlay)
+								+ SOverlay::Slot()[SNew(SImage).Image_Lambda([]() { return WRClanPins::ShowClan() ? WRUI::Box(Hex(TEXT("4A3520")), 3.f, Hex(TEXT("2A1D12")), 1.5f) : WRUI::Box(FLinearColor(1.f, 0.97f, 0.9f, 0.55f), 3.f, Hex(TEXT("2A1D12")), 1.5f); })]
+								+ SOverlay::Slot().Padding(3.f * U)[SNew(SImage).Image(Glyph(TEXT("check"))).ColorAndOpacity_Lambda([]() { return WRClanPins::ShowClan() ? Hex(TEXT("F0D49B")) : FLinearColor::Transparent; })]
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 12.f * U, 0.f)
+						[
+							SNew(SBox).WidthOverride(24.f * U).HeightOverride(24.f * U)
+							[
+								SNew(SBorder).BorderImage(FCoreStyle::Get().GetBrush("NoBorder")).Padding(0.f).ColorAndOpacity_Lambda([]() { return FLinearColor(1.f, 1.f, 1.f, WRClanPins::ShowClan() ? 1.f : 0.5f); })
+								[
+									SNew(SOverlay)
+									+ SOverlay::Slot()[SNew(SImage).Image(WRUI::Box(FLinearColor(0.02f, 0.045f, 0.03f, 0.95f), 12.f * U, Hex(TEXT("A9CDA0")), 1.5f))]
+									+ SOverlay::Slot().Padding(4.f * U)[SNew(SWRPinGlyphIcon).Glyph(5).Size(16.f * U).Color(Hex(TEXT("D8ECD2")))]
+								]
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							WRUI::Text(LOCTEXT("ClanPins", "Clan pins"), WRUI::Body(14, 700), TAttribute<FSlateColor>::CreateLambda([Ink]() { return FSlateColor(WRClanPins::ShowClan() ? Ink : Hex(TEXT("6B5640"))); }))
+						]
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(5.f * U, 0.f, 0.f, 0.f)
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+							{
+								const AWRPlayerState* PS = PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+								if (!PS || PS->ClanName.IsEmpty()) return LOCTEXT("SubClanPinsNone", "· join a clan to share");
+								return WRClanPins::ShowClan() ? LOCTEXT("SubClanPinsOn", "· your clan's marks") : LOCTEXT("SubClanPinsOff", "· only yours shown");
+							}), WRUI::Body(14, 500), Soft)
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+						[
+							WRUI::Text(TAttribute<FText>::CreateLambda([this]() { return FText::AsNumber(PC.IsValid() ? WRClanPins::Clan(PC->GetWorld()).Num() : 0); }), WRUI::Body(13, 500), Soft)
+						]
+					]
+				]
+			];
 			return SNew(SWRPanel).Kind(EWRPanel::Parchment).Padding(FMargin(18.f * U, 12.f * U, 18.f * U, 16.f * U))
 				[
 					SNew(SVerticalBox)
@@ -1705,7 +1844,21 @@ namespace WRMapTab
 
 const TArray<WRUIMap::FPin>& WRUIMap::GetPins(const UWorld* World)
 {
-	return WRMapTab::PinsFor(World);
+	const TArray<WRUIMap::FPin>& Pins = WRMapTab::PinsFor(World);
+	// Read every frame by the compass and the map: the moment to send a changed list up (WRClanPins, once a second).
+	if (World && WRClanPins::FlushDue())
+	{
+		TArray<FWRSharedPin> Own;
+		for (const WRUIMap::FPin& Pin : Pins)
+		{
+			FWRSharedPin& S = Own.AddDefaulted_GetRef();
+			S.Where = Pin.Where;
+			S.Glyph = Pin.Glyph;
+			S.Label = Pin.Label;
+		}
+		WRClanPins::Send(World, Own);
+	}
+	return Pins;
 }
 
 FString WRUIMap::PinGlyphName(uint8 Glyph)

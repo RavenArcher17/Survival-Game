@@ -27,6 +27,7 @@
 #include "WRUIStyle.h"
 #include "WRUIWidgets.h"
 #include "WRUIMap.h"
+#include "WRClanPins.h"
 #include "WRAltar.h"
 #include "WRAttributeSet.h"
 #include "WRBoss.h"
@@ -325,6 +326,33 @@ public:
 					const FVector2D Pos(FMath::Clamp(X - TS.X * 0.5f, 0.f, Size.X - TS.X), Size.Y + 6.f);
 					WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(TS + FVector2D(12.f, 2.f), FSlateLayoutTransform(Pos - FVector2D(6.f, 1.f))), WRUI::Box(FLinearColor(0.05f, 0.04f, 0.035f, 0.72f), 8.f));
 					DrawTextAt(Out, Layer + 3, Geo, T, Font, Pos, FLinearColor(FColor(0xF0, 0xD4, 0x9B)), false);
+				}
+			}
+			// Clanmates' pins (WRClanPins), only while "Clan pins" is ticked on the map: the same badge in sage, the owner's
+			// name with the pin's when you face it.
+			if (WRClanPins::ShowClan())
+			{
+				const FLinearColor Sage(FColor(0xA9, 0xCD, 0xA0)), Pale(FColor(0xD8, 0xEC, 0xD2));
+				for (const FWRSharedPin& Pin : WRClanPins::Clan(Pawn->GetWorld()))
+				{
+					const FVector D = FVector(Pin.Where, 0.f) - Pawn->GetActorLocation();
+					if (D.Size2D() > Reach || D.Size2D() < 300.f) continue;
+					const float Deg = FMath::RadiansToDegrees(FMath::Atan2(D.X, -D.Y));
+					bool bVis = false;
+					const float X = XFor(Deg, bVis);
+					if (!bVis) continue;
+					const float R = 7.f;
+					WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(FVector2D(R * 2.f, R * 2.f), FSlateLayoutTransform(FVector2D(X - R, Size.Y - R * 2.f - 3.f))), WRUI::Box(FLinearColor(0.02f, 0.045f, 0.03f, 0.95f), R, Sage, 1.f));
+					WRUIMap::DrawPinGlyph(Out, Layer + 3, Geo, FVector2D(X, Size.Y - R - 3.f), R * 1.25f, Pin.Glyph, Pale);
+					if (FMath::Abs(FMath::UnwindDegrees(Deg - Heading)) < 6.f)
+					{
+						const FText T = FText::FromString(FString::Printf(TEXT("%s · %s · %.0f m"), *Pin.Owner, *(Pin.Label.IsEmpty() ? WRUIMap::PinGlyphName(Pin.Glyph) : Pin.Label), D.Size2D() / 100.f));
+						const FSlateFontInfo Font = WRUI::Body(11, 700);
+						const FVector2D TS = Measure(T, Font);
+						const FVector2D Pos(FMath::Clamp(X - TS.X * 0.5f, 0.f, Size.X - TS.X), Size.Y + 6.f);
+						WRUI::DrawBox(Out, Layer + 2, Geo.ToPaintGeometry(TS + FVector2D(12.f, 2.f), FSlateLayoutTransform(Pos - FVector2D(6.f, 1.f))), WRUI::Box(FLinearColor(0.03f, 0.045f, 0.035f, 0.72f), 8.f));
+						DrawTextAt(Out, Layer + 3, Geo, T, Font, Pos, Pale, false);
+					}
 				}
 			}
 		}

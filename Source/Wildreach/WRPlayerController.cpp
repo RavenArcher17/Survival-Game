@@ -1395,6 +1395,18 @@ void AWRPlayerController::ClientGodPlaces_Implementation(const TArray<FWRGodPlac
 	WRGod::ReceivePlaces(this, Places);
 }
 
+void AWRPlayerController::ServerMapPins_Implementation(const TArray<FWRSharedPin>& Pins)
+{
+	// The client already holds itself to the pin cap; a list far past it is dropped whole, never partly trusted.
+	if (!PlayerState || Pins.Num() > 4 * FMath::Max(1, static_cast<int32>(WRTune(TEXT("ui.pins.max"), 30.f)))) return;
+	WRClanPins::SetPlayerPins(GetWorld(), PlayerState->GetPlayerName(), Pins);
+}
+
+void AWRPlayerController::ClientClanPins_Implementation(const TArray<FWRSharedPin>& Pins)
+{
+	WRClanPins::SetClan(GetWorld(), Pins);
+}
+
 void AWRPlayerController::ToggleGod()
 {
 	// No god mode for anyone the server hasn't verified: the key, the pad stop and the screen don't exist for them. A

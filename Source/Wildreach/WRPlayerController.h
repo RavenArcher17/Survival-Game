@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerController.h"
 #include "WRFlowTypes.h"
 #include "WRGod.h"
+#include "WRClanPins.h"
 #include "WRPlayerController.generated.h"
 
 class AWRCharacterBase;
@@ -253,6 +254,10 @@ public:
 	UFUNCTION(Client, Reliable) void ClientGodChallenge(const FString& Nonce);
 	UFUNCTION(Server, Reliable) void ServerGodProof(const FString& Proof);
 	UFUNCTION(Client, Reliable) void ClientGodPlaces(const TArray<FWRGodPlace>& Places);
+	/** Map pins shared with the clan (WRClanPins, cooks/wild-answers-1116.md 4.2): this player's own pins up to the server
+	 *  (it fills in the owner and clamps them); their clanmates' pins down from it. */
+	UFUNCTION(Server, Reliable) void ServerMapPins(const TArray<FWRSharedPin>& Pins);
+	UFUNCTION(Client, Reliable) void ClientClanPins(const TArray<FWRSharedPin>& Pins);
 	/** Server only (not an RPC): a command as the controller's own testing commands run it (the god commands' jump-starts). */
 	void RunDevCommand(const FString& Command) { RunServerCommand(Command); }
 	/** The god-mode panel open / shut (its key, the pad's page cycle): nothing at all unless this player is a verified tester. */
