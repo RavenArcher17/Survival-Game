@@ -1193,7 +1193,9 @@
 		"arcane.prism_line": {"files": ["creature/wisp_chime_1", "creature/wisp_chime_2", "creature/wisp_chime_3", "creature/wisp_chime_4", "creature/wisp_chime_5"], "volume": 0.8, "pitch": [1.6, 1.75], "radius": 2500, "category": "effects", "minGap": 0.1, "maxVoices": 2, "_comment": "The Prismglass spear's lines of light. Stand-in: wisp chimes.", "_standin": true},
 		"arcane.path_magic": {"files": ["spell/nature_heal_1", "spell/nature_heal_2"], "volume": 0.8, "pitch": [1.2, 1.3], "radius": 2500, "category": "effects", "minGap": 0.15, "maxVoices": 4, "_comment": "A Prismback warded by path magic (crystal 2.12.1). Stand-in: the Nature heal pitched up.", "_standin": true}
   },
-	"creatures": {
+	"voiceFallback": { "_comment": "A creature call kind with no row of its own (creature.<id>.<kind> or the family's) plays another kind: [kind, pitch, volume] (cooks/cookpass-creatures.md 3.4). alert = the alarm as it turns wary of someone (a sharper, quieter idle call); flee = the cry as it bolts; answer = a packmate answering a contact call, and a tame answering the whistle / Call your mount. A species' own row wins as soon as the voice pass adds it.",
+    "alert": ["idle", 1.12, 0.85], "flee": ["hurt", 1.06, 0.7], "answer": ["idle", 1.0, 0.8] },
+  "creatures": {
     "old_barnacle": {"family": "bug", "pitch": 0.45, "_why": "Ocean boss (stand-in voice, pitched; cooks/biome-ocean.md 2.13-2.15 names the real calls for the audio cook)"},
     "siren_eel": {"family": "wisp", "pitch": 0.9, "_why": "Ocean boss (stand-in voice, pitched; cooks/biome-ocean.md 2.13-2.15 names the real calls for the audio cook)"},
     "reef_tyrant": {"family": "murkjaw", "pitch": 0.6, "_why": "Ocean boss (stand-in voice, pitched; cooks/biome-ocean.md 2.13-2.15 names the real calls for the audio cook)"},
@@ -1441,6 +1443,7 @@
 		"watchRange": 4500,
 		"idleRange": 3000,
 		"idleEvery": [12, 35],
+		"alertEvery": 8, "answerChance": 0.45, "answerRadius": 2500, "answerDelayMin": 0.5, "answerDelayMax": 1.4,
 		"owlEvery": [25, 70],
 		"swampFade": 4.0,
 		"swampFallsNear": 6000,

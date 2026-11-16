@@ -1132,6 +1132,7 @@ void UWRAudioDirector::WatchBodies()
 			New.Aggro = Creature ? Creature->GetAggroRep() : nullptr;
 			New.NextIdle = Now + FMath::FRandRange(3.f, IdleMax);
 			New.Seen = Now;
+			New.Mood = Creature ? Creature->MoodRep : 0;
 			continue;
 		}
 		B->bDead = bDead;   // the death call itself comes from the death multicast (AWRCharacterBase)
@@ -1173,14 +1174,82 @@ void UWRAudioDirector::WatchBodies()
 			if (Now >= B->NextIdle)
 			{
 				B->NextIdle = Now + FMath::FRandRange(IdleMin, IdleMax) * (Creature->IsTamed() ? 2.f : 1.f);
-				if (!Aggro && !Creature->bAsleep && !Creature->IsUnconscious() && D2 < FMath::Square(IdleRange)) WRSound::Voice(Creature, TEXT("idle"));
+				if (!Aggro && !Creature->bAsleep && !Creature->IsUnconscious() && D2 < FMath::Square(IdleRange))
+				{
+					WRSound::Voice(Creature, TEXT("idle"));
+					QueueAnswer(Creature, Now);
+				}
 			}
+			// Its mood's calls (cookpass-creatures 3.4): the alarm when it turns wary of someone (not too often), a cry as
+			// it bolts.
+			const uint8 Mood = Creature->MoodRep;
+			if (Mood != B->Mood && !Boss)
+			{
+				if (Mood == static_cast<uint8>(EWRCreatureMood::Wary) && Now >= B->NextAlert)
+				{
+					WRSound::Voice(Creature, TEXT("alert"));
+					B->NextAlert = Now + Tune(TEXT("ambient.alertEvery"), 8.f);
+				}
+				else if (Mood == static_cast<uint8>(EWRCreatureMood::Flee))
+				{
+					WRSound::Voice(Creature, TEXT("flee"));
+				}
+			}
+			B->Mood = Mood;
 		}
 		B->bFalling = bFalling;
 	}
 	for (auto It = Bodies.CreateIterator(); It; ++It)
 	{
 		if (!It.Key().IsValid()) It.RemoveCurrent();
+	}
+	for (int32 i = Answers.Num() - 1; i >= 0; --i)
+	{
+		if (Now < Answers[i].Value)
+		{
+			continue;
+		}
+		if (AWRCreature* Mate = Answers[i].Key.Get(); Mate && Mate->IsAlive() && !Mate->bAsleep)
+		{
+			WRSound::Voice(Mate, TEXT("answer"));
+		}
+		Answers.RemoveAt(i);
+	}
+}
+
+void UWRAudioDirector::QueueAnswer(AWRCreature* Caller, double Now)
+{
+	// Contact calls (cooks/cookpass-creatures.md 3.4): a packmate of the same kind in earshot, awake and calm, answers
+	// now and then a moment later (wolves, flocks, herds keep in touch this way).
+	if (!Caller || FMath::FRand() >= Tune(TEXT("ambient.answerChance"), 0.45f))
+	{
+		return;
+	}
+	const float Radius = Tune(TEXT("ambient.answerRadius"), 2500.f);
+	AWRCreature* Best = nullptr;
+	float BestD2 = FMath::Square(Radius);
+	for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+	{
+		AWRCreature* Mate = *It;
+		if (Mate == Caller || Mate->CreatureId != Caller->CreatureId || !Mate->IsAlive() || Mate->bAsleep || Mate->IsUnconscious()
+			|| Mate->GetAggroRep() || Mate->IsTamed() != Caller->IsTamed())
+		{
+			continue;
+		}
+		const float D2 = float(FVector::DistSquared(Mate->GetActorLocation(), Caller->GetActorLocation()));
+		if (D2 < BestD2)
+		{
+			BestD2 = D2;
+			Best = Mate;
+		}
+	}
+	if (Best)
+	{
+		Answers.Add({ Best, Now + FMath::FRandRange(Tune(TEXT("ambient.answerDelayMin"), 0.5f), Tune(TEXT("ambient.answerDelayMax"), 1.4f)) });
+		if (FBody* B = Bodies.Find(Best))
+		{
+			B->NextIdle = FMath::Max(B->NextIdle, Now + 6.0);   // its answer is its call for now
+		}
 	}
 }
 

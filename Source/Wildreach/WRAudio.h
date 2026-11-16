@@ -121,6 +121,9 @@ public:
 	float Tune(FName Key, float Fallback) const;
 	/** Per-creature voice settings: family and pitch ("creatures" in the table). */
 	bool CreatureVoice(FName CreatureId, FName& OutFamily, float& OutPitch) const;
+	/** A creature call kind with no row of its own plays another kind, pitched and quieter (sounds.json voiceFallback:
+	 *  alert -> idle, flee -> hurt, answer -> idle; cooks/cookpass-creatures.md 3.4). */
+	bool VoiceFallback(FName Kind, FName& OutKind, float& OutPitch, float& OutVolume) const;
 
 	void Log(const FString& Line) const;
 	bool IsLogging() const;
@@ -141,6 +144,8 @@ private:
 	TMap<FName, TArray<FWRMusicTrack>> MusicPools;
 	TMap<FName, float> Settings;          // "music" / "ambient" numbers
 	TMap<FName, TPair<FName, float>> Creatures;
+	struct FVoiceFallback { FName Kind; float Pitch = 1.f; float Volume = 1.f; };
+	TMap<FName, FVoiceFallback> VoiceFallbacks;
 	TSet<FName> Unknown;                  // unknown events already logged
 
 	UPROPERTY(Transient) TMap<FString, TObjectPtr<UWRPcmSound>> Sounds;
@@ -331,7 +336,13 @@ private:
 		TWeakObjectPtr<AActor> Aggro;
 		double NextIdle = 0.0;
 		double Seen = 0.0;
+		uint8 Mood = 0;            // the creature's mood when last watched (alert / flee calls on the change)
+		double NextAlert = 0.0;
 	};
 	TMap<TWeakObjectPtr<AActor>, FBody> Bodies;
+	/** Packmates answering a contact call (cookpass-creatures 3.4): who and when. */
+	TArray<TPair<TWeakObjectPtr<class AWRCreature>, double>> Answers;
+	/** After an idle call: one packmate in earshot may answer it a moment later. */
+	void QueueAnswer(class AWRCreature* Caller, double Now);
 	double NextWatch = 0.0;
 };

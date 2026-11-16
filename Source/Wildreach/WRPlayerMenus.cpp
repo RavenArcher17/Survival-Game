@@ -1091,7 +1091,7 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 			const TWeakObjectPtr<AWRCreature> Weak = Tame;
 			GetWorldTimerManager().SetTimer(Answer, FTimerDelegate::CreateLambda([Weak]()
 			{
-				if (AWRCreature* T = Weak.Get(); T && T->IsAlive()) T->MulticastSound(TEXT("voice.idle"));
+				if (AWRCreature* T = Weak.Get(); T && T->IsAlive()) T->MulticastSound(TEXT("voice.answer"));
 			}), FMath::FRandRange(0.35f, 0.35f + 0.18f * FMath::Min(Count, 6)), false);
 		}
 		static const TMap<FString, FString> Said = { { TEXT("follow"), TEXT("come to you") }, { TEXT("stay"), TEXT("stay put") }, { TEXT("passive"), TEXT("won't fight") }, { TEXT("aggressive"), TEXT("will fight your enemies") } };

@@ -38,6 +38,16 @@ cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron a
     the wind-up and releases it at the strike, over the clip (`WRCreatureBody.cpp`). 28 motions in tuning
     `anim.gesture` (bite draws back and snaps, sweep coils away from its target and swings across, slam rears and comes
     down, howl lifts the head, spit throws, charge drops the horns...). Real per-row clips are still an art job.
+- **Creatures (4): voices.** Why: every member of a pack had the identical voice, nothing raised an alarm or cried as
+  it bolted, packs never called to each other, and the whistle's answer was the idle call (grade G9; LATER-COOKS
+  build-finish / cookpass-taming "each species' own answer call").
+  - Each animal's voice pitched a little off its kind's (seeded 1 +- tuning `audio.voice.spread` 0.06, the same animal
+    stays itself): `AWRCreature::GetVoicePitch`, applied in `WRSound::Voice` to every creature call.
+  - New call kinds `alert` (as it turns wary), `flee` (as it bolts), `answer` (a packmate answering a contact call: 45%,
+    0.5-1.4 s later, `UWRAudioDirector::QueueAnswer`; the whistle and Call your mount): each plays the species' own row
+    when the voice pass adds one, else its stand-in from `sounds.json voiceFallback` (alert = a sharper, quieter idle
+    call; flee = a quieter hurt; answer = idle). Numbers in sounds.json `ambient` (alertEvery, answer*).
+  - No sleep breathing: there's no recording for it, so nothing plays rather than a stand-in.
 
 ## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 

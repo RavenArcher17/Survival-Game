@@ -379,6 +379,26 @@ bool UWRAudioSubsystem::EnsureLoaded()
 			Creatures.Add(FName(*Pair.Key), TPair<FName, float>(Family.IsEmpty() ? NAME_None : FName(*Family), JsonNum(O, TEXT("pitch"), 1.f)));
 		}
 	}
+	// Creature call kinds with no row of their own: another kind, pitched and quieter ([kind, pitch, volume]).
+	VoiceFallbacks.Reset();
+	const TSharedPtr<FJsonObject>* FallbackObj = nullptr;
+	if (Root->TryGetObjectField(TEXT("voiceFallback"), FallbackObj))
+	{
+		for (const auto& Pair : (*FallbackObj)->Values)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			const FString Key(*Pair.Key);
+			if (Key.StartsWith(TEXT("_")) || !Pair.Value->TryGetArray(Arr) || Arr->Num() < 1)
+			{
+				continue;
+			}
+			FVoiceFallback F;
+			F.Kind = FName(*(*Arr)[0]->AsString());
+			if (Arr->Num() > 1) F.Pitch = float((*Arr)[1]->AsNumber());
+			if (Arr->Num() > 2) F.Volume = float((*Arr)[2]->AsNumber());
+			VoiceFallbacks.Add(FName(*Key), F);
+		}
+	}
 	// Ambient beds and music: numbers into Settings ("ambient.x" / "music.x"), files stream.
 	for (const TCHAR* Section : { TEXT("ambient"), TEXT("music") })
 	{
@@ -477,6 +497,19 @@ bool UWRAudioSubsystem::CreatureVoice(FName CreatureId, FName& OutFamily, float&
 	if (!Found) return false;
 	if (!Found->Key.IsNone()) OutFamily = Found->Key;
 	OutPitch = Found->Value;
+	return true;
+}
+
+bool UWRAudioSubsystem::VoiceFallback(FName Kind, FName& OutKind, float& OutPitch, float& OutVolume) const
+{
+	const FVoiceFallback* F = VoiceFallbacks.Find(Kind);
+	if (!F || F->Kind.IsNone() || F->Kind == Kind)
+	{
+		return false;
+	}
+	OutKind = F->Kind;
+	OutPitch = F->Pitch;
+	OutVolume = F->Volume;
 	return true;
 }
 
@@ -872,22 +905,39 @@ void WRSound::Voice(AActor* Actor, FName Kind, float VolumeScale)
 		{
 			return;
 		}
-		const FName Own(*FString::Printf(TEXT("creature.%s.%s"), *C->CreatureId.ToString(), *K));
-		if (Audio->FindEvent(Own))
-		{
-			PlayEvent(Actor, Own, Actor->GetActorLocation(), Actor, false, VolumeScale);
-			return;
-		}
+		// Each animal its own voice, a little off its kind's (cooks/cookpass-creatures.md 3.4): a pack is several animals.
+		const float Own = C->GetVoicePitch();
 		// Shared calls: smaller bodies sound higher, bigger ones lower (unless the table gives this one its own pitch).
 		const float SizePitch = bListed ? 1.f : FMath::Clamp(FMath::Pow(50.f / FMath::Max(SizeCm, 10.f), 0.3f), 0.75f, 1.35f);
-		for (const FString& Name : { FString::Printf(TEXT("creature.%s.%s.%s"), *Size.ToString(), *Family.ToString(), *K),
-			FString::Printf(TEXT("creature.%s.%s"), *Family.ToString(), *K), FString::Printf(TEXT("creature.%s.%s"), *Size.ToString(), *K) })
+		const auto TryKind = [&](const FString& Want, float PitchMul, float VolumeMul)
 		{
-			if (Audio->FindEvent(FName(*Name)))
+			const FName Its(*FString::Printf(TEXT("creature.%s.%s"), *C->CreatureId.ToString(), *Want));
+			if (Audio->FindEvent(Its))
 			{
-				PlayEvent(Actor, FName(*Name), Actor->GetActorLocation(), Actor, false, VolumeScale, Pitch * SizePitch);
-				return;
+				PlayEvent(Actor, Its, Actor->GetActorLocation(), Actor, false, VolumeScale * VolumeMul, Own * PitchMul);
+				return true;
 			}
+			for (const FString& Name : { FString::Printf(TEXT("creature.%s.%s.%s"), *Size.ToString(), *Family.ToString(), *Want),
+				FString::Printf(TEXT("creature.%s.%s"), *Family.ToString(), *Want), FString::Printf(TEXT("creature.%s.%s"), *Size.ToString(), *Want) })
+			{
+				if (Audio->FindEvent(FName(*Name)))
+				{
+					PlayEvent(Actor, FName(*Name), Actor->GetActorLocation(), Actor, false, VolumeScale * VolumeMul, Pitch * SizePitch * Own * PitchMul);
+					return true;
+				}
+			}
+			return false;
+		};
+		if (TryKind(K, 1.f, 1.f))
+		{
+			return;
+		}
+		// No call of that kind for it: the kind's stand-in (an alarm is a sharp, quieter idle call; sounds.json voiceFallback).
+		FName Fallback;
+		float FallbackPitch = 1.f, FallbackVolume = 1.f;
+		if (Audio->VoiceFallback(Kind, Fallback, FallbackPitch, FallbackVolume))
+		{
+			TryKind(Fallback.ToString(), FallbackPitch, FallbackVolume);
 		}
 		return;
 	}

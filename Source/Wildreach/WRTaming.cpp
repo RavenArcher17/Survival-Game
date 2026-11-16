@@ -2456,7 +2456,7 @@ FString FWRTaming::CallMount(AWRPlayerController* Player)
 	Best->CallUntil = World->GetTimeSeconds() + T(TEXT("call.seconds"), 90.f);
 	Best->TameOrder = EWRTameOrder::Follow;
 	Best->SiegePiece = nullptr;
-	Best->MulticastSound(TEXT("voice.idle"));   // it answers (each species' own answer call waits for the voice pass)
+	Best->MulticastSound(TEXT("voice.answer"));   // it answers (voice.answer: its kind's own answer call, else its idle call)
 	return Dist < 1500.f ? FString::Printf(TEXT("%s comes to your side"), *Best->TameName()) : FString::Printf(TEXT("%s heard you: it's coming (%.0f m)"), *Best->TameName(), Dist / 100.f);
 }
 
