@@ -91,7 +91,7 @@ static class WildreachBootstrap
 			Shown += (s, e) => new Thread(Work) { IsBackground = true }.Start();
 		}
 
-		bool done, finished;
+		bool finished;
 
 		void Ui(Action a) { try { if (!IsDisposed) BeginInvoke(a); } catch { } }
 
@@ -136,7 +136,6 @@ static class WildreachBootstrap
 				}
 				if (cancelled) return;
 				Log("downloaded and checked; starting the Setup");
-				done = true;
 				Ui(() => { label.Text = "Installing Wildreach " + Version + "..."; bar.Style = ProgressBarStyle.Marquee; cancel.Enabled = false; });
 				int code;
 				using (Process p = Process.Start(new ProcessStartInfo(whole, string.Join(" ", passOn.Select(Quote))) { UseShellExecute = false }))

@@ -35,6 +35,25 @@ Lane ship-7. Compiled (editor target); the packaged build was launched and its l
 - **630 MB less to download:** `Config/DefaultGame.ini` never cooks `/MetaHuman/GenericTracker` (MetaHuman Animator's
   face-tracking models, a capture tool: 530 MB) or `/NNEDenoiser` (the path tracer's denoiser: 98 MB); the game loads
   neither.
+- **The packaged game started at all, and stays up in play** (found by the playable gate; the editor never showed them):
+  - It crashed before its first log line (exit 777006, a fatal error during static init): `WRUIMap.cpp` read the map's
+    tuning (`ui.mapMin` / `ui.mapSize`) into file-scope constants, which in a packaged exe runs before the game can read
+    `Data/`. They're read when used now. A scan of every file-scope initializer found no other.
+  - 11 s into a new world: `WRForestCreatures.cpp` added `M.Verts[i]` back into `M.Verts` (the add can move the array
+    under the reference: an assertion in a packaged build); the same in `WRUIMap.cpp`'s map glyph lines. Both copy first.
+  - 13 s in: `WRDeedsAchieve.cpp` walked an array inside a JSON object that was a temporary, already freed (an access
+    violation). The file is held while it's read. A scan found no other.
+- **Ten materials that never compiled now do.** Why: the cook logged "Failed to compile Material ... Default Material
+  will be used in game" for every tree (`M_TreeKit`, `M_TreeKitLeaf`, `M_TreeKitGlow`), the borrowed lands' ground
+  (`M_LandGround`), held tools (`M_HeldTool`), tames' looks (`M_TameMorph`), fungal glow and veil, and the hero's armour
+  (`M_WR_Armor`) and hair cards (`M_WR_HairCards`); they drew grey in the editor too. Causes: on UE 5.8 a Vertex Color
+  node's main output is RGB only (alpha masks and the armour's HLSL `VC.a` failed), Clamp's input pin is `""`, not
+  `"Input"` (so every scripted Clamp was left empty), pre-skinned position read in the pixel shader, and hair UV read in
+  the hair cards' vertex offset. The scripts' `link()` now raises when a connection fails instead of leaving the pin
+  empty, alpha comes from the node's `A` output, the tame look carries its position through a vertex interpolator, and
+  `Tools/art/fix_hero_materials_58.py` repairs the two hero materials in place (their lab script isn't in the repo).
+  Rebuilt with `make_tree_kit_material.py`, `make_held_tool_material.py`, `make_tame_morph_material.py`,
+  `build_fungal_materials.py`, `build_void_materials.py`.
 - **README.txt beside the game** no longer says anyone can use the console: since the god mode lane the test commands
   need a verified tester in packaged builds.
 

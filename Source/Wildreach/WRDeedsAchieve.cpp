@@ -329,7 +329,9 @@ bool WRDeeds::IsLive(const TSharedPtr<FJsonObject>& Row)
 			else if (K == TEXT("paths")) bOk = FWRPathRegistry::Get().All().Num() >= Count;
 			else if (K == TEXT("skill"))
 			{
-				if (const TArray<TSharedPtr<FJsonValue>>* Skills = DArr(FWRTuning::LoadDataFile(TEXT("lifeskills.json")), TEXT("skills")))
+				// The file held while its array is read (a pointer into a temporary's JSON is freed before the loop runs).
+				const TSharedPtr<FJsonObject> SkillsFile = FWRTuning::LoadDataFile(TEXT("lifeskills.json"));
+				if (const TArray<TSharedPtr<FJsonValue>>* Skills = DArr(SkillsFile, TEXT("skills")))
 					for (const TSharedPtr<FJsonValue>& S : *Skills) bOk |= DStr(S->AsObject(), TEXT("id")) == Val;
 			}
 			else if (K == TEXT("raid")) bOk = WRWarHall::IsLive(FName(*Val));

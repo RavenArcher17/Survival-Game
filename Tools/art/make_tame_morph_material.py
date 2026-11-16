@@ -28,7 +28,14 @@ def expr(cls, **props):
 
 
 def link(a, b, pin="", out=""):
-    mel.connect_material_expressions(a, out, b, pin)
+    # A pin name that doesn't exist fails silently and leaves the input empty (the material then fails to compile in
+    # the cook and the game draws the default material). UE 5.8 names a single input "" (Clamp, OneMinus...), so
+    # "Input" falls back to it; anything else that won't connect stops the script.
+    if mel.connect_material_expressions(a, out, b, pin):
+        return
+    if pin == "Input" and mel.connect_material_expressions(a, out, b, ""):
+        return
+    raise RuntimeError(f"couldn't connect {a.get_name()}:{out!r} -> {b.get_name()}:{pin!r}")
 
 
 def op(cls, a, b=None, **consts):
@@ -114,6 +121,11 @@ glow = scalar("GlowLine", 0.0)
 band_scale = scalar("BandScale", 0.045)
 
 pos = expr(unreal.MaterialExpressionPreSkinnedPosition)
+# Pre-skinned position exists only in the vertex shader: carry it to the pixel shader through a vertex interpolator (read
+# directly in the pixel shader the material doesn't compile, and the cooked game draws the default material).
+carried = expr(unreal.MaterialExpressionVertexInterpolator)
+link(pos, carried, "")
+pos = carried
 try:
     bounds = expr(unreal.MaterialExpressionPreSkinnedLocalBounds)
     bmin = mask(bounds, "r", "g", "b", out="Min")

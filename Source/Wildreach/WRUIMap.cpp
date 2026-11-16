@@ -68,8 +68,10 @@ namespace WRMapTab
 	using WRUI::U;
 	// The picture's world corner and size (cm): Data/UI/map.png covers every land on L_Island (the Old Island and Storm
 	// peaks, Tools/terrain/world_map.py), so they're tuning (ui.mapMin / ui.mapSize), written by that script.
-	static const float MapMin = WRTune(TEXT("ui.mapMin"), -201800.f);    // world cm at the picture's left / top edge
-	static const float MapSize = WRTune(TEXT("ui.mapSize"), 403600.f);   // world cm across the picture
+	// Read when used, never at file scope: a packaged game builds file-scope values before it can read Data/ (a fatal
+	// error on startup), where the editor loads this module later.
+	float MapMin() { return WRTune(TEXT("ui.mapMin"), -201800.f); }    // world cm at the picture's left / top edge
+	float MapSize() { return WRTune(TEXT("ui.mapSize"), 403600.f); }   // world cm across the picture
 	constexpr float MaxZoom = 8.f;
 
 	FLinearColor Hex(const TCHAR* H) { return FLinearColor(FColor::FromHex(H)); }
@@ -561,7 +563,7 @@ namespace WRMapTab
 		TArray<FMarker> Markers() const { return MarkersFn ? MarkersFn() : Gather(PC.Get()); }
 
 		// --- view maths
-		static float Frac(float W) { return (W - MapMin) / MapSize; }
+		static float Frac(float W) { return (W - MapMin()) / MapSize(); }
 		FVector2D ToLocal(const FVector& W, const FVector2D& Size) const
 		{
 			const FMapState& S = View();
@@ -573,13 +575,13 @@ namespace WRMapTab
 			const FMapState& S = View();
 			const float Img = Size.Y * S.Zoom;
 			const FVector2D F = (L - Size * 0.5f) / Img + FVector2D(Frac(S.Centre.X), Frac(S.Centre.Y));
-			return F * MapSize + FVector2D(MapMin, MapMin);
+			return F * MapSize() + FVector2D(MapMin(), MapMin());
 		}
 		static void Clamp(FMapState& S)
 		{
 			S.Zoom = FMath::Clamp(S.Zoom, 1.f, S.ZoomLimit);
-			S.Centre.X = FMath::Clamp(S.Centre.X, MapMin, MapMin + MapSize);
-			S.Centre.Y = FMath::Clamp(S.Centre.Y, MapMin, MapMin + MapSize);
+			S.Centre.X = FMath::Clamp(S.Centre.X, MapMin(), MapMin() + MapSize());
+			S.Centre.Y = FMath::Clamp(S.Centre.Y, MapMin(), MapMin() + MapSize());
 		}
 		static void ZoomBy(FMapState& S, float Factor) { S.Zoom *= Factor; Clamp(S); }
 
@@ -599,7 +601,7 @@ namespace WRMapTab
 			const FVector2D Extent = FVector2D::Max(Box.GetSize(), FVector2D(15000.f, 15000.f));
 			FMapState& S = View();
 			S.Centre = Box.GetCenter();
-			S.Zoom = FMath::Min(0.8f * Size.X * MapSize / (Extent.X * Size.Y), 0.72f * MapSize / Extent.Y);
+			S.Zoom = FMath::Min(0.8f * Size.X * MapSize() / (Extent.X * Size.Y), 0.72f * MapSize() / Extent.Y);
 			Clamp(S);
 		}
 
@@ -665,7 +667,7 @@ namespace WRMapTab
 				if (bDragged)
 				{
 					const FVector2D DL = Geo.AbsoluteToLocal(Event.GetScreenSpacePosition()) - Geo.AbsoluteToLocal(LastAt);
-					View().Centre -= DL / (Size.Y * View().Zoom) * MapSize;
+					View().Centre -= DL / (Size.Y * View().Zoom) * MapSize();
 					Clamp(View());
 				}
 				LastAt = Event.GetScreenSpacePosition();
@@ -757,21 +759,21 @@ namespace WRMapTab
 			// Sea, then the island picture.
 			Box(Layer, FVector2D::ZeroVector, Size, WRUI::White(), Hex(TEXT("18242E")));
 			const float Img = Size.Y * S.Zoom;
-			const FVector2D ImgPos = ToLocal(FVector(MapMin, MapMin, 0.f), Size);
+			const FVector2D ImgPos = ToLocal(FVector(MapMin(), MapMin(), 0.f), Size);
 			if (const FSlateBrush* Map = WRUI::Image(TEXT("map")))
 			{
 				FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(Img, Img), FSlateLayoutTransform(ImgPos)), Map);
 			}
 			// The fill-in map: where you haven't been lies under the fog (the coast and mountains faintly through).
-			float CoverCm = MapSize;
+			float CoverCm = MapSize();
 			if (const FSlateBrush* Fog = PC.IsValid() ? FogBrush(UWRMapRevealComponent::For(PC->PlayerState), CoverCm) : nullptr)
 			{
-				const float FogPx = Img * CoverCm / MapSize;
+				const float FogPx = Img * CoverCm / MapSize();
 				FSlateDrawElement::MakeBox(Out, Layer + 1, Geo.ToPaintGeometry(FVector2D(FogPx, FogPx), FSlateLayoutTransform(ImgPos)), Fog);
 			}
 			// A 500 m grid over everything.
 			const float Step = 50000.f;
-			for (float W = 0.f; W <= MapSize * 0.5f; W += Step)
+			for (float W = 0.f; W <= MapSize() * 0.5f; W += Step)
 			{
 				for (const float Sign : { -1.f, 1.f })
 				{
@@ -851,7 +853,7 @@ namespace WRMapTab
 			{
 				if (M.Cat != ECat::Claim || !S.bShow[static_cast<int32>(ECat::Claim)]) continue;
 				const FVector2D C = ToLocal(M.World, Size);
-				const float R = M.Radius / MapSize * Img;
+				const float R = M.Radius / MapSize() * Img;
 				TArray<FVector2f> Ring;
 				for (int32 i = 0; i <= 64; ++i) { const float A = 2.f * PI * i / 64.f; Ring.Add(FVector2f(C + FVector2D(FMath::Cos(A), FMath::Sin(A)) * R)); }
 				FSlateDrawElement::MakeLines(Out, L, Geo.ToPaintGeometry(), Ring, ESlateDrawEffect::None, WRUI::Alpha(M.bMine ? WRUI::Brass : WRUI::Bad, 0.75f), true, 2.f);
@@ -975,9 +977,9 @@ namespace WRMapTab
 				for (const float Try : { 1000.f, 500.f, 200.f, 100.f, 50.f })
 				{
 					Metres = Try;
-					if (Try * 100.f / MapSize * Img <= 200.f * U) break;
+					if (Try * 100.f / MapSize() * Img <= 200.f * U) break;
 				}
-				const float Km = Metres * 100.f / MapSize * Img;
+				const float Km = Metres * 100.f / MapSize() * Img;
 				const FVector2D Base(18.f * U, Size.Y - 16.f * U - 8.f * U);
 				const FSlateFontInfo F = WRUI::Body(11, 700);
 				Text(L + 11, FText::FromString(TEXT("0")), F, Base + FVector2D(0.f, -18.f * U), WRUI::Ink2, true);
@@ -1721,7 +1723,7 @@ void WRUIMap::DrawPinGlyph(FSlateWindowElementList& Out, int32 Layer, const FGeo
 	const auto Lines = [&](std::initializer_list<FVector2f> Pts, bool bClosed)
 	{
 		TArray<FVector2f> A(Pts);
-		if (bClosed && A.Num() > 0) A.Add(A[0]);
+		if (bClosed && A.Num() > 0) { const FVector2f First = A[0]; A.Add(First); }   // a copy: Add may move the array
 		FSlateDrawElement::MakeLines(Out, Layer, Geo.ToPaintGeometry(), MoveTemp(A), ESlateDrawEffect::None, Color, true, W);
 	};
 	const auto Ring = [&](float CX, float CY, float R)

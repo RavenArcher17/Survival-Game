@@ -337,7 +337,8 @@ namespace WRForestCrMesh
 			const int32 First = M.Verts.Num();
 			for (int32 s = 0; s < Sides; ++s)
 			{
-				M.Verts.Add(M.Verts[Base + End * Sides + s]); M.Normals.Add(Out); M.UVs.Add(FVector2D(0.f, s / static_cast<float>(Sides))); M.Colors.Add(Col);
+				const auto Rim = M.Verts[Base + End * Sides + s];   // a copy: Add may move the array it points into
+				M.Verts.Add(Rim); M.Normals.Add(Out); M.UVs.Add(FVector2D(0.f, s / static_cast<float>(Sides))); M.Colors.Add(Col);
 			}
 			for (int32 s = 0; s < Sides; ++s)
 			{
