@@ -57,11 +57,12 @@ known traps. The design docs are in `Docs/design/`. Claude Code reads `CLAUDE.md
 
 ```
 Tools\package.ps1          # -> C:\Dev\WildreachBuild\Windows\Wildreach.exe (+ README.txt for players)
-Tools\make_installer.ps1   # -> C:\Dev\WildreachBuild\Wildreach-Setup.exe (one file to send friends)
+Tools\make_installer.ps1   # -> C:\Dev\WildreachBuild\Wildreach-Setup.exe (one file to send friends) + release\ (what to publish)
 ```
 
 Players download `Wildreach-Setup.exe` from the latest GitHub release
-(https://github.com/RavenArcher17/Survival-Game/releases/latest/download/Wildreach-Setup.exe, ~1.6 GB). Double-clicking
+(https://github.com/RavenArcher17/Survival-Game/releases/latest/download/Wildreach-Setup.exe). Since 0.8.0 the Setup is over GitHub's
+2 GiB file limit, so that file is a small program that downloads the Setup in parts (~3.6 GB) and runs it. Double-clicking
 it installs to the player's own folder (no admin), adds Desktop and Start Menu shortcuts, installs the VC++ runtime only
 if it's missing, and starts the game; a newer Setup updates in place and keeps saves. The shortcuts start
 `WildreachUpdater.exe`, which installs any newer GitHub release by itself before starting the game (the main menu
@@ -77,8 +78,8 @@ A packaged **dedicated server** needs Unreal built from source: `Tools\build_eng
 ~200 GB; log `C:\Dev\UE5Source-build.log`). Until then the host plays and hosts at once.
 
 **Releasing an update:** bump `ProjectVersion` in `Config/DefaultGame.ini` (e.g. 0.2.1), run `Tools\package.ps1` and
-`Tools\make_installer.ps1`, then publish a GitHub release tagged `v0.2.1` with `Wildreach-Setup.exe` attached
-(`gh release create v0.2.1 C:\Dev\WildreachBuild\Wildreach-Setup.exe --target master --latest`). Installed copies
+`Tools\make_installer.ps1`, then publish a GitHub release tagged `v0.2.1` with every file in `release\` attached
+(`gh release create v0.2.1 C:\Dev\WildreachBuild\release\* --target <full commit id> --latest`). Installed copies
 update on their next start. Clients and hosts must be on the same version to play together. The full steps, with the
 checks before and after publishing, are in `Docs/HANDOFF.md` ("Releasing an update").
 

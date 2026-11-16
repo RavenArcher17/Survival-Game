@@ -732,10 +732,17 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
 3. Run the whole suite; rerun failures alone.
 4. Package into a **new** folder (a running packaged game locks its folder):
    `Tools\package.ps1 -Out C:\Dev\WildreachBuild<N> -SkipEditorBuild`, then
-   `Tools\make_installer.ps1 -Build C:\Dev\WildreachBuild<N>` (makes `Wildreach-Setup.exe` there, ~1.7 GB).
+   `Tools\make_installer.ps1 -Build C:\Dev\WildreachBuild<N>` (makes the whole
+   `Wildreach-Setup.exe` there, ~3.6 GB at 0.8.0, and `release\`: what goes on the release).
+   GitHub takes no file over 2 GiB, so a bigger Setup goes up in parts: `release\` then holds `Wildreach-Setup.001`,
+   `.002`... (1,900 MB each), their list `Wildreach-Setup.parts`, and as `Wildreach-Setup.exe` the small download program
+   (`installer\WildreachBootstrap.cs`) that fetches the parts, checks the whole SHA-256 and runs the Setup. Updaters from
+   0.8.0 read the parts themselves (`SetupSource`, still only what changed); 0.7.1's and older find no index on the
+   download program, fetch it whole and run it, so they still update (the whole game, once).
    Before a big release, refresh the bundled shader cache first (Docs/PERFORMANCE.md "PSO cache": play the package
    with `-logPSO`, `Tools\perf\pso_cache.ps1 -Build <it>`, commit the `.spc`, package again).
-5. Test the installer on a copy, never the build folder: `Wildreach-Setup.exe --silent --nolaunch --noshortcuts --dir
+5. Test the installer on a copy, never the build folder: the whole `Wildreach-Setup.exe` (not `release\`'s download
+   program, which reads the published release) `--silent --nolaunch --noshortcuts --dir
    C:\Dev\WildreachTest`, then start that copy's `Wildreach.exe` and play a little (host a world, open the menus). The
    first start of a game in a new folder brings up a Windows Firewall prompt; answer it yourself.
    The boot check does the first part with nobody at the keys: start that copy with `-F35Boot -log -windowed` (or the
@@ -743,12 +750,12 @@ Only with Raven's OK. Players' games update themselves from the newest GitHub re
    `F35BOOT new` and `F35READY play`; start it again the same way for `F35BOOT continue` and a second `F35READY play`.
    An engine outside `C:\Program Files\Epic Games\UE_5.8`: pass `-Engine <its UE_5.8 folder>` to both scripts.
    `build.json` beside the game names the commit it was packaged from.
-6. Commit (by name) and push. Then publish:
-   `gh release create v<ver> C:\Dev\WildreachBuild<N>\Wildreach-Setup.exe --repo RavenArcher17/Survival-Game
+6. Commit (by name) and push. Then publish **every file in `release\`**:
+   `gh release create v<ver> C:\Dev\WildreachBuild<N>\release\* --repo RavenArcher17/Survival-Game
    --target <full 40-character commit id> --latest --title "Wildreach <ver>: <what's new>" --notes-file
    Docs\release-notes\v<ver>.md`. A short commit id gets HTTP 422.
-7. Check it: `gh release view v<ver> --repo RavenArcher17/Survival-Game --json assets` shows a `digest` that must equal
-   `(Get-FileHash <setup> -Algorithm SHA256).Hash`, and https://github.com/RavenArcher17/Survival-Game/releases/latest
+7. Check it: `gh release view v<ver> --repo RavenArcher17/Survival-Game --json assets` shows a `digest` for each file
+   that must equal `(Get-FileHash <that file in release\> -Algorithm SHA256).Hash`, and https://github.com/RavenArcher17/Survival-Game/releases/latest
    must lead to the new tag. Then mark the CHANGELOG entry released, commit, push.
 
 ## Traps

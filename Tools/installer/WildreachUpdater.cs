@@ -1,6 +1,7 @@
 // The Wildreach shortcut: checks GitHub for a newer release, and if there is one brings this folder up to it (saves are
 // kept) and starts the game; otherwise (or offline) starts the game right away. It fetches only what changed, from the
-// release's Wildreach-Setup.exe (WildreachPack.cs); if that can't be done it downloads the whole Setup and runs it.
+// release's Wildreach-Setup.exe (WildreachPack.cs), or from its parts when the release has them (SetupParts: a Setup over
+// GitHub's 2 GiB limit); if that can't be done it downloads the whole Setup and runs it.
 // Either way it downloads over a few connections at once: GitHub gives each one about the same speed.
 // Installed next to Wildreach.exe by Wildreach-Setup.exe; built by Tools\make_installer.ps1. The installed version is
 // in version.txt beside it, a release's version is its tag ("v0.2.1").
@@ -177,7 +178,10 @@ static class WildreachUpdater
 
 		void Ui(Action a) { try { if (!IsDisposed) BeginInvoke(a); } catch { } }
 
-		string SetupUrl { get { return feed + "/releases/download/" + Uri.EscapeDataString(latest) + "/Wildreach-Setup.exe"; } }
+		string ReleaseBase { get { return feed + "/releases/download/" + Uri.EscapeDataString(latest); } }
+		string SetupUrl { get { return ReleaseBase + "/" + SetupSource.SetupName; } }
+		/** The release's whole Setup, one file or parts (null until asked for). */
+		SetupSource source;
 
 		void Work()
 		{
@@ -202,7 +206,10 @@ static class WildreachUpdater
 				if (cancelled) return;
 				Ui(() => { skip.Enabled = true; bar.Style = ProgressBarStyle.Blocks; bar.Value = 0; label.Text = "Wildreach " + latest.TrimStart('v') + " is out (you have " + installed + "). Downloading it..."; });
 				Directory.CreateDirectory(temp);
-				Download(SetupUrl, setup, inParts ? setupSize : 0);
+				// A release in parts can only come down in parts (put together here); one file as before.
+				if (source == null) { try { source = SetupSource.Find(ReleaseBase, "WildreachUpdater"); } catch (Exception e) { Log("couldn't read the release (" + e.Message + ")"); } }
+				if (source != null && source.Parts != null) Download(SetupUrl, setup, source.Length);
+				else Download(SetupUrl, setup, inParts ? setupSize : 0);
 				if (cancelled) return;
 				Ui(() => { label.Text = "Installing Wildreach " + latest.TrimStart('v') + "..."; bar.Style = ProgressBarStyle.Marquee; skip.Enabled = false; });
 				using (Process p = Process.Start(new ProcessStartInfo(setup, "--silent --update --nolaunch --dir \"" + dir + "\"") { UseShellExecute = false, CreateNoWindow = true }))
@@ -248,17 +255,19 @@ static class WildreachUpdater
 		bool SmallUpdate()
 		{
 			var clock = Stopwatch.StartNew();
-			// The index, from the end of the Setup. (GitHub won't serve "the last N bytes", so first ask how long the file is.)
-			long total;
-			Range(SetupUrl, 0, 1, out total);
+			// The index, from the end of the Setup. (GitHub won't serve "the last N bytes", so first learn how long the Setup is:
+			// its parts list says, else a one-byte part of the one file.)
+			source = SetupSource.Find(ReleaseBase, "WildreachUpdater");
+			if (source.Parts != null) Log(string.Format("the Setup is in {0} parts", source.Parts.Parts.Count));
+			long total = source.Length;
 			setupSize = total;
-			long unused, indexAt, indexLength;
-			if (!Index.ReadFooter(Range(SetupUrl, total - Index.FooterSize, Index.FooterSize, out unused), out indexAt, out indexLength))
+			long indexAt, indexLength;
+			if (!Index.ReadFooter(source.Read(total - Index.FooterSize, Index.FooterSize), out indexAt, out indexLength))
 			{
 				Log("that Setup has no index to update from");
 				return false;
 			}
-			Index index = Index.Load(Range(SetupUrl, indexAt, indexLength, out unused));
+			Index index = Index.Load(source.Read(indexAt, indexLength));
 
 			// What this copy has: each file cut the same way. A file whose hash already matches needs nothing.
 			Say("Checking your files...", 0, 0);
@@ -359,44 +368,6 @@ static class WildreachUpdater
 			}
 		}
 
-		/** Exact bytes of the Setup. Throws if the server doesn't give exactly those. */
-		byte[] Range(string url, long from, long length, out long total)
-		{
-			var request = RangeRequest(url, from, length);
-			using (var response = (HttpWebResponse)request.GetResponse())
-			{
-				total = CheckRange(response, from);
-				var bytes = new byte[length];
-				using (Stream stream = response.GetResponseStream())
-				{
-					int got = 0, read;
-					while (got < length && (read = stream.Read(bytes, got, (int)length - got)) > 0) got += read;
-					if (got != length) throw new IOException("a part of the Setup stopped early");
-				}
-				return bytes;
-			}
-		}
-
-		static HttpWebRequest RangeRequest(string url, long from, long length)
-		{
-			var request = (HttpWebRequest)WebRequest.Create(url);
-			request.UserAgent = "WildreachUpdater";
-			request.Timeout = 30000;
-			request.ReadWriteTimeout = 60000;
-			request.AddRange(from, from + length - 1);
-			return request;
-		}
-
-		/** The server must answer with the part asked for: anything else would be read as the wrong bytes. Returns the file's whole length. */
-		static long CheckRange(HttpWebResponse response, long from)
-		{
-			string range = response.Headers["Content-Range"] ?? "";
-			if (response.StatusCode != HttpStatusCode.PartialContent || !range.StartsWith("bytes " + from + "-")) throw new IOException("the server doesn't do partial downloads");
-			long total;
-			if (!long.TryParse(range.Substring(range.LastIndexOf('/') + 1), out total)) throw new IOException("the server's partial download makes no sense");
-			return total;
-		}
-
 		/** Each missing block into its own file, as stored. What's already there from an interrupted try isn't fetched again. */
 		void Fetch(Dictionary<string, BlockRef> missing, string folder, long total)
 		{
@@ -434,10 +405,8 @@ static class WildreachUpdater
 					int before = next;
 					try
 					{
-						using (var response = (HttpWebResponse)RangeRequest(SetupUrl, from, length).GetResponse())
-						using (Stream stream = response.GetResponseStream())
+						using (Stream stream = source.Open(from, length))
 						{
-							CheckRange(response, from);
 							long position = from;
 							for (; next < run.Count && !cancelled; next++)
 							{
@@ -609,7 +578,7 @@ static class WildreachUpdater
 
 		// ---------------------------------------------------------------- the whole Setup
 
-		/** The whole Setup: in parts over several connections when its length is known (the server does partial downloads), else in one go. */
+		/** The whole Setup: in pieces over several connections when its length is known (the server does partial downloads), else in one go. */
 		void Download(string url, string path, long length)
 		{
 			string part = path + ".part";
@@ -643,10 +612,8 @@ static class WildreachUpdater
 					long before = got;
 					try
 					{
-						using (var response = (HttpWebResponse)RangeRequest(url, from + got, length - got).GetResponse())
-						using (Stream stream = response.GetResponseStream())
+						using (Stream stream = source.Open(from + got, length - got))
 						{
-							CheckRange(response, from + got);
 							to.Seek(from + got, SeekOrigin.Begin);
 							int read;
 							while (got < length && !cancelled && (read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, length - got))) > 0)

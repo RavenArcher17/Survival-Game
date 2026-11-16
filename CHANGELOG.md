@@ -16,6 +16,25 @@ Lane ship-7. Compiled (editor target); the packaged build was launched and its l
   and what's in it counted from the data (lands, paths, creatures, items, recipes, build pieces).
 - **`-Engine <UE_5.8 folder>`** on `Tools/package.ps1` and `Tools/make_installer.ps1` (default unchanged: the launcher
   folder), for a PC whose engine lives elsewhere.
+- **The Setup goes up in parts when it's over GitHub's 2 GiB file limit.** Why: 0.8.0's Setup is 3.6 GB (0.7.1's was
+  1.7 GB) and GitHub refuses any release file over 2 GiB, so the release couldn't be published as one file.
+  `Tools/make_installer.ps1` now also writes `<build>\release\`, exactly what to attach: the Setup alone when it fits
+  (`-PartMB`, 1,900), else `Wildreach-Setup.001`, `.002`... with their list `Wildreach-Setup.parts` (sizes, SHA-256 of
+  each part and of the whole) and, as `Wildreach-Setup.exe`, a 28 KB download program (`installer/WildreachBootstrap.cs`)
+  that fetches the parts over 4 connections (a window with MB and time left, Cancel), checks the whole SHA-256, and
+  runs the Setup with the arguments it was given. The download link stays the same for new players.
+  - Updaters from 0.8.0 on read a release in parts as one Setup (`SetupSource` / `SetupParts` in `WildreachPack.cs`:
+    every range read spans the parts it crosses), so small updates still fetch only what changed.
+  - The updater every player has now (0.7.1) finds no index on the download program, downloads it whole and runs it
+    with `--silent --update`: it fetches the parts and installs over that folder as a whole Setup always has, so 0.7.1
+    players update by themselves (the whole game, once).
+  - Tested offline (a stand-in GitHub serving a two-version stand-in game in 1 MB parts): the new updater's small update
+    over parts (1 MB of 25 fetched, never touching `Wildreach-Setup.exe`), its whole download from parts, **0.7.1's
+    real updater (built from the v0.7.1 tag) updating through the download program**, a fresh install through it, and a
+    damaged part refused (8 of 8); `Tools/updatertest.ps1` still passes 44 of 44 (one-file releases unchanged).
+- **630 MB less to download:** `Config/DefaultGame.ini` never cooks `/MetaHumanAnimator` (MetaHuman Animator's
+  face-tracking models, a capture tool: 530 MB) or `/NNEDenoiser` (the path tracer's denoiser: 98 MB); the game loads
+  neither.
 - **README.txt beside the game** no longer says anyone can use the console: since the god mode lane the test commands
   need a verified tester in packaged builds.
 
