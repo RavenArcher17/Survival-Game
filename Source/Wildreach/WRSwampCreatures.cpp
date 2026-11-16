@@ -40,6 +40,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "WRStrikeFront.h"
 
 // ---------------------------------------------------------------- shared bits
 
@@ -1963,9 +1964,16 @@ void FWRSwampAI::TickStrike(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttac
 		const FVector Feet = SwcFeet(Self);
 		const bool bWet = WRSwamp::IsWet(Feet + FVector(0.f, 0.f, 20.f)) && WRSwamp::WaterAt(Self, Feet) != EWRSwampWater::Dry;
 		WRFx::Broadcast(Self, bWet ? TEXT("mire.splash") : TEXT("mire.mud"), Feet, FRotator::ZeroRotator, Radius / 120.f, TEXT("mire.flop_land"));
-		for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
+		// The ring really rolls out (cookpass-combat 3.10): it takes you where its front is; a jump clears it.
 		{
-			if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && FVector::Dist2D(It->GetActorLocation(), Self->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius()) AI->RowHit(Self, *It);
+			TWeakObjectPtr<AWRCreatureAI> WeakAI(AI);
+			TWeakObjectPtr<AWRCreature> WeakSelf(Self);
+			AWRStrikeFront::Ring(Self, Feet, Radius, 1200.f, 150.f, [WeakAI, WeakSelf](AWRCharacterBase* Who)
+			{
+				AWRCreatureAI* A = WeakAI.Get();
+				AWRCreature* S = WeakSelf.Get();
+				if (A && S && S->IsAlive() && S->IsHostileTo(Who)) A->RowHit(S, Who);
+			}, bWet ? TEXT("mire.splash") : TEXT("mire.mud"), NAME_None);
 		}
 		AI->RowPhaseEnd = FMath::Min(AI->RowPhaseEnd, T + 0.05);
 		return;

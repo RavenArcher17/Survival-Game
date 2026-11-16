@@ -37,6 +37,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "ProceduralMeshComponent.h"
+#include "WRStrikeFront.h"
 
 namespace WROceanBossImpl
 {
@@ -853,17 +854,21 @@ bool FWROceanBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		}
 		const FVector C = PoundCentre();
 		WRFx::Broadcast(Boss, TEXT("ocean.bore"), C + FVector(PoundInnerR(), 0, 0), FRotator(0.f, 180.f, 0.f), 1.5f, TEXT("ocean.bore_roar"));
-		for (TActorIterator<AWRCharacterBase> It(Boss->GetWorld()); It; ++It)
-		{
-			AWRCharacterBase* V = *It;
-			if (V == Boss || !V->IsAlive() || UWROceanBody::Get(V) || FVector::Dist2D(V->GetActorLocation(), C) > PoundInnerR()) continue;
-			// On a tower or the wall (high): over it. In the air (jumped): over it.
-			const float Feet = V->GetActorLocation().Z - V->GetSimpleCollisionHalfHeight();
-			if (Feet > WRTide::MeanZ() + 300.f || V->GetCharacterMovement()->IsFalling()) continue;
-			ObHit(Boss, V, ObT(Boss, TEXT("surgeDamage"), 60.f), C + FVector(PoundInnerR(), 0, 0));
-			if (V->Status) V->Status->Stagger(1.2f);
-			WRSkyAir::Push(V, FVector(-800.f, 0.f, 100.f), 0.5f, TEXT("surge"), Boss);
-		}
+		// The surge runs across the flat from the burst gates, west, at surgeSpeed (cookpass-combat 3.10): it takes you
+		// where its front reaches you, so you can see it coming and climb a tower or jump it.
+		TWeakObjectPtr<AWRBoss> Weak(Boss);
+		AWRStrikeFront::Line(Boss, C + FVector(PoundInnerR(), 0, 0), C - FVector(PoundInnerR(), 0, 0), ObT(Boss, TEXT("surgeSpeed"), 600.f), PoundInnerR() * 0.6f,
+			[Weak, C](AWRCharacterBase* V)
+			{
+				AWRBoss* B = Weak.Get();
+				if (!B || V == B || UWROceanBody::Get(V) || FVector::Dist2D(V->GetActorLocation(), C) > PoundInnerR()) return;
+				// On a tower or the wall (high): over it. In the air (jumped): over it.
+				const float Feet = V->GetActorLocation().Z - V->GetSimpleCollisionHalfHeight();
+				if (Feet > WRTide::MeanZ() + 300.f || V->GetCharacterMovement()->IsFalling()) return;
+				ObHit(B, V, ObT(B, TEXT("surgeDamage"), 60.f), V->GetActorLocation() + FVector(300.f, 0.f, 0.f));
+				if (V->Status) V->Status->Stagger(1.2f);
+				WRSkyAir::Push(V, FVector(-800.f, 0.f, 100.f), 0.5f, TEXT("surge"), B);
+			}, TEXT("tide.high_tide"), TEXT("ocean.bore_roar"));
 		SetFlag(Boss, WROceanFlag::Flare, false);
 		return false;   // the row's own ring still lands (the scream's shockwave)
 	}

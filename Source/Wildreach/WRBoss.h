@@ -330,6 +330,8 @@ private:
 	double EmptySince = -1.0;
 	double NextParticipantCheck = 0.0;
 	double NextFloodAt = 0.0;
+	/** The flood whose warning has shown (cookpass-combat 3.10). */
+	double FloodWarnedFor = -1.0;
 	double SpecialClock = 0.0;     // Ignessa landing / Pale Hunter blizzard / Skaldrith flight cycle
 	double RevealedUntil = 0.0;
 	double GroundedUntil = 0.0;

@@ -36,6 +36,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "WRStrikeFront.h"
 
 namespace WRVoidBossImpl
 {
@@ -1428,25 +1429,29 @@ void AWRVorhollowStage::Tick(float DeltaSeconds)
 		}
 		if (GulletClock >= WRTune(TEXT("bosses.vorhollow.gulletCrushEvery"), 20.f))
 		{
-			// The ribs creak and close (1.2 s tell: the sound and the walls' shudder, then the ring): the alcoves are safe.
+			// The ribs creak and close (cookpass-combat 3.10-3.11): gulletTell s of warning you can see (the flesh between
+			// the ribs pulsing all round the wall, the creak), then the walls press in as a ring closing toward the heart;
+			// the alcoves between the ribs are safe.
 			GulletClock = 0.f;
+			const float Tell = WRTune(TEXT("bosses.vorhollow.gulletTell"), 2.f);
+			const float Wall = WRTune(TEXT("bosses.vorhollow.gulletRadius"), 1800.f);
 			WRSound::PlayAt(this, TEXT("void.gullet.creak"), GulletCentre());
-			TWeakObjectPtr<AWRVorhollowStage> Self(this);
-			FTimerHandle H;
-			GetWorldTimerManager().SetTimer(H, [Self]()
+			for (int32 k = 0; k < 12; ++k)
 			{
-				if (!Self.IsValid()) return;
-				for (const TWeakObjectPtr<AActor>& W : Self->InGullet)
+				WRFx::Broadcast(this, TEXT("void.collapse"), GulletCentre() + FRotator(0.f, k * 30.f + 15.f, 0.f).Vector() * Wall, FRotator::ZeroRotator, 0.6f, NAME_None, Tell);
+			}
+			TWeakObjectPtr<AWRVorhollowStage> Self(this);
+			AWRStrikeFront* Press = AWRStrikeFront::Ring(this, GulletCentre(), Wall, -WRTune(TEXT("bosses.vorhollow.gulletPressSpeed"), 1500.f), 300.f,
+				[Self](AWRCharacterBase* Who)
 				{
-					AWRCharacter* C = Cast<AWRCharacter>(W.Get());
-					if (!C) continue;
+					AWRCharacter* C = Cast<AWRCharacter>(Who);
+					if (!Self.IsValid() || !C || !Self->InGullet.Contains(C)) return;
 					const FVector L = C->GetActorLocation() - Self->GulletCentre();
 					const float Ang = FMath::Fmod(FMath::RadiansToDegrees(FMath::Atan2(L.Y, L.X)) + 360.f, 30.f);
 					const bool bAlcove = L.Size2D() > 1300.f && Ang > 8.f && Ang < 22.f;
 					if (!bAlcove) VbHurt(Self.Get(), C, WRTune(TEXT("bosses.vorhollow.gulletCrush"), 60.f), 4, true, Self->GulletCentre());
-				}
-				WRFx::Broadcast(Self.Get(), TEXT("void.collapse"), Self->GulletCentre(), FRotator::ZeroRotator, 3.f, TEXT("void.crush"));
-			}, 1.2f, false);
+				}, TEXT("void.collapse"), TEXT("void.crush"), Tell);
+			if (Press) Press->bGround = false;   // walls closing, not a ground wave
 		}
 		if (CoughClock >= WRTune(TEXT("bosses.vorhollow.gulletCoughEvery"), 30.f))
 		{

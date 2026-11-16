@@ -135,8 +135,9 @@ void AWRStrikeFront::Tick(float DeltaSeconds)
 	}
 	const FWRTuning& T = FWRTuning::Get();
 	// A ground front runs along the floor: a body in the air over it (a jump, a leap) clears it.
-	const auto Grounded = [](const AWRCharacterBase* Who, const FVector& FloorAt)
+	const auto Grounded = [this](const AWRCharacterBase* Who, const FVector& FloorAt)
 	{
+		if (!bGround) return true;
 		const UCharacterMovementComponent* Move = Who->GetCharacterMovement();
 		const float Feet = Who->GetActorLocation().Z - Who->GetSimpleCollisionHalfHeight();
 		return !(Move && Move->IsFalling() && Feet > FloorAt.Z + WRTune(TEXT("bosses.frontClear"), 70.f)) && FMath::Abs(Feet - FloorAt.Z) < 450.f;

@@ -1223,6 +1223,17 @@ void AWRBoss::TickCombat(float DeltaSeconds)
 	}
 
 	// Periodic flood (Vulkarn): in addition to the anvil slam, phase 2 floods more often.
+	// Its warning first (cookpass-combat 3.10): floodWarn s before, the forge rumbles and lava wells up round the rim.
+	if (Id == TEXT("vulkarn") && Phase >= 2 && NextFloodAt > 0.0 && FloodWarnedFor != NextFloodAt && Now >= NextFloodAt - Tune(TEXT("floodWarn"), 2.f))
+	{
+		FloodWarnedFor = NextFloodAt;
+		const FVector Rim = GetHome() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
+		for (int32 k = 0; k < 10; ++k)
+		{
+			WRFx::Broadcast(this, TEXT("firewall"), Rim + FRotator(0.f, k * 36.f, 0.f).Vector() * ArenaRadius * 0.9f, FRotator::ZeroRotator, 1.2f, k == 0 ? FName(TEXT("stomp")) : NAME_None, Tune(TEXT("floodWarn"), 2.f));
+		}
+		MulticastTell(2, TEXT("hand"), TEXT("tell.final"));
+	}
 	if (Id == TEXT("vulkarn") && Phase >= 2 && Now >= NextFloodAt && Current == INDEX_NONE)
 	{
 		NextFloodAt = Now + Tune(TEXT("phase2FloodSeconds"), 22.f);

@@ -76,6 +76,25 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   - One reflect rule (`AWRProjectile::IsEnemyShot`): every enemy shot reflects except a modelled heavy lob (a boulder,
     a headstone); a survivor's own shots keep their rule.
   - The Echo mimic aims where you stood at its wind-up, at the shot cap; a thrown cone fans `bosses.coneLobs` 5 lobs.
+- **Combat (12): the bosses' own moves.** Why: a dozen bespoke moves still hit everyone in an area in one tick, some with
+  no tell at all (G20, G21). Each is now a front, a real body or a warned moment:
+  - Ahrumet: the gnomon uproot gets a 1.2 s tell (crimson glint, the sand cracking) and swings round as an arc; the
+    Noon Lock pulse gets 2 s of warning (the sun gathering, the sting, his eye flaring).
+  - Thalassor's sluice surge runs across the Pound (600 cm/s). Mycelorn's root lash runs along the vein (2000 cm/s), his
+    cap-falls are real slabs falling from the roof with their shadow, his rot belch follows his mouth.
+  - Graveyard: the toll rolls out as a ring; the Gravedigger's clod is really thrown and buries where it lands; the
+    spade's crack runs out; grave hands and lay-to-rest lose their painted circles (the soil cracking is the cue); the
+    keen travels as a wave of sound.
+  - Sky: Aeolith's lash shows its tail glint 0.9 s before; the barnacles are real lobs off the hump; the downburst and
+    Kyrra's landing roll out as rings.
+  - Lyrathis: her copies glint and strike where they aimed; the sundering flare sweeps out as a ring of light.
+  - Sylvaroth's heart-trees sweep their limbs round as arcs. Vharra's heave runs along her body, her coil closes in
+    from the mound's rim. Bloat's burst sprays out as a ring. The Vorhollow Gullet's walls give 2 s of visible warning
+    and press inward. Vulkarn's phase-2 flood is warned 2 s ahead (the rim welling, his glint).
+  - The Swamp flop, the Storm discharge and the tunnel toad's croak roll out as rings.
+  - Marks: the Grey Matron's leap lane is gone, her canopy shadow and Vharra's clot shadows show from the drop / spit,
+    Kharvox's dive shadow is his body's size; Kharvox's eye bolt shows its leader 0.9 s (`boltLead`), its double 1.0 s
+    apart; the Hex-Warden's bolt and Vharra's clots can be reflected.
 
 ## Unreleased: the audio cook pass (all sound and music)
 

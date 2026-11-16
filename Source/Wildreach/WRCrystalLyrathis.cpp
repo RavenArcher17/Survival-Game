@@ -45,6 +45,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "ProceduralMeshComponent.h"
+#include "WRStrikeFront.h"
 
 namespace WRLyrathisImpl
 {
@@ -912,26 +913,53 @@ void FWRCrystalBoss::Echo(AWRBoss* Boss, FWRCrystalBossState& St, FName AttackId
 	const FWRBossAttack& A = Boss->Attacks[Idx];
 	const float Delay = LyT(TEXT("copyEcho"), 0.5f);
 	const float Strike = A.Windup + (A.bRow ? A.Row.Hold : 0.f);
-	const FVector Point = Boss->AttackPoint;
 	TWeakObjectPtr<AWRBoss> WeakB(Boss);
 	for (const TWeakObjectPtr<AWRCreature>& W : St.Copies)
 	{
 		TWeakObjectPtr<AWRCreature> WeakC = W;
 		FTimerHandle H1, H2;
-		Boss->GetWorldTimerManager().SetTimer(H1, FTimerDelegate::CreateLambda([WeakC, Strike]()
+		// Each copy picks its own mark as it winds up (the survivor nearest it, else ahead of it) and shows its own glint
+		// (cookpass-combat 3.10-3.11): its echo lands where it aimed, not at her point.
+		TSharedRef<FVector> CopyAim = MakeShared<FVector>(FVector::ZeroVector);
+		const bool bUnblockable = A.bUnblockable;
+		const float CopyRange = A.Range;
+		Boss->GetWorldTimerManager().SetTimer(H1, FTimerDelegate::CreateLambda([WeakB, WeakC, Strike, CopyAim, bUnblockable, CopyRange]()
 		{
-			if (AWRCreature* C = WeakC.Get()) C->PlaySwing(EWRSwingKind::Heavy, Strike + 0.2f);
+			AWRCreature* C = WeakC.Get();
+			AWRBoss* B = WeakB.Get();
+			if (!C || !B) return;
+			C->PlaySwing(EWRSwingKind::Heavy, Strike + 0.2f);
+			C->MulticastTell(bUnblockable ? 2 : 1, TEXT("hand"), TEXT("voice"));
+			const AWRCharacterBase* Nearest = nullptr;
+			for (AWRCharacterBase* V : LyFoes(B, 100000.f))
+			{
+				if (!Nearest || FVector::DistSquared(V->GetActorLocation(), C->GetActorLocation()) < FVector::DistSquared(Nearest->GetActorLocation(), C->GetActorLocation())) Nearest = V;
+			}
+			*CopyAim = Nearest && FVector::Dist2D(Nearest->GetActorLocation(), C->GetActorLocation()) < CopyRange + 600.f
+				? Nearest->GetActorLocation() - FVector(0.f, 0.f, Nearest->GetSimpleCollisionHalfHeight())
+				: C->GetActorLocation() + C->GetActorForwardVector() * FMath::Min(CopyRange, 600.f) - FVector(0.f, 0.f, C->GetSimpleCollisionHalfHeight());
 		}), Delay, false);
 		const EWRBossShape Shape = A.Shape;
 		const float Range = A.Range, Size = A.Size, Dmg = A.Damage * LyT(TEXT("copyDamage"), 0.6f), Poise = A.Poise;
 		const uint8 Impact = A.Impact;
 		const bool bLow = A.bLow;
-		Boss->GetWorldTimerManager().SetTimer(H2, FTimerDelegate::CreateLambda([WeakB, WeakC, Shape, Range, Size, Dmg, Poise, Impact, bLow, Point]()
+		Boss->GetWorldTimerManager().SetTimer(H2, FTimerDelegate::CreateLambda([WeakB, WeakC, Shape, Range, Size, Dmg, Poise, Impact, bLow, CopyAim]()
 		{
 			AWRBoss* B = WeakB.Get();
 			AWRCreature* C = WeakC.Get();
 			if (!B || !C || !B->IsAlive()) return;
-			const FVector At = Shape == EWRBossShape::TargetCircle ? Point : C->GetActorLocation();
+			if (Shape == EWRBossShape::TargetCircle)
+			{
+				// Its ring rolls out from where it aimed (a front, like hers).
+				TWeakObjectPtr<AWRBoss> WeakRing(B);
+				AWRStrikeFront::Ring(C, *CopyAim, Size, 1200.f, 180.f, [WeakRing, Dmg, Poise, Impact, bLow, CopyAim](AWRCharacterBase* V)
+				{
+					AWRBoss* Owner = WeakRing.Get();
+					if (Owner && Owner->IsAlive() && Owner->IsHostileTo(V)) LyHit(Owner, V, Dmg, Poise, Impact, false, bLow, *CopyAim);
+				}, TEXT("crystal.copy_echo"), TEXT("crystal.boss.copy_echo"));
+				return;
+			}
+			const FVector At = C->GetActorLocation();
 			const FVector Fwd = C->GetActorForwardVector().GetSafeNormal2D();
 			WRFx::Broadcast(B, TEXT("crystal.copy_echo"), At, Fwd.Rotation(), Size / 150.f, TEXT("crystal.boss.copy_echo"));
 			for (AWRCharacterBase* V : LyFoes(B, 100000.f))
@@ -1145,10 +1173,22 @@ bool FWRCrystalBoss::LyrathisStrike(AWRBoss* Boss, FWRCrystalBossState& St, FWRB
 		// A radial burst from her heart crystal: everyone with a clear line to her chest within 30 m takes it.
 		const FVector Heart = LyHeart(Boss);
 		WRFx::Broadcast(Boss, TEXT("crystal.flare_burst"), Heart, FRotator::ZeroRotator, 6.f, TEXT("crystal.boss.flare_burst"));
-		for (AWRCharacterBase* C : LyFoes(Boss, Attack.Size))
+		// The flare's light sweeps out from her heart (cookpass-combat 3.10): a ring of light flareSpeed cm/s, stopped by
+		// anything between you and her chest; in the air is no shelter.
+		TWeakObjectPtr<AWRBoss> WeakF(Boss);
+		const float Dmg = Attack.Damage, Poise = Attack.Poise, Mark = Attack.bRow ? Attack.Row.Buildups.FindRef(TEXT("mark")) : 60.f;
+		const uint8 Impact = Attack.Impact;
+		if (AWRStrikeFront* Light = AWRStrikeFront::Ring(Boss, Boss->GetActorLocation(), Attack.Size, LyT(TEXT("flareSpeed"), 2500.f), 300.f,
+			[WeakF, Dmg, Poise, Impact, Mark](AWRCharacterBase* C)
+			{
+				AWRBoss* B = WeakF.Get();
+				if (!B || !B->IsAlive() || !B->IsHostileTo(C)) return;
+				const FVector From = LyHeart(B);
+				if (!LyClear(B->GetWorld(), From, C->GetActorLocation() + FVector(0.f, 0.f, 40.f), B, C)) return;
+				LyHit(B, C, Dmg, Poise, Impact, true, false, From, Mark);
+			}, TEXT("crystal.copy_echo"), NAME_None))
 		{
-			if (!LyClear(World, Heart, C->GetActorLocation() + FVector(0.f, 0.f, 40.f), Boss, C)) continue;
-			LyHit(Boss, C, Attack.Damage, Attack.Poise, Attack.Impact, true, false, Heart, Attack.bRow ? Attack.Row.Buildups.FindRef(TEXT("mark")) : 60.f);
+			Light->bGround = false;
 		}
 		return true;
 	}

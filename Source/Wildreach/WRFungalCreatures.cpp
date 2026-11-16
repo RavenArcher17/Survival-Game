@@ -34,6 +34,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
+#include "WRStrikeFront.h"
 
 TArray<TWeakObjectPtr<UWRFungalBody>> UWRFungalBody::Live;
 
@@ -1126,9 +1127,19 @@ bool FWRFungalAI::StrikeRow(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttac
 		const FVector At = Self->GetActorLocation();
 		const float Rad = Row.Radius > 0.f ? Row.Radius : 400.f;
 		WRFx::Broadcast(Self, TEXT("fungal.croak"), At, Self->GetActorRotation(), Rad / 200.f, TEXT("creature.tunnel_toad.signature"));
-		for (TActorIterator<AWRCharacterBase> It(World); It; ++It)
+		// The blast of sound rolls out from its throat (cookpass-combat 3.10): a ring, in the air too.
 		{
-			if (*It != Self && It->IsAlive() && Self->IsHostileTo(*It) && FVector::Dist(It->GetActorLocation(), At) < Rad + It->GetSimpleCollisionRadius()) AI->RowHit(Self, *It);
+			TWeakObjectPtr<AWRCreatureAI> WeakAI(AI);
+			TWeakObjectPtr<AWRCreature> WeakSelf(Self);
+			if (AWRStrikeFront* Croak = AWRStrikeFront::Ring(Self, At - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight()), Rad, 1800.f, 200.f, [WeakAI, WeakSelf](AWRCharacterBase* Who)
+			{
+				AWRCreatureAI* A = WeakAI.Get();
+				AWRCreature* S = WeakSelf.Get();
+				if (A && S && S->IsAlive() && S->IsHostileTo(Who)) A->RowHit(S, Who);
+			}, TEXT("fungal.croak"), NAME_None))
+			{
+				Croak->bGround = false;
+			}
 		}
 		for (const TWeakObjectPtr<AWRLureLines>& L : AWRLureLines::All()) if (L.IsValid()) L->CutNear(At, FkT(TEXT("toad.croakSnaps"), 800.f), TEXT("croak"));
 		for (const TWeakObjectPtr<UWRFungalBody>& O : UWRFungalBody::All())

@@ -42,6 +42,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "WRStrikeFront.h"
 
 using namespace WRSwampBossDetail;
 
@@ -2875,9 +2876,15 @@ bool FWRSwampBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			// collapses (staggered 6 s: the big punish).
 			const float R = Attack.Size;
 			WRFx::Broadcast(Boss, TEXT("swampboss.burst"), Boss->GetActorLocation(), FRotator::ZeroRotator, R / 800.f, TEXT("swamp.bloat.burst"));
-			for (AWRCharacterBase* V : SwbFoes(Boss, Boss->ChaseRadius))
+			// The blood sprays out from the body as a ring (cookpass-combat 3.10): it takes you where it reaches.
 			{
-				if (FVector::Dist2D(V->GetActorLocation(), Boss->GetActorLocation()) < R + V->GetSimpleCollisionRadius()) Boss->StrikeHit(V);
+				TWeakObjectPtr<AWRBoss> WeakB(Boss);
+				if (AWRStrikeFront* Spray = AWRStrikeFront::Ring(Boss, SwbFeet(Boss), R, SwbST(Boss, TEXT("burstSpeed"), 1400.f), 220.f,
+					[WeakB](AWRCharacterBase* V) { if (AWRBoss* B = WeakB.Get(); B && B->IsHostileTo(V)) B->StrikeHit(V); }, TEXT("swampboss.burst"), NAME_None))
+				{
+					Spray->bGround = false;   // a spray of blood, not a ground wave
+				}
+				Boss->StrikeEnds = FMath::Max(Boss->StrikeEnds, T + R / FMath::Max(100.f, SwbST(Boss, TEXT("burstSpeed"), 1400.f)) + 0.1f);
 			}
 			Puddle(World, TEXT("bleedwater"), SwbFeet(Boss), SwbST(Boss, TEXT("burstPuddleRadius"), 800.f), SwbST(Boss, TEXT("burstPuddleSeconds"), 20.f), SwbST(Boss, TEXT("burstPuddleBleed"), 10.f), false, Boss);
 			St.Gorge = 0.f;
@@ -3976,6 +3983,8 @@ void FWRSwampBoss::FireShot(AWRBoss* Boss, FName Kind, const FVector& From, cons
 	Shot->Gravity = G;
 	Shot->LaunchAt = SwbServerTime(World);
 	Shot->Hit = Hit;
+	Shot->Hit.bProjectile = true;
+	Shot->Hit.bReflectable = !Hit.bReaction;   // a hex bolt can be thrown back by a reflector (cookpass-combat 3.12)
 	Shot->MaxRange = bLob ? Flat * 1.3f + 400.f : SwbST(Boss, TEXT("boltRange"), 2500.f);
 	Shot->Radius = Kind == TEXT("clot") ? 90.f : SwbST(Boss, TEXT("boltRadius"), 45.f);
 	Shot->FinishSpawning(Where);

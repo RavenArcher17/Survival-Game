@@ -1408,7 +1408,8 @@ bool FWRStormBoss::TickWindup(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaS
 			Boss->AttackPoint = St.Aim;
 			Boss->MulticastTell(2, TEXT("Foot"), TEXT("tell.final"));
 			const float Left = FMath::Max(0.2f, float(Boss->ResolveAt - T));
-			if (AWRGroundMarker* Shade = AWRGroundMarker::Spawn(Boss->GetWorld(), St.Aim + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(0.02f, 0.02f, 0.025f), Left + 0.4f))
+			// His own shadow (he's folded high over the spot): his body's size, not the strike's whole reach (3.11).
+			if (AWRGroundMarker* Shade = AWRGroundMarker::Spawn(Boss->GetWorld(), St.Aim + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(FMath::Min(Attack.Size, Boss->GetSimpleCollisionRadius() * 1.6f)), false, FLinearColor(0.02f, 0.02f, 0.025f), Left + 0.4f))
 			{
 				St.Shadow = Shade;
 			}
@@ -1420,9 +1421,11 @@ bool FWRStormBoss::TickWindup(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaS
 	}
 	else if (Id == TEXT("eye_bolt") || Id == TEXT("double_eye_bolt"))
 	{
-		// At 0.5 s the aim locks on the spot where the target was; a faint stepped leader crawls along the line for
-		// the last 0.5 s, then the stroke.
-		if (St.Stage == 0 && T - Boss->StrikeStarted >= Boss->Tune(TEXT("boltLock"), 0.5f))
+		// The aim locks on the spot where the target was; a faint stepped leader crawls along the line for
+		// the last boltLead s, then the stroke.
+		// (cookpass-combat 3.12: the leader shows boltLead s, at least the 0.9 s every shot gives, so the lock comes that
+		// long before the stroke.)
+		if (St.Stage == 0 && T - Boss->StrikeStarted >= FMath::Max(0.f, float(Boss->ResolveAt - Boss->StrikeStarted) - Boss->Tune(TEXT("boltLead"), 0.9f)))
 		{
 			St.Stage = 1;
 			St.Aim = Target ? Target->GetActorLocation() : Boss->AttackPoint;
@@ -1819,9 +1822,9 @@ bool FWRStormBoss::TickStrike(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaS
 	}
 	if (Id == TEXT("double_eye_bolt") && !St.bSecondFired)
 	{
-		// A second flare after the first stroke: the second bolt re-aims once, 0.5 s before it fires, at where you went.
-		const float Gap = Boss->Tune(TEXT("doubleBoltGap"), 0.6f);
-		if (St.Stage == 1 && T - Boss->StrikeStarted >= Gap - Boss->Tune(TEXT("boltLock"), 0.5f))
+		// A second flare after the first stroke: the second bolt re-aims once, boltLead s before it fires, at where you went.
+		const float Gap = Boss->Tune(TEXT("doubleBoltGap"), 1.0f);
+		if (St.Stage == 1 && T - Boss->StrikeStarted >= FMath::Max(0.f, Gap - Boss->Tune(TEXT("boltLead"), 0.9f)))
 		{
 			St.Stage = 2;
 			AWRCharacterBase* Target = Boss->AttackTarget.Get();

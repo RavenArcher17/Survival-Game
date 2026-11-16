@@ -35,6 +35,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "WRStrikeFront.h"
 
 namespace WRDesertBossImpl
 {
@@ -104,6 +105,7 @@ namespace WRDesertBossImpl
 		float SweepDir = 1.f;
 		bool bReversed = false;
 		double NextPulseAt = 0.0;
+		bool bPulseWarned = false;   // the Noon Lock pulse's warning shown (cookpass-combat 3.10)
 		float LockYaw = 0.f;
 		double NextLockTick = 0.0;
 		bool bUprooted = false;
@@ -476,8 +478,17 @@ bool FWRDesertBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 				BeamSweep(Boss, EyeAt(Boss), FRotator(0.f, S.LockYaw, 0.f).Vector(), DbT(Boss, TEXT("beamRange"), 4000.f), DbT(Boss, TEXT("beamTick"), 40.f) * 0.5f, 15.f, nullptr);
 			}
 			if (S.NextPulseAt <= 0.0) S.NextPulseAt = T + DbT(Boss, TEXT("lockPulseEvery"), 20.f);
+			else if (!S.bPulseWarned && T >= S.NextPulseAt - DbT(Boss, TEXT("pulseWarn"), 2.f))
+			{
+				// Two seconds of warning (cookpass-combat 3.10): the sun gathers over the plaza, his eye flares crimson,
+				// the rising sting: get under him.
+				S.bPulseWarned = true;
+				WRFx::Broadcast(Boss, TEXT("desert.noon_pulse"), Boss->GetActorLocation() + FVector(0.f, 0.f, 1200.f), FRotator::ZeroRotator, 1.2f, TEXT("tell.final"), DbT(Boss, TEXT("pulseWarn"), 2.f));
+				Boss->MulticastTell(2, TEXT("head"), TEXT("voice"));
+			}
 			else if (T >= S.NextPulseAt)
 			{
+				S.bPulseWarned = false;
 				S.NextPulseAt = T + DbT(Boss, TEXT("lockPulseEvery"), 20.f);
 				WRFx::Broadcast(Boss, TEXT("desert.noon_pulse"), Boss->GetActorLocation(), FRotator::ZeroRotator, 3.f, TEXT("boss.ahrumet.pulse"));
 				for (TActorIterator<AWRCharacterBase> It(Boss->GetWorld()); It; ++It)
@@ -840,15 +851,19 @@ void FWRDesertBoss::PhaseChanged(AWRBoss* Boss, int32 NewPhase)
 		const FVector C = PlazaAt();
 		if (AWRDesertState* DS = AWRDesertState::Get(Boss)) DS->bGnomonUprooted = true;
 		Flag(Boss, WRDesertFlag::Dulla, true);
-		WRFx::Broadcast(Boss, TEXT("desert.sand_burst"), C, FRotator::ZeroRotator, 8.f, TEXT("boss.ahrumet.uproot"));
-		for (TActorIterator<AWRCharacterBase> It(Boss->GetWorld()); It; ++It)
-		{
-			AWRCharacterBase* V = *It;
-			if (V == Boss || !V->IsAlive() || UWRDesertBody::Get(V)) continue;
-			if (FVector::Dist2D(V->GetActorLocation(), Boss->GetActorLocation()) > DbT(Boss, TEXT("uprootReach"), 1400.f)) continue;
-			if (V->HasTag(WRTags::State_Dodging)) continue;   // rolled through it
-			DbHit(Boss, V, DbT(Boss, TEXT("uprootDamage"), 60.f), Boss->GetActorLocation());
-		}
+		// The tell first (cookpass-combat 3.10): he grips it (a crimson glint, his voice), the sand cracks round the base
+		// for uprootTell s; then the gnomon swings all the way round as an arc: you're struck only where it is.
+		const float Tell = DbT(Boss, TEXT("uprootTell"), 1.2f);
+		Boss->MulticastTell(2, TEXT("hand"), TEXT("voice"));
+		WRFx::Broadcast(Boss, TEXT("desert.sand_burst"), C, FRotator::ZeroRotator, 2.5f, TEXT("boss.ahrumet.uproot"), Tell);
+		TWeakObjectPtr<AWRBoss> Weak(Boss);
+		AWRStrikeFront::Arc(Boss, Boss->GetActorLocation(), DbT(Boss, TEXT("uprootReach"), 1400.f), Boss->GetActorRotation().Yaw + 180.f, 360.f, DbT(Boss, TEXT("uprootSweep"), 0.8f),
+			[Weak](AWRCharacterBase* V)
+			{
+				AWRBoss* B = Weak.Get();
+				if (!B || V == B || UWRDesertBody::Get(V) || V->HasTag(WRTags::State_Dodging)) return;   // rolled through it
+				DbHit(B, V, DbT(B, TEXT("uprootDamage"), 60.f), B->GetActorLocation());
+			}, TEXT("desert.sand_burst"), TEXT("boss.ahrumet.uproot"), Tell);
 		if (UWRDesertHazards* H = UWRDesertHazards::Get(Boss)) H->Funnels.Add({ C, Dd().ArenaNum(TEXT("ahrumet"), TEXT("pit"), 10.f) * 100.f, 1.0e12 });
 		UE_LOG(LogWildreach, Log, TEXT("DESERT Ahrumet uproots the gnomon"));
 	}

@@ -40,6 +40,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
+#include "WRStrikeFront.h"
 
 namespace WRSkyBossImpl
 {
@@ -984,22 +985,24 @@ bool FWRSkyBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			if (WRSkyIsles::GroundUnder(At + FVector(0, 0, 500.f), Gz)) At.Z = Gz;
 			const float Tell = SbT(Boss, TEXT("barnacleTell"), 0.9f) + b * 0.25f;
 			WRFx::Broadcast(Boss, TEXT("sky.shadow"), At, FRotator::ZeroRotator, 1.f, NAME_None, Tell);
-			FTimerHandle H;
-			Boss->GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(Boss, [Weak, At]()
+			// Each barnacle really comes off the hump and falls where its shadow grows (cookpass-combat 3.10): a lob timed
+			// to land as the shadow closes, bursting over barnacleRadius.
+			const FVector Hump = Boss->GetActorLocation() + FVector(0.f, 0.f, Boss->GetSimpleCollisionHalfHeight() * 0.8f);
+			FActorSpawnParameters Params;
+			Params.Owner = Boss;
+			Params.Instigator = Boss;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			const FVector V = AWRProjectile::LobVelocity(Hump, At, FMath::Max(250.f, FVector::Dist2D(Hump, At) / Tell), 1.f);
+			if (AWRProjectile* Barnacle = Boss->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), Hump, V.Rotation(), Params))
 			{
-				AWRBoss* B = Weak.Get();
-				if (!B) return;
-				WRFx::Broadcast(B, TEXT("hit.dust"), At, FRotator::ZeroRotator, 2.f, TEXT("sky.shard_fall"));
-				for (AWRCharacterBase* F : Foes(B, 1.0e6f))
+				FWRHit Hit = SbHit(Boss, 40.f, false);
+				Hit.Origin = Hump;
+				Barnacle->InitLob(Hit, V, 1.f, SbT(Boss, TEXT("barnacleRadius"), 200.f), TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_05A.SM_SimpleRock_05A"));
+				Barnacle->OnLanded = [Weak](const FVector& Landed)
 				{
-					if (FVector::Dist(F->GetActorLocation(), At + FVector(0, 0, 90.f)) < SbT(B, TEXT("barnacleRadius"), 200.f) + F->GetSimpleCollisionRadius())
-					{
-						FWRHit Hit = SbHit(B, 40.f, false);
-						Hit.Origin = At + FVector(0, 0, 400.f);
-						UWRCombatLibrary::ApplyHit(F, Hit);
-					}
-				}
-			}), Tell, false);
+					if (AWRBoss* B = Weak.Get()) WRFx::Broadcast(B, TEXT("hit.dust"), Landed, FRotator::ZeroRotator, 2.f, TEXT("sky.shard_fall"));
+				};
+			}
 		}
 		return true;
 	}
@@ -1049,6 +1052,12 @@ bool FWRSkyBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		}
 		S.LiftUntil = T + 0.9 + SbAeo(TEXT("inhaleHold"), 1.2f);
 		TWeakObjectPtr<AWRBoss> Weak(Boss);
+		// The tail's crimson glint and its sting lashTell s before the lash (cookpass-combat 3.11: 0.2 s was no tell).
+		FTimerHandle TellTimer;
+		Boss->GetWorldTimerManager().SetTimer(TellTimer, FTimerDelegate::CreateWeakLambda(Boss, [Weak]()
+		{
+			if (AWRBoss* B = Weak.Get()) B->MulticastTell(2, TEXT("tail"), TEXT("tell.final"));
+		}), FMath::Max(0.05f, 0.9f + SbAeo(TEXT("inhaleHold"), 1.2f) - SbAeo(TEXT("lashTell"), 0.9f)), false);
 		FTimerHandle H;
 		Boss->GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(Boss, [Weak]()
 		{
@@ -1056,7 +1065,6 @@ bool FWRSkyBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			AWRBoss* B = Weak.Get();
 			if (!B) return;
 			FSbState& S2 = St(B);
-			B->MulticastTell(2, TEXT("tail"), TEXT("tell.final"));
 			for (const TWeakObjectPtr<AWRCharacterBase>& W : S2.Lifted) if (AWRCharacterBase* C = W.Get())
 			{
 				if (C->GetCharacterMovement()->IsMovingOnGround()) continue;
@@ -1160,26 +1168,20 @@ void FWRSkyBoss::EndStrike(AWRBoss* Boss, const FWRBossAttack& Attack)
 	if (Attack.Id == TEXT("dive") && Boss->CreatureId == TEXT("kyrra"))
 	{
 		const FVector Feet = Boss->GetActorLocation() - FVector(0, 0, Boss->GetSimpleCollisionHalfHeight());
-		for (AWRCharacterBase* F : Foes(Boss, SbT(Boss, TEXT("landRing"), 400.f) + 100.f))
-		{
-			if (F->GetCharacterMovement()->IsFalling()) continue;
-			FWRHit Hit = SbHit(Boss, SbT(Boss, TEXT("landRingDamage"), 25.f), false);
-			Hit.bLow = true;
-			Hit.Origin = Feet;
-			UWRCombatLibrary::ApplyHit(F, Hit);
-		}
+		// The dust rolls out from where she struck (cookpass-combat 3.10): a ring, low, jumpable.
+		FWRHit Hit = SbHit(Boss, SbT(Boss, TEXT("landRingDamage"), 25.f), false);
+		Hit.bLow = true;
+		Hit.Origin = Feet;
+		AWRStrikeFront::Ring(Boss, Feet, SbT(Boss, TEXT("landRing"), 400.f), 1200.f, 160.f, AWRStrikeFront::HitWith(Hit), TEXT("land.dust"), TEXT("stomp"));
 	}
 	// Downburst: the column slams the platform, a ring 8 m (low, 30).
 	if (Attack.Id == TEXT("downburst"))
 	{
-		for (AWRCharacterBase* F : Foes(Boss, 1.0e6f))
-		{
-			if (FVector::Dist2D(F->GetActorLocation(), Boss->AttackPoint) > SbAeo(TEXT("downburstRing"), 800.f) || F->GetCharacterMovement()->IsFalling()) continue;
-			FWRHit Hit = SbHit(Boss, SbAeo(TEXT("downburstRingDamage"), 30.f), false);
-			Hit.bLow = true;
-			Hit.Origin = Boss->AttackPoint;
-			UWRCombatLibrary::ApplyHit(F, Hit);
-		}
+		// The column's blast rolls out across the platform from where it slammed (cookpass-combat 3.10).
+		FWRHit Hit = SbHit(Boss, SbAeo(TEXT("downburstRingDamage"), 30.f), false);
+		Hit.bLow = true;
+		Hit.Origin = Boss->AttackPoint;
+		AWRStrikeFront::Ring(Boss, Boss->AttackPoint, SbAeo(TEXT("downburstRing"), 800.f), 1200.f, 180.f, AWRStrikeFront::HitWith(Hit), NAME_None, TEXT("stomp"));
 	}
 	// The Sentinel's deck throw left a hole where it pried the stone (2 game hours).
 	if (Attack.Id == TEXT("deck_throw"))

@@ -42,6 +42,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "WRStrikeFront.h"
 
 // ---------------------------------------------------------------- shared bits
 
@@ -1621,11 +1622,18 @@ bool FWRStormAI::StrikeRow(AWRCreatureAI* AI, AWRCreature* Self, const FWRAttack
 		// A burst round itself (the Voltfang's static shake 3 m, the Raiju's discharge 4 m): bodies inside take it.
 		const float Radius = FMath::Max(150.f, Row.Radius);
 		WRFx::Broadcast(Self, TEXT("storm.discharge"), Self->GetActorLocation(), FRotator::ZeroRotator, Radius / 100.f, TEXT("storm.arc"));
-		for (TActorIterator<AWRCharacterBase> It(Self->GetWorld()); It; ++It)
+		// The arcs crawl out from its fur (cookpass-combat 3.10): a fast ring of lightning, in the air too.
 		{
-			if (*It != Self && It->IsAlive() && FVector::Dist(It->GetActorLocation(), Self->GetActorLocation()) < Radius + It->GetSimpleCollisionRadius())
+			TWeakObjectPtr<AWRCreatureAI> WeakAI(AI);
+			TWeakObjectPtr<AWRCreature> WeakSelf(Self);
+			if (AWRStrikeFront* Arcs = AWRStrikeFront::Ring(Self, Self->GetActorLocation() - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight()), Radius, 2500.f, 200.f, [WeakAI, WeakSelf](AWRCharacterBase* Who)
 			{
-				AI->RowHit(Self, *It);
+				AWRCreatureAI* A = WeakAI.Get();
+				AWRCreature* S = WeakSelf.Get();
+				if (A && S && S->IsAlive() && Who != S) A->RowHit(S, Who);
+			}, TEXT("storm.discharge"), NAME_None))
+			{
+				Arcs->bGround = false;
 			}
 		}
 		Body->Set(WRStormFlag::Charged, Row.Id == TEXT("static_shake") ? false : Body->Has(WRStormFlag::Charged));

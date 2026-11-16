@@ -39,6 +39,9 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
+	/** A ground front (the default) misses a body in the air over it; a front of light or sound (false) doesn't. */
+	bool bGround = true;
+
 private:
 	enum class EKind : uint8 { Ring, Line, Arc };
 	static AWRStrikeFront* Make(AActor* Owner, EKind Kind, const FVector& At, FOnHit OnHit, FName Fx, FName Sound, float Delay);

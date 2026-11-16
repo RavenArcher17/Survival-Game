@@ -32,6 +32,7 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "WRStrikeFront.h"
 
 /** Server: one Fungal boss's fight. */
 struct FWRFungalBossState
@@ -831,16 +832,35 @@ bool FWRFungalBoss::TickMycelorn(AWRBoss* Boss, FWRFungalBossState& St, float Dt
 			// Cap-falls knock over three survivors and drop.
 			for (int32 k = 0; k < FMath::Min(3, Foes.Num()); ++k)
 			{
-				const FVector At = Foes[k]->GetActorLocation();
-				WRFx::Broadcast(Boss, TEXT("fungal.capFallMark"), At - FVector(0.f, 0.f, Foes[k]->GetSimpleCollisionHalfHeight()), FRotator::ZeroRotator, 1.f, TEXT("fungal.cap_knock"));
-				FTimerHandle H;
-				World->GetTimerManager().SetTimer(H, [Weak, At]()
+				// A real slab breaks off the cavern roof over each of them and falls (cookpass-combat 3.10): the knock and a
+				// dust trickle where it parts from the ceiling, its shadow under it while it falls, the hit where it lands.
+				const FVector Feet = Foes[k]->GetActorLocation() - FVector(0.f, 0.f, Foes[k]->GetSimpleCollisionHalfHeight());
+				FHitResult Roof;
+				FCollisionQueryParams Q(SCENE_QUERY_STAT(WRCapFall), false, Boss);
+				const float Up = World->LineTraceSingleByChannel(Roof, Feet + FVector(0.f, 0.f, 200.f), Feet + FVector(0.f, 0.f, 1600.f), ECC_WorldStatic, Q) ? float(Roof.ImpactPoint.Z - Feet.Z) - 60.f : 1100.f;
+				const FVector Top = Feet + FVector(0.f, 0.f, FMath::Max(400.f, Up));
+				const float Fall = FMath::Sqrt(2.f * (Top.Z - Feet.Z) / 980.f);
+				WRFx::Broadcast(Boss, TEXT("fungal.threadDrop"), Top, FRotator::ZeroRotator, 0.8f, TEXT("fungal.cap_knock"));
+				AWRGroundMarker::Spawn(World, Feet + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(FbT(Boss, TEXT("capFallRadius"), 250.f) * 0.7f), false, FLinearColor(0.02f, 0.02f, 0.025f), Fall + 0.1f);
+				FActorSpawnParameters Params;
+				Params.Owner = Boss;
+				Params.Instigator = Boss;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				if (AWRProjectile* Slab = World->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), Top, FRotator(-90.f, 0.f, 0.f), Params))
 				{
-					AWRBoss* Bs = Weak.Get();
-					if (!Bs) return;
-					WRFx::Broadcast(Bs, TEXT("fungal.capFallLand"), At, FRotator::ZeroRotator, 1.f, TEXT("fungal.cap_fall"));
-					for (AWRCharacterBase* F : FbFoes(Bs, FbT(Bs, TEXT("capFallRadius"), 250.f), At)) FbHit(Bs, F, FbT(Bs, TEXT("capFallDamage"), 40.f), 80.f, 4, false, false, At + FVector(0.f, 0.f, 500.f), NAME_None, 0.f, false);
-				}, 1.5f, false);
+					FWRHit Hit;
+					Hit.Instigator = Boss;
+					Hit.Damage = FbT(Boss, TEXT("capFallDamage"), 40.f);
+					Hit.PoiseDamage = 80.f;
+					Hit.Impact = 4;
+					Hit.Tier = EWRHitTier::Heavy;
+					Hit.Origin = Top;
+					Slab->InitLob(Hit, FVector(0.f, 0.f, -10.f), 1.f, FbT(Boss, TEXT("capFallRadius"), 250.f), TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_05A.SM_SimpleRock_05A"));
+					Slab->OnLanded = [Weak](const FVector& At)
+					{
+						if (AWRBoss* Bs = Weak.Get()) WRFx::Broadcast(Bs, TEXT("fungal.capFallLand"), At, FRotator::ZeroRotator, 1.f, TEXT("fungal.cap_fall"));
+					};
+				}
 			}
 		}
 		else
@@ -1002,10 +1022,13 @@ bool FWRFungalBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		for (int32 k = 0; k < Ticks; ++k)
 		{
 			FTimerHandle H;
-			World->GetTimerManager().SetTimer(H, [Weak, At, Fwd, Range, Half, Dmg, Rot]()
+			World->GetTimerManager().SetTimer(H, [Weak, Range, Half, Dmg, Rot]()
 			{
 				AWRBoss* Bs = Weak.Get();
 				if (!Bs || !Bs->IsAlive()) return;
+				// The gas goes where its mouth points now, from where it stands now (3.10), not a cone frozen at the start.
+				const FVector At = Bs->GetActorLocation();
+				const FVector Fwd = Bs->GetActorForwardVector().GetSafeNormal2D();
 				for (AWRCharacterBase* F : FbFoes(Bs, Range, At))
 				{
 					const FVector To = F->GetActorLocation() - At;
@@ -1163,12 +1186,17 @@ bool FWRFungalBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		// Eight tendrils burst up along the vein toward you: 30 m x 2 m, unblockable.
 		const FVector Dir = (Target->GetActorLocation() - Boss->GetActorLocation()).GetSafeNormal2D();
 		const FVector A = Feet, B = Feet + Dir * FbT(Boss, TEXT("lashLine"), 3000.f);
-		for (int32 k = 0; k < 8; ++k) WRFx::Broadcast(Boss, TEXT("fungal.tendrilBurst"), FMath::Lerp(A, B, (k + 0.5f) / 8.f), Dir.Rotation(), 1.5f, k == 0 ? FName(TEXT("boss.mycelorn.lash")) : NAME_None);
-		for (AWRCharacterBase* F : FbFoes(Boss, FbT(Boss, TEXT("lashLine"), 3000.f) + 200.f, Feet))
-		{
-			const FVector P = FMath::ClosestPointOnSegment(F->GetActorLocation(), A, B);
-			if (FVector::Dist2D(P, F->GetActorLocation()) < 100.f + F->GetSimpleCollisionRadius()) FbHit(Boss, F, Attack.Damage, Attack.Poise, Attack.Impact, true, false, P, NAME_None, 0.f, true);
-		}
+		// The tendrils burst up one after another along the vein from his feet at lashSpeed (cookpass-combat 3.10): each
+		// takes you only where it rises.
+		TWeakObjectPtr<AWRBoss> WeakLash(Boss);
+		const float Dmg = Attack.Damage, Poise = Attack.Poise;
+		const uint8 Impact = Attack.Impact;
+		AWRStrikeFront::Line(Boss, A, B, FbT(Boss, TEXT("lashSpeed"), 2000.f), 100.f,
+			[WeakLash, Dmg, Poise, Impact](AWRCharacterBase* F)
+			{
+				AWRBoss* Bs = WeakLash.Get();
+				if (Bs && F != Bs && Bs->IsHostileTo(F)) FbHit(Bs, F, Dmg, Poise, Impact, true, false, F->GetActorLocation() - FVector(0.f, 0.f, 80.f), NAME_None, 0.f, true);
+			}, TEXT("fungal.tendrilBurst"), TEXT("boss.mycelorn.lash"));
 		return true;
 	}
 	return false;

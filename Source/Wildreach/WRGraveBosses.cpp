@@ -32,6 +32,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "WRStrikeFront.h"
 
 /** A survivor (or tame) held by a Graveyard boss: the Knell, the palps, the ribcage, the cage, the Shroud. */
 struct FWRGraveBossHold
@@ -877,7 +878,7 @@ void FWRGraveBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharac
 			Boss->GetWorldTimerManager().SetTimer(H, [WeakB, At, R, Tell]()
 			{
 				if (!WeakB.IsValid()) return;
-				AWRGroundMarker::Spawn(WeakB->GetWorld(), At + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(R, R), false, FLinearColor(0.25f, 0.9f, 0.55f), Tell + 0.2f);
+				// The soil heaving and cracking where the hands will come up is the cue (no painted circle: cookpass-combat 3.11).
 				WRFx::Broadcast(WeakB.Get(), TEXT("grave.floor_crack"), At, FRotator::ZeroRotator, R / 250.f, TEXT("grave.soil_heave"), Tell);
 			}, FMath::Max(0.01f, Delay), false);
 		}
@@ -893,7 +894,8 @@ void FWRGraveBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharac
 		if (AWRCreature* Tame = GbFurthestTame(Boss, GbT(Boss, TEXT("arenaRadius"), 4000.f)))
 		{
 			Boss->AttackPoint = GbFeet(Tame);
-			AWRGroundMarker::Spawn(Boss->GetWorld(), Boss->AttackPoint + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(0.25f, 0.9f, 0.55f), Attack.Windup + 0.3f);
+			// The grave-light seeps up through the cracked soil under it (a small cue, not a painted circle: 3.11).
+			WRFx::Broadcast(Boss, TEXT("grave.floor_crack"), Boss->AttackPoint, FRotator::ZeroRotator, Attack.Size / 300.f, TEXT("grave.soil_heave"), Attack.Windup);
 		}
 	}
 	(void)Target;
@@ -981,10 +983,18 @@ bool FWRGraveBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		const FVector Base = GbRopeFoot(St);
 		if (AWRGraveBossProp* B = St.Belfry.Get()) B->TollAt = B->ServerNow();
 		WRFx::Broadcast(Boss, TEXT("grave.toll_ring"), Base, FRotator::ZeroRotator, GbT(Boss, TEXT("tollRing"), 800.f) / 200.f, TEXT("grave.bell_toll"));
-		for (AWRCharacterBase* C : GbFoes(Boss, GbT(Boss, TEXT("tollRing"), 800.f), Base))
+		// The force rolls out from the tower's base as a ring (cookpass-combat 3.10): it takes you where its front is.
 		{
-			GbHitWith(Boss, C, Attack.Damage, Attack.Poise, 3, true, false, Base);
-			if (C->Status) C->Status->Stagger(0.6f);
+			TWeakObjectPtr<AWRBoss> WeakT(Boss);
+			const float Dmg = Attack.Damage, Poise = Attack.Poise;
+			AWRStrikeFront::Ring(Boss, Base, GbT(Boss, TEXT("tollRing"), 800.f), GbT(Boss, TEXT("tollSpeed"), 1200.f), 200.f,
+				[WeakT, Base, Dmg, Poise](AWRCharacterBase* C)
+				{
+					AWRBoss* B = WeakT.Get();
+					if (!B || C == B || !B->IsHostileTo(C)) return;
+					GbHitWith(B, C, Dmg, Poise, 3, true, false, Base);
+					if (C->Status) C->Status->Stagger(0.6f);
+				}, TEXT("stomp"), NAME_None);
 		}
 		const int32 Max = int32(GbT(Boss, TEXT("risenMax"), 9.f));
 		const FVector Yard = St.Belfry.IsValid() ? St.Belfry->GetActorLocation() : St.Home;
@@ -1070,30 +1080,60 @@ bool FWRGraveBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 	{
 		// He drives the spade in and heaves up a huge clod: where it lands (locked at the end of the wind-up), a 3 m circle
 		// buries everyone in it up to 5 s.
+		// The clod is really thrown (cookpass-combat 3.10): heaved off the spade it flies at least creatureAI.minWarning,
+		// its shadow under it, and buries whoever it comes down on.
 		const FVector At = Boss->AttackPoint;
-		WRFx::Broadcast(Boss, TEXT("grave.soil_heave"), At, FRotator::ZeroRotator, Attack.Size / 150.f, TEXT("grave.clod"));
-		for (AWRCharacterBase* C : GbFoes(Boss, Attack.Size, At))
+		const FVector Spade = Hand;
+		const float Dist = FVector::Dist2D(Spade, At);
+		const float Speed = FMath::Max(250.f, FMath::Min(900.f, Dist / FMath::Max(0.3f, WRTune(TEXT("creatureAI.minWarning"), 0.9f))));
+		AWRGroundMarker::Spawn(Boss->GetWorld(), At + FVector(0, 0, 3), FRotator::ZeroRotator, FVector2D(Attack.Size * 0.6f, Attack.Size * 0.6f), false, FLinearColor(0.02f, 0.02f, 0.025f), Dist / Speed + 0.1f);
+		WRFx::Broadcast(Boss, TEXT("grave.soil_heave"), Spade, FRotator::ZeroRotator, 0.8f, TEXT("grave.clod"));
+		FActorSpawnParameters ClodParams;
+		ClodParams.Owner = Boss;
+		ClodParams.Instigator = Boss;
+		ClodParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector ClodV = AWRProjectile::LobVelocity(Spade, At, Speed, 1.f);
+		AWRProjectile* Clod = Boss->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), Spade, ClodV.Rotation(), ClodParams);
+		if (!Clod) return true;
+		FWRHit ClodHit;
+		ClodHit.Instigator = Boss;
+		ClodHit.Damage = Attack.Damage;
+		ClodHit.PoiseDamage = Attack.Poise;
+		ClodHit.Impact = 3;
+		ClodHit.bUnblockable = true;
+		ClodHit.Tier = EWRHitTier::Heavy;
+		Clod->InitLob(ClodHit, ClodV, 1.f, Attack.Size, TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_05A.SM_SimpleRock_05A"));
+		TWeakObjectPtr<AWRBoss> WeakClod(Boss);
+		const float ClodSize = Attack.Size;
+		Clod->OnLanded = [WeakClod, ClodSize](const FVector& Landed)
 		{
-			if (FMath::Abs(GbFeet(C).Z - At.Z) > 300.f) continue;
-			GbHitWith(Boss, C, Attack.Damage, Attack.Poise, 3, true, false, At + FVector(0.f, 0.f, 300.f));
+			AWRBoss* Thrower = WeakClod.Get();
+			if (!Thrower || !Thrower->IsAlive()) return;
+			FWRGraveBossState& Gs = GbS(Thrower);
+			const double Tn = GbNow(Thrower);
+			WRFx::Broadcast(Thrower, TEXT("grave.soil_heave"), Landed, FRotator::ZeroRotator, ClodSize / 150.f, TEXT("grave.clod"));
+		for (AWRCharacterBase* C : GbFoes(Thrower, ClodSize, Landed))
+		{
+			if (FMath::Abs(GbFeet(C).Z - Landed.Z) > 300.f) continue;
 			FWRGraveBuried B;
 			B.Who = C;
 			B.How = TEXT("buried");
-			B.Until = T + GbT(Boss, TEXT("buriedSeconds"), 5.f);
-			B.TickAt = T + 0.5;
+			B.Until = Tn + GbT(Thrower, TEXT("buriedSeconds"), 5.f);
+			B.TickAt = Tn + 0.5;
 			const FTransform MT(FRotator::ZeroRotator, GbFeet(C));
-			if (AWRGraveBossProp* M = Boss->GetWorld()->SpawnActorDeferred<AWRGraveBossProp>(AWRGraveBossProp::StaticClass(), MT, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+			if (AWRGraveBossProp* M = Thrower->GetWorld()->SpawnActorDeferred<AWRGraveBossProp>(AWRGraveBossProp::StaticClass(), MT, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 			{
 				M->Kind = TEXT("dug");
 				M->State = 1;   // heaped over someone
-				M->SetLifeSpan(GbT(Boss, TEXT("buriedSeconds"), 5.f) + 1.f);
+				M->SetLifeSpan(GbT(Thrower, TEXT("buriedSeconds"), 5.f) + 1.f);
 				M->FinishSpawning(MT);
 				B.Mound = M;
 			}
-			St.Buried.Add(B);
-			if (C->Status) C->Status->ApplyStatus(WRTags::Status_Rooted, GbT(Boss, TEXT("buriedSeconds"), 5.f));
+			Gs.Buried.Add(B);
+			if (C->Status) C->Status->ApplyStatus(WRTags::Status_Rooted, GbT(Thrower, TEXT("buriedSeconds"), 5.f));
 			GbTell(C, TEXT("Buried! Mash to dig out (a friend holding E digs you out faster)"));
 		}
+		};
 		return true;
 	}
 	if (Id == TEXT("spade_slam"))
@@ -1102,14 +1142,16 @@ bool FWRGraveBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		const FVector From = GbFeet(Boss);
 		const FVector Dir = Boss->GetActorForwardVector().GetSafeNormal2D();
 		const FVector To = From + Dir * Attack.Range;
-		WRFx::Broadcast(Boss, TEXT("grave.ground_crack"), (From + To) * 0.5f, Dir.Rotation(), Attack.Range / 400.f, TEXT("stomp"));
-		for (AWRCharacterBase* C : GbFoes(Boss, Attack.Range + 200.f, From))
-		{
-			const FVector2D AB(To - From), AP(C->GetActorLocation() - From);
-			const float U = FMath::Clamp(FVector2D::DotProduct(AP, AB) / FMath::Max(1.f, AB.SizeSquared()), 0.f, 1.f);
-			if (FVector2D::Distance(FVector2D(From) + AB * U, FVector2D(C->GetActorLocation())) > Attack.Size + C->GetSimpleCollisionRadius()) continue;
-			GbHitWith(Boss, C, Attack.Damage, Attack.Poise, Attack.Impact, false, true, From);
-		}
+		// The crack runs out from the spade's blade (cookpass-combat 3.10): it takes you where it has reached; jump it.
+		TWeakObjectPtr<AWRBoss> WeakS(Boss);
+		const float Dmg = Attack.Damage, Poise = Attack.Poise;
+		const uint8 Impact = Attack.Impact;
+		AWRStrikeFront::Line(Boss, From + Dir * Boss->GetSimpleCollisionRadius(), To, GbT(Boss, TEXT("spadeCrackSpeed"), 1600.f), Attack.Size,
+			[WeakS, From, Dmg, Poise, Impact](AWRCharacterBase* C)
+			{
+				AWRBoss* B = WeakS.Get();
+				if (B && C != B && B->IsHostileTo(C)) GbHitWith(B, C, Dmg, Poise, Impact, false, true, From);
+			}, TEXT("grave.ground_crack"), TEXT("stomp"));
 		return true;
 	}
 	if (Id == TEXT("grave_hands"))
@@ -1231,10 +1273,17 @@ bool FWRGraveBoss::TickStrike(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaS
 		const float Span = FMath::Max(0.05f, float(Boss->StrikeEnds - Boss->StrikeStarted));
 		const float A = FMath::Clamp(float(T - Boss->StrikeStarted) / Span, 0.f, 1.f);
 		const bool bRing = Id == TEXT("unhinged_keen") && A < 0.5f;
-		if (!bRing && St.bKeenSecond) return true;
-		if (!bRing) St.bKeenSecond = true;
+		// The cry travels (cookpass-combat 3.10): a wave of sound keenSpeed cm/s out from her mouth, so the dust lifts
+		// and the grass flattens before it reaches you. The cone starts after the unhinged ring (its bodies may be hit again).
+		if (!bRing && !St.bKeenSecond)
+		{
+			St.bKeenSecond = true;
+			Boss->StrikeHits.Reset();
+		}
+		const float Since = float(T - Boss->StrikeStarted) - (Id == TEXT("unhinged_keen") && !bRing ? Span * 0.5f : 0.f);
+		const float Wave = FMath::Max(0.f, Since) * GbT(Boss, TEXT("keenSpeed"), bRing ? 1800.f : 2500.f);
 		const FVector Mouth = GbBodyPoint(Boss, 0.4f, 0.f, 0.85f);
-		const float Reach = bRing ? Attack.Size : 2500.f;
+		const float Reach = FMath::Min(bRing ? Attack.Size : 2500.f, Wave);
 		const float Half = GbT(Boss, TEXT("keenAngle"), 35.f);
 		for (AWRCharacterBase* C : GbFoes(Boss, Reach, Boss->GetActorLocation()))
 		{
@@ -1249,7 +1298,6 @@ bool FWRGraveBoss::TickStrike(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaS
 			Boss->StrikeHits.Add(C);
 			GbHitWith(Boss, C, Attack.Damage, Attack.Poise, 2, true, false, Mouth, TEXT("decay"), Attack.Buildup > 0.f ? Attack.Buildup : (Id == TEXT("keen") ? 80.f : 60.f), Id == TEXT("keen") ? 40.f : -1.f);
 		}
-		if (bRing && A >= 0.45f) Boss->StrikeHits.Reset();   // the cone may hit those the ring did
 		return true;
 	}
 	if (Id == TEXT("toll") || Id == TEXT("headstone_throw") || Id == TEXT("brood_shed") || Id == TEXT("bone_spray") || Id == TEXT("bury") || Id == TEXT("spade_slam")

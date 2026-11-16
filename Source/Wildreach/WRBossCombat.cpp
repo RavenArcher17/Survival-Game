@@ -429,7 +429,9 @@ void AWRBoss::BeginStrike()
 		TWeakObjectPtr<AWRBoss> Weak(this);
 		AWRStrikeFront::Line(this, Limb, AttackPoint, Speed, T.Num(TEXT("bosses.eruptionWidth"), 160.f),
 			[Weak](AWRCharacterBase* Who) { if (AWRBoss* Self = Weak.Get(); Self && Self->IsHostileTo(Who)) Self->StrikeHit(Who); },
-			bBurrow ? FName(TEXT("burst")) : FName(TEXT("stomp")), TEXT("stomp"), Attack.Size);
+			// The split throws up its own ground: dirt for a burrower, embers off a fire boss, rime off a frost one, grit else.
+			bBurrow ? FName(TEXT("burst")) : WRBossDetail::ElementOf(GetDef()) == WRTags::Element_Fire ? FName(TEXT("fire.impact"))
+				: WRBossDetail::ElementOf(GetDef()) == WRTags::Element_Frost ? FName(TEXT("frost.impact")) : FName(TEXT("stomp")), TEXT("stomp"), Attack.Size);
 		bFarSlam = true;
 		StrikeTo = AttackPoint;
 		// The strike stays open while the split runs and its ring rolls out (StrikeHit counts each body once).

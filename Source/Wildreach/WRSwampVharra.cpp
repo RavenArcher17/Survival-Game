@@ -48,6 +48,7 @@
 #include "Net/UnrealNetwork.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "TimerManager.h"
+#include "WRStrikeFront.h"
 
 // Unity builds can put WRSwampScenery.cpp (its palette names at file scope through `using namespace WRSwampLook`) ahead of
 // this file; its own same-named surfaces are local on purpose, so the shadowing warning is off for this file only.
@@ -1299,8 +1300,17 @@ void FWRSwampBoss::VharraAttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWR
 			St.ClotSpots.Add(Spot);
 			const float Flight = FVector::Dist2D(Mouth, Spot) / FMath::Max(100.f, VhT(TEXT("clotSpeed"), 1000.f));
 			const float Size = VhT(TEXT("clotRadius"), 200.f);
-			AWRGroundMarker::Spawn(Boss->GetWorld(), Spot + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(Size, Size), false,
-				VhHex(TEXT("#1A0306")), Attack.Windup + Flight + 0.2f);
+			// Each clot's shadow from the moment it's spat (cookpass-combat 3.11), for its flight; not from the wind-up.
+			{
+				TWeakObjectPtr<UWorld> WeakW(Boss->GetWorld());
+				const FLinearColor Shade = VhHex(TEXT("#1A0306"));
+				const float Last = Flight + 0.2f;
+				FTimerHandle ShadowTimer;
+				Boss->GetWorldTimerManager().SetTimer(ShadowTimer, FTimerDelegate::CreateLambda([WeakW, Spot, Size, Shade, Last]()
+				{
+					if (UWorld* W = WeakW.Get()) AWRGroundMarker::Spawn(W, Spot + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(Size, Size), false, Shade, Last);
+				}), FMath::Max(0.01f, Attack.Windup), false);
+			}
 		}
 		if (Body) Body->MulticastMoment(TEXT("vharra.sacpulse"), VhMouth(Boss), 1.2f, TEXT("creature.vharra.tell"));
 	}
@@ -1463,6 +1473,8 @@ bool FWRSwampBoss::VharraBeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 			Hit.Origin = Mouth;
 			for (const TPair<FName, float>& B : Attack.Row.Buildups) Hit.Buildups.Add(B.Key, B.Value);
 			Shot->Hit = Hit;
+			Shot->Hit.bProjectile = true;
+			Shot->Hit.bReflectable = !Hit.bReaction;   // a clot can be thrown back by a reflector (cookpass-combat 3.12)
 			Shot->MaxRange = Attack.Range + 800.f;
 			Shot->Radius = VhT(TEXT("clotRadius"), 200.f);
 			Shot->OnLanded = [WeakBoss](const FVector& At)
@@ -1485,9 +1497,14 @@ bool FWRSwampBoss::VharraBeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		const float Length = VhT(TEXT("heaveLength"), 1200.f);
 		const float Half = VhT(TEXT("heaveWidth"), 300.f) * 0.5f;
 		const FVector End = Here + Fwd * Length;
-		for (AWRCharacterBase* V : VhFoes(Boss, WRTune(TEXT("bosses.vharra.chaseRadius"), 9000.f)))
+		// The forebody comes down from the shoulders to the jaw (cookpass-combat 3.10): the slam runs along her length at
+		// heaveSpeed, taking you where her body is meeting the ground.
 		{
-			if (VhSegDist2D(V->GetActorLocation(), Here, End) <= Half + V->GetSimpleCollisionRadius()) Boss->StrikeHit(V);
+			TWeakObjectPtr<AWRBoss> WeakH(Boss);
+			AWRStrikeFront::Line(Boss, FVector(Here.X, Here.Y, Surface), FVector(End.X, End.Y, Surface), VhT(TEXT("heaveSpeed"), 2400.f), Half,
+				[WeakH](AWRCharacterBase* V) { if (AWRBoss* B = WeakH.Get(); B && B->IsAlive() && B->IsHostileTo(V)) B->StrikeHit(V); },
+				TEXT("mire.splash"), NAME_None);
+			Boss->StrikeEnds = FMath::Max(Boss->StrikeEnds, T + Length / FMath::Max(100.f, VhT(TEXT("heaveSpeed"), 2400.f)) + 0.1f);
 		}
 		for (int32 i = 1; i <= 4; ++i)
 		{
@@ -1496,7 +1513,7 @@ bool FWRSwampBoss::VharraBeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		}
 		const FVector WaveAt = Here + Fwd * Length * 0.75f;
 		VhStartWave(Boss, St, FVector(WaveAt.X, WaveAt.Y, Surface), VhT(TEXT("heaveWaveRadius"), 2400.f), VhT(TEXT("heaveWaveDamage"), 30.f), 50.f, true, true, false, 3, VhT(TEXT("heaveWaveKnock"), 300.f));
-		Boss->StrikeEnds = T + Active;
+		Boss->StrikeEnds = FMath::Max(Boss->StrikeEnds, T + Active);
 		return true;
 	}
 	if (Id == TEXT("brood_shed"))
@@ -1547,13 +1564,21 @@ bool FWRSwampBoss::VharraBeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 	{
 		// The squeeze: everyone on that mound or plinth (5 m ring) takes it and is thrown off into the water.
 		const float Radius = VhT(TEXT("coilRadius"), 500.f);
-		for (AWRCharacterBase* V : VhFoes(Boss, WRTune(TEXT("bosses.vharra.chaseRadius"), 9000.f)))
+		// The coils close from the mound's rim inward (cookpass-combat 3.10): a ring tightening at coilSpeed; whoever it
+		// reaches is squeezed off.
 		{
-			if (FVector::Dist2D(V->GetActorLocation(), St.CoilAt) <= Radius + V->GetSimpleCollisionRadius()) Boss->StrikeHit(V);
+			TWeakObjectPtr<AWRBoss> WeakC(Boss);
+			if (AWRStrikeFront* Coil = AWRStrikeFront::Ring(Boss, St.CoilAt, Radius + 100.f, -VhT(TEXT("coilSpeed"), 1000.f), 220.f,
+				[WeakC](AWRCharacterBase* V) { if (AWRBoss* B = WeakC.Get(); B && B->IsAlive() && B->IsHostileTo(V)) B->StrikeHit(V); },
+				TEXT("mire.splash"), TEXT("stomp")))
+			{
+				Coil->bGround = false;   // a coil wraps whoever is on the mound, jumping or not
+			}
+			Boss->StrikeEnds = FMath::Max(Boss->StrikeEnds, T + (Radius + 100.f) / FMath::Max(100.f, VhT(TEXT("coilSpeed"), 1000.f)) + 0.1f);
 		}
 		WRFx::Broadcast(Boss, TEXT("mire.splash"), FVector(St.CoilAt.X, St.CoilAt.Y, Surface), FRotator::ZeroRotator, 4.f, TEXT("stomp"));
 		WRFx::Broadcast(Boss, TEXT("part.break"), St.CoilAt + FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator, 2.f);
-		Boss->StrikeEnds = T + Active;
+		Boss->StrikeEnds = FMath::Max(Boss->StrikeEnds, T + Active);
 		return true;
 	}
 	return false;

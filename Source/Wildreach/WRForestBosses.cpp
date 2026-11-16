@@ -35,6 +35,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/GameStateBase.h"
+#include "WRStrikeFront.h"
 
 /** A ground wave rolling out from a slam (Sylvaroth's hammer fists): its front hurts, low, jumpable. */
 struct FWRForestBossWave
@@ -1530,10 +1531,16 @@ void FWRForestBoss::TickHearts(AWRBoss* Boss, FWRForestBossState& St)
 			St.HeartHitAt[i] = 0.0;
 			const FVector Foot = H->GetActorLocation();
 			WRFx::Broadcast(Boss, TEXT("sylvaroth.limb_sweep"), Foot, H->GetActorRotation(), Boss->Tune(TEXT("p3SweepRadius"), 1500.f) / 500.f, TEXT("forest.uproot"));
-			for (AWRCharacterBase* Who : FbFoes(Boss, Boss->Tune(TEXT("p3SweepRadius"), 1500.f), Foot))
-			{
-				FbHitWith(Boss, Who, Boss->Tune(TEXT("p3SweepDamage"), 40.f), 80.f, 4, false, true, Foot);
-			}
+			// The lower limbs go round the trunk (cookpass-combat 3.10): an arc from the tree's own facing, all the way round
+			// over p3SweepSeconds; it takes you where the limbs are (low: jump it, or be past its reach).
+			TWeakObjectPtr<AWRBoss> WeakB(Boss);
+			const float Dmg = Boss->Tune(TEXT("p3SweepDamage"), 40.f);
+			AWRStrikeFront::Arc(Boss, Foot, Boss->Tune(TEXT("p3SweepRadius"), 1500.f), H->GetActorRotation().Yaw, 360.f, Boss->Tune(TEXT("p3SweepSeconds"), 0.8f),
+				[WeakB, Foot, Dmg](AWRCharacterBase* Who)
+				{
+					AWRBoss* B = WeakB.Get();
+					if (B && B->IsAlive() && B->IsHostileTo(Who)) WRForestBossImpl::FbHitWith(B, Who, Dmg, 80.f, 4, false, true, Foot);
+				}, TEXT("forest.widow_bark"), TEXT("forest.uproot"));
 		}
 	}
 }
@@ -2102,7 +2109,18 @@ void FWRForestBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRChara
 		{
 			// Bark and leaves rain from where she hangs; her shadow grows on the moss where she'll land.
 			WRFx::Broadcast(Boss, TEXT("matron.bark_rain"), Boss->GetActorLocation(), FRotator::ZeroRotator, 1.f, TEXT("forest.canopy_rustle"), Attack.Windup);
-			AWRGroundMarker::Spawn(Boss->GetWorld(), Boss->AttackPoint + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(0.012f, 0.012f, 0.016f), Attack.Windup + Attack.Row.Active + 0.1f);
+			// Her shadow on the moss from the moment she lets go (cookpass-combat 3.11), for the drop: a body above casts one,
+			// a wind-up doesn't.
+			{
+				TWeakObjectPtr<UWorld> WeakW(Boss->GetWorld());
+				const FVector Spot = Boss->AttackPoint;
+				const float Size = Attack.Size * 0.7f, Last = Attack.Row.Active + 0.1f;
+				FTimerHandle ShadowTimer;
+				Boss->GetWorldTimerManager().SetTimer(ShadowTimer, FTimerDelegate::CreateLambda([WeakW, Spot, Size, Last]()
+				{
+					if (UWorld* W = WeakW.Get()) AWRGroundMarker::Spawn(W, Spot + FVector(0.f, 0.f, 3.f), FRotator::ZeroRotator, FVector2D(Size, Size), false, FLinearColor(0.012f, 0.012f, 0.016f), Last);
+				}), FMath::Max(0.01f, Attack.Windup), false);
+			}
 		}
 		else if (Id == TEXT("bridge_leap"))
 		{
@@ -2125,8 +2143,10 @@ void FWRForestBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRChara
 				const FVector Mid = (St.LeapFrom + St.LeapEnd) * 0.5f;
 				FVector G;
 				FbGround(Boss->GetWorld(), Mid, G);
-				AWRGroundMarker::Spawn(Boss->GetWorld(), G + FVector(0.f, 0.f, 3.f), (St.LeapEnd - St.LeapFrom).Rotation(), FVector2D(FVector::Dist2D(St.LeapFrom, St.LeapEnd), 220.f), true,
-					FLinearColor(0.012f, 0.012f, 0.016f), Attack.Windup + Attack.Row.Hold + 0.2f);
+				// No painted lane (cookpass-combat 3.11): bark and leaves shower off the far oak she's eyeing, her crouch
+				// on the limb is the tell; her body's own shadow crosses the ground as she leaps.
+				WRFx::Broadcast(Boss, TEXT("matron.bark_rain"), St.LeapEnd, FRotator::ZeroRotator, 0.8f, TEXT("forest.canopy_rustle"), Attack.Windup + Attack.Row.Hold);
+				(void)G;
 			}
 		}
 		else if (Id == TEXT("kit_scream"))
