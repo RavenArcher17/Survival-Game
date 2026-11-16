@@ -21,6 +21,8 @@ public:
 	void Init(const FWRHit& InHit, float Speed, const FLinearColor& Color);
 	/** Server: curve toward a locked-on target as it flies (Acceleration cm/s/s; 0 = straight on). */
 	void HomeOn(AActor* Target, float Acceleration);
+	/** A shot not fired by a survivor (a creature, a boss, a turret): reflectable unless it says otherwise. */
+	static bool IsEnemyShot(const FWRHit& InHit);
 	/** A thrown or shot weapon: flies with drop as a model (MeshAlong = the model's tip axis, empty = from its bounds).
 	 *  Kind "bola" tangles what it hits; arrows, bolts, darts and spears stick where they land, and PickupItem (a thrown
 	 *  spear) is left on the ground there to pick up again. */

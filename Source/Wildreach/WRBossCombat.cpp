@@ -29,6 +29,7 @@
 #include "WRPlayerController.h"
 #include "WRPlayerState.h"
 #include "WRProjectile.h"
+#include "WRStrikeFront.h"
 #include "WRSound.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
@@ -55,6 +56,15 @@ namespace WRBossDetail
 	{
 		const FVector To = (P - Here).GetSafeNormal2D();
 		return FMath::FindDeltaAngleDegrees(Facing.Yaw, To.Rotation().Yaw);
+	}
+
+	/** A body's element tag from its creatures.json element (tide is water; paths with no element of their own hit as
+	 *  physical). */
+	FGameplayTag ElementOf(const FWRCreatureDef* Def)
+	{
+		const FName E = Def ? Def->Element : NAME_None;
+		return E == TEXT("fire") ? WRTags::Element_Fire : E == TEXT("frost") ? WRTags::Element_Frost : E == TEXT("lightning") ? WRTags::Element_Lightning
+			: E == TEXT("tide") ? WRTags::Element_Water : E == TEXT("void") ? WRTags::Element_Void : E == TEXT("arcane") ? WRTags::Element_Arcane : WRTags::Element_Physical;
 	}
 
 	bool IsThrown(const FWRBossAttack& A)
@@ -248,17 +258,14 @@ void AWRBoss::StartAttack(FWRBossAttack& Attack, AWRCharacterBase* Target)
 	// The cue is small (combat.md 2.17.1b): a glint on the attacking part (white blockable, crimson unblockable) and
 	// its voice; the clip's own wind-up does the rest. Ground marks only for what's really coming down there: the
 	// shadow of a thrown boulder or slag, of a diving wyrm, frost creeping where spikes will burst.
-	const uint8 Glint = Attack.bRow ? Attack.Row.Glint : (Attack.bUnblockable || Attack.bGrab ? 2 : 1);
+	uint8 Glint = Attack.bRow ? Attack.Row.Glint : (Attack.bUnblockable || Attack.bGrab ? 2 : 1);
+	if (Glint == 0 && WRBossDetail::IsThrown(Attack)) Glint = 1;   // a throw always shows where it comes from (3.11)
 	MulticastTell(Glint, Attack.bRow ? Attack.Row.TellBone : FName(TEXT("hand")), TEXT("voice"));
-	const float Flight = WRBossDetail::IsThrown(Attack) ? FVector::Dist2D(AttackPoint, GetActorLocation()) / FMath::Max(100.f, Attack.bRow ? Attack.Row.ProjectileSpeed : 1000.f) : 0.f;
-	if (WRBossDetail::IsThrown(Attack) || Attack.Id == TEXT("dive"))
+	// No mark on the ground during the wind-up (cookpass-combat 3.11): a thrown thing casts its shadow from the moment it
+	// leaves the hand, a diving body from the moment it drops; ice spikes show their frost creeping only at the spot, small.
+	if (Attack.Id == TEXT("ice_spikes"))
 	{
-		AWRGroundMarker::Spawn(GetWorld(), AttackPoint + FVector(0, 0, 3), AttackFacing, FVector2D(Attack.Size * 0.7f, Attack.Size * 0.7f), false,
-			FLinearColor(0.02f, 0.02f, 0.025f), Attack.Windup + Hold + Flight + 0.2f);
-	}
-	else if (Attack.Id == TEXT("ice_spikes"))
-	{
-		AWRGroundMarker::Spawn(GetWorld(), AttackPoint + FVector(0, 0, 3), AttackFacing, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(0.75f, 0.9f, 1.f), Attack.Windup + Hold);
+		WRFx::Broadcast(this, TEXT("frostnova"), AttackPoint, FRotator::ZeroRotator, 0.35f, NAME_None, Attack.Windup + Hold);
 	}
 	PlaySwing(EWRSwingKind::Heavy, Attack.Windup + Hold + 0.2f);
 	FWRStormBoss::AttackStarted(this, Attack, Target);
@@ -289,6 +296,9 @@ void AWRBoss::BeginStrike()
 	FWRBossAttack& Attack = Attacks[Current];
 	const double Now = GetWorld()->GetTimeSeconds();
 	const FWRTuning& T = FWRTuning::Get();
+	// How long its tell has been showing (the wind-up, or a repeat's gap): a throw's flight adds to it (3.12).
+	const float TellAge = FMath::Max(0.f, float(Now - StrikeStarted));
+	bFarSlam = false;
 	StrikeState = EStrike::Strike;
 	StrikeStarted = Now;
 	const float Active = Attack.bRow ? FMath::Max(0.1f, Attack.Row.Active) : 0.25f;
@@ -308,12 +318,36 @@ void AWRBoss::BeginStrike()
 	{
 		// The real thing flies: a lob from its hand to where the target stood, bursting where it lands.
 		const FVector From = GetActorLocation() + GetActorForwardVector() * GetSimpleCollisionRadius() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() * 0.6f);
-		const float Speed = Attack.bRow ? Attack.Row.ProjectileSpeed : 1000.f;
+		// At least creatureAI.minWarning from the first sign to the landing (3.12): a close throw flies slower, never faster.
+		const float MinWarning = T.Num(TEXT("creatureAI.minWarning"), 0.9f);
 		FActorSpawnParameters Params;
 		Params.Owner = this;
 		Params.Instigator = this;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		const FVector Velocity = AWRProjectile::LobVelocity(From, AttackPoint, Speed, 1.f);
+		// A thrown cone (a fan of needles, a spray of shards) is coneLobs lobs spread evenly across its arc.
+		TArray<FVector> Aims;
+		if (Attack.Shape == EWRBossShape::Cone)
+		{
+			const int32 Count = FMath::Max(2, FMath::RoundToInt(T.Num(TEXT("bosses.coneLobs"), 5.f)));
+			const FVector Off = AttackPoint - GetActorLocation();
+			for (int32 k = 0; k < Count; ++k)
+			{
+				const float Yaw = FMath::Lerp(-Attack.Size, Attack.Size, float(k) / float(Count - 1));
+				Aims.Add(GetActorLocation() + FRotator(0.f, Yaw, 0.f).RotateVector(Off));
+			}
+		}
+		else
+		{
+			Aims.Add(AttackPoint);
+		}
+		for (const FVector& Aim : Aims)
+		{
+		const float Distance = FVector::Dist2D(From, Aim);
+		const float Speed = FMath::Max(250.f, FMath::Min(Attack.bRow ? Attack.Row.ProjectileSpeed : 1000.f, Distance / FMath::Max(0.05f, MinWarning - TellAge)));
+		const FVector Velocity = AWRProjectile::LobVelocity(From, Aim, Speed, 1.f);
+		// Its shadow where it will land, from the throw for the flight (the thrown thing's own, not a wind-up mark).
+		AWRGroundMarker::Spawn(GetWorld(), Aim + FVector(0, 0, 3), AttackFacing, FVector2D(Attack.Size * 0.6f, Attack.Size * 0.6f), false,
+			FLinearColor(0.02f, 0.02f, 0.025f), FMath::Max(0.25f, Distance / Speed) + 0.1f);
 		if (AWRProjectile* Lob = GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), From, Velocity.Rotation(), Params))
 		{
 			FWRHit Hit;
@@ -324,8 +358,11 @@ void AWRBoss::BeginStrike()
 			Hit.bUnblockable = Attack.bUnblockable;
 			Hit.bHeavy = true;
 			Hit.Tier = EWRHitTier::Heavy;
-			Hit.Element = Attack.Buildup > 0.f ? BossElement() : WRTags::Element_Physical;
-			(BossElement() == WRTags::Element_Fire ? Hit.BurnBuildup : Hit.FrostBuildup) = Attack.Buildup;
+			// Its own element (a void boss's glob is void, not fire: 3.12); burn / frost buildup only for those two.
+			const FGameplayTag Own = WRBossDetail::ElementOf(GetDef());
+			Hit.Element = Attack.Buildup > 0.f || (Own != WRTags::Element_Fire && Own != WRTags::Element_Frost) ? Own : WRTags::Element_Physical;
+			if (Own == WRTags::Element_Fire) Hit.BurnBuildup = Attack.Buildup;
+			else if (Own == WRTags::Element_Frost) Hit.FrostBuildup = Attack.Buildup;
 			const bool bRock = Attack.Id == TEXT("boulder");
 			Lob->InitLob(Hit, Velocity, 1.f, Attack.Size, bRock ? FString(TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_05A.SM_SimpleRock_05A")) : FString());
 			++InFlight;
@@ -339,6 +376,7 @@ void AWRBoss::BeginStrike()
 				const int32 Index = Self->Attacks.IndexOfByPredicate([AttackId](const FWRBossAttack& A) { return A.Id == AttackId; });
 				if (Self->Attacks.IsValidIndex(Index)) Self->Aftermath(Self->Attacks[Index], At);
 			};
+		}
 		}
 		bThrown = true;
 		return;
@@ -371,11 +409,33 @@ void AWRBoss::BeginStrike()
 		// Down out of the sky onto where the target stood, the wing-beat shadow there since the wind-up.
 		StrikeTo = AttackPoint + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() + 20.f);
 		StrikeEnds = Now + FMath::Clamp(FVector::Dist(StrikeFrom, StrikeTo) / T.Num(TEXT("bosses.diveSpeed"), 3000.f), 0.3f, 1.2f);
+		// Its shadow under it from the moment it drops (3.11), for the fall.
+		AWRGroundMarker::Spawn(GetWorld(), AttackPoint + FVector(0, 0, 3), AttackFacing, FVector2D(Attack.Size * 0.6f, Attack.Size * 0.6f), false, FLinearColor(0.02f, 0.02f, 0.025f), float(StrikeEnds - Now) + 0.1f);
 		return;
 	}
 	// Slams and stomps: a wave of dust and grit (embers, snow) rolls out from where it struck; damage rides the front.
 	const bool bWave = Attack.Shape == EWRBossShape::SelfCircle && !Id.Contains(TEXT("tail")) && !Id.Contains(TEXT("bellow"));
 	const bool bPointSlam = Attack.Shape == EWRBossShape::TargetCircle;
+	// A point slam aimed past the arm's reach (3.10): the weapon comes down at its reach on the line to the target, and
+	// the ground splits from there to the aim point (a burrower's mound runs the same way); the row's ring bursts there.
+	const float Reach = GetSimpleCollisionRadius() + FMath::Max(T.Num(TEXT("bosses.slamReachMin"), 250.f), GetSimpleCollisionHalfHeight() * T.Num(TEXT("bosses.slamReachHeight"), 1.4f));
+	if (bPointSlam && FVector::Dist2D(AttackPoint, GetActorLocation()) > Reach + T.Num(TEXT("bosses.slamReachSlack"), 100.f))
+	{
+		const FVector Dir = ((AttackPoint - GetActorLocation()) * FVector(1.f, 1.f, 0.f)).GetSafeNormal();
+		const FVector Limb = GetActorLocation() + Dir * Reach - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
+		const bool bBurrow = Id.Contains(TEXT("burrow")) || Id.Contains(TEXT("breach")) || Id.Contains(TEXT("emerge"));
+		const float Speed = T.Num(TEXT("bosses.eruptionSpeed"), 1500.f);
+		WRFx::Broadcast(this, bBurrow ? FName(TEXT("burst")) : FName(TEXT("shockwave")), Limb, FRotator::ZeroRotator, bBurrow ? 1.2f : 1.6f, TEXT("stomp"));
+		TWeakObjectPtr<AWRBoss> Weak(this);
+		AWRStrikeFront::Line(this, Limb, AttackPoint, Speed, T.Num(TEXT("bosses.eruptionWidth"), 160.f),
+			[Weak](AWRCharacterBase* Who) { if (AWRBoss* Self = Weak.Get(); Self && Self->IsHostileTo(Who)) Self->StrikeHit(Who); },
+			bBurrow ? FName(TEXT("burst")) : FName(TEXT("stomp")), TEXT("stomp"), Attack.Size);
+		bFarSlam = true;
+		StrikeTo = AttackPoint;
+		// The strike stays open while the split runs and its ring rolls out (StrikeHit counts each body once).
+		StrikeEnds = FMath::Max(StrikeEnds, Now + FVector::Dist2D(Limb, AttackPoint) / FMath::Max(100.f, Speed) + Attack.Size / T.Num(TEXT("bosses.waveSpeed"), 1200.f) + 0.1f);
+		return;
+	}
 	if (bWave || bPointSlam)
 	{
 		const FVector At = bPointSlam ? AttackPoint : Floor;
@@ -645,9 +705,9 @@ void AWRBoss::TickStrike(float DeltaSeconds)
 	}
 	else if (Attack.Shape == EWRBossShape::SelfCircle || Attack.Shape == EWRBossShape::TargetCircle)
 	{
-		if (Id.Contains(TEXT("bellow")))
+		if (Id.Contains(TEXT("bellow")) || bFarSlam)
 		{
-			return;
+			return;   // (a far slam's eruption front does its own hitting)
 		}
 		// The wave's front: a ring rolling out at waveSpeed; inside the slam's own head (the first half metre) at once.
 		const float Front = float(Now - StrikeStarted) * T.Num(TEXT("bosses.waveSpeed"), 1200.f);
@@ -765,9 +825,12 @@ void AWRBoss::EndStrike()
 	if (++RepeatIndex <= Attack.Repeats)
 	{
 		const float Hold = Attack.bRow && FMath::RoundToInt(Attack.Row.HoldOn) == RepeatIndex ? Attack.Row.Hold : 0.f;
+		// Every repeat shows its own tell (3.11): the row's glint and voice, a gap of at least repeatMinGap s. A gap of 0 is a
+		// volley thrown together off the one tell.
+		const float Gap = Attack.RepeatGap <= 0.f ? 0.f : FMath::Max(Attack.RepeatGap, FWRTuning::Get().Num(TEXT("bosses.repeatMinGap"), 0.4f));
 		StrikeState = EStrike::Windup;
 		StrikeStarted = Now;
-		ResolveAt = Now + Attack.RepeatGap + Hold;
+		ResolveAt = Now + Gap + Hold;
 		bFinalCue = false;
 		bThrown = false;
 		if (AWRCharacterBase* Target = AttackTarget.Get(); Target && Target->IsAlive())
@@ -775,10 +838,16 @@ void AWRBoss::EndStrike()
 			AttackPoint = Target->GetActorLocation() - FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight());
 			if (Attack.Id == TEXT("ice_spikes"))
 			{
-				AWRGroundMarker::Spawn(GetWorld(), AttackPoint + FVector(0, 0, 3), AttackFacing, FVector2D(Attack.Size, Attack.Size), false, FLinearColor(0.75f, 0.9f, 1.f), Attack.RepeatGap + Hold);
+				WRFx::Broadcast(this, TEXT("frostnova"), AttackPoint, FRotator::ZeroRotator, 0.35f, NAME_None, Gap + Hold);
 			}
 		}
-		PlaySwing(EWRSwingKind::Heavy, Attack.RepeatGap + Hold + 0.2f);
+		if (Gap > 0.f)
+		{
+			uint8 RepeatGlint = Attack.bRow ? Attack.Row.Glint : (Attack.bUnblockable || Attack.bGrab ? 2 : 1);
+			if (RepeatGlint == 0 && WRBossDetail::IsThrown(Attack)) RepeatGlint = 1;
+			MulticastTell(RepeatGlint, Attack.bRow ? Attack.Row.TellBone : FName(TEXT("hand")), TEXT("voice"));
+		}
+		PlaySwing(EWRSwingKind::Heavy, Gap + Hold + 0.2f);
 		return;
 	}
 	// A combo's next move (claw, claw, then the lunge; the breath into the slam).

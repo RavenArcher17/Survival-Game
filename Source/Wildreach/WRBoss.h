@@ -343,6 +343,9 @@ private:
 	bool bFurnished = false;
 	float LineTravelled = 0.f;
 	bool bLineLeap = false;
+	/** A point slam aimed past the arm's reach (cookpass-combat 3.10): the weapon comes down at its reach and an eruption
+	 *  runs along the ground to the aim point (an AWRStrikeFront), which does all its hitting. */
+	bool bFarSlam = false;
 	double BossReadAt = -100.0;
 	double NextFurnishTry = 0.0;
 	double PlungeUntil = 0.0;

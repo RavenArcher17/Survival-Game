@@ -49,6 +49,33 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
 - **Combat (8): the lock mark.** Why: gold corners framed the body's middle while the camera held a lock point, so
   flicking from a head to a wing showed nothing (G5). A small warm dot on the exact point held, with a ring closing onto
   it whenever the lock lands or moves (`AWRPlayerController::GetLockAimLocation`).
+- **Combat (9): fronts, so every blow lands where something is.** Why: boss rows aimed at a far spot burst a ring there
+  with nothing at it (echo_warden's fork slam up to 30 m off, the avalanche at 24 m, burrow eruptions, Vulkarn's
+  overhead slam past his arm), and creature bursts did the same from a body standing in plain sight (G13, G22; Elden
+  Ring's ground eruptions, Monster Hunter's slam waves).
+  - `AWRStrikeFront` (`WRStrikeFront.cpp`, server only, fx rows on every machine): rings (out, or closing in), lines
+    running on the ground and limb arcs, hitting only where the front is, once per body; a body in the air over a ground
+    front clears it.
+  - A point slam aimed past the boss's reach comes down at its reach and the ground splits to the aim point
+    (`bosses.eruptionSpeed` 1500 cm/s, 160 cm wide), then the row's ring bursts there; burrowing rows run a mound the same
+    way. A creature `burst` from a visible body splits the ground from its feet.
+- **Combat (10): tells.** Why: repeats of a string came with no glint (gaps of 0.0-0.3 s), every thrown row and dive
+  laid a dark mark from the start of its wind-up, ice spikes a full frost circle, glints on buried bodies showed
+  nothing, four rows coiled in under 0.34 s, and throwing rows with no glint gave no sign where the shot came from
+  (G14, G15, G23-G25).
+  - Every repeat shows its own glint and voice, its gap at least `bosses.repeatMinGap` 0.4 s (0 stays a volley).
+  - A throw casts its shadow from the moment it leaves the hand, a dive from the drop; ice spikes show a small frost at
+    the spot. A buried body's cue plays at the surface over it. Glints grow with distance past 10 m so they read at
+    15 m (`creatureAI.glintNear`). Throwing rows always glint.
+  - attacks.json: thornlynx paw_swipe2 0.36 s, raiju claw2 0.36, bogstalker gulp 0.4, hex_warden sickle_b 0.4.
+- **Combat (11): projectiles.** Why: close spits arrived in 0.5-0.7 s (gemsniffer, wickbeetle, dromad), the Echo mimic
+  flew at 1600 cm/s at where you were at release, an arcane or void spitter threw a burning glob, a void boss's lobs
+  were fire, boss globs and nets couldn't be reflected while stones could, and needle_fan was one lob (G16-G19).
+  - At least `creatureAI.minWarning` 0.9 s from tell to hit: a close shot flies slower (at least 250 cm/s), never faster.
+  - Spits and boss lobs carry the body's own element and colour; burn / frost buildup only for fire / frost.
+  - One reflect rule (`AWRProjectile::IsEnemyShot`): every enemy shot reflects except a modelled heavy lob (a boulder,
+    a headstone); a survivor's own shots keep their rule.
+  - The Echo mimic aims where you stood at its wind-up, at the shot cap; a thrown cone fans `bosses.coneLobs` 5 lobs.
 
 ## Unreleased: the audio cook pass (all sound and music)
 

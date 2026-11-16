@@ -126,7 +126,9 @@ the reach tube. A chain light into a wall recoils (`CheckRecoil`, tuning `combat
 `blade` row (two points in the fist's frame and a radius), and a new hero swing clip needs its `trace` window in
 `anim_windows.json`, or its blade path is wrong. A one-off burst under a tick's rules sets `FWRHit::bBurst` so it gets the full hit stack;
 the tier rises by itself for impact 3+ or a fifth of the body's health. A bar that should show what a blow took uses
-`SWRBar` `.Trail(true)`; your running damage on a body is `UWRFxSubsystem::Tally`.
+`SWRBar` `.Trail(true)`; your running damage on a body is `UWRFxSubsystem::Tally`. A blow that isn't a body (a shockwave, a split in the ground, a bore, a sweep) is an
+`AWRStrikeFront` (`Ring` / `Line` / `Arc` with the owner's hit callback), never an instant radius check; every enemy
+shot gives at least `creatureAI.minWarning` from its tell.
 
 Also since 0.7.1: **survival** (FULL-GAME 6.1, cooks/build-survival.md): `UWRSurvivalComponent` on the PlayerState
 owns sleep and Rested, comfort near beds, lit / unlit, the weather on that player, corruption and the held light

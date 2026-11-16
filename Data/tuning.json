@@ -450,6 +450,8 @@
     "holdSeconds": 0.15, "easeOutSeconds": 0.4, "hideUnder": 100, "giantRatio": 3, "giantBoom": 150, "giantPitch": 10, "giantSeconds": 0.4, "mouseFlickPx": 300, "mouseFlickMinPx": 40, "flickRearm": 0.25, "blockMinExtent": 160},
 
   "bosses": {
+    "_fronts": "cookpass-combat 3.10-3.12: a point slam aimed past the boss's reach (capsule radius + max(slamReachMin, slamReachHeight x half height), plus slamReachSlack) comes down at its reach and an eruption runs along the ground to the aim point at eruptionSpeed cm/s, eruptionWidth wide, then the row's ring bursts there. Ground fronts (AWRStrikeFront) drop a puff every frontStepCm and miss a body in the air more than frontClear cm over the floor. A repeat's gap is at least repeatMinGap s with its own tell (0 stays a volley). A thrown cone row throws coneLobs lobs across its arc.",
+    "slamReachMin": 250, "slamReachHeight": 1.4, "slamReachSlack": 100, "eruptionSpeed": 1500, "eruptionWidth": 160, "frontStepCm": 120, "frontClear": 70, "repeatMinGap": 0.4, "coneLobs": 5,
     "ssarrok": {"health": 3000, "arenaRadius": 6000, "chaseRadius": 6500, "beachSeconds": 6, "beachTaken": 1.3, "swallowSeconds": 4, "swallowDps": 12, "throatFree": 400, "spitDamage": 40, "spitBlind": 80, "breachLaunch": 1200, "duskFrom": 18, "duskTo": 21, "routeInput": 0.5},
     "mirage_matriarch": {"health": 3000, "arenaRadius": 3500, "chaseRadius": 6500, "mirageSpread": 500, "reformSeconds": 12, "blindBreak": 15},
     "glass_empress": {"health": 3000, "arenaRadius": 3200, "chaseRadius": 6500, "plateHealth": 300, "plateTaken": 0.3, "strikePlate": 2, "shockSeconds": 4, "shardRadius": 400, "shardDamage": 15, "crushSeconds": 2, "crushDps": 25, "crushFree": 300, "crushSting": 82, "stingBlind": 80, "prismArc": 40, "prismTurn": 50, "prismRange": 2000, "prismTick": 15},
@@ -700,6 +702,8 @@
     "threat": { "default": 0.7, "pack_hunter": 0.5, "ground_predator": 0.9, "flyer": 0.4, "burrower": 0.4, "highlandMult": 1.3, "notAfterHit": 5, "turnRate": 240, "breakMargin": 100 },
 
     "_rows": "Attack rows (Data/attacks.json, cooks/build-combat-full.md 2.15): minWindup s (no faster tell), finalCueSeconds before a held strike's contact, maxProjectileSpeed cm/s (Fire / Frost; never homing), offscreen (a wind-up starts only within offscreenHalfAngle degrees of its target's view, or within offscreenAudibleRadius cm), readsActionCooldown s, stomp waves (waveSpeed cm/s, waveDepth cm), breathe (after a string: min-max s, at distance.min-max cm), flank (inner-outer cm ring, tolerance cm), withdraw (a quarter of its stance in window s: shelled up seconds, damageTaken x, strikeMult x), howl callRadius, pulling (a hit from beyond pullRange cm alerts packmates within pullAlertRadius cm that see it).",
+    "_warning": "cookpass-combat 3.11-3.12: minWarning s is the least time from a shot's tell to its hit (a close shot flies slower, at least 250 cm/s); past glintNear cm from the viewer a tell's glint grows with distance (up to x3) so it reads at 15 m.",
+    "minWarning": 0.9, "glintNear": 1000,
     "minWindup": 0.34, "finalCueSeconds": 0.2, "maxProjectileSpeed": 1000,
     "offscreenHalfAngle": 55, "offscreenAudibleRadius": 800, "readsActionCooldown": 6,
     "stomp": { "radius": 320, "bodyRadius": 90, "waveSpeed": 1200, "waveDepth": 150 },

@@ -33,6 +33,9 @@
 #include "WRSound.h"
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
+#include "Engine/Engine.h"
+#include "Camera/PlayerCameraManager.h"
+#include "WRStrikeFront.h"
 #include "WRTaming.h"
 #include "WRWeapons.h"
 #include "WRPadInput.h"
@@ -452,11 +455,27 @@ void AWRCreature::MulticastTell_Implementation(uint8 Glint, FName BoneHint, FNam
 		return;
 	}
 	const FName Bone = FindBone(BoneHint);
-	if (Glint > 0)
+	// Past glintNear cm from this machine's view the glint grows with the distance, so it reads as big at 15 m as at 10
+	// (the bar: tells read at 15 m; cookpass-combat 3.11).
+	const APlayerController* Viewer = GEngine ? GEngine->GetFirstLocalPlayerController(GetWorld()) : nullptr;
+	const float View = Viewer && Viewer->PlayerCameraManager ? FVector::Dist(Viewer->PlayerCameraManager->GetCameraLocation(), GetActorLocation()) : 0.f;
+	const float Grow = FMath::Clamp(View / FMath::Max(100.f, WRTune(TEXT("creatureAI.glintNear"), 1000.f)), 1.f, 3.f);
+	if (IsHidden())
+	{
+		// Under the ground or the water: the cue is at the surface over it, where it will come up (a hidden mesh shows
+		// nothing).
+		const FVector Surface = GetActorLocation() - FVector(0.f, 0.f, GetSimpleCollisionHalfHeight());
+		WRFx::SpawnAt(this, TEXT("burst"), Surface, FRotator(90.f, 0.f, 0.f), FMath::Clamp(GetSimpleCollisionRadius() / 150.f, 0.4f, 1.2f));
+		if (Glint > 0)
+		{
+			WRFx::SpawnAt(this, Glint == 2 ? TEXT("glint.crimson") : TEXT("glint.white"), Surface + FVector(0.f, 0.f, 40.f), FRotator::ZeroRotator, FMath::Clamp(GetSimpleCollisionRadius() / 90.f, 0.7f, 2.5f) * Grow);
+		}
+	}
+	else if (Glint > 0)
 	{
 		// A small glint on the attacking part: white = it can be blocked, crimson = dodge it (the colour law).
 		const FVector At = Bone.IsNone() ? MouthLocation() : Skel->GetBoneLocation(Bone);
-		WRFx::SpawnAt(this, Glint == 2 ? TEXT("glint.crimson") : TEXT("glint.white"), At, FRotator::ZeroRotator, FMath::Clamp(GetSimpleCollisionRadius() / 90.f, 0.7f, 2.5f));
+		WRFx::SpawnAt(this, Glint == 2 ? TEXT("glint.crimson") : TEXT("glint.white"), At, FRotator::ZeroRotator, FMath::Clamp(GetSimpleCollisionRadius() / 90.f, 0.7f, 2.5f) * Grow);
 	}
 	if (!Sound.IsNone())
 	{
@@ -730,7 +749,8 @@ bool AWRCreatureAI::StartRow(AWRCreature* Self, AWRCharacterBase* Target, FName 
 		Self->MulticastRowGesture(R->Motion, (R->Windup + R->Hold) / Pace, Side);
 	}
 	// The tell: its voice and a small glint on the attacking part (white blockable, crimson unblockable).
-	Self->MulticastTell(R->Glint, R->TellBone, TEXT("voice"));
+	// A row that throws something always shows a glint where it comes from (3.11), whatever its row says.
+	Self->MulticastTell(R->Glint == 0 && R->Motion == TEXT("spit") ? uint8(1) : R->Glint, R->TellBone, TEXT("voice"));
 	FWRStormAI::RowStarted(this, Self, *R, Target);
 	FWRSwampAI::RowStarted(this, Self, *R, Target);
 	FWRVoidAI::RowStarted(this, Self, *R, Target);
@@ -918,9 +938,14 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	{
 		// A glob of its element, at where the target stood when it wound up; it never homes (CAL 1.9).
 		const FWRCreatureDef* Def = Self->GetDef();
-		const bool bFrost = Def && Def->Element == TEXT("frost");
+		const FName Own = Def ? Def->Element : NAME_None;
+		const bool bFrost = Own == TEXT("frost");
 		const FVector From = Self->MouthLocation();
 		const FVector AimAt = RowAim + FVector(0.f, 0.f, 60.f);
+		// At least creatureAI.minWarning from the tell to the hit (3.12): close up, the glob flies slower (a frenzied fold's
+		// shorter wind-up included, since it's the time the tell really showed).
+		const float Shown = float(GetWorld()->GetTimeSeconds() - RowStarted);
+		const float Speed = FMath::Max(250.f, FMath::Min(R->ProjectileSpeed, FVector::Dist(From, AimAt) / FMath::Max(0.05f, WRTune(TEXT("creatureAI.minWarning"), 0.9f) - Shown)));
 		FActorSpawnParameters Params;
 		Params.Owner = Self;
 		Params.Instigator = Self;
@@ -933,14 +958,19 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 			Hit.PoiseDamage = R->Poise;
 			Hit.Impact = R->Impact;
 			Hit.bProjectile = true;
-			Hit.Element = bFrost ? WRTags::Element_Frost : WRTags::Element_Fire;
+			// Its own element: an arcane, void or lightning spitter's glob is its kind, not fire (3.12).
+			Hit.Element = Own == TEXT("fire") ? WRTags::Element_Fire : bFrost ? WRTags::Element_Frost : Own == TEXT("lightning") ? WRTags::Element_Lightning
+				: Own == TEXT("tide") ? WRTags::Element_Water : Own == TEXT("void") ? WRTags::Element_Void : Own == TEXT("arcane") ? WRTags::Element_Arcane : WRTags::Element_Physical;
 			for (const TPair<FName, float>& B : R->Buildups)
 			{
 				if (B.Key == TEXT("burn")) Hit.BurnBuildup += B.Value;
 				else if (B.Key == TEXT("frost")) Hit.FrostBuildup += B.Value;
 				else Hit.Buildups.Add(B.Key, B.Value);
 			}
-			Glob->Init(Hit, R->ProjectileSpeed, bFrost ? FLinearColor(0.5f, 0.85f, 1.f) : FLinearColor(1.f, 0.45f, 0.05f));
+			const FLinearColor Tint = Own == TEXT("fire") ? FLinearColor(1.f, 0.45f, 0.05f) : bFrost ? FLinearColor(0.5f, 0.85f, 1.f) : Own == TEXT("arcane") ? FLinearColor(0.7f, 0.45f, 1.f)
+				: Own == TEXT("void") ? FLinearColor(0.35f, 0.1f, 0.55f) : Own == TEXT("lightning") ? FLinearColor(0.75f, 0.85f, 1.f) : Own == TEXT("tide") ? FLinearColor(0.2f, 0.6f, 0.8f)
+				: Own == TEXT("spore") || Own == TEXT("nature") ? FLinearColor(0.55f, 0.75f, 0.2f) : Own == TEXT("blood") ? FLinearColor(0.5f, 0.04f, 0.08f) : FLinearColor(0.8f, 0.72f, 0.55f);
+			Glob->Init(Hit, Speed, Tint);
 		}
 	}
 	else if (M == TEXT("stomp"))
@@ -954,6 +984,24 @@ void AWRCreatureAI::StrikeRow(AWRCreature* Self)
 	{
 		// Up out of the ground where the target stood.
 		const float Radius = FMath::Max(150.f, R->Radius);
+		const float Reach = Self->GetSimpleCollisionRadius() + FMath::Max(150.f, Self->GetSimpleCollisionHalfHeight());
+		if (!Self->IsHidden() && FVector::Dist2D(Self->GetActorLocation(), RowAim) > Reach + Radius)
+		{
+			// A body standing in plain sight bursts the ground at its feet and the split runs to the spot (3.10): nothing
+			// rises out of the ground at a distance with nothing under it.
+			const FVector Feet = Self->GetActorLocation() - FVector(0.f, 0.f, Self->GetSimpleCollisionHalfHeight());
+			WRFx::Broadcast(Self, TEXT("burst"), Feet, FRotator(90.f, 0.f, 0.f), 0.7f, TEXT("stomp"));
+			TWeakObjectPtr<AWRCreatureAI> WeakAI(this);
+			TWeakObjectPtr<AWRCreature> WeakSelf(Self);
+			AWRStrikeFront::Line(Self, Feet, RowAim, WRTune(TEXT("bosses.eruptionSpeed"), 1500.f), FMath::Max(100.f, Radius * 0.5f),
+				[WeakAI, WeakSelf](AWRCharacterBase* Who)
+				{
+					AWRCreatureAI* AI = WeakAI.Get();
+					AWRCreature* Body = WeakSelf.Get();
+					if (AI && Body && Body->IsAlive() && Body->IsHostileTo(Who)) AI->RowHit(Body, Who);
+				}, TEXT("burst"), TEXT("stomp"), Radius);
+			return;
+		}
 		WRFx::Broadcast(Self, TEXT("burst"), RowAim, FRotator(90.f, 0.f, 0.f), Radius / 120.f, TEXT("stomp"));
 		if (Self->IsHidden())
 		{

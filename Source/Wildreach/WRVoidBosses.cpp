@@ -343,14 +343,15 @@ bool FWRVoidBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
 		Hit.bProjectile = true;
 		Hit.bSpell = true;
 		const FVector From = Boss->MouthLocation();
-		const FVector Aim = Target->GetActorLocation();
+		// Where you stood when its wind-up began, never where you are now (cookpass-combat 3.12).
+		const FVector Aim = Boss->AttackPoint + FVector(0.f, 0.f, Target->GetSimpleCollisionHalfHeight());
 		FActorSpawnParameters Params;
 		Params.Owner = Boss;
 		Params.Instigator = Boss;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (AWRProjectile* P = Boss->GetWorld()->SpawnActor<AWRProjectile>(AWRProjectile::StaticClass(), From, (Aim - From).Rotation(), Params))
 		{
-			P->Init(Hit, FMath::Min(VbT(Boss, TEXT("mimicSpeed"), 1600.f), 1600.f), Last.Element == WRTags::Element_Fire ? FLinearColor(1.f, 0.45f, 0.05f) : Last.Element == WRTags::Element_Frost ? FLinearColor(0.5f, 0.85f, 1.f) : VbDeep);
+			P->Init(Hit, FMath::Min(VbT(Boss, TEXT("mimicSpeed"), 1600.f), WRTune(TEXT("creatureAI.maxProjectileSpeed"), 1000.f)), Last.Element == WRTags::Element_Fire ? FLinearColor(1.f, 0.45f, 0.05f) : Last.Element == WRTags::Element_Frost ? FLinearColor(0.5f, 0.85f, 1.f) : VbDeep);
 		}
 		return true;
 	}

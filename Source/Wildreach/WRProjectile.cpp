@@ -142,6 +142,13 @@ void AWRProjectile::Init(const FWRHit& InHit, float Speed, const FLinearColor& C
 	OnRep_Fx();
 }
 
+bool AWRProjectile::IsEnemyShot(const FWRHit& InHit)
+{
+	// Not a survivor's own shot (theirs set their own flag in WRRanged / the path abilities): a creature, a boss, a turret.
+	const AWRCharacterBase* By = Cast<AWRCharacterBase>(InHit.Instigator);
+	return !By || !By->GetPlayerState();
+}
+
 void AWRProjectile::HomeOn(AActor* Target, float Acceleration)
 {
 	// Enemy projectiles never home (COMBAT-AND-LESSONS 1.9, the hard rule): only a player's (or its tame's) may curve.
@@ -175,6 +182,9 @@ FVector AWRProjectile::LobVelocity(const FVector& From, const FVector& To, float
 void AWRProjectile::InitLob(const FWRHit& InHit, const FVector& Velocity, float Gravity, float InSplashRadius, const FString& MeshPath)
 {
 	Hit = InHit;
+	// A creature's or boss's glob, clot or spray can be thrown back by a reflector (cookpass-combat 3.12); a heavy body
+	// (a boulder, a headstone: a modelled lob) can't, unless its thrower says so.
+	Hit.bReflectable = InHit.bReflectable || (!InHit.bReaction && MeshPath.IsEmpty() && IsEnemyShot(InHit));
 	SplashRadius = InSplashRadius;
 	Movement->ProjectileGravityScale = Gravity;
 	Movement->MaxSpeed = FMath::Max(4000.f, Velocity.Size());
@@ -197,6 +207,8 @@ void AWRProjectile::InitLob(const FWRHit& InHit, const FVector& Velocity, float 
 void AWRProjectile::InitPhysical(const FWRHit& InHit, const FVector& Velocity, float Gravity, const FString& MeshPath, const FString& MeshAlong, FName InKind, FName InPickupItem)
 {
 	Hit = InHit;
+	// A creature's net or dart, a turret's bolt: straight flying shots a reflector can send back (3.12).
+	Hit.bReflectable = InHit.bReflectable || (!InHit.bReaction && IsEnemyShot(InHit));
 	Kind = InKind;
 	PickupItem = InPickupItem;
 	Collision->SetSphereRadius(WRTune(TEXT("ranged.projectileRadius"), 6.f));
