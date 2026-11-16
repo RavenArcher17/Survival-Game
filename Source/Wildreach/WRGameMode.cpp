@@ -1,10 +1,13 @@
 #include "WRGameMode.h"
+#include "WRSiege.h"
 #include "WRMapReveal.h"
 #include "WRSporePath.h"
 #include "WRNecroPath.h"
 #include "WRLand.h"
 #include "WRStore.h"
 #include "WRIdentity.h"
+#include "WRAccess.h"
+#include "GameFramework/GameSession.h"
 #include "WRGod.h"
 #include "WRRaiding.h"
 #include "WRArtifacts.h"
@@ -80,6 +83,15 @@ void AWRGameMode::InitGame(const FString& MapName, const FString& Options, FStri
 	// The world store (SQLite, Saved/Worlds/<id>/world.db): opened before anything loads; brings in 0.7's JSON saves once.
 	WRStore::Open(GetWorld());
 	FWRClans::Get().Load();
+	// Offline raid protection counts owners' leaving times per world (cooks/cookpass-multiplayer.md 3.2).
+	FWRSocialRules::ResetSession();
+	// Who may come in (cooks/cookpass-multiplayer.md 3.4): access.json's cap, password, admins and bans. The engine's own
+	// cap is the same number (PreLogin refuses first, with the reason).
+	WRAccess::LoadCurrent();
+	if (GameSession && !WRWorlds::Current().IsEmpty())
+	{
+		GameSession->MaxPlayers = FMath::Clamp(WRAccess::Current().MaxPlayers, WRAccess::MinPlayers(), WRAccess::MaxPlayersLimit(IsRunningDedicatedServer()));
+	}
 	UE_LOG(LogWildreach, Log, TEXT("WORLD %s"), Id.IsEmpty() ? TEXT("none (the menu's island: nothing is loaded or saved)") : *FString::Printf(TEXT("'%s' (Saved/Worlds/%s), preset %s"), *Id, *Id, *FWRTuning::Get().GetPreset()));
 }
 
@@ -100,6 +112,15 @@ namespace WRGameModeIdentity
 
 void AWRGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
 {
+	// Banned, full, password (WRAccess), before the engine's own checks so the joiner reads why.
+	if (!WRWorlds::Current().IsEmpty())
+	{
+		ErrorMessage = WRAccess::Refuse(UGameplayStatics::ParseOption(Options, TEXT("WRName")).Left(24), UGameplayStatics::ParseOption(Options, TEXT("WRPass")).Left(64), Address, GetNumPlayers());
+		if (!ErrorMessage.IsEmpty())
+		{
+			return;
+		}
+	}
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
 	if (!ErrorMessage.IsEmpty())
 	{
@@ -156,7 +177,11 @@ FString AWRGameMode::InitNewPlayer(APlayerController* NewPlayerController, const
 			PS->HeroBuild = uint8(FMath::Clamp(FCString::Atoi(*BuildStr), 0, 255));
 			PS->bHideHelmet = Flags.Contains(TEXT("h"));
 		}
-		// A returning player's saved paths override the join URL.
+		// A returning player's saved paths override the join URL. (No save yet: new to this world, "washed ashore".)
+		{
+			FString Existing;
+			PS->bNewToWorld = !WRWorlds::Current().IsEmpty() && !WRStore::ReadCharacter(PS->GetPlayerName(), Existing);
+		}
 		LoadPlayer(PS);
 		if (UWRWorldSystems* WorldSys = UWRWorldSystems::Get(this)) WorldSys->PlayerJoined(PS);
 		// The engine picked the start spot inside Super::InitNewPlayer, before the main path was known, so the first
@@ -174,6 +199,7 @@ void AWRGameMode::BeginPlay()
 	Super::BeginPlay();
 	LoadWorld();
 	FWRRaiding::Load(GetWorld());
+	FWRSiege::Load(GetWorld());
 	WRWildlife::Start(GetWorld());
 	WRRaids::Start(GetWorld());
 	// The endgame: achievements' census, the kill-time boards and their tablets, the war-halls (WRDeeds, WRRecords, WRWarHall).
@@ -386,6 +412,7 @@ void AWRGameMode::SaveWorld()
 	FJsonSerializer::Serialize(Root, Writer);
 	WRStore::WriteDoc(TEXT("world"), Text);
 	FWRRaiding::Save();
+	FWRSiege::Save(GetWorld());
 	UE_LOG(LogWildreach, Log, TEXT("WORLD saved %d pieces"), Pieces.Num());
 	WRWildlife::Save(GetWorld());
 }
@@ -679,6 +706,18 @@ void AWRGameMode::PostLogin(APlayerController* NewPlayer)
 	CountPlayTime();
 	FWRClans::Get().RefreshPlayerStates(GetWorld());
 	AWRPlayerState* PS = NewPlayer ? NewPlayer->GetPlayerState<AWRPlayerState>() : nullptr;
+	if (PS) FWRSocialRules::NoteJoined(PS->GetPlayerName());
+	WRAccess::RefreshRoles(GetWorld());
+	// Everyone else hears who came (cooks/cookpass-multiplayer.md 3.4).
+	if (PS && !WRWorlds::Current().IsEmpty())
+	{
+		const FString Line = PS->bNewToWorld ? FString::Printf(TEXT("%s washed ashore"), *PS->GetPlayerName()) : FString::Printf(TEXT("%s is back"), *PS->GetPlayerName());
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
+			if (Other && Other != NewPlayer) Other->ClientChat(FString(), Line, WRChat::System);
+		}
+	}
 	WRBeds::Refresh(PS);
 	FWRRaiding::PlayerJoined(Cast<AWRPlayerController>(NewPlayer));
 	// The testers' god mode: this connection's nonce; a tester's game answers with the Freedom35 site's proof (WRGod).
@@ -691,6 +730,19 @@ void AWRGameMode::Logout(AController* Exiting)
 {
 	UE_LOG(LogWildreach, Log, TEXT("Player left: %s"), *GetNameSafe(Exiting));
 	SavePlayer(Exiting ? Exiting->GetPlayerState<AWRPlayerState>() : nullptr);
+	if (const APlayerState* LeftPS = Exiting ? Exiting->PlayerState.Get() : nullptr)
+	{
+		FWRSocialRules::NoteLeft(LeftPS->GetPlayerName());
+		// The others hear it (not while the whole world is closing).
+		if (!GetWorld()->bIsTearingDown && !WRWorlds::Current().IsEmpty())
+		{
+			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			{
+				AWRPlayerController* Other = Cast<AWRPlayerController>(It->Get());
+				if (Other && Other != Exiting) Other->ClientChat(FString(), FString::Printf(TEXT("%s left"), *LeftPS->GetPlayerName()), WRChat::System);
+			}
+		}
+	}
 	WRStore::Flush(false);   // a leaving character is committed now, not at the next batch
 	Super::Logout(Exiting);
 	CountPlayTime(Exiting);

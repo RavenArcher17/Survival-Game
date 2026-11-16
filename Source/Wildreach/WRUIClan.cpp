@@ -176,6 +176,8 @@ namespace WRClanTab
 		TSharedPtr<SBox> Content;
 		uint32 LastHash = 0;
 		bool bConfirmLeave = false;
+		/** The player whose Ban asks how long (24 h / for good / cancel), "" none. */
+		FString BanAsk;
 
 		const AWRPlayerState* PS() const { return PC.IsValid() ? PC->GetPlayerState<AWRPlayerState>() : nullptr; }
 		FString Me() const { const AWRPlayerState* S = PS(); return S ? S->GetPlayerName() : FString(); }
@@ -195,6 +197,24 @@ namespace WRClanTab
 			Out.Sort([](const TPair<FString, FString>& A, const TPair<FString, FString>& B) { return A.Key < B.Key; });
 			return Out;
 		}
+		/** Everyone in this game but you, as their player states (their role and ping for the players list). */
+		TArray<const AWRPlayerState*> OtherStates() const
+		{
+			TArray<const AWRPlayerState*> Out;
+			const AGameStateBase* GS = PC.IsValid() && PC->GetWorld() ? PC->GetWorld()->GetGameState() : nullptr;
+			const FString Mine = Me();
+			for (const APlayerState* P : GS ? GS->PlayerArray : TArray<TObjectPtr<APlayerState>>())
+			{
+				const AWRPlayerState* W = Cast<AWRPlayerState>(P);
+				if (W && W->GetPlayerName() != Mine && !W->GetPlayerName().IsEmpty()) Out.Add(W);
+			}
+			return Out;
+		}
+		const AWRPlayerState* StateOf(const FString& Name) const
+		{
+			for (const AWRPlayerState* W : OtherStates()) if (W->GetPlayerName() == Name) return W;
+			return nullptr;
+		}
 		bool IsOnline(const FString& Name) const
 		{
 			if (Name == Me()) return true;
@@ -203,15 +223,18 @@ namespace WRClanTab
 
 		uint32 StateHash() const
 		{
-			uint32 H = GetTypeHash(bConfirmLeave);
+			uint32 H = HashCombine(GetTypeHash(bConfirmLeave), GetTypeHash(BanAsk));
 			if (const AWRPlayerState* S = PS())
 			{
+				H = HashCombine(H, GetTypeHash(S->AccessRole));
+				for (const FString& X : S->AdminBans) H = HashCombine(H, GetTypeHash(X) + 3);
 				H = HashCombine(H, HashCombine(GetTypeHash(S->ClanName), GetTypeHash(S->ClanLeader)));
 				for (const FString& X : S->ClanMembers) H = HashCombine(H, GetTypeHash(X));
 				for (const FString& X : S->ClanInvited) H = HashCombine(H, GetTypeHash(X) + 1);
 				for (const FString& X : S->ClanInvitesToMe) H = HashCombine(H, GetTypeHash(X) + 2);
 			}
 			for (const TPair<FString, FString>& O : Others()) H = HashCombine(H, HashCombine(GetTypeHash(O.Key), GetTypeHash(O.Value)));
+			for (const AWRPlayerState* W : OtherStates()) H = HashCombine(H, GetTypeHash(W->AccessRole) + 7);
 			return H;
 		}
 
@@ -391,20 +414,85 @@ namespace WRClanTab
 			const TArray<TPair<FString, FString>> Here = Others();
 			if (Here.Num() == 0)
 			{
-				Col->AddSlot().AutoHeight()[WRUI::Text(LOCTEXT("ClanNobody", "Nobody else is here. Friends join with your IP from the main menu."), WRUI::Body(13, 500), WRUI::Ink3, false, true)];
+				Col->AddSlot().AutoHeight()[WRUI::Text(LOCTEXT("ClanNobody", "Nobody else is here. Friends join with your IP from the main menu (and the world's password, if it has one)."), WRUI::Body(13, 500), WRUI::Ink3, false, true)];
+			}
+			// Who runs the world (cooks/cookpass-multiplayer.md 3.4): the host and admins kick and ban from these rows.
+			const uint8 MyRole = S->AccessRole;
+			if (MyRole > 0)
+			{
+				Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f * U)
+				[
+					WRUI::Text(MyRole == 2 ? LOCTEXT("ClanYouHost", "You host this world: kick or ban from a player's row, and make admins who can too.")
+						: LOCTEXT("ClanYouAdmin", "You're an admin of this world: kick or ban from a player's row."), WRUI::Body(13, 500), WRUI::Brass, false, true)
+				];
 			}
 			for (const TPair<FString, FString>& O : Here)
 			{
 				const FString Name = O.Key;
+				const AWRPlayerState* Them = StateOf(Name);
+				const uint8 TheirRole = Them ? Them->AccessRole : 0;
 				TArray<TPair<FText, FLinearColor>> Chips;
+				if (TheirRole == 2) Chips.Add({ LOCTEXT("ClanHostChip", "Host"), WRUI::Brass });
+				else if (TheirRole == 1) Chips.Add({ LOCTEXT("ClanAdminChip", "Admin"), WRUI::Brass });
 				if (!O.Value.IsEmpty()) Chips.Add({ FText::FromString(O.Value == S->ClanName ? FString(TEXT("your clan")) : O.Value), O.Value == S->ClanName ? WRUI::Good : WRUI::Ink2 });
-				TSharedRef<SWidget> Buttons = SNullWidget::NullWidget;
-				if (bLead && O.Value.IsEmpty())
+				TSharedRef<SHorizontalBox> Buttons = SNew(SHorizontalBox);
+				// Its ping, live: green under 80 ms, amber under 160, red past that.
+				const TWeakObjectPtr<const AWRPlayerState> WeakThem(Them);
+				Buttons->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+				[
+					SNew(SWRChip).FontSize(11)
+					.Text_Lambda([WeakThem]() { return FText::FromString(WeakThem.IsValid() ? FString::Printf(TEXT("%d ms"), FMath::RoundToInt(WeakThem->GetPingInMilliseconds())) : FString(TEXT("-"))); })
+					.Color_Lambda([WeakThem]()
+					{
+						const float Ms = WeakThem.IsValid() ? WeakThem->GetPingInMilliseconds() : 999.f;
+						return Ms < WRTune(TEXT("access.pingGoodMs"), 80.f) ? WRUI::Good : Ms < WRTune(TEXT("access.pingFairMs"), 160.f) ? WRUI::Warn : WRUI::Bad;
+					})
+				];
+				if (BanAsk == Name)
 				{
-					Buttons = S->ClanInvited.Contains(Name) ? StaticCastSharedRef<SWidget>(WRUI::Text(LOCTEXT("ClanInvitedNote", "Invited"), WRUI::Body(13, 700), WRUI::Warn))
-						: Button(LOCTEXT("ClanInvite", "Invite"), true, [this, Name]() { Send(TEXT("clan invite ") + Name); });
+					// How long: 24 h, for good, or not after all.
+					Buttons->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)[WRUI::Text(LOCTEXT("ClanBanHow", "Ban for"), WRUI::Body(13, 700), WRUI::Warn)];
+					Buttons->AddSlot().AutoWidth().Padding(0.f, 0.f, 6.f * U, 0.f)[Button(LOCTEXT("ClanBan24", "24 h"), true, [this, Name]() { BanAsk.Reset(); Send(FString::Printf(TEXT("admin ban %s 24"), *Name)); })];
+					Buttons->AddSlot().AutoWidth().Padding(0.f, 0.f, 6.f * U, 0.f)[Button(LOCTEXT("ClanBanGood", "For good"), true, [this, Name]() { BanAsk.Reset(); Send(FString::Printf(TEXT("admin ban %s 0"), *Name)); })];
+					Buttons->AddSlot().AutoWidth()[Button(LOCTEXT("ClanBanCancel", "Cancel"), false, [this]() { BanAsk.Reset(); })];
+				}
+				else
+				{
+					if (bLead && O.Value.IsEmpty())
+					{
+						Buttons->AddSlot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f * U, 0.f)
+						[
+							S->ClanInvited.Contains(Name) ? StaticCastSharedRef<SWidget>(WRUI::Text(LOCTEXT("ClanInvitedNote", "Invited"), WRUI::Body(13, 700), WRUI::Warn))
+								: Button(LOCTEXT("ClanInvite", "Invite"), true, [this, Name]() { Send(TEXT("clan invite ") + Name); })
+						];
+					}
+					// The host over anyone; an admin over players.
+					if (MyRole > TheirRole)
+					{
+						Buttons->AddSlot().AutoWidth().Padding(0.f, 0.f, 6.f * U, 0.f)[Button(LOCTEXT("ClanKickPlayer", "Kick"), false, [this, Name]() { Send(TEXT("admin kick ") + Name); })];
+						Buttons->AddSlot().AutoWidth().Padding(0.f, 0.f, 6.f * U, 0.f)[Button(LOCTEXT("ClanBanPlayer", "Ban"), false, [this, Name]() { BanAsk = Name; })];
+					}
+					if (MyRole == 2)
+					{
+						Buttons->AddSlot().AutoWidth()[Button(TheirRole == 1 ? LOCTEXT("ClanDeop", "Remove admin") : LOCTEXT("ClanOp", "Make admin"), false,
+							[this, Name, TheirRole]() { Send(FString::Printf(TEXT("admin %s %s"), TheirRole == 1 ? TEXT("deop") : TEXT("op"), *Name)); })];
+					}
 				}
 				Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)[Row(Name, true, Chips, Buttons)];
+			}
+			// Admins: who's banned, and Unban.
+			if (MyRole > 0 && S->AdminBans.Num() > 0)
+			{
+				Col->AddSlot().AutoHeight().Padding(0.f, 16.f * U, 0.f, 10.f * U)[Heading(LOCTEXT("ClanBannedHead", "Banned"))];
+				for (const FString& Line : S->AdminBans)
+				{
+					FString Name, Left;
+					if (!Line.Split(TEXT("\t"), &Name, &Left)) Name = Line;
+					Col->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+					[
+						Row(Name, false, { { FText::FromString(Left), WRUI::Bad } }, Button(LOCTEXT("ClanUnban", "Unban"), false, [this, Name]() { Send(TEXT("admin unban ") + Name); }))
+					];
+				}
 			}
 			if (bLead)
 			{

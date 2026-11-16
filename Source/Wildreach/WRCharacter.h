@@ -295,6 +295,15 @@ private:
 	/** The ladder's climbing pose and a siege post's working pose, eased in and out (cookpass-building 3.5). */
 	float ClimbBlend = 0.f;
 	float CrewBlend = 0.f;
+	int32 LastCrewKind = 0;
+public:
+	/** On a siege engine's post (WRSiege): this frame's move stick, what was last sent, the aim last sent and when. */
+	FVector2D CrewMove = FVector2D::ZeroVector;
+	int32 CrewSentForward = 0, CrewSentRight = 0;
+	FRotator CrewAimSent = FRotator::ZeroRotator;
+	double CrewAimSentAt = 0.0;
+	bool bCrewHeld = false;
+private:
 	TWeakObjectPtr<AActor> SeatParent;
 	FVector SeatEaseFrom = FVector::ZeroVector;
 	float SeatEaseT = 1.f, SeatEaseSeconds = 0.45f;

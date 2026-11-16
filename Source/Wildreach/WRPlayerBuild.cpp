@@ -1051,8 +1051,9 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		{
 			// Right: it opens, and stays theirs to open until the code changes.
 			Door->UnlockedFor.AddUnique(Who);
-			if (!Door->bOpen) Door->SetOpen(true);
-			OutResult = TEXT("Code accepted");
+			// It swings away from whoever keyed it (cooks/cookpass-multiplayer.md 3.1).
+			FString Why;
+			OutResult = Door->bOpen || Door->SwingFor(GetPawn(), true, Why) ? TEXT("Code accepted") : FString::Printf(TEXT("Code accepted, but it can't open: %s"), *Why);
 		}
 		else OutResult = TEXT("Wrong code");
 		UE_LOG(LogWildreach, Log, TEXT("DOOR %s %s at %s: %s"), *Who, *Cmd, Door ? *Door->GetActorLocation().ToCompactString() : TEXT("-"), *OutResult);

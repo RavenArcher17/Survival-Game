@@ -5,9 +5,11 @@
 #include "WRCharacter.h"
 #include "WRUIPadKeyboard.h"
 #include "WRIdentity.h"
+#include "WRAccess.h"
 #include "WRPadInput.h"
 #include "Wildreach.h"
 #include "WRPlayerController.h"
+#include "WRPlayerState.h"
 #include "WRPlayerUI.h"
 #include "WRKeyBindings.h"
 #include "WRUISettings.h"
@@ -64,6 +66,12 @@ double SWRMainMenu::LastRejoinAt = -1000.0;
 double SWRMainMenu::NextRejoinAt = 0.0;
 double SWRMainMenu::LastFailAt = -1000.0;
 bool SWRMainMenu::bJoining = false;
+FString SWRMainMenu::LeaveTitle;
+FString SWRMainMenu::LeaveLine;
+double SWRMainMenu::LeaveAt = -1000.0;
+bool SWRMainMenu::bNeedPassword = false;
+FString SWRMainMenu::TypedPassword;
+FString SWRMainMenu::PasswordAddress;
 
 static const TCHAR* ReleasesPage = TEXT("https://github.com/RavenArcher17/Survival-Game/releases/latest");
 
@@ -76,28 +84,94 @@ static FDelayedAutoRegisterHelper GWatchNetworkFailures(EDelayedRegisterRunPhase
 	}
 });
 
+uint8 SWRChatBox::Channel = 0;
+
+FText SWRChatBox::ChannelName(uint8 InChannel)
+{
+	switch (InChannel)
+	{
+	case WRChat::Local: return NSLOCTEXT("WRUI", "ChatNearby", "Nearby");
+	case WRChat::Clan: return NSLOCTEXT("WRUI", "ChatClan", "Clan");
+	default: return NSLOCTEXT("WRUI", "ChatEveryone", "Everyone");
+	}
+}
+
+bool SWRChatBox::InClan() const
+{
+	const APlayerController* PC = Owner.Get();
+	const AWRPlayerState* PS = PC ? PC->GetPlayerState<AWRPlayerState>() : nullptr;
+	return PS && !PS->ClanName.IsEmpty();
+}
+
+void SWRChatBox::NextChannel()
+{
+	// Everyone, nearby, your clan (only while you have one), round again.
+	Channel = Channel == WRChat::Global ? WRChat::Local : Channel == WRChat::Local && InClan() ? WRChat::Clan : WRChat::Global;
+}
+
+FString SWRChatBox::WithChannel(const FString& Text) const
+{
+	const FString Line = Text.Left(200);
+	if (Line.StartsWith(TEXT("/")))
+	{
+		return Line;   // its own channel: /w name, /r, /g, /l, /c
+	}
+	const uint8 Use = Channel == WRChat::Clan && !InClan() ? WRChat::Global : Channel;
+	return Use == WRChat::Local ? TEXT("/l ") + Line : Use == WRChat::Clan ? TEXT("/c ") + Line : Line;
+}
+
 void SWRChatBox::Construct(const FArguments& InArgs)
 {
 	Owner = InArgs._Owner;
+	if (Channel == WRChat::Clan && !InClan()) Channel = WRChat::Global;
 	ChildSlot.HAlign(HAlign_Left).VAlign(VAlign_Bottom).Padding(FMargin(20.f, 0.f, 0.f, 240.f))
 	[
-		SNew(SBox).WidthOverride(520.f)
+		SNew(SBox).WidthOverride(620.f)
 		[
-			SAssignNew(Box, SEditableTextBox).HintText(FText::FromString(TEXT("Say something (Enter to send, Esc to cancel)")))
-			.Font(FCoreStyle::GetDefaultFontStyle("Regular", 13)).OnTextCommitted(this, &SWRChatBox::OnCommitted)
+			SNew(SHorizontalBox)
+			// The channel chip: click it (or Tab) for the next; its colour is the channel's lines' colour.
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(SBox).WidthOverride(96.f)
+				[
+					SNew(SWRButton).Ghost(true).FontSize(12).MinHeight(30.f)
+					.Text_Lambda([]() { return ChannelName(Channel); })
+					.OnClicked_Lambda([this]() { NextChannel(); if (Box.IsValid()) FSlateApplication::Get().SetKeyboardFocus(Box, EFocusCause::SetDirectly); return FReply::Handled(); })
+				]
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SAssignNew(Box, SEditableTextBox)
+				.HintText_Lambda([]()
+				{
+					return FText::Format(NSLOCTEXT("WRUI", "ChatHint", "To {0}: Enter sends, Tab changes, /w name whispers, Esc cancels"), ChannelName(Channel));
+				})
+				.ForegroundColor_Lambda([]() { return FSlateColor(AWRPlayerController::ChatColor(Channel)); })
+				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 13)).OnTextCommitted(this, &SWRChatBox::OnCommitted)
+			]
 		]
 	];
+}
+
+FReply SWRChatBox::OnPreviewKeyDown(const FGeometry& Geo, const FKeyEvent& Key)
+{
+	if (Key.GetKey() == EKeys::Tab)
+	{
+		NextChannel();
+		return FReply::Handled();
+	}
+	return SCompoundWidget::OnPreviewKeyDown(Geo, Key);
 }
 
 void SWRChatBox::OnCommitted(const FText& Text, ETextCommit::Type How)
 {
 	// The pad keyboard over the line: its Done presses Enter here; anything else waits for it.
 	if (How != ETextCommit::OnEnter && WRPadKeyboard::IsOpen()) return;
-	if (How == ETextCommit::OnEnter && !Text.IsEmpty())
+	if (How == ETextCommit::OnEnter && !Text.IsEmptyOrWhitespace())
 	{
 		if (AWRPlayerController* PC = Cast<AWRPlayerController>(Owner.Get()))
 		{
-			PC->ServerChat(Text.ToString().Left(200));
+			PC->ServerChat(WithChannel(Text.ToString()));
 		}
 	}
 	Close();
@@ -116,18 +190,20 @@ void SWRChatBox::Open(APlayerController* PC)
 	Mode.SetWidgetToFocus(Widget->Box);
 	PC->SetInputMode(Mode);
 	FSlateApplication::Get().SetKeyboardFocus(Widget->Box);
-	// Opened on a pad (Settings > Chat): the keyboard comes up on the line at once; cancelling it closes the line.
+	// Opened on a pad (Settings > Chat): the keyboard comes up on the line at once; cancelling it closes the line. The
+	// channel is the one last used; typed /c, /l, /g, /w name pick another.
 	if (WRInput::UsingPad())
 	{
 		WRPadKeyboard::FTarget Target;
-		Target.Hint = NSLOCTEXT("WRUI", "ChatPadHint", "Say something to everyone");
+		Target.Hint = FText::Format(NSLOCTEXT("WRUI", "ChatPadHint2", "To {0} (/g everyone, /l nearby, /c clan, /w name)"), ChannelName(Channel));
 		Target.MaxLength = 200;
 		Target.bDockTop = true;   // the chat line sits low on the left
-		const TWeakObjectPtr<APlayerController> Weak(PC);
-		Target.OnDone = [Weak](const FText& Text)
+		const TWeakPtr<SWRChatBox> WeakBox = Widget;
+		Target.OnDone = [WeakBox](const FText& Text)
 		{
-			AWRPlayerController* W = Cast<AWRPlayerController>(Weak.Get());
-			if (W && !Text.IsEmptyOrWhitespace()) W->ServerChat(Text.ToString().Left(200));
+			const TSharedPtr<SWRChatBox> B = WeakBox.Pin();
+			AWRPlayerController* W = B.IsValid() ? Cast<AWRPlayerController>(B->Owner.Get()) : nullptr;
+			if (W && !Text.IsEmptyOrWhitespace()) W->ServerChat(B->WithChannel(Text.ToString()));
 			Close();
 		};
 		Target.OnCancel = []() { Close(); };
@@ -490,6 +566,16 @@ TSharedRef<SWidget> SWRMainMenu::MakeCard()
 							return FText::Format(NSLOCTEXT("WRUI", "RejoinCount", "Try {0} of {1} didn't get in. Trying again in {2} s."), RejoinTries, Max(), Left);
 						}), WRUI::Body(13, 700), WRUI::Brass, false, true)
 					]
+					// The host's world asked for its password (cooks/cookpass-multiplayer.md 3.4): type it here; Enter or Join.
+					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 14.f * U, 0.f, 0.f)
+					[
+						SNew(SBox).Visibility_Lambda([]() { return CardKind == 1 && bNeedPassword ? EVisibility::Visible : EVisibility::Collapsed; })
+						[
+							SAssignNew(PasswordBox, SEditableTextBox).IsPassword(true).Font(WRUI::Body(16, 700))
+							.HintText(NSLOCTEXT("WRUI", "PasswordHint", "The world's password"))
+							.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type How) { if (How == ETextCommit::OnEnter && !Text.IsEmpty()) JoinWithPassword(); })
+						]
+					]
 					+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 20.f * U, 0.f, 0.f)
 					[
 						SNew(SHorizontalBox)
@@ -505,13 +591,17 @@ TSharedRef<SWidget> SWRMainMenu::MakeCard()
 						]
 						+ SHorizontalBox::Slot().AutoWidth()
 						[
-							SNew(SBox).MinDesiredWidth(190.f * U).Visibility_Lambda([]() { return CardKind == 2 || (CardKind == 1 && bCanRejoin) ? EVisibility::Visible : EVisibility::Collapsed; })
+							SNew(SBox).MinDesiredWidth(190.f * U).Visibility_Lambda([]() { return CardKind == 2 || (CardKind == 1 && (bCanRejoin || bNeedPassword)) ? EVisibility::Visible : EVisibility::Collapsed; })
 							[
 								SNew(SWRButton).Primary(true).FontSize(13).MinHeight(44.f * U)
-								.Text_Lambda([]() { return CardKind == 2 ? NSLOCTEXT("WRUI", "SendCrash", "Send the crash report") : NextRejoinAt > 0.0 ? NSLOCTEXT("WRUI", "RejoinNow", "Try now") : NSLOCTEXT("WRUI", "Rejoin", "Rejoin"); })
+								.Text_Lambda([]() { return CardKind == 2 ? NSLOCTEXT("WRUI", "SendCrash", "Send the crash report") : bNeedPassword ? NSLOCTEXT("WRUI", "JoinPassword", "Join") : NextRejoinAt > 0.0 ? NSLOCTEXT("WRUI", "RejoinNow", "Try now") : NSLOCTEXT("WRUI", "Rejoin", "Rejoin"); })
 								.OnClicked_Lambda([this]()
 								{
-									if (CardKind == 2)
+									if (CardKind == 1 && bNeedPassword)
+									{
+										JoinWithPassword();
+									}
+									else if (CardKind == 2)
 									{
 										WRReport::SendCrash();
 										CardKind = 0;
@@ -537,6 +627,7 @@ void SWRMainMenu::CloseCard()
 	CardKind = 0;
 	NextRejoinAt = 0.0;
 	bCanRejoin = false;
+	bNeedPassword = false;
 	LastFailure.Empty();
 }
 
@@ -1094,8 +1185,12 @@ FString SWRMainMenu::Options() const
 	Look = Look.Replace(TEXT("?"), TEXT("")).Replace(TEXT("="), TEXT("")).Left(12);
 	// This PC's identity token (WRIdentity): the server keeps the name for whoever claimed it first.
 	const FString Key = WRIdentity::Token();
-	return FString::Printf(TEXT("?WRName=%s?Path=%s%s%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()),
-		Look.IsEmpty() ? TEXT("") : *(TEXT("?Look=") + Look), Key.IsEmpty() ? TEXT("") : *(TEXT("?WRKey=") + Key));
+	// A password typed on the card for this address (its hash: the typed text never leaves this PC).
+	FString Address;
+	GConfig->GetString(MenuSection, TEXT("Address"), Address, GGameUserSettingsIni);
+	const FString Pass = !TypedPassword.IsEmpty() && PasswordAddress == Address ? WRAccess::WireHash(TypedPassword) : FString();
+	return FString::Printf(TEXT("?WRName=%s?Path=%s%s%s%s%s"), *Name, *Path.ToString(), Body.IsNone() ? TEXT("") : *(TEXT("?Body=") + Body.ToString()),
+		Look.IsEmpty() ? TEXT("") : *(TEXT("?Look=") + Look), Key.IsEmpty() ? TEXT("") : *(TEXT("?WRKey=") + Key), Pass.IsEmpty() ? TEXT("") : *(TEXT("?WRPass=") + Pass));
 }
 
 void SWRMainMenu::Remember() const
@@ -1302,6 +1397,25 @@ void SWRMainMenu::NoteFailure(const FString& Title, const FString& Line, bool bR
 	}
 }
 
+void SWRMainMenu::NoteLeaving(const FString& Title, const FString& Line)
+{
+	LeaveTitle = Title;
+	LeaveLine = Line;
+	LeaveAt = FPlatformTime::Seconds();
+	UE_LOG(LogWildreach, Log, TEXT("MENU leaving: %s: %s"), *Title, *Line);
+}
+
+void SWRMainMenu::JoinWithPassword()
+{
+	if (!PasswordBox.IsValid()) return;
+	TypedPassword = PasswordBox->GetText().ToString();
+	GConfig->GetString(MenuSection, TEXT("Address"), PasswordAddress, GGameUserSettingsIni);
+	PasswordBox->SetText(FText::GetEmpty());
+	bNeedPassword = false;
+	RejoinTries = 0;   // (a password try isn't a retry of a host that isn't answering)
+	Rejoin();
+}
+
 void SWRMainMenu::WatchNetworkFailures()
 {
 	static bool bWatching = false;
@@ -1318,8 +1432,28 @@ void SWRMainMenu::WatchNetworkFailures()
 		const bool bVersion = Type == ENetworkFailure::OutdatedClient || Type == ENetworkFailure::OutdatedServer;
 		if (CardKind == 1 && Now - LastFailAt < 2.0 && !bVersion) return;
 		const bool bClient = Driver && Driver->ServerConnection != nullptr;
+		// Kicked, banned, or the host closed the world: the word that came first says it (no Rejoin).
+		if (!LeaveLine.IsEmpty() && Now - LeaveAt < 20.0)
+		{
+			const FString Title = LeaveTitle, Said = LeaveLine;
+			LeaveLine.Reset();
+			bNeedPassword = false;
+			NoteFailure(Title, Said, false);
+			return;
+		}
 		FString Line;
 		bool bRejoin = bClient;
+		bNeedPassword = false;
+		// The world's own refusals (WRAccess::Refuse): "PASSWORD|..." asks for the password, "WR|..." reads as it is.
+		if ((Type == ENetworkFailure::FailureReceived || Type == ENetworkFailure::PendingConnectionFailure) && (Error.StartsWith(TEXT("PASSWORD|")) || Error.StartsWith(TEXT("WR|"))))
+		{
+			const bool bPassword = Error.StartsWith(TEXT("PASSWORD|"));
+			FString Said;
+			Error.Split(TEXT("|"), nullptr, &Said);
+			bNeedPassword = bPassword;
+			NoteFailure(bPassword ? TEXT("Password needed") : TEXT("Couldn't join"), Said.Left(200), !bPassword && !Said.StartsWith(TEXT("Banned")));
+			return;
+		}
 		switch (Type)
 		{
 		case ENetworkFailure::OutdatedClient:

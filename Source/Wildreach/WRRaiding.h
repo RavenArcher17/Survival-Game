@@ -17,7 +17,7 @@ class UPointLightComponent;
 class UBoxComponent;
 
 /** What hurt a piece: each has its own share per material (tuning raiding.material.<source>). */
-enum class EWRRaidSource : uint8 { Weapon, Blast, FirePot, Spell, Tame, Fire };
+enum class EWRRaidSource : uint8 { Weapon, Blast, FirePot, Spell, Tame, Fire, Ram, Siege };   // Ram / Siege: siege engines (WRSiege)
 
 /**
  * Player raiding (FULL-GAME 7; cooks/build-server-raids.md 2.3 to 2.7): one rule for every player-side source that hurts

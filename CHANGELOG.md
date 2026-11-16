@@ -43,6 +43,61 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   `craft.quench`, `forge.roar` (Freesound CC0 recordings cut by `Tools/audio/build_craft_audio.py`, credited in
   `Docs/CREDITS.md`).
 
+## Unreleased: the multiplayer cook pass (cookpass-multiplayer)
+
+Aaron 11-13: built features get the full cook pass. The requirement ledger, research, grades and plan are in
+showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled after each part; nothing was played here (Aaron tests).
+
+- **Part A: doors swing on their hinges.** Why: the leaf jumped 90° in one frame (the BAR's "never snap"), always
+  to the same side even into the person opening it, it could be walked through when open, and the shutting sound
+  played on the press. Now the leaf turns about its hinge on every machine (`AWRBuildPiece::OnRep_Door` / `Tick`,
+  tuning `door`). Pushed open, it slows into its stop at 90°, a little past it, and settles back. Pushed shut, it
+  speeds into the frame, and the latch sound plays as it meets it, with a 1.5° rebound. A gate leaf takes 1.6 s, a
+  door 0.9 s. A door turned back mid-swing goes from where it is. It **swings away from whoever opens it** (the keypad
+  and the code breaker too). If someone stands on that side it swings the other way, and if both sides are taken it
+  says "Someone's in the way". It won't shut on a body in its swing or in the doorway ("Someone's in the doorway" /
+  "Step back: you're in the door's way"). It collides when at rest, open or shut, never while it moves. Doors seen
+  for the first time are drawn as they are. Tested by compiling.
+- **Part B: offline raid protection arms instead of switching on.** Why: protection started the instant the last
+  clanmate logged off, so logging out mid-raid shielded the base (ARK's lesson: its protection waits 15 min). Now a
+  claim is protected only once none of its owners is on, `server.offlineArmMinutes` (15) have passed since the last
+  of them left, and `server.offlineQuietMinutes` (10) since its last attack. It ends the moment one logs in
+  (`FWRSocialRules::ProtectionFor`). Leaving times come from this session or the account's last seen (now also written
+  on logout, `WRIdentity::NoteLeft`), never earlier than the world's start, so a restart isn't a free arm. Any hit from
+  outside the owners restarts the quiet time (the totem's `LastAttackedUtc`, saved). Upkeep decay is no longer reduced
+  by protection. The Claim tab says the live state ("Unprotected: one of you is home", "Arming: protected in 11 min",
+  "Protected: 75% less damage while you're all away"). A raider hitting a protected claim is told so once a minute,
+  "Protected (75%): its owners are away". Two new rows in the world settings (Protection arms after, Quiet time after
+  an attack), and both keys are in every preset. Tested by compiling.
+- **Part C: chat channels.** Why: chat was one global channel with an 8-line memory and no limit: no clan talk, no
+  whisper, no talk to the people beside you, and a client could flood everyone. Now there are **Everyone**, **Nearby**
+  (40 m, `chat.localRangeCm`), **Clan** and **whispers** (`/w name`, `/r` replies), in `AWRPlayerController::ServerChat`
+  (the channel rides at the line's start, so the pad keyboard types them too). The chat line has a channel chip: click
+  it or press Tab for the next channel, which is remembered. Each channel's lines have their own colour on the HUD
+  (`chat.colors`, sRGB): "[Nearby] Mira: ...", "[Clan] Mira: ...", "Mira whispers: ...", "To Mira: ...". The server
+  keeps a line a second (5 at once) per player, and refuses with a reason: not in a clan, nobody by that name, nobody
+  near enough to hear. 50 lines are kept. Tested by compiling.
+- **Part D: who may come in, and who runs the world.** Why: a world had no password, no player cap, no admin, no
+  kick and no ban (`PreLogin` checked only the name's key). When the host left, everyone read "Lost the connection",
+  and nobody was told who came or went. Now:
+  - **`Saved/Worlds/<id>/access.json`** (`WRAccess`, written whole then swapped in): the player cap (2 to 16 on a
+    listen world, default 8, `net.listen*`), a **password** (kept as a salted hash; the joiner's game sends a hash,
+    never what was typed), admins and bans. `AWRGameMode::PreLogin` refuses, in order, a banned name or address
+    ("Banned from this world (21 h left)"), a full world ("World full (8/8)") and a missing or wrong password. Three
+    wrong passwords from one address in 60 s lock it out for the rest of that minute. The engine's own cap is set to match.
+  - **The Hosting page** in Choose a world (a new Hosting button): players with − / +, password Set / Remove, admins
+    (Remove) and bans (Unban), then Save.
+  - **Joining:** when a world asks for its password, the Disconnected card shows a password box and Join (Enter
+    works; on a pad A opens the keyboard). The password is kept only for this run, for Rejoin. A refusal reads as the
+    world said it, and only a ban has no Rejoin.
+  - **The players list** (the Clan tab's right column): each player's live ping (green / amber / red), Host and Admin
+    chips, and for the host or an admin **Kick**, **Ban** (24 h / For good / Cancel), plus **Make admin / Remove
+    admin** for the host, and a **Banned** list with Unban (`admin ...` commands, all checked on the server: nobody
+    kicks the host, admins can't remove admins). A kicked or banned player's card says so and by whom.
+  - **Arrivals:** everyone else reads "Mira washed ashore" (new to the world), "Mira is back" or "Mira left".
+  - **The host leaving** (Main menu or Quit) with others here tells each of them first and saves everyone. Their card
+    reads "The host closed the world. Everything was saved", with no Rejoin. Tested by compiling.
+
 ## Unreleased: building and raids cook pass (cookpass-building)
 
 Aaron 11-13: built features get the full cook pass. Research, grade, requirement ledger and plan in showcase-notes
@@ -71,6 +126,33 @@ cooks/cookpass-building.md. Compiled (editor target) after each part; not played
   rung while the other foot steps up, one cycle every two rungs, timed by height so it stops when you stop (tuning
   `anim.climb`); the same pose layer has push / crank / aim poses for siege crews (used by part D). The hot spring bath
   also stands inside a hot spring (the Steam Ground, `building.hotSpringKinds`). Tested by compiling.
+- **Part D, siege engines.** Why: FULL-GAME 7's "explosives, raid tools, siege weapons" row and biome-crystal 2.21.5 had
+  no siege engines, so stone and metal bases could only be blown with charges and haulers had no ram to push. Three
+  engines, each an item you stand in front of you (workbench at Hearth 4) and crew at its posts (Interact; the stick,
+  Attack, Block and Dodge work the engine; on a pad the same buttons), every part modelled and moving on its mechanism
+  (`WRSiegeLook.cpp`; real rams, trebuchets and ballistae measured, cooks/cookpass-building.md 1.3):
+  - **Battering ram** (steel plate 6, heartwood 10, hide 8, rope 4; 2,000 HP, wet-hide roof 800): a heartwood log with a
+    steel cap hung on two parallel chains from the ridge of a wheeled shed (solid plank wheels on iron axles in bearing
+    blocks, rafters, lapped hides); two at the rear handles (or one with a harnessed hauler, Block) push it at 1 m/s, its
+    wheels turning by the ground covered and its body pitching to them; hold Attack to draw the log back 35 deg on its
+    chains, let go and it swings as a damped pendulum: 250 at a full draw to a door or gate at the bottom of the arc
+    (walls refuse), and it bounces back off what it hits. Blows from above land on the roof first.
+  - **Trebuchet** (wood 60, steel plate 6, rope 10; 1,500 HP): base timbers, a turntable on rollers, two A-frame towers,
+    a 7.5 m arm on an iron axle, a hinged box of stones, a sling on a release pin, a winch with capstan wheels and a
+    ratchet whose pawl clicks every tooth. The winch crew holds Attack 10 s to wind the arm down; the aimer turns it
+    (10 deg/s), sets the pin (20 / 40 / 60 m), loads a siege stone (workbench: 25 stone) and throws: the weight falls,
+    the arm swings up past upright and rocks back, the sling whips round and lets go at the pin's angle. The stone's
+    whole flight is drawn for everyone within 150 m while it's cocked and loaded and in flight; it never homes. 500 to the
+    piece it hits, half to others in its 2 m footprint, 80 to anyone under it (ApplyHit; the crew's clan spared); a stone
+    breaks an Aegis dome.
+  - **Ballista** (steel plate 8, wood 30; 800 HP; any world): a steel bow on a stock on a swivelling yoke over a tripod.
+    Look to aim (it follows at 60 / 30 deg/s), hold Attack to draw with the windlass (2 s, a bolt goes in the groove),
+    let go: a red aim line for 0.9 s that everyone sees, then a straight bolt at 60 m/s, never homing, 220 (players
+    take the PvP share); Aegis stops it.
+  Engines are broken by weapons (a quarter), charges, fire pots, spells, stones; they leave a third of their materials;
+  the owner packs one up (Dodge twice, at 90% health); unattended for two hours one falls apart; they're saved with the
+  world. Siege engineer (Engineering 100) is live: engines you build hit 20% harder. The ladder climber and the crews
+  use part C's poses (push, crank with the crank's real angle, aim). Tested by compiling.
 ## Unreleased: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
 
 Aaron (lane cookpass-survival: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-survival.md).

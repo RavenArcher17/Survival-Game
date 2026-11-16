@@ -18,8 +18,18 @@ public:
 	static void Close();
 	static bool IsOpen() { return Instance.IsValid(); }
 
+	/** Tab in the line: the next channel (cooks/cookpass-multiplayer.md 3.3). */
+	virtual FReply OnPreviewKeyDown(const FGeometry& Geo, const FKeyEvent& Key) override;
+
 private:
 	void OnCommitted(const FText& Text, ETextCommit::Type How);
+	/** The channel the chip shows (WRChat::EChannel: everyone, nearby, clan), kept between lines; the next one. */
+	static uint8 Channel;
+	void NextChannel();
+	bool InClan() const;
+	/** The line as sent: the chip's channel in front, unless it starts with its own (/w name, /r, /g...). */
+	FString WithChannel(const FString& Text) const;
+	static FText ChannelName(uint8 InChannel);
 	TWeakObjectPtr<APlayerController> Owner;
 	TSharedPtr<SEditableTextBox> Box;
 	static TSharedPtr<SWidget> Instance;
@@ -61,6 +71,9 @@ public:
 	static void WatchNetworkFailures();
 	/** A failure for the card: its title, the plain line, whether Rejoin can help. */
 	static void NoteFailure(const FString& Title, const FString& Line, bool bRejoin);
+	/** Why this game is about to end (kicked, banned, the host closing the world: cooks/cookpass-multiplayer.md 3.4): the
+	 *  card that follows says it, with no Rejoin, instead of "lost the connection". */
+	static void NoteLeaving(const FString& Title, const FString& Line);
 	/** The look picked for the next join ([Wildreach.Menu] Look = <face>.<build>[.h], the ?Look= option): face index,
 	 *  build index (0 lean, 1 athletic, 2 strong) and whether the helmet is hidden. Defaults 0, 1, shown. */
 	static void GetLook(int32& Face, int32& Build, bool& bHideHelmet);
@@ -125,6 +138,17 @@ private:
 	static double NextRejoinAt;   // > 0: a countdown to the next try
 	static double LastFailAt;
 	static bool bJoining;         // the last thing the menu did was join a host (so a travel failure can be rejoined)
+	/** A kick, ban or closing world's word, and when it came (FPlatformTime). */
+	static FString LeaveTitle;
+	static FString LeaveLine;
+	static double LeaveAt;
+	/** The host asked for a password: the card has a box for it. What was typed (this run only, never saved) and the
+	 *  address it's for; the join sends its wire hash (WRAccess::WireHash). */
+	static bool bNeedPassword;
+	static FString TypedPassword;
+	static FString PasswordAddress;
+	TSharedPtr<SEditableTextBox> PasswordBox;
+	void JoinWithPassword();
 	TSharedPtr<SWidget> CardPanel;   // the card itself: the pad's D-pad navigates inside it while it shows
 	bool bCardNav = false;
 

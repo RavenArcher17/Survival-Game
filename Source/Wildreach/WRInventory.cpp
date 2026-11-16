@@ -1,4 +1,5 @@
 #include "WRInventory.h"
+#include "WRSiege.h"
 #include "WRCrystalHazards.h"
 #include "WRStormTypes.h"
 #include "WRSwampSystems.h"
@@ -1019,6 +1020,11 @@ FString UWRInventoryComponent::UseSlot(int32 SlotIndex)
 	{
 		const FString Crystal = WRCrystal::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id, SlotIndex);
 		if (!Crystal.IsEmpty()) return Crystal;
+	}
+	if (Def->Category == TEXT("siege"))
+	{
+		// Siege engines (WRSiege): a ram, a trebuchet or a ballista stood in front of you.
+		return FWRSiege::UseItem(Cast<AWRPlayerState>(GetOwner()), Def->Id);
 	}
 	if (Def->Category == TEXT("raid"))
 	{

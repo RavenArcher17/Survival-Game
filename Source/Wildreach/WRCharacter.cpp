@@ -1,4 +1,5 @@
 #include "WRCharacter.h"
+#include "WRSiege.h"
 #include "WRGod.h"
 #include "WROceanCreatures.h"
 #include "WRDesertCreatures.h"
@@ -203,6 +204,7 @@ void AWRCharacter::Tick(float DeltaSeconds)
 			TickAimCamera(DeltaSeconds);
 			TickDiveInput();
 			FWRRaiding::TickThrowArc(this, DeltaSeconds);   // a fire pot's arc while you aim it
+			FWRSiege::TickLocalCrew(this, DeltaSeconds);    // a siege post's stick and aim to the engine
 			TickCombatCamera(DeltaSeconds);
 			TickFirstPersonCamera(DeltaSeconds);
 		}
@@ -1022,6 +1024,24 @@ void AWRCharacter::TickBodyAnim()
 		H.Climb = ClimbBlend;
 		H.ClimbPhase = float(GetActorLocation().Z) / FMath::Max(1.f, 2.f * WRTune(TEXT("anim.climb.rungCm"), 30.f)) * 2.f * PI;
 	}
+	// On a siege engine's post (cookpass-building 3.5): leaning on the ram's handle, turning the winch or windlass with
+	// the crank's real angle, or on the ballista's grips.
+	{
+		const AWRSiegeEngine* Engine = bDead ? nullptr : FWRSiege::CrewingOf(this);
+		CrewBlend = FMath::FInterpConstantTo(CrewBlend, Engine ? 1.f : 0.f, Dt, 1.f / FMath::Max(0.05f, WRTune(TEXT("anim.crew.easeSeconds"), 0.35f)));
+		H.Crew = CrewBlend;
+		if (Engine)
+		{
+			const int32 Post = Engine->PostOf(this);
+			H.CrewKind = Engine->PostPose(Post);
+			H.CrewPhase = H.CrewKind == 1 ? Engine->CrankAngle() : 0.f;
+			LastCrewKind = H.CrewKind;
+		}
+		else
+		{
+			H.CrewKind = LastCrewKind;
+		}
+	}
 	FillConsumeInput(H);
 	FillWorkInput(H);
 	if (bSeated)
@@ -1049,7 +1069,9 @@ void AWRCharacter::TickBodyAnim()
 	// so any jump of the body within half a second of it attaching to or leaving a creature is eased out from where it was
 	// (a jump across the world is a teleport, not a mount).
 	const double SeatNow = GetWorld()->GetTimeSeconds();
-	AActor* NowParent = SeatMount;
+	// (Taking or leaving a siege engine's post eases the same way: WRSiege attaches the body to the engine.)
+	AActor* EaseMount = SeatMount ? static_cast<AActor*>(SeatMount) : static_cast<AActor*>(FWRSiege::CrewingOf(this));
+	AActor* NowParent = EaseMount;
 	if (NowParent != SeatParent.Get())
 	{
 		SeatChangedAt = SeatNow;
@@ -1058,9 +1080,9 @@ void AWRCharacter::TickBodyAnim()
 	}
 	// The jump: on the same mount both frames, how far it moved on its back (its gallop isn't a jump); otherwise in the world.
 	FVector Jump = bSeatHasLast ? SeatLastAt - GetActorLocation() : FVector::ZeroVector;
-	if (SeatMount && SeatLastParent.Get() == SeatMount)
+	if (EaseMount && SeatLastParent.Get() == EaseMount)
 	{
-		const FTransform Mt = SeatMount->GetActorTransform();
+		const FTransform Mt = EaseMount->GetActorTransform();
 		Jump = Mt.TransformVectorNoScale(SeatLastRel - Mt.InverseTransformPositionNoScale(GetActorLocation()));
 	}
 	if (SeatNow - SeatChangedAt < 0.5 && Jump.Size() > 30.f && Jump.Size() < 1500.f)
@@ -1082,8 +1104,8 @@ void AWRCharacter::TickBodyAnim()
 	}
 	SeatEaseWorld = EaseWorld;
 	SeatLastAt = GetActorLocation();
-	SeatLastParent = SeatMount;
-	SeatLastRel = SeatMount ? SeatMount->GetActorTransform().InverseTransformPositionNoScale(GetActorLocation()) : FVector::ZeroVector;
+	SeatLastParent = EaseMount;
+	SeatLastRel = EaseMount ? EaseMount->GetActorTransform().InverseTransformPositionNoScale(GetActorLocation()) : FVector::ZeroVector;
 	bSeatHasLast = true;
 	const FVector EaseLocal = GetActorTransform().InverseTransformVectorNoScale(EaseWorld);
 	// Sunk into quicksand, dropped into a brine pit, buried by a slide (WRDesertHazards: eased on every machine).
@@ -1306,6 +1328,11 @@ void AWRCharacter::ToggleView()
 
 void AWRCharacter::PressAbilityInput(EWRAbilityInput Input)
 {
+	// On a siege engine's post the attack works the engine; no swings or casts from there (WRSiege).
+	if (FWRSiege::CrewInput(this, int32(Input), true))
+	{
+		return;
+	}
 	// In a swamp creature's jaws or mouth (the Murkjaw's death roll, the Bogstalker's gulp): every press fights the hold
 	// (-0.15 s each, WRSwampCreatures); nothing else can start in there.
 	if (WRSwampGrip::IsHeld(this) || WRForestGrip::IsHeld(this) || FWRGraveBoss::IsHeld(this) || FWRSkyBoss::IsHeld(this) || FWROceanAI::HolderOf(this) || FWRDesertAI::HolderOf(this) || WRDesertHz::IsHeld(this))
@@ -1589,6 +1616,10 @@ void AWRCharacter::TickGuardEdge()
 
 void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)
 {
+	if (FWRSiege::CrewInput(this, int32(Input), false))
+	{
+		return;
+	}
 	if (Input == EWRAbilityInput::Light && (IsHoldingRod() || FishChargeLocal >= 0.0))
 	{
 		FishChargeLocal = -1.0;
@@ -1787,6 +1818,12 @@ void AWRCharacter::Move(const FInputActionValue& Value)
 	const FVector2D Axis = Value.Get<FVector2D>();
 	if (!Controller)
 	{
+		return;
+	}
+	// On a siege engine's post the stick works the engine (pushes the ram, turns the trebuchet), not the legs (WRSiege).
+	if (FWRSiege::CrewingOf(this))
+	{
+		CrewMove = Axis;
 		return;
 	}
 	const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);

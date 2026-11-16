@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRSiege.h"
 #include "WRGod.h"
 #include "WRSporePath.h"
 #include "WRNecroPath.h"
@@ -3711,6 +3712,12 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	}
 	if (FWRForestAI::TickTame(this, Self, DeltaSeconds))
 	{
+		return;
+	}
+	// In a battering ram's harness (WRSiege): it walks at the harness behind the ram.
+	if (AWRSiegeEngine* Ram = Cast<AWRSiegeEngine>(Self->HarnessedTo.Get()))
+	{
+		FWRSiege::TickHauler(Self, Ram, DeltaSeconds);
 		return;
 	}
 	// Sent at a building ("Break that"): bite it down, then the next piece of the same owner beside it.

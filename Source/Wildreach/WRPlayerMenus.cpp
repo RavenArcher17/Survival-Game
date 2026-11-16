@@ -3,10 +3,12 @@
 
 #include "WRCraftWork.h"
 #include "WRDeeds.h"
+#include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRWarHall.h"
 #include "WRLandThings.h"
 #include "WRPlayerController.h"
+#include "WRAccess.h"
 #include "WRCrystalCreatures.h"
 #include "WROceanCreatures.h"
 #include "WRDesertCreatures.h"
@@ -228,6 +230,11 @@ void AWRPlayerController::WRInteract()
 	}
 	// A runtime land's things: the Grey Crossing's boats, the Descent lift, the Null Gate's winch (WRLandThings).
 	if (WRLandThings::ClientInteract(this))
+	{
+		return;
+	}
+	// A siege engine's post: take it, or step off the one you're on (WRSiege).
+	if (FWRSiege::ClientInteract(this))
 	{
 		return;
 	}
@@ -848,6 +855,13 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
 		return true;
 	}
+	// Siege engines (WRSiege): siege take / leave / move / act / aim / pack / harness.
+	if (Cmd == TEXT("siege"))
+	{
+		OutResult = FWRSiege::Command(this, Args);
+		if (!OutResult.IsEmpty()) ClientNotify(OutResult);
+		return true;
+	}
 	// Runtime lands (WRLandThings): land cross / crank / repair / winch.
 	if (Cmd == TEXT("land"))
 	{
@@ -920,6 +934,13 @@ bool AWRPlayerController::RunGameplayCommand(const TArray<FString>& Args, FStrin
 		else if (A == TEXT("leave") && OutResult.StartsWith(TEXT("Left"))) TellClan(Before, FString::Printf(TEXT("%s left the clan"), *Who));
 		else if (A == TEXT("kick") && OutResult.StartsWith(TEXT("Kicked"))) { Tell(Arg(2), FString::Printf(TEXT("%s removed you from clan %s"), *Who, *Before)); TellClan(Before, FString::Printf(TEXT("%s removed %s from the clan"), *Who, *Arg(2))); }
 		UE_LOG(LogWildreach, Log, TEXT("CLAN %s: %s -> %s"), *Who, *FString::Join(Args, TEXT(" ")), *OutResult);
+		return true;
+	}
+	if (Cmd == TEXT("admin"))
+	{
+		// The host's and admins' players list (cooks/cookpass-multiplayer.md 3.4): kick, ban, unban, op, deop.
+		OutResult = WRAccess::Command(this, Args);
+		ClientNotify(OutResult);
 		return true;
 	}
 	if (Cmd == TEXT("dismount"))

@@ -134,11 +134,11 @@ void AWRHUD::DrawHUD()
 	{
 		const double ChatNow = GetWorld()->GetTimeSeconds();
 		float CY = Canvas->ClipY - 300.f;
-		for (int32 i = WPC->GetChat().Num() - 1; i >= 0; --i)
+		for (int32 i = WPC->GetChat().Num() - 1; i >= FMath::Max(0, WPC->GetChat().Num() - 8); --i)
 		{
 			const AWRPlayerController::FChatLine& L = WPC->GetChat()[i];
 			if (ChatNow - L.Time > 25.0) continue;
-			DrawText(L.Text, FLinearColor(0.85f, 0.95f, 1.f), 20.f, CY, nullptr, 1.f);
+			DrawText(L.Text, AWRPlayerController::ChatColor(L.Channel), 20.f, CY, nullptr, 1.f);
 			CY -= 20.f;
 		}
 		if (WPC->IsMapShown() && FWRPoi::All.Num() > 0)

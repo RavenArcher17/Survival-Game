@@ -73,6 +73,12 @@ public:
 	UPROPERTY(Replicated) TArray<FString> ClanInvitesToMe;
 	/** Each of those clans' leader (the same order). */
 	UPROPERTY(Replicated) TArray<FString> ClanInviteFrom;
+	/** Who runs this world (WRAccess::RefreshRoles; cooks/cookpass-multiplayer.md 3.4): 2 the host, 1 an admin, 0 a
+	 *  player (everyone sees it: the players list's chips). An admin's own: the bans ("name	time left"). */
+	UPROPERTY(Replicated) uint8 AccessRole = 0;
+	UPROPERTY(Replicated) TArray<FString> AdminBans;
+	/** Server: this character was new to the world as they came in (the "washed ashore" notice). */
+	bool bNewToWorld = false;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

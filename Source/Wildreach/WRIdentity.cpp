@@ -169,3 +169,11 @@ void WRIdentity::Bind(const FString& Name, const FString& InToken, const FString
 	A.LastAddress = Address;
 	WRStore::WriteAccount(A);
 }
+
+void WRIdentity::NoteLeft(const FString& Name)
+{
+	WRStore::FAccount A;
+	if (!WRStore::IsSql() || Name.IsEmpty() || !WRStore::ReadAccount(Name, A)) return;
+	A.LastSeen = FDateTime::UtcNow().ToUnixTimestamp();
+	WRStore::WriteAccount(A);
+}

@@ -310,6 +310,8 @@ public:
 	/** A tame sent at a building ("Break that": FWRRaiding::OrderTamesToBreak): it bites it, then the next piece of the
 	 *  same owner within raiding.tames.nextCm, until told otherwise (Come / Stay) or it's attacked. */
 	TWeakObjectPtr<class AWRBuildPiece> SiegePiece;
+	/** A hauler in a battering ram's harness (WRSiege): it walks behind the ram on its own legs until let out. */
+	TWeakObjectPtr<AActor> HarnessedTo;
 	bool bRaidLeaving = false;
 	FVector RaidBase = FVector::ZeroVector;
 	/** The claim's radius: the pieces it breaks are the claim's owner's and their clan's within it. */

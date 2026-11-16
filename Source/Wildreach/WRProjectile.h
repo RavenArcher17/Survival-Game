@@ -45,6 +45,10 @@ public:
 	/** The blow it carries and what it is (the Arcane path's Aegis stops it, a catapult stone breaks the dome). */
 	const FWRHit& GetHit() const { return Hit; }
 	FName GetKind() const { return Kind; }
+	/** Server: what it is, for a thrown thing that isn't from a ranged weapon (a trebuchet's stone: WRSiege). */
+	void SetKind(FName InKind) { Kind = InKind; }
+	/** It flies through this actor (the engine that threw it). */
+	void IgnoreActor(AActor* A);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

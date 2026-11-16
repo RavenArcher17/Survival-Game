@@ -7,6 +7,7 @@
 #include "WRBuilding.generated.h"
 
 class AWRPlayerController;
+class APawn;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
@@ -166,6 +167,9 @@ public:
 	/** Server: when it last took damage (Self repair waits for a quiet minute). */
 	double LastDamagedAt = -1.0e9;
 	UPROPERTY(ReplicatedUsing=OnRep_Door) bool bOpen = false;
+	/** Doors: which way the leaf swings open, +1 to its +Y side, -1 to -Y: away from whoever opened it (cooks/cookpass-
+	 *  multiplayer.md 3.1). The hinge stays on the frame's -X jamb either way. */
+	UPROPERTY(ReplicatedUsing=OnRep_Door) int8 DoorSide = 1;
 	UPROPERTY(Replicated) bool bLocked = false;
 	/** Crop plots: server time planting finished growing (0 = empty). */
 	UPROPERTY(Replicated) float CropReadyAt = 0.f;
@@ -261,8 +265,14 @@ public:
 	 *  entered its code)? The prompt and E use these; the server decides with CanAccess / UnlockedFor. */
 	bool SeemsShared(const AController* Player) const;
 	bool SeemsOpenable(const AController* Player) const;
-	/** Doors: open or shut it (the right code on its keypad opens it). */
-	void SetOpen(bool bNewOpen) { bOpen = bNewOpen; OnRep_Door(); }
+	/** Doors, server: open or shut it without a person at it (a blast, build copy, the right code): it swings to its +Y
+	 *  side unless a body stands there. */
+	void SetOpen(bool bNewOpen);
+	/** Doors, server: open or shut it for someone standing at it: open swings away from them, refused (OutWhy) while a
+	 *  body stands in the swing or, shutting, in the doorway. */
+	bool SwingFor(const APawn* By, bool bNewOpen, FString& OutWhy);
+	/** Doors: the leaf turns about its hinge over door.swingSeconds (Tick runs only while it moves). */
+	virtual void Tick(float DeltaSeconds) override;
 	AActor* GetChild() const { return ChildActor.Get(); }
 
 	TSharedRef<class FJsonObject> ToJson() const;
@@ -287,6 +297,19 @@ protected:
 private:
 	UFUNCTION() void OnRep_Piece();
 	UFUNCTION() void OnRep_Door();
+	/** Doors: puts the leaf at this angle about its hinge (deg; + toward its +Y side). */
+	void PoseLeaf(float Degrees);
+	/** Doors: a body (other than Ignore) in the quarter the leaf sweeps on that side (Side 0: the doorway itself). */
+	const APawn* DoorSweepBlocker(int32 Side, const AActor* Ignore) const;
+	/** Doors: where the swing is (deg), and the one under way: from, to, how far (0..1), how long, whether it shuts. */
+	float DoorAngle = 0.f;
+	float DoorFrom = 0.f;
+	float DoorTo = 0.f;
+	float DoorT = 1.f;
+	float DoorDur = 0.9f;
+	bool bDoorShutting = false;
+	bool bDoorLatched = true;
+	bool bDoorPosed = false;
 	void SpawnChild();
 	/** The real shape over the plain blocks (WRBuildLook), which stay as the collision. */
 	void ApplyDetail(const FWRPieceDef& Def, const FVector& LeafSize);
@@ -318,6 +341,19 @@ public:
 	UPROPERTY(Replicated) float BellRungAt = -1000.f;
 	/** Server: the game hour (AWRGameState::GetTotalHours) its next creature raid is due (WRRaids); < 0: not set yet. Saved. */
 	double NextRaidHours = -1.0;
+	/** Offline raid protection (FWRSocialRules::ProtectionFor; cooks/cookpass-multiplayer.md 3.2): its state as the Claim
+	 *  tab shows it (0 off on this world, 1 an owner is home, 2 arming, 3 protected) and, arming, the server world time
+	 *  it arms (AGameStateBase::GetServerWorldTimeSeconds on a client). */
+	UPROPERTY(Replicated) uint8 ProtectState = 0;
+	UPROPERTY(Replicated) float ProtectArmsAt = 0.f;
+	/** Server: when it was last hit by anyone but its owners (UTC seconds; 0 never): the quiet time counts from it. Saved. */
+	int64 LastAttackedUtc = 0;
+	/** Server: works out ProtectState now (each second, and before a hit is judged). */
+	void UpdateProtection();
+	bool IsProtectedNow() const { return ProtectState == 3; }
+	/** Server: a piece in it was hit by Source (anyone but its owners): restarts the quiet time; tells a protected
+	 *  claim's attacker it's protected (once a minute each). */
+	void NoteHit(AActor* Source, float Share);
 
 	static AWRClaimTotem* FindAt(const UWorld* World, const FVector& Location);
 	/** Can this player build here? (No claim = yes; someone else's claim = no.) */
@@ -334,6 +370,8 @@ protected:
 
 private:
 	float MinuteClock = 0.f;
+	/** Who has been told it's protected, and when (server time). */
+	TMap<FString, double> ToldProtected;
 	/** Upkeep due but not yet a whole item, per material (paid as it adds up to one). */
 	TMap<FName, float> UpkeepOwed;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
