@@ -911,6 +911,9 @@ void FWRSkyBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharacte
 		Body->Set(WRSkyFlag::Flap, Id == TEXT("vane_spin"));
 		Body->Set(WRSkyFlag::Gape, Id == TEXT("inhale") || Id.ToString().StartsWith(TEXT("coil")));
 		Body->Set(WRSkyFlag::Crest, Id == TEXT("dive"));
+		// (A stoop cut short by a stagger leaves no folded wings or mantle behind into the next move.)
+		Body->Set(WRSkyFlag::Stoop, false);
+		Body->Set(WRSkyFlag::Mantle, false);
 	}
 	// Kyrra's stoop: during the wind-up she climbs to a fold point up and back off her line to you; the drop starts from
 	// there, so it comes down steep out of the sky (SbT stoopClimb / stoopBack / stoopFoldAt).
