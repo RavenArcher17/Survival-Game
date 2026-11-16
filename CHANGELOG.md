@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: building and raids cook pass (cookpass-building)
+
+Aaron 11-13: built features get the full cook pass. Research, grade, requirement ledger and plan in showcase-notes
+cooks/cookpass-building.md. Compiled (editor target) after each part; not played here (Aaron tests).
+
+- **Part A, the build mode.** Why: on a pad RB placed and RT turned (the spec is RT place, LB / RB turn), the D-pad still
+  fired abilities while placing, nothing copied a piece, the bar always opened on Foundations, its chip said
+  "need 3 wood" (an item id), and costs counted only the bag. Now: the pad's build mode (RT place, LB / RB turn 22.5 deg
+  or the grid's step, held they repeat every 0.12 s; D-pad left / right the previous / next piece of the category, up
+  the next category, X copy; the keys panel shows them); copy for everyone (middle mouse / `BuildCopy`: the piece you aim
+  at, turned as it is, or why you can't build it); a **Survival** tab first (workbench, storage chest, lean-to, bedroll,
+  torch, campfire, claim totem) that the bar opens on until you own a claim, then the tab you used last; the chip says why
+  in 1 to 4 words ("Needs support", "Missing 3 Wood", "Someone's claim", "Blocked"...) with the whole reason under it;
+  **your chests within 20 m inside your claim pay** toward a piece (cards say "you have 12 (30 in chests)"; the server
+  takes the bag first, then the nearest chest). New piece: the **lean-to** (wood 10, fiber 8: two forked uprights, a
+  lashed ridge pole, five rafters dug in, seven rows of conifer boughs laid bottom-up, a wind-block log; you crawl in under
+  its sloped roof, and it counts as a roof for a bedroll's rest and comfort). Tested by compiling.
 ## Unreleased: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
 
 Aaron (lane cookpass-survival: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-survival.md).

@@ -187,6 +187,18 @@ public:
 	/** The mouse wheel while placing: a step on a grid, free a fine turn. */
 	void WheelPlacement(int32 Dir);
 	void CancelPlacement();
+	/** The pad's build mode (cookpass-building 3.1; ui-controls 2.1): LB / RB turn -/+ a step (22.5 deg free, the grid's
+	 *  step on a grid), held they repeat (building.padRepeat); D-pad left / right the previous / next piece of the open
+	 *  category, D-pad up the next category. */
+	void PadTurn(int32 Dir);
+	void PadTurnEnd(int32 Dir);
+	void CycleBuildPiece(int32 Dir);
+	void CycleBuildTab();
+	/** Copy (pad X, the BuildCopy key, middle mouse): start placing the built piece you aim at, turned as it is. */
+	void CopyAimedPiece();
+	/** The build bar's open tab (the bar and the pad's D-pad share it). */
+	FName GetBuildTab() const { return BuildTab; }
+	void SetBuildTab(FName Tab) { BuildTab = Tab; }
 	/** Demolish mode (the build bar's button, the Demolish key): on, bringing the build bar up, or back off to the bar. */
 	void ToggleDemolish();
 	bool IsDemolishing() const { return PlacingPiece == TEXT("demolish"); }
@@ -431,6 +443,10 @@ private:
 	float PlaceStep = 0.f;
 	bool bPlaceSpin = false;
 	double PlaceSpinAt = 0.0;
+	/** The pad's held turn (-1, 0, +1) and when it next steps. */
+	int32 PadSpinDir = 0;
+	double PadSpinAt = 0.0;
+	FName BuildTab;
 	FVector PlaceLoc = FVector::ZeroVector;
 	/** A beam's or brace's slope (degrees; a post stands at 90): the place command carries it (build-building). */
 	float PlacePitch = 0.f;

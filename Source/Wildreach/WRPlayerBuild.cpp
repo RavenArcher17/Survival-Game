@@ -6,6 +6,7 @@
 #include "WRFarm.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
+#include "WRBuildBar.h"
 #include "WRBuildLook.h"
 #include "WRLifeSkills.h"
 #include "WRCrafting.h"
@@ -301,6 +302,84 @@ void AWRPlayerController::RotatePlacementEnd()
 	bPlaceSpin = false;
 }
 
+void AWRPlayerController::PadTurn(int32 Dir)
+{
+	if (!IsPlacing() || IsDemolishing()) return;
+	const float Step = PlaceStep > 0.f ? PlaceStep : WRTune(TEXT("building.padTurnStep"), 22.5f);
+	PlaceTurn += Dir * Step;
+	PadSpinDir = Dir;
+	PadSpinAt = GetWorld()->GetTimeSeconds() + WRTune(TEXT("building.padRepeatDelay"), 0.3f);
+}
+
+void AWRPlayerController::PadTurnEnd(int32 Dir)
+{
+	if (PadSpinDir == Dir) PadSpinDir = 0;
+}
+
+void AWRPlayerController::CycleBuildPiece(int32 Dir)
+{
+	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
+	FName Tab = BuildTab;
+	if (Def && (Tab.IsNone() || !WRBuildBar::InTab(*Def, Tab))) Tab = WRBuildBar::TabOf(*Def);
+	if (Tab.IsNone()) Tab = WRBuildBar::OpeningTab(this);
+	const FName Next = WRBuildBar::Step(this, Tab, Def ? Def->Id : NAME_None, Dir);
+	if (Next.IsNone() || Next == PlacingPiece) return;
+	const float Turn = PlaceTurn;   // the piece keeps the turn you gave the last one
+	BuildTab = Tab;
+	StartPlacing(Next);
+	PlaceTurn = Turn;
+	WRSound::PlayUI(this, TEXT("ui.hover"));
+}
+
+void AWRPlayerController::CycleBuildTab()
+{
+	const FWRPieceDef* Def = FWRBuildRegistry::Get().Find(PlacingPiece);
+	const FName From = !BuildTab.IsNone() ? BuildTab : Def ? WRBuildBar::TabOf(*Def) : WRBuildBar::OpeningTab(this);
+	FName First;
+	const FName Next = WRBuildBar::NextTab(this, From, First);
+	if (First.IsNone()) return;
+	BuildTab = Next;
+	WRBuildBar::RememberTab(Next);
+	StartPlacing(First);
+	WRSound::PlayUI(this, TEXT("ui.click"));
+}
+
+void AWRPlayerController::CopyAimedPiece()
+{
+	const APawn* Self = GetPawn();
+	if (!Self || !PlayerCameraManager) return;
+	const FVector Eye = PlayerCameraManager->GetCameraLocation();
+	const FVector Dir = PlayerCameraManager->GetCameraRotation().Vector();
+	const float Behind = FMath::Max(0.f, static_cast<float>(FVector::DotProduct(Self->GetActorLocation() - Eye, Dir)));
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(WRBuildCopy), false, Self);
+	if (AWRBuildPiece* G = Ghost.Get()) Query.AddIgnoredActor(G);
+	FHitResult Hit;
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Eye, Eye + Dir * (Behind + WRTune(TEXT("building.copyReachCm"), 800.f)), ECC_Visibility, Query)) return;
+	AActor* A = Hit.GetActor();
+	AWRBuildPiece* Piece = Cast<AWRBuildPiece>(A);
+	if (!Piece && A) Piece = Cast<AWRBuildPiece>(A->GetOwner());
+	const FWRPieceDef* Def = Piece && !Piece->bGhost ? Piece->GetDef() : nullptr;
+	if (!Def)
+	{
+		ShowLocalNotice(TEXT("Aim at a built piece to copy it"));
+		WRSound::PlayUI(this, TEXT("build.invalid"));
+		return;
+	}
+	FString Why;
+	if (!WRBuildBar::CanPick(this, *Def, &Why))
+	{
+		ShowLocalNotice(Why);
+		WRSound::PlayUI(this, TEXT("build.invalid"));
+		return;
+	}
+	// Build mode comes up on the piece's tab, the piece in hand turned as the one you copied.
+	if (UI && FWRScreens::Find(TEXT("build"))) Menu = EWRMenu::Build;
+	if (!WRBuildBar::InTab(*Def, BuildTab)) BuildTab = WRBuildBar::TabOf(*Def);
+	StartPlacing(Def->Id);
+	PlaceTurn = FRotator::NormalizeAxis(Piece->GetActorRotation().Yaw - GetControlRotation().Yaw);
+	WRSound::PlayUI(this, TEXT("ui.click"));
+}
+
 void AWRPlayerController::WheelPlacement(int32 Dir)
 {
 	PlaceTurn -= Dir * (PlaceStep > 0.f ? PlaceStep : WRTune(TEXT("building.wheelStep"), 5.f));
@@ -458,6 +537,12 @@ void AWRPlayerController::UpdatePlacement()
 	if (bPlaceSpin && PlaceStep <= 0.f && GetWorld()->GetTimeSeconds() >= PlaceSpinAt)
 	{
 		PlaceTurn += GetWorld()->GetDeltaSeconds() * WRTune(TEXT("building.spinSpeed"), 90.f);
+	}
+	// The pad's held LB / RB: a step every building.padRepeat seconds.
+	if (PadSpinDir != 0 && GetWorld()->GetTimeSeconds() >= PadSpinAt)
+	{
+		PlaceTurn += PadSpinDir * (PlaceStep > 0.f ? PlaceStep : WRTune(TEXT("building.padTurnStep"), 22.5f));
+		PadSpinAt = GetWorld()->GetTimeSeconds() + WRTune(TEXT("building.padRepeat"), 0.12f);
 	}
 	const float Wanted = GetControlRotation().Yaw + PlaceTurn;
 	const float Grid = FWRBuildRegistry::Get().GridSize;
@@ -678,7 +763,8 @@ void AWRPlayerController::UpdatePlacement()
 	{
 		for (const TPair<FName, int32>& C : WRFreeBuild::CostFor(this, *Def))
 		{
-			if (FWRMachines::CanPay(PS->GetInventory(), C.Key) < C.Value)
+			// Your chests near you in your claim pay too (cookpass-building 3.2).
+			if (FWRMachines::CanPay(PS->GetInventory(), C.Key) + WRBuildStock::InChests(GetWorld(), PS->GetPlayerName(), Self->GetActorLocation(), C.Key) < C.Value)
 			{
 				bPlaceValid = false;
 				PlaceWhy = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString());
@@ -804,6 +890,8 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 	const auto Arg = [&Args](int32 i) { return Args.IsValidIndex(i) ? Args[i] : FString(); };
 	const FString Who = PS->GetPlayerName();
 	UWRInventoryComponent* Inv = PS->GetInventory();
+	// Where the builder stands: their chests near it in their claim pay toward a piece (cookpass-building 3.2).
+	const FVector StockAt = GetPawn() ? GetPawn()->GetActorLocation() : FVector::ZeroVector;
 
 	if (Cmd == TEXT("place"))
 	{
@@ -875,12 +963,12 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		{
 			for (const TPair<FName, int32>& C : Cost)
 			{
-				if (FWRMachines::CanPay(Inv, C.Key) < C.Value) { OutResult = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString()); break; }
+				if (FWRMachines::CanPay(Inv, C.Key) + WRBuildStock::InChests(GetWorld(), Who, StockAt, C.Key) < C.Value) { OutResult = FString::Printf(TEXT("need %d %s"), C.Value, *C.Key.ToString()); break; }
 			}
 		}
 		if (OutResult.IsEmpty())
 		{
-			for (const TPair<FName, int32>& C : Cost) FWRMachines::Pay(Inv, C.Key, C.Value);   // planks pay for wood first
+			for (const TPair<FName, int32>& C : Cost) WRBuildStock::Pay(GetWorld(), Who, StockAt, Inv, C.Key, C.Value);   // the bag (planks first), then your chests
 			// Building XP: metal and biome pieces teach more (survival-crafting 2.24).
 			const bool bHighTier = FWRBuildSets::PlaceXP(*Def) > WRTune(TEXT("lifeSkills.xp.place"), 8.f);
 			UWRLifeSkillsComponent::Award(this, TEXT("building"), bHighTier ? TEXT("placeHighTier") : TEXT("place"), bHighTier ? 12.f : 8.f);

@@ -141,6 +141,7 @@ FWRBuildRegistry::FWRBuildRegistry()
 			if (O->TryGetStringField(TEXT("needsPlace"), S)) D.Needs = FName(*S);
 			if (O->TryGetStringField(TEXT("blueprint"), S)) D.Blueprint = FName(*S);
 			if (O->TryGetStringField(TEXT("tier"), S)) D.Tier = FName(*S);
+			O->TryGetBoolField(TEXT("starter"), D.bStarter);
 			// A monument to a great boss not in this build (its row waits in the data): left out until the boss ships.
 			if (!D.Monument.IsNone() && !FWRCreatureRegistry::Get().Find(D.Monument)) continue;
 			Pieces.Add(D);
@@ -610,6 +611,15 @@ void AWRBuildPiece::ApplyLook()
 	{
 		const FBox Box = FWRBuildLook::BeamBox(*Def);
 		Parts.Add({ Box.GetSize(), Box.GetCenter() });
+	}
+	// The lean-to (cookpass-building 3.3): its sloped bough roof and two uprights, so you crawl in under it.
+	else if (Def->Arch == TEXT("lean_to"))
+	{
+		const float Slope = FMath::RadiansToDegrees(FMath::Atan2(165.f, 200.f));
+		const float SlabLen = FMath::Sqrt(165.f * 165.f + 200.f * 200.f);
+		const FVector N(-FMath::Sin(FMath::DegreesToRadians(Slope)), 0.f, FMath::Cos(FMath::DegreesToRadians(Slope)));
+		Parts.Add({ FVector(SlabLen, 270.f, 12.f), FVector(-40.f, 0.f, 82.5f) + N * 10.f, FRotator(Slope, 0.f, 0.f) });
+		for (const float Y : { -120.f, 120.f }) Parts.Add({ FVector(12.f, 12.f, 165.f), FVector(60.f, Y, 82.5f) });
 	}
 	// Modelled furniture (the comfort decor, the biome sets'): it collides as its model's boxes.
 	else if (!Def->Arch.IsNone())
