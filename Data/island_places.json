@@ -732,1173 +732,1208 @@
    "zone": "V2"
   },
   {
-   "kind": "tent_ring",
-   "at": [ 1329.6, 1211.1 ],
-   "yaw": 331,
-   "v": 0,
-   "zone": "T1"
-  },
-  {
    "kind": "basalt_ring",
    "at": [ -519, -240 ],
-   "yaw": 139,
-   "v": 1,
+   "yaw": 331,
+   "v": 0,
    "zone": "V5"
-  },
-  {
-   "kind": "small_pingo",
-   "at": [ 1227.4, -1436.2 ],
-   "yaw": 291,
-   "v": 1,
-   "zone": "T3"
   },
   {
    "kind": "cache_pole",
    "at": [ 467, 1360 ],
-   "yaw": 94,
-   "v": 0,
+   "yaw": 139,
+   "v": 1,
    "zone": "T2"
   },
   {
-   "kind": "sulfur_vent",
-   "at": [ -723.1, -1037.8 ],
-   "yaw": 142,
-   "v": 2,
-   "zone": "V4"
-  },
-  {
-   "kind": "frozen_carcass",
-   "at": [ 921, -784 ],
-   "yaw": 177,
-   "v": 1,
-   "zone": "T3"
-  },
-  {
    "kind": "tent_ring",
-   "at": [ 1505.3, -787.1 ],
-   "yaw": 151,
+   "at": [ 1306.7, -1384.8 ],
+   "yaw": 291,
    "v": 1,
    "zone": "T1"
   },
   {
+   "kind": "sulfur_vent",
+   "at": [ -723.1, -1037.8 ],
+   "yaw": 94,
+   "v": 0,
+   "zone": "V4"
+  },
+  {
+   "kind": "small_pingo",
+   "at": [ 921, -784 ],
+   "yaw": 142,
+   "v": 2,
+   "zone": "T3"
+  },
+  {
    "kind": "erratic",
    "at": [ 1296, -1136 ],
-   "yaw": 276,
-   "v": 3,
+   "yaw": 177,
+   "v": 1,
    "zone": "T1"
   },
   {
    "kind": "hornito",
    "at": [ -472, 1616 ],
-   "yaw": 145,
-   "v": 3,
+   "yaw": 151,
+   "v": 1,
    "zone": "V2"
   },
   {
    "kind": "basalt_ring",
    "at": [ -800.9, -1257.8 ],
-   "yaw": 177,
-   "v": 0,
+   "yaw": 276,
+   "v": 3,
    "zone": "V3"
   },
   {
    "kind": "snowpuff_nest",
    "at": [ 1572, -1220.8 ],
-   "yaw": 215,
-   "v": 0,
+   "yaw": 145,
+   "v": 3,
    "zone": "T1"
   },
   {
    "kind": "snowpuff_nest",
    "at": [ 1520, 1128 ],
-   "yaw": 64,
-   "v": 2,
+   "yaw": 177,
+   "v": 0,
    "zone": "T1"
   },
   {
    "kind": "smith_grave",
    "at": [ -1360, -48 ],
-   "yaw": 1,
-   "v": 2,
+   "yaw": 215,
+   "v": 0,
    "zone": "V1"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -1296, 1264 ],
-   "yaw": 214,
-   "v": 3,
+   "yaw": 64,
+   "v": 2,
    "zone": "V1"
   },
   {
    "kind": "hornito",
    "at": [ -264.3, 1217.6 ],
-   "yaw": 197,
-   "v": 3,
+   "yaw": 1,
+   "v": 2,
    "zone": "V2"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 752, -1168 ],
-   "yaw": 112,
-   "v": 1,
+   "yaw": 214,
+   "v": 3,
    "zone": "T3"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -1584, -464 ],
-   "yaw": 239,
+   "yaw": 197,
    "v": 3,
    "zone": "V1"
   },
   {
    "kind": "basalt_ring",
    "at": [ -500.5, 1448.2 ],
-   "yaw": 74,
-   "v": 0,
+   "yaw": 112,
+   "v": 1,
    "zone": "V2"
   },
   {
-   "kind": "small_pingo",
+   "kind": "frozen_carcass",
    "at": [ 636, -528 ],
-   "yaw": 66,
+   "yaw": 239,
    "v": 3,
    "zone": "T4"
   },
   {
-   "kind": "erratic",
+   "kind": "small_pingo",
    "at": [ 409.3, -204.5 ],
-   "yaw": 128,
-   "v": 1,
+   "yaw": 74,
+   "v": 0,
    "zone": "T4"
   },
   {
    "kind": "giant_tool",
    "at": [ -936, -1584 ],
+   "yaw": 66,
+   "v": 3,
+   "zone": "V3"
+  },
+  {
+   "kind": "frozen_carcass",
+   "at": [ 324, -1296 ],
+   "yaw": 128,
+   "v": 1,
+   "zone": "T3"
+  },
+  {
+   "kind": "glowmoth_roost",
+   "at": [ -1090.2, -1403.6 ],
    "yaw": 0,
    "v": 3,
    "zone": "V3"
   },
   {
    "kind": "cache_pole",
-   "at": [ 324, -1296 ],
-   "yaw": 206,
-   "v": 2,
-   "zone": "T3"
-  },
-  {
-   "kind": "glowmoth_roost",
-   "at": [ -1090.2, -1403.6 ],
-   "yaw": 322,
-   "v": 3,
-   "zone": "V3"
-  },
-  {
-   "kind": "cache_pole",
    "at": [ 1636.1, 217.7 ],
-   "yaw": 348,
+   "yaw": 206,
    "v": 2,
    "zone": "T1"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -528, 1104 ],
-   "yaw": 273,
-   "v": 2,
+   "yaw": 322,
+   "v": 3,
    "zone": "V2"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -429.3, 617.8 ],
-   "yaw": 55,
-   "v": 0,
+   "yaw": 348,
+   "v": 2,
    "zone": "V2"
   },
   {
    "kind": "giant_tool",
    "at": [ -1214.6, 987.8 ],
-   "yaw": 111,
-   "v": 0,
+   "yaw": 273,
+   "v": 2,
    "zone": "V2"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -467, -1770.8 ],
-   "yaw": 81,
-   "v": 1,
+   "yaw": 55,
+   "v": 0,
    "zone": "V4"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -256.9, -1302.2 ],
-   "yaw": 235,
+   "yaw": 111,
    "v": 0,
    "zone": "V4"
   },
   {
    "kind": "basalt_ring",
    "at": [ -1424, -208 ],
-   "yaw": 128,
-   "v": 0,
+   "yaw": 81,
+   "v": 1,
    "zone": "V1"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 867.9, 1048.8 ],
-   "yaw": 216,
-   "v": 3,
+   "yaw": 235,
+   "v": 0,
    "zone": "T2"
   },
   {
    "kind": "basalt_ring",
    "at": [ -1488, 624 ],
-   "yaw": 269,
-   "v": 2,
+   "yaw": 128,
+   "v": 0,
    "zone": "V1"
   },
   {
    "kind": "smith_grave",
    "at": [ -921, -1407.6 ],
-   "yaw": 186,
+   "yaw": 216,
    "v": 3,
    "zone": "V3"
   },
   {
    "kind": "smith_grave",
    "at": [ -1064.3, -481.6 ],
-   "yaw": 262,
+   "yaw": 269,
    "v": 2,
    "zone": "V3"
   },
   {
    "kind": "miner_leanto",
    "at": [ -1616, 304 ],
-   "yaw": 83,
-   "v": 0,
+   "yaw": 186,
+   "v": 3,
    "zone": "V1"
   },
   {
    "kind": "cache_pole",
    "at": [ 1712, 880 ],
-   "yaw": 186,
+   "yaw": 262,
    "v": 2,
    "zone": "T1"
   },
   {
    "kind": "giant_tool",
    "at": [ -388.8, 1308 ],
-   "yaw": 138,
-   "v": 1,
+   "yaw": 83,
+   "v": 0,
    "zone": "V2"
   },
   {
    "kind": "small_pingo",
    "at": [ 1395.1, -641.7 ],
-   "yaw": 17,
-   "v": 0,
+   "yaw": 186,
+   "v": 2,
    "zone": "T1"
   },
   {
    "kind": "smith_grave",
    "at": [ -281, 1664.4 ],
-   "yaw": 34,
-   "v": 0,
+   "yaw": 138,
+   "v": 1,
    "zone": "V2"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -758, 1370.4 ],
-   "yaw": 343,
+   "yaw": 17,
    "v": 0,
    "zone": "V2"
   },
   {
    "kind": "frozen_carcass",
-   "at": [ 1380.1, -1350.3 ],
-   "yaw": 313,
-   "v": 0,
-   "zone": "T1"
-  },
-  {
-   "kind": "erratic",
    "at": [ 1341.8, -219.6 ],
-   "yaw": 14,
-   "v": 2,
+   "yaw": 34,
+   "v": 0,
    "zone": "T1"
   },
   {
    "kind": "smith_grave",
    "at": [ -656, 1200 ],
-   "yaw": 268,
-   "v": 1,
+   "yaw": 343,
+   "v": 0,
    "zone": "V2"
   },
   {
    "kind": "hornito",
    "at": [ -560, -1424 ],
-   "yaw": 76,
-   "v": 3,
+   "yaw": 313,
+   "v": 0,
    "zone": "V4"
   },
   {
    "kind": "giant_tool",
    "at": [ -1454.4, -935.1 ],
-   "yaw": 49,
-   "v": 1,
+   "yaw": 14,
+   "v": 2,
    "zone": "V1"
   },
   {
    "kind": "erratic",
    "at": [ 956, 1232 ],
-   "yaw": 176,
-   "v": 2,
+   "yaw": 268,
+   "v": 1,
    "zone": "T2"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -653, 624 ],
-   "yaw": 113,
-   "v": 0,
+   "yaw": 76,
+   "v": 3,
    "zone": "V2"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -1424, 112 ],
-   "yaw": 187,
+   "yaw": 49,
    "v": 1,
    "zone": "V1"
   },
   {
    "kind": "hornito",
    "at": [ -784, -456 ],
-   "yaw": 94,
-   "v": 3,
+   "yaw": 176,
+   "v": 2,
    "zone": "V5"
   },
   {
-   "kind": "erratic",
+   "kind": "cache_pole",
    "at": [ 720, -1488 ],
-   "yaw": 256,
+   "yaw": 113,
    "v": 0,
    "zone": "T3"
   },
   {
    "kind": "basalt_ring",
    "at": [ -471.9, 188.1 ],
-   "yaw": 197,
-   "v": 3,
+   "yaw": 187,
+   "v": 1,
    "zone": "V5"
   },
   {
    "kind": "smith_grave",
    "at": [ -742, 443.1 ],
-   "yaw": 258,
-   "v": 2,
+   "yaw": 94,
+   "v": 3,
    "zone": "V5"
   },
   {
    "kind": "hornito",
    "at": [ -556.9, 353.7 ],
-   "yaw": 63,
+   "yaw": 256,
    "v": 0,
    "zone": "V5"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 484, 304 ],
-   "yaw": 145,
-   "v": 2,
+   "yaw": 197,
+   "v": 3,
    "zone": "T4"
   },
   {
    "kind": "giant_tool",
    "at": [ -708.8, 243.1 ],
-   "yaw": 49,
-   "v": 0,
+   "yaw": 258,
+   "v": 2,
    "zone": "V5"
   },
   {
    "kind": "tent_ring",
    "at": [ 1008, 592 ],
-   "yaw": 84,
-   "v": 1,
+   "yaw": 63,
+   "v": 0,
    "zone": "T2"
   },
   {
    "kind": "erratic",
    "at": [ 1488, 272 ],
-   "yaw": 207,
-   "v": 0,
+   "yaw": 145,
+   "v": 2,
    "zone": "T1"
   },
   {
    "kind": "hornito",
    "at": [ -949, 1520 ],
-   "yaw": 225,
-   "v": 1,
+   "yaw": 49,
+   "v": 0,
    "zone": "V2"
   },
   {
    "kind": "basalt_ring",
    "at": [ -1264, -1392 ],
-   "yaw": 85,
-   "v": 2,
+   "yaw": 84,
+   "v": 1,
    "zone": "V1"
   },
   {
-   "kind": "snowpuff_nest",
+   "kind": "erratic",
    "at": [ 1593.3, -268.5 ],
-   "yaw": 285,
-   "v": 1,
+   "yaw": 207,
+   "v": 0,
    "zone": "T1"
   },
   {
    "kind": "giant_tool",
    "at": [ -1616, 16 ],
-   "yaw": 205,
-   "v": 0,
+   "yaw": 225,
+   "v": 1,
    "zone": "V1"
   },
   {
    "kind": "miner_leanto",
    "at": [ -723, -1621.2 ],
-   "yaw": 30,
+   "yaw": 85,
    "v": 2,
    "zone": "V4"
   },
   {
    "kind": "basalt_ring",
    "at": [ -883, 661.2 ],
-   "yaw": 278,
-   "v": 0,
+   "yaw": 285,
+   "v": 1,
    "zone": "V2"
   },
   {
    "kind": "cache_pole",
    "at": [ 825, 560 ],
-   "yaw": 129,
-   "v": 1,
+   "yaw": 205,
+   "v": 0,
    "zone": "T2"
   },
   {
-   "kind": "tent_ring",
+   "kind": "erratic",
    "at": [ 505.3, -1491.5 ],
-   "yaw": 142,
-   "v": 1,
+   "yaw": 30,
+   "v": 2,
    "zone": "T3"
   },
   {
-   "kind": "small_pingo",
+   "kind": "tent_ring",
    "at": [ 602.7, -1096.8 ],
-   "yaw": 22,
-   "v": 3,
+   "yaw": 278,
+   "v": 0,
    "zone": "T3"
   },
   {
    "kind": "basalt_ring",
    "at": [ -973.3, -790.2 ],
-   "yaw": 184,
-   "v": 2,
+   "yaw": 129,
+   "v": 1,
    "zone": "V3"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 763.2, 1436 ],
-   "yaw": 244,
-   "v": 3,
+   "yaw": 142,
+   "v": 1,
    "zone": "T2"
   },
   {
-   "kind": "cache_pole",
+   "kind": "snowpuff_nest",
    "at": [ 1296, -400 ],
-   "yaw": 292,
-   "v": 1,
+   "yaw": 22,
+   "v": 3,
    "zone": "T1"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 933, 1392 ],
-   "yaw": 118,
-   "v": 3,
+   "yaw": 184,
+   "v": 2,
    "zone": "T2"
   },
   {
    "kind": "miner_leanto",
    "at": [ -592, -1232 ],
-   "yaw": 121,
-   "v": 2,
+   "yaw": 244,
+   "v": 3,
    "zone": "V4"
   },
   {
    "kind": "basalt_ring",
    "at": [ -1104, 1456 ],
-   "yaw": 336,
-   "v": 2,
+   "yaw": 292,
+   "v": 1,
    "zone": "V2"
   },
   {
    "kind": "cache_pole",
    "at": [ 1358, 1392 ],
-   "yaw": 247,
+   "yaw": 118,
    "v": 3,
    "zone": "T1"
   },
   {
    "kind": "smith_grave",
    "at": [ -558.4, -1639.1 ],
-   "yaw": 68,
+   "yaw": 121,
    "v": 2,
    "zone": "V4"
   },
   {
-   "kind": "cache_pole",
+   "kind": "small_pingo",
    "at": [ 999, -1247.6 ],
-   "yaw": 352,
-   "v": 3,
+   "yaw": 336,
+   "v": 2,
    "zone": "T3"
   },
   {
    "kind": "miner_leanto",
    "at": [ -1414, -420.9 ],
-   "yaw": 88,
+   "yaw": 247,
    "v": 3,
    "zone": "V1"
   },
   {
    "kind": "small_pingo",
-   "at": [ 1697.3, 556.9 ],
-   "yaw": 93,
-   "v": 2,
-   "zone": "T1"
-  },
-  {
-   "kind": "frozen_carcass",
    "at": [ 1302, 1552 ],
-   "yaw": 337,
+   "yaw": 68,
    "v": 2,
    "zone": "T1"
   },
   {
-   "kind": "erratic",
+   "kind": "small_pingo",
    "at": [ 397, -1130.8 ],
-   "yaw": 192,
-   "v": 0,
+   "yaw": 352,
+   "v": 3,
    "zone": "T3"
   },
   {
    "kind": "basalt_ring",
    "at": [ -1392, 1104 ],
-   "yaw": 64,
-   "v": 0,
+   "yaw": 88,
+   "v": 3,
    "zone": "V1"
   },
   {
    "kind": "giant_tool",
    "at": [ -1211.3, 382.6 ],
-   "yaw": 295,
-   "v": 0,
+   "yaw": 93,
+   "v": 2,
    "zone": "V5"
   },
   {
    "kind": "basalt_ring",
    "at": [ -1581, -304 ],
-   "yaw": 32,
-   "v": 3,
+   "yaw": 337,
+   "v": 2,
    "zone": "V1"
   },
   {
    "kind": "smith_grave",
    "at": [ -614.7, -460.5 ],
-   "yaw": 332,
+   "yaw": 192,
    "v": 0,
    "zone": "V5"
   },
   {
    "kind": "smith_grave",
    "at": [ -1438.7, 396.9 ],
-   "yaw": 260,
-   "v": 2,
+   "yaw": 64,
+   "v": 0,
    "zone": "V1"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -848, 872 ],
-   "yaw": 353,
-   "v": 1,
+   "yaw": 295,
+   "v": 0,
    "zone": "V2"
-  },
-  {
-   "kind": "cache_pole",
-   "at": [ 1460.6, -1118.3 ],
-   "yaw": 265,
-   "v": 3,
-   "zone": "T1"
   },
   {
    "kind": "erratic",
    "at": [ 541.5, 1219.6 ],
-   "yaw": 247,
-   "v": 1,
+   "yaw": 32,
+   "v": 3,
    "zone": "T2"
   },
   {
    "kind": "frozen_carcass",
-   "at": [ 1300.7, -949.4 ],
-   "yaw": 224,
-   "v": 0,
-   "zone": "T1"
-  },
-  {
-   "kind": "tent_ring",
-   "at": [ 1575.5, 723.1 ],
-   "yaw": 66,
-   "v": 3,
-   "zone": "T1"
-  },
-  {
-   "kind": "frozen_carcass",
    "at": [ 1041.6, -519.1 ],
-   "yaw": 330,
-   "v": 3,
+   "yaw": 332,
+   "v": 0,
    "zone": "T4"
-  },
-  {
-   "kind": "small_pingo",
-   "at": [ 1616, -1040 ],
-   "yaw": 223,
-   "v": 2,
-   "zone": "T1"
   },
   {
    "kind": "giant_tool",
    "at": [ -979, -629.2 ],
-   "yaw": 133,
-   "v": 0,
+   "yaw": 260,
+   "v": 2,
    "zone": "V3"
   },
   {
    "kind": "tent_ring",
    "at": [ 895.1, 713.8 ],
-   "yaw": 160,
+   "yaw": 353,
    "v": 1,
    "zone": "T2"
   },
   {
-   "kind": "frozen_carcass",
-   "at": [ 1552, 976 ],
-   "yaw": 319,
-   "v": 3,
-   "zone": "T1"
-  },
-  {
    "kind": "hornito",
    "at": [ -887.7, -342.1 ],
-   "yaw": 232,
-   "v": 0,
+   "yaw": 265,
+   "v": 3,
    "zone": "V5"
   },
   {
-   "kind": "tent_ring",
+   "kind": "frozen_carcass",
    "at": [ 560, -1296 ],
-   "yaw": 201,
+   "yaw": 247,
    "v": 1,
    "zone": "T3"
   },
   {
    "kind": "giant_tool",
    "at": [ -738.2, -251.6 ],
-   "yaw": 358,
-   "v": 2,
+   "yaw": 224,
+   "v": 0,
    "zone": "V5"
   },
   {
-   "kind": "tent_ring",
+   "kind": "frozen_carcass",
    "at": [ 1078, -1541.6 ],
-   "yaw": 99,
-   "v": 1,
+   "yaw": 66,
+   "v": 3,
    "zone": "T3"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -279.5, 1443 ],
-   "yaw": 348,
-   "v": 2,
+   "yaw": 330,
+   "v": 3,
    "zone": "V2"
   },
   {
-   "kind": "snowpuff_nest",
+   "kind": "tent_ring",
+   "at": [ 1232, 1200 ],
+   "yaw": 223,
+   "v": 2,
+   "zone": "T2"
+  },
+  {
+   "kind": "frozen_carcass",
    "at": [ 1476, 443.2 ],
-   "yaw": 347,
-   "v": 1,
+   "yaw": 133,
+   "v": 0,
    "zone": "T1"
   },
   {
    "kind": "smith_grave",
    "at": [ -1520, -1072 ],
-   "yaw": 100,
-   "v": 2,
+   "yaw": 160,
+   "v": 1,
    "zone": "V1"
   },
   {
-   "kind": "erratic",
+   "kind": "cache_pole",
    "at": [ 829.1, -928.4 ],
-   "yaw": 231,
-   "v": 0,
+   "yaw": 319,
+   "v": 3,
    "zone": "T3"
   },
   {
-   "kind": "small_pingo",
+   "kind": "erratic",
    "at": [ 322.5, -39.4 ],
-   "yaw": 358,
-   "v": 1,
+   "yaw": 232,
+   "v": 0,
    "zone": "T4"
   },
   {
-   "kind": "tent_ring",
+   "kind": "cache_pole",
    "at": [ 1149.5, 1443.6 ],
-   "yaw": 124,
-   "v": 2,
+   "yaw": 201,
+   "v": 1,
    "zone": "T2"
   },
   {
    "kind": "miner_leanto",
    "at": [ -795.2, -764 ],
-   "yaw": 155,
-   "v": 0,
+   "yaw": 358,
+   "v": 2,
    "zone": "V4"
   },
   {
    "kind": "small_pingo",
    "at": [ 1512.1, -67.9 ],
-   "yaw": 244,
-   "v": 0,
+   "yaw": 99,
+   "v": 1,
    "zone": "T1"
   },
   {
-   "kind": "frozen_carcass",
+   "kind": "tent_ring",
    "at": [ 1635.9, 376.8 ],
-   "yaw": 345,
-   "v": 1,
+   "yaw": 348,
+   "v": 2,
    "zone": "T1"
   },
   {
    "kind": "erratic",
    "at": [ 1363, 1008 ],
-   "yaw": 91,
+   "yaw": 347,
    "v": 1,
    "zone": "T1"
   },
   {
    "kind": "cache_pole",
    "at": [ 695.7, 734.4 ],
-   "yaw": 288,
-   "v": 3,
+   "yaw": 100,
+   "v": 2,
    "zone": "T2"
   },
   {
    "kind": "hornito",
    "at": [ -1240.5, 83.1 ],
-   "yaw": 248,
-   "v": 2,
+   "yaw": 231,
+   "v": 0,
    "zone": "V5"
   },
   {
-   "kind": "frozen_carcass",
+   "kind": "erratic",
    "at": [ 304, -368 ],
-   "yaw": 123,
-   "v": 2,
+   "yaw": 358,
+   "v": 1,
    "zone": "T4"
   },
   {
    "kind": "miner_leanto",
    "at": [ -415, -1514 ],
-   "yaw": 353,
-   "v": 0,
+   "yaw": 124,
+   "v": 2,
    "zone": "V4"
   },
   {
-   "kind": "tent_ring",
+   "kind": "erratic",
    "at": [ 797.1, -1344.4 ],
-   "yaw": 36,
-   "v": 2,
+   "yaw": 155,
+   "v": 0,
    "zone": "T3"
   },
   {
-   "kind": "cache_pole",
+   "kind": "tent_ring",
    "at": [ 759.7, -638.4 ],
-   "yaw": 239,
-   "v": 3,
+   "yaw": 244,
+   "v": 0,
    "zone": "T3"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 301, 1258.8 ],
-   "yaw": 282,
-   "v": 3,
+   "yaw": 345,
+   "v": 1,
    "zone": "T2"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 929, 1546 ],
-   "yaw": 316,
+   "yaw": 91,
    "v": 1,
    "zone": "T2"
   },
   {
    "kind": "erratic",
    "at": [ 587.5, 936.2 ],
-   "yaw": 42,
-   "v": 1,
+   "yaw": 288,
+   "v": 3,
    "zone": "T2"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -659, -629.2 ],
-   "yaw": 116,
-   "v": 0,
+   "yaw": 248,
+   "v": 2,
    "zone": "V4"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -372.7, 1092.5 ],
-   "yaw": 227,
+   "yaw": 123,
    "v": 2,
    "zone": "V2"
   },
   {
    "kind": "giant_tool",
    "at": [ -908.9, 414.3 ],
-   "yaw": 30,
+   "yaw": 353,
    "v": 0,
    "zone": "V5"
   },
   {
    "kind": "smith_grave",
    "at": [ -1296, 1424 ],
-   "yaw": 154,
-   "v": 0,
-   "zone": "V1"
-  },
-  {
-   "kind": "erratic",
-   "at": [ 1387.3, 740.5 ],
-   "yaw": 143,
+   "yaw": 36,
    "v": 2,
-   "zone": "T1"
+   "zone": "V1"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -1179.3, -641.4 ],
-   "yaw": 130,
-   "v": 0,
+   "yaw": 239,
+   "v": 3,
    "zone": "V3"
   },
   {
    "kind": "tent_ring",
    "at": [ 631.7, 510.4 ],
-   "yaw": 335,
-   "v": 2,
+   "yaw": 282,
+   "v": 3,
    "zone": "T2"
   },
   {
-   "kind": "cache_pole",
-   "at": [ 1360, -1520 ],
-   "yaw": 104,
-   "v": 3,
-   "zone": "T1"
-  },
-  {
-   "kind": "tent_ring",
+   "kind": "erratic",
    "at": [ 535.7, -892.5 ],
-   "yaw": 76,
+   "yaw": 316,
    "v": 1,
    "zone": "T3"
   },
   {
    "kind": "sulfur_vent",
    "at": [ -1104, 1168 ],
-   "yaw": 79,
-   "v": 2,
+   "yaw": 42,
+   "v": 1,
    "zone": "V2"
+  },
+  {
+   "kind": "snowpuff_nest",
+   "at": [ 1302, 741.6 ],
+   "yaw": 116,
+   "v": 0,
+   "zone": "T1"
   },
   {
    "kind": "hornito",
    "at": [ -636.1, -903.2 ],
-   "yaw": 91,
-   "v": 1,
+   "yaw": 227,
+   "v": 2,
    "zone": "V4"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 973, 170.8 ],
-   "yaw": 80,
-   "v": 2,
+   "yaw": 30,
+   "v": 0,
    "zone": "T5"
   },
   {
    "kind": "giant_tool",
    "at": [ -1220, -123.2 ],
-   "yaw": 299,
-   "v": 3,
+   "yaw": 154,
+   "v": 0,
    "zone": "V5"
   },
   {
-   "kind": "frozen_carcass",
+   "kind": "tent_ring",
    "at": [ 919.7, -1630.4 ],
-   "yaw": 354,
-   "v": 3,
+   "yaw": 143,
+   "v": 2,
    "zone": "T3"
   },
   {
-   "kind": "frozen_carcass",
-   "at": [ 1552, -592 ],
-   "yaw": 308,
-   "v": 0,
-   "zone": "T1"
-  },
-  {
-   "kind": "tent_ring",
+   "kind": "cache_pole",
    "at": [ 1654.9, -405.8 ],
-   "yaw": 74,
-   "v": 3,
+   "yaw": 130,
+   "v": 0,
    "zone": "T1"
   },
   {
    "kind": "tent_ring",
    "at": [ 816, 848 ],
-   "yaw": 149,
-   "v": 3,
+   "yaw": 335,
+   "v": 2,
    "zone": "T2"
   },
   {
    "kind": "basalt_ring",
    "at": [ -965.3, 119.2 ],
-   "yaw": 272,
-   "v": 1,
+   "yaw": 104,
+   "v": 3,
    "zone": "V5"
   },
   {
-   "kind": "tent_ring",
+   "kind": "snowpuff_nest",
    "at": [ 1287, 256.4 ],
-   "yaw": 115,
+   "yaw": 76,
    "v": 1,
+   "zone": "T1"
+  },
+  {
+   "kind": "frozen_carcass",
+   "at": [ 1456, 1264 ],
+   "yaw": 79,
+   "v": 2,
    "zone": "T1"
   },
   {
    "kind": "giant_tool",
    "at": [ -944, -1136 ],
-   "yaw": 30,
-   "v": 0,
+   "yaw": 91,
+   "v": 1,
    "zone": "V3"
   },
   {
    "kind": "hornito",
    "at": [ -1024.9, 585.8 ],
-   "yaw": 252,
-   "v": 0,
+   "yaw": 80,
+   "v": 2,
    "zone": "V2"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 509.8, -1723.6 ],
-   "yaw": 150,
+   "yaw": 299,
    "v": 3,
    "zone": "T3"
   },
   {
-   "kind": "cache_pole",
+   "kind": "tent_ring",
    "at": [ 1081.3, 1580.5 ],
-   "yaw": 212,
-   "v": 2,
+   "yaw": 354,
+   "v": 3,
    "zone": "T2"
   },
   {
-   "kind": "tent_ring",
+   "kind": "snowpuff_nest",
    "at": [ 1666, 48 ],
-   "yaw": 221,
+   "yaw": 308,
+   "v": 0,
+   "zone": "T1"
+  },
+  {
+   "kind": "erratic",
+   "at": [ 342, 122.4 ],
+   "yaw": 74,
+   "v": 3,
+   "zone": "T4"
+  },
+  {
+   "kind": "tent_ring",
+   "at": [ 1505.3, -499.1 ],
+   "yaw": 149,
    "v": 3,
    "zone": "T1"
   },
   {
-   "kind": "frozen_carcass",
-   "at": [ 342, 122.4 ],
-   "yaw": 220,
-   "v": 0,
-   "zone": "T4"
+   "kind": "erratic",
+   "at": [ 1392, -1552 ],
+   "yaw": 272,
+   "v": 1,
+   "zone": "T1"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -1329.6, 286.9 ],
-   "yaw": 33,
+   "yaw": 115,
    "v": 1,
    "zone": "V1"
   },
   {
    "kind": "giant_tool",
    "at": [ -546.2, 836.4 ],
-   "yaw": 188,
+   "yaw": 30,
    "v": 0,
    "zone": "V2"
   },
   {
-   "kind": "small_pingo",
+   "kind": "cache_pole",
    "at": [ 263.5, -1484.9 ],
-   "yaw": 273,
-   "v": 3,
+   "yaw": 252,
+   "v": 0,
    "zone": "T3"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 605.1, 1862.9 ],
-   "yaw": 54,
-   "v": 2,
+   "yaw": 150,
+   "v": 3,
    "zone": "T2"
   },
   {
-   "kind": "small_pingo",
+   "kind": "erratic",
    "at": [ 1014, -922.4 ],
-   "yaw": 350,
-   "v": 1,
+   "yaw": 212,
+   "v": 2,
    "zone": "T3"
+  },
+  {
+   "kind": "cache_pole",
+   "at": [ 1409.3, -1235.1 ],
+   "yaw": 221,
+   "v": 3,
+   "zone": "T1"
   },
   {
    "kind": "basalt_ring",
    "at": [ -870.7, -179.5 ],
-   "yaw": 213,
+   "yaw": 220,
    "v": 0,
    "zone": "V5"
   },
   {
-   "kind": "erratic",
-   "at": [ 1457.6, -452.9 ],
-   "yaw": 191,
-   "v": 0,
-   "zone": "T1"
-  },
-  {
-   "kind": "frozen_carcass",
+   "kind": "tent_ring",
    "at": [ 720, -816 ],
-   "yaw": 111,
-   "v": 0,
+   "yaw": 33,
+   "v": 1,
    "zone": "T3"
   },
   {
    "kind": "basalt_ring",
    "at": [ -403.1, 914.2 ],
-   "yaw": 262,
-   "v": 1,
+   "yaw": 188,
+   "v": 0,
    "zone": "V2"
   },
   {
    "kind": "basalt_ring",
    "at": [ -752, 1072 ],
-   "yaw": 260,
-   "v": 1,
+   "yaw": 273,
+   "v": 3,
    "zone": "V2"
   },
   {
-   "kind": "frozen_carcass",
+   "kind": "small_pingo",
    "at": [ 1049, -1392 ],
-   "yaw": 153,
+   "yaw": 54,
    "v": 2,
    "zone": "T3"
   },
   {
    "kind": "smith_grave",
    "at": [ -885.7, 265.8 ],
-   "yaw": 344,
-   "v": 3,
+   "yaw": 350,
+   "v": 1,
    "zone": "V5"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -1264, -272 ],
-   "yaw": 319,
+   "yaw": 213,
    "v": 0,
    "zone": "V1"
   },
   {
    "kind": "miner_leanto",
    "at": [ -1320.3, 766.4 ],
-   "yaw": 202,
-   "v": 2,
+   "yaw": 191,
+   "v": 0,
    "zone": "V1"
   },
   {
    "kind": "cache_pole",
    "at": [ 432, -592 ],
-   "yaw": 13,
-   "v": 1,
+   "yaw": 111,
+   "v": 0,
    "zone": "T3"
   },
   {
-   "kind": "frozen_carcass",
+   "kind": "cache_pole",
    "at": [ 1661.8, -123.6 ],
-   "yaw": 26,
-   "v": 3,
+   "yaw": 262,
+   "v": 1,
    "zone": "T1"
   },
   {
    "kind": "tent_ring",
    "at": [ 466.7, 1046.2 ],
-   "yaw": 304,
-   "v": 0,
+   "yaw": 260,
+   "v": 1,
    "zone": "T2"
   },
   {
    "kind": "frozen_carcass",
    "at": [ 503.7, 766.4 ],
-   "yaw": 300,
-   "v": 3,
+   "yaw": 153,
+   "v": 2,
    "zone": "T2"
   },
   {
    "kind": "basalt_ring",
    "at": [ -868.8, -1724 ],
-   "yaw": 310,
-   "v": 0,
+   "yaw": 344,
+   "v": 3,
    "zone": "V3"
   },
   {
    "kind": "glowmoth_roost",
    "at": [ -795.9, 1574.3 ],
-   "yaw": 23,
+   "yaw": 319,
    "v": 0,
    "zone": "V2"
   },
   {
    "kind": "cache_pole",
-   "at": [ 1291.5, 616.2 ],
-   "yaw": 76,
-   "v": 2,
-   "zone": "T1"
-  },
-  {
-   "kind": "erratic",
    "at": [ 1234.7, -617.8 ],
-   "yaw": 190,
-   "v": 3,
+   "yaw": 202,
+   "v": 2,
    "zone": "T3"
   },
   {
    "kind": "miner_leanto",
    "at": [ -1424, -1232 ],
-   "yaw": 334,
-   "v": 0,
+   "yaw": 13,
+   "v": 1,
    "zone": "V1"
-  },
-  {
-   "kind": "small_pingo",
-   "at": [ 1266.7, 406.2 ],
-   "yaw": 38,
-   "v": 2,
-   "zone": "T1"
   },
   {
    "kind": "giant_tool",
    "at": [ -1584, -144 ],
-   "yaw": 243,
+   "yaw": 26,
    "v": 3,
    "zone": "V1"
+  }
+ ],
+ "ground": [
+  {
+   "kind": "sastrugi",
+   "at": [ 1641.4, 597 ],
+   "yaw": -144.5,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1206.4, -994.4 ],
+   "yaw": 112,
+   "zone": "T3"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1435, -1409.8 ],
+   "yaw": 114.1,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1435.5, -1028.8 ],
+   "yaw": 121.5,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1525.3, 942.3 ],
+   "yaw": -127.4,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1575.9, 753.5 ],
+   "yaw": -135.7,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1619.5, -1054.7 ],
+   "yaw": 127.7,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1554.6, -703 ],
+   "yaw": 136.9,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1192.8, -792.7 ],
+   "yaw": 116.1,
+   "zone": "T3"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1364.9, 1170.4 ],
+   "yaw": -115.6,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1179.5, -1238.9 ],
+   "yaw": 106.9,
+   "zone": "T3"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1568.6, -867.3 ],
+   "yaw": 131.4,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1230.7, -1478.8 ],
+   "yaw": 106.1,
+   "zone": "T3"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1295.1, 461.8 ],
+   "yaw": -136.8,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1394.2, 829.5 ],
+   "yaw": -125.4,
+   "zone": "T1"
+  },
+  {
+   "kind": "sastrugi",
+   "at": [ 1410.1, -777.6 ],
+   "yaw": 127.9,
+   "zone": "T1"
   }
  ],
  "hazards": {

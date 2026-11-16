@@ -518,6 +518,11 @@ void UWRIslandPlaces::Load()
 			for (const TSharedPtr<FJsonValue>& M : *Marks) Queue(IsleStr(M->AsObject(), TEXT("kind")), 1000 + n++, M->AsObject(), false);
 		}
 	}
+	// Ground features (the sastrugi fields): keys 4000.., built like the kit.
+	if (File->TryGetArrayField(TEXT("ground"), Arr))
+	{
+		for (int32 i = 0; i < Arr->Num(); ++i) Queue(IsleStr((*Arr)[i]->AsObject(), TEXT("kind")), 4000 + i, (*Arr)[i]->AsObject(), false);
+	}
 	if (File->TryGetArrayField(TEXT("kit"), Arr))
 	{
 		for (int32 i = 0; i < Arr->Num(); ++i) Queue(IsleStr((*Arr)[i]->AsObject(), TEXT("kind")), 2000 + i, (*Arr)[i]->AsObject(), false);

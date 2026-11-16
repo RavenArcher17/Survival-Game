@@ -8,7 +8,7 @@ world parts of cooks/fire-frost.md 3.1-3.6). Compiled (editor target); not playe
 - **World (1): the places.** Why: the Old Island had 20 POIs on its two sides (one every ~300 m against the bar's
   150-250 m), no named sub-zones and no environmental story (grades B3-B5 in the doc).
   - `Data/island_places.json` from `Tools/terrain/island_places.mjs`: 10 sub-zones, 15 landmarks, 26 story sites, the
-    Slag-Cairn and Inuksuk roads (24 waymarks), 177 kit POIs (13 kinds, 150 m apart, every walkable spot within 125 m
+    Slag-Cairn and Inuksuk roads (24 waymarks), 16 sastrugi fields, 168 kit POIs (13 kinds, 150 m apart, every walkable spot within 125 m
     of a place) and the hazard spots. Positions are settled on dry, gentle ground off the heightmap, clear of arenas,
     shrines, villages, camps and caves.
   - Built at runtime on every machine (`UWRIslandPlaces`, the dressing's pattern; `L_Island` untouched), each place
@@ -30,6 +30,8 @@ world parts of cooks/fire-frost.md 3.1-3.6). Compiled (editor target); not playe
     Pale Hunter's Camp (boots facing out, prints turning to claws), the Hunter's Blind, the Fallen Giant Pine, the
     Glacimaw Boneyard, the Wyrm Claw Scars, the Watch Cairn, the Moulin of Voices, the Crevasse Maze.
   - Waymark roads: slag cairns and inuksuit whose ember cups / lamp bowls light for you as you pass at night (10 min).
+  - Sastrugi: fields of wind-carved snow ridges on the Snow Flats and lakes, every ridge lying along the wind off the
+    glacier, so the ground itself points at the bowl (WRIslandPlacesLook2.cpp `Sastrugi`, `ground` in the places file).
   - Night: every place has a lamp, a fire or a skyline shape; lamps ease up after dusk on the clock.
   - Sub-zones: `WRIsle::ZoneAt`; entering one shows its name (`FWRFlow::CheckZones`, not again within 2 min); each has
     its own bed (`ambient.beds` layer `ffzone.<id>`, made from the existing recordings and marked `_standin`).
@@ -49,6 +51,10 @@ world parts of cooks/fire-frost.md 3.1-3.6). Compiled (editor target); not playe
 - **World (3): lava and the volcanic scrub.** Lava `hazards.lavaDps` 8 -> 20 and burn 12 -> 20 a second (an unprotected
   survivor dies in about 4 s). The volcanic `ember_shrub` draws the charred-tree meshes at shrub size (a dead, ash-grey
   scrub) instead of the green GV shrub; the old ash coat hung the GPU, and this needs no new material.
+- **World (4): unity-build safety.** The places' look files keep their helpers and their `Lin` inside their own
+  namespaces and dispatch from there (a file-scope `using WRIsleLook::Lin` clashed with WRLandSites' in one unity blob;
+  checked by compiling the committed tree, which puts every new file in a unity blob). The Slag Light's brazier starts
+  dark until its first look at the Kipuka shrine.
 - **Not done in this pass** (cooks/cookpass-world.md section 7): rivers, the steaming ford and the lava-fall need a
   terrain rebuild; the crevasses are serac lanes on the heightfield (no landscape holes); thin ice opens onto drawn icy
   water (no water body under the lakes); every new sound row and bed is a stand-in from existing recordings.

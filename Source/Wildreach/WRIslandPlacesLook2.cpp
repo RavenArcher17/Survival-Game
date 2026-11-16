@@ -741,6 +741,25 @@ namespace WRIsleT
 		}
 	}
 
+	void Sastrugi(FWRIsleSite& S, const FPal& P)
+	{
+		// Wind-carved snow ridges: low, sharp-crested, their long axis along the wind off the glacier (local +X points at
+		// the bowl), the blunt end upwind and the tail tapering away. Read them and you know which way the glacier lies.
+		for (int32 i = 0; i < 48; ++i)
+		{
+			const float A = i * 137.508f, R = 3000.f * FMath::Sqrt((i + 0.5f) / 48.f);
+			const FVector L(FMath::Cos(FMath::DegreesToRadians(A)) * R, FMath::Sin(FMath::DegreesToRadians(A)) * R, 0.f);
+			const float Len = 220.f + 260.f * S.R(L, 1), Wid = 50.f + 40.f * S.R(L, 2), Ht = 18.f + 22.f * S.R(L, 3);
+			const float Yaw = 6.f * S.J(L, 4);
+			const FVector G(L.X, L.Y, S.Gz(L.X, L.Y));
+			const FRotator Rot(0.f, Yaw, 0.f);
+			// The body, its crest, and the tapering tail (downwind is local -X).
+			S.K.Add(P.Snow, FVector(Len, Wid, Ht), G + FVector(0, 0, Ht * 0.35f), Rot + FRotator(0.f, 0.f, 4.f * S.J(L, 5)));
+			S.K.Add(P.SnowShade.Dim(1.02f), FVector(Len * 0.8f, Wid * 0.28f, Ht * 0.5f), G + FVector(0, 0, Ht * 0.8f) + Rot.RotateVector(FVector(Len * 0.05f, Wid * 0.1f, 0.f)), Rot);
+			S.K.Add(P.Snow.Dim(0.97f), FVector(Len * 0.5f, Wid * 0.6f, Ht * 0.5f), G + FVector(0, 0, Ht * 0.18f) + Rot.RotateVector(FVector(-Len * 0.6f, 0.f, 0.f)), Rot + FRotator(-3.f, 0.f, 0.f));
+		}
+	}
+
 	void ThinIcePatch(FWRIsleSite& S, const FPal& P)
 	{
 		// A dark patch on the lake: thin ice heaved a little proud, ringed by white pressure ridges. Too much weight on it
@@ -830,6 +849,7 @@ namespace WRIsleT
 		if (Kind == TEXT("moulin")) { Moulin(S, P); S.Done(Site); return true; }
 		if (Kind == TEXT("crevasse_maze")) { CrevasseMaze(S, P); S.Done(Site); return true; }
 		if (Kind == TEXT("thin_ice")) { ThinIcePatch(S, P); S.Done(Site); return true; }
+		if (Kind == TEXT("sastrugi")) { Sastrugi(S, P); S.Done(WRTune(TEXT("places.kitCull"), 40000.f)); return true; }
 		if (Kind == TEXT("inuksuk")) { Inuksuk(S, P, 170.f + 40.f * S.R(FVector::ZeroVector, 5), true); S.Done(WRTune(TEXT("places.kitCull"), 40000.f)); return true; }
 		return false;
 	}
