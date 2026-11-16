@@ -201,6 +201,9 @@ lifts, before the feet. The chains are found by bone name (`SetupCreatureBody`: 
 "spine" / "chest"). Every landed blow kicks `KickFlinch` from `HitOriginShown` / `HitDamageShown` (set in `MulticastHit`).
 Numbers in tuning `anim.look / flinch / pant / wounded / slump / hungry / beat`. A creature that should look somewhere
 new gets a case in `AWRCreature::BodyLookAt`, not a new system.
+Moods are `EWRCreatureMood` in `AWRCreature::MoodRep` (+ `WatchRep`), set only by the server's brain through
+`SetMood` (it falls back to calm after `creatureAI.mood.staleSeconds` without a refresh, so a biome hook that takes the
+brain's turn never leaves a stale pose). A biome's own creature that wants a pose sets a mood the same way.
 
 Also since 0.7.1: **world systems** (`WRWorldSystems.*`, `WRWorldSites.cpp`, `WRWorldNpc.cpp`, `WRUIWorld.cpp`,
 `Data/world.json`, cooks/build-world-systems.md): `UWRWorldSystems` (server world subsystem) places the villages, shrines,

@@ -1530,7 +1530,26 @@ void AWRCreature::StartFleeing(AActor* From, const TCHAR* Why)
 		const UWRAttributeSet* A = GetAttributes();
 		UE_LOG(LogWildreach, Log, TEXT("AI %s flees from %s (%s, %.0f%% health)"), *GetName(), *GetNameSafe(From), Why,
 			A ? 100.f * A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 0.f);
+		// A grazer's flight is the herd's (cookpass-creatures 3.2): its packmates close by bolt a beat after it, each a
+		// little apart, from the same threat.
+		HerdFleeAt = -1.0;
+		if (Def->Behavior == TEXT("passive") && Spawner.IsValid())
+		{
+			const float Radius = WRTune(TEXT("creatureAI.wary.herdRadius"), 2500.f);
+			const double Now = GetWorld()->GetTimeSeconds();
+			for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
+			{
+				AWRCreature* Mate = *It;
+				if (Mate != this && Mate->Spawner == Spawner && Mate->IsAlive() && !Mate->IsTamed() && !Mate->IsFleeing() && Mate->HerdFleeAt < 0.0
+					&& FVector::Dist(Mate->GetActorLocation(), GetActorLocation()) < Radius)
+				{
+					Mate->HerdFleeAt = Now + FMath::FRandRange(WRTune(TEXT("creatureAI.wary.herdDelayMin"), 0.15f), WRTune(TEXT("creatureAI.wary.herdDelayMax"), 0.6f));
+					Mate->HerdFleeFrom = From;
+				}
+			}
+		}
 	}
+	SetMood(EWRCreatureMood::Flee, From);
 }
 
 void AWRCreature::NotePackLoss()
@@ -3010,6 +3029,13 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		return;
 	}
 
+	// The herd bolts after the first one (StartFleeing set the beat).
+	if (Self->HerdFleeAt >= 0.0 && GetWorld()->GetTimeSeconds() >= Self->HerdFleeAt)
+	{
+		Self->HerdFleeAt = -1.0;
+		if (!Self->IsFleeing() && !Self->IsUnconscious()) Self->StartFleeing(Self->HerdFleeFrom.Get(), TEXT("the herd bolts"));
+	}
+
 	ThinkTimer -= DeltaSeconds;
 	if (ThinkTimer <= 0.f)
 	{
@@ -3041,6 +3067,17 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 			AActor* Picked = PickTarget(Self);
 			if (Picked)
 			{
+				// Turning on someone from its calm (not stung into it): the threat display first, head low and eyes on
+				// them, its growl (the aggro call) giving the read before the first charge (cookpass-creatures 3.2).
+				const bool bFresh = !Current && Def->Behavior == TEXT("aggressive") && Def->Archetype != TEXT("boss") && Def->Role != TEXT("minion")
+					&& !Self->bRaider && !Def->bPortalOnly && Self->SinceHit() > WRTune(TEXT("creatureAI.threat.notAfterHit"), 5.f);
+				if (bFresh)
+				{
+					float Hold = WRTune(*FString::Printf(TEXT("creatureAI.threat.%s"), *Def->Archetype.ToString()), WRTune(TEXT("creatureAI.threat.default"), 0.7f));
+					if (Def->Tier == TEXT("highland")) Hold *= WRTune(TEXT("creatureAI.threat.highlandMult"), 1.3f);
+					ThreatUntil = GetWorld()->GetTimeSeconds() + Hold;
+					ThreatOf = Picked;
+				}
 				Self->HuntTarget = nullptr;
 				Self->SetAggroTarget(Picked);
 			}
@@ -3086,6 +3123,7 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	// Running for its life: away from the threat, a little faster than usual.
 	if (Self->IsFleeing())
 	{
+		Self->SetMood(EWRCreatureMood::Flee, Self->GetFleeFrom());
 		Self->SpeedBoost = WRTune(TEXT("creatureAI.fleeSpeedMult"), 1.2f);
 		const AActor* From = Self->GetFleeFrom();
 		FVector Away = From ? Self->GetActorLocation() - From->GetActorLocation() : Self->GetActorLocation() - Self->GetHome();
@@ -3105,6 +3143,7 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	Self->SpeedBoost = Self->HuntTarget.IsValid() && Target == Self->HuntTarget.Get() ? WRTune(TEXT("creatureAI.huntSpeedMult"), 1.3f) : 1.f;
 	if (Self->IsEating())
 	{
+		Self->SetMood(EWRCreatureMood::Eat);
 		return;  // over its kill
 	}
 
@@ -3123,18 +3162,10 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		}
 	}
 
-	// Passive creatures flee from nearby survivors (and from anyone who hurt them), and from a predator hunting them.
+	// Passive creatures flee from a predator hunting them. Survivors: passive and neutral ones stare at one who comes
+	// near and a passive one bolts when flushed (TickWary below; anyone who hurt them already sent them running).
 	if (Def->Behavior == TEXT("passive"))
 	{
-		for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
-		{
-			const FVector Away = Self->GetActorLocation() - It->GetActorLocation();
-			if (It->IsAlive() && Away.Size2D() < 600.f && It->GetVelocity().Size2D() > 250.f)
-			{
-				Self->AddMovementInput(Away.GetSafeNormal2D(), 1.f);
-				return;
-			}
-		}
 		for (TActorIterator<AWRCreature> It(GetWorld()); It; ++It)
 		{
 			// It bolts in bursts: after a run it needs creatureAI.preyRestSeconds before it can bolt again (a bite still sends it).
@@ -3147,8 +3178,28 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 		}
 	}
 
+	if (!Target && !Self->bRaider && TickWary(Self))
+	{
+		return;
+	}
+
 	if (Target)
 	{
+		// The threat display: it stands, faces them and holds, unless they close to its reach or strike it first.
+		if (GetWorld()->GetTimeSeconds() < ThreatUntil && ThreatOf.Get() == Target)
+		{
+			const FVector To = Target->GetActorLocation() - Self->GetActorLocation();
+			const float Reach = Def->AttackRange + Target->GetSimpleCollisionRadius() + Self->GetSimpleCollisionRadius() + WRTune(TEXT("creatureAI.threat.breakMargin"), 100.f);
+			if (To.Size2D() > Reach && Self->SinceHit() > 0.3f)
+			{
+				Self->SetActorRotation(FMath::RInterpConstantTo(Self->GetActorRotation(), FRotator(0.f, To.Rotation().Yaw, 0.f), DeltaSeconds,
+					WRTune(TEXT("creatureAI.threat.turnRate"), 240.f)));
+				Self->SetMood(EWRCreatureMood::Threat, Target);
+				return;
+			}
+			ThreatUntil = 0.0;
+		}
+		Self->SetMood(EWRCreatureMood::Calm);
 		ChaseAndBite(Self, Target);
 		return;
 	}
@@ -3165,6 +3216,13 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	}
 	if (Self->IsAsleep())
 	{
+		Self->SetMood(EWRCreatureMood::Calm);
+		return;
+	}
+	// A beat under way (grazing, sniffing, scanning, preening): it stands for it (a travelling pack doesn't stop).
+	if (Self->GetPackHeading().IsNearlyZero() && GetWorld()->GetTimeSeconds() < BeatUntil)
+	{
+		TickBeat(Self, true);
 		return;
 	}
 	WanderClock -= DeltaSeconds;
@@ -3180,8 +3238,151 @@ void AWRCreatureAI::TickWild(AWRCreature* Self, float DeltaSeconds)
 	const FVector ToGoal = Self->GetHome() + WanderGoal + FVector(Heading * WRTune(TEXT("wildlife.leadDistance"), 400.f), 0.f) - Self->GetActorLocation();
 	if (ToGoal.Size2D() > 150.f)
 	{
+		TickBeat(Self, false);
 		Self->AddMovementInput(ToGoal.GetSafeNormal2D(), !bTravelling ? 0.4f : ToGoal.Size2D() > WRTune(TEXT("wildlife.catchUpDistance"), 2500.f) ? 0.95f : WRTune(TEXT("wildlife.travelInput"), 0.55f));
 	}
+	else
+	{
+		TickBeat(Self, !bTravelling);   // at its spot: a beat now and then
+	}
+}
+
+bool AWRCreatureAI::TickBeat(AWRCreature* Self, bool bStill)
+{
+	// Calm beats (cookpass-creatures 3.2): what it does when it has stopped, by what it eats. Grazers graze and look
+	// round (less in a big herd: the group-size effect), hunters work a scent, birds preen; then it moves on.
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (!bStill)
+	{
+		BeatUntil = 0.0;
+		Self->SetMood(EWRCreatureMood::Calm);
+		return false;
+	}
+	if (Now < BeatUntil)
+	{
+		Self->SetMood(BeatMood);
+		return true;
+	}
+	if (Now < NextBeatAt || WRTune(TEXT("creatureAI.beat.enabled"), 1.f) <= 0.f)
+	{
+		Self->SetMood(EWRCreatureMood::Calm);
+		return false;
+	}
+	const FWRCreatureDef* Def = Self->GetDef();
+	const bool bFlyer = Def && Def->Archetype == TEXT("flyer");
+	const bool bHunter = Def && (Def->Diet == TEXT("carnivore") || Def->Behavior == TEXT("aggressive"));
+	const int32 Pack = Self->Spawner.IsValid() ? FMath::Max(1, Self->Spawner->Count) : 1;
+	const float ScanShare = FMath::Clamp(3.f / Pack, WRTune(TEXT("creatureAI.beat.minScanShare"), 0.3f), 1.f);
+	float Graze = 0.f, Sniff = 0.f, Scan = 0.f, Preen = 0.f;
+	if (bFlyer)
+	{
+		Preen = WRTune(TEXT("creatureAI.beat.flyer.preen"), 0.5f);
+		Scan = WRTune(TEXT("creatureAI.beat.flyer.scan"), 0.5f);
+	}
+	else if (bHunter)
+	{
+		Sniff = WRTune(TEXT("creatureAI.beat.hunter.sniff"), 0.45f);
+		Scan = WRTune(TEXT("creatureAI.beat.hunter.scan"), 0.4f);
+		Preen = WRTune(TEXT("creatureAI.beat.hunter.preen"), 0.15f);
+	}
+	else
+	{
+		Graze = WRTune(TEXT("creatureAI.beat.grazer.graze"), 0.55f);
+		Scan = WRTune(TEXT("creatureAI.beat.grazer.scan"), 0.3f) * ScanShare;
+		Preen = WRTune(TEXT("creatureAI.beat.grazer.preen"), 0.15f);
+	}
+	// A hungry tame grazes / sniffs more (it's looking for food).
+	if (Self->IsTamed() && Self->TameRep.Hunger < WRTune(TEXT("anim.hungry.below"), 25.f))
+	{
+		Graze *= 2.f;
+		Sniff *= 2.f;
+	}
+	const float Roll = FMath::FRand() * FMath::Max(0.01f, Graze + Sniff + Scan + Preen);
+	BeatMood = Roll < Graze ? EWRCreatureMood::Graze : Roll < Graze + Sniff ? EWRCreatureMood::Sniff : Roll < Graze + Sniff + Scan ? EWRCreatureMood::Scan : EWRCreatureMood::Preen;
+	BeatUntil = Now + FMath::FRandRange(WRTune(TEXT("creatureAI.beat.secondsMin"), 3.f), WRTune(TEXT("creatureAI.beat.secondsMax"), 8.f));
+	NextBeatAt = BeatUntil + FMath::FRandRange(WRTune(TEXT("creatureAI.beat.gapMin"), 2.f), WRTune(TEXT("creatureAI.beat.gapMax"), 6.f));
+	WanderClock = FMath::Max(WanderClock, float(BeatUntil - Now) + 0.5f);   // the wander waits for it
+	Self->SetMood(BeatMood);
+	return true;
+}
+
+bool AWRCreatureAI::TickWary(AWRCreature* Self)
+{
+	// The wary stare (cookpass-creatures 3.2; RDR2's deer, real flight-initiation distances): a grazer or a neutral herd
+	// stops and stares, head up, at the nearest survivor inside its notice range (sneaking shortens it); a passive one
+	// bolts when that survivor comes on at more than a walk inside its flush range (a sprint flushes it from further), the
+	// herd behind it. Walking slowly up to it (to offer food) never flushes it.
+	const FWRCreatureDef* Def = Self->GetDef();
+	if (!Def || Self->IsAsleep() || Self->IsUnconscious() || Self->bRaider || Self->GetRider() || WRTune(TEXT("creatureAI.wary.enabled"), 1.f) <= 0.f
+		|| (Def->Behavior != TEXT("passive") && Def->Behavior != TEXT("neutral")))
+	{
+		return false;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float Notice = WRTune(TEXT("creatureAI.wary.notice"), 2800.f);
+	AWRCharacter* Watcher = nullptr;
+	float Best = TNumericLimits<float>::Max();
+	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsAlive())
+		{
+			continue;
+		}
+		const float Range = Notice * FMath::Max(0.3f, 1.f + UWRLifeSkillsComponent::StatFor(*It, TEXT("aggroRadius")));
+		const float D = float(FVector::Dist(It->GetActorLocation(), Self->GetActorLocation()));
+		if (D < Range && D < Best)
+		{
+			Best = D;
+			Watcher = *It;
+		}
+	}
+	// Used to them: someone who has kept their distance for a while is let be (it goes back to its day) until they come
+	// a good deal closer or the calm runs out.
+	if (Watcher && Now < Self->WaryCalmUntil && Best > WRTune(TEXT("creatureAI.wary.flush"), 900.f) * WRTune(TEXT("creatureAI.wary.calmBreakMult"), 1.5f))
+	{
+		Watcher = nullptr;
+	}
+	if (Watcher)
+	{
+		if (Self->WaryOf.Get() != Watcher || Now >= Self->WaryUntil) Self->WaryStartAt = Now;
+		if (Now - Self->WaryStartAt > WRTune(TEXT("creatureAI.wary.maxStare"), 12.f))
+		{
+			Self->WaryCalmUntil = Now + WRTune(TEXT("creatureAI.wary.calmSeconds"), 25.f);
+			Self->WaryOf = nullptr;
+			return false;
+		}
+		Self->WaryOf = Watcher;
+		Self->WaryUntil = Now + WRTune(TEXT("creatureAI.wary.holdSeconds"), 2.f);
+		if (Def->Behavior == TEXT("passive") && Self->CanBoltAgain())
+		{
+			const FVector Vel = Watcher->GetVelocity();
+			const FVector Toward = (Self->GetActorLocation() - Watcher->GetActorLocation()).GetSafeNormal2D();
+			const float Speed = float(Vel.Size2D());
+			const bool bComing = Speed > 1.f && FVector::DotProduct(Vel.GetSafeNormal2D(), Toward) > WRTune(TEXT("creatureAI.wary.approachDot"), 0.4f);
+			const float Flush = WRTune(TEXT("creatureAI.wary.flush"), 900.f) * (Speed > WRTune(TEXT("creatureAI.wary.sprintSpeed"), 600.f) ? WRTune(TEXT("creatureAI.wary.sprintMult"), 2.f) : 1.f);
+			if (bComing && Speed > WRTune(TEXT("creatureAI.wary.flushSpeed"), 250.f) && Best < Flush)
+			{
+				Self->StartFleeing(Watcher, TEXT("flushed"));
+				return true;
+			}
+		}
+	}
+	AActor* Of = Self->WaryOf.Get();
+	if (!Of || Now >= Self->WaryUntil)
+	{
+		Self->WaryOf = nullptr;
+		return false;
+	}
+	// Standing still, it turns its body to them once they're well off to one side (its head covers the rest).
+	const FVector To = Of->GetActorLocation() - Self->GetActorLocation();
+	if (FMath::Abs(FMath::FindDeltaAngleDegrees(Self->GetActorRotation().Yaw, To.Rotation().Yaw)) > WRTune(TEXT("creatureAI.wary.turnBeyond"), 70.f))
+	{
+		Self->SetActorRotation(FMath::RInterpConstantTo(Self->GetActorRotation(), FRotator(0.f, To.Rotation().Yaw, 0.f), GetWorld()->GetDeltaSeconds(),
+			WRTune(TEXT("creatureAI.wary.turnRate"), 120.f)));
+	}
+	BeatUntil = 0.0;
+	Self->SetMood(EWRCreatureMood::Wary, Of);
+	return true;
 }
 
 namespace
@@ -3506,7 +3707,13 @@ void AWRCreatureAI::TickTame(AWRCreature* Self, float DeltaSeconds)
 	const float Stop = Self->TameOrder == EWRTameOrder::Follow ? 350.f : 100.f;
 	if (To.Size2D() > Stop)
 	{
+		TickBeat(Self, false);
 		Self->AddMovementInput(To.GetSafeNormal2D(), To.Size2D() > 1200.f ? 1.f : 0.7f);
+	}
+	else
+	{
+		// Standing by its owner or on Stay: its calm beats (a hungry one grazes and sniffs more).
+		TickBeat(Self, !Self->GetRider() && !Self->IsBaby() && Self->GetVelocity().Size2D() < 30.f);
 	}
 }
 

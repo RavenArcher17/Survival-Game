@@ -18,6 +18,20 @@ cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron a
     slump (neck down, back sagging, head tilted), a dozing head, a hungry tame's low head.
   - `FWRAnimProxy::ApplyCreatureBody` / `ApplyCreatureShape` (WRAnimInstance.cpp); tuning `anim.look`, `flinch`,
     `pant`, `wounded`, `slump`, `hungry`, `beat`, `sleepDip`.
+- **Creatures (2): moods.** Why: a doe ran only while you were touching it, a herd never fled together, nothing grazed
+  or sniffed, and a predator went from calm to charging with no read (grades G2-G4; RDR2's deer and wolves, Horizon's
+  grazers, Monster Hunter's first-sight roar).
+  - `AWRCreature::MoodRep` / `WatchRep` (replicated): calm, graze, sniff, scan, preen, wary, threat, flee, eat; set by
+    the wild brain (`AWRCreatureAI::TickBeat`, `TickWary`, the threat display in `TickWild`), drawn on every machine.
+  - Calm beats at the wander spot by diet (grazers graze with head-up checks, scan less in a big herd; hunters sniff;
+    flyers preen), tames standing by too (a hungry tame grazes and sniffs more).
+  - The wary stare: passive and neutral wild ones stop and watch the nearest survivor inside 28 m (sneaking shortens
+    it), turning the body when needed; they get used to someone who keeps their distance (12 s, then calm for 25 s).
+    A passive one bolts when the watcher comes straight at it faster than a slow walk inside 9 m (18 m sprinting); its
+    packmates within 25 m follow 0.15-0.6 s later. Walking slowly up to offer food still works.
+  - The threat display: an aggressive creature turning on a survivor or tame from its calm holds 0.4-1.2 s by
+    archetype (head low, shoulders down, a sway, its growl), cut short if you close to its reach or strike it.
+  - Tuning `creatureAI.mood / beat / wary / threat`.
 
 ## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 

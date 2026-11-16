@@ -280,6 +280,13 @@ public:
 	/** Server: its mood unless it was set again within the stale time (biome hooks that take the brain's turn). */
 	void TickMoodStale();
 	double MoodSetAt = 0.0;
+	/** Server: the wary stare (cookpass-creatures 3.2): who it watches and until when (held a moment after they leave). */
+	TWeakObjectPtr<AActor> WaryOf;
+	double WaryUntil = 0.0;
+	double WaryStartAt = 0.0, WaryCalmUntil = 0.0;   // it gets used to a survivor who keeps their distance
+	/** Server: a packmate bolted; it follows at HerdFleeAt (the herd goes together, a beat apart). */
+	double HerdFleeAt = -1.0;
+	TWeakObjectPtr<AActor> HerdFleeFrom;
 	/** Every machine: an attack row's coil and release over its one attack clip (cookpass-creatures 3.3). */
 	UFUNCTION(NetMulticast, Unreliable) void MulticastRowGesture(FName Motion, float Windup, int8 Side);
 	/** This one's own voice (1 +- audio.voice.spread, seeded by its kind and where it came into the world). */
@@ -733,6 +740,16 @@ private:
 	float RaidPickClock = 0.f;
 	double NextRaidBiteAt = 0.0;
 	double RaidBiteLandsAt = -1.0;
+	// Moods (cookpass-creatures 3.2): the threat display before its first charge, the calm beats, the wary stare.
+	/** At its spot (or a tame standing by): a beat now and then (graze, sniff, scan, preen by diet); false = it may move on. */
+	bool TickBeat(AWRCreature* Self, bool bStill);
+	/** Passive / neutral wild ones: stare at the nearest survivor in notice range; a passive one bolts when flushed (true:
+	 *  it stands staring, or it just bolted). */
+	bool TickWary(AWRCreature* Self);
+	double ThreatUntil = 0.0;
+	TWeakObjectPtr<AActor> ThreatOf;
+	double BeatUntil = 0.0, NextBeatAt = 0.0;
+	EWRCreatureMood BeatMood = EWRCreatureMood::Calm;
 	FName Special;
 	int32 SpecialPhase = 0;  // 0 none, 1 windup, 2 under way
 	float SpecialClock = 0.f;
