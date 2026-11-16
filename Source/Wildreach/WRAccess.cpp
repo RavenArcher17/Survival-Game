@@ -79,7 +79,8 @@ int32 WRAccess::MaxPlayersLimit(bool bDedicated)
 FWRAccess WRAccess::Read(const FString& WorldId)
 {
 	FWRAccess A;
-	A.MaxPlayers = FMath::RoundToInt(WRTune(TEXT("net.listenDefaultPlayers"), 8.f));
+	// Until its host sets one: 8 on a listen world, more on a dedicated server (M7: 10 to 100).
+	A.MaxPlayers = FMath::RoundToInt(IsRunningDedicatedServer() ? WRTune(TEXT("net.dedicatedDefaultPlayers"), 32.f) : WRTune(TEXT("net.listenDefaultPlayers"), 8.f));
 	FString Text;
 	TSharedPtr<FJsonObject> O;
 	const FString Path = WRAccessDetail::PathFor(WorldId);

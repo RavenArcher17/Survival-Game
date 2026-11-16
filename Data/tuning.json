@@ -120,8 +120,8 @@
   "net": {
     "_comment": "Server rewind (COMBAT-AND-LESSONS 1.17; cooks/build-combat-core.md 3.4): every character's body is kept for history s at sampleHz. A player's swing and crit are judged against bodies where that player saw them (its ping / 2 + interpSeconds, at most rewindMax). A creature's or boss's blow on a remote player waits up to its ping + interp (at most rewindMax) for the defence it pressed when it saw the blow.",
     "rewindMax": 0.25, "interpSeconds": 0.1, "history": 1.0, "sampleHz": 30,
-    "_players": "How many can be in a world at once (WRAccess; cooks/cookpass-multiplayer.md 3.4): a listen world's host sets listenMinPlayers..listenMaxPlayers on the Hosting page (listenDefaultPlayers until then), a dedicated server up to dedicatedMaxPlayers.",
-    "listenMinPlayers": 2, "listenMaxPlayers": 16, "listenDefaultPlayers": 8, "dedicatedMaxPlayers": 100
+    "_players": "How many can be in a world at once (WRAccess; cooks/cookpass-multiplayer.md 3.4): a listen world's host sets listenMinPlayers..listenMaxPlayers on the Hosting page (listenDefaultPlayers until then), a dedicated server up to dedicatedMaxPlayers (dedicatedDefaultPlayers until its access.json says).",
+    "listenMinPlayers": 2, "listenMaxPlayers": 16, "listenDefaultPlayers": 8, "dedicatedDefaultPlayers": 32, "dedicatedMaxPlayers": 100
   },
 
   "claims": { "_comment": "Land claims (cooks/cookpass-multiplayer.md 3.7): totems stand at least two full-upgrade radii plus gapCm apart (claims never nest or grow into a neighbour); a claim's name is up to nameLength letters.",

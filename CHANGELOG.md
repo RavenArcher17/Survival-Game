@@ -129,6 +129,8 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
     once, keeps the world as it is now as a "before a restore" backup, then puts the snapshot back
     (`WRStore::ListBackups` / `RestoreBackup`; refused while the world runs).
   - Shipping builds now let the `admin` and `claimname` commands through (the list of allowed gameplay commands). Tested by compiling.
+- **Spot-check fix:** a dedicated server's default cap is `net.dedicatedDefaultPlayers` (32) until its `access.json`
+  sets one; a listen world's is still 8. Tested by compiling.
 
 ## Unreleased: building and raids cook pass (cookpass-building)
 
