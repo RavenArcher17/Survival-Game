@@ -9,6 +9,12 @@
 #include "WRStore.h"
 #include "WRIdentity.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
+#include "ProceduralMeshComponent.h"
+#include "WRLootLook.h"
+#include "WRGameMode.h"
+#include "WRPathComponent.h"
+#include "WRPathTypes.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
 #include "GameFramework/GameStateBase.h"
@@ -385,14 +391,16 @@ void AWRSafeZone::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 AWRLootBag::AWRLootBag()
 {
 	bReplicates = true;
-	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-	RootComponent = Mesh;
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (Sphere.Succeeded()) Mesh->SetStaticMesh(Sphere.Object);
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Mat(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	if (Mat.Succeeded()) Mesh->SetMaterial(0, Mat.Object);
-	Mesh->SetRelativeScale3D(FVector(0.5f));
-	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	// Modelled on every machine that draws (WRLootLook); nothing collides with it: it's found by distance.
+	Body = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Body"));
+	Body->SetupAttachment(RootComponent);
+	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Body->SetCanEverAffectNavigation(false);
+	// Ticks only on its owner's machine, for the beacon (BuildLook turns it on).
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	PrimaryActorTick.TickInterval = 0.05f;
 }
 
 void AWRLootBag::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -400,6 +408,203 @@ void AWRLootBag::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AWRLootBag, OwnerName);
 	DOREPLIFETIME(AWRLootBag, bOwnerOnly);
+	DOREPLIFETIME(AWRLootBag, Kind);
+	DOREPLIFETIME(AWRLootBag, ExpiresAt);
+	DOREPLIFETIME(AWRLootBag, OwnerPath);
+}
+
+void AWRLootBag::BeginPlay()
+{
+	Super::BeginPlay();
+	if (HasAuthority())
+	{
+		Settle();
+	}
+	BuildLook();
+}
+
+void AWRLootBag::Setup(uint8 InKind, float LifeSeconds)
+{
+	Kind = InKind;
+	if (LifeSeconds > 0.f)
+	{
+		SetLifeSpan(LifeSeconds);
+		ExpiresAt = float(GetWorld()->GetTimeSeconds() + LifeSeconds);
+	}
+	BuildLook();   // the host's own view (OnRep only runs on clients)
+	ForceNetUpdate();
+}
+
+void AWRLootBag::OnRep_Look()
+{
+	BuildLook();
+}
+
+void AWRLootBag::Settle()
+{
+	// On the ground under it (a floor, a rock, the land), its foot turned to the slope, a turn of its own.
+	UWorld* World = GetWorld();
+	if (!World) return;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(WRBagSettle), false, this);
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
+	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
+	FHitResult Hit;
+	const FVector From = GetActorLocation() + FVector(0.f, 0.f, 100.f);
+	if (!World->LineTraceSingleByObjectType(Hit, From, GetActorLocation() - FVector(0.f, 0.f, 300.f), Objects, Q))
+	{
+		return;
+	}
+	const float Yaw = FMath::Frac(FMath::Abs(GetActorLocation().X * 0.0137f + GetActorLocation().Y * 0.0071f)) * 360.f;
+	const FVector Up = Hit.ImpactNormal.GetSafeNormal();
+	const FQuat Tilt = FQuat::FindBetweenNormals(FVector::UpVector, Up.Z > 0.5f ? Up : FVector::UpVector);
+	SetActorLocationAndRotation(Hit.ImpactPoint, Tilt * FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw)));
+}
+
+void AWRLootBag::BuildLook()
+{
+	if (GetNetMode() == NM_DedicatedServer || BuiltKind == int32(Kind) * 2 + (OwnerPath.IsNone() ? 0 : 1))
+	{
+		return;
+	}
+	BuiltKind = int32(Kind) * 2 + (OwnerPath.IsNone() ? 0 : 1);
+	const FWRToolMesh Look = Kind == KindDeath ? WRLootLook::Satchel() : Kind == KindSpill ? WRLootLook::Crate() : WRLootLook::Sack();
+	Look.ApplyTo(Body);
+	Body->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// A souls satchel's beacon: only its owner's game draws it (the others see the satchel alone).
+	const bool bBeacon = Kind == KindDeath && bOwnerOnly;
+	if (bBeacon && !Beacon)
+	{
+		Beacon = NewObject<UProceduralMeshComponent>(this, TEXT("Beacon"));
+		Beacon->SetupAttachment(RootComponent);
+		Beacon->SetUsingAbsoluteRotation(true);   // straight up, however the satchel lies
+		Beacon->RegisterComponent();
+		WRLootLook::Beacon(WRTune(TEXT("death.beaconHeightCm"), 600.f)).ApplyTo(Beacon);
+		Beacon->SetCastShadow(false);
+		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/FX/M_WindupGlow.M_WindupGlow")))
+		{
+			BeaconMat = UMaterialInstanceDynamic::Create(Base, this);
+			Beacon->SetMaterial(0, BeaconMat);
+		}
+		BeaconLight = NewObject<UPointLightComponent>(this, TEXT("BeaconLight"));
+		BeaconLight->SetupAttachment(RootComponent);
+		BeaconLight->RegisterComponent();
+		BeaconLight->SetRelativeLocation(FVector(0.f, 0.f, 60.f));
+		BeaconLight->SetIntensity(WRTune(TEXT("death.beaconLight"), 1800.f));
+		BeaconLight->SetAttenuationRadius(450.f);
+		BeaconLight->SetCastShadows(false);
+	}
+	if (Beacon)
+	{
+		// The owner's main path's colour (each path's own: Fire ember, Frost pale blue...); a warm gold without one.
+		const FWRPathDef* Def = OwnerPath.IsNone() ? nullptr : FWRPathRegistry::Get().Find(OwnerPath);
+		const FLinearColor C = Def && Def->Color.A > 0.f ? Def->Color : FLinearColor(FColor(255, 196, 110));
+		if (BeaconMat)
+		{
+			BeaconMat->SetVectorParameterValue(TEXT("Color"), C);
+			BeaconMat->SetScalarParameterValue(TEXT("Glow"), WRTune(TEXT("death.beaconGlow"), 1.6f));
+			BeaconMat->SetScalarParameterValue(TEXT("Opacity"), 0.f);
+		}
+		BeaconLight->SetLightColor(C);
+		Beacon->SetVisibility(false);
+		BeaconLight->SetVisibility(false);
+		SetActorTickEnabled(true);
+	}
+}
+
+void AWRLootBag::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!Beacon) { SetActorTickEnabled(false); return; }
+	// Only its owner sees it, from up to death.beaconRangeCm; a slow breath of light.
+	const APlayerController* Local = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	const APawn* View = Local ? Local->GetPawn() : nullptr;
+	const bool bMine = Local && Local->PlayerState && Local->PlayerState->GetPlayerName() == OwnerName;
+	const float Range = WRTune(TEXT("death.beaconRangeCm"), 20000.f);
+	const float Dist = View ? FVector::Dist(View->GetActorLocation(), GetActorLocation()) : 0.f;
+	const bool bShow = bMine && Dist < Range;
+	Beacon->SetVisibility(bShow);
+	BeaconLight->SetVisibility(bShow && Dist < 6000.f);
+	if (bShow && BeaconMat)
+	{
+		const float Breath = 0.5f + 0.5f * FMath::Sin(float(GetWorld()->GetTimeSeconds()) * 2.f * PI / FMath::Max(0.5f, WRTune(TEXT("death.beaconPulseSeconds"), 3.f)));
+		// Fainter close up (it's beside you), stronger far off (it's what you look for).
+		const float Far = FMath::Clamp((Dist - 300.f) / 3000.f, 0.25f, 1.f);
+		BeaconMat->SetScalarParameterValue(TEXT("Opacity"), WRTune(TEXT("death.beaconOpacity"), 0.28f) * Far * (0.75f + 0.25f * Breath));
+	}
+}
+
+TSharedRef<FJsonObject> AWRLootBag::SaveAll(UWorld* World)
+{
+	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> List;
+	const double Now = World ? World->GetTimeSeconds() : 0.0;
+	for (TActorIterator<AWRLootBag> It(World); It; ++It)
+	{
+		// A death's belongings (souls, drop or full loot), with the time they have left; other drops stay short-lived.
+		if (It->Kind != KindDeath || It->Items.Num() == 0 || It->IsActorBeingDestroyed()) continue;
+		const TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+		O->SetStringField(TEXT("owner"), It->OwnerName);
+		O->SetBoolField(TEXT("ownerOnly"), It->bOwnerOnly);
+		O->SetStringField(TEXT("path"), It->OwnerPath.ToString());
+		const FVector L = It->GetActorLocation();
+		O->SetArrayField(TEXT("at"), { MakeShared<FJsonValueNumber>(L.X), MakeShared<FJsonValueNumber>(L.Y), MakeShared<FJsonValueNumber>(L.Z) });
+		O->SetNumberField(TEXT("left"), It->ExpiresAt > 0.f ? FMath::Max(60.0, double(It->ExpiresAt) - Now) : WRTune(TEXT("death.bagMinutes"), 30.f) * 60.0);
+		TArray<TSharedPtr<FJsonValue>> Stacks;
+		for (const FWRItemStack& S : It->Items) if (!S.IsEmpty()) Stacks.Add(MakeShared<FJsonValueObject>(FWRInventoryRules::StackToJson(S)));
+		O->SetArrayField(TEXT("items"), Stacks);
+		List.Add(MakeShared<FJsonValueObject>(O));
+	}
+	Root->SetArrayField(TEXT("bags"), List);
+	return Root;
+}
+
+void AWRLootBag::SaveNow(UWorld* World, bool bClosing)
+{
+	// (While a world closes only its own last save writes: bags leaving with it aren't "gone".)
+	if (!World || (World->bIsTearingDown && !bClosing) || WRWorlds::Current().IsEmpty()) return;
+	FString Text;
+	FJsonSerializer::Serialize(SaveAll(World), TJsonWriterFactory<>::Create(&Text));
+	WRStore::WriteDoc(TEXT("bags"), Text);
+}
+
+void AWRLootBag::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// A death's bag gone (taken, run out): the saved list without it, so a restart can't bring it back.
+	const bool bDeath = Kind == KindDeath && HasAuthority();
+	Super::EndPlay(Reason);
+	if (bDeath && Reason == EEndPlayReason::Destroyed) SaveNow(GetWorld());
+}
+
+void AWRLootBag::LoadAll(UWorld* World, const TSharedPtr<FJsonObject>& Json)
+{
+	const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+	if (!World || !Json.IsValid() || !Json->TryGetArrayField(TEXT("bags"), List)) return;
+	for (const TSharedPtr<FJsonValue>& V : *List)
+	{
+		const TSharedPtr<FJsonObject> O = V->AsObject();
+		const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
+		const TArray<TSharedPtr<FJsonValue>>* Stacks = nullptr;
+		if (!O.IsValid() || !O->TryGetArrayField(TEXT("at"), At) || At->Num() < 3 || !O->TryGetArrayField(TEXT("items"), Stacks)) continue;
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector L((*At)[0]->AsNumber(), (*At)[1]->AsNumber(), (*At)[2]->AsNumber());
+		AWRLootBag* Bag = World->SpawnActor<AWRLootBag>(AWRLootBag::StaticClass(), L + FVector(0.f, 0.f, 20.f), FRotator::ZeroRotator, Params);
+		if (!Bag) continue;
+		Bag->OwnerName = O->GetStringField(TEXT("owner"));
+		O->TryGetBoolField(TEXT("ownerOnly"), Bag->bOwnerOnly);
+		FString Path;
+		if (O->TryGetStringField(TEXT("path"), Path) && !Path.IsEmpty() && Path != TEXT("None")) Bag->OwnerPath = FName(*Path);
+		for (const TSharedPtr<FJsonValue>& S : *Stacks)
+		{
+			const FWRItemStack Stack = FWRInventoryRules::StackFromJson(S->AsObject());
+			if (!Stack.IsEmpty()) Bag->Items.Add(Stack);
+		}
+		double Left = 0.0;
+		O->TryGetNumberField(TEXT("left"), Left);
+		Bag->Setup(KindDeath, float(FMath::Max(60.0, Left)));
+		UE_LOG(LogWildreach, Log, TEXT("DEATH %s's belongings back after the restart at %s (%.0f min left)"), *Bag->OwnerName, *L.ToCompactString(), Left / 60.0);
+	}
 }
 
 void AWRLootBag::ApplyDeathPenalty(AWRCharacterBase* Died, AWRPlayerState* PS)
@@ -456,16 +661,14 @@ void AWRLootBag::ApplyDeathPenalty(AWRCharacterBase* Died, AWRPlayerState* PS)
 		Bag->OwnerName = Who;
 		Bag->bOwnerOnly = Mode == TEXT("souls");
 		Bag->Items = Items;
-		Bag->SetLifeSpan(WRTune(TEXT("death.bagMinutes"), 30.f) * 60.f);
-		if (UMaterialInstanceDynamic* MID = Bag->Mesh->CreateAndSetMaterialInstanceDynamic(0))
-		{
-			MID->SetVectorParameterValue(TEXT("Color"), Bag->bOwnerOnly ? FLinearColor(0.5f, 0.8f, 1.f) : FLinearColor(0.6f, 0.4f, 0.2f));
-		}
+		Bag->OwnerPath = PS->GetPaths() ? PS->GetPaths()->GetMainPath() : NAME_None;
+		Bag->Setup(KindDeath, WRTune(TEXT("death.bagMinutes"), 30.f) * 60.f);
+		SaveNow(Died->GetWorld());
 		UE_LOG(LogWildreach, Log, TEXT("DEATH %s (%s): %d stacks dropped at %s"), *Who, *Mode, Items.Num(), *At.ToCompactString());
 	}
 }
 
-AWRLootBag* AWRLootBag::Spill(UWorld* World, const FVector& At, const FString& Owner, const TArray<FWRItemStack>& Items)
+AWRLootBag* AWRLootBag::Spill(UWorld* World, const FVector& At, const FString& Owner, const TArray<FWRItemStack>& Items, uint8 InKind)
 {
 	TArray<FWRItemStack> Held = Items.FilterByPredicate([](const FWRItemStack& S) { return !S.IsEmpty(); });
 	if (!World || Held.Num() == 0)
@@ -482,11 +685,7 @@ AWRLootBag* AWRLootBag::Spill(UWorld* World, const FVector& At, const FString& O
 	Bag->OwnerName = Owner;
 	Bag->bOwnerOnly = false;
 	Bag->Items = MoveTemp(Held);
-	Bag->SetLifeSpan(WRTune(TEXT("building.spillMinutes"), 30.f) * 60.f);
-	if (UMaterialInstanceDynamic* MID = Bag->Mesh->CreateAndSetMaterialInstanceDynamic(0))
-	{
-		MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.6f, 0.4f, 0.2f));
-	}
+	Bag->Setup(InKind, WRTune(TEXT("building.spillMinutes"), 30.f) * 60.f);
 	return Bag;
 }
 
@@ -511,6 +710,12 @@ FString AWRLootBag::Loot(AWRPlayerController* Player)
 		}
 	}
 	Items.RemoveAll([](const FWRItemStack& S) { return S.IsEmpty(); });
+	// What was taken is saved with the taker at once, and the bag's new state too: a crash can't hand it out twice.
+	if (Taken > 0 && Kind == KindDeath)
+	{
+		if (AWRGameMode* GM = GetWorld()->GetAuthGameMode<AWRGameMode>()) GM->SavePlayer(PS);
+		if (Items.Num() > 0) SaveNow(GetWorld());
+	}
 	if (Items.Num() == 0)
 	{
 		Destroy();

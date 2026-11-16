@@ -90,7 +90,9 @@ public:
 	UPROPERTY(EditAnywhere, Replicated, Category="Safe zone") float Radius = 3000.f;
 };
 
-/** What a death leaves behind (Souls-like: only you can pick it up; drop/full loot: anyone). */
+/** What a death leaves behind (Souls-like: only you can pick it up; drop/full loot: anyone), what a broken chest
+ *  spills, and anything else dropped. Modelled (WRLootLook, cooks/cookpass-multiplayer.md 3.5): a satchel and bedroll,
+ *  a stove-in crate, a tied sack. The owner of a souls satchel sees a column of light over it. */
 UCLASS()
 class WILDREACH_API AWRLootBag : public AActor
 {
@@ -99,18 +101,47 @@ class WILDREACH_API AWRLootBag : public AActor
 public:
 	AWRLootBag();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	/** What it is (and so how it looks): a death's belongings, a broken chest's contents, anything else dropped. */
+	enum : uint8 { KindDrop = 0, KindDeath = 1, KindSpill = 2 };
 
 	/** Server: run the death penalty for a player who just died here. */
 	static void ApplyDeathPenalty(AWRCharacterBase* Died, class AWRPlayerState* PS);
-	/** Server: what a broken chest held, in a bag where it stood that anyone can take, for building.spillMinutes. */
-	static AWRLootBag* Spill(UWorld* World, const FVector& At, const FString& Owner, const TArray<FWRItemStack>& Items);
+	/** Server: items in a bag where they fell that anyone can take, for building.spillMinutes (a chest's: KindSpill). */
+	static AWRLootBag* Spill(UWorld* World, const FVector& At, const FString& Owner, const TArray<FWRItemStack>& Items, uint8 InKind = KindDrop);
 	/** Server: take everything. */
 	FString Loot(AWRPlayerController* Player);
+	/** Server: its kind (its look follows on every machine) and how long it lasts (seconds; 0 keeps the life it has). */
+	void Setup(uint8 InKind, float LifeSeconds);
+
+	/** Server: the souls and loot satchels into the world save and back after a clean restart (with the time they had left). */
+	static TSharedRef<class FJsonObject> SaveAll(UWorld* World);
+	static void LoadAll(UWorld* World, const TSharedPtr<class FJsonObject>& Json);
+	/** Server: write that list now (a death's bag made, taken from or gone; the world's own save). */
+	static void SaveNow(UWorld* World, bool bClosing = false);
 
 	UPROPERTY(Replicated) FString OwnerName;
 	UPROPERTY(Replicated) bool bOwnerOnly = true;
+	UPROPERTY(ReplicatedUsing=OnRep_Look) uint8 Kind = KindDrop;
+	/** Server world time it goes (0: no end set); clients read it against the game state's server time. */
+	UPROPERTY(Replicated) float ExpiresAt = 0.f;
+	/** Its owner's main path, for the beacon's colour. */
+	UPROPERTY(ReplicatedUsing=OnRep_Look) FName OwnerPath;
 	TArray<FWRItemStack> Items;
 
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+
 private:
-	UPROPERTY(VisibleAnywhere) TObjectPtr<UStaticMeshComponent> Mesh;
+	UFUNCTION() void OnRep_Look();
+	/** Server: sit it on the ground under it, tilted to the slope. */
+	void Settle();
+	void BuildLook();
+	UPROPERTY(VisibleAnywhere) TObjectPtr<class UProceduralMeshComponent> Body;
+	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> Beacon;
+	UPROPERTY(Transient) TObjectPtr<class UPointLightComponent> BeaconLight;
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> BeaconMat;
+	int32 BuiltKind = -1;
 };

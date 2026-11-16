@@ -73,6 +73,8 @@ Who may join is `WRAccess` (`access.json` per world: cap, salted password hash, 
 Roles are `AWRPlayerState::AccessRole` (2 host, 1 admin), refreshed by `WRAccess::RefreshRoles`; admin actions are the
 `admin kick|ban|unban|op|deop` server command. Leaving reasons for the card: `SWRMainMenu::NoteLeaving` (kicks, the host
 closing: `AWRPlayerController::AnnounceHostClosing`).
+Dropped bags have a kind (`AWRLootBag::KindDeath / KindSpill / KindDrop`, set with `Setup(kind, life)` or `Spill(..., kind)`)
+that picks their modelled look (`WRLootLook`); a death's bags are saved in the world doc `bags` (`AWRLootBag::SaveNow`).
 Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

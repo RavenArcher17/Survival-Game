@@ -15,6 +15,7 @@
 #include "WRUIEndgame.h"
 #include "WRUICaptions.h"
 #include "WRPlayerUI.h"
+#include "WRSocial.h"
 #include "WRPortals.h"
 #include "WRArtifacts.h"
 #include "WRWorldSystems.h"
@@ -61,6 +62,7 @@
 #include "WRWater.h"
 #include "AbilitySystemComponent.h"
 #include "EngineUtils.h"
+#include "GameFramework/GameStateBase.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
@@ -258,7 +260,18 @@ public:
 				const float R = 6.f;
 				FSlateDrawElement::MakeRotatedBox(Out, Layer + 3, Geo.ToPaintGeometry(FVector2D(R * 2.f, R * 2.f), FSlateLayoutTransform(FVector2D(X - R, 4.f))), WRUI::Box(WRUI::Warn, 1.f, FLinearColor::Black, 1.f),
 					ESlateDrawEffect::None, FMath::DegreesToRadians(45.f), TOptional<FVector2f>(), FSlateDrawElement::RelativeToElement, WRUI::Warn);
-				const FText T = FText::FromString(FString::Printf(TEXT("Your belongings · %s"), D.Size2D() < 100000.f ? *FString::Printf(TEXT("%.0f m"), D.Size2D() / 100.f) : *FString::Printf(TEXT("%.1f km"), D.Size2D() / 100000.f)));
+				// How long they'll wait (the satchel's own clock: cooks/cookpass-multiplayer.md 3.5).
+				FString Left;
+				const AGameStateBase* GS = P->GetWorld()->GetGameState();
+				for (TActorIterator<AWRLootBag> It(P->GetWorld()); It && GS; ++It)
+				{
+					if (It->Kind == AWRLootBag::KindDeath && It->ExpiresAt > 0.f && FVector::Dist2D(It->GetActorLocation(), Bag) < 500.f && P->PlayerState && It->OwnerName == P->PlayerState->GetPlayerName())
+					{
+						Left = FString::Printf(TEXT(" · %d min left"), FMath::Max(1, FMath::CeilToInt((It->ExpiresAt - float(GS->GetServerWorldTimeSeconds())) / 60.f)));
+						break;
+					}
+				}
+				const FText T = FText::FromString(FString::Printf(TEXT("Your belongings · %s%s"), D.Size2D() < 100000.f ? *FString::Printf(TEXT("%.0f m"), D.Size2D() / 100.f) : *FString::Printf(TEXT("%.1f km"), D.Size2D() / 100000.f), *Left));
 				const FSlateFontInfo Font = WRUI::Body(12, 700);
 				const FVector2D S = Measure(T, Font);
 				const FVector2D Pos(X - S.X * 0.5f, Size.Y + 30.f);

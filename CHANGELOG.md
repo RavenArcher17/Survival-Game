@@ -97,6 +97,22 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
   - **Arrivals:** everyone else reads "Mira washed ashore" (new to the world), "Mira is back" or "Mira left".
   - **The host leaving** (Main menu or Quit) with others here tells each of them first and saves everyone. Their card
     reads "The host closed the world. Everything was saved", with no Rejoin. Tested by compiling.
+- **Part E: what a death leaves is a satchel, not a ball.** Why: every dropped bag (a death's belongings, a broken
+  chest's contents, loot, overflow) was an engine sphere with the basic-shape material (a primitive). A souls bag had
+  no light, the compass didn't say how long it would wait, and a restart lost it. Now `AWRLootBag` is modelled in code
+  (`WRLootLook`, the tool kit's lathe, loft and tube; no engine shapes) by kind:
+  - **a death**: a rolled fur bedroll whose layers spiral at its ends, two straps with bronze buckles (one fallen loose
+    across the ground), a hide satchel slumped against it with its flap shut by a bone toggle, and a cord-tied pouch
+    and a stoppered waterskin spilled beside it;
+  - **a broken chest**: a nailed crate with its front stove in (boards fallen out, one hanging from a nail), its lid
+    leaning on its back, a burlap sack against its end and a few lumps rolled out;
+  - **anything else**: a hide sack tied at the neck, with a rolled fur bundle.
+  Each settles onto whatever is under it (floor, rock or ground), tilted to the slope, with a turn of its own. A souls
+  satchel's owner, and only its owner, sees a soft column of light 6 m tall over it, in their main path's colour,
+  breathing slowly, out to 200 m, with a small light at its foot (`death.beacon*`). The compass marker says how long
+  the belongings will wait ("Your belongings · 40 m · 24 min left"). A death's belongings are saved with the world
+  (doc `bags`) and come back after a clean restart with the time they had left. Taking from one saves the taker and
+  the bag at once, so a crash can't hand them out twice. Tested by compiling.
 
 ## Unreleased: building and raids cook pass (cookpass-building)
 

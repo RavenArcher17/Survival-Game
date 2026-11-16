@@ -198,6 +198,14 @@ void AWRGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	LoadWorld();
+	{
+		FString BagsText;
+		TSharedPtr<FJsonObject> Bags;
+		if (!WRWorlds::Current().IsEmpty() && WRStore::ReadDoc(TEXT("bags"), BagsText) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(BagsText), Bags))
+		{
+			AWRLootBag::LoadAll(GetWorld(), Bags);
+		}
+	}
 	FWRRaiding::Load(GetWorld());
 	FWRSiege::Load(GetWorld());
 	WRWildlife::Start(GetWorld());
@@ -357,6 +365,8 @@ void AWRGameMode::SaveWorld()
 		return;
 	}
 	CountPlayTime();
+	// A death's belongings wait through a clean restart (cooks/cookpass-multiplayer.md 3.5).
+	AWRLootBag::SaveNow(GetWorld(), true);
 	TArray<TSharedPtr<FJsonValue>> Pieces;
 	for (TActorIterator<AWRBuildPiece> It(GetWorld()); It; ++It)
 	{

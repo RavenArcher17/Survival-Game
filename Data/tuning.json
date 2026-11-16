@@ -607,7 +607,7 @@
     "setComplete": { "glowSeconds": 1.6 },
     "reveal": { "cellCm": 800, "radiusCm": 15000, "shrineCm": 60000, "tickSeconds": 1.0, "tilesPerTick": 4, "redrawSeconds": 1.0, "fogColor": "2A241C", "fogAlpha": 0.86 } },
   "husbandry": { "produceSeconds": 600 },
-  "death": { "bagMinutes": 30 },
+  "death": { "_comment": "A death's belongings (AWRLootBag, cooks/cookpass-multiplayer.md 3.5): they wait bagMinutes (saved through a clean restart). A souls satchel's owner sees a column of light beaconHeightCm tall in their main path's colour from up to beaconRangeCm (glow beaconGlow, opacity beaconOpacity breathing every beaconPulseSeconds, a point light of beaconLight).", "bagMinutes": 30, "beaconHeightCm": 600, "beaconRangeCm": 20000, "beaconGlow": 1.6, "beaconOpacity": 0.28, "beaconPulseSeconds": 3, "beaconLight": 1800 },
   "flow": { "_comment": "The moments between play (WRUIFlow): the death screen and its fades; the Loading the island cover, held until World Partition has streamed streamRadius cm around you (at most streamMaxSeconds), shown after a jump of teleportCm or more; screens ease in over screenInSeconds; notices queue (each up noticeSeconds, at least noticeMinSeconds when others wait); banners, toasts and hints; discovery radii by place kind (cm); menuCamera is the main menu backdrop (cm, degrees). placeholder",
     "deathHoldSeconds": 0.8, "deathFadeSeconds": 1.0, "deathCardMinSeconds": 2.0, "fadeInSeconds": 0.7, "jumpFadeSeconds": 0.15, "loadingMinSeconds": 0.5,
     "streamRadius": 6000, "streamMaxSeconds": 15, "teleportCm": 6000, "campMatchRadius": 6000,

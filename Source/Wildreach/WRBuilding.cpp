@@ -476,7 +476,7 @@ void AWRBuildPiece::EndPlay(const EEndPlayReason::Type Reason)
 			if (const UWRMachineSubsystem* Machines = UWRMachineSubsystem::Get(this); Machines && Machines->HasOtherRift(this)) Storage.Reset();
 		}
 		// A chest broken open (by raiders, or upkeep running out) leaves what it held in a bag where it stood.
-		if (const AWRLootBag* Bag = AWRLootBag::Spill(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 25.f), OwnerName, Storage))
+		if (const AWRLootBag* Bag = AWRLootBag::Spill(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 25.f), OwnerName, Storage, AWRLootBag::KindSpill))
 		{
 			UE_LOG(LogWildreach, Log, TEXT("BUILD %s (%s) spilled %d stacks"), *GetName(), *PieceId.ToString(), Bag->Items.Num());
 		}
