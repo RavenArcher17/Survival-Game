@@ -33,7 +33,7 @@ bosses, enemies and wildlife regions, taming, survival, crafting (with time and 
 claims, raids and door keypads), clans, PvP rules, worlds and world settings, the stone-and-leather UI, sound, the
 installer and auto-updater. `CHANGELOG.md` has every version, newest first, with what changed and why.
 
-Since 0.7.1 (unreleased): **F8 reports** (testers' reports land in the studio inbox, in `Saved/Reports` on their PC
+Released in 0.8.0 (2026-11-16) with everything below: **F8 reports** (testers' reports land in the studio inbox, in `Saved/Reports` on their PC
 and, from a client, in the host's `Saved/Reports`), **full controller support** (`Data/gamepad.json`; menus driven by
 one input processor in `WRPadInput.cpp`, so a new screen needs nothing for the pad as long as its clickable pieces
 show the hand cursor or are buttons / slots), the **F1 controls page**, and **look sensitivity / invert**. New prompt
@@ -85,7 +85,7 @@ that picks their modelled look (`WRLootLook`); a death's bags are saved in the w
 Wake points: beds, the player's clan's unbroken Hearths (`WRBeds` HearthsFor / SpotByHearth; kind "hearth"), camps,
 shrine-stones. A claim's name is its totem piece's `CustomName` (`AWRClaimTotem::ClaimName`). A world's backups can be
 restored from the menu (`WRStore::RestoreBackup`), never while it runs.
-Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
+Also in 0.8.0: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);
 a boss's fall plays `music.sting.boss_fall` and a planned hush. Reverb comes from sounds.json `spaces`, picked in
@@ -119,7 +119,7 @@ bronze, iron now; the 12 steel biome sets and their Ascendant versions are mappe
 crafting cook), body-hide masks under every piece, and **path marks** on skin, eyes and hair on every machine
 (`player_art.json paths`), with Blood's canines and Lightning's crackle on cast.
 
-Also unreleased: **the testers' god mode** (cooks/build-godmode.md in showcase-notes). Only Aaron, Raven and Colin get
+Also in 0.8.0: **the testers' god mode** (cooks/build-godmode.md in showcase-notes). Only Aaron, Raven and Colin get
 it, by their Freedom35 accounts: the site's `game_testers` list (freedom35-studios `node tools/testers.mjs list | add |
 remove`, admin token) signs a per-connection proof (`POST /api/pc/tester`) that the server checks with the public key in
 `WRGodAuth.cpp` (rotating the site's `TESTER_SIGNING_KEY` needs that key slot filled and a new build first). The game
@@ -132,7 +132,7 @@ must first type **`god-mode`** in the chat line (`WRGod::ChatLine`, `tuning god.
 tester in god mode also moderates like the host (`WRAccess::RoleOf` -> 2: kick, ban, admins); `god.privatePresets` now
 only decides whether the panel says the world is public.
 
-Also unreleased: **Aaron's 11-15 question answers** (lane wild-answers-1115, showcase-notes cooks/wild-answers-1115.md, which
+Also in 0.8.0: **Aaron's 11-15 question answers** (lane wild-answers-1115, showcase-notes cooks/wild-answers-1115.md, which
 also keeps the 20 cards' full text): god-mode gate word and mod mode (above); **Wet is off** (`tuning wet.enabled` 0: one
 switch brings it all back for its design pass); **flint** comes away with mined stone (`tuning gather.flint`,
 `FWRGathering::Gather`; Hush arrows and flint arrows use it); **levistone moss** floats beside every keel outcrop

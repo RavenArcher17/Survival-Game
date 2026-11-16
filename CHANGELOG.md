@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased: shipping 0.8.0 (the boot check, build.json, packaging on any engine folder)
+## 0.8.0 (2026-11-16): shipping it (the boot check, the Setup in parts, a packaged game that starts, ten materials that compile)
 
-Lane ship-7. Compiled (editor target); the packaged build was launched and its log read before release (below).
+Released 2026-11-16 as https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.8.0 (target ff115f9; every
+section from here down to 0.7.1 is in it). Lane ship-7. Playable gate on the installed copy of that package (whole
+Setup, `--silent` into a fresh folder, started with `-F35Boot`): `F35READY menu`, `F35BOOT new world 'Boot_check'`,
+`F35READY play` 35 s after launch, still running 4 min later; again on that save: `F35BOOT continue world
+'Boot_check'`, `F35READY play` after 30 s, running 2 min later. Cook: 0 errors, 0 material failures. Assets'
+SHA-256 digests on the release match the files.
 
 - **0.8.0** (`Config/DefaultGame.ini`, `Docs/release-notes/v0.8.0.md`): everything since 0.7.1, the full game.
 - **The boot check markers.** Why: the Freedom35 site publishes a download only with a boot proof
@@ -60,7 +65,7 @@ Lane ship-7. Compiled (editor target); the packaged build was launched and its l
 - **README.txt beside the game** no longer says anyone can use the console: since the god mode lane the test commands
   need a verified tester in packaged builds.
 
-## Unreleased: the performance cook pass (Medium on an 8 GB card, the shader cache, loading)
+## 0.8.0: the performance cook pass (Medium on an 8 GB card, the shader cache, loading)
 
 Research, requirement ledger and plan: showcase-notes cooks/cookpass-performance.md. Compiled (editor target); not
 played or measured here (Aaron tests; `Tools\benchmark.ps1` is the before/after measure).
@@ -118,7 +123,7 @@ played or measured here (Aaron tests; `Tools\benchmark.ps1` is the before/after 
 - Not done here: recording the bundled PSO cache (needs a package and a play session), and measuring the pass on an
   8 GB card (`Tools\benchmark.ps1`).
 
-## Unreleased: Aaron's answers to the 11-15 question cards (wild-answers-1115)
+## 0.8.0: Aaron's answers to the 11-15 question cards (wild-answers-1115)
 
 Aaron answered the 20-card page wildreach-questions-1115 on 11-16. The cards' full text, the requirement ledger, the
 research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled (editor target); not played here
@@ -234,7 +239,7 @@ research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled
   music or asks you to play to it.
 
 
-## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)
+## 0.8.0: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)
 
 Aaron (lane cookpass-crafting: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-crafting.md).
 Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -277,7 +282,7 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   `craft.quench`, `forge.roar` (Freesound CC0 recordings cut by `Tools/audio/build_craft_audio.py`, credited in
   `Docs/CREDITS.md`).
 
-## Unreleased: the multiplayer cook pass (cookpass-multiplayer)
+## 0.8.0: the multiplayer cook pass (cookpass-multiplayer)
 
 Aaron 11-13: built features get the full cook pass. The requirement ledger, research, grades and plan are in
 showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled after each part; nothing was played here (Aaron tests).
@@ -366,7 +371,7 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
 - **Spot-check fix:** a dedicated server's default cap is `net.dedicatedDefaultPlayers` (32) until its `access.json`
   sets one; a listen world's is still 8. Tested by compiling.
 
-## Unreleased: building and raids cook pass (cookpass-building)
+## 0.8.0: building and raids cook pass (cookpass-building)
 
 Aaron 11-13: built features get the full cook pass. Research, grade, requirement ledger and plan in showcase-notes
 cooks/cookpass-building.md. Compiled (editor target) after each part; not played here (Aaron tests).
@@ -421,7 +426,7 @@ cooks/cookpass-building.md. Compiled (editor target) after each part; not played
   the owner packs one up (Dodge twice, at 90% health); unattended for two hours one falls apart; they're saved with the
   world. Siege engineer (Engineering 100) is live: engines you build hit 20% harder. The ladder climber and the crews
   use part C's poses (push, crank with the crank's real angle, aim). Tested by compiling.
-## Unreleased: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
+## 0.8.0: the survival cook pass (eating and drinking in the hand, waterskins that fill, the body's warnings, the kitchen at work)
 
 Aaron (lane cookpass-survival: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-survival.md).
 Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -485,7 +490,7 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
 - **Music check (Aaron 11-15):** nothing in the game shows the music or asks you to play to it (no staff, notes, beat
   markers or rhythm prompts exist); the soundtrack's smooth switching stays as it is.
 
-## Unreleased: the testers' god mode (Aaron, Raven and Colin only)
+## 0.8.0: the testers' god mode (Aaron, Raven and Colin only)
 
 Aaron 11-15: "I need to have a god mode in Wildreach so I can test everything. This is something that should only be
 available to Aaron, Raven and Colin and just for testing." (lane build-godmode: research, requirement ledger and plan in
@@ -524,7 +529,7 @@ showcase-notes cooks/build-godmode.md). Compiled (editor target); not played her
   unless started with `-wrtestworld`) refuse god and testing commands. F8 reports carry `godMode` in their context.
   Numbers in `tuning.json god`.
 
-## Unreleased: the combat cook pass (the blade's real path, hit feel, bars, tells, fronts, projectiles)
+## 0.8.0: the combat cook pass (the blade's real path, hit feel, bars, tells, fronts, projectiles)
 
 Aaron (lane cookpass-combat: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-combat.md).
 Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -623,7 +628,7 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   summon and boss health (LATER-COOKS). No summon counts as a tame toward a boss's health: the Spore path's summons and
   the Necromancy path's raised dead are left out of `AWRBoss::UpdateParticipants` (plants were never creatures).
 
-## Unreleased: the audio cook pass (all sound and music)
+## 0.8.0: the audio cook pass (all sound and music)
 
 Aaron (lane cookpass-audio: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-audio.md).
 Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -681,7 +686,7 @@ Compiled (editor target); not played here (Aaron and the testers test, F8).
   - `Tools/audio/sources_cookpass.py` + `build_cookpass_audio.py` (music -18 LUFS, calm -21, boss -16, layers -24;
     beds -23; effects -16), credits in Docs/CREDITS.md. New files: 157 OGG, ~98 MB (LFS).
 
-## Unreleased: the creature cook pass (look, animation, voice, behaviour of every built creature and boss)
+## 0.8.0: the creature cook pass (look, animation, voice, behaviour of every built creature and boss)
 
 Aaron (lane cookpass-creatures: requirement ledger, research, grades and plan in showcase-notes
 cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -745,7 +750,7 @@ cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron a
   - A raised body with no palette of its own gets a bone-grey wash over its hide (`UWRGraveBody::BuildLook`, tuning
     `necromancy.raisedLook`), so every raised minion reads as dead; its threads and eyes still glow over it.
 
-## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
+## 0.8.0: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 
 Aaron (lane cookpass-world: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-world.md; the
 world parts of cooks/fire-frost.md 3.1-3.6). Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -804,7 +809,7 @@ world parts of cooks/fire-frost.md 3.1-3.6). Compiled (editor target); not playe
   terrain rebuild; the crevasses are serac lanes on the heightfield (no landscape holes); thin ice opens onto drawn icy
   water (no water body under the lakes); every new sound row and bed is a stand-in from existing recordings.
 
-## Unreleased: the UI cook pass (settings, HUD, menus, controls)
+## 0.8.0: the UI cook pass (settings, HUD, menus, controls)
 
 Aaron (lane cookpass-ui: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-ui.md; a cook
 pass on the built screens and the ui-controls cook's open rounds). Compiled (editor target); not played here (Aaron
@@ -946,7 +951,7 @@ and the testers test, F8).
   check runs on whichever asks first, the log's install or the main menu's card, so the card can't miss a crash when
   the menu opens before the player's UI.
 
-## Unreleased: the Desert / Sun & sand
+## 0.8.0: the Desert / Sun & sand
 
 Aaron (lane build-biome-desert: requirement ledger R1-R52, build research and plan in showcase-notes
 cooks/build-biome-desert.md, building cooks/biome-desert.md). Landing in pieces; compiled (editor target) after each; not
@@ -1028,7 +1033,7 @@ creatures).
   at the plaza and the Spring. Server state replicated on `AWRDesertState`; everything that moves is a function of it and
   the clock. New items: sunglass, nitre, acacia log, palm fibre, red ochre, gold flakes, bat guano, radiant essence, the
   rubbing, the sun-disc key, 12 lore pieces. Tuning `desertWorld`; world.json `biomes.desert`.
-## Unreleased: the taming cook pass (taming, mounts, breeding)
+## 0.8.0: the taming cook pass (taming, mounts, breeding)
 
 Aaron (lane cookpass-taming: research, grades, requirement ledger and plan in showcase-notes cooks/cookpass-taming.md;
 a cook pass on build-taming's work). Compiled (editor target); not played here (Aaron and the testers test, F8).
@@ -1074,7 +1079,7 @@ a cook pass on build-taming's work). Compiled (editor target); not played here (
   gets up at a quarter health instead of dying. New icons (collar, draught: 9 KB each, PIL). Not built: the bone altar's
   undead tames, species' own answer calls, riding clips (the seat is a procedural pose).
 
-## Unreleased: the Ocean & reefs (the Tide land)
+## 0.8.0: the Ocean & reefs (the Tide land)
 
 Aaron (lane build-biome-ocean: requirement ledger R1-R54, build research and plan in showcase-notes
 cooks/build-biome-ocean.md, building cooks/biome-ocean.md). Landing in pieces; compiled (editor target) after each; not
@@ -1320,7 +1325,7 @@ played here (Aaron and the testers test, F8). Live from Ocean (4) (`ocean` in `w
   New items: pearl, sea-glass, driftwood, oyster, urchin, clam meat, Tidefowl egg, kelp ash, bronze scrap and sheet, iron
   nails, gold leaf, glass, the worn harpoon, the Sluice key, eight lore keepsakes, four recipe scraps; recipes glass
   (kelp glass), bronze from scrap, iron from nails. The `ocean` row in `world.json biomes`.
-## Unreleased: the Fungal caverns (the Spore land)
+## 0.8.0: the Fungal caverns (the Spore land)
 
 Aaron (lane build-biome-fungal: requirement ledger R1-R60, build research and plan in showcase-notes
 cooks/build-biome-fungal.md, building cooks/biome-fungal.md). Landing in pieces; compiled (editor target) after each;
@@ -1495,7 +1500,7 @@ not played here (Aaron tests). Live from Fungal (1): `fungal` is in `world.liveB
   Tip's cove. Numbers: tuning `fungalWorld`. No diving exists yet, so the moat and the two sumps are flooded crawls you
   wade (LATER-COOKS). Compiled; not played.
 
-## Unreleased: the Crystal caves (the Arcane land)
+## 0.8.0: the Crystal caves (the Arcane land)
 
 Aaron (lane build-biome-crystal: requirement ledger R1-R50, build research and plan in showcase-notes
 cooks/build-biome-crystal.md, building cooks/biome-crystal.md). Landing in pieces; compiled (editor target) after each;
@@ -1694,7 +1699,7 @@ shield items exist in the game yet), the Prismglass spear's Soul art.
   `Tri` / `Pack` are public (the crystal kit builds facets with them). `dressing.mjs` keeps the crystal and graveyard
   POIs when the island is regenerated. `WRSealBody.cpp`'s `Rings` constant is `SealRings` (it clashed with a local in
   `WRSkyAir.cpp` once the unity build regrouped).
-## Unreleased: the Sky islands (the Wind land)
+## 0.8.0: the Sky islands (the Wind land)
 
 Aaron (lane build-biome-sky: requirement ledger R1-R62, build research and plan in showcase-notes
 cooks/build-biome-sky.md, building cooks/biome-sky.md). Landing in pieces; compiled (editor target) after each; not
@@ -1896,7 +1901,7 @@ played here (Aaron and the testers test, F8). This first piece is the land, the 
   a Hushwing taking a Windmane foal (no wild foals yet); the Last Circle's riders move vent to vent with E rather than
   running free along the spine; boss soul forging (Aeolith's soul) is the souls cook's.
 
-## Unreleased: the Graveyard (the Necromancy land)
+## 0.8.0: the Graveyard (the Necromancy land)
 
 Aaron (lane build-biome-graveyard: requirement ledger R1-R61, build research and plan in showcase-notes
 cooks/build-biome-graveyard.md, building cooks/biome-graveyard.md). Landing in pieces; compiled (editor target) after
@@ -2067,7 +2072,7 @@ each; not played here (Aaron and the testers test, F8). This first piece is the 
   cook. Not built: the processions' claim raids, the Mourning's x3 seams, the invasion signs (the Lantern Line lighting
   itself, moss along the forest's road), the forest invasion's sealed band.
 
-## Unreleased: the Ancient forest (the Nature land)
+## 0.8.0: the Ancient forest (the Nature land)
 
 Aaron (lane build-biome-forest: requirement ledger R1-R56, research, plan and per-track build notes in showcase-notes
 cooks/build-biome-forest.md, building cooks/biome-forest.md). Compiled (editor target, and the game target in full
@@ -2113,7 +2118,7 @@ parts), lock-on to Sylvaroth's Root Knots.
   `Docs/CREDITS.md`.
 - Fixes found on the way: `WRStormWorld`'s file-scope `Char` renamed `CharBlack` (it hid UE's `Char` in full unity).
 
-## Unreleased: the Corrupted wasteland (the Void land)
+## 0.8.0: the Corrupted wasteland (the Void land)
 
 Aaron (lane build-biome-void: requirement ledger, research and plan in showcase-notes cooks/build-biome-void.md, building
 cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the testers test, F8).
@@ -2234,7 +2239,7 @@ cooks/biome-void.md). Built to compile (editor); not played here (Aaron and the 
 - Build fix: `WRSwampVharra.cpp` turns off C4459 for itself (a unity build can put `WRSwampScenery.cpp`'s file-scope
   palette ahead of it).
 
-## Unreleased: the Swamp (the Mire), the Blood land, and the Blood & curse path
+## 0.8.0: the Swamp (the Mire), the Blood land, and the Blood & curse path
 
 Aaron (lanes build-biome-swamp + build-biome-swamp-finish: requirement ledger, research and plan in showcase-notes
 cooks/build-biome-swamp.md, building cooks/biome-swamp.md). Built to compile (editor, adaptive and full unity); not
@@ -2277,7 +2282,7 @@ played here (Aaron and the testers test, F8).
   the boss-weapon cook; swamp portal folds stay off (`portals.json land: false`); the Coven pillar red in the tide warning
   waits for the Ring pillars; vein reach by stage needs a new hero mask channel.
 
-## Unreleased: Storm peaks, the Lightning land (the first land off the Old Island) and the Lightning path
+## 0.8.0: Storm peaks, the Lightning land (the first land off the Old Island) and the Lightning path
 
 Aaron (lane build-biome-lightning: requirement ledger, research and plan in showcase-notes cooks/build-biome-lightning.md,
 building cooks/biome-lightning.md). Built to compile (editor, adaptive build); not played here (Aaron and the testers
@@ -2335,7 +2340,7 @@ test, F8).
 - Fixes found on the way: `rescueTraceTop` raised to 2,000 m (the Spire is taller than 1,500 m); world settling traces
   from 2,000 m; a unity-build name clash in `WRGameMode.cpp`.
 
-## Unreleased: the endgame (prestige, the Heron's draught, soul forging, mythic rules, boards, deeds, titles, cosmetics, monuments, the Thaw Hall raid)
+## 0.8.0: the endgame (prestige, the Heron's draught, soul forging, mythic rules, boards, deeds, titles, cosmetics, monuments, the Thaw Hall raid)
 
 Aaron (lane build-endgame: research, requirement ledger and plan in showcase-notes cooks/build-endgame.md, following
 cooks/endgame.md 2.7-2.12 and biome-void.md 2.23.2-2.23.9, Raven's DD Endgame, DR #9 and DR #22). Built to compile
@@ -2386,7 +2391,7 @@ cooks/endgame.md 2.7-2.12 and biome-void.md 2.23.2-2.23.9, Raven's DD Endgame, D
 - Server: `deeds ...` and `warhall ...` commands (everything checked on the server); the deeds save in each character
   (`deeds`). Hall space counts as its two lands (west / east), sheltered, and its ice flags are slick for movement.
 
-## Unreleased: the world store (SQLite), identity, player raiding, raid group settings
+## 0.8.0: the world store (SQLite), identity, player raiding, raid group settings
 
 Aaron (lane build-server-raids: research, requirement ledger and plan in showcase-notes cooks/build-server-raids.md,
 following Raven's M7 1, server-settings.md and cooks/multiplayer.md, survival-crafting.md 2.16 / 2.18 and
@@ -2455,7 +2460,7 @@ testers test, F8).
 - New binaries: 8 synthesised OGGs (`Data/Audio/raid`, 235 KB; `Tools/audio/synth_raid.py`) and 8 item icons
   (`Data/UI/Icons`, 60 KB; `Tools/art/make_raid_icons.py`).
 
-## Unreleased: dungeon portals and artifacts
+## 0.8.0: dungeon portals and artifacts
 
 Aaron (lane build-portals-artifacts: research, requirement ledger and plan in showcase-notes cooks/build-portals-artifacts.md,
 following cooks/endgame.md 2.5 / 2.6 and biome-desert 2.22). Built to compile (editor, adaptive and full unity); not
@@ -2526,7 +2531,7 @@ played here (Aaron and the testers test, F8). Data: `Data/portals.json`, `Data/p
   stone" reverb aren't built; Connla's challenge doesn't double boss chase yet and Connla's third geis isn't wired (raid
   artifacts, no raids yet); only four artifacts can drop on a two-boss island.
 
-## Unreleased: world systems (shrines and fast travel, path masters and quests, villages, factions and merchants, message stones, Starfall, the Eruption and the Whiteout, invasions, day and night tables, the hidden tubes, summoning stones)
+## 0.8.0: world systems (shrines and fast travel, path masters and quests, villages, factions and merchants, message stones, Starfall, the Eruption and the Whiteout, invasions, day and night tables, the hidden tubes, summoning stones)
 
 Aaron (lane build-world-systems: research, requirement ledger and plan in showcase-notes cooks/build-world-systems.md,
 following cooks/fire-frost.md 3.1 / 3.3.x / 3.4.x / 3.8, world-map.md 2.7-2.9, endgame.md 2.8). Built to compile
@@ -2604,7 +2609,7 @@ rows: a new biome adds shrines, a master and quests, a village, a caravan, event
   eruption's river rise and spill channels, Magmaw / Scorchwing boosts and the event music layer aren't built; invaders
   leave no slick ice or melted snow; the Dimming and the Migration aren't built.
 
-## Unreleased: taming (levels, bond and role trees, saddles and barding, ground / pack / swimming / flying mounts, the Floeback, breeding, eggs and the incubator, babies and imprinting, mutations)
+## 0.8.0: taming (levels, bond and role trees, saddles and barding, ground / pack / swimming / flying mounts, the Floeback, breeding, eggs and the incubator, babies and imprinting, mutations)
 
 Aaron (lane build-taming: FULL-GAME 6.5; research, requirement ledger and plan in showcase-notes cooks/build-taming.md,
 numbers from cooks/survival-crafting.md 2.19-2.21). Built to compile (editor); not played here (Aaron and the testers
@@ -2673,7 +2678,7 @@ test, F8).
   clips (they walk to each other and face, the hero plays its pick-up); saddle fits per species are first estimates;
   stable, necro raising, revive, Soulbond and tame names aren't built.
 
-## Unreleased: building (metal, the 12 biome sets, beams and posts, structural integrity, comfort decor, powered turrets)
+## 0.8.0: building (metal, the 12 biome sets, beams and posts, structural integrity, comfort decor, powered turrets)
 
 Aaron (lane build-building: FULL-GAME 6.4; research, requirement ledger and plan in showcase-notes
 cooks/build-building.md, following cooks/survival-crafting.md 2.2 / 2.17 / 2.18). Built to compile (editor and full
@@ -2734,7 +2739,7 @@ unity); not played here (Aaron and the testers test, F8).
 - Not finished: tundra hot springs aren't on the map (the bath goes by lava); ten sets and their decor wait for their
   lands; ten element-turret essences wait for their paths' items; turrets reuse the crossbow and spell sounds.
 
-## Unreleased: machinery and power (water wheels, windmills, turbines, shafts, conveyors, sorting, drills, the 12 biome machines)
+## 0.8.0: machinery and power (water wheels, windmills, turbines, shafts, conveyors, sorting, drills, the 12 biome machines)
 
 Aaron (lane build-machinery: FULL-GAME 6.3 machinery; research, requirement ledger and plan in showcase-notes
 cooks/build-machinery.md, following cooks/survival-crafting.md 2.15 / 2.17 / 2.23 / 2.25). Built to compile (editor);
@@ -2800,7 +2805,7 @@ not played here (Aaron and the testers test, F8).
   (rivers and vents join `FWRMachines::FlowAt` / `LavaNear` when the map has them); turrets and siege weapons (the
   other two engineering perks) aren't built; ten biome machines wait for their lands.
 
-## Unreleased: crafting (steel and starsteel, the four armour slots and 12 biome sets, rings, talismans, runes, salvage, blueprints)
+## 0.8.0: crafting (steel and starsteel, the four armour slots and 12 biome sets, rings, talismans, runes, salvage, blueprints)
 
 Aaron (lane build-crafting: FULL-GAME 6.3; research, requirement ledger and plan in showcase-notes
 cooks/build-crafting.md, following cooks/survival-crafting.md 2.13 / 2.14 and hero.md 2.5). Built to compile (editor);
@@ -2863,7 +2868,7 @@ not played here (Aaron and the testers test, F8).
   hidden); portals don't exist yet, so nothing calls `PortalDrop`; the other lands' set bonuses and talismans whose
   systems don't exist yet (glide, fall damage, rifts, ward fields...) are hidden with their land and read by nothing yet.
 
-## Unreleased: farming and food (biome crops, water, greenhouses, pens, hives, fishing in every land, the kitchen, spoilage)
+## 0.8.0: farming and food (biome crops, water, greenhouses, pens, hives, fishing in every land, the kitchen, spoilage)
 
 Aaron (lane build-farming: FULL-GAME 6.2; research, requirement ledger and plan in showcase-notes cooks/build-farming.md,
 following cooks/survival-crafting.md 2.7-2.11 and 2.23). Built to compile (editor); not played here (Aaron and the
@@ -2939,7 +2944,7 @@ testers test, F8).
   for their land (in data and code, hidden); POI dressing (old kitchens with recipe scraps, ash-pit vineyards) waits for
   the map cooks.
 
-## Unreleased: survival (sleep and Rested, comfort, weather, darkness and light, corruption)
+## 0.8.0: survival (sleep and Rested, comfort, weather, darkness and light, corruption)
 
 Aaron (lane build-survival: FULL-GAME 6.1; research, requirement ledger and plan in showcase-notes
 cooks/build-survival.md, following cooks/survival-crafting.md 2.2-2.6 and world-map 2.6 for the lesser weathers). Built
@@ -2996,7 +3001,7 @@ to compile (editor); not played here (Aaron and the testers test, F8).
   Cleansing draught, grounding charm, sand veil, anchor boots and filter mask items, the Rodcrest's grounding, gale
   stamina for flyers and spore-cloud spread wait for the systems and biomes they belong to.
 
-## Unreleased: the full combat (every weapon class, every status, Wildbrands and spells, creature rows, bosses, camera, flasks, the saddle, PvP)
+## 0.8.0: the full combat (every weapon class, every status, Wildbrands and spells, creature rows, bosses, camera, flasks, the saddle, PvP)
 
 Aaron (lane build-combat-full: COMBAT-AND-LESSONS C6-C12 and the full-game combat rows; research, requirement ledger and
 plan in showcase-notes cooks/build-combat-full.md, following cooks/combat.md). Built to compile (editor and a full unity
@@ -3094,7 +3099,7 @@ Magmaw's lava-burst ambush, the logout body (a tagged player's body staying 30 s
 yet), Cinderhorn and Old Tusker share their herd's textures (bigger, no new hide), the parts break without a visible
 piece coming off, mark's "seen through walls".
 
-## Unreleased: the combat core (feel, stamina and roll, guard / parry / crits with server rewind, stance and poise)
+## 0.8.0: the combat core (feel, stamina and roll, guard / parry / crits with server rewind, stance and poise)
 
 Aaron (lane build-combat-core: COMBAT-AND-LESSONS C0 and C2-C5; research, requirement ledger and plan in showcase-notes
 cooks/build-combat-core.md, following cooks/combat.md). Built to compile (editor and a full unity build); not played here
@@ -3185,7 +3190,7 @@ other off-hands are data only (the hero's carried shield is the guard) until the
 sword, charged / running / rolling / jump / crouch attacks and counter-hits are C6; breakable parts and head daze are C10;
 PvP blows are judged at the attacker's view only (the defender's lag isn't waited for).
 
-## Unreleased: the hero's look (12 faces, 3 builds, armour tiers and the 12 biome sets, path marks on skin, eyes and hair)
+## 0.8.0: the hero's look (12 faces, 3 builds, armour tiers and the 12 biome sets, path marks on skin, eyes and hair)
 
 Aaron (lane build-hero-look-2; research and plan in showcase-notes cooks/hero-look-2.md, following cooks/hero.md 2.2-2.6).
 Built to compile; not played here (Aaron and the testers test, F8).
@@ -3222,7 +3227,7 @@ face 1, athletic); capes, veils and strips are skinned, not cloth-simulated; Voi
 corruption is a stat; the steel set items come with the crafting cook; path Niagara extras (heat haze, frost breath,
 spore motes) aren't built.
 
-## Unreleased: finishing what was half-built (skill nodes, perks, fishing, swimming, engineering, the whistle, tools, build pieces)
+## 0.8.0: finishing what was half-built (skill nodes, perks, fishing, swimming, engineering, the whistle, tools, build pieces)
 
 Aaron (lane build-finish; research and plan in showcase-notes cooks/build-finish.md): finish every built-but-unfinished
 feature. Built to compile; not played here (Aaron and the testers test, F8).
@@ -3268,7 +3273,7 @@ feature. Built to compile; not played here (Aaron and the testers test, F8).
 - New sounds (synthesized, `Data/Audio/item`): whistle, reel ratchet, line snap, nibble (12 files, 112 KB); new icons
   for the 21 new items (`Tools/art/make_fish_icons.py`).
 
-## Unreleased: the MetaHuman hero moves (motion matching, retargeted actions, first person on the head)
+## 0.8.0: the MetaHuman hero moves (motion matching, retargeted actions, first person on the head)
 
 Aaron (cooks/hero.md, build lane build-hero-anim; research and plan in showcase-notes cooks/build-hero-anim.md): the
 Mixamo survivor is replaced by the MetaHuman hero from the hero lab, and the hero gets GASP motion-matched locomotion,
@@ -3320,7 +3325,7 @@ its action clips, sockets and full-body first person. Built to compile and the a
 - Assets: `Content/Wildreach/Characters/Hero` (372 MB in Git LFS: the two heroes 259 MB, clips and databases 90 MB,
   wraps 17 MB, skin materials 7.5 MB), rebuilt with `Tools/anim/build_hero_anim.py`.
 
-## Unreleased: F8 bug reports, the controller, the F1 controls page, look settings
+## 0.8.0: F8 bug reports, the controller, the F1 controls page, look settings
 
 Aaron: build the in-game bug report first so testers can report (COMBAT-AND-LESSONS L10, C1), with the controls page,
 full controller support (L4 one verb per button, L8 held-input isolation) and mouse sensitivity / invert (quality
@@ -3371,7 +3376,7 @@ plan row 9). Built to compile; not played here (Aaron and the testers test, and 
   neither device is inverted by default.
 - Rebindable: Report (F8) joins the keys; the settings window's key listening takes F1 / F8 when you bind them.
 
-## Since 0.7.1: set up for a second developer
+## 0.8.0: set up for a second developer
 
 Raven: "make a handoff and a readme making sure his Claude knows it needs the art packs and Visual Studio and the other
 things" (Raven's brother, on his own PC with his own Claude account, pulling this repo). Docs and a check script only;
