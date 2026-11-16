@@ -1775,6 +1775,19 @@ namespace WRInvTab
 				if (D->SatedMinutes > 0.f) Fills.Add(FString::Printf(TEXT("sated %d min"), FMath::RoundToInt(D->SatedMinutes * Worth)));
 				if (Fills.Num() > 0) WhereRows.Add({ TEXT("Fills"), FString::Join(Fills, TEXT(" · ")) + (Worth > 1.01f ? TEXT(" (golden)") : TEXT("")) });
 			}
+			// Where it's eaten from (Aaron 11-16, r-lefthand: "Food should be on the item quick use or other toolbar"): food,
+			// drink and potions are used from the quick-use bar (a key, the pad's belt button or the item wheel), never
+			// put in a hand first. The card says which.
+			if (D->Category == TEXT("food") || D->Category == TEXT("drink") || D->Category == TEXT("potion"))
+			{
+				int32 OnBar = INDEX_NONE;
+				if (const FWRPlayerUI* X = UI()) for (int32 k = 0; k < 8 && OnBar == INDEX_NONE; ++k) if (X->GetHotbarItem(k) == D->Id) OnBar = k;
+				const FString Verb = D->Category == TEXT("food") ? TEXT("eat") : TEXT("drink");
+				if (OnBar == INDEX_NONE) WhereRows.Add({ TEXT("Quick use"), TEXT("Not on your bar: drag it onto a slot below") });
+				else if (WRInput::UsingPad()) WhereRows.Add({ TEXT("Quick use"), FString::Printf(TEXT("Belt slot %d: %s picks it, %s to %s (or hold %s: the item wheel)"), OnBar + 1,
+					*WRInput::PadButton(TEXT("BeltNext")).ToString(), *WRInput::PadButton(TEXT("UseBelt")).ToString(), *Verb, *WRInput::PadButton(TEXT("QuickNext")).ToString()) });
+				else WhereRows.Add({ TEXT("Quick use"), FString::Printf(TEXT("Key %s on your bar to %s it"), *WRUI::KeyName(FWRKeyBindings::Get().Key(FName(*FString::Printf(TEXT("Hotbar%d"), OnBar + 1)))).ToString(), *Verb) });
+			}
 			if (D->Category == TEXT("tool"))
 			{
 				WhereRows.Add({ TEXT("Repair at"), StationName(TEXT("workbench")) });  // tools aren't upgraded

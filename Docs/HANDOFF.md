@@ -130,7 +130,8 @@ also keeps the 20 cards' full text): god-mode gate word and mod mode (above); **
 switch brings it all back for its design pass); **flint** comes away with mined stone (`tuning gather.flint`,
 `FWRGathering::Gather`; Hush arrows and flint arrows use it); **levistone moss** floats beside every keel outcrop
 (AWRSkySpot Kind "moss", `WRSkyMoss.cpp`, `tuning skyWorld.moss`; the Cloudback's favourite food, `creatures.json
-foodValue`). Question cards: every future card says in full sentences what the thing is, where it is in the game, what
+foodValue`); **eating is the right hand's** (the weapon put away for the use, `WRHeldFood.cpp`; the pose in
+`WRHeroAnimInstance.cpp`), from the quick-use bar (the item card names the key). Question cards: every future card says in full sentences what the thing is, where it is in the game, what
 is built, what the other choice changes and why it is a question (Aaron 11-16, r-dunewrap).
 
 Also since 0.7.1: **the combat core** (COMBAT-AND-LESSONS C2-C5, cooks/build-combat-core.md): melee swings are move

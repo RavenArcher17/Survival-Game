@@ -415,10 +415,13 @@ void AWRCharacter::TickConsumeLook(float DeltaSeconds)
 		if (FoodMesh && FoodMesh->IsVisible()) FoodMesh->SetVisibility(false);
 		if (bOffHandStowed)
 		{
-			// The shield or torch comes back to the hand.
+			// The weapon (or the tool) comes back to the right hand (unless crafting by hand has the hands now).
 			bOffHandStowed = false;
-			if (ShieldMesh) ShieldMesh->SetHiddenInGame(false);
-			if (LightMesh) LightMesh->SetHiddenInGame(false, true);
+			if (!bWorkStowed)
+			{
+				if (WeaponMesh) WeaponMesh->SetHiddenInGame(false);
+				if (ToolMesh) ToolMesh->SetHiddenInGame(false);
+			}
 		}
 		if (Frac < 0.f && ConsumeSeconds > 0.f && GetWorld()->GetTimeSeconds() - ConsumeStart > ConsumeSeconds)
 		{
@@ -447,24 +450,26 @@ void AWRCharacter::TickConsumeLook(float DeltaSeconds)
 		M.ApplyTo(FoodMesh);
 	}
 	FoodMesh->SetVisibility(true);
-	// The hand is busy: a shield or a torch in it is set out of sight until it's free again (the light keeps burning).
+	// Eaten with the right hand (Aaron 11-16, r-lefthand: Monster Hunter's way): the weapon or tool in it is put away for
+	// the use and comes back after; the left keeps its shield or torch (the light keeps burning, carried at the chest).
 	if (!bOffHandStowed)
 	{
 		bOffHandStowed = true;
-		if (ShieldMesh) ShieldMesh->SetHiddenInGame(true);
-		if (LightMesh) LightMesh->SetHiddenInGame(true, true);
+		if (WeaponMesh) WeaponMesh->SetHiddenInGame(true);
+		if (ToolMesh) ToolMesh->SetHiddenInGame(true);
 	}
 
-	// In the left hand's palm (the bone runs toward the fingers along its X): food held across the face with its far end
-	// tipped up, standing things upright and tipped toward the mouth (a drink's neck to the lips, more as the pull goes).
-	const FTransform Hand = Body->GetSocketTransform(TEXT("hand_l"));
+	// In the right hand's palm (the bone runs toward the fingers along its X): food held across the face with its far end
+	// tipped up toward the left, standing things upright and tipped toward the mouth (a drink's neck to the lips, more as
+	// the pull goes).
+	const FTransform Hand = Body->GetSocketTransform(TEXT("hand_r"));
 	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
 	const FVector Right = GetActorRightVector().GetSafeNormal2D();
 	const FVector Palm = Hand.GetLocation() + Hand.GetUnitAxis(EAxis::X) * 8.f;
 	FRotator Rot;
 	if (FWRFoodLook::IsAlongX(Look.Shape))
 	{
-		Rot = FRotationMatrix::MakeFromXZ((Right * 0.85f + FVector::UpVector * 0.45f - Fwd * 0.15f).GetSafeNormal(), FVector::UpVector).Rotator();
+		Rot = FRotationMatrix::MakeFromXZ((-Right * 0.85f + FVector::UpVector * 0.45f - Fwd * 0.15f).GetSafeNormal(), FVector::UpVector).Rotator();
 	}
 	else
 	{

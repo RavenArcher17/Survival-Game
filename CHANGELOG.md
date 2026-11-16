@@ -37,6 +37,16 @@ research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled
   few flecks and the crystal glow cyan and a dim cyan light falls under it. Hold E 2 s to peel a mat: 4 levistone moss,
   ripe again for you after a game day. It is the Cloudback's favourite food (first in its list, each lasts x1.5 as
   long: `creatures.json foodValue`). Tuning `skyWorld.moss`.
+- **Food is eaten with the right hand, from the quick-use bar.** Why: Aaron (r-lefthand) chose the other choice,
+  Monster Hunter's: "Food should be on the item quick use or other toolbar. Not equipped in one of the hands to eat."
+  The right arm now brings the food to the mouth (the eat pose mirrored, `WRHeroAnimInstance.cpp`; the food at
+  `hand_r`, its far end tipped toward the left); the weapon or tool in that hand is put away for the use and comes back
+  after (`WRHeldFood.cpp`), and the left keeps its shield or lit torch (the torch stays carried at the chest through a
+  meal). Food, drink and potions go on the quick-use bar by themselves when picked up (as before, while a key is free),
+  are used with one press of their key, the pad's belt button or the item wheel, and are never equipped. The item card
+  now says where: "Key 4 on your bar to eat it", on a pad "Belt slot 4: D-pad down picks it, Y to eat (or hold D-pad
+  right: the item wheel)", or "Not on your bar: drag it onto a slot below".
+
 
 ## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)
 

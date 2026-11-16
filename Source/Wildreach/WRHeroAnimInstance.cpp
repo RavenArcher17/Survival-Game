@@ -468,7 +468,8 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 	// thigh (the torch itself is held upright at the hand: AWRCharacter::TickSurvivalLook). Gives way to a one-shot on
 	// the upper body (a swing, a cast) and to eating.
 	{
-		const float A = Hero.TorchCarry * Hero.ConsumeArms * (1.f - FMath::Clamp(Hero.Consume, 0.f, 1.f));
+		// (Eating is the right hand's now: the torch stays carried through a meal.)
+		const float A = Hero.TorchCarry * Hero.ConsumeArms;
 		if (A > 0.01f)
 		{
 			const FQuat Lift(Side, FMath::DegreesToRadians(-Hero.TorchArmForward * A));
@@ -480,10 +481,11 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 	}
 
 	// Eating or drinking (cooks/cookpass-survival.md 3.1; Monster Hunter's two bites, Elden Ring's committed use): the
-	// left upper arm lifts forward and in across the chest and the elbow folds, so the hand and the food in it come to
-	// the mouth; at each bite the hand pushes in and the head dips to meet it; a drink lifts the hand higher and tips the
-	// head back for the pull. Eased in and out by the owner (AWRCharacter::FillConsumeInput); a one-shot on the upper body
-	// (a real drink clip) takes over.
+	// right upper arm (Aaron 11-16, r-lefthand: the weapon is put away and the right hand eats; the left keeps its shield
+	// or torch) lifts forward and in across the chest and the elbow folds, so the hand and the food in it come to the
+	// mouth; at each bite the hand pushes in and the head dips to meet it; a drink lifts the hand higher and tips the head
+	// back for the pull. Eased in and out by the owner (AWRCharacter::FillConsumeInput); a one-shot on the upper body (a
+	// real drink clip) takes over.
 	if (Hero.Consume > 0.01f)
 	{
 		const float W = Hero.Consume * Hero.ConsumeArms;
@@ -492,11 +494,11 @@ void FWRHeroAnimProxy::PostLayers(FPoseContext& Output)
 		{
 			const float Fwd = Hero.EatArmForward + (Hero.bConsumeDrink ? Hero.EatDrinkLift : 0.f) + Bite * 6.f;
 			const FQuat Lift(Side, FMath::DegreesToRadians(-Fwd * W));
-			const FQuat Inward(Forward, FMath::DegreesToRadians(Hero.EatArmIn * W));   // the left arm comes in toward +Side (as the reins)
+			const FQuat Inward(Forward, FMath::DegreesToRadians(-Hero.EatArmIn * W));   // the right arm comes in toward -Side (the left's mirror)
 			const FVector Elbow = Inward.RotateVector(Side);
-			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("upperarm_l")), Inward * Lift);
-			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("lowerarm_l")), FQuat(Elbow, FMath::DegreesToRadians(-(Hero.EatElbowBend + Bite * 8.f) * W)));
-			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("hand_l")), FQuat(Forward, FMath::DegreesToRadians(-20.f * W)));   // the wrist turns the food to the lips
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("upperarm_r")), Inward * Lift);
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("lowerarm_r")), FQuat(Elbow, FMath::DegreesToRadians(-(Hero.EatElbowBend + Bite * 8.f) * W)));
+			WRHeroAnim::TurnBone(Pose, WRHeroAnim::Compact(Bones, TEXT("hand_r")), FQuat(Forward, FMath::DegreesToRadians(20.f * W)));   // the wrist turns the food to the lips
 		}
 		// The head: dips into a bite, or tips back for a drink (over the neck and the head, 40 / 60).
 		const float HeadDeg = Hero.bConsumeDrink ? -Hero.EatDrinkTilt * Hero.Consume : Hero.EatBiteDip * Bite * Hero.Consume;
