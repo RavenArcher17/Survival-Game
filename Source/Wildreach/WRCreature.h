@@ -101,6 +101,9 @@ struct FWRCreatureDef
 	bool bOwnWindup = false;      // its attack clip rears up on its own (Glacimaw lifts its front half): no telegraph rear-back
 	FName AnimUpper;             // bone the attack / hit layer starts from (its subtree), so running legs keep running
 	TArray<TPair<FName, float>> PoseLift;  // bones turned nose-up by these degrees over every clip (a head held low)
+	// Its own proportions on a shared mesh (creatures.json shape; cooks/cookpass-creatures.md 3.5): the head's scale,
+	// the neck's and tail's length, the wings' scale. 1 = the mesh as made.
+	float ShapeHead = 1.f, ShapeNeck = 1.f, ShapeTail = 1.f, ShapeWings = 1.f;
 
 	// --- Full combat (cooks/build-combat-full.md 2.7, 2.16) ---
 	/** Damage x by physical type: [0] unused, [1] slash, [2] strike, [3] pierce (creatures.json physResist). */

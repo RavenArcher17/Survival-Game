@@ -204,6 +204,10 @@ new gets a case in `AWRCreature::BodyLookAt`, not a new system.
 Moods are `EWRCreatureMood` in `AWRCreature::MoodRep` (+ `WatchRep`), set only by the server's brain through
 `SetMood` (it falls back to calm after `creatureAI.mood.staleSeconds` without a refresh, so a biome hook that takes the
 brain's turn never leaves a stale pose). A biome's own creature that wants a pose sets a mood the same way.
+Attack rows shape the body by their `motion` (tuning `anim.gesture.<motion>`, sent by `MulticastRowGesture` from
+`StartRow`): a new motion needs a tuning row, not code. Creature calls `alert` / `flee` / `answer` fall back through
+sounds.json `voiceFallback`; a species' own recording is just a `creature.<id>.<kind>` row. A creature on a shared mesh
+gets its own silhouette with creatures.json `shape` (head / neck / tail / wings), never a bone edit in code.
 
 Also since 0.7.1: **world systems** (`WRWorldSystems.*`, `WRWorldSites.cpp`, `WRWorldNpc.cpp`, `WRUIWorld.cpp`,
 `Data/world.json`, cooks/build-world-systems.md): `UWRWorldSystems` (server world subsystem) places the villages, shrines,

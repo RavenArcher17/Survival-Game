@@ -82,7 +82,7 @@ void AWRCreature::SetupCreatureBody(const FWRCreatureDef& Def)
 	const FName Head = HeadBone();
 	const int32 HeadIndex = Head.IsNone() ? INDEX_NONE : Ref.FindBoneIndex(Head);
 	TArray<FName> Neck, Spine;
-	if (HeadIndex != INDEX_NONE && WRTune(TEXT("anim.look.enabled"), 1.f) > 0.f)
+	if (HeadIndex != INDEX_NONE)
 	{
 		Neck.Add(Head);
 		int32 B = Ref.GetParentIndex(HeadIndex);
@@ -100,8 +100,41 @@ void AWRCreature::SetupCreatureBody(const FWRCreatureDef& Def)
 			Spine.Insert(Ref.GetBoneName(B), 0);
 		}
 	}
-	Anim->SetBodyChains(Neck, Spine);
+	const bool bBodyOn = WRTune(TEXT("anim.look.enabled"), 1.f) > 0.f;   // 0: no body language (the shape still applies)
+	Anim->SetBodyChains(bBodyOn ? Neck : TArray<FName>(), bBodyOn ? Spine : TArray<FName>());
 	BodyLang.Head = Head;
+	// Its own proportions on a shared mesh (creatures.json shape, cookpass-creatures 3.5): the head scaled (everything on
+	// it with it: jaw, ears, antlers); the neck and tail lengthened along their own bones (thickness kept); each wing
+	// scaled from its root. The legs never change, so the feet stay planted.
+	TMap<FName, FWRBoneShape> Shapes;
+	const auto ShapeOf = [&Shapes](FName Bone) -> FWRBoneShape& { FWRBoneShape& S = Shapes.FindOrAdd(Bone); S.Bone = Bone; return S; };
+	if (!Head.IsNone() && !FMath::IsNearlyEqual(Def.ShapeHead, 1.f)) ShapeOf(Head).Scale = Def.ShapeHead;
+	if (Neck.Num() > 1 && !FMath::IsNearlyEqual(Def.ShapeNeck, 1.f))
+	{
+		for (int32 i = 1; i < Neck.Num(); ++i) ShapeOf(Neck[i]).Length = Def.ShapeNeck;
+	}
+	if (!FMath::IsNearlyEqual(Def.ShapeTail, 1.f) || !FMath::IsNearlyEqual(Def.ShapeWings, 1.f))
+	{
+		for (int32 B = 0; B < Ref.GetNum(); ++B)
+		{
+			const FString Name = Ref.GetBoneName(B).ToString();
+			const int32 Parent = Ref.GetParentIndex(B);
+			const FString ParentName = Parent != INDEX_NONE ? Ref.GetBoneName(Parent).ToString() : FString();
+			// A tail bone past the root of the tail (its offset is the segment before it).
+			if (Name.Contains(TEXT("tail")) && ParentName.Contains(TEXT("tail")) && !FMath::IsNearlyEqual(Def.ShapeTail, 1.f))
+			{
+				ShapeOf(Ref.GetBoneName(B)).Length = Def.ShapeTail;
+			}
+			// A wing's root (its parent isn't wing): the whole wing scales from the shoulder.
+			if (Name.Contains(TEXT("wing")) && !ParentName.Contains(TEXT("wing")) && !FMath::IsNearlyEqual(Def.ShapeWings, 1.f))
+			{
+				ShapeOf(Ref.GetBoneName(B)).Scale = Def.ShapeWings;
+			}
+		}
+	}
+	TArray<FWRBoneShape> ShapeList;
+	Shapes.GenerateValueArray(ShapeList);
+	Anim->SetShape(ShapeList);
 	// Its own voice and its own rhythm, seeded as its animation phase is (its kind and where it came into the world):
 	// packmates differ, the same animal stays itself.
 	const FVector At = GetActorLocation();
@@ -203,13 +236,15 @@ FVector AWRCreature::BodyLookAt(bool& bOutHave, float& OutSpeed)
 	{
 		return FVector::ZeroVector;
 	}
-	// Ridden: where its rider looks (the rider's own machine; elsewhere it looks ahead).
+	// Ridden: where its rider looks (on the rider's own machine, whichever of the two the controller drives; elsewhere it
+	// looks ahead).
 	if (const AWRCharacter* R = Rider.Get())
 	{
-		if (R->IsLocallyControlled() && R->GetController())
+		const AController* Driver = IsLocallyControlled() && GetController() ? GetController() : R->IsLocallyControlled() ? R->GetController() : nullptr;
+		if (Driver)
 		{
 			bOutHave = true;
-			return Me + R->GetController()->GetControlRotation().Vector() * 3000.f;
+			return Me + Driver->GetControlRotation().Vector() * 3000.f;
 		}
 		return FVector::ZeroVector;
 	}

@@ -262,6 +262,15 @@ void FWRCreatureRegistry::Reload()
 		if (O->TryGetNumberField(TEXT("strikeAt"), Num)) D.StrikeAt = Num;
 		O->TryGetBoolField(TEXT("ownWindup"), D.bOwnWindup);
 		if (O->TryGetStringField(TEXT("animUpper"), Str)) D.AnimUpper = FName(*Str);
+		const TSharedPtr<FJsonObject>* ShapeObj = nullptr;
+		if (O->TryGetObjectField(TEXT("shape"), ShapeObj))
+		{
+			double V = 1.0;
+			if ((*ShapeObj)->TryGetNumberField(TEXT("head"), V)) D.ShapeHead = FMath::Clamp(float(V), 0.4f, 2.f);
+			if ((*ShapeObj)->TryGetNumberField(TEXT("neck"), V)) D.ShapeNeck = FMath::Clamp(float(V), 0.4f, 2.f);
+			if ((*ShapeObj)->TryGetNumberField(TEXT("tail"), V)) D.ShapeTail = FMath::Clamp(float(V), 0.2f, 2.f);
+			if ((*ShapeObj)->TryGetNumberField(TEXT("wings"), V)) D.ShapeWings = FMath::Clamp(float(V), 0.4f, 2.f);
+		}
 		const TSharedPtr<FJsonObject>* LiftObj = nullptr;
 		if (O->TryGetObjectField(TEXT("poseLift"), LiftObj))
 		{

@@ -48,6 +48,14 @@ cooks/cookpass-creatures.md). Compiled (editor target); not played here (Aaron a
     when the voice pass adds one, else its stand-in from `sounds.json voiceFallback` (alert = a sharper, quieter idle
     call; flee = a quieter hurt; answer = idle). Numbers in sounds.json `ambient` (alertEvery, answer*).
   - No sleep breathing: there's no recording for it, so nothing plays rather than a stand-in.
+- **Creatures (5): their own proportions.** Why: ~130 species share 15 meshes and were told apart only by colour and
+  size: the Duskjackal, Hollowfang and Gravehound were the same dog, the Bramblewasp and Cryptstalker the same mite
+  (grade G8; Monster Hunter's subspecies and Elden Ring's reused skeletons change proportion first).
+  - creatures.json `shape` (`head` scale, `neck` and `tail` length, `wings` scale) on 73 shared-mesh species, each
+    from its own description (the `_why` beside it: the shoebill's bill on a heron's neck, the fossa's body-length tail,
+    the hippo's box head, the elk's head carrying its antlers...). Applied over every clip in
+    `FWRAnimProxy::ApplyCreatureShape`; legs never change (the feet stay planted).
+  - A ridden mount's head follows its rider's view whichever pawn the controller drives.
 
 ## Unreleased: the Fire and Frost world cook pass (places, sub-zones, hazards, lava, scrub, sky)
 
