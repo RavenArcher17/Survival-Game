@@ -1,4 +1,5 @@
 #include "WRAccess.h"
+#include "WRGod.h"
 #include "Wildreach.h"
 #include "WRIdentity.h"
 #include "WRPlayerController.h"
@@ -241,6 +242,9 @@ uint8 WRAccess::RoleOf(const APlayerController* PC)
 	if (!PC || !PC->PlayerState) return 0;
 	// The listen world's host: the server's own player.
 	if (PC->GetNetMode() == NM_ListenServer && PC->IsLocalController()) return 2;
+	// A Freedom35 developer in god mode moderates any world as its host does (Aaron 11-16: "We need Mod Mode still
+	// available for us in public servers"; WRGod::IsModerator, server-verified).
+	if (WRGod::IsModerator(PC)) return 2;
 	return Current().IsAdmin(PC->PlayerState->GetPlayerName()) ? 1 : 0;
 }
 
@@ -299,7 +303,8 @@ FString WRAccess::Command(APlayerController* By, const TArray<FString>& Args)
 	const uint8 TargetRole = RoleOf(Target);
 	if (TargetRole == 2) return Act == TEXT("ban") ? TEXT("You can't ban the host") : TEXT("You can't kick the host");
 	if (TargetRole == 1 && Role < 2) return TEXT("Only the host can remove an admin");
-	const FString Who = Role == 2 ? FString(TEXT("the host")) : FString::Printf(TEXT("an admin (%s)"), *Me);
+	const FString Who = WRGod::IsModerator(By) ? FString::Printf(TEXT("a Freedom35 developer (%s)"), *Me)
+		: Role == 2 ? FString(TEXT("the host")) : FString::Printf(TEXT("an admin (%s)"), *Me);
 	FString Reason;
 	if (Act == TEXT("ban"))
 	{

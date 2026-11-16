@@ -119,8 +119,19 @@ remove`, admin token) signs a per-connection proof (`POST /api/pc/tester`) that 
 must be run through Freedom35 (its updater's PC link) for the proof; editor runs keep the old testing commands open, a
 packaged game needs a verified tester for them (`WRGod::IsDevCommand` lists them: a new testing command goes there).
 A new god power is a verb in `WRGod::Run` and a row in `WRUIGod.cpp`; anything that rewards a player (a new achievement
-source, a leaderboard) must skip `WRGod::IsTestedCharacter`. Public worlds (dedicated, preset not in
-`tuning god.privatePresets`, no `-wrtestworld`) refuse it all.
+source, a leaderboard) must skip `WRGod::IsTestedCharacter`. Since wild-answers-1115 (Aaron 11-16) a verified tester
+must first type **`god-mode`** in the chat line (`WRGod::ChatLine`, `tuning god.gateWord`; typed again it all goes off,
+`UWRGodComponent::bArmed`); from anyone else it is an ordinary chat line. It works on **public servers too**, where a
+tester in god mode also moderates like the host (`WRAccess::RoleOf` -> 2: kick, ban, admins); `god.privatePresets` now
+only decides whether the panel says the world is public.
+
+Also unreleased: **Aaron's 11-15 question answers** (lane wild-answers-1115, showcase-notes cooks/wild-answers-1115.md, which
+also keeps the 20 cards' full text): god-mode gate word and mod mode (above); **Wet is off** (`tuning wet.enabled` 0: one
+switch brings it all back for its design pass); **flint** comes away with mined stone (`tuning gather.flint`,
+`FWRGathering::Gather`; Hush arrows and flint arrows use it); **levistone moss** floats beside every keel outcrop
+(AWRSkySpot Kind "moss", `WRSkyMoss.cpp`, `tuning skyWorld.moss`; the Cloudback's favourite food, `creatures.json
+foodValue`). Question cards: every future card says in full sentences what the thing is, where it is in the game, what
+is built, what the other choice changes and why it is a question (Aaron 11-16, r-dunewrap).
 
 Also since 0.7.1: **the combat core** (COMBAT-AND-LESSONS C2-C5, cooks/build-combat-core.md): melee swings are move
 rows in `Data/weapons.json` (`FWRWeapons`), timed the same on the server, the owner and in the warped clip; one rule set

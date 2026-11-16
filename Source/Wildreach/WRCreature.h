@@ -45,6 +45,8 @@ struct FWRCreatureDef
 	TArray<FName> TamingMethods;  // knockout_feed, offer_food, steal_egg, path_magic
 	FName Difficulty;             // easy / medium / hard
 	TArray<FName> Food;
+	/** How much one of a food is worth to it, over 1 (creatures.json "foodValue": a favourite lasts longer); absent = 1. */
+	TMap<FName, float> FoodValues;
 	bool bMount = false;
 	float RideSpeed = 600.f;
 	// Mounts, breeding and bodies (cooks/build-taming.md)

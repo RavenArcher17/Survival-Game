@@ -88,7 +88,9 @@ float FWRCreatureDef::FoodValue(FName Item) const
 	{
 		return WRTune(TEXT("taming.kibbleValue"), 2.f);
 	}
-	return Food.Contains(Item) ? 1.f : 0.f;
+	if (!Food.Contains(Item)) return 0.f;
+	const float* V = FoodValues.Find(Item);
+	return V ? FMath::Max(0.f, *V) : 1.f;
 }
 
 bool FWRCreatureDef::CanHunt(const FWRCreatureDef& Hunter, const FWRCreatureDef& Prey)
@@ -290,6 +292,10 @@ void FWRCreatureRegistry::Reload()
 		}
 		D.TamingMethods = ParseNames(O, TEXT("taming"));
 		D.Food = ParseNames(O, TEXT("food"));
+		if (const TSharedPtr<FJsonObject>* FV = nullptr; O->TryGetObjectField(TEXT("foodValue"), FV))
+		{
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& E : (*FV)->Values) D.FoodValues.Add(FName(*E.Key), float(E.Value->AsNumber()));
+		}
 		D.Products = ParseCounts(O, TEXT("products"));
 		D.Attacks = ParseNames(O, TEXT("attacks"));
 		D.Diet = O->TryGetStringField(TEXT("diet"), Str) ? FName(*Str)
@@ -1724,7 +1730,8 @@ FString AWRCreature::Feed(AWRPlayerController* Player)
 	bCalm = true;
 	MealValue = 1.f;
 	FedUntil = GetWorld()->GetTimeSeconds() + WRTune(TEXT("taming.secondsPerFood"), 30.f) * FoodValue(FoodUsed);
-	return FString::Printf(TEXT("Fed %s: taming %.0f%% (needs %.0f s fed)"), *FoodUsed.ToString(), TameProgress * 100.f, Def->TameSeconds());
+	const FWRItemDef* UsedDef = FWRItemRegistry::Get().Find(FoodUsed);
+	return FString::Printf(TEXT("Fed %s: taming %.0f%% (needs %.0f s fed)"), UsedDef ? *UsedDef->Name : *FoodUsed.ToString(), TameProgress * 100.f, Def->TameSeconds());
 }
 
 float AWRCreature::FoodValue(FName Item) const

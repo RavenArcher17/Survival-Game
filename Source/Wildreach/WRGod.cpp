@@ -30,6 +30,7 @@
 #include "WRLifeSkills.h"
 #include "WRTuning.h"
 #include "WRWorlds.h"
+#include "WRAccess.h"
 #include "WRGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/Engine.h"
@@ -290,6 +291,7 @@ void UWRGodComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UWRGodComponent, bTester);
 	DOREPLIFETIME(UWRGodComponent, Label);
+	DOREPLIFETIME(UWRGodComponent, bArmed);
 	DOREPLIFETIME(UWRGodComponent, Flags);
 	DOREPLIFETIME(UWRGodComponent, FlySpeed);
 	DOREPLIFETIME(UWRGodComponent, bCharacterTested);
@@ -323,7 +325,7 @@ void UWRGodComponent::ApplyMovement()
 	{
 		return;   // a body on the ground is the death flow's: nothing is changed on it (the next one is set up fresh)
 	}
-	const uint16 Want = bTester ? uint16(Flags & (EWRGodFlag::Fly | EWRGodFlag::Noclip)) : uint16(0);
+	const uint16 Want = IsOn() ? uint16(Flags & (EWRGodFlag::Fly | EWRGodFlag::Noclip)) : uint16(0);
 	UCharacterMovementComponent* Move = Body->GetCharacterMovement();
 	const bool bNew = AppliedTo.Get() != Body;
 	// Only this machine's own movement is set: the server's and the owner's (a simulated copy follows the server).
@@ -564,7 +566,7 @@ bool WRGod::IsAIFrozen(const UWorld* World)
 bool WRGod::IsLocalTester(const APlayerController* PC)
 {
 	const UWRGodComponent* G = PC && PC->IsLocalController() ? UWRGodComponent::For(PC) : nullptr;
-	return G && G->bTester;
+	return G && G->IsOn();
 }
 
 bool WRGod::IsThisMachineTester()
@@ -618,8 +620,58 @@ FString WRGod::Block(const AWRPlayerController* PC)
 {
 	const UWRGodComponent* G = UWRGodComponent::For(PC);
 	if (!G || !G->bTester) return TEXT("not a tester");
-	if (IsPublicWorld(PC->GetWorld())) return TEXT("God mode is off on public worlds: it works in single player, on a hosted world and on playtest servers.");
+	// Public servers too (Aaron 11-16, r-pubserver): only the gate word is needed, on every world.
+	if (!G->bArmed) return TEXT("God mode is off: type god-mode in the chat line to turn it on.");
 	return FString();
+}
+
+bool WRGod::ChatLine(AWRPlayerController* PC, const FString& Line)
+{
+	UWRGodComponent* G = PC ? UWRGodComponent::For(PC) : nullptr;
+	FString Word = Line.TrimStartAndEnd().ToLower();
+	Word.RemoveFromStart(TEXT("/"));
+	const FString Gate = FWRTuning::Get().Str(TEXT("god.gateWord"), TEXT("god-mode")).ToLower();
+	if (!G || !G->bTester || Word != Gate)
+	{
+		return false;   // anyone else: an ordinary chat line, so nothing tells a player there's anything behind the word
+	}
+	const FString Name = PC->PlayerState ? PC->PlayerState->GetPlayerName() : FString(TEXT("?"));
+	G->bArmed = !G->bArmed;
+	if (!G->bArmed)
+	{
+		// Off: every power with it, the flight let go where they are, and the world's creatures woken if no other tester
+		// in god mode wants them frozen.
+		G->Flags = 0;
+		G->ApplyMovement();
+		bool bOtherOn = false;
+		for (TActorIterator<AWRPlayerState> It(PC->GetWorld()); It; ++It)
+		{
+			const UWRGodComponent* O = It->GetGod();
+			bOtherOn |= O && O != G && O->IsOn();
+		}
+		UWRGodWorld* W = UWRGodWorld::Get(PC);
+		if (W && W->bAIFrozen && !bOtherOn) W->bAIFrozen = false;
+		if (W) W->SyncComponents();
+		// (The panel closes itself on the owner once bArmed replicates: SGodPanel's tick.)
+		PC->ClientNotify(TEXT("God mode off"));
+	}
+	else
+	{
+		if (UWRGodWorld* W = UWRGodWorld::Get(PC)) W->SyncComponents();
+		PC->ClientNotify(IsPublicWorld(PC->GetWorld())
+			? TEXT("God mode on (public server: what you change here marks this world tested). F9 opens the panel; type god-mode again to turn it off.")
+			: TEXT("God mode on. F9 opens the panel (on a pad: the journal's last page); type god-mode again to turn it off."));
+	}
+	WRAccess::RefreshRoles(PC->GetWorld());   // moderation follows god mode
+	G->GetOwner()->ForceNetUpdate();
+	UE_LOG(LogWildreach, Log, TEXT("GOD %s (%s) %s god mode"), *G->Label, *Name, G->bArmed ? TEXT("entered") : TEXT("left"));
+	return true;
+}
+
+bool WRGod::IsModerator(const APlayerController* PC)
+{
+	const UWRGodComponent* G = PC ? UWRGodComponent::For(PC) : nullptr;
+	return G && G->IsOn();
 }
 
 // ---------------------------------------------------------------- the proof at login
@@ -670,7 +722,7 @@ void WRGod::ReceiveProof(AWRPlayerController* PC, const FString& Proof)
 	G->Label = Claims.Label;
 	if (UWRGodWorld* W = UWRGodWorld::Get(PC)) W->SyncComponents();
 	UE_LOG(LogWildreach, Log, TEXT("GOD %s is a verified tester (%s, Freedom35 account %s)"), *Name, *Claims.Label, *Claims.Sub);
-	if (IsPublicWorld(PC->GetWorld())) PC->ClientNotify(TEXT("Tester verified. God mode is off on public worlds."));
+	PC->ClientNotify(TEXT("Tester verified: type god-mode in the chat line for god mode."));
 }
 
 void WRGod::ReceivePlaces(AWRPlayerController* PC, const TArray<FWRGodPlace>& Places)
@@ -962,7 +1014,7 @@ void WRGod::Run(AWRPlayerController* PC, const TArray<FString>& Args)
 TArray<FString> WRGod::ActiveWords(const UWRGodComponent* G)
 {
 	TArray<FString> Out;
-	if (!G || !G->bTester) return Out;
+	if (!G || !G->IsOn()) return Out;
 	if (G->Flags & EWRGodFlag::Invulnerable) Out.Add(TEXT("INVULNERABLE"));
 	if (G->Flags & EWRGodFlag::Vitals) Out.Add(TEXT("ENDLESS"));
 	if (G->Flags & EWRGodFlag::OneHit) Out.Add(TEXT("ONE-HIT"));

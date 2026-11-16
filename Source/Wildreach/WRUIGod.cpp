@@ -248,7 +248,7 @@ namespace WRUIGodPanel
 				WRUIWindowKit::Window(PC, SNew(SGodSigil), LOCTEXT("Title", "God mode"),
 					TAttribute<FText>::CreateLambda([this]() { const UWRGodComponent* G = God(); return FText::Format(LOCTEXT("Sub", "Tester tools  ·  {0}  ·  only Freedom35's developers have this"), FText::FromString(G ? G->Label : FString())); }),
 					TAttribute<FText>::CreateLambda([this]() { return StateChip(); }),
-					TAttribute<FLinearColor>::CreateLambda([this]() { const UWRGodComponent* G = God(); return !G ? WRUI::Ink3 : G->bPublicWorld ? WRUI::Bad : G->bWorldTested ? WRUI::Warn : WRUI::Good; }),
+					TAttribute<FLinearColor>::CreateLambda([this]() { const UWRGodComponent* G = God(); return !G ? WRUI::Ink3 : G->bPublicWorld ? WRUI::Warn : G->bWorldTested ? WRUI::Warn : WRUI::Good; }),
 					Content)
 			];
 			Rebuild();
@@ -317,7 +317,7 @@ namespace WRUIGodPanel
 		{
 			const UWRGodComponent* G = God();
 			if (!G) return FText::GetEmpty();
-			if (G->bPublicWorld) return LOCTEXT("ChipPublic", "Public world: off");
+			if (G->bPublicWorld) return LOCTEXT("ChipPublic", "Public server: mod mode");
 			if (G->bWorldTested) return LOCTEXT("ChipTested", "World marked tested");
 			return LOCTEXT("ChipTesting", "Testing world");
 		}
@@ -326,7 +326,8 @@ namespace WRUIGodPanel
 		{
 			const UWRGodComponent* G = God();
 			const AWRPlayerState* PS = State();
-			if (G && G->bPublicWorld) return LOCTEXT("BannerPublic", "This is a public server: god mode is off here so its world stays clean. It works in single player, on a hosted world and on playtest servers.");
+			if (G && G->bPublicWorld) return FText::Format(LOCTEXT("BannerPublic", "This is a public server. Everyone here sees GOD over {0} while a power is on, and anything you change in the world (time, weather, events, spawns, freezing, kills) marks this world tested. You can kick, ban and make admins from the Clan tab (O). Type god-mode in chat to turn it all off."),
+				FText::FromString(PS ? PS->GetPlayerName() : FString(TEXT("you"))));
 			return FText::Format(LOCTEXT("Banner", "Using anything here marks {0} as a test character for good: no achievements or kill-time records from it. World changes (time, weather, events, spawns, freezing, kills) mark this world too."),
 				FText::FromString(PS ? PS->GetPlayerName() : FString(TEXT("this character"))));
 		}

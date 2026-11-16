@@ -22,6 +22,7 @@ class AWRCharacterBase;
 class AWRResourceNode;
 class AWRWorldCache;
 class UPointLightComponent;
+class UMaterialInstanceDynamic;
 class UBoxComponent;
 class UProceduralMeshComponent;
 
@@ -148,8 +149,22 @@ public:
 	FString Start(AWRPlayerController* PC);
 	bool IsDoneBy(const FString& Player, double NowHours) const;
 
+protected:
+	virtual void BeginPlay() override;
+
 private:
 	void Finish();
+
+	// --- Every machine that draws: a moss spot's look (Kind "moss", WRSkyMoss.cpp; Aaron 11-16 r-moss): a lump of
+	// levistone overgrown with moss, floating beside its keel as levistone does, beards hanging, tips glowing at night.
+	void BuildMossLook();
+	void TickMossLook(float DeltaSeconds);
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> MossFloat;
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> MossBeards;
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> MossGlow;
+	UPROPERTY(Transient) TObjectPtr<UPointLightComponent> MossLight;
+	float MossPhase = 0.f;
+	float MossNight = -1.f;
 };
 
 /**

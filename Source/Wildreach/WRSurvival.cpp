@@ -1129,8 +1129,14 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 {
 	WThirst = WRegen = WRun = WBurn = WSwim = WCorruption = 1.f;
 	const FVector At = Pawn->GetActorLocation();
-	// Wet from the water you're in; drying fast by a warding fire (a campfire, a brazier, a Hearth).
-	if (UWRWaterSubsystem::IsInWater(Cast<ACharacter>(Pawn)))
+	// Wet from the water you're in; drying fast by a warding fire (a campfire, a brazier, a Hearth). Switched off for now
+	// (Aaron 11-16, r-wet: "We will do more design passes to make it really good"): wet.enabled 0 sets nothing.
+	const bool bWetOn = WRTune(TEXT("wet.enabled"), 0.f) > 0.f;
+	if (!bWetOn)
+	{
+		WetUntil = 0.f;
+	}
+	else if (UWRWaterSubsystem::IsInWater(Cast<ACharacter>(Pawn)))
 	{
 		WetUntil = Now + WRTune(TEXT("wet.drySeconds"), 60.f);
 	}
@@ -1187,7 +1193,7 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 			WBurn = K->BurnMult;
 		}
 		// And you (cooks/cookpass-survival.md 3.7): wet under open rain, whatever you wear.
-		if (K->bWatersCrops && !bSheltered)
+		if (bWetOn && K->bWatersCrops && !bSheltered)
 		{
 			WetUntil = Now + WRTune(TEXT("wet.drySeconds"), 60.f);
 		}
@@ -1614,7 +1620,8 @@ void UWRSurvivalComponent::FromJson(const TSharedPtr<FJsonObject>& Json)
 
 bool UWRSurvivalComponent::IsWet() const
 {
-	return WetUntil > UWRWeatherSubsystem::Now(this);
+	// Off (wet.enabled 0): never wet, so no multipliers in ApplyHit / the build-ups and no HUD line.
+	return WRTune(TEXT("wet.enabled"), 0.f) > 0.f && WetUntil > UWRWeatherSubsystem::Now(this);
 }
 
 float UWRSurvivalComponent::WetSecondsLeft() const

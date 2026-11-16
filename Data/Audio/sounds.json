@@ -505,6 +505,7 @@
 		"frost.impact": {"files": ["spell/frost_impact_1", "spell/frost_impact_2", "spell/frost_impact_3", "spell/frost_impact_4"], "volume": 0.92, "pitch": [0.92, 1.08], "radius": 4500, "category": "effects", "minGap": 0.05},
 		"frostnova": {"files": ["spell/cast_frost_1", "spell/frost_impact_1"], "volume": 1.22, "pitch": [0.8, 0.9], "radius": 5000, "category": "effects", "minGap": 0.5},
 		"gather.fiber": {"files": ["foot/grass_2", "foot/grass_4", "combat/dodge_2", "combat/dodge_4"], "volume": 0.9, "pitch": [1.1, 1.25], "radius": 1800, "category": "effects", "minGap": 0.08},
+		"gather.flint": {"files": ["craft/knap_2", "craft/knap_3"], "volume": 0.55, "pitch": [1.25, 1.4], "radius": 1500, "category": "effects", "minGap": 0.2, "_note": "a flint nodule coming away with the stone: the knap recordings pitched up, a glassy click (xtra1, mathiaslyhne1, CC0)"},
 		"gather.stone": {"files": ["world/gather_stone_1", "world/gather_stone_2", "world/gather_stone_3", "world/gather_stone_4", "world/gather_stone_5"], "volume": 0.87, "pitch": [0.9, 1.08], "radius": 3000, "category": "effects", "minGap": 0.08},
 		"gather.wood": {"files": ["world/gather_wood_1", "world/gather_wood_2", "world/gather_wood_3", "world/gather_wood_4", "world/gather_wood_5", "world/gather_wood_6"], "volume": 1.03, "pitch": [0.9, 1.08], "radius": 3000, "category": "effects", "minGap": 0.08},
 		"hearth.feed": {"files": ["world/hearth_feed_1"], "volume": 0.75, "pitch": [0.95, 1.05], "radius": 2500, "category": "effects", "minGap": 0.5},

@@ -100,6 +100,11 @@ void AWRPlayerController::ServerChat_Implementation(const FString& Message)
 	{
 		return;
 	}
+	// The testers' gate word (WRGod::ChatLine): "god-mode" from a verified tester toggles god mode and never reaches chat.
+	if (WRGod::ChatLine(this, Clean))
+	{
+		return;
+	}
 	// The channel, from the line's start (the chat box puts the one its chip shows; anyone can type them).
 	uint8 Channel = WRChat::Global;
 	FString Target;
@@ -133,6 +138,11 @@ void AWRPlayerController::ServerChat_Implementation(const FString& Message)
 			return;
 		}
 		Clean = Rest.TrimStartAndEnd();
+		// (The chip's channel rides in front: "/l god-mode" is the gate word too.)
+		if (WRGod::ChatLine(this, Clean))
+		{
+			return;
+		}
 	}
 	Clean = Clean.Left(FMath::RoundToInt(WRTune(TEXT("chat.maxLength"), 200.f)));
 	if (Clean.IsEmpty())
@@ -1374,7 +1384,14 @@ void AWRPlayerController::ClientGodPlaces_Implementation(const TArray<FWRGodPlac
 
 void AWRPlayerController::ToggleGod()
 {
-	// No god mode for anyone the server hasn't verified: the key, the pad stop and the screen don't exist for them.
+	// No god mode for anyone the server hasn't verified: the key, the pad stop and the screen don't exist for them. A
+	// verified tester who hasn't typed the gate word yet is told how (nobody else hears anything).
+	const UWRGodComponent* God = UWRGodComponent::For(this);
+	if (UI && God && God->bTester && !God->bArmed)
+	{
+		ShowLocalNotice(TEXT("Type god-mode in the chat line first"));
+		return;
+	}
 	if (!UI || !WRGod::IsLocalTester(this)) return;
 	OpenJournal(EWRMenu::God);
 }

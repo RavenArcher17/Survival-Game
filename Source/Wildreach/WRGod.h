@@ -9,10 +9,15 @@
 // (WRGodAuth::Verify) and sets UWRGodComponent::bTester, replicated. Nothing typed, saved or passed on the command line
 // makes anyone a tester.
 //
+// ON: god mode is entered by typing "god-mode" in the chat line (Aaron 11-16: "Make it a command we need to enter
+// in-game 'god-mode' in the existing command line"; WRGod::ChatLine). From anyone the server hasn't verified it is an
+// ordinary chat line. Typed again, every power goes off.
+//
 // WHAT: every power is a "god <verb> ..." server command (WRGod::Run), re-checked against the flag each time; the old
-// dev commands need it too in packaged builds (WRGod::DevBlock). Nothing runs on a public world (a dedicated server
-// not on a private preset). Using any of it marks the character as tested for good, and world changes mark the world
-// (Saved/Worlds/<world>/tested.json): no achievements or kill-time records from a tested character.
+// dev commands need it too in packaged builds. It works on every world, public servers included (Aaron 11-16: "We need
+// Mod Mode still available for us in public servers"), where a tester in god mode can also moderate (kick, ban, admins)
+// as a host can (WRAccess::RoleOf). Using any of it marks the character as tested for good, and world changes mark the
+// world (Saved/Worlds/<world>/tested.json): no achievements or kill-time records from a tested character.
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Subsystems/WorldSubsystem.h"
@@ -68,6 +73,10 @@ public:
 	UPROPERTY(Replicated) bool bTester = false;
 	/** The tester's first name from the site's list ("Aaron"). */
 	UPROPERTY(Replicated) FString Label;
+	/** God mode entered this connection: the tester typed "god-mode" in the chat line (Aaron 11-16, r-colin). Every power,
+	 *  the panel, its key, the pad stop, the badge and the moderation rights wait for it; typed again, all of it goes off.
+	 *  Not saved: a new connection starts without it. */
+	UPROPERTY(Replicated) bool bArmed = false;
 	UPROPERTY(ReplicatedUsing=OnRep_Flags) uint16 Flags = 0;
 	/** Fly speed as a multiple of god.flyBase. */
 	UPROPERTY(ReplicatedUsing=OnRep_Flags) float FlySpeed = 1.f;
@@ -80,10 +89,12 @@ public:
 
 	UFUNCTION() void OnRep_Flags();
 
-	/** A tester with this power on. */
-	bool Has(uint16 Flag) const { return bTester && (Flags & Flag) != 0; }
-	/** Anything on that the badge shows (a power, or the world's AI frozen). */
-	bool AnyOn() const { return bTester && (Flags != 0 || bAIFrozen); }
+	/** A tester in god mode with this power on. */
+	bool Has(uint16 Flag) const { return bTester && bArmed && (Flags & Flag) != 0; }
+	/** Anything on that the head tag shows (a power, or the world's AI frozen). */
+	bool AnyOn() const { return bTester && bArmed && (Flags != 0 || bAIFrozen); }
+	/** A verified tester who has typed "god-mode" (the panel, the badge, moderation). */
+	bool IsOn() const { return bTester && bArmed; }
 
 	/** Owning client only: the View page's hitboxes and aggro lines. */
 	bool bShowHitboxes = false;
@@ -149,7 +160,7 @@ namespace WRGod
 	WILDREACH_API float FlySpeed(const AActor* Who);
 	/** Server: every creature's and boss's brain stopped. */
 	WILDREACH_API bool IsAIFrozen(const UWorld* World);
-	/** The local player is a verified tester (the panel, its key, the pad stop, the badge ask this first). */
+	/** The local player is a verified tester in god mode (the panel, its key, the pad stop, the badge ask this first). */
 	WILDREACH_API bool IsLocalTester(const APlayerController* PC);
 	/** This machine's first local player is a verified tester (the controls pages' tester-only key rows). */
 	WILDREACH_API bool IsThisMachineTester();
@@ -164,6 +175,11 @@ namespace WRGod
 	WILDREACH_API bool IsDevCommand(const TArray<FString>& Args);
 	/** Server: why this player may not run a god / dev command here (empty: they may). */
 	WILDREACH_API FString Block(const AWRPlayerController* PC);
+	/** Server: a chat line that is the gate word ("god-mode", "/god-mode") from a verified tester toggles god mode and is
+	 *  taken (true); from anyone else it's an ordinary chat line (false). */
+	WILDREACH_API bool ChatLine(AWRPlayerController* PC, const FString& Line);
+	/** Server: a verified tester in god mode (moderation on any world). */
+	WILDREACH_API bool IsModerator(const APlayerController* PC);
 
 	/** Server, at login: the connection's nonce, sent to its client. */
 	WILDREACH_API void Challenge(AWRPlayerController* PC);

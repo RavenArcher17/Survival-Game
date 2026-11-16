@@ -171,6 +171,28 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 		Inventory->AddItem(TEXT("seeds"), 1);
 	}
 	const int32 Got = Amount - Left;
+	// Flint in the stone (Aaron 11-16, r-flint: "occasionally getting a stack along with the stone you mine"): now and
+	// then a nodule of flint comes away with the stone, its own stack (gather.flint: chance a hit, more with a pick in
+	// hand, a heavy blow's x heavyMult; never from rock that is all ice). Its own line and a sharper click.
+	int32 Flint = 0;
+	if (ItemId == TEXT("stone") && Got > 0)
+	{
+		const FWRTuning& T = FWRTuning::Get();
+		bool bExcluded = false;
+		TArray<FString> Never;
+		T.Str(TEXT("gather.flint.never"), TEXT("ice_rock")).ParseIntoArrayWS(Never);
+		for (const FString& N : Never) bExcluded |= !N.IsEmpty() && Source.StartsWith(N);
+		float Chance = T.Num(TEXT("gather.flint.chance"), 0.15f) * (bHeavy ? T.Num(TEXT("gather.flint.heavyMult"), 1.5f) : 1.f);
+		if (Tool && Tool->Kind == TEXT("pick")) Chance *= T.Num(TEXT("gather.flint.pickMult"), 1.4f);
+		if (!bExcluded && FMath::FRand() < Chance)
+		{
+			const int32 Lo = FMath::Max(1, FMath::RoundToInt(T.Num(TEXT("gather.flint.min"), 1.f)));
+			const int32 Hi = FMath::Max(Lo, FMath::RoundToInt(T.Num(TEXT("gather.flint.max"), 3.f)));
+			const int32 Want = FMath::RandRange(Lo, Hi);
+			Flint = Want - Inventory->AddItem(TEXT("flint"), Want);
+			if (Flint > 0) WRSound::PlayAt(Gatherer, TEXT("gather.flint"), Gatherer->GetActorLocation() + Gatherer->GetActorForwardVector() * 80.f);
+		}
+	}
 	const FName HeldId = Held.ItemId;
 	const float HeldBefore = Held.Durability;
 	if (AWRPlayerController* PC = Cast<AWRPlayerController>(Gatherer->GetController()))
@@ -181,14 +203,19 @@ int32 FWRGathering::Gather(AWRCharacterBase* Gatherer, FName ItemId, float PerHi
 		const FString Why = ToolDef ? FString::Printf(TEXT("  (%s)"), *ToolDef->Name)
 			: BrokenDef ? FString::Printf(TEXT("  (%s broken: repair it)"), *BrokenDef->Name) : FString();
 		PC->ClientNotify(Got <= 0 ? FString(TEXT("Your bag is full")) : FString::Printf(TEXT("+%d %s%s"), Got, Def ? *Def->Name : *ItemId.ToString(), *Why));
+		if (Flint > 0)
+		{
+			const FWRItemDef* FlintDef = FWRItemRegistry::Get().Find(TEXT("flint"));
+			PC->ClientNotify(FString::Printf(TEXT("+%d %s"), Flint, FlintDef ? *FlintDef->Name : TEXT("Flint")));
+		}
 	}
 	// The swing wears what's in hand (after the notice, so "it broke" comes second).
 	if (Got > 0)
 	{
 		WearHeld(Gatherer, Tool != nullptr);
 	}
-	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s, tool %s, held %s %.0f"), *Gatherer->GetName(), Got, *ItemId.ToString(), *Source,
-		Tool ? *Tool->ItemId.ToString() : TEXT("none"), HeldId.IsNone() ? TEXT("nothing") : *HeldId.ToString(), HeldBefore);
+	UE_LOG(LogWildreach, Log, TEXT("GATHER %s got %d %s from %s, tool %s, held %s %.0f%s"), *Gatherer->GetName(), Got, *ItemId.ToString(), *Source,
+		Tool ? *Tool->ItemId.ToString() : TEXT("none"), HeldId.IsNone() ? TEXT("nothing") : *HeldId.ToString(), HeldBefore, Flint > 0 ? *FString::Printf(TEXT(", +%d flint"), Flint) : TEXT(""));
 	return Got;
 }
 

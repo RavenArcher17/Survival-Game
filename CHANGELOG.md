@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased: Aaron's answers to the 11-15 question cards (wild-answers-1115)
+
+Aaron answered the 20-card page wildreach-questions-1115 on 11-16. The cards' full text, the requirement ledger, the
+research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled (editor target); not played here
+(Aaron tests).
+
+- **God mode is entered with `god-mode` in the chat line.** Why: Aaron (r-colin): "Make it a command we need to enter
+  in-game 'god-mode' in the existing command line." A verified tester (still only Aaron, Raven and Colin, proven by their
+  Freedom35 accounts) types `god-mode` (or `/god-mode`, also behind a channel chip) and the server turns god mode on for
+  that connection (`WRGod::ChatLine`, `UWRGodComponent::bArmed`); typed again, every power goes off, flight lets go
+  where you are and the creatures wake unless another tester froze them. From anyone else it is an ordinary chat line,
+  so nothing shows there's anything behind it. The panel (F9, the pad's last journal page), the badge, the GOD tag, every
+  `god ...` command and the old testing commands in a packaged game wait for it; F9 before it tells a tester "Type
+  god-mode in the chat line first". Tuning `god.gateWord`.
+- **Mod mode on public servers.** Why: Aaron (r-pubserver): "We need Mod Mode still available for us in public
+  servers." God mode no longer refuses public dedicated servers. A tester in god mode also moderates any world as its
+  host (`WRAccess::RoleOf` 2: kick, ban, unban, make admins from the Clan tab), and a kick or ban reads "by a Freedom35
+  developer (Aaron)". On a public server the panel's chip reads "Public server: mod mode" and its banner says everyone
+  sees GOD while a power is on and that world changes mark the world tested.
+- **Wet is off for now.** Why: Aaron (r-wet) chose "leave it for a later status pass": "We will do more design passes to
+  make it really good." `tuning wet.enabled` 0: rain and water set nothing, `IsWet` is false (no fire / burn / frost /
+  shock multipliers), no HUD line. Setting it to 1 brings all of it back unchanged for the design pass.
+- **Flint.** Why: Aaron (r-flint): "Add flint as a material that can be mined and collected, occasionally getting a
+  stack along with the stone you mine." New item `flint` (bag icon `Tools/art/make_answer_icons.py`). Every hit that
+  gives stone (a rock or a stone node) has a 15% chance of turning up 1-3 flint with it (x1.5 on a heavy blow, x1.4
+  with a pick in hand; never from ice rocks), with its own "+2 Flint" line and a glassy click (`gather.flint`, the knap
+  recordings pitched up). Hush arrows now take flint x2 as the sky spec says (they cost stone because flint didn't
+  exist), and new **flint arrows** (by hand: wood, flint, fiber -> 3; 8 damage, between stone 6 and a crossbow bolt) are
+  knapped in the hands. Tuning `gather.flint`.
+- **Levistone moss on the keels.** Why: Aaron (r-moss): "Yes add the moss to collect. Make it look good." Beside every
+  keel outcrop's levistone a lump of the same stone floats on its own lift over open air, overgrown with moss
+  (`WRSkyMoss.cpp`): velvet cushions crowding its top (26, set by the golden angle so they never fall in rows), a ragged
+  skirt round its waist, 22 old-man's-beard strands hanging under it with side strands, blue crystal points on its
+  keel. It bobs and turns slowly and its beards swing under it, every frame near a camera; at night the beard tips, a
+  few flecks and the crystal glow cyan and a dim cyan light falls under it. Hold E 2 s to peel a mat: 4 levistone moss,
+  ripe again for you after a game day. It is the Cloudback's favourite food (first in its list, each lasts x1.5 as
+  long: `creatures.json foodValue`). Tuning `skyWorld.moss`.
+
 ## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)
 
 Aaron (lane cookpass-crafting: requirement ledger, research, grades and plan in showcase-notes cooks/cookpass-crafting.md).

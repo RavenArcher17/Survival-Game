@@ -221,7 +221,8 @@ FString AWRSkySpot::Start(AWRPlayerController* PC)
 	}
 	if (IsDoneBy(Who, GameHours(this)))
 	{
-		return Kind == TEXT("gossamer") ? TEXT("You've taken the silk here; it gathers again by tomorrow") : TEXT("You've had what's here");
+		return Kind == TEXT("gossamer") ? TEXT("You've taken the silk here; it gathers again by tomorrow")
+			: Kind == TEXT("moss") ? TEXT("You've peeled what's ripe here; it grows back by tomorrow") : TEXT("You've had what's here");
 	}
 	float Secs = Seconds;
 	if (Kind == TEXT("gossamer") && Me->GetVelocity().Size2D() > 50.f) return TEXT("Stand still to wind the silk");
@@ -234,9 +235,20 @@ FString AWRSkySpot::Start(AWRPlayerController* PC)
 	return FString::Printf(TEXT("%s..."), *Verb);
 }
 
+void AWRSkySpot::BeginPlay()
+{
+	Super::BeginPlay();
+	if (Kind == TEXT("moss") && GetNetMode() != NM_DedicatedServer)
+	{
+		BuildMossLook();
+		SetActorTickInterval(0.f);   // its bob and sway are drawn every frame (TickMossLook culls by distance)
+	}
+}
+
 void AWRSkySpot::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (MossFloat) TickMossLook(DeltaSeconds);
 	if (!HasAuthority() || DoneAt <= 0.f) return;
 	AWRCharacterBase* P = DoerPawn.Get();
 	if (!P || !P->IsAlive() || FVector::Dist(P->GetActorLocation(), DoerFrom) > 120.f || FVector::Dist(P->GetActorLocation(), GetActorLocation()) > Reach + 150.f)
@@ -1336,6 +1348,17 @@ void UWRSkyWorld::SpawnServerActors()
 		if (!I || Drifts(N.Island)) continue;
 		const FVector At(N.At.X, N.At.Y, I->Centre.Z - FMath::Clamp(I->R() * 0.12f, 800.f, 2500.f) - 1450.f);
 		Levi(Node(TEXT("keel"), TEXT("levistone"), At), 2);
+		// Levistone moss (Aaron 11-16, r-moss: "Yes add the moss to collect. Make it look good."): beside each keel a
+		// lump of levistone the moss has overgrown floats on its own lift, out from the root over open air; hold E to
+		// peel a mat off it (any hand), a game day before it's ripe again for you (skyWorld.moss).
+		const FVector Out = (FVector(N.At.X, N.At.Y, 0.f) - FVector(I->Centre.X, I->Centre.Y, 0.f)).GetSafeNormal2D();
+		const FVector MossAt = At + Out * Tn(TEXT("skyWorld.moss.outCm"), 330.f) + FVector(0.f, 0.f, Tn(TEXT("skyWorld.moss.upCm"), 60.f));
+		if (AWRSkySpot* M = SpawnSpot(TEXT("moss"), TEXT("levistone_moss"), MossAt, TEXT("Levistone moss"), TEXT("Peel the moss"), Tn(TEXT("skyWorld.moss.seconds"), 2.f)))
+		{
+			M->Gives.Add(TEXT("levistone_moss"), FMath::Max(1, FMath::RoundToInt(Tn(TEXT("skyWorld.moss.gives"), 4.f))));
+			M->RespawnHours = Tn(TEXT("skyWorld.moss.respawnHours"), 24.f);
+			M->Reach = Tn(TEXT("skyWorld.moss.reachCm"), 380.f);
+		}
 	}
 	for (const FWRSkyIsleData::FNode& N : List(TEXT("core")))
 	{
