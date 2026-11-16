@@ -75,6 +75,9 @@ Roles are `AWRPlayerState::AccessRole` (2 host, 1 admin), refreshed by `WRAccess
 closing: `AWRPlayerController::AnnounceHostClosing`).
 Dropped bags have a kind (`AWRLootBag::KindDeath / KindSpill / KindDrop`, set with `Setup(kind, life)` or `Spill(..., kind)`)
 that picks their modelled look (`WRLootLook`); a death's bags are saved in the world doc `bags` (`AWRLootBag::SaveNow`).
+Wake points: beds, the player's clan's unbroken Hearths (`WRBeds` HearthsFor / SpotByHearth; kind "hearth"), camps,
+shrine-stones. A claim's name is its totem piece's `CustomName` (`AWRClaimTotem::ClaimName`). A world's backups can be
+restored from the menu (`WRStore::RestoreBackup`), never while it runs.
 Also unreleased: **the audio cook pass** (cooks/cookpass-audio.md). The music is always on (breaths between pieces,
 `music.gap`); every duck is capped at 4 dB in `UWRAudioDirector::Duck`; mode changes wait for the playing piece's beat or
 bar (give a new pool row its `bpm`); combat music needs `music.combatThreat` worth of creatures on you (or a PvP blow);

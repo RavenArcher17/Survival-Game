@@ -16,7 +16,9 @@
   },
 
   "beds": { "_comment": "Beds and bedrolls (WRBeds): a bed you just woke at rests restSeconds before you can wake there again; a bedroll is used up when you wake on it (bedrollSingleUse 1). placeholder",
-    "restSeconds": 60, "bedrollSingleUse": 1 },
+    "restSeconds": 60, "bedrollSingleUse": 1,
+    "_hearth": "Every unbroken Hearth of yours or your clan's is a place to wake (cooks/cookpass-multiplayer.md 3.6): you stand up hearthWakeRingCm from it, facing the fire; after you wake there it rests hearthRestSeconds for you.",
+    "hearthRestSeconds": 300, "hearthWakeRingCm": 160 },
 
   "chat": { "_comment": "Chat channels (cooks/cookpass-multiplayer.md 3.3, AWRPlayerController::ServerChat): /g everyone, /l nearby (within localRangeCm), /c your clan, /w name a whisper, /r a reply. At most perSecond lines a second per player, burst at once; maxLength characters; history lines kept (the HUD shows the last 6 for 25 s). colors: each channel's lines (sRGB hex).",
     "localRangeCm": 4000, "perSecond": 1, "burst": 5, "maxLength": 200, "history": 50,
@@ -121,6 +123,9 @@
     "_players": "How many can be in a world at once (WRAccess; cooks/cookpass-multiplayer.md 3.4): a listen world's host sets listenMinPlayers..listenMaxPlayers on the Hosting page (listenDefaultPlayers until then), a dedicated server up to dedicatedMaxPlayers.",
     "listenMinPlayers": 2, "listenMaxPlayers": 16, "listenDefaultPlayers": 8, "dedicatedMaxPlayers": 100
   },
+
+  "claims": { "_comment": "Land claims (cooks/cookpass-multiplayer.md 3.7): totems stand at least two full-upgrade radii plus gapCm apart (claims never nest or grow into a neighbour); a claim's name is up to nameLength letters.",
+    "gapCm": 1000, "nameLength": 24 },
 
   "access": { "_comment": "Who may come into a world (WRAccess, access.json; cooks/cookpass-multiplayer.md 3.4): passwordTries wrong passwords from one address within passwordWindowSeconds lock it out until the window passes; hostCloseDelay: seconds between telling everyone the host is closing the world and closing it; the players list's ping colours (good under pingGoodMs, fair under pingFairMs).",
     "passwordTries": 3, "passwordWindowSeconds": 60, "hostCloseDelay": 0.5, "pingGoodMs": 80, "pingFairMs": 160 },
@@ -960,7 +965,8 @@
   },
   "store": {
     "_comment": "The world store (WRStore: Saved/Worlds/<id>/world.db, SQLite). flushSeconds: how often the writer commits what's pending (also at once on logout and shutdown). Backups (VACUUM INTO snapshots in the world's backups/ folder): every hourlySeconds while the world runs (keep hourlyKeep), the first of each UTC day kept as a daily (dailyKeep), one at every clean shutdown (shutdownKeep), and one before the 0.7 JSON saves were brought in (kept).",
-    "flushSeconds": 10, "hourlySeconds": 3600, "hourlyKeep": 24, "dailyKeep": 7, "shutdownKeep": 5
+    "flushSeconds": 10, "hourlySeconds": 3600, "hourlyKeep": 24, "dailyKeep": 7, "shutdownKeep": 5,
+    "_backupsShown": "How many of a world's backups its Backups page lists, newest first (cooks/cookpass-multiplayer.md 3.8).", "backupsShown": 12
   },
   "prestige": { "_comment": "Prestige (cooks/build-endgame.md 2.1, biome-void 2.23.4): a path at atPoints earned, at its altar, held Return holdSeconds: XP and ranks go (the layout is kept for Restore), one mark (maxMarks a path) with a perk: keener (that path's damage + damage a mark), deeper (its resource capacity and gain + resource a mark), rooted (its root passive on the subclass at rootShare, once a path). Marks count while the path is main or subclass. goldPerMark: the skin marks' lerp toward goldColour (sRGB) per mark.", "atPoints": 100, "maxMarks": 3, "holdSeconds": 1.5, "damage": 0.05, "resource": 0.1, "rootShare": 0.5, "goldPerMark": 0.12, "goldColour": [214, 170, 70] },
   "deeds": { "_comment": "Deeds (WRDeeds): respec (the Heron's draught: holdSeconds to drink-forget one active path; drops: majorRepeat + majorPerAL x party AL on a major's repeat kill, portal by rank 3/4/5), trophy heads (headFirst on your first kill, headRepeat after), achievement census every censusSeconds, landmarks within landmarkCm, passes crossed within passCm of the pass point, toastSeconds, a fight is deathless when no survivor within deathlessCm of the boss's home died.", "respecHoldSeconds": 1.5, "draught": { "majorRepeat": 0.03, "majorPerAL": 0.005, "portal": [0, 0, 0.02, 0.04, 0.06] }, "headFirst": 1.0, "headRepeat": 0.25, "censusSeconds": 30, "landmarkCm": 6000, "passCm": 30000, "toastSeconds": 3.0, "deathlessCm": 9000, "soulArtSlot": 8, "talismans": { "forgeHeartAbove": 0.7, "rimeScaleQuiet": 10.0 } },

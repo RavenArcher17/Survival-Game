@@ -20,6 +20,7 @@
 #include "Fonts/FontMeasure.h"
 #include "GameFramework/GameStateBase.h"
 #include "Widgets/Layout/SSpacer.h"
+#include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SWrapBox.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
@@ -484,9 +485,53 @@ namespace WRUIClaimScreen
 				+ SVerticalBox::Slot().AutoHeight()[RulesBlock()];
 		}
 
+		/** The claim's name (cooks/cookpass-multiplayer.md 3.7): shown on the Hearth's wake label and in raid notices; its
+		 *  owner and their clan type it here (Enter or Save). */
+		TSharedRef<SWidget> NameRow()
+		{
+			const auto Current = [this]() { const AWRClaimTotem* T = Totem.Get(); return T ? T->ClaimName() : FString(); };
+			return SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Bottom)[WRUI::Text(LOCTEXT("ClaimNameHead", "Name"), WRUI::Caps(12), WRUI::Ink2)]
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([Current]() { const FString N = Current(); return N.IsEmpty() ? LOCTEXT("ClaimUnnamed", "unnamed") : FText::FromString(N); }), WRUI::Body(13, 700), WRUI::Brass)
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 12.f * U)
+				[
+					SNew(SBox).Visibility_Lambda([this]() { return CanShare() ? EVisibility::Visible : EVisibility::Collapsed; })
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(0.f, 0.f, 8.f * U, 0.f)
+						[
+							SAssignNew(NameBox, SEditableTextBox).Font(WRUI::Body(14, 700)).HintText(LOCTEXT("ClaimNameHint", "Name this claim (Ashen Ford, the Long Hall...)"))
+							.OnTextCommitted_Lambda([this](const FText& Text, ETextCommit::Type How) { if (How == ETextCommit::OnEnter) SaveName(); })
+						]
+						+ SHorizontalBox::Slot().AutoWidth()
+						[
+							SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(36.f * U).Text(LOCTEXT("ClaimNameSave", "Save name"))
+							.OnClicked_Lambda([this]() { SaveName(); return FReply::Handled(); })
+						]
+					]
+				];
+		}
+
+		void SaveName()
+		{
+			if (!PC.IsValid() || !NameBox.IsValid()) return;
+			PC->SendCommand(TEXT("claimname ") + NameBox->GetText().ToString().Replace(TEXT("|"), TEXT("")).Left(24));
+			NameBox->SetText(FText::GetEmpty());
+		}
+
+		TSharedPtr<SEditableTextBox> NameBox;
+
 		TSharedRef<SWidget> OwnerCard()
 		{
 			return Card(SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight()[NameRow()]
 				+ SVerticalBox::Slot().AutoHeight()
 				[
 					SNew(SHorizontalBox)

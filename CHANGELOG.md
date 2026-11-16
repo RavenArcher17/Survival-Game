@@ -113,6 +113,22 @@ showcase-notes cooks/cookpass-multiplayer.md. The editor target was compiled aft
   the belongings will wait ("Your belongings · 40 m · 24 min left"). A death's belongings are saved with the world
   (doc `bags`) and come back after a clean restart with the time they had left. Taking from one saves the taker and
   the bag at once, so a crash can't hand them out twice. Tested by compiling.
+- **Part F: wake at your Hearth.** Why: FULL-GAME lists the Hearth as a place to come back to, but you could only
+  wake at beds and camps. Now every unbroken Hearth of yours or your clan's is on the death screen's list (after your
+  beds, before the camps, with the flame glyph): "Your Hearth at Ashen Ford" or "Mira's Hearth". You stand up 1.6 m from
+  the fire, facing it, on the first of eight spots around it that has room and ground (else on top of its piece).
+  After you wake there it rests 5 min for you (`beds.hearthRestSeconds`). A broken Hearth is cold and isn't offered. Tested by compiling.
+- **Part G: claims keep their distance and have names; worlds can be put back.** Why: claims could nest, and an
+  upgrade could grow into a neighbour's (only the current radius was checked), claims had no name, and the hourly
+  backups existed with no way to use them.
+  - Totems now stand at least two full-upgrade radii plus 10 m apart (`AWRClaimTotem::SpacingWhy`, `claims.gapCm`),
+    checked by the server and on the build ghost before you place ("Too close to a claim").
+  - The Claim tab has the claim's **Name** (owner and clan type it: Enter or Save name; `claimname`). The name is
+    used on the Hearth's wake line and in raid alerts ("Raid: Brann is attacking Ashen Ford, 120 m north of you").
+  - **Backups** in Choose a world lists the world's snapshots, newest first (when, kind, size). **Restore** asks
+    once, keeps the world as it is now as a "before a restore" backup, then puts the snapshot back
+    (`WRStore::ListBackups` / `RestoreBackup`; refused while the world runs).
+  - Shipping builds now let the `admin` and `claimname` commands through (the list of allowed gameplay commands). Tested by compiling.
 
 ## Unreleased: building and raids cook pass (cookpass-building)
 

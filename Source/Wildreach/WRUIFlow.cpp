@@ -421,7 +421,7 @@ private:
 			if (D.Size2D() < 500.f) return LOCTEXT("WakeChoiceNear", "where you fell");
 			return FText::FromString(FString::Printf(TEXT("%s %s"), *WRUIWindowKit::Distance(D.Size2D()), WRUIWindowKit::CompassName(D)));
 		};
-		const FName Glyph = O.Kind == TEXT("camp") ? FName(TEXT("camp")) : FName(TEXT("bed"));
+		const FName Glyph = O.Kind == TEXT("camp") ? FName(TEXT("camp")) : O.Kind == TEXT("hearth") ? FName(TEXT("flame")) : FName(TEXT("bed"));
 		return SNew(SButton).ButtonStyle(FCoreStyle::Get(), "NoBorder").ContentPadding(0.f).Cursor(EMouseCursor::Hand)
 			.IsEnabled_Lambda([Resting]() { return !Resting(); })
 			.OnClicked_Lambda([W, i]() { if (const TSharedPtr<FWRFlow> F = W.Pin()) F->ChooseWake(i); return FReply::Handled(); })

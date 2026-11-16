@@ -10,6 +10,8 @@
 #include "WRUIWidgets.h"
 #include "WRWorlds.h"
 #include "WRAccess.h"
+#include "WRStore.h"
+#include "WRTuning.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Images/SImage.h"
@@ -341,7 +343,7 @@ namespace WRWorldsUI
 		}
 
 	private:
-		enum class EMode : uint8 { List, New, Rename, ConfirmDelete, Hosting };
+		enum class EMode : uint8 { List, New, Rename, ConfirmDelete, Hosting, Backups };
 		EMode Mode = EMode::List;
 		TFunction<void(const FString&)> OnPlay;
 		FSimpleDelegate OnClose;
@@ -460,6 +462,7 @@ namespace WRWorldsUI
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Delete", "Delete"), false, [this]() { AskDelete(); }, HasPick)]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Rename", "Rename"), false, [this]() { StartRename(); }, HasPick)]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Hosting", "Hosting"), false, [this]() { ShowHosting(); }, HasPick)]
+				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Backups", "Backups"), false, [this]() { ShowBackups(); }, HasPick)]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("NewWorld", "New world"), false, [this]() { ShowNew(); })]
 				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("Play", "Play"), true, [this]() { Play(SelectedId); }, HasPick, 150.f)]);
 		}
@@ -675,6 +678,102 @@ namespace WRWorldsUI
 						+ SScrollBox::Slot().Padding(FMargin(0.f, 0.f, 6.f * U, 0.f))[Rows]
 					]
 				]);
+		}
+
+		// ------------------------------------------------------------ backups: put the world back as it was
+
+		static FText BackupKind(const FString& Kind)
+		{
+			if (Kind == TEXT("hourly")) return LOCTEXT("BackupHourly", "Hourly");
+			if (Kind == TEXT("daily")) return LOCTEXT("BackupDaily", "Daily");
+			if (Kind == TEXT("shutdown")) return LOCTEXT("BackupShutdown", "When it closed");
+			if (Kind == TEXT("before-restore")) return LOCTEXT("BackupBeforeRestore", "Before a restore");
+			return FText::FromString(Kind.Replace(TEXT("-"), TEXT(" ")));
+		}
+
+		void ShowBackups()
+		{
+			const FWRWorldInfo* W = SelectedWorld();
+			if (!W) return;
+			Mode = EMode::Backups;
+			Status = FText::GetEmpty();
+			const TArray<WRStore::FBackupInfo> All = WRStore::ListBackups(SelectedId);
+			const int32 Shown = FMath::Min(All.Num(), FMath::Max(1, FMath::RoundToInt(WRTune(TEXT("store.backupsShown"), 12.f))));
+			TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
+			if (All.Num() == 0)
+			{
+				Rows->AddSlot().AutoHeight().Padding(8.f * U)[Muted(LOCTEXT("NoBackups", "No backups yet: the world keeps one every hour you play, one a day and one each time it closes."), 14, true)];
+			}
+			for (int32 i = 0; i < Shown; ++i)
+			{
+				const WRStore::FBackupInfo B = All[i];
+				const FString Name = W->Name;
+				Rows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f * U)
+				[
+					SNew(SBorder).BorderImage(WRUI::Box(FLinearColor(0.f, 0.f, 0.f, 0.22f), 4.f, FLinearColor(0.f, 0.f, 0.f, 0.6f), 1.f)).Padding(FMargin(18.f * U, 10.f * U))
+					[
+						SNew(SHorizontalBox)
+						+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+						[
+							SNew(SVerticalBox)
+							+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(When(B.MadeUtc), Spaced(WRUI::Title(15), 40), WRUI::Ink)]
+							+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 3.f * U, 0.f, 0.f)
+							[
+								WRUI::Text(FText::Format(LOCTEXT("BackupLine", "{0} · {1} KB"), BackupKind(B.Kind), FText::AsNumber(FMath::Max<int64>(1, B.Bytes / 1024))), WRUI::Body(13, 500), WRUI::Ink2)
+							]
+						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Button(LOCTEXT("BackupRestore", "Restore"), false, [this, B, Name]() { AskRestore(B, Name); })]
+					]
+				];
+			}
+			Body->SetContent(
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(2.f * U, 0.f, 0.f, 10.f * U)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[Label(FText::Format(LOCTEXT("BackupsOf", "Backups of {0}"), FText::FromString(W->Name)))]
+					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)[Muted(LOCTEXT("BackupsHint", "Newest first · a restore keeps the world as it is now too"), 12)]
+				]
+				+ SVerticalBox::Slot().FillHeight(1.f)
+				[
+					SNew(SBorder).BorderImage(InsetBrush()).Padding(FMargin(10.f * U, 10.f * U, 6.f * U, 2.f * U))
+					[
+						SNew(SScrollBox).ScrollBarThickness(FVector2D(5.f, 5.f))
+						+ SScrollBox::Slot().Padding(FMargin(0.f, 0.f, 6.f * U, 0.f))[Rows]
+					]
+				]);
+			SetFooter(
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)[SNew(SBox).MinDesiredWidth(110.f * U)[SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U).Text(LOCTEXT("BackupsBack", "Back")).OnClicked_Lambda([this]() { ShowList(); return FReply::Handled(); })]]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)[StatusLine()],
+				SNew(SHorizontalBox));
+		}
+
+		void AskRestore(const WRStore::FBackupInfo& B, const FString& WorldName)
+		{
+			SetFooter(
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 10.f * U, 0.f)[SNew(SWRLineIcon).Icon(EWRIcon::Warning).Size(20.f * U).Color(WRUI::Warn)]
+				+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+				[
+					WRUI::Text(FText::Format(LOCTEXT("RestoreAsk", "Put \"{0}\" back as it was {1}? The world as it is now is kept as a backup first."), FText::FromString(WorldName), When(B.MadeUtc)), WRUI::Body(14, 700), WRUI::Ink, false, true)
+				],
+				SNew(SHorizontalBox)
+				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("RestoreNo", "Keep it as it is"), false, [this]() { ShowBackups(); })]
+				+ SHorizontalBox::Slot().AutoWidth()[Button(LOCTEXT("RestoreYes", "Restore"), true, [this, B]()
+				{
+					FString Why;
+					if (WRStore::RestoreBackup(SelectedId, B.File, Why))
+					{
+						ShowList();
+						Status = FText::Format(LOCTEXT("Restored", "Restored the backup from {0}."), When(B.MadeUtc));
+					}
+					else
+					{
+						ShowBackups();
+						Status = FText::FromString(Why);
+					}
+				}, nullptr, 150.f)]);
 		}
 
 		// ------------------------------------------------------------ rename and delete

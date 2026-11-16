@@ -728,6 +728,68 @@ void WRStore::Flush(bool bWait)
 	}
 }
 
+TArray<WRStore::FBackupInfo> WRStore::ListBackups(const FString& WorldId)
+{
+	TArray<FBackupInfo> Out;
+	const FString Dir = FPaths::Combine(WRWorlds::Dir(WorldId), TEXT("backups"));
+	TArray<FString> Files;
+	IFileManager::Get().FindFiles(Files, *FPaths::Combine(Dir, TEXT("*.db")), true, false);
+	for (const FString& F : Files)
+	{
+		// <kind>-YYYYMMDD-HHMMSS.db
+		const FString Base = FPaths::GetBaseFilename(F);
+		if (Base.Len() < 17) continue;
+		const FString Stamp = Base.Right(15);
+		FDateTime When;
+		if (!FDateTime::Parse(FString::Printf(TEXT("%s.%s.%s-%s.%s.%s"), *Stamp.Mid(0, 4), *Stamp.Mid(4, 2), *Stamp.Mid(6, 2), *Stamp.Mid(9, 2), *Stamp.Mid(11, 2), *Stamp.Mid(13, 2)), When)) continue;
+		FBackupInfo& B = Out.AddDefaulted_GetRef();
+		B.File = F;
+		B.Kind = Base.LeftChop(16);
+		B.MadeUtc = When;
+		B.Bytes = IFileManager::Get().FileSize(*FPaths::Combine(Dir, F));
+	}
+	Out.Sort([](const FBackupInfo& A, const FBackupInfo& B) { return A.MadeUtc > B.MadeUtc; });
+	return Out;
+}
+
+bool WRStore::RestoreBackup(const FString& WorldId, const FString& File, FString& OutWhy)
+{
+	using namespace WRStoreImpl;
+	const FString Dir = WRWorlds::Dir(WorldId);
+	const FString Db = FPaths::Combine(Dir, TEXT("world.db"));
+	const FString From = FPaths::Combine(Dir, TEXT("backups"), FPaths::GetCleanFilename(File));
+	IFileManager& FM = IFileManager::Get();
+	if (G.bOpen && FPaths::IsSamePath(G.Dir, Dir))
+	{
+		OutWhy = TEXT("That world is running: leave it first.");
+		return false;
+	}
+	if (!FM.FileExists(*From))
+	{
+		OutWhy = TEXT("That backup is gone.");
+		return false;
+	}
+	// The world as it is now is kept first, so a restore can be undone.
+	if (FM.FileExists(*Db))
+	{
+		const FString Keep = FPaths::Combine(Dir, TEXT("backups"), FString::Printf(TEXT("before-restore-%s.db"), *FDateTime::UtcNow().ToString(TEXT("%Y%m%d-%H%M%S"))));
+		if (FM.Copy(*Keep, *Db) != COPY_OK)
+		{
+			OutWhy = TEXT("Couldn't keep a copy of the world as it is (is a game still using it?).");
+			return false;
+		}
+	}
+	FM.Delete(*(Db + TEXT("-wal")), false, true, true);
+	FM.Delete(*(Db + TEXT("-shm")), false, true, true);
+	if (FM.Copy(*Db, *From, true, true) != COPY_OK)
+	{
+		OutWhy = TEXT("Couldn't copy the backup over the world (is a game still using it?).");
+		return false;
+	}
+	UE_LOG(LogWildreach, Log, TEXT("STORE world '%s' restored from backups/%s"), *WorldId, *File);
+	return true;
+}
+
 void WRStore::Tick()
 {
 	using namespace WRStoreImpl;

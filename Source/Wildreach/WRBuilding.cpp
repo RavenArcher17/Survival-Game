@@ -1821,6 +1821,25 @@ bool AWRClaimTotem::CanBuild(const UWorld* World, const FVector& Location, const
 	return true;
 }
 
+FString AWRClaimTotem::SpacingWhy(const UWorld* World, const FVector& Location)
+{
+	const float Need = 2.f * FWRBuildRegistry::Get().ClaimMaxRadius + WRTune(TEXT("claims.gapCm"), 1000.f);
+	for (TActorIterator<AWRClaimTotem> It(World); It; ++It)
+	{
+		if (!It->IsActorBeingDestroyed() && FVector::Dist2D(It->GetActorLocation(), Location) < Need)
+		{
+			return FString::Printf(TEXT("too close to another land claim (totems stand %.0f m apart)"), Need / 100.f);
+		}
+	}
+	return FString();
+}
+
+FString AWRClaimTotem::ClaimName() const
+{
+	const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(GetOwner());
+	return Piece ? Piece->CustomName : FString();
+}
+
 TMap<FName, float> AWRClaimTotem::CurrentUpkeepPerHour() const
 {
 	TMap<FName, int32> ByMaterial;

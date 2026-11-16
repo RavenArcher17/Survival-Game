@@ -6,6 +6,7 @@
 #include "WRFarm.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
+#include "WRSocial.h"
 #include "WRBuildBar.h"
 #include "WRBuildLook.h"
 #include "WRLifeSkills.h"
@@ -726,6 +727,12 @@ void AWRPlayerController::UpdatePlacement()
 	{
 		bPlaceValid = false;
 	}
+	else if (const FString Spacing = Def->Kind == TEXT("totem") ? AWRClaimTotem::SpacingWhy(GetWorld(), PlaceLoc) : FString(); !Spacing.IsEmpty())
+	{
+		// The same rule the server keeps (totems replicate to everyone): red before you place.
+		bPlaceValid = false;
+		PlaceWhy = Spacing;
+	}
 	else if (Def->IsStructural() && AWRBuildPiece::SupportAt(GetWorld(), PlacingPiece, PlaceT) == INDEX_NONE)
 	{
 		// Same rules as the server (support values replicate), so red means it really won't go there.
@@ -913,10 +920,7 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		else if (!AWRClaimTotem::CanBuild(GetWorld(), Loc, Who, OutResult)) {}
 		else if (Def->Kind == TEXT("totem"))
 		{
-			for (TActorIterator<AWRClaimTotem> It(GetWorld()); It; ++It)
-			{
-				if (FVector::Dist2D(It->GetActorLocation(), Loc) < It->Radius + FWRBuildRegistry::Get().ClaimRadius) OutResult = TEXT("too close to another land claim");
-			}
+			OutResult = AWRClaimTotem::SpacingWhy(GetWorld(), Loc);
 		}
 		else if (Def->Kind == TEXT("hearth"))
 		{
@@ -1101,6 +1105,25 @@ bool AWRPlayerController::RunBuildCommand(const TArray<FString>& Args, FString& 
 		if (!Totem) OutResult = TEXT("not inside a land claim");
 		else if (Cmd == TEXT("claimdeposit")) OutResult = Totem->OwnerName == Who ? Totem->Deposit(this) : TEXT("not your claim");
 		else OutResult = Totem->Upgrade(this);
+	}
+	else if (Cmd == TEXT("claimname"))
+	{
+		// claimname <words>: name the claim you stand in (its owner or their clan); nothing after it = no name.
+		AWRClaimTotem* Totem = Self ? AWRClaimTotem::FindAt(GetWorld(), Self->GetActorLocation()) : nullptr;
+		AWRBuildPiece* Piece = Totem ? Cast<AWRBuildPiece>(Totem->GetOwner()) : nullptr;
+		TArray<FString> Words(Args);
+		Words.RemoveAt(0);
+		FString Name = FString::Join(Words, TEXT(" ")).TrimStartAndEnd().Left(FMath::RoundToInt(WRTune(TEXT("claims.nameLength"), 24.f)));
+		Name.ReplaceInline(TEXT("|"), TEXT(""));
+		if (!Totem || !Piece) OutResult = TEXT("not inside a land claim");
+		else if (!FWRSocialRules::CanShare(Totem->OwnerName, Who)) OutResult = TEXT("not your claim");
+		else
+		{
+			Piece->CustomName = Name;
+			Piece->ForceNetUpdate();
+			OutResult = Name.IsEmpty() ? TEXT("The claim has no name now") : FString::Printf(TEXT("Claim named \"%s\""), *Name);
+			UE_LOG(LogWildreach, Log, TEXT("CLAIM %s named \"%s\" by %s"), *Totem->GetName(), *Name, *Who);
+		}
 	}
 	else if (Cmd == TEXT("chestname"))
 	{

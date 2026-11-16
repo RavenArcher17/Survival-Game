@@ -190,7 +190,9 @@ namespace WRRaidingImpl
 			const APawn* Me = PC->GetPawn();
 			const FString Where = Me ? FString::Printf(TEXT("%.0f m %s of you"), FVector::Dist2D(Me->GetActorLocation(), Totem->GetActorLocation()) / 100.f,
 				*Compass(Me->GetActorLocation(), Totem->GetActorLocation())) : FString(TEXT("on the map"));
-			PC->ClientRaid(NAME_None, TEXT("Claim attacked"), FString::Printf(TEXT("Raid: %s is attacking your claim, %s"), *WhoList(Raid->Raiders), *Where), 0);
+			// The claim by its name when it has one (cooks/cookpass-multiplayer.md 3.7).
+			const FString Claim = Totem->ClaimName().IsEmpty() ? FString(TEXT("your claim")) : Totem->ClaimName();
+			PC->ClientRaid(NAME_None, TEXT("Claim attacked"), FString::Printf(TEXT("Raid: %s is attacking %s, %s"), *WhoList(Raid->Raiders), *Claim, *Where), 0);
 			Raid->Told.Add(PC->PlayerState->GetPlayerName());
 		}
 	}

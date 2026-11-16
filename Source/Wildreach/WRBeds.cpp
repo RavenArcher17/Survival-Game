@@ -5,6 +5,7 @@
 #include "WRBoss.h"
 #include "Wildreach.h"
 #include "WRBuilding.h"
+#include "WRCrafting.h"
 #include "WRFlowTypes.h"
 #include "WRPathComponent.h"
 #include "WRPathTypes.h"
@@ -89,14 +90,80 @@ namespace
 		return FString::Printf(TEXT("%s's %s"), *Bed->OwnerName, Thing);
 	}
 
-	/** Pin where the controller comes back: on top of a bed, or at the camp's start. */
+	/** The Hearths a player may wake at (cooks/cookpass-multiplayer.md 3.6): unbroken, theirs or their clan's. */
+	TArray<AActor*> HearthsFor(UWorld* World, const AWRPlayerState* PS)
+	{
+		TArray<AActor*> Out;
+		for (TActorIterator<AWRHearth> It(World); It; ++It)
+		{
+			const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(It->GetOwner());
+			if (Piece && !It->IsBroken() && !It->IsActorBeingDestroyed() && FWRSocialRules::CanShare(Piece->OwnerName, PS->GetPlayerName())) Out.Add(*It);
+		}
+		return Out;
+	}
+
+	/** "Your Hearth at Ashen Ford", "Mira's Hearth": the claim's name when it has one. */
+	FString HearthLabel(const AActor* Hearth, const AWRPlayerState* PS)
+	{
+		const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(Hearth->GetOwner());
+		const FString Owner = Piece ? Piece->OwnerName : FString();
+		const FString Whose = Owner == PS->GetPlayerName() ? FString(TEXT("Your Hearth")) : FString::Printf(TEXT("%s's Hearth"), *Owner);
+		const AWRClaimTotem* Claim = AWRClaimTotem::FindAt(Hearth->GetWorld(), Hearth->GetActorLocation());
+		const AWRBuildPiece* ClaimPiece = Claim ? Cast<AWRBuildPiece>(Claim->GetOwner()) : nullptr;
+		return ClaimPiece && !ClaimPiece->CustomName.IsEmpty() ? FString::Printf(TEXT("%s at %s"), *Whose, *ClaimPiece->CustomName) : Whose;
+	}
+
+	/** Where to stand up by a Hearth: the first of eight spots around it (from its front) with room to stand and ground
+	 *  under it; else on top of it. */
+	AActor* SpotByHearth(AActor* Hearth, float HalfHeight, float Seconds)
+	{
+		UWorld* World = Hearth->GetWorld();
+		const float Ring = WRTune(TEXT("beds.hearthWakeRingCm"), 160.f);
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRHearthWake), false, Hearth);
+		Q.AddIgnoredActor(Hearth->GetOwner());
+		const FCollisionShape Body = FCollisionShape::MakeCapsule(34.f, HalfHeight);
+		const FVector Centre = Hearth->GetActorLocation();
+		const float BaseYaw = Hearth->GetActorRotation().Yaw;
+		for (int32 i = 0; i < 8; ++i)
+		{
+			const float Yaw = BaseYaw + (i % 2 ? 1.f : -1.f) * 45.f * ((i + 1) / 2);
+			const FVector Dir = FRotator(0.f, Yaw, 0.f).Vector();
+			const FVector Probe = Centre + Dir * Ring + FVector(0.f, 0.f, 200.f);
+			FHitResult Ground;
+			if (!World->LineTraceSingleByChannel(Ground, Probe, Probe - FVector(0.f, 0.f, 520.f), ECC_Visibility, Q) || Ground.ImpactNormal.Z < 0.7f)
+			{
+				continue;
+			}
+			const FVector Stand = Ground.ImpactPoint + FVector(0.f, 0.f, HalfHeight + 5.f);
+			if (FMath::Abs(Stand.Z - (Centre.Z + HalfHeight)) > 150.f || World->OverlapAnyTestByChannel(Stand, FQuat::Identity, ECC_Pawn, Body, Q))
+			{
+				continue;
+			}
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			// Facing the fire.
+			if (ATargetPoint* Spot = World->SpawnActor<ATargetPoint>(Stand, FRotator(0.f, Yaw + 180.f, 0.f), Params))
+			{
+				Spot->SetLifeSpan(Seconds);
+				return Spot;
+			}
+		}
+		return WRBeds::SpotAbove(Hearth, HalfHeight, Seconds);
+	}
+
+	/** Pin where the controller comes back: on top of a bed, beside a Hearth, or at the camp's start. */
 	void PinStart(AController* Controller, AActor* Where, float HalfHeight)
 	{
 		if (!Controller || !Where) return;
 		AActor* Spot = Where;
+		const float Keep = WRTune(TEXT("player.respawnSeconds"), 10.f) + 30.f;
 		if (Cast<AWRBuildPiece>(Where))
 		{
-			Spot = WRBeds::SpotAbove(Where, HalfHeight, WRTune(TEXT("player.respawnSeconds"), 10.f) + 30.f);
+			Spot = WRBeds::SpotAbove(Where, HalfHeight, Keep);
+		}
+		else if (Cast<AWRHearth>(Where))
+		{
+			Spot = SpotByHearth(Where, HalfHeight, Keep);
 		}
 		Controller->StartSpot = Spot ? Spot : Where;
 	}
@@ -214,6 +281,7 @@ void WRBeds::FillWakeChoices(AController* Controller, AWRPlayerState* PS, FWRDea
 	const double Now = World->GetTimeSeconds();
 	TArray<AWRBuildPiece*> Beds = BedsFor(PS);
 	TArray<AActor*> Camps = CampsFor(World, PS, Note.DeathAt);
+	TArray<AActor*> Hearths = HearthsFor(World, PS);
 
 	// The default: the bed you set last, unless it's resting; else the camp you came from (or the nearest).
 	AActor* Default = nullptr;
@@ -245,6 +313,8 @@ void WRBeds::FillWakeChoices(AController* Controller, AWRPlayerState* PS, FWRDea
 	TArray<AActor*> Order;
 	if (Default) Order.Add(Default);
 	for (AWRBuildPiece* Bed : Beds) if (Bed != Default) Order.Add(Bed);
+	// Your clan's fire is where you come back to (Hestia's, Brigid's): after the beds, before the camps.
+	for (AActor* Hearth : Hearths) if (Hearth != Default) Order.Add(Hearth);
 	for (AActor* Camp : Camps) if (Camp != Default) Order.Add(Camp);
 	for (AActor* Stone : Stones) if (Stone != Default) Order.Add(Stone);
 
@@ -262,6 +332,14 @@ void WRBeds::FillWakeChoices(AController* Controller, AWRPlayerState* PS, FWRDea
 			O.Kind = IsBedroll(Bed) ? FName(TEXT("bedroll")) : FName(TEXT("bed"));
 			O.RestSeconds = float(RestLeft(PS, Bed, Now));
 			O.bClan = !Bed->Sleepers.Contains(PS->GetPlayerName());
+		}
+		else if (Hearths.Contains(A))
+		{
+			const AWRBuildPiece* Piece = Cast<AWRBuildPiece>(A->GetOwner());
+			O.Name = HearthLabel(A, PS);
+			O.Kind = TEXT("hearth");
+			O.RestSeconds = float(RestLeft(PS, A, Now));
+			O.bClan = Piece && Piece->OwnerName != PS->GetPlayerName();
 		}
 		else if (Stones.Contains(A))
 		{
@@ -302,7 +380,7 @@ bool WRBeds::Choose(AController* Controller, AWRPlayerState* PS, int32 Index)
 	PinStart(Controller, Where, PS->WakeHalfHeight);
 	const AWRBuildPiece* Bed = Cast<AWRBuildPiece>(Where);
 	UE_LOG(LogWildreach, Log, TEXT("BEDS %s chose to wake at %s (%s)"), *PS->GetPlayerName(),
-		Bed ? *BedLabel(Bed, PS) : *CampName(Where->GetActorLocation()), *Where->GetActorLocation().ToCompactString());
+		Bed ? *BedLabel(Bed, PS) : Cast<AWRHearth>(Where) ? *HearthLabel(Where, PS) : *CampName(Where->GetActorLocation()), *Where->GetActorLocation().ToCompactString());
 	return true;
 }
 
@@ -313,9 +391,21 @@ void WRBeds::OnWoke(AWRPlayerState* PS)
 		if (PS) PS->WakeActors.Reset();
 		return;
 	}
-	AWRBuildPiece* Bed = Cast<AWRBuildPiece>(PS->WakeActors[PS->WakePick].Get());
+	AActor* Picked = PS->WakeActors[PS->WakePick].Get();
+	AWRBuildPiece* Bed = Cast<AWRBuildPiece>(Picked);
 	PS->WakeActors.Reset();
 	PS->WakePick = INDEX_NONE;
+	// A Hearth rests longer than a bed after you wake at it (it can be broken, never destroyed).
+	if (AWRHearth* Hearth = Cast<AWRHearth>(Picked))
+	{
+		const float HearthRest = WRTune(TEXT("beds.hearthRestSeconds"), 300.f);
+		if (HearthRest > 0.f)
+		{
+			PS->BedRestUntil.Add(Hearth, Hearth->GetWorld()->GetTimeSeconds() + HearthRest);
+			UE_LOG(LogWildreach, Log, TEXT("BEDS %s woke at %s: it rests %.0f s"), *PS->GetPlayerName(), *HearthLabel(Hearth, PS), HearthRest);
+		}
+		return;
+	}
 	UWorld* World = Bed ? Bed->GetWorld() : nullptr;
 	if (!World || Bed->IsActorBeingDestroyed()) return;
 	AWRPlayerController* PC = Cast<AWRPlayerController>(PS->GetOwner());

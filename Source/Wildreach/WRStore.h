@@ -62,4 +62,19 @@ namespace WRStore
 	WILDREACH_API void Tick();
 	/** "": fine; else what went wrong at open (a damaged file restored from a backup...), for the host's banner. */
 	WILDREACH_API const FString& OpenNote();
+
+	/** One snapshot in a world's backups/ folder (cooks/cookpass-multiplayer.md 3.8). Kind: hourly, daily, shutdown,
+	 *  pre-import, before-restore. */
+	struct FBackupInfo
+	{
+		FString File;
+		FString Kind;
+		FDateTime MadeUtc;
+		int64 Bytes = 0;
+	};
+	/** A world's snapshots, newest first (read from the folder: works while the world isn't running). */
+	WILDREACH_API TArray<FBackupInfo> ListBackups(const FString& WorldId);
+	/** Puts a snapshot back as the world's world.db, keeping the world as it was as backups/before-restore-<time>.db
+	 *  first. Refused while this game has that world open. False with the reason. */
+	WILDREACH_API bool RestoreBackup(const FString& WorldId, const FString& File, FString& OutWhy);
 }

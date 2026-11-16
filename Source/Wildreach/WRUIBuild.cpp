@@ -199,6 +199,7 @@ namespace WRBuildUI
 		if (L.Contains(TEXT("blueprint"))) return TEXT("Needs its blueprint");
 		if (L.Contains(TEXT("not yours"))) return TEXT("Not yours");
 		if (L.Contains(TEXT("safe zone"))) return TEXT("Safe zone");
+		if (L.Contains(TEXT("too close"))) return TEXT("Too close to a claim");
 		if (L.Contains(TEXT("claim")))
 		{
 			return L.Contains(TEXT("'s")) ? FString(TEXT("Someone's claim")) : FString(TEXT("Outside your claim"));

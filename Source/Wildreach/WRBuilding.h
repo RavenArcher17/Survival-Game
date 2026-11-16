@@ -358,6 +358,11 @@ public:
 	static AWRClaimTotem* FindAt(const UWorld* World, const FVector& Location);
 	/** Can this player build here? (No claim = yes; someone else's claim = no.) */
 	static bool CanBuild(const UWorld* World, const FVector& Location, const FString& PlayerName, FString& OutWhy);
+	/** Why a new totem can't stand here (cooks/cookpass-multiplayer.md 3.7): its circle at full upgrade plus claims.gapCm
+	 *  would reach another's at full upgrade, so claims never nest or grow into a neighbour. "" = it can. */
+	static FString SpacingWhy(const UWorld* World, const FVector& Location);
+	/** Its name (the totem piece's CustomName: the Claim tab's Name), "" when it has none. */
+	FString ClaimName() const;
 
 	FString Deposit(AWRPlayerController* Player);
 	FString Upgrade(AWRPlayerController* Player);
