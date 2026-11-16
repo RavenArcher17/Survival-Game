@@ -4,6 +4,7 @@
 
 #include "WRWarHall.h"
 #include "WRStronghold.h"
+#include "WRGarrison.h"
 #include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRTidePath.h"
@@ -472,7 +473,7 @@ public:
 		bAny |= bVital;
 		// Fighting, aiming, a boss, a raid, a screen or wheel, building, riding: everything shows.
 		const AWRCharacter* Me = Survivor();
-		bAny |= (PC.IsValid() && PC->GetLockTarget()) || (Me && Me->IsAimingRanged()) || EngagedBoss() != nullptr || WheelOpen() || BuildMode();
+		bAny |= (PC.IsValid() && PC->GetLockTarget()) || (Me && Me->IsAimingRanged()) || EngagedBoss() != nullptr || EngagedWarlord() != nullptr || WheelOpen() || BuildMode();
 		bAny |= PC.IsValid() && PC->GetPawn() && !Me;   // riding a tame: the pawn is the creature
 		{
 			FRaidLine L;
@@ -710,7 +711,7 @@ private:
 			]
 			+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 32.f * U, 0.f, 0.f)
 			[
-				SNew(SBox).WidthOverride(640.f * U).Visibility_Lambda([this]() { return EngagedBoss() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+				SNew(SBox).WidthOverride(640.f * U).Visibility_Lambda([this]() { return EngagedBoss() || EngagedWarlord() ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
 				[
 					SNew(SVerticalBox)
 					+ SVerticalBox::Slot().AutoHeight()
@@ -723,7 +724,13 @@ private:
 							WRUI::Text(TAttribute<FText>::CreateLambda([this]()
 							{
 								const AWRBoss* B = EngagedBoss();
-								return B ? FText::FromString(FString::Printf(TEXT("%s   ·   phase %d%s"), *B->GetDisplayLabel(), B->Phase, B->Participants > 1 ? *FString::Printf(TEXT("   ·   %d fighters"), B->Participants) : TEXT(""))) : FText::GetEmpty();
+								if (!B)
+								{
+									// A stronghold's warlord (WRGarrison) wears the same bar.
+									const AWRGarrison* G = EngagedWarlord();
+									return G ? FText::FromString(FString::Printf(TEXT("%s   ·   phase %d%s"), *G->GetDisplayLabel(), G->Phase, G->Participants > 1 ? *FString::Printf(TEXT("   ·   %d fighters"), G->Participants) : TEXT(""))) : FText::GetEmpty();
+								}
+								return FText::FromString(FString::Printf(TEXT("%s   ·   phase %d%s"), *B->GetDisplayLabel(), B->Phase, B->Participants > 1 ? *FString::Printf(TEXT("   ·   %d fighters"), B->Participants) : TEXT("")));
 							}), WRUI::Title(17), WRUI::Ink, true)
 						]
 						+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Bottom)
@@ -735,7 +742,7 @@ private:
 					[
 						SNew(SWRBar).Height(16.f * U).Trail(true).Color(FLinearColor(0.72f, 0.12f, 0.08f)).Fraction_Lambda([this]()
 						{
-							const AWRBoss* B = EngagedBoss();
+							const AWRCharacterBase* B = EngagedBoss() ? static_cast<const AWRCharacterBase*>(EngagedBoss()) : EngagedWarlord();
 							const UWRAttributeSet* A = B ? B->GetAttributes() : nullptr;
 							return A ? A->GetHealth() / FMath::Max(1.f, A->GetMaxHealth()) : 0.f;
 						})
@@ -754,13 +761,25 @@ private:
 	FText BossTally() const
 	{
 		// Your blows on the engaged boss while they keep landing (UWRFxSubsystem::Tally, fx.hud.tallySeconds).
-		const AWRBoss* B = EngagedBoss();
+		const AWRCharacterBase* B = EngagedBoss() ? static_cast<const AWRCharacterBase*>(EngagedBoss()) : EngagedWarlord();
 		const UWRFxSubsystem* Fx = B ? UWRFxSubsystem::Get(B) : nullptr;
 		if (!Fx || Fx->TallyTarget.Get() != B || Fx->Tally < 1.f || B->GetWorld()->GetTimeSeconds() - Fx->TallyTime > WRTune(TEXT("fx.hud.tallySeconds"), 2.5f))
 		{
 			return FText::GetEmpty();
 		}
 		return FText::AsNumber(FMath::RoundToInt(Fx->Tally));
+	}
+
+	/** A stronghold's warlord in a fight near (WRGarrison): the boss bar is his. */
+	const AWRGarrison* EngagedWarlord() const
+	{
+		const APawn* Me = PC.IsValid() ? PC->GetPawn() : nullptr;
+		if (!Me) return nullptr;
+		for (TActorIterator<AWRGarrison> It(Me->GetWorld()); It; ++It)
+		{
+			if (It->bEngaged && It->IsAlive() && It->IsWarlord() && FVector::Dist(It->GetActorLocation(), Me->GetActorLocation()) < 4500.f) return *It;
+		}
+		return nullptr;
 	}
 
 	const AWRBoss* EngagedBoss() const
@@ -1204,11 +1223,11 @@ private:
 				if (FWRStrongholds::IsHoldPiece(Piece))
 				{
 					const FString Fort = FWRStrongholds::DisplayName(Piece->OwnerName);
-					if (Def->Kind == TEXT("door")) { OutTarget = FString::Printf(TEXT("%s · %s"), *Fort, *Def->Name); return TEXT("Barred: break it down"); }
+					if (Def->Kind == TEXT("door")) { OutTarget = FString::Printf(TEXT("%s · %s"), *Fort, *Def->Name); return FWRStrongholds::DoorPrompt(Piece, P ? P->GetPawn() : nullptr); }
 					if (Def->Kind == TEXT("chest"))
 					{
 						OutTarget = FString::Printf(TEXT("%s war chest"), *Fort);
-						return Piece->bLocked ? TEXT("Barred until the keep is breached") : TEXT("Open");
+						return Piece->bLocked ? TEXT("Barred until the keep is breached or its warlord falls") : TEXT("Open");
 					}
 				}
 				if (Def->Kind == TEXT("door"))

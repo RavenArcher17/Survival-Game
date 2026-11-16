@@ -337,7 +337,7 @@ void AWRPlayerController::WRInteract()
 			// A stronghold's war chest is barred until its keep is breached (WRStronghold).
 			if (FWRStrongholds::IsBarredChest(Piece))
 			{
-				ShowLocalNotice(FString::Printf(TEXT("Barred: %s's war chest opens once its keep is breached"), *FWRStrongholds::DisplayName(Piece->OwnerName)));
+				ShowLocalNotice(FString::Printf(TEXT("Barred: %s's war chest opens once its keep is breached or its warlord falls"), *FWRStrongholds::DisplayName(Piece->OwnerName)));
 				return;
 			}
 			if (Me && Me->HasTag(WRTags::State_CombatTagged) && MyPS && Piece->OwnerName != MyPS->GetPlayerName())

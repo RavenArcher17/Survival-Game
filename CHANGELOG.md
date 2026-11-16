@@ -2,6 +2,83 @@
 
 ## Unreleased
 
+### The NPC strongholds as Elden Ring forts, with a garrison in three tiers (lane build-wild-strongholds; cooks/build-wild-strongholds.md in showcase-notes)
+
+Compiled (editor target); not played here (Aaron tests). The fort layout data was regenerated
+(`node Tools/terrain/strongholds.mjs`); no map or asset change.
+
+- **Emberwatch and Rimehold are laid out like Elden Ring's forts and held by people.** Why: Aaron (q-stronghold-garrison,
+  11-16): "make the NPC strongholds designed like elden ring areas, with small, medium, and boss enemies." Before, each
+  was a ring of palisade with two turreted towers, a small keep and four of the land's beasts in the yard. Now each is
+  layered the way Stormveil, Fort Haight and Castle Morne are (research in the cook doc), in the game's own build
+  pieces so every siege rule still works on all of it:
+  - **An outpost on the approach** (a guard tower 29 m in front of the gate, a ladder up it): an archer on its deck and
+    the **horn-blower** at its foot. **The gate front**: the gate between its two towers (the bolt turrets as before),
+    archers on both **front corner towers** and on the **wall walk** either side of the gate (plank floors on posts
+    2.3 m up, the palisade's points a parapet at chest height; ladders up from the yard, and from the walk to the
+    corner decks). The obvious way in is the one defended hardest.
+  - **The side path**: two palisade segments down at the rear of the far side (**the breach**), rubble across the gap,
+    the **kennel** just inside (three of the land's beasts kept as war-hounds, asleep), one archer on the rear corner
+    tower covering it.
+  - **The yard**: the campfire with its benches (three footmen at their ease), the **barracks** (two wood cells, beds),
+    the land's work (Emberwatch's forge and the basalt anvil table; Rimehold's try-pots and the flensing table), a
+    second horn-blower at the barracks door, the **captain** walking his round.
+  - **The keep**, in the land's own building set (`basalt_hall` / `rime_lodge`): the hall below behind a **barred
+    door** (the siege door: ram it, charge it, stone it), the upper floor reached by a **ladder to a landing and a
+    doorway** on its side (the on-foot way in), where the **keep warden** guards the **war chest**; stairs down to the
+    hall and up to the **roof**, a parapet round it, the **beacon** (a brazier, lit while the fort is held) and the
+    warband's banner: the vantage over the approach and down into the ward.
+  - **The inner ward** behind the keep (20 x 20 m of the set's walls and floor, lamps at its corners, the warlord's
+    seat at the back): the **boss arena at the heart**, entered from the hall through the boss door. Its **postern**
+    opens only from inside ("Barred from the other side"; inside, E: "Lift the bar"), and stays open until the fort
+    stands again: 10 m outside it is a **run-back stone** (die to the warlord, wake there, walk straight back in).
+    **The gate opens from inside too**: get round by the breach and lift its bar for your friends and your engines.
+  - The keep and the ward share one level floor on a plinth of the set's foundations; the bailey follows the ground.
+    The siting script now tests the whole 46 x 22 m footprint, the outpost and the ground behind the ward.
+- **The garrison** (`WRGarrison.cpp`, `AWRGarrison`): people on the hero's own body (MetaHuman, the real clips, armour
+  piece by piece: hide and iron on the ranks, forgeplate / rimeguard on the elites), driven by a server brain that
+  presses the same ability inputs a survivor does, so **every soldier uses a survivor's real move set** from
+  `Data/weapons.json` (light chains, heavies, charged heavies, the guard, the roll, the critical) and every blow goes
+  through `ApplyHit` with the whole hit stack. Small: **footmen** (sword and shield, axe, spear: posts, and a patrol
+  pair walking a round outside the walls), **archers** (the hunting bow: a 1.1 s draw in the aim pose with the creak,
+  then an arrow with drop at where you stand as it leaves, never homing; inside 4 m the dagger), **horn-blowers**
+  (they see you: the horn comes up for 2 s with a shout; kill or stagger them first, or the war horn rouses the whole
+  fort: the footmen come, the hounds are loosed), **hounds**. Medium: the **captain** (sword and shield, guards more,
+  kicks a guard held too long: the kick empties the shield) and the **keep warden** (greatsword at Emberwatch, great
+  hammer at Rimehold: hyperarmoured heavies and charged heavies). Boss: the **warlord** (below). They see in a cone
+  (half the range on a crouching survivor) through what's in the way, turn to look before they commit, call their
+  fellows within hearing when hit, search where they last saw you, then walk back to their post or their round;
+  nobody waits a turn to attack (CAL). Names: "Reaver footman", "Varro, Reaver captain", "Ysolde of the Anvil"...
+  Ranks are `ranks` in `Data/strongholds.json`.
+- **The warlords, with phases** (`warlords` in `Data/strongholds.json`): **Hask, the Forge-Reeve** (Emberwatch, great
+  hammer, fire) and **Skarde, the Wreck-Queen** (Rimehold, whaler's spear, frost). Each fights with its weapon's whole
+  move set plus its own rows (CAL 1.13 grammar: wind-up, hold with the final glint 0.2 s before contact, active,
+  punish, flags): Hask's **anvil leap** onto where you stood (it goes for the furthest tame first) and **bellows
+  kick**; Skarde's **harpoon cast** (thrown at where you stand, straight, never homing, never inside 4 m) and low
+  **ice hook** (jump it). At half health the change is an attack (**quench flare** / **whiteout**: an unblockable
+  4.5 m burst on a crimson ring; it waits out a crit or a stance break); phase 2 puts his element on every blow
+  (embers / rime on the weapon), speeds him up and adds delayed moves and a combo (**cinder sweep** leaving burning
+  ground, **forge combo**, the leap held longer; **flense**, the **tide drag** lunge, two harpoons). The boss bar
+  shows the warlord like any boss (name, phase, fighters); health scales +80% a fighter (each tame counts); nobody in
+  the ward for 8 s and he walks back whole, phase 1. He never leaves his ward.
+- **Respawn and loot, for a survival game**: while a fort stands, a dead soldier comes back after 2 game hours and
+  only with nobody within 150 m (never in front of you). The warlord's fall **takes the fort**: the beacon goes dark,
+  the banners come down, the war chest unbars, a knell; nothing comes back until it **stands again whole** 12 game
+  hours after the last survivor left (pieces, garrison, warlord, a full chest). A fort broken anywhere (a gate rammed,
+  a tower down) mends the same way. The keep breached by siege still opens the chest. A broken gate or keep door
+  sounds the alarm (the sally). Each soldier's loot goes to its killer (arrows, iron, flint; the captain a shard and
+  maybe his sword, the warden shards and maybe her cuirass); the warlord pays everyone who did a tenth of his health
+  (shards, iron) and, the first time, his own weapon (steel great hammer / steel spear) as a first-kill drop. Saved
+  with the world (`strongholds` document v2: broken, unbarred, dead and their return hours, warlord down, the chest);
+  an old v1 save stands whole.
+- Plumbing: `FWRWeapons::ClassFor` gives a body with no bag the class of the weapon in its hand; a fort's hounds and
+  its garrison are one side (`FWRStrongholds::HoldOf`, `AWRCreature::IsHostileTo`); fort doors go through
+  `UWRStrongholdSubsystem::UseDoor` (prompt `FWRStrongholds::DoorPrompt`); the run-back stone names the fort. Tuning
+  `strongholds.kitHealthScale` (the set's pieces at half health), `respawnHours`, `alarmSeconds`, `ladderHealth`,
+  `strongholds.garrison.*`; sounds `hold.horn`, `hold.horn_raise`, `hold.bar`, `hold.taken` (existing files).
+- Not finished: soldiers steer in straight lines with a sidestep when blocked (the island has no navmesh), so one can
+  stall at a corner of the keep until it gives up and walks home; the soldiers use the existing human voice set.
+
 ### Answers 11-16 (lane build-wild-answers-1116; cooks/wild-answers-1116.md in showcase-notes)
 
 Compiled (editor target); not played here (Aaron tests).

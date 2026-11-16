@@ -4,6 +4,7 @@
 // by range band, a transition attack at the phase change, breakable parts, a tame-punishing move, the roaming minis
 // (Cinderhorn among his basalt pillars, Old Tusker on the snow flats), shrine-stones and the first-kill drop.
 #include "WRBoss.h"
+#include "WRStronghold.h"
 #include "WRCrystalBosses.h"
 #include "WRFungalBosses.h"
 #include "WROceanBosses.h"
@@ -1174,6 +1175,8 @@ FString AWRRunbackStone::Bind(AWRCharacter* Who)
 	PS->RespawnPoint = this;
 	WRSound::Broadcast(Who, TEXT("discover"));
 	const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(BossId);
+	// A stronghold's stone (WRStronghold) stands outside its ward's postern.
+	if (const FWRHoldDef* Hold = Def ? nullptr : FWRStrongholds::Find(BossId)) return FString::Printf(TEXT("You'll wake at the shrine-stone by %s's postern"), *Hold->Name);
 	return FString::Printf(TEXT("You'll wake at the shrine-stone by %s"), Def ? *Def->Name : TEXT("the arena"));
 }
 

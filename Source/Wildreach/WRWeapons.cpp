@@ -1,4 +1,5 @@
 #include "WRWeapons.h"
+#include "WRCharacter.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
@@ -275,6 +276,12 @@ const FWRWeaponClass& FWRWeapons::ClassFor(const AWRCharacterBase* Character) co
 			// The hatchet swings as an axe, the pick as a pick-hammer (each with the tool's own flat damage).
 			Id = Tool->Kind == TEXT("hatchet") ? FName(TEXT("axe")) : Tool->Kind == TEXT("pick") ? FName(TEXT("pick_hammer")) : NAME_None;
 		}
+	}
+	else if (const AWRCharacter* Body = Cast<AWRCharacter>(Character))
+	{
+		// No bag (a stronghold's soldier, WRGarrison): the class of what it holds in the weapon hand.
+		const FWRItemDef* Def = Body->GetMeleeItem().IsNone() ? nullptr : FWRItemRegistry::Get().Find(Body->GetMeleeItem());
+		if (Def && !Def->WeaponClass.IsNone()) Id = Def->WeaponClass;
 	}
 	return Class(Id);
 }

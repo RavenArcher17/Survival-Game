@@ -1320,11 +1320,16 @@ FString AWRBuildPiece::Interact(AWRPlayerController* Player)
 	const FString Who = PS->GetPlayerName();
 	const FName K = Def->Kind;
 
-	// A stronghold (WRStronghold): its gate and the keep's door are barred from inside; they come down, they don't open.
+	// A stronghold (WRStronghold): the keep's door is barred from inside and comes down, it doesn't open; the gate and the
+	// ward's postern can be unbarred from their inside (E lifts the bar), then they open and shut for anyone.
 	if (FWRStrongholds::IsHoldPiece(this))
 	{
-		if (K == TEXT("door")) return FString::Printf(TEXT("Barred from the inside: break it down (a ram, a charge, a trebuchet stone)"));
-		if (bLocked) return FString::Printf(TEXT("Barred: %s's war chest opens once its keep is breached"), *FWRStrongholds::DisplayName(OwnerName));
+		if (K == TEXT("door"))
+		{
+			UWRStrongholdSubsystem* Holds = UWRStrongholdSubsystem::Get(this);
+			return Holds ? Holds->UseDoor(this, Player->GetPawn()) : FString(TEXT("Barred from the inside: break it down (a ram, a charge, a trebuchet stone)"));
+		}
+		if (bLocked) return FString::Printf(TEXT("Barred: %s's war chest opens once its keep is breached or its warlord falls"), *FWRStrongholds::DisplayName(OwnerName));
 	}
 	if (K == TEXT("door"))
 	{

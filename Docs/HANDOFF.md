@@ -33,6 +33,16 @@ bosses, enemies and wildlife regions, taming, survival, crafting (with time and 
 claims, raids and door keypads), clans, PvP rules, worlds and world settings, the stone-and-leather UI, sound, the
 installer and auto-updater. `CHANGELOG.md` has every version, newest first, with what changed and why.
 
+Since 0.8.0 (unreleased): **the NPC strongholds are Elden-Ring-style forts with a garrison** (lane
+build-wild-strongholds, cooks/build-wild-strongholds.md in showcase-notes): the layout is data
+(`Tools/terrain/strongholds.mjs` -> `Data/strongholds.json`: outpost, gate front, breach, yard, keep in the land's set,
+inner ward + postern + run-back stone; ladders are fort-owned `AWRSiegeLadder`s), the soldiers are `AWRGarrison`
+(`WRGarrison.cpp`: the hero body pressing the survivor's own ability inputs, so `weapons.json` move sets are theirs;
+ranks and warlords in `strongholds.json`), and `UWRStrongholdSubsystem` (`WRStronghold.cpp`) keeps the fort: alarm,
+respawn while standing, the warlord's fall takes it, rebuild after `rebuildHours` with nobody near. A new soldier or
+warlord is a data row; a new fort is a `forts` entry in the script (siting, layout kit, garrison). Soldiers steer
+straight with a sidestep (no navmesh), so keep posts and routes on open ground.
+
 Released in 0.8.0 (2026-11-16) with everything below: **F8 reports** (testers' reports land in the studio inbox, in `Saved/Reports` on their PC
 and, from a client, in the host's `Saved/Reports`), **full controller support** (`Data/gamepad.json`; menus driven by
 one input processor in `WRPadInput.cpp`, so a new screen needs nothing for the pad as long as its clickable pieces

@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRStronghold.h"
 #include "WRSiege.h"
 #include "WRGod.h"
 #include "WRSporePath.h"
@@ -1416,6 +1417,11 @@ bool AWRCreature::IsHostileTo(const AWRCharacterBase* Other) const
 	}
 	const FString OtherOwner = Other->GetTameOwner();
 	const APlayerState* OtherPS = Other->GetPlayerState();
+	// A stronghold's hounds (WRStronghold): its garrison and its other hounds are their pack.
+	if (const FName Hold = FWRStrongholds::HoldOf(this); !Hold.IsNone() && FWRStrongholds::HoldOf(Other) == Hold)
+	{
+		return false;
+	}
 	if (!IsTamed())
 	{
 		// Wild: hostile to survivors and tames; other wild creatures only in a hunt (predator and prey fight each other).
