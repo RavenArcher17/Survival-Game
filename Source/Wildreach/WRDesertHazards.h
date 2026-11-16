@@ -63,6 +63,10 @@ namespace WRDesertHz
 	WILDREACH_API float BeltAmount(const APawn* Me, float& OutVisionCm);
 	/** The compass ribbon and waypoint markers hide (in the belt or a sandstorm, no lens carried, no Scarab near). */
 	WILDREACH_API bool CompassHidden(const APawn* Me);
+	/** What the compass is doing in the belt (Aaron 11-16, r-lens: "best user experience is priority 1"): 0 no storm,
+	 *  1 hidden (no sun to read), 2 shown by the Sunwatch lens in your bag, 3 shown by your Scarab digger near. The HUD
+	 *  says which, so the compass never just vanishes without a word. */
+	WILDREACH_API int32 CompassState(const APawn* Me);
 	/** Server, a dodge began: quicksand lifts you (Dune oil: frees you). */
 	WILDREACH_API void OnDodge(AWRCharacterBase* Who);
 	/** Wet sand here now (an Oasis water jar's splash): no Dunejaw dives, Ssarrok beaches. */

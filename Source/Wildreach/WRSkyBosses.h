@@ -90,6 +90,8 @@ struct WILDREACH_API FWRSkyBoss
 	static bool Tick(AWRBoss* Boss, float DeltaSeconds);
 	static bool Allowed(const AWRBoss* Boss, const FWRBossAttack& Attack, const AWRCharacterBase* Target);
 	static void AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharacterBase* Target);
+	/** The wind-up: Kyrra's stoop climbs to its fold point and folds there (Aaron 11-16, r-kyrra: "make it good"). */
+	static bool TickWindup(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaSeconds);
 	static bool BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack);
 	static bool TickStrike(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaSeconds);
 	static void EndStrike(AWRBoss* Boss, const FWRBossAttack& Attack);

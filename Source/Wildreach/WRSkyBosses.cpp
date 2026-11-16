@@ -63,6 +63,10 @@ namespace WRSkyBossImpl
 		double NextLandAt = 0.0, LandUntil = 0.0;
 		FVector LandAt = FVector::ZeroVector;
 		bool bScreeched = false;
+		// Her stoop (Aaron 11-16, r-kyrra: "Try it, make it good"): where the wind-up began, the fold point she climbs to
+		// (up and back off the line, as a peregrine climbs before it stoops), and whether she has folded yet.
+		FVector StoopFrom = FVector::ZeroVector, StoopFold = FVector::ZeroVector;
+		bool bStooping = false, bStoopFolded = false;
 		// The Sentinel.
 		bool bAwake = false, bFell = false, bFalling = false;
 		double KneelUntil = 0.0;
@@ -681,6 +685,12 @@ bool FWRSkyBoss::Tick(AWRBoss* Boss, float DeltaSeconds)
 			Boss->LaunchCharacter(FVector(0, 0, 1200.f), true, true);
 		}
 		if (bBoth) Boss->SpeedBoost = SbT(Boss, TEXT("footSpeed"), 0.6f);
+		// Her stoop's bring-down window over: up off the mantle.
+		if (Body && Body->Has(WRSkyFlag::Mantle) && Boss->GetWorld()->GetTimeSeconds() >= Boss->GroundedUntil)
+		{
+			Body->Set(WRSkyFlag::Mantle, false);
+			Body->Set(WRSkyFlag::Grounded, false);
+		}
 		return false;
 	}
 	if (Id == TEXT("bridge_sentinel"))
@@ -902,6 +912,20 @@ void FWRSkyBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharacte
 		Body->Set(WRSkyFlag::Gape, Id == TEXT("inhale") || Id.ToString().StartsWith(TEXT("coil")));
 		Body->Set(WRSkyFlag::Crest, Id == TEXT("dive"));
 	}
+	// Kyrra's stoop: during the wind-up she climbs to a fold point up and back off her line to you; the drop starts from
+	// there, so it comes down steep out of the sky (SbT stoopClimb / stoopBack / stoopFoldAt).
+	if (Boss->CreatureId == TEXT("kyrra") && Id == TEXT("dive"))
+	{
+		FSbState& S = St(Boss);
+		const FVector Aim = Target ? Target->GetActorLocation() : Boss->AttackPoint;
+		const FVector Away = (Boss->GetActorLocation() - Aim).GetSafeNormal2D();
+		S.StoopFrom = Boss->GetActorLocation();
+		S.StoopFold = S.StoopFrom + Away * SbT(Boss, TEXT("stoopBack"), 600.f)
+			+ FVector(0.f, 0.f, FMath::Max(SbT(Boss, TEXT("stoopClimb"), 900.f), Aim.Z + SbT(Boss, TEXT("stoopAbove"), 1800.f) - S.StoopFrom.Z));
+		S.bStooping = true;
+		S.bStoopFolded = false;
+		if (Body) Body->Set(WRSkyFlag::Grounded, false);
+	}
 	if (Id == TEXT("inhale")) WRFx::Broadcast(Boss, TEXT("sky.undertow_tell"), Boss->GetActorLocation() + Boss->GetActorForwardVector() * Boss->GetSimpleCollisionRadius(), Boss->GetActorRotation(), 3.f, TEXT("creature.old_gulper.inhale"), Attack.Windup);
 	if (Id == TEXT("updraft_inhale")) WRFx::Broadcast(Boss, TEXT("sky.gap_column"), Boss->GetActorLocation() - FVector(0, 0, 600.f), FRotator::ZeroRotator, 4.f, TEXT("creature.aeolith.roar"), Attack.Windup);
 	if (Id == TEXT("downburst")) WRFx::Broadcast(Boss, TEXT("sky.shadow"), Boss->AttackPoint, FRotator::ZeroRotator, 4.f, TEXT("sky.downburst_hiss"), Attack.Windup + Attack.Row.Hold);
@@ -912,6 +936,42 @@ void FWRSkyBoss::AttackStarted(AWRBoss* Boss, FWRBossAttack& Attack, AWRCharacte
 		for (AWRCharacterBase* F : Foes(Boss, 3000.f)) Sum += (F->GetActorLocation() - Boss->GetActorLocation()).GetSafeNormal2D();
 		if (!Sum.IsNearlyZero()) Boss->AttackFacing = Sum.Rotation();
 	}
+}
+
+bool FWRSkyBoss::TickWindup(AWRBoss* Boss, FWRBossAttack& Attack, float DeltaSeconds)
+{
+	if (!IsSkyBoss(Boss) || Boss->CreatureId != TEXT("kyrra") || Attack.Id != TEXT("dive")) return false;
+	FSbState& S = St(Boss);
+	if (!S.bStooping) return false;
+	UWRSkyBody* Body = UWRSkyBody::Get(Boss);
+	const double Now = Boss->GetWorld()->GetTimeSeconds();
+	const float Total = FMath::Max(0.2f, float(Boss->ResolveAt - Boss->StrikeStarted));
+	const float FoldAt = SbT(Boss, TEXT("stoopFoldAt"), 0.72f);
+	const float A = FMath::Clamp(float(Now - Boss->StrikeStarted) / (Total * FoldAt), 0.f, 1.f);
+	if (!S.bStoopFolded)
+	{
+		// The climb: wings beating hard, eased in and out (never a jump), up and back to the fold point.
+		const float E = A * A * (3.f - 2.f * A);
+		Boss->SetActorLocation(FMath::Lerp(S.StoopFrom, S.StoopFold, E), false);
+		if (Body) Body->Set(WRSkyFlag::Flap, true);
+		if (A >= 1.f)
+		{
+			// The fold: the line locks on where you stand now (never homing after this), wings in to a teardrop, her
+			// scream and a streak off her head; the last of the wind-up she hangs there, aimed.
+			S.bStoopFolded = true;
+			if (AWRCharacterBase* T = Boss->AttackTarget.Get()) Boss->AttackPoint = T->GetActorLocation() - FVector(0.f, 0.f, T->GetSimpleCollisionHalfHeight());
+			if (Body)
+			{
+				Body->Set(WRSkyFlag::Flap, false);
+				Body->Set(WRSkyFlag::Stoop, true);
+				Body->MulticastMoment(TEXT("sky.stoop_streak"), TEXT("head"), 1.6f, TEXT("creature.galeharrier.signature"));
+			}
+		}
+	}
+	// Facing down the line she'll fall along.
+	const FVector Line = Boss->AttackPoint - Boss->GetActorLocation();
+	Boss->SetActorRotation(FRotator(0.f, Line.Rotation().Yaw, 0.f));
+	return true;
 }
 
 bool FWRSkyBoss::BeginStrike(AWRBoss* Boss, FWRBossAttack& Attack)
@@ -1167,6 +1227,14 @@ void FWRSkyBoss::EndStrike(AWRBoss* Boss, const FWRBossAttack& Attack)
 	// Kyrra's stoop lands: a 4 m dust ring (low, 25).
 	if (Attack.Id == TEXT("dive") && Boss->CreatureId == TEXT("kyrra"))
 	{
+		// Down in her bring-down window (diveGroundedSeconds, x1.25 taken): wings spread low over the ground, mantling.
+		St(Boss).bStooping = false;
+		if (UWRSkyBody* KBody = UWRSkyBody::Get(Boss))
+		{
+			KBody->Set(WRSkyFlag::Stoop, false);
+			KBody->Set(WRSkyFlag::Grounded, true);
+			KBody->Set(WRSkyFlag::Mantle, true);
+		}
 		const FVector Feet = Boss->GetActorLocation() - FVector(0, 0, Boss->GetSimpleCollisionHalfHeight());
 		// The dust rolls out from where she struck (cookpass-combat 3.10): a ring, low, jumpable.
 		FWRHit Hit = SbHit(Boss, SbT(Boss, TEXT("landRingDamage"), 25.f), false);

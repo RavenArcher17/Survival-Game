@@ -95,6 +95,25 @@ research and the plan are in showcase-notes cooks/wild-answers-1115.md. Compiled
   edges like the colours, trades litter and moss in noise patches so no stretch is one even mix (Electric Dreams'
   clustering), and grows moss on the damp ground beside water (Trails' creek-bank strip), into UV channels 1-3 of each
   chunk). The heightfield is unchanged (`forest_ground.bin` byte-identical). Credits in `Docs/CREDITS.md`.
+- **Kyrra's Tempest stoop is a real stoop.** Why: Aaron (r-kyrra) kept the built dive: "Try it, make it good." Before,
+  she dropped from wherever she hovered (often low and shallow). Now, as a peregrine does: through the wind-up she climbs
+  to a fold point 9 m up (at least 18 m over you) and 6 m back off her line, eased in and out with her wings beating
+  hard (`FWRSkyBoss::TickWindup`, wired into `AWRBoss::TickAttack`); at the fold (72% of the wind-up) the line locks on
+  where you stand (it never homes after), her wings fold, she screams and a streak leaves her head; she hangs aimed for
+  the last moment, then comes down the locked line steep onto her shadow. On the ground the 4 m dust ring rolls out
+  and she **mantles**, wings spread low (the Grounded and Mantle looks), for her 1.6 s bring-down window (x1.25 taken),
+  then lifts. Tuning `bosses.kyrra.stoop*`.
+- **The Sunwatch lens stays in the bag, and the compass says what the storm is doing.** Why: Aaron (r-lens) kept it
+  in the pack: "Figure it out, best user experience is priority 1." No slot juggling for a passive tool (Breath of
+  the Wild's sensor); and the compass no longer just vanishes in the belt or a sandstorm: its ribbon gives way to
+  "Sandstorm: no sun to read · A Sunwatch lens in your bag shows the sun through it", and while the lens (or your
+  Scarab digger) is what keeps it, a small gold line under it says so ("Sunwatch lens: the sun through the sand"):
+  `WRDesertHz::CompassState`.
+- **Kept and checked:** wall recoil (r-recoil, "Try it.") is on (`WRAbilities.cpp` BladeSweep's wall test, one switch
+  `combat.recoil.enabled` turns it off if the corridors feel bad); the sky trophy talismans keep one clear effect each
+  (r-talisman, "Choose what's best": 50 of the 56 talismans have one effect, each wired: `vsAirborne`
+  `WRCombatLibrary.cpp`, `stillPoise` `WRCombatLibrary.cpp`, `glideStamina` `WRSkyAir.cpp`). Nothing in this lane shows
+  music or asks you to play to it.
 
 
 ## Unreleased: the crafting cook pass (hands-on crafting, the workshop at work, crafting from your chests)

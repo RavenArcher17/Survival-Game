@@ -890,6 +890,7 @@ void AWRBoss::TickAttack(float DeltaSeconds)
 		FWRStormBoss::TickWindup(this, Attack, DeltaSeconds);   // a dive's climb and fold, a bolt's aim lock
 		FWRSwampBoss::TickWindup(this, Attack, DeltaSeconds);   // the hex bolt's aim lock
 		FWRForestBoss::TickWindup(this, Attack, DeltaSeconds);  // the queen over her comb, the root hand's ring held
+		FWRSkyBoss::TickWindup(this, Attack, DeltaSeconds);     // Kyrra's stoop: the climb to her fold point, the fold
 		// Tracking through the first part of the wind-up, then committed (a late step aside still works).
 		AWRCharacterBase* Target = AttackTarget.Get();
 		const float Track = Attack.bRow ? Attack.Row.TrackUntil : 0.5f;

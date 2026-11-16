@@ -221,18 +221,24 @@ float WRDesertHz::BeltAmount(const APawn* Me, float& OutVisionCm)
 
 bool WRDesertHz::CompassHidden(const APawn* Me)
 {
+	return CompassState(Me) == 1;
+}
+
+int32 WRDesertHz::CompassState(const APawn* Me)
+{
 	float Vision = 0.f;
-	if (BeltAmount(Me, Vision) <= 0.f) return false;
-	// The Sunwatch lens shows the sun's bearing through the storm (carried); so does a tamed Scarab digger close by.
-	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me); Inv && Inv->CountOf(TEXT("sunwatch_lens")) > 0) return false;
+	if (BeltAmount(Me, Vision) <= 0.f) return 0;
+	// The Sunwatch lens shows the sun's bearing through the storm from your bag (no slot to fill: r-lens keeps it there);
+	// so does a tamed Scarab digger close by.
+	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Me); Inv && Inv->CountOf(TEXT("sunwatch_lens")) > 0) return 2;
 	const FString MyName = Me->GetPlayerState() ? Me->GetPlayerState()->GetPlayerName() : FString();
 	const float Reach = DzTn(TEXT("belt.scarabReach"), 1500.f);
 	for (const TWeakObjectPtr<UWRDesertBody>& W : UWRDesertBody::Live)
 	{
 		const AWRCreature* C = W.IsValid() ? Cast<AWRCreature>(W->GetOwner()) : nullptr;
-		if (C && C->CreatureId == TEXT("scarab_digger") && C->IsTamed() && C->GetTameOwner() == MyName && FVector::Dist(C->GetActorLocation(), Me->GetActorLocation()) < Reach) return false;
+		if (C && C->CreatureId == TEXT("scarab_digger") && C->IsTamed() && C->GetTameOwner() == MyName && FVector::Dist(C->GetActorLocation(), Me->GetActorLocation()) < Reach) return 3;
 	}
-	return true;
+	return 1;
 }
 
 bool WRDesertHz::LongNoon(const UObject* WorldContext)

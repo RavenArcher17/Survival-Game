@@ -622,14 +622,39 @@ private:
 				SAssignNew(FadeCompass, SBox).Visibility_Lambda([this]()
 				{
 					const FWRKeyBindings& K = FWRKeyBindings::Get();
-					// In the Desert's belt or a sandstorm there's no sun to read: the ribbon hides (a Sunwatch lens or a tame Scarab digger near brings it back).
-					if (WRDesertHz::CompassHidden(PC.IsValid() ? PC->GetPawn() : nullptr)) return EVisibility::Collapsed;
 					return K.PrefOn(TEXT("Compass")) && K.PrefInt(TEXT("HudMode")) != 2 ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
 				})
 				[
-					SNew(SOverlay)
-					+ SOverlay::Slot()[SNew(SBox).WidthOverride(560.f * U).HeightOverride(46.f * U)[SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(0.f)[SNullWidget::NullWidget]]]
-					+ SOverlay::Slot()[SNew(SWRCompass).PC(PC)]
+					SNew(SVerticalBox)
+					+ SVerticalBox::Slot().AutoHeight()
+					[
+						SNew(SOverlay)
+						+ SOverlay::Slot()[SNew(SBox).WidthOverride(560.f * U).HeightOverride(46.f * U)[SNew(SWRPanel).Kind(EWRPanel::Glass).Padding(0.f)[SNullWidget::NullWidget]]]
+						// In the Desert's belt or a sandstorm there's no sun to read (r-lens): the ribbon gives way to why, and
+						// what brings it back, instead of vanishing.
+						+ SOverlay::Slot()
+						[
+							SNew(SBox).Visibility_Lambda([this]() { return WRDesertHz::CompassState(PC.IsValid() ? PC->GetPawn() : nullptr) == 1 ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
+							[
+								SNew(SWRCompass).PC(PC)
+							]
+						]
+						+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+						[
+							SNew(SVerticalBox).Visibility_Lambda([this]() { return WRDesertHz::CompassState(PC.IsValid() ? PC->GetPawn() : nullptr) == 1 ? EVisibility::HitTestInvisible : EVisibility::Collapsed; })
+							+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[WRUI::Text(LOCTEXT("SandNoSun", "Sandstorm: no sun to read"), WRUI::Caps(13), WRUI::Ink, true)]
+							+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center)[WRUI::Text(LOCTEXT("SandLens", "A Sunwatch lens in your bag shows the sun through it"), WRUI::Body(11, 500), WRUI::Ink3)]
+						]
+					]
+					// What is showing the way through the storm: a small gold tag under the ribbon.
+					+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Center).Padding(0.f, 3.f * U, 0.f, 0.f)
+					[
+						WRUI::Text(TAttribute<FText>::CreateLambda([this]()
+						{
+							const int32 S = WRDesertHz::CompassState(PC.IsValid() ? PC->GetPawn() : nullptr);
+							return S == 2 ? LOCTEXT("ByLens", "Sunwatch lens: the sun through the sand") : S == 3 ? LOCTEXT("ByScarab", "Your Scarab digger knows the way") : FText::GetEmpty();
+						}), WRUI::Caps(10), WRUI::Brass, true)
+					]
 				]
 			]
 			// In a portal's fold: which fold, its modifiers, the close count once it's won (WRPortals). Your artifact
