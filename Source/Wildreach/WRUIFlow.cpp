@@ -3,6 +3,7 @@
 // Sizes are 1080p units (the mockups' px x 1.2), as in the rest of the stone-and-leather UI.
 
 #include "WRUIFlow.h"
+#include "WRBootMark.h"
 #include "WRUIFit.h"
 #include "WRPadInput.h"
 #include "Wildreach.h"
@@ -1184,7 +1185,7 @@ void FWRFlow::TickCover(float Dt)
 		// The site's PC boot check reads this: a hosted or joined world is in view and playable (WRMainMenu.cpp).
 		if (Cover == ECover::Loading && P && P->GetPawn() && P->GetNetMode() != NM_Standalone && !SWRMainMenu::IsOpen())
 		{
-			UE_LOG(LogWildreach, Display, TEXT("F35READY play"));
+			WRBootMark::Line(TEXT("F35READY play"));
 		}
 		Cover = ECover::None;
 		bReleasing = false;

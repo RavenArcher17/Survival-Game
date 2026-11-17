@@ -1,5 +1,55 @@
 # Changelog
 
+## Unreleased (0.8.2): a smaller game, Shipping for players, Freedom35 installs
+
+### Wildreach on Freedom35 Studios: a smaller package, every file under 64 MB, updates through Freedom35 (lane wild-f35; cooks/wild-f35.md in showcase-notes)
+
+Why: Aaron 11-16: "get wildreach listed on freedom 35, Raven is the author. Create a store page too" / "maybe we need to
+redesign the installer so it isnt that big" / "no reason for an installer to be that big"; and "Just don't show the
+github anywhere". The 0.8.1 package was 4.3 GB (Setup 3.58 GB): a 499 MB debug-symbol file went to every player, the
+exe was a Development build, 477 MB of shrubs nothing places and the packs' 4K textures were in it, and the content was
+one 3 GB file (the site's file store takes up to 64 MB a file).
+
+- **Players get the Shipping build** (`Tools/package.ps1`: `-Config Shipping` is the default now, Development on
+  request). The exe goes from 350 MB to 184 MB. Shipping has no log and no console: the testers' tools are all in the God
+  mode window, and the boot check's lines are written by `WRBootMark::Line` (`WRBootMark.h`) into the `-abslog=` file
+  itself (only when the site's check starts it that way; a player's start writes nothing). The old Shipping-only list of
+  allowed server commands (`AWRPlayerController::ServerCommand`) went: it predated most screens (deeds, portal, hearth,
+  artifacts... would have been dead), and every packaged build already refuses the testing commands by name
+  (`WRGod::IsDevCommand`).
+- **No debug symbols ship**: the `.pdb` is moved to `<Out>\Symbols\<version>-<config>` (kept for crash dumps).
+- **Only what the game uses is cooked**: the four shrubs the game places (`Shrub_A`-`D`) instead of the whole GV Wind
+  folder; MetaHuman's face detector (`/MetaHumanCoreTech/GenericTracker`) never cooked; a Windows device profile
+  (`Config/DefaultDeviceProfiles.ini`) caps world, character, weapon, effect and sky textures at 2K as the rest of the
+  project is (the Fab packs' 4K maps cook at 2K, the pack assets themselves untouched).
+- **Every file under 64 MB except the exe**: the content is cut into 60 MB IoStore partitions
+  (`MaxIoStorePartitionSizeMB=60`, the biggest single chunk is a MetaHuman hair at 51.6 MB, so 48 could not be used).
+  The 184 MB exe goes up in parts the site's updater joins and checks.
+- **A Freedom35 install updates only through Freedom35** (`WRMainMenu.cpp` `WRMenuUpdate`): `f35-update.json` beside
+  the game marks it; the main menu asks the site's `/api/games/wildreach/latest` (public) and compares with the
+  installed version (`f35-files.json`); Update now starts `F35Update.exe` beside the game and closes, F35Update fetches
+  only the changed files and starts Wildreach again. GitHub is never asked there. `package.ps1 -Store freedom35` leaves
+  out `WildreachUpdater.exe` and writes a README that says updates come through Freedom35. Nothing a player sees names
+  GitHub (menus, update lines, crash card, README); copies installed from GitHub keep the GitHub path.
+
+| Package (0.8.1 Development -> 0.8.2 Shipping, Freedom35) | 0.8.1 | 0.8.2 |
+|---|---|---|
+| On disk | 4,368 MB | 3,086 MB (2,953 files) |
+| Debug symbols (`Wildreach.pdb`) | 499 MB shipped | 0 (344 MB kept in Symbols) |
+| Exe | 350 MB | 184 MB |
+| Cooked content | 3,082 MB in one file | 2,545 MB in 47 files of up to 60 MB |
+| - GV shrubs | 643 MB | 127 MB (E-I out) |
+| - MetaHuman (hair, heads) | 868 MB | 765 MB (2K) |
+| - MW landscape / SimpleRocks / Barghest+Dragon / LavaMat | 199 / 103 / 66 / 26 MB | 52 / 32 / 18 / 6 MB (2K) |
+| - MetaHuman face detector | 22 MB | 0 |
+| - Electric Dreams forest kit (new since 0.8.1) | 0 | 364 MB |
+| Data (sound, UI, JSON) | 300 MB | 293 MB |
+| What a Freedom35 player downloads first | Setup 3.58 GB | installer + 3.09 GB of files |
+
+Checked: the editor compiles; the Shipping package's playable gate on a fresh profile (scratch LOCALAPPDATA), run 1:
+`F35READY menu`, `F35BOOT new world 'Boot_check'`, `F35READY play`; run 2: `F35READY menu`, `F35BOOT continue world
+'Boot_check'`, `F35READY play`; the container list has no Shrub_E-I and no FaceDetector; no file over 64 MB but the exe.
+
 ## 0.8.1 (2026-11-16): every screen fits every screen, Update now never opens a web page
 
 Released https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.8.1 from b420575 (package E:\Dev\WildreachBuild6 on the desktop). Playable gate on the installed package: F35READY menu, F35BOOT new / continue, F35READY play at 2560x1600 and at 1920x1080; a fresh 0.8.0 install updated itself from the release (19 of 2,929 files, 286 MB) and reached play. Every asset digest equals its local SHA-256. Not in it: the Electric Dreams forest kit (not on the packaging PC), so the Ancient forest ships its tree-kit look.

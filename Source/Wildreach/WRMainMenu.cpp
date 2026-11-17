@@ -44,6 +44,7 @@
 #include "Fonts/FontMeasure.h"
 #include "Containers/Ticker.h"
 #include "WRWorlds.h"
+#include "WRBootMark.h"
 
 // The Freedom35 site's PC boot check (tools/bootcheck-pc.mjs) launches the packaged game with -F35Boot and reads the
 // log for "F35READY menu" (the main menu is up) and "F35READY play" (FWRFlow, the loading cover lifts in a hosted or
@@ -69,6 +70,7 @@ namespace WRMenuBootCheck
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
 
 // Update now (wild-hotfix-menus, Aaron 11-16: "clicking to install the update should close the client, or restart it so
 // it can apply the new version"; 0.8.0 opened the GitHub page when no updater sat beside the game). It never opens a web
@@ -114,6 +116,51 @@ namespace WRMenuUpdate
 			if (FPaths::FileExists(Full)) return Full;
 		}
 		return FString();
+	}
+
+	// A FREEDOM35 INSTALL (wild-f35, Aaron 11-16: "on a Freedom35 install, updates come ONLY through Freedom35"): the
+	// site's installer puts F35Update.exe and f35-update.json beside the game. Then the newest version is the site's
+	// (/api/games/wildreach/latest, public), Update now hands over to F35Update (it fetches only the files that changed
+	// and starts the game again), and the game never asks anywhere else.
+	static FString F35File(const TCHAR* Name) { return FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::RootDir(), Name)); }
+
+	static TSharedPtr<FJsonObject> ReadJson(const FString& Path)
+	{
+		FString Text;
+		TSharedPtr<FJsonObject> Json;
+		if (FFileHelper::LoadFileToString(Text, *Path)) FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Json);
+		return Json;
+	}
+
+	static bool IsFreedom35() { return FPaths::FileExists(F35File(TEXT("f35-update.json"))); }
+
+	/** The version Freedom35 installed here: its file list's (rewritten by every update), else its config's; empty if neither. */
+	static FString Freedom35Version()
+	{
+		FString Version;
+		for (const TCHAR* Name : { TEXT("f35-files.json"), TEXT("f35-update.json") })
+		{
+			if (const TSharedPtr<FJsonObject> Json = ReadJson(F35File(Name)))
+			{
+				if (Json->TryGetStringField(TEXT("version"), Version) && !Version.IsEmpty()) return Version;
+			}
+		}
+		return FString();
+	}
+
+	/** Where to ask: the site f35-update.json names (the one this copy came from), else tuning's. */
+	static FString Freedom35Latest()
+	{
+		FString Site, Slug;
+		if (const TSharedPtr<FJsonObject> Json = ReadJson(F35File(TEXT("f35-update.json"))))
+		{
+			Json->TryGetStringField(TEXT("site"), Site);
+			Json->TryGetStringField(TEXT("slug"), Slug);
+		}
+		if (Site.IsEmpty()) Site = FWRTuning::Get().Str(TEXT("god.site"), TEXT("https://freedom35studios.pages.dev"));
+		if (Slug.IsEmpty()) Slug = TEXT("wildreach");
+		Site.RemoveFromEnd(TEXT("/"));
+		return FString::Printf(TEXT("%s/api/games/%s/latest?platform=windows"), *Site, *Slug);
 	}
 
 	/** A moment for "Updating..." to show, then the game closes so the update can replace it. */
@@ -1045,7 +1092,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeUpdate()
 	return SNew(SBox).WidthOverride(460.f * U)
 	[
 		SNew(SVerticalBox)
-		// A newer release on GitHub: one click installs it (the updater) and starts it again.
+		// A newer version (Freedom35's live one on a Freedom35 install): one click installs it (the updater) and starts it again.
 		+ SVerticalBox::Slot().AutoHeight()
 		[
 			SNew(SBox).Visibility_Lambda([]() { return LatestVersion.IsEmpty() ? EVisibility::Collapsed : EVisibility::Visible; })
@@ -1092,7 +1139,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeUpdate()
 		]
 		+ SVerticalBox::Slot().AutoHeight().HAlign(HAlign_Right).Padding(0.f, 8.f * U, 0.f, 0.f)
 		[
-			WRUI::Text(FText::Format(NSLOCTEXT("WRUI", "VersionLine", "Version {0}"), FText::FromString(GameVersion())), WRUI::Body(11, 500), WRUI::Ink3, true)
+			WRUI::Text(FText::Format(NSLOCTEXT("WRUI", "VersionLine", "Version {0}"), FText::FromString(WRMenuUpdate::IsFreedom35() && !WRMenuUpdate::Freedom35Version().IsEmpty() ? WRMenuUpdate::Freedom35Version() : GameVersion())), WRUI::Body(11, 500), WRUI::Ink3, true)
 		]
 	];
 }
@@ -1116,7 +1163,7 @@ void SWRMainMenu::Tick(const FGeometry& Geo, const double Time, const float Delt
 				FString Id = Worlds.Num() ? Worlds[0].Id : FString();
 				const bool bContinue = !Id.IsEmpty();
 				if (!bContinue) Id = WRWorlds::Create(TEXT("Boot check"), WRWorlds::PresetSettings(TEXT("pve")));
-				UE_LOG(LogWildreach, Display, TEXT("F35BOOT %s world '%s'"), bContinue ? TEXT("continue") : TEXT("new"), *Id);
+				WRBootMark::Line(FString::Printf(TEXT("F35BOOT %s world '%s'"), bContinue ? TEXT("continue") : TEXT("new"), *Id));
 				if (!Id.IsEmpty()) Menu->HostWorld(Id);
 				return false;
 			}));
@@ -1588,6 +1635,24 @@ FReply SWRMainMenu::OnUpdate()
 	if (WRMenuUpdate::bBusy || LatestVersion.IsEmpty()) return FReply::Handled();
 	WRMenuUpdate::bBusy = true;
 	const TWeakObjectPtr<APlayerController> PC = Owner;
+	if (WRMenuUpdate::IsFreedom35())
+	{
+		// Freedom35's updater beside the game: started now, it finds the new version, waits for this game to close,
+		// fetches the files that changed and starts Wildreach again. Nothing else is ever downloaded from here.
+		const FString F35 = WRMenuUpdate::F35File(TEXT("F35Update.exe"));
+		FProcHandle Proc = FPaths::FileExists(F35)
+			? FPlatformProcess::CreateProc(*F35, TEXT(""), true, false, false, nullptr, 0, *FPaths::GetPath(F35), nullptr) : FProcHandle();
+		UE_LOG(LogWildreach, Log, TEXT("MENU update: %s (%s)"), *F35, Proc.IsValid() ? TEXT("started") : TEXT("couldn't start"));
+		if (!Proc.IsValid())
+		{
+			WRMenuUpdate::Fail(NSLOCTEXT("WRUI", "UpdateF35NoStart", "Couldn't start the update. Close Wildreach and start it from its shortcut: it updates before it opens."));
+			return FReply::Handled();
+		}
+		FPlatformProcess::CloseProc(Proc);
+		WRMenuUpdate::Line = WRMenuUpdate::UpdatingLine(LatestVersion);
+		WRMenuUpdate::QuitSoon(PC);
+		return FReply::Handled();
+	}
 	// The updater waits for this game to close, installs the new release over its own folder and starts it.
 	const FString Updater = WRMenuUpdate::FindUpdater();
 	if (Updater.IsEmpty())
@@ -1667,6 +1732,32 @@ void SWRMainMenu::CheckForUpdate()
 		return;
 	}
 	bAsked = true;
+	if (!bTestFeed && WRMenuUpdate::IsFreedom35())
+	{
+		// A Freedom35 install asks only Freedom35 (public, no account): its live version against the one installed here.
+		const FString Installed = WRMenuUpdate::Freedom35Version();
+		TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Ask = FHttpModule::Get().CreateRequest();
+		Ask->SetURL(WRMenuUpdate::Freedom35Latest());
+		Ask->SetVerb(TEXT("GET"));
+		Ask->SetHeader(TEXT("User-Agent"), TEXT("Wildreach"));
+		Ask->SetTimeout(10.f);
+		Ask->OnProcessRequestComplete().BindLambda([Installed](FHttpRequestPtr, FHttpResponsePtr Response, bool bConnected)
+		{
+			TSharedPtr<FJsonObject> Json;
+			FString Live;
+			if (bConnected && Response.IsValid() && Response->GetResponseCode() == 200
+				&& FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Response->GetContentAsString()), Json) && Json.IsValid())
+			{
+				Json->TryGetStringField(TEXT("version"), Live);
+			}
+			Live = Live.TrimStartAndEnd();
+			if (!Live.IsEmpty() && IsNewerVersion(Live, Installed.IsEmpty() ? GameVersion() : Installed)) LatestVersion = Live;
+			UE_LOG(LogWildreach, Log, TEXT("MENU update check (Freedom35): installed %s, live %s%s"), Installed.IsEmpty() ? TEXT("?") : *Installed,
+				Live.IsEmpty() ? TEXT("unknown (offline?)") : *Live, LatestVersion.IsEmpty() ? TEXT("") : TEXT(": offering the update"));
+		});
+		Ask->ProcessRequest();
+		return;
+	}
 	if (!bTestFeed)
 	{
 		Feed = TEXT("https://api.github.com/repos/RavenArcher17/Survival-Game/releases/latest");
@@ -1856,7 +1947,7 @@ void SWRMainMenu::Open(APlayerController* PC)
 	}
 	Instance = SNew(SWRMainMenu).Owner(PC);
 	GEngine->GameViewport->AddViewportWidgetContent(Instance.ToSharedRef(), 100);
-	UE_LOG(LogWildreach, Display, TEXT("F35READY menu"));
+	WRBootMark::Line(TEXT("F35READY menu"));
 	FInputModeUIOnly Mode;
 	Mode.SetWidgetToFocus(Instance);
 	PC->SetInputMode(Mode);

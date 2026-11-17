@@ -33,6 +33,11 @@ bosses, enemies and wildlife regions, taming, survival, crafting (with time and 
 claims, raids and door keypads), clans, PvP rules, worlds and world settings, the stone-and-leather UI, sound, the
 installer and auto-updater. `CHANGELOG.md` has every version, newest first, with what changed and why.
 
+Unreleased (0.8.2, lane wild-f35): players get the Shipping build (184 MB exe, no `.pdb`), the cooked content is cut
+to what the game uses and 2K textures (3.1 GB on disk, was 4.3 GB) in files of up to 60 MB, and Wildreach is listed on
+Freedom35 with a small installer that downloads the files; a Freedom35 install updates only through Freedom35
+("Releasing on Freedom35" below).
+
 In 0.8.1: every screen fits every screen (`WRUIFit.h`: a 1760 x 1080 minimum canvas and `SWRFit` around every viewport
 root; the main menu laid out by flow, the survivor framed into its free stage), Update now never opens a web page, and
 every package carries its updater. The Ancient forest still shipped its tree-kit look: the packaging PC (the desktop)
@@ -775,9 +780,32 @@ Tools\play.ps1 listen                                  # play it yourself from t
 - Runtime errors go to the log, not the exit code: check logs for `Error:`.
 - Look at visual changes from at least two camera angles; one angle has hidden real defects before.
 
+## Releasing on Freedom35 (0.8.2 on; lane wild-f35)
+
+Wildreach is listed on Freedom35 Studios (https://freedom35studios.pages.dev/g/wildreach, Raven's studio, under the
+Play Pass). Its download is a small installer (F35Update + `f35-update.json` with `"install": "files"` + the icon): the
+first start links the PC to the player's account, downloads every file of the live version and checks each SHA-256;
+later starts fetch only the files that changed. The site's side is in the freedom35-studios repo (DEPLOY.md
+"Wildreach: a download installed from its files", `db/wildreach.sql`).
+
+1. Package Shipping for Freedom35: `Tools\package.ps1 -Store freedom35 -Out <folder> [-Engine <UE_5.8>]` (Shipping is
+   the default; the `.pdb` goes to `<folder>\Symbols`). Every file is under 64 MB but the exe, which goes up in parts.
+2. Playable gate on the package with a fresh profile: start
+   `Wildreach\Binaries\Win64\Wildreach-Win64-Shipping.exe -F35Boot -abslog=<file> -windowed` twice with LOCALAPPDATA
+   and APPDATA pointed at a scratch folder: the file must show `F35READY menu`, `F35BOOT new`, `F35READY play`, then
+   `F35BOOT continue` and `F35READY play`. (Shipping writes no log of its own; these lines are written for the check.)
+3. In the site repo, with a developer token for Raven's studio in `F35_TOKEN` (the operator mints a two-hour one):
+   `node cli/f35.mjs installer <package>\Windows wildreach --name Wildreach --exe Wildreach.exe --version <v> --icon
+   <Wildreach.ico> --files-only --record` -> `node cli/f35.mjs download <setup> wildreach --platform windows --version <v>
+   --notes "..."` -> `node cli/f35.mjs files <package>\Windows wildreach --platform windows --version <v>`. Only the
+   third step makes the version live for installed copies.
+4. `curl -s https://freedom35studios.pages.dev/api/games/wildreach/latest?platform=windows` says the new version with
+   `"files": true`.
+
 ## Releasing an update
 
-Only with Raven's OK. Players' games update themselves from the newest GitHub release.
+Only with Raven's OK. Copies installed from a GitHub release update themselves from the newest GitHub release; copies
+installed from Freedom35 update only through Freedom35 (above).
 
 1. `git pull`, and make sure the working tree is clean apart from files that stay local.
 2. Bump `ProjectVersion` in `Config/DefaultGame.ini` (it's also the network version: different versions can't play

@@ -1359,24 +1359,10 @@ void AWRPlayerController::ServerCommand_Implementation(const FString& Command)
 		}
 #endif
 	}
-#if UE_BUILD_SHIPPING
-	// Only real gameplay actions go through in shipping builds; the rest are dev commands.
-	static const TCHAR* GameplayCommands[] = { TEXT("interact"), TEXT("use "), TEXT("craft "), TEXT("repair "), TEXT("upgrade "), TEXT("slot "), TEXT("unequip "),
-		TEXT("place "), TEXT("setcode "), TEXT("code "), TEXT("demolish"), TEXT("claim"), TEXT("store"), TEXT("take"), TEXT("tame "), TEXT("dismount"), TEXT("clan "), TEXT("perk "), TEXT("learn "),
-		TEXT("move "), TEXT("split "), TEXT("drop "), TEXT("tamegive "), TEXT("tamenarcotic"), TEXT("tameall "), TEXT("whistle "), TEXT("hearthfeed"), TEXT("hearthrepair"),
-		TEXT("craftcancel "), TEXT("crafttake"), TEXT("chestname "), TEXT("claimname"), TEXT("admin "), TEXT("clearcode"), TEXT("light"),
-		TEXT("world "), TEXT("mon "), TEXT("moverclock "), TEXT("mput "), TEXT("mtake"), TEXT("mrepair "), TEXT("mlink "), TEXT("msend ") };  // chat is its own RPC
-	// (god commands were taken above, each checked against the tester flag.)
-	bool bAllowed = false;
-	for (const TCHAR* Prefix : GameplayCommands)
-	{
-		bAllowed |= Command.StartsWith(Prefix);
-	}
-	if (!bAllowed)
-	{
-		return;
-	}
-#endif
+	// (0.8.2, wild-f35: players get the Shipping build now.) Shipping used to let through only an allow-list of gameplay
+	// verbs written long before most screens: deeds, portal, hearth, artifacts and the rest would have been dead there.
+	// Every packaged build (Development and Shipping alike) refuses the testing commands above instead, by name
+	// (WRGod::IsDevCommand) unless a verified tester has god mode on; everything else is gameplay the server checks itself.
 	RunServerCommand(Command);
 }
 
