@@ -529,6 +529,10 @@ namespace WRReportCrash
 			for (const FString& D : Dirs)
 			{
 				const FDateTime T = FM.GetTimeStamp(*(CrashRoot / D));
+				// A handled ensure writes a folder too (the engine's PSO and mesh checks do on most starts): not a crash.
+				FString Context;
+				FFileHelper::LoadFileToString(Context, *(CrashRoot / D / TEXT("CrashContext.runtime-xml")));
+				if (Context.Contains(TEXT("<CrashType>Ensure</CrashType>"))) continue;
 				if (T > Best && D != Seen)
 				{
 					Best = T;

@@ -35,6 +35,8 @@ the character covers up the character preview, and the continue button is off th
   their column (round tokens in centred rows, the name and where it comes from on hover; two cores keep their cards);
   **Crafting**'s category list ran under the window's foot (it scrolls above the skill card); Settings' section list is
   262 wide ("Look and controller" was cut at 200); the path grid's names at 12 px so "Blood & curse" clears its cell.
+- The "Wildreach closed unexpectedly" card no longer takes a handled engine ensure for the crash (they write a folder in
+  Saved\Crashes on most starts): after a run that didn't quit cleanly it only offers a real crash's report.
 - Test hooks for the shots: `WRMainMenu look` (the look picker open) and `WRMainMenu worlds` (Host a game's chooser);
   `WRMenu god` in editor runs. A unity-build clash in `WRGarrison.cpp` (`Num`) renamed.
 
