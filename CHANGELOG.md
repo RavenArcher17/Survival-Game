@@ -28,8 +28,15 @@ the character covers up the character preview, and the continue button is off th
   `Wildreach-Setup.exe` itself (progress on the banner), starts it with `--update --wait <game pid> --dir <this folder>`
   and closes; the Setup now waits for that process before installing. It never opens a web page. Every package now
   carries `WildreachUpdater.exe` and `version.txt` (`Tools/package.ps1`), not only the installed copy.
-- Settings' section list is 234 wide (was 200: "Look and controller" was cut). A unity-build clash in `WRGarrison.cpp`
-  (`Num`) renamed.
+- Screens checked by rendering them (editor `-game`, `shot showui`, every journal tab, settings pages, build bar, storage,
+  taming, claim, hearth, clan, the moments, death and respawn, the main menu with its settings, look picker and world
+  chooser) at 1440x900 (the 2560x1600 laptop's 16:10 canvas), 1024x768 (4:3) and 1920x1080 at 130% interface size. Fixed
+  what they showed: the **Hearth**'s level list ran out of the window (it scrolls now) and its ten boss cores overran
+  their column (round tokens in centred rows, the name and where it comes from on hover; two cores keep their cards);
+  **Crafting**'s category list ran under the window's foot (it scrolls above the skill card); Settings' section list is
+  262 wide ("Look and controller" was cut at 200); the path grid's names at 12 px so "Blood & curse" clears its cell.
+- Test hooks for the shots: `WRMainMenu look` (the look picker open) and `WRMainMenu worlds` (Host a game's chooser);
+  `WRMenu god` in editor runs. A unity-build clash in `WRGarrison.cpp` (`Num`) renamed.
 
 Compiled (editor target, no warnings). Checked in the packaged 0.8.1 (see the release notes and the lane's proof).
 

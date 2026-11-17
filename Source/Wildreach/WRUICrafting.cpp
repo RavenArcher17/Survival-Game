@@ -401,9 +401,13 @@ public:
 					SNew(SBox).WidthOverride(160.f * U)
 					[
 						SNew(SVerticalBox)
-						+ SVerticalBox::Slot().AutoHeight()[SAssignNew(Nav, SVerticalBox)]
-						+ SVerticalBox::Slot().FillHeight(1.f)[SNullWidget::NullWidget]
-						+ SVerticalBox::Slot().AutoHeight()[SAssignNew(NavFoot, SBox)]
+						// The categories scroll in what the skill card leaves (a dozen ran past the window's foot: wild-hotfix-menus).
+						+ SVerticalBox::Slot().FillHeight(1.f)
+						[
+							SNew(SScrollBox).ScrollBarThickness(FVector2D(4.f, 4.f))
+							+ SScrollBox::Slot().Padding(0.f, 0.f, 4.f * U, 0.f)[SAssignNew(Nav, SVerticalBox)]
+						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[SAssignNew(NavFoot, SBox)]
 					]
 				]
 				// Middle: search and the recipe cards.

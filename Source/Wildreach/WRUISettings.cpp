@@ -2370,8 +2370,8 @@ namespace WRSettingsUI
 								SNew(SHorizontalBox)
 								+ SHorizontalBox::Slot().AutoWidth()
 								[
-									// Wide enough for its longest name ("Look and controller" was cut at 200).
-									SNew(SBox).WidthOverride(234.f * U)
+									// Wide enough for its longest name ("Look and controller" was cut at 200 and at 234).
+									SNew(SBox).WidthOverride(262.f * U)
 									[
 										SNew(SBorder).BorderImage(InsetBrush()).Padding(FMargin(8.f * U, 10.f * U))[Nav]
 									]

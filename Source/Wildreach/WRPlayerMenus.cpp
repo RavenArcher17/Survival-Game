@@ -197,6 +197,9 @@ void AWRPlayerController::WRMenu(FName Which, int32 Select)
 	else if (Which == TEXT("settings")) OpenJournal(EWRMenu::Settings);
 	else if (Which == TEXT("hearth")) OpenJournal(EWRMenu::Hearth);
 	else if (Which == TEXT("clan")) OpenJournal(EWRMenu::Clan);
+#if WITH_EDITOR
+	else if (Which == TEXT("god")) OpenJournal(EWRMenu::God);   // the layout shots (editor runs only: testers open it with their key)
+#endif
 	MenuIndex = FMath::Clamp(Select, 0, FMath::Max(0, BuildMenuEntries().Num() - 1));
 }
 

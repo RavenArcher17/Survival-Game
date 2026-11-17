@@ -62,6 +62,10 @@ public:
 	static bool IsOpen();
 	/** Open or close the settings window over the menu (when the menu is open). */
 	static void ShowSettings(bool bShow);
+	/** Testing and the layout shots (WRMainMenu look): the look picker open, the survivor framed into the stage. */
+	static void ShowLook(bool bShow);
+	/** Testing and the layout shots (WRMainMenu worlds): Host a game's world chooser. */
+	static void ShowWorlds();
 
 	/** This build's version (ProjectVersion in DefaultGame.ini; releases are tagged v<version>). */
 	static FString GameVersion();

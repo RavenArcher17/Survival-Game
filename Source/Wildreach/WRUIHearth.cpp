@@ -18,6 +18,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Layout/SWrapBox.h"
+#include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "WRUI"
@@ -340,10 +341,27 @@ namespace WRUIHearthScreen
 					]
 				];
 			}
-			TSharedRef<SHorizontalBox> CoreCards = SNew(SHorizontalBox);
-			for (int32 i = 0; i < Cores.Num(); ++i)
+			// Two cores (the Old Island's Fire and Frost) side by side as cards; more (a boss in every land) as round tokens
+			// that wrap into centred rows, each naming its core and where it comes from on hover (wild-hotfix-menus: ten
+			// cards in one row ran over each other and off the column).
+			TSharedRef<SWidget> CoreCards = SNullWidget::NullWidget;
+			if (Cores.Num() <= 2)
 			{
-				CoreCards->AddSlot().FillWidth(1.f).Padding(i > 0 ? 12.f * U : 0.f, 0.f, 0.f, 0.f)[CoreCard(Cores[i])];
+				TSharedRef<SHorizontalBox> Row = SNew(SHorizontalBox);
+				for (int32 i = 0; i < Cores.Num(); ++i)
+				{
+					Row->AddSlot().FillWidth(1.f).Padding(i > 0 ? 12.f * U : 0.f, 0.f, 0.f, 0.f)[CoreCard(Cores[i])];
+				}
+				CoreCards = Row;
+			}
+			else
+			{
+				TSharedRef<SWrapBox> Wrap = SNew(SWrapBox).UseAllottedSize(true).HAlign(HAlign_Center).InnerSlotPadding(FVector2D(10.f * U, 10.f * U));
+				for (const FCoreInfo& C : Cores)
+				{
+					Wrap->AddSlot()[CoreToken(C)];
+				}
+				CoreCards = Wrap;
 			}
 
 			return SNew(SWRPanel).Kind(EWRPanel::Inset).Padding(FMargin(22.f * U, 18.f * U))
@@ -424,6 +442,36 @@ namespace WRUIHearthScreen
 							[
 								SNew(SWRChip).FontSize(11).Text(BossChip).Color(Tint)
 							]
+						]
+					]
+				];
+		}
+
+		/** A core as a round token (many cores): the card's ring and icon, its name and where it comes from on hover. */
+		TSharedRef<SWidget> CoreToken(const FCoreInfo& Info)
+		{
+			const FName Core = Info.Core;
+			const FLinearColor Tint = Info.Element == TEXT("frost") ? WRUI::Frost : WRUI::Ember;
+			const FWRItemDef* Def = FWRItemRegistry::Get().Find(Core);
+			const FText Name = FText::FromString(Def ? Def->Name : Core.ToString());
+			const FCoreInfo Copy = Info;
+			return SNew(SBox).WidthOverride(54.f * U).HeightOverride(54.f * U)
+				.ToolTipText_Lambda([this, Copy, Name]() { return FText::Format(LOCTEXT("CoreTip", "{0}: {1}"), Name, CoreLine(Copy)); })
+				[
+					SNew(SOverlay)
+					+ SOverlay::Slot()
+					[
+						SNew(SImage).Image_Lambda([this, Core, Tint]()
+						{
+							return HasCore(Core) ? Circle(Tint * 0.22f + FLinearColor(0.f, 0.f, 0.f, 0.78f), WRUI::Brass, 2.f)
+								: Circle(FLinearColor(0.02f, 0.025f, 0.03f), WRUI::Alpha(Tint, Carried(Core) > 0 ? 1.f : 0.6f), 2.f);
+						})
+					]
+					+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)
+					[
+						SNew(SBox).WidthOverride(36.f * U).HeightOverride(36.f * U)
+						[
+							SNew(SImage).Image(WRUI::Icon(Core)).ColorAndOpacity_Lambda([this, Core]() { return HasCore(Core) ? FLinearColor::White : FLinearColor(1.f, 1.f, 1.f, 0.35f); })
 						]
 					]
 				];
@@ -559,11 +607,13 @@ namespace WRUIHearthScreen
 					+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Bottom)[WRUI::Text(LOCTEXT("Unlocks", "What each level unlocks"), WRUI::Title(17), WRUI::Ink, true)]
 					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Bottom)[WRUI::Text(LOCTEXT("UnlocksSub", "Recipes at your stations"), WRUI::Body(13, 500), WRUI::Ink3)]
 				];
+			// The levels scroll inside the column (five or more levels are taller than the window: they ran out of it).
+			TSharedRef<SScrollBox> Levels = SNew(SScrollBox).ScrollBarThickness(FVector2D(6.f * U, 6.f * U));
 			for (int32 L = 1; L <= MaxLevel; ++L)
 			{
-				Col->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)[LevelCard(L)];
+				Levels->AddSlot().Padding(0.f, L > 1 ? 12.f * U : 0.f, 6.f * U, 0.f)[LevelCard(L)];
 			}
-			Col->AddSlot().FillHeight(1.f)[SNew(SSpacer)];
+			Col->AddSlot().FillHeight(1.f).Padding(0.f, 12.f * U, 0.f, 0.f)[Levels];
 			Col->AddSlot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 			[
 				SNew(SBorder).BorderImage(CardBrush()).Padding(FMargin(16.f * U, 10.f * U, 16.f * U, 12.f * U))
@@ -678,7 +728,7 @@ namespace WRUIHearthScreen
 								]
 								+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(FText::FromString(Metal), WRUI::Body(16, 800), (MetalCol * 1.15f).GetClamped())]
 							]
-							+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this, L]() { return LevelLine(L); }), WRUI::Body(13, 500), WRUI::Ink3)]
+							+ SVerticalBox::Slot().AutoHeight()[WRUI::Text(TAttribute<FText>::CreateLambda([this, L]() { return LevelLine(L); }), WRUI::Body(13, 500), WRUI::Ink3, false, true)]
 						]
 						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
 						[

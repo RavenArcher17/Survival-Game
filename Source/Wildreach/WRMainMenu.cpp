@@ -1221,7 +1221,7 @@ TSharedRef<SWidget> SWRMainMenu::MakePathPicker()
 		const FName Id = Defs[i].Id;
 		Row->AddSlot().FillWidth(1.f).Padding(i % Cols > 0 ? 3.f * U : 0.f, 0.f, 0.f, 0.f)
 		[
-			SNew(SWRChoice, [this, Id]() { return Path == Id; }).Path(Id).Height(30.f).FontSize(13)
+			SNew(SWRChoice, [this, Id]() { return Path == Id; }).Path(Id).Height(30.f).FontSize(12)
 			.Text(FText::FromString(WRPathLook::Name(Id))).OnClicked(this, &SWRMainMenu::OnPickPath, Id)
 		];
 	}
@@ -1938,13 +1938,30 @@ bool SWRMainMenu::IsOpen()
 	return Instance.IsValid();
 }
 
+void SWRMainMenu::ShowWorlds()
+{
+	if (Instance.IsValid()) static_cast<SWRMainMenu&>(*Instance).OnHost();
+}
+
+void SWRMainMenu::ShowLook(bool bShow)
+{
+	if (!Instance.IsValid()) return;
+	SWRMainMenu& M = static_cast<SWRMainMenu&>(*Instance);
+	if (M.bLookOpen == bShow) return;
+	M.bLookOpen = bShow;
+	if (bShow) M.ApplyPreview();
+	else M.EndFraming();
+}
+
 #if !UE_BUILD_SHIPPING
 // Testing and screenshots (the bot runs console commands): WRMainMenu opens the front end; WRMainMenu settings also
 // opens its settings window.
-static FAutoConsoleCommandWithWorldAndArgs GWRMainMenuCommand(TEXT("WRMainMenu"), TEXT("Testing: open the main menu (WRMainMenu settings: with its settings open)"),
+static FAutoConsoleCommandWithWorldAndArgs GWRMainMenuCommand(TEXT("WRMainMenu"), TEXT("Testing: open the main menu (WRMainMenu settings: with its settings open; WRMainMenu look: the look picker; WRMainMenu worlds: Host a game)"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 	{
 		SWRMainMenu::Open(World ? World->GetFirstPlayerController() : nullptr);
 		SWRMainMenu::ShowSettings(Args.Num() > 0 && Args[0] == TEXT("settings"));
+		SWRMainMenu::ShowLook(Args.Num() > 0 && Args[0] == TEXT("look"));
+		if (Args.Num() > 0 && Args[0] == TEXT("worlds")) SWRMainMenu::ShowWorlds();
 	}));
 #endif
