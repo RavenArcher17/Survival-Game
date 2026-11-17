@@ -33,6 +33,7 @@ private:
 	TWeakObjectPtr<APlayerController> Owner;
 	TSharedPtr<SEditableTextBox> Box;
 	static TSharedPtr<SWidget> Instance;
+	friend class SWRMainMenu;  // ReleaseAtExit
 };
 
 /**
@@ -50,6 +51,12 @@ public:
 
 	void Construct(const FArguments& InArgs);
 	virtual ~SWRMainMenu() override;
+	/**
+	 * Drops the widgets and the update download these statics hold, while the engine is still up (FCoreDelegates::
+	 * OnEnginePreExit, Wildreach.cpp). Left to the C runtime's exit, the menu's text layouts were freed after ICU had
+	 * shut down and every quit ended in heap corruption (0xC0000374), which the Freedom35 updater reports as a crash.
+	 */
+	static void ReleaseAtExit();
 	virtual void Tick(const FGeometry& Geo, const double Time, const float Delta) override;
 	/** Esc closes the card over the menu (a disconnect, a crash). */
 	virtual FReply OnKeyDown(const FGeometry& Geo, const FKeyEvent& E) override;

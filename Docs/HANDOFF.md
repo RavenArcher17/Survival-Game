@@ -36,7 +36,8 @@ installer and auto-updater. `CHANGELOG.md` has every version, newest first, with
 Unreleased (0.8.2, lane wild-f35): players get the Shipping build (184 MB exe, no `.pdb`), the cooked content is cut
 to what the game uses and 2K textures (3.1 GB on disk, was 4.3 GB) in files of up to 60 MB, and Wildreach is listed on
 Freedom35 with a small installer that downloads the files; a Freedom35 install updates only through Freedom35
-("Releasing on Freedom35" below).
+("Releasing on Freedom35" below). Live there: 0.8.2.2 (2026-11-17), which also fixes every quit ending in heap
+corruption (static Slate widgets freed after ICU shut down; `SWRMainMenu::ReleaseAtExit`). No GitHub release of 0.8.2.
 
 In 0.8.1: every screen fits every screen (`WRUIFit.h`: a 1760 x 1080 minimum canvas and `SWRFit` around every viewport
 root; the main menu laid out by flow, the survivor framed into its free stage), Update now never opens a web page, and
@@ -790,10 +791,14 @@ later starts fetch only the files that changed. The site's side is in the freedo
 
 1. Package Shipping for Freedom35: `Tools\package.ps1 -Store freedom35 -Out <folder> [-Engine <UE_5.8>]` (Shipping is
    the default; the `.pdb` goes to `<folder>\Symbols`). Every file is under 64 MB but the exe, which goes up in parts.
-2. Playable gate on the package with a fresh profile: start
-   `Wildreach\Binaries\Win64\Wildreach-Win64-Shipping.exe -F35Boot -abslog=<file> -windowed` twice with LOCALAPPDATA
-   and APPDATA pointed at a scratch folder: the file must show `F35READY menu`, `F35BOOT new`, `F35READY play`, then
-   `F35BOOT continue` and `F35READY play`. (Shipping writes no log of its own; these lines are written for the check.)
+2. Playable gate on the package: start
+   `Wildreach\Binaries\Win64\Wildreach-Win64-Shipping.exe -F35Boot -abslog=<file> -windowed` twice: the file must show
+   `F35READY menu`, `F35BOOT new`, `F35READY play`, then `F35BOOT continue` and `F35READY play`. (Shipping writes no log
+   of its own; these lines are written for the check.) Shipping saves under the account's real
+   `%LOCALAPPDATA%\Wildreach\Saved` whatever the LOCALAPPDATA variable says (Windows' known-folder path), so the check's
+   `Boot_check` world lands there: delete `Saved\Worlds\Boot_check` afterwards on a PC whose player uses the game.
+   Then close the game with its window's close button: the exit code must be 0 (F35Update reports any other code as a
+   crash; 0.8.2.1 and earlier ended every quit in 0xC0000374, see CHANGELOG 0.8.2.2).
 3. In the site repo, with a developer token for Raven's studio in `F35_TOKEN` (the operator mints a two-hour one):
    `node cli/f35.mjs installer <package>\Windows wildreach --name Wildreach --exe Wildreach.exe --version <v> --icon
    <Wildreach.ico> --files-only --record` -> `node cli/f35.mjs download <setup> wildreach --platform windows --version <v>

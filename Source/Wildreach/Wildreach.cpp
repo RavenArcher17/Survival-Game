@@ -3,6 +3,8 @@
 #include "WRNet.h"
 #include "Engine/ReplicationDriver.h"
 #include "Modules/ModuleManager.h"
+#include "Misc/CoreDelegates.h"
+#include "WRMainMenu.h"
 
 DEFINE_LOG_CATEGORY(LogWildreach);
 
@@ -14,6 +16,8 @@ public:
 	virtual void StartupModule() override
 	{
 		WRNet::InstallGraphFactory();
+		// Slate widgets held in statics go while the engine is still up, not in the C runtime's exit (SWRMainMenu::ReleaseAtExit).
+		FCoreDelegates::OnEnginePreExit.AddStatic(&SWRMainMenu::ReleaseAtExit);
 	}
 
 	virtual void ShutdownModule() override

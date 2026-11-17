@@ -46,7 +46,21 @@ one 3 GB file (the site's file store takes up to 64 MB a file).
 | Data (sound, UI, JSON) | 300 MB | 293 MB |
 | What a Freedom35 player downloads first | Setup 3.58 GB | installer + 3.09 GB of files |
 
-Checked: the editor compiles; the Shipping package's playable gate on a fresh profile (scratch LOCALAPPDATA), run 1:
+### Quitting no longer crashes (0.8.2.2 on Freedom35)
+
+Why: every quit, from the menu or from a world, ended in `0xC0000374` (heap corruption) after "Log file closed", in
+0.8.1 too, so F35Update sent a crash report each time a player closed the game. Under cdb the stack was the C runtime's
+exit table destroying `SWRMainMenu::Instance` (a static `TSharedPtr<SWidget>`), whose text blocks' BiDi layouts freed
+ICU memory after ICU had shut down. `SWRMainMenu::ReleaseAtExit` (bound to `FCoreDelegates::OnEnginePreExit` in
+`Wildreach.cpp`, before any core module shuts down) now drops the menu and chat box widgets and the update download's
+request and file while the engine is up.
+
+Checked: the editor compiles; the 0.8.2.2 Shipping package under cdb (break on `c0000374`): no break, normal
+termination; without the debugger, quit from the main menu exit 0, quit from a hosted world (`F35READY play`) exit 0;
+the installed Freedom35 copy updated 0.8.2.1 -> 0.8.2.2 (6 of 2,953 files, 184.9 MB) and its next quit logged `game
+exited 0` in F35Update's log.
+
+Checked (0.8.2): the editor compiles; the Shipping package's playable gate, run 1:
 `F35READY menu`, `F35BOOT new world 'Boot_check'`, `F35READY play`; run 2: `F35READY menu`, `F35BOOT continue world
 'Boot_check'`, `F35READY play`; the container list has no Shrub_E-I and no FaceDetector; no file over 64 MB but the exe.
 

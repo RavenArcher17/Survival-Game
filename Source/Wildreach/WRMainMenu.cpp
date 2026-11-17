@@ -251,6 +251,20 @@ namespace WRMenuUpdate
 TSharedPtr<SWidget> SWRMainMenu::Instance;
 TWeakObjectPtr<ACameraActor> SWRMainMenu::Backdrop;
 TSharedPtr<SWidget> SWRChatBox::Instance;
+
+void SWRMainMenu::ReleaseAtExit()
+{
+	if (WRMenuUpdate::Request.IsValid())
+	{
+		WRMenuUpdate::Request->OnProcessRequestComplete().Unbind();
+		WRMenuUpdate::Request->CancelRequest();
+		WRMenuUpdate::Request.Reset();
+	}
+	WRMenuUpdate::File.Reset();
+	Instance.Reset();
+	SWRChatBox::Instance.Reset();
+}
+
 FString SWRMainMenu::LatestVersion;
 FString SWRMainMenu::LastFailure;
 int32 SWRMainMenu::CardKind = 0;
