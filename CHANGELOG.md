@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.1 (2026-11-16): every screen fits every screen, Update now never opens a web page
+
+Released https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.8.1 from b420575 (package E:\Dev\WildreachBuild6 on the desktop). Playable gate on the installed package: F35READY menu, F35BOOT new / continue, F35READY play at 2560x1600 and at 1920x1080; a fresh 0.8.0 install updated itself from the release (19 of 2,929 files, 286 MB) and reached play. Every asset digest equals its local SHA-256. Not in it: the Electric Dreams forest kit (not on the packaging PC), so the Ancient forest ships its tree-kit look.
 
 ### Every screen fits every screen; Update now never opens a web page (lane wild-hotfix-menus; cooks/wild-hotfix-menus.md in showcase-notes)
 

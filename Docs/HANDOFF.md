@@ -26,14 +26,17 @@ Raven writes them in Claude Docs. Copies as of 2026-11-08 are in `Docs/design/` 
 one file per tab). Raven keeps editing the live ones, so the copies go stale: ask Raven for a fresh export before a
 big piece of work. The build plan's "Where it stands" table says what's built.
 
-## Where the game stands (v0.8.0, the full game: all 12 lands)
+## Where the game stands (v0.8.1, the full game: all 12 lands)
 
 Every system in the First playable tier is built and has a bot test: biomes, both paths, levelling, combat, six
 bosses, enemies and wildlife regions, taming, survival, crafting (with time and station queues), building (with
 claims, raids and door keypads), clans, PvP rules, worlds and world settings, the stone-and-leather UI, sound, the
 installer and auto-updater. `CHANGELOG.md` has every version, newest first, with what changed and why.
 
-Since 0.8.0 (unreleased): **the NPC strongholds are Elden-Ring-style forts with a garrison** (lane
+In 0.8.1: every screen fits every screen (`WRUIFit.h`: a 1760 x 1080 minimum canvas and `SWRFit` around every viewport
+root; the main menu laid out by flow, the survivor framed into its free stage), Update now never opens a web page, and
+every package carries its updater. The Ancient forest still shipped its tree-kit look: the packaging PC (the desktop)
+has no Electric Dreams kit yet. Also since 0.8.0: **the NPC strongholds are Elden-Ring-style forts with a garrison** (lane
 build-wild-strongholds, cooks/build-wild-strongholds.md in showcase-notes): the layout is data
 (`Tools/terrain/strongholds.mjs` -> `Data/strongholds.json`: outpost, gate front, breach, yard, keep in the land's set,
 inner ward + postern + run-back stone; ladders are fort-owned `AWRSiegeLadder`s), the soldiers are `AWRGarrison`
