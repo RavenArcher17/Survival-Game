@@ -4,6 +4,10 @@
 
 ### 0.8.2 on GitHub too (Raven's PC)
 
+**Released** https://github.com/RavenArcher17/Survival-Game/releases/tag/v0.8.2 (Latest; tag on 77d7bc1; uploaded as a
+draft, published once every asset's digest equalled its local SHA-256). The first playtest's page
+(playtest-2026-10-25) now says the game has moved on and links the newest download.
+
 Why: Raven 11-17: "people installing from github need the newest version aswell untill further notice". So until Raven
 says otherwise, every version goes out on GitHub as well as Freedom35 (HANDOFF "Releasing an update").
 
