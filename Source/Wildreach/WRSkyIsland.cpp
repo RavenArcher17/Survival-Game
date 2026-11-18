@@ -236,7 +236,9 @@ void AWRSkyScenery::BuildIsland()
 					if (Da < 260.f && Zm < M.Z + 470.f && Zm > M.Z - 30.f) bHole = true;
 				}
 			}
-			if (!bHole) Rim.Quad(Wall[r][s], Wall[r + 1][s], Wall[r + 1][S1], Wall[r][S1]);
+			// Wound to face outward, the same way round as the top's rings (it was the other way: every island's sides
+			// and root were inside out and read as black cones, hollow from below; landmarks audit 11-18).
+			if (!bHole) Rim.Quad(Wall[r][s], Wall[r][S1], Wall[r + 1][S1], Wall[r + 1][s]);
 		}
 	}
 	// The root's tip: a fan to the last ring's centre.
@@ -246,7 +248,7 @@ void AWRSkyScenery::BuildIsland()
 		for (int32 Ix : Last) Mid += Rim.V[Ix];
 		Mid /= Last.Num();
 		const int32 Tip = Rim.Add(Mid - FVector(0, 0, 300.f), -FVector::UpVector, SkSRGB(0xA9, 0xC4, 0xD9) * 0.7f, Xf.TransformPosition(Mid));
-		for (int32 s = 0; s < NS; ++s) Rim.T.Append({ Last[s], Tip, Last[(s + 1) % NS] });
+		for (int32 s = 0; s < NS; ++s) Rim.T.Append({ Last[s], Last[(s + 1) % NS], Tip });
 	}
 
 	UMaterialInterface* Ground = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_LandGround.M_LandGround"));

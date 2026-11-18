@@ -34,6 +34,8 @@ private:
 	void Build();
 	float LipZ = 0.f;
 	FVector Centre = FVector::ZeroVector;
+	/** The Great Rift's radius (cm): the drain reaches only who is inside it, not every land's caves. */
+	float RadiusCm = 0.f;
 	FVector U8 = FVector::ZeroVector;
 	TSet<FString> ReachedLastNote;
 	float DrainClock = 0.f;

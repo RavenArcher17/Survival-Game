@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+### Phase 2, part 1: the progression, data and landmark bugs, and the unit tests green again (Raven, 11-18)
+
+From the 11-18 audits (the whole-game one and the landmarks-and-looks one, notes in `C:\Dev\WildreachAudit-20261118`).
+Built and unit-tested (32 of 32 pass); the landmark fixes checked in game pictures (spotshots); **not played yet**.
+
+Progression
+- **The Hearth takes every major boss's core**, not only Vulkarn's and Skaldrith's (`WRCrafting.cpp`): tech levels 4
+  and 5 (steel, starsteel, the 12 land armour sets and building sets, siege, 165 recipes) can be reached.
+- **Ahrumet and Thalassor are major bosses** (`creatures.json` role): phases, blueprints, artifacts, their bar.
+- **Morwen's quest chain goes past quest 2:** raising a Gravehound, or butchering one to the bones, counts
+  (`first_raise`, `WRNecroPath.cpp`, `WRCarcass.cpp`).
+- **Achievements:** the Sky and Void rows name the game's land ids (`sky_islands`, `wasteland`); the five new belts list
+  their mini-bosses, and a belt's `minis:` need is understood (`WRDeedsAchieve.cpp`).
+- **All 12 monuments can be built:** every major has `trophy_head_<boss>` (four renamed, four new), dropped on the kill
+  as before; the monuments' `liveWith` use the game's land ids.
+
+Lands and data
+- **The Desert has wildlife:** its three settings blocks were inside the Ocean's in `tuning.json`; moved out.
+- **The Wasteland has sound:** its 64 sound events were in the voices section of `sounds.json`; moved to the events.
+- Two settings written twice in `tuning.json` merged (`lifeSkills.xp.place`, `creatureAI.stomp`).
+- **Dead ends opened:** the Puffram gives Puffram wool (the Stormweave set); the Desert minis drop their trophies (the
+  three talismans); the Graveyard's bosses drop grave essence (Nhal's scythe, the Decay turret); the Blind turret ammo
+  is radiant essence; the puffwing, slimeshell and mournhare pens give real items; the Sun-Vault's sunglass ring and
+  the Updraft lift and Gale arrow blueprints exist; three blueprints are learnable; the yew longbow's blueprint id
+  fixed; two quest rewards unlock their recipes; the shock-resist potion no longer waits for the Swamp; digging clay
+  in the Desert turns up beetle grubs (Wellfrog and Scarab food).
+- **Eggs:** 4 nest eggs and 58 fertilised eggs are items now (no more "Inventory full" at a nest).
+- **Packs of 4 at most everywhere** (Raven 11-18): 39 creatures' packs capped.
+- Storm lowland bases get night raiders (a Voltfang). The other six lands' raiders come with the population rebuild.
+- Ten timed effects now emit (the lightning warning, the bell's Toll, the Long Noon's column...); six "streak" layers
+  draw as sparks.
+
+Landmarks (checked in pictures)
+- **The Unmade pocket only drains inside the Great Rift** (`WRVoidUnmade.cpp`): it drained anyone in any land's caves
+  and killed explorers of the Crystal and Fungal caverns in about 30 s.
+- **The Old Island's ash and snow stay on the Old Island** (`WRFxAmbient.cpp`): keyed on x alone, they fell in every land.
+- **Landmark effects draw out to their own reach** (each particle carries its effect's `cull`, `WRFx.cpp`): the crater's
+  plume, the Haboob Wall, the falls' mist no longer stop at 250 m. Lava and ice sheets draw to 1.5 km, place lamps to
+  600 m, night place effects start from 1.2 km (`tuning.json`).
+- **Sky islands face outward** (`WRSkyIsland.cpp`): their sides and roots were inside out (black cones, hollow below).
+- **The Great Rift's walls face inward** (`WRLand.cpp`): from inside it showed open sea and sky.
+- **The Bridge of Nine Spans and the Sky's sinking stones reach joining players** (always relevant): spawned at the
+  world origin with a range from there, a client never got them.
+- The Erg and Canyon shrines' braziers stand on their skull and spire tops (`world.json`), so they can be lit.
+
+Engine errors and saves
+- The Sky's sailbell clean-up no longer changes the creature list while walking it (`WRSkyCreatureAI.cpp`).
+- A boss-look part with a NaN point is left out and logged instead of breaking the mesh's bounds (Sylvaroth).
+- Players are saved every 10 s each, not every second when fewer than 10 are on (`WRGameMode.cpp`).
+- Comment rows in `attacks.json` and `sounds.json` are skipped before they're read as objects: the 39 + 4 `LogJson`
+  errors every start are gone (they failed every bot test's "no errors" check).
+
+Tests
+- Unit tests updated to the 0.8 design (audio, combat scenarios, crafting, creatures, spawn regions, walk map, build
+  pieces); the obsolete `island_spawns.json` test removed. New `Wildreach.Data.*` checks: every item id used exists,
+  the lands' settings are where their code reads them, majors have a core and a head, land ids are live, belts list
+  minis, eggs exist, effect sprites and loops, sound rows in the right section.
+- Every bot test's world keeps JSON save files (`-wrstore=json`), as the tests read them; the version test reads the
+  menu's new `MENU card` line.
+
 ### The Electric Dreams forest kit is out of git again (Raven, 11-18)
 
 The kit pushed in 29d9fb7 (190 files, 1.57 GB of LFS under `Content/Megascans`, `MSPresets`, `Custom` and

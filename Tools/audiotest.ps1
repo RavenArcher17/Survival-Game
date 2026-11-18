@@ -26,7 +26,7 @@ if ($MainMenu) {
 	$cmds = @('WRBotPause 1', 'wait 2', 'WRSoundRecord start 120', 'WRMainMenu', 'wait 14', 'WRSoundStats', 'WRMainMenu settings', 'wait 2', 'WRSettings audio', 'wait 1.5',
 		'shot showui', 'wait 2', 'WRUIMouse click 203 273', 'wait 1', 'WRUIMouse click 204 235', 'wait 1', 'WRUIMouse drag 1025 219 900 219', 'wait 1',
 		'WRUIMouse click 1080 641', 'wait 2', 'WRSoundStats', 'WRSoundRecord stop audiotest_menu', 'wait 3')
-	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?Path=fire?WRName=${name} -game -windowed -ResX=1280 -ResY=720 -unattended -wrbot -wrsoundlog -wrworld=audiotestmenu $focus `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$Out\client.log`"" -PassThru
+	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?Path=fire?WRName=${name} -game -windowed -ResX=1280 -ResY=720 -unattended -wrbot -wrsoundlog -wrworld=audiotestmenu -wrstore=json $focus `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$Out\client.log`"" -PassThru
 	$s = $null
 } else {
 	$cmds = @(
@@ -73,7 +73,7 @@ if ($MainMenu) {
 		# Spam check: ten of one event at once: the minimum gap lets one through.
 		'WRSoundPlay ui.click 2d 10', 'wait 1', 'WRSoundPlay no.such.event', 'WRSoundPlay no.such.event', 'wait 1',
 		'WRSoundStats', 'WRSoundRecord stop audiotest', 'wait 4')
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=audiotest -abslog=`"$Out\server.log`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=audiotest -wrstore=json -abslog=`"$Out\server.log`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 30
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1280 -ResY=720 -unattended -wrbot -wrsoundlog $focus `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$Out\client.log`"" -PassThru
 }

@@ -50,7 +50,7 @@ function Cmds([string]$menuClick) {
 function Start-Player([string]$name, [string]$menuClick, [string]$extraIni, [string]$map = '/Game/Maps/L_Island') {
 	$log = Join-Path $logs "$name.log"
 	$ini = "[Wildreach.Menu]:Name=$name,[Wildreach.Menu]:Body=m,[Wildreach.Menu]:Path=fire$extraIni"
-	$args = "`"$project`" $map -game -windowed -ResX=1280 -ResY=720 -unattended -nosound -wrbot -wrworld=menutest -port=$Port " +
+	$args = "`"$project`" $map -game -windowed -ResX=1280 -ResY=720 -unattended -nosound -wrbot -wrworld=menutest -wrstore=json -port=$Port " +
 		"`"-ini:Engine:[URL]:Port=$Port`" `"-ini:GameUserSettings:$ini`" `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$((Cmds $menuClick) -join '|')`" -abslog=`"$log`""
 	Start-Process $ue -ArgumentList $args -PassThru
 }

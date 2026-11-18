@@ -913,7 +913,7 @@ resources.lime = LIME.map(([x, y, r, z]) => [x, y, z]).slice(0, 3);
 const yew = sites.find(s => s.id === 'L2');
 const named = sites.find(s => s.id === 'H2');
 const secrets = [
-	{ id: 'S1', kind: 'yew_grave', x: yew.x + 3.5, y: yew.y + 1.5, z: r2(hAt(yew.x, yew.y)), dig: 3, tool: 'pick', gives: { yew_longbow_bp: 1, lore_first_lantern: 1 } },
+	{ id: 'S1', kind: 'yew_grave', x: yew.x + 3.5, y: yew.y + 1.5, z: r2(hAt(yew.x, yew.y)), dig: 3, tool: 'pick', gives: { bp_yew_longbow: 1, lore_first_lantern: 1 } },
 	{ id: 'S2', kind: 'full_grave', x: named.x - 7.5, y: named.y + 6, z: r2(hAt(named.x, named.y)), dig: 3, tool: 'pick', gives: { mourning_ring: 1, silver_ingot: 6 } },
 	{ id: 'S3', kind: 'unlit_lantern', x: 0, y: 0, z: 0, hold: 3, flame: true, xp: 1000 },
 	{ id: 'S4', kind: 'seventh_name', x: -1750 - 10, y: 2650, z: 0, hold: 5, needs: 'mourners_chisel', gives: { sextons_pick: 1 } },

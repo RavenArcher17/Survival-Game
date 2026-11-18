@@ -142,7 +142,7 @@
         "rimeclaw": 6
       }
     },
-    {"id":"storm_lowland","name":"Storm peaks lowland","side":"storm_peaks","band":"lowland","zones":"12","target":60,"creatures":{"puffram":12,"rodcrest":8},"night":{"puffram":10,"rodcrest":6}},
+    {"id":"storm_lowland","name":"Storm peaks lowland","side":"storm_peaks","band":"lowland","zones":"12","target":60,"creatures":{"puffram":12,"rodcrest":8},"raiders":{"voltfang":1},"night":{"puffram":10,"rodcrest":6}},
     {"id":"storm_midland_passes","name":"Storm peaks passes and cliff paths","side":"storm_peaks","band":"midland","zones":"12","target":55,"creatures":{"galeback":8,"voltfang":6,"coilburrow":5,"cragstrider":4,"stormkite":3},"raiders":{"voltfang":2},"night":{"voltfang":10,"galeback":6,"coilburrow":5,"cragstrider":4,"stormkite":3},"storm":{"voltfang":8,"galeback":6,"stormkite":4}},
     {"id":"storm_midland_gorges","name":"Storm peaks bridges and crags","side":"storm_peaks","band":"midland","zones":"34","target":40,"creatures":{"stormkite":8,"cragstrider":6,"coilburrow":2},"raiders":{"stormkite":1,"voltfang":1},"night":{"voltfang":8,"stormkite":6,"cragstrider":6},"storm":{"stormkite":8,"voltfang":4}},
     {"id":"storm_highland","name":"Storm peaks heights","side":"storm_peaks","band":"highland","zones":"245","target":14,"creatures":{"thunderhorn":6},"raiders":{"thunderhorn":1},"night":{"thunderhorn":6},"storm":{"thunderhorn":4,"raiju":3}},

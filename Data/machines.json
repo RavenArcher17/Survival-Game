@@ -69,7 +69,7 @@
       { "turret": "element_turret", "item": "frost_essence", "element": "frost", "shape": "bolt", "damage": 20, "frost": 40, "speed": 3000, "range": 2000, "shots": 50, "color": [0.55, 0.85, 1.0] },
       { "turret": "element_turret", "item": "storm_essence", "element": "shock", "shape": "bolt", "damage": 22, "status": "shock", "buildup": 30, "speed": 4500, "range": 2000, "shots": 50, "color": [0.5, 0.65, 1.0] },
       { "turret": "element_turret", "item": "tide_essence", "element": "soak", "shape": "bolt", "damage": 18, "status": "soak", "buildup": 40, "speed": 3000, "range": 2000, "shots": 50, "color": [0.2, 0.55, 0.85] },
-      { "turret": "element_turret", "item": "sun_essence", "element": "blind", "shape": "bolt", "damage": 20, "status": "blind", "buildup": 30, "speed": 3500, "range": 2000, "shots": 50, "color": [1.0, 0.8, 0.3] },
+      { "turret": "element_turret", "item": "radiant_essence", "element": "blind", "shape": "bolt", "damage": 20, "status": "blind", "buildup": 30, "speed": 3500, "range": 2000, "shots": 50, "color": [1.0, 0.8, 0.3] },
       { "turret": "element_turret", "item": "grave_essence", "element": "decay", "shape": "bolt", "damage": 20, "status": "decay", "buildup": 30, "speed": 3000, "range": 2000, "shots": 50, "color": [0.4, 0.9, 0.55] },
       { "turret": "element_turret", "item": "arcane_essence", "element": "mark", "shape": "bolt", "damage": 22, "status": "mark", "buildup": 35, "speed": 3500, "range": 2000, "shots": 50, "color": [0.75, 0.55, 1.0] },
       { "turret": "element_turret", "item": "void_essence", "element": "curse", "shape": "bolt", "damage": 22, "status": "curse", "buildup": 30, "speed": 3000, "range": 2000, "shots": 50, "color": [0.55, 0.15, 0.9] },

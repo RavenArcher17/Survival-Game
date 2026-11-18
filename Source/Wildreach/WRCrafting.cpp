@@ -315,7 +315,14 @@ FString AWRHearth::DepositCores(AWRPlayerController* Player)
 		return FString();
 	}
 	int32 Added = 0;
-	for (const FName Core : { FName(TEXT("core_vulkarn")), FName(TEXT("core_skaldrith")) })
+	// Every major boss's core (items.json "core_<boss>", category core): all 12 lands' majors, not only the Old Island's
+	// two (the champion's mark is a core-category token, not a boss core).
+	TArray<FName> BossCores;
+	for (const FWRItemDef& D : FWRItemRegistry::Get().All())
+	{
+		if (D.Category == TEXT("core") && D.Id.ToString().StartsWith(TEXT("core_"))) BossCores.Add(D.Id);
+	}
+	for (const FName Core : BossCores)
 	{
 		// Each level needs cores from *different* major bosses, so only the first of each counts.
 		if (PS->GetInventory()->CountOf(Core) > 0 && !Cores.Contains(Core))

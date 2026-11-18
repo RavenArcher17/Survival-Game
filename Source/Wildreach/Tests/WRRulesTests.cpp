@@ -235,12 +235,13 @@ bool FWRCraftingRulesTest::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("%s needs only wood and stone"), *Tool.ToString()), In.Key == TEXT("wood") || In.Key == TEXT("stone"));
 		}
 	}
+	// Hand recipes' inputs are items (where each can be had, from a drop, a node, a fish, a crop or another recipe, is
+	// Wildreach.Data.Sources' job: since 0.8.0 flint, clay, wax and the like come from the lands' nodes and creatures).
 	for (const FWRRecipe* R : FWRRecipeRegistry::Get().ForStation(TEXT("hand")))
 	{
 		for (const TPair<FName, int32>& In : R->Inputs)
 		{
-			const bool bBareHanded = In.Key == TEXT("wood") || In.Key == TEXT("stone") || In.Key == TEXT("fiber") || In.Key == TEXT("berries");
-			TestTrue(FString::Printf(TEXT("%s input %s can be had"), *R->Id.ToString(), *In.Key.ToString()), bBareHanded || FWRRecipeRegistry::Get().ForOutput(In.Key) != nullptr);
+			TestNotNull(FString::Printf(TEXT("%s input %s is an item"), *R->Id.ToString(), *In.Key.ToString()), FWRItemRegistry::Get().Find(In.Key));
 		}
 	}
 	// Every ranged weapon and its ammo can be made.

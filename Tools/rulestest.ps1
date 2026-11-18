@@ -26,7 +26,7 @@ function Play([string]$tag, [string]$settings) {
 	New-Item -ItemType Directory -Force $db | Out-Null
 	[IO.File]::WriteAllText((Join-Path $db 'settings.json'), $settings)
 	$slog = "$logs\$tag-server.log"; $clog = "$logs\$tag-client.log"
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=$world -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=$world -wrstore=json -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 25
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$clog`"" -PassThru -WindowStyle Hidden
 	$deadline = (Get-Date).AddSeconds(150)

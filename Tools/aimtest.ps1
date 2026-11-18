@@ -17,7 +17,7 @@ foreach ($w in 'aimtest', 'aimcave') { Remove-Item -Recurse -Force (Join-Path $r
 # ---- the arena
 $tune = 'spells.fireBolt.damage:1,spells.fireBolt.burnBuildup:0,spells.meteor.damage:30,spells.meteor.burnBuildup:0,spells.meteor.cooldown:1'
 if ($NoAssist) { $tune += ',spells.lockLead:0,spells.lockHoming:0,spells.lockHomingPlayers:0' }
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=aimtest -wrpreset=pvp_standard -wrtune=$tune `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=aimtest -wrstore=json -wrpreset=pvp_standard -wrtune=$tune `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 
 $hunter = @('WRBotPause 1', 'wait 3',
@@ -61,7 +61,7 @@ if (-not $NoAssist) {
 	$a = $cave.yaw * [math]::PI / 180; $k = if ($cave.scale) { [double]$cave.scale } else { 1.0 }
 	function CaveAt([double]$along) { '{0:F0} {1:F0}' -f ($cave.x + [math]::Cos($a) * $along * $k), ($cave.y + [math]::Sin($a) * $along * $k) }
 	$cmds = @('WRBotPause 1', 'wait 3', "WRTeleport $(CaveAt 2200)", 'wait 6', 'WRHeal', "WRWalkTo $(CaveAt 300)", 'wait 16', 'WRHeal', "WRLookAt $(CaveAt -300) $($cave.z + 60)", 'wait 1', 'WRLockOn', 'wait 1', 'WRSay aimcave-done')
-	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=Caver?Path=fire -game -nullrhi -unattended -nosound -port=$($Port + 1) -wrworld=aimcave -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$caveLog`"" -PassThru -WindowStyle Hidden
+	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=Caver?Path=fire -game -nullrhi -unattended -nosound -port=$($Port + 1) -wrworld=aimcave -wrstore=json -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$caveLog`"" -PassThru -WindowStyle Hidden
 	$deadline = (Get-Date).AddSeconds(130)
 	# (The log may not exist yet: Select-String on a missing file would end this loop at once.)
 	while ((Get-Date) -lt $deadline -and -not ((Test-Path $caveLog) -and (Select-String -Path $caveLog -Pattern 'chat Caver: aimcave-done|CHAT .*aimcave-done' -Quiet))) { Start-Sleep -Seconds 3 }

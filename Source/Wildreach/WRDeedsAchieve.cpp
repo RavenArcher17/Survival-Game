@@ -344,6 +344,13 @@ bool WRDeeds::IsLive(const TSharedPtr<FJsonObject>& Row)
 					for (const TSharedPtr<FJsonValue>& T : *H) bOk |= DStr(T->AsObject(), TEXT("biome")) == Val;
 			}
 			else if (K == TEXT("mythic")) bOk = DBool(Mythic(), TEXT("live"));
+			else if (K == TEXT("minis"))
+			{
+				// A belt row: live once it lists its mini-bosses and every one of them exists.
+				const TArray<TSharedPtr<FJsonValue>>* Minis = DArr(Params(Row), TEXT("minis"));
+				bOk = Minis && Minis->Num() > 0;
+				if (Minis) for (const TSharedPtr<FJsonValue>& M : *Minis) bOk &= FWRCreatureRegistry::Get().Find(FName(*M->AsString())) != nullptr;
+			}
 			if (!bOk) { bLive = false; break; }
 		}
 	}

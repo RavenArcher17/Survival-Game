@@ -28,7 +28,7 @@ $packAnimals = @('cinderfang', 'gloomhowl', 'ashstrider', 'emberhorn', 'frostant
 
 function Run([string]$tag, [string]$tune, [object[]]$cmds, [string]$doneWord, [int]$seconds) {
 	$slog = "$logs\$tag-server.log"
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=roamtest -wrpreset=pve $tune -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=roamtest -wrstore=json -wrpreset=pve $tune -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 25
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\$tag-client.log`"" -PassThru -WindowStyle Hidden
 	$deadline = (Get-Date).AddSeconds($seconds)

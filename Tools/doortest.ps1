@@ -51,7 +51,7 @@ Remove-Item -Recurse -Force $db -ErrorAction SilentlyContinue
 $shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 $started = Get-Date
 $hostLog = Join-Path $logs 'host.log'; $friendLog = Join-Path $logs 'friend.log'
-$h = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=Mason?Path=fire?Body=m -game -nullrhi -unattended -nosound -port=$Port -wrworld=doortest -wrtune=wildlife.enabled:0 -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($mason -join '|')`" -abslog=`"$hostLog`"" -PassThru -WindowStyle Hidden
+$h = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=Mason?Path=fire?Body=m -game -nullrhi -unattended -nosound -port=$Port -wrworld=doortest -wrstore=json -wrtune=wildlife.enabled:0 -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($mason -join '|')`" -abslog=`"$hostLog`"" -PassThru -WindowStyle Hidden
 $f = $null
 $deadline = (Get-Date).AddSeconds(360)
 while ((Get-Date) -lt $deadline -and -not $h.HasExited) {

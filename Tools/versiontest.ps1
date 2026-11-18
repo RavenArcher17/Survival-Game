@@ -15,12 +15,12 @@ function Has([string]$file, [string]$pattern) { (Test-Path $file) -and (Select-S
 [System.IO.File]::WriteAllText("$out\feed.mjs", "import http from 'http'; http.createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify({ tag_name: 'v9.9.9' })); }).listen($port, '127.0.0.1');")
 $node = Start-Process node -ArgumentList "`"$out\feed.mjs`"" -PassThru -WindowStyle Hidden
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7838 -wrworld=versiontest `"-ini:Game:$old`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7838 -wrworld=versiontest -wrstore=json `"-ini:Game:$old`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 25
 # Not a bot: a plain player whose join fails falls back to the menu.
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7838?WRName=Newer -game -nullrhi -unattended -nosound -wrupdatefeed=http://127.0.0.1:$port/latest -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(120)
-while ((Get-Date) -lt $deadline -and -not ((Has "$out\client.log" 'MENU update check') -and (Has "$out\client.log" 'MENU shows'))) { Start-Sleep -Seconds 3 }
+while ((Get-Date) -lt $deadline -and -not ((Has "$out\client.log" 'MENU update check') -and ((Has "$out\client.log" 'MENU shows') -or (Has "$out\client.log" 'MENU card')))) { Start-Sleep -Seconds 3 }
 Start-Sleep -Seconds 2
 if (-not $c.HasExited) { Stop-Process -Id $c.Id -Force }
 # The same version as the server joins.
@@ -35,7 +35,8 @@ $client = @(if (Test-Path "$out\client.log") { Select-String -Path "$out\client.
 $results = @()
 function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
 $failure = [string]($client | Where-Object { $_ -match '^MENU network failure' } | Select-Object -First 1)
-$shows = [string]($client | Where-Object { $_ -match '^MENU shows' } | Select-Object -First 1)
+# The menu's failure card logs "MENU card: <title>: <reason>" since the UI cook pass ("MENU shows" before).
+$shows = [string]($client | Where-Object { $_ -match '^MENU (shows|card)' } | Select-Object -First 1)
 $check = [string]($client | Where-Object { $_ -match '^MENU update check' } | Select-Object -First 1)
 Check "the server (0.1.9) turned the $version client away" ($failure -match 'Outdated') $failure
 Check 'the menu says why' ($shows -match ('different version of Wildreach \(you have ' + [regex]::Escape($version))) $shows

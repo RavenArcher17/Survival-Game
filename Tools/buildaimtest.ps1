@@ -45,7 +45,7 @@ $cmds = @('WRBotPause 1', 'wait 2', 'WRGive wood 2000', 'WRGive stone 500', 'WRG
 	'WRGhost wood_foundation', "WRLookAt $(Local2 -400 0) $($Z2 + 60)", 'wait 0.6', 'WRGhostPlace', 'wait 1',
 	'WRSay buildaim-done', 'wait 1') -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=buildaimtest -wrtune=wildlife.enabled:0 -unattended -nosound -port=$Port -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=buildaimtest -wrstore=json -wrtune=wildlife.enabled:0 -unattended -nosound -port=$Port -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=fire?WRName=Placer -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(160)

@@ -8,6 +8,7 @@
 #include "WRGameState.h"
 #include "WRInventory.h"
 #include "WRMainMenu.h"
+#include "WRFarm.h"
 #include "WRTuning.h"
 #include "WRWildlife.h"
 #include "Dom/JsonObject.h"
@@ -148,8 +149,9 @@ bool FWRCreatureAIRulesTest::RunTest(const FString& Parameters)
 				(Attack == TEXT("lunge") || Attack == TEXT("charge") || Attack == TEXT("spit") || Attack == TEXT("stomp"))
 				&& T.Num(FString::Printf(TEXT("creatureAI.%s.windup"), *Attack.ToString()), -1.f) > 0.f);
 		}
+		// "storm": out only in a thunderstorm (the Raiju, Storm peaks).
 		TestTrue(FString::Printf(TEXT("%s: activity %s"), *C.Id.ToString(), *C.Activity.ToString()),
-			C.Activity == TEXT("any") || C.Activity == TEXT("diurnal") || C.Activity == TEXT("nocturnal"));
+			C.Activity == TEXT("any") || C.Activity == TEXT("diurnal") || C.Activity == TEXT("nocturnal") || C.Activity == TEXT("storm"));
 	}
 	TestTrue(TEXT("Gloomhowls hunt at night"), Def(TEXT("gloomhowl")) && Def(TEXT("gloomhowl"))->Activity == TEXT("nocturnal"));
 	TestTrue(TEXT("Emberhorns charge"), Def(TEXT("emberhorn"))->Attacks.Contains(TEXT("charge")));
@@ -178,75 +180,6 @@ bool FWRClockRulesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRWildlifeSitesTest, "Wildreach.World.Wildlife",
-	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FWRWildlifeSitesTest::RunTest(const FString& Parameters)
-{
-	const TSharedPtr<FJsonObject> Spawns = FWRTuning::LoadDataFile(TEXT("island_spawns.json"));
-	const TSharedPtr<FJsonObject> Roster = FWRTuning::LoadDataFile(TEXT("creatures.json"));
-	TSharedPtr<FJsonObject> Layout;
-	FString LayoutText;
-	if (FFileHelper::LoadFileToString(LayoutText, *FPaths::Combine(FPaths::ProjectDir(), TEXT("Docs/terrain/layout_proposal.json"))))
-	{
-		FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(LayoutText), Layout);
-	}
-	if (!TestTrue(TEXT("island_spawns.json, creatures.json and the layout load"), Spawns.IsValid() && Roster.IsValid() && Layout.IsValid()))
-	{
-		return false;
-	}
-	TestEqual(TEXT("sites are for the island"), Spawns->GetStringField(TEXT("map")), FString(TEXT("L_Island")));
-	// Every wild species (not bosses, their minions or the dummy) by biome.
-	TMap<FString, FString> Biome;
-	for (const TSharedPtr<FJsonValue>& V : Roster->GetArrayField(TEXT("creatures")))
-	{
-		const TSharedPtr<FJsonObject> C = V->AsObject();
-		FString Id, Home, Archetype, Role;
-		if (C && C->TryGetStringField(TEXT("id"), Id) && C->TryGetStringField(TEXT("biome"), Home) && C->TryGetStringField(TEXT("archetype"), Archetype)
-			&& Archetype != TEXT("boss") && !(C->TryGetStringField(TEXT("role"), Role) && Role == TEXT("minion")))
-		{
-			Biome.Add(Id, Home);
-		}
-	}
-	// Map metres -> world cm, as the island import does (4,033 m square, centred).
-	const double Half = (4033 - 1) * 100.0 / 2.0;
-	TArray<FVector2D> Camps;
-	for (const TSharedPtr<FJsonValue>& V : Layout->GetArrayField(TEXT("spawns")))
-	{
-		Camps.Add(FVector2D(V->AsObject()->GetNumberField(TEXT("x")) * 100.0 - Half, V->AsObject()->GetNumberField(TEXT("y")) * 100.0 - Half));
-	}
-	TMap<FString, int32> Count;
-	int32 Total = 0;
-	for (const TSharedPtr<FJsonValue>& V : Spawns->GetArrayField(TEXT("sites")))
-	{
-		const TSharedPtr<FJsonObject> S = V->AsObject();
-		const FString Id = S->GetStringField(TEXT("creature"));
-		const FVector2D At(S->GetNumberField(TEXT("x")), S->GetNumberField(TEXT("y")));
-		const FString* Home = Biome.Find(Id);
-		if (!TestNotNull(FString::Printf(TEXT("%s is a wild creature"), *Id), Home))
-		{
-			continue;
-		}
-		// The ridge runs down the middle (x = 0): volcanic to the west, tundra to the east.
-		TestTrue(FString::Printf(TEXT("%s at %.0f %.0f is in its %s half"), *Id, At.X, At.Y, **Home), (*Home == TEXT("volcanic")) == (At.X < 0.0));
-		TestTrue(FString::Printf(TEXT("%s at %.0f %.0f is on the island"), *Id, At.X, At.Y), FMath::Abs(At.X) < Half && FMath::Abs(At.Y) < Half && S->GetNumberField(TEXT("z")) > 0.0);
-		for (const FVector2D& Camp : Camps)
-		{
-			TestTrue(FString::Printf(TEXT("%s at %.0f %.0f is well clear of a player camp's safe zone"), *Id, At.X, At.Y), FVector2D::Distance(Camp, At) > 8000.0);
-		}
-		TestTrue(FString::Printf(TEXT("%s site has a pack, a range and a respawn"), *Id), S->GetIntegerField(TEXT("count")) >= 1 && S->GetNumberField(TEXT("radius")) > 0.0 && S->GetNumberField(TEXT("respawn")) > 0.0);
-		Count.FindOrAdd(Id) += S->GetIntegerField(TEXT("count"));
-		Total += S->GetIntegerField(TEXT("count"));
-	}
-	for (const TPair<FString, FString>& Wild : Biome)
-	{
-		TestTrue(FString::Printf(TEXT("%s lives somewhere on the island"), *Wild.Key), Count.FindRef(Wild.Key) > 0);
-	}
-	TestTrue(FString::Printf(TEXT("the island is busy (%d creatures)"), Total), Total >= 120);
-	TestTrue(TEXT("packs come out near players"), FWRTuning::Get().Num(TEXT("wildlife.activationRadius"), 0.f) >= 10000.f
-		&& FWRTuning::Get().Num(TEXT("wildlife.leaveRadiusMult"), 0.f) >= 1.f && FWRTuning::Get().Num(TEXT("wildlife.despawnSeconds"), 0.f) > 0.f);
-	return true;
-}
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRSpawnRegionsTest, "Wildreach.World.SpawnRegions",
 	EAutomationTestFlags::ProductFilter | EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ServerContext)
 
@@ -259,13 +192,17 @@ bool FWRSpawnRegionsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	TSet<FName> Placed;
+	TSet<FName> Sides;
 	double Total = 0.0;
 	for (const TSharedPtr<FJsonValue>& V : *Regions)
 	{
 		const TSharedPtr<FJsonObject> R = V->AsObject();
 		const FString Id = R->GetStringField(TEXT("id")), Side = R->GetStringField(TEXT("side")), Band = R->GetStringField(TEXT("band"));
-		TestTrue(*FString::Printf(TEXT("%s is on a side of the island and in a band"), *Id), (Side == TEXT("volcanic") || Side == TEXT("tundra"))
+		// A region is on a live land (the Old Island's two halves, Storm peaks, the Swamp, the Forest, the Graveyard...) in
+		// a band; the new lands' regions follow their sub-zones, so a band is a difficulty, not the creature's tier.
+		TestTrue(*FString::Printf(TEXT("%s is on a live land (%s) and in a band"), *Id, *Side), WRBiome::IsLive(FName(*Side))
 			&& (Band == TEXT("lowland") || Band == TEXT("midland") || Band == TEXT("highland")));
+		Sides.Add(FName(*Side));
 		TestTrue(*FString::Printf(TEXT("%s has a population target"), *Id), R->GetNumberField(TEXT("target")) >= 1.0);
 		Total += R->GetNumberField(TEXT("target"));
 		const TSharedPtr<FJsonObject>* Kinds = nullptr;
@@ -273,23 +210,37 @@ bool FWRSpawnRegionsTest::RunTest(const FString& Parameters)
 		{
 			continue;
 		}
-		for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Kinds)->Values)
+		// Day, night, storm and raider tables all name creatures of the region's own land.
+		for (const TCHAR* Table : { TEXT("creatures"), TEXT("night"), TEXT("storm"), TEXT("raiders") })
 		{
-			const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(FName(*KV.Key));
-			if (!TestNotNull(*FString::Printf(TEXT("%s in %s is a creature"), *KV.Key, *Id), Def))
+			const TSharedPtr<FJsonObject>* Rows = nullptr;
+			if (!R->TryGetObjectField(Table, Rows)) continue;
+			for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Rows)->Values)
 			{
-				continue;
+				const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(FName(*KV.Key));
+				if (!TestNotNull(*FString::Printf(TEXT("%s in %s (%s) is a creature"), *KV.Key, *Id, Table), Def))
+				{
+					continue;
+				}
+				TestTrue(*FString::Printf(TEXT("%s has a weight in %s (%s)"), *KV.Key, *Id, Table), KV.Value->AsNumber() > 0.0);
+				TestTrue(*FString::Printf(TEXT("%s lives on %s's land (%s)"), *KV.Key, *Id, *Def->Biome.ToString()), Def->Biome.ToString() == Side);
+				Placed.Add(Def->Id);
 			}
-			TestTrue(*FString::Printf(TEXT("%s has a weight in %s"), *KV.Key, *Id), KV.Value->AsNumber() > 0.0);
-			// It only starts on ground it can stand on: its side and band have to be the region's.
-			TestTrue(*FString::Printf(TEXT("%s lives where %s is (%s %s)"), *KV.Key, *Id, *Def->Biome.ToString(), *Def->Tier.ToString()), Def->Biome.ToString() == Side && Def->Tier.ToString() == Band);
-			Placed.Add(Def->Id);
 		}
 	}
-	// Every wild species has a region (not bosses, their minions or the dummy).
+	// Every wild species of a land the regions fill has a region (not bosses, minis, their minions, summons or portal
+	// creatures: those come from their arenas, events or code). The other lands spawn from their own tables for now.
+	// Spawned only by their boss, a raise or an event (audit 11-18 data.md 6.4): Vharra's brood and her leeches, the
+	// Graveyard's risen dead and the Crypt Mother's young.
+	static const TSet<FName> ByCode = { TEXT("vharra_brood"), TEXT("latch_leech"), TEXT("hex_totem"), TEXT("risen_mourner"), TEXT("risen_hound"),
+		TEXT("risen_bearer"), TEXT("crypt_young"), TEXT("galvara_core"), TEXT("wisp"), TEXT("training_dummy") };
 	for (const FWRCreatureDef& Def : FWRCreatureRegistry::Get().All())
 	{
-		const bool bWild = Def.Archetype != TEXT("boss") && Def.Role != TEXT("minion") && !Def.Biome.IsNone() && Def.Tier != TEXT("boss");
+		const FString Role = Def.Role;
+		const bool bWild = Def.Archetype != TEXT("boss") && Def.Tier != TEXT("boss") && !Def.Biome.IsNone() && Sides.Contains(Def.Biome)
+			&& !Def.bPortalOnly && Def.PortalRank == 0 && !Role.Contains(TEXT("boss")) && !Role.Contains(TEXT("minion"))
+			&& !Role.Contains(TEXT("summon")) && !Role.Contains(TEXT("champion")) && Role != TEXT("copy") && Role != TEXT("double")
+			&& !ByCode.Contains(Def.Id);
 		if (bWild) TestTrue(*FString::Printf(TEXT("%s has a region to live in"), *Def.Id.ToString()), Placed.Contains(Def.Id));
 	}
 	TestTrue(*FString::Printf(TEXT("the island is busy (%.0f animals)"), Total), Total >= 200.0);
@@ -303,25 +254,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRWalkMapTest, "Wildreach.World.WalkMap",
 
 bool FWRWalkMapTest::RunTest(const FString& Parameters)
 {
-	const TSharedPtr<FJsonObject> Spawns = FWRTuning::LoadDataFile(TEXT("island_spawns.json"));
-	if (!TestTrue(TEXT("sites load"), Spawns.IsValid()))
+	// (island_spawns.json is gone since the 0.6.2 region spawner; the packs are checked from the creature rows.)
+	for (const FWRCreatureDef& Def : FWRCreatureRegistry::Get().All())
 	{
-		return false;
+		if (Def.Archetype == TEXT("boss")) continue;
+		TestTrue(*FString::Printf(TEXT("%s has a pack size (%d to %d)"), *Def.Id.ToString(), Def.PackMin, Def.PackMax), Def.PackMin >= 1 && Def.PackMax >= Def.PackMin);
 	}
-	TMap<FName, TArray<FVector2D>> SitesOf;
-	for (const TSharedPtr<FJsonValue>& V : Spawns->GetArrayField(TEXT("sites")))
-	{
-		const TSharedPtr<FJsonObject> S = V->AsObject();
-		const FName Id(*S->GetStringField(TEXT("creature")));
-		const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Id);
-		if (!TestNotNull(*FString::Printf(TEXT("%s is a creature"), *Id.ToString()), Def))
-		{
-			continue;
-		}
-		TestTrue(*FString::Printf(TEXT("%s has a pack size (%d to %d)"), *Id.ToString(), Def->PackMin, Def->PackMax), Def->PackMin >= 1 && Def->PackMax >= Def->PackMin);
-		SitesOf.FindOrAdd(Id).Add(FVector2D(S->GetNumberField(TEXT("x")), S->GetNumberField(TEXT("y"))));
-	}
-	// Packs are small: 3 or 4 for the pack animals (Raven: big herds didn't feel right), lone hunters alone or in pairs.
+	// Packs are small: 3 or 4 for the pack animals (Raven: big herds didn't feel right; 4 at most everywhere, 11-18),
+	// lone hunters alone or in pairs.
 	for (const TCHAR* Pack : { TEXT("ashstrider"), TEXT("emberhorn"), TEXT("frostantler"), TEXT("cinderfang"), TEXT("gloomhowl") })
 	{
 		const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Pack);
@@ -332,35 +272,9 @@ bool FWRWalkMapTest::RunTest(const FString& Parameters)
 		if (Def.Archetype != TEXT("boss")) TestTrue(*FString::Printf(TEXT("no pack of %s is over 4"), *Def.Id.ToString()), Def.PackMax <= 4);
 	}
 	TestTrue(TEXT("hunters can be alone"), FWRCreatureRegistry::Get().Find(TEXT("magmaw")) && FWRCreatureRegistry::Get().Find(TEXT("magmaw"))->PackMin == 1);
-
-	// Ground of its own for each kind, and from most of its sites a way across that ground to another of them. (Not from
-	// all: the lava river and the ridge cut the bands into pieces, and a kind can have a site on each. Burrowers stay home.)
-	for (const TPair<FName, TArray<FVector2D>>& KV : SitesOf)
-	{
-		int32 Connected = 0;
-		for (int32 i = 0; i < KV.Value.Num(); ++i)
-		{
-			bool bOut = false;
-			for (int32 j = 0; j < KV.Value.Num() && !bOut; ++j)
-			{
-				TArray<FVector2D> Way;
-				if (i != j && WRWildlife::FindPath(KV.Key, KV.Value[i], KV.Value[j], Way) && Way.Num() > 0)
-				{
-					bOut = true;
-					for (const FVector2D& Point : Way)
-					{
-						TestTrue(*FString::Printf(TEXT("%s's way is all ground it can stand on"), *KV.Key.ToString()), WRWildlife::CanStand(KV.Key, Point));
-					}
-				}
-			}
-			Connected += bOut;
-		}
-		TestTrue(*FString::Printf(TEXT("%s can walk between most of its sites (%d of %d)"), *KV.Key.ToString(), Connected, KV.Value.Num()), Connected * 2 >= KV.Value.Num());
-	}
+	// The walk map keeps creatures on their own ground.
 	TestFalse(TEXT("nobody stands in the deep sea"), WRWildlife::CanStand(TEXT("ashstrider"), FVector2D(-199000.0, -199000.0)));
 	TestFalse(TEXT("nor on the other side of the island"), WRWildlife::CanStand(TEXT("ashstrider"), FVector2D(130000.0, 0.0)));
-	TArray<FVector2D> Way;
-	TestFalse(TEXT("there's no way out to sea"), WRWildlife::FindPath(TEXT("ashstrider"), SitesOf.FindRef(TEXT("ashstrider"))[0], FVector2D(-199000.0, -199000.0), Way));
 	return true;
 }
 

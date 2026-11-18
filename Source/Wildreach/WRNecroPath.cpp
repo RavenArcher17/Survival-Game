@@ -21,6 +21,8 @@
 #include "WRStatusComponent.h"
 #include "WRSurvival.h"
 #include "WRTuning.h"
+#include "WRPlayerState.h"
+#include "WRWorldSystems.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -397,6 +399,11 @@ AWRCreature* WRNecro::Raise(AWRCharacterBase* Owner, AWRCreature* Body, float Se
 	// Its master's: it follows them and fights what they fight (the tame orders work), but it is never a tame (no
 	// limit, no save, no body when it falls).
 	M->TamedBy = Owner->GetPlayerState()->GetPlayerName();
+	// Morwen's second quest (world.json quests.morwen "the_first_raise"): a raised Gravehound.
+	if (Id == TEXT("gravehound"))
+	{
+		if (UWRWorldSystems* WS = Owner->GetWorld()->GetSubsystem<UWRWorldSystems>()) WS->QuestEvent(Owner->GetPlayerState<AWRPlayerState>(), TEXT("event"), TEXT("first_raise"), 1);
+	}
 	M->TameOrder = EWRTameOrder::Follow;
 	M->bTameAggressive = true;
 	if (UAbilitySystemComponent* ASC = M->GetAbilitySystemComponent())

@@ -862,7 +862,9 @@ AWRSkyStones::AWRSkyStones()
 	bReplicates = true;
 	PrimaryActorTick.bCanEverTick = true;
 	SetNetUpdateFrequency(4.f);
-	SetNetCullDistanceSquared(FMath::Square(100000.f));
+	// Spawned at the world origin, ~8.7 km from its stones: a range from the actor never reached the Sky, so joining
+	// players never got the stones (landmarks audit 11-18). One actor, light state.
+	bAlwaysRelevant = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 }
 

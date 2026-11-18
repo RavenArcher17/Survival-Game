@@ -73,7 +73,7 @@ if (-not $Log) {
 	[System.IO.File]::WriteAllText((Join-Path $db 'world.json'), $world)
 	$shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 	$started = Get-Date
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=demolishtest -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=demolishtest -wrstore=json -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 30
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=m -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 	$deadline = (Get-Date).AddSeconds(420)

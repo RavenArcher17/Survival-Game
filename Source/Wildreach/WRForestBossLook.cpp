@@ -256,6 +256,15 @@ UProceduralMeshComponent* UWRForestBossBody::AddMesh(FName Bone, const FVector& 
 	{
 		return nullptr;
 	}
+	// A part with a NaN point or placement gave its mesh NaN bounds (the engine's ensure on Sylvaroth's body, 11-17):
+	// leave it out and say which, so the shape that makes it can be found.
+	bool bNaN = WorldAt.ContainsNaN() || WorldRot.ContainsNaN();
+	for (int32 i = 0; i < Mesh.Verts.Num() && !bNaN; ++i) bNaN = Mesh.Verts[i].ContainsNaN();
+	if (bNaN)
+	{
+		UE_LOG(LogWildreach, Warning, TEXT("BOSSLOOK %s: part on %s (kind %d) has a NaN point or placement, left out"), *GetNameSafe(C), *Bone.ToString(), Kind);
+		return nullptr;
+	}
 	USceneComponent* Frame = NewObject<USceneComponent>(C);
 	Frame->RegisterComponent();
 	Frame->AttachToComponent(Skel, FAttachmentTransformRules(EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::KeepWorld, false), Bone);

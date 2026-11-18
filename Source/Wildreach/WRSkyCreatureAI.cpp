@@ -1283,11 +1283,15 @@ void UWRSkyLife::BeatBlooms()
 {
 	// A bloom that has drifted out of the Sky (or 800 m from where it came in) is taken in; the population brings it back
 	// in again upwind (the next bloom crosses the same bridge the same way).
+	// Collected first, destroyed after: destroying one takes its body out of Live while the loop is still walking it
+	// ("Array has changed during ranged-for iteration"; a skipped element or a bad read in Shipping).
+	TArray<AWRCreature*> Gone;
 	for (const TWeakObjectPtr<UWRSkyBody>& W : UWRSkyBody::Live)
 	{
 		UWRSkyBody* B = W.Get();
 		AWRCreature* C = B ? Cast<AWRCreature>(B->GetOwner()) : nullptr;
 		if (!C || C->CreatureId != TEXT("sailbell") || !C->IsAlive() || C->IsTamed() || C->GetAggroTarget()) continue;
-		if (!WRSkyIsles::Contains(C->GetActorLocation()) || FVector::Dist2D(C->GetActorLocation(), B->HomeNode) > SlTn(TEXT("sailbell.driftMax"), 80000.f)) C->Destroy();
+		if (!WRSkyIsles::Contains(C->GetActorLocation()) || FVector::Dist2D(C->GetActorLocation(), B->HomeNode) > SlTn(TEXT("sailbell.driftMax"), 80000.f)) Gone.Add(C);
 	}
+	for (AWRCreature* C : Gone) if (IsValid(C)) C->Destroy();
 }

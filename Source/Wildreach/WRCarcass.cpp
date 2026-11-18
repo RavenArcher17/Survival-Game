@@ -15,6 +15,8 @@
 #include "WRResourceNode.h"
 #include "WRSocial.h"
 #include "WRTuning.h"
+#include "WRPlayerState.h"
+#include "WRWorldSystems.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerState.h"
@@ -202,6 +204,11 @@ void AWRCreature::HarvestBody(AWRCharacterBase* Harvester, bool bHeavy)
 	UE_LOG(LogWildreach, Log, TEXT("BODY %s harvested by %s (%s, %s): %s, %d hits left"), *GetName(), *Harvester->GetName(),
 		bSharp ? TEXT("blade") : TEXT("blunt"), Held.IsEmpty() ? TEXT("bare hands") : *Held.ItemId.ToString(),
 		Lines.Num() > 0 ? *FString::Join(Lines, TEXT(" ")) : TEXT("nothing"), BodyHitsLeft);
+	if (BodyHitsLeft == 0 && CreatureId == TEXT("gravehound"))
+	{
+		// Morwen's second quest, the non-Necromancer way: a Gravehound butchered down to its bones.
+		if (UWRWorldSystems* WS = GetWorld()->GetSubsystem<UWRWorldSystems>()) WS->QuestEvent(Harvester->GetPlayerState<AWRPlayerState>(), TEXT("event"), TEXT("first_raise"), 1);
+	}
 	if (BodyHitsLeft == 0)
 	{
 		// Emptied: it goes, with a puff where it lay.

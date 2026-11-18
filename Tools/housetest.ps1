@@ -84,7 +84,7 @@ $cmds = @(
 # (a foreach, not Where-Object: piping drops the entries after an empty $(if ...) one)
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=housetest -unattended -nosound -port=7836 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=housetest -wrstore=json -unattended -nosound -port=7836 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7836?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
@@ -98,7 +98,7 @@ if (-not $c.HasExited) { Stop-Process -Id $c.Id -Force }
 $deadline = (Get-Date).AddSeconds(75)
 while ((Get-Date) -lt $deadline -and -not (Select-String -Path "$out\server.log" -Pattern 'WORLD saved 34 pieces' -Quiet)) { Start-Sleep -Seconds 3 }
 if (-not $s.HasExited) { Stop-Process -Id $s.Id -Force }
-$s2 = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=housetest -unattended -nosound -port=7836 -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
+$s2 = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -wrworld=housetest -wrstore=json -unattended -nosound -port=7836 -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(90)
 while ((Get-Date) -lt $deadline) {
 	Start-Sleep -Seconds 3

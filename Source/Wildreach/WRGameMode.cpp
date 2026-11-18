@@ -797,13 +797,14 @@ void AWRGameMode::AutosaveStep()
 	}
 	// Each player every playerEverySeconds as before, but a share of them each second: at 100 that's 10 a second,
 	// not 100 in one frame.
+	// Second k saves the players whose place in the list is k mod Every: one player alone is saved every 10 s (with the
+	// old ceil(N / Every) a second, anyone under 10 players was saved every second).
 	const TArray<TObjectPtr<APlayerState>>& All = GameState->PlayerArray;
 	const int32 Every = FMath::Max(1, FMath::RoundToInt(WRTune(TEXT("net.save.playerEverySeconds"), 10.f)));
-	const int32 Count = FMath::Min(All.Num(), FMath::DivideAndRoundUp(All.Num(), Every));
-	for (int32 i = 0; i < Count; ++i)
+	AutosaveCursor = (AutosaveCursor + 1) % Every;
+	for (int32 i = AutosaveCursor; i < All.Num(); i += Every)
 	{
-		AutosaveCursor = AutosaveCursor % All.Num();
-		SavePlayer(Cast<AWRPlayerState>(All[AutosaveCursor++]));
+		SavePlayer(Cast<AWRPlayerState>(All[i]));
 	}
 }
 

@@ -1516,7 +1516,9 @@ AWRStormBridge::AWRStormBridge()
 {
 	bReplicates = true;
 	SetNetUpdateFrequency(4.f);
-	SetNetCullDistanceSquared(FMath::Square(60000.f));
+	// Spawned at the world origin with its planks at their world positions, so a range from the actor never reached a
+	// player at the gorge: joining players never got the bridge at all (landmarks audit 11-18). Six bridges, light state.
+	bAlwaysRelevant = true;
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.1f;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));

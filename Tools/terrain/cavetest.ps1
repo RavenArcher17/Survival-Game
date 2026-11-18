@@ -34,7 +34,7 @@ foreach ($c in $caves) {
 }
 $cmds = $cmds -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=cavetest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=cavetest -wrstore=json -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=$Path?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(60 + 45 * $caves.Count)

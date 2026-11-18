@@ -1,6 +1,6 @@
 # Building test on the arena: claim, foundations, walls, floor, span limit, code-locked door, chest,
 # crop; a second player is blocked by the claim and the lock; raid damage + collapse; then a server
-# restart reloads everything that was built. Its own world save (-wrworld=buildtest), fresh each run.
+# restart reloads everything that was built. Its own world save (-wrworld=buildtest) -wrstore=json, fresh each run.
 $ue = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..\Wildreach.uproject')).Path
 $root = Split-Path $project
@@ -36,7 +36,7 @@ $raider = @(
 	'WRTeleport 2400 3700', 'wait 1', 'WRHitPiece 60', 'wait 2', 'WRSay buildtest-done'
 ) -join '|'
 
-function Start-Server($log) { Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7815 -wrworld=buildtest -abslog=`"$log`"" -PassThru -WindowStyle Hidden }
+function Start-Server($log) { Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7815 -wrworld=buildtest -wrstore=json -abslog=`"$log`"" -PassThru -WindowStyle Hidden }
 function Start-Bot($name, $cmds, $log) { Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7815?Path=fire?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$log`"" -PassThru -WindowStyle Hidden }
 function Lines($file, $pattern) { if (Test-Path $file) { @(Select-String -Path $file -Pattern $pattern | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ', '').Trim() }) } else { @() } }
 

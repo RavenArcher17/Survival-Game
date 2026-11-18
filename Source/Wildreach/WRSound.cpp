@@ -340,6 +340,9 @@ bool UWRAudioSubsystem::EnsureLoaded()
 	{
 		for (const auto& Pair : (*EventsObj)->Values)
 		{
+			// Comment strings among the events ("_combatFull", "_survival"...) are skipped before AsObject(), which
+			// would log a LogJson error on each.
+			if (!Pair.Value.IsValid() || Pair.Value->Type != EJson::Object) continue;
 			const TSharedPtr<FJsonObject> O = Pair.Value->AsObject();
 			if (!O.IsValid()) continue;
 			FWRSoundEvent E;

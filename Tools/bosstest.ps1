@@ -21,7 +21,7 @@ $hero += & $fight 'grimjaw' @('wait 4', 'WRBossDmgPct 0 none')
 $hero += & $fight 'pale_hunter' @('wait 6', 'WRBossDmg 10 fire')
 $helper = @('WRBotPause 1', 'WRTeleport 300 4200', 'wait 12', 'WRBossDmgPct 3 none')
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7812 -wrworld=bosstest $tune -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7812 -wrworld=bosstest -wrstore=json $tune -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c1 = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7812?Path=fire?WRName=Hero -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($hero -join '|')`" -abslog=`"$out\hero.log`"" -PassThru -WindowStyle Hidden
 $c2 = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7812?Path=frost?WRName=Helper -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($helper -join '|')`" -abslog=`"$out\helper.log`"" -PassThru -WindowStyle Hidden

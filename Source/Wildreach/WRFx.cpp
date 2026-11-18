@@ -592,6 +592,7 @@ void UWRFxSubsystem::SpawnLayer(FEmitter& E, int32 EmitterIndex, int32 LayerInde
 		P.Normal = L.bFlat ? FVector3f(Q.GetUpVector()) : FVector3f::ZeroVector;
 		P.Layer = LayerIndex;
 		P.Emitter = L.bFollow ? EmitterIndex : INDEX_NONE;
+		P.Reach = E.Def ? E.Def->Cull : 0.f;
 		P.Tint = E.Tint;
 		Arr.Add(P);
 	}
@@ -784,7 +785,10 @@ void UWRFxSubsystem::BuildSprites()
 			const FLayer& L = Layers[Pt.Layer];
 			const FEmitter* E = Pt.Emitter != INDEX_NONE ? &Emitters[Pt.Emitter] : nullptr;
 			const FVector Pos = E ? E->Xf.GetLocation() + Pt.Pos : Pt.Pos;
-			if (FVector::DistSquared(Pos, ViewLocation) > MaxDraw2) continue;
+			// A landmark effect with its own long reach (a row's "cull": the crater's plume, the Haboob Wall, the falls'
+			// mist) draws out to that reach, so it reads from across the land; everything else stops at drawDistance.
+			const double Reach2 = Pt.Reach > MaxDraw ? FMath::Square(static_cast<double>(Pt.Reach)) : MaxDraw2;
+			if (FVector::DistSquared(Pos, ViewLocation) > Reach2) continue;
 			const float T = Pt.Age / Pt.Life;
 			FLinearColor C = Gradient(L.Colors, T);
 			if (Pt.Tint != FColor::White)

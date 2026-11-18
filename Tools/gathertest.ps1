@@ -86,7 +86,7 @@ $cmds = @(
 # (a foreach, not Where-Object: piping drops the entries after an empty $(if ...) one)
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=gathertest -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=gathertest -wrstore=json -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$logs\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })

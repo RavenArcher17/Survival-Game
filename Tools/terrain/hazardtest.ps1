@@ -40,7 +40,7 @@ $bots = @(
 	@{ N = 'Blaze';  P = 'fire';  Lava = ('WRTeleport {0:F0} {1:F0}' -f $spots[1].x, $spots[1].y); Ice = 'WRTeleport 109000 4000' },
 	@{ N = 'Edgy';   P = 'frost'; Lava = ('WRTeleport {0:F0} {1:F0}' -f $edge.x, $edge.y); Ice = 'WRTeleport 48400 4000' }
 )
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=hazardtest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=hazardtest -wrstore=json -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $clients = foreach ($b in $bots) {
 	# Two readings in the lava 4 s apart, then one on the ice.

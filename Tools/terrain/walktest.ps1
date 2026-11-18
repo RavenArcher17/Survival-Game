@@ -15,7 +15,7 @@ $walkers = @(
 	@{ Name = 'WalkC_RidgeWall'; Cmds = 'WRBotPause 1|WRTeleport -60000 0|wait 3|WRWalkTo 60000 0' }
 )
 $procs = @()
-$procs += Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7800 -wrworld=walktest -wrtune=wildlife.enabled:0 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$procs += Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7800 -wrworld=walktest -wrstore=json -wrtune=wildlife.enabled:0 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 foreach ($w in $walkers) {
 	$procs += Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7800?Path=fire?WRName=$($w.Name) -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($w.Cmds)`" -abslog=`"$out\$($w.Name).log`"" -PassThru -WindowStyle Hidden

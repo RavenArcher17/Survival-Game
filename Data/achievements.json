@@ -98,10 +98,10 @@
    "cat": "explorer",
    "event": "landmarks",
    "params": {
-    "biome": "sky"
+    "biome": "sky_islands"
    },
    "needs": [
-    "biome:sky"
+    "biome:sky_islands"
    ],
    "title": "Windwalker"
   },
@@ -196,10 +196,10 @@
    "cat": "explorer",
    "event": "landmarks",
    "params": {
-    "biome": "void"
+    "biome": "wasteland"
    },
    "needs": [
-    "biome:void"
+    "biome:wasteland"
    ],
    "title": "Voidwalker"
   },
@@ -266,10 +266,10 @@
    "cat": "explorer",
    "event": "hidden",
    "params": {
-    "biome": "sky"
+    "biome": "sky_islands"
    },
    "needs": [
-    "hiddenin:sky"
+    "hiddenin:sky_islands"
    ],
    "hidden": true
   },
@@ -364,10 +364,10 @@
    "cat": "explorer",
    "event": "hidden",
    "params": {
-    "biome": "void"
+    "biome": "wasteland"
    },
    "needs": [
-    "hiddenin:void"
+    "hiddenin:wasteland"
    ],
    "hidden": true
   },
@@ -508,10 +508,10 @@
    "cat": "hunter",
    "event": "huntall",
    "params": {
-    "biome": "sky"
+    "biome": "sky_islands"
    },
    "needs": [
-    "biome:sky"
+    "biome:sky_islands"
    ]
   },
   {
@@ -599,10 +599,10 @@
    "cat": "hunter",
    "event": "huntall",
    "params": {
-    "biome": "void"
+    "biome": "wasteland"
    },
    "needs": [
-    "biome:void"
+    "biome:wasteland"
    ]
   },
   {
@@ -664,10 +664,10 @@
    "cat": "hunter",
    "event": "tameall",
    "params": {
-    "biome": "sky"
+    "biome": "sky_islands"
    },
    "needs": [
-    "biome:sky"
+    "biome:sky_islands"
    ]
   },
   {
@@ -755,10 +755,10 @@
    "cat": "hunter",
    "event": "tameall",
    "params": {
-    "biome": "void"
+    "biome": "wasteland"
    },
    "needs": [
-    "biome:void"
+    "biome:wasteland"
    ]
   },
   {
@@ -1126,7 +1126,15 @@
    "cat": "slayer",
    "event": "belt",
    "params": {
-    "belt": "storm_swamp"
+    "belt": "storm_swamp",
+    "minis": [
+     "bellwether",
+     "galvara",
+     "coilback",
+     "mother_maw",
+     "hex_warden",
+     "bloat"
+    ]
    },
    "needs": [
     "biome:storm_peaks",
@@ -1141,7 +1149,15 @@
    "cat": "slayer",
    "event": "belt",
    "params": {
-    "belt": "desert_ocean"
+    "belt": "desert_ocean",
+    "minis": [
+     "ssarrok",
+     "mirage_matriarch",
+     "glass_empress",
+     "old_barnacle",
+     "siren_eel",
+     "reef_tyrant"
+    ]
    },
    "needs": [
     "biome:desert",
@@ -1156,7 +1172,17 @@
    "cat": "slayer",
    "event": "belt",
    "params": {
-    "belt": "forest_grave"
+    "belt": "forest_grave",
+    "minis": [
+     "old_gnarl",
+     "bramblequeen",
+     "grey_matron",
+     "hornwarden",
+     "bell_ringer",
+     "crypt_mother",
+     "ossuary_lord",
+     "gravedigger"
+    ]
    },
    "needs": [
     "biome:forest",
@@ -1171,10 +1197,18 @@
    "cat": "slayer",
    "event": "belt",
    "params": {
-    "belt": "sky_fungal"
+    "belt": "sky_fungal",
+    "minis": [
+     "kyrra",
+     "bridge_sentinel",
+     "old_gulper",
+     "sporemother",
+     "rot_king",
+     "weaver"
+    ]
    },
    "needs": [
-    "biome:sky",
+    "biome:sky_islands",
     "biome:fungal",
     "minis:sky_fungal"
    ]
@@ -1186,10 +1220,20 @@
    "cat": "slayer",
    "event": "belt",
    "params": {
-    "belt": "void_crystal"
+    "belt": "void_crystal",
+    "minis": [
+     "unravelled",
+     "mother_of_rifts",
+     "starving_one",
+     "null_warden",
+     "echo",
+     "mirrored_twins",
+     "echo_warden",
+     "geode_tyrant"
+    ]
    },
    "needs": [
-    "biome:void",
+    "biome:wasteland",
     "biome:crystal",
     "minis:void_crystal"
    ]
@@ -1741,7 +1785,7 @@
    "cat": "survivor",
    "event": "unmade",
    "needs": [
-    "biome:void"
+    "biome:wasteland"
    ],
    "hidden": true,
    "title": "Unmade"

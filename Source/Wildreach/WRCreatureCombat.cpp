@@ -181,12 +181,16 @@ void FWRAttackRows::Reload()
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& Who : Set->Values)
 		{
+			// Comment rows ("_comment" strings) are skipped before AsObject(), which logs a LogJson error on a string:
+			// 39 of them every start failed every bot test's "no errors in the log" check.
+			if (Who.Key.StartsWith(TEXT("_")) || !Who.Value.IsValid() || Who.Value->Type != EJson::Object) continue;
 			const TSharedPtr<FJsonObject> Rows = Who.Value->AsObject();
-			if (!Rows.IsValid() || Who.Key.StartsWith(TEXT("_"))) continue;
+			if (!Rows.IsValid()) continue;
 			for (const TPair<FString, TSharedPtr<FJsonValue>>& Row : Rows->Values)
 			{
+				if (Row.Key.StartsWith(TEXT("_")) || !Row.Value.IsValid() || Row.Value->Type != EJson::Object) continue;
 				const TSharedPtr<FJsonObject> R = Row.Value->AsObject();
-				if (R.IsValid() && !Row.Key.StartsWith(TEXT("_")))
+				if (R.IsValid())
 				{
 					Add(FName(*Who.Key), WRRowsDetail::Read(Row.Key, R));
 				}

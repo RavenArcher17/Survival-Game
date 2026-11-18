@@ -41,7 +41,7 @@ if (-not $Log) {
 	Remove-Item -Recurse -Force $db -ErrorAction SilentlyContinue
 	$shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 	$started = Get-Date
-	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=${name}?Path=fire?Body=m -game -windowed -ResX=1440 -ResY=900 -unattended -nosound -port=$Port -wrworld=crafttimetest -wrtune=wildlife.enabled:0 -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
+	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=${name}?Path=fire?Body=m -game -windowed -ResX=1440 -ResY=900 -unattended -nosound -port=$Port -wrworld=crafttimetest -wrstore=json -wrtune=wildlife.enabled:0 -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 	$deadline = (Get-Date).AddSeconds(300)
 	while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 		Start-Sleep -Seconds 3

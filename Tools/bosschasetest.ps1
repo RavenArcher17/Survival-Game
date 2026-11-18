@@ -16,7 +16,7 @@ $hero = @('WRBotPause 1', 'WRTeleport 0 4200', 'wait 3', 'WRSpawn grimjaw 1', 'w
 	'WRTeleport 0 700', 'wait 3', 'WRCmd bossinfo', 'WRHeal', 'wait 5', 'WRCmd bossinfo', 'WRHeal', 'wait 4', 'WRCmd bossinfo',
 	# Out of its reach for good: it resets and walks home.
 	'WRTeleport 0 -18000', 'wait 12', 'WRCmd bossinfo', 'wait 4', 'WRCmd bossinfo', 'wait 14', 'WRCmd bossinfo', 'WRSay bosschase-done')
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=bosschasetest $tune -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=bosschasetest -wrstore=json $tune -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Hero -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($hero -join '|')`" -abslog=`"$out\hero.log`"" -PassThru -WindowStyle Hidden
 $deadline = (Get-Date).AddSeconds(150)

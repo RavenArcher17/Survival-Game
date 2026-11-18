@@ -107,6 +107,7 @@ void AWRUnmadePlace::Build()
 	if (!UmRift(D, C, R, Lip)) return;
 	LipZ = D.Origin.Z + Lip * 100.f;
 	Centre = D.ToWorld(C, Lip);
+	RadiusCm = R * 100.f;
 	const TSharedPtr<FJsonObject> UmSec = D.Section(TEXT("unmade"));
 	const bool bDraw = GetNetMode() != NM_DedicatedServer;
 	UMaterialInterface* Stone = WRFoldLook::RockMat(this, UmDolo * 0.4f);
@@ -326,7 +327,10 @@ void AWRUnmadePlace::Tick(float DeltaSeconds)
 	const float Top = LipZ - UmT(TEXT("top"), 5000.f);
 	for (TActorIterator<AWRCharacter> It(GetWorld()); It; ++It)
 	{
+		// Only inside the Great Rift itself: InHole alone is true in every land's caves (the Crystal and Fungal caverns
+		// sit below the lip too), which drained anyone exploring them to death (landmarks audit 11-18).
 		if (!It->IsAlive() || !WRLand::InHole(It->GetActorLocation()) || It->GetActorLocation().Z > Top) continue;
+		if (RadiusCm <= 0.f || FVector::Dist2D(It->GetActorLocation(), Centre) > RadiusCm + UmT(TEXT("drainMargin"), 2000.f)) continue;
 		const float Mult = WRVoid::RiftDrainMult(*It);
 		if (Mult > 0.f) WRVoid::LoseMaxHealth(*It, WRTune(TEXT("void.riftDrain"), 2.f) * UmT(TEXT("drainMult"), 1.5f) * Mult * DeltaSeconds, this, true);
 		if (!U8.IsZero() && FVector::Dist(It->GetActorLocation(), U8) < UmT(TEXT("lastNoteReach"), 800.f) && It->GetPlayerState())

@@ -433,6 +433,30 @@
         "boss": "vorhollow",
         "kind": "set decor",
         "set": "hollow_bastion"
+      },
+      {
+        "id": "bp_yew_longbow",
+        "kind": "found",
+        "recipes": [
+          "yew_longbow"
+        ],
+        "from": "the oldest grave under the Great Yew (Graveyard)"
+      },
+      {
+        "id": "bp_whalers_harpoon",
+        "kind": "found",
+        "recipes": [
+          "whalers_harpoon"
+        ],
+        "from": "Haewon's quest A line on the reef (Ocean)"
+      },
+      {
+        "id": "bp_kelp_glass",
+        "kind": "found",
+        "recipes": [
+          "kelp_glass"
+        ],
+        "from": "a recipe scrap on the Ocean shore"
       }
     ]
   },

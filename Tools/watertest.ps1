@@ -73,7 +73,7 @@ $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 
 if (-not $Recheck) {
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=watertest -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=watertest -wrstore=json -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$logs\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })
 # The run ends with WRProbe ("PROBE view" in the log; the command line, which the log starts with, doesn't say that).

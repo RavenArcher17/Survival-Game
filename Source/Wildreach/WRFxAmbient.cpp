@@ -178,7 +178,21 @@ void UWRFxSubsystem::TickWeather(float DeltaTime)
 {
 	const FWRTuning& T = FWRTuning::Get();
 	// Only on the island (the arena maps have no dressing), and only if it isn't switched off.
-	const bool bIsland = UWRDressingSubsystem::FindDressing(GetWorld()) != nullptr && T.Num(TEXT("fx.weather.enabled"), 1.f) > 0.f;
+	bool bIsland = UWRDressingSubsystem::FindDressing(GetWorld()) != nullptr && T.Num(TEXT("fx.weather.enabled"), 1.f) > 0.f;
+	// The ash and snow belong to the Old Island's two halves only: keyed on x alone they fell in every land, even under
+	// the sea (landmarks audit 11-18). The biome under the camera, looked up twice a second.
+	{
+		static double NextBiomeCheck = 0.0;
+		static bool bOnFireFrost = true;
+		const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+		if (Now >= NextBiomeCheck || Now + 1.0 < NextBiomeCheck)
+		{
+			NextBiomeCheck = Now + 0.5;
+			const FName B = WRBiome::At(GetWorld(), ViewLocation);
+			bOnFireFrost = B == TEXT("volcanic") || B == TEXT("tundra");
+		}
+		bIsland = bIsland && bOnFireFrost;
+	}
 	Sheltered = FMath::FInterpTo(Sheltered, ShelterTarget, DeltaTime, 3.f);
 	// The ridge runs down x = 0: tundra east, volcanic west; the weather builds up away from the ridge.
 	const float Start0 = T.Num(TEXT("fx.weather.ridgeStart"), 5000.f), Full = T.Num(TEXT("fx.weather.ridgeFull"), 25000.f);

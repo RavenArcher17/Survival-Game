@@ -185,6 +185,7 @@ namespace WRFxDetail
 		FVector3f Normal;
 		int32 Layer;
 		int32 Emitter;                // following layers only
+		float Reach = 0.f;            // its effect's own "cull" (cm): a landmark effect draws out to it, past fx.drawDistance
 		FColor Tint;
 	};
 

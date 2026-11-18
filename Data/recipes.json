@@ -400,7 +400,7 @@
     { "id": "siege_stone", "station": "workbench", "level": 4, "inputs": { "stone": 25 }, "output": "siege_stone", "count": 1, "seconds": 6 },
     { "id": "ballista_bolt", "station": "workbench", "level": 4, "inputs": { "wood": 4, "iron_ingot": 1, "fiber": 2 }, "output": "ballista_bolt", "count": 2, "seconds": 4 },
     {"id": "grounding_salve", "station": "alchemy_table", "level": 1, "inputs": {"copper_scale": 2, "resin": 2, "rock_salt": 1}, "output": "grounding_salve", "count": 1, "seconds": 5, "biome": "storm_peaks", "blueprint": "quest_grounding_salve"},
-    {"id": "shock_resist_potion", "station": "alchemy_table", "level": 2, "inputs": {"gentian": 1, "stormglass": 1, "slimeshell_slime": 1}, "output": "shock_resist_potion", "count": 1, "seconds": 6, "biome": "storm_peaks", "waitsFor": "swamp"},
+    {"id": "shock_resist_potion", "station": "alchemy_table", "level": 2, "inputs": {"gentian": 1, "stormglass": 1, "slimeshell_slime": 1}, "output": "shock_resist_potion", "count": 1, "seconds": 6, "biome": "storm_peaks"},
     {"id": "stormglass_arrow", "station": "workbench", "level": 2, "inputs": {"stormglass": 1, "wood": 1, "stormkite_feather": 1}, "output": "stormglass_arrow", "count": 4, "seconds": 4, "biome": "storm_peaks", "blueprint": "quest_stormglass_arrow"},
     {"id": "rodwarden_spear", "station": "forge", "level": 2, "inputs": {"copper_ingot": 6, "wood": 4, "thunderstone": 1}, "output": "rodwarden_spear", "count": 1, "seconds": 12, "biome": "storm_peaks"},
     {"id": "talisman_crown_plume", "station": "armorer", "level": 1, "inputs": {"trophy_crown_plume": 1, "copper_ingot": 2}, "output": "talisman_crown_plume", "count": 1, "seconds": 6, "biome": "storm_peaks"},

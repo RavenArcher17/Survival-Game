@@ -47,7 +47,7 @@ if (-not $Log) {
 	$shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 	$started = Get-Date
 	$tune = 'wildlife.enabled:0,raid.maxMinutes:0.75,raid.warnSeconds:6,raid.leaveSeconds:30'
-	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=${name}?Path=fire?Body=m -game -windowed -ResX=1440 -ResY=900 -unattended -nosound -port=$Port -wrworld=raidtest -wrtune=$tune -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
+	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=${name}?Path=fire?Body=m -game -windowed -ResX=1440 -ResY=900 -unattended -nosound -port=$Port -wrworld=raidtest -wrstore=json -wrtune=$tune -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 	$deadline = (Get-Date).AddSeconds(420)
 	while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 		Start-Sleep -Seconds 3

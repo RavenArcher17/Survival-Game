@@ -1551,7 +1551,10 @@ void AWRLand::BuildHoles()
 			for (int32 c = 0; c < Cols; ++c)
 			{
 				const int32 A = r * (Cols + 1) + c, B = A + 1, C = A + Cols + 1, E = C + 1;
-				Tris.Append({ A, B, E, A, E, C });
+				// Wound to face into the hole, as its normals do (Unreal draws a triangle whose cross product points away
+				// from the viewer, see OcDomeInward): the other way round the walls faced outward, so from inside the
+				// Great Rift they weren't drawn and it showed open sea and sky (landmarks audit 11-18).
+				Tris.Append({ A, E, B, A, C, E });
 			}
 		}
 		UProceduralMeshComponent* Wall = NewObject<UProceduralMeshComponent>(this);

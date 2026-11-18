@@ -44,7 +44,7 @@ $cmds += 'WRSay combattest-done'
 $cmds = $cmds -join '|'
 
 # Verbose: the server logs abilities, bites and blocks; the client its telegraphs. Wheel 1 starts empty (a fresh install).
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=combattest `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=combattest -wrstore=json `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $ini = '[Wildreach.UI]:Wheel1=,[Wildreach.UI]:Wheel2=,[Wildreach.UI]:WheelPicked1=0,[Wildreach.UI]:StarterWheeled='
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=frost?WRName=Vanguard -game -windowed -ResX=1280 -ResY=720 -unattended -nosound -wrbot `"-ini:GameUserSettings:$ini`" `"-ExecCmds=t.MaxFPS 60`" `"-LogCmds=LogWildreach Verbose`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru
