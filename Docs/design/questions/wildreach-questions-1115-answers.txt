@@ -1,0 +1,126 @@
+﻿{
+  "slug": "wildreach-questions-1115",
+  "title": "Wildreach: questions (11-15)",
+  "docs": {
+    "answers/r-bossdmg": {
+      "id": "r-bossdmg",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T04:36:23.982Z"
+    },
+    "answers/r-colin": {
+      "id": "r-colin",
+      "pick": "Keep what is built",
+      "text": "Make it a command we need to enter in-game 'god-mode' in the existing command line.",
+      "at": "2026-11-16T04:40:41.308Z"
+    },
+    "answers/r-dunewrap": {
+      "id": "r-dunewrap",
+      "pick": "Keep what is built",
+      "text": "Idk you aren't giving me any context or even full fucking sentences ",
+      "at": "2026-11-16T04:34:48.854Z"
+    },
+    "answers/r-eat": {
+      "id": "r-eat",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T04:36:40.205Z"
+    },
+    "answers/r-flint": {
+      "id": "r-flint",
+      "pick": "Switch to the other choice",
+      "text": "Add flint as a material that can be mined and collected, occasionally getting a stack along with the stone you mine. ",
+      "at": "2026-11-16T04:31:33.191Z"
+    },
+    "answers/r-forest-ground": {
+      "id": "r-forest-ground",
+      "pick": "Switch to the other choice",
+      "text": "We already have the electric dreams env paack. Can't we use that to create an incredible forest biome? Or take some lessons we learned from Trails? ",
+      "at": "2026-11-16T04:30:43.355Z"
+    },
+    "answers/r-hurtedge": {
+      "id": "r-hurtedge",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T04:36:12.147Z"
+    },
+    "answers/r-kyrra": {
+      "id": "r-kyrra",
+      "pick": "Keep what is built",
+      "text": "Try it, make it good ",
+      "at": "2026-11-16T04:33:37.340Z"
+    },
+    "answers/r-lefthand": {
+      "id": "r-lefthand",
+      "pick": "Switch to the other choice",
+      "text": "Food should be on the item quick use or other toolbar. Not equipped in one of the hands to eat. ",
+      "at": "2026-11-16T04:37:39.770Z"
+    },
+    "answers/r-lens": {
+      "id": "r-lens",
+      "pick": "Keep what is built",
+      "text": "Figure it out, best user experience is priority 1",
+      "at": "2026-11-16T04:34:14.536Z"
+    },
+    "answers/r-mirage": {
+      "id": "r-mirage",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T04:35:04.205Z"
+    },
+    "answers/r-moss": {
+      "id": "r-moss",
+      "pick": "Switch to the other choice",
+      "text": "Yes add the moss to collect. Make it look good. ",
+      "at": "2026-11-16T04:32:01.199Z"
+    },
+    "answers/r-oldcmds": {
+      "id": "r-oldcmds",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T04:41:47.106Z"
+    },
+    "answers/r-packup": {
+      "id": "r-packup",
+      "pick": "Switch to the other choice",
+      "text": "Figure it out and make sure it's the best cook it can be with resea ch and planning to find the best solution for this. ",
+      "at": "2026-11-16T04:39:11.957Z"
+    },
+    "answers/r-pubserver": {
+      "id": "r-pubserver",
+      "pick": "Keep what is built",
+      "text": "We need Mod Mode still available for us in public servers. ",
+      "at": "2026-11-16T04:41:35.492Z"
+    },
+    "answers/r-recoil": {
+      "id": "r-recoil",
+      "pick": "Keep what is built",
+      "text": "Try it.",
+      "at": "2026-11-16T04:35:57.815Z"
+    },
+    "answers/r-siege-pve": {
+      "id": "r-siege-pve",
+      "pick": "Switch to the other choice",
+      "text": "Allow it to practice siegeing on NPC strongholds",
+      "at": "2026-11-16T04:39:52.239Z"
+    },
+    "answers/r-talisman": {
+      "id": "r-talisman",
+      "pick": "Keep what is built",
+      "text": "Choose whats best for this game ",
+      "at": "2026-11-16T04:33:08.841Z"
+    },
+    "answers/r-waterskin": {
+      "id": "r-waterskin",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T04:37:54.697Z"
+    },
+    "answers/r-wet": {
+      "id": "r-wet",
+      "pick": "Switch to the other choice",
+      "text": "We will do more design passes to make it really good ",
+      "at": "2026-11-16T04:38:18.443Z"
+    }
+  }
+}

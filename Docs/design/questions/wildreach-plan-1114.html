@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<script>window.REVIEWER={"name":"Aaron","guest":false};</script>
+<script src="/js/review-db.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wildreach Plan</title><link rel="stylesheet" href="/css/review-kit.css">
+<style>
+.rv main{max-width:820px;margin:0 auto;padding:16px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;margin-right:6px}
+.done{background:#1f7a3a;color:#fff}.part{background:#b7791f;color:#fff}.todo{background:#555;color:#fff}
+.card{border:1px solid rgba(127,127,127,.35);border-radius:12px;padding:12px 14px;margin:10px 0}
+.card p,.card li{font-size:15px;line-height:1.45}
+.bar{height:10px;border-radius:6px;background:rgba(127,127,127,.25);overflow:hidden;margin:6px 0 2px}.bar i{display:block;height:100%;background:#1f7a3a}
+</style></head><body class="rv"><main>
+<h1>Wildreach: full plan and progress</h1>
+<p><b>14 Nov 2026, 1:45 PM.</b> Production is paused because Claude usage is used up (the weekly limit resets 20 Nov). Goal: Raven's full release, all 12 biomes. Every feature is built as a full cook: research how the best games do it, write a plan that solves every gap, build it in Raven's repo keeping his rules, then check every requirement before pushing.</p>
+<div class="card"><b>Where it stands</b>
+<p>Design: every area of the game is designed and build-ready.</p><div class="bar"><i style="width:100%"></i></div>
+<p>Systems built (running in the 2 built biomes, Fire and Frost): 15 of 17 build lanes.</p><div class="bar"><i style="width:85%"></i></div>
+<p>The 10 new biomes' content (their land, creatures, bosses and sets in the world): designed, not built yet.</p><div class="bar"><i style="width:15%"></i></div>
+<p>Quality passes over everything: not started.</p><div class="bar"><i style="width:0%"></i></div>
+</div>
+
+<h2>1. Design (all done)</h2>
+<div class="card"><span class="tag done">DONE</span><b>Written, build-ready designs</b> in showcase-notes/notes/Wildreach/cooks/: the hero; combat (based on Elden Ring: Wildbrands, no spirit summons, packs attack freely, holding block pauses stamina); UI and controls; the world map (the Spine: an 18 km continent with the Crown and biome belts north to south); survival and crafting; all 12 biomes (Fire, Frost, Lightning, Swamp, Forest, Graveyard, Desert, Ocean, Sky, Fungal, Crystal, Void); multiplayer; endgame.</div>
+
+<h2>2. Built and in the repo (master f93ad47)</h2>
+<div class="card"><span class="tag done">DONE</span><b>F8 bug report:</b> frozen frame, 8 report kinds, a typed note, the last 60 s of play, sent to Freedom35 with an offline outbox.</div>
+<div class="card"><span class="tag done">DONE</span><b>New hero:</b> MetaHuman male and female replace the old Mixamo survivor. 12 faces (6 men, 6 women) with lean and strong bodies; worn armour shows (Hidewear, Cinderhide, Snowhide, Copperscale, Bronze and more); motion-matching animation with a face rig.</div>
+<div class="card"><span class="tag done">DONE</span><b>Half-built features finished:</b> all Fire and Frost passives work (the 3 dead ones fixed); 41 more perks built (66 of 120 work; the rest wait on their systems).</div>
+<div class="card"><span class="tag done">DONE</span><b>Combat:</b> move rows and chains, input buffer, hit stack, stamina and equip-load rolls, backstep, jumping. 9 weapon classes with charged, running, rolling and jumping attacks, two-handing, 15 forge weapons, and every status effect (bleed, poison, rot, shock, soak, blind and more).</div>
+<div class="card"><span class="tag done">DONE</span><b>Survival:</b> sleeping in your bed for Rest, weather for all 12 biomes (Ashfall and Blizzard live), no temperature meter.</div>
+<div class="card"><span class="tag done">DONE</span><b>Farming and food:</b> 24 biome crops (4 live) in 4 growth stages, wells and irrigation, greenhouses, compost, animal pens.</div>
+<div class="card"><span class="tag done">DONE</span><b>Crafting:</b> steel and starsteel tiers, a charcoal kiln, every weapon class, armour split into Head, Chest, Hands and Legs plus a Talisman and 2 Rings (old saves migrated).</div>
+<div class="card"><span class="tag done">DONE</span><b>Machinery and power:</b> power networks, water wheel, windmill, geothermal turbine, drive shafts.</div>
+<div class="card"><span class="tag done">DONE</span><b>Building:</b> a metal tier, 12 biome building sets (12 shapes each), 84 furnishings, structural integrity, comfort, turrets. Raven's rules kept: no traps in bases, no underground bases, no NPC guards.</div>
+<div class="card"><span class="tag done">DONE</span><b>Taming:</b> wild levels, a bond that grows from the tame's work, 5 role skill trees, saddles, mounts, breeding, babies and mutations.</div>
+<div class="card"><span class="tag done">DONE</span><b>World systems (Fire and Frost):</b> shrines with fast travel and path XP, path masters and quests, villages, factions and merchants, message stones, Starfall, Eruption and Whiteout events, invasions.</div>
+<div class="card"><span class="tag done">DONE</span><b>Dungeon portals and artifacts:</b> ranked portals in the Volcanic and Tundra regions that break and spill monsters, handmade rooms with traps and trials, arena bosses, keys, the artifact belt.</div>
+<div class="card"><span class="tag done">DONE</span><b>Server and raids:</b> the world saved in a real database with hourly and daily backups, imported with no wipe; player raiding (petard, fire pot, mining charge, siege ladder, code breaker, raid bell), path and tame raiding, raid server settings.</div>
+
+<h2>3. Paused mid-way</h2>
+<div class="card"><span class="tag part">PARTIAL</span><b>Endgame:</b> prestige, respec, boss soul forging, mythic gear, leaderboards, achievements, titles, cosmetics, trophies and 6 to 10 player raids. The build was cut off by the usage limit. Its unfinished work is saved on the branch <b>wip/endgame-partial</b> and is <b>not</b> in the stable build. It resumes from there.</div>
+
+<h2>4. Still to do</h2>
+<div class="card"><span class="tag todo">NEXT</span><b>Finish endgame</b> from the saved branch.</div>
+<div class="card"><span class="tag todo">NEXT</span><b>Build the 10 new biomes' content</b> from their designs, one biome per cook: the land on the Spine map, 9 creatures, a major boss and 3 mini bosses, crops, weather, shrines, portals and sets placed in the world. Today most systems run in Fire and Frost only.</div>
+<div class="card"><span class="tag todo">NEXT</span><b>11 quality passes</b> over what's built: combat, survival, crafting, building, taming, UI, world, creatures, audio, multiplayer, performance.</div>
+<div class="card"><span class="tag todo">NEXT</span><b>Gaps found along the way</b> (wildreach-night/LATER-COOKS.md): sculpted models for the code-modelled weapons and tools, fishing cast and reel animations, a co-op ping and mark system, an economy cook for merchants, boss weapon movesets, one shared grab system for creatures, streaming for an 18 km continent.</div>
+<div class="card"><span class="tag todo">LAST</span><b>Release:</b> once everything is complete, publish the GitHub release so players' games auto-update, then one status email to Aaron and Raven.</div>
+
+<h2>5. The stable build</h2>
+<div class="card"><span class="tag done">BUILDING</span>A Windows Development build of master f93ad47: every completed feature above, nothing partial. When it finishes it goes to <b>\\192.168.0.150\TrailsRepo\Saved\Showcase\Wildreach\0.8-stable-1114</b>. Copy that folder to the desktop and run Wildreach.exe. It is not published as a release; that waits for the full game.</div>
+</main></body></html>

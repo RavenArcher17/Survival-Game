@@ -1,0 +1,11 @@
+﻿{
+  "slug": "wildreach-full-game",
+  "title": "Wildreach Full Game",
+  "docs": {
+    "by/raven/10-conflicts-and-which-source-wins": {
+      "text": "Conflict 1, they can vary aarons word goes. Conflict 2, Aaron can design it as he wants. Conflict 3, fuck the old worlds.           Conflict 5, go ahead with Aaron’s proposition. \nConflict 6, name changes are fine. \nConflict 10, can also be sitting by a fire. \nConflict 25 do the tests only if Aaron asks or before any release. Sub note all the abilities for creature and paths can be changed as Aaron sees fit they were not thoroughly thought through ",
+      "by": "Raven",
+      "at": "2026-11-13T23:45:27.445Z"
+    }
+  }
+}

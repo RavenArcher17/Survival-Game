@@ -1,0 +1,97 @@
+﻿{
+  "slug": "wildreach-open-questions",
+  "title": "Wildreach: open questions",
+  "docs": {
+    "answers/q-anything": {
+      "id": "q-anything",
+      "pick": "",
+      "text": "This question page is not good. The first half of each question is greyed out and hard to fucking see. Each second half starts with the other choice. I mean for fuck sake, this is retarded. ",
+      "at": "2026-11-16T13:38:49.978Z"
+    },
+    "answers/q-ballista-players": {
+      "id": "q-ballista-players",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:33:13.184Z"
+    },
+    "answers/q-claim-gap": {
+      "id": "q-claim-gap",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:33:59.744Z"
+    },
+    "answers/q-electric-dreams": {
+      "id": "q-electric-dreams",
+      "pick": "Switch to the other choice",
+      "text": "Yes do the better forest. ",
+      "at": "2026-11-16T13:31:35.735Z"
+    },
+    "answers/q-fov": {
+      "id": "q-fov",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:36:15.597Z"
+    },
+    "answers/q-hearth-rest": {
+      "id": "q-hearth-rest",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:34:43.527Z"
+    },
+    "answers/q-loading-cover": {
+      "id": "q-loading-cover",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:36:41.050Z"
+    },
+    "answers/q-map-pins": {
+      "id": "q-map-pins",
+      "pick": "Switch to the other choice",
+      "text": "Let's allow players to share this info across clans, but players have an option to \"see clan pins\" but only see their own by default. ",
+      "at": "2026-11-16T13:35:58.973Z"
+    },
+    "answers/q-packup-hold": {
+      "id": "q-packup-hold",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:32:54.241Z"
+    },
+    "answers/q-players-list": {
+      "id": "q-players-list",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:34:24.661Z"
+    },
+    "answers/q-server-32": {
+      "id": "q-server-32",
+      "pick": "Keep what is built",
+      "text": "Maybe we will want 100 player servers later. Raven will say. ",
+      "at": "2026-11-16T13:35:14.854Z"
+    },
+    "answers/q-stronghold-garrison": {
+      "id": "q-stronghold-garrison",
+      "pick": "Keep what is built",
+      "text": "Yes this is fine and good, make the NPC strongholds designed like elden ring areas, with small, medium, and boss enemies. ",
+      "at": "2026-11-16T15:31:23.995Z",
+      "title": "Should the two NPC strongholds (Emberwatch and Rimehold) be defended by human soldiers or bandits instead of the land's beasts?"
+    },
+    "answers/q-trebuchet-stone": {
+      "id": "q-trebuchet-stone",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:33:31.542Z"
+    },
+    "answers/q-version": {
+      "id": "q-version",
+      "pick": "Keep what is built",
+      "text": "",
+      "at": "2026-11-16T13:37:51.482Z"
+    },
+    "answers/q-world-moved": {
+      "id": "q-world-moved",
+      "pick": "Keep what is built",
+      "text": "That's fine they they were moved, they need a redesign so they are placed with clear intention instead of just placed wherever the nearest land is. ",
+      "at": "2026-11-16T13:37:34.971Z"
+    }
+  }
+}
