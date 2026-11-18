@@ -13,7 +13,7 @@ This is for building and changing the game. To just play it, download the instal
 |---|---|
 | Windows 10 or 11, 64-bit, a DirectX 12 gaming GPU | the island uses Nanite and virtual shadow maps |
 | About 100 GB free | engine ~30 GB, the project with its build files ~20 GB, shader cache and packaged builds the rest |
-| **Unreal Engine 5.8.4** | Epic Games Launcher > Unreal Engine > Library > +. Leave it in its default folder, `C:\Program Files\Epic Games\UE_5.8`: the scripts in `Tools\` look for it there |
+| **Unreal Engine 5.8.4** | Epic Games Launcher > Unreal Engine > Library > +. Leave it in its default folder, `C:\Program Files\Epic Games\UE_5.8`: the scripts in `Tools\` look for it there. Then the arrow beside 5.8 > Options: tick **MetaHuman Creator Core Data** (about 5 GB): the hero's hair, brows and lashes come from it, and packaging fails without it |
 | **Visual Studio 2022 Community** (17.8 or later; VS 2026 works too) | in the Visual Studio Installer tick the workloads **Game development with C++**, **Desktop development with C++** and **.NET desktop development**, plus a **Windows 11 SDK** (10.0.22621 is the one Unreal 5.8 prefers) |
 | **Git for Windows** (includes **Git LFS**) | run `git lfs install` once, before cloning |
 | **The six Fab art packs below** | not in git (their licence doesn't allow sharing them publicly) |

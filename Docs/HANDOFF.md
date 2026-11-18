@@ -33,11 +33,14 @@ bosses, enemies and wildlife regions, taming, survival, crafting (with time and 
 claims, raids and door keypads), clans, PvP rules, worlds and world settings, the stone-and-leather UI, sound, the
 installer and auto-updater. `CHANGELOG.md` has every version, newest first, with what changed and why.
 
-Unreleased (0.8.2, lane wild-f35): players get the Shipping build (184 MB exe, no `.pdb`), the cooked content is cut
+0.8.2 (lane wild-f35): players get the Shipping build (184 MB exe, no `.pdb`), the cooked content is cut
 to what the game uses and 2K textures (3.1 GB on disk, was 4.3 GB) in files of up to 60 MB, and Wildreach is listed on
 Freedom35 with a small installer that downloads the files; a Freedom35 install updates only through Freedom35
 ("Releasing on Freedom35" below). Live there: 0.8.2.2 (2026-11-17), which also fixes every quit ending in heap
-corruption (static Slate widgets freed after ICU shut down; `SWRMainMenu::ReleaseAtExit`). No GitHub release of 0.8.2.
+corruption (static Slate widgets freed after ICU shut down; `SWRMainMenu::ReleaseAtExit`). The same game is the GitHub release v0.8.2 (2026-11-17, packaged on Raven's PC
+without the Electric Dreams kit); from now on every version goes out on both (Raven 11-17, "Releasing an update").
+The old unit and bot tests fail since the 0.8.0 passes (CHANGELOG 0.8.2): they need their own pass before they guard
+anything again.
 
 In 0.8.1: every screen fits every screen (`WRUIFit.h`: a 1760 x 1080 minimum canvas and `SWRFit` around every viewport
 root; the main menu laid out by flow, the survivor framed into its free stage), Update now never opens a web page, and
@@ -810,7 +813,13 @@ later starts fetch only the files that changed. The site's side is in the freedo
 ## Releasing an update
 
 Only with Raven's OK. Copies installed from a GitHub release update themselves from the newest GitHub release; copies
-installed from Freedom35 update only through Freedom35 (above).
+installed from Freedom35 update only through Freedom35 (above). **Until Raven says otherwise (Raven 2026-11-17), every
+version goes out on both**: the Freedom35 package (`-Store freedom35`) and a GitHub release made with the steps below
+(`-Store github`, the default), with the same `ProjectVersion`, so players on either can play together.
+
+The packaging PC needs the engine's **MetaHuman Creator Core Data** option (Epic launcher > Library > the arrow beside
+5.8 > Options): the hero grooms' bindings point into it, and without it the cook fails with "The binding asset (...) has
+missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 
 1. `git pull`, and make sure the working tree is clean apart from files that stay local.
 2. Bump `ProjectVersion` in `Config/DefaultGame.ini` (it's also the network version: different versions can't play

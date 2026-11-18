@@ -21,6 +21,12 @@ if (Test-Path "$ue\Engine\Build\Build.version") {
 Check "Unreal Engine 5.8 in $ue (found: $(if ($ver) { $ver } else { 'none' }))" ($ver -like '5.8.*') `
 	'Install Unreal Engine 5.8 from the Epic Games Launcher (Unreal Engine > Library > +), in its default folder.'
 if ($ver -like '5.8.*' -and $ver -ne '5.8.4') { Note "Raven builds with 5.8.4; $ver should work, but update the engine in the launcher if anything odd happens." }
+# The hero's hair, brows and lashes are the MetaHumanCharacter plugin's optional grooms (Hero/Grooms/<face>/ holds only
+# the bindings). The launcher installs them only when the engine's MetaHuman option is ticked; without them the hero is
+# bald in the editor and packaging fails ("The binding asset (...) has missing cooked platform data", 0.8.2 on Raven's PC).
+Check "MetaHuman optional grooms in the engine (Plugins\MetaHuman\MetaHumanCharacter\Content\Optional\Grooms)" `
+	(Test-Path "$ue\Engine\Plugins\MetaHuman\MetaHumanCharacter\Content\Optional\Grooms") `
+	'Epic Games Launcher > Unreal Engine > Library > the arrow beside 5.8 > Options: tick the MetaHuman Creator content option, Apply, let it download.'
 
 # Visual Studio with the C++ game workload (UE 5.8: VS 2022 17.8 or later, or VS 2026).
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"

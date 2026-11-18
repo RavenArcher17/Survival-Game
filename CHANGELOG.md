@@ -1,6 +1,33 @@
 # Changelog
 
-## Unreleased (0.8.2): a smaller game, Shipping for players, Freedom35 installs
+## 0.8.2 (2026-11-17): a smaller game, Shipping for players, Freedom35 installs
+
+### 0.8.2 on GitHub too (Raven's PC)
+
+Why: Raven 11-17: "people installing from github need the newest version aswell untill further notice". So until Raven
+says otherwise, every version goes out on GitHub as well as Freedom35 (HANDOFF "Releasing an update").
+
+- **v0.8.2 on GitHub** is the 0.8.2.2 game (commit 260820f), packaged on Raven's PC into `C:\Dev\WildreachBuild9`
+  (Shipping, store github, 2,946 files, 2,709 MB; Setup 2,454 MB in two parts plus the download program). The game
+  calls itself 0.8.2 (`ProjectVersion`), so the tag is v0.8.2 and 0.8.1 copies see it as newer; Freedom35's ".2"
+  is the site's own build number.
+- **Not in it: the Electric Dreams forest kit** (not on Raven's PC either), so GitHub copies show the Ancient forest's
+  tree-kit look; Freedom35's 0.8.2.2 has the scans. Same version, so the two still play together.
+- **Setup check: the MetaHuman optional grooms.** The first package on Raven's PC failed with 582 errors, "The binding
+  asset (Hair_...) has missing cooked platform data": every hero groom binding points at
+  `/MetaHumanCharacter/Optional/Grooms/...`, which the launcher installs only with the engine option **MetaHuman
+  Creator Core Data** (4.97 GB). `Tools\check_setup.ps1` now FAILs without it; README's PC table names it.
+
+Checked: the editor builds; `Tools\updatertest.ps1` 44 of 44; the whole Setup installed to a test folder and the
+boot check passed twice (new world, then continue, both `F35READY play`, exit 0 on quit) with `-userdir=` keeping its
+saves out of the real `%LOCALAPPDATA%\Wildreach` (0 files changed there); a 0.7.1 install (Build8's Setup) updated
+itself to 0.8.2 through its own updater from a local stand-in for the release (the download program, the parts list,
+the parts by range) and booted.
+
+**Not passing (from the 0.8.0 passes, not 0.8.2): the old bot and unit tests.** `alltests -Only unit,survival,version`
+on 260820f: unit 11 of 30 failed (the sound table's limits, combat, crafting, raids, spawn regions, walk map, build
+pieces), survival 18 of 25 (no fiber from shrubs, then "can't craft now" while a swing is still on), version 1 of 5
+("the menu says why"). No commit since 0.7.1 ran the suite; these need their own pass.
 
 ### Wildreach on Freedom35 Studios: a smaller package, every file under 64 MB, updates through Freedom35 (lane wild-f35; cooks/wild-f35.md in showcase-notes)
 
