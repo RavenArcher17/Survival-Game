@@ -1,0 +1,13 @@
+LANE: wild-answers-1115 (WILDREACH, desktop, BEFORE ship-7). Aaron answered the 20-card page wildreach-questions-1115 at 23:3x (answers saved in Saved/Handoff/wild-desktop/answers-wildreach-questions-1115.json; the questions came from wildreach-night/QUESTIONS-FOR-TOMORROW.md (laptop), wild-desktop/QUESTIONS-FOR-TOMORROW.md and DESKTOP-SAYS "QUESTION FOR TOMORROW" lines: match each card id r-<topic> to its question there). "Keep what is built" = nothing to do. BUILD every change below (full cook, ledger proven by file:line + commit):
+- r-colin (god mode): keep, AND "Make it a command we need to enter in-game 'god-mode' in the existing command line." God mode is opened by typing god-mode in the existing in-game command line (still only for the three signed-in devs).
+- r-pubserver: keep, AND "We need Mod Mode still available for us in public servers." The devs' god/mod mode works on public servers too (still only for them, server-verified).
+- r-flint: SWITCH: "Add flint as a material that can be mined and collected, occasionally getting a stack along with the stone you mine."
+- r-forest-ground: SWITCH: "We already have the electric dreams env pack. Can't we use that to create an incredible forest biome? Or take some lessons we learned from Trails?" Rebuild the forest ground/look with the Electric Dreams environment pack (find it in the project content) and the Trails of Appalachia forest lessons (C:/Users/acars/TrailsOfAppalachia docs on the laptop share if reachable): an incredible forest.
+- r-lefthand: SWITCH: "Food should be on the item quick use or other toolbar. Not equipped in one of the hands to eat."
+- r-moss: SWITCH: "Yes add the moss to collect. Make it look good."
+- r-packup: SWITCH: "Figure it out and make sure it's the best cook it can be with research and planning to find the best solution for this."
+- r-siege-pve: SWITCH: "Allow it to practice sieging on NPC strongholds."
+- r-wet: SWITCH: "We will do more design passes to make it really good" (build the other choice now, to a high standard).
+- r-kyrra: keep, "Try it, make it good". r-lens: keep, "Figure it out, best user experience is priority 1". r-recoil: keep, "Try it." r-talisman: keep, "Choose what's best for this game". Make sure each of those is genuinely good, not just present.
+- r-dunewrap: keep; Aaron: "Idk you aren't giving me any context or even full sentences" (the card failed him; keep what is built, and every future question card has full context in full sentences).
+Rules as in the preamble; Wildreach is NOT a music game. Push to master; 'WILDREACH LANDED wild-answers-1115 <commits>' in DESKTOP-SAYS.
