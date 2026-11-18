@@ -17,6 +17,7 @@ This is for building and changing the game. To just play it, download the instal
 | **Visual Studio 2022 Community** (17.8 or later; VS 2026 works too) | in the Visual Studio Installer tick the workloads **Game development with C++**, **Desktop development with C++** and **.NET desktop development**, plus a **Windows 11 SDK** (10.0.22621 is the one Unreal 5.8 prefers) |
 | **Git for Windows** (includes **Git LFS**) | run `git lfs install` once, before cloning |
 | **The six Fab art packs below** | not in git (their licence doesn't allow sharing them publicly) |
+| **Epic's Electric Dreams forest kit**, optional | not in git either (a Fab sample). Without it the Ancient forest draws stand-in trees. `Tools\art\electric_dreams_forest.ps1 -From <an Electric Dreams project>` copies it in (Fab: "Electric Dreams Environment", Create Project in the launcher); `Tools\check_setup.ps1` says PASS when it's in place |
 | GitHub CLI (`gh`), optional | only to publish a release: `gh auth login` as an account with write access to the repo |
 | Node.js, optional | only for the island scripts in `Tools\terrain` |
 | Claude Code, optional | on this PC (desktop app or terminal), not a cloud session: Unreal has to run here |

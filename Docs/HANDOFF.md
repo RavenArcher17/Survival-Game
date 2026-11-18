@@ -752,7 +752,9 @@ The repo is https://github.com/RavenArcher17/Survival-Game (public). Everyone wo
 - **Pull before you start, and again before you push** (`git pull`). Push each change once it builds and its tests
   pass. Don't leave finished work sitting unpushed: the other person builds on master.
 - **Commit your own files by name** (`git add <paths>`), never `git add -A` / `git add .`. Raven's PC has a local
-  `Config/DefaultEditor.ini` that stays out of git, and the Fab packs must never go in.
+  `Config/DefaultEditor.ini` that stays out of git, and the Fab packs and the Electric Dreams forest kit must never go
+  in: the repo is public and their licences don't allow sharing them (the kit went in at 29d9fb7 and came out again
+  the same day, Raven 11-18).
 - **Maps and `.uasset` files can't be merged.** If both of you change the same one, one person's change is lost. C++,
   `Data/*.json`, scripts and docs merge as usual. Before changing a map (`Content/Maps`, `Content/__ExternalActors__`)
   or an asset someone else may be working on, say so; one person at a time.

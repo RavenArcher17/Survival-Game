@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### The Electric Dreams forest kit is out of git again (Raven, 11-18)
+
+The kit pushed in 29d9fb7 (190 files, 1.57 GB of LFS under `Content/Megascans`, `MSPresets`, `Custom` and
+`PhysicalMaterials`) is untracked again, and its four folders are back in `.gitignore`. Why: the repo is public and Fab
+content may not be shared publicly (README), and every clone and pull of it counts against the Git LFS allowance.
+Raven's PC keeps its copy, so builds packaged there have the real trees.
+
+**Pulling this commit deletes the kit from your `Content` folder.** Copy the four folders aside before you pull and put
+them back after, or re-run `Tools\art\electric_dreams_forest.ps1 -From <an Electric Dreams project>`.
+`Tools\check_setup.ps1` says PASS when it's in place. The files are still in the history of 29d9fb7 and the two
+commits after it.
+
 ## 0.8.2 (2026-11-17): a smaller game, Shipping for players, Freedom35 installs
 
 ### 0.8.2 on GitHub too (Raven's PC)

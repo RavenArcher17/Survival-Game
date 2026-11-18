@@ -37,5 +37,9 @@ Plugins/*/Intermediate/
 /Content/MWLandscapeAutoMaterial/
 /Content/Atmospheric_Skybox/
 /Content/Materials_Bundle_Vol1/
-# Epic's Electric Dreams forest kit: committed (LFS) 11-18 so a pull brings the trees;
-# Tools/art/electric_dreams_forest.ps1 still works for a fresh copy.
+# Epic's Electric Dreams forest kit (Fab sample, ~1.6 GB): never in git (public repo; Fab content may not be shared
+# publicly). Tools/art/electric_dreams_forest.ps1 copies it in. Taken back out 11-18 after 29d9fb7 (Raven).
+/Content/Megascans/
+/Content/MSPresets/
+/Content/Custom/
+/Content/PhysicalMaterials/
