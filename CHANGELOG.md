@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Phase 2, part 2: joining players keep the server's movement corrections on the new lands (Raven, 11-18)
+
+The new lands' ground, the island places and the Ocean and Sky scenery are built at runtime on each machine, so their
+pieces have no network name. A joining player standing on one sent its position relative to it (the server couldn't
+resolve it and read it as a world position), and threw away every correction the server sent relative to it
+("could not resolve the new relative movement base actor, ignoring server correction": 160 to 1,600 a run). Both
+ends now send world positions with no base when the base can't be named over the network
+(`WRCharacterMovementComponent`: `FWRNetworkMoveData`, `FWRMoveResponseDataContainer`).
+
+- New `Tools\netwalktest.ps1`: three joining players walk 150 m and back on the Desert, the Forest and the Graveyard.
+  11-18: **0 corrections thrown away** on all three (PASS).
+- Still open: the server (uncooked editor, `-server -nullrhi`) ran at about 7.5 frames a second with three players and
+  no wildlife, so walking players still get small corrections (10-40 cm, about 7 a second). Next: measure where the
+  server's frame goes, then the packaged server.
+
 ### Phase 2, part 1: the progression, data and landmark bugs, and the unit tests green again (Raven, 11-18)
 
 From the 11-18 audits (the whole-game one and the landmarks-and-looks one, notes in `C:\Dev\WildreachAudit-20261118`).

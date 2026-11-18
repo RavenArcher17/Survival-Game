@@ -21,6 +21,70 @@
 #include "GameFramework/PhysicsVolume.h"
 #include "WRInventory.h"
 
+// ================================================================================================ moves over runtime ground
+
+namespace WRMoveNet
+{
+	/** Can the other machine find this movement base by its network name? Runtime-built ground can't. */
+	bool CanName(const UObject* Base)
+	{
+		return !Base || Base->IsSupportedForNetworking();
+	}
+}
+
+void FWRNetworkMoveData::ClientFillNetworkMoveData(const FSavedMove_Character& ClientMove, ENetworkMoveType MoveType)
+{
+	FCharacterNetworkMoveData::ClientFillNetworkMoveData(ClientMove, MoveType);
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	const UObject* Base = MovementBase ? static_cast<const UObject*>(MovementBase) : MovementBasePhysicsObjectOwner.Get();
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	if (!Base || WRMoveNet::CanName(Base) || !ClientMove.CharacterOwner) return;
+	// The server can't resolve this base: send where we are in the world, with no base.
+	Location = FRepMovement::RebaseOntoZeroOrigin(ClientMove.SavedLocation, ClientMove.CharacterOwner->GetCharacterMovement());
+	Acceleration = ClientMove.Acceleration;
+	MovementBasePhysicsObjectOwner = nullptr;
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	MovementBase = nullptr;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	MovementBaseBoneName = NAME_None;
+}
+
+FWRNetworkMoveDataContainer::FWRNetworkMoveDataContainer()
+{
+	NewMoveData = &Moves[0];
+	PendingMoveData = &Moves[1];
+	OldMoveData = &Moves[2];
+}
+
+void FWRMoveResponseDataContainer::ServerFillResponseData(const UCharacterMovementComponent& CharacterMovement, const FClientAdjustment& PendingAdjustment)
+{
+	FCharacterMoveResponseDataContainer::ServerFillResponseData(CharacterMovement, PendingAdjustment);
+	if (ClientAdjustment.bAckGoodMove || !ClientAdjustment.bBaseRelativePosition || !CharacterMovement.UpdatedComponent) return;
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	const UPrimitiveComponent* AdjBase = ClientAdjustment.NewBase;
+	const UObject* Base = AdjBase ? static_cast<const UObject*>(AdjBase) : ClientAdjustment.NewMovementBasePhysicsObjectOwner.Get();
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	if (!Base || WRMoveNet::CanName(Base)) return;
+	// The client can't resolve this base and would ignore a correction relative to it: correct in world terms instead.
+	ClientAdjustment.bBaseRelativePosition = false;
+	ClientAdjustment.bBaseRelativeVelocity = false;
+	ClientAdjustment.NewLoc = FRepMovement::RebaseOntoZeroOrigin(CharacterMovement.UpdatedComponent->GetComponentLocation(), &CharacterMovement);
+	ClientAdjustment.NewVel = CharacterMovement.Velocity;
+	ClientAdjustment.NewMovementBasePhysicsObjectOwner = nullptr;
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	ClientAdjustment.NewBase = nullptr;
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	ClientAdjustment.NewBaseBoneName = NAME_None;
+	bHasBase = false;
+}
+
+UWRCharacterMovementComponent::UWRCharacterMovementComponent(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	SetNetworkMoveDataContainer(WRMoveData);
+	SetMoveResponseDataContainer(WRMoveResponse);
+}
+
 bool UWRCharacterMovementComponent::IsSprinting() const
 {
 	const AWRCharacterBase* WRChar = Cast<AWRCharacterBase>(CharacterOwner);

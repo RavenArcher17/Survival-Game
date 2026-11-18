@@ -2,7 +2,32 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/CharacterMovementReplication.h"
 #include "WRCharacterMovementComponent.generated.h"
+
+/**
+ * Moves and corrections over ground the other machine can't name. The new lands' ground, the island places and the
+ * Ocean and Sky scenery are built at runtime on each machine, so their components have no stable network name. The
+ * engine sends a position relative to such a base when it is movable: the server couldn't resolve the client's base
+ * (and read a relative position as a world one: a correction every move), and the client threw the server's
+ * relative corrections away ("could not resolve the new relative movement base actor"). Both ends now send world
+ * positions with no base whenever the base can't be named over the network.
+ */
+struct FWRNetworkMoveData : public FCharacterNetworkMoveData
+{
+	virtual void ClientFillNetworkMoveData(const FSavedMove_Character& ClientMove, ENetworkMoveType MoveType) override;
+};
+
+struct FWRNetworkMoveDataContainer : public FCharacterNetworkMoveDataContainer
+{
+	FWRNetworkMoveDataContainer();
+	FWRNetworkMoveData Moves[3];
+};
+
+struct FWRMoveResponseDataContainer : public FCharacterMoveResponseDataContainer
+{
+	virtual void ServerFillResponseData(const UCharacterMovementComponent& CharacterMovement, const FClientAdjustment& PendingAdjustment) override;
+};
 
 /**
  * Client-predicted movement extras. Sprint and the action slowdowns (attacking, blocking)
@@ -16,6 +41,8 @@ class WILDREACH_API UWRCharacterMovementComponent : public UCharacterMovementCom
 	GENERATED_BODY()
 
 public:
+	UWRCharacterMovementComponent(const FObjectInitializer& ObjectInitializer);
+
 	UPROPERTY(EditDefaultsOnly, Category="Character Movement: Sprint")
 	float SprintSpeed = 750.f;
 
@@ -63,6 +90,10 @@ public:
 	virtual float GetMaxSpeed() const override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
+
+private:
+	FWRNetworkMoveDataContainer WRMoveData;
+	FWRMoveResponseDataContainer WRMoveResponse;
 };
 
 class FSavedMove_WR : public FSavedMove_Character
