@@ -213,6 +213,9 @@ namespace WRLand
 	WILDREACH_API const FString& CurrentMap();
 	/** A land whose biome is live (tuning world.liveBiomes). */
 	WILDREACH_API bool IsLive(const FWRLandDef& Def);
+	/** The map being played has a land of its own (the round island, L_Wildreach): the Old Island's lands and everything
+	 *  placed on them (their tides, hazards, bosses, shrines, scenery, creatures) stay off it. */
+	WILDREACH_API bool OwnLandMap();
 	WILDREACH_API const FWRLandDef* Find(FName Id);
 	/** The live land containing a game point (its coast box + 300 m), or null. */
 	WILDREACH_API const FWRLandDef* At(const FVector& World);

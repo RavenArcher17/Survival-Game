@@ -381,9 +381,9 @@ const ZONES = [
 	{ id: "graveyard", letter: "7", name: "the Graveyard", ground: [112, 116, 96], groundAlt: [98, 100, 86], layers: { soil: 0.5, grass: 0.3, stones: 0.2 } },
 	{ id: "wasteland", letter: "8", name: "the Corrupted wasteland", ground: [104, 88, 112], groundAlt: [86, 72, 96], layers: { soil: 0.5, stones: 0.5 } },
 	{ id: "volcanic", letter: "9", name: "the Volcanic", ground: [46, 44, 44], groundAlt: [70, 56, 50], layers: { stones: 0.7, soil: 0.3 } },
-	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [96, 150, 62], groundAlt: [124, 166, 70], layers: { grass: 0.85, soil: 0.15 }, speck: { colors: [[236, 232, 244], [230, 196, 70], [160, 120, 196]], amount: 0.08, scale: 4 } },
-	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [118, 140, 82], groundAlt: [130, 146, 86], layers: { grass: 0.7, soil: 0.3 } },
-	{ id: "yards", letter: "Y", name: "Hearthmoot's yards", ground: [92, 140, 64], groundAlt: [112, 150, 70], layers: { grass: 0.85, soil: 0.15 }, speck: { colors: [[236, 232, 244], [230, 196, 70]], amount: 0.04, scale: 3 } },
+	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [96, 150, 62], groundAlt: [124, 166, 70], layers: { grass: 0.85, soil: 0.15 } },
+	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [96, 148, 62], groundAlt: [120, 162, 70], layers: { grass: 0.8, soil: 0.2 } },
+	{ id: "yards", letter: "Y", name: "Hearthmoot's yards", ground: [92, 140, 64], groundAlt: [112, 150, 70], layers: { grass: 0.85, soil: 0.15 } },
 	{ id: "seabed", letter: "~", name: "the sea floor", ground: [176, 164, 124], groundAlt: [150, 144, 112], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "deep", letter: "D", name: "the deep sea floor", ground: [34, 46, 56], groundAlt: [30, 40, 50], layers: { sand: 0.6, stones: 0.4 } },
 ];

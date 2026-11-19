@@ -4,6 +4,7 @@
 // chests in WRPortalThings.cpp, the bosses' arenas in WRPortalBosses.cpp, the screens in WRUIPortals.cpp.
 
 #include "WRPortals.h"
+#include "WRLand.h"
 #include "WRForestTypes.h"
 #include "WRPortalsInternal.h"
 #include "WRArtifacts.h"
@@ -683,7 +684,9 @@ void UWRPortalSystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	PsCached().Reset();
 	PsKits().Reset();
-	bServer = InWorld.GetNetMode() != NM_Client && InWorld.GetAuthGameMode<AWRGameMode>() != nullptr && !WRWorlds::Current().IsEmpty();
+	// Not on a map with a land of its own (the round island): the portals open on the Old Island's ground, and there they
+	// stood in the air over the new map until its own slice brings them.
+	bServer = InWorld.GetNetMode() != NM_Client && InWorld.GetAuthGameMode<AWRGameMode>() != nullptr && !WRWorlds::Current().IsEmpty() && !WRLand::OwnLandMap();
 	if (bServer) Load();
 }
 

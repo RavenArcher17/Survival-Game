@@ -2,6 +2,7 @@
 
 #include "WRFarm.h"
 #include "WRFarmLook.h"
+#include "WRLand.h"
 #include "WRForestCreatures.h"
 #include "WRForestHazards.h"
 #include "WRBuilding.h"
@@ -158,6 +159,13 @@ using namespace WRFarmDetail;
 bool WRBiome::IsLive(FName Biome)
 {
 	if (Biome.IsNone() || Biome == TEXT("any")) return true;
+	// The Old Island's lands aren't on the round island's map: nothing of theirs is placed there.
+	return !WRLand::OwnLandMap() && IsContentLive(Biome);
+}
+
+bool WRBiome::IsContentLive(FName Biome)
+{
+	if (Biome.IsNone() || Biome == TEXT("any")) return true;
 	static TArray<FString> Live;
 	static bool bRead = false;
 	if (!bRead)
@@ -175,7 +183,7 @@ FString WRBiome::Name(FName Biome)
 	return N.IsEmpty() ? Biome.ToString().Replace(TEXT("_"), TEXT(" ")) : N;
 }
 
-bool FWRCropDef::IsLive() const { return WRBiome::IsLive(Biome); }
+bool FWRCropDef::IsLive() const { return WRBiome::IsContentLive(Biome); }
 
 bool FWRAnimalDef::Eats(FName Item) const
 {
@@ -369,7 +377,7 @@ const FWRDishDef* FWRFarmDefs::Match(FName Station, const TArray<FName>& Ingredi
 	const FWRDishDef* Best = nullptr;
 	for (const FWRDishDef& D : DishList)
 	{
-		if (D.Station != Station || D.Pattern.Num() != Ingredients.Num() || !WRBiome::IsLive(D.Biome)) continue;
+		if (D.Station != Station || D.Pattern.Num() != Ingredients.Num() || !WRBiome::IsContentLive(D.Biome)) continue;
 		// One to one: some ordering of the ingredients fills every entry (4! = 24 at most).
 		TArray<int32> Order;
 		for (int32 i = 0; i < Ingredients.Num(); ++i) Order.Add(i);
@@ -441,8 +449,8 @@ namespace WRFarmDetail
 
 bool FWRFarm::IsPieceLive(const FWRPieceDef& Def)
 {
-	if (!Def.Biome.IsNone() && !WRBiome::IsLive(Def.Biome)) return false;
-	if (!Def.LiveWith.IsNone() && !WRBiome::IsLive(Def.LiveWith)) return false;
+	if (!Def.Biome.IsNone() && !WRBiome::IsContentLive(Def.Biome)) return false;
+	if (!Def.LiveWith.IsNone() && !WRBiome::IsContentLive(Def.LiveWith)) return false;
 	if (!Def.NeedsCreature.IsNone() && !FWRCreatureRegistry::Get().Find(Def.NeedsCreature)) return false;
 	if (!Def.Plot.IsNone())
 	{
@@ -454,7 +462,7 @@ bool FWRFarm::IsPieceLive(const FWRPieceDef& Def)
 	if (!Def.Trophy.IsNone())
 	{
 		const FWRFishDef* F = FWRFishRegistry::Get().Find(Def.Trophy);
-		if (!F || !WRBiome::IsLive(F->Biome)) return false;
+		if (!F || !WRBiome::IsContentLive(F->Biome)) return false;
 	}
 	return true;
 }
@@ -953,7 +961,7 @@ FString FWRFarm::UseItem(UWRInventoryComponent* Inventory, int32 SlotIndex)
 		TArray<const FWRDishDef*> Unknown;
 		for (const FWRDishDef& D : FWRFarmDefs::Get().Dishes())
 		{
-			if (WRBiome::IsLive(D.Biome) && Food && !Food->Known.Contains(D.Id) && !Food->Hinted.Contains(D.Id)) Unknown.Add(&D);
+			if (WRBiome::IsContentLive(D.Biome) && Food && !Food->Known.Contains(D.Id) && !Food->Hinted.Contains(D.Id)) Unknown.Add(&D);
 		}
 		if (!Food || Unknown.Num() == 0) return TEXT("The scrap tells you nothing new");
 		const FWRDishDef* D = Unknown[FMath::RandRange(0, Unknown.Num() - 1)];

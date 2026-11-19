@@ -194,7 +194,7 @@ TArray<const FWRRecipe*> FWRRecipeRegistry::ForStation(FName Station) const
 		// Discovery dishes aren't listed: they're found in the Cook screen's pot.
 		// The lava forge makes everything a forge does, and its own steel (cooks/build-machinery.md 2.5).
 		const bool bHere = R.Station == Station || (Station == TEXT("lava_forge") && R.Station == TEXT("forge"));
-		if (bHere && !R.bDish && WRBiome::IsLive(R.Biome) && R.WaitsFor.IsEmpty()) Out.Add(&R);
+		if (bHere && !R.bDish && WRBiome::IsContentLive(R.Biome) && R.WaitsFor.IsEmpty()) Out.Add(&R);
 	}
 	return Out;
 }
@@ -1030,7 +1030,7 @@ FName FWRCrafting::GearStation(const FWRItemDef& Def)
 
 bool FWRCrafting::IsOpenTo(const AActor* Player, const FWRRecipe& Recipe)
 {
-	return WRBiome::IsLive(Recipe.Biome) && Recipe.WaitsFor.IsEmpty() && (Recipe.Blueprint.IsNone() || FWRBlueprints::Knows(Player, Recipe.Blueprint));
+	return WRBiome::IsContentLive(Recipe.Biome) && Recipe.WaitsFor.IsEmpty() && (Recipe.Blueprint.IsNone() || FWRBlueprints::Knows(Player, Recipe.Blueprint));
 }
 
 int32 FWRCrafting::Have(const AWRPlayerController* Player, FName Item, const AActor* StockAt)

@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Phase 3, slice 1 finished: every rough edge out of Hearthmoot, the meadow and the lake (11-19)
+
+Raven: "Make each slice as we go perfect". An audit of the slice from the ground, the walls, the air, by day, at dusk
+and at night (over 60 views across the passes), and everything it found fixed:
+- **The hearth burns:** a low stone hearth with a kerb, an ember bed and split logs leaning in, and the game's own
+  hearth fire on it day and night with its light; four iron braziers round it lit at dusk.
+- **The plaza paved:** rings of flagstones in six stone tones round the hearth (it was bare dirt).
+- **Lights after dark:** about two in five windows glow (shown only after dusk), 58 street lanterns along the avenues
+  and the ring street, lamps either side of each gate passage, torches on the gates and the forts, braziers on the
+  fort gates. A few lights each, the rest glass that glows (`fires` and `nightBlocks` in Data/hearthmoot.json,
+  `StepLights` in WRRoundIsland.cpp; `roundIsland.*Light`, `fireReach`).
+- **Calmer colours:** the quarters' roofs in weathered, earthy versions of their paths' colours, plaster mostly
+  limewash (purple, lilac and ice-blue streets were loud).
+- **Wall and gates:** the curtain wall's town side has buttresses, a plinth and string courses (it was one flat sunlit
+  sheet); gatehouses have merlons, arrow slits and a string course on both faces, a proud arch, open oak gates and a
+  raised portcullis.
+- **The meadow:** the smeared flower specks painted into the ground are gone; real wildflowers (white, yellow, purple,
+  blue, pink) grow among the grass round you. The ring of different green round the city's hill is gone.
+- **The fields grow crops:** wheat and barley with their ears, rows of greens, rough fallow, round you in the fields.
+- **Farm, windmill, fort, waymark:** weatherboarded barns with doors and a thatch roof; the windmills rebuilt (tapered
+  tower, gallery, cap, four lattice sails that actually meet at the hub); forts with gates, arrow slits, pennants and
+  torches; each waymark a standing stone on a cairn and a signpost with an arm down every road, off the roads.
+- **The lake is a lake:** the sea's surf, foam glow and swell taken off it (they drew white breakers and a tiled
+  pattern), gentle ripples, and next to no refraction (seen low across the water it showed the lake bed over the whole
+  surface): calm teal water from the shore and from a swimmer's eye.
+- **Nothing of the Old Island on the round island's map:** a green light column in the north sky was an Old Island
+  portal standing in the air 450 m off the meadow, and the Ocean land's tide waters and markers were spawning 6 km
+  out. The Old Island's lands and what is placed on them now stay off a map with a land of its own
+  (`WRLand::OwnLandMap`; `WRBiome::IsLive` is false there, while `WRBiome::IsContentLive` keeps recipes, crops,
+  dishes and factions as before; the Ocean, Desert and Sky isles' live checks are per map now; portals don't open there).
+  Old Island maps, the combat arena and the creature stage are unchanged.
+- **The map's scaffold removed:** a 4 km grid floor and four grid cubes from before the round island, buried under it.
+- **Look-check commands:** `wr.Lake` (try the lake's settings live), `wr.Ahead`, `wr.FarActors`, `wr.ActorCensus`,
+  `wr.FindTall` (what is in view, far out, or in the world).
+- Playtest (`Tools/roundtest.ps1`): all walks arrive, the walker swims at the lake's surface, 11.6 ms a frame over the
+  city and 9.0 ms on the meadow at 1600x900, a second player joins, no errors. Unit tests 33/33.
+
 ### Phase 3, slice 1 quality pass: a lived-in Hearthmoot, a natural meadow and lake, a playtest (11-19)
 
 Raven: "Go ahead with what you recommend" (the three items after slice 1's first look).

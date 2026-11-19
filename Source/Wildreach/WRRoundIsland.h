@@ -23,6 +23,8 @@ class WILDREACH_API AWRRoundIsland : public AActor
 public:
 	AWRRoundIsland();
 	virtual void Tick(float DeltaSeconds) override;
+	/** Look checks (wr.Lake): param Name Value | colour Name R G B (sRGB) | material Path (the lake's base material). */
+	void DebugLake(const TArray<FString>& Args);
 
 protected:
 	virtual void BeginPlay() override;
@@ -36,12 +38,29 @@ private:
 	void BuildPlants(const TSharedPtr<class FJsonObject>& J);
 	/** Server: the meadow is the Commons, a safe zone (roundIsland.safeRadius). */
 	void BuildSafeZone();
-	/** Machines that draw: grass on the meadow and the city's yards, tufts of thin blades in cells round the view, made
-	 *  and dropped as it moves (roundIsland.cover*, roundIsland.grass*). */
+	/** Machines that draw: grass and wildflowers on the meadow and the city's yards, the crops in the fields' rows,
+	 *  tufts of thin blades in cells round the view, made and dropped as it moves (roundIsland.cover*, grass*, flower*,
+	 *  crop*). */
 	void StepCover();
 	UPROPERTY() TObjectPtr<UStaticMesh> BladeMesh;
 	UPROPERTY() TObjectPtr<class UMaterialInterface> BladeMat;
 	TMap<FIntPoint, TArray<TObjectPtr<UInstancedStaticMeshComponent>>> CoverCells;
+
+	/** Machines that draw: the city's lights with the clock. The night blocks (lit windows, lantern glass) show after
+	 *  dusk; the hearth burns always; braziers and torches light at dusk; each fire's flame is drawn only near the view. */
+	void StepLights(float Daylight);
+	UPROPERTY() TObjectPtr<USceneComponent> NightRoot;
+	struct FFire
+	{
+		uint8 Kind = 0;               // 0 hearth, 1 brazier, 2 lantern (a light only), 3 torch (a flame only)
+		FVector At = FVector::ZeroVector;
+		float Scale = 1.f;
+		float Phase = 0.f;
+		TWeakObjectPtr<class UPointLightComponent> Light;
+		TWeakObjectPtr<USceneComponent> Fx;
+	};
+	TArray<FFire> Fires;
+	bool bNightShown = false;
 
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Solids;
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Water;

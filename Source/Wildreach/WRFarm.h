@@ -26,6 +26,9 @@ namespace WRBiome
 	/** A biome whose land is in the game (tuning world.liveBiomes): only those biomes' crops, animals, fish, baits and
 	 *  pieces show. Adding a biome's land is adding its id there. */
 	WILDREACH_API bool IsLive(FName Biome);
+	/** The same list without the map: a biome's content (its recipes, crops, dishes, factions) is in the game even where
+	 *  its land isn't (IsLive is also false on a map with a land of its own, WRLand::OwnLandMap). */
+	WILDREACH_API bool IsContentLive(FName Biome);
 	/** "the volcanic slopes", "the frozen tundra"... (farming.json biomeNames). */
 	WILDREACH_API FString Name(FName Biome);
 }

@@ -120,6 +120,13 @@ ground), then the rest round the ring.
 - **Ground cover and the safe meadow:** `WRRoundIsland.cpp` grows low grass near the camera on the meadow and yards
   (`roundIsland.cover*`) and puts one safe zone over the meadow (`roundIsland.safeRadius`, 1.3 km).
 - **Playtest:** `Tools/roundtest.ps1` (server + a rendered walker + a second player; walks, swim, frame times).
+- **Lights:** `fires` (hearth, braziers, lantern lights, torches) and `nightBlocks` (lit windows, lantern glass) in
+  Data/hearthmoot.json; WRRoundIsland's `StepLights` shows them with the clock.
+- **Only the round island's own things on its map:** `WRLand::OwnLandMap()` is true on a map with a land of its own;
+  `WRBiome::IsLive` is then false for every Old Island biome (nothing of theirs is placed there), while
+  `WRBiome::IsContentLive` (recipes, crops, dishes, factions) is unchanged. Each land's slice brings its content here.
+- **Each slice is finished before the next** (Raven, 11-19): audit it from many angles, day and night, fix everything
+  in it, and list only what truly belongs to a later slice.
 - **Hearthmoot and the forts:** `node Tools/terrain/hearthmoot.mjs` -> `Data/hearthmoot.json`, built on every machine
   by `WRRoundIsland.cpp` from the building look's blocks (no replication); its solids are hidden boxes.
 - **Pictures:** `Tools/terrain/spotshots.ps1 -Map L_Wildreach` (camera spots in game cm: map metres x 100).

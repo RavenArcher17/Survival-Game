@@ -385,7 +385,7 @@ namespace WRUICookScreen
 			int32 Here = 0, All = 0;
 			for (const FWRDishDef& D : FWRFarmDefs::Get().Dishes())
 			{
-				if (!WRBiome::IsLive(D.Biome)) continue;
+				if (!WRBiome::IsContentLive(D.Biome)) continue;
 				++All;
 				Here += F && F->Known.Contains(D.Id) ? 1 : 0;
 			}
@@ -495,7 +495,7 @@ namespace WRUICookScreen
 			int32 MinN = 4, MaxN = 1;
 			for (const FWRDishDef& D : FWRFarmDefs::Get().Dishes())
 			{
-				if (!WRBiome::IsLive(D.Biome)) continue;
+				if (!WRBiome::IsContentLive(D.Biome)) continue;
 				const bool bKnown = F && F->Known.Contains(D.Id);
 				const bool bHint = F && F->Hinted.Contains(D.Id);
 				if (!bKnown && !bHint) { ++Unknown; MinN = FMath::Min(MinN, D.Pattern.Num()); MaxN = FMath::Max(MaxN, D.Pattern.Num()); continue; }

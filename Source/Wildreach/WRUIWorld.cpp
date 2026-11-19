@@ -746,7 +746,7 @@ namespace WRUIWorldScreens
 				for (const auto& KV : Factions->Values)
 				{
 					const TSharedPtr<FJsonObject> F = KV.Value->AsObject();
-					if (!F.IsValid() || !F->HasField(TEXT("name")) || !WRBiome::IsLive(FName(*StrIn(F, TEXT("biome"))))) continue;
+					if (!F.IsValid() || !F->HasField(TEXT("name")) || !WRBiome::IsContentLive(FName(*StrIn(F, TEXT("biome"))))) continue;
 					const FName Id(*KV.Key);
 					const int32 V = Log ? Log->StandingOf(Id) : 0;
 					const int32 Tier = Log ? Log->TierOf(Id) : 0;

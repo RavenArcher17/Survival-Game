@@ -36,13 +36,15 @@ const CITY_TOP = groundAt(0, 0);
 const WALL = { r: CITY_WALL, height: 11, thick: 4, segment: 6 };
 const GATE_HALF = 7;
 // Each path's quarter: its roof colour (its path's) and the plaster its houses wear.
+// Earthy, weathered versions of the path colours (slate, tile, thatch-like tones), so a quarter reads as its path's
+// without looking painted; plaster is mostly limewash, only tinged with the path.
 const QUARTER_LOOK = {
-	lightning: { roof: [118, 108, 196], plaster: [200, 200, 212] }, wind: { roof: [176, 204, 230], plaster: [226, 228, 234] },
-	sun: { roof: [206, 160, 58], plaster: [228, 208, 164] }, nature: { roof: [76, 128, 62], plaster: [206, 196, 166] },
-	arcane: { roof: [156, 80, 178], plaster: [206, 196, 218] }, frost: { roof: [140, 188, 220], plaster: [218, 226, 234] },
-	blood: { roof: [122, 34, 38], plaster: [184, 158, 148] }, tide: { roof: [44, 132, 142], plaster: [208, 216, 208] },
-	necromancy: { roof: [96, 88, 108], plaster: [158, 154, 158] }, spore: { roof: [116, 124, 60], plaster: [196, 190, 156] },
-	void: { roof: [62, 46, 82], plaster: [140, 132, 146] }, fire: { roof: [188, 72, 42], plaster: [196, 158, 126] },
+	lightning: { roof: [96, 98, 136], plaster: [214, 212, 214] }, wind: { roof: [132, 150, 162], plaster: [222, 222, 218] },
+	sun: { roof: [176, 136, 66], plaster: [228, 212, 176] }, nature: { roof: [82, 112, 62], plaster: [214, 204, 176] },
+	arcane: { roof: [112, 82, 124], plaster: [214, 206, 208] }, frost: { roof: [124, 148, 164], plaster: [222, 224, 222] },
+	blood: { roof: [124, 50, 44], plaster: [204, 184, 166] }, tide: { roof: [62, 112, 116], plaster: [214, 216, 204] },
+	necromancy: { roof: [86, 84, 92], plaster: [188, 184, 178] }, spore: { roof: [116, 114, 70], plaster: [208, 200, 170] },
+	void: { roof: [70, 60, 82], plaster: [176, 170, 168] }, fire: { roof: [164, 84, 56], plaster: [214, 186, 156] },
 };
 
 // ---- blocks, solids, plants --------------------------------------------------------------------------------------------
@@ -55,7 +57,7 @@ const pal = (rgb, metal = 0, rough = 0.85, glow = 0, pattern = 0) => {
 	if (!palIndex.has(key)) { palIndex.set(key, palette.length); palette.push([...rgb.map(Math.round), metal, rough, glow, pattern]); }
 	return palIndex.get(key);
 };
-const blocks = [], solids = [], plants = [];
+const blocks = [], nightBlocks = [], solids = [], plants = [], fires = [];
 const cm = (v) => Math.round(v * 100);
 const CUBE = 0, CYL = 1, CONE = 2, WOOD = 0, STONE = 1, CLOTH = 2, TINT = 4;
 const frame = (x, y, z, yaw) => ({
@@ -64,16 +66,25 @@ const frame = (x, y, z, yaw) => ({
 });
 // Anything standing on the ground (its bottom at 0) goes SINK m into it, so a dip under it never shows a gap.
 const SINK = 2;
-function block(F, mesh, mat, [lx, ly, lz], [sx, sy, sz], { roll = 0, pitch = 0, yawAdd = 0, colour = -1, solid = false, nosink = false } = {}) {
+// night: the block shows only after dusk (lit windows, lantern glass): WRRoundIsland.cpp draws those under a root it
+// shows and hides with the daylight.
+function block(F, mesh, mat, [lx, ly, lz], [sx, sy, sz], { roll = 0, pitch = 0, yawAdd = 0, colour = -1, solid = false, nosink = false, night = false } = {}) {
 	if (!nosink && roll === 0 && pitch === 0 && Math.abs(lz - sz / 2) < 0.15 && mesh !== CONE) { lz -= SINK / 2; sz += SINK; }
 	const [x, y, z] = F.at(lx, ly, lz);
-	blocks.push([mesh, mat, cm(x), cm(y), cm(z), cm(sx), cm(sy), cm(sz), +(F.yaw + yawAdd).toFixed(1), +pitch.toFixed(1), +roll.toFixed(1), colour]);
+	(night ? nightBlocks : blocks).push([mesh, mat, cm(x), cm(y), cm(z), cm(sx), cm(sy), cm(sz), +(F.yaw + yawAdd).toFixed(1), +pitch.toFixed(1), +roll.toFixed(1), colour]);
 	if (solid) solids.push([cm(x), cm(y), cm(z), cm(sx), cm(sy), cm(sz), +(F.yaw + yawAdd).toFixed(1)]);
 }
+// A fire or a light: [kind, cx, cy, cz (cm), scale]. Kinds (WRRoundIsland.cpp): 0 the hearth (burns day and night, its
+// light always on), 1 a brazier (lit at dusk, a light), 2 a lantern's light (dusk, no flame), 3 a torch (dusk, no light).
+const FIRE = { hearth: 0, brazier: 1, lantern: 2, torch: 3 };
+const fire = (kind, [x, y, z], scale = 1) => fires.push([kind, cm(x), cm(y), cm(z), +scale.toFixed(2)]);
 const plant = (kind, variant, x, y, yaw, scale) => plants.push([kind, variant, cm(x), cm(y), cm(groundAt(x, y) - 0.15), Math.round(yaw), +scale.toFixed(2)]);
 const trunkSolid = (x, y, h = 4) => solids.push([cm(x), cm(y), cm(groundAt(x, y) + h / 2), 70, 70, cm(h), 0]);
 const slate = pal([62, 66, 74], 0, 0.7), iron = pal([40, 40, 44], 0.8, 0.45, 0, 2), darkWood = pal([58, 40, 26], 0, 0.9, 0, 1), beam = pal([70, 50, 34], 0, 0.9, 0, 1);
-const glass = pal([30, 34, 40], 0, 0.2, 0, 3), ember = pal([255, 120, 30], 0, 0.6, 6, 3), straw = pal([196, 168, 92], 0, 0.95, 0, 1);
+const glass = pal([30, 34, 40], 0, 0.2, 0, 3), ember = pal([170, 60, 18], 0, 0.7, 1.4, 0), straw = pal([196, 168, 92], 0, 0.95, 0, 1);
+// A lit window after dusk (a few shades of candle and hearth light) and a lantern's glass.
+const litWindow = [pal([255, 196, 120], 0, 0.5, 1.1, 3), pal([255, 176, 96], 0, 0.5, 0.9, 3), pal([255, 214, 150], 0, 0.5, 1.3, 3)];
+const lanternGlow = pal([255, 188, 104], 0, 0.4, 3.2, 3), soot = pal([34, 30, 28], 0, 0.95);
 const reedGreen = pal([96, 112, 58], 0, 0.9, 0, 1), reedHead = pal([92, 64, 40], 0, 0.95, 0, 1), cloth = pal([150, 40, 40], 0, 0.9);
 const gateBearings = trunks.map((t) => t.bearing);
 const nearGate = (deg, r, clear) => gateBearings.some((g) => Math.abs(dAng(deg, g)) * RAD * r < clear);
@@ -111,6 +122,15 @@ const insideCity = (b) => corners(b).every((p) => { const r = Math.hypot(...p); 
 		block(F, CUBE, STONE, [0, 0, WALL.height / 2], [len, WALL.thick, WALL.height], { solid: true });
 		block(F, CUBE, STONE, [-len / 4, -WALL.thick / 2 + 0.4, WALL.height + 0.7], [len / 2 - 0.6, 0.8, 1.4]);
 		block(F, CUBE, STONE, [0, WALL.thick / 2 - 0.25, WALL.height + 0.45], [len, 0.5, 0.9]);
+		// The faces broken up: a battered plinth both sides, a string course under the walk, and on the inner face a
+		// buttress every other length (the town side was one flat, sunlit sheet).
+		for (const s of [-1, 1]) block(F, CUBE, STONE, [0, s * (WALL.thick / 2 + 0.35), 0.9], [len, 0.7, 1.8]);
+		block(F, CUBE, STONE, [0, WALL.thick / 2 + 0.2, WALL.height - 1.6], [len, 0.4, 0.35], { nosink: true });
+		block(F, CUBE, STONE, [0, -WALL.thick / 2 - 0.2, WALL.height - 1.2], [len, 0.4, 0.35], { nosink: true });
+		if (k % 2 === 0) {
+			block(F, CUBE, STONE, [0, WALL.thick / 2 + 0.75, (WALL.height - 2) / 2], [1.4, 1.5, WALL.height - 2], { solid: true });
+			block(F, CUBE, STONE, [0, WALL.thick / 2 + 0.6, WALL.height - 2.4], [1.4, 1.2, 1.2], { pitch: 0, roll: 40, nosink: true });
+		}
 	}
 }
 for (const q of quarters) {
@@ -127,23 +147,74 @@ for (const t of trunks) {
 		block(F, CUBE, STONE, [side * (GATE_HALF + 5), 0, 9], [10, 11, 18], { solid: true });
 		block(F, CUBE, STONE, [side * (GATE_HALF + 5), 0, 18.6], [11, 12, 1.2]);
 		for (const m of [-3.5, 0, 3.5]) block(F, CUBE, STONE, [side * (GATE_HALF + 5) + m, -5.6, 19.9], [1.6, 0.9, 1.4]);
+		// Both faces: merlons, a string course, arrow slits (the town side was a blank slab).
+		for (const m of [-3.5, 0, 3.5]) block(F, CUBE, STONE, [side * (GATE_HALF + 5) + m, 5.6, 19.9], [1.6, 0.9, 1.4]);
+		block(F, CUBE, STONE, [side * (GATE_HALF + 5), 0, 12], [10.5, 11.5, 0.45], { nosink: true });
+		for (const yy of [-5.53, 5.53]) for (const zz of [6.5, 15]) for (const xx of [-2.2, 2.2]) block(F, CUBE, TINT, [side * (GATE_HALF + 5) + xx, yy, zz], [0.35, 0.06, 1.4], { colour: soot, nosink: true });
 		block(F, CUBE, CLOTH, [side * (GATE_HALF + 5), -5.8, 12], [4, 0.2, 7], { colour: cloth });
 	}
 	block(F, CUBE, STONE, [0, 0, 13.5], [2 * GATE_HALF + 0.6, 11, 5], { solid: true });
+	// The raised portcullis under the outer arch, its bars' feet showing.
 	block(F, CUBE, TINT, [0, -3.5, 10.4], [2 * GATE_HALF - 0.4, 0.4, 1.2], { colour: iron });
+	for (let b = -GATE_HALF + 1; b < GATE_HALF; b += 1.4) block(F, CUBE, TINT, [b, -3.5, 9.6], [0.16, 0.16, 1.2], { colour: iron, nosink: true });
+	// The gates: two leaves of oak swung back against the passage walls, iron-banded.
+	for (const side of [-1, 1]) {
+		block(F, CUBE, WOOD, [side * (GATE_HALF - 0.3), -1.2, 5.2], [0.35, 6.4, 10.4], { colour: darkWood });
+		for (const z of [2, 5.2, 8.4]) block(F, CUBE, TINT, [side * (GATE_HALF - 0.5), -1.2, z], [0.08, 6.5, 0.3], { colour: iron, nosink: true });
+	}
+	// The town side: an arch ring standing proud, lamps either side of the passage, and torches on the outer towers.
+	block(F, CUBE, STONE, [0, 5.7, 12.2], [2 * GATE_HALF + 2.4, 0.6, 1.6], { nosink: true });
+	for (const side of [-1, 1]) {
+		block(F, CUBE, STONE, [side * (GATE_HALF + 0.6), 5.7, 5.5], [1.2, 0.6, 11], { solid: true });
+		const L = frame(...F.at(side * (GATE_HALF + 2.2), 6.1, 0).slice(0, 2), CITY_TOP, deg);
+		block(L, CUBE, TINT, [0, 0, 4.2], [0.5, 0.5, 0.7], { colour: iron, nosink: true });
+		block(L, CUBE, TINT, [0, 0, 4.2], [0.56, 0.38, 0.5], { colour: lanternGlow, nosink: true, night: true });
+		fire(FIRE.lantern, L.at(0, 0, 4.2), 1);
+		block(F, CUBE, TINT, [side * (GATE_HALF + 2.2), -5.65, 7.0], [0.16, 0.5, 0.9], { colour: iron, nosink: true });
+		fire(FIRE.torch, F.at(side * (GATE_HALF + 2.2), -6.0, 7.6), 1.3);
+	}
 }
 
 // ---- the plaza: the hearth, braziers, and the market ring ------------------------------------------------------------
 {
 	const F = frame(0, 0, CITY_TOP, 0);
-	block(F, CYL, STONE, [0, 0, 0.6], [12, 12, 1.2], { solid: true });
-	block(F, CYL, STONE, [0, 0, 1.25], [10, 10, 0.3]);
-	block(F, CYL, TINT, [0, 0, 2.6], [4, 4, 3], { colour: ember });
-	block(F, CONE, TINT, [0, 0, 5.4], [3.2, 3.2, 3], { colour: ember });
+	// The hearth: two steps of dressed stone, a kerb of big stones round the fire pit, a bed of embers, split logs
+	// stacked in a cone, and the game's own hearth fire burning on them day and night (WRRoundIsland.cpp, fires).
+	// Low enough that the fire shows over its kerb from where you stand on the plaza.
+	block(F, CYL, STONE, [0, 0, 0.2], [13, 13, 0.4], { solid: true });
+	block(F, CYL, STONE, [0, 0, 0.55], [10.4, 10.4, 0.3], { solid: true, nosink: true });
+	for (let k = 0; k < 14; k++) {
+		const a = k * 360 / 14 + R() * 6, [kx, ky] = polar(a, 3.6);
+		block(frame(kx, ky, CITY_TOP + 0.7, a), CUBE, STONE, [0, 0, 0.25], [1.4, 0.9, 0.48 + R() * 0.14], { nosink: true });
+	}
+	block(F, CYL, TINT, [0, 0, 0.72], [6.2, 6.2, 0.06], { colour: soot, nosink: true });
+	block(F, CYL, TINT, [0, 0, 0.78], [4.2, 4.2, 0.08], { colour: ember, nosink: true });
+	for (let k = 0; k < 9; k++) {
+		// (A frame turned to a bearing has x along the circle and y in toward the middle; a positive roll tips a
+		// block's top toward +y, so the logs lean in over the fire.)
+		const a = k * 40 + R() * 12, [lx, ly] = polar(a, 1.45), G = frame(lx, ly, CITY_TOP, a);
+		block(G, CYL, WOOD, [0, 0, 1.78], [0.32, 0.32, 2.4], { roll: 30 + R() * 8, colour: k % 3 ? darkWood : beam, nosink: true });
+	}
+	fire(FIRE.hearth, [0, 0, CITY_TOP + 1.05], 2.6);
+	// Four braziers round it on iron legs, lit at dusk.
 	for (let k = 0; k < 4; k++) {
-		const [bx, by] = polar(45 + 90 * k, 18), G = frame(bx, by, CITY_TOP, 0);
-		block(G, CYL, STONE, [0, 0, 1], [1.4, 1.4, 2], { solid: true });
-		block(G, CYL, TINT, [0, 0, 2.3], [1.2, 1.2, 0.6], { colour: ember });
+		const [bx, by] = polar(45 + 90 * k, 16), G = frame(bx, by, CITY_TOP, 45 + 90 * k);
+		block(G, CYL, STONE, [0, 0, 0.25], [1.6, 1.6, 0.5], { solid: true });
+		for (let l = 0; l < 3; l++) { const a = l * 120; block(frame(...G.at(Math.cos(a * RAD) * 0.42, Math.sin(a * RAD) * 0.42, 0).slice(0, 2), CITY_TOP, G.yaw + a + 90), CUBE, TINT, [0, 0, 1.05], [0.1, 0.1, 1.3], { roll: 12, colour: iron, nosink: true }); }
+		block(G, CONE, TINT, [0, 0, 1.78], [1.5, 1.5, 0.6], { pitch: 180, colour: iron });
+		block(G, CYL, TINT, [0, 0, 2.06], [1.42, 1.42, 0.06], { colour: soot, nosink: true });
+		block(G, CYL, TINT, [0, 0, 2.08], [1.0, 1.0, 0.05], { colour: ember, nosink: true });
+		fire(FIRE.brazier, G.at(0, 0, 2.08), 0.8);
+	}
+	const flags = [[150, 144, 132], [136, 130, 120], [158, 150, 136], [126, 122, 116], [144, 136, 122], [118, 112, 104]].map((c) => pal(c, 0, 0.92, 0, 0));
+	// The plaza paved: rings of flagstones round the hearth, each ring cut into stones about 1.7 m long, laid a hand
+	// above the ground with thin dark joints between (the ground's own plaza colour shows in them).
+	for (let r = 7.5; r < PLAN.PLAZA_R - 0.6; r += 1.6) {
+		const n = Math.max(8, Math.round(2 * Math.PI * r / 1.7)), off = R() * 360;
+		for (let s = 0; s < n; s++) {
+			const a = off + s * 360 / n, [px, py] = polar(a, r), w = 2 * Math.PI * r / n - 0.07;
+			block(frame(px, py, CITY_TOP, a), CUBE, TINT, [0, 0, -0.04], [w, 1.52, 0.16], { nosink: true, colour: pick(flags) });
+		}
 	}
 	reserveCircle([0, 0], 24);
 	// Market stalls in a ring, their counters facing the hearth, awnings in the twelve paths' colours.
@@ -208,9 +279,12 @@ for (const q of quarters) {
 	}
 	if (!placed) console.warn(`no room for the ${q.path} quarter's hall`);
 	// The green: an open square of grass with a well and a couple of trees, set back off a lane or alley.
-	for (const rr of [205, 240, 120, 260]) {
-		const deg = mid + (R() - 0.5) * 12, c = polar(deg, rr), fp = { c, u: [1, 0], hw: 13, hd: 13 };
+	// Tried at several depths and across the quarter's width, so every quarter gets one.
+	let greened = false;
+	for (const [rr, off] of [205, 240, 120, 260, 180, 150, 225].flatMap((r) => [0, 5, -5, 9, -9, 12, -12].map((o) => [r, o]))) {
+		const deg = mid + off, c = polar(deg, rr), fp = { c, u: [1, 0], hw: 13, hd: 13 };
 		if (!free(fp, 1) || !offStreets(fp, 0.3) || !insideCity(fp)) continue;
+		greened = true;
 		reserve(fp);
 		wellAt(c);
 		for (let t = 0; t < 3; t++) { const a = R() * 360, p = [c[0] + Math.cos(a * RAD) * (6 + 4 * R()), c[1] + Math.sin(a * RAD) * (6 + 4 * R())]; plant(0, Math.floor(R() * 8), p[0], p[1], R() * 360, 0.5 + 0.2 * R()); trunkSolid(p[0], p[1]); }
@@ -218,6 +292,7 @@ for (const q of quarters) {
 		quarterGreens.push(c);
 		break;
 	}
+	if (!greened) console.warn(`no room for the ${q.path} quarter's green`);
 }
 
 // ---- trees along the avenues -------------------------------------------------------------------------------------------
@@ -240,11 +315,54 @@ for (const st of PLAN.streets.filter((s) => s.kind === "avenue")) {
 	}
 }
 
+// ---- street lanterns along the avenues and the ring street: a post, an arm, a lantern lit at dusk -----------------------
+let lanterns = 0;
+for (const st of PLAN.streets.filter((s) => s.kind === "avenue" || s.kind === "ring")) {
+	let L = 0, side = 1;
+	for (let i = 1; i < st.pts.length; i++) {
+		const a = st.pts[i - 1], b = st.pts[i], seg = Math.hypot(b[0] - a[0], b[1] - a[1]), d = [(b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
+		L += seg;
+		if (L < 26) continue;
+		const r = Math.hypot(...b);
+		if (r > 262 || r < PLAN.PLAZA_R + 8) continue;
+		const p = [b[0] - d[1] * side * (st.half + 0.9), b[1] + d[0] * side * (st.half + 0.9)];
+		if (!free({ c: p, u: [1, 0], hw: 0.6, hd: 0.6 }, 0.3)) continue;
+		L = 0;
+		reserveCircle(p, 0.7);
+		// Its x toward the street's middle: the arm reaches out over the street.
+		const G = frame(p[0], p[1], CITY_TOP, Math.atan2(-d[0] * side, d[1] * side) / RAD);
+		block(G, CYL, STONE, [0, 0, 0.2], [0.5, 0.5, 0.4]);
+		block(G, CYL, WOOD, [0, 0, 1.9], [0.18, 0.18, 3.4], { colour: darkWood, nosink: true });
+		block(G, CUBE, TINT, [0.45, 0, 3.45], [0.95, 0.08, 0.08], { colour: iron, nosink: true });
+		block(G, CUBE, TINT, [0.85, 0, 3.05], [0.36, 0.36, 0.5], { colour: iron, nosink: true });
+		block(G, CONE, TINT, [0.85, 0, 3.42], [0.46, 0.46, 0.24], { colour: iron });
+		block(G, CUBE, TINT, [0.85, 0, 3.05], [0.4, 0.26, 0.38], { colour: lanternGlow, nosink: true, night: true });
+		block(G, CUBE, TINT, [0.85, 0, 3.05], [0.26, 0.4, 0.38], { colour: lanternGlow, nosink: true, night: true });
+		if (lanterns % 4 === 0) fire(FIRE.lantern, G.at(0.85, 0, 3.0), 1);
+		lanterns++;
+		side = -side;
+	}
+}
+
 // ---- the houses: every kind, fronting the nearest street on a plot of its own -----------------------------------------
 const KINDS = [["cottage", 30], ["house", 34], ["townhouse", 12], ["lhouse", 9], ["workshop", 8], ["tower", 4], ["garden", 3]];
 const pickKind = () => { let t = R() * 100; for (const [k, w] of KINDS) { if ((t -= w) < 0) return k; } return "house"; };
 const SIZES = { cottage: [[7, 9], [6, 7.5]], house: [[9, 12], [7, 9]], townhouse: [[6, 7.5], [9, 11.5]], lhouse: [[10, 13], [7, 8.5]], workshop: [[12, 15.5], [8.5, 10]], tower: [[6, 7], [6, 7]], garden: [[11, 15], [10, 13]] };
-function windows(F, w, d, z, n, h = 1.2) { for (let i = 0; i < n; i++) { const x = -w / 2 + w * (i + 0.5) / n; if (R() < 0.85) block(F, CUBE, TINT, [x, d / 2 + 0.05, z], [0.95, 0.12, h], { colour: glass }); if (R() < 0.35) block(F, CUBE, WOOD, [x + 0.7, d / 2 + 0.06, z], [0.4, 0.1, h + 0.1], { colour: darkWood }); } }
+// Windows on the street face: dark glass in a timber frame with a sill, now and then a shutter; after dusk about two
+// in five of them glow with the light of the room behind.
+function windows(F, w, d, z, n, h = 1.2) {
+	for (let i = 0; i < n; i++) {
+		const x = -w / 2 + w * (i + 0.5) / n;
+		if (R() < 0.85) {
+			block(F, CUBE, TINT, [x, d / 2 + 0.05, z], [0.95, 0.12, h], { colour: glass });
+			block(F, CUBE, TINT, [x, d / 2 + 0.07, z + h / 2 + 0.06], [1.15, 0.14, 0.12], { colour: beam, nosink: true });
+			block(F, CUBE, TINT, [x, d / 2 + 0.12, z - h / 2 - 0.06], [1.2, 0.24, 0.12], { colour: beam, nosink: true });
+			block(F, CUBE, TINT, [x, d / 2 + 0.09, z], [0.08, 0.1, h], { colour: beam, nosink: true });
+			if (R() < 0.42) block(F, CUBE, TINT, [x, d / 2 + 0.115, z], [0.9, 0.02, h - 0.06], { colour: pick(litWindow), nosink: true, night: true });
+		}
+		if (R() < 0.35) block(F, CUBE, WOOD, [x + 0.7, d / 2 + 0.06, z], [0.4, 0.1, h + 0.1], { colour: darkWood });
+	}
+}
 // A gable roof is one block turned 45 degrees: its upper half the roof, its lower half hidden in the house, so it may
 // not reach past the gable walls (its lower half would show there); the eaves overhang a little either side.
 function gableRoof(F, w, d, z, roof, ox = 0, oy = 0, along = 0) { block(F, CUBE, TINT, [ox, oy, z], along ? [w * 0.78, d - 0.04, w * 0.78] : [w - 0.04, d * 0.78, d * 0.78], along ? { pitch: 45, colour: roof } : { roll: 45, colour: roof }); }
@@ -382,26 +500,45 @@ for (const f of PLAN.farms) {
 	building("house", frame(...F.at(-9, 0, 0).slice(0, 2), z, f.yaw), 10, 8, look);
 	// The barn: big, timber, a stone footing; haystacks and a fenced yard.
 	const B = frame(...F.at(10, -4, 0).slice(0, 2), groundAt(...F.at(10, -4, 0).slice(0, 2)), f.yaw + 90);
-	block(B, CUBE, STONE, [0, 0, 0.5], [16, 10, 1], { solid: true });
-	block(B, CUBE, WOOD, [0, 0, 3.5], [16, 10, 5], { solid: true, colour: beam });
-	gableRoof(B, 16, 10, 6, pal([84, 70, 60], 0, 0.85));
-	block(B, CUBE, WOOD, [0, 5.06, 2.3], [4, 0.2, 4.2], { colour: darkWood });
+	// Weatherboarded: a stone footing, boards in two tones, corner posts, big double doors with a hayloft door above,
+	// and a thatch-coloured roof.
+	const boards = pal([104, 76, 52], 0, 0.9, 0, 1);
+	block(B, CUBE, STONE, [0, 0, 0.6], [16, 10, 1.2], { solid: true });
+	block(B, CUBE, TINT, [0, 0, 3.6], [15.8, 9.8, 4.8], { solid: true, colour: boards, nosink: true });
+	for (let x = -7.2; x <= 7.2; x += 0.9) block(B, CUBE, TINT, [x, 4.93, 3.6], [0.12, 0.08, 4.8], { colour: beam, nosink: true });
+	for (const x of [-7.95, 7.95]) for (const y of [-4.95, 4.95]) block(B, CUBE, TINT, [x, y, 3.6], [0.35, 0.35, 4.9], { colour: darkWood, nosink: true });
+	block(B, CUBE, TINT, [0, 0, 6.06], [16.2, 10.2, 0.25], { colour: darkWood, nosink: true });
+	gableRoof(B, 16.6, 10.6, 6.1, pal([112, 94, 64], 0, 0.95, 0, 1));
+	for (const s of [-1, 1]) block(B, CUBE, WOOD, [s * 1.05, 5.02, 2.4], [2.0, 0.16, 3.6], { colour: darkWood, nosink: true });
+	block(B, CUBE, TINT, [0, 5.06, 4.25], [4.4, 0.18, 0.3], { colour: beam, nosink: true });
+	block(B, CUBE, WOOD, [5, 5.02, 4.7], [1.4, 0.16, 1.2], { colour: darkWood, nosink: true });
 	for (let k = 0; k < 3; k++) { const [hx, hy] = F.at(-2 + k * 3.2, 9, 0); block(frame(hx, hy, groundAt(hx, hy), 0), CYL, TINT, [0, 0, 1.2], [2.6, 2.6, 2.4], { colour: straw, solid: true }); }
 	for (let k = 0; k <= 10; k++) { const [px, py] = F.at(-16 + k * 3.2, 14, 0); block(frame(px, py, groundAt(px, py), f.yaw), CUBE, WOOD, [0, 0, 0.6], [0.16, 0.16, 1.2], { colour: beam }); }
 	for (let k = 0; k < 4; k++) { const [tx, ty] = F.at(-20 + k * 5 + R() * 2, -12 - R() * 6, 0); plant(0, Math.floor(R() * 8), tx, ty, R() * 360, 0.8 + 0.25 * R()); trunkSolid(tx, ty); }
 }
 for (const m of PLAN.windmills) {
+	// A tower mill: a tapering stone tower in three courses, a gallery, a timber cap, and four sails on a hub facing the
+	// wind (its front is the frame's +y). A sail is a stock from the hub with a lattice frame and its canvas on one side.
 	const z = groundAt(...m.at), F = frame(m.at[0], m.at[1], z, m.yaw);
-	block(F, CYL, STONE, [0, 0, 6], [7.5, 7.5, 12], { solid: true });
-	block(F, CYL, STONE, [0, 0, 12.2], [7, 7, 0.4]);
-	block(F, CONE, TINT, [0, 0, 14.4], [7.6, 7.6, 4.4], { colour: pal([80, 62, 46], 0, 0.85) });
-	block(F, CUBE, WOOD, [0, 4.1, 1.15], [1.4, 0.2, 2.3], { colour: darkWood });
-	block(F, CYL, WOOD, [0, 4.4, 12.6], [0.6, 0.6, 1.6], { roll: 90, colour: beam });
+	block(F, CYL, STONE, [0, 0, 2.5], [8, 8, 5], { solid: true });
+	block(F, CYL, STONE, [0, 0, 6.6], [7.2, 7.2, 3.4], { nosink: true });
+	block(F, CYL, STONE, [0, 0, 9.9], [6.4, 6.4, 3.2], { nosink: true });
+	block(F, CYL, WOOD, [0, 0, 11.65], [8.2, 8.2, 0.3], { colour: beam, nosink: true });
+	for (let k = 0; k < 16; k++) { const a = k * 22.5; block(F, CUBE, WOOD, [Math.cos(a * RAD) * 3.95, Math.sin(a * RAD) * 3.95, 12.3], [0.1, 0.1, 1], { colour: beam, nosink: true }); }
+	block(F, CUBE, WOOD, [0, 0, 13.1], [5.2, 6.4, 2.6], { colour: pal([112, 84, 58], 0, 0.9, 0, 1), nosink: true });
+	gableRoof(F, 5.2, 6.8, 14.4, pal([74, 62, 54], 0, 0.85), 0, 0, 1);
+	block(F, CUBE, WOOD, [0, 4.05, 1.15], [1.4, 0.2, 2.3], { colour: darkWood });
+	windows(F, 4, 7.4, 6.8, 1, 1);
+	const hub = [0, 3.9, 13.2], sailCloth = pal([214, 204, 182], 0, 0.95), turn = 17;
+	block(F, CYL, WOOD, hub, [0.8, 0.8, 1.4], { roll: 90, colour: darkWood, nosink: true });
 	for (let k = 0; k < 4; k++) {
-		const a = 45 + 90 * k + 17;
-		const [sx, sz] = [Math.cos(a * RAD) * 5.6, Math.sin(a * RAD) * 5.6];
-		block(F, CUBE, WOOD, [sx, 5.2, 12.6 + sz], [11, 0.15, 1.9], { pitch: 0, roll: 0, yawAdd: 0, colour: pal([196, 186, 160], 0, 0.95) });
-		blocks[blocks.length - 1][9] = +(-a).toFixed(1);   // the sail turned round the hub (pitch about the hub's axis)
+		// pitch tilts a block's x up toward z: the sail's length points out from the hub at angle a round it.
+		const a = 90 * k + turn, c = Math.cos(a * RAD), s = Math.sin(a * RAD), along = (r) => [hub[0] + c * r, hub[1] + 0.35, hub[2] + s * r];
+		block(F, CUBE, WOOD, along(5.6), [11.2, 0.22, 0.32], { pitch: a, colour: beam, nosink: true });
+		const sideOff = (r, o) => [hub[0] + c * r - s * o, hub[1] + 0.45, hub[2] + s * r + c * o];
+		block(F, CUBE, TINT, sideOff(6.4, 0.95), [8.4, 0.06, 1.7], { pitch: a, colour: sailCloth, nosink: true });
+		block(F, CUBE, WOOD, sideOff(6.4, 1.85), [8.6, 0.12, 0.12], { pitch: a, colour: beam, nosink: true });
+		for (let r = 2.4; r <= 10.6; r += 1.37) block(F, CUBE, WOOD, sideOff(r, 0.95), [0.1, 0.12, 1.9], { pitch: a, colour: beam, nosink: true });
 	}
 }
 
@@ -462,21 +599,63 @@ for (const t of trunks) {
 	for (const end of [-1, 1]) {
 		block(F, CUBE, STONE, [end * S / 2, 0, Hh + 1.5], [T + 0.4, 2 * gate + 0.4, 3], { solid: true });
 		block(F, CUBE, TINT, [end * S / 2, 0, Hh - 0.6], [0.3, 2 * gate - 0.4, 1], { colour: iron });
+		for (const m of [-3.9, -1.3, 1.3, 3.9]) block(F, CUBE, STONE, [end * S / 2 + end * 0.2, m, Hh + 3.6], [T + 0.2, 1.3, 1.2], { nosink: true });
+		// Its gates swung open against the passage, and a torch either side of the arch on the outer face.
+		for (const s of [-1, 1]) {
+			block(F, CUBE, WOOD, [end * (S / 2 - T / 2 - gate / 2), s * (gate - 0.25), 3.2], [gate - 0.2, 0.3, 6.4], { colour: darkWood });
+			fire(FIRE.torch, F.at(end * (S / 2 + T / 2 + 0.35), s * (gate + 1.1), 4.6), 1.2);
+			block(F, CUBE, TINT, [end * (S / 2 + T / 2 + 0.12), s * (gate + 1.1), 4.1], [0.3, 0.16, 0.9], { colour: iron, nosink: true });
+		}
 	}
+	// The towers: arrow slits on their outer faces, a pennant over each, the fort's braziers on the gate tops.
+	for (const ex of [-1, 1]) for (const sy of [-1, 1]) {
+		for (const zz of [3.5, 7]) {
+			block(F, CUBE, TINT, [ex * (S / 2 + 4.02), sy * S / 2, zz], [0.06, 0.4, 1.4], { colour: soot, nosink: true });
+			block(F, CUBE, TINT, [ex * S / 2, sy * (S / 2 + 4.02), zz], [0.4, 0.06, 1.4], { colour: soot, nosink: true });
+		}
+		block(F, CYL, WOOD, [ex * S / 2, sy * S / 2, 17.4], [0.16, 0.16, 4], { colour: darkWood, nosink: true });
+		block(F, CUBE, CLOTH, [ex * S / 2 + 0.9, sy * S / 2, 18.6], [1.8, 0.06, 1.1], { colour: cloth, nosink: true });
+	}
+	for (const end of [-1, 1]) fire(FIRE.brazier, F.at(end * S / 2, 0, Hh + 3.05), 0.7);
 	// Inside: a barracks along one wall, a well, a banner.
 	block(F, CUBE, STONE, [0, -S / 2 + 5.5, 2.2], [S - 12, 7, 4.4], { solid: true });
 	gableRoof(F, S - 12, 7, 4.4, slate, 0, -S / 2 + 5.5);
 	block(F, CYL, WOOD, [6, S / 2 - 5, 6], [0.35, 0.35, 12]);
 	block(F, CUBE, CLOTH, [6.9, S / 2 - 5, 9.5], [1.8, 0.12, 4], { colour: cloth });
-	const [cx, cy] = t.crossroads, G = frame(cx, cy, groundAt(cx, cy), t.bearing);
-	block(G, CUBE, STONE, [0, 0, 2.2], [1.2, 1.2, 4.4], { solid: true });
-	block(G, CUBE, STONE, [0, 0, 4.7], [1.6, 1.6, 0.6]);
-	for (const [a, l] of [[0, 1.8], [100, 1.5], [-110, 1.6]]) block(G, CUBE, WOOD, [0, 0, 3.3], [l, 0.12, 0.35], { yawAdd: a, colour: beam });
+	// The waymark: a standing stone on a low cairn beside the crossroads, and a signpost with an arm down every road
+	// that meets there (to Hearthmoot, and to each land's road), a lantern on top lit at dusk.
+	const [cx, cy] = t.crossroads;
+	const offRoad = (p, m) => PLAN.roads.every((rd) => PLAN.lineDist(p, rd.pts).d > rd.half + m);
+	const spotNear = (r0, not) => { for (let rr = r0; rr < r0 + 30; rr += 2) for (let a = 0; a < 360; a += 15) { const p = [cx + Math.cos(a * RAD) * rr, cy + Math.sin(a * RAD) * rr]; if (offRoad(p, 2.5) && (!not || Math.hypot(p[0] - not[0], p[1] - not[1]) > 5)) return p; } return [cx + r0, cy]; };
+	const [sx0, sy0] = spotNear(9), [px0, py0] = spotNear(7, [sx0, sy0]), G = frame(sx0, sy0, groundAt(sx0, sy0), t.bearing);
+	for (let k = 0; k < 9; k++) { const a = k * 40, rr = 1.6 + R() * 0.6; block(frame(sx0 + Math.cos(a * RAD) * rr, sy0 + Math.sin(a * RAD) * rr, G.z, a), CUBE, STONE, [0, 0, 0.3], [0.9 + R() * 0.4, 0.7, 0.6 + R() * 0.3], { roll: (R() - 0.5) * 16 }); }
+	block(G, CUBE, STONE, [0, 0, 1.6], [1.3, 0.9, 3.2], { solid: true, roll: 3 });
+	block(G, CUBE, STONE, [0, 0.05, 3.55], [1.0, 0.75, 0.9], { roll: -4, nosink: true, pitch: 5 });
+	const P = frame(px0, py0, groundAt(px0, py0), 0), dirs = [];
+	const toward = (p) => Math.atan2(p[1] - py0, p[0] - px0) / RAD;
+	dirs.push(toward(t.points[Math.min(3, t.points.length - 1)]));   // the main road on to Hearthmoot
+	for (const l of RI.lands) {
+		if (!l.road || l.road.length < 2) continue;
+		const ends = [l.road[0], l.road[l.road.length - 1]];
+		const near = ends.map((e) => Math.hypot(e[0] - cx, e[1] - cy));
+		if (Math.min(...near) > 60) continue;
+		const pts = near[0] < near[1] ? l.road : [...l.road].reverse();
+		dirs.push(toward(pts[Math.min(4, pts.length - 1)]));
+	}
+	block(P, CYL, WOOD, [0, 0, 1.9], [0.22, 0.22, 3.8], { colour: darkWood });
+	dirs.forEach((a, i) => {
+		const z = 3.1 - i * 0.42, c = Math.cos(a * RAD), s = Math.sin(a * RAD);
+		block(frame(px0 + c * 0.75, py0 + s * 0.75, P.z, a), CUBE, TINT, [0, 0, z], [1.3, 0.06, 0.3], { colour: pal([150, 120, 84], 0, 0.9, 0, 1), nosink: true });
+		block(frame(px0 + c * 1.45, py0 + s * 1.45, P.z, a + 45), CUBE, TINT, [0, 0, z], [0.21, 0.21, 0.3], { colour: pal([150, 120, 84], 0, 0.9, 0, 1), nosink: true });
+	});
+	block(P, CUBE, TINT, [0, 0, 3.95], [0.32, 0.32, 0.4], { colour: iron, nosink: true });
+	block(P, CUBE, TINT, [0, 0, 3.95], [0.36, 0.22, 0.32], { colour: lanternGlow, nosink: true, night: true });
+	block(P, CONE, TINT, [0, 0, 4.27], [0.42, 0.42, 0.24], { colour: iron });
 }
 
 fs.writeFileSync(path.join(root, "Data/hearthmoot.json"), JSON.stringify({
-	_comment: "Generated by Tools/terrain/hearthmoot.mjs from the shared plan (Tools/terrain/hearthmoot_plan.mjs; edit the scripts, not this file). Hearthmoot and its meadow, built on every machine by WRRoundIsland.cpp (no replication). blocks: [mesh 0 cube / 1 cylinder / 2 cone, mat 0 wood / 1 stone / 2 cloth / 3 trim / 4 tinted, cx, cy, cz, sx, sy, sz (game cm), yaw, pitch, roll (degrees), palette index or -1]; palette rows [r, g, b (sRGB), metal, rough, glow, pattern]; solids: [cx, cy, cz, sx, sy, sz, yaw] boxes you bump into; plants: [kind 0 tree / 1 sapling / 2 shrub, variant, cx, cy, cz (its base), yaw, scale].",
-	cityTop: CITY_TOP, palette, blocks, solids, plants,
+	_comment: "Generated by Tools/terrain/hearthmoot.mjs from the shared plan (Tools/terrain/hearthmoot_plan.mjs; edit the scripts, not this file). Hearthmoot and its meadow, built on every machine by WRRoundIsland.cpp (no replication). blocks: [mesh 0 cube / 1 cylinder / 2 cone, mat 0 wood / 1 stone / 2 cloth / 3 trim / 4 tinted, cx, cy, cz, sx, sy, sz (game cm), yaw, pitch, roll (degrees), palette index or -1]; palette rows [r, g, b (sRGB), metal, rough, glow, pattern]; nightBlocks: the same, shown only after dusk (lit windows, lantern glass); fires: [kind 0 hearth / 1 brazier / 2 lantern light / 3 torch, cx, cy, cz, scale]; solids: [cx, cy, cz, sx, sy, sz, yaw] boxes you bump into; plants: [kind 0 tree / 1 sapling / 2 shrub, variant, cx, cy, cz (its base), yaw, scale].",
+	cityTop: CITY_TOP, palette, blocks, nightBlocks, fires, solids, plants,
 }));
-console.log(`Hearthmoot: ${blocks.length} blocks, ${solids.length} solids, ${plants.length} plants (${PLAN.trees.length} meadow trees, ${hedge} hedge shrubs), ${stalks} reeds, ${palette.length} colours`);
+console.log(`Hearthmoot: ${blocks.length} blocks, ${nightBlocks.length} night blocks, ${fires.length} fires (${lanterns} street lanterns), ${solids.length} solids, ${plants.length} plants (${PLAN.trees.length} meadow trees, ${hedge} hedge shrubs), ${stalks} reeds, ${palette.length} colours`);
 console.log(`buildings: ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(", ")}; ${quarterGreens.length} greens; fields ${PLAN.fields.length}, farms ${PLAN.farms.length}, windmills ${PLAN.windmills.length}`);

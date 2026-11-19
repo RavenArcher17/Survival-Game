@@ -378,8 +378,10 @@ bool WRDesert::Loaded() { return FWRDesertData::Get().bLoaded; }
 
 bool WRDesert::Live()
 {
+	// Per map: the round island's map has none of the Old Island's lands (WRLand::OwnLandMap).
 	static int32 Cached = -1;
-	if (Cached < 0) Cached = WRBiome::IsLive(WRDesertImpl::DBiome) && FWRDesertData::Get().bLoaded ? 1 : 0;
+	static FString CachedMap;
+	if (Cached < 0 || CachedMap != WRLand::CurrentMap()) { CachedMap = WRLand::CurrentMap(); Cached = WRBiome::IsLive(WRDesertImpl::DBiome) && FWRDesertData::Get().bLoaded ? 1 : 0; }
 	return Cached == 1;
 }
 

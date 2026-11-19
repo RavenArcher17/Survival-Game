@@ -978,6 +978,19 @@ const FString& WRLand::CurrentMap()
 	return CurrentMapRef();
 }
 
+bool WRLand::OwnLandMap()
+{
+	static FString Seen;
+	static bool bOwn = false;
+	const FString& Cur = CurrentMapRef();
+	if (Cur != Seen)
+	{
+		Seen = Cur;
+		bOwn = !Cur.IsEmpty() && Registry().ContainsByPredicate([&Cur](const FWRLandDef& D) { return !D.Map.IsEmpty() && D.Map == Cur; });
+	}
+	return bOwn;
+}
+
 bool WRLand::IsLive(const FWRLandDef& Def)
 {
 	// A land with its own map (the round island) is there and nowhere else; the Old Island's lands only on the island's
