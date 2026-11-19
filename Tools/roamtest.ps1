@@ -25,6 +25,17 @@ foreach ($r in (Get-Content -Raw (Join-Path $root 'Data\spawn_regions.json') | C
 $kinds = @{}
 foreach ($k in (Get-Content -Raw (Join-Path $root 'Data\creatures.json') | ConvertFrom-Json).creatures) { if ($k.id) { $kinds[$k.id] = $k } }
 $packAnimals = @('cinderfang', 'gloomhowl', 'ashstrider', 'emberhorn', 'frostantler')
+# A region's own kinds: its day table (creatures) and, since 0.8, its night table (night) and a Thunderstorm's (storm).
+function KindsOf($r) { @(foreach ($t in 'creatures', 'night', 'storm') { if ($r.$t) { $r.$t.PSObject.Properties.Name } }) | Sort-Object -Unique }
+# How many packs of a kind a new world's fill should draw in a region: its target over the day table's mean pack size,
+# shared out by weight.
+function ExpectedPacks($r, [string]$id) {
+	$table = @($r.creatures.PSObject.Properties)
+	$sum = ($table | ForEach-Object { [double]$_.Value } | Measure-Object -Sum).Sum
+	$meanPack = 0.0
+	foreach ($t in $table) { $size = $kinds[$t.Name].pack; $meanPack += [double]$t.Value / $sum * $(if ($size) { ($size[0] + $size[1]) / 2 } else { 1 }) }
+	$r.target / $meanPack * [double]$r.creatures.$id / $sum
+}
 
 function Run([string]$tag, [string]$tune, [object[]]$cmds, [string]$doneWord, [int]$seconds) {
 	$slog = "$logs\$tag-server.log"
@@ -81,9 +92,18 @@ $fill = @($born | Where-Object { $_.player -lt 0 })   # the new world's, before 
 $wrongSize = @($fill | Where-Object { $_.n -lt $kinds[$_.id].pack[0] -or $_.n -gt $kinds[$_.id].pack[1] -or $_.n -gt 4 -or ($packAnimals -contains $_.id -and $_.n -lt 3) })
 $bySize = ($fill | Group-Object n | Sort-Object Name | ForEach-Object { "x$($_.Name): $($_.Count)" }) -join ', '
 Check 'packs are small: none over 4, the pack animals in threes and fours' ($fill.Count -ge 100 -and $wrongSize.Count -eq 0) "$($fill.Count) packs ($bySize)$(if ($wrongSize.Count) { '; e.g. ' + $wrongSize[0].id + ' x' + $wrongSize[0].n })"
-$foreign = @($fill | Where-Object { -not $regions[$_.region] -or -not ($regions[$_.region].creatures.PSObject.Properties.Name -contains $_.id) })
-$missing = @(foreach ($r in $regions.Values) { foreach ($k in $r.creatures.PSObject.Properties.Name) { if (-not @($fill | Where-Object { $_.region -eq $r.id -and $_.id -eq $k }).Count) { "$k in $($r.id)" } } })
-Check 'each region has only its own kinds, and every one of them' ($fill.Count -gt 0 -and $foreign.Count -eq 0 -and $missing.Count -eq 0) "$(if ($foreign.Count) { 'foreign: ' + $foreign[0].id + ' in ' + $foreign[0].region })$(if ($missing.Count) { ' missing: ' + ($missing -join ', ') })"
+$foreign = @($fill | Where-Object { -not $regions[$_.region] -or -not ((KindsOf $regions[$_.region]) -contains $_.id) })
+# (0.8's lands have small regions with many kinds, some under a pack in the whole fill: gravehound in graveyard_g1 is 0.5
+# packs, none 58% of the time. So only kinds with 4.5 or more packs expected must be drawn (none: under 1% each); the
+# rare ones come with the later checks.)
+$missing = @(); $rare = @()
+foreach ($r in $regions.Values) {
+	foreach ($k in $r.creatures.PSObject.Properties.Name) {
+		if (@($fill | Where-Object { $_.region -eq $r.id -and $_.id -eq $k }).Count) { continue }
+		if ((ExpectedPacks $r $k) -ge 4.5) { $missing += "$k in $($r.id)" } else { $rare += "$k in $($r.id)" }
+	}
+}
+Check 'each region has only its own kinds, and every common one' ($fill.Count -gt 0 -and $foreign.Count -eq 0 -and $missing.Count -eq 0) "$(if ($foreign.Count) { 'foreign: ' + $foreign[0].id + ' in ' + $foreign[0].region })$(if ($missing.Count) { ' missing: ' + ($missing -join ', ') })$(if ($rare.Count) { " ($($rare.Count) rare not drawn this time)" })"
 
 $saved = @(Packs)
 $walkers = @($saved | Where-Object { $kinds[$_.id].archetype -ne 'burrower' })
@@ -98,6 +118,14 @@ Check 'burrowers and colonies stay home' ($homebodies.Count -ge 6 -and $strayed.
 $bad = @()
 foreach ($p in $walkers) {
 	$k = $kinds[$p.id]
+	# (The sides, bands and camps are the old island's, measured from its ridge at X = 0. 0.8's lands keep their kinds by
+	# their own sub-zones (WRWildlife InRegion): a pack there is in a region of its own land, and the Storm peaks' north
+	# of the island's edge, world.islandNorthEdge y -2016 m.)
+	if ($k.biome -and $k.biome -notin 'volcanic', 'tundra') {
+		if (-not $regions[$p.region] -or $regions[$p.region].side -ne $k.biome) { $bad += "$($p.id) off its land (in '$($p.region)')" }
+		elseif ($k.biome -eq 'storm_peaks' -and $p.y / 100 -gt -2016 + 100) { $bad += "$($p.id) south of the Storm peaks ($([int]($p.y / 100)) m)" }
+		continue
+	}
 	$band = $walk.bands.($k.tier)
 	$slack = 100   # metres: a pack can stop a cell's width over, and comes back to its centroid after being in view
 	$d = [Math]::Abs($p.x) / 100
@@ -132,7 +160,11 @@ $kindsSeen = @($outs | ForEach-Object { $_.id } | Sort-Object -Unique)
 Check 'standing still, packs pass by and come out where they have got to' ($outs.Count -ge 5) "$($outs.Count) came out ($($kindsSeen -join ', '))"
 $costs = @($steps | ForEach-Object { if ($_ -match '([\d.]+) ms$') { [double]$Matches[1] } })
 $costMean = ($costs | Measure-Object -Average).Average; $costMax = ($costs | Measure-Object -Maximum).Maximum
-Check 'moving them all costs the server next to nothing' ($costMean -lt 3 -and $costMax -lt 25) ("{0:N2} ms a step on average, {1:N2} at most" -f $costMean, $costMax)
+# (A step's cost grows with the packs: 3 ms was the old island's ~140; 0.8's twelve lands hold ~390. So per 100 packs,
+# on this fast time, where each 2 s step moves a minute of their time: the game's own steps move 20 s, every 20 s.)
+$packsMean = ($steps | ForEach-Object { if ($_ -match '^WILDLIFE step: (\d+) packs') { [double]$Matches[1] } } | Measure-Object -Average).Average
+$per100 = if ($packsMean -gt 0) { 100 / $packsMean } else { 0 }
+Check 'moving them all costs the server next to nothing' ($packsMean -gt 0 -and $costMean * $per100 -lt 4 -and $costMax * $per100 -lt 8) ("{0:N2} ms a step on average, {1:N2} at most, for {2:N0} packs: {3:N2} and {4:N2} ms per 100" -f $costMean, $costMax, $packsMean, ($costMean * $per100), ($costMax * $per100))
 
 # ---- a region emptied out, with the player standing in it and a building 700 m or more away: it fills back up, a few
 # packs at a check, none within 300 m of the player or (for the test) 600 m of the building.
@@ -166,7 +198,8 @@ $nearPlayer = ($withPlayer | ForEach-Object { $_.player } | Measure-Object -Mini
 $nearHut = ($back | ForEach-Object { Dist $_.x $_.y $hut.x $hut.y } | Measure-Object -Minimum).Minimum
 $tooClose = @($withPlayer | Where-Object { $_.player -lt 300 }) + @($back | Where-Object { $_.building -lt 600 })
 Check 'new packs start out of the player''s sight and away from buildings' ($hutLoaded -and $withPlayer.Count -ge 15 -and $tooClose.Count -eq 0 -and $nearHut -ge 600) ("{0} packs, {1} with the player on: the nearest {2} m from the player, {3:N0} m from the building (loaded: {4})" -f $back.Count, $withPlayer.Count, $nearPlayer, $nearHut, $hutLoaded)
-$foreign = @($back | Where-Object { -not ($regions[$emptied].creatures.PSObject.Properties.Name -contains $_.id) })
+# (The night table's kinds count: on this fast day a refill runs through the night, when glowmoths come out.)
+$foreign = @($back | Where-Object { -not ((KindsOf $regions[$emptied]) -contains $_.id) })
 $mix = ($back | Group-Object id | Sort-Object Count -Descending | ForEach-Object { "$($_.Name) $($_.Count)" }) -join ', '
 Check 'and are the region''s kinds, mixed by weight' ($foreign.Count -eq 0 -and @($back | Group-Object id).Count -ge 4) $mix
 [IO.File]::WriteAllText($worldPath, $worldBefore)

@@ -44,14 +44,20 @@ static void ParseNodes(const TArray<TSharedPtr<FJsonValue>>& Array, FName Branch
 		Obj->TryGetStringField(TEXT("text"), Node.Text);
 		const FString Kind = Obj->GetStringField(TEXT("kind"));
 		Node.Kind = Kind == TEXT("stat") ? EWRNodeKind::Stat : Kind == TEXT("capstone") ? EWRNodeKind::Capstone : EWRNodeKind::Ability;
-		if (Node.Kind == EWRNodeKind::Stat)
+		int32 Ranks = 0, Cost = 1;
+		const bool bRanks = Obj->TryGetNumberField(TEXT("ranks"), Ranks);
+		Obj->TryGetNumberField(TEXT("cost"), Cost);   // 0 is real: Spore's Detonate comes free with its cloud
+		if (Node.Kind == EWRNodeKind::Stat && bRanks)
 		{
 			Node.Cost = 1;
-			Node.MaxRank = Obj->GetIntegerField(TEXT("ranks"));
+			Node.MaxRank = Ranks;
 		}
 		else
 		{
-			Node.Cost = Obj->GetIntegerField(TEXT("cost"));
+			// An ability, a capstone, or a one-off passive written as a stat with a cost and no ranks (Spore, Sun and
+			// Tide: corrode, dawn, anchor...): bought once for its cost. They loaded with 0 ranks before and could
+			// never be bought, so those trees stopped short of 100.
+			Node.Cost = FMath::Max(0, Cost);
 			Node.MaxRank = 1;
 		}
 		int32 Gate = 0;

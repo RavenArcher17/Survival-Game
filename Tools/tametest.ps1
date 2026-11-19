@@ -57,10 +57,12 @@ function Count($path, $pattern) { @(Select-String -Path $path -Pattern $pattern)
 $log = "$out\server.log"
 $notices = @(Select-String -Path "$out\client.log" -Pattern 'NOTICE (.*)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
 function Said($pattern) { @($notices | Where-Object { $_ -match $pattern }).Count }
-Check 'an Ashstrider tames on offered food' ((Said "^Tamer's Ashstrider torpor .* tame 100%") -ge 1)
-Check 'ride it and get off' ((Said '^Riding \(E to dismount\)') -ge 1 -and (Said "^Tamer's Ashstrider .* rider WRCharacter") -ge 1)
-Check 'two tranq arrows knock a Cinderfang out' ((Count $log 'fires hunting_bow \(tranq_arrow\)') -eq 2 -and (Said '^Cinderfang torpor .* unconscious') -ge 1)
-Check 'a hit while it is out costs effectiveness' ((Said '^Cinderfang torpor .* eff 9\d% .*unconscious') -ge 1)
+# (WRTameStat has the level between the name and its torpor since 0.8, "Cinderfang - Lv 7 torpor ...": matched as .*;
+# mounting says "Riding: Sprint gallops on its stamina..." now)
+Check 'an Ashstrider tames on offered food' ((Said "^Tamer's Ashstrider .*torpor .* tame 100%") -ge 1)
+Check 'ride it and get off' ((Said '^Riding') -ge 1 -and (Said "^Tamer's Ashstrider .* rider WRCharacter") -ge 1)
+Check 'two tranq arrows knock a Cinderfang out' ((Count $log 'fires hunting_bow \(tranq_arrow\)') -eq 2 -and (Said '^Cinderfang .*torpor .* unconscious') -ge 1)
+Check 'a hit while it is out costs effectiveness' ((Said '^Cinderfang .*torpor .* eff 9\d% .*unconscious') -ge 1)
 Check 'a narcotic tops its torpor up' ((Said '^Narcotic: torpor') -eq 1)
 Check 'kibble tames it with a bonus (from 94%)' ((Count $log 'tamed by Tamer \(effectiveness 9\d%: \+4\d% health') -ge 1)
 Check 'a stolen egg hatches a tame' ((Said 'Kilnmite egg hatched') -eq 1)

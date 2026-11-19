@@ -27,7 +27,8 @@ $cmds = @(
 	'WRTeleport 0 2500', 'wait 1', 'WRClearCreatures', 'WRRanged 1', 'wait 1', 'WRAim 1', 'wait 1',
 	'WRSpawn rimeclaw 1', 'wait 0.5', 'WRCreatureHP rimeclaw 0.3', (Aim 'rimeclaw'), 'WRFire', (Hold 4), 'WRClearCreatures',
 	# Attacks: provoke an Emberhorn (charge), meet a Magmaw (spit, lunge), provoke a Basaltback (stomp).
-	'WRSpawn emberhorn 1', 'wait 0.5', (Aim 'emberhorn'), 'WRFire', 'WRArtCam emberhorn 100', 'wait 0.6', $shot, (Hold 6), 'WRArtCam none', 'WRClearCreatures',
+	# (11 m off: its charge is for 4.5-16 m; spawned at arm's length it only tosses and kicks.)
+	'WRSpawnAt emberhorn 0 3600', 'wait 0.5', (Aim 'emberhorn'), 'WRFire', 'WRArtCam emberhorn 100', 'wait 0.6', $shot, (Hold 6), 'WRArtCam none', 'WRClearCreatures',
 	'WRSpawn basaltback 1', 'wait 0.5', (Aim 'basaltback'), 'WRFire', 'WRArtCam basaltback 100', (Hold 6), $shot, (Hold 4), 'WRArtCam none', 'WRClearCreatures',
 	'WRSpawn magmaw 1', 'WRArtCam magmaw 100', 'wait 0.4', $shot, (Hold 8), 'WRArtCam none', 'WRClearCreatures'
 ) -join '|'

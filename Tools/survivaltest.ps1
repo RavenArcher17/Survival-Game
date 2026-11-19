@@ -35,7 +35,8 @@ $cmds = @(
 	(Gather '-130596 -59750' 'tree' 14),                                                    # tree 2020, bare hands
 	(Shot '-131246 -59750' '0 -5'),                                                         # ...and felled
 	(Gather '-134077 -58676' 'rock' 6),                                                     # rock 1004, bare hands
-	'WRCraft crude_hatchet none', 'WRCraft crude_pick none', 'wait 1',                     # by hand, no station
+	# By hand, no station: each takes its recipe's 2 s in the hands, one at a time ("already crafting" while one's on).
+	'WRCraft crude_hatchet none', 'wait 3', 'WRCraft crude_pick none', 'wait 3',
 	'WREquip crude_hatchet', 'wait 1',                                                      # tools work in the hand
 	(Gather '-129046 -58811' 'tree' 35),                                                    # tree 2037 and on, crude hatchet
 	'WREquip crude_pick', 'wait 1',
@@ -52,8 +53,11 @@ $cmds = @(
 	# i.e. inside; a shut door leaves it stuck outside), craft at the bench.
 	"WRTeleport $($X + 400) $Y", 'wait 2', 'WRInteract', 'wait 1', "WRWalkTo $($X - 500) $Y", 'wait 6',
 	'WRCraft stone_hatchet none', 'WRCraft stone_pick none', 'wait 1', 'WREquip stone_hatchet', 'wait 1',
-	# E just inside the door, with the bench in reach too, closes the door (the nearer one wins).
-	"WRWalkTo $($X + 500) $Y", 'wait 3', 'WRInteract', 'wait 1',
+	# E just inside the door, with the bench in reach too, closes the door (the nearer one wins). The door swung in when
+	# it was opened from outside, and it won't shut on a body in its swing (0.8: "Step back: you're in the door's way"),
+	# so the bot walks from the bench to the hut's northeast corner, beside the door but north of the leaf's arc: the
+	# walk stops 4 m short of a goal past the corner, on the line from the bench (~X+110, Y+125).
+	"WRWalkTo $($X + 458) $($Y + 323)", 'wait 3', 'WRInteract', 'wait 1',
 	$(if ($Shots) { "WRTeleport -135802 -59658|wait 3|WRGather tree|WRBotPause 0|wait 1.7|HighResShot 1600x900|wait 6|WRBotPause 1|WRGather off" }  # mid-chop
 	  else { Gather '-135802 -59658' 'tree' 8 }),                                           # tree 2018, stone hatchet
 	(Shot "$($X + 1000) $($Y + 400)" '202 -8'),                                             # hut from the door side

@@ -1,11 +1,13 @@
 # Demolish mode in the build bar, played with the mouse and keyboard as a player does (WRKey, WRClick, WRMouseClick go
 # through Slate like real input). On L_Island by the claim test's hut site, beside a foundation and wall that another
 # player ("Stranger", from a prepared world save) built:
-#   B opens the build bar, a click on the Wood foundation card and a click in the world builds one; X turns demolish on,
+#   B opens the build bar (on its Survival tab), a click on the Foundations tab, on the Wood foundation card and in the
+#   world builds one; X turns demolish on,
 #   the chip over the red copy says "Demolish Wood foundation" and what comes back, a click takes it down (half back);
 #   aimed at Stranger's wall the chip says whose it is and a click is refused, as is the server when asked straight;
 #   X again, Esc and right mouse each leave demolish mode, the Demolish button turns it on, X from outside build mode
-#   opens the bar demolishing, and the key is listed in the H help and in Settings > Controls.
+#   opens the bar demolishing, and the key is listed on the F1 controls page and in Settings > Controls (H is the
+#   tame whistle now).
 # -Shots also saves pictures: the bar demolishing a wall of yours (two angles by day, one by night), Stranger's wall
 # refused, and the bar with its Demolish button. -Log re-checks the client log of an earlier run.
 #   demolishtest.ps1 [-Port 7875] [-Shots] [-Out <folder>] [-Log <client.log>]
@@ -18,10 +20,13 @@ $expect = @(
 )
 $hut = 'WRTeleport -131650 -56400|wait 5|WRLook 0 -10|wait 1'
 $cmds = @(
-	'WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 3', $hut, 'WRClearCreatures', 'WRHour 13', 'WRGive wood 120', 'wait 1.5', 'WRUIState',
-	# Build a foundation through the bar: the card, then a click in the world.
+	# (wait 10: a joining client builds every land's ground at a few frames a second, and the server's teleport reaches its
+	# view of the survivor only seconds later; the click in the world needs it at the hut.)
+	'WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 10', $hut, 'WRClearCreatures', 'WRHour 13', 'WRGive wood 120', 'wait 1.5', 'WRUIState',
+	# Build a foundation through the bar: its Foundations tab (the bar opens on Survival with no claim), the card, then a
+	# click in the world.
 	'WRKey B', 'wait 1', 'WRUIState',
-	'WRClick Wood foundation @ Enough for', 'wait 1', 'WRUIState',
+	'WRClick Foundations', 'wait 1', 'WRClick Wood foundation @ Enough for', 'wait 1', 'WRUIState',
 	'WRLookAt -131200 -56400 4800', 'wait 1.5', 'WRMouseClick', 'wait 2',
 	# X: demolish it.
 	'WRKey X', 'wait 0.5', 'WRLookAt -131200 -56400 4850', 'wait 1.5', 'WRUIState', 'WRUIText', 'WRMouseClick', 'wait 2',
@@ -35,8 +40,8 @@ $cmds = @(
 	'WRKey Escape', 'wait 1', 'WRUIState',
 	'WRKey X', 'wait 1', 'WRUIState',
 	'WRKey B', 'wait 1', 'WRUIState',
-	# The key in the H help and in Settings > Controls.
-	'WRKey H', 'wait 1', 'WRUIText', 'WRKey H', 'wait 0.5',
+	# The key on the F1 controls page and in Settings > Controls.
+	'WRKey F1', 'wait 1', 'WRUIText', 'WRKey F1', 'wait 0.5',
 	'WRKey Escape', 'wait 1.5', 'WRSettings scroll 2000', 'wait 0.5', 'WRUIText', 'WRClick Resume', 'wait 1'
 )
 if ($Shots) {
@@ -131,7 +136,7 @@ $clicks = @($lines | Where-Object { $_ -like 'MOUSECLICK LeftMouseButton*' -and 
 Check 'clicks in the world reach the game view' ($clicks.Count -ge 3 -and @($clicks | Where-Object { $_ -notmatch 'SViewport' }).Count -eq 0) (($clicks | Select-Object -First 2) -join ' | ')
 $missed = @($lines | Where-Object { $_ -match '^CLICK .*(not on screen|reaches=0)' })
 Check 'every click on the bar lands on its button' ($missed.Count -eq 0) (($missed | Select-Object -First 2) -join ' | ')
-Check 'the H help and Settings > Controls list the key' (@($texts | Where-Object { $_ -eq 'Building: demolish mode' }).Count -ge 2)
+Check 'the F1 controls page and Settings > Controls list the key' (@($texts | Where-Object { $_ -eq 'Building: demolish mode' }).Count -ge 2)
 $errors = @(Select-String -Path $Log -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })
 Check 'no errors in the client log' ($errors.Count -eq 0) (($errors | Select-Object -First 2 | ForEach-Object { $_.Line.Trim() }) -join ' | ')
 foreach ($r in $results) { "{0,-5} {1}{2}" -f $(if ($r.ok) { 'PASS' } else { 'FAIL' }), $r.what, $(if ($r.detail) { "  ($($r.detail))" } else { '' }) }

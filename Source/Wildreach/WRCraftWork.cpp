@@ -145,8 +145,10 @@ namespace WRCraftWorkDetail
 		const FWRTuning& T = FWRTuning::Get();
 		const float Seconds = FMath::Max(T.Num(TEXT("craft.hand.minSeconds"), 0.8f), R->Seconds * T.Num(TEXT("craft.hand.timeScale"), 1.f));
 		if (UAbilitySystemComponent* ASC = C->GetAbilitySystemComponent()) ASC->CancelAbilities();
-		// Held a moment past the item's end so the finish still finds it on.
-		C->Status->ApplyStatus(WRTags::State_Drinking, Seconds + 0.15f);
+		// Held well past the item's end so the finish still finds it on, and cleared by End. (0.15 s wasn't enough: the
+		// status runs out in the component tick, before the timer fires in the same frame, so on a slow listen host any
+		// frame over 150 ms threw the craft away as "Interrupted". A stagger, a freeze or death still clear it.)
+		C->Status->ApplyStatus(WRTags::State_Drinking, Seconds + WRTune(TEXT("craft.hand.holdMargin"), 1.f));
 		C->Work.Kind = FWRCraftWork::HandKind(*R);
 		C->Work.Item = R->Output;
 		C->Work.At = nullptr;
@@ -399,6 +401,8 @@ void FWRCraftWork::End(AWRCharacter* Who, const FString& Why)
 		Who->HandLeft = 0;
 		// What's still in the hands (ended from outside the finish) goes back.
 		if (Who->HandTaken.Num() > 0) WRCraftWorkDetail::Refund(Who);
+		// The hands are free again (the item's hold runs a second past its end so a slow frame can't cut it).
+		if (Who->HasAuthority() && Who->Status) Who->Status->ClearStatus(WRTags::State_Drinking);
 	}
 	const uint8 Serial = static_cast<uint8>(Who->Work.Serial + 1);
 	Who->Work = FWRWorkRep();

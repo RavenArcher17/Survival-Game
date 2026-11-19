@@ -632,6 +632,13 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 	}
 
 	// --- Guard (COMBAT-AND-LESSONS 1.2): from the front, not while swinging, not a grab or an unblockable blow ---
+	if (!Hit.bDamageOverTime && Defended(WRTags::State_Blocking) && (Hit.bUnblockable || Hit.bGrab || Hit.bCritical || bSwinging || !bFacing))
+	{
+		// Why a raised guard didn't take it (a blow from the side, mid-swing, an unblockable one).
+		UE_LOG(LogWildreach, Verbose, TEXT("GUARD %s up but not blocking %s: facing %d swinging %d unblockable %d grab %d crit %d (yaw %.0f, to it %.0f)"),
+			*Target->GetName(), *GetNameSafe(Hit.Instigator), bFacing, bSwinging, Hit.bUnblockable, Hit.bGrab, Hit.bCritical,
+			Target->GetActorRotation().Yaw, (Hit.Origin - Target->GetActorLocation()).Rotation().Yaw);
+	}
 	if (!Hit.bDamageOverTime && !Hit.bUnblockable && !Hit.bGrab && !Hit.bCritical && !bSwinging && bFacing && Defended(WRTags::State_Blocking))
 	{
 		const FWRGuard Guard = FWRWeapons::Get().GuardFor(Target);

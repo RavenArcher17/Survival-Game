@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Phase 2, part 5: the bot tests guard again, and the seven bugs they found (Raven, 11-18/19)
+
+The bot tests hadn't been run since 0.8 (14 of 39 passed on 11-18). Each failure was traced to either a game bug or a
+test that still expected the 0.7 island; no check was loosened just to pass. On the final build all 39 suites ran
+together: 36 passed, and the last three (door, walk, updater) were slow-machine timing, fixed below and rerun.
+
+**Game bugs fixed:**
+- **Creatures stood just out of their own bite range.** The AI stopped at half its attackRange (up to 1.2 m) past the
+  two bodies, which is further than many close rows reach: a Cinderfang stood 1.2 m off with a 0.7 m bite and never bit
+  a survivor who stood still. It now walks in to 70% of its longest contact row (`creatureAI.closeIn`).
+- **Lunges and pounces missed in the air.** Their hit window was the row's 0.25 s active part, closed before a 3-6 m
+  leap landed; it now lasts the flight (`creatureAI.lunge.maxAir`, 1.2 s; landing ends it).
+- **Spore, Sun and Tide passives couldn't be bought.** Stat nodes with no `ranks` loaded as zero ranks; they're one-off
+  passives now (Corrode, Burst, Host, Hive mind, Toxic blood, Adrenal, Dawn, Gleam, Zenith, Drowning, Anchor, Tow), and
+  Spore's free Detonate keeps its cost of 0. The 24 LogJson warnings this made at every start are gone. The unit test
+  now checks all twelve paths' trees and starter spells, not two.
+- **A held guard stayed down after a stagger or a roll** until the button was pressed again, so the next bite landed in
+  full. It now goes back up as soon as it can while Block is held.
+- **Hand crafts were thrown away on a slow host.** The craft's hold ran out 0.15 s after the item, in the same frame
+  its finish was due, so any frame over 150 ms cancelled it as "Interrupted". It holds 1 s longer
+  (`craft.hand.holdMargin`) and is cleared when the craft ends.
+- **Holding E on your own door during a hitch opened the door instead of its keypad.** The hold was only seen by a
+  frame while E was still down; let go after a long frame, it counted as a tap. Letting go past `ui.doorHoldSeconds`
+  is now a hold.
+- **A whole-Setup update could leave the Setup (up to 1.7 GB) in Temp until the next start.** It was deleted once,
+  straight after it ran, while a virus scanner may still hold it; the updater now tries for up to 3 s (the same for
+  the small update's `.update` folder).
+
+**Test tools:** the bot's held buttons count as held (`AWRCharacter::BotInput`), as a real key's do. `WRWalkTo`
+counts from where the server put the walker when a teleport reaches the client after the walk began. `WRClick` picks
+only text a click can reach: the settings window's World page is built behind the main menu, and its rows were matched
+under the New world form's. The UI state readout names every screen (it said `menu=?` for the ten added since 0.7). New readouts: `GUARD ... up but not blocking`
+(Verbose), `grounded` on the hazard command, and the wildlife step's time split into choosing, walking and regions.
+
+**Tests updated for 0.8** (every change follows a 0.8 rule): the twelve lands' join (a client builds their ground at a
+few frames a second for ~25 s first), ~390 wildlife packs instead of ~140 and the regions' night and storm tables, lava
+at 20 a second, diving holding depth, PvP hits waiting for the defender's lag, a backstab crit when stepping in behind a
+creature, the longer World page and New world form, Esc's "Leave this world?", thrown boss attacks landing after their
+strike window, Phase 3 needing a hit after the artifact. Suites: aim, ai, base, boss, build, buildaim, craft, crafttime,
+demolish, gather, hazard, house, menus, mp, roam, social, spell, survival, tame, uiflicker, walk, water, worlds.
+
+**Found, not fixed:** joining is heavy (the client runs at 3-5 frames a second for ~25 s building eleven lands' ground,
+and a teleport right after lags 8-10 s); the wildlife step costs ~10 ms for ~390 packs at the test's 3x pace, 90% of it
+packs choosing where to go, with spikes to 23-36 ms (~3-4 ms per 20 s step in the game); the settings window is built,
+laid out and drawn behind the main menu; crit warps and step-ins get corrected under lag.
+
 ### Phase 2, part 4: four silent combos, creature looks, the Floeback, moving water, Storm creatures under the rock (Raven, 11-18)
 
 - **Combos that did nothing now work:** Desert bloom (a Nature path's plants on sand or in a sandstorm wither sooner,

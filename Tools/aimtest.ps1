@@ -88,7 +88,8 @@ if (-not $NoAssist) { Check 'a bolt goes through the crosshair at 15 m' ($dummyH
 $moving = Phase $server 'phase-moving' 'phase-meteor'
 $meteorPhase = Phase $server 'phase-meteor' 'aimtest-done'
 $meteorCasts = @($meteorPhase | Where-Object { $_ -match 'ABILITY \S+ used WRGA_Meteor' }).Count
-$meteorHits = @($meteorPhase | Where-Object { $_ -match '^COMBAT WRCharacter_\d+ -> WRCharacter_\d+ dmg=(\d+)' -and [int]$Matches[1] -ge 20 }).Count
+# (The Meteor's 30 lands on a player x pvp.damage 0.6 x pvp.spell 0.85, about 15-19; a bolt's 1 and the burn's ticks stay under 3.)
+$meteorHits = @($meteorPhase | Where-Object { $_ -match '^COMBAT WRCharacter_\d+ -> WRCharacter_\d+ dmg=(\d+)' -and [int]$Matches[1] -ge 10 }).Count
 $hits = @($moving | Where-Object { $_ -match '^COMBAT WRCharacter_\d+ -> WRCharacter_\d+' -and $_ -match 'Element.Fire' }).Count
 $casts = Casts $moving
 $locks = Phase $hunterLog 'phase-wall' 'phase-buried'

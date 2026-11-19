@@ -1179,6 +1179,8 @@ void WRWildlife::Step(UWorld* World, float RealSeconds)
 	const float HealPerHour = WRTune(TEXT("wildlife.healPerHour"), 0.25f);
 	int32 Travelling = 0, Grazing = 0, Hunting = 0, Resting = 0, Animals = 0, Active = 0;
 	G.Moved = 0;
+	// Where a step's time goes (the log line): the packs' choices (paths found), their walking, the region check.
+	double ThinkS = 0.0, AdvanceS = 0.0, RegionsS = 0.0;
 	for (const TWeakObjectPtr<AWRCreatureSpawner>& P : TArray<TWeakObjectPtr<AWRCreatureSpawner>>(G.Packs))
 	{
 		AWRCreatureSpawner* Pack = P.Get();
@@ -1198,15 +1200,21 @@ void WRWildlife::Step(UWorld* World, float RealSeconds)
 		{
 			++Active;
 			// In view it walks at its own pace (its Tick), and stays put in a fight.
+			const double T0 = FPlatformTime::Seconds();
 			if (!Pack->IsBusy()) Think(*Pack, *Def, bNight);
+			ThinkS += FPlatformTime::Seconds() - T0;
 		}
 		else if (Pack->Count > 0)
 		{
 			Pack->PackHealth = FMath::Min(1.f, Pack->PackHealth + HealPerHour * Seconds / 3600.f);
+			const double T0 = FPlatformTime::Seconds();
 			Think(*Pack, *Def, bNight);
+			const double T1 = FPlatformTime::Seconds();
 			const bool bMoving = Pack->Path.Num() > 0;
 			Pack->Advance(Seconds);
 			G.Moved += bMoving;
+			ThinkS += T1 - T0;
+			AdvanceS += FPlatformTime::Seconds() - T1;
 		}
 		switch (Pack->Doing)
 		{
@@ -1237,7 +1245,9 @@ void WRWildlife::Step(UWorld* World, float RealSeconds)
 	if (G.CheckOwed >= WRTune(TEXT("wildlife.spawnCheckSeconds"), 60.f))
 	{
 		G.CheckOwed = 0.0;
+		const double T0 = FPlatformTime::Seconds();
 		CheckRegions(World, false);
+		RegionsS = FPlatformTime::Seconds() - T0;
 	}
 
 	G.StepMs = static_cast<float>((FPlatformTime::Seconds() - Began) * 1000.0);
@@ -1247,8 +1257,9 @@ void WRWildlife::Step(UWorld* World, float RealSeconds)
 		G.NextLogAt = Now + WRTune(TEXT("wildlife.logSeconds"), 300.f);
 		float Target = 0.f;
 		for (const FRegion& R : G.Regions) Target += TargetOf(R);
-		UE_LOG(LogWildreach, Log, TEXT("WILDLIFE step: %d packs (%d in view), %d animals of %.0f; %d travelling, %d grazing, %d hunting, %d resting; since last: %d caught, %d missed, %d new packs, %d thinned; %.2f ms"),
-			G.Packs.Num(), Active, Animals, Target, Travelling, Grazing, Hunting, Resting, G.Caught, G.Missed, G.NewPacks, G.Retired, G.StepMs);
+		UE_LOG(LogWildreach, Log, TEXT("WILDLIFE step: %d packs (%d in view), %d animals of %.0f; %d travelling, %d grazing, %d hunting, %d resting; since last: %d caught, %d missed, %d new packs, %d thinned; choosing %.2f, walking %.2f, regions %.2f of %.2f ms"),
+			G.Packs.Num(), Active, Animals, Target, Travelling, Grazing, Hunting, Resting, G.Caught, G.Missed, G.NewPacks, G.Retired,
+			ThinkS * 1000.0, AdvanceS * 1000.0, RegionsS * 1000.0, G.StepMs);
 		LogRegions();
 		G.Caught = G.Missed = G.NewPacks = G.Retired = 0;
 	}

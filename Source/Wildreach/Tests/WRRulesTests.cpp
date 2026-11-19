@@ -45,14 +45,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRTreeShapeTest, "Wildreach.Paths.TreeShape",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWRTreeShapeTest::RunTest(const FString& Parameters)
 {
-	// Every tree: 10-point trunk + three 30-point branches = 100.
-	for (const FName PathId : { FName(TEXT("fire")), FName(TEXT("frost")) })
+	// Every tree (all twelve paths): 10-point trunk + three 30-point branches = 100.
+	TestEqual(TEXT("all twelve paths load"), FWRPathRegistry::Get().All().Num(), 12);
+	for (const FWRPathDef& Each : FWRPathRegistry::Get().All())
 	{
-		const FWRPathDef* Def = FWRPathRegistry::Get().Find(PathId);
-		if (!TestNotNull(FString::Printf(TEXT("%s loaded"), *PathId.ToString()), Def))
-		{
-			continue;
-		}
+		const FName PathId = Each.Id;
+		const FWRPathDef* Def = &Each;
 		TMap<FName, int32> Sums;
 		for (const FWRPathNodeDef& Node : Def->Nodes)
 		{
@@ -114,25 +112,35 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRStarterSpellTest, "Wildreach.Paths.StarterSp
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FWRStarterSpellTest::RunTest(const FString& Parameters)
 {
-	// Every path comes with its first spell at level 1, free, so it has something to earn path XP with.
+	// Every path (all twelve) comes with its first spell at level 1, free, so it has something to earn path XP with.
 	const TPair<const TCHAR*, const TCHAR*> Expected[] = { { TEXT("fire"), TEXT("fire_bolt") }, { TEXT("frost"), TEXT("frost_shard") } };
 	for (const TPair<const TCHAR*, const TCHAR*>& E : Expected)
 	{
 		const FWRPathDef* Def = FWRPathRegistry::Get().Find(E.Key);
-		if (!TestNotNull(FString::Printf(TEXT("%s loaded"), E.Key), Def))
+		if (TestNotNull(FString::Printf(TEXT("%s loaded"), E.Key), Def))
+		{
+			TestEqual(FString::Printf(TEXT("%s starter"), E.Key), Def->Starter, FName(E.Value));
+		}
+	}
+	for (const FWRPathDef& Each : FWRPathRegistry::Get().All())
+	{
+		const FWRPathDef* Def = &Each;
+		const FString IdText = Def->Id.ToString();
+		const TCHAR* K = *IdText;
+		if (!TestFalse(FString::Printf(TEXT("%s has a starter"), K), Def->Starter.IsNone()))
 		{
 			continue;
 		}
-		TestEqual(FString::Printf(TEXT("%s starter"), E.Key), Def->Starter, FName(E.Value));
-		TestNotNull(FString::Printf(TEXT("%s starter is a spell"), E.Key), UWRAbilityRegistry::ClassForNode(Def->Id, Def->Starter).Get());
+		TestTrue(FString::Printf(TEXT("%s starter is one of its nodes"), K), Def->Nodes.ContainsByPredicate([Def](const FWRPathNodeDef& N) { return N.Id == Def->Starter; }));
+		TestNotNull(FString::Printf(TEXT("%s starter is a spell"), K), UWRAbilityRegistry::ClassForNode(Def->Id, Def->Starter).Get());
 		FWRPathProgress P;
 		P.PathId = Def->Id;
-		TestTrue(FString::Printf(TEXT("%s starter given"), E.Key), FWRPathRules::GrantStarter(*Def, P));
-		TestFalse(FString::Printf(TEXT("%s starter given once"), E.Key), FWRPathRules::GrantStarter(*Def, P));
-		TestEqual(FString::Printf(TEXT("%s starter owned"), E.Key), P.GetRank(Def->Starter), 1);
-		TestEqual(FString::Printf(TEXT("%s starter costs nothing"), E.Key), FWRPathRules::Spent(*Def, P), 0);
-		TestEqual(FString::Printf(TEXT("%s still level 1"), E.Key), FWRPathRules::CharacterLevel(FWRPathRules::Spent(*Def, P)), 1);
-		TestEqual(FString::Printf(TEXT("%s starter maxed"), E.Key), FWRPathRules::CanBuy(*Def, P, 0, Def->Starter), FString(TEXT("already maxed")));
+		TestTrue(FString::Printf(TEXT("%s starter given"), K), FWRPathRules::GrantStarter(*Def, P));
+		TestFalse(FString::Printf(TEXT("%s starter given once"), K), FWRPathRules::GrantStarter(*Def, P));
+		TestEqual(FString::Printf(TEXT("%s starter owned"), K), P.GetRank(Def->Starter), 1);
+		TestEqual(FString::Printf(TEXT("%s starter costs nothing"), K), FWRPathRules::Spent(*Def, P), 0);
+		TestEqual(FString::Printf(TEXT("%s still level 1"), K), FWRPathRules::CharacterLevel(FWRPathRules::Spent(*Def, P)), 1);
+		TestEqual(FString::Printf(TEXT("%s starter maxed"), K), FWRPathRules::CanBuy(*Def, P, 0, Def->Starter), FString(TEXT("already maxed")));
 	}
 	return true;
 }

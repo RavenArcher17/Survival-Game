@@ -33,6 +33,9 @@ function UIShot([string]$label, [string]$setup) { if ($Shots) { $script:labels +
 # or come up to you), then faced from 2 m north of it (WRGoTo stands you there; it finds a body too).
 $BX = -131000; $BY = -56500
 function Put([string]$id) { "WRTeleport $BX $($BY + 700)|wait 2|WRClearCreatures|WRSpawnAt $id $BX $BY|wait 0.3|WRHold 120|wait 2|WRGoTo $id|wait 1.5|WRLook 270 -10|wait 0.5" }
+# Since 0.8 a swing only cuts what the drawn blade passes through (WRBladePath): a hatchet's head 2 m from a knee-high
+# Pumicehog cuts air. So for the small one the bot steps in to about 1 m (the walk stops 4 m short of a goal 3 m past it).
+function StepIn { "WRWalkTo $BX $($BY - 300)|wait 2|WRLook 270 -10|wait 0.5" }
 function Finish([string]$id) { "WRCreatureHP $id 0.01|wait 0.5|WRPress light|wait 2" }
 function Butcher([int]$n) { (@(1..$n) | ForEach-Object { 'WRPress light|wait 1.3' }) -join '|' }
 
@@ -62,7 +65,7 @@ $cmds = @(
 	'WRGoTo workbench', 'wait 1', 'WRCmd repair weapon', 'wait 1',
 	(Gather '-135802 -59658' 'tree' 5),                       # and on, mended
 	# Bodies: a Pumicehog hit with the hatchet (a modest blow), killed, and butchered with the sword...
-	(Put 'pumicehog'), 'WRPress light', 'wait 1.5', (Finish 'pumicehog'), 'WRCmd wear 0', 'wait 0.5',   # (reports what the blows left)
+	(Put 'pumicehog'), (StepIn), 'WRPress light', 'wait 1.5', (Finish 'pumicehog'), 'WRCmd wear 0', 'wait 0.5',   # (reports what the blows left)
 	'WREquip copper_sword', 'wait 1',
 	(Shot 'body_a' 'WRArtCam pumicehog 50|wait 2'),
 	(Shot 'body_b' 'WRArtCam pumicehog 200|wait 2'),
@@ -145,17 +148,27 @@ Check 'hitting the body takes its loot, hit by hit' ($blade.Count -ge 2 -and (@(
 Check 'the body is gone once emptied' (@($server | Where-Object { $_ -match '^BODY .* emptied and gone' }).Count -ge 2)
 # A blade keeps all of what a hit cuts; bare hands half (gather.body.bareShare): per hit, and over the whole body.
 $bigLoot = @($downs | Where-Object { $_ -match '\(basaltback\)' } | ForEach-Object { $n = 0; foreach ($m in [regex]::Matches($_, ' x(\d+)')) { $n += [int]$m.Groups[1].Value }; $n } | Select-Object -First 1)
-$bladePerHit = if ($blade.Count) { (Items $blade) / $blade.Count } else { 0 }
+# Per hit against what a blade cuts from the same body (all of it over its hits): the Pumicehog's blade hits carry a
+# smaller body's share, so they're no yardstick for the Basaltback's.
+$bigHits = @($downs | ForEach-Object { if ($_ -match '\(basaltback\) down: (\d+) hits') { [int]$Matches[1] } } | Select-Object -First 1)
+$bladePerHit = if ($bigLoot.Count -and $bigHits.Count -and $bigHits[0] -gt 0) { $bigLoot[0] / $bigHits[0] } else { 0 }
 $barePerHit = if ($bare.Count) { (Items $bare) / $bare.Count } else { 0 }
-Check 'bare hands get less from a body than a blade' ($bare.Count -ge 2 -and $barePerHit -gt 0 -and $barePerHit -lt $bladePerHit -and $bigLoot.Count -eq 1 -and (Items $bare) -le [math]::Ceiling($bigLoot[0] / 2)) ("{0:N2} vs {1:N2} a hit; {2} of the Basaltback's {3}" -f $barePerHit, $bladePerHit, (Items $bare), $(if ($bigLoot.Count) { $bigLoot[0] } else { '?' }))
+Check 'bare hands get less from a body than a blade' ($bare.Count -ge 2 -and $barePerHit -gt 0 -and $barePerHit -lt $bladePerHit -and $bigLoot.Count -eq 1 -and (Items $bare) -le [math]::Ceiling($bigLoot[0] / 2)) ("{0:N2} vs a blade's {1:N2} a hit; {2} of the Basaltback's {3}" -f $barePerHit, $bladePerHit, (Items $bare), $(if ($bigLoot.Count) { $bigLoot[0] } else { '?' }))
 # Walked along a line through the Basaltback's body (90 cm across): it gets there without being turned aside.
 $walk = @(Select-String -Path "$logs\client.log" -Pattern 'WALK arrived after .* at V\(X=([-\d.]+), Y=([-\d.]+)' | Select-Object -Last 1)
 $off = if ($walk.Count) { [math]::Abs([double]$walk[0].Matches[0].Groups[2].Value - $BY) } else { 999 }
 Check 'a body does not block the way' ($walk.Count -eq 1 -and $off -lt 40 -and @($server | Where-Object { $_ -match '^BODY .*\(basaltback\) down' }).Count -eq 1) ("arrived {0:N0} cm off the line" -f $off)
-# The first blow on the first Pumicehog is the hatchet's (held since the repair).
-$blow = @($server | Where-Object { $_ -match '^COMBAT WRCharacter\S* -> WRCreature\S* dmg=([\d.]+) .*result=hit' } | Select-Object -First 1)
+# The first blow on the first Pumicehog is the hatchet's (held since the repair). (On the Pumicehog itself: the sword's
+# blow on the Basaltback, 12 x its 0.8 against slash, would pass for a hatchet's.)
+$hog = @($server | ForEach-Object { if ($_ -match '^CMD \S+ spawnat pumicehog .*-> (WRCreature_\d+) ') { $Matches[1] } } | Select-Object -First 1)
+$blow = @(if ($hog.Count) { $server | Where-Object { $_ -match "^COMBAT WRCharacter\S* -> $($hog[0]) dmg=([\d.]+) .*result=hit" } | Select-Object -First 1 })
 $dmg = if ($blow.Count -gt 0 -and $blow[0] -match 'dmg=([\d.]+)') { [double]$Matches[1] } else { 0 }
-Check 'a hatchet swung at a creature hits it (modest damage)' ($dmg -gt 0 -and $dmg -lt 12) ("{0} damage (a copper sword: 12)" -f $dmg)
+# Stepping in from behind a grazing Pumicehog makes it a backstab: the axe class's crit (the hatchet swings as an axe)
+# multiplies it, so the plain blow is that over it.
+$stab = $hog.Count -and @($server | Where-Object { $_ -match "^CRIT WRCharacter\S* backstab on $($hog[0])$" }).Count -gt 0
+$axeStab = (Get-Content -Raw (Join-Path (Split-Path $project) 'Data\weapons.json') | ConvertFrom-Json).classes.axe.crit.backstab
+$plain = if ($stab) { $dmg / $axeStab } else { $dmg }
+Check 'a hatchet swung at a creature hits it (modest damage)' ($dmg -gt 0 -and $plain -lt 12) ("{0} damage{1} (a copper sword: 12)" -f $dmg, $(if ($stab) { ", a backstab: {0:N1} plain" -f $plain } else { '' }))
 # Used as a weapon it wears too: one a blow (the two on the Pumicehog), after the last chop's one.
 $lastChop = if ($mended.Count) { [int]($mended[-1] -replace '^.* (\d+)$', '$1') } else { -1 }
 $afterBlows = @($notices | Where-Object { $_ -match '^crude_hatchet durability (\d+)$' } | ForEach-Object { [int]$Matches[1] } | Select-Object -Last 1)

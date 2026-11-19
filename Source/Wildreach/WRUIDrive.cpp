@@ -147,7 +147,10 @@ namespace WRUIDrive
 	const TCHAR* MenuName(EWRMenu M)
 	{
 		static const TCHAR* Names[] = { TEXT("none"), TEXT("crafting"), TEXT("inventory"), TEXT("build"), TEXT("chest"), TEXT("claim"), TEXT("tame"),
-			TEXT("taming"), TEXT("skills"), TEXT("paths"), TEXT("map"), TEXT("hearth"), TEXT("settings"), TEXT("door"), TEXT("clan") };
+			TEXT("taming"), TEXT("skills"), TEXT("paths"), TEXT("map"), TEXT("hearth"), TEXT("settings"), TEXT("door"), TEXT("clan"),
+			TEXT("cook"), TEXT("machine"), TEXT("tamecard"), TEXT("incubator"), TEXT("stable"), TEXT("world"), TEXT("quests"),
+			TEXT("artifacts"), TEXT("deeds"), TEXT("god") };
+		static_assert(UE_ARRAY_COUNT(Names) == static_cast<int32>(EWRMenu::God) + 1, "a name for every EWRMenu");
 		const int32 i = static_cast<int32>(M);
 		return i >= 0 && i < UE_ARRAY_COUNT(Names) ? Names[i] : TEXT("?");
 	}
@@ -173,10 +176,19 @@ namespace WRUIDrive
 			Label.TrimStartAndEndInline();
 			Anchor.TrimStartAndEndInline();
 			const TArray<FFound> All = VisibleText();
-			TArray<FFound> Hits = Matching(All, Label);
+			// Of the matches, the ones a click would reach, as a player only clicks what they can see: text covered by a
+			// window on top (the settings window's World page is built behind the main menu, its rows under the New world
+			// form's) isn't a candidate. When nothing reaches, all stay: the click's own log shows it fell on something else.
+			const auto InSight = [](TArray<FFound> In)
+			{
+				FString Ignored;
+				TArray<FFound> Seen = In.FilterByPredicate([&Ignored](const FFound& F) { return Reaches(F.Centre, F.Widget, Ignored); });
+				return Seen.Num() > 0 ? Seen : In;
+			};
+			TArray<FFound> Hits = InSight(Matching(All, Label));
 			if (!Anchor.IsEmpty())
 			{
-				const TArray<FFound> Anchors = Matching(All, Anchor);
+				const TArray<FFound> Anchors = InSight(Matching(All, Anchor));
 				if (Anchors.Num() == 0) Hits.Reset();
 				else
 				{

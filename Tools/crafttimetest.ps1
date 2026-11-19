@@ -93,7 +93,8 @@ $cancel = Index '^CRAFT Mason cancelled Mason''s order of 2 copper_sword at forg
 Check 'Cancel calls the swords off before one is made, and their materials come back' ($q3 -ge 0 -and $cancel -gt $q3 -and (Index '^NOTICE Cancelled 2 Copper sword: its materials are back' $cancel) -ge 0 -and (Index 'copper_sword at forge: Crafted' $q3) -lt 0)
 $forge = if ($saved) { @($saved.pieces | Where-Object { $_.piece -eq 'forge' }) | Select-Object -First 1 } else { $null }
 $job = if ($forge -and $forge.queue) { $forge.queue[0] } else { $null }
-Check 'an order under way is saved with its forge' ($job -and $job.recipe -eq 'copper_ingot' -and $job.left -ge 1 -and $job.owner -eq 'Mason' -and $job.each -eq 1) $(if ($job) { $job | ConvertTo-Json -Compress } else { 'no queue saved' })
+# (each: 1 s at the preset's 2x, a little less once the crafting skill's levels add their machineSpeed, 0.003 a level)
+Check 'an order under way is saved with its forge' ($job -and $job.recipe -eq 'copper_ingot' -and $job.left -ge 1 -and $job.owner -eq 'Mason' -and $job.each -gt 0.85 -and $job.each -le 1.0001) $(if ($job) { $job | ConvertTo-Json -Compress } else { 'no queue saved' })
 $missed = @($lines | Where-Object { $_ -match '^CLICK .*(not on screen|reaches=0)' })
 Check 'every click lands on its button' ($missed.Count -eq 0) (($missed | Select-Object -First 2) -join ' | ')
 $errors = @(Select-String -Path $Log -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue | Where-Object { $_.Line -notmatch 'FDataflowToolNodeSnapshot' })

@@ -31,20 +31,25 @@ function Json([string]$path) { if (Test-Path $path) { Get-Content $path -Raw | C
 
 $shot = if ($Shots) { @('wait 1', 'shot showui', 'wait 1') } else { @() }
 $menu = @('wait 3', 'WRMainMenu', 'wait 3', 'WRClick Host a game', 'wait 2')
-$leave = @('WRKey Escape', 'wait 1.5', 'WRClick Main menu')
+# (Since 0.8 Esc's Main menu asks "Leave this world?" first: Leave.)
+$leave = @('WRKey Escape', 'wait 1.5', 'WRClick Main menu', 'wait 1', 'WRClick Leave')
 function At([int]$world, [object[]]$cmds) { $cmds | ForEach-Object { "@${world}:$_" } }
 $bot = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off') +
-	# (The form's rules: one step up on XP, then scrolled down, on Day length; a preset picked and back resets them first.)
+	# (The form's rules: one step up on XP, then scrolled down, on Day length; a preset picked and back resets them first.
+	# 0.8 put eight more rows under Day length, so -30 ran it up under the form's top: 20 notches keep it and raids in view.)
 	(At 1 ($menu + $shot + @('WRClick New world', 'wait 2', 'WRType WT Alpha', 'wait 1', 'WRClick PvP', 'wait 1', 'WRClick PvE', 'wait 1', 'WRClick + @ XP', 'wait 1') + $shot +
-		@('WRWheel -30 XP', 'wait 1', 'WRClick + @ Day length', 'wait 1', 'WRClick Frequent @ Creature raids', 'wait 1') + $shot + @('WRClick Create and play'))) +
+		@('WRWheel -20 XP', 'wait 1', 'WRClick + @ Day length', 'wait 1', 'WRClick Frequent @ Creature raids', 'wait 1') + $shot + @('WRClick Create and play'))) +
 	(At 2 (@('wait 10', 'WRTeleport -131650 -56400', 'wait 5', 'WRClearCreatures', 'WRGive wood 120', 'wait 1',
 		'WRGhost wood_foundation', 'WRLookAt -131200 -56400 4800', 'wait 1.5', 'WRGhostPlace', 'wait 2') + $leave)) +
 	(At 3 ($menu + @('WRClick New world', 'wait 2', 'WRType WT Beta', 'wait 1', 'WRClick PvP', 'wait 1') + $shot + @('WRClick Create and play'))) +
 	(At 4 (@('wait 10') + $leave)) +
 	(At 5 ($menu + @('WRClick WT Beta', 'wait 1') + $shot + @('WRClick Rename', 'wait 1.5', 'WRType WT Gamma', 'wait 0.5') + $shot + @('WRKey Enter', 'wait 1.5',
 		'WRClick Delete', 'wait 1') + $shot + @('WRClick Keep it', 'wait 1', 'WRClick Delete', 'wait 1', 'WRClick Yes, delete it', 'wait 1.5', 'WRClick WT Alpha', 'wait 1', 'WRClick Play'))) +
-	# (Esc > World: the host changes the rules with a friend in the game, then the page's button puts one back.)
-	(At 6 (@('wait 50', 'WRKey Escape', 'wait 1.5', 'WRClick World', 'wait 1.5') + $shot + @('WRClick + @ Taming', 'wait 2', 'WRClick On/Off @ Players can fight each other', 'wait 2', 'WRWheel -30 XP', 'wait 1', 'WRClick + @ Day length', 'wait 2') + $shot + @('WRClick Video', 'wait 3', 'WRClick Main menu'))) +
+	# (Esc > World: the host changes the rules with a friend in the game, then the page's button puts one back. WRStreaming:
+	# the host's own ground, for the friend's to match. 0.8's longer Players group puts Taming at the page's bottom edge,
+	# under the window's footer, so PvP is switched first, at the top, and 15 notches then bring Taming and Day length up
+	# into the middle.)
+	(At 6 (@('wait 50', 'WRStreaming', 'WRKey Escape', 'wait 1.5', 'WRClick World', 'wait 1.5') + $shot + @('WRClick On/Off @ Players can fight each other', 'wait 2', 'WRWheel -15 Players can fight each other', 'wait 1.5', 'WRClick + @ Taming', 'wait 2', 'WRClick + @ Day length', 'wait 2') + $shot + @('WRClick Video', 'wait 3', 'WRClick Main menu', 'wait 1', 'WRClick Leave'))) +
 	# (Esc: one press from a new world's name box back to the list, one more out to the menu. Each click after it only lands if it worked.)
 	(At 7 ($menu + @('WRClick New world', 'wait 2', 'WRKey Escape', 'wait 1', 'WRClick Rename', 'wait 1.5', 'WRKey Escape', 'wait 1', 'WRKey Escape', 'wait 1', 'WRClick Host a game', 'wait 2', 'WRClick Island', 'wait 1', 'WRClick Play'))) +
 	# On the real island, as the host: die, click a camp on the death screen's map, press Wake. (The arena's starts all have
@@ -61,7 +66,8 @@ try {
 	[IO.File]::WriteAllText($seed, "{`"version`":1,`"name`":`"$name`",`"paths`":{`"main`":`"frost`",`"sub`":`"`",`"paths`":[],`"quickSlots`":[]}}")
 
 	$ini = "[Wildreach.Menu]:Name=$name,[Wildreach.Menu]:Body=m,[Wildreach.Menu]:Path=fire"
-	$c = Start-Process $ue -ArgumentList ("`"$project`" /Game/Maps/L_Island -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot -port=$Port " +
+	# (-wrstore=json: every world this one game hosts from the menu keeps world.json and players/*.json, which the checks read.)
+	$c = Start-Process $ue -ArgumentList ("`"$project`" /Game/Maps/L_Island -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot -wrstore=json -port=$Port " +
 		"`"-ini:Engine:[URL]:Port=$Port`" `"-ini:GameUserSettings:$ini`" `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$log`"") -PassThru
 	$deadline = (Get-Date).AddSeconds(780)
 	$friendLog = Join-Path $logs 'friend.log'
@@ -74,7 +80,7 @@ try {
 			# (A real window: it opens Esc and reads what's there, and the World page shouldn't be.)
 			# (WRStreaming: the friend has the whole island's ground, as the host does: 0.7's far views.)
 			$pal = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 12', 'WRStreaming', 'WRKey Escape', 'wait 1.5', 'WRUIText', 'WRKey Escape')
-			$friend = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Palbot -game -windowed -ResX=960 -ResY=540 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 30`" `"-wrbotcmds=$($pal -join '|')`" -abslog=`"$friendLog`"" -PassThru
+			$friend = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Palbot -game -windowed -ResX=960 -ResY=540 -unattended -nosound -wrbot -wrstore=json `"-ExecCmds=t.MaxFPS 30`" `"-wrbotcmds=$($pal -join '|')`" -abslog=`"$friendLog`"" -PassThru
 		}
 	}
 	foreach ($p in @($c, $friend)) { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
@@ -155,7 +161,9 @@ try {
 	$clocks = @($again | Where-Object { $_ -match '^CLOCK day (\d+) ([\d.]+)' } | ForEach-Object { if ($_ -match '^CLOCK day (\d+) ([\d.]+)') { (([int]$Matches[1] - 1) * 24) + [double]$Matches[2] } })
 	$jump = if ($clocks.Count -ge 2) { ($clocks | Measure-Object -Maximum).Maximum - ($clocks | Measure-Object -Minimum).Minimum } else { -1 }
 	Check 'the clock doesn''t jump when the day length changes' ($clocks.Count -ge 2 -and $jump -lt 0.5) "$($clocks.Count) clock settings, $jump h apart"
-	$fromHost = @(Select-String -Path $friendLog -Pattern 'Server settings from host: ' -ErrorAction SilentlyContinue | ForEach-Object { $_.Line })
+	# (A friend that never started leaves no log, and Select-String on a missing file stops the whole script: an empty one.)
+	if (-not (Test-Path $friendLog)) { New-Item -ItemType File $friendLog | Out-Null }
+	$fromHost =@(Select-String -Path $friendLog -Pattern 'Server settings from host: ' -ErrorAction SilentlyContinue | ForEach-Object { $_.Line })
 	$fromHostLast = if ($fromHost.Count) { $fromHost[$fromHost.Count - 1] } else { '' }
 	Check 'the friend gets the new rules' ($fromHostLast -match 'server\.tamingMultiplier=1\.5' -and $fromHostLast -match 'server\.pvp=1' -and $fromHostLast -match 'server\.dayMinutes=70') "$($fromHost.Count) updates"
 	Check 'and is told' ((Select-String -Path $friendLog -Pattern "NOTICE The host changed the world's settings" -Quiet -ErrorAction SilentlyContinue) -eq $true)
@@ -164,7 +172,9 @@ try {
 	$palWorld = @($palSaw | Where-Object { $_ -cmatch 'UITEXT\s+-?\d+,\s*-?\d+ World$' }).Count
 	Check 'a friend''s Esc menu has no World page' ($palSettings -and $palWorld -eq 0) "settings window up: $palSettings, World shown: $palWorld"
 	$palGround = @(Select-String -Path $friendLog -Pattern 'STREAMING client: (\d+) landscape pieces' -ErrorAction SilentlyContinue | ForEach-Object { [int]$_.Matches[0].Groups[1].Value }) | Select-Object -First 1
-	Check 'a friend has the whole island''s ground loaded, as the host does' ($palGround -eq 257) "$palGround of 257 landscape pieces"
+	# (Matched to the host's own count: 0.7's island was 257 pieces, and 0.8's lands added landscapes of their own.)
+	$hostGround = @($again | Where-Object { $_ -match '^STREAMING listen host: (\d+) landscape pieces' } | ForEach-Object { if ($_ -match '^STREAMING listen host: (\d+) landscape pieces') { [int]$Matches[1] } }) | Select-Object -First 1
+	Check 'a friend has the whole island''s ground loaded, as the host does' ($palGround -gt 0 -and $palGround -eq $hostGround) "$palGround of $hostGround landscape pieces"
 	$alphaInfo = Json (Join-Path $worlds 'WT_Alpha\info.json')
 	Check 'the list knows when it was played and for how long' ($alphaInfo -and $alphaInfo.playSeconds -ge 5 -and $alphaInfo.version) $(if ($alphaInfo) { "$($alphaInfo.playSeconds) s, version $($alphaInfo.version)" })
 

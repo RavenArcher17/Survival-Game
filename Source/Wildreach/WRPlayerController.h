@@ -553,6 +553,7 @@ private:
 	float WalkStart = 0.f;
 	float WalkLastProgress = 0.f;
 	float WalkBestDist = 0.f;
+	FVector WalkLastHere = FVector::ZeroVector;   // where the last walk tick was (a jump from there: moved by the server)
 	float WalkNextLog = 0.f;
 	float BotClock = 0.f;
 	float BotNextAttack = 0.f;

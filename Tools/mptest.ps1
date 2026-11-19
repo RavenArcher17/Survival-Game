@@ -72,13 +72,27 @@ Check "both bots join and are welcomed" ($n.joins -eq 2 -and @($bots | Where-Obj
 Check "hits land" ($n.hits -ge 20) "$($n.hits) hits"
 Check "fire and frost both land" ($n.fire -gt 0 -and $n.frost -gt 0) "fire $($n.fire), frost $($n.frost)"
 Check "statuses build up (burn, frostbite, frozen) and staggers happen" (($n.burn + $n.frostbite + $n.frozen) -ge 2 -and $n.staggers -ge 1) "burn $($n.burn), frostbite $($n.frostbite), frozen $($n.frozen), staggers $($n.staggers)"
-$abilities = if ($Scenario -eq 'pve') { 'WRGA_LightAttack', 'WRGA_HeavyAttack', 'WRGA_Block', 'WRGA_Dodge', 'WRGA_FireBolt', 'WRGA_FrostShard', 'WRGA_FlameSlash', 'WRGA_IceSlash', 'WRGA_Bite' } else { 'WRGA_LightAttack', 'WRGA_HeavyAttack', 'WRGA_Block', 'WRGA_Dodge' }
+$abilities = if ($Scenario -eq 'pve') { 'WRGA_LightAttack', 'WRGA_HeavyAttack', 'WRGA_Block', 'WRGA_Dodge', 'WRGA_FireBolt', 'WRGA_FrostShard', 'WRGA_FlameSlash', 'WRGA_IceSlash' } else { 'WRGA_LightAttack', 'WRGA_HeavyAttack', 'WRGA_Block', 'WRGA_Dodge' }
 $missing = @($abilities | Where-Object { (Uses $_) -eq 0 })
-Check "every kind of ability is used and confirmed by the server" ($missing.Count -eq 0) $(if ($missing) { 'never used: ' + ($missing -join ', ') } else { "$($abilities.Count) kinds" })
+# (Since 0.8 creatures attack from their Data/attacks.json rows, "AI WRCreature_3 uses bite", not WRGA_Bite: that's
+# only for a kind with no rows.)
+$creatureRows = Count $serverLog 'AI WRCreature_\d+ uses \w+'
+if ($Scenario -eq 'pve' -and $creatureRows -eq 0) { $missing += 'creature attack rows' }
+Check "every kind of ability is used and confirmed by the server" ($missing.Count -eq 0) $(if ($missing) { 'never used: ' + ($missing -join ', ') } else { "$($abilities.Count) kinds, $creatureRows creature attacks" })
 if ($Scenario -eq 'pve') { Check "the hunting bot kills creatures" ($n.kills -ge 1) "$($n.kills) kills, $($n.deaths) deaths in all" }
 Check "path abilities are granted" ($n.applies -ge 2) "$($n.applies) applies"
-# Knockback, staggers and the 80 ms lag bot give a few dozen corrections a run (13-56 seen); a broken sync gives hundreds.
-Check "movement stays in sync (no saved-move overflow, few corrections)" ($n.overflow -eq 0 -and $n.corrections -le $Seconds) "$($n.corrections) corrections, $($n.overflow) overflows"
+# Knockback, staggers and the 80 ms lag bot give a few dozen corrections a run (13-56 seen before 0.8); a broken sync gives
+# hundreds. Since 0.8's combat a backstab's warp and a swing's step-in aim at where each machine sees the target, 80 ms
+# apart, and each mismatch is corrected for several server frames running (9-16 lines). So the mismatches are counted as
+# bursts (a character's corrections under 0.4 s apart), a third of the seconds at most, and the lines twice the seconds.
+$bursts = 0; $lastAt = @{}
+foreach ($m in @(Select-String -Path $serverLog -Pattern '^\[[\d.]+-(\d+)\.(\d+)\.(\d+):(\d+)\].*\*\*\* Server: Error for (\S+)' -ErrorAction SilentlyContinue)) {
+	$g = $m.Matches[0].Groups
+	$at = [int]$g[1].Value * 3600 + [int]$g[2].Value * 60 + [int]$g[3].Value + [int]$g[4].Value / 1000
+	if (-not $lastAt.ContainsKey($g[5].Value) -or $at - $lastAt[$g[5].Value] -gt 0.4) { $bursts++ }
+	$lastAt[$g[5].Value] = $at
+}
+Check "movement stays in sync (no saved-move overflow, few corrections)" ($n.overflow -eq 0 -and $bursts -le $Seconds / 3 -and $n.corrections -le 2 * $Seconds) "$($n.corrections) corrections in $bursts bursts, $($n.overflow) overflows"
 $logs = @($serverLog) + @($bots | ForEach-Object { Join-Path $out "$($_.Name).log" })
 $errors = @(Select-String -Path $logs -Pattern 'Error:|Ensure condition failed|Accessed None|Fatal error' -ErrorAction SilentlyContinue)
 # The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.

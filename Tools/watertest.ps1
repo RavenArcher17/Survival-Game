@@ -35,7 +35,9 @@ $labels = @()
 function Shot([string]$label, [string]$prep) { if ($Shots) { $script:labels += $label; "$prep|wait 0.8|HighResShot 1600x900|wait 1.5" } }
 function UIShot([string]$label, [string]$prep) { if ($Shots) { $script:labels += $label; "$prep|wait 0.8|shot showui|wait 1.5" } }
 $cmds = @(
-	'WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 3', 'WRHour 12',
+	# (Since 0.8 a client builds the eleven new lands' ground for its first ~25 s at a few frames a second, and a teleport
+	# then sat unanswered: the server's body hung Falling where it was put, the client's still at the spawn.)
+	'WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 30', 'WRHour 12',
 	# Off the beach into the sea, walking: deep enough, it swims.
 	"WRTeleport $beach", 'wait 5', 'wr.Water beach', 'WRCmd water stat beach',
 	"WRWalkTo $sea", 'wait 30', 'wr.Water sea', 'WRCmd water stat sea',
@@ -59,7 +61,8 @@ $cmds = @(
 	(Shot 'day_edge_kneel' 'WRCmd water thirst 50|wait 1|WRInteract|wait 0.6'),
 	# Up the beach, away from the water: nothing to drink.
 	"WRTeleport $beach", 'wait 3', 'wr.Water dry', 'WRCmd water stat drybefore', 'WRInteract', 'wait 1', 'WRCmd water stat dry',
-	# Dropped 7 m through the sea floor (into the water under it): put back on the floor, it floats up and swims.
+	# Dropped 7 m through the sea floor (into the water under it): put back on the floor, swimming. (Since 0.8's diving a
+	# body wholly under the surface holds its depth until Rise, so it no longer floats up by itself.)
 	"WRTeleport $sea", 'wait 4', 'WRCmd water sink 700', 'WRCmd water stat sunk', 'wait 5', 'WRCmd water stat afterseafloor',
 	# Dropped 300 m through the beach (far under the island, below where the old sea plane was): back on top.
 	"WRTeleport $beach", 'wait 4', 'WRCmd water sink 30000', 'WRCmd water stat deep', 'wait 4', 'WRCmd water stat afterisland',
@@ -120,7 +123,8 @@ $dry = State 'client' 'dry'; $dryS = State 'server' 'dry'; $dryB = State 'server
 Check 'away from the water there is nothing to drink' ($dry -and -not $dry.candrink -and ($server -contains 'CMD WRPlayerState_0: interact -> nothing to interact with' -or @($server | Where-Object { $_ -like 'CMD *: interact -> nothing to interact with' }).Count -ge 1) -and $dryS -and $dryB -and [math]::Abs($dryS.water - $dryB.water) -lt 1) (Short $dryS)
 $sunk = State 'server' 'sunk'; $afterSea = State 'server' 'afterseafloor'
 $seaRescue = @($server | Where-Object { $_ -like 'RESCUE WRCharacter*' })
-Check 'dropped through the sea floor: back over it, swimming at the surface' ($sunk -and $afterSea -and $sunk.z -lt -400 -and $afterSea.mode -eq 'Swimming' -and $afterSea.depth -gt 300 -and $afterSea.z -gt ($afterSea.surface - 130)) ("sunk {0} | after {1} | {2}" -f (Short $sunk), (Short $afterSea), ($seaRescue -join '; '))
+# (Over the floor: the sea floor there is depth under the surface. Under the surface it holds its depth, as 0.8's diving has it.)
+Check 'dropped through the sea floor: back over it, swimming' ($sunk -and $afterSea -and $sunk.z -lt -400 -and $afterSea.mode -eq 'Swimming' -and $afterSea.inwater -and $afterSea.depth -gt 300 -and $afterSea.z -gt ($afterSea.surface - $afterSea.depth) -and $afterSea.z -lt $afterSea.surface -and @($seaRescue | Where-Object { $_ -like '*(in the water)*' }).Count -ge 1) ("sunk {0} | after {1} | {2}" -f (Short $sunk), (Short $afterSea), ($seaRescue -join '; '))
 $deep = State 'server' 'deep'; $afterIsland = State 'server' 'afterisland'
 Check 'dropped 300 m through the island: put back on top' ($deep -and $afterIsland -and $deep.z -lt -20000 -and $afterIsland.z -gt 0 -and $afterIsland.mode -ne 'Swimming' -and @($server | Where-Object { $_ -like 'RESCUE WRCharacter* under the ground*' }).Count -ge 1) ("deep {0} | after {1}" -f (Short $deep), (Short $afterIsland))
 $fangs = @($server | Where-Object { $_ -like 'WATER creature *' })

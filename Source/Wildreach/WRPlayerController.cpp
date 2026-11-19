@@ -605,6 +605,7 @@ void AWRPlayerController::WRWalkTo(float X, float Y)
 	WalkTarget = FVector2D(X, Y);
 	WalkStart = WalkLastProgress = WalkNextLog = BotClock;
 	WalkBestDist = TNumericLimits<float>::Max();
+	WalkLastHere = FVector::ZeroVector;
 	UE_LOG(LogWildreach, Log, TEXT("WALK start toward (%.0f, %.0f)"), X, Y);
 }
 
@@ -1788,9 +1789,11 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 	{
 		const FVector Feet = Survivor->GetActorLocation() - FVector(0.f, 0.f, Survivor->GetSimpleCollisionHalfHeight());
 		const FName Kind = FWRBiomeHazards::KindAt(Feet);
-		Result = FString::Printf(TEXT("hazard %s resist %s onIce %s friction %.1f hp %.0f"), Kind.IsNone() ? TEXT("none") : *Kind.ToString(),
+		// (grounded: the server's own view of the body; lava burns only bodies on the ground, not one still falling.)
+		Result = FString::Printf(TEXT("hazard %s resist %s onIce %s friction %.1f hp %.0f grounded %s"), Kind.IsNone() ? TEXT("none") : *Kind.ToString(),
 			FWRBiomeHazards::Resists(Survivor, Kind) ? TEXT("yes") : TEXT("no"), Survivor->IsOnIce() ? TEXT("yes") : TEXT("no"),
-			Survivor->GetCharacterMovement()->GroundFriction, Survivor->GetAttributes()->GetHealth());
+			Survivor->GetCharacterMovement()->GroundFriction, Survivor->GetAttributes()->GetHealth(),
+			Survivor->GetCharacterMovement()->IsMovingOnGround() ? TEXT("yes") : TEXT("no"));
 		ClientNotify(Result);
 	}
 	else if (Cmd == TEXT("skillstat") && PS)
@@ -2028,7 +2031,7 @@ void AWRPlayerController::BotPress(int32 Input, float HoldSeconds)
 {
 	if (AWRCharacter* Survivor = Cast<AWRCharacter>(GetPawn()))
 	{
-		Survivor->PressAbilityInput(static_cast<EWRAbilityInput>(Input));
+		Survivor->BotInput(static_cast<EWRAbilityInput>(Input), true);
 		BotHeld.Add({ Input, BotClock + HoldSeconds });
 	}
 }
@@ -2044,7 +2047,7 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		{
 			if (Survivor)
 			{
-				Survivor->ReleaseAbilityInput(static_cast<EWRAbilityInput>(BotHeld[i].Key));
+				Survivor->BotInput(static_cast<EWRAbilityInput>(BotHeld[i].Key), false);
 			}
 			BotHeld.RemoveAt(i);
 		}
@@ -2146,6 +2149,14 @@ void AWRPlayerController::TickBot(float DeltaTime)
 		const FVector Here = Survivor->GetActorLocation();
 		const FVector2D To = WalkTarget - FVector2D(Here.X, Here.Y);
 		const float Dist = To.Size();
+		// Moved 50 m+ in a frame: a teleport that reached this client after the walk began (a slow load). Count from here.
+		if (!WalkLastHere.IsZero() && FVector::Dist2D(Here, WalkLastHere) > 5000.f)
+		{
+			UE_LOG(LogWildreach, Log, TEXT("WALK moved to %s by the server: %.0f m to go from here"), *Here.ToCompactString(), Dist / 100.f);
+			WalkBestDist = Dist;
+			WalkLastProgress = BotClock;
+		}
+		WalkLastHere = Here;
 		if (Dist < WalkBestDist - 100.f)
 		{
 			WalkBestDist = Dist;

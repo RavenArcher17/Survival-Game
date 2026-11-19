@@ -36,15 +36,18 @@ foreach ($row in $grid.rows) {
 }
 "lava spots: $(($spots | ForEach-Object { '{0:F0} {1:F0}' -f $_.x, $_.y }) -join ' / '); beside the edge: $('{0:F0} {1:F0}' -f $edge.x, $edge.y)"
 $bots = @(
-	@{ N = 'Frosty'; P = 'frost'; Lava = ('WRTeleport {0:F0} {1:F0}' -f $spots[0].x, $spots[0].y); Ice = 'WRTeleport 48400 4000' },
-	@{ N = 'Blaze';  P = 'fire';  Lava = ('WRTeleport {0:F0} {1:F0}' -f $spots[1].x, $spots[1].y); Ice = 'WRTeleport 109000 4000' },
-	@{ N = 'Edgy';   P = 'frost'; Lava = ('WRTeleport {0:F0} {1:F0}' -f $edge.x, $edge.y); Ice = 'WRTeleport 48400 4000' }
+	@{ N = 'Frosty'; P = 'frost'; Gap = 1.5; Lava = ('WRTeleport {0:F0} {1:F0}' -f $spots[0].x, $spots[0].y); Ice = 'WRTeleport 48400 4000' },
+	@{ N = 'Blaze';  P = 'fire';  Gap = 4; Lava = ('WRTeleport {0:F0} {1:F0}' -f $spots[1].x, $spots[1].y); Ice = 'WRTeleport 109000 4000' },
+	@{ N = 'Edgy';   P = 'frost'; Gap = 4; Lava = ('WRTeleport {0:F0} {1:F0}' -f $edge.x, $edge.y); Ice = 'WRTeleport 48400 4000' }
 )
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=hazardtest -wrstore=json -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $clients = foreach ($b in $bots) {
-	# Two readings in the lava 4 s apart, then one on the ice.
-	$steps = @('WRBotPause 1', 'wait 2', $b.Lava, 'wait 3', 'WRHazard', 'wait 4', 'WRHazard', 'WRHeal', $b.Ice, 'wait 3', 'WRHazard') -join '|'
+	# Two readings in the lava Gap s apart, then one on the ice. (Lava burns 20 a second plus burn: a frost main lasts
+	# about 5 s in it, so its second reading comes 1.5 s after the first.) (The first 25 s: a joining client builds the
+	# twelve lands' ground at a few frames a second, and a survivor teleported then stays "falling" on the server, which
+	# lava ignores.)
+	$steps = @('WRBotPause 1', 'wait 25', $b.Lava, 'wait 3', 'WRHazard', "wait $($b.Gap)", 'WRHazard', 'WRHeal', $b.Ice, 'wait 3', 'WRHazard') -join '|'
 	Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=$($b.P)?WRName=$($b.N) -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$steps`" -abslog=`"$out\$($b.N).log`"" -PassThru -WindowStyle Hidden
 }
 function Readings([string]$name) {
@@ -52,7 +55,7 @@ function Readings([string]$name) {
 	@(Select-String -Path "$out\$name.log" -Pattern 'NOTICE hazard (\S+) resist (yes|no) onIce (yes|no) friction ([\d.]+) hp (\d+)' -ErrorAction SilentlyContinue | ForEach-Object {
 		$m = $_.Matches[0].Groups; [pscustomobject]@{ kind = $m[1].Value; resist = $m[2].Value -eq 'yes'; onIce = $m[3].Value -eq 'yes'; friction = [double]$m[4].Value; hp = [int]$m[5].Value } })
 }
-$deadline = (Get-Date).AddSeconds(60)
+$deadline = (Get-Date).AddSeconds(100)
 while ((Get-Date) -lt $deadline -and ((Readings 'Frosty').Count -lt 3 -or (Readings 'Blaze').Count -lt 3 -or (Readings 'Edgy').Count -lt 2)) { Start-Sleep -Seconds 3 }
 foreach ($p in @($clients) + $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 

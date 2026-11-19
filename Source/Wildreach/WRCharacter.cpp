@@ -1448,7 +1448,30 @@ void AWRCharacter::TickInputBuffer()
 {
 	if (BufferedInput == EWRAbilityInput::None)
 	{
-		return;
+		// A guard still held after something cut it (a stagger cancels every ability; a roll drops the guard) goes back
+		// up as soon as it can, as a guard held through a swing does. It used to stay down until the button was pressed
+		// again, so a survivor holding block through a flinch took the next bite in full.
+		const double Now = GetWorld()->GetTimeSeconds();
+		if (!AbilitySystem || !HeldInputs.Contains(EWRAbilityInput::Block) || Now < GuardRetryAt || !IsAlive() || IsRangedOut() || IsHoldingRod()
+			|| HasTag(WRTags::State_Blocking) || HasTag(WRTags::State_Mounted) || HasTag(WRTags::Status_Frozen))
+		{
+			return;
+		}
+		const AWRPlayerController* PC = Cast<AWRPlayerController>(Controller);
+		if (PC && PC->IsPlacing())
+		{
+			return;
+		}
+		for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+		{
+			if (Spec.InputID == static_cast<int32>(EWRAbilityInput::Block) && Spec.IsActive())
+			{
+				return;  // up already, or between a swing's strike and its end (it comes back by itself)
+			}
+		}
+		GuardRetryAt = Now + 0.25;
+		BufferedInput = EWRAbilityInput::Block;
+		BufferedAt = Now;
 	}
 	const FWRTuning& T = FWRTuning::Get();
 	const double Age = GetWorld()->GetTimeSeconds() - BufferedAt;
@@ -1613,6 +1636,18 @@ void AWRCharacter::TickGuardEdge()
 		GuardEdgeMaterial->SetScalarParameterValue(TEXT("Wash"), T.Num(TEXT("fx.guardEdge.wash"), 0.f));
 		ShieldMesh->SetOverlayMaterial(GuardEdgeMaterial);
 	}
+}
+
+void AWRCharacter::BotInput(EWRAbilityInput Input, bool bDown)
+{
+	if (bDown)
+	{
+		HeldInputs.Add(Input);
+		PressAbilityInput(Input);
+		return;
+	}
+	HeldInputs.Remove(Input);
+	ReleaseAbilityInput(Input);
 }
 
 void AWRCharacter::ReleaseAbilityInput(EWRAbilityInput Input)

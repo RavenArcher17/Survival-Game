@@ -19,7 +19,9 @@ $X2 = $X - 1200; $Y2 = $Y; $Z2 = 4874; $T2 = $Z2 + 100   # (the ground's a littl
 $c30 = [math]::Cos([math]::PI / 6); $s30 = [math]::Sin([math]::PI / 6)
 function Local2([double]$lx, [double]$ly) { '{0:0} {1:0}' -f ($X2 + $lx * $c30 - $ly * $s30), ($Y2 + $lx * $s30 + $ly * $c30) }
 
-$cmds = @('WRBotPause 1', 'wait 2', 'WRGive wood 2000', 'WRGive stone 500', 'WRGive hide 50', 'WRGive fiber 50', 'WRGive copper_ore 20', 'WRGive copper_ingot 20', 'WRView fp',
+# (wait 20: a joining client builds every land's ground at a few frames a second, and the server's teleport reaches its
+# view of the survivor only seconds later; before, the free ghosts showed at the camp it woke in, in its safe zone.)
+$cmds = @('WRBotPause 1', 'wait 20', 'WRGive wood 2000', 'WRGive stone 500', 'WRGive hide 50', 'WRGive fiber 50', 'WRGive copper_ore 20', 'WRGive copper_ingot 20', 'WRView fp',
 	# Free, on open ground: it faces the way you look; the rotate key and the wheel turn it from there.
 	'WRSay phase-free', 'WRSnap off', "WRTeleport $($X - 500) $Y", 'wait 2', 'WRLook 0 -30', 'WRGhost bed', 'wait 1', 'WRGhostInfo',
 	'WRLook 40 -30', 'wait 0.4', 'WRGhostInfo', 'WRLook 123 -30', 'wait 0.4', 'WRGhostInfo',

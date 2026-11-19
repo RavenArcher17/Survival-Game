@@ -27,15 +27,16 @@ $cmds = @(
 	# narcotic and darts at the alchemy table, bolts and (Hearth tier 2) the crossbow at the forge.
 	'WRGive wood 40', 'WRGive stone 12', 'WRGive fiber 40', 'WRGive hide 4', 'WRGive berries 6', 'WRGive raw_meat 2',
 	'WRGive copper_ore 14', 'WRGive tin_ore 3',
-	'WRCraft throwing_spear none', 'WRCraft throwing_spear none', 'WRCraft bola none', 'WRCraft stone_arrow none', 'wait 1',
+	# (hand crafts take their recipe's seconds in the hands, one at a time: "already crafting" while one's on)
+	'WRCraft throwing_spear none', 'wait 3', 'WRCraft throwing_spear none', 'wait 3', 'WRCraft bola none', 'wait 3', 'WRCraft stone_arrow none', 'wait 2',
 	'WRGoTo workbench', 'wait 2', 'WRCraft hunting_bow none', 'WRCraft blowgun none', 'wait 1',
 	'WRGoTo alchemy_table', 'wait 2', 'WRCraft narcotic none', 'WRCraft narcotic none', 'WRCraft torpor_dart none', 'wait 1',
-	'WRCraft tranq_arrow none', 'WRCraft tranq_arrow none', 'wait 1',
+	'WRCraft tranq_arrow none', 'wait 2', 'WRCraft tranq_arrow none', 'wait 2',
 	'WRGoTo forge', 'wait 2',
 	'WRCraft copper_ingot none', 'WRCraft copper_ingot none', 'WRCraft copper_ingot none', 'WRCraft copper_ingot none',
 	'WRCraft copper_ingot none', 'WRCraft copper_ingot none', 'WRCraft copper_ingot none', 'wait 1',
 	'WRCraft bronze_ingot none', 'WRCraft bronze_ingot none', 'WRCraft bronze_ingot none', 'wait 1',
-	'WRCraft crossbow none', 'WRCraft crossbow_bolt none', 'wait 1', 'WRCraft tranq_bolt none', 'wait 1',
+	'WRCraft crossbow none', 'WRCraft crossbow_bolt none', 'wait 1', 'WRCraft tranq_bolt none', 'wait 2',  # tranq bolts are by hand
 	# The bow wears with each shot and is mended at the workbench, not the forge.
 	'WREquip hunting_bow', 'wait 1', 'WRRanged 1', 'wait 1.5', 'WRRepair ranged', 'wait 0.5',
 	'WRFire', 'wait 1.3', 'WRFire', 'wait 1.3', 'WRFire', 'wait 1.3', 'WRRepair ranged', 'wait 0.5',
@@ -46,7 +47,7 @@ $cmds = @(
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=crafttest -wrstore=json -wrtune=craft.timeScale:0 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Crafter -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
-Start-Sleep -Seconds 80
+Start-Sleep -Seconds 95
 foreach ($p in $c, $s) { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
 $results = @()
 function Check([string]$what, [bool]$ok, [string]$detail = '') { $script:results += [pscustomobject]@{ ok = $ok; what = $what; detail = $detail } }
@@ -56,7 +57,7 @@ function Said($pattern) { @($notices | Where-Object { $_ -match $pattern }).Coun
 Check 'smelts copper ingots' ((Said '^Crafted 1 Copper ingot') -ge 3)
 Check 'crafts and infuses a sword' ((Said '^Crafted \w+ Copper sword, fire-infused') -eq 1)
 Check 'upgrades to the Hearth cap' ((Said '^Upgraded to \+2') -eq 1 -and (Said 'is the cap at Hearth level 1') -eq 1)
-Check 'armor at the armorer, a potion at the alchemy table' ((Said '^Crafted \w+ Hide armor') -eq 1 -and (Said '^Crafted 1 Minor healing potion') -eq 1)
+Check 'armor at the armorer, a potion at the alchemy table' ((Said '^Crafted \w+ Hide (armor|vest)') -eq 1 -and (Said '^Crafted 1 Minor healing potion') -eq 1)
 Check 'a boss core raises the Hearth' ((Said 'The Hearth burns brighter: tech level 2') -eq 1)
 Check 'tier 2: bronze and +3' ((Said '^Crafted 1 Bronze ingot') -ge 1 -and (Said '^Upgraded to \+3') -eq 1)
 Check 'spears and a bola by hand (spears stack)' ((Said '^Crafted 1 Throwing spear') -eq 2 -and (Said '^Crafted 1 Bola') -eq 1)

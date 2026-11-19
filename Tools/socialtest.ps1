@@ -46,9 +46,17 @@ $b = @(Select-String -Path "$out\bravo.log" -Pattern 'NOTICE ' | ForEach-Object 
 function Stat([string]$name) { $l = $a | Where-Object { $_ -match "^stat $name = (-?[\d.]+)" } | Select-Object -First 1; if ($l -and $l -match '= (-?[\d.]+)') { [double]$Matches[1] } else { $null } }
 Check 'the server runs the PvP standard preset' (@($server | Where-Object { $_ -eq 'Server preset: pvp_standard' }).Count -ge 1)
 $hits = @($a | Where-Object { $_ -like 'hit Bravo:*' })
-Check 'PvP is on between strangers' ($hits.Count -ge 1 -and $hits[0] -eq 'hit Bravo: hit') ($hits -join '; ')
+# A blow on a remote player waits for its defence (WRLag ShouldHold, favour-the-defender): the command says "ignored" at
+# once and the hit lands a moment later as the server's "COMBAT <Alpha> -> <Bravo> ... result=hit ... (judged at the
+# player's view)" line. So a player-on-player hit counts from the server log: before Bravo joins the clan, none after.
+$joinedAt = -1; for ($i = 0; $i -lt $server.Count; $i++) { if ($server[$i] -match '^CLAN Bravo joined Wolves') { $joinedAt = $i; break } }
+$diedAt = $server.Count; for ($i = [Math]::Max(0, $joinedAt); $i -lt $server.Count; $i++) { if ($server[$i] -match '^DEATH Bravo') { $diedAt = $i; break } }
+$pvp = @(for ($i = 0; $i -lt $diedAt; $i++) { if ($server[$i] -match '^COMBAT (WRCharacter_\d+) -> (WRCharacter_\d+) .*result=hit' -and $Matches[1] -ne $Matches[2]) { $i } })
+$pvpBefore = @($pvp | Where-Object { $joinedAt -lt 0 -or $_ -lt $joinedAt }).Count
+$pvpAfter = @($pvp | Where-Object { $joinedAt -ge 0 -and $_ -gt $joinedAt }).Count
+Check 'PvP is on between strangers' ($hits.Count -ge 1 -and ($hits[0] -eq 'hit Bravo: hit' -or $pvpBefore -ge 1)) (($hits -join '; ') + "; $pvpBefore landed")
 Check 'a clan is founded and joined' (($a -contains 'Founded clan Wolves') -and ($b -contains 'Joined clan Wolves') -and ($a -contains 'Clan Wolves (leader Alpha): Alpha, Bravo'))
-Check 'PvP is off between clanmates' ($hits.Count -ge 2 -and $hits[1] -eq 'hit Bravo: ignored') ($hits -join '; ')
+Check 'PvP is off between clanmates' ($hits.Count -ge 2 -and $hits[1] -eq 'hit Bravo: ignored' -and $joinedAt -ge 0 -and $pvpAfter -eq 0) (($hits -join '; ') + "; $pvpAfter landed after joining")
 $bag = $server | Where-Object { $_ -match '^DEATH Bravo \(souls\): (\d+) stacks dropped' } | Select-Object -First 1
 Check 'a death drops a bag of belongings (souls)' ($null -ne $bag) $bag
 Check 'only its owner can open it' ($a -contains "Bravo's lost belongings: only they can recover them")

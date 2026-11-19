@@ -2,7 +2,7 @@
 # tabs are tightest): the build bar pages its cards ("1–3 of 6", the › arrow) and the claim totem and Hearth have their
 # own Claim tab (0.6.2 hid them past a 4 px scroll bar); the first claim brings the hint about the Hearth; a Hearth
 # broken by hits stays standing, broken, and its screen's Repair mends it; a chest renamed through its Rename box; a
-# waypoint set by right-clicking the map shows there and on the HUD compass.
+# waypoint set by right-clicking the map (its pin card's Waypoint here) shows there and on the HUD compass.
 # The tests used to place the Hearth by command (WRGhost / WRPlace), never through the bar, so none of them saw it was
 # out of sight. -Shots keeps the pictures; -Log re-checks the client log of an earlier run.
 #   basetest.ps1 [-Port 7896] [-Shots] [-Out <folder>] [-Log <client.log>]
@@ -22,8 +22,8 @@ $cmds = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'WRHour 11', 'w
 	# A chest, renamed through its box.
 	@("WRTeleport $($X - 600) $Y", 'wait 1.5', 'WRGhost storage_chest', "WRLookAt $X $($Y + 700) $G", 'wait 1', 'WRGhostPlace', 'wait 1.5', "WRTeleport $X $($Y + 500)", 'wait 2', 'WRLook 90 -25',
 		'WRKey E', 'wait 1.5', 'WRClick Rename', 'wait 1') + (Shot) + @('WRType Ore and metal', 'wait 0.5', 'WRKey Enter', 'wait 1.5') + (Shot) + @('WRUIText', 'WRKey Escape', 'wait 1') +
-	# The map: a right-click sets the waypoint; the compass shows it.
-	@('WRMenu map 0', 'wait 2', 'WRMouseClick 0.40 0.38 rmb once', 'wait 1.5') + (Shot) + @('WRUIText', 'WRMenu none 0', 'wait 1.5', 'WRLook 300 -5', 'wait 1') + (Shot) + @('WRUIText', 'wait 1', 'WRSay basetest-done')
+	# The map: a right-click opens the pin card there, its Waypoint here sets the waypoint; the compass shows it.
+	@('WRMenu map 0', 'wait 2', 'WRMouseClick 0.40 0.38 rmb once', 'wait 1.5', 'WRClick Waypoint here', 'wait 1.5') + (Shot) + @('WRUIText', 'WRMenu none 0', 'wait 1.5', 'WRLook 300 -5', 'wait 1') + (Shot) + @('WRUIText', 'wait 1', 'WRSay basetest-done')
 $shotNames = @('stations_page1', 'stations_page2', 'claim_tab', 'hint', 'hearth_broken', 'hearth_repaired', 'chest_name_box', 'chest_named', 'map_waypoint', 'compass_waypoint')
 
 if (-not $Log) {

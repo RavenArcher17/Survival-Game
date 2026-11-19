@@ -217,8 +217,14 @@ static class WildreachUpdater
 					p.WaitForExit();
 					if (p.ExitCode != 0) throw new Exception("the installer stopped with code " + p.ExitCode);
 				}
-				try { File.Delete(setup); } catch { }
-				try { Directory.Delete(Path.Combine(dir, WorkFolder), true); } catch { }   // what a small update left when it gave up
+				// A Setup that just ran often can't be deleted for a moment (a virus scanner still reading it): a few tries.
+				string work = Path.Combine(dir, WorkFolder);   // what a small update left when it gave up
+				for (int i = 0; i < 10 && (File.Exists(setup) || Directory.Exists(work)); i++)
+				{
+					if (i > 0) Thread.Sleep(300);
+					try { if (File.Exists(setup)) File.Delete(setup); } catch { }
+					try { if (Directory.Exists(work)) Directory.Delete(work, true); } catch { }
+				}
 				Log("updated to " + latest);
 				Ui(() => { Close(); Launch(); });
 			}

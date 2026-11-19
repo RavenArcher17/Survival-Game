@@ -9,8 +9,10 @@ $out = Join-Path $env:TEMP ("wildreach-walk-" + (Get-Date -Format 'yyyyMMdd-HHmm
 New-Item -ItemType Directory -Force $out | Out-Null
 Remove-Item (Join-Path (Split-Path $project) 'Saved\Worlds\walktest\world.json') -ErrorAction SilentlyContinue
 
+# (WalkA goes over the pass and 530 m down the far side. Its old end, x 600 m, is 40 m past a small pingo that 0.8's Frost
+# places put on the line (Data/island_places.json kit small_pingo at 560, -1296 m: a solid ice mound), so it stops 80 m short.)
 $walkers = @(
-	@{ Name = 'WalkA_NorthPass'; Cmds = 'WRBotPause 1|WRTeleport -100400 -129600|wait 3|WRWalkTo 60000 -129600' },
+	@{ Name = 'WalkA_NorthPass'; Cmds = 'WRBotPause 1|WRTeleport -100400 -129600|wait 3|WRWalkTo 52000 -129600' },
 	@{ Name = 'WalkB_MiddleSpawn'; Cmds = 'WRBotPause 1|WRTeleport -131200 -51600|wait 3|WRWalkTo -1300 -129600' },
 	@{ Name = 'WalkC_RidgeWall'; Cmds = 'WRBotPause 1|WRTeleport -60000 0|wait 3|WRWalkTo 60000 0' }
 )

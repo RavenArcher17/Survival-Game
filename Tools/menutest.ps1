@@ -30,7 +30,8 @@ $play = @(
 	'net:WRKey Escape', 'net:wait 1.5', 'net:WRUIState',
 	'net:WRClick Video', 'net:wait 1', 'net:WRClick On/Off @ Vertical sync', 'net:wait 1', 'net:WRUIState',
 	'net:WRClick On/Off @ Vertical sync', 'net:wait 1', 'net:WRUIState',
-	'net:WRClick Audio', 'net:wait 1', 'net:WRClick Controls', 'net:wait 1', 'net:WRClick Resume', 'net:wait 1', 'net:WRUIState',
+	# (Controls by the row beside Look and controller: the HUD's "F1 Controls" hint, under the blur, is higher on screen.)
+	'net:WRClick Audio', 'net:wait 1', 'net:WRClick Controls @ Look and controller', 'net:wait 1', 'net:WRClick Resume', 'net:wait 1', 'net:WRUIState',
 	'net:WRKey B', 'net:wait 1', 'net:WRUIState',
 	'net:WRKey Escape', 'net:wait 1', 'net:WRUIState', 'net:wait 600'
 )
@@ -104,7 +105,8 @@ foreach ($who in @(@{ Name = 'Hosty'; Log = $hostLog; Role = 'host'; Front = $ho
 	Check "$($who.Role): Vertical sync flips off and back by clicking" ($v.Count -ge 12 -and $v[10] -ne $v[9] -and $v[11] -eq $v[9]) "vsync $($v[9]) -> $($v[10]) -> $($v[11])"
 	Check "$($who.Role): crafting by clicking makes the hatchet" (@($lines | Where-Object { $_ -like 'NOTICE Crafted 1 Crude hatchet*' }).Count -ge 1)
 }
-$crafts = @(Select-String -Path $hostLog -Pattern 'CRAFT .*Crafted 1 Crude hatchet' -ErrorAction SilentlyContinue).Count
+# (A hand craft takes its seconds now and the server logs each one made: "CRAFT <name> by hand: <recipe> (n to go)".)
+$crafts = @(Select-String -Path $hostLog -Pattern 'CRAFT \S+ by hand: crude_hatchet ' -ErrorAction SilentlyContinue).Count
 Check "the host's server crafts for both players" ($crafts -ge $(if ($Only) { 1 } else { 2 })) "$crafts crafts"
 $errors = @(Select-String -Path @($hostLog, $friendLog | Where-Object { Test-Path $_ }) -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)
 # The engine's Dataflow plugin logs a struct warning as an error on some starts: not the game's.

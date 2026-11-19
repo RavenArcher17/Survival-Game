@@ -31,8 +31,11 @@ function P([string]$piece, [double]$x, [double]$y, [double]$z, [double]$yaw) { "
 function Ghost([string]$piece, [string]$at, [string]$look) { "WRTeleport $at|wait 2|WRLook $look|WRGhost $piece|wait 1|WRGhostPlace|wait 0.5" }
 function Shot([string]$at, [string]$look) { if ($Shots) { "WRTeleport $at|wait 3|WRLook $look|wait 2|HighResShot 1600x900|wait 1" } else { $null } }
 
+# The first 20 s: since 0.8.0's lands a joining client builds every land's ground at a few frames a second, and the
+# server's teleports reach its view of the survivor only seconds later, so the first ghosts showed at the camp (in its
+# safe zone) while the server already had the builder at the house: "too far away".
 $cmds = @(
-	'WRBotPause 1', 'wait 2', 'WRGive wood 1200', 'WRView fp',
+	'WRBotPause 1', 'wait 20', 'WRGive wood 1200', 'WRView fp',
 	# Foundations: A at a known height; B, C and D through the ghost, aimed at the ground in their cell from outside.
 	"WRTeleport $($X - 500) $Y", 'wait 2', (P wood_foundation $X $Y $Zf 0),
 	(Ghost wood_foundation "$($X - 500) $($Y + 400)" '0 -20'),          # C, from the west

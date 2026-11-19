@@ -98,6 +98,9 @@ public:
 	/** Press/release an ability input (used by real input and by the test bot). */
 	void PressAbilityInput(EWRAbilityInput Input);
 	void ReleaseAbilityInput(EWRAbilityInput Input);
+	/** The test bot's press / release (WRPress): held as a key is, so what reads a held button (a guard held through a
+	 *  stagger comes back up) sees it; without the menu gate or the guard-toggle setting. */
+	void BotInput(EWRAbilityInput Input, bool bDown);
 	/** Let go of every held gameplay input (block, a charging heavy, sprint, jump): a menu, wheel, build placing, a mount
 	 *  or the death screen took the buttons (WRInput::Transition). The input buffer empties too. */
 	void DropHeldInputs();
@@ -470,6 +473,8 @@ private:
 	// mid-swing up to combat.dodgeBufferMax) and fires the moment it can; the last press wins.
 	EWRAbilityInput BufferedInput = EWRAbilityInput::None;
 	double BufferedAt = 0.0;
+	/** When a guard still held after something cut it (a stagger, a roll) last asked to go back up (at most 4 a second). */
+	double GuardRetryAt = 0.0;
 	bool CanStartNow(EWRAbilityInput Input) const;
 	void FireAbilityInput(EWRAbilityInput Input);
 	void TickInputBuffer();

@@ -13,7 +13,7 @@ $tune = '-wrtune=bosses.damageScale:0.05,bosses.partChance:1'
 
 $fight = { param($id, $extra) @("WRSpawn $id 1", 'wait 7', 'WRHeal', 'WRBossDmgPct 30 none', 'wait 3', 'WRBossDmgPct 25 none', 'wait 6') + $extra + @('WRHeal', 'WRBossDmg 9999999 none', 'wait 8') }
 $hero = @('WRBotPause 1', 'WRTeleport 0 4200', 'wait 2', 'WRSpawn vulkarn 1', 'wait 14', 'WRHeal', 'WRBossDmgPct 30 frost', 'wait 3', 'WRBossDmgPct 25 none', 'wait 8',
-	'WRHeal', 'WRArtifacts 1', 'WRBossDmgPct 30 none', 'wait 6', 'WRHeal', 'WRBossDmg 9999999 none', 'wait 8', 'WRArtifacts 0')
+	'WRHeal', 'WRArtifacts 1', 'WRBossDmg 10 none', 'wait 2', 'WRBossDmgPct 30 none', 'wait 6', 'WRHeal', 'WRBossDmg 9999999 none', 'wait 8', 'WRArtifacts 0')
 $hero += & $fight 'skaldrith' @('WRBossDmg 10 fire', 'WRBossDmg 10 fire', 'WRBossDmg 10 fire', 'wait 3')
 $hero += & $fight 'obsidian_warden' @('WRBossDmgPct 30 frost', 'WRBossDmgPct 30 frost', 'wait 2')
 $hero += & $fight 'ignessa' @('wait 6')
@@ -41,9 +41,21 @@ $bosses = [ordered]@{
 	'Vulkarn, the Forge Giant' = 'core_vulkarn'; 'Skaldrith, the Frost Wyrm' = 'core_skaldrith'; 'The Obsidian Warden' = 'trophy_obsidian_heart'
 	'Ignessa, Queen of Wisps' = 'trophy_wisp_crown'; 'Grimjaw' = 'trophy_troll_marrow'; 'The Pale Hunter' = 'trophy_stalker_fang'
 }
+# A thrown attack (a bolt, a boulder) lands after its strike window ends, so its "done" line says 0: it counts when a
+# boss blow with poise reaches a survivor within 2.5 s of its "strikes" line.
+function Stamp($line) { if ($line -match '^\[(\d+)\.(\d+)\.(\d+)-(\d+)\.(\d+)\.(\d+):(\d+)\]') { [datetime]::new([int]$Matches[1], [int]$Matches[2], [int]$Matches[3], [int]$Matches[4], [int]$Matches[5], [int]$Matches[6], [int]$Matches[7]) } }
+$raw = @(Select-String -Path "$out\server.log" -Pattern 'LogWildreach: (BOSS .* strikes$|COMBAT WRBoss_\d+ -> WRCharacter_\d+ .*poise=[1-9])' | ForEach-Object { $_.Line })
+$thrownHits = @()
+for ($i = 0; $i -lt $raw.Count; $i++) {
+	if ($raw[$i] -match 'LogWildreach: BOSS (.+) (slag_throw|boulder|fire_bolt|snow_fling) strikes$') {
+		$who = $Matches[1]; $what = $Matches[2]; $at = Stamp $raw[$i]
+		$hit = @($raw | Where-Object { $_ -match 'COMBAT WRBoss_' -and (Stamp $_) -ge $at -and ((Stamp $_) - $at).TotalSeconds -le 2.5 }).Count
+		if ($hit -gt 0) { $thrownHits += "$who $what" }
+	}
+}
 foreach ($name in $bosses.Keys) {
 	$e = [regex]::Escape($name)
-	$attacks = @($boss | ForEach-Object { if ($_ -match "^$e (\S+) lands: [1-9]") { $Matches[1] } } | Sort-Object -Unique)
+	$attacks = @(@($boss | ForEach-Object { if ($_ -match "^$e (\S+) done: [1-9]\d* hit") { $Matches[1] } }) + @($thrownHits | ForEach-Object { if ($_ -match "^$e (\S+)$") { $Matches[1] } }) | Sort-Object -Unique)
 	$loot = $boss | Where-Object { $_ -match '^loot: Hero dealt' } | Where-Object { $_ -match $bosses[$name] } | Select-Object -First 1
 	Check "$name`: fights with at least two attacks that land, is defeated, drops its loot" ($attacks.Count -ge 2 -and (Has "^$e defeated") -and $loot) "attacks: $($attacks -join ', ')"
 }
@@ -53,7 +65,7 @@ Check 'Vulkarn floods the floor and its anvils shatter' ((Has 'floods the floor'
 Check 'a helper under 10% gets no loot, and is told so' ((Has '^loot: Helper dealt .* - not enough') -and @($helperNotices | Where-Object { $_ -match 'need 10% for loot' }).Count -ge 1)
 Check 'boss parts drop (partChance 1 in this test)' ((Has 'part_giants_ember') -and (Has 'part_wyrm_scale'))
 Check 'Skaldrith is grounded by wing hits and its ice pillars shatter' ((Has '^Skaldrith, the Frost Wyrm grounded by wing hits') -and (Has '\(pillar\) shattered'))
-Check 'the Obsidian Warden''s shell breaks' (Has '^The Obsidian Warden shell broken')
+Check 'the Obsidian Warden''s shell breaks' (@(Select-String -Path "$out\server.log" -Pattern "LogWildreach: PART WRBoss_\d+'s shell broken").Count -ge 1)
 Check 'Ignessa sends wisps, then lands when they''re gone' ((Has 'sends \d+ wisps') -and (Has 'out of wisps and lands'))
 Check 'the Pale Hunter vanishes into the blizzard and shows again' ((Has 'Pale Hunter vanishes into the blizzard') -and (Has 'Pale Hunter is visible'))
 $errors = @(Select-String -Path "$out\server.log", "$out\hero.log", "$out\helper.log" -Pattern 'Error:|Ensure condition failed|Accessed None' -ErrorAction SilentlyContinue)

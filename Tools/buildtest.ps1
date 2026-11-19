@@ -12,7 +12,7 @@ Remove-Item (Join-Path $root 'Saved\Worlds\buildtest\players\Builder.json'), (Jo
 
 $builder = @(
 	'WRBotPause 1', 'WRTeleport 2400 3000', 'wait 1',
-	'WRGive wood 500', 'WRGive stone 300', 'WRGive copper_ingot 10', 'WRGive hide 10', 'WRGive fiber 20', 'WRGive seeds 2',
+	'WRGive wood 500', 'WRGive stone 300', 'WRGive copper_ingot 10', 'WRGive hide 10', 'WRGive fiber 20', 'WRGive seeds 9',
 	'WRPlace claim_totem 2000 3000 0 0',
 	'WRPlace wood_foundation 2400 3600 0 0', 'WRPlace wood_foundation 2800 3600 0 0',
 	'WRPlace wood_wall 2400 3400 100 0', 'WRPlace wood_wall 2200 3600 100 90',
@@ -76,20 +76,22 @@ Check 'floors go up within the span from support' ((Built 'Wood floor / ceiling'
 Check 'floors past the span are refused' (@($bn | Where-Object { $_ -match '^no support \(wood spans \d+\)' }).Count -eq 3) (($bn | Where-Object { $_ -match '^no support' } | Select-Object -First 1))
 Check 'a chest goes down' ((Built 'Storage chest') -eq 1)
 Check 'placing from too far away is refused' (@($bn | Where-Object { $_ -eq 'too far away' }).Count -eq 1)
-Check 'a crop plot goes down and is planted' ((Built 'Crop plot') -eq 1 -and @($bn | Where-Object { $_ -match '^Planted\. Ready in' }).Count -eq 1) ($bn | Where-Object { $_ -match '^Planted' } | Select-Object -First 1)
+# (A plot takes farm.seedsPerPlot seeds, 9: "Planted Berry bush: ripe in about N min ...", or "Planted. <why it waits>".)
+Check 'a crop plot goes down and is planted' ((Built 'Crop plot') -eq 1 -and @($bn | Where-Object { $_ -match '^Planted\b' }).Count -eq 1) ($bn | Where-Object { $_ -match '^(Planted|Need \d+ )' } | Select-Object -First 1)
 Check 'the owner sets a code and opens the door' (($bn -contains 'Code set; door locked') -and ($bn -contains 'Opened'))
 Check 'another player can''t build in the claim' ($rn -contains "Builder's land claim")
 Check 'the locked door keeps them out until the right code' (@($rn | Where-Object { $_ -like 'Locked.*' }).Count -ge 1 -and ($rn -contains 'Wrong code') -and ($rn -contains 'Code accepted') -and (@($rn | Where-Object { $_ -in 'Opened', 'Closed' }).Count -ge 1)) (($rn | Select-Object -Skip 1 -First 4) -join '; ')
 $server = Lines "$out\server1.log" 'LogWildreach: '
 Check 'raid hits wear a wall down, then destroy it' (@($rn | Where-Object { $_ -match '^wood_wall hp \d+' }).Count -ge 1 -and @($server | Where-Object { $_ -match '^BUILD \S+ \(wood_wall\) destroyed by ' }).Count -eq 1) (($rn | Where-Object { $_ -match 'hp|destroyed' }) -join '; ')
-$collapsed = @($server | Where-Object { $_ -match '^BUILD \S+ collapsed \(no support\)' }).Count
+$collapsed = @($server | Where-Object { $_ -match '^BUILD \S+ \(\S+\) collapsed: no support' }).Count
 Check 'floors with nothing under them collapse' (@($server | Where-Object { $_ -match '^BUILD \S+ \(wood_floor\) destroyed by ' }).Count -eq 1 -and $collapsed -eq 2) "$collapsed collapsed"
 # Built: claim, 2 foundations, 2 walls, door, 3 floors, chest, crop = 11; less a wall, a floor and 2 collapsed floors = 7.
 $last = Lines "$out\server1.log" 'WORLD saved' | Select-Object -Last 1
 Check 'the world saves what still stands' ($last -eq 'WORLD saved 7 pieces') $last
 $door = if ($saved) { $saved.pieces | Where-Object { $_.piece -eq 'reinforced_door' } | Select-Object -First 1 }
 $crop = if ($saved) { $saved.pieces | Where-Object { $_.piece -eq 'crop_plot' } | Select-Object -First 1 }
-Check 'the save keeps the door''s code and the planted crop' ($door -and $door.code -eq '1234' -and $door.locked -and $crop -and $crop.planted -and $crop.cropSecondsLeft -gt 0) $(if ($saved) { "door code '$($door.code)' locked $($door.locked); crop planted $($crop.planted), $([int]$crop.cropSecondsLeft) s left" } else { 'no world save' })
+# (A planted plot saves its crop and how far it has grown, 0 to 1: AWRBuildPiece::ToJson.)
+Check 'the save keeps the door''s code and the planted crop' ($door -and $door.code -eq '1234' -and $door.locked -and $crop -and $crop.crop -and $null -ne $crop.growth -and [double]$crop.growth -lt 1) $(if ($saved) { "door code '$($door.code)' locked $($door.locked); crop '$($crop.crop)', growth $($crop.growth)" } else { 'no world save' })
 $loaded = Lines "$out\server2.log" 'WORLD loaded' | Select-Object -First 1
 Check 'a restarted server loads every piece, and nothing collapses' ($loaded -match '^WORLD loaded 7 pieces' -and (Lines "$out\server2.log" 'collapsed').Count -eq 0) $loaded
 $logs = @("$out\server1.log", "$out\server2.log", "$out\builder.log", "$out\raider.log" | Where-Object { Test-Path $_ })

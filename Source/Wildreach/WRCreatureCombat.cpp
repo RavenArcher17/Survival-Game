@@ -1109,6 +1109,12 @@ void AWRCreatureAI::TickRow(AWRCreature* Self, float DeltaSeconds)
 		{
 			RowPhase = 3;
 			RowPhaseEnd = Now + R->Active;
+			if (M == TEXT("lunge") || M == TEXT("pounce"))
+			{
+				// A leap is live for its whole flight; landing ends it (below). Its row's 0.25 s active part closed the
+				// window while it was still in the air, so a lunge from 3-6 m never reached a survivor.
+				RowPhaseEnd = Now + FMath::Max(R->Active, WRTune(TEXT("creatureAI.lunge.maxAir"), 1.2f));
+			}
 			Self->SetCombatTag(WRTags::State_Windup, false);
 			StrikeRow(Self);
 		}
@@ -1295,7 +1301,28 @@ void AWRCreatureAI::TickRowFight(AWRCreature* Self, AWRCharacterBase* Target, fl
 	// Move: to its spot, or in on the target; flyers circle high and come down to strike.
 	const FVector Goal = bInPlace ? Target->GetActorLocation() : Spot;
 	FVector Dir = (Goal - Self->GetActorLocation()).GetSafeNormal2D();
-	const float Stop = Self->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius() + (Def ? FMath::Min(Def->AttackRange * 0.5f, 120.f) : 80.f);
+	// It walks in until its own contact blows reach: the longest close-range row that starts at contact, with a margin,
+	// never further out than half its attackRange. (A fixed share of attackRange left a Cinderfang standing 1.2 m off
+	// with a 0.7 m bite: it never bit a survivor who stood still. Ten old-island creatures did the same.)
+	float StopGap = Def ? FMath::Min(Def->AttackRange * 0.5f, 120.f) : 80.f;
+	if (const TMap<FName, FWRAttackRow>* Rows = FWRAttackRows::Get().Creature(Self->CreatureId))
+	{
+		float Contact = -1.f;
+		for (const TPair<FName, FWRAttackRow>& P : *Rows)
+		{
+			const FWRAttackRow& R = P.Value;
+			if (R.WClose > 0.f && !R.bBehindOnly && R.MinRange <= 0.f && R.Motion != TEXT("withdraw") && R.Motion != TEXT("spit")
+				&& R.Motion != TEXT("burst") && R.Motion != TEXT("howl"))
+			{
+				Contact = FMath::Max(Contact, R.MaxRange);
+			}
+		}
+		if (Contact > 0.f)
+		{
+			StopGap = FMath::Min(StopGap, Contact * WRTune(TEXT("creatureAI.closeIn"), 0.7f));
+		}
+	}
+	const float Stop = Self->GetSimpleCollisionRadius() + Target->GetSimpleCollisionRadius() + StopGap;
 	if (Def && Def->Archetype == TEXT("flyer") && !Self->HasTag(WRTags::Status_Staggered) && !FWRStormAI::Grounded(Self) && !FWRSwampAI::Grounded(Self) && !FWRVoidAI::Grounded(Self))
 	{
 		const float WantZ = Target->GetActorLocation().Z + (Dist > 700.f ? 450.f : 0.f);

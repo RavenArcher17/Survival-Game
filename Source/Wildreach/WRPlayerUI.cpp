@@ -1183,7 +1183,15 @@ void FWRPlayerUI::DoorKey(bool bDown, AWRBuildPiece* Door)
 	}
 	if (!bDoorKeyDown) return;   // the hold already opened the keypad
 	bDoorKeyDown = false;
-	if (AWRPlayerController* P = PC.Get()) P->InteractNow();   // a tap: open or shut it
+	AWRPlayerController* P = PC.Get();
+	if (!P) return;
+	// Held long enough, but let go before a frame looked (a hitch): still a hold, the keypad, not a tap that opens the door.
+	if (FPlatformTime::Seconds() - DoorDownAt > WRTune(TEXT("ui.doorHoldSeconds"), 0.35f) && DoorKeyPiece.IsValid())
+	{
+		P->OpenDoorKeypad(DoorKeyPiece.Get());
+		return;
+	}
+	P->InteractNow();   // a tap: open or shut it
 }
 
 void FWRPlayerUI::SiegeKey(bool bDown, AWRSiegeEngine* Engine)

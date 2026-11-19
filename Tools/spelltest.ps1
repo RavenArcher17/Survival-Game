@@ -12,8 +12,11 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $db = Join-Path (Split-Path $project) 'Saved\Worlds\spelltest'
 Remove-Item (Join-Path $db 'players\Pyro.json'), (Join-Path $db 'players\Cryo.json'), (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
+# (Molten cleave is a Wildbrand that fits an axe, greatsword, great hammer or pick-hammer, not the starting sword:
+# tuning wildbrands.molten_cleave.fits. Pyro takes an iron axe in hand for slot 7.)
 $pyro = @('WRBotPause 1', 'wait 1', 'WRCast 1', 'wait 1.6', 'WRCast 1', 'wait 1', 'WRGivePoints fire 120', 'WRLearn fire spreading_flames', 'WRLearn fire heat_capacity', 'WRAutoSpend fire 100', 'wait 2',
-	'WRTeleport -400 -500', 'wait 2', 'WRLook 0 -20', 'WRCast 3', 'wait 3', 'WRCast 4', 'wait 3', 'WRCast 5', 'wait 3', 'WRLook 0 0', 'WRCast 6', 'wait 2', 'WRCast 7', 'wait 4',
+	'WRGive iron_axe 1',
+	'WRTeleport -400 -500', 'wait 2', 'WRLook 0 -20', 'WRCast 3', 'wait 3', 'WRCast 4', 'wait 3', 'WRCast 5', 'wait 3', 'WRLook 0 0', 'WRCast 6', 'wait 2', 'WREquip iron_axe', 'wait 1', 'WRCast 7', 'wait 4',
 	'WRSay spelltest-done') -join '|'
 $cryo = @('WRBotPause 1', 'wait 1', 'WRCast 1', 'wait 1.4', 'WRCast 1', 'wait 1', 'WRGivePoints frost 120', 'WRAutoSpend frost 100', 'wait 2',
 	'WRTeleport -400 500', 'wait 2', 'WRLook 0 0', 'WRCast 3', 'wait 2', 'WRCast 4', 'wait 2', 'WRCast 5', 'wait 2', 'WRCast 6', 'wait 3', 'WRCast 7', 'wait 3',
