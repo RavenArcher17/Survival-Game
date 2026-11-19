@@ -379,6 +379,14 @@ void UWRPathComponent::RefreshQuickSlots()
 			}
 		}
 	}
+	// A combo that is an action (Data/combos.json kind "action": Sacrifice to the sun) is a quick-slot ability of its own
+	// while the main path and subclass earn it: "combo.<id>".
+	TArray<FName> ComboActions;
+	for (const FName& Action : FWRComboRegistry::Get().ActionsFor(*this))
+	{
+		if (UWRAbilityRegistry::ClassForNode(TEXT("combo"), Action)) ComboActions.Add(FName(*FString::Printf(TEXT("combo.%s"), *Action.ToString())));
+	}
+	Owned.Append(ComboActions);
 	// An awakened boss weapon in the hand gives its Soul art a quick slot (WRDeeds): first in the owned list.
 	const FName SoulArt = WRDeeds::SoulArtFor(GetOwner());
 	if (!SoulArt.IsNone())
@@ -416,6 +424,19 @@ void UWRPathComponent::RefreshQuickSlots()
 			break;
 		}
 		QuickSlots[Free] = Ability;
+	}
+	// A combo action earned with every slot taken (a combo comes at 25 / 50 points, by when the tree fills them) goes in the
+	// last slot that isn't the Soul art's or another combo's, as a Soul art does; that ability comes back to the slot when
+	// the combo goes (the fill above).
+	for (const FName& Action : ComboActions)
+	{
+		if (QuickSlots.Contains(Action)) continue;
+		for (int32 i = QuickSlots.Num() - 1; i >= 0; --i)
+		{
+			if (QuickSlots[i] == SoulArt || ComboActions.Contains(QuickSlots[i])) continue;
+			QuickSlots[i] = Action;
+			break;
+		}
 	}
 }
 

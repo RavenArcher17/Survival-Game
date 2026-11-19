@@ -76,6 +76,12 @@ namespace WRNecro
 	/** Server: raise Body for Owner (the body is used up): the same creature at necromancy.raisedStats for Seconds.
 	 *  bIgnoreCap: Army of the dead / the free combo raises. StatScale < 0: the default 60%. Variant: ash / ice / blood. */
 	WILDREACH_API AWRCreature* Raise(AWRCharacterBase* Owner, AWRCreature* Body, float Seconds, bool bIgnoreCap, float StatScale = -1.f, FName Variant = NAME_None);
+	/** Server: raise a creature of Kind for Owner with no body (Desert graves' sand-shell copy), standing at At (its capsule's
+	 *  centre), on Raise's terms. */
+	WILDREACH_API AWRCreature* RaiseKind(AWRCharacterBase* Owner, FName Kind, const FVector& At, const FRotator& Face, float Seconds, bool bIgnoreCap, float StatScale = -1.f, FName Variant = NAME_None);
+	/** Server: the kind of the last creature that died within Radius of At, within Window seconds, that a raise could take
+	 *  (not a boss, a dummy, a Risen, a minion); None if nothing did. */
+	WILDREACH_API FName LastKilledNear(const UWorld* World, const FVector& At, float Radius, float Window);
 	/** Server: the owner's raised minions, alive. */
 	WILDREACH_API TArray<AWRCreature*> MinionsOf(const AWRCharacterBase* Owner);
 	/** How many may stand at once (3, 5 with Second wave). */

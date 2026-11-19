@@ -322,10 +322,26 @@ void UWRGraveBody::BuildLook()
 	const FWRCreatureDef* Def = C ? C->GetDef() : nullptr;
 	USkeletalMeshComponent* Body = Skel();
 	if (!Def || !Body || !Body->GetSkeletalMeshAsset()) return;
+	const TSharedPtr<FJsonObject> Look = GcLook(C->CreatureId);
+	// A body drawn wholly by parts on the rig's own bones (the Risen: hideMesh). The rig's mesh hides but stays its art
+	// (its bones pose every frame, bone lookups work: AWRCreature::SetRigUnseen), and the parts wait for a posed skeleton.
+	// Hidden first and built on bones that were never posed, every bone stood at the rig's feet: the limbs weren't drawn,
+	// the rest lay in a heap on the ground (risen_hound, risen_bearer) or at the world's origin (risen_mourner).
+	bool bHideMesh = false;
+	if (Look.IsValid()) Look->TryGetBoolField(TEXT("hideMesh"), bHideMesh);
+	if (bHideMesh)
+	{
+		C->SetRigUnseen(true);
+		bMeshHidden = true;
+		// Posed: the head's bone has its place in the pose, above the rig's feet (never posed: no pose, or all at 0).
+		const FName HeadB = C->FindBone(TEXT("head"));
+		const int32 HeadI = HeadB.IsNone() ? INDEX_NONE : Body->GetBoneIndex(HeadB);
+		const TArray<FTransform>& Pose = Body->GetComponentSpaceTransforms();
+		if (HeadI != INDEX_NONE && (!Pose.IsValidIndex(HeadI) || Pose[HeadI].GetLocation().SizeSquared() < FMath::Square(5.f))) return;   // next frame
+	}
 	ClearLook();
 	LookFor = C->CreatureId;
 	LookFlags = Flags & (WRGraveFlag::Raised | WRGraveFlag::Riftborn | WRGraveFlag::Ash | WRGraveFlag::Ice);
-	const TSharedPtr<FJsonObject> Look = GcLook(C->CreatureId);
 	const FName K = GcKind(C->CreatureId);
 	const bool bRaised = Has(WRGraveFlag::Raised);
 	const bool bRift = Has(WRGraveFlag::Riftborn);
@@ -378,9 +394,6 @@ void UWRGraveBody::BuildLook()
 			Body->SetRelativeScale3D(FVector(S0.X * Stretch, S0.Y * Stretch, S0.Z * Flatten));
 		}
 	}
-	bool bHideMesh = false;
-	if (Look.IsValid()) Look->TryGetBoolField(TEXT("hideMesh"), bHideMesh);
-	if (bHideMesh) { Body->SetVisibility(false, false); bMeshHidden = true; }
 
 	const auto BoneAt = [&](const TCHAR* Hint, FVector& Out) -> FName
 	{
@@ -663,7 +676,7 @@ void UWRGraveBody::BuildLook()
 		Pair(TEXT("LeftUpLeg"), TEXT("LeftLeg"), 3.2f); Pair(TEXT("LeftLeg"), TEXT("LeftFoot"), 2.8f); Pair(TEXT("RightUpLeg"), TEXT("RightLeg"), 3.2f); Pair(TEXT("RightLeg"), TEXT("RightFoot"), 2.8f);
 		Pair(TEXT("LeftFoot"), TEXT("LeftToeBase"), 2.f); Pair(TEXT("RightFoot"), TEXT("RightToeBase"), 2.f);
 		Pair(TEXT("LeftShoulder"), TEXT("LeftArm"), 1.8f); Pair(TEXT("RightShoulder"), TEXT("RightArm"), 1.8f);
-		FVector Hd, Ch, Hp;
+		FVector Hd = C->GetActorLocation(), Ch = Hd, Hp = Hd;
 		const FName HdB = BoneAt(TEXT("Head"), Hd), ChB = BoneAt(TEXT("Spine1"), Ch), HpB = BoneAt(TEXT("Hips"), Hp);
 		AddGroup(HdB, Hd, Yaw, Blocks([&](FKit& Kit)
 		{

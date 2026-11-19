@@ -40,8 +40,8 @@ namespace WRWind
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_HexStorm);         // Wind + Blood 50
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_LeafGlide);        // Nature + Wind 25
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_WindborneSeeds);   // Nature + Wind 50
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SoulWind);         // Wind + Necromancy 25 (data-ready: the Necromancy path's soul pickup reads SoulPickupScale)
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_ReapersCyclone);   // Wind + Necromancy 50 (data-ready: its Scythe sweep reads the tag)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SoulWind);         // Wind + Necromancy 25 (the Necromancy path's Souls on a kill read SoulPickupScale)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_ReapersCyclone);   // Wind + Necromancy 50 (UWRGA_ScytheSweep spins with it)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SandBlast);        // Sun & sand + Wind 25
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_Sunshot);          // Sun & sand + Wind 50
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SeaSpray);         // Wind + Tide 25

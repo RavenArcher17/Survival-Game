@@ -2987,6 +2987,11 @@ TSubclassOf<UGameplayAbility> UWRAbilityRegistry::ClassForNode(FName PathId, FNa
 		if (NodeId == TEXT("vulkarn")) return UWRGA_SoulArtVulkarn::StaticClass();
 		if (NodeId == TEXT("skaldrith")) return UWRGA_SoulArtSkaldrith::StaticClass();
 	}
+	else if (PathId == TEXT("combo"))
+	{
+		// A path combo that is an action (Data/combos.json kind "action": "combo.<id>" in a quick slot while it's earned).
+		if (NodeId == TEXT("sacrifice_to_the_sun")) return UWRGA_SunSacrifice::StaticClass();
+	}
 	else if (PathId == TEXT("frost"))
 	{
 		if (NodeId == TEXT("frost_shard")) return UWRGA_FrostShard::StaticClass();

@@ -100,6 +100,21 @@ namespace WRStormBossDetail
 		return bOk ? Hit.ImpactPoint : At;
 	}
 
+	/** Galvara's cores ride 8 m under her, but never down in the rock: idle over her crag she hangs only a few metres up
+	 *  (her hover height is over a fight), so 8 m under her was under the ground, and the server's underground rescue
+	 *  lifted all three out every second (330 RESCUE lines in one Storm run). At least Lift over the ground under At
+	 *  (static ground only: her own body and the cores aren't ground). */
+	FVector SbOverGround(const UWorld* World, FVector At, float FromZ, float Lift)
+	{
+		FHitResult Hit;
+		const FCollisionQueryParams Q(SCENE_QUERY_STAT(WRStormCoreGround), false);
+		if (World && World->LineTraceSingleByObjectType(Hit, FVector(At.X, At.Y, FMath::Max(FromZ, At.Z) + 2000.f), FVector(At.X, At.Y, At.Z - 3000.f), FCollisionObjectQueryParams(ECC_WorldStatic), Q))
+		{
+			At.Z = FMath::Max(At.Z, Hit.ImpactPoint.Z + Lift);
+		}
+		return At;
+	}
+
 	/** Data/storm_peaks.json (read once). */
 	TSharedPtr<FJsonObject> SbPeaks()
 	{
@@ -594,7 +609,8 @@ void FWRStormBoss::SpawnCores(AWRBoss* Boss, int32 Count, float Health)
 	St.Cores.Reset();
 	for (int32 i = 0; i < Count; ++i)
 	{
-		const FVector At = Boss->GetActorLocation() - FVector(0.f, 0.f, Boss->Tune(TEXT("coreDrop"), 800.f)) + FRotator(0.f, 120.f * i, 0.f).Vector() * Boss->Tune(TEXT("coreOrbit"), 600.f);
+		const FVector At = SbOverGround(Boss->GetWorld(), Boss->GetActorLocation() - FVector(0.f, 0.f, Boss->Tune(TEXT("coreDrop"), 800.f)) + FRotator(0.f, 120.f * i, 0.f).Vector() * Boss->Tune(TEXT("coreOrbit"), 600.f),
+			Boss->GetActorLocation().Z, Boss->Tune(TEXT("coreLift"), 200.f));
 		if (AWRCreature* Core = AWRCreature::SpawnCreature(Boss->GetWorld(), TEXT("galvara_core"), At, FRotator::ZeroRotator))
 		{
 			Core->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
@@ -769,7 +785,8 @@ void FWRStormBoss::OrbitCores(AWRBoss* Boss)
 		AWRCreature* Core = St.Cores[i].Get();
 		if (!Core || !Core->IsAlive()) continue;
 		const float A = T * Boss->Tune(TEXT("coreSpin"), 0.4f) + 2.f * PI * i / FMath::Max(1, N);
-		const FVector At = Boss->GetActorLocation() - FVector(0.f, 0.f, Boss->Tune(TEXT("coreDrop"), 800.f)) + FVector(FMath::Cos(A), FMath::Sin(A), 0.f) * Boss->Tune(TEXT("coreOrbit"), 600.f);
+		const FVector At = SbOverGround(Boss->GetWorld(), Boss->GetActorLocation() - FVector(0.f, 0.f, Boss->Tune(TEXT("coreDrop"), 800.f)) + FVector(FMath::Cos(A), FMath::Sin(A), 0.f) * Boss->Tune(TEXT("coreOrbit"), 600.f),
+			Boss->GetActorLocation().Z, Boss->Tune(TEXT("coreLift"), 200.f));
 		Core->SetActorLocation(FMath::VInterpTo(Core->GetActorLocation(), At, Boss->GetWorld()->GetDeltaSeconds(), 3.f));
 	}
 }

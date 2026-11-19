@@ -346,6 +346,14 @@ void AWRGameMode::RescueUnderground()
 		{
 			if (Cast<ULandscapeHeightfieldCollisionComponent>(Hit.GetComponent()) && Hit.ImpactPoint.Z > L.Z + Need)
 			{
+				// Under the ground on purpose: a cave's chamber and tunnel (AWRCave: the Swamp's Gullet is dug in under the
+				// Storm peaks' cliff), a fold, a war-hall. Its creatures belong there: "rescued", the Gullet's were lifted
+				// 200-640 m onto the cliff top. Only asked when the ground is over them, so it costs nothing otherwise.
+				if (WRBiome::IsUnderground(this, L))
+				{
+					bRescued = true;   // not lost: nothing to do
+					break;
+				}
 				const float Half = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 				C->TeleportTo(FVector(L.X, L.Y, Hit.ImpactPoint.Z + Half + 30.f), C->GetActorRotation(), false, true);
 				C->GetCharacterMovement()->Velocity = FVector::ZeroVector;

@@ -12,6 +12,7 @@
 #include "WRSound.h"
 #include "WRStatusComponent.h"
 #include "WRSurvival.h"
+#include "WRSunPath.h"
 #include "WRToolMesh.h"
 #include "WRTreeKit.h"
 #include "WRTuning.h"
@@ -469,6 +470,12 @@ AWRPlantSummon* AWRPlantSummon::Plant(UClass* Class, AWRCharacterBase* Planter, 
 		&& (WRBiome::At(Planter, Root) == TEXT("tundra") || FWRBiomeHazards::KindAt(Root) == TEXT("ice")))
 	{
 		P->PlantSeconds *= WRTune(TEXT("nature.plants.frostLifetime"), 0.6f);
+	}
+	// So do sand and the Desert's sandstorms (the belt, a storm over the open desert); Desert bloom (Sun + Nature 25,
+	// cooks/biome-desert.md combos): your plants ignore sand and storms.
+	if (!Planter->HasTag(WRSun::Combo_DesertBloom) && (WRSun::SandAt(Root) || WRSun::SandstormAt(Planter, Root)))
+	{
+		P->PlantSeconds *= WRTune(TEXT("nature.plants.sandLifetime"), 0.6f);
 	}
 	P->bPollen = UWRPathComponent::HasNode(Planter, PathId, TEXT("pollen"));
 	P->BornAt = P->ServerNow();

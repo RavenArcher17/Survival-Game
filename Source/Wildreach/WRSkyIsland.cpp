@@ -322,6 +322,9 @@ void AWRSkyScenery::BuildIsland()
 				Boxes.Add({ FVector(0, 0, WZ - Deep * 0.3f), FVector(WR * 0.92f, WR * 0.5f, Deep * 0.3f), 0.f });
 				Boxes.Add({ FVector(0, 0, WZ - Deep * 0.3f), FVector(WR * 0.5f, WR * 0.92f, Deep * 0.3f), 0.f });
 				V->Build(Boxes);
+				// The island drifts: its water rides with it, so the volume must be movable (a static one won't attach to
+				// the island's moving root, and the lagoon's water stayed behind in the air).
+				V->GetRootComponent()->SetMobility(EComponentMobility::Movable);
 				V->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 			}
 		}

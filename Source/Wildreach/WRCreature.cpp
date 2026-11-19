@@ -683,16 +683,32 @@ void AWRCreature::PlayCreatureOneShot(FName Key)
 {
 	UWRAnimInstance* Anim = CreatureAnim();
 	UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, Key);
-	if (Anim && Clip && Skel->IsVisible() && IsAlive())
+	if (Anim && Clip && ArtOn() && IsAlive())
 	{
 		OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, 1.f);
 	}
 }
 
+bool AWRCreature::ArtOn() const
+{
+	return Skel && (Skel->IsVisible() || (bRigUnseen && Skel->GetSkeletalMeshAsset()));
+}
+
+void AWRCreature::SetRigUnseen(bool bUnseen)
+{
+	if (!Skel || GetNetMode() == NM_DedicatedServer) return;
+	bRigUnseen = bUnseen;
+	Skel->SetVisibility(!bUnseen, false);
+	// Never rendered, so its pose would never refresh: the parts on its bones would lie where the bones stood at spawn.
+	// Every frame instead (only the Graveyard's few Risen hide their rig); the tick keeps it so.
+	if (bUnseen) Skel->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	EarshotClock = 0.f;
+}
+
 void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 {
 	UWRAnimInstance* Anim = CreatureAnim();
-	if (!Anim || !Skel->IsVisible())
+	if (!Anim || !ArtOn())
 	{
 		return;
 	}
@@ -717,7 +733,8 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 	if (EarshotClock <= 0.f)
 	{
 		EarshotClock = 0.5f;
-		Skel->VisibilityBasedAnimTickOption = WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.footstepRange"), 3000.f))
+		Skel->VisibilityBasedAnimTickOption = bRigUnseen ? EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones
+			: WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.footstepRange"), 3000.f))
 			? EVisibilityBasedAnimTickOption::AlwaysTickPose : EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
 		bFeetInRange = (Anim->GetCreatureLegs().Num() > 0 || Anim->GetCreatureSpine().Num() > 0) && WRCreatureAnimDetail::NearLocalView(this, WRTune(TEXT("anim.creatureFeet.range"), 6000.f));
 	}
@@ -742,7 +759,7 @@ void AWRCreature::TickCreatureAnim(float DeltaSeconds)
 		bNuzzleLifted = NuzzleWeight > 0.01f;
 	}
 	// Its body language (head aim, flinch, pant, slump, moods, row gestures) while its pose updates.
-	if (Skel->WasRecentlyRendered(0.5f) || Skel->VisibilityBasedAnimTickOption == EVisibilityBasedAnimTickOption::AlwaysTickPose)
+	if (Skel->WasRecentlyRendered(0.5f) || Skel->VisibilityBasedAnimTickOption == EVisibilityBasedAnimTickOption::AlwaysTickPose || bRigUnseen)
 	{
 		TickCreatureBody(DeltaSeconds);
 	}
@@ -776,7 +793,7 @@ void AWRCreature::TickCreatureFeet(float DeltaSeconds)
 	Feet.LegAlpha = Toward(Feet.LegAlpha, bOn ? 1.f : 0.f);
 	Spine.Alpha = bAlive ? Toward(Spine.Alpha, bOn ? 1.f : 0.f) : Spine.Alpha;
 	// Sampled only while its pose updates (seen, or within earshot), in range, alive.
-	if (!bOn || (!Skel->WasRecentlyRendered(0.2f) && Skel->VisibilityBasedAnimTickOption != EVisibilityBasedAnimTickOption::AlwaysTickPose))
+	if (!bOn || (!Skel->WasRecentlyRendered(0.2f) && Skel->VisibilityBasedAnimTickOption != EVisibilityBasedAnimTickOption::AlwaysTickPose && !bRigUnseen))
 	{
 		return;
 	}
@@ -844,7 +861,7 @@ void AWRCreature::TickCreatureFeet(float DeltaSeconds)
 FVector AWRCreature::MouthLocation() const
 {
 	// The jaw's hinge is the back of the mouth; without a jaw, the head's joint.
-	if (Skel && Skel->IsVisible() && Skel->GetSkeletalMeshAsset())
+	if (ArtOn() && Skel->GetSkeletalMeshAsset())
 	{
 		for (const TCHAR* Bone : { TEXT("jaw"), TEXT("head") })
 		{
@@ -861,7 +878,7 @@ void AWRCreature::OnSwingVisual(EWRSwingKind Kind, float Duration)
 {
 	StartTelegraph(Kind, Duration);  // art or placeholder body alike
 	UWRAnimInstance* Anim = CreatureAnim();
-	if (!Skel->IsVisible() || !Anim)
+	if (!ArtOn() || !Anim)
 	{
 		return;
 	}
@@ -972,7 +989,7 @@ void AWRCreature::StartTelegraph(EWRSwingKind Kind, float Duration)
 	// The rear-back moves the fitted art (bosses keep to their own big clips, and so does a creature whose clip rears
 	// on its own: tipping a long worm back would sink its tail into the ground).
 	const FWRCreatureDef* Def = GetDef();
-	if (Skel->IsVisible() && Def && Def->Archetype != TEXT("boss") && !Def->bOwnWindup)
+	if (ArtOn() && Def && Def->Archetype != TEXT("boss") && !Def->bOwnWindup)
 	{
 		SkelBaseLocation = Skel->GetRelativeLocation();
 		SkelBaseRotation = Skel->GetRelativeRotation();
@@ -1083,7 +1100,7 @@ void AWRCreature::OnHitVisual(EWRHitResult Result)
 	// death takes over).
 	UWRAnimInstance* Anim = CreatureAnim();
 	UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, TEXT("hit"));
-	if (Anim && Clip && Skel->IsVisible() && Result == EWRHitResult::Hit && WRFx::ReactionOf(HitFlagsShown) > 0 && IsAlive()
+	if (Anim && Clip && ArtOn() && Result == EWRHitResult::Hit && WRFx::ReactionOf(HitFlagsShown) > 0 && IsAlive()
 		&& GetWorld()->GetTimeSeconds() >= OneShotUntil && !bStanceBrokenShown)
 	{
 		OneShotUntil = GetWorld()->GetTimeSeconds() + Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, 1.f);
@@ -1121,13 +1138,13 @@ void AWRCreature::OnStanceBreakVisual(bool bBroken)
 	if (bBroken && IsAlive())
 	{
 		// Its recoil, slowed and held at the end for the whole break; the slump settles over it (TickStanceSlump).
-		if (UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, TEXT("hit")); Anim && Clip && Skel->IsVisible())
+		if (UAnimSequenceBase* Clip = WRCreatureAnimDetail::Clip(AnimAssets, TEXT("hit")); Anim && Clip && ArtOn())
 		{
 			Anim->PlayOneShot(Clip, EWRAnimLayer::Upper, WRTune(TEXT("stance.recoilRate"), 0.6f), 0.f, 0.f, true);
 			OneShotUntil = GetWorld()->GetTimeSeconds() + 60.0;
 		}
 		const FName Head = HeadBone();
-		const FVector At = Head.IsNone() || !Skel->IsVisible() ? GetActorLocation() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() * 0.6f) + GetActorForwardVector() * GetSimpleCollisionRadius() * 0.8f
+		const FVector At = Head.IsNone() || !ArtOn() ? GetActorLocation() + FVector(0.f, 0.f, GetSimpleCollisionHalfHeight() * 0.6f) + GetActorForwardVector() * GetSimpleCollisionRadius() * 0.8f
 			: Skel->GetSocketLocation(Head);
 		WRFx::SpawnAt(this, TEXT("stance.break"), At, GetActorForwardVector().Rotation(), FMath::Clamp(GetSimpleCollisionRadius() / 80.f, 0.7f, 2.5f));
 		WRSound::PlayAt(this, TEXT("stance.break"), At);
@@ -1135,9 +1152,9 @@ void AWRCreature::OnStanceBreakVisual(bool bBroken)
 		// The gold weak-point mark (colour law: gold is yours to strike) on the head, where the crit lands.
 		if (!CritMark)
 		{
-			CritMark = Skel->IsVisible() && !Head.IsNone() ? WRFx::Attach(Skel, TEXT("crit.mark"), Head, FMath::Clamp(GetSimpleCollisionRadius() / 70.f, 0.8f, 2.4f))
+			CritMark = ArtOn() && !Head.IsNone() ? WRFx::Attach(Skel, TEXT("crit.mark"), Head, FMath::Clamp(GetSimpleCollisionRadius() / 70.f, 0.8f, 2.4f))
 				: WRFx::Attach(GetRootComponent(), TEXT("crit.mark"), NAME_None, 1.f);
-			if (CritMark && (Head.IsNone() || !Skel->IsVisible()))
+			if (CritMark && (Head.IsNone() || !ArtOn()))
 			{
 				CritMark->SetRelativeLocation(FVector(GetSimpleCollisionRadius() * 0.8f, 0.f, GetSimpleCollisionHalfHeight() * 0.6f));
 			}
@@ -1198,7 +1215,7 @@ void AWRCreature::OnDeathVisual()
 		CritMark = nullptr;
 	}
 	UWRAnimInstance* Anim = CreatureAnim();
-	if (Skel->IsVisible() && Anim)
+	if (ArtOn() && Anim)
 	{
 		bDeathShown = true;  // a body that comes into view later shows it from OnRep_Body (WRCarcass.cpp)
 		Anim->PlayOneShot(WRCreatureAnimDetail::Clip(AnimAssets, TEXT("death")), EWRAnimLayer::Full, 1.f, 0.f, 0.f, true);

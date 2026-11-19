@@ -193,8 +193,11 @@ namespace WRWildlifeImpl
 				R.Allowed[i] = true;
 			}
 			// Connected pieces of it, the same way a walk connects them. A scrap too small to live on is left out: a pack
-			// starting there moves to proper ground.
-			const int32 MinPiece = FMath::RoundToInt(WRTune(TEXT("wildlife.minPieceCells"), 40.f));
+			// starting there moves to proper ground. The shore is only ever a strip a cell or two wide, broken by inlets and
+			// cliffs (the tundra coast's longest stretch is 11 cells), so a shore kind keeps every stretch of a few cells and
+			// swims between them: the 40-cell rule left the Floeback nowhere to live, so it never spawned.
+			const int32 MinPiece = Def.Habitat == TEXT("shore") ? FMath::RoundToInt(WRTune(TEXT("wildlife.minShorePieceCells"), 4.f))
+				: FMath::RoundToInt(WRTune(TEXT("wildlife.minPieceCells"), 40.f));
 			R.Piece.Init(INDEX_NONE, N * N);
 			int32 NextPiece = 0;
 			TArray<int32> Stack, Members;

@@ -2,6 +2,7 @@
 #include "WRRaiding.h"
 #include "Wildreach.h"
 #include "WRAttributeSet.h"
+#include "WRBloodPath.h"
 #include "WRBoss.h"
 #include "WRCharacter.h"
 #include "WRCharacterBase.h"
@@ -139,6 +140,65 @@ void UWRGA_SunSpell::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FG
 }
 
 FWRHit UWRGA_SunSpell::SunHit(AWRCharacterBase* Caster, float Damage, float Blind) const { return SnBase(Caster, Damage, Blind); }
+
+// ---------------------------------------------------------------- Sacrifice to the sun (Sun + Blood 50)
+
+namespace WRSunSacrificeImpl
+{
+	float Num(const TCHAR* Key, float Fallback) { return FWRComboRegistry::Get().Num(TEXT("sacrifice_to_the_sun"), FName(Key), Fallback); }
+}
+
+UWRGA_SunSacrifice::UWRGA_SunSacrifice()
+{
+	DisplayName = TEXT("Sacrifice to the sun"); PathId = TEXT("sun"); NodeId = TEXT("sacrifice_to_the_sun");
+	CooldownFallback = 20.f;   // combos.json's cooldown, read again as it goes off
+}
+
+bool UWRGA_SunSacrifice::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	// Yours while the pair earns it (its slot goes with the tag); nothing to fill when the bar is already full.
+	const AWRCharacterBase* Who = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+	return Who && Who->HasTag(WRSun::Combo_SunSacrifice) && WRSun::RadianceOf(Who) < WRSun::MaxRadianceOf(Who) - 0.5f
+		&& Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+bool UWRGA_SunSacrifice::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	// The Blood rule: HP above the price pays (it may leave you at 1); short, the slot shakes.
+	const AWRCharacterBase* Who = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (UWRBloodPath::CanSpend(Who, WRSunSacrificeImpl::Num(TEXT("health"), 20.f))) return Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags);
+	if (Who && Who->IsLocallyControlled()) WRBlood::NoteRefused(Who);
+	return false;
+}
+
+void UWRGA_SunSacrifice::ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	Super::ApplyCost(Handle, ActorInfo, ActivationInfo);
+	AWRCharacterBase* Who = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
+	if (Who && HasAuthority(&ActivationInfo)) UWRBloodPath::SpendBlood(Who, WRSunSacrificeImpl::Num(TEXT("health"), 20.f));   // into Spilled
+}
+
+void UWRGA_SunSacrifice::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
+{
+	CooldownFallback = WRSunSacrificeImpl::Num(TEXT("cooldown"), 20.f);
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	AWRCharacterBase* Who = GetCharacter();
+	if (Who && IsServer())
+	{
+		// The blood burns off the skin in a gold flash and the bar fills at once.
+		const float Radiance = WRSunSacrificeImpl::Num(TEXT("radiance"), 40.f);
+		WRSun::GainRadiance(Who, Radiance);
+		const FVector Chest = Who->GetActorLocation() + FVector(0.f, 0.f, Who->GetSimpleCollisionHalfHeight() * 0.4f);
+		WRFx::Broadcast(Who, TEXT("blood.cast"), Chest, Who->GetActorRotation(), 1.f, TEXT("blood.cast"));
+		WRFx::Broadcast(Who, TEXT("sun.flare"), Chest, FRotator::ZeroRotator, 0.4f, TEXT("sun.cast"));
+		UE_LOG(LogWildreach, Log, TEXT("SUN %s sacrifices %.0f HP to the sun: +%.0f Radiance (%.0f now)"), *Who->GetName(), WRSunSacrificeImpl::Num(TEXT("health"), 20.f), Radiance, WRSun::RadianceOf(Who));
+	}
+	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+}
 
 void UWRGA_SunSpell::TakeAim(AWRCharacterBase* Caster)
 {

@@ -9,6 +9,7 @@
 #include "WRBuilding.h"
 #include "WRCharacter.h"
 #include "WRCombatTypes.h"
+#include "WRCombos.h"
 #include "WRInventory.h"
 #include "WRGear.h"
 #include "WRCrafting.h"
@@ -755,6 +756,11 @@ TArray<FWRCastable> FWRPlayerUI::GetCastables() const
 			const TSharedPtr<FJsonObject> SoulRow = WRDeeds::SoulRow(FName(*NodeStr));
 			const TSharedPtr<FJsonObject>* Art = nullptr;
 			if (SoulRow.IsValid() && SoulRow->TryGetObjectField(TEXT("art"), Art)) (*Art)->TryGetStringField(TEXT("name"), SoulName);
+		}
+		else if (PathStr == TEXT("combo"))
+		{
+			// A combo that is an action (Sacrifice to the sun): its name from Data/combos.json.
+			if (const FWRComboLevel* Combo = FWRComboRegistry::Get().Level(FName(*NodeStr))) SoulName = Combo->Name;
 		}
 		C.Name = FText::FromString(Node ? Node->Name : !SoulName.IsEmpty() ? SoulName : NodeStr);
 		C.InputIndex = i;

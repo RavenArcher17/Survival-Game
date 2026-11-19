@@ -23,6 +23,7 @@
 #include "WRStatusComponent.h"
 #include "WRTuning.h"
 #include "WRWeapons.h"
+#include "WRWindPath.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -251,6 +252,23 @@ void UWRGA_RaiseDead::CastNecro(AWRCharacterBase* Caster)
 	TArray<AWRCreature*> Bodies = WRNecro::BodiesNear(Caster->GetWorld(), At, Spell(TEXT("raiseRange"), 1000.f), Caster);
 	if (Bodies.Num() == 0)
 	{
+		// Desert graves (Sun + Necromancy 25, cooks/biome-desert.md combos): on sand no body is needed: the last thing
+		// killed near the aim rises out of the sand as a sand-shell copy of itself at half strength.
+		if (Caster->HasTag(WRSun::Combo_DesertGraves) && WRSun::SandAt(At))
+		{
+			const FName Kind = WRNecro::LastKilledNear(Caster->GetWorld(), At, WRTune(TEXT("necromancy.soulReach"), 3000.f), WRTune(TEXT("necromancy.desertGravesWindow"), 600.f));
+			const FWRCreatureDef* Def = Kind.IsNone() ? nullptr : FWRCreatureRegistry::Get().Find(Kind);
+			const FRotator Face(0.f, (Caster->GetActorLocation() - At).Rotation().Yaw, 0.f);
+			if (Def && WRNecro::RaiseKind(Caster, Kind, At + FVector(0.f, 0.f, Def->HalfHeight + 30.f), Face, Spell(TEXT("seconds"), 30.f), false,
+				FWRComboRegistry::Get().Num(TEXT("desert_graves"), TEXT("stats"), 0.5f), TEXT("sand")))
+			{
+				WRFx::Broadcast(Caster, TEXT("sun.burrow_pop"), At, Face, FMath::Max(0.8f, Def->Radius / 60.f), TEXT("sun.burrow"));
+				WRFx::Broadcast(Caster, TEXT("necro.raise"), At, Face, FMath::Max(0.6f, Def->Radius / 60.f), TEXT("necro.raise"));
+				return;
+			}
+			Refund(Caster, TEXT("Nothing has died near here for the sand to give back"));
+			return;
+		}
 		Refund(Caster, TEXT("No body there fresh enough to raise"));
 		return;
 	}
@@ -596,30 +614,43 @@ void UWRGA_ScytheSweep::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	const float Windup = FMath::Max(T.Num(W + TEXT(".windup"), 0.4f), T.Num(TEXT("combat.minArtWindup"), 0.2f));
 	const float Active = T.Num(W + TEXT(".active"), 0.3f);
 	const float Recovery = T.Num(W + TEXT(".recovery"), 0.55f);
+	// Reaper's cyclone (Wind + Necromancy 50, cooks/biome-sky.md combos): the sweep becomes a spin, two full turns round
+	// you at x0.8 each, with Whirlwind's hyperarmor through the wind-up and every turn.
+	const bool bCyclone = Caster->HasTag(WRWind::Combo_ReapersCyclone);
+	const int32 Spins = bCyclone ? FMath::Clamp(FMath::RoundToInt(FWRComboRegistry::Get().Num(TEXT("reapers_cyclone"), TEXT("spins"), 2.f)), 1, 6) : 1;
+	const float SpinDamage = bCyclone ? FWRComboRegistry::Get().Num(TEXT("reapers_cyclone"), TEXT("spinDamage"), 0.8f) : 1.f;
+	const float Sweeping = Active * Spins;
 	if (Caster->Controller) Caster->SetActorRotation(FRotator(0.f, Caster->GetControlRotation().Yaw, 0.f));
 	Caster->PlaySwing(EWRSwingKind::WeaponArt, Windup + Active, 1, Windup, Active, Recovery);
 	SetMoveSlow(false, true);
 	// Hyperarmor through the wind-up and the sweep (it can't be staggered out of it).
-	if (IsServer() && Caster->Status && T.Num(W + TEXT(".ha"), 1.f) > 0.f) Caster->Status->ApplyStatus(WRTags::State_Hyperarmor, Windup + Active);
-	if (IsServer()) WRFx::BroadcastOn(Caster, TEXT("necro.weapon"), TEXT("weapon"), 1.2f, TEXT("necro.cast"), Windup + Active);
-	After(Windup, [this]()
+	if (IsServer() && Caster->Status && (bCyclone || T.Num(W + TEXT(".ha"), 1.f) > 0.f)) Caster->Status->ApplyStatus(WRTags::State_Hyperarmor, Windup + Sweeping);
+	if (IsServer()) WRFx::BroadcastOn(Caster, TEXT("necro.weapon"), TEXT("weapon"), 1.2f, TEXT("necro.cast"), Windup + Sweeping);
+	for (int32 Spin = 0; Spin < Spins; ++Spin)
 	{
-		AWRCharacterBase* C = GetCharacter();
-		if (C && IsServer() && C->IsAlive()) Reap(C);
-	});
-	After(Windup + Active + Recovery, [this]() { EndSelf(); });
+		After(Windup + Active * Spin, [this, bCyclone, SpinDamage, Spin, Active]()
+		{
+			AWRCharacterBase* C = GetCharacter();
+			if (!C || !C->IsAlive()) return;
+			if (bCyclone && Spin > 0) C->PlaySwing(EWRSwingKind::WeaponArt, Active, uint8(1 + Spin % 2));   // the next turn (both machines)
+			if (IsServer()) Reap(C, bCyclone ? 360.f : 0.f, SpinDamage, Spin);
+		});
+	}
+	After(Windup + Sweeping + Recovery, [this]() { EndSelf(); });
 }
 
-void UWRGA_ScytheSweep::Reap(AWRCharacterBase* Caster)
+void UWRGA_ScytheSweep::Reap(AWRCharacterBase* Caster, float Arc, float Mult, int32 Spin)
 {
-	// One sweep 300 degrees round you at 3.2 m (the blade's arc), everything in it once.
+	// One sweep 300 degrees round you at 3.2 m (the blade's arc), everything in it once; a cyclone's turn: all the way
+	// round (Arc 360), at Mult.
 	const FWRTuning& T = FWRTuning::Get();
 	const FString W = TEXT("wildbrands.scythe_sweep");
 	const float Reach = T.Num(W + TEXT(".reach"), 320.f);
-	const float Half = T.Num(W + TEXT(".arc"), 300.f) * 0.5f;
+	const float Half = (Arc > 0.f ? Arc : T.Num(W + TEXT(".arc"), 300.f)) * 0.5f;
 	const FVector C = Caster->GetActorLocation();
 	const FVector Fwd = Caster->GetActorForwardVector().GetSafeNormal2D();
-	WRFx::Broadcast(Caster, TEXT("necro.scythe_arc"), C, Caster->GetActorRotation(), Reach / 100.f, TEXT("swing.heavy"));
+	WRFx::Broadcast(Caster, TEXT("necro.scythe_arc"), C, Caster->GetActorRotation() + FRotator(0.f, 180.f * Spin, 0.f), Reach / 100.f, TEXT("swing.heavy"));
+	if (Arc >= 360.f) WRFx::Broadcast(Caster, TEXT("wind.whirl"), C - FVector(0.f, 0.f, Caster->GetSimpleCollisionHalfHeight()), FRotator(0.f, Caster->GetActorRotation().Yaw + Spin * 90.f, 0.f), Reach / 100.f, Spin == 0 ? FName(TEXT("wind.whirl")) : NAME_None);
 	const FWRWeaponClass& Class = FWRWeapons::Get().ClassFor(Caster);
 	const FWRMove* Light = Class.Move(TEXT("light1"));
 	const float ClassScale = Caster->Weapon.FlatDamage > 0.f ? 1.f : FWRWeapons::ClassBase(Class, false) / FMath::Max(1.f, T.Num(TEXT("weapon.copperSwordLight"), 12.f));
@@ -633,7 +664,7 @@ void UWRGA_ScytheSweep::Reap(AWRCharacterBase* Caster)
 		if (Ang > Half) continue;
 		FWRHit Hit;
 		Hit.Instigator = Caster;
-		Hit.Damage = UWRCombatLibrary::WeaponDamage(Caster->Weapon, false) * ClassScale * T.Num(W + TEXT(".dmg"), 1.5f);
+		Hit.Damage = UWRCombatLibrary::WeaponDamage(Caster->Weapon, false) * ClassScale * T.Num(W + TEXT(".dmg"), 1.5f) * Mult;
 		Hit.PoiseDamage = (Light ? Light->Poise : 30.f) * 1.5f;
 		Hit.StanceDamage = (Light ? Light->Stance : 5.f) * T.Num(W + TEXT(".stance"), 2.f);
 		Hit.StaminaDamage = Light ? Light->GuardStamina : 30.f;

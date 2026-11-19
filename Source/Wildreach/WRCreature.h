@@ -391,6 +391,11 @@ public:
 	virtual void OnDamageTaken(const struct FWRHit& Hit, float Damage) override;
 	/** Its art's body (null on a dedicated server's placeholder): the Storm peaks looks attach their parts to its bones. */
 	class USkeletalMeshComponent* GetCreatureSkel() const;
+	/** This machine: a body drawn wholly by code parts on the rig's own bones (the Risen: look.hideMesh). The rig's mesh
+	 *  is hidden, but it still counts as its art: its bones keep posing every frame (a hidden mesh is never rendered, so
+	 *  they'd otherwise never update) and its clips, bone lookups and swings work as on a shown one. */
+	void SetRigUnseen(bool bUnseen);
+	bool IsRigUnseen() const { return bRigUnseen; }
 
 	UPROPERTY(EditAnywhere, ReplicatedUsing=OnRep_CreatureId, Category="Creature") FName CreatureId = TEXT("cinderfang");
 	/** A fold's rank scaling (WRPortals), set before it begins play: health, bite and stance times. */
@@ -591,6 +596,9 @@ private:
 	float NightGlowNow = -1.f;
 	float LastYaw = 0.f;      // for its turn rate (feet step while it turns on the spot)
 	float EarshotClock = 0.f;
+	bool bRigUnseen = false;  // SetRigUnseen
+	/** Its art is in use on this machine: the rig shown, or hidden under a body of code parts (SetRigUnseen). */
+	bool ArtOn() const;
 	class UWRAnimInstance* CreatureAnim() const;
 	/** Stance break, the look (COMBAT-AND-LESSONS 1.4): its recoil held, the head dropped and the body sunk a little
 	 *  (tuning stance.slump), and the gold weak-point mark on its head where the crit goes. */

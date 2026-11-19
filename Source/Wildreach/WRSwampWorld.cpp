@@ -613,6 +613,9 @@ AWRSwampCaveTide::AWRSwampCaveTide(const FObjectInitializer& ObjectInitializer)
 	Shape->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	Shape->SetGenerateOverlapEvents(true);
 	Shape->SetCanEverAffectNavigation(false);
+	// Setup moves it down onto the cave's floor after it's spawned: a static brush refuses the move (the tide stood at the
+	// chamber's mid-height instead of rising from the floor).
+	Shape->SetMobility(EComponentMobility::Movable);
 }
 
 float AWRSwampCaveTide::Fullness(const UObject* WorldContext)

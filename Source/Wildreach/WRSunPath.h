@@ -29,13 +29,13 @@ namespace WRSun
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_Supernova);       // Fire + Sun 50: full Heat and Radiance release a blinding explosion
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_Thunderflash);    // Lightning + Sun 25: shocks also blind
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SolarStorm);      // Lightning + Sun 50: lightning strikes inside your sandstorms
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_DesertBloom);     // Sun + Nature 25: your plants survive in sand and storms
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_DesertBloom);     // Sun + Nature 25: your plants survive in sand and storms (WRPlantSummon, WRNature::ClassifyGround)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SunGarden);       // Sun + Nature 50: healing zones also blind enemies
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_FrozenSand);      // Sun + Frost 25: quicksand freezes enemies stuck in it
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SunAndSnow);      // Sun + Frost 50: shattering a blinded enemy flashes
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_DryBlood);        // Sun + Blood 25: bleeds deal more in sunlight
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SunSacrifice);    // Sun + Blood 50: spend HP to fill Radiance (an action)
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_DesertGraves);    // Sun + Necromancy 25: raise from the sand anywhere
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_SunSacrifice);    // Sun + Blood 50: spend HP to fill Radiance (a quick-slot action: UWRGA_SunSacrifice)
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_DesertGraves);    // Sun + Necromancy 25: raise from the sand anywhere (UWRGA_RaiseDead)
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Combo_ScarabSwarm);     // Sun + Necromancy 50: Corpse explosion releases scarabs
 
 	// ---------------------------------------------------------------- the path
@@ -56,6 +56,10 @@ namespace WRSun
 	WILDREACH_API bool NearSunLight(const AActor* Who);
 	/** Is there sand under Who to Burrow through (any land's sand: the desert's soft sand and beaches, the coast's)? */
 	WILDREACH_API bool SandUnder(const AActor* Who);
+	/** Sand at a point on the ground (SandUnder's test for a place: an aimed spot, a plant's root). */
+	WILDREACH_API bool SandAt(const FVector& Ground);
+	/** A sandstorm over the point: the Desert's belt, or a sandstorm blowing over the open Desert. */
+	WILDREACH_API bool SandstormAt(const UObject* WorldContext, const FVector& At);
 
 	// ---------------------------------------------------------------- Radiance
 	WILDREACH_API float RadianceOf(const AActor* Who);

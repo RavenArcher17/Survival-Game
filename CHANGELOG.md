@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Phase 2, part 4: four silent combos, creature looks, the Floeback, moving water, Storm creatures under the rock (Raven, 11-18)
+
+- **Combos that did nothing now work:** Desert bloom (a Nature path's plants on sand or in a sandstorm wither sooner,
+  new `nature.plants.sandLifetime`; the combo exempts them, and sand counts as Normal ground); **Sacrifice to the sun**
+  is a quick-slot action (`UWRGA_SunSacrifice`: 20 HP for 40 Radiance, on a cooldown; combos.json kind "action", slot
+  `combo.<id>`); Desert graves (Raise dead on sand with no body raises a half-strength copy of the last thing killed
+  nearby); Reaper's cyclone (the Scythe sweep spins twice at x0.8 with hyperarmor). Soul wind's range was unread too.
+- **Creature textures:** 16 rows pointed at textures renamed in the 0.6 rebuilds; repointed (0 "Failed to find object").
+- **Rime-Witch and Hrímgerðr are pale:** their overlay drew but too weakly over Ignessa's fire texture (data).
+- **The risen dead show as animated skeletons:** their body was hidden before its bones were looked up, and a hidden
+  mesh's bones never update (`AWRCreature::SetRigUnseen`; the grave look waits for a posed skeleton).
+- **The Floeback spawns:** the 40-cell minimum habitat dropped every tundra shore strip (longest 11 cells); shore kinds
+  keep strips of 4+ (`WRWildlife.cpp`). A fresh world spawned 9 packs.
+- **Moving water:** the Sky lagoons' swim volumes and the Swamp's cave tide are Movable, so they follow their island
+  and rise (10 warnings to 0).
+- **Storm peaks' creatures under the rock:** 330 of 332 rescues were Galvara's three cores orbiting 8 m under her while
+  she idles low; they stay above ground now, and cave creatures aren't lifted onto the cliff: same 13-spot run,
+  **332 rescues to 0**. Left: a Gullet cave creature can still stick where the Storm landscape cuts through that cave's
+  chamber (a terrain or cave placement fix, with the world rebuild).
+
+Built, unit tests 32 of 32; checked in portrait and picture runs; Desert graves, Reaper's cyclone and Desert bloom
+**not played yet**.
+
 ### Phase 2, part 3: the server back to 30 frames a second, and the 29 gear stats that did nothing (Raven, 11-18)
 
 **Server speed.** The 11-18 benchmark found the server doing 104 ms of work a frame (it was 3-4 ms at 0.7), so it ran at

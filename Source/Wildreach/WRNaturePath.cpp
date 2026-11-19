@@ -16,6 +16,7 @@
 #include "WRSound.h"
 #include "WRStatusComponent.h"
 #include "WRSurvival.h"
+#include "WRSunPath.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
 #include "AbilitySystemComponent.h"
@@ -418,7 +419,8 @@ WRNature::EGround WRNature::ClassifyGround(const AActor* Who, const FVector& Fee
 	{
 		return EGround::Lush;
 	}
-	if (Surface == TEXT("sand") || (Surface == TEXT("snow") && !bEvergreen))
+	// Desert bloom (Sun + Nature 25): sand counts as Normal ground, as Evergreen's snow does.
+	if ((Surface == TEXT("sand") && !C->HasTag(WRSun::Combo_DesertBloom)) || (Surface == TEXT("snow") && !bEvergreen))
 	{
 		return EGround::Barren;
 	}

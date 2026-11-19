@@ -12,6 +12,8 @@ struct FWRComboLevel
 	FName Id;
 	FString Name;
 	FString Text;
+	/** "passive" (its tags do it), or "action": a quick-slot ability of its own ("combo.<id>" in a slot; ClassForNode "combo"). */
+	FString Kind;
 	int32 At = 25;
 	TArray<FGameplayTag> Grants;
 	/** "path.node" the owner must have learned too (empty: none). */
@@ -47,10 +49,14 @@ public:
 
 	/** The tags a survivor's main path and subclass have earned (points in both, learned requirements). */
 	TArray<FGameplayTag> TagsFor(const UWRPathComponent& Paths) const;
+	/** The levels they have earned that are actions (kind "action"): each takes a quick slot as "combo.<id>". */
+	TArray<FName> ActionsFor(const UWRPathComponent& Paths) const;
 
 	const TArray<FWRComboPair>& All() const { return Pairs; }
 
 private:
 	FWRComboRegistry();
+	/** The levels the main path and subclass have earned (points in both, learned requirements). */
+	TArray<const FWRComboLevel*> EarnedBy(const UWRPathComponent& Paths) const;
 	TArray<FWRComboPair> Pairs;
 };

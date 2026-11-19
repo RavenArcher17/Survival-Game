@@ -273,7 +273,7 @@ int32 AWRCreature::NumLockPoints() const
 
 FName AWRCreature::FindBone(FName Hint) const
 {
-	const USkinnedAsset* Asset = Skel && Skel->IsVisible() ? Skel->GetSkinnedAsset() : nullptr;
+	const USkinnedAsset* Asset = ArtOn() ? Skel->GetSkinnedAsset() : nullptr;
 	if (!Asset || Hint.IsNone())
 	{
 		return NAME_None;

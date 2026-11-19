@@ -195,8 +195,18 @@ bool WRSun::NearSunLight(const AActor* Who)
 
 bool WRSun::SandUnder(const AActor* Who)
 {
-	if (!Who) return false;
-	const FVector Feet = Who->GetActorLocation() - FVector(0.f, 0.f, 90.f);
+	return Who && SandAt(Who->GetActorLocation() - FVector(0.f, 0.f, 90.f));
+}
+
+bool WRSun::SandstormAt(const UObject* WorldContext, const FVector& At)
+{
+	if (WRDesert::InBelt(At)) return true;
+	const FWRWeatherKind* K = WRDesert::Contains(At) ? UWRWeatherSubsystem::ActiveKind(WorldContext, WRDesert::Biome()) : nullptr;
+	return K && K->Id == TEXT("sandstorm");
+}
+
+bool WRSun::SandAt(const FVector& Feet)
+{
 	const FWRLandDef* L = WRLand::At(Feet);
 	if (!L || !L->bHeightfield || L->HfSurface.Num() != L->HfHeights.Num()) return false;
 	const FVector2D M = L->ToMap(Feet);

@@ -132,5 +132,6 @@ public:
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 private:
-	void Reap(AWRCharacterBase* Caster);
+	/** Server: one sweep (Arc 0: the tuning's 300 degrees) or a cyclone's turn (Reaper's cyclone: 360, x Mult). */
+	void Reap(AWRCharacterBase* Caster, float Arc = 0.f, float Mult = 1.f, int32 Spin = 0);
 };

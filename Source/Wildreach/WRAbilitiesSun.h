@@ -42,6 +42,20 @@ protected:
 	TWeakObjectPtr<AWRCharacterBase> AimLock;
 };
 
+/** Sacrifice to the sun (Sun + Blood 50, a combo that is an action: cooks/biome-desert.md combos): a quick-slot action,
+ *  20 HP into Spilled for +40 Radiance at once, cd 20 (Data/combos.json sacrifice_to_the_sun numbers). Its slot is
+ *  "combo.sacrifice_to_the_sun" while the pair earns it (UWRPathComponent::RefreshQuickSlots). */
+UCLASS() class WILDREACH_API UWRGA_SunSacrifice : public UWRGameplayAbility
+{
+	GENERATED_BODY()
+public:
+	UWRGA_SunSacrifice();
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+	virtual void ApplyCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo) const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+};
+
 /** Sunbeam (trunk starter): a bolt of light 16, blind 30, 3,400 cm/s, 8 Radiance, cd 1.0; homes only on creatures. */
 UCLASS() class WILDREACH_API UWRGA_Sunbeam : public UWRGA_SunSpell
 {

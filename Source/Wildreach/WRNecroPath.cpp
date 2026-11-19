@@ -25,6 +25,7 @@
 #include "WRTuning.h"
 #include "WRPlayerState.h"
 #include "WRWorldSystems.h"
+#include "WRWindPath.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -97,6 +98,10 @@ namespace WRNecroImpl
 		FName FreeVariant;
 	};
 	TMap<TWeakObjectPtr<AWRCreature>, FNcBody>& NcBodies() { static TMap<TWeakObjectPtr<AWRCreature>, FNcBody> M; return M; }
+
+	/** The last deaths a raise could take (Desert graves raises a copy of the last thing killed near its aim): oldest first. */
+	struct FNcDeath { FName Kind; FVector At = FVector::ZeroVector; double When = 0.0; TWeakObjectPtr<const UWorld> World; };
+	TArray<FNcDeath>& NcDeaths() { static TArray<FNcDeath> A; return A; }
 
 	/** Who had a hand in a body's death (a Necromancer, or their minion for them): when they last hit it. */
 	TMap<TWeakObjectPtr<AActor>, TMap<TWeakObjectPtr<AWRCharacterBase>, double>>& NcCredit()
@@ -376,6 +381,29 @@ AWRCreature* WRNecro::Raise(AWRCharacterBase* Owner, AWRCreature* Body, float Se
 	if (!Owner || !Owner->HasAuthority() || !Body || !Owner->GetPlayerState()) return nullptr;
 	const FWRCreatureDef* Def = Body->GetDef();
 	if (!Def) return nullptr;
+	const FVector At = Body->GetActorLocation() + FVector(0.f, 0.f, 40.f);
+	const FRotator Face(0.f, Body->GetActorRotation().Yaw, 0.f);
+	if (FNcBody* B = NcBodies().Find(Body)) B->bUsed = true;
+	// Grave-light threads pull the body upright; the eyes light; a dry crack of joints.
+	WRFx::Broadcast(Owner, TEXT("necro.raise"), At - FVector(0.f, 0.f, Body->GetSimpleCollisionHalfHeight()), Face, FMath::Max(0.6f, Body->GetSimpleCollisionRadius() / 60.f), TEXT("necro.raise"));
+	Body->Destroy();
+	return RaiseKind(Owner, Def->Id, At, Face, Seconds, bIgnoreCap, StatScale, Variant);
+}
+
+FName WRNecro::LastKilledNear(const UWorld* World, const FVector& At, float Radius, float Window)
+{
+	const double Now = NcNow(World);
+	for (int32 i = NcDeaths().Num() - 1; i >= 0; --i)
+	{
+		const FNcDeath& D = NcDeaths()[i];
+		if (D.World.Get() == World && Now - D.When <= Window && FVector::DistSquared2D(D.At, At) <= FMath::Square(Radius)) return D.Kind;
+	}
+	return NAME_None;
+}
+
+AWRCreature* WRNecro::RaiseKind(AWRCharacterBase* Owner, FName Kind, const FVector& At, const FRotator& Face, float Seconds, bool bIgnoreCap, float StatScale, FName Variant)
+{
+	if (!Owner || !Owner->HasAuthority() || !Owner->GetPlayerState() || !FWRCreatureRegistry::Get().Find(Kind)) return nullptr;
 	// Bound dead (Arcane + Necromancy 25, Data/combos.json): raised minions last twice as long.
 	if (Owner->HasTag(WRArcane::Combo_BoundDead)) Seconds *= FWRComboRegistry::Get().Num(TEXT("bound_dead"), TEXT("duration"), 2.f);
 	// The Ossuary crown talisman: your raised dead last longer (raiseDuration 0.2: +20%).
@@ -391,13 +419,7 @@ AWRCreature* WRNecro::Raise(AWRCharacterBase* Owner, AWRCreature* Body, float Se
 		Capped.Sort([](const TPair<double, AWRCreature*>& A, const TPair<double, AWRCreature*>& B) { return A.Key < B.Key; });
 		for (int32 i = 0; i <= Capped.Num() - MinionCap(Owner); ++i) Crumble(Capped[i].Value, false);
 	}
-	const FVector At = Body->GetActorLocation() + FVector(0.f, 0.f, 40.f);
-	const FRotator Face(0.f, Body->GetActorRotation().Yaw, 0.f);
-	const FName Id = Def->Id;
-	if (FNcBody* B = NcBodies().Find(Body)) B->bUsed = true;
-	// Grave-light threads pull the body upright; the eyes light; a dry crack of joints.
-	WRFx::Broadcast(Owner, TEXT("necro.raise"), At - FVector(0.f, 0.f, Body->GetSimpleCollisionHalfHeight()), Face, FMath::Max(0.6f, Body->GetSimpleCollisionRadius() / 60.f), TEXT("necro.raise"));
-	Body->Destroy();
+	const FName Id = Kind;
 	AWRCreature* M = AWRCreature::SpawnCreature(Owner->GetWorld(), Id, At, Face);
 	if (!M) return nullptr;
 	// Its master's: it follows them and fights what they fight (the tame orders work), but it is never a tame (no
@@ -621,7 +643,8 @@ void WRNecro::OnKill(AWRCharacterBase* Target, const FWRHit& Hit)
 	{
 		AWRCharacter* N = *It;
 		if (!N->IsAlive() || !Walks(N) || N == Target) continue;
-		if (FVector::Dist(N->GetActorLocation(), Target->GetActorLocation()) > NcT(TEXT("soulReach"), 3000.f)) continue;
+		// Soul wind (Wind + Necromancy 25): Souls come to you from x2.5 as far.
+		if (FVector::Dist(N->GetActorLocation(), Target->GetActorLocation()) > NcT(TEXT("soulReach"), 3000.f) * WRWind::SoulPickupScale(N)) continue;
 		const double* When = Hands ? Hands->Find(N) : nullptr;
 		const bool bHand = N == Killer || (When && T - *When <= NcT(TEXT("creditSeconds"), 10.f));
 		if (!bHand) continue;
@@ -688,8 +711,16 @@ void WRNecro::CreatureDied(AWRCreature* Creature, AActor* Killer)
 		return;
 	}
 	FNcBody& B = NcBodies().FindOrAdd(Creature);
-	if (B.DiedAt <= 0.0) B.DiedAt = NcNow(Creature);
+	const bool bFirst = B.DiedAt <= 0.0;
+	if (bFirst) B.DiedAt = NcNow(Creature);
 	B.HitsAtDeath = uint8(Creature->GetBodyHitsLeft());
+	// What Desert graves can raise a copy of: a creature a raise could take (not a boss, a dummy or a Risen).
+	if (const FWRCreatureDef* Def = Creature->GetDef(); bFirst && Def && Def->Archetype != TEXT("boss") && Def->Archetype != TEXT("dummy") && !UWRGraveBody::IsRisen(Def->Id))
+	{
+		TArray<FNcDeath>& Deaths = NcDeaths();
+		if (Deaths.Num() >= 64) Deaths.RemoveAt(0);
+		Deaths.Add({ Def->Id, Creature->GetActorLocation(), NcNow(Creature), Creature->GetWorld() });
+	}
 	// Ash wraith: a body that died burning rises burning (the raise reads it).
 	// Free raises waiting on it (Frozen legion, Death curse): it stands up a moment after it falls.
 	if (AWRCharacterBase* For = B.FreeFor.Get(); For && B.HitsAtDeath > 0)

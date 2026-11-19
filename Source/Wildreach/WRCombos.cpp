@@ -48,6 +48,7 @@ void FWRComboRegistry::Reload()
 			Level.Id = FName(*(*LevelObj)->GetStringField(TEXT("id")));
 			(*LevelObj)->TryGetStringField(TEXT("name"), Level.Name);
 			(*LevelObj)->TryGetStringField(TEXT("text"), Level.Text);
+			(*LevelObj)->TryGetStringField(TEXT("kind"), Level.Kind);
 			int32 At = Level.At;
 			if ((*LevelObj)->TryGetNumberField(TEXT("at"), At)) Level.At = At;
 			const TArray<TSharedPtr<FJsonValue>>* Grants = nullptr;
@@ -105,9 +106,9 @@ float FWRComboRegistry::Num(FName ComboId, FName Key, float Fallback) const
 	return V ? *V : Fallback;
 }
 
-TArray<FGameplayTag> FWRComboRegistry::TagsFor(const UWRPathComponent& Paths) const
+TArray<const FWRComboLevel*> FWRComboRegistry::EarnedBy(const UWRPathComponent& Paths) const
 {
-	TArray<FGameplayTag> Out;
+	TArray<const FWRComboLevel*> Out;
 	const FName Main = Paths.GetMainPath(), Sub = Paths.GetSubPath();
 	const FWRComboPair* Pair = Main.IsNone() || Sub.IsNone() ? nullptr : Find(Main, Sub);
 	if (!Pair)
@@ -130,7 +131,27 @@ TArray<FGameplayTag> FWRComboRegistry::TagsFor(const UWRPathComponent& Paths) co
 				continue;
 			}
 		}
-		Out.Append(L.Grants);
+		Out.Add(&L);
+	}
+	return Out;
+}
+
+TArray<FGameplayTag> FWRComboRegistry::TagsFor(const UWRPathComponent& Paths) const
+{
+	TArray<FGameplayTag> Out;
+	for (const FWRComboLevel* L : EarnedBy(Paths))
+	{
+		Out.Append(L->Grants);
+	}
+	return Out;
+}
+
+TArray<FName> FWRComboRegistry::ActionsFor(const UWRPathComponent& Paths) const
+{
+	TArray<FName> Out;
+	for (const FWRComboLevel* L : EarnedBy(Paths))
+	{
+		if (L->Kind == TEXT("action")) Out.Add(L->Id);
 	}
 	return Out;
 }
