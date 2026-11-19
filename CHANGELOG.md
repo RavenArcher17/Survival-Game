@@ -21,6 +21,9 @@ build scripts will use) and `Docs/design/round_island_map.svg`.
   champion to a crossroads it shares with its neighbours; four main roads cross the meadow to the city's four gates,
   each with its fort at the meadow's edge; its major boss deep inland, clear of roads, borders and the other bosses;
   coast, midlands and inland bands of equal depth.
+- **Bigger caverns (Raven 11-19):** the Crystal caves are 8 km² (under the Forest and Tundra, out into the midlands) and
+  the Fungal caverns 12 km² (under the Graveyard and Wasteland, reaching under the Ocean shore's and the Volcanic's
+  edges), twice what they were, with uneven outlines kept 400 m in from the coast.
 - **Hearthmoot:** walls 600 m across in the middle of the meadow (the guarded Commons, about 2.9 km across); a 0.44 km²
   lake on the Ocean side, its stream running 4 km out to the reef bay; 12 quarters in the ring's order.
 - **Layers:** the sky islands over Storm, Desert and Forest; the Crystal caves under Forest and Tundra (the Severance

@@ -79,8 +79,11 @@ are equal depths between the meadow's edge and the coast.
 | Layer | Where | Size | Ways in |
 |---|---|---|---|
 | Sky islands | Over Storm, Desert and Forest (303–43°), 1.9 to 3.9 km from the centre, 500 to 1,300 m up; a few over other lands | 4 km² of islands in ~10 km² of air | Updrafts, gliding, flying mounts |
-| Crystal caves | Under Forest and Tundra (23–108°), 1.75 to 2.9 km from the centre | ~4 km² | The Severance (a rift-cut gorge on the Forest–Tundra border), crystal rifts |
-| Fungal caverns | Under Graveyard and Wasteland (172–239°), 1.75 to 3.7 km from the centre | ~6 km² | Cave mouths, sinkholes; the Flue rises from its floor to the surface, a sky island anchored over it |
+| Crystal caves | Under Forest and Tundra (23–108°), 1.75 to about 3.6 km from the centre (inland band into the midlands) | 8 km² | The Severance (a rift-cut gorge on the Forest–Tundra border), crystal rifts |
+| Fungal caverns | Under Graveyard and Wasteland, reaching under the edges of the Ocean shore and the Volcanic (168–247°), 1.75 to about 4.4 km from the centre | 12 km² | Cave mouths, sinkholes; the Flue rises from its floor to the surface, a sky island anchored over it |
+
+- **Bigger caverns (Raven 11-19):** both are twice the size they were (Aaron's 2 and 3 km², x4), with uneven outlines and
+  rounded ends instead of straight-edged slices, kept at least 400 m in from the coast.
 
 - **Starts inside the layers (Raven Q18):** Wind on a low starter sky island over the north coast (ropes, ledges and
   updrafts down); Spore in a shallow cavern under the south-west coast; Arcane in a shallow crystal hall under the

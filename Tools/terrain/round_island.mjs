@@ -241,9 +241,30 @@ const sky = sector(byId.storm_peaks.mid, byId.forest.mid, MEADOW + 450, 5 * SCAL
 sky.islandsKm2 = 2.0 * SCALE_AREA;
 sky.height = [500, 1300];
 sky.note = "thickest over Storm peaks, the Desert and the Forest; a few more over other lands";
-const crystal = sector(byId.forest.from + 6, byId.tundra.to - 4, MEADOW + 300, 2 * SCALE_AREA);
+// The caverns (Raven 11-19: "make the cavern layers larger"): twice what they were (Aaron's 2 and 3 km² x4), each an
+// uneven footprint with rounded ends rather than a straight-edged slice, kept 400 m in from the coast.
+const CRYSTAL_KM2 = 8, FUNGAL_KM2 = 12;
+const polyArea = (o) => Math.abs(o.reduce((s, p, j) => { const q = o[(j + 1) % o.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+const cavern = (from, to, r1, km2, seed) => {
+	if (to < from) to += 360;
+	const shape = (r2) => {
+		const outerR = (d) => Math.min(r2 * (1 + 0.08 * ring(d, 2.2, seed)), coastR(norm(d)) - 400);
+		const innerR = (d) => r1 * (1 + 0.08 * ring(d, 2.2, seed + 1));
+		const o = [];
+		for (let d = from; d <= to + 1e-6; d += 1) o.push(pt(d, outerR(d)));
+		for (let t = 0.1; t < 0.95; t += 0.1) { const r = outerR(to) + (innerR(to) - outerR(to)) * t; o.push(pt(to + 6 * Math.sin(Math.PI * t) * 2000 / r, r)); }
+		for (let d = to; d >= from - 1e-6; d -= 2) o.push(pt(d, innerR(d)));
+		for (let t = 0.1; t < 0.95; t += 0.1) { const r = innerR(from) + (outerR(from) - innerR(from)) * t; o.push(pt(from - 6 * Math.sin(Math.PI * t) * 2000 / r, r)); }
+		return o;
+	};
+	let lo = r1 + 100, hi = 7000;
+	for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (polyArea(shape(m)) < km2 * 1e6) lo = m; else hi = m; }
+	const outline = shape(lo);
+	return { from: +norm(from).toFixed(1), to: +norm(to).toFixed(1), r1: Math.round(r1), r2: Math.round(lo), areaKm2: +(polyArea(outline) / 1e6).toFixed(2), outline: outline.map(rnd) };
+};
+const crystal = cavern(byId.forest.from + 6, byId.tundra.to - 4, MEADOW + 300, CRYSTAL_KM2, 41);
 crystal.note = "under the Forest and the Tundra; deeper halls hold harder creatures and better ore";
-const fungal = sector(byId.graveyard.from + 2, byId.wasteland.to - 6, MEADOW + 300, 3 * SCALE_AREA);
+const fungal = cavern(byId.graveyard.from - 2, byId.wasteland.to + 2, MEADOW + 300, FUNGAL_KM2, 43);
 fungal.note = "under the Graveyard and the Wasteland, across the island from the sky (Wind and Spore are opposites)";
 // The Severance (the old Void–Arcane pass) becomes the way down into the Crystal caves on the Forest–Tundra border; the
 // Flue (the 740 m shaft) rises from the Fungal floor to the south-west surface, with one sky island anchored over it.
@@ -339,8 +360,8 @@ for (const f of [1 / 3, 2 / 3]) shapes.push(`<path d='${pathOf(ringPts((d) => de
 shapes.push(`<g data-claude-anchor='meadow'><path d='${pathOf(ringPts(meadowR, 0, 360, 2))}' fill='#a8d080' stroke='#4f7a2a' strokeWidth='1.2'/><path d='${pathOf(lakeOutline)}' fill='#5aa9c9' stroke='#2f6f8f'/></g>`);
 shapes.push(`<path d='${pathOf(stream, false)}' fill='none' stroke='#3f8fbf' strokeWidth='2'/>`);
 shapes.push(`<g data-claude-anchor='layer-sky'><path d='${sectorPath(sky)}' fill='none' stroke='#ffffff' strokeWidth='2.2' strokeDasharray='7 4'/></g>`);
-shapes.push(`<g data-claude-anchor='layer-crystal'><path d='${sectorPath(crystal)}' fill='#b06fe0' fillOpacity='0.18' stroke='#7a3fb0' strokeWidth='2' strokeDasharray='2 3'/></g>`);
-shapes.push(`<g data-claude-anchor='layer-fungal'><path d='${sectorPath(fungal)}' fill='#3fb08a' fillOpacity='0.18' stroke='#1f7a5a' strokeWidth='2' strokeDasharray='2 3'/></g>`);
+shapes.push(`<g data-claude-anchor='layer-crystal'><path d='${pathOf(crystal.outline)}' fill='#b06fe0' fillOpacity='0.18' stroke='#7a3fb0' strokeWidth='2' strokeDasharray='2 3'/></g>`);
+shapes.push(`<g data-claude-anchor='layer-fungal'><path d='${pathOf(fungal.outline)}' fill='#3fb08a' fillOpacity='0.18' stroke='#1f7a5a' strokeWidth='2' strokeDasharray='2 3'/></g>`);
 for (const s of lands) shapes.push(`<path d='${pathOf(s.road, false)}' fill='none' stroke='#3a2a10' strokeWidth='1.5'/>`);
 for (const t of trunks) shapes.push(`<path d='${pathOf(t.points, false)}' fill='none' stroke='#3a2a10' strokeWidth='3'/>`);
 shapes.push(`<g data-claude-anchor='hearthmoot'><circle cx='${P([0, 0])[0]}' cy='${P([0, 0])[1]}' r='${(CITY_WALL * sc).toFixed(1)}' fill='#c9b27a' stroke='#5a4a20' strokeWidth='2'/></g>`);
@@ -410,3 +431,4 @@ console.log("land | path | Aaron km² | now km² (outline) | coast | coast km | 
 for (const s of lands) console.log(`${s.name} | ${s.path} | ${s.aaron} | ${(s.area / 1e6).toFixed(2)} (${(s.polyArea / 1e6).toFixed(2)}) | ${norm(s.coastFrom).toFixed(0)}-${norm(s.coastTo).toFixed(0)} | ${(s.coastLen / 1000).toFixed(1)} | ${s.bandArea.slice().reverse().map((a) => (a / 1e6).toFixed(1)).join(" / ")} | ${(s.roadLen / 1000).toFixed(1)} (${Math.round(s.roadOwn * 100)}%) | ${Math.round(s.bossFromRoad)} m (border ${Math.round(s.bossFromBorder)} m)`);
 for (const t of trunks) console.log(`main road ${t.lands.join("+")}: bearing ${t.bearing.toFixed(0)}, crossroads ${Math.round(Math.hypot(...t.crossroads))} m out, fort ${Math.round(Math.hypot(...t.fort))} m`);
 for (const k of ["sky", "crystal", "fungal"]) { const L = layers[k]; console.log(`${k}: ${L.from.toFixed(0)}-${L.to.toFixed(0)} deg, ${L.r1}-${L.r2} m from the centre, ${L.areaKm2} km²`); }
+console.log(`checks: the Severance over the Crystal caves ${inPoly(layers.severance.at, crystal.outline)}; the Flue over the Fungal caverns ${inPoly(layers.flue.at, fungal.outline)}; caverns 400 m in from the coast ${[...crystal.outline, ...fungal.outline].every((p) => Math.hypot(...p) <= coastR(bearingOf(...p)) - 390)}`);
