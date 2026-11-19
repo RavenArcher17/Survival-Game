@@ -13,6 +13,7 @@ import path from "path";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
 import * as RI from "./round_island.mjs";
+import * as PLAN from "./hearthmoot_plan.mjs";
 
 const { LANDS, lands, coastR, meadowR, warpDeg, fbm, pt, bearingOf, norm, dAng, gauss, RAD, CITY_WALL, LAKE, lakeOutline, stream, trunks, islets, edgeOf, FIRST_DEG, inPoly } = RI;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -91,7 +92,8 @@ function landH(k, x, y, c) {
 
 // ---- 1. every sample's shape: the lands blended across their borders, the meadow, the coast and the sea floor ------
 const H = new Float32Array(N * N), S = new Uint8Array(N * N), OWN = new Int8Array(N * N);
-const SURF = { bed: 1, bank: 2, sand: 3, shore_rock: 6, road: 7, main_road: 10, plaza: 11, lake_bed: 12 };
+const SURF = { bed: 1, bank: 2, sand: 3, shore_rock: 6, road: 7, main_road: 10, plaza: 11, lake_bed: 12, cobble: 13,
+	wheat: 14, wheat2: 15, barley: 16, barley2: 17, greens: 18, greens2: 19, ploughed: 20, ploughed2: 21, fallow: 22, fallow2: 23 };
 for (let j = 0; j < N; j++) {
 	const y = -HALF + j * STEP;
 	for (let i = 0; i < N; i++) {
@@ -241,7 +243,35 @@ function pad([px, py], radius, blend, level) {
 	}
 	return L;
 }
-for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = -HALF + i * STEP, y = -HALF + j * STEP, r = Math.hypot(x, y), k = j * N + i; if (r < CITY_FLAT + 40) H[k] = lerp(CITY_TOP, H[k], smooth(CITY_FLAT, CITY_FLAT + 40, r)); if (r < CITY_FLAT) S[k] = SURF.plaza; }
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = -HALF + i * STEP, y = -HALF + j * STEP, r = Math.hypot(x, y), k = j * N + i; if (r < CITY_FLAT + 40) H[k] = lerp(CITY_TOP, H[k], smooth(CITY_FLAT, CITY_FLAT + 40, r)); if (r < PLAN.PLAZA_R) S[k] = SURF.plaza; }
+// The city's streets cobbled (Tools/terrain/hearthmoot_plan.mjs); the rest of the hilltop is grass yards (zone Y).
+for (const st of PLAN.streets) {
+	const pts = st.pts;
+	for (let s = 1; s < pts.length; s++) {
+		const [ax, ay] = pts[s - 1], [bx, by] = pts[s], reach = st.half;
+		for (let j = Math.floor((Math.min(ay, by) - reach + HALF) / STEP); j <= Math.ceil((Math.max(ay, by) + reach + HALF) / STEP); j++) for (let i = Math.floor((Math.min(ax, bx) - reach + HALF) / STEP); i <= Math.ceil((Math.max(ax, bx) + reach + HALF) / STEP); i++) {
+			const x = -HALF + i * STEP, y = -HALF + j * STEP, k = j * N + i;
+			if (S[k] !== SURF.plaza && PLAN.segDist([x, y], [ax, ay], [bx, by]).d < reach) S[k] = SURF.cobble;
+		}
+	}
+}
+// The fields: each its crop in rows (two shades, 2.5 m apart, across its width).
+for (const f of PLAN.fields) {
+	const xs = f.poly.map((p) => p[0]), ys = f.poly.map((p) => p[1]);
+	for (let j = Math.floor((Math.min(...ys) + HALF) / STEP); j <= Math.ceil((Math.max(...ys) + HALF) / STEP); j++) for (let i = Math.floor((Math.min(...xs) + HALF) / STEP); i <= Math.ceil((Math.max(...xs) + HALF) / STEP); i++) {
+		const x = -HALF + i * STEP, y = -HALF + j * STEP, k = j * N + i;
+		if (!inPoly([x, y], f.poly)) continue;
+		const row = Math.floor(((x - f.poly[0][0]) * f.v[0] + (y - f.poly[0][1]) * f.v[1]) / 2.5) % 2;
+		S[k] = SURF[f.crop + (row ? "2" : "")];
+	}
+}
+// The lake's beach: a sand strip on the city side, sloping gently into the water.
+for (const p of PLAN.beach) {
+	for (let j = Math.floor((p[1] - 20 + HALF) / STEP); j <= Math.ceil((p[1] + 20 + HALF) / STEP); j++) for (let i = Math.floor((p[0] - 20 + HALF) / STEP); i <= Math.ceil((p[0] + 20 + HALF) / STEP); i++) {
+		const x = -HALF + i * STEP, y = -HALF + j * STEP, k = j * N + i, d = Math.hypot(x - p[0], y - p[1]);
+		if (d < 18 && !inPoly([x, y], lakeOutline)) { S[k] = SURF.sand; H[k] = Math.min(H[k], LAKE_LEVEL + 0.25 + d * 0.06); }
+	}
+}
 const fortLevels = trunks.map((t) => pad(t.fort, 45, 30));
 // Each crossroads sits in a pass: no higher than its fort plus a gentle climb (CROSS_CLIMB of the way), the ground
 // round it lowered into a bowl whose sides rise out at CROSS_SIDE, so the main road and the lands' roads can reach it.
@@ -316,6 +346,7 @@ for (let gj = 0; gj < GW; gj++) {
 	let row = "";
 	for (let gi = 0; gi < GW; gi++) {
 		const x = -HALF + (gi + 0.5) * CELL, y = -HALF + (gj + 0.5) * CELL, r = Math.hypot(x, y), deg = bearingOf(x, y);
+		if (r < CITY_FLAT - 45) { row += "Y"; continue; }   // inside the walls: grass yards (the streets are cobbled surfaces)
 		if (r < CITY_FLAT + 10) { row += "C"; continue; }
 		if (r < meadowAt(deg) + 60 * fbm(x / 140, y / 140, 23, 3)) { row += "M"; continue; }
 		if (r > coastAt(deg) + 1100) { row += "D"; continue; }   // the deep floor past the reefs: dark, so where it stops building never shows
@@ -351,7 +382,8 @@ const ZONES = [
 	{ id: "wasteland", letter: "8", name: "the Corrupted wasteland", ground: [104, 88, 112], groundAlt: [86, 72, 96], layers: { soil: 0.5, stones: 0.5 } },
 	{ id: "volcanic", letter: "9", name: "the Volcanic", ground: [46, 44, 44], groundAlt: [70, 56, 50], layers: { stones: 0.7, soil: 0.3 } },
 	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [96, 150, 62], groundAlt: [124, 166, 70], layers: { grass: 0.85, soil: 0.15 }, speck: { colors: [[236, 232, 244], [230, 196, 70], [160, 120, 196]], amount: 0.08, scale: 4 } },
-	{ id: "city", letter: "C", name: "Hearthmoot", ground: [150, 142, 124], groundAlt: [136, 130, 116], layers: { stones: 0.85, sand: 0.15 } },
+	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [118, 140, 82], groundAlt: [130, 146, 86], layers: { grass: 0.7, soil: 0.3 } },
+	{ id: "yards", letter: "Y", name: "Hearthmoot's yards", ground: [92, 140, 64], groundAlt: [112, 150, 70], layers: { grass: 0.85, soil: 0.15 }, speck: { colors: [[236, 232, 244], [230, 196, 70]], amount: 0.04, scale: 3 } },
 	{ id: "seabed", letter: "~", name: "the sea floor", ground: [176, 164, 124], groundAlt: [150, 144, 112], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "deep", letter: "D", name: "the deep sea floor", ground: [34, 46, 56], groundAlt: [30, 40, 50], layers: { sand: 0.6, stones: 0.4 } },
 ];
@@ -363,7 +395,7 @@ const land = {
 	lod: { _comment: "Far detail levels (WRLand): a chunk this far (m) from your view uses every 2nd, 4th, 8th sample; collision only within collisionRange m of a player.", ranges: [700, 1600, 3600], collisionRange: 600 },
 	zoneGrid: { cell: CELL, x0: -HALF, y0: -HALF, width: GW, height: GW, rows },
 	zoneBlend: 40,
-	zoneBiomes: { "1": "storm_peaks", "2": "desert", "3": "forest", "4": "tundra", "5": "swamp", "6": "ocean", "7": "graveyard", "8": "wasteland", "9": "volcanic", M: "meadow", C: "meadow", "~": "ocean", D: "ocean" },
+	zoneBiomes: { "1": "storm_peaks", "2": "desert", "3": "forest", "4": "tundra", "5": "swamp", "6": "ocean", "7": "graveyard", "8": "wasteland", "9": "volcanic", M: "meadow", C: "meadow", Y: "meadow", "~": "ocean", D: "ocean" },
 	groundMaterial: "/Game/Terrain/M_IslandGround.M_IslandGround",
 	zones: ZONES.map((z) => ({ id: z.id, letter: z.letter, name: z.name, ground: z.ground, groundAlt: z.groundAlt, rough: 0.9, ...(z.speck ? { speck: z.speck } : {}), layers: z.layers })),
 	surfaces: [
@@ -375,6 +407,17 @@ const land = {
 		{ id: "main_road", class: SURF.main_road, color: [132, 124, 108], rough: 0.85, layers: { stones: 0.8, soil: 0.2 } },
 		{ id: "plaza", class: SURF.plaza, color: [150, 142, 124], rough: 0.85, layers: { stones: 0.9, sand: 0.1 } },
 		{ id: "lake_bed", class: SURF.lake_bed, color: [92, 96, 74], rough: 0.5, layers: { soil: 0.5, moss: 0.3, sand: 0.2 } },
+		{ id: "cobble", class: SURF.cobble, color: [128, 122, 112], rough: 0.8, layers: { stones: 0.95, sand: 0.05 } },
+		{ id: "wheat", class: SURF.wheat, color: [206, 176, 86], rough: 0.9, layers: { grass: 0.6, soil: 0.4 } },
+		{ id: "wheat2", class: SURF.wheat2, color: [178, 148, 70], rough: 0.9, layers: { grass: 0.5, soil: 0.5 } },
+		{ id: "barley", class: SURF.barley, color: [178, 178, 104], rough: 0.9, layers: { grass: 0.7, soil: 0.3 } },
+		{ id: "barley2", class: SURF.barley2, color: [150, 154, 88], rough: 0.9, layers: { grass: 0.6, soil: 0.4 } },
+		{ id: "greens", class: SURF.greens, color: [70, 124, 46], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
+		{ id: "greens2", class: SURF.greens2, color: [86, 70, 50], rough: 0.95, layers: { soil: 0.9, grass: 0.1 } },
+		{ id: "ploughed", class: SURF.ploughed, color: [96, 72, 50], rough: 0.95, layers: { soil: 1 } },
+		{ id: "ploughed2", class: SURF.ploughed2, color: [78, 58, 42], rough: 0.95, layers: { soil: 1 } },
+		{ id: "fallow", class: SURF.fallow, color: [126, 146, 72], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
+		{ id: "fallow2", class: SURF.fallow2, color: [118, 136, 66], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
 	],
 	slopeRock: { color: [88, 84, 80], fromDeg: 33, toDeg: 47, ledge: [96, 112, 70] },
 	lake: { level: LAKE_LEVEL, at: RI.lakeAt.map(Math.round), outline: lakeOutline.map((p) => p.map(Math.round)),

@@ -10,6 +10,8 @@
 #include "WRRoundIsland.generated.h"
 
 class UInstancedStaticMeshComponent;
+class UHierarchicalInstancedStaticMeshComponent;
+class UStaticMesh;
 class UProceduralMeshComponent;
 class UMaterialInstanceDynamic;
 
@@ -30,6 +32,16 @@ private:
 	void BuildCity();
 	/** The lake's surface and its swim volume, the stream's ribbon of water down to the sea. */
 	void BuildWater();
+	/** The trees, saplings and hedge shrubs (Data/hearthmoot.json "plants"), one instanced mesh per kind and variant. */
+	void BuildPlants(const TSharedPtr<class FJsonObject>& J);
+	/** Server: the meadow is the Commons, a safe zone (roundIsland.safeRadius). */
+	void BuildSafeZone();
+	/** Machines that draw: grass on the meadow and the city's yards, tufts of thin blades in cells round the view, made
+	 *  and dropped as it moves (roundIsland.cover*, roundIsland.grass*). */
+	void StepCover();
+	UPROPERTY() TObjectPtr<UStaticMesh> BladeMesh;
+	UPROPERTY() TObjectPtr<class UMaterialInterface> BladeMat;
+	TMap<FIntPoint, TArray<TObjectPtr<UInstancedStaticMeshComponent>>> CoverCells;
 
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Solids;
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Water;

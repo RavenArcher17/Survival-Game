@@ -40,7 +40,7 @@ const MEADOW = 1450;               // the meadow round the walls (the Commons): 
 const MEADOW_WOBBLE = 0.2;         // how uneven the meadow's edge is (fraction of its radius)
 const FIRST_DEG = -76.85;          // where the ring starts (Storm's west edge): puts the Storm-Desert-Forest block on north
 // The lake in the meadow, on the Ocean side (Raven 11-19), its stream running out through the Ocean shore to the sea.
-const LAKE = { bearing: 162, inFromMeadowEdge: 420, along: 480, across: 300 };
+const LAKE = { bearing: 162, inFromMeadowEdge: 420, along: 480, across: 300, km2: 0.44 };
 // The coast: a few slow waves plus capes and bays where a land's look wants one (bearing, width in degrees, amount as a
 // fraction of the radius), the same every run.
 const WAVES = [[3, 0.022, 0.7], [5, 0.014, 2.1], [8, 0.008, 4.4], [13, 0.004, 1.3]];
@@ -164,10 +164,18 @@ const lakeAt = pt(LAKE.bearing, meadowR(LAKE.bearing) - LAKE.inFromMeadowEdge);
 const lakeOutline = [];
 {
 	const t = LAKE.bearing * RAD, tan = [Math.cos(t), Math.sin(t)], rad = [Math.sin(t), -Math.cos(t)];
-	for (let a = 0; a < 360; a += 6) {
-		const c = Math.cos(a * RAD), s = Math.sin(a * RAD), rr = 1 / Math.sqrt((c / LAKE.along) ** 2 + (s / LAKE.across) ** 2) * (1 + 0.12 * fbm(c * 1.3 + 60, s * 1.3 + 60, 21, 3));
-		lakeOutline.push([lakeAt[0] + rr * (c * tan[0] + s * rad[0]), lakeAt[1] + rr * (c * tan[1] + s * rad[1])]);
+	// A natural shore (Raven 11-19's quality pass): bays and points on the oval, then scaled back to LAKE.km2.
+	const local = [];
+	for (let a = 0; a < 360; a += 3) {
+		const c = Math.cos(a * RAD), s = Math.sin(a * RAD);
+		const rr = 1 / Math.sqrt((c / LAKE.along) ** 2 + (s / LAKE.across) ** 2) * (1 + 0.24 * fbm(c * 1.1 + 60, s * 1.1 + 60, 21, 3) + 0.07 * fbm(c * 3.4 + 90, s * 3.4 + 90, 23, 2));
+		local.push([rr * c, rr * s]);
 	}
+	const area0 = Math.abs(local.reduce((t, p, j) => { const q = local[(j + 1) % local.length]; return t + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+	const k = Math.sqrt(LAKE.km2 * 1e6 / area0);
+	for (const [u, v] of local) lakeOutline.push([lakeAt[0] + k * (u * tan[0] + v * rad[0]), lakeAt[1] + k * (u * tan[1] + v * rad[1])]);
+}
+{
 }
 const inPoly = (p, poly) => { let ins = false; for (let j = 0, k = poly.length - 1; j < poly.length; k = j++) { const [xi, yi] = poly[j], [xk, yk] = poly[k]; if ((yi > p[1]) !== (yk > p[1]) && p[0] < (xk - xi) * (p[1] - yi) / (yk - yi) + xi) ins = !ins; } return ins; };
 const lakeArea = Math.abs(lakeOutline.reduce((s, p, j) => { const q = lakeOutline[(j + 1) % lakeOutline.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;

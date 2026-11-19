@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Phase 3, slice 1 quality pass: a lived-in Hearthmoot, a natural meadow and lake, a playtest (11-19)
+
+Raven: "Go ahead with what you recommend" (the three items after slice 1's first look).
+- **The city plan** (`Tools/terrain/hearthmoot_plan.mjs`, shared by the ground and the city scripts): a 44 m market
+  plaza with stalls round the hearth, avenues out to the gates, a ring street, alleys and lanes between
+  them; houses stand on plots along the street they face. Seven kinds (cottages, half-timbered houses, tall townhouses with
+  jettied upper floors, L-shaped houses, workshops, towers, garden plots) in their quarter's colours, weathered roof
+  tones, gable roofs that fit their walls; each quarter's hall faces a green; trees on the avenues and greens. Streets
+  are cobbled (the ground's own cobble), yards grassy. 554 buildings, 12 greens.
+- **The meadow and the lake made natural:** trees in clumps and alone over the meadow, hedgerows, farms with striped
+  fields (wheat, barley, greens, ploughed, fallow), windmills; the lake's shore is uneven (still 0.44 km²) with a sand beach, reeds, a jetty with a
+  boat, and a footbridge over the stream by its outlet. Low grass grows round you on the meadow and the city's yards
+  (`StepCover` in `WRRoundIsland.cpp`: 24 m cells of thin blades near the camera only).
+- **The meadow is the Commons:** one safe zone 1.3 km round Hearthmoot (`roundIsland.safeRadius`).
+- **Playtest:** `Tools/roundtest.ps1`, a dedicated server on `L_Wildreach` with a rendered walker and a second
+  player. The walker walks the north-west avenue out through its gate, into a fort, and wades into the lake off the
+  beach; the visitor joins and walks to the market. All six walks arrive, the walker swims at the lake's surface, 10.0
+  ms a frame looking over the city and 8.3 ms on the meadow (1600x900), no errors.
+
 ### Phase 3, slice 1: the round island's map, its first ground, Hearthmoot, the meadow and the lake (11-19)
 
 Raven OK'd the layout ("Ok build it"). The round island is its own map (`L_Wildreach`, which until now held only the

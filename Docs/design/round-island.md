@@ -113,6 +113,13 @@ ground), then the rest round the ring.
   the same script, so borders stay crack-free (one ground).
 - **The sea:** `Data/sea_mask_L_Wildreach.json` from the same script; the sea and the water you swim in pick the mask
   named after their map.
+- **The city plan:** `Tools/terrain/hearthmoot_plan.mjs` holds the streets (avenues, ring, alleys, lanes), the beach,
+  jetty, reeds, footbridge, farms, fields, windmills and meadow trees. Both scripts import it: the ground cobbles the
+  streets and stripes the fields, the city script puts houses on plots facing their street. Run order:
+  `round_island.mjs` (only when the layout changes), `round_ground.mjs`, `hearthmoot.mjs`.
+- **Ground cover and the safe meadow:** `WRRoundIsland.cpp` grows low grass near the camera on the meadow and yards
+  (`roundIsland.cover*`) and puts one safe zone over the meadow (`roundIsland.safeRadius`, 1.3 km).
+- **Playtest:** `Tools/roundtest.ps1` (server + a rendered walker + a second player; walks, swim, frame times).
 - **Hearthmoot and the forts:** `node Tools/terrain/hearthmoot.mjs` -> `Data/hearthmoot.json`, built on every machine
   by `WRRoundIsland.cpp` from the building look's blocks (no replication); its solids are hidden boxes.
 - **Pictures:** `Tools/terrain/spotshots.ps1 -Map L_Wildreach` (camera spots in game cm: map metres x 100).

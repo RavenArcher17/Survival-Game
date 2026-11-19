@@ -6,6 +6,10 @@
 #include "WRTuning.h"
 #include "WRWater.h"
 #include "WRGameState.h"
+#include "WRSocial.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -51,7 +55,7 @@ void UWRRoundIslandSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 AWRRoundIsland::AWRRoundIsland()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.TickInterval = 0.25f;   // only the lake's day and night look
+	PrimaryActorTick.TickInterval = 0.25f;   // the lake's day and night look, the low plants round the view
 	bReplicates = false;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	RootComponent->SetMobility(EComponentMobility::Static);
@@ -62,11 +66,19 @@ void AWRRoundIsland::BeginPlay()
 	Super::BeginPlay();
 	BuildCity();
 	BuildWater();
+	BuildSafeZone();
+	if (GetNetMode() != NM_DedicatedServer)
+	{
+		// The grass: thin blades of the building look's tinted material (each blade its own green from custom data).
+		BladeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+		BladeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+	}
 }
 
 void AWRRoundIsland::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	StepCover();
 	if (!LakeMat || LakeDay.Num() == 0) return;
 	const AWRGameState* State = AWRGameState::Get(this);
 	const float Daylight = State ? State->GetDaylight() : 1.f;
@@ -154,6 +166,154 @@ void AWRRoundIsland::BuildCity()
 		NumSolids = T.Num();
 	}
 	UE_LOG(LogWildreach, Log, TEXT("ROUND Hearthmoot: %d blocks in %d parts, %d solids"), Blocks.Num(), Parts, NumSolids);
+	BuildPlants(J);
+}
+
+void AWRRoundIsland::BuildPlants(const TSharedPtr<FJsonObject>& J)
+{
+	using namespace WRRoundIslandImpl;
+	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+	if (!J.IsValid() || !J->TryGetArrayField(TEXT("plants"), Rows) || GetNetMode() == NM_DedicatedServer) return;
+	// Each kind's meshes: Electric Dreams' hornbeams and elderberries where the kit is installed (the Ancient forest's),
+	// else the island's own birch and the shrubs pack.
+	const auto Load = [](const FString& Path) { return LoadObject<UStaticMesh>(nullptr, *Path); };
+	TArray<UStaticMesh*> Kinds[3];
+	for (int32 i = 1; i <= 8; ++i) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/Megascans/3D_Plants/EuropeanHornbeam/Geometry/SimpleWind/SM_EuropeanHornbeam_Forest_%02d.SM_EuropeanHornbeam_Forest_%02d"), i, i))) Kinds[0].Add(M);
+	for (int32 i = 1; i <= 6; ++i) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/Megascans/3D_Plants/EuropeanHornbeam/Geometry/SimpleWind/SM_EuropeanHornbeam_Sapling_%02d.SM_EuropeanHornbeam_Sapling_%02d"), i, i))) Kinds[1].Add(M);
+	for (const int32 i : { 1, 2, 3, 4, 5, 6, 10, 11, 12, 13 }) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/Megascans/3D_Plants/Elderberry/SM_Elderberry_%02d.SM_Elderberry_%02d"), i, i))) Kinds[2].Add(M);
+	float FallbackScale[3] = { 1.f, 1.f, 1.f };
+	if (Kinds[0].Num() == 0) { if (UStaticMesh* M = Load(TEXT("/Game/Props/BirchA/birch_a_textured/StaticMeshes/birch_a_textured.birch_a_textured"))) Kinds[0].Add(M); }
+	if (Kinds[1].Num() == 0) { Kinds[1] = Kinds[0]; FallbackScale[1] = 0.25f; }
+	if (Kinds[2].Num() == 0) { if (UStaticMesh* M = Load(TEXT("/Game/GV_FreeShrubsPack/Meshes/Shrubs/Wind/Shrub_A/GV_Vol7_Shrub_A_full_type1.GV_Vol7_Shrub_A_full_type1"))) Kinds[2].Add(M); }
+	const FWRTuning& T = FWRTuning::Get();
+	const float Cull[3] = { T.Num(TEXT("roundIsland.treeCull"), 350000.f), T.Num(TEXT("roundIsland.saplingCull"), 120000.f), T.Num(TEXT("roundIsland.shrubCull"), 90000.f) };
+	TMap<UStaticMesh*, UHierarchicalInstancedStaticMeshComponent*> Parts;
+	TMap<UStaticMesh*, TArray<FTransform>> Xf;
+	TMap<UStaticMesh*, int32> KindOf;
+	for (const TSharedPtr<FJsonValue>& V : *Rows)
+	{
+		const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
+		const int32 Kind = FMath::Clamp(int32(At(R, 0)), 0, 2);
+		if (Kinds[Kind].Num() == 0) continue;
+		UStaticMesh* M = Kinds[Kind][int32(At(R, 1)) % Kinds[Kind].Num()];
+		Xf.FindOrAdd(M).Emplace(FRotator(0.f, At(R, 5), 0.f), FVector(At(R, 2), At(R, 3), At(R, 4)), FVector(At(R, 6) * FallbackScale[Kind]));
+		KindOf.Add(M, Kind);
+	}
+	int32 Count = 0;
+	for (TPair<UStaticMesh*, TArray<FTransform>>& P : Xf)
+	{
+		UHierarchicalInstancedStaticMeshComponent* H = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
+		H->SetStaticMesh(P.Key);
+		H->SetupAttachment(RootComponent);
+		H->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		H->SetCanEverAffectNavigation(false);
+		const int32 Kind = KindOf.FindRef(P.Key);
+		H->SetCullDistances(0, int32(Cull[Kind]));
+		H->SetCastShadow(Kind != 2 || T.Num(TEXT("roundIsland.shrubShadows"), 1.f) > 0.f);
+		H->RegisterComponent();
+		H->AddInstances(P.Value, false, true, false);
+		Count += P.Value.Num();
+	}
+	UE_LOG(LogWildreach, Log, TEXT("ROUND plants: %d in %d meshes (trees %d kinds, saplings %d, shrubs %d)"), Count, Xf.Num(), Kinds[0].Num(), Kinds[1].Num(), Kinds[2].Num());
+}
+
+void AWRRoundIsland::BuildSafeZone()
+{
+	// The meadow is the Commons (Raven's answers: fully safe, nothing owned): one safe zone over it, from the server.
+	if (GetNetMode() == NM_Client) return;
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AWRSafeZone* Z = GetWorld()->SpawnActor<AWRSafeZone>(AWRSafeZone::StaticClass(), FTransform(FVector(0.f, 0.f, 4100.f)), P))
+	{
+		Z->Radius = FWRTuning::Get().Num(TEXT("roundIsland.safeRadius"), 130000.f);
+		UE_LOG(LogWildreach, Log, TEXT("ROUND the meadow is safe: %.0f m round Hearthmoot"), Z->Radius / 100.f);
+	}
+}
+
+void AWRRoundIsland::StepCover()
+{
+	// Low plants in 24 m cells round the view (roundIsland.coverCell / coverRange / coverPerCell), on the meadow and the
+	// yards (zone letters M, Y, C) where the ground is plain (no road, field, sand or bed), never in the lake.
+	using namespace WRRoundIslandImpl;
+	if (!BladeMesh || !BladeMat) return;
+	const FWRLandDef* D = MapLand();
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!D || !D->bHeightfield || !PC || !PC->PlayerCameraManager) return;
+	const FWRTuning& T = FWRTuning::Get();
+	const float Cell = T.Num(TEXT("roundIsland.coverCell"), 24.f), Range = T.Num(TEXT("roundIsland.coverRange"), 75.f);
+	const int32 PerCell = int32(T.Num(TEXT("roundIsland.coverPerCell"), 180.f));
+	const FVector2D View = D->ToMap(PC->PlayerCameraManager->GetCameraLocation());
+	const float ViewZ = PC->PlayerCameraManager->GetCameraLocation().Z / 100.f;
+	TSet<FIntPoint> Want;
+	// High above (a camera over the meadow) the low plants wouldn't show: none.
+	if (ViewZ - D->Height(View) < T.Num(TEXT("roundIsland.coverMaxHeight"), 60.f))
+	{
+		const int32 C0x = FMath::FloorToInt((View.X - Range) / Cell), C1x = FMath::FloorToInt((View.X + Range) / Cell);
+		const int32 C0y = FMath::FloorToInt((View.Y - Range) / Cell), C1y = FMath::FloorToInt((View.Y + Range) / Cell);
+		for (int32 y = C0y; y <= C1y; ++y) for (int32 x = C0x; x <= C1x; ++x)
+		{
+			if (FVector2D::Distance(View, (FVector2D(x, y) + FVector2D(0.5f, 0.5f)) * Cell) < Range + Cell * 0.71f) Want.Add(FIntPoint(x, y));
+		}
+	}
+	for (auto It = CoverCells.CreateIterator(); It; ++It)
+	{
+		if (Want.Contains(It.Key())) continue;
+		for (UInstancedStaticMeshComponent* C : It.Value()) if (C) C->DestroyComponent();
+		It.RemoveCurrent();
+	}
+	int32 Made = 0;
+	for (const FIntPoint& C : Want)
+	{
+		if (CoverCells.Contains(C) || Made >= 8) continue;
+		++Made;
+		TArray<TObjectPtr<UInstancedStaticMeshComponent>>& Parts = CoverCells.Add(C);
+		TArray<FTransform> Xf;
+		TArray<FLinearColor> Col;
+		FRandomStream Rng(HashCombine(GetTypeHash(C.X * 92821), GetTypeHash(C.Y * 68917)));
+		const float BladeW = T.Num(TEXT("roundIsland.grassBladeWidth"), 2.2f), BladeT = 0.8f;
+		const FVector2D BladeH(T.Num(TEXT("roundIsland.grassMin"), 20.f), T.Num(TEXT("roundIsland.grassMax"), 50.f));
+		for (int32 n = 0; n < PerCell; ++n)
+		{
+			const FVector2D M = (FVector2D(C) + FVector2D(Rng.FRand(), Rng.FRand())) * Cell;
+			const TCHAR L = D->GridLetter(M);
+			if (L != TEXT('M') && L != TEXT('Y') && L != TEXT('C')) continue;
+			const int32 I = FMath::RoundToInt((M.X - D->HfOrigin.X) / D->HfStep), J = FMath::RoundToInt((M.Y - D->HfOrigin.Y) / D->HfStep);
+			if (D->HfSurfaceAt(I, J) != 0) continue;
+			// A tuft: blades fanned out from one root, leaning away from it, mostly green, now and then a dry one.
+			const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
+			const int32 Blades = 9 + Rng.RandHelper(7);
+			const FLinearColor Green(Rng.FRandRange(0.045f, 0.09f), Rng.FRandRange(0.15f, 0.24f), Rng.FRandRange(0.025f, 0.05f));
+			for (int32 b = 0; b < Blades; ++b)
+			{
+				const float H = Rng.FRandRange(BladeH.X, BladeH.Y), Yaw = Rng.FRand() * 360.f, Lean = Rng.FRandRange(6.f, 30.f);
+				const FRotator Rot(Lean, Yaw, 0.f);
+				const FVector Off(Rng.FRandRange(-6.f, 6.f), Rng.FRandRange(-6.f, 6.f), 0.f);
+				Xf.Emplace(Rot, Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H * 0.5f)), FVector(BladeW, BladeT, H) / 100.f);
+				Col.Add(Rng.FRand() < 0.14f ? FLinearColor(0.2f, 0.19f, 0.07f) : Green * Rng.FRandRange(0.85f, 1.2f));
+			}
+		}
+		if (Xf.Num())
+		{
+			UInstancedStaticMeshComponent* P = NewObject<UInstancedStaticMeshComponent>(this);
+			P->SetStaticMesh(BladeMesh);
+			P->SetMaterial(0, BladeMat);
+			P->SetupAttachment(RootComponent);
+			P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			P->SetCanEverAffectNavigation(false);
+			P->SetCastShadow(false);
+			P->SetCullDistances(0, int32((Range + Cell) * 100.f));
+			P->SetNumCustomDataFloats(10);
+			P->RegisterComponent();
+			P->AddInstances(Xf, false, false, false);
+			for (int32 i = 0; i < Xf.Num(); ++i)
+			{
+				// M_BuildTinted: shade, grain axis, brightness, colour, metallic, roughness, glow, pattern (smooth).
+				const float Data[10] = { 0.5f, 2.f, 1.f, Col[i].R, Col[i].G, Col[i].B, 0.f, 0.9f, 0.f, 3.f };
+				P->SetCustomData(i, Data, i == Xf.Num() - 1);
+			}
+			Parts.Add(P);
+		}
+	}
 }
 
 void AWRRoundIsland::BuildWater()
