@@ -10,7 +10,14 @@
 #include "WRFarm.h"
 #include "WRInventory.h"
 #include "WRTuning.h"
+#include "WRUIStyle.h"
 #include "Dom/JsonObject.h"
+#include "HAL/FileManager.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
 
 namespace WRDataTestDetail
 {
@@ -238,6 +245,38 @@ bool FWRDataFxSoundTest::RunTest(const FString& Parameters)
 			TestFalse(FString::Printf(TEXT("%s is a voice row, not an event (it's in the creatures section)"), *Id), V.Value->AsObject()->HasField(TEXT("files")));
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWRDataUIImagesTest, "Wildreach.Data.UIImages",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWRDataUIImagesTest::RunTest(const FString& Parameters)
+{
+	// Every picture the UI reads from Data/UI decodes as the game decodes it (BGRA, 8 bits): an unreadable one draws as
+	// nothing (the loading screen's island view, an icon, a portrait), with only a warning in the log.
+	IImageWrapperModule& Wrappers = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
+	const FString Dir = FPaths::ConvertRelativePathToFull(WRUI::Dir());
+	TArray<FString> Files;
+	IFileManager::Get().FindFilesRecursive(Files, *Dir, TEXT("*.png"), true, false);
+	IFileManager::Get().FindFilesRecursive(Files, *Dir, TEXT("*.jpg"), true, false, false);
+	TestTrue(TEXT("Data/UI has the loading screen's picture"), Files.ContainsByPredicate([](const FString& F) { return F.EndsWith(TEXT("/loading.jpg")); }));
+	TArray<FString> Bad;
+	for (const FString& F : Files)
+	{
+		TArray<uint8> File;
+		const bool bJpg = F.EndsWith(TEXT(".jpg"));
+		TSharedPtr<IImageWrapper> W = Wrappers.CreateImageWrapper(bJpg ? EImageFormat::JPEG : EImageFormat::PNG);
+		TArray<uint8> Raw;
+		FString Why;
+		if (!FFileHelper::LoadFileToArray(File, *F)) Why = TEXT("can't be read");
+		else if (!W.IsValid()) Why = TEXT("no decoder");
+		else if (!W->SetCompressed(File.GetData(), File.Num())) Why = TEXT("not a file the decoder takes");
+		else if (!W->GetRaw(ERGBFormat::BGRA, 8, Raw)) Why = FString::Printf(TEXT("doesn't decode (%lldx%lld, %d bits)"), W->GetWidth(), W->GetHeight(), W->GetBitDepth());
+		else if (Raw.Num() != W->GetWidth() * W->GetHeight() * 4) Why = TEXT("decodes to the wrong size");
+		if (!Why.IsEmpty()) Bad.Add(FPaths::GetCleanFilename(F) + TEXT(": ") + Why);
+	}
+	AddInfo(FString::Printf(TEXT("%d pictures in Data/UI"), Files.Num()));
+	TestEqual(FString::Printf(TEXT("every Data/UI picture decodes (%s)"), *FString::Join(Bad, TEXT("; "))), Bad.Num(), 0);
 	return true;
 }
 

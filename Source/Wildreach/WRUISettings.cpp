@@ -7,6 +7,7 @@
 
 #include "WRUISettings.h"
 #include "WRGod.h"
+#include "WRReport.h"
 #include "WRTuning.h"
 #include "WRPlayerUI.h"
 #include "WRUIStyle.h"
@@ -1825,6 +1826,14 @@ namespace WRSettingsUI
 				[
 					SettingRow(LOCTEXT("FrameTime", "Show frame time"), LOCTEXT("FrameTimeSub", "Frame rate, CPU and GPU time, graphics memory"),
 						SNew(SWRSwitch, []() { return WRPerf::OverlayOn(); }, []() { WRPerf::SetOverlay(!WRPerf::OverlayOn()); }), 52.f)
+				]
+				// Virtual shadow maps or the classic kind (WRReport::ClassicShadows): classic avoids the graphics-card crash, and
+				// a run that crashed that way turns it on by itself. (Here: the Quality column has no room left at 16:9.)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+				[
+					SettingRow(LOCTEXT("ShadowMethod", "Shadow method"), LOCTEXT("ShadowMethodSub", "Classic avoids a graphics-card crash some PCs hit"),
+						Segmented({ LOCTEXT("ShadowVirtual", "Virtual"), LOCTEXT("ShadowClassic", "Classic") }, []() { return WRReport::ClassicShadows() ? 1 : 0; },
+							[](int32 V) { WRReport::SetClassicShadows(V == 1); }), 52.f)
 				]
 				+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 12.f * U, 0.f, 0.f)
 				[

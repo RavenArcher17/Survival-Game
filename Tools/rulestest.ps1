@@ -26,7 +26,7 @@ function Play([string]$tag, [string]$settings) {
 	New-Item -ItemType Directory -Force $db | Out-Null
 	[IO.File]::WriteAllText((Join-Path $db 'settings.json'), $settings)
 	$slog = "$logs\$tag-server.log"; $clog = "$logs\$tag-client.log"
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=$world -wrstore=json -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=$world -wrstore=json -wrdefaultpreset=playtest -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 25
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$clog`"" -PassThru -WindowStyle Hidden
 	$deadline = (Get-Date).AddSeconds(150)
@@ -41,7 +41,8 @@ function Play([string]$tag, [string]$settings) {
 	$r = [ordered]@{ Packs = 0; Animals = 0; Share = 0; HungerPerS = 0.0; ThirstPerS = 0.0; ClockPerS = 0.0; CreatureHp = 0.0; CreatureDamage = 0.0; BossHp = 0.0; Client = '' }
 	foreach ($l in $lines) {
 		if ($l -match "^WILDLIFE (\d+) packs, (\d+) animals, new; the island's share is (\d+)") { $r.Packs = [int]$Matches[1]; $r.Animals = [int]$Matches[2]; $r.Share = [int]$Matches[3] }
-		if ($l -match '^SPAWN cinderfang: ([\d.]+) hp, ([\d.]+) damage') { $r.CreatureHp = [double]$Matches[1]; $r.CreatureDamage = [double]$Matches[2] }
+		# (The health before its wild genes: they move it up to 10% either way, so two creatures' rolled health isn't 2x.)
+		if ($l -match '^SPAWN cinderfang: ([\d.]+) hp, ([\d.]+) damage, ([\d.]+) hp before its genes') { $r.CreatureHp = [double]$Matches[3]; $r.CreatureDamage = [double]$Matches[2] }
 		if ($l -match '^BOSS Ignessa, Queen of Wisps ready \(mini, ([\d.]+) hp solo\)') { $r.BossHp = [double]$Matches[1] }
 	}
 	if ($v.Count -ge 2) {

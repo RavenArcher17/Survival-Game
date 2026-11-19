@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Phase 2, part 6: a way round the graphics-card crash, normal XP by default, the twelve lands on the menu (Raven, 11-19)
+
+- **The graphics-card crash, looked into.** All 22 GPU crash folders on Raven's PC (10-25 to 11-17) hold NVIDIA
+  Aftermath dumps that say the same thing, and it isn't the Nanite `NodeAndClusterCull` pass the notes blamed (that was
+  only in flight beside it): a memory fault in `CullPerPageDrawCommandsCs`, the virtual shadow maps' culling of
+  non-Nanite meshes, mostly in the first seconds after a map loads. The cause inside the engine is still open (the plan
+  leaves it for later; `Docs/PERFORMANCE.md` has what to try next). **The way round it:** Settings > Video > Shadow
+  method, Virtual or Classic (classic shadow maps don't run that pass). A run that ends in a graphics-card crash
+  (its crash folder says `GPUCrash`) turns Classic on by itself at the next start, once, and the crash card says so and
+  where to switch back (`WRReport::ClassicShadows`). Bot runs (`-wrbot`) never change it or use it.
+- **Normal XP by default** (Raven's answer, 11-18): a world with no settings of its own plays `pve`, not `playtest`
+  (`server_presets.json` "default"; the New world form already started on PvE). The tests keep playtest's 10x XP and
+  taming through a new `-wrdefaultpreset=playtest` on their command lines, which only fills in for a world with no
+  settings (the worlds and rules tests' own settings still win).
+- **The main menu says "A survival island of twelve lands"**, not "of fire and frost" (from the two-land first playable).
+- **Log noise:** the 140 `LogJson` warnings at every start are gone (two boss lookups read `id` from creatures.json's five
+  note rows). The loading screens' island picture tries again when Slate isn't ready for it yet (it was dropped for the
+  whole run with "missing or unreadable"). A new unit test, `Wildreach.Data.UIImages`, decodes every picture in Data/UI
+  as the game does.
+- **Tests:** the rules test compares a creature's health before its wild genes (the `spawn` readout says it now): the
+  genes move it up to 10% either way, so a doubled difficulty read 137 against 140 now and then. Checked on this build:
+  unit (33), menus, flicker, worlds, rules, flow, tame, spell, mp all pass; the Video page and main menu in pictures;
+  classic shadows switched on by the row and by a stand-in GPU crash folder, drawn in a new world.
+
 ### Phase 2, part 5: the bot tests guard again, and the seven bugs they found (Raven, 11-18/19)
 
 The bot tests hadn't been run since 0.8 (14 of 39 passed on 11-18). Each failure was traced to either a game bug or a

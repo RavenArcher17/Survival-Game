@@ -798,6 +798,10 @@ TSharedRef<SWidget> SWRMainMenu::MakeCard()
 					[
 						WRUI::Text(TAttribute<FText>::CreateLambda([]()
 						{
+							if (CardKind == 2 && WRReport::SwitchedShadowsAfterCrash())
+							{
+								return NSLOCTEXT("WRUI", "CrashLineGpu", "The graphics card stopped last time. Shadows are now Classic, which avoids that crash (Settings > Video > Shadow method switches them back). Sending the crash report helps us fix it: it holds what went wrong and the last lines of the game's log, nothing else.");
+							}
 							return CardKind == 2 ? NSLOCTEXT("WRUI", "CrashLine", "It crashed last time. Sending the crash report helps us fix it: it holds what went wrong and the last lines of the game's log, nothing else.")
 								: FText::FromString(LastFailure);
 						}), WRUI::Body(15, 500), WRUI::Ink2, false, true)
@@ -914,7 +918,8 @@ TSharedRef<SWidget> SWRMainMenu::MakeTitle()
 	{
 		return SNew(SBox).HeightOverride(H * Fraction).VAlign(VAlign_Top).Clipping(EWidgetClipping::ClipToBounds)[Layer(Color)];
 	};
-	const FText Line1 = NSLOCTEXT("WRUI", "Tagline1", "A SURVIVAL ISLAND OF "), Fire = NSLOCTEXT("WRUI", "TaglineFire", "FIRE"), And = NSLOCTEXT("WRUI", "TaglineAnd", " AND "), Frost = NSLOCTEXT("WRUI", "TaglineFrost", "FROST");
+	// (It said "of fire and frost" from the two-land first playable; since 0.8 the island has all twelve lands.)
+	const FText Line1 = NSLOCTEXT("WRUI", "Tagline1", "A SURVIVAL ISLAND OF "), Lands = NSLOCTEXT("WRUI", "TaglineLands", "TWELVE LANDS");
 	const FSlateFontInfo TagFont = Spaced(WRUI::Body(14, 400), 520);
 	const FLinearColor B2 = WRUI::Brass2;
 	return SNew(SBox).WidthOverride(590.f * U)
@@ -949,9 +954,7 @@ TSharedRef<SWidget> SWRMainMenu::MakeTitle()
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(Line1, TagFont, WRUI::Ink2, true)]
-			+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(Fire, TagFont, WRUI::Ember, true)]
-			+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(And, TagFont, WRUI::Ink2, true)]
-			+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(Frost, TagFont, WRUI::Frost, true)]
+			+ SHorizontalBox::Slot().AutoWidth()[WRUI::Text(Lands, TagFont, WRUI::Brass, true)]
 		]
 	];
 }

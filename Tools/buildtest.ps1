@@ -36,7 +36,7 @@ $raider = @(
 	'WRTeleport 2400 3700', 'wait 1', 'WRHitPiece 60', 'wait 2', 'WRSay buildtest-done'
 ) -join '|'
 
-function Start-Server($log) { Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7815 -wrworld=buildtest -wrstore=json -abslog=`"$log`"" -PassThru -WindowStyle Hidden }
+function Start-Server($log) { Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7815 -wrworld=buildtest -wrstore=json -wrdefaultpreset=playtest -abslog=`"$log`"" -PassThru -WindowStyle Hidden }
 function Start-Bot($name, $cmds, $log) { Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7815?Path=fire?WRName=$name -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$log`"" -PassThru -WindowStyle Hidden }
 function Lines($file, $pattern) { if (Test-Path $file) { @(Select-String -Path $file -Pattern $pattern | ForEach-Object { ($_.Line -replace '^.*LogWildreach: ', '').Trim() }) } else { @() } }
 

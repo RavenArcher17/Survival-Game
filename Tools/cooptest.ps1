@@ -53,7 +53,7 @@ $started = Get-Date
 $hostLog = Join-Path $logs 'host.log'; $friendLog = Join-Path $logs 'friend.log'
 # (Crafting at half speed here: both orders stay on the forge while Bravo looks at them.)
 $tune = 'wildlife.enabled:0,craft.timeScale:2,raid.warnSeconds:6'
-$h = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=Mason?Path=fire?Body=m -game -nullrhi -unattended -nosound -port=$Port -wrworld=cooptest -wrstore=json -wrtune=$tune -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($mason -join '|')`" -abslog=`"$hostLog`"" -PassThru -WindowStyle Hidden
+$h = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=Mason?Path=fire?Body=m -game -nullrhi -unattended -nosound -port=$Port -wrworld=cooptest -wrstore=json -wrdefaultpreset=playtest -wrtune=$tune -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($mason -join '|')`" -abslog=`"$hostLog`"" -PassThru -WindowStyle Hidden
 $f = $null
 $deadline = (Get-Date).AddSeconds(420)
 while ((Get-Date) -lt $deadline -and -not $h.HasExited) {

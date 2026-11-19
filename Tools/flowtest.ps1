@@ -26,7 +26,7 @@ $bot = @(
 	'WRClearCreatures', 'WRGive wood 40', 'WRGive hide 8', 'WRGive fiber 12', 'WRTeleport -500 700', 'wait 2', 'WRPlace bed -500 900 0 0', 'wait 1', 'WRTeleport -500 760', 'wait 2', 'WRInteract', 'wait 1',
 	'WRTeleport 600 -700', 'wait 2', 'WRKillMe', 'wait 18', 'WRSay flowtest-done'
 )
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrstore=json -wrpreset=pve -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrstore=json -wrdefaultpreset=playtest -wrpreset=pve -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${port}?Path=fire?WRName=Flowbot -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 $worldFile = Join-Path $db 'world.json'
@@ -48,7 +48,7 @@ $bot2 = @(
 	'WRKillMe', 'wait 4', 'dead:WRClickMap Your bed', 'wait 9', 'dead:WRClick Wake at', 'wait 12',
 	'WRKillMe', 'wait 16', 'WRSay flowtest2-done'
 )
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrstore=json -wrpreset=pve -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$port -wrworld=flowtest -wrstore=json -wrdefaultpreset=playtest -wrpreset=pve -abslog=`"$out\server2.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${port}?Path=fire?WRName=Flowbot -game -windowed -ResX=1280 -ResY=720 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($bot2 -join '|')`" -abslog=`"$out\client2.log`"" -PassThru
 $deadline = (Get-Date).AddSeconds(150)

@@ -14,7 +14,7 @@ function Seen($file, $pattern) { (Test-Path $file) -and (Select-String -Path $fi
 # Runs a server and the bot until $done is true (or $seconds pass), then stops both.
 function Run-Phase($name, $url, $cmds, $seconds, [scriptblock]$done) {
 	$slog = Join-Path $out "$name-server.log"; $clog = Join-Path $out "$name-client.log"
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7781 -wrworld=persisttest -wrstore=json -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7781 -wrworld=persisttest -wrstore=json -wrdefaultpreset=playtest -abslog=`"$slog`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 20
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7781$url -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$clog`"" -PassThru -WindowStyle Hidden
 	$deadline = (Get-Date).AddSeconds($seconds)

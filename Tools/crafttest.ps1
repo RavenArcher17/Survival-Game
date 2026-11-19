@@ -44,7 +44,7 @@ $cmds = @(
 ) -join '|'
 
 # (craft.timeScale 0: stations make things at once, as before crafting time; crafttimetest has the timed queue.)
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=crafttest -wrstore=json -wrtune=craft.timeScale:0 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=crafttest -wrstore=json -wrdefaultpreset=playtest -wrtune=craft.timeScale:0 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Crafter -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 95

@@ -83,12 +83,14 @@ namespace WRWorldsFiles
 		O->TryGetStringField(TEXT("artifactCap"), S.ArtifactCap);
 	}
 
-	/** The preset a server plays with no settings of its own (server_presets.json "default"). */
+	/** The preset a server plays with no settings of its own: -wrdefaultpreset=<name> (the tests play playtest), else
+	 *  server_presets.json "default" (pve: normal XP, Raven 11-18). */
 	FString DefaultPreset()
 	{
 		const TSharedPtr<FJsonObject> Presets = FWRTuning::LoadDataFile(TEXT("server_presets.json"));
 		FString Preset = TEXT("pve");
 		if (Presets.IsValid()) Presets->TryGetStringField(TEXT("default"), Preset);
+		FParse::Value(FCommandLine::Get(), TEXT("-wrdefaultpreset="), Preset);
 		return Preset;
 	}
 

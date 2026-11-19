@@ -22,7 +22,7 @@ $bravo = @(
 	'WRBotPause 1', 'WRTeleport 1000 1000', 'wait 9', 'WRClan join Wolves', 'wait 6',
 	'WRGive wood 20', 'WRTeleport 1000 1000', 'wait 1', 'WRKillMe', 'wait 14', 'WRTeleport 1000 1000', 'wait 1', 'WRInteract', 'wait 1', 'WRSay socialtest-done'
 )
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7813 -wrworld=socialtest -wrstore=json -wrpreset=pvp_standard -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7813 -wrworld=socialtest -wrstore=json -wrdefaultpreset=playtest -wrpreset=pvp_standard -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c1 = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7813?Path=fire?WRName=Alpha -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($alpha -join '|')`" -abslog=`"$out\alpha.log`"" -PassThru -WindowStyle Hidden
 $c2 = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7813?Path=frost?WRName=Bravo -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($bravo -join '|')`" -abslog=`"$out\bravo.log`"" -PassThru -WindowStyle Hidden

@@ -33,10 +33,14 @@
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Kismet/GameplayStatics.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/App.h"
+#include "Misc/CommandLine.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Misc/CoreDelegates.h"
 #include "Misc/Base64.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Parse.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
@@ -490,6 +494,18 @@ namespace WRReportCrash
 {
 	FString CrashDir;   // the last run's crash folder, until answered
 	bool bChecked = false;
+	bool bSwitchedShadows = false;   // this start turned classic shadows on after a graphics-card crash
+	const TCHAR* GraphicsSection = TEXT("Wildreach.Graphics");
+
+	/** r.Shadow.Virtual.Enable from the setting (by code: the project's renderer settings turn it on). */
+	void ApplyShadowMethod(bool bClassic)
+	{
+		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Shadow.Virtual.Enable")))
+		{
+			V->Set(bClassic ? 0 : 1, ECVF_SetByCode);
+			UE_LOG(LogWildreach, Log, TEXT("REPORT shadows: %s"), bClassic ? TEXT("classic shadow maps") : TEXT("virtual shadow maps"));
+		}
+	}
 	FString StampDir() { return FPaths::ProjectSavedDir() / TEXT("Wildreach"); }
 	FString SessionFile() { return StampDir() / TEXT("session"); }
 	FString CleanFile() { return StampDir() / TEXT("clean_exit"); }
@@ -539,8 +555,24 @@ namespace WRReportCrash
 					CrashDir = CrashRoot / D;
 				}
 			}
-			if (!CrashDir.IsEmpty()) UE_LOG(LogWildreach, Log, TEXT("REPORT the last run crashed: %s"), *CrashDir);
+			if (!CrashDir.IsEmpty())
+			{
+				FString Context;
+				FFileHelper::LoadFileToString(Context, *(CrashDir / TEXT("CrashContext.runtime-xml")));
+				const bool bGpu = Between(Context, TEXT("CrashType")) == TEXT("GPUCrash");
+				UE_LOG(LogWildreach, Log, TEXT("REPORT the last run crashed%s: %s"), bGpu ? TEXT(" (the graphics card)") : TEXT(""), *CrashDir);
+				// The graphics card stopped: classic shadow maps from now on (see WRReport::ClassicShadows), once.
+				if (bGpu && !WRReport::ClassicShadows() && !FParse::Param(FCommandLine::Get(), TEXT("wrbot")))
+				{
+					GConfig->SetBool(GraphicsSection, TEXT("ClassicShadows"), true, GGameUserSettingsIni);
+					GConfig->Flush(false, GGameUserSettingsIni);
+					bSwitchedShadows = true;
+					UE_LOG(LogWildreach, Log, TEXT("REPORT the graphics card crashed last run: classic shadows from now on (Settings > Video)"));
+				}
+			}
 		}
+		// (Bot runs, -wrbot: the tests and picture tools draw what the project draws; this machine's setting is the player's.)
+		if (WRReport::ClassicShadows() && !FParse::Param(FCommandLine::Get(), TEXT("wrbot"))) ApplyShadowMethod(true);
 		// This run starts now; a normal quit stamps clean_exit.
 		FM.Delete(*CleanFile(), false, true, true);
 		FFileHelper::SaveStringToFile(FDateTime::UtcNow().ToIso8601(), *SessionFile());
@@ -573,6 +605,27 @@ FString WRReport::PendingCrash()
 {
 	WRReportCrash::CheckLastRun();
 	return WRReportCrash::CrashDir;
+}
+
+bool WRReport::ClassicShadows()
+{
+	bool bOn = false;
+	if (GConfig) GConfig->GetBool(WRReportCrash::GraphicsSection, TEXT("ClassicShadows"), bOn, GGameUserSettingsIni);
+	return bOn;
+}
+
+void WRReport::SetClassicShadows(bool bOn)
+{
+	if (!GConfig) return;
+	GConfig->SetBool(WRReportCrash::GraphicsSection, TEXT("ClassicShadows"), bOn, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+	WRReportCrash::ApplyShadowMethod(bOn);
+}
+
+bool WRReport::SwitchedShadowsAfterCrash()
+{
+	WRReportCrash::CheckLastRun();
+	return WRReportCrash::bSwitchedShadows;
 }
 
 void WRReport::DismissCrash()

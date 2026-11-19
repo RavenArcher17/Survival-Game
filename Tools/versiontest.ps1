@@ -15,7 +15,7 @@ function Has([string]$file, [string]$pattern) { (Test-Path $file) -and (Select-S
 [System.IO.File]::WriteAllText("$out\feed.mjs", "import http from 'http'; http.createServer((q, r) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify({ tag_name: 'v9.9.9' })); }).listen($port, '127.0.0.1');")
 $node = Start-Process node -ArgumentList "`"$out\feed.mjs`"" -PassThru -WindowStyle Hidden
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7838 -wrworld=versiontest -wrstore=json `"-ini:Game:$old`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=7838 -wrworld=versiontest -wrstore=json -wrdefaultpreset=playtest `"-ini:Game:$old`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 25
 # Not a bot: a plain player whose join fails falls back to the menu.
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7838?WRName=Newer -game -nullrhi -unattended -nosound -wrupdatefeed=http://127.0.0.1:$port/latest -abslog=`"$out\client.log`"" -PassThru -WindowStyle Hidden

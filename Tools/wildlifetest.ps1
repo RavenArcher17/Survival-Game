@@ -40,7 +40,7 @@ $cmds = @(
 )
 $cmds = @(foreach ($c in $cmds) { if ($c) { $c } }) -join '|'
 
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=wildlife -wrstore=json -wrtune=wildlife.despawnSeconds:10 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=wildlife -wrstore=json -wrdefaultpreset=playtest -wrtune=wildlife.despawnSeconds:10 -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $render = if ($Shots) { '-windowed -ResX=1600 -ResY=900' } else { '-nullrhi' }
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=$name -game $render -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cmds`" -abslog=`"$out\client.log`"" -PassThru -WindowStyle $(if ($Shots) { 'Normal' } else { 'Hidden' })

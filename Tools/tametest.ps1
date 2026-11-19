@@ -37,7 +37,7 @@ $cmds = @(
 ) -join '|'
 
 function Start-Server($log) {
-	Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=tametest -wrstore=json $tune -abslog=`"$log`"" -PassThru -WindowStyle Hidden
+	Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=tametest -wrstore=json -wrdefaultpreset=playtest $tune -abslog=`"$log`"" -PassThru -WindowStyle Hidden
 }
 $s = Start-Server "$out\server.log"
 Start-Sleep -Seconds 20

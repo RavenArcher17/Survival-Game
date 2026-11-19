@@ -17,7 +17,7 @@ $walkers = @(
 	@{ Name = 'NetGraveyard'; Cmds = 'WRBotPause 1|wait 5|WRTeleport -122600 312400|wait 12|WRWalkTo -107600 312400|wait 40|WRWalkTo -122600 312400|wait 40' }
 )
 $procs = @()
-$procs += Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7810 -wrworld=netwalktest -wrstore=json -wrtune=wildlife.enabled:0 `"-ExecCmds=p.NetShowCorrections 1`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$procs += Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=7810 -wrworld=netwalktest -wrstore=json -wrdefaultpreset=playtest -wrtune=wildlife.enabled:0 `"-ExecCmds=p.NetShowCorrections 1`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 40
 foreach ($w in $walkers) {
 	$procs += Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:7810?Path=fire?WRName=$($w.Name) -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60,p.NetShowCorrections 1`" `"-wrbotcmds=$($w.Cmds)`" -abslog=`"$out\$($w.Name).log`"" -PassThru -WindowStyle Hidden

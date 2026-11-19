@@ -39,8 +39,8 @@ Freedom35 with a small installer that downloads the files; a Freedom35 install u
 ("Releasing on Freedom35" below). Live there: 0.8.2.2 (2026-11-17), which also fixes every quit ending in heap
 corruption (static Slate widgets freed after ICU shut down; `SWRMainMenu::ReleaseAtExit`). The same game is the GitHub release v0.8.2 (2026-11-17, packaged on Raven's PC
 without the Electric Dreams kit); from now on every version goes out on both (Raven 11-17, "Releasing an update").
-The old unit and bot tests fail since the 0.8.0 passes (CHANGELOG 0.8.2): they need their own pass before they guard
-anything again.
+The unit and bot tests guard again since phase 2 (11-19, CHANGELOG "Unreleased"): all 39 suites pass on one run of
+`Toolsalltests.ps1` (about 2 hours; `-Only a,b` reruns a few).
 
 In 0.8.1: every screen fits every screen (`WRUIFit.h`: a 1760 x 1080 minimum canvas and `SWRFit` around every viewport
 root; the main menu laid out by flow, the survivor framed into its free stage), Update now never opens a web page, and
@@ -885,8 +885,9 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   (write them with `[IO.File]::WriteAllText`, not `Set-Content -Encoding UTF8`). `git commit -F -` with a here-string
   fails in PowerShell: write the message to a file and use `-F <file>`.
 - **Headless clients** need `t.MaxFPS 60` or they flood the server. Use `?WRName=<name>` for a stable player name.
-- **Server presets**: with no settings a server plays `playtest` (10x XP, taming 10x, PvP off). PvP tests pass
-  `-wrpreset=pvp_standard`.
+- **Server presets**: with no settings a server plays `pve` (normal XP, Raven 11-18). Every test passes
+  `-wrdefaultpreset=playtest` (10x XP, taming 10x, PvP off) beside `-wrstore=json`, which only fills in for a world with no
+  settings of its own; PvP tests pass `-wrpreset=pvp_standard`, which overrides a world's settings.
 - **The island's landscape** rebuilds only in the full editor (`Tools\terrain\build_island.ps1 -Force`), not a
   `-nullrhi` commandlet. Trees, rocks, caves and hazards change without a rebuild: `node Tools/terrain/dressing.mjs`.
 

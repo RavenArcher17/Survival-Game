@@ -66,4 +66,16 @@ namespace WRReport
 	WILDREACH_API FString PendingCrash();
 	WILDREACH_API void SendCrash();
 	WILDREACH_API void DismissCrash();
+
+	/**
+	 * Classic shadow maps instead of virtual ones (Settings > Video > Shadow method; GameUserSettings
+	 * [Wildreach.Graphics] ClassicShadows). Every graphics-card crash seen so far (22 of 22, 10-25 to 11-17, NVIDIA
+	 * Aftermath) was a memory fault in the virtual shadow maps' culling of non-Nanite meshes (CullPerPageDrawCommandsCs),
+	 * so a run that ended in one (CrashType GPUCrash) turns them on by itself at the next start, once; the player can
+	 * turn them back. Not in bot runs (-wrbot: the tests and picture tools).
+	 */
+	WILDREACH_API bool ClassicShadows();
+	WILDREACH_API void SetClassicShadows(bool bOn);
+	/** This start switched to classic shadows because the last run's graphics card crashed (the crash card says so). */
+	WILDREACH_API bool SwitchedShadowsAfterCrash();
 }

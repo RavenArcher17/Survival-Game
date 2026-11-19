@@ -23,7 +23,7 @@ $cryo = @('WRBotPause 1', 'wait 1', 'WRCast 1', 'wait 1.4', 'WRCast 1', 'wait 1'
 	'WRSay spelltest-done') -join '|'
 
 # Verbose: the server logs every ability it confirms (ABILITY <who> used <class>).
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=spelltest -wrstore=json `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_CombatArena -server -nullrhi -unattended -nosound -port=$Port -wrworld=spelltest -wrstore=json -wrdefaultpreset=playtest `"-LogCmds=LogWildreach Verbose`" -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 20
 $c1 = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=fire?WRName=Pyro -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$pyro`" -abslog=`"$out\pyro.log`"" -PassThru -WindowStyle Hidden
 $c2 = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:$($Port)?Path=frost?WRName=Cryo -game -nullrhi -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$cryo`" -abslog=`"$out\cryo.log`"" -PassThru -WindowStyle Hidden

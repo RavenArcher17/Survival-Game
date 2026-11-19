@@ -136,7 +136,15 @@ didn't call for it or it couldn't be verified in this pass.
   hang check", `DXGI_ERROR_DEVICE_HUNG`, the virtual shadow maps' Nanite `NodeAndClusterCull`), as it hung 4 of 4 in
   0.4; the 5 runs without it that day were all clean. It stays at 0. The same hang turns up now and then elsewhere
   (the menus test's host with two game windows on the GPU, the creature-video and portrait tools), always in that step
-  and with the GPU heavily loaded: not looked into yet.
+  and with the GPU heavily loaded. Looked into 11-19 (phase 2): the NVIDIA Aftermath dumps in all 22 GPU crash folders
+  (10-25 to 11-17) say the same thing, and it isn't `NodeAndClusterCull` (that is only in flight beside it): a page
+  fault (an MMU read at 0xfffff000, 0x100000000 and the like) in `CullPerPageDrawCommandsCs`, the virtual shadow maps'
+  culling of non-Nanite meshes (breadcrumb `RenderVirtualShadowMaps(Non-Nanite) > Batched > CullingPasses`), most
+  within the first seconds after a map loads. The root cause is still open (an instance or primitive id out of range,
+  the engine's own range check there is debug-only). The workaround: Settings > Video > Shadow method (Classic = no
+  virtual shadow maps), turned on by itself at the start after a run whose crash folder says `GPUCrash`
+  (`WRReport::ClassicShadows`). Next to try for the cause: `r.Shadow.Virtual.NonNanite.Batch 0`, and moving the
+  code-built meshes (land chunks, caves, boss bodies) off the dynamic path.
 - **Shader pipeline (PSO) cache for packaged builds**: UE 5.8 already precaches PSOs on D3D12 and holds a mesh back
   until its PSOs are ready (`r.PSOPrecache.ProxyCreationStrategy=1`), so a first-time compile shows as an object
   appearing a moment late rather than a stutter. A bundled cache would cover the rest, but it has to be recorded from

@@ -662,7 +662,8 @@ void UWRCrystalBossBody::ApplyTint()
 			const TSharedPtr<FJsonObject> O = V->AsObject();
 			const TSharedPtr<FJsonObject>* Look = nullptr;
 			const TArray<TSharedPtr<FJsonValue>>* Tints = nullptr;
-			if (O.IsValid() && O->GetStringField(TEXT("id")) == C->CreatureId.ToString() && O->TryGetObjectField(TEXT("look"), Look) && (*Look)->TryGetArrayField(TEXT("tint"), Tints) && Tints->Num()) Pick = (*Tints)[0]->AsObject();
+			FString Id;   // (the list's "_bosses"-style notes have no id)
+			if (O.IsValid() && O->TryGetStringField(TEXT("id"), Id) && Id == C->CreatureId.ToString() && O->TryGetObjectField(TEXT("look"), Look) && (*Look)->TryGetArrayField(TEXT("tint"), Tints) && Tints->Num()) Pick = (*Tints)[0]->AsObject();
 		}
 	}
 	if (!Pick.IsValid()) return;

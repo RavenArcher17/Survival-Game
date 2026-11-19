@@ -38,7 +38,7 @@ if (-not $Log) {
 	foreach ($s in $sections.GetEnumerator()) { $cmds += $s.Value[0]; $cmds += 'WRUIState'; $cmds += $frames }
 	if ($Shots) { $cmds += 'WRClick Map|wait 2'; $cmds += ((1..45 | ForEach-Object { 'shot showui|wait 0' }) -join '|'); $cmds += 'wait 5' }
 	$cmds += 'WRUIState|wait 1'
-	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=flicker -wrstore=json -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
+	$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=flicker -wrstore=json -wrdefaultpreset=playtest -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 	Start-Sleep -Seconds 30
 	$c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name}?Body=f -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 	$deadline = (Get-Date).AddSeconds(480)

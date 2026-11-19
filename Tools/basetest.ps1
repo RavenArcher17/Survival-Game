@@ -43,7 +43,7 @@ if (-not $Log) {
 	if (Test-Path $ini) { $t = [IO.File]::ReadAllText($ini); [IO.File]::WriteAllText($ini, ($t -replace "(?m)^Hints_$name=.*\r?\n", '')) }
 	$shotDir = Join-Path $root 'Saved\Screenshots\WindowsEditor'
 	$started = Get-Date
-	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=${name}?Path=fire?Body=m -game -windowed -ResX=1440 -ResY=900 -unattended -nosound -port=$Port -wrworld=basetest -wrstore=json -wrtune=wildlife.enabled:0 -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
+	$c = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island?listen?WRName=${name}?Path=fire?Body=m -game -windowed -ResX=1440 -ResY=900 -unattended -nosound -port=$Port -wrworld=basetest -wrstore=json -wrdefaultpreset=playtest -wrtune=wildlife.enabled:0 -wrbot `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 	$deadline = (Get-Date).AddSeconds(300)
 	while ((Get-Date) -lt $deadline -and -not $c.HasExited) {
 		Start-Sleep -Seconds 3

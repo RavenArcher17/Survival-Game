@@ -191,25 +191,46 @@ namespace WRFlowUI
 	const FSlateBrush* LoadingBackdrop()
 	{
 		static TSharedPtr<FSlateDynamicImageBrush> Brush;
-		static bool bTried = false;
-		if (!bTried)
+		static int32 Tries = 0;
+		static double NextTry = 0.0;
+		const double Now = FPlatformTime::Seconds();
+		if (!Brush.IsValid() && Tries < 5 && Now >= NextTry)
 		{
-			bTried = true;
+			++Tries;
+			NextTry = Now + 1.0;
 			const FString Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(WRUI::Dir(), TEXT("loading.jpg")));
 			TArray<uint8> File;
-			if (FFileHelper::LoadFileToArray(File, *Path, FILEREAD_Silent))
+			FString Why;
+			if (!FFileHelper::LoadFileToArray(File, *Path, FILEREAD_Silent))
+			{
+				Why = TEXT("no file");
+				Tries = 5;
+			}
+			else
 			{
 				IImageWrapperModule& Wrappers = FModuleManager::LoadModuleChecked<IImageWrapperModule>(TEXT("ImageWrapper"));
 				TSharedPtr<IImageWrapper> Jpg = Wrappers.CreateImageWrapper(EImageFormat::JPEG);
 				TArray<uint8> Raw;
-				if (Jpg.IsValid() && Jpg->SetCompressed(File.GetData(), File.Num()) && Jpg->GetRaw(ERGBFormat::BGRA, 8, Raw))
+				if (!Jpg.IsValid() || !Jpg->SetCompressed(File.GetData(), File.Num()) || !Jpg->GetRaw(ERGBFormat::BGRA, 8, Raw))
 				{
+					Why = TEXT("not a JPEG it can decode");
+					Tries = 5;
+				}
+				else
+				{
+					// Slate makes the texture only once its renderer is up: the first loading screen can come before that
+					// (the map on the command line), so it tries again a second later, up to five times.
 					Brush = FSlateDynamicImageBrush::CreateWithImageData(TEXT("WRLoadingBackdrop"), FVector2D(Jpg->GetWidth(), Jpg->GetHeight()), Raw);
+					if (!Brush.IsValid()) Why = FString::Printf(TEXT("Slate couldn't make its %lldx%lld texture yet"), Jpg->GetWidth(), Jpg->GetHeight());
 				}
 			}
 			if (!Brush.IsValid())
 			{
-				UE_LOG(LogWildreach, Warning, TEXT("FLOW loading backdrop missing or unreadable: %s"), *Path);
+				UE_LOG(LogWildreach, Warning, TEXT("FLOW loading backdrop %s (try %d): %s"), *Why, Tries, *Path);
+			}
+			else if (Tries > 1)
+			{
+				UE_LOG(LogWildreach, Log, TEXT("FLOW loading backdrop made on try %d"), Tries);
 			}
 		}
 		return Brush.Get();

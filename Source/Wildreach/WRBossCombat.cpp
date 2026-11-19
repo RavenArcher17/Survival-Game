@@ -1003,7 +1003,8 @@ void AWRBoss::SpawnRoamProps()
 	{
 		const TSharedPtr<FJsonObject> O = V->AsObject();
 		const TSharedPtr<FJsonObject>* PropsObj = nullptr;
-		if (!O.IsValid() || O->GetStringField(TEXT("id")) != CreatureId.ToString() || !O->TryGetObjectField(TEXT("props"), PropsObj))
+		FString Id;   // (the list's "_bosses"-style notes have no id)
+		if (!O.IsValid() || !O->TryGetStringField(TEXT("id"), Id) || Id != CreatureId.ToString() || !O->TryGetObjectField(TEXT("props"), PropsObj))
 		{
 			continue;
 		}

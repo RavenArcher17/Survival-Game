@@ -87,7 +87,7 @@ checks before and after publishing, are in `Docs/HANDOFF.md` ("Releasing an upda
 Server settings: a world's preset and rules are set on the New world form, and by the host in game (Esc > World). They live
 in `Saved/Worlds/<world>/settings.json`: the preset alone, or `{"preset": "custom", "base": "pve", "settings": {...}}` with
 what differs from it (the keys in `Data/server_presets.json`, plus `dayMinutes`, `hungerMultiplier`, `creatureNumbers` and
-`creatureDifficulty`). A server with no settings file plays `playtest` (10x XP, PvP off). `-wrpreset=pvp_standard` (or
+`creatureDifficulty`). A server with no settings file plays `pve` (`-wrdefaultpreset=playtest` makes that 10x XP, as the tests do). `-wrpreset=pvp_standard` (or
 `pve`, `casual_coop`) overrides either, and `-wrworld=<name>` picks a dedicated server's world (without it: the map's, so
 `Island` on L_Island).
 

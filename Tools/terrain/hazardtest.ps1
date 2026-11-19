@@ -40,7 +40,7 @@ $bots = @(
 	@{ N = 'Blaze';  P = 'fire';  Gap = 4; Lava = ('WRTeleport {0:F0} {1:F0}' -f $spots[1].x, $spots[1].y); Ice = 'WRTeleport 109000 4000' },
 	@{ N = 'Edgy';   P = 'frost'; Gap = 4; Lava = ('WRTeleport {0:F0} {1:F0}' -f $edge.x, $edge.y); Ice = 'WRTeleport 48400 4000' }
 )
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=hazardtest -wrstore=json -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=hazardtest -wrstore=json -wrdefaultpreset=playtest -abslog=`"$out\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $clients = foreach ($b in $bots) {
 	# Two readings in the lava Gap s apart, then one on the ice. (Lava burns 20 a second plus burn: a frost main lasts

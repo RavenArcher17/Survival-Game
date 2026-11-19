@@ -1443,7 +1443,9 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 			const FVector At = Survivor->GetActorLocation() + Survivor->GetActorForwardVector() * 700.f + FVector(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), 0.f);
 			if (AWRCreature* Spawned = AWRCreature::SpawnCreature(GetWorld(), FName(*Arg(1)), At, FRotator(0.f, Survivor->GetActorRotation().Yaw + 180.f, 0.f)))
 			{
-				UE_LOG(LogWildreach, Log, TEXT("SPAWN %s: %.0f hp, %.0f damage"), *Arg(1), Spawned->GetAttributes()->GetMaxHealth(), Spawned->Weapon.FlatDamage);
+				// Last, its health before its wild genes (they move it up to wildClamp either way): the world's difficulty alone.
+				UE_LOG(LogWildreach, Log, TEXT("SPAWN %s: %.0f hp, %.0f damage, %.0f hp before its genes"), *Arg(1), Spawned->GetAttributes()->GetMaxHealth(),
+					Spawned->Weapon.FlatDamage, Spawned->GetDef() ? Spawned->GetDef()->Health * FMath::Max(0.1f, WRTune(TEXT("server.creatureDifficulty"), 1.f)) : 0.f);
 			}
 		}
 	}

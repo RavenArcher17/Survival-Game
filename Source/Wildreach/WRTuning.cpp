@@ -178,7 +178,8 @@ void FWRTuning::ImportServerSettings(const FString& InPreset, const TArray<FStri
 
 void FWRTuning::ApplyServerPreset()
 {
-	// Preset: -wrpreset=<name>, else the world's settings.json {"preset": ..., "settings": {...}}, else the file's default.
+	// Preset: -wrpreset=<name>, else the world's settings.json {"preset": ..., "settings": {...}}, else
+	// -wrdefaultpreset=<name> (the tests: playtest), else the file's default (pve).
 	const TSharedPtr<FJsonObject> Presets = LoadDataFile(TEXT("server_presets.json"));
 	const TSharedPtr<FJsonObject>* List = nullptr;
 	if (!Presets.IsValid() || !Presets->TryGetObjectField(TEXT("presets"), List))
@@ -193,6 +194,7 @@ void FWRTuning::ApplyServerPreset()
 		FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), ServerFile);
 	}
 	Preset = Presets->GetStringField(TEXT("default"));
+	FParse::Value(FCommandLine::Get(), TEXT("-wrdefaultpreset="), Preset);
 	if (ServerFile.IsValid()) ServerFile->TryGetStringField(TEXT("preset"), Preset);
 	FParse::Value(FCommandLine::Get(), TEXT("wrpreset="), Preset);
 

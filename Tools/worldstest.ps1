@@ -67,7 +67,7 @@ try {
 
 	$ini = "[Wildreach.Menu]:Name=$name,[Wildreach.Menu]:Body=m,[Wildreach.Menu]:Path=fire"
 	# (-wrstore=json: every world this one game hosts from the menu keeps world.json and players/*.json, which the checks read.)
-	$c = Start-Process $ue -ArgumentList ("`"$project`" /Game/Maps/L_Island -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot -wrstore=json -port=$Port " +
+	$c = Start-Process $ue -ArgumentList ("`"$project`" /Game/Maps/L_Island -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot -wrstore=json -wrdefaultpreset=playtest -port=$Port " +
 		"`"-ini:Engine:[URL]:Port=$Port`" `"-ini:GameUserSettings:$ini`" `"-ExecCmds=t.MaxFPS 45`" `"-wrbotcmds=$($bot -join '|')`" -abslog=`"$log`"") -PassThru
 	$deadline = (Get-Date).AddSeconds(780)
 	$friendLog = Join-Path $logs 'friend.log'
@@ -80,7 +80,7 @@ try {
 			# (A real window: it opens Esc and reads what's there, and the World page shouldn't be.)
 			# (WRStreaming: the friend has the whole island's ground, as the host does: 0.7's far views.)
 			$pal = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 12', 'WRStreaming', 'WRKey Escape', 'wait 1.5', 'WRUIText', 'WRKey Escape')
-			$friend = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Palbot -game -windowed -ResX=960 -ResY=540 -unattended -nosound -wrbot -wrstore=json `"-ExecCmds=t.MaxFPS 30`" `"-wrbotcmds=$($pal -join '|')`" -abslog=`"$friendLog`"" -PassThru
+			$friend = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Palbot -game -windowed -ResX=960 -ResY=540 -unattended -nosound -wrbot -wrstore=json -wrdefaultpreset=playtest `"-ExecCmds=t.MaxFPS 30`" `"-wrbotcmds=$($pal -join '|')`" -abslog=`"$friendLog`"" -PassThru
 		}
 	}
 	foreach ($p in @($c, $friend)) { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force } }
