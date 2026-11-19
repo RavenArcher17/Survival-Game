@@ -204,6 +204,9 @@ protected:
 	/** The ranged weapon in hand while it's out. */
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> RangedMesh;
 	bool bShieldShown = false;
+	/** A crowd's face: the head follows the body's pose with no face rig of its own (blinks, the jaw), which is most of
+	 *  what a person costs to draw (the city's people, AWRWorldNpc::IsTownsfolk). Set before BeginPlay. */
+	bool bPlainFace = false;
 	/** Body picked in the menu (?Body= on the join URL, kept on the PlayerState): a variant under "bodies" in
 	 *  Data/player_art.json. None = the default body. */
 	UPROPERTY(ReplicatedUsing=OnRep_BodyStyle) FName BodyStyle;

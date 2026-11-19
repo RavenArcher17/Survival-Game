@@ -1852,6 +1852,12 @@
 			{"id": "howl", "event": "ff.spot.howl_far", "layers": ["tundra.night"], "min": 0.5, "every": [90, 200], "dist": [150, 250], "up": [0, 10], "_why": "A far howl across the tundra at night."}
 		],
 		"beds": [
+			{ "id": "round.yards.day", "file": "amb/forest_villages", "volume": 0.5, "layer": "zone.yards.day", "_comment": "Hearthmoot inside its walls by day: the town about its business (the forest villages' bed, a stand-in)." },
+			{ "id": "round.walls.day", "file": "amb/forest_villages", "volume": 0.3, "layer": "zone.city.day", "_comment": "Hearthmoot's hill and walls by day: the town further off." },
+			{ "id": "round.yards.night", "file": "amb/night_insects", "volume": 0.14, "layer": "zone.yards.night", "_comment": "The town at night: crickets in the yards." },
+			{ "id": "round.walls.night", "file": "amb/night_insects", "volume": 0.2, "layer": "zone.city.night" },
+			{ "id": "round.meadow.day", "file": "amb/forest_meadows_day", "volume": 0.35, "layer": "zone.meadow.day", "_comment": "Hearthmoot's meadow by day: birds and the breeze in the grass." },
+			{ "id": "round.meadow.night", "file": "amb/night_insects", "volume": 0.3, "layer": "zone.meadow.night" },
 			{"id": "ff.V10", "file": "amb/ff_v1", "volume": 0.35, "layer": "ffzone.V1", "_comment": "V1 the Ash Plains: wind over ash, the crater's far rumble."},
 			{"id": "ff.V11", "file": "amb/volcanic_rumble", "volume": 0.15, "layer": "ffzone.V1", "_comment": "V1: the crater's rumble under the wind."},
 			{"id": "ff.V22", "file": "amb/ff_v2", "volume": 0.35, "layer": "ffzone.V2", "_comment": "V2 the Lava Fields: the river's gurgle and crack."},

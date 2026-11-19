@@ -224,6 +224,71 @@
 
   "trade": {
     "_comment": "Barter: give -> get, opened at a standing tier (0 Stranger .. 3 Kin). Discounts take off the give side (rounded up, at least 1).",
+    "_market": "Hearthmoot: the plaza market stalls and the inn (WRRoundIsland sellers; anyone may trade, no standing needed).",
+    "market_bread": [
+      { "give": { "meadow_oats": 6 }, "get": { "bread": 2 }, "tier": 0 },
+      { "give": { "wood": 10 }, "get": { "bread": 1 }, "tier": 0 },
+      { "give": { "honey": 1, "meadow_oats": 4 }, "get": { "honey_cake": 1 }, "tier": 0 },
+      { "give": { "berries": 12 }, "get": { "pie": 1 }, "tier": 0 }
+    ],
+    "market_food": [
+      { "give": { "raw_meat": 4 }, "get": { "cooked_meat": 3 }, "tier": 0 },
+      { "give": { "hide": 4 }, "get": { "stew": 1 }, "tier": 0 },
+      { "give": { "berries": 10 }, "get": { "dried_fruit": 3 }, "tier": 0 },
+      { "give": { "stone": 20 }, "get": { "salted_meat": 2 }, "tier": 0 }
+    ],
+    "market_fish": [
+      { "give": { "wood": 12 }, "get": { "smoked_fish": 2 }, "tier": 0 },
+      { "give": { "fiber": 15 }, "get": { "grilled_fish": 2 }, "tier": 0 },
+      { "give": { "raw_meat": 6 }, "get": { "fish_soup": 1 }, "tier": 0 },
+      { "give": { "flint": 6 }, "get": { "salt": 2 }, "tier": 0 }
+    ],
+    "market_produce": [
+      { "give": { "wood": 8 }, "get": { "idunn_apple": 3 }, "tier": 0 },
+      { "give": { "fiber": 10 }, "get": { "berries": 8 }, "tier": 0 },
+      { "give": { "stone": 15 }, "get": { "egg": 3 }, "tier": 0 },
+      { "give": { "hide": 3 }, "get": { "honey": 1 }, "tier": 0 },
+      { "give": { "wood": 15 }, "get": { "meadow_oats": 6 }, "tier": 0 }
+    ],
+    "market_tools": [
+      { "give": { "wood": 12, "stone": 8 }, "get": { "stone_hatchet": 1 }, "tier": 0 },
+      { "give": { "wood": 12, "stone": 10 }, "get": { "stone_pick": 1 }, "tier": 0 },
+      { "give": { "fiber": 20 }, "get": { "rope": 2 }, "tier": 0 },
+      { "give": { "wood": 20 }, "get": { "planks": 6 }, "tier": 0 },
+      { "give": { "hide": 8 }, "get": { "iron_ingot": 1 }, "tier": 0 }
+    ],
+    "market_cloth": [
+      { "give": { "fiber": 20 }, "get": { "linen": 2 }, "tier": 0 },
+      { "give": { "hide": 6 }, "get": { "wool": 3 }, "tier": 0 },
+      { "give": { "hide": 6, "fiber": 6 }, "get": { "hide_head": 1 }, "tier": 0 },
+      { "give": { "hide": 12, "fiber": 10 }, "get": { "hide_armor": 1 }, "tier": 0 },
+      { "give": { "hide": 6, "fiber": 6 }, "get": { "hide_hands": 1 }, "tier": 0 },
+      { "give": { "hide": 8, "fiber": 8 }, "get": { "hide_legs": 1 }, "tier": 0 }
+    ],
+    "market_fletcher": [
+      { "give": { "wood": 6, "flint": 3 }, "get": { "flint_arrow": 10 }, "tier": 0 },
+      { "give": { "wood": 5, "stone": 3 }, "get": { "stone_arrow": 10 }, "tier": 0 },
+      { "give": { "fiber": 8 }, "get": { "waterskin": 1 }, "tier": 0 }
+    ],
+    "market_potter": [
+      { "give": { "stone": 12 }, "get": { "clay": 6 }, "tier": 0 },
+      { "give": { "wood": 15 }, "get": { "charcoal": 6 }, "tier": 0 },
+      { "give": { "clay": 6, "charcoal": 2 }, "get": { "glass": 2 }, "tier": 0 },
+      { "give": { "berries": 6 }, "get": { "candle_rhubarb": 2 }, "tier": 0 }
+    ],
+    "market_herbs": [
+      { "give": { "berries": 10 }, "get": { "cinder_salve": 1 }, "tier": 0 },
+      { "give": { "fiber": 12 }, "get": { "mushroom_broth": 1 }, "tier": 0 },
+      { "give": { "meadow_oats": 6 }, "get": { "cloudberry_porridge": 1 }, "tier": 0 }
+    ],
+    "inn": [
+      { "give": { "wood": 8 }, "get": { "stew": 1 }, "tier": 0 },
+      { "give": { "raw_meat": 3 }, "get": { "roast_vegetable": 2 }, "tier": 0 },
+      { "give": { "berries": 6 }, "get": { "cloudberry_porridge": 1 }, "tier": 0 },
+      { "give": { "stone": 10 }, "get": { "bread": 1 }, "tier": 0 },
+      { "give": { "fiber": 10 }, "get": { "fish_soup": 1 }, "tier": 0 },
+      { "give": { "hide": 2 }, "get": { "pie": 1 }, "tier": 0 }
+    ],
     "volcanic": [
       { "give": { "hide": 6 }, "get": { "iron_ingot": 1 }, "tier": 0 },
       { "give": { "raw_meat": 8 }, "get": { "sulfur_crystal": 4 }, "tier": 0 },

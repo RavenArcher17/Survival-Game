@@ -61,6 +61,32 @@ private:
 	};
 	TArray<FFire> Fires;
 	bool bNightShown = false;
+	/** The hearth's crackle now and then while you're near it. */
+	float CrackleClock = 0.f;
+
+	/** Rooms you walk into (Data/hearthmoot.json "floors", map metres): no grass grows through their floors. */
+	struct FFloor { FVector2D C = FVector2D::ZeroVector, Half = FVector2D::ZeroVector; float Yaw = 0.f; };
+	TArray<FFloor> Floors;
+
+	/** Server: Hearthmoot's people (Data/hearthmoot.json "people"): out while any player is near the city (a few each
+	 *  tick, so no hitch), gone a while after the last one leaves; the walkers kept moving along their walks. */
+	void LoadPeople(const TSharedPtr<class FJsonObject>& J);
+	void StepPeople(float DeltaSeconds);
+	struct FWalk { TArray<FVector> Pts; bool bClosed = false; };
+	struct FPerson
+	{
+		uint8 Kind = 0;               // 0 walker, 1 seller, 2 at a post
+		FName Role, Sex, Outfit, Table;
+		FString Name, Id;
+		int32 Face = 0, Build = 0, Walk = -1, Point = 0, Dir = 1;
+		FVector At = FVector::ZeroVector;
+		float Yaw = 0.f;
+		TWeakObjectPtr<class AWRWorldNpc> Npc;
+	};
+	TArray<FWalk> Walks;
+	TArray<FPerson> People;
+	bool bPeopleOut = false;
+	float AloneFor = 0.f;
 
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> Solids;
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Water;

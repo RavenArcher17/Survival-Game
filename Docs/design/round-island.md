@@ -125,8 +125,15 @@ ground), then the rest round the ring.
 - **Only the round island's own things on its map:** `WRLand::OwnLandMap()` is true on a map with a land of its own;
   `WRBiome::IsLive` is then false for every Old Island biome (nothing of theirs is placed there), while
   `WRBiome::IsContentLive` (recipes, crops, dishes, factions) is unchanged. Each land's slice brings its content here.
+- **People:** hearthmoot.json "people" (walks + walkers, sellers, standers) spawned by WRRoundIsland on the server
+  as AWRWorldNpc townsfolk / seller / guard; a seller trades from its TradeTable (world.json trade). Plain faces, net
+  cull 90 m, pose and tick throttled by distance (StepCrowdCost); `wr.HidePeople 1` hides them for frame checks.
+- **Rooms you walk into:** `hallInside` and the inn in hearthmoot.mjs (`wall` with openings, `openRoof`, `table`,
+  `lampHang`); their floors in "floors" keep the grass out; fires kind 4 / 5 light them.
+- **Sound:** sounds.json ambient beds on the island's zones (zone.yards / zone.city / zone.meadow, .day / .night).
 - **Each slice is finished before the next** (Raven, 11-19): audit it from many angles, day and night, fix everything
-  in it, and list only what truly belongs to a later slice.
+  in it, make it alive (people or creatures that belong there) and explorable (key places you walk into), and list
+  only what truly belongs to a later slice.
 - **Hearthmoot and the forts:** `node Tools/terrain/hearthmoot.mjs` -> `Data/hearthmoot.json`, built on every machine
   by `WRRoundIsland.cpp` from the building look's blocks (no replication); its solids are hidden boxes.
 - **Pictures:** `Tools/terrain/spotshots.ps1 -Map L_Wildreach` (camera spots in game cm: map metres x 100).

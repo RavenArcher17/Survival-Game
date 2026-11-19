@@ -32,9 +32,16 @@
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
 
 namespace WRNpcDetail
 {
+	/** Look checks: hide the city's people (frame-time comparisons). */
+	static int32 HidePeople = 0;
+	static FAutoConsoleVariableRef HidePeopleVar(TEXT("wr.HidePeople"), HidePeople, TEXT("1: the city's people are hidden and don't tick (look checks)."));
+
 	TSharedPtr<FJsonObject> MasterRow(FName Id)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
@@ -93,6 +100,7 @@ void AWRWorldNpc::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AWRWorldNpc, NpcName);
 	DOREPLIFETIME(AWRWorldNpc, Biome);
 	DOREPLIFETIME(AWRWorldNpc, bTrading);
+	DOREPLIFETIME(AWRWorldNpc, TradeTable);
 }
 
 void AWRWorldNpc::SetLook(FName Sex, int32 InFace, int32 InBuild, const FName (&Armor)[4], const FName (&Elements)[4])
@@ -102,7 +110,7 @@ void AWRWorldNpc::SetLook(FName Sex, int32 InFace, int32 InBuild, const FName (&
 	SetWornArmor(Armor, Elements);
 	// A master wears their path at 75 points (fire-frost 3.3.10 / 3.4.10: the body change as a living preview); a
 	// merchant the faint marks of a life on their land.
-	bNpcMarks = true;
+	bNpcMarks = !IsTownsfolk();   // the city's people carry no path's marks (their glow read as a collar of light)
 	const TSharedPtr<FJsonObject> B = WRWorld::Biome(Biome);
 	FString Path;
 	if (B.IsValid()) B->TryGetStringField(TEXT("path"), Path);
@@ -115,9 +123,9 @@ void AWRWorldNpc::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);   // no PlayerState: the survivor's set-up is skipped
 	if (!AbilitySystem) return;
 	AbilitySystem->InitAbilityActorInfo(this, this);
-	if (NpcRole == TEXT("master"))
+	if (NpcRole == TEXT("master") || IsTownsfolk())
 	{
-		// Masters stand outside the fight: no health to take (BlocksHit too), nothing hunts them.
+		// Masters (and the city's people) stand outside the fight: no health to take (BlocksHit too), nothing hunts them.
 		AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetMaxHealthAttribute(), 0.f);
 		AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), 0.f);
 		bVitals = false;
@@ -129,8 +137,24 @@ void AWRWorldNpc::PossessedBy(AController* NewController)
 
 void AWRWorldNpc::BeginPlay()
 {
+	if (IsTownsfolk())
+	{
+		// A crowd: plain faces, and only sent to players within peopleNetCull cm (the city's far side stays on the server).
+		bPlainFace = true;
+		NetCullDistanceSquared = FMath::Square(FWRTuning::Get().Num(TEXT("roundIsland.peopleNetCull"), 9000.f));
+	}
 	Super::BeginPlay();
 	GetCharacterMovement()->MaxWalkSpeed = NpcRole == TEXT("master") ? 160.f : WRWorld::Num(TEXT("caravan.speed"), 300.f);
+	if (IsTownsfolk())
+	{
+		// A stroll (each their own pace), and the pose only ticks while seen: a city's worth of people stays cheap.
+		GetCharacterMovement()->MaxWalkSpeed = NpcRole == TEXT("townsfolk") ? FMath::FRandRange(115.f, 155.f) : 150.f;
+		if (Body)
+		{
+			Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+			Body->bEnableUpdateRateOptimizations = true;
+		}
+	}
 	LastPos = GetActorLocation();
 	WorkClock = FMath::FRandRange(0.f, WorkEvery);
 }
@@ -144,12 +168,21 @@ FString AWRWorldNpc::GetDisplayLabel() const
 		if (B.IsValid()) B->TryGetStringField(TEXT("path"), Path);
 		return FString::Printf(TEXT("%s · %s path master"), *NpcName, *Path.Left(1).ToUpper().Append(Path.RightChop(1)));
 	}
+	if (NpcRole == TEXT("seller")) return FString::Printf(TEXT("%s · market"), *NpcName);
+	if (NpcRole == TEXT("guard")) return FString::Printf(TEXT("%s · city watch"), *NpcName);
 	return NpcRole == TEXT("merchant") ? FString::Printf(TEXT("%s%s"), *NpcName, bTrading ? TEXT(" · trading") : TEXT(" · on the road")) : NpcName;
 }
 
 void AWRWorldNpc::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (IsTownsfolk() && NpcRole != TEXT("guard"))
+	{
+		// The hero body's sword and shield stay off the city's people (only the watch is armed).
+		if (ShieldMesh && ShieldMesh->IsVisible()) ShieldMesh->SetVisibility(false);
+		if (WeaponMesh && WeaponMesh->IsVisible()) WeaponMesh->SetVisibility(false);
+	}
+	if (IsTownsfolk() && GetNetMode() != NM_DedicatedServer) StepCrowdCost();
 	if (!HasAuthority() || (bVitals && !IsAlive())) return;
 	// Whoever's nearest within talking range: the master turns to them and stops work; a merchant at a stop faces them.
 	APawn* Nearest = nullptr;
@@ -234,6 +267,25 @@ void AWRWorldNpc::Tick(float DeltaSeconds)
 	}
 }
 
+void AWRWorldNpc::StepCrowdCost()
+{
+	// A crowd's cost by its distance from the view: close by every frame; further off their pose and their own tick
+	// update a few times a second (roundIsland.peopleNear / peopleMid cm, peopleMidEvery / peopleFarEvery s).
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	const FVector View = PC && PC->PlayerCameraManager ? PC->PlayerCameraManager->GetCameraLocation() : GetActorLocation();
+	const FWRTuning& T = FWRTuning::Get();
+	const float D = FVector::Dist(View, GetActorLocation());
+	const float Every = D < T.Num(TEXT("roundIsland.peopleNear"), 1500.f) ? 0.f : D < T.Num(TEXT("roundIsland.peopleMid"), 4000.f) ? T.Num(TEXT("roundIsland.peopleMidEvery"), 0.05f) : T.Num(TEXT("roundIsland.peopleFarEvery"), 0.12f);
+	if (Body && !FMath::IsNearlyEqual(Body->PrimaryComponentTick.TickInterval, Every)) Body->SetComponentTickInterval(Every);
+	if (!FMath::IsNearlyEqual(PrimaryActorTick.TickInterval, Every)) SetActorTickInterval(Every);
+	const bool bHide = WRNpcDetail::HidePeople != 0;
+	if (bHide != IsHidden())
+	{
+		SetActorHiddenInGame(bHide);
+		if (Body) Body->SetComponentTickEnabled(!bHide);
+	}
+}
+
 void AWRWorldNpc::OnDeath(AActor* Killer)
 {
 	// No respawn, no death penalty: a merchant killed on the road drops a tenth of the stock on it.
@@ -305,7 +357,7 @@ namespace WRNpcDetail
 		for (TActorIterator<AWRShrine> It(World); It; ++It) Consider(*It, It->GetActorLocation() + FVector(0.f, 0.f, 120.f), ShrineReach * (It->bGreat ? 1.3f : 1.f));
 		for (TActorIterator<AWRWorldNpc> It(World); It; ++It)
 		{
-			if (It->NpcRole == TEXT("master") || (It->NpcRole == TEXT("merchant") && It->bTrading)) Consider(*It, It->GetActorLocation(), WRWorld::Num(TEXT("quests.talkRange"), 400.f));
+			if (It->NpcRole == TEXT("master") || ((It->NpcRole == TEXT("merchant") || It->NpcRole == TEXT("seller")) && It->bTrading)) Consider(*It, It->GetActorLocation(), WRWorld::Num(TEXT("quests.talkRange"), 400.f));
 		}
 		for (TActorIterator<AWRSummoningStone> It(World); It; ++It) Consider(*It, It->GetActorLocation(), 320.f);
 		for (TActorIterator<AWRMessageStone> It(World); It; ++It) Consider(*It, It->GetActorLocation(), WRWorld::Num(TEXT("messages.readRange"), 300.f));

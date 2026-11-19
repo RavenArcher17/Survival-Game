@@ -1,4 +1,5 @@
 #include "WRHUD.h"
+#include "WRWorldSystems.h"
 #include "WRGod.h"
 #include "WRTuning.h"
 #include "WRPadInput.h"
@@ -453,8 +454,10 @@ void AWRHUD::DrawWorldBars(const AWRCharacterBase* Self)
 		const bool bPlayer = Other->GetPlayerState() != nullptr;
 		const int32 NamesMode = FWRKeyBindings::Get().PrefInt(TEXT("Names"));
 		const float BarRange = WRTune(TEXT("ui.names.barCm"), 2500.f);
-		const float NameRange = !bPlayer ? BarRange : NamesMode == 0 ? WRTune(TEXT("ui.names.farCm"), 8000.f) : NamesMode == 1 ? WRTune(TEXT("ui.names.nearCm"), 4000.f) : 0.f;
-		const bool bBar = Dist <= BarRange;
+		const AWRWorldNpc* Npc = Cast<AWRWorldNpc>(Other);
+		const bool bTown = Npc && Npc->IsTownsfolk();
+		const float NameRange = bTown ? WRTune(TEXT("ui.names.townCm"), 800.f) : !bPlayer ? BarRange : NamesMode == 0 ? WRTune(TEXT("ui.names.farCm"), 8000.f) : NamesMode == 1 ? WRTune(TEXT("ui.names.nearCm"), 4000.f) : 0.f;
+		const bool bBar = !bTown && Dist <= BarRange;
 		const bool bName = Dist <= NameRange;
 		if (!bBar && !bName)
 		{

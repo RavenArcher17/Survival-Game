@@ -402,14 +402,18 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual FString GetDisplayLabel() const override;
 
-	/** master / merchant / outrider. */
+	/** master / merchant / outrider; Hearthmoot's people (WRRoundIsland): townsfolk / seller / guard. */
 	UPROPERTY(Replicated) FName NpcRole;
 	/** Master id (world.json masters) or caravan id. */
 	UPROPERTY(Replicated) FName NpcId;
 	UPROPERTY(Replicated) FString NpcName;
 	UPROPERTY(Replicated) FName Biome;
-	/** Merchants: stopped at a stop (trade open). */
+	/** Merchants: stopped at a stop (trade open). Market sellers: always. */
 	UPROPERTY(Replicated) bool bTrading = false;
+	/** The trade table (world.json trade) a seller deals from; none: the caravan's. */
+	UPROPERTY(Replicated) FName TradeTable;
+	/** One of the city's people (townsfolk, seller, guard): can't be hurt, cheap to animate, strolls. */
+	bool IsTownsfolk() const { return NpcRole == TEXT("townsfolk") || NpcRole == TEXT("seller") || NpcRole == TEXT("guard"); }
 
 	/** Server: the look (sex m/f, face, build, the four armour pieces and their elements). */
 	void SetLook(FName Sex, int32 InFace, int32 InBuild, const FName (&Armor)[4], const FName (&Elements)[4]);
@@ -425,6 +429,8 @@ public:
 	FName WorkFx;
 	TMap<FString, double> GreetedAt;
 	bool HasVitals() const { return bVitals; }
+	/** Clients: the city's people tick and pose less often the further they are from the view. */
+	void StepCrowdCost();
 
 protected:
 	virtual void PossessedBy(AController* NewController) override;

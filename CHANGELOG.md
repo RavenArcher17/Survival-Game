@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Phase 3, slice 1: Hearthmoot alive and open: its people, a market that trades, halls and an inn you walk into (11-19)
+
+Raven: "Do those two now and anything else and we'll do the rest of the slices the same way" (after I said the city was
+empty and every building a closed box).
+- **The city's people** (Data/hearthmoot.json "people", spawned by WRRoundIsland on the server; AWRWorldNpc roles
+  townsfolk / seller / guard): 82 of them. 32 stroll the plaza, the ring street, the alleys, the avenues and lanes; 14
+  sellers stand behind the market stalls and an innkeeper behind the inn's bar; two of the watch at each gate (iron,
+  armed); people warm themselves at the hearth, neighbours stand by the wells, a steward at each hall's dais, patrons
+  at the inn's tables. Dressed in the cloth and hide sets, some hooded, unarmed but the watch; they can't be hurt; their
+  names show within 8 m, no health bars. Out while a player is within 900 m of the city (a few at a time, so no
+  hitch), in again 30 s after the last one leaves.
+- **What a crowd costs:** plain faces (no face rig), sent only to players within 90 m, and past 15 m their pose and
+  tick update a few times a second (`roundIsland.people*`); 82 people cost about 1 ms of game thread where they first
+  cost 16.
+- **The market trades:** each stall's seller and the innkeeper barter from their own table (world.json trade
+  market_bread, _produce, _tools, _fish, _cloth, _food, _fletcher, _potter, _herbs, inn; tier 0, no faction, the same
+  price for all): E at the stall opens the trade screen ("Market stall · Hearthmoot").
+- **Walk-in halls:** each quarter's hall is one long room you walk into: door and windows open to the street, a
+  timber floor, two long tables with benches, a fireplace, a dais with the steward's chair, banners in the path's
+  colour, two hanging lamps, and a real pitched roof over you (two slabs and gable ends, not a solid block).
+- **The inn, the Hearth and Kettle,** on the plaza's north edge: the bar with barrels and jugs on its shelves, round
+  tables and stools, a fireplace, lamps; its sign, lanterns and a bench outside.
+- **Rooms light themselves** day and night (fires kind 4 fireplace, 5 lamp); no grass grows through a floor
+  (hearthmoot.json "floors").
+- **And the rest of what I said bothered me:** every roof has tile courses and a ridge cap; carts, crates and a notice
+  board on the plaza; the hearth's fire shows by day (a bright core among the logs); the meadow's grass is denser, the
+  wheat finer and thicker; the city has its sound: the town about its business in the yards and on the walls by day,
+  crickets at night, birds over the meadow (sounds.json beds on the island's zones; a zone bed may now be .day or
+  .night), and the hearth crackles when you're near it.
+- Playtest (`Tools/roundtest.ps1`, points from `Tools/terrain/roundtest_points.mjs`): the walker buys bread at the
+  first stall, walks into the inn and out, into a hall and out, then the avenue, the fort and the lake as before; all
+  82 people out; 14.7 ms a frame looking across the plaza with everyone in view (11.6 before the people and the rooms),
+  9.3 ms on the meadow; no errors.
+
 ### Phase 3, slice 1 finished: every rough edge out of Hearthmoot, the meadow and the lake (11-19)
 
 Raven: "Make each slice as we go perfect". An audit of the slice from the ground, the walls, the air, by day, at dusk

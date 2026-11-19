@@ -2408,11 +2408,12 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 	{
 		// world trade <caravan> <offer index>
 		AWRWorldNpc* N = nullptr;
-		for (TActorIterator<AWRWorldNpc> It(PC->GetWorld()); It; ++It) if (It->NpcId == FName(*Arg(2)) && It->NpcRole == TEXT("merchant")) N = *It;
+		for (TActorIterator<AWRWorldNpc> It(PC->GetWorld()); It; ++It) if (It->NpcId == FName(*Arg(2)) && (It->NpcRole == TEXT("merchant") || It->NpcRole == TEXT("seller"))) N = *It;
 		if (!N || !Near(N, 600.f) || !N->bTrading) return TEXT("The merchant isn't trading here");
 		const TArray<TSharedPtr<FJsonValue>>* Rows = WArr(WRWorld::Data(), TEXT("caravans"));
 		FString Table;
 		for (int32 i = 0; Rows && i < Rows->Num(); ++i) if (WStrOf((*Rows)[i]->AsObject(), TEXT("id")) == Arg(2)) Table = WStrOf((*Rows)[i]->AsObject(), TEXT("trade"));
+		if (!N->TradeTable.IsNone()) Table = N->TradeTable.ToString();   // a market seller's own table
 		const TArray<TSharedPtr<FJsonValue>>* Offers = WArr(WRWorld::Obj(TEXT("trade")), Table);
 		const int32 Index = FCString::Atoi(*Arg(3));
 		if (!Offers || !Offers->IsValidIndex(Index)) return TEXT("No such offer");
@@ -2439,8 +2440,9 @@ FString WRWorld::Command(AWRPlayerController* PC, const TArray<FString>& Args)
 			}
 			Got.Add(FString::Printf(TEXT("%s x%d"), *WRWorld::ItemName(KV.Key), KV.Value));
 		}
-		if (Log) Log->AddStanding(Faction, int32(WRWorld::Num(TEXT("factions.perTrade"), 5.f)));
+		if (Log && !Faction.IsNone()) Log->AddStanding(Faction, int32(WRWorld::Num(TEXT("factions.perTrade"), 5.f)));
 		WRSound::Broadcast(N, TEXT("world.trade"));
+		UE_LOG(LogWildreach, Log, TEXT("TRADE %s with %s (%s): %s"), *PS->GetPlayerName(), *N->NpcName, *Table, *FString::Join(Got, TEXT(", ")));
 		return FString::Printf(TEXT("Traded for %s"), *FString::Join(Got, TEXT(", ")));
 	}
 	if (Verb == TEXT("msg"))

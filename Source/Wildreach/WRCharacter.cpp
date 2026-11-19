@@ -610,7 +610,7 @@ void AWRCharacter::LoadBodyArt()
 	Face->SetVisibility(FaceAsset != nullptr);
 	if (FaceAsset)
 	{
-		if (UClass* FaceAnim = FaceAnimPath.IsEmpty() ? nullptr : LoadClass<UAnimInstance>(nullptr, *FaceAnimPath))
+		if (UClass* FaceAnim = FaceAnimPath.IsEmpty() || bPlainFace ? nullptr : LoadClass<UAnimInstance>(nullptr, *FaceAnimPath))
 		{
 			Face->SetAnimInstanceClass(FaceAnim);
 		}

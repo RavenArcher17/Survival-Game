@@ -13,6 +13,8 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "WRFx.h"
+#include "WRSound.h"
+#include "WRWorldSystems.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/StaticMesh.h"
@@ -83,6 +85,7 @@ void AWRRoundIsland::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	StepCover();
+	StepPeople(DeltaSeconds);
 	const AWRGameState* State = AWRGameState::Get(this);
 	const float Daylight = State ? State->GetDaylight() : 1.f;
 	StepLights(Daylight);
@@ -173,16 +176,17 @@ void AWRRoundIsland::BuildCity()
 		{
 			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
 			FFire& F = Fires.AddDefaulted_GetRef();
-			F.Kind = uint8(FMath::Clamp(int32(At(R, 0)), 0, 3));
+			F.Kind = uint8(FMath::Clamp(int32(At(R, 0)), 0, 5));
 			F.At = FVector(At(R, 1), At(R, 2), At(R, 3));
 			F.Scale = FMath::Max(0.1f, At(R, 4));
 			F.Phase = FWRBuildLook::Hash01(F.At, 5) * 6.f;
 			if (F.Kind == 3) continue;
-			const float Radius[3] = { T.Num(TEXT("roundIsland.hearthLightRadius"), 4200.f), T.Num(TEXT("roundIsland.brazierLightRadius"), 1600.f), T.Num(TEXT("roundIsland.lanternLightRadius"), 1100.f) };
+			const float Radius[6] = { T.Num(TEXT("roundIsland.hearthLightRadius"), 4200.f), T.Num(TEXT("roundIsland.brazierLightRadius"), 1600.f), T.Num(TEXT("roundIsland.lanternLightRadius"), 1100.f), 0.f,
+				T.Num(TEXT("roundIsland.fireplaceLightRadius"), 1300.f), T.Num(TEXT("roundIsland.lampLightRadius"), 1500.f) };
 			UPointLightComponent* L = NewObject<UPointLightComponent>(this);
 			L->SetupAttachment(RootComponent);
-			L->SetWorldLocation(F.At + FVector(0.f, 0.f, F.Kind == 0 ? 220.f : 40.f));
-			L->SetLightColor(F.Kind == 2 ? FLinearColor(FColor(255, 190, 120)) : FLinearColor(FColor(255, 150, 70)));
+			L->SetWorldLocation(F.At + FVector(0.f, 0.f, F.Kind == 0 ? 220.f : F.Kind == 5 ? 0.f : F.Kind == 4 ? 70.f : 40.f));
+			L->SetLightColor(F.Kind == 5 ? FLinearColor(FColor(255, 214, 170)) : F.Kind == 2 ? FLinearColor(FColor(255, 190, 120)) : FLinearColor(FColor(255, 150, 70)));
 			L->SetAttenuationRadius(Radius[F.Kind]);
 			L->SetCastShadows(false);
 			L->SetIntensity(0.f);
@@ -220,6 +224,17 @@ void AWRRoundIsland::BuildCity()
 	}
 	UE_LOG(LogWildreach, Log, TEXT("ROUND Hearthmoot: %d blocks in %d parts, %d night blocks, %d fires, %d solids"), Blocks.Num(), Parts, NumNight, Fires.Num(), NumSolids);
 	BuildPlants(J);
+	LoadPeople(J);
+	// The rooms' floors (StepCover keeps the grass out of them).
+	const TArray<TSharedPtr<FJsonValue>>* FloorRows = nullptr;
+	if (J->TryGetArrayField(TEXT("floors"), FloorRows))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *FloorRows)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
+			Floors.Add({ FVector2D(At(R, 0), At(R, 1)) / 100.f, FVector2D(At(R, 2), At(R, 3)) / 100.f, At(R, 4) });
+		}
+	}
 }
 
 void AWRRoundIsland::StepLights(float Daylight)
@@ -235,15 +250,18 @@ void AWRRoundIsland::StepLights(float Daylight)
 	const FVector View = PC && PC->PlayerCameraManager ? PC->PlayerCameraManager->GetCameraLocation() : FVector(1e9);
 	const float Reach = T.Num(TEXT("roundIsland.fireReach"), 30000.f);
 	const float Now = float(GetWorld()->GetTimeSeconds());
-	const float Base[3] = { T.Num(TEXT("roundIsland.hearthLight"), 26000.f), T.Num(TEXT("roundIsland.brazierLight"), 7000.f), T.Num(TEXT("roundIsland.lanternLight"), 2600.f) };
+	const float Base[6] = { T.Num(TEXT("roundIsland.hearthLight"), 26000.f), T.Num(TEXT("roundIsland.brazierLight"), 7000.f), T.Num(TEXT("roundIsland.lanternLight"), 2600.f), 0.f,
+		T.Num(TEXT("roundIsland.fireplaceLight"), 4500.f), T.Num(TEXT("roundIsland.lampLight"), 4000.f) };
 	for (FFire& F : Fires)
 	{
 		// The hearth burns day and night; the rest from dusk.
-		const float On = F.Kind == 0 ? 1.f : Night;
-		const bool bNear = FVector::Dist(View, F.At) < Reach * (F.Kind == 0 ? 2.f : 1.f);
-		if (F.Kind != 2)
+		// The hearth and the rooms' fires and lamps burn day and night; the rest from dusk. Rooms' only near (indoors).
+		const bool bAlways = F.Kind == 0 || F.Kind >= 4;
+		const float On = bAlways ? 1.f : Night;
+		const bool bNear = FVector::Dist(View, F.At) < Reach * (F.Kind == 0 ? 2.f : F.Kind >= 4 ? 0.25f : 1.f);
+		static const FName Row[6] = { TEXT("hearth.fire"), TEXT("brazier.fire"), NAME_None, TEXT("torch.fire"), TEXT("brazier.fire"), NAME_None };
+		if (!Row[F.Kind].IsNone())
 		{
-			static const FName Row[4] = { TEXT("hearth.fire"), TEXT("brazier.fire"), NAME_None, TEXT("torch.fire") };
 			const bool bWant = bNear && On > 0.15f;
 			if (bWant && !F.Fx.IsValid())
 			{
@@ -251,15 +269,158 @@ void AWRRoundIsland::StepLights(float Daylight)
 			}
 			else if (!bWant && F.Fx.IsValid()) { WRFx::Stop(F.Fx.Get()); F.Fx.Reset(); }
 		}
+		if (F.Kind == 0 && FVector::Dist(View, F.At) < T.Num(TEXT("roundIsland.crackleReach"), 2500.f))
+		{
+			CrackleClock -= 0.25f;
+			if (CrackleClock <= 0.f) { CrackleClock = FMath::FRandRange(5.f, 11.f); WRSound::PlayAt(this, TEXT("hearth.feed"), F.At, 0.7f); }
+		}
 		if (UPointLightComponent* L = F.Light.Get())
 		{
 			// A flame's slow breathing on top, so the fires don't read as bulbs; by day the hearth's light is a glow.
-			const float Flick = F.Kind == 2 ? 1.f : 1.f + 0.07f * FMath::Sin(Now * 2.3f + F.Phase) + 0.04f * FMath::Sin(Now * 5.7f + F.Phase * 1.7f);
+			const float Flick = F.Kind == 2 || F.Kind == 5 ? 1.f : 1.f + 0.07f * FMath::Sin(Now * 2.3f + F.Phase) + 0.04f * FMath::Sin(Now * 5.7f + F.Phase * 1.7f);
 			const float Strength = F.Kind == 0 ? FMath::Lerp(0.25f, 1.f, Night) : On;
 			L->SetIntensity(Base[F.Kind] * Strength * Flick);
 			L->SetVisibility(Strength > 0.01f && bNear);
 		}
 	}
+}
+
+void AWRRoundIsland::LoadPeople(const TSharedPtr<FJsonObject>& J)
+{
+	using namespace WRRoundIslandImpl;
+	const TSharedPtr<FJsonObject>* P = nullptr;
+	if (GetNetMode() == NM_Client || !J.IsValid() || !J->TryGetObjectField(TEXT("people"), P)) return;
+	const float Z = float(J->GetNumberField(TEXT("cityTop"))) * 100.f;
+	const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+	const auto Str = [](const TArray<TSharedPtr<FJsonValue>>& R, int32 i) { return R.IsValidIndex(i) ? R[i]->AsString() : FString(); };
+	if ((*P)->TryGetArrayField(TEXT("walks"), A))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *A)
+		{
+			FWalk& Wk = Walks.AddDefaulted_GetRef();
+			Wk.bClosed = V->AsObject()->GetBoolField(TEXT("closed"));
+			for (const TSharedPtr<FJsonValue>& Pt : V->AsObject()->GetArrayField(TEXT("pts"))) Wk.Pts.Add(FVector(At(Pt->AsArray(), 0), At(Pt->AsArray(), 1), Z));
+		}
+	}
+	// walkers [walk, start, dir, name, sex, face, build, outfit]
+	if ((*P)->TryGetArrayField(TEXT("walkers"), A))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *A)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
+			const int32 Wi = int32(At(R, 0));
+			if (!Walks.IsValidIndex(Wi) || Walks[Wi].Pts.Num() < 2) continue;
+			FPerson& Pn = People.AddDefaulted_GetRef();
+			Pn.Kind = 0; Pn.Role = TEXT("townsfolk"); Pn.Walk = Wi;
+			Pn.Point = FMath::Clamp(int32(At(R, 1)), 0, Walks[Wi].Pts.Num() - 1); Pn.Dir = At(R, 2) < 0.f ? -1 : 1;
+			Pn.Name = Str(R, 3); Pn.Sex = FName(*Str(R, 4)); Pn.Face = int32(At(R, 5)); Pn.Build = int32(At(R, 6)); Pn.Outfit = FName(*Str(R, 7));
+			Pn.Id = FString::Printf(TEXT("hm_walker_%d"), People.Num() - 1);
+		}
+	}
+	// sellers [x, y, z, yaw, table, name, sex, face, build, outfit]; standers [x, y, z, yaw, role, name, sex, face, build, outfit]
+	for (const TCHAR* Field : { TEXT("sellers"), TEXT("standers") })
+	{
+		if (!(*P)->TryGetArrayField(Field, A)) continue;
+		const bool bSeller = FCString::Strcmp(Field, TEXT("sellers")) == 0;
+		int32 Count = 0;
+		for (const TSharedPtr<FJsonValue>& V : *A)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
+			FPerson& Pn = People.AddDefaulted_GetRef();
+			Pn.Kind = bSeller ? 1 : 2;
+			Pn.At = FVector(At(R, 0), At(R, 1), At(R, 2));
+			Pn.Yaw = At(R, 3);
+			if (bSeller) { Pn.Role = TEXT("seller"); Pn.Table = FName(*Str(R, 4)); }
+			else Pn.Role = FName(*Str(R, 4));
+			Pn.Name = Str(R, 5); Pn.Sex = FName(*Str(R, 6)); Pn.Face = int32(At(R, 7)); Pn.Build = int32(At(R, 8)); Pn.Outfit = FName(*Str(R, 9));
+			// Sellers by their stall's number (hm_seller_0 is the first stall's), the rest by their place in the list.
+			Pn.Id = bSeller ? FString::Printf(TEXT("hm_seller_%d"), Count) : FString::Printf(TEXT("hm_%s_%d"), *Pn.Role.ToString(), Count);
+			++Count;
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("ROUND Hearthmoot's people: %d (%d walks)"), People.Num(), Walks.Num());
+}
+
+void AWRRoundIsland::StepPeople(float DeltaSeconds)
+{
+	if (GetNetMode() == NM_Client || People.Num() == 0) return;
+	const FWRTuning& T = FWRTuning::Get();
+	UWorld* World = GetWorld();
+	// Out while anyone is within reach of the city (roundIsland.peopleRange cm from its middle); in after peopleLinger s alone.
+	bool bNear = false;
+	const float Range = T.Num(TEXT("roundIsland.peopleRange"), 90000.f);
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APawn* Pw = It->Get() ? It->Get()->GetPawn() : nullptr;
+		if (Pw && FVector2D(Pw->GetActorLocation()).Size() < Range) { bNear = true; break; }
+	}
+	AloneFor = bNear ? 0.f : AloneFor + DeltaSeconds;
+	if (bNear) bPeopleOut = true;
+	else if (bPeopleOut && AloneFor > T.Num(TEXT("roundIsland.peopleLinger"), 30.f))
+	{
+		bPeopleOut = false;
+		for (FPerson& Pn : People) if (AWRWorldNpc* N = Pn.Npc.Get()) N->Destroy();
+		UE_LOG(LogWildreach, Log, TEXT("ROUND Hearthmoot's people in for the night (nobody near)"));
+	}
+	if (!bPeopleOut) return;
+	int32 Made = 0, Out = 0;
+	const int32 PerTick = int32(T.Num(TEXT("roundIsland.peoplePerTick"), 8.f));
+	for (int32 i = 0; i < People.Num(); ++i)
+	{
+		FPerson& Pn = People[i];
+		AWRWorldNpc* N = Pn.Npc.Get();
+		if (!N && Made < PerTick)
+		{
+			++Made;
+			FVector Where = Pn.At;
+			float Yaw = Pn.Yaw;
+			if (Pn.Kind == 0)
+			{
+				const FWalk& Wk = Walks[Pn.Walk];
+				Where = Wk.Pts[Pn.Point];
+				const int32 Next = FMath::Clamp(Pn.Point + Pn.Dir, 0, Wk.Pts.Num() - 1);
+				Yaw = (Wk.Pts[Next] - Where).Rotation().Yaw;
+			}
+			const FTransform Xf(FRotator(0.f, Yaw, 0.f), Where + FVector(0.f, 0.f, 100.f));
+			N = World->SpawnActorDeferred<AWRWorldNpc>(AWRWorldNpc::StaticClass(), Xf, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+			if (!N) continue;
+			N->NpcRole = Pn.Role;
+			N->NpcId = FName(*Pn.Id);
+			N->NpcName = Pn.Name;
+			N->TradeTable = Pn.Table;
+			N->bTrading = Pn.Kind == 1;
+			// What they wear: everyday clothes (none), a set's body, hands and legs, or the watch's iron with its helm.
+			FName Armor[4], Elements[4];
+			const FString O = Pn.Outfit.ToString();
+			if (O == TEXT("iron")) { Armor[0] = TEXT("iron_head"); Armor[1] = TEXT("iron_armor"); Armor[2] = TEXT("iron_hands"); Armor[3] = TEXT("iron_legs"); }
+			else if (!O.IsEmpty() && O != TEXT("plain") && O != TEXT("None"))
+			{
+				// "set" or "set+" (with its hood).
+				const FString Set = O.Replace(TEXT("+"), TEXT(""));
+				if (O.EndsWith(TEXT("+"))) Armor[0] = FName(*(Set + TEXT("_head")));
+				Armor[1] = FName(*(Set + TEXT("_armor"))); Armor[2] = FName(*(Set + TEXT("_hands"))); Armor[3] = FName(*(Set + TEXT("_legs")));
+			}
+			N->SetLook(Pn.Sex, Pn.Face, Pn.Build, Armor, Elements);
+			N->FinishSpawning(Xf);
+			Pn.Npc = N;
+		}
+		if (!N) continue;
+		++Out;
+		if (Pn.Kind != 0) continue;
+		// A walker: on to the next point when this one is reached; an open walk turns back at its ends.
+		const FWalk& Wk = Walks[Pn.Walk];
+		if (FVector::Dist2D(N->GetActorLocation(), Wk.Pts[Pn.Point]) < 260.f)
+		{
+			int32 Next = Pn.Point + Pn.Dir;
+			if (Wk.bClosed) Next = (Next + Wk.Pts.Num()) % Wk.Pts.Num();
+			else if (Next < 0 || Next >= Wk.Pts.Num()) { Pn.Dir = -Pn.Dir; Next = FMath::Clamp(Pn.Point + Pn.Dir, 0, Wk.Pts.Num() - 1); }
+			Pn.Point = Next;
+		}
+		N->WalkTo = Wk.Pts[Pn.Point];
+		N->bWalking = true;
+	}
+	static int32 LastOut = -1;
+	if (Out != LastOut && (Out == People.Num() || Out == 0)) { UE_LOG(LogWildreach, Log, TEXT("ROUND Hearthmoot's people out: %d"), Out); LastOut = Out; }
 }
 
 void AWRRoundIsland::BuildPlants(const TSharedPtr<FJsonObject>& J)
@@ -335,7 +496,7 @@ void AWRRoundIsland::StepCover()
 	if (!D || !D->bHeightfield || !PC || !PC->PlayerCameraManager) return;
 	const FWRTuning& T = FWRTuning::Get();
 	const float Cell = T.Num(TEXT("roundIsland.coverCell"), 24.f), Range = T.Num(TEXT("roundIsland.coverRange"), 75.f);
-	const int32 PerCell = int32(T.Num(TEXT("roundIsland.coverPerCell"), 180.f));
+	const int32 PerCell = int32(T.Num(TEXT("roundIsland.coverPerCell"), 240.f));
 	const FVector2D View = D->ToMap(PC->PlayerCameraManager->GetCameraLocation());
 	const float ViewZ = PC->PlayerCameraManager->GetCameraLocation().Z / 100.f;
 	TSet<FIntPoint> Want;
@@ -366,7 +527,7 @@ void AWRRoundIsland::StepCover()
 		FRandomStream Rng(HashCombine(GetTypeHash(C.X * 92821), GetTypeHash(C.Y * 68917)));
 		const float BladeW = T.Num(TEXT("roundIsland.grassBladeWidth"), 2.2f), BladeT = 0.8f;
 		const FVector2D BladeH(T.Num(TEXT("roundIsland.grassMin"), 20.f), T.Num(TEXT("roundIsland.grassMax"), 50.f));
-		const int32 CropPerCell = int32(T.Num(TEXT("roundIsland.cropPerCell"), 380.f));
+		const int32 CropPerCell = int32(T.Num(TEXT("roundIsland.cropPerCell"), 480.f));
 		const float FlowerChance = T.Num(TEXT("roundIsland.flowerChance"), 0.09f);
 		// Wildflower colours (linear): white, buttercup yellow, clover purple, cornflower blue, campion pink.
 		static const FLinearColor Petal[5] = { { 0.78f, 0.78f, 0.72f }, { 0.78f, 0.52f, 0.04f }, { 0.30f, 0.12f, 0.48f }, { 0.14f, 0.24f, 0.66f }, { 0.74f, 0.26f, 0.42f } };
@@ -377,6 +538,13 @@ void AWRRoundIsland::StepCover()
 			if (L != TEXT('M') && L != TEXT('Y') && L != TEXT('C')) continue;
 			const int32 I = FMath::RoundToInt((M.X - D->HfOrigin.X) / D->HfStep), J = FMath::RoundToInt((M.Y - D->HfOrigin.Y) / D->HfStep);
 			const uint8 Surf = D->HfSurfaceAt(I, J);
+			bool bIndoors = false;
+			for (const FFloor& Fl : Floors)
+			{
+				const FVector2D Rel = (M - Fl.C).GetRotated(-Fl.Yaw);
+				if (FMath::Abs(Rel.X) < Fl.Half.X + 0.4f && FMath::Abs(Rel.Y) < Fl.Half.Y + 0.4f) { bIndoors = true; break; }
+			}
+			if (bIndoors) continue;
 			// The fields' crops (Tools/terrain/round_ground.mjs SURF): 14/15 wheat, 16/17 barley, 18 greens, 22/23 fallow;
 			// 19 (greens' bare rows) and 20/21 (ploughed) stay bare soil.
 			const bool bCrop = Surf == 14 || Surf == 15 || Surf == 16 || Surf == 17 || Surf == 18 || Surf == 22 || Surf == 23;
@@ -396,7 +564,7 @@ void AWRRoundIsland::StepCover()
 					const float Lean = bGreens ? Rng.FRandRange(30.f, 60.f) : Rng.FRandRange(0.f, 12.f);
 					const FRotator Rot(Lean, Rng.FRand() * 360.f, 0.f);
 					const FVector Off(Rng.FRandRange(-9.f, 9.f), Rng.FRandRange(-9.f, 9.f), 0.f);
-					const float W = bGreens ? 9.f : 1.8f;
+					const float W = bGreens ? 9.f : 1.3f;
 					Xf.Emplace(Rot, Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H * 0.5f)), FVector(W, BladeT, H) / 100.f);
 					Col.Add(Base * Rng.FRandRange(0.85f, 1.15f));
 					if (bWheat || bBarley)

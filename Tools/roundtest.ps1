@@ -2,8 +2,11 @@
 # and a second (headless) player joining. The walker starts on Hearthmoot's plaza, measures the frame rate looking over
 # the city, walks out along the north-west avenue and through its gate (the houses stand beside the street: a body that
 # walks through one, or sticks on one, shows here), walks on into the north-west fort through its gate, measures the
-# frame rate out on the meadow, and swims in the lake. The visitor joins, walks to the market and says so.
-# Checks: both are in, every walk arrives, the walker swims in the lake, the frame times, no errors in the logs.
+# frame rate out on the meadow, and swims in the lake. Before the avenue it trades at the first market stall (bread for
+# oats it is given), walks into the inn and back out, and into a quarter's hall and back out (the rooms are open: a
+# body that can't get through a door shows here). The visitor joins, walks to the market and says so.
+# Checks: both are in, every walk arrives, the trade goes through, the city's people are out, the walker swims in the
+# lake, the frame times (with the people about), no errors in the logs.
 #   roundtest.ps1 [-Port 7880]
 param([int]$Port = 7880)
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -18,11 +21,17 @@ $db = Join-Path $root 'Saved\Worlds\roundtest'
 foreach ($n in 'Walker', 'Visitor') { Remove-Item (Join-Path $db "players\$n.json") -ErrorAction SilentlyContinue }
 Remove-Item (Join-Path $db 'world.json') -ErrorAction SilentlyContinue
 
+# The stall, the inn and the hall from the city's data (Tools/terrain/roundtest_points.mjs).
+$pts = node (Join-Path $PSScriptRoot 'terrain\roundtest_points.mjs') | ConvertFrom-Json
+$rooms = @("WRTeleport $($pts.seller)", "wait 5", "WRGive meadow_oats 6", "wait 1", "WRCmd world trade hm_seller_0 0", "wait 2",
+	"WRTeleport $($pts.innOut)", "wait 5", "WRWalkTo $($pts.innIn)", "wait 20", "WRWalkTo $($pts.innOut)", "wait 20",
+	"WRTeleport $($pts.hallOut)", "wait 5", "WRWalkTo $($pts.hallIn)", "wait 20", "WRWalkTo $($pts.hallOut)", "wait 20",
+	"WRTeleport 0 3000", "wait 5")
 # Game cm (map metres x 100): the north-west avenue's own line (Tools/terrain/hearthmoot_plan.mjs) from the plaza out to
 # the gate at bearing 326, then out of it onto the main road.
 $avenue = @('-5244 -6976', '-10593 -14777', '-15668 -22766', '-23500 -34800')
 $walker = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 25', 'WRHour 12', 'stat unit', 'wait 2',
-	'WRLook 270 -5', 'wait 3', 'wr.FrameStats 6', 'wait 8') +
+	'WRLook 270 -5', 'wait 3', 'wr.FrameStats 6', 'wait 8') + $rooms +
 	@($avenue | ForEach-Object { "WRWalkTo $_"; 'wait 45' }) +
 	@('WRTeleport -66000 -97000', 'wait 6', 'WRWalkTo -77000 -113900', 'wait 40',
 	'WRLook 56 -3', 'wait 2', 'wr.FrameStats 6', 'wait 8',
@@ -38,7 +47,7 @@ Start-Sleep -Seconds 30
 $w = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=Walker -game -windowed -ResX=1600 -ResY=900 -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 120`" `"-wrbotcmds=$($walker -join '|')`" -abslog=`"$logs\walker.log`"" -PassThru
 Start-Sleep -Seconds 12
 $v = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=frost?WRName=Visitor -game -nullrhi -unattended -nosound -wrbot `"-wrbotcmds=$($visitor -join '|')`" -abslog=`"$logs\visitor.log`"" -PassThru
-$deadline = (Get-Date).AddSeconds(600)
+$deadline = (Get-Date).AddSeconds(900)
 while ((Get-Date) -lt $deadline -and -not ($w.HasExited -and $v.HasExited)) {
 	Start-Sleep -Seconds 5
 	if (Select-String -Path "$logs\walker.log" -Pattern 'chat Visitor: visitor-done' -Quiet -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 4; break }
@@ -49,7 +58,11 @@ Start-Sleep -Seconds 2
 $fail = 0
 function Check([string]$what, [bool]$ok, [string]$detail) { if ($ok) { "  ok    $what  ($detail)" } else { "  FAIL  $what  ($detail)"; $script:fail++ } }
 $arrived = @(Select-String -Path "$logs\walker.log" -Pattern 'WALK arrived after' | ForEach-Object { $_.Line -replace '.*WALK ', '' })
-Check 'the walker walks the avenue, through the gate and into the fort, and wades into the lake' ($arrived.Count -ge 6) ("{0} of 6 walks arrived: {1}" -f $arrived.Count, ($arrived -join ' | '))
+Check 'the walker trades at a stall, walks into the inn and a hall and out, walks the avenue, through the gate and into the fort, and wades into the lake' ($arrived.Count -ge 10) ("{0} of 10 walks arrived: {1}" -f $arrived.Count, ($arrived -join ' | '))
+$trade = @(Select-String -Path "$logs\server.log" -Pattern 'TRADE Walker with' | Select-Object -First 1)
+Check 'the walker trades at the first market stall' ($trade.Count -gt 0) $(if ($trade.Count) { $trade[0].Line -replace '.*TRADE ', '' } else { 'no trade' })
+$folk = @(Select-String -Path "$logs\server.log" -Pattern "Hearthmoot's people out: (\d+)" | Select-Object -Last 1)
+Check "the city's people are out" ($folk.Count -and [int]$folk[0].Matches[0].Groups[1].Value -ge 60) $(if ($folk.Count) { $folk[0].Line -replace '.*LogWildreach: ', '' } else { 'none' })
 $visit = @(Select-String -Path "$logs\visitor.log" -Pattern 'WALK arrived after')
 Check 'the visitor joins and walks to the market' ($visit.Count -ge 1) ("{0} walk arrived" -f $visit.Count)
 $both = (Select-String -Path "$logs\server.log" -Pattern 'Walker' -Quiet) -and (Select-String -Path "$logs\server.log" -Pattern 'Visitor' -Quiet)

@@ -365,6 +365,7 @@ namespace WRUIWorldScreens
 			Npc = PC.IsValid() ? Cast<AWRWorldNpc>(PC->WorldTarget.Get()) : nullptr;
 			FString Table;
 			for (const auto& V : ArrOf(WRWorld::Data(), TEXT("caravans"))) if (Npc.IsValid() && StrIn(V->AsObject(), TEXT("id")) == Npc->NpcId.ToString()) Table = StrIn(V->AsObject(), TEXT("trade"));
+			if (Npc.IsValid() && !Npc->TradeTable.IsNone()) Table = Npc->TradeTable.ToString();
 			Offers = ArrOf(WRWorld::Obj(TEXT("trade")), Table);
 			TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
 			for (int32 i = 0; i < Offers.Num(); ++i)
@@ -406,7 +407,7 @@ namespace WRUIWorldScreens
 			ChildSlot
 			[
 				Frame(TAttribute<FText>::CreateLambda([this]() { const AWRWorldNpc* N = Npc.Get(); return FText::FromString(N ? N->NpcName : FString()); }),
-					TAttribute<FText>::CreateLambda([this]() { const AWRWorldNpc* N = Npc.Get(); return FText::FromString(N ? FString::Printf(TEXT("Traveling merchant  ·  %s"), *BiomeName(N->Biome)) : FString()); }),
+					TAttribute<FText>::CreateLambda([this]() { const AWRWorldNpc* N = Npc.Get(); return FText::FromString(!N ? FString() : N->NpcRole == TEXT("seller") ? FString(TEXT("Market stall  ·  Hearthmoot")) : FString::Printf(TEXT("Traveling merchant  ·  %s"), *BiomeName(N->Biome))); }),
 					Body, 700.f)
 			];
 		}
@@ -452,6 +453,8 @@ namespace WRUIWorldScreens
 		{
 			const UWRQuestLog* Log = UWRQuestLog::For(PC.Get());
 			const FString Name = StrIn(WRWorld::Obj(TEXT("factions.") + Faction().ToString()), TEXT("name"));
+			// Hearthmoot's market and inn belong to no faction: anyone trades there at the same price.
+			if (Name.IsEmpty()) return TEXT("Hearthmoot's market: anyone may trade here, at the same price for all.");
 			const float D = Discount();
 			return FString::Printf(TEXT("%s count you %s (%d).%s Quests, kindled shrines, trade and defending their land raise it."), *Name, *TierName(Tier()), Log ? Log->StandingOf(Faction()) : 0,
 				D > 0.f ? *FString::Printf(TEXT(" You pay %d%% less."), FMath::RoundToInt(D * 100.f)) : TEXT(""));

@@ -375,7 +375,7 @@ float UWRAudioDirector::LayerWeight(FName Layer) const
 		{
 			W = Parts.Num() >= 3 ? (Parts[2] == TEXT("night") ? Night : Parts[2] == TEXT("day") ? Daylight : 1.f) : 1.f;
 		}
-		else if (Parts[0] == TEXT("zone") && Parts.Num() >= 2 && FName(*Parts[1]) == LandZone) W = 1.f;
+		else if (Parts[0] == TEXT("zone") && Parts.Num() >= 2 && FName(*Parts[1]) == LandZone) W = Parts.Num() >= 3 ? (Parts[2] == TEXT("night") ? Night : Parts[2] == TEXT("day") ? Daylight : 1.f) : 1.f;   // zone.<id>[.day|.night]
 		return W * Out * (1.f - Hush);
 	}
 	if (!LandBiome.IsNone() && !L.StartsWith(TEXT("weather.")) && Layer != Always && Layer != CaveL && Layer != CoastL) return 0.f;
