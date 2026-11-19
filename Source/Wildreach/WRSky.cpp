@@ -15,6 +15,7 @@
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRTuning.h"
+#include "WRLand.h"
 #include "Dom/JsonObject.h"
 #include "Camera/CameraActor.h"
 #include "Camera/PlayerCameraManager.h"
@@ -196,12 +197,15 @@ void AWRSky::BeginPlay()
 {
 	Super::BeginPlay();
 	FindMapLights();
+	// The round island's map (a map that has its own lands, Data/lands "map"): its own air, none of the Old Island's.
+	for (const FWRLandDef& L : WRLand::All()) bRoundIsland |= !L.Map.IsEmpty() && L.Map == WRLand::CurrentMap();
 	BuildMist();
 	Apply(true);
 }
 
 void AWRSky::BuildMist()
 {
+	if (bRoundIsland) return;   // the valleys in valley_fog.json are the Old Island's
 	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(TEXT("valley_fog.json"));
 	const TArray<TSharedPtr<FJsonValue>>* Valleys = nullptr;
 	if (!File.IsValid() || !File->TryGetArrayField(TEXT("valleys"), Valleys))
@@ -414,29 +418,47 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	const float B = Biome;
 	// Storm peaks' air north of the island (cooks/biome-lightning.md 2.1): iron-dark haze, a cool slate grade, blended in
 	// across the Ash Sound and the neck.
-	const float StormTarget = FMath::SmoothStep(0.f, 1.f, float((T.Num(TEXT("world.islandNorthEdge"), -201600.f) + T.Num(TEXT("sky.stormBlendFrom"), 15000.f) - View.Y) / T.Num(TEXT("sky.stormBlendWidth"), 40000.f)));
+	if (bRoundIsland)
+	{
+		// The round island's air: the haze of the land under the camera (sky.roundAir.<biome> "r,g,b,density", sRGB; .default
+		// where a biome has none), eased so a border or a teleport fades rather than snaps.
+		const FName Here = WRBiome::At(this, View);
+		FString Row = T.Str(*FString::Printf(TEXT("sky.roundAir.%s"), *Here.ToString()), TEXT(""));
+		if (Row.IsEmpty()) Row = T.Str(TEXT("sky.roundAir.default"), TEXT("196,212,230,0.0035"));
+		TArray<FString> P;
+		Row.ParseIntoArray(P, TEXT(","));
+		const FLinearColor Want = P.Num() >= 3 ? FLinearColor(FColor(uint8(FCString::Atoi(*P[0])), uint8(FCString::Atoi(*P[1])), uint8(FCString::Atoi(*P[2])))) : FLinearColor(0.55f, 0.65f, 0.78f);
+		const float WantDensity = P.Num() >= 4 ? FCString::Atof(*P[3]) : 0.0035f;
+		if (RoundDensity < 0.f) { RoundFog = Want; RoundDensity = WantDensity; }
+		else
+		{
+			RoundFog = FMath::CInterpTo(RoundFog, Want, DeltaSeconds, 0.8f);
+			RoundDensity = FMath::FInterpTo(RoundDensity, WantDensity, DeltaSeconds, 0.8f);
+		}
+	}
+	const float StormTarget = bRoundIsland ? 0.f : FMath::SmoothStep(0.f, 1.f, float((T.Num(TEXT("world.islandNorthEdge"), -201600.f) + T.Num(TEXT("sky.stormBlendFrom"), 15000.f) - View.Y) / T.Num(TEXT("sky.stormBlendWidth"), 40000.f)));
 	StormAir = StormAir < 0.f ? StormTarget : FMath::FInterpTo(StormAir, StormTarget, DeltaSeconds, 1.5f);
 	const float SA = StormAir;
 	// The Swamp blends over Storm peaks' air where it lies (its frame is inside the north lands).
-	const float SwampTarget = WRSwampSky::Share(View, T.Num(TEXT("swampWorld.sky.blendRing"), 6000.f));
+	const float SwampTarget = bRoundIsland ? 0.f : WRSwampSky::Share(View, T.Num(TEXT("swampWorld.sky.blendRing"), 6000.f));
 	WRSwampSky::Air = WRSwampSky::Air < 0.f ? SwampTarget : FMath::FInterpTo(WRSwampSky::Air, SwampTarget, DeltaSeconds, 1.2f);
 	const float SW = WRSwampSky::Air;
 	// The Ancient forest's air south of the island (cooks/biome-forest.md 2.1; build plan 2.4): green-gold light and a
 	// soft haze on its own ground, and under the trees the canopy closes the light down (0 at the coast, 0.4 in the
 	// streams and the villages, 0.75 in the old growth, 0.9 in the Elder Canopy: green dusk at noon), eased so a step
 	// into a clearing opens the light over a second or two instead of snapping.
-	const float ForestTarget = WRForest::Contains(View) ? 1.f : 0.f;
+	const float ForestTarget = !bRoundIsland && WRForest::Contains(View) ? 1.f : 0.f;
 	ForestAir = ForestAir < 0.f ? ForestTarget : FMath::FInterpTo(ForestAir, ForestTarget, DeltaSeconds, T.Num(TEXT("sky.forestBlendSpeed"), 0.7f));
 	ForestCanopy = FMath::FInterpTo(ForestCanopy, ForestTarget > 0.f ? WRForest::Canopy(View) : 0.f, DeltaSeconds, T.Num(TEXT("sky.forestCanopySpeed"), 1.2f));
 	const float FA = ForestAir, CN = ForestCanopy * ForestAir;
 	// Under the Crystal caves' rock the open sky is gone (crystal 2.8 full dark): the sky light fades out within a second
 	// or two of going in, so only carried light, tames and crystals woken by sound light the caves (the caves' rock is
 	// procedural mesh, which the sky light's occlusion can't see).
-	CrystalCave = FMath::FInterpTo(CrystalCave, WRCrystal::InCave(View) || WRFungal::UnderRock(View) ? 1.f : 0.f, DeltaSeconds, T.Num(TEXT("crystalWorld.sky.caveFadeSpeed"), 1.5f));
+	CrystalCave = FMath::FInterpTo(CrystalCave, !bRoundIsland && (WRCrystal::InCave(View) || WRFungal::UnderRock(View)) ? 1.f : 0.f, DeltaSeconds, T.Num(TEXT("crystalWorld.sky.caveFadeSpeed"), 1.5f));
 	// The Graveyard's air west of the Spine (cooks/biome-graveyard.md 2.7): a bruise-violet haze by day that never quite
 	// clears, a sickly yellow-green rim on the dusk instead of gold, and its two mists: Ground mist pooled knee-deep over
 	// the graves by day, Corpse fog standing chest-high at night (the second fog layer, its floor at your feet).
-	const float GraveTarget = WRGrave::Contains(View) ? 1.f : 0.f;
+	const float GraveTarget = !bRoundIsland && WRGrave::Contains(View) ? 1.f : 0.f;
 	GraveAir = GraveAir < 0.f ? GraveTarget : FMath::FInterpTo(GraveAir, GraveTarget, DeltaSeconds, T.Num(TEXT("graveyardWorld.sky.blendSpeed"), 0.7f));
 	const float GA = GraveAir;
 	{
@@ -523,13 +545,13 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 	if (UExponentialHeightFogComponent* F = Fog.Get())
 	{
 		// Haze: warm ash west, cold blue east, deep blue at night (readable, not black).
-		const FLinearColor DayFog = FMath::Lerp(FMath::Lerp(SRGB(TEXT("sky.volcanicFogColor"), FColor(176, 146, 120)), SRGB(TEXT("sky.tundraFogColor"), FColor(160, 190, 228)), B),
+		const FLinearColor DayFog = bRoundIsland ? RoundFog : FMath::Lerp(FMath::Lerp(SRGB(TEXT("sky.volcanicFogColor"), FColor(176, 146, 120)), SRGB(TEXT("sky.tundraFogColor"), FColor(160, 190, 228)), B),
 			SRGB(TEXT("sky.stormFogColor"), FColor(132, 140, 156)), SA);
 		const FVector Night = Vec(TEXT("sky.nightFogColor"), FVector(0.01f, 0.015f, 0.035f));
 		const FLinearColor Haze = FMath::Lerp(FLinearColor(Night.X, Night.Y, Night.Z), DayFog * T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
 		const FLinearColor Storm = WeatherFogColor * FMath::Lerp(T.Num(TEXT("sky.weatherNightFog"), 0.06f), T.Num(TEXT("sky.fogBrightness"), 1.f), Daylight);
 		F->SetFogInscatteringColor(FMath::Lerp(Haze, Storm, WeatherAmount));
-		const float BaseDensity = FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B), T.Num(TEXT("sky.stormFogDensity"), 0.018f), SA);
+		const float BaseDensity = bRoundIsland ? RoundDensity : FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B), T.Num(TEXT("sky.stormFogDensity"), 0.018f), SA);
 		F->SetFogDensity(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount));
 		// Toward a low sun the haze glows warm: the dawn and dusk glare across a valley.
 		F->SetDirectionalInscatteringExponent(T.Num(TEXT("sky.sunGlowExponent"), 6.f));
@@ -600,8 +622,8 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		const APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
 		const APawn* Me = LocalPC ? LocalPC->GetPawn() : nullptr;
 		float Vision = 0.f;
-		const float BeltTarget = WRDesertHz::BeltAmount(Me, Vision);
-		const float DesertTarget = WRDesert::Contains(View) && !WRDesert::InCave(View) && !WRDesert::InHourhold(View) ? 1.f : 0.f;
+		const float BeltTarget = bRoundIsland ? 0.f : WRDesertHz::BeltAmount(Me, Vision);
+		const float DesertTarget = !bRoundIsland && WRDesert::Contains(View) && !WRDesert::InCave(View) && !WRDesert::InHourhold(View) ? 1.f : 0.f;
 		DesertAir = DesertAir < 0.f ? DesertTarget : FMath::FInterpTo(DesertAir, DesertTarget, DeltaSeconds, 0.7f);
 		BeltAir = FMath::FInterpTo(BeltAir, BeltTarget, DeltaSeconds, 0.8f);
 		if (Vision > 0.f) BeltVision = Vision;

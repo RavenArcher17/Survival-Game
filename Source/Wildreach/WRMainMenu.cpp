@@ -1615,9 +1615,11 @@ void SWRMainMenu::HostWorld(const FString& WorldId)
 	GConfig->SetString(MenuSection, TEXT("World"), *WorldId, GGameUserSettingsIni);
 	GConfig->Flush(false, GGameUserSettingsIni);
 	const FString Opts = FString::Printf(TEXT("listen%s?World=%s"), *Options(), *WorldId);
-	UE_LOG(LogWildreach, Log, TEXT("MENU host: L_Island?%s"), *Opts);
+	// The world's own map: the Old Island's, or the round island's for a world made on it (WRWorlds::MapOf).
+	const FString Map = WRWorlds::MapOf(WorldId);
+	UE_LOG(LogWildreach, Log, TEXT("MENU host: %s?%s"), *Map, *Opts);
 	Close();
-	UGameplayStatics::OpenLevel(PC, TEXT("/Game/Maps/L_Island"), true, Opts);
+	UGameplayStatics::OpenLevel(PC, FName(*(TEXT("/Game/Maps/") + Map)), true, Opts);
 }
 
 FReply SWRMainMenu::OnJoin()

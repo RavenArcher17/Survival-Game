@@ -24,6 +24,9 @@ struct WILDREACH_API FWRSeaMask
 	bool IsSea(int32 X, int32 Y) const { return X < 0 || Y < 0 || X >= Width || Y >= Height || Sea[Y * Width + X] != 0; }
 	/** Reads the run-length rows (Tools/terrain/sea_mask.mjs). */
 	bool Parse(const FJsonObject& Json);
+	/** The mask file for a world's map: Data/sea_mask_<map>.json when there is one (the round island's), else
+	 *  Data/sea_mask.json (the Old Island's). */
+	static FString FileFor(const UWorld* World);
 	void ComputeDistance();
 	/** Distance (cells) to land from a cell, outside the grid too (beyond its edge, the edge's distance plus the way out). */
 	float DistanceAt(int32 X, int32 Y) const;

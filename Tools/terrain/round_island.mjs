@@ -11,9 +11,10 @@
 //   Docs/design/round_island_map.svg         the map to scale
 //   (stdout) the table for the plan doc
 //   node Tools/terrain/round_island.mjs [--widget <file>]   --widget also writes the plan doc's drawing module
+// Imported (Tools/terrain/round_ground.mjs builds the ground from it), it writes nothing and exports the layout's shapes.
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -288,10 +289,18 @@ const quarterOrder = ["lightning", "wind", "sun", "nature", "arcane", "frost", "
 const quarters = quarterOrder.map((p, i) => ({ path: p, from: norm(FIRST_DEG + i * 30), to: norm(FIRST_DEG + (i + 1) * 30) }));
 let meadowArea = 0; { const n = 3600; for (let i = 0; i < n; i++) meadowArea += 0.5 * meadowR(i * 360 / n) ** 2 * 2 * Math.PI / n; }
 
+const islets = ISLETS.map(([d, out, size]) => { const at = pt(d, coastR(d) + out); return { at: rnd(at), radius: size, land: LANDS[sliceOf(d + warpDeg(at[0], at[1], Math.hypot(...at)))].id }; });
+export {
+	LANDS, GROUPS, FIRST_DEG, SCALE_AREA, CITY_WALL, MEADOW, LAKE, FEATURES, SHALLOWS, REEFS, MAP_HALF, BLEND, RAD,
+	hsh, vn, fbm, norm, dAng, bearingOf, pt, gauss, ring, dist, inPoly,
+	coastShape, coastR, meadowR, depth, depthAt, warpDeg, along, edgeOf, sliceOf, ownerAt, R0,
+	lands, byId, borders, lakeAt, lakeOutline, stream, trunks, layers, islets, quarters,
+};
+const MAIN = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+if (MAIN) {
 // ---- out ------------------------------------------------------------------------------------------------------------
 const coast = []; for (let d = 0; d < 360; d += 1) coast.push(xy(d, coastR(d)));
 const meadowEdge = []; for (let d = 0; d < 360; d += 2) meadowEdge.push(xy(d, meadowR(d)));
-const islets = ISLETS.map(([d, out, size]) => { const at = pt(d, coastR(d) + out); return { at: rnd(at), radius: size, land: LANDS[sliceOf(d + warpDeg(at[0], at[1], Math.hypot(...at)))].id }; });
 const extent = Math.max(...coast.map((p) => Math.hypot(...p)));
 const layout = {
 	_comment: "The round island's layout (plan phase 3 step 1, for Raven's sign-off). Made by Tools/terrain/round_island.mjs: change that, not this. Metres; x east, y south; bearings in degrees clockwise from north. Land areas = Aaron's surface sizes (world-map.md 2.2) x " + SCALE_AREA + ". Borders wander and blend over blendMetres either side; a land's polygon is its exact shape before the blend.",
@@ -432,3 +441,4 @@ for (const s of lands) console.log(`${s.name} | ${s.path} | ${s.aaron} | ${(s.ar
 for (const t of trunks) console.log(`main road ${t.lands.join("+")}: bearing ${t.bearing.toFixed(0)}, crossroads ${Math.round(Math.hypot(...t.crossroads))} m out, fort ${Math.round(Math.hypot(...t.fort))} m`);
 for (const k of ["sky", "crystal", "fungal"]) { const L = layers[k]; console.log(`${k}: ${L.from.toFixed(0)}-${L.to.toFixed(0)} deg, ${L.r1}-${L.r2} m from the centre, ${L.areaKm2} km²`); }
 console.log(`checks: the Severance over the Crystal caves ${inPoly(layers.severance.at, crystal.outline)}; the Flue over the Fungal caverns ${inPoly(layers.flue.at, fungal.outline)}; caverns 400 m in from the coast ${[...crystal.outline, ...fungal.outline].every((p) => Math.hypot(...p) <= coastR(bearingOf(...p)) - 390)}`);
+}

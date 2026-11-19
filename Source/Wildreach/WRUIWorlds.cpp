@@ -201,6 +201,10 @@ namespace WRWorldsUI
 						[
 							SNew(SWRChip).Text(WRWorlds::PresetName(W.Preset)).Color(PresetColor(W.Preset)).FontSize(12)
 						]
+						+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(8.f * U, 0.f, 0.f, 0.f)
+						[
+							W.Map == TEXT("L_Wildreach") ? StaticCastSharedRef<SWidget>(SNew(SWRChip).Text(LOCTEXT("ChipRound", "Round island")).Color(WRUI::Frost).FontSize(12)) : SNullWidget::NullWidget
+						]
 					]
 				]
 			];
@@ -351,6 +355,8 @@ namespace WRWorldsUI
 		FString SelectedId;
 		TSharedPtr<FWRWorldSettings> NewValues;
 		bool bNewChanged = false;
+		/** The map a new world is made on (world.newWorldMap; the round island's while it's built, by choice). */
+		FString NewMap = TEXT("L_Island");
 		FText Status;
 		bool bFocused = false;
 		TSharedPtr<SWidget> FocusNext;
@@ -840,6 +846,7 @@ namespace WRWorldsUI
 			Status = FText::GetEmpty();
 			NewValues = MakeShared<FWRWorldSettings>(WRWorlds::PresetSettings(TEXT("pve")));
 			bNewChanged = false;
+			NewMap = FWRTuning::Get().Str(TEXT("world.newWorldMap"), TEXT("L_Island"));
 			SAssignNew(NameBox, SEditableTextBox).Style(&FieldStyle()).Font(WRUI::Body(17, 700)).Text(FText::FromString(DefaultName()))
 				.SelectAllTextWhenFocused(true).HintText(LOCTEXT("WorldNameHint", "The world's name")).OnKeyDownHandler(this, &SWRWorldChooser::OnTextBoxKey)
 				.OnTextCommitted_Lambda([this](const FText&, ETextCommit::Type How) { if (How == ETextCommit::OnEnter) CreateAndPlay(); });
@@ -863,6 +870,19 @@ namespace WRWorldsUI
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[SNew(SBox).HeightOverride(46.f * U)[NameBox.ToSharedRef()]]
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Label(LOCTEXT("WorldKind", "Kind of world"))]
 						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)[Tiles]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 18.f * U, 0.f, 0.f)[Label(LOCTEXT("WorldMap", "Map"))]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 8.f * U, 0.f, 0.f)
+						[
+							SNew(SWRButton).Ghost(true).FontSize(13).MinHeight(44.f * U)
+								.Text_Lambda([this]() { return NewMap == TEXT("L_Wildreach") ? LOCTEXT("MapRound", "The round island (being built)") : LOCTEXT("MapOld", "The Old Island"); })
+								.OnClicked_Lambda([this]() { NewMap = NewMap == TEXT("L_Wildreach") ? TEXT("L_Island") : TEXT("L_Wildreach"); return FReply::Handled(); })
+						]
+						+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f * U, 0.f, 0.f)
+						[
+							Muted(TAttribute<FText>::CreateLambda([this]() { return NewMap == TEXT("L_Wildreach")
+								? LOCTEXT("MapRoundInfo", "So far: Hearthmoot, its meadow and lake, and the first shape of the nine lands")
+								: LOCTEXT("MapOldInfo", "Every land as it plays today"); }), 12, true)
+						]
 					]
 				]
 				+ SHorizontalBox::Slot().FillWidth(1.f).Padding(22.f * U, 0.f, 0.f, 0.f)
@@ -903,7 +923,7 @@ namespace WRWorldsUI
 			if (Mode != EMode::New || !NameBox.IsValid()) return;
 			FString Name = NameBox->GetText().ToString().TrimStartAndEnd();
 			if (Name.IsEmpty()) Name = DefaultName();
-			const FString Id = WRWorlds::Create(Name, *NewValues);
+			const FString Id = WRWorlds::Create(Name, *NewValues, NewMap);
 			if (Id.IsEmpty())
 			{
 				Status = LOCTEXT("CreateFailed", "Couldn't make the world's folder in Saved/Worlds");

@@ -45,6 +45,7 @@ namespace WRWorldsFiles
 		O->SetStringField(TEXT("lastPlayed"), I.LastPlayed.ToIso8601());
 		O->SetNumberField(TEXT("playSeconds"), FMath::RoundToDouble(I.PlaySeconds));
 		O->SetStringField(TEXT("version"), I.Version);
+		O->SetStringField(TEXT("map"), I.Map);
 		return WriteJson(FPaths::Combine(WRWorlds::Dir(I.Id), TEXT("info.json")), O);
 	}
 
@@ -231,6 +232,7 @@ bool WRWorlds::Read(const FString& Id, FWRWorldInfo& Out)
 	Out.LastPlayed = ParseTime(Info, TEXT("lastPlayed"));
 	Info->TryGetNumberField(TEXT("playSeconds"), Out.PlaySeconds);
 	Info->TryGetStringField(TEXT("version"), Out.Version);
+	if (!Info->TryGetStringField(TEXT("map"), Out.Map) || Out.Map.IsEmpty()) Out.Map = TEXT("L_Island");
 	const TSharedPtr<FJsonObject> Settings = ReadJson(FPaths::Combine(Dir(Id), TEXT("settings.json")));
 	if (!Settings.IsValid() || !Settings->TryGetStringField(TEXT("preset"), Out.Preset)) Out.Preset = DefaultPreset();
 	return true;
@@ -315,7 +317,13 @@ bool WRWorlds::IsCustom(const FWRWorldSettings& Settings)
 		|| Settings.PortalBreak != Preset.PortalBreak || Settings.ArtifactCap != Preset.ArtifactCap;
 }
 
-FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings)
+FString WRWorlds::MapOf(const FString& Id)
+{
+	FWRWorldInfo Info;
+	return Read(Id, Info) ? Info.Map : FString(TEXT("L_Island"));
+}
+
+FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings, const FString& Map)
 {
 	using namespace WRWorldsFiles;
 	const FString Shown = Name.TrimStartAndEnd().Left(32);
@@ -332,6 +340,7 @@ FString WRWorlds::Create(const FString& Name, const FWRWorldSettings& Settings)
 	Info.Name = Shown.IsEmpty() ? Id : Shown;
 	Info.Created = Info.LastPlayed = FDateTime::UtcNow();
 	Info.Version = SWRMainMenu::GameVersion();
+	Info.Map = Map.IsEmpty() ? FString(TEXT("L_Island")) : Map;
 	if (!WriteSettings(Id, Settings) || !WriteInfo(Info))
 	{
 		UE_LOG(LogWildreach, Warning, TEXT("WORLDS couldn't make the world '%s' in %s"), *Info.Name, *Dir(Id));

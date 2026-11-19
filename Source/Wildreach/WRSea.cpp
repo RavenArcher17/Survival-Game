@@ -12,8 +12,21 @@
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Dom/JsonObject.h"
 #include "EngineUtils.h"
+#include "Misc/Paths.h"
 
 // ---------------------------------------------------------------- mask and quadtree
+
+FString FWRSeaMask::FileFor(const UWorld* World)
+{
+	if (World)
+	{
+		FString Map = UWorld::RemovePIEPrefix(World->GetMapName());
+		Map.RemoveFromStart(World->StreamingLevelsPrefix);
+		const FString Own = FString::Printf(TEXT("sea_mask_%s.json"), *Map);
+		if (FPaths::FileExists(FPaths::Combine(FWRTuning::DataDir(), Own))) return Own;
+	}
+	return TEXT("sea_mask.json");
+}
 
 bool FWRSeaMask::Parse(const FJsonObject& Json)
 {
@@ -348,7 +361,7 @@ void AWRSea::BeginPlay()
 bool AWRSea::BuildMesh()
 {
 	const double Began = FPlatformTime::Seconds();
-	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(TEXT("sea_mask.json"));
+	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(FWRSeaMask::FileFor(GetWorld()));
 	FWRSeaMask Mask;
 	if (!File.IsValid() || !Mask.Parse(*File))
 	{

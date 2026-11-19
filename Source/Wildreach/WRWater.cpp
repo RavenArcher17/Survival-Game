@@ -43,7 +43,7 @@ AWRWaterVolume::AWRWaterVolume(const FObjectInitializer& ObjectInitializer)
 	Shape->SetCanEverAffectNavigation(false);
 }
 
-int32 AWRWaterVolume::Build(const FWRSeaMask& Mask, float SurfaceZ, float FloorZ, float Extent)
+int32 AWRWaterVolume::Build(const FWRSeaMask& Mask, float SurfaceZ, float FloorZ, float Extent, bool bOpenSeaAround)
 {
 	FluidFriction = WRTune(TEXT("water.friction"), 2.f);
 	UBrushComponent* Shape = GetBrushComponent();
@@ -65,11 +65,14 @@ int32 AWRWaterVolume::Build(const FWRSeaMask& Mask, float SurfaceZ, float FloorZ
 	{
 		AddBox(GX0 + R.Min.X * Mask.Cell, GY0 + R.Min.Y * Mask.Cell, GX0 + R.Max.X * Mask.Cell, GY0 + R.Max.Y * Mask.Cell);
 	}
-	// Outside the grid it's all sea: a frame of four boxes out to Extent.
-	AddBox(-Extent, -Extent, GX0, Extent);
-	AddBox(GX1, -Extent, Extent, Extent);
-	AddBox(GX0, -Extent, GX1, GY0);
-	AddBox(GX0, GY1, GX1, Extent);
+	// Outside the grid it's all sea: a frame of four boxes out to Extent (not round a lake: WRRoundIsland).
+	if (bOpenSeaAround)
+	{
+		AddBox(-Extent, -Extent, GX0, Extent);
+		AddBox(GX1, -Extent, Extent, Extent);
+		AddBox(GX0, -Extent, GX1, GY0);
+		AddBox(GX0, GY1, GX1, Extent);
+	}
 	Setup->CreatePhysicsMeshes();
 	Shape->BrushBodySetup = Setup;
 	Shape->RecreatePhysicsState();
@@ -171,7 +174,7 @@ void UWRWaterSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	// The mask belongs to one map (other maps, like the combat arena, have no sea to swim in).
-	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(TEXT("sea_mask.json"));
+	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(FWRSeaMask::FileFor(&InWorld));
 	FString Map;
 	if (File.IsValid() && !File->TryGetStringField(TEXT("map"), Map))
 	{

@@ -19,6 +19,9 @@ ambientCG scans Ground053 and kin by Trails' terrain_surfaces.py, tiled at 2.5 m
                   damp shade within 70 cm (the global distance field: Electric Dreams hides contacts with dirt and moss
                   decals; this does it for every mesh at once). The vertex colour (each sub-zone's palette) stays a
                   gentle tint. Parameter: Wet (0..1, the land's rain, as M_LandGround).
+  M_IslandGround  the round island's ground (Data/lands/island.json; built with --island): the same layers, but each
+                  land's colour comes from the vertex colour (TintAmount 0.8 of it: the textures keep their light and
+                  shade, the land its own colour), so one ground can be snow, basalt, dune sand and meadow.
 """
 import os
 import sys
@@ -106,8 +109,8 @@ def mx(a, b):
     return op(unreal.MaterialExpressionMax, a, b)
 
 
-def build_material():
-    begin("/Game/Terrain/M_ForestGround")
+def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
+    begin(path)
     wp = expr(unreal.MaterialExpressionWorldPosition)
     wx, wy, wz = mask(wp, "r"), mask(wp, "g"), mask(wp, "b")
     xy = append2(wx, wy)
@@ -196,7 +199,14 @@ def build_material():
     lum = add(dot3(rgb, (0.299, 0.587, 0.114)), k=0.03)
     hue = op(unreal.MaterialExpressionDivide, rgb, lum)
     tint = lerp(const3((1.0, 1.0, 1.0)), mul(hue, k=0.95), const(0.22))
-    albedo = mul(albedo, tint)
+    if strong_tint:
+        # The island: the vertex colour is the land's colour; the textures give only their light and shade (their
+        # brightness, about 0.25-0.4, scaled to about 0.65-1).
+        shade = sat(mul(dot3(albedo, (0.299, 0.587, 0.114)), k=2.6))
+        amount = expr(unreal.MaterialExpressionScalarParameter, parameter_name="TintAmount", default_value=0.8)
+        albedo = lerp(mul(albedo, tint), mul(rgb, shade), amount)
+    else:
+        albedo = mul(albedo, tint)
     far = noise(mul(xy, k=1.0 / 3100.0))
     albedo = mul(albedo, add(mul(far, k=0.34), k=0.83))
 
@@ -221,4 +231,7 @@ if scans and os.path.isdir(scans):
     import_scans(scans)
 else:
     unreal.log("[Wildreach] forest ground: no scans dir given; using the textures already in /Game/Terrain/Forest")
-build_material()
+if "--island" in sys.argv[1:]:
+    build_material("/Game/Terrain/M_IslandGround", True)
+else:
+    build_material()

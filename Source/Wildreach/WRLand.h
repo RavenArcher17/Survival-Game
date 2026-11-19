@@ -75,6 +75,17 @@ struct WILDREACH_API FWRLandDef
 	FName Id;
 	FName Biome;
 	FString Name;
+	/** The map it stands on (the round island's lands: "L_Wildreach"). Empty: the Old Island's map, as before. */
+	FString Map;
+	/** A zone letter's own biome (the round island holds every land in one ground: "zoneBiomes"); empty: Biome. */
+	TMap<TCHAR, FName> ZoneBiomes;
+	/** Far detail levels (the round island, "lod"): a chunk at least LodRanges[k] m from the view uses every 2^(k+1)th
+	 *  sample; ground you can stand on (collision) only within CollisionRange m of a player, a chunk round anyone else. */
+	bool bLod = false;
+	TArray<float> LodRanges;
+	float CollisionRange = 600.f;
+	/** The biome at a map point: its zone letter's (ZoneBiomes), else the land's. */
+	FName BiomeAtMap(const FVector2D& M) const;
 	FVector Origin = FVector::ZeroVector;      // game cm the map centre sits on
 	FVector2D MapCentre = FVector2D::ZeroVector;
 	int32 Seed = 1;
@@ -194,6 +205,10 @@ namespace WRLand
 {
 	/** Every land file in Data/lands. */
 	WILDREACH_API const TArray<FWRLandDef>& All();
+	/** The map the lands are being built for (set as a game world begins): a land with a "map" is live only there, the
+	 *  Old Island's lands (no "map") only on a map named like the island. */
+	WILDREACH_API void SetCurrentMap(const FString& Map);
+	WILDREACH_API const FString& CurrentMap();
 	/** A land whose biome is live (tuning world.liveBiomes). */
 	WILDREACH_API bool IsLive(const FWRLandDef& Def);
 	WILDREACH_API const FWRLandDef* Find(FName Id);
@@ -230,8 +245,11 @@ class WILDREACH_API UWRLandSubsystem : public UWorldSubsystem
 
 public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	static class AWRLand* FindLand(const UWorld* World, FName Id);
+	/** The map name without its PIE or streaming prefix. */
+	static FString MapOf(const UWorld& World);
 
 private:
 	TArray<TWeakObjectPtr<class AWRLand>> Lands;
@@ -287,6 +305,24 @@ private:
 	void QueueChunks();
 	bool BuildChunk(const FIntPoint& Cell);
 	bool BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync = true);
+	/** Far detail levels (FWRLandDef::bLod): which chunks exist, at what level, with collision or not. */
+	struct FLodChunk
+	{
+		TObjectPtr<UProceduralMeshComponent> Mesh = nullptr;
+		int8 Level = -1;
+		bool bCollision = false;
+	};
+	TMap<FIntPoint, FLodChunk> LodChunks;
+	TSet<FIntPoint> LodCells;            // every chunk with ground above the sea floor
+	struct FLodJob { FIntPoint Cell; int8 Level = -1; bool bCollision = false; float Priority = 0.f; };
+	TArray<FLodJob> LodJobs;             // nearest last (popped first)
+	float LodCheck = 0.f;
+	int32 LodPasses = 0;
+	bool bLodFirstPass = true;
+	void LodStart();
+	void LodTick(float DeltaSeconds);
+	/** One chunk of a far-detail land at Level (stride 2^Level samples), with or without collision. */
+	bool BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision, bool bAsync);
 	void BuildHoles();
 	/** Rain on a heightfield land: its ground's Wet look (M_LandGround's Wet scalar) eased in and out. */
 	void StepWet(float DeltaSeconds);

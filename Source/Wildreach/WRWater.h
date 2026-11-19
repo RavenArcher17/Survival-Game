@@ -26,7 +26,7 @@ public:
 	AWRWaterVolume(const FObjectInitializer& ObjectInitializer);
 	/** Boxes over the mask's sea cells (rows merged into rectangles) and the open sea around the grid out to Extent
 	 *  cm from the middle. Returns how many boxes. */
-	int32 Build(const FWRSeaMask& Mask, float SurfaceZ, float FloorZ, float Extent);
+	int32 Build(const FWRSeaMask& Mask, float SurfaceZ, float FloorZ, float Extent, bool bOpenSeaAround = true);
 };
 
 /** Pure water rules (tests): the mask's sea cells as rectangles, in cells (X, Y, width, height). */

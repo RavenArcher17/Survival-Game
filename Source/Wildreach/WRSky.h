@@ -102,6 +102,11 @@ private:
 	float GraveAir = -1.f;
 	/** The Desert's air and its belt's sand fog (eased), and how far you see in it (cm). */
 	float DesertAir = -1.f, BeltAir = 0.f, BeltVision = 2500.f;
+	/** The round island's map (not the Old Island's): its air is the land under the camera's (sky.roundAir), eased; the
+	 *  Old Island's ridge, mist and the old lands' airs (placed by that map's coordinates) stay off. */
+	bool bRoundIsland = false;
+	FLinearColor RoundFog = FLinearColor::Black;
+	float RoundDensity = -1.f;
 	float GraveMistTop = 0.f;
 	float GraveMist = 0.f;
 	bool bGraveFogSet = false;

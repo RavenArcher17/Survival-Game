@@ -24,6 +24,10 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/Compression.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "ProceduralMeshComponent.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -71,6 +75,12 @@ namespace
 		uint32 H = uint32(X) * 0x8da6b343u ^ uint32(Y) * 0xd8163841u ^ uint32(Seed) * 0xcb1ab31fu;
 		H ^= H >> 13; H *= 0x5bd1e995u; H ^= H >> 15;
 		return H;
+	}
+
+	FString& CurrentMapRef()
+	{
+		static FString Map;
+		return Map;
 	}
 
 	TArray<FWRLandDef>& Registry()
@@ -152,6 +162,23 @@ namespace WRLandHfImpl
 		{
 			UE_LOG(LogWildreach, Error, TEXT("LAND %s: its heightfield %s is missing"), *D.Id.ToString(), *Path);
 			return;
+		}
+		// A packed file (the round island's: "compressed": "zlib", "rawBytes" its unpacked size).
+		FString Packing;
+		if (Hf->TryGetStringField(TEXT("compressed"), Packing) && Packing == TEXT("zlib"))
+		{
+			// (Read as a whole number: a float can't hold 32,689,803 exactly.)
+			int64 RawBytes64 = 0;
+			Hf->TryGetNumberField(TEXT("rawBytes"), RawBytes64);
+			const int32 RawBytes = int32(RawBytes64);
+			TArray<uint8> Raw;
+			Raw.SetNumUninitialized(FMath::Max(0, RawBytes));
+			if (RawBytes <= 0 || !FCompression::UncompressMemory(NAME_Zlib, Raw.GetData(), RawBytes, Bytes.GetData(), Bytes.Num()))
+			{
+				UE_LOG(LogWildreach, Error, TEXT("LAND %s: its heightfield %s would not unpack"), *D.Id.ToString(), *Path);
+				return;
+			}
+			Bytes = MoveTemp(Raw);
 		}
 		D.HfOrigin = FVector2D(LNum(Hf, TEXT("x0"), 0.f), LNum(Hf, TEXT("y0"), 0.f));
 		D.HfStep = FMath::Max(0.5f, LNum(Hf, TEXT("step"), 4.f));
@@ -331,6 +358,23 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 	CoastSea = LNum(J, TEXT("coastSea"), 140.f);
 	SeaFloor = LNum(J, TEXT("seaFloor"), -12.f);
 	Priority = int32(LNum(J, TEXT("priority"), 0.f));
+	J->TryGetStringField(TEXT("map"), Map);
+	const TSharedPtr<FJsonObject>* ZB = nullptr;
+	if (J->TryGetObjectField(TEXT("zoneBiomes"), ZB))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& P : (*ZB)->Values)
+		{
+			if (P.Key.Len() == 1 && P.Value.IsValid()) ZoneBiomes.Add(P.Key[0], FName(*P.Value->AsString()));
+		}
+	}
+	const TSharedPtr<FJsonObject>* Lod = nullptr;
+	if (J->TryGetObjectField(TEXT("lod"), Lod))
+	{
+		bLod = true;
+		const TArray<TSharedPtr<FJsonValue>>* R = nullptr;
+		if ((*Lod)->TryGetArrayField(TEXT("ranges"), R)) for (const TSharedPtr<FJsonValue>& V : *R) LodRanges.Add(float(V->AsNumber()));
+		CollisionRange = LNum(*Lod, TEXT("collisionRange"), 600.f);
+	}
 	if (J->TryGetArrayField(TEXT("cuts"), A))
 	{
 		for (const TSharedPtr<FJsonValue>& V : *A)
@@ -702,6 +746,15 @@ bool FWRLandDef::HfHiddenAt(const FVector2D& M) const
 	return HfSurface[J * HfN + I] == HfHidden;
 }
 
+FName FWRLandDef::BiomeAtMap(const FVector2D& M) const
+{
+	if (ZoneBiomes.Num())
+	{
+		if (const FName* B = ZoneBiomes.Find(GridLetter(M))) return *B;
+	}
+	return Biome;
+}
+
 TCHAR FWRLandDef::GridLetter(const FVector2D& M) const
 {
 	const int32 I = FMath::FloorToInt((M.X - GridOrigin.X) / GridCell), J = FMath::FloorToInt((M.Y - GridOrigin.Y) / GridCell);
@@ -900,8 +953,23 @@ const TArray<FWRLandDef>& WRLand::All()
 	return Registry();
 }
 
+void WRLand::SetCurrentMap(const FString& Map)
+{
+	CurrentMapRef() = Map;
+}
+
+const FString& WRLand::CurrentMap()
+{
+	return CurrentMapRef();
+}
+
 bool WRLand::IsLive(const FWRLandDef& Def)
 {
+	// A land with its own map (the round island) is there and nowhere else; the Old Island's lands only on the island's
+	// map (or before any world has begun), when their biome is live.
+	const FString& Cur = CurrentMapRef();
+	if (!Def.Map.IsEmpty()) return Def.Map == Cur;
+	if (!Cur.IsEmpty() && !Cur.Contains(TEXT("Island"))) return false;
 	return WRBiome::IsLive(Def.Biome);
 }
 
@@ -932,7 +1000,7 @@ const FWRLandDef* WRLand::At(const FVector& World)
 FName WRLand::BiomeAt(const FVector& World)
 {
 	const FWRLandDef* D = At(World);
-	return D ? D->Biome : NAME_None;
+	return D ? D->BiomeAtMap(D->ToMap(World)) : NAME_None;
 }
 
 bool WRLand::PlaceOn(FName LandId, const FVector2D& MapM, FVector& OutWorld)
@@ -988,13 +1056,28 @@ bool UWRLandSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 	return World && World->IsGameWorld();
 }
 
+FString UWRLandSubsystem::MapOf(const UWorld& World)
+{
+	FString Map = UWorld::RemovePIEPrefix(World.GetMapName());
+	Map.RemoveFromStart(World.StreamingLevelsPrefix);
+	return Map;
+}
+
+void UWRLandSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	// Which lands are live depends on the map (WRLand::IsLive): known before any other world system begins play.
+	if (const UWorld* W = GetWorld()) WRLand::SetCurrentMap(MapOf(*W));
+}
+
 void UWRLandSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	// Lands sit in the island's sea: only the island's world holds them (test arenas and stages don't).
-	FString Map = InWorld.GetMapName();
-	Map.RemoveFromStart(InWorld.StreamingLevelsPrefix);
-	if (!Map.Contains(TEXT("Island"))) return;
+	// Lands sit in their map's sea: the Old Island's lands only on the island's map (test arenas and stages hold none),
+	// the round island's on its own map (FWRLandDef::Map).
+	const FString Map = MapOf(InWorld);
+	WRLand::SetCurrentMap(Map);
+	const bool bOldIsland = Map.Contains(TEXT("Island"));
 	for (const FWRLandDef& Def : WRLand::All())
 	{
 		if (!WRLand::IsLive(Def)) continue;
@@ -1010,6 +1093,7 @@ void UWRLandSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		// Its camps (PlayerStarts, safe zones, starter stations): before the game mode picks anyone's start this frame.
 		if (InWorld.GetNetMode() != NM_Client) AWRLand::SpawnCamps(&InWorld, Def);
 	}
+	if (!bOldIsland) return;
 	// The server's live things (the crossings, rifts, machines): replicated, so only it spawns them.
 	if (InWorld.GetNetMode() != NM_Client && Lands.Num()) WRLandThings::Start(&InWorld);
 	WRVoid::Start(&InWorld);
@@ -1066,6 +1150,11 @@ void AWRLand::BeginPlay()
 		// One instance for the whole land so rain can wet all of it at once (StepWet).
 		GroundMID = UMaterialInstanceDynamic::Create(GroundMat, this);
 		GroundMID->SetScalarParameterValue(TEXT("Wet"), 0.f);
+	}
+	if (D && D->bHeightfield && D->bLod)
+	{
+		LodStart();
+		return;
 	}
 	QueueChunks();
 	// A heightfield land's camps are where new players of its path first stand, and the game mode places them right
@@ -1143,6 +1232,12 @@ void AWRLand::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const FWRLandDef* D = Def();
 	if (!D) return;
+	if (D->bHeightfield && D->bLod)
+	{
+		LodTick(DeltaSeconds);
+		StepWet(DeltaSeconds);
+		return;
+	}
 	if (!bGroundDone)
 	{
 		for (int32 n = 0; n < D->ChunksPerFrame && Queue.Num(); ++n)
@@ -1391,11 +1486,293 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 	return true;
 }
 
+// ================================================================================================ far detail levels
+// The round island (FWRLandDef::bLod) is too big to build whole at full detail: each chunk is built at the detail its
+// distance from your view wants (every sample near you, every 2nd, 4th, 8th further off), with a skirt hanging under its
+// edge so a coarser neighbour never shows a crack, and it has collision only near a body that could stand on it (players
+// within CollisionRange, anyone else on their own chunk and the next). A dedicated server draws nothing, so it only
+// builds the ground under bodies. Rebuilt as you move, nearest first, a few a frame.
+
+void AWRLand::LodStart()
+{
+	const FWRLandDef& D = *Def();
+	const int32 Q = FMath::Max(1, FMath::RoundToInt(D.Chunk / D.HfStep));
+	const int32 NC = FMath::DivideAndRoundUp(D.HfN - 1, Q);
+	const float Span = Q * D.HfStep;
+	for (int32 y = 0; y < NC; ++y)
+	{
+		for (int32 x = 0; x < NC; ++x)
+		{
+			float Top = -1e6f;
+			for (int32 j = 0; j <= Q; j += 2) for (int32 i = 0; i <= Q; i += 2) Top = FMath::Max(Top, D.HfSample(x * Q + i, y * Q + j));
+			if (Top >= D.SeaFloor + 1.5f) LodCells.Add(FIntPoint(x, y));
+		}
+	}
+	// Where players first stand (the camps, Hearthmoot's gates): solid at once, the game mode places people right after.
+	int32 Made = 0;
+	for (const FVector2D& P : D.BuildFirst)
+	{
+		for (int32 dy = -1; dy <= 1; ++dy) for (int32 dx = -1; dx <= 1; ++dx)
+		{
+			const FVector2D At = P + FVector2D(dx, dy) * 70.f;
+			const FIntPoint Cell(FMath::FloorToInt((At.X - D.HfOrigin.X) / Span), FMath::FloorToInt((At.Y - D.HfOrigin.Y) / Span));
+			const FLodChunk* Have = LodChunks.Find(Cell);
+			if ((!Have || !Have->bCollision) && LodCells.Contains(Cell) && BuildLodChunk(Cell, 0, true, false)) ++Made;
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("LAND %s: %d chunks above the sea floor, %d built solid at load where players first stand"), *LandId.ToString(), LodCells.Num(), Made);
+}
+
+void AWRLand::LodTick(float DeltaSeconds)
+{
+	const FWRLandDef& D = *Def();
+	UWorld* W = GetWorld();
+	if (!W) return;
+	const int32 Q = FMath::Max(1, FMath::RoundToInt(D.Chunk / D.HfStep));
+	const float Span = Q * D.HfStep;
+	const bool bDraw = GetNetMode() != NM_DedicatedServer;
+	const auto CellOf = [&](const FVector2D& M) { return FIntPoint(FMath::FloorToInt((M.X - D.HfOrigin.X) / Span), FMath::FloorToInt((M.Y - D.HfOrigin.Y) / Span)); };
+	LodCheck -= DeltaSeconds;
+	if (LodCheck <= 0.f)
+	{
+		LodCheck = 0.4f;
+		++LodPasses;
+		// Where the views are (ground drawn) and where bodies are (ground to stand on), in map metres.
+		TArray<FVector2D> Views;
+		struct FBody { FVector2D At; float R; };
+		TArray<FBody> Bodies;
+		for (FConstPlayerControllerIterator It = W->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			if (!PC) continue;
+			if (bDraw && PC->IsLocalController())
+			{
+				const APawn* P = PC->GetPawn();
+				const FVector Cam = PC->PlayerCameraManager ? PC->PlayerCameraManager->GetCameraLocation() : (P ? P->GetActorLocation() : FVector::ZeroVector);
+				Views.Add(D.ToMap(Cam));
+			}
+			if (const APawn* P = PC->GetPawn()) Bodies.Add({ D.ToMap(P->GetActorLocation()), D.CollisionRange });
+		}
+		// Everyone else (creatures, mounts, other players on a client): their own chunk and the next.
+		for (TActorIterator<APawn> It(W); It; ++It) Bodies.Add({ D.ToMap(It->GetActorLocation()), Span });
+		// Nobody may stand on nothing: a body's own chunk without collision is made solid now, not in the queue.
+		for (const FBody& B : Bodies)
+		{
+			const FIntPoint Cell = CellOf(B.At);
+			const FLodChunk* Have = LodChunks.Find(Cell);
+			if ((!Have || !Have->bCollision) && LodCells.Contains(Cell)) BuildLodChunk(Cell, 0, true, false);
+		}
+		const int32 MaxLevel = D.LodRanges.Num();
+		const float HalfDiag = Span * 0.7072f;
+		TArray<FLodJob> Jobs;
+		for (const FIntPoint& Cell : LodCells)
+		{
+			const FVector2D C = D.HfOrigin + (FVector2D(Cell) + FVector2D(0.5f, 0.5f)) * Span;
+			float DV = 1e12f;
+			for (const FVector2D& V : Views) DV = FMath::Min(DV, float(FVector2D::Distance(C, V)));
+			DV = FMath::Max(0.f, DV - HalfDiag);
+			int32 Level = -1;
+			if (Views.Num())
+			{
+				Level = MaxLevel;
+				for (int32 k = 0; k < MaxLevel; ++k) if (DV < D.LodRanges[k]) { Level = k; break; }
+			}
+			bool bCol = false;
+			float DB = 1e12f;
+			for (const FBody& B : Bodies)
+			{
+				const float Dist = FMath::Max(0.f, float(FVector2D::Distance(C, B.At)) - HalfDiag);
+				if (Dist < B.R) { bCol = true; DB = FMath::Min(DB, Dist); }
+			}
+			if (bCol) Level = 0;
+			const FLodChunk* Have = LodChunks.Find(Cell);
+			if ((Have ? Have->Level : -1) == Level && (Have && Have->bCollision) == bCol) continue;
+			// Ground to stand on first (nearest first), then what you see (nearest first), a chunk going away last.
+			Jobs.Add({ Cell, int8(Level), bCol, bCol ? DB - 1e9f : (Level < 0 ? 1e12f : DV) });
+		}
+		Jobs.Sort([](const FLodJob& A, const FLodJob& B) { return A.Priority > B.Priority; });
+		LodJobs = MoveTemp(Jobs);
+	}
+	// A few chunks a frame (a far one is a fraction of a near one's work); more while the island first comes in.
+	float Budget = bLodFirstPass ? 24.f : float(D.ChunksPerFrame);
+	while (LodJobs.Num() && Budget > 0.f)
+	{
+		const FLodJob J = LodJobs.Pop(EAllowShrinking::No);
+		FLodChunk* Have = LodChunks.Find(J.Cell);
+		if ((Have ? Have->Level : -1) == J.Level && (Have && Have->bCollision) == J.bCollision) continue;
+		if (J.Level < 0)
+		{
+			if (Have && Have->Mesh)
+			{
+				Chunks.Remove(Have->Mesh);
+				Have->Mesh->DestroyComponent();
+			}
+			LodChunks.Remove(J.Cell);
+			Budget -= 0.05f;
+			continue;
+		}
+		BuildLodChunk(J.Cell, J.Level, J.bCollision, true);
+		Budget -= 1.f / float(1 << (2 * J.Level));
+	}
+	if (bLodFirstPass && LodPasses > 0 && LodJobs.Num() == 0)
+	{
+		bLodFirstPass = false;
+		bGroundDone = true;
+		UE_LOG(LogWildreach, Log, TEXT("LAND %s ground in: %d chunks drawn"), *LandId.ToString(), LodChunks.Num());
+	}
+}
+
+bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision, bool bAsync)
+{
+	const FWRLandDef& D = *Def();
+	const int32 Q = FMath::Max(1, FMath::RoundToInt(D.Chunk / D.HfStep));
+	const int32 I0 = Cell.X * Q, J0 = Cell.Y * Q;
+	const int32 NI = FMath::Min(Q, D.HfN - 1 - I0), NJ = FMath::Min(Q, D.HfN - 1 - J0);
+	if (NI <= 0 || NJ <= 0) return false;
+	const int32 Sx = 1 << FMath::Clamp(Level, 0, 6);
+	TArray<int32> Is, Js;
+	for (int32 i = 0; i < NI; i += Sx) Is.Add(i);
+	Is.Add(NI);
+	for (int32 j = 0; j < NJ; j += Sx) Js.Add(j);
+	Js.Add(NJ);
+	const int32 VX = Is.Num(), VY = Js.Num();
+	const bool bLook = GetNetMode() != NM_DedicatedServer;
+	const bool bLayers = bLook && D.bLayered;
+	const bool bSurface = D.HfSurface.Num() == D.HfHeights.Num();
+	struct FSection
+	{
+		TArray<FVector> Verts, Normals;
+		TArray<FLinearColor> Colours;
+		TArray<FVector2D> UV, UV1, UV2, UV3;
+		TArray<FProcMeshTangent> Tangents;
+		TArray<int32> Tris;
+	};
+	FSection G, Sk;
+	const auto AddVert = [&](FSection& S, int32 SI, int32 SJ, float DropM)
+	{
+		const FVector2D M = D.HfOrigin + FVector2D(float(SI), float(SJ)) * D.HfStep;
+		const float Z = D.HfSample(SI, SJ) - DropM;
+		const float DX = D.HfSample(SI + Sx, SJ) - D.HfSample(SI - Sx, SJ);
+		const float DY = D.HfSample(SI, SJ + Sx) - D.HfSample(SI, SJ - Sx);
+		const FVector Nrm = FVector(-DX, -DY, 2.f * D.HfStep * Sx).GetSafeNormal();
+		float Rough = 0.9f;
+		FLinearColor C = bLook ? D.HfGround(SI, SJ, Nrm, Rough) : FLinearColor::White;
+		C.A = 1.f - Rough;
+		S.Verts.Add(D.ToWorld(M, Z) - D.Origin);
+		S.Normals.Add(Nrm);
+		S.Colours.Add(C);
+		S.UV.Add(M / 4.f);
+		if (bLayers)
+		{
+			float L[6];
+			D.HfLayers(SI, SJ, L);
+			S.UV1.Add(FVector2D(L[0], L[1]));
+			S.UV2.Add(FVector2D(L[2], L[3]));
+			S.UV3.Add(FVector2D(L[4], L[5]));
+		}
+		S.Tangents.Add(FProcMeshTangent(FVector(1.f, 0.f, 0.f), false));
+	};
+	TArray<uint8> Gone;
+	Gone.Reserve(VX * VY);
+	for (int32 j = 0; j < VY; ++j)
+	{
+		for (int32 i = 0; i < VX; ++i)
+		{
+			const int32 SI = I0 + Is[i], SJ = J0 + Js[j];
+			AddVert(G, SI, SJ, 0.f);
+			Gone.Add(bSurface && D.HfSurface[SJ * D.HfN + SI] == FWRLandDef::HfHidden ? 1 : 0);
+		}
+	}
+	for (int32 j = 0; j + 1 < VY; ++j)
+	{
+		for (int32 i = 0; i + 1 < VX; ++i)
+		{
+			const int32 A = j * VX + i, B = A + 1, C = A + VX, E = C + 1;
+			if (Gone[A] || Gone[B] || Gone[C] || Gone[E]) continue;
+			G.Tris.Append({ A, C, E, A, E, B });
+		}
+	}
+	if (G.Tris.Num() == 0) return false;
+	if (bLook)
+	{
+		// The skirt: the chunk's rim, and the same points dropped, joined both ways round (seen from either side).
+		TArray<FIntPoint> Rim;
+		for (int32 i = 0; i < VX; ++i) Rim.Add(FIntPoint(i, 0));
+		for (int32 j = 1; j < VY; ++j) Rim.Add(FIntPoint(VX - 1, j));
+		for (int32 i = VX - 2; i >= 0; --i) Rim.Add(FIntPoint(i, VY - 1));
+		for (int32 j = VY - 2; j >= 0; --j) Rim.Add(FIntPoint(0, j));
+		const float Drop = 2.f + D.HfStep * Sx;
+		for (const FIntPoint& R : Rim)
+		{
+			AddVert(Sk, I0 + Is[R.X], J0 + Js[R.Y], 0.f);
+			AddVert(Sk, I0 + Is[R.X], J0 + Js[R.Y], Drop);
+		}
+		for (int32 r = 0; r + 1 < Rim.Num(); ++r)
+		{
+			const int32 T0 = r * 2, B0 = T0 + 1, T1 = T0 + 2, B1 = T0 + 3;
+			Sk.Tris.Append({ T0, B0, T1, T1, B0, B1, T0, T1, B0, T1, B1, B0 });
+		}
+	}
+	FLodChunk& Have = LodChunks.FindOrAdd(Cell);
+	UProceduralMeshComponent* Mesh = Have.Mesh;
+	if (!Mesh)
+	{
+		Mesh = NewObject<UProceduralMeshComponent>(this);
+		Mesh->SetupAttachment(RootComponent);
+		Mesh->SetCanEverAffectNavigation(false);
+		Mesh->LDMaxDrawDistance = D.DrawDistance;
+		Mesh->SetCachedMaxDrawDistance(D.DrawDistance);
+		Mesh->RegisterComponent();
+		Chunks.Add(Mesh);
+		Have.Mesh = Mesh;
+	}
+	else
+	{
+		Mesh->ClearAllMeshSections();
+	}
+	Mesh->bUseAsyncCooking = bAsync;
+	if (bCollision)
+	{
+		Mesh->SetCollisionProfileName(TEXT("BlockAll"));
+		Mesh->SetCollisionObjectType(ECC_WorldStatic);
+	}
+	else
+	{
+		Mesh->SetCollisionProfileName(TEXT("NoCollision"));
+	}
+	if (bLayers)
+	{
+		Mesh->CreateMeshSection_LinearColor(0, G.Verts, G.Tris, G.Normals, G.UV, G.UV1, G.UV2, G.UV3, G.Colours, G.Tangents, bCollision);
+		if (Sk.Tris.Num()) Mesh->CreateMeshSection_LinearColor(1, Sk.Verts, Sk.Tris, Sk.Normals, Sk.UV, Sk.UV1, Sk.UV2, Sk.UV3, Sk.Colours, Sk.Tangents, false);
+	}
+	else
+	{
+		Mesh->CreateMeshSection_LinearColor(0, G.Verts, G.Tris, G.Normals, G.UV, G.Colours, G.Tangents, bCollision);
+		if (Sk.Tris.Num()) Mesh->CreateMeshSection_LinearColor(1, Sk.Verts, Sk.Tris, Sk.Normals, Sk.UV, Sk.Colours, Sk.Tangents, false);
+	}
+	UMaterialInterface* Mat = GroundMID ? GroundMID.Get() : GroundMat.Get();
+	if (Mat)
+	{
+		Mesh->SetMaterial(0, Mat);
+		if (Sk.Tris.Num()) Mesh->SetMaterial(1, Mat);
+	}
+	Have.Level = int8(Level);
+	Have.bCollision = bCollision;
+	return true;
+}
+
 bool AWRLand::IsGroundBuiltAt(const FVector& World) const
 {
 	const FWRLandDef* D = Def();
 	if (!D) return false;
 	const FVector2D M = D->ToMap(World);
+	if (D->bHeightfield && D->bLod)
+	{
+		// Built means you can stand on it there (the far chunks are looks only).
+		const float Span = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep)) * D->HfStep;
+		const FLodChunk* C = LodChunks.Find(FIntPoint(FMath::FloorToInt((M.X - D->HfOrigin.X) / Span), FMath::FloorToInt((M.Y - D->HfOrigin.Y) / Span)));
+		return C && C->bCollision;
+	}
 	if (D->bHeightfield)
 	{
 		const float Span = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep)) * D->HfStep;

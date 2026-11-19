@@ -101,3 +101,18 @@ The build goes land by land, each checked against its land's design and its land
 spots, with pictures for Raven at each land. Proposed first: Hearthmoot with its meadow, lake and main roads, then
 Volcanic and Frozen tundra (their content and creatures exist on the Old Island, so the method is proven on known
 ground), then the rest round the ring.
+
+## How it is built (from slice 1, 11-19)
+
+- **Its own map:** `L_Wildreach` (sky, sun, fog and clouds only; everything else is built by code at runtime). The Old
+  Island keeps `L_Island`. A world remembers its map (`info.json` "map"); the New world form chooses it.
+- **The ground:** `node Tools/terrain/round_ground.mjs` turns this layout into one heightfield land,
+  `Data/lands/island.json` + `island_ground.bin` (4 m samples over ±6.6 km, zlib), with a zone letter per land (its
+  biome via `zoneBiomes`), the meadow (M), the city's hilltop (C) and the sea floor (~, D). Its far detail levels and
+  collision-near-bodies keep 95 km² of runtime ground cheap. Each land's slice replaces that land's first-pass shape in
+  the same script, so borders stay crack-free (one ground).
+- **The sea:** `Data/sea_mask_L_Wildreach.json` from the same script; the sea and the water you swim in pick the mask
+  named after their map.
+- **Hearthmoot and the forts:** `node Tools/terrain/hearthmoot.mjs` -> `Data/hearthmoot.json`, built on every machine
+  by `WRRoundIsland.cpp` from the building look's blocks (no replication); its solids are hidden boxes.
+- **Pictures:** `Tools/terrain/spotshots.ps1 -Map L_Wildreach` (camera spots in game cm: map metres x 100).

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Phase 3, slice 1: the round island's map, its first ground, Hearthmoot, the meadow and the lake (11-19)
+
+Raven OK'd the layout ("Ok build it"). The round island is its own map (`L_Wildreach`, which until now held only the
+sky and lights); the Old Island keeps `L_Island` and plays exactly as before.
+- **One runtime ground for the whole island** (`node Tools/terrain/round_ground.mjs` from the signed-off layout):
+  `Data/lands/island.json` + `island_ground.bin` (4 m samples over ±6.6 km, zlib-packed to 7.6 MB), a heightfield land
+  like Aaron's, with a `map` of its own. Every land has a first-pass shape (Storm's peaks, the Desert's dunes and
+  mesas, the Forest's hills, the Tundra's plateau, the Swamp's pools, the volcano, the Wasteland's terraces and rifts)
+  that its own slice replaces; the coast has beaches and cliffs, shelving sea floor, reefs and the nine islets.
+- **Far detail levels** (`WRLand.cpp`, land `lod`): each 200 m chunk is built at the detail its distance wants (every
+  sample near you, every 2nd / 4th / 8th further off), with a skirt under its edge so no crack shows, and has
+  collision only near bodies (players within 600 m, anyone else on their own chunk and the next); a dedicated server
+  builds only the ground under bodies. The whole island comes in in about 4 s.
+- **The island's ground material** `M_IslandGround` (`build_forest_ground.py --island`): the forest's six textured
+  layers, but each land's colour comes from the ground data, so one ground can be snow, basalt, dune sand and meadow.
+- **The new map's own air** (`sky.roundAir`: each land's haze, eased across borders) and sea (`Data/sea_mask_L_Wildreach.json`,
+  the Swamp's pools included); the Old Island's valley mist and old lands' fogs stay off it.
+- **Hearthmoot, first pass** (`node Tools/terrain/hearthmoot.mjs` -> `Data/hearthmoot.json`, built on every machine by
+  `WRRoundIsland.cpp` from the building look's blocks, nothing replicated): the curtain wall 600 m across with 12
+  towers and four gatehouses where the main roads arrive, the hearth on the central plaza, a ring street, and 12
+  quarters of 420 houses roofed in their path's colour, each with its hall. A fort on each main road at the meadow's
+  edge, a waymark at each crossroads. Everyone starts on the plaza for now (`world.cityStartTag`).
+- **The meadow, the lake and the stream**: the green basin round the city's hill, the 0.44 km² lake (the sea's water,
+  swimmable) and its 4 km stream to the reef bay. Roads join at crossroads in passes no steeper than 11%; cuts and
+  fills slope back instead of standing as walls.
+- **Worlds have a map**: the New world form's Map choice (the Old Island, or the round island while it's built); a
+  world's `info.json` keeps it and Host opens it. Worlds from before stay on the Old Island.
+- Tools: `spotshots.ps1 -Map L_Wildreach` takes pictures on the new map.
+
 ### Phase 3, step 1: the round island laid out to scale, for Raven's OK (11-19)
 
 Nothing built yet: the layout the slices will be built to, for Raven's sign-off (the plan doc's "Round island layout"

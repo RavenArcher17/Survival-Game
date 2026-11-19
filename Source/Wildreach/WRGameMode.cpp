@@ -930,6 +930,18 @@ AActor* AWRGameMode::ChoosePlayerStart_Implementation(AController* Player)
 			return Matching[FMath::RandRange(0, Matching.Num() - 1)];
 		}
 	}
+	// No start of the path's own here (the round island's lands come slice by slice): Hearthmoot's (Data/lands/island.json
+	// camps, tag world.cityStartTag).
+	const FName City(*FWRTuning::Get().Str(TEXT("world.cityStartTag"), TEXT("hearthmoot")));
+	TArray<APlayerStart*> CityStarts;
+	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+	{
+		if (It->PlayerStartTag == City) CityStarts.Add(*It);
+	}
+	if (CityStarts.Num() > 0)
+	{
+		return CityStarts[FMath::RandRange(0, CityStarts.Num() - 1)];
+	}
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 

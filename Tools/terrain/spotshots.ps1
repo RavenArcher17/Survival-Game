@@ -2,8 +2,8 @@
 # rendered client driven by bot commands, as uishots.ps1. Each spot is "label=commands", commands separated by ';'
 # (bot commands, wr.Cam X Y Z Yaw Pitch for a free camera, WRHour, ...); a scene picture follows each spot.
 #   spotshots.ps1 -Port 7871 -Out <folder> -Spots 'lava_day=WRHour 12;wr.Cam -40000 85000 9000 90 -20', 'lava_night=WRHour 0.5'
-# -Ui takes "shot showui" pictures (HUD included) instead of HighResShot.
-param([int]$Port = 7838, [string]$Out = '', [string[]]$Spots = @(), [switch]$Ui, [int]$Res = 1600)
+# -Ui takes "shot showui" pictures (HUD included) instead of HighResShot. -Map L_Wildreach shoots the round island's map.
+param([int]$Port = 7838, [string]$Out = '', [string[]]$Spots = @(), [switch]$Ui, [int]$Res = 1600, [string]$Map = 'L_Island')
 $lock = New-Object System.Threading.Mutex($false, 'Global\WildreachUIShots')
 try { [void]$lock.WaitOne() } catch [System.Threading.AbandonedMutexException] { }
 $env:UE_SKIP_UBT_SDK_SETUP = '1'
@@ -28,7 +28,7 @@ foreach ($s in $Spots) {
 	$labels += $label
 }
 $cmds += 'wait 2'
-$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Island -server -nullrhi -unattended -nosound -port=$Port -wrworld=spotshots -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
+$s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/$Map -server -nullrhi -unattended -nosound -port=$Port -wrworld=spotshots -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $c = Start-Process $ue -ArgumentList "`"$project`" 127.0.0.1:${Port}?Path=fire?WRName=${name} -game -windowed -ResX=$Res -ResY=$h -unattended -nosound -wrbot `"-ExecCmds=t.MaxFPS 60`" `"-wrbotcmds=$($cmds -join '|')`" -abslog=`"$logs\client.log`"" -PassThru
 $deadline = (Get-Date).AddSeconds(180 + 25 * $labels.Count)

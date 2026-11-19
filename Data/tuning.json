@@ -464,7 +464,9 @@
     "mistDensity": 1.2, "mistDawn": 0.55, "mistDawnHours": 1.1, "mistDusk": 0.45, "mistDay": 0.03, "mistNight": 0.04, "mistFalloff": 1000, "mistHeightOffset": 0, "mistLift": 300, "mistRadiusScale": 1, "volcanicMistColor": "232,220,206", "tundraMistColor": "214,226,240",
     "volcanicWhiteTemp": 7000, "tundraWhiteTemp": 5900, "volcanicSaturation": 0.94, "tundraSaturation": 0.97, "contrast": 1.04,
     "volcanicGain": "1.03,1.0,0.95", "tundraGain": "0.96,0.99,1.04", "shadowLift": "0.004,0.005,0.008", "nightShadowLift": 2, "vignette": 0.3,
-    "volumetricFog": 0 },
+    "volumetricFog": 0,
+    "roundAir": { "_comment": "The round island's air (its own map, WRSky): the haze of the land under the camera, \"r,g,b,density\" (sRGB, exponential fog density), eased across borders; default where a biome has no row. Light, so the 11 km island reads from a hill; each land's slice tunes its own.",
+      "default": "196,212,230,0.0035", "meadow": "200,216,232,0.003", "volcanic": "178,154,136,0.006", "tundra": "180,202,232,0.005", "storm_peaks": "150,160,178,0.006", "desert": "228,210,172,0.005", "forest": "178,192,152,0.006", "swamp": "150,158,136,0.009", "ocean": "190,214,226,0.004", "graveyard": "142,132,152,0.008", "wasteland": "152,130,162,0.007" } },
 
   "sea": { "_comment": "The sea (WRSea, polish pass): the WaterMaterials ocean at level cm over the open sea of Data/sea_mask.json (node Tools/terrain/sea_mask.mjs), in squares one mask cell (4 m) wide at the shore growing to distance / falloff (bigger falloff = finer far out) up to maxSquare cm, out to extent cm across, split into tile cm meshes near the island (8x that further out); uvScale cm per texture repeat. dim: material parameters with their daytime values that dim to nightDim x at night (glow, foam glow, painted highlights, sky reflection). scalars / colours (sRGB) set any of the material's parameters by name.",
     "material": "/Game/Sea/MI_Ocean.MI_Ocean", "level": -20, "falloff": 6, "maxSquare": 409600, "extent": 6553600, "tile": 102400, "uvScale": 1500,

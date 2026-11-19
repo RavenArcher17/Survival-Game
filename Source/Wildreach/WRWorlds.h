@@ -12,6 +12,7 @@ struct FWRWorldInfo
 	FDateTime LastPlayed;
 	double PlaySeconds = 0.0;
 	FString Version;       // the game version that last played it
+	FString Map = TEXT("L_Island");   // the map it plays on: the Old Island's (L_Island) or the round island's (L_Wildreach)
 };
 
 /** What a world plays by: the preset it started from, and every value on the world settings screen (server.<key>). */
@@ -30,7 +31,7 @@ struct FWRWorldSettings
 
 /**
  * Worlds: each is a folder, Saved/Worlds/<id>/, with everything the server keeps for it:
- *   info.json      name, created, last played, play time, version (only worlds with one are on the menu's list)
+ *   info.json      name, created, last played, play time, version, map (only worlds with one are on the menu's list)
  *   settings.json  {"preset": ..., "base": ..., "settings": {...}} (what Saved/ServerDB/server.json was)
  *   world.json     buildings, tames, the clock (AWRGameMode::SaveWorld)
  *   clans.json     FWRClans
@@ -58,7 +59,9 @@ namespace WRWorlds
 	WILDREACH_API TArray<FWRWorldInfo> List();
 	WILDREACH_API bool Read(const FString& Id, FWRWorldInfo& Out);
 	/** A new world: its folder (named after it, made unique), info.json and settings.json. Returns its id. */
-	WILDREACH_API FString Create(const FString& Name, const FWRWorldSettings& Settings);
+	WILDREACH_API FString Create(const FString& Name, const FWRWorldSettings& Settings, const FString& Map = TEXT("L_Island"));
+	/** The map a world plays on (its info.json "map"; the Old Island's for worlds from before maps). */
+	WILDREACH_API FString MapOf(const FString& Id);
 	WILDREACH_API bool Rename(const FString& Id, const FString& NewName);
 	/** Removes the world's folder and everything in it. */
 	WILDREACH_API bool Delete(const FString& Id);
