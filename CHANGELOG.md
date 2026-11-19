@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Phase 3, step 1: the round island laid out to scale, for Raven's OK (11-19)
+
+Nothing built yet: the layout the slices will be built to, for Raven's sign-off (the plan doc's "Round island layout"
+tab, and `Docs/design/round-island.md`). `node Tools/terrain/round_island.mjs` makes it from Aaron's land sizes
+(world-map.md 2.2, each doubled) and Raven's answers, and writes `Tools/terrain/round_island_layout.json` (every number the
+build scripts will use) and `Docs/design/round_island_map.svg`.
+- **10.7 km across:** nine lands as uneven slices round Hearthmoot, clockwise from the north-west Storm peaks, Desert,
+  Ancient forest, Frozen tundra, Swamp, Ocean & reefs (shore), Graveyard, Corrupted wasteland, Volcanic; opposites face
+  each other across the city.
+- **Each land:** three wake-up camps on its coast, a gate road (4.7 to 5 km) with its old pass's mouth shrine, champion
+  and fort, its major boss deep inland off the road; coast, midlands and inland bands of equal depth.
+- **Hearthmoot:** walls 600 m across inside a guarded Commons 1.3 km across; 12 quarters in the ring's order.
+- **Layers:** the sky islands over Storm, Desert and Forest; the Crystal caves under Forest and Tundra (the Severance
+  leads down); the Fungal caverns under Graveyard and Wasteland (the Flue rises out); Wind, Spore and Arcane starts
+  inside their layers. **The sea:** shallows 300 m, reefs to 1.2 km, then deep; Thalassor's waters south.
+
 ### Phase 2, part 6: a way round the graphics-card crash, normal XP by default, the twelve lands on the menu (Raven, 11-19)
 
 - **The graphics-card crash, looked into.** All 22 GPU crash folders on Raven's PC (10-25 to 11-17) hold NVIDIA
