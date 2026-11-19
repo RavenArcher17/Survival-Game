@@ -156,8 +156,8 @@ namespace WRSwampVharraLocal
 		if (WRLightning::IsGrounded(V) || WRStorm::HasBuff(V, TEXT("grounding"))) return true;
 		const AWRPlayerState* PS = V->GetPlayerState<AWRPlayerState>();
 		if (PS && PS->GetPaths() && PS->GetPaths()->GetMainPath() == TEXT("lightning")) return true;
-		const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(V);
-		return Inv && Inv->GetEquipped(EWREquipSlot::Talisman).ItemId == TEXT("grounding_charm");
+		// Worn passStorm: the grounding charm, Stormweave's four.
+		return UWRInventoryComponent::GearStatFor(V, TEXT("passStorm")) > 0.f;
 	}
 
 	/** Riding a Mirestrider (the bird stands tall): out of the water. */

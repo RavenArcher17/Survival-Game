@@ -224,13 +224,29 @@ void AWRFungalCaves::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!bQueued) return;
+	// Worked out on worker threads, a few cubes in flight; the game thread only makes the finished ones into meshes,
+	// inside its budget (WRCaveBuild.h).
 	const double Budget = WRTune(TEXT("fungalWorld.caves.msPerFrame"), 6.f) / 1000.0;
 	const double Start = FPlatformTime::Seconds();
-	while (Next < Queue.Num() && FPlatformTime::Seconds() - Start < Budget)
+	for (int32 i = 0; i < InFlight.Num() && FPlatformTime::Seconds() - Start < Budget;)
 	{
-		BuildCube(Queue[Next]);
-		Done.Add(Queue[Next]);
-		++Next;
+		if (!InFlight[i].Task.IsCompleted()) { ++i; continue; }
+		const FWRCaveMeshPtr M = InFlight[i].Mesh;
+		InFlight.RemoveAtSwap(i);
+		if (M.IsValid()) { FinishCube(*M); Done.Add(M->Key); }
+	}
+	const int32 MaxInFlight = FMath::Max(1, int32(WRTune(TEXT("fungalWorld.caves.inFlight"), 4.f)));
+	const float GroundSkin = WRTune(TEXT("fungalWorld.caves.groundSkin"), 120.f);
+	while (Next < Queue.Num() && InFlight.Num() < MaxInFlight)
+	{
+		FWRCaveMeshPtr M = MakeShared<FWRCaveMesh, ESPMode::ThreadSafe>();
+		M->Key = Queue[Next++];
+		const float C = Cell;
+		const int32 N = Cells;
+		const FVector Loc = GetActorLocation();
+		FWRCaveJob& J = InFlight.AddDefaulted_GetRef();
+		J.Mesh = M;
+		J.Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, [M, C, N, Loc, GroundSkin]() { ComputeCube(M->Key, C, N, Loc, GroundSkin, *M); });
 	}
 	if (IsBuilt())
 	{
@@ -239,7 +255,15 @@ void AWRFungalCaves::Tick(float DeltaSeconds)
 	}
 }
 
-bool AWRFungalCaves::BuildCube(const FIntVector& Key)
+void AWRFungalCaves::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// The workers only touch their own result and the static fungal data; wait for them so none outlives the world.
+	for (FWRCaveJob& J : InFlight) J.Task.Wait();
+	InFlight.Reset();
+	Super::EndPlay(Reason);
+}
+
+void AWRFungalCaves::ComputeCube(const FIntVector& Key, float Cell, int32 Cells, const FVector& ActorLoc, float GroundSkin, FWRCaveMesh& Out)
 {
 	using namespace WRFungalCavesImpl;
 	const FWRFungalData& D = FWRFungalData::Get();
@@ -248,7 +272,7 @@ bool AWRFungalCaves::BuildCube(const FIntVector& Key)
 	const FVector O(Key.X * S, Key.Y * S, Key.Z * S);
 	TArray<int32> Shapes;
 	D.ShapesIn(FBox(O - FVector(Cell * 2.f), O + FVector(S + Cell * 2.f)), Shapes);
-	if (Shapes.Num() == 0) return false;
+	if (Shapes.Num() == 0) return;
 	const FVector Mid = O + FVector(S * 0.5f);
 	const float HalfDiag = S * 0.8660254f + Cell * 2.f;
 	// The ground over the cube's columns (only matters where a cube reaches up near it: a mouth).
@@ -273,7 +297,7 @@ bool AWRFungalCaves::BuildCube(const FIntVector& Key)
 	{
 		float Centre = 1.0e6f;
 		for (int32 s : Shapes) Centre = FMath::Min(Centre, D.ShapeAir(s, Mid));
-		if (FMath::Abs(Centre) > HalfDiag * 1.6f) { ++Skipped; return false; }
+		if (FMath::Abs(Centre) > HalfDiag * 1.6f) { Out.bSkipped = true; return; }
 	}
 	TArray<float> F;
 	F.SetNumUninitialized(NS * NS * NS);
@@ -323,7 +347,7 @@ bool AWRFungalCaves::BuildCube(const FIntVector& Key)
 			(Cv[4] - Cv[0]) + (Cv[5] - Cv[1]) + (Cv[6] - Cv[2]) + (Cv[7] - Cv[3]));
 		const FVector Nrm = (-G).GetSafeNormal();
 		CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)] = Verts.Num();
-		Verts.Add(P - GetActorLocation());
+		Verts.Add(P - ActorLoc);
 		Normals.Add(Nrm);
 		UVs.Add(FVector2D(P.X / 400.f, P.Y / 400.f));
 		int32 Near = INDEX_NONE;
@@ -335,11 +359,10 @@ bool AWRFungalCaves::BuildCube(const FIntVector& Key)
 	}
 	const auto CV = [&](int32 i, int32 j, int32 k) { return CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)]; };
 	TArray<int32> Tris;
-	const float GroundSkin = WRTune(TEXT("fungalWorld.caves.groundSkin"), 120.f);
 	const auto Quad = [&](int32 A, int32 B, int32 C, int32 E, const FVector& RockDir)
 	{
 		if (A < 0 || B < 0 || C < 0 || E < 0) return;
-		const FVector QM = (Verts[A] + Verts[B] + Verts[C] + Verts[E]) * 0.25f + GetActorLocation();
+		const FVector QM = (Verts[A] + Verts[B] + Verts[C] + Verts[E]) * 0.25f + ActorLoc;
 		if (bNearGround && FMath::Abs(QM.Z - FcGroundZ(L, QM.X, QM.Y)) < GroundSkin && FcLandDraws(L, QM.X, QM.Y)) return;
 		if (bFlue)
 		{
@@ -359,14 +382,25 @@ bool AWRFungalCaves::BuildCube(const FIntVector& Key)
 		if ((V0 < 0.f) != (Fv(i, j + 1, k) < 0.f)) Quad(CV(i - 1, j, k - 1), CV(i - 1, j, k), CV(i, j, k), CV(i, j, k - 1), FVector(0.f, Sign, 0.f));
 		if ((V0 < 0.f) != (Fv(i, j, k + 1) < 0.f)) Quad(CV(i - 1, j - 1, k), CV(i, j - 1, k), CV(i, j, k), CV(i - 1, j, k), FVector(0.f, 0.f, Sign));
 	}
-	if (Tris.Num() == 0) return false;
+	if (Tris.Num() == 0) return;
+	Out.Verts = MoveTemp(Verts);
+	Out.Tris = MoveTemp(Tris);
+	Out.Normals = MoveTemp(Normals);
+	Out.UVs = MoveTemp(UVs);
+	Out.Colours = MoveTemp(Colours);
+}
+
+bool AWRFungalCaves::FinishCube(const FWRCaveMesh& M)
+{
+	if (M.bSkipped) ++Skipped;
+	if (M.Tris.Num() == 0) return false;
 	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
 	Mesh->SetupAttachment(RootComponent);
 	Mesh->bUseAsyncCooking = true;
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
 	Mesh->SetCollisionObjectType(ECC_WorldStatic);
 	Mesh->SetCanEverAffectNavigation(false);
-	Mesh->CreateMeshSection(0, Verts, Tris, Normals, UVs, Colours, TArray<FProcMeshTangent>(), true);
+	Mesh->CreateMeshSection(0, M.Verts, M.Tris, M.Normals, M.UVs, M.Colours, TArray<FProcMeshTangent>(), true);
 	Mesh->SetMaterial(0, RockMID ? static_cast<UMaterialInterface*>(RockMID) : FWRToolMesh::Material());
 	Mesh->SetCullDistance(WRTune(TEXT("fungalWorld.caves.cullDistance"), 40000.f));
 	Mesh->RegisterComponent();

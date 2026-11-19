@@ -15,6 +15,8 @@
 #include "WRGraveCreatures.h"
 #include "WRGraveEvents.h"
 #include "WRGraveTypes.h"
+#include "WRGearPerks.h"
+#include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "WRSound.h"
@@ -244,8 +246,8 @@ void WRNecro::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 		if (A->GetSouls() > 0.f) ASC->SetNumericAttributeBase(UWRAttributeSet::GetSoulsAttribute(), 0.f);
 		return;
 	}
-	// Max Souls 20, +5 a Soul capacity rank.
-	const float Max = NcT(TEXT("soulsMax"), 20.f) + NcT(TEXT("soulCapacityPerRank"), 5.f) * NcRank(Who, TEXT("soul_capacity"));
+	// Max Souls 20, +5 a Soul capacity rank; an amethyst's room (pathResourceMax, WRGearPerks).
+	const float Max = NcT(TEXT("soulsMax"), 20.f) + NcT(TEXT("soulCapacityPerRank"), 5.f) * NcRank(Who, TEXT("soul_capacity")) + WRGearPerks::ResourceMaxBonus(Who);
 	if (!FMath::IsNearlyEqual(A->GetMaxSouls(), Max))
 	{
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxSoulsAttribute(), Max);
@@ -376,6 +378,8 @@ AWRCreature* WRNecro::Raise(AWRCharacterBase* Owner, AWRCreature* Body, float Se
 	if (!Def) return nullptr;
 	// Bound dead (Arcane + Necromancy 25, Data/combos.json): raised minions last twice as long.
 	if (Owner->HasTag(WRArcane::Combo_BoundDead)) Seconds *= FWRComboRegistry::Get().Num(TEXT("bound_dead"), TEXT("duration"), 2.f);
+	// The Ossuary crown talisman: your raised dead last longer (raiseDuration 0.2: +20%).
+	Seconds *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Owner, TEXT("raiseDuration")));
 	// At the cap the oldest capped minion goes to bones first (the newest raise always stands).
 	if (!bIgnoreCap)
 	{

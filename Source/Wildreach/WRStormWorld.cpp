@@ -407,14 +407,14 @@ namespace WRStormDetail
 	FName StormBiome() { static const FName B(TEXT("storm_peaks")); return B; }
 	FName Thunderstorm() { static const FName K(TEXT("thunderstorm")); return K; }
 
-	/** Grounded (the Lightning path's root passive, main path) or a grounding charm worn: no stun, half damage. */
+	/** Grounded (the Lightning path's root passive, main path), worn passStorm (the grounding charm, Stormweave's four) or
+	 *  the grounding salve: no stun, half damage. */
 	bool IsGrounded(const AWRCharacterBase* V)
 	{
 		const AWRPlayerState* PS = V ? V->GetPlayerState<AWRPlayerState>() : nullptr;
 		if (!PS) return false;
 		if (PS->GetPaths() && PS->GetPaths()->GetMainPath() == TEXT("lightning")) return true;
-		const UWRInventoryComponent* Inv = PS->GetInventory();
-		return (Inv && Inv->GetEquipped(EWREquipSlot::Talisman).ItemId == TEXT("grounding_charm")) || WRStorm::HasBuff(V, TEXT("grounding"));
+		return UWRInventoryComponent::GearStatFor(V, TEXT("passStorm")) > 0.f || WRStorm::HasBuff(V, TEXT("grounding"));
 	}
 
 	/** Holding a guard up and not swinging: the brace against a gust. */

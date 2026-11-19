@@ -142,7 +142,7 @@ namespace WRArtifacts
 	WILDREACH_API void OnBossKilled(AWRBoss* Boss);
 	/** A portal's artifact roll for this player (empty: none). */
 	WILDREACH_API FString PortalDrop(AWRPlayerState* PS, FName Biome, int32 Rank, float BaseChance);
-	/** The scale on a push a player takes (Gale Feather) and whether a heavy blow knocks them down. */
+	/** The scale on a push a player takes (Gale Feather; worn knockbackTaken) and whether a heavy blow knocks them down. */
 	WILDREACH_API float KnockScale(const AActor* Victim);
 	/** A heal reaching this player (No healing, Leech Tooth on potions, Open Vein's cap). Returns the heal to give. */
 	WILDREACH_API float HealFilter(const AWRCharacterBase* Who, float Heal, bool bPotion);

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Phase 2, part 3: the server back to 30 frames a second, and the 29 gear stats that did nothing (Raven, 11-18)
+
+**Server speed.** The 11-18 benchmark found the server doing 104 ms of work a frame (it was 3-4 ms at 0.7), so it ran at
+about 7.5 frames a second and joining players got constant small corrections. An Unreal Insights trace of the server
+(game thread, 60 s with one player walking) showed where:
+- **The cave rock (61 ms a frame for the server's first ten minutes):** the Crystal caves' and the Fungal caverns'
+  rock cubes were built on the game thread, each blocking the frame on its field. They're now worked out on worker
+  threads, a few in flight, and the game thread only turns finished ones into meshes inside its budget
+  (`WRCaveBuild.h`, `WRCrystalCaves`, `WRFungalCaves`). Built on the server in 45 s and 88 s (were 3.6 min and over 8).
+- **The Graveyard's grave lids (10 ms) and the Crystal caves' ward fields (4 ms)** each scanned every character in the
+  world 10-20 times a second; they now sleep while no player is within 60 m.
+- **After:** the server runs at its 30 Hz cap (1,794 frames in 60 s; was 528). The net walk test's corrections stop
+  once the caverns are built (one in the last minute). Left: creature AI and statuses (about 2 ms each).
+
+**Gear stats.** All 29 worn, set, gem and rune stats that no code read now work (a helper pass; `WRGearPerks.h/.cpp` for
+the ones that hang on a moment: a dodge's next blow and its mirage, a parry's ward, a kill's heal and stacks, a blow
+landing twice or splitting, a spell from a full bar, the Gale plume's gust, standing still, the amethyst's bar room;
+the plain multipliers where their number is worked out). Also found: **rings only counted the gem in the band, never
+their own worn stats**, so every boss-part ring did nothing (`RingStat`), and a weapon's own worn stats now count.
+Simplified: the mirage makes the creatures on you lose you for its seconds (no decoy body; 5 s cooldown, never
+bosses); the Tooth of Ssarrok's bonus works after any dodge, not only on sand; the Mourner's lantern has no visual; the
+amethyst doesn't widen the Void bar; Wardcloth doesn't cut Blood's health cost; two Prism-heart rings cap at x2;
+Stormweave's 4 pieces now also ground you (it shares the charm's stat). 15 new `gear.*` numbers in `tuning.json`.
+
+Built, unit tests 32 of 32, net walk test PASS; the gear perks are **not played yet**.
+
 ### Phase 2, part 2: joining players keep the server's movement corrections on the new lands (Raven, 11-18)
 
 The new lands' ground, the island places and the Ocean and Sky scenery are built at runtime on each machine, so their

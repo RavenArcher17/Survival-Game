@@ -552,6 +552,11 @@ void WRWind::Knock(AWRCharacterBase* By, AWRCharacterBase* Target, const FVector
 		const FName Tier = TierOf(Target);
 		Share = Tier == TEXT("lowland") ? Tn.Num(TEXT("knockback.lowland"), 1.f) : Tier == TEXT("midland") ? Tn.Num(TEXT("knockback.midland"), 0.75f) : Tn.Num(TEXT("knockback.highland"), 0.5f);
 	}
+	else
+	{
+		// The Bellwether talisman: worn knockbackTaken (-0.3: pushed 30% less).
+		Share = FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Target, TEXT("knockbackTaken")));
+	}
 	if (By && HighMomentum(By))
 	{
 		Share *= WiMom(TEXT("knockbackAtHigh"), 1.25f);

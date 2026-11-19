@@ -58,6 +58,7 @@
 #include "WRCreature.h"
 #include "WRWeapons.h"
 #include "WRLag.h"
+#include "WRGearPerks.h"
 #include "WRCombatRules.h"
 #include "WRForestHazards.h"
 #include "WRBladePath.h"
@@ -234,7 +235,9 @@ void UWRGameplayAbility::ApplyCost(const FGameplayAbilitySpecHandle Handle, cons
 	AWRCharacterBase* Character = ActorInfo ? Cast<AWRCharacterBase>(ActorInfo->AvatarActor.Get()) : nullptr;
 	if (Character && Character->GetAttributes())
 	{
-		const float Cost = CostOverride >= 0.f ? CostOverride : FWRTuning::Get().Num(StaminaKey, StaminaFallback);
+		float Cost = CostOverride >= 0.f ? CostOverride : FWRTuning::Get().Num(StaminaKey, StaminaFallback);
+		// Wardcloth's four: path spells (not Wildbrands) cost less (spellCost, WRGearPerks).
+		if (!PathId.IsNone() && !IsA<UWRGA_Melee>()) Cost *= WRGearPerks::SpellCostScale(Character);
 		Character->GetAbilitySystemComponent()->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(),
 			Character->GetAttributes()->GetStamina() - Cost);
 		Character->Status->NotifyStaminaUsed();
@@ -275,10 +278,14 @@ void UWRGameplayAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, 
 
 bool UWRGameplayAbility::CommitAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, FGameplayTagContainer* OptionalRelevantTags)
 {
+	// The Prism heart: a path spell cast with its bar full (looked at before the cost is paid; WRGearPerks).
+	const bool bPathSpell = !PathId.IsNone() && !IsA<UWRGA_Melee>() && IsServer();
+	const bool bFullBar = bPathSpell && WRGearPerks::ResourceFull(GetCharacter(), PathId);
 	if (!Super::CommitAbility(Handle, ActorInfo, ActivationInfo, OptionalRelevantTags))
 	{
 		return false;
 	}
+	if (bPathSpell) WRGearPerks::NoteCast(GetCharacter(), bFullBar);
 	if (IsServer())
 	{
 		UE_LOG(LogWildreach, Verbose, TEXT("ABILITY %s used %s"), *GetNameSafe(GetAvatarActorFromActorInfo()), *GetClass()->GetName());
@@ -719,7 +726,9 @@ void UWRGA_Melee::BeginCharge(float Windup, float Active, float Recovery, uint8 
 	PendingVariant = Variant;
 	// Charging: hyperarmored and rooted, the coil drawn over the hold (the clip's lead-in over the charge time, held at
 	// its top), State.Charging for the creatures that answer it (readsAction).
-	const float Max = ArtKey.IsEmpty() ? T.Num(TEXT("combat.charge.max"), 1.0f) : T.Num(WildbrandKey() + TEXT(".charge.max"), 1.0f);
+	// The Crown Plume talisman: Wildbrands charge faster (wildbrandChargeTime -0.15: x0.85 the time).
+	const float Max = ArtKey.IsEmpty() ? T.Num(TEXT("combat.charge.max"), 1.0f)
+		: T.Num(WildbrandKey() + TEXT(".charge.max"), 1.0f) * FMath::Max(0.1f, 1.f + UWRInventoryComponent::GearStatFor(Character, TEXT("wildbrandChargeTime")));
 	Character->SetCombatTag(WRTags::State_Charging, true);
 	Character->SetCombatTag(WRTags::State_Hyperarmor, true);
 	SetMoveRoot(true);
@@ -759,7 +768,7 @@ void UWRGA_Melee::OnChargeReleased(float /*TimeHeld*/)
 	{
 		// A charged Wildbrand (Molten cleave): x charge.dmg at charge.max, linear from nothing.
 		const FString W = WildbrandKey();
-		const float Max = FMath::Max(0.05f, T.Num(W + TEXT(".charge.max"), 1.f));
+		const float Max = FMath::Max(0.05f, T.Num(W + TEXT(".charge.max"), 1.f) * FMath::Max(0.1f, 1.f + UWRInventoryComponent::GearStatFor(Character, TEXT("wildbrandChargeTime"))));
 		ChargeFactor = FMath::Lerp(1.f, T.Num(W + TEXT(".charge.dmg"), 1.f), FMath::Clamp(Held / Max, 0.f, 1.f));
 		const float Windup = FMath::Max(0.12f, T.Num(W + TEXT(".windup"), 0.6f) - Held);
 		StartSwing(Windup, T.Num(W + TEXT(".active"), 0.28f), T.Num(W + TEXT(".recovery"), 0.7f), true, PendingVariant, false);
@@ -1889,7 +1898,13 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Travel = UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(this, TEXT("SkyLordDash"), Dir, Distance / TravelTime, TravelTime, false, nullptr,
 			ERootMotionFinishVelocityMode::ClampVelocity, FVector::ZeroVector, Character->GetCharacterMovement()->GetMaxSpeed(), false);
 		if (Travel) Travel->ReadyForActivation();
-		if (IsServer()) WRFx::BroadcastOn(Character, TEXT("wind.dash"), NAME_None, 1.f, TEXT("wind.dash"), TravelTime);
+		if (IsServer())
+		{
+			WRFx::BroadcastOn(Character, TEXT("wind.dash"), NAME_None, 1.f, TEXT("wind.dash"), TravelTime);
+			// Worn gear on a dodge, and on an airborne one: the Gale plume's gust (WRGearPerks).
+			WRGearPerks::OnDodge(Character);
+			WRGearPerks::OnAirDodge(Character);
+		}
 		After(TravelTime, [this]() { SetInvulnerable(false); });
 		After(TravelTime + Tw.Num(TEXT("spells.airDash.recovery"), 0.15f), [this]() { EndSelf(); });
 		return;
@@ -1917,6 +1932,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		{
 			Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
 			WRTidePath::OnDodge(Character, false);
+			WRGearPerks::OnDodge(Character);   // worn gear: the next blow's edge, the mirage (WRGearPerks)
 			WRFx::Broadcast(Character, bUnder ? TEXT("ocean.kick") : TEXT("ocean.surface_roll"), Character->GetActorLocation(), (-Dir).Rotation(), 1.f, bUnder ? TEXT("ocean.kick") : TEXT("water.stroke"));
 		}
 		bWasBackstep = false;
@@ -1983,6 +1999,7 @@ void UWRGA_Dodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const
 		Character->DodgeStartedAt = GetWorld()->GetTimeSeconds() - UWRLagSubsystem::OneWay(Character);
 		WRTidePath::OnDodge(Character, false);   // the Tide path's Flow: +10 a dodge
 		WRDesertHz::OnDodge(Character);          // quicksand: each dodge lifts you 25% (WRDesertHazards)
+		WRGearPerks::OnDodge(Character);         // worn gear: the next blow's edge, the mirage (WRGearPerks)
 		const FVector Feet = Character->GetActorLocation() - FVector(0.f, 0.f, Character->GetSimpleCollisionHalfHeight());
 		WRFx::Broadcast(Character, TEXT("dodge.dust"), Feet, (-Dir).Rotation(), bBackstep ? 0.7f : 1.f);  // (the dodge sound is the audio director's)
 		// In the Crystal caves a roll is an 8 m noise (crystal 2.1): the crystals light and the hunters hear it.

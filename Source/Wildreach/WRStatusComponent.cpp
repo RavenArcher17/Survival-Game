@@ -25,6 +25,7 @@
 #include "WRTuning.h"
 #include "WRLifeSkills.h"
 #include "WRInventory.h"
+#include "WRGearPerks.h"
 #include "WRCreature.h"
 #include "WRBoss.h"
 #include "WRSwampBosses.h"
@@ -326,6 +327,8 @@ void UWRStatusComponent::AddStatusBuildup(int32 Id, float Amount, AWRCharacterBa
 	if (Owner->GetPlayerState())
 	{
 		Amount *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Owner, FName(*(FString(TEXT("buildupTaken.")) + WRStatus::Name(Id).ToString()))));
+		// The Pearl circlet: the Ocean's soak builds slower on you (soakTaken -0.15).
+		if (Id == WRStatus::Soak) Amount *= FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Owner, TEXT("soakTaken")));
 		if (Amount <= 0.f) return;
 	}
 	// Frozen grove (Frost + Nature): an ally in that survivor's Sanctuary or under their World tree takes frostbite x0.5.
@@ -808,6 +811,11 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 			ASC->SetNumericAttributeBase(UWRAttributeSet::GetHealthAttribute(), FMath::Min(Attr->GetMaxHealth(), Attr->GetHealth() + WRArtifacts::HealFilter(Owner, Regen * DeltaTime * HealingTakenScale(), false)));
 		}
 	}
+	// Worn gear on a survivor's tick (WRGearPerks): the Heartguard's still-standing heal, an amethyst's room in the bars.
+	if (Owner->HasAuthority() && Owner->GetPlayerState())
+	{
+		WRGearPerks::TickPlayer(Owner, DeltaTime, HealingTakenScale());
+	}
 	// No regen from a swing's press until its cancel window (ER): the stamina spent on a chain stays spent. Nor while a
 	// charge is held, or a drink is going down (combat.md 2.3).
 	const bool bMidSwing = (Owner->IsSwinging() && GetWorld()->GetTimeSeconds() < Owner->Swing.CancelAt)
@@ -825,7 +833,8 @@ void UWRStatusComponent::TickRegen(float DeltaTime)
 	const bool bMountRates = Owner && Owner->MountStaminaRates(MountDrain, MountRegen);
 	const float DrainPerSecond = bMountRates ? MountDrain : bFastStroke
 		? WRTune(TEXT("water.fastSwimStamina"), 8.f) * FMath::Max(0.f, 1.f + UWRLifeSkillsComponent::StatFor(Owner, TEXT("swimStamina"))) * (Survival ? Survival->SwimStaminaMult() : 1.f) * UWROceanHazards::RipStaminaMult(Owner)
-		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f) * WRDesertHz::SprintStaminaMult(Owner);
+		: WRTune(TEXT("stamina.sprintPerSecond"), 5.f) * WRDesertHz::SprintStaminaMult(Owner)
+			* FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Owner, TEXT("sprintStamina")));   // Stormweave's four: -25%
 	// Gliding (WRSkyAir): its own stamina a second (none in an updraft); no regen while it carries you.
 	const float GlideDrain = WRSkyAir::GlideDrain(Owner);
 	if (GlideDrain >= 0.f)

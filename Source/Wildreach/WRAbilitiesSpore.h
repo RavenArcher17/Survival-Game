@@ -29,7 +29,7 @@ protected:
 	FString SpellKey;
 	FString ShapeName = TEXT("pool");
 	float Spell(const TCHAR* Field, float Fallback) const;
-	float SporeCost() const { return Spell(TEXT("sporeCost"), 0.f); }
+	float SporeCost() const;
 	/** The ground the caster aims at within Range (a locked target's feet, the crosshair's point, else ahead). */
 	FVector AimedGround(AWRCharacterBase* Caster, float Range) const;
 };

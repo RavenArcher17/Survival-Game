@@ -308,20 +308,35 @@ void AWRCrystalCaves::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!bQueued) return;
-	// A time budget a frame (the cubes cost a few milliseconds each), so loading in never hitches.
+	// The cubes' fields are worked out on worker threads (a few in flight); the game thread only turns finished ones
+	// into meshes, inside a time budget a frame, so loading in never stalls the frame (WRCaveBuild.h).
 	const double Budget = WRTune(TEXT("crystalWorld.caves.msPerFrame"), 6.f) / 1000.0;
 	const double Start = FPlatformTime::Seconds();
-	while (Next < Queue.Num() && FPlatformTime::Seconds() - Start < Budget)
+	for (int32 i = 0; i < InFlight.Num() && FPlatformTime::Seconds() - Start < Budget;)
 	{
-		BuildCube(Queue[Next]);
-		Done.Add(Queue[Next]);
-		++Next;
+		if (!InFlight[i].Task.IsCompleted()) { ++i; continue; }
+		const FWRCaveMeshPtr M = InFlight[i].Mesh;
+		InFlight.RemoveAtSwap(i);
+		if (M.IsValid()) { FinishCube(*M); Done.Add(M->Key); }
 	}
-	if (Next >= Queue.Num() && GetNetMode() != NM_DedicatedServer)
+	const int32 MaxInFlight = FMath::Max(1, int32(WRTune(TEXT("crystalWorld.caves.inFlight"), 4.f)));
+	const float GroundSkin = WRTune(TEXT("crystalWorld.caves.groundSkin"), 120.f);
+	while (Next < Queue.Num() && InFlight.Num() < MaxInFlight)
+	{
+		FWRCaveMeshPtr M = MakeShared<FWRCaveMesh, ESPMode::ThreadSafe>();
+		M->Key = Queue[Next++];
+		const float C = Cell;
+		const int32 N = Cells;
+		const FVector Loc = GetActorLocation();
+		FWRCaveJob& J = InFlight.AddDefaulted_GetRef();
+		J.Mesh = M;
+		J.Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, [M, C, N, Loc, GroundSkin]() { ComputeCube(M->Key, C, N, Loc, GroundSkin, *M); });
+	}
+	if (Next >= Queue.Num() && InFlight.Num() == 0 && GetNetMode() != NM_DedicatedServer)
 	{
 		while (NextHall < HallOrder.Num() && FPlatformTime::Seconds() - Start < Budget) BuildLining(HallOrder[NextHall++]);
 	}
-	else if (Next >= Queue.Num()) NextHall = HallOrder.Num();
+	else if (Next >= Queue.Num() && InFlight.Num() == 0) NextHall = HallOrder.Num();
 	if (IsBuilt())
 	{
 		SetActorTickEnabled(false);
@@ -329,7 +344,32 @@ void AWRCrystalCaves::Tick(float DeltaSeconds)
 	}
 }
 
-bool AWRCrystalCaves::BuildCube(const FIntVector& Key)
+void AWRCrystalCaves::EndPlay(const EEndPlayReason::Type Reason)
+{
+	// The workers only touch their own result and the static crystal data; wait for them so none outlives the world.
+	for (FWRCaveJob& J : InFlight) J.Task.Wait();
+	InFlight.Reset();
+	Super::EndPlay(Reason);
+}
+
+bool AWRCrystalCaves::FinishCube(const FWRCaveMesh& M)
+{
+	if (M.Tris.Num() == 0) return false;
+	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
+	Mesh->SetupAttachment(RootComponent);
+	Mesh->bUseAsyncCooking = true;
+	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
+	Mesh->SetCollisionObjectType(ECC_WorldStatic);
+	Mesh->SetCanEverAffectNavigation(false);
+	Mesh->CreateMeshSection(0, M.Verts, M.Tris, M.Normals, M.UVs, M.Colours, TArray<FProcMeshTangent>(), true);
+	Mesh->SetMaterial(0, FWRToolMesh::Material());
+	Mesh->SetCullDistance(WRTune(TEXT("crystalWorld.caves.cullDistance"), 30000.f));
+	Mesh->RegisterComponent();
+	Rock.Add(Mesh);
+	return true;
+}
+
+void AWRCrystalCaves::ComputeCube(const FIntVector& Key, float Cell, int32 Cells, const FVector& ActorLoc, float GroundSkin, FWRCaveMesh& Out)
 {
 	using namespace WRCrystalCavesImpl;
 	const FWRCrystalData& D = FWRCrystalData::Get();
@@ -339,7 +379,7 @@ bool AWRCrystalCaves::BuildCube(const FIntVector& Key)
 	const FVector O(Key.X * S, Key.Y * S, Key.Z * S);
 	TArray<int32> Shapes;
 	D.ShapesIn(FBox(O - FVector(Cell * 2.f), O + FVector(S + Cell * 2.f)), Shapes);
-	if (Shapes.Num() == 0) return false;
+	if (Shapes.Num() == 0) return;
 	const int32 NS = Cells + 3, NC = Cells + 2;
 	// The ground over each column of samples (only matters where a cube reaches up near it: a mouth).
 	TArray<float> Ground;
@@ -402,7 +442,7 @@ bool AWRCrystalCaves::BuildCube(const FIntVector& Key)
 			(Cv[4] - Cv[0]) + (Cv[5] - Cv[1]) + (Cv[6] - Cv[2]) + (Cv[7] - Cv[3]));
 		const FVector Nrm = (-G).GetSafeNormal();
 		CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)] = Verts.Num();
-		Verts.Add(P - GetActorLocation());
+		Verts.Add(P - ActorLoc);
 		Normals.Add(Nrm);
 		UVs.Add(FVector2D(P.X / 400.f, P.Y / 400.f));
 		int32 Near = INDEX_NONE;
@@ -419,8 +459,8 @@ bool AWRCrystalCaves::BuildCube(const FIntVector& Key)
 	{
 		if (A < 0 || B < 0 || C < 0 || E < 0) return;
 		// The skin that lies on ground a land already draws is that land's (dropped here, so nothing doubles up).
-		const FVector Mid = (Verts[A] + Verts[B] + Verts[C] + Verts[E]) * 0.25f + GetActorLocation();
-		if (bNearGround && FMath::Abs(Mid.Z - GroundZ(L, W, Mid.X, Mid.Y)) < WRTune(TEXT("crystalWorld.caves.groundSkin"), 120.f) && LandDraws(L, W, Mid.X, Mid.Y)) return;
+		const FVector Mid = (Verts[A] + Verts[B] + Verts[C] + Verts[E]) * 0.25f + ActorLoc;
+		if (bNearGround && FMath::Abs(Mid.Z - GroundZ(L, W, Mid.X, Mid.Y)) < GroundSkin && LandDraws(L, W, Mid.X, Mid.Y)) return;
 		// Unreal draws the side where the stored order's cross points away from the viewer (who is in the air).
 		const FVector Cr = FVector::CrossProduct(Verts[B] - Verts[A], Verts[C] - Verts[A]);
 		if (FVector::DotProduct(Cr, RockDir) >= 0.f) Tris.Append({ A, B, C, A, C, E });
@@ -434,19 +474,12 @@ bool AWRCrystalCaves::BuildCube(const FIntVector& Key)
 		if ((V0 < 0.f) != (Fv(i, j + 1, k) < 0.f)) Quad(CV(i - 1, j, k - 1), CV(i - 1, j, k), CV(i, j, k), CV(i, j, k - 1), FVector(0.f, Sign, 0.f));
 		if ((V0 < 0.f) != (Fv(i, j, k + 1) < 0.f)) Quad(CV(i - 1, j - 1, k), CV(i, j - 1, k), CV(i, j, k), CV(i - 1, j, k), FVector(0.f, 0.f, Sign));
 	}
-	if (Tris.Num() == 0) return false;
-	UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(this);
-	Mesh->SetupAttachment(RootComponent);
-	Mesh->bUseAsyncCooking = true;
-	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
-	Mesh->SetCollisionObjectType(ECC_WorldStatic);
-	Mesh->SetCanEverAffectNavigation(false);
-	Mesh->CreateMeshSection(0, Verts, Tris, Normals, UVs, Colours, TArray<FProcMeshTangent>(), true);
-	Mesh->SetMaterial(0, FWRToolMesh::Material());
-	Mesh->SetCullDistance(WRTune(TEXT("crystalWorld.caves.cullDistance"), 30000.f));
-	Mesh->RegisterComponent();
-	Rock.Add(Mesh);
-	return true;
+	if (Tris.Num() == 0) return;
+	Out.Verts = MoveTemp(Verts);
+	Out.Tris = MoveTemp(Tris);
+	Out.Normals = MoveTemp(Normals);
+	Out.UVs = MoveTemp(UVs);
+	Out.Colours = MoveTemp(Colours);
 }
 
 void AWRCrystalCaves::BuildLining(int32 Hall)

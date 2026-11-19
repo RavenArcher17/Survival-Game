@@ -46,6 +46,7 @@
 #include "WRBloodPath.h"
 #include "WRNecroPath.h"
 #include "WRArcanePath.h"
+#include "WRGearPerks.h"
 #include "WRStatusComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
 #include "GameFramework/GameStateBase.h"
@@ -622,6 +623,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRLightning::OnGuard(Target, Attacker, true);
 		// Gleam (the Sun path): the parry throws the sun into the attacker's eyes.
 		WRSun::OnParry(Target, Attacker);
+		// Rune of Warding: a parry puts a ward on you (perfectGuardShield, WRGearPerks).
+		WRGearPerks::OnParry(Target);
 		uint16 Flags = WRFx::HitFlagsFor(Hit, false, false, false, false, false);
 		if (bStanceBroke) Flags |= WRFx::Hit_StanceBreak;
 		Target->ReportHit(0.f, EWRHitResult::Parried, Flags, Hit.Instigator, Hit.Origin);
@@ -797,6 +800,13 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			bCrit = true;
 			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s%s"), *Target->GetName(), bPerkCrit ? TEXT(" (unaware: assassin)") : TEXT(""));
 		}
+		// The Prism heart: a spell cast from a full path bar always crits, at the heart's multiplier (WRGearPerks).
+		else if (float SpellCrit = 1.f; !Hit.bCritical && WRGearPerks::FullResourceCrit(Attacker, Hit, SpellCrit))
+		{
+			Damage *= SpellCrit;
+			bCrit = true;
+			UE_LOG(LogWildreach, Log, TEXT("COMBAT crit on %s (a full-bar spell, x%.2f)"), *Target->GetName(), SpellCrit);
+		}
 
 		// The attacker's worn gear against this target (cooks/build-crafting.md 2.6): strikes on armoured foes (Empress
 		// stinger), hits on swimming ones (Maw tooth) and on rotting ones (Rot crown).
@@ -811,6 +821,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 			// The Harrier plume: flying and airborne targets (cooks/biome-sky.md 2.10).
 			if (Target->GetCharacterMovement() && (Target->GetCharacterMovement()->IsFlying() || Target->GetCharacterMovement()->IsFalling()))
 				Gear += UWRInventoryComponent::GearStatFor(Attacker, TEXT("vsAirborne"));
+			// The first blow after a dodge, ranged from above, on swarms, Necromancy's, the Mourner's lantern stacks (WRGearPerks).
+			Gear += WRGearPerks::DealtBonus(Attacker, Target, Hit);
 			Damage *= 1.f + Gear;
 		}
 		// Spells hurt a Tyrant plate's wearer less.
@@ -1231,6 +1243,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRVoidPath::AfterHit(Target, Hit, Damage);
 		// The Wind path's (WRWindPath.cpp): Momentum for a blow struck from the air.
 		WRWind::AfterHit(Target, Hit, Damage);
+		// Worn runes (WRGearPerks): Doubling's second blow at half, the Prism's spell copy onto a second enemy.
+		WRGearPerks::AfterHit(Target, Hit);
 	}
 	// The Necromancy path's (WRNecroPath.cpp): who had a hand in it (Souls), Death mark, Final harvest's reaping finish.
 	if (Result == EWRHitResult::Hit && Attacker)
@@ -1355,6 +1369,8 @@ EWRHitResult UWRCombatLibrary::ApplyHit(AWRCharacterBase* Target, const FWRHit& 
 		WRVoidPath::OnKill(Target, Hit);
 		// Necromancy: Souls to every Necromancer who had a hand in it, Soul siphon, Reaping stride, the body's clock.
 		WRNecro::OnKill(Target, Hit);
+		// Worn gear (WRGearPerks): the Mire heart heals off a bleeding kill, the Mourner's lantern takes a stack.
+		WRGearPerks::OnKill(Target, Hit);
 		Target->Die(Hit.Instigator);
 	}
 	// A fire blow, a fire spell's touch (not a burn's tick): marsh gas near it lights (WRSwampSystems; cheap when none).

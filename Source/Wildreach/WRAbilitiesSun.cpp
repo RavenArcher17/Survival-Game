@@ -9,6 +9,7 @@
 #include "WRCreature.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
+#include "WRGearPerks.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
 #include "WRProjectile.h"
@@ -122,7 +123,8 @@ UWRGA_SunSpell::UWRGA_SunSpell()
 }
 
 float UWRGA_SunSpell::Spell(const TCHAR* Field, float Fallback) const { return FWRTuning::Get().Num(SpellKey + TEXT(".") + Field, Fallback); }
-float UWRGA_SunSpell::RadianceCost() const { return Spell(TEXT("radianceCost"), 0.f); }
+// Wardcloth's four: spells cost less (spellCost, WRGearPerks).
+float UWRGA_SunSpell::RadianceCost() const { return Spell(TEXT("radianceCost"), 0.f) * WRGearPerks::SpellCostScale(CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr); }
 
 bool UWRGA_SunSpell::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
 {

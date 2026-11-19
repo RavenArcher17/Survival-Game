@@ -12,6 +12,7 @@
 #include "WRFx.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
+#include "WRGearPerks.h"
 #include "WRLightningPath.h"
 #include "WRNaturePath.h"
 #include "WRNecroPath.h"
@@ -196,8 +197,8 @@ void WRArcane::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 		if (A->GetMana() > 0.f) ArSetAttr(Who, UWRAttributeSet::GetManaAttribute(), 0.f);
 		return;
 	}
-	// Capacity 100, +15 a Mana capacity rank (2.17).
-	const float Max = ArT(TEXT("manaMax"), 100.f) + ArT(TEXT("manaPerRank"), 15.f) * Rank(Who, TEXT("mana_capacity"));
+	// Capacity 100, +15 a Mana capacity rank (2.17); an amethyst's room (pathResourceMax, WRGearPerks).
+	const float Max = ArT(TEXT("manaMax"), 100.f) + ArT(TEXT("manaPerRank"), 15.f) * Rank(Who, TEXT("mana_capacity")) + WRGearPerks::ResourceMaxBonus(Who);
 	if (!FMath::IsNearlyEqual(A->GetMaxMana(), Max))
 	{
 		ArSetAttr(Who, UWRAttributeSet::GetMaxManaAttribute(), Max);

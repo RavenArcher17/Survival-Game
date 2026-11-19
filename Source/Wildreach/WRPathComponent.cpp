@@ -7,6 +7,7 @@
 #include "WRArcanePath.h"
 #include "WRArtifacts.h"
 #include "WRDeeds.h"
+#include "WRGearPerks.h"
 #include "WRSurvival.h"
 #include "Wildreach.h"
 #include "WRAbilities.h"
@@ -637,27 +638,30 @@ void UWRPathComponent::ApplyToCharacter(AWRCharacter* Character)
 		const FWRPathProgress* P = IsActivePath(PathId) ? GetProgress(PathId) : nullptr;
 		return P ? P->GetRank(NodeId) : 0;
 	};
-	// Prestige (Deeper marks): that path's resource holds more (WRDeeds).
+	// Prestige (Deeper marks): that path's resource holds more (WRDeeds). An amethyst in the weapon: +its room in every
+	// builder bar (pathResourceMax; WRGearPerks keeps it in step when the gem goes in or out).
+	const float GemRoom = WRGearPerks::ResourceMaxBonus(Character);
+	WRGearPerks::NoteResourceMax(Character, GemRoom);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxHeatAttribute(),
-		(WRTune(TEXT("resources.heatMax"), 100.f) + WRTune(TEXT("resources.heatCapacityPerRank"), 15.f) * RankIn(TEXT("fire"), TEXT("heat_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("fire")));
+		(WRTune(TEXT("resources.heatMax"), 100.f) + WRTune(TEXT("resources.heatCapacityPerRank"), 15.f) * RankIn(TEXT("fire"), TEXT("heat_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("fire")) + GemRoom);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChillAttribute(),
-		(WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("frost")));
+		(WRTune(TEXT("resources.chillMax"), 100.f) + WRTune(TEXT("resources.chillCapacityPerRank"), 15.f) * RankIn(TEXT("frost"), TEXT("chill_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("frost")) + GemRoom);
 	ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxChargeAttribute(),
-		(WRTune(TEXT("resources.chargeMax"), 100.f) + WRTune(TEXT("resources.chargeCapacityPerRank"), 15.f) * RankIn(TEXT("lightning"), TEXT("charge_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("lightning")));
+		(WRTune(TEXT("resources.chargeMax"), 100.f) + WRTune(TEXT("resources.chargeCapacityPerRank"), 15.f) * RankIn(TEXT("lightning"), TEXT("charge_capacity"))) * WRDeeds::PrestigeResource(GetOwner(), TEXT("lightning")) + GemRoom);
 	// Growth (the Nature path): 100 + 10 a rank of Growth capacity (nodeEffects nature.growth_capacity maxGrowth); a
 	// bigger bar keeps how full it was.
 	{
 		const float OldMax = FMath::Max(1.f, Attr->GetMaxGrowth());
 		const float Share = FMath::Clamp(Attr->GetGrowth() / OldMax, 0.f, 1.f);
 		const float NewMax = (WRTune(TEXT("resources.growth.max"), 100.f) + (IsActivePath(TEXT("nature")) ? FMath::Max(0.f, Stat(Character, TEXT("maxGrowth"))) : 0.f))
-			* WRDeeds::PrestigeResource(GetOwner(), TEXT("nature"));
+			* WRDeeds::PrestigeResource(GetOwner(), TEXT("nature")) + GemRoom;
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxGrowthAttribute(), NewMax);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetGrowthAttribute(), NewMax * Share);
 	}
 	// Momentum (the Wind path): 100 + 15 a rank of Momentum capacity (nodeEffects wind.momentum_capacity maxMomentum).
 	{
 		const float NewMax = (WRTune(TEXT("resources.momentum.max"), 100.f) + (IsActivePath(TEXT("wind")) ? FMath::Max(0.f, Stat(Character, TEXT("maxMomentum"))) : 0.f))
-			* WRDeeds::PrestigeResource(GetOwner(), TEXT("wind"));
+			* WRDeeds::PrestigeResource(GetOwner(), TEXT("wind")) + GemRoom;
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMaxMomentumAttribute(), NewMax);
 		ASC->SetNumericAttributeBase(UWRAttributeSet::GetMomentumAttribute(), FMath::Min(Attr->GetMomentum(), NewMax));
 	}

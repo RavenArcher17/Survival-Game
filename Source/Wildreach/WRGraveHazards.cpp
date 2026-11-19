@@ -128,6 +128,20 @@ void AWRGraveLid::Tick(float DeltaSeconds)
 	if (!HasAuthority()) return;
 	const double Now = HzNow(this);
 	const FVector C = GetActorLocation();
+	// Asleep while no player is near: an idle lid with nobody within lidWake does nothing, so the scans below over every
+	// character in the world (hundreds, every land) aren't run ten times a second by each of the ~40 lids (10 ms a
+	// server frame, 11-18). Only players' pawns are checked; a heavy tame walks with its player.
+	if (Stage == 0)
+	{
+		bool bNear = false;
+		const float Wake = HzT(TEXT("lidWake"), 6000.f);
+		for (FConstPlayerControllerIterator P = GetWorld()->GetPlayerControllerIterator(); P && !bNear; ++P)
+		{
+			const APawn* Pawn = P->Get() ? P->Get()->GetPawn() : nullptr;
+			bNear = Pawn && FVector::DistSquared2D(Pawn->GetActorLocation(), C) < FMath::Square(Wake);
+		}
+		if (!bNear) return;
+	}
 	// Who stands on it (a survivor or a heavy tame; the Graveyard's own creatures know the ground).
 	AWRCharacterBase* On = nullptr;
 	for (TActorIterator<AWRCharacterBase> It(GetWorld()); It; ++It)

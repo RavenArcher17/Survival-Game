@@ -11,6 +11,7 @@
 #include "WRCombos.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
+#include "WRGearPerks.h"
 #include "WRPlayerController.h"
 #include "WRSound.h"
 #include "WRStatusComponent.h"
@@ -66,6 +67,8 @@ UWRGA_SporeSpell::UWRGA_SporeSpell()
 }
 
 float UWRGA_SporeSpell::Spell(const TCHAR* Field, float Fallback) const { return FWRTuning::Get().Num(SpellKey + TEXT(".") + Field, Fallback); }
+// Wardcloth's four: spells cost less (spellCost, WRGearPerks).
+float UWRGA_SporeSpell::SporeCost() const { return Spell(TEXT("sporeCost"), 0.f) * WRGearPerks::SpellCostScale(CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr); }
 
 bool UWRGA_SporeSpell::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
 {

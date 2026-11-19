@@ -243,14 +243,8 @@ bool WRForest::PassesThornbrake(const AActor* Who)
 	}
 	// Heartguard barding on the mount carries its rider through too (cooks/cookpass-taming.md L11).
 	if (FWRTaming::BardingPass(Who, TEXT("thorns"))) return true;
-	if (const UWRInventoryComponent* Inv = UWRInventoryComponent::FindFor(Who))
-	{
-		// Briarproof leathers in the chest slot (survival-crafting KEPT), the Heartguard set at 4 pieces.
-		const FWRItemStack& Chest = Inv->GetEquipped(EWREquipSlot::Armor);
-		if (!Chest.IsEmpty() && Chest.ItemId == FName(*FWRTuning::Get().Str(TEXT("hazards.thornbrake.passItem"), TEXT("briarproof_leathers")))) return true;
-		if (Inv->SetPieces(TEXT("heartguard")) >= int32(WRForestHzImpl::Tn(TEXT("thornbrake.passSetPieces"), 4.f))) return true;
-	}
-	return false;
+	// Worn passThorns: Briarproof leathers (survival-crafting KEPT), the Heartguard set at 4 pieces (Data/gear.json).
+	return UWRInventoryComponent::GearStatFor(Who, TEXT("passThorns")) > 0.f;
 }
 
 void WRForest::BurnThornbrake(UWorld* World, const FVector& At, float Radius)

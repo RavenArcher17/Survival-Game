@@ -2800,7 +2800,9 @@ namespace
 			AWRCharacterBase* V = WeakVictim.Get();
 			if (S && V && V->IsAlive() && Knockback > 0.f && (Result == EWRHitResult::Hit || Result == EWRHitResult::GuardBroken))
 			{
-				const FVector Push = (V->GetActorLocation() - S->GetActorLocation()).GetSafeNormal2D() * Knockback + FVector(0.f, 0.f, Knockback * 0.35f);
+				// A player's own push scale (the Gale Feather, the Bellwether talisman's knockbackTaken).
+				const float K = Knockback * WRArtifacts::KnockScale(V);
+				const FVector Push = (V->GetActorLocation() - S->GetActorLocation()).GetSafeNormal2D() * K + FVector(0.f, 0.f, K * 0.35f);
 				V->LaunchCharacter(Push, true, true);
 			}
 		});

@@ -97,7 +97,9 @@ float WRUnderwater::MeleeRate(const AWRCharacterBase* Who, FName WeaponClass)
 {
 	if (!Who || !IsUnder(Who) || HasGills(Who)) return 1.f;
 	const FWRTuning& T = FWRTuning::Get();
-	if (Who->HasTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Tide.FullSpeedUnder"), false))) return 1.f;  // Hae-won's knife
+	if (Who->HasTag(FGameplayTag::RequestGameplayTag(TEXT("Status.Tide.FullSpeedUnder"), false))) return 1.f;
+	// Hae-won's knife: it swings at full speed under the water in anyone's hand (the weapon's worn underwaterFullSpeed).
+	if (UWRInventoryComponent::GearStatFor(Who, TEXT("underwaterFullSpeed")) > 0.f) return 1.f;
 	TArray<FString> Thrust;
 	T.Str(TEXT("underwater.thrustClasses"), TEXT("spear,dagger,harpoon,fists,throwing_spear")).ParseIntoArray(Thrust, TEXT(","));
 	return Thrust.Contains(WeaponClass.ToString()) ? 1.f : T.Num(TEXT("underwater.meleePlayRate"), 0.8f);

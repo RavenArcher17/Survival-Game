@@ -1577,7 +1577,8 @@ void AWRCharacter::OnJumped_Implementation()
 		AbilitySystem->SetNumericAttributeBase(UWRAttributeSet::GetStaminaAttribute(), GetAttributes()->GetStamina() - WRTune(TEXT("stamina.jump"), 8.f));
 		Status->NotifyStaminaUsed();
 		// Legs and lower body clear of the ground: blows flagged low (ground waves, tail sweeps, stomps) pass under.
-		Status->ApplyStatus(WRTags::State_JumpLegsInvuln, WRTune(TEXT("defense.jumpLegInvuln"), 0.8f));
+		// The Coil heart talisman: the legs stay safe a little longer (jumpIframes s).
+		Status->ApplyStatus(WRTags::State_JumpLegsInvuln, WRTune(TEXT("defense.jumpLegInvuln"), 0.8f) + FMath::Max(0.f, UWRInventoryComponent::GearStatFor(this, TEXT("jumpIframes"))));
 	}
 }
 

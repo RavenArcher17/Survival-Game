@@ -238,6 +238,18 @@ void AWRWardField::StepServer()
 	// The ward shift (crystal 2.10): pattern A normally, B in the Resonance.
 	const bool bWant = CzResonanceOn(this) ? W.bB : W.bA;
 	if (bPattern != bWant) { bPattern = bWant; ForceNetUpdate(); }
+	// Nobody to throw while no player is near: the scan below walks every character in the world 20 times a second,
+	// for each of the ~35 wards (4 ms a server frame, 11-18). Creatures only live near players.
+	{
+		bool bNear = false;
+		const float Wake = CzTn(TEXT("hazards.crystal.ward.wake"), 6000.f);
+		for (FConstPlayerControllerIterator P = GetWorld()->GetPlayerControllerIterator(); P && !bNear; ++P)
+		{
+			const APawn* Pawn = P->Get() ? P->Get()->GetPawn() : nullptr;
+			bNear = Pawn && FVector::DistSquared(Pawn->GetActorLocation(), GetActorLocation()) < FMath::Square(Wake);
+		}
+		if (!bNear) { Side.Reset(); ServerClock = 0.5f; return; }
+	}
 	const FTransform& T = GetActorTransform();
 	const float Now_ = CzNow(this);
 	const bool bLive = IsLive();

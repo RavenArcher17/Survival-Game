@@ -849,7 +849,12 @@ FString WRArtifacts::PortalDrop(AWRPlayerState* PS, FName Biome, int32 Rank, flo
 	return FString::Printf(TEXT("an artifact: %s (%s)"), *Name(Art), *MetalName(W));
 }
 
-float WRArtifacts::KnockScale(const AActor* Victim) { return Has(Victim, TEXT("double_knockback")) ? RuleNum(Victim, TEXT("double_knockback"), TEXT("scale"), 2.f) : 1.f; }
+float WRArtifacts::KnockScale(const AActor* Victim)
+{
+	// The Bellwether talisman: worn knockbackTaken (-0.3: pushed 30% less), with the Gale Feather's rule.
+	const float Worn = FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Victim, TEXT("knockbackTaken")));
+	return Worn * (Has(Victim, TEXT("double_knockback")) ? RuleNum(Victim, TEXT("double_knockback"), TEXT("scale"), 2.f) : 1.f);
+}
 
 float WRArtifacts::HealFilter(const AWRCharacterBase* Who, float Heal, bool bPotion)
 {

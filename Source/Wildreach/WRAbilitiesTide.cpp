@@ -11,6 +11,7 @@
 #include "WRCreature.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
+#include "WRGearPerks.h"
 #include "WRNaturePath.h"
 #include "WRNecroPath.h"
 #include "WRPathComponent.h"
@@ -137,7 +138,8 @@ UWRGA_TideSpell::UWRGA_TideSpell()
 }
 
 float UWRGA_TideSpell::Spell(const TCHAR* Field, float Fallback) const { return FWRTuning::Get().Num(SpellKey + TEXT(".") + Field, Fallback); }
-float UWRGA_TideSpell::FlowCost() const { return Spell(TEXT("flowCost"), 0.f); }
+// Wardcloth's four: spells cost less (spellCost, WRGearPerks).
+float UWRGA_TideSpell::FlowCost() const { return Spell(TEXT("flowCost"), 0.f) * WRGearPerks::SpellCostScale(CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr); }
 
 bool UWRGA_TideSpell::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
 {

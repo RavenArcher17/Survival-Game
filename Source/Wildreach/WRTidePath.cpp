@@ -1,5 +1,6 @@
 #include "WRTidePath.h"
 #include "WRInventory.h"
+#include "WRGearPerks.h"
 #include "Wildreach.h"
 #include "WRArcanePath.h"
 #include "WRAttributeSet.h"
@@ -258,8 +259,9 @@ void WRTidePath::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 		if (A->GetFlow() > 0.f) TpSetAttr(Who, UWRAttributeSet::GetFlowAttribute(), 0.f);
 		return;
 	}
-	// Capacity 100, +15 a Flow capacity rank (nodeEffects tide.flow_capacity maxFlow).
-	const float Max = (TpF(TEXT("max"), 100.f) + FMath::Max(0.f, UWRPathComponent::Stat(Who, TEXT("maxFlow")))) * (1.f + UWRInventoryComponent::GearStatFor(Who, TEXT("maxFlowMult")));
+	// Capacity 100, +15 a Flow capacity rank (nodeEffects tide.flow_capacity maxFlow); an amethyst's room (pathResourceMax).
+	const float Max = (TpF(TEXT("max"), 100.f) + FMath::Max(0.f, UWRPathComponent::Stat(Who, TEXT("maxFlow"))) + WRGearPerks::ResourceMaxBonus(Who))
+		* (1.f + UWRInventoryComponent::GearStatFor(Who, TEXT("maxFlowMult")));
 	if (!FMath::IsNearlyEqual(A->GetMaxFlow(), Max))
 	{
 		TpSetAttr(Who, UWRAttributeSet::GetMaxFlowAttribute(), Max);

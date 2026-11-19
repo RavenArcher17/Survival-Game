@@ -598,14 +598,16 @@ namespace WRInvGear
 
 float UWRInventoryComponent::RingStat(const FWRItemDef& Ring, FName Stat)
 {
+	// A one-of-a-kind ring's own worn stats (boss parts, the Mourner's lantern, the Pearl circlet): in full, no band.
+	const float Own = Ring.Worn.FindRef(Stat);
 	const FWRItemDef* Gem = Ring.RingGem.IsNone() ? nullptr : FWRItemRegistry::Get().Find(Ring.RingGem);
 	const float Base = Gem ? Gem->GemStats.FindRef(Stat) : 0.f;
 	if (Base == 0.f)
 	{
-		return 0.f;
+		return Own;
 	}
 	const FWRGear& G = FWRGear::Get();
-	return Base * G.RingShare * (1.f + G.RingPerTier * float(G.MetalTier.FindRef(Ring.Metal)));
+	return Own + Base * G.RingShare * (1.f + G.RingPerTier * float(G.MetalTier.FindRef(Ring.Metal)));
 }
 
 int32 UWRInventoryComponent::SetPieces(FName Set) const
@@ -701,6 +703,8 @@ float UWRInventoryComponent::GemStat(FName Stat) const
 	if (const FWRItemDef* W = EquippedWeapon.IsEmpty() ? nullptr : FWRItemRegistry::Get().Find(EquippedWeapon.ItemId))
 	{
 		Total += W->Innate.FindRef(Stat);
+		// A weapon's own worn stat, in anyone's hand (Hae-won's knife: underwaterFullSpeed).
+		Total += W->Worn.FindRef(Stat);
 	}
 	// Runes in the sockets work at more than full with the Carver's Chisel worn (worn runePower: +25%, crystal 2.19.2).
 	float RuneScale = -1.f;

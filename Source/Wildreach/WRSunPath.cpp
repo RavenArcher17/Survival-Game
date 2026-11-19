@@ -14,6 +14,7 @@
 #include "WRGameState.h"
 #include "WRGameplayTags.h"
 #include "WRInventory.h"
+#include "WRGearPerks.h"
 #include "WRLand.h"
 #include "WRPathComponent.h"
 #include "WRSound.h"
@@ -285,8 +286,9 @@ void WRSun::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 		if (A->GetRadiance() > 0.f) SuSetAttr(Who, UWRAttributeSet::GetRadianceAttribute(), 0.f);
 		return;
 	}
-	// Capacity 100, +10 a Radiance capacity rank (nodeEffects sun.radiance_capacity maxRadiance).
-	const float Max = SuR(TEXT("max"), 100.f) + FMath::Max(0.f, UWRPathComponent::Stat(Who, TEXT("maxRadiance")));
+	// Capacity 100, +10 a Radiance capacity rank (nodeEffects sun.radiance_capacity maxRadiance); an amethyst's room
+	// (pathResourceMax, WRGearPerks).
+	const float Max = SuR(TEXT("max"), 100.f) + FMath::Max(0.f, UWRPathComponent::Stat(Who, TEXT("maxRadiance"))) + WRGearPerks::ResourceMaxBonus(Who);
 	if (!FMath::IsNearlyEqual(A->GetMaxRadiance(), Max))
 	{
 		SuSetAttr(Who, UWRAttributeSet::GetMaxRadianceAttribute(), Max);

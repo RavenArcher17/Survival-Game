@@ -15,6 +15,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "WRCaveBuild.h"
 #include "WRFungalCaves.generated.h"
 
 class UProceduralMeshComponent;
@@ -30,7 +31,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	/** Every rock cube is built (collision may still be cooking for a frame or two). */
-	bool IsBuilt() const { return bQueued && Next >= Queue.Num(); }
+	bool IsBuilt() const { return bQueued && Next >= Queue.Num() && InFlight.Num() == 0; }
 	bool IsBuiltAt(const FVector& World) const;
 	/** The rock's material instance (null on a dedicated server). */
 	UMaterialInstanceDynamic* RockGlow() const { return RockMID; }
@@ -41,7 +42,12 @@ protected:
 
 private:
 	void QueueCubes();
-	bool BuildCube(const FIntVector& Key);
+	/** A cube's rock, worked out on a worker thread from the fungal data alone (WRCaveBuild.h). */
+	static void ComputeCube(const FIntVector& Key, float Cell, int32 Cells, const FVector& ActorLoc, float GroundSkin, FWRCaveMesh& Out);
+	/** On the game thread: a computed cube becomes a mesh component (false: nothing to draw). */
+	bool FinishCube(const FWRCaveMesh& M);
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	TArray<FWRCaveJob> InFlight;
 	TArray<FIntVector> Queue;
 	TSet<FIntVector> Done;
 	int32 Next = 0;

@@ -14,6 +14,7 @@
 #include "WRGraveEvents.h"
 #include "WRGraveTypes.h"
 #include "WRGameplayTags.h"
+#include "WRGearPerks.h"
 #include "WRNecroPath.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
@@ -113,7 +114,8 @@ float UWRGA_NecroSpell::Spell(const TCHAR* Field, float Fallback) const
 
 float UWRGA_NecroSpell::SoulCost() const
 {
-	return Spell(TEXT("soulCost"), 0.f);
+	// Wardcloth's four: spells cost less (spellCost, WRGearPerks).
+	return Spell(TEXT("soulCost"), 0.f) * WRGearPerks::SpellCostScale(CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr);
 }
 
 bool UWRGA_NecroSpell::CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const

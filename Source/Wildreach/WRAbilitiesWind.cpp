@@ -14,6 +14,7 @@
 #include "WRCreature.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
+#include "WRGearPerks.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
@@ -586,6 +587,9 @@ void UWRGA_AirDash::ActivateAbility(const FGameplayAbilitySpecHandle Handle, con
 	if (IsServer())
 	{
 		WRFx::BroadcastOn(C, TEXT("wind.dash"), NAME_None, 1.f, TEXT("wind.dash"), Windup + TravelTime);
+		// Worn gear: an air dash is a dodge (the next blow's edge, the mirage) and throws the Gale plume's gust (WRGearPerks).
+		WRGearPerks::OnDodge(C);
+		WRGearPerks::OnAirDodge(C);
 	}
 	After(Windup, [this, Dir, Distance, TravelTime]()
 	{

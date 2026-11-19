@@ -626,7 +626,8 @@ void UWRWeatherSubsystem::TickStrikes(float DeltaTime)
 						if (Id.ToString().StartsWith(TEXT("stormweave"))) W *= WRTune(TEXT("storm.pickWeave"), 0.85f);
 						else if (const FWRItemDef* Def = FWRItemRegistry::Get().Find(Id)) if (Def->Weight >= WRTune(TEXT("storm.heavyPieceKg"), 6.f)) W *= WRTune(TEXT("storm.pickHeavy"), 1.25f);
 					}
-					const bool bCharm = Inv->GetEquipped(EWREquipSlot::Talisman).ItemId == TEXT("grounding_charm");
+					// Worn passStorm (the grounding charm, Stormweave's four): strikes never pick you while anyone else can be.
+					const bool bCharm = UWRInventoryComponent::GearStatFor(P, TEXT("passStorm")) > 0.f;
 					const bool bGrounded = bCharm || (PS->GetPaths() && PS->GetPaths()->GetMainPath() == TEXT("lightning"));
 					if (bGrounded) W *= 0.001f;
 				}
@@ -1182,6 +1183,11 @@ void UWRSurvivalComponent::TickWeather(AWRCharacterBase* Pawn, float Now)
 		if (!bCountered && !bSheltered)
 		{
 			WThirst = K->ThirstMult;
+			// Dunewrap's two: a heat wave's extra thirst x (1 + heatwaveThirst); -1 none of it.
+			if (K->Id == TEXT("heatwave") && WThirst > 1.f)
+			{
+				WThirst = 1.f + (WThirst - 1.f) * FMath::Max(0.f, 1.f + UWRInventoryComponent::GearStatFor(Pawn, TEXT("heatwaveThirst")));
+			}
 			WRegen = K->StaminaRegenMult;
 			WRun = K->RunMult;
 			WSwim = K->SwimStaminaMult;
@@ -1572,8 +1578,9 @@ float UWRSurvivalComponent::AggroMultFor(const AActor* Player, const FWRCreature
 	float M = 1.f;
 	const bool bMatch = S->MatchesCorruption();
 	// Dark-hunters smell the unlit (and anyone corruption has darkened) from twice as far.
+	// Gravecloth's four (noDoubleAggro): dark-hunters never double it on you (graveyard 2.19: the light check, passed).
 	const bool bDarkToThem = S->IsUnlit() || (S->CorruptionStep() >= 2 && !bMatch);
-	if (Creature.bDarkHunter && bDarkToThem) M *= WRTune(TEXT("darkness.darkHunterAggroMult"), 2.f);
+	if (Creature.bDarkHunter && bDarkToThem && UWRInventoryComponent::GearStatFor(Player, TEXT("noDoubleAggro")) <= 0.f) M *= WRTune(TEXT("darkness.darkHunterAggroMult"), 2.f);
 	// Marked: every creature of the corrupt biome you're in.
 	const FWRBiomeSurvival* Row = FWRWeatherDefs::Get().Biome(S->GetBiomeHere());
 	if (S->CorruptionStep() >= 4 && !bMatch && Row && Row->bCorrupt && Creature.Biome == S->GetBiomeHere()) M *= WRTune(TEXT("corruption.markedAggroMult"), 2.f);

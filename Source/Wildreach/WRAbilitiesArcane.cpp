@@ -18,6 +18,7 @@
 #include "WRCrystalTypes.h"
 #include "WRFx.h"
 #include "WRGameplayTags.h"
+#include "WRGearPerks.h"
 #include "WRInventory.h"
 #include "WRPathComponent.h"
 #include "WRPlayerController.h"
@@ -204,7 +205,8 @@ float UWRGA_ArcaneSpell::Spell(const TCHAR* Field, float Fallback) const
 
 float UWRGA_ArcaneSpell::ManaCost() const
 {
-	return Spell(TEXT("manaCost"), 0.f);
+	// Wardcloth's four: spells cost less (spellCost, WRGearPerks).
+	return Spell(TEXT("manaCost"), 0.f) * WRGearPerks::SpellCostScale(CurrentActorInfo ? CurrentActorInfo->AvatarActor.Get() : nullptr);
 }
 
 float UWRGA_ArcaneSpell::Glyph(const AWRCharacterBase* Caster) const

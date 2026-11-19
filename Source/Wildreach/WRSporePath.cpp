@@ -16,6 +16,7 @@
 #include "WRGameplayTags.h"
 #include "WRGameState.h"
 #include "WRInventory.h"
+#include "WRGearPerks.h"
 #include "WRNecroPath.h"
 #include "WRPathComponent.h"
 #include "WRPlantSummon.h"
@@ -191,8 +192,8 @@ void WRSporePath::TickOwner(AWRCharacterBase* Who, float DeltaTime)
 	if (!Who || !Who->HasAuthority() || !Walks(Who) || !Who->IsAlive()) return;
 	const double T = SpNow(Who);
 	FSpOwner& O = SpOwners().FindOrAdd(Who);
-	// The bar: 100, +20 a capacity rank.
-	const float Max = SpR(TEXT("max"), 100.f) + UWRPathComponent::Stat(Who, TEXT("maxSpores"));
+	// The bar: 100, +20 a capacity rank; an amethyst's room (pathResourceMax, WRGearPerks).
+	const float Max = SpR(TEXT("max"), 100.f) + UWRPathComponent::Stat(Who, TEXT("maxSpores")) + WRGearPerks::ResourceMaxBonus(Who);
 	if (!FMath::IsNearlyEqual(MaxSporesOf(Who), Max))
 	{
 		SpSetAttr(Who, UWRAttributeSet::GetMaxSporesAttribute(), Max);
