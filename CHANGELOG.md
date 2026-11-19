@@ -8,12 +8,21 @@ Nothing built yet: the layout the slices will be built to, for Raven's sign-off 
 tab, and `Docs/design/round-island.md`). `node Tools/terrain/round_island.mjs` makes it from Aaron's land sizes
 (world-map.md 2.2, each doubled) and Raven's answers, and writes `Tools/terrain/round_island_layout.json` (every number the
 build scripts will use) and `Docs/design/round_island_map.svg`.
-- **10.7 km across:** nine lands as uneven slices round Hearthmoot, clockwise from the north-west Storm peaks, Desert,
-  Ancient forest, Frozen tundra, Swamp, Ocean & reefs (shore), Graveyard, Corrupted wasteland, Volcanic; opposites face
-  each other across the city.
-- **Each land:** three wake-up camps on its coast, a gate road (4.7 to 5 km) with its old pass's mouth shrine, champion
-  and fort, its major boss deep inland off the road; coast, midlands and inland bands of equal depth.
-- **Hearthmoot:** walls 600 m across inside a guarded Commons 1.3 km across; 12 quarters in the ring's order.
+- **Redrawn after Raven's look (11-19):** the first version (straight slices meeting at the city) looked too much like
+  a pie. From four sketches Raven picked wandering borders, a rugged coast, roads that join, and Hearthmoot in a green
+  meadow with a lake on the Ocean side.
+- **10.9 km across:** nine lands round Hearthmoot's meadow, clockwise from the north-west Storm peaks, Desert, Ancient
+  forest, Frozen tundra, Swamp, Ocean & reefs (shore), Graveyard, Corrupted wasteland, Volcanic; opposites face each
+  other across the city. Borders bend along ridges, rivers and valleys and blend over about 200 m; every land keeps
+  exactly Aaron's size x2 (the script fits the borders to it).
+- **The coast:** a volcano cape (the widest point, 12.4 km across), a reef bay with islets on the Ocean shore, a cliff
+  cape with sea stacks, an icy headland, the Swamp's delta, a long dune coast, a forest inlet; nine islets.
+- **Each land:** three wake-up camps on its coast; its own road runs in down its middle past its mouth shrine and
+  champion to a crossroads it shares with its neighbours; four main roads cross the meadow to the city's four gates,
+  each with its fort at the meadow's edge; its major boss deep inland, clear of roads, borders and the other bosses;
+  coast, midlands and inland bands of equal depth.
+- **Hearthmoot:** walls 600 m across in the middle of the meadow (the guarded Commons, about 2.9 km across); a 0.44 km²
+  lake on the Ocean side, its stream running 4 km out to the reef bay; 12 quarters in the ring's order.
 - **Layers:** the sky islands over Storm, Desert and Forest; the Crystal caves under Forest and Tundra (the Severance
   leads down); the Fungal caverns under Graveyard and Wasteland (the Flue rises out); Wind, Spore and Arcane starts
   inside their layers. **The sea:** shallows 300 m, reefs to 1.2 km, then deep; Thalassor's waters south.
