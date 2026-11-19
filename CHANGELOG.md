@@ -25,6 +25,11 @@
   genes move it up to 10% either way, so a doubled difficulty read 137 against 140 now and then. Checked on this build:
   unit (33), menus, flicker, worlds, rules, flow, tame, spell, mp all pass; the Video page and main menu in pictures;
   classic shadows switched on by the row and by a stand-in GPU crash folder, drawn in a new world.
+- **Test build for Raven (not released):** `C:\Dev\WildreachBuild10\Windows` (Development: the console and the log stay
+  on; still labelled 0.8.2; 3.45 GB, from 8fa0b92). A copy of it played through: the main menu, a new world hosted by
+  clicks (pve), Shadow method switched to Classic (shadows still drawn in the cooked game; about a 3 s hitch while its
+  shaders compile the first time), no loading-picture or `LogJson` warnings; the only error is the engine's known
+  PSO-precache ensure.
 
 ### Phase 2, part 5: the bot tests guard again, and the seven bugs they found (Raven, 11-18/19)
 
