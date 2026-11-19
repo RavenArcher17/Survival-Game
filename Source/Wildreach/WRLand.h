@@ -77,6 +77,8 @@ struct WILDREACH_API FWRLandDef
 	FString Name;
 	/** The map it stands on (the round island's lands: "L_Wildreach"). Empty: the Old Island's map, as before. */
 	FString Map;
+	/** Its heightfield waits to be read until its map begins (a land of another map costs the one playing nothing). */
+	bool bHeightfieldPending = false;
 	/** A zone letter's own biome (the round island holds every land in one ground: "zoneBiomes"); empty: Biome. */
 	TMap<TCHAR, FName> ZoneBiomes;
 	/** Far detail levels (the round island, "lod"): a chunk at least LodRanges[k] m from the view uses every 2^(k+1)th

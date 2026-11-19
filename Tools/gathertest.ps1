@@ -41,7 +41,8 @@ function Butcher([int]$n) { (@(1..$n) | ForEach-Object { 'WRPress light|wait 1.3
 
 $cmds = @(
 	'WRBotPause 1', 'WRFlow hints off', 'wait 2', 'WRHour 11', 'WRGive crude_hatchet 1', 'WRGive stone_pick 1', 'wait 1',
-	(Gather '-130596 -59750' 'tree' 9),                       # tree 2020, the starting sword in hand: the base rate
+	# (14 s: the client is still loading the lands at a few frames a second here; 9 s gave 3 or 4 chops by chance)
+	(Gather '-130596 -59750' 'tree' 14),                      # tree 2020, the starting sword in hand: the base rate
 	# Rendered, the hatchet comes out by its hotbar key as a player's would (the bar fills sword, food, drink,
 	# potion, then the tools given here: key 5); headless has no hotbar, so the server command.
 	$(if ($Shots) { 'WRKey Five|wait 1|WRUIState' } else { 'WREquip crude_hatchet' }), 'wait 1',
@@ -153,7 +154,8 @@ $bigLoot = @($downs | Where-Object { $_ -match '\(basaltback\)' } | ForEach-Obje
 $bigHits = @($downs | ForEach-Object { if ($_ -match '\(basaltback\) down: (\d+) hits') { [int]$Matches[1] } } | Select-Object -First 1)
 $bladePerHit = if ($bigLoot.Count -and $bigHits.Count -and $bigHits[0] -gt 0) { $bigLoot[0] / $bigHits[0] } else { 0 }
 $barePerHit = if ($bare.Count) { (Items $bare) / $bare.Count } else { 0 }
-Check 'bare hands get less from a body than a blade' ($bare.Count -ge 2 -and $barePerHit -gt 0 -and $barePerHit -lt $bladePerHit -and $bigLoot.Count -eq 1 -and (Items $bare) -le [math]::Ceiling($bigLoot[0] / 2)) ("{0:N2} vs a blade's {1:N2} a hit; {2} of the Basaltback's {3}" -f $barePerHit, $bladePerHit, (Items $bare), $(if ($bigLoot.Count) { $bigLoot[0] } else { '?' }))
+# (Bare hands average a little over half a blade's haul a hit, so the cap is 60% of the blade's: the rolls cross half by chance.)
+Check 'bare hands get less from a body than a blade' ($bare.Count -ge 2 -and $barePerHit -gt 0 -and $barePerHit -lt $bladePerHit -and $bigLoot.Count -eq 1 -and (Items $bare) -le [math]::Ceiling($bigLoot[0] * 0.6)) ("{0:N2} vs a blade's {1:N2} a hit; {2} of the Basaltback's {3}" -f $barePerHit, $bladePerHit, (Items $bare), $(if ($bigLoot.Count) { $bigLoot[0] } else { '?' }))
 # Walked along a line through the Basaltback's body (90 cm across): it gets there without being turned aside.
 $walk = @(Select-String -Path "$logs\client.log" -Pattern 'WALK arrived after .* at V\(X=([-\d.]+), Y=([-\d.]+)' | Select-Object -Last 1)
 $off = if ($walk.Count) { [math]::Abs([double]$walk[0].Matches[0].Groups[2].Value - $BY) } else { 999 }

@@ -431,7 +431,13 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 	J->TryGetStringField(TEXT("groundMaterial"), GroundMaterial);
 	for (const FWRLandZone& Z : Zones) bLayered |= Z.bLayers;
 	bLayered = bLayered && !GroundMaterial.IsEmpty();
-	if (J->TryGetObjectField(TEXT("heightfield"), N)) WRLandHfImpl::ParseHeightfield(*this, J, *N);
+	if (J->TryGetObjectField(TEXT("heightfield"), N))
+	{
+		// A land of another map (the round island's, while the Old Island plays) waits: its ground is read when its own
+		// map begins (WRLand::SetCurrentMap), so no other map pays for it.
+		if (!Map.IsEmpty() && Map != CurrentMapRef()) bHeightfieldPending = true;
+		else WRLandHfImpl::ParseHeightfield(*this, J, *N);
+	}
 	// Features last: their levels read the base ground (crest + noise + coast) at their own points.
 	if (J->TryGetArrayField(TEXT("features"), A))
 	{
@@ -493,6 +499,7 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			Fe.Depth = LNum(C, TEXT("depth"), 5.f);
 		}
 	}
+	if (bHeightfieldPending) return true;   // read when its map begins
 	if (bHeightfield) return HfN > 1 && HfHeights.Num() == HfN * HfN;
 	return Coast.Num() >= 3 && HeightCurve.Num() >= 2;
 }
@@ -956,6 +963,14 @@ const TArray<FWRLandDef>& WRLand::All()
 void WRLand::SetCurrentMap(const FString& Map)
 {
 	CurrentMapRef() = Map;
+	// This map's own lands read their ground now, if they waited (FWRLandDef::bHeightfieldPending).
+	for (FWRLandDef& D : Registry())
+	{
+		if (!D.bHeightfieldPending || D.Map != Map) continue;
+		D.bHeightfieldPending = false;
+		const TSharedPtr<FJsonObject>* Hf = nullptr;
+		if (D.Json.IsValid() && D.Json->TryGetObjectField(TEXT("heightfield"), Hf)) WRLandHfImpl::ParseHeightfield(D, D.Json, *Hf);
+	}
 }
 
 const FString& WRLand::CurrentMap()
