@@ -1285,9 +1285,18 @@ void UWRWorldSystems::PlaceTubes()
 		{
 			const TSharedPtr<FJsonObject> Room = (*Rooms)[r]->AsObject();
 			const int32 At = FMath::Clamp(int32(WNumOf(Room, TEXT("at"), 0.f)), 0, Route.Num() - 1);
-			const FVector C = Route[At];
-			const FVector Along = (Route[FMath::Min(At + 1, Route.Num() - 1)] - Route[FMath::Max(At - 1, 0)]).GetSafeNormal2D();
-			const FVector Side = FVector::CrossProduct(FVector::UpVector, Along);
+			FVector C = Route[At];
+			FVector Along = (Route[FMath::Min(At + 1, Route.Num() - 1)] - Route[FMath::Max(At - 1, 0)]).GetSafeNormal2D();
+			FVector Side = FVector::CrossProduct(FVector::UpVector, Along);
+			// On a map with lands the room is the land's underground hall off the corridor (<tube>_r<room>): its things
+			// stand on the hall's floor, laid out across it.
+			const FWRLandDef* HallLand = nullptr;
+			if (const FWRLandCave* Hall = WRLand::FindCave(FName(*FString::Printf(TEXT("%s_r%d"), *WStrOf(Row, TEXT("id")), r)), &HallLand); Hall && HallLand)
+			{
+				C = HallLand->ToWorld(FVector2D(Hall->Hall), Hall->Hall.Z) + FVector(0.f, 0.f, 5.f);
+				Side = FVector(Hall->Dir, 0.f).GetSafeNormal();
+				Along = FVector::CrossProduct(Side, FVector::UpVector);
+			}
 			const FString RoomName = WStrOf(Room, TEXT("name"));
 			for (const auto& KV : WCountsOf(WChild(Room, TEXT("creatures"))))
 			{
@@ -1298,7 +1307,7 @@ void UWRWorldSystems::PlaceTubes()
 				Sp->Radius = 250.f;
 				Sp->RespawnSeconds = 1800.f;
 				Sp->ActivationRadius = 9000.f;
-				Sp->bTraceGround = true;
+				Sp->bTraceGround = !HallLand;   // (an underground hall: its floor, not the land's ground over it)
 				Sp->FinishSpawning(FTransform(C + Along * 300.f));
 			}
 			int32 n = 0;

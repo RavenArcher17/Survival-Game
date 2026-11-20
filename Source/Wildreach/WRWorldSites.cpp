@@ -1618,9 +1618,34 @@ void AWRHiddenTube::BuildLook()
 			}
 		}
 	}
-	// The rooms: the sculpted cave shells at the route's corners (their mouths on the corridor).
+	// The rooms: the sculpted cave shells at the route's corners (their mouths on the corridor). On a map with lands of
+	// its own they are the land's underground halls (WRLandCaves builds their rock; <tube>_r<room>): a lintel over each
+	// doorway in the left wall, and the hall's light.
 	const TArray<TSharedPtr<FJsonValue>>* Rooms = nullptr;
-	if (Row->TryGetArrayField(TEXT("rooms"), Rooms))
+	if (bRidge && Row->TryGetArrayField(TEXT("rooms"), Rooms))
+	{
+		for (int32 r = 0; r < Rooms->Num(); ++r)
+		{
+			const FWRLandDef* LandDef = nullptr;
+			const FWRLandCave* Hall = WRLand::FindCave(FName(*FString::Printf(TEXT("%s_r%d"), *TubeId.ToString(), r)), &LandDef);
+			if (!Hall || !LandDef) continue;
+			double At = 0.0;
+			(*Rooms)[r]->AsObject()->TryGetNumberField(TEXT("at"), At);
+			const int32 i = FMath::Clamp(int32(At), 0, Route.Num() - 1);
+			const FVector C = Route[i] - GetActorLocation();
+			const FVector Along = (Route[FMath::Min(i + 1, Route.Num() - 1)] - Route[FMath::Max(i - 1, 0)]).GetSafeNormal2D();
+			const FVector Side = FVector::CrossProduct(FVector::UpVector, Along);
+			const FVector2D Door = FVector2D(C - Side * WallOut);
+			SiteRock(this, RootComponent, 77 + r, FVector(WallDepth, 560.f, 230.f), FVector(Door, SiteGroundZ(this, FVector2D(C), C.Z) + 460.f), FRotator(0.f, Along.Rotation().Yaw + 90.f, 0.f), Mat, true, 0.f);
+			if (bDraw)
+			{
+				const FVector HallW = LandDef->ToWorld(FVector2D(Hall->Hall), Hall->Hall.Z + 4.f) - GetActorLocation();
+				SiteLight(this, RootComponent, HallW, bIce ? FLinearColor(0.4f, 0.65f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f), 6000.f, 2200.f);
+			}
+		}
+		Rooms = nullptr;
+	}
+	if (!bRidge && Row->TryGetArrayField(TEXT("rooms"), Rooms))
 	{
 		static const TCHAR* Variants[] = { TEXT("/Game/Props/Caves/CaveA/cave_a.cave_a"), TEXT("/Game/Props/Caves/CaveB/cave_b.cave_b"), TEXT("/Game/Props/Caves/CaveC/cave_c.cave_c") };
 		for (int32 r = 0; r < Rooms->Num(); ++r)

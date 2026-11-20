@@ -300,68 +300,28 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 	console.log("places:", FFL.places.length, "places,", FFL.kit.length, "kit,", FFL.ground.length, "ground,", thin.length + "/" + FFL.hazards.thinIce.length, "thin ice on ice,", FFL.hazards.fumaroles.length, "fumaroles,", FFL.hazards.geysers.length, "geysers | pois", pois.length, "| villages", villages.length, "shrines", shrineRows.length);
 }
 
-// ---- part 3: the caves (fitted to the round island's ground), the bosses and their altars, the resource nodes, the
+// ---- part 3: the caves (underground: round_ground.mjs), the bosses and their altars, the resource nodes, the
 // hidden tubes' routes and each land's event centre.
 {
 	const WORLD = read("Data/world.json"), LIFE = JSON.parse(fs.readFileSync(path.join(root, "Data/wildreach_life.json"), "utf8"));
-	// Caves: the measured meshes (Tools/terrain/cave_hollows.json), fitted as the Old Island's dressing.mjs fits them: a
-	// height where a survivor walks from outside to the back of the chamber with headroom while the walls reach below the
-	// ground all round. Each near its mapped spot on a fairly flat footprint, its mouth toward the coast.
-	const hollows = read("Tools/terrain/cave_hollows.json").variants;
-	const CUT = -3;
-	const column = (v, x, y) => { const row = v.grid[Math.round(x) - v.x0]; return (row && row[Math.round(y) - v.y0]) || []; };
-	const isMouth = (x, y) => x > 11.5 && Math.abs(y) < 6;
-	const walkPts = [];
-	for (let x = -6; x <= 20; x += 1) for (const y of [-0.7, 0, 0.7]) walkPts.push([x, y, y === 0 ? 2.6 : 2.3]);
-	for (const [x, y] of [[-5.5, -5.5], [-5.5, 5.5], [0, -6.5], [3, 6.2], [-7, 0], [-3, 0], [2.5, 0]]) walkPts.push([x, y, 2.3]);
-	const wallPts = hollows.map((v) => { const pts = []; for (let gx = 0; gx < v.grid.length; gx += 2) for (let gy = 0; gy < v.grid[gx].length; gy += 2) { const x = gx + v.x0, y = gy + v.y0, hits = v.grid[gx][gy]; if (hits.length && hits[0] > CUT + 0.2 && !isMouth(x, y)) pts.push([x, y]); } return pts; });
-	const fitCave = (c, index) => {
-		let best = null;
-		for (const s of [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]) {
-			for (let v = 0; v < hollows.length; v++) for (let turn = -60; turn <= 60; turn += 15) {
-				const yaw = (c.yaw + turn + 360) % 360, a = yaw * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
-				const at = (x, y) => [c.x + (x * ca - y * sa) * s, c.y + (x * sa + y * ca) * s];
-				let zMax = Infinity;
-				for (const [x, y] of wallPts[v]) { const [wx, wy] = at(x, y); zMax = Math.min(zMax, hAt(wx, wy) - CUT * s - 0.3); }
-				const ground = walkPts.map(([x, y]) => { const [wx, wy] = at(x, y); return hAt(wx, wy); });
-				const clearAt = (z) => { let worst = Infinity; for (let k = 0; k < walkPts.length; k++) { const [x, y, need] = walkPts[k], zl = (ground[k] - z) / s; const above = column(hollows[v], x, y).filter((q) => q > zl + 0.45 / s); if (above.length % 2) return -Infinity; worst = Math.min(worst, (above.length ? Math.min(...above) - zl : 99) * s - need); } return worst; };
-				const top = clearAt(zMax);
-				if (top < 0) continue;
-				let z = zMax;
-				while (z > zMax - 4 && clearAt(z - 0.1) >= Math.min(1, top)) z -= 0.1;
-				const margin = clearAt(z), score = s * 100 + Math.abs(turn) * 0.05 - Math.min(margin, 1) + (v === index % hollows.length ? 0 : 0.02);
-				if (!best || score < best.score) best = { score, s, v, yaw, z, margin };
-			}
-			if (best) break;
-		}
-		return best;
-	};
+	// Caves: underground (round_ground.mjs sites them, cuts their mouths and writes island.json "caves"; WRLand builds
+	// their rock). Each AWRCave stands on its hall's floor, its +X toward the passage and the mouth (AWRCave's chamber
+	// layout: the ore, the hazard, the burrowers and the glow are placed from it), underground: no sculpted shell.
 	const caves = [], cavePois = [];
-	FFL.caves.forEach((c0, index) => {
-		const [mx, my] = c0.at, want = Math.atan2(my, mx) * 180 / Math.PI;
-		let spot = null;
-		for (let r = 0; r <= 220 && !spot; r += 20) for (let k = 0; k < (r ? 12 : 1) && !spot; k++) {
-			const x = mx + r * Math.cos(k * Math.PI / 6), y = my + r * Math.sin(k * Math.PI / 6);
-			if (hAt(x, y) < 6 || BARE.has(surfAt(x, y)) || lavaDist(x, y) < 60) continue;
-			let lo = Infinity, hi = -Infinity;
-			for (let dx = -14; dx <= 14; dx += 7) for (let dy = -14; dy <= 14; dy += 7) { const v = hAt(x + dx, y + dy); lo = Math.min(lo, v); hi = Math.max(hi, v); }
-			if (hi - lo > 5) continue;
-			if (!isClear(x, y, 30)) continue;
-			const fit = fitCave({ x, y, yaw: (want + 360) % 360 }, index);
-			if (fit) spot = { x, y, fit };
-		}
-		if (!spot) { console.log("cave", index, "NO FIT near", c0.at); return; }
-		caves.push({ biome: c0.biome, x: Math.round(spot.x * 100), y: Math.round(spot.y * 100), z: Math.round(spot.fit.z * 100), yaw: spot.fit.yaw, variant: spot.fit.v, scale: spot.fit.s });
-		cavePois.push({ name: `${c0.biome === "volcanic" ? "Volcanic" : "Tundra"} cave ${index % 3 + 1}`, kind: "cave", x: Math.round(spot.x * 100), y: Math.round(spot.y * 100), z: Math.round(hAt(spot.x, spot.y) * 100), biome: c0.biome });
+	(LAND.caves || []).filter((c) => !c.room).forEach((c, index) => {
+		const [hx, hy, hf] = c.hall, [dx, dy] = c.dir;
+		caves.push({ biome: c.biome, x: Math.round(hx * 100), y: Math.round(hy * 100), z: Math.round(hf * 100), yaw: +(Math.atan2(-dy, -dx) * 180 / Math.PI).toFixed(2), variant: -1, scale: 1, underground: true });
+		cavePois.push({ name: `${c.biome === "volcanic" ? "Volcanic" : "Tundra"} cave ${index % 3 + 1}`, kind: "cave", x: Math.round(c.mouth[0] * 100), y: Math.round(c.mouth[1] * 100), z: Math.round(c.mouth[2] * 100), biome: c.biome });
 	});
 	file.caves = caves;
-	// Nothing of the dressing stands in a cave (they moved to flat ground after the dressing was laid).
+	// Nothing of the dressing stands in a cave's mouth or the way up to it (the passage's first metres lie just under
+	// the ground there, and a sunk boulder would stand in it).
 	let cut = 0;
+	const inMouth = (x, y) => (LAND.caves || []).some((c) => { const [mx, my] = c.mouth, [dx, dy] = c.dir, s = (x - mx) * dx + (y - my) * dy, lat = -(x - mx) * dy + (y - my) * dx; return Math.hypot(x - mx, y - my) < 16 || (s > -14 && s < 14 && Math.abs(lat) < 9); });
 	for (const [kind, arr] of Object.entries(file.instances)) {
 		const keepI = [];
 		for (let i = 0; i + 4 < arr.length; i += 5) {
-			const x = arr[i] / 100, y = arr[i + 1] / 100;
-			if (caves.some((c) => Math.hypot(c.x / 100 - x, c.y / 100 - y) < 34 * c.scale)) { cut++; continue; }
+			if (inMouth(arr[i] / 100, arr[i + 1] / 100)) { cut++; continue; }
 			keepI.push(arr[i], arr[i + 1], arr[i + 2], arr[i + 3], arr[i + 4]);
 		}
 		file.instances[kind] = keepI;

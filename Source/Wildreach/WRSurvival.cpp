@@ -134,6 +134,9 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 		if (FVector::DistSquared(It->GetActorLocation(), Pos) > FMath::Square(4000.f)) continue;
 		const FVector L = It->GetActorTransform().InverseTransformPosition(Pos);
 		if (L.Z < -400.f || L.Z > 1000.f || FMath::Abs(L.Y) > 1000.f) continue;
+		// A land's underground cave: only under its ground (standing on the rise over the hall is the open air).
+		float GroundZ = 0.f;
+		if (It->bUnderground && WRLand::GroundUnder(Pos, GroundZ) && Pos.Z > GroundZ - 100.f) continue;
 		if (L.X >= -1000.f && L.X <= 1000.f) return true;
 		if (L.X > 1000.f && L.X < Mouth && FMath::Abs(L.Y) < 600.f) return true;
 	}

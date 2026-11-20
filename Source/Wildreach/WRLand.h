@@ -74,6 +74,29 @@ struct WILDREACH_API FWRLandFeature
 	float R = 0.f, Width = 0.f, Depth = 0.f, Walls = 0.f, Blend = 0.f, LipDrop = 0.f;
 };
 
+/** The underground caves' shape (Tools/terrain/cave_shape.mjs CAVE: m). */
+namespace WRCaveShape { inline constexpr float HalfW = 2.6f, TubeB = 2.8f, TubeLift = 1.6f, HallLift = 1.f, HallB = 5.6f, Join = 2.f; }
+
+/** An underground cave of a heightfield land (land file "caves"; Tools/terrain/cave_shape.mjs is the same formula, and
+ *  round_ground.mjs sites it and cuts the ground at its mouth): a flat-floored passage along Pts (x, y, its floor: map
+ *  metres, z absolute) going down from the mouth, smoothly joined to a hall, a flat-floored ellipsoid whose floor centre
+ *  is Hall, half-axes HallR along and across Dir. AWRLandCaves builds its rock, AWRCave its contents. */
+struct WILDREACH_API FWRLandCave
+{
+	FName Id;
+	FName Biome;
+	FVector2D Dir = FVector2D(1.f, 0.f);
+	FVector Mouth = FVector::ZeroVector;
+	TArray<FVector> Pts;
+	FVector Hall = FVector::ZeroVector;
+	FVector2D HallR = FVector2D(11.5f, 10.f);
+	/** Signed distance (m) to the cave's air at a map point with an absolute height (m): negative inside. OutFloor: the
+	 *  floor of the part nearest it (m). */
+	float Air(const FVector& P, float* OutFloor = nullptr) const;
+	/** The cave's air's box (map metres, z absolute), grown by Grow. */
+	FBox Bounds(float Grow) const;
+};
+
 struct WILDREACH_API FWRLandDef
 {
 	FName Id;
@@ -136,6 +159,8 @@ struct WILDREACH_API FWRLandDef
 	TArray<FVector4f> UndergroundWays;
 	TArray<float> UndergroundRadii;
 	TArray<FVector2D> BuildFirst;
+	/** Its underground caves (heightfield lands: the round island's). */
+	TArray<FWRLandCave> Caves;
 	/** Where two lands both have ground at a point, the higher priority's is the ground there (the Graveyard's 1 over the
 	 *  forest's west face of the Spine). */
 	int32 Priority = 0;
@@ -236,6 +261,10 @@ namespace WRLand
 	/** A live heightfield land's own ground height (game cm) under a point (built or not: the samples); false outside
 	 *  every such land or where it builds none (the island's strip). */
 	WILDREACH_API bool GroundUnder(const FVector& World, float& OutZ);
+	/** A live land's underground cave by id (a hidden tube's room: <tube>_r<room>), or null. */
+	WILDREACH_API const FWRLandCave* FindCave(FName Id, const FWRLandDef** OutLand = nullptr);
+	/** In one of a live land's underground caves, more than Depth cm under its ground (the sky's light fades there). */
+	WILDREACH_API bool InLandCave(const FVector& World, float Depth = 150.f);
 	/** The sub-zone at a game point (None outside every land). */
 	WILDREACH_API FName ZoneAt(const FVector& World);
 	/** sRGB array [r,g,b] -> linear. */
@@ -296,6 +325,8 @@ public:
 	/** Height of the ground (game cm) under a game point: the function, never a trace. */
 	float GroundZ(const FVector& World) const;
 	UMaterialInterface* GroundMaterial() const;
+	/** What its ground chunks draw with (the land's instance, so rain wets anything else drawn with it too). */
+	UMaterialInterface* GroundLook() const;
 	UMaterialInterface* TearMaterial() const;
 	UMaterialInterface* LightMaterial() const;
 	void AddMover(const FWRLandMover& M) { Movers.Add(M); }

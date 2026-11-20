@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Round island: caves that go into the ground (11-20)
+
+Raven: "Now's probably a good time to fix caves and make them like real caves that go into the ground".
+- **The Volcanic's and the Tundra's six caves go into the ground.** Each has a mouth at the foot of a hill or a rise,
+  then a passage going down 6 m into a hall under the ground (about 23 by 20 m, 6.6 m high) with at least 2 m of
+  rock over it.
+  - Each is sited near its mapped spot. Three sit in natural hillsides; for the other three a low rise (2-4.5 m)
+    comes up over the cave, its flanks curving round the mouth.
+  - The rock is built from the cave's shape on worker threads, as the Fungal caverns' is (WRLandCaves): dark basalt
+    in the Volcanic, ice in the Tundra.
+  - The land's ground is cut only where the passage breaks the surface. The ground round the lip is drawn exactly as
+    the land's (same material, same triangles), so there is no seam.
+  - Each hall holds its ore, its burrowers and its light. The sky's light fades as you go in.
+  - The Volcanic halls' sulfur gas now breathes from vents at the side of the hall. It used to lie on the way in, and
+    a survivor who stopped there burned. It no longer draws as a flat yellow disc.
+  - Before, the caves were sculpted domes standing on top of the ground.
+- **The hidden tubes' rooms are underground halls too.** A doorway in the corridor's wall, under a lintel, leads down
+  a passage into a hall under the ridge's flank, and each room's cache, ore and creatures are in its hall. The ridges
+  run unbroken now; the dome caves that stood in gaps beside them are gone.
+- Checked: a bot walked into every cave and tube room and back out, with no rescues and no falls.
+
 ### Phase 3, slices 2 and 3, step 2 (content), part 3: caves, hidden tubes, bosses, resource nodes and events (11-20)
 
 Raven: "If you think it's perfect keep going".

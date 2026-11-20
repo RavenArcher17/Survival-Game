@@ -1,4 +1,5 @@
 #include "WRRoundIsland.h"
+#include "WRLandCaves.h"
 #include "Wildreach.h"
 #include "WRBuildLook.h"
 #include "WRLand.h"
@@ -77,6 +78,12 @@ void AWRRoundIsland::BeginPlay()
 	BuildWater();
 	BuildLava();
 	BuildSafeZone();
+	// The land's underground caves' rock (every machine: the server's collision, the clients' look).
+	{
+		FActorSpawnParameters P;
+		P.Owner = this;
+		GetWorld()->SpawnActor<AWRLandCaves>(AWRLandCaves::StaticClass(), FTransform::Identity, P);
+	}
 	if (HasAuthority()) PlaceLife();
 	if (GetNetMode() != NM_DedicatedServer)
 	{

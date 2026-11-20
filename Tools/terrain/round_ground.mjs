@@ -15,6 +15,7 @@ import { fileURLToPath } from "url";
 import * as RI from "./round_island.mjs";
 import * as PLAN from "./hearthmoot_plan.mjs";
 import * as FF from "./fire_frost.mjs";
+import { CAVE, caveAir } from "./cave_shape.mjs";
 
 const { LANDS, lands, coastR, meadowR, warpDeg, fbm, pt, bearingOf, norm, dAng, gauss, RAD, CITY_WALL, LAKE, lakeOutline, stream, trunks, islets, edgeOf, FIRST_DEG, inPoly } = RI;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -619,6 +620,87 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 	for (const p of FFL.places) if (!KEEP.has(p.kind) && Array.isArray(p.at)) { pad(p.at, WIDE[p.kind] || 18, 26); n++; }
 	log(`places levelled: ${n}`);
 }
+// The caves (11-20, Raven: "make them like real caves that go into the ground"): each a mouth at the foot of a rise, a
+// passage going down 6 m into a hall under the ground (cave_shape.mjs; WRLand builds the rock, AWRCave its contents).
+// Each is sited near its mapped spot (fire_frost_layout.json caves) where the ground in front of the mouth is easy and
+// the ground over the hall and the passage already stands high; where it doesn't, a knoll rises over them (its brow
+// over the mouth, its flanks coming forward either side), so the hall has 2.2 m of rock over its ceiling and the
+// passage 1.8 m. The ground's hole where the passage breaks the surface is cut at the end (after every height change).
+const CAVES = [];
+const CAVE_KIT = {};   // the siting helpers, for the hidden tubes' rooms below
+{
+	const SITE = { mouthIn: 4, pass: 18, drop: 6, hallR: [11.5, 10], out: 3, hallRoof: 2.2, tubeRoof: 1.8, clear: 28, road: 140 };
+	const roadDist = (x, y) => { let d = Infinity; for (const rd of roads) for (let s = 1; s < rd.pts.length; s++) { const [ax, ay] = rd.pts[s - 1], [bx, by] = rd.pts[s], dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy))); d = Math.min(d, Math.hypot(x - ax - dx * t, y - ay - dy * t)); } return d; };
+	const reach = SITE.mouthIn + SITE.pass;
+	const make = (id, biome, mx, my, z0, dx, dy) => {
+		const zf = z0 - SITE.drop, P = (s) => [mx + dx * s, my + dy * s], hc = P(reach + SITE.hallR[0] - 2);
+		return { id, biome, dir: [dx, dy], mouth: [mx, my, z0], pts: [[...P(-SITE.out), z0], [...P(SITE.mouthIn), z0], [...P(reach), zf], [...hc, zf]], hall: [...hc, zf], hallR: SITE.hallR };
+	};
+	const floorAt = (c, s) => s <= SITE.mouthIn ? c.mouth[2] : c.mouth[2] - SITE.drop * Math.min(1, (s - SITE.mouthIn) / SITE.pass);
+	// The ground each part needs over it: [x, y, z]; the deficit is the knoll the cave needs.
+	const needs = (c) => {
+		const out = [], [hx, hy, hf] = c.hall, [dx, dy] = c.dir, [rx, ry] = c.hallR;
+		for (let u = -rx * 1.15; u <= rx * 1.15; u += 2.5) for (let v = -ry * 1.15; v <= ry * 1.15; v += 2.5) if ((u / (rx * 1.15)) ** 2 + (v / (ry * 1.15)) ** 2 <= 1)
+			out.push([hx + dx * u - dy * v, hy + dy * u + dx * v, hf + CAVE.hallLift + CAVE.hallB + SITE.hallRoof]);
+		for (let s = c.needFrom ?? 7; s <= reach; s += 2) for (const lat of [-(CAVE.halfW + 1), 0, CAVE.halfW + 1])
+			out.push([c.mouth[0] + dx * s - dy * lat, c.mouth[1] + dy * s + dx * lat, floorAt(c, s) + CAVE.tubeLift + CAVE.tubeB + SITE.tubeRoof]);
+		return out;
+	};
+	const deficit = (c) => needs(c).reduce((m, [x, y, z]) => Math.max(m, z - sampleH(x, y)), 0);
+	// The knoll: A m over the cave's footprint (the passage from 1.5-7 m in, the hall), falling away over 16 m; around
+	// the mouth its brow recedes, so the flanks come forward either side of a recess.
+	const knoll = (c, A, x, y) => {
+		const [mx, my] = c.mouth, [dx, dy] = c.dir, [hx, hy] = c.hall, [rx, ry] = c.hallR;
+		const s = (x - mx) * dx + (y - my) * dy, lat = -(x - mx) * dy + (y - my) * dx;
+		const eC = s < 0 ? Math.hypot(s, Math.max(0, Math.abs(lat) - 4.6)) : s > reach ? Math.hypot(s - reach, Math.max(0, Math.abs(lat) - 4.6)) : Math.max(0, Math.abs(lat) - 4.6);
+		const u = (x - hx) * dx + (y - hy) * dy, v = -(x - hx) * dy + (y - hy) * dx;
+		const eH = Math.max(0, (Math.hypot(u / (rx + 2), v / (ry + 2)) - 1) * Math.min(rx + 2, ry + 2));
+		const f0 = c.front0 ?? 1.5, front = smooth(f0, f0 + 5.5, s + Math.max(0, Math.abs(lat) - 4) * 0.8);
+		// A tube's room: nothing rises over its corridor (the corridor's floor is the ground as it was).
+		let keep = 1;
+		if (c.keepOff) { let d = Infinity; const P = c.keepOff.pts; for (let i = 1; i < P.length; i++) { const [ax, ay] = P[i - 1], [bx, by] = P[i], ex = bx - ax, ey = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey))); d = Math.min(d, Math.hypot(x - ax - ex * t, y - ay - ey * t)); } keep = smooth(c.keepOff.r, c.keepOff.r + 2, d); }
+		return A * front * keep * (1 - smooth(0, 16, Math.min(eC, eH))) * (1 + 0.12 * fbm(x / 30, y / 30, 1068 + 71, 2));
+	};
+	Object.assign(CAVE_KIT, { make, deficit, knoll });
+	FFL.caves.forEach((c0, n) => {
+		// Clear of everything big but its own mapped spot (KEEP_CLEAR holds the caves too).
+		const clear = (x, y, r) => KEEP_CLEAR.every(([px, py, pr]) => (px === c0.at[0] && py === c0.at[1]) || Math.hypot(x - px, y - py) > pr + r);
+		const id = `${c0.biome === "volcanic" ? "v" : "t"}${n % 3 + 1}`;
+		let best = null;
+		for (let r = 0; r <= 260; r += 20) for (let k = 0; k < (r ? 16 : 1); k++) {
+			const mx = c0.at[0] + r * Math.cos(k * Math.PI / 8), my = c0.at[1] + r * Math.sin(k * Math.PI / 8);
+			if (!inLand(c0.land, mx, my) || !clear(mx, my, SITE.clear) || roadDist(mx, my) < SITE.road) continue;
+			const z0 = sampleH(mx, my);
+			if (z0 < 12) continue;
+			for (let h = 0; h < 16; h++) {
+				const a = h * Math.PI / 8, dx = Math.cos(a), dy = Math.sin(a);
+				// An easy way up to the mouth: the ground in front neither drops away nor climbs, nor leans across.
+				if (Math.abs(sampleH(mx - dx * 6, my - dy * 6) - z0) > 2 || Math.abs(sampleH(mx - dx * 12, my - dy * 12) - z0) > 3.5) continue;
+				if (Math.abs(sampleH(mx - dy * 6, my + dx * 6) - sampleH(mx + dy * 6, my - dx * 6)) > 3) continue;
+				const c = make(id, c0.biome, mx, my, z0, dx, dy);
+				const [hx, hy] = c.hall;
+				if (!inLand(c0.land, hx, hy) || !clear(hx, hy, SITE.clear) || roadDist(hx, hy) < SITE.road) continue;
+				// No cave under the sea or a lake: the hall's floor stays over 4 m.
+				if (c.hall[2] < 4) continue;
+				const need = deficit(c), score = need + r / 25;
+				if (!best || score < best.score) best = { score, need, c, r };
+			}
+		}
+		if (!best) { log(`cave ${id} NO SITE near`, c0.at); return; }
+		const { c, need } = best, A = need > 0 ? need + 0.8 : 0;
+		if (A > 0) {
+			const xs = [c.mouth[0], c.hall[0]], ys = [c.mouth[1], c.hall[1]], M = 50;
+			for (let j = Math.floor((Math.min(...ys) - M + HALF) / STEP); j <= Math.ceil((Math.max(...ys) + M + HALF) / STEP); j++) for (let i = Math.floor((Math.min(...xs) - M + HALF) / STEP); i <= Math.ceil((Math.max(...xs) + M + HALF) / STEP); i++) {
+				if (i < 0 || j < 0 || i >= N || j >= N) continue;
+				const R = knoll(c, A, -HALF + i * STEP, -HALF + j * STEP);
+				if (R > 0.01) H[j * N + i] += R;
+			}
+		}
+		const left = deficit(c);
+		CAVES.push(c);
+		log(`cave ${id}: ${best.r} m from its spot, mouth at ${c.mouth.map((v) => v.toFixed(0)).join(", ")} facing ${(Math.atan2(-c.dir[1], -c.dir[0]) * 180 / Math.PI).toFixed(0)} deg, knoll ${A.toFixed(1)} m${left > 0.05 ? ` -- STILL ${left.toFixed(1)} M SHORT` : ""}`);
+	});
+}
 // The places kit's small pingos (WRIslandPlacesKit SmallPingo: on the Old Island a stack of snow discs; here the ground
 // itself, the kit adding only its cracked blue top), their size by the kit's variant; raised after the roads' passes,
 // which would flatten them to a third near a road.
@@ -638,8 +720,9 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 // the ground as it was (|d| < TUBE.core), the ridge rises over its boulder walls (AWRHiddenTube: 7.6 m deep on a map with
 // lands, their tops 6.3 m up) to TUBE.top and falls away to its foot, so from outside it reads as a ridge with the roof
 // slabs as its rocky crest, not a wall on the snow. It opens at both mouths (the flanks run on past the end, tapering)
-// and beside each room, whose cave (25.5 m off on the corridor's left, AWRHiddenTube rooms) stands on the ground as it
-// was in the gap.
+// and its rooms are underground halls off the corridor's left (a passage going down from a doorway in its wall, sited as
+// the caves are: round_ground.mjs caves, id <tube>_r<room>), the ridge's flank raised over them where it isn't high
+// enough.
 {
 	const TUBE = { h: 6.6, core: 7.5, top: 9.5, foot: 34, end: 24, roomAlong: 13, roomFade: 16, roomOut: 44 };
 	const WORLD_ROWS = JSON.parse(fs.readFileSync(path.join(root, "Data/world.json"), "utf8")).hidden || [];
@@ -667,11 +750,6 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 			const foot = TUBE.foot + 8 * fbm(x / 90, y / 90, 1068 + 61, 2);
 			let h = TUBE.h * (1 + 0.15 * fbm(x / 70, y / 70, 1068 + 62, 2)) * smooth(TUBE.core, TUBE.top, d) * (1 - smooth(TUBE.top + 1, foot, d)) * (1 - smooth(0, TUBE.end, beyond));
 			if (h <= 0.01) continue;
-			// Each room's gap: its cave stands on the ground as it was, the ridge's ends falling to it.
-			for (const r of rooms) {
-				const ra = (x - r.c[0]) * r.ax + (y - r.c[1]) * r.ay, rd = -(x - r.c[0]) * r.ay + (y - r.c[1]) * r.ax;
-				if (rd < 0) h *= 1 - (1 - smooth(TUBE.roomAlong, TUBE.roomAlong + TUBE.roomFade, Math.abs(ra))) * (1 - smooth(TUBE.roomOut, TUBE.roomOut + TUBE.roomFade, -rd));
-			}
 			H[k] += h;
 			raised++;
 			peak = Math.max(peak, h);
@@ -679,7 +757,26 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 		// A road crossing the ridge would be cut through it later (the roads' pass): say so.
 		let road = Infinity;
 		for (const rd of roads) for (let s = 1; s < rd.pts.length; s++) { const [ax, ay] = rd.pts[s - 1], [bx, by] = rd.pts[s], L = Math.hypot(bx - ax, by - ay); for (let t = 0; t <= L; t += 5) { const x = ax + (bx - ax) * t / L, y = ay + (by - ay) * t / L; for (const g of segs) { const u = Math.max(0, Math.min(g.L, (x - g.a[0]) * g.ux + (y - g.a[1]) * g.uy)); road = Math.min(road, Math.hypot(x - g.a[0] - g.ux * u, y - g.a[1] - g.uy * u)); } } }
-		log(`tube ridge ${tube.id}: ${raised} samples raised (peak ${peak.toFixed(1)} m), ${rooms.length} room gaps, nearest road ${road.toFixed(0)} m${road < TUBE.foot + 20 ? " -- THE ROAD CUTS THE RIDGE" : ""}`);
+		log(`tube ridge ${tube.id}: ${raised} samples raised (peak ${peak.toFixed(1)} m), nearest road ${road.toFixed(0)} m${road < TUBE.foot + 20 ? " -- THE ROAD CUTS THE RIDGE" : ""}`);
+		// The rooms: a passage from the corridor's middle through a doorway in its left wall (AWRHiddenTube leaves the wall
+		// out there under a lintel), going down 6 m into a hall under the ridge's flank.
+		rooms.forEach((r, n) => {
+			const dx = r.ay, dy = -r.ax, z0 = sampleH(r.c[0], r.c[1]);
+			const c = CAVE_KIT.make(`${tube.id}_r${n}`, tube.land, r.c[0], r.c[1], z0, dx, dy);
+			Object.assign(c, { front0: 9, needFrom: 11, keepOff: { pts, r: 7.5 }, room: { tube: tube.id, index: n } });
+			const need = CAVE_KIT.deficit(c), A = need > 0 ? need + 0.8 : 0;
+			if (A > 0) {
+				const M2 = 50;
+				for (let j = Math.floor((Math.min(c.mouth[1], c.hall[1]) - M2 + HALF) / STEP); j <= Math.ceil((Math.max(c.mouth[1], c.hall[1]) + M2 + HALF) / STEP); j++) for (let i = Math.floor((Math.min(c.mouth[0], c.hall[0]) - M2 + HALF) / STEP); i <= Math.ceil((Math.max(c.mouth[0], c.hall[0]) + M2 + HALF) / STEP); i++) {
+					if (i < 0 || j < 0 || i >= N || j >= N) continue;
+					const R = CAVE_KIT.knoll(c, A, -HALF + i * STEP, -HALF + j * STEP);
+					if (R > 0.01) H[j * N + i] += R;
+				}
+			}
+			const left = CAVE_KIT.deficit(c);
+			CAVES.push(c);
+			log(`  room ${c.id}: hall ${c.hall.map((v) => v.toFixed(0)).join(", ")}, flank raised ${A.toFixed(1)} m${left > 0.05 ? ` -- STILL ${left.toFixed(1)} M SHORT` : ""}`);
+		});
 	}
 }
 log("pads done");
@@ -763,6 +860,17 @@ for (let gj = 0; gj < GW; gj++) {
 }
 log("zone letters done");
 
+{
+	let n = 0;
+	for (const c of CAVES) {
+		const xs = [...c.pts.map((p) => p[0]), c.hall[0]], ys = [...c.pts.map((p) => p[1]), c.hall[1]], M = 16;
+		for (let j = Math.floor((Math.min(...ys) - M + HALF) / STEP); j <= Math.ceil((Math.max(...ys) + M + HALF) / STEP); j++) for (let i = Math.floor((Math.min(...xs) - M + HALF) / STEP); i <= Math.ceil((Math.max(...xs) + M + HALF) / STEP); i++) {
+			const k = j * N + i;
+			if (caveAir(c, -HALF + i * STEP, -HALF + j * STEP, H[k] - 0.2) < 1.2) { S[k] = 255; n++; }
+		}
+	}
+	log(`cave mouths: ${n} samples of ground cut`);
+}
 // ---- out --------------------------------------------------------------------------------------------------------------
 const bytes = Buffer.alloc(N * N * 3);
 let lo = 1e9, hi = -1e9;
@@ -887,6 +995,11 @@ const land = {
 	// Hearthmoot's camps (everyone whose path's land isn't built yet starts there), then each built land's three wake-up camps
 	// on its coast (tagged with its biome: WRGameMode starts a new player of its path there), each looking out to sea, the
 	// middle one with the starter stations.
+	caves: CAVES.map((c) => ({ id: c.id, biome: c.biome, ...(c.room ? { room: c.room } : {}), dir: c.dir.map((v) => +v.toFixed(4)), mouth: c.mouth.map((v) => +v.toFixed(2)), pts: c.pts.map((p) => p.map((v) => +v.toFixed(2))), hall: c.hall.map((v) => +v.toFixed(2)), hallR: c.hallR })),
+	underground: { _comment: "Where a body is rightly under the ground (no rescue): each cave's passage and hall, [x1, y1, x2, y2, r] m.", ways: CAVES.flatMap((c) => {
+		const [dx, dy] = c.dir, [hx, hy] = c.hall, e = c.hallR[0] - c.hallR[1];
+		return [[...c.pts[0].slice(0, 2), ...c.pts[2].slice(0, 2), CAVE.halfW + 1.5].map((v) => +v.toFixed(1)), [hx - dx * e, hy - dy * e, hx + dx * e, hy + dy * e, c.hallR[1] + 1.5].map((v) => +v.toFixed(1))];
+	}) },
 	camps: { tag: "hearthmoot", safeRadius: 40, stationsAt: -1, list: [[0, 34, 0], [30, -17, 120], [-30, -17, 240]],
 		groups: ["volcanic", "tundra"].map((id) => ({ tag: id, safeRadius: 40, stationsAt: 1, stations: ["forge", "armorer", "alchemy_table", "workbench"], stationsBack: 25,
 			list: RI.byId[id].camps.map((c) => { const p = Array.isArray(c) ? c : c.at; return [Math.round(p[0]), Math.round(p[1]), Math.round(Math.atan2(p[1], p[0]) * 180 / Math.PI)]; }) })) },

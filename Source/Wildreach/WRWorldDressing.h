@@ -216,6 +216,9 @@ public:
 	/** A named cave's character (Storm peaks: halite = the Halite Cave's pink salt and rock salt, adit = the Copper
 	 *  Adit's copper and iron, grotto = Thundergorge's wet tin and copper). None: the biome's usual cave. */
 	UPROPERTY(Replicated) FName Theme;
+	/** A land's underground cave (the round island's: WRLandCaves builds its rock): no sculpted shell, the actor stands on
+	 *  the hall's flat floor with its +X toward the passage and the mouth. */
+	UPROPERTY(Replicated) bool bUnderground = false;
 
 protected:
 	virtual void BeginPlay() override;

@@ -164,6 +164,18 @@ alive-and-explorable pass, as slice 1.
   ridge over each tube (`TUBE`: nothing within 7.5 m of the line, so the corridor's floor is the ground as it was, full
   height by 9.5 m over `AWRHiddenTube`'s deeper walls on a map with lands, falling to its foot by ~34 m; open past
   both ends and beside each room) and the places kit's small pingos as mounds (after the roads' passes).
+- **Underground caves (11-20):** a land file's `caves` (`FWRLandCave`; `Tools/terrain/cave_shape.mjs` is the same
+  formula) each a flat-floored passage along `pts` [x, y, floor] going down from its `mouth` into a `hall` (a
+  flat-floored ellipsoid, `hallR` along and across `dir`), joined smoothly. `round_ground.mjs` sites them (near the
+  mapped spot, an easy way up to the mouth, scored by the knoll it needs plus distance), raises a knoll where the hall
+  or passage lack cover (hall 2.2 m, passage 1.8 m), and last cuts the land's ground (surface 255) wherever the cave's
+  air comes within 1.2 m of it. `underground.ways` mark them rightly underground (no rescue). `AWRLandCaves`
+  (spawned by `AWRRoundIsland` on every machine) meshes the caves' air unioned with the air over the ground by
+  surface nets (1 m cells, 20 m cubes, workers). The ground's part of that skin is dropped where the land draws its
+  own; round the hole it is drawn with the land's material and vertex data on the land's own triangles. The rest is
+  the biome's rock (M_Rock basalt; ice). `AWRCave` `bUnderground` (dressing `"underground": true`) stands on the hall's
+  floor with no shell. A tube's rooms are caves `<tube>_r<room>` whose passage starts in the corridor:
+  `AWRHiddenTube` puts a lintel over the doorway and lights the hall, and `PlaceTubes` puts the room's things there.
 - **Weather on the round island:** the weather's fog is the second fog layer, its floor on the ground under the camera
   (eased), falloff `sky.roundWeatherFalloff` (low: the air overhead as thick as round you), density the look's x
   `sky.roundWeatherDensity` or `sky.roundWeather.<kind>` "r,g,b,density" where the round island has its own look (the

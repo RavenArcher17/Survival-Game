@@ -277,6 +277,9 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			{
 				Cave->Biome = FName(*C->GetStringField(TEXT("biome")));
 				Cave->Variant = FMath::RoundToInt(Variant);
+				bool bUnder = false;
+				C->TryGetBoolField(TEXT("underground"), bUnder);
+				Cave->bUnderground = bUnder;
 				Cave->FinishSpawning(T);
 			}
 		}
@@ -1675,6 +1678,7 @@ void AWRCave::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	DOREPLIFETIME(AWRCave, Biome);
 	DOREPLIFETIME(AWRCave, Variant);
 	DOREPLIFETIME(AWRCave, Theme);
+	DOREPLIFETIME(AWRCave, bUnderground);
 }
 
 void AWRCave::BeginPlay()
@@ -1728,6 +1732,19 @@ void AWRCave::BuildShell()
 	Glow->SetIntensity(WRTune(TEXT("caves.glowIntensity"), 8000.f));
 	Glow->SetAttenuationRadius(WRTune(TEXT("caves.glowRadius"), 2400.f) * GetActorScale3D().X);
 
+	// A land's underground cave: its rock is the land's (WRLandCaves); the light is the cave's, and the volcanic one's
+	// sulfur gas breathes from vents in the floor where the hazard is (SpawnContents: to one side of the hall).
+	if (bUnderground)
+	{
+		if (!bFrost && GetNetMode() != NM_DedicatedServer)
+		{
+			for (const FVector& V : { FVector(-250.f, 320.f, 5.f), FVector(-380.f, 210.f, 5.f), FVector(-140.f, 440.f, 5.f) })
+			{
+				if (USceneComponent* W = WRFx::Attach(RootComponent, TEXT("cave.gas.vent"))) W->SetRelativeLocation(V);
+			}
+		}
+		return;
+	}
 	// Blender-sculpted cave (Tools/art/cave_gen.py): a rock mound with the chamber and a ragged entrance tunnel carved
 	// out, in the same local layout as the blocks below. Its collision is the mesh itself, and the landscape is the floor.
 	// Three variants: the one the dressing file chose (replicated), else picked by position so every machine agrees; the
@@ -1828,6 +1845,8 @@ void AWRCave::SpawnContents()
 	const bool bFrost = Biome == TEXT("tundra");
 	const auto Floor = [this](const FVector& Local)
 	{
+		// An underground cave's hall floor is flat at the actor (its rock may not be built yet on the server).
+		if (bUnderground) return GetActorTransform().TransformPosition(FVector(Local.X, Local.Y, 5.f));
 		const FVector Top = GetActorTransform().TransformPosition(FVector(Local.X, Local.Y, 650.f));
 		// (The round island: the land's height is the cave's floor.)
 		if (WRLand::OwnLandMap())
@@ -1911,8 +1930,9 @@ void AWRCave::SpawnContents()
 	const bool bSwampCave = Biome == TEXT("swamp");
 	if (!bStormCave && !bSwampCave && !bForestCave)
 	{
-		AWRHazard::Spawn(GetWorld(), nullptr, Floor(FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
-			WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")));
+		// (An underground hall's gas lies to one side, off the way in from the passage: AWRCave::BuildShell's vents.)
+		AWRHazard::Spawn(GetWorld(), nullptr, Floor(bUnderground && !bFrost ? FVector(-250, 320, 0) : FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
+			WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")), !bUnderground);
 	}
 	// The Swamp's caves (cooks/biome-swamp.md 2.6): Reedmouth's Lanterntoads and Slimeshells, the Eel Hole's leeches, the
 	// Peat Cellar's Bogstalkers and leeches, the Gullet's leeches and the Murkjaw in its sump.

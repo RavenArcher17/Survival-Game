@@ -263,6 +263,26 @@ namespace WRLandHfImpl
 			}
 		}
 		D.BuildFirst = LLine(J, TEXT("buildFirst"));
+		if (J->TryGetArrayField(TEXT("caves"), A))
+		{
+			const auto V3 = [](const TArray<TSharedPtr<FJsonValue>>& X) { return FVector(X.Num() > 0 ? X[0]->AsNumber() : 0.0, X.Num() > 1 ? X[1]->AsNumber() : 0.0, X.Num() > 2 ? X[2]->AsNumber() : 0.0); };
+			for (const TSharedPtr<FJsonValue>& V : *A)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				if (!O.IsValid()) continue;
+				FWRLandCave& C = D.Caves.AddDefaulted_GetRef();
+				FString S;
+				if (O->TryGetStringField(TEXT("id"), S)) C.Id = FName(*S);
+				if (O->TryGetStringField(TEXT("biome"), S)) C.Biome = FName(*S);
+				const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
+				if (O->TryGetArrayField(TEXT("dir"), X)) C.Dir = FVector2D(V3(*X)).GetSafeNormal();
+				if (O->TryGetArrayField(TEXT("mouth"), X)) C.Mouth = V3(*X);
+				if (O->TryGetArrayField(TEXT("hall"), X)) C.Hall = V3(*X);
+				if (O->TryGetArrayField(TEXT("hallR"), X)) C.HallR = FVector2D(V3(*X));
+				if (O->TryGetArrayField(TEXT("pts"), X)) for (const TSharedPtr<FJsonValue>& P : *X) { const TArray<TSharedPtr<FJsonValue>>* Q = nullptr; if (P->TryGetArray(Q)) C.Pts.Add(V3(*Q)); }
+				if (C.Pts.Num() < 2) D.Caves.Pop();
+			}
+		}
 		UE_LOG(LogWildreach, Log, TEXT("LAND %s: heightfield %d x %d at %.0f m from (%.0f, %.0f)"), *D.Id.ToString(), D.HfN, D.HfN, D.HfStep, D.HfOrigin.X, D.HfOrigin.Y);
 	}
 
@@ -774,6 +794,42 @@ TCHAR FWRLandDef::GridLetter(const FVector2D& M) const
 	return GridRows[J][I];
 }
 
+float FWRLandCave::Air(const FVector& P, float* OutFloor) const
+{
+	using namespace WRCaveShape;
+	// The passage: the nearest point of its polyline (in plan), its floor there, an ellipse across it cut flat by the floor.
+	float Best = TNumericLimits<float>::Max(), F = 0.f;
+	for (int32 i = 1; i < Pts.Num(); ++i)
+	{
+		const FVector2D A(Pts[i - 1]), B(Pts[i]), AB = B - A;
+		const float T = FMath::Clamp(FVector2D::DotProduct(FVector2D(P) - A, AB) / FMath::Max(1e-4f, float(AB.SizeSquared())), 0.f, 1.f);
+		const float Dd = FVector2D::Distance(FVector2D(P), A + AB * T);
+		if (Dd < Best) { Best = Dd; F = FMath::Lerp(float(Pts[i - 1].Z), float(Pts[i].Z), T); }
+	}
+	const float Tube = FMath::Max((FMath::Sqrt(FMath::Square(Best / HalfW) + FMath::Square((float(P.Z) - F - TubeLift) / TubeB)) - 1.f) * FMath::Min(HalfW, TubeB), F - float(P.Z));
+	// The hall: an ellipsoid along Dir, cut flat by its floor.
+	const FVector2D Rel = FVector2D(P) - FVector2D(Hall);
+	const float U = FVector2D::DotProduct(Rel, Dir), Vv = -Rel.X * Dir.Y + Rel.Y * Dir.X;
+	const float HallD = FMath::Max((FMath::Sqrt(FMath::Square(U / HallR.X) + FMath::Square(Vv / HallR.Y) + FMath::Square((float(P.Z) - float(Hall.Z) - HallLift) / HallB)) - 1.f)
+		* FMath::Min3(float(HallR.X), float(HallR.Y), HallB), float(Hall.Z) - float(P.Z));
+	if (OutFloor) *OutFloor = Tube < HallD ? F : float(Hall.Z);
+	// Joined smoothly (cave_shape.mjs smin).
+	const float H = FMath::Max(Join - FMath::Abs(Tube - HallD), 0.f) / Join;
+	return FMath::Min(Tube, HallD) - H * H * Join * 0.25f;
+}
+
+FBox FWRLandCave::Bounds(float Grow) const
+{
+	using namespace WRCaveShape;
+	FBox B(ForceInit);
+	for (const FVector& P : Pts) B += P;
+	const float R = FMath::Max(HallR.X, HallR.Y);
+	B += Hall + FVector(R, R, HallLift + HallB);
+	B += Hall - FVector(R, R, 0.f);
+	B += FVector(Pts[0].X, Pts[0].Y, Pts[0].Z + TubeLift + TubeB);
+	return B.ExpandBy(FVector(HalfW + Grow, HalfW + Grow, Grow));
+}
+
 bool FWRLandDef::IsUnderground(const FVector2D& M) const
 {
 	if (!bHeightfield) return false;
@@ -1072,6 +1128,29 @@ bool WRLand::InHole(const FVector& World)
 	return H && World.Z < D->ToWorld(M, H->Levels[0]).Z + 200.f;
 }
 
+const FWRLandCave* WRLand::FindCave(FName Id, const FWRLandDef** OutLand)
+{
+	for (const FWRLandDef& D : All())
+	{
+		if (!D.bHeightfield || D.Caves.Num() == 0 || !IsLive(D)) continue;
+		for (const FWRLandCave& C : D.Caves) if (C.Id == Id) { if (OutLand) *OutLand = &D; return &C; }
+	}
+	return nullptr;
+}
+
+bool WRLand::InLandCave(const FVector& World, float Depth)
+{
+	const FWRLandDef* D = At(World);
+	if (!D || D->Caves.Num() == 0) return false;
+	const FVector2D M = D->ToMap(World);
+	const FVector Pm(M.X, M.Y, (World.Z - D->Origin.Z) / 100.f);
+	for (const FWRLandCave& C : D->Caves)
+	{
+		if (C.Air(Pm) < 0.5f) return D->Height(M) > Pm.Z + Depth / 100.f;
+	}
+	return false;
+}
+
 bool WRLand::GroundUnder(const FVector& World, float& OutZ)
 {
 	const FWRLandDef* D = At(World);
@@ -1156,6 +1235,7 @@ AWRLand::AWRLand()
 }
 
 UMaterialInterface* AWRLand::GroundMaterial() const { return GroundMat; }
+UMaterialInterface* AWRLand::GroundLook() const { return GroundMID ? static_cast<UMaterialInterface*>(GroundMID) : GroundMat.Get(); }
 UMaterialInterface* AWRLand::TearMaterial() const { return TearMat; }
 UMaterialInterface* AWRLand::LightMaterial() const { return LightMat; }
 
