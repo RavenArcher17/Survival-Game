@@ -16,6 +16,7 @@
 #include "WRSkyAir.h"
 #include "WRSound.h"
 #include "WRTuning.h"
+#include "WRLand.h"
 #include "WRWorldDressing.h"
 #include "WRBuildLook.h"
 #include "Components/BoxComponent.h"
@@ -60,6 +61,14 @@ namespace WRIsleHz
 
 	bool HzLandZ(UWorld* World, const FVector2D& P, float& OutZ)
 	{
+		// On a map with lands of its own (the round island) the ground is the land's height there: its collision is built
+		// only near players, and a place far off must still build.
+		if (WRLand::OwnLandMap())
+		{
+			const float LZ = WRLand::GroundZAt(FVector(P, 0.f), TNumericLimits<float>::Lowest());
+			if (LZ > TNumericLimits<float>::Lowest()) { OutZ = LZ; return true; }
+			return false;
+		}
 		TArray<FHitResult> Hits;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRIsleGust), false);
 		World->LineTraceMultiByObjectType(Hits, FVector(P, 200000.f), FVector(P, -30000.f), FCollisionObjectQueryParams(ECC_WorldStatic), Q);

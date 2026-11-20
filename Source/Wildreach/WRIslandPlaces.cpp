@@ -8,6 +8,7 @@
 #include "WRGameState.h"
 #include "WRSound.h"
 #include "WRTuning.h"
+#include "WRLand.h"
 #include "WRWorldDressing.h"
 #include "WRWorldSystems.h"
 #include "WRBuildLook.h"
@@ -61,6 +62,14 @@ namespace WRIslePlacesImpl
 	/** The landscape's height under a world point (cm), ignoring everything built on it; false until it streams in. */
 	bool IsleLandZ(UWorld* World, const FVector2D& P, float& OutZ)
 	{
+		// On a map with lands of its own (the round island) the ground is the land's height there: its collision is built
+		// only near players, and a place far off must still build.
+		if (WRLand::OwnLandMap())
+		{
+			const float LZ = WRLand::GroundZAt(FVector(P, 0.f), TNumericLimits<float>::Lowest());
+			if (LZ > TNumericLimits<float>::Lowest()) { OutZ = LZ; return true; }
+			return false;
+		}
 		TArray<FHitResult> Hits;
 		FCollisionQueryParams Q(SCENE_QUERY_STAT(WRIsleGround), false);
 		World->LineTraceMultiByObjectType(Hits, FVector(P, 200000.f), FVector(P, -30000.f), FCollisionObjectQueryParams(ECC_WorldStatic), Q);
@@ -94,6 +103,14 @@ bool WRIsle::Live(const UObject* WorldContext)
 
 FName WRIsle::ZoneAt(const FVector& At)
 {
+	// The round island: the land's own sub-zone there (V1..V7, T1..T7), when the places file names it.
+	if (WRLand::OwnLandMap())
+	{
+		const FWRLandDef* L = WRLand::At(At);
+		const FWRLandZone* LZ = L ? L->ZoneAt(L->ToMap(At)) : nullptr;
+		if (LZ) for (const FIsleZone& Z : IsleZones()) if (Z.Id == LZ->Id) return Z.Id;
+		return NAME_None;
+	}
 	for (const FIsleZone& Z : IsleZones())
 	{
 		if (Z.bRing)
@@ -433,7 +450,10 @@ void UWRIslandPlaces::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	FString Map = InWorld.GetMapName();
 	Map.RemoveFromStart(InWorld.StreamingLevelsPrefix);
-	if (Map != TEXT("L_Island") || WRTune(TEXT("places.enabled"), 1.f) <= 0.f) return;
+	// The Old Island's places, or a map's own (the round island: Data/wildreach_places.json, made by
+	// Tools/terrain/fire_frost_dressing.mjs).
+	PlacesFile = Map == TEXT("L_Island") ? FString(TEXT("island_places.json")) : (Map.StartsWith(TEXT("L_")) ? Map.Mid(2).ToLower() : Map.ToLower()) + TEXT("_places.json");
+	if (WRTune(TEXT("places.enabled"), 1.f) <= 0.f || !FWRTuning::LoadDataFile(PlacesFile).IsValid()) return;
 	bServer = InWorld.GetNetMode() != NM_Client;
 	bDraw = InWorld.GetNetMode() != NM_DedicatedServer;
 	Load();
@@ -447,10 +467,10 @@ void UWRIslandPlaces::OnWorldBeginPlay(UWorld& InWorld)
 
 void UWRIslandPlaces::Load()
 {
-	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(TEXT("island_places.json"));
+	const TSharedPtr<FJsonObject> File = FWRTuning::LoadDataFile(PlacesFile);
 	if (!File.IsValid())
 	{
-		UE_LOG(LogWildreach, Warning, TEXT("PLACES: no Data/island_places.json; the Fire and Frost places aren't built"));
+		UE_LOG(LogWildreach, Warning, TEXT("PLACES: no Data/%s; the Fire and Frost places aren't built"), *PlacesFile);
 		return;
 	}
 	IsleZones().Reset();

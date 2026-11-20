@@ -8,8 +8,8 @@
    "line": "Vulkarn's forge breathes smoke over the whole island.",
    "name": "Vulkarn's Crater",
    "at": [
-    -4650,
-    276
+    -4660,
+    277
    ],
    "landmark": true,
    "clear": 0,
@@ -27,7 +27,7 @@
    "line": "Three spatter chimneys the smiths worked as bellows. They still breathe fire in turn.",
    "name": "The Bellows Stacks",
    "at": [
-    -4005,
+    -4008,
     -334
    ],
    "landmark": true,
@@ -47,8 +47,8 @@
    "line": "A forge giant split by frost, Rime-folk spearheads still in his skull. His hammer is the only bridge over the river.",
    "name": "The Fallen Smith",
    "at": [
-    -5456,
-    932
+    -5455,
+    933
    ],
    "landmark": true,
    "clear": 45,
@@ -76,7 +76,7 @@
    "line": "A cliff of black glass. Something is cut into the ledge nine metres up.",
    "name": "Glasswall",
    "at": [
-    -4904,
+    -4910,
     -456
    ],
    "landmark": true,
@@ -96,7 +96,7 @@
    "line": "Sulfur vents the miners worked. At night their fire burns blue.",
    "name": "The Blue Fire",
    "at": [
-    -3543,
+    -3549,
     -637
    ],
    "landmark": true,
@@ -116,8 +116,8 @@
    "landmark": true,
    "clear": 20,
    "at": [
-    -5970,
-    589
+    -5984,
+    590
    ],
    "why": "The smiths' beacon for ships on the west coast: the west headland's tip (the most open sea round it, on the cliff top at the water's edge), lit by the Kipuka's shrine. fire-frost.md's sea stack at -1880, +120 is open water on the built island",
    "yaw": 180,
@@ -135,8 +135,8 @@
    "line": "Old forest the lava flowed around: the only living green in the Volcanic.",
    "name": "Ash Pine Kipuka",
    "at": [
-    -5113,
-    761
+    -5091,
+    760
    ],
    "clearing": [
     -1150,
@@ -178,7 +178,7 @@
    "line": "The Rime-folk's gate of mammoth tusks, facing the glacier.",
    "name": "The Tusk Gate",
    "at": [
-    4607,
+    4600,
     464
    ],
    "landmark": true,
@@ -198,8 +198,8 @@
    "line": "Nine metres of stacked stone. Its arm points at the glacier.",
    "name": "The Great Inuksuk",
    "at": [
-    4595,
-    331
+    4586,
+    330
    ],
    "landmark": true,
    "clear": 20,
@@ -218,7 +218,7 @@
    "line": "A Rime-folk longboat locked in the ice from when the shelf was sea.",
    "name": "The Frozen Whaler",
    "at": [
-    3541,
+    3542,
     -155
    ],
    "landmark": true,
@@ -238,7 +238,7 @@
    "line": "A wall of blue ice towers. Listen for the crack before one falls.",
    "name": "The Weeping Seracs",
    "at": [
-    3838,
+    3834,
     377
    ],
    "landmark": true,
@@ -296,8 +296,8 @@
    "line": "A natural ice bridge over the river ice. Something lives beneath it.",
    "name": "The Ice Arch",
    "at": [
-    4405,
-    -343
+    4412,
+    -342
    ],
    "landmark": true,
    "clear": 0,
@@ -319,12 +319,12 @@
     720
    ],
    "from": [
-    -5787,
+    -5792,
     644
    ],
    "to": [
-    -5636,
-    794
+    -5613,
+    793
    ],
    "clear": 20,
    "zone": "V1",
@@ -340,8 +340,8 @@
    "name": "The Miners' Grave",
    "clear": 22,
    "at": [
-    -3806,
-    -691
+    -3834,
+    -689
    ],
    "why": "The miners died fleeing an eruption toward the shore: on the line from the Blue Fire's pits to the nearest shore, 60-140 m out, the bodies facing the sea they never reached",
    "yaw": -135,
@@ -358,8 +358,8 @@
    "name": "The Miners' Camp",
    "clear": 18,
    "at": [
-    -3633,
-    -699
+    -3659,
+    -698
    ],
    "why": "\"The miners' camp below\" the Blue Fire: the nearest flat lower ground 70-170 m from the pits (6 m+ below them, out of the fumes), the tents facing the work",
    "yaw": 85,
@@ -376,8 +376,8 @@
    "name": "The Charred Caravan",
    "clear": 22,
    "at": [
-    -5708,
-    -140
+    -5699,
+    -141
    ],
    "why": "Smith wagons burn where they stood: on the Slag-Cairn road where it passes nearest the design spot, the guards' blades pointing toward the north pass the attack came from",
    "yaw": -24.6,
@@ -394,7 +394,7 @@
    "why": "In the old lava field beside the Kipuka (fire-frost.md's spot): the lava came through a living forest",
    "name": "The Tree-Mold Field",
    "at": [
-    -4869,
+    -4858,
     664
    ],
    "clear": 30,
@@ -411,7 +411,7 @@
    "why": "At the crater wall's foot (fire-frost.md's spot), climbing toward the rim",
    "name": "The Crater Stair",
    "at": [
-    -5098,
+    -5099,
     205
    ],
    "clear": 20,
@@ -429,8 +429,8 @@
    "why": "Pinned by the Obsidian Warden's arena: the quarry face beside it",
    "name": "The Warden's Quarry",
    "at": [
-    -4946,
-    -250
+    -4962,
+    -249
    ],
    "clear": 14,
    "yaw": 14.7,
@@ -447,7 +447,7 @@
    "name": "The Shard Field",
    "clear": 45,
    "at": [
-    -5610,
+    -5607,
     -9
    ],
    "why": "Obsidian blades are shed by the ridges: the gentle apron at the foot of the steepest obsidian face near the design spot, spread downhill from it",
@@ -465,7 +465,7 @@
    "name": "The Ridge Watch",
    "clear": 14,
    "at": [
-    -3974,
+    -3972,
     -555
    ],
    "why": "The smiths' watchtower: the volcanic-side crest with an unbroken sight line from its roof to the north pass (250-800 m off), seeing the crater too (it reveals the Crater Highlands); its slits face the pass",
@@ -483,8 +483,8 @@
    "why": "A mound of chewed ore on the Obsidian Ridges' lower ground (fire-frost.md's spot, 50 m onto even ground)",
    "name": "The Kilnmite Hill",
    "at": [
-    -5194,
-    -612
+    -5221,
+    -610
    ],
    "clear": 20,
    "zone": "V1",
@@ -500,7 +500,7 @@
    "name": "The Acid Pool",
    "clear": 22,
    "at": [
-    -4055,
+    -4056,
     -628
    ],
    "why": "Acid run-off from the fumarole fields pools where it can't drain: the deepest closed hollow among the Solfatara's fumarole fields (ground 0.8 m+ higher all round at 30 m: a shallow pan, as the real ones are; fire-frost.md's -230, -980 is on the ridge face), the cart rolled down its side",
@@ -517,8 +517,8 @@
    "why": "On the Solfatara's fumarole ground (fire-frost.md's spot)",
    "name": "The Steam Ground",
    "at": [
-    -3932,
-    -236
+    -3919,
+    -237
    ],
    "clear": 22,
    "zone": "V4",
@@ -534,7 +534,7 @@
    "why": "On Old Tusker's loop (creatures.json roam): he wallows on his own round",
    "name": "Old Tusker's Wallow",
    "at": [
-    4487,
+    4480,
     460
    ],
    "clear": 20,
@@ -551,7 +551,7 @@
    "name": "The Tusk Midden",
    "clear": 18,
    "at": [
-    5113,
+    5115,
     -428
    ],
    "why": "Tusks stacked by the dozen half-frozen in a bank: flat footing against a slope that rises behind it, the stacked face looking out from the bank",
@@ -569,8 +569,8 @@
    "name": "The Sledge Wreck Line",
    "clear": 25,
    "at": [
-    5309,
-    698
+    5329,
+    699
    ],
    "why": "Three sledges abandoned in a line toward the coast: flat snow 60-160 m inland near the design spot, the line pointing at the nearest shore",
    "yaw": -45,
@@ -587,8 +587,8 @@
    "name": "The Ice-Fishing Camp",
    "clear": 18,
    "at": [
-    3986,
-    -619
+    4001,
+    -618
    ],
    "why": "Ice-fishers walk a short way out: lake ice 15-45 m from the shore nearest the design spot, the windbreak's back to the open ice and the camp facing the shore",
    "yaw": 90,
@@ -605,7 +605,7 @@
    "name": "The Drowned Sledge",
    "clear": 15,
    "at": [
-    4562,
+    4558,
     -469
    ],
    "why": "A sledge and dogs frozen under clear ice where they went through: lake ice 20-120 m out near the design spot; it points at the nearest thin ice (set below, once the thin ice is placed)",
@@ -623,7 +623,7 @@
    "why": "Pinned by the Pale Hunter's arena: the tent at the edge of his dead pines",
    "name": "The Pale Hunter's Camp",
    "at": [
-    4136,
+    4141,
     902
    ],
    "clear": 14,
@@ -641,8 +641,8 @@
    "why": "Over a game trail in the Pine Hollows (fire-frost.md's spot)",
    "name": "The Hunter's Blind",
    "at": [
-    4090,
-    1182
+    4119,
+    1184
    ],
    "clear": 12,
    "yaw": 180,
@@ -659,7 +659,7 @@
    "name": "The Fallen Giant Pine",
    "clear": 25,
    "at": [
-    3677,
+    3682,
     818
    ],
    "why": "The only bridge over a ravine: a 34 m pine lying bank to bank where both banks stand 3.5 m+ over the gully between them, its root plate on the higher bank",
@@ -677,7 +677,7 @@
    "name": "The Glacimaw Boneyard",
    "clear": 18,
    "at": [
-    3761,
+    3762,
     464
    ],
    "why": "Where the Glacimaw surfaces through the snow: the flattest level 20 m disc of the ice shelf near the design spot, the bone ring round churned snow",
@@ -694,7 +694,7 @@
    "why": "Down the cliff where Skaldrith lands (fire-frost.md's spot), facing the bowl",
    "name": "The Wyrm Claw Scars",
    "at": [
-    3793,
+    3800,
     -26
    ],
    "clear": 12,
@@ -712,7 +712,7 @@
    "name": "The Watch Cairn",
    "clear": 12,
    "at": [
-    3561,
+    3554,
     -685
    ],
    "why": "The Rime-folk's mirror of the Ridge Watch: the tundra-side crest with an unbroken sight line from the cairn's wall to the north pass, seeing the glacier bowl too (it reveals the Glacier Plateau); spear rack facing the pass",
@@ -730,8 +730,8 @@
    "name": "The Moulin of Voices",
    "clear": 12,
    "at": [
-    3878,
-    28
+    3877,
+    27
    ],
    "why": "Meltwater finds the lowest point of the ice shelf and drills down: a gentle low 1.5 m+ below the ground round it near the design spot, the channels running in",
    "zone": "T5",
@@ -747,7 +747,7 @@
    "why": "Below the Crevasse Shrine on the shelf (fire-frost.md's spot)",
    "name": "The Crevasse Maze",
    "at": [
-    3576,
+    3575,
     144
    ],
    "clear": 60,
@@ -765,8 +765,8 @@
    "why": "At the south pass where the Fire's heat leaks through (fire-frost.md's spot)",
    "name": "The Steam Ground",
    "at": [
-    3351,
-    1138
+    3376,
+    1139
    ],
    "clear": 22,
    "zone": "T2",
@@ -781,7 +781,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -4635,
+    -4633,
     -461
    ],
    "yaw": 160,
@@ -796,7 +796,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    4887,
+    4886,
     266
    ],
    "yaw": 274,
@@ -811,8 +811,8 @@
   {
    "kind": "erratic",
    "at": [
-    4084,
-    -127
+    4079,
+    -128
    ],
    "yaw": 18,
    "v": 2,
@@ -826,8 +826,8 @@
   {
    "kind": "smith_grave",
    "at": [
-    -5189,
-    991
+    -5205,
+    992
    ],
    "yaw": 89,
    "v": 0,
@@ -841,8 +841,8 @@
   {
    "kind": "small_pingo",
    "at": [
-    5080,
-    -993
+    5052,
+    -995
    ],
    "yaw": 209,
    "v": 0,
@@ -856,8 +856,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    4500,
-    1422
+    4411,
+    1417
    ],
    "yaw": 148,
    "v": 1,
@@ -871,7 +871,7 @@
   {
    "kind": "erratic",
    "at": [
-    4133,
+    4138,
     508
    ],
    "yaw": 207,
@@ -886,8 +886,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    4976,
-    1531
+    5114,
+    1539
    ],
    "yaw": 350,
    "v": 3,
@@ -901,8 +901,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4222,
-    215
+    -4217,
+    214
    ],
    "yaw": 12,
    "v": 1,
@@ -916,8 +916,8 @@
   {
    "kind": "hornito",
    "at": [
-    -3877,
-    921
+    -3894,
+    922
    ],
    "yaw": 9,
    "v": 2,
@@ -931,7 +931,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4130,
+    -4124,
     65
    ],
    "yaw": 331,
@@ -946,7 +946,7 @@
   {
    "kind": "cache_pole",
    "at": [
-    3862,
+    3858,
     1213
    ],
    "yaw": 139,
@@ -961,8 +961,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -3711,
-    -721
+    -3705,
+    -720
    ],
    "yaw": 291,
    "v": 1,
@@ -976,8 +976,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    5036,
-    -769
+    4983,
+    -771
    ],
    "yaw": 94,
    "v": 0,
@@ -991,7 +991,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    4202,
+    4199,
     -367
    ],
    "yaw": 142,
@@ -1006,8 +1006,8 @@
   {
    "kind": "erratic",
    "at": [
-    4741,
-    -600
+    4732,
+    -601
    ],
    "yaw": 177,
    "v": 1,
@@ -1021,8 +1021,8 @@
   {
    "kind": "hornito",
    "at": [
-    -5193,
-    1512
+    -5053,
+    1503
    ],
    "yaw": 151,
    "v": 1,
@@ -1036,7 +1036,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4353,
+    -4361,
     -679
    ],
    "yaw": 276,
@@ -1051,8 +1051,8 @@
   {
    "kind": "snowpuff_nest",
    "at": [
-    5163,
-    -642
+    5168,
+    -641
    ],
    "yaw": 145,
    "v": 3,
@@ -1066,8 +1066,8 @@
   {
    "kind": "snowpuff_nest",
    "at": [
-    5200,
-    1116
+    5209,
+    1117
    ],
    "yaw": 177,
    "v": 0,
@@ -1081,8 +1081,8 @@
   {
    "kind": "smith_grave",
    "at": [
-    -5668,
-    301
+    -5664,
+    300
    ],
    "yaw": 215,
    "v": 0,
@@ -1096,7 +1096,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -5166,
+    -5154,
     1251
    ],
    "yaw": 64,
@@ -1111,7 +1111,7 @@
   {
    "kind": "hornito",
    "at": [
-    -3175,
+    -3169,
     1091
    ],
    "yaw": 1,
@@ -1126,7 +1126,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -5974,
+    -5977,
     7
    ],
    "yaw": 214,
@@ -1141,8 +1141,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -3732,
-    1295
+    -3749,
+    1297
    ],
    "yaw": 197,
    "v": 3,
@@ -1156,7 +1156,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    3787,
+    3794,
     -197
    ],
    "yaw": 112,
@@ -1171,7 +1171,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    3484,
+    3483,
     29
    ],
    "yaw": 239,
@@ -1186,8 +1186,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -5212,
-    -870
+    -5194,
+    -871
    ],
    "yaw": 74,
    "v": 0,
@@ -1201,7 +1201,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    3385,
+    3390,
     -783
    ],
    "yaw": 66,
@@ -1216,8 +1216,8 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -4934,
-    -753
+    -4961,
+    -752
    ],
    "yaw": 128,
    "v": 1,
@@ -1231,8 +1231,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    5326,
-    443
+    5322,
+    442
    ],
    "yaw": 0,
    "v": 3,
@@ -1246,7 +1246,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -3538,
+    -3543,
     1032
    ],
    "yaw": 206,
@@ -1261,8 +1261,8 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -3410,
-    664
+    -3384,
+    663
    ],
    "yaw": 322,
    "v": 3,
@@ -1276,8 +1276,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4846,
-    1027
+    -4841,
+    1026
    ],
    "yaw": 348,
    "v": 2,
@@ -1291,8 +1291,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -4842,
-    -941
+    -4861,
+    -945
    ],
    "yaw": 273,
    "v": 2,
@@ -1306,7 +1306,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5865,
+    -5861,
     529
    ],
    "yaw": 55,
@@ -1321,8 +1321,8 @@
   {
    "kind": "hornito",
    "at": [
-    -3477,
-    -676
+    -3452,
+    -671
    ],
    "yaw": 111,
    "v": 0,
@@ -1336,7 +1336,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5763,
+    -5761,
     186
    ],
    "yaw": 81,
@@ -1351,7 +1351,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4194,
+    4185,
     1003
    ],
    "yaw": 235,
@@ -1366,7 +1366,7 @@
   {
    "kind": "miner_leanto",
    "at": [
-    -5477,
+    -5464,
     793
    ],
    "yaw": 128,
@@ -1381,8 +1381,8 @@
   {
    "kind": "smith_grave",
    "at": [
-    -4619,
-    -774
+    -4646,
+    -773
    ],
    "yaw": 216,
    "v": 3,
@@ -1396,7 +1396,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -5016,
+    -5026,
     -63
    ],
    "yaw": 269,
@@ -1411,7 +1411,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -5396,
+    -5399,
     -553
    ],
    "yaw": 186,
@@ -1426,7 +1426,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -3414,
+    -3417,
     1173
    ],
    "yaw": 262,
@@ -1441,7 +1441,7 @@
   {
    "kind": "cache_pole",
    "at": [
-    4959,
+    4958,
     -221
    ],
    "yaw": 83,
@@ -1456,7 +1456,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -4924,
+    -4921,
     1530
    ],
    "yaw": 186,
@@ -1471,8 +1471,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -4104,
-    1263
+    -4120,
+    1264
    ],
    "yaw": 138,
    "v": 1,
@@ -1486,7 +1486,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    4900,
+    4899,
     92
    ],
    "yaw": 17,
@@ -1501,7 +1501,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -3910,
+    -3911,
     1126
    ],
    "yaw": 34,
@@ -1516,8 +1516,8 @@
   {
    "kind": "miner_leanto",
    "at": [
-    -3978,
-    -773
+    -3996,
+    -777
    ],
    "yaw": 343,
    "v": 0,
@@ -1531,7 +1531,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -5485,
+    -5490,
     -374
    ],
    "yaw": 313,
@@ -1546,7 +1546,7 @@
   {
    "kind": "erratic",
    "at": [
-    4473,
+    4461,
     1153
    ],
    "yaw": 14,
@@ -1561,8 +1561,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -3836,
-    695
+    -3822,
+    694
    ],
    "yaw": 268,
    "v": 1,
@@ -1576,7 +1576,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -5756,
+    -5760,
     426
    ],
    "yaw": 76,
@@ -1591,7 +1591,7 @@
   {
    "kind": "hornito",
    "at": [
-    -4502,
+    -4499,
     -75
    ],
    "yaw": 49,
@@ -1606,8 +1606,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4086,
-    -890
+    4122,
+    -889
    ],
    "yaw": 176,
    "v": 2,
@@ -1621,7 +1621,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4017,
+    -4013,
     380
    ],
    "yaw": 113,
@@ -1636,7 +1636,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -4183,
+    -4192,
     581
    ],
    "yaw": 187,
@@ -1651,8 +1651,8 @@
   {
    "kind": "hornito",
    "at": [
-    -3905,
-    497
+    -3910,
+    498
    ],
    "yaw": 94,
    "v": 3,
@@ -1666,7 +1666,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4365,
+    -4367,
     442
    ],
    "yaw": 256,
@@ -1681,7 +1681,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    4299,
+    4302,
     669
    ],
    "yaw": 197,
@@ -1696,7 +1696,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    5128,
+    5127,
     473
    ],
    "yaw": 258,
@@ -1711,8 +1711,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    3813,
-    -646
+    3805,
+    -647
    ],
    "yaw": 63,
    "v": 0,
@@ -1726,7 +1726,7 @@
   {
    "kind": "hornito",
    "at": [
-    -4992,
+    -4994,
     1429
    ],
    "yaw": 145,
@@ -1741,8 +1741,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5267,
-    -726
+    -5285,
+    -725
    ],
    "yaw": 49,
    "v": 0,
@@ -1756,8 +1756,8 @@
   {
    "kind": "erratic",
    "at": [
-    5270,
-    75
+    5265,
+    74
    ],
    "yaw": 84,
    "v": 1,
@@ -1771,8 +1771,8 @@
   {
    "kind": "miner_leanto",
    "at": [
-    -6098,
-    422
+    -6104,
+    423
    ],
    "yaw": 207,
    "v": 0,
@@ -1786,7 +1786,7 @@
   {
    "kind": "hornito",
    "at": [
-    -4944,
+    -4947,
     -912
    ],
    "yaw": 225,
@@ -1801,8 +1801,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4193,
-    744
+    -4233,
+    747
    ],
    "yaw": 85,
    "v": 2,
@@ -1816,8 +1816,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    4001,
-    629
+    4021,
+    631
    ],
    "yaw": 285,
    "v": 1,
@@ -1831,8 +1831,8 @@
   {
    "kind": "erratic",
    "at": [
-    3779,
-    -907
+    3811,
+    -905
    ],
    "yaw": 205,
    "v": 0,
@@ -1846,7 +1846,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    3498,
+    3501,
     627
    ],
    "yaw": 30,
@@ -1861,7 +1861,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -5948,
+    -5943,
     317
    ],
    "yaw": 278,
@@ -1876,7 +1876,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4710,
+    -4701,
     -312
    ],
    "yaw": 129,
@@ -1891,7 +1891,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    3978,
+    3974,
     -497
    ],
    "yaw": 142,
@@ -1906,8 +1906,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4357,
-    1297
+    4350,
+    1296
    ],
    "yaw": 22,
    "v": 3,
@@ -1921,7 +1921,7 @@
   {
    "kind": "snowpuff_nest",
    "at": [
-    4753,
+    4760,
     -51
    ],
    "yaw": 184,
@@ -1936,7 +1936,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4286,
+    -4289,
     -518
    ],
    "yaw": 244,
@@ -1951,7 +1951,7 @@
   {
    "kind": "cache_pole",
    "at": [
-    3642,
+    3643,
     -369
    ],
    "yaw": 292,
@@ -1966,7 +1966,7 @@
   {
    "kind": "erratic",
    "at": [
-    4545,
+    4551,
     1275
    ],
    "yaw": 118,
@@ -1981,8 +1981,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4897,
-    1376
+    -4928,
+    1378
    ],
    "yaw": 121,
    "v": 2,
@@ -1996,8 +1996,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    5162,
-    1309
+    5168,
+    1310
    ],
    "yaw": 336,
    "v": 2,
@@ -2011,8 +2011,8 @@
   {
    "kind": "smith_grave",
    "at": [
-    -4737,
-    -921
+    -4706,
+    -915
    ],
    "yaw": 247,
    "v": 3,
@@ -2026,7 +2026,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    4341,
+    4347,
     -702
    ],
    "yaw": 68,
@@ -2041,8 +2041,8 @@
   {
    "kind": "small_pingo",
    "at": [
-    5170,
-    1427
+    5231,
+    1431
    ],
    "yaw": 352,
    "v": 3,
@@ -2056,8 +2056,8 @@
   {
    "kind": "erratic",
    "at": [
-    3448,
-    329
+    3468,
+    330
    ],
    "yaw": 88,
    "v": 3,
@@ -2071,8 +2071,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5160,
-    1132
+    -5164,
+    1133
    ],
    "yaw": 93,
    "v": 2,
@@ -2086,7 +2086,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -5134,
+    -5132,
     592
    ],
    "yaw": 337,
@@ -2101,7 +2101,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5987,
+    -5984,
     127
    ],
    "yaw": 192,
@@ -2131,8 +2131,8 @@
   {
    "kind": "smith_grave",
    "at": [
-    -5544,
-    627
+    -5547,
+    628
    ],
    "yaw": 295,
    "v": 0,
@@ -2146,8 +2146,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -4102,
-    -453
+    -4115,
+    -452
    ],
    "yaw": 32,
    "v": 3,
@@ -2161,7 +2161,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -4188,
+    -4187,
     901
    ],
    "yaw": 332,
@@ -2176,7 +2176,7 @@
   {
    "kind": "erratic",
    "at": [
-    3878,
+    3863,
     1111
    ],
    "yaw": 260,
@@ -2191,7 +2191,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4407,
+    4408,
     -158
    ],
    "yaw": 353,
@@ -2206,8 +2206,8 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -4829,
-    -185
+    -4816,
+    -186
    ],
    "yaw": 265,
    "v": 3,
@@ -2221,8 +2221,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    4086,
-    749
+    4079,
+    748
    ],
    "yaw": 247,
    "v": 1,
@@ -2236,8 +2236,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4685,
-    21
+    -4700,
+    22
    ],
    "yaw": 224,
    "v": 0,
@@ -2251,7 +2251,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    3732,
+    3738,
     -767
    ],
    "yaw": 66,
@@ -2266,8 +2266,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4521,
-    80
+    -4513,
+    79
    ],
    "yaw": 330,
    "v": 3,
@@ -2281,8 +2281,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    4732,
-    -899
+    4765,
+    -897
    ],
    "yaw": 223,
    "v": 2,
@@ -2296,8 +2296,8 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -3295,
-    1262
+    -3311,
+    1264
    ],
    "yaw": 133,
    "v": 0,
@@ -2311,7 +2311,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    4860,
+    4850,
     1151
    ],
    "yaw": 160,
@@ -2326,7 +2326,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    5089,
+    5086,
     599
    ],
    "yaw": 319,
@@ -2341,8 +2341,8 @@
   {
    "kind": "erratic",
    "at": [
-    4738,
-    979
+    4808,
+    982
    ],
    "yaw": 232,
    "v": 0,
@@ -2356,7 +2356,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    3359,
+    3353,
     146
    ],
    "yaw": 201,
@@ -2371,8 +2371,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    4921,
-    1334
+    4908,
+    1333
    ],
    "yaw": 358,
    "v": 2,
@@ -2386,7 +2386,7 @@
   {
    "kind": "miner_leanto",
    "at": [
-    -4346,
+    -4349,
     -313
    ],
    "yaw": 99,
@@ -2402,7 +2402,7 @@
    "kind": "erratic",
    "at": [
     5142,
-    218
+    219
    ],
    "yaw": 348,
    "v": 2,
@@ -2416,7 +2416,7 @@
   {
    "kind": "snowpuff_nest",
    "at": [
-    5342,
+    5344,
     563
    ],
    "yaw": 347,
@@ -2431,7 +2431,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -3728,
+    -3720,
     -493
    ],
    "yaw": 100,
@@ -2446,7 +2446,7 @@
   {
    "kind": "cache_pole",
    "at": [
-    4863,
+    4861,
     757
    ],
    "yaw": 231,
@@ -2461,8 +2461,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    3758,
-    659
+    3746,
+    658
    ],
    "yaw": 358,
    "v": 1,
@@ -2491,7 +2491,7 @@
   {
    "kind": "erratic",
    "at": [
-    3221,
+    3223,
     -107
    ],
    "yaw": 155,
@@ -2506,7 +2506,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    3531,
+    3534,
     516
    ],
    "yaw": 244,
@@ -2521,8 +2521,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    4147,
-    -783
+    4171,
+    -782
    ],
    "yaw": 345,
    "v": 1,
@@ -2536,7 +2536,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    3998,
+    4000,
     -269
    ],
    "yaw": 91,
@@ -2551,7 +2551,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    3534,
+    3539,
     1121
    ],
    "yaw": 288,
@@ -2566,8 +2566,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4630,
-    1393
+    4682,
+    1396
    ],
    "yaw": 248,
    "v": 2,
@@ -2581,8 +2581,8 @@
   {
    "kind": "erratic",
    "at": [
-    3535,
-    884
+    3552,
+    885
    ],
    "yaw": 123,
    "v": 2,
@@ -2596,7 +2596,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    3449,
+    3441,
     743
    ],
    "yaw": 353,
@@ -2611,7 +2611,7 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -4200,
+    -4187,
     -222
    ],
    "yaw": 36,
@@ -2626,8 +2626,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -3187,
-    1001
+    -3230,
+    1004
    ],
    "yaw": 239,
    "v": 3,
@@ -2641,7 +2641,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -4532,
+    -4537,
     580
    ],
    "yaw": 282,
@@ -2656,7 +2656,7 @@
   {
    "kind": "smith_grave",
    "at": [
-    -5200,
+    -5209,
     1372
    ],
    "yaw": 316,
@@ -2671,8 +2671,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -5196,
-    -172
+    -5187,
+    -173
    ],
    "yaw": 42,
    "v": 1,
@@ -2686,8 +2686,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -4734,
-    1154
+    -4721,
+    1153
    ],
    "yaw": 116,
    "v": 0,
@@ -2701,8 +2701,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4310,
-    354
+    4324,
+    355
    ],
    "yaw": 227,
    "v": 2,
@@ -2731,8 +2731,8 @@
   {
    "kind": "erratic",
    "at": [
-    4975,
-    -952
+    5002,
+    -951
    ],
    "yaw": 154,
    "v": 0,
@@ -2746,8 +2746,8 @@
   {
    "kind": "sulfur_vent",
    "at": [
-    -3893,
-    -757
+    -3972,
+    -772
    ],
    "yaw": 143,
    "v": 2,
@@ -2761,8 +2761,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    5305,
-    -27
+    5314,
+    -26
    ],
    "yaw": 130,
    "v": 0,
@@ -2776,7 +2776,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    3397,
+    3405,
     -656
    ],
    "yaw": 335,
@@ -2791,8 +2791,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4945,
-    383
+    -4949,
+    384
    ],
    "yaw": 104,
    "v": 3,
@@ -2821,8 +2821,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    5194,
-    1216
+    5200,
+    1217
    ],
    "yaw": 79,
    "v": 2,
@@ -2836,8 +2836,8 @@
   {
    "kind": "hornito",
    "at": [
-    -4622,
-    714
+    -4616,
+    713
    ],
    "yaw": 91,
    "v": 1,
@@ -2851,8 +2851,8 @@
   {
    "kind": "cache_pole",
    "at": [
-    4854,
-    -1025
+    5008,
+    -1018
    ],
    "yaw": 80,
    "v": 2,
@@ -2866,7 +2866,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    5020,
+    5018,
     1440
    ],
    "yaw": 299,
@@ -2881,7 +2881,7 @@
   {
    "kind": "small_pingo",
    "at": [
-    5334,
+    5343,
     316
    ],
    "yaw": 354,
@@ -2896,7 +2896,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5804,
+    -5796,
     -248
    ],
    "yaw": 308,
@@ -2911,7 +2911,7 @@
   {
    "kind": "cache_pole",
    "at": [
-    3861,
+    3865,
     850
    ],
    "yaw": 74,
@@ -2926,8 +2926,8 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    4263,
-    -482
+    4259,
+    -483
    ],
    "yaw": 149,
    "v": 3,
@@ -2941,7 +2941,7 @@
   {
    "kind": "erratic",
    "at": [
-    3645,
+    3647,
     -561
    ],
    "yaw": 272,
@@ -2956,7 +2956,7 @@
   {
    "kind": "tent_ring",
    "at": [
-    5116,
+    5115,
     -106
    ],
    "yaw": 115,
@@ -2971,8 +2971,8 @@
   {
    "kind": "erratic",
    "at": [
-    5215,
-    -883
+    5267,
+    -880
    ],
    "yaw": 30,
    "v": 0,
@@ -3001,8 +3001,8 @@
   {
    "kind": "giant_tool",
    "at": [
-    -3650,
-    842
+    -3640,
+    841
    ],
    "yaw": 150,
    "v": 3,
@@ -3016,8 +3016,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    3415,
-    -915
+    3453,
+    -916
    ],
    "yaw": 212,
    "v": 2,
@@ -3046,7 +3046,7 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -4785,
+    -4783,
     149
    ],
    "yaw": 220,
@@ -3061,7 +3061,7 @@
   {
    "kind": "cache_pole",
    "at": [
-    4930,
+    4936,
     -666
    ],
    "yaw": 33,
@@ -3076,8 +3076,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -3314,
-    879
+    -3330,
+    880
    ],
    "yaw": 188,
    "v": 0,
@@ -3091,8 +3091,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -3929,
-    1033
+    -3961,
+    1035
    ],
    "yaw": 273,
    "v": 3,
@@ -3106,8 +3106,8 @@
   {
    "kind": "small_pingo",
    "at": [
-    4661,
-    -793
+    4614,
+    -795
    ],
    "yaw": 54,
    "v": 2,
@@ -3121,8 +3121,8 @@
   {
    "kind": "smith_grave",
    "at": [
-    -4661,
-    477
+    -4657,
+    476
    ],
    "yaw": 350,
    "v": 1,
@@ -3136,7 +3136,7 @@
   {
    "kind": "miner_leanto",
    "at": [
-    -5449,
+    -5444,
     119
    ],
    "yaw": 213,
@@ -3151,8 +3151,8 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -5174,
-    882
+    -5121,
+    878
    ],
    "yaw": 191,
    "v": 0,
@@ -3166,7 +3166,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -5618,
+    -5613,
     -469
    ],
    "yaw": 111,
@@ -3181,8 +3181,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    3532,
-    -258
+    3519,
+    -259
    ],
    "yaw": 262,
    "v": 1,
@@ -3196,7 +3196,7 @@
   {
    "kind": "glowmoth_roost",
    "at": [
-    -4520,
+    -4526,
     -588
    ],
    "yaw": 260,
@@ -3211,7 +3211,7 @@
   {
    "kind": "snowpuff_nest",
    "at": [
-    5378,
+    5377,
     189
    ],
    "yaw": 153,
@@ -3226,8 +3226,8 @@
   {
    "kind": "small_pingo",
    "at": [
-    3438,
-    -477
+    3447,
+    -476
    ],
    "yaw": 344,
    "v": 3,
@@ -3241,7 +3241,7 @@
   {
    "kind": "frozen_carcass",
    "at": [
-    3613,
+    3602,
     969
    ],
    "yaw": 319,
@@ -3256,8 +3256,8 @@
   {
    "kind": "basalt_ring",
    "at": [
-    -5447,
-    -960
+    -5453,
+    -959
    ],
    "yaw": 202,
    "v": 2,
@@ -3271,7 +3271,7 @@
   {
    "kind": "miner_leanto",
    "at": [
-    -5184,
+    -5189,
     -470
    ],
    "yaw": 13,
@@ -3301,8 +3301,8 @@
   {
    "kind": "erratic",
    "at": [
-    4748,
-    -214
+    4727,
+    -215
    ],
    "yaw": 304,
    "v": 0,
@@ -3316,7 +3316,7 @@
   {
    "kind": "giant_tool",
    "at": [
-    -5667,
+    -5671,
     62
    ],
    "yaw": 300,
@@ -3331,8 +3331,8 @@
   {
    "kind": "tent_ring",
    "at": [
-    3846,
-    -418
+    3838,
+    -419
    ],
    "yaw": 310,
    "v": 0,
@@ -3348,7 +3348,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    5283,
+    5281,
     725
    ],
    "yaw": -144.5,
@@ -3362,8 +3362,8 @@
   {
    "kind": "sastrugi",
    "at": [
-    4601,
-    -502
+    4594,
+    -503
    ],
    "yaw": 112,
    "zone": "T3",
@@ -3376,7 +3376,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    4894,
+    4898,
     -426
    ],
    "yaw": 123.2,
@@ -3390,8 +3390,8 @@
   {
    "kind": "sastrugi",
    "at": [
-    5207,
-    -779
+    5185,
+    -780
    ],
    "yaw": 114.1,
    "zone": "T1",
@@ -3404,8 +3404,8 @@
   {
    "kind": "sastrugi",
    "at": [
-    4937,
-    964
+    4963,
+    966
    ],
    "yaw": -127.4,
    "zone": "T1",
@@ -3418,7 +3418,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    5108,
+    5099,
     832
    ],
    "yaw": -135.7,
@@ -3432,7 +3432,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    5189,
+    5196,
     -517
    ],
    "yaw": 127.7,
@@ -3446,7 +3446,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    4926,
+    4917,
     -590
    ],
    "yaw": 118.5,
@@ -3460,7 +3460,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    5146,
+    5160,
     -257
    ],
    "yaw": 136.9,
@@ -3474,7 +3474,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    4610,
+    4608,
     -352
    ],
    "yaw": 116.1,
@@ -3488,7 +3488,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    5029,
+    5021,
     1138
    ],
    "yaw": -115.6,
@@ -3502,7 +3502,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    4596,
+    4603,
     -683
    ],
    "yaw": 106.9,
@@ -3516,7 +3516,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    5160,
+    5161,
     -379
    ],
    "yaw": 131.4,
@@ -3530,8 +3530,8 @@
   {
    "kind": "sastrugi",
    "at": [
-    4847,
-    -847
+    4882,
+    -845
    ],
    "yaw": 106.1,
    "zone": "T3",
@@ -3544,8 +3544,8 @@
   {
    "kind": "sastrugi",
    "at": [
-    4815,
-    599
+    4806,
+    598
    ],
    "yaw": -136.8,
    "zone": "T1",
@@ -3558,7 +3558,7 @@
   {
    "kind": "sastrugi",
    "at": [
-    4746,
+    4752,
     870
    ],
    "yaw": -125.4,
@@ -3574,7 +3574,7 @@
   "fumaroles": [
    {
     "at": [
-     -3712,
+     -3711,
      -507
     ],
     "land": "volcanic",
@@ -3585,8 +3585,8 @@
    },
    {
     "at": [
-     -3748,
-     -500
+     -3746,
+     -501
     ],
     "land": "volcanic",
     "old": [
@@ -3596,8 +3596,8 @@
    },
    {
     "at": [
-     -3704,
-     -528
+     -3710,
+     -527
     ],
     "land": "volcanic",
     "old": [
@@ -3607,8 +3607,8 @@
    },
    {
     "at": [
-     -3703,
-     -493
+     -3695,
+     -494
     ],
     "land": "volcanic",
     "old": [
@@ -3618,8 +3618,8 @@
    },
    {
     "at": [
-     -3769,
-     -470
+     -3791,
+     -469
     ],
     "land": "volcanic",
     "old": [
@@ -3629,8 +3629,8 @@
    },
    {
     "at": [
-     -3793,
-     -461
+     -3829,
+     -458
     ],
     "land": "volcanic",
     "old": [
@@ -3640,8 +3640,8 @@
    },
    {
     "at": [
-     -3798,
-     -485
+     -3790,
+     -486
     ],
     "land": "volcanic",
     "old": [
@@ -3651,8 +3651,8 @@
    },
    {
     "at": [
-     -4270,
-     -120
+     -4279,
+     -119
     ],
     "land": "volcanic",
     "old": [
@@ -3662,7 +3662,7 @@
    },
    {
     "at": [
-     -4311,
+     -4319,
      -109
     ],
     "land": "volcanic",
@@ -3673,7 +3673,7 @@
    },
    {
     "at": [
-     -4302,
+     -4293,
      -135
     ],
     "land": "volcanic",
@@ -3686,8 +3686,8 @@
   "geysers": [
    {
     "at": [
-     -3876,
-     -662
+     -3883,
+     -661
     ],
     "land": "volcanic",
     "old": [
@@ -3697,8 +3697,8 @@
    },
    {
     "at": [
-     -3992,
-     -738
+     -3966,
+     -739
     ],
     "land": "volcanic",
     "old": [
@@ -3708,7 +3708,7 @@
    },
    {
     "at": [
-     -3712,
+     -3716,
      -452
     ],
     "land": "volcanic",
@@ -3719,8 +3719,8 @@
    },
    {
     "at": [
-     -4282,
-     -714
+     -4251,
+     -716
     ],
     "land": "volcanic",
     "old": [
@@ -3732,8 +3732,8 @@
   "thinIce": [
    {
     "at": [
-     4792,
-     -320
+     4799,
+     -319
     ],
     "r": 9.5,
     "land": "tundra",
@@ -3744,7 +3744,7 @@
    },
    {
     "at": [
-     4301,
+     4298,
      -526
     ],
     "r": 7.7,
@@ -3756,7 +3756,7 @@
    },
    {
     "at": [
-     3609,
+     3608,
      -582
     ],
     "r": 8.9,
@@ -3768,7 +3768,7 @@
    },
    {
     "at": [
-     4269,
+     4262,
      -412
     ],
     "r": 9.9,
@@ -3780,7 +3780,7 @@
    },
    {
     "at": [
-     4865,
+     4857,
      -365
     ],
     "r": 8,
@@ -3792,7 +3792,7 @@
    },
    {
     "at": [
-     4214,
+     4221,
      -570
     ],
     "r": 7.9,
@@ -3804,8 +3804,8 @@
    },
    {
     "at": [
-     3712,
-     -526
+     3706,
+     -527
     ],
     "r": 8.7,
     "land": "tundra",
@@ -3816,7 +3816,7 @@
    },
    {
     "at": [
-     4841,
+     4837,
      -447
     ],
     "r": 9,
@@ -3829,7 +3829,7 @@
   ],
   "katabatic": {
    "centre": [
-    4064,
+    4063,
     213
    ],
    "inner": 270,
@@ -3841,8 +3841,8 @@
    "kind": "boss",
    "name": "Vulkarn",
    "at": [
-    -4650,
-    276
+    -4660,
+    277
    ],
    "land": "volcanic",
    "old": [
@@ -3854,7 +3854,7 @@
    "kind": "boss",
    "name": "Skaldrith",
    "at": [
-    4064,
+    4063,
     213
    ],
    "land": "tundra",
@@ -3867,8 +3867,8 @@
    "kind": "mini-boss",
    "name": "Obsidian Warden",
    "at": [
-    -4880,
-    -247
+    -4892,
+    -246
    ],
    "land": "volcanic",
    "old": [
@@ -3893,8 +3893,8 @@
    "kind": "mini-boss",
    "name": "Grimjaw",
    "at": [
-    4405,
-    -343
+    4412,
+    -342
    ],
    "land": "tundra",
    "old": [
@@ -3919,7 +3919,7 @@
    "kind": "cave",
    "name": "Volcanic cave 1",
    "at": [
-    -3615,
+    -3611,
     750
    ],
    "land": "volcanic",
@@ -3932,7 +3932,7 @@
    "kind": "cave",
    "name": "Volcanic cave 2",
    "at": [
-    -4255,
+    -4254,
     -814
    ],
    "land": "volcanic",
@@ -3945,7 +3945,7 @@
    "kind": "cave",
    "name": "Volcanic cave 3",
    "at": [
-    -4412,
+    -4416,
     -412
    ],
    "land": "volcanic",
@@ -3958,7 +3958,7 @@
    "kind": "cave",
    "name": "Tundra cave 1",
    "at": [
-    4254,
+    4256,
     -42
    ],
    "land": "tundra",
@@ -3971,8 +3971,8 @@
    "kind": "cave",
    "name": "Tundra cave 2",
    "at": [
-    4686,
-    1442
+    4609,
+    1438
    ],
    "land": "tundra",
    "old": [
@@ -3984,8 +3984,8 @@
    "kind": "cave",
    "name": "Tundra cave 3",
    "at": [
-    3890,
-    501
+    3894,
+    502
    ],
    "land": "tundra",
    "old": [
@@ -4000,7 +4000,7 @@
    "variant": 0,
    "yaw": 180,
    "at": [
-    -3615,
+    -3611,
     750
    ],
    "land": "volcanic",
@@ -4014,7 +4014,7 @@
    "variant": 0,
    "yaw": 180,
    "at": [
-    -4255,
+    -4254,
     -814
    ],
    "land": "volcanic",
@@ -4028,7 +4028,7 @@
    "variant": 2,
    "yaw": 180,
    "at": [
-    -4412,
+    -4416,
     -412
    ],
    "land": "volcanic",
@@ -4042,7 +4042,7 @@
    "variant": 0,
    "yaw": 0,
    "at": [
-    4254,
+    4256,
     -42
    ],
    "land": "tundra",
@@ -4056,8 +4056,8 @@
    "variant": 1,
    "yaw": 0,
    "at": [
-    4686,
-    1442
+    4609,
+    1438
    ],
    "land": "tundra",
    "old": [
@@ -4070,8 +4070,8 @@
    "variant": 2,
    "yaw": 0,
    "at": [
-    3890,
-    501
+    3894,
+    502
    ],
    "land": "tundra",
    "old": [
@@ -4113,27 +4113,27 @@
    ],
    "route": [
     [
-     -4083,
+     -4080,
      430
     ],
     [
-     -4345,
-     386
+     -4338,
+     385
     ],
     [
-     -4505,
+     -4502,
      313
     ],
     [
-     -4536,
-     209
+     -4540,
+     210
     ],
     [
-     -4452,
+     -4450,
      107
     ],
     [
-     -4223,
+     -4228,
      11
     ]
    ]
@@ -4170,11 +4170,11 @@
    ],
    "route": [
     [
-     3553,
+     3556,
      -99
     ],
     [
-     3696,
+     3692,
      6
     ],
     [
@@ -4182,15 +4182,15 @@
      123
     ],
     [
-     3792,
+     3794,
      244
     ],
     [
-     3811,
-     335
+     3830,
+     336
     ],
     [
-     3870,
+     3863,
      428
     ]
    ]
@@ -4205,8 +4205,8 @@
     650
    ],
    "at": [
-    -4737,
-    768
+    -4770,
+    770
    ]
   },
   {
@@ -4217,8 +4217,8 @@
     -900
    ],
    "at": [
-    -4998,
-    -377
+    -5003,
+    -376
    ]
   },
   {
@@ -4229,7 +4229,7 @@
     -1050
    ],
    "at": [
-    -3500,
+    -3501,
     -574
    ]
   },
@@ -4241,8 +4241,8 @@
     -250
    ],
    "at": [
-    -4994,
-    109
+    -4987,
+    108
    ]
   },
   {
@@ -4253,7 +4253,7 @@
     -1150
    ],
    "at": [
-    4172,
+    4164,
     -639
    ]
   },
@@ -4265,7 +4265,7 @@
     1150
    ],
    "at": [
-    4026,
+    4024,
     1068
    ]
   },
@@ -4277,7 +4277,7 @@
     60
    ],
    "at": [
-    3523,
+    3526,
     230
    ]
   },
@@ -4289,7 +4289,7 @@
     420
    ],
    "at": [
-    4440,
+    4443,
     548
    ]
   }
@@ -4809,13 +4809,13 @@
     ]
    ],
    "village": [
-    -5134,
-    49
+    -5149,
+    50
    ],
    "villageId": "emberwick",
    "boss": [
-    -4650,
-    276
+    -4660,
+    277
    ],
    "mouthShrine": [
     -3824,
@@ -4831,15 +4831,15 @@
    ],
    "lavaRiver": [
     [
-     -3200,
+     -3199,
      841
     ],
     [
-     -3326,
+     -3322,
      839
     ],
     [
-     -3435,
+     -3432,
      850
     ],
     [
@@ -4847,86 +4847,86 @@
      881
     ],
     [
-     -3629,
+     -3628,
      920
     ],
     [
-     -3743,
+     -3737,
      948
     ],
     [
-     -3857,
+     -3849,
      965
     ],
     [
-     -3967,
-     977
+     -3959,
+     976
     ],
     [
-     -4070,
+     -4069,
      972
     ],
     [
-     -4174,
+     -4182,
      950
     ],
     [
-     -4299,
+     -4305,
      932
     ],
     [
-     -4435,
+     -4438,
      922
     ],
     [
-     -4568,
+     -4569,
      917
     ],
     [
-     -4691,
+     -4689,
      922
     ],
     [
-     -4805,
-     931
+     -4803,
+     930
     ],
     [
-     -4930,
+     -4925,
      933
     ],
     [
-     -5067,
-     926
-    ],
-    [
-     -5203,
-     913
-    ],
-    [
-     -5326,
-     906
-    ],
-    [
-     -5441,
-     911
-    ],
-    [
-     -5555,
+     -5053,
      925
     ],
     [
-     -5634,
-     934
+     -5177,
+     911
     ],
     [
-     -5714,
-     944
+     -5291,
+     904
+    ],
+    [
+     -5406,
+     909
+    ],
+    [
+     -5527,
+     923
+    ],
+    [
+     -5606,
+     932
+    ],
+    [
+     -5686,
+     941
     ]
    ],
    "lavaWidth": 16,
    "smithBridge": [
-    -5431,
-    911
+    -5430,
+    912
    ]
   },
   "tundra": {
@@ -5343,12 +5343,12 @@
     ]
    ],
    "village": [
-    4676,
-    505
+    4674,
+    504
    ],
    "villageId": "rimehold",
    "boss": [
-    4064,
+    4063,
     213
    ],
    "mouthShrine": [

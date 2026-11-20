@@ -34,13 +34,30 @@ const coastRows = (() => {
 	return rows;
 })();
 const ROW0 = SEA.originY, CELL = SEA.cell;
-/** The Old Island's coast on the row at y (m), on that side (-1 west, +1 east): |x| in metres. */
-function oldCoast(side, y) {
-	let r = Math.round((y * 100 - ROW0) / CELL);
-	for (let d = 0; d < 400; d++) {
-		for (const rr of [r - d, r + d]) { const span = coastRows[rr]; if (span) return Math.abs(side < 0 ? span[0] : span[1]) / 100; }
+/** The Old Island's coast on the row at y (m), on that side (-1 west, +1 east): |x| in metres. Row by row the old coast
+ *  jumps metres at a time (a jagged shore); everything mapped from it (each sub-zone's shapes, the ice cap) stepped with
+ *  it, a sawtooth seen from the ground. So it is filled, smoothed over about 60 m of shore and read between rows. */
+const coastSmooth = (() => {
+	const out = {};
+	for (const side of [-1, 1]) {
+		const raw = coastRows.map((span) => (span ? Math.abs(side < 0 ? span[0] : span[1]) / 100 : null));
+		let last = null;
+		for (let i = 0; i < raw.length; i++) { if (raw[i] == null) raw[i] = last; else last = raw[i]; }
+		last = null;
+		for (let i = raw.length - 1; i >= 0; i--) { if (raw[i] == null) raw[i] = last; else last = raw[i]; }
+		let arr = raw.map((v) => v ?? 1900);
+		for (let pass = 0; pass < 3; pass++) {
+			const R = 8, next = new Array(arr.length);
+			for (let i = 0; i < arr.length; i++) { let t = 0, n = 0; for (let k = -R; k <= R; k++) { const j = i + k; if (j >= 0 && j < arr.length) { t += arr[j]; n++; } } next[i] = t / n; }
+			arr = next;
+		}
+		out[side] = arr;
 	}
-	return 1900;
+	return out;
+})();
+function oldCoast(side, y) {
+	const arr = coastSmooth[side < 0 ? -1 : 1], fr = Math.max(0, Math.min(arr.length - 1.001, (y * 100 - ROW0) / CELL)), i = Math.floor(fr);
+	return arr[i] + (arr[i + 1] - arr[i]) * (fr - i);
 }
 const Y_EDGE = 2016;   // world.islandNorth/SouthEdge, m
 

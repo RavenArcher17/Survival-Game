@@ -532,7 +532,9 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 			: z === "T4" ? SURF.glacier
 			: z === "T5" ? (() => {   // the cirque floor one sheet of blue ice (Skaldrith's arena); polished ice in streaks down the ice cap
 				const db = Math.hypot(x - BOWL[0], y - BOWL[1]), th = Math.atan2(y - BOWL[1], x - BOWL[0]);
-				return db < 205 + 15 * fbm(x / 40, y / 40, 1068 + 50, 2) || Math.abs(fbm(th * 9, db / 140, 1068 + 51, 2)) < 0.05 ? SURF.ice : SURF.glacier;
+				// (Polished streaks only on the cirque's own walls: out on the cap a thin noise-contour streak, drawn 4 m at a
+				// time, read as a jagged dark band.)
+				return db < 205 + 15 * fbm(x / 40, y / 40, 1068 + 50, 2) || (db < 300 && Math.abs(fbm(th * 9, db / 140, 1068 + 51, 2)) < 0.07) ? SURF.ice : SURF.glacier;
 			})()
 			: z === "T7" ? (Math.max(0, 1 - Math.abs(fbm(x / 520, y / 300, 1068 + 43, 3)) * 22) > 0.4 ? SURF.shingle
 				: n > -0.25 + 0.9 * (1 - smooth(60, 200, FF.beyondAt("tundra", [x, y]))) ? SURF.steppe : SURF.snow)   // old snow lies in its hollows
@@ -540,7 +542,7 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		if (z === "T6" && thawPond(x, y) > 0.5) S[k] = SURF.lake_ice;
 		else if (z === "T6" && thawChan(x, y) > 0.35) S[k] = SURF.shingle;
 		else if ((z === "T1" || z === "T6") && polyEdge(x, y, 26, 401) < 0.6 && fbm(x / 240, y / 240, 1068 + 33, 2) > 0.05) S[k] = S[k] === SURF.thaw_moss ? SURF.moss_crack : SURF.snow_crack;
-		if (z === "T4" && (H[k] < sampleH(x + 8, y) - 2 || H[k] < sampleH(x - 8, y) - 2) && (H[k] < sampleH(x, y + 8) - 1 || H[k] < sampleH(x, y - 8) - 1)) S[k] = SURF.crevasse;
+		if (z === "T4" && clearOf(x, y, 0) && (H[k] < sampleH(x + 8, y) - 2 || H[k] < sampleH(x - 8, y) - 2) && (H[k] < sampleH(x, y + 8) - 1 || H[k] < sampleH(x, y - 8) - 1)) S[k] = SURF.crevasse;
 	}
 }
 // The landforms content may stand on (vents on the cones, a den in a pingo, the tube mouth at the lava head).
@@ -606,6 +608,15 @@ const crossLevels = trunks.map((t, n) => {
 });
 for (const l of lands) for (const c of l.camps) pad(c, 30, 25, Math.max(2.2, sampleH(...c)));
 for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy blend: no cut face round the village
+// The Fire and Frost places that sit on open ground get a little level floor (their builders lay flat crusts, rings and
+// camps); the ones made to sit in a landform keep it (the plume in the crater, the seracs and the whaler in the ice, the
+// stair up the cone, the ridge glass, the pingo, the arch, the moulin, the smith in the lava, the kipuka's own rise).
+{
+	const KEEP = new Set(["crater_plume", "crater_stair", "weeping_seracs", "frozen_whaler", "glasswall", "fox_pingo", "ice_arch", "moulin", "fallen_smith", "kipuka", "crevasse_maze", "claw_scars", "ridge_watch", "wardens_quarry", "steam_ground", "acid_pool"]);
+	let n = 0;
+	for (const p of FFL.places) if (!KEEP.has(p.kind) && Array.isArray(p.at)) { pad(p.at, 18, 26); n++; }
+	log(`places levelled: ${n}`);
+}
 log("pads done");
 
 // ---- 5. the roads: each one's grade smoothed along it (never steeper than ROAD_GRADE), the ground flattened to it --
@@ -713,8 +724,8 @@ const ZONES = [
 	{ id: "V5", letter: "e", name: "the Crater Highlands", slopeRock: [40, 34, 32], ground: [48, 44, 42], groundAlt: [78, 52, 42], layers: { stones: 0.8, soil: 0.2 } },
 	{ id: "V6", letter: "f", name: "the Cinder Terraces", slopeRock: [54, 46, 40], ground: [64, 54, 46], groundAlt: [80, 86, 56], layers: { soil: 0.5, stones: 0.4, grass: 0.1 } },
 	{ id: "V7", letter: "m", name: "the Ashfall Woods", slopeRock: [70, 66, 62], ground: [118, 118, 122], groundAlt: [104, 104, 108], layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
-	{ id: "T1", letter: "g", name: "the Snow Flats", slopeRock: [150, 172, 194], ground: [236, 240, 244], groundAlt: [220, 228, 236], layers: { sand: 0.9, stones: 0.1 } },
-	{ id: "T2", letter: "h", name: "the Pine Hollows", slopeRock: [120, 126, 132], ground: [210, 218, 220], groundAlt: [196, 206, 204], layers: { sand: 0.6, litter: 0.4 } },
+	{ id: "T1", letter: "g", name: "the Snow Flats", slopeRock: [200, 216, 232], ground: [236, 240, 244], groundAlt: [220, 228, 236], layers: { sand: 0.9, stones: 0.1 } },
+	{ id: "T2", letter: "h", name: "the Pine Hollows", slopeRock: [188, 204, 222], ground: [210, 218, 220], groundAlt: [196, 206, 204], layers: { sand: 0.6, litter: 0.4 } },
 	{ id: "T3", letter: "i", name: "the Frozen Lakes", slopeRock: [214, 230, 242], ground: [222, 232, 240], groundAlt: [190, 214, 228], layers: { sand: 1 } },
 	{ id: "T4", letter: "j", name: "the Ice Shelves", slopeRock: [214, 232, 246], ground: [196, 218, 236], groundAlt: [176, 204, 228], layers: { sand: 0.8, stones: 0.2 } },
 	{ id: "T5", letter: "k", name: "the Glacier Plateau", slopeRock: [214, 232, 246], ground: [224, 234, 244], groundAlt: [206, 222, 238], layers: { sand: 0.9, stones: 0.1 } },
@@ -804,7 +815,12 @@ const land = {
 		stream: (() => { let L = 0; return stream.map((p, i) => { if (i) L += Math.hypot(p[0] - stream[i - 1][0], p[1] - stream[i - 1][1]); const s = L / streamLen; return [Math.round(p[0]), Math.round(p[1]), +(LAKE_LEVEL - 0.6 - (LAKE_LEVEL - 0.6 + 1.2) * Math.pow(s, 0.85) + 0.4).toFixed(2)]; }); })() },
 	buildFirst: [[0, 0], ...trunks.map((t) => t.gate.map(Math.round))],
 	// Until each land's own camps are built (its slice), everyone starts in Hearthmoot (WRGameMode: world.cityStartTag).
-	camps: { tag: "hearthmoot", safeRadius: 40, stationsAt: -1, list: [[0, 34, 0], [30, -17, 120], [-30, -17, 240]] },
+	// Hearthmoot's camps (everyone whose path's land isn't built yet starts there), then each built land's three wake-up camps
+	// on its coast (tagged with its biome: WRGameMode starts a new player of its path there), each looking out to sea, the
+	// middle one with the starter stations.
+	camps: { tag: "hearthmoot", safeRadius: 40, stationsAt: -1, list: [[0, 34, 0], [30, -17, 120], [-30, -17, 240]],
+		groups: ["volcanic", "tundra"].map((id) => ({ tag: id, safeRadius: 40, stationsAt: 1, stations: ["forge", "armorer", "alchemy_table", "workbench"], stationsBack: 25,
+			list: RI.byId[id].camps.map((c) => { const p = Array.isArray(c) ? c : c.at; return [Math.round(p[0]), Math.round(p[1]), Math.round(Math.atan2(p[1], p[0]) * 180 / Math.PI)]; }) })) },
 };
 fs.writeFileSync(path.join(root, "Data/lands/island.json"), JSON.stringify(land));
 

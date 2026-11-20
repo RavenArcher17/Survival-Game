@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Phase 3, slices 2 and 3, step 2 (content), part 2: landmarks, camps, villages and shrines (11-20)
+
+Raven: "These creatures had a quality pass already in the play test so we can move on to part 2".
+- **Every Fire and Frost place is on the round island** (Data/wildreach_places.json, made by fire_frost_dressing.mjs):
+  all 41 named places, 171 kit pieces, 16 ground features and the micro-hazards (fumaroles, geysers, thin ice on the
+  frozen lakes, the katabatic gusts round Skaldrith's cirque) at their round island spots: the Fallen Smith beside the
+  lava river, Glasswall, the Blue Fire, the Bellows Stacks, the Kipuka, the Slag Light, the Wisp Spire, the crater's
+  plume; the Tusk Gate, the Great Inuksuk, the Frozen Whaler, the Weeping Seracs, the Fox Pingo, the Pale Pines, the Ice
+  Arch, the crevasse maze and the rest. They build on the land's own ground (no trace, so they stand even far from
+  players), and the places on open ground stand on a small level floor.
+- **Wake-up camps:** three on each land's coast; a new player of the Fire path wakes in a Volcanic camp, Frost in a
+  Tundra one (the middle camp has the forge, armourer, alchemy table and workbench). Other paths still start in
+  Hearthmoot until their land is built.
+- **Emberwick and Rimehold** with their Great Shrines, Sigrun and Áilu, and the eight shrines out in the lands
+  (Data/wildreach_world.json): the world systems now start on the round island.
+- **Sound:** the Volcanic and the Tundra play their own beds (volcanic and tundra air, lava, wind, each sub-zone's bed),
+  not the Wasteland's Void beds whose zone ids they share; the new sub-zones take their neighbours'.
+- **Fixed on the way:** a jagged dark band across the snow by Rimehold (a polished-ice streak drawn 4 m at a time; now
+  only on the cirque's own walls), crevasse ground along the village's edge, the Blue Fire's crusts on a slope.
+
 ### Phase 3, slices 2 and 3, step 2 (content), part 1: the Volcanic's and the Tundra's creatures (11-20)
 
 Raven: "If you think it's perfect how it is then you can start bringing content over".

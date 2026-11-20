@@ -145,6 +145,8 @@ private:
 		TSharedPtr<FJsonObject> Row;
 		int32 Variant = 0;
 	};
+	/** The places file this map builds from: island_places.json on the Old Island, <map>_places.json on another. */
+	FString PlacesFile;
 	void Load();
 	bool BuildOne(const FPending& P);
 	void TickLooks(float Dt);

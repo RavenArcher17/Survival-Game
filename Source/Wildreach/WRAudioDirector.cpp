@@ -477,6 +477,23 @@ void UWRAudioDirector::UpdateAmbient(float DeltaTime)
 		LandBiome = LD ? LD->Biome : NAME_None;
 		LandZone = WRLand::ZoneAt(Listener);
 		IsleZone = LD ? NAME_None : WRIsle::ZoneAt(Listener);
+		// The round island's Volcanic and Frozen tundra sound as the Old Island's did (the island's beds: volcanic, tundra,
+		// lava, wind, ffzone.<V1..T5>), not as a land: their sub-zone ids V1.. are the Wasteland's beds' (zone.V1..V4)
+		// there. The new sub-zones take their neighbours' beds (the terraces and the ash woods the ash plains', the thaw and
+		// the steppe the snow flats').
+		if (LD && WRLand::OwnLandMap())
+		{
+			const FName B = LD->BiomeAtMap(LD->ToMap(Listener));
+			if (B == TEXT("volcanic") || B == TEXT("tundra"))
+			{
+				FString Z = LandZone.ToString();
+				if (Z == TEXT("V6") || Z == TEXT("V7")) Z = TEXT("V1");
+				else if (Z == TEXT("T6") || Z == TEXT("T7")) Z = TEXT("T1");
+				IsleZone = FName(*Z);
+				LandBiome = NAME_None;
+				LandZone = NAME_None;
+			}
+		}
 		// The Sky (cooks/biome-sky.md 2.12): over the islands as on the cape, its own beds by sub-zone (zone.W1..W5).
 		if (WRSkyIsles::Contains(Listener))
 		{

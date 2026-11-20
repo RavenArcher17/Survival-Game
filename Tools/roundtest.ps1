@@ -30,7 +30,9 @@ $rooms = @("WRTeleport $($pts.seller)", "wait 5", "WRGive meadow_oats 6", "wait 
 # Game cm (map metres x 100): the north-west avenue's own line (Tools/terrain/hearthmoot_plan.mjs) from the plaza out to
 # the gate at bearing 326, then out of it onto the main road.
 $avenue = @('-5244 -6976', '-10593 -14777', '-15668 -22766', '-23500 -34800')
-$walker = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 25', 'WRHour 12', 'stat unit', 'wait 2',
+# Both start in Hearthmoot whatever their paths: a Fire or Frost newcomer wakes in their own land's camp since those were
+# built (11-20), so each is brought to the plaza first.
+$walker = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 20', 'WRTeleport 0 3000', 'wait 5', 'WRHour 12', 'stat unit', 'wait 2',
 	'WRLook 270 -5', 'wait 3', 'wr.FrameStats 6', 'wait 8') + $rooms +
 	@($avenue | ForEach-Object { "WRWalkTo $_"; 'wait 45' }) +
 	@('WRTeleport -66000 -97000', 'wait 6', 'WRWalkTo -77000 -113900', 'wait 40',
@@ -39,7 +41,7 @@ $walker = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 25', 'W
 	# the underwater rules), then a look at the water from a swimmer's place.
 	'WRTeleport 23600 72800', 'wait 6', 'WRWalkTo 25600 79000', 'wait 25', 'wr.Water lake2', 'WRCmd water stat lake', 'wait 2',
 	'WRTeleport 0 3000', 'wait 5', 'WRSay walker-done', 'waitchat visitor-done', 'wait 2')
-$visitor = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 30', 'WRWalkTo 2600 -900', 'wait 25', 'WRSay visitor-here',
+$visitor = @('WRBotPause 1', 'WRFlow quiet on', 'WRFlow hints off', 'wait 25', 'WRTeleport 0 3000', 'wait 5', 'WRWalkTo 2600 -900', 'wait 25', 'WRSay visitor-here',
 	'waitchat walker-done', 'wait 1', 'WRSay visitor-done', 'wait 3')
 
 $s = Start-Process $ue -ArgumentList "`"$project`" /Game/Maps/L_Wildreach -server -nullrhi -unattended -nosound -port=$Port -wrworld=roundtest -wrstore=json -wrdefaultpreset=playtest -abslog=`"$logs\server.log`"" -PassThru -WindowStyle Hidden

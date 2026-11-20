@@ -149,6 +149,13 @@ alive-and-explorable pass, as slice 1.
   `AWRRoundIsland::PlaceLife` (server) spawns an `AWRCreatureSpawner` per pack (Shift 1 day / 2 night) and gives
   `FWRCreatureRegistry::SetMapRoam` the loops; on a map with lands of its own a roaming mini without a loop there
   stays in. `AWRCreatureSpawner::GroundAt` uses the land's height there.
+- **Places, villages, shrines, camps (11-20):** `fire_frost_dressing.mjs` also writes `Data/wildreach_places.json`
+  (the Old Island's places file format at round island spots; its sub-zones carry no shapes: `WRIsle::ZoneAt` answers
+  the land's zone id on a map with lands of its own), `Data/wildreach_world.json` (villages and shrines with
+  `"map": "L_Wildreach"`; `UWRWorldSystems` reads `<map>_world.json` after world.json, a row with `map` is live only
+  there, a row with `land` stands on the land's height) and the dressing's `pois` (camps, bosses, minis: the map and
+  the world systems' start). `UWRIslandPlaces` loads `<map>_places.json` on any map that has one and finds the ground
+  from the land's height. island.json `camps.groups`: each built land's three camps, tagged with its biome.
 - **The lava river:** island.json `lava` (width, points with the lava's level, ending at the shore); its channel and
   levees are cut into the ground, and `WRRoundIsland::BuildLava` draws it with `M_Lava` (molten in the middle, crust at
   the rims) and warm lights along its banks (`roundIsland.lavaGlow`, `lavaLight`, `lavaLightEvery`, `lavaLightRadius`).

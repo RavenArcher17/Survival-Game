@@ -1718,6 +1718,7 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 			Gone.Add(bSurface && D.HfSurface[SJ * D.HfN + SI] == FWRLandDef::HfHidden ? 1 : 0);
 		}
 	}
+	const bool bFlatDiag = WRTune(TEXT("land.flatDiagonal"), 1.f) > 0.f;
 	for (int32 j = 0; j + 1 < VY; ++j)
 	{
 		for (int32 i = 0; i + 1 < VX; ++i)
@@ -1726,7 +1727,7 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 			if (Gone[A] || Gone[B] || Gone[C] || Gone[E]) continue;
 			// Split along the diagonal whose ends are closest in height: a steep face running across the grid
 			// (a crater wall, a sea cliff, an ice cliff) then has no staircase in its edge or silhouette.
-			if (FMath::Abs(G.Verts[A].Z - G.Verts[E].Z) <= FMath::Abs(G.Verts[B].Z - G.Verts[C].Z)) G.Tris.Append({ A, C, E, A, E, B });
+			if (!bFlatDiag || FMath::Abs(G.Verts[A].Z - G.Verts[E].Z) <= FMath::Abs(G.Verts[B].Z - G.Verts[C].Z)) G.Tris.Append({ A, C, E, A, E, B });
 			else G.Tris.Append({ A, C, B, C, E, B });
 		}
 	}
@@ -1851,8 +1852,14 @@ void AWRLand::SpawnCamps(UWorld* World, const FWRLandDef& D)
 	// the biome its path starts in (WRGameMode::ChoosePlayerStart and WRBeds pick a new player's camp by it), a safe zone
 	// round each (safeRadius m), and the forge, armourer, alchemy table and workbench a short walk inland of the middle
 	// one, facing the camp. Only what the map does not already hold is made (a map with them placed keeps its own).
-	const TSharedPtr<FJsonObject> C = D.Section(TEXT("camps"));
-	if (!World || World->GetNetMode() == NM_Client || !C.IsValid()) return;
+	const TSharedPtr<FJsonObject> Top = D.Section(TEXT("camps"));
+	if (!World || World->GetNetMode() == NM_Client || !Top.IsValid()) return;
+	// The round island holds several lands' camps: "groups" are more camp lists like the first, each with its own tag.
+	TArray<TSharedPtr<FJsonObject>> Groups = { Top };
+	const TArray<TSharedPtr<FJsonValue>>* More = nullptr;
+	if (Top->TryGetArrayField(TEXT("groups"), More)) for (const TSharedPtr<FJsonValue>& G : *More) if (G->AsObject().IsValid()) Groups.Add(G->AsObject());
+	for (const TSharedPtr<FJsonObject>& C : Groups)
+	{
 	FString TagStr = D.Biome.ToString();
 	C->TryGetStringField(TEXT("tag"), TagStr);
 	const FName Tag(*TagStr);
@@ -1917,7 +1924,8 @@ void AWRLand::SpawnCamps(UWorld* World, const FWRLandDef& D)
 			}
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("LAND %s camps: %s; made %d start(s) / safe zone(s) / station(s)"), *D.Id.ToString(), bHaveStart ? TEXT("starts already in the map") : TEXT("no starts in the map"), Made);
+	UE_LOG(LogWildreach, Log, TEXT("LAND %s camps %s: %s; made %d start(s) / safe zone(s) / station(s)"), *D.Id.ToString(), *Tag.ToString(), bHaveStart ? TEXT("starts already in the map") : TEXT("no starts in the map"), Made);
+	}
 }
 
 

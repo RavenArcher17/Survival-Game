@@ -131,6 +131,40 @@ namespace WRWorldImpl
 	double WGameHours(const UObject* Ctx) { const AWRGameState* GS = AWRGameState::Get(Ctx); return GS ? GS->GetTotalHours() : 0.0; }
 	float WServerNow(const UObject* Ctx) { return UWRWeatherSubsystem::Now(Ctx); }
 
+	/** A world.json list (path "villages", "shrines.list", "hidden") with this map's own rows after it: the round island's
+	 *  villages, shrines and tubes (Data/<map>_world.json, made by Tools/terrain/fire_frost_dressing.mjs; each row has
+	 *  "map"). The Old Island's rows of the same ids aren't live there (WRBiome::IsLive), so these stand in for them. */
+	TArray<TSharedPtr<FJsonValue>> WRows(const FString& Path)
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		const auto Take = [&Out, &Path](const TSharedPtr<FJsonObject>& Root)
+		{
+			FString Head, Key;
+			TSharedPtr<FJsonObject> O = Root;
+			if (Path.Split(TEXT("."), &Head, &Key)) O = WChild(Root, Head); else Key = Path;
+			if (const TArray<TSharedPtr<FJsonValue>>* A = WArr(O, Key)) Out.Append(*A);
+		};
+		Take(WRWorld::Data());
+		static TMap<FString, TSharedPtr<FJsonObject>> PerMap;
+		const FString& Map = WRLand::CurrentMap();
+		if (!PerMap.Contains(Map))
+		{
+			const FString Short = Map.StartsWith(TEXT("L_")) ? Map.Mid(2).ToLower() : Map.ToLower();
+			PerMap.Add(Map, Map.IsEmpty() ? nullptr : FWRTuning::LoadDataFile(Short + TEXT("_world.json")));
+		}
+		if (const TSharedPtr<FJsonObject>& Own = PerMap.FindRef(Map); Own.IsValid()) Take(Own);
+		return Out;
+	}
+
+	/** Is a world row live on this map: one with "map" only on that map (and its biome's content live), the rest as
+	 *  WRBiome::IsLive (the Old Island's, on the Old Island). */
+	bool WRowLive(const TSharedPtr<FJsonObject>& Row, FName Biome)
+	{
+		FString Map;
+		if (Row.IsValid() && Row->TryGetStringField(TEXT("map"), Map)) return Map == WRLand::CurrentMap() && WRBiome::IsContentLive(Biome);
+		return WRBiome::IsLive(Biome);
+	}
+
 	/** A point on land: traced down; in the sea it steps toward the island's middle until it isn't. */
 	bool WSettle(UWorld* World, FVector2D Cm, FVector& Out)
 	{
@@ -804,34 +838,43 @@ bool UWRWorldSystems::TryPlace()
 	UWorld* World = GetWorld();
 	if (FWRPoi::All.Num() == 0) return false;
 	FVector Probe;
-	const TArray<TSharedPtr<FJsonValue>>* List = WArr(WRWorld::Obj(TEXT("shrines")), TEXT("list"));
-	if (List)
+	for (const TSharedPtr<FJsonValue>& V : WRows(TEXT("shrines.list")))
 	{
-		for (const TSharedPtr<FJsonValue>& V : *List)
-		{
-			const TSharedPtr<FJsonObject> Row = V->AsObject();
-			if (Row->HasField(TEXT("at")) && !WSettle(World, WMetres(Row->TryGetField(TEXT("at"))), Probe)) return false;
-		}
+		const TSharedPtr<FJsonObject> Row = V->AsObject();
+		if (!WRowLive(Row, FName(*WStrOf(Row, TEXT("biome")))) || Row->HasField(TEXT("land"))) continue;
+		if (Row->HasField(TEXT("at")) && !WSettle(World, WMetres(Row->TryGetField(TEXT("at"))), Probe)) return false;
 	}
 	// Villages first (the Great Shrines and masters stand in them).
-	if (const TArray<TSharedPtr<FJsonValue>>* Vs = WArr(WRWorld::Data(), TEXT("villages")))
 	{
-		for (const TSharedPtr<FJsonValue>& V : *Vs)
+		for (const TSharedPtr<FJsonValue>& V : WRows(TEXT("villages")))
 		{
 			const TSharedPtr<FJsonObject> Row = V->AsObject();
 			const FName Id(*WStrOf(Row, TEXT("id")));
 			const FName Biome(*WStrOf(Row, TEXT("biome")));
-			if (!WRBiome::IsLive(Biome)) continue;
-			const FWRPoi* Camp = WPoi(WStrOf(Row, TEXT("camp")));
-			const TSharedPtr<FJsonObject> B = WRWorld::Biome(Biome);
-			const FVector2D Centre = WMetres(B.IsValid() ? B->TryGetField(TEXT("centre")) : nullptr);
-			if (!Camp) continue;
-			const FVector2D In = (Centre - FVector2D(Camp->Location)).GetSafeNormal();
+			if (!WRowLive(Row, Biome) || Villages.Contains(Id)) continue;
 			FVector Ground;
-			if (!WSettle(World, FVector2D(Camp->Location) + In * WNumOf(Row, TEXT("inland"), 250.f) * 100.f, Ground)) return false;
+			FRotator Face;
+			const FName OnLand(*WStrOf(Row, TEXT("land")));
+			if (!OnLand.IsNone())
+			{
+				// A village on a runtime land (the round island's): "at" in the land's map metres, its height; "yaw" the way
+				// its Great Shrine's steps face (toward its camp and the sea).
+				const TArray<TSharedPtr<FJsonValue>>* AtArr = WArr(Row, TEXT("at"));
+				if (!AtArr || AtArr->Num() < 2 || !WRLand::PlaceOn(OnLand, FVector2D((*AtArr)[0]->AsNumber(), (*AtArr)[1]->AsNumber()), Ground)) continue;
+				Face = FRotator(0.f, WNumOf(Row, TEXT("yaw"), 0.f), 0.f);
+			}
+			else
+			{
+				const FWRPoi* Camp = WPoi(WStrOf(Row, TEXT("camp")));
+				const TSharedPtr<FJsonObject> B = WRWorld::Biome(Biome);
+				const FVector2D Centre = WMetres(B.IsValid() ? B->TryGetField(TEXT("centre")) : nullptr);
+				if (!Camp) continue;
+				const FVector2D In = (Centre - FVector2D(Camp->Location)).GetSafeNormal();
+				if (!WSettle(World, FVector2D(Camp->Location) + In * WNumOf(Row, TEXT("inland"), 250.f) * 100.f, Ground)) return false;
+				Face = FRotator(0.f, FVector(-In, 0.f).Rotation().Yaw, 0.f);   // the shrine's steps toward the camp and the sea
+			}
 			FActorSpawnParameters P;
 			P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			const FRotator Face(0.f, FVector(-In, 0.f).Rotation().Yaw, 0.f);   // the shrine's steps toward the camp and the sea
 			AWRVillage* Village = World->SpawnActorDeferred<AWRVillage>(AWRVillage::StaticClass(), FTransform(Face, Ground), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 			if (!Village) continue;
 			Village->VillageId = Id;
@@ -928,15 +971,13 @@ bool UWRWorldSystems::TryPlace()
 void UWRWorldSystems::PlaceShrines()
 {
 	UWorld* World = GetWorld();
-	const TArray<TSharedPtr<FJsonValue>>* List = WArr(WRWorld::Obj(TEXT("shrines")), TEXT("list"));
-	if (!List) return;
 	const double Hours = WGameHours(World);
-	for (const TSharedPtr<FJsonValue>& V : *List)
+	for (const TSharedPtr<FJsonValue>& V : WRows(TEXT("shrines.list")))
 	{
 		const TSharedPtr<FJsonObject> Row = V->AsObject();
 		const FName Id(*WStrOf(Row, TEXT("id")));
 		const FName Biome(*WStrOf(Row, TEXT("biome")));
-		if (!WRBiome::IsLive(Biome) || Shrines.Contains(Id)) continue;
+		if (!WRowLive(Row, Biome) || Shrines.Contains(Id)) continue;
 		bool bGreat = false;
 		Row->TryGetBoolField(TEXT("great"), bGreat);
 		FVector Ground;
@@ -1674,7 +1715,10 @@ void UWRWorldSystems::StepEvents(float Dt)
 	{
 		for (const auto& KV : Ev->Values)
 		{
-			const TSharedPtr<FJsonObject> Row = KV.Value->AsObject();
+			// (Only the event rows: the section's own numbers and comment aren't objects, and AsObject on them logs an error.)
+			const TSharedPtr<FJsonObject>* RowPtr = nullptr;
+			if (!KV.Value.IsValid() || !KV.Value->TryGetObject(RowPtr)) continue;
+			const TSharedPtr<FJsonObject> Row = *RowPtr;
 			if (!Row.IsValid() || !Row->HasField(TEXT("everyHours"))) continue;
 			const FName Id(*KV.Key);
 			const bool bWorld = !Row->HasField(TEXT("biome"));
