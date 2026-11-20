@@ -36,6 +36,10 @@ private:
 	void BuildWater();
 	/** The trees, saplings and hedge shrubs (Data/hearthmoot.json "plants"), one instanced mesh per kind and variant. */
 	void BuildPlants(const TSharedPtr<class FJsonObject>& J);
+	/** Machines that draw: the Volcanic's lava river (island.json "lava"), molten in the middle and crusting at its
+	 *  rims, with its glow lights along it. */
+	void BuildLava();
+	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Lava;
 	/** Server: the meadow is the Commons, a safe zone (roundIsland.safeRadius). */
 	void BuildSafeZone();
 	/** Machines that draw: grass and wildflowers on the meadow and the city's yards, the crops in the fields' rows,

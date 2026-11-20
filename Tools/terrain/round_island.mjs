@@ -64,6 +64,16 @@ const WARP = 950, WARP_SCALE = 2600, BLEND = 200;
 const GROUPS = [["storm_peaks", "desert"], ["forest", "tundra"], ["swamp", "ocean"], ["graveyard", "wasteland", "volcanic"]];
 const CROSSROADS_OUT = 700;        // a crossroads sits this far out from the meadow's edge (in the inland band)
 const ROAD_TURN = 0.3;             // a land's road runs down its own middle until this deep, then turns for the crossroads
+// Slices 2 and 3 (11-19): the Volcanic's and the Tundra's own content moved from the Old Island (Tools/terrain/
+// fire_frost.mjs) sets their roads and their majors. The Volcanic's road goes round the south of the cape's volcano,
+// over the lava river on the Fallen Smith's hammer; the Tundra's keeps north of the Great Frozen Lake (the belt of
+// old content between Skaldrith's bowl and the lake is too full for a road).
+// Their majors sit where the Old Island had them: Vulkarn in the volcano's crater, Skaldrith in his glacier bowl.
+const ROAD_VIA = {
+	volcanic: [[-5760, 640], [-5420, 860], [-5050, 845], [-4760, 905], [-4640, 1085], [-4100, 1220], [-3100, 1350], [-2200, 1520]],
+	tundra: [[5060, 590], [4700, 690], [4250, 700], [3600, 430], [2900, -160]],
+};
+const BOSS_AT = { volcanic: [-5212, 310], tundra: [4425, 232] };   // fire_frost.mjs: Vulkarn's crater and Skaldrith's bowl, moved
 const SHALLOWS = 300, REEFS = 1200;  // off the coast: calm shallows by the camps, reefs, then deep water
 const MAP_HALF = 8000;             // the level's square: 16 km, the deep sea round the island
 const CELL = 40;                   // the grid that measures every land's area
@@ -200,6 +210,21 @@ const trunks = GROUPS.map((ids) => {
 	const fortR = meadowR(ga), jr = fortR + CROSSROADS_OUT, crossroads = pt(ga, jr), fort = pt(ga, fortR + 40), gate = pt(ga, CITY_WALL);
 	const points = [...bez(crossroads, pt(ga + 5, (jr + fortR) / 2), fort, 20), ...bez(fort, pt(ga, (fortR + CITY_WALL) / 2), gate, 12).slice(1)];
 	for (const s of ls) {
+		if (ROAD_VIA[s.id]) {
+			// Through its waypoints: a Catmull-Rom curve from the middle camp to the crossroads, a point every ~40 m.
+			const K = [s.camps[1], ...ROAD_VIA[s.id], crossroads], out = [K[0]];
+			for (let k = 0; k + 1 < K.length; k++) {
+				const p0 = K[Math.max(0, k - 1)], p1 = K[k], p2 = K[k + 1], p3 = K[Math.min(K.length - 1, k + 2)], n = Math.max(2, Math.round(dist(p1, p2) / 40));
+				for (let j = 1; j <= n; j++) {
+					const t = j / n, t2 = t * t, t3 = t2 * t;
+					out.push([0, 1].map((c) => 0.5 * (2 * p1[c] + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3)));
+				}
+			}
+			s.road = out;
+			s.roadLen = s.road.reduce((t, p, j) => j ? t + dist(s.road[j - 1], p) : 0, 0);
+			s.trunk = ids;
+			continue;
+		}
 		const road = [];
 		for (let r = Math.hypot(...s.camps[1]); r > jr; r -= 50) { const p = along(s.mid, r); road.push(p); if (depthAt(p) <= ROAD_TURN) break; }
 		const last = road[road.length - 1], lr = Math.hypot(...last);
@@ -217,6 +242,13 @@ for (const s of lands) {
 	const firstBelow = (f) => s.road.findIndex((p) => depthAt(p) <= f);
 	s.mouthShrine = s.road[firstBelow(2 / 3)];
 	s.champion = s.road[Math.min(s.road.length - 1, firstBelow(1 / 3) + 2)];
+	// On a road that bends near a border, each work goes to its own land's stretch nearest its band's depth, at least
+	// OWN_CLEAR m inside its own land all round (not on the border's blend).
+	const OWN_CLEAR = 80;
+	const deepOwn = (q) => [0, 40, OWN_CLEAR].every((rr) => Array.from({ length: 12 }, (_, k) => k * Math.PI / 6).every((t) => ownerAt([q[0] + rr * Math.cos(t), q[1] + rr * Math.sin(t)]) === s.i));
+	const ownNear = (f, p) => { if (deepOwn(p)) return p; const own = s.road.filter(deepOwn); return own.reduce((b, q) => Math.abs(depthAt(q) - f) < Math.abs(depthAt(b) - f) ? q : b, own[0]); };
+	s.mouthShrine = ownNear(2 / 3, s.mouthShrine);
+	s.champion = ownNear(1 / 3, s.champion);
 	s.roadOwn = s.road.filter((p) => ownerAt(p) === s.i).length / s.road.length;
 	s.worksOwn = ownerAt(s.mouthShrine) === s.i && ownerAt(s.champion) === s.i;
 }
@@ -234,7 +266,9 @@ for (const s of lands) {
 		const road = nearestRoad(p), edge = Math.min(...edges.map((q) => dist(p, q))), other = placed.length ? Math.min(...placed.map((q) => dist(p, q))) : 1e9;
 		const score = Math.min(road, 1.5 * edge, 0.45 * other); if (!best || score > best.score) best = { p, score, road, edge };
 	}
-	s.bossLair = best.p; s.bossFromRoad = best.road; s.bossFromBorder = best.edge; placed.push(best.p);
+	s.bossLair = best.p; s.bossFromRoad = best.road; s.bossFromBorder = best.edge;
+	if (BOSS_AT[s.id]) { s.bossLair = BOSS_AT[s.id]; s.bossFromRoad = nearestRoad(s.bossLair); s.bossFromBorder = Math.min(...edges.map((q) => dist(s.bossLair, q))); }
+	placed.push(s.bossLair);
 }
 const campsOk = lands.every((s) => s.camps.every((c) => ownerAt(c) === s.i));
 

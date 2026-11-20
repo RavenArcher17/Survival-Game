@@ -137,7 +137,10 @@ namespace WRSkyDetail
 		Camera->SetActorLocationAndRotation(FVector(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]), FCString::Atof(*Args[2])),
 			FRotator(FCString::Atof(*Args[4]), FCString::Atof(*Args[3]), 0.f));
 		PC->SetViewTarget(Camera.Get());
-		UE_LOG(LogWildreach, Log, TEXT("CAM at %s"), *Camera->GetActorLocation().ToCompactString());
+		const FVector At = Camera->GetActorLocation();
+		const FWRLandDef* Land = WRLand::At(At);
+		UE_LOG(LogWildreach, Log, TEXT("CAM at %s: biome %s, land %s, zone %c"), *At.ToCompactString(), *WRBiome::At(World, At).ToString(),
+			Land ? *Land->Id.ToString() : TEXT("-"), Land && Land->GridLetter(Land->ToMap(At)) ? Land->GridLetter(Land->ToMap(At)) : TEXT('-'));
 	}
 
 	static void FrameStats(const TArray<FString>& Args, UWorld* World)
@@ -314,9 +317,25 @@ void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
 	}
 	// Overcast over the Elder Canopy: the eye may not open up as far as under a sunlit canopy, so the deep wood reads
 	// near-dark by day and the foxfire shows (cooks/biome-forest.md 2.9).
-	const float DayEV = FMath::Lerp(bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : T.Num(TEXT("sky.dayMinEV100"), -2.f),
+	// The ground's own brightness: the Volcanic's black rock is not opened up to grey by day, nor is moonlit snow made
+	// daylight by night (the biome under the camera).
+	{
+		FVector Here;
+		const FName B = GetViewLocation(Here) ? WRBiome::At(this, Here) : NAME_None;
+		static const FName Volcanic(TEXT("volcanic")), Tundra(TEXT("tundra"));
+		if (B != GroundBiome)
+		{
+			GroundBiome = B;
+			UE_LOG(LogWildreach, Log, TEXT("SKY ground biome %s at %s"), *B.ToString(), *Here.ToString());
+		}
+		LavaGround = FMath::FInterpTo(LavaGround, B == Volcanic ? 1.f : 0.f, DeltaSeconds, 0.6f);
+		SnowGround = FMath::FInterpTo(SnowGround, B == Tundra ? 1.f : 0.f, DeltaSeconds, 0.6f);
+	}
+	const float OpenDayEV = FMath::Lerp(T.Num(TEXT("sky.dayMinEV100"), -2.f), T.Num(TEXT("sky.volcanicDayMinEV100"), -2.f), LavaGround);
+	const float DayEV = FMath::Lerp(bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : OpenDayEV,
 		T.Num(TEXT("sky.forestOvercastMinEV100"), 0.5f), ForestDark);
-	const float Target = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), DayEV, Daylight);
+	const float NightEV = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), T.Num(TEXT("sky.tundraNightMinEV100"), 2.f), SnowGround);
+	const float Target = FMath::Lerp(NightEV, DayEV, Daylight);
 	// Eased, so stepping under a branch or through a doorway doesn't pump the exposure.
 	FloorEV = FloorEV < -50.f || DeltaSeconds <= 0.f ? Target : FMath::FInterpTo(FloorEV, Target, DeltaSeconds, 1.5f);
 	// The setting is EV100 only with the extended luminance range on; this project leaves it off, where the same

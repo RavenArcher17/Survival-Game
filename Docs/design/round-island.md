@@ -102,6 +102,47 @@ spots, with pictures for Raven at each land. Proposed first: Hearthmoot with its
 Volcanic and Frozen tundra (their content and creatures exist on the Old Island, so the method is proven on known
 ground), then the rest round the ring.
 
+## Slices 2 and 3: the Volcanic and the Frozen tundra (from 11-19)
+
+Step 1 (this): both lands laid out and their ground built. Step 2: their content and creatures brought over, then the
+alive-and-explorable pass, as slice 1.
+
+- **The Old Island's halves at true proportions:** `Tools/terrain/fire_frost.mjs` maps every Old Island point onto its
+  wedge. It keeps its distance in from its own coast (x 1.1) and its place north or south of the half's middle (x 0.75,
+  as arc round the wedge's middle bearing). The old ground fills the outer ~2 km of each wedge; the new inner ground
+  past the old ridge is a sub-zone of its own, **V6 the Cinder Terraces** and **T6 the Thaw**. Zone edges are looked up
+  through a two-scale warp (`warpXY`) and the inner line wanders at km scale (`beyondAt`), so no edge runs straight.
+  It writes `fire_frost_layout.json` (every place, site, cave, shrine, village and boss at its round-island spot, the
+  lava river, the Smith's crossing) and the review map `Docs/design/fire_frost_map.svg`. Hand moves (`NUDGE`): Ignessa
+  and the Pale Hunter off the roads, the Fallen Smith at the crossing.
+- **Roads:** `round_island.mjs` `ROAD_VIA` routes the Volcanic's road round the volcano and the Tundra's down the
+  land's middle past Rimehold; a land's mouth shrine and champion stand at least 80 m inside its own land.
+- **The ground** (`round_ground.mjs` `landV` / `landT`, run order unchanged: `round_island.mjs`, `fire_frost.mjs`,
+  `round_ground.mjs`, `hearthmoot.mjs`):
+  - V1 ash dunes and black sand beaches; V2 lava flow sheets with steep fronts and tumuli; V3 sharp obsidian ridges;
+    V4 a sunken solfatara basin with fumarole mounds, sulfur and rust in patches on pale steaming ground; V5 the
+    volcano (a crater with a steep inner wall, a flat floor for Vulkarn and a walkable breach toward the crater stair;
+    radial gullies down its flanks); V6 crisp terraces stepping down to the meadow; ten cinder cones on the flanks, the
+    lava fields and the terraces.
+  - T1 snow flats with frost polygons; T2 rolling pine hollows with kettle holes; T3 the Great Frozen Lake (a flat
+    basin with pressure ridges and drifts on its ice); T4 raised ice shelves ending in cliffs or ramps, crossed by
+    crevasse fields; T5 Skaldrith's cirque (headwall on the inland side, open to the coast) on its glacier plateau;
+    T6 the Thaw's moss hummocks, braided gravel channels and frozen ponds; eight pingos (the Fox Pingo the biggest).
+  - Where they stand (for step 2's content): `Saved/RoundIsland/fire_frost_features.json` (cones, pingos, the lava's
+    head, the bowl, the lake, the volcano), rewritten each run.
+- **The lava river:** island.json `lava` (width, points with the lava's level, ending at the shore); its channel and
+  levees are cut into the ground, and `WRRoundIsland::BuildLava` draws it with `M_Lava` (molten in the middle, crust at
+  the rims) and warm lights along its banks (`roundIsland.lavaGlow`, `lavaLight`, `lavaLightEvery`, `lavaLightRadius`).
+- **Steep ground per zone:** a zone's `slopeRock` colours its own cliffs (basalt and obsidian black in the Volcanic,
+  blue ice on the glacier) instead of the island's grey.
+- **Exposure:** `sky.volcanicDayMinEV100` (by day the eye may not open far on black rock) and `sky.tundraNightMinEV100`
+  (by night moonlit snow stays night), eased by the biome under the camera (WRSky::UpdateExposure).
+- **Each zone carries its own biome** (island.json zones[].biome): `zoneBiomes` is a JSON object and the game matches
+  its keys without case, so letters that differ only in case (c / C, d / D) can't share it.
+- **Ground quads split along their flatter diagonal** (WRLand chunk build): no staircase on steep faces.
+- **Dark ground stays dark:** `M_IslandGround` (`build_forest_ground.py --island`) takes nearly all of a dark ground's
+  colour from the land, so pale textures can't lift basalt, obsidian or black sand to grey.
+
 ## How it is built (from slice 1, 11-19)
 
 - **Its own map:** `L_Wildreach` (sky, sun, fog and clouds only; everything else is built by code at runtime). The Old

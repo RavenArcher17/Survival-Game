@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Phase 3, slices 2 and 3, step 1: the Volcanic and the Frozen tundra laid out and their ground built (11-19)
+
+Raven: "Move on" (to the Volcanic and Frozen tundra slices, done the same way as slice 1). This step lays out both lands and
+builds their ground; their content (creatures, villages, caves, shrines, people) is step 2, after Raven's OK.
+- **The Old Island's halves carried over at true proportions** (`Tools/terrain/fire_frost.mjs`): each Old Island point
+  keeps its distance in from its own coast (x 1.1) and its place north or south of the half's middle (x 0.75). The old
+  ground fills the outer ~2 km of each wedge; the new inner ground is a sub-zone of its own: **V6 the Cinder Terraces**
+  and **T6 the Thaw**. Zone edges wander (no straight lines). Every place, site, cave, shrine, village and boss has its
+  round-island spot in `fire_frost_layout.json`; the review map is `Docs/design/fire_frost_map.svg`.
+- **The Volcanic:** Vulkarn's volcano on the cape: a crater with a steep inner wall, a flat floor ~80 m down for
+  Vulkarn's fight and a breach toward the crater stair you can walk through; radial gullies down its flanks; ten cinder
+  cones on its flanks, the lava fields and the terraces. The lava river runs 1.7 km from a rocky rise where it breaks
+  out (the Kiln Roads' tube mouth) west to the sea, in its own channel with levees, molten in the middle and crusting at
+  its rims, glowing at night with warm light on its banks; the road crosses it where the Fallen Smith lies. Ash dunes
+  on the coast, lava flow sheets with steep fronts and tumuli, sharp black obsidian ridges, the solfatara's sunken
+  basin with fumarole mounds and sulfur and rust on pale steaming ground, the kipuka, and terraces stepping down to
+  the meadow.
+- **The Frozen tundra:** snow flats with frost polygons; rolling pine hollows with kettle holes; the Great Frozen Lake
+  (pressure ridges and drifts on its ice); raised ice shelves ending in blue ice cliffs or ramps, crossed by crevasse
+  fields; Skaldrith's cirque (a headwall on the inland side, open to the coast) on its glacier plateau; the Thaw's moss
+  and snow patches, braided gravel channels and a few frozen ponds; eight pingos (the Fox Pingo the biggest).
+- **Roads:** the Volcanic's goes round the volcano and crosses the lava at the Smith's bridge; the Tundra's runs down
+  the land's middle past Rimehold. Mouth shrines and champions stand well inside their own land; the bosses stay off
+  the roads (Ignessa and the Pale Hunter moved a little further off).
+- **Light:** by day the Volcanic's black rock isn't opened up to grey (`sky.volcanicDayMinEV100`); by night moonlit snow
+  is a dark blue night, not daylight (`sky.tundraNightMinEV100`). Dark ground keeps its colour (`M_IslandGround`), and
+  each zone's cliffs have their own colour (black basalt and obsidian, blue ice) instead of the island's grey.
+- **Fixed on the way:** the island's zone letters "c" and "C", "d" and "D" were one key in island.json's zoneBiomes (the game
+  matches JSON keys without case), so the obsidian ridges counted as Hearthmoot's meadow and the solfatara as the sea;
+  each zone now carries its own biome. The ground's quads split along their flatter diagonal, so a steep face (the
+  crater wall, a sea cliff, an ice cliff) has no staircase in its edge.
+
 ### Phase 3, slice 1: Hearthmoot alive and open: its people, a market that trades, halls and an inn you walk into (11-19)
 
 Raven: "Do those two now and anything else and we'll do the rest of the slices the same way" (after I said the city was

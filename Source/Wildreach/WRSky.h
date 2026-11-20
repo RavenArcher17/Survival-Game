@@ -135,6 +135,9 @@ private:
 	float ShelterClock = 0.f;
 	/** The exposure floor in EV100, eased toward its target (unset below -50). */
 	float FloorEV = -100.f;
+	/** How much the ground under the camera is black lava (by day) or snow (by night), eased: their own exposure floors. */
+	float LavaGround = 0.f, SnowGround = 0.f;
+	FName GroundBiome;
 	bool bShaftsOn = false;
 	/** wr.FrameStats accumulators. */
 	float StatsLeft = 0.f;

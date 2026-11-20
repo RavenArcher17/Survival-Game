@@ -417,6 +417,8 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			}
 			Zone.Ground = WRLand::Colour(Z, TEXT("ground"), FColor(150, 146, 140));
 			Zone.GroundAlt = WRLand::Colour(Z, TEXT("groundAlt"), FColor(150, 146, 140));
+			Zone.bOwnSlope = Z->HasField(TEXT("slopeRock"));
+			if (Zone.bOwnSlope) Zone.SlopeRock = WRLand::Colour(Z, TEXT("slopeRock"), FColor(104, 100, 95));
 			Zone.Rough = LNum(Z, TEXT("rough"), 0.9f);
 			FString Str;
 			if (Z->TryGetStringField(TEXT("region"), Str)) Zone.Region = FName(*Str);
@@ -424,6 +426,9 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 			const TSharedPtr<FJsonObject>* D = nullptr;
 			if (Z->TryGetObjectField(TEXT("decor"), D)) Zone.Decor = *D;
 			if (Z->TryGetStringField(TEXT("letter"), Str) && Str.Len() > 0) Zone.Letter = Str[0];
+			// A zone's own biome (case-safe: zoneBiomes is a JSON object, whose keys are matched without case, so "c" and
+			// "C" were one key there).
+			if (Zone.Letter && Z->TryGetStringField(TEXT("biome"), Str) && !Str.IsEmpty()) ZoneBiomes.Add(Zone.Letter, FName(*Str));
 			WRLandHfImpl::LSpeck(Z, Zone.Speck, Zone.SpeckAmount, Zone.SpeckScale);
 			Zone.bLayers = WRLandHfImpl::LLayers(Z, Zone.Layers);
 		}
@@ -805,7 +810,7 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 		}
 		return C;
 	};
-	FLinearColor Sum(0.f, 0.f, 0.f, 0.f);
+	FLinearColor Sum(0.f, 0.f, 0.f, 0.f), SlopeSum(0.f, 0.f, 0.f, 0.f);
 	float RSum = 0.f, WSum = 0.f, SpineW = 0.f;
 	const float Turn = Noise(M / 41.f + FVector2D(1.3f, 8.8f)) * PI;
 	for (int32 k = 0; k < 9; ++k)
@@ -825,11 +830,13 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 		if (!Z) continue;
 		float R = 0.9f;
 		Sum += ZoneColour(*Z, R) * W;
+		SlopeSum += (Z->bOwnSlope ? Z->SlopeRock : SlopeRock) * W;
 		RSum += R * W;
 		WSum += W;
 		if (L == TEXT('s')) SpineW += W;
 	}
 	FLinearColor C = WSum > 0.f ? Sum / WSum : FLinearColor(FColor(90, 96, 70));
+	const FLinearColor SlopeHere = WSum > 0.f ? SlopeSum / WSum : SlopeRock;
 	OutRough = WSum > 0.f ? RSum / WSum : 0.9f;
 	SpineW = WSum > 0.f ? SpineW / WSum : 0.f;
 	// The sample's surface, softened where its neighbours are something else (a road's edge, a beach's back).
@@ -881,7 +888,7 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 		const float Ledge = SpineW * (1.f - Rock) * Smooth(8.f, SlopeFrom, Slope) * Smooth(-0.3f, 0.3f, Noise(M / 5.f + FVector2D(6.f, 6.f)));
 		C = FMath::Lerp(C, LedgeColor, Ledge * 0.8f);
 	}
-	C = FMath::Lerp(C, SlopeRock * (0.85f + 0.3f * (Noise(M / 7.f) * 0.5f + 0.5f)), Rock);
+	C = FMath::Lerp(C, SlopeHere * (0.85f + 0.3f * (Noise(M / 7.f) * 0.5f + 0.5f)), Rock);
 	OutRough = FMath::Lerp(OutRough, 0.86f, Rock);
 	return C;
 }
@@ -1717,7 +1724,10 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 		{
 			const int32 A = j * VX + i, B = A + 1, C = A + VX, E = C + 1;
 			if (Gone[A] || Gone[B] || Gone[C] || Gone[E]) continue;
-			G.Tris.Append({ A, C, E, A, E, B });
+			// Split along the diagonal whose ends are closest in height: a steep face running across the grid
+			// (a crater wall, a sea cliff, an ice cliff) then has no staircase in its edge or silhouette.
+			if (FMath::Abs(G.Verts[A].Z - G.Verts[E].Z) <= FMath::Abs(G.Verts[B].Z - G.Verts[C].Z)) G.Tris.Append({ A, C, E, A, E, B });
+			else G.Tris.Append({ A, C, B, C, E, B });
 		}
 	}
 	if (G.Tris.Num() == 0) return false;

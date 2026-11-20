@@ -204,6 +204,10 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
         # brightness, about 0.25-0.4, scaled to about 0.65-1).
         shade = sat(mul(dot3(albedo, (0.299, 0.587, 0.114)), k=2.6))
         amount = expr(unreal.MaterialExpressionScalarParameter, parameter_name="TintAmount", default_value=0.8)
+        # Dark ground (basalt, obsidian, black sand: linear brightness under ~0.12) takes nearly all its colour from the
+        # land, so a pale texture's share can't lift it to grey; brighter ground keeps TintAmount as it was.
+        dark = sub(const(1.0), sat(mul(dot3(rgb, (0.299, 0.587, 0.114)), k=8.0)))
+        amount = add(amount, mul(sub(const(1.0), amount), dark))
         albedo = lerp(mul(albedo, tint), mul(rgb, shade), amount)
     else:
         albedo = mul(albedo, tint)

@@ -72,6 +72,7 @@ void AWRRoundIsland::BeginPlay()
 	Super::BeginPlay();
 	BuildCity();
 	BuildWater();
+	BuildLava();
 	BuildSafeZone();
 	if (GetNetMode() != NM_DedicatedServer)
 	{
@@ -628,6 +629,89 @@ void AWRRoundIsland::StepCover()
 			Parts.Add(P);
 		}
 	}
+}
+
+void AWRRoundIsland::BuildLava()
+{
+	using namespace WRRoundIslandImpl;
+	const FWRLandDef* D = MapLand();
+	const TSharedPtr<FJsonObject> L = D ? D->Section(TEXT("lava")) : nullptr;
+	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+	if (!L.IsValid() || GetNetMode() == NM_DedicatedServer || !L->TryGetArrayField(TEXT("river"), Rows) || Rows->Num() < 2) return;
+	const FWRTuning& T = FWRTuning::Get();
+	TArray<FVector> Pts;
+	for (const TSharedPtr<FJsonValue>& V : *Rows) { const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray(); Pts.Add(FVector(At(R, 0), At(R, 1), At(R, 2)) * 100.f); }
+	// Five across: crust at the rims (tucked a little under the levees), molten in the middle (M_Lava: R = heat).
+	const float Half = float(L->GetNumberField(TEXT("width"))) * 50.f * 1.15f;
+	static const float Across[5] = { -1.f, -0.5f, 0.f, 0.5f, 1.f };
+	TArray<FVector> V, N;
+	TArray<int32> Tri;
+	TArray<FVector2D> UV;
+	TArray<FLinearColor> Col;
+	TArray<FProcMeshTangent> Tan;
+	float Along = 0.f;
+	for (int32 i = 0; i < Pts.Num(); ++i)
+	{
+		if (i) Along += FVector::Dist2D(Pts[i], Pts[i - 1]);
+		const FVector Dir = (Pts[FMath::Min(i + 1, Pts.Num() - 1)] - Pts[FMath::Max(i - 1, 0)]).GetSafeNormal2D();
+		const FVector Side(-Dir.Y, Dir.X, 0.f);
+		for (const float A : Across)
+		{
+			V.Add(Pts[i] + Side * (A * Half) - FVector(0.f, 0.f, FMath::Abs(A) > 0.9f ? 25.f : 0.f));
+			N.Add(FVector::UpVector);
+			UV.Add(FVector2D(Along / 600.f, A * 0.5f + 0.5f));
+			Col.Add(FLinearColor(FMath::Abs(A) > 0.9f ? 0.05f : FMath::Abs(A) > 0.4f ? 0.55f : 1.f, 1.f, 0.f, 1.f));
+			Tan.Add(FProcMeshTangent(Dir, false));
+		}
+	}
+	for (int32 i = 0; i + 1 < Pts.Num(); ++i) for (int32 k = 0; k < 4; ++k)
+	{
+		const int32 a = i * 5 + k, b = a + 1, c = a + 5, d = a + 6;
+		Tri.Append({ a, c, b, b, c, d });
+	}
+	Lava = NewObject<UProceduralMeshComponent>(this, TEXT("Lava"));
+	Lava->SetupAttachment(RootComponent);
+	Lava->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Lava->SetCastShadow(false);
+	Lava->RegisterComponent();
+	Lava->CreateMeshSection_LinearColor(0, V, Tri, N, UV, Col, Tan, false);
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Lava.M_Lava"));
+	UMaterialInstanceDynamic* Mat = Base ? UMaterialInstanceDynamic::Create(Base, this) : nullptr;
+	if (Mat)
+	{
+		Mat->SetScalarParameterValue(TEXT("Glow"), T.Num(TEXT("roundIsland.lavaGlow"), 3.f));
+		Mat->SetScalarParameterValue(TEXT("FarLift"), 0.f);
+		Mat->SetScalarParameterValue(TEXT("HotLevel"), T.Num(TEXT("lava.hotLevel"), 6.f));
+		Mat->SetScalarParameterValue(TEXT("CrustLevel"), T.Num(TEXT("lava.crustLevel"), 0.f));
+		Mat->SetScalarParameterValue(TEXT("CrackPower"), T.Num(TEXT("lava.crackPower"), 2.5f));
+		Mat->SetScalarParameterValue(TEXT("MoltenCore"), T.Num(TEXT("lava.moltenCore"), 0.9f));
+		Mat->SetScalarParameterValue(TEXT("Steady"), T.Num(TEXT("lava.steady"), 0.85f));
+		Lava->SetMaterial(0, Mat);
+	}
+	// Its glow on the banks: a warm light every lavaLightEvery m along it.
+	const float Every = T.Num(TEXT("roundIsland.lavaLightEvery"), 90.f) * 100.f;
+	int32 Lights = 0;
+	for (float S = 0.f, Run = 0.f; ; S += Every)
+	{
+		int32 i = 1; float Acc = 0.f;
+		for (; i < Pts.Num(); ++i) { const float Seg = FVector::Dist2D(Pts[i], Pts[i - 1]); if (Acc + Seg >= S) break; Acc += Seg; }
+		if (i >= Pts.Num()) break;
+		const float Seg = FMath::Max(1.f, FVector::Dist2D(Pts[i], Pts[i - 1]));
+		const FVector P = FMath::Lerp(Pts[i - 1], Pts[i], (S - Acc) / Seg) + FVector(0.f, 0.f, 250.f);
+		UPointLightComponent* Lt = NewObject<UPointLightComponent>(this);
+		Lt->SetupAttachment(RootComponent);
+		Lt->SetMobility(EComponentMobility::Movable);
+		Lt->SetWorldLocation(P);
+		Lt->SetLightColor(FLinearColor(FColor(255, 110, 40)));
+		Lt->SetIntensity(T.Num(TEXT("roundIsland.lavaLight"), 7000.f));
+		Lt->SetAttenuationRadius(T.Num(TEXT("roundIsland.lavaLightRadius"), 3500.f));
+		Lt->SetCastShadows(false);
+		Lt->MaxDrawDistance = 40000.f;
+		Lt->RegisterComponent();
+		++Lights;
+		(void)Run;
+	}
+	UE_LOG(LogWildreach, Log, TEXT("ROUND the lava river: %d points, %.0f m, %d glow lights"), Pts.Num(), Along / 100.f, Lights);
 }
 
 void AWRRoundIsland::BuildWater()

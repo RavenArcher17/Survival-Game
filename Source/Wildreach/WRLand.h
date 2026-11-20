@@ -24,6 +24,10 @@ struct WILDREACH_API FWRLandZone
 	float RoadWidth = 0.f;
 	FLinearColor Ground = FLinearColor::Gray;
 	FLinearColor GroundAlt = FLinearColor::Gray;
+	/** Its own colour for steep ground ("slopeRock": the Volcanic's basalt cliffs, the glacier's blue ice faces), or the
+	 *  land's slopeRock when it has none. */
+	FLinearColor SlopeRock = FLinearColor::Gray;
+	bool bOwnSlope = false;
 	float Rough = 0.9f;
 	FName Region;
 	FName Bed;
