@@ -148,7 +148,7 @@ function polyEdge(x, y, cell, seed) {
 // with the surfaces below.
 const thawChan = (x, y) => Math.max(0, 1 - Math.abs(fbm(x / 380, y / 240, 1068 + 30, 3)) * 40);
 const thawPond = (x, y) => smooth(-0.58, -0.66, fbm(x / 60, y / 60, 1068 + 31, 2));
-const lakeRidge = (x, y) => Math.max(0, 1 - Math.abs(Math.sin((x * 0.8 - y * 0.6) / 34 + 6 * fbm(x / 260, y / 260, 1068 + 34, 2))) / 0.06);
+const lakeRidge = (x, y) => Math.max(0, 1 - Math.abs(Math.sin((x * 0.8 - y * 0.6) / 70 + 1.2 * fbm(x / 400, y / 400, 1068 + 34, 2))) / 0.05) * smooth(0.0, 0.25, fbm(x / 300, y / 300, 1068 + 49, 2));
 // The Volcanic's middle sub-zones (the lava fields, the obsidian ridges, the solfatara) shape the ground where those
 // zones really lie: each zone's share of the ground round a point, from a 16 m grid of the zones blurred over ~130 m and
 // read smoothly, so a zone's shapes fade in across its edge instead of stepping.
@@ -510,11 +510,13 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		if (Math.hypot(x - KIPUKA[0], y - KIPUKA[1]) < 150 + 25 * fbm(x / 60, y / 60, 81, 2)) { S[k] = SURF.kipuka; continue; }
 		if (Math.hypot(x - ACID[0], y - ACID[1]) < 26) { S[k] = SURF.acid; H[k] -= 1.2; continue; }
 		const n = fbm(x / 90, y / 90, 83, 3), dv = Math.hypot(x - VOLC_AT[0], y - VOLC_AT[1]);
-		S[k] = z === "V1" ? (fbm(x / 70, y / 70, 97, 2) > 0.45 ? SURF.pumice : SURF.ash) : z === "V2" ? (n > 0.12 ? SURF.aa : SURF.pahoehoe)
+		S[k] = z === "V1" ? (fbm(x / 70, y / 70, 97, 2) > 0.55 ? SURF.pumice : SURF.ash) : z === "V2" ? (n > 0.12 ? SURF.aa : SURF.pahoehoe)
 			: z === "V3" ? (fbm(x / 50, y / 50, 98, 2) > 0.55 ? SURF.copper : SURF.obsidian)
-			: z === "V4" ? (fbm(x / 60, y / 60, 1240 + 27, 2) < -0.55 ? SURF.acid : fbm(x / 55, y / 55, 93, 2) > 0.24 ? SURF.sulfur : fbm(x / 80, y / 80, 94, 2) > 0.4 ? SURF.oxide : SURF.steam_ground)
+			: z === "V4" ? (fbm(x / 60, y / 60, 1240 + 27, 2) < -0.6 ? SURF.acid
+				: fbm(x / 46, y / 46, 1240 + 24, 2) + 0.12 * fbm(x / 9, y / 9, 98, 2) > 0.2 ? SURF.sulfur
+				: Math.abs(fbm(x / 160, y / 38, 94, 2)) < 0.035 ? SURF.oxide : SURF.steam_ground)
 			: z === "V5" ? (dv < VOLCANO.crater + 40 ? SURF.scoria : SURF.basalt)
-			: z === "V7" ? (fbm(x / 40, y / 40, 99, 2) > 0.25 ? SURF.charcoal : SURF.ash_pale)
+			: z === "V7" ? (Math.abs(fbm((x * 0.8 + y * 0.6) / 30, (y * 0.8 - x * 0.6) / 110, 99, 2)) < 0.025 ? SURF.charcoal : SURF.ash_pale)
 			: grassy(x, y) ? SURF.cinder_grass : SURF.cinder;
 		for (const hn of HORNITOS) if (Math.hypot(x - hn.at[0], y - hn.at[1]) < hn.r * 0.95) { S[k] = SURF.scoria; break; }
 		for (const cn of CONES) if (Math.hypot(x - cn.at[0], y - cn.at[1]) < cn.r * (0.8 + 0.12 * fbm(x / 30, y / 30, 95, 2))) { S[k] = SURF.scoria; break; }
@@ -523,12 +525,15 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 	} else {
 		const z = FF.subZoneAt("tundra", [x, y]), n = fbm(x / 110, y / 110, 87, 3);
 		const dlk = lakeD(x, y);
-		if (dlk < 210 && (lakeRidge(x, y) > 0.3 || fbm(x / 50, y / 50, 96, 2) > 0.45)) { S[k] = SURF.snow; continue; }   // pressure ridges and a few drifts   // pressure ridges and drifts on the ice
+		if (dlk < 210 && (lakeRidge(x, y) > 0.35 || (dlk > 175 && fbm(x / 40, y / 40, 96, 2) > 0.1))) { S[k] = SURF.snow; continue; }   // pressure ridges, and drifts along the shore   // pressure ridges and drifts on the ice
 		if (dlk < 210) { S[k] = SURF.lake_ice; continue; }
 		S[k] = z === "T1" ? (fbm(x / 45, y / 45, 1068 + 1, 2) > 0.45 ? SURF.lichen_rock : SURF.snow) : z === "T2" ? SURF.snow_forest
 			: z === "T3" ? (t3Lake(x, y) > 0.5 ? (fbm(x / 50, y / 50, 96, 2) > 0.35 ? SURF.snow : SURF.lake_ice) : SURF.snow)
 			: z === "T4" ? SURF.glacier
-			: z === "T5" ? (n > 0.0 && Math.hypot(x - BOWL[0], y - BOWL[1]) < 420 ? SURF.ice : SURF.glacier)
+			: z === "T5" ? (() => {   // the cirque floor one sheet of blue ice (Skaldrith's arena); polished ice in streaks down the ice cap
+				const db = Math.hypot(x - BOWL[0], y - BOWL[1]), th = Math.atan2(y - BOWL[1], x - BOWL[0]);
+				return db < 205 + 15 * fbm(x / 40, y / 40, 1068 + 50, 2) || Math.abs(fbm(th * 9, db / 140, 1068 + 51, 2)) < 0.05 ? SURF.ice : SURF.glacier;
+			})()
 			: z === "T7" ? (Math.max(0, 1 - Math.abs(fbm(x / 520, y / 300, 1068 + 43, 3)) * 22) > 0.4 ? SURF.shingle
 				: n > -0.25 + 0.9 * (1 - smooth(60, 200, FF.beyondAt("tundra", [x, y]))) ? SURF.steppe : SURF.snow)   // old snow lies in its hollows
 			: (n > -0.15 ? SURF.thaw_moss : SURF.snow);
@@ -707,12 +712,12 @@ const ZONES = [
 	{ id: "V4", letter: "d", name: "the Solfatara", slopeRock: [150, 128, 96], ground: [168, 162, 146], groundAlt: [182, 172, 138], layers: { sand: 0.5, stones: 0.5 } },
 	{ id: "V5", letter: "e", name: "the Crater Highlands", slopeRock: [40, 34, 32], ground: [48, 44, 42], groundAlt: [78, 52, 42], layers: { stones: 0.8, soil: 0.2 } },
 	{ id: "V6", letter: "f", name: "the Cinder Terraces", slopeRock: [54, 46, 40], ground: [64, 54, 46], groundAlt: [80, 86, 56], layers: { soil: 0.5, stones: 0.4, grass: 0.1 } },
-	{ id: "V7", letter: "m", name: "the Ashfall Woods", slopeRock: [70, 66, 62], ground: [140, 141, 146], groundAlt: [118, 118, 122], layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
+	{ id: "V7", letter: "m", name: "the Ashfall Woods", slopeRock: [70, 66, 62], ground: [118, 118, 122], groundAlt: [104, 104, 108], layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
 	{ id: "T1", letter: "g", name: "the Snow Flats", slopeRock: [150, 172, 194], ground: [236, 240, 244], groundAlt: [220, 228, 236], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "T2", letter: "h", name: "the Pine Hollows", slopeRock: [120, 126, 132], ground: [210, 218, 220], groundAlt: [196, 206, 204], layers: { sand: 0.6, litter: 0.4 } },
-	{ id: "T3", letter: "i", name: "the Frozen Lakes", slopeRock: [140, 180, 210], ground: [222, 232, 240], groundAlt: [190, 214, 228], layers: { sand: 1 } },
-	{ id: "T4", letter: "j", name: "the Ice Shelves", slopeRock: [128, 178, 218], ground: [196, 218, 236], groundAlt: [176, 204, 228], layers: { sand: 0.8, stones: 0.2 } },
-	{ id: "T5", letter: "k", name: "the Glacier Plateau", slopeRock: [128, 178, 218], ground: [224, 234, 244], groundAlt: [206, 222, 238], layers: { sand: 0.9, stones: 0.1 } },
+	{ id: "T3", letter: "i", name: "the Frozen Lakes", slopeRock: [214, 230, 242], ground: [222, 232, 240], groundAlt: [190, 214, 228], layers: { sand: 1 } },
+	{ id: "T4", letter: "j", name: "the Ice Shelves", slopeRock: [214, 232, 246], ground: [196, 218, 236], groundAlt: [176, 204, 228], layers: { sand: 0.8, stones: 0.2 } },
+	{ id: "T5", letter: "k", name: "the Glacier Plateau", slopeRock: [214, 232, 246], ground: [224, 234, 244], groundAlt: [206, 222, 238], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "T6", letter: "l", name: "the Thaw", slopeRock: [104, 102, 96], ground: [150, 156, 118], groundAlt: [226, 232, 236], layers: { moss: 0.5, sand: 0.3, grass: 0.2 } },
 	{ id: "T7", letter: "n", name: "the Mammoth Steppe", slopeRock: [120, 110, 92], ground: [166, 148, 100], groundAlt: [150, 136, 96], layers: { grass: 0.7, soil: 0.3 } },
 	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [96, 150, 62], groundAlt: [124, 166, 70], layers: { grass: 0.85, soil: 0.15 } },
@@ -781,10 +786,10 @@ const land = {
 		{ id: "shingle", class: SURF.shingle, color: [120, 124, 126], rough: 0.85, layers: { stones: 1 } },
 		{ id: "ice", class: SURF.ice, color: [128, 174, 208], rough: 0.4, layers: { stones: 0.4, sand: 0.6 } },
 		{ id: "steppe", class: SURF.steppe, color: [168, 148, 96], rough: 0.92, layers: { grass: 0.75, soil: 0.25 } },
-		{ id: "ash_pale", class: SURF.ash_pale, color: [140, 141, 146], rough: 0.95, layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
-		{ id: "charcoal", class: SURF.charcoal, color: [44, 40, 38], rough: 0.95, layers: { soil: 0.6, litter: 0.4 } },
+		{ id: "ash_pale", class: SURF.ash_pale, color: [118, 118, 122], rough: 0.95, layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
+		{ id: "charcoal", class: SURF.charcoal, color: [66, 62, 60], rough: 0.95, layers: { soil: 0.6, litter: 0.4 } },
 		{ id: "lichen_rock", class: SURF.lichen_rock, color: [176, 150, 100], rough: 0.85, layers: { stones: 0.8, moss: 0.2 } },
-		{ id: "pumice", class: SURF.pumice, color: [150, 146, 138], rough: 0.9, layers: { stones: 0.6, sand: 0.4 } },
+		{ id: "pumice", class: SURF.pumice, color: [112, 109, 104], rough: 0.9, layers: { stones: 0.6, sand: 0.4 } },
 		{ id: "moraine", class: SURF.moraine, color: [170, 172, 176], rough: 0.85, layers: { stones: 0.7, sand: 0.3 } },
 		{ id: "copper", class: SURF.copper, color: [52, 84, 72], rough: 0.6, layers: { stones: 1 } },
 		{ id: "oxide", class: SURF.oxide, color: [116, 66, 40], rough: 0.85, layers: { sand: 0.5, stones: 0.5 } },

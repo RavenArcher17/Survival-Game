@@ -203,6 +203,10 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
         # The island: the vertex colour is the land's colour; the textures give only their light and shade (their
         # brightness, about 0.25-0.4, scaled to about 0.65-1).
         shade = sat(mul(dot3(albedo, (0.299, 0.587, 0.114)), k=2.6))
+        # Bright ground (snow, glacier ice: linear brightness over ~0.35) keeps at least 0.8 of its own colour, so the dark
+        # steep-rock texture under an ice cliff can't turn the cliff into a dark trench.
+        bright = sat(mul(add(dot3(rgb, (0.299, 0.587, 0.114)), k=-0.35), k=3.0))
+        shade = op(unreal.MaterialExpressionMax, shade, mul(bright, k=0.8))
         amount = expr(unreal.MaterialExpressionScalarParameter, parameter_name="TintAmount", default_value=0.8)
         # Dark ground (basalt, obsidian, black sand: linear brightness under ~0.12) takes nearly all its colour from the
         # land, so a pale texture's share can't lift it to grey; brighter ground keeps TintAmount as it was.

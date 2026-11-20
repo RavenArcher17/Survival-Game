@@ -17,6 +17,12 @@ ice shelf's". They were there but 10-40 m high, so from above both lands read fl
 - **From the air:** the Volcanic's black-rock exposure eases a little with height (`sky.groundFloorAirKeep` 0.8 from
   200 m up), so from a flying mount it is neither a black blot nor washed out.
 - Hollows never sink below the sea; maars keep well in from the coast.
+- **Finishing touches:** the solfatara's sulfur crusts round its vents with rust streaks running downhill and a few acid
+  pools (not camouflage blotches); the ash woods' ground sooty grey with charcoal lines of fallen trunks; ice cliffs pale
+  glacier blue (bright ground keeps its own colour on steep faces in `M_IslandGround`, so they read as ice, not a dark
+  trench); Skaldrith's cirque floor one sheet of blue ice with polished streaks down the ice cap; the Great Frozen Lake's
+  ice clean, a few long pressure ridges, drifts along its shore. Checked walkable: onto the ice shelf from both sides,
+  into the cirque from the shelf and from Rimehold, into the volcano's crater, the ridges and the solfatara (40 degrees).
 
 ### Phase 3, slices 2 and 3: every sub-biome its own size and look (11-20)
 
