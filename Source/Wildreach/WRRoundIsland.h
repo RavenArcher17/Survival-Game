@@ -39,6 +39,9 @@ private:
 	/** Machines that draw: the Volcanic's lava river (island.json "lava"), molten in the middle and crusting at its
 	 *  rims, with its glow lights along it. */
 	void BuildLava();
+	/** Server: the Volcanic's and the Frozen tundra's creature dens (Data/wildreach_life.json "dens": map metres, a day
+	 *  pack and a night pack each) and the roaming minis' loops on their lands ("roam"). */
+	void PlaceLife();
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Lava;
 	/** Server: the meadow is the Commons, a safe zone (roundIsland.safeRadius). */
 	void BuildSafeZone();

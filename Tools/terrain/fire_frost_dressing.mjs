@@ -2,12 +2,14 @@
 // "make sure they look like they are supposed to"): each sub-zone's trees, scrub and rocks, its lava that burns and its
 // ice that slips. Reads the finished ground (run after round_ground.mjs) and writes Data/wildreach_dressing.json, which
 // UWRDressingSubsystem loads on L_Wildreach (the same builder, kinds, harvests and ledger as the Old Island's dressing).
+// Also Data/wildreach_life.json: the creature dens per sub-zone and the roaming minis' loops.
 //   node Tools/terrain/fire_frost_dressing.mjs
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
 import { fbm } from "./round_island.mjs";
+import * as FF from "./fire_frost.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8"));
@@ -145,3 +147,81 @@ const file = {
 };
 fs.writeFileSync(path.join(root, "Data/wildreach_dressing.json"), JSON.stringify(file));
 console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).join(", "), "| lava cells", lavaCells.length / 3, "ice cells", iceCells.length / 3);
+
+// ---- life: the dens of each sub-zone's creatures (the Old Island's spawn_regions.json kinds, given out by sub-zone),
+// and the roaming minis' loops moved onto their lands. Data/wildreach_life.json, read by WRRoundIsland (server).
+{
+	// Per sub-zone: dens wanted, the day table and the night table (weights). Lowland kinds on the coast bands, the
+	// midland herds and flyers further in, the highland predators on the crater and the glacier.
+	const LIFE = {
+		V1: [10, { pumicehog: 5, ashstrider: 4, cinderfang: 1 }, { cinderfang: 3, glowmoth: 2 }],
+		V2: [14, { ashstrider: 3, kilnmite: 3, basaltback: 2, emberhorn: 2 }, { cinderfang: 2, glowmoth: 3, kilnmite: 1 }],
+		V3: [7, { kilnmite: 4, scorchwing: 2, basaltback: 2 }, { scorchwing: 2, basaltback: 1 }],
+		V4: [8, { kilnmite: 3, scorchwing: 3, ashstrider: 1 }, { glowmoth: 3, scorchwing: 2 }],
+		V5: [6, { magmaw: 2, basaltback: 3, scorchwing: 2 }, { magmaw: 3 }],
+		V6: [8, { pumicehog: 3, emberhorn: 3, ashstrider: 2 }, { cinderfang: 2, glowmoth: 2 }],
+		V7: [9, { emberhorn: 3, pumicehog: 2, cinderfang: 1 }, { cinderfang: 3, glowmoth: 3 }],
+		T1: [10, { snowpuff: 5, floeback: 3, aurora_fox: 2 }, { gloomhowl: 3, aurora_fox: 3 }],
+		T2: [14, { frostantler: 4, aurora_fox: 2, snowpuff: 2 }, { gloomhowl: 4, frostantler: 1 }],
+		T3: [10, { floeback: 4, rimeshell: 3, snowpuff: 2 }, { floeback: 2, glacimaw: 2 }],
+		T4: [6, { rimeshell: 3, glacimaw: 2, woolly_drudge: 1 }, { glacimaw: 3 }],
+		T5: [5, { rimeclaw: 2, glacimaw: 2 }, { rimeclaw: 3 }],
+		T6: [9, { woolly_drudge: 4, frostantler: 3, snowpuff: 2 }, { gloomhowl: 3, frostantler: 2 }],
+		T7: [9, { woolly_drudge: 5, frostantler: 3, aurora_fox: 1 }, { gloomhowl: 3, woolly_drudge: 1 }],
+	};
+	const GAP = 170;
+	const roll = (table, r) => { const e = Object.entries(table), tot = e.reduce((t, [, w]) => t + w, 0); let p = r * tot; for (const [k, w] of e) { p -= w; if (p <= 0) return k; } return e.at(-1)[0]; };
+	const cand = {};
+	for (let gx = -6600; gx < 6600; gx += 20) for (let gy = -6600; gy < 6600; gy += 20) {
+		const z = zoneAt(gx, gy); if (!LIFE[z]) continue;
+		(cand[z] ||= []).push([gx + 10, gy + 10, rand(Math.round(gx / 20), Math.round(gy / 20), 977)]);
+	}
+	const dens = [], denCount = {};
+	const taken = [];
+	for (const [z, [want, day, night]] of Object.entries(LIFE)) {
+		const list = (cand[z] || []).sort((a, b) => a[2] - b[2]);
+		let n = 0;
+		for (const [x, y, r] of list) {
+			if (n >= want) break;
+			const h = hAt(x, y), sf = surfAt(x, y);
+			if (h < 2 || BARE.has(sf) && !(z === "T3" && sf === SURF.lake_ice) || slopeAt(x, y) > 28) continue;
+			if (!isClear(x, y, 25) || lavaDist(x, y) < 45) continue;
+			// Not by a drop: the ground within 45 m all round keeps within 10 m of the den's (no ice cliff, crater wall or ridge edge).
+			if ([0, 1, 2, 3, 4, 5, 6, 7].some((k) => [20, 45].some((r) => Math.abs(hAt(x + r * Math.cos(k * Math.PI / 4), y + r * Math.sin(k * Math.PI / 4)) - h) > 10))) continue;
+			if (taken.some(([tx, ty]) => Math.hypot(tx - x, ty - y) < GAP)) continue;
+			taken.push([x, y]);
+			const d = roll(day, rand(Math.round(x), Math.round(y), 31)), nt = roll(night, rand(Math.round(x), Math.round(y), 37));
+			dens.push([Math.round(x), Math.round(y), d, nt, z]);
+			n++;
+		}
+		denCount[z] = n;
+	}
+	// The roaming minis' loops (creatures.json roam, Old Island cm) moved onto their wedges.
+	const CRE = read("Data/creatures.json"), rows = Array.isArray(CRE.creatures || CRE) ? (CRE.creatures || CRE) : Object.values(CRE.creatures || CRE);
+	const roam = {};
+	for (const c of rows) if (c.roam && c.archetype === "boss" && ["cinderhorn", "old_tusker"].includes(c.id)) {
+		const side = c.roam[0][0] < 0 ? "volcanic" : "tundra";
+		roam[c.id] = c.roam.map(([x, y]) => FF.toRound(side, [x / 100, y / 100]));
+	}
+	// Each loop kept in its own country, well off the roads, villages and camps: Old Tusker, an old mammoth bull, on the
+	// Mammoth Steppe; Cinderhorn out on the Ash Plains (the Plough Trench is on its loop). Same shape, moved whole.
+	const HOME = { cinderhorn: ["V1"], old_tusker: ["T7"] };
+	for (const [id, pts] of Object.entries(roam)) {
+		const cx = pts.reduce((t, p) => t + p[0], 0) / pts.length, cy = pts.reduce((t, p) => t + p[1], 0) / pts.length;
+		let fit = null;
+		for (const pad of [450, 350, 250, 150]) {
+			for (const z of HOME[id]) for (const [x, y] of (cand[z] || [])) {
+				const moved = pts.map(([px, py]) => [px - cx + x, py - cy + y]);
+				if (moved.every(([mx, my]) => zoneAt(mx, my) === z && isClear(mx, my, pad) && slopeAt(mx, my) < 28 && !BARE.has(surfAt(mx, my)) && hAt(mx, my) > 3 && [0, 2, 4, 6].every((k) => Math.abs(hAt(mx + 45 * Math.cos(k * Math.PI / 4), my + 45 * Math.sin(k * Math.PI / 4)) - hAt(mx, my)) < 12))) { fit = moved; break; }
+			}
+			if (fit) { console.log("roam", id, "clear by", pad, "m"); break; }
+		}
+		roam[id] = (fit || pts).map((p) => p.map(Math.round));
+	}
+	const life = {
+		_comment: "Generated by Tools/terrain/fire_frost_dressing.mjs: the Volcanic's and the Frozen tundra's creature dens on the round island (map metres; each den a day pack and a night pack, kinds from spawn_regions.json given out by sub-zone) and the roaming minis' loops moved onto their lands. Read by WRRoundIsland (server).",
+		activation: 12000, respawn: 600, dens, roam,
+	};
+	fs.writeFileSync(path.join(root, "Data/wildreach_life.json"), JSON.stringify(life));
+	console.log("life:", dens.length, "dens", JSON.stringify(denCount), "| roam", Object.entries(roam).map(([k, v]) => k + " " + JSON.stringify(v[0]) + " " + (zoneAt(...v[0]) || "?")).join(", "));
+}

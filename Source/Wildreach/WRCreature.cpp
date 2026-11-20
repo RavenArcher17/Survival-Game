@@ -1,4 +1,5 @@
 #include "WRCreature.h"
+#include "WRLand.h"
 #include "WRStronghold.h"
 #include "WRSiege.h"
 #include "WRGod.h"
@@ -147,6 +148,17 @@ static TArray<FName> ParseNames(const TSharedPtr<FJsonObject>& O, const TCHAR* F
 		for (const TSharedPtr<FJsonValue>& V : *Arr) Out.Add(FName(*V->AsString()));
 	}
 	return Out;
+}
+
+void FWRCreatureRegistry::SetMapRoam(FName Id, const TArray<FVector>& Roam)
+{
+	for (FWRCreatureDef& D : Defs)
+	{
+		if (D.Id != Id) continue;
+		D.Roam = Roam;
+		MapRoamed.Add(Id);
+		return;
+	}
 }
 
 void FWRCreatureRegistry::Reload()
@@ -3994,6 +4006,15 @@ FVector AWRCreatureSpawner::GroundAt(const FVector& Point, bool& bFound) const
 	if (!bTraceGround)
 	{
 		return Point;
+	}
+	// On a map with lands of its own (the round island) the ground is the land's height there: its collision is built only
+	// near players, and a trace would find a tree or nothing.
+	if (WRLand::OwnLandMap())
+	{
+		if (const FWRLandDef* L = WRLand::At(Point); L && L->bHeightfield && !L->HoleAt(L->ToMap(Point)))
+		{
+			return L->GroundPoint(L->ToMap(Point));
+		}
 	}
 	// The terrain under the point, not a tree crown or a roof over it. (From over the island's highest ground: a roaming
 	// pack's height isn't kept up to date as it walks.)

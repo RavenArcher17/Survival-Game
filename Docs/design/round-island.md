@@ -143,6 +143,12 @@ alive-and-explorable pass, as slice 1.
   obsidian ridges 90 m, solfatara basin 32 m; ice shelves 58 m with crevasses 18 m deep, the ice cap +85 m, the cirque
   95 m deep (breached east), nunataks 36-44 m, pingos 26-45 m. Positions in `Saved/RoundIsland/fire_frost_features.json`
   (cones, maars, pingos). A relief check: contours and hill shade from island_ground.bin, by eye.
+- **Creatures (11-20):** `fire_frost_dressing.mjs` also writes `Data/wildreach_life.json`: `dens` [x, y, day kind,
+  night kind, sub-zone] (map metres; per sub-zone kinds and counts in its `LIFE` table, from spawn_regions.json's
+  Volcanic and Tundra kinds) and `roam` (the roaming minis' loops, moved whole into their home sub-biome).
+  `AWRRoundIsland::PlaceLife` (server) spawns an `AWRCreatureSpawner` per pack (Shift 1 day / 2 night) and gives
+  `FWRCreatureRegistry::SetMapRoam` the loops; on a map with lands of its own a roaming mini without a loop there
+  stays in. `AWRCreatureSpawner::GroundAt` uses the land's height there.
 - **The lava river:** island.json `lava` (width, points with the lava's level, ending at the shore); its channel and
   levees are cut into the ground, and `WRRoundIsland::BuildLava` draws it with `M_Lava` (molten in the middle, crust at
   the rims) and warm lights along its banks (`roundIsland.lavaGlow`, `lavaLight`, `lavaLightEvery`, `lavaLightRadius`).

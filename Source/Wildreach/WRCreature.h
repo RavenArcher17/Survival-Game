@@ -151,10 +151,15 @@ public:
 	const FWRCreatureDef* Find(FName Id) const;
 	const TArray<FWRCreatureDef>& All() const { return Defs; }
 	void Reload();
+	/** This map's own loop for a roaming mini (cm; WRRoundIsland from Data/wildreach_life.json "roam"): its creatures.json
+	 *  loop is the Old Island's. A mini with no loop of this map's own doesn't come out on a map with lands of its own. */
+	void SetMapRoam(FName Id, const TArray<FVector>& Roam);
+	bool HasMapRoam(FName Id) const { return MapRoamed.Contains(Id); }
 
 private:
 	FWRCreatureRegistry();
 	TArray<FWRCreatureDef> Defs;
+	TSet<FName> MapRoamed;
 };
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FWROnCreatureDied, AWRCreature*);

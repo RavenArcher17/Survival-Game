@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Phase 3, slices 2 and 3, step 2 (content), part 1: the Volcanic's and the Tundra's creatures (11-20)
+
+Raven: "If you think it's perfect how it is then you can start bringing content over".
+- **125 creature dens** across the 14 sub-biomes (Data/wildreach_life.json, made by fire_frost_dressing.mjs; placed by
+  WRRoundIsland on the server): each a day pack and a night pack of its sub-zone's kinds, out when a player comes
+  within 120 m. Ash striders and pumice hogs on the ash plains, basaltbacks, kilnmites and emberhorns on the lava
+  fields, scorchwings over the obsidian ridges and the solfatara, magmaws on the crater highlands, emberhorns and
+  cinderfangs in the Ashfall Woods; snowpuffs and aurora foxes on the snow flats, frostantlers in the pine hollows,
+  floebacks and rimeshells on the frozen lakes, glacimaws in the ice shelves, rimeclaws on the glacier plateau, woolly
+  drudges on the steppe and the thaw; gloomhowls, glowmoths and cinderfangs hunt at night. Dens keep off roads,
+  villages, camps, places, lava and ice, and away from cliff edges.
+- **The roaming minis on their own lands:** Cinderhorn walks his loop on the Ash Plains, Old Tusker on the Mammoth
+  Steppe, each 450 m clear of roads, villages and camps.
+- **Fixed:** on the round island the roaming minis used the Old Island's loops, so Old Tusker could come out in
+  Hearthmoot's meadow; only a loop the map gives counts there now. Spawned packs, the roaming minis and the `tp`
+  command find the round island's ground from its height (its collision is built only near players).
+
 ### Phase 3, slices 2 and 3: landforms you can see from the air (11-20)
 
 Raven: "Take pictures of the terrain from a Birds Eye view I don't see any major elevation changes like craters or the

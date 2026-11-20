@@ -1,4 +1,5 @@
 #include "WRPlayerController.h"
+#include "WRLand.h"
 #include "WRSiege.h"
 #include "WRSporePath.h"
 #include "WRCrystalCreatures.h"
@@ -1872,7 +1873,9 @@ void AWRPlayerController::RunServerCommand(const FString& Command)
 		const FVector Top(FCString::Atof(*Arg(1)), FCString::Atof(*Arg(2)), 200000.f);
 		FHitResult Ground;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRTeleport), false, Survivor);
-		const bool bHit = GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0.f, 0.f, 400000.f), ECC_WorldStatic, Query);
+		bool bHit = GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0.f, 0.f, 400000.f), ECC_WorldStatic, Query);
+		// (On a map with lands of its own, far from players the land has no collision yet: its height, then.)
+		if (WRLand::OwnLandMap()) { const float Z = WRLand::GroundZAt(Top, -1.0e9f); if (Z > -1.0e8f && (!bHit || Ground.ImpactPoint.Z < Z - 50.f)) { Ground.ImpactPoint = FVector(Top.X, Top.Y, Z); bHit = true; } }
 		const FVector Dest = bHit ? Ground.ImpactPoint + FVector(0.f, 0.f, 120.f) : FVector(Top.X, Top.Y, 1000.f);
 		Survivor->TeleportTo(Dest, Survivor->GetActorRotation());
 		Result = FString::Printf(TEXT("at %s (ground %s)"), *Dest.ToCompactString(), bHit ? TEXT("found") : TEXT("NOT found"));

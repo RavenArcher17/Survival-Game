@@ -15,6 +15,7 @@
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRWorldSystems.h"
+#include "WRCreature.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/StaticMesh.h"
@@ -74,6 +75,7 @@ void AWRRoundIsland::BeginPlay()
 	BuildWater();
 	BuildLava();
 	BuildSafeZone();
+	if (HasAuthority()) PlaceLife();
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		// The grass: thin blades of the building look's tinted material (each blade its own green from custom data).
@@ -737,6 +739,71 @@ void AWRRoundIsland::BuildLava()
 		(void)Run;
 	}
 	UE_LOG(LogWildreach, Log, TEXT("ROUND the lava river: %d points, %.0f m, %d glow lights"), Pts.Num(), Along / 100.f, Lights);
+}
+
+void AWRRoundIsland::PlaceLife()
+{
+	using namespace WRRoundIslandImpl;
+	const TSharedPtr<FJsonObject> J = FWRTuning::LoadDataFile(TEXT("wildreach_life.json"));
+	const FWRLandDef* D = MapLand();
+	if (!J.IsValid() || !D) return;
+	const auto Ground = [D](const FVector2D& M) { return D->GroundPoint(M); };
+	// The roaming minis' own loops here.
+	const TSharedPtr<FJsonObject>* Roam = nullptr;
+	int32 Loops = 0;
+	if (J->TryGetObjectField(TEXT("roam"), Roam))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Roam)->Values)
+		{
+			TArray<FVector> Pts;
+			for (const TSharedPtr<FJsonValue>& P : KV.Value->AsArray())
+			{
+				const TArray<TSharedPtr<FJsonValue>>& A = P->AsArray();
+				if (A.Num() >= 2) Pts.Add(Ground(FVector2D(A[0]->AsNumber(), A[1]->AsNumber())));
+			}
+			if (Pts.Num() >= 2) { FWRCreatureRegistry::Get().SetMapRoam(FName(*KV.Key), Pts); ++Loops; }
+		}
+	}
+	// The dens: each a day pack and a night pack of its sub-zone's kinds, out when a player comes near.
+	const float Act = float(J->GetNumberField(TEXT("activation"))), Respawn = float(J->GetNumberField(TEXT("respawn")));
+	int32 Dens = 0, Packs = 0;
+	const auto Spawn = [&](FName Kind, const FVector& At, uint8 Shift)
+	{
+		const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Kind);
+		if (!Def) { UE_LOG(LogWildreach, Warning, TEXT("ROUND life: no creature %s"), *Kind.ToString()); return; }
+		const FTransform T(At);
+		AWRCreatureSpawner* Sp = GetWorld()->SpawnActorDeferred<AWRCreatureSpawner>(AWRCreatureSpawner::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (!Sp) return;
+		Sp->CreatureId = Kind;
+		Sp->Count = FMath::RandRange(Def->PackMin, FMath::Max(Def->PackMin, Def->PackMax));
+		Sp->Radius = FMath::Max(250.f, 120.f * Sp->Count);
+		Sp->RespawnSeconds = Respawn;
+		Sp->ActivationRadius = Act;
+		Sp->bTraceGround = true;
+		Sp->Shift = Shift;
+		Sp->Tags.Add(TEXT("round_den"));
+		Sp->FinishSpawning(T);
+		++Packs;
+	};
+	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
+	if (J->TryGetArrayField(TEXT("dens"), Rows))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Rows)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
+			if (R.Num() < 4) continue;
+			const FVector At = Ground(FVector2D(R[0]->AsNumber(), R[1]->AsNumber())) + FVector(0.f, 0.f, 100.f);
+			const FName Day(*R[2]->AsString()), Night(*R[3]->AsString());
+			if (Day == Night) Spawn(Day, At, 0);
+			else
+			{
+				if (!Day.IsNone()) Spawn(Day, At, 1);
+				if (!Night.IsNone()) Spawn(Night, At + FVector(400.f, 0.f, 0.f), 2);
+			}
+			++Dens;
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("ROUND life: %d dens (%d packs), %d roaming loops"), Dens, Packs, Loops);
 }
 
 void AWRRoundIsland::BuildWater()

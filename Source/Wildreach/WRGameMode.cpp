@@ -271,6 +271,12 @@ void AWRGameMode::StepRoamingBosses()
 		{
 			continue;
 		}
+		// (On the round island the Old Island's loops would put Old Tusker in Hearthmoot's meadow: only a loop of this
+		// map's own counts there.)
+		if (WRLand::OwnLandMap() && !FWRCreatureRegistry::Get().HasMapRoam(Def.Id))
+		{
+			continue;
+		}
 		bool bAlive = false;
 		for (TActorIterator<AWRCreature> It(GetWorld()); It && !bAlive; ++It)
 		{
@@ -299,7 +305,11 @@ void AWRGameMode::StepRoamingBosses()
 		}
 		FHitResult Ground;
 		const FCollisionQueryParams Q(SCENE_QUERY_STAT(WRRoamBoss), false);
-		if (!bNear || !GetWorld()->LineTraceSingleByChannel(Ground, Start + FVector(0, 0, 80000), Start - FVector(0, 0, 80000), ECC_WorldStatic, Q))
+		if (bNear && WRLand::OwnLandMap())
+		{
+			Ground.ImpactPoint = FVector(Start.X, Start.Y, WRLand::GroundZAt(Start, Start.Z));
+		}
+		else if (!bNear || !GetWorld()->LineTraceSingleByChannel(Ground, Start + FVector(0, 0, 80000), Start - FVector(0, 0, 80000), ECC_WorldStatic, Q))
 		{
 			continue;
 		}
