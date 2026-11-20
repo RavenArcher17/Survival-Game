@@ -77,6 +77,17 @@ private:
 	TWeakObjectPtr<UDirectionalLightComponent> Sun;
 	TWeakObjectPtr<USkyLightComponent> SkyLight;
 	TWeakObjectPtr<UExponentialHeightFogComponent> Fog;
+	/** The map's sky atmosphere: thick weather tints its light toward the weather's haze (WeatherSky). */
+	TWeakObjectPtr<class USkyAtmosphereComponent> Atmosphere;
+	FLinearColor SkyFactorBase = FLinearColor::White;
+	FLinearColor FogAmbientBase = FLinearColor::White;
+	/** How far thick weather has closed the sky (0..1) as last set, and the round island's weather layer's ground (the
+	 *  second fog stands on the ground under the camera there, eased so a cliff doesn't jolt it). */
+	float WeatherSkySet = -1.f;
+	/** The round island's weather layer density (sky.roundWeather.<kind>'s, or the look's x sky.roundWeatherDensity). */
+	float WeatherLayerDensity = 0.f;
+	float WeatherGround = -1.f;
+	bool bWeatherLayerSet = false;
 	float SunLux = 10.f;
 	float SkyIntensity = 1.f;
 	FLinearColor FogColor = FLinearColor(0.45f, 0.55f, 0.7f);

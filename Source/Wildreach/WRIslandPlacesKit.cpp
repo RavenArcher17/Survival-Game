@@ -6,6 +6,7 @@
 #include "WRIslandPlacesLook.h"
 #include "WRIslandPlaces.h"
 #include "WRTuning.h"
+#include "WRLand.h"
 
 using WRLookKit::FSurf;
 
@@ -290,9 +291,20 @@ namespace WRIsleK
 
 	void SmallPingo(FWRIsleSite& S, const FPal& P)
 	{
-		// A small ice-cored mound, its top cracked open to blue.
+		// A small ice-cored mound, its top cracked open to blue. On a map with lands of its own the mound is the ground's
+		// (round_ground.mjs raises it at the kit's spot): only the cracks.
 		const float G0 = S.Gz(0, 0) - 30.f;
 		const float Sc = 1.f + 0.25f * (S.Variant % 3);
+		if (WRLand::OwnLandMap())
+		{
+			for (int32 k = 0; k < 4; ++k)
+			{
+				const FRotator R(0.f, 90.f * k + 20.f, 0.f);
+				const FVector Mid = R.Vector() * 80.f * Sc;
+				S.K.Add(P.DeepIce, FVector(170.f, 18.f, 30.f) * Sc, FVector(Mid.X, Mid.Y, S.Gz(Mid.X, Mid.Y) + 4.f), R);
+			}
+			return;
+		}
 		for (int32 t = 0; t < 4; ++t)
 		{
 			const float D = FMath::Lerp(1300.f, 380.f, t / 3.f) * Sc;

@@ -176,5 +176,227 @@
     "yaw": 101
    }
   ]
+ },
+ "hidden": [
+  {
+   "id": "kilnroads",
+   "name": "The Kiln Roads",
+   "biome": "volcanic",
+   "look": "lava",
+   "width": 700,
+   "height": 550,
+   "skylights": [
+    0,
+    3
+   ],
+   "route": [
+    [
+     -4120,
+     90
+    ],
+    [
+     -3960,
+     180
+    ],
+    [
+     -3800,
+     300
+    ],
+    [
+     -3660,
+     430
+    ],
+    [
+     -3520,
+     560
+    ],
+    [
+     -3380,
+     680
+    ]
+   ],
+   "rooms": [
+    {
+     "at": 1,
+     "name": "The Ember Gallery",
+     "creatures": {
+      "kilnmite": 3
+     },
+     "stream": true
+    },
+    {
+     "at": 2,
+     "name": "Smiths' Hall",
+     "ore": {
+      "iron_ore": 3
+     },
+     "cache": {
+      "gem_ruby": 1,
+      "iron_ingot": 2
+     },
+     "lore": "Smith's tally: forty marks cut in the anvil's foot, and a forty-first half done."
+    },
+    {
+     "at": 4,
+     "name": "Pele's Loom",
+     "creatures": {
+      "scorchwing": 2
+     }
+    },
+    {
+     "at": 5,
+     "name": "The Sealed Vault",
+     "vault": true,
+     "cache": {
+      "iron_ingot": 6,
+      "gem_ruby": 1,
+      "gem_onyx": 1,
+      "upgrade_shard": 2
+     },
+     "lore": "Giant's first hammer-head, cracked through: the forge-giant was once small enough to need a smith."
+    }
+   ],
+   "map": "L_Wildreach"
+  },
+  {
+   "id": "bluebelow",
+   "name": "The Blue Below",
+   "biome": "tundra",
+   "look": "ice",
+   "width": 700,
+   "height": 550,
+   "skylights": [
+    0
+   ],
+   "route": [
+    [
+     3225,
+     500
+    ],
+    [
+     3351,
+     522
+    ],
+    [
+     3477,
+     544
+    ],
+    [
+     3603,
+     567
+    ],
+    [
+     3729,
+     589
+    ],
+    [
+     3855,
+     611
+    ]
+   ],
+   "rooms": [
+    {
+     "at": 1,
+     "name": "Meltwater Hall",
+     "creatures": {
+      "rimeshell": 2
+     },
+     "stream": true
+    },
+    {
+     "at": 3,
+     "name": "The Burnt Wyrm",
+     "cache": {
+      "ember_essence": 3
+     },
+     "lore": "Smith's spike: forged iron, driven into a wyrm's skull long before Skaldrith was hatched."
+    },
+    {
+     "at": 4,
+     "name": "Rime-folk Ice Tomb",
+     "cache": {
+      "hide": 6,
+      "bronze_ingot": 3
+     }
+    },
+    {
+     "at": 5,
+     "name": "The Deep Vein",
+     "ore": {
+      "iron_ore": 6
+     },
+     "cache": {
+      "gem_topaz": 1
+     }
+    }
+   ],
+   "map": "L_Wildreach"
+  }
+ ],
+ "biomes": {
+  "volcanic": {
+   "name": "Volcanic",
+   "path": "fire",
+   "signature": "sulfur_crystal",
+   "essence": "ember_essence",
+   "faction": "forgebound",
+   "centre": [
+    -4660,
+    277
+   ],
+   "waymark": "cairn",
+   "rock": [
+    30,
+    27,
+    25
+   ],
+   "rockAlt": [
+    52,
+    44,
+    38
+   ],
+   "accent": [
+    217,
+    194,
+    74
+   ],
+   "glow": [
+    255,
+    140,
+    60
+   ]
+  },
+  "tundra": {
+   "name": "Frozen tundra",
+   "path": "frost",
+   "signature": "lichen",
+   "essence": "frost_essence",
+   "faction": "rimekin",
+   "centre": [
+    4063,
+    213
+   ],
+   "waymark": "inuksuk",
+   "rock": [
+    185,
+    196,
+    206
+   ],
+   "rockAlt": [
+    140,
+    152,
+    166
+   ],
+   "accent": [
+    198,
+    40,
+    40
+   ],
+   "glow": [
+    150,
+    200,
+    255
+   ]
+  }
  }
 }

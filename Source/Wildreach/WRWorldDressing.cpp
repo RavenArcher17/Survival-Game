@@ -1713,6 +1713,14 @@ void AWRCave::BuildShell()
 		MID->SetVectorParameterValue(RockMat ? TEXT("Tint") : TEXT("Color"),
 			bForestRock ? ForestTint : bSwampRock ? SwampTint : bStorm ? StormTint : bFrost ? FLinearColor(0.7f, 0.79f, 0.9f) : (RockMat ? FLinearColor(0.13f, 0.12f, 0.11f) : FLinearColor(0.04f, 0.035f, 0.03f)));
 		Rock->SetMaterial(0, MID);
+		if (bFrost)
+		{
+			// The Tundra's caves are ice (the pale tint on the dark rock texture still read as a black dome on the snow):
+			// the seracs' blue-white, as the Blue Below's walls.
+			UMaterialInstanceDynamic* Ice = UMaterialInstanceDynamic::Create(ShapeMaterial(), this);
+			Ice->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.68f, 0.84f));
+			Rock->SetMaterial(0, Ice);
+		}
 	}
 	// The forest's caves glow foxfire green (the mycelium on the walls; the Alder Grotto's glowworms read the same).
 	Glow->SetLightColor(Biome == TEXT("forest") ? FLinearColor(FColor(127, 224, 122)) : Biome == TEXT("swamp") ? FLinearColor(0.75f, 0.85f, 0.25f) : Biome == TEXT("storm_peaks") ? FLinearColor(0.62f, 0.55f, 1.f) : bFrost ? FLinearColor(0.5f, 0.7f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f));
@@ -1809,8 +1817,8 @@ void AWRCave::SpawnContents()
 		FHitResult Ground;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCave), false, this);
 		// (A runtime land's chunks are its ground too: the forest's caves stand on WRLand.)
-		const bool bGround = GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0, 0, 2000), ECC_WorldStatic, Query)
-			&& (Cast<ULandscapeHeightfieldCollisionComponent>(Ground.GetComponent()) || Cast<AWRLand>(Ground.GetActor()));
+		const bool bGround = WRLand::OwnLandMap() || (GetWorld()->LineTraceSingleByChannel(Ground, Top, Top - FVector(0, 0, 2000), ECC_WorldStatic, Query)
+			&& (Cast<ULandscapeHeightfieldCollisionComponent>(Ground.GetComponent()) || Cast<AWRLand>(Ground.GetActor())));
 		if (!bGround && ++ContentTries < 60)
 		{
 			GetWorldTimerManager().SetTimer(ContentTimer, this, &AWRCave::SpawnContents, 1.f, false);
@@ -1821,6 +1829,12 @@ void AWRCave::SpawnContents()
 	const auto Floor = [this](const FVector& Local)
 	{
 		const FVector Top = GetActorTransform().TransformPosition(FVector(Local.X, Local.Y, 650.f));
+		// (The round island: the land's height is the cave's floor.)
+		if (WRLand::OwnLandMap())
+		{
+			const float Z = WRLand::GroundZAt(Top, TNumericLimits<float>::Lowest());
+			if (Z > TNumericLimits<float>::Lowest()) return FVector(Top.X, Top.Y, Z);
+		}
 		FHitResult Hit;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(WRCave), false, this);
 		return GetWorld()->LineTraceSingleByChannel(Hit, Top, Top - FVector(0, 0, 2000), ECC_WorldStatic, Query) ? Hit.ImpactPoint : Top - FVector(0, 0, 650);

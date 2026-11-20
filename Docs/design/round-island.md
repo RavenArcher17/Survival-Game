@@ -156,6 +156,20 @@ alive-and-explorable pass, as slice 1.
   there, a row with `land` stands on the land's height) and the dressing's `pois` (camps, bosses, minis: the map and
   the world systems' start). `UWRIslandPlaces` loads `<map>_places.json` on any map that has one and finds the ground
   from the land's height. island.json `camps.groups`: each built land's three camps, tagged with its biome.
+- **Caves, tubes, bosses, nodes (11-20):** `fire_frost_dressing.mjs` part 3 fits the caves (`Tools/terrain/cave_hollows.json`,
+  as the Old Island's dressing does) near their mapped spots into the dressing's `caves`, and writes `wildreach_life.json`
+  `bosses` (`[id, at, altar?, altarAt?]`: `PlaceLife` spawns each as a spawner of 1, tag `round_boss`, and the altar
+  with its path) and `nodes` (`[x, y, item, yaw]` → `AWRResourceNode`), and `wildreach_world.json` `hidden` (the tubes
+  on `fire_frost.mjs` `HIDDEN_ROUTE`) and `biomes` (each land's centre for its event). `round_ground.mjs` raises a
+  ridge over each tube (`TUBE`: nothing within 7.5 m of the line, so the corridor's floor is the ground as it was, full
+  height by 9.5 m over `AWRHiddenTube`'s deeper walls on a map with lands, falling to its foot by ~34 m; open past
+  both ends and beside each room) and the places kit's small pingos as mounds (after the roads' passes).
+- **Weather on the round island:** the weather's fog is the second fog layer, its floor on the ground under the camera
+  (eased), falloff `sky.roundWeatherFalloff` (low: the air overhead as thick as round you), density the look's x
+  `sky.roundWeatherDensity` or `sky.roundWeather.<kind>` "r,g,b,density" where the round island has its own look (the
+  eruption). Thick weather there tints the sky atmosphere toward the weather's colour and stops the sky adding to
+  the fog (`sky.weatherSkyFullAt`, `weatherSkyTint`, `weatherSkyLevel`, `weatherSkyHorizon`). The eruption's column
+  (fx `eruption.column`) is drawn by every machine from the event's state (`AWRWorldState::Tick`).
 - **The lava river:** island.json `lava` (width, points with the lava's level, ending at the shore); its channel and
   levees are cut into the ground, and `WRRoundIsland::BuildLava` draws it with `M_Lava` (molten in the middle, crust at
   the rims) and warm lights along its banks (`roundIsland.lavaGlow`, `lavaLight`, `lavaLightEvery`, `lavaLightRadius`).

@@ -134,6 +134,19 @@ namespace WRWorldImpl
 	/** A world.json list (path "villages", "shrines.list", "hidden") with this map's own rows after it: the round island's
 	 *  villages, shrines and tubes (Data/<map>_world.json, made by Tools/terrain/fire_frost_dressing.mjs; each row has
 	 *  "map"). The Old Island's rows of the same ids aren't live there (WRBiome::IsLive), so these stand in for them. */
+	/** This map's own world file (Data/<map>_world.json; the round island's), or null. */
+	TSharedPtr<FJsonObject> WOwnWorld()
+	{
+		static TMap<FString, TSharedPtr<FJsonObject>> PerMap;
+		const FString& Map = WRLand::CurrentMap();
+		if (!PerMap.Contains(Map))
+		{
+			const FString Short = Map.StartsWith(TEXT("L_")) ? Map.Mid(2).ToLower() : Map.ToLower();
+			PerMap.Add(Map, Map.IsEmpty() ? nullptr : FWRTuning::LoadDataFile(Short + TEXT("_world.json")));
+		}
+		return PerMap.FindRef(Map);
+	}
+
 	TArray<TSharedPtr<FJsonValue>> WRows(const FString& Path)
 	{
 		TArray<TSharedPtr<FJsonValue>> Out;
@@ -145,15 +158,28 @@ namespace WRWorldImpl
 			if (const TArray<TSharedPtr<FJsonValue>>* A = WArr(O, Key)) Out.Append(*A);
 		};
 		Take(WRWorld::Data());
-		static TMap<FString, TSharedPtr<FJsonObject>> PerMap;
-		const FString& Map = WRLand::CurrentMap();
-		if (!PerMap.Contains(Map))
-		{
-			const FString Short = Map.StartsWith(TEXT("L_")) ? Map.Mid(2).ToLower() : Map.ToLower();
-			PerMap.Add(Map, Map.IsEmpty() ? nullptr : FWRTuning::LoadDataFile(Short + TEXT("_world.json")));
-		}
-		if (const TSharedPtr<FJsonObject>& Own = PerMap.FindRef(Map); Own.IsValid()) Take(Own);
+		if (const TSharedPtr<FJsonObject> Own = WOwnWorld(); Own.IsValid()) Take(Own);
 		return Out;
+	}
+
+	/** This map's own biome row (the round island's: Data/<map>_world.json "biomes", e.g. the Volcanic's centre for its
+	 *  Eruption), else world.json's. */
+	TSharedPtr<FJsonObject> WHereBiome(FName Biome)
+	{
+		if (const TSharedPtr<FJsonObject> Own = WOwnWorld(); Own.IsValid())
+		{
+			if (const TSharedPtr<FJsonObject> B = WChild(WChild(Own, TEXT("biomes")), Biome.ToString()); B.IsValid()) return B;
+		}
+		return WRWorld::Biome(Biome);
+	}
+
+	/** Is a biome's world content (its events, its bosses' stones) here: live on the Old Island, or given by this map's own
+	 *  world file (the round island's Volcanic and Tundra). */
+	bool WBiomeHere(FName Biome)
+	{
+		if (WRBiome::IsLive(Biome)) return true;
+		const TSharedPtr<FJsonObject> Own = WOwnWorld();
+		return Own.IsValid() && WChild(WChild(Own, TEXT("biomes")), Biome.ToString()).IsValid() && WRBiome::IsContentLive(Biome);
 	}
 
 	/** Is a world row live on this map: one with "map" only on that map (and its biome's content live), the rest as
@@ -171,6 +197,17 @@ namespace WRWorldImpl
 		const float Sea = WRTune(TEXT("sea.level"), -20.f) + 150.f;
 		for (int32 Step = 0; Step < 80; ++Step)
 		{
+			// On a map with lands of its own the ground is the land's height (its collision is built only near players).
+			if (WRLand::OwnLandMap())
+			{
+				const float Z = WRLand::GroundZAt(FVector(Cm, 0.f), TNumericLimits<float>::Lowest());
+				if (Z > TNumericLimits<float>::Lowest())
+				{
+					if (Z > Sea) { Out = FVector(Cm, Z); return true; }
+					Cm += -Cm.GetSafeNormal() * 2000.f;
+					continue;
+				}
+			}
 			FHitResult Hit;
 			FCollisionQueryParams Q(SCENE_QUERY_STAT(WRWorldSettle), false);
 			if (!World->LineTraceSingleByChannel(Hit, FVector(Cm, 200000.f), FVector(Cm, -20000.f), ECC_WorldStatic, Q))
@@ -516,6 +553,25 @@ void AWRWorldState::Tick(float DeltaSeconds)
 			const float Yaw = FMath::FRandRange(0.f, 360.f);
 			const FVector At = Me->GetActorLocation() + FRotator(0.f, Yaw, 0.f).Vector() * FMath::FRandRange(30000.f, 80000.f) + FVector(0.f, 0.f, FMath::FRandRange(60000.f, 90000.f));
 			WRFx::SpawnAt(this, TEXT("meteor.streak"), At, FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), 6.f);
+		}
+	}
+	{
+		// The round island's eruption column: every machine draws it over the crater while the eruption is on, so it
+		// stands over the island for everyone, whenever they arrive (fx.json eruption.column).
+		const FWRWorldEventRep* E = WRLand::OwnLandMap() ? Event(TEXT("eruption")) : nullptr;
+		const bool bOn = E && E->Stage == 1;
+		if (bOn && !EruptionColumn)
+		{
+			EruptionColumn = NewObject<USceneComponent>(this);
+			EruptionColumn->SetMobility(EComponentMobility::Movable);
+			EruptionColumn->RegisterComponent();
+			EruptionColumn->SetWorldLocation(E->Centre + FVector(0.f, 0.f, 3000.f));
+			WRFx::Attach(EruptionColumn, TEXT("eruption.column"));
+		}
+		else if (!bOn && EruptionColumn)
+		{
+			EruptionColumn->DestroyComponent(true);
+			EruptionColumn = nullptr;
 		}
 	}
 	if (const FWRWorldEventRep* E = Event(TEXT("eruption")); E && E->Stage <= 1 && WRBiome::At(this, Me->GetActorLocation()) == E->Biome)
@@ -1158,7 +1214,7 @@ void UWRWorldSystems::PlaceStones()
 	{
 		const FName Boss(*KV.Key);
 		const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(Boss);
-		if (Have.Contains(Boss) || !Def || !WRBiome::IsLive(Def->Biome)) continue;
+		if (Have.Contains(Boss) || !Def || !WBiomeHere(Def->Biome)) continue;
 		FVector Spot = FVector::ZeroVector;
 		FRotator Face = FRotator::ZeroRotator;
 		for (TActorIterator<AWRRunbackStone> It(World); It; ++It)
@@ -1201,14 +1257,14 @@ void UWRWorldSystems::PlaceStones()
 void UWRWorldSystems::PlaceTubes()
 {
 	UWorld* World = GetWorld();
-	const TArray<TSharedPtr<FJsonValue>>* List = WArr(WRWorld::Data(), TEXT("hidden"));
-	if (!List) return;
 	const TSharedPtr<FJsonObject> SavedCaches = WChild(Loaded, TEXT("caches"));
-	for (const TSharedPtr<FJsonValue>& V : *List)
+	TSet<FName> Placed;
+	for (const TSharedPtr<FJsonValue>& V : WRows(TEXT("hidden")))
 	{
 		const TSharedPtr<FJsonObject> Row = V->AsObject();
 		const FName Biome(*WStrOf(Row, TEXT("biome")));
-		if (!WRBiome::IsLive(Biome)) continue;
+		if (!WRowLive(Row, Biome) || Placed.Contains(FName(*WStrOf(Row, TEXT("id"))))) continue;
+		Placed.Add(FName(*WStrOf(Row, TEXT("id"))));
 		TArray<FVector> Route;
 		if (const TArray<TSharedPtr<FJsonValue>>* R = WArr(Row, TEXT("route")))
 		{
@@ -1672,7 +1728,7 @@ bool UWRWorldSystems::StartEvent(FName Id, bool bNow)
 	const TSharedPtr<FJsonObject> Row = WRWorld::Obj(TEXT("events.") + Id.ToString());
 	if (!Row.IsValid() || Runs.ContainsByPredicate([Id](const FEventRun& R) { return R.Id == Id; })) return false;
 	const FName Biome(*WStrOf(Row, TEXT("biome")));
-	if (!Biome.IsNone() && !WRBiome::IsLive(Biome)) return false;
+	if (!Biome.IsNone() && !WBiomeHere(Biome)) return false;
 	FEventRun R;
 	R.Id = Id;
 	R.Biome = Biome;
@@ -1681,7 +1737,7 @@ bool UWRWorldSystems::StartEvent(FName Id, bool bNow)
 	R.StartAt = Now + (bNow ? 5.0 : WRWorld::Num(TEXT("events.warnSeconds"), 300.f));
 	R.EndAt = R.StartAt + WNumOf(Row, TEXT("end"), 3600.f);
 	R.bForced = bNow;
-	if (const TSharedPtr<FJsonObject> B = WRWorld::Biome(Biome))
+	if (const TSharedPtr<FJsonObject> B = WHereBiome(Biome))
 	{
 		const FVector2D C = WMetres(B->TryGetField(TEXT("centre")));
 		FVector G;
@@ -1764,8 +1820,9 @@ void UWRWorldSystems::StepEvents(float Dt)
 			if (R.Id != TEXT("starfall")) WTellBiome(World, R.Biome, WStrOf(Row, TEXT("startText")), TEXT("world.event"));
 			if (R.Id == TEXT("eruption"))
 			{
-				// The plume stands over the crater for the whole event: seen island-wide.
-				WRFx::Broadcast(World, TEXT("eruption.plume"), R.Centre + FVector(0.f, 0.f, 3000.f), FRotator::ZeroRotator, 1.f, TEXT("world.bomb_launch"), float(R.EndAt - R.StartAt));
+				// The plume stands over the crater for the whole event: seen island-wide (on the round island every machine
+				// draws its own ~500 m column from the event's state: AWRWorldState::Tick).
+				if (!WRLand::OwnLandMap()) WRFx::Broadcast(World, TEXT("eruption.plume"), R.Centre + FVector(0.f, 0.f, 3000.f), FRotator::ZeroRotator, 1.f, TEXT("world.bomb_launch"), float(R.EndAt - R.StartAt));
 				VaultOpenUntilHours = WGameHours(World) + WNumOf(Row, TEXT("vaultHours"), 24.f);
 			}
 			UE_LOG(LogWildreach, Log, TEXT("EVENT %s on"), *R.Id.ToString());

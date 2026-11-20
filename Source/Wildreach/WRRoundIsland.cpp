@@ -16,6 +16,8 @@
 #include "WRSound.h"
 #include "WRWorldSystems.h"
 #include "WRCreature.h"
+#include "WRAltar.h"
+#include "WRResourceNode.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/StaticMesh.h"
@@ -803,7 +805,64 @@ void AWRRoundIsland::PlaceLife()
 			++Dens;
 		}
 	}
-	UE_LOG(LogWildreach, Log, TEXT("ROUND life: %d dens (%d packs), %d roaming loops"), Dens, Packs, Loops);
+	// The bosses and minis at their arenas (one each, back server.bossRespawnHours after it falls), the paths' altars
+	// beside the majors.
+	int32 Bosses = 0;
+	if (J->TryGetArrayField(TEXT("bosses"), Rows))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Rows)
+		{
+			const TSharedPtr<FJsonObject> B = V->AsObject();
+			const TArray<TSharedPtr<FJsonValue>>* At = nullptr;
+			if (!B.IsValid() || !B->TryGetArrayField(TEXT("at"), At) || At->Num() < 2) continue;
+			const FName Id(*B->GetStringField(TEXT("id")));
+			if (!FWRCreatureRegistry::Get().Find(Id)) { UE_LOG(LogWildreach, Warning, TEXT("ROUND life: no boss %s"), *Id.ToString()); continue; }
+			const FVector G = Ground(FVector2D((*At)[0]->AsNumber(), (*At)[1]->AsNumber()));
+			const FTransform T(FRotator(0.f, B->HasField(TEXT("yaw")) ? float(B->GetNumberField(TEXT("yaw"))) : 0.f, 0.f), G + FVector(0.f, 0.f, 150.f));
+			if (AWRCreatureSpawner* Sp = GetWorld()->SpawnActorDeferred<AWRCreatureSpawner>(AWRCreatureSpawner::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+			{
+				Sp->CreatureId = Id;
+				Sp->Count = 1;
+				Sp->Radius = 0.f;
+				Sp->RespawnSeconds = FWRTuning::Get().Num(TEXT("server.bossRespawnHours"), 4.f) * 3600.f;
+				Sp->bTraceGround = true;
+				Sp->Tags.Add(TEXT("round_boss"));
+				Sp->FinishSpawning(T);
+				++Bosses;
+			}
+			FString Path;
+			if (B->TryGetStringField(TEXT("altar"), Path))
+			{
+				const TArray<TSharedPtr<FJsonValue>>* AA = nullptr;
+				const FVector AG = B->TryGetArrayField(TEXT("altarAt"), AA) && AA->Num() >= 2 ? Ground(FVector2D((*AA)[0]->AsNumber(), (*AA)[1]->AsNumber())) : G + FVector(4000.f, 0.f, 0.f);
+				const FTransform AT(FRotator::ZeroRotator, AG + FVector(0.f, 0.f, 50.f));
+				if (AWRBossAltar* Altar = GetWorld()->SpawnActorDeferred<AWRBossAltar>(AWRBossAltar::StaticClass(), AT, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+				{
+					Altar->PathId = FName(*Path);
+					Altar->FinishSpawning(AT);
+				}
+			}
+		}
+	}
+	// The gathering that isn't a tree, a rock or a shrub (those are the dressing's): ore, sulfur, lichen, berries.
+	int32 Nodes = 0;
+	if (J->TryGetArrayField(TEXT("nodes"), Rows))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *Rows)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
+			if (R.Num() < 4) continue;
+			const FTransform T(FRotator(0.f, float(R[3]->AsNumber()), 0.f), Ground(FVector2D(R[0]->AsNumber(), R[1]->AsNumber())));
+			if (AWRResourceNode* N = GetWorld()->SpawnActorDeferred<AWRResourceNode>(AWRResourceNode::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+			{
+				N->ItemId = FName(*R[2]->AsString());
+				N->Tags.Add(TEXT("round_node"));
+				N->FinishSpawning(T);
+				++Nodes;
+			}
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("ROUND life: %d dens (%d packs), %d roaming loops, %d bosses, %d resource nodes"), Dens, Packs, Loops, Bosses, Nodes);
 }
 
 void AWRRoundIsland::BuildWater()

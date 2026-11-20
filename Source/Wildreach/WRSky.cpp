@@ -24,6 +24,7 @@
 #include "Components/LocalFogVolumeComponent.h"
 #include "Components/PostProcessComponent.h"
 #include "Components/SkyLightComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/SkyLight.h"
@@ -259,11 +260,17 @@ void AWRSky::FindMapLights()
 		SkyLight = It->GetLightComponent();
 		SkyIntensity = SkyLight.IsValid() ? SkyLight->Intensity : 1.f;
 	}
+	for (TActorIterator<ASkyAtmosphere> It(GetWorld()); It && !Atmosphere.IsValid(); ++It)
+	{
+		Atmosphere = It->GetComponent();
+		if (Atmosphere.IsValid()) SkyFactorBase = Atmosphere->SkyLuminanceFactor;
+	}
 	for (TActorIterator<AExponentialHeightFog> It(GetWorld()); It && !Fog.IsValid(); ++It)
 	{
 		Fog = It->GetComponent();
 		if (UExponentialHeightFogComponent* F = Fog.Get())
 		{
+			FogAmbientBase = F->SkyAtmosphereAmbientContributionColorScale;
 			FogColor = F->FogInscatteringLuminance;
 			FogDensity = F->FogDensity;
 			FogFalloff = F->FogHeightFalloff;
@@ -560,6 +567,16 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 					WeatherFogDensity = K->FogDensity;
 					WeatherFogColor = K->FogColor;
 					WeatherSkyDim = K->SkyDim;
+					WeatherLayerDensity = K->FogDensity * T.Num(TEXT("sky.roundWeatherDensity"), 0.35f);
+					// The round island's own look for a weather where the Old Island's doesn't suit it (sky.roundWeather.<kind>
+					// "r,g,b,density", sRGB; the density the weather layer's own): an eruption you see 300 m into, not 50.
+					const FString Own = bRoundIsland ? T.Str(*FString::Printf(TEXT("sky.roundWeather.%s"), *W->Kind.ToString()), TEXT("")) : FString();
+					TArray<FString> P;
+					if (Own.ParseIntoArray(P, TEXT(",")) >= 4)
+					{
+						WeatherFogColor = FLinearColor(FColor(uint8(FCString::Atoi(*P[0])), uint8(FCString::Atoi(*P[1])), uint8(FCString::Atoi(*P[2]))));
+						WeatherLayerDensity = FCString::Atof(*P[3]);
+					}
 				}
 			}
 		}
@@ -576,6 +593,49 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		F->SetFogInscatteringColor(FMath::Lerp(Haze, Storm, WeatherAmount));
 		const float BaseDensity = bRoundIsland ? RoundDensity : FMath::Lerp(FMath::Lerp(T.Num(TEXT("sky.volcanicFogDensity"), 0.027f), T.Num(TEXT("sky.tundraFogDensity"), 0.022f), B), T.Num(TEXT("sky.stormFogDensity"), 0.018f), SA);
 		F->SetFogDensity(FMath::Lerp(BaseDensity, FMath::Max(BaseDensity, WeatherFogDensity), WeatherAmount));
+		if (bRoundIsland)
+		{
+			// The round island's weather (an eruption's ash, a whiteout's snow) stands on the ground under the camera: its
+			// lands lie from the sea to 300 m up (the volcano, the ice shelf), far from the main haze's height, so the
+			// weather is the second fog layer there, its floor at the ground and reaching high (a low falloff) so the
+			// air overhead is as thick as round you; the main haze keeps the land's own density.
+			F->SetFogDensity(BaseDensity);
+			const float Ground = WRLand::GroundZAt(View, 0.f);
+			WeatherGround = WeatherGround < -1e6f || WeatherAmount < 0.001f ? Ground : FMath::FInterpTo(WeatherGround, Ground, DeltaSeconds, 0.6f);
+			if (WeatherAmount > 0.001f)
+			{
+				F->SetSecondFogHeightOffset(WeatherGround + T.Num(TEXT("sky.roundWeatherLift"), 0.f) - F->GetComponentLocation().Z);
+				F->SetSecondFogHeightFalloff(T.Num(TEXT("sky.roundWeatherFalloff"), 0.04f));
+				F->SetSecondFogDensity(WeatherLayerDensity * WeatherAmount);
+				bWeatherLayerSet = true;
+			}
+			else if (bWeatherLayerSet)
+			{
+				F->SetSecondFogDensity(0.f);
+				bWeatherLayerSet = false;
+			}
+		}
+		// Thick weather closes the sky too: the sky's light tinted toward the weather's haze, so the fogged ground and
+		// the sky meet without a line on the horizon, and the sky no longer adds its blue to the haze (which turned the
+		// eruption's brown ash pink). Full at sky.weatherSkyFullAt density; set only when it moves. The round island's
+		// only so far (the Old Island's weather looks are as they shipped).
+		{
+			const float Thick = !bRoundIsland ? 0.f : WeatherAmount * FMath::Clamp(WeatherFogDensity / FMath::Max(0.01f, T.Num(TEXT("sky.weatherSkyFullAt"), 0.3f)), 0.f, 1.f) * T.Num(TEXT("sky.weatherSkyTint"), 0.9f);
+			if (FMath::Abs(Thick - WeatherSkySet) > 0.004f)
+			{
+				WeatherSkySet = Thick;
+				F->SetSkyAtmosphereAmbientContributionColorScale(FMath::Lerp(FogAmbientBase, FLinearColor::Black, Thick));
+				if (USkyAtmosphereComponent* Air = Atmosphere.Get())
+				{
+					// The sky's horizon is a light blue: the factor that turns it into the weather's colour (its hue, at
+					// sky.weatherSkyLevel of the sky's brightness) darkens and greys the rest of it alike.
+					const FVector H = Vec(TEXT("sky.weatherSkyHorizon"), FVector(0.62f, 0.76f, 1.f));
+					const FLinearColor C = WeatherFogColor / FMath::Max(0.01f, WeatherFogColor.GetMax());
+					const FLinearColor Want = FLinearColor(C.R / FMath::Max(0.05f, float(H.X)), C.G / FMath::Max(0.05f, float(H.Y)), C.B / FMath::Max(0.05f, float(H.Z)));
+					Air->SetSkyLuminanceFactor(FMath::Lerp(SkyFactorBase, Want / FMath::Max(0.01f, Want.GetMax()) * T.Num(TEXT("sky.weatherSkyLevel"), 0.45f), Thick));
+				}
+			}
+		}
 		// Toward a low sun the haze glows warm: the dawn and dusk glare across a valley.
 		F->SetDirectionalInscatteringExponent(T.Num(TEXT("sky.sunGlowExponent"), 6.f));
 		F->SetDirectionalInscatteringColor(SRGB(TEXT("sky.sunGlowColor"), FColor(255, 150, 80)) * (Low * T.Num(TEXT("sky.sunGlow"), 0.6f)));

@@ -193,6 +193,10 @@ const NUDGE = {
 	"Pale Hunter": { to: [4250, 1150] }, pale_pines: { to: [4220, 1125] },
 	fallen_smith: SMITH_CROSSING ? (() => { const L = Math.hypot(...SMITH_CROSSING.road), n = [-SMITH_CROSSING.road[1] / L, SMITH_CROSSING.road[0] / L]; return { to: [SMITH_CROSSING.at[0] + n[0] * 32, SMITH_CROSSING.at[1] + n[1] * 32] }; })() : null,
 };
+const HIDDEN_ROUTE = {
+	kilnroads: [[-4120, 90], [-3960, 180], [-3800, 300], [-3660, 430], [-3520, 560], [-3380, 680]],
+	bluebelow: [[3225, 500], [3351, 522], [3477, 544], [3603, 567], [3729, 589], [3855, 611]],
+};
 export const nudged = (key, at) => { const n = NUDGE[key]; if (!n) return at; return n.to ? n.to : [at[0] + n[0], at[1] + n[1]]; };
 
 const MAIN = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
@@ -210,7 +214,10 @@ if (MAIN) {
 		},
 		sites: DRESS.pois.filter((p) => /boss|mini|cave/.test(p.kind) && Math.abs(p.y) < 201600 && Math.abs(p.x) < 210000).map((p) => move({ kind: p.kind, name: p.name, at: [p.x / 100, p.y / 100] })),
 		caves: DRESS.caves.map((c) => move({ biome: c.biome, variant: c.variant, yaw: c.yaw, at: [c.x / 100, c.y / 100] })),
-		hidden: WORLD.hidden.filter((h) => /volcanic|tundra/.test(h.biome)).map((h) => ({ id: h.id, name: h.name, land: h.biome, old: h.route, route: h.route.map((p) => R(toRound(h.biome, p))) })),
+		// The tubes on gentle ground of their own (surface corridors; the mapped routes ran over the crater's wall and
+		// through the Weeping Seracs): the Kiln Roads down the volcano's lower east flank toward where the lava breaks
+		// out, the Blue Below along the ice shelf's southern top (a search for its gentlest 640 m line).
+		hidden: WORLD.hidden.filter((h) => /volcanic|tundra/.test(h.biome)).map((h) => ({ id: h.id, name: h.name, land: h.biome, old: h.route, route: HIDDEN_ROUTE[h.id] || h.route.map((p) => R(toRound(h.biome, p))) })),
 		shrines: (WORLD.shrines.list || WORLD.shrines).filter((s) => /volcanic|tundra/.test(s.biome) && s.at).map((s) => ({ id: s.id, land: s.biome, old: s.at, at: R(toRound(s.biome, s.at)) })),
 		lands: {},
 	};

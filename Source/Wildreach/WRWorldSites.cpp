@@ -1516,12 +1516,27 @@ void AWRHiddenTube::BuildLook()
 	const TArray<TSharedPtr<FJsonValue>>* Sky = nullptr;
 	if (Row->TryGetArrayField(TEXT("skylights"), Sky)) for (const auto& V : *Sky) Skylights.Add(int32(V->AsNumber()));
 	const FColor RockC = SiteColour(FName(*BiomeStr), TEXT("rock"), FColor(30, 27, 25));
-	UMaterialInstanceDynamic* Mat = SiteRockMat(this, bIce ? FLinearColor(0.75f, 0.85f, 1.f) : SiteLin(RockC) * 3.f);
+	UMaterialInstanceDynamic* Mat = SiteRockMat(this, SiteLin(RockC) * 3.f);
+	if (bIce)
+	{
+		// The Blue Below's walls are the ice itself (the rock texture tinted pale still read as dark stone on the snow):
+		// the seracs' blue-white (WRWorldDressing serac).
+		if (UMaterialInterface* IceBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+		{
+			Mat = UMaterialInstanceDynamic::Create(IceBase, this);
+			Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.68f, 0.84f));
+		}
+	}
+	// On a map with lands of its own the tube runs under a ridge the ground generator raised over it (round_ground.mjs
+	// tube ridges): its walls are deeper there, so the ridge buries their outsides and only the inside shows them.
+	const bool bRidge = WRLand::OwnLandMap();
+	const float WallDepth = bRidge ? 760.f : 420.f, WallOut = W * 0.5f + (bRidge ? 330.f : 160.f);
 	const bool bDraw = GetNetMode() != NM_DedicatedServer;
 	TArray<FWRLookBlock> Blocks;
 	FKit K(GetActorTransform(), Blocks);
 	int32 Seed = 0;
 	float SinceLight = 0.f;
+	UMaterialInstanceDynamic* HeapMat = nullptr;
 	// Where the rooms open off the corridor: the wall on their side is left out there (the cave's mouth).
 	TArray<FVector> Mouths;
 	const TArray<TSharedPtr<FJsonValue>>* RoomList = nullptr;
@@ -1533,7 +1548,7 @@ void AWRHiddenTube::BuildLook()
 			RV->AsObject()->TryGetNumberField(TEXT("at"), RA);
 			const int32 RI = FMath::Clamp(int32(RA), 0, Route.Num() - 1);
 			const FVector RAlong = (Route[FMath::Min(RI + 1, Route.Num() - 1)] - Route[FMath::Max(RI - 1, 0)]).GetSafeNormal2D();
-			Mouths.Add(Route[RI] - GetActorLocation() - FVector::CrossProduct(FVector::UpVector, RAlong) * (W * 0.5f + 160.f));
+			Mouths.Add(Route[RI] - GetActorLocation() - FVector::CrossProduct(FVector::UpVector, RAlong) * WallOut);
 		}
 	}
 	for (int32 s = 0; s + 1 < Route.Num(); ++s)
@@ -1553,16 +1568,16 @@ void AWRHiddenTube::BuildLook()
 			// The walls: boulders shoulder to shoulder each side, sunk 3 m so the ground never shows a gap.
 			for (const float S : { -1.f, 1.f })
 			{
-				const FVector2D WP = FVector2D(Mid + Side * S * (W * 0.5f + 160.f));
+				const FVector2D WP = FVector2D(Mid + Side * S * WallOut);
 				if (S < 0.f && Mouths.ContainsByPredicate([&WP](const FVector& M) { return FVector2D::Distance(FVector2D(M), WP) < 450.f; })) continue;
 				const float WZ = FMath::Min(SiteGroundZ(this, WP, Floor), Floor);
-				SiteRock(this, RootComponent, Seed + (S > 0 ? 3 : 0), FVector(420.f, 360.f, H + 380.f), FVector(WP, WZ), FRotator(0.f, Yaw.Yaw + 90.f * S + 10.f * FMath::Sin(Seed * 1.3f), 0.f), Mat, true, 300.f);
+				SiteRock(this, RootComponent, Seed + (S > 0 ? 3 : 0), FVector(WallDepth, 360.f, H + 380.f), FVector(WP, WZ), FRotator(0.f, Yaw.Yaw + 90.f * S + 10.f * FMath::Sin(Seed * 1.3f), 0.f), Mat, true, 300.f);
 			}
 			// The roof: slabs resting across the walls; a skylight leaves the first 9 m of its run open.
 			const bool bOpen = Skylights.Contains(s) && T * Len < 900.f;
 			if (!bOpen)
 			{
-				SiteRock(this, RootComponent, Seed + 1, FVector(380.f, W + 520.f, 240.f), Mid + FVector(0, 0, H), FRotator(4.f * FMath::Sin(Seed * 0.7f), Yaw.Yaw + 90.f, 0.f), Mat, true, 0.f);
+				SiteRock(this, RootComponent, Seed + 1, FVector(380.f, W + 520.f, 240.f), Mid + FVector(0, 0, H), FRotator(4.f * FMath::Sin(Seed * 0.7f), Yaw.Yaw, 0.f), Mat, true, 0.f);
 				if (bIce && bDraw && Seed % 2 == 0)
 				{
 					// Icicles from the roof.
@@ -1571,8 +1586,18 @@ void AWRHiddenTube::BuildLook()
 			}
 			else if (T * Len < 300.f)
 			{
-				// Under a skylight: the heap of ash or snow that blew in breaks the 7 m drop.
-				K.Add(bIce ? FSurf::Stone(FLinearColor(0.85f, 0.9f, 0.95f), 0.95f) : FSurf::Stone(FLinearColor(0.09f, 0.085f, 0.08f), 0.98f), FVector(500.f, W * 0.8f, 120.f), Mid + FVector(0, 0, 40.f), Yaw, EWRLookMesh::Cylinder);
+				// Under a skylight: the drift of ash or snow that blew in breaks the 7 m drop (a squashed rock of the walls'
+				// set, so it lies as a lumpy drift rather than a drum).
+				if (!HeapMat)
+				{
+					HeapMat = SiteRockMat(this, FLinearColor(0.05f, 0.048f, 0.046f));
+					if (bIce) if (UMaterialInterface* SnowBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+					{
+						HeapMat = UMaterialInstanceDynamic::Create(SnowBase, this);
+						HeapMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.82f, 0.86f, 0.9f));
+					}
+				}
+				SiteRock(this, RootComponent, Seed + 11, FVector(560.f, W * 0.85f, 150.f), Mid, Yaw, HeapMat, false, 60.f);   // no collision: it fills the corridor (snow and ash to wade through)
 			}
 			// The floor: a seam of glowing crust (cooling lava under a black skin) or a sheet of meltwater ice.
 			if (bDraw)

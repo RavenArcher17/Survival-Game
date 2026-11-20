@@ -122,6 +122,9 @@ private:
 	/** Client: the meteor streaks across the sky while Starfall's warning runs. */
 	float StreakClock = 0.f;
 	float TremorClock = 0.f;
+	/** The eruption's column over the crater on a map with lands of its own, drawn by every machine from the event's
+	 *  state while it's on (a broadcast reaches only the players near the crater when it starts). */
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> EruptionColumn;
 };
 
 /** A quest a player holds with one master. */

@@ -75,6 +75,7 @@ const KEEP_CLEAR = (() => {
 		for (const c of L.camps) add(c, 120);
 	}
 	for (const p of FF.LAVA_RIVER) add(p, 90);
+	for (const h of FFL.hidden || []) for (const p of h.route) add(p, 60);
 	for (const k of ["places", "sites", "caves", "shrines"]) for (const o of FFL[k] || []) if (Array.isArray(o.at)) add(o.at, k === "sites" ? 160 : 70);
 	return pts;
 })();
@@ -316,7 +317,7 @@ const SURF = { bed: 1, bank: 2, sand: 3, shore_rock: 6, road: 7, main_road: 10, 
 	cinder: 34, cinder_grass: 35, kipuka: 36, lava: 37, lava_crust: 38, snow: 39, snow_forest: 40, lake_ice: 41, glacier: 42,
 	crevasse: 43, thaw_moss: 44, shingle: 45, ice: 46, oxide: 47, snow_crack: 48, moss_crack: 49,
 	// The Ashfall Woods and the Mammoth Steppe (11-20), and each old sub-zone's own touches.
-	steppe: 50, ash_pale: 51, charcoal: 52, lichen_rock: 53, pumice: 54, moraine: 55, copper: 56 };
+	steppe: 50, ash_pale: 51, charcoal: 52, lichen_rock: 53, pumice: 54, moraine: 55, copper: 56, snow_road: 57 };
 for (let j = 0; j < N; j++) {
 	const y = -HALF + j * STEP;
 	for (let i = 0; i < N; i++) {
@@ -614,8 +615,72 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 {
 	const KEEP = new Set(["crater_plume", "crater_stair", "weeping_seracs", "frozen_whaler", "glasswall", "fox_pingo", "ice_arch", "moulin", "fallen_smith", "kipuka", "crevasse_maze", "claw_scars", "ridge_watch", "wardens_quarry", "steam_ground", "acid_pool"]);
 	let n = 0;
-	for (const p of FFL.places) if (!KEEP.has(p.kind) && Array.isArray(p.at)) { pad(p.at, 18, 26); n++; }
+	const WIDE = { blue_fire: 34, bellows_stacks: 26, miners_camp: 24, hunter_camp: 24, fishing_camp: 24 };   // places whose crusts or camps spread wider
+	for (const p of FFL.places) if (!KEEP.has(p.kind) && Array.isArray(p.at)) { pad(p.at, WIDE[p.kind] || 18, 26); n++; }
 	log(`places levelled: ${n}`);
+}
+// The places kit's small pingos (WRIslandPlacesKit SmallPingo: on the Old Island a stack of snow discs; here the ground
+// itself, the kit adding only its cracked blue top), their size by the kit's variant; raised after the roads' passes,
+// which would flatten them to a third near a road.
+{
+	let n = 0;
+	for (const kp of FFL.kit.filter((k) => k.kind === "small_pingo")) {
+		const sc = 1 + 0.25 * (kp.v % 3), p = { at: kp.at, r: 16 * sc, h: 5.5 * sc, cr: 3 * sc, cd: 1.2 * sc };
+		for (let j = Math.floor((p.at[1] - p.r + HALF) / STEP); j <= Math.ceil((p.at[1] + p.r + HALF) / STEP); j++) for (let i = Math.floor((p.at[0] - p.r + HALF) / STEP); i <= Math.ceil((p.at[0] + p.r + HALF) / STEP); i++) {
+			if (i < 0 || j < 0 || i >= N || j >= N) continue;
+			H[j * N + i] += pingoH(p, -HALF + i * STEP, -HALF + j * STEP);
+		}
+		n++;
+	}
+	log(`kit pingos raised: ${n}`);
+}
+// The hidden tubes under ridges of their own (a lava tube's roof; an esker over the ice tunnel): the corridor's floor is
+// the ground as it was (|d| < TUBE.core), the ridge rises over its boulder walls (AWRHiddenTube: 7.6 m deep on a map with
+// lands, their tops 6.3 m up) to TUBE.top and falls away to its foot, so from outside it reads as a ridge with the roof
+// slabs as its rocky crest, not a wall on the snow. It opens at both mouths (the flanks run on past the end, tapering)
+// and beside each room, whose cave (25.5 m off on the corridor's left, AWRHiddenTube rooms) stands on the ground as it
+// was in the gap.
+{
+	const TUBE = { h: 6.6, core: 7.5, top: 9.5, foot: 34, end: 24, roomAlong: 13, roomFade: 16, roomOut: 44 };
+	const WORLD_ROWS = JSON.parse(fs.readFileSync(path.join(root, "Data/world.json"), "utf8")).hidden || [];
+	for (const tube of FFL.hidden || []) {
+		const pts = tube.route, row = WORLD_ROWS.find((q) => q.id === tube.id) || {};
+		const segs = pts.slice(1).map((b, s) => { const a = pts[s], L = Math.hypot(b[0] - a[0], b[1] - a[1]); return { a, L, ux: (b[0] - a[0]) / L, uy: (b[1] - a[1]) / L }; });
+		const rooms = (row.rooms || []).map((r) => {
+			const i = Math.max(0, Math.min(pts.length - 1, r.at | 0)), p0 = pts[Math.max(i - 1, 0)], p1 = pts[Math.min(i + 1, pts.length - 1)];
+			const l = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+			return { c: pts[i], ax: (p1[0] - p0[0]) / l, ay: (p1[1] - p0[1]) / l };
+		});
+		const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]), M = TUBE.foot + 12 + TUBE.end;
+		let raised = 0, peak = 0;
+		for (let j = Math.floor((Math.min(...ys) - M + HALF) / STEP); j <= Math.ceil((Math.max(...ys) + M + HALF) / STEP); j++) for (let i = Math.floor((Math.min(...xs) - M + HALF) / STEP); i <= Math.ceil((Math.max(...xs) + M + HALF) / STEP); i++) {
+			if (i < 0 || j < 0 || i >= N || j >= N) continue;
+			const x = -HALF + i * STEP, y = -HALF + j * STEP, k = j * N + i;
+			// The nearest point of the route: the across distance, and how far past an end (the mouths' approaches).
+			let best = Infinity, d = 0, beyond = 0;
+			segs.forEach((g, s) => {
+				const t = (x - g.a[0]) * g.ux + (y - g.a[1]) * g.uy, across = -(x - g.a[0]) * g.uy + (y - g.a[1]) * g.ux;
+				const past = s === 0 && t < 0 ? -t : s === segs.length - 1 && t > g.L ? t - g.L : 0;
+				const tc = Math.max(0, Math.min(g.L, t)), dist = past > 0 ? Math.abs(across) : Math.hypot(x - g.a[0] - g.ux * tc, y - g.a[1] - g.uy * tc);
+				if (dist + past < best) { best = dist + past; d = dist; beyond = past; }
+			});
+			const foot = TUBE.foot + 8 * fbm(x / 90, y / 90, 1068 + 61, 2);
+			let h = TUBE.h * (1 + 0.15 * fbm(x / 70, y / 70, 1068 + 62, 2)) * smooth(TUBE.core, TUBE.top, d) * (1 - smooth(TUBE.top + 1, foot, d)) * (1 - smooth(0, TUBE.end, beyond));
+			if (h <= 0.01) continue;
+			// Each room's gap: its cave stands on the ground as it was, the ridge's ends falling to it.
+			for (const r of rooms) {
+				const ra = (x - r.c[0]) * r.ax + (y - r.c[1]) * r.ay, rd = -(x - r.c[0]) * r.ay + (y - r.c[1]) * r.ax;
+				if (rd < 0) h *= 1 - (1 - smooth(TUBE.roomAlong, TUBE.roomAlong + TUBE.roomFade, Math.abs(ra))) * (1 - smooth(TUBE.roomOut, TUBE.roomOut + TUBE.roomFade, -rd));
+			}
+			H[k] += h;
+			raised++;
+			peak = Math.max(peak, h);
+		}
+		// A road crossing the ridge would be cut through it later (the roads' pass): say so.
+		let road = Infinity;
+		for (const rd of roads) for (let s = 1; s < rd.pts.length; s++) { const [ax, ay] = rd.pts[s - 1], [bx, by] = rd.pts[s], L = Math.hypot(bx - ax, by - ay); for (let t = 0; t <= L; t += 5) { const x = ax + (bx - ax) * t / L, y = ay + (by - ay) * t / L; for (const g of segs) { const u = Math.max(0, Math.min(g.L, (x - g.a[0]) * g.ux + (y - g.a[1]) * g.uy)); road = Math.min(road, Math.hypot(x - g.a[0] - g.ux * u, y - g.a[1] - g.uy * u)); } } }
+		log(`tube ridge ${tube.id}: ${raised} samples raised (peak ${peak.toFixed(1)} m), ${rooms.length} room gaps, nearest road ${road.toFixed(0)} m${road < TUBE.foot + 20 ? " -- THE ROAD CUTS THE RIDGE" : ""}`);
+	}
 }
 log("pads done");
 
@@ -660,12 +725,15 @@ for (const rd of roads) {
 			}
 		}
 	});
+	const SNOWY = new Set([SURF.snow, SURF.snow_forest, SURF.glacier, SURF.snow_crack, SURF.ice, SURF.crevasse, SURF.lake_ice]);
 	for (let k = 0; k < N * N; k++) {
 		if (WHO[k] < 0) continue;
 		// The road's bed at its grade; beside it the ground held within CUT_SLOPE of it (cuttings and banks, not walls).
 		const rd = roadInfo[WHO[k]], d = D[k], s = Math.max(0, d - rd.half) * CUT_SLOPE;
 		H[k] = lerp(A[k], Math.min(Math.max(H[k], A[k] - s), A[k] + s), smooth(rd.half, rd.half + 6, d));
-		if (d < rd.half && Math.hypot(-HALF + (k % N) * STEP, -HALF + Math.floor(k / N) * STEP) >= CITY_FLAT) S[k] = rd.main ? SURF.main_road : SURF.road;
+		// Over the Tundra's snow and ice the road is packed snow (a gravel road's dark band on the snow showed every 4 m
+		// step of its edge); where it reaches the meadow's grass it's the land's road again.
+		if (d < rd.half && Math.hypot(-HALF + (k % N) * STEP, -HALF + Math.floor(k / N) * STEP) >= CITY_FLAT) S[k] = SNOWY.has(S[k]) || S[k] === SURF.snow_road ? SURF.snow_road : rd.main ? SURF.main_road : SURF.road;
 	}
 	log("roads done");
 }
@@ -759,6 +827,7 @@ const land = {
 		{ id: "sand", class: SURF.sand, color: [206, 190, 146], rough: 0.8, layers: { sand: 1 } },
 		{ id: "shore_rock", class: SURF.shore_rock, color: [110, 106, 100], rough: 0.8, layers: { stones: 0.9, sand: 0.1 } },
 		{ id: "road", class: SURF.road, color: [118, 104, 79], rough: 0.9, layers: { soil: 0.5, stones: 0.5 } },
+		{ id: "snow_road", class: SURF.snow_road, color: [204, 210, 218], rough: 0.8, layers: { sand: 0.85, stones: 0.15 } },
 		{ id: "main_road", class: SURF.main_road, color: [132, 124, 108], rough: 0.85, layers: { stones: 0.8, soil: 0.2 } },
 		{ id: "plaza", class: SURF.plaza, color: [150, 142, 124], rough: 0.85, layers: { stones: 0.9, sand: 0.1 } },
 		{ id: "lake_bed", class: SURF.lake_bed, color: [92, 96, 74], rough: 0.5, layers: { soil: 0.5, moss: 0.3, sand: 0.2 } },
@@ -854,7 +923,7 @@ fs.writeFileSync(path.join(root, "Data/lands/island.json"), JSON.stringify(land)
 		if (h < 0 && rows[gj][gi] === "~") col = h > -3 ? [120, 196, 200] : h > -10 ? [70, 150, 172] : [40, 92, 128];
 		else if (inPoly([x, y], lakeOutline)) col = [80, 160, 205];
 		else if (s === SURF.bed) col = [70, 140, 200];
-		else if (s === SURF.road || s === SURF.main_road) col = [92, 70, 40];
+		else if (s === SURF.road || s === SURF.main_road || s === SURF.snow_road) col = [92, 70, 40];
 		else if (h < 0 && rows[gj][gi] === "5") col = [70, 110, 120];
 		else col = (zc[rows[gj][gi]] || [128, 128, 128]).map((v) => v * shade);
 		const o = (py * P + px) * 3; img[o] = Math.min(255, col[0]); img[o + 1] = Math.min(255, col[1]); img[o + 2] = Math.min(255, col[2]);

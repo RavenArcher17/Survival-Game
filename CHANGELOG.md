@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Phase 3, slices 2 and 3, step 2 (content), part 3: caves, hidden tubes, bosses, resource nodes and events (11-20)
+
+Raven: "If you think it's perfect keep going".
+- **Caves:** the six Fire and Frost caves (three a land), each the measured cave mesh fitted to the land's ground near
+  its mapped spot (you walk in from outside to the back with headroom, its walls reach into the ground all round), the
+  dressing cleared from them; what's inside stands on the land's height. The Tundra's caves are ice (both maps): their pale
+  tint on the dark rock texture had read as black domes on the snow.
+- **Bosses:** Vulkarn in the crater and Skaldrith in the cirque at their arenas, their altars 40 m east on the arena
+  floor; the Obsidian Warden, Ignessa, Grimjaw and the Pale Hunter at their lairs; summoning stones for all eight
+  (Cinderhorn and Old Tusker roam).
+- **Resource nodes:** 88: copper 20, tin 12 and iron 12 (better metal deeper in), sulfur 14 in the sulfur fields,
+  lichen 14 and berries 16, on gentle, clear ground in their sub-zones.
+- **The hidden tubes,** the Kiln Roads and the Blue Below, on routes of their own on gentle ground (the mapped ones
+  ran over the crater's wall and through the Weeping Seracs), each under a ridge the ground raises over it (a lava
+  tube's roof; an esker over the ice tunnel). From outside: a ridge with a rocky crest, a mouth at each end, a gap by
+  each room's cave. Before, both were long boulder walls standing on the open ground. The Blue Below is ice now
+  (blue-white walls, icicles), not dark rock on the snow; the drift under a skylight is a low heap, not a drum.
+  Fixed for both maps: the roof slabs were turned the wrong way (3.8 m across, short of the walls) and now rest on both.
+- **The Eruption and the Whiteout** start on the round island (each land's centre in wildreach_world.json). Their
+  weather is a fog layer of its own on the ground under the camera, reaching high: the lands lie from the sea to 300
+  m up, far from the haze's height. Thick weather closes the sky too: no clear blue sky over a fog wall, no hard line
+  at the horizon. The eruption's ash was pink (the sky's blue added to its brown) and is ash-brown now. You see about
+  300 m in it (sky.roundWeather.eruption), not 50, and about 80 m in the whiteout. Every machine draws the eruption's
+  column over the crater while it's on, about 800 m tall and seen from Hearthmoot. Before, a broadcast reached only the
+  players by the crater as it started.
+- **Fixed on the way:** the Tundra's road is packed snow over the snow and ice (the gravel road's dark band showed
+  every 4 m step of its edge). The places kit's 13 small pingos are real mounds in the ground with their cracked blue
+  tops; they were stacks of white discs.
+
 ### Phase 3, slices 2 and 3, step 2 (content), part 2: landmarks, camps, villages and shrines (11-20)
 
 Raven: "These creatures had a quality pass already in the play test so we can move on to part 2".

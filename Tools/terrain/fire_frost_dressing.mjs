@@ -43,6 +43,7 @@ for (const id of ["volcanic", "tundra"]) {
 for (const k of ["places", "sites", "caves", "shrines"]) for (const o of FFL[k] || []) if (Array.isArray(o.at)) keep(o.at, k === "sites" ? 45 : 28);
 for (const o of FFL.kit || []) if (Array.isArray(o.at)) keep(o.at, 10);
 keep(FEAT.volcano, 150);   // Vulkarn's crater floor
+for (const h of FFL.hidden || []) for (let i = 1; i < h.route.length; i++) { const [ax, ay] = h.route[i - 1], [bx, by] = h.route[i], L = Math.hypot(bx - ax, by - ay); for (let t = 0; t <= L; t += 10) keep([ax + (bx - ax) * t / L, ay + (by - ay) * t / L], 14); }
 const lava = LAND.lava.river;
 const CELL = 40, buckets = new Map();
 for (const [x, y, r] of clear) {
@@ -297,4 +298,118 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 	};
 	fs.writeFileSync(path.join(root, "Data/wildreach_world.json"), JSON.stringify(world, null, 1));
 	console.log("places:", FFL.places.length, "places,", FFL.kit.length, "kit,", FFL.ground.length, "ground,", thin.length + "/" + FFL.hazards.thinIce.length, "thin ice on ice,", FFL.hazards.fumaroles.length, "fumaroles,", FFL.hazards.geysers.length, "geysers | pois", pois.length, "| villages", villages.length, "shrines", shrineRows.length);
+}
+
+// ---- part 3: the caves (fitted to the round island's ground), the bosses and their altars, the resource nodes, the
+// hidden tubes' routes and each land's event centre.
+{
+	const WORLD = read("Data/world.json"), LIFE = JSON.parse(fs.readFileSync(path.join(root, "Data/wildreach_life.json"), "utf8"));
+	// Caves: the measured meshes (Tools/terrain/cave_hollows.json), fitted as the Old Island's dressing.mjs fits them: a
+	// height where a survivor walks from outside to the back of the chamber with headroom while the walls reach below the
+	// ground all round. Each near its mapped spot on a fairly flat footprint, its mouth toward the coast.
+	const hollows = read("Tools/terrain/cave_hollows.json").variants;
+	const CUT = -3;
+	const column = (v, x, y) => { const row = v.grid[Math.round(x) - v.x0]; return (row && row[Math.round(y) - v.y0]) || []; };
+	const isMouth = (x, y) => x > 11.5 && Math.abs(y) < 6;
+	const walkPts = [];
+	for (let x = -6; x <= 20; x += 1) for (const y of [-0.7, 0, 0.7]) walkPts.push([x, y, y === 0 ? 2.6 : 2.3]);
+	for (const [x, y] of [[-5.5, -5.5], [-5.5, 5.5], [0, -6.5], [3, 6.2], [-7, 0], [-3, 0], [2.5, 0]]) walkPts.push([x, y, 2.3]);
+	const wallPts = hollows.map((v) => { const pts = []; for (let gx = 0; gx < v.grid.length; gx += 2) for (let gy = 0; gy < v.grid[gx].length; gy += 2) { const x = gx + v.x0, y = gy + v.y0, hits = v.grid[gx][gy]; if (hits.length && hits[0] > CUT + 0.2 && !isMouth(x, y)) pts.push([x, y]); } return pts; });
+	const fitCave = (c, index) => {
+		let best = null;
+		for (const s of [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]) {
+			for (let v = 0; v < hollows.length; v++) for (let turn = -60; turn <= 60; turn += 15) {
+				const yaw = (c.yaw + turn + 360) % 360, a = yaw * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+				const at = (x, y) => [c.x + (x * ca - y * sa) * s, c.y + (x * sa + y * ca) * s];
+				let zMax = Infinity;
+				for (const [x, y] of wallPts[v]) { const [wx, wy] = at(x, y); zMax = Math.min(zMax, hAt(wx, wy) - CUT * s - 0.3); }
+				const ground = walkPts.map(([x, y]) => { const [wx, wy] = at(x, y); return hAt(wx, wy); });
+				const clearAt = (z) => { let worst = Infinity; for (let k = 0; k < walkPts.length; k++) { const [x, y, need] = walkPts[k], zl = (ground[k] - z) / s; const above = column(hollows[v], x, y).filter((q) => q > zl + 0.45 / s); if (above.length % 2) return -Infinity; worst = Math.min(worst, (above.length ? Math.min(...above) - zl : 99) * s - need); } return worst; };
+				const top = clearAt(zMax);
+				if (top < 0) continue;
+				let z = zMax;
+				while (z > zMax - 4 && clearAt(z - 0.1) >= Math.min(1, top)) z -= 0.1;
+				const margin = clearAt(z), score = s * 100 + Math.abs(turn) * 0.05 - Math.min(margin, 1) + (v === index % hollows.length ? 0 : 0.02);
+				if (!best || score < best.score) best = { score, s, v, yaw, z, margin };
+			}
+			if (best) break;
+		}
+		return best;
+	};
+	const caves = [], cavePois = [];
+	FFL.caves.forEach((c0, index) => {
+		const [mx, my] = c0.at, want = Math.atan2(my, mx) * 180 / Math.PI;
+		let spot = null;
+		for (let r = 0; r <= 220 && !spot; r += 20) for (let k = 0; k < (r ? 12 : 1) && !spot; k++) {
+			const x = mx + r * Math.cos(k * Math.PI / 6), y = my + r * Math.sin(k * Math.PI / 6);
+			if (hAt(x, y) < 6 || BARE.has(surfAt(x, y)) || lavaDist(x, y) < 60) continue;
+			let lo = Infinity, hi = -Infinity;
+			for (let dx = -14; dx <= 14; dx += 7) for (let dy = -14; dy <= 14; dy += 7) { const v = hAt(x + dx, y + dy); lo = Math.min(lo, v); hi = Math.max(hi, v); }
+			if (hi - lo > 5) continue;
+			if (!isClear(x, y, 30)) continue;
+			const fit = fitCave({ x, y, yaw: (want + 360) % 360 }, index);
+			if (fit) spot = { x, y, fit };
+		}
+		if (!spot) { console.log("cave", index, "NO FIT near", c0.at); return; }
+		caves.push({ biome: c0.biome, x: Math.round(spot.x * 100), y: Math.round(spot.y * 100), z: Math.round(spot.fit.z * 100), yaw: spot.fit.yaw, variant: spot.fit.v, scale: spot.fit.s });
+		cavePois.push({ name: `${c0.biome === "volcanic" ? "Volcanic" : "Tundra"} cave ${index % 3 + 1}`, kind: "cave", x: Math.round(spot.x * 100), y: Math.round(spot.y * 100), z: Math.round(hAt(spot.x, spot.y) * 100), biome: c0.biome });
+	});
+	file.caves = caves;
+	// Nothing of the dressing stands in a cave (they moved to flat ground after the dressing was laid).
+	let cut = 0;
+	for (const [kind, arr] of Object.entries(file.instances)) {
+		const keepI = [];
+		for (let i = 0; i + 4 < arr.length; i += 5) {
+			const x = arr[i] / 100, y = arr[i + 1] / 100;
+			if (caves.some((c) => Math.hypot(c.x / 100 - x, c.y / 100 - y) < 34 * c.scale)) { cut++; continue; }
+			keepI.push(arr[i], arr[i + 1], arr[i + 2], arr[i + 3], arr[i + 4]);
+		}
+		file.instances[kind] = keepI;
+		file.counts[kind] = keepI.length / 5;
+	}
+	console.log("caves cleared of", cut, "dressing pieces");
+	file.pois = file.pois.filter((p) => p.kind !== "cave").concat(cavePois);
+	fs.writeFileSync(path.join(root, "Data/wildreach_dressing.json"), JSON.stringify(file));
+	// The bosses at their arenas (the majors' altars 40 m east of them on the arena floor), the minis at their lairs.
+	const ID = { "Vulkarn": "vulkarn", "Skaldrith": "skaldrith", "Obsidian Warden": "obsidian_warden", "Ignessa": "ignessa", "Grimjaw": "grimjaw", "Pale Hunter": "pale_hunter" };
+	const bosses = FFL.sites.filter((s) => ID[s.name]).map((s) => {
+		const row = { id: ID[s.name], at: s.at };
+		if (s.name === "Vulkarn") Object.assign(row, { altar: "fire", altarAt: [s.at[0] + 40, s.at[1]] });
+		if (s.name === "Skaldrith") Object.assign(row, { altar: "frost", altarAt: [s.at[0] + 40, s.at[1]] });
+		return row;
+	});
+	// Resource nodes (the Old Island's ore, sulfur, lichen and berries; trees, rocks and scrub are the dressing's): each land's
+	// share by sub-zone, better metal deeper in.
+	const NODES = {
+		copper_ore: [10, ["V1", "V2", "V6", "V7"], ["T1", "T2", "T6", "T7"]], tin_ore: [6, ["V2", "V3"], ["T3", "T4"]], iron_ore: [6, ["V5", "V3"], ["T5", "T4"]],
+		sulfur_crystal: [14, ["V4", "V4", "V4", "V5"], null], lichen: [14, null, ["T1", "T6", "T7", "T5"]], berries: [8, ["V2", "V6"], ["T2", "T6"]],
+	};
+	const nodes = [], taken = [];
+	let seed = 0;
+	for (const [item, [count, vz, tz]] of Object.entries(NODES)) for (const zones of [vz, tz]) {
+		if (!zones) continue;
+		let n = 0;
+		for (let tries = 0; n < count && tries < 40000; tries++) {
+			const x = -6400 + rand(tries, ++seed, 7) * 12800, y = -6400 + rand(seed, tries, 11) * 12800, z = zoneAt(x, y);
+			if (!zones.includes(z) || hAt(x, y) < 2 || slopeAt(x, y) > 26 || BARE.has(surfAt(x, y)) || !isClear(x, y, 6) || lavaDist(x, y) < 30) continue;
+			if (item === "berries" && z === "V2" && surfAt(x, y) !== SURF.kipuka) continue;
+			if (taken.some(([tx, ty]) => Math.hypot(tx - x, ty - y) < 60)) continue;
+			taken.push([x, y]);
+			nodes.push([Math.round(x), Math.round(y), item, Math.round(rand(seed, tries, 13) * 360)]);
+			n++;
+		}
+	}
+	LIFE.bosses = bosses;
+	LIFE.nodes = nodes;
+	fs.writeFileSync(path.join(root, "Data/wildreach_life.json"), JSON.stringify(LIFE));
+	// The hidden tubes on their routes (fire_frost.mjs lays them on gentle ground), and each land's centre for its event.
+	const WW = JSON.parse(fs.readFileSync(path.join(root, "Data/wildreach_world.json"), "utf8"));
+	WW.hidden = WORLD.hidden.filter((h) => /volcanic|tundra/.test(h.biome)).map((h) => { const m = FFL.hidden.find((q) => q.id === h.id); return m ? { ...h, map: "L_Wildreach", route: m.route } : null; }).filter(Boolean);
+	WW.biomes = {
+		volcanic: { ...WORLD.biomes.volcanic, centre: FFL.lands.volcanic.boss },
+		tundra: { ...WORLD.biomes.tundra, centre: FFL.lands.tundra.boss },
+	};
+	fs.writeFileSync(path.join(root, "Data/wildreach_world.json"), JSON.stringify(WW, null, 1));
+	const counts2 = {}; for (const n of nodes) counts2[n[2]] = (counts2[n[2]] || 0) + 1;
+	console.log("part 3: caves", caves.length + "/" + FFL.caves.length, "| bosses", bosses.map((b) => b.id).join(","), "| nodes", JSON.stringify(counts2), "| tubes", WW.hidden.map((h) => h.id + " " + h.route.length + " pts").join(", "));
 }
