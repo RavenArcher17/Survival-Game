@@ -328,8 +328,12 @@ void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
 			GroundBiome = B;
 			UE_LOG(LogWildreach, Log, TEXT("SKY ground biome %s at %s"), *B.ToString(), *Here.ToString());
 		}
-		LavaGround = FMath::FInterpTo(LavaGround, B == Volcanic ? 1.f : 0.f, DeltaSeconds, 0.6f);
-		SnowGround = FMath::FInterpTo(SnowGround, B == Tundra ? 1.f : 0.f, DeltaSeconds, 0.6f);
+		// High over the ground (a flying mount, an overview) the land is seen whole, sky and all: the black-rock floor partly
+		// eases out between 40 and 200 m up (to groundFloorAirKeep of it), so the Volcanic is neither a black blot nor washed out.
+		const float Up = GroundBiome.IsNone() ? 0.f : (Here.Z - WRLand::GroundZAt(Here, Here.Z)) / 100.f;
+		const float Low = FMath::Lerp(1.f, T.Num(TEXT("sky.groundFloorAirKeep"), 0.8f), FMath::SmoothStep(T.Num(TEXT("sky.groundFloorFrom"), 40.f), T.Num(TEXT("sky.groundFloorTo"), 200.f), Up));
+		LavaGround = FMath::FInterpTo(LavaGround, B == Volcanic ? Low : 0.f, DeltaSeconds, 0.6f);
+		SnowGround = FMath::FInterpTo(SnowGround, B == Tundra ? Low : 0.f, DeltaSeconds, 0.6f);
 	}
 	const float OpenDayEV = FMath::Lerp(T.Num(TEXT("sky.dayMinEV100"), -2.f), T.Num(TEXT("sky.volcanicDayMinEV100"), -2.f), LavaGround);
 	const float DayEV = FMath::Lerp(bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : OpenDayEV,

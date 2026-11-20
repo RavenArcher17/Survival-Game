@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Phase 3, slices 2 and 3: landforms you can see from the air (11-20)
+
+Raven: "Take pictures of the terrain from a Birds Eye view I don't see any major elevation changes like craters or the
+ice shelf's". They were there but 10-40 m high, so from above both lands read flat. Now:
+- **The Volcanic:** nine cinder cones 54-100 m high, each with a deep summit crater (were 22-40 m); four maars,
+  explosion craters 33-45 m deep with a ring of ejecta, in the terraces, the ash woods and the lava fields; the
+  obsidian ridges 90 m (were 44); the solfatara sunk into a 32 m basin (was 13); lava flow fronts 7 m; terrace risers
+  16 m; ash dunes 7 m; bigger hornitos. The volcano and its crater as before (300 m, 80 m deep).
+- **The Frozen tundra:** the ice shelves are a 60 m raised block with sheer ice-cliff fronts (were 20 m) and crevasses
+  18 m deep; the ice cap round Skaldrith's cirque stands 85 m higher (was 42), the cirque 95 m deep with a flat floor,
+  a 45 m headwall and a walkable mouth to the east; nunataks 36-44 m rock horns; pingos 26-45 m (the Fox Pingo 45 m);
+  rolling pine hollows with deeper kettles; steppe ravines; the Great Frozen Lake's shore in bays and points, not a ring.
+- **From the air:** the Volcanic's black-rock exposure eases a little with height (`sky.groundFloorAirKeep` 0.8 from
+  200 m up), so from a flying mount it is neither a black blot nor washed out.
+- Hollows never sink below the sea; maars keep well in from the coast.
+
 ### Phase 3, slices 2 and 3: every sub-biome its own size and look (11-20)
 
 Raven, on the sub-biomes: "Your choice make sure they look like they are supposed to".

@@ -139,6 +139,10 @@ alive-and-explorable pass, as slice 1.
   off roads, lava, ice, steep ground, villages, camps and every place; its hazard cells (lava burns, ice slips;
   `drawCells: false`, as WRRoundIsland draws the lava and the ground the ice). Run order now: `round_island.mjs`,
   `fire_frost.mjs`, `round_ground.mjs`, `fire_frost_dressing.mjs`, `hearthmoot.mjs`.
+- **Landform sizes (11-20, read from the air):** cinder cones 54-100 m with craters, maars 33-45 m deep (`MAARS`),
+  obsidian ridges 90 m, solfatara basin 32 m; ice shelves 58 m with crevasses 18 m deep, the ice cap +85 m, the cirque
+  95 m deep (breached east), nunataks 36-44 m, pingos 26-45 m. Positions in `Saved/RoundIsland/fire_frost_features.json`
+  (cones, maars, pingos). A relief check: contours and hill shade from island_ground.bin, by eye.
 - **The lava river:** island.json `lava` (width, points with the lava's level, ending at the shore); its channel and
   levees are cut into the ground, and `WRRoundIsland::BuildLava` draws it with `M_Lava` (molten in the middle, crust at
   the rims) and warm lights along its banks (`roundIsland.lavaGlow`, `lavaLight`, `lavaLightEvery`, `lavaLightRadius`).
