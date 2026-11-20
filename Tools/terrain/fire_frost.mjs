@@ -207,8 +207,8 @@ if (MAIN) {
 	fs.writeFileSync(path.join(root, "Tools/terrain/fire_frost_layout.json"), JSON.stringify(layout, null, 1));
 
 	// ---- the review map: each land on its own panel, sub-zones and the flow / sheet filled by the inverse map -------
-	const COL = { V1: "#8f8a84", V2: "#3a3431", V3: "#4b4458", V4: "#c9b54a", V5: "#7a3b22", T1: "#eef2f5", T2: "#4c6b55", T3: "#9fd4e0", T4: "#7fb1d6", T5: "#d9e6f2", V6: "#6b5646", T6: "#9fb08f" };
-	const NEWZ = { V6: "Cinder Terraces (new)", T6: "The Thaw (new)" };
+	const COL = { V1: "#8f8a84", V2: "#3a3431", V3: "#4b4458", V4: "#c9b54a", V5: "#7a3b22", T1: "#eef2f5", T2: "#4c6b55", T3: "#9fd4e0", T4: "#7fb1d6", T5: "#d9e6f2", V6: "#6b5646", T6: "#9fb08f", V7: "#a9a8ab", T7: "#c2a66a" };
+	const NEWZ = { V6: "Cinder Terraces (new)", T6: "The Thaw (new)", V7: "Ashfall Woods (new)", T7: "Mammoth Steppe (new)" };
 	const panel = (id, ox, W) => {
 		const L = SIDE[id].land, xs = L.polygon.map((p) => p[0]), ys = L.polygon.map((p) => p[1]);
 		const x0 = Math.min(...xs) - 150, x1 = Math.max(...xs) + 150, y0 = Math.min(...ys) - 150, y1 = Math.max(...ys) + 150, sc = W / (x1 - x0), H = (y1 - y0) * sc;
@@ -241,7 +241,7 @@ if (MAIN) {
 		return { svg: out.join(""), H };
 	};
 	const a = panel("volcanic", 20, 760), b = panel("tundra", 820, 620);
-	const legend = Object.entries(COL).map(([k, c], i) => `<rect x='${20 + i * 120}' y='${Math.max(a.H, b.H) + 60}' width='14' height='14' fill='${c}' stroke='#000'/><text x='${38 + i * 120}' y='${Math.max(a.H, b.H) + 72}' font-size='11' font-family='Segoe UI'>${k} ${NEWZ[k] || PLACES.zones.find((z) => z.id === k)?.name.replace(/^The /, "") || ""}</text>`).join("");
+	const legend = Object.entries(COL).map(([k, c], i) => `<rect x='${20 + (i % 7) * 205}' y='${Math.max(a.H, b.H) + 60 + Math.floor(i / 7) * 22}' width='14' height='14' fill='${c}' stroke='#000'/><text x='${38 + (i % 7) * 205}' y='${Math.max(a.H, b.H) + 72 + Math.floor(i / 7) * 22}' font-size='11' font-family='Segoe UI'>${k} ${NEWZ[k] || PLACES.zones.find((z) => z.id === k)?.name.replace(/^The /, "") || ""}</text>`).join("");
 	const H = Math.max(a.H, b.H) + 100;
 	fs.writeFileSync(path.join(root, "Docs/design/fire_frost_map.svg"), `<svg xmlns='http://www.w3.org/2000/svg' width='1460' height='${Math.round(H)}' viewBox='0 0 1460 ${Math.round(H)}'><rect width='100%' height='100%' fill='#f4f1ea'/>${a.svg}${b.svg}${legend}</svg>`);
 	// Overlaps: places closer than their clearings.
