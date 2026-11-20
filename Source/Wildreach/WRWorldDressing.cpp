@@ -43,6 +43,7 @@ TMap<FIntPoint, float> FWRBiomeHazards::Ice;
 FWRBiomeHazards::FLavaGrid FWRBiomeHazards::LavaFlow;
 FWRBiomeHazards::FLavaGrid FWRBiomeHazards::IceGrid;
 float FWRBiomeHazards::Cell = 600.f;
+bool FWRBiomeHazards::bDrawCells = true;
 
 float FWRBiomeHazards::FLavaGrid::Lift(float Cover) const
 {
@@ -107,6 +108,8 @@ void FWRBiomeHazards::Load(const TSharedPtr<FJsonObject>& Hazards)
 	double Size = 600.0;
 	Hazards->TryGetNumberField(TEXT("cell"), Size);
 	Cell = Size;
+	bDrawCells = true;
+	Hazards->TryGetBoolField(TEXT("drawCells"), bDrawCells);
 	for (const TPair<const TCHAR*, TMap<FIntPoint, float>*> Kind : { TPair<const TCHAR*, TMap<FIntPoint, float>*>(TEXT("lava"), &Lava), TPair<const TCHAR*, TMap<FIntPoint, float>*>(TEXT("ice"), &Ice) })
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
@@ -318,6 +321,12 @@ static const FWRHarvestSpec HarvestSpecs[] = {
 	{ TEXT("forest_stump"), TEXT("tree"), TEXT("wood"), 50.f }, { TEXT("forest_fern"), TEXT("shrub"), TEXT("fiber"), 40.f },
 	{ TEXT("forest_bramble"), TEXT("shrub"), TEXT("fiber"), 60.f }, { TEXT("forest_rock"), TEXT("rock"), TEXT("stone"), 110.f },
 	{ TEXT("forest_giant"), TEXT("giant"), TEXT("wood"), 300.f }, { TEXT("forest_dead"), TEXT("giant"), TEXT("wood"), 220.f },
+	// The round island's Volcanic and Frozen tundra (Tools/terrain/fire_frost_dressing.mjs, 11-20): obsidian blades give
+	// obsidian, seracs ice, basalt columns and pumice boulders stone. Appended last so the older kinds keep their keys.
+	{ TEXT("obsidian_blade"), TEXT("rock"), TEXT("obsidian"), 60.f }, { TEXT("serac"), TEXT("rock"), TEXT("ice_block"), 150.f },
+	{ TEXT("basalt_column"), TEXT("rock"), TEXT("stone"), 120.f }, { TEXT("pumice_rock"), TEXT("rock"), TEXT("stone"), 100.f },
+	{ TEXT("frost_shrub"), TEXT("shrub"), TEXT("fiber"), 60.f }, { TEXT("kipuka_shrub"), TEXT("shrub"), TEXT("fiber"), 55.f },
+	{ TEXT("ice_boulder"), TEXT("rock"), TEXT("ice_block"), 90.f },
 };
 
 // The Ancient forest's dressing kinds, drawn from the code-built tree kit (WRTreeKit; no forest pack on this PC, no
@@ -472,6 +481,27 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			{ Cyl, FLinearColor(0.55f, 0.5f, 0.39f), FVector(5, 5, 46), 12, false, 9000, FVector::ZeroVector, FVector(10, 46, 0), FRotator(70, 220, 30) },
 			{ Sphere, FLinearColor(0.7f, 0.64f, 0.5f), FVector(22, 18, 20), 10, false, 9000, FVector::ZeroVector, FVector(30, -30, 0) } } },
 		{ TEXT("swamp_shrub"), { { Sphere, FLinearColor(0.16f, 0.19f, 0.12f), FVector(130, 130, 70), 15, false, 12000, FVector::ZeroVector } } },
+		// The round island's Volcanic and Frozen tundra (cooks fire-frost 3.3.1 / 3.4.1): black glass blades standing out of
+		// the obsidian ridges' scree, a few leaning; seracs, tilted towers of blue glacier ice with snow on their tops;
+		// basalt columns in a cluster of uneven heights; pumice boulders (pale; drawn by the rock art, tinted).
+		{ TEXT("obsidian_blade"), {
+			{ Cube, FLinearColor(0.006f, 0.006f, 0.008f), FVector(60, 14, 260), 110, true, 20000, FVector(14, 0, 10) },
+			{ Cube, FLinearColor(0.01f, 0.009f, 0.013f), FVector(45, 12, 180), 80, false, 20000, FVector::ZeroVector, FVector(70, 30, 0), FRotator(18, 25, 0) },
+			{ Cube, FLinearColor(0.006f, 0.006f, 0.008f), FVector(35, 10, 140), 60, false, 20000, FVector::ZeroVector, FVector(-60, -25, 0), FRotator(-15, -40, 0) } } },
+		{ TEXT("serac"), {
+			{ Cube, FLinearColor(0.42f, 0.62f, 0.8f), FVector(380, 300, 620), 290, true, 30000, FVector(10, 0, 14) },
+			{ Cube, FLinearColor(0.55f, 0.72f, 0.86f), FVector(260, 220, 420), 190, false, 30000, FVector::ZeroVector, FVector(260, 120, 0), FRotator(12, 30, 6) },
+			{ Cube, FLinearColor(0.88f, 0.92f, 0.96f), FVector(390, 310, 40), 610, false, 30000, FVector(10, 0, 14) } } },
+		{ TEXT("basalt_column"), {
+			{ Cyl, FLinearColor(0.025f, 0.022f, 0.022f), FVector(90, 90, 520), 250, true, 24000, FVector::ZeroVector },
+			{ Cyl, FLinearColor(0.03f, 0.026f, 0.025f), FVector(85, 85, 430), 205, false, 24000, FVector::ZeroVector, FVector(85, 0, 0) },
+			{ Cyl, FLinearColor(0.022f, 0.02f, 0.02f), FVector(88, 88, 360), 170, false, 24000, FVector::ZeroVector, FVector(-45, 75, 0) },
+			{ Cyl, FLinearColor(0.028f, 0.024f, 0.023f), FVector(80, 80, 470), 225, false, 24000, FVector::ZeroVector, FVector(-45, -75, 0) },
+			{ Cyl, FLinearColor(0.024f, 0.021f, 0.02f), FVector(82, 82, 300), 140, false, 24000, FVector::ZeroVector, FVector(40, -150, 0) } } },
+		{ TEXT("pumice_rock"), { { Sphere, FLinearColor(0.5f, 0.48f, 0.45f), FVector(220, 190, 140), 30, true, 24000, FVector(8, 0, 0) } } },
+		{ TEXT("frost_shrub"), { { Sphere, FLinearColor(0.8f, 0.86f, 0.88f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
+		{ TEXT("kipuka_shrub"), { { Sphere, FLinearColor(0.08f, 0.16f, 0.06f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
+		{ TEXT("ice_boulder"), { { Cube, FLinearColor(0.55f, 0.7f, 0.85f), FVector(220, 190, 170), 50, true, 24000, FVector(12, 0, 18) } } },
 	};
 	// Real meshes from the art packs / AI props replace the shapes above where we have them.
 	// Size is what each mesh is fitted to (cm, before the instance's own scale): all three axes for rocks, so they keep
@@ -483,6 +513,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	              const TCHAR* Material; TArray<FParam> Params; TArray<FScalar> Scalars;
 	              bool bShapeCollision = false; };  // keep the shapes' colliding parts, hidden (tree trunks)
 	static const TCHAR* RockMat = TEXT("/Game/Terrain/M_Rock.M_Rock");
+	static const TCHAR* IceMat = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
 	TArray<FString> Rocks, Shrubs;
 	for (const TCHAR* N : { TEXT("01A"), TEXT("02A"), TEXT("03A"), TEXT("05A"), TEXT("08A"), TEXT("12A") })
 	{
@@ -502,6 +533,19 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, {} } },
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
 		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
+		{ TEXT("pumice_rock"), { Rocks, FVector(220, 190, 140), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.55f, 0.53f, 0.5f) } }, {} } },
+		// Seracs: tall leaning towers of glacier ice; obsidian blades: thin black glass standing on end; basalt columns:
+		// dark pillars (the rock meshes stretched tall and tinted).
+		// (Ice in the plain shape material: the rock texture under M_Rock is too dark for ice, whatever its tint.)
+		{ TEXT("serac"), { Rocks, FVector(300, 260, 620), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Color"), FLinearColor(0.5f, 0.68f, 0.84f) } }, {} } },
+		{ TEXT("ice_boulder"), { Rocks, FVector(220, 190, 170), 25, true, 24000, FVector(12, 0, 18), false, IceMat, { { TEXT("Color"), FLinearColor(0.58f, 0.74f, 0.88f) } }, {} } },
+		{ TEXT("obsidian_blade"), { Rocks, FVector(150, 70, 420), 50, true, 20000, FVector(14, 0, 10), false, RockMat, { { TEXT("Tint"), FLinearColor(0.012f, 0.012f, 0.016f) } }, {} } },
+		{ TEXT("basalt_column"), { Rocks, FVector(170, 160, 560), 40, true, 24000, FVector(3, 0, 3), false, RockMat, { { TEXT("Tint"), FLinearColor(0.05f, 0.045f, 0.043f) } }, {} } },
+		// The tundra's scrub is frosted through (willow and dwarf birch under rime); the kipuka's and the terraces' green.
+		{ TEXT("frost_shrub"), { Shrubs, FVector(0, 0, 220), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Snow Color"), FLinearColor(0.93f, 0.96f, 1.f) } }, { { TEXT("Amount Min"), 0.85f }, { TEXT("Amount Max"), 1.f } } } },
+		{ TEXT("kipuka_shrub"), { Shrubs, FVector(0, 0, 230), 5, false, 12000, FVector::ZeroVector, true, nullptr,
+			{ { TEXT("Snow Color"), FLinearColor(0.3f, 0.33f, 0.24f) } }, { { TEXT("Amount Min"), 0.f }, { TEXT("Amount Max"), 0.25f } } } },
 		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
 		// Fitted heights are the meshes' bounds, about twice their leafy part: 260 cm makes a bush of a metre or so.
 		// The volcanic west's scrub is dead (cooks/cookpass-world.md 3.7, G22): the GV leaves stayed green whatever their
@@ -1001,9 +1045,9 @@ void AWRDressing::BuildHazardVisuals()
 	for (const FName Kind : { FName(TEXT("lava")), FName(TEXT("ice")) })
 	{
 		const bool bLava = Kind == TEXT("lava");
-		if (bLava ? bLavaFlow : bIceSheet)
+		if ((bLava ? bLavaFlow : bIceSheet) || !FWRBiomeHazards::DrawCells())
 		{
-			continue;  // drawn from its own fine grid instead of the coarse cells
+			continue;  // drawn from its own fine grid instead of the coarse cells, or not drawn here at all
 		}
 		const TMap<FIntPoint, float>& Cells = FWRBiomeHazards::Cells(Kind);
 		if (Cells.Num() == 0)

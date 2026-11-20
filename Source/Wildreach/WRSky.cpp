@@ -869,10 +869,10 @@ FString AWRSky::Describe() const
 {
 	const AWRGameState* State = AWRGameState::Get(this);
 	const UDirectionalLightComponent* S = Sun.Get();
-	return FString::Printf(TEXT("day %d hour %.2f daylight %.2f sun %.1f deg %.2f lux, moon %.1f deg %.2f lux, exposure floor EV100 %.1f%s"),
+	return FString::Printf(TEXT("day %d hour %.2f daylight %.2f sun %.1f deg %.2f lux, moon %.1f deg %.2f lux, exposure floor EV100 %.1f%s, ground lava %.2f snow %.2f (%s)"),
 		State ? State->GetDay() : 0, State ? State->GetHour() : -1.f, State ? State->GetDaylight() : -1.f,
 		SunElevation, S && S->IsVisible() ? S->Intensity : 0.f, MoonElevation, Moon->IsVisible() ? Moon->Intensity : 0.f,
-		FloorEV, bSheltered ? TEXT(" (sheltered)") : TEXT(""));
+		FloorEV, bSheltered ? TEXT(" (sheltered)") : TEXT(""), LavaGround, SnowGround, *GroundBiome.ToString());
 }
 
 // ---------------------------------------------------------------- subsystem

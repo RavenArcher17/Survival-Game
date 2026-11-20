@@ -130,6 +130,15 @@ alive-and-explorable pass, as slice 1.
     T6 the Thaw's moss hummocks, braided gravel channels and frozen ponds; eight pingos (the Fox Pingo the biggest).
   - Where they stand (for step 2's content): `Saved/RoundIsland/fire_frost_features.json` (cones, pingos, the lava's
     head, the bowl, the lake, the volcano), rewritten each run.
+- **Sub-biome sizes (11-20):** each land's old ground is stretched in (`SIDE.depth`: Volcanic 1.75, Tundra 1.5) so the
+  five old sub-biomes fill about 70%; `ZONE_FIX` widens the Obsidian Ridges and the Glacier Plateau; the new ground
+  splits at `SIDE.split` m past the old ridge (wandering) into V7 the Ashfall Woods / T7 the Mammoth Steppe (outer) and
+  V6 the Cinder Terraces / T6 the Thaw (inner). Zone letters m and n.
+- **Dressing:** `node Tools/terrain/fire_frost_dressing.mjs` (after `round_ground.mjs`) writes
+  `Data/wildreach_dressing.json` from the finished ground: each sub-zone's kinds per hectare (`PLAN`), clumped, kept
+  off roads, lava, ice, steep ground, villages, camps and every place; its hazard cells (lava burns, ice slips;
+  `drawCells: false`, as WRRoundIsland draws the lava and the ground the ice). Run order now: `round_island.mjs`,
+  `fire_frost.mjs`, `round_ground.mjs`, `fire_frost_dressing.mjs`, `hearthmoot.mjs`.
 - **The lava river:** island.json `lava` (width, points with the lava's level, ending at the shore); its channel and
   levees are cut into the ground, and `WRRoundIsland::BuildLava` draws it with `M_Lava` (molten in the middle, crust at
   the rims) and warm lights along its banks (`roundIsland.lavaGlow`, `lavaLight`, `lavaLightEvery`, `lavaLightRadius`).

@@ -43,7 +43,7 @@ const CLIFFS = [[315.3, 6], [266.6, 7], [94.2, 7]];          // bearings (and wi
 // at the rim, with a lip; breached on the side facing breachTo (the crater stair, Emberwick), where the wall runs out
 // into a ramp a body can walk.
 const VOLCANO = { bearing: 266.6, inFromCoast: FF.CRATER_IN, height: 330, radius: 700, crater: 165, craterDepth: 80, lip: 12, wallPower: 2.5,
-	breachTo: [-5491, 228], shield: 1300, shieldHeight: 32 };
+	breachTo: [-5098, 205], shield: 1300, shieldHeight: 32 };
 
 // ---- helpers --------------------------------------------------------------------------------------------------------
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -109,7 +109,7 @@ function coneH(c, x, y) {
 const FOX = (FFL.places.find((p) => p.id === "fox_pingo") || {}).at;
 const PINGOS = [
 	...(FOX ? [{ at: [FOX[0] + 40, FOX[1] - 30], r: 120, h: 24, cr: 26, cd: 7 }] : []),
-	...scatter("tundra", ["T1", "T6", "T2"], 7, 81, (R, at) => { const r = 55 + R() * 55; const fallen = R() < 0.4; return { at, r, h: r * (0.16 + R() * 0.08), cr: fallen ? r * 0.22 : 0, cd: fallen ? 6 : 0 }; }),
+	...scatter("tundra", ["T1", "T6", "T7"], 7, 81, (R, at) => { const r = 55 + R() * 55; const fallen = R() < 0.4; return { at, r, h: r * (0.16 + R() * 0.08), cr: fallen ? r * 0.22 : 0, cd: fallen ? 6 : 0 }; }),
 ];
 function pingoH(p, x, y) {
 	const d = Math.hypot(x - p.at[0], y - p.at[1]);
@@ -138,7 +138,7 @@ function polyEdge(x, y, cell, seed) {
 // with the surfaces below.
 const thawChan = (x, y) => Math.max(0, 1 - Math.abs(fbm(x / 380, y / 240, 1068 + 30, 3)) * 40);
 const thawPond = (x, y) => smooth(-0.58, -0.66, fbm(x / 60, y / 60, 1068 + 31, 2));
-const lakeRidge = (x, y) => Math.max(0, 1 - Math.abs(Math.sin((x * 0.8 - y * 0.6) / 34 + 2.2 * fbm(x / 200, y / 200, 1068 + 34, 2))) / 0.06);
+const lakeRidge = (x, y) => Math.max(0, 1 - Math.abs(Math.sin((x * 0.8 - y * 0.6) / 34 + 6 * fbm(x / 260, y / 260, 1068 + 34, 2))) / 0.06);
 // The Volcanic's middle sub-zones (the lava fields, the obsidian ridges, the solfatara) shape the ground where those
 // zones really lie: each zone's share of the ground round a point, from a 16 m grid of the zones blurred over ~130 m and
 // read smoothly, so a zone's shapes fade in across its edge instead of stepping.
@@ -160,10 +160,19 @@ const VZONES = (() => {
 		return g.map((a) => { const k = j * nx + i; return a[k] * (1 - tx) * (1 - ty) + a[k + 1] * tx * (1 - ty) + a[k + nx] * (1 - tx) * ty + a[k + nx + 1] * tx * ty; });
 	};
 })();
+// Hornitos: small spatter cones on the lava fields, a few metres high with a throat at the top.
+const HORNITOS = scatter("volcanic", ["V2"], 16, 73, (R, at) => { const r = 14 + R() * 10; return { at, r, h: r * (0.32 + R() * 0.12), cr: r * 0.28, cd: r * 0.2 }; });
+// Nunataks: dark rock knobs standing out of the glacier plateau's ice.
+const NUNATAKS = [40, 150, 230, 320].map((a, i) => { const t = a * Math.PI / 180, d = 330 + 60 * (i % 2); return { at: [BOWL[0] + Math.cos(t) * d, BOWL[1] + Math.sin(t) * d], r: 55 + 10 * (i % 3), h: 11 + 3 * (i % 2) }; });
+// The Frozen Lakes are lakes: flat basins of ice in the hollows (0..1), besides the Great Frozen Lake.
+const t3Lake = (x, y) => smooth(-0.2, -0.28, fbm(x / 430, y / 430, 1068 + 42, 2));
+// Where the new ground's outer sub-zone meets its inner one (same line as fire_frost.mjs subZoneAt): 0 outer, 1 inner.
+const innerOf = (id, x, y, b) => smooth(-120, 120, b - (FF.SIDE[id].split + 180 * fbm(x / 1100, y / 1100, 507, 2)));
 function landV(x, y, c) {
-	const o = FF.fromRound("volcanic", FF.warpXY([x, y])), ax = Math.abs(o.at[0]), oy = o.at[1], s = 1240;
+	const o = FF.fromRound("volcanic", FF.warpXY([x, y])), ax = Math.abs(o.at[0]), s = 1240;
 	const base = 8 + 40 * smooth(0, 0.35, c) * (1 - 0.65 * smooth(0.75, 1, c));
-	const w6 = smooth(0, 320, FF.beyondAt("volcanic", [x, y])), rest = 1 - w6;
+	const b = FF.beyondAt("volcanic", [x, y]), wNew = smooth(0, 320, b), rest = 1 - wNew, inner = innerOf("volcanic", x, y, b);
+	const w6 = wNew * inner, w7 = wNew * (1 - inner);
 	const wc = smooth(1150, 1400, ax) * rest, rem = rest - wc;
 	const zw = VZONES(x, y);
 	const w2 = rem * zw[0], w3 = rem * zw[1], w4 = rem * zw[2], w5 = Math.max(0, rem - w2 - w3 - w4);
@@ -181,14 +190,17 @@ function landV(x, y, c) {
 	// V3 the Obsidian Ridges: tall, sharp-crested ridges with glassy faces, smaller blades between them.
 	const rn = fbm(x / 270, y / 270, s + 4, 4);
 	const ridges = 44 * Math.pow(Math.max(0, 1 - Math.abs(rn) * 2.6), 2.6) + 7 * Math.pow(Math.max(0, 1 - Math.abs(fbm(x / 80, y / 80, s + 23, 2)) * 2.8), 2) + 3 * fbm(x / 120, y / 120, s + 5, 2);
-	// V4 the Solfatara: a sunken, steaming basin dotted with fumarole mounds.
+	// V4 the Solfatara: a sunken, steaming basin dotted with fumarole mounds and boiling pools.
 	const mounds = 4.5 * Math.pow(Math.max(0, fbm(x / 46, y / 46, s + 24, 2) - 0.16) / 0.84, 1.1);
-	const solf = -13 * smooth(0.15, 0.85, zw[2]) + mounds + 5 * fbm(x / 350, y / 350, s + 6, 3);
+	const solf = -13 * smooth(0.15, 0.85, zw[2]) + mounds + 5 * fbm(x / 350, y / 350, s + 6, 3) - 1.5 * smooth(-0.42, -0.5, fbm(x / 60, y / 60, s + 27, 2));
 	// V6 the Cinder Terraces: broad steps down toward the meadow, each with a crisp riser.
 	const v = (fbm(x / 1100, y / 1100, s + 8, 3) + 1) * 2.5 + o.beyond / 500, vf = v - Math.floor(v);
 	const terraces = 9 * (Math.floor(v) + smooth(0.46, 0.54, vf)) - 9 * o.beyond / 500 + 3 * fbm(x / 160, y / 160, s + 9, 2);
-	let h = base + wc * ash + w2 * flow + w3 * ridges + w4 * solf + w5 * 5 * fbm(x / 300, y / 300, s + 10, 3) + w6 * terraces;
+	// V7 the Ashfall Woods: an old forest smothered by a fall of ash: soft drifted swells, hummocks over fallen trunks.
+	const woods = 6 * fbm(x / 340, y / 340, s + 40, 3) + 1.3 * Math.abs(fbm(x / 40, y / 40, s + 41, 2)) + 1.6 * Math.max(0, 1 - Math.abs(fbm(x / 90, y / 160, s + 42, 2)) * 9);
+	let h = base + wc * ash + w2 * flow + w3 * ridges + w4 * solf + w5 * 5 * fbm(x / 300, y / 300, s + 10, 3) + w6 * terraces + w7 * woods;
 	for (const cn of CONES) h += coneH(cn, x, y);
+	for (const hn of HORNITOS) h += coneH(hn, x, y);
 	const dh = Math.hypot(x - LAVA_HEAD[0], y - LAVA_HEAD[1]);
 	if (dh < 170) h += 26 * Math.pow(1 - dh / 170, 1.4) * (1 + 0.25 * fbm(x / 30, y / 30, s + 26, 2));
 	return h;
@@ -196,14 +208,17 @@ function landV(x, y, c) {
 function landT(x, y, c) {
 	const o = FF.fromRound("tundra", FF.warpXY([x, y])), ax = Math.abs(o.at[0]), oy = o.at[1], s = 1068;
 	const base = 10 + 46 * smooth(0, 0.35, c) * (1 - 0.6 * smooth(0.75, 1, c));
-	const w6 = smooth(0, 320, FF.beyondAt("tundra", [x, y])), rest = 1 - w6;
+	const b = FF.beyondAt("tundra", [x, y]), wNew = smooth(0, 320, b), rest = 1 - wNew, inner = innerOf("tundra", x, y, b);
+	const w6 = wNew * inner, w7 = wNew * (1 - inner);
 	const wc = smooth(1150, 1400, ax) * rest, rem = rest - wc;
-	const north = smooth(-450, -650, oy), south = smooth(350, 550, oy);
+	// (The bands are bent a little more than the zones, so the ice shelves' fronts wander instead of running straight.)
+	const oyb = oy + 220 * fbm(x / 1300, y / 1300, s + 46, 2), north = smooth(-450, -650, oyb), south = smooth(350, 550, oyb);
 	const w3 = rem * north, w2 = rem * south, w4 = Math.max(0, rem * (1 - north - south));
-	// T1 the Snow Flats: wind-smoothed swells, erratics, frost polygons.
+	// T1 the Snow Flats: wind-smoothed swells, wind-scoured rock knolls (erratics), frost polygons.
 	const flats = 3 * fbm(x / 400, y / 400, s, 3) + 4 * Math.max(0, fbm(x / 45, y / 45, s + 1, 2) - 0.25);
 	// T2 the Pine Hollows: rolling ground with kettle hollows among the trees.
 	const pines = 14 * fbm(x / 320, y / 320, s + 2, 4) - 7 * smooth(0.12, 0.34, fbm(x / 170, y / 170, s + 9, 2));
+	// T3 the Frozen Lakes: low ground with lakes of ice in its hollows.
 	const lakes = 9 * fbm(x / 520, y / 520, s + 3, 3);
 	// T4 the Ice Shelves: raised, smooth ice that ends in cliffs here and ramps there, crossed by crevasse fields
 	// running across its flow (it flows to the coast).
@@ -215,16 +230,23 @@ function landT(x, y, c) {
 	// T6 the Thaw: hummocky moss, braided meltwater channels of gravel, frozen ponds in the hollows.
 	const chan = thawChan(x, y), pond = thawPond(x, y);
 	const thaw = 6 * fbm(x / 450, y / 450, s + 7, 3) + 1.6 * Math.abs(fbm(x / 26, y / 26, s + 32, 2)) - 2.2 * chan - 1.8 * pond;
-	let h = base + wc * flats + w2 * pines + w3 * lakes + rem * shelf + w6 * thaw;
+	// T7 the Mammoth Steppe: long, low, wind-laid swells of loess under dry grass, cut by a few shallow dry gullies.
+	const gully = Math.max(0, 1 - Math.abs(fbm(x / 520, y / 300, s + 43, 3)) * 22);
+	const steppe = 8 * fbm(x / 700, y / 700, s + 40, 3) + 2.4 * Math.sin((x * 0.3 - y * 0.95) / 60 + 2 * fbm(x / 400, y / 400, s + 41, 2)) - 2.5 * gully;
+	let h = base + wc * flats + w2 * pines + w3 * lakes + rem * shelf + w6 * thaw + w7 * steppe;
+	// The lakes of the Frozen Lakes: flat ice a metre over the land's base.
+	const tl = t3Lake(x, y) * smooth(0.35, 0.75, w3);
+	if (tl > 0) h = lerp(h, base + 1, tl);
 	// Frost polygons on the flats and the thaw: their cracks sink a little.
 	if (wc + w6 > 0.2) h -= 1.0 * (1 - polyEdge(x, y, 26, 401)) * smooth(0.0, 0.3, fbm(x / 240, y / 240, s + 33, 2)) * (wc + w6);
 	for (const p of PINGOS) h += pingoH(p, x, y);
 	// The glacier plateau round Skaldrith's bowl, and the bowl: a cirque, its headwall on the inland (west) side, open
-	// to the east where the ice spills toward the coast.
+	// to the east where the ice spills toward the coast; dark nunataks stand out of its ice.
 	const db = Math.hypot(x - BOWL[0], y - BOWL[1]), cosE = db > 1 ? (x - BOWL[0]) / db : 0;
 	h += 42 * (1 - smooth(300, 560, db)) * rest;
 	if (db < 255) h -= 48 * (1 - (db / 255) ** 2) * (1 - 0.35 * Math.max(0, (x - BOWL[0]) / 255) ** 2);
 	h += 22 * Math.exp(-(((db - 262) / 40) ** 2)) * Math.max(0, -cosE) ** 1.2 * rest;
+	for (const n of NUNATAKS) { const d = Math.hypot(x - n.at[0], y - n.at[1]); if (d < n.r) h += n.h * Math.pow(1 - (d / n.r) ** 2, 1.4) * (1 + 0.2 * fbm(x / 14, y / 14, s + 44, 2)); }
 	// The Great Frozen Lake: a flat basin; pressure ridges where the ice pushed up.
 	const dl = Math.hypot((x - GREAT_LAKE[0]) / 1.25, y - GREAT_LAKE[1]);
 	if (dl < 300) h = lerp(h, Math.min(h, base + 2), 1 - smooth(200, 300, dl));
@@ -275,7 +297,9 @@ const SURF = { bed: 1, bank: 2, sand: 3, shore_rock: 6, road: 7, main_road: 10, 
 	// The Volcanic's and the Tundra's (slices 2 and 3).
 	ash: 24, black_sand: 25, pahoehoe: 26, aa: 27, obsidian: 28, sulfur: 29, steam_ground: 30, acid: 31, basalt: 32, scoria: 33,
 	cinder: 34, cinder_grass: 35, kipuka: 36, lava: 37, lava_crust: 38, snow: 39, snow_forest: 40, lake_ice: 41, glacier: 42,
-	crevasse: 43, thaw_moss: 44, shingle: 45, ice: 46, oxide: 47, snow_crack: 48, moss_crack: 49 };
+	crevasse: 43, thaw_moss: 44, shingle: 45, ice: 46, oxide: 47, snow_crack: 48, moss_crack: 49,
+	// The Ashfall Woods and the Mammoth Steppe (11-20), and each old sub-zone's own touches.
+	steppe: 50, ash_pale: 51, charcoal: 52, lichen_rock: 53, pumice: 54, moraine: 55, copper: 56 };
 for (let j = 0; j < N; j++) {
 	const y = -HALF + j * STEP;
 	for (let i = 0; i < N; i++) {
@@ -469,20 +493,28 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		if (Math.hypot(x - KIPUKA[0], y - KIPUKA[1]) < 150 + 25 * fbm(x / 60, y / 60, 81, 2)) { S[k] = SURF.kipuka; continue; }
 		if (Math.hypot(x - ACID[0], y - ACID[1]) < 26) { S[k] = SURF.acid; H[k] -= 1.2; continue; }
 		const n = fbm(x / 90, y / 90, 83, 3), dv = Math.hypot(x - VOLC_AT[0], y - VOLC_AT[1]);
-		S[k] = z === "V1" ? SURF.ash : z === "V2" ? (n > 0.12 ? SURF.aa : SURF.pahoehoe) : z === "V3" ? SURF.obsidian
-			: z === "V4" ? (fbm(x / 55, y / 55, 93, 2) > 0.24 ? SURF.sulfur : fbm(x / 80, y / 80, 94, 2) > 0.27 ? SURF.oxide : SURF.steam_ground)
+		S[k] = z === "V1" ? (fbm(x / 70, y / 70, 97, 2) > 0.45 ? SURF.pumice : SURF.ash) : z === "V2" ? (n > 0.12 ? SURF.aa : SURF.pahoehoe)
+			: z === "V3" ? (fbm(x / 50, y / 50, 98, 2) > 0.55 ? SURF.copper : SURF.obsidian)
+			: z === "V4" ? (fbm(x / 60, y / 60, 1240 + 27, 2) < -0.55 ? SURF.acid : fbm(x / 55, y / 55, 93, 2) > 0.24 ? SURF.sulfur : fbm(x / 80, y / 80, 94, 2) > 0.4 ? SURF.oxide : SURF.steam_ground)
 			: z === "V5" ? (dv < VOLCANO.crater + 40 ? SURF.scoria : SURF.basalt)
+			: z === "V7" ? (fbm(x / 40, y / 40, 99, 2) > 0.25 ? SURF.charcoal : SURF.ash_pale)
 			: grassy(x, y) ? SURF.cinder_grass : SURF.cinder;
+		for (const hn of HORNITOS) if (Math.hypot(x - hn.at[0], y - hn.at[1]) < hn.r * 0.95) { S[k] = SURF.scoria; break; }
 		for (const cn of CONES) if (Math.hypot(x - cn.at[0], y - cn.at[1]) < cn.r * (0.8 + 0.12 * fbm(x / 30, y / 30, 95, 2))) { S[k] = SURF.scoria; break; }
 		// Where the old ground gives way to the terraces, its dark rock breaks up in patches over ~400 m.
-		if (z === "V6") { const b = FF.beyondAt("volcanic", [x, y]); if (fbm(x / 70, y / 70, 89, 2) > -0.35 + 0.95 * smooth(60, 460, b)) S[k] = n > 0.1 ? SURF.aa : SURF.basalt; }
+		if (z === "V7") { const b = FF.beyondAt("volcanic", [x, y]); if (fbm(x / 70, y / 70, 89, 2) > -0.35 + 0.95 * smooth(60, 260, b)) S[k] = n > 0.1 ? SURF.aa : SURF.basalt; }
 	} else {
 		const z = FF.subZoneAt("tundra", [x, y]), n = fbm(x / 110, y / 110, 87, 3);
 		const dlk = Math.hypot((x - GREAT_LAKE[0]) / 1.25, y - GREAT_LAKE[1]);
 		if (dlk < 210 && (lakeRidge(x, y) > 0.3 || fbm(x / 50, y / 50, 96, 2) > 0.3)) { S[k] = SURF.snow; continue; }   // pressure ridges and drifts on the ice
-		if (FF.iceAt([x, y]) || dlk < 210) { S[k] = z === "T3" ? SURF.lake_ice : SURF.ice; continue; }
-		S[k] = z === "T1" ? SURF.snow : z === "T2" ? SURF.snow_forest : z === "T3" ? SURF.snow : z === "T4" ? SURF.glacier : z === "T5" ? SURF.glacier
-			: (n > -0.05 + 0.75 * (1 - smooth(60, 560, FF.beyondAt("tundra", [x, y]))) ? SURF.thaw_moss : SURF.snow);   // snow patches thin out into the thaw
+		if (dlk < 210) { S[k] = SURF.lake_ice; continue; }
+		S[k] = z === "T1" ? (fbm(x / 45, y / 45, 1068 + 1, 2) > 0.45 ? SURF.lichen_rock : SURF.snow) : z === "T2" ? SURF.snow_forest
+			: z === "T3" ? (t3Lake(x, y) > 0.5 ? (fbm(x / 50, y / 50, 96, 2) > 0.35 ? SURF.snow : SURF.lake_ice) : SURF.snow)
+			: z === "T4" ? SURF.glacier
+			: z === "T5" ? (n > 0.0 && Math.hypot(x - BOWL[0], y - BOWL[1]) < 420 ? SURF.ice : SURF.glacier)
+			: z === "T7" ? (Math.max(0, 1 - Math.abs(fbm(x / 520, y / 300, 1068 + 43, 3)) * 22) > 0.4 ? SURF.shingle
+				: n > -0.25 + 0.9 * (1 - smooth(60, 200, FF.beyondAt("tundra", [x, y]))) ? SURF.steppe : SURF.snow)   // old snow lies in its hollows
+			: (n > -0.15 ? SURF.thaw_moss : SURF.snow);
 		if (z === "T6" && thawPond(x, y) > 0.5) S[k] = SURF.lake_ice;
 		else if (z === "T6" && thawChan(x, y) > 0.35) S[k] = SURF.shingle;
 		else if ((z === "T1" || z === "T6") && polyEdge(x, y, 26, 401) < 0.6 && fbm(x / 240, y / 240, 1068 + 33, 2) > 0.05) S[k] = S[k] === SURF.thaw_moss ? SURF.moss_crack : SURF.snow_crack;
@@ -609,7 +641,7 @@ for (const rd of roads) {
 const LETTERS = "123456789";
 // The Volcanic's and the Tundra's sub-zones have letters of their own (their zone ids V1-V6, T1-T6: the sub-zone
 // banners and the ambient beds go by them).
-const SUBLETTER = { V1: "a", V2: "b", V3: "c", V4: "d", V5: "e", V6: "f", T1: "g", T2: "h", T3: "i", T4: "j", T5: "k", T6: "l" };
+const SUBLETTER = { V1: "a", V2: "b", V3: "c", V4: "d", V5: "e", V6: "f", T1: "g", T2: "h", T3: "i", T4: "j", T5: "k", T6: "l", V7: "m", T7: "n" };
 const CELL = 16, GW = Math.ceil(HALF * 2 / CELL);
 const rows = [];
 for (let gj = 0; gj < GW; gj++) {
@@ -652,18 +684,20 @@ const ZONES = [
 	{ id: "graveyard", letter: "7", name: "the Graveyard", ground: [112, 116, 96], groundAlt: [98, 100, 86], layers: { soil: 0.5, grass: 0.3, stones: 0.2 } },
 	{ id: "wasteland", letter: "8", name: "the Corrupted wasteland", ground: [104, 88, 112], groundAlt: [86, 72, 96], layers: { soil: 0.5, stones: 0.5 } },
 	{ id: "volcanic", letter: "9", name: "the Volcanic", ground: [46, 44, 44], groundAlt: [70, 56, 50], layers: { stones: 0.7, soil: 0.3 } },
-	{ id: "V1", letter: "a", name: "the Ash Plains", slopeRock: [56, 52, 50], ground: [86, 82, 80], groundAlt: [74, 70, 68], layers: { sand: 0.6, stones: 0.4 } },
+	{ id: "V1", letter: "a", name: "the Ash Plains", slopeRock: [56, 52, 50], ground: [78, 79, 84], groundAlt: [68, 68, 72], layers: { soil: 0.45, stones: 0.4, sand: 0.15 } },
 	{ id: "V2", letter: "b", name: "the Lava Fields", slopeRock: [34, 31, 30], ground: [38, 34, 33], groundAlt: [52, 44, 40], layers: { stones: 0.9, soil: 0.1 } },
 	{ id: "V3", letter: "c", name: "the Obsidian Ridges", slopeRock: [14, 13, 18], ground: [28, 27, 34], groundAlt: [48, 44, 56], layers: { stones: 1 } },
 	{ id: "V4", letter: "d", name: "the Solfatara", slopeRock: [150, 128, 96], ground: [168, 162, 146], groundAlt: [182, 172, 138], layers: { sand: 0.5, stones: 0.5 } },
 	{ id: "V5", letter: "e", name: "the Crater Highlands", slopeRock: [40, 34, 32], ground: [48, 44, 42], groundAlt: [78, 52, 42], layers: { stones: 0.8, soil: 0.2 } },
 	{ id: "V6", letter: "f", name: "the Cinder Terraces", slopeRock: [54, 46, 40], ground: [64, 54, 46], groundAlt: [80, 86, 56], layers: { soil: 0.5, stones: 0.4, grass: 0.1 } },
+	{ id: "V7", letter: "m", name: "the Ashfall Woods", slopeRock: [70, 66, 62], ground: [140, 141, 146], groundAlt: [118, 118, 122], layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
 	{ id: "T1", letter: "g", name: "the Snow Flats", slopeRock: [150, 172, 194], ground: [236, 240, 244], groundAlt: [220, 228, 236], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "T2", letter: "h", name: "the Pine Hollows", slopeRock: [120, 126, 132], ground: [210, 218, 220], groundAlt: [196, 206, 204], layers: { sand: 0.6, litter: 0.4 } },
 	{ id: "T3", letter: "i", name: "the Frozen Lakes", slopeRock: [140, 180, 210], ground: [222, 232, 240], groundAlt: [190, 214, 228], layers: { sand: 1 } },
 	{ id: "T4", letter: "j", name: "the Ice Shelves", slopeRock: [128, 178, 218], ground: [196, 218, 236], groundAlt: [176, 204, 228], layers: { sand: 0.8, stones: 0.2 } },
 	{ id: "T5", letter: "k", name: "the Glacier Plateau", slopeRock: [128, 178, 218], ground: [224, 234, 244], groundAlt: [206, 222, 238], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "T6", letter: "l", name: "the Thaw", slopeRock: [104, 102, 96], ground: [150, 156, 118], groundAlt: [226, 232, 236], layers: { moss: 0.5, sand: 0.3, grass: 0.2 } },
+	{ id: "T7", letter: "n", name: "the Mammoth Steppe", slopeRock: [120, 110, 92], ground: [166, 148, 100], groundAlt: [150, 136, 96], layers: { grass: 0.7, soil: 0.3 } },
 	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [96, 150, 62], groundAlt: [124, 166, 70], layers: { grass: 0.85, soil: 0.15 } },
 	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [96, 148, 62], groundAlt: [120, 162, 70], layers: { grass: 0.8, soil: 0.2 } },
 	{ id: "yards", letter: "Y", name: "Hearthmoot's yards", ground: [92, 140, 64], groundAlt: [112, 150, 70], layers: { grass: 0.85, soil: 0.15 } },
@@ -673,7 +707,7 @@ const ZONES = [
 // Which biome each zone letter is (the lands' first-pass letters, the Volcanic's and the Tundra's sub-zones, the meadow,
 // the city, the yards, the sea floor).
 const ZONE_BIOME = { "1": "storm_peaks", "2": "desert", "3": "forest", "4": "tundra", "5": "swamp", "6": "ocean", "7": "graveyard", "8": "wasteland", "9": "volcanic",
-	a: "volcanic", b: "volcanic", c: "volcanic", d: "volcanic", e: "volcanic", f: "volcanic", g: "tundra", h: "tundra", i: "tundra", j: "tundra", k: "tundra", l: "tundra", M: "meadow", C: "meadow", Y: "meadow", "~": "ocean", D: "ocean" };
+	a: "volcanic", b: "volcanic", c: "volcanic", d: "volcanic", e: "volcanic", f: "volcanic", g: "tundra", h: "tundra", i: "tundra", j: "tundra", k: "tundra", l: "tundra", m: "volcanic", n: "tundra", M: "meadow", C: "meadow", Y: "meadow", "~": "ocean", D: "ocean" };
 const land = {
 	_comment: "Generated by Tools/terrain/round_ground.mjs from the signed-off layout (Tools/terrain/round_island.mjs; edit the scripts, not this file). The round island as one runtime heightfield land on its own map (map): 4 m samples in island_ground.bin (zlib: uint16 heights = offset + m x unitsPerMetre, then a surface byte each), built as procedural-mesh chunks, full detail near you and coarser far off (lod), with collision only near players. Zones by letter: one per land (each land's slice replaces its first-pass ground later), the meadow (M), Hearthmoot's hill top (C), the sea floor (~); zoneBiomes says which biome each letter is.",
 	id: "island", biome: "meadow", name: "the round island", map: MAP,
@@ -706,12 +740,12 @@ const land = {
 		{ id: "ploughed2", class: SURF.ploughed2, color: [78, 58, 42], rough: 0.95, layers: { soil: 1 } },
 		{ id: "fallow", class: SURF.fallow, color: [126, 146, 72], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
 		{ id: "fallow2", class: SURF.fallow2, color: [118, 136, 66], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
-		{ id: "ash", class: SURF.ash, color: [84, 80, 78], rough: 0.95, layers: { sand: 0.6, stones: 0.4 } },
+		{ id: "ash", class: SURF.ash, color: [76, 77, 82], rough: 0.95, layers: { soil: 0.45, stones: 0.4, sand: 0.15 } },
 		{ id: "black_sand", class: SURF.black_sand, color: [44, 42, 42], rough: 0.85, layers: { sand: 1 } },
 		{ id: "pahoehoe", class: SURF.pahoehoe, color: [36, 33, 32], rough: 0.55, layers: { stones: 0.8, soil: 0.2 } },
 		{ id: "aa", class: SURF.aa, color: [52, 43, 38], rough: 0.95, layers: { stones: 1 } },
 		{ id: "obsidian", class: SURF.obsidian, color: [18, 17, 22], rough: 0.55, layers: { stones: 1 } },
-		{ id: "sulfur", class: SURF.sulfur, color: [212, 190, 84], rough: 0.85, layers: { sand: 0.6, stones: 0.4 } },
+		{ id: "sulfur", class: SURF.sulfur, color: [206, 188, 112], rough: 0.85, layers: { sand: 0.6, stones: 0.4 } },
 		{ id: "steam_ground", class: SURF.steam_ground, color: [188, 182, 166], rough: 0.8, layers: { sand: 0.5, soil: 0.5 } },
 		{ id: "acid", class: SURF.acid, color: [74, 160, 146], rough: 0.25, layers: { sand: 1 } },
 		{ id: "basalt", class: SURF.basalt, color: [46, 44, 44], rough: 0.85, layers: { stones: 0.9, soil: 0.1 } },
@@ -723,13 +757,20 @@ const land = {
 		{ id: "lava_crust", class: SURF.lava_crust, color: [30, 25, 23], rough: 0.95, layers: { stones: 1 } },
 		{ id: "snow", class: SURF.snow, color: [238, 242, 245], rough: 0.8, layers: { sand: 0.9, stones: 0.1 } },
 		{ id: "snow_forest", class: SURF.snow_forest, color: [214, 222, 224], rough: 0.85, layers: { sand: 0.6, litter: 0.4 } },
-		{ id: "lake_ice", class: SURF.lake_ice, color: [184, 210, 224], rough: 0.12, layers: { sand: 1 } },
+		{ id: "lake_ice", class: SURF.lake_ice, color: [160, 186, 204], rough: 0.42, layers: { stones: 0.5, sand: 0.5 } },
 		{ id: "glacier", class: SURF.glacier, color: [198, 222, 238], rough: 0.3, layers: { sand: 0.8, stones: 0.2 } },
 		{ id: "crevasse", class: SURF.crevasse, color: [92, 148, 200], rough: 0.4, layers: { stones: 1 } },
-		{ id: "thaw_moss", class: SURF.thaw_moss, color: [118, 124, 86], rough: 0.9, layers: { moss: 0.6, grass: 0.2, soil: 0.2 } },
+		{ id: "thaw_moss", class: SURF.thaw_moss, color: [104, 106, 72], rough: 0.9, layers: { moss: 0.6, grass: 0.2, soil: 0.2 } },
 		{ id: "shingle", class: SURF.shingle, color: [120, 124, 126], rough: 0.85, layers: { stones: 1 } },
-		{ id: "ice", class: SURF.ice, color: [172, 210, 228], rough: 0.18, layers: { sand: 1 } },
-		{ id: "oxide", class: SURF.oxide, color: [142, 82, 46], rough: 0.85, layers: { sand: 0.5, stones: 0.5 } },
+		{ id: "ice", class: SURF.ice, color: [172, 200, 222], rough: 0.4, layers: { stones: 0.4, sand: 0.6 } },
+		{ id: "steppe", class: SURF.steppe, color: [168, 148, 96], rough: 0.92, layers: { grass: 0.75, soil: 0.25 } },
+		{ id: "ash_pale", class: SURF.ash_pale, color: [140, 141, 146], rough: 0.95, layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
+		{ id: "charcoal", class: SURF.charcoal, color: [44, 40, 38], rough: 0.95, layers: { soil: 0.6, litter: 0.4 } },
+		{ id: "lichen_rock", class: SURF.lichen_rock, color: [176, 150, 100], rough: 0.85, layers: { stones: 0.8, moss: 0.2 } },
+		{ id: "pumice", class: SURF.pumice, color: [150, 146, 138], rough: 0.9, layers: { stones: 0.6, sand: 0.4 } },
+		{ id: "moraine", class: SURF.moraine, color: [170, 172, 176], rough: 0.85, layers: { stones: 0.7, sand: 0.3 } },
+		{ id: "copper", class: SURF.copper, color: [52, 84, 72], rough: 0.6, layers: { stones: 1 } },
+		{ id: "oxide", class: SURF.oxide, color: [116, 66, 40], rough: 0.85, layers: { sand: 0.5, stones: 0.5 } },
 		{ id: "snow_crack", class: SURF.snow_crack, color: [168, 184, 202], rough: 0.8, layers: { sand: 0.7, stones: 0.3 } },
 		{ id: "moss_crack", class: SURF.moss_crack, color: [86, 90, 62], rough: 0.9, layers: { moss: 0.5, soil: 0.5 } },
 	],

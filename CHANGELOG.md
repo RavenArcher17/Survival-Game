@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Phase 3, slices 2 and 3: every sub-biome its own size and look (11-20)
+
+Raven, on the sub-biomes: "Your choice make sure they look like they are supposed to".
+- **Rebalanced:** the Old Island's five sub-biomes per land are stretched in to fill about 70% of each land (no more
+  slivers: the Obsidian Ridges and the Glacier Plateau were under the world-map's 0.6 km² floor, now 0.95 and 0.78 km²);
+  the new inner ground is two sub-biomes each: the Volcanic's **Ashfall Woods** (a ghost forest of charred snags on
+  pale ash) and **Cinder Terraces**, the Tundra's **Mammoth Steppe** (tawny grass, erratic boulders, old snow in the
+  hollows) and **the Thaw**. Every sub-biome is 0.8 to 2.5 km². The volcano sits further in, its lava river 2.4 km.
+  Roads re-routed round the new spots; the bosses stay off them.
+- **Dressed as designed** (`Tools/terrain/fire_frost_dressing.mjs` -> `Data/wildreach_dressing.json`, the Old Island's
+  dressing builder, harvests and ledger): charred trees and dead scrub on the ash plains, basalt boulders and pumice;
+  a green kipuka of pines in the lava fields; black obsidian blades on the ridges; bare steaming solfatara; basalt
+  columns on the crater highlands; 5,000 standing dead trees in the Ashfall Woods; erratics and frosted scrub on the
+  snow flats; 8,000 snowy pines in the pine hollows; seracs of blue ice on the ice shelves; willow scrub in the thaw.
+  New kinds: obsidian blades (obsidian), seracs and ice boulders (ice), basalt columns and pumice (stone), frosted and
+  green scrub (fibre).
+- **Each sub-biome's ground:** dark grey ash with pumice, ropy and spiky lava with hornitos (spatter cones), black
+  glass with copper stains, sulfur, rust and acid pools, pale ash and charcoal under the dead woods; lichen-patched
+  rock on the snow flats, lakes of ice in the Frozen Lakes, wind-polished ice on the glacier plateau, dry grass on the
+  steppe. Near the camera, grass grows on the steppe, the terraces, the thaw and the kipuka.
+- **Lava burns and ice slips:** the lava river's cells burn, the lake and glacier ice is slick (the dressing's hazards).
+- **Fixed:** the lava river was drawn face down (only its glow lights showed); it is molten now. Black lava fields and
+  the volcano no longer open up to grey by day (Volcanic floor EV 5.5).
+
 ### Phase 3, slices 2 and 3, step 1: the Volcanic and the Frozen tundra laid out and their ground built (11-19)
 
 Raven: "Move on" (to the Volcanic and Frozen tundra slices, done the same way as slice 1). This step lays out both lands and

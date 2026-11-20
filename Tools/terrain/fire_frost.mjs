@@ -45,15 +45,16 @@ function oldCoast(side, y) {
 const Y_EDGE = 2016;   // world.islandNorth/SouthEdge, m
 
 // ---- the wedges -----------------------------------------------------------------------------------------------------
-// Near true proportions: an Old Island point keeps its distance in from its own coast (x DEPTH) and its distance north
-// or south of the half's middle (x ACROSS, as arc length round the wedge's middle bearing at that radius). The old
-// content then fills the outer ~2 km of each wedge, where it is widest; the ground past the old ridge (the inner half of
-// each wedge, new since the lands doubled) is a sub-zone of its own (V6, T6). The Volcanic's middle bearing is its cape
-// volcano's, which stands where Vulkarn's crater maps (round_ground.mjs takes VOLCANO from here).
-const DEPTH = 1.1, ACROSS = 0.75;
+// An Old Island point keeps its distance in from its own coast (x DEPTH) and its distance north or south of the half's
+// middle (x ACROSS, as arc length round the wedge's middle bearing at that radius). Raven 11-20 ("make sure they look
+// like they are supposed to"): the old sub-zones are stretched in (DEPTH) to fill about 70% of each wedge, so none is
+// a sliver; the new ground past the old ridge is two sub-zones of its own, the outer one (V7 the Ashfall Woods, T7 the
+// Mammoth Steppe) and the inner one down to the meadow (V6 the Cinder Terraces, T6 the Thaw). The Volcanic's middle
+// bearing is its cape volcano's, which stands where Vulkarn's crater maps (round_ground.mjs takes VOLCANO from here).
+const ACROSS = 0.75;
 const SIDE = {
-	volcanic: { side: -1, land: byId.volcanic, mid: 266.6, lo: 247.5, hi: 281, crater: [-786, 0] },
-	tundra: { side: 1, land: byId.tundra, mid: 93, lo: 75, hi: 111.5, crater: [804, 0] },
+	volcanic: { side: -1, land: byId.volcanic, mid: 266.6, lo: 247.5, hi: 281, crater: [-786, 0], depth: +(process.env.FF_DEPTH_V || 1.75), split: +(process.env.FF_SPLIT_V || 620) },
+	tundra: { side: 1, land: byId.tundra, mid: 93, lo: 75, hi: 111.5, crater: [804, 0], depth: +(process.env.FF_DEPTH_T || 1.5), split: +(process.env.FF_SPLIT_T || 760) },
 };
 const COAST_IN = 40;
 // Bearing off the middle for an arc s (m) at radius r: north of the middle (s < 0) is the higher bearing on the west
@@ -64,24 +65,28 @@ const arcFor = (S, deg, r) => S.side * RI.dAng(deg, S.mid) * RAD * r;
 export function toRound(id, [x, y]) {
 	const S = SIDE[id], inFromOld = Math.max(0, oldCoast(S.side, y) - S.side * x), s = y * ACROSS;
 	// The radius for this depth depends on the bearing (the coast wanders), and the bearing on the radius: two passes.
-	let deg = S.mid, r = coastR(deg) - COAST_IN - inFromOld * DEPTH;
-	for (let k = 0; k < 3; k++) { deg = bearingFor(S, s, Math.max(r, 400)); r = coastR(deg) - COAST_IN - inFromOld * DEPTH; }
+	let deg = S.mid, r = coastR(deg) - COAST_IN - inFromOld * S.depth;
+	for (let k = 0; k < 3; k++) { deg = bearingFor(S, s, Math.max(r, 400)); r = coastR(deg) - COAST_IN - inFromOld * S.depth; }
 	return pt(deg, r);
 }
 /** Round island (x, y) m -> Old Island (x, y) m; beyond is how far past the old ridge (m of new ground, 0 if not). */
 export function fromRound(id, [X, Y]) {
 	const S = SIDE[id], deg = bearingOf(X, Y), r = Math.hypot(X, Y), s = arcFor(S, deg, r), y = Math.max(-Y_EDGE, Math.min(Y_EDGE, s / ACROSS));
-	const inFrom = (coastR(deg) - COAST_IN - r) / DEPTH, c = oldCoast(S.side, y), ax = c - inFrom;
-	return { at: [S.side * Math.max(0, ax), y], beyond: Math.max(0, -ax) * DEPTH, past: -ax * DEPTH, inside: Math.abs(s / ACROSS) <= Y_EDGE && inFrom >= -30 && ax >= 0 };
+	const inFrom = (coastR(deg) - COAST_IN - r) / S.depth, c = oldCoast(S.side, y), ax = c - inFrom;
+	return { at: [S.side * Math.max(0, ax), y], beyond: Math.max(0, -ax) * S.depth, past: -ax * S.depth, inside: Math.abs(s / ACROSS) <= Y_EDGE && inFrom >= -30 && ax >= 0 };
 }
-export const CRATER_IN = (() => { const c = oldCoast(-1, 0); return COAST_IN + (c - 786) * DEPTH; })();   // m in from the coast at the volcano's bearing
+export const CRATER_IN = (() => { const c = oldCoast(-1, 0); return COAST_IN + (c - 786) * SIDE.volcanic.depth; })();   // m in from the coast at the volcano's bearing
 
 // ---- the Old Island's content ---------------------------------------------------------------------------------------
 const PLACES = read("Data/island_places.json"), DRESS = read("Data/island_dressing.json"), WORLD = read("Data/world.json");
 const sideOf = (x) => (x < 0 ? "volcanic" : "tundra");
-/** The Old Island sub-zone at (x, y) m (the places file's rings first, then its rects). */
+// Sub-zones the Old Island had too small for a land of their own (the world-map's 0.6 km² floor): the Obsidian Ridges
+// take more of the Solfatara's side of the ridge, the Glacier Plateau a wider ring round Skaldrith's bowl.
+const ZONE_FIX = { T5: { ring: [804, 0, 0, 470] }, V3: { rect: [-1250, -2100, -640, -350] }, V4: { rect: [-640, -2100, -150, -350] } };
+const ZONES = PLACES.zones.map((z) => (ZONE_FIX[z.id] && (z.ring ? ZONE_FIX[z.id].ring : ZONE_FIX[z.id].rect) ? { ...z, ...ZONE_FIX[z.id] } : z));
+/** The Old Island sub-zone at (x, y) m (the places file's rings first, then its rects; ZONE_FIX applied). */
 export function oldZoneAt([x, y]) {
-	for (const z of PLACES.zones) {
+	for (const z of ZONES) {
 		if (z.ring) { const [cx, cy, r0, r1] = z.ring, d = Math.hypot(x - cx, y - cy); if (d >= r0 && d <= r1) return z.id; }
 		else if (z.rect) { const [x0, y0, x1, y1] = z.rect; if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return z.id; }
 	}
@@ -110,9 +115,10 @@ export const warpXY = ([x, y]) => [
 /** How far past the old ridge a round island point lies (m; negative on the old ground), the line wandering ~250 m in
  *  and out over ~1.4 km. */
 export const beyondAt = (id, XY) => fromRound(id, warpXY(XY)).past - 260 * RI.fbm(XY[0] / 1400, XY[1] / 1400, 505, 2);
+/** Where the new ground's outer sub-zone (V7, T7) gives way to the inner one (V6, T6): m past the old ridge, wandering. */
 export function subZoneAt(id, XY0) {
-	const XY = warpXY(XY0);
-	if (beyondAt(id, XY0) > INNER_FROM) return id === "volcanic" ? "V6" : "T6";
+	const XY = warpXY(XY0), b = beyondAt(id, XY0);
+	if (b > INNER_FROM) return b > SIDE[id].split + 180 * RI.fbm(XY0[0] / 1100, XY0[1] / 1100, 507, 2) ? (id === "volcanic" ? "V6" : "T6") : (id === "volcanic" ? "V7" : "T7");
 	const o = oldUnder(id, XY), z = oldZoneAt(o) || (id === "volcanic" ? "V1" : "T1");
 	if (z === "V5" && Math.hypot(XY[0] - CRATER_AT[0], XY[1] - CRATER_AT[1]) > CRATER_REACH) return o[1] < 50 ? "V4" : "V2";
 	return z;
@@ -165,9 +171,9 @@ export const SMITH_CROSSING = (() => {
 // Hand moves after the mapping (map metres, by place id or site name): a mini-boss off the road (Raven: bosses off the
 // roads) with its spire, the Fallen Smith at the crossing.
 const NUDGE = {
-	Ignessa: { to: [-4950, 1130] }, wisp_spire: { to: [-4920, 1105] },
+	Ignessa: { to: [-4500, 1090] }, wisp_spire: { to: [-4530, 1065] },
 	// The Pale Hunter keeps to the deep pines, off the road that now runs past Rimehold.
-	"Pale Hunter": { to: [4440, 1120] }, pale_pines: { to: [4410, 1095] },
+	"Pale Hunter": { to: [4250, 1150] }, pale_pines: { to: [4220, 1125] },
 	fallen_smith: SMITH_CROSSING ? (() => { const L = Math.hypot(...SMITH_CROSSING.road), n = [-SMITH_CROSSING.road[1] / L, SMITH_CROSSING.road[0] / L]; return { to: [SMITH_CROSSING.at[0] + n[0] * 32, SMITH_CROSSING.at[1] + n[1] * 32] }; })() : null,
 };
 export const nudged = (key, at) => { const n = NUDGE[key]; if (!n) return at; return n.to ? n.to : [at[0] + n[0], at[1] + n[1]]; };

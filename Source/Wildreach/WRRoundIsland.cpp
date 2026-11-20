@@ -488,7 +488,8 @@ void AWRRoundIsland::BuildSafeZone()
 void AWRRoundIsland::StepCover()
 {
 	// Low plants in 24 m cells round the view (roundIsland.coverCell / coverRange / coverPerCell), on the meadow and the
-	// yards (zone letters M, Y, C): grass and now and then a clump of wildflowers where the ground is plain (no road,
+	// yards (zone letters M, Y, C), and out in the lands on their grassy grounds (the steppe, the cinder grass, the thaw,
+	// the kipuka): grass and now and then a clump of wildflowers where the ground is plain (no road,
 	// sand or bed, never in the lake), and in the fields their crop (roundIsland.cropPerCell more tries there).
 	using namespace WRRoundIslandImpl;
 	if (!BladeMesh || !BladeMat) return;
@@ -536,9 +537,38 @@ void AWRRoundIsland::StepCover()
 		{
 			const FVector2D M = (FVector2D(C) + FVector2D(Rng.FRand(), Rng.FRand())) * Cell;
 			const TCHAR L = D->GridLetter(M);
-			if (L != TEXT('M') && L != TEXT('Y') && L != TEXT('C')) continue;
+			const bool bMeadow = L == TEXT('M') || L == TEXT('Y') || L == TEXT('C');
 			const int32 I = FMath::RoundToInt((M.X - D->HfOrigin.X) / D->HfStep), J = FMath::RoundToInt((M.Y - D->HfOrigin.Y) / D->HfStep);
 			const uint8 Surf = D->HfSurfaceAt(I, J);
+			// Out in the lands, the grassy grounds grow their own (round_ground.mjs SURF): 50 the Mammoth Steppe's dry
+			// grass, 35 the Cinder Terraces' sparse grass, 44 the Thaw's sedge, 36 the kipuka's green.
+			const int32 Wild = bMeadow ? -1 : Surf == 50 ? 0 : Surf == 35 ? 1 : Surf == 44 ? 2 : Surf == 36 ? 3 : -2;
+			if (Wild == -2) continue;
+			if (Wild >= 0)
+			{
+				static const float Density[4] = { 1.f, 0.45f, 0.55f, 0.9f };
+				static const FVector2D WildH[4] = { { 28.f, 64.f }, { 14.f, 34.f }, { 8.f, 24.f }, { 20.f, 48.f } };
+				// Linear colours: the steppe gold and straw with a little grey-green; the cinder grass green and burnt brown;
+				// the thaw's sedge yellow-green and russet; the kipuka green.
+				static const FLinearColor WildCol[4][3] = {
+					{ { 0.30f, 0.21f, 0.07f }, { 0.24f, 0.20f, 0.09f }, { 0.12f, 0.13f, 0.06f } },
+					{ { 0.06f, 0.11f, 0.03f }, { 0.14f, 0.09f, 0.04f }, { 0.09f, 0.12f, 0.04f } },
+					{ { 0.13f, 0.15f, 0.04f }, { 0.22f, 0.08f, 0.03f }, { 0.05f, 0.12f, 0.03f } },
+					{ { 0.05f, 0.15f, 0.03f }, { 0.04f, 0.10f, 0.025f }, { 0.08f, 0.16f, 0.04f } } };
+				if (n >= int32(PerCell * Density[Wild])) continue;
+				const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
+				const int32 Blades = Wild == 2 ? 6 + Rng.RandHelper(5) : 8 + Rng.RandHelper(7);
+				const FLinearColor Tint = WildCol[Wild][Rng.FRand() < 0.6f ? 0 : Rng.FRand() < 0.6f ? 1 : 2];
+				for (int32 b = 0; b < Blades; ++b)
+				{
+					const float H = Rng.FRandRange(WildH[Wild].X, WildH[Wild].Y), Lean = Rng.FRandRange(6.f, Wild == 0 ? 36.f : 28.f);
+					const FRotator Rot(Lean, Rng.FRand() * 360.f, 0.f);
+					const FVector Off(Rng.FRandRange(-7.f, 7.f), Rng.FRandRange(-7.f, 7.f), 0.f);
+					Xf.Emplace(Rot, Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H * 0.5f)), FVector(BladeW * (Wild == 0 ? 0.8f : 1.f), BladeT, H) / 100.f);
+					Col.Add(Tint * Rng.FRandRange(0.85f, 1.15f));
+				}
+				continue;
+			}
 			bool bIndoors = false;
 			for (const FFloor& Fl : Floors)
 			{
@@ -641,7 +671,7 @@ void AWRRoundIsland::BuildLava()
 	const FWRTuning& T = FWRTuning::Get();
 	TArray<FVector> Pts;
 	for (const TSharedPtr<FJsonValue>& V : *Rows) { const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray(); Pts.Add(FVector(At(R, 0), At(R, 1), At(R, 2)) * 100.f); }
-	// Five across: crust at the rims (tucked a little under the levees), molten in the middle (M_Lava: R = heat).
+	// Five across, molten all across with a little crust at the rims (tucked under the levees) (M_Lava: R = heat).
 	const float Half = float(L->GetNumberField(TEXT("width"))) * 50.f * 1.15f;
 	static const float Across[5] = { -1.f, -0.5f, 0.f, 0.5f, 1.f };
 	TArray<FVector> V, N;
@@ -660,14 +690,14 @@ void AWRRoundIsland::BuildLava()
 			V.Add(Pts[i] + Side * (A * Half) - FVector(0.f, 0.f, FMath::Abs(A) > 0.9f ? 25.f : 0.f));
 			N.Add(FVector::UpVector);
 			UV.Add(FVector2D(Along / 600.f, A * 0.5f + 0.5f));
-			Col.Add(FLinearColor(FMath::Abs(A) > 0.9f ? 0.05f : FMath::Abs(A) > 0.4f ? 0.55f : 1.f, 1.f, 0.f, 1.f));
+			Col.Add(FLinearColor(FMath::Abs(A) > 0.9f ? 0.6f : 1.f, 1.f, 0.f, 1.f));   // molten all across, a crust at the rims
 			Tan.Add(FProcMeshTangent(Dir, false));
 		}
 	}
 	for (int32 i = 0; i + 1 < Pts.Num(); ++i) for (int32 k = 0; k < 4; ++k)
 	{
 		const int32 a = i * 5 + k, b = a + 1, c = a + 5, d = a + 6;
-		Tri.Append({ a, c, b, b, c, d });
+		Tri.Append({ a, b, c, b, d, c });   // counter-clockwise from above (face up), as the dressing's hazard sheets
 	}
 	Lava = NewObject<UProceduralMeshComponent>(this, TEXT("Lava"));
 	Lava->SetupAttachment(RootComponent);
@@ -680,12 +710,7 @@ void AWRRoundIsland::BuildLava()
 	if (Mat)
 	{
 		Mat->SetScalarParameterValue(TEXT("Glow"), T.Num(TEXT("roundIsland.lavaGlow"), 3.f));
-		Mat->SetScalarParameterValue(TEXT("FarLift"), 0.f);
-		Mat->SetScalarParameterValue(TEXT("HotLevel"), T.Num(TEXT("lava.hotLevel"), 6.f));
-		Mat->SetScalarParameterValue(TEXT("CrustLevel"), T.Num(TEXT("lava.crustLevel"), 0.f));
-		Mat->SetScalarParameterValue(TEXT("CrackPower"), T.Num(TEXT("lava.crackPower"), 2.5f));
-		Mat->SetScalarParameterValue(TEXT("MoltenCore"), T.Num(TEXT("lava.moltenCore"), 0.9f));
-		Mat->SetScalarParameterValue(TEXT("Steady"), T.Num(TEXT("lava.steady"), 0.85f));
+		// (Its other looks at the material's own defaults: the flowing molten swirl.)
 		Lava->SetMaterial(0, Mat);
 	}
 	// Its glow on the banks: a warm light every lavaLightEvery m along it.

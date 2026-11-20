@@ -24,6 +24,9 @@ struct WILDREACH_API FWRBiomeHazards
 	/** Coarse cells (CellSize apart) with lava / ice in them, at the surface height: where the hazard roughly is. */
 	static const TMap<FIntPoint, float>& Cells(FName Kind);
 	static float CellSize() { return Cell; }
+	/** Whether the coarse cells are drawn as sheets where no fine grid is given (the Old Island's file: yes; the round
+	 *  island's, whose lava WRRoundIsland draws and whose ice is the ground's own: hazards "drawCells": false). */
+	static bool DrawCells() { return bDrawCells; }
 
 	/**
 	 * The lava flow as drawn (hazards.lavaGrid in the dressing file, from Tools/terrain/dressing.mjs): grid points every
@@ -53,6 +56,7 @@ private:
 	static FLavaGrid LavaFlow;
 	static FLavaGrid IceGrid;
 	static float Cell;
+	static bool bDrawCells;
 };
 
 /** Places of interest for the map list (bosses, mini-bosses, passes, camps, caves). */

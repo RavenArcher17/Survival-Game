@@ -70,10 +70,10 @@ const ROAD_TURN = 0.3;             // a land's road runs down its own middle unt
 // old content between Skaldrith's bowl and the lake is too full for a road).
 // Their majors sit where the Old Island had them: Vulkarn in the volcano's crater, Skaldrith in his glacier bowl.
 const ROAD_VIA = {
-	volcanic: [[-5760, 640], [-5420, 860], [-5050, 845], [-4760, 905], [-4640, 1085], [-4100, 1220], [-3100, 1350], [-2200, 1520]],
-	tundra: [[5060, 590], [4700, 690], [4250, 700], [3600, 430], [2900, -160]],
+	volcanic: [[-5720, 600], [-5460, 880], [-5150, 1180], [-4600, 1330], [-4000, 1390], [-3100, 1450], [-2200, 1520]],
+	tundra: [[5050, 560], [4800, 640], [4300, 620], [3700, 520], [3000, 220], [2500, -300]],
 };
-const BOSS_AT = { volcanic: [-5212, 310], tundra: [4425, 232] };   // fire_frost.mjs: Vulkarn's crater and Skaldrith's bowl, moved
+const BOSS_AT = { volcanic: [-4650, 276], tundra: [4064, 213] };   // fire_frost.mjs: Vulkarn's crater and Skaldrith's bowl, moved
 const SHALLOWS = 300, REEFS = 1200;  // off the coast: calm shallows by the camps, reefs, then deep water
 const MAP_HALF = 8000;             // the level's square: 16 km, the deep sea round the island
 const CELL = 40;                   // the grid that measures every land's area
