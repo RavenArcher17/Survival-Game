@@ -219,7 +219,8 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 	TArray<FVector> Verts, Normals;
 	TArray<FColor> Colours;
 	TArray<FVector2D> UVs;
-	TArray<bool> UnderLand, GroundSkinV, NearGroundV;
+	TArray<bool> UnderLand;
+	TArray<float> Depth;   // each vertex's depth under the ground's surface (cm)
 	static const int32 Corner[8][3] = { {0,0,0},{1,0,0},{0,1,0},{1,1,0},{0,0,1},{1,0,1},{0,1,1},{1,1,1} };
 	static const int32 Edge[12][2] = { {0,1},{2,3},{4,5},{6,7},{0,2},{1,3},{4,6},{5,7},{0,4},{1,5},{2,6},{3,7} };
 	for (int32 k = -1; k <= Cells; ++k) for (int32 j = -1; j <= Cells; ++j) for (int32 i = -1; i <= Cells; ++i)
@@ -253,14 +254,14 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 		CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)] = Verts.Num();
 		Verts.Add(P - ActorLoc);
 		UnderLand.Add(bUnderLand);
-		GroundSkinV.Add(bGroundSkin);
-		NearGroundV.Add(FMath::Abs(GroundTerm) < 100.f);
+		Depth.Add(GroundTerm);
 		Normals.Add(Nrm);
-		// The land's own vertex data here, bilinear from its four samples (its UV: map metres / 4, seen from above; a steep
-		// face of the lip takes its UV from the side, or the ground's texture ran down it in streaks).
+		// The rock's UV: slowly along the ground, height up the wall (M_HeldTool's grain runs along U, so the ice's grain
+		// lies in level strata; projected from above it ran down every wall in streaks). The lip's are made again triangle by
+		// triangle below, as the land's.
 		const FVector2D M = L->ToMap(P);
-		const float Zm = float(P.Z) / 100.f;
-		UVs.Add(FMath::Abs(Nrm.Z) >= 0.6f ? M / 4.f : FMath::Abs(Nrm.X) > FMath::Abs(Nrm.Y) ? FVector2D(M.Y, Zm) / 4.f : FVector2D(M.X, Zm) / 4.f);
+		UVs.Add(FVector2D((M.X + M.Y) / 40.f, float(P.Z) / 400.f));
+		// The land's own vertex data here, bilinear from its four samples.
 		const float GX = (M.X - L->HfOrigin.X) / L->HfStep, GY = (M.Y - L->HfOrigin.Y) / L->HfStep;
 		const int32 I0 = FMath::FloorToInt(GX), J0 = FMath::FloorToInt(GY);
 		const float TX = GX - I0, TY = GY - J0;
@@ -300,25 +301,76 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 	}
 	const auto CV = [&](int32 i, int32 j, int32 k) { return CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)]; };
 	TArray<int32> Tris, Lip;
+	// The lip (drawn as the land) is the skin less than LipDepth under the ground's surface: the ground round a mouth or a
+	// doorway and the first of its rim; deeper is the cave's rock. A triangle across that depth is cut where it crosses
+	// it, so the land's look gives way to the rock's along a smooth line (taken quad by quad, it changed in 1 m steps, and
+	// the Tundra's mouths showed a stair of snow against the ice). The ice's colours fade to the ground's by then.
+	constexpr float LipDepth = 90.f;
+	TMap<uint64, int32> Mids;
+	const auto LerpPacked = [](const FColor& A, const FColor& B, float T)
+	{
+		return FColor(uint8(FMath::RoundToInt(FMath::Lerp(float(A.R), float(B.R), T))), uint8(FMath::RoundToInt(FMath::Lerp(float(A.G), float(B.G), T))),
+			uint8(FMath::RoundToInt(FMath::Lerp(float(A.B), float(B.B), T))), uint8(FMath::RoundToInt(FMath::Lerp(float(A.A), float(B.A), T))));
+	};
+	// The vertex where an edge crosses LipDepth (made once per edge, so the triangles either side share it: no crack).
+	const auto Mid = [&](int32 X, int32 Y)
+	{
+		const uint64 Key = (uint64(FMath::Min(X, Y)) << 32) | uint64(FMath::Max(X, Y));
+		if (const int32* Found = Mids.Find(Key)) return *Found;
+		const int32 Lo = FMath::Min(X, Y), Hi = FMath::Max(X, Y);
+		const float SL = LipDepth - Depth[Lo], SH = LipDepth - Depth[Hi];
+		const float T = FMath::Clamp(SL / (SL - SH), 0.f, 1.f);
+		const int32 N = Verts.Num();
+		const FVector V = FMath::Lerp(Verts[Lo], Verts[Hi], T), Nm = FMath::Lerp(Normals[Lo], Normals[Hi], T).GetSafeNormal();
+		const FVector2D U = FMath::Lerp(UVs[Lo], UVs[Hi], T);
+		const FColor Cp = LerpPacked(Colours[Lo], Colours[Hi], T);
+		const FLinearColor Cl = FMath::Lerp(Out.Colours[Lo], Out.Colours[Hi], T);
+		const FVector2D U1 = FMath::Lerp(Out.UV1[Lo], Out.UV1[Hi], T), U2 = FMath::Lerp(Out.UV2[Lo], Out.UV2[Hi], T), U3 = FMath::Lerp(Out.UV3[Lo], Out.UV3[Hi], T);
+		Verts.Add(V);
+		Normals.Add(Nm);
+		UVs.Add(U);
+		Colours.Add(Cp);
+		Out.Colours.Add(Cl);
+		Out.UV1.Add(U1);
+		Out.UV2.Add(U2);
+		Out.UV3.Add(U3);
+		if (Out.IceColours.Num() > Hi) { const FColor Ic = LerpPacked(Out.IceColours[Lo], Out.IceColours[Hi], T); Out.IceColours.Add(Ic); }
+		UnderLand.Add(false);
+		Depth.Add(LipDepth);
+		Mids.Add(Key, N);
+		return N;
+	};
+	// A triangle (in its facing order) into the lip, the rock, or cut between them.
+	const auto Emit = [&](int32 X, int32 Y, int32 Z)
+	{
+		const int32 V[3] = { X, Y, Z };
+		bool bLip[3];
+		for (int32 n = 0; n < 3; ++n) bLip[n] = Depth[V[n]] <= LipDepth;
+		if (bLip[0] && bLip[1] && bLip[2]) { Lip.Append({ X, Y, Z }); return; }
+		if (!bLip[0] && !bLip[1] && !bLip[2]) { Tris.Append({ X, Y, Z }); return; }
+		int32 Lone = 0;
+		for (int32 n = 0; n < 3; ++n) if (bLip[n] != bLip[(n + 1) % 3] && bLip[n] != bLip[(n + 2) % 3]) Lone = n;
+		const int32 A = V[Lone], B = V[(Lone + 1) % 3], C = V[(Lone + 2) % 3];
+		const int32 AB = Mid(A, B), AC = Mid(A, C);
+		TArray<int32>& Own = bLip[Lone] ? Lip : Tris;
+		TArray<int32>& Rest = bLip[Lone] ? Tris : Lip;
+		Own.Append({ A, AB, AC });
+		Rest.Append({ AB, B, C });
+		Rest.Append({ AB, C, AC });
+	};
 	const auto Quad = [&](int32 A, int32 B, int32 C, int32 E, const FVector& RockDir)
 	{
 		if (A < 0 || B < 0 || C < 0 || E < 0) return;
-		const FVector QM = (Verts[A] + Verts[B] + Verts[C] + Verts[E]) * 0.25f + ActorLoc;
 		// The skin lying on ground the land draws itself: the land's.
 		if (UnderLand[A] && UnderLand[B] && UnderLand[C] && UnderLand[E]) return;
-		// The ground's skin is the lip (drawn as the land), the rest the cave's rock; so is skin within a metre of the ground's
-		// surface, where a mouth or a doorway cuts in (drawn as rock, the bank round a tube room's doorway showed in steps
-		// of ice in the corridor's ground).
-		const bool bNearGround = NearGroundV[A] && NearGroundV[B] && NearGroundV[C] && NearGroundV[E];
-		TArray<int32>& Into = bNearGround || int32(GroundSkinV[A]) + int32(GroundSkinV[B]) + int32(GroundSkinV[C]) + int32(GroundSkinV[E]) >= 3 ? Lip : Tris;
 		// Each triangle faces the air on its own, judged by the surface's own normal at its corners (toward the air): the
 		// grid axis of its edge misjudged triangles lying edge-on to it, and those showed as holes you saw the sky through.
 		const auto Tri = [&](int32 X, int32 Y, int32 Z)
 		{
 			const FVector Air = Normals[X] + Normals[Y] + Normals[Z];
 			const FVector Toward = Air.IsNearlyZero() ? -RockDir : Air;
-			if (FVector::DotProduct(FVector::CrossProduct(Verts[Y] - Verts[X], Verts[Z] - Verts[X]), -Toward) >= 0.f) Into.Append({ X, Y, Z });
-			else Into.Append({ X, Z, Y });
+			if (FVector::DotProduct(FVector::CrossProduct(Verts[Y] - Verts[X], Verts[Z] - Verts[X]), -Toward) >= 0.f) Emit(X, Y, Z);
+			else Emit(X, Z, Y);
 		};
 		Tri(A, B, C);
 		Tri(A, C, E);
@@ -330,6 +382,52 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 		if ((V0 < 0.f) != (Fv(i + 1, j, k) < 0.f)) Quad(CV(i, j - 1, k - 1), CV(i, j, k - 1), CV(i, j, k), CV(i, j - 1, k), FVector(Sign, 0.f, 0.f));
 		if ((V0 < 0.f) != (Fv(i, j + 1, k) < 0.f)) Quad(CV(i - 1, j, k - 1), CV(i - 1, j, k), CV(i, j, k), CV(i, j, k - 1), FVector(0.f, Sign, 0.f));
 		if ((V0 < 0.f) != (Fv(i, j, k + 1) < 0.f)) Quad(CV(i - 1, j - 1, k), CV(i, j - 1, k), CV(i, j, k), CV(i - 1, j, k), FVector(0.f, 0.f, Sign));
+	}
+	// The lip's UVs, triangle by triangle: from above on ground, from the side on a steep face (map metres / 4, as the
+	// land's), each triangle with corners of its own. (With the projection chosen per corner, a triangle whose corners
+	// were projected two ways smeared the ground's texture across it in streaks; down a steep face projected from above
+	// it ran in streaks too.)
+	if (Lip.Num() > 0)
+	{
+		const auto Copy = [&](int32 V, const FVector2D& U)
+		{
+			const FVector Vp = Verts[V], Nm = Normals[V];
+			const FColor Cp = Colours[V];
+			const FLinearColor Cl = Out.Colours[V];
+			const FVector2D U1 = Out.UV1[V], U2 = Out.UV2[V], U3 = Out.UV3[V];
+			const bool bIceV = Out.IceColours.IsValidIndex(V);
+			const FColor Ic = bIceV ? Out.IceColours[V] : FColor::White;
+			const float Dp = Depth[V];
+			const int32 N = Verts.Num();
+			Verts.Add(Vp);
+			Normals.Add(Nm);
+			UVs.Add(U);
+			Colours.Add(Cp);
+			Out.Colours.Add(Cl);
+			Out.UV1.Add(U1);
+			Out.UV2.Add(U2);
+			Out.UV3.Add(U3);
+			if (bIceV) Out.IceColours.Add(Ic);
+			UnderLand.Add(false);
+			Depth.Add(Dp);
+			return N;
+		};
+		TArray<int32> Own;
+		Own.Reserve(Lip.Num());
+		for (int32 t = 0; t + 2 < Lip.Num(); t += 3)
+		{
+			const int32 Tri[3] = { Lip[t], Lip[t + 1], Lip[t + 2] };
+			const FVector Fn = FVector::CrossProduct(Verts[Tri[1]] - Verts[Tri[0]], Verts[Tri[2]] - Verts[Tri[0]]).GetSafeNormal();
+			const int32 Proj = FMath::Abs(Fn.Z) >= 0.6f ? 0 : FMath::Abs(Fn.X) > FMath::Abs(Fn.Y) ? 1 : 2;
+			for (const int32 V : Tri)
+			{
+				const FVector P = Verts[V] + ActorLoc;
+				const FVector2D M = L->ToMap(P);
+				const float Zm = float(P.Z) / 100.f;
+				Own.Add(Copy(V, Proj == 0 ? M / 4.f : Proj == 1 ? FVector2D(M.Y, Zm) / 4.f : FVector2D(M.X, Zm) / 4.f));
+			}
+		}
+		Lip = MoveTemp(Own);
 	}
 	if (Tris.Num() == 0 && Lip.Num() == 0) return;
 	Out.Mesh.Verts = MoveTemp(Verts);

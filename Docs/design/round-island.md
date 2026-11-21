@@ -179,6 +179,11 @@ alive-and-explorable pass, as slice 1.
   - Walkable by construction: passage floors are graded by the length walked (`graded`), level for FLAT m where
     they meet a chamber, and a slope has a level landing where its crawl leaves. The capsule climbs 0.45 m steps
     and ~44° slopes; keep slope runs at GRADE (0.36) or less, noise included. Only the ledge's drop is one-way.
+  - The rock's look (WRLandCaves ComputeCube): skin less than LipDepth (0.9 m) under the ground's surface is the lip,
+    drawn as the land (its material, its vertex data; a cut sample borrows its nearest drawn neighbour's ground). It
+    is cut exactly along that depth, so the change is a smooth line; the lip's UVs are made per triangle (from above,
+    or from the side on steep faces). The Tundra's ice (M_HeldTool) has UVs that put its grain in level strata, and
+    its colours fade to the ground's toward the lip. The weather's fog layer fades out underground (WRSky).
   - Checking: probe the air with the game's noise (LcAir's hash noise ported to JS) along every passage before
     building. Then walk a bot through with `WRWalkTo x y 120` + `waitwalk`. A 4 m arrival radius cuts the corners
     of narrow passages and gets the bot "stuck" on walls a player would never touch.

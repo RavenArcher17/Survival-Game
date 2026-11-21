@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Round island: cave mouths smoothed (11-21)
+
+Raven: "Yes, smooth it" (the stepped edge just inside the Tundra caves' mouths).
+- **The ground gives way to the cave's rock along a smooth line,** a little under the surface. It used to change in
+  metre-sized steps, which showed as a stair of pale snow against the ice inside every Tundra mouth and round the
+  Blue Below's doorways.
+- **The ice's grain lies in level layers,** like glacier ice. It used to run down every wall in streaks.
+- **No more smeared streaks on the ground at a mouth's rim:** steep faces there take the ground's texture from the
+  side.
+- **Weather stays outside.** In a blizzard or an eruption, the weather's fog used to fill the caves too, because its
+  floor sat on the ground above the roof. It now fades out as you go underground, as the sky already did.
+
 ### Round island: caves worth exploring (11-20)
 
 Raven: "Build them" (after "Do you think the caves feel like real exploitable caves or just some rooms connected").

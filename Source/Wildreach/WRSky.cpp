@@ -606,7 +606,9 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			{
 				F->SetSecondFogHeightOffset(WeatherGround + T.Num(TEXT("sky.roundWeatherLift"), 0.f) - F->GetComponentLocation().Z);
 				F->SetSecondFogHeightFalloff(T.Num(TEXT("sky.roundWeatherFalloff"), 0.04f));
-				F->SetSecondFogDensity(WeatherLayerDensity * WeatherAmount);
+				// (Not in a cave: the ground over you there is the land's surface above the roof, and the weather stood
+				// thick through the halls under it.)
+				F->SetSecondFogDensity(WeatherLayerDensity * WeatherAmount * (1.f - CrystalCave));
 				bWeatherLayerSet = true;
 			}
 			else if (bWeatherLayerSet)
