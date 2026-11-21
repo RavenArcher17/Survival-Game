@@ -75,24 +75,69 @@ struct WILDREACH_API FWRLandFeature
 };
 
 /** The underground caves' shape (Tools/terrain/cave_shape.mjs CAVE: m). */
-namespace WRCaveShape { inline constexpr float HalfW = 2.6f, TubeB = 2.8f, TubeLift = 1.6f, HallLift = 1.f, HallB = 5.6f, Join = 2.f; }
+namespace WRCaveShape { inline constexpr float Join = 1.5f; }
 
-/** An underground cave of a heightfield land (land file "caves"; Tools/terrain/cave_shape.mjs is the same formula, and
- *  round_ground.mjs sites it and cuts the ground at its mouth): a flat-floored passage along Pts (x, y, its floor: map
- *  metres, z absolute) going down from the mouth, smoothly joined to a hall, a flat-floored ellipsoid whose floor centre
- *  is Hall, half-axes HallR along and across Dir. AWRLandCaves builds its rock, AWRCave its contents. */
+/** One shape of an underground cave's air (Tools/terrain/cave_shape.mjs; map metres, z absolute). */
+struct WILDREACH_API FWRLandCaveShape
+{
+	/** 0 a tube (a passage along P: x, y, floor, half-width; PH its height at each point), 1 a hall (an ellipsoid cut
+	 *  flat by its floor: C its floor centre, R its half-axes along and across Yaw, H its height), 2 a shaft (a vertical
+	 *  cylinder at C, radius R.X, from Z0 up to Z1). */
+	uint8 Kind = 0;
+	FName Role;
+	TArray<FVector4f> P;
+	TArray<float> PH;
+	FVector C = FVector::ZeroVector;
+	FVector2D R = FVector2D::ZeroVector;
+	float Yaw = 0.f, H = 0.f, Z0 = 0.f, Z1 = 0.f;
+	FBox Box = FBox(ForceInit);
+	/** Signed distance (m, approximate: negative inside), the floor under the point and the shape's size there. */
+	float Air(const FVector& Pm, float& OutFloor, float& OutWidth) const;
+};
+
+/** A formation of a cave (drip, icicle, mite, icemite, column, icecolumn, rock, rimrock, bench, crack, sulfur, icefall,
+ *  pool, trapped): at At (map metres), its sizes A and B (m), turned Yaw (deg). */
+struct WILDREACH_API FWRLandCaveFeat
+{
+	FName Kind;
+	FVector At = FVector::ZeroVector;
+	float A = 0.f, B = 0.f, Yaw = 0.f;
+};
+
+struct WILDREACH_API FWRLandCaveLight
+{
+	FVector At = FVector::ZeroVector;
+	FLinearColor Color = FLinearColor::White;
+	float Intensity = 0.f, Radius = 0.f;   // radius in m
+};
+
+/** An underground cave of a heightfield land (land file "caves"; Tools/terrain/cave_layout.mjs lays it, round_ground.mjs
+ *  sites it and cuts the ground at its mouth and skylights): a small network of shapes joined smoothly (an entrance,
+ *  chambers, passages, a crawl to a pocket, a squeeze, a ledge and its ramp, a skylight), its formations and lights,
+ *  and the spots its contents stand on. WRLandCaves builds its rock and formations, AWRCave (or a hidden tube) and the
+ *  world systems its contents. */
 struct WILDREACH_API FWRLandCave
 {
 	FName Id;
 	FName Biome;
+	FString Name;
+	/** A hidden tube's room (<tube>_r<room>): its contents are the tube's. */
+	bool bRoom = false;
 	FVector2D Dir = FVector2D(1.f, 0.f);
 	FVector Mouth = FVector::ZeroVector;
-	TArray<FVector> Pts;
+	/** The main chamber's floor centre (a cave's big hall; a room's room). */
 	FVector Hall = FVector::ZeroVector;
-	FVector2D HallR = FVector2D(11.5f, 10.f);
+	TArray<FWRLandCaveShape> Shapes;
+	TArray<FWRLandCaveFeat> Feats;
+	TArray<FWRLandCaveLight> Lights;
+	/** Where the contents stand (map metres): the ores in AWRCave's order, star iron, the hazard, the den, the cache. */
+	TArray<FVector> OreSpots;
+	FVector StarSpot = FVector::ZeroVector, HazardSpot = FVector::ZeroVector, DenSpot = FVector::ZeroVector, CacheSpot = FVector::ZeroVector;
+	float CacheYaw = 0.f;
+	bool bHasCache = false, bHasSpots = false;
 	/** Signed distance (m) to the cave's air at a map point with an absolute height (m): negative inside. OutFloor: the
-	 *  floor of the part nearest it (m). */
-	float Air(const FVector& P, float* OutFloor = nullptr) const;
+	 *  floor of the shape nearest it, OutWidth that shape's size there (m). */
+	float Air(const FVector& P, float* OutFloor = nullptr, float* OutWidth = nullptr) const;
 	/** The cave's air's box (map metres, z absolute), grown by Grow. */
 	FBox Bounds(float Grow) const;
 };

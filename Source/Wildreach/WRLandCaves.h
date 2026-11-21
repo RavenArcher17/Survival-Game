@@ -41,6 +41,9 @@ private:
 		 *  bilinear from its samples, so the lip draws as the land does. */
 		TArray<FLinearColor> Colours;
 		TArray<FVector2D> UV1, UV2, UV3;
+		/** Ice walls' own colours (the Tundra's: banded pale and deep blue, snow on the floors, the snow's colour near the
+		 *  surface so a mouth has no blue flap), gloss in alpha (M_HeldTool). */
+		TArray<FColor> IceColours;
 		FName Biome;
 	};
 	using FCubePtr = TSharedPtr<FCube, ESPMode::ThreadSafe>;
@@ -48,6 +51,9 @@ private:
 	static void ComputeCube(const FWRLandDef* Land, const FIntVector& Key, float Cell, int32 Cells, const FVector& ActorLoc, float GroundSkin, FCube& Out);
 	void FinishCube(const FCube& C);
 	UMaterialInterface* WallMaterial(FName Biome);
+	/** The caves' formations (the look kit's spikes, rods and slabs; the rock set's rocks), their collision (every machine)
+	 *  and their lights (clients). */
+	void BuildFormations();
 
 	const FWRLandDef* Land = nullptr;
 	TArray<FIntVector> Queue;

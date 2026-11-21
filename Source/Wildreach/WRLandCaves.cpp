@@ -4,6 +4,10 @@
 #include "Wildreach.h"
 #include "WRLand.h"
 #include "WRToolMesh.h"
+#include "WRBuildLookKit.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "WRTuning.h"
 #include "Async/ParallelFor.h"
 #include "Engine/World.h"
@@ -39,6 +43,25 @@ namespace WRLandCavesImpl
 		else H = TX + TY <= 1.f ? A + (B - A) * TX + (C - A) * TY : E + (C - E) * (1.f - TX) + (B - E) * (1.f - TY);
 		return L->ToWorld(M, H).Z;
 	}
+	/** The sample whose ground a lip shows at sample (I, J): itself, or, where it is cut (a mouth's sample has no surface
+	 *  of its own), the nearest drawn one. (The cut samples fell back to the zone's bare ground: in the Blue Below's
+	 *  corridor a room's doorway showed squares of it in the corridor's ice floor.) */
+	FIntPoint LcGroundSample(const FWRLandDef* L, int32 I, int32 J)
+	{
+		if (L->HfSurfaceAt(I, J) != FWRLandDef::HfHidden) return FIntPoint(I, J);
+		for (int32 R = 1; R <= 4; ++R)
+		{
+			int32 BestD = MAX_int32;
+			FIntPoint Best(I, J);
+			for (int32 dj = -R; dj <= R; ++dj) for (int32 di = -R; di <= R; ++di)
+			{
+				if (FMath::Max(FMath::Abs(di), FMath::Abs(dj)) != R || L->HfSurfaceAt(I + di, J + dj) == FWRLandDef::HfHidden) continue;
+				if (di * di + dj * dj < BestD) { BestD = di * di + dj * dj; Best = FIntPoint(I + di, J + dj); }
+			}
+			if (BestD < MAX_int32) return Best;
+		}
+		return FIntPoint(I, J);
+	}
 	/** The land draws its own ground over this point (no corner of its grid square is cut). */
 	bool LcLandDraws(const FWRLandDef* L, float X, float Y)
 	{
@@ -56,16 +79,19 @@ namespace WRLandCavesImpl
 	{
 		const FVector2D M = L->ToMap(P);
 		const FVector Pm(M.X, M.Y, (P.Z - L->Origin.Z) / 100.f);
-		float Best = TNumericLimits<float>::Max(), Floor = 0.f;
+		float Best = TNumericLimits<float>::Max(), Floor = 0.f, Width = 1.f;
 		int32 Which = INDEX_NONE;
 		for (int32 c : Caves)
 		{
-			float F = 0.f;
-			const float A = L->Caves[c].Air(Pm, &F);
-			if (A < Best) { Best = A; Floor = F; Which = c; }
+			float F = 0.f, W = 1.f;
+			const float A = L->Caves[c].Air(Pm, &F, &W);
+			if (A < Best) { Best = A; Floor = F; Width = W; Which = c; }
 		}
 		if (Which == INDEX_NONE) return 1.0e6f;
-		const float Amp = 0.12f + 0.38f * LcSm(0.4f, 1.6f, float(Pm.Z) - Floor);
+		// The rock's noise: up to 0.7 m on a big chamber's walls, less in a narrow passage (a squeeze stays passable), a
+		// little on the floors.
+		const float Wall = FMath::Clamp(0.22f * Width, 0.18f, 0.7f);
+		const float Amp = FMath::Lerp(0.12f, Wall, LcSm(0.4f, 1.6f, float(Pm.Z) - Floor));
 		Best += Amp * (LcN3(P / 220.f) + 0.35f * LcN3(P / 70.f + FVector(5.f, 1.f, 3.f)));
 		if (OutCave) *OutCave = Which;
 		if (OutFloorCm) *OutFloorCm = L->Origin.Z + Floor * 100.f;
@@ -104,6 +130,7 @@ void AWRLandCaves::BeginPlay()
 	}
 	Queue = Keys.Array();
 	bQueued = true;
+	BuildFormations();
 	UE_LOG(LogWildreach, Log, TEXT("LAND CAVES %s: %d caves, %d rock cubes of %.0f m to build"), *Land->Id.ToString(), Land->Caves.Num(), Queue.Num(), S / 100.f);
 }
 
@@ -164,6 +191,7 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 	}
 	if (Caves.Num() == 0) { Out.Mesh.bSkipped = true; return; }
 	Out.Biome = L->Caves[Caves[0]].Biome;
+	const bool bIce = Out.Biome == TEXT("tundra");
 	const int32 NS = Cells + 3, NC = Cells + 2;
 	TArray<float> Ground;
 	Ground.SetNumUninitialized(NS * NS);
@@ -191,7 +219,7 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 	TArray<FVector> Verts, Normals;
 	TArray<FColor> Colours;
 	TArray<FVector2D> UVs;
-	TArray<bool> UnderLand, GroundSkinV;
+	TArray<bool> UnderLand, GroundSkinV, NearGroundV;
 	static const int32 Corner[8][3] = { {0,0,0},{1,0,0},{0,1,0},{1,1,0},{0,0,1},{1,0,1},{0,1,1},{1,1,1} };
 	static const int32 Edge[12][2] = { {0,1},{2,3},{4,5},{6,7},{0,2},{1,3},{4,6},{5,7},{0,4},{1,5},{2,6},{3,7} };
 	for (int32 k = -1; k <= Cells; ++k) for (int32 j = -1; j <= Cells; ++j) for (int32 i = -1; i <= Cells; ++i)
@@ -211,23 +239,28 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 			++Cnt;
 		}
 		FVector P = O + (FVector(i, j, k) + Sum / FMath::Max(1, Cnt)) * Cell;
-		// The ground's skin (its term the nearer to zero: not the cave's wall or thin roof), and of that, the part on ground
-		// the land draws itself (sunk 4 cm under the land's, which wins where both are).
-		const float GroundTerm = LcGroundZ(L, P.X, P.Y) - float(P.Z);
-		const bool bGroundSkin = LcAir(L, Caves, P) > GroundTerm + 5.f;
-		const bool bUnderLand = bGroundSkin && FMath::Abs(GroundTerm) < GroundSkin && LcLandDraws(L, P.X, P.Y);
-		if (bUnderLand) P.Z -= 4.f;
 		const FVector G((Cv[1] - Cv[0]) + (Cv[3] - Cv[2]) + (Cv[5] - Cv[4]) + (Cv[7] - Cv[6]), (Cv[2] - Cv[0]) + (Cv[3] - Cv[1]) + (Cv[6] - Cv[4]) + (Cv[7] - Cv[5]),
 			(Cv[4] - Cv[0]) + (Cv[5] - Cv[1]) + (Cv[6] - Cv[2]) + (Cv[7] - Cv[3]));
 		const FVector Nrm = (-G).GetSafeNormal();
+		// The ground's skin (its term the nearer to zero: not the cave's wall or thin roof), and of that, the part on ground
+		// the land draws itself (sunk 4 cm under the land's, which wins where both are). A floor lying at the ground's own
+		// level is the ground's too: a passage's first metres run in at the ground's height, and drawn as the cave's rock
+		// they showed as squares of ice in a tube corridor's floor at each room's doorway.
+		const float GroundTerm = LcGroundZ(L, P.X, P.Y) - float(P.Z);
+		const bool bGroundSkin = LcAir(L, Caves, P) > GroundTerm + 5.f || (Nrm.Z > 0.7f && FMath::Abs(GroundTerm) < 30.f);
+		const bool bUnderLand = bGroundSkin && FMath::Abs(GroundTerm) < GroundSkin && LcLandDraws(L, P.X, P.Y);
+		if (bUnderLand) P.Z -= 4.f;
 		CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)] = Verts.Num();
 		Verts.Add(P - ActorLoc);
 		UnderLand.Add(bUnderLand);
 		GroundSkinV.Add(bGroundSkin);
+		NearGroundV.Add(FMath::Abs(GroundTerm) < 100.f);
 		Normals.Add(Nrm);
-		// The land's own vertex data here, bilinear from its four samples (its UV: map metres / 4).
+		// The land's own vertex data here, bilinear from its four samples (its UV: map metres / 4, seen from above; a steep
+		// face of the lip takes its UV from the side, or the ground's texture ran down it in streaks).
 		const FVector2D M = L->ToMap(P);
-		UVs.Add(M / 4.f);
+		const float Zm = float(P.Z) / 100.f;
+		UVs.Add(FMath::Abs(Nrm.Z) >= 0.6f ? M / 4.f : FMath::Abs(Nrm.X) > FMath::Abs(Nrm.Y) ? FVector2D(M.Y, Zm) / 4.f : FVector2D(M.X, Zm) / 4.f);
 		const float GX = (M.X - L->HfOrigin.X) / L->HfStep, GY = (M.Y - L->HfOrigin.Y) / L->HfStep;
 		const int32 I0 = FMath::FloorToInt(GX), J0 = FMath::FloorToInt(GY);
 		const float TX = GX - I0, TY = GY - J0;
@@ -235,7 +268,8 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 		float Mix[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 		for (int32 c = 0; c < 4; ++c)
 		{
-			const int32 SI = I0 + (c & 1), SJ = J0 + (c >> 1);
+			const FIntPoint GS = LcGroundSample(L, I0 + (c & 1), J0 + (c >> 1));
+			const int32 SI = GS.X, SJ = GS.Y;
 			const float Wt = ((c & 1) ? TX : 1.f - TX) * ((c >> 1) ? TY : 1.f - TY);
 			float Rough = 0.9f;
 			FLinearColor Gc = L->HfGround(SI, SJ, Nrm, Rough);
@@ -244,6 +278,21 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 			if (L->bLayered) { float Lm[6]; L->HfLayers(SI, SJ, Lm); for (int32 m = 0; m < 6; ++m) Mix[m] += Lm[m] * Wt; }
 		}
 		Out.Colours.Add(C);
+		if (bIce)
+		{
+			// Glacier ice: layers of pale and deep blue (bands a metre or so thick, bent by noise), the floor drifted snow,
+			// the ceiling a little deeper; the snow's own colour toward the surface (a mouth's lip).
+			const float Mz = float(P.Z) / 100.f;
+			const float Band = FMath::Frac(Mz / (1.1f + 0.4f * LcN2(P.X / 900.f, P.Y / 900.f)) + 0.3f * LcN3(P / 400.f));
+			FLinearColor Ice = FMath::Lerp(LcLin(70, 128, 196), LcLin(176, 214, 240), LcSm(0.25f, 0.75f, Band));
+			Ice = FMath::Lerp(Ice, LcLin(40, 92, 170), 0.35f * LcSm(0.55f, 0.85f, LcN3(P / 160.f) * 0.5f + 0.5f));
+			float IceRough = 0.22f;
+			if (Nrm.Z > 0.6f) { Ice = FMath::Lerp(LcLin(214, 226, 238), LcLin(190, 206, 224), LcSm(-0.3f, 0.5f, LcN3(P / 120.f))); IceRough = 0.8f; }
+			else if (Nrm.Z < -0.55f) Ice *= 0.85f;
+			const float Lip = LcSm(-250.f, -60.f, -GroundTerm);
+			Ice = FMath::Lerp(Ice, C, Lip);
+			Out.IceColours.Add(FWRToolMesh::Pack(Ice, FMath::Lerp(IceRough, 1.f - C.A, Lip)));
+		}
 		Out.UV1.Add(FVector2D(Mix[0], Mix[1]));
 		Out.UV2.Add(FVector2D(Mix[2], Mix[3]));
 		Out.UV3.Add(FVector2D(Mix[4], Mix[5]));
@@ -257,8 +306,11 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 		const FVector QM = (Verts[A] + Verts[B] + Verts[C] + Verts[E]) * 0.25f + ActorLoc;
 		// The skin lying on ground the land draws itself: the land's.
 		if (UnderLand[A] && UnderLand[B] && UnderLand[C] && UnderLand[E]) return;
-		// The ground's skin is the lip (drawn as the land), the rest the cave's rock.
-		TArray<int32>& Into = int32(GroundSkinV[A]) + int32(GroundSkinV[B]) + int32(GroundSkinV[C]) + int32(GroundSkinV[E]) >= 3 ? Lip : Tris;
+		// The ground's skin is the lip (drawn as the land), the rest the cave's rock; so is skin within a metre of the ground's
+		// surface, where a mouth or a doorway cuts in (drawn as rock, the bank round a tube room's doorway showed in steps
+		// of ice in the corridor's ground).
+		const bool bNearGround = NearGroundV[A] && NearGroundV[B] && NearGroundV[C] && NearGroundV[E];
+		TArray<int32>& Into = bNearGround || int32(GroundSkinV[A]) + int32(GroundSkinV[B]) + int32(GroundSkinV[C]) + int32(GroundSkinV[E]) >= 3 ? Lip : Tris;
 		// Each triangle faces the air on its own, judged by the surface's own normal at its corners (toward the air): the
 		// grid axis of its edge misjudged triangles lying edge-on to it, and those showed as holes you saw the sky through.
 		const auto Tri = [&](int32 X, int32 Y, int32 Z)
@@ -286,6 +338,158 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 	Out.Mesh.Normals = MoveTemp(Normals);
 	Out.Mesh.UVs = MoveTemp(UVs);
 	Out.Mesh.Colours = MoveTemp(Colours);
+}
+
+void AWRLandCaves::BuildFormations()
+{
+	using namespace WRLookKit;
+	const bool bDraw = GetNetMode() != NM_DedicatedServer;
+	TArray<FWRLookBlock> Blocks;
+	FKit K(GetActorTransform(), Blocks);
+	int32 Count = 0, Solid = 0;
+	// A pillar you can't walk through (stalagmites, columns, frozen falls): a capsule, every machine.
+	const auto Block = [this, &Solid](const FVector& Base, float RadiusCm, float HeightCm)
+	{
+		if (RadiusCm < 20.f || HeightCm < 60.f) return;
+		UCapsuleComponent* Cap = NewObject<UCapsuleComponent>(this);
+		Cap->SetupAttachment(RootComponent);
+		Cap->InitCapsuleSize(RadiusCm, FMath::Max(RadiusCm, HeightCm * 0.5f));
+		Cap->SetRelativeLocation(Base + FVector(0.f, 0.f, HeightCm * 0.5f));
+		Cap->SetCollisionProfileName(TEXT("BlockAll"));
+		Cap->SetCanEverAffectNavigation(false);
+		Cap->RegisterComponent();
+		++Solid;
+	};
+	// A rock of the set, its bottom at Base (sunk a fifth), Size (cm) along its own axes, with collision.
+	static const TCHAR* RockNames[] = { TEXT("01A"), TEXT("02A"), TEXT("05A"), TEXT("08A"), TEXT("09A"), TEXT("12A") };
+	const auto SetRock = [this](int32 Which, const FVector& Size, const FVector& Base, float Yaw, UMaterialInterface* Mat)
+	{
+		const TCHAR* N = RockNames[((Which % 6) + 6) % 6];
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/SimpleRocks/3D_Assets/Meshes/Rocks/SM_SimpleRock_%s.SM_SimpleRock_%s"), N, N));
+		if (!Mesh) return;
+		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+		C->SetStaticMesh(Mesh);
+		C->SetupAttachment(RootComponent);
+		const FBox B = Mesh->GetBoundingBox();
+		const FVector S = B.GetSize(), Scale(Size.X / FMath::Max(1.f, float(S.X)), Size.Y / FMath::Max(1.f, float(S.Y)), Size.Z / FMath::Max(1.f, float(S.Z)));
+		const FRotator Rot(0.f, Yaw, 0.f);
+		C->SetRelativeScale3D(Scale);
+		C->SetRelativeRotation(Rot);
+		C->SetRelativeLocation(Base + Rot.RotateVector(FVector(-B.GetCenter().X * Scale.X, -B.GetCenter().Y * Scale.Y, -B.Min.Z * Scale.Z - Size.Z * 0.2f)));
+		if (Mat) C->SetMaterial(0, Mat);
+		C->SetCollisionProfileName(TEXT("BlockAll"));
+		C->SetCanEverAffectNavigation(false);
+		C->RegisterComponent();
+	};
+	for (const FWRLandCave& Cave : Land->Caves)
+	{
+		const bool bIce = Cave.Biome == TEXT("tundra");
+		UMaterialInterface* RockMat = WallMaterial(Cave.Biome);
+		const FSurf Basalt = FSurf::Stone(FLinearColor(0.07f, 0.064f, 0.06f), 0.9f), Dripstone = FSurf::Stone(FLinearColor(0.05f, 0.042f, 0.038f), 0.85f);
+		const FSurf Ice = FSurf::Glass(FLinearColor(0.62f, 0.8f, 0.95f), 0.06f), DeepIce = FSurf::Glass(FLinearColor(0.42f, 0.65f, 0.9f), 0.1f);
+		const FSurf Ember = FSurf::Lit(FLinearColor(1.f, 0.36f, 0.06f), 0.9f), Sulfur = FSurf::Stone(FLinearColor(0.42f, 0.33f, 0.05f), 0.75f);
+		const FSurf Bone = FSurf::Stone(FLinearColor(0.72f, 0.66f, 0.55f), 0.6f), Pool = FSurf::Glass(FLinearColor(0.5f, 0.72f, 0.88f), 0.04f);
+		int32 Seed = 0;
+		for (const FWRLandCaveFeat& F : Cave.Feats)
+		{
+			++Seed;
+			const FVector At = Land->ToWorld(FVector2D(F.At), F.At.Z) - GetActorLocation();
+			const float A = F.A * 100.f, B = F.B * 100.f;
+			const FName Kd = F.Kind;
+			if (Kd == TEXT("drip") || Kd == TEXT("icicle"))
+			{
+				// Hanging from the ceiling (its root sunk into the rock).
+				if (bDraw) K.Spike(Kd == TEXT("icicle") ? Ice : Dripstone, At, -FVector::UpVector, B * (Kd == TEXT("icicle") ? 2.f : 3.2f), A);
+			}
+			else if (Kd == TEXT("mite") || Kd == TEXT("icemite"))
+			{
+				// A stalagmite: a cone on a wider foot.
+				const FSurf& Sf = Kd == TEXT("icemite") ? Ice : Dripstone;
+				if (bDraw) { K.Spike(Sf, At, FVector::UpVector, B * 2.f, A); K.Spike(Sf, At, FVector::UpVector, B * 3.2f, A * 0.35f); }
+				Block(At, B * 0.8f, A);
+			}
+			else if (Kd == TEXT("column") || Kd == TEXT("icecolumn"))
+			{
+				// A column: a stalagmite and a stalactite grown together, waisted where they met.
+				const FSurf& Sf = Kd == TEXT("icecolumn") ? Ice : Dripstone;
+				if (bDraw)
+				{
+					K.Spike(Sf, At, FVector::UpVector, B * 2.6f, A * 0.62f);
+					K.Spike(Sf, At + FVector(0.f, 0.f, A), -FVector::UpVector, B * 2.2f, A * 0.62f);
+					K.Rod(Sf, At, At + FVector(0.f, 0.f, A), B * 0.9f);
+				}
+				Block(At, B, A);
+			}
+			else if (Kd == TEXT("rock") || Kd == TEXT("rimrock"))
+			{
+				SetRock(Seed, FVector(A, A * 0.85f, B), At, F.Yaw, RockMat);
+			}
+			else if (Kd == TEXT("bench"))
+			{
+				// A lava bench: the old flow's shelf along the wall, long and flat-topped.
+				SetRock(Seed + 3, FVector(A, 130.f, B), At, F.Yaw, RockMat);
+			}
+			else if (Kd == TEXT("crack") && bDraw)
+			{
+				// A seam of the floor still glowing: a lit strip in a black lip.
+				const FRotator R(0.f, F.Yaw, 0.f);
+				const FVector Mid = At + R.Vector() * (A * 0.5f);
+				K.Add(Basalt, FVector(A + 10.f, B * 3.f, 6.f), Mid, R);
+				K.Add(Ember, FVector(A, B, 7.f), Mid + FVector(0.f, 0.f, 1.f), R);
+			}
+			else if (Kd == TEXT("sulfur") && bDraw)
+			{
+				// A sulfur crust: a cluster of small ochre crystals round a vent.
+				for (int32 k = 0; k < 4; ++k)
+				{
+					const FVector O = FRotator(0.f, float(Seed * 37 + k * 90 + 20), 0.f).Vector() * (A * 0.35f) * (k ? 1.f : 0.f);
+					K.Spike(Sulfur, At + O - FVector(0.f, 0.f, 4.f), FRotator(70.f + 8.f * k, float(Seed * 53 + k * 70), 0.f).Vector(), A * 0.18f, A * (0.3f + 0.1f * k));
+				}
+			}
+			else if (Kd == TEXT("icefall"))
+			{
+				// A frozen fall: ice poured down the wall and set, thicker at its foot.
+				if (bDraw)
+				{
+					K.Add(Ice, FVector(B * 2.f, B * 1.6f, A), At + FVector(0.f, 0.f, A * 0.5f), FRotator(0.f, float(Seed * 53 % 360), 0.f), EWRLookMesh::Cylinder);
+					K.Spike(DeepIce, At, FVector::UpVector, B * 3.f, A * 0.3f);
+					K.Spike(Ice, At + FVector(0.f, 0.f, A * 0.55f), -FVector::UpVector, B * 1.6f, A * 0.35f);
+				}
+				Block(At, B * 0.9f, A);
+			}
+			else if (Kd == TEXT("pool") && bDraw)
+			{
+				K.Add(Pool, FVector(A * 2.f, A * 1.7f, 5.f), At, FRotator(0.f, float(Seed * 29 % 360), 0.f), EWRLookMesh::Cylinder);
+			}
+			else if (Kd == TEXT("trapped") && bDraw)
+			{
+				// A wall of clear ice with something old in it: a great tusk and ribs half out of the ice.
+				const FRotator R(0.f, F.Yaw, 0.f);
+				const FVector Fwd = R.Vector(), Side = FVector::CrossProduct(FVector::UpVector, Fwd);
+				K.Add(DeepIce, FVector(90.f, 420.f, 300.f), At + FVector(0.f, 0.f, 150.f), R);
+				K.Rod(Bone, At + Fwd * 20.f + Side * -120.f + FVector(0.f, 0.f, 60.f), At + Fwd * 110.f + Side * 40.f + FVector(0.f, 0.f, 150.f), 22.f);
+				K.Rod(Bone, At + Fwd * 110.f + Side * 40.f + FVector(0.f, 0.f, 150.f), At + Fwd * 150.f + Side * 120.f + FVector(0.f, 0.f, 120.f), 16.f);
+				for (int32 r = 0; r < 4; ++r) K.Rod(Bone, At + Fwd * 10.f + Side * (60.f + 30.f * r) + FVector(0.f, 0.f, 40.f), At + Fwd * 70.f + Side * (60.f + 30.f * r) + FVector(0.f, 0.f, 120.f + 15.f * r), 8.f);
+			}
+			++Count;
+		}
+		if (bDraw)
+		{
+			for (const FWRLandCaveLight& Lt : Cave.Lights)
+			{
+				UPointLightComponent* P = NewObject<UPointLightComponent>(this);
+				P->SetupAttachment(RootComponent);
+				P->SetRelativeLocation(Land->ToWorld(FVector2D(Lt.At), Lt.At.Z) - GetActorLocation());
+				P->SetLightColor(Lt.Color);
+				P->SetIntensity(Lt.Intensity);
+				P->SetAttenuationRadius(Lt.Radius * 100.f);
+				P->SetCastShadows(false);
+				P->RegisterComponent();
+			}
+		}
+	}
+	if (bDraw) FWRBuildLook::Spawn(this, RootComponent, Blocks, FLinearColor(0.3f, 0.25f, 0.2f), false);
+	UE_LOG(LogWildreach, Log, TEXT("LAND CAVES formations: %d (%d look blocks, %d pillars)"), Count, Blocks.Num(), Solid);
 }
 
 UMaterialInterface* AWRLandCaves::WallMaterial(FName Biome)
@@ -325,8 +529,10 @@ void AWRLandCaves::FinishCube(const FCube& C)
 	int32 Section = 0;
 	if (C.Mesh.Tris.Num() > 0)
 	{
-		Mesh->CreateMeshSection(Section, C.Mesh.Verts, C.Mesh.Tris, C.Mesh.Normals, C.Mesh.UVs, C.Mesh.Colours, TArray<FProcMeshTangent>(), true);
-		Mesh->SetMaterial(Section++, WallMaterial(C.Biome));
+		// The Tundra's walls are coloured ice (M_HeldTool, their vertex colours); the Volcanic's the textured basalt.
+		const bool bIceWalls = C.IceColours.Num() == C.Mesh.Verts.Num() && C.IceColours.Num() > 0;
+		Mesh->CreateMeshSection(Section, C.Mesh.Verts, C.Mesh.Tris, C.Mesh.Normals, C.Mesh.UVs, bIceWalls ? C.IceColours : C.Mesh.Colours, TArray<FProcMeshTangent>(), true);
+		Mesh->SetMaterial(Section++, bIceWalls ? FWRToolMesh::Material() : WallMaterial(C.Biome));
 	}
 	if (C.Lip.Num() > 0)
 	{

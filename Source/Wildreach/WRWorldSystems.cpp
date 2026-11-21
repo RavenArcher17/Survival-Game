@@ -950,6 +950,7 @@ bool UWRWorldSystems::TryPlace()
 	PlaceShrines();
 	PlaceMasters();
 	PlaceTubes();
+	PlaceCaveCaches();
 	// Messages from the save.
 	if (const TArray<TSharedPtr<FJsonValue>>* Msgs = WArr(Loaded, TEXT("messages")))
 	{
@@ -1254,6 +1255,41 @@ void UWRWorldSystems::PlaceStones()
 	}
 }
 
+void UWRWorldSystems::PlaceCaveCaches()
+{
+	UWorld* World = GetWorld();
+	const TSharedPtr<FJsonObject> SavedCaches = WChild(Loaded, TEXT("caches"));
+	int32 N = 0;
+	for (const FWRLandDef& D : WRLand::All())
+	{
+		if (!D.bHeightfield || D.Caves.Num() == 0 || !WRLand::IsLive(D)) continue;
+		for (const FWRLandCave& C : D.Caves)
+		{
+			if (C.bRoom || !C.bHasCache) continue;
+			const bool bIce = C.Biome == TEXT("tundra");
+			const FVector Where = D.ToWorld(FVector2D(C.CacheSpot), C.CacheSpot.Z) + FVector(0.f, 0.f, 5.f);
+			const FTransform T(FRotator(0.f, C.CacheYaw, 0.f), Where);
+			AWRWorldCache* Box = World->SpawnActorDeferred<AWRWorldCache>(AWRWorldCache::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			if (!Box) continue;
+			Box->Kind = TEXT("chest");
+			Box->Biome = C.Biome;
+			FString Name = C.Name.IsEmpty() ? C.Id.ToString() : C.Name;
+			if (Name.StartsWith(TEXT("the "))) Name = TEXT("The ") + Name.Mid(4);
+			Box->Title = FString::Printf(TEXT("%s: the pocket"), *Name);
+			if (bIce) Box->Items = { { TEXT("bronze_ingot"), 2 }, { TEXT("hide"), 4 }, { TEXT("gem_topaz"), 1 } };
+			else Box->Items = { { TEXT("iron_ingot"), 2 }, { TEXT("gem_ruby"), 1 }, { TEXT("ember_essence"), 1 } };
+			Box->Lore = bIce ? TEXT("Wrapped in sealskin and wedged in the ice: a hunter's winter stores, never fetched.")
+				: TEXT("A smith's cache, wrapped in hide against the heat: someone meant to come back for it.");
+			Box->RefillHours = 96.f;
+			const float Refill = WNumOf(SavedCaches, Box->Title, -1.f);
+			if (Refill >= 0.f && WGameHours(World) < Refill) { Box->bTaken = true; Box->RefillAtHours = Refill; }
+			Box->FinishSpawning(T);
+			++N;
+		}
+	}
+	if (N) UE_LOG(LogWildreach, Log, TEXT("WORLDSYS %d cave caches in their pockets"), N);
+}
+
 void UWRWorldSystems::PlaceTubes()
 {
 	UWorld* World = GetWorld();
@@ -1291,7 +1327,8 @@ void UWRWorldSystems::PlaceTubes()
 			// On a map with lands the room is the land's underground hall off the corridor (<tube>_r<room>): its things
 			// stand on the hall's floor, laid out across it.
 			const FWRLandDef* HallLand = nullptr;
-			if (const FWRLandCave* Hall = WRLand::FindCave(FName(*FString::Printf(TEXT("%s_r%d"), *WStrOf(Row, TEXT("id")), r)), &HallLand); Hall && HallLand)
+			const FWRLandCave* RoomCave = WRLand::FindCave(FName(*FString::Printf(TEXT("%s_r%d"), *WStrOf(Row, TEXT("id")), r)), &HallLand);
+			if (const FWRLandCave* Hall = RoomCave; Hall && HallLand)
 			{
 				C = HallLand->ToWorld(FVector2D(Hall->Hall), Hall->Hall.Z) + FVector(0.f, 0.f, 5.f);
 				Side = FVector(Hall->Dir, 0.f).GetSafeNormal();
@@ -1315,10 +1352,14 @@ void UWRWorldSystems::PlaceTubes()
 			{
 				for (int32 i = 0; i < KV.Value; ++i, ++n)
 				{
-					const FVector P = C + Side * (220.f * (n % 2 ? 1.f : -1.f)) + Along * (150.f * (n / 2) - 150.f);
+					// (An underground hall's ore stands at its layout's spots, along the walls: two rows across its middle
+					// put a node in the way in from the door.)
+					const bool bSpot = RoomCave && HallLand && RoomCave->OreSpots.IsValidIndex(n);
+					const FVector P = bSpot ? HallLand->ToWorld(FVector2D(RoomCave->OreSpots[n]), RoomCave->OreSpots[n].Z) + FVector(0.f, 0.f, 5.f)
+						: C + Side * (220.f * (n % 2 ? 1.f : -1.f)) + Along * (150.f * (n / 2) - 150.f);
 					FHitResult G;
 					FCollisionQueryParams Q(SCENE_QUERY_STAT(WRTubeOre), false, Tube);
-					const FVector Where = World->LineTraceSingleByChannel(G, P + FVector(0, 0, 400), P - FVector(0, 0, 2000), ECC_WorldStatic, Q) ? G.ImpactPoint : P;
+					const FVector Where = bSpot ? P : World->LineTraceSingleByChannel(G, P + FVector(0, 0, 400), P - FVector(0, 0, 2000), ECC_WorldStatic, Q) ? G.ImpactPoint : P;
 					AWRResourceNode* Node = World->SpawnActorDeferred<AWRResourceNode>(AWRResourceNode::StaticClass(), FTransform(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Where), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 					if (!Node) continue;
 					Node->ItemId = KV.Key;
@@ -1331,10 +1372,12 @@ void UWRWorldSystems::PlaceTubes()
 			const TSharedPtr<FJsonObject> Cache = WChild(Room, TEXT("cache"));
 			if (Cache.IsValid() || Room->HasField(TEXT("lore")))
 			{
-				const FVector P = C - Side * 260.f + Along * 120.f;
+				FVector P = C - Side * 260.f + Along * 120.f;
 				FHitResult G;
 				FCollisionQueryParams Q(SCENE_QUERY_STAT(WRTubeCache), false, Tube);
-				const FVector Where = World->LineTraceSingleByChannel(G, P + FVector(0, 0, 400), P - FVector(0, 0, 2000), ECC_WorldStatic, Q) ? G.ImpactPoint : P;
+				FVector Where = World->LineTraceSingleByChannel(G, P + FVector(0, 0, 400), P - FVector(0, 0, 2000), ECC_WorldStatic, Q) ? G.ImpactPoint : P;
+				// An underground room hides its cache in the pocket at the end of its crawl.
+				if (RoomCave && HallLand && RoomCave->bHasCache) Where = HallLand->ToWorld(FVector2D(RoomCave->CacheSpot), RoomCave->CacheSpot.Z) + FVector(0.f, 0.f, 5.f);
 				AWRWorldCache* Box = World->SpawnActorDeferred<AWRWorldCache>(AWRWorldCache::StaticClass(), FTransform(FRotator(0.f, Side.Rotation().Yaw, 0.f), Where), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 				if (Box)
 				{
@@ -1354,8 +1397,10 @@ void UWRWorldSystems::PlaceTubes()
 				Room->TryGetBoolField(TEXT("vault"), bVaultRoom);
 				if (bVaultRoom)
 				{
-					// The vault's slab between the corridor and its cache.
-					const FVector D = (C - Side * 120.f);
+					// The vault's slab between the corridor and its cache (an underground room's: across its crawl, 2.5 m
+					// short of the pocket's cache).
+					FVector D = (C - Side * 120.f);
+					if (RoomCave && HallLand && RoomCave->bHasCache) D = Where + (C - Where).GetSafeNormal2D() * 250.f;
 					AWRVaultDoor* Door = World->SpawnActorDeferred<AWRVaultDoor>(AWRVaultDoor::StaticClass(), FTransform(FRotator(0.f, Side.Rotation().Yaw, 0.f), D), nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 					if (Door) { Door->Biome = Biome; Door->FinishSpawning(FTransform(FRotator(0.f, Side.Rotation().Yaw, 0.f), D)); }
 				}

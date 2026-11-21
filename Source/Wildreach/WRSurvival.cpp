@@ -126,6 +126,11 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 	{
 		return true;
 	}
+	// A land's underground caves (the round island's): inside their air, under their ground.
+	if (WRLand::InLandCave(Pos, 100.f))
+	{
+		return true;
+	}
 	// AWRCave's local layout (BuildShell): the chamber x/y -900..900, 0..700 high; the entrance tunnel runs out along
 	// +X to the mouth at ~2300. Its inner part (past darkness.caveMouth from the chamber) is as dark as the chamber.
 	const float Mouth = WRTune(TEXT("darkness.caveMouth"), 1700.f);
@@ -134,9 +139,8 @@ bool WRBiome::IsUnderground(const UObject* WorldContext, const FVector& Pos)
 		if (FVector::DistSquared(It->GetActorLocation(), Pos) > FMath::Square(4000.f)) continue;
 		const FVector L = It->GetActorTransform().InverseTransformPosition(Pos);
 		if (L.Z < -400.f || L.Z > 1000.f || FMath::Abs(L.Y) > 1000.f) continue;
-		// A land's underground cave: only under its ground (standing on the rise over the hall is the open air).
-		float GroundZ = 0.f;
-		if (It->bUnderground && WRLand::GroundUnder(Pos, GroundZ) && Pos.Z > GroundZ - 100.f) continue;
+		// (A land's underground cave: InLandCave above.)
+		if (It->bUnderground) continue;
 		if (L.X >= -1000.f && L.X <= 1000.f) return true;
 		if (L.X > 1000.f && L.X < Mouth && FMath::Abs(L.Y) < 600.f) return true;
 	}

@@ -164,6 +164,24 @@ alive-and-explorable pass, as slice 1.
   ridge over each tube (`TUBE`: nothing within 7.5 m of the line, so the corridor's floor is the ground as it was, full
   height by 9.5 m over `AWRHiddenTube`'s deeper walls on a map with lands, falling to its foot by ~34 m; open past
   both ends and beside each room) and the places kit's small pingos as mounds (after the roads' passes).
+- **Cave networks (11-20, "Build them"):** `Tools/terrain/cave_layout.mjs` lays each cave from its mouth with a seed:
+  `layoutCave` (entrance, entry chamber, slope or ledge + ramp to the hall, crawl to a pocket, squeeze to the deep
+  chamber; a room: entrance, room, crawl, pocket; chamber floors no higher than the ground over them allows and no
+  steeper than GRADE between), `coverNeeds` (round_ground.mjs `raiseCave` lifts the ground over thin rock),
+  `addSkylight` (a shaft over a chamber where the fall is 14 m at most), `dressCave` (formations
+  `[kind, x, y, z, a, b, yaw]`, lights `[x, y, z, r, g, b, intensity, radius m]`, spots `{ ore[], star, hazard, den,
+  cache }`). island.json `caves` carry `shapes` (tube `p` [x, y, floor, halfWidth, height]; hall `c`, `r`, `yaw`,
+  `h`; shaft `c`, `r`, `z`), `feats`, `lights`, `spots` and a `name`. WRLandCaves builds the formations (the look
+  kit's spikes, rods and slabs, the rock set's rocks; capsules make the pillars solid) and the lights. The Tundra's
+  walls are vertex-coloured ice (M_HeldTool). AWRCave `CaveId` puts its ores, hazard and den at the spots, and
+  `UWRWorldSystems::PlaceCaveCaches` puts a chest in each pocket. Survivors are underground by the cave's air itself
+  (`WRLand::InLandCave`).
+  - Walkable by construction: passage floors are graded by the length walked (`graded`), level for FLAT m where
+    they meet a chamber, and a slope has a level landing where its crawl leaves. The capsule climbs 0.45 m steps
+    and ~44° slopes; keep slope runs at GRADE (0.36) or less, noise included. Only the ledge's drop is one-way.
+  - Checking: probe the air with the game's noise (LcAir's hash noise ported to JS) along every passage before
+    building. Then walk a bot through with `WRWalkTo x y 120` + `waitwalk`. A 4 m arrival radius cuts the corners
+    of narrow passages and gets the bot "stuck" on walls a player would never touch.
 - **Underground caves (11-20):** a land file's `caves` (`FWRLandCave`; `Tools/terrain/cave_shape.mjs` is the same
   formula) each a flat-floored passage along `pts` [x, y, floor] going down from its `mouth` into a `hall` (a
   flat-floored ellipsoid, `hallR` along and across `dir`), joined smoothly. `round_ground.mjs` sites them (near the

@@ -310,14 +310,14 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 	const caves = [], cavePois = [];
 	(LAND.caves || []).filter((c) => !c.room).forEach((c, index) => {
 		const [hx, hy, hf] = c.hall, [dx, dy] = c.dir;
-		caves.push({ biome: c.biome, x: Math.round(hx * 100), y: Math.round(hy * 100), z: Math.round(hf * 100), yaw: +(Math.atan2(-dy, -dx) * 180 / Math.PI).toFixed(2), variant: -1, scale: 1, underground: true });
-		cavePois.push({ name: `${c.biome === "volcanic" ? "Volcanic" : "Tundra"} cave ${index % 3 + 1}`, kind: "cave", x: Math.round(c.mouth[0] * 100), y: Math.round(c.mouth[1] * 100), z: Math.round(c.mouth[2] * 100), biome: c.biome });
+		caves.push({ biome: c.biome, cave: c.id, x: Math.round(hx * 100), y: Math.round(hy * 100), z: Math.round(hf * 100), yaw: +(Math.atan2(-dy, -dx) * 180 / Math.PI).toFixed(2), variant: -1, scale: 1, underground: true });
+		cavePois.push({ name: c.name ? c.name.replace(/^the /, "The ") : `${c.biome === "volcanic" ? "Volcanic" : "Tundra"} cave ${index % 3 + 1}`, kind: "cave", x: Math.round(c.mouth[0] * 100), y: Math.round(c.mouth[1] * 100), z: Math.round(c.mouth[2] * 100), biome: c.biome });
 	});
 	file.caves = caves;
 	// Nothing of the dressing stands in a cave's mouth or the way up to it (the passage's first metres lie just under
 	// the ground there, and a sunk boulder would stand in it).
 	let cut = 0;
-	const inMouth = (x, y) => (LAND.caves || []).some((c) => { const [mx, my] = c.mouth, [dx, dy] = c.dir, s = (x - mx) * dx + (y - my) * dy, lat = -(x - mx) * dy + (y - my) * dx; return Math.hypot(x - mx, y - my) < 16 || (s > -14 && s < 14 && Math.abs(lat) < 9); });
+	const inMouth = (x, y) => (LAND.caves || []).some((c) => { const [mx, my] = c.mouth, [dx, dy] = c.dir, s = (x - mx) * dx + (y - my) * dy, lat = -(x - mx) * dy + (y - my) * dx; return Math.hypot(x - mx, y - my) < 16 || (s > -14 && s < 14 && Math.abs(lat) < 9) || (c.shapes || []).some((q) => q.k === "shaft" && Math.hypot(x - q.c[0], y - q.c[1]) < q.r + 5); });
 	for (const [kind, arr] of Object.entries(file.instances)) {
 		const keepI = [];
 		for (let i = 0; i + 4 < arr.length; i += 5) {

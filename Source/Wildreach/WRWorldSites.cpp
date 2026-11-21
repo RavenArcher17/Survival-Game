@@ -1619,8 +1619,8 @@ void AWRHiddenTube::BuildLook()
 		}
 	}
 	// The rooms: the sculpted cave shells at the route's corners (their mouths on the corridor). On a map with lands of
-	// its own they are the land's underground halls (WRLandCaves builds their rock; <tube>_r<room>): a lintel over each
-	// doorway in the left wall, and the hall's light.
+	// its own they are the land's underground halls (WRLandCaves builds their rock, formations and lights; <tube>_r<room>):
+	// a lintel over each doorway in the left wall.
 	const TArray<TSharedPtr<FJsonValue>>* Rooms = nullptr;
 	if (bRidge && Row->TryGetArrayField(TEXT("rooms"), Rooms))
 	{
@@ -1637,11 +1637,7 @@ void AWRHiddenTube::BuildLook()
 			const FVector Side = FVector::CrossProduct(FVector::UpVector, Along);
 			const FVector2D Door = FVector2D(C - Side * WallOut);
 			SiteRock(this, RootComponent, 77 + r, FVector(WallDepth, 560.f, 230.f), FVector(Door, SiteGroundZ(this, FVector2D(C), C.Z) + 460.f), FRotator(0.f, Along.Rotation().Yaw + 90.f, 0.f), Mat, true, 0.f);
-			if (bDraw)
-			{
-				const FVector HallW = LandDef->ToWorld(FVector2D(Hall->Hall), Hall->Hall.Z + 4.f) - GetActorLocation();
-				SiteLight(this, RootComponent, HallW, bIce ? FLinearColor(0.4f, 0.65f, 1.f) : FLinearColor(1.f, 0.45f, 0.15f), 6000.f, 2200.f);
-			}
+			// (The room's light is its cave's: WRLandCaves.)
 		}
 		Rooms = nullptr;
 	}

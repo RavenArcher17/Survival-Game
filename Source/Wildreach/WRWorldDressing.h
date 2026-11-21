@@ -219,6 +219,8 @@ public:
 	/** A land's underground cave (the round island's: WRLandCaves builds its rock): no sculpted shell, the actor stands on
 	 *  the hall's flat floor with its +X toward the passage and the mouth. */
 	UPROPERTY(Replicated) bool bUnderground = false;
+	/** That land cave's id (WRLand::FindCave): its ores, hazard and den stand at its layout's spots. */
+	UPROPERTY(Replicated) FName CaveId;
 
 protected:
 	virtual void BeginPlay() override;

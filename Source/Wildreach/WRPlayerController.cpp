@@ -600,9 +600,10 @@ void AWRPlayerController::UseDrink() { ServerCommand(TEXT("use drink")); }
 void AWRPlayerController::WRTeleport(float X, float Y) { ServerCommand(FString::Printf(TEXT("tp %.0f %.0f"), X, Y)); }
 void AWRPlayerController::WRLook(float Yaw, float Pitch) { SetControlRotation(FRotator(Pitch, Yaw, 0.f)); }
 
-void AWRPlayerController::WRWalkTo(float X, float Y)
+void AWRPlayerController::WRWalkTo(float X, float Y, float Radius)
 {
 	bWalking = true;
+	WalkRadius = Radius > 0.f ? Radius : 400.f;
 	WalkTarget = FVector2D(X, Y);
 	WalkStart = WalkLastProgress = WalkNextLog = BotClock;
 	WalkBestDist = TNumericLimits<float>::Max();
@@ -2117,6 +2118,20 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			BotCmdResume = BotClock + FCString::Atof(*Cmd.RightChop(5));
 			break;
 		}
+		if (Cmd.StartsWith(TEXT("waitwalk")))
+		{
+			// Until the walk (WRWalkTo) ends, arrived or stuck, at most N s: a walk test needn't sit out a fixed wait.
+			if (WaitWalkUntil < 0.f) WaitWalkUntil = BotClock + FMath::Max(1.f, FCString::Atof(*Cmd.RightChop(8)));
+			if (bWalking && BotClock < WaitWalkUntil)
+			{
+				BotCmdQueue.Insert(Cmd, 0);
+				BotCmdResume = BotClock + 0.25f;
+				break;
+			}
+			WaitWalkUntil = -1.f;
+			BotCmdResume = BotClock + 0.5f;
+			break;
+		}
 		if (Cmd.StartsWith(TEXT("waitchat ")))
 		{
 			// Two bots in step: wait until a chat line with this in it has come (anyone's, since this bot began).
@@ -2167,7 +2182,7 @@ void AWRPlayerController::TickBot(float DeltaTime)
 			WalkBestDist = Dist;
 			WalkLastProgress = BotClock;
 		}
-		if (Dist < 400.f)
+		if (Dist < WalkRadius)
 		{
 			UE_LOG(LogWildreach, Log, TEXT("WALK arrived after %.0f s (%.1f min) at %s"), BotClock - WalkStart, (BotClock - WalkStart) / 60.f, *Here.ToCompactString());
 			bWalking = false;

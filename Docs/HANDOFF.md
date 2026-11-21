@@ -776,7 +776,8 @@ Tools\play.ps1 listen                                  # play it yourself from t
 
 - Tests drive the real game with bot commands: `-wrbot -wrbotcmds="cmd|cmd|..."` (`WRClick <button text>`,
   `WRKey <key> [hold <s>]`, `WRUIText`, `WRUIState`, `WRTeleport`, `WRGive`, `WRCmd <server command>`, `waitchat <text>`
-  to keep two bots in step; prefixes `@1:` / `net:` / `solo:` pick which world a command runs in). The bot runner and
+  to keep two bots in step, `WRWalkTo <x> <y> [radius]` (cm; logs arrived / stuck) with `waitwalk <max s>` to wait for
+  it; prefixes `@1:` / `net:` / `solo:` pick which world a command runs in). The bot runner and
   `waitchat` are in `Source/Wildreach/WRPlayerController.cpp`, the UI commands (`WRClick`, `WRKey`, `WRUIText`,
   `WRUIState`) in `WRUIDrive.cpp`. To write a test, copy one (`Tools\doortest.ps1` is a short two-player one).
 - Two-player tests run a host with no window (`-nullrhi`, it still has the UI) and a rendered friend.

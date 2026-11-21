@@ -265,7 +265,8 @@ namespace WRLandHfImpl
 		D.BuildFirst = LLine(J, TEXT("buildFirst"));
 		if (J->TryGetArrayField(TEXT("caves"), A))
 		{
-			const auto V3 = [](const TArray<TSharedPtr<FJsonValue>>& X) { return FVector(X.Num() > 0 ? X[0]->AsNumber() : 0.0, X.Num() > 1 ? X[1]->AsNumber() : 0.0, X.Num() > 2 ? X[2]->AsNumber() : 0.0); };
+			const auto Num = [](const TArray<TSharedPtr<FJsonValue>>& X, int32 i) { return X.IsValidIndex(i) ? float(X[i]->AsNumber()) : 0.f; };
+			const auto V3 = [&Num](const TArray<TSharedPtr<FJsonValue>>& X) { return FVector(Num(X, 0), Num(X, 1), Num(X, 2)); };
 			for (const TSharedPtr<FJsonValue>& V : *A)
 			{
 				const TSharedPtr<FJsonObject> O = V->AsObject();
@@ -274,13 +275,86 @@ namespace WRLandHfImpl
 				FString S;
 				if (O->TryGetStringField(TEXT("id"), S)) C.Id = FName(*S);
 				if (O->TryGetStringField(TEXT("biome"), S)) C.Biome = FName(*S);
+				O->TryGetStringField(TEXT("name"), C.Name);
+				C.bRoom = O->HasField(TEXT("room"));
 				const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
 				if (O->TryGetArrayField(TEXT("dir"), X)) C.Dir = FVector2D(V3(*X)).GetSafeNormal();
 				if (O->TryGetArrayField(TEXT("mouth"), X)) C.Mouth = V3(*X);
 				if (O->TryGetArrayField(TEXT("hall"), X)) C.Hall = V3(*X);
-				if (O->TryGetArrayField(TEXT("hallR"), X)) C.HallR = FVector2D(V3(*X));
-				if (O->TryGetArrayField(TEXT("pts"), X)) for (const TSharedPtr<FJsonValue>& P : *X) { const TArray<TSharedPtr<FJsonValue>>* Q = nullptr; if (P->TryGetArray(Q)) C.Pts.Add(V3(*Q)); }
-				if (C.Pts.Num() < 2) D.Caves.Pop();
+				if (O->TryGetArrayField(TEXT("shapes"), X)) for (const TSharedPtr<FJsonValue>& SV : *X)
+				{
+					const TSharedPtr<FJsonObject> SO = SV->AsObject();
+					if (!SO.IsValid()) continue;
+					FWRLandCaveShape Sh;
+					FString K;
+					SO->TryGetStringField(TEXT("k"), K);
+					if (SO->TryGetStringField(TEXT("role"), S)) Sh.Role = FName(*S);
+					const TArray<TSharedPtr<FJsonValue>>* Y = nullptr;
+					if (K == TEXT("tube") && SO->TryGetArrayField(TEXT("p"), Y))
+					{
+						Sh.Kind = 0;
+						for (const TSharedPtr<FJsonValue>& PV : *Y)
+						{
+							const TArray<TSharedPtr<FJsonValue>>* Q = nullptr;
+							if (!PV->TryGetArray(Q)) continue;
+							Sh.P.Add(FVector4f(Num(*Q, 0), Num(*Q, 1), Num(*Q, 2), Num(*Q, 3)));
+							Sh.PH.Add(Num(*Q, 4));
+							const float W = Num(*Q, 3) + 1.f;
+							Sh.Box += FVector(Num(*Q, 0) - W, Num(*Q, 1) - W, Num(*Q, 2) - 0.5f);
+							Sh.Box += FVector(Num(*Q, 0) + W, Num(*Q, 1) + W, Num(*Q, 2) + Num(*Q, 4) + 0.5f);
+						}
+						if (Sh.P.Num() < 2) continue;
+					}
+					else if (K == TEXT("hall"))
+					{
+						Sh.Kind = 1;
+						if (SO->TryGetArrayField(TEXT("c"), Y)) Sh.C = V3(*Y);
+						if (SO->TryGetArrayField(TEXT("r"), Y)) Sh.R = FVector2D(Num(*Y, 0), Num(*Y, 1));
+						Sh.Yaw = float(SO->GetNumberField(TEXT("yaw")));
+						Sh.H = float(SO->GetNumberField(TEXT("h")));
+						const float Rm = FMath::Max(Sh.R.X, Sh.R.Y) + 0.5f;
+						Sh.Box = FBox(Sh.C - FVector(Rm, Rm, 0.5f), Sh.C + FVector(Rm, Rm, Sh.H + 0.5f));
+					}
+					else if (K == TEXT("shaft"))
+					{
+						Sh.Kind = 2;
+						if (SO->TryGetArrayField(TEXT("c"), Y)) Sh.C = FVector(Num(*Y, 0), Num(*Y, 1), 0.f);
+						Sh.R = FVector2D(float(SO->GetNumberField(TEXT("r"))), 0.f);
+						if (SO->TryGetArrayField(TEXT("z"), Y)) { Sh.Z0 = Num(*Y, 0); Sh.Z1 = Num(*Y, 1); }
+						Sh.Box = FBox(FVector(Sh.C.X - Sh.R.X - 0.5f, Sh.C.Y - Sh.R.X - 0.5f, Sh.Z0 - 0.5f), FVector(Sh.C.X + Sh.R.X + 0.5f, Sh.C.Y + Sh.R.X + 0.5f, Sh.Z1 + 0.5f));
+					}
+					else continue;
+					C.Shapes.Add(MoveTemp(Sh));
+				}
+				if (O->TryGetArrayField(TEXT("feats"), X)) for (const TSharedPtr<FJsonValue>& FV : *X)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* Q = nullptr;
+					if (!FV->TryGetArray(Q) || Q->Num() < 7) continue;
+					FWRLandCaveFeat& F = C.Feats.AddDefaulted_GetRef();
+					F.Kind = FName(*(*Q)[0]->AsString());
+					F.At = FVector(Num(*Q, 1), Num(*Q, 2), Num(*Q, 3));
+					F.A = Num(*Q, 4); F.B = Num(*Q, 5); F.Yaw = Num(*Q, 6);
+				}
+				if (O->TryGetArrayField(TEXT("lights"), X)) for (const TSharedPtr<FJsonValue>& LV : *X)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* Q = nullptr;
+					if (!LV->TryGetArray(Q) || Q->Num() < 8) continue;
+					FWRLandCaveLight& L = C.Lights.AddDefaulted_GetRef();
+					L.At = FVector(Num(*Q, 0), Num(*Q, 1), Num(*Q, 2));
+					L.Color = FLinearColor(Num(*Q, 3), Num(*Q, 4), Num(*Q, 5));
+					L.Intensity = Num(*Q, 6); L.Radius = Num(*Q, 7);
+				}
+				const TSharedPtr<FJsonObject>* Sp = nullptr;
+				if (O->TryGetObjectField(TEXT("spots"), Sp))
+				{
+					C.bHasSpots = true;
+					if ((*Sp)->TryGetArrayField(TEXT("ore"), X)) for (const TSharedPtr<FJsonValue>& PV : *X) { const TArray<TSharedPtr<FJsonValue>>* Q = nullptr; if (PV->TryGetArray(Q)) C.OreSpots.Add(V3(*Q)); }
+					if ((*Sp)->TryGetArrayField(TEXT("star"), X)) C.StarSpot = V3(*X);
+					if ((*Sp)->TryGetArrayField(TEXT("hazard"), X)) C.HazardSpot = V3(*X);
+					if ((*Sp)->TryGetArrayField(TEXT("den"), X)) C.DenSpot = V3(*X);
+					if ((*Sp)->TryGetArrayField(TEXT("cache"), X)) { C.CacheSpot = V3(*X); C.CacheYaw = Num(*X, 3); C.bHasCache = true; }
+				}
+				if (C.Shapes.Num() == 0) D.Caves.Pop();
 			}
 		}
 		UE_LOG(LogWildreach, Log, TEXT("LAND %s: heightfield %d x %d at %.0f m from (%.0f, %.0f)"), *D.Id.ToString(), D.HfN, D.HfN, D.HfStep, D.HfOrigin.X, D.HfOrigin.Y);
@@ -794,40 +868,64 @@ TCHAR FWRLandDef::GridLetter(const FVector2D& M) const
 	return GridRows[J][I];
 }
 
-float FWRLandCave::Air(const FVector& P, float* OutFloor) const
+float FWRLandCaveShape::Air(const FVector& Pm, float& OutFloor, float& OutWidth) const
 {
-	using namespace WRCaveShape;
-	// The passage: the nearest point of its polyline (in plan), its floor there, an ellipse across it cut flat by the floor.
-	float Best = TNumericLimits<float>::Max(), F = 0.f;
-	for (int32 i = 1; i < Pts.Num(); ++i)
+	if (Kind == 0)
 	{
-		const FVector2D A(Pts[i - 1]), B(Pts[i]), AB = B - A;
-		const float T = FMath::Clamp(FVector2D::DotProduct(FVector2D(P) - A, AB) / FMath::Max(1e-4f, float(AB.SizeSquared())), 0.f, 1.f);
-		const float Dd = FVector2D::Distance(FVector2D(P), A + AB * T);
-		if (Dd < Best) { Best = Dd; F = FMath::Lerp(float(Pts[i - 1].Z), float(Pts[i].Z), T); }
+		// The cross-section of the passage's nearest point in plan (cave_shape.mjs tubeAir): its floor runs on through every
+		// bend, with no pit and step at a joint where the grade changes.
+		float Near = TNumericLimits<float>::Max(), F = 0.f, W = 1.f, Hh = 1.f;
+		for (int32 i = 1; i < P.Num(); ++i)
+		{
+			const FVector2D A(P[i - 1].X, P[i - 1].Y), B(P[i].X, P[i].Y), AB = B - A;
+			const float U = FMath::Clamp(FVector2D::DotProduct(FVector2D(Pm) - A, AB) / FMath::Max(1e-6f, float(AB.SizeSquared())), 0.f, 1.f);
+			const float Lat = FVector2D::Distance(FVector2D(Pm), A + AB * U);
+			if (Lat < Near) { Near = Lat; F = FMath::Lerp(P[i - 1].Z, P[i].Z, U); W = FMath::Lerp(P[i - 1].W, P[i].W, U); Hh = FMath::Lerp(PH[i - 1], PH[i], U); }
+		}
+		const float Bv = 0.62f * Hh, Lv = Hh - Bv;
+		OutFloor = F;
+		OutWidth = W;
+		return FMath::Max((FMath::Sqrt(FMath::Square(Near / W) + FMath::Square((float(Pm.Z) - F - Lv) / Bv)) - 1.f) * FMath::Min(W, Bv), F - float(Pm.Z));
 	}
-	const float Tube = FMath::Max((FMath::Sqrt(FMath::Square(Best / HalfW) + FMath::Square((float(P.Z) - F - TubeLift) / TubeB)) - 1.f) * FMath::Min(HalfW, TubeB), F - float(P.Z));
-	// The hall: an ellipsoid along Dir, cut flat by its floor.
-	const FVector2D Rel = FVector2D(P) - FVector2D(Hall);
-	const float U = FVector2D::DotProduct(Rel, Dir), Vv = -Rel.X * Dir.Y + Rel.Y * Dir.X;
-	const float HallD = FMath::Max((FMath::Sqrt(FMath::Square(U / HallR.X) + FMath::Square(Vv / HallR.Y) + FMath::Square((float(P.Z) - float(Hall.Z) - HallLift) / HallB)) - 1.f)
-		* FMath::Min3(float(HallR.X), float(HallR.Y), HallB), float(Hall.Z) - float(P.Z));
-	if (OutFloor) *OutFloor = Tube < HallD ? F : float(Hall.Z);
-	// Joined smoothly (cave_shape.mjs smin).
-	const float H = FMath::Max(Join - FMath::Abs(Tube - HallD), 0.f) / Join;
-	return FMath::Min(Tube, HallD) - H * H * Join * 0.25f;
+	if (Kind == 1)
+	{
+		const float Ar = FMath::DegreesToRadians(Yaw), Ca = FMath::Cos(Ar), Sa = FMath::Sin(Ar);
+		const float Dx = float(Pm.X - C.X), Dy = float(Pm.Y - C.Y), U = Dx * Ca + Dy * Sa, Vv = -Dx * Sa + Dy * Ca;
+		const float Bv = 0.85f * H, Lv = H - Bv;
+		OutFloor = float(C.Z);
+		OutWidth = FMath::Min(float(R.X), float(R.Y));
+		return FMath::Max((FMath::Sqrt(FMath::Square(U / float(R.X)) + FMath::Square(Vv / float(R.Y)) + FMath::Square((float(Pm.Z) - float(C.Z) - Lv) / Bv)) - 1.f)
+			* FMath::Min3(float(R.X), float(R.Y), Bv), float(C.Z) - float(Pm.Z));
+	}
+	OutFloor = Z0;
+	OutWidth = float(R.X);
+	return FMath::Max3(float(FVector2D::Distance(FVector2D(Pm), FVector2D(C))) - float(R.X), Z0 - float(Pm.Z), float(Pm.Z) - Z1);
+}
+
+float FWRLandCave::Air(const FVector& P, float* OutFloor, float* OutWidth) const
+{
+	// The union of the shapes, joined smoothly in order (cave_shape.mjs caveAir).
+	float V = TNumericLimits<float>::Max(), Best = V, Floor = 0.f, Width = 1.f;
+	bool bFirst = true;
+	for (const FWRLandCaveShape& S : Shapes)
+	{
+		float F = 0.f, W = 1.f;
+		const float D = S.Air(P, F, W);
+		if (D < Best) { Best = D; Floor = F; Width = W; }
+		if (bFirst) { V = D; bFirst = false; continue; }
+		const float H = FMath::Max(WRCaveShape::Join - FMath::Abs(V - D), 0.f) / WRCaveShape::Join;
+		V = FMath::Min(V, D) - H * H * WRCaveShape::Join * 0.25f;
+	}
+	if (OutFloor) *OutFloor = Floor;
+	if (OutWidth) *OutWidth = Width;
+	return V;
 }
 
 FBox FWRLandCave::Bounds(float Grow) const
 {
-	using namespace WRCaveShape;
 	FBox B(ForceInit);
-	for (const FVector& P : Pts) B += P;
-	const float R = FMath::Max(HallR.X, HallR.Y);
-	B += Hall + FVector(R, R, HallLift + HallB);
-	B += Hall - FVector(R, R, 0.f);
-	B += FVector(Pts[0].X, Pts[0].Y, Pts[0].Z + TubeLift + TubeB);
-	return B.ExpandBy(FVector(HalfW + Grow, HalfW + Grow, Grow));
+	for (const FWRLandCaveShape& S : Shapes) B += S.Box;
+	return B.ExpandBy(Grow);
 }
 
 bool FWRLandDef::IsUnderground(const FVector2D& M) const

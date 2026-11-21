@@ -280,6 +280,8 @@ void UWRDressingSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 				bool bUnder = false;
 				C->TryGetBoolField(TEXT("underground"), bUnder);
 				Cave->bUnderground = bUnder;
+				FString CaveIdStr;
+				if (C->TryGetStringField(TEXT("cave"), CaveIdStr)) Cave->CaveId = FName(*CaveIdStr);
 				Cave->FinishSpawning(T);
 			}
 		}
@@ -1679,6 +1681,7 @@ void AWRCave::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	DOREPLIFETIME(AWRCave, Variant);
 	DOREPLIFETIME(AWRCave, Theme);
 	DOREPLIFETIME(AWRCave, bUnderground);
+	DOREPLIFETIME(AWRCave, CaveId);
 }
 
 void AWRCave::BeginPlay()
@@ -1738,9 +1741,13 @@ void AWRCave::BuildShell()
 	{
 		if (!bFrost && GetNetMode() != NM_DedicatedServer)
 		{
-			for (const FVector& V : { FVector(-250.f, 320.f, 5.f), FVector(-380.f, 210.f, 5.f), FVector(-140.f, 440.f, 5.f) })
+			// At the layout's hazard spot when the land cave has one (its sulfur crust is there too: WRLandCaves).
+			const FWRLandDef* CaveLand = nullptr;
+			const FWRLandCave* LC = CaveId.IsNone() ? nullptr : WRLand::FindCave(CaveId, &CaveLand);
+			const FVector Gas = LC && CaveLand && LC->bHasSpots ? CaveLand->ToWorld(FVector2D(LC->HazardSpot), LC->HazardSpot.Z) : GetActorTransform().TransformPosition(FVector(-250.f, 320.f, 0.f));
+			for (const FVector& V : { FVector(0.f, 0.f, 5.f), FVector(-130.f, -110.f, 5.f), FVector(110.f, 120.f, 5.f) })
 			{
-				if (USceneComponent* W = WRFx::Attach(RootComponent, TEXT("cave.gas.vent"))) W->SetRelativeLocation(V);
+				if (USceneComponent* W = WRFx::Attach(RootComponent, TEXT("cave.gas.vent"))) W->SetWorldLocation(Gas + V);
 			}
 		}
 		return;
@@ -1906,9 +1913,17 @@ void AWRCave::SpawnContents()
 	{
 		Ores.Add({ TEXT("star_iron_ore"), FVector(-650, -280, 0) });
 	}
+	// A land's underground cave stands its things at its layout's spots (the best ore deepest, the gas off the ways).
+	const FWRLandDef* CaveLand = nullptr;
+	const FWRLandCave* LC = bUnderground && !CaveId.IsNone() ? WRLand::FindCave(CaveId, &CaveLand) : nullptr;
+	if (LC && (!CaveLand || !LC->bHasSpots)) LC = nullptr;
+	const auto SpotW = [CaveLand](const FVector& M) { return CaveLand->ToWorld(FVector2D(M), M.Z) + FVector(0.f, 0.f, 5.f); };
+	int32 OreIndex = 0;
 	for (const TPair<FName, FVector>& Ore : Ores)
 	{
-		const FTransform T(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), Floor(Ore.Value));
+		const int32 Oi = OreIndex++;
+		const FVector OreAt = !LC ? Floor(Ore.Value) : Ore.Key == TEXT("star_iron_ore") ? SpotW(LC->StarSpot) : LC->OreSpots.IsValidIndex(Oi) ? SpotW(LC->OreSpots[Oi]) : Floor(Ore.Value);
+		const FTransform T(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), OreAt);
 		if (AWRResourceNode* Node = GetWorld()->SpawnActorDeferred<AWRResourceNode>(AWRResourceNode::StaticClass(), T, this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 		{
 			Node->ItemId = Ore.Key;
@@ -1931,7 +1946,7 @@ void AWRCave::SpawnContents()
 	if (!bStormCave && !bSwampCave && !bForestCave)
 	{
 		// (An underground hall's gas lies to one side, off the way in from the passage: AWRCave::BuildShell's vents.)
-		AWRHazard::Spawn(GetWorld(), nullptr, Floor(bUnderground && !bFrost ? FVector(-250, 320, 0) : FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
+		AWRHazard::Spawn(GetWorld(), nullptr, LC ? SpotW(LC->HazardSpot) : Floor(bUnderground && !bFrost ? FVector(-250, 320, 0) : FVector(250, 0, 0)), bFrost ? 450.f : 260.f, 0.f,
 			WRTune(TEXT("caves.gasDps"), 6.f), bFrost ? FName(TEXT("ice")) : FName(TEXT("gas")), !bUnderground);
 	}
 	// The Swamp's caves (cooks/biome-swamp.md 2.6): Reedmouth's Lanterntoads and Slimeshells, the Eel Hole's leeches, the
@@ -1985,7 +2000,7 @@ void AWRCave::SpawnContents()
 		return;
 	}
 	// A burrower colony (Kilnmites nest here and mine ore once tamed; Glacimaws lurk under the ice).
-	const FTransform SpawnAt(FRotator::ZeroRotator, Floor(FVector(-300, 0, 0)));
+	const FTransform SpawnAt(FRotator::ZeroRotator, LC ? SpotW(LC->DenSpot) : Floor(FVector(-300, 0, 0)));
 	if (AWRCreatureSpawner* Spawner = GetWorld()->SpawnActorDeferred<AWRCreatureSpawner>(AWRCreatureSpawner::StaticClass(), SpawnAt, this))
 	{
 		Spawner->CreatureId = bStormCave ? FName(TEXT("coilburrow")) : bFrost ? FName(TEXT("glacimaw")) : FName(TEXT("kilnmite"));

@@ -326,8 +326,9 @@ public:
 	UFUNCTION(Exec) void WRTeleport(float X, float Y);
 	/** Set the camera direction (local). */
 	UFUNCTION(Exec) void WRLook(float Yaw, float Pitch);
-	/** Bot walks straight toward world X/Y (cm) and logs the time it takes, or where it got stuck. */
-	UFUNCTION(Exec) void WRWalkTo(float X, float Y);
+	/** Bot walks straight toward world X/Y (cm) and logs the time it takes, or where it got stuck; it has arrived within
+	 *  Radius cm (4 m if not given: a cave walk wants ~1.2 m, or it cuts the corners of narrow passages). */
+	UFUNCTION(Exec) void WRWalkTo(float X, float Y, float Radius = 400.f);
 	void UsePotion();
 	void UseFood();
 	void UseDrink();
@@ -553,6 +554,8 @@ private:
 	float WalkStart = 0.f;
 	float WalkLastProgress = 0.f;
 	float WalkBestDist = 0.f;
+	float WalkRadius = 400.f;
+	float WaitWalkUntil = -1.f;   // a "waitwalk N" bot command's deadline (-1: none running)
 	FVector WalkLastHere = FVector::ZeroVector;   // where the last walk tick was (a jump from there: moved by the server)
 	float WalkNextLog = 0.f;
 	float BotClock = 0.f;

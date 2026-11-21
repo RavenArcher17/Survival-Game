@@ -524,6 +524,8 @@ private:
 	void PlaceMasters();
 	void PlaceStones();
 	void PlaceTubes();
+	/** Each land cave's cache in its hidden pocket (a hidden tube's room's is the tube's). */
+	void PlaceCaveCaches();
 	void StepShrinesAndKindles(float Dt);
 	void StepMasters(float Dt);
 

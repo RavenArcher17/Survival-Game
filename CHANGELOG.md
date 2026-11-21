@@ -2,6 +2,53 @@
 
 ## Unreleased
 
+### Round island: caves worth exploring (11-20)
+
+Raven: "Build them" (after "Do you think the caves feel like real exploitable caves or just some rooms connected").
+- **Each of the six caves is a small network, and each has a name.** The Volcanic's are the Cinder Gullet, the Ember
+  Vaults and Slagfall Hollow; the Tundra's are the Hollow Ice, Rimefang Grotto and the Frozen Throat. Each has:
+  - an entrance winding down to an entry chamber;
+  - the big hall beyond, reached either down a slope or off a ledge (a 3-3.6 m drop) with a ramp that loops round
+    outside the hall's wall and back up to the ledge;
+  - a crawl off the way to a hidden pocket;
+  - a squeeze from the hall down into the deep chamber.
+- **Every cave is laid differently.** Chamber sizes, heights, turns and depths come from each cave's own seed, and the
+  depths follow the ground over them.
+- **Skylights:** all three Volcanic caves have a collapsed roof. Daylight comes down a shaft onto the fallen rubble,
+  and a ring of rocks marks the hole up on the ground. You can drop in that way (it hurts).
+- **Formations in every chamber:**
+  - the Volcanic's: dark lava drips from the ceilings, stubby stalagmites, a column or two in the big chambers, rubble
+    against the walls, a lava bench along one wall of the hall, cracks in the floor still glowing, and small ochre
+    sulfur crystals round the gas vents;
+  - the Tundra's: icicles, ice stalagmites and columns, a frozen fall down the hall's far wall with its frozen pool
+    (the slick ice), and a clear-ice wall in the deep chamber with an old tusk and ribs in it. Their walls are
+    banded glacier ice, pale and deep blue, with snow on the floors; they used to be one flat blue.
+  - Stalagmites, columns, falls and rocks are solid.
+- **The light comes from the cave itself:** the glowing cracks and an ember in the pocket, blue glows by the frozen
+  fall and in the deep chamber. The ways between are dark.
+- **Contents placed by the layout:**
+  - the best ore (iron) is in the deep chamber, the other ores in the hall and the entry chamber;
+  - the gas or the slick ice is in the hall, off the ways;
+  - the burrowers' den is in the deep chamber;
+  - each cave's pocket holds a chest: iron ingots, a ruby and ember essence in the Volcanic, bronze, hides and a
+    topaz in the Tundra, refilling every 96 hours.
+- **The hidden tubes' rooms:** each room now has a crawl from it to a pocket, and the room's cache is hidden there.
+  The Sealed Vault's slab now stands across its crawl. A room's ore stands along its walls; it used to stand in two
+  rows across the middle, with one node in the way in from the door.
+- **Every way in is a way out.** A test bot walked every passage of every cave and room both ways. It found two
+  traps, now fixed:
+  - a squeeze that dropped 2.9 m in 2 m: easy to fall down, impossible to climb back up. Squeezes are now longer, and
+    every passage's slope is spread evenly along its length;
+  - a crawl leaving a sloping passage cut a lip too steep to climb. Slopes now level out into a landing where the
+    crawl leaves.
+- **Mouths, doorways and skylights:**
+  - a tube room's doorway in the Blue Below used to show squares of bare ground and ice in the corridor's floor; the
+    ground there now matches the corridor;
+  - steep faces at a mouth's lip no longer show the ground's texture run down them in streaks;
+  - no drips hang under a skylight's shaft (one stood up out of the ground beside the hole).
+- **For testing:** `WRWalkTo <x> <y> [radius]` takes an arrival radius, and the bot command `waitwalk <max s>` waits for
+  a walk to end.
+
 ### Round island: caves that go into the ground (11-20)
 
 Raven: "Now's probably a good time to fix caves and make them like real caves that go into the ground".
