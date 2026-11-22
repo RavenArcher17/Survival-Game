@@ -624,6 +624,18 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 	let n = 0;
 	const WIDE = { blue_fire: 34, bellows_stacks: 26, miners_camp: 24, hunter_camp: 24, fishing_camp: 24 };   // places whose crusts or camps spread wider
 	for (const p of FFL.places) if (!KEEP.has(p.kind) && Array.isArray(p.at)) { pad(p.at, WIDE[p.kind] || 18, 26); n++; }
+	// The Glasswall stands against the ridge's inner face (11-22): a level apron at its foot's height in front of it, so
+	// the geyser's spout and the ledge 9 m up sit as built (its 1600 cm/s throw reaches the ledge only from the foot).
+	for (const p of FFL.places) if (p.kind === "glasswall") {
+		const a = (p.yaw || 0) * Math.PI / 180, foot = [p.at[0] - Math.cos(a) * 6, p.at[1] - Math.sin(a) * 6];
+		// (not pad(): its slope clamp reaches 168 m and would cut the ridge down; just this apron, blended out by 18 m)
+		const L = sampleH(...foot);
+		for (let j = Math.floor((p.at[1] - 18 + HALF) / STEP); j <= Math.ceil((p.at[1] + 18 + HALF) / STEP); j++) for (let i = Math.floor((p.at[0] - 18 + HALF) / STEP); i <= Math.ceil((p.at[0] + 18 + HALF) / STEP); i++) {
+			if (i < 0 || j < 0 || i >= N || j >= N) continue;
+			const d = Math.hypot(-HALF + i * STEP - p.at[0], -HALF + j * STEP - p.at[1]);
+			if (d < 18) H[j * N + i] = lerp(L, H[j * N + i], smooth(8, 18, d));
+		}
+	}
 	log(`places levelled: ${n}`);
 }
 // The caves (11-20, Raven: "make them like real caves that go into the ground", then "Build them": caves worth

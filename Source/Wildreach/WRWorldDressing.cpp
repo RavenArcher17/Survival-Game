@@ -553,7 +553,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// dark pillars (the rock meshes stretched tall and tinted).
 		// (Ice in its own glacier-ice material, M_IceBlock: the rock texture under M_Rock is too dark for ice, whatever its
 		// tint; the engine shape material it had read as flat blue plastic.)
-		{ TEXT("serac"), { Gen(TEXT("SM_Serac"), TEXT("AB")), FVector(300, 260, 620), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Tint"), FLinearColor(0.92f, 0.97f, 1.f) } }, {} } },
+		{ TEXT("serac"), { Gen(TEXT("SM_Serac"), TEXT("ABCD")), FVector(300, 260, 620), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Tint"), FLinearColor(0.92f, 0.97f, 1.f) } }, {} } },
 		{ TEXT("ice_boulder"), { Rocks, FVector(220, 190, 170), 25, true, 24000, FVector(12, 0, 18), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, {} } },
 		// (11-22: the blades and columns were the rock set's boulders stretched tall; now real shapes of their own.)
 		{ TEXT("obsidian_blade"), { Gen(TEXT("SM_ObsidianBlade"), TEXT("ABC")), FVector(210, 180, 420), 50, true, 20000, FVector(10, 0, 8), false, ObsidianMat, {}, {} } },

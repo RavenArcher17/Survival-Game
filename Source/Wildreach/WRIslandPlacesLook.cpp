@@ -15,6 +15,8 @@ using WRLookKit::FSurf;
 namespace WRIsleV
 {
 	using WRIsleLook::Lin;
+	/** The dressing's obsidian (world-projected black glass): the Glasswall, the quarry, the spire's ribs. */
+	static const TCHAR* ObsidianPath = TEXT("/Game/Terrain/M_Obsidian.M_Obsidian");
 
 	struct FPal
 	{
@@ -230,83 +232,102 @@ namespace WRIsleV
 		// The body's axis: 26 m south of the haft's south end, along the bank (local X).
 		const float Ay = From.Y + 2600.f;
 		const FSurf& B = P.Bone;
-		// Skull at the east end, turned up, the jaw dropped.
-		const FVector Sk(2600.f, Ay, S.Gz(2600.f, Ay) + 150.f);
-		S.K.Add(B, FVector(520.f, 430.f, 380.f), Sk, FRotator(-12.f, 0.f, 8.f));
-		S.K.Add(B.Dim(0.92f), FVector(300.f, 380.f, 160.f), Sk + FVector(240.f, 0, -150.f), FRotator(-30.f, 0.f, 0.f));   // the brow and nasal shelf
-		S.K.Add(B.Dim(0.88f), FVector(380.f, 340.f, 90.f), Sk + FVector(260.f, 0, -260.f), FRotator(18.f, 0.f, 6.f));     // the dropped jaw
-		for (const float Sd : { -1.f, 1.f }) S.K.Add(P.Dark, FVector(60.f, 110.f, 100.f), Sk + FVector(250.f, Sd * 110.f, 40.f), FRotator(-12.f, 0.f, 0.f));
-		for (int32 t = 0; t < 8; ++t) S.K.Add(B.Dim(1.05f), FVector(40.f, 34.f, 70.f), Sk + FVector(380.f, -140.f + 40.f * t, -170.f), FRotator(10.f, 0.f, 0.f));
-		// The frost crack: a seam of blue-black ice through the crown, and three spearheads driven into it.
-		S.K.Add(FSurf::Glass(Lin(70, 120, 160), 0.05f), FVector(40.f, 430.f, 22.f), Sk + FVector(-40.f, 0, 190.f), FRotator(-12.f, 18.f, 8.f));
-		for (int32 k = 0; k < 3; ++k)
+		// His bones are shapes of their own (11-22, round 4: Tools/art/make_meshes.py's skull, jaw, vertebra, ribs, pelvis
+		// and long bone, voxel-merged so the parts grow into each other as bone does) in the kit's bone; they were boxes,
+		// sticks and cylinders, the ribs a row of straight stakes.
+		const auto Bone = [&S, &B](const TCHAR* Name, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide = false)
 		{
-			const FVector At = Sk + FVector(-80.f + 70.f * k, -90.f + 90.f * k, 170.f);
-			S.K.Spike(P.RimeBlack, At, FVector(0.3f * S.J(At, 1), 0.3f * S.J(At, 2), -1.f), 18.f, 70.f);
-			S.K.Rod(P.Wood.Dim(0.5f), At, At + FVector(40.f * S.J(At, 3), 40.f * S.J(At, 4), 160.f), 6.f);   // the shaft's burnt stub
+			return S.ShapeKit(*FString::Printf(TEXT("/Game/Art/Gen/%s.%s"), Name, Name), At, Rot, Scale, bCollide, B);
+		};
+		const auto Compose = [](const FRotator& Outer, const FRotator& Inner) { return (Outer.Quaternion() * Inner.Quaternion()).Rotator(); };
+		// Skull at the east end, the face turned up to the sky, half sunk in the clinker; the jaw hanging open off its hinges.
+		const FVector Sk(2650.f, Ay, S.Gz(2650.f, Ay) + 120.f);
+		const FRotator SkRot(38.f, 0.f, 8.f);
+		Bone(TEXT("SM_GiantSkull_A"), Sk, SkRot, FVector(1.f), true);
+		{
+			// The hinge in the skull's frame, and where it sits on the jaw (make_meshes giant_jaw); dropped 32 degrees.
+			const FVector HingeSkull(-14.f, 0.f, -84.f), HingeJaw(-14.f, 0.f, 116.f);
+			const FRotator Drop(-32.f, 0.f, 0.f);
+			const FVector JawOrigin = HingeSkull + Drop.RotateVector(-HingeJaw);
+			Bone(TEXT("SM_GiantJaw_A"), Sk + SkRot.RotateVector(JawOrigin), Compose(SkRot, Drop), FVector(1.f));
 		}
-		S.Solid(Sk, FVector(260.f, 215.f, 190.f), FRotator(-12.f, 0.f, 8.f));
-		// Spine: eighteen vertebrae from the neck to the pelvis, each a body and a dorsal spine, half in the clinker.
+		// The frost crack: a seam of blue-black ice over the crown (on the braincase's curve), three spearheads driven in.
+		{
+			const FSurf Seam = FSurf::Glass(Lin(70, 120, 160), 0.05f);
+			const auto Crown = [](float Y) { return FVector(-30.f, Y, 70.f + 185.f * FMath::Sqrt(FMath::Max(0.f, 1.f - FMath::Square(Y / 200.f) - FMath::Square(20.f / 235.f))) - 6.f); };
+			for (int32 k = 0; k < 4; ++k)
+			{
+				const FVector A = Crown(-135.f + 90.f * k), C = Crown(-45.f + 90.f * k);
+				const float Roll = FMath::RadiansToDegrees(FMath::Atan2(C.Z - A.Z, C.Y - A.Y));
+				S.K.Add(Seam, FVector(34.f, FVector::Dist(A, C) + 6.f, 16.f), Sk + SkRot.RotateVector((A + C) * 0.5f + FVector(8.f * (k % 2), 0, 0)), Compose(SkRot, FRotator(0.f, 6.f * (k % 2 ? 1 : -1), Roll)));
+			}
+			for (int32 k = 0; k < 3; ++k)
+			{
+				const FVector At = Sk + SkRot.RotateVector(Crown(-80.f + 80.f * k));
+				const FVector Dir = SkRot.RotateVector(FVector(0.3f * S.J(At, 1), 0.3f * S.J(At, 2), -1.f));
+				S.K.Spike(P.RimeBlack, At + Dir * 30.f, Dir, 18.f, 70.f);
+				S.K.Rod(P.Wood.Dim(0.5f), At - Dir * 10.f, At - Dir * 150.f + FVector(40.f * S.J(At, 3), 40.f * S.J(At, 4), 0.f), 6.f);   // the shaft's burnt stub
+			}
+		}
+		// Spine: eighteen vertebrae from the neck to the pelvis, lying as he fell (each drum up, its spine down in the clinker),
+		// growing from the neck to the small of the back.
 		for (int32 v = 0; v < 18; ++v)
 		{
 			const float X = 2150.f - 250.f * v;
-			const FVector At(X, Ay, S.Gz(X, Ay) + 40.f);
-			S.K.Add(B.Dim(0.9f + 0.1f * (v % 2)), FVector(180.f, 170.f, 150.f), At, FRotator(0.f, 0.f, 4.f * S.J(At, 5)), EWRLookMesh::Cylinder);
-			S.K.Add(B.Dim(0.85f), FVector(60.f, 40.f, 170.f), At + FVector(0, 0, 120.f), FRotator(-10.f, 0.f, 0.f));
-			for (const float Sd : { -1.f, 1.f }) S.K.Add(B.Dim(0.85f), FVector(50.f, 110.f, 40.f), At + FVector(0, Sd * 120.f, 30.f), FRotator(0.f, 0.f, Sd * 20.f));
+			const float Sc = 0.78f + 0.3f * FMath::Min(1.f, v / 12.f);
+			const FVector At(X, Ay, S.Gz(X, Ay) + 45.f * Sc);
+			Bone(TEXT("SM_GiantVertebra_A"), At, FRotator(3.f * S.J(At, 5), 6.f * S.J(At, 6), 5.f * S.J(At, 7)), FVector(Sc * 1.3f, Sc, Sc));
 		}
 		S.Solid(FVector(0.f, Ay, S.Gz(0, Ay) + 60.f), FVector(2300.f, 110.f, 90.f));
-		// Ribs: nine pairs arching up and out from the spine and down into the ground; the middle ones broken by the fall.
+		// Ribs: nine pairs rising off the spine round his sides and in over the chest, 10 m up (a cage you walk under); the
+		// middle ones on the north side broken by the fall, their upper halves lying in the clinker beside the stubs.
 		for (int32 r = 0; r < 9; ++r)
 		{
 			const float X = 1750.f - 240.f * r;
+			const float Sc = 0.7f + 0.32f * FMath::Sin(PI * (r + 0.5f) / 9.f);
 			for (const float Sd : { -1.f, 1.f })
 			{
-				const bool bBroken = (r >= 3 && r <= 5 && Sd > 0.f) || (r == 4);
-				const float Span = 560.f + 40.f * FMath::Sin(r * 0.6f), Rise = 680.f + 90.f * FMath::Sin(r * 0.5f);
-				FVector Prev(X, Ay + Sd * 90.f, S.Gz(X, Ay) + 120.f);
-				const int32 Segs = bBroken ? 3 : 7;
-				for (int32 k = 1; k <= Segs; ++k)
-				{
-					const float T = k / 7.f;
-					const float Yy = Ay + Sd * (90.f + Span * FMath::Sin(T * PI * 0.55f));
-					const FVector Pt(X - 60.f * T, Yy, S.Gz(X, Ay) + 120.f + Rise * FMath::Sin(T * PI) - 140.f * T * T);
-					S.K.Rod(B.Dim(0.85f + 0.1f * S.R(Pt, 9)), Prev, Pt, FMath::Lerp(60.f, 38.f, T));
-					Prev = Pt;
-				}
+				const bool bBroken = (r >= 3 && r <= 5 && Sd > 0.f) || r == 4;
+				const FVector At(X, Ay + Sd * 40.f, S.Gz(X, Ay) + 30.f);
+				Bone(bBroken ? TEXT("SM_GiantRib_B") : TEXT("SM_GiantRib_A"), At, FRotator(0.f, 4.f * S.J(At, 8), Sd * 3.f * S.J(At, 9)), FVector(Sc, Sd * Sc, Sc));
 				if (bBroken)
 				{
-					// The broken end lies on the clinker beside its stub.
-					const FVector Lie(X - 120.f, Ay + Sd * 640.f, 0.f);
-					S.K.Rod(B.Dim(0.8f), FVector(Lie.X, Lie.Y, S.Gz(Lie.X, Lie.Y) + 25.f), FVector(Lie.X + 260.f, Lie.Y + Sd * 180.f, S.Gz(Lie.X + 260.f, Lie.Y + Sd * 180.f) + 15.f), 44.f);
+					const FVector Lie(X - 160.f + 120.f * S.J(At, 10), Ay + Sd * (780.f * Sc + 60.f * S.R(At, 11)), 0.f);
+					Bone(TEXT("SM_GiantRib_C"), FVector(Lie.X, Lie.Y, S.Gz(Lie.X, Lie.Y) - 15.f), FRotator(0.f, 20.f * S.J(At, 12) + (Sd > 0.f ? 0.f : 180.f), 0.f), FVector(Sc));
 				}
 			}
 		}
-		// Pelvis and the legs running west into the flow.
-		const FVector Pv(-2350.f, Ay, S.Gz(-2350.f, Ay) + 80.f);
-		for (const float Sd : { -1.f, 1.f }) S.K.Add(B.Dim(0.9f), FVector(420.f, 260.f, 70.f), Pv + FVector(0, Sd * 220.f, 40.f), FRotator(0.f, Sd * 20.f, Sd * -35.f));
-		S.Solid(Pv, FVector(260.f, 380.f, 120.f));
+		// Pelvis, its blades up, and the legs running west into the flow.
+		const FVector Pv(-2350.f, Ay, S.Gz(-2350.f, Ay) + 40.f);
+		Bone(TEXT("SM_GiantPelvis_A"), Pv, FRotator(0.f, 0.f, 3.f), FVector(1.f));
+		S.Solid(Pv + FVector(0, 0, 40.f), FVector(260.f, 380.f, 120.f));
+		// A long bone (its hip or shoulder end at its origin, its length along X, 15 m at scale 1) from one joint to the next.
+		const auto Long = [&](const FVector& From0, const FVector& To0, float Thick, float Roll)
+		{
+			const FVector D = To0 - From0;
+			Bone(TEXT("SM_GiantLongBone_A"), From0, Compose(D.Rotation(), FRotator(0.f, 0.f, Roll)), FVector(D.Size() / 1500.f, Thick, Thick));
+		};
 		for (const float Sd : { -1.f, 1.f })
 		{
-			const FVector Hip = Pv + FVector(-100.f, Sd * 300.f, 0.f);
-			const FVector Knee(Hip.X - 1500.f, Hip.Y + Sd * 250.f, S.Gz(Hip.X - 1500.f, Hip.Y + Sd * 250.f) + 30.f);
+			const FVector Hip = Pv + FVector(-110.f, Sd * 235.f, 0.f);
+			const FVector Knee(Hip.X - 1500.f, Hip.Y + Sd * 250.f, S.Gz(Hip.X - 1500.f, Hip.Y + Sd * 250.f) + 40.f);
 			const FVector Ankle(Knee.X - 1300.f, Knee.Y - Sd * 100.f, S.Gz(Knee.X - 1300.f, Knee.Y - Sd * 100.f) - 30.f);
-			S.K.Rod(B, Hip, Knee, 130.f);
-			S.K.Add(B.Dim(0.9f), FVector(180.f, 170.f, 150.f), Knee, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
-			S.K.Rod(B.Dim(0.9f), Knee, Ankle, 100.f);
+			Long(Hip, Knee, 1.f, Sd * -90.f);
+			Long(Knee + (Ankle - Knee).GetSafeNormal() * 60.f, Ankle, 0.82f, Sd * 90.f);
 		}
-		// The right arm reaches north to the bank: humerus, elbow, forearm, the hand's bones round the haft.
-		const FVector Shoulder(1650.f, Ay - 300.f, S.Gz(1650.f, Ay - 300.f) + 140.f);
+		// The right arm reaches north to the bank from the shoulder (outside the cage): upper arm, elbow, forearm, the hand's
+		// bones round the haft.
+		const FVector Shoulder(2000.f, Ay - 720.f, S.Gz(2000.f, Ay - 720.f) + 120.f);
 		const FVector Hand = From + FVector(0, 0, 10.f);
 		const FVector Elbow = (Shoulder + Hand) * 0.5f + FVector(500.f, 0.f, 120.f);
-		S.K.Rod(B, Shoulder, Elbow, 120.f);
-		S.K.Add(B.Dim(0.9f), FVector(170.f, 170.f, 150.f), Elbow, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
-		S.K.Rod(B.Dim(0.95f), Elbow, Hand + FVector(0, 260.f, 30.f), 90.f);
+		Long(Shoulder, Elbow, 0.72f, 90.f);
+		Long(Elbow, Hand + FVector(0, 260.f, 30.f), 0.6f, 0.f);
 		for (int32 f = 0; f < 4; ++f)
 		{
 			const FVector Kn = Hand + FVector(-120.f + 80.f * f, 120.f, 120.f);
 			S.K.Rod(B.Dim(0.9f), Hand + FVector(-90.f + 60.f * f, 220.f, 40.f), Kn, 40.f);
 			S.K.Rod(B.Dim(0.85f), Kn, Hand + FVector(-120.f + 80.f * f, -60.f, 90.f), 34.f);
+			S.K.Add(B.Dim(0.9f), FVector(70.f, 70.f, 60.f), Kn, FRotator::ZeroRotator, EWRLookMesh::Sphere);   // the knuckle
 		}
 		// The hammer: the haft spanning the river (walkable), iron-banded every 3 m; the head sunk in the far bank.
 		const FVector Dir = (To - From).GetSafeNormal();
@@ -335,36 +356,33 @@ namespace WRIsleV
 
 	void Glasswall(FWRIsleSite& S, const FPal& P)
 	{
-		// A 46 m cliff of obsidian behind the shrine's valley: fifteen black glass slabs leaning out, curved faces, razor rims;
-		// a ledge 9 m up holds the Mirror Room's door, reached by riding the geyser at its foot.
+		// A 46 m cliff of obsidian behind the shrine's valley (SM_Glasswall_A in M_Obsidian, 11-22 round 4: fused slabs
+		// leaning out, their faces broken into shell-shaped scallops with sharp ridges, deep joints, a ragged top; it was
+		// fifteen black boxes); a ledge 9 m up holds the Mirror Room's door, reached by riding the geyser at its foot.
 		const float Back = -600.f;
-		for (int32 i = 0; i < 15; ++i)
+		// The cliff is 52 m long: its foot goes on the lowest ground along it (the mesh runs 1.5 m on into the ground).
+		float Low = S.Gz(Back, 0.f);
+		for (float Y = -2600.f; Y <= 2600.f; Y += 325.f) Low = FMath::Min(Low, S.Gz(Back + 100.f, Y) + 120.f);
+		const float G0 = FMath::Min(S.Gz(Back, 0.f), Low);
+		S.ShapeMat(TEXT("/Game/Art/Gen/SM_Glasswall_A.SM_Glasswall_A"), FVector(Back, 0.f, G0), FRotator::ZeroRotator, FVector(1.f), true, ObsidianPath);
+		// The middle slab leans 8% and is plain 8.5-14.5 m up: its face at the ledge stands 72 cm out from its foot.
+		const float LedgeZ = G0 + 900.f;
+		const float Face = Back + 72.f;
+		// Fallen blades at the foot.
+		for (int32 i = 0; i < 9; ++i)
 		{
-			const float Y = -2300.f + 330.f * i + 40.f * S.J(FVector(i, 0, 0), 1);
-			const float W = 300.f + 180.f * S.R(FVector(i, 1, 0), 2);
-			const float H = 1800.f + 800.f * S.R(FVector(i, 2, 0), 3) * (1.f - FMath::Abs(i - 7.f) / 10.f);
-			const float Th = 260.f + 140.f * S.R(FVector(i, 3, 0), 4);
-			const float Lean = 4.f + 5.f * S.R(FVector(i, 4, 0), 5);
-			const float Gz = S.Gz(Back, Y);
-			const FRotator Rot(-Lean, 6.f * S.J(FVector(i, 5, 0), 6), 0.f);
-			const FVector C(Back, Y, Gz + H * 0.5f - 60.f);
-			S.K.Add(P.Glass, FVector(Th, W, H), C, Rot);
-			// The conchoidal face: a second, curved-in slab proud of the first, and its razor rim catching the light.
-			S.K.Add(P.Glass.Dim(1.1f), FVector(Th * 0.4f, W * 0.8f, H * 0.6f), C + Rot.RotateVector(FVector(Th * 0.45f, 0.f, H * 0.12f)), Rot + FRotator(-4.f, 10.f * S.J(C, 7), 0.f));
-			S.K.Add(P.GlassEdge, FVector(18.f, W * 0.95f, 20.f), C + Rot.RotateVector(FVector(Th * 0.5f, 0.f, H * 0.5f)), Rot);
-			S.Solid(C, FVector(Th * 0.5f, W * 0.5f, H * 0.5f), Rot);
-			// Fallen blades at the foot.
-			if (i % 2 == 0) S.K.Add(P.Glass, FVector(200.f, 60.f, 30.f), FVector(Back + 420.f, Y + 100.f, S.Gz(Back + 420.f, Y + 100.f) + 12.f), FRotator(8.f, 40.f * S.J(C, 8), 20.f));
+			const float Y = -2200.f + 550.f * i + 120.f * S.J(FVector(i, 0, 0), 1);
+			const FVector At(Back + 420.f + 160.f * S.R(FVector(i, 1, 0), 2), Y, 0.f);
+			S.K.Add(P.Glass, FVector(220.f, 60.f, 30.f), FVector(At.X, At.Y, S.Gz(At.X, At.Y) + 10.f), FRotator(8.f, 360.f * S.R(At, 8), 20.f * S.J(At, 9)));
 		}
 		// The ledge (walkable) and the Mirror Room's door: a glass arch over a black mouth, an ember cup on the sill.
-		const float LedgeZ = S.Gz(Back, 0.f) + 900.f;
-		S.K.Add(P.Glass.Dim(1.2f), FVector(360.f, 900.f, 60.f), FVector(Back + 300.f, 0.f, LedgeZ - 30.f));
-		S.Solid(FVector(Back + 300.f, 0.f, LedgeZ - 30.f), FVector(180.f, 450.f, 30.f));
-		for (const float Sd : { -1.f, 1.f }) S.K.Add(P.GlassEdge, FVector(80.f, 70.f, 330.f), FVector(Back + 170.f, Sd * 170.f, LedgeZ + 165.f));
-		S.K.Add(P.GlassEdge, FVector(90.f, 420.f, 70.f), FVector(Back + 170.f, 0.f, LedgeZ + 360.f));
-		S.K.Add(P.Dark, FVector(40.f, 270.f, 320.f), FVector(Back + 130.f, 0.f, LedgeZ + 160.f));
-		S.Lamp(FVector(Back + 230.f, 0.f, LedgeZ + 40.f), Lin(255, 140, 60), 1800.f, 700.f);
-		S.K.Add(P.Iron, FVector(30.f, 30.f, 14.f), FVector(Back + 230.f, 0.f, LedgeZ + 8.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		S.K.Add(P.Glass.Dim(1.2f), FVector(360.f, 900.f, 60.f), FVector(Face + 180.f, 0.f, LedgeZ - 30.f));
+		S.Solid(FVector(Face + 180.f, 0.f, LedgeZ - 30.f), FVector(180.f, 450.f, 30.f));
+		for (const float Sd : { -1.f, 1.f }) S.K.Add(P.GlassEdge, FVector(80.f, 70.f, 330.f), FVector(Face + 40.f, Sd * 170.f, LedgeZ + 165.f));
+		S.K.Add(P.GlassEdge, FVector(90.f, 420.f, 70.f), FVector(Face + 40.f, 0.f, LedgeZ + 360.f));
+		S.K.Add(P.Dark, FVector(40.f, 270.f, 320.f), FVector(Face + 4.f, 0.f, LedgeZ + 160.f));
+		S.Lamp(FVector(Face + 100.f, 0.f, LedgeZ + 40.f), Lin(255, 140, 60), 1800.f, 700.f);
+		S.K.Add(P.Iron, FVector(30.f, 30.f, 14.f), FVector(Face + 100.f, 0.f, LedgeZ + 8.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 		// The geyser in front of the ledge: its spout leans a little toward the wall so its burst carries you up onto it.
 		const FVector Spout(Back + 680.f, 0.f, S.Gz(Back + 680.f, 0.f));
 		FWRIsleHazard& G = S.Hazard(FWRIsleHazard::EKind::Geyser, Spout, 150.f);
@@ -546,35 +564,23 @@ namespace WRIsleV
 
 	void WispSpire(FWRIsleSite& S, const FPal& P)
 	{
-		// A spire of fused rock behind Ignessa's ring: nine hexagonal basalt drums each turned 7 degrees on the last, three
-		// glassy ribs spiralling up it, a split crown; her wisps rise off its top in a slow halo.
-		float Z = S.Gz(0, 0) - 40.f;
-		for (int32 d = 0; d < 9; ++d)
-		{
-			const float R = FMath::Lerp(300.f, 80.f, d / 8.f);
-			const float H = 270.f;
-			S.K.Hex(d % 2 ? P.BasaltAlt : P.Basalt, 0.f, 0.f, Z, Z + H, R, 7.f * d);
-			Z += H;
-		}
-		S.Solid(FVector(0, 0, S.Gz(0, 0) + 1100.f), FVector(200.f, 200.f, 1150.f));
-		for (int32 r = 0; r < 3; ++r)
-		{
-			for (int32 k = 0; k < 20; ++k)
-			{
-				const float T = k / 20.f;
-				const float A = 120.f * r + 400.f * T;
-				const float R = FMath::Lerp(320.f, 100.f, T);
-				const FVector At(FMath::Cos(FMath::DegreesToRadians(A)) * R, FMath::Sin(FMath::DegreesToRadians(A)) * R, S.Gz(0, 0) + 2300.f * T + 40.f);
-				S.K.Add(P.Glass, FVector(46.f, 70.f, 150.f), At, FRotator(0.f, A, 20.f));
-			}
-		}
-		const FVector Crown(0, 0, Z);
-		S.K.Spike(P.Basalt, Crown, FVector(0.25f, 0.1f, 1.f), 120.f, 360.f);
-		S.K.Spike(P.BasaltAlt, Crown + FVector(-30.f, 20.f, 0), FVector(-0.35f, -0.1f, 1.f), 90.f, 260.f);
+		// A spire of fused rock behind Ignessa's ring (SM_WispSpire_A, 11-22 round 4: nine hexagonal basalt drums each
+		// turned 7 degrees on the last and a little off true, worn in at the joints, a split crown; three glassy ribs
+		// spiralling up it, SM_WispRibs_A in obsidian. It was a twist of boxes); her wisps rise off its top in a slow halo.
+		const float G0 = S.Gz(0, 0);
+		S.Shape(TEXT("/Game/Art/Gen/SM_WispSpire_A.SM_WispSpire_A"), FVector(0, 0, G0), FRotator::ZeroRotator, FVector(1.f), true, true, FLinearColor(0.62f, 0.57f, 0.54f));
+		S.ShapeMat(TEXT("/Game/Art/Gen/SM_WispRibs_A.SM_WispRibs_A"), FVector(0, 0, G0), FRotator::ZeroRotator, FVector(1.f), false, ObsidianPath);
+		const FVector Crown(0, 0, G0 + 2430.f);
 		S.Fx(Crown + FVector(0, 0, 200.f), TEXT("ff.wisp_halo"), 1.f);
 		S.Lamp(Crown + FVector(0, 0, 250.f), Lin(255, 228, 176), WRTune(TEXT("places.wispLux"), 5000.f), 2200.f);
-		// Scorched rings on the ground round its foot.
-		for (int32 k = 0; k < 3; ++k) S.K.Ring(P.AshDark.Dim(0.6f), FVector(0, 0, S.Gz(0, 0) + 2.f), 500.f + 260.f * k, 6.f, 40.f, 18, 0.f, 360.f, 30.f);
+		// The ground round its foot scorched in patches (11-22: the old rings stood up as dashed arches).
+		for (int32 k = 0; k < 22; ++k)
+		{
+			const float A = 137.5f * k, R = 380.f + 900.f * FMath::Sqrt((k + 0.5f) / 22.f);
+			const FVector At(FMath::Cos(FMath::DegreesToRadians(A)) * R, FMath::Sin(FMath::DegreesToRadians(A)) * R, 0.f);
+			const float W = 180.f + 260.f * S.R(At, 1);
+			S.K.Add(P.AshDark.Dim(0.45f + 0.3f * (R / 1300.f)), FVector(W, W * (0.6f + 0.4f * S.R(At, 2)), 4.f), FVector(At.X, At.Y, S.Gz(At.X, At.Y) + 1.f), FRotator(0.f, A, 0.f), EWRLookMesh::Cylinder);
+		}
 	}
 
 	// ======================================================================================================= story sites
@@ -751,24 +757,40 @@ namespace WRIsleV
 
 	void WardensQuarry(FWRIsleSite& S, const FPal& P)
 	{
-		// Where the Warden was cut: half-cut obsidian blocks with chisel grooves, a second golem left half-carved on its back,
-		// a stone sledge on log rollers. It stands outside the Warden's ring, facing it.
+		// Where the Warden was cut: an outcrop of obsidian with its front cut back in three benches, the faces scored by
+		// the drill channels its blocks were split along (SM_QuarryFace_A); blocks split out of it, chisel-grooved, wedge
+		// holes along their edges (SM_CutBlock_A/B), one still standing on the first bench; a second golem left half-carved
+		// on its back; a stone sledge on log rollers. It stands outside the Warden's ring, facing it. (11-22 round 4: it
+		// was black crates on a hill.)
+		static const TCHAR* BlockA = TEXT("/Game/Art/Gen/SM_CutBlock_A.SM_CutBlock_A");
+		static const TCHAR* BlockB = TEXT("/Game/Art/Gen/SM_CutBlock_B.SM_CutBlock_B");
+		// The outcrop's weathered rock is dull (the dressing's rock, near black); what was cut from it is fresh, glossy glass.
+		// It stands on the highest ground along its front: the hilltop falls away round it and its 15 m skirt meets the
+		// ground wherever it's lower.
+		const float FaceX = -1150.f;
+		float High = -1e9f;
+		for (float Y = -600.f; Y <= 600.f; Y += 200.f) High = FMath::Max(High, S.Gz(FaceX, Y));
+		S.Shape(TEXT("/Game/Art/Gen/SM_QuarryFace_A.SM_QuarryFace_A"), FVector(FaceX, 0.f, High - 30.f), FRotator::ZeroRotator, FVector(1.f), true, true, FLinearColor(0.24f, 0.22f, 0.24f));
+		S.ShapeMat(BlockA, FVector(FaceX - 110.f, 250.f, High - 30.f + 158.f), FRotator(0.f, 2.f, 0.f), FVector(0.8f), false, ObsidianPath);
 		for (int32 i = 0; i < 5; ++i)
 		{
 			const FVector G = S.G(-200.f - 180.f * (i % 3), -500.f + 260.f * i);
-			S.K.Add(P.Glass, FVector(160.f, 140.f, 120.f + 40.f * (i % 2)), G + FVector(0, 0, 60.f), FRotator(0.f, 15.f * S.J(G, 1), 0.f));
-			for (int32 g = 0; g < 3; ++g) S.K.Add(P.GlassEdge, FVector(164.f, 6.f, 4.f), G + FVector(0, -40.f + 40.f * g, 125.f + 40.f * (i % 2)), FRotator(0.f, 15.f * S.J(G, 1), 0.f));
+			const float Sc = 0.85f + 0.25f * S.R(G, 2);
+			S.ShapeMat(i % 2 ? BlockB : BlockA, G - FVector(0, 0, 6.f), FRotator(0.f, 15.f * S.J(G, 1) + 90.f * (i % 2), 0.f), FVector(Sc), true, ObsidianPath);
+			if (i == 2) S.ShapeMat(BlockB, G + FVector(0, 0, 150.f * Sc - 10.f), FRotator(0.f, 70.f + 10.f * S.J(G, 3), 0.f), FVector(0.7f), false, ObsidianPath);   // one stacked on it
 		}
+		// The second golem, face up on the block it was being cut from.
 		const FVector Gl = S.G(-500.f, 300.f);
-		S.K.Add(P.Glass, FVector(220.f, 150.f, 90.f), Gl + FVector(0, 0, 50.f));                    // the torso, face up
-		S.K.Add(P.Glass, FVector(110.f, 100.f, 80.f), Gl + FVector(170.f, 0, 50.f));                // head
-		for (const float Sd : { -1.f, 1.f }) S.K.Rod(P.Glass.Dim(1.1f), Gl + FVector(60.f, Sd * 90.f, 50.f), Gl + FVector(-60.f, Sd * 200.f, 30.f), 60.f);
-		S.K.Add(P.Basalt, FVector(420.f, 160.f, 70.f), Gl + FVector(-120.f, 0, 10.f));              // the uncut block it lies on
-		S.Solid(Gl + FVector(0, 0, 50.f), FVector(260.f, 110.f, 70.f));
+		S.ShapeMat(BlockB, Gl + FVector(-120.f, 0, -10.f), FRotator::ZeroRotator, FVector(1.45f, 1.1f, 0.55f), true, ObsidianPath);
+		S.K.Add(P.Glass, FVector(220.f, 150.f, 90.f), Gl + FVector(0, 0, 105.f));                     // the torso, face up
+		S.K.Add(P.Glass, FVector(110.f, 100.f, 80.f), Gl + FVector(170.f, 0, 100.f));                 // head
+		for (const float Sd : { -1.f, 1.f }) S.K.Rod(P.Glass.Dim(1.1f), Gl + FVector(60.f, Sd * 90.f, 105.f), Gl + FVector(-60.f, Sd * 200.f, 85.f), 60.f);
+		for (int32 g = 0; g < 4; ++g) S.K.Add(P.GlassEdge, FVector(6.f, 140.f, 4.f), Gl + FVector(-60.f + 40.f * g, 0, 151.f));   // the chisel's lines on its chest
+		// The sledge on its rollers, a block lashed on.
 		const FVector Sl = S.G(-300.f, -900.f);
 		S.K.Add(P.Wood.Dim(0.7f), FVector(300.f, 140.f, 20.f), Sl + FVector(0, 0, 40.f));
 		for (int32 r = 0; r < 3; ++r) S.K.Rod(P.Wood.Dim(0.6f), Sl + FVector(-100.f + 100.f * r, -90.f, 14.f), Sl + FVector(-100.f + 100.f * r, 90.f, 14.f), 26.f);
-		S.K.Add(P.Glass, FVector(150.f, 120.f, 100.f), Sl + FVector(0, 0, 100.f));
+		S.ShapeMat(BlockA, Sl + FVector(0, 0, 50.f), FRotator(0.f, 90.f, 0.f), FVector(0.6f), false, ObsidianPath);
 	}
 
 	void ShardField(FWRIsleSite& S, const FPal& P)

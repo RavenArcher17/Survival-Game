@@ -351,8 +351,10 @@ void FWRIsleSite::Rock(int32 Which, const FVector& Size, const FVector& Base, co
 UStaticMeshComponent* FWRIsleSite::Ice(int32 Which, const FVector& Size, const FVector& Base, const FRotator& Rot, bool bCollide, float Sink, float Snow)
 {
 	if (!bDraw && !bCollide) return nullptr;
-	const TCHAR* Name = (Which & 1) ? TEXT("/Game/Art/Gen/SM_Serac_B.SM_Serac_B") : TEXT("/Game/Art/Gen/SM_Serac_A.SM_Serac_A");
-	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Name);
+	// Four towers (11-22, round 4: each one leaning prism with sheared faces; they were stacked boxes)
+	static const TCHAR* Names[4] = { TEXT("/Game/Art/Gen/SM_Serac_A.SM_Serac_A"), TEXT("/Game/Art/Gen/SM_Serac_B.SM_Serac_B"),
+		TEXT("/Game/Art/Gen/SM_Serac_C.SM_Serac_C"), TEXT("/Game/Art/Gen/SM_Serac_D.SM_Serac_D") };
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Names[FMath::Abs(Which) % 4]);
 	UMaterialInterface* Base0 = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_IceBlock.M_IceBlock"));
 	if (!Mesh || !Base0)
 	{
@@ -408,6 +410,43 @@ UStaticMeshComponent* FWRIsleSite::Shape(const TCHAR* Path, const FVector& At, c
 		M = D;
 		RockMats.Add(MatKey, M);
 	}
+	return ShapeWith(Mesh, At, Rot, Scale, bCollide, M);
+}
+
+UStaticMeshComponent* FWRIsleSite::ShapeMat(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, const TCHAR* MatPath)
+{
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Path);
+	if (!Mesh || (!bDraw && !bCollide)) return nullptr;
+	return ShapeWith(Mesh, At, Rot, Scale, bCollide, LoadObject<UMaterialInterface>(nullptr, MatPath));
+}
+
+UInstancedStaticMeshComponent* FWRIsleSite::ShapeKit(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, const WRLookKit::FSurf& Surf, float GrainAxis)
+{
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Path);
+	UMaterialInterface* Tinted = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+	if (!Mesh || !Tinted || (!bDraw && !bCollide)) return nullptr;
+	UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(Owner);
+	C->SetStaticMesh(Mesh);
+	C->SetMaterial(0, Tinted);
+	C->SetupAttachment(Root);
+	C->SetCollisionProfileName(bCollide ? TEXT("BlockAll") : TEXT("NoCollision"));
+	C->SetCanEverAffectNavigation(false);
+	C->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	const float Cull = WRTune(TEXT("places.siteCull"), 60000.f);
+	C->SetCullDistances(0, int32(Cull));
+	C->SetCachedMaxDrawDistance(Cull);
+	C->SetNumCustomDataFloats(10);
+	if (!bDraw) C->SetHiddenInGame(true);
+	C->RegisterComponent();
+	C->AddInstance(FTransform(Rot, At, Scale));
+	// M_BuildTinted: shade, grain axis, brightness, colour, metallic, roughness, glow, pattern.
+	const float Data[10] = { 0.5f, GrainAxis, 1.f, Surf.Color.R, Surf.Color.G, Surf.Color.B, Surf.Metal, Surf.Rough, Surf.Glow, Surf.Pattern };
+	C->SetCustomData(0, Data, true);
+	return C;
+}
+
+UStaticMeshComponent* FWRIsleSite::ShapeWith(UStaticMesh* Mesh, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, UMaterialInterface* M)
+{
 	UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
 	C->SetStaticMesh(Mesh);
 	C->SetupAttachment(Root);

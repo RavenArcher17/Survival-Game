@@ -927,6 +927,13 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   only those. Materials come from where they are used (world-space projected), so the meshes need no real UVs. Its
   `xf()` takes rotations as (pitch, yaw, roll): Python's `unreal.Rotator` is (roll, pitch, yaw). Raw triangles: the
   DynamicMesh's front is cross(c - a, b - a) (`tent()` checks its first face).
+- **Generated meshes, round 4** (11-22): the bones, the longboat, the spire, the Glasswall and the quarry are built from
+  helpers in `make_meshes.py`: `prism()` (faceted columns: each side its own strip, so edges stay sharp), `tube()`
+  (rings swept along a path), `ellipsoid()`, and for bone `voxel()` (Geometry Script solidify + a morphological
+  close, so parts grow into each other) and `boolean()` (the skull's sockets). Look a mesh over before the game:
+  `WR_OBJ=<folder> WR_OBJ_ONLY=1 WR_MESHES=skull` writes OBJs, then render them in Blender. In C++,
+  `FWRIsleSite::ShapeKit` draws a mesh in M_BuildTinted (one instance with the kit's custom data: colour, pattern,
+  grain axis) and `ShapeMat` in a named material.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'
   rock in courses; wood is WoodMaterialPack2's scans set at run time (`FWRBuildLook::Material`; optional pack, the
   procedural planks without it); M_BuildTinted patterns 0 stone, 1 wood, 2 metal, 3 smooth, 4 plaster, 5 pantiles,

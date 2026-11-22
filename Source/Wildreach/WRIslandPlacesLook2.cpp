@@ -232,53 +232,38 @@ namespace WRIsleT
 		S.Ice(1, FVector(800.f, 680.f, 820.f), FVector(500.f, 500.f, G0 - 60.f), FRotator(8.f, 30.f, -6.f), false, 0.f);
 		S.Solid(FVector(-200.f, 0.f, G0 + 560.f), FVector(550.f, 450.f, 650.f), FRotator(-6.f, 8.f, 4.f));
 		S.Solid(FVector(500.f, 500.f, G0 + 340.f), FVector(350.f, 300.f, 400.f), FRotator(8.f, 30.f, -6.f));
-		// The hull in its own frame: pitched up 34 degrees, its keel along X, the prow at +X.
+		// The hull (SM_Longboat_A, 11-22 round 4: a clinker hull with its strakes lapped, ribs and thwarts inside, the stems
+		// curling up; it was boards stuck out like fins) in weathered wood, its grain along the keel; pitched up 34 degrees, the
+		// prow 11 m up, the stern in the ice. The carving, the mast and the crow's nest go on in its frame.
+		const FRotator HullRot(34.f, 0.f, 6.f);
+		const FVector HullAt(150.f, -40.f, G0 + 400.f);
+		// Weathered: centuries in the ice have greyed the tarred planks.
+		const FSurf Weathered = FSurf::Wood(Lin(118, 104, 90));
+		S.ShapeKit(TEXT("/Game/Art/Gen/SM_Longboat_A.SM_Longboat_A"), HullAt, HullRot, FVector(1.f), true, Weathered, 0.f);
 		const FTransform Was = S.K.Frame;
-		S.K.Frame = FTransform(FRotator(34.f, 0.f, 6.f), FVector(150.f, -40.f, G0 + 400.f));
-		const float L = 1900.f;
-		S.K.Rod(P.WoodDark, FVector(-L * 0.5f, 0, 0), FVector(L * 0.5f, 0, 0), 30.f, true);
-		for (int32 k = 0; k < 7; ++k)
-		{
-			for (const float Sd : { -1.f, 1.f })
-			{
-				for (int32 p = 0; p < 10; ++p)
-				{
-					const float X = -L * 0.5f + L * (p + 0.5f) / 10.f;
-					const float Beam = 230.f * FMath::Pow(FMath::Sin(PI * (p + 0.5f) / 10.f), 0.7f);
-					const float Y = Sd * Beam * (0.35f + 0.65f * (k + 1) / 7.f);
-					// Each strake laps over the one below (clinker), leaning out.
-					S.K.Add(P.WoodDark.Dim(0.85f + 0.2f * S.R(FVector(k, p, Sd), 1)), FVector(L / 10.f + 14.f, 8.f, 42.f), FVector(X, Y, 30.f + 38.f * k), FRotator(0.f, 0.f, Sd * (40.f - 4.f * k)));
-				}
-			}
-		}
-		// The prow and stern posts curving up, a carved head on the prow.
-		for (const float End : { -1.f, 1.f })
-		{
-			FVector Prev(End * L * 0.5f, 0, 0);
-			for (int32 k = 1; k <= 6; ++k)
-			{
-				const FVector Pt(End * (L * 0.5f + 60.f * FMath::Sin(k * 0.35f)), 0, 60.f * k);
-				S.K.Rod(P.WoodDark, Prev, Pt, 26.f);
-				Prev = Pt;
-			}
-			if (End > 0.f) S.K.Add(P.WoodDark.Dim(1.1f), FVector(70.f, 26.f, 50.f), Prev + FVector(30.f, 0, 10.f), FRotator(-20.f, 0.f, 0.f));
-		}
+		S.K.Frame = FTransform(HullRot, HullAt);
+		// A carved head on the prow's scroll.
+		S.K.Add(Weathered.Dim(0.9f), FVector(70.f, 26.f, 50.f), FVector(985.f, 0.f, 600.f), FRotator(-20.f, 0.f, 0.f));
 		// The mast stub and the crow's nest with its lantern.
 		const FVector Mast0(120.f, 0, 40.f), Mast1(120.f, 0, 720.f);
-		S.K.Rod(P.WoodDark, Mast0, Mast1, 30.f);
-		S.K.Disc(P.WoodDark, Mast1 - FVector(0, 0, 60.f), FVector::UpVector, 150.f, 10.f);
+		S.K.Rod(Weathered.Dim(0.85f), Mast0, Mast1, 30.f);
+		S.K.Disc(Weathered.Dim(0.85f), Mast1 - FVector(0, 0, 60.f), FVector::UpVector, 150.f, 10.f);
 		for (int32 k = 0; k < 8; ++k)
 		{
 			const FVector D = FRotator(0.f, 45.f * k, 0.f).Vector();
-			S.K.Rod(P.WoodDark, Mast1 - FVector(0, 0, 60.f) + D * 70.f, Mast1 + D * 70.f + FVector(0, 0, 20.f), 5.f);
+			S.K.Rod(Weathered.Dim(0.85f), Mast1 - FVector(0, 0, 60.f) + D * 70.f, Mast1 + D * 70.f + FVector(0, 0, 20.f), 5.f);
 		}
 		const FVector Lantern = S.K.Frame.TransformPosition(Mast1 - FVector(0, 0, 20.f));
 		S.K.Frame = Was;
 		S.K.Add(P.Iron, FVector(24.f, 24.f, 34.f), Lantern, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 		S.K.Add(FSurf::Lit(Lin(255, 200, 130), 0.6f), FVector(16.f, 16.f, 20.f), Lantern, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 		S.Lamp(Lantern + FVector(0, 0, 10.f), Lin(255, 196, 120), WRTune(TEXT("places.whalerLux"), 2600.f), 1600.f);
-		// Ice grown over the lower hull.
-		for (int32 k = 0; k < 6; ++k) S.K.Add(P.Ice, FVector(300.f, 200.f, 200.f), FVector(-500.f + 180.f * k, -60.f + 100.f * S.J(FVector(k), 3), G0 + 120.f + 60.f * k), FRotator(10.f * S.J(FVector(k), 4), 30.f * k, 0.f));
+		// Ice grown up over the lower hull, from the ground to its keel (serac shapes; they were striped cubes).
+		for (int32 k = 0; k < 4; ++k)
+		{
+			const float X = -500.f + 180.f * k, Keel = 400.f + (X - 150.f) / 0.829f * 0.559f;
+			S.Ice(k + 2, FVector(340.f, 280.f, FMath::Max(180.f, Keel + 110.f)), FVector(X, -40.f + 80.f * S.J(FVector(k), 3), G0 - 30.f), FRotator(4.f * S.J(FVector(k), 4), 30.f * k, 0.f), false, 40.f, 0.3f);
+		}
 	}
 
 	void WeepingSeracs(FWRIsleSite& S, const FPal& P)

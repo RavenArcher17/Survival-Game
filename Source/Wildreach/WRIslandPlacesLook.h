@@ -62,6 +62,11 @@ struct FWRIsleSite
 	 *  (local), turned Rot, scaled Scale; in M_IceBlock (Snow on its tops) or, with bRock, the dressing's rock tinted Tint.
 	 *  Null where the mesh isn't there (the caller keeps its look-kit build). */
 	UStaticMeshComponent* Shape(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, bool bRock, const FLinearColor& Tint, float Snow = 0.f);
+	/** The same in a named material (MatPath: M_Obsidian for the Glasswall, the quarry, the spire's ribs). */
+	UStaticMeshComponent* ShapeMat(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, const TCHAR* MatPath);
+	/** The same in the look kit's own material (M_BuildTinted, one instance in the shape's space: the bones' mottle, the
+	 *  boat's wood with its grain along GrainAxis, 0 = its X), so it matches the kit pieces round it. */
+	class UInstancedStaticMeshComponent* ShapeKit(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, const WRLookKit::FSurf& Surf, float GrainAxis = 0.f);
 	/** Instances of a pack mesh (pines, char trees, shrubs) at local transforms (scale fits Height cm tall). */
 	void Meshes(const TCHAR* Path, const TArray<FTransform>& Local, float Height, float Cull, const FLinearColor* Coat = nullptr);
 	/** A hazard of this place (key = the place's key + its count). */
@@ -70,6 +75,7 @@ struct FWRIsleSite
 	void Done(float Cull);
 
 private:
+	UStaticMeshComponent* ShapeWith(UStaticMesh* Mesh, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, UMaterialInterface* M);
 	TMap<FIntPoint, float> GroundCache;
 	TMap<FString, UMaterialInterface*> RockMats;
 };

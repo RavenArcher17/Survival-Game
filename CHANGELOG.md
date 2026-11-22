@@ -15,8 +15,33 @@
   towers of every height leaning over the bowl with a fused mass of ice behind (eleven of one size in a row, like
   totems); the Bellows Stacks and the Volcanic's hornitos are lumpy chimneys of welded spatter with open throats (rings
   of boxes, stacks of black crates).
-- Still open: the Frozen Whaler and the ice shelves' pillars are stacked ice blocks, the Glasswall, the Wisp Spire, the
-  Warden's Quarry and the Fallen Smith are look-kit pieces; the chimneys read dark against the sky.
+- **The last box-built places as real shapes** (more generated meshes; `FWRIsleSite::ShapeKit` draws one in the
+  look kit's own material, so bone and wood match the kit round them, `ShapeMat` in a named one):
+  - **The Fallen Smith** is a skeleton: a skull with deep eye sockets, brow, cheekbones and teeth, face up and half
+    sunk, its jaw hanging open, the frost crack and spearheads in its crown; eighteen vertebrae; nine pairs of ribs
+    rising round him and in over the chest, 10 m up, a cage you walk under, three on one side snapped with the fallen
+    pieces lying beside them; the hips, thigh and shin bones, the arm reaching to the hammer (it was boxes and sticks,
+    the ribs a row of straight stakes). His hammer's bridge points had stayed where the river ran on the Old Island,
+    4.5 km off, so his arm and haft ran across the map: the haft now spans the round island's river beside him
+    (`fire_frost_dressing.mjs`), his frame turned to it.
+  - **The Glasswall** is a 46 m cliff of fused black glass slabs leaning out, scalloped faces, a ragged top, the
+    ledge door 9 m up. It had been mapped onto a ridge's crest, where it sank into the slope behind and showed nothing
+    (fifteen black boxes before that): it now stands at the foot of the ridge's inner face, its ends running into the
+    slope, a level apron at its foot so the geyser still throws you onto the ledge (`fire_frost.mjs` hand move,
+    `round_ground.mjs` apron; 60 ground cells).
+  - **The Wisp Spire** is nine hexagonal drums of basalt, each turned on the last, worn at the joints, a split crown,
+    three glassy ribs spiralling up it (it was a twist of boxes); its scorched ground is patches on the ground (the
+    rings stood up as dashed arches).
+  - **Warden's Quarry** is an outcrop of dull obsidian cut back in three benches, scored with drill channels, the
+    glossy cut blocks before it (chisel grooves, wedge holes), one on the first bench, one stacked, one on the sledge
+    (black crates on a hill).
+  - **The Frozen Whaler** is a clinker boat: lapped strakes, ribs and thwarts inside, the prow curled into a scroll,
+    in weathered grey wood, ice grown up its lower hull (boards stuck out like fins over striped cubes).
+  - **The seracs** (the ice shelves' and the glacier's pillars, the Weeping Seracs, the whaler's ice) are one leaning
+    tower each, sheared faces and a slanted broken top, four of them (stacked cubes like chess pieces); the shelves'
+    stand in broken clusters, a big one with lesser ones crowded round it (`fire_frost_dressing.mjs` group).
+- Still open: the cut blocks read as dark boxes from afar, the chimneys dark against the sky; the whaler's hull is in
+  its cliff's shadow most of the day.
 
 ### Round island: the look pass, second round (11-22)
 

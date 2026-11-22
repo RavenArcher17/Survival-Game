@@ -7,7 +7,8 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
                           tilted and broken; about 3 x 3 m across, 5.6 m tall at the highest.
   SM_ObsidianBlade_A..C   clusters of thin faceted glass blades leaning out of a stub, 4.2 m tall at the highest.
   SM_SulfurCrystal        one small crystal: a squashed double point (the sulfur node's crust is covered in them).
-  SM_Serac_A..B           tall leaning ice towers with blocky faceted faces.
+  SM_Serac_A..D           tall leaning ice towers, each one prism of sheared faces with a slanted broken top, a lesser
+                          block fused to it, chunks at its foot (round 4; they were stacked boxes).
   SM_Rubble_A..C          a patch of broken basalt about 4.4 m across: ~40 angular stones (5-45 cm), bigger and
                           thicker toward the middle, half sunk; Nanite (the Volcanic's lava_rubble dressing).
   SM_TentRidge_A          a ridge tent's canvas (the wake-up camps): sagging panels, a flared hem tucked into the ground,
@@ -18,6 +19,20 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
   SM_Pingo_A              an ice-cored mound 26 m across, 10.5 m high, a cracked crown, one flank broken open.
   SM_IceBlock_A..C        a block of glacier ice 4 m each way, top broken at a slant, faces split (the Crevasse Maze).
   SM_Hornito_A..B         a lava chimney of welded spatter, 20 m tall, an open throat (the Bellows Stacks, hornitos).
+  The last places (round 4), drawn by FWRIsleSite::Shape / ShapeMat / ShapeKit:
+  SM_GiantSkull_A, _Jaw_A the Fallen Smith's skull (5.6 m: braincase, brow, cheekbones, the sockets and the nose's opening
+                          cut by booleans, teeth) and its lower jaw; SM_GiantVertebra_A, SM_GiantRib_A (whole) / _B
+                          (snapped) / _C (the fallen piece, lying), SM_GiantLongBone_A (a 15 m thigh bone, scaled for the
+                          shin and the arm), SM_GiantPelvis_A: parts merged by voxels, filled round where they meet.
+  SM_Longboat_A           the Frozen Whaler: a clinker hull 19 m long, strakes lapped, ribs and thwarts inside, stems curled.
+  SM_WispSpire_A, _Ribs_A Ignessa's spire (nine hexagonal drums, each turned 7 degrees, worn joints, a split crown) and its
+                          three glassy ribs spiralling up it (their own mesh, for the obsidian).
+  SM_Glasswall_A          a 52 m cliff of fused obsidian slabs leaning out, scalloped (conchoidal) faces, a plain patch for
+                          the Mirror Room's door 8.5-14.5 m up.
+  SM_QuarryFace_A         Warden's Quarry: an outcrop cut back in three benches scored by drill channels, a 15 m skirt.
+  SM_CutBlock_A..B        blocks split from it: chisel grooves, wedge holes along one edge, corners knocked.
+  Helpers: prism() (faceted columns, sharp edges), tube() (swept rings), ellipsoid(), voxel(), boolean(). WR_OBJ=<folder>
+  also writes each mesh as an OBJ there (WR_OBJ_ONLY=1: only that) to look it over in Blender first.
 Materials are set where they're used (the dressing's M_Rock / M_IceBlock / M_Obsidian, world-space projected, so the
 meshes need no UVs to speak of).
 """
@@ -60,7 +75,28 @@ def noise(mesh, magnitude, frequency, seed):
     DEF.apply_perlin_noise_to_mesh2(mesh, unreal.GeometryScriptMeshSelection(), o)
 
 
+def dump_obj(mesh, name):
+    """WR_OBJ=<folder>: also write the mesh as an OBJ there (to look it over in Blender before the game)."""
+    folder = os.environ.get("WR_OBJ")
+    if not folder:
+        return
+    Q, L = unreal.GeometryScript_MeshQueries, unreal.GeometryScript_List
+
+    def pick(r, kind):
+        return next(x for x in (r if isinstance(r, tuple) else (r,)) if isinstance(x, kind))
+    vs = L.convert_vector_list_to_array(pick(Q.get_all_vertex_positions(mesh, False), unreal.GeometryScriptVectorList))
+    ts = L.convert_triangle_list_to_array(pick(Q.get_all_triangle_indices(mesh, True), unreal.GeometryScriptTriangleList))
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, name + ".obj"), "w") as f:
+        f.write("".join(f"v {v.x:.1f} {v.y:.1f} {v.z:.1f}\n" for v in vs))
+        f.write("".join(f"f {t.x + 1} {t.z + 1} {t.y + 1}\n" for t in ts))
+
+
 def save(mesh, name, nanite=False):
+    dump_obj(mesh, name)
+    if os.environ.get("WR_OBJ_ONLY"):
+        unreal.log(f"[Wildreach] mesh {name}: obj only")
+        return
     path = FOLDER + name
     if unreal.EditorAssetLibrary.does_asset_exist(path):
         unreal.EditorAssetLibrary.delete_asset(path)
@@ -126,26 +162,35 @@ def sulfur(name, seed):
 
 
 def serac(name, seed):
+    """A tower of ice broken off a glacier's front, in one piece (11-22: stacked boxes, even with noise, read as stacked
+    cubes, totems): a leaning column of five to seven sheared faces, narrowing, its top snapped off at a slant with a
+    ragged crest, meltwater runnels down some faces; a lesser block fused to one side, broken chunks at its foot."""
     rnd = random.Random(seed)
-    mesh = unreal.DynamicMesh()
-    # A tower of ice broken off a glacier's front: a few fused, tilted blocks, narrowing and leaning, its top snapped off
-    # at a slant, finely divided so two scales of noise can split and slump its faces (blocks with a little noise read
-    # as stacked boxes). A couple of fallen chunks at its foot.
-    z = -60.0
-    sx, sy = rnd.uniform(240, 300), rnd.uniform(200, 260)
-    for k in range(5):
-        h = rnd.uniform(110, 160)
-        GS.append_box(mesh, opts(), xf((rnd.uniform(-30, 30), rnd.uniform(-30, 30), z), (rnd.uniform(-7, 7), rnd.uniform(-20, 20), rnd.uniform(-7, 7))), sx, sy, h, 6, 6, 5, unreal.GeometryScriptPrimitiveOriginMode.BASE)
-        z += h * 0.88
-        sx *= rnd.uniform(0.7, 0.88)
-        sy *= rnd.uniform(0.7, 0.88)
+    raw = Raw()
+    sides = rnd.randint(5, 7)
+    ax, ay = rnd.uniform(170, 230), rnd.uniform(110, 160)
+    angs = sorted(2 * math.pi * k / sides + rnd.uniform(-0.3, 0.3) * 2 * math.pi / sides for k in range(sides))
+    base = [(math.cos(a) * ax * rnd.uniform(0.85, 1.1), math.sin(a) * ay * rnd.uniform(0.85, 1.1)) for a in angs]
+    H = rnd.uniform(650, 950)
+    sl = (rnd.uniform(-0.7, 0.7), rnd.uniform(-0.7, 0.7))
+    prism(raw, rnd, seed, base, -80.0, lambda x, y: H + sl[0] * x + sl[1] * y + 70.0 * fbm(x / 90, y / 90, 0, seed + 5),
+          nz=12, nw=5, mag=26.0, profile=lambda t: 1.0 - 0.3 * t ** 1.3, lean=(rnd.uniform(-0.05, 0.05), rnd.uniform(0.06, 0.15)), flutes=22.0, cap_jag=60.0)
+    # a lesser block fused to its side
+    a = rnd.uniform(0, 2 * math.pi)
+    c2 = (math.cos(a) * ax * 0.85, math.sin(a) * ay * 0.85)
+    r2, h2 = rnd.uniform(90, 130), H * rnd.uniform(0.35, 0.6)
+    b2 = [(c2[0] + math.cos(q) * r2 * rnd.uniform(0.8, 1.1), c2[1] + math.sin(q) * r2 * rnd.uniform(0.8, 1.1)) for q in sorted(rnd.uniform(0, 2 * math.pi) for _ in range(5))]
+    prism(raw, rnd, seed + 11, b2, -70.0, lambda x, y: h2 + 0.5 * (x - c2[0]) + 40.0 * fbm(x / 70, y / 70, 1, seed), nz=7, nw=3, mag=16.0,
+          profile=lambda t: 1.0 - 0.25 * t, lean=(rnd.uniform(-0.08, 0.08), rnd.uniform(-0.08, 0.08)), cap_jag=35.0)
+    # chunks fallen at its foot
     for k in range(rnd.randint(2, 3)):
-        a = rnd.uniform(0, 6.28)
-        s = rnd.uniform(60, 110)
-        GS.append_box(mesh, opts(), xf((math.cos(a) * 190, math.sin(a) * 170, -20), (rnd.uniform(-25, 25), rnd.uniform(0, 360), rnd.uniform(-25, 25))), s, s * 0.8, s * 0.7, 3, 3, 3, unreal.GeometryScriptPrimitiveOriginMode.BASE)
-    noise(mesh, 38.0, 0.006, seed)
-    noise(mesh, 9.0, 0.03, seed + 7)
-    save(mesh, name)
+        a = rnd.uniform(0, 2 * math.pi)
+        c3 = (math.cos(a) * (ax + 90), math.sin(a) * (ay + 90))
+        r3 = rnd.uniform(45, 80)
+        b3 = [(c3[0] + math.cos(q) * r3 * rnd.uniform(0.7, 1.1), c3[1] + math.sin(q) * r3 * rnd.uniform(0.7, 1.1)) for q in sorted(rnd.uniform(0, 2 * math.pi) for _ in range(rnd.randint(4, 6)))]
+        h3 = r3 * rnd.uniform(0.7, 1.2)
+        prism(raw, rnd, seed + 20 + k, b3, -30.0, lambda x, y, h3=h3, c3=c3: h3 + 0.6 * (y - c3[1]), nz=3, nw=2, mag=8.0, cap_jag=15.0)
+    save(raw.mesh(), name)
 
 
 def rubble(name, seed):
@@ -256,12 +301,12 @@ class Raw:
         n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
         self.tris.append((a, c, b) if n[0] * out[0] + n[1] * out[1] + n[2] * out[2] >= 0 else (a, b, c))
 
-    def grid(self, ids, out_of):
-        """Quads over a grid of point ids (rows x columns, the columns wrapping round); out_of(p) gives each face's
-        outward hint from its centre."""
+    def grid(self, ids, out_of, wrap=True):
+        """Quads over a grid of point ids (rows x columns, the columns wrapping round unless wrap is False); out_of(p)
+        gives each face's outward hint from its centre."""
         rows, cols = len(ids), len(ids[0])
         for i in range(rows - 1):
-            for j in range(cols):
+            for j in range(cols if wrap else cols - 1):
                 a, b, c, d = ids[i][j], ids[i][(j + 1) % cols], ids[i + 1][(j + 1) % cols], ids[i + 1][j]
                 ctr = [sum(self.pts[k][m] for k in (a, b, c, d)) / 4.0 for m in range(3)]
                 o = out_of(ctr)
@@ -467,6 +512,674 @@ def hornito(name, seed):
     save(raw.mesh(), name)
 
 
+# ------------------------------------------------------------------------- the last places (11-22, the look's round 4)
+def v_add(a, b):
+    return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
+
+
+def v_sub(a, b):
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def v_mul(a, k):
+    return (a[0] * k, a[1] * k, a[2] * k)
+
+
+def v_dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def v_cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def v_norm(a):
+    ln = math.sqrt(v_dot(a, a)) or 1.0
+    return (a[0] / ln, a[1] / ln, a[2] / ln)
+
+
+def spline(ctrl, n):
+    """n points (ends included) on a Catmull-Rom curve through the control points."""
+    P = [ctrl[0]] + list(ctrl) + [ctrl[-1]]
+    segs = len(ctrl) - 1
+    out = []
+    for i in range(n):
+        u = i / (n - 1) * segs
+        k = min(int(u), segs - 1)
+        t = u - k
+        p0, p1, p2, p3 = P[k], P[k + 1], P[k + 2], P[k + 3]
+        out.append(tuple(0.5 * (2 * p1[m] + (p2[m] - p0[m]) * t + (2 * p0[m] - 5 * p1[m] + 4 * p2[m] - p3[m]) * t * t
+                                + (3 * p1[m] - p0[m] - 3 * p2[m] + p3[m]) * t * t * t) for m in range(3)))
+    return out
+
+
+def tube(raw, path, radius, na=16, side=None, disp=None, caps=True, jag=None):
+    """A ring swept along a path of points. radius(t) gives the ring's half-sizes (a, b), t 0..1 along the path; the a
+    axis lies along side(p, tangent) where given (made square to the path), else a frame carried along the path. disp(p,
+    t, th) pushes each point out (noise). jag = (rnd, cm): the far end broken off, its ring pushed along the path unevenly."""
+    n = len(path)
+    T = [v_norm(v_sub(path[min(n - 1, i + 1)], path[max(0, i - 1)])) for i in range(n)]
+    rings, prev = [], None
+    for i in range(n):
+        t = i / (n - 1)
+        if side is not None:
+            ref = side(path[i], T[i])
+        elif prev is not None:
+            ref = prev
+        else:
+            ref = (0.0, 0.0, 1.0) if abs(T[0][2]) < 0.9 else (1.0, 0.0, 0.0)
+        A = v_norm(v_sub(ref, v_mul(T[i], v_dot(ref, T[i]))))
+        prev = A
+        B = v_cross(T[i], A)
+        ra, rb = radius(t)
+        ring = []
+        for j in range(na):
+            th = 2 * math.pi * j / na
+            off = v_add(v_mul(A, math.cos(th) * ra), v_mul(B, math.sin(th) * rb))
+            p = v_add(path[i], off)
+            if disp:
+                p = v_add(p, v_mul(v_norm(off), disp(p, t, th)))
+            if jag and i == n - 1:
+                p = v_add(p, v_mul(T[i], jag[0].uniform(-jag[1], jag[1])))
+            ring.append(raw.pt(p))
+        rings.append(ring)
+
+    def out_of(c):
+        k = min(range(n), key=lambda q: (path[q][0] - c[0]) ** 2 + (path[q][1] - c[1]) ** 2 + (path[q][2] - c[2]) ** 2)
+        return v_sub(c, path[k])
+    raw.grid(rings, out_of)
+    if caps:
+        raw.fan(rings[0], path[0], v_mul(T[0], -1.0))
+        raw.fan(rings[-1], path[-1], T[-1])
+    return rings
+
+
+def ellipsoid(raw, c, r, axes=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), nu=12, nv=20, disp=None):
+    """A closed ellipsoid at c, half-sizes r along its three axes (unit vectors)."""
+    rings = []
+    for i in range(1, nu):
+        lat = -math.pi / 2 + math.pi * i / nu
+        ring = []
+        for j in range(nv):
+            lon = 2 * math.pi * j / nv
+            l3 = (math.cos(lat) * math.cos(lon) * r[0], math.cos(lat) * math.sin(lon) * r[1], math.sin(lat) * r[2])
+            off = v_add(v_add(v_mul(axes[0], l3[0]), v_mul(axes[1], l3[1])), v_mul(axes[2], l3[2]))
+            p = v_add(c, off)
+            if disp:
+                p = v_add(p, v_mul(v_norm(off), disp(p)))
+            ring.append(raw.pt(p))
+        rings.append(ring)
+    raw.grid(rings, lambda q: v_sub(q, c))
+    raw.fan(rings[0], v_sub(c, v_mul(axes[2], r[2])), v_mul(axes[2], -1.0))
+    raw.fan(rings[-1], v_add(c, v_mul(axes[2], r[2])), axes[2])
+
+
+def prism(raw, rnd, seed, base, z0, top, nz=10, nw=4, mag=18.0, profile=None, lean=(0.0, 0.0), flutes=0.0, cap_jag=30.0):
+    """A faceted column standing on the corners `base` [(x, y)] (going round): each side its own strip of points, so its
+    edges stay sharp, pushed out along its face by noise (none at the corners, where the strips meet); narrowing by
+    profile(t) up it; leaning (cm out per cm up); each corner's top at top(x, y) (a slanted, broken top); a cap stepping
+    in to the middle with a ragged crest. flutes: runnels (cm deep) down some faces."""
+    n = len(base)
+    cx = sum(p[0] for p in base) / n
+    cy = sum(p[1] for p in base) / n
+    edge, bottom = [], []
+    for k in range(n):
+        a, b = base[k], base[(k + 1) % n]
+        ex, ey = b[0] - a[0], b[1] - a[1]
+        nx, ny = ey, -ex
+        if nx * ((a[0] + b[0]) / 2 - cx) + ny * ((a[1] + b[1]) / 2 - cy) < 0:
+            nx, ny = -nx, -ny
+        ln = math.hypot(nx, ny) or 1.0
+        nx, ny = nx / ln, ny / ln
+        g = rnd.uniform(0.2, 0.8) if flutes and rnd.random() < 0.65 else None
+        ids = []
+        for i in range(nz + 1):
+            t = i / nz
+            s = profile(t) if profile else 1.0
+            row = []
+            for j in range(nw + 1):
+                u = j / nw
+                x0, y0 = a[0] + ex * u, a[1] + ey * u
+                z = z0 + (top(x0, y0) - z0) * t
+                x1, y1 = cx + (x0 - cx) * s, cy + (y0 - cy) * s
+                d = mag * math.sin(math.pi * u) ** 0.6 * (fbm(x1 / 260, y1 / 260, z / 260, seed) + 0.35 * fbm(x1 / 70, y1 / 70, z / 70, seed + 1))
+                if g is not None:
+                    d -= flutes * math.exp(-((u - g) / 0.07) ** 2) * (0.4 + 0.6 * t)
+                row.append(raw.pt((x1 + nx * d + lean[0] * (z - z0), y1 + ny * d + lean[1] * (z - z0), z)))
+            ids.append(row)
+        raw.grid(ids, lambda c, nx=nx, ny=ny: (nx, ny, 0.0), wrap=False)
+        for j in range(nw):
+            edge.append(raw.pts[ids[nz][j]])
+            bottom.append(raw.pts[ids[0][j]])
+    zc = top(cx, cy)
+    centre = (cx + lean[0] * (zc - z0), cy + lean[1] * (zc - z0), zc + cap_jag * 0.5)
+    rings = []
+    for f in (0.0, 0.35, 0.7):
+        ring = []
+        for p in edge:
+            q = (p[0] + (centre[0] - p[0]) * f, p[1] + (centre[1] - p[1]) * f, p[2] + (centre[2] - p[2]) * f)
+            if f > 0:
+                q = (q[0], q[1], q[2] + cap_jag * fbm(q[0] / 60, q[1] / 60, 0, seed + 3))
+            ring.append(raw.pt(q))
+        rings.append(ring)
+    raw.grid(rings, lambda c: (0.0, 0.0, 1.0))
+    raw.fan(rings[-1], centre, (0.0, 0.0, 1.0))
+    raw.fan([raw.pt(p) for p in bottom], (cx, cy, z0), (0.0, 0.0, -1.0))
+
+
+VOX = getattr(unreal, "GeometryScript_MeshVoxelProcessing", None)
+
+
+def enum_value(fragment, member):
+    for n in dir(unreal):
+        if fragment in n:
+            e = getattr(unreal, n, None)
+            if e is not None and hasattr(e, member):
+                return getattr(e, member)
+    return None
+
+
+def grid_params(g, cell):
+    g.set_editor_property("size_method", enum_value("GridSizingMethod", "GRID_CELL_SIZE"))
+    g.set_editor_property("grid_cell_size", cell)
+    return g
+
+
+def voxel(mesh, cell, close=0.0, smooth_n=0, tris=0):
+    """Overlapping closed parts made one surface (voxel solidify, cell cm), the inside corners where they meet filled
+    round (a morphological close of `close` cm: the parts grow together as bone does), relaxed, thinned to `tris`."""
+    o = unreal.GeometryScriptSolidifyOptions()
+    o.set_editor_property("grid_parameters", grid_params(o.get_editor_property("grid_parameters"), cell))
+    VOX.apply_mesh_solidify(mesh, o)
+    if close > 0:
+        try:
+            m = unreal.GeometryScriptMorphologyOptions()
+            m.set_editor_property("operation", enum_value("MorphologicalOpType", "CLOSE"))
+            m.set_editor_property("distance", close)
+            m.set_editor_property("sdf_grid_parameters", grid_params(m.get_editor_property("sdf_grid_parameters"), cell))
+            VOX.apply_mesh_morphology(mesh, m)
+        except Exception as e:
+            unreal.log_warning(f"[Wildreach] morphology close failed: {e}")
+    if smooth_n:
+        s = unreal.GeometryScriptIterativeMeshSmoothingOptions()
+        s.set_editor_property("num_iterations", smooth_n)
+        s.set_editor_property("alpha", 0.3)
+        DEF.apply_iterative_smoothing_to_mesh(mesh, unreal.GeometryScriptMeshSelection(), s)
+    if tris:
+        unreal.GeometryScript_MeshSimplification.apply_simplify_to_triangle_count(mesh, tris, unreal.GeometryScriptSimplifyMeshOptions())
+
+
+def boolean(mesh, tool, op):
+    unreal.GeometryScript_MeshBooleans.apply_mesh_boolean(mesh, unreal.Transform(), tool, unreal.Transform(), op, unreal.GeometryScriptMeshBooleanOptions())
+
+
+def append(mesh, raw):
+    unreal.GeometryScript_MeshEdits.append_mesh(mesh, raw.mesh(), unreal.Transform())
+
+
+def tooth(raw, p, w, h, up):
+    """A blunt tooth from p, h long, pointing down (up = -1) or up (1)."""
+    tube(raw, [(p[0], p[1], p[2] - 20 * up), (p[0], p[1], p[2] + h * 0.5 * up), (p[0], p[1], p[2] + h * up)],
+         lambda t: (w * (1 - 0.5 * t * t), w * 0.8 * (1 - 0.5 * t * t)), na=8)
+
+
+def teeth_row(ctrl, up, seed, dz):
+    """Fifteen teeth along a jaw's row, set close (they touch), broad molars at the back and narrower teeth in front,
+    worn to uneven lengths, one lost."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    lost = rnd.choice((2, 3, 11, 12))
+    for k, p in enumerate(spline(ctrl, 15)):
+        if k == lost:
+            continue
+        f = abs(k - 7) / 7.0
+        tooth(raw, (p[0], p[1], p[2] + dz), 21 + 9 * f, (44 - 10 * f) * rnd.uniform(0.75, 1.05), up)
+    return raw
+
+
+def giant_skull(name, seed):
+    """The Fallen Smith's skull, a forge giant's, 5.6 m long: braincase, brow ridge, cheekbones and arches, the upper
+    jaw and the ridge its teeth sit in, made one bone (voxel-merged, filled round where the parts meet); the eye
+    sockets and the nose's opening cut deep into it; the teeth. Face toward +X, top up, origin at its middle."""
+    raw = Raw()
+    E = lambda c, r: ellipsoid(raw, c, r, nu=14, nv=22)
+    E((-50, 0, 70), (235, 200, 185))      # braincase
+    E((110, 0, 70), (150, 172, 150))      # forehead
+    E((-140, 0, -40), (120, 150, 110))    # the base at the back
+    E((200, 0, -105), (115, 118, 85))     # the upper jaw
+    for s in (-1, 1):
+        E((205, s * 132, -22), (60, 50, 55))          # cheekbones
+        E((-20, s * 150, -120), (45, 40, 55))         # behind the ears
+        tube(raw, spline([(215, s * 150, -10), (130, s * 192, -35), (30, s * 185, -30)], 10), lambda t: (26, 20), na=10)
+    tube(raw, spline([(165, -178, 70), (215, -92, 98), (234, 0, 92), (215, 92, 98), (165, 178, 70)], 16), lambda t: (36, 30), na=12)
+    tube(raw, spline([(232, 0, 80), (262, 0, 0), (284, 0, -48)], 8), lambda t: (26, 20), na=10)
+    row = [(70, -128, -158), (170, -114, -174), (250, -56, -178), (270, 0, -178), (250, 56, -178), (170, 114, -174), (70, 128, -158)]
+    tube(raw, spline(row, 24), lambda t: (34, 28), na=12)
+    mesh = raw.mesh()
+    voxel(mesh, 7.0, close=24.0, smooth_n=3)
+    cut = Raw()
+    for s in (-1, 1):
+        a = math.radians(14 * s)
+        ellipsoid(cut, (262, s * 88, 18), (118, 66, 60), axes=((math.cos(a), math.sin(a), 0.0), (-math.sin(a), math.cos(a), 0.0), (0.0, 0.0, 1.0)))
+    ellipsoid(cut, (300, 0, -60), (70, 32, 50))
+    ellipsoid(cut, (300, 0, -92), (62, 44, 30))
+    tool = cut.mesh()
+    voxel(tool, 6.0)   # the cutters as one closed surface (two overlapping left a disc in the nose)
+    boolean(mesh, tool, unreal.GeometryScriptBooleanOperation.SUBTRACT)
+    append(mesh, teeth_row(row, -1, seed, -18.0))
+    noise(mesh, 4.0, 0.02, seed)
+    noise(mesh, 1.5, 0.08, seed + 1)
+    save(mesh, name)
+
+
+def giant_jaw(name, seed):
+    """The skull's lower jaw: one U of bone, its sides rising behind into the hinges, the chin at +X, its teeth up.
+    Origin as the skull's (the hinges at about (-10, +-168, 115) under it)."""
+    raw = Raw()
+    radial = lambda p: v_norm((max(0.0, p[0] - 60.0), p[1], 0.0))
+    side = lambda p, T: v_cross(T, radial(p))
+    path = spline([(-10, -168, 110), (-24, -172, 10), (-18, -166, -70), (70, -142, -96), (170, -106, -102), (248, -52, -100), (272, 0, -98),
+                   (248, 52, -100), (170, 106, -102), (70, 142, -96), (-18, 166, -70), (-24, 172, 10), (-10, 168, 110)], 64)
+    # the sides rising to the hinges are broad plates (the ramus), the body a tall narrow bar
+    tube(raw, path, lambda t: (40.0 + 22.0 * (1.0 - smooth(0.1, 0.2, min(t, 1.0 - t))), 17.0), na=14, side=side)
+    for s in (-1, 1):
+        ellipsoid(raw, (-14, s * 168, 116), (32, 44, 22))
+        tube(raw, spline([(10, s * 165, 30), (45, s * 160, 95), (62, s * 156, 124)], 8), lambda t: (30 - 14 * t, 13), na=10, side=side)
+    mesh = raw.mesh()
+    voxel(mesh, 6.0, close=16.0, smooth_n=2)
+    append(mesh, teeth_row([(60, -140, -62), (170, -104, -62), (248, -50, -62), (272, 0, -62), (248, 50, -62), (170, 104, -62), (60, 140, -62)], 1, seed, 0.0))
+    noise(mesh, 3.0, 0.03, seed)
+    save(mesh, name)
+
+
+def giant_vertebra(name, seed):
+    """A vertebra of the giant lying on its back: the drum (centrum) on top along X, the arch round the spinal canal
+    under it, the spine pointing down into the clinker, the wings (transverse processes) out to either side, the joint
+    knobs fore and aft. About 1.6 m long, 4.3 m across the wings. Origin at the drum's middle."""
+    raw = Raw()
+    tube(raw, [(-80 + 20 * i, 0, 0) for i in range(9)], lambda t: (82 - 12 * math.sin(math.pi * t),) * 2, na=24)
+    tube(raw, spline([(0, -58, -40), (0, -66, -110), (0, -30, -160), (0, 0, -168), (0, 30, -160), (0, 66, -110), (0, 58, -40)], 16), lambda t: (26, 20), na=12)
+    tube(raw, spline([(0, 0, -160), (-25, 0, -260), (-45, 0, -340)], 8), lambda t: (34 - 14 * t, 14 - 4 * t), na=12, side=lambda p, T: (1.0, 0.0, 0.0))
+    for s in (-1, 1):
+        tube(raw, spline([(0, s * 50, -105), (-5, s * 140, -100), (-15, s * 215, -80)], 8), lambda t: (24 - 8 * t, 18 - 6 * t), na=12)
+        for fx in (-1, 1):
+            ellipsoid(raw, (fx * 62, s * 50, -72), (30, 22, 26), nu=8, nv=12)
+    mesh = raw.mesh()
+    voxel(mesh, 6.0, close=10.0, smooth_n=2)
+    noise(mesh, 2.5, 0.04, seed)
+    save(mesh, name)
+
+
+RIB = [(0, 70, 0), (-15, 300, 15), (-35, 520, 160), (-55, 625, 420), (-75, 590, 690), (-90, 440, 900), (-100, 250, 1000)]
+
+
+def giant_rib(name, seed, t0, t1, lying=False):
+    """A rib of the giant lying on its back (the +Y side): it leaves the spine (origin) outward along the ground, curves
+    up round the body's side and in over it, its tip 10 m up and 2.5 m off the middle; flat (wide along the body), a
+    knob where it meets the spine. t0..t1: the part of it (a stub snapped off, the piece that fell: jagged where it
+    broke). lying: the piece laid flat on its side (origin under its middle)."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    full = spline(RIB, 49)
+    path = full[int(round(t0 * 48)): int(round(t1 * 48)) + 1]
+    # the broken end last (tube jags its far end): the fallen piece runs from its tip back to where it snapped
+    flip = t0 > 0.0
+    if flip:
+        path = path[::-1]
+    at = (lambda t: t1 - (t1 - t0) * t) if flip else (lambda t: t0 + (t1 - t0) * t)
+    tube(raw, path, lambda t: (62 - 26 * at(t), 26 - 9 * at(t)), na=14,
+         side=lambda p, T: (1.0, 0.0, 0.0), disp=lambda p, t, th: 4.0 * fbm(p[0] / 60, p[1] / 60, p[2] / 60, seed),
+         jag=(rnd, 28.0) if (t1 < 1.0 or flip) else None)
+    if t0 == 0.0:
+        ellipsoid(raw, (0, 60, 0), (60, 45, 50), nu=10, nv=16)
+    if lying:
+        # turned onto its side: the curve's plane (YZ) laid flat, its middle over the origin, its lowest point at -10
+        pts = [(p[2], p[1], -p[0]) for p in raw.pts]
+        mx = (min(p[0] for p in pts) + max(p[0] for p in pts)) / 2
+        my = (min(p[1] for p in pts) + max(p[1] for p in pts)) / 2
+        mz = min(p[2] for p in pts)
+        raw.pts = [(p[0] - mx, p[1] - my, p[2] - mz - 10.0) for p in pts]
+    save(raw.mesh(), name)
+
+
+def giant_long_bone(name, seed):
+    """A thigh bone of the giant, 15 m along X from the hip end (origin): a shaft narrowing to its middle, the ball on its
+    neck and the knob below it at the hip end, two rounded knuckles at the knee end. (Scaled for the shin and the arm.)"""
+    raw = Raw()
+    L = 1500.0
+    tube(raw, [(L * i / 30, 0, 0) for i in range(31)], lambda t: ((52 + 30 * abs(2 * t - 1) ** 3), (52 + 30 * abs(2 * t - 1) ** 3) * 0.92), na=20,
+         disp=lambda p, t, th: 3.0 * fbm(p[0] / 80, p[1] / 80, p[2] / 80, seed))
+    tube(raw, spline([(60, 0, 20), (10, 0, 90), (-30, 0, 140)], 8), lambda t: (48, 44), na=16)
+    ellipsoid(raw, (-40, 0, 150), (75, 72, 72))
+    ellipsoid(raw, (40, 0, -60), (70, 55, 60))
+    for s in (-1, 1):
+        ellipsoid(raw, (L - 20, s * 48, -10), (85, 58, 78))
+    mesh = raw.mesh()
+    voxel(mesh, 8.0, close=18.0, smooth_n=3)
+    noise(mesh, 3.0, 0.02, seed)
+    save(mesh, name)
+
+
+def giant_pelvis(name, seed):
+    """The giant's hips, lying face up: the sacrum along the ground toward the spine (+X), the two hip blades rising up
+    and out, the sockets at (-90, +-260) where the legs go off west (-X), the pubic arch meeting in front."""
+    raw = Raw()
+    ellipsoid(raw, (40, 0, 20), (170, 110, 55))                        # sacrum
+    for s in (-1, 1):
+        a = math.radians(40)
+        ax1 = (0.0, s * math.cos(a), math.sin(a))
+        ax2 = v_norm(v_cross((1.0, 0.0, 0.0), ax1))
+        ellipsoid(raw, (40, s * 190, 140), (230, 170, 30), axes=((1.0, 0.0, 0.0), ax1, ax2), nu=12, nv=24)   # the blade
+        tube(raw, spline([(150, s * 80, 110), (60, s * 230, 260), (-60, s * 300, 210)], 14), lambda t: (30, 26), na=12)   # its crest
+        ellipsoid(raw, (60, s * 90, 60), (110, 70, 60))                # the joint with the sacrum
+        ellipsoid(raw, (-90, s * 230, 30), (80, 70, 70))               # the hip socket
+        tube(raw, spline([(0, s * 200, 80), (-50, s * 220, 60), (-90, s * 230, 40)], 8), lambda t: (52, 46), na=14)
+        tube(raw, spline([(-90, s * 220, 50), (-170, s * 120, 130), (-205, 0, 150)], 12), lambda t: (34, 28), na=12)    # pubis
+        tube(raw, spline([(-100, s * 240, 0), (-200, s * 180, 20), (-215, s * 115, 100)], 12), lambda t: (36, 30), na=12)  # ischium
+    mesh = raw.mesh()
+    voxel(mesh, 8.0, close=20.0, smooth_n=3)
+    noise(mesh, 3.0, 0.02, seed)
+    save(mesh, name)
+
+
+def longboat(name, seed):
+    """A Rime-folk whaling boat (the Frozen Whaler): a clinker hull 19 m long and 4.6 m in the beam, seven strakes a side
+    each lapped over the one below, the sheer rising to the ends, an inside of its own (ribs, thwarts), the keel, the
+    stems curling up (the prow's into a scroll). Keel along X, the prow at +X, origin on the keel amidships."""
+    raw = Raw()
+    L, B, D, NS, STRAKES = 1900.0, 230.0, 150.0, 60, 7
+    top_c = (1.0 - math.cos(math.pi / 2 * 1.05)) ** 0.9
+
+    def skin(s, v):
+        b = B * max(0.0, 1.0 - abs(s) ** 2.4) ** 0.55
+        d = D + 90.0 * abs(s) ** 3
+        phi = v * math.pi / 2 * 1.05
+        return (L / 2 * s, b * math.sin(phi) ** 0.8, 25.0 * s * s + d * (1.0 - math.cos(phi)) ** 0.9 / top_c)
+
+    def normal(s, v):
+        a, b = skin(s, max(0.0, v - 0.01)), skin(s, min(1.0, v + 0.01))
+        ty, tz = b[1] - a[1], b[2] - a[2]
+        ln = math.hypot(ty, tz) or 1.0
+        return (0.0, tz / ln, -ty / ln)
+    vs = []
+    for k in range(STRAKES):
+        for f in (0.003, 0.5, 0.997):
+            vs.append(((k + f) / STRAKES, 4.5 * (1.0 - f)))
+    vs[0] = (0.0, 0.0)
+    vs[-1] = (1.0, 0.0)
+    for sign in (1.0, -1.0):
+        outer, inner = [], []
+        for i in range(NS + 1):
+            s = -1.0 + 2.0 * i / NS
+            fade = 1.0 - abs(s) ** 4
+            ro, ri = [], []
+            for v, lap in vs:
+                p, n = skin(s, v), normal(s, v)
+                ro.append(raw.pt((p[0], sign * (p[1] + n[1] * lap * fade), p[2] + n[2] * lap * fade)))
+            for q in range(15):
+                p, n = skin(s, q / 14.0), normal(s, q / 14.0)
+                ri.append(raw.pt((p[0], sign * max(0.0, p[1] - n[1] * 7.0), p[2] - n[2] * 7.0)))
+            outer.append(ro)
+            inner.append(ri)
+        raw.grid(outer, lambda c: (0.0, c[1], c[2] - 200.0), wrap=False)
+        raw.grid(inner, lambda c: (0.0, -c[1], 200.0 - c[2]), wrap=False)
+        raw.grid([[r[-1] for r in outer], [r[-1] for r in inner]], lambda c: (0.0, 0.0, 1.0), wrap=False)
+    # the keel
+    tube(raw, [(L / 2 * s, 0.0, 25.0 * s * s - 12.0) for s in [-1.0 + 2.0 * i / 30 for i in range(31)]], lambda t: (16.0, 12.0), na=10)
+    # the stems: the prow scrolls over, the stern rises and turns in
+    tube(raw, spline([(940, 0, 20), (1000, 0, 110), (1040, 0, 240), (1056, 0, 380), (1036, 0, 500), (986, 0, 566), (936, 0, 548), (922, 0, 496)], 30),
+         lambda t: (13.0, 22.0 - 8.0 * t), na=10, side=lambda p, T: (0.0, 1.0, 0.0))
+    tube(raw, spline([(-940, 0, 20), (-1000, 0, 120), (-1032, 0, 260), (-1032, 0, 345), (-1004, 0, 396)], 18),
+         lambda t: (13.0, 22.0 - 6.0 * t), na=10, side=lambda p, T: (0.0, 1.0, 0.0))
+    # ribs (frames) inside, from gunwale to gunwale
+    for s in [-0.75 + 0.1875 * k for k in range(9)]:
+        path = []
+        for q in range(-10, 11):
+            v = abs(q) / 10.0
+            p, n = skin(s, v), normal(s, v)
+            path.append((p[0], (1.0 if q >= 0 else -1.0) * max(0.0, p[1] - n[1] * 14.0), p[2] - n[2] * 14.0))
+        tube(raw, path, lambda t: (9.0, 7.0), na=8, side=lambda p, T: (1.0, 0.0, 0.0))
+    mesh = raw.mesh()
+    # thwarts across
+    for x in (-600.0, -300.0, 0.0, 300.0, 600.0):
+        s = x / (L / 2)
+        w = 2 * skin(s, 0.86)[1]
+        GS.append_box(mesh, opts(), xf((x, 0, skin(s, 0.86)[2] - 10)), 34.0, w, 10.0, 2, 4, 1, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    save(mesh, name)
+
+
+def wisp_spire(name, seed):
+    """Ignessa's Wisp Spire: nine hexagonal drums of fused basalt, each turned 7 degrees on the one below and a little off
+    true, narrowing from 6 m across to 1.3 m, worn in at every joint, and a split crown of two leaning prongs. Origin at
+    its foot (it runs 0.6 m into the ground); the drums' top about 24 m up."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    z = -60.0
+    off = (0.0, 0.0)
+    for d in range(9):
+        r0 = 300.0 - 220.0 * d / 8.0
+        r1 = 300.0 - 220.0 * (d + 1) / 8.0 if d < 8 else r0 * 0.82
+        h = 330.0 if d == 0 else 270.0
+        off = (off[0] + rnd.uniform(-7, 7), off[1] + rnd.uniform(-7, 7))
+        a0 = math.radians(7.0 * d)
+        base = [(off[0] + math.cos(a0 + math.pi / 3 * k) * r0, off[1] + math.sin(a0 + math.pi / 3 * k) * r0) for k in range(6)]
+        zt = z + h
+        prism(raw, rnd, seed + d, base, z, lambda x, y, zt=zt, d=d: zt + 6.0 * fbm(x / 50, y / 50, d, seed), nz=8, nw=4, mag=13.0,
+              profile=lambda t, r0=r0, r1=r1: (1.0 - (1.0 - r1 / r0) * t) * (1.0 - 0.07 * (smooth(0.12, 0.0, t) + smooth(0.88, 1.0, t))),
+              cap_jag=4.0)
+        z = zt
+    for (r, h, lean, k) in ((62.0, 360.0, (0.28, 0.1), 5), (46.0, 260.0, (-0.36, -0.12), 4)):
+        c = (off[0] + lean[0] * 60, off[1] + lean[1] * 60)
+        b = [(c[0] + math.cos(2 * math.pi * q / k) * r, c[1] + math.sin(2 * math.pi * q / k) * r) for q in range(k)]
+        prism(raw, rnd, seed + 40 + k, b, z - 30.0, lambda x, y, h=h: z + h, nz=6, nw=2, mag=4.0, profile=lambda t: 1.0 - 0.88 * t, lean=lean, cap_jag=6.0)
+    save(raw.mesh(), name)
+
+
+def wisp_ribs(name, seed):
+    """The spire's three glassy ribs, spiralling up it (each 400 degrees round from its foot to its crown), as their own
+    mesh for the obsidian: flat bands, thinning as they climb, a little proud of the drums' faces."""
+    raw = Raw()
+    R = lambda z: 300.0 - 220.0 * max(0.0, min(1.0, (z + 60.0) / 2220.0))
+    radial = lambda p: v_norm((p[0], p[1], 0.0))
+    for r in range(3):
+        path = []
+        for k in range(73):
+            T = k / 72.0
+            a = math.radians(120.0 * r + 400.0 * T)
+            z = 30.0 + 2250.0 * T
+            rr = R(z) * 0.9 + 8.0
+            path.append((math.cos(a) * rr, math.sin(a) * rr, z))
+        tube(raw, path, lambda t: (40.0 - 18.0 * t, 20.0 - 8.0 * t), na=10, side=lambda p, T: v_cross(T, radial(p)),
+             disp=lambda p, t, th: 3.0 * fbm(p[0] / 40, p[1] / 40, p[2] / 40, seed + r))
+    save(raw.mesh(), name)
+
+
+def glasswall(name, seed):
+    """The Glasswall: a cliff of obsidian 52 m long and up to 46 m high, fused slabs leaning out over the valley (+X),
+    their faces broken into shell-shaped scallops (glass's conchoidal fracture, rippled) with sharp ridges between, deep
+    joints between the slabs, a ragged top; the middle slab plain 8.5-14.5 m up, where the Mirror Room's door is set.
+    Origin at the foot of the middle (its face there at x = 0 near the ground); it runs 1.5 m into the ground."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    W, NY, NZ = 5200.0, 176, 150
+    bounds = [-W / 2]
+    while bounds[-1] < W / 2 - 300:
+        bounds.append(bounds[-1] + rnd.uniform(280, 470))
+    bounds[-1] = W / 2
+    slabs = []
+    for i in range(len(bounds) - 1):
+        yc = (bounds[i] + bounds[i + 1]) / 2
+        bell = math.cos(min(1.0, abs(yc) / (W / 2)) * math.pi / 2)
+        slabs.append({"y0": bounds[i], "y1": bounds[i + 1], "yc": yc, "H": 1500 + 3100 * bell * rnd.uniform(0.75, 1.0),
+                      "lean": rnd.uniform(0.05, 0.15), "off": rnd.uniform(-90, 90), "slope": rnd.uniform(-0.5, 0.5),
+                      "peak": yc + rnd.uniform(-0.3, 0.3) * (bounds[i + 1] - bounds[i]), "drop": rnd.uniform(180, 420)})
+    mid = next(s for s in slabs if s["y0"] <= 0 <= s["y1"])
+    mid.update(H=max(mid["H"], 3800.0), lean=0.08, off=0.0)
+    cells = {}
+    for _ in range(300):
+        sc = (rnd.uniform(-W / 2, W / 2), rnd.uniform(-100, 4700), rnd.uniform(140, 420), rnd.uniform(25, 110))
+        for i in range(int((sc[0] - sc[2]) // 400), int((sc[0] + sc[2]) // 400) + 1):
+            for j in range(int((sc[1] - sc[2]) // 400), int((sc[1] + sc[2]) // 400) + 1):
+                cells.setdefault((i, j), []).append(sc)
+
+    def slab_at(y):
+        for s in slabs:
+            if y <= s["y1"]:
+                return s
+        return slabs[-1]
+
+    def top(y):
+        s = slab_at(y)
+        half = (s["y1"] - s["y0"]) / 2
+        return (s["H"] - s["drop"] * (abs(y - s["peak"]) / half) ** 1.3 + s["slope"] * (y - s["yc"])
+                + 160.0 * fbm(y / 110, 0, 0, seed + 3) + 60.0 * fbm(y / 35, 0, 1, seed + 3))
+
+    def front(y, z):
+        s = slab_at(y)
+        x = s["off"] + s["lean"] * max(z, 0.0)
+        best, rip = 0.0, 0.0
+        for (cy, cz, r, dep) in cells.get((int(y // 400), int(z // 400)), ()):
+            d = math.hypot(y - cy, z - cz)
+            if d < r:
+                v = dep * (1 - (d / r) ** 2)
+                if v > best:
+                    best, rip = v, 2.5 * math.sin(d / 13.0 * 2 * math.pi) * (d / r)
+        door = (1.0 - smooth(260.0, 360.0, abs(y))) * (1.0 - smooth(300.0, 420.0, abs(z - 1150.0)))
+        x -= (best + rip) * (1.0 - door)
+        for b in bounds[1:-1]:
+            x -= 75.0 * math.exp(-((y - b) / 22.0) ** 2)
+        return x + 14.0 * fbm(y / 220, z / 220, 0, seed + 4) * (1.0 - door)
+
+    back = lambda y, z: -1000.0 + 0.18 * z + 60.0 * fbm(y / 300, z / 300, 1, seed + 5)
+    F, Bk = [], []
+    for i in range(NZ + 1):
+        rf, rb = [], []
+        for j in range(NY + 1):
+            y = -W / 2 + W * j / NY
+            z = -150.0 + (top(y) + 150.0) * i / NZ
+            rf.append(raw.pt((front(y, z), y, z)))
+            rb.append(raw.pt((back(y, z), y, z)))
+        F.append(rf)
+        Bk.append(rb)
+    raw.grid(F, lambda c: (1.0, 0.0, 0.0), wrap=False)
+    raw.grid(Bk, lambda c: (-1.0, 0.0, 0.0), wrap=False)
+    # the ragged top between them
+    crest = []
+    for j in range(NY + 1):
+        pf, pb = raw.pts[F[-1][j]], raw.pts[Bk[-1][j]]
+        crest.append(raw.pt(((pf[0] + pb[0]) / 2, pf[1], pf[2] + 60.0 + 90.0 * fbm(pf[1] / 90, 0, 2, seed + 6))))
+    raw.grid([F[-1], crest, Bk[-1]], lambda c: (0.0, 0.0, 1.0), wrap=False)
+    for j, sgn in ((0, -1.0), (NY, 1.0)):
+        raw.grid([[F[i][j], Bk[i][j]] for i in range(NZ + 1)], lambda c, sgn=sgn: (0.0, sgn, 0.0), wrap=False)
+    save(raw.mesh(), name)
+
+
+def quarry_face(name, seed):
+    """Warden's Quarry: an outcrop of obsidian 14 m long with its front (+X) cut back in three benches, the cut faces
+    scored by the drill channels the blocks were split along, the benches' tops tooled; natural rock over the top and
+    behind, falling away into the ground at both ends; under it all a skirt of rock 15 m deep (it stands on a hilltop
+    whose ground falls away round it: set on the highest ground along its front, the skirt meets the ground anywhere).
+    Origin at the foot of the front, its middle; 6 m high at most; its ends closed."""
+    raw = Raw()
+    Wd = 1400.0
+    cut = [(0, -1600), (0, -120), (0, 160), (-220, 160), (-220, 340), (-450, 340), (-450, 470), (-600, 560), (-800, 600),
+           (-1000, 520), (-1150, 300), (-1250, -120), (-1250, -1600)]
+    kinds = ["skirt", "face", "tread", "face", "tread", "face", "rock", "rock", "rock", "rock", "rock", "skirt"]
+    crag = lambda u: (-600.0 * u, -120.0 + 680.0 * math.sin(u * math.pi / 2) ** 0.8)   # the natural slope where nothing was cut
+    NYQ = 176
+    ends = ([], [])
+    for k in range(len(cut) - 1):
+        (x0, z0), (x1, z1) = cut[k], cut[k + 1]
+        segs = max(2, int(math.hypot(x1 - x0, z1 - z0) / 30))
+        nx, nz = (z1 - z0), -(x1 - x0)
+        ln = math.hypot(nx, nz)
+        nx, nz = nx / ln, nz / ln
+        if k == 0:
+            nx, nz = 1.0, 0.0
+        elif k == len(cut) - 2:
+            nx, nz = -1.0, 0.0
+        elif nx * 1.0 + nz * 0.2 < 0 and kinds[k] != "rock":
+            nx, nz = -nx, -nz
+        ids = []
+        for i in range(segs + 1):
+            t = i / segs
+            row = []
+            for j in range(NYQ + 1):
+                y = -Wd / 2 + Wd * j / NYQ
+                x, z = x0 + (x1 - x0) * t, z0 + (z1 - z0) * t
+                w = 1.0 - smooth(380.0, 620.0, abs(y) + 60.0 * fbm(y / 200, 0, 3, seed))
+                if 1 <= k <= 5:
+                    u = (k - 1 + t) / 5.0
+                    cx, cz = crag(u)
+                    x, z = cx + (x - cx) * w, cz + (z - cz) * w
+                edgef = math.sin(math.pi * t) ** 0.5
+                if kinds[k] == "face":
+                    d = -4.5 * (0.5 - 0.5 * math.cos(2 * math.pi * y / 34.0)) * w + 1.5 * fbm(y / 30, z / 30, 0, seed)
+                elif kinds[k] == "tread":
+                    d = -1.2 * (0.5 - 0.5 * math.cos(2 * math.pi * x / 22.0)) * w + 1.0 * fbm(x / 30, y / 30, 1, seed)
+                elif kinds[k] == "skirt":
+                    d = 30.0 * fbm(x / 200, y / 200, z / 200, seed + 5) + 10.0 * fbm(x / 60, y / 60, z / 60, seed + 6)
+                else:
+                    d = 55.0 * fbm(x / 300, y / 300, z / 300, seed + 2) + 18.0 * fbm(x / 90, y / 90, z / 90, seed + 3) + 6.0 * fbm(x / 30, y / 30, z / 30, seed + 4)
+                if kinds[k] in ("face", "tread") and w < 1.0:
+                    d = d * w + (1.0 - w) * (34.0 * fbm(x / 260, y / 260, z / 260, seed + 2))
+                d *= edgef
+                end = 1.0 - smooth(560.0, Wd / 2, abs(y))
+                zz = z + d * nz
+                if zz > -120.0:
+                    zz = -120.0 + (zz + 120.0) * (0.15 + 0.85 * end)
+                p = (x + d * nx, y, zz)
+                row.append(raw.pt(p))
+                if j == 0:
+                    ends[0].append(p)
+                elif j == NYQ:
+                    ends[1].append(p)
+            ids.append(row)
+        raw.grid(ids, lambda c, nx=nx, nz=nz: (nx, 0.0, nz), wrap=False)
+    # its ends closed (the section there, fanned from its middle)
+    for pts, sgn in ((ends[0], -1.0), (ends[1], 1.0)):
+        cx = sum(p[0] for p in pts) / len(pts)
+        cz = sum(p[2] for p in pts) / len(pts)
+        ring = [raw.pt(p) for p in pts]
+        c = raw.pt((cx, pts[0][1], cz))
+        for q in range(len(ring)):
+            raw.face(c, ring[q], ring[(q + 1) % len(ring)], (0.0, sgn, 0.0))
+    save(raw.mesh(), name)
+
+
+def cut_block(name, seed, sx, sy, sz):
+    """A block split out of the obsidian (Warden's Quarry): dressed flat but not true, chisel grooves across its top, a
+    row of wedge holes along one top edge, its corners knocked off. Origin at the centre of its foot."""
+    rnd = random.Random(seed)
+    mesh = unreal.DynamicMesh()
+    GS.append_box(mesh, opts(), xf((0, 0, 0)), sx, sy, sz, 28, 24, 20, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    Q, E = unreal.GeometryScript_MeshQueries, unreal.GeometryScript_MeshEdits
+    for v in range(Q.get_vertex_count(mesh)):
+        p, ok = Q.get_vertex_position(mesh, v)
+        x, y, z = p.x, p.y, p.z
+        ux, uy, uz = abs(x) / (sx / 2), abs(y) / (sy / 2), z / sz
+        dz = 0.0
+        if z > sz - 0.5:
+            for g in (-0.3, 0.0, 0.3):
+                dz -= 2.5 * math.exp(-((y - g * sy) / 3.0) ** 2)
+            if y > sy / 2 - 18 and ((x + sx / 2) % 26) < 10:
+                dz -= 8.0
+        # the corners and edges knocked back toward the middle
+        k = max(0.0, ux + uy - 1.75) * 0.5 + max(0.0, ux + uz - 1.8) * 0.4 + max(0.0, uy + uz - 1.8) * 0.4
+        k += 0.02 * (fbm(x / 40, y / 40, z / 40, seed) + 1.0)
+        E.set_vertex_position(mesh, v, unreal.Vector(x * (1 - k * 0.6), y * (1 - k * 0.6), z * (1 - k * 0.25) + dz), True)
+    noise(mesh, 1.5, 0.04, seed)
+    save(mesh, name)
+
+
+def run(key, fn, *args):
+    if want(key):
+        try:
+            fn(*args)
+        except Exception as e:
+            import traceback
+            unreal.log_error(f"[Wildreach] mesh {args[0] if args else key} failed: {e}\n{traceback.format_exc()}")
+
 
 if want("basalt"):
     for i, n in enumerate("ABC"):
@@ -477,8 +1190,8 @@ if want("obsidian"):
 if want("sulfur"):
     sulfur("SM_SulfurCrystal", 301)
 if want("serac"):
-    for i, n in enumerate("AB"):
-        serac("SM_Serac_" + n, 401 + i)
+    for i, n in enumerate("ABCD"):
+        run("serac", serac, "SM_Serac_" + n, 401 + i)
 if want("rubble"):
     for i, n in enumerate("ABC"):
         rubble("SM_Rubble_" + n, 601 + i)
@@ -494,3 +1207,18 @@ if want("iceblock"):
 if want("hornito"):
     for i, n in enumerate("AB"):
         hornito("SM_Hornito_" + n, 901 + i)
+run("skull", giant_skull, "SM_GiantSkull_A", 1101)
+run("jaw", giant_jaw, "SM_GiantJaw_A", 1102)
+run("vertebra", giant_vertebra, "SM_GiantVertebra_A", 1103)
+run("rib", giant_rib, "SM_GiantRib_A", 1104, 0.0, 1.0)
+run("rib", giant_rib, "SM_GiantRib_B", 1105, 0.0, 0.42)
+run("rib", giant_rib, "SM_GiantRib_C", 1106, 0.46, 1.0, True)
+run("longbone", giant_long_bone, "SM_GiantLongBone_A", 1107)
+run("pelvis", giant_pelvis, "SM_GiantPelvis_A", 1108)
+run("longboat", longboat, "SM_Longboat_A", 1201)
+run("spire", wisp_spire, "SM_WispSpire_A", 1301)
+run("spire", wisp_ribs, "SM_WispRibs_A", 1302)
+run("glasswall", glasswall, "SM_Glasswall_A", 1401)
+run("quarry", quarry_face, "SM_QuarryFace_A", 1501)
+run("quarry", cut_block, "SM_CutBlock_A", 1502, 220.0, 170.0, 150.0)
+run("quarry", cut_block, "SM_CutBlock_B", 1503, 300.0, 150.0, 120.0)

@@ -55,8 +55,9 @@ const isClear = (x, y, pad) => !(buckets.get(Math.floor(x / CELL) + "," + Math.f
 const lavaDist = (x, y) => { let d = 1e9; for (let i = 1; i < lava.length; i++) { const [ax, ay] = lava[i - 1], [bx, by] = lava[i], dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1))); d = Math.min(d, Math.hypot(x - ax - t * dx, y - ay - t * dy)); } return d; };
 
 // ---- what each sub-zone grows (per hectare; trees clump, rocks scatter) ----------------------------------------------
-// [kind, per ha, scale min, scale max, steepest ground (deg), clumped, steep-only (cliffs), surfaces it keeps to]
-const T = (kind, ha, s0, s1, slope = 28, clump = 0, only = null) => ({ kind, ha, s0, s1, slope, clump, only });
+// [kind, per ha, scale min, scale max, steepest ground (deg), clumped, steep-only (cliffs), surfaces it keeps to,
+//  group: [fewest, most, nearest m, furthest m] lesser ones round each (seracs stand in broken clusters, 11-22)]
+const T = (kind, ha, s0, s1, slope = 28, clump = 0, only = null, group = null) => ({ kind, ha, s0, s1, slope, clump, only, group });
 const ON = (...ids) => new Set(ids.map((k) => SURF[k]));
 const PLAN = {
 	V1: [T("char_tree", 1.2, 0.8, 1.2, 26, 0.6), T("ember_shrub", 5, 0.7, 1.2, 30, 0.5), T("basalt_rock", 1.5, 0.6, 1.5, 38), T("pumice_rock", 1.5, 0.5, 1.3, 34), T("lava_rubble", 6, 0.6, 1.1, 16, 0.7)],
@@ -71,8 +72,8 @@ const PLAN = {
 	T1: [T("granite_rock", 1.2, 0.8, 2.2, 38), T("frost_shrub", 1.5, 0.6, 1.0, 30, 0.5), T("ice_boulder", 0.4, 0.6, 1.3, 38)],
 	T2: [T("pine", 32, 0.75, 1.3, 30, 0.45), T("frost_shrub", 5, 0.6, 1.1, 30, 0.5), T("granite_rock", 0.4, 0.7, 1.6, 38)],
 	T3: [T("pine", 3, 0.7, 1.2, 26, 0.7), T("frost_shrub", 5, 0.5, 0.9, 30, 0.5), T("ice_boulder", 0.8, 0.6, 1.4, 38)],
-	T4: [T("serac", 2.5, 0.7, 1.4, 45, 0.4), T("ice_boulder", 2.5, 0.6, 1.6, 40), T("ice_cliff", 3, 0.7, 1.4, 70, 0, "steep")],
-	T5: [T("ice_boulder", 1.5, 0.6, 1.5, 40), T("serac", 0.6, 0.7, 1.3, 40, 0.4), T("ice_cliff", 3, 0.7, 1.4, 70, 0, "steep"), T("basalt_rock", 6, 0.6, 1.4, 40, 0, ON("basalt"))],
+	T4: [T("serac", 0.7, 0.8, 1.45, 45, 0.6, null, [2, 5, 3.5, 9]), T("ice_boulder", 2.5, 0.6, 1.6, 40), T("ice_cliff", 3, 0.7, 1.4, 70, 0, "steep")],
+	T5: [T("ice_boulder", 1.5, 0.6, 1.5, 40), T("serac", 0.18, 0.8, 1.35, 40, 0.6, null, [1, 4, 3.5, 8]), T("ice_cliff", 3, 0.7, 1.4, 70, 0, "steep"), T("basalt_rock", 6, 0.6, 1.4, 40, 0, ON("basalt"))],
 	T6: [T("frost_shrub", 7, 0.5, 1.0, 30, 0.5), T("pine", 1.2, 0.7, 1.1, 26, 0.7), T("granite_rock", 0.6, 0.7, 1.6, 38)],
 	T7: [T("granite_rock", 1.2, 0.8, 2.4, 38), T("frost_shrub", 0.8, 0.6, 1.0, 30, 0.5), T("pine", 0.2, 0.8, 1.1, 24, 0.8)],
 };
@@ -109,6 +110,17 @@ for (let gx = -6600; gx < 6600; gx += C) {
 				if (ld < LAND.lava.width / 2 + (P.kind === "char_tree" || P.kind === "pine" ? 18 : 8)) continue;
 				const s = P.s0 + (P.s1 - P.s0) * rand(ci, cj, p * 7 + 4 + t * 13);
 				add(P.kind, x, y, h, rand(ci, cj, p * 7 + 5 + t * 13) * 360, s);
+				if (P.group) {
+					// lesser ones crowded round it, leaning their own ways
+					const [g0, g1, r0, r1] = P.group, R = (m, k) => rand(ci, cj, p * 7 + 60 + t * 13 + m * 7 + k);
+					const n = g0 + Math.floor(R(0, 0) * (g1 - g0 + 1));
+					for (let m = 1; m <= n; m++) {
+						const a = R(m, 1) * 2 * Math.PI, d = r0 + (r1 - r0) * R(m, 2), x2 = x + Math.cos(a) * d, y2 = y + Math.sin(a) * d;
+						if (zoneAt(x2, y2) !== zc || hAt(x2, y2) < 1.2 || BARE.has(surfAt(x2, y2)) || slopeAt(x2, y2) > P.slope || !isClear(x2, y2, 1.5)) continue;
+						if (lavaDist(x2, y2) < LAND.lava.width / 2 + 8) continue;
+						add(P.kind, x2, y2, hAt(x2, y2), R(m, 3) * 360, s * (0.5 + 0.42 * R(m, 4)));
+					}
+				}
 			}
 		}
 	}
@@ -256,10 +268,43 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 		return best ? { ...o, at: best[1] } : null;
 	};
 	const thin = FFL.hazards.thinIce.map(onIce).filter(Boolean);
+	// The Fallen Smith (11-22): the port to the round island moved him to the road's lava crossing but left his hammer's
+	// bridge points where the river was on the Old Island, 4.5 km off (his arm and haft ran across the map). His haft
+	// spans the round island's river at the stretch nearest him; his frame turns so local +Y points from the river to
+	// his bank (he lies 26 m back from the haft's end, along the bank), moved along the bank if his 80 m would lie
+	// across the road.
+	const smithRow = (p) => {
+		const near = (x, y) => {
+			let best = null;
+			for (let i = 1; i < lava.length; i++) {
+				const [ax, ay] = lava[i - 1], [bx, by] = lava[i], dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+				const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2)), px = ax + dx * t, py = ay + dy * t, d = Math.hypot(x - px, y - py);
+				if (!best || d < best.d) best = { d, p: [px, py], tan: [dx / Math.sqrt(L2), dy / Math.sqrt(L2)] };
+			}
+			return best;
+		};
+		let at = [...p.at], n = null, r = null;
+		for (let pass = 0; pass < 3; pass++) {
+			r = near(...at);
+			n = r.d > 1 ? [(at[0] - r.p[0]) / r.d, (at[1] - r.p[1]) / r.d] : [-r.tan[1], r.tan[0]];
+			const X = [n[1], -n[0]], cr = FFL.lands.volcanic.smithBridge;
+			if (!cr) break;
+			const roadX = (cr[0] - at[0]) * X[0] + (cr[1] - at[1]) * X[1];
+			const shift = roadX >= 0 ? Math.min(0, roadX - 34) : Math.max(0, roadX + 58);
+			if (Math.abs(shift) < 0.5) break;
+			at = [at[0] + X[0] * shift, at[1] + X[1] * shift];
+		}
+		const half = LAND.lava.width / 2 + 4;
+		const R = (v) => Math.round(v * 10) / 10;
+		return { ...p, at: at.map(Math.round), yaw: R(Math.atan2(n[1], n[0]) * 180 / Math.PI - 90),
+			bridge: { from: [R(r.p[0] + n[0] * half), R(r.p[1] + n[1] * half)], to: [R(r.p[0] - n[0] * half), R(r.p[1] - n[1] * half)] } };
+	};
+	const placeRows = FFL.places.map((p) => p.kind === "fallen_smith" ? smithRow(p) : p);
+	console.log("fallen smith:", JSON.stringify(placeRows.find((p) => p.kind === "fallen_smith")));
 	const places = {
 		_comment: "Generated by Tools/terrain/fire_frost_dressing.mjs from Tools/terrain/fire_frost_layout.json: the Old Island's Fire and Frost places, kit, ground features and micro-hazards at their round island spots (map metres = game cm / 100), for UWRIslandPlaces on L_Wildreach. Sub-zones have no shapes here: the land's own zone letters say where each lies.",
 		zones,
-		places: FFL.places,
+		places: placeRows,
 		roads: [],
 		ground: FFL.ground,
 		kit: FFL.kit,

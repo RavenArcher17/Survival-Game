@@ -189,6 +189,9 @@ export const SMITH_CROSSING = (() => {
 // roads) with its spire, the Fallen Smith at the crossing.
 const NUDGE = {
 	Ignessa: { to: [-4500, 1090] }, wisp_spire: { to: [-4530, 1065] },
+	// The Glasswall at the foot of the ridge's inner face, the bowl below it (11-22: mapped onto the ridge's crest, its
+	// 46 m of glass had no face to stand against and sank into the slope behind).
+	glasswall: { to: [-4910, -426] },
 	// The Pale Hunter keeps to the deep pines, off the road that now runs past Rimehold.
 	"Pale Hunter": { to: [4250, 1150] }, pale_pines: { to: [4220, 1125] },
 	fallen_smith: SMITH_CROSSING ? (() => { const L = Math.hypot(...SMITH_CROSSING.road), n = [-SMITH_CROSSING.road[1] / L, SMITH_CROSSING.road[0] / L]; return { to: [SMITH_CROSSING.at[0] + n[0] * 32, SMITH_CROSSING.at[1] + n[1] * 32] }; })() : null,
