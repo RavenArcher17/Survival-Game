@@ -88,10 +88,18 @@ public:
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
 	virtual float GetMaxSpeed() const override;
+	/** No braking in the air while a launch carries you (Carry): with no input the survivor's braking friction took a
+	 *  geyser's sideways push in 20 cm, so the Glasswall's geyser dropped you back on its spout instead of onto the ledge. */
+	virtual void ApplyVelocityBraking(float DeltaTime, float Friction, float BrakingDeceleration) override;
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
 
+	/** A launch that should carry you across (the Glasswall ledge's geyser): no air braking for Seconds, while you fall.
+	 *  Set where the launch is (the server); a remote client's prediction is corrected toward it. */
+	void Carry(float Seconds);
+
 private:
+	double CarryUntil = 0.0;
 	FWRNetworkMoveDataContainer WRMoveData;
 	FWRMoveResponseDataContainer WRMoveResponse;
 };

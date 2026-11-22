@@ -107,6 +107,18 @@ void UWRCharacterMovementComponent::BeginPlay()
 	BrakingDecelerationSwimming = WRTune(TEXT("water.braking"), 0.f);
 }
 
+void UWRCharacterMovementComponent::Carry(float Seconds)
+{
+	CarryUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.0;
+}
+
+void UWRCharacterMovementComponent::ApplyVelocityBraking(float DeltaTime, float Friction, float BrakingDeceleration)
+{
+	// (Its braking friction is the survivor's separate one, not the friction passed in: skip the step outright.)
+	if (MovementMode == MOVE_Falling && CarryUntil > 0.0 && GetWorld() && GetWorld()->GetTimeSeconds() < CarryUntil) return;
+	Super::ApplyVelocityBraking(DeltaTime, Friction, BrakingDeceleration);
+}
+
 float UWRCharacterMovementComponent::GetMaxSpeed() const
 {
 	// A tester's god flight (WRGod; the speed replicates, so both machines agree): Sprint doubles it.

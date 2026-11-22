@@ -31,6 +31,8 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
                           the Mirror Room's door 8.5-14.5 m up.
   SM_QuarryFace_A         Warden's Quarry: an outcrop cut back in three benches scored by drill channels, a 15 m skirt.
   SM_CutBlock_A..B        blocks split from it: chisel grooves, wedge holes along one edge, corners knocked.
+  SM_GolemRough_A         the quarry's second golem, half carved: a rough block 4.6 m long with a figure lying face up
+                          out of its top (torso, head, shoulders, arms at its sides, hips), its legs still in the stone.
   Helpers: prism() (faceted columns, sharp edges), tube() (swept rings), ellipsoid(), voxel(), boolean(). WR_OBJ=<folder>
   also writes each mesh as an OBJ there (WR_OBJ_ONLY=1: only that) to look it over in Blender first.
 Materials are set where they're used (the dressing's M_Rock / M_IceBlock / M_Obsidian, world-space projected, so the
@@ -1172,6 +1174,33 @@ def cut_block(name, seed, sx, sy, sz):
     save(mesh, name)
 
 
+def golem_rough(name, seed):
+    """The Warden's Quarry's second golem, left half carved: a rough block of the obsidian, its top worked down into a
+    figure lying face up (the head toward +X): a broad chest, the head, the shoulders, arms laid along its sides, the hips;
+    its legs not yet cut out of the block's -X end. Parts voxel-merged so the figure grows out of the stone; the block's
+    sides left rough. Origin near the centre of its foot, 4.9 m long."""
+    mesh = unreal.DynamicMesh()
+    GS.append_box(mesh, opts(), xf((-5, 0, 0)), 490, 250, 50, 8, 6, 3, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    GS.append_box(mesh, opts(), xf((-190, 0, 0)), 120, 250, 135, 4, 6, 4, unreal.GeometryScriptPrimitiveOriginMode.BASE)   # the uncut end
+    raw = Raw()
+    E = lambda c, r: ellipsoid(raw, c, r, nu=12, nv=18)
+    E((25, 0, 92), (115, 72, 42))          # chest
+    E((-55, 0, 82), (62, 58, 30))          # belly
+    E((-125, 0, 78), (55, 70, 30))         # hips, going into the stone
+    E((178, 0, 98), (50, 42, 42))          # head
+    tube(raw, [(128, 0, 92), (150, 0, 95)], lambda t: (20, 18), na=10)       # neck
+    for s_ in (-1, 1):
+        E((85, s_ * 90, 92), (44, 38, 34))                                     # shoulders
+        tube(raw, spline([(90, s_ * 118, 84), (20, s_ * 126, 74), (-50, s_ * 124, 70), (-100, s_ * 118, 70)], 10),
+             lambda t: (22 - 4 * t, 19 - 3 * t), na=10)                         # arms laid along its sides, clear of it
+        E((-108, s_ * 116, 68), (25, 21, 18))                                  # the fists
+    append(mesh, raw)
+    voxel(mesh, 5.0, close=7.0, smooth_n=1)
+    noise(mesh, 3.0, 0.035, seed)
+    noise(mesh, 1.0, 0.12, seed + 1)
+    save(mesh, name)
+
+
 def run(key, fn, *args):
     if want(key):
         try:
@@ -1222,3 +1251,4 @@ run("glasswall", glasswall, "SM_Glasswall_A", 1401)
 run("quarry", quarry_face, "SM_QuarryFace_A", 1501)
 run("quarry", cut_block, "SM_CutBlock_A", 1502, 220.0, 170.0, 150.0)
 run("quarry", cut_block, "SM_CutBlock_B", 1503, 300.0, 150.0, 120.0)
+run("golem", golem_rough, "SM_GolemRough_A", 1504)

@@ -224,19 +224,21 @@ namespace WRIsleT
 
 	void FrozenWhaler(FWRIsleSite& S, const FPal& P)
 	{
-		// A Rime-folk longboat from when the shelf was sea, locked into a serac: clinker strakes, a raised prow 11 m up,
-		// the stern buried; a lantern left in the crow's nest.
+		// A Rime-folk longboat from when the shelf was sea, locked in the ice: clinker strakes, the stern sunk in the shelf, the
+		// bow heaved up on a pressure ridge, slabs of ice shoved up against its sides; the serac behind it; a lantern left in
+		// the crow's nest. (11-22 round 5: pitched 34 degrees with its middle 4 m up, it hung in the air over two seracs.)
 		const float G0 = S.Gz(0, 0);
-		// The serac it's frozen into, and a second leaning on it.
-		S.Ice(0, FVector(1250.f, 1000.f, 1340.f), FVector(-200.f, 0.f, G0 - 90.f), FRotator(-6.f, 8.f, 4.f), false, 0.f);
-		S.Ice(1, FVector(800.f, 680.f, 820.f), FVector(500.f, 500.f, G0 - 60.f), FRotator(8.f, 30.f, -6.f), false, 0.f);
-		S.Solid(FVector(-200.f, 0.f, G0 + 560.f), FVector(550.f, 450.f, 650.f), FRotator(-6.f, 8.f, 4.f));
-		S.Solid(FVector(500.f, 500.f, G0 + 340.f), FVector(350.f, 300.f, 400.f), FRotator(8.f, 30.f, -6.f));
+		// The serac behind its stern (the stern runs into its foot), and a second leaning on it.
+		S.Ice(0, FVector(1250.f, 1000.f, 1340.f), FVector(-1250.f, 0.f, S.Gz(-1250.f, 0.f) - 90.f), FRotator(-6.f, 8.f, 4.f), false, 0.f);
+		S.Ice(1, FVector(800.f, 680.f, 820.f), FVector(-1000.f, 900.f, S.Gz(-1000.f, 900.f) - 60.f), FRotator(8.f, 30.f, -6.f), false, 0.f);
+		S.Solid(FVector(-1250.f, 0.f, S.Gz(-1250.f, 0.f) + 560.f), FVector(550.f, 450.f, 650.f), FRotator(-6.f, 8.f, 4.f));
+		S.Solid(FVector(-1000.f, 900.f, S.Gz(-1000.f, 900.f) + 340.f), FVector(350.f, 300.f, 400.f), FRotator(8.f, 30.f, -6.f));
 		// The hull (SM_Longboat_A, 11-22 round 4: a clinker hull with its strakes lapped, ribs and thwarts inside, the stems
-		// curling up; it was boards stuck out like fins) in weathered wood, its grain along the keel; pitched up 34 degrees, the
-		// prow 11 m up, the stern in the ice. The carving, the mast and the crow's nest go on in its frame.
-		const FRotator HullRot(34.f, 0.f, 6.f);
-		const FVector HullAt(150.f, -40.f, G0 + 400.f);
+		// curling up; it was boards stuck out like fins) in weathered wood, its grain along the keel; pitched up 12 degrees and
+		// listing, its keel half a metre down amidships: the stern sunk to the gunwale, the bow's forefoot clear on the ridge.
+		// The carving, the mast and the crow's nest go on in its frame.
+		const FRotator HullRot(12.f, 0.f, 7.f);
+		const FVector HullAt(150.f, -40.f, G0 - 50.f);
 		// Weathered: centuries in the ice have greyed the tarred planks.
 		const FSurf Weathered = FSurf::Wood(Lin(118, 104, 90));
 		S.ShapeKit(TEXT("/Game/Art/Gen/SM_Longboat_A.SM_Longboat_A"), HullAt, HullRot, FVector(1.f), true, Weathered, 0.f);
@@ -258,11 +260,28 @@ namespace WRIsleT
 		S.K.Add(P.Iron, FVector(24.f, 24.f, 34.f), Lantern, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 		S.K.Add(FSurf::Lit(Lin(255, 200, 130), 0.6f), FVector(16.f, 16.f, 20.f), Lantern, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 		S.Lamp(Lantern + FVector(0, 0, 10.f), Lin(255, 196, 120), WRTune(TEXT("places.whalerLux"), 2600.f), 1600.f);
-		// Ice grown up over the lower hull, from the ground to its keel (serac shapes; they were striped cubes).
-		for (int32 k = 0; k < 4; ++k)
+		// The pressure ridge the bow rides on, and slabs of the shelf shoved up against both sides of the hull, tipped toward it
+		// (glacier ice blocks, snow on their tops; serac towers stood round it like posts).
+		static const TCHAR* Blocks[3] = { TEXT("/Game/Art/Gen/SM_IceBlock_A.SM_IceBlock_A"), TEXT("/Game/Art/Gen/SM_IceBlock_B.SM_IceBlock_B"), TEXT("/Game/Art/Gen/SM_IceBlock_C.SM_IceBlock_C") };
+		const float Tan = FMath::Tan(FMath::DegreesToRadians(HullRot.Pitch));
+		const auto KeelZ = [&](float X) { return G0 - 50.f + (X - 150.f) * Tan; };
+		for (int32 k = 0; k < 2; ++k)
 		{
-			const float X = -500.f + 180.f * k, Keel = 400.f + (X - 150.f) / 0.829f * 0.559f;
-			S.Ice(k + 2, FVector(340.f, 280.f, FMath::Max(180.f, Keel + 110.f)), FVector(X, -40.f + 80.f * S.J(FVector(k), 3), G0 - 30.f), FRotator(4.f * S.J(FVector(k), 4), 30.f * k, 0.f), false, 40.f, 0.3f);
+			// Under the bow: its top just under the keel there.
+			const float X = 650.f + 260.f * k;
+			const float Top = KeelZ(X) - 10.f - S.Gz(X, -40.f);
+			S.Shape(Blocks[k], FVector(X, -40.f, S.Gz(X, -40.f) - 60.f), FRotator(0.f, 20.f + 35.f * k, 0.f), FVector(360.f / 400.f, 330.f / 400.f, (Top + 60.f) / 400.f), false, false, FLinearColor::White, 0.55f);
+		}
+		for (int32 k = 0; k < 8; ++k)
+		{
+			const float Sd = k % 2 ? 1.f : -1.f;
+			const float X = -700.f + 230.f * (k / 2) + 60.f * S.J(FVector(k, 1, 0), 1);
+			const FVector Seed(k, 2, 0);
+			const float Y = -40.f + Sd * (300.f + 50.f * S.R(Seed, 2));
+			const float H = 140.f + 120.f * S.R(Seed, 3);
+			// Tipped in toward the hull, each its own size and turn.
+			S.Shape(Blocks[k % 3], FVector(X, Y, S.Gz(X, Y) - 70.f), FRotator(0.f, 15.f * S.J(Seed, 4), -Sd * (14.f + 10.f * S.R(Seed, 5))),
+				FVector((260.f + 120.f * S.R(Seed, 6)) / 400.f, (110.f + 50.f * S.R(Seed, 7)) / 400.f, (H + 70.f) / 400.f), false, false, FLinearColor::White, 0.6f);
 		}
 	}
 

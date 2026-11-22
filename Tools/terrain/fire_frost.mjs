@@ -192,6 +192,9 @@ const NUDGE = {
 	// The Glasswall at the foot of the ridge's inner face, the bowl below it (11-22: mapped onto the ridge's crest, its
 	// 46 m of glass had no face to stand against and sank into the slope behind).
 	glasswall: { to: [-4910, -426] },
+	// The Frozen Whaler 40 m out from the foot of the ice shelf's 55 m cliff, prow still toward the old sea (11-22: 20 m
+	// from it, in its shadow all day).
+	frozen_whaler: { to: [3577, -174] },
 	// The Pale Hunter keeps to the deep pines, off the road that now runs past Rimehold.
 	"Pale Hunter": { to: [4250, 1150] }, pale_pines: { to: [4220, 1125] },
 	fallen_smith: SMITH_CROSSING ? (() => { const L = Math.hypot(...SMITH_CROSSING.road), n = [-SMITH_CROSSING.road[1] / L, SMITH_CROSSING.road[0] / L]; return { to: [SMITH_CROSSING.at[0] + n[0] * 32, SMITH_CROSSING.at[1] + n[1] * 32] }; })() : null,

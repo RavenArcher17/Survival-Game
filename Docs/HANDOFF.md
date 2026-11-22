@@ -934,6 +934,15 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   `WR_OBJ=<folder> WR_OBJ_ONLY=1 WR_MESHES=skull` writes OBJs, then render them in Blender. In C++,
   `FWRIsleSite::ShapeKit` draws a mesh in M_BuildTinted (one instance with the kit's custom data: colour, pattern,
   grain axis) and `ShapeMat` in a named material.
+- **The light** (11-22, round 5) is all `AWRSky` + `tuning.json` `sky` (`_light` says what each key does): golden hour
+  tints the map's sun (`goldenSunColor` x `goldenSunTint` by `FWRSkyRules::LowSun`), night grades toward
+  `nightWhiteTemp` / `nightSaturation` and darkens the round island's moonlit sky (`nightSkyLuminance`, the sky
+  atmosphere's luminance factor, folded in with the weather's tint), exposure biases by daylight add to the map's own,
+  and by day local exposure (`dayHighlightContrast` / `dayShadowContrast`) keeps dark ground under a bright sky. Look
+  at it with the scratch spots at 12, 19.4 (the sun ~9 degrees up: 18.5 is still 21 degrees, not golden) and 23.
+  Hearthmoot's lights are `roundIsland.<kind>Light` / `<kind>LightRadius` (StepLights).
+- **Launches that must carry sideways** (a geyser onto a ledge): call `UWRCharacterMovementComponent::Carry(seconds)`
+  after `LaunchCharacter`; with no input the survivor's braking friction in the air kills any sideways launch in ~20 cm.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'
   rock in courses; wood is WoodMaterialPack2's scans set at run time (`FWRBuildLook::Material`; optional pack, the
   procedural planks without it); M_BuildTinted patterns 0 stone, 1 wood, 2 metal, 3 smooth, 4 plaster, 5 pantiles,

@@ -90,6 +90,14 @@ private:
 	TWeakObjectPtr<class USkyAtmosphereComponent> Atmosphere;
 	FLinearColor SkyFactorBase = FLinearColor::White;
 	FLinearColor FogAmbientBase = FLinearColor::White;
+	/** The map's sun colour (a low sun warms it: sky.goldenSunColor) and its exposure bias (sky.*ExposureBias add to it);
+	 *  the sky's brightness factor and the sun's colour as last set (set only when they move). */
+	FLinearColor SunColorBase = FLinearColor::White;
+	float ExposureBiasBase = 0.f;
+	FLinearColor SkyFactorSet = FLinearColor(-1.f, -1.f, -1.f, -1.f);
+	FLinearColor SunColorSet = FLinearColor(-1.f, -1.f, -1.f, -1.f);
+	/** How far into golden hour the sun is (0..1, FWRSkyRules::LowSun with sky.goldenHourBelow) as of the last Apply. */
+	float Golden = 0.f;
 	/** How far thick weather has closed the sky (0..1) as last set, and the round island's weather layer's ground (the
 	 *  second fog stands on the ground under the camera there, eased so a cliff doesn't jolt it). */
 	float WeatherSkySet = -1.f;

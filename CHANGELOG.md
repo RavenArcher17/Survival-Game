@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Round island: the look pass, fourth round: light (11-22)
+
+- **Golden hour reads golden:** the hour before dusk (the sun under 22 degrees, it was 18) warms the sunlight itself
+  toward a low sun's orange (the sky's own reddening is faint a few degrees up), the haze glows warmer toward it and the
+  grade warms a touch and takes a little more colour: walls and roofs catch gold, clouds light up, shadows run long. It
+  read as a pale, hazy afternoon (`sky.goldenSun*`, `goldenWhiteTemp`, `goldenSaturation`, `sunGlow` 1.1).
+- **Night reads as night:** the moonlit sky is held darker than the ground it lights (`sky.nightSkyLuminance`), so it's
+  navy with the stars out, not a pale blue evening; the grade cools a little and takes some colour out by moonlight (firelight
+  stays warm) and the exposure sits a third of a stop lower; the moon a little brighter, so the ground and lake still
+  read. Hearthmoot's street lanterns, braziers and hearth burn two to five times as strong and reach further (pools of warm
+  light on the street and the plaza; `roundIsland.lanternLight` etc.).
+- **Daylight keeps its detail:** by day local exposure eases the contrast of highlights and shadows, so the Volcanic's
+  black rock and a street in a wall's shade keep their surfaces under a bright sky (they sank to murk while the sky and
+  white plaster clipped); the black-ground exposure floor eased (`sky.dayHighlightContrast` / `dayShadowContrast`,
+  `volcanicDayMinEV100` 3.5).
+- **The Glasswall's geyser throws you onto the ledge again:** its sideways push was gone in 20 cm (the survivor's
+  braking friction in the air), so it dropped you back on the spout from 13 m, and a second ride killed the test
+  survivor. The launch now carries you (`UWRCharacterMovementComponent::Carry`: no air braking for
+  `hazards.ff.geyser.carrySeconds`): you meet the wall and land on the ledge by the Mirror Room's door (bot: 5.4 m
+  across, standing 9 m up).
+- **The Frozen Whaler is locked in the ice:** pitched 34 degrees with its middle 4 m up, it hung in the air over two
+  seracs; now its stern is sunk in the shelf to the gunwale, its bow heaved up on a pressure ridge, slabs of glacier ice
+  shoved up against its sides, the serac behind its stern. It stood 20 m from the foot of the ice shelf's 55 m cliff, in
+  its shadow all day: moved 40 m out into the sun (`fire_frost.mjs` hand move; no ground heights changed).
+- **Warden's Quarry's second golem** is a half-carved figure lying face up in its block, its legs still in the uncut
+  stone (`SM_GolemRough_A`), in the outcrop's dull rock, clear of the cut blocks (it was glass boxes on a block, two
+  blocks lying across it).
+- Still open: Hearthmoot's lit windows are glowing boxes; the lake shore and the sea's edge still follow the 4 m ground
+  cells; at night the lake doesn't mirror the moon.
+
 ### Round island: the look pass, third round (11-22)
 
 - **People** (skin drawing again, wool hose) and **level camps** (tents no longer float): see the second round's
@@ -40,8 +70,8 @@
   - **The seracs** (the ice shelves' and the glacier's pillars, the Weeping Seracs, the whaler's ice) are one leaning
     tower each, sheared faces and a slanted broken top, four of them (stacked cubes like chess pieces); the shelves'
     stand in broken clusters, a big one with lesser ones crowded round it (`fire_frost_dressing.mjs` group).
-- Still open: the cut blocks read as dark boxes from afar, the chimneys dark against the sky; the whaler's hull is in
-  its cliff's shadow most of the day.
+- Still open: the cut blocks read as dark boxes from afar, the chimneys dark against the sky (the fourth round's daylight
+  eases both); the whaler's hull was in its cliff's shadow most of the day (moved in the fourth round).
 
 ### Round island: the look pass, second round (11-22)
 

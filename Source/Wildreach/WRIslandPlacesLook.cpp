@@ -779,13 +779,14 @@ namespace WRIsleV
 			S.ShapeMat(i % 2 ? BlockB : BlockA, G - FVector(0, 0, 6.f), FRotator(0.f, 15.f * S.J(G, 1) + 90.f * (i % 2), 0.f), FVector(Sc), true, ObsidianPath);
 			if (i == 2) S.ShapeMat(BlockB, G + FVector(0, 0, 150.f * Sc - 10.f), FRotator(0.f, 70.f + 10.f * S.J(G, 3), 0.f), FVector(0.7f), false, ObsidianPath);   // one stacked on it
 		}
-		// The second golem, face up on the block it was being cut from.
-		const FVector Gl = S.G(-500.f, 300.f);
-		S.ShapeMat(BlockB, Gl + FVector(-120.f, 0, -10.f), FRotator::ZeroRotator, FVector(1.45f, 1.1f, 0.55f), true, ObsidianPath);
-		S.K.Add(P.Glass, FVector(220.f, 150.f, 90.f), Gl + FVector(0, 0, 105.f));                     // the torso, face up
-		S.K.Add(P.Glass, FVector(110.f, 100.f, 80.f), Gl + FVector(170.f, 0, 100.f));                 // head
-		for (const float Sd : { -1.f, 1.f }) S.K.Rod(P.Glass.Dim(1.1f), Gl + FVector(60.f, Sd * 90.f, 105.f), Gl + FVector(-60.f, Sd * 200.f, 85.f), 60.f);
-		for (int32 g = 0; g < 4; ++g) S.K.Add(P.GlassEdge, FVector(6.f, 140.f, 4.f), Gl + FVector(-60.f + 40.f * g, 0, 151.f));   // the chisel's lines on its chest
+		// The second golem, half carved: a figure lying face up out of the block it was being cut from, its legs still in
+		// the uncut stone (SM_GolemRough_A; it was glass boxes on a block).
+		// (On the lowest ground under its corners: on the slope its high end sinks in rather than its low end floating.)
+		// (Past the last block, clear of them: at (-500, 300) two lay across its head and feet.)
+		FVector Gl = S.G(-650.f, 1000.f);
+		for (const FVector2D C : { FVector2D(-245.f, -125.f), FVector2D(245.f, -125.f), FVector2D(-245.f, 125.f), FVector2D(245.f, 125.f) }) Gl.Z = FMath::Min(Gl.Z, S.Gz(-650.f + C.X, 1000.f + C.Y));
+		// In the outcrop's dull rock, a shade lighter (the worked faces): in the glossy glass it read as three black lumps.
+		S.Shape(TEXT("/Game/Art/Gen/SM_GolemRough_A.SM_GolemRough_A"), Gl - FVector(0, 0, 10.f), FRotator::ZeroRotator, FVector(1.f), true, true, FLinearColor(0.4f, 0.38f, 0.4f));
 		// The sledge on its rollers, a block lashed on.
 		const FVector Sl = S.G(-300.f, -900.f);
 		S.K.Add(P.Wood.Dim(0.7f), FVector(300.f, 140.f, 20.f), Sl + FVector(0, 0, 40.f));

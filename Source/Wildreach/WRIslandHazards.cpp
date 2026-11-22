@@ -6,6 +6,7 @@
 #include "WRIslandPlaces.h"
 #include "Wildreach.h"
 #include "WRCharacterBase.h"
+#include "WRCharacterMovementComponent.h"
 #include "WRCombatLibrary.h"
 #include "WRCombatTypes.h"
 #include "WRCreature.h"
@@ -216,6 +217,9 @@ void UWRIslandPlaces::StepServer(float Dt)
 					// Straight up, and a little toward where the spout leans (the Glasswall ledge's geyser).
 					const FVector Lean = H.Rot.Vector() * H.Half.X;
 					if (C->IsAlive()) C->LaunchCharacter(FVector(Lean.X, Lean.Y, HzT(TEXT("geyser.launch"), 1600.f)), true, true);
+					// The lean must carry you across: the survivor's braking friction in the air stopped it in 20 cm (you fell back on
+					// the spout, from 13 m); carried, you meet the wall and drop onto the ledge.
+					if (H.Half.X > 0.f) if (UWRCharacterMovementComponent* M = Cast<UWRCharacterMovementComponent>(C->GetCharacterMovement())) M->Carry(HzT(TEXT("geyser.carrySeconds"), 3.5f));
 				}
 				else
 				{

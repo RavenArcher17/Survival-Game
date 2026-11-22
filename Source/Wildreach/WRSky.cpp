@@ -31,6 +31,7 @@
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/SkyLight.h"
+#include "Engine/PostProcessVolume.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
@@ -198,6 +199,7 @@ AWRSky::AWRSky()
 	S.bOverride_ColorGain = true;
 	S.bOverride_ColorOffsetShadows = true;
 	S.bOverride_VignetteIntensity = true;
+	S.bOverride_AutoExposureBias = true;
 }
 
 void AWRSky::BeginPlay()
@@ -349,6 +351,16 @@ void AWRSky::FindMapLights()
 			Sun = C;
 			SunLux = C->Intensity;
 			SunScatterBase = C->VolumetricScatteringIntensity;
+			SunColorBase = FLinearColor(C->LightColor);
+		}
+	}
+	// The map's own exposure compensation (this driver's grade overrides it, so its day/night/golden biases add to it).
+	for (TActorIterator<APostProcessVolume> It(GetWorld()); It; ++It)
+	{
+		if (It->bUnbound && It->Settings.bOverride_AutoExposureBias)
+		{
+			ExposureBiasBase = It->Settings.AutoExposureBias;
+			break;
 		}
 	}
 	for (TActorIterator<ASkyLight> It(GetWorld()); It && !SkyLight.IsValid(); ++It)
@@ -453,9 +465,14 @@ void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
 		// keep both; an eye does): the sunlit patch kept clipping to a flat white shape.
 		FPostProcessSettings& Pp = Exposure->Settings;
 		const float SkyLx = SkylitCave * FMath::SmoothStep(0.05f, 0.3f, Daylight);
-		Pp.bOverride_LocalExposureHighlightContrastScale = Pp.bOverride_LocalExposureShadowContrastScale = SkyLx > 0.001f;
-		Pp.LocalExposureHighlightContrastScale = FMath::Lerp(1.f, T.Num(TEXT("sky.skylitHighlightContrast"), 0.25f), SkyLx);
-		Pp.LocalExposureShadowContrastScale = FMath::Lerp(1.f, T.Num(TEXT("sky.skylitShadowContrast"), 0.7f), SkyLx);
+		// By day in the open, too, a little: the bright sky sets the exposure, so dark ground under it (the Volcanic's black
+		// rock, a street in a wall's shade) sank to murk while the sky and white plaster clipped; the eye keeps both
+		// (sky.dayHighlightContrast / dayShadowContrast, 1 = off).
+		const float DayHi = FMath::Lerp(1.f, T.Num(TEXT("sky.dayHighlightContrast"), 1.f), FMath::Clamp(Daylight, 0.f, 1.f));
+		const float DaySh = FMath::Lerp(1.f, T.Num(TEXT("sky.dayShadowContrast"), 1.f), FMath::Clamp(Daylight, 0.f, 1.f));
+		Pp.bOverride_LocalExposureHighlightContrastScale = Pp.bOverride_LocalExposureShadowContrastScale = SkyLx > 0.001f || DayHi < 0.999f || DaySh < 0.999f;
+		Pp.LocalExposureHighlightContrastScale = FMath::Lerp(DayHi, T.Num(TEXT("sky.skylitHighlightContrast"), 0.25f), SkyLx);
+		Pp.LocalExposureShadowContrastScale = FMath::Lerp(DaySh, T.Num(TEXT("sky.skylitShadowContrast"), 0.7f), SkyLx);
 	}
 	const float NightEV = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), T.Num(TEXT("sky.tundraNightMinEV100"), 2.f), SnowGround);
 	const float Target = FMath::Lerp(NightEV, DayEV, Daylight);
@@ -504,6 +521,15 @@ void AWRSky::Apply(bool bForce)
 		// (Overcast over the Elder Canopy takes most of what's left under the leaves: ForestDark, cooks/biome-forest.md 2.9.)
 		S->SetIntensity(SunLux * SunUp * (1.f - WeatherSkyDim * WeatherAmount) * (1.f - ForestDark * T.Num(TEXT("sky.forestOvercastSunDim"), 0.6f)));
 		S->SetVisibility(SunUp > 0.f);
+		// Golden hour: the low sun's light warms further than the atmosphere alone turns it (the sky's reddening is weak
+		// over a few degrees), so the hour before dusk reads gold on walls and ground, not a pale afternoon.
+		Golden = FWRSkyRules::LowSun(SunElevation, T.Num(TEXT("sky.goldenHourBelow"), 18.f)) * (1.f - WeatherAmount);
+		const FLinearColor Want = FMath::Lerp(SunColorBase, WRSkyDetail::SRGB(TEXT("sky.goldenSunColor"), FColor(255, 186, 120)), Golden * T.Num(TEXT("sky.goldenSunTint"), 0.f));
+		if (!Want.Equals(SunColorSet, 0.003f))
+		{
+			SunColorSet = Want;
+			S->SetLightColor(Want);
+		}
 	}
 	// The Graveyard has no moon (cooks/biome-graveyard.md 2.7: moonless nights, only the lanterns), unless the Blood Moon
 	// is up: then it comes back red and brighter than any island night.
@@ -739,14 +765,23 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			{
 				WeatherSkySet = Thick;
 				F->SetSkyAtmosphereAmbientContributionColorScale(FMath::Lerp(FogAmbientBase, FLinearColor::Black, Thick));
-				if (USkyAtmosphereComponent* Air = Atmosphere.Get())
+			}
+			if (USkyAtmosphereComponent* Air = Atmosphere.Get())
+			{
+				// The sky's horizon is a light blue: the factor that turns it into the weather's colour (its hue, at
+				// sky.weatherSkyLevel of the sky's brightness) darkens and greys the rest of it alike.
+				const FVector H = Vec(TEXT("sky.weatherSkyHorizon"), FVector(0.62f, 0.76f, 1.f));
+				const FLinearColor C = WeatherFogColor / FMath::Max(0.01f, WeatherFogColor.GetMax());
+				const FLinearColor Tint = FLinearColor(C.R / FMath::Max(0.05f, float(H.X)), C.G / FMath::Max(0.05f, float(H.Y)), C.B / FMath::Max(0.05f, float(H.Z)));
+				FLinearColor Want = FMath::Lerp(SkyFactorBase, Tint / FMath::Max(0.01f, Tint.GetMax()) * T.Num(TEXT("sky.weatherSkyLevel"), 0.45f), Thick);
+				// The moonlit sky: the moon lights the air as the sun does, so with the eye opened up for the night it read
+				// as a pale blue evening; held darker than the ground it lights (sky.nightSkyLuminance), it's a night sky
+				// the stars show in. (The round island's; the Old Island's nights are as they shipped.)
+				if (bRoundIsland) Want *= FMath::Lerp(T.Num(TEXT("sky.nightSkyLuminance"), 1.f), 1.f, Daylight);
+				if (!Want.Equals(SkyFactorSet, 0.002f))
 				{
-					// The sky's horizon is a light blue: the factor that turns it into the weather's colour (its hue, at
-					// sky.weatherSkyLevel of the sky's brightness) darkens and greys the rest of it alike.
-					const FVector H = Vec(TEXT("sky.weatherSkyHorizon"), FVector(0.62f, 0.76f, 1.f));
-					const FLinearColor C = WeatherFogColor / FMath::Max(0.01f, WeatherFogColor.GetMax());
-					const FLinearColor Want = FLinearColor(C.R / FMath::Max(0.05f, float(H.X)), C.G / FMath::Max(0.05f, float(H.Y)), C.B / FMath::Max(0.05f, float(H.Z)));
-					Air->SetSkyLuminanceFactor(FMath::Lerp(SkyFactorBase, Want / FMath::Max(0.01f, Want.GetMax()) * T.Num(TEXT("sky.weatherSkyLevel"), 0.45f), Thick));
+					SkyFactorSet = Want;
+					Air->SetSkyLuminanceFactor(Want);
 				}
 			}
 		}
@@ -987,7 +1022,20 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		const FVector FGain = FMath::Lerp(SwampGain, Vec(TEXT("sky.forestGain"), FVector(0.98f, 1.02f, 0.94f)), FA);
 		P.ColorGain = FVector4(FGain.X, FGain.Y, FGain.Z, 1.f);
 	}
-	const FVector Lift = Vec(TEXT("sky.shadowLift"), FVector(0.004f, 0.005f, 0.008f)) * FMath::Lerp(T.Num(TEXT("sky.nightShadowLift"), 2.f), 1.f, Daylight);
+	{
+		// Golden hour warms the grade and lifts its colour (the eye keeps the day's white balance as the light turns gold);
+		// night cools it and drains colour (moonlight: the eye sees in blue-grey), so a red roof by the moon isn't a red
+		// roof by day; and the exposure leans by daylight (sky.dayExposureBias, nightExposureBias, goldenExposureBias, in
+		// stops, on the map's own).
+		const float Dark = 1.f - FMath::Clamp(Daylight, 0.f, 1.f);
+		P.WhiteTemp += Golden * T.Num(TEXT("sky.goldenWhiteTemp"), 0.f);
+		P.WhiteTemp = FMath::Lerp(P.WhiteTemp, T.Num(TEXT("sky.nightWhiteTemp"), P.WhiteTemp), Dark);
+		const float GSat = P.ColorSaturation.X * (1.f + Golden * T.Num(TEXT("sky.goldenSaturation"), 0.f)) * FMath::Lerp(1.f, T.Num(TEXT("sky.nightSaturation"), 1.f), Dark);
+		P.ColorSaturation = FVector4(GSat, GSat, GSat, 1.f);
+		P.AutoExposureBias = ExposureBiasBase + FMath::Lerp(T.Num(TEXT("sky.nightExposureBias"), 0.f), T.Num(TEXT("sky.dayExposureBias"), 0.f), FMath::Clamp(Daylight, 0.f, 1.f))
+			+ Golden * T.Num(TEXT("sky.goldenExposureBias"), 0.f);
+	}
+	const FVector Lift =Vec(TEXT("sky.shadowLift"), FVector(0.004f, 0.005f, 0.008f)) * FMath::Lerp(T.Num(TEXT("sky.nightShadowLift"), 2.f), 1.f, Daylight);
 	P.ColorOffsetShadows = FVector4(Lift.X, Lift.Y, Lift.Z, 0.f);
 	P.VignetteIntensity = T.Num(TEXT("sky.vignette"), 0.3f);
 	{
