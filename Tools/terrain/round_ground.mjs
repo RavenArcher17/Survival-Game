@@ -610,7 +610,11 @@ const crossLevels = trunks.map((t, n) => {
 	}
 	return pad(t.crossroads, 25, 25, level);
 });
-for (const l of lands) for (const c of l.camps) pad(c, 30, 25, Math.max(2.2, sampleH(...c)));
+// (each camp's level kept: a land's road starts at its middle camp, and the road's pass would otherwise lay its own
+// smoothed grade through the camp, a 2 m bank across it with the tents and logs standing off it, 11-22)
+const campLevels = [];
+for (const l of lands) for (const c of l.camps) campLevels.push({ at: c, level: pad(c, 30, 25, Math.max(2.2, sampleH(...c))) });
+const campLevelAt = ([x, y]) => { const c = campLevels.find((q) => Math.hypot(q.at[0] - x, q.at[1] - y) < 6); return c ? c.level : null; };
 for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy blend: no cut face round the village
 // The Fire and Frost places that sit on open ground get a little level floor (their builders lay flat crusts, rings and
 // camps); the ones made to sit in a landform keep it (the plume in the crater, the seracs and the whaler in the ice, the
@@ -782,11 +786,14 @@ for (const rd of roads) {
 	const pinEnd = (level, over) => { const d = level - sm[last]; for (let q = 0; q <= last; q++) sm[q] += d * ease(at[last] - over, at[last], q); };
 	const pinStart = (level, over) => { const d = level - sm[0]; for (let q = 0; q <= last; q++) sm[q] += d * (1 - ease(0, over, q)); };
 	if (rd.main) { pinStart(crossLevels[rd.trunk], 250); pinEnd(CITY_TOP, 250); } else pinEnd(crossLevels[rd.trunk], 300);
+	// A land's road leaves its middle camp at the camp's own level (held flat over the camp, then eased up).
+	const campLevel = rd.main ? null : campLevelAt(rd.pts[0]);
+	if (campLevel !== null) { pinStart(campLevel, 160); for (let q = 0; q <= last && at[q] < 34; q++) sm[q] = campLevel; }
 	const ends = [sm[0], sm[last]];
 	for (let q = 1; q < sm.length; q++) sm[q] = Math.min(sm[q], sm[q - 1] + ROAD_GRADE * (at[q] - at[q - 1]));
 	for (let q = sm.length - 2; q >= 0; q--) sm[q] = Math.min(sm[q], sm[q + 1] + ROAD_GRADE * (at[q + 1] - at[q]));
 	for (let q = 0; q < sm.length; q++) sm[q] = Math.max(sm[q], 1.2);
-	if (rd.main) sm[0] = ends[0];
+	if (rd.main || campLevel !== null) sm[0] = ends[0];
 	sm[last] = ends[1];
 	roadInfo.push({ ...rd, dense, grade: sm, at, length: at[at.length - 1], climb: sm.reduce((m, v, q) => q ? Math.max(m, Math.abs(v - sm[q - 1]) / Math.max(1e-6, at[q] - at[q - 1])) : 0, 0) });
 }

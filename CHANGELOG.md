@@ -20,7 +20,9 @@ The first round's pictures, graded against the caves again, and what they still 
   The market's loaves are domed and its fruit round (they were cylinders on their sides).
 - **The wake-up camps' tents** are real ridge tents (a generated mesh: sagging canvas, the hem pegged into the ground,
   a doorway open toward the fire, dark inside); they were a cube turned on its edge. The starter stations stand round
-  a work yard (they were a row across the plain).
+  a work yard (they were a row across the plain). The middle camps (the ones with stations) lie level: the land's road laid its own
+  grade through them, a 2 m bank across the camp, and the tents and the log seat hung in the air off it (Raven's picture);
+  the road now leaves the camp at its level, and each tent, log and crate sits on the lowest ground under it.
 - **People:** every face's far skin material had no specular map (all twelve); set. Some townsfolk's faces still draw
   shiny black, and the town clothes leave legs and feet bare: next round.
 - **The Volcanic:** the ground was darker than charcoal and read as black; it is now real basalt and ash, the lava

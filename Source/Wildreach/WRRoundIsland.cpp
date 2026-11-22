@@ -816,6 +816,18 @@ void AWRRoundIsland::BuildCamps()
 			const FRotator R0(0.f, Yaw, 0.f);
 			FRandomStream Rng(GetTypeHash(FIntPoint(int32(M.X), int32(M.Y))));
 			const auto At = [&](float X, float Y) { const FVector2D P = M + FVector2D(R0.RotateVector(FVector(X, Y, 0.f))); return D->ToWorld(P, D->Height(P)); };
+			// The lowest ground under a footprint (centre C, turned R, half sizes in cm): a long thing set on the ground at its
+			// middle stood off it at its low end on any slope (11-22: the tents' hems and the log seat hung in the air).
+			const auto Lowest = [&](const FVector& C, const FRotator& R, float HalfX, float HalfY)
+			{
+				float Z = C.Z;
+				for (const float SX : { -1.f, 0.f, 1.f }) for (const float SY : { -1.f, 0.f, 1.f })
+				{
+					const FVector2D P = D->ToMap(C + R.RotateVector(FVector(SX * HalfX, SY * HalfY, 0.f)));
+					Z = FMath::Min(Z, D->ToWorld(P, D->Height(P)).Z);
+				}
+				return FVector(C.X, C.Y, Z);
+			};
 			const auto Add = [&](EWRLookMat Mat, EWRLookMesh Mesh, const FVector& Size, const FVector& Centre, const FRotator& Rot, const FLinearColor& Col, float Pattern, float Rough = 0.9f, float Metal = 0.f, float Glow = 0.f)
 			{
 				FWRLookBlock B;
@@ -887,9 +899,9 @@ void AWRRoundIsland::BuildCamps()
 			{
 				const float SideSign = (t % 2) ? 1.f : -1.f, A = SideSign * Rng.FRandRange(75.f, 120.f) + (t >= 2 ? 180.f : 0.f);
 				const FVector2D Off = FVector2D(FRotator(0.f, A, 0.f).Vector()) * Rng.FRandRange(560.f, 680.f);
-				const FVector P = At(6.f + Off.X / 100.f, Off.Y / 100.f);
 				// the ridge points at the fire: the door's gable faces it
 				const float TYaw = Yaw + A + 180.f, Len = Rng.FRandRange(240.f, 300.f), Side = Rng.FRandRange(190.f, 220.f);
+				const FVector P = Lowest(At(6.f + Off.X / 100.f, Off.Y / 100.f), FRotator(0.f, TYaw, 0.f), Len * 0.5f, Side * 0.5f);
 				const FLinearColor C = Canvas * Rng.FRandRange(0.85f, 1.2f);
 				// the canvas: the mesh at 100 = 280 cm long, 150 cm to the ridge (sunk 4 cm so the hem sits in the ground)
 				const float Scale = Side / 205.f;
@@ -900,7 +912,7 @@ void AWRRoundIsland::BuildCamps()
 				// guy ropes, ridge end to a peg out along the ridge line
 				for (const float E : { -1.f, 1.f })
 				{
-					const FVector RopeTop = P + TR.RotateVector(FVector(E * (Len * 0.5f + 4.f), 0.f, Ridge + 18.f)), Peg = P + TR.RotateVector(FVector(E * (Len * 0.5f + 120.f), 0.f, 0.f));
+					const FVector RopeTop = P + TR.RotateVector(FVector(E * (Len * 0.5f + 4.f), 0.f, Ridge + 18.f)), Peg = Lowest(P + TR.RotateVector(FVector(E * (Len * 0.5f + 120.f), 0.f, 0.f)), TR, 0.f, 0.f);
 					const FVector RopeMid = (RopeTop + Peg) * 0.5f, Dir = (RopeTop - Peg).GetSafeNormal();
 					Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(1.2f, 1.2f, FVector::Dist(RopeTop, Peg)), RopeMid, FRotationMatrix::MakeFromZ(Dir).Rotator(), FLinearColor(0.2f, 0.17f, 0.12f), 9.f);
 					Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(4.f, 4.f, 22.f), Peg + FVector(0.f, 0.f, 4.f), FRotator(15.f * E, TYaw, 0.f), Wood, 1.f);
@@ -911,12 +923,12 @@ void AWRRoundIsland::BuildCamps()
 			for (int32 b = 0; b < 2; ++b)
 			{
 				const float A = (b ? 150.f : 210.f) + Rng.FRandRange(-10.f, 10.f);
-				const FVector P = Fire + FRotator(0.f, Yaw + A, 0.f).Vector() * 190.f + FVector(0.f, 0.f, 8.f);
+				const FVector P = Lowest(Fire + FRotator(0.f, Yaw + A, 0.f).Vector() * 190.f, FRotator(0.f, Yaw + A + 90.f, 0.f), 88.f, 17.f) + FVector(0.f, 0.f, 8.f);
 				const FLinearColor Wool = (b ? FLinearColor(0.16f, 0.1f, 0.06f) : FLinearColor(0.08f, 0.1f, 0.07f)) * Rng.FRandRange(0.9f, 1.1f);
 				Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(30.f, 34.f, 175.f), P, FRotator(90.f, Yaw + A + 90.f, 0.f), Wool, 9.f, 0.98f);
 			}
-			Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(36.f, 36.f, 220.f), Fire + FRotator(0.f, Yaw - 90.f, 0.f).Vector() * 170.f + FVector(0.f, 0.f, 16.f), FRotator(90.f, Yaw, 0.f), Wood * 0.8f, 1.f);
-			const FVector Store = At(9.5f, -6.f);
+			Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(36.f, 36.f, 220.f), Lowest(Fire + FRotator(0.f, Yaw - 90.f, 0.f).Vector() * 170.f, R0, 110.f, 18.f) + FVector(0.f, 0.f, 15.f), FRotator(90.f, Yaw, 0.f), Wood * 0.8f, 1.f);
+			const FVector Store = Lowest(At(9.5f, -6.f), R0, 110.f, 70.f);
 			for (int32 c = 0; c < 2; ++c) Add(EWRLookMat::Tinted, EWRLookMesh::Cube, FVector(62.f), Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(c * 70.f, 0.f, 31.f + (c ? 0.f : 0.f))), FRotator(0.f, Yaw + Rng.FRandRange(-12.f, 12.f), 0.f), FLinearColor(0.16f, 0.11f, 0.07f), 1.f);
 			Add(EWRLookMat::Tinted, EWRLookMesh::Cube, FVector(56.f), Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(30.f, 0.f, 62.f + 28.f)), FRotator(0.f, Yaw + 20.f, 0.f), FLinearColor(0.14f, 0.1f, 0.06f), 1.f);
 			const FVector Barrel = Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(-70.f, 40.f, 45.f));
