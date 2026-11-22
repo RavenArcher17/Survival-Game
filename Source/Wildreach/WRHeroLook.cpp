@@ -518,17 +518,29 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 		Outfit[i]->EmptyOverrideMaterials();
 		Outfit[i]->SetSkeletalMesh(Piece);
 		// A look that is another look's meshes in other materials (Cinderhide, Snowhide: hero.md 2.5) swaps by slot name.
+		// A key "Piece/Slot" (e.g. "Legs/Ward_Bodice") swaps that slot on that piece only, over a plain "Slot" key: the
+		// town clothes' hose share the bodice's slot with the tunic, and in the tunic's linen they read as bare legs.
 		if (Piece)
 		{
 			if (const TSharedPtr<FJsonObject> Swaps = Obj(Look, TEXT("materials")))
 			{
-				for (const auto& Swap : Swaps->Values)
+				for (const bool bPieceKeys : { false, true })
 				{
-					const int32 Index = Outfit[i]->GetMaterialIndex(FName(*Swap.Key));
-					UMaterialInterface* Mat = Index == INDEX_NONE ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Swap.Value->AsString());
-					if (Mat)
+					for (const auto& Swap : Swaps->Values)
 					{
-						Outfit[i]->SetMaterial(Index, Mat);
+						const FString Key(*Swap.Key);
+						FString PieceName, SlotKey = Key;
+						const bool bQualified = Key.Split(TEXT("/"), &PieceName, &SlotKey);
+						if (bQualified != bPieceKeys || (bQualified && PieceName != SlotNames[i]))
+						{
+							continue;
+						}
+						const int32 Index = Outfit[i]->GetMaterialIndex(FName(*SlotKey));
+						UMaterialInterface* Mat = Index == INDEX_NONE ? nullptr : LoadObject<UMaterialInterface>(nullptr, *Swap.Value->AsString());
+						if (Mat)
+						{
+							Outfit[i]->SetMaterial(Index, Mat);
+						}
 					}
 				}
 			}

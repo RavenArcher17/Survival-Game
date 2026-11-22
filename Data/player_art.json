@@ -2400,7 +2400,8 @@
         "Ward_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen_Dark.MI_Linen_Dark",
         "Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
         "Ward_Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
-        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather"
+        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Legs/Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wool_Dark.MI_Wool_Dark"
       }
     },
     "townwear_b": {
@@ -2455,7 +2456,8 @@
         "Ward_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Hide_Dark.MI_Hide_Dark",
         "Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
         "Ward_Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
-        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather"
+        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Legs/Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wool_Brown.MI_Wool_Brown"
       }
     },
     "townwear_c": {
@@ -2510,7 +2512,8 @@
         "Ward_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
         "Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen_Dark.MI_Linen_Dark",
         "Ward_Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Rawhide.MI_Rawhide",
-        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Rawhide.MI_Rawhide"
+        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Rawhide.MI_Rawhide",
+        "Legs/Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wool_Dark.MI_Wool_Dark"
       }
     },
     "towngown": {
