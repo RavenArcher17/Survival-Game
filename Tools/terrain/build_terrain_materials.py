@@ -467,8 +467,12 @@ if want("caverock"):
     lines = mul(mul(lines, sat(mul(op(unreal.MaterialExpressionSubtract, None, nz, const_a=0.5), k=4.0))),
                 mul(sat(mul(op(unreal.MaterialExpressionSubtract, h, const_b=0.3), k=3.0)), sat(mul(op(unreal.MaterialExpressionSubtract, None, h, const_a=3.0), k=2.0))))
     base = mul(mul(mask(vc, "r", "g", "b"), mul(lum, k=1.6)), add(mul(lines, k=0.3), expr(unreal.MaterialExpressionConstant, r=1.0)))
-    # Glazed rock is satin, not a mirror: the near lights silvered whole walls at the mesh's own roughness.
-    rough = lerp(expr(unreal.MaterialExpressionConstant, r=0.55), expr(unreal.MaterialExpressionConstant, r=1.0), vc_alpha(vc))
+    # Glazed rock is satin, not a mirror: the near lights silvered whole walls at the mesh's own roughness. Standing water
+    # (UV1.y = wet, a puddle in the floor's low spots) is dark and glossy.
+    wet = mask(uv1, "g")
+    base = mul(base, op(unreal.MaterialExpressionSubtract, None, mul(wet, k=0.7), const_a=1.0))
+    rough = lerp(lerp(expr(unreal.MaterialExpressionConstant, r=0.55), expr(unreal.MaterialExpressionConstant, r=1.0), vc_alpha(vc)),
+                 expr(unreal.MaterialExpressionConstant, r=0.04), wet)
     normal = normalized(add(add(n, tri_bump("Ground/TEX_MWAM_Rock_nrm", big, w, 1.0)), tri_bump("Ground/TEX_MWAM_Rock_nrm", small, w, 0.55)))
     finish(base, normal, rough, specular=expr(unreal.MaterialExpressionConstant, r=0.35))
 

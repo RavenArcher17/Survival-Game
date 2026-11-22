@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Round island: skylights, puddles and nests (11-21)
+
+Raven: "Fix them" (the sunlit patch under a skylight that looked like a paper cut-out, and a puddle like a metal plate).
+- **Under a skylight lies the roof that fell:** a debris cone of rubble and gravel, mossy where the light reaches.
+  - By day the chamber is lit a little by the sun bouncing off it.
+  - Your eyes don't open all the way while the sunbeam is in view, so the sunlit floor keeps its stones and texture.
+    It used to blow out to a flat white shape in a black chamber.
+- **Puddles are wet floor:** seep water stands in the floor's low spots, so its edge is as ragged as the floor, and
+  the rock round it is damp. Puddles stay in the dark parts of the lava tubes. They used to be glassy discs that read
+  as metal plates.
+- **Nests are nests:** a bowl of crossed sticks on a bed of dry grass, with eggs in it while there are eggs to take.
+  Every creature nest in the world used to be an untextured flattened sphere.
+
 ### Round island: caves that look real (11-21)
 
 Raven: "Go ahead and do the caves until they look perfect" (after I said they played like caves but didn't look like

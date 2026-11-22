@@ -197,6 +197,15 @@ alive-and-explorable pass, as slice 1.
   - Formations are grown in code (LcLathe: profile, two-wave section, bend) into one mesh in the cave materials.
     Pillars stop you by capsules. Rocks and pebbles (instanced, no collision) and puddles snap to the real floor.
   - The weather's fog layer fades out underground (WRSky).
+  - Skylights:
+    - A shaft's `talus` [floor, height, radius] is a debris cone of rock added into the air (cave_shape.mjs
+      `talusCut`, the same in FWRLandCave::Air), with rubble and gravel on it and moss in its vertex colours.
+    - A light flagged as day (9th value 1) is the sun bounced about the chamber: WRLandCaves scales it by the
+      daylight.
+    - WRSky raises the exposure floor near a skylight (`WRLand::SkylightNear`, sky.skylitCaveMinEV100), so the
+      sunlit floor isn't blown out.
+  - Puddles are the floor itself: inside a puddle feat's footprint, below its waterline, the basalt is wet (UV1.y,
+    dark and glossy).
   - Checking: probe the air with the game's noise (LcAir's hash noise ported to JS) along every passage before
     building. Then walk a bot through with `WRWalkTo x y 120` + `waitwalk`. A 4 m arrival radius cuts the corners
     of narrow passages and gets the bot "stuck" on walls a player would never touch.

@@ -235,11 +235,12 @@ void AWRLandCaves::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!bQueued) return;
-	// The ice's thin places glow with the day (light through the glacier).
-	if (IceLook)
+	// The ice's thin places glow with the day (light through the glacier); the skylights throw the day's light about.
 	{
 		const AWRGameState* GS = GetWorld()->GetGameState<AWRGameState>();
-		IceLook->SetScalarParameterValue(TEXT("Glow"), (GS ? GS->GetDaylight() : 1.f) * WRTune(TEXT("landCaves.iceGlow"), 0.35f));
+		const float Day = GS ? GS->GetDaylight() : 1.f;
+		if (IceLook) IceLook->SetScalarParameterValue(TEXT("Glow"), Day * WRTune(TEXT("landCaves.iceGlow"), 0.35f));
+		for (int32 i = 0; i < DayLights.Num(); ++i) if (DayLights[i]) DayLights[i]->SetIntensity(DayLightFull[i] * Day * WRTune(TEXT("landCaves.skyBounce"), 1.f));
 	}
 	if (bBuiltLogged) return;
 	const double Budget = WRTune(TEXT("landCaves.msPerFrame"), 4.f) / 1000.0;
@@ -388,7 +389,20 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 			// The cave's own rock. Only smooth values per vertex (the ice's strata and the basalt's grain are drawn per pixel:
 			// a pattern that wraps, worked out per vertex, broke into sharp triangles).
 			float FloorCm = 0.f;
-			LcAir(L, Caves, P, nullptr, &FloorCm);
+			int32 InCave = INDEX_NONE;
+			LcAir(L, Caves, P, &InCave, &FloorCm);
+			// Moss where a skylight's light falls on the floor and its debris cone (the floor round the hole, facing up).
+			float Moss = 0.f;
+			if (InCave != INDEX_NONE)
+			{
+				const FVector2D Mv = L->ToMap(P);
+				for (const FWRLandCaveShape& Sh : L->Caves[InCave].Shapes)
+				{
+					if (Sh.Kind != 2 || Sh.Talus.Y <= 0.f) continue;
+					const float Dm = float(FVector2D::Distance(Mv, FVector2D(Sh.C)));
+					Moss = FMath::Max(Moss, (1.f - LcSm(float(Sh.R.X) + 0.3f, float(Sh.Talus.Z) + 0.8f, Dm)) * LcSm(0.35f, 0.75f, Nrm.Z) * (0.6f + 0.4f * LcSm(-0.4f, 0.4f, LcN3(P / 90.f))));
+				}
+			}
 			const float Above = (float(P.Z) - FloorCm) / 100.f;
 			// 1 at the ground's surface, 0 by 2.5 m under it, and 0 again by 1.5 m over it (a crag's face is rock, not ground).
 			const float Lip = GroundTerm >= 0.f ? LcSm(-250.f, -60.f, -GroundTerm) : 1.f - LcSm(40.f, 150.f, -GroundTerm);
@@ -416,9 +430,29 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 				const float OnFloor = LcSm(0.55f, 0.85f, Nrm.Z), Glaze = LcSm(0.9f, 2.2f, Above) * (1.f - OnFloor);
 				B = FMath::Lerp(B, LcLin(34, 34, 38), 0.7f * Glaze);
 				B = FMath::Lerp(B, LcLin(72, 66, 60), 0.6f * OnFloor);
+				B = FMath::Lerp(B, FMath::Lerp(LcLin(38, 52, 22), LcLin(58, 66, 30), LcSm(-0.3f, 0.5f, LcN3(P / 45.f))), 0.85f * Moss);
+				// Seep water: a puddle feature wets the floor in its footprint, the water standing only in the floor's low
+				// spots (so its edge is as ragged as the floor), the rock round it damp and darker. UV1.y = wet (M_CaveRock:
+				// dark and glossy).
+				float Wet = 0.f, Damp = 0.f;
+				if (InCave != INDEX_NONE && OnFloor > 0.3f)
+				{
+					const FVector2D Mv = L->ToMap(P);
+					for (const FWRLandCaveFeat& Pf : L->Caves[InCave].Feats)
+					{
+						if (Pf.Kind != TEXT("puddle")) continue;
+						const float Ya = FMath::DegreesToRadians(Pf.Yaw), Dx = float(Mv.X - Pf.At.X), Dy = float(Mv.Y - Pf.At.Y);
+						const float E = FMath::Sqrt(FMath::Square((Dx * FMath::Cos(Ya) + Dy * FMath::Sin(Ya)) / FMath::Max(0.2f, Pf.A))
+							+ FMath::Square((-Dx * FMath::Sin(Ya) + Dy * FMath::Cos(Ya)) / FMath::Max(0.2f, Pf.B))) + 0.25f * LcN3(P / 70.f);
+						const float Level = float(Pf.At.Z) * 100.f + L->Origin.Z + 2.f;
+						Wet = FMath::Max(Wet, (1.f - LcSm(0.75f, 1.15f, E)) * LcSm(4.f, -3.f, float(P.Z) - Level));
+						Damp = FMath::Max(Damp, 1.f - LcSm(0.9f, 1.7f, E));
+					}
+				}
+				B *= 1.f - 0.45f * Damp;
 				Rc = FMath::Lerp(B, C, Lip);
-				RRough = FMath::Lerp(FMath::Lerp(FMath::Lerp(0.78f, 0.36f, Glaze), 0.92f, OnFloor), 1.f - C.A, Lip);
-				U1 = FVector2D(Above, 0.f);
+				RRough = FMath::Lerp(FMath::Lerp(FMath::Lerp(FMath::Lerp(0.78f, 0.36f, Glaze), 0.92f, OnFloor), 0.97f, Moss), 1.f - C.A, Lip);
+				U1 = FVector2D(Above, Wet * (1.f - Lip));
 			}
 			Out.RockColours.Add(FWRToolMesh::Pack(Rc, RRough));
 			Out.RockUV1.Add(U1);
@@ -709,7 +743,7 @@ void AWRLandCaves::BuildFormations()
 							const float D = T * Len;
 							if (D < Root) return R0 * 1.1f;                                 // in the rock
 							const float U = (D - Root) / FMath::Max(1.f, Len - Root);      // 0 at the ceiling .. 1 the tip
-							const float Taper = FMath::Pow(1.f - U, bIce ? 0.8f : 0.65f);
+							const float Taper = FMath::Pow(FMath::Max(0.f, 1.f - U), bIce ? 0.8f : 0.65f);
 							const float Rings2 = 1.f + (bIce ? 0.06f : 0.14f) * FMath::Sin(U * (bIce ? 22.f : 13.f));
 							return FMath::Max(U > 0.97f ? 0.f : 1.5f, R0 * (0.12f + 0.88f * Taper) * Rings2);
 						}, 10, bIce ? 9 : 7, S0 + n * 31, Len * 0.06f, bIce ? 0.06f : 0.2f, Col, U1, U2);
@@ -754,11 +788,7 @@ void AWRLandCaves::BuildFormations()
 			{
 				if (bDraw) Pebble(Seed, bIce ? 1 : 0, FVector(A, A * 0.85f, B), At, F.Yaw, RockMat);
 			}
-			else if (Kd == TEXT("puddle") && bDraw)
-			{
-				// Seep water pooled in a hollow of the floor: black, mirror-still.
-				K.Add(FSurf::Glass(FLinearColor(0.01f, 0.012f, 0.014f), 0.02f), FVector(A * 2.f, B * 2.f, 2.f), At + FVector(0.f, 0.f, 1.f), FRotator(0.f, F.Yaw, 0.f), EWRLookMesh::Cylinder);
-			}
+			// (A puddle is the floor itself, wet: the cave's rock, ComputeCube. Discs laid on it read as metal plates.)
 			else if (Kd == TEXT("bench"))
 			{
 				// A lava bench: the old flow's shelf along the wall, long and flat-topped.
@@ -829,6 +859,7 @@ void AWRLandCaves::BuildFormations()
 				P->SetAttenuationRadius(Lt.Radius * 100.f);
 				P->SetCastShadows(false);
 				P->RegisterComponent();
+				if (Lt.bDay) { DayLights.Add(P); DayLightFull.Add(Lt.Intensity); }
 			}
 		}
 	}

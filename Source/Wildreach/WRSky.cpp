@@ -343,8 +343,16 @@ void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
 		SnowGround = FMath::FInterpTo(SnowGround, B == Tundra ? Low : 0.f, DeltaSeconds, 0.6f);
 	}
 	const float OpenDayEV = FMath::Lerp(T.Num(TEXT("sky.dayMinEV100"), -2.f), T.Num(TEXT("sky.volcanicDayMinEV100"), -2.f), LavaGround);
-	const float DayEV = FMath::Lerp(bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : OpenDayEV,
+	float DayEV = FMath::Lerp(bSheltered ? T.Num(TEXT("sky.shelteredMinEV100"), -5.5f) : OpenDayEV,
 		T.Num(TEXT("sky.forestOvercastMinEV100"), 0.5f), ForestDark);
+	// In a cave by a skylight the sunbeam on the floor holds the eye back: it doesn't open up as far as in the dark, so
+	// the sunlit floor keeps its stones and moss (opened all the way, it blew out to a flat white shape).
+	{
+		FVector View;
+		const float Sky = GetViewLocation(View) ? WRLand::SkylightNear(View) : 0.f;
+		SkylitCave = FMath::FInterpTo(SkylitCave, Sky, DeltaSeconds, 1.f);
+		DayEV = FMath::Lerp(DayEV, FMath::Max(DayEV, T.Num(TEXT("sky.skylitCaveMinEV100"), 1.f)), SkylitCave);
+	}
 	const float NightEV = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), T.Num(TEXT("sky.tundraNightMinEV100"), 2.f), SnowGround);
 	const float Target = FMath::Lerp(NightEV, DayEV, Daylight);
 	// Eased, so stepping under a branch or through a doorway doesn't pump the exposure.

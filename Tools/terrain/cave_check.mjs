@@ -4,7 +4,7 @@
 // edge eats a little), roofs under 2.1 m, and ways under 1.1 m wide at the knee. The ledge's own drop is one-way by
 // design (the ramp is the way back up), so its last 4 m are left out.
 // round_ground.mjs logs it for every cave; on its own: node Tools/terrain/cave_check.mjs [caveId ...]
-import { shapeAir, CAVE } from "./cave_shape.mjs";
+import { shapeAir, talusCut, CAVE } from "./cave_shape.mjs";
 
 const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k / 4; };
 const sm = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
@@ -24,6 +24,7 @@ export function gameAir(c, x, y, z) {
 		if (d < best) { best = d; floor = f; width = w; }
 		v = v === Infinity ? d : smin(v, d, CAVE.join);
 	}
+	v = talusCut(c, x, y, z, v);
 	const wall = Math.min(0.7, Math.max(0.18, 0.22 * width)), amp = 0.12 + (wall - 0.12) * sm(0.4, 1.6, z - floor);
 	return v + amp * (n3(x / 2.2, y / 2.2, z / 2.2) + 0.35 * n3(x / 0.7 + 5, y / 0.7 + 1, z / 0.7 + 3));
 }

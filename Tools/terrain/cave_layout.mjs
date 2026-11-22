@@ -199,7 +199,8 @@ export function addSkylight(c, H, seed, chance) {
 		const r = 2.2 + 0.8 * R();
 		let lo = Infinity;
 		for (let k = 0; k < 8; k++) lo = Math.min(lo, H(x + Math.cos(k * Math.PI / 4) * (r + 2), y + Math.sin(k * Math.PI / 4) * (r + 2)));
-		const s = { k: "shaft", role: "skylight", under: B.role, c: [x, y], r, z: [top - 1.5, Math.max(g, lo) + 3] };
+		// (with the fallen roof heaped under it: a debris cone 1.2 m high, a little wider than the hole)
+		const s = { k: "shaft", role: "skylight", under: B.role, c: [x, y], r, z: [top - 1.5, Math.max(g, lo) + 3], talus: [B.c[2], 1.2, r + 1.4] };
 		c.shapes.push(s);
 		return s;
 	}
@@ -224,7 +225,7 @@ export function dressCave(c, H, biome, seed) {
 	const spot = (h, f0, f1, lane, r) => { for (let k = 0; k < 40; k++) { const [x, y] = inHall(h, f0, f1); if (laneDist(x, y) > lane && free(x, y, r)) { used.push([x, y, r]); return [x, y, h.c[2]]; } } const [x, y] = inHall(h, f0, f1); used.push([x, y, r]); return [x, y, h.c[2]]; };
 	const r2 = (v) => Math.round(v * 100) / 100;
 	const feat = (kind, x, y, z, a, b, yaw = 0) => feats.push([kind, r2(x), r2(y), r2(z), r2(a), r2(b), Math.round(yaw)]);
-	const light = (x, y, z, col, intensity, radius) => lights.push([r2(x), r2(y), r2(z), ...col, intensity, radius]);
+	const light = (x, y, z, col, intensity, radius, day = 0) => lights.push([r2(x), r2(y), r2(z), ...col, intensity, radius, ...(day ? [1] : [])]);
 	const pocket = role("pocket");
 	if (c.kind === "room") {
 		const room = role("room");
@@ -328,9 +329,16 @@ export function dressCave(c, H, biome, seed) {
 			const [x, y] = inHall(h, 0.05, 0.95), s = rr(0.08, 0.28);
 			if (laneDist(x, y) > 0.6) feat("pebble", x, y, h.c[2], s, s * rr(0.45, 0.8), R() * 360);
 		}
-		if (!ice && h.r[0] > 5 && R() < 0.65) {
-			const [x, y] = inHall(h, 0.15, 0.6);
-			if (free(x, y, 1.5)) feat("puddle", x, y, h.c[2], rr(0.7, 1.5), rr(0.5, 1.0), R() * 360);
+		if (!ice && h.r[0] > 5 && R() < 0.75) {
+			// (in the dark, not under a skylight: in the sunlight one mirrored it like a metal plate; a few tries for a spot)
+			const sky = c.shapes.find((q) => q.k === "shaft");
+			for (let t = 0; t < 8; t++) {
+				const [x, y] = inHall(h, 0.15, 0.7);
+				if (!free(x, y, 1.5) || (sky && Math.hypot(x - sky.c[0], y - sky.c[1]) < sky.r + 5)) continue;
+				used.push([x, y, 1.5]);
+				feat("puddle", x, y, h.c[2], rr(0.7, 1.5), rr(0.5, 1.0), R() * 360);
+				break;
+			}
 		}
 	}
 	for (const t of tubes) for (let i = 1; i < t.p.length; i++) {
@@ -346,7 +354,13 @@ export function dressCave(c, H, biome, seed) {
 	const sky = c.shapes.find((s) => s.k === "shaft");
 	if (sky) {
 		const B = role(sky.under);
-		for (let k = 0; k < 6; k++) { const a = R() * Math.PI * 2, d = R() * sky.r * 0.8; feat("rock", sky.c[0] + Math.cos(a) * d, sky.c[1] + Math.sin(a) * d, B.c[2], rr(0.5, 1.1), rr(0.35, 0.7), R() * 360); }
+		// The day's light thrown about the chamber off the sunlit cone (by day only: the game scales it by the daylight).
+		// Without it the chamber was black round a sunlit patch, and the eye's adjustment to the dark blew the patch out
+		// to a flat white shape.
+		light(sky.c[0], sky.c[1], B.c[2] + 2.2, [1, 0.9, 0.78], 9000, sky.r + 12, 1);
+		// (on the debris cone: blocks, and stones and gravel down its sides; they settle on its slope in the game)
+		for (let k = 0; k < 11; k++) { const a = R() * Math.PI * 2, d = R() * sky.r * 1.1; feat("rock", sky.c[0] + Math.cos(a) * d, sky.c[1] + Math.sin(a) * d, B.c[2], rr(0.35, 1.1), rr(0.25, 0.7), R() * 360); }
+		for (let k = 0; k < 26; k++) { const a = R() * Math.PI * 2, d = Math.sqrt(R()) * (sky.r + 1.3), s = rr(0.1, 0.32); feat("pebble", sky.c[0] + Math.cos(a) * d, sky.c[1] + Math.sin(a) * d, B.c[2], s, s * rr(0.45, 0.8), R() * 360); }
 		for (let k = 0; k < 9; k++) {
 			const a = k * Math.PI * 2 / 9 + rr(-0.2, 0.2), d = sky.r + rr(0.8, 2.2), x = sky.c[0] + Math.cos(a) * d, y = sky.c[1] + Math.sin(a) * d;
 			feat("rimrock", x, y, H(x, y), rr(0.7, 1.6), rr(0.5, 0.9), R() * 360);

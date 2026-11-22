@@ -90,6 +90,8 @@ struct WILDREACH_API FWRLandCaveShape
 	FVector C = FVector::ZeroVector;
 	FVector2D R = FVector2D::ZeroVector;
 	float Yaw = 0.f, H = 0.f, Z0 = 0.f, Z1 = 0.f;
+	/** A skylight's debris cone (land file "talus": floor, height, radius m; 0 height for none). */
+	FVector Talus = FVector::ZeroVector;
 	FBox Box = FBox(ForceInit);
 	/** Signed distance (m, approximate: negative inside), the floor under the point and the shape's size there. Bench:
 	 *  the cave's lava bench (height above the floor, depth; 0 depth for none). */
@@ -110,6 +112,8 @@ struct WILDREACH_API FWRLandCaveLight
 	FVector At = FVector::ZeroVector;
 	FLinearColor Color = FLinearColor::White;
 	float Intensity = 0.f, Radius = 0.f;   // radius in m
+	/** Daylight thrown in by a skylight: its intensity follows the day. */
+	bool bDay = false;
 };
 
 /** An underground cave of a heightfield land (land file "caves"; Tools/terrain/cave_layout.mjs lays it, round_ground.mjs
@@ -318,6 +322,8 @@ namespace WRLand
 	WILDREACH_API const FWRLandCave* FindCave(FName Id, const FWRLandDef** OutLand = nullptr);
 	/** In one of a live land's underground caves, more than Depth cm under its ground (the sky's light fades there). */
 	WILDREACH_API bool InLandCave(const FVector& World, float Depth = 150.f);
+	/** In a land cave near one of its skylights: 1 within 6 m of the hole's edge, easing to 0 by 20 m (0 outside caves). */
+	WILDREACH_API float SkylightNear(const FVector& World);
 	/** The sub-zone at a game point (None outside every land). */
 	WILDREACH_API FName ZoneAt(const FVector& World);
 	/** sRGB array [r,g,b] -> linear. */

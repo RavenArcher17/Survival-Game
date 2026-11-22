@@ -1011,7 +1011,7 @@ const land = {
 	// middle one with the starter stations.
 	caves: CAVES.map((c) => {
 		const R2 = (v) => Math.round(v * 100) / 100;
-		const shape = (q) => q.k === "tube" ? { k: "tube", role: q.role, p: q.p.map((p) => p.map(R2)) } : q.k === "hall" ? { k: "hall", role: q.role, c: q.c.map(R2), r: q.r.map(R2), yaw: R2(q.yaw), h: R2(q.h) } : { k: "shaft", role: q.role, under: q.under, c: q.c.map(R2), r: R2(q.r), z: q.z.map(R2) };
+		const shape = (q) => q.k === "tube" ? { k: "tube", role: q.role, p: q.p.map((p) => p.map(R2)) } : q.k === "hall" ? { k: "hall", role: q.role, c: q.c.map(R2), r: q.r.map(R2), yaw: R2(q.yaw), h: R2(q.h) } : { k: "shaft", role: q.role, under: q.under, c: q.c.map(R2), r: R2(q.r), z: q.z.map(R2), ...(q.talus ? { talus: q.talus.map(R2) } : {}) };
 		return { id: c.id, name: c.name, biome: c.biome, ...(c.room ? { room: c.room } : {}), dir: c.dir.map((v) => +v.toFixed(4)), mouth: c.mouth.map(R2), hall: c.main.c.map(R2),
 			...(c.bench ? { bench: c.bench } : {}), ...(c.brow ? { brow: c.brow } : {}), shapes: c.shapes.map(shape), feats: c.feats, lights: c.lights, spots: c.spots };
 	}),

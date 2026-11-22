@@ -71,6 +71,8 @@ private:
 	void TickFrameStats(float DeltaSeconds);
 	/** Auto-exposure's floor: how far the camera may brighten, by daylight and by whether it's under cover. */
 	void UpdateExposure(float DeltaSeconds, float Daylight);
+	/** How near a cave's skylight the view is (eased): the eye opens up less there by day. */
+	float SkylitCave = 0.f;
 
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UDirectionalLightComponent> Moon;
 	UPROPERTY(VisibleAnywhere) TObjectPtr<UPostProcessComponent> Exposure;

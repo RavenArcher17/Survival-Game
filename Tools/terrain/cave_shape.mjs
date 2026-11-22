@@ -42,6 +42,19 @@ export function shaftAir(s, x, y, z) {
 	return [Math.max(Math.hypot(x - s.c[0], y - s.c[1]) - s.r, s.z[0] - z, z - s.z[1]), s.z[0], s.r];
 }
 
+/** The debris cone under a skylight (a shaft's talus = [floor, height, radius], m): the fallen roof heaped on the floor
+ *  below the hole, a gentle cone (walkable), rock added into the air. WRLand's FWRLandCave::Air is the same. */
+export function talusCut(c, x, y, z, v) {
+	for (const s of c.shapes) {
+		if (s.k !== "shaft" || !s.talus) continue;
+		const [f, h, r] = s.talus, rho = Math.hypot(x - s.c[0], y - s.c[1]);
+		const d = ((z - f) / h + rho / r - 1) * h / Math.hypot(1, h / r);
+		const k = 0.4, hh = Math.max(k - Math.abs(v + d), 0) / k;
+		v = Math.max(v, -d) + hh * hh * k / 4;
+	}
+	return v;
+}
+
 export const shapeAir = (s, x, y, z, bench) => s.k === "tube" ? tubeAir(s, x, y, z, bench) : s.k === "hall" ? hallAir(s, x, y, z, bench) : shaftAir(s, x, y, z);
 
 /** The cave's air at a point; out (optional) gets the floor and the size of the nearest shape. */
@@ -52,7 +65,7 @@ export function caveAir(c, x, y, z, out) {
 		if (d < best) { best = d; if (out) { out.floor = f; out.width = w; } }
 		v = v === Infinity ? d : smin(v, d, CAVE.join);
 	}
-	return v;
+	return talusCut(c, x, y, z, v);
 }
 
 /** The top of the air over a map point (the ceiling), from a floor height up; -Infinity if no air there. */

@@ -321,6 +321,7 @@ namespace WRLandHfImpl
 						if (SO->TryGetArrayField(TEXT("c"), Y)) Sh.C = FVector(Num(*Y, 0), Num(*Y, 1), 0.f);
 						Sh.R = FVector2D(float(SO->GetNumberField(TEXT("r"))), 0.f);
 						if (SO->TryGetArrayField(TEXT("z"), Y)) { Sh.Z0 = Num(*Y, 0); Sh.Z1 = Num(*Y, 1); }
+						if (SO->TryGetArrayField(TEXT("talus"), Y) && Y->Num() >= 3) Sh.Talus = FVector(Num(*Y, 0), Num(*Y, 1), Num(*Y, 2));
 						Sh.Box = FBox(FVector(Sh.C.X - Sh.R.X - 0.5f, Sh.C.Y - Sh.R.X - 0.5f, Sh.Z0 - 0.5f), FVector(Sh.C.X + Sh.R.X + 0.5f, Sh.C.Y + Sh.R.X + 0.5f, Sh.Z1 + 0.5f));
 					}
 					else continue;
@@ -351,6 +352,7 @@ namespace WRLandHfImpl
 					L.At = FVector(Num(*Q, 0), Num(*Q, 1), Num(*Q, 2));
 					L.Color = FLinearColor(Num(*Q, 3), Num(*Q, 4), Num(*Q, 5));
 					L.Intensity = Num(*Q, 6); L.Radius = Num(*Q, 7);
+					L.bDay = Q->Num() >= 9 && Num(*Q, 8) > 0.f;
 				}
 				const TSharedPtr<FJsonObject>* Sp = nullptr;
 				if (O->TryGetObjectField(TEXT("spots"), Sp))
@@ -936,6 +938,15 @@ float FWRLandCave::Air(const FVector& P, float* OutFloor, float* OutWidth) const
 		const float H = FMath::Max(WRCaveShape::Join - FMath::Abs(V - D), 0.f) / WRCaveShape::Join;
 		V = FMath::Min(V, D) - H * H * WRCaveShape::Join * 0.25f;
 	}
+	// The skylights' debris cones: rock heaped on the floor under the hole (cave_shape.mjs talusCut).
+	for (const FWRLandCaveShape& S : Shapes)
+	{
+		if (S.Kind != 2 || S.Talus.Y <= 0.f) continue;
+		const float Rho = float(FVector2D::Distance(FVector2D(P), FVector2D(S.C)));
+		const float D = ((float(P.Z) - float(S.Talus.X)) / float(S.Talus.Y) + Rho / float(S.Talus.Z) - 1.f) * float(S.Talus.Y) / FMath::Sqrt(1.f + FMath::Square(float(S.Talus.Y / S.Talus.Z)));
+		const float Hh = FMath::Max(0.4f - FMath::Abs(V + D), 0.f) / 0.4f;
+		V = FMath::Max(V, -D) + Hh * Hh * 0.4f * 0.25f;
+	}
 	if (OutFloor) *OutFloor = Floor;
 	if (OutWidth) *OutWidth = Width;
 	return V;
@@ -1268,6 +1279,27 @@ bool WRLand::InLandCave(const FVector& World, float Depth)
 		if (C.Air(Pm) < 0.5f) return D->Height(M) > Pm.Z + Depth / 100.f;
 	}
 	return false;
+}
+
+float WRLand::SkylightNear(const FVector& World)
+{
+	const FWRLandDef* D = At(World);
+	if (!D || D->Caves.Num() == 0) return 0.f;
+	const FVector2D M = D->ToMap(World);
+	const FVector Pm(M.X, M.Y, (World.Z - D->Origin.Z) / 100.f);
+	for (const FWRLandCave& C : D->Caves)
+	{
+		if (C.Air(Pm) >= 0.5f) continue;
+		float Best = 0.f;
+		for (const FWRLandCaveShape& S : C.Shapes)
+		{
+			if (S.Kind != 2) continue;
+			const float Edge = float(FVector2D::Distance(M, FVector2D(S.C))) - float(S.R.X);
+			Best = FMath::Max(Best, 1.f - FMath::SmoothStep(6.f, 20.f, Edge));
+		}
+		return Best;
+	}
+	return 0.f;
 }
 
 bool WRLand::GroundUnder(const FVector& World, float& OutZ)

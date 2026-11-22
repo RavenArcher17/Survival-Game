@@ -919,14 +919,20 @@ class WILDREACH_API AWRNest : public AActor
 public:
 	AWRNest();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
 
 	UPROPERTY(Replicated) FName CreatureId;
-	UPROPERTY(Replicated) bool bHasEgg = true;
+	UPROPERTY(ReplicatedUsing = OnRep_HasEgg) bool bHasEgg = true;
 	TWeakObjectPtr<AWRCreatureSpawner> Spawner;
 
 	FString TakeEgg(AWRPlayerController* Player);
 
 private:
-	UPROPERTY(VisibleAnywhere) TObjectPtr<class UStaticMeshComponent> Mesh;
+	UFUNCTION() void OnRep_HasEgg() { ShowEggs(); }
+	void ShowEggs();
+	/** The nest (a rim of woven twigs round a bed of dry stuff) and its clutch, code meshes on M_HeldTool (every machine
+	 *  that draws). It used to be an engine sphere squashed flat with no material: a checkered lens. */
+	UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Bed;
+	UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Eggs;
 	FTimerHandle RegrowTimer;
 };

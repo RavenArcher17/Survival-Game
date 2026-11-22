@@ -75,6 +75,9 @@ private:
 	UPROPERTY() TMap<FName, TObjectPtr<UMaterialInterface>> FormationMats;
 	/** The ice's material instance: its thin places glow with the day ("Glow", set each second). */
 	UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> IceLook;
+	/** The skylights' daylight (bounce off the sunlit floor) and its full intensity: scaled by the day each second. */
+	UPROPERTY() TArray<TObjectPtr<class UPointLightComponent>> DayLights;
+	TArray<float> DayLightFull;
 	bool bBuiltLogged = false;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GroundLook;
 };

@@ -1,4 +1,6 @@
 #include "WRCreature.h"
+#include "WRToolMesh.h"
+#include "ProceduralMeshComponent.h"
 #include "WRLand.h"
 #include "WRStronghold.h"
 #include "WRSiege.h"
@@ -4191,11 +4193,61 @@ void AWRCreatureSpawner::Tick(float DeltaSeconds)
 AWRNest::AWRNest()
 {
 	bReplicates = true;
-	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-	RootComponent = Mesh;
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (Sphere.Succeeded()) Mesh->SetStaticMesh(Sphere.Object);
-	Mesh->SetRelativeScale3D(FVector(1.2f, 1.2f, 0.4f));
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+}
+
+void AWRNest::BeginPlay()
+{
+	Super::BeginPlay();
+	if (GetNetMode() == NM_DedicatedServer) return;
+	// A shallow bowl of sticks: dozens laid round the rim, crossing one another at all angles and heights (the material's
+	// grain runs along each), on a bed of dry grass and down. (Three smooth rings read as a ring of bread.)
+	FWRToolMesh N;
+	const uint32 Seed = GetTypeHash(GetActorLocation().GridSnap(10.f));
+	const auto Rnd = [Seed](int32 A, int32 B) { uint32 X = Seed ^ uint32(A) * 0x9e3779b9u ^ uint32(B) * 0x85ebca6bu; X ^= X >> 15; X *= 0x2c1b3c6du; X ^= X >> 12; return float(X & 0xffff) / 65535.f; };
+	for (int32 k = 0; k < 40; ++k)
+	{
+		const float A = 2.f * PI * (k + Rnd(k, 1)) / 40.f, R0 = 38.f + 14.f * Rnd(k, 2), Z0 = 3.f + 16.f * Rnd(k, 3);
+		const FVector Mid(FMath::Cos(A) * R0, FMath::Sin(A) * R0, Z0);
+		// Mostly along the rim, tilted and swung off it.
+		const float Swing = (Rnd(k, 4) - 0.5f) * 1.4f, Tilt = (Rnd(k, 5) - 0.5f) * 0.7f;
+		const FVector Dir = (FVector(-FMath::Sin(A + Swing), FMath::Cos(A + Swing), 0.f) + FVector(0.f, 0.f, Tilt)).GetSafeNormal();
+		const float Len = 30.f + 30.f * Rnd(k, 6), Rad = 1.4f + 1.4f * Rnd(k, 7);
+		const float Shade = 0.6f + 0.5f * Rnd(k, 8);
+		N.Lathe(Mid - Dir * (Len * 0.5f), Dir, Len, { FVector(0.f, Rad, Rad), FVector(0.5f, Rad * 0.9f, Rad * 0.9f), FVector(1.f, Rad * 0.6f, Rad * 0.6f) }, 5,
+			FLinearColor(0.055f, 0.038f, 0.022f) * Shade, 0.9f, 0.f, float(k + 1));
+	}
+	N.Lathe(FVector(0.f, 0.f, -2.f), FVector::UpVector, 8.f, { FVector(0.f, 46.f, 46.f), FVector(0.6f, 42.f, 42.f), FVector(1.f, 28.f, 28.f) }, 14, FLinearColor(0.085f, 0.068f, 0.04f), 0.95f, 0.f, float(Seed % 97 + 1));
+	Bed = NewObject<UProceduralMeshComponent>(this);
+	Bed->SetupAttachment(RootComponent);
+	Bed->RegisterComponent();
+	N.ApplyTo(Bed);
+	// The clutch: three speckled eggs lying in the hollow.
+	FWRToolMesh E;
+	for (int32 e = 0; e < 3; ++e)
+	{
+		const float A = 2.f * PI * e / 3.f + Rnd(9, e);
+		const FVector At(FMath::Cos(A) * 11.f, FMath::Sin(A) * 11.f, 9.f);
+		const FVector Ax = FVector(FMath::Cos(A + 1.2f), FMath::Sin(A + 1.2f), 0.25f).GetSafeNormal();
+		TArray<FVector> Egg;
+		for (int32 i = 0; i <= 8; ++i)
+		{
+			// (sin(PI) is a hair below 0 in floats, and a fractional power of it is NaN: a NaN vertex, NaN bounds)
+			const float T = i / 8.f, Rr = 6.5f * FMath::Pow(FMath::Max(0.f, FMath::Sin(PI * T)), 0.75f) * (1.f + 0.18f * (T - 0.5f));
+			Egg.Add(FVector(T, Rr, Rr));
+		}
+		E.Lathe(At - Ax * 8.f, Ax, 16.f, Egg, 10, FLinearColor(0.5f, 0.46f, 0.38f), 0.55f, 0.f, float(e + 3));
+	}
+	Eggs = NewObject<UProceduralMeshComponent>(this);
+	Eggs->SetupAttachment(RootComponent);
+	Eggs->RegisterComponent();
+	E.ApplyTo(Eggs);
+	ShowEggs();
+}
+
+void AWRNest::ShowEggs()
+{
+	if (Eggs) Eggs->SetVisibility(bHasEgg);
 }
 
 void AWRNest::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -4222,7 +4274,8 @@ FString AWRNest::TakeEgg(AWRPlayerController* Player)
 		return TEXT("Inventory full");
 	}
 	bHasEgg = false;
-	GetWorldTimerManager().SetTimer(RegrowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { bHasEgg = true; }), WRTune(TEXT("taming.eggRegrowSeconds"), 300.f), false);
+	ShowEggs();
+	GetWorldTimerManager().SetTimer(RegrowTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { bHasEgg = true; ShowEggs(); }), WRTune(TEXT("taming.eggRegrowSeconds"), 300.f), false);
 	// The pack swarms whoever robbed the nest.
 	if (AWRCreatureSpawner* S = Spawner.Get())
 	{
