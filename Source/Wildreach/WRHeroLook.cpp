@@ -1108,6 +1108,7 @@ void AWRCharacter::ApplyPathMarks(bool bForce)
 	if (Canines->GetStaticMesh() != Fangs)
 	{
 		Canines->SetStaticMesh(Fangs);
+		Canines->AttachToComponent(Body, FAttachmentTransformRules::KeepRelativeTransform, Fangs ? FName(TEXT("teeth_upper")) : NAME_None);
 	}
 	Canines->SetVisibility(Fangs != nullptr && Face->IsVisible());
 	// Nature: the small leaf buds at the temples from strength 1.0 (cooks/biome-forest.md 2.18), hidden with the face.

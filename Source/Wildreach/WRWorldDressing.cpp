@@ -504,6 +504,8 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			{ Cyl, FLinearColor(0.028f, 0.024f, 0.023f), FVector(80, 80, 470), 225, false, 24000, FVector::ZeroVector, FVector(-45, -75, 0) },
 			{ Cyl, FLinearColor(0.024f, 0.021f, 0.02f), FVector(82, 82, 300), 140, false, 24000, FVector::ZeroVector, FVector(40, -150, 0) } } },
 		{ TEXT("pumice_rock"), { { Sphere, FLinearColor(0.5f, 0.48f, 0.45f), FVector(220, 190, 140), 30, true, 24000, FVector(8, 0, 0) } } },
+		// (the loop below builds only kinds listed here: the rubble's art is SM_Rubble, this a stand-in stone)
+		{ TEXT("lava_rubble"), { { Sphere, FLinearColor(0.025f, 0.022f, 0.022f), FVector(60, 50, 28), 8, false, 21000, FVector(8, 0, 0) } } },
 		{ TEXT("frost_shrub"), { { Sphere, FLinearColor(0.8f, 0.86f, 0.88f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
 		{ TEXT("kipuka_shrub"), { { Sphere, FLinearColor(0.08f, 0.16f, 0.06f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
 		{ TEXT("ice_boulder"), { { Cube, FLinearColor(0.55f, 0.7f, 0.85f), FVector(220, 190, 170), 50, true, 24000, FVector(12, 0, 18) } } },
@@ -518,7 +520,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	              const TCHAR* Material; TArray<FParam> Params; TArray<FScalar> Scalars;
 	              bool bShapeCollision = false; };  // keep the shapes' colliding parts, hidden (tree trunks)
 	static const TCHAR* RockMat = TEXT("/Game/Terrain/M_Rock.M_Rock");
-	static const TCHAR* IceMat = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
+	static const TCHAR* IceMat = TEXT("/Game/Terrain/M_IceBlock.M_IceBlock");
 	TArray<FString> Rocks, Shrubs;
 	for (const TCHAR* N : { TEXT("01A"), TEXT("02A"), TEXT("03A"), TEXT("05A"), TEXT("08A"), TEXT("12A") })
 	{
@@ -529,29 +531,39 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		Shrubs.Add(FString::Printf(TEXT("/Game/GV_FreeShrubsPack/Meshes/Shrubs/Wind/Shrub_%s/GV_Vol7_Shrub_%s_full_type1.GV_Vol7_Shrub_%s_full_type1"), N, N, N));
 	}
 	const auto Prop = [](const TCHAR* Folder, const TCHAR* Name) { return FString::Printf(TEXT("/Game/Props/%s/%s/StaticMeshes/%s.%s"), Folder, Name, Name, Name); };
+	// Our own generated shapes (Tools/art/make_meshes.py, in git): hexagonal basalt columns, obsidian blades, seracs.
+	const auto Gen = [](const TCHAR* Name, const TCHAR* Letters) { TArray<FString> Out; for (const TCHAR* L = Letters; *L; ++L) Out.Add(FString::Printf(TEXT("/Game/Art/Gen/%s_%c.%s_%c"), Name, *L, Name, *L)); return Out; };
+	static const TCHAR* ObsidianMat = TEXT("/Game/Terrain/M_Obsidian.M_Obsidian");
 	const TMap<FString, FArt> Art = {
 		{ TEXT("char_tree"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")),
 		    Prop(TEXT("CharTreeC"), TEXT("char_tree_c_textured")), Prop(TEXT("CharTreeD"), TEXT("char_tree_d_textured")) },
 			FVector(0, 0, 720), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
 		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")),
 		    Prop(TEXT("FirA"), TEXT("fir_a_textured")), Prop(TEXT("BirchA"), TEXT("birch_a_textured")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
-		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, {} } },
-		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, {} } },
-		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, {} } },
-		{ TEXT("pumice_rock"), { Rocks, FVector(220, 190, 140), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.55f, 0.53f, 0.5f) } }, {} } },
+		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, { { TEXT("Dust"), 0.55f } } } },
+		// (M_Rock's coats, 11-22: snow lying on the tundra's rocks, ash settled on the volcanic's.)
+		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, { { TEXT("Snow"), 0.9f } } } },
+		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, { { TEXT("Dust"), 0.45f } } } },
+		{ TEXT("pumice_rock"), { Rocks, FVector(220, 190, 140), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.55f, 0.53f, 0.5f) } }, { { TEXT("Dust"), 0.3f } } } },
+		// Rubble on the lava fields, the obsidian ridges and the crater highlands (11-22: the ground read bare and smooth):
+		// patches of broken basalt about 4 m across (SM_Rubble, ~40 stones each, Nanite), on gentle ground only (the
+		// patch isn't laid to the slope), walked over (no collision, not gathered), shadowed (cull over 200 m keeps it).
+		{ TEXT("lava_rubble"), { Gen(TEXT("SM_Rubble"), TEXT("ABC")), FVector(420, 420, 45), 4, false, 21000, FVector(2, 0, 2), false, RockMat, { { TEXT("Tint"), FLinearColor(0.3f, 0.28f, 0.27f) } }, { { TEXT("Dust"), 0.55f } } } },   // (0.14 read as black cubes on the ash)
 		// Seracs: tall leaning towers of glacier ice; obsidian blades: thin black glass standing on end; basalt columns:
 		// dark pillars (the rock meshes stretched tall and tinted).
-		// (Ice in the plain shape material: the rock texture under M_Rock is too dark for ice, whatever its tint.)
-		{ TEXT("serac"), { Rocks, FVector(300, 260, 620), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Color"), FLinearColor(0.5f, 0.68f, 0.84f) } }, {} } },
-		{ TEXT("ice_boulder"), { Rocks, FVector(220, 190, 170), 25, true, 24000, FVector(12, 0, 18), false, IceMat, { { TEXT("Color"), FLinearColor(0.58f, 0.74f, 0.88f) } }, {} } },
-		{ TEXT("obsidian_blade"), { Rocks, FVector(150, 70, 420), 50, true, 20000, FVector(14, 0, 10), false, RockMat, { { TEXT("Tint"), FLinearColor(0.012f, 0.012f, 0.016f) } }, {} } },
-		{ TEXT("basalt_column"), { Rocks, FVector(170, 160, 560), 40, true, 24000, FVector(3, 0, 3), false, RockMat, { { TEXT("Tint"), FLinearColor(0.05f, 0.045f, 0.043f) } }, {} } },
+		// (Ice in its own glacier-ice material, M_IceBlock: the rock texture under M_Rock is too dark for ice, whatever its
+		// tint; the engine shape material it had read as flat blue plastic.)
+		{ TEXT("serac"), { Gen(TEXT("SM_Serac"), TEXT("AB")), FVector(300, 260, 620), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Tint"), FLinearColor(0.92f, 0.97f, 1.f) } }, {} } },
+		{ TEXT("ice_boulder"), { Rocks, FVector(220, 190, 170), 25, true, 24000, FVector(12, 0, 18), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, {} } },
+		// (11-22: the blades and columns were the rock set's boulders stretched tall; now real shapes of their own.)
+		{ TEXT("obsidian_blade"), { Gen(TEXT("SM_ObsidianBlade"), TEXT("ABC")), FVector(210, 180, 420), 50, true, 20000, FVector(10, 0, 8), false, ObsidianMat, {}, {} } },
+		{ TEXT("basalt_column"), { Gen(TEXT("SM_BasaltColumns"), TEXT("ABC")), FVector(300, 290, 560), 40, true, 24000, FVector(2, 0, 2), false, RockMat, { { TEXT("Tint"), FLinearColor(0.07f, 0.065f, 0.062f) } }, { { TEXT("Dust"), 0.35f } } } },
 		// The tundra's scrub is frosted through (willow and dwarf birch under rime); the kipuka's and the terraces' green.
 		{ TEXT("frost_shrub"), { Shrubs, FVector(0, 0, 220), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.93f, 0.96f, 1.f) } }, { { TEXT("Amount Min"), 0.85f }, { TEXT("Amount Max"), 1.f } } } },
 		{ TEXT("kipuka_shrub"), { Shrubs, FVector(0, 0, 230), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.3f, 0.33f, 0.24f) } }, { { TEXT("Amount Min"), 0.f }, { TEXT("Amount Max"), 0.25f } } } },
-		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, {} } },
+		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, { { TEXT("Snow"), 0.75f } } } },
 		// Fitted heights are the meshes' bounds, about twice their leafy part: 260 cm makes a bush of a metre or so.
 		// The volcanic west's scrub is dead (cooks/cookpass-world.md 3.7, G22): the GV leaves stayed green whatever their
 		// tint, and greying them with their "snow" coat (world.ashCoatMin) hung the GPU in the virtual shadow maps' Nanite
@@ -569,7 +581,8 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// shrubs coated a lichen grey-green where the wind keeps them low.
 		{ TEXT("storm_pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")),
 		    Prop(TEXT("FirA"), TEXT("fir_a_textured")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
-		{ TEXT("granite_rock"), { Rocks, FVector(240, 210, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.42f, 0.43f, 0.45f) } }, {} } },
+		// (lighter than the rock is: against the snow, with the eye set for the snow, 0.42 read pitch black, 11-22)
+		{ TEXT("granite_rock"), { Rocks, FVector(240, 210, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.63f, 0.66f) } }, { { TEXT("Snow"), 0.35f } } } },
 		{ TEXT("slate_scree"), { Rocks, FVector(420, 360, 260), 120, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.14f, 0.16f, 0.2f) } }, {} } },
 		{ TEXT("storm_shrub"), { Shrubs, FVector(0, 0, 200), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.42f, 0.45f, 0.38f) } },

@@ -39,6 +39,10 @@ private:
 	/** Machines that draw: the Volcanic's lava river (island.json "lava"), molten in the middle and crusting at its
 	 *  rims, with its glow lights along it. */
 	void BuildLava();
+	/** The lands' wake-up camps (island.json camps.groups): a lived-in campsite at each, a fire ring with its fire,
+	 *  canvas tents, bedrolls, a log seat, crates and a barrel (looks on clients; the tents and crates solid on every
+	 *  machine). The camps were spawn points with nothing to see. */
+	void BuildCamps();
 	/** Server: the Volcanic's and the Frozen tundra's creature dens (Data/wildreach_life.json "dens": map metres, a day
 	 *  pack and a night pack each) and the roaming minis' loops on their lands ("roam"). */
 	void PlaceLife();
@@ -51,6 +55,12 @@ private:
 	void StepCover();
 	UPROPERTY() TObjectPtr<UStaticMesh> BladeMesh;
 	UPROPERTY() TObjectPtr<class UMaterialInterface> BladeMat;
+	/** Flower heads and grain ears: the engine cylinder (a disc, a rounded ear) in the same tinted material. */
+	UPROPERTY() TObjectPtr<UStaticMesh> DiscMesh;
+	/** Real grass (MW Landscape Auto Material's clumps A-D, wind-swayed cards) and its material per grass: the meadow,
+	 *  the steppe, the cinder grass, the thaw's sedge, the kipuka (tinted each). Empty without the pack: cube blades. */
+	UPROPERTY() TArray<TObjectPtr<UStaticMesh>> GrassMeshes;
+	UPROPERTY() TArray<TObjectPtr<class UMaterialInstanceDynamic>> GrassMats;
 	TMap<FIntPoint, TArray<TObjectPtr<UInstancedStaticMeshComponent>>> CoverCells;
 
 	/** Machines that draw: the city's lights with the clock. The night blocks (lit windows, lantern glass) show after

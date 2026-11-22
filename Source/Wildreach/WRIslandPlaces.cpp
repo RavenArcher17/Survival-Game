@@ -348,6 +348,47 @@ void FWRIsleSite::Rock(int32 Which, const FVector& Size, const FVector& Base, co
 	}
 }
 
+UStaticMeshComponent* FWRIsleSite::Ice(int32 Which, const FVector& Size, const FVector& Base, const FRotator& Rot, bool bCollide, float Sink, float Snow)
+{
+	if (!bDraw && !bCollide) return nullptr;
+	const TCHAR* Name = (Which & 1) ? TEXT("/Game/Art/Gen/SM_Serac_B.SM_Serac_B") : TEXT("/Game/Art/Gen/SM_Serac_A.SM_Serac_A");
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Name);
+	UMaterialInterface* Base0 = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_IceBlock.M_IceBlock"));
+	if (!Mesh || !Base0)
+	{
+		K.Add(WRLookKit::FSurf::Glass(FLinearColor(0.62f, 0.8f, 0.95f), 0.f), Size, Base + Rot.RotateVector(FVector(0.f, 0.f, Size.Z * 0.5f - Sink)), Rot);
+		return nullptr;
+	}
+	const FString MatKey = FString::Printf(TEXT("ice%.2f"), Snow);
+	UMaterialInterface* M = nullptr;
+	if (UMaterialInterface** Found = RockMats.Find(MatKey)) M = *Found;
+	else
+	{
+		UMaterialInstanceDynamic* D = UMaterialInstanceDynamic::Create(Base0, Owner);
+		D->SetScalarParameterValue(TEXT("Snow"), Snow);
+		M = D;
+		RockMats.Add(MatKey, M);
+	}
+	UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
+	C->SetStaticMesh(Mesh);
+	C->SetupAttachment(Root);
+	const FBox B = Mesh->GetBoundingBox();
+	const FVector Sz = B.GetSize();
+	const FVector Scale(Size.X / FMath::Max(1.f, float(Sz.X)), Size.Y / FMath::Max(1.f, float(Sz.Y)), Size.Z / FMath::Max(1.f, float(Sz.Z)));
+	C->SetRelativeScale3D(Scale);
+	C->SetRelativeRotation(Rot);
+	C->SetRelativeLocation(Base + Rot.RotateVector(FVector(-B.GetCenter().X * Scale.X, -B.GetCenter().Y * Scale.Y, -B.Min.Z * Scale.Z - Sink)));
+	C->SetMaterial(0, M);
+	C->SetCollisionProfileName(bCollide ? TEXT("BlockAll") : TEXT("NoCollision"));
+	C->SetCanEverAffectNavigation(false);
+	C->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	C->SetCullDistance(WRTune(TEXT("places.siteCull"), 60000.f));
+	C->SetCachedMaxDrawDistance(WRTune(TEXT("places.siteCull"), 60000.f));
+	if (!bDraw) C->SetHiddenInGame(true);
+	C->RegisterComponent();
+	return C;
+}
+
 void FWRIsleSite::Meshes(const TCHAR* Path, const TArray<FTransform>& Local, float Height, float Cull, const FLinearColor* Coat)
 {
 	if (!bDraw || Local.Num() == 0) return;

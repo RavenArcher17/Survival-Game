@@ -9,6 +9,8 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Engine/Texture.h"
+#include "WRTuning.h"
 
 // Sizes are cm in the piece's space as AWRBuildPiece::ApplyLook lays it out: walls run along X on a cell edge (cell
 // corners at X = +-200, 20 thick around Y = 0, floor at Z = 0), cells span +-200 in X and Y.
@@ -29,15 +31,42 @@ namespace WRBuildLookDetail
 		static UStaticMesh* Cube = Rooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Cube.Cube"));
 		static UStaticMesh* Cylinder = Rooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 		static UStaticMesh* Cone = Rooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Cone.Cone"));
-		return Mesh == EWRLookMesh::Cylinder ? Cylinder : Mesh == EWRLookMesh::Cone ? Cone : Cube;
+		static UStaticMesh* Tent = Rooted<UStaticMesh>(TEXT("/Game/Art/Gen/SM_TentRidge_A.SM_TentRidge_A"));
+		static UStaticMesh* Sphere = Rooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		return Mesh == EWRLookMesh::Cylinder ? Cylinder : Mesh == EWRLookMesh::Cone ? Cone : Mesh == EWRLookMesh::Tent && Tent ? Tent
+			: Mesh == EWRLookMesh::Sphere ? Sphere : Cube;
+	}
+
+	/** The scanned boards (WoodMaterialPack2, a pack the project doesn't require: when it's on this machine) handed to
+	 *  a building material's WoodColor / WoodNormal / WoodRough with Scan on; without it the material's own planks. */
+	static UMaterialInterface* Scanned(UMaterialInterface* Base)
+	{
+		if (!Base) return Base;
+		const int32 N = FMath::Clamp(int32(WRTune(TEXT("build.woodScan"), 3.f)), 1, 10);
+		const auto Load = [N](const TCHAR* Map)
+		{
+			const FString Name = FString::Printf(TEXT("T_WoodMatPack2_%d_%s"), N, Map);
+			return LoadObject<UTexture>(nullptr, *FString::Printf(TEXT("/Game/WoodMaterialPack2/Textures/%s.%s"), *Name, *Name));
+		};
+		UTexture* C = Load(TEXT("basecolor"));
+		UTexture* Nm = Load(TEXT("normal"));
+		UTexture* R = Load(TEXT("roughness"));
+		if (!C || !Nm || !R) return Base;
+		UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Base, GetTransientPackage());
+		M->SetTextureParameterValue(TEXT("WoodColor"), C);
+		M->SetTextureParameterValue(TEXT("WoodNormal"), Nm);
+		M->SetTextureParameterValue(TEXT("WoodRough"), R);
+		M->SetScalarParameterValue(TEXT("Scan"), 1.f);
+		M->AddToRoot();
+		return M;
 	}
 
 	static UMaterialInterface* MaterialFor(EWRLookMat Mat)
 	{
-		static UMaterialInterface* Wood = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
+		static UMaterialInterface* Wood = Scanned(Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildWood.M_BuildWood")));
 		static UMaterialInterface* Stone = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
 		static UMaterialInterface* Shape = Rooted<UMaterialInterface>(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-		static UMaterialInterface* Tinted = Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+		static UMaterialInterface* Tinted = Scanned(Rooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildTinted.M_BuildTinted")));
 		if (Mat == EWRLookMat::Tinted) return Tinted ? Tinted : Shape;
 		return Mat == EWRLookMat::Wood ? Wood : Mat == EWRLookMat::Stone ? Stone : Shape;   // cloth and trim: flat colours
 	}
@@ -526,6 +555,20 @@ namespace WRBuildLookDetail
 }
 
 // ---------------------------------------------------------------- FWRBuildLook
+
+UMaterialInterface* FWRBuildLook::Material(EWRLookMat Mat)
+{
+	return WRBuildLookDetail::MaterialFor(Mat);
+}
+
+UMaterialInterface* FWRBuildLook::MaterialAt(const TCHAR* Path)
+{
+	const FString P(Path);
+	if (P.Contains(TEXT("M_BuildWood"))) return Material(EWRLookMat::Wood);
+	if (P.Contains(TEXT("M_BuildStone"))) return Material(EWRLookMat::Stone);
+	if (P.Contains(TEXT("M_BuildTinted"))) return Material(EWRLookMat::Tinted);
+	return LoadObject<UMaterialInterface>(nullptr, Path);
+}
 
 float FWRBuildLook::Hash01(const FVector& WorldPoint, int32 Salt)
 {
@@ -1160,14 +1203,14 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 	TMap<int32, TArray<const FWRLookBlock*>> Groups;
 	for (const FWRLookBlock& Bl : Blocks)
 	{
-		Groups.FindOrAdd(static_cast<int32>(Bl.Mat) * 4 + static_cast<int32>(Bl.Mesh)).Add(&Bl);
+		Groups.FindOrAdd(static_cast<int32>(Bl.Mat) * 8 + static_cast<int32>(Bl.Mesh)).Add(&Bl);
 	}
 	int32 Made = 0;
 	for (const TPair<int32, TArray<const FWRLookBlock*>>& G : Groups)
 	{
-		const EWRLookMat Mat = static_cast<EWRLookMat>(G.Key / 4);
+		const EWRLookMat Mat = static_cast<EWRLookMat>(G.Key / 8);
 		UInstancedStaticMeshComponent* Part = NewObject<UInstancedStaticMeshComponent>(Owner);
-		Part->SetStaticMesh(MeshFor(static_cast<EWRLookMesh>(G.Key % 4)));
+		Part->SetStaticMesh(MeshFor(static_cast<EWRLookMesh>(G.Key % 8)));
 		Part->SetupAttachment(Parent);
 		Part->SetUsingAbsoluteScale(bAbsoluteScale);
 		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -1192,17 +1235,20 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 			Transforms.Emplace(Bl->Rot, Bl->Centre, Bl->Size / 100.f);
 		}
 		Part->AddInstances(Transforms, false, false, false);
+		// A round block's axis goes to the material plus 3 (M_Build* round_info): its texture measures the arc round it.
+		const EWRLookMesh Shape = static_cast<EWRLookMesh>(G.Key % 8);
+		const float RoundMark = Shape == EWRLookMesh::Cylinder || Shape == EWRLookMesh::Cone ? 3.f : 0.f;
 		for (int32 i = 0; i < G.Value.Num(); ++i)
 		{
 			const FWRLookBlock& Bl = *G.Value[i];
 			if (Mat == EWRLookMat::Tinted)
 			{
 				// M_BuildTinted: shade, axis, brightness, colour, metallic, roughness, glow, pattern.
-				const float Data[10] = { Bl.Tone, Bl.Axis, Bl.Dim, Bl.Color.R, Bl.Color.G, Bl.Color.B, Bl.Metal, Bl.Rough, Bl.Glow, Bl.Pattern };
+				const float Data[10] = { Bl.Tone, Bl.Axis + RoundMark, Bl.Dim, Bl.Color.R, Bl.Color.G, Bl.Color.B, Bl.Metal, Bl.Rough, Bl.Glow, Bl.Pattern };
 				Part->SetCustomData(i, Data, i == G.Value.Num() - 1);
 				continue;
 			}
-			const float Data[3] = { Bl.Tone, Bl.Axis, Bl.Dim };
+			const float Data[3] = { Bl.Tone, Bl.Axis + RoundMark, Bl.Dim };
 			Part->SetCustomData(i, Data, i == G.Value.Num() - 1);
 		}
 		++Made;

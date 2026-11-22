@@ -2348,6 +2348,283 @@
         }
       }
     },
+    "townwear": {
+      "_comment": "Everyday clothes for townsfolk (11-22): the wardcloth or gravecloth cut in plain linen, wool and leather, no head piece (the adventurer sets showed skin windows and read as underwear on Hearthmoot's people).",
+      "tier": 0,
+      "hidesHair": false,
+      "meshes": {
+        "M_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Chest.SKM_Wardcloth_M_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Hands.SKM_Wardcloth_M_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Legs.SKM_Wardcloth_M_Lean_Legs"
+        },
+        "M_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Chest.SKM_Wardcloth_M_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Hands.SKM_Wardcloth_M_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Legs.SKM_Wardcloth_M_Athletic_Legs"
+        },
+        "M_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Chest.SKM_Wardcloth_M_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Hands.SKM_Wardcloth_M_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Legs.SKM_Wardcloth_M_Strong_Legs"
+        },
+        "F_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Chest.SKM_Wardcloth_F_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Hands.SKM_Wardcloth_F_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Legs.SKM_Wardcloth_F_Lean_Legs"
+        },
+        "F_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Chest.SKM_Wardcloth_F_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Hands.SKM_Wardcloth_F_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Legs.SKM_Wardcloth_F_Athletic_Legs"
+        },
+        "F_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Chest.SKM_Wardcloth_F_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Hands.SKM_Wardcloth_F_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Legs.SKM_Wardcloth_F_Strong_Legs"
+        }
+      },
+      "hide": {
+        "m": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Chest.T_Hide_Wardcloth_M_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Hands.T_Hide_Wardcloth_M_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Legs.T_Hide_Wardcloth_M_Legs"
+        },
+        "f": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Chest.T_Hide_Wardcloth_F_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Hands.T_Hide_Wardcloth_F_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Legs.T_Hide_Wardcloth_F_Legs"
+        }
+      },
+      "materials": {
+        "Ward_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen_Dark.MI_Linen_Dark",
+        "Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
+        "Ward_Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather"
+      }
+    },
+    "townwear_b": {
+      "_comment": "Everyday clothes for townsfolk (11-22): the wardcloth or gravecloth cut in plain linen, wool and leather, no head piece (the adventurer sets showed skin windows and read as underwear on Hearthmoot's people).",
+      "tier": 0,
+      "hidesHair": false,
+      "meshes": {
+        "M_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Chest.SKM_Wardcloth_M_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Hands.SKM_Wardcloth_M_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Legs.SKM_Wardcloth_M_Lean_Legs"
+        },
+        "M_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Chest.SKM_Wardcloth_M_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Hands.SKM_Wardcloth_M_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Legs.SKM_Wardcloth_M_Athletic_Legs"
+        },
+        "M_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Chest.SKM_Wardcloth_M_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Hands.SKM_Wardcloth_M_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Legs.SKM_Wardcloth_M_Strong_Legs"
+        },
+        "F_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Chest.SKM_Wardcloth_F_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Hands.SKM_Wardcloth_F_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Legs.SKM_Wardcloth_F_Lean_Legs"
+        },
+        "F_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Chest.SKM_Wardcloth_F_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Hands.SKM_Wardcloth_F_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Legs.SKM_Wardcloth_F_Athletic_Legs"
+        },
+        "F_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Chest.SKM_Wardcloth_F_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Hands.SKM_Wardcloth_F_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Legs.SKM_Wardcloth_F_Strong_Legs"
+        }
+      },
+      "hide": {
+        "m": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Chest.T_Hide_Wardcloth_M_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Hands.T_Hide_Wardcloth_M_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Legs.T_Hide_Wardcloth_M_Legs"
+        },
+        "f": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Chest.T_Hide_Wardcloth_F_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Hands.T_Hide_Wardcloth_F_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Legs.T_Hide_Wardcloth_F_Legs"
+        }
+      },
+      "materials": {
+        "Ward_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Hide_Dark.MI_Hide_Dark",
+        "Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
+        "Ward_Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather"
+      }
+    },
+    "townwear_c": {
+      "_comment": "Everyday clothes for townsfolk (11-22): the wardcloth or gravecloth cut in plain linen, wool and leather, no head piece (the adventurer sets showed skin windows and read as underwear on Hearthmoot's people).",
+      "tier": 0,
+      "hidesHair": false,
+      "meshes": {
+        "M_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Chest.SKM_Wardcloth_M_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Hands.SKM_Wardcloth_M_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Lean_Legs.SKM_Wardcloth_M_Lean_Legs"
+        },
+        "M_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Chest.SKM_Wardcloth_M_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Hands.SKM_Wardcloth_M_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Athletic_Legs.SKM_Wardcloth_M_Athletic_Legs"
+        },
+        "M_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Chest.SKM_Wardcloth_M_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Hands.SKM_Wardcloth_M_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_M_Strong_Legs.SKM_Wardcloth_M_Strong_Legs"
+        },
+        "F_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Chest.SKM_Wardcloth_F_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Hands.SKM_Wardcloth_F_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Lean_Legs.SKM_Wardcloth_F_Lean_Legs"
+        },
+        "F_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Chest.SKM_Wardcloth_F_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Hands.SKM_Wardcloth_F_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Athletic_Legs.SKM_Wardcloth_F_Athletic_Legs"
+        },
+        "F_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Chest.SKM_Wardcloth_F_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Hands.SKM_Wardcloth_F_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Wardcloth/SKM_Wardcloth_F_Strong_Legs.SKM_Wardcloth_F_Strong_Legs"
+        }
+      },
+      "hide": {
+        "m": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Chest.T_Hide_Wardcloth_M_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Hands.T_Hide_Wardcloth_M_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_M_Legs.T_Hide_Wardcloth_M_Legs"
+        },
+        "f": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Chest.T_Hide_Wardcloth_F_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Hands.T_Hide_Wardcloth_F_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Wardcloth_F_Legs.T_Hide_Wardcloth_F_Legs"
+        }
+      },
+      "materials": {
+        "Ward_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
+        "Ward_Bodice": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen_Dark.MI_Linen_Dark",
+        "Ward_Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Rawhide.MI_Rawhide",
+        "Ward_Crystal": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Rawhide.MI_Rawhide"
+      }
+    },
+    "towngown": {
+      "_comment": "Everyday clothes for townsfolk (11-22): the wardcloth or gravecloth cut in plain linen, wool and leather, no head piece (the adventurer sets showed skin windows and read as underwear on Hearthmoot's people).",
+      "tier": 0,
+      "hidesHair": false,
+      "meshes": {
+        "M_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Lean_Chest.SKM_Gravecloth_M_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Lean_Hands.SKM_Gravecloth_M_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Lean_Legs.SKM_Gravecloth_M_Lean_Legs"
+        },
+        "M_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Athletic_Chest.SKM_Gravecloth_M_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Athletic_Hands.SKM_Gravecloth_M_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Athletic_Legs.SKM_Gravecloth_M_Athletic_Legs"
+        },
+        "M_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Strong_Chest.SKM_Gravecloth_M_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Strong_Hands.SKM_Gravecloth_M_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Strong_Legs.SKM_Gravecloth_M_Strong_Legs"
+        },
+        "F_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Lean_Chest.SKM_Gravecloth_F_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Lean_Hands.SKM_Gravecloth_F_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Lean_Legs.SKM_Gravecloth_F_Lean_Legs"
+        },
+        "F_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Athletic_Chest.SKM_Gravecloth_F_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Athletic_Hands.SKM_Gravecloth_F_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Athletic_Legs.SKM_Gravecloth_F_Athletic_Legs"
+        },
+        "F_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Strong_Chest.SKM_Gravecloth_F_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Strong_Hands.SKM_Gravecloth_F_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Strong_Legs.SKM_Gravecloth_F_Strong_Legs"
+        }
+      },
+      "hide": {
+        "m": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_M_Chest.T_Hide_Gravecloth_M_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_M_Hands.T_Hide_Gravecloth_M_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_M_Legs.T_Hide_Gravecloth_M_Legs"
+        },
+        "f": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_F_Chest.T_Hide_Gravecloth_F_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_F_Hands.T_Hide_Gravecloth_F_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_F_Legs.T_Hide_Gravecloth_F_Legs"
+        }
+      },
+      "materials": {
+        "Grave_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen_Dark.MI_Linen_Dark",
+        "Grave_Shroud": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen.MI_Linen",
+        "Grave_Bone": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Grave_Soul": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather"
+      }
+    },
+    "towngown_b": {
+      "_comment": "Everyday clothes for townsfolk (11-22): the wardcloth or gravecloth cut in plain linen, wool and leather, no head piece (the adventurer sets showed skin windows and read as underwear on Hearthmoot's people).",
+      "tier": 0,
+      "hidesHair": false,
+      "meshes": {
+        "M_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Lean_Chest.SKM_Gravecloth_M_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Lean_Hands.SKM_Gravecloth_M_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Lean_Legs.SKM_Gravecloth_M_Lean_Legs"
+        },
+        "M_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Athletic_Chest.SKM_Gravecloth_M_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Athletic_Hands.SKM_Gravecloth_M_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Athletic_Legs.SKM_Gravecloth_M_Athletic_Legs"
+        },
+        "M_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Strong_Chest.SKM_Gravecloth_M_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Strong_Hands.SKM_Gravecloth_M_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_M_Strong_Legs.SKM_Gravecloth_M_Strong_Legs"
+        },
+        "F_Lean": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Lean_Chest.SKM_Gravecloth_F_Lean_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Lean_Hands.SKM_Gravecloth_F_Lean_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Lean_Legs.SKM_Gravecloth_F_Lean_Legs"
+        },
+        "F_Athletic": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Athletic_Chest.SKM_Gravecloth_F_Athletic_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Athletic_Hands.SKM_Gravecloth_F_Athletic_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Athletic_Legs.SKM_Gravecloth_F_Athletic_Legs"
+        },
+        "F_Strong": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Strong_Chest.SKM_Gravecloth_F_Strong_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Strong_Hands.SKM_Gravecloth_F_Strong_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Gravecloth/SKM_Gravecloth_F_Strong_Legs.SKM_Gravecloth_F_Strong_Legs"
+        }
+      },
+      "hide": {
+        "m": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_M_Chest.T_Hide_Gravecloth_M_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_M_Hands.T_Hide_Gravecloth_M_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_M_Legs.T_Hide_Gravecloth_M_Legs"
+        },
+        "f": {
+          "Chest": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_F_Chest.T_Hide_Gravecloth_F_Chest",
+          "Hands": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_F_Hands.T_Hide_Gravecloth_F_Hands",
+          "Legs": "/Game/Wildreach/Characters/Hero/Outfits/Masks/T_Hide_Gravecloth_F_Legs.T_Hide_Gravecloth_F_Legs"
+        }
+      },
+      "materials": {
+        "Grave_Coat": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Hide.MI_Hide",
+        "Grave_Shroud": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Linen_Dark.MI_Linen_Dark",
+        "Grave_Bone": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Grave_Soul": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather",
+        "Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Leather.MI_Leather"
+      }
+    },
     "wardcloth": {
       "tier": 5,
       "hidesHair": false,
@@ -2863,6 +3140,21 @@
   },
   "_looks": "cook hero-look-2: the worn armour picks a look (armorLooks); 4 visual slots per build; hide = body-hide masks (skin under the piece is clipped); hidesHair = the Head piece hides the hair groom; materials = slot-name swaps.",
   "armorLooks": {
+    "townwear_armor": "townwear",
+    "townwear_hands": "townwear",
+    "townwear_legs": "townwear",
+    "townwear_b_armor": "townwear_b",
+    "townwear_b_hands": "townwear_b",
+    "townwear_b_legs": "townwear_b",
+    "townwear_c_armor": "townwear_c",
+    "townwear_c_hands": "townwear_c",
+    "townwear_c_legs": "townwear_c",
+    "towngown_armor": "towngown",
+    "towngown_hands": "towngown",
+    "towngown_legs": "towngown",
+    "towngown_b_armor": "towngown_b",
+    "towngown_b_hands": "towngown_b",
+    "towngown_b_legs": "towngown_b",
     "hide_armor": {
       "look": "hidewear",
       "byElement": {

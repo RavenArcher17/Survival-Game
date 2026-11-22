@@ -2,6 +2,91 @@
 
 ## Unreleased
 
+### Round island: the look pass, second round (11-22)
+
+The first round's pictures, graded against the caves again, and what they still showed.
+- **Buildings are mapped from each face:** every piece of the city, the places and the bases took its texture along
+  the world's axes, so anything turned (every house round the plaza) wore its stone and boards sheared across the
+  face, and a piece made of one big block (a hall's wall, a floor) showed no joints at all: one giant stone, one board.
+  Now each face is mapped along the piece itself, big walls show their courses and mortar, big floors their boards,
+  and roof undersides boards and rafters. Round towers, logs and cone roofs measure their texture round them (it ran
+  in streaks like bark). The building stone is calmer (its dark blotches read as marble): smaller courses of their own
+  lengths, grey and warmer sandstone mixed softly, each stone's edge rounded into the joint. Plaster shows stains and
+  rain streaks, plastered houses stand on a stone footing, doors are boards on ledges in a frame with a latch (they were
+  a slab on the wall), benches have legs, the plaza's flagstones are worn grey, near flush with tight joints, and canvas
+  shows its sewn seams.
+- **Interiors:** the inn's stools are three-legged with round seats, its tables round on a post and crossed feet, with
+  tankards and plates; barrels have iron hoops; the hall's benches stand on trestles (they were cylinders and boxes).
+  The market's loaves are domed and its fruit round (they were cylinders on their sides).
+- **The wake-up camps' tents** are real ridge tents (a generated mesh: sagging canvas, the hem pegged into the ground,
+  a doorway open toward the fire, dark inside); they were a cube turned on its edge. The starter stations stand round
+  a work yard (they were a row across the plain).
+- **People:** every face's far skin material had no specular map (all twelve); set. Some townsfolk's faces still draw
+  shiny black, and the town clothes leave legs and feet bare: next round.
+- **The Volcanic:** the ground was darker than charcoal and read as black; it is now real basalt and ash, the lava
+  fields wear pahoehoe's ropy folds and aa's clinker (the LavaMat pack's flows), broken basalt lies in patches across
+  the lava fields, ridges and crater highlands, the Ash Plains are rippled grey ash, and the colour grade is less
+  orange. Ash falls as fine grey flakes (they were dark blots on the lens). Emberwick's huts have heather thatch with
+  smoke from the hole (a flame sat on every peak, the roofs looked on fire); Rimehold's tents smoke at the top too.
+- **Generated shapes:** the basalt columns stood tipped 30 degrees and the obsidian blades end over end (Python's
+  rotation order); they stand as they should. Skaldrith's ice pillars are seracs (they were blue tubes).
+- **Ground and water:** the meadow is a less saturated green with more, taller grass; the far ground no longer breaks
+  into camouflage blotches from the air (far squares average their ground); shores show a wet band at the water; the
+  beach sand is sand-coloured (it wore the snow texture and blew out white), black sand is black; the lake is a deeper
+  water (it was flat teal); the snow's texture no longer repeats in a cell pattern; the tundra's cliffs show grey rock
+  and blue ice (a floor on bright ground's brightness made them flat white walls); granite rocks read as rock on snow
+  (they read black); the solfatara's ground is sulfur crust, not flat yellow. Snowflakes are small (they were discs
+  on the lens).
+- **Night:** stars and a faint Milky Way, turning with the hours, behind the clouds.
+- The townsfolk far off no longer log a warning every frame (the hidden fangs looked for a socket on a body with no mesh).
+
+### Round island: the look pass, first round (11-22)
+
+Raven: "I want everything in this game to look as good as these caves look. Use sub agents as you need to." Subagents
+traced how everything is drawn, catalogued the art packs on disk, wrote a 183-picture survey of the island and graded
+the city and meadow against the caves. This round fixes what they found first.
+- **Real surfaces on every built thing:** the city, forts, villages, shrines, places and player bases are made of
+  blocks whose materials were procedural noise. Now:
+  - stone is dressed rock (SimpleRocks' scanned rock) in courses, each block its own;
+  - wood is scanned boards (WoodMaterialPack2, when it's installed; the old planks without it);
+  - metal is hammered iron;
+  - plaster is limewashed render;
+  - roofs are clay pantiles, thatch, wooden shingles or slate, each drawn in courses down the slope, and boards seen
+    from inside;
+  - cloth is woven.
+  Each of the city's twelve quarters roofs with its own material in natural colours (they were flat sheets of the path's
+  colour), and plaster is a shade under paper white (it blew out in the sun).
+- **Real grass:** wind-swayed grass clumps over the meadow and the steppe, cinder grass, thaw and kipuka (they were
+  cubes); flower heads are discs, grain ears rounded; reeds are tall reed grass with bulrushes.
+- **The city:**
+  - the plaza is paved with flagstones of their own sizes (they were 1.7 m slabs in even rings);
+  - the market stalls stand a little off their ring, with plank counters on trestles, canvas awnings with valances,
+    and their trade's goods (bread, produce, tools, fish, cloth, pots, arrows, herbs);
+  - street lanterns are iron frames with glass panes and a candle (they were iron boxes);
+  - towers are round under their cone roofs, the forts' too;
+  - wells have an open roof, a windlass and a bucket (a cube balanced on its edge);
+  - jettied houses overhang only their long sides, so the roof's hidden half no longer shows as a white wedge, and the
+    barn's roof no longer sticks out of its gables;
+  - the halls have fireplaces with jambs, a lintel and a mantel;
+  - the footbridge stands on piles and stone abutments.
+- **People:** five of the twelve faces (F1, F2, F3, F6, M3) had a mid-distance skin material with no textures and went
+  black from about 4 to 12 m, for townsfolk and survivors alike; fixed (Tools/art/fix_face_lod3.py). The townsfolk wear
+  everyday clothes, linen, wool and leather (they wore adventurers' armour sets that showed skin), and pick from the six
+  faces there are.
+- **Water:** the lake was drawn a metre above where it really is (the sea's material lifts its surface), so the jetty's
+  deck and the reeds stood under it; the stream's water faced down, a dry ditch from above.
+- **The lands:**
+  - generated shapes (Tools/art/make_meshes.py): hexagonal basalt columns, obsidian blades in glossy volcanic glass,
+    seracs broken off the glacier in pale glacier ice (they were stretched boulders and flat blue blocks);
+  - rocks: snow on the tundra's, ash on the volcanic's, less repetition;
+  - snow wears the snow texture with its wind ripples (it was sand, tinted white);
+  - the borders between grounds wander instead of following the 4 m grid;
+  - the boss altars are stepped stone with an iron fire bowl and a real fire (they were the engine's plain cylinder
+    and a ball);
+  - the wake-up camps have a fire ring with its fire, tents, bedrolls, a log seat, crates and a barrel;
+  - sulfur nodes are a yellow crust with small crystals, lichen nodes a lichened rock, berries small and in bunches;
+  - the meadow's trees' leaves let the light through (they read near-black).
+
 ### Round island: skylights, water, glowing seams and nests, second pass (11-22)
 
 Raven asked whether I was happy with the caves. I wasn't, and listed six things that still looked off; "Keep going then".

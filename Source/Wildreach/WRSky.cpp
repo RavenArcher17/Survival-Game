@@ -25,6 +25,9 @@
 #include "Components/PostProcessComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Engine/SkyLight.h"
@@ -205,7 +208,56 @@ void AWRSky::BeginPlay()
 	for (const FWRLandDef& L : WRLand::All()) bRoundIsland |= !L.Map.IsEmpty() && L.Map == WRLand::CurrentMap();
 	BuildMist();
 	BuildSkylightDust();
+	BuildStars();
 	Apply(true);
+}
+
+void AWRSky::BuildStars()
+{
+	if (!bRoundIsland || GetNetMode() == NM_DedicatedServer) return;
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_NightSky.M_NightSky"));
+	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (!Mat || !Sphere) return;
+	Stars = NewObject<UStaticMeshComponent>(this, TEXT("Stars"));
+	Stars->SetupAttachment(RootComponent);
+	Stars->SetUsingAbsoluteLocation(true);
+	Stars->SetUsingAbsoluteRotation(true);
+	Stars->SetUsingAbsoluteScale(true);
+	Stars->SetStaticMesh(Sphere);
+	StarsMID = UMaterialInstanceDynamic::Create(Mat, this);
+	Stars->SetMaterial(0, StarsMID);
+	Stars->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Stars->SetCastShadow(false);
+	Stars->SetCanEverAffectNavigation(false);
+	Stars->bVisibleInReflectionCaptures = false;
+	Stars->bVisibleInRealTimeSkyCaptures = false;
+	Stars->bAffectDistanceFieldLighting = false;
+	Stars->SetReceivesDecals(false);
+	// The engine sphere is 100 cm across: 60 km, past the clouds, so they draw over the stars.
+	Stars->SetWorldScale3D(FVector(FWRTuning::Get().Num(TEXT("sky.starDomeKm"), 60.f) * 1000.f));
+	Stars->SetVisibility(false);
+	Stars->RegisterComponent();
+}
+
+void AWRSky::TickStars()
+{
+	if (!Stars || !StarsMID) return;
+	const FWRTuning& T = FWRTuning::Get();
+	// Out as the sun sinks past 2 degrees under the horizon, full by 12; the weather's cloud and fog take them.
+	const float Night = (1.f - FMath::SmoothStep(-12.f, -2.f, SunElevation)) * (1.f - FMath::Clamp(WeatherAmount, 0.f, 1.f) * 0.9f);
+	Stars->SetVisibility(Night > 0.001f);
+	if (Night <= 0.001f) return;
+	FVector View;
+	if (GetViewLocation(View)) Stars->SetWorldLocation(View);
+	StarsMID->SetScalarParameterValue(TEXT("Night"), Night);
+	StarsMID->SetScalarParameterValue(TEXT("StarLevel"), T.Num(TEXT("sky.starLevel"), 2.f));
+	// The sky turns about the pole (north, sky.starPole degrees up) once a day.
+	if (const AWRGameState* State = AWRGameState::Get(this))
+	{
+		const float Pole = FMath::DegreesToRadians(T.Num(TEXT("sky.starPole"), 50.f));
+		const FVector Axis(0.f, -FMath::Cos(Pole), FMath::Sin(Pole));   // north is -Y on the island's map
+		Stars->SetWorldRotation(FQuat(Axis, State->GetHour() / 24.f * 2.f * PI));
+	}
 }
 
 void AWRSky::BuildSkylightDust()
@@ -340,6 +392,7 @@ void AWRSky::Tick(float DeltaSeconds)
 		ApplyAtmosphere(DeltaSeconds, Daylight);
 		UpdateExposure(DeltaSeconds, Daylight);
 	}
+	TickStars();
 	TickFrameStats(DeltaSeconds);
 }
 

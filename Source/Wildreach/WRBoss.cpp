@@ -225,9 +225,14 @@ AWRBossProp::AWRBossProp()
 	Mesh = MakeShapeMesh(this, TEXT("Mesh"), TEXT("/Engine/BasicShapes/Cube.Cube"));
 	RootComponent = Mesh;
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
-	// Stone from the start (anvils), so no prop ever shows the engine's plain white shape material.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Stone(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
-	if (Stone.Succeeded()) Mesh->SetMaterial(0, Stone.Object);
+	// (Its look is set in BeginPlay / OnRep_Kind, not here: loaded in a constructor at startup, M_BuildStone was held for
+	// the editor's whole run and the material scripts could no longer rebuild it.)
+}
+
+void AWRBossProp::BeginPlay()
+{
+	Super::BeginPlay();
+	OnRep_Kind();   // every machine: the default anvil's look too (its Kind never replicates a change)
 }
 
 void AWRBossProp::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -272,13 +277,34 @@ void AWRBossProp::OnRep_Kind()
 		// The island's ice (the frozen-ground material); the old pale tint on the shape material read as plain white.
 		if (UMaterialInterface* Ice = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Ice.M_Ice"))) Mesh->SetMaterial(0, Ice);
 		else TintMesh(Mesh, FLinearColor(0.65f, 0.85f, 1.f));
+		// Drawn as a serac (11-22: the cylinder alone read as a blue tube): a generated ice tower (/Game/Art/Gen) about
+		// the pillar's width and 8.6 m tall, each turned its own way; the cylinder stays, hidden, as what blocks.
+		static const FName LookName(TEXT("SeracLook"));
+		const uint32 Seed = GetTypeHash(FIntVector(GetActorLocation() / 50.f));
+		UStaticMesh* Serac = LoadObject<UStaticMesh>(nullptr, (Seed & 1) ? TEXT("/Game/Art/Gen/SM_Serac_B.SM_Serac_B") : TEXT("/Game/Art/Gen/SM_Serac_A.SM_Serac_A"));
+		if (Serac && !FindObjectFast<UStaticMeshComponent>(this, LookName))
+		{
+			UStaticMeshComponent* Look = NewObject<UStaticMeshComponent>(this, LookName);
+			Look->SetupAttachment(Mesh);
+			Look->SetUsingAbsoluteScale(true);
+			Look->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Look->SetStaticMesh(Serac);
+			const float W = Radius * 2.3f / 260.f;
+			Look->SetRelativeLocation(FVector(0.f, 0.f, -50.f));   // the cylinder's foot (its scale is the parent's)
+			Look->SetRelativeRotation(FRotator(0.f, float(Seed % 360u), 0.f));
+			Look->SetWorldScale3D(FVector(W, W, 860.f / FMath::Max(1.f, Serac->GetBoundingBox().GetSize().Z)));
+			if (UMaterialInterface* IceBlock = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_IceBlock.M_IceBlock"))) Look->SetMaterial(0, IceBlock);
+			Look->RegisterComponent();
+			Mesh->SetVisibility(false);
+		}
 	}
 	else
 	{
-		// Anvil: a raised stone block to stand on when the floor floods (coursed building stone, set in the constructor).
+		// Anvil: a raised stone block to stand on when the floor floods (coursed building stone).
 		Radius = WRTune(TEXT("bosses.anvilHalfSize"), 160.f);
 		Mesh->SetRelativeScale3D(FVector(Radius / 50.f, Radius / 50.f, 1.5f));
-		if (!LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildStone.M_BuildStone"))) TintMesh(Mesh, FLinearColor(0.18f, 0.16f, 0.15f));
+		if (UMaterialInterface* Stone = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildStone.M_BuildStone"))) Mesh->SetMaterial(0, Stone);
+		else TintMesh(Mesh, FLinearColor(0.18f, 0.16f, 0.15f));
 	}
 }
 

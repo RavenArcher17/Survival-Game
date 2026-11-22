@@ -78,6 +78,11 @@ $edHave = @($edList | Where-Object { Test-Path (Join-Path $root ('Content\' + $_
 if ($edHave -eq $edList.Count) { Write-Host "PASS  Electric Dreams forest kit ($edHave packages)" -ForegroundColor Green }
 else { Note "Electric Dreams forest kit: $edHave of $($edList.Count) packages. The forest draws its tree kit without them; to add them: Tools\art\electric_dreams_forest.ps1 -From <an Electric Dreams project> (README in the script), then its commandlet." }
 
+# Optional: the scanned boards the building materials wear (M_BuildWood / M_BuildTinted, set at run time by FWRBuildLook::Material).
+$wood = @(Get-ChildItem (Join-Path $root "Content\WoodMaterialPack2\Textures") -Filter *.uasset -ErrorAction SilentlyContinue).Count
+if ($wood -gt 0) { Write-Host "PASS  WoodMaterialPack2 ($wood textures): buildings wear scanned wood" -ForegroundColor Green }
+else { Note "WoodMaterialPack2 is not in Content: buildings keep their procedural planks. To match Raven's look, add 'Wood Material Pack 2' from Fab (or copy Content\WoodMaterialPack2 from Raven)." }
+
 # Packaging crashes cooking these four Barghest pack files (no skeleton); the game never uses them.
 $bad = @('SK_BARGHEST_MANE', 'SK_BARGHEST_TAIL', 'BARGHEST_MANE_Anim', 'BARGHEST_TAIL_Anim') | ForEach-Object {
 	Get-ChildItem (Join-Path $root 'Content\QuadrapedCreatures') -Recurse -Filter "$_.uasset" -ErrorAction SilentlyContinue

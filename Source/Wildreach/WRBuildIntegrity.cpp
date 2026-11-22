@@ -306,7 +306,7 @@ void AWRRubble::MakeChunks()
 	const bool bTinted = Tier && Tier->Look.Style != TEXT("wood") && Tier->Look.Style != TEXT("stone");
 	const TCHAR* MatPath = bTinted ? TEXT("/Game/Building/M_BuildTinted.M_BuildTinted")
 		: Def->Material == TEXT("wood") ? TEXT("/Game/Building/M_BuildWood.M_BuildWood") : TEXT("/Game/Building/M_BuildStone.M_BuildStone");
-	Pieces->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, MatPath));
+	Pieces->SetMaterial(0, FWRBuildLook::MaterialAt(MatPath));
 	Pieces->SetNumCustomDataFloats(bTinted ? 10 : 3);
 	Pieces->RegisterComponent();
 	for (int32 i = 0; i < Chunks.Num(); ++i)

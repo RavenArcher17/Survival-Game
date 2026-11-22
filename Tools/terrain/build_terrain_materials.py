@@ -139,6 +139,61 @@ def world_uvs(scale_cm):
 
 ISM = (unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES,)
 
+# World-space triplanar helpers (the caves' and the rocks' materials).
+def tri_weights():
+    n = expr(unreal.MaterialExpressionVertexNormalWS)
+    a = expr(unreal.MaterialExpressionAbs)
+    link(n, a)
+    p = mul(mul(a, a), mul(a, a))
+    s = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionAdd, mask(p, "r"), mask(p, "g")), mask(p, "b"))
+    return n, op(unreal.MaterialExpressionDivide, p, s)
+
+
+def append(a, b):
+    return op(unreal.MaterialExpressionAppendVector, a, b)
+
+
+def add(a, b):
+    return op(unreal.MaterialExpressionAdd, a, b)
+
+
+def tri_uvs(wp, scale_cm):
+    x, y, z = mask(wp, "r"), mask(wp, "g"), mask(wp, "b")
+    return mul(append(y, z), k=1.0 / scale_cm), mul(append(x, z), k=1.0 / scale_cm), mul(append(x, y), k=1.0 / scale_cm)
+
+
+def tri_colour(path, uvs, w):
+    cx, cy, cz = [sample(path, uv) for uv in uvs]
+    return add(add(mul(cx, mask(w, "r")), mul(cy, mask(w, "g"))), mul(cz, mask(w, "b")))
+
+
+def tri_bump(path, uvs, w, strength):
+    """The texture's normal from the three projections as a world-space offset to add to the surface's normal."""
+    tx, ty, tz = [mask(sample(path, uv), "r", "g") for uv in uvs]
+    zero = expr(unreal.MaterialExpressionConstant, r=0.0)
+    vx = append(zero, tx)                                   # (0, u, v): the X projection runs (Y, Z)
+    vy = append(append(mask(ty, "r"), zero), mask(ty, "g"))  # (u, 0, v)
+    vz = append(tz, zero)                                   # (u, v, 0)
+    return mul(add(add(mul(vx, mask(w, "r")), mul(vy, mask(w, "g"))), mul(vz, mask(w, "b"))), k=strength)
+
+
+def vc_alpha(vc):
+    """The vertex colour's alpha (its first output is RGB only: masking it for A fails to compile)."""
+    e = expr(unreal.MaterialExpressionComponentMask, r=True)
+    link(vc, e, "", "A")
+    return e
+
+
+def normalized(v):
+    e = expr(unreal.MaterialExpressionNormalize)
+    link(v, e, "VectorInput")
+    return e
+
+
+def lin(rgb):
+    return const3(tuple((c / 255.0) ** 2.2 for c in rgb))
+
+
 # ================================================================ M_IslandAuto (landscape)
 if want("island"):
     begin("/Game/Terrain/M_IslandAuto")
@@ -177,12 +232,41 @@ if want("island"):
 if want("rock"):
     # Nanite too: the cave boulders are Nanite meshes, and without the flag cooked builds draw them in the default material.
     begin("/Game/Terrain/M_Rock", ISM + (unreal.MaterialUsage.MATUSAGE_NANITE,))
-    wp, uv_top, uv_side = world_uvs(300.0)
-    up = sat(mul(mask(expr(unreal.MaterialExpressionVertexNormalWS), "b"), k=1.5))
-    top_c, side_c = sample("Ground/TEX_MWAM_Rock_col", uv_top), sample("Ground/TEX_MWAM_Rock_col", uv_side)
-    top_n, side_n = sample("Ground/TEX_MWAM_Rock_nrm", uv_top), sample("Ground/TEX_MWAM_Rock_nrm", uv_side)
+    # 11-22 ("everything as good as the caves"): projected along all three axes (blended by the surface's own normal, as
+    # the caves'), with a broad tone variation so a field of the same six meshes doesn't repeat, and three optional
+    # coats on the faces turned up: Snow (the tundra's rocks), Dust (the volcanic ash settled on them), Lichen (patches
+    # of pale sage and orange crust; the lichen node). All 0 by default: the boulders as before, only less repetitive.
+    mat.set_editor_property("tangent_space_normal", False)
+    wp = expr(unreal.MaterialExpressionWorldPosition)
+    n, w = tri_weights()
+    uvs = tri_uvs(wp, 300.0)
+    rock = tri_colour("Ground/TEX_MWAM_Rock_col", uvs, w)
     tint_p = expr(unreal.MaterialExpressionVectorParameter, parameter_name="Tint", default_value=unreal.LinearColor(0.5, 0.5, 0.5, 1))
-    finish(mul(lerp(side_c, top_c, up), tint_p), lerp(side_n, top_n, up), expr(unreal.MaterialExpressionConstant, r=0.88))
+    side = append(add(mask(wp, "r"), mask(wp, "g")), mask(wp, "b"))
+    macro = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 1800.0)), "r")
+    base = mul(mul(mask(rock, "r", "g", "b"), tint_p), lerp(None, None, macro, const_a=0.78, const_b=1.18))
+    rock_n = tri_bump("Ground/TEX_MWAM_Rock_nrm", uvs, w, 1.0)
+    up = sat(mul(op(unreal.MaterialExpressionSubtract, mask(n, "b"), const_b=0.45), k=3.0))
+    breakup = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 240.0)), "b")
+    fine = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 45.0)), "g")
+    scalar = lambda name: expr(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=0.0)
+    # Dust: pale grey ash in the hollows of the up faces.
+    dust = sat(mul(mul(up, scalar("Dust")), lerp(None, None, breakup, const_a=0.5, const_b=1.4)))
+    base = lerp(base, lin((92, 88, 84)), mul(dust, k=0.75))
+    # Lichen: blotches (where the breakup noise is high) on faces turned up or out, pale sage with orange spots.
+    blotch = sat(mul(op(unreal.MaterialExpressionSubtract, add(breakup, mul(fine, k=0.35)), const_b=0.72), k=6.0))
+    lichen = mul(mul(blotch, scalar("Lichen")), sat(add(up, expr(unreal.MaterialExpressionConstant, r=0.35))))
+    lichen_c = lerp(lin((150, 160, 118)), lin((176, 104, 40)), sat(mul(op(unreal.MaterialExpressionSubtract, fine, const_b=0.78), k=8.0)))
+    base = lerp(base, lichen_c, lichen)
+    # Snow: on the faces turned up, ragged at its edge.
+    snow = sat(mul(op(unreal.MaterialExpressionSubtract, add(up, mul(op(unreal.MaterialExpressionSubtract, breakup, const_b=0.5), k=0.6)), const_b=0.35), k=4.0))
+    snow = mul(snow, scalar("Snow"))
+    snow_n = tri_bump("Ground/TEX_MWAM_Snow_nrm", tri_uvs(wp, 180.0), w, 0.6)
+    base = lerp(base, lerp(lin((214, 226, 238)), lin((192, 206, 224)), breakup), snow)
+    normal = normalized(add(n, lerp(rock_n, snow_n, snow)))
+    rough = lerp(lerp(expr(unreal.MaterialExpressionConstant, r=0.88), expr(unreal.MaterialExpressionConstant, r=0.95), dust),
+                 expr(unreal.MaterialExpressionConstant, r=0.75), snow)
+    finish(base, normal, rough)
 
 # ================================================================ M_Lava (the lava flow)
 # Raven saw "weird lava squares": flat pale-pink sheets. The old glow was the LavaMat emissive everywhere at x14, which
@@ -385,58 +469,6 @@ if want("swamp"):
 # no tangents, so both materials light world-space normals made here: the texture's normal taken from three world
 # projections (X, Y and Z, blended by the surface's own normal) and added to the surface's normal (tangent_space_normal
 # off). The vertex colour carries the colour the mesh worked out (RGB) and its roughness (A).
-def tri_weights():
-    n = expr(unreal.MaterialExpressionVertexNormalWS)
-    a = expr(unreal.MaterialExpressionAbs)
-    link(n, a)
-    p = mul(mul(a, a), mul(a, a))
-    s = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionAdd, mask(p, "r"), mask(p, "g")), mask(p, "b"))
-    return n, op(unreal.MaterialExpressionDivide, p, s)
-
-
-def append(a, b):
-    return op(unreal.MaterialExpressionAppendVector, a, b)
-
-
-def add(a, b):
-    return op(unreal.MaterialExpressionAdd, a, b)
-
-
-def tri_uvs(wp, scale_cm):
-    x, y, z = mask(wp, "r"), mask(wp, "g"), mask(wp, "b")
-    return mul(append(y, z), k=1.0 / scale_cm), mul(append(x, z), k=1.0 / scale_cm), mul(append(x, y), k=1.0 / scale_cm)
-
-
-def tri_colour(path, uvs, w):
-    cx, cy, cz = [sample(path, uv) for uv in uvs]
-    return add(add(mul(cx, mask(w, "r")), mul(cy, mask(w, "g"))), mul(cz, mask(w, "b")))
-
-
-def tri_bump(path, uvs, w, strength):
-    """The texture's normal from the three projections as a world-space offset to add to the surface's normal."""
-    tx, ty, tz = [mask(sample(path, uv), "r", "g") for uv in uvs]
-    zero = expr(unreal.MaterialExpressionConstant, r=0.0)
-    vx = append(zero, tx)                                   # (0, u, v): the X projection runs (Y, Z)
-    vy = append(append(mask(ty, "r"), zero), mask(ty, "g"))  # (u, 0, v)
-    vz = append(tz, zero)                                   # (u, v, 0)
-    return mul(add(add(mul(vx, mask(w, "r")), mul(vy, mask(w, "g"))), mul(vz, mask(w, "b"))), k=strength)
-
-
-def vc_alpha(vc):
-    """The vertex colour's alpha (its first output is RGB only: masking it for A fails to compile)."""
-    e = expr(unreal.MaterialExpressionComponentMask, r=True)
-    link(vc, e, "", "A")
-    return e
-
-
-def normalized(v):
-    e = expr(unreal.MaterialExpressionNormalize)
-    link(v, e, "VectorInput")
-    return e
-
-
-def lin(rgb):
-    return const3(tuple((c / 255.0) ** 2.2 for c in rgb))
 
 
 if want("caverock"):
@@ -587,3 +619,139 @@ if want("caveice"):
     glow_p = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Glow", default_value=0.0)
     emissive = mul(mul(mul(lerp(lin((60, 140, 230)), lin((150, 205, 245)), strata), thin), ice), glow_p)
     finish(base, normal, rough, emissive)
+
+if want("iceblock"):
+    # 11-22 ("everything as good as the caves"): glacier ice for loose ice in the open and in the Blue Below's corridor
+    # (seracs, ice boulders, the tube's walls; they were the engine's flat shape material in pale blue). The caves' ice
+    # without their vertex data: level strata of pale and deep blue bent by noise, deeper knots, now and then a band of
+    # grit, scalloped; snow lying on the faces turned up (and everywhere with "Snow" 1: the drifts). "Tint" shifts it.
+    begin("/Game/Terrain/M_IceBlock", ISM)
+    mat.set_editor_property("tangent_space_normal", False)
+    wp = expr(unreal.MaterialExpressionWorldPosition)
+    n, w = tri_weights()
+    side = append(add(mask(wp, "r"), mask(wp, "g")), mask(wp, "b"))
+    warp = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 1500.0)), "r")
+    knots = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 420.0)), "g")
+    f = expr(unreal.MaterialExpressionFrac)
+    link(add(mul(mask(wp, "b"), k=1.0 / 95.0), mul(warp, k=1.4)), f)
+    tri_wave = expr(unreal.MaterialExpressionAbs)
+    link(op(unreal.MaterialExpressionSubtract, mul(f, k=2.0), const_b=1.0), tri_wave)
+    strata = sat(mul(op(unreal.MaterialExpressionSubtract, tri_wave, const_b=0.25), k=2.0))
+    # (glacier ice is mostly white and pale cyan, deep blue only in its hollows: saturated, it read as blue plastic)
+    ice_c = lerp(lin((150, 188, 214)), lin((214, 230, 242)), strata)
+    ice_c = lerp(ice_c, lin((92, 146, 198)), mul(sat(mul(op(unreal.MaterialExpressionSubtract, knots, const_b=0.6), k=3.0)), k=0.4))
+    fd = expr(unreal.MaterialExpressionFrac)
+    link(add(mul(mask(wp, "b"), k=1.0 / 330.0), mul(warp, k=0.7)), fd)
+    dirt = sat(mul(op(unreal.MaterialExpressionSubtract, fd, const_b=0.93), k=14.0))
+    ice_c = lerp(ice_c, lin((96, 100, 104)), mul(dirt, k=0.5))
+    ice_c = mul(ice_c, expr(unreal.MaterialExpressionVectorParameter, parameter_name="Tint", default_value=unreal.LinearColor(1.0, 1.0, 1.0, 1.0)))
+    big, small, snow_uv = tri_uvs(wp, 300.0), tri_uvs(wp, 460.0), tri_uvs(wp, 160.0)
+    ice_bump = add(tri_bump("Ground/TEX_MWAM_Stones_nrm", big, w, -0.24), tri_bump("Ground/TEX_MWAM_Rock_nrm", small, w, 0.14))
+    snow_bump = tri_bump("Ground/TEX_MWAM_Snow_nrm", snow_uv, w, 0.7)
+    up = sat(mul(op(unreal.MaterialExpressionSubtract, mask(n, "b"), const_b=0.55), k=4.0))
+    breakup = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 260.0)), "b")
+    snow_amt = sat(add(add(mul(up, lerp(None, None, breakup, const_a=0.7, const_b=1.3)),
+                         expr(unreal.MaterialExpressionScalarParameter, parameter_name="Snow", default_value=0.0)), expr(unreal.MaterialExpressionConstant, r=0.0)))
+    snow_c = lerp(lin((214, 226, 238)), lin((192, 206, 224)), breakup)
+    base = lerp(ice_c, snow_c, snow_amt)
+    rough = lerp(expr(unreal.MaterialExpressionConstant, r=0.38), expr(unreal.MaterialExpressionConstant, r=0.82), snow_amt)
+    normal = normalized(add(n, lerp(ice_bump, snow_bump, snow_amt)))
+    finish(base, normal, rough, specular=expr(unreal.MaterialExpressionConstant, r=0.45))
+
+if want("obsidian"):
+    # 11-22: volcanic glass for the obsidian blades (they were boulders tinted black, matte): near black, glossy, the faint
+    # ripples of a conchoidal fracture in its relief, a smoky brown where it's thin at grazing angles.
+    begin("/Game/Terrain/M_Obsidian", ISM)
+    mat.set_editor_property("tangent_space_normal", False)
+    wp = expr(unreal.MaterialExpressionWorldPosition)
+    n, w = tri_weights()
+    ripples = tri_bump("Ground/TEX_MWAM_Stones_nrm", tri_uvs(wp, 140.0), w, 0.22)
+    normal = normalized(add(n, ripples))
+    fres = expr(unreal.MaterialExpressionFresnel, exponent=3.0, base_reflect_fraction=0.0)
+    base = lerp(lin((10, 10, 13)), lin((34, 26, 22)), mul(fres, k=0.6))
+    side = append(add(mask(wp, "r"), mask(wp, "g")), mask(wp, "b"))
+    var = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 300.0)), "r")
+    rough = lerp(None, None, var, const_a=0.06, const_b=0.2)
+    finish(base, normal, rough, specular=expr(unreal.MaterialExpressionConstant, r=0.6))
+
+if want("nightsky"):
+    # 11-22 (the whole-game look pass: the night had no stars): the stars on a dome round the camera (WRSky BuildStars, a
+    # 60 km sphere so the clouds draw over them: Apply Cloud Fogging), additive and unlit, only where the view meets the
+    # sky (the scene's depth past 40 km). A hashed star field in two layers (many faint, a few bright, each its own
+    # tint, a little twinkle), kept about a pixel across at any distance, a faint Milky Way band, all fading into the
+    # haze near the horizon. Directions are the dome's own, so turning the dome (the hours) turns the sky. Parameters:
+    # Night (0..1, WRSky by the sun's depth and the weather), StarLevel. Held at a steady on-screen brightness.
+    begin("/Game/Terrain/M_NightSky")
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("two_sided", True)
+    mat.set_editor_property("disable_depth_test", True)
+    for prop in ("apply_cloud_fogging", "apply_fogging"):
+        try:
+            mat.set_editor_property(prop, prop == "apply_cloud_fogging")
+        except Exception as ex:
+            unreal.log_warning(f"[Wildreach] nightsky: no {prop} ({ex})")
+    cam = expr(unreal.MaterialExpressionCameraVectorWS)
+    d_world = mul(cam, k=-1.0)
+    d_local = expr(unreal.MaterialExpressionTransform,
+                   transform_source_type=unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD,
+                   transform_type=unreal.MaterialVectorCoordTransform.TRANSFORM_LOCAL)
+    link(d_world, d_local)
+    stars = expr(unreal.MaterialExpressionCustom, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Stars", code="""
+float3 d = normalize(D);
+float3 col = 0;
+for (int L = 0; L < 2; L++)
+{
+    float sc = L == 0 ? 460.0 : 160.0;
+    float dens = L == 0 ? 0.78 : 0.955;
+    float3 p = d * sc;
+    float3 c = floor(p);
+    float3 f = p - c;
+    uint3 H = uint3(c + 8192.0);
+    uint N = (H.x * 73856093u) ^ (H.y * 19349663u) ^ (H.z * 83492791u);
+    N = (N ^ 61u) ^ (N >> 16); N *= 9u; N = N ^ (N >> 4); N *= 0x27d4eb2du; N = N ^ (N >> 15);
+    float h = (N & 0xffffu) / 65535.0;
+    float h2 = (N >> 16) / 65535.0;
+    if (h > dens)
+    {
+        float3 o = frac(float3(h2 * 13.7, h2 * 71.3, h2 * 197.9)) * 0.6 + 0.2;
+        float r = length(f - o);
+        float px = max(length(ddx(p)), length(ddy(p)));
+        float s = max(px * 1.2, 0.015);
+        float b = saturate(1.0 - r / s);
+        b *= b;
+        float mag = pow((h - dens) / (1.0 - dens), 2.5) * (L == 0 ? 0.6 : 3.0);
+        mag *= 0.8 + 0.2 * sin(T * (1.5 + h2 * 4.0) + h2 * 40.0);
+        float3 tint = lerp(float3(0.72, 0.82, 1.0), float3(1.0, 0.86, 0.66), frac(h2 * 7.31));
+        col += tint * b * mag;
+    }
+}
+float3 A = normalize(float3(0.32, -0.58, 0.75));
+float m = dot(d, A);
+float band = exp(-m * m / 0.018);
+float clump = 0.55 + 0.45 * sin(d.x * 11.0 + sin(d.y * 7.0) * 2.0) * sin(d.y * 9.0 + d.z * 13.0);
+col += float3(0.75, 0.8, 1.0) * band * clump * 0.035;
+return col * saturate((U - 0.015) / 0.14);
+""")
+    ins = []
+    for name in ("D", "U", "T"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        ins.append(ci)
+    stars.set_editor_property("inputs", ins)
+    link(d_local, stars, "D")
+    link(mask(d_world, "b"), stars, "U")
+    link(expr(unreal.MaterialExpressionTime), stars, "T")
+    depth = expr(unreal.MaterialExpressionSceneDepth)
+    sky = sat(mul(op(unreal.MaterialExpressionSubtract, depth, const_b=4.0e6), k=1.0e-6))
+    night = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Night", default_value=1.0)
+    level = expr(unreal.MaterialExpressionScalarParameter, parameter_name="StarLevel", default_value=2.0)
+    steady = expr(unreal.MaterialExpressionEyeAdaptationInverse)
+    ok_l = any(mel.connect_material_expressions(mul(night, level), "", steady, p) for p in ("LightValue", "Light Value", "LightValueInput"))
+    ok_a = any(mel.connect_material_expressions(expr(unreal.MaterialExpressionConstant, r=0.8), "", steady, p) for p in ("Alpha", "AlphaInput"))
+    if not (ok_l and ok_a):
+        unreal.log_error(f"[Wildreach] nightsky: EyeAdaptationInverse inputs not connected ({ok_l} {ok_a})")
+    mel.connect_material_property(mul(mul(stars, sky), steady), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")

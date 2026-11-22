@@ -782,8 +782,8 @@ static UMaterialInterface* SurfaceFor(const FWRPieceDef& Def)
 	{
 		return nullptr;
 	}
-	static UMaterialInterface* Wood = LoadRooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildWood.M_BuildWood"));
-	static UMaterialInterface* Stone = LoadRooted<UMaterialInterface>(TEXT("/Game/Building/M_BuildStone.M_BuildStone"));
+	static UMaterialInterface* Wood = FWRBuildLook::Material(EWRLookMat::Wood);
+	static UMaterialInterface* Stone = FWRBuildLook::Material(EWRLookMat::Stone);
 	return Def.Material == TEXT("stone") || Def.Id == TEXT("brazier") ? Stone : Wood;
 }
 

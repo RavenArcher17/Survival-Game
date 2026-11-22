@@ -21,7 +21,7 @@ namespace WRResourceLookParts
 	FString Prop(const TCHAR* Folder, const TCHAR* Name) { return FString::Printf(TEXT("/Game/Props/%s/%s/StaticMeshes/%s.%s"), Folder, Name, Name, Name); }
 
 	/** A tinted copy of the project's world-aligned rock material (the island's boulders use the same). */
-	UMaterialInterface* RockMaterial(UObject* Outer, const FLinearColor& Tint)
+	UMaterialInterface* RockMaterial(UObject* Outer, const FLinearColor& Tint, float Snow = 0.f, float Lichen = 0.f, float Dust = 0.f)
 	{
 		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_Rock.M_Rock"));
 		if (!Base)
@@ -30,6 +30,10 @@ namespace WRResourceLookParts
 		}
 		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Base, Outer);
 		MID->SetVectorParameterValue(TEXT("Tint"), Tint);
+		// M_Rock's coats on the faces turned up (11-22): snow, lichen crust, settled ash.
+		MID->SetScalarParameterValue(TEXT("Snow"), Snow);
+		MID->SetScalarParameterValue(TEXT("Lichen"), Lichen);
+		MID->SetScalarParameterValue(TEXT("Dust"), Dust);
 		return MID;
 	}
 
@@ -332,30 +336,33 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		}
 		else
 		{
-			Tint(RockMaterial(Node, bForest ? FLinearColor(0.3f, 0.34f, 0.26f) : bStorm ? GraniteTint : bTundra ? FrostTint : BasaltTint));
+			Tint(RockMaterial(Node, bForest ? FLinearColor(0.3f, 0.34f, 0.26f) : bStorm ? GraniteTint : bTundra ? FrostTint : BasaltTint, bTundra ? 0.8f : 0.f, bForest ? 0.6f : 0.f, !bForest && !bStorm && !bTundra ? 0.5f : 0.f));
 			Bits->SetStaticMesh(nullptr);
 		}
 	}
 	else if (Item == TEXT("sulfur_crystal"))
 	{
-		// A cluster of yellow sulfur crystals growing out of a low dark rock: stretched rock shards leaning outward.
-		Place(Fit(Main, FVector(115.f, 100.f, 42.f), 12.f));
-		Tint(RockMaterial(Node, BasaltTint));
-		Bits->SetStaticMesh(Shard);
+		// A sulfur vent's crust: a low rock caked yellow, small crystals crowded on its top, and yellow crust spread on the
+		// ground round it. (11-22: it was a fan of 2-3 m golden shards that read as plastic.)
+		Place(Fit(Main, FVector(130.f, 115.f, 48.f), 12.f));
+		Tint(RockMaterial(Node, FLinearColor(1.35f, 1.05f, 0.22f)));
+		// The crystals: sulfur's double points (Tools/art/make_meshes.py), else the rock shards.
+		UStaticMesh* Crystal = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Art/Gen/SM_SulfurCrystal.SM_SulfurCrystal"));
+		Bits->SetStaticMesh(Crystal ? Crystal : Shard);
 		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(2.6f, 2.0f, 0.12f)));  // bright sulfur yellow over the dark rock texture
-		const int32 N = 9;
-		for (int32 k = 0; k < N; ++k)
+		for (int32 k = 0; k < 22; ++k)
 		{
-			const float A = (k + Rand.FRandRange(-0.35f, 0.35f)) * 2.f * PI / N;
-			const float Lean = k == 0 ? 0.f : Rand.FRandRange(12.f, 38.f);
-			// Sized against the rock mesh's bounds, which run well past the rock itself (so are the shards').
-			const float Len = k == 0 ? 280.f : Rand.FRandRange(150.f, 240.f);
-			const float W = Len * Rand.FRandRange(0.18f, 0.26f);
-			const FVector Foot(FMath::Cos(A) * (k == 0 ? 0.f : 30.f), FMath::Sin(A) * (k == 0 ? 0.f : 26.f), 22.f);
-			// Tip away from the middle: pitch the shard's long (Z) axis outward along A.
+			const float A = Rand.FRandRange(0.f, 2.f * PI), D = Rand.FRandRange(0.f, 42.f);
+			const float Lean = Rand.FRandRange(5.f, 45.f);
+			const float Len = Rand.FRandRange(24.f, 60.f), W = Len * Rand.FRandRange(0.22f, 0.32f);
+			const FVector Foot(FMath::Cos(A) * D, FMath::Sin(A) * D * 0.9f, 30.f - D * 0.25f);
 			const FQuat Q = FQuat(FVector(-FMath::Sin(A), FMath::Cos(A), 0.f), FMath::DegreesToRadians(Lean));
-			const FVector Centre = Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.45f));
-			Bit(Centre, Q.Rotator() + FRotator(0.f, 0.f, 0.f), FVector(W, W * 0.85f, Len));
+			Bit(Foot + Q.RotateVector(FVector(0.f, 0.f, Len * 0.35f)), Q.Rotator(), FVector(W, W * 0.85f, Len));
+		}
+		for (int32 k = 0; k < 6; ++k)
+		{
+			const float A = (k + Rand.FRandRange(-0.3f, 0.3f)) * 2.f * PI / 6.f, D = Rand.FRandRange(80.f, 125.f), S = Rand.FRandRange(50.f, 85.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, -2.f), FRotator(Rand.FRandRange(-3.f, 3.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(S, S * 0.8f, 7.f));
 		}
 	}
 	else if (Item == TEXT("greywood"))
@@ -576,17 +583,17 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 	}
 	else if (Item == TEXT("lichen"))
 	{
-		// A frosted rock crusted with pale green lichen: flat pads over its top and spreading on the snow at its foot.
+		// A frosted rock crusted with lichen: pale sage blotches and orange spots in the rock's own surface (M_Rock's lichen
+		// coat), a little snow on its top, a few lichened stones round its foot. (11-22: the lichen was green slabs on it.)
 		Place(Fit(Main, FVector(160.f, 140.f, 85.f), 20.f));
-		Tint(RockMaterial(Node, FLinearColor(0.75f, 0.8f, 0.86f)));
+		Tint(RockMaterial(Node, FLinearColor(0.62f, 0.64f, 0.66f), 0.35f, 1.f));
 		Bits->SetStaticMesh(Shard);
-		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(1.1f, 1.45f, 0.6f)));  // pale sage green
-		Bit(FVector(0.f, 0.f, 60.f), FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(95.f, 80.f, 16.f));
-		for (int32 k = 0; k < 6; ++k)
+		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(0.6f, 0.62f, 0.64f), 0.2f, 1.f));
+		for (int32 k = 0; k < 5; ++k)
 		{
-			const float A = (k + Rand.FRandRange(-0.3f, 0.3f)) * 2.f * PI / 6.f;
-			const float D = Rand.FRandRange(70.f, 115.f), S = Rand.FRandRange(55.f, 90.f);
-			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 0.f), FRotator(Rand.FRandRange(-4.f, 4.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(S, S * 0.75f, 10.f));
+			const float A = (k + Rand.FRandRange(-0.3f, 0.3f)) * 2.f * PI / 5.f;
+			const float D = Rand.FRandRange(95.f, 130.f), S = Rand.FRandRange(22.f, 40.f);
+			Bit(FVector(FMath::Cos(A) * D, FMath::Sin(A) * D, 2.f), FRotator(Rand.FRandRange(-10.f, 10.f), Rand.FRandRange(0.f, 360.f), 0.f), FVector(S, S * 0.8f, S * 0.5f));
 		}
 	}
 	else if (Item == TEXT("berries"))
@@ -611,12 +618,17 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		Bits->SetMaterial(0, RockMaterial(Node, FLinearColor(2.2f, 0.06f, 0.12f)));
 		const FBox Box = Main->GetBoundingBox();
 		const float Width = FMath::Max(Box.GetSize().X, Box.GetSize().Y) * (BushH / FMath::Max(1.f, Box.GetSize().Z)) * 0.45f;  // the leafy part
-		for (int32 k = 0; k < 18; ++k)
+		// Bunches of three to six small berries (they were single 10-14 cm balls: apples).
+		for (int32 k = 0; k < 14; ++k)
 		{
 			const float A = Rand.FRandRange(0.f, 2.f * PI), H = Rand.FRandRange(0.3f, 0.95f);
 			const float R = Width * 0.5f * FMath::Lerp(0.9f, 0.5f, H) * Rand.FRandRange(0.8f, 1.05f);
-			const float S = Rand.FRandRange(10.f, 14.f);
-			Bit(FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, LeafH * H - 8.f), FRotator::ZeroRotator, FVector(S));
+			const FVector C(FMath::Cos(A) * R, FMath::Sin(A) * R, LeafH * H - 8.f);
+			for (int32 b = 3 + Rand.RandHelper(4); b > 0; --b)
+			{
+				const float S = Rand.FRandRange(3.2f, 4.6f);
+				Bit(C + FVector(Rand.FRandRange(-4.f, 4.f), Rand.FRandRange(-4.f, 4.f), Rand.FRandRange(-5.f, 2.f)), FRotator::ZeroRotator, FVector(S));
+			}
 		}
 	}
 	else if (Item == TEXT("fiber"))

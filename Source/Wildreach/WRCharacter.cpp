@@ -148,7 +148,9 @@ AWRCharacter::AWRCharacter(const FObjectInitializer& ObjectInitializer)
 	HaloCrest->SetVisibility(false);
 	HaloCrest->bCastHiddenShadow = true;
 	Canines = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Canines"));
-	Canines->SetupAttachment(Body, TEXT("teeth_upper"));
+	// On the teeth socket only while worn (WRHeroLook): attached there always, every body without a mesh loaded (the
+	// townsfolk far off) logged a missing-socket warning each frame.
+	Canines->SetupAttachment(Body);
 	Canines->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Canines->SetVisibility(false);
 	Canines->SetCastShadow(false);

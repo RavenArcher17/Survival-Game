@@ -55,6 +55,9 @@ struct FWRIsleSite
 	void Glowmoth(const FVector& At, float Phase);
 	/** A pack rock (SimpleRocks) fitted to Size, its foot at Base (local), in a tinted rock material. */
 	void Rock(int32 Which, const FVector& Size, const FVector& Base, const FRotator& Rot, const FLinearColor& Tint, bool bCollide, float Sink = 10.f);
+	/** A tower or block of glacier ice (Tools/art/make_meshes.py's seracs in M_IceBlock: snow on its faces turned up, all
+	 *  snow with Snow 1) fitted to Size, its foot at Base (local). Where the mesh isn't there, a look-kit block. */
+	UStaticMeshComponent* Ice(int32 Which, const FVector& Size, const FVector& Base, const FRotator& Rot, bool bCollide, float Sink = 40.f, float Snow = 0.f);
 	/** Instances of a pack mesh (pines, char trees, shrubs) at local transforms (scale fits Height cm tall). */
 	void Meshes(const TCHAR* Path, const TArray<FTransform>& Local, float Height, float Cull, const FLinearColor* Coat = nullptr);
 	/** A hazard of this place (key = the place's key + its count). */

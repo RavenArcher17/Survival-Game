@@ -22,8 +22,11 @@ namespace WRLookKit
 		static FSurf Glass(const FLinearColor& C, float Glow = 0.f) { FSurf S; S.Color = C; S.Rough = 0.08f; S.Glow = Glow; S.Pattern = WRLookPattern::Smooth; return S; }
 		static FSurf Glaze(const FLinearColor& C, float Rough = 0.25f) { FSurf S; S.Color = C; S.Rough = Rough; S.Pattern = WRLookPattern::Smooth; return S; }
 		static FSurf Lit(const FLinearColor& C, float Glow) { FSurf S; S.Color = C; S.Rough = 0.5f; S.Glow = Glow; S.Pattern = WRLookPattern::Smooth; return S; }
-		static FSurf Cloth(const FLinearColor& C) { FSurf S; S.Color = C; S.Rough = 0.95f; S.Pattern = WRLookPattern::Mottle; return S; }
+		static FSurf Cloth(const FLinearColor& C) { FSurf S; S.Color = C; S.Rough = 0.95f; S.Pattern = WRLookPattern::Cloth; return S; }
+		/** Glacier ice (M_BuildTinted pattern 10: level strata, scallops, snow on what faces up). */
+		static FSurf Ice(const FLinearColor& C) { FSurf S; S.Color = C; S.Rough = 0.35f; S.Pattern = WRLookPattern::Ice; return S; }
 		FSurf Dim(float K) const { FSurf S = *this; S.Color = Color * K; S.Color.A = 1.f; return S; }
+		FSurf WithPattern(float P) const { FSurf S = *this; S.Pattern = P; return S; }
 	};
 
 	struct FKit

@@ -10,9 +10,11 @@ class UStaticMeshComponent;
 /** What a detail block is made of: the building materials' planks or stone, or a flat cloth / soil colour. */
 enum class EWRLookMat : uint8 { Wood, Stone, Cloth, Trim, Tinted };
 /** A tinted block's surface (M_BuildTinted custom data 9): mottled stone, wood grain, brushed metal, smooth (glass, glaze). */
-namespace WRLookPattern { constexpr float Mottle = 0.f, Grain = 1.f, Brushed = 2.f, Smooth = 3.f; }
-/** Engine shapes the blocks use (one instanced component per shape and material). */
-enum class EWRLookMesh : uint8 { Cube, Cylinder, Cone };
+namespace WRLookPattern { constexpr float Mottle = 0.f, Grain = 1.f, Brushed = 2.f, Smooth = 3.f, Plaster = 4.f, Tile = 5.f, Thatch = 6.f, Shingle = 7.f, Slate = 8.f, Cloth = 9.f, Ice = 10.f; }
+/** Shapes the blocks use (one instanced component per shape and material): engine shapes, and a ridge tent's canvas
+ *  (/Game/Art/Gen/SM_TentRidge_A, Tools/art/make_meshes.py: 280 x 290 x 150 cm at size 100, X along the ridge, the door
+ *  at -X; a cube where the mesh is missing), the engine sphere (loaves, fruit). */
+enum class EWRLookMesh : uint8 { Cube, Cylinder, Cone, Tent, Sphere };
 
 /** One visible block of a built piece: an engine shape, scaled, placed in the piece's (or the door leaf's) space. */
 struct FWRLookBlock
@@ -53,6 +55,11 @@ struct WILDREACH_API FWRBuildLook
 	static FLinearColor TrimColor() { return FLinearColor(0.56f, 0.45f, 0.27f); }
 	/** 0..1, the same for the same world point (to 5 cm) on every machine. */
 	static float Hash01(const FVector& WorldPoint, int32 Salt);
+	/** The building materials as every piece and place should wear them: M_BuildWood / M_BuildTinted with the scanned
+	 *  boards when WoodMaterialPack2 is on this machine (else their own planks), M_BuildStone, the flat shape material. */
+	static class UMaterialInterface* Material(EWRLookMat Mat);
+	/** The same by the asset's path (/Game/Building/M_BuildWood...); any other path loads as it is. */
+	static class UMaterialInterface* MaterialAt(const TCHAR* Path);
 
 	/**
 	 * Builds the blocks as instanced static meshes under Parent (one per material and shape, no collision): planks

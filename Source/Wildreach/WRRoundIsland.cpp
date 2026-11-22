@@ -13,6 +13,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/BoxComponent.h"
 #include "WRFx.h"
 #include "WRSound.h"
 #include "WRWorldSystems.h"
@@ -77,6 +78,7 @@ void AWRRoundIsland::BeginPlay()
 	BuildCity();
 	BuildWater();
 	BuildLava();
+	BuildCamps();
 	BuildSafeZone();
 	// The land's underground caves' rock (every machine: the server's collision, the clients' look).
 	{
@@ -89,7 +91,34 @@ void AWRRoundIsland::BeginPlay()
 	{
 		// The grass: thin blades of the building look's tinted material (each blade its own green from custom data).
 		BladeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+		DiscMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 		BladeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+		// Real grass (11-22: the cube blades read as green matchsticks): the MW pack's four clumps, each grass its own tint.
+		static const TCHAR* Clumps[4] = { TEXT("A"), TEXT("B"), TEXT("C"), TEXT("D") };
+		for (const TCHAR* C : Clumps)
+		{
+			if (UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_Grass%s.SM_MWAM_Grass%s"), C, C))) GrassMeshes.Add(M);
+		}
+		UMaterialInterface* GrassBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/MWLandscapeAutoMaterial/Materials/Plants/MTL_MWAM_PlantsGrass.MTL_MWAM_PlantsGrass"));
+		if (GrassMeshes.Num() == 4 && GrassBase)
+		{
+			// The meadow's green, the steppe's gold and straw, the cinder grass's green going brown, the thaw's sedge,
+			// the kipuka's lush green (the pack's tint multiplies its own blades).
+			const FWRTuning& T = FWRTuning::Get();
+			static const FLinearColor Tints[5] = { { 0.085f, 0.16f, 0.035f }, { 0.30f, 0.22f, 0.08f }, { 0.11f, 0.13f, 0.04f }, { 0.16f, 0.15f, 0.05f }, { 0.07f, 0.17f, 0.04f } };
+			for (const FLinearColor& Tint : Tints)
+			{
+				UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(GrassBase, this);
+				M->SetVectorParameterValue(TEXT("MW_BaseColorCorrection"), Tint);
+				M->SetScalarParameterValue(TEXT("MW_CameraFadeOffset"), T.Num(TEXT("roundIsland.grassFadeFrom"), 5500.f));
+				M->SetScalarParameterValue(TEXT("MW_CameraFadeRange"), T.Num(TEXT("roundIsland.grassFadeRange"), 2000.f));
+				GrassMats.Add(M);
+			}
+		}
+		else
+		{
+			GrassMeshes.Reset();
+		}
 	}
 }
 
@@ -139,7 +168,7 @@ void AWRRoundIsland::BuildCity()
 		{
 			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
 			FWRLookBlock B;
-			B.Mesh = static_cast<EWRLookMesh>(FMath::Clamp(int32(At(R, 0)), 0, 2));
+			B.Mesh = static_cast<EWRLookMesh>(FMath::Clamp(int32(At(R, 0)), 0, 4));   // cube, cylinder, cone, tent, sphere
 			B.Mat = static_cast<EWRLookMat>(FMath::Clamp(int32(At(R, 1)), 0, 4));
 			B.Centre = FVector(At(R, 2), At(R, 3), At(R, 4));
 			B.Size = FVector(At(R, 5), At(R, 6), At(R, 7)).ComponentMax(FVector(1.f));
@@ -443,26 +472,29 @@ void AWRRoundIsland::BuildPlants(const TSharedPtr<FJsonObject>& J)
 	// Each kind's meshes: Electric Dreams' hornbeams and elderberries where the kit is installed (the Ancient forest's),
 	// else the island's own birch and the shrubs pack.
 	const auto Load = [](const FString& Path) { return LoadObject<UStaticMesh>(nullptr, *Path); };
-	TArray<UStaticMesh*> Kinds[3];
+	TArray<UStaticMesh*> Kinds[4];
 	for (int32 i = 1; i <= 8; ++i) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/Megascans/3D_Plants/EuropeanHornbeam/Geometry/SimpleWind/SM_EuropeanHornbeam_Forest_%02d.SM_EuropeanHornbeam_Forest_%02d"), i, i))) Kinds[0].Add(M);
 	for (int32 i = 1; i <= 6; ++i) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/Megascans/3D_Plants/EuropeanHornbeam/Geometry/SimpleWind/SM_EuropeanHornbeam_Sapling_%02d.SM_EuropeanHornbeam_Sapling_%02d"), i, i))) Kinds[1].Add(M);
 	for (const int32 i : { 1, 2, 3, 4, 5, 6, 10, 11, 12, 13 }) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/Megascans/3D_Plants/Elderberry/SM_Elderberry_%02d.SM_Elderberry_%02d"), i, i))) Kinds[2].Add(M);
-	float FallbackScale[3] = { 1.f, 1.f, 1.f };
+	// Kind 3, reeds in the lake's shallows: the MW pack's grass clumps drawn tall (kept on its own, tinted reed green).
+	for (const TCHAR* C : { TEXT("A"), TEXT("B"), TEXT("C"), TEXT("D") }) if (UStaticMesh* M = Load(FString::Printf(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_Grass%s.SM_MWAM_Grass%s"), C, C))) Kinds[3].Add(M);
+	float FallbackScale[4] = { 1.f, 1.f, 1.f, 1.f };
 	if (Kinds[0].Num() == 0) { if (UStaticMesh* M = Load(TEXT("/Game/Props/BirchA/birch_a_textured/StaticMeshes/birch_a_textured.birch_a_textured"))) Kinds[0].Add(M); }
 	if (Kinds[1].Num() == 0) { Kinds[1] = Kinds[0]; FallbackScale[1] = 0.25f; }
 	if (Kinds[2].Num() == 0) { if (UStaticMesh* M = Load(TEXT("/Game/GV_FreeShrubsPack/Meshes/Shrubs/Wind/Shrub_A/GV_Vol7_Shrub_A_full_type1.GV_Vol7_Shrub_A_full_type1"))) Kinds[2].Add(M); }
 	const FWRTuning& T = FWRTuning::Get();
-	const float Cull[3] = { T.Num(TEXT("roundIsland.treeCull"), 350000.f), T.Num(TEXT("roundIsland.saplingCull"), 120000.f), T.Num(TEXT("roundIsland.shrubCull"), 90000.f) };
+	const float Cull[4] = { T.Num(TEXT("roundIsland.treeCull"), 350000.f), T.Num(TEXT("roundIsland.saplingCull"), 120000.f), T.Num(TEXT("roundIsland.shrubCull"), 90000.f), T.Num(TEXT("roundIsland.reedCull"), 60000.f) };
 	TMap<UStaticMesh*, UHierarchicalInstancedStaticMeshComponent*> Parts;
 	TMap<UStaticMesh*, TArray<FTransform>> Xf;
 	TMap<UStaticMesh*, int32> KindOf;
 	for (const TSharedPtr<FJsonValue>& V : *Rows)
 	{
 		const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
-		const int32 Kind = FMath::Clamp(int32(At(R, 0)), 0, 2);
+		const int32 Kind = FMath::Clamp(int32(At(R, 0)), 0, 3);
 		if (Kinds[Kind].Num() == 0) continue;
 		UStaticMesh* M = Kinds[Kind][int32(At(R, 1)) % Kinds[Kind].Num()];
-		Xf.FindOrAdd(M).Emplace(FRotator(0.f, At(R, 5), 0.f), FVector(At(R, 2), At(R, 3), At(R, 4)), FVector(At(R, 6) * FallbackScale[Kind]));
+		const float Sc = At(R, 6) * FallbackScale[Kind];
+		Xf.FindOrAdd(M).Emplace(FRotator(0.f, At(R, 5), 0.f), FVector(At(R, 2), At(R, 3), At(R, 4)), Kind == 3 ? FVector(Sc * 0.8f, Sc * 0.8f, Sc * 3.2f) : FVector(Sc));
 		KindOf.Add(M, Kind);
 	}
 	int32 Count = 0;
@@ -476,6 +508,27 @@ void AWRRoundIsland::BuildPlants(const TSharedPtr<FJsonObject>& J)
 		const int32 Kind = KindOf.FindRef(P.Key);
 		H->SetCullDistances(0, int32(Cull[Kind]));
 		H->SetCastShadow(Kind != 2 || T.Num(TEXT("roundIsland.shrubShadows"), 1.f) > 0.f);
+		if (Kind == 3)
+		{
+			if (UMaterialInterface* Gm = P.Key->GetMaterial(0))
+			{
+				UMaterialInstanceDynamic* Rd = UMaterialInstanceDynamic::Create(Gm, this);
+				Rd->SetVectorParameterValue(TEXT("MW_BaseColorCorrection"), FLinearColor(0.1f, 0.13f, 0.045f));
+				H->SetMaterial(0, Rd);
+			}
+		}
+		// The leaves a little brighter and letting more light through (11-22: in the meadow's sun every canopy read
+		// near-black). Megascans' foliage master: its leaves' albedo tint and subsurface strength.
+		for (int32 Slot = 0; Slot < P.Key->GetStaticMaterials().Num(); ++Slot)
+		{
+			UMaterialInterface* Mi = P.Key->GetMaterial(Slot);
+			if (!Mi || !Mi->GetPathName().Contains(TEXT("TwoSided"))) continue;
+			UMaterialInstanceDynamic* L = UMaterialInstanceDynamic::Create(Mi, this);
+			const float B = T.Num(TEXT("roundIsland.leafBright"), 1.45f);
+			L->SetVectorParameterValue(TEXT("Albedo Tint Leaves"), FLinearColor(B, B, B * 0.92f));
+			L->SetScalarParameterValue(TEXT("LightInfluence Subsurface Strength"), T.Num(TEXT("roundIsland.leafSubsurface"), 0.55f));
+			H->SetMaterial(Slot, L);
+		}
 		H->RegisterComponent();
 		H->AddInstances(P.Value, false, true, false);
 		Count += P.Value.Num();
@@ -535,9 +588,24 @@ void AWRRoundIsland::StepCover()
 		if (CoverCells.Contains(C) || Made >= 8) continue;
 		++Made;
 		TArray<TObjectPtr<UInstancedStaticMeshComponent>>& Parts = CoverCells.Add(C);
-		TArray<FTransform> Xf;
-		TArray<FLinearColor> Col;
 		FRandomStream Rng(HashCombine(GetTypeHash(C.X * 92821), GetTypeHash(C.Y * 68917)));
+		TArray<FTransform> Xf, Xd;
+		TArray<FLinearColor> Col, ColD;
+		// Real grass clumps by grass (0 meadow, 1-4 the wild grasses as Wild + 1) and clump mesh.
+		TMap<int32, TArray<FTransform>> Clump;
+		const bool bClumps = GrassMeshes.Num() == 4 && GrassMats.Num() == 5;
+		const int32 ClumpsPerTuft = int32(T.Num(TEXT("roundIsland.clumpsPerTuft"), 3.f));
+		const auto AddClumps = [&](int32 Kind, const FVector& Root, const FVector2D& Scale, float Spread)
+		{
+			for (int32 k = 0; k < ClumpsPerTuft; ++k)
+			{
+				const FVector2D Off = FVector2D(Rng.FRandRange(-Spread, Spread), Rng.FRandRange(-Spread, Spread));
+				const FVector2D Mp = D->ToMap(Root) + Off / 100.f;
+				const FVector At = D->ToWorld(Mp, D->Height(Mp) - 0.03f);
+				const float S = Rng.FRandRange(Scale.X, Scale.Y);
+				Clump.FindOrAdd(Kind * 4 + Rng.RandHelper(4)).Emplace(FRotator(Rng.FRandRange(-4.f, 4.f), Rng.FRand() * 360.f, Rng.FRandRange(-4.f, 4.f)), At, FVector(S, S, S * Rng.FRandRange(0.85f, 1.2f)));
+			}
+		};
 		const float BladeW = T.Num(TEXT("roundIsland.grassBladeWidth"), 2.2f), BladeT = 0.8f;
 		const FVector2D BladeH(T.Num(TEXT("roundIsland.grassMin"), 20.f), T.Num(TEXT("roundIsland.grassMax"), 50.f));
 		const int32 CropPerCell = int32(T.Num(TEXT("roundIsland.cropPerCell"), 480.f));
@@ -568,6 +636,12 @@ void AWRRoundIsland::StepCover()
 					{ { 0.05f, 0.15f, 0.03f }, { 0.04f, 0.10f, 0.025f }, { 0.08f, 0.16f, 0.04f } } };
 				if (n >= int32(PerCell * Density[Wild])) continue;
 				const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
+				if (bClumps)
+				{
+					static const FVector2D WildScale[4] = { { 0.65f, 1.25f }, { 0.35f, 0.7f }, { 0.25f, 0.5f }, { 0.5f, 1.f } };
+					AddClumps(Wild + 1, Root, WildScale[Wild], 60.f);
+					continue;
+				}
 				const int32 Blades = Wild == 2 ? 6 + Rng.RandHelper(5) : 8 + Rng.RandHelper(7);
 				const FLinearColor Tint = WildCol[Wild][Rng.FRand() < 0.6f ? 0 : Rng.FRand() < 0.6f ? 1 : 2];
 				for (int32 b = 0; b < Blades; ++b)
@@ -613,8 +687,8 @@ void AWRRoundIsland::StepCover()
 					{
 						// The ear: a little head at the top, barley's nodding over.
 						const FRotator Ear(Lean + (bBarley ? 40.f : 4.f), Rot.Yaw, 0.f);
-						Xf.Emplace(Ear, Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H)) + Ear.RotateVector(FVector(0.f, 0.f, 4.f)), FVector(2.6f, 2.2f, 9.f) / 100.f);
-						Col.Add(Base * 1.12f);
+						Xd.Emplace(Ear, Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H)) + Ear.RotateVector(FVector(0.f, 0.f, 4.f)), FVector(2.4f, 2.2f, 9.f) / 100.f);
+						ColD.Add(Base * 1.12f);
 					}
 				}
 				continue;
@@ -631,12 +705,20 @@ void AWRRoundIsland::StepCover()
 					const FVector Off(Rng.FRandRange(-14.f, 14.f), Rng.FRandRange(-14.f, 14.f), 0.f);
 					Xf.Emplace(Rot, Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H * 0.5f)), FVector(1.4f, BladeT, H) / 100.f);
 					Col.Add(FLinearColor(0.05f, 0.14f, 0.03f));
-					Xf.Emplace(FRotator(Rng.FRandRange(-20.f, 20.f), Rng.FRand() * 360.f, 0.f), Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H)), FVector(8.f, 8.f, 3.f) / 100.f);
-					Col.Add(P * Rng.FRandRange(0.9f, 1.1f));
+					// (a flat round head: a cube read as a sugar lump)
+					const float Hd = Rng.FRandRange(4.f, 7.f);
+					Xd.Emplace(FRotator(Rng.FRandRange(-25.f, 25.f), Rng.FRand() * 360.f, 0.f), Root + Off + Rot.RotateVector(FVector(0.f, 0.f, H)), FVector(Hd, Hd, 1.2f) / 100.f);
+					ColD.Add(P * Rng.FRandRange(0.9f, 1.1f));
 				}
 				continue;
 			}
-			// A tuft: blades fanned out from one root, leaning away from it, mostly green, now and then a dry one.
+			// A tuft: real grass clumps round the spot (with the pack), else blades fanned out from one root, leaning away
+			// from it, mostly green, now and then a dry one.
+			if (bClumps)
+			{
+				AddClumps(0, Root, FVector2D(T.Num(TEXT("roundIsland.meadowGrassMin"), 0.45f), T.Num(TEXT("roundIsland.meadowGrassMax"), 0.95f)), 70.f);
+				continue;
+			}
 			const int32 Blades = 9 + Rng.RandHelper(7);
 			const FLinearColor Green(Rng.FRandRange(0.045f, 0.09f), Rng.FRandRange(0.15f, 0.24f), Rng.FRandRange(0.025f, 0.05f));
 			for (int32 b = 0; b < Blades; ++b)
@@ -669,7 +751,183 @@ void AWRRoundIsland::StepCover()
 			}
 			Parts.Add(P);
 		}
+		if (Xd.Num() && DiscMesh)
+		{
+			UInstancedStaticMeshComponent* P = NewObject<UInstancedStaticMeshComponent>(this);
+			P->SetStaticMesh(DiscMesh);
+			P->SetMaterial(0, BladeMat);
+			P->SetupAttachment(RootComponent);
+			P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			P->SetCanEverAffectNavigation(false);
+			P->SetCastShadow(false);
+			P->SetCullDistances(0, int32((Range + Cell) * 100.f));
+			P->SetNumCustomDataFloats(10);
+			P->RegisterComponent();
+			P->AddInstances(Xd, false, false, false);
+			for (int32 i = 0; i < Xd.Num(); ++i)
+			{
+				const float Data[10] = { 0.5f, 2.f, 1.f, ColD[i].R, ColD[i].G, ColD[i].B, 0.f, 0.8f, 0.f, 3.f };
+				P->SetCustomData(i, Data, i == Xd.Num() - 1);
+			}
+			Parts.Add(P);
+		}
+		for (const TPair<int32, TArray<FTransform>>& G : Clump)
+		{
+			UInstancedStaticMeshComponent* P = NewObject<UInstancedStaticMeshComponent>(this);
+			P->SetStaticMesh(GrassMeshes[G.Key % 4]);
+			P->SetMaterial(0, GrassMats[G.Key / 4]);
+			P->SetupAttachment(RootComponent);
+			P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			P->SetCanEverAffectNavigation(false);
+			P->SetCastShadow(true);
+			P->bCastDynamicShadow = true;
+			P->SetCullDistances(0, int32((Range + Cell) * 100.f));
+			P->RegisterComponent();
+			P->AddInstances(G.Value, false, false, false);
+			Parts.Add(P);
+		}
 	}
+}
+
+void AWRRoundIsland::BuildCamps()
+{
+	const FWRLandDef* D = WRRoundIslandImpl::MapLand();
+	const TSharedPtr<FJsonObject> Top = D ? D->Section(TEXT("camps")) : nullptr;
+	const TArray<TSharedPtr<FJsonValue>>* Groups = nullptr;
+	if (!Top.IsValid() || !Top->TryGetArrayField(TEXT("groups"), Groups)) return;
+	const bool bLook = GetNetMode() != NM_DedicatedServer;
+	TArray<FWRLookBlock> Blocks;
+	int32 Camps = 0;
+	for (const TSharedPtr<FJsonValue>& GV : *Groups)
+	{
+		const TSharedPtr<FJsonObject> G = GV->AsObject();
+		const TArray<TSharedPtr<FJsonValue>>* List = nullptr;
+		if (!G.IsValid() || !G->TryGetArrayField(TEXT("list"), List)) continue;
+		FString Tag;
+		G->TryGetStringField(TEXT("tag"), Tag);
+		const bool bFrost = Tag == TEXT("tundra");
+		for (const TSharedPtr<FJsonValue>& RV : *List)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& Row = RV->AsArray();
+			if (Row.Num() < 3) continue;
+			const FVector2D M(Row[0]->AsNumber(), Row[1]->AsNumber());
+			// The camp's own frame: X inland (its row's yaw looks out to sea), Y to the left.
+			const float Yaw = float(Row[2]->AsNumber()) + 180.f;
+			const FRotator R0(0.f, Yaw, 0.f);
+			FRandomStream Rng(GetTypeHash(FIntPoint(int32(M.X), int32(M.Y))));
+			const auto At = [&](float X, float Y) { const FVector2D P = M + FVector2D(R0.RotateVector(FVector(X, Y, 0.f))); return D->ToWorld(P, D->Height(P)); };
+			const auto Add = [&](EWRLookMat Mat, EWRLookMesh Mesh, const FVector& Size, const FVector& Centre, const FRotator& Rot, const FLinearColor& Col, float Pattern, float Rough = 0.9f, float Metal = 0.f, float Glow = 0.f)
+			{
+				FWRLookBlock B;
+				B.Mat = Mat;
+				B.Mesh = Mesh;
+				B.Size = Size;
+				B.Centre = Centre;
+				B.Rot = Rot;
+				B.Color = Col;
+				B.Pattern = Pattern;
+				B.Rough = Rough;
+				B.Metal = Metal;
+				B.Glow = Glow;
+				B.Tone = Rng.FRand();
+				const FVector Long = Mesh == EWRLookMesh::Tent ? FVector::XAxisVector : Mesh != EWRLookMesh::Cube ? FVector::ZAxisVector
+					: Size.X >= Size.Y && Size.X >= Size.Z ? FVector::XAxisVector : Size.Y >= Size.Z ? FVector::YAxisVector : FVector::ZAxisVector;
+				const FVector Dir = Rot.RotateVector(Long).GetAbs();
+				B.Axis = Dir.Z > 0.7f ? 2.f : Dir.X >= Dir.Y ? 0.f : 1.f;
+				Blocks.Add(B);
+			};
+			const auto Solid = [&](const FVector& Centre, const FVector& Half, float BoxYaw)
+			{
+				UBoxComponent* Box = NewObject<UBoxComponent>(this);
+				Box->SetupAttachment(RootComponent);
+				Box->SetBoxExtent(Half);
+				Box->SetWorldLocationAndRotation(Centre, FRotator(0.f, BoxYaw, 0.f));
+				Box->SetCollisionProfileName(TEXT("BlockAll"));
+				Box->SetHiddenInGame(true);
+				Box->RegisterComponent();
+			};
+			// (weathered canvas: light canvas read as a flat beige sheet in the sun)
+			const FLinearColor Canvas = bFrost ? FLinearColor(0.2f, 0.16f, 0.11f) : FLinearColor(0.18f, 0.15f, 0.11f);
+			const FLinearColor Wood(0.12f, 0.08f, 0.05f), Ash(0.04f, 0.035f, 0.03f);
+			// The fire: a ring of stones, its ash, logs laid across, burning, a warm light.
+			const FVector Fire = At(6.f, 0.f);
+			for (int32 k = 0; k < 10; ++k)
+			{
+				const float A = 360.f * k / 10.f + Rng.FRandRange(-8.f, 8.f);
+				const FVector P = Fire + FRotator(0.f, A, 0.f).Vector() * 62.f + FVector(0.f, 0.f, 4.f);
+				Add(EWRLookMat::Tinted, EWRLookMesh::Cube, FVector(28.f, 20.f, 16.f) * Rng.FRandRange(0.8f, 1.2f), P, FRotator(Rng.FRandRange(-10.f, 10.f), A, Rng.FRandRange(-10.f, 10.f)), FLinearColor(0.09f, 0.085f, 0.08f), 0.f);
+			}
+			Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(105.f, 105.f, 3.f), Fire + FVector(0.f, 0.f, 1.f), FRotator::ZeroRotator, Ash, 0.f, 0.98f);
+			for (int32 k = 0; k < 4; ++k)
+			{
+				const float A = 45.f * k + Rng.FRandRange(-10.f, 10.f);
+				Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(13.f, 13.f, 95.f), Fire + FVector(0.f, 0.f, 9.f + 4.f * (k % 2)), FRotator(90.f - 12.f, A, 0.f), Wood * 0.6f, 1.f, 0.95f, 0.f, k < 2 ? 0.25f : 0.f);
+			}
+			if (bLook)
+			{
+				USceneComponent* F = NewObject<USceneComponent>(this);
+				F->SetupAttachment(RootComponent);
+				F->SetWorldLocation(Fire + FVector(0.f, 0.f, 30.f));
+				F->RegisterComponent();
+				WRFx::Attach(F, TEXT("hearth.fire"), NAME_None, 0.45f);
+				UPointLightComponent* L = NewObject<UPointLightComponent>(this);
+				L->SetupAttachment(F);
+				L->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+				L->SetLightColor(FLinearColor(1.f, 0.55f, 0.25f));
+				L->SetIntensity(5000.f);
+				L->SetAttenuationRadius(1200.f);
+				L->SetCastShadows(false);
+				L->RegisterComponent();
+			}
+			// Tents either side of the fire (clear of the way inland to the stations): canvas ridge tents (SM_TentRidge_A:
+			// sagging panels, the hem tucked into the ground, the doorway open toward the fire), a pole at each end of the
+			// ridge, guy ropes from the ridge to pegs in the ground. (11-22: they were a cube turned 45 degrees.)
+			const int32 Tents = 2 + Rng.RandHelper(2);
+			for (int32 t = 0; t < Tents; ++t)
+			{
+				const float SideSign = (t % 2) ? 1.f : -1.f, A = SideSign * Rng.FRandRange(75.f, 120.f) + (t >= 2 ? 180.f : 0.f);
+				const FVector2D Off = FVector2D(FRotator(0.f, A, 0.f).Vector()) * Rng.FRandRange(560.f, 680.f);
+				const FVector P = At(6.f + Off.X / 100.f, Off.Y / 100.f);
+				// the ridge points at the fire: the door's gable faces it
+				const float TYaw = Yaw + A + 180.f, Len = Rng.FRandRange(240.f, 300.f), Side = Rng.FRandRange(190.f, 220.f);
+				const FLinearColor C = Canvas * Rng.FRandRange(0.85f, 1.2f);
+				// the canvas: the mesh at 100 = 280 cm long, 150 cm to the ridge (sunk 4 cm so the hem sits in the ground)
+				const float Scale = Side / 205.f;
+				Add(EWRLookMat::Tinted, EWRLookMesh::Tent, FVector(100.f * Len / 280.f, 100.f * Scale, 100.f * Scale), P - FVector(0.f, 0.f, 4.f), FRotator(0.f, TYaw, 0.f), C, 9.f, 0.97f);
+				const FRotator TR(0.f, TYaw, 0.f);
+				const float Ridge = 150.f * Scale - 4.f;
+				for (const float E : { -0.5f, 0.5f }) Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(5.f, 5.f, Ridge + 26.f), P + TR.RotateVector(FVector(E * (Len + 4.f), 0.f, (Ridge + 26.f) * 0.5f - 4.f)), FRotator::ZeroRotator, Wood, 1.f);
+				// guy ropes, ridge end to a peg out along the ridge line
+				for (const float E : { -1.f, 1.f })
+				{
+					const FVector RopeTop = P + TR.RotateVector(FVector(E * (Len * 0.5f + 4.f), 0.f, Ridge + 18.f)), Peg = P + TR.RotateVector(FVector(E * (Len * 0.5f + 120.f), 0.f, 0.f));
+					const FVector RopeMid = (RopeTop + Peg) * 0.5f, Dir = (RopeTop - Peg).GetSafeNormal();
+					Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(1.2f, 1.2f, FVector::Dist(RopeTop, Peg)), RopeMid, FRotationMatrix::MakeFromZ(Dir).Rotator(), FLinearColor(0.2f, 0.17f, 0.12f), 9.f);
+					Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(4.f, 4.f, 22.f), Peg + FVector(0.f, 0.f, 4.f), FRotator(15.f * E, TYaw, 0.f), Wood, 1.f);
+				}
+				Solid(P + FVector(0.f, 0.f, Side * 0.35f), FVector(Len * 0.5f, Side * 0.6f, Side * 0.35f), TYaw);
+			}
+			// Bedrolls by the fire, a log seat, the camp's crates and a barrel by the first tent.
+			for (int32 b = 0; b < 2; ++b)
+			{
+				const float A = (b ? 150.f : 210.f) + Rng.FRandRange(-10.f, 10.f);
+				const FVector P = Fire + FRotator(0.f, Yaw + A, 0.f).Vector() * 190.f + FVector(0.f, 0.f, 8.f);
+				const FLinearColor Wool = (b ? FLinearColor(0.16f, 0.1f, 0.06f) : FLinearColor(0.08f, 0.1f, 0.07f)) * Rng.FRandRange(0.9f, 1.1f);
+				Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(30.f, 34.f, 175.f), P, FRotator(90.f, Yaw + A + 90.f, 0.f), Wool, 9.f, 0.98f);
+			}
+			Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(36.f, 36.f, 220.f), Fire + FRotator(0.f, Yaw - 90.f, 0.f).Vector() * 170.f + FVector(0.f, 0.f, 16.f), FRotator(90.f, Yaw, 0.f), Wood * 0.8f, 1.f);
+			const FVector Store = At(9.5f, -6.f);
+			for (int32 c = 0; c < 2; ++c) Add(EWRLookMat::Tinted, EWRLookMesh::Cube, FVector(62.f), Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(c * 70.f, 0.f, 31.f + (c ? 0.f : 0.f))), FRotator(0.f, Yaw + Rng.FRandRange(-12.f, 12.f), 0.f), FLinearColor(0.16f, 0.11f, 0.07f), 1.f);
+			Add(EWRLookMat::Tinted, EWRLookMesh::Cube, FVector(56.f), Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(30.f, 0.f, 62.f + 28.f)), FRotator(0.f, Yaw + 20.f, 0.f), FLinearColor(0.14f, 0.1f, 0.06f), 1.f);
+			const FVector Barrel = Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(-70.f, 40.f, 45.f));
+			Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(58.f, 58.f, 90.f), Barrel, FRotator::ZeroRotator, FLinearColor(0.14f, 0.09f, 0.05f), 1.f);
+			for (const float Z : { -28.f, 28.f }) Add(EWRLookMat::Tinted, EWRLookMesh::Cylinder, FVector(60.f, 60.f, 5.f), Barrel + FVector(0.f, 0.f, Z), FRotator::ZeroRotator, FLinearColor(0.05f, 0.045f, 0.04f), 2.f, 0.5f, 0.8f);
+			Solid(Store + FRotator(0.f, Yaw, 0.f).RotateVector(FVector(20.f, 10.f, 45.f)), FVector(90.f, 60.f, 45.f), Yaw);
+			++Camps;
+		}
+	}
+	if (bLook && Blocks.Num()) FWRBuildLook::Spawn(this, RootComponent, Blocks, FLinearColor::Gray, false);
+	UE_LOG(LogWildreach, Log, TEXT("ROUND camps: %d lived-in campsites (%d blocks)"), Camps, Blocks.Num());
 }
 
 void AWRRoundIsland::BuildLava()
@@ -902,8 +1160,11 @@ void AWRRoundIsland::BuildWater()
 		TArray<FVector2D> UV;
 		TArray<FLinearColor> Col;
 		TArray<FProcMeshTangent> Tan;
-		V.Add(FVector(Mid, Level));
-		for (const FVector2D& P : Outline) V.Add(FVector(Mid + (P - Mid) * 1.04f, Level));
+		// (The sea's material lifts its surface about a metre over its mesh: drawn at the level, the lake stood a metre
+		// over the water you swim in, over the jetty's deck and the reeds. The mesh goes down that much, roundIsland.lakeLift.)
+		const float Drawn = Level - T.Num(TEXT("roundIsland.lakeLift"), 100.f);
+		V.Add(FVector(Mid, Drawn));
+		for (const FVector2D& P : Outline) V.Add(FVector(Mid + (P - Mid) * 1.04f, Drawn));
 		for (const FVector& P : V) { N.Add(FVector::UpVector); UV.Add(FVector2D(P.X, P.Y) / 1500.f); Col.Add(FLinearColor::White); Tan.Add(FProcMeshTangent(1.f, 0.f, 0.f)); }
 		// Both windings: the water faces up to you on the shore and down to you under it, whichever way the outline runs.
 		for (int32 i = 0; i < Outline.Num(); ++i) Tri.Append({ 0, 1 + (i + 1) % Outline.Num(), 1 + i, 0, 1 + i, 1 + (i + 1) % Outline.Num() });
@@ -939,6 +1200,8 @@ void AWRRoundIsland::BuildWater()
 				{ TEXT("Wave1_Scale"), 0.f }, { TEXT("Wave2_Scale"), 0.f }, { TEXT("Wave3_Scale"), 0.f },
 				{ TEXT("Foam1_Scale"), 0.f }, { TEXT("Foam2_Scale"), 0.f }, { TEXT("Foam3_Scale"), 0.f },
 				{ TEXT("EdgeFoam_Scale"), 3.f }, { TEXT("Master_Intensity"), 0.f },
+				// (and no lift: the sea's surface stands 1 m over its mesh, which put the jetty's deck under the lake)
+				{ TEXT("Ocean_Offset"), 0.f }, { TEXT("Foam1_HeightOffset"), 0.f },
 				{ TEXT("Ocean1_NormalIntensity"), 0.5f }, { TEXT("Ocean2_NormalIntensity"), 0.5f }, { TEXT("OceanShore_NormalIntensity"), 0.4f },
 				// Gentle ripples, and next to no refraction: seen low across the water, the sea's bending of the view showed the
 				// lake bed over the whole surface.
@@ -982,7 +1245,8 @@ void AWRRoundIsland::BuildWater()
 		for (int32 i = 0; i + 1 < Pts.Num(); ++i) for (int32 k = 0; k < 2; ++k)
 		{
 			const int32 a = i * 3 + k, b = a + 1, c = a + 3, d = a + 4;
-			Tri.Append({ a, c, b, b, c, d });
+			// Both windings (it faced down, a dry ditch from above; the lava ribbon had the same fault).
+			Tri.Append({ a, c, b, b, c, d, a, b, c, b, d, c });
 		}
 		Water->CreateMeshSection_LinearColor(1, V, Tri, N, UV, Col, Tan, false);
 		if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *T.Str(TEXT("roundIsland.streamMaterial"), TEXT("/Game/WaterMaterials/Materials/M_River.M_River"))))

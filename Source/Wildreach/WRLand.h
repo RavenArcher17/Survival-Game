@@ -208,6 +208,17 @@ struct WILDREACH_API FWRLandDef
 	int32 GridW = 0, GridH = 0;
 	TArray<FString> GridRows;
 	float ZoneBlend = 45.f;
+	// The zone's second colour in patches (HfGround): PatchSoft 0 = the old sharp 34 m patches; over 0, soft patches of
+	// three sizes (PatchScale m and smaller) blended over +-PatchSoft (the round island: hard camouflage blotches from the air).
+	float PatchScale = 34.f;
+	float PatchSoft = 0.f;
+	/** groundPatch.farBlend: a far chunk's vertex takes its ground averaged over the squares round it (one 4 m sample
+	 *  every 16-32 m aliased the ground's specks and patches into camouflage blotches seen from the air). */
+	bool bFarBlend = false;
+	/** wetShore: the ground darkens within Sea m over the sea and Lake m over the lake's level (near its outline), by
+	 *  Dark at the water's edge: the wet band a shore shows (11-22: grass and sand ran dry into the water). */
+	float WetSea = 0.f, WetLake = 0.f, WetDark = 1.f, LakeLevel = 0.f;
+	FBox2D LakeBox = FBox2D(ForceInit);
 	TArray<FWRLandSurface> Surfaces;
 	TArray<FWRLandBand> Bands;
 	FLinearColor LedgeColor = FLinearColor::Transparent;

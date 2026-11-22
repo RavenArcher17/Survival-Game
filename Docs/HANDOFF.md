@@ -917,6 +917,25 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   MetaHumanCharacter plugin's own assets with a small binding per face (`Hero/Grooms/<face>/`): never copy groom assets
   into the repo (they carry strand data; F1's was 63 MB). Lab scripts that make all of it: `Scripts/hero2/` in the lab
   (faces via `faces2.sh`, armour via `hero_armor.py`, masks via `gen_hide_masks.py`, migration via `migrate.sh`).
+- **Generated meshes** (11-22): `Tools/art/make_meshes.py` builds shapes the packs lack with Geometry Script
+  (`unreal.GeometryScript_Primitives` / `_MeshDeformers` / `_NewAssetUtils`) into `/Game/Art/Gen` (in git, cooked:
+  DefaultGame.ini): basalt column clusters, obsidian blades, seracs, the sulfur crystal, lava rubble patches (Nanite),
+  the camps' ridge tent (`EWRLookMesh::Tent`, drawn in M_BuildTinted like any block). `WR_MESHES=basalt,serac` makes
+  only those. Materials come from where they are used (world-space projected), so the meshes need no real UVs. Its
+  `xf()` takes rotations as (pitch, yaw, roll): Python's `unreal.Rotator` is (roll, pitch, yaw). Raw triangles: the
+  DynamicMesh's front is cross(c - a, b - a) (`tent()` checks its first face).
+- **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'
+  rock in courses; wood is WoodMaterialPack2's scans set at run time (`FWRBuildLook::Material`; optional pack, the
+  procedural planks without it); M_BuildTinted patterns 0 stone, 1 wood, 2 metal, 3 smooth, 4 plaster, 5 pantiles,
+  6 thatch, 7 shingles, 8 slate, 9 cloth, 10 ice. Detail blocks are mapped in their own frame (instance space,
+  `block_frame`: custom data 1 is the world axis the long side lies nearest, plus 3 for a cylinder or cone, whose
+  texture then runs round it); a block whose middle side is over ~1.6 m draws joints (courses, boards). "Local" space
+  on an instanced component is the component's: use Instance space. A material a C++ constructor loads at startup can't
+  be rebuilt by these scripts ("Assertion failed: !IsRooted()" in DeleteAllMaterialExpressions): load building
+  materials at play time.
+- **Hero faces:** `Tools/art/fix_face_lod3.py` gives a face's LOD3 and LOD5to7 skin materials their LOD1 textures when
+  they are missing (F1, F2, F3, F6, M3 came without at LOD3 and went black at 4-12 m; all twelve lacked "SRMF Baked VT"
+  at LOD5to7). Run it again after importing new faces. (Some townsfolk faces still draw shiny black: open.)
 - The hero animates with **no animation blueprint**: `UWRHeroAnimInstance` (a `UWRAnimInstance`) does motion matching
   in C++ (`UPoseSearchLibrary::MotionMatch` with its own pose history and blend stack), because the engine's
   motion-matching node can't run outside an animation blueprint in a packaged build and anim graphs can't be made

@@ -69,6 +69,7 @@ class WILDREACH_API AWRBossProp : public AActor
 public:
 	AWRBossProp();
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Kind) FName Kind = TEXT("anvil");
 	float Radius = 150.f;

@@ -18,10 +18,10 @@ namespace WRIsleT
 
 	struct FPal
 	{
-		FSurf Snow = FSurf::Stone(Lin(238, 242, 245), 0.9f);
+		FSurf Snow = FSurf::Stone(Lin(226, 232, 238), 0.9f).WithPattern(WRLookPattern::Plaster);
 		FSurf SnowShade = FSurf::Stone(Lin(200, 214, 228), 0.9f);
-		FSurf Ice = FSurf::Glass(Lin(159, 212, 224), 0.02f);
-		FSurf DeepIce = FSurf::Glass(Lin(95, 168, 211), 0.03f);
+		FSurf Ice = FSurf::Ice(Lin(196, 222, 236));
+		FSurf DeepIce = FSurf::Ice(Lin(150, 194, 222));
 		FSurf IceGlow = FSurf::Lit(Lin(120, 190, 235), 0.18f);
 		FSurf ThinIce = FSurf::Glass(Lin(27, 42, 51), 0.f);
 		FSurf Water = FSurf::Glaze(Lin(10, 22, 30), 0.04f);
@@ -228,9 +228,8 @@ namespace WRIsleT
 		// the stern buried; a lantern left in the crow's nest.
 		const float G0 = S.Gz(0, 0);
 		// The serac it's frozen into, and a second leaning on it.
-		S.K.Add(P.DeepIce, FVector(1100.f, 900.f, 1300.f), FVector(-200.f, 0.f, G0 + 560.f), FRotator(-6.f, 8.f, 4.f));
-		S.K.Add(P.Ice, FVector(700.f, 600.f, 800.f), FVector(500.f, 500.f, G0 + 340.f), FRotator(8.f, 30.f, -6.f));
-		S.K.Add(P.Snow, FVector(1120.f, 920.f, 60.f), FVector(-230.f, 0.f, G0 + 1210.f), FRotator(-6.f, 8.f, 4.f));
+		S.Ice(0, FVector(1250.f, 1000.f, 1340.f), FVector(-200.f, 0.f, G0 - 90.f), FRotator(-6.f, 8.f, 4.f), false, 0.f);
+		S.Ice(1, FVector(800.f, 680.f, 820.f), FVector(500.f, 500.f, G0 - 60.f), FRotator(8.f, 30.f, -6.f), false, 0.f);
 		S.Solid(FVector(-200.f, 0.f, G0 + 560.f), FVector(550.f, 450.f, 650.f), FRotator(-6.f, 8.f, 4.f));
 		S.Solid(FVector(500.f, 500.f, G0 + 340.f), FVector(350.f, 300.f, 400.f), FRotator(8.f, 30.f, -6.f));
 		// The hull in its own frame: pitched up 34 degrees, its keel along X, the prow at +X.
@@ -292,10 +291,9 @@ namespace WRIsleT
 			const float W = 340.f + 160.f * S.R(FVector(i), 2), D = 320.f + 120.f * S.R(FVector(i), 3), H = 600.f + 800.f * S.R(FVector(i), 4);
 			const float Lean = 3.f + 5.f * S.R(FVector(i), 5);
 			const FVector C(-300.f, Y, S.Gz(-300.f, Y) + H * 0.5f - 60.f);
-			const FRotator Rot(-Lean, 8.f * S.J(FVector(i), 6), 3.f * S.J(FVector(i), 7));
-			S.K.Add(i % 3 == 1 ? P.Ice : P.DeepIce, FVector(D, W, H), C, Rot);
-			S.K.Add(P.Snow, FVector(D * 1.02f, W * 1.02f, 50.f), C + Rot.RotateVector(FVector(0, 0, H * 0.5f + 10.f)), Rot);
-			S.K.Add(P.IceGlow, FVector(D * 0.4f, 8.f, H * 0.7f), C + Rot.RotateVector(FVector(D * 0.5f - 10.f, W * 0.18f, 0.f)), Rot + FRotator(0.f, 0.f, 6.f));
+			const FRotator Rot(-Lean, 8.f * S.J(FVector(i), 6) + 90.f * (i % 2), 3.f * S.J(FVector(i), 7));
+			// (real broken ice towers, 11-22: they were blue boxes with a snow slab on top and a glowing strip)
+			S.Ice(i, FVector(D * 1.15f, W * 1.15f, H), FVector(-300.f, Y, S.Gz(-300.f, Y)), Rot, false, 60.f);
 			S.Solid(C, FVector(D * 0.5f, W * 0.5f, H * 0.5f), Rot);
 			if (i % 2 == 0 && i > 0 && i < 10)
 			{
@@ -306,7 +304,7 @@ namespace WRIsleT
 		for (int32 k = 0; k < 10; ++k)
 		{
 			const FVector At(150.f + 300.f * S.R(FVector(k), 8), -2300.f + 480.f * k, 0.f);
-			S.K.Add(k % 2 ? P.Ice : P.DeepIce, FVector(160.f + 120.f * S.R(At, 9), 140.f + 100.f * S.R(At, 10), 120.f + 90.f * S.R(At, 11)), FVector(At.X, At.Y, S.Gz(At.X, At.Y) + 50.f), FRotator(20.f * S.J(At, 12), 360.f * S.R(At, 13), 15.f * S.J(At, 14)));
+			S.Ice(k + 1, FVector(160.f + 120.f * S.R(At, 9), 140.f + 100.f * S.R(At, 10), 120.f + 90.f * S.R(At, 11)), FVector(At.X, At.Y, S.Gz(At.X, At.Y)), FRotator(20.f * S.J(At, 12), 360.f * S.R(At, 13), 15.f * S.J(At, 14)), true, 20.f);
 		}
 		S.Lamp(FVector(-100.f, 0.f, S.Gz(-100.f, 0.f) + 300.f), Lin(110, 180, 240), 2000.f, 2000.f);
 		S.Fx(FVector(-120.f, 0.f, S.Gz(-120.f, 0.f) + 600.f), TEXT("ff.serac.drip"), 1.f);

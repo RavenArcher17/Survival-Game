@@ -59,14 +59,14 @@ const lavaDist = (x, y) => { let d = 1e9; for (let i = 1; i < lava.length; i++) 
 const T = (kind, ha, s0, s1, slope = 28, clump = 0, only = null) => ({ kind, ha, s0, s1, slope, clump, only });
 const ON = (...ids) => new Set(ids.map((k) => SURF[k]));
 const PLAN = {
-	V1: [T("char_tree", 1.2, 0.8, 1.2, 26, 0.6), T("ember_shrub", 5, 0.7, 1.2, 30, 0.5), T("basalt_rock", 1.5, 0.6, 1.5, 38), T("pumice_rock", 1.5, 0.5, 1.3, 34)],
+	V1: [T("char_tree", 1.2, 0.8, 1.2, 26, 0.6), T("ember_shrub", 5, 0.7, 1.2, 30, 0.5), T("basalt_rock", 1.5, 0.6, 1.5, 38), T("pumice_rock", 1.5, 0.5, 1.3, 34), T("lava_rubble", 6, 0.6, 1.1, 16, 0.7)],
 	V2: [T("basalt_rock", 3, 0.6, 1.6, 38), T("ember_shrub", 1.5, 0.7, 1.1, 30, 0.5), T("char_tree", 0.4, 0.8, 1.2, 26, 0.6),
-		T("pine", 30, 0.7, 1.15, 26, 0.4, ON("kipuka")), T("kipuka_shrub", 14, 0.6, 1.1, 30, 0.4, ON("kipuka"))],
-	V3: [T("obsidian_blade", 6, 0.7, 1.5, 45, 0.5), T("basalt_rock", 2, 0.6, 1.4, 40), T("basalt_cliff", 4, 0.7, 1.4, 70, 0, "steep")],
+		T("pine", 30, 0.7, 1.15, 26, 0.4, ON("kipuka")), T("kipuka_shrub", 14, 0.6, 1.1, 30, 0.4, ON("kipuka")), T("lava_rubble", 80, 0.6, 1.3, 16, 0.6)],
+	V3: [T("obsidian_blade", 6, 0.7, 1.5, 45, 0.5), T("basalt_rock", 2, 0.6, 1.4, 40), T("basalt_cliff", 4, 0.7, 1.4, 70, 0, "steep"), T("lava_rubble", 40, 0.6, 1.2, 16, 0.6)],
 	V4: [T("basalt_rock", 0.8, 0.5, 1.2, 36), T("ember_shrub", 0.5, 0.6, 1.0, 28, 0.5)],
-	V5: [T("basalt_rock", 2, 0.6, 1.5, 40), T("basalt_column", 0.6, 0.8, 1.5, 30, 0.6), T("basalt_cliff", 3, 0.7, 1.4, 70, 0, "steep"), T("char_tree", 0.3, 0.8, 1.1, 24, 0.6)],
+	V5: [T("basalt_rock", 2, 0.6, 1.5, 40), T("basalt_column", 0.6, 0.8, 1.5, 30, 0.6), T("basalt_cliff", 3, 0.7, 1.4, 70, 0, "steep"), T("char_tree", 0.3, 0.8, 1.1, 24, 0.6), T("lava_rubble", 60, 0.6, 1.3, 16, 0.6)],
 	V6: [T("ember_shrub", 3, 0.7, 1.2, 30, 0.5), T("basalt_rock", 0.8, 0.6, 1.3, 38), T("char_tree", 0.4, 0.8, 1.2, 26, 0.6),
-		T("pine", 1.5, 0.7, 1.1, 26, 0.7, ON("cinder_grass")), T("kipuka_shrub", 2, 0.6, 1.0, 30, 0.5, ON("cinder_grass"))],
+		T("pine", 1.5, 0.7, 1.1, 26, 0.7, ON("cinder_grass")), T("kipuka_shrub", 2, 0.6, 1.0, 30, 0.5, ON("cinder_grass")), T("lava_rubble", 12, 0.6, 1.1, 16, 0.7)],
 	V7: [T("char_tree", 28, 0.9, 1.6, 30, 0.45), T("ember_shrub", 6, 0.7, 1.2, 30, 0.5), T("basalt_rock", 0.4, 0.6, 1.2, 38)],
 	T1: [T("granite_rock", 1.2, 0.8, 2.2, 38), T("frost_shrub", 1.5, 0.6, 1.0, 30, 0.5), T("ice_boulder", 0.4, 0.6, 1.3, 38)],
 	T2: [T("pine", 32, 0.75, 1.3, 30, 0.45), T("frost_shrub", 5, 0.6, 1.1, 30, 0.5), T("granite_rock", 0.4, 0.7, 1.6, 38)],

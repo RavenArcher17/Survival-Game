@@ -1323,7 +1323,6 @@ void AWRVillage::BuildLook()
 	const FColor RockC = SiteColour(Biome, TEXT("rock"), FColor(30, 27, 25));
 	const FColor AltC = SiteColour(Biome, TEXT("rockAlt"), FColor(52, 44, 38));
 	const FSurf Wall = FSurf::Stone(SiteLin(RockC) * (bLavvu ? 1.f : 1.15f), 0.92f);
-	const FSurf Turf = FSurf::Cloth(FLinearColor(0.07f, 0.06f, 0.045f));
 	const FSurf Hide = FSurf::Cloth(FLinearColor(0.36f, 0.27f, 0.18f));
 	const FSurf Pole = FSurf::Wood(FLinearColor(0.16f, 0.11f, 0.07f));
 	const FSurf Lamp = FSurf::Lit(FLinearColor(1.f, 0.6f, 0.25f), 0.95f);
@@ -1339,7 +1338,8 @@ void AWRVillage::BuildLook()
 		if (!bLavvu)
 		{
 			// A round house of dry-laid basalt: twelve wall runs in three courses, the doorway gap toward the shrine,
-			// a turf-and-ash cone roof with a glowing smoke hole.
+			// a cone roof of heather thatch dusted with ash, smoke curling from the hole at its peak. (11-22: a flame and a
+			// glowing disc sat on the peak, the roofs read as burning; the roof wore the cloth weave.)
 			const float R = 260.f;
 			for (int32 s = 0; s < 12; ++s)
 			{
@@ -1357,16 +1357,17 @@ void AWRVillage::BuildLook()
 			const FVector Door = C + Face.Vector() * R;
 			for (const float Side : { -1.f, 1.f }) K.Add(Pole, FVector(22.f, 22.f, 190.f), Door + Face.RotateVector(FVector(0, Side * 75.f, 95.f)), Face);
 			K.Add(Pole, FVector(30.f, 190.f, 22.f), Door + FVector(0, 0, 196.f), Face);
-			K.Add(Turf, FVector(560.f, 560.f, 260.f), C + FVector(0, 0, 186.f + 130.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
-			K.Add(Turf.Dim(0.8f), FVector(600.f, 600.f, 20.f), C + FVector(0, 0, 190.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
-			K.Disc(FSurf::Lit(FLinearColor(1.f, 0.42f, 0.12f), 0.7f), C + FVector(0, 0, 440.f), FVector::UpVector, 40.f, 6.f);
+			const FSurf Thatch = FSurf::Cloth(FLinearColor(0.13f, 0.105f, 0.07f)).WithPattern(WRLookPattern::Thatch);
+			K.Add(Thatch, FVector(560.f, 560.f, 260.f), C + FVector(0, 0, 186.f + 130.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
+			K.Add(Thatch.Dim(0.8f), FVector(600.f, 600.f, 20.f), C + FVector(0, 0, 190.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			K.Disc(FSurf::Cloth(FLinearColor(0.02f, 0.018f, 0.016f)), C + FVector(0, 0, 437.f), FVector::UpVector, 36.f, 6.f);   // the smoke hole
 			// The lantern by the door.
 			K.Add(Pole, FVector(10.f, 10.f, 170.f), Door + Face.RotateVector(FVector(60.f, 110.f, 85.f)), Face);
 			K.Add(Lamp, FVector(18.f, 18.f, 24.f), Door + Face.RotateVector(FVector(60.f, 110.f, 160.f)), Face);
 			if (bDraw)
 			{
 				SiteLight(this, RootComponent, Door + Face.RotateVector(FVector(70.f, 110.f, 160.f)), FLinearColor(1.f, 0.6f, 0.28f), 1600.f, 900.f);
-				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("hearth.fire"), NAME_None, 0.6f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 445.f));
+				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("kitchen.smoke"), NAME_None, 0.8f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 445.f));
 			}
 		}
 		else
@@ -1401,7 +1402,8 @@ void AWRVillage::BuildLook()
 			if (bDraw)
 			{
 				SiteLight(this, RootComponent, Door + Face.RotateVector(FVector(90.f, 100.f, 160.f)), FLinearColor(1.f, 0.6f, 0.28f), 1600.f, 900.f);
-				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("hearth.fire"), NAME_None, 0.45f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 520.f));
+				// (smoke from the flap: a flame at the poles' crossing read as the tent on fire, 11-22)
+				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("kitchen.smoke"), NAME_None, 0.7f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 520.f));
 			}
 		}
 	}
@@ -1520,11 +1522,10 @@ void AWRHiddenTube::BuildLook()
 	if (bIce)
 	{
 		// The Blue Below's walls are the ice itself (the rock texture tinted pale still read as dark stone on the snow):
-		// the seracs' blue-white (WRWorldDressing serac).
-		if (UMaterialInterface* IceBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+		// glacier ice, as the seracs' (M_IceBlock; the engine shape material it had read as flat blue plastic).
+		if (UMaterialInterface* IceBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_IceBlock.M_IceBlock")))
 		{
 			Mat = UMaterialInstanceDynamic::Create(IceBase, this);
-			Mat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.5f, 0.68f, 0.84f));
 		}
 	}
 	// On a map with lands of its own the tube runs under a ridge the ground generator raised over it (round_ground.mjs
@@ -1591,10 +1592,10 @@ void AWRHiddenTube::BuildLook()
 				if (!HeapMat)
 				{
 					HeapMat = SiteRockMat(this, FLinearColor(0.05f, 0.048f, 0.046f));
-					if (bIce) if (UMaterialInterface* SnowBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+					if (bIce) if (UMaterialInterface* SnowBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_IceBlock.M_IceBlock")))
 					{
 						HeapMat = UMaterialInstanceDynamic::Create(SnowBase, this);
-						HeapMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.82f, 0.86f, 0.9f));
+						HeapMat->SetScalarParameterValue(TEXT("Snow"), 1.f);
 					}
 				}
 				SiteRock(this, RootComponent, Seed + 11, FVector(560.f, W * 0.85f, 150.f), Mid, Yaw, HeapMat, false, 60.f);   // no collision: it fills the corridor (snow and ash to wade through)

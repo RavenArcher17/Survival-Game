@@ -29,10 +29,10 @@ namespace WRIsleK
 		FSurf Rope = FSurf::Cloth(Lin(120, 104, 80));
 		FSurf Dark = FSurf::Stone(Lin(8, 7, 7), 0.98f);
 		FSurf Cocoon = FSurf::Lit(Lin(214, 240, 190), 0.15f);
-		FSurf Snow = FSurf::Stone(Lin(238, 242, 245), 0.9f);
+		FSurf Snow = FSurf::Stone(Lin(226, 232, 238), 0.9f).WithPattern(WRLookPattern::Plaster);
 		FSurf SnowShade = FSurf::Stone(Lin(200, 214, 228), 0.9f);
-		FSurf Ice = FSurf::Glass(Lin(159, 212, 224), 0.02f);
-		FSurf DeepIce = FSurf::Glass(Lin(95, 168, 211), 0.03f);
+		FSurf Ice = FSurf::Ice(Lin(196, 222, 236));
+		FSurf DeepIce = FSurf::Ice(Lin(150, 194, 222));
 		FSurf Granite = FSurf::Stone(Lin(185, 196, 206), 0.85f);
 		FSurf GraniteDark = FSurf::Stone(Lin(120, 132, 146), 0.88f);
 		FSurf Carve = FSurf::Stone(Lin(70, 78, 90), 0.9f);

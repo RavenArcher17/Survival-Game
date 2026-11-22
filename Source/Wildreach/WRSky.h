@@ -69,6 +69,10 @@ private:
 	/** The round island's caves' skylights: a volume of dust in each skylit chamber for the sun's beam to light (shown,
 	 *  with the volumetric fog on, only near one by day). */
 	void BuildSkylightDust();
+	/** The round island's night sky: a dome of stars round the camera (M_NightSky), shown as the sun goes down and the
+	 *  clouds and weather allow, turning with the hours about the pole. */
+	void BuildStars();
+	void TickStars();
 	/** The camera's location on this machine (the first local player's view), or false (no view yet). */
 	bool GetViewLocation(FVector& Out) const;
 	void TickFrameStats(float DeltaSeconds);
@@ -146,6 +150,8 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<class ULocalFogVolumeComponent>> Mist;
 	UPROPERTY(Transient) TArray<TObjectPtr<class ULocalFogVolumeComponent>> SkylightDust;
 	bool bSkylightBeams = false;
+	UPROPERTY(Transient) TObjectPtr<class UStaticMeshComponent> Stars;
+	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> StarsMID;
 	float MistDensity = -1.f;
 	float MistClock = 0.f;
 	/** Under something (a cave, a roof, a canopy) as of the last check; checked a few times a second. */

@@ -214,6 +214,26 @@ namespace WRLandHfImpl
 			D.GridH = FMath::Min(D.GridH, D.GridRows.Num());
 		}
 		D.ZoneBlend = LNum(J, TEXT("zoneBlend"), 45.f);
+		if (const TSharedPtr<FJsonObject>* GP = nullptr; J->TryGetObjectField(TEXT("groundPatch"), GP))
+		{
+			D.PatchScale = FMath::Max(4.f, LNum(*GP, TEXT("scale"), 34.f));
+			D.PatchSoft = FMath::Max(0.f, LNum(*GP, TEXT("soft"), 0.f));
+			D.bFarBlend = LNum(*GP, TEXT("farBlend"), 0.f) > 0.f;
+		}
+		if (const TSharedPtr<FJsonObject>* WS = nullptr; J->TryGetObjectField(TEXT("wetShore"), WS))
+		{
+			D.WetSea = LNum(*WS, TEXT("sea"), 0.f);
+			D.WetLake = LNum(*WS, TEXT("lake"), 0.f);
+			D.WetDark = LNum(*WS, TEXT("dark"), 0.7f);
+			const TSharedPtr<FJsonObject>* Lk = nullptr;
+			const TArray<TSharedPtr<FJsonValue>>* Outline = nullptr;
+			if (D.WetLake > 0.f && J->TryGetObjectField(TEXT("lake"), Lk) && (*Lk)->TryGetArrayField(TEXT("outline"), Outline))
+			{
+				D.LakeLevel = LNum(*Lk, TEXT("level"), 0.f);
+				for (const TSharedPtr<FJsonValue>& P : *Outline) D.LakeBox += WRLand::Vec2(P);
+				D.LakeBox = D.LakeBox.ExpandBy(30.f);
+			}
+		}
 		const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
 		if (J->TryGetArrayField(TEXT("surfaces"), A))
 		{
@@ -983,7 +1003,9 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 	// under the water, and rock on the steep ground with moss on the Spine's ledges.
 	const FVector2D M = HfOrigin + FVector2D(float(I), float(J)) * HfStep;
 	const float H = HfSample(I, J);
-	const float Patch = Smooth(-0.15f, 0.35f, Noise(M / 34.f + FVector2D(5.3f, 2.9f)) + Noise(M / 9.f) * 0.3f);
+	const float Patch = PatchSoft > 0.f
+		? Smooth(-PatchSoft, PatchSoft, Noise(M / PatchScale + FVector2D(5.3f, 2.9f)) * 0.65f + Noise(M / (PatchScale * 0.31f) + FVector2D(1.7f, 8.1f)) * 0.25f + Noise(M / 9.f) * 0.1f)
+		: Smooth(-0.15f, 0.35f, Noise(M / 34.f + FVector2D(5.3f, 2.9f)) + Noise(M / 9.f) * 0.3f);
 	const auto ZoneColour = [&](const FWRLandZone& Z, float& OutR) -> FLinearColor
 	{
 		FLinearColor C = FMath::Lerp(Z.Ground, Z.GroundAlt, Patch);
@@ -1065,6 +1087,19 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 			OutRough = FMath::Lerp(OutRough, Q.Rough, S);
 			break;
 		}
+	}
+	// The wet band along the sea and the lake.
+	if (WetSea > 0.f || WetLake > 0.f)
+	{
+		float Wet = WetSea > 0.f && H > -0.3f ? 1.f - FMath::Clamp(H / WetSea, 0.f, 1.f) : 0.f;
+		if (WetLake > 0.f && LakeBox.bIsValid && LakeBox.IsInside(M))
+		{
+			const float Above = H - LakeLevel;
+			if (Above > -0.3f) Wet = FMath::Max(Wet, 1.f - FMath::Clamp(Above / WetLake, 0.f, 1.f));
+		}
+		Wet *= Wet * (3.f - 2.f * Wet);
+		C = FMath::Lerp(C, C * WetDark, Wet);
+		OutRough = FMath::Lerp(OutRough, 0.35f, Wet);
 	}
 	// Steep ground is bare rock (basalt on the Spine's face); its ledges keep a mat of moss.
 	const float Slope = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Nrm.Z, -1.f, 1.f)));
@@ -1923,6 +1958,32 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 		const FVector Nrm = FVector(-DX, -DY, 2.f * D.HfStep * Sx).GetSafeNormal();
 		float Rough = 0.9f;
 		FLinearColor C = bLook ? D.HfGround(SI, SJ, Nrm, Rough) : FLinearColor::White;
+		float L[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+		if (bLayers) D.HfLayers(SI, SJ, L);
+		if (bLook && D.bFarBlend && Sx > 1)
+		{
+			// The ground (and its layers) averaged with four samples half a step off on the diagonals, the vertex's own twice.
+			const int32 H2 = Sx / 2;
+			C *= 2.f;
+			float RSum = Rough * 2.f;
+			for (int32 L2 = 0; L2 < 6; ++L2) L[L2] *= 2.f;
+			for (const FIntPoint O : { FIntPoint(-H2, -H2), FIntPoint(H2, -H2), FIntPoint(-H2, H2), FIntPoint(H2, H2) })
+			{
+				const int32 OI = FMath::Clamp(SI + O.X, 0, D.HfN - 1), OJ = FMath::Clamp(SJ + O.Y, 0, D.HfN - 1);
+				float R2 = 0.9f;
+				C += D.HfGround(OI, OJ, Nrm, R2);
+				RSum += R2;
+				if (bLayers)
+				{
+					float L3[6];
+					D.HfLayers(OI, OJ, L3);
+					for (int32 L2 = 0; L2 < 6; ++L2) L[L2] += L3[L2];
+				}
+			}
+			C /= 6.f;
+			Rough = RSum / 6.f;
+			for (int32 L2 = 0; L2 < 6; ++L2) L[L2] /= 6.f;
+		}
 		C.A = 1.f - Rough;
 		S.Verts.Add(D.ToWorld(M, Z) - D.Origin);
 		S.Normals.Add(Nrm);
@@ -1930,8 +1991,6 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 		S.UV.Add(M / 4.f);
 		if (bLayers)
 		{
-			float L[6];
-			D.HfLayers(SI, SJ, L);
 			S.UV1.Add(FVector2D(L[0], L[1]));
 			S.UV2.Add(FVector2D(L[2], L[3]));
 			S.UV3.Add(FVector2D(L[4], L[5]));
@@ -2140,11 +2199,15 @@ void AWRLand::SpawnCamps(UWorld* World, const FWRLandDef& D)
 			{
 				const FVector2D Sea(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw)));
 				const FVector2D Side(-Sea.Y, Sea.X);
+				// Round a work yard BackM inland of the camp's middle: in a U open toward the camp, 8 m out from the yard's
+				// middle, 30 degrees apart, each facing the middle (11-22: in a row across an empty plain).
+				const FVector2D Yard = M - Sea * (BackM - 4.f);
 				for (int32 k = 0; k < Kinds->Num(); ++k)
 				{
-					// In a row across, BackM inland of the camp's middle, 8 m apart, each facing the camp.
-					const FVector2D Spot = M - Sea * BackM + Side * ((k - (Kinds->Num() - 1) * 0.5f) * 8.f);
-					const FTransform T(FRotator(0.f, Yaw, 0.f), D.GroundPoint(Spot) + FVector(0.f, 0.f, 40.f));
+					const float A = FMath::DegreesToRadians((k - (Kinds->Num() - 1) * 0.5f) * 30.f);
+					const FVector2D Out = -Sea * FMath::Cos(A) + Side * FMath::Sin(A);
+					const FVector2D Spot = Yard + Out * 8.f;
+					const FTransform T(FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(-Out.Y, -Out.X)), 0.f), D.GroundPoint(Spot) + FVector(0.f, 0.f, 40.f));
 					if (AWRStation* St = World->SpawnActorDeferred<AWRStation>(AWRStation::StaticClass(), T, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 					{
 						St->StationType = FName(*(*Kinds)[k]->AsString());

@@ -1450,7 +1450,7 @@ void AWRStormRods::Build(const TArray<FWRStormData::FRod>& Rods)
 	const bool bServer = GetNetMode() == NM_DedicatedServer;
 	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
-	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+	UMaterialInterface* Base = FWRBuildLook::Material(EWRLookMat::Tinted);
 	const auto Make = [&](UStaticMesh* Mesh, const FLinearColor& C, float Metal, float Rough, float Glow, bool bCollide)
 	{
 		UHierarchicalInstancedStaticMeshComponent* H = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
@@ -1654,7 +1654,7 @@ void AWRStormBridge::BuildPlanks()
 	const float HalfW = WRTune(TEXT("storm.bridgeHalfWidth"), 75.f);
 	const float Len = FVector::Dist2D(From, To) / N;
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+	UMaterialInterface* Base = FWRBuildLook::Material(EWRLookMat::Tinted);
 	// Two instance sets: sound planks and rotten ones (a shade darker so they read before you reach them).
 	for (int32 k = 0; k < 2; ++k)
 	{
