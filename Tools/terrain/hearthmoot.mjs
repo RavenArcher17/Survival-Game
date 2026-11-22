@@ -202,14 +202,18 @@ const plant = (kind, variant, x, y, yaw, scale) => plants.push([kind, variant, c
 const trunkSolid = (x, y, h = 4) => solids.push([cm(x), cm(y), cm(groundAt(x, y) + h / 2), 70, 70, cm(h), 0]);
 const slate = pal([62, 66, 74], 0, 0.6, 0, 8), iron = pal([40, 40, 44], 0.8, 0.45, 0, 2), darkWood = pal([58, 40, 26], 0, 0.9, 0, 1), beam = pal([70, 50, 34], 0, 0.9, 0, 1);
 const glass = pal([30, 34, 40], 0, 0.2, 0, 3), ember = pal([170, 60, 18], 0, 0.7, 1.4, 0), straw = pal([196, 168, 92], 0, 0.95, 0, 1);
-// A lit window after dusk (a few shades of candle and hearth light) and a lantern's glass.
-const litWindow = [pal([255, 196, 120], 0, 0.5, 1.1, 3), pal([255, 176, 96], 0, 0.5, 0.9, 3), pal([255, 214, 150], 0, 0.5, 1.3, 3)];
+// A lit window after dusk: the room behind it, a dim warm glow filling the pane (a few shades of candle and hearth light),
+// brighter on the side its lamp or fire is; now and then a curtain half drawn, the light through its cloth. (11-22 round
+// 6: every lit window was one flat panel at full glow, so the town's windows read as glowing boxes.) A lantern's glass.
+const roomGlow = [pal([236, 150, 78], 0, 0.6, 0.38, 0), pal([214, 128, 64], 0, 0.6, 0.3, 0), pal([244, 172, 104], 0, 0.6, 0.45, 0)];
+const lampGlow = [pal([255, 204, 132], 0, 0.5, 1.05, 0), pal([255, 184, 104], 0, 0.5, 0.85, 0), pal([255, 220, 160], 0, 0.5, 1.25, 0)];
+const curtainLit = [pal([176, 72, 40], 0, 0.95, 0.22, 9), pal([150, 112, 56], 0, 0.95, 0.2, 9), pal([96, 104, 120], 0, 0.95, 0.16, 9)];
 const lanternGlow = pal([255, 188, 104], 0, 0.4, 3.2, 3), soot = pal([34, 30, 28], 0, 0.95);
 const reedGreen = pal([96, 112, 58], 0, 0.9, 0, 1), reedHead = pal([92, 64, 40], 0, 0.95, 0, 1), cloth = pal([150, 40, 40], 0, 0.95, 0, 9);
 const gateBearings = trunks.map((t) => t.bearing);
 const nearGate = (deg, r, clear) => gateBearings.some((g) => Math.abs(dAng(deg, g)) * RAD * r < clear);
 const polar = (deg, r) => pt(deg, r);
-const R = PLAN.rng(20261119);
+const R = PLAN.rng(20261119), RW = PLAN.rng(20261122);   // RW: the lit windows' own details
 const pick = (arr) => arr[Math.floor(R() * arr.length)];
 const tone = (rgb, amount = 0.12) => { const k = 1 + (R() * 2 - 1) * amount; return rgb.map((v) => Math.max(0, Math.min(255, v * k))); };
 const weathered = (rgb) => { const g = rgb[0] * 0.3 + rgb[1] * 0.59 + rgb[2] * 0.11; return rgb.map((v) => v * 0.72 + g * 0.28); };
@@ -662,7 +666,14 @@ function windows(F, w, d, z, n, h = 1.2) {
 			block(F, CUBE, TINT, [x, d / 2 + 0.07, z + h / 2 + 0.06], [1.15, 0.14, 0.12], { colour: beam, nosink: true });
 			block(F, CUBE, TINT, [x, d / 2 + 0.12, z - h / 2 - 0.06], [1.2, 0.24, 0.12], { colour: beam, nosink: true });
 			block(F, CUBE, TINT, [x, d / 2 + 0.09, z], [0.08, 0.1, h], { colour: beam, nosink: true });
-			if (R() < 0.42) block(F, CUBE, TINT, [x, d / 2 + 0.115, z], [0.9, 0.02, h - 0.06], { colour: pick(litWindow), nosink: true, night: true });
+			if (R() < 0.42) {
+				// the room's glow, the lamp's side brighter (behind the mullion and the frame), now and then a curtain (their
+				// own random stream: drawing on the town's would move every house after the first lit window)
+				block(F, CUBE, TINT, [x, d / 2 + 0.105, z], [0.9, 0.02, h - 0.06], { colour: pick(roomGlow), nosink: true, night: true });
+				const side = RW() < 0.5 ? -1 : 1, lamp = 0.3 + 0.2 * RW();
+				block(F, CUBE, TINT, [x + side * (0.45 - lamp / 2), d / 2 + 0.112, z - 0.12 * h], [lamp, 0.02, h * (0.45 + 0.2 * RW())], { colour: lampGlow[Math.floor(RW() * lampGlow.length)], nosink: true, night: true });
+				if (RW() < 0.3) block(F, CUBE, TINT, [x - side * 0.27, d / 2 + 0.118, z + 0.02], [0.34, 0.02, h - 0.1], { colour: curtainLit[Math.floor(RW() * curtainLit.length)], nosink: true, night: true });
+			}
 		}
 		if (R() < 0.35) block(F, CUBE, WOOD, [x + 0.7, d / 2 + 0.06, z], [0.4, 0.1, h + 0.1], { colour: darkWood });
 	}

@@ -943,6 +943,15 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   Hearthmoot's lights are `roundIsland.<kind>Light` / `<kind>LightRadius` (StepLights).
 - **Launches that must carry sideways** (a geyser onto a ledge): call `UWRCharacterMovementComponent::Carry(seconds)`
   after `LaunchCharacter`; with no input the survivor's braking friction in the air kills any sideways launch in ~20 cm.
+- **Shores** (11-22 round 6): wherever ground meets water, give it one continuous profile through the water's level at
+  the outline (signed distance); a step between two 4 m samples there makes the waterline follow the grid.
+  `round_ground.mjs` SEA_LEVEL (the sea's -0.2 m) and the lake's profile do this.
+- **Cliffs**: `fire_frost_dressing.mjs`'s cliff pass places `basalt_cliff` / `scoria_cliff` / `granite_cliff` /
+  `ice_cliff` by the area of the face (CLIFF_AREA m2 each; spaced over the map, a sheer wall got a row every 40 m up
+  it), the point on the face and the yaw facing down it; `WRWorldDressing`'s FArt `Laid` (> 0) sets the panel there
+  by its middle and leans it back that share of the way to the slope measured on the ground (WRLand::GroundZAt). The
+  cliff pass has its own clearings (16 m from places, 32 m from the Glasswall). Meshes: `make_meshes.py` crag()
+  (SM_Crag_A..D, soft=True SM_CragSoft_A..D).
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'
   rock in courses; wood is WoodMaterialPack2's scans set at run time (`FWRBuildLook::Material`; optional pack, the
   procedural planks without it); M_BuildTinted patterns 0 stone, 1 wood, 2 metal, 3 smooth, 4 plaster, 5 pantiles,

@@ -63,17 +63,17 @@ const PLAN = {
 	V1: [T("char_tree", 1.2, 0.8, 1.2, 26, 0.6), T("ember_shrub", 5, 0.7, 1.2, 30, 0.5), T("basalt_rock", 1.5, 0.6, 1.5, 38), T("pumice_rock", 1.5, 0.5, 1.3, 34), T("lava_rubble", 6, 0.6, 1.1, 16, 0.7)],
 	V2: [T("basalt_rock", 3, 0.6, 1.6, 38), T("ember_shrub", 1.5, 0.7, 1.1, 30, 0.5), T("char_tree", 0.4, 0.8, 1.2, 26, 0.6),
 		T("pine", 30, 0.7, 1.15, 26, 0.4, ON("kipuka")), T("kipuka_shrub", 14, 0.6, 1.1, 30, 0.4, ON("kipuka")), T("lava_rubble", 80, 0.6, 1.3, 16, 0.6)],
-	V3: [T("obsidian_blade", 6, 0.7, 1.5, 45, 0.5), T("basalt_rock", 2, 0.6, 1.4, 40), T("basalt_cliff", 4, 0.7, 1.4, 70, 0, "steep"), T("lava_rubble", 40, 0.6, 1.2, 16, 0.6)],
+	V3: [T("obsidian_blade", 6, 0.7, 1.5, 45, 0.5), T("basalt_rock", 2, 0.6, 1.4, 40), T("lava_rubble", 40, 0.6, 1.2, 16, 0.6)],
 	V4: [T("basalt_rock", 0.8, 0.5, 1.2, 36), T("ember_shrub", 0.5, 0.6, 1.0, 28, 0.5)],
-	V5: [T("basalt_rock", 2, 0.6, 1.5, 40), T("basalt_column", 0.6, 0.8, 1.5, 30, 0.6), T("basalt_cliff", 3, 0.7, 1.4, 70, 0, "steep"), T("char_tree", 0.3, 0.8, 1.1, 24, 0.6), T("lava_rubble", 60, 0.6, 1.3, 16, 0.6)],
+	V5: [T("basalt_rock", 2, 0.6, 1.5, 40), T("basalt_column", 0.6, 0.8, 1.5, 30, 0.6), T("char_tree", 0.3, 0.8, 1.1, 24, 0.6), T("lava_rubble", 60, 0.6, 1.3, 16, 0.6)],
 	V6: [T("ember_shrub", 3, 0.7, 1.2, 30, 0.5), T("basalt_rock", 0.8, 0.6, 1.3, 38), T("char_tree", 0.4, 0.8, 1.2, 26, 0.6),
 		T("pine", 1.5, 0.7, 1.1, 26, 0.7, ON("cinder_grass")), T("kipuka_shrub", 2, 0.6, 1.0, 30, 0.5, ON("cinder_grass")), T("lava_rubble", 12, 0.6, 1.1, 16, 0.7)],
 	V7: [T("char_tree", 28, 0.9, 1.6, 30, 0.45), T("ember_shrub", 6, 0.7, 1.2, 30, 0.5), T("basalt_rock", 0.4, 0.6, 1.2, 38)],
 	T1: [T("granite_rock", 1.2, 0.8, 2.2, 38), T("frost_shrub", 1.5, 0.6, 1.0, 30, 0.5), T("ice_boulder", 0.4, 0.6, 1.3, 38)],
 	T2: [T("pine", 32, 0.75, 1.3, 30, 0.45), T("frost_shrub", 5, 0.6, 1.1, 30, 0.5), T("granite_rock", 0.4, 0.7, 1.6, 38)],
 	T3: [T("pine", 3, 0.7, 1.2, 26, 0.7), T("frost_shrub", 5, 0.5, 0.9, 30, 0.5), T("ice_boulder", 0.8, 0.6, 1.4, 38)],
-	T4: [T("serac", 0.7, 0.8, 1.45, 45, 0.6, null, [2, 5, 3.5, 9]), T("ice_boulder", 2.5, 0.6, 1.6, 40), T("ice_cliff", 3, 0.7, 1.4, 70, 0, "steep")],
-	T5: [T("ice_boulder", 1.5, 0.6, 1.5, 40), T("serac", 0.18, 0.8, 1.35, 40, 0.6, null, [1, 4, 3.5, 8]), T("ice_cliff", 3, 0.7, 1.4, 70, 0, "steep"), T("basalt_rock", 6, 0.6, 1.4, 40, 0, ON("basalt"))],
+	T4: [T("serac", 0.7, 0.8, 1.45, 45, 0.6, null, [2, 5, 3.5, 9]), T("ice_boulder", 2.5, 0.6, 1.6, 40)],
+	T5: [T("ice_boulder", 1.5, 0.6, 1.5, 40), T("serac", 0.18, 0.8, 1.35, 40, 0.6, null, [1, 4, 3.5, 8]), T("basalt_rock", 6, 0.6, 1.4, 40, 0, ON("basalt"))],
 	T6: [T("frost_shrub", 7, 0.5, 1.0, 30, 0.5), T("pine", 1.2, 0.7, 1.1, 26, 0.7), T("granite_rock", 0.6, 0.7, 1.6, 38)],
 	T7: [T("granite_rock", 1.2, 0.8, 2.4, 38), T("frost_shrub", 0.8, 0.6, 1.0, 30, 0.5), T("pine", 0.2, 0.8, 1.1, 24, 0.8)],
 };
@@ -124,6 +124,64 @@ for (let gx = -6600; gx < 6600; gx += C) {
 			}
 		}
 	}
+}
+// ---- cliffs: every steep face in the two lands covered in panels of jointed rock (11-22 round 6) ----------------------
+// The 4 m ground drew a cliff as its texture stretched down a smooth wall. Ground steeper than CLIFF_DEG gets panels
+// (SM_Crag, 10 m across) by the area of its face, one to every CLIFF_AREA m2 of it (a near-vertical face has many times
+// the face of its footprint: spaced over the map, a 55 m wall got a row every 40 m up it), each facing straight down the
+// slope, its point on the face (the game sets it there by its middle and leans it back toward the slope: WRWorldDressing's Laid),
+// in its land's rock: frosted rock on the Tundra's ice and snow, granite on its rock, scoria on the Volcanic's cones and
+// cinder, basalt elsewhere.
+const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55;
+{
+	// Their own clearings: a place stands on level ground, so a cliff panel need only keep 16 m from it (the dressing's
+	// 28 m bared the wall behind the Frozen Whaler), but the Glasswall stands against its ridge (its 52 m of glass runs
+	// into the slope): 32 m; the rest as the dressing's.
+	const cliffClear = [];
+	const keepC = (p, r) => p && cliffClear.push([p[0], p[1], r]);
+	for (const id of ["volcanic", "tundra"]) {
+		const L = FFL.lands[id];
+		keepC(L.village, 150); keepC(L.mouthShrine, 30); keepC(L.champion, 30);
+		for (const c of L.camps) keepC(c, 55);
+		for (let i = 0; i < L.road.length; i++) keepC(L.road[i], 9);
+	}
+	for (const o of FFL.places || []) if (Array.isArray(o.at)) keepC(o.at, o.kind === "glasswall" || o.id === "glasswall" ? 32 : 16);
+	for (const k of ["sites", "caves"]) for (const o of FFL[k] || []) if (Array.isArray(o.at)) keepC(o.at, k === "sites" ? 45 : 28);
+	for (const o of FFL.shrines || []) if (Array.isArray(o.at)) keepC(o.at, 16);
+	for (const o of FFL.kit || []) if (Array.isArray(o.at)) keepC(o.at, 8);
+	keepC(FEAT.volcano, 150);
+	for (const h of FFL.hidden || []) for (let i = 1; i < h.route.length; i++) { const [ax, ay] = h.route[i - 1], [bx, by] = h.route[i], L = Math.hypot(bx - ax, by - ay); for (let t = 0; t <= L; t += 10) keepC([ax + (bx - ax) * t / L, ay + (by - ay) * t / L], 12); }
+	const cb = new Map();
+	for (const [cx, cy, r] of cliffClear) for (let i = Math.floor((cx - r) / CELL); i <= Math.floor((cx + r) / CELL); i++) for (let j = Math.floor((cy - r) / CELL); j <= Math.floor((cy + r) / CELL); j++) { const k = i + "," + j; if (!cb.has(k)) cb.set(k, []); cb.get(k).push([cx, cy, r]); }
+	const cliffOk = (x, y) => !(cb.get(Math.floor(x / CELL) + "," + Math.floor(y / CELL)) || []).some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) < r + 4);
+	const ICY = new Set(["glacier", "ice", "snow", "snow_forest", "crevasse", "lake_ice", "snow_crack"].map((k) => SURF[k]));
+	const RED = new Set(["scoria", "cinder", "cinder_grass", "oxide"].map((k) => SURF[k]));
+	let cliffs = 0;
+	for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
+		const ci = Math.round(gx / CLIFF_STEP), cj = Math.round(gy / CLIFF_STEP);
+		const sl0 = slopeAt(gx, gy);
+		if (sl0 < CLIFF_DEG - 3) continue;
+		const want = CLIFF_STEP * CLIFF_STEP / Math.max(0.1, Math.cos(Math.min(84, sl0) * Math.PI / 180)) / CLIFF_AREA;
+		const tries = Math.floor(want) + (rand(ci, cj, 905) < want - Math.floor(want) ? 1 : 0);
+		for (let t = 0; t < tries; t++) {
+		const x = gx + rand(ci, cj, 901 + t * 11) * CLIFF_STEP, y = gy + rand(ci, cj, 902 + t * 11) * CLIFF_STEP;
+		const zc = zoneAt(x, y);
+		if (!zc || !PLAN[zc]) continue;
+		const h = hAt(x, y);
+		if (h < 2 || slopeAt(x, y) < CLIFF_DEG) continue;
+		if (!cliffOk(x, y) || lavaDist(x, y) < LAND.lava.width / 2 + 6) continue;
+		const sf = surfAt(x, y);
+		if (sf === SURF.road || sf === SURF.main_road || sf === SURF.lava || sf === SURF.lava_crust) continue;
+		// downhill: against the ground's gradient
+		const gxh = hAt(x + 3, y) - hAt(x - 3, y), gyh = hAt(x, y + 3) - hAt(x, y - 3), gl = Math.hypot(gxh, gyh) || 1;
+		const dx = -gxh / gl, dy = -gyh / gl;
+		const z = h;
+		const kind = /^T/.test(zc) ? (ICY.has(sf) ? "ice_cliff" : "granite_cliff") : RED.has(sf) ? "scoria_cliff" : "basalt_cliff";
+		add(kind, x, y, z, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 903 + t * 11) - 0.5) * 16, 0.85 + 0.45 * rand(ci, cj, 904 + t * 11));
+		cliffs++;
+		}
+	}
+	console.log("cliffs:", cliffs, "panels on ground over", CLIFF_DEG, "degrees");
 }
 // ---- hazards: the lava burns where its molten channel runs; the lake ice and the glacier's polished ice are slick ----
 const HCELL = 600;

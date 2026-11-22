@@ -31,6 +31,9 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
                           the Mirror Room's door 8.5-14.5 m up.
   SM_QuarryFace_A         Warden's Quarry: an outcrop cut back in three benches scored by drill channels, a 15 m skirt.
   SM_CutBlock_A..B        blocks split from it: chisel grooves, wedge holes along one edge, corners knocked.
+  SM_CragSoft_A..D        the same with snow and ice built up over them, every edge rounded (the Tundra's faces).
+  SM_Crag_A..D            jointed rock panels for steep faces (10 m across, up to 8.5 m tall, 4.8 m deep), laid against
+                          the slope by the dressing (basalt_cliff, ice_cliff, crag_*): the ground's cliffs read as rock.
   SM_GolemRough_A         the quarry's second golem, half carved: a rough block 4.6 m long with a figure lying face up
                           out of its top (torso, head, shoulders, arms at its sides, hips), its legs still in the stone.
   Helpers: prism() (faceted columns, sharp edges), tube() (swept rings), ellipsoid(), voxel(), boolean(). WR_OBJ=<folder>
@@ -1201,6 +1204,49 @@ def golem_rough(name, seed):
     save(mesh, name)
 
 
+def crag(name, seed, soft=False):
+    """A panel of jointed rock for a steep face (the dressing lays them against it, leaning back to its slope): columns of
+    blocks split along their joints, each block's face set back its own way, the columns of every height, the top ragged
+    and stepped back; merged into one rock, the faces left angular (a coarse voxel close, no smoothing). Front toward +X,
+    its back flat at X -220 (buried in the slope), 10 m across (Y), up to 8.5 m tall, origin at the middle of its foot.
+    soft: the same blocks with snow and ice built up over them, every edge rounded (a wide close, relaxed): the Tundra's
+    faces (the angular ones in pale ice read as sugar cubes)."""
+    rnd = random.Random(seed)
+    mesh = unreal.DynamicMesh()
+    y = -500.0
+    while y < 500.0:
+        w = rnd.uniform(140.0, 260.0)
+        w = min(w, 500.0 - y)
+        if w < 60.0:
+            break
+        top = rnd.uniform(420.0, 850.0) * (0.8 + 0.2 * math.sin((y + 500.0) / 1000.0 * math.pi))
+        z, front = 0.0, rnd.uniform(160.0, 260.0)
+        while z < top - 40.0:
+            h = min(rnd.uniform(120.0, 300.0), top - z)
+            # each block of the column sits a little back or proud of the one below; higher up the face steps back
+            front = max(60.0, min(280.0, front + rnd.uniform(-60.0, 30.0) - 10.0))
+            depth = front + 220.0
+            yaw, pitch = rnd.uniform(-5.0, 5.0), rnd.uniform(-4.0, 4.0)
+            GS.append_box(mesh, opts(), xf((front - depth / 2.0, y + w / 2.0 + rnd.uniform(-10.0, 10.0), z - 8.0), (pitch, yaw, rnd.uniform(-3.0, 3.0))),
+                          depth, w - rnd.uniform(0.0, 18.0), h + 16.0, 1, 1, 1, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+            z += h
+        y += w
+    # a few loose blocks fallen onto the foot
+    for _ in range(rnd.randint(2, 4)):
+        s = rnd.uniform(60.0, 120.0)
+        GS.append_box(mesh, opts(), xf((rnd.uniform(220.0, 320.0), rnd.uniform(-420.0, 420.0), -10.0), (rnd.uniform(-15, 15), rnd.uniform(0, 90), rnd.uniform(-15, 15))),
+                      s, s * rnd.uniform(0.7, 1.2), s * rnd.uniform(0.5, 0.9), 1, 1, 1, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    if soft:
+        voxel(mesh, 12.0, close=55.0, smooth_n=6, tris=50000)
+        noise(mesh, 14.0, 0.008, seed)
+        noise(mesh, 2.0, 0.04, seed + 1)
+    else:
+        voxel(mesh, 9.0, close=14.0, smooth_n=0, tris=60000)
+        noise(mesh, 9.0, 0.012, seed)
+        noise(mesh, 3.0, 0.05, seed + 1)
+    save(mesh, name, nanite=True)
+
+
 def run(key, fn, *args):
     if want(key):
         try:
@@ -1252,3 +1298,7 @@ run("quarry", quarry_face, "SM_QuarryFace_A", 1501)
 run("quarry", cut_block, "SM_CutBlock_A", 1502, 220.0, 170.0, 150.0)
 run("quarry", cut_block, "SM_CutBlock_B", 1503, 300.0, 150.0, 120.0)
 run("golem", golem_rough, "SM_GolemRough_A", 1504)
+for i, n in enumerate("ABCD"):
+    run("crag", crag, "SM_Crag_" + n, 1601 + i)
+for i, n in enumerate("ABCD"):
+    run("cragsoft", crag, "SM_CragSoft_" + n, 1611 + i, True)

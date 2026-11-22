@@ -518,7 +518,8 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	struct FScalar { const TCHAR* Name; float Value; };
 	struct FArt { TArray<FString> Meshes; FVector Size; float Sink; bool bCollision; float Cull; FVector Tilt; bool bHeightOnly;
 	              const TCHAR* Material; TArray<FParam> Params; TArray<FScalar> Scalars;
-	              bool bShapeCollision = false; };  // keep the shapes' colliding parts, hidden (tree trunks)
+	              bool bShapeCollision = false;   // keep the shapes' colliding parts, hidden (tree trunks)
+	              float Laid = 0.f; };            // > 0: faces down its slope (its yaw) and leans back that share of the way to the ground's own slope (crags on a cliff)
 	static const TCHAR* RockMat = TEXT("/Game/Terrain/M_Rock.M_Rock");
 	static const TCHAR* IceMat = TEXT("/Game/Terrain/M_IceBlock.M_IceBlock");
 	TArray<FString> Rocks, Shrubs;
@@ -543,7 +544,10 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, { { TEXT("Dust"), 0.55f } } } },
 		// (M_Rock's coats, 11-22: snow lying on the tundra's rocks, ash settled on the volcanic's.)
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, { { TEXT("Snow"), 0.9f } } } },
-		{ TEXT("basalt_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.13f, 0.12f, 0.11f) } }, { { TEXT("Dust"), 0.45f } } } },
+		// Cliffs (11-22 round 6): panels of jointed rock (SM_Crag, 10 m across) laid over the steep faces close together, each
+		// facing down its slope and leaning back most of the way to it, so a cliff reads as rock in columns and ledges, not the
+		// ground's texture stretched down it (they were the rock set's boulders, a few a hectare). You bump into them.
+		{ TEXT("basalt_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.16f, 0.15f, 0.14f) } }, { { TEXT("Dust"), 0.4f } }, false, 0.75f } },
 		{ TEXT("pumice_rock"), { Rocks, FVector(220, 190, 140), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.55f, 0.53f, 0.5f) } }, { { TEXT("Dust"), 0.3f } } } },
 		// Rubble on the lava fields, the obsidian ridges and the crater highlands (11-22: the ground read bare and smooth):
 		// patches of broken basalt about 4 m across (SM_Rubble, ~40 stones each, Nanite), on gentle ground only (the
@@ -563,7 +567,14 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			{ { TEXT("Snow Color"), FLinearColor(0.93f, 0.96f, 1.f) } }, { { TEXT("Amount Min"), 0.85f }, { TEXT("Amount Max"), 1.f } } } },
 		{ TEXT("kipuka_shrub"), { Shrubs, FVector(0, 0, 230), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.3f, 0.33f, 0.24f) } }, { { TEXT("Amount Min"), 0.f }, { TEXT("Amount Max"), 0.25f } } } },
-		{ TEXT("ice_cliff"), { Rocks, FVector(520, 460, 440), 140, false, 30000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.58f, 0.68f, 0.8f) } }, { { TEXT("Snow"), 0.75f } } } },
+		// (The ice shelf's and the glacier's faces: the panels with snow and ice built up over them (SM_CragSoft, rounded),
+		// in glacier ice crusted with snow ("Snow" 0.7: pale, its
+		// strata faint), so they sit with the ice round them: in rock they read as dark bricks on a pale wall, and in the bare
+		// ice's bold strata as stacked bricks.)
+		{ TEXT("ice_cliff"), { Gen(TEXT("SM_CragSoft"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, { { TEXT("Snow"), 0.7f } }, false, 0.75f } },
+		// The Tundra's rock faces (granite) and the Volcanic's cones and crater (scoria): the same panels in their rock.
+		{ TEXT("granite_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.5f, 0.5f, 0.53f) } }, { { TEXT("Snow"), 0.45f } }, false, 0.75f } },
+		{ TEXT("scoria_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.3f, 0.17f, 0.13f) } }, { { TEXT("Dust"), 0.3f } }, false, 0.75f } },
 		// Fitted heights are the meshes' bounds, about twice their leafy part: 260 cm makes a bush of a metre or so.
 		// The volcanic west's scrub is dead (cooks/cookpass-world.md 3.7, G22): the GV leaves stayed green whatever their
 		// tint, and greying them with their "snow" coat (world.ashCoatMin) hung the GPU in the virtual shadow maps' Nanite
@@ -653,8 +664,24 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				const float S = Arr[i * 5 + 4]->AsNumber();
 				const float Yaw = Arr[i * 5 + 3]->AsNumber();
 				const FVector Ground(Arr[i * 5]->AsNumber(), Arr[i * 5 + 1]->AsNumber(), Arr[i * 5 + 2]->AsNumber());
-				const FRotator Rot(A.Tilt.X * FMath::Sin(Yaw), Yaw, A.Tilt.Z * FMath::Cos(Yaw * 1.7f));
+				FRotator Rot(A.Tilt.X * FMath::Sin(Yaw), Yaw, A.Tilt.Z * FMath::Cos(Yaw * 1.7f));
 				const FVector Scale = Fit * S;
+				if (A.Laid > 0.f)
+				{
+					// A crag on a cliff (its point is on the face) faces down it (its yaw, the writer's) and leans back toward the
+					// cliff's own slope, a share of the way (steeper than the ground, so each one's top stands proud of it as a
+					// ledge): the slope measured on the ground 4 m either side along its facing. It's set on the face by its
+					// middle, a little over half of it below the point and its back sunk into the slope, so a near-sheer wall is
+					// covered (set by its foot on the ground in front, it sat low and mostly inside the cliff: dark specks).
+					const FVector Dir = FRotator(0.f, Yaw, 0.f).Vector();
+					const float Behind = WRLand::GroundZAt(Ground - Dir * 400.f, Ground.Z), Ahead = WRLand::GroundZAt(Ground + Dir * 400.f, Ground.Z);
+					const float Slope = FMath::RadiansToDegrees(FMath::Atan2(FMath::Max(0.f, Behind - Ahead), 800.f));
+					Rot.Pitch += FMath::Clamp((90.f - Slope) * A.Laid, 0.f, 55.f);
+					const FQuat Q = Rot.Quaternion();
+					const float Mid = FMath::Lerp(Box.Min.Z, Box.Max.Z, 0.62f) * Scale.Z;
+					Transforms.Emplace(Rot, Ground - Q.GetUpVector() * Mid - Q.GetForwardVector() * (A.Sink * S), Scale);
+					continue;
+				}
 				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, -Box.Min.Z * Scale.Z - A.Sink * S), Scale);
 			}
 			UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(Meshes[m], A.bCollision, A.Cull);

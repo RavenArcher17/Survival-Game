@@ -37,6 +37,7 @@ const MEADOW_RISE = 450;        // m: from the meadow's edge up into the lands
 const ROAD_W = 4, TRUNK_W = 6;  // m: half widths
 const ROAD_GRADE = 0.11;        // steepest a road climbs
 const SEA_FLOOR = -30;          // m: open sea floor below this isn't built (the sea covers it; the deep floor is dark)
+const SEA_LEVEL = -0.2;         // m: the sea's surface (tuning sea.level -20 cm): the shore's profile passes through it
 const LAND_ABOVE = 1.5;         // m: a sea-mask cell whose lowest corner is above this is dry land
 // Each land's first-pass character (its own slice redoes it): a base, a highland peak inland, and its own shapes.
 const LAND_INDEX = Object.fromEntries(LANDS.map((l, i) => [l.id, i]));
@@ -363,15 +364,18 @@ for (let j = 0; j < N; j++) {
 			hm = lerp(hm, CITY_TOP, 1 - smooth(CITY_FLAT, CITY_FLAT + 40, r));
 			h = lerp(hm, h, smooth(0, MEADOW_RISE, r - mR));
 		}
-		// The coast: beaches, cliffs where the land wants them, then the shelving sea floor and the reefs.
+		// The coast: beaches, cliffs where the land wants them, then the shelving sea floor and the reefs. One profile
+		// through the sea's level (SEA_LEVEL) at the coastline, so the water meets the sand along that ragged line: it
+		// stepped from +0.9 m to -0.5 m between two samples there, and the water's edge followed the 4 m grid in jogs.
 		const cliff = cliffAt(deg), beachW = 70 * (1 - cliff) + 8;
 		if (dc >= 0) {
-			h = lerp(0.9 + 0.4 * fbm(x / 60, y / 60, 5, 2), h, smooth(0, beachW, dc));
+			const beach = SEA_LEVEL + (1.1 + 0.4 * fbm(x / 60, y / 60, 5, 2)) * smooth(0, 16 + 10 * (1 - cliff), dc);
+			h = lerp(beach, h, smooth(0, beachW, dc));
 			if (dc < beachW * 0.8 && cliff < 0.5) S[k] = SURF.sand;
 			else if (dc < 14 && cliff >= 0.5) S[k] = SURF.shore_rock;
 		} else {
 			const o = -dc, fall = 1 + 2 * cliff;
-			h = -(0.5 + 2.5 * fall * smooth(0, 300, o) + 7 * smooth(300, 1200, o) + 30 * smooth(1200, 2600, o));
+			h = SEA_LEVEL - (0.6 * smooth(0, 14, o) + 2.5 * fall * smooth(0, 300, o) + 7 * smooth(300, 1200, o) + 30 * smooth(1200, 2600, o));
 			if (o > 250 && o < 1250) h += 2.2 * Math.max(0, fbm(x / 80, y / 80, 31, 3));   // the reefs
 			if (o < 300) S[k] = SURF.sand;
 		}
@@ -446,10 +450,12 @@ const lakeEdgeDist = (x, y) => {
 	const P = 160;
 	for (let j = Math.floor((lakeBox[1] - P + HALF) / STEP); j <= Math.ceil((lakeBox[3] + P + HALF) / STEP); j++) for (let i = Math.floor((lakeBox[0] - P + HALF) / STEP); i <= Math.ceil((lakeBox[2] + P + HALF) / STEP); i++) {
 		const x = -HALF + i * STEP, y = -HALF + j * STEP, k = j * N + i, d = lakeEdgeDist(x, y);
-		if (inPoly([x, y], lakeOutline)) { H[k] = LAKE_LEVEL - Math.min(6, 0.6 + d * 0.045); S[k] = SURF.lake_bed; }
+		// One profile through the water's level at the outline (it stepped from +0.3 m to -0.6 m between two samples, so
+		// the water's edge followed the 4 m grid): shelving gently in, a soft bank out.
+		if (inPoly([x, y], lakeOutline)) { H[k] = LAKE_LEVEL - Math.min(6, 0.07 * d + 0.0012 * d * d); S[k] = SURF.lake_bed; }
 		else if (d < P) {
 			H[k] = Math.max(H[k], LAKE_LEVEL + 0.5 + d * 0.012);   // the meadow never dips under the lake beside it
-			if (d < 6) H[k] = lerp(LAKE_LEVEL + 0.3, H[k], d / 6);
+			if (d < 9) H[k] = lerp(LAKE_LEVEL + 0.07 * d, H[k], smooth(0, 9, d));
 			if (d < 5) S[k] = SURF.bank;
 		}
 	}
@@ -474,7 +480,9 @@ const lavaLine = (() => {
 	for (let i = 0; i < pts.length; i++) {
 		const g = sampleH(...pts[i]), along = i ? Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) : 0;
 		lv = Math.min(lv - 0.015 * along, g - 1.2);
-		out.push([pts[i][0], pts[i][1], Math.max(0.6, lv)]);
+		// (down to just over the sea at its mouth: held at 0.6 m it stood over the beach on raised banks)
+		const inland = coastAt(bearingOf(...pts[i])) - Math.hypot(...pts[i]);
+		out.push([pts[i][0], pts[i][1], Math.max(lerp(SEA_LEVEL + 0.25, 0.6, smooth(0, 120, inland)), lv)]);
 	}
 	return out;
 })();
@@ -488,9 +496,12 @@ const lavaLine = (() => {
 		const d = D[k], lv = levelAt(A[k]);
 		const want = d < half ? lv - 0.8 : d < half + 6 ? lv + 0.5 + (d - half) * 0.12 : lv + 1.2 + (d - half - 6) * 0.32;
 		const xk = -HALF + (k % N) * STEP, yk = -HALF + Math.floor(k / N) * STEP;
-		const seaward = Math.hypot(xk, yk) > coastAt(bearingOf(xk, yk)) - 4;
+		const inland = coastAt(bearingOf(xk, yk)) - Math.hypot(xk, yk);
+		const seaward = inland < 4;
 		if (seaward) { H[k] = Math.min(H[k], want); continue; }
-		if (d < half + 6 || want < H[k]) H[k] = d < half + 6 ? want : Math.min(H[k], want);
+		// The banks are built up to the channel only away from the shore: over the last 40 m they fade into the beach
+		// (they stopped dead 4 m short of it, a raised shelf with walls standing over the sand).
+		if (d < half + 6 || want < H[k]) H[k] = d < half + 6 ? lerp(Math.min(H[k], want), want, smooth(4, 44, inland)) : Math.min(H[k], want);
 		if (d < half) S[k] = SURF.lava; else if (d < half + 7) S[k] = SURF.lava_crust;
 	}
 	log(`lava river: ${Math.round(len)} m, ${lavaLine[0][2].toFixed(1)} m at its mouth down to ${lavaLine[lavaLine.length - 1][2].toFixed(1)} m`);

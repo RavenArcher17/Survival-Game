@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Round island: the look pass, fifth round: shores, cliffs, windows (11-22)
+
+- **The sea meets the land along the coast, not the ground's grid:** the shore's profile stepped from +0.9 m to -0.5 m
+  between two 4 m samples at the coastline, so the water's edge ran in straight lines and jogs along the grid with a
+  lip of sand standing over it. The ground now passes through the sea's level (-0.2 m) at the coastline and shelves
+  gently out (`round_ground.mjs` SEA_LEVEL): the waterline follows the ragged coast in a smooth curve, the surf
+  breaking in the shallows. The meadow lake's shore the same (it stepped from +0.3 m to -0.6 m): a soft bank, the bed
+  shelving in. Where the lava river reaches the sea its banks no longer stand on a raised shelf with walls over the
+  beach: the lava runs down to just over the sea and its banks fade into the sand over the last 40 m.
+- **Cliffs are rock:** the 4 m ground drew a steep face as its texture smeared down a smooth wall (a few stretched
+  boulders a hectare on it). Every face steeper than 40 degrees in the Volcanic and the Tundra is now covered in panels
+  of jointed rock (`SM_Crag`, generated: columns of blocks, each face set back its own way, ragged stepped tops,
+  fallen blocks at the foot), one to every 55 m2 of the face itself, each set on the face by its middle, facing down
+  it and leaning back most of the way to it so its top stands proud as a ledge (`WRWorldDressing` Laid,
+  `fire_frost_dressing.mjs` cliff pass: 25,700 panels): basalt on the Volcanic's faces, red-brown scoria on its cones
+  and cinder, granite in the Tundra, and on the Tundra's ice and snow the same blocks with snow and ice built up over
+  them (`SM_CragSoft`, rounded) in snow-crusted glacier ice. You bump into them; none stand within 10 m of a road, 16 m
+  of a place, 32 m of the Glasswall (the geyser's ride is as it was).
+- **Lit windows read as rooms:** each was one flat panel glowing at full strength, so the town's windows were glowing
+  boxes. Now a dim warm glow fills the pane with the lamp's side brighter, and now and then a curtain half drawn
+  (`hearthmoot.mjs` windows; their own random stream, so no house moved).
+- Still open: the beaches have no pebbles, wrack or reeds along the waterline; the cliff panels' blocky edges show on
+  the Tundra's sheer ice faces; at night the lake doesn't mirror the moon. During this round's runs the game twice hit
+  the known GPU crash (virtual shadow maps' non-Nanite culling, as in phase 2), against none in the twelve runs before:
+  the cliffs are Nanite, so likely unrelated, but watch for it.
+
 ### Round island: the look pass, fourth round: light (11-22)
 
 - **Golden hour reads golden:** the hour before dusk (the sun under 22 degrees, it was 18) warms the sunlight itself
