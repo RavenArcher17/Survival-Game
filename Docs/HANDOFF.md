@@ -935,7 +935,10 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   materials at play time.
 - **Hero faces:** `Tools/art/fix_face_lod3.py` gives a face's LOD3 and LOD5to7 skin materials their LOD1 textures when
   they are missing (F1, F2, F3, F6, M3 came without at LOD3 and went black at 4-12 m; all twelve lacked "SRMF Baked VT"
-  at LOD5to7). Run it again after importing new faces. (Some townsfolk faces still draw shiny black: open.)
+  at LOD5to7). Run it again after importing new faces. If skin ever draws shiny black everywhere (face and body alike),
+  look at MF_PathMarks first: its code node must read the BaseColor input M_WR_Skin feeds (`Tools/art/
+  fix_pathmarks_input.py` mended a function built twice, 11-22). Tuning overrides on the command line are
+  `-wrtune=key:value,key:value` (a colon, not =).
 - The hero animates with **no animation blueprint**: `UWRHeroAnimInstance` (a `UWRAnimInstance`) does motion matching
   in C++ (`UPoseSearchLibrary::MotionMatch` with its own pose history and blend stack), because the engine's
   motion-matching node can't run outside an animation blueprint in a packaged build and anim graphs can't be made

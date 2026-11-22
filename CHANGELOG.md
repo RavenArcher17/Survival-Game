@@ -23,8 +23,12 @@ The first round's pictures, graded against the caves again, and what they still 
   a work yard (they were a row across the plain). The middle camps (the ones with stations) lie level: the land's road laid its own
   grade through them, a 2 m bank across the camp, and the tents and the log seat hung in the air off it (Raven's picture);
   the road now leaves the camp at its level, and each tent, log and crate sits on the lowest ground under it.
-- **People:** every face's far skin material had no specular map (all twelve); set. Some townsfolk's faces still draw
-  shiny black, and the town clothes leave legs and feet bare: next round.
+- **People:** everyone's skin drew shiny black (every townsperson's face and neck, and every survivor's body where
+  the clothes don't cover it: the brown "skin" on the townsfolk was their leggings). The path marks' material function
+  (MF_PathMarks) had been built more than once and carried three BaseColor inputs: the skin material fed one, the code
+  that draws the marks over the skin read another that nothing fed, so the skin's colour was black under every mark.
+  It reads the fed one now and the strays are gone (Tools/art/fix_pathmarks_input.py). Faces show their skin, freckles,
+  lips and stubble at every distance. (Every face's far skin material also lacked its specular map; set.)
 - **The Volcanic:** the ground was darker than charcoal and read as black; it is now real basalt and ash, the lava
   fields wear pahoehoe's ropy folds and aa's clinker (the LavaMat pack's flows), broken basalt lies in patches across
   the lava fields, ridges and crater highlands, the Ash Plains are rippled grey ash, and the colour grade is less
