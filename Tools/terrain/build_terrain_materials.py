@@ -467,14 +467,81 @@ if want("caverock"):
     lines = mul(mul(lines, sat(mul(op(unreal.MaterialExpressionSubtract, None, nz, const_a=0.5), k=4.0))),
                 mul(sat(mul(op(unreal.MaterialExpressionSubtract, h, const_b=0.3), k=3.0)), sat(mul(op(unreal.MaterialExpressionSubtract, None, h, const_a=3.0), k=2.0))))
     base = mul(mul(mask(vc, "r", "g", "b"), mul(lum, k=1.6)), add(mul(lines, k=0.3), expr(unreal.MaterialExpressionConstant, r=1.0)))
-    # Glazed rock is satin, not a mirror: the near lights silvered whole walls at the mesh's own roughness. Standing water
-    # (UV1.y = wet, a puddle in the floor's low spots) is dark and glossy.
-    wet = mask(uv1, "g")
-    base = mul(base, op(unreal.MaterialExpressionSubtract, None, mul(wet, k=0.7), const_a=1.0))
-    rough = lerp(lerp(expr(unreal.MaterialExpressionConstant, r=0.55), expr(unreal.MaterialExpressionConstant, r=1.0), vc_alpha(vc)),
-                 expr(unreal.MaterialExpressionConstant, r=0.04), wet)
+    # Glazed rock is satin, not a mirror: the near lights silvered whole walls at the mesh's own roughness.
+    rough = lerp(expr(unreal.MaterialExpressionConstant, r=0.55), expr(unreal.MaterialExpressionConstant, r=1.0), vc_alpha(vc))
     normal = normalized(add(add(n, tri_bump("Ground/TEX_MWAM_Rock_nrm", big, w, 1.0)), tri_bump("Ground/TEX_MWAM_Rock_nrm", small, w, 0.55)))
-    finish(base, normal, rough, specular=expr(unreal.MaterialExpressionConstant, r=0.35))
+    # Standing water (UV1.y = how far under a puddle's waterline + 0.3 m; the mesh changes it linearly across each
+    # triangle, so here the level water's edge falls exactly where it meets the rock): a wet band just over the line, and
+    # under it the rock dark through the water beneath a level, mirror-smooth top (its normal straight up whatever the
+    # floor's bumps: it mirrors the cave as water does; bumpy, wet rock was a glitter of sparks, a burnt patch).
+    wl = mask(uv1, "g")
+    sub = unreal.MaterialExpressionSubtract
+    var = "Extra/TEX_MWAM_Variation_msk"
+    wxy = mul(mask(wp, "r", "g"), k=0.01)                  # world metres
+    # (the edge wanders a few cm with two scales of noise, as water creeps into the rock's grain)
+    rag = add(mul(op(sub, mask(sample(var, mul(wxy, k=1.0 / 0.7)), "g"), const_b=0.5), k=0.03),
+              mul(op(sub, mask(sample(var, mul(wxy, k=1.0 / 0.22)), "b"), const_b=0.5), k=0.016))
+    under = add(op(sub, wl, const_b=0.3), rag)
+    water = sat(mul(under, k=60.0))
+    rim = sat(mul(add(under, expr(unreal.MaterialExpressionConstant, r=0.05)), k=20.0))
+    deep = sat(mul(under, k=4.0))
+    base = mul(base, op(sub, None, mul(rim, k=0.35), const_a=1.0))
+    # (clear water: the rock under it a little darker, darker again where it's deep)
+    base = lerp(base, mul(base, lerp(None, None, deep, const_a=0.72, const_b=0.42)), water)
+    # (the wet band satin, not glossy: at 0.3 the lights' glints along it read as a fringe of frost)
+    rough = lerp(lerp(rough, expr(unreal.MaterialExpressionConstant, r=0.5), rim), expr(unreal.MaterialExpressionConstant, r=0.02), water)
+    normal = normalized(lerp(normal, const3((0.0, 0.0, 1.0)), water))
+    # Seams still glowing (UV2 = heat round a crack's zig-zag, the signed distance across it in m): the fissure itself, a
+    # jagged line exactly along the zig-zag (the distance bent by noise), fine where the heat is low and wider at its
+    # middle; round it the cooling crust split in a net of polygon cracks (Voronoi cell edges); a dim glow on the crust
+    # beside the fissure. Deep red to orange to yellow, held at a steady brightness on screen as the lava flow's is. (A
+    # lit strip laid on the floor read as a neon tube; the lava texture's veins as a blurred red smear.)
+    uv2 = expr(unreal.MaterialExpressionTextureCoordinate, coordinate_index=2)
+    heat, sd = mask(uv2, "r"), mask(uv2, "g")
+    sdw = add(add(sd, mul(op(sub, mask(sample(var, mul(wxy, k=1.0 / 0.9)), "r"), const_b=0.5), k=0.22)),
+              mul(op(sub, mask(sample(var, mul(wxy, k=1.0 / 0.25)), "g"), const_b=0.5), k=0.07))
+    asd = expr(unreal.MaterialExpressionAbs)
+    link(sdw, asd)
+    width = lerp(None, None, heat, const_a=0.006, const_b=0.04)
+    core = sat(op(sub, None, op(unreal.MaterialExpressionDivide, asd, width), const_a=1.0))
+    halo = sat(op(sub, None, mul(asd, k=1.0 / 0.3), const_a=1.0))
+    net = expr(unreal.MaterialExpressionCustom, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT1, description="CrackNet", code="""
+float2 Q = P - 512.0 * floor(P / 512.0);
+float2 I = floor(Q), F = frac(Q);
+float D1 = 8.0, D2 = 8.0;
+for (int y = -1; y <= 1; y++)
+for (int x = -1; x <= 1; x++)
+{
+    float2 G = float2(x, y);
+    uint2 H = uint2(I + G + 1024.0);
+    uint N = H.x * 73856093u ^ H.y * 19349663u;
+    N = (N ^ 61u) ^ (N >> 16); N *= 9u; N = N ^ (N >> 4); N *= 0x27d4eb2du; N = N ^ (N >> 15);
+    float2 R = G + float2(N & 0xffffu, N >> 16) / 65535.0 - F;
+    float D = dot(R, R);
+    if (D < D1) { D2 = D1; D1 = D; } else if (D < D2) { D2 = D; }
+}
+return sqrt(D2) - sqrt(D1);
+""")
+    ci = unreal.CustomInput()
+    ci.set_editor_property("input_name", "P")
+    net.set_editor_property("inputs", [ci])
+    warped = add(mul(wxy, k=1.0 / 0.42), mul(mask(sample(var, mul(wxy, k=1.0 / 1.3)), "r", "g"), k=0.6))
+    link(warped, net, "P")
+    nline = sat(op(sub, None, mul(net, k=1.0 / 0.07), const_a=1.0))
+    e = sat(mul(add(add(mul(core, core), mul(mul(nline, nline), mul(sat(mul(op(sub, heat, const_b=0.35), k=2.5)), k=0.55))),
+                    mul(mul(halo, halo), k=0.22)), mul(heat, k=1.3)))
+    ember = lerp(lerp(const3((0.6, 0.02, 0.003)), const3((1.0, 0.18, 0.01)), sat(mul(e, k=1.8))),
+                 const3((1.0, 0.45, 0.06)), sat(mul(op(sub, e, const_b=0.7), k=3.0)))
+    level = mul(mul(e, e), expr(unreal.MaterialExpressionScalarParameter, parameter_name="EmberLevel", default_value=8.0))
+    steady = expr(unreal.MaterialExpressionEyeAdaptationInverse)
+    ok_l = any(mel.connect_material_expressions(level, "", steady, p) for p in ("LightValue", "Light Value", "LightValueInput"))
+    ok_a = any(mel.connect_material_expressions(expr(unreal.MaterialExpressionConstant, r=0.85), "", steady, p) for p in ("Alpha", "AlphaInput"))
+    if not (ok_l and ok_a):
+        unreal.log_error(f"[Wildreach] caverock: EyeAdaptationInverse inputs not connected ({ok_l} {ok_a})")
+    # (the crust darker in the cracks' lines: they're gaps)
+    base = mul(base, op(sub, None, mul(sat(mul(add(core, mul(nline, sat(mul(op(sub, heat, const_b=0.35), k=2.5)))), k=1.0)), k=0.8), const_a=1.0))
+    finish(base, normal, rough, emissive=mul(ember, steady),
+           specular=lerp(expr(unreal.MaterialExpressionConstant, r=0.35), expr(unreal.MaterialExpressionConstant, r=0.3), water))
 
 if want("caveice"):
     # The Tundra's glacier ice: level strata of pale and deep blue drawn here per pixel (bent by noise; done per vertex

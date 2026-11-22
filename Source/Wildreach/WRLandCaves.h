@@ -42,8 +42,9 @@ private:
 		TArray<FLinearColor> Colours;
 		TArray<FVector2D> UV1, UV2, UV3;
 		/** The cave's own rock (M_CaveRock, the Volcanic's basalt; M_CaveIce, the Tundra's ice): its colour (RGB) and
-		 *  roughness (A); UV1 = the height above the passage's floor (basalt) or (ice 0..1, thin cover 0..1); UV2.x = how
-		 *  deep (the ice darkens). Toward the ground's surface the colour fades to the ground's. */
+		 *  roughness (A). Basalt: UV1 = (the height above the passage's floor, a puddle's depth under its waterline + 0.3 m),
+		 *  UV2 = (heat, the signed distance across a seam still glowing, m). Ice: UV1 = (ice 0..1, thin cover 0..1), UV2 = (how deep: the ice darkens,
+		 *  clear ice). Toward the ground's surface the colour fades to the ground's. */
 		TArray<FColor> RockColours;
 		TArray<FVector2D> RockUV1, RockUV2;
 		/** The lip's tangents (U's direction, as its UVs were projected). */

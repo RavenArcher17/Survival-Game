@@ -4200,24 +4200,73 @@ void AWRNest::BeginPlay()
 {
 	Super::BeginPlay();
 	if (GetNetMode() == NM_DedicatedServer) return;
-	// A shallow bowl of sticks: dozens laid round the rim, crossing one another at all angles and heights (the material's
-	// grain runs along each), on a bed of dry grass and down. (Three smooth rings read as a ring of bread.)
+	// A shallow bowl of sticks laid round the rim, crossing one another at all angles and heights (the material's grain
+	// runs along each): a few thick, most thin, each bowed a little, some kinked, some forked, a few fallen out onto the
+	// ground round it; the hollow lined with fine dry grass laid round in arcs. (Straight, even rods read as matchsticks,
+	// a smooth disc of "grass" under them as a plate; three smooth rings before that as a ring of bread.)
 	FWRToolMesh N;
 	const uint32 Seed = GetTypeHash(GetActorLocation().GridSnap(10.f));
 	const auto Rnd = [Seed](int32 A, int32 B) { uint32 X = Seed ^ uint32(A) * 0x9e3779b9u ^ uint32(B) * 0x85ebca6bu; X ^= X >> 15; X *= 0x2c1b3c6du; X ^= X >> 12; return float(X & 0xffff) / 65535.f; };
-	for (int32 k = 0; k < 40; ++k)
+	const auto Stick = [&N](const FVector& From, const FVector& Dir, float Len, float Rad, float Bow, const FLinearColor& Col, float Grain)
 	{
-		const float A = 2.f * PI * (k + Rnd(k, 1)) / 40.f, R0 = 38.f + 14.f * Rnd(k, 2), Z0 = 3.f + 16.f * Rnd(k, 3);
+		// (five rings, so a bowed stick curves; with three it bent once in the middle and read as a straight dowel)
+		N.Lathe(From, Dir, Len, { FVector(0.f, Rad, Rad), FVector(0.25f, Rad * 0.95f, Rad * 0.9f), FVector(0.5f, Rad * 0.82f, Rad * 0.86f), FVector(0.75f, Rad * 0.7f, Rad * 0.66f), FVector(1.f, Rad * 0.5f, Rad * 0.5f) }, 5, Col, 0.92f, Bow, Grain);
+	};
+	// Old wood: brown to weathered grey, some darker.
+	const auto Wood = [&Rnd](int32 k) { return FMath::Lerp(FLinearColor(0.045f, 0.032f, 0.02f), FLinearColor(0.055f, 0.051f, 0.045f), Rnd(k, 9)) * (0.55f + 0.5f * Rnd(k, 8)); };
+	const auto Across = [](const FVector& D, float Turn) { return FVector::CrossProduct(D, FVector::UpVector).GetSafeNormal().RotateAngleAxis(Turn, D); };
+	for (int32 k = 0; k < 64; ++k)
+	{
+		const float A = 2.f * PI * (k + Rnd(k, 1)) / 64.f, R0 = 33.f + 17.f * Rnd(k, 2), Z0 = 2.f + 18.f * Rnd(k, 3) * (R0 > 44.f ? 0.6f : 1.f);
 		const FVector Mid(FMath::Cos(A) * R0, FMath::Sin(A) * R0, Z0);
 		// Mostly along the rim, tilted and swung off it.
-		const float Swing = (Rnd(k, 4) - 0.5f) * 1.4f, Tilt = (Rnd(k, 5) - 0.5f) * 0.7f;
+		const float Swing = (Rnd(k, 4) - 0.5f) * 1.6f, Tilt = (Rnd(k, 5) - 0.5f) * 0.8f;
 		const FVector Dir = (FVector(-FMath::Sin(A + Swing), FMath::Cos(A + Swing), 0.f) + FVector(0.f, 0.f, Tilt)).GetSafeNormal();
-		const float Len = 30.f + 30.f * Rnd(k, 6), Rad = 1.4f + 1.4f * Rnd(k, 7);
-		const float Shade = 0.6f + 0.5f * Rnd(k, 8);
-		N.Lathe(Mid - Dir * (Len * 0.5f), Dir, Len, { FVector(0.f, Rad, Rad), FVector(0.5f, Rad * 0.9f, Rad * 0.9f), FVector(1.f, Rad * 0.6f, Rad * 0.6f) }, 5,
-			FLinearColor(0.055f, 0.038f, 0.022f) * Shade, 0.9f, 0.f, float(k + 1));
+		const bool bThick = Rnd(k, 6) < 0.28f;
+		const float Len = bThick ? 35.f + 30.f * Rnd(k, 7) : 22.f + 30.f * Rnd(k, 7), Rad = bThick ? 1.3f + 1.f * Rnd(k, 10) : 0.5f + 0.6f * Rnd(k, 10);
+		const FLinearColor Col = Wood(k);
+		const FVector Start = Mid - Dir * (Len * 0.5f);
+		if (Rnd(k, 11) < 0.35f)
+		{
+			// Kinked where it grew a bud: two pieces at an angle.
+			const float Cut = 0.35f + 0.3f * Rnd(k, 12);
+			const FVector Knee = Start + Dir * (Len * Cut);
+			const FVector Dir2 = (Dir + Across(Dir, 360.f * Rnd(k, 13)) * (0.3f + 0.35f * Rnd(k, 14))).GetSafeNormal();
+			Stick(Start, Dir, Len * Cut + Rad, Rad, Len * Cut * 0.06f, Col, float(k + 1));
+			Stick(Knee, Dir2, Len * (1.f - Cut), Rad * 0.85f, Len * (1.f - Cut) * 0.08f, Col, float(k + 101));
+		}
+		else
+		{
+			Stick(Start, Dir, Len, Rad, Len * (0.04f + 0.1f * Rnd(k, 15)), Col, float(k + 1));
+		}
+		if (Rnd(k, 16) < 0.3f)
+		{
+			// A fork: a short thin twig off it.
+			const FVector At = Start + Dir * (Len * (0.3f + 0.4f * Rnd(k, 17)));
+			Stick(At, (Dir + Across(Dir, 360.f * Rnd(k, 18)) * 0.9f).GetSafeNormal(), Len * (0.2f + 0.2f * Rnd(k, 19)), Rad * 0.45f, 0.f, Col, float(k + 201));
+		}
 	}
-	N.Lathe(FVector(0.f, 0.f, -2.f), FVector::UpVector, 8.f, { FVector(0.f, 46.f, 46.f), FVector(0.6f, 42.f, 42.f), FVector(1.f, 28.f, 28.f) }, 14, FLinearColor(0.085f, 0.068f, 0.04f), 0.95f, 0.f, float(Seed % 97 + 1));
+	for (int32 k = 0; k < 9; ++k)
+	{
+		// Fallen out onto the ground round it, pointing out more or less.
+		const float A = 2.f * PI * (k + Rnd(k, 31)) / 9.f, R0 = 52.f + 24.f * Rnd(k, 32), Len = 18.f + 26.f * Rnd(k, 33), Rad = 0.5f + 0.7f * Rnd(k, 34);
+		const FVector Dir = FVector(FMath::Cos(A + (Rnd(k, 35) - 0.5f) * 1.6f), FMath::Sin(A + (Rnd(k, 35) - 0.5f) * 1.6f), 0.f).GetSafeNormal();
+		Stick(FVector(FMath::Cos(A) * R0, FMath::Sin(A) * R0, Rad) - Dir * (Len * 0.5f), Dir, Len, Rad, Len * 0.06f * Rnd(k, 36), Wood(k + 70), float(k + 301));
+	}
+	// Under the lining, the packed old stuff of the bowl: low and dark.
+	N.Lathe(FVector(0.f, 0.f, -3.f), FVector::UpVector, 9.f, { FVector(0.f, 44.f, 44.f), FVector(0.5f, 40.f, 40.f), FVector(1.f, 30.f, 30.f) }, 14, FLinearColor(0.042f, 0.034f, 0.025f), 0.97f, 0.f, float(Seed % 97 + 1));
+	// The lining: fine dry grass laid round the hollow in arcs (it rises toward the rim), pale straw to old hay.
+	for (int32 k = 0; k < 110; ++k)
+	{
+		const float A0 = 2.f * PI * Rnd(k, 41), Rr = 6.f + 28.f * FMath::Pow(Rnd(k, 42), 0.7f), Span = 0.35f + 0.7f * Rnd(k, 43), Drift = (Rnd(k, 44) - 0.5f) * 6.f;
+		TArray<FVector> Pts;
+		for (int32 p = 0; p <= 4; ++p)
+		{
+			const float T = p / 4.f, Ap = A0 + Span * T, Rp = Rr + Drift * T;
+			Pts.Add(FVector(FMath::Cos(Ap) * Rp, FMath::Sin(Ap) * Rp, 6.f + 8.f * FMath::Square(Rp / 34.f) + 1.2f * FMath::Sin(T * PI + k)));
+		}
+		N.Tube(Pts, 0.22f + 0.15f * Rnd(k, 45), 3, FMath::Lerp(FLinearColor(0.2f, 0.16f, 0.085f), FLinearColor(0.12f, 0.095f, 0.055f), Rnd(k, 46)), 0.95f);
+	}
 	Bed = NewObject<UProceduralMeshComponent>(this);
 	Bed->SetupAttachment(RootComponent);
 	Bed->RegisterComponent();
@@ -4227,7 +4276,7 @@ void AWRNest::BeginPlay()
 	for (int32 e = 0; e < 3; ++e)
 	{
 		const float A = 2.f * PI * e / 3.f + Rnd(9, e);
-		const FVector At(FMath::Cos(A) * 11.f, FMath::Sin(A) * 11.f, 9.f);
+		const FVector At(FMath::Cos(A) * 11.f, FMath::Sin(A) * 11.f, 11.f);
 		const FVector Ax = FVector(FMath::Cos(A + 1.2f), FMath::Sin(A + 1.2f), 0.25f).GetSafeNormal();
 		TArray<FVector> Egg;
 		for (int32 i = 0; i <= 8; ++i)

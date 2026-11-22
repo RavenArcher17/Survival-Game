@@ -186,7 +186,8 @@ alive-and-explorable pass, as slice 1.
     built by `Tools/terrain/build_terrain_materials.py` (WR_MATERIALS=caverock,caveice). Both are world-space
     triplanar with tangent_space_normal off, because the mesh has no tangents. Per vertex they get only smooth values:
     - the colour and roughness (vertex colour);
-    - basalt UV1.x = the height above the passage's floor (its flow lines);
+    - basalt UV1 = (the height above the passage's floor: its flow lines; a puddle's depth under its waterline
+      + 0.3 m), UV2 = (heat round a seam still glowing, the signed distance across the seam's zig-zag, m);
     - ice UV1 = (ice 0..1, thin cover 0..1), UV2 = (deep 0..1, clear 0..1).
     The ice's strata are drawn per pixel (worked out per vertex, they broke into triangles). Its glow is the "Glow"
     parameter, set each second from the daylight.
@@ -197,15 +198,28 @@ alive-and-explorable pass, as slice 1.
   - Formations are grown in code (LcLathe: profile, two-wave section, bend) into one mesh in the cave materials.
     Pillars stop you by capsules. Rocks and pebbles (instanced, no collision) and puddles snap to the real floor.
   - The weather's fog layer fades out underground (WRSky).
-  - Skylights:
+  - Skylights (only where there's 3 m of rock over the chamber, so the hole's rim isn't paper-thin):
     - A shaft's `talus` [floor, height, radius] is a debris cone of rock added into the air (cave_shape.mjs
-      `talusCut`, the same in FWRLandCave::Air), with rubble and gravel on it and moss in its vertex colours.
+      `talusCut`, the same in FWRLandCave::Air): 2.2-2.8 m high at about 30 deg (walkable), its foot allowed over
+      the walking lines. Slabs, stones and gravel lie on it at the game's real floor (`caveFloorAt`, cave_check.mjs),
+      moss is in its vertex colours, and "fern" feats are the forest's Megascans ferns (none without the pack).
+    - The beam: WRSky puts a local fog volume of dust in each skylit chamber (`BuildSkylightDust`: a sphere over the
+      cone, its height term a mask cut off a metre up the hole). It's shown, with the volumetric fog on and the sun's
+      scattering raised, only near a skylight by day (`SkylitCave` x daylight): drawn without the volumetric fog it
+      isn't shadowed. r.LocalFogVolume.GlobalStartDistance is lowered on the round island, or the dust began 10 m off.
+      Cave lights scatter none of it (day lights) or little (landCaves.lightHaze): they made balls of fog.
     - A light flagged as day (9th value 1) is the sun bounced about the chamber: WRLandCaves scales it by the
       daylight.
-    - WRSky raises the exposure floor near a skylight (`WRLand::SkylightNear`, sky.skylitCaveMinEV100), so the
-      sunlit floor isn't blown out.
-  - Puddles are the floor itself: inside a puddle feat's footprint, below its waterline, the basalt is wet (UV1.y,
-    dark and glossy).
+    - WRSky raises the exposure floor near a skylight (`WRLand::SkylightNear`, sky.skylitCaveMinEV100) and turns on
+      local exposure (sky.skylitHighlightContrast, sky.skylitShadowContrast), so the sunlit floor keeps its texture.
+  - Puddles are the floor itself: a puddle feat's z is its waterline (the game floor's median over its footprint).
+    UV1.y changes linearly across each triangle, so M_CaveRock finds the exact line where the level water meets the
+    rock (bent a few cm by noise). Under it: the rock a little darker, a flat normal and roughness 0.02, so it mirrors
+    the cave; over it a narrow satin wet band.
+  - Seams still glowing ("crack" feats, kept off the debris cones): heat round the zig-zag and the signed distance
+    across it (UV2). M_CaveRock draws the fissure on that line, jagged by noise, a Voronoi net of finer cracks round
+    it (a Custom node), deep red to yellow, at a steady on-screen brightness (EyeAdaptationInverse).
+  - Sulfur round a gas vent is a crust in the vertex colours with a scatter of small needles.
   - Checking: probe the air with the game's noise (LcAir's hash noise ported to JS) along every passage before
     building. Then walk a bot through with `WRWalkTo x y 120` + `waitwalk`. A 4 m arrival radius cuts the corners
     of narrow passages and gets the bot "stuck" on walls a player would never touch.

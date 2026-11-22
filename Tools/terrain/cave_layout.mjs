@@ -8,6 +8,7 @@
 // hall down into the deep chamber (the best ore, the burrowers' den); sometimes a collapsed skylight over the hall.
 // A tube's room: its passage from the corridor down into the room, and a crawl to a pocket.
 import { caveAir, airTop } from "./cave_shape.mjs";
+import { caveFloorAt } from "./cave_check.mjs";
 
 export const rng = (seed) => { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; };
 const V = (a) => [Math.cos(a), Math.sin(a)];
@@ -176,8 +177,7 @@ export function coverNeeds(c, skipEntrance) {
 	return out;
 }
 
-/** A skylight (a collapsed roof) over a chamber where the drop to its floor is at most 14 m (onto the fallen roof's
- *  rubble): a shaft from just under the ceiling to over the ground. Tries the big hall, then the others. Returns the
+/** A skylight (a collapsed roof) over a chamber where the drop onto the fallen roof's rubble is at most 14 m: a shaft from just under the ceiling to over the ground. Tries the big hall, then the others. Returns the
  *  shaft (also pushed into the shapes) or null. */
 export function addSkylight(c, H, seed, chance) {
 	const R = rng(seed ^ 0x2f17);
@@ -193,14 +193,19 @@ export function addSkylight(c, H, seed, chance) {
 		const B = order[Math.floor(tries / 20)];
 		if (!B) break;
 		const a = R() * Math.PI * 2, f = 0.35 + 0.4 * R(), [x, y] = at(B, Math.cos(a) * B.r[0] * f, Math.sin(a) * B.r[1] * f);
-		if (laneDist(x, y) < 4.6) continue;
-		const g = H(x, y), top = airTop(c, x, y, B.c[2]);
-		if (!(top > -Infinity) || g - B.c[2] > 14 || g - top < 1.5) continue;
 		const r = 2.2 + 0.8 * R();
+		// The fallen roof heaped under it: a debris cone 2.2-2.8 m high, as steep as loose rock lies (about 30 deg: still
+		// walkable), wider than the hole. (At 1.2 m over 4 m it lay flat, and the sunlit patch on it read as a sheet of paper.)
+		const th = 2.2 + 0.6 * R(), tr = Math.max(r + 1.6, th * 1.75);
+		const g = H(x, y), top = airTop(c, x, y, B.c[2]);
+		// (the walking lines may pass over its foot, a gentle slope, not its steep middle)
+		if (laneDist(x, y) < tr - 0.6) continue;
+		// (3 m of rock over the chamber at least: with 1.5 m the hole's rim, most of it the ground's own skin, looked as thin
+		// as torn paper from below)
+		if (!(top > -Infinity) || g - (B.c[2] + th) > 14 || g - top < 3) continue;
 		let lo = Infinity;
 		for (let k = 0; k < 8; k++) lo = Math.min(lo, H(x + Math.cos(k * Math.PI / 4) * (r + 2), y + Math.sin(k * Math.PI / 4) * (r + 2)));
-		// (with the fallen roof heaped under it: a debris cone 1.2 m high, a little wider than the hole)
-		const s = { k: "shaft", role: "skylight", under: B.role, c: [x, y], r, z: [top - 1.5, Math.max(g, lo) + 3], talus: [B.c[2], 1.2, r + 1.4] };
+		const s = { k: "shaft", role: "skylight", under: B.role, c: [x, y], r, z: [top - 1.5, Math.max(g, lo) + 3], talus: [B.c[2], +th.toFixed(2), +tr.toFixed(2)] };
 		c.shapes.push(s);
 		return s;
 	}
@@ -274,6 +279,8 @@ export function dressCave(c, H, biome, seed) {
 			}
 		}
 	}
+	const shaftSky = c.shapes.find((q) => q.k === "shaft" && q.talus);
+	const nearCone = (x, y) => !!shaftSky && Math.hypot(x - shaftSky.c[0], y - shaftSky.c[1]) < shaftSky.talus[2] + 1.2;
 	if (c.kind !== "room") {
 		const B = role("hall"), Dp = role("deep");
 		if (!ice) {
@@ -282,7 +289,12 @@ export function dressCave(c, H, biome, seed) {
 			for (const h of [B, Dp]) for (let n = h === B ? 2 : 1; n > 0; n--) {
 				let [x, y] = spot(h, 0.2, 0.7, 2.5, 2.5), a = R() * 360;
 				const mid = [x, y];
-				for (let k = 0; k < 5; k++) { const l = rr(1.0, 1.6); feat("crack", x, y, h.c[2] + 0.04, l, rr(0.06, 0.12), a); x += Math.cos(a * Math.PI / 180) * l; y += Math.sin(a * Math.PI / 180) * l; a += rr(-55, 55); }
+				for (let k = 0; k < 5; k++) {
+					const l = rr(1.0, 1.6), w = rr(0.06, 0.12), x1 = x + Math.cos(a * Math.PI / 180) * l, y1 = y + Math.sin(a * Math.PI / 180) * l;
+					// (not up a skylight's debris cone: the fallen roof has no seam in it)
+					if (!nearCone(x, y) && !nearCone(x1, y1)) feat("crack", x, y, h.c[2] + 0.04, l, w, a);
+					x = x1; y = y1; a += rr(-55, 55);
+				}
 				light(mid[0], mid[1], h.c[2] + 1.2, [1, 0.42, 0.12], 2600, 11);
 			}
 			const a0 = R() * Math.PI * 2;
@@ -334,9 +346,21 @@ export function dressCave(c, H, biome, seed) {
 			const sky = c.shapes.find((q) => q.k === "shaft");
 			for (let t = 0; t < 8; t++) {
 				const [x, y] = inHall(h, 0.15, 0.7);
-				if (!free(x, y, 1.5) || (sky && Math.hypot(x - sky.c[0], y - sky.c[1]) < sky.r + 5)) continue;
-				used.push([x, y, 1.5]);
-				feat("puddle", x, y, h.c[2], rr(0.7, 1.5), rr(0.5, 1.0), R() * 360);
+				if (!free(x, y, 2.2) || (sky && Math.hypot(x - sky.c[0], y - sky.c[1]) < sky.r + 5)) continue;
+				used.push([x, y, 2.2]);
+				// The water's level: the floor's own (the game's rock noise and all) sampled over the footprint, filled to its
+				// lowest half, so the water stands level in the hollows and its edge is wherever the rock rises out of it.
+				// (1-2 m across: smaller, the few triangles it filled drew it as a sharp-cornered hole.)
+				const A = rr(1.0, 2.0), Bq = rr(0.7, 1.3), yaw = R() * 360, ya = yaw * Math.PI / 180, fl = [];
+				for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+					const u = i / 3, v = j / 3;
+					if (u * u + v * v > 1) continue;
+					const z = caveFloorAt(c, x + Math.cos(ya) * u * A - Math.sin(ya) * v * Bq, y + Math.sin(ya) * u * A + Math.cos(ya) * v * Bq, h.c[2]);
+					if (!isNaN(z)) fl.push(z);
+				}
+				fl.sort((p, q) => p - q);
+				const level = fl.length ? fl[Math.floor(fl.length * 0.5)] + 0.01 : h.c[2];
+				feat("puddle", x, y, level, A, Bq, yaw);
 				break;
 			}
 		}
@@ -357,10 +381,19 @@ export function dressCave(c, H, biome, seed) {
 		// The day's light thrown about the chamber off the sunlit cone (by day only: the game scales it by the daylight).
 		// Without it the chamber was black round a sunlit patch, and the eye's adjustment to the dark blew the patch out
 		// to a flat white shape.
-		light(sky.c[0], sky.c[1], B.c[2] + 2.2, [1, 0.9, 0.78], 9000, sky.r + 12, 1);
-		// (on the debris cone: blocks, and stones and gravel down its sides; they settle on its slope in the game)
-		for (let k = 0; k < 11; k++) { const a = R() * Math.PI * 2, d = R() * sky.r * 1.1; feat("rock", sky.c[0] + Math.cos(a) * d, sky.c[1] + Math.sin(a) * d, B.c[2], rr(0.35, 1.1), rr(0.25, 0.7), R() * 360); }
-		for (let k = 0; k < 26; k++) { const a = R() * Math.PI * 2, d = Math.sqrt(R()) * (sky.r + 1.3), s = rr(0.1, 0.32); feat("pebble", sky.c[0] + Math.cos(a) * d, sky.c[1] + Math.sin(a) * d, B.c[2], s, s * rr(0.45, 0.8), R() * 360); }
+		const [tf, th, tr] = sky.talus, onCone = (d) => tf + th * Math.max(0, 1 - d / tr);
+		light(sky.c[0], sky.c[1], tf + th + 1.4, [1, 0.9, 0.78], 9000, sky.r + 12, 1);
+		// On the debris cone: the roof's slabs, big ones half sunk in it, then stones, then gravel down its sides (each on
+		// the cone's real surface, the rock's noise and all); ferns where the light falls on it.
+		const onFloor = (x, y, d) => { const z = caveFloorAt(c, x, y, onCone(d)); return isNaN(z) ? onCone(d) : z; };
+		const drop = (kind, d0, d1, s0, s1, h0, h1, sink) => {
+			const a = R() * Math.PI * 2, d = d0 + (d1 - d0) * Math.sqrt(R()), x = sky.c[0] + Math.cos(a) * d, y = sky.c[1] + Math.sin(a) * d, s = rr(s0, s1);
+			feat(kind, x, y, onFloor(x, y, d) - sink * s, s, s * rr(h0, h1), R() * 360);
+		};
+		for (let k = 0; k < 5; k++) drop("rock", 0, tr * 0.8, 1.0, 1.7, 0.45, 0.7, 0.18);
+		for (let k = 0; k < 10; k++) drop("rock", 0, tr, 0.35, 0.85, 0.4, 0.75, 0.05);
+		for (let k = 0; k < 34; k++) drop("pebble", 0, tr + 0.8, 0.1, 0.32, 0.45, 0.8, 0);
+		for (let k = 0; k < 7; k++) { const a = R() * Math.PI * 2, d = rr(0.3, 1.05) * sky.r, x = sky.c[0] + Math.cos(a) * d, y = sky.c[1] + Math.sin(a) * d; feat("fern", x, y, onFloor(x, y, d), rr(0.55, 0.95), 0, R() * 360); }
 		for (let k = 0; k < 9; k++) {
 			const a = k * Math.PI * 2 / 9 + rr(-0.2, 0.2), d = sky.r + rr(0.8, 2.2), x = sky.c[0] + Math.cos(a) * d, y = sky.c[1] + Math.sin(a) * d;
 			feat("rimrock", x, y, H(x, y), rr(0.7, 1.6), rr(0.5, 0.9), R() * 360);

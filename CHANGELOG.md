@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Round island: skylights, water, glowing seams and nests, second pass (11-22)
+
+Raven asked whether I was happy with the caves. I wasn't, and listed six things that still looked off; "Keep going then".
+- **Sunbeams you can see:** by day near a skylight the chamber's air holds a little dust, and the sun's beam shows in
+  it, shaped by the hole and cut by the rock's shadow; it moves with the sun. The eye holds the sunlit rock back (local
+  exposure) so it keeps its texture while the dim chamber round it stays seen. (About 0.4 ms of GPU, only there.)
+- **A real heap under each skylight:** the fallen roof is a cone 2.2-2.8 m high at the angle loose rock lies at (still
+  walkable), with big slabs half sunk in it, stones and gravel down its sides, and ferns where the light falls. It
+  used to be a low, flat cone, and the sunlit patch on it read as a sheet of paper.
+- **Thick roofs over skylights:** a skylight needs 3 m of rock over the chamber. With 1.5 m the hole's rim, mostly the
+  ground's own skin, looked as thin as torn paper from below.
+- **Puddles are water:** 1-2 m across, each stands level in the floor's hollows at its own waterline, with a ragged,
+  crisp edge wherever the rock rises out of it, a flat mirror-smooth top that reflects the cave, and a satin wet band
+  just above it. Wet, bumpy rock used to glitter like sparks and read as a burnt patch.
+- **Glowing seams are fissures in the floor:** a jagged crack along each seam's zig-zag, wider and brighter at its
+  middle, a net of finer cracks round it, deep red to orange to yellow. It used to be a lit strip lying on the floor,
+  which read as a neon tube. Seams stay off the skylights' heaps.
+- **No balls of fog:** the cave lights don't light the dust (they stood in it as glowing balls).
+- **Sulfur:** a yellow-and-white crust stains the floor round each gas vent, with small pale needles on it. It used to
+  be four fat yellow cones that read as candy corn.
+- **Nests look woven:** a few thick sticks and many thin ones, curved, some kinked or forked, a few fallen out round
+  it, and the hollow lined with fine dry grass. They used to be straight, even rods (matchsticks) on a flat disc.
+
 ### Round island: skylights, puddles and nests (11-21)
 
 Raven: "Fix them" (the sunlit patch under a skylight that looked like a paper cut-out, and a puddle like a metal plate).

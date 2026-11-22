@@ -66,6 +66,9 @@ private:
 	void ApplyAtmosphere(float DeltaSeconds, float Daylight);
 	/** The valley mist volumes from Data/valley_fog.json. */
 	void BuildMist();
+	/** The round island's caves' skylights: a volume of dust in each skylit chamber for the sun's beam to light (shown,
+	 *  with the volumetric fog on, only near one by day). */
+	void BuildSkylightDust();
 	/** The camera's location on this machine (the first local player's view), or false (no view yet). */
 	bool GetViewLocation(FVector& Out) const;
 	void TickFrameStats(float DeltaSeconds);
@@ -141,6 +144,8 @@ private:
 	float WeatherSkyDim = 0.f;
 	/** The valley mist (BuildMist): one local fog volume per hollow, all at the same density. */
 	UPROPERTY(Transient) TArray<TObjectPtr<class ULocalFogVolumeComponent>> Mist;
+	UPROPERTY(Transient) TArray<TObjectPtr<class ULocalFogVolumeComponent>> SkylightDust;
+	bool bSkylightBeams = false;
 	float MistDensity = -1.f;
 	float MistClock = 0.f;
 	/** Under something (a cave, a roof, a canopy) as of the last check; checked a few times a second. */

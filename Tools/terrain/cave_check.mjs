@@ -29,6 +29,16 @@ export function gameAir(c, x, y, z) {
 	return v + amp * (n3(x / 2.2, y / 2.2, z / 2.2) + 0.35 * n3(x / 0.7 + 5, y / 0.7 + 1, z / 0.7 + 3));
 }
 
+/** The cave's floor under a map point, from a guess (m): up out of the rock if the guess is in it, then down to the rock;
+ *  NaN if there's no air there. */
+export function caveFloorAt(c, x, y, guess) {
+	const air = (x, y, z) => gameAir(c, x, y, z);
+	let z = guess + 1.0;
+	if (air(x, y, z) >= 0) { while (z < guess + 4 && air(x, y, z) >= 0) z += 0.02; if (air(x, y, z) >= 0) return NaN; }
+	while (z > guess - 6 && air(x, y, z - 0.02) < 0) z -= 0.02;
+	return z;
+}
+
 /** The crag over a cave's mouth (land file "brow"; WRLandCaves.cpp LcBrow, the same): rock where negative, m. */
 export function cragAt(c, x, y, z) {
 	if (!c.brow) return Infinity;
@@ -60,12 +70,7 @@ export function checkMouth(c, H) {
 /** The problems found walking the cave's passages (empty: all walkable). */
 export function checkCave(c) {
 	const air = (x, y, z) => gameAir(c, x, y, z);
-	const floorAt = (x, y, guess) => {
-		let z = guess + 1.0;
-		if (air(x, y, z) >= 0) { while (z < guess + 4 && air(x, y, z) >= 0) z += 0.02; if (air(x, y, z) >= 0) return NaN; }
-		while (z > guess - 6 && air(x, y, z - 0.02) < 0) z -= 0.02;
-		return z;
-	};
+	const floorAt = (x, y, guess) => caveFloorAt(c, x, y, guess);
 	const headroom = (x, y, f) => { let z = f + 0.05; while (z < f + 20 && air(x, y, z) < 0) z += 0.05; return z - f; };
 	const across = (x, y, f, nx, ny) => { const go = (s) => { let d = 0; while (d < 6 && air(x + nx * d * s, y + ny * d * s, f + 0.6) < 0) d += 0.05; return d; }; return go(1) + go(-1); };
 	const fmt = (p) => `(${p.map((v) => v.toFixed(1)).join(", ")})`;

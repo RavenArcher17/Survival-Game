@@ -431,28 +431,54 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 				B = FMath::Lerp(B, LcLin(34, 34, 38), 0.7f * Glaze);
 				B = FMath::Lerp(B, LcLin(72, 66, 60), 0.6f * OnFloor);
 				B = FMath::Lerp(B, FMath::Lerp(LcLin(38, 52, 22), LcLin(58, 66, 30), LcSm(-0.3f, 0.5f, LcN3(P / 45.f))), 0.85f * Moss);
-				// Seep water: a puddle feature wets the floor in its footprint, the water standing only in the floor's low
-				// spots (so its edge is as ragged as the floor), the rock round it damp and darker. UV1.y = wet (M_CaveRock:
-				// dark and glossy).
-				float Wet = 0.f, Damp = 0.f;
-				if (InCave != INDEX_NONE && OnFloor > 0.3f)
+				// Seep water: a puddle stands level in the floor's hollows (its waterline from cave_layout: the floor's lowest
+				// 40% under its footprint), the rock round it damp and darker. UV1.y = how far under the waterline, +0.3 (m,
+				// 0..0.6: 0 dry, over 0.3 under water). It changes linearly across each triangle, so the material finds the
+				// exact line where the level water meets the rock, as ragged as the floor. Past the footprint the waterline
+				// falls away.
+				// A seam still glowing (crack): the floor round its zig-zag hot (UV2.x = heat: M_CaveRock draws the lava's crack
+				// pattern glowing in it), the crust there black and glassy. Sulfur round a gas vent: a yellow and white crust.
+				float Water = 0.f, Damp = 0.f, Heat = 0.f, Sulf = 0.f, SeamD = 1.f, Seam = 1.f;
+				if (InCave != INDEX_NONE)
 				{
 					const FVector2D Mv = L->ToMap(P);
+					const float Vz = (float(P.Z) - L->Origin.Z) / 100.f;
 					for (const FWRLandCaveFeat& Pf : L->Caves[InCave].Feats)
 					{
-						if (Pf.Kind != TEXT("puddle")) continue;
-						const float Ya = FMath::DegreesToRadians(Pf.Yaw), Dx = float(Mv.X - Pf.At.X), Dy = float(Mv.Y - Pf.At.Y);
-						const float E = FMath::Sqrt(FMath::Square((Dx * FMath::Cos(Ya) + Dy * FMath::Sin(Ya)) / FMath::Max(0.2f, Pf.A))
-							+ FMath::Square((-Dx * FMath::Sin(Ya) + Dy * FMath::Cos(Ya)) / FMath::Max(0.2f, Pf.B))) + 0.25f * LcN3(P / 70.f);
-						const float Level = float(Pf.At.Z) * 100.f + L->Origin.Z + 2.f;
-						Wet = FMath::Max(Wet, (1.f - LcSm(0.75f, 1.15f, E)) * LcSm(4.f, -3.f, float(P.Z) - Level));
-						Damp = FMath::Max(Damp, 1.f - LcSm(0.9f, 1.7f, E));
+						const float Dx = float(Mv.X - Pf.At.X), Dy = float(Mv.Y - Pf.At.Y);
+						if (Pf.Kind == TEXT("puddle"))
+						{
+							const float Ya = FMath::DegreesToRadians(Pf.Yaw);
+							const float E = FMath::Sqrt(FMath::Square((Dx * FMath::Cos(Ya) + Dy * FMath::Sin(Ya)) / FMath::Max(0.2f, Pf.A))
+								+ FMath::Square((-Dx * FMath::Sin(Ya) + Dy * FMath::Cos(Ya)) / FMath::Max(0.2f, Pf.B))) + 0.25f * LcN3(P / 70.f);
+							const float Under = float(Pf.At.Z) - Vz - 0.5f * FMath::Max(0.f, E - 0.8f);
+							Water = FMath::Max(Water, FMath::Clamp(Under + 0.3f, 0.f, 0.6f));
+							Damp = FMath::Max(Damp, (1.f - LcSm(0.9f, 1.7f, E)) * OnFloor);
+						}
+						else if (Pf.Kind == TEXT("crack"))
+						{
+							const FVector2f Dir(FMath::Cos(FMath::DegreesToRadians(Pf.Yaw)), FMath::Sin(FMath::DegreesToRadians(Pf.Yaw)));
+							const float Along = FMath::Clamp(Dx * Dir.X + Dy * Dir.Y, 0.f, Pf.A);
+							const float D = FMath::Sqrt(FMath::Square(Dx - Dir.X * Along) + FMath::Square(Dy - Dir.Y * Along));
+							Heat = FMath::Max(Heat, (1.f - LcSm(0.1f, 0.8f, D)) * OnFloor * (1.f - LcSm(0.6f, 1.2f, FMath::Abs(Vz - float(Pf.At.Z)))));
+							// The fissure itself: the signed distance across the nearest leg of the zig-zag (UV2.y; linear across
+							// each triangle, so the material finds its line exactly).
+							if (D < SeamD) { SeamD = D; Seam = Dx * Dir.Y - Dy * Dir.X >= 0.f ? D : -D; }
+						}
+						else if (Pf.Kind == TEXT("sulfur"))
+						{
+							const float D = FMath::Sqrt(Dx * Dx + Dy * Dy) + 0.2f * LcN3(P / 40.f);
+							Sulf = FMath::Max(Sulf, (1.f - LcSm(Pf.A * 0.5f, Pf.A * 1.6f + 0.4f, D)) * OnFloor);
+						}
 					}
 				}
+				B = FMath::Lerp(B, LcLin(20, 19, 19), 0.75f * Heat);
+				B = FMath::Lerp(B, FMath::Lerp(LcLin(170, 146, 52), LcLin(178, 172, 150), LcSm(-0.2f, 0.5f, LcN3(P / 25.f + FVector(3.f, 1.f, 0.f)))), 0.8f * Sulf);
 				B *= 1.f - 0.45f * Damp;
 				Rc = FMath::Lerp(B, C, Lip);
-				RRough = FMath::Lerp(FMath::Lerp(FMath::Lerp(FMath::Lerp(0.78f, 0.36f, Glaze), 0.92f, OnFloor), 0.97f, Moss), 1.f - C.A, Lip);
-				U1 = FVector2D(Above, Wet * (1.f - Lip));
+				RRough = FMath::Lerp(FMath::Lerp(FMath::Lerp(FMath::Lerp(FMath::Lerp(0.78f, 0.36f, Glaze), 0.92f, OnFloor), 0.97f, Moss), 0.5f, Heat), 1.f - C.A, Lip);
+				U1 = FVector2D(Above, Water * (1.f - Lip));
+				U2 = FVector2D(Heat * (1.f - Lip), FMath::Clamp(Seam, -1.f, 1.f));
 			}
 			Out.RockColours.Add(FWRToolMesh::Pack(Rc, RRough));
 			Out.RockUV1.Add(U1);
@@ -697,7 +723,7 @@ void AWRLandCaves::BuildFormations()
 		{
 			const FVector Wp = Local + Here;
 			if (LcAir(Land, ThisCave, Wp + FVector(0.f, 0.f, 30.f)) >= 0.f) return Local;
-			for (float Z = Wp.Z + 30.f; Z > Wp.Z - 60.f; Z -= 3.f)
+			for (float Z = Wp.Z + 30.f; Z > Wp.Z - 120.f; Z -= 3.f)
 			{
 				if (LcAir(Land, ThisCave, FVector(Wp.X, Wp.Y, Z)) >= 0.f) return FVector(Local.X, Local.Y, Z - Here.Z + 2.f);
 			}
@@ -709,9 +735,8 @@ void AWRLandCaves::BuildFormations()
 		// Their surface: the basalt's glazed dark (no flow lines: UV1.x 0); the ice clear (UV1.x 1, not thin, not dark).
 		const FColor Col = bIce ? FWRToolMesh::Pack(FLinearColor(0.75f, 0.82f, 0.9f), 0.2f) : FWRToolMesh::Pack(LcLin(38, 36, 38), 0.45f);
 		const FVector2D U1 = bIce ? FVector2D(1.f, 0.f) : FVector2D(0.f, 0.f), U2 = bIce ? FVector2D(0.f, 1.f) : FVector2D(0.f, 0.f);
-		const FSurf Basalt = FSurf::Stone(FLinearColor(0.07f, 0.064f, 0.06f), 0.9f), Dripstone = FSurf::Stone(FLinearColor(0.05f, 0.042f, 0.038f), 0.85f);
 		const FSurf Ice = FSurf::Glass(FLinearColor(0.62f, 0.8f, 0.95f), 0.06f), DeepIce = FSurf::Glass(FLinearColor(0.42f, 0.65f, 0.9f), 0.1f);
-		const FSurf Ember = FSurf::Lit(FLinearColor(1.f, 0.36f, 0.06f), 0.9f), Sulfur = FSurf::Stone(FLinearColor(0.42f, 0.33f, 0.05f), 0.75f);
+		const FSurf Sulfur = FSurf::Stone(FLinearColor(0.5f, 0.44f, 0.16f), 0.6f);
 		const FSurf Bone = FSurf::Stone(FLinearColor(0.72f, 0.66f, 0.55f), 0.6f), Pool = FSurf::Glass(FLinearColor(0.5f, 0.72f, 0.88f), 0.04f);
 		int32 Seed = 0;
 		for (const FWRLandCaveFeat& F : Cave.Feats)
@@ -719,7 +744,7 @@ void AWRLandCaves::BuildFormations()
 			++Seed;
 			const FName Kd = F.Kind;
 			const bool bOnFloor = Kd == TEXT("rock") || Kd == TEXT("pebble") || Kd == TEXT("puddle") || Kd == TEXT("mite") || Kd == TEXT("icemite")
-				|| Kd == TEXT("column") || Kd == TEXT("icecolumn") || Kd == TEXT("crack") || Kd == TEXT("sulfur") || Kd == TEXT("bench");
+				|| Kd == TEXT("column") || Kd == TEXT("icecolumn") || Kd == TEXT("crack") || Kd == TEXT("sulfur") || Kd == TEXT("bench") || Kd == TEXT("fern");
 			const FVector At0 = Land->ToWorld(FVector2D(F.At), F.At.Z) - GetActorLocation();
 			const FVector At = bOnFloor ? FloorAt(At0) : At0;
 			const float A = F.A * 100.f, B = F.B * 100.f;
@@ -794,21 +819,36 @@ void AWRLandCaves::BuildFormations()
 				// A lava bench: the old flow's shelf along the wall, long and flat-topped.
 				SetRock(Seed + 3, FVector(A, 130.f, B), At, F.Yaw, RockMat);
 			}
-			else if (Kd == TEXT("crack") && bDraw)
-			{
-				// A seam of the floor still glowing: a lit strip in a black lip.
-				const FRotator R(0.f, F.Yaw, 0.f);
-				const FVector Mid = At + R.Vector() * (A * 0.5f);
-				K.Add(Basalt, FVector(A + 10.f, B * 3.f, 6.f), Mid, R);
-				K.Add(Ember, FVector(A, B, 7.f), Mid + FVector(0.f, 0.f, 1.f), R);
-			}
+			// (A seam still glowing is the floor itself, hot: ComputeCube's heat, M_CaveRock's cracks. A lit strip laid on
+			// the floor read as a neon tube.)
 			else if (Kd == TEXT("sulfur") && bDraw)
 			{
-				// A sulfur crust: a cluster of small ochre crystals round a vent.
-				for (int32 k = 0; k < 4; ++k)
+				// A sulfur crust (the floor's, ComputeCube) and on it a scatter of small pale-yellow needles round the vent.
+				// (Four fat cones of it read as candy corn.)
+				for (int32 k = 0; k < 9; ++k)
 				{
-					const FVector O = FRotator(0.f, float(Seed * 37 + k * 90 + 20), 0.f).Vector() * (A * 0.35f) * (k ? 1.f : 0.f);
-					K.Spike(Sulfur, At + O - FVector(0.f, 0.f, 4.f), FRotator(70.f + 8.f * k, float(Seed * 53 + k * 70), 0.f).Vector(), A * 0.18f, A * (0.3f + 0.1f * k));
+					const float Ang = 360.f * LcHash(S0, k, 20), Off = A * 0.5f * FMath::Sqrt(LcHash(S0, k, 21));
+					const FVector O = FRotator(0.f, Ang, 0.f).Vector() * Off;
+					const float Len = A * (0.1f + 0.15f * LcHash(S0, k, 22));
+					K.Spike(Sulfur, At + O - FVector(0.f, 0.f, 2.f), FRotator(55.f + 30.f * LcHash(S0, k, 23), 360.f * LcHash(S0, k, 24), 0.f).Vector(), Len * 0.22f, Len);
+				}
+			}
+			else if (Kd == TEXT("fern") && bDraw)
+			{
+				// Ferns where a skylight's light falls on its debris cone (the forest's, Megascans: none if the pack isn't in).
+				static const TCHAR* Ferns[] = { TEXT("/Game/Megascans/3D_Plants/Fern/SM_Fern_01.SM_Fern_01"), TEXT("/Game/Megascans/3D_Plants/Fern/SM_Fern_03.SM_Fern_03"),
+					TEXT("/Game/Megascans/3D_Plants/Fern/SM_Fern_05.SM_Fern_05") };
+				if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Ferns[Seed % 3]))
+				{
+					UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+					C->SetStaticMesh(Mesh);
+					C->SetupAttachment(RootComponent);
+					C->SetRelativeLocation(At - FVector(0.f, 0.f, 4.f));
+					C->SetRelativeRotation(FRotator(0.f, F.Yaw, 0.f));
+					C->SetRelativeScale3D(FVector(F.A));
+					C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					C->SetCanEverAffectNavigation(false);
+					C->RegisterComponent();
 				}
 			}
 			else if (Kd == TEXT("icefall"))
@@ -858,6 +898,9 @@ void AWRLandCaves::BuildFormations()
 				P->SetIntensity(Lt.Intensity);
 				P->SetAttenuationRadius(Lt.Radius * 100.f);
 				P->SetCastShadows(false);
+				// (No glow in a skylit chamber's dust: lit by these, the dust stood round each as a bright ball of fog. The
+				// embers' a faint haze.)
+				P->SetVolumetricScatteringIntensity(Lt.bDay ? 0.f : WRTune(TEXT("landCaves.lightHaze"), 0.12f));
 				P->RegisterComponent();
 				if (Lt.bDay) { DayLights.Add(P); DayLightFull.Add(Lt.Intensity); }
 			}

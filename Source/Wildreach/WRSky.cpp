@@ -204,7 +204,51 @@ void AWRSky::BeginPlay()
 	// The round island's map (a map that has its own lands, Data/lands "map"): its own air, none of the Old Island's.
 	for (const FWRLandDef& L : WRLand::All()) bRoundIsland |= !L.Map.IsEmpty() && L.Map == WRLand::CurrentMap();
 	BuildMist();
+	BuildSkylightDust();
 	Apply(true);
+}
+
+void AWRSky::BuildSkylightDust()
+{
+	if (!bRoundIsland) return;
+	const FWRTuning& T = FWRTuning::Get();
+	for (const FWRLandDef& D : WRLand::All())
+	{
+		if (!D.bHeightfield || !WRLand::IsLive(D)) continue;
+		for (const FWRLandCave& C : D.Caves) for (const FWRLandCaveShape& S : C.Shapes)
+		{
+			if (S.Kind != 2 || S.Talus.Y <= 0.f) continue;
+			// A sphere of dust over the debris cone filling the chamber, thinning toward its rim, cut off a metre up the hole
+			// (the height term is a mask: thick under its offset, gone a metre over it), so none hangs in the open air.
+			const float Rm = float(S.R.X) + T.Num(TEXT("sky.skylightDustReach"), 7.f);
+			const float Zc = float(S.Talus.X) + T.Num(TEXT("sky.skylightDustUp"), 3.f);
+			const float Top = float(S.Z0) + 1.5f + 1.f;   // the roof (the shaft starts 1.5 m under it) and a metre up the hole
+			ULocalFogVolumeComponent* V = NewObject<ULocalFogVolumeComponent>(this);
+			V->SetupAttachment(RootComponent);
+			V->SetUsingAbsoluteLocation(true);
+			V->SetUsingAbsoluteRotation(true);
+			V->SetUsingAbsoluteScale(true);
+			V->SetWorldLocationAndRotation(D.ToWorld(FVector2D(S.C), Zc), FRotator::ZeroRotator);
+			V->SetWorldScale3D(FVector(Rm * 100.f / ULocalFogVolumeComponent::GetBaseVolumeSize()));
+			V->RadialFogExtinction = T.Num(TEXT("sky.skylightDust"), 0.03f);
+			V->HeightFogExtinction = 20.f;
+			V->HeightFogFalloff = 300.f * Rm;            // x0.01 in the sphere's own units (radius 1): fades over ~1 m
+			V->HeightFogOffset = (Top - Zc) / Rm;
+			V->FogAlbedo = WRSkyDetail::SRGB(TEXT("sky.skylightDustColor"), FColor(226, 216, 198));
+			V->SetVisibility(false);
+			V->RegisterComponent();
+			SkylightDust.Add(V);
+		}
+	}
+	if (SkylightDust.Num() > 0)
+	{
+		// (Local fog starts 10 m from the eye by default: in a chamber that size the beam faded away as you walked up to it.)
+		if (IConsoleVariable* Cv = IConsoleManager::Get().FindConsoleVariable(TEXT("r.LocalFogVolume.GlobalStartDistance")))
+		{
+			Cv->Set(T.Num(TEXT("sky.skylightDustStart"), 50.f), ECVF_SetByCode);
+		}
+	}
+	UE_LOG(LogWildreach, Log, TEXT("SKY skylight dust: %d volumes"), SkylightDust.Num());
 }
 
 void AWRSky::BuildMist()
@@ -351,7 +395,14 @@ void AWRSky::UpdateExposure(float DeltaSeconds, float Daylight)
 		FVector View;
 		const float Sky = GetViewLocation(View) ? WRLand::SkylightNear(View) : 0.f;
 		SkylitCave = FMath::FInterpTo(SkylitCave, Sky, DeltaSeconds, 1.f);
-		DayEV = FMath::Lerp(DayEV, FMath::Max(DayEV, T.Num(TEXT("sky.skylitCaveMinEV100"), 1.f)), SkylitCave);
+		DayEV = FMath::Lerp(DayEV, FMath::Max(DayEV, T.Num(TEXT("sky.skylitCaveMinEV100"), 3.5f)), SkylitCave);
+		// And local exposure holds the sunlit floor back further while the dim chamber round it stays seen (a camera can't
+		// keep both; an eye does): the sunlit patch kept clipping to a flat white shape.
+		FPostProcessSettings& Pp = Exposure->Settings;
+		const float SkyLx = SkylitCave * FMath::SmoothStep(0.05f, 0.3f, Daylight);
+		Pp.bOverride_LocalExposureHighlightContrastScale = Pp.bOverride_LocalExposureShadowContrastScale = SkyLx > 0.001f;
+		Pp.LocalExposureHighlightContrastScale = FMath::Lerp(1.f, T.Num(TEXT("sky.skylitHighlightContrast"), 0.25f), SkyLx);
+		Pp.LocalExposureShadowContrastScale = FMath::Lerp(1.f, T.Num(TEXT("sky.skylitShadowContrast"), 0.7f), SkyLx);
 	}
 	const float NightEV = FMath::Lerp(T.Num(TEXT("sky.nightMinEV100"), 2.f), T.Num(TEXT("sky.tundraNightMinEV100"), 2.f), SnowGround);
 	const float Target = FMath::Lerp(NightEV, DayEV, Daylight);
@@ -798,7 +849,17 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 		// The shafts themselves: volumetric fog scattering the sun, so every gap in the canopy throws a beam through the
 		// haze (the trees' shadows cut it). Volumetric fog is costly, so it's on only while the shafts are (unless the map
 		// keeps it on anyway: sky.volumetricFog).
-		const bool bVolumetric = Green > 0.05f && T.Num(TEXT("sky.forestShaftVolumetric"), 1.f) > 0.f;
+		// In a cave by a skylight by day, the same: the sun's beam down through the hole lit in the chamber's dust (its own
+		// fog volume, shown only then: drawn without the volumetric fog it isn't shadowed, a lit ball in the dark).
+		const float Beam = SkylightDust.Num() > 0 && T.Num(TEXT("sky.skylightBeams"), 1.f) > 0.f ? SkylitCave * FMath::SmoothStep(0.05f, 0.3f, Daylight) : 0.f;
+		const bool bBeams = bSkylightBeams ? Beam > 0.01f : Beam > 0.03f;
+		if (bBeams != bSkylightBeams)
+		{
+			bSkylightBeams = bBeams;
+			for (ULocalFogVolumeComponent* V : SkylightDust) if (V) V->SetVisibility(bBeams);
+		}
+		const bool bForest = Green > 0.05f && T.Num(TEXT("sky.forestShaftVolumetric"), 1.f) > 0.f;
+		const bool bVolumetric = bForest || bBeams;
 		UExponentialHeightFogComponent* F = Fog.Get();
 		if (F && bVolumetric != bForestVolumetric)
 		{
@@ -806,7 +867,15 @@ void AWRSky::ApplyAtmosphere(float DeltaSeconds, float Daylight)
 			F->SetVolumetricFog(bVolumetric || T.Num(TEXT("sky.volumetricFog"), 0.f) > 0.f);
 			if (!bVolumetric) S->SetVolumetricScatteringIntensity(SunScatterBase);
 		}
-		if (F && bVolumetric)
+		if (F && bBeams && !bForest)
+		{
+			F->SetVolumetricFogScatteringDistribution(T.Num(TEXT("sky.skylightForward"), 0.3f));
+			F->SetVolumetricFogAlbedo(SRGB(TEXT("sky.skylightDustColor"), FColor(226, 216, 198)).ToFColor(true));
+			F->SetVolumetricFogExtinctionScale(1.f);
+			F->SetVolumetricFogDistance(T.Num(TEXT("sky.skylightBeamDistance"), 5000.f));
+			S->SetVolumetricScatteringIntensity(SunScatterBase * (1.f + Beam * T.Num(TEXT("sky.skylightScatter"), 2.f)));
+		}
+		if (F && bForest)
 		{
 			F->SetVolumetricFogScatteringDistribution(T.Num(TEXT("sky.forestShaftForward"), 0.75f));
 			F->SetVolumetricFogAlbedo(SRGB(TEXT("sky.forestShaftAlbedo"), FColor(214, 240, 170)).ToFColor(true));
