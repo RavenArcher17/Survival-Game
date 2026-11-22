@@ -41,16 +41,23 @@ private:
 		 *  bilinear from its samples, so the lip draws as the land does. */
 		TArray<FLinearColor> Colours;
 		TArray<FVector2D> UV1, UV2, UV3;
-		/** Ice walls' own colours (the Tundra's: banded pale and deep blue, snow on the floors, the snow's colour near the
-		 *  surface so a mouth has no blue flap), gloss in alpha (M_HeldTool). */
-		TArray<FColor> IceColours;
+		/** The cave's own rock (M_CaveRock, the Volcanic's basalt; M_CaveIce, the Tundra's ice): its colour (RGB) and
+		 *  roughness (A); UV1 = the height above the passage's floor (basalt) or (ice 0..1, thin cover 0..1); UV2.x = how
+		 *  deep (the ice darkens). Toward the ground's surface the colour fades to the ground's. */
+		TArray<FColor> RockColours;
+		TArray<FVector2D> RockUV1, RockUV2;
+		/** The lip's tangents (U's direction, as its UVs were projected). */
+		TArray<FVector> LipTangentX;
 		FName Biome;
 	};
 	using FCubePtr = TSharedPtr<FCube, ESPMode::ThreadSafe>;
 	struct FJob { UE::Tasks::FTask Task; FCubePtr Cube; };
 	static void ComputeCube(const FWRLandDef* Land, const FIntVector& Key, float Cell, int32 Cells, const FVector& ActorLoc, float GroundSkin, FCube& Out);
 	void FinishCube(const FCube& C);
+	/** The cave mesh's rock: M_CaveRock (the Volcanic's basalt) or M_CaveIce (the Tundra's ice). */
 	UMaterialInterface* WallMaterial(FName Biome);
+	/** The formations' rock meshes (rocks, benches): M_Rock tinted. */
+	UMaterialInterface* FormationMaterial(FName Biome);
 	/** The caves' formations (the look kit's spikes, rods and slabs; the rock set's rocks), their collision (every machine)
 	 *  and their lights (clients). */
 	void BuildFormations();
@@ -65,5 +72,9 @@ private:
 	int32 Meshes = 0;
 	UPROPERTY() TArray<TObjectPtr<UProceduralMeshComponent>> Rock;
 	UPROPERTY() TMap<FName, TObjectPtr<UMaterialInterface>> Walls;
+	UPROPERTY() TMap<FName, TObjectPtr<UMaterialInterface>> FormationMats;
+	/** The ice's material instance: its thin places glow with the day ("Glow", set each second). */
+	UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> IceLook;
+	bool bBuiltLogged = false;
 	UPROPERTY() TObjectPtr<UMaterialInterface> GroundLook;
 };

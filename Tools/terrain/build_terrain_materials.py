@@ -378,3 +378,141 @@ if want("swamp"):
     normal = lerp(lerp(lerp(lerp(grass_n, dirt_n, mudline), stones_n, bones), snow_n, mul(frost, k=0.7)), rock_n, rock_a)
     rough = lerp(lerp(None, None, mudline, const_a=0.88, const_b=0.3), None, wet, const_b=0.3)
     finish(base, normal, rough)
+
+
+# ================================================================ cave walls (WRLandCaves)
+# 11-21 (Raven: "do the caves until they look perfect"). The round island's underground caves are one runtime mesh with
+# no tangents, so both materials light world-space normals made here: the texture's normal taken from three world
+# projections (X, Y and Z, blended by the surface's own normal) and added to the surface's normal (tangent_space_normal
+# off). The vertex colour carries the colour the mesh worked out (RGB) and its roughness (A).
+def tri_weights():
+    n = expr(unreal.MaterialExpressionVertexNormalWS)
+    a = expr(unreal.MaterialExpressionAbs)
+    link(n, a)
+    p = mul(mul(a, a), mul(a, a))
+    s = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionAdd, mask(p, "r"), mask(p, "g")), mask(p, "b"))
+    return n, op(unreal.MaterialExpressionDivide, p, s)
+
+
+def append(a, b):
+    return op(unreal.MaterialExpressionAppendVector, a, b)
+
+
+def add(a, b):
+    return op(unreal.MaterialExpressionAdd, a, b)
+
+
+def tri_uvs(wp, scale_cm):
+    x, y, z = mask(wp, "r"), mask(wp, "g"), mask(wp, "b")
+    return mul(append(y, z), k=1.0 / scale_cm), mul(append(x, z), k=1.0 / scale_cm), mul(append(x, y), k=1.0 / scale_cm)
+
+
+def tri_colour(path, uvs, w):
+    cx, cy, cz = [sample(path, uv) for uv in uvs]
+    return add(add(mul(cx, mask(w, "r")), mul(cy, mask(w, "g"))), mul(cz, mask(w, "b")))
+
+
+def tri_bump(path, uvs, w, strength):
+    """The texture's normal from the three projections as a world-space offset to add to the surface's normal."""
+    tx, ty, tz = [mask(sample(path, uv), "r", "g") for uv in uvs]
+    zero = expr(unreal.MaterialExpressionConstant, r=0.0)
+    vx = append(zero, tx)                                   # (0, u, v): the X projection runs (Y, Z)
+    vy = append(append(mask(ty, "r"), zero), mask(ty, "g"))  # (u, 0, v)
+    vz = append(tz, zero)                                   # (u, v, 0)
+    return mul(add(add(mul(vx, mask(w, "r")), mul(vy, mask(w, "g"))), mul(vz, mask(w, "b"))), k=strength)
+
+
+def vc_alpha(vc):
+    """The vertex colour's alpha (its first output is RGB only: masking it for A fails to compile)."""
+    e = expr(unreal.MaterialExpressionComponentMask, r=True)
+    link(vc, e, "", "A")
+    return e
+
+
+def normalized(v):
+    e = expr(unreal.MaterialExpressionNormalize)
+    link(v, e, "VectorInput")
+    return e
+
+
+def lin(rgb):
+    return const3(tuple((c / 255.0) ** 2.2 for c in rgb))
+
+
+if want("caverock"):
+    # The Volcanic's lava tubes: dark basalt, glazed where the flow left it (the colour and gloss come from the mesh),
+    # the MW rock's grain at two scales, and the flow lines the lava wrote along the walls as it fell: faint level
+    # lines at its old levels (UV1.x = the height above the passage's floor, m).
+    begin("/Game/Terrain/M_CaveRock")
+    mat.set_editor_property("tangent_space_normal", False)
+    wp = expr(unreal.MaterialExpressionWorldPosition)
+    n, w = tri_weights()
+    big, small = tri_uvs(wp, 260.0), tri_uvs(wp, 85.0)
+    grain = lerp(tri_colour("Ground/TEX_MWAM_Rock_col", big, w), tri_colour("Ground/TEX_MWAM_Rock_col", small, w), expr(unreal.MaterialExpressionConstant, r=0.45))
+    lum = expr(unreal.MaterialExpressionDotProduct)
+    link(grain, lum, "A")
+    link(const3((0.3, 0.59, 0.11)), lum, "B")
+    vc = expr(unreal.MaterialExpressionVertexColor)
+    uv1 = expr(unreal.MaterialExpressionTextureCoordinate, coordinate_index=1)
+    warp = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(append(add(mask(wp, "r"), mask(wp, "g")), mask(wp, "b")), k=1.0 / 1400.0)), "r")
+    f = expr(unreal.MaterialExpressionFrac)
+    link(add(mul(mask(uv1, "r"), k=1.0 / 0.42), mul(warp, k=0.8)), f)
+    tri_wave = expr(unreal.MaterialExpressionAbs)
+    link(op(unreal.MaterialExpressionSubtract, mul(f, k=2.0), const_b=1.0), tri_wave)
+    lines = sat(mul(op(unreal.MaterialExpressionSubtract, tri_wave, const_b=0.82), k=5.5))
+    # Only on the walls, from knee to head height (over the roof they drew rings like a tree's; on the floor a maze).
+    nz = expr(unreal.MaterialExpressionAbs)
+    link(mask(n, "b"), nz)
+    h = mask(uv1, "r")
+    lines = mul(mul(lines, sat(mul(op(unreal.MaterialExpressionSubtract, None, nz, const_a=0.5), k=4.0))),
+                mul(sat(mul(op(unreal.MaterialExpressionSubtract, h, const_b=0.3), k=3.0)), sat(mul(op(unreal.MaterialExpressionSubtract, None, h, const_a=3.0), k=2.0))))
+    base = mul(mul(mask(vc, "r", "g", "b"), mul(lum, k=1.6)), add(mul(lines, k=0.3), expr(unreal.MaterialExpressionConstant, r=1.0)))
+    # Glazed rock is satin, not a mirror: the near lights silvered whole walls at the mesh's own roughness.
+    rough = lerp(expr(unreal.MaterialExpressionConstant, r=0.55), expr(unreal.MaterialExpressionConstant, r=1.0), vc_alpha(vc))
+    normal = normalized(add(add(n, tri_bump("Ground/TEX_MWAM_Rock_nrm", big, w, 1.0)), tri_bump("Ground/TEX_MWAM_Rock_nrm", small, w, 0.55)))
+    finish(base, normal, rough, specular=expr(unreal.MaterialExpressionConstant, r=0.35))
+
+if want("caveice"):
+    # The Tundra's glacier ice: level strata of pale and deep blue drawn here per pixel (bent by noise; done per vertex
+    # they broke into sharp triangles), deeper blue knots, now and then a dirty band of grit; scalloped like the walls
+    # of a real ice cave (the water ripple's normal at two scales); snow where the mesh says (UV1.x = ice 0..1: 0 is the
+    # vertex colour's snow or ground). Where the ice over you is thin it glows with the day (UV1.y = thin, the "Glow"
+    # parameter = daylight); deep in it darkens (UV2.x).
+    begin("/Game/Terrain/M_CaveIce")
+    mat.set_editor_property("tangent_space_normal", False)
+    wp = expr(unreal.MaterialExpressionWorldPosition)
+    n, w = tri_weights()
+    vc = expr(unreal.MaterialExpressionVertexColor)
+    uv1 = expr(unreal.MaterialExpressionTextureCoordinate, coordinate_index=1)
+    uv2 = expr(unreal.MaterialExpressionTextureCoordinate, coordinate_index=2)
+    ice, thin, dark, clear = mask(uv1, "r"), mask(uv1, "g"), mask(uv2, "r"), mask(uv2, "g")
+    side = append(add(mask(wp, "r"), mask(wp, "g")), mask(wp, "b"))
+    warp = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 1500.0)), "r")
+    knots = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 420.0)), "g")
+    f = expr(unreal.MaterialExpressionFrac)
+    link(add(mul(mask(wp, "b"), k=1.0 / 115.0), mul(warp, k=1.4)), f)
+    tri_wave = expr(unreal.MaterialExpressionAbs)
+    link(op(unreal.MaterialExpressionSubtract, mul(f, k=2.0), const_b=1.0), tri_wave)
+    strata = sat(mul(op(unreal.MaterialExpressionSubtract, tri_wave, const_b=0.25), k=2.0))
+    ice_c = lerp(lin((70, 128, 196)), lin((176, 214, 240)), strata)
+    ice_c = lerp(ice_c, lin((40, 92, 170)), mul(sat(mul(op(unreal.MaterialExpressionSubtract, knots, const_b=0.55), k=3.0)), k=0.45))
+    fd = expr(unreal.MaterialExpressionFrac)
+    link(add(mul(mask(wp, "b"), k=1.0 / 380.0), mul(warp, k=0.7)), fd)
+    dirt = sat(mul(op(unreal.MaterialExpressionSubtract, fd, const_b=0.93), k=14.0))
+    ice_c = lerp(ice_c, lin((92, 96, 102)), mul(dirt, k=0.55))
+    ice_c = mul(ice_c, op(unreal.MaterialExpressionSubtract, None, mul(dark, k=0.62), const_a=1.0))
+    # Clear ice (UV2.y: icicles, frozen falls): pale and glassy, not the walls' strata.
+    ice_c = lerp(ice_c, lin((196, 224, 244)), clear)
+    base = lerp(mask(vc, "r", "g", "b"), ice_c, ice)
+    # (Wet ice, not foil: at 0.2 every dimple in a narrow way caught a glint.)
+    rough = lerp(vc_alpha(vc), expr(unreal.MaterialExpressionConstant, r=0.32), ice)
+    # Scallops: the dimpled walls of a real ice cave, the stones' rounded bumps turned inside out (negative strength),
+    # over a broad undulation; on clear ice only a little (the ripple's lines ran like fur over the walls).
+    # (At 1.3 m the stones' bumps were a speckle in the narrow ways: 3.6 m tiles make them dimples a hand or two wide.)
+    big, small, snow_uv = tri_uvs(wp, 360.0), tri_uvs(wp, 520.0), tri_uvs(wp, 190.0)
+    ice_bump = mul(add(tri_bump("Ground/TEX_MWAM_Stones_nrm", big, w, -0.22), tri_bump("Ground/TEX_MWAM_Rock_nrm", small, w, 0.12)),
+                   op(unreal.MaterialExpressionSubtract, None, mul(clear, k=0.7), const_a=1.0))
+    normal = normalized(add(n, lerp(tri_bump("Ground/TEX_MWAM_Snow_nrm", snow_uv, w, 0.7), ice_bump, ice)))
+    glow_p = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Glow", default_value=0.0)
+    emissive = mul(mul(mul(lerp(lin((60, 140, 230)), lin((150, 205, 245)), strata), thin), ice), glow_p)
+    finish(base, normal, rough, emissive)

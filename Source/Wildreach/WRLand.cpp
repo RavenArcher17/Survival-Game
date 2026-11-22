@@ -326,6 +326,14 @@ namespace WRLandHfImpl
 					else continue;
 					C.Shapes.Add(MoveTemp(Sh));
 				}
+				if (O->TryGetArrayField(TEXT("bench"), X) && X->Num() >= 2) C.Bench = FVector2f(float((*X)[0]->AsNumber()), float((*X)[1]->AsNumber()));
+				if (O->TryGetArrayField(TEXT("brow"), X) && X->Num() >= 7)
+				{
+					C.bHasBrow = true;
+					C.BrowC = FVector(Num(*X, 0), Num(*X, 1), Num(*X, 2));
+					C.BrowR = FVector(Num(*X, 3), Num(*X, 4), Num(*X, 5));
+					C.BrowYaw = Num(*X, 6);
+				}
 				if (O->TryGetArrayField(TEXT("feats"), X)) for (const TSharedPtr<FJsonValue>& FV : *X)
 				{
 					const TArray<TSharedPtr<FJsonValue>>* Q = nullptr;
@@ -868,7 +876,18 @@ TCHAR FWRLandDef::GridLetter(const FVector2D& M) const
 	return GridRows[J][I];
 }
 
-float FWRLandCaveShape::Air(const FVector& Pm, float& OutFloor, float& OutWidth) const
+namespace
+{
+	/** The lava bench's cut at a height above the floor (cave_shape.mjs benchCut). */
+	float WRBenchCut(const FVector2f& Bench, float Width, float ZRel)
+	{
+		if (Bench.Y <= 0.f) return 0.f;
+		const auto Sm = [](float E0, float E1, float X) { const float T = FMath::Clamp((X - E0) / (E1 - E0), 0.f, 1.f); return T * T * (3.f - 2.f * T); };
+		return Bench.Y * Sm(1.7f, 2.1f, Width) * (1.f - Sm(Bench.X - 0.15f, Bench.X + 0.05f, ZRel));
+	}
+}
+
+float FWRLandCaveShape::Air(const FVector& Pm, float& OutFloor, float& OutWidth, const FVector2f& Bench) const
 {
 	if (Kind == 0)
 	{
@@ -882,20 +901,21 @@ float FWRLandCaveShape::Air(const FVector& Pm, float& OutFloor, float& OutWidth)
 			const float Lat = FVector2D::Distance(FVector2D(Pm), A + AB * U);
 			if (Lat < Near) { Near = Lat; F = FMath::Lerp(P[i - 1].Z, P[i].Z, U); W = FMath::Lerp(P[i - 1].W, P[i].W, U); Hh = FMath::Lerp(PH[i - 1], PH[i], U); }
 		}
-		const float Bv = 0.62f * Hh, Lv = Hh - Bv;
+		const float Bv = 0.62f * Hh, Lv = Hh - Bv, We = W - WRBenchCut(Bench, W, float(Pm.Z) - F);
 		OutFloor = F;
 		OutWidth = W;
-		return FMath::Max((FMath::Sqrt(FMath::Square(Near / W) + FMath::Square((float(Pm.Z) - F - Lv) / Bv)) - 1.f) * FMath::Min(W, Bv), F - float(Pm.Z));
+		return FMath::Max((FMath::Sqrt(FMath::Square(Near / We) + FMath::Square((float(Pm.Z) - F - Lv) / Bv)) - 1.f) * FMath::Min(We, Bv), F - float(Pm.Z));
 	}
 	if (Kind == 1)
 	{
 		const float Ar = FMath::DegreesToRadians(Yaw), Ca = FMath::Cos(Ar), Sa = FMath::Sin(Ar);
 		const float Dx = float(Pm.X - C.X), Dy = float(Pm.Y - C.Y), U = Dx * Ca + Dy * Sa, Vv = -Dx * Sa + Dy * Ca;
 		const float Bv = 0.85f * H, Lv = H - Bv;
+		const float Cut = WRBenchCut(Bench, FMath::Min(float(R.X), float(R.Y)), float(Pm.Z) - float(C.Z)), Rx = float(R.X) - Cut, Ry = float(R.Y) - Cut;
 		OutFloor = float(C.Z);
 		OutWidth = FMath::Min(float(R.X), float(R.Y));
-		return FMath::Max((FMath::Sqrt(FMath::Square(U / float(R.X)) + FMath::Square(Vv / float(R.Y)) + FMath::Square((float(Pm.Z) - float(C.Z) - Lv) / Bv)) - 1.f)
-			* FMath::Min3(float(R.X), float(R.Y), Bv), float(C.Z) - float(Pm.Z));
+		return FMath::Max((FMath::Sqrt(FMath::Square(U / Rx) + FMath::Square(Vv / Ry) + FMath::Square((float(Pm.Z) - float(C.Z) - Lv) / Bv)) - 1.f)
+			* FMath::Min3(Rx, Ry, Bv), float(C.Z) - float(Pm.Z));
 	}
 	OutFloor = Z0;
 	OutWidth = float(R.X);
@@ -910,7 +930,7 @@ float FWRLandCave::Air(const FVector& P, float* OutFloor, float* OutWidth) const
 	for (const FWRLandCaveShape& S : Shapes)
 	{
 		float F = 0.f, W = 1.f;
-		const float D = S.Air(P, F, W);
+		const float D = S.Air(P, F, W, Bench);
 		if (D < Best) { Best = D; Floor = F; Width = W; }
 		if (bFirst) { V = D; bFirst = false; continue; }
 		const float H = FMath::Max(WRCaveShape::Join - FMath::Abs(V - D), 0.f) / WRCaveShape::Join;
@@ -925,6 +945,7 @@ FBox FWRLandCave::Bounds(float Grow) const
 {
 	FBox B(ForceInit);
 	for (const FWRLandCaveShape& S : Shapes) B += S.Box;
+	if (bHasBrow) { const float Rm = FMath::Max3(BrowR.X, BrowR.Y, BrowR.Z) + 0.6f; B += FBox(BrowC - FVector(Rm), BrowC + FVector(Rm)); }
 	return B.ExpandBy(Grow);
 }
 

@@ -179,11 +179,24 @@ alive-and-explorable pass, as slice 1.
   - Walkable by construction: passage floors are graded by the length walked (`graded`), level for FLAT m where
     they meet a chamber, and a slope has a level landing where its crawl leaves. The capsule climbs 0.45 m steps
     and ~44° slopes; keep slope runs at GRADE (0.36) or less, noise included. Only the ledge's drop is one-way.
-  - The rock's look (WRLandCaves ComputeCube): skin less than LipDepth (0.9 m) under the ground's surface is the lip,
-    drawn as the land (its material, its vertex data; a cut sample borrows its nearest drawn neighbour's ground). It
-    is cut exactly along that depth, so the change is a smooth line; the lip's UVs are made per triangle (from above,
-    or from the side on steep faces). The Tundra's ice (M_HeldTool) has UVs that put its grain in level strata, and
-    its colours fade to the ground's toward the lip. The weather's fog layer fades out underground (WRSky).
+  - The rock's look (WRLandCaves ComputeCube, 0.6 m cells): skin in a band from 0.5 m over to 0.9 m under the
+    ground's surface is the lip, drawn as the land (its material, its vertex data with per-triangle UVs and
+    tangents; a cut sample borrows its nearest drawn neighbour's ground). It is cut exactly along the band's edges,
+    so the change is a smooth line. The rest is the cave's own rock: M_CaveRock (basalt) or M_CaveIce (glacier ice),
+    built by `Tools/terrain/build_terrain_materials.py` (WR_MATERIALS=caverock,caveice). Both are world-space
+    triplanar with tangent_space_normal off, because the mesh has no tangents. Per vertex they get only smooth values:
+    - the colour and roughness (vertex colour);
+    - basalt UV1.x = the height above the passage's floor (its flow lines);
+    - ice UV1 = (ice 0..1, thin cover 0..1), UV2 = (deep 0..1, clear 0..1).
+    The ice's strata are drawn per pixel (worked out per vertex, they broke into triangles). Its glow is the "Glow"
+    parameter, set each second from the daylight.
+  - Lava benches: a cave's `bench` [height, depth] narrows its wide shapes below that height (cave_shape.mjs
+    `benchCut`, the same in FWRLandCaveShape::Air).
+  - Crags: a cave's `brow` [x, y, z, along, across, up, yaw] is a rough solid (two eggs, the rock noise and ridged
+    creases) joined to the ground. The cave's air is carved through ground and crag alike, so the way in is an arch.
+  - Formations are grown in code (LcLathe: profile, two-wave section, bend) into one mesh in the cave materials.
+    Pillars stop you by capsules. Rocks and pebbles (instanced, no collision) and puddles snap to the real floor.
+  - The weather's fog layer fades out underground (WRSky).
   - Checking: probe the air with the game's noise (LcAir's hash noise ported to JS) along every passage before
     building. Then walk a bot through with `WRWalkTo x y 120` + `waitwalk`. A 4 m arrival radius cuts the corners
     of narrow passages and gets the bot "stuck" on walls a player would never touch.

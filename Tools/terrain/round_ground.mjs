@@ -17,7 +17,7 @@ import * as PLAN from "./hearthmoot_plan.mjs";
 import * as FF from "./fire_frost.mjs";
 import { CAVE, caveAir } from "./cave_shape.mjs";
 import { layoutCave, coverNeeds, addSkylight, dressCave } from "./cave_layout.mjs";
-import { checkCave } from "./cave_check.mjs";
+import { checkCave, checkMouth } from "./cave_check.mjs";
 
 const { LANDS, lands, coastR, meadowR, warpDeg, fbm, pt, bearingOf, norm, dAng, gauss, RAD, CITY_WALL, LAKE, lakeOutline, stream, trunks, islets, edgeOf, FIRST_DEG, inPoly } = RI;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -850,8 +850,27 @@ log("zone letters done");
 {
 	let n = 0, skies = 0;
 	for (const c of CAVES) {
+		// The Volcanic's are lava tubes: a bench (a shelf) along their walls where the flow's level stood, 1-1.4 m up.
+		if (c.biome === "volcanic") { const R = rng(c.seed ^ 0xbe7c); c.bench = [+(1.0 + 0.4 * R()).toFixed(2), +(0.3 + 0.12 * R()).toFixed(2)]; }
 		if (c.kind === "cave" && addSkylight(c, sampleH, c.seed, c.biome === "volcanic" ? 0.85 : 0.55)) skies++;
 		Object.assign(c, dressCave(c, sampleH, c.biome, c.seed));
+		if (c.kind === "cave") {
+			// The mouth opens into the slope under a crag: a rough mass of rock (a solid the cave's rock is drawn round,
+			// WRLandCaves) over the way in, its underside 3.4 m over it, its back in the hillside;
+			// and boulders either side framing the opening, half sunk.
+			const [mx, my, z0] = c.mouth, [dx, dy] = c.dir, Rb = rng(c.seed ^ 0xb40);
+			// (A crag reaching down into the ground: the passage's arch is cut through it, so there is rock over the way in
+			// and either side of it; one perched over the mouth looked like a balanced boulder.)
+			const along = 3.0 + 0.6 * Rb(), across = 4.6 + 0.8 * Rb(), up = 3.4 + 0.6 * Rb();
+			// (Its face starts at the mouth: reaching out over the lower ground in front, it filled the space under the way
+			// in and left a 1 m step up into the cave.)
+			c.brow = [+(mx + dx * (along + 0.1)).toFixed(2), +(my + dy * (along + 0.1)).toFixed(2), +(z0 + 1.6).toFixed(2), +along.toFixed(2), +across.toFixed(2), +up.toFixed(2), Math.round(Math.atan2(dy, dx) * 180 / Math.PI)];
+			for (const side of [-1, 1]) for (let k = 0; k < 2; k++) {
+				const u = -1.2 + 1.8 * k + Rb() * 0.6, v = side * (3.6 + Rb() * 1.0), s = 1.0 + Rb() * 1.0;
+				const x = mx + dx * u - dy * v, y = my + dy * u + dx * v;
+				c.feats.push(["rock", +x.toFixed(2), +y.toFixed(2), +sampleH(x, y).toFixed(2), +s.toFixed(2), +(s * (0.7 + 0.4 * Rb())).toFixed(2), Math.round(Rb() * 360)]);
+			}
+		}
 		const xs = [], ys = [];
 		for (const q of c.shapes) { if (q.k === "tube") for (const p of q.p) { xs.push(p[0]); ys.push(p[1]); } else { xs.push(q.c[0]); ys.push(q.c[1]); } }
 		const M = 20;
@@ -863,8 +882,8 @@ log("zone letters done");
 	}
 	log(`caves: ${CAVES.length} (${skies} skylights), ${CAVES.reduce((t, c) => t + c.feats.length, 0)} formations, ${n} samples of ground cut`);
 	// Every passage walkable both ways, with the game's rock noise (cave_check.mjs).
-	const bad = CAVES.map((c) => [c, checkCave(c)]).filter(([, i]) => i.length);
-	log(bad.length ? `CAVES NOT WALKABLE:${bad.map(([c, i]) => `\n  ${c.id}: ${i.join("; ")}`).join("")}` : "caves walkable: every passage, both ways");
+	const bad = CAVES.map((c) => [c, [...checkCave(c), ...(c.brow ? checkMouth(c, sampleH) : [])]]).filter(([, i]) => i.length);
+	log(bad.length ? `CAVES NOT WALKABLE:${bad.map(([c, i]) => `\n  ${c.id}: ${i.join("; ")}`).join("")}` : "caves walkable: every passage and mouth, both ways");
 }
 // ---- out --------------------------------------------------------------------------------------------------------------
 const bytes = Buffer.alloc(N * N * 3);
@@ -994,7 +1013,7 @@ const land = {
 		const R2 = (v) => Math.round(v * 100) / 100;
 		const shape = (q) => q.k === "tube" ? { k: "tube", role: q.role, p: q.p.map((p) => p.map(R2)) } : q.k === "hall" ? { k: "hall", role: q.role, c: q.c.map(R2), r: q.r.map(R2), yaw: R2(q.yaw), h: R2(q.h) } : { k: "shaft", role: q.role, under: q.under, c: q.c.map(R2), r: R2(q.r), z: q.z.map(R2) };
 		return { id: c.id, name: c.name, biome: c.biome, ...(c.room ? { room: c.room } : {}), dir: c.dir.map((v) => +v.toFixed(4)), mouth: c.mouth.map(R2), hall: c.main.c.map(R2),
-			shapes: c.shapes.map(shape), feats: c.feats, lights: c.lights, spots: c.spots };
+			...(c.bench ? { bench: c.bench } : {}), ...(c.brow ? { brow: c.brow } : {}), shapes: c.shapes.map(shape), feats: c.feats, lights: c.lights, spots: c.spots };
 	}),
 	underground: { _comment: "Where a body is rightly under the ground (no rescue): every cave's passages, chambers and skylights, [x1, y1, x2, y2, r] m.", ways: CAVES.flatMap((c) => c.shapes.flatMap((q) => {
 		if (q.k === "tube") return q.p.slice(1).map((p, i) => [q.p[i][0], q.p[i][1], p[0], p[1], p[3] + 1.5]);

@@ -20,12 +20,40 @@ const n3 = (x, y, z) => n2(x + z * 0.37, y - z * 0.61) * 0.6 + n2(y * 0.73 + 11,
 export function gameAir(c, x, y, z) {
 	let v = Infinity, best = Infinity, floor = 0, width = 1;
 	for (const s of c.shapes) {
-		const [d, f, w] = shapeAir(s, x, y, z);
+		const [d, f, w] = shapeAir(s, x, y, z, c.bench);
 		if (d < best) { best = d; floor = f; width = w; }
 		v = v === Infinity ? d : smin(v, d, CAVE.join);
 	}
 	const wall = Math.min(0.7, Math.max(0.18, 0.22 * width)), amp = 0.12 + (wall - 0.12) * sm(0.4, 1.6, z - floor);
 	return v + amp * (n3(x / 2.2, y / 2.2, z / 2.2) + 0.35 * n3(x / 0.7 + 5, y / 0.7 + 1, z / 0.7 + 3));
+}
+
+/** The crag over a cave's mouth (land file "brow"; WRLandCaves.cpp LcBrow, the same): rock where negative, m. */
+export function cragAt(c, x, y, z) {
+	if (!c.brow) return Infinity;
+	const [bx, by, bz, rx, ry, rz, yaw] = c.brow, a = yaw * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+	const egg = (cx, cy, cz, sx, sy, sz) => { const dx = x - cx, dy = y - cy, dz = z - cz; return (Math.hypot((dx * ca + dy * sa) / sx, (-dx * sa + dy * ca) / sy, dz / sz) - 1) * Math.min(sx, sy, sz); };
+	const side = yaw * 0.1 - Math.floor(yaw * 0.1) < 0.5 ? 1 : -1;
+	const lx = bx + ca * rx * 0.45 - sa * ry * 0.55 * side, ly = by + sa * rx * 0.45 + ca * ry * 0.55 * side, lz = bz + rz * 0.35;
+	const e1 = egg(bx, by, bz, rx, ry, rz), e2 = egg(lx, ly, lz, rx * 0.62, ry * 0.62, rz * 0.62), hj = Math.max(1 - Math.abs(e1 - e2), 0);
+	return Math.min(e1, e2) - hj * hj * 0.25 + 0.5 * n3(x / 2, y / 2, z / 2) + 0.25 * n3(x / 0.6 + 3, y / 0.6 + 9, z / 0.6 + 2) - 0.4 * Math.abs(n3(x / 1.2 + 11, y / 1.2 + 4, z / 1.2 + 7));
+}
+
+/** The way in from outside, ground, crag and cave together as the game joins them (H: the ground's height): from 10 m
+ *  out to 4 m in along the mouth's line, the steepest step (empty: walkable). */
+export function checkMouth(c, H) {
+	const [mx, my] = c.mouth, [dx, dy] = c.dir;
+	const field = (x, y, z) => { const g = H(x, y) - z, b = -cragAt(c, x, y, z), hk = Math.max(0.5 - Math.abs(g - b), 0) / 0.5; return Math.min(gameAir(c, x, y, z), Math.max(g, b) + hk * hk * 0.5 * 0.25); };
+	let prev = null, steep = { g: 0 };
+	for (let d = -10; d <= 4; d += 0.25) {
+		const x = mx + dx * d, y = my + dy * d;
+		// (up from under both the ground and the way in's floor: under the hill the ground is the hill's top)
+		let z = Math.min(H(x, y), c.mouth[2]) - 1.5;
+		while (z < H(x, y) + 8 && field(x, y, z) >= 0) z += 0.02;
+		if (prev !== null && Math.abs(z - prev) / 0.25 > Math.abs(steep.g)) steep = { g: (z - prev) / 0.25, at: [x, y, z] };
+		prev = z;
+	}
+	return Math.abs(steep.g) > 0.84 ? [`mouth: grade ${steep.g.toFixed(2)} at (${steep.at.map((v) => v.toFixed(1)).join(", ")})`] : [];
 }
 
 /** The problems found walking the cave's passages (empty: all walkable). */

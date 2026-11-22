@@ -314,6 +314,34 @@ export function dressCave(c, H, biome, seed) {
 		const room = role("room");
 		light(room.c[0], room.c[1], room.c[2] + 3, ice ? [0.4, 0.65, 1] : [1, 0.45, 0.15], 5000, 18);
 	}
+	// Breakdown: blocks fallen from the roof lying in the big chambers (solid, off the ways); gravel over every floor and
+	// along the passages' sides (no collision: small enough to walk over); in the lava tubes a puddle or two where
+	// water seeped in and pooled in the floor's hollows.
+	for (const h of halls) {
+		if (h.r[0] > 6) for (let k = 2 + Math.floor(R() * 3); k > 0; k--) {
+			const s = rr(1.2, 2.4), [x, y] = inHall(h, 0.35, 0.85);
+			if (laneDist(x, y) < 2.4 + s * 0.5 || !free(x, y, s * 0.6)) continue;
+			used.push([x, y, s * 0.6]);
+			feat("rock", x, y, h.c[2], s, s * rr(0.4, 0.65), R() * 360);
+		}
+		for (let k = Math.round(h.r[0] * h.r[1] * 0.3); k > 0; k--) {
+			const [x, y] = inHall(h, 0.05, 0.95), s = rr(0.08, 0.28);
+			if (laneDist(x, y) > 0.6) feat("pebble", x, y, h.c[2], s, s * rr(0.45, 0.8), R() * 360);
+		}
+		if (!ice && h.r[0] > 5 && R() < 0.65) {
+			const [x, y] = inHall(h, 0.15, 0.6);
+			if (free(x, y, 1.5)) feat("puddle", x, y, h.c[2], rr(0.7, 1.5), rr(0.5, 1.0), R() * 360);
+		}
+	}
+	for (const t of tubes) for (let i = 1; i < t.p.length; i++) {
+		const [ax, ay, af, aw] = t.p[i - 1], [bx, by, bf] = t.p[i], len = Math.hypot(bx - ax, by - ay);
+		if (len < 0.5) continue;
+		const nx = -(by - ay) / len, ny = (bx - ax) / len;
+		for (let d = rr(0, 1.5); d < len; d += rr(0.8, 2.2)) {
+			const side = R() < 0.5 ? -1 : 1, off = side * aw * rr(0.45, 0.72), k = d / len, s = rr(0.08, 0.24);
+			feat("pebble", ax + (bx - ax) * k + nx * off, ay + (by - ay) * k + ny * off, af + (bf - af) * k, s, s * rr(0.45, 0.8), R() * 360);
+		}
+	}
 	// Under a skylight: the rubble of the fallen roof, and the rim's rocks up on the ground round its opening.
 	const sky = c.shapes.find((s) => s.k === "shaft");
 	if (sky) {

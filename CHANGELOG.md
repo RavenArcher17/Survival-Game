@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Round island: caves that look real (11-21)
+
+Raven: "Go ahead and do the caves until they look perfect" (after I said they played like caves but didn't look like
+them).
+- **Walls of real rock.**
+  - The Volcanic's lava tubes are dark basalt with the rock's grain and relief. They're satin where the flow glazed
+    them, with rusty patches where the iron weathered, and dustier on the floor.
+  - The Tundra's caves are glacier ice: level layers of pale and deep blue, deeper blue knots, now and then a band of
+    grit, scalloped like a real ice cave's walls, with snow drifted on the floors. Where the ice over you is thin it
+    glows with the daylight.
+  - The walls used to be smooth and flat-coloured, and the ice broke into sharp triangles. The rock mesh is also finer
+    (0.6 m, was 1 m), so the facets no longer show.
+- **Lava benches:** a shelf runs along the lava tubes' walls, 1-1.4 m up, where the flow's level once stood.
+- **Formations grow; they aren't placed.**
+  - Clusters of lavacicles (short, knobbly, glazed) and icicles (long, ringed), one long and a few shorter, never quite
+    round.
+  - Lumpy dribble spires and stalagmites on broad feet.
+  - Columns flared at both ends and waisted where they met.
+  - Frozen falls of fused ropes of ice.
+  - They used to be plain cones.
+- **Floors:**
+  - blocks fallen from the roof lie in the big chambers;
+  - gravel covers every floor and the sides of the passages;
+  - seep water pools in a hollow here and there in the lava tubes.
+  - Everything sits on the real, uneven floor; pebbles used to hang over the hollows.
+- **Mouths:** each cave opens through an arch in a crag (basalt, or glacier ice under a cap of snow), with boulders
+  either side. They used to be holes in a mound.
+
 ### Round island: cave mouths smoothed (11-21)
 
 Raven: "Yes, smooth it" (the stepped edge just inside the Tundra caves' mouths).

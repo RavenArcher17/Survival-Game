@@ -91,8 +91,9 @@ struct WILDREACH_API FWRLandCaveShape
 	FVector2D R = FVector2D::ZeroVector;
 	float Yaw = 0.f, H = 0.f, Z0 = 0.f, Z1 = 0.f;
 	FBox Box = FBox(ForceInit);
-	/** Signed distance (m, approximate: negative inside), the floor under the point and the shape's size there. */
-	float Air(const FVector& Pm, float& OutFloor, float& OutWidth) const;
+	/** Signed distance (m, approximate: negative inside), the floor under the point and the shape's size there. Bench:
+	 *  the cave's lava bench (height above the floor, depth; 0 depth for none). */
+	float Air(const FVector& Pm, float& OutFloor, float& OutWidth, const FVector2f& Bench = FVector2f::ZeroVector) const;
 };
 
 /** A formation of a cave (drip, icicle, mite, icemite, column, icecolumn, rock, rimrock, bench, crack, sulfur, icefall,
@@ -125,10 +126,17 @@ struct WILDREACH_API FWRLandCave
 	bool bRoom = false;
 	FVector2D Dir = FVector2D(1.f, 0.f);
 	FVector Mouth = FVector::ZeroVector;
+	/** A lava tube's bench (height above the floor, depth, m; land file "bench"): below it the way is narrower. */
+	FVector2f Bench = FVector2f::ZeroVector;
 	/** The main chamber's floor centre (a cave's big hall; a room's room). */
 	FVector Hall = FVector::ZeroVector;
 	TArray<FWRLandCaveShape> Shapes;
 	TArray<FWRLandCaveFeat> Feats;
+	/** The rock lip over the mouth (land file "brow": [x, y, z, along, across, up, yaw], map m): a solid ellipsoid the
+	 *  cave's rock is drawn round (WRLandCaves), half in the hillside, overhanging the way in. */
+	bool bHasBrow = false;
+	FVector BrowC = FVector::ZeroVector, BrowR = FVector::OneVector;
+	float BrowYaw = 0.f;
 	TArray<FWRLandCaveLight> Lights;
 	/** Where the contents stand (map metres): the ores in AWRCave's order, star iron, the hazard, the den, the cache. */
 	TArray<FVector> OreSpots;
