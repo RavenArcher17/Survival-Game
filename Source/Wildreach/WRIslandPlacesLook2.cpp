@@ -285,21 +285,31 @@ namespace WRIsleT
 	{
 		// A 50 m wall of blue ice towers leaning toward the bowl (local +X), cracked; the blocks that fell before lie at the
 		// foot. Six drop points in front are the serac-fall hazard.
-		for (int32 i = 0; i < 11; ++i)
+		// A ragged, fused wall (11-22: eleven towers of one size in an even row read as totems): seventeen towers set close
+		// and out of line, of every height, leaning out over the bowl, a lower mass of ice fused behind them.
+		for (int32 i = 0; i < 17; ++i)
 		{
-			const float Y = -2500.f + 500.f * i + 80.f * S.J(FVector(i), 1);
-			const float W = 340.f + 160.f * S.R(FVector(i), 2), D = 320.f + 120.f * S.R(FVector(i), 3), H = 600.f + 800.f * S.R(FVector(i), 4);
-			const float Lean = 3.f + 5.f * S.R(FVector(i), 5);
-			const FVector C(-300.f, Y, S.Gz(-300.f, Y) + H * 0.5f - 60.f);
-			const FRotator Rot(-Lean, 8.f * S.J(FVector(i), 6) + 90.f * (i % 2), 3.f * S.J(FVector(i), 7));
-			// (real broken ice towers, 11-22: they were blue boxes with a snow slab on top and a glowing strip)
-			S.Ice(i, FVector(D * 1.15f, W * 1.15f, H), FVector(-300.f, Y, S.Gz(-300.f, Y)), Rot, false, 60.f);
-			S.Solid(C, FVector(D * 0.5f, W * 0.5f, H * 0.5f), Rot);
-			if (i % 2 == 0 && i > 0 && i < 10)
+			const FVector Seed(i, 3, 0);
+			const float Y = -2600.f + 325.f * i + 110.f * S.J(Seed, 1);
+			const float X = -300.f + 200.f * S.J(Seed, 8) - (i % 3 == 1 ? 180.f : 0.f);
+			const float W = 300.f + 220.f * S.R(Seed, 2), D = 300.f + 160.f * S.R(Seed, 3);
+			const float H = 450.f + 1150.f * FMath::Pow(S.R(Seed, 4), 0.8f) * (0.55f + 0.45f * FMath::Sin(PI * (i + 0.5f) / 17.f));
+			const float Lean = 4.f + 8.f * S.R(Seed, 5);
+			const FVector C(X, Y, S.Gz(X, Y) + H * 0.5f - 60.f);
+			const FRotator Rot(-Lean, 25.f * S.J(Seed, 6), 5.f * S.J(Seed, 7));
+			S.Ice(i, FVector(D * 1.15f, W * 1.15f, H), FVector(X, Y, S.Gz(X, Y)), Rot, false, 60.f, 0.35f);
+			S.Solid(C, FVector(D * 0.45f, W * 0.45f, H * 0.5f), Rot);
+			if (i % 3 == 1 && i > 0 && i < 16)
 			{
 				FWRIsleHazard& H2 = S.Hazard(FWRIsleHazard::EKind::Serac, FVector(250.f, Y, S.Gz(250.f, Y)), 400.f);
 				H2.Half = FVector(0, 0, H);
 			}
+		}
+		for (int32 i = 0; i < 7; ++i)
+		{
+			const FVector Seed(i, 9, 0);
+			const float Y = -2700.f + 900.f * i + 150.f * S.J(Seed, 1), X = -800.f + 120.f * S.J(Seed, 2);
+			S.Ice(40 + i, FVector(800.f + 300.f * S.R(Seed, 3), 950.f + 250.f * S.R(Seed, 4), 380.f + 260.f * S.R(Seed, 5)), FVector(X, Y, S.Gz(X, Y)), FRotator(-3.f, 90.f + 15.f * S.J(Seed, 6), 0.f), false, 80.f, 0.6f);
 		}
 		for (int32 k = 0; k < 10; ++k)
 		{
@@ -315,6 +325,20 @@ namespace WRIsleT
 		// An ice-cored mound: stacked snow terraces, a star crack in the top showing blue ice, one flank broken open to the
 		// clear core. The aurora foxes gather here.
 		const float G0 = S.Gz(0, 0) - 60.f;
+		// One mound (SM_Pingo_A: a snow dome with a five-rayed crack in its crown and its flank broken open toward 210 degrees,
+		// the ice showing on the steep faces; it collides as its shape). 11-22: stacked discs read as a flying saucer.
+		if (S.Shape(TEXT("/Game/Art/Gen/SM_Pingo_A.SM_Pingo_A"), FVector(0.f, 0.f, G0), FRotator::ZeroRotator, FVector(1.f), true, false, FLinearColor::White, 0.5f))
+		{
+			const FVector Flank = FRotator(0.f, 210.f, 0.f).Vector() * 900.f + FVector(0, 0, G0 + 380.f);
+			S.Lamp(Flank, Lin(120, 190, 255), 2200.f, 1400.f);
+			S.Lamp(FVector(0, 0, G0 + 1100.f), Lin(140, 200, 255), 1500.f, 1000.f);
+			for (int32 k = 0; k < 8; ++k)
+			{
+				const FVector At = FRotator(0.f, 45.f * k + 10.f, 0.f).Vector() * 1700.f;
+				S.K.Add(P.SnowShade.Dim(0.85f), FVector(80.f, 50.f, 8.f), FVector(At.X, At.Y, S.Gz(At.X, At.Y) + 2.f), FRotator(0.f, 45.f * k, 0.f), EWRLookMesh::Cylinder);
+			}
+			return;
+		}
 		for (int32 t = 0; t < 6; ++t)
 		{
 			const float D = FMath::Lerp(2600.f, 700.f, t / 5.f);
@@ -358,7 +382,10 @@ namespace WRIsleT
 		// 13 m up (walkable on top), blue light inside the ice. The den beneath stays open.
 		const float Span = 3600.f;
 		const float Z0 = S.Gz(0, -Span), Z1 = S.Gz(0, Span);
-		const int32 N = 18;
+		// One sweep of ice (SM_IceArch_A: blocky, split faces, icicles under it; walkable, it collides as its shape); 11-22:
+		// 18 boxes end to end read as one flat slab from below.
+		const bool bShape = S.Shape(TEXT("/Game/Art/Gen/SM_IceArch_A.SM_IceArch_A"), FVector(0.f, 0.f, (Z0 + Z1) * 0.5f), FRotator::ZeroRotator, FVector(1.f), true, false, FLinearColor::White, 0.55f) != nullptr;
+		const int32 N = bShape ? 0 : 18;
 		for (int32 i = 0; i < N; ++i)
 		{
 			const float T0 = float(i) / N, T1 = float(i + 1) / N;
@@ -376,6 +403,7 @@ namespace WRIsleT
 		}
 		for (const float Sd : { -1.f, 1.f })
 		{
+			if (bShape) break;
 			const FVector B(0.f, Sd * (Span + 200.f), (Sd < 0.f ? Z0 : Z1));
 			S.K.Add(P.DeepIce, FVector(900.f, 700.f, 700.f), B + FVector(0, 0, 250.f), FRotator(0.f, 10.f * Sd, 4.f * Sd));
 			S.K.Add(P.Snow, FVector(920.f, 720.f, 60.f), B + FVector(0, 0, 610.f), FRotator(0.f, 10.f * Sd, 4.f * Sd));
@@ -673,8 +701,10 @@ namespace WRIsleT
 				const float Gz = S.Gz(X, Y);
 				const float H = TopZ(r, c) - Gz + 30.f;
 				const FVector Ctr(X, Y, Gz + H * 0.5f - 30.f);
-				S.K.Add((r + c) % 3 ? P.DeepIce : P.Ice, FVector(Block, Block, H), Ctr, FRotator(1.f * S.J(Ctr, 2), 0.f, 1.f * S.J(Ctr, 3)));
-				S.K.Add(P.Snow, FVector(Block + 10.f, Block + 10.f, 40.f), Ctr + FVector(0, 0, H * 0.5f + 10.f));
+				// (blocks of glacier ice, snow on their tops, each turned its own way; 11-22: white and blue boxes on a grid)
+				static const TCHAR* Blocks[3] = { TEXT("/Game/Art/Gen/SM_IceBlock_A.SM_IceBlock_A"), TEXT("/Game/Art/Gen/SM_IceBlock_B.SM_IceBlock_B"), TEXT("/Game/Art/Gen/SM_IceBlock_C.SM_IceBlock_C") };
+				const float Hs = (H + 60.f) / 400.f;
+				S.Shape(Blocks[(r * 3 + c) % 3], FVector(X, Y, Gz - 90.f), FRotator(0.f, 90.f * ((r * 3 + c) % 4) + 14.f * S.J(Ctr, 4), 0.f), FVector(Block * 1.12f / 400.f, Block * 1.12f / 400.f, Hs), false, false, FLinearColor::White, 0.75f);
 				S.Solid(Ctr + FVector(0, 0, 10.f), FVector(Block * 0.5f, Block * 0.5f, H * 0.5f + 20.f));
 				if (c == Safe)
 				{
@@ -692,8 +722,7 @@ namespace WRIsleT
 				if (bSafe)
 				{
 					// An old ice bridge: thick, blue, a crust of snow on top, and it holds.
-					S.K.Add(P.DeepIce, FVector(Half.X * 2.f, Half.Y * 2.f, 120.f), Mid - FVector(0, 0, 35.f));
-					S.K.Add(P.Snow, FVector(Half.X * 2.f, Half.Y * 2.f + 10.f, 30.f), Mid + FVector(0, 0, 15.f));
+					S.Shape(TEXT("/Game/Art/Gen/SM_IceBlock_B.SM_IceBlock_B"), FVector(Mid.X, Mid.Y, Mid.Z - 70.f), FRotator::ZeroRotator, FVector((Half.X * 2.f + 60.f) / 400.f, (Half.Y * 2.f + 20.f) / 400.f, 95.f / 400.f), false, false, FLinearColor::White, 0.8f);
 					S.Solid(Mid, Half);
 					continue;
 				}
@@ -704,7 +733,7 @@ namespace WRIsleT
 				{
 					// A sagging drift: its look is its own part so it can drop when it goes.
 					const int32 Before = S.Blocks.Num();
-					S.K.Add(P.Snow, FVector(Half.X * 2.f + 40.f, Half.Y * 2.f, 50.f), Mid);
+					S.K.Add(P.Snow, FVector(Half.X * 2.f + 60.f, Half.Y * 2.f + 10.f, 70.f), Mid - FVector(0, 0, 8.f), FRotator::ZeroRotator, EWRLookMesh::Sphere);
 					S.K.Add(P.SnowShade, FVector(Half.X * 2.f, Half.Y * 1.6f, 34.f), Mid - FVector(0, 0, 34.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
 					TArray<FWRLookBlock> Mine;
 					for (int32 b = Before; b < S.Blocks.Num(); ++b) Mine.Add(S.Blocks[b]);
@@ -735,7 +764,8 @@ namespace WRIsleT
 		for (int32 r = 0; r < Rows - 1; ++r)
 		{
 			const float X = X0 + PitchX * r + PitchX * 0.5f;
-			S.K.Add(P.SnowShade.Dim(0.8f), FVector(PitchX - Block, PitchY * Cols, 20.f), FVector(X, Y0 + PitchY * 2.f, S.Gz(X, Y0 + PitchY * 2.f) + 6.f));
+			// (dark old ice at the bottom: in the snow's stone look they read as grey paving, 11-22)
+			S.K.Add(P.DeepIce.Dim(0.45f), FVector(PitchX - Block, PitchY * Cols, 20.f), FVector(X, Y0 + PitchY * 2.f, S.Gz(X, Y0 + PitchY * 2.f) + 2.f));
 		}
 	}
 

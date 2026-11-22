@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Round island: the look pass, third round (11-22)
+
+- **People** (skin drawing again, wool hose) and **level camps** (tents no longer float): see the second round's
+  People and wake-up camps notes.
+- **The Tundra's and the Volcanic's places as real shapes** (generated meshes, `Tools/art/make_meshes.py`, placed by
+  `FWRIsleSite::Shape`): the Ice Arch is one sweep of blocky ice 72 m across with icicles under it (it was 18 boxes
+  end to end, a flat slab from below; you walk on it, it collides as its shape); the Fox Circle Pingo is a snow mound
+  with a cracked crown and one flank broken open on its ice (it was stacked discs, a flying saucer); the Crevasse Maze's
+  rows are blocks of glacier ice with slanted, split tops over dark blue crevasse floors (white and blue boxes over grey
+  paving), its safe bridges old ice, its snow bridges sagging drifts; the Weeping Seracs are a ragged wall of seventeen
+  towers of every height leaning over the bowl with a fused mass of ice behind (eleven of one size in a row, like
+  totems); the Bellows Stacks and the Volcanic's hornitos are lumpy chimneys of welded spatter with open throats (rings
+  of boxes, stacks of black crates).
+- Still open: the Frozen Whaler and the ice shelves' pillars are stacked ice blocks, the Glasswall, the Wisp Spire, the
+  Warden's Quarry and the Fallen Smith are look-kit pieces; the chimneys read dark against the sky.
+
 ### Round island: the look pass, second round (11-22)
 
 The first round's pictures, graded against the caves again, and what they still showed.

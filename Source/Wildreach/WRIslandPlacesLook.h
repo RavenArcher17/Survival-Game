@@ -58,6 +58,10 @@ struct FWRIsleSite
 	/** A tower or block of glacier ice (Tools/art/make_meshes.py's seracs in M_IceBlock: snow on its faces turned up, all
 	 *  snow with Snow 1) fitted to Size, its foot at Base (local). Where the mesh isn't there, a look-kit block. */
 	UStaticMeshComponent* Ice(int32 Which, const FVector& Size, const FVector& Base, const FRotator& Rot, bool bCollide, float Sink = 40.f, float Snow = 0.f);
+	/** A generated mesh (Tools/art/make_meshes.py: the ice arch, the pingo, hornitos) at its own size: its origin at At
+	 *  (local), turned Rot, scaled Scale; in M_IceBlock (Snow on its tops) or, with bRock, the dressing's rock tinted Tint.
+	 *  Null where the mesh isn't there (the caller keeps its look-kit build). */
+	UStaticMeshComponent* Shape(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, bool bRock, const FLinearColor& Tint, float Snow = 0.f);
 	/** Instances of a pack mesh (pines, char trees, shrubs) at local transforms (scale fits Height cm tall). */
 	void Meshes(const TCHAR* Path, const TArray<FTransform>& Local, float Height, float Cull, const FLinearColor* Coat = nullptr);
 	/** A hazard of this place (key = the place's key + its count). */

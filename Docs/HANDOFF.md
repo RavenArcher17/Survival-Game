@@ -920,7 +920,10 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **Generated meshes** (11-22): `Tools/art/make_meshes.py` builds shapes the packs lack with Geometry Script
   (`unreal.GeometryScript_Primitives` / `_MeshDeformers` / `_NewAssetUtils`) into `/Game/Art/Gen` (in git, cooked:
   DefaultGame.ini): basalt column clusters, obsidian blades, seracs, the sulfur crystal, lava rubble patches (Nanite),
-  the camps' ridge tent (`EWRLookMesh::Tent`, drawn in M_BuildTinted like any block). `WR_MESHES=basalt,serac` makes
+  the camps' ridge tent (`EWRLookMesh::Tent`, drawn in M_BuildTinted like any block), the Ice Arch, the pingo, ice
+  blocks and hornitos (placed by `FWRIsleSite::Shape` at their own size in M_IceBlock or the dressing's rock; null
+  when the mesh is missing, so a place keeps its look-kit build). `Raw` builds a mesh from rings of points (each
+  face wound by an outward hint), `fbm` is its noise. `WR_MESHES=basalt,serac` makes
   only those. Materials come from where they are used (world-space projected), so the meshes need no real UVs. Its
   `xf()` takes rotations as (pitch, yaw, roll): Python's `unreal.Rotator` is (roll, pitch, yaw). Raw triangles: the
   DynamicMesh's front is cross(c - a, b - a) (`tent()` checks its first face).

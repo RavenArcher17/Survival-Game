@@ -389,6 +389,42 @@ UStaticMeshComponent* FWRIsleSite::Ice(int32 Which, const FVector& Size, const F
 	return C;
 }
 
+UStaticMeshComponent* FWRIsleSite::Shape(const TCHAR* Path, const FVector& At, const FRotator& Rot, const FVector& Scale, bool bCollide, bool bRock, const FLinearColor& Tint, float Snow)
+{
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, Path);
+	if (!Mesh || (!bDraw && !bCollide)) return nullptr;
+	const FString MatKey = bRock ? Tint.ToString() : FString::Printf(TEXT("ice%.2f"), Snow);
+	UMaterialInterface* M = nullptr;
+	if (UMaterialInterface** Found = RockMats.Find(MatKey)) M = *Found;
+	else if (bRock)
+	{
+		M = WRFoldLook::RockMat(Owner, Tint);
+		RockMats.Add(MatKey, M);
+	}
+	else if (UMaterialInterface* Base0 = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Terrain/M_IceBlock.M_IceBlock")))
+	{
+		UMaterialInstanceDynamic* D = UMaterialInstanceDynamic::Create(Base0, Owner);
+		D->SetScalarParameterValue(TEXT("Snow"), Snow);
+		M = D;
+		RockMats.Add(MatKey, M);
+	}
+	UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
+	C->SetStaticMesh(Mesh);
+	C->SetupAttachment(Root);
+	C->SetRelativeLocation(At);
+	C->SetRelativeRotation(Rot);
+	C->SetRelativeScale3D(Scale);
+	if (M) C->SetMaterial(0, M);
+	C->SetCollisionProfileName(bCollide ? TEXT("BlockAll") : TEXT("NoCollision"));
+	C->SetCanEverAffectNavigation(false);
+	C->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	C->SetCullDistance(WRTune(TEXT("places.siteCull"), 60000.f));
+	C->SetCachedMaxDrawDistance(WRTune(TEXT("places.siteCull"), 60000.f));
+	if (!bDraw) C->SetHiddenInGame(true);
+	C->RegisterComponent();
+	return C;
+}
+
 void FWRIsleSite::Meshes(const TCHAR* Path, const TArray<FTransform>& Local, float Height, float Cull, const FLinearColor* Coat)
 {
 	if (!bDraw || Local.Num() == 0) return;

@@ -55,6 +55,15 @@ namespace WRIsleV
 	/** A hornito: rings of spatter narrowing to a glowing throat (H tall, R across the base, in cm), at local Base. */
 	void Hornito(FWRIsleSite& S, const FPal& P, const FVector& Base, float H, float R, bool bBig)
 	{
+		// One chimney of welded spatter (SM_Hornito_A/B: lumpy bands, an open throat), in the dressing's rock; 11-22: rings of
+		// boxes read as a stack of black crates.
+		const TCHAR* Path = S.R(Base, 11) < 0.5f ? TEXT("/Game/Art/Gen/SM_Hornito_A.SM_Hornito_A") : TEXT("/Game/Art/Gen/SM_Hornito_B.SM_Hornito_B");
+		if (S.Shape(Path, Base, FRotator(0.f, 360.f * S.R(Base, 12), 0.f), FVector(R / 300.f, R / 300.f, H / 2000.f), false, true, FLinearColor(0.72f, 0.66f, 0.62f)))
+		{
+			const FVector Throat = Base + FVector(0.f, 0.f, H - 120.f * H / 2000.f);
+			S.K.Add(P.Ember, FVector(R * 0.42f, R * 0.42f, 14.f), Throat, FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			return;
+		}
 		const int32 Rings = FMath::Max(3, FMath::RoundToInt(H / (bBig ? 105.f : 60.f)));
 		const float RingH = H / Rings;
 		for (int32 i = 0; i < Rings; ++i)
