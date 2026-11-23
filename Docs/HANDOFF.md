@@ -970,6 +970,14 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **The wet band** (`wetShore`: sea, shown, lake, dark): measured up from `shown` (where the sea's edge is drawn). The
   island's ground takes its brightness from its textures, so the vertex colour hardly darkens it: the wetness also goes to
   the ground's first UV (`HfWet`), which `M_IslandGround` (`build_forest_ground.py --island`) treats as rain.
+- **The town's look shapes** (round 8): hearthmoot.json blocks' mesh 5 awning, 6 haystack, 7 rowboat are generated
+  meshes (make_meshes.py, WR_MESHES=townprops) fitting a 100 cm box like the engine cube (`EWRLookMesh`, WRBuildLook
+  MeshFor; each falls back to the shape it replaced). New details in hearthmoot.mjs draw on their own random streams
+  (RW windows' glow, RS back and end windows) so the town doesn't reshuffle. The fields' crops are generated clumps
+  (WR_MESHES=crops) drawn by StepCover in M_BuildTinted.
+- **Ground painting and the meadow**: round_ground.mjs paints the Volcanic's and the Tundra's sub-zone surfaces only past
+  the meadow's edge (their wedges reach to the walls). Any colour noise finer than about two samples (8 m) aliases into
+  stripes on the 4 m ground: keep ground noise scales at 13 m or more.
 - **NaN vertices**: `FMath::Pow(FMath::Sin(PI * t), e)` at t = 1 is NaN (sin(PI) is a hair below 0 in floats), and a NaN
   vertex gives the component NaN bounds (an ensure). Clamp the sine: `FMath::Pow(FMath::Max(0.f, FMath::Sin(...)), e)`.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'

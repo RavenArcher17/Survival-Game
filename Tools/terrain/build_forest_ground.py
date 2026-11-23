@@ -148,6 +148,22 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     moss_c, moss_h, moss_n = scan("Moss", 250.0)
     soil_c, soil_h, soil_n = scan("Soil", 250.0)
     grass_c, grass_h, grass_n = pack("Grass", 400.0)
+    if strong_tint:
+        # (round 8) the grass again at 9.7 m, turned a quarter, mixed in by a slow wash: its 4 m repeat ran across every
+        # lawn as mowing stripes
+        uv_g2 = mul(append2(wy, mul(wx, k=-1.0)), k=1.0 / 970.0)
+        g2c, g2n = sample(MW + "Grass_col", uv_g2), sample(MW + "Grass_nrm", uv_g2)
+        # and a third at 6.3 m turned 60 degrees: the three in shifting shares, so the grass's dirt flecks average out and
+        # no one repeat lines up into bands (two still striped every lawn)
+        uv_g3 = mul(append2(add(mul(wx, k=0.5), mul(wy, k=0.866)), add(mul(wx, k=-0.866), mul(wy, k=0.5))), k=1.0 / 630.0)
+        g3c, g3n = sample(MW + "Grass_col", uv_g3), sample(MW + "Grass_nrm", uv_g3)
+        w1 = sat(add(mul(noise(mul(xy, k=1.0 / 1700.0)), k=0.25), k=0.34))
+        w2 = sat(add(mul(noise(add(mul(xy, k=1.0 / 1300.0), const(7.3))), k=0.25), k=0.33))
+        w3 = sat(sub(sub(const(1.0), w1), w2))
+        wsum = add(add(w1, w2), add(w3, const(0.001)))
+        grass_c = op(unreal.MaterialExpressionDivide, add(add(mul(grass_c, w1), mul(mask(g2c, "r", "g", "b"), w2)), mul(mask(g3c, "r", "g", "b"), w3)), wsum)
+        grass_n = op(unreal.MaterialExpressionDivide, add(add(mul(grass_n, w1), mul(g2n, w2)), mul(g3n, w3)), wsum)
+        grass_h = dot3(grass_c, (0.299, 0.587, 0.114))
     stones_c, stones_h, stones_n = pack("Stones", 300.0)
     sand_c, sand_h, sand_n = pack("SandA", 400.0)
     cols = [litter_c, moss_c, soil_c, grass_c, stones_c, sand_c]

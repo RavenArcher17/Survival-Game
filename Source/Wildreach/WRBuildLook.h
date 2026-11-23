@@ -14,7 +14,7 @@ namespace WRLookPattern { constexpr float Mottle = 0.f, Grain = 1.f, Brushed = 2
 /** Shapes the blocks use (one instanced component per shape and material): engine shapes, and a ridge tent's canvas
  *  (/Game/Art/Gen/SM_TentRidge_A, Tools/art/make_meshes.py: 280 x 290 x 150 cm at size 100, X along the ridge, the door
  *  at -X; a cube where the mesh is missing), the engine sphere (loaves, fruit). */
-enum class EWRLookMesh : uint8 { Cube, Cylinder, Cone, Tent, Sphere };
+enum class EWRLookMesh : uint8 { Cube, Cylinder, Cone, Tent, Sphere, Awning, Haystack, Rowboat };   // (the last three: Tools/art/make_meshes.py, each fitting a 100 cm box centred like the engine cube; round 8)
 
 /** One visible block of a built piece: an engine shape, scaled, placed in the piece's (or the door leaf's) space. */
 struct FWRLookBlock

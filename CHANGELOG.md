@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Round island: the look pass, seventh round: the meadow, the fields and the town's details (11-23)
+
+From a fresh survey of the city and the meadow (63 pictures, Raven: "Keep going with the next round").
+- **The meadow's lawns were Tundra ground:** the Volcanic's and the Tundra's ground painting ran over every sample their
+  wedges owned, and those reach in to the walls: a third of the meadow round the city and the lake was thaw moss and
+  cinder, so no grass grew there and its colour striped. They stop at the meadow's edge now (`round_ground.mjs`), and the
+  meadow is grass to the walls and the lake (heights unchanged).
+- **No mowing stripes:** the grass texture repeated every 4 m in rows; it's mixed now with two more scales of itself, turned
+  (9.7 m, 6.3 m, `M_IslandGround`), and the ground's colour noises that were finer than its 4 m samples (6-7 m) are
+  coarser, so they no longer alias into bands. The meadow's two greens are closer (it read as camouflage from above).
+- **Real crops:** each crop was eight to twelve 1 cm boxes with a box for an ear, a field of sticks. Now clumps of the crop
+  itself (`make_meshes.py` crop()): ripe wheat (~50 stalks with ears and leaves, 0.9 m across), barley with nodding bearded
+  ears, cabbages in rosettes of leaves; fallow is long rough grass (`WRRoundIsland` StepCover).
+- **The town's details:** a market stall's canvas sags between its posts with a scalloped valance (it was a slab and a
+  strip, `SM_Awning_A`); the barns' haystacks are beehives of hay (`SM_Haystack_A`, they were yellow cylinders); the
+  rowboat at the jetty is a clinker boat with thwarts (`SM_Rowboat_A`, it was three boxes): new look shapes 5-7
+  (`EWRLookMesh` Awning, Haystack, Rowboat). Houses have windows on their backs and gable ends too, some lit at night
+  (every house showed only its street face windows; the rest of the town was blank walls). No house moved.
+- **The steward has a shirt:** a man drawn one of the gowns (the gravecloth cut, a bare-chested wrap on a man) wears a coat
+  instead; nobody else in town changed.
+- Round-island tests 0 failed; the city 15.0 ms a frame, the meadow 9.0 ms (with another game on the card).
+
 ### Round island: the look pass, sixth round: the beaches, the ice walls, the moon on the lake (11-22)
 
 The round's open list, finished (Raven: "Finish everything that's still open before you ask to push").

@@ -516,6 +516,9 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 	if (own !== LAND_INDEX.volcanic && own !== LAND_INDEX.tundra) continue;
 	const x = -HALF + i * STEP, y = -HALF + j * STEP;
 	if (H[k] < 0) continue;
+	// (round 8: not the meadow, though the lands' wedges reach into it: its lawns by the lake and round the walls were
+	// painted thaw moss and cinder, so no grass grew there and their colour striped)
+	if (Math.hypot(x, y) < meadowAt(bearingOf(x, y))) continue;
 	const cur = S[k];
 	if (cur === SURF.sand) { S[k] = own === LAND_INDEX.volcanic ? SURF.black_sand : SURF.shingle; continue; }
 	if (cur === SURF.shore_rock) continue;
@@ -951,9 +954,9 @@ const ZONES = [
 	{ id: "T5", letter: "k", name: "the Glacier Plateau", slopeRock: [176, 200, 224], ground: [224, 234, 244], groundAlt: [206, 222, 238], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "T6", letter: "l", name: "the Thaw", slopeRock: [104, 102, 96], ground: [150, 156, 118], groundAlt: [226, 232, 236], layers: { moss: 0.5, sand: 0.3, grass: 0.2 } },
 	{ id: "T7", letter: "n", name: "the Mammoth Steppe", slopeRock: [120, 110, 92], ground: [166, 148, 100], groundAlt: [150, 136, 96], layers: { grass: 0.7, soil: 0.3 } },
-	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [92, 132, 62], groundAlt: [118, 146, 72], layers: { grass: 0.85, soil: 0.15 } },
-	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [92, 130, 62], groundAlt: [116, 142, 70], layers: { grass: 0.8, soil: 0.2 } },
-	{ id: "yards", letter: "Y", name: "Hearthmoot's yards", ground: [90, 126, 62], groundAlt: [110, 136, 68], layers: { grass: 0.85, soil: 0.15 } },
+	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [92, 132, 62], groundAlt: [106, 140, 67], layers: { grass: 0.93, soil: 0.07 } },
+	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [92, 130, 62], groundAlt: [104, 137, 65], layers: { grass: 0.9, soil: 0.1 } },
+	{ id: "yards", letter: "Y", name: "Hearthmoot's yards", ground: [90, 126, 62], groundAlt: [101, 132, 65], layers: { grass: 0.93, soil: 0.07 } },
 	{ id: "seabed", letter: "~", name: "the sea floor", ground: [176, 164, 124], groundAlt: [150, 144, 112], layers: { sand: 0.9, stones: 0.1 } },
 	{ id: "deep", letter: "D", name: "the deep sea floor", ground: [34, 46, 56], groundAlt: [30, 40, 50], layers: { sand: 0.6, stones: 0.4 } },
 ];

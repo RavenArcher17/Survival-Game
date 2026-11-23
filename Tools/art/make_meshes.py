@@ -35,6 +35,11 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
   SM_IceFace_A..D         a glacier's face 12 m across, up to 10 m tall: fluted top to bottom, stepped where its layers
                           end, its top rounding over (some with a cornice), its sides and top sunk back into the slope so
                           overlapping faces join (the Tundra's steep ice: ice_cliff).
+  The town (round 8, drawn as blocks: each fits a 100 cm box like the engine shapes): SM_Awning_A (a stall's canvas
+                          sagging between its posts, a scalloped valance), SM_Haystack_A (a beehive of hay),
+                          SM_Rowboat_A (a clinker rowboat, thwarts and keel).
+  The fields (round 8): SM_WheatClump_A..B (~50 stalks with ears, 0.9 m across, a metre tall), SM_BarleyClump_A..B
+                          (nodding bearded ears), SM_Cabbage_A..B (a head in a rosette of cupped leaves).
   The coast (round 7): SM_Pebbles_A..C (a patch of sea-worn pebbles 3.4 m across), SM_Driftwood_A..C (drift logs 4.6,
                           3.3, 2.5 m: grooved along the grain, root plates or snapped ends, branch stubs), SM_Wrack_A..C
                           (the tide's strand line of weed 5.4 m long, kelp straps lying out of it).
@@ -1422,6 +1427,190 @@ def ice_face(name, seed):
     save(raw.mesh(), name, nanite=True)
 
 
+def _frame(d):
+    """Two unit vectors square to d and to each other (an ellipsoid's or a strap's axes about a stalk)."""
+    u = v_norm(v_cross(d, (0.0, 0.0, 1.0) if abs(d[2]) < 0.95 else (1.0, 0.0, 0.0)))
+    return u, v_cross(d, u)
+
+
+def crop(name, seed, kind):
+    """A clump of a field's crop (round 8, the meadow's fields: each crop was eight to twelve 1 cm boxes with a box for an
+    ear, a field of sticks). wheat: ~50 stalks about a metre tall in a clump 0.9 m across, leaning out a little, each with
+    its ear (a slim head) and a leaf or two low down; barley: shorter, its ears nodding over with long awns; cabbage: a
+    head in a rosette of cupped outer leaves 45 cm across. Origin on the ground at the middle; Nanite."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    if kind in ("wheat", "barley"):
+        wheat = kind == "wheat"
+        n = 52 if wheat else 46
+        for k in range(n):
+            r = 44.0 * rnd.random() ** 0.6
+            a = rnd.uniform(0, 2 * math.pi)
+            x, y = math.cos(a) * r, math.sin(a) * r
+            h = rnd.uniform(84.0, 108.0) if wheat else rnd.uniform(68.0, 88.0)
+            lean = math.radians(rnd.uniform(1.0, 7.0) + r / 44.0 * 6.0)
+            la = a + rnd.uniform(-0.6, 0.6)
+            d = v_norm((math.cos(la) * math.sin(lean), math.sin(la) * math.sin(lean), math.cos(lean)))
+            base = (x, y, -3.0)
+            top = v_add(base, v_mul(d, h))
+            mid = v_add(v_add(base, v_mul(d, h * 0.5)), (rnd.uniform(-1.5, 1.5), rnd.uniform(-1.5, 1.5), 0.0))
+            tube(raw, spline([base, mid, top], 5), lambda t: (0.34 * (1.0 - 0.35 * t), 0.34 * (1.0 - 0.35 * t)), na=4, caps=False)
+            if wheat:
+                u, v = _frame(d)
+                ellipsoid(raw, v_add(top, v_mul(d, 4.2)), (0.75, 0.55, 4.6), (u, v, d), nu=5, nv=6)
+            else:
+                # the ear nods over: hangs out and down from the top of the stalk, its awns trailing past it
+                nod = v_norm(v_add(v_mul((math.cos(la), math.sin(la), 0.0), 1.0), (0.0, 0.0, rnd.uniform(-0.9, -0.3))))
+                u, v = _frame(nod)
+                c = v_add(top, v_mul(nod, 3.6))
+                ellipsoid(raw, c, (0.6, 0.5, 3.8), (u, v, nod), nu=5, nv=6)
+                for w in range(5):
+                    off = v_add(v_mul(u, rnd.uniform(-0.5, 0.5)), v_mul(v, rnd.uniform(-0.5, 0.5)))
+                    p0 = v_add(c, off)
+                    p1 = v_add(p0, v_mul(v_norm(v_add(nod, (rnd.uniform(-0.15, 0.15), rnd.uniform(-0.15, 0.15), -0.1))), rnd.uniform(7.0, 10.0)))
+                    tube(raw, [p0, p1], lambda t: (0.09, 0.09), na=3, caps=False)
+            for _ in range(rnd.randint(1, 2)):
+                # a leaf: a strap from low on the stalk arching out and down
+                z0 = rnd.uniform(0.15, 0.4) * h
+                p0 = v_add(base, v_mul(d, z0))
+                out = (math.cos(la + rnd.uniform(-1.2, 1.2)), math.sin(la + rnd.uniform(-1.2, 1.2)), 0.0)
+                ln = rnd.uniform(16.0, 26.0)
+                pts = [p0, v_add(p0, v_add(v_mul(out, ln * 0.45), (0.0, 0.0, ln * 0.35))), v_add(p0, v_add(v_mul(out, ln), (0.0, 0.0, ln * 0.05)))]
+                tube(raw, spline(pts, 6), lambda t: (0.7 * (1.0 - 0.8 * t) + 0.08, 0.06), na=4, side=lambda p, T: (0.0, 0.0, 1.0), caps=False)
+    else:
+        # cabbage: a head, then two rings of cupped leaves opening out from under it
+        hr = rnd.uniform(8.5, 10.5)
+        ellipsoid(raw, (0.0, 0.0, hr * 0.85), (hr, hr * rnd.uniform(0.9, 1.0), hr * 0.85), nu=8, nv=12,
+                  disp=lambda p, sd=seed: 0.6 * fbm(p[0] / 4.0, p[1] / 4.0, p[2] / 4.0, sd, 2))
+        for ring, (cnt, rr, tilt, size) in enumerate(((6, 8.0, 58.0, 10.0), (8, 15.0, 22.0, 13.0))):
+            for k in range(cnt):
+                a = 2 * math.pi * (k + rnd.uniform(-0.2, 0.2) + ring * 0.5) / cnt
+                out = (math.cos(a), math.sin(a), 0.0)
+                t = math.radians(tilt + rnd.uniform(-8.0, 8.0))
+                n_up = v_norm((math.cos(a) * math.sin(t), math.sin(a) * math.sin(t), math.cos(t)))   # the leaf's face normal
+                along = v_norm(v_cross(n_up, (-math.sin(a), math.cos(a), 0.0)))                         # up the leaf, outward
+                side = v_cross(n_up, along)
+                sz = size * rnd.uniform(0.85, 1.15)
+                c = v_add(v_mul(out, rr), (0.0, 0.0, 7.0 - ring * 4.5))
+                ellipsoid(raw, c, (sz * 0.8, sz, 1.1), (side, v_mul(along, -1.0), n_up), nu=5, nv=10,
+                          disp=lambda p, sd=seed + k + 10 * ring: 0.5 * fbm(p[0] / 3.0, p[1] / 3.0, p[2] / 3.0, sd, 2))
+    save(raw.mesh(), name, True)
+
+
+def _closed_sheet(raw, top_pts, thick):
+    """A sheet given as rows of points (its top face), closed: a bottom face 'thick' under it and its edges joined."""
+    T = [[raw.pt(p) for p in row] for row in top_pts]
+    B = [[raw.pt((p[0], p[1], p[2] - thick)) for p in row] for row in top_pts]
+    raw.grid(T, lambda c: (0.0, 0.0, 1.0), wrap=False)
+    raw.grid(B, lambda c: (0.0, 0.0, -1.0), wrap=False)
+    raw.grid([T[0], B[0]], lambda c: (-1.0, 0.0, 0.0), wrap=False)
+    raw.grid([T[-1], B[-1]], lambda c: (1.0, 0.0, 0.0), wrap=False)
+    raw.grid([[r[0] for r in T], [r[0] for r in B]], lambda c: (0.0, -1.0, 0.0), wrap=False)
+    raw.grid([[r[-1] for r in T], [r[-1] for r in B]], lambda c: (0.0, 1.0, 0.0), wrap=False)
+
+
+def awning(name, seed):
+    """A market stall's canvas (round 8: it was a flat slab with a strip for a valance): the canvas sagging between its
+    four posts and along its edges, rumpled a little, the front valance hanging from it with a scalloped hem. Fits a 100
+    cm box (as the engine cube: the town's blocks scale it), centred: X across the stall, Y front (+) to back, the
+    canvas at the top, the valance hanging to the bottom."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    NX, NY = 41, 25
+    rows = []
+    for j in range(NY):
+        y = -50.0 + 100.0 * j / (NY - 1)
+        row = []
+        for i in range(NX):
+            x = -50.0 + 100.0 * i / (NX - 1)
+            sag = 9.0 * math.sin(math.pi * (x + 50.0) / 100.0) * (0.55 + 0.45 * math.sin(math.pi * (y + 50.0) / 100.0))
+            row.append((x, y, 50.0 - sag + 1.2 * fbm(x / 14.0, y / 14.0, 0.3, seed, 2)))
+        rows.append(row)
+    _closed_sheet(raw, rows, 1.0)
+    # the valance: a strip down from the front edge, its hem in scallops
+    V = []
+    for k in range(9):
+        t = k / 8.0
+        row = []
+        for i in range(NX):
+            x = -50.0 + 100.0 * i / (NX - 1)
+            top = 50.0 - 9.0 * math.sin(math.pi * (x + 50.0) / 100.0)
+            hem = -50.0 + 14.0 * (1.0 - abs(math.sin(math.pi * (x + 50.0) / 100.0 * 7.0)))
+            row.append((x, 50.0 + 0.6 * math.sin(t * math.pi), top - (top - hem) * t))
+        V.append(row)
+    Vf = [[raw.pt(p) for p in row] for row in V]
+    Vb = [[raw.pt((p[0], p[1] - 0.8, p[2])) for p in row] for row in V]
+    raw.grid(Vf, lambda c: (0.0, 1.0, 0.0), wrap=False)
+    raw.grid(Vb, lambda c: (0.0, -1.0, 0.0), wrap=False)
+    raw.grid([Vf[-1], Vb[-1]], lambda c: (0.0, 0.0, -1.0), wrap=False)
+    save(raw.mesh(), name)
+
+
+def haystack(name, seed):
+    """A haystack (round 8: they were yellow cylinders): a beehive of hay, its flanks bulging and ragged with loose straw,
+    a rounded crown drawn up to a point, its foot spread. Fits a 100 cm box, centred, like the engine shapes."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    NV, NU = 30, 40
+    rings = []
+    for i in range(NV + 1):
+        t = i / NV
+        z = -50.0 + 100.0 * t
+        r = 50.0 * (1.0 - t ** 2.4) ** 0.55 * (1.0 + 0.08 * (1.0 - smooth(0.0, 0.12, t)))
+        ring = []
+        for j in range(NU):
+            a = 2 * math.pi * j / NU
+            rr = r * (1.0 + 0.05 * fbm(math.cos(a) * 2.0, math.sin(a) * 2.0, t * 3.0, seed, 3)) + 1.6 * fbm(a * 6.0, t * 20.0, 0.5, seed + 1, 2)
+            ring.append(raw.pt((math.cos(a) * rr, math.sin(a) * rr, z)))
+        rings.append(ring)
+    raw.grid(rings, lambda c: (c[0], c[1], 0.3))
+    raw.fan(rings[0], (0.0, 0.0, -50.0), (0.0, 0.0, -1.0))
+    raw.fan(rings[-1], (0.0, 0.0, 50.0), (0.0, 0.0, 1.0))
+    save(raw.mesh(), name)
+
+
+def rowboat(name, seed):
+    """A rowboat moored at the jetty (round 8: it was three boxes): a clinker hull, its strakes lapped, sheer rising to a
+    pointed bow (+X) and a small transom at the stern, open, two thwarts across it and a keel. Fits a 100 cm box,
+    centred: X along the boat, Y across, Z from the keel (-50) to the bow's tip (+50)."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    NX, NA = 33, 17
+    outer, inner = [], []
+    for i in range(NX):
+        t = i / (NX - 1)                      # 0 stern .. 1 bow
+        x = -50.0 + 100.0 * t
+        beam = 50.0 * (math.sin(math.pi * min(1.0, 0.18 + t * 0.92)) ** 0.75) * (0.55 + 0.45 * smooth(0.0, 0.25, t))
+        depth = 62.0 * (0.75 + 0.25 * math.sin(math.pi * t))
+        sheer = 38.0 + 12.0 * smooth(0.65, 1.0, t) + 4.0 * (1.0 - smooth(0.0, 0.2, t))
+        ro, ri = [], []
+        for j in range(NA):
+            a = math.pi * j / (NA - 1)        # round the hull from port gunwale to starboard
+            sy, sz = -math.cos(a), math.sin(a)
+            step = 1.2 * (int(sz * 5.0) % 2)  # the strakes, each lapped over the one below
+            y = sy * (beam + step)
+            z = sheer - sz * depth * (0.9 if t > 0.03 else 0.7)
+            ro.append(raw.pt((x, y, z)))
+            ri.append(raw.pt((x, sy * max(0.0, beam - 2.6), z + 2.6 * sz)))
+        outer.append(ro)
+        inner.append(ri)
+    raw.grid(outer, lambda c: (0.0, c[1], -0.3), wrap=False)
+    raw.grid(inner, lambda c: (0.0, -c[1], 0.3), wrap=False)
+    raw.grid([[r[0] for r in outer], [r[0] for r in inner]], lambda c: (0.0, -1.0, 0.4), wrap=False)   # the gunwales
+    raw.grid([[r[-1] for r in outer], [r[-1] for r in inner]], lambda c: (0.0, 1.0, 0.4), wrap=False)
+    raw.grid([outer[0], inner[0]], lambda c: (-1.0, 0.0, 0.0), wrap=False)                            # the transom's edge
+    raw.fan(inner[0], (-50.0, 0.0, 10.0), (-1.0, 0.0, 0.0))
+    raw.fan(outer[-1], (50.0, 0.0, 30.0), (1.0, 0.0, 0.0))
+    mesh = raw.mesh()
+    # the thwarts just under the gunwales, as wide as the hull is there; the keel along its bottom
+    for tx in (-12.0, 18.0):
+        t = (tx + 50.0) / 100.0
+        beam = 50.0 * (math.sin(math.pi * min(1.0, 0.18 + t * 0.92)) ** 0.75) * (0.55 + 0.45 * smooth(0.0, 0.25, t))
+        GS.append_box(mesh, opts(), xf((tx, 0.0, 24.0)), 9.0, 2.0 * beam - 4.0, 3.0, 1, 1, 1, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    GS.append_box(mesh, opts(), xf((2.0, 0.0, -24.0)), 84.0, 4.0, 7.0, 1, 1, 1, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    save(mesh, name)
+
+
 def run(key, fn, *args):
     if want(key):
         try:
@@ -1486,3 +1675,10 @@ run("driftwood", driftwood, "SM_Driftwood_B", 1712, 330.0, False, 2)
 run("driftwood", driftwood, "SM_Driftwood_C", 1713, 250.0, False, 3)
 for i, n in enumerate("ABC"):
     run("wrack", wrack, "SM_Wrack_" + n, 1721 + i)
+run("townprops", awning, "SM_Awning_A", 1901)
+run("townprops", haystack, "SM_Haystack_A", 1902)
+run("townprops", rowboat, "SM_Rowboat_A", 1903)
+for i, n in enumerate("AB"):
+    run("crops", crop, "SM_WheatClump_" + n, 1801 + i, "wheat")
+    run("crops", crop, "SM_BarleyClump_" + n, 1811 + i, "barley")
+    run("crops", crop, "SM_Cabbage_" + n, 1821 + i, "cabbage")

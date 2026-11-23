@@ -33,8 +33,13 @@ namespace WRBuildLookDetail
 		static UStaticMesh* Cone = Rooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Cone.Cone"));
 		static UStaticMesh* Tent = Rooted<UStaticMesh>(TEXT("/Game/Art/Gen/SM_TentRidge_A.SM_TentRidge_A"));
 		static UStaticMesh* Sphere = Rooted<UStaticMesh>(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		static UStaticMesh* Awning = Rooted<UStaticMesh>(TEXT("/Game/Art/Gen/SM_Awning_A.SM_Awning_A"));
+		static UStaticMesh* Haystack = Rooted<UStaticMesh>(TEXT("/Game/Art/Gen/SM_Haystack_A.SM_Haystack_A"));
+		static UStaticMesh* Rowboat = Rooted<UStaticMesh>(TEXT("/Game/Art/Gen/SM_Rowboat_A.SM_Rowboat_A"));
+		// (each falls back to the shape it stood in for: a cube, a cylinder)
 		return Mesh == EWRLookMesh::Cylinder ? Cylinder : Mesh == EWRLookMesh::Cone ? Cone : Mesh == EWRLookMesh::Tent && Tent ? Tent
-			: Mesh == EWRLookMesh::Sphere ? Sphere : Cube;
+			: Mesh == EWRLookMesh::Sphere ? Sphere : Mesh == EWRLookMesh::Awning && Awning ? Awning
+			: Mesh == EWRLookMesh::Haystack ? (Haystack ? Haystack : Cylinder) : Mesh == EWRLookMesh::Rowboat && Rowboat ? Rowboat : Cube;
 	}
 
 	/** The scanned boards (WoodMaterialPack2, a pack the project doesn't require: when it's on this machine) handed to

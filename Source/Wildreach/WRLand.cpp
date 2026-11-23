@@ -1063,7 +1063,8 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 			if (S.Class != Cls) continue;
 			int32 Same = 0;
 			Same += HfSurfaceAt(I + 1, J) == Cls; Same += HfSurfaceAt(I - 1, J) == Cls; Same += HfSurfaceAt(I, J + 1) == Cls; Same += HfSurfaceAt(I, J - 1) == Cls;
-			FLinearColor SC = S.Color * (0.9f + 0.2f * (Noise(M / 6.f + FVector2D(4.f, 0.f)) * 0.5f + 0.5f));
+			// (round 8: a 6 m noise sampled every 4 m aliased into stripes across a surface: 23 m)
+			FLinearColor SC = S.Color * (0.9f + 0.2f * (Noise(M / 23.f + FVector2D(4.f, 0.f)) * 0.5f + 0.5f));
 			if (S.Speck.Num() && S.SpeckAmount > 0.f)
 			{
 				const float SN = Noise(M / S.SpeckScale + FVector2D(12.f, 3.f)) * 0.5f + 0.5f;
@@ -1106,11 +1107,11 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 	const float Rock = Smooth(SlopeFrom, SlopeTo, Slope);
 	if (LedgeColor.A > 0.f && SpineW > 0.f)
 	{
-		const float Ledge = SpineW * (1.f - Rock) * Smooth(8.f, SlopeFrom, Slope) * Smooth(-0.3f, 0.3f, Noise(M / 5.f + FVector2D(6.f, 6.f)));
+		const float Ledge = SpineW * (1.f - Rock) * Smooth(8.f, SlopeFrom, Slope) * Smooth(-0.3f, 0.3f, Noise(M / 15.f + FVector2D(6.f, 6.f)));
 		C = FMath::Lerp(C, LedgeColor, Ledge * 0.8f);
 	}
 	const bool bIceFace = SlopeIce.A > 0.f && SlopeIceClasses.Contains(Cls);
-	C = FMath::Lerp(C, (bIceFace ? SlopeIce : SlopeHere) * (0.85f + 0.3f * (Noise(M / 7.f) * 0.5f + 0.5f)), Rock);
+	C = FMath::Lerp(C, (bIceFace ? SlopeIce : SlopeHere) * (0.85f + 0.3f * (Noise(M / 19.f) * 0.5f + 0.5f)), Rock);
 	OutRough = FMath::Lerp(OutRough, 0.86f, Rock);
 	return C;
 }
@@ -1161,7 +1162,7 @@ void FWRLandDef::HfLayers(int32 I, int32 J, float Out[6]) const
 	else Out[0] = 1.f;
 	// Patches: within a zone the litter and the moss trade places by noise (a mossy hollow, a drift of leaves), so no
 	// stretch of floor is one even mix (Electric Dreams' clustering, never uniform cover).
-	const float Patch = Noise(M / 17.f + FVector2D(3.7f, 9.1f)) * 0.6f + Noise(M / 6.f + FVector2D(11.f, 2.f)) * 0.25f;
+	const float Patch = Noise(M / 17.f + FVector2D(3.7f, 9.1f)) * 0.6f + Noise(M / 13.f + FVector2D(11.f, 2.f)) * 0.25f;
 	const float Shift = FMath::Clamp(Patch, -0.5f, 0.5f) * FMath::Min(Out[0], Out[1]) * 1.6f;
 	Out[0] = FMath::Max(0.f, Out[0] - Shift);
 	Out[1] = FMath::Max(0.f, Out[1] + Shift);

@@ -94,6 +94,14 @@ void AWRRoundIsland::BeginPlay()
 		BladeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 		DiscMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 		BladeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"));
+		for (const TCHAR* Crop : { TEXT("SM_WheatClump_A"), TEXT("SM_WheatClump_B"), TEXT("SM_BarleyClump_A"), TEXT("SM_BarleyClump_B"), TEXT("SM_Cabbage_A"), TEXT("SM_Cabbage_B") })
+		{
+			if (UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/Gen/%s.%s"), Crop, Crop)))
+			{
+				CropMeshes.Add(M);
+			}
+		}
+		if (CropMeshes.Num() != 6) CropMeshes.Reset();
 		// Real grass (11-22: the cube blades read as green matchsticks): the MW pack's four clumps, each grass its own tint.
 		static const TCHAR* Clumps[4] = { TEXT("A"), TEXT("B"), TEXT("C"), TEXT("D") };
 		for (const TCHAR* C : Clumps)
@@ -187,7 +195,7 @@ void AWRRoundIsland::BuildCity()
 		{
 			const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray();
 			FWRLookBlock B;
-			B.Mesh = static_cast<EWRLookMesh>(FMath::Clamp(int32(At(R, 0)), 0, 4));   // cube, cylinder, cone, tent, sphere
+			B.Mesh = static_cast<EWRLookMesh>(FMath::Clamp(int32(At(R, 0)), 0, 7));   // cube, cylinder, cone, tent, sphere, awning, haystack, rowboat
 			B.Mat = static_cast<EWRLookMat>(FMath::Clamp(int32(At(R, 1)), 0, 4));
 			B.Centre = FVector(At(R, 2), At(R, 3), At(R, 4));
 			B.Size = FVector(At(R, 5), At(R, 6), At(R, 7)).ComponentMax(FVector(1.f));
@@ -610,6 +618,9 @@ void AWRRoundIsland::StepCover()
 		FRandomStream Rng(HashCombine(GetTypeHash(C.X * 92821), GetTypeHash(C.Y * 68917)));
 		TArray<FTransform> Xf, Xd;
 		TArray<FLinearColor> Col, ColD;
+		// The crops' clumps by mesh (CropMeshes' index) and their colours.
+		TMap<int32, TArray<FTransform>> CropXf;
+		TMap<int32, TArray<FLinearColor>> CropCol;
 		// Real grass clumps by grass (0 meadow, 1-4 the wild grasses as Wild + 1) and clump mesh.
 		TMap<int32, TArray<FTransform>> Clump;
 		const bool bClumps = GrassMeshes.Num() == 4 && GrassMats.Num() == 5;
@@ -686,6 +697,26 @@ void AWRRoundIsland::StepCover()
 			if (n >= PerCell && !bCrop) continue;
 			if (!bCrop && Surf != 0) continue;
 			const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
+			if (bCrop && CropMeshes.Num() == 6)
+			{
+				// (round 8) A clump of the crop itself: wheat (~50 stalks with ears, 0.9 m across), barley nodding, a
+				// cabbage, every other try (a clump covers what eight blades didn't); fallow is the meadow's grass grown
+				// rough and long. Golden wheat, straw-green barley, blue-green cabbages, each a shade of its own.
+				const bool bWheat = Surf <= 15, bBarley = Surf == 16 || Surf == 17, bGreens = Surf == 18;
+				if (!bWheat && !bBarley && !bGreens)
+				{
+					if (bClumps && (n & 1)) AddClumps(0, Root, FVector2D(0.85f, 1.35f), 60.f);
+					continue;
+				}
+				if (n & 1) continue;
+				const int32 Mi = (bWheat ? 0 : bBarley ? 2 : 4) + Rng.RandHelper(2);
+				const float Sc = bGreens ? Rng.FRandRange(0.8f, 1.15f) : Rng.FRandRange(0.9f, 1.25f);
+				// (ripe: the thin stalks read dark brown in their own shade at 0.44, 0.31, 0.09)
+				const FLinearColor Base = bWheat ? FLinearColor(0.66f, 0.47f, 0.15f) : bBarley ? FLinearColor(0.50f, 0.47f, 0.22f) : FLinearColor(0.10f, 0.19f, 0.09f);
+				CropXf.FindOrAdd(Mi).Emplace(FRotator(Rng.FRandRange(-3.f, 3.f), Rng.FRand() * 360.f, Rng.FRandRange(-3.f, 3.f)), Root, FVector(Sc, Sc, Sc * Rng.FRandRange(0.9f, 1.1f)));
+				CropCol.FindOrAdd(Mi).Add(Base * Rng.FRandRange(0.82f, 1.15f));
+				continue;
+			}
 			if (bCrop)
 			{
 				// A crop tuft: wheat and barley tall and gold with their ears, greens low and leafy, fallow rough grass.
@@ -787,6 +818,28 @@ void AWRRoundIsland::StepCover()
 			{
 				const float Data[10] = { 0.5f, 2.f, 1.f, ColD[i].R, ColD[i].G, ColD[i].B, 0.f, 0.8f, 0.f, 3.f };
 				P->SetCustomData(i, Data, i == Xd.Num() - 1);
+			}
+			Parts.Add(P);
+		}
+		for (const TPair<int32, TArray<FTransform>>& G : CropXf)
+		{
+			UInstancedStaticMeshComponent* P = NewObject<UInstancedStaticMeshComponent>(this);
+			P->SetStaticMesh(CropMeshes[G.Key]);
+			P->SetMaterial(0, BladeMat);
+			P->SetupAttachment(RootComponent);
+			P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			P->SetCanEverAffectNavigation(false);
+			P->SetCastShadow(true);
+			P->SetCullDistances(0, int32((Range + Cell) * 100.f));
+			P->SetNumCustomDataFloats(10);
+			P->RegisterComponent();
+			P->AddInstances(G.Value, false, false, false);
+			const TArray<FLinearColor>& Cc = CropCol.FindChecked(G.Key);
+			for (int32 i = 0; i < G.Value.Num(); ++i)
+			{
+				// M_BuildTinted: shade, grain axis (up), brightness, colour, metallic, roughness, glow, pattern (smooth).
+				const float Data[10] = { 0.5f, 2.f, 1.f, Cc[i].R, Cc[i].G, Cc[i].B, 0.f, 0.85f, 0.f, 3.f };
+				P->SetCustomData(i, Data, i == G.Value.Num() - 1);
 			}
 			Parts.Add(P);
 		}

@@ -61,6 +61,9 @@ private:
 	 *  the steppe, the cinder grass, the thaw's sedge, the kipuka (tinted each). Empty without the pack: cube blades. */
 	UPROPERTY() TArray<TObjectPtr<UStaticMesh>> GrassMeshes;
 	UPROPERTY() TArray<TObjectPtr<class UMaterialInstanceDynamic>> GrassMats;
+	/** The fields' crops (round 8; Tools/art/make_meshes.py crop()): wheat clumps, barley clumps, cabbages, two of each,
+	 *  in the tinted material. Empty if they're missing: the old blades. */
+	UPROPERTY() TArray<TObjectPtr<UStaticMesh>> CropMeshes;
 	TMap<FIntPoint, TArray<TObjectPtr<UInstancedStaticMeshComponent>>> CoverCells;
 
 	/** Machines that draw: the city's lights with the clock. The night blocks (lit windows, lantern glass) show after
