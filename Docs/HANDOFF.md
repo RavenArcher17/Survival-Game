@@ -1006,8 +1006,12 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   body's head bone, unbound and rigid, moved from the template's crown (hero.groomTemplate, SKM_Face's bounds) to the
   face's crown and widened to its width; eyelashes (made in another space) are hidden. hero.groomFit 0 = the old
   binding. Rebuilding the bindings with MH_Groom_Head as source threw the hair 20 cm up (the vertices don't match).
-  The eyelashes alone are made round MH_Groom_Head (eyes at z 149.3, not SKM_Face's 160.4): fitted by the eyes
-  (hero.lashTemplate to the face's FACIAL_L/R_Eye). Far ground (WRLand BuildLodChunk): a far vertex over any bed (class
+  Not only the lashes: every woman's hairstyle and some brows and lashes are made round MH_Groom_Head (eyes at z 149.3,
+  not SKM_Face's 160.4): a groom whose own top is under its slot's split (hair 167, moustache 151, others 156.5 cm) is
+  raised hero.groomLowShift first; the eyelashes then fit by the eyes (hero.lashTemplate, SKM_Face's eyes).
+- **The Survivor Wraps** (round 11): all trim on M_WR_Garment (TrimColor is their colour); the look's materials map
+  gives each part its own (Tools/art/make_wraps_look.py). Their kilt was wound inside out; Tools/art/fix_wraps_kilt.py
+  reversed it (it checks first: running it again leaves it). The sword and shield wear M_PropMetal (metal found by colour). Far ground (WRLand BuildLodChunk): a far vertex over any bed (class
   1) takes the bed's lowest sample in its square, so narrow channels stay carved at 1/2-1/8 detail.
 - **NaN vertices**: `FMath::Pow(FMath::Sin(PI * t), e)` at t = 1 is NaN (sin(PI) is a hair below 0 in floats), and a NaN
   vertex gives the component NaN bounds (an ensure). Clamp the sine: `FMath::Pow(FMath::Max(0.f, FMath::Sin(...)), e)`.

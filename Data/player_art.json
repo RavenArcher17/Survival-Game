@@ -1814,6 +1814,8 @@
   "looks": {
     "wraps": {
       "tier": 0,
+      "_materials": "round 11: the wraps are all trim, drawn in the shared slots' dark trim colour (a flat sticker of a strap, a black kilt, brown tubes for shin wraps); each part its own stuff (Tools/art/make_wraps_look.py).",
+      "materials": {"Chest/Linen": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Strap.MI_Wraps_Strap", "Chest/Leather": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Strap.MI_Wraps_Strap", "Hands/Rope": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Rope.MI_Wraps_Rope", "Legs/Rope": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Rope.MI_Wraps_Rope", "Legs/Linen": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Kilt.MI_Wraps_Kilt", "Legs/Linen_Dark": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Shins.MI_Wraps_Shins", "Legs/Rawhide": "/Game/Wildreach/Characters/Hero/Outfits/Common/MI_Wraps_Sole.MI_Wraps_Sole"},
       "hidesHair": false,
       "meshes": {
         "M_Lean": {

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Your clothes and gear; women's hair (11-23)
+
+Raven: "Also fix the cloths and stuff on the player".
+- **The Survivor Wraps:** the starter outfit's pieces (Aaron's lab, refitted) are all trim on M_WR_Garment, so every part
+  drew in its shared slot's dark trim colour: the chest strap a flat dark-brown sticker, the shin wraps brown tubes. Each
+  part has its own stuff now (`Tools/art/make_wraps_look.py`; the wraps look's `materials`): a tanned leather strap
+  (the woman's band too), a weathered sailcloth kilt, pale linen shin wraps tiled so the wrapping shows, hemp belt and
+  bracers, dark rawhide sandal soles.
+- **The kilt the right way out:** it was black even in full sun. Every one of its triangles was wound inward (its
+  normals outward), so the camera saw the inside of its far side, in the body's shadow. Reversed on all six builds,
+  normals and bone weights kept (`Tools/art/fix_wraps_kilt.py`, run once): a grey-brown cloth kilt with its folds lit.
+- **Steel that reads as steel:** the sword and shield were one painted texture on a plain matte material, the blade a
+  glaring near-white. `M_PropMetal` finds the metal in the texture (grey and bright: metallic, smoother; warm wood and
+  leather as before); the sword and shield wear it (MI_Sword_Metal, MI_Shield_Metal).
+- **Women's hair:** the MetaHuman hairstyles come made round two heads, SKM_Face and MH_Groom_Head (the same head 11 cm
+  lower): every woman's hairstyle, some brows and lashes. The tenth round's fit took them all for the first, so the women's
+  hair sat 11 cm low: bald on top, the hair at the nape. Each groom's own top now tells its head (a split per slot), the
+  lower ones raised by `hero.groomLowShift` before the fit; the eyelashes fit by the eyes from SKM_Face's.
+- Round-island tests 0 failed; the city 16.7 ms a frame, inside the north-west fort 10.3 ms.
+
 ### Round island: the look pass, the tenth round's loose ends: eyelashes, the far stream, the cirque floor (11-23)
 
 Raven: "Fix it" (the three things the tenth round left).
