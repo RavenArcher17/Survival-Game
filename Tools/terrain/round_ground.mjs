@@ -1045,7 +1045,8 @@ const land = {
 		{ id: "crevasse", class: SURF.crevasse, color: [92, 148, 200], rough: 0.4, layers: { stones: 1 } },
 		{ id: "thaw_moss", class: SURF.thaw_moss, soft: 1, color: [104, 106, 72], rough: 0.9, layers: { moss: 0.6, grass: 0.2, soil: 0.2 } },
 		{ id: "shingle", class: SURF.shingle, color: [120, 124, 126], rough: 0.85, layers: { stones: 1 } },
-		{ id: "ice", class: SURF.ice, soft: 1, color: [128, 174, 208], rough: 0.4, layers: { stones: 0.4, sand: 0.6 } },
+		// (round 11: its stones showed through the blue in dark blotches across Skaldrith's cirque floor) smooth blue ice
+		{ id: "ice", class: SURF.ice, soft: 1, color: [140, 184, 216], rough: 0.3, layers: { sand: 1 } },
 		{ id: "steppe", class: SURF.steppe, soft: 1, color: [168, 148, 96], rough: 0.92, layers: { grass: 0.75, soil: 0.25 } },
 		{ id: "ash_pale", class: SURF.ash_pale, soft: 1, color: [118, 118, 122], rough: 0.95, layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
 		{ id: "charcoal", class: SURF.charcoal, color: [78, 74, 72], rough: 0.95, layers: { soil: 0.6, litter: 0.4 } },

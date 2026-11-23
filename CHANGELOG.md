@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Round island: the look pass, the tenth round's loose ends: eyelashes, the far stream, the cirque floor (11-23)
+
+Raven: "Fix it" (the three things the tenth round left).
+- **Eyelashes back:** they are made round another head than the rest of the hair (MH_Groom_Head, its eyes 11 cm lower),
+  so the crown fit put them in the cheeks and they were hidden. Now fitted by the eyes: from that head's eyes
+  (`hero.lashTemplate`) to each face's FACIAL_L/R_Eye, scaled by their spacing (measured: centred between the eyes, at the
+  lids). Fine strands: they show close up.
+- **The stream's far banks:** far ground takes one sample in two (four, eight); a channel two samples wide was caught by
+  one vertex and missed by the next, its banks notched along it seen from afar. A far vertex whose square holds any river
+  or stream bed now takes that bed's lowest point (WRLand BuildLodChunk): the channel runs on unbroken to the horizon.
+- **The cirque floor:** its ice was 40% stones under the blue, and the pebbles showed through in dark blotches; smooth
+  paler blue ice now (the arena's floor at eye level a clean sheet; a few faint patches from above).
+- Round-island tests 0 failed; the city 15.7 ms a frame, inside the north-west fort 9.9 ms.
+
 ### Round island: the look pass, tenth round: hair on everyone, the lava, ground seen from afar (11-23)
 
 From round 10's open hair and a fresh survey of the coast, the Volcanic and the Tundra (96 pictures, Raven: "Keep
@@ -11,7 +25,7 @@ going").
   point of our faces, reduced meshes whose crowns stand ~11 cm higher and ~10% wider than the template head the grooms
   were made on (the women's 1-2 cm). Each groom now rides the head bone, unbound, moved from the template's crown to the
   face's and widened to it (WRCharacter; `hero.groomTemplate`, `hero.groomFit` 0 puts the binding back). Beards on
-  chins, hair on heads. The eyelashes (made in another space) are hidden.
+  chins, hair on heads.
 - **The lava crusts over:** it was molten all across, a strip of orange paint. Now a molten streak down its middle
   cooling to dark crust toward its banks, with rafts of crust drifting in it (`roundIsland.lavaCrust`, `lavaRafts`).
   Its ground is the dark crust it cooled to (it was flat salmon orange, a painted pad at its head and on the beach).
@@ -24,7 +38,7 @@ going").
   there (dark rock smudges ran down Skaldrith's cirque); no polished streaks down its walls.
 - Round-island tests 0 failed; the city 16.5 ms a frame, inside the north-west fort 10.3 ms (last round 18.0 and 10.6:
   unbound hair costs less).
-- Open: the stream's far banks still step a little (every second sample far off).
+- Open (then): the stream's far banks, the cirque floor's blotches, the eyelashes hidden (all three fixed next).
 
 ### Round island: the look pass, ninth round: the lake, the edges between grounds, shoes and the inn's bar (11-23)
 

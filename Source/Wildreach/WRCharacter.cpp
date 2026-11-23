@@ -636,9 +636,12 @@ void AWRCharacter::LoadBodyArt()
 	// onto the nearest point of the face, and our heroes' heads stand ~11 cm higher and ~10% wider than the template's:
 	// the beard landed on the throat and the hair on the nape. So, rigid (a plain face's jaw doesn't move anyway): from
 	// the template's crown (hero.groomTemplate: SKM_Face's bounds "x,y,z,ex,ey,ez", cm) to this face's crown, widened to
-	// its width, carried by the head. Eyelashes are made in another space: hidden. hero.groomFit 0: bound as before.
+	// its width, carried by the head. The eyelashes are made round another head (MH_Groom_Head, its eyes 11 cm lower):
+	// fitted by the eyes instead, from that head's eyes (hero.lashTemplate "x,y,z,spacing" cm) to this face's, scaled by
+	// their spacing. hero.groomFit 0: bound as before.
 	const bool bFit = FaceAsset && WRTune(TEXT("hero.groomFit"), 1.f) > 0.f;
-	FTransform GroomRel = FTransform::Identity;
+	FTransform GroomRel = FTransform::Identity, LashRel = FTransform::Identity;
+	bool bLashFit = false;
 	if (bFit)
 	{
 		TArray<FString> TP;
@@ -653,6 +656,25 @@ void AWRCharacter::LoadBodyArt()
 		FTransform HeadRest = FTransform::Identity;
 		for (int32 I = Ref.FindBoneIndex(TEXT("head")); I != INDEX_NONE; I = Ref.GetParentIndex(I)) HeadRest = HeadRest * Ref.GetRefBonePose()[I];
 		GroomRel = Fit * HeadRest.Inverse();
+		const auto RefPos = [&Ref](const TCHAR* Bone, FVector& Out)
+		{
+			int32 I = Ref.FindBoneIndex(FName(Bone));
+			if (I == INDEX_NONE) return false;
+			FTransform X = FTransform::Identity;
+			for (; I != INDEX_NONE; I = Ref.GetParentIndex(I)) X = X * Ref.GetRefBonePose()[I];
+			Out = X.GetLocation();
+			return true;
+		};
+		FVector EyeL, EyeR;
+		TArray<FString> LP;
+		FWRTuning::Get().Str(TEXT("hero.lashTemplate"), TEXT("0,8.26,149.28,6.03")).ParseIntoArray(LP, TEXT(","));
+		if (LP.Num() >= 4 && RefPos(TEXT("FACIAL_L_Eye"), EyeL) && RefPos(TEXT("FACIAL_R_Eye"), EyeR))
+		{
+			const FVector LashFrom(FCString::Atof(*LP[0]), FCString::Atof(*LP[1]), FCString::Atof(*LP[2]));
+			const float Spread = FVector::Dist(EyeL, EyeR) / FMath::Max(FCString::Atof(*LP[3]), 1.f);
+			LashRel = FTransform(-LashFrom) * FTransform(FQuat::Identity, FVector::ZeroVector, FVector(Spread)) * FTransform((EyeL + EyeR) * 0.5f) * HeadRest.Inverse();
+			bLashFit = true;
+		}
 	}
 	for (UGroomComponent* Groom : Grooms)
 	{
@@ -668,7 +690,7 @@ void AWRCharacter::LoadBodyArt()
 		if (bFit)
 		{
 			Groom->AttachToComponent(Body, FAttachmentTransformRules::KeepRelativeTransform, TEXT("head"));
-			Groom->SetRelativeTransform(GroomRel);
+			Groom->SetRelativeTransform(Groom->GetFName() == TEXT("Eyelashes") ? LashRel : GroomRel);
 		}
 		else if (Groom->GetAttachParent() != Face)
 		{
@@ -677,7 +699,7 @@ void AWRCharacter::LoadBodyArt()
 		Groom->SetUseCards(true);
 		Groom->SetGroomAsset(GroomAsset, bFit ? nullptr : Binding, false);
 		Groom->SetEnableSimulation(false);
-		Groom->SetVisibility(GroomAsset != nullptr && !(bFit && Groom->GetFName() == TEXT("Eyelashes")));
+		Groom->SetVisibility(GroomAsset != nullptr && !(bFit && !bLashFit && Groom->GetFName() == TEXT("Eyelashes")));   // (no eyes to fit lashes to: none)
 		// The hair cards in the Wildreach hair material (path motion: Lightning's lift, Wind's stir; hero.md 2.6).
 		Groom->EmptyOverrideMaterials();
 		FString CardsPath, CardsSlot = TEXT("MI_Hair_Cards");

@@ -2078,7 +2078,19 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 	const auto AddVert = [&](FSection& S, int32 SI, int32 SJ, float DropM)
 	{
 		const FVector2D M = D.HfOrigin + FVector2D(float(SI), float(SJ)) * D.HfStep;
-		const float Z = D.HfSample(SI, SJ) - DropM;
+		// (round 11) A far vertex whose square holds any river or stream bed takes that bed's lowest point: picked one sample in
+		// Sx, a channel two samples wide was caught by one vertex and missed by the next, and its banks stepped in notches
+		// along it seen from afar.
+		float Ground = D.HfSample(SI, SJ);
+		if (Sx > 1 && bSurface)
+		{
+			const int32 H2 = Sx / 2;
+			for (int32 dj = -H2; dj <= H2; ++dj) for (int32 di = -H2; di <= H2; ++di)
+			{
+				if (D.HfSurfaceAt(SI + di, SJ + dj) == 1) Ground = FMath::Min(Ground, D.HfSample(SI + di, SJ + dj));
+			}
+		}
+		const float Z = Ground - DropM;
 		const float DX = D.HfSample(SI + Sx, SJ) - D.HfSample(SI - Sx, SJ);
 		const float DY = D.HfSample(SI, SJ + Sx) - D.HfSample(SI, SJ - Sx);
 		const FVector Nrm = FVector(-DX, -DY, 2.f * D.HfStep * Sx).GetSafeNormal();
