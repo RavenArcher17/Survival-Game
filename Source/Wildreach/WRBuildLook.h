@@ -34,6 +34,9 @@ struct FWRLookBlock
 	float Rough = 0.85f;
 	float Glow = 0.f;
 	float Pattern = 0.f;
+	/** A stone block tinted by Color (M_BuildStone custom data 3-5: the round island's forts in their own stone, round 9);
+	 *  every other stone block keeps the stone's own colour. */
+	bool bStoneTint = false;
 };
 
 /**

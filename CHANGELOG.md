@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Round island: the look pass, eighth round: the forts, the stream, the roads and the rooms (11-23)
+
+From a fresh survey of the forts, the lake, the stream, the main roads, the inn and a hall (31 pictures, Raven: "Keep
+going").
+- **Four forts, each its own:** they were one box fort four times (the same square of walls, cones on round towers, a
+  barracks box and a pole in an empty yard). Each keeps its square and the road through its two gates, and is built for
+  the lands its road runs to (`hearthmoot.mjs` fortAt): the Storm Peaks and Desert road's of warm sandstone with square
+  towers and a keep with a beacon on its roof; the Forest and Tundra road's of grey granite under timber hoardings and
+  shingle cones, with a log barracks, a stable and woodpiles; the Swamp and Ocean road's with low drum towers of pale
+  stone, a slender beacon tower lit at night, nets drying and a boat over on trestles; the Graveyard, Wasteland and
+  Volcanic road's of dark basalt, tall square towers with turrets on their corners, a smithy at its forge, spear racks and
+  a stake palisade. Every one: corbelled parapets and battered feet, gates 5.4 m high under a portcullis's teeth, the
+  fort's banners over the arch, barracks with doors, windows, chimneys and a bench, a stair you can climb to the wall
+  walk, a well, and the watch: two at each gate and one on the walls (five more guards a fort; the basalt fort's smith).
+- **Stone in its own colour:** a stone block with a colour is tinted stone now (`M_BuildStone` custom data 3-5,
+  `FWRLookBlock::bStoneTint`); only the round island's blocks ask, so every other stone keeps its own.
+- **The stream meanders:** it ran near straight from the lake to the sea between two bright lime stripes stepped along
+  it, a canal. Its line bends now either side of the old one (up to ~30 m, loops of a few hundred metres, points every
+  12 m: `round_island.mjs`), its muddy edge is one sample wide and the meadow's own grass runs down its banks; pebbles in
+  patches at its water's edge (`fire_frost_dressing.mjs`), reed stands and bulrushes along it (`hearthmoot.mjs`, their
+  own random stream). The pale lime band either side (and round the lake) was the moss WRLand grows on dry ground within
+  two samples of a bed or bank, stepped along the 4 m samples: a land sets its reach now (`dampMoss`, the round island one
+  sample and a little), and the bank surface is mud and trodden grass. The forts' yards are kept clear of the lands'
+  trees and scrub.
+- **The main roads narrower:** 12 m of gravel, twice a cart's width; their worn track is 7 m now, a grassy verge either
+  side (a new `verge` surface, thin grass growing on it; the road's bed, grade and the lands' roads unchanged).
+- **The rooms:** the inn's and the halls' roofs show their trusses inside (tie beams, king posts, rafters, purlins); their
+  walls are panelled to dado height; candles on the tables (lit after dusk); the halls have a runner down the floor, a
+  sideboard of plates, the quarter's shields on the walls; the inn hams and herbs hung from its beams, a hearthstone and
+  a rag rug before the fire, a cask on its cradle.
+- **Shirts that read as shirts:** the town's clothes were undyed linen, the colour of skin: a skin-tight shirt read as a
+  bare chest (the hall's steward, the innkeeper). Dyed wools now (`make_wool.py`: woad blue, oatmeal, madder russet, weld
+  green). On these cuts the coat slot is the shirt and its sleeves, the bodice the panel in its neck: the shirts and the
+  gown are dyed, an oatmeal undershirt in the neck.
+- Round-island tests 0 failed; the city 18.5 ms a frame, inside the north-west fort 10.5 ms (last round 15.0 and 9.0;
+  the city has measured 15-21.5 ms across rounds). A first run with another game on the card measured 79 ms at the fort.
+
 ### Round island: the look pass, seventh round: the meadow, the fields and the town's details (11-23)
 
 From a fresh survey of the city and the meadow (63 pictures, Raven: "Keep going with the next round").

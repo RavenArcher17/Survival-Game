@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
-import { fbm, coastR } from "./round_island.mjs";
+import { fbm, coastR, trunks } from "./round_island.mjs";
 import * as FF from "./fire_frost.mjs";
 import * as HP from "./hearthmoot_plan.mjs";
 
@@ -46,6 +46,7 @@ for (const id of ["volcanic", "tundra"]) {
 for (const k of ["places", "sites", "caves", "shrines"]) for (const o of FFL[k] || []) if (Array.isArray(o.at)) keep(o.at, k === "sites" ? 45 : 28);
 for (const o of FFL.kit || []) if (Array.isArray(o.at)) keep(o.at, 10);
 keep(FEAT.volcano, 150);   // Vulkarn's crater floor
+for (const t of trunks) keep(t.fort, 42);   // (round 9: the Tundra's spruces grew in the south-east fort's yard)
 for (const h of FFL.hidden || []) for (let i = 1; i < h.route.length; i++) { const [ax, ay] = h.route[i - 1], [bx, by] = h.route[i], L = Math.hypot(bx - ax, by - ay); for (let t = 0; t <= L; t += 10) keep([ax + (bx - ax) * t / L, ay + (by - ay) * t / L], 14); }
 const lava = LAND.lava.river;
 const CELL = 40, buckets = new Map();
@@ -347,6 +348,25 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 				const [x, y] = pick(1752 + t * 5), h = hAt(x, y);
 				if (h < SHOWN - 0.35 || h > SHOWN + 0.6 || NOT.has(surfAt(x, y)) || !coastOk(x, y)) continue;
 				add("shore_ice", x, y, h, rand(i, j, 1754 + t * 5) * 360, 0.5 + 0.7 * rand(i, j, 1755 + t * 5) ** 1.5);
+			}
+		}
+	}
+	// The stream's banks (round 9: it ran between bare grass banks, a canal): pebbles at its water's edge, in patches, laid
+	// along it. Its own salts.
+	{
+		const SR = LAND.lake.stream;
+		for (let q = 1; q < SR.length; q++) {
+			const [ax, ay, al] = SR[q - 1], [bx, by, bl] = SR[q], L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
+			const yaw = Math.atan2(uy, ux) * 180 / Math.PI;
+			for (let t = 0; t < L; t += 1.6) {
+				const u = t / L, cx = ax + (bx - ax) * u, cy = ay + (by - ay) * u, lvl = al + (bl - al) * u;
+				const ci = Math.round((cx - X0) / STEP), cj = Math.round((cy - Y0) / STEP), salt = (q * 97 + Math.round(t * 10)) % 100000;
+				for (const side of [-1, 1]) {
+					if (rand(ci, cj, 1801 + salt * 7 + side) > 0.42 * sm(-0.2, 0.3, fbm(cx / 60, cy / 60, 1807, 2))) continue;
+					const off = 3.0 + 1.6 * rand(ci, cj, 1803 + salt * 7 + side), x = cx - uy * side * off, y = cy + ux * side * off, h = hAt(x, y);
+					if (h < lvl - 0.5 || h > lvl + 0.35 || NOT.has(surfAt(x, y)) || !isClear(x, y, 1)) continue;
+					add("beach_pebbles", x, y, h, yaw + (rand(ci, cj, 1805 + salt * 7 + side) - 0.5) * 30, 0.55 + 0.4 * rand(ci, cj, 1806 + salt * 7 + side));
+				}
 			}
 		}
 	}

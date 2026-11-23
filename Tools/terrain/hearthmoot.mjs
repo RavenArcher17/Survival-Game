@@ -142,6 +142,20 @@ function openRoof(F, x0, x1, cy, halfD, z, roof, endThick) {
 	// (The roof's own pattern draws its courses: the darker strips laid on it went.)
 	block(F, CUBE, TINT, [cx, cy, z + halfD + 0.3], [len, 0.42, 0.42], { roll: 45, colour: darker(roof, 0.85), nosink: true });
 	for (const ex of [x0, x1]) block(F, CUBE, STONE, [ex, cy, z], [endThick - 0.06, halfD * Math.SQRT2, halfD * Math.SQRT2], { roll: 45, nosink: true });
+	// (round 9: indoors the roof was a bare slab) its trusses: a tie beam across the walls' tops, a king post up to the
+	// ridge, a rafter under each slab, and a purlin along each side and the ridge.
+	const bays = Math.max(2, Math.round((x1 - x0) / 3.6)), wood = darkWood;
+	for (let b = 1; b < bays; b++) {
+		const x = x0 + (x1 - x0) * b / bays;
+		block(F, CUBE, TINT, [x, cy, z - 0.18], [0.3, 2 * halfD, 0.36], { colour: wood, nosink: true });
+		block(F, CUBE, TINT, [x, cy, z + halfD / 2 - 0.2], [0.24, 0.24, halfD - 0.3], { colour: wood, nosink: true });
+		for (const sd of [-1, 1]) {
+			block(F, CUBE, TINT, [x, cy + sd * (halfD / 2 + 0.12), z + halfD / 2 - 0.12], [0.24, halfD * Math.SQRT2 - 0.3, 0.26], { roll: sd * 45, colour: wood, nosink: true });
+			block(F, CUBE, TINT, [x, cy + sd * halfD * 0.42, z + halfD * 0.22 - 0.05], [0.16, halfD * 0.62, 0.18], { roll: -sd * 30, colour: wood, nosink: true });
+		}
+	}
+	for (const sd of [-1, 1]) block(F, CUBE, TINT, [cx, cy + sd * (halfD * 0.5 + 0.12), z + halfD * 0.5 - 0.42], [x1 - x0 - 0.2, 0.22, 0.24], { roll: sd * 45, colour: wood, nosink: true });
+	block(F, CUBE, TINT, [cx, cy, z + halfD - 0.45], [x1 - x0 - 0.2, 0.24, 0.26], { colour: wood, nosink: true });
 }
 const floorWood = pal([90, 74, 58], 0, 0.9, 0, 1), cloth2 = pal([120, 36, 34], 0, 0.95, 0, 9);
 function table(F, x, y, len, wid, along = 0) {
@@ -454,6 +468,24 @@ const wellAt = ([x, y]) => {
 	block(F, CYL, TINT, [0.35, 0, 1.6], [0.03, 0.03, 1.0], { colour: pal([150, 128, 92], 0, 0.95), nosink: true });
 	block(F, CYL, WOOD, [0.35, 0, 1.0], [0.34, 0.34, 0.32], { colour: darkWood, nosink: true });
 };
+// Boards up a room's walls to dado height, a rail along their top (round 9: the rooms were bare walls to the floor):
+// along the frame's x at y (the wall's inner face, facing in = -sign(y)), from x0 to x1, gaps [{at, w}] for the doors.
+function wainscot(F, x0, x1, y, h, gaps = []) {
+	const inward = -Math.sign(y), pieces = [];
+	let a = x0;
+	for (const g of [...gaps].sort((p, q) => p.at - q.at)) { pieces.push([a, g.at - g.w / 2]); a = g.at + g.w / 2; }
+	pieces.push([a, x1]);
+	for (const [p, q] of pieces) {
+		if (q - p < 0.2) continue;
+		block(F, CUBE, TINT, [(p + q) / 2, y + inward * 0.04, h / 2], [q - p, 0.06, h], { colour: pal([74, 52, 34], 0, 0.85, 0, 1), nosink: true });
+		block(F, CUBE, TINT, [(p + q) / 2, y + inward * 0.08, h + 0.04], [q - p, 0.1, 0.1], { colour: beam, nosink: true });
+		block(F, CUBE, TINT, [(p + q) / 2, y + inward * 0.07, 0.08], [q - p, 0.08, 0.16], { colour: darkWood, nosink: true });
+	}
+}
+function wainscotX(F, y0, y1, x, h, gaps = []) {
+	const G = frame(...F.at(0, 0, 0).slice(0, 2), F.z, F.yaw + 90);
+	wainscot(G, y0, y1, -x, h, gaps);
+}
 // A quarter's hall you can walk into: one long room (22 x 14 m, walls 9 m) with a door and windows open to the street,
 // a timber floor, two long tables with benches, a fireplace on the back wall, a dais with the steward's chair, banners
 // in the path's colour, two hanging lamps; its bell tower at the end. Its steward stands at the dais.
@@ -478,6 +510,24 @@ function hallInside(F, look, roof, q) {
 	block(F, CUBE, CLOTH, [-3.9, HY + 1.6, 7.6], [2, 0.12, 4], { colour: banner });
 	// Inside: the long tables, the fireplace, the dais, banners, lamps.
 	for (const ty of [-3, 3]) table(F, 1, ty, 12, 1.3);
+	// (round 9) the walls panelled to 1.4 m, a runner down the floor between the tables, candles on them, a sideboard of
+	// plates by the dais, the path's shields hung along the walls
+	wainscot(F, X0 + T / 2, X1 - T / 2, HY - T / 2, 1.4, [{ at: X0 + 11, w: 2.6 }]);
+	wainscot(F, X0 + T / 2, X1 - T / 2, -HY + T / 2, 1.4, [{ at: 2, w: 4.4 }]);
+	wainscotX(F, -HY + T / 2, HY - T / 2, X0 + T / 2, 1.4);
+	block(F, CUBE, TINT, [1, 0, 0.215], [13, 2.2, 0.03], { colour: pal([150, 120, 70], 0, 0.97, 0, 9), nosink: true });
+	for (const ty of [-3, 3]) for (const tx of [-3.5, 1, 5.5]) {
+		block(F, CYL, TINT, [tx, ty, 1.05], [0.16, 0.16, 0.16], { colour: iron, nosink: true });
+		block(F, CYL, TINT, [tx, ty, 1.2], [0.07, 0.07, 0.22], { colour: pal([236, 226, 200], 0, 0.6, 0, 3), nosink: true });
+		block(F, CYL, TINT, [tx, ty, 1.35], [0.04, 0.04, 0.08], { colour: lanternGlow, nosink: true, night: true });
+	}
+	block(F, CUBE, TINT, [X1 - 4.6, HY - 1.0, 0.5], [2.6, 0.7, 1.0], { colour: darkWood, nosink: true, solid: true });
+	block(F, CUBE, TINT, [X1 - 4.6, HY - 1.0, 1.03], [2.7, 0.75, 0.06], { colour: beam, nosink: true });
+	for (let k = 0; k < 4; k++) block(F, CYL, TINT, [X1 - 5.6 + k * 0.65, HY - 0.75, 1.32], [0.5, 0.5, 0.03], { pitch: 75, colour: pal([150, 140, 124], 0.3, 0.45, 0, 3), nosink: true });
+	for (const sx of [-7.5, -1.5, 5.5]) for (const sd of [-1, 1]) {
+		block(F, CYL, TINT, [sx, sd * (HY - T / 2 - 0.06), 3.0], [0.9, 0.9, 0.08], { pitch: 90, yawAdd: 90, colour: banner, nosink: true });
+		block(F, CYL, TINT, [sx, sd * (HY - T / 2 - 0.1), 3.0], [0.22, 0.22, 0.06], { pitch: 90, yawAdd: 90, colour: iron, nosink: true });
+	}
 	// The fireplace: two jambs and a lintel round the firebox, a mantel shelf, the chimney breast above (11-22: one
 	// stone block with a glowing panel in it).
 	for (const jx of [-1.45, 1.45]) block(F, CUBE, STONE, [2 + jx, -HY + 0.9, 0.95], [1.3, 1.2, 1.9], { solid: true, nosink: true });
@@ -583,6 +633,27 @@ for (const q of quarters) {
 			// A patron at each table, on the side its stools leave free.
 			for (const [tx, ty, a] of [[-5.5, 2.6, 90], [-1, 3.0, 90], [3.4, 2.4, 90], [-6.5, -0.6, 330]]) { const px = tx + Math.cos(a * RAD) * 1.3, py = ty + Math.sin(a * RAD) * 1.3; stand(F, px, py, tx - px, ty - py, "townsfolk", person()); }
 			lampHang(F, -4, 0.5, 4.0, H + Y - 0.3); lampHang(F, 3, 0.5, 4.0, H + Y - 0.3);
+			// (round 9) the walls panelled to 1.2 m, a hearthstone apron, hams and bunches of herbs hung from the tie beams,
+			// a candle on each table, a cask on its cradle at the bar's end, a rag rug before the fire
+			wainscot(F, -X + T / 2, X - T / 2, Y - T / 2, 1.2, [{ at: -X + 6, w: 2.4 }]);
+			wainscot(F, -X + T / 2, X - T / 2, -Y + T / 2, 1.2);
+			wainscotX(F, -Y + T / 2, Y - T / 2, -X + T / 2, 1.2);
+			for (const [hx, hy] of [[-5.4, -1.2], [-5.4, -1.9], [-1.8, -1.0], [1.8, -0.6], [5.4, 0.8]]) {
+				const top = H - 0.36, ham = hx < -3 && hy > -1.5;
+				block(F, CUBE, TINT, [hx, hy, top - 0.45], [0.02, 0.02, 0.9], { colour: pal([150, 128, 92], 0, 0.95), nosink: true });
+				if (ham) block(F, SPH, TINT, [hx, hy, top - 1.15], [0.3, 0.24, 0.55], { colour: pal([84, 46, 30], 0, 0.7, 0, 0), nosink: true });
+				else for (let b = 0; b < 3; b++) block(F, CYL, TINT, [hx + (b - 1) * 0.1, hy, top - 1.05], [0.09, 0.09, 0.42], { roll: (b - 1) * 14, colour: pal([88, 84, 52], 0, 0.95, 0, 9), nosink: true });
+			}
+			for (const [tx, ty] of [[-5.5, 2.6], [-1, 3.0], [3.4, 2.4], [-6.5, -0.6]]) {
+				block(F, CYL, TINT, [tx + 0.15, ty - 0.2, 0.97], [0.07, 0.07, 0.16], { colour: pal([236, 226, 200], 0, 0.6, 0, 3), nosink: true });
+				block(F, CYL, TINT, [tx + 0.15, ty - 0.2, 1.08], [0.04, 0.04, 0.07], { colour: lanternGlow, nosink: true, night: true });
+			}
+			block(F, CUBE, STONE, [X - 2.7, 1.5, 0.21], [2.0, 3.4, 0.04], { nosink: true });
+			block(F, CUBE, TINT, [X - 4.6, 1.5, 0.212], [1.7, 2.5, 0.02], { colour: pal([52, 34, 28], 0, 0.97, 0, 9), nosink: true });
+			block(F, CUBE, TINT, [X - 4.6, 1.5, 0.222], [1.4, 2.2, 0.02], { colour: pal([92, 46, 36], 0, 0.97, 0, 9), nosink: true });
+			block(F, CUBE, TINT, [4.3, -2.9, 0.45], [0.9, 0.9, 0.12], { colour: darkWood, nosink: true });
+			block(F, CYL, WOOD, [4.3, -2.9, 0.95], [0.95, 0.95, 1.2], { pitch: 90, yawAdd: 90, colour: beam, nosink: true });
+			for (const hx of [-0.4, 0.4]) block(F, CYL, TINT, [4.3, -2.9 + hx, 0.95], [0.98, 0.98, 0.05], { pitch: 90, yawAdd: 90, colour: iron, nosink: true });
 			// Outside: the sign on its bracket, a lantern either side of the door, a bench.
 			block(F, CUBE, TINT, [-3, Y + 0.9, 4.7], [0.08, 1.6, 0.08], { colour: iron, nosink: true });
 			block(F, CUBE, TINT, [-3, Y + 1.4, 4.05], [0.06, 1.0, 0.8], { colour: darkWood, nosink: true });
@@ -919,6 +990,34 @@ for (const [x, y, n] of PLAN.reeds) {
 		block(F, CYL, TINT, [0, 0, h - 0.12], [0.07, 0.07, 0.24], { ...tilt, colour: reedHead, nosink: true });
 	}
 }
+// The stream's reeds (round 9: it ran between bare banks): clumps of reed grass at its water's edge, in stands with gaps
+// between, a bulrush now and then; on their own random stream (RD), so nothing else moves.
+{
+	const RD = PLAN.rng(20261125), SR = RI.stream;
+	let L = 0;
+	for (let q = 1; q < SR.length; q++) {
+		const [ax, ay] = SR[q - 1], [bx, by] = SR[q], len = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / len, uy = (by - ay) / len;
+		for (let t = 0; t < len; t += 2.2) {
+			const cx = ax + ux * t, cy = ay + uy * t, along = L + t;
+			if (along < 30) continue;   // (the outlet's own reeds are the lake's)
+			for (const side of [-1, 1]) {
+				const stand = Math.sin(along / 37 + side * 1.7) + 0.6 * Math.sin(along / 13 + side * 4.1);
+				if (stand < 0.55 || RD() < 0.35) continue;
+				const off = 3.1 + RD() * 1.4, px = cx - uy * side * off, py = cy + ux * side * off;
+				if (PLAN.roads.some((rd) => PLAN.lineDist([px, py], rd.pts).d < rd.half + 3)) continue;
+				const g = groundAt(px, py);
+				plants.push([3, Math.floor(RD() * 4), cm(px), cm(py), cm(g - 0.1), Math.round(RD() * 360), +(0.6 + RD() * 0.45).toFixed(2)]);
+				stalks++;
+				if (RD() < 0.18) {
+					const h = 1.4 + RD() * 0.7, F = frame(px + (RD() - 0.5), py + (RD() - 0.5), g, RD() * 360), tilt = { pitch: (RD() - 0.5) * 12, roll: (RD() - 0.5) * 12 };
+					block(F, CYL, TINT, [0, 0, h / 2 + 0.01], [0.025, 0.025, h], { ...tilt, colour: reedGreen, nosink: true });
+					block(F, CYL, TINT, [0, 0, h - 0.12], [0.07, 0.07, 0.24], { ...tilt, colour: reedHead, nosink: true });
+				}
+			}
+		}
+		L += len;
+	}
+}
 {
 	const J = PLAN.jetty, deckZ = LAKE_LEVEL + 0.75, yaw = Math.atan2(J.dir[1], J.dir[0]) / RAD;
 	const start = [J.at[0] - J.dir[0] * 3, J.at[1] - J.dir[1] * 3];
@@ -954,48 +1053,366 @@ for (const [x, y, n] of PLAN.reeds) {
 	for (const e of [-1, 1]) { const [ax, ay] = F.at(e * 7.6, 0, 0), g = groundAt(ax, ay); block(frame(ax, ay, g, yaw), CUBE, STONE, [0, 0, (deckZ - g) / 2 - 0.1], [1.4, 2.8, deckZ - g + 0.3], { nosink: true }); }
 }
 
+// ---- the forts (round 9) ---------------------------------------------------------------------------------------------
+// The four were one box fort four times: the same square of walls, cones on its towers, a barracks box and a pole in an
+// empty yard. Each keeps its square and the road through its two gates, and now has its own build from the lands its
+// road runs to: the Storm Peaks and Desert road's of warm sandstone, square towers and a keep with a beacon on it; the
+// Forest and Tundra road's of grey granite under timber hoardings and shingle cones, a log barracks, a stable and a
+// woodpile; the Swamp and Ocean road's low drum towers of pale weathered stone, a beacon tower, nets drying and a boat
+// turned over on trestles; the Graveyard, Wasteland and Volcanic road's of dark basalt, tall square towers with turrets
+// on their corners, a smithy at its forge and racks of spears. Every yard: barracks with doors, windows and a chimney, a
+// stair up to the wall walk, a well, the watch at the gates. Their own random stream (RF), so nothing else moves.
+const RF = PLAN.rng(20261124);
+const pickF = (arr) => arr[Math.floor(RF() * arr.length)];
+const fortGuards = [];   // [frame, x, y, face x, face y, role, outfit]: added with the city's people (their draws last)
+const FORT_STYLE = {
+	sand: { S: 36, Hh: 8, T: 3, gate: 5, tint: [255, 226, 186], roof: pal([150, 84, 56], 0, 0.75, 0, 5), banner: pal([40, 62, 120], 0, 0.95, 0, 9), towers: "square", tw: 8.2, th: 12.5 },
+	granite: { S: 36, Hh: 7, T: 3, gate: 5, tint: [208, 214, 212], roof: pal([104, 92, 78], 0, 0.9, 0, 7), banner: pal([52, 92, 50], 0, 0.95, 0, 9), towers: "hoard", tw: 8.6, th: 10 },
+	shore: { S: 36, Hh: 7, T: 3, gate: 5, tint: [232, 236, 226], roof: pal([72, 76, 84], 0, 0.6, 0, 8), banner: pal([40, 104, 112], 0, 0.95, 0, 9), towers: "drum", tw: 10.5, th: 9 },
+	basalt: { S: 36, Hh: 10, T: 3.2, gate: 5, tint: [150, 142, 140], roof: pal([52, 50, 54], 0, 0.6, 0, 8), banner: pal([112, 24, 22], 0, 0.95, 0, 9), towers: "turret", tw: 8.6, th: 16 },
+};
+const fortStyleOf = (t) => t.lands.includes("storm_peaks") ? "sand" : t.lands.includes("forest") ? "granite" : t.lands.includes("swamp") ? "shore" : "basalt";
+// A row of merlons from (x0, y0) to (x1, y1) at z (their foot), and a ring of them round (cx, cy).
+function merlonRow(F, x0, y0, x1, y1, z, mat, colour, step = 2.6) {
+	const L = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(L / step)), ya = Math.atan2(y1 - y0, x1 - x0) / RAD;
+	for (let k = 0; k <= n; k++) { const u = k / n; block(F, CUBE, mat, [x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, z + 0.65], [1.2, 0.7, 1.3], { colour, yawAdd: ya, nosink: true }); }
+}
+function merlonRing(F, cx, cy, r, z, colour) {
+	const n = Math.max(6, Math.round(2 * Math.PI * r / 2.3));
+	for (let m = 0; m < n; m++) { const a = (m + 0.5) * 360 / n; block(F, CUBE, STONE, [cx + Math.cos(a * RAD) * r, cy + Math.sin(a * RAD) * r, z + 0.65], [1.2, 0.7, 1.3], { colour, yawAdd: a + 90, nosink: true }); }
+}
+// Arrow slits on a round tower (a dark slot facing out every 60 degrees, two storeys) or along a flat face.
+function slitsRound(F, cx, cy, d, zs) { for (const z of zs) for (let m = 0; m < 6; m++) { const a = m * 60 + 30; block(F, CUBE, TINT, [cx + Math.cos(a * RAD) * (d / 2 + 0.01), cy + Math.sin(a * RAD) * (d / 2 + 0.01), z], [0.08, 0.36, 1.4], { yawAdd: a, colour: soot, nosink: true }); } }
+// A round tower: a battered foot, a string course, a corbelled parapet a hand proud of it (its corbels under it).
+function roundTower(F, cx, cy, d, h, tint, { parapet = true, foot = 1.4 } = {}) {
+	block(F, CYL, STONE, [cx, cy, h / 2], [d, d, h], { solid: true, colour: tint });
+	block(F, CYL, STONE, [cx, cy, 1.2], [d + foot, d + foot, 2.4], { colour: tint });
+	block(F, CYL, STONE, [cx, cy, h * 0.55], [d + 0.3, d + 0.3, 0.35], { colour: tint, nosink: true });
+	if (!parapet) return;
+	block(F, CYL, STONE, [cx, cy, h + 0.4], [d + 0.9, d + 0.9, 0.8], { colour: tint, nosink: true });
+	const n = Math.round(d * 1.7);
+	for (let m = 0; m < n; m++) { const a = m * 360 / n; block(F, CUBE, STONE, [cx + Math.cos(a * RAD) * (d / 2 + 0.2), cy + Math.sin(a * RAD) * (d / 2 + 0.2), h - 0.4], [0.45, 0.5, 0.8], { colour: tint, yawAdd: a, nosink: true }); }
+	merlonRing(F, cx, cy, d / 2 + 0.05, h + 0.8, tint);
+}
+// A square tower (or the keep): a battered plinth, a string course, a corbelled parapet, merlons on all four sides.
+function squareTower(F, cx, cy, w, h, tint) {
+	const G = frame(...F.at(cx, cy, 0).slice(0, 2), F.z, F.yaw);
+	block(G, CUBE, STONE, [0, 0, h / 2], [w, w, h], { solid: true, colour: tint });
+	block(G, CUBE, STONE, [0, 0, 1.1], [w + 1.0, w + 1.0, 2.2], { colour: tint });
+	block(G, CUBE, STONE, [0, 0, h * 0.55], [w + 0.3, w + 0.3, 0.35], { colour: tint, nosink: true });
+	block(G, CUBE, STONE, [0, 0, h + 0.4], [w + 0.9, w + 0.9, 0.8], { colour: tint, nosink: true });
+	const e = w / 2 + 0.2, n = Math.max(3, Math.round(w / 1.1));
+	for (const [ux, uy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+		for (let k = 0; k < n; k++) { const t = -w / 2 + 0.4 + (w - 0.8) * k / (n - 1); block(G, CUBE, STONE, [ux ? ux * e : t, uy ? uy * e : t, h - 0.4], [0.45, 0.45, 0.8], { colour: tint, nosink: true }); }
+		const m = (w + 0.9) / 2 - 0.35;
+		merlonRow(G, ux ? ux * m : -m, uy ? uy * m : -m, ux ? ux * m : m, uy ? uy * m : m, h + 0.8, STONE, tint, 2.2);
+		for (const z of [h * 0.3, h * 0.72]) block(G, CUBE, TINT, [ux * (w / 2 + 0.01), uy * (w / 2 + 0.01), z], ux ? [0.08, 0.36, 1.4] : [0.36, 0.08, 1.4], { colour: soot, nosink: true });
+	}
+	return G;
+}
+// A turret corbelled out from a square tower's top corner, under its own spire.
+function turret(G, sx, sy, w, h, tint, roof) {
+	const cx = sx * (w / 2 + 0.35), cy = sy * (w / 2 + 0.35);
+	block(G, CONE, STONE, [cx, cy, h - 1.0], [2.5, 2.5, 2.0], { pitch: 180, colour: tint, nosink: true });
+	block(G, CYL, STONE, [cx, cy, h + 1.0], [2.5, 2.5, 4.0], { colour: tint, nosink: true });
+	block(G, CONE, TINT, [cx, cy, h + 4.6], [3.1, 3.1, 3.4], { colour: roof });
+	block(G, CYL, TINT, [cx, cy, h + 6.7], [0.08, 0.08, 1.0], { colour: iron, nosink: true });
+	block(G, CUBE, TINT, [cx + sx * 1.26, cy + sy * 1.26, h + 1.3], [0.08, 0.3, 1.0], { yawAdd: Math.atan2(sy, sx) / RAD, colour: soot, nosink: true });
+}
+// A cone roof with an iron finial and a pennant over it in the fort's colour.
+function coneRoof(F, cx, cy, d, z, h, roof, banner) {
+	block(F, CONE, TINT, [cx, cy, z + h / 2], [d, d, h], { colour: roof });
+	block(F, CYL, TINT, [cx, cy, z + h + 1.6], [0.12, 0.12, 3.4], { colour: iron, nosink: true });
+	block(F, CUBE, CLOTH, [cx + 0.75, cy, z + h + 2.7], [1.5, 0.05, 0.8], { colour: banner, nosink: true });
+}
+// Windows on a building's front (+y face) on the fort's own random stream, now and then lit after dusk.
+function fortWindows(B, w, d, z, n, h = 1.1) {
+	for (let i = 0; i < n; i++) {
+		const x = -w / 2 + w * (i + 0.5) / n;
+		block(B, CUBE, TINT, [x, d / 2 + 0.05, z], [0.85, 0.12, h], { colour: glass, nosink: true });
+		block(B, CUBE, TINT, [x, d / 2 + 0.07, z + h / 2 + 0.06], [1.05, 0.14, 0.12], { colour: beam, nosink: true });
+		block(B, CUBE, TINT, [x, d / 2 + 0.12, z - h / 2 - 0.06], [1.1, 0.24, 0.12], { colour: beam, nosink: true });
+		block(B, CUBE, TINT, [x, d / 2 + 0.09, z], [0.07, 0.1, h], { colour: beam, nosink: true });
+		if (RF() < 0.55) block(B, CUBE, TINT, [x, d / 2 + 0.105, z], [0.8, 0.02, h - 0.06], { colour: roomGlow[Math.floor(RF() * roomGlow.length)], nosink: true, night: true });
+	}
+}
+// The barracks along the wall: stone (or logs), a gable roof, two chimneys, doors and windows to the yard, a bench and a
+// lantern by the door.
+function barracks(F, cx, cy, w, d, h, st, logs) {
+	const B = frame(...F.at(cx, cy, 0).slice(0, 2), F.z, F.yaw);
+	if (logs) {
+		block(B, CUBE, TINT, [0, 0, h / 2], [w - 0.3, d - 0.3, h], { solid: true, colour: darkWood });
+		for (let z = 0.2, k = 0; z < h; z += 0.36, k++) {
+			const c = k % 3 === 1 ? beam : darkWood;
+			for (const sy of [-1, 1]) block(B, CYL, WOOD, [0, sy * d / 2, z], [0.38, 0.38, w + 0.8], { pitch: 90, colour: c, nosink: true });
+			for (const sx of [-1, 1]) block(B, CYL, WOOD, [sx * w / 2, 0, z + 0.18], [0.38, 0.38, d + 0.8], { pitch: 90, yawAdd: 90, colour: c, nosink: true });
+		}
+	} else {
+		block(B, CUBE, STONE, [0, 0, h / 2], [w, d, h], { solid: true, colour: st.tintPal });
+		block(B, CUBE, STONE, [0, 0, 0.3], [w + 0.2, d + 0.2, 0.6], { colour: st.tintPal });
+	}
+	gableRoof(B, w, d, h, st.roof);
+	const fd = logs ? d + 0.42 : d;   // (its front face: the logs stand proud of the box, the doors and windows on them)
+	for (const sx of [-1, 1]) {
+		block(B, CUBE, STONE, [sx * w / 3, -d / 4, h + 1.4], [1.0, 1.0, 4.2], { colour: st.tintPal, nosink: true });
+		block(B, CUBE, STONE, [sx * w / 3, -d / 4, h + 3.55], [1.25, 1.25, 0.25], { colour: st.tintPal, nosink: true });
+	}
+	for (const dx of [-w / 4, w / 4]) door(B, dx, fd / 2, 1.2, 2.3);
+	fortWindows(B, w, fd, 2.3, 4);
+	bench(B, -w / 4 + 2.2, fd / 2 + 0.6, 2.2);
+	block(B, CUBE, TINT, [w / 4 + 1.1, fd / 2 + 0.25, 2.6], [0.3, 0.3, 0.42], { colour: iron, nosink: true });
+	block(B, CUBE, TINT, [w / 4 + 1.1, fd / 2 + 0.25, 2.6], [0.34, 0.2, 0.32], { colour: lanternGlow, nosink: true, night: true });
+	fire(FIRE.lantern, B.at(w / 4 + 1.1, fd / 2 + 0.25, 2.6), 0.8);
+}
+// A well with a stone kerb, its roof on two posts and a windlass (a fort's: on its own ground).
+function fortWell(F, x, y) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + RF() * 90);
+	block(G, CYL, STONE, [0, 0, 0.45], [2.2, 2.2, 0.9], { solid: true });
+	block(G, CYL, TINT, [0, 0, 0.92], [1.6, 1.6, 0.05], { colour: pal([24, 46, 58], 0, 0.15, 0, 3) });
+	for (const sx of [-1, 1]) block(G, CUBE, WOOD, [sx * 1.05, 0, 1.4], [0.18, 0.18, 2.8]);
+	for (const sd of [-1, 1]) block(G, CUBE, TINT, [0, sd * 0.44, 3.04], [2.9, 1.3, 0.07], { roll: sd * 45, colour: slate, nosink: true });
+	block(G, CYL, WOOD, [0, 0, 2.1], [0.16, 0.16, 2.1], { pitch: 90, colour: beam, nosink: true });
+	block(G, CYL, TINT, [0.35, 0, 1.6], [0.03, 0.03, 1.0], { colour: pal([150, 128, 92], 0, 0.95), nosink: true });
+	block(G, CYL, WOOD, [0.35, 0, 1.0], [0.34, 0.34, 0.32], { colour: darkWood, nosink: true });
+}
+// The yard's things.
+function crates(F, x, y) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + (RF() - 0.5) * 30);
+	const n = 3 + Math.floor(RF() * 3);
+	for (let k = 0; k < n; k++) {
+		const sz = 0.7 + RF() * 0.35, up = k >= 3;
+		block(G, CUBE, WOOD, [(k % 3) * 1.0 - 1 + (up ? 0.5 : 0), (RF() - 0.5) * 0.3, up ? 1.0 + sz / 2 : sz / 2], [sz, sz, sz], { yawAdd: (RF() - 0.5) * 20, colour: pickF([beam, darkWood, pal([120, 92, 60], 0, 0.9, 0, 1)]), solid: !up, nosink: up });
+	}
+	for (let k = 0; k < 2; k++) {
+		const bx = 2.0 + k * 0.85;
+		block(G, CYL, WOOD, [bx, 0.2, 0.48], [0.72, 0.72, 0.95], { colour: k ? beam : darkWood, solid: true });
+		for (const hz of [0.18, 0.78]) block(G, CYL, TINT, [bx, 0.2, hz], [0.75, 0.75, 0.05], { colour: iron, nosink: true });
+	}
+}
+function butt(F, x, y, yawAdd) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + yawAdd);
+	for (const sx of [-0.5, 0.5]) block(G, CUBE, WOOD, [sx, 0.3, 0.75], [0.12, 0.12, 1.6], { pitch: -14, colour: darkWood, nosink: true });
+	block(G, CYL, TINT, [0, 0, 1.15], [1.3, 1.3, 0.3], { pitch: 90, colour: straw, nosink: true });
+	block(G, CYL, TINT, [0, -0.16, 1.15], [0.8, 0.8, 0.02], { pitch: 90, colour: cloth, nosink: true });
+	block(G, CYL, TINT, [0, -0.17, 1.15], [0.5, 0.5, 0.02], { pitch: 90, colour: straw, nosink: true });
+	block(G, CYL, TINT, [0, -0.18, 1.15], [0.18, 0.18, 0.02], { pitch: 90, colour: cloth, nosink: true });
+	for (let k = 0; k < 2; k++) block(G, CYL, TINT, [(RF() - 0.5) * 0.6, -0.45, 1.1 + (RF() - 0.5) * 0.5], [0.03, 0.03, 0.7], { pitch: 90 - 8, yawAdd: 90 + (RF() - 0.5) * 10, colour: beam, nosink: true });
+}
+function rack(F, x, y, yawAdd, shield) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + yawAdd);
+	for (const sx of [-1.1, 1.1]) block(G, CUBE, WOOD, [sx, 0, 0.8], [0.14, 0.14, 1.6], { colour: darkWood });
+	for (const z of [0.5, 1.45]) block(G, CUBE, WOOD, [0, 0, z], [2.4, 0.12, 0.1], { colour: beam, nosink: true });
+	for (let k = 0; k < 5; k++) {
+		block(G, CYL, TINT, [-0.8 + k * 0.4, 0.12, 1.25], [0.05, 0.05, 2.5], { pitch: 8, colour: beam, nosink: true });
+		block(G, CONE, TINT, [-0.8 + k * 0.4, 0.12 - 0.17, 2.55], [0.09, 0.09, 0.3], { pitch: 8, colour: iron, nosink: true });
+	}
+	if (shield) for (const sx of [-1.75, 1.75]) block(G, CYL, TINT, [sx, 0.15, 0.6], [0.75, 0.75, 0.06], { pitch: 90, roll: 8, colour: shield, nosink: true });
+}
+function woodpile(F, x, y, len, yawAdd) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + yawAdd);
+	for (let row = 0; row < 4; row++) for (let k = 0; k < 7 - row; k++) block(G, CYL, WOOD, [(k - (6 - row) / 2) * 0.36, 0, 0.18 + row * 0.31], [0.34, 0.34, len], { pitch: 90, yawAdd: 90, colour: k % 2 ? beam : darkWood, nosink: true });
+	solids.push([...G.at(0, 0, 0.7).map(cm), cm(2.6), cm(len), cm(1.4), +G.yaw.toFixed(1)]);
+}
+function stable(F, x0, x1, yWall, depth, st) {
+	const mid = (x0 + x1) / 2, len = x1 - x0, yF = yWall - depth, hi = 4.0, lo = 2.7;
+	for (let x = x0; x <= x1 + 0.01; x += len / 3) block(F, CUBE, WOOD, [x, yF, lo / 2], [0.22, 0.22, lo], { colour: darkWood });
+	const run = Math.hypot(depth, hi - lo), ang = Math.atan2(hi - lo, depth) / RAD;
+	block(F, CUBE, TINT, [mid, yF + depth / 2 - 0.2, (hi + lo) / 2 + 0.1], [len + 0.8, run + 0.9, 0.14], { roll: ang, colour: st.roof, nosink: true });
+	block(F, CUBE, TINT, [mid, yF, lo - 0.05], [len + 0.3, 0.2, 0.22], { colour: beam, nosink: true });
+	for (let x = x0 + 2.5; x < x1 - 1; x += 2.5) block(F, CUBE, TINT, [x, yF + depth / 2, 0.65], [0.08, depth - 0.3, 1.3], { colour: beam, nosink: true });
+	for (let k = 0; k < 4; k++) block(F, CUBE, TINT, [x0 + 1.2 + k * 0.9 + (k > 1 ? 4 : 0), yWall - 0.6, 0.35 + (k === 1 ? 0.5 : 0)], [0.85, 0.5, 0.45], { yawAdd: (RF() - 0.5) * 20, colour: straw, nosink: true });
+	const T0 = frame(...F.at(mid, yF - 0.9, 0).slice(0, 2), F.z, F.yaw);
+	block(T0, CUBE, WOOD, [0, 0, 0.32], [2.6, 0.7, 0.64], { colour: darkWood, solid: true });
+	block(T0, CUBE, TINT, [0, 0, 0.62], [2.4, 0.5, 0.02], { colour: pal([24, 46, 58], 0, 0.15, 0, 3), nosink: true });
+}
+function smithy(F, x, y, st) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw);
+	block(G, CUBE, STONE, [0, 0, 0.5], [1.8, 1.6, 1.0], { solid: true, colour: st.tintPal });
+	block(G, CUBE, TINT, [0, 0, 1.02], [1.3, 1.1, 0.06], { colour: ember, nosink: true });
+	block(G, CUBE, STONE, [0, 0.2, 2.4], [1.9, 1.3, 0.9], { pitch: 0, colour: st.tintPal, nosink: true });
+	block(G, CUBE, STONE, [0, 0.4, 4.0], [0.9, 0.9, 2.6], { colour: st.tintPal, nosink: true });
+	for (const sx of [-0.8, 0.8]) block(G, CUBE, STONE, [sx, 0.55, 1.45], [0.3, 0.4, 1.0], { colour: st.tintPal, nosink: true });
+	fire(FIRE.fireplace, G.at(0, 0, 1.15), 0.5);
+	block(G, CYL, WOOD, [0.2, -1.9, 0.3], [0.7, 0.7, 0.6], { colour: darkWood });
+	block(G, CUBE, TINT, [0.2, -1.9, 0.72], [0.7, 0.28, 0.24], { colour: iron, nosink: true });
+	block(G, CONE, TINT, [0.67, -1.9, 0.75], [0.18, 0.18, 0.3], { pitch: 90, colour: iron, nosink: true });
+	block(G, CYL, WOOD, [1.6, -1.3, 0.45], [0.75, 0.75, 0.9], { colour: beam, solid: true });
+	block(G, CYL, TINT, [1.6, -1.3, 0.88], [0.6, 0.6, 0.02], { colour: pal([24, 34, 40], 0, 0.15, 0, 3), nosink: true });
+	block(G, CUBE, TINT, [-1.5, -0.6, 0.9], [0.9, 0.5, 0.06], { pitch: -60, colour: pal([92, 60, 36], 0, 0.9, 0, 1), nosink: true });
+	// its open shed: four posts and a pent roof
+	for (const sx of [-2.2, 2.2]) for (const sy of [-2.8, 1.2]) block(G, CUBE, WOOD, [sx, sy, 1.5], [0.2, 0.2, 3.0], { colour: darkWood });
+	block(G, CUBE, TINT, [0, -0.8, 3.15], [5.2, 4.8, 0.14], { roll: -9, colour: st.roof, nosink: true });
+	return G;
+}
+function cart(F, x, y, yawAdd) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + yawAdd);
+	block(G, CUBE, WOOD, [0, 0, 0.95], [2.4, 1.3, 0.1], { colour: beam, nosink: true });
+	for (const sy of [-0.62, 0.62]) block(G, CUBE, WOOD, [0, sy, 1.2], [2.4, 0.06, 0.45], { colour: darkWood, nosink: true });
+	for (const sx of [-1.18, 1.18]) block(G, CUBE, WOOD, [sx, 0, 1.2], [0.06, 1.3, 0.45], { colour: darkWood, nosink: true });
+	for (const sy of [-0.78, 0.78]) {
+		block(G, CYL, TINT, [0.2, sy, 0.62], [1.24, 1.24, 0.08], { roll: 90, colour: darkWood, nosink: true });
+		block(G, CYL, TINT, [0.2, sy * 1.02, 0.62], [0.25, 0.25, 0.14], { roll: 90, colour: iron, nosink: true });
+		block(G, CUBE, WOOD, [-2.3, sy * 0.45, 0.62], [2.4, 0.08, 0.08], { pitch: -8, colour: beam, nosink: true });
+	}
+	block(G, CUBE, TINT, [0.3, 0, 1.25], [1.2, 0.9, 0.5], { colour: pal([120, 102, 70], 0, 0.95, 0, 9), nosink: true });
+	solids.push([...G.at(0, 0, 0.8).map(cm), cm(2.5), cm(1.6), cm(1.6), +G.yaw.toFixed(1)]);
+}
+function netRack(F, x, y, yawAdd) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + yawAdd);
+	for (const sx of [-1.8, 0, 1.8]) block(G, CUBE, WOOD, [sx, 0, 1.2], [0.12, 0.12, 2.4], { colour: darkWood });
+	block(G, CYL, WOOD, [0, 0, 2.35], [0.1, 0.1, 3.9], { pitch: 90, yawAdd: 0, colour: beam, nosink: true });
+	// each net a mesh of cords (a solid sheet read as a signboard), sagging a little
+	const cord = pal([120, 110, 88], 0, 0.95, 0, 9);
+	for (const [ox, w, drop] of [[-0.9, 1.7, 1.5], [0.9, 1.6, 1.8]]) {
+		for (let x = -w / 2; x <= w / 2 + 0.01; x += 0.17) block(G, CUBE, TINT, [ox + x, 0.03, 2.3 - drop / 2], [0.018, 0.018, drop], { colour: cord, nosink: true });
+		for (let zz = 0.15; zz < drop; zz += 0.17) block(G, CUBE, TINT, [ox, 0.03 + 0.04 * Math.sin(Math.PI * zz / drop), 2.3 - zz], [w, 0.018, 0.018], { colour: cord, nosink: true });
+	}
+	for (let k = 0; k < 5; k++) block(G, SPH, TINT, [-1.6 + k * 0.8, 0.07, 0.75 + (k % 2) * 0.3], [0.16, 0.16, 0.16], { colour: pal([196, 160, 90], 0, 0.5, 0, 3), nosink: true });
+}
+function upturnedBoat(F, x, y, yawAdd) {
+	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + yawAdd);
+	for (const sx of [-1.1, 1.1]) {
+		block(G, CUBE, WOOD, [sx, 0, 0.75], [0.12, 1.3, 0.12], { colour: darkWood, nosink: true });
+		for (const sy of [-0.55, 0.55]) block(G, CUBE, WOOD, [sx, sy, 0.38], [0.1, 0.1, 0.78], { roll: sy > 0 ? 12 : -12, colour: darkWood, nosink: true });
+	}
+	block(G, BOAT, WOOD, [0, 0, 1.15], [3.8, 1.3, 0.6], { roll: 180, colour: pal([92, 64, 42], 0, 0.9, 0, 1), nosink: true });
+}
+function fortAt(t) {
+	const style = fortStyleOf(t), st = { ...FORT_STYLE[style] };
+	st.tintPal = pal(st.tint, 0, 0.9, 0, 0);
+	const { S, Hh, T, gate } = st, tint = st.tintPal;
+	const [fx, fy] = t.fort, z = groundAt(fx, fy), F = frame(fx, fy, z, t.bearing - 90);
+	// The curtain: four walls (the two ends open at the gate), a battered plinth outside, slits along them; the walk on top.
+	const wallPiece = (cx, cy, lx, ly) => {
+		block(F, CUBE, STONE, [cx, cy, Hh / 2], [lx, ly, Hh], { solid: true, colour: tint });
+		block(F, CUBE, STONE, [cx, cy, 0.8], [lx + (lx > ly ? 0 : 1.0), ly + (ly > lx ? 0 : 1.0), 1.6], { colour: tint });
+	};
+	for (const side of [-1, 1]) {
+		wallPiece(0, side * S / 2, S, T);
+		for (const end of [-1, 1]) wallPiece(end * S / 2, side * (gate + (S / 2 - gate) / 2), T, S / 2 - gate);
+		for (let m = -S / 2 + 7; m <= S / 2 - 7; m += 5.5) block(F, CUBE, TINT, [m, side * (S / 2 + T / 2 + 0.01), 3.6], [0.36, 0.08, 1.4], { colour: soot, nosink: true });
+		if (style === "granite") {
+			// a timber breastwork on the wall walk, posts along it, instead of stone merlons
+			block(F, CUBE, TINT, [0, side * (S / 2 + 1.05), Hh + 0.7], [S - 6, 0.25, 1.4], { colour: beam, nosink: true });
+			for (let m = -S / 2 + 4; m <= S / 2 - 4; m += 2.5) block(F, CUBE, TINT, [m, side * (S / 2 + 1.25), Hh + 0.9], [0.22, 0.22, 1.8], { colour: darkWood, nosink: true });
+		} else merlonRow(F, -S / 2 + 4, side * (S / 2 + 1.1), S / 2 - 4, side * (S / 2 + 1.1), Hh, STONE, tint);
+		for (const end of [-1, 1]) if (style !== "granite") merlonRow(F, end * (S / 2 + 1.1), side * (gate + 2.4), end * (S / 2 + 1.1), side * (S / 2 - 4.5), Hh, STONE, tint);
+	}
+	// The gatehouses: the opening 5.4 m high under the wall's head, a portcullis's teeth showing under it, the leaves
+	// swung open against the passage, a torch either side outside and the fort's banners over the arch.
+	for (const end of [-1, 1]) {
+		const top = Hh + 3, low = 5.4;
+		block(F, CUBE, STONE, [end * S / 2, 0, (low + top) / 2], [T + 0.4, 2 * gate + 0.4, top - low], { solid: true, colour: tint, nosink: true });
+		for (const m of [-3.9, -1.3, 1.3, 3.9]) block(F, CUBE, STONE, [end * S / 2 + end * 0.2, m, top + 0.6], [T + 0.2, 1.3, 1.2], { colour: tint, nosink: true });
+		for (let k = 0; k < 13; k++) block(F, CUBE, TINT, [end * S / 2, -gate + 0.35 + k * (2 * gate - 0.7) / 12, low - 0.35], [0.12, 0.12, 0.9], { colour: iron, nosink: true });
+		block(F, CUBE, TINT, [end * S / 2, 0, low - 0.15], [0.14, 2 * gate - 0.4, 0.14], { colour: iron, nosink: true });
+		for (const sd of [-1, 1]) {
+			block(F, CUBE, WOOD, [end * (S / 2 - T / 2 - gate / 2), sd * (gate - 0.25), 2.7], [gate - 0.2, 0.3, 5.3], { colour: darkWood });
+			for (const zz of [1.0, 4.4]) block(F, CUBE, TINT, [end * (S / 2 - T / 2 - gate / 2), sd * (gate - 0.42), zz], [gate - 0.5, 0.05, 0.16], { colour: iron, nosink: true });
+			fire(FIRE.torch, F.at(end * (S / 2 + T / 2 + 0.35), sd * (gate + 1.1), 4.0), 1.2);
+			block(F, CUBE, TINT, [end * (S / 2 + T / 2 + 0.12), sd * (gate + 1.1), 3.5], [0.3, 0.16, 0.9], { colour: iron, nosink: true });
+			block(F, CUBE, CLOTH, [end * (S / 2 + T / 2 + 0.25), sd * 2.4, low + 1.95], [0.05, 1.3, 3.0], { colour: st.banner, nosink: true });
+			block(F, CUBE, TINT, [end * (S / 2 + T / 2 + 0.25), sd * 2.4, low + 3.5], [0.08, 1.5, 0.08], { colour: iron, nosink: true });
+		}
+		fire(FIRE.brazier, F.at(end * S / 2, 0, top + 0.05), 0.7);
+	}
+	// The towers on the corners, each fort's own.
+	for (const ex of [-1, 1]) for (const sy of [-1, 1]) {
+		const cx = ex * S / 2, cy = sy * S / 2;
+		if (st.towers === "square") {
+			squareTower(F, cx, cy, st.tw, st.th, tint);
+			block(F, CYL, TINT, [cx, cy, st.th + 3.2], [0.14, 0.14, 4.4], { colour: darkWood, nosink: true });
+			block(F, CUBE, CLOTH, [cx + 0.9, cy, st.th + 4.6], [1.8, 0.06, 1.1], { colour: st.banner, nosink: true });
+		} else if (st.towers === "hoard") {
+			roundTower(F, cx, cy, st.tw, st.th, tint, { parapet: false });
+			// the timber hoarding: a gallery of boards round the top on beams run out of the stone, slots in it, and a
+			// shingle cone over all
+			for (let m = 0; m < 12; m++) { const a = m * 30; block(F, CUBE, TINT, [cx + Math.cos(a * RAD) * (st.tw / 2 + 0.3), cy + Math.sin(a * RAD) * (st.tw / 2 + 0.3), st.th - 0.15], [1.4, 0.24, 0.3], { yawAdd: a, colour: darkWood, nosink: true }); }
+			block(F, CYL, TINT, [cx, cy, st.th + 1.35], [st.tw + 1.5, st.tw + 1.5, 2.7], { colour: beam, nosink: true });
+			for (let m = 0; m < 16; m++) { const a = m * 22.5; block(F, CUBE, TINT, [cx + Math.cos(a * RAD) * (st.tw / 2 + 0.76), cy + Math.sin(a * RAD) * (st.tw / 2 + 0.76), st.th + 1.35], [0.12, 0.2, 2.7], { yawAdd: a, colour: darkWood, nosink: true }); }
+			slitsRound(F, cx, cy, st.tw + 1.52, [st.th + 1.5]);
+			coneRoof(F, cx, cy, st.tw + 3.0, st.th + 2.65, st.tw * 0.95, st.roof, st.banner);
+		} else if (st.towers === "drum") {
+			if (ex === 1 && sy === 1) {
+				// the beacon tower: tall and slender, its lantern room at the top lit at dusk
+				const bd = 7, bh = 21;
+				roundTower(F, cx, cy, bd, bh, tint, { parapet: false, foot: 2.0 });
+				for (const zz of [7, 14]) block(F, CYL, STONE, [cx, cy, zz], [bd + 0.35, bd + 0.35, 0.35], { colour: tint, nosink: true });
+				block(F, CYL, STONE, [cx, cy, bh + 0.3], [bd + 1.2, bd + 1.2, 0.6], { colour: tint, nosink: true });
+				for (let m = 0; m < 8; m++) { const a = m * 45 + 22.5; block(F, CUBE, TINT, [cx + Math.cos(a * RAD) * 2.4, cy + Math.sin(a * RAD) * 2.4, bh + 2.1], [0.22, 0.22, 3.0], { colour: iron, nosink: true }); }
+				block(F, CYL, TINT, [cx, cy, bh + 2.1], [4.6, 4.6, 2.8], { colour: glass, nosink: true });
+				block(F, CYL, TINT, [cx, cy, bh + 2.1], [4.5, 4.5, 2.7], { colour: lanternGlow, nosink: true, night: true });
+				block(F, CYL, TINT, [cx, cy, bh + 3.65], [5.6, 5.6, 0.3], { colour: iron, nosink: true });
+				coneRoof(F, cx, cy, 5.8, bh + 3.8, 2.8, st.roof, st.banner);
+				fire(FIRE.brazier, F.at(cx, cy, bh + 1.2), 1.6);
+				slitsRound(F, cx, cy, bd, [4, 10, 16]);
+			} else {
+				roundTower(F, cx, cy, st.tw, st.th, tint, { foot: 2.2 });
+				slitsRound(F, cx, cy, st.tw, [3.5]);
+				block(F, CYL, TINT, [cx, cy, st.th + 3.0], [0.14, 0.14, 4.0], { colour: darkWood, nosink: true });
+				block(F, CUBE, CLOTH, [cx + 0.9, cy, st.th + 4.3], [1.8, 0.06, 1.1], { colour: st.banner, nosink: true });
+			}
+		} else {
+			const G = squareTower(F, cx, cy, st.tw, st.th, tint);
+			for (const tx of [-1, 1]) for (const ty of [-1, 1]) turret(G, tx, ty, st.tw, st.th, tint, st.roof);
+		}
+	}
+	// The yard. Barracks along one wall, a stair up the other to the wall walk, a well; the rest each fort's own.
+	const inner = S / 2 - T / 2, flip = 1;
+	barracks(F, 0, -(inner - 0.2 - 3.6), 22, 7.2, style === "basalt" ? 5.2 : 4.4, st, style === "granite");
+	{
+		// (the stair's head stops short of the corner tower; each step a solid you climb)
+		const steps = Math.ceil(Hh / 0.34), rise = Hh / steps, y0 = inner - 0.85, L = steps * 0.48, x0 = 12.4 - L;
+		for (let k = 0; k < steps; k++) {
+			const top = (k + 1) * rise;
+			block(F, CUBE, STONE, [x0 + 0.24 + k * 0.48, y0, top / 2], [0.5, 1.6, top], { solid: true, colour: tint });
+		}
+		block(F, CUBE, TINT, [x0 + L / 2, y0 - 0.78, Hh / 2 + 0.95], [Math.hypot(L, Hh), 0.08, 0.08], { pitch: Math.atan2(Hh, L) / RAD, colour: darkWood, nosink: true });
+		for (const u of [0.15, 0.5, 0.85]) block(F, CUBE, TINT, [x0 + L * u, y0 - 0.78, Hh * u + 0.48], [0.08, 0.08, 0.95], { colour: darkWood, nosink: true });
+	}
+	fortWell(F, style === "shore" ? -3 : style === "basalt" ? -1 : 4, 7.5 * flip);
+	if (style === "sand") {
+		// the keep: a square tower in the yard's corner, its door to the yard, a beacon in an iron basket on its roof
+		const G = squareTower(F, -9, 10.2, 10, 17, tint);
+		const G2 = frame(...G.at(0, 0, 0).slice(0, 2), F.z, F.yaw + 180);
+		door(G2, 0, 5, 1.6, 2.8);
+		block(G2, CUBE, STONE, [0, 5.8, 0.2], [3.2, 1.4, 0.4], { colour: tint });
+		block(G, CYL, STONE, [0, 0, 17.6], [2.2, 2.2, 1.2], { colour: tint, nosink: true });
+		block(G, CYL, TINT, [0, 0, 18.6], [1.8, 1.8, 0.9], { colour: iron, nosink: true });
+		fire(FIRE.brazier, G.at(0, 0, 19.2), 1.5);
+		block(G, CYL, TINT, [3.6, 3.6, 21], [0.18, 0.18, 7], { colour: darkWood, nosink: true });
+		block(G, CUBE, CLOTH, [3.6 + 1.3, 3.6, 22.8], [2.6, 0.06, 1.6], { colour: st.banner, nosink: true });
+		for (const zz of [6, 11]) block(G2, CUBE, TINT, [0, 5.01, zz], [0.7, 0.08, 1.3], { colour: soot, nosink: true });
+		butt(F, 8.5, 11.5, 0); butt(F, 11.5, 11.5, 0);
+		rack(F, 10, 6.5, 0, st.banner);
+		crates(F, -0.5, 13.0);
+	} else if (style === "granite") {
+		stable(F, -12.4, -3.5, inner - 0.2, 3.6, st);
+		woodpile(F, 9.5, 12.8, 2.6, 0); woodpile(F, 9.5, 10.2, 2.6, 0);
+		crates(F, -10, 6.5);
+		cart(F, 3, 11.8, 8);
+	} else if (style === "shore") {
+		netRack(F, -10.5, 9.5, 0); netRack(F, -10.5, 6.2, 0);
+		upturnedBoat(F, 5, 10, 0);
+		crates(F, 9.5, 6.2);
+		for (let k = 0; k < 4; k++) block(F, CYL, TINT, [-5 + k * 0.7, 13.6, 0.3], [0.55, 0.55, 0.6], { colour: pal([120, 96, 62], 0, 0.95, 0, 9), solid: k === 0 });
+	} else {
+		smithy(F, -9.5, 10.5, st);
+		rack(F, 3.5, 12.6, 0, st.banner); rack(F, 7.5, 12.6, 0, st.banner);
+		butt(F, 11, 9.5, 0);
+		cart(F, 8, 6.8, -5);
+		crates(F, -4, 13.3);
+		// a spiked palisade of stakes in front of each gate's flanks, outside
+		for (const end of [-1, 1]) for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) block(F, CYL, WOOD, [end * (S / 2 + 4.2 + (k % 2) * 0.5), sd * (gate + 2.5 + k * 1.3), 1.0], [0.24, 0.24, 2.4], { pitch: end * 28, colour: darkWood, nosink: true });
+	}
+	// The watch: two at each gate inside, one on the wall walk at the head of the stair; a smith at the forge.
+	for (const end of [-1, 1]) for (const sd of [-1, 1]) fortGuards.push([F, end * (S / 2 - T / 2 - gate - 0.8), sd * (gate - 1.6), end, 0, "guard", "iron"]);
+	fortGuards.push([frame(fx, fy, z + Hh, F.yaw), 4, S / 2, 0, 1, "guard", "iron"]);
+	if (style === "basalt") fortGuards.push([F, -9.5, 8.0, 0, 1, "townsfolk", "townwear_b"]);
+}
 // ---- a fort on each main road at the meadow's edge (the road runs through it), a waymark at each crossroads -------------
 for (const t of trunks) {
-	const [fx, fy] = t.fort, z = groundAt(fx, fy), F = frame(fx, fy, z, t.bearing - 90);
-	const S = 36, Hh = 8, gate = 5, T = 3;
-	for (const side of [-1, 1]) {
-		block(F, CUBE, STONE, [0, side * S / 2, Hh / 2], [S, T, Hh], { solid: true });
-		for (const end of [-1, 1]) block(F, CUBE, STONE, [end * S / 2, side * (gate + (S / 2 - gate) / 2), Hh / 2], [T, S / 2 - gate, Hh], { solid: true });
-		for (const end of [-1, 1]) {
-			// Round towers under their cones (a cone on a square tower read wrong, 11-22).
-			block(F, CYL, STONE, [end * S / 2, side * S / 2, 5.5], [8.6, 8.6, 11], { solid: true });
-			for (let m = 0; m < 6; m++) { const a = (m * 60 + 30) * RAD; block(F, CUBE, STONE, [end * S / 2 + Math.cos(a) * 3.9, side * S / 2 + Math.sin(a) * 3.9, 11.7], [1.3, 0.8, 1.4], { yawAdd: m * 60 + 30 + 90 }); }
-			block(F, CONE, TINT, [end * S / 2, side * S / 2, 13.9], [10, 10, 4.6], { colour: slate });
-		}
-		// Merlons along the long walls.
-		for (let m = -S / 2 + 3; m < S / 2 - 2; m += 2.6) block(F, CUBE, STONE, [m, side * (S / 2 + 1.1), Hh + 0.6], [1.2, 0.7, 1.2]);
-	}
-	for (const end of [-1, 1]) {
-		block(F, CUBE, STONE, [end * S / 2, 0, Hh + 1.5], [T + 0.4, 2 * gate + 0.4, 3], { solid: true });
-		block(F, CUBE, TINT, [end * S / 2, 0, Hh - 0.6], [0.3, 2 * gate - 0.4, 1], { colour: iron });
-		for (const m of [-3.9, -1.3, 1.3, 3.9]) block(F, CUBE, STONE, [end * S / 2 + end * 0.2, m, Hh + 3.6], [T + 0.2, 1.3, 1.2], { nosink: true });
-		// Its gates swung open against the passage, and a torch either side of the arch on the outer face.
-		for (const s of [-1, 1]) {
-			block(F, CUBE, WOOD, [end * (S / 2 - T / 2 - gate / 2), s * (gate - 0.25), 3.2], [gate - 0.2, 0.3, 6.4], { colour: darkWood });
-			fire(FIRE.torch, F.at(end * (S / 2 + T / 2 + 0.35), s * (gate + 1.1), 4.6), 1.2);
-			block(F, CUBE, TINT, [end * (S / 2 + T / 2 + 0.12), s * (gate + 1.1), 4.1], [0.3, 0.16, 0.9], { colour: iron, nosink: true });
-		}
-	}
-	// The towers: arrow slits on their outer faces, a pennant over each, the fort's braziers on the gate tops.
-	for (const ex of [-1, 1]) for (const sy of [-1, 1]) {
-		for (const zz of [3.5, 7]) {
-			block(F, CUBE, TINT, [ex * (S / 2 + 4.31), sy * S / 2, zz], [0.06, 0.4, 1.4], { colour: soot, nosink: true });
-			block(F, CUBE, TINT, [ex * S / 2, sy * (S / 2 + 4.31), zz], [0.4, 0.06, 1.4], { colour: soot, nosink: true });
-		}
-		block(F, CYL, WOOD, [ex * S / 2, sy * S / 2, 17.4], [0.16, 0.16, 4], { colour: darkWood, nosink: true });
-		block(F, CUBE, CLOTH, [ex * S / 2 + 0.9, sy * S / 2, 18.6], [1.8, 0.06, 1.1], { colour: cloth, nosink: true });
-	}
-	for (const end of [-1, 1]) fire(FIRE.brazier, F.at(end * S / 2, 0, Hh + 3.05), 0.7);
-	// Inside: a barracks along one wall, a well, a banner.
-	block(F, CUBE, STONE, [0, -S / 2 + 5.5, 2.2], [S - 12, 7, 4.4], { solid: true });
-	gableRoof(F, S - 12, 7, 4.4, slate, 0, -S / 2 + 5.5);
-	block(F, CYL, WOOD, [6, S / 2 - 5, 6], [0.35, 0.35, 12]);
-	block(F, CUBE, CLOTH, [6.9, S / 2 - 5, 9.5], [1.8, 0.12, 4], { colour: cloth });
+	fortAt(t);
 	// The waymark: a standing stone on a low cairn beside the crossroads, and a signpost with an arm down every road
 	// that meets there (to Hearthmoot, and to each land's road), a lantern on top lit at dusk.
 	const [cx, cy] = t.crossroads;
@@ -1061,6 +1478,8 @@ for (const t of trunks) {
 	}
 	// A neighbour by the well on every other green.
 	quarterGreens.forEach((c, i) => { if (i % 2 === 0) stand(frame(c[0] + 2.4, c[1] + 0.8, CITY_TOP, 0), 0, 0, -1, -0.3, "townsfolk", person()); });
+	// The forts' watch (round 9: the forts stood empty).
+	for (const [F, x, y, fxx, fyy, role, outfit] of fortGuards) stand(F, x, y, fxx, fyy, role, person(outfit), role === "guard" ? "of the fort's watch" : "the smith");
 }
 
 fs.writeFileSync(path.join(root, "Data/hearthmoot.json"), JSON.stringify({

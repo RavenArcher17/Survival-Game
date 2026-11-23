@@ -978,6 +978,19 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **Ground painting and the meadow**: round_ground.mjs paints the Volcanic's and the Tundra's sub-zone surfaces only past
   the meadow's edge (their wedges reach to the walls). Any colour noise finer than about two samples (8 m) aliases into
   stripes on the 4 m ground: keep ground noise scales at 13 m or more.
+- **Moss by water**: WRLand HfLayers mosses dry ground beside a bed, bank or marsh; a land's dampMoss [reach in samples,
+  most] sets how far and how much (default 2 and 0.7; the round island 1 and 0.25).
+- **Town clothes' slots**: on the wardcloth and gravecloth cuts the "Coat" slot is the shirt with its sleeves, the
+  "Bodice" / "Shroud" the panel in its neck (and, on the legs, the hose: "Legs/Ward_Bodice").
+- **The forts** (round 9): hearthmoot.mjs fortAt(t) builds each fort by its road's lands (FORT_STYLE sand / granite /
+  shore / basalt) on its own random stream (RF); the forts' watch joins the city's people last (fortGuards), so the
+  town's draws don't move. A stone block with a palette colour is tinted stone (WRRoundIsland sets bStoneTint; M_BuildStone
+  reads custom data 3-5, white otherwise): other callers' stone is unchanged.
+- **The stream** (round 9): round_island.mjs draws it every 12 m with its meanders; round_ground.mjs cuts its channel
+  (bed to 3.5 m, a muddy edge to 5.5 m, the meadow's grass beyond); its pebbles come from fire_frost_dressing.mjs's coast
+  block (LAND.lake.stream, with each point's water level), its reeds from hearthmoot.mjs (RD).
+- **Road verges**: a main road's bed is still 12 m (round_ground.mjs TRUNK_W) but its gravel only ROAD_TRACK of it; the rest
+  is surface 58 `verge` (WRRoundIsland StepCover grows thin grass there).
 - **NaN vertices**: `FMath::Pow(FMath::Sin(PI * t), e)` at t = 1 is NaN (sin(PI) is a hair below 0 in floats), and a NaN
   vertex gives the component NaN bounds (an ensure). Clamp the sine: `FMath::Pow(FMath::Max(0.f, FMath::Sin(...)), e)`.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'

@@ -35,6 +35,8 @@ const CITY_FLAT = 345;          // m: the flat top (the walls are at 300)
 const BLEND_W = 250;            // m either side of a border where the two lands' shapes mix
 const MEADOW_RISE = 450;        // m: from the meadow's edge up into the lands
 const ROAD_W = 4, TRUNK_W = 6;  // m: half widths
+const ROAD_TRACK = 0.6;          // a main road's worn track: its share of the bed (the rest its verge, round 9; a land's road
+                                // is 8 m of gravel already, narrower steps along the 4 m samples)
 const ROAD_GRADE = 0.11;        // steepest a road climbs
 const SEA_FLOOR = -30;          // m: open sea floor below this isn't built (the sea covers it; the deep floor is dark)
 const SEA_LEVEL = -0.2;         // m: the sea's surface (tuning sea.level -20 cm): the shore's profile passes through it
@@ -321,7 +323,9 @@ const SURF = { bed: 1, bank: 2, sand: 3, shore_rock: 6, road: 7, main_road: 10, 
 	cinder: 34, cinder_grass: 35, kipuka: 36, lava: 37, lava_crust: 38, snow: 39, snow_forest: 40, lake_ice: 41, glacier: 42,
 	crevasse: 43, thaw_moss: 44, shingle: 45, ice: 46, oxide: 47, snow_crack: 48, moss_crack: 49,
 	// The Ashfall Woods and the Mammoth Steppe (11-20), and each old sub-zone's own touches.
-	steppe: 50, ash_pale: 51, charcoal: 52, lichen_rock: 53, pumice: 54, moraine: 55, copper: 56, snow_road: 57 };
+	steppe: 50, ash_pale: 51, charcoal: 52, lichen_rock: 53, pumice: 54, moraine: 55, copper: 56, snow_road: 57,
+	// (round 9) a road's grassy verge: its bed keeps its width, the worn track down its middle narrower
+	verge: 58 };
 for (let j = 0; j < N; j++) {
 	const y = -HALF + j * STEP;
 	for (let i = 0; i < N; i++) {
@@ -468,7 +472,9 @@ const streamLen = lengthOf(stream);
 		if (D[k] >= 240) continue;
 		const s = A[k] / streamLen, bed = LAKE_LEVEL - 0.6 - (LAKE_LEVEL - 0.6 + 1.2) * Math.pow(s, 0.85), d = D[k];
 		const cut = d < 3.5 ? bed : d < 12 ? bed + 0.5 + (d - 3.5) * 0.3 : bed + 3 + (d - 12) * 0.17;
-		if (cut < H[k]) { H[k] = cut; if (d < 3.5) S[k] = SURF.bed; else if (d < 9) S[k] = SURF.bank; }
+		// (round 9: a bank band to 9 m read as two bright stripes stepped along the stream; now the bed, its muddy edge one
+		// sample wide, and the meadow's own grass down the banks)
+		if (cut < H[k]) { H[k] = cut; if (d < 3.5) S[k] = SURF.bed; else if (d < 5.5) S[k] = SURF.bank; }
 	}
 	log("lake and stream done");
 }
@@ -846,7 +852,9 @@ for (const rd of roads) {
 		H[k] = lerp(A[k], Math.min(Math.max(H[k], A[k] - s), A[k] + s), smooth(rd.half, rd.half + 6, d));
 		// Over the Tundra's snow and ice the road is packed snow (a gravel road's dark band on the snow showed every 4 m
 		// step of its edge); where it reaches the meadow's grass it's the land's road again.
-		if (d < rd.half && Math.hypot(-HALF + (k % N) * STEP, -HALF + Math.floor(k / N) * STEP) >= CITY_FLAT) S[k] = SNOWY.has(S[k]) || S[k] === SURF.snow_road ? SURF.snow_road : rd.main ? SURF.main_road : SURF.road;
+		// (round 9: the main roads read 12 m of gravel, twice a cart's width: their worn track down the middle is
+		// ROAD_TRACK of the bed, grass and trodden soil the rest, the bed's width and grade unchanged)
+		if (d < rd.half && Math.hypot(-HALF + (k % N) * STEP, -HALF + Math.floor(k / N) * STEP) >= CITY_FLAT) S[k] = SNOWY.has(S[k]) || S[k] === SURF.snow_road ? SURF.snow_road : rd.main && d > rd.half * ROAD_TRACK ? SURF.verge : rd.main ? SURF.main_road : SURF.road;
 	}
 	log("roads done");
 }
@@ -978,15 +986,20 @@ const land = {
 	// (shown: the sea draws its edge ~0.75 m over its level, its material's lift and waves: the band runs from there up
 	// the beach past the strand line)
 	wetShore: { sea: 0.9, shown: 0.75, lake: 0.5, dark: 0.55 },
+	// (round 9) moss on the dry ground beside the stream and the lake's bank: one sample out, a little (WRLand HfLayers;
+	// at 2 samples and 0.7 it drew a pale lime band stepped along both sides of the stream)
+	dampMoss: [1, 0.25],
 	zoneBiomes: ZONE_BIOME,
 	groundMaterial: "/Game/Terrain/M_IslandGround.M_IslandGround",
 	// Each zone carries its own biome: zoneBiomes is a JSON object, and the game matches its keys without case ("c" = "C").
 	zones: ZONES.map((z) => ({ id: z.id, letter: z.letter, name: z.name, biome: ZONE_BIOME[z.letter], ground: z.ground, groundAlt: z.groundAlt, ...(z.slopeRock ? { slopeRock: z.slopeRock } : {}), rough: 0.9, ...(z.speck ? { speck: z.speck } : {}), layers: z.layers })),
 	surfaces: [
 		{ id: "bed", class: SURF.bed, color: [70, 76, 78], rough: 0.45, layers: { stones: 0.85, sand: 0.15 } },
-		{ id: "bank", class: SURF.bank, color: [70, 92, 54], rough: 0.7, layers: { grass: 0.4, soil: 0.35, moss: 0.25 } },
+		// (round 9: its moss layer drew a lime stripe round the lake and down the stream: the water's edge mud and trodden grass)
+		{ id: "bank", class: SURF.bank, color: [72, 78, 50], rough: 0.6, layers: { grass: 0.45, soil: 0.45, stones: 0.1 } },
 		{ id: "sand", class: SURF.sand, color: [182, 168, 134], rough: 0.8, layers: { sand: 1 } },
 		{ id: "shore_rock", class: SURF.shore_rock, color: [110, 106, 100], rough: 0.8, layers: { stones: 0.9, sand: 0.1 } },
+		{ id: "verge", class: SURF.verge, color: [104, 112, 70], rough: 0.85, layers: { grass: 0.55, soil: 0.3, stones: 0.15 } },
 		{ id: "road", class: SURF.road, color: [118, 104, 79], rough: 0.9, layers: { soil: 0.5, stones: 0.5 } },
 		{ id: "snow_road", class: SURF.snow_road, color: [204, 210, 218], rough: 0.8, layers: { sand: 0.85, stones: 0.15 } },
 		{ id: "main_road", class: SURF.main_road, color: [132, 124, 108], rough: 0.85, layers: { stones: 0.8, soil: 0.2 } },

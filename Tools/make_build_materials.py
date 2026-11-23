@@ -450,6 +450,9 @@ sand = mul(mask(tex("/Game/SimpleRocks/Master_Materials/Textures/TX_Rock_08_D", 
 rock = lerp(rock, sand, mul(hash1(mul(bid, k=91.7)), k=0.55))   # (fully one or the other read as a checkerboard)
 rock_n = tex("/Game/SimpleRocks/Master_Materials/Textures/TX_Rock_05_N", uv)
 stone = mul(mul(rock, vector_p("StoneTint", (0.95, 0.9, 0.84))), lerp(const(0.72), const(1.12), tone))
+# (round 9) a detail block's own tint, custom data 3-5 (WRBuildLook Spawn; white unless the block asks: the round
+# island's forts each in their own stone)
+stone = mul(stone, append(append(custom(3, 1.0), custom(4, 1.0)), custom(5, 1.0)))
 stone = mul(stone, lerp(const(1.0), lerp(const(0.72), const(1.0), bevel), sub(const(1.0), solo)))
 base = mul(lerp(const3((0.04, 0.037, 0.033)), stone, mortar), dim)
 # (dressed stone: its face's relief gentle; at full strength the walls read as raw cliff)

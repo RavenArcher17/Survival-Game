@@ -204,6 +204,7 @@ void AWRRoundIsland::BuildCity()
 			if (Pal.IsValidIndex(PalIdx))
 			{
 				if (B.Mat == EWRLookMat::Cloth || B.Mat == EWRLookMat::Wood) B.Mat = EWRLookMat::Tinted;
+				B.bStoneTint = B.Mat == EWRLookMat::Stone;   // (stone with a colour: tinted stone, the forts' own, round 9)
 				const FPal& P = Pal[PalIdx];
 				B.Color = P.C;
 				B.Metal = P.Metal;
@@ -695,7 +696,9 @@ void AWRRoundIsland::StepCover()
 			// 19 (greens' bare rows) and 20/21 (ploughed) stay bare soil.
 			const bool bCrop = Surf == 14 || Surf == 15 || Surf == 16 || Surf == 17 || Surf == 18 || Surf == 22 || Surf == 23;
 			if (n >= PerCell && !bCrop) continue;
-			if (!bCrop && Surf != 0) continue;
+			// (58: a road's verge, round 9: grass thinner there, trodden)
+			if (!bCrop && Surf != 0 && Surf != 58) continue;
+			if (Surf == 58 && n >= PerCell * 0.4f) continue;
 			const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
 			if (bCrop && CropMeshes.Num() == 6)
 			{

@@ -220,6 +220,11 @@ namespace WRLandHfImpl
 			D.PatchSoft = FMath::Max(0.f, LNum(*GP, TEXT("soft"), 0.f));
 			D.bFarBlend = LNum(*GP, TEXT("farBlend"), 0.f) > 0.f;
 		}
+		if (const TArray<TSharedPtr<FJsonValue>>* DM = nullptr; J->TryGetArrayField(TEXT("dampMoss"), DM) && DM->Num() >= 2)
+		{
+			D.DampReach = FMath::Clamp(int32((*DM)[0]->AsNumber()), 0, 3);
+			D.DampMost = FMath::Clamp(float((*DM)[1]->AsNumber()), 0.f, 1.f);
+		}
 		if (const TSharedPtr<FJsonObject>* WS = nullptr; J->TryGetObjectField(TEXT("wetShore"), WS))
 		{
 			D.WetSea = LNum(*WS, TEXT("sea"), 0.f);
@@ -1181,15 +1186,15 @@ void FWRLandDef::HfLayers(int32 I, int32 J, float Out[6]) const
 		}
 	}
 	// Damp ground beside water grows moss (a bank's edge; Trails' creek-bank strip).
-	if (Cls == 0)
+	if (Cls == 0 && DampReach > 0)
 	{
 		int32 Wet = 0;
-		for (int32 dj = -2; dj <= 2; ++dj) for (int32 di = -2; di <= 2; ++di)
+		for (int32 dj = -DampReach; dj <= DampReach; ++dj) for (int32 di = -DampReach; di <= DampReach; ++di)
 		{
 			const uint8 C2 = HfSurfaceAt(I + di, J + dj);
 			Wet += (C2 == 1 || C2 == 2 || C2 == 5) ? 1 : 0;   // bed, bank, marsh
 		}
-		const float Damp = FMath::Clamp(Wet / 8.f, 0.f, 0.7f);
+		const float Damp = FMath::Clamp(Wet / 8.f, 0.f, DampMost);
 		for (int32 k = 0; k < 6; ++k) Out[k] *= 1.f - Damp;
 		Out[1] += Damp;
 	}

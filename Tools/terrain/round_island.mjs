@@ -194,7 +194,15 @@ const lakeOk = lakeOutline.every((p) => Math.hypot(...p) < meadowR(bearingOf(...
 const stream = [];
 {
 	const r0 = Math.hypot(...lakeAt) + LAKE.across * 0.9;
-	for (let r = r0; ; r += 40) { const d = LAKE.bearing + 4 * Math.sin((r - r0) / 650) + 2.5 * fbm(r / 900, 3.3, 29, 2); stream.push(pt(d, r)); if (r > coastR(d) + 60) break; }
+	// (round 9: it ran near straight, a canal; now it meanders either side of that line, up to ~30 m, in loops of a few
+	// hundred metres, easing in from the lake's outlet and out to its mouth; points every 12 m so its bends are round)
+	for (let r = r0; ; r += 12) {
+		const d = LAKE.bearing + 4 * Math.sin((r - r0) / 650) + 2.5 * fbm(r / 900, 3.3, 29, 2), s = r - r0;
+		const ease = Math.min(1, s / 120), m = ease * (22 * Math.sin(s / 105 + 0.7) + 9 * Math.sin(s / 43 + 2.1));
+		const [x, y] = pt(d, r), a = d * Math.PI / 180;
+		stream.push([x + Math.cos(a) * m, y + Math.sin(a) * m]);
+		if (r > coastR(d) + 60) break;
+	}
 }
 let streamLen = 0; for (let j = 1; j < stream.length; j++) streamLen += dist(stream[j - 1], stream[j]);
 

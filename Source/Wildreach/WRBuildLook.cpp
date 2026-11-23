@@ -1221,7 +1221,7 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Part->SetGenerateOverlapEvents(false);
 		Part->SetCanEverAffectNavigation(false);
-		Part->SetNumCustomDataFloats(Mat == EWRLookMat::Tinted ? 10 : 3);
+		Part->SetNumCustomDataFloats(Mat == EWRLookMat::Tinted ? 10 : Mat == EWRLookMat::Stone ? 6 : 3);
 		if (Mat == EWRLookMat::Cloth || Mat == EWRLookMat::Trim)
 		{
 			UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(MaterialFor(Mat), Owner);
@@ -1250,6 +1250,14 @@ int32 FWRBuildLook::Spawn(AActor* Owner, USceneComponent* Parent, const TArray<F
 			{
 				// M_BuildTinted: shade, axis, brightness, colour, metallic, roughness, glow, pattern.
 				const float Data[10] = { Bl.Tone, Bl.Axis + RoundMark, Bl.Dim, Bl.Color.R, Bl.Color.G, Bl.Color.B, Bl.Metal, Bl.Rough, Bl.Glow, Bl.Pattern };
+				Part->SetCustomData(i, Data, i == G.Value.Num() - 1);
+				continue;
+			}
+			if (Mat == EWRLookMat::Stone)
+			{
+				// M_BuildStone: shade, axis, brightness, and its tint (white but on a tinted stone block, round 9).
+				const FLinearColor T = Bl.bStoneTint ? Bl.Color : FLinearColor::White;
+				const float Data[6] = { Bl.Tone, Bl.Axis + RoundMark, Bl.Dim, T.R, T.G, T.B };
 				Part->SetCustomData(i, Data, i == G.Value.Num() - 1);
 				continue;
 			}

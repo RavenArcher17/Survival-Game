@@ -225,6 +225,11 @@ struct WILDREACH_API FWRLandDef
 	/** wetShore.shown: where the sea's edge is drawn (m: its material lifts and waves its surface over its level), the wet
 	 *  band measured up from there (it was from 0, under the drawn water: no band showed). */
 	float WetShown = 0.f;
+	/** dampMoss [reach, most]: the moss on dry ground beside a bed, bank or marsh: within reach samples, at most this much
+	 *  (2 and 0.7 unless a land says: the round island's 1 and 0.25, round 9: its moss drew a pale lime band stepped along
+	 *  the 4 m samples either side of the stream). */
+	int32 DampReach = 2;
+	float DampMost = 0.7f;
 	FBox2D LakeBox = FBox2D(ForceInit);
 	TArray<FWRLandSurface> Surfaces;
 	TArray<FWRLandBand> Bands;
