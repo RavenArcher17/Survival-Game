@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Round island: the look pass, tenth round: hair on everyone, the lava, ground seen from afar (11-23)
+
+From round 10's open hair and a fresh survey of the coast, the Volcanic and the Tundra (96 pictures, Raven: "Keep
+going").
+- **Hair where it grows:** every man's beard hung at his throat and his hair sat at his nape, hidden by his collar; the
+  player's too. The MetaHuman grooms' bindings had no source head, so each hair root was only projected onto the nearest
+  point of our faces, reduced meshes whose crowns stand ~11 cm higher and ~10% wider than the template head the grooms
+  were made on (the women's 1-2 cm). Each groom now rides the head bone, unbound, moved from the template's crown to the
+  face's and widened to it (WRCharacter; `hero.groomTemplate`, `hero.groomFit` 0 puts the binding back). Beards on
+  chins, hair on heads. The eyelashes (made in another space) are hidden.
+- **The lava crusts over:** it was molten all across, a strip of orange paint. Now a molten streak down its middle
+  cooling to dark crust toward its banks, with rafts of crust drifting in it (`roundIsland.lavaCrust`, `lavaRafts`).
+  Its ground is the dark crust it cooled to (it was flat salmon orange, a painted pad at its head and on the beach).
+- **Steam where the lava meets the sea:** a white column boils off its mouth (`lava.sea_steam`).
+- **Ground that doesn't repeat from afar:** each ground texture (2.5-4 m tiles) seen from a hundred metres repeated into a
+  regular grid of its own speckles: the solfatara and the Thaw read as graph paper from the air. Past ~25 m each layer
+  eases into a 90 m copy of itself (M_IslandGround). The moss's two extra sizes are smaller and turned at odd angles;
+  the soil keeps one.
+- **The cirque's walls clean ice:** steep ice is a little brighter (slopeRock.ice), so the ground keeps its ice texture
+  there (dark rock smudges ran down Skaldrith's cirque); no polished streaks down its walls.
+- Round-island tests 0 failed; the city 16.5 ms a frame, inside the north-west fort 10.3 ms (last round 18.0 and 10.6:
+  unbound hair costs less).
+- Open: the stream's far banks still step a little (every second sample far off).
+
 ### Round island: the look pass, ninth round: the lake, the edges between grounds, shoes and the inn's bar (11-23)
 
 From round 9's open list and a fresh look at the lake, the south-east fort, the stream and Hearthmoot's people (Raven:
@@ -39,9 +63,8 @@ From round 9's open list and a fresh look at the lake, the south-east fort, the 
   kick board, tankards and a tap keg on the counter, a board over the bar (their own random stream: nothing else moved).
 - Round-island tests 0 failed; the city 18.0 ms a frame, inside the north-west fort 10.6 ms (last round 18.5 and 10.5).
   One run of four hit the known GPU fault in the shadow maps' non-Nanite culling (the shoes are Nanite, out of that pass).
-- Open: everyone's hair (the townsfolk's and yours) is drawn where the head is in the face mesh's own rest pose, a hand
-  lower than the head: a beard at the throat, short hair hidden in the collar (Docs/HANDOFF.md "Hair"). The stream's banks
-  still step a little far off, where the ground is drawn from every second sample.
+- Open (then): everyone's hair drawn a hand too low (fixed in the tenth round). The stream's banks still step a little far
+  off, where the ground is drawn from every second sample.
 
 ### Round island: the look pass, eighth round: the forts, the stream, the roads and the rooms (11-23)
 

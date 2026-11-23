@@ -554,11 +554,11 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		S[k] = z === "T1" ? (fbm(x / 45, y / 45, 1068 + 1, 2) > 0.45 ? SURF.lichen_rock : SURF.snow) : z === "T2" ? SURF.snow_forest
 			: z === "T3" ? (t3Lake(x, y) > 0.5 ? (fbm(x / 50, y / 50, 96, 2) > 0.35 ? SURF.snow : SURF.lake_ice) : SURF.snow)
 			: z === "T4" ? SURF.glacier
-			: z === "T5" ? (() => {   // the cirque floor one sheet of blue ice (Skaldrith's arena); polished ice in streaks down the ice cap
-				const db = Math.hypot(x - BOWL[0], y - BOWL[1]), th = Math.atan2(y - BOWL[1], x - BOWL[0]);
-				// (Polished streaks only on the cirque's own walls: out on the cap a thin noise-contour streak, drawn 4 m at a
-				// time, read as a jagged dark band.)
-				return db < 205 + 15 * fbm(x / 40, y / 40, 1068 + 50, 2) || (db < 300 && Math.abs(fbm(th * 9, db / 140, 1068 + 51, 2)) < 0.07) ? SURF.ice : SURF.glacier;
+			: z === "T5" ? (() => {   // the cirque floor one sheet of blue ice (Skaldrith's arena), the ice cap glacier
+				const db = Math.hypot(x - BOWL[0], y - BOWL[1]);
+				// (No polished streaks down the walls: drawn 4 m at a time a thin streak read as a jagged dark band, and blended
+				// soft, round 11, as big dark smudges.)
+				return db < 205 + 15 * fbm(x / 40, y / 40, 1068 + 50, 2) ? SURF.ice : SURF.glacier;
 			})()
 			: z === "T7" ? (Math.max(0, 1 - Math.abs(fbm(x / 520, y / 300, 1068 + 43, 3)) * 22) > 0.4 ? SURF.shingle
 				: n > -0.25 + 0.9 * (1 - smooth(60, 200, FF.beyondAt("tundra", [x, y]))) ? SURF.steppe : SURF.snow)   // old snow lies in its hollows
@@ -1034,7 +1034,9 @@ const land = {
 		{ id: "cinder", class: SURF.cinder, soft: 1, color: [94, 84, 76], rough: 0.95, layers: { soil: 0.5, stones: 0.5 } },
 		{ id: "cinder_grass", class: SURF.cinder_grass, soft: 1, color: [80, 90, 54], rough: 0.9, layers: { grass: 0.6, soil: 0.4 } },
 		{ id: "kipuka", class: SURF.kipuka, soft: 1, color: [72, 90, 60], rough: 0.9, layers: { litter: 0.5, moss: 0.3, grass: 0.2 } },
-		{ id: "lava", class: SURF.lava, color: [232, 92, 26], rough: 0.6, layers: { stones: 1 } },
+		// (round 11: the lava ground was flat salmon orange, a painted pad at the river's head and on the beach at its mouth;
+		// the river's own sheet glows, its ground is the dark crust it cooled to)
+		{ id: "lava", class: SURF.lava, color: [66, 36, 30], rough: 0.6, layers: { stones: 1 } },
 		{ id: "lava_crust", class: SURF.lava_crust, color: [66, 60, 58], rough: 0.95, layers: { stones: 1 } },
 		{ id: "snow", class: SURF.snow, soft: 1, color: [238, 242, 245], rough: 0.8, layers: { sand: 0.9, stones: 0.1 } },
 		{ id: "snow_forest", class: SURF.snow_forest, soft: 1, color: [214, 222, 224], rough: 0.85, layers: { sand: 0.6, litter: 0.4 } },
@@ -1055,8 +1057,10 @@ const land = {
 		{ id: "snow_crack", class: SURF.snow_crack, color: [168, 184, 202], rough: 0.8, layers: { sand: 0.7, stones: 0.3 } },
 		{ id: "moss_crack", class: SURF.moss_crack, color: [86, 90, 62], rough: 0.9, layers: { moss: 0.5, soil: 0.5 } },
 	],
-	// (ice: the steep faces of these surfaces, glacier and ice, show ice not the zone's rock: WRLand SlopeIce)
-	slopeRock: { color: [88, 84, 80], fromDeg: 33, toDeg: 47, ledge: [96, 112, 70], ice: [172, 198, 222], iceClasses: [SURF.lake_ice, SURF.glacier, SURF.crevasse, SURF.ice] },
+	// (ice: the steep faces of these surfaces, glacier and ice, show ice not the zone's rock: WRLand SlopeIce; round 11 a
+	// little brighter, so the ground material keeps its snow and ice texture there: darker, the cirque's walls took the
+	// rock texture in dark smudges)
+	slopeRock: { color: [88, 84, 80], fromDeg: 33, toDeg: 47, ledge: [96, 112, 70], ice: [196, 218, 236], iceClasses: [SURF.lake_ice, SURF.glacier, SURF.crevasse, SURF.ice] },
 	// The Volcanic's lava river (WRRoundIsland draws it, molten): its points with the surface level (m), and its width.
 	lava: { width: FF.LAVA_WIDTH, river: lavaLine.filter((p) => Math.hypot(p[0], p[1]) < coastAt(bearingOf(p[0], p[1])) - 10).map((p) => [Math.round(p[0]), Math.round(p[1]), +p[2].toFixed(2)]) },
 	lake: { level: LAKE_LEVEL, at: RI.lakeAt.map(Math.round), outline: lakeOutline.map((p) => p.map(Math.round)),

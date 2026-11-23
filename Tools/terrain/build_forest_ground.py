@@ -23,6 +23,7 @@ ambientCG scans Ground053 and kin by Trails' terrain_surfaces.py, tiled at 2.5 m
                   land's colour comes from the vertex colour (TintAmount 0.8 of it: the textures keep their light and
                   shade, the land its own colour), so one ground can be snow, basalt, dune sand and meadow.
 """
+import math
 import os
 import sys
 import unreal
@@ -148,11 +149,15 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     moss_c, moss_h, moss_n = scan("Moss", 250.0)
     soil_c, soil_h, soil_n = scan("Soil", 250.0)
     if strong_tint:
-        # (round 10) the moss and the soil again at two more sizes, turned, in shifting shares (as the grass, round 8): the
-        # Thaw's moss repeat ran across it in fine diagonal stripes, seen from any height
+        # (round 10) the moss again at two more sizes, turned, in shifting shares (as the grass, round 8): the Thaw's moss
+        # repeat ran across it in fine diagonal stripes, seen from any height
         def multi(short, c0, h0, n0):
-            uv2 = mul(append2(wy, mul(wx, k=-1.0)), k=1.0 / 730.0)
-            uv3 = mul(append2(add(mul(wx, k=0.5), mul(wy, k=0.866)), add(mul(wx, k=-0.866), mul(wy, k=0.5))), k=1.0 / 410.0)
+            # (round 11: at 7.3 m turned a quarter its seams drew a 7 m square grid seen from afar; smaller sizes at odd
+            # angles, their seams lost in the far mips)
+            def turned(deg, size):
+                c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+                return mul(append2(add(mul(wx, k=c), mul(wy, k=s_)), add(mul(wx, k=-s_), mul(wy, k=c))), k=1.0 / size)
+            uv2, uv3 = turned(37.0, 190.0), turned(71.0, 310.0)
             c2, n2 = sample(f"{FOLDER}/T_Forest{short}_BCH", uv2), sample(f"{FOLDER}/T_Forest{short}_N", uv2)
             c3, n3 = sample(f"{FOLDER}/T_Forest{short}_BCH", uv3), sample(f"{FOLDER}/T_Forest{short}_N", uv3)
             v1 = sat(add(mul(noise(add(mul(xy, k=1.0 / 1500.0), const(3.1))), k=0.25), k=0.34))
@@ -165,7 +170,7 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
             h = div(add(add(mul(h0, v1), mul(pin(c2, "A"), v2)), mul(pin(c3, "A"), v3)), vs)
             return c, h, nn
         moss_c, moss_h, moss_n = multi("Moss", moss_c, moss_h, moss_n)
-        soil_c, soil_h, soil_n = multi("Soil", soil_c, soil_h, soil_n)
+        # (not the soil, round 11: its seams crossed into a square grid over the steam ground)
     grass_c, grass_h, grass_n = pack("Grass", 400.0)
     if strong_tint:
         # (round 8) the grass again at 9.7 m, turned a quarter, mixed in by a slow wash: its 4 m repeat ran across every
@@ -187,6 +192,17 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     sand_c, sand_h, sand_n = pack("SandA", 400.0)
     cols = [litter_c, moss_c, soil_c, grass_c, stones_c, sand_c]
     heights = [litter_h, moss_h, soil_h, grass_h, stones_h, sand_h]
+    if strong_tint:
+        # (round 11) Far off, each layer eases into a 90 m copy of itself (big soft patches of its own colours) and its
+        # height flattens: a 2.5-4 m texture seen from a hundred metres repeats into a regular grid of its own speckles
+        # (the steam ground and the Thaw read as graph paper from the air).
+        far_d = op(unreal.MaterialExpressionDistance, expr(unreal.MaterialExpressionCameraPositionWS), expr(unreal.MaterialExpressionWorldPosition))
+        far_k = sat(mul(add(far_d, k=-2500.0), k=1.0 / 6000.0))
+        far_uv = mul(xy, k=1.0 / 9000.0)
+        far_src = [f"{FOLDER}/T_ForestLitter_BCH", f"{FOLDER}/T_ForestMoss_BCH", f"{FOLDER}/T_ForestSoil_BCH", MW + "Grass_col", MW + "Stones_col", MW + "SandA_col"]
+        for i, src in enumerate(far_src):
+            cols[i] = lerp(cols[i], mask(sample(src, far_uv), "r", "g", "b"), far_k)
+            heights[i] = lerp(heights[i], const(0.35), far_k)
     norms = [litter_n, moss_n, soil_n, grass_n, stones_n, sand_n]
     roughs = [0.88, 0.95, 0.9, 0.86, 0.72, 0.9]
 

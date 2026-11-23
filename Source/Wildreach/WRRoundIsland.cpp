@@ -1038,9 +1038,13 @@ void AWRRoundIsland::BuildLava()
 	const FWRTuning& T = FWRTuning::Get();
 	TArray<FVector> Pts;
 	for (const TSharedPtr<FJsonValue>& V : *Rows) { const TArray<TSharedPtr<FJsonValue>>& R = V->AsArray(); Pts.Add(FVector(At(R, 0), At(R, 1), At(R, 2)) * 100.f); }
-	// Five across, molten all across with a little crust at the rims (tucked under the levees) (M_Lava: R = heat).
+	// Nine across (M_Lava: R = heat, G = 0 at the sunk rim): a molten streak down the middle, crusting over toward the
+	// banks, rafts of crust drifting in it (round 11: molten all across, it read as a bright orange strip of paint), the
+	// rims tucked under the levees.
 	const float Half = float(L->GetNumberField(TEXT("width"))) * 50.f * 1.15f;
-	static const float Across[5] = { -1.f, -0.5f, 0.f, 0.5f, 1.f };
+	static const float Across[9] = { -1.f, -0.75f, -0.5f, -0.25f, 0.f, 0.25f, 0.5f, 0.75f, 1.f };
+	constexpr int32 NA = UE_ARRAY_COUNT(Across);
+	const float CrustAt = T.Num(TEXT("roundIsland.lavaCrust"), 0.75f), Rafts = T.Num(TEXT("roundIsland.lavaRafts"), 0.45f);
 	TArray<FVector> V, N;
 	TArray<int32> Tri;
 	TArray<FVector2D> UV;
@@ -1054,16 +1058,20 @@ void AWRRoundIsland::BuildLava()
 		const FVector Side(-Dir.Y, Dir.X, 0.f);
 		for (const float A : Across)
 		{
-			V.Add(Pts[i] + Side * (A * Half) - FVector(0.f, 0.f, FMath::Abs(A) > 0.9f ? 25.f : 0.f));
+			const bool bRim = FMath::Abs(A) > 0.9f;
+			V.Add(Pts[i] + Side * (A * Half) - FVector(0.f, 0.f, bRim ? 25.f : 0.f));
 			N.Add(FVector::UpVector);
 			UV.Add(FVector2D(Along / 600.f, A * 0.5f + 0.5f));
-			Col.Add(FLinearColor(FMath::Abs(A) > 0.9f ? 0.6f : 1.f, 1.f, 0.f, 1.f));   // molten all across, a crust at the rims
+			// heat: 1 down the middle, falling to (1 - CrustAt) at the banks; rafts of crust (Perlin, ~25 m) cool it in places
+			const float Profile = 1.f - CrustAt * FMath::SmoothStep(0.2f, 0.95f, FMath::Abs(A));
+			const float Raft = FMath::SmoothStep(-0.15f, 0.35f, FMath::PerlinNoise2D(FVector2D(Along / 2500.f + 7.1f, A * 1.4f + 3.3f)));
+			Col.Add(FLinearColor(Profile * FMath::Lerp(1.f - Rafts, 1.f, Raft), bRim ? 0.4f : 1.f, 0.f, 1.f));
 			Tan.Add(FProcMeshTangent(Dir, false));
 		}
 	}
-	for (int32 i = 0; i + 1 < Pts.Num(); ++i) for (int32 k = 0; k < 4; ++k)
+	for (int32 i = 0; i + 1 < Pts.Num(); ++i) for (int32 k = 0; k < NA - 1; ++k)
 	{
-		const int32 a = i * 5 + k, b = a + 1, c = a + 5, d = a + 6;
+		const int32 a = i * NA + k, b = a + 1, c = a + NA, d = a + NA + 1;
 		Tri.Append({ a, b, c, b, d, c });   // counter-clockwise from above (face up), as the dressing's hazard sheets
 	}
 	Lava = NewObject<UProceduralMeshComponent>(this, TEXT("Lava"));
@@ -1102,6 +1110,15 @@ void AWRRoundIsland::BuildLava()
 		Lt->RegisterComponent();
 		++Lights;
 		(void)Run;
+	}
+	// (round 11) Where it runs into the sea, a wall of steam boils off (it ended at the water in a bright flat strip).
+	if (Pts.Num() >= 2)
+	{
+		const FVector MouthDir = (Pts.Last() - Pts[Pts.Num() - 2]).GetSafeNormal2D();
+		if (USceneComponent* Steam = WRFx::Attach(RootComponent, TEXT("lava.sea_steam"), NAME_None, T.Num(TEXT("roundIsland.lavaSteamScale"), 1.f)))
+		{
+			Steam->SetWorldLocation(Pts.Last() + MouthDir * T.Num(TEXT("roundIsland.lavaSteamOut"), 1500.f) + FVector(0.f, 0.f, 150.f));
+		}
 	}
 	UE_LOG(LogWildreach, Log, TEXT("ROUND the lava river: %d points, %.0f m, %d glow lights"), Pts.Num(), Along / 100.f, Lights);
 }

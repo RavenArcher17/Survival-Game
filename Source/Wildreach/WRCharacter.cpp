@@ -631,6 +631,29 @@ void AWRCharacter::LoadBodyArt()
 			FaceHairParams.Add(FName(*P.Key), float(P.Value->AsNumber()));
 		}
 	}
+	// (round 11) The grooms ride the body's head bone, fitted from the head they were made on to this face. Bound to the
+	// face (their binding has no source head, and our faces aren't the template's mesh) each hair root was projected
+	// onto the nearest point of the face, and our heroes' heads stand ~11 cm higher and ~10% wider than the template's:
+	// the beard landed on the throat and the hair on the nape. So, rigid (a plain face's jaw doesn't move anyway): from
+	// the template's crown (hero.groomTemplate: SKM_Face's bounds "x,y,z,ex,ey,ez", cm) to this face's crown, widened to
+	// its width, carried by the head. Eyelashes are made in another space: hidden. hero.groomFit 0: bound as before.
+	const bool bFit = FaceAsset && WRTune(TEXT("hero.groomFit"), 1.f) > 0.f;
+	FTransform GroomRel = FTransform::Identity;
+	if (bFit)
+	{
+		TArray<FString> TP;
+		FWRTuning::Get().Str(TEXT("hero.groomTemplate"), TEXT("0,2.0,153.1,17.4,12.2,18.6")).ParseIntoArray(TP, TEXT(","));
+		const FVector TC = TP.Num() >= 6 ? FVector(FCString::Atof(*TP[0]), FCString::Atof(*TP[1]), FCString::Atof(*TP[2])) : FVector(0, 2.0, 153.1);
+		const FVector TE = TP.Num() >= 6 ? FVector(FCString::Atof(*TP[3]), FCString::Atof(*TP[4]), FCString::Atof(*TP[5])) : FVector(17.4, 12.2, 18.6);
+		const FBoxSphereBounds FB = FaceAsset->GetImportedBounds();
+		const float Wide = 0.5f * (FB.BoxExtent.X / FMath::Max(TE.X, 1.f) + FB.BoxExtent.Y / FMath::Max(TE.Y, 1.f));
+		const FVector From(TC.X, TC.Y, TC.Z + TE.Z), To(FB.Origin.X, FB.Origin.Y, FB.Origin.Z + FB.BoxExtent.Z);
+		const FTransform Fit = FTransform(-From) * FTransform(FQuat::Identity, FVector::ZeroVector, FVector(Wide, Wide, 1.f)) * FTransform(To);
+		const FReferenceSkeleton& Ref = FaceAsset->GetRefSkeleton();
+		FTransform HeadRest = FTransform::Identity;
+		for (int32 I = Ref.FindBoneIndex(TEXT("head")); I != INDEX_NONE; I = Ref.GetParentIndex(I)) HeadRest = HeadRest * Ref.GetRefBonePose()[I];
+		GroomRel = Fit * HeadRest.Inverse();
+	}
 	for (UGroomComponent* Groom : Grooms)
 	{
 		const TSharedPtr<FJsonObject>* Slot = nullptr;
@@ -642,10 +665,19 @@ void AWRCharacter::LoadBodyArt()
 		}
 		UGroomAsset* GroomAsset = GroomPath.IsEmpty() ? nullptr : LoadObject<UGroomAsset>(nullptr, *GroomPath);
 		UGroomBindingAsset* Binding = BindingPath.IsEmpty() ? nullptr : LoadObject<UGroomBindingAsset>(nullptr, *BindingPath);
+		if (bFit)
+		{
+			Groom->AttachToComponent(Body, FAttachmentTransformRules::KeepRelativeTransform, TEXT("head"));
+			Groom->SetRelativeTransform(GroomRel);
+		}
+		else if (Groom->GetAttachParent() != Face)
+		{
+			Groom->AttachToComponent(Face, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+		}
 		Groom->SetUseCards(true);
-		Groom->SetGroomAsset(GroomAsset, Binding, false);
+		Groom->SetGroomAsset(GroomAsset, bFit ? nullptr : Binding, false);
 		Groom->SetEnableSimulation(false);
-		Groom->SetVisibility(GroomAsset != nullptr);
+		Groom->SetVisibility(GroomAsset != nullptr && !(bFit && Groom->GetFName() == TEXT("Eyelashes")));
 		// The hair cards in the Wildreach hair material (path motion: Lightning's lift, Wind's stir; hero.md 2.6).
 		Groom->EmptyOverrideMaterials();
 		FString CardsPath, CardsSlot = TEXT("MI_Hair_Cards");

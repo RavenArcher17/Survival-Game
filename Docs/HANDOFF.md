@@ -999,12 +999,13 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **Shoes** (round 10): a look's `shoes` {mesh, material, ankleToBall} (on its legs piece's look) puts a static mesh on
   foot_l/foot_r, placed from the body's bind pose (ankle over the ground, toe toward ball_l/r, scaled by that length over
   ankleToBall, 14 cm for SM_Shoe_A).
-- **Hair (open)**: every groom is drawn at the face mesh's rest pose, so it sits a hand below the posed head (the beard at
-  the throat). Ruled out in round 10: the townsfolk's plain face (with the face rig on it's the same), the groom's LOD
-  (forced 0, 1 and 3: the same), Nanite (the faces aren't) and the skin cache (on). Without its binding, on the body's head
-  bone set off by the face's rest head, it follows the head but sits on the generic head (a few cm off; short hair still
-  hidden); with the binding, it ignores where it's attached (on the body it threw the hair out in spikes). Next: why the
-  binding's skinning never moves it (the binding's target is the face mesh, num_interpolation_points 100).
+- **Hair** (round 11): the MetaHuman grooms' bindings have no source mesh, so binding only projected each hair root onto
+  the nearest point of our faces, which are reduced meshes (19k vertices, not the template's 34.6k: no transfer is
+  possible) whose crowns stand ~11 cm higher and ~10% wider than the template head the grooms were made on (the women's
+  only 1-2 cm). Every man's beard hung at his throat and his hair at his nape. WRCharacter now hangs each groom on the
+  body's head bone, unbound and rigid, moved from the template's crown (hero.groomTemplate, SKM_Face's bounds) to the
+  face's crown and widened to its width; eyelashes (made in another space) are hidden. hero.groomFit 0 = the old
+  binding. Rebuilding the bindings with MH_Groom_Head as source threw the hair 20 cm up (the vertices don't match).
 - **NaN vertices**: `FMath::Pow(FMath::Sin(PI * t), e)` at t = 1 is NaN (sin(PI) is a hair below 0 in floats), and a NaN
   vertex gives the component NaN bounds (an ensure). Clamp the sine: `FMath::Pow(FMath::Max(0.f, FMath::Sin(...)), e)`.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'
